@@ -1,0 +1,11 @@
+syntax = "proto3";
+
+package api.inventory.v1beta1;
+
+message UpdateResourceRelationshipByURNHsHcrnsParameter {
+
+  string subjectURN = 36776796;
+
+  string objectURN = 415864400;
+
+}

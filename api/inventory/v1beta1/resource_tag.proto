@@ -1,0 +1,11 @@
+syntax = "proto3";
+
+package api.inventory.v1beta1;
+
+message ResourceTag {
+
+  string key = 106079;
+
+  string value = 111972721;
+
+}

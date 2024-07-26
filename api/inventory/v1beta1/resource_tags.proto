@@ -1,0 +1,11 @@
+syntax = "proto3";
+
+package api.inventory.v1beta1;
+
+import public "inventory/v1beta1/resource_tag.proto";
+
+message ResourceTags {
+
+  repeated ResourceTag tags = 3552281;
+
+}

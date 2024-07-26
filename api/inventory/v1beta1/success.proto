@@ -1,0 +1,10 @@
+syntax = "proto3";
+
+package api.inventory.v1beta1;
+
+message Success {
+
+  // A unique id that references the resource instance.
+  string id = 3355;
+
+}

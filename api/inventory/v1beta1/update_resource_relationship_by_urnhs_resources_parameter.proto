@@ -1,0 +1,11 @@
+syntax = "proto3";
+
+package api.inventory.v1beta1;
+
+message UpdateResourceRelationshipByURNHsResourcesParameter {
+
+  string subject_resource = 19549760;
+
+  string object_resource = 254445841;
+
+}

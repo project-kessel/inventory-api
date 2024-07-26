@@ -1,0 +1,37 @@
+syntax = "proto3";
+
+package api.inventory.v1beta1;
+
+import "google/protobuf/empty.proto";
+import public "inventory/v1beta1/error.proto";
+import public "inventory/v1beta1/rhel_host.proto";
+
+service HostsService {
+  rpc CreateRHELHostinKessel (CreateRHELHostinKesselRequest) returns (RHELHost);
+
+  rpc DeleteRHELHost (DeleteRHELHostRequest) returns (google.protobuf.Empty);
+
+  rpc UpdateRHELHost (UpdateRHELHostRequest) returns (google.protobuf.Empty);
+
+}
+
+message CreateRHELHostinKesselRequest {
+  // The RHEL Host to create in Kessel Asset Inventory
+  RHELHost rHELHost = 1;
+
+}
+
+message DeleteRHELHostRequest {
+  // A resource instance using the format: \"<reporter_data.reporter_type>:<reporter_data.reporter_id>::<reporter_data.resourceId_alias>\"
+  string resource = 1;
+
+}
+
+message UpdateRHELHostRequest {
+  // A resource instance using the format: \"<reporter_data.reporter_type>:<reporter_data.reporter_id>::<reporter_data.resourceId_alias>\"
+  string resource = 1;
+  // The RHEL host to update
+  RHELHost rHELHost = 2;
+
+}
+

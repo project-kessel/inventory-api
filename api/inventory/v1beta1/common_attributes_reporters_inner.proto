@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+package api.inventory.v1beta1;
+
+message CommonAttributesReportersInner {
+
+  // The reporter type, for example, Satellite, ACM, OCM The reporter type is authenticated during resource registration/update.
+  string Type = 2622298;
+
+  // Identifies the reporter. This is meant to uniquely identify reporters that can have multiple instances running, such as ACM. The instance ID is authenticated during resource registration/update.
+  string reporter_instance_id = 513872551;
+
+  // The time when this reporter record was created
+  string created = 491683561;
+
+  // The time when this reporter record was updated
+  string last_updated = 338699282;
+
+}

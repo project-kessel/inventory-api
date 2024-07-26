@@ -6,6 +6,10 @@ import public "inventory/v1beta1/common_attributes_reporters_inner.proto";
 import public "inventory/v1beta1/reporter_data.proto";
 import public "inventory/v1beta1/resource_tag.proto";
 
+option go_package = "api/inventory/v1beta1;v1beta1";
+option java_multiple_files = true;
+option java_package = "api.inventory.v1beta1";
+
 message RHELHost {
 
   // Kessel Asset Inventory generated identifier.

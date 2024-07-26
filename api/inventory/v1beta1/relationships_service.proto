@@ -7,6 +7,10 @@ import public "inventory/v1beta1/error.proto";
 import public "inventory/v1beta1/policy_relationship.proto";
 import public "inventory/v1beta1/update_resource_relationship_by_urnhs_resources_parameter.proto";
 
+option go_package = "api/inventory/v1beta1;v1beta1";
+option java_multiple_files = true;
+option java_package = "api.inventory.v1beta1";
+
 service RelationshipsService {
   rpc CreatePolicyRelationshipinKessel (CreatePolicyRelationshipinKesselRequest) returns (PolicyRelationship);
 

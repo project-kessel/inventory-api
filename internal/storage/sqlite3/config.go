@@ -21,8 +21,3 @@ func (c *Config) Complete() CompletedConfig {
 		c,
 	}}
 }
-
-func NewCompleteConfig(c *Config) CompletedConfig {
-    return c.Complete()
-}
-

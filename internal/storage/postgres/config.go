@@ -67,8 +67,3 @@ func (c *Config) Complete() CompletedConfig {
 
 	return CompletedConfig{&completedConfig{DSN: dsn}}
 }
-
-func NewCompleteConfig(c *Config) CompletedConfig {
-    return c.Complete()
-}
-

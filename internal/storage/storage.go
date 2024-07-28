@@ -3,14 +3,10 @@ package storage
 import (
 	"fmt"
 
-    "github.com/google/wire"
-
 	"gorm.io/driver/postgres"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
-
-var ProviderSet = wire.NewSet(New, NewOptions, NewConfig, NewCompleteConfig)
 
 func New(c CompletedConfig) (*gorm.DB, error) {
 	var opener func(string) gorm.Dialector

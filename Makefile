@@ -6,7 +6,7 @@ API_PROTO_FILES:=$(shell find api -name *.proto)
 
 TITLE:="Kessel Asset Inventory API"
 VERSION:=$(shell git describe --tags --always)
-OPENAPI_SCHEMA_VERSION=0.8.10
+INVENTORY_SCHEMA_VERSION=0.8.10
 
 .PHONY: init
 # init env
@@ -26,7 +26,7 @@ api:
  	       --go_out=paths=source_relative:./api \
  	       --go-http_out=paths=source_relative:./api \
  	       --go-grpc_out=paths=source_relative:./api \
-	       --openapi_out=fq_schema_naming=false,default_response=true,version=$(OPENAPI_SCHEMA_VERSION),title=$(TITLE):. \
+	       --openapi_out=fq_schema_naming=false,default_response=true,version=$(INVENTORY_SCHEMA_VERSION),title=$(TITLE):. \
 	       $(API_PROTO_FILES)
 
 # .PHONY: api

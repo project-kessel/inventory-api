@@ -1,5 +1,5 @@
 version: v2
-name: buf.build/project-kessel/relations-api
+name: buf.build/project-kessel/inventory-api
 lint:
   use:
     - DEFAULT

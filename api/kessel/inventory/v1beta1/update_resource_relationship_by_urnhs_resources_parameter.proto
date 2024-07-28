@@ -1,0 +1,14 @@
+syntax = "proto3";
+
+package api.kessel.inventory.v1beta1;
+
+option go_package = "api/kessel/inventory/v1beta1;v1beta1";
+option java_multiple_files = true;
+option java_package = "api.kessel.inventory.v1beta1";
+
+message UpdateResourceRelationshipByURNHsResourcesParameter {
+
+  string subject_resource = 19549760;
+
+  string object_resource = 254445841;
+}

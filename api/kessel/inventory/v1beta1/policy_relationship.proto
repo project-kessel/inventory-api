@@ -1,0 +1,33 @@
+syntax = "proto3";
+
+package api.kessel.inventory.v1beta1;
+
+option go_package = "api/kessel/inventory/v1beta1;v1beta1";
+option java_multiple_files = true;
+option java_package = "api.kessel.inventory.v1beta1";
+
+message PolicyRelationship {
+
+  // The type of Resource relationship
+  string relationship_type = 251000036;
+
+  // The resource ID assigned to the resource by Kessel Asset Inventory. A
+  // reporter alias may also be used as a resource ID using the format:
+  // \"hcrn:<reporter_data.reporter_type>:<reporter_data.reporter_id>::<reporter_data.resourceId_alias>\"
+  string policy_id = 225679544;
+
+  // The resource ID assigned to the resource by Kessel Asset Inventory. A
+  // reporter alias may also be used as a resource ID using the format:
+  // \"hcrn:<reporter_data.reporter_type>:<reporter_data.reporter_id>::<reporter_data.resourceId_alias>\"
+  string cluster_id = 240280960;
+
+  // the aggregate status of the cluster
+  enum StatusEnum {
+    StatusEnum_COMPLIANT = 0;
+    StatusEnum_NON_COMPLIANT = 1;
+    StatusEnum_OTHER = 2;
+    StatusEnum_UNKNOWN = 3;
+  }
+
+  StatusEnum status = 355610639;
+}

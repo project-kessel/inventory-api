@@ -1,0 +1,62 @@
+syntax = "proto3";
+
+package api.kessel.inventory.v1beta1;
+
+import "google/api/annotations.proto";
+
+import public "kessel/inventory/v1beta1/error.proto";
+import public "kessel/inventory/v1beta1/policy.proto";
+
+option go_package = "api/kessel/inventory/v1beta1;v1beta1";
+option java_multiple_files = true;
+option java_package = "api.kessel.inventory.v1beta1";
+
+message CreatePolicyRequest {
+  // The policy to create in Kessel Asset Inventory
+  Policy policy = 1;
+}
+
+message CreatePolicyResponse {
+  // The policy created in Kessel Asset Inventory
+  Policy policy = 1;
+}
+
+message UpdatePolicyRequest {
+  // The {resource} format
+  // \"<reporter_data.reporter_type>:<reporter_data.reporter_id>::<reporter_data.resourceId_alias>\".
+  string resource = 1;
+  // The Policy to update in Kessel Asset Inventory
+  Policy policy = 2;
+}
+
+message UpdatePolicyResponse {}
+
+message DeletePolicyRequest {
+  // The {resource} format
+  // \"<reporter_data.reporter_type>:<reporter_data.reporter_id>::<reporter_data.resourceId_alias>\".
+  string resource = 1;
+}
+
+message DeletePolicyResponse {}
+
+service PoliciesService {
+  rpc CreatePolicy(CreatePolicyRequest) returns (CreatePolicyResponse) {
+    option (google.api.http) = {
+      post : "/v1beta1/policies"
+      body : "policy"
+    };
+  };
+
+  rpc UpdatePolicy(UpdatePolicyRequest) returns (UpdatePolicyResponse) {
+    option (google.api.http) = {
+      put : "/v1beta1/policies/{resource}"
+      body : "policy"
+    };
+  };
+
+  rpc DeletePolicy(DeletePolicyRequest) returns (DeletePolicyResponse) {
+    option (google.api.http) = {
+      delete : "/v1beta1/policies/{resource}"
+    };
+  };
+}

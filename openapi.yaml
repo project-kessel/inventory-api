@@ -4,7 +4,7 @@
 openapi: 3.0.3
 info:
     title: Kessel Asset Inventory API
-    version: 0.8.9
+    version: 0.8.10
 paths:
     /v1beta1/hosts:
         post:

@@ -1,0 +1,5 @@
+"1234":
+  tenant: "Example"
+  principal: "user@example.com"
+  is_reporter: true
+  type: "OCM"

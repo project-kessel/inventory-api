@@ -7,16 +7,12 @@ require (
 	github.com/cloudevents/sdk-go/v2 v2.15.2
 	github.com/confluentinc/confluent-kafka-go/v2 v2.5.0
 	github.com/coreos/go-oidc/v3 v3.11.0
-	github.com/go-chi/chi/v5 v5.1.0
-	github.com/go-chi/render v1.0.3
 	github.com/go-kratos/kratos/v2 v2.8.0
 	github.com/google/wire v0.6.0
 	github.com/project-kessel/relations-api v0.0.0-20240724204044-470d97c937c3
-	github.com/samber/slog-chi v1.11.0
 	github.com/spf13/cobra v1.8.1
 	github.com/spf13/pflag v1.0.5
 	github.com/spf13/viper v1.19.0
-	go.uber.org/automaxprocs v1.5.3
 	google.golang.org/genproto/googleapis/api v0.0.0-20240528184218-531527333157
 	google.golang.org/grpc v1.65.0
 	google.golang.org/protobuf v1.34.2
@@ -28,9 +24,8 @@ require (
 )
 
 require (
-	dario.cat/mergo v1.0.0 // indirect
 	filippo.io/edwards25519 v1.1.0 // indirect
-	github.com/ajg/form v1.5.1 // indirect
+	github.com/containerd/platforms v0.2.1 // indirect
 	github.com/envoyproxy/protoc-gen-validate v1.0.4 // indirect
 	github.com/fsnotify/fsnotify v1.7.0 // indirect
 	github.com/go-jose/go-jose/v4 v4.0.2 // indirect
@@ -76,7 +71,6 @@ require (
 	golang.org/x/sys v0.22.0 // indirect
 	golang.org/x/text v0.16.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240604185151-ef581f913117 // indirect
-	google.golang.org/grpc/cmd/protoc-gen-go-grpc v1.5.0 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gorm.io/driver/mysql v1.5.6 // indirect
 )

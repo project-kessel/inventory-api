@@ -2,7 +2,7 @@ package kafka
 
 import (
 	"context"
-	"fmt"
+
 	"github.com/go-kratos/kratos/v2/log"
 
 	confluent "github.com/cloudevents/sdk-go/protocol/kafka_confluent/v2"
@@ -12,7 +12,6 @@ import (
 
 	authnapi "github.com/project-kessel/inventory-api/internal/authn/api"
 	"github.com/project-kessel/inventory-api/internal/eventing/api"
-	"github.com/project-kessel/inventory-api/internal/models"
 )
 
 type KafkaManager struct {
@@ -20,9 +19,12 @@ type KafkaManager struct {
 	Protocol *confluent.Protocol
 	Client   cloudevents.Client
 	Errors   <-chan error
+
+	Logger *log.Helper
 }
 
-func New(config CompletedConfig, logger log.Logger) (*KafkaManager, error) {
+func New(config CompletedConfig, logger *log.Helper) (*KafkaManager, error) {
+	logger.Info("Using eventing: kafka")
 	if sender, err := confluent.New(
 		confluent.WithSenderTopic(config.DefaultTopic),
 		confluent.WithConfigMap(config.KafkaConfig),
@@ -39,7 +41,7 @@ func New(config CompletedConfig, logger log.Logger) (*KafkaManager, error) {
 		go func() {
 			eventChan, err := sender.Events()
 			if err != nil {
-				logger.Log(log.LevelError, "msg", fmt.Sprintf("failed to get events channel for sender, %v", err))
+				logger.Errorf("failed to get events channel for sender, %v", err)
 				errChan <- err
 			} else {
 				for e := range eventChan {
@@ -50,22 +52,22 @@ func New(config CompletedConfig, logger log.Logger) (*KafkaManager, error) {
 						// configured to do that.
 						m := ev
 						if m.TopicPartition.Error != nil {
-							logger.Log(log.LevelError, "msg", fmt.Sprintf("Delivery failed: %v\n", m.TopicPartition.Error))
+							logger.Errorf("Delivery failed: %v\n", m.TopicPartition.Error)
 							errChan <- err
 						} else {
-							logger.Log(log.LevelInfo, "msg", fmt.Sprintf("Delivered message to topic %s [%d] at offset %v\n",
-								*m.TopicPartition.Topic, m.TopicPartition.Partition, m.TopicPartition.Offset))
+							logger.Infof("Delivered message to topic %s [%d] at offset %v\n",
+								*m.TopicPartition.Topic, m.TopicPartition.Partition, m.TopicPartition.Offset)
 						}
 					case kafka.Error:
 						e := ev
 						if e.IsFatal() {
-							logger.Log(log.LevelError, "msg", fmt.Sprintf("Error: %v\n", ev))
+							logger.Errorf("Error: %v\n", ev)
 							errChan <- e
 						} else {
-							logger.Log(log.LevelInfo, "msg", fmt.Sprintf("Error: %v\n", ev))
+							logger.Infof("Error: %v\n", ev)
 						}
 					default:
-						logger.Log(log.LevelInfo, "msg", fmt.Sprintf("Ignored event: %v\n", ev))
+						logger.Infof("Ignored event: %v\n", ev)
 					}
 				}
 			}
@@ -76,6 +78,8 @@ func New(config CompletedConfig, logger log.Logger) (*KafkaManager, error) {
 			Protocol: sender,
 			Client:   client,
 			Errors:   errChan,
+
+			Logger: logger,
 		}, nil
 	}
 }
@@ -85,7 +89,7 @@ func (m *KafkaManager) Errs() <-chan error {
 }
 
 // Lookup figures out which topic should be used for the given identity and resource.
-func (m *KafkaManager) Lookup(identity *authnapi.Identity, resource *models.Resource) (api.Producer, error) {
+func (m *KafkaManager) Lookup(identity *authnapi.Identity, resource_type string, resource_id int64) (api.Producer, error) {
 
 	// there is no complicated topic dispatch logic... for now.
 	return NewProducer(m, m.Config.DefaultTopic, identity), nil
@@ -99,6 +103,8 @@ type kafkaProducer struct {
 	Manager  *KafkaManager
 	Topic    string
 	Identity *authnapi.Identity
+
+	Logger *log.Helper
 }
 
 // NewProducer produces a kafka producer that is bound to a particular topic.
@@ -107,11 +113,15 @@ func NewProducer(manager *KafkaManager, topic string, identity *authnapi.Identit
 		Manager:  manager,
 		Topic:    topic,
 		Identity: identity,
+
+		Logger: manager.Logger,
 	}
 }
 
 // Produce creates the cloud event and sends it on the Kafka Topic
 func (p *kafkaProducer) Produce(ctx context.Context, event *api.Event) error {
+
+	// TODO: flesh out the cloudevent structure
 	e := cloudevents.NewEvent()
 	e.SetData(cloudevents.ApplicationJSON, event)
 	return p.Manager.Client.Send(cecontext.WithTopic(ctx, p.Topic), e)

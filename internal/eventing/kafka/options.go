@@ -92,7 +92,7 @@ type Options struct {
 
 func NewOptions() *Options {
 	return &Options{
-		DefaultTopic:                       "common-inventory",
+		DefaultTopic:                       "kessel-inventory",
 		BuiltInFeatures:                    "gzip, snappy, ssl, sasl, regex, lz4, sasl_plain, sasl_scram, plugins, zstd, sasl_oauthbearer, http, oidc",
 		ClientId:                           "rdkafka",
 		MetadataBrokerList:                 "",

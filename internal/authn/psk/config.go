@@ -1,6 +1,7 @@
 package psk
 
 import (
+	"fmt"
 	"io"
 	"os"
 
@@ -39,19 +40,21 @@ func (c *Config) Complete() (CompletedConfig, error) {
 }
 
 func (c *Config) loadPreSharedKeys() error {
-	// TODO: fsnotify to reload the keys when the PSK file changes.
-	if file, err := os.Open(c.PreSharedKeyFile); err == nil {
-		defer file.Close()
-		data, err := io.ReadAll(file)
-		if err == nil {
-			if err := yaml.Unmarshal(data, &c.Keys); err != nil {
+	if len(c.PreSharedKeyFile) > 0 {
+		// TODO: fsnotify to reload the keys when the PSK file changes.
+		if file, err := os.Open(c.PreSharedKeyFile); err == nil {
+			defer file.Close()
+			data, err := io.ReadAll(file)
+			if err == nil {
+				if err := yaml.Unmarshal(data, &c.Keys); err != nil {
+					return err
+				}
+			} else {
 				return err
 			}
 		} else {
-			return err
+            return fmt.Errorf("Error opening preshared key file: %s [%s]", c.PreSharedKeyFile, err.Error())
 		}
-	} else {
-		return err
 	}
 	return nil
 }

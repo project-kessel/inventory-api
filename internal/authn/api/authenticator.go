@@ -1,7 +1,9 @@
 package api
 
 import (
-	"net/http"
+	"context"
+
+	"github.com/go-kratos/kratos/v2/transport"
 )
 
 type Decision string
@@ -15,5 +17,5 @@ const (
 type Authenticator interface {
 
 	// TODO: update the return value so it can carry a message in the DENY case
-	Authenticate(r *http.Request) (*Identity, Decision)
+	Authenticate(context.Context, transport.Transporter) (*Identity, Decision)
 }

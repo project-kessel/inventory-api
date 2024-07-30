@@ -1,7 +1,9 @@
 package delegator
 
 import (
-	"net/http"
+	"context"
+
+	"github.com/go-kratos/kratos/v2/transport"
 
 	"github.com/project-kessel/inventory-api/internal/authn/api"
 )
@@ -18,9 +20,9 @@ func (d *DelegatingAuthenticator) Add(a api.Authenticator) {
 	d.Authenticators = append(d.Authenticators, a)
 }
 
-func (d *DelegatingAuthenticator) Authenticate(r *http.Request) (*api.Identity, api.Decision) {
+func (d *DelegatingAuthenticator) Authenticate(ctx context.Context, t transport.Transporter) (*api.Identity, api.Decision) {
 	for _, a := range d.Authenticators {
-		identity, decision := a.Authenticate(r)
+		identity, decision := a.Authenticate(ctx, t)
 		if decision == api.Ignore {
 			continue
 		}

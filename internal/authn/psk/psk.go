@@ -2,8 +2,9 @@
 package psk
 
 import (
-	"net/http"
+	"context"
 
+	"github.com/go-kratos/kratos/v2/transport"
 	"github.com/project-kessel/inventory-api/internal/authn/api"
 	"github.com/project-kessel/inventory-api/internal/authn/util"
 )
@@ -27,8 +28,8 @@ func (a *PreSharedKeyAuthenticator) Lookup(key string) *api.Identity {
 	return nil
 }
 
-func (a *PreSharedKeyAuthenticator) Authenticate(r *http.Request) (*api.Identity, api.Decision) {
-	token := util.GetBearerToken(r)
+func (a *PreSharedKeyAuthenticator) Authenticate(ctx context.Context, t transport.Transporter) (*api.Identity, api.Decision) {
+	token := util.GetBearerToken(t)
 	identity := a.Lookup(token)
 	if identity != nil {
 		return identity, api.Allow

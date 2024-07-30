@@ -3,9 +3,9 @@ package oidc
 
 import (
 	"context"
-	"net/http"
 
 	coreosoidc "github.com/coreos/go-oidc/v3/oidc"
+	"github.com/go-kratos/kratos/v2/transport"
 
 	"github.com/project-kessel/inventory-api/internal/authn/api"
 	"github.com/project-kessel/inventory-api/internal/authn/util"
@@ -36,9 +36,9 @@ func New(c CompletedConfig) (*OAuth2Authenticator, error) {
 
 }
 
-func (o *OAuth2Authenticator) Authenticate(r *http.Request) (*api.Identity, api.Decision) {
+func (o *OAuth2Authenticator) Authenticate(ctx context.Context, t transport.Transporter) (*api.Identity, api.Decision) {
 	// get the token from the request
-	rawToken := util.GetBearerToken(r)
+	rawToken := util.GetBearerToken(t)
 
 	// ensure we got one
 	if rawToken == "" {

@@ -1,7 +1,7 @@
 package guest
 
 import (
-	"net/http"
+	"github.com/go-kratos/kratos/v2/transport"
 
 	"github.com/project-kessel/inventory-api/internal/authn/api"
 )
@@ -12,10 +12,10 @@ func New() *GuestAuthenticator {
 	return &GuestAuthenticator{}
 }
 
-func (a *GuestAuthenticator) Authenticate(r *http.Request) (*api.Identity, api.Decision) {
+func (a *GuestAuthenticator) Authenticate(t transport.Transporter) (*api.Identity, api.Decision) {
 
 	// TODO: should we use something else? ip address?
-	ua := r.Header.Get("User-Agent")
+	ua := t.RequestHeader().Get("User-Agent")
 	identity := &api.Identity{
 		Principal: ua,
 		IsGuest:   true,

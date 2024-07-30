@@ -5,20 +5,25 @@ import (
 	"encoding/json"
 	"os"
 
+	"github.com/go-kratos/kratos/v2/log"
 	authnapi "github.com/project-kessel/inventory-api/internal/authn/api"
 	"github.com/project-kessel/inventory-api/internal/eventing/api"
-	"github.com/project-kessel/inventory-api/internal/models"
 )
 
 type StdOutManager struct {
 	Encoder *json.Encoder
 	Errors  chan error
+
+	Logger *log.Helper
 }
 
-func New() (*StdOutManager, error) {
+func New(logger *log.Helper) (*StdOutManager, error) {
+	logger.Info("Using eventing: stdout")
 	return &StdOutManager{
 		Encoder: json.NewEncoder(os.Stdout),
 		Errors:  make(chan error),
+
+		Logger: logger,
 	}, nil
 }
 
@@ -31,7 +36,7 @@ func (m *StdOutManager) Errs() <-chan error {
 }
 
 // Lookup figures out which Producer should be used for the given identity and resource.
-func (m *StdOutManager) Lookup(identity *authnapi.Identity, resource *models.Resource) (api.Producer, error) {
+func (m *StdOutManager) Lookup(identity *authnapi.Identity, resource_type string, resource_id int64) (api.Producer, error) {
 	return m, nil
 }
 

@@ -3,13 +3,19 @@ package allow
 import (
 	"context"
 
+	"github.com/go-kratos/kratos/v2/log"
 	kessel "github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
 )
 
-type AllowAllAuthz struct{}
+type AllowAllAuthz struct {
+	Logger *log.Helper
+}
 
-func New() *AllowAllAuthz {
-	return &AllowAllAuthz{}
+func New(logger *log.Helper) *AllowAllAuthz {
+	logger.Info("Using authorizer: allow-all")
+	return &AllowAllAuthz{
+		Logger: logger,
+	}
 }
 
 func (a *AllowAllAuthz) Check(ctx context.Context, r *kessel.CheckRequest) (*kessel.CheckResponse, error) {

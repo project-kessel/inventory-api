@@ -14,12 +14,12 @@ message PolicyRelationship {
   // The resource ID assigned to the resource by Kessel Asset Inventory. A
   // reporter alias may also be used as a resource ID using the format:
   // \"hcrn:<reporter_data.reporter_type>:<reporter_data.reporter_id>::<reporter_data.resourceId_alias>\"
-  string policy_id = 225679544;
+  int64 policy_id = 225679544;
 
   // The resource ID assigned to the resource by Kessel Asset Inventory. A
   // reporter alias may also be used as a resource ID using the format:
   // \"hcrn:<reporter_data.reporter_type>:<reporter_data.reporter_id>::<reporter_data.resourceId_alias>\"
-  string cluster_id = 240280960;
+  int64 cluster_id = 240280960;
 
   // the aggregate status of the cluster
   enum StatusEnum {

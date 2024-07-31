@@ -1,0 +1,42 @@
+syntax = "proto3";
+
+package api.kessel.inventory.v1beta1;
+
+import "google/api/field_behavior.proto";
+import "google/protobuf/timestamp.proto";
+
+import public "kessel/inventory/v1beta1/resource_tag.proto";
+
+option go_package = "api/kessel/inventory/v1beta1;v1beta1";
+option java_multiple_files = true;
+option java_package = "api.kessel.inventory.v1beta1";
+
+message Metadata {
+  // Kessel Asset Inventory generated identifier.
+  int64 id = 3355 [ (google.api.field_behavior) = OUTPUT_ONLY ];
+
+  // The type of the Resource
+  string resource_type = 442752204;
+
+  // Date and time when the inventory item was first reported.
+  google.protobuf.Timestamp first_reported = 13874816
+      [ (google.api.field_behavior) = OUTPUT_ONLY ];
+
+  // Date and time when the inventory item was last updated.
+  google.protobuf.Timestamp last_reported = 436473483
+      [ (google.api.field_behavior) = OUTPUT_ONLY ];
+
+  // Identifier of the reporter that first reported this item.
+  string first_reported_by = 46112820
+      [ (google.api.field_behavior) = OUTPUT_ONLY ];
+
+  // Identifier of the reporter that last reported on this item.
+  string latest_reported_by = 505008782
+      [ (google.api.field_behavior) = OUTPUT_ONLY ];
+
+  // The workspace in which this resource is a member for access control.  A
+  // resource can only be a member of one workspace.
+  string workspace = 35122327;
+
+  repeated ResourceTag tags = 3552281;
+}

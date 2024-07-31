@@ -4,7 +4,6 @@ package api.kessel.inventory.v1beta1;
 
 import "google/api/annotations.proto";
 
-import public "kessel/inventory/v1beta1/error.proto";
 import public "kessel/inventory/v1beta1/policy_relationship.proto";
 import public "kessel/inventory/v1beta1/update_resource_relationship_by_urnhs_resources_parameter.proto";
 

@@ -4,7 +4,6 @@ package api.kessel.inventory.v1beta1;
 
 import "google/api/annotations.proto";
 
-import public "kessel/inventory/v1beta1/error.proto";
 import public "kessel/inventory/v1beta1/rhel_host.proto";
 
 option go_package = "api/kessel/inventory/v1beta1;v1beta1";

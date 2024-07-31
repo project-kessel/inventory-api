@@ -4,7 +4,7 @@
 openapi: 3.0.3
 info:
     title: Kessel Asset Inventory API
-    version: 0.8.10
+    version: 0.9.0
 paths:
     /v1beta1/hosts:
         post:
@@ -339,26 +339,6 @@ paths:
                                 $ref: '#/components/schemas/Status'
 components:
     schemas:
-        CommonAttributesReportersInner:
-            type: object
-            properties:
-                Type:
-                    type: string
-                    description: |-
-                        The reporter type, for example, Satellite, ACM, OCM The reporter type is
-                         authenticated during resource registration/update.
-                reporterInstanceId:
-                    type: string
-                    description: |-
-                        Identifies the reporter. This is meant to uniquely identify reporters that
-                         can have multiple instances running, such as ACM. The instance ID is
-                         authenticated during resource registration/update.
-                created:
-                    type: string
-                    description: The time when this reporter record was created
-                lastUpdated:
-                    type: string
-                    description: The time when this reporter record was updated
         CreateK8sClusterResponse:
             type: object
             properties:
@@ -408,50 +388,28 @@ components:
             additionalProperties: true
             description: Contains an arbitrary serialized message along with a @type that describes the type of the serialized message.
         K8sCluster:
+            required:
+                - metadata
             type: object
             properties:
-                id:
-                    type: string
-                    description: Kessel Asset Inventory generated identifier.
-                resourceType:
-                    type: string
-                    description: |-
-                        The type of the Resource.  This should match the segment of the URL path
-                         that is used to manage individual resources of the type; e.g.,
-                         \"k8s-cluster\"
-                firstReported:
-                    type: string
-                    description: Date and time when the inventory item was first reported.
-                firstReportedBy:
-                    type: string
-                    description: Identification of the reporter that first reported this item.
-                latestReported:
-                    type: string
-                    description: Date and time when the inventory item was last updated.
-                latestReportedBy:
-                    type: string
-                    description: Id of the reporter that last reported on this item.
-                workspace:
-                    type: string
-                    description: |-
-                        The workspace in which this resource is a member for access control.  A
-                         resource can only be a member of one workspace.
+                metadata:
+                    allOf:
+                        - $ref: '#/components/schemas/Metadata'
+                    description: Metadata about this resource
                 reporterData:
+                    writeOnly: true
                     allOf:
                         - $ref: '#/components/schemas/ReporterData'
                     description: Write only reporter specific data
                 reporters:
+                    readOnly: true
                     type: array
                     items:
-                        $ref: '#/components/schemas/CommonAttributesReportersInner'
+                        $ref: '#/components/schemas/ReporterData'
                     description: |-
                         The entities that registered this item in the Kessel Asset Inventory. The
-                         same resource may be registered by multiple reporters
-                tags:
-                    type: array
-                    items:
-                        $ref: '#/components/schemas/ResourceTag'
-                Data:
+                         same resource may be registered by multiple reporters.
+                data:
                     $ref: '#/components/schemas/K8sClusterDetail'
         K8sClusterDetail:
             type: object
@@ -497,47 +455,66 @@ components:
                     description: |-
                         Map of string keys and string values that can be used to organize and
                          categorize (scope and select) resources
-        Policy:
+        Metadata:
             type: object
             properties:
                 id:
+                    readOnly: true
                     type: string
                     description: Kessel Asset Inventory generated identifier.
                 resourceType:
                     type: string
-                    description: |-
-                        The type of the Resource.  This should match the segment of the URL path
-                         that is used to manage individual resources of the type; e.g.,
-                         \"k8s-cluster\"
+                    description: The type of the Resource
                 firstReported:
+                    readOnly: true
                     type: string
                     description: Date and time when the inventory item was first reported.
-                firstReportedBy:
-                    type: string
-                    description: Identification of the reporter that first reported this item.
-                latestReported:
+                    format: date-time
+                lastReported:
+                    readOnly: true
                     type: string
                     description: Date and time when the inventory item was last updated.
-                latestReportedBy:
+                    format: date-time
+                firstReportedBy:
+                    readOnly: true
                     type: string
-                    description: Id of the reporter that last reported on this item.
+                    description: Identifier of the reporter that first reported this item.
+                latestReportedBy:
+                    readOnly: true
+                    type: string
+                    description: Identifier of the reporter that last reported on this item.
                 workspace:
                     type: string
                     description: |-
                         The workspace in which this resource is a member for access control.  A
                          resource can only be a member of one workspace.
+                tags:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/ResourceTag'
+        Policy:
+            required:
+                - metadata
+            type: object
+            properties:
+                metadata:
+                    allOf:
+                        - $ref: '#/components/schemas/Metadata'
+                    description: Metadata about this resource
                 reporterData:
+                    writeOnly: true
                     allOf:
                         - $ref: '#/components/schemas/ReporterData'
                     description: Write only reporter specific data
                 reporters:
+                    readOnly: true
                     type: array
                     items:
-                        $ref: '#/components/schemas/CommonAttributesReportersInner'
+                        $ref: '#/components/schemas/ReporterData'
                     description: |-
                         The entities that registered this item in the Kessel Asset Inventory. The
-                         same resource may be registered by multiple reporters
-                Data:
+                         same resource may be registered by multiple reporters.
+                data:
                     $ref: '#/components/schemas/PolicyDetail'
         PolicyDetail:
             type: object
@@ -570,56 +547,34 @@ components:
                     type: integer
                     format: enum
         RHELHost:
+            required:
+                - metadata
             type: object
             properties:
-                id:
-                    type: string
-                    description: Kessel Asset Inventory generated identifier.
-                resourceType:
-                    type: string
-                    description: |-
-                        The type of the Resource.  This should match the segment of the URL path
-                         that is used to manage individual resources of the type; e.g.,
-                         \"k8s-cluster\"
-                firstReported:
-                    type: string
-                    description: Date and time when the inventory item was first reported.
-                firstReportedBy:
-                    type: string
-                    description: Identification of the reporter that first reported this item.
-                latestReported:
-                    type: string
-                    description: Date and time when the inventory item was last updated.
-                latestReportedBy:
-                    type: string
-                    description: Id of the reporter that last reported on this item.
-                workspace:
-                    type: string
-                    description: |-
-                        The workspace in which this resource is a member for access control.  A
-                         resource can only be a member of one workspace.
+                metadata:
+                    allOf:
+                        - $ref: '#/components/schemas/Metadata'
+                    description: Metadata about this resource
                 reporterData:
+                    writeOnly: true
                     allOf:
                         - $ref: '#/components/schemas/ReporterData'
                     description: Write only reporter specific data
                 reporters:
+                    readOnly: true
                     type: array
                     items:
-                        $ref: '#/components/schemas/CommonAttributesReportersInner'
+                        $ref: '#/components/schemas/ReporterData'
                     description: |-
                         The entities that registered this item in the Kessel Asset Inventory. The
-                         same resource may be registered by multiple reporters
-                tags:
-                    type: array
-                    items:
-                        $ref: '#/components/schemas/ResourceTag'
+                         same resource may be registered by multiple reporters.
         ReporterData:
             type: object
             properties:
                 reporterType:
                     type: integer
                     format: enum
-                reporterIs:
+                reporterInstanceId:
                     type: string
                     description: |-
                         The ID of the instance of the reporter. This is derived from the

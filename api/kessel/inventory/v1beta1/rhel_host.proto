@@ -2,46 +2,25 @@ syntax = "proto3";
 
 package api.kessel.inventory.v1beta1;
 
-import public "kessel/inventory/v1beta1/common_attributes_reporters_inner.proto";
+import "google/api/field_behavior.proto";
+
+import public "kessel/inventory/v1beta1/metadata.proto";
 import public "kessel/inventory/v1beta1/reporter_data.proto";
-import public "kessel/inventory/v1beta1/resource_tag.proto";
 
 option go_package = "api/kessel/inventory/v1beta1;v1beta1";
 option java_multiple_files = true;
 option java_package = "api.kessel.inventory.v1beta1";
 
 message RHELHost {
-
-  // Kessel Asset Inventory generated identifier.
-  string id = 3355;
-
-  // The type of the Resource.  This should match the segment of the URL path
-  // that is used to manage individual resources of the type; e.g.,
-  // \"k8s-cluster\"
-  string resource_type = 442752204;
-
-  // Date and time when the inventory item was first reported.
-  string first_reported = 13874816;
-
-  // Identification of the reporter that first reported this item.
-  string first_reported_by = 46112820;
-
-  // Date and time when the inventory item was last updated.
-  string latest_reported = 436473483;
-
-  // Id of the reporter that last reported on this item.
-  string latest_reported_by = 505008782;
-
-  // The workspace in which this resource is a member for access control.  A
-  // resource can only be a member of one workspace.
-  string workspace = 35122327;
+  // Metadata about this resource
+  Metadata metadata = 1 [ (google.api.field_behavior) = REQUIRED ];
 
   // Write only reporter specific data
-  ReporterData reporter_data = 245278792;
+  ReporterData reporter_data = 245278792
+      [ (google.api.field_behavior) = INPUT_ONLY ];
 
   // The entities that registered this item in the Kessel Asset Inventory. The
-  // same resource may be registered by multiple reporters
-  repeated CommonAttributesReportersInner reporters = 353323086;
-
-  repeated ResourceTag tags = 3552281;
+  // same resource may be registered by multiple reporters.
+  repeated ReporterData reporters = 353323086
+      [ (google.api.field_behavior) = OUTPUT_ONLY ];
 }

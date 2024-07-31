@@ -3,6 +3,7 @@ syntax = "proto3";
 package api.kessel.inventory.v1beta1;
 
 import "google/api/field_behavior.proto";
+import "validate/validate.proto";
 
 import public "kessel/inventory/v1beta1/metadata.proto";
 import public "kessel/inventory/v1beta1/reporter_data.proto";
@@ -13,11 +14,11 @@ option java_package = "api.kessel.inventory.v1beta1";
 
 message RHELHost {
   // Metadata about this resource
-  Metadata metadata = 1 [ (google.api.field_behavior) = REQUIRED ];
+  Metadata metadata = 1 [ (google.api.field_behavior) = REQUIRED, (validate.rules).any.required = true ];
 
   // Write only reporter specific data
   ReporterData reporter_data = 245278792
-      [ (google.api.field_behavior) = INPUT_ONLY ];
+      [ (google.api.field_behavior) = INPUT_ONLY, (validate.rules).any.required = true ];
 
   // The entities that registered this item in the Kessel Asset Inventory. The
   // same resource may be registered by multiple reporters.

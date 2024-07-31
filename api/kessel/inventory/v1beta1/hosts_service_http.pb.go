@@ -31,9 +31,9 @@ type HostsServiceHTTPServer interface {
 
 func RegisterHostsServiceHTTPServer(s *http.Server, srv HostsServiceHTTPServer) {
 	r := s.Route("/")
-	r.POST("/v1beta1/hosts", _HostsService_CreateRHELHost0_HTTP_Handler(srv))
-	r.PUT("/v1beta1/hosts/{resource}", _HostsService_UpdateRHELHost0_HTTP_Handler(srv))
-	r.DELETE("/v1beta1/hosts/{resource}", _HostsService_DeleteRHELHost0_HTTP_Handler(srv))
+	r.POST("/api/inventory/v1beta1/hosts", _HostsService_CreateRHELHost0_HTTP_Handler(srv))
+	r.PUT("/api/inventory/v1beta1/hosts/{resource}", _HostsService_UpdateRHELHost0_HTTP_Handler(srv))
+	r.DELETE("/api/inventory/v1beta1/hosts/{resource}", _HostsService_DeleteRHELHost0_HTTP_Handler(srv))
 }
 
 func _HostsService_CreateRHELHost0_HTTP_Handler(srv HostsServiceHTTPServer) func(ctx http.Context) error {
@@ -121,7 +121,7 @@ func NewHostsServiceHTTPClient(client *http.Client) HostsServiceHTTPClient {
 
 func (c *HostsServiceHTTPClientImpl) CreateRHELHost(ctx context.Context, in *CreateRHELHostRequest, opts ...http.CallOption) (*CreateRHELHostResponse, error) {
 	var out CreateRHELHostResponse
-	pattern := "/v1beta1/hosts"
+	pattern := "/api/inventory/v1beta1/hosts"
 	path := binding.EncodeURL(pattern, in, false)
 	opts = append(opts, http.Operation(OperationHostsServiceCreateRHELHost))
 	opts = append(opts, http.PathTemplate(pattern))
@@ -134,7 +134,7 @@ func (c *HostsServiceHTTPClientImpl) CreateRHELHost(ctx context.Context, in *Cre
 
 func (c *HostsServiceHTTPClientImpl) DeleteRHELHost(ctx context.Context, in *DeleteRHELHostRequest, opts ...http.CallOption) (*DeleteRHELHostResponse, error) {
 	var out DeleteRHELHostResponse
-	pattern := "/v1beta1/hosts/{resource}"
+	pattern := "/api/inventory/v1beta1/hosts/{resource}"
 	path := binding.EncodeURL(pattern, in, true)
 	opts = append(opts, http.Operation(OperationHostsServiceDeleteRHELHost))
 	opts = append(opts, http.PathTemplate(pattern))
@@ -147,7 +147,7 @@ func (c *HostsServiceHTTPClientImpl) DeleteRHELHost(ctx context.Context, in *Del
 
 func (c *HostsServiceHTTPClientImpl) UpdateRHELHost(ctx context.Context, in *UpdateRHELHostRequest, opts ...http.CallOption) (*UpdateRHELHostResponse, error) {
 	var out UpdateRHELHostResponse
-	pattern := "/v1beta1/hosts/{resource}"
+	pattern := "/api/inventory/v1beta1/hosts/{resource}"
 	path := binding.EncodeURL(pattern, in, false)
 	opts = append(opts, http.Operation(OperationHostsServiceUpdateRHELHost))
 	opts = append(opts, http.PathTemplate(pattern))

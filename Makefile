@@ -6,7 +6,7 @@ API_PROTO_FILES:=$(shell find api -name *.proto)
 
 TITLE:="Kessel Asset Inventory API"
 VERSION:=$(shell git describe --tags --always)
-INVENTORY_SCHEMA_VERSION=0.9.0
+INVENTORY_SCHEMA_VERSION=0.10.0
 
 .PHONY: init
 # init env
@@ -18,6 +18,8 @@ init:
 	go install google.golang.org/grpc/cmd/protoc-gen-go-grpc
 	go install github.com/go-kratos/kratos/cmd/protoc-gen-go-http/v2@latest
 	go install github.com/google/gnostic/cmd/protoc-gen-openapi@latest
+	go get github.com/envoyproxy/protoc-gen-validate
+	go install github.com/envoyproxy/protoc-gen-validate
 
 .PHONY: api
 # generate api proto
@@ -28,6 +30,7 @@ api:
  	       --go-http_out=paths=source_relative:./api \
  	       --go-grpc_out=paths=source_relative:./api \
 	       --openapi_out=fq_schema_naming=false,default_response=true,version=$(INVENTORY_SCHEMA_VERSION),title=$(TITLE):. \
+		   --validate_out="lang=go,paths=source_relative:./api" \
 	       $(API_PROTO_FILES)
 
 # .PHONY: api

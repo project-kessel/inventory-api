@@ -31,9 +31,9 @@ type RelationshipsServiceHTTPServer interface {
 
 func RegisterRelationshipsServiceHTTPServer(s *http.Server, srv RelationshipsServiceHTTPServer) {
 	r := s.Route("/")
-	r.POST("/v1beta1/policy_relationships", _RelationshipsService_CreatePolicyRelationship0_HTTP_Handler(srv))
-	r.PUT("/v1beta1/policy_relationships", _RelationshipsService_UpdateResourceRelationshipByURNHs0_HTTP_Handler(srv))
-	r.DELETE("/v1beta1/policy_relationships", _RelationshipsService_DeleteResourceRelationshipByURN0_HTTP_Handler(srv))
+	r.POST("/api/inventory/v1beta1/policy_relationships", _RelationshipsService_CreatePolicyRelationship0_HTTP_Handler(srv))
+	r.PUT("/api/inventory/v1beta1/policy_relationships", _RelationshipsService_UpdateResourceRelationshipByURNHs0_HTTP_Handler(srv))
+	r.DELETE("/api/inventory/v1beta1/policy_relationships", _RelationshipsService_DeleteResourceRelationshipByURN0_HTTP_Handler(srv))
 }
 
 func _RelationshipsService_CreatePolicyRelationship0_HTTP_Handler(srv RelationshipsServiceHTTPServer) func(ctx http.Context) error {
@@ -115,7 +115,7 @@ func NewRelationshipsServiceHTTPClient(client *http.Client) RelationshipsService
 
 func (c *RelationshipsServiceHTTPClientImpl) CreatePolicyRelationship(ctx context.Context, in *CreatePolicyRelationshipRequest, opts ...http.CallOption) (*CreatePolicyRelationshipResponse, error) {
 	var out CreatePolicyRelationshipResponse
-	pattern := "/v1beta1/policy_relationships"
+	pattern := "/api/inventory/v1beta1/policy_relationships"
 	path := binding.EncodeURL(pattern, in, false)
 	opts = append(opts, http.Operation(OperationRelationshipsServiceCreatePolicyRelationship))
 	opts = append(opts, http.PathTemplate(pattern))
@@ -128,7 +128,7 @@ func (c *RelationshipsServiceHTTPClientImpl) CreatePolicyRelationship(ctx contex
 
 func (c *RelationshipsServiceHTTPClientImpl) DeleteResourceRelationshipByURN(ctx context.Context, in *DeleteResourceRelationshipByURNRequest, opts ...http.CallOption) (*DeleteResourceRelationshipByURNResponse, error) {
 	var out DeleteResourceRelationshipByURNResponse
-	pattern := "/v1beta1/policy_relationships"
+	pattern := "/api/inventory/v1beta1/policy_relationships"
 	path := binding.EncodeURL(pattern, in, true)
 	opts = append(opts, http.Operation(OperationRelationshipsServiceDeleteResourceRelationshipByURN))
 	opts = append(opts, http.PathTemplate(pattern))
@@ -141,7 +141,7 @@ func (c *RelationshipsServiceHTTPClientImpl) DeleteResourceRelationshipByURN(ctx
 
 func (c *RelationshipsServiceHTTPClientImpl) UpdateResourceRelationshipByURNHs(ctx context.Context, in *UpdateResourceRelationshipByURNHsRequest, opts ...http.CallOption) (*UpdateResourceRelationshipByURNResponse, error) {
 	var out UpdateResourceRelationshipByURNResponse
-	pattern := "/v1beta1/policy_relationships"
+	pattern := "/api/inventory/v1beta1/policy_relationships"
 	path := binding.EncodeURL(pattern, in, false)
 	opts = append(opts, http.Operation(OperationRelationshipsServiceUpdateResourceRelationshipByURNHs))
 	opts = append(opts, http.PathTemplate(pattern))

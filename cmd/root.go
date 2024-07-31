@@ -103,9 +103,10 @@ func initConfig() {
 	viper.SetEnvPrefix(Name)
 	viper.AutomaticEnv()
 
-	if err := viper.ReadInConfig(); err == nil {
-		msg := fmt.Sprintf("Using config file: %s", viper.ConfigFileUsed())
-		logger.Debug(msg)
+	if err := viper.ReadInConfig(); err != nil {
+		panic(err)
+		// msg := fmt.Sprintf("Using config file: %s", viper.ConfigFileUsed())
+		// logger.Debug(msg)
 	}
 
 	// put the values into the options struct.

@@ -41,21 +41,21 @@ message DeleteK8sClusterResponse {}
 service K8sClustersService {
   rpc CreateK8sCluster(CreateK8sClusterRequest) returns (CreateK8sClusterResponse) {
     option (google.api.http) = {
-      post : "/v1beta1/k8s_clusters"
+      post : "/api/inventory/v1beta1/k8s_clusters"
       body : "k8sCluster"
     };
   };
 
   rpc UpdateK8sCluster(UpdateK8sClusterRequest) returns (UpdateK8sClusterResponse) {
     option (google.api.http) = {
-      put : "/v1beta1/k8s_clusters/{resource}"
+      put : "/api/inventory/v1beta1/k8s_clusters/{resource}"
       body : "k8sCluster"
     };
   };
 
   rpc DeleteK8sCluster(DeleteK8sClusterRequest) returns (DeleteK8sClusterResponse) {
     option (google.api.http) = {
-      delete : "/v1beta1/k8s_clusters/{resource}"
+      delete : "/api/inventory/v1beta1/k8s_clusters/{resource}"
     };
   };
 }

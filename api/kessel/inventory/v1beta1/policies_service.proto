@@ -41,21 +41,21 @@ message DeletePolicyResponse {}
 service PoliciesService {
   rpc CreatePolicy(CreatePolicyRequest) returns (CreatePolicyResponse) {
     option (google.api.http) = {
-      post : "/v1beta1/policies"
+      post : "/api/inventory/v1beta1/policies"
       body : "policy"
     };
   };
 
   rpc UpdatePolicy(UpdatePolicyRequest) returns (UpdatePolicyResponse) {
     option (google.api.http) = {
-      put : "/v1beta1/policies/{resource}"
+      put : "/api/inventory/v1beta1/policies/{resource}"
       body : "policy"
     };
   };
 
   rpc DeletePolicy(DeletePolicyRequest) returns (DeletePolicyResponse) {
     option (google.api.http) = {
-      delete : "/v1beta1/policies/{resource}"
+      delete : "/api/inventory/v1beta1/policies/{resource}"
     };
   };
 }

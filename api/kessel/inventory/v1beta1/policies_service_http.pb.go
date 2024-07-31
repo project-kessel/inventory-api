@@ -31,9 +31,9 @@ type PoliciesServiceHTTPServer interface {
 
 func RegisterPoliciesServiceHTTPServer(s *http.Server, srv PoliciesServiceHTTPServer) {
 	r := s.Route("/")
-	r.POST("/v1beta1/policies", _PoliciesService_CreatePolicy0_HTTP_Handler(srv))
-	r.PUT("/v1beta1/policies/{resource}", _PoliciesService_UpdatePolicy0_HTTP_Handler(srv))
-	r.DELETE("/v1beta1/policies/{resource}", _PoliciesService_DeletePolicy0_HTTP_Handler(srv))
+	r.POST("/api/inventory/v1beta1/policies", _PoliciesService_CreatePolicy0_HTTP_Handler(srv))
+	r.PUT("/api/inventory/v1beta1/policies/{resource}", _PoliciesService_UpdatePolicy0_HTTP_Handler(srv))
+	r.DELETE("/api/inventory/v1beta1/policies/{resource}", _PoliciesService_DeletePolicy0_HTTP_Handler(srv))
 }
 
 func _PoliciesService_CreatePolicy0_HTTP_Handler(srv PoliciesServiceHTTPServer) func(ctx http.Context) error {
@@ -121,7 +121,7 @@ func NewPoliciesServiceHTTPClient(client *http.Client) PoliciesServiceHTTPClient
 
 func (c *PoliciesServiceHTTPClientImpl) CreatePolicy(ctx context.Context, in *CreatePolicyRequest, opts ...http.CallOption) (*CreatePolicyResponse, error) {
 	var out CreatePolicyResponse
-	pattern := "/v1beta1/policies"
+	pattern := "/api/inventory/v1beta1/policies"
 	path := binding.EncodeURL(pattern, in, false)
 	opts = append(opts, http.Operation(OperationPoliciesServiceCreatePolicy))
 	opts = append(opts, http.PathTemplate(pattern))
@@ -134,7 +134,7 @@ func (c *PoliciesServiceHTTPClientImpl) CreatePolicy(ctx context.Context, in *Cr
 
 func (c *PoliciesServiceHTTPClientImpl) DeletePolicy(ctx context.Context, in *DeletePolicyRequest, opts ...http.CallOption) (*DeletePolicyResponse, error) {
 	var out DeletePolicyResponse
-	pattern := "/v1beta1/policies/{resource}"
+	pattern := "/api/inventory/v1beta1/policies/{resource}"
 	path := binding.EncodeURL(pattern, in, true)
 	opts = append(opts, http.Operation(OperationPoliciesServiceDeletePolicy))
 	opts = append(opts, http.PathTemplate(pattern))
@@ -147,7 +147,7 @@ func (c *PoliciesServiceHTTPClientImpl) DeletePolicy(ctx context.Context, in *De
 
 func (c *PoliciesServiceHTTPClientImpl) UpdatePolicy(ctx context.Context, in *UpdatePolicyRequest, opts ...http.CallOption) (*UpdatePolicyResponse, error) {
 	var out UpdatePolicyResponse
-	pattern := "/v1beta1/policies/{resource}"
+	pattern := "/api/inventory/v1beta1/policies/{resource}"
 	path := binding.EncodeURL(pattern, in, false)
 	opts = append(opts, http.Operation(OperationPoliciesServiceUpdatePolicy))
 	opts = append(opts, http.PathTemplate(pattern))

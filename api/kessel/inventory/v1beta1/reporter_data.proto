@@ -32,7 +32,7 @@ message ReporterData {
 
   // The ID assigned to this resource by the reporter, for example OCM cluster
   // ID, HBI's host id, or ACM managed cluster name etc.
-  string resourceid_alias = 508976189;
+  string local_resource_id = 508976189;
 
   // version of the reporter
   string reporter_version = 269629306;

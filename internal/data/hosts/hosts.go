@@ -38,8 +38,8 @@ func (r *hostsRepo) Save(ctx context.Context, model *models.Host) (*models.Host,
 		return nil, nil
 	}
 
-	if err := r.Db.Create(model).Error; err != nil {
-		return nil, nil
+	if err := r.Db.Session(&gorm.Session{FullSaveAssociations: true}).Create(model).Error; err != nil {
+		return nil, err
 	}
 
 	if r.Events != nil {

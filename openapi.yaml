@@ -4,9 +4,9 @@
 openapi: 3.0.3
 info:
     title: Kessel Asset Inventory API
-    version: 0.9.0
+    version: 0.10.0
 paths:
-    /v1beta1/hosts:
+    /api/inventory/v1beta1/hosts:
         post:
             tags:
                 - HostsService
@@ -30,7 +30,7 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/Status'
-    /v1beta1/hosts/{resource}:
+    /api/inventory/v1beta1/hosts/{resource}:
         put:
             tags:
                 - HostsService
@@ -89,7 +89,7 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/Status'
-    /v1beta1/k8s_clusters:
+    /api/inventory/v1beta1/k8s_clusters:
         post:
             tags:
                 - K8SClustersService
@@ -113,7 +113,7 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/Status'
-    /v1beta1/k8s_clusters/{resource}:
+    /api/inventory/v1beta1/k8s_clusters/{resource}:
         put:
             tags:
                 - K8SClustersService
@@ -172,7 +172,7 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/Status'
-    /v1beta1/policies:
+    /api/inventory/v1beta1/policies:
         post:
             tags:
                 - PoliciesService
@@ -196,7 +196,7 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/Status'
-    /v1beta1/policies/{resource}:
+    /api/inventory/v1beta1/policies/{resource}:
         put:
             tags:
                 - PoliciesService
@@ -255,7 +255,7 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/Status'
-    /v1beta1/policy_relationships:
+    /api/inventory/v1beta1/policy_relationships:
         put:
             tags:
                 - RelationshipsService
@@ -361,6 +361,8 @@ components:
                         - $ref: '#/components/schemas/Policy'
                     description: The policy created in Kessel Asset Inventory
         CreateRHELHostResponse:
+            required:
+                - host
             type: object
             properties:
                 host:
@@ -479,7 +481,7 @@ components:
                     readOnly: true
                     type: string
                     description: Identifier of the reporter that first reported this item.
-                latestReportedBy:
+                lastReportedBy:
                     readOnly: true
                     type: string
                     description: Identifier of the reporter that last reported on this item.
@@ -588,7 +590,7 @@ components:
                 apiHref:
                     type: string
                     description: Reporter specific API link to the resource.
-                resourceidAlias:
+                localResourceId:
                     type: string
                     description: |-
                         The ID assigned to this resource by the reporter, for example OCM cluster

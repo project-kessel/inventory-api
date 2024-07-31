@@ -31,7 +31,7 @@ message Metadata {
       [ (google.api.field_behavior) = OUTPUT_ONLY ];
 
   // Identifier of the reporter that last reported on this item.
-  string latest_reported_by = 505008782
+  string last_reported_by = 505008782
       [ (google.api.field_behavior) = OUTPUT_ONLY ];
 
   // The workspace in which this resource is a member for access control.  A

@@ -31,9 +31,9 @@ type K8SClustersServiceHTTPServer interface {
 
 func RegisterK8SClustersServiceHTTPServer(s *http.Server, srv K8SClustersServiceHTTPServer) {
 	r := s.Route("/")
-	r.POST("/v1beta1/k8s_clusters", _K8SClustersService_CreateK8SCluster0_HTTP_Handler(srv))
-	r.PUT("/v1beta1/k8s_clusters/{resource}", _K8SClustersService_UpdateK8SCluster0_HTTP_Handler(srv))
-	r.DELETE("/v1beta1/k8s_clusters/{resource}", _K8SClustersService_DeleteK8SCluster0_HTTP_Handler(srv))
+	r.POST("/api/inventory/v1beta1/k8s_clusters", _K8SClustersService_CreateK8SCluster0_HTTP_Handler(srv))
+	r.PUT("/api/inventory/v1beta1/k8s_clusters/{resource}", _K8SClustersService_UpdateK8SCluster0_HTTP_Handler(srv))
+	r.DELETE("/api/inventory/v1beta1/k8s_clusters/{resource}", _K8SClustersService_DeleteK8SCluster0_HTTP_Handler(srv))
 }
 
 func _K8SClustersService_CreateK8SCluster0_HTTP_Handler(srv K8SClustersServiceHTTPServer) func(ctx http.Context) error {
@@ -121,7 +121,7 @@ func NewK8SClustersServiceHTTPClient(client *http.Client) K8SClustersServiceHTTP
 
 func (c *K8SClustersServiceHTTPClientImpl) CreateK8SCluster(ctx context.Context, in *CreateK8SClusterRequest, opts ...http.CallOption) (*CreateK8SClusterResponse, error) {
 	var out CreateK8SClusterResponse
-	pattern := "/v1beta1/k8s_clusters"
+	pattern := "/api/inventory/v1beta1/k8s_clusters"
 	path := binding.EncodeURL(pattern, in, false)
 	opts = append(opts, http.Operation(OperationK8SClustersServiceCreateK8sCluster))
 	opts = append(opts, http.PathTemplate(pattern))
@@ -134,7 +134,7 @@ func (c *K8SClustersServiceHTTPClientImpl) CreateK8SCluster(ctx context.Context,
 
 func (c *K8SClustersServiceHTTPClientImpl) DeleteK8SCluster(ctx context.Context, in *DeleteK8SClusterRequest, opts ...http.CallOption) (*DeleteK8SClusterResponse, error) {
 	var out DeleteK8SClusterResponse
-	pattern := "/v1beta1/k8s_clusters/{resource}"
+	pattern := "/api/inventory/v1beta1/k8s_clusters/{resource}"
 	path := binding.EncodeURL(pattern, in, true)
 	opts = append(opts, http.Operation(OperationK8SClustersServiceDeleteK8sCluster))
 	opts = append(opts, http.PathTemplate(pattern))
@@ -147,7 +147,7 @@ func (c *K8SClustersServiceHTTPClientImpl) DeleteK8SCluster(ctx context.Context,
 
 func (c *K8SClustersServiceHTTPClientImpl) UpdateK8SCluster(ctx context.Context, in *UpdateK8SClusterRequest, opts ...http.CallOption) (*UpdateK8SClusterResponse, error) {
 	var out UpdateK8SClusterResponse
-	pattern := "/v1beta1/k8s_clusters/{resource}"
+	pattern := "/api/inventory/v1beta1/k8s_clusters/{resource}"
 	path := binding.EncodeURL(pattern, in, false)
 	opts = append(opts, http.Operation(OperationK8SClustersServiceUpdateK8sCluster))
 	opts = append(opts, http.PathTemplate(pattern))

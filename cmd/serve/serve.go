@@ -17,6 +17,7 @@ import (
 	"github.com/project-kessel/inventory-api/internal/errors"
 	"github.com/project-kessel/inventory-api/internal/eventing"
 	eventingapi "github.com/project-kessel/inventory-api/internal/eventing/api"
+	"github.com/project-kessel/inventory-api/internal/middleware"
 	"github.com/project-kessel/inventory-api/internal/server"
 	"github.com/project-kessel/inventory-api/internal/storage"
 
@@ -62,16 +63,16 @@ func NewCommand(
 			storageConfig := storage.NewConfig(storageOptions).Complete()
 
 			// // configure authn
-			// if errs := authnOptions.Complete(); errs != nil {
-			// 	return errors.NewAggregate(errs)
-			// }
-			// if errs := authnOptions.Validate(); errs != nil {
-			// 	return errors.NewAggregate(errs)
-			// }
-			// authnConfig, errs := authn.NewConfig(authnOptions).Complete()
-			// if errs != nil {
-			// 	return errors.NewAggregate(errs)
-			// }
+			if errs := authnOptions.Complete(); errs != nil {
+				return errors.NewAggregate(errs)
+			}
+			if errs := authnOptions.Validate(); errs != nil {
+				return errors.NewAggregate(errs)
+			}
+			authnConfig, errs := authn.NewConfig(authnOptions).Complete()
+			if errs != nil {
+				return errors.NewAggregate(errs)
+			}
 
 			// configure authz
 			if errs := authzOptions.Complete(); errs != nil {
@@ -116,10 +117,10 @@ func NewCommand(
 			}
 
 			// construct the authn
-			// authenticator, err := authn.New(authnConfig)
-			// if err != nil {
-			// 	return err
-			// }
+			authenticator, err := authn.New(authnConfig)
+			if err != nil {
+				return err
+			}
 
 			// construct the authz
 			authorizer, err := authz.New(ctx, authzConfig, log.NewHelper(log.With(logger, "subsystem", "authz")))
@@ -134,7 +135,7 @@ func NewCommand(
 			}
 
 			// construct the servers
-			server := server.New(serverConfig, logger)
+			server := server.New(serverConfig, middleware.Authentication(authenticator), logger)
 
 			// wire together hosts handling
 			hosts_repo := hostsrepo.New(db, authorizer, eventingManager, log.NewHelper(log.With(logger, "subsystem", "hosts_repo")))

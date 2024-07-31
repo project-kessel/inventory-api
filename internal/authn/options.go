@@ -7,6 +7,8 @@ import (
 )
 
 type Options struct {
+	AllowUnauthenticated bool `mapstructure:"allow-unauthenticated"`
+
 	Oidc          *oidc.Options `mapstructure:"oidc"`
 	PreSharedKeys *psk.Options  `mapstructure:"psk"`
 }
@@ -22,6 +24,8 @@ func (o *Options) AddFlags(fs *pflag.FlagSet, prefix string) {
 	if prefix != "" {
 		prefix = prefix + "."
 	}
+
+	fs.BoolVar(&o.AllowUnauthenticated, prefix+"allow-unauthenticated", o.AllowUnauthenticated, "Allow unauthenticated access to the server?")
 
 	o.Oidc.AddFlags(fs, prefix+"oidc")
 	o.PreSharedKeys.AddFlags(fs, prefix+"psk")

@@ -6,12 +6,16 @@ import (
 )
 
 type Config struct {
+	AllowUnauthenticated bool
+
 	Oidc          *oidc.Config
 	PreSharedKeys *psk.Config
 }
 
 func NewConfig(o *Options) *Config {
-	cfg := &Config{}
+	cfg := &Config{
+		AllowUnauthenticated: o.AllowUnauthenticated,
+	}
 
 	if len(o.Oidc.AuthorizationServerURL) > 0 {
 		cfg.Oidc = oidc.NewConfig(o.Oidc)
@@ -26,6 +30,8 @@ func NewConfig(o *Options) *Config {
 }
 
 type completedConfig struct {
+	AllowUnauthenticated bool
+
 	Oidc          *oidc.CompletedConfig
 	PreSharedKeys *psk.CompletedConfig
 }
@@ -36,7 +42,9 @@ type CompletedConfig struct {
 
 func (c *Config) Complete() (CompletedConfig, []error) {
 	var errs []error
-	cfg := CompletedConfig{&completedConfig{}}
+	cfg := CompletedConfig{&completedConfig{
+		AllowUnauthenticated: c.AllowUnauthenticated,
+	}}
 
 	if c.Oidc != nil {
 		if o, err := c.Oidc.Complete(); err == nil {

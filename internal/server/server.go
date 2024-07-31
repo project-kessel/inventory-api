@@ -5,6 +5,7 @@ import (
 
 	"github.com/go-kratos/kratos/v2"
 	"github.com/go-kratos/kratos/v2/log"
+	"github.com/go-kratos/kratos/v2/middleware"
 	kgrpc "github.com/go-kratos/kratos/v2/transport/grpc"
 	khttp "github.com/go-kratos/kratos/v2/transport/http"
 
@@ -23,12 +24,12 @@ type Server struct {
 	Logger log.Logger
 }
 
-func New(c CompletedConfig, logger log.Logger) *Server {
+func New(c CompletedConfig, authn middleware.Middleware, logger log.Logger) *Server {
 	s := &Server{
 		Id:         c.Options.Id,
 		Name:       c.Options.Name,
-		HttpServer: http.New(c.HttpConfig),
-		GrpcServer: grpc.New(c.GrpcConfig),
+		HttpServer: http.New(c.HttpConfig, authn),
+		GrpcServer: grpc.New(c.GrpcConfig, authn),
 		Logger:     log.With(logger, "service.id", c.Options.Id),
 	}
 

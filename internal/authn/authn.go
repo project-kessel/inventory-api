@@ -4,7 +4,8 @@ import (
 	"github.com/project-kessel/inventory-api/internal/authn/api"
 	"github.com/project-kessel/inventory-api/internal/authn/clientcert"
 	"github.com/project-kessel/inventory-api/internal/authn/delegator"
-	//	"github.com/project-kessel/inventory-api/internal/authn/guest"
+
+	"github.com/project-kessel/inventory-api/internal/authn/guest"
 	"github.com/project-kessel/inventory-api/internal/authn/oidc"
 	"github.com/project-kessel/inventory-api/internal/authn/psk"
 )
@@ -30,9 +31,9 @@ func New(config CompletedConfig) (api.Authenticator, error) {
 		}
 	}
 
-	// unauthenticated
-	// TODO: make it configurable whether we allow unauthenticated access
-	// d.Add(guest.New())
+	if config.AllowUnauthenticated {
+		d.Add(guest.New())
+	}
 
 	return d, nil
 }

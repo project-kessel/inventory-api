@@ -116,13 +116,13 @@ func NewCommand(
 				return err
 			}
 
-			// construct the authn
-			authenticator, err := authn.New(authnConfig)
+			// construct authn
+			authenticator, err := authn.New(authnConfig, log.NewHelper(log.With(logger, "subsystem", "authn")))
 			if err != nil {
 				return err
 			}
 
-			// construct the authz
+			// construct authz
 			authorizer, err := authz.New(ctx, authzConfig, log.NewHelper(log.With(logger, "subsystem", "authz")))
 			if err != nil {
 				return err
@@ -134,7 +134,7 @@ func NewCommand(
 				return err
 			}
 
-			// construct the servers
+			// construct servers
 			server := server.New(serverConfig, middleware.Authentication(authenticator), logger)
 
 			// wire together hosts handling

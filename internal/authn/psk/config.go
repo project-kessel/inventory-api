@@ -14,7 +14,8 @@ type Config struct {
 }
 
 type completedConfig struct {
-	Keys IdentityMap
+	PreSharedKeyFile string
+	Keys             IdentityMap
 }
 
 type CompletedConfig struct {
@@ -35,7 +36,8 @@ func (c *Config) Complete() (CompletedConfig, error) {
 	}
 
 	return CompletedConfig{&completedConfig{
-		Keys: c.Keys,
+		PreSharedKeyFile: c.PreSharedKeyFile,
+		Keys:             c.Keys,
 	}}, nil
 }
 
@@ -53,7 +55,7 @@ func (c *Config) loadPreSharedKeys() error {
 				return err
 			}
 		} else {
-            return fmt.Errorf("Error opening preshared key file: %s [%s]", c.PreSharedKeyFile, err.Error())
+			return fmt.Errorf("Error opening preshared key file: %s [%s]", c.PreSharedKeyFile, err.Error())
 		}
 	}
 	return nil

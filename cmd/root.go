@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -89,6 +90,20 @@ func initConfig() {
 	if cfgFile != "" {
 		viper.SetConfigFile(cfgFile)
 	} else {
+		configFilePath, exists := os.LookupEnv("INVENTORY_API_CONFIG")
+		if !exists {
+			log.Fatal("Environment variable INVENTORY_API_CONFIG is not set")
+		}
+		absPath, err := filepath.Abs(configFilePath)
+		if err != nil {
+			log.Fatalf("Failed to resolve absolute path for config file: %v", err)
+		}
+		// Set the config file path
+		viper.SetConfigFile(absPath)
+		if err := viper.ReadInConfig(); err != nil {
+			log.Fatalf("Error reading INVENTORY_API_CONFIG file, %s", err)
+		}
+
 		home, err := os.UserHomeDir()
 		cobra.CheckErr(err)
 
@@ -96,7 +111,7 @@ func initConfig() {
 		viper.AddConfigPath(home)
 		viper.SetConfigType("yaml")
 
-		configName := fmt.Sprintf(".%s", Name)
+		configName := fmt.Sprintf("%s", Name)
 		viper.SetConfigName(configName)
 	}
 

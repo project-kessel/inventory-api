@@ -1,0 +1,23 @@
+server:
+  http:
+    address: 0.0.0.0:8081
+  grpc:
+    address: 0.0.0.0:9081
+#authn:
+#  psk:
+#    pre-shared-key-file: config/psks.yaml
+authz:
+  impl: allow-all
+eventing:
+  eventer: stdout
+  kafka:
+storage:
+  database: postgres
+  sqlite3:
+    dsn: inventory.db
+  postgres:
+    host: "invdatabase"
+    port: "5433"
+    user: "postgres"
+    password: "yPsw5e6ab4bvAGe5H"
+    dbname: "spicedb"

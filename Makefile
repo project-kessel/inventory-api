@@ -82,6 +82,10 @@ pr-check:
 	make build;
 	#
 
+inventory-up:
+	./scripts/start-inventory.sh
+.PHONY: inventory-up
+
 help:
 # show help
 	@echo ''

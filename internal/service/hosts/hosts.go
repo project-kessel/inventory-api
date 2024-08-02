@@ -2,14 +2,19 @@ package hosts
 
 import (
 	"context"
+	"fmt"
+	"strings"
 
 	"github.com/go-kratos/kratos/v2/errors"
 	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1"
 	authnapi "github.com/project-kessel/inventory-api/internal/authn/api"
-	bizcommon "github.com/project-kessel/inventory-api/internal/biz/common"
 	biz "github.com/project-kessel/inventory-api/internal/biz/hosts"
 	"github.com/project-kessel/inventory-api/internal/middleware"
 	conv "github.com/project-kessel/inventory-api/internal/service/common"
+)
+
+const (
+	resource_type = "rhelhost"
 )
 
 // HostsService handles requests for RHEL hosts
@@ -29,6 +34,11 @@ func New(c *biz.HostUsecase) *HostsService {
 func (c *HostsService) CreateRHELHost(ctx context.Context, r *pb.CreateRHELHostRequest) (*pb.CreateRHELHostResponse, error) {
 	if err := r.ValidateAll(); err != nil {
 		return nil, err
+	}
+
+	//TODO: refactor / abstract resource type strings
+	if !strings.EqualFold(r.Host.Metadata.ResourceType, resource_type) {
+		return nil, errors.BadRequest("BADREQUEST", fmt.Sprintf("incorrect resource type: expected %s", resource_type))
 	}
 
 	identity, err := middleware.GetIdentity(ctx)
@@ -68,8 +78,7 @@ func hostFromCreateRequest(r *pb.CreateRHELHostRequest, identity *authnapi.Ident
 	}
 
 	return &biz.Host{
-		Metadata:  *conv.MetadataFromPb(r.Host.Metadata, identity),
-		Reporters: []*bizcommon.Reporter{conv.ReporterFromPb(r.Host.ReporterData, identity)},
+		Metadata: *conv.MetadataFromPb(r.Host.Metadata, r.Host.ReporterData, identity),
 	}, nil
 }
 
@@ -77,7 +86,7 @@ func createResponseFromHost(h *biz.Host) *pb.CreateRHELHostResponse {
 	return &pb.CreateRHELHostResponse{
 		Host: &pb.RHELHost{
 			Metadata:  conv.MetadataFromModel(&h.Metadata),
-			Reporters: conv.ReportersFromModel(h.Reporters),
+			Reporters: conv.ReportersFromModel(h.Metadata.Reporters),
 		},
 	}
 }

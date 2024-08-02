@@ -10,7 +10,7 @@ import (
 	models "github.com/project-kessel/inventory-api/internal/biz/common"
 )
 
-func MetadataFromPb(in *pb.Metadata, identity *authnapi.Identity) *models.Metadata {
+func MetadataFromPb(in *pb.Metadata, reporter *pb.ReporterData, identity *authnapi.Identity) *models.Metadata {
 	var tags []*models.Tag
 	for _, t := range in.Tags {
 		tags = append(tags, &models.Tag{Key: t.Key, Value: t.Value})
@@ -27,6 +27,8 @@ func MetadataFromPb(in *pb.Metadata, identity *authnapi.Identity) *models.Metada
 
 		FirstReported: time.Now(),
 		LastReported:  time.Now(),
+
+		Reporters: []*models.Reporter{ReporterFromPb(reporter, identity)},
 	}
 }
 

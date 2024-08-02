@@ -1,10 +1,10 @@
-package hosts
+package notificationsintegrations
 
 import (
 	"github.com/project-kessel/inventory-api/internal/biz/common"
 )
 
-type Host struct {
+type NotificationsIntegration struct {
 	// Kessel Asset Inventory generated identifier.
 	ID int64 `gorm:"primaryKey"`
 

@@ -30,12 +30,15 @@ type Metadata struct {
 	// of one workspace.
 	Workspace string
 
+	// Write only reporter specific data
+	Reporters []*Reporter
+
 	Tags []*Tag
 }
 
 type Reporter struct {
 	// This is necessary to satisfy gorm so the collection in the Resource model works.
-	HostID int64 `json:"-"`
+	MetadataID int64 `json:"-"`
 
 	// ReporterID should be populated from the Identity of the caller.  e.g. if this is an ACM reporter, *which* ACM
 	// instance is it?

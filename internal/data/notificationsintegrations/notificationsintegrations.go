@@ -1,4 +1,4 @@
-package hosts
+package notificationsintegrations
 
 import (
 	"context"
@@ -9,12 +9,12 @@ import (
 	"github.com/go-kratos/kratos/v2/log"
 
 	authzapi "github.com/project-kessel/inventory-api/internal/authz/api"
-	models "github.com/project-kessel/inventory-api/internal/biz/hosts"
+	models "github.com/project-kessel/inventory-api/internal/biz/notificationsintegrations"
 	eventingapi "github.com/project-kessel/inventory-api/internal/eventing/api"
 	"github.com/project-kessel/inventory-api/internal/middleware"
 )
 
-type hostsRepo struct {
+type notificationsIntegrationsRepo struct {
 	Db      *gorm.DB
 	Authz   authzapi.Authorizer
 	Eventer eventingapi.Manager
@@ -22,8 +22,8 @@ type hostsRepo struct {
 	Log *log.Helper
 }
 
-func New(g *gorm.DB, a authzapi.Authorizer, e eventingapi.Manager, l *log.Helper) *hostsRepo {
-	return &hostsRepo{
+func New(g *gorm.DB, a authzapi.Authorizer, e eventingapi.Manager, l *log.Helper) *notificationsIntegrationsRepo {
+	return &notificationsIntegrationsRepo{
 		Db:      g,
 		Authz:   a,
 		Eventer: e,
@@ -32,7 +32,7 @@ func New(g *gorm.DB, a authzapi.Authorizer, e eventingapi.Manager, l *log.Helper
 	}
 }
 
-func (r *hostsRepo) Save(ctx context.Context, model *models.Host) (*models.Host, error) {
+func (r *notificationsIntegrationsRepo) Save(ctx context.Context, model *models.NotificationsIntegration) (*models.NotificationsIntegration, error) {
 	identity, err := middleware.GetIdentity(ctx)
 	if err != nil {
 		return nil, nil
@@ -45,10 +45,10 @@ func (r *hostsRepo) Save(ctx context.Context, model *models.Host) (*models.Host,
 	if r.Eventer != nil {
 		// TODO: handle eventing errors
 		// TODO: Update the Object that's sent.  This is going to be what we actually emit.
-		producer, _ := r.Eventer.Lookup(identity, "rhelhost", model.ID)
+		producer, _ := r.Eventer.Lookup(identity, "notificationsintegration", model.ID)
 		evt := &eventingapi.Event{
 			EventType:    "Create",
-			ResourceType: "rhelhost",
+			ResourceType: "notificationsintegration",
 			Object:       model,
 		}
 		producer.Produce(ctx, evt)
@@ -56,26 +56,26 @@ func (r *hostsRepo) Save(ctx context.Context, model *models.Host) (*models.Host,
 	return model, nil
 }
 
-func (r *hostsRepo) Update(context.Context, *models.Host, string) (*models.Host, error) {
+func (r *notificationsIntegrationsRepo) Update(context.Context, *models.NotificationsIntegration, string) (*models.NotificationsIntegration, error) {
 	return nil, nil
 }
 
-func (r *hostsRepo) Delete(context.Context, string) error {
+func (r *notificationsIntegrationsRepo) Delete(context.Context, string) error {
 	return nil
 }
 
-func (r *hostsRepo) FindByID(context.Context, string) (*models.Host, error) {
+func (r *notificationsIntegrationsRepo) FindByID(context.Context, string) (*models.NotificationsIntegration, error) {
 	return nil, nil
 }
 
-func (r *hostsRepo) ListAll(context.Context) ([]*models.Host, error) {
-	// var model models.Host
+func (r *notificationsIntegrationsRepo) ListAll(context.Context) ([]*models.NotificationsIntegration, error) {
+	// var model models.NotificationsIntegration
 	// var count int64
 	// if err := r.Db.Model(&model).Count(&count).Error; err != nil {
 	// 	return nil, err
 	// }
 
-	var results []*models.Host
+	var results []*models.NotificationsIntegration
 	if err := r.Db.Preload(clause.Associations).Find(&results).Error; err != nil {
 		return nil, err
 	}

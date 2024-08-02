@@ -6,12 +6,12 @@ import (
 	"github.com/go-kratos/kratos/v2/log"
 )
 
-// HostRepo is a Greater repo.
+// HostRepo is a Host repo.
 type HostRepo interface {
 	Save(context.Context, *Host) (*Host, error)
-	Update(context.Context, *Host) (*Host, error)
-	Delete(context.Context, int64) error
-	FindByID(context.Context, int64) (*Host, error)
+	Update(context.Context, *Host, string) (*Host, error)
+	Delete(context.Context, string) error
+	FindByID(context.Context, string) (*Host, error)
 	ListAll(context.Context) ([]*Host, error)
 }
 
@@ -26,7 +26,7 @@ func New(repo HostRepo, logger log.Logger) *HostUsecase {
 	return &HostUsecase{repo: repo, log: log.NewHelper(logger)}
 }
 
-// CreateHost creates a Host, and returns the new Host.
+// CreateHost creates a Host in the repository and returns the new Host.
 func (uc *HostUsecase) CreateHost(ctx context.Context, h *Host) (*Host, error) {
 	if ret, err := uc.repo.Save(ctx, h); err != nil {
 		return nil, err

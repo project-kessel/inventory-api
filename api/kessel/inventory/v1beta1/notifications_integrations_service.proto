@@ -1,0 +1,72 @@
+syntax = "proto3";
+
+package api.kessel.inventory.v1beta1;
+
+import "google/api/annotations.proto";
+import "google/api/field_behavior.proto";
+
+import public "kessel/inventory/v1beta1/notifications_integration.proto";
+
+option go_package = "api/kessel/inventory/v1beta1;v1beta1";
+option java_multiple_files = true;
+option java_package = "api.kessel.inventory.v1beta1";
+
+message CreateNotificationsIntegrationRequest {
+  // The NotificationsIntegration to create in Kessel Asset Inventory
+  NotificationsIntegration integration = 1 [
+    (google.api.field_behavior) = REQUIRED
+  ];
+}
+
+message CreateNotificationsIntegrationResponse {
+  // The NotificationsIntegration created in Kessel Asset Inventory
+  NotificationsIntegration integration = 1 [
+    (google.api.field_behavior) = REQUIRED
+  ];
+}
+
+message UpdateNotificationsIntegrationRequest {
+  // A resource instance using the format:
+  // \"<reporter_data.reporter_type>:<reporter_data.reporter_id>::<reporter_data.resourceId_alias>\"
+  string resource = 1 [
+    (google.api.field_behavior) = REQUIRED
+  ];
+  // The NotificationsIntegration to update
+  NotificationsIntegration integration = 2 [
+    (google.api.field_behavior) = REQUIRED
+  ];
+}
+
+message UpdateNotificationsIntegrationResponse {}
+
+message DeleteNotificationsIntegrationRequest {
+  // A resource instance using the format:
+  // \"<reporter_data.reporter_type>:<reporter_data.reporter_id>::<reporter_data.resourceId_alias>\"
+  string resource = 1 [
+    (google.api.field_behavior) = REQUIRED
+  ];
+}
+
+message DeleteNotificationsIntegrationResponse {}
+
+service NotificationsIntegrationsService {
+  rpc CreateNotificationsIntegration(CreateNotificationsIntegrationRequest) returns (CreateNotificationsIntegrationResponse) {
+    option (google.api.http) = {
+      post : "/api/inventory/v1beta1/notificationsintegrations"
+      body : "integration"
+    };
+  };
+
+  rpc UpdateNotificationsIntegration(UpdateNotificationsIntegrationRequest) returns (UpdateNotificationsIntegrationResponse) {
+    option (google.api.http) = {
+      put : "/api/inventory/v1beta1/notificationsintegrations/{resource}"
+      body : "integration"
+    };
+  };
+
+  rpc DeleteNotificationsIntegration(DeleteNotificationsIntegrationRequest) returns (DeleteNotificationsIntegrationResponse) {
+    option (google.api.http) = {
+      delete : "/api/inventory/v1beta1/notificationsintegrations/{resource}"
+    };
+  };
+}

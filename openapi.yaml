@@ -4,7 +4,7 @@
 openapi: 3.0.3
 info:
     title: Kessel Asset Inventory API
-    version: 0.10.0
+    version: 0.10.1
 paths:
     /api/inventory/v1beta1/hosts:
         post:
@@ -166,6 +166,89 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/DeleteK8sClusterResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+    /api/inventory/v1beta1/notificationsintegrations:
+        post:
+            tags:
+                - NotificationsIntegrationsService
+            operationId: NotificationsIntegrationsService_CreateNotificationsIntegration
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/NotificationsIntegration'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/CreateNotificationsIntegrationResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+    /api/inventory/v1beta1/notificationsintegrations/{resource}:
+        put:
+            tags:
+                - NotificationsIntegrationsService
+            operationId: NotificationsIntegrationsService_UpdateNotificationsIntegration
+            parameters:
+                - name: resource
+                  in: path
+                  description: |-
+                    A resource instance using the format:
+                     \"<reporter_data.reporter_type>:<reporter_data.reporter_id>::<reporter_data.resourceId_alias>\"
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/NotificationsIntegration'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/UpdateNotificationsIntegrationResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+        delete:
+            tags:
+                - NotificationsIntegrationsService
+            operationId: NotificationsIntegrationsService_DeleteNotificationsIntegration
+            parameters:
+                - name: resource
+                  in: path
+                  description: |-
+                    A resource instance using the format:
+                     \"<reporter_data.reporter_type>:<reporter_data.reporter_id>::<reporter_data.resourceId_alias>\"
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/DeleteNotificationsIntegrationResponse'
                 default:
                     description: Default error response
                     content:
@@ -346,6 +429,15 @@ components:
                     allOf:
                         - $ref: '#/components/schemas/K8sCluster'
                     description: The K8s cluster created in Kessel Asset Inventory
+        CreateNotificationsIntegrationResponse:
+            required:
+                - integration
+            type: object
+            properties:
+                integration:
+                    allOf:
+                        - $ref: '#/components/schemas/NotificationsIntegration'
+                    description: The NotificationsIntegration created in Kessel Asset Inventory
         CreatePolicyRelationshipResponse:
             type: object
             properties:
@@ -370,6 +462,9 @@ components:
                         - $ref: '#/components/schemas/RHELHost'
                     description: The RHEL Host created in Kessel Asset Inventory
         DeleteK8sClusterResponse:
+            type: object
+            properties: {}
+        DeleteNotificationsIntegrationResponse:
             type: object
             properties: {}
         DeletePolicyResponse:
@@ -494,6 +589,28 @@ components:
                     type: array
                     items:
                         $ref: '#/components/schemas/ResourceTag'
+        NotificationsIntegration:
+            required:
+                - metadata
+            type: object
+            properties:
+                metadata:
+                    allOf:
+                        - $ref: '#/components/schemas/Metadata'
+                    description: Metadata about this resource
+                reporterData:
+                    writeOnly: true
+                    allOf:
+                        - $ref: '#/components/schemas/ReporterData'
+                    description: Write only reporter specific data
+                reporters:
+                    readOnly: true
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/ReporterData'
+                    description: |-
+                        The entities that registered this item in the Kessel Asset Inventory. The
+                         same resource may be registered by multiple reporters.
         Policy:
             required:
                 - metadata
@@ -624,6 +741,9 @@ components:
         UpdateK8sClusterResponse:
             type: object
             properties: {}
+        UpdateNotificationsIntegrationResponse:
+            type: object
+            properties: {}
         UpdatePolicyResponse:
             type: object
             properties: {}
@@ -636,5 +756,6 @@ components:
 tags:
     - name: HostsService
     - name: K8SClustersService
+    - name: NotificationsIntegrationsService
     - name: PoliciesService
     - name: RelationshipsService

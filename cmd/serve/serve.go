@@ -21,20 +21,23 @@ import (
 	"github.com/project-kessel/inventory-api/internal/server"
 	"github.com/project-kessel/inventory-api/internal/storage"
 
-	"github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1"
+	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1"
 
 	hostsrepo "github.com/project-kessel/inventory-api/internal/data/hosts"
 	k8sclustersrepo "github.com/project-kessel/inventory-api/internal/data/k8sclusters"
+	notifsrepo "github.com/project-kessel/inventory-api/internal/data/notificationsintegrations"
 	policiesrepo "github.com/project-kessel/inventory-api/internal/data/policies"
 	relationshipsrepo "github.com/project-kessel/inventory-api/internal/data/relationships"
 
 	hostsctl "github.com/project-kessel/inventory-api/internal/biz/hosts"
 	k8sclustersctl "github.com/project-kessel/inventory-api/internal/biz/k8sclusters"
+	notifsctl "github.com/project-kessel/inventory-api/internal/biz/notificationsintegrations"
 	policiesctl "github.com/project-kessel/inventory-api/internal/biz/policies"
 	relationshipsctl "github.com/project-kessel/inventory-api/internal/biz/relationships"
 
 	hostssvc "github.com/project-kessel/inventory-api/internal/service/hosts"
 	k8sclusterssvc "github.com/project-kessel/inventory-api/internal/service/k8sclusters"
+	notifssvc "github.com/project-kessel/inventory-api/internal/service/notificationsintegrations"
 	policiessvc "github.com/project-kessel/inventory-api/internal/service/policies"
 	relationshipssvc "github.com/project-kessel/inventory-api/internal/service/relationships"
 )
@@ -137,33 +140,40 @@ func NewCommand(
 			// construct servers
 			server := server.New(serverConfig, middleware.Authentication(authenticator), logger)
 
+			// wire together notificationsintegrations handling
+			notifs_repo := notifsrepo.New(db, authorizer, eventingManager, log.NewHelper(log.With(logger, "subsystem", "notificationsintegrations_repo")))
+			notifs_controller := notifsctl.New(notifs_repo, log.With(logger, "subsystem", "notificationsintegrations_controller"))
+			notifs_service := notifssvc.New(notifs_controller)
+			pb.RegisterNotificationsIntegrationsServiceServer(server.GrpcServer, notifs_service)
+			pb.RegisterNotificationsIntegrationsServiceHTTPServer(server.HttpServer, notifs_service)
+
 			// wire together hosts handling
 			hosts_repo := hostsrepo.New(db, authorizer, eventingManager, log.NewHelper(log.With(logger, "subsystem", "hosts_repo")))
 			hosts_controller := hostsctl.New(hosts_repo, log.With(logger, "subsystem", "hosts_controller"))
 			hosts_service := hostssvc.New(hosts_controller)
-			v1beta1.RegisterHostsServiceServer(server.GrpcServer, hosts_service)
-			v1beta1.RegisterHostsServiceHTTPServer(server.HttpServer, hosts_service)
+			pb.RegisterHostsServiceServer(server.GrpcServer, hosts_service)
+			pb.RegisterHostsServiceHTTPServer(server.HttpServer, hosts_service)
 
 			// wire together k8sclusters handling
 			k8sclusters_repo := k8sclustersrepo.New(db, log.NewHelper(log.With(logger, "subsystem", "k8sclusters_repo")))
 			k8sclusters_controller := k8sclustersctl.New(k8sclusters_repo, log.With(logger, "subsystem", "k8sclusters_controller"))
 			k8sclusters_service := k8sclusterssvc.New(k8sclusters_controller)
-			v1beta1.RegisterK8SClustersServiceServer(server.GrpcServer, k8sclusters_service)
-			v1beta1.RegisterK8SClustersServiceHTTPServer(server.HttpServer, k8sclusters_service)
+			pb.RegisterK8SClustersServiceServer(server.GrpcServer, k8sclusters_service)
+			pb.RegisterK8SClustersServiceHTTPServer(server.HttpServer, k8sclusters_service)
 
 			// wire together policies handling
 			policies_repo := policiesrepo.New(db, log.NewHelper(log.With(logger, "subsystem", "policies_repo")))
 			policies_controller := policiesctl.New(policies_repo, log.With(logger, "subsystem", "policies_controller"))
 			policies_service := policiessvc.New(policies_controller)
-			v1beta1.RegisterPoliciesServiceServer(server.GrpcServer, policies_service)
-			v1beta1.RegisterPoliciesServiceHTTPServer(server.HttpServer, policies_service)
+			pb.RegisterPoliciesServiceServer(server.GrpcServer, policies_service)
+			pb.RegisterPoliciesServiceHTTPServer(server.HttpServer, policies_service)
 
 			// wire together relationships handling
 			relationships_repo := relationshipsrepo.New(db, log.NewHelper(log.With(logger, "subsystem", "relationships_repo")))
 			relationships_controller := relationshipsctl.New(relationships_repo, log.With(logger, "subsystem", "relationships_controller"))
 			relationships_service := relationshipssvc.New(relationships_controller)
-			v1beta1.RegisterRelationshipsServiceServer(server.GrpcServer, relationships_service)
-			v1beta1.RegisterRelationshipsServiceHTTPServer(server.HttpServer, relationships_service)
+			pb.RegisterRelationshipsServiceServer(server.GrpcServer, relationships_service)
+			pb.RegisterRelationshipsServiceHTTPServer(server.HttpServer, relationships_service)
 
 			srvErrs := make(chan error)
 			go func() {

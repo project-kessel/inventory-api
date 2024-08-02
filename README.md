@@ -10,5 +10,5 @@ make build
 ```
 
 ```bash
-curl -H "Authorization: Bearer 123" -H "Content-Type: application/json" --data "@data/host.json" http://localhost:8080/api/inventory/v1beta1/hosts
+curl -H "Authorization: Bearer 1234" -H "Content-Type: application/json" --data "@data/host.json" http://localhost:8080/api/inventory/v1beta1/hosts
 ```

@@ -3,9 +3,9 @@ server:
     address: 0.0.0.0:8081
   grpc:
     address: 0.0.0.0:9081
-#authn:
-#  psk:
-#    pre-shared-key-file: config/psks.yaml
+authn:
+ psk:
+   pre-shared-key-file: /psks.yaml
 authz:
   impl: allow-all
 eventing:

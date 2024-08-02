@@ -82,9 +82,13 @@ pr-check:
 	make build;
 	#
 
+.PHONY: inventory-up
 inventory-up:
 	./scripts/start-inventory.sh
-.PHONY: inventory-up
+
+.PHONY: inventory-down
+inventory-down:
+	./scripts/stop-inventory.sh
 
 help:
 # show help

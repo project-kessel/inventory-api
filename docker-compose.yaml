@@ -10,6 +10,7 @@ services:
       dockerfile: Dockerfile
     volumes:
       - ./inventory-api-compose.yaml:/inventory-api-compose.yaml:ro,z
+      - ./config/psks.yaml:/psks.yaml:ro,z
     command: ["serve"]
     restart: "always"
     ports:
@@ -48,7 +49,6 @@ services:
       - "SPICEDB_PRESHARED=${SPICEDB_GRPC_PRESHARED_KEY}"
       # - "SPICEDB_PRESHARED_FILE=/run/secrets/spicedb_pre_shared"
       - "SPICEDB_ENDPOINT=spicedb:50051"
-    profiles: ["relations-api"]
     secrets:
       - spicedb_pre_shared
     restart: "always"

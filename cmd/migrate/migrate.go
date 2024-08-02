@@ -30,7 +30,7 @@ func NewCommand(options *storage.Options, logger log.Logger) *cobra.Command {
 				return err
 			}
 
-			return data.Migrate(db)
+			return data.Migrate(db, logHelper)
 		},
 	}
 

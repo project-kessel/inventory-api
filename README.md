@@ -5,8 +5,8 @@ This repository implements a common inventory system with eventing.
 make init
 make api
 make build
-./bin/inventory-api migrate
-./bin/inventory-api serve
+./bin/inventory-api migrate --config .inventory-api.yaml
+./bin/inventory-api serve --config .inventory-api.yaml
 ```
 
 ```bash

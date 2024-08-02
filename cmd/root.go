@@ -104,15 +104,15 @@ func initConfig() {
 			log.Fatalf("Error reading INVENTORY_API_CONFIG file, %s", err)
 		}
 
-		home, err := os.UserHomeDir()
-		cobra.CheckErr(err)
-
-		viper.AddConfigPath(".")
-		viper.AddConfigPath(home)
-		viper.SetConfigType("yaml")
-
-		configName := fmt.Sprintf("%s", Name)
-		viper.SetConfigName(configName)
+		// home, err := os.UserHomeDir()
+		// cobra.CheckErr(err)
+		//
+		// viper.AddConfigPath(".")
+		// viper.AddConfigPath(home)
+		// viper.SetConfigType("yaml")
+		//
+		// configName := Name
+		// viper.SetConfigName(configName)
 	}
 
 	viper.SetEnvPrefix(Name)

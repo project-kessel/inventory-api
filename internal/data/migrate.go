@@ -3,6 +3,7 @@ package data
 import (
 	"gorm.io/gorm"
 
+	"github.com/go-kratos/kratos/v2/log"
 	"github.com/project-kessel/inventory-api/internal/biz/common"
 	"github.com/project-kessel/inventory-api/internal/biz/hosts"
 	// "github.com/project-kessel/inventory-api/internal/biz/k8sclusters"
@@ -12,7 +13,7 @@ import (
 
 // Migrate the tables
 // See https://gorm.io/docs/migration.html
-func Migrate(db *gorm.DB) error {
+func Migrate(db *gorm.DB, logger *log.Helper) error {
 	if err := db.AutoMigrate(
 		&hosts.Host{},
 		&common.Metadata{},
@@ -24,5 +25,6 @@ func Migrate(db *gorm.DB) error {
 	); err != nil {
 		return err
 	}
+	logger.Info("Migration successful!")
 	return nil
 }

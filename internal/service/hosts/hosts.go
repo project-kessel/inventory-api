@@ -2,17 +2,14 @@ package hosts
 
 import (
 	"context"
-	"time"
-
-	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/go-kratos/kratos/v2/errors"
-	"github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1"
 	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1"
 	authnapi "github.com/project-kessel/inventory-api/internal/authn/api"
-	"github.com/project-kessel/inventory-api/internal/biz/common"
+	bizcommon "github.com/project-kessel/inventory-api/internal/biz/common"
 	biz "github.com/project-kessel/inventory-api/internal/biz/hosts"
 	"github.com/project-kessel/inventory-api/internal/middleware"
+	conv "github.com/project-kessel/inventory-api/internal/service/common"
 )
 
 // HostsService handles requests for RHEL hosts
@@ -70,68 +67,17 @@ func hostFromCreateRequest(r *pb.CreateRHELHostRequest, identity *authnapi.Ident
 		return nil, errors.Forbidden("FORBIDDEN", "Reporter identity must match the provided reporter instance identity")
 	}
 
-	var tags []*common.Tag
-	for _, t := range r.Host.Metadata.Tags {
-		tags = append(tags, &common.Tag{Key: t.Key, Value: t.Value})
-	}
-
 	return &biz.Host{
-		Metadata: common.Metadata{
-			ID:           r.Host.Metadata.Id,
-			ResourceType: r.Host.Metadata.ResourceType,
-			Workspace:    r.Host.Metadata.Workspace,
-			Tags:         tags,
-
-			FirstReportedBy: identity.Principal,
-			LastReportedBy:  identity.Principal,
-
-			FirstReported: time.Now(),
-			LastReported:  time.Now(),
-		},
-		Reporters: []*common.Reporter{{
-			ReporterID:      identity.Principal,
-			ReporterType:    r.Host.ReporterData.ReporterType.String(),
-			ReporterVersion: r.Host.ReporterData.ReporterVersion,
-
-			LocalResourceId: r.Host.ReporterData.LocalResourceId,
-
-			ConsoleHref: r.Host.ReporterData.ConsoleHref,
-			ApiHref:     r.Host.ReporterData.ApiHref,
-		}},
+		Metadata:  *conv.MetadataFromPb(r.Host.Metadata, identity),
+		Reporters: []*bizcommon.Reporter{conv.ReporterFromPb(r.Host.ReporterData, identity)},
 	}, nil
 }
 
-func createResponseFromHost(h *biz.Host) *v1beta1.CreateRHELHostResponse {
-	var tags []*v1beta1.ResourceTag
-	for _, t := range h.Metadata.Tags {
-		tags = append(tags, &v1beta1.ResourceTag{Key: t.Key, Value: t.Value})
+func createResponseFromHost(h *biz.Host) *pb.CreateRHELHostResponse {
+	return &pb.CreateRHELHostResponse{
+		Host: &pb.RHELHost{
+			Metadata:  conv.MetadataFromModel(&h.Metadata),
+			Reporters: conv.ReportersFromModel(h.Reporters),
+		},
 	}
-
-	var reporters []*v1beta1.ReporterData
-	for _, r := range h.Reporters {
-		reporters = append(reporters, &v1beta1.ReporterData{
-			ReporterInstanceId: r.ReporterID,
-			ReporterType:       v1beta1.ReporterData_ReporterTypeEnum(v1beta1.ReporterData_ReporterTypeEnum_value[r.ReporterType]),
-			ReporterVersion:    r.ReporterVersion,
-
-			LocalResourceId: r.LocalResourceId,
-
-			ConsoleHref: r.ConsoleHref,
-			ApiHref:     r.ApiHref,
-		})
-	}
-
-	return &v1beta1.CreateRHELHostResponse{
-		Host: &v1beta1.RHELHost{
-			Metadata: &v1beta1.Metadata{
-				Id:              h.Metadata.ID,
-				ResourceType:    h.Metadata.ResourceType,
-				FirstReported:   timestamppb.New(h.Metadata.FirstReported),
-				LastReported:    timestamppb.New(h.Metadata.LastReported),
-				FirstReportedBy: h.Metadata.FirstReportedBy,
-				LastReportedBy:  h.Metadata.LastReportedBy,
-				Tags:            tags,
-			},
-			Reporters: reporters,
-		}}
 }

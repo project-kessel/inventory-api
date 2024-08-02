@@ -2,7 +2,7 @@ FROM registry.access.redhat.com/ubi8/ubi-minimal:8.10 AS builder
 
 ARG TARGETARCH
 USER root
-RUN microdnf install -y tar gzip make which gcc gcc-c++ cyrus-sasl-lib
+RUN microdnf install -y tar gzip make which gcc gcc-c++ cyrus-sasl-lib findutils git
 
 # install platform specific go version
 RUN curl -O -J  https://dl.google.com/go/go1.22.5.linux-${TARGETARCH}.tar.gz

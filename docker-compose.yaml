@@ -1,7 +1,7 @@
 services:
   inventory-api:
     environment:
-      - "INVENTORY_API_CONFIG=/inventory_file"
+      - "INVENTORY_API_CONFIG=/inventory-api-compose.yaml"
 #      - "INVENTORY_API_STORAGE_DBNAME=postgres"
 #      - "INVENTORY_API_STORAGE_POSTGRES_DBNAME=database"
 #      - "INVENTORY_API_STORAGE_POSTGRES_USER=${POSTGRES_USER}"
@@ -9,14 +9,42 @@ services:
     build:
       dockerfile: Dockerfile
     configs:
-      - inventory_file
+      - source: inventory_file
+        target: /inventory-api-compose.yaml
     command: ["serve"]
     restart: "always"
     ports:
       - "8081:8081"
       - "9081:9081"
     depends_on:
-      - "invdatabase"
+      invmigrate:
+        condition: service_completed_successfully
+
+  invmigrate:
+    environment:
+      - "INVENTORY_API_CONFIG=/inventory-api-compose.yaml"
+    build:
+      dockerfile: Dockerfile
+    configs:
+      - source: inventory_file
+        target: /inventory-api-compose.yaml
+    command: ["migrate"]
+    restart: "never"
+    depends_on:
+      invdatabase:
+        condition: service_started
+
+  invdatabase:
+    image: "postgres"
+    command: ["-p", "5433","-c", "track_commit_timestamp=on"]
+    expose:
+      - "5433"
+    ports:
+      - "5433:5433"
+    environment:
+      - "POSTGRES_PASSWORD=${POSTGRES_PASSWORD}"
+      - "POSTGRES_DB=${POSTGRES_DBNAME}"
+      - "PGPORT=5433"
 
   relations-api:
     image: "quay.io/cloudservices/kessel-relations:latest"
@@ -31,7 +59,9 @@ services:
     ports:
       - "8000:8000"
       - "9000:9000"
-
+    depends_on:
+      spicedb:
+        condition: service_started
 
   spicedb:
     image: "authzed/spicedb"
@@ -51,31 +81,21 @@ services:
       - "SPICEDB_DATASTORE_BOOTSTRAP_FILES=/bootstrap_file"
       - "SPICEDB_DATASTORE_CONN_URI=postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@database:5432/spicedb?sslmode=disable"
     depends_on:
-      - "migrate"
+      migrate:
+        condition: service_completed_successfully
 
   migrate:
     image: "authzed/spicedb"
     command: "datastore migrate head"
-    restart: "on-failure"
+    restart: "never"
     secrets:
       - spicedb_pre_shared
     environment:
       - "SPICEDB_DATASTORE_ENGINE=postgres"
       - "SPICEDB_DATASTORE_CONN_URI=postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@database:5432/spicedb?sslmode=disable"
     depends_on:
-      - "database"
-
-  invdatabase:
-    image: "postgres"
-    command: ["-p", "5433","-c", "track_commit_timestamp=on"]
-    expose:
-      - "5433"
-    ports:
-      - "5433:5433"
-    environment:
-      - "POSTGRES_PASSWORD=${POSTGRES_PASSWORD}"
-      - "POSTGRES_DB=${POSTGRES_DBNAME}"
-      - "PGPORT=5433"
+      database:
+        condition: service_started
 
   database:
     image: "postgres"
@@ -85,7 +105,6 @@ services:
     environment:
       - "POSTGRES_PASSWORD=${POSTGRES_PASSWORD}"
       - "POSTGRES_DB=${POSTGRES_DBNAME}"
-
 
 configs:
   spicedb_pre_shared:

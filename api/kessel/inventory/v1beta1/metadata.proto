@@ -15,6 +15,9 @@ message Metadata {
   // Kessel Asset Inventory generated identifier.
   int64 id = 3355 [ (google.api.field_behavior) = OUTPUT_ONLY ];
 
+  // Some identifier intrinsic to the resource itself that is unique across reporters
+  string natural_id = 1;
+
   // The type of the Resource
   string resource_type = 442752204;
 
@@ -26,7 +29,7 @@ message Metadata {
   google.protobuf.Timestamp last_reported = 436473483
       [ (google.api.field_behavior) = OUTPUT_ONLY ];
 
-  // Identifier of the reporter that first reported this item.
+  // Identifier of the reporter that first reported on this item.
   string first_reported_by = 46112820
       [ (google.api.field_behavior) = OUTPUT_ONLY ];
 

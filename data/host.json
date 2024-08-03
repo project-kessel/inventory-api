@@ -1,6 +1,6 @@
 {
     "metadata": {
-        "resource_type": "k8scluster",
+        "resource_type": "rhelhost",
         "workspace": ""
     },
     "reporter_data":{

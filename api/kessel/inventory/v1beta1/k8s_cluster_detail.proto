@@ -15,10 +15,10 @@ message K8sClusterDetail {
 
   // the aggregate status of the cluster
   enum Cluster_statusEnum {
-    Cluster_statusEnum_READY = 0;
-    Cluster_statusEnum_FAILED = 1;
-    Cluster_statusEnum_OFFLINE = 2;
-    Cluster_statusEnum_UNKNOWN = 3;
+    Cluster_statusEnum_UNKNOWN = 0;
+    Cluster_statusEnum_READY = 1;
+    Cluster_statusEnum_FAILED = 2;
+    Cluster_statusEnum_OFFLINE = 3;
   }
 
   Cluster_statusEnum cluster_status = 499346904;
@@ -28,13 +28,13 @@ message K8sClusterDetail {
 
   // The kubernetes vendor
   enum Kube_vendorEnum {
-    Kube_vendorEnum_AKS = 0;
-    Kube_vendorEnum_EKS = 1;
-    Kube_vendorEnum_IKS = 2;
-    Kube_vendorEnum_OPENSHIFT = 3;
-    Kube_vendorEnum_GKE = 4;
-    Kube_vendorEnum_OTHER = 5;
-    Kube_vendorEnum_UNKNOWN = 6;
+    Kube_vendorEnum_UNKNOWN = 0;
+    Kube_vendorEnum_OTHER = 1;
+    Kube_vendorEnum_AKS = 2;
+    Kube_vendorEnum_EKS = 3;
+    Kube_vendorEnum_IKS = 4;
+    Kube_vendorEnum_OPENSHIFT = 5;
+    Kube_vendorEnum_GKE = 6;
   }
 
   Kube_vendorEnum kube_vendor = 264191642;
@@ -44,26 +44,26 @@ message K8sClusterDetail {
 
   // The platform on which this cluster is hosted
   enum Cloud_platformEnum {
-    Cloud_platformEnum_BAREMETAL_IPI_ = 0;
-    Cloud_platformEnum_BAREMETAL_UPI_ = 1;
-    Cloud_platformEnum_AWS_IPI_ = 2;
-    Cloud_platformEnum_AWS_UPI_ = 3;
-    Cloud_platformEnum_AZURE_IPI_ = 4;
-    Cloud_platformEnum_AZURE_UPI_ = 5;
-    Cloud_platformEnum_IBMCLOUD_IPI_ = 6;
-    Cloud_platformEnum_IBMCLOUD_UPI_ = 7;
-    Cloud_platformEnum_KUBEVIRT_IPI_ = 8;
-    Cloud_platformEnum_OPENSTACK_IPI_ = 9;
-    Cloud_platformEnum_OPENSTACK_UPI_ = 10;
-    Cloud_platformEnum_GCP_IPI_ = 11;
-    Cloud_platformEnum_GCP_UPI_ = 12;
-    Cloud_platformEnum_NUTANIX_IPI_ = 13;
-    Cloud_platformEnum_NUTANIX_UPI_ = 14;
-    Cloud_platformEnum_VSPHERE_IPI_ = 15;
-    Cloud_platformEnum_VSPHERE_UPI_ = 16;
-    Cloud_platformEnum_OVIRT_IPI_ = 17;
-    Cloud_platformEnum_UNKNOWN_IPI_ = 18;
-    Cloud_platformEnum_NONE_UPI_ = 19;
+    Cloud_platformEnum_UNKNOWN_IPI = 0;
+    Cloud_platformEnum_NONE_UPI = 1;
+    Cloud_platformEnum_BAREMETAL_IPI = 2;
+    Cloud_platformEnum_BAREMETAL_UPI = 3;
+    Cloud_platformEnum_AWS_IPI = 4;
+    Cloud_platformEnum_AWS_UPI = 5;
+    Cloud_platformEnum_AZURE_IPI = 6;
+    Cloud_platformEnum_AZURE_UPI = 7;
+    Cloud_platformEnum_IBMCLOUD_IPI = 8;
+    Cloud_platformEnum_IBMCLOUD_UPI = 9;
+    Cloud_platformEnum_KUBEVIRT_IPI = 10;
+    Cloud_platformEnum_OPENSTACK_IPI = 11;
+    Cloud_platformEnum_OPENSTACK_UPI = 12;
+    Cloud_platformEnum_GCP_IPI = 13;
+    Cloud_platformEnum_GCP_UPI = 14;
+    Cloud_platformEnum_NUTANIX_IPI = 15;
+    Cloud_platformEnum_NUTANIX_UPI = 16;
+    Cloud_platformEnum_VSPHERE_IPI = 17;
+    Cloud_platformEnum_VSPHERE_UPI = 18;
+    Cloud_platformEnum_OVIRT_IPI = 19;
   }
 
   Cloud_platformEnum cloud_platform = 476768062;

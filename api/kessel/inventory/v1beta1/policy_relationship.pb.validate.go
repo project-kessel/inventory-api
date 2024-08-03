@@ -61,7 +61,7 @@ func (m *PolicyRelationship) validate(all bool) error {
 
 	// no validation rules for PolicyId
 
-	// no validation rules for ClusterId
+	// no validation rules for K8SClusterId
 
 	// no validation rules for Status
 

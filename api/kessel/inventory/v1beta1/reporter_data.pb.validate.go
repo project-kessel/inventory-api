@@ -61,6 +61,64 @@ func (m *ReporterData) validate(all bool) error {
 
 	// no validation rules for ReporterInstanceId
 
+	if all {
+		switch v := interface{}(m.GetFirstReported()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, ReporterDataValidationError{
+					field:  "FirstReported",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, ReporterDataValidationError{
+					field:  "FirstReported",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetFirstReported()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return ReporterDataValidationError{
+				field:  "FirstReported",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if all {
+		switch v := interface{}(m.GetLastReported()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, ReporterDataValidationError{
+					field:  "LastReported",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, ReporterDataValidationError{
+					field:  "LastReported",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetLastReported()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return ReporterDataValidationError{
+				field:  "LastReported",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
 	// no validation rules for ConsoleHref
 
 	// no validation rules for ApiHref

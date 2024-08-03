@@ -35,22 +35,22 @@ var (
 	_ = sort.Sort
 )
 
-// Validate checks the field values on RHELHost with the rules defined in the
+// Validate checks the field values on RhelHost with the rules defined in the
 // proto definition for this message. If any rules are violated, the first
 // error encountered is returned, or nil if there are no violations.
-func (m *RHELHost) Validate() error {
+func (m *RhelHost) Validate() error {
 	return m.validate(false)
 }
 
-// ValidateAll checks the field values on RHELHost with the rules defined in
+// ValidateAll checks the field values on RhelHost with the rules defined in
 // the proto definition for this message. If any rules are violated, the
-// result is a list of violation errors wrapped in RHELHostMultiError, or nil
+// result is a list of violation errors wrapped in RhelHostMultiError, or nil
 // if none found.
-func (m *RHELHost) ValidateAll() error {
+func (m *RhelHost) ValidateAll() error {
 	return m.validate(true)
 }
 
-func (m *RHELHost) validate(all bool) error {
+func (m *RhelHost) validate(all bool) error {
 	if m == nil {
 		return nil
 	}
@@ -58,7 +58,7 @@ func (m *RHELHost) validate(all bool) error {
 	var errors []error
 
 	if m.GetMetadata() == nil {
-		err := RHELHostValidationError{
+		err := RhelHostValidationError{
 			field:  "Metadata",
 			reason: "value is required",
 		}
@@ -72,19 +72,33 @@ func (m *RHELHost) validate(all bool) error {
 
 	}
 
-	if m.GetReporterData() == nil {
-		err := RHELHostValidationError{
-			field:  "ReporterData",
-			reason: "value is required",
+	if all {
+		switch v := interface{}(m.GetReporterData()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, RhelHostValidationError{
+					field:  "ReporterData",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, RhelHostValidationError{
+					field:  "ReporterData",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
 		}
-		if !all {
-			return err
+	} else if v, ok := interface{}(m.GetReporterData()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return RhelHostValidationError{
+				field:  "ReporterData",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
 		}
-		errors = append(errors, err)
-	}
-
-	if a := m.GetReporterData(); a != nil {
-
 	}
 
 	for idx, item := range m.GetReporters() {
@@ -94,7 +108,7 @@ func (m *RHELHost) validate(all bool) error {
 			switch v := interface{}(item).(type) {
 			case interface{ ValidateAll() error }:
 				if err := v.ValidateAll(); err != nil {
-					errors = append(errors, RHELHostValidationError{
+					errors = append(errors, RhelHostValidationError{
 						field:  fmt.Sprintf("Reporters[%v]", idx),
 						reason: "embedded message failed validation",
 						cause:  err,
@@ -102,7 +116,7 @@ func (m *RHELHost) validate(all bool) error {
 				}
 			case interface{ Validate() error }:
 				if err := v.Validate(); err != nil {
-					errors = append(errors, RHELHostValidationError{
+					errors = append(errors, RhelHostValidationError{
 						field:  fmt.Sprintf("Reporters[%v]", idx),
 						reason: "embedded message failed validation",
 						cause:  err,
@@ -111,7 +125,7 @@ func (m *RHELHost) validate(all bool) error {
 			}
 		} else if v, ok := interface{}(item).(interface{ Validate() error }); ok {
 			if err := v.Validate(); err != nil {
-				return RHELHostValidationError{
+				return RhelHostValidationError{
 					field:  fmt.Sprintf("Reporters[%v]", idx),
 					reason: "embedded message failed validation",
 					cause:  err,
@@ -122,18 +136,18 @@ func (m *RHELHost) validate(all bool) error {
 	}
 
 	if len(errors) > 0 {
-		return RHELHostMultiError(errors)
+		return RhelHostMultiError(errors)
 	}
 
 	return nil
 }
 
-// RHELHostMultiError is an error wrapping multiple validation errors returned
-// by RHELHost.ValidateAll() if the designated constraints aren't met.
-type RHELHostMultiError []error
+// RhelHostMultiError is an error wrapping multiple validation errors returned
+// by RhelHost.ValidateAll() if the designated constraints aren't met.
+type RhelHostMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
-func (m RHELHostMultiError) Error() string {
+func (m RhelHostMultiError) Error() string {
 	var msgs []string
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
@@ -142,11 +156,11 @@ func (m RHELHostMultiError) Error() string {
 }
 
 // AllErrors returns a list of validation violation errors.
-func (m RHELHostMultiError) AllErrors() []error { return m }
+func (m RhelHostMultiError) AllErrors() []error { return m }
 
-// RHELHostValidationError is the validation error returned by
-// RHELHost.Validate if the designated constraints aren't met.
-type RHELHostValidationError struct {
+// RhelHostValidationError is the validation error returned by
+// RhelHost.Validate if the designated constraints aren't met.
+type RhelHostValidationError struct {
 	field  string
 	reason string
 	cause  error
@@ -154,22 +168,22 @@ type RHELHostValidationError struct {
 }
 
 // Field function returns field value.
-func (e RHELHostValidationError) Field() string { return e.field }
+func (e RhelHostValidationError) Field() string { return e.field }
 
 // Reason function returns reason value.
-func (e RHELHostValidationError) Reason() string { return e.reason }
+func (e RhelHostValidationError) Reason() string { return e.reason }
 
 // Cause function returns cause value.
-func (e RHELHostValidationError) Cause() error { return e.cause }
+func (e RhelHostValidationError) Cause() error { return e.cause }
 
 // Key function returns key value.
-func (e RHELHostValidationError) Key() bool { return e.key }
+func (e RhelHostValidationError) Key() bool { return e.key }
 
 // ErrorName returns error name.
-func (e RHELHostValidationError) ErrorName() string { return "RHELHostValidationError" }
+func (e RhelHostValidationError) ErrorName() string { return "RhelHostValidationError" }
 
 // Error satisfies the builtin error interface
-func (e RHELHostValidationError) Error() string {
+func (e RhelHostValidationError) Error() string {
 	cause := ""
 	if e.cause != nil {
 		cause = fmt.Sprintf(" | caused by: %v", e.cause)
@@ -181,14 +195,14 @@ func (e RHELHostValidationError) Error() string {
 	}
 
 	return fmt.Sprintf(
-		"invalid %sRHELHost.%s: %s%s",
+		"invalid %sRhelHost.%s: %s%s",
 		key,
 		e.field,
 		e.reason,
 		cause)
 }
 
-var _ error = RHELHostValidationError{}
+var _ error = RhelHostValidationError{}
 
 var _ interface {
 	Field() string
@@ -196,4 +210,4 @@ var _ interface {
 	Key() bool
 	Cause() error
 	ErrorName() string
-} = RHELHostValidationError{}
+} = RhelHostValidationError{}

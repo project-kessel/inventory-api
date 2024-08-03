@@ -6,9 +6,9 @@ option go_package = "api/kessel/inventory/v1beta1;v1beta1";
 option java_multiple_files = true;
 option java_package = "api.kessel.inventory.v1beta1";
 
-message UpdateResourceRelationshipByURNHsHcrnsParameter {
+message UpdateResourceRelationshipByUrnHsHcrnsParameter {
 
-  string subjectURN = 36776796;
+  string subjectUrn = 36776796;
 
-  string objectURN = 415864400;
+  string objectUrn = 415864400;
 }

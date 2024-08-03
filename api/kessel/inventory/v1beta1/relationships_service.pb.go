@@ -117,7 +117,7 @@ func (x *CreatePolicyRelationshipResponse) GetPolicyRelationship() *PolicyRelati
 	return nil
 }
 
-type UpdateResourceRelationshipByURNHsRequest struct {
+type UpdateResourceRelationshipByUrnHsRequest struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
@@ -125,7 +125,7 @@ type UpdateResourceRelationshipByURNHsRequest struct {
 	// The subject {resource} and the object {resource}. A relationship is between
 	// a Subject and an Object, e.g. a Policy (subject) has a propagated
 	// relationship to an k8s cluster (object)
-	Resources *UpdateResourceRelationshipByURNHsResourcesParameter `protobuf:"bytes,1,opt,name=resources,proto3" json:"resources,omitempty"`
+	Resources *UpdateResourceRelationshipByUrnHsResourcesParameter `protobuf:"bytes,1,opt,name=resources,proto3" json:"resources,omitempty"`
 	// Update a resource relationship in Kessel Asset Inventory by the {subject
 	// resource, object resource}. A relationship is between a Subject and an
 	// Object, e.g. a Policy (subject) has a propagated relationship to an k8s
@@ -134,8 +134,8 @@ type UpdateResourceRelationshipByURNHsRequest struct {
 	PolicyRelationship *PolicyRelationship `protobuf:"bytes,2,opt,name=policyRelationship,proto3" json:"policyRelationship,omitempty"`
 }
 
-func (x *UpdateResourceRelationshipByURNHsRequest) Reset() {
-	*x = UpdateResourceRelationshipByURNHsRequest{}
+func (x *UpdateResourceRelationshipByUrnHsRequest) Reset() {
+	*x = UpdateResourceRelationshipByUrnHsRequest{}
 	if protoimpl.UnsafeEnabled {
 		mi := &file_kessel_inventory_v1beta1_relationships_service_proto_msgTypes[2]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -143,13 +143,13 @@ func (x *UpdateResourceRelationshipByURNHsRequest) Reset() {
 	}
 }
 
-func (x *UpdateResourceRelationshipByURNHsRequest) String() string {
+func (x *UpdateResourceRelationshipByUrnHsRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*UpdateResourceRelationshipByURNHsRequest) ProtoMessage() {}
+func (*UpdateResourceRelationshipByUrnHsRequest) ProtoMessage() {}
 
-func (x *UpdateResourceRelationshipByURNHsRequest) ProtoReflect() protoreflect.Message {
+func (x *UpdateResourceRelationshipByUrnHsRequest) ProtoReflect() protoreflect.Message {
 	mi := &file_kessel_inventory_v1beta1_relationships_service_proto_msgTypes[2]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -161,33 +161,33 @@ func (x *UpdateResourceRelationshipByURNHsRequest) ProtoReflect() protoreflect.M
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use UpdateResourceRelationshipByURNHsRequest.ProtoReflect.Descriptor instead.
-func (*UpdateResourceRelationshipByURNHsRequest) Descriptor() ([]byte, []int) {
+// Deprecated: Use UpdateResourceRelationshipByUrnHsRequest.ProtoReflect.Descriptor instead.
+func (*UpdateResourceRelationshipByUrnHsRequest) Descriptor() ([]byte, []int) {
 	return file_kessel_inventory_v1beta1_relationships_service_proto_rawDescGZIP(), []int{2}
 }
 
-func (x *UpdateResourceRelationshipByURNHsRequest) GetResources() *UpdateResourceRelationshipByURNHsResourcesParameter {
+func (x *UpdateResourceRelationshipByUrnHsRequest) GetResources() *UpdateResourceRelationshipByUrnHsResourcesParameter {
 	if x != nil {
 		return x.Resources
 	}
 	return nil
 }
 
-func (x *UpdateResourceRelationshipByURNHsRequest) GetPolicyRelationship() *PolicyRelationship {
+func (x *UpdateResourceRelationshipByUrnHsRequest) GetPolicyRelationship() *PolicyRelationship {
 	if x != nil {
 		return x.PolicyRelationship
 	}
 	return nil
 }
 
-type UpdateResourceRelationshipByURNResponse struct {
+type UpdateResourceRelationshipByUrnResponse struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 }
 
-func (x *UpdateResourceRelationshipByURNResponse) Reset() {
-	*x = UpdateResourceRelationshipByURNResponse{}
+func (x *UpdateResourceRelationshipByUrnResponse) Reset() {
+	*x = UpdateResourceRelationshipByUrnResponse{}
 	if protoimpl.UnsafeEnabled {
 		mi := &file_kessel_inventory_v1beta1_relationships_service_proto_msgTypes[3]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -195,13 +195,13 @@ func (x *UpdateResourceRelationshipByURNResponse) Reset() {
 	}
 }
 
-func (x *UpdateResourceRelationshipByURNResponse) String() string {
+func (x *UpdateResourceRelationshipByUrnResponse) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*UpdateResourceRelationshipByURNResponse) ProtoMessage() {}
+func (*UpdateResourceRelationshipByUrnResponse) ProtoMessage() {}
 
-func (x *UpdateResourceRelationshipByURNResponse) ProtoReflect() protoreflect.Message {
+func (x *UpdateResourceRelationshipByUrnResponse) ProtoReflect() protoreflect.Message {
 	mi := &file_kessel_inventory_v1beta1_relationships_service_proto_msgTypes[3]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -213,12 +213,12 @@ func (x *UpdateResourceRelationshipByURNResponse) ProtoReflect() protoreflect.Me
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use UpdateResourceRelationshipByURNResponse.ProtoReflect.Descriptor instead.
-func (*UpdateResourceRelationshipByURNResponse) Descriptor() ([]byte, []int) {
+// Deprecated: Use UpdateResourceRelationshipByUrnResponse.ProtoReflect.Descriptor instead.
+func (*UpdateResourceRelationshipByUrnResponse) Descriptor() ([]byte, []int) {
 	return file_kessel_inventory_v1beta1_relationships_service_proto_rawDescGZIP(), []int{3}
 }
 
-type DeleteResourceRelationshipByURNRequest struct {
+type DeleteResourceRelationshipByUrnRequest struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
@@ -226,11 +226,11 @@ type DeleteResourceRelationshipByURNRequest struct {
 	// The subject {resource} and the object {resource}. A relationship is between
 	// a Subject and an Object, e.g. a Policy (subject) has a propagated
 	// relationship to an k8s cluster (object)
-	Resources *UpdateResourceRelationshipByURNHsResourcesParameter `protobuf:"bytes,1,opt,name=resources,proto3" json:"resources,omitempty"`
+	Resources *UpdateResourceRelationshipByUrnHsResourcesParameter `protobuf:"bytes,1,opt,name=resources,proto3" json:"resources,omitempty"`
 }
 
-func (x *DeleteResourceRelationshipByURNRequest) Reset() {
-	*x = DeleteResourceRelationshipByURNRequest{}
+func (x *DeleteResourceRelationshipByUrnRequest) Reset() {
+	*x = DeleteResourceRelationshipByUrnRequest{}
 	if protoimpl.UnsafeEnabled {
 		mi := &file_kessel_inventory_v1beta1_relationships_service_proto_msgTypes[4]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -238,13 +238,13 @@ func (x *DeleteResourceRelationshipByURNRequest) Reset() {
 	}
 }
 
-func (x *DeleteResourceRelationshipByURNRequest) String() string {
+func (x *DeleteResourceRelationshipByUrnRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*DeleteResourceRelationshipByURNRequest) ProtoMessage() {}
+func (*DeleteResourceRelationshipByUrnRequest) ProtoMessage() {}
 
-func (x *DeleteResourceRelationshipByURNRequest) ProtoReflect() protoreflect.Message {
+func (x *DeleteResourceRelationshipByUrnRequest) ProtoReflect() protoreflect.Message {
 	mi := &file_kessel_inventory_v1beta1_relationships_service_proto_msgTypes[4]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -256,26 +256,26 @@ func (x *DeleteResourceRelationshipByURNRequest) ProtoReflect() protoreflect.Mes
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use DeleteResourceRelationshipByURNRequest.ProtoReflect.Descriptor instead.
-func (*DeleteResourceRelationshipByURNRequest) Descriptor() ([]byte, []int) {
+// Deprecated: Use DeleteResourceRelationshipByUrnRequest.ProtoReflect.Descriptor instead.
+func (*DeleteResourceRelationshipByUrnRequest) Descriptor() ([]byte, []int) {
 	return file_kessel_inventory_v1beta1_relationships_service_proto_rawDescGZIP(), []int{4}
 }
 
-func (x *DeleteResourceRelationshipByURNRequest) GetResources() *UpdateResourceRelationshipByURNHsResourcesParameter {
+func (x *DeleteResourceRelationshipByUrnRequest) GetResources() *UpdateResourceRelationshipByUrnHsResourcesParameter {
 	if x != nil {
 		return x.Resources
 	}
 	return nil
 }
 
-type DeleteResourceRelationshipByURNResponse struct {
+type DeleteResourceRelationshipByUrnResponse struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 }
 
-func (x *DeleteResourceRelationshipByURNResponse) Reset() {
-	*x = DeleteResourceRelationshipByURNResponse{}
+func (x *DeleteResourceRelationshipByUrnResponse) Reset() {
+	*x = DeleteResourceRelationshipByUrnResponse{}
 	if protoimpl.UnsafeEnabled {
 		mi := &file_kessel_inventory_v1beta1_relationships_service_proto_msgTypes[5]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -283,13 +283,13 @@ func (x *DeleteResourceRelationshipByURNResponse) Reset() {
 	}
 }
 
-func (x *DeleteResourceRelationshipByURNResponse) String() string {
+func (x *DeleteResourceRelationshipByUrnResponse) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*DeleteResourceRelationshipByURNResponse) ProtoMessage() {}
+func (*DeleteResourceRelationshipByUrnResponse) ProtoMessage() {}
 
-func (x *DeleteResourceRelationshipByURNResponse) ProtoReflect() protoreflect.Message {
+func (x *DeleteResourceRelationshipByUrnResponse) ProtoReflect() protoreflect.Message {
 	mi := &file_kessel_inventory_v1beta1_relationships_service_proto_msgTypes[5]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -301,8 +301,8 @@ func (x *DeleteResourceRelationshipByURNResponse) ProtoReflect() protoreflect.Me
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use DeleteResourceRelationshipByURNResponse.ProtoReflect.Descriptor instead.
-func (*DeleteResourceRelationshipByURNResponse) Descriptor() ([]byte, []int) {
+// Deprecated: Use DeleteResourceRelationshipByUrnResponse.ProtoReflect.Descriptor instead.
+func (*DeleteResourceRelationshipByUrnResponse) Descriptor() ([]byte, []int) {
 	return file_kessel_inventory_v1beta1_relationships_service_proto_rawDescGZIP(), []int{5}
 }
 
@@ -343,13 +343,13 @@ var file_kessel_inventory_v1beta1_relationships_service_proto_rawDesc = []byte{
 	0x61, 0x74, 0x69, 0x6f, 0x6e, 0x73, 0x68, 0x69, 0x70, 0x52, 0x12, 0x70, 0x6f, 0x6c, 0x69, 0x63,
 	0x79, 0x52, 0x65, 0x6c, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x73, 0x68, 0x69, 0x70, 0x22, 0xfd, 0x01,
 	0x0a, 0x28, 0x55, 0x70, 0x64, 0x61, 0x74, 0x65, 0x52, 0x65, 0x73, 0x6f, 0x75, 0x72, 0x63, 0x65,
-	0x52, 0x65, 0x6c, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x73, 0x68, 0x69, 0x70, 0x42, 0x79, 0x55, 0x52,
-	0x4e, 0x48, 0x73, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x12, 0x6f, 0x0a, 0x09, 0x72, 0x65,
+	0x52, 0x65, 0x6c, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x73, 0x68, 0x69, 0x70, 0x42, 0x79, 0x55, 0x72,
+	0x6e, 0x48, 0x73, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x12, 0x6f, 0x0a, 0x09, 0x72, 0x65,
 	0x73, 0x6f, 0x75, 0x72, 0x63, 0x65, 0x73, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x51, 0x2e,
 	0x61, 0x70, 0x69, 0x2e, 0x6b, 0x65, 0x73, 0x73, 0x65, 0x6c, 0x2e, 0x69, 0x6e, 0x76, 0x65, 0x6e,
 	0x74, 0x6f, 0x72, 0x79, 0x2e, 0x76, 0x31, 0x62, 0x65, 0x74, 0x61, 0x31, 0x2e, 0x55, 0x70, 0x64,
 	0x61, 0x74, 0x65, 0x52, 0x65, 0x73, 0x6f, 0x75, 0x72, 0x63, 0x65, 0x52, 0x65, 0x6c, 0x61, 0x74,
-	0x69, 0x6f, 0x6e, 0x73, 0x68, 0x69, 0x70, 0x42, 0x79, 0x55, 0x52, 0x4e, 0x48, 0x73, 0x52, 0x65,
+	0x69, 0x6f, 0x6e, 0x73, 0x68, 0x69, 0x70, 0x42, 0x79, 0x55, 0x72, 0x6e, 0x48, 0x73, 0x52, 0x65,
 	0x73, 0x6f, 0x75, 0x72, 0x63, 0x65, 0x73, 0x50, 0x61, 0x72, 0x61, 0x6d, 0x65, 0x74, 0x65, 0x72,
 	0x52, 0x09, 0x72, 0x65, 0x73, 0x6f, 0x75, 0x72, 0x63, 0x65, 0x73, 0x12, 0x60, 0x0a, 0x12, 0x70,
 	0x6f, 0x6c, 0x69, 0x63, 0x79, 0x52, 0x65, 0x6c, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x73, 0x68, 0x69,
@@ -359,20 +359,20 @@ var file_kessel_inventory_v1beta1_relationships_service_proto_rawDesc = []byte{
 	0x61, 0x74, 0x69, 0x6f, 0x6e, 0x73, 0x68, 0x69, 0x70, 0x52, 0x12, 0x70, 0x6f, 0x6c, 0x69, 0x63,
 	0x79, 0x52, 0x65, 0x6c, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x73, 0x68, 0x69, 0x70, 0x22, 0x29, 0x0a,
 	0x27, 0x55, 0x70, 0x64, 0x61, 0x74, 0x65, 0x52, 0x65, 0x73, 0x6f, 0x75, 0x72, 0x63, 0x65, 0x52,
-	0x65, 0x6c, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x73, 0x68, 0x69, 0x70, 0x42, 0x79, 0x55, 0x52, 0x4e,
+	0x65, 0x6c, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x73, 0x68, 0x69, 0x70, 0x42, 0x79, 0x55, 0x72, 0x6e,
 	0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x22, 0x99, 0x01, 0x0a, 0x26, 0x44, 0x65, 0x6c,
 	0x65, 0x74, 0x65, 0x52, 0x65, 0x73, 0x6f, 0x75, 0x72, 0x63, 0x65, 0x52, 0x65, 0x6c, 0x61, 0x74,
-	0x69, 0x6f, 0x6e, 0x73, 0x68, 0x69, 0x70, 0x42, 0x79, 0x55, 0x52, 0x4e, 0x52, 0x65, 0x71, 0x75,
+	0x69, 0x6f, 0x6e, 0x73, 0x68, 0x69, 0x70, 0x42, 0x79, 0x55, 0x72, 0x6e, 0x52, 0x65, 0x71, 0x75,
 	0x65, 0x73, 0x74, 0x12, 0x6f, 0x0a, 0x09, 0x72, 0x65, 0x73, 0x6f, 0x75, 0x72, 0x63, 0x65, 0x73,
 	0x18, 0x01, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x51, 0x2e, 0x61, 0x70, 0x69, 0x2e, 0x6b, 0x65, 0x73,
 	0x73, 0x65, 0x6c, 0x2e, 0x69, 0x6e, 0x76, 0x65, 0x6e, 0x74, 0x6f, 0x72, 0x79, 0x2e, 0x76, 0x31,
 	0x62, 0x65, 0x74, 0x61, 0x31, 0x2e, 0x55, 0x70, 0x64, 0x61, 0x74, 0x65, 0x52, 0x65, 0x73, 0x6f,
 	0x75, 0x72, 0x63, 0x65, 0x52, 0x65, 0x6c, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x73, 0x68, 0x69, 0x70,
-	0x42, 0x79, 0x55, 0x52, 0x4e, 0x48, 0x73, 0x52, 0x65, 0x73, 0x6f, 0x75, 0x72, 0x63, 0x65, 0x73,
+	0x42, 0x79, 0x55, 0x72, 0x6e, 0x48, 0x73, 0x52, 0x65, 0x73, 0x6f, 0x75, 0x72, 0x63, 0x65, 0x73,
 	0x50, 0x61, 0x72, 0x61, 0x6d, 0x65, 0x74, 0x65, 0x72, 0x52, 0x09, 0x72, 0x65, 0x73, 0x6f, 0x75,
 	0x72, 0x63, 0x65, 0x73, 0x22, 0x29, 0x0a, 0x27, 0x44, 0x65, 0x6c, 0x65, 0x74, 0x65, 0x52, 0x65,
 	0x73, 0x6f, 0x75, 0x72, 0x63, 0x65, 0x52, 0x65, 0x6c, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x73, 0x68,
-	0x69, 0x70, 0x42, 0x79, 0x55, 0x52, 0x4e, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x32,
+	0x69, 0x70, 0x42, 0x79, 0x55, 0x72, 0x6e, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x32,
 	0xdf, 0x05, 0x0a, 0x14, 0x52, 0x65, 0x6c, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x73, 0x68, 0x69, 0x70,
 	0x73, 0x53, 0x65, 0x72, 0x76, 0x69, 0x63, 0x65, 0x12, 0xe2, 0x01, 0x0a, 0x18, 0x43, 0x72, 0x65,
 	0x61, 0x74, 0x65, 0x50, 0x6f, 0x6c, 0x69, 0x63, 0x79, 0x52, 0x65, 0x6c, 0x61, 0x74, 0x69, 0x6f,
@@ -390,32 +390,32 @@ var file_kessel_inventory_v1beta1_relationships_service_proto_rawDesc = []byte{
 	0x2f, 0x76, 0x31, 0x62, 0x65, 0x74, 0x61, 0x31, 0x2f, 0x70, 0x6f, 0x6c, 0x69, 0x63, 0x79, 0x5f,
 	0x72, 0x65, 0x6c, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x73, 0x68, 0x69, 0x70, 0x73, 0x12, 0xfb, 0x01,
 	0x0a, 0x21, 0x55, 0x70, 0x64, 0x61, 0x74, 0x65, 0x52, 0x65, 0x73, 0x6f, 0x75, 0x72, 0x63, 0x65,
-	0x52, 0x65, 0x6c, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x73, 0x68, 0x69, 0x70, 0x42, 0x79, 0x55, 0x52,
-	0x4e, 0x48, 0x73, 0x12, 0x46, 0x2e, 0x61, 0x70, 0x69, 0x2e, 0x6b, 0x65, 0x73, 0x73, 0x65, 0x6c,
+	0x52, 0x65, 0x6c, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x73, 0x68, 0x69, 0x70, 0x42, 0x79, 0x55, 0x72,
+	0x6e, 0x48, 0x73, 0x12, 0x46, 0x2e, 0x61, 0x70, 0x69, 0x2e, 0x6b, 0x65, 0x73, 0x73, 0x65, 0x6c,
 	0x2e, 0x69, 0x6e, 0x76, 0x65, 0x6e, 0x74, 0x6f, 0x72, 0x79, 0x2e, 0x76, 0x31, 0x62, 0x65, 0x74,
 	0x61, 0x31, 0x2e, 0x55, 0x70, 0x64, 0x61, 0x74, 0x65, 0x52, 0x65, 0x73, 0x6f, 0x75, 0x72, 0x63,
 	0x65, 0x52, 0x65, 0x6c, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x73, 0x68, 0x69, 0x70, 0x42, 0x79, 0x55,
-	0x52, 0x4e, 0x48, 0x73, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x1a, 0x45, 0x2e, 0x61, 0x70,
+	0x72, 0x6e, 0x48, 0x73, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x1a, 0x45, 0x2e, 0x61, 0x70,
 	0x69, 0x2e, 0x6b, 0x65, 0x73, 0x73, 0x65, 0x6c, 0x2e, 0x69, 0x6e, 0x76, 0x65, 0x6e, 0x74, 0x6f,
 	0x72, 0x79, 0x2e, 0x76, 0x31, 0x62, 0x65, 0x74, 0x61, 0x31, 0x2e, 0x55, 0x70, 0x64, 0x61, 0x74,
 	0x65, 0x52, 0x65, 0x73, 0x6f, 0x75, 0x72, 0x63, 0x65, 0x52, 0x65, 0x6c, 0x61, 0x74, 0x69, 0x6f,
-	0x6e, 0x73, 0x68, 0x69, 0x70, 0x42, 0x79, 0x55, 0x52, 0x4e, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e,
+	0x6e, 0x73, 0x68, 0x69, 0x70, 0x42, 0x79, 0x55, 0x72, 0x6e, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e,
 	0x73, 0x65, 0x22, 0x47, 0x82, 0xd3, 0xe4, 0x93, 0x02, 0x41, 0x3a, 0x12, 0x70, 0x6f, 0x6c, 0x69,
 	0x63, 0x79, 0x52, 0x65, 0x6c, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x73, 0x68, 0x69, 0x70, 0x1a, 0x2b,
 	0x2f, 0x61, 0x70, 0x69, 0x2f, 0x69, 0x6e, 0x76, 0x65, 0x6e, 0x74, 0x6f, 0x72, 0x79, 0x2f, 0x76,
 	0x31, 0x62, 0x65, 0x74, 0x61, 0x31, 0x2f, 0x70, 0x6f, 0x6c, 0x69, 0x63, 0x79, 0x5f, 0x72, 0x65,
 	0x6c, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x73, 0x68, 0x69, 0x70, 0x73, 0x12, 0xe3, 0x01, 0x0a, 0x1f,
 	0x44, 0x65, 0x6c, 0x65, 0x74, 0x65, 0x52, 0x65, 0x73, 0x6f, 0x75, 0x72, 0x63, 0x65, 0x52, 0x65,
-	0x6c, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x73, 0x68, 0x69, 0x70, 0x42, 0x79, 0x55, 0x52, 0x4e, 0x12,
+	0x6c, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x73, 0x68, 0x69, 0x70, 0x42, 0x79, 0x55, 0x72, 0x6e, 0x12,
 	0x44, 0x2e, 0x61, 0x70, 0x69, 0x2e, 0x6b, 0x65, 0x73, 0x73, 0x65, 0x6c, 0x2e, 0x69, 0x6e, 0x76,
 	0x65, 0x6e, 0x74, 0x6f, 0x72, 0x79, 0x2e, 0x76, 0x31, 0x62, 0x65, 0x74, 0x61, 0x31, 0x2e, 0x44,
 	0x65, 0x6c, 0x65, 0x74, 0x65, 0x52, 0x65, 0x73, 0x6f, 0x75, 0x72, 0x63, 0x65, 0x52, 0x65, 0x6c,
-	0x61, 0x74, 0x69, 0x6f, 0x6e, 0x73, 0x68, 0x69, 0x70, 0x42, 0x79, 0x55, 0x52, 0x4e, 0x52, 0x65,
+	0x61, 0x74, 0x69, 0x6f, 0x6e, 0x73, 0x68, 0x69, 0x70, 0x42, 0x79, 0x55, 0x72, 0x6e, 0x52, 0x65,
 	0x71, 0x75, 0x65, 0x73, 0x74, 0x1a, 0x45, 0x2e, 0x61, 0x70, 0x69, 0x2e, 0x6b, 0x65, 0x73, 0x73,
 	0x65, 0x6c, 0x2e, 0x69, 0x6e, 0x76, 0x65, 0x6e, 0x74, 0x6f, 0x72, 0x79, 0x2e, 0x76, 0x31, 0x62,
 	0x65, 0x74, 0x61, 0x31, 0x2e, 0x44, 0x65, 0x6c, 0x65, 0x74, 0x65, 0x52, 0x65, 0x73, 0x6f, 0x75,
 	0x72, 0x63, 0x65, 0x52, 0x65, 0x6c, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x73, 0x68, 0x69, 0x70, 0x42,
-	0x79, 0x55, 0x52, 0x4e, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x22, 0x33, 0x82, 0xd3,
+	0x79, 0x55, 0x72, 0x6e, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x22, 0x33, 0x82, 0xd3,
 	0xe4, 0x93, 0x02, 0x2d, 0x2a, 0x2b, 0x2f, 0x61, 0x70, 0x69, 0x2f, 0x69, 0x6e, 0x76, 0x65, 0x6e,
 	0x74, 0x6f, 0x72, 0x79, 0x2f, 0x76, 0x31, 0x62, 0x65, 0x74, 0x61, 0x31, 0x2f, 0x70, 0x6f, 0x6c,
 	0x69, 0x63, 0x79, 0x5f, 0x72, 0x65, 0x6c, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x73, 0x68, 0x69, 0x70,
@@ -443,25 +443,25 @@ var file_kessel_inventory_v1beta1_relationships_service_proto_msgTypes = make([]
 var file_kessel_inventory_v1beta1_relationships_service_proto_goTypes = []any{
 	(*CreatePolicyRelationshipRequest)(nil),                     // 0: api.kessel.inventory.v1beta1.CreatePolicyRelationshipRequest
 	(*CreatePolicyRelationshipResponse)(nil),                    // 1: api.kessel.inventory.v1beta1.CreatePolicyRelationshipResponse
-	(*UpdateResourceRelationshipByURNHsRequest)(nil),            // 2: api.kessel.inventory.v1beta1.UpdateResourceRelationshipByURNHsRequest
-	(*UpdateResourceRelationshipByURNResponse)(nil),             // 3: api.kessel.inventory.v1beta1.UpdateResourceRelationshipByURNResponse
-	(*DeleteResourceRelationshipByURNRequest)(nil),              // 4: api.kessel.inventory.v1beta1.DeleteResourceRelationshipByURNRequest
-	(*DeleteResourceRelationshipByURNResponse)(nil),             // 5: api.kessel.inventory.v1beta1.DeleteResourceRelationshipByURNResponse
+	(*UpdateResourceRelationshipByUrnHsRequest)(nil),            // 2: api.kessel.inventory.v1beta1.UpdateResourceRelationshipByUrnHsRequest
+	(*UpdateResourceRelationshipByUrnResponse)(nil),             // 3: api.kessel.inventory.v1beta1.UpdateResourceRelationshipByUrnResponse
+	(*DeleteResourceRelationshipByUrnRequest)(nil),              // 4: api.kessel.inventory.v1beta1.DeleteResourceRelationshipByUrnRequest
+	(*DeleteResourceRelationshipByUrnResponse)(nil),             // 5: api.kessel.inventory.v1beta1.DeleteResourceRelationshipByUrnResponse
 	(*PolicyRelationship)(nil),                                  // 6: api.kessel.inventory.v1beta1.PolicyRelationship
-	(*UpdateResourceRelationshipByURNHsResourcesParameter)(nil), // 7: api.kessel.inventory.v1beta1.UpdateResourceRelationshipByURNHsResourcesParameter
+	(*UpdateResourceRelationshipByUrnHsResourcesParameter)(nil), // 7: api.kessel.inventory.v1beta1.UpdateResourceRelationshipByUrnHsResourcesParameter
 }
 var file_kessel_inventory_v1beta1_relationships_service_proto_depIdxs = []int32{
 	6, // 0: api.kessel.inventory.v1beta1.CreatePolicyRelationshipRequest.policyRelationship:type_name -> api.kessel.inventory.v1beta1.PolicyRelationship
 	6, // 1: api.kessel.inventory.v1beta1.CreatePolicyRelationshipResponse.policyRelationship:type_name -> api.kessel.inventory.v1beta1.PolicyRelationship
-	7, // 2: api.kessel.inventory.v1beta1.UpdateResourceRelationshipByURNHsRequest.resources:type_name -> api.kessel.inventory.v1beta1.UpdateResourceRelationshipByURNHsResourcesParameter
-	6, // 3: api.kessel.inventory.v1beta1.UpdateResourceRelationshipByURNHsRequest.policyRelationship:type_name -> api.kessel.inventory.v1beta1.PolicyRelationship
-	7, // 4: api.kessel.inventory.v1beta1.DeleteResourceRelationshipByURNRequest.resources:type_name -> api.kessel.inventory.v1beta1.UpdateResourceRelationshipByURNHsResourcesParameter
+	7, // 2: api.kessel.inventory.v1beta1.UpdateResourceRelationshipByUrnHsRequest.resources:type_name -> api.kessel.inventory.v1beta1.UpdateResourceRelationshipByUrnHsResourcesParameter
+	6, // 3: api.kessel.inventory.v1beta1.UpdateResourceRelationshipByUrnHsRequest.policyRelationship:type_name -> api.kessel.inventory.v1beta1.PolicyRelationship
+	7, // 4: api.kessel.inventory.v1beta1.DeleteResourceRelationshipByUrnRequest.resources:type_name -> api.kessel.inventory.v1beta1.UpdateResourceRelationshipByUrnHsResourcesParameter
 	0, // 5: api.kessel.inventory.v1beta1.RelationshipsService.CreatePolicyRelationship:input_type -> api.kessel.inventory.v1beta1.CreatePolicyRelationshipRequest
-	2, // 6: api.kessel.inventory.v1beta1.RelationshipsService.UpdateResourceRelationshipByURNHs:input_type -> api.kessel.inventory.v1beta1.UpdateResourceRelationshipByURNHsRequest
-	4, // 7: api.kessel.inventory.v1beta1.RelationshipsService.DeleteResourceRelationshipByURN:input_type -> api.kessel.inventory.v1beta1.DeleteResourceRelationshipByURNRequest
+	2, // 6: api.kessel.inventory.v1beta1.RelationshipsService.UpdateResourceRelationshipByUrnHs:input_type -> api.kessel.inventory.v1beta1.UpdateResourceRelationshipByUrnHsRequest
+	4, // 7: api.kessel.inventory.v1beta1.RelationshipsService.DeleteResourceRelationshipByUrn:input_type -> api.kessel.inventory.v1beta1.DeleteResourceRelationshipByUrnRequest
 	1, // 8: api.kessel.inventory.v1beta1.RelationshipsService.CreatePolicyRelationship:output_type -> api.kessel.inventory.v1beta1.CreatePolicyRelationshipResponse
-	3, // 9: api.kessel.inventory.v1beta1.RelationshipsService.UpdateResourceRelationshipByURNHs:output_type -> api.kessel.inventory.v1beta1.UpdateResourceRelationshipByURNResponse
-	5, // 10: api.kessel.inventory.v1beta1.RelationshipsService.DeleteResourceRelationshipByURN:output_type -> api.kessel.inventory.v1beta1.DeleteResourceRelationshipByURNResponse
+	3, // 9: api.kessel.inventory.v1beta1.RelationshipsService.UpdateResourceRelationshipByUrnHs:output_type -> api.kessel.inventory.v1beta1.UpdateResourceRelationshipByUrnResponse
+	5, // 10: api.kessel.inventory.v1beta1.RelationshipsService.DeleteResourceRelationshipByUrn:output_type -> api.kessel.inventory.v1beta1.DeleteResourceRelationshipByUrnResponse
 	8, // [8:11] is the sub-list for method output_type
 	5, // [5:8] is the sub-list for method input_type
 	5, // [5:5] is the sub-list for extension type_name
@@ -502,7 +502,7 @@ func file_kessel_inventory_v1beta1_relationships_service_proto_init() {
 			}
 		}
 		file_kessel_inventory_v1beta1_relationships_service_proto_msgTypes[2].Exporter = func(v any, i int) any {
-			switch v := v.(*UpdateResourceRelationshipByURNHsRequest); i {
+			switch v := v.(*UpdateResourceRelationshipByUrnHsRequest); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -514,7 +514,7 @@ func file_kessel_inventory_v1beta1_relationships_service_proto_init() {
 			}
 		}
 		file_kessel_inventory_v1beta1_relationships_service_proto_msgTypes[3].Exporter = func(v any, i int) any {
-			switch v := v.(*UpdateResourceRelationshipByURNResponse); i {
+			switch v := v.(*UpdateResourceRelationshipByUrnResponse); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -526,7 +526,7 @@ func file_kessel_inventory_v1beta1_relationships_service_proto_init() {
 			}
 		}
 		file_kessel_inventory_v1beta1_relationships_service_proto_msgTypes[4].Exporter = func(v any, i int) any {
-			switch v := v.(*DeleteResourceRelationshipByURNRequest); i {
+			switch v := v.(*DeleteResourceRelationshipByUrnRequest); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -538,7 +538,7 @@ func file_kessel_inventory_v1beta1_relationships_service_proto_init() {
 			}
 		}
 		file_kessel_inventory_v1beta1_relationships_service_proto_msgTypes[5].Exporter = func(v any, i int) any {
-			switch v := v.(*DeleteResourceRelationshipByURNResponse); i {
+			switch v := v.(*DeleteResourceRelationshipByUrnResponse); i {
 			case 0:
 				return &v.state
 			case 1:

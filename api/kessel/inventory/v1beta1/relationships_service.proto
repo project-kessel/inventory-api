@@ -21,11 +21,11 @@ message CreatePolicyRelationshipResponse {
   PolicyRelationship policyRelationship = 1;
 }
 
-message UpdateResourceRelationshipByURNHsRequest {
+message UpdateResourceRelationshipByUrnHsRequest {
   // The subject {resource} and the object {resource}. A relationship is between
   // a Subject and an Object, e.g. a Policy (subject) has a propagated
   // relationship to an k8s cluster (object)
-  UpdateResourceRelationshipByURNHsResourcesParameter resources = 1;
+  UpdateResourceRelationshipByUrnHsResourcesParameter resources = 1;
   // Update a resource relationship in Kessel Asset Inventory by the {subject
   // resource, object resource}. A relationship is between a Subject and an
   // Object, e.g. a Policy (subject) has a propagated relationship to an k8s
@@ -34,16 +34,16 @@ message UpdateResourceRelationshipByURNHsRequest {
   PolicyRelationship policyRelationship = 2;
 }
 
-message UpdateResourceRelationshipByURNResponse {}
+message UpdateResourceRelationshipByUrnResponse {}
 
-message DeleteResourceRelationshipByURNRequest {
+message DeleteResourceRelationshipByUrnRequest {
   // The subject {resource} and the object {resource}. A relationship is between
   // a Subject and an Object, e.g. a Policy (subject) has a propagated
   // relationship to an k8s cluster (object)
-  UpdateResourceRelationshipByURNHsResourcesParameter resources = 1;
+  UpdateResourceRelationshipByUrnHsResourcesParameter resources = 1;
 }
 
-message DeleteResourceRelationshipByURNResponse {}
+message DeleteResourceRelationshipByUrnResponse {}
 
 service RelationshipsService {
   rpc CreatePolicyRelationship(CreatePolicyRelationshipRequest) returns (CreatePolicyRelationshipResponse) {
@@ -53,14 +53,14 @@ service RelationshipsService {
     };
   };
 
-  rpc UpdateResourceRelationshipByURNHs(UpdateResourceRelationshipByURNHsRequest) returns (UpdateResourceRelationshipByURNResponse) {
+  rpc UpdateResourceRelationshipByUrnHs(UpdateResourceRelationshipByUrnHsRequest) returns (UpdateResourceRelationshipByUrnResponse) {
     option (google.api.http) = {
       put: "/api/inventory/v1beta1/policy_relationships"
       body : "policyRelationship"
     };
   };
 
-  rpc DeleteResourceRelationshipByURN(DeleteResourceRelationshipByURNRequest) returns (DeleteResourceRelationshipByURNResponse) {
+  rpc DeleteResourceRelationshipByUrn(DeleteResourceRelationshipByUrnRequest) returns (DeleteResourceRelationshipByUrnResponse) {
     option (google.api.http) = {
       delete: "/api/inventory/v1beta1/policy_relationships"
     };

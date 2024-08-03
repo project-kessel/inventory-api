@@ -59,6 +59,8 @@ func (m *Metadata) validate(all bool) error {
 
 	// no validation rules for Id
 
+	// no validation rules for NaturalId
+
 	// no validation rules for ResourceType
 
 	if all {

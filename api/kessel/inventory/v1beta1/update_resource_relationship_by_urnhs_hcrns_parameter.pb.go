@@ -20,17 +20,17 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-type UpdateResourceRelationshipByURNHsHcrnsParameter struct {
+type UpdateResourceRelationshipByUrnHsHcrnsParameter struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	SubjectURN string `protobuf:"bytes,36776796,opt,name=subjectURN,proto3" json:"subjectURN,omitempty"`
-	ObjectURN  string `protobuf:"bytes,415864400,opt,name=objectURN,proto3" json:"objectURN,omitempty"`
+	SubjectUrn string `protobuf:"bytes,36776796,opt,name=subjectUrn,proto3" json:"subjectUrn,omitempty"`
+	ObjectUrn  string `protobuf:"bytes,415864400,opt,name=objectUrn,proto3" json:"objectUrn,omitempty"`
 }
 
-func (x *UpdateResourceRelationshipByURNHsHcrnsParameter) Reset() {
-	*x = UpdateResourceRelationshipByURNHsHcrnsParameter{}
+func (x *UpdateResourceRelationshipByUrnHsHcrnsParameter) Reset() {
+	*x = UpdateResourceRelationshipByUrnHsHcrnsParameter{}
 	if protoimpl.UnsafeEnabled {
 		mi := &file_kessel_inventory_v1beta1_update_resource_relationship_by_urnhs_hcrns_parameter_proto_msgTypes[0]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -38,13 +38,13 @@ func (x *UpdateResourceRelationshipByURNHsHcrnsParameter) Reset() {
 	}
 }
 
-func (x *UpdateResourceRelationshipByURNHsHcrnsParameter) String() string {
+func (x *UpdateResourceRelationshipByUrnHsHcrnsParameter) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*UpdateResourceRelationshipByURNHsHcrnsParameter) ProtoMessage() {}
+func (*UpdateResourceRelationshipByUrnHsHcrnsParameter) ProtoMessage() {}
 
-func (x *UpdateResourceRelationshipByURNHsHcrnsParameter) ProtoReflect() protoreflect.Message {
+func (x *UpdateResourceRelationshipByUrnHsHcrnsParameter) ProtoReflect() protoreflect.Message {
 	mi := &file_kessel_inventory_v1beta1_update_resource_relationship_by_urnhs_hcrns_parameter_proto_msgTypes[0]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -56,21 +56,21 @@ func (x *UpdateResourceRelationshipByURNHsHcrnsParameter) ProtoReflect() protore
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use UpdateResourceRelationshipByURNHsHcrnsParameter.ProtoReflect.Descriptor instead.
-func (*UpdateResourceRelationshipByURNHsHcrnsParameter) Descriptor() ([]byte, []int) {
+// Deprecated: Use UpdateResourceRelationshipByUrnHsHcrnsParameter.ProtoReflect.Descriptor instead.
+func (*UpdateResourceRelationshipByUrnHsHcrnsParameter) Descriptor() ([]byte, []int) {
 	return file_kessel_inventory_v1beta1_update_resource_relationship_by_urnhs_hcrns_parameter_proto_rawDescGZIP(), []int{0}
 }
 
-func (x *UpdateResourceRelationshipByURNHsHcrnsParameter) GetSubjectURN() string {
+func (x *UpdateResourceRelationshipByUrnHsHcrnsParameter) GetSubjectUrn() string {
 	if x != nil {
-		return x.SubjectURN
+		return x.SubjectUrn
 	}
 	return ""
 }
 
-func (x *UpdateResourceRelationshipByURNHsHcrnsParameter) GetObjectURN() string {
+func (x *UpdateResourceRelationshipByUrnHsHcrnsParameter) GetObjectUrn() string {
 	if x != nil {
-		return x.ObjectURN
+		return x.ObjectUrn
 	}
 	return ""
 }
@@ -87,12 +87,12 @@ var file_kessel_inventory_v1beta1_update_resource_relationship_by_urnhs_hcrns_pa
 	0x65, 0x6c, 0x2e, 0x69, 0x6e, 0x76, 0x65, 0x6e, 0x74, 0x6f, 0x72, 0x79, 0x2e, 0x76, 0x31, 0x62,
 	0x65, 0x74, 0x61, 0x31, 0x22, 0x76, 0x0a, 0x2f, 0x55, 0x70, 0x64, 0x61, 0x74, 0x65, 0x52, 0x65,
 	0x73, 0x6f, 0x75, 0x72, 0x63, 0x65, 0x52, 0x65, 0x6c, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x73, 0x68,
-	0x69, 0x70, 0x42, 0x79, 0x55, 0x52, 0x4e, 0x48, 0x73, 0x48, 0x63, 0x72, 0x6e, 0x73, 0x50, 0x61,
+	0x69, 0x70, 0x42, 0x79, 0x55, 0x72, 0x6e, 0x48, 0x73, 0x48, 0x63, 0x72, 0x6e, 0x73, 0x50, 0x61,
 	0x72, 0x61, 0x6d, 0x65, 0x74, 0x65, 0x72, 0x12, 0x21, 0x0a, 0x0a, 0x73, 0x75, 0x62, 0x6a, 0x65,
-	0x63, 0x74, 0x55, 0x52, 0x4e, 0x18, 0xdc, 0xd6, 0xc4, 0x11, 0x20, 0x01, 0x28, 0x09, 0x52, 0x0a,
-	0x73, 0x75, 0x62, 0x6a, 0x65, 0x63, 0x74, 0x55, 0x52, 0x4e, 0x12, 0x20, 0x0a, 0x09, 0x6f, 0x62,
-	0x6a, 0x65, 0x63, 0x74, 0x55, 0x52, 0x4e, 0x18, 0xd0, 0xac, 0xa6, 0xc6, 0x01, 0x20, 0x01, 0x28,
-	0x09, 0x52, 0x09, 0x6f, 0x62, 0x6a, 0x65, 0x63, 0x74, 0x55, 0x52, 0x4e, 0x42, 0x46, 0x0a, 0x1c,
+	0x63, 0x74, 0x55, 0x72, 0x6e, 0x18, 0xdc, 0xd6, 0xc4, 0x11, 0x20, 0x01, 0x28, 0x09, 0x52, 0x0a,
+	0x73, 0x75, 0x62, 0x6a, 0x65, 0x63, 0x74, 0x55, 0x72, 0x6e, 0x12, 0x20, 0x0a, 0x09, 0x6f, 0x62,
+	0x6a, 0x65, 0x63, 0x74, 0x55, 0x72, 0x6e, 0x18, 0xd0, 0xac, 0xa6, 0xc6, 0x01, 0x20, 0x01, 0x28,
+	0x09, 0x52, 0x09, 0x6f, 0x62, 0x6a, 0x65, 0x63, 0x74, 0x55, 0x72, 0x6e, 0x42, 0x46, 0x0a, 0x1c,
 	0x61, 0x70, 0x69, 0x2e, 0x6b, 0x65, 0x73, 0x73, 0x65, 0x6c, 0x2e, 0x69, 0x6e, 0x76, 0x65, 0x6e,
 	0x74, 0x6f, 0x72, 0x79, 0x2e, 0x76, 0x31, 0x62, 0x65, 0x74, 0x61, 0x31, 0x50, 0x01, 0x5a, 0x24,
 	0x61, 0x70, 0x69, 0x2f, 0x6b, 0x65, 0x73, 0x73, 0x65, 0x6c, 0x2f, 0x69, 0x6e, 0x76, 0x65, 0x6e,
@@ -114,7 +114,7 @@ func file_kessel_inventory_v1beta1_update_resource_relationship_by_urnhs_hcrns_p
 
 var file_kessel_inventory_v1beta1_update_resource_relationship_by_urnhs_hcrns_parameter_proto_msgTypes = make([]protoimpl.MessageInfo, 1)
 var file_kessel_inventory_v1beta1_update_resource_relationship_by_urnhs_hcrns_parameter_proto_goTypes = []any{
-	(*UpdateResourceRelationshipByURNHsHcrnsParameter)(nil), // 0: api.kessel.inventory.v1beta1.UpdateResourceRelationshipByURNHsHcrnsParameter
+	(*UpdateResourceRelationshipByUrnHsHcrnsParameter)(nil), // 0: api.kessel.inventory.v1beta1.UpdateResourceRelationshipByUrnHsHcrnsParameter
 }
 var file_kessel_inventory_v1beta1_update_resource_relationship_by_urnhs_hcrns_parameter_proto_depIdxs = []int32{
 	0, // [0:0] is the sub-list for method output_type
@@ -133,7 +133,7 @@ func file_kessel_inventory_v1beta1_update_resource_relationship_by_urnhs_hcrns_p
 	}
 	if !protoimpl.UnsafeEnabled {
 		file_kessel_inventory_v1beta1_update_resource_relationship_by_urnhs_hcrns_parameter_proto_msgTypes[0].Exporter = func(v any, i int) any {
-			switch v := v.(*UpdateResourceRelationshipByURNHsHcrnsParameter); i {
+			switch v := v.(*UpdateResourceRelationshipByUrnHsHcrnsParameter); i {
 			case 0:
 				return &v.state
 			case 1:

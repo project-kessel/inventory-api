@@ -4,18 +4,18 @@
 openapi: 3.0.3
 info:
     title: Kessel Asset Inventory API
-    version: 0.10.1
+    version: 0.11.0
 paths:
     /api/inventory/v1beta1/hosts:
         post:
             tags:
                 - HostsService
-            operationId: HostsService_CreateRHELHost
+            operationId: HostsService_CreateRhelHost
             requestBody:
                 content:
                     application/json:
                         schema:
-                            $ref: '#/components/schemas/RHELHost'
+                            $ref: '#/components/schemas/RhelHost'
                 required: true
             responses:
                 "200":
@@ -23,7 +23,7 @@ paths:
                     content:
                         application/json:
                             schema:
-                                $ref: '#/components/schemas/CreateRHELHostResponse'
+                                $ref: '#/components/schemas/CreateRhelHostResponse'
                 default:
                     description: Default error response
                     content:
@@ -34,7 +34,7 @@ paths:
         put:
             tags:
                 - HostsService
-            operationId: HostsService_UpdateRHELHost
+            operationId: HostsService_UpdateRhelHost
             parameters:
                 - name: resource
                   in: path
@@ -48,7 +48,7 @@ paths:
                 content:
                     application/json:
                         schema:
-                            $ref: '#/components/schemas/RHELHost'
+                            $ref: '#/components/schemas/RhelHost'
                 required: true
             responses:
                 "200":
@@ -56,7 +56,7 @@ paths:
                     content:
                         application/json:
                             schema:
-                                $ref: '#/components/schemas/UpdateRHELHostResponse'
+                                $ref: '#/components/schemas/UpdateRhelHostResponse'
                 default:
                     description: Default error response
                     content:
@@ -66,7 +66,7 @@ paths:
         delete:
             tags:
                 - HostsService
-            operationId: HostsService_DeleteRHELHost
+            operationId: HostsService_DeleteRhelHost
             parameters:
                 - name: resource
                   in: path
@@ -82,7 +82,7 @@ paths:
                     content:
                         application/json:
                             schema:
-                                $ref: '#/components/schemas/DeleteRHELHostResponse'
+                                $ref: '#/components/schemas/DeleteRhelHostResponse'
                 default:
                     description: Default error response
                     content:
@@ -342,7 +342,7 @@ paths:
         put:
             tags:
                 - RelationshipsService
-            operationId: RelationshipsService_UpdateResourceRelationshipByURNHs
+            operationId: RelationshipsService_UpdateResourceRelationshipByUrnHs
             parameters:
                 - name: resources.subjectResource
                   in: query
@@ -364,7 +364,7 @@ paths:
                     content:
                         application/json:
                             schema:
-                                $ref: '#/components/schemas/UpdateResourceRelationshipByURNResponse'
+                                $ref: '#/components/schemas/UpdateResourceRelationshipByUrnResponse'
                 default:
                     description: Default error response
                     content:
@@ -397,7 +397,7 @@ paths:
         delete:
             tags:
                 - RelationshipsService
-            operationId: RelationshipsService_DeleteResourceRelationshipByURN
+            operationId: RelationshipsService_DeleteResourceRelationshipByUrn
             parameters:
                 - name: resources.subjectResource
                   in: query
@@ -413,7 +413,7 @@ paths:
                     content:
                         application/json:
                             schema:
-                                $ref: '#/components/schemas/DeleteResourceRelationshipByURNResponse'
+                                $ref: '#/components/schemas/DeleteResourceRelationshipByUrnResponse'
                 default:
                     description: Default error response
                     content:
@@ -452,15 +452,15 @@ components:
                     allOf:
                         - $ref: '#/components/schemas/Policy'
                     description: The policy created in Kessel Asset Inventory
-        CreateRHELHostResponse:
+        CreateRhelHostResponse:
             required:
                 - host
             type: object
             properties:
                 host:
                     allOf:
-                        - $ref: '#/components/schemas/RHELHost'
-                    description: The RHEL Host created in Kessel Asset Inventory
+                        - $ref: '#/components/schemas/RhelHost'
+                    description: The Rhel Host created in Kessel Asset Inventory
         DeleteK8sClusterResponse:
             type: object
             properties: {}
@@ -470,10 +470,10 @@ components:
         DeletePolicyResponse:
             type: object
             properties: {}
-        DeleteRHELHostResponse:
+        DeleteResourceRelationshipByUrnResponse:
             type: object
             properties: {}
-        DeleteResourceRelationshipByURNResponse:
+        DeleteRhelHostResponse:
             type: object
             properties: {}
         GoogleProtobufAny:
@@ -559,6 +559,9 @@ components:
                     readOnly: true
                     type: string
                     description: Kessel Asset Inventory generated identifier.
+                naturalId:
+                    type: string
+                    description: Some identifier intrinsic to the resource itself that is unique across reporters
                 resourceType:
                     type: string
                     description: The type of the Resource
@@ -575,7 +578,7 @@ components:
                 firstReportedBy:
                     readOnly: true
                     type: string
-                    description: Identifier of the reporter that first reported this item.
+                    description: Identifier of the reporter that first reported on this item.
                 lastReportedBy:
                     readOnly: true
                     type: string
@@ -656,7 +659,7 @@ components:
                         The resource ID assigned to the resource by Kessel Asset Inventory. A
                          reporter alias may also be used as a resource ID using the format:
                          \"hcrn:<reporter_data.reporter_type>:<reporter_data.reporter_id>::<reporter_data.resourceId_alias>\"
-                clusterId:
+                k8sClusterId:
                     type: string
                     description: |-
                         The resource ID assigned to the resource by Kessel Asset Inventory. A
@@ -665,28 +668,6 @@ components:
                 status:
                     type: integer
                     format: enum
-        RHELHost:
-            required:
-                - metadata
-            type: object
-            properties:
-                metadata:
-                    allOf:
-                        - $ref: '#/components/schemas/Metadata'
-                    description: Metadata about this resource
-                reporterData:
-                    writeOnly: true
-                    allOf:
-                        - $ref: '#/components/schemas/ReporterData'
-                    description: Write only reporter specific data
-                reporters:
-                    readOnly: true
-                    type: array
-                    items:
-                        $ref: '#/components/schemas/ReporterData'
-                    description: |-
-                        The entities that registered this item in the Kessel Asset Inventory. The
-                         same resource may be registered by multiple reporters.
         ReporterData:
             type: object
             properties:
@@ -698,6 +679,16 @@ components:
                     description: |-
                         The ID of the instance of the reporter. This is derived from the
                          authentication mechanism, i.e. authentication token.
+                firstReported:
+                    readOnly: true
+                    type: string
+                    description: Date and time when the inventory item was first reported by this reporter
+                    format: date-time
+                lastReported:
+                    readOnly: true
+                    type: string
+                    description: Date and time when the inventory item was last updated by this reporter
+                    format: date-time
                 consoleHref:
                     type: string
                     description: |-
@@ -722,6 +713,28 @@ components:
                     type: string
                 value:
                     type: string
+        RhelHost:
+            required:
+                - metadata
+            type: object
+            properties:
+                metadata:
+                    allOf:
+                        - $ref: '#/components/schemas/Metadata'
+                    description: Metadata about this resource
+                reporterData:
+                    writeOnly: true
+                    allOf:
+                        - $ref: '#/components/schemas/ReporterData'
+                    description: Write only reporter specific data
+                reporters:
+                    readOnly: true
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/ReporterData'
+                    description: |-
+                        The entities that registered this item in the Kessel Asset Inventory. The
+                         same resource may be registered by multiple reporters.
         Status:
             type: object
             properties:
@@ -747,10 +760,10 @@ components:
         UpdatePolicyResponse:
             type: object
             properties: {}
-        UpdateRHELHostResponse:
+        UpdateResourceRelationshipByUrnResponse:
             type: object
             properties: {}
-        UpdateResourceRelationshipByURNResponse:
+        UpdateRhelHostResponse:
             type: object
             properties: {}
 tags:

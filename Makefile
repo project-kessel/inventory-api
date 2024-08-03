@@ -6,7 +6,7 @@ API_PROTO_FILES:=$(shell find api -name *.proto)
 
 TITLE:="Kessel Asset Inventory API"
 VERSION:=$(shell git describe --tags --always)
-INVENTORY_SCHEMA_VERSION=0.10.1
+INVENTORY_SCHEMA_VERSION=0.11.0
 
 .PHONY: init
 # init env

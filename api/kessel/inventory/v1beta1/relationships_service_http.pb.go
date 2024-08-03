@@ -20,20 +20,20 @@ var _ = binding.EncodeURL
 const _ = http.SupportPackageIsVersion1
 
 const OperationRelationshipsServiceCreatePolicyRelationship = "/api.kessel.inventory.v1beta1.RelationshipsService/CreatePolicyRelationship"
-const OperationRelationshipsServiceDeleteResourceRelationshipByURN = "/api.kessel.inventory.v1beta1.RelationshipsService/DeleteResourceRelationshipByURN"
-const OperationRelationshipsServiceUpdateResourceRelationshipByURNHs = "/api.kessel.inventory.v1beta1.RelationshipsService/UpdateResourceRelationshipByURNHs"
+const OperationRelationshipsServiceDeleteResourceRelationshipByUrn = "/api.kessel.inventory.v1beta1.RelationshipsService/DeleteResourceRelationshipByUrn"
+const OperationRelationshipsServiceUpdateResourceRelationshipByUrnHs = "/api.kessel.inventory.v1beta1.RelationshipsService/UpdateResourceRelationshipByUrnHs"
 
 type RelationshipsServiceHTTPServer interface {
 	CreatePolicyRelationship(context.Context, *CreatePolicyRelationshipRequest) (*CreatePolicyRelationshipResponse, error)
-	DeleteResourceRelationshipByURN(context.Context, *DeleteResourceRelationshipByURNRequest) (*DeleteResourceRelationshipByURNResponse, error)
-	UpdateResourceRelationshipByURNHs(context.Context, *UpdateResourceRelationshipByURNHsRequest) (*UpdateResourceRelationshipByURNResponse, error)
+	DeleteResourceRelationshipByUrn(context.Context, *DeleteResourceRelationshipByUrnRequest) (*DeleteResourceRelationshipByUrnResponse, error)
+	UpdateResourceRelationshipByUrnHs(context.Context, *UpdateResourceRelationshipByUrnHsRequest) (*UpdateResourceRelationshipByUrnResponse, error)
 }
 
 func RegisterRelationshipsServiceHTTPServer(s *http.Server, srv RelationshipsServiceHTTPServer) {
 	r := s.Route("/")
 	r.POST("/api/inventory/v1beta1/policy_relationships", _RelationshipsService_CreatePolicyRelationship0_HTTP_Handler(srv))
-	r.PUT("/api/inventory/v1beta1/policy_relationships", _RelationshipsService_UpdateResourceRelationshipByURNHs0_HTTP_Handler(srv))
-	r.DELETE("/api/inventory/v1beta1/policy_relationships", _RelationshipsService_DeleteResourceRelationshipByURN0_HTTP_Handler(srv))
+	r.PUT("/api/inventory/v1beta1/policy_relationships", _RelationshipsService_UpdateResourceRelationshipByUrnHs0_HTTP_Handler(srv))
+	r.DELETE("/api/inventory/v1beta1/policy_relationships", _RelationshipsService_DeleteResourceRelationshipByUrn0_HTTP_Handler(srv))
 }
 
 func _RelationshipsService_CreatePolicyRelationship0_HTTP_Handler(srv RelationshipsServiceHTTPServer) func(ctx http.Context) error {
@@ -58,51 +58,51 @@ func _RelationshipsService_CreatePolicyRelationship0_HTTP_Handler(srv Relationsh
 	}
 }
 
-func _RelationshipsService_UpdateResourceRelationshipByURNHs0_HTTP_Handler(srv RelationshipsServiceHTTPServer) func(ctx http.Context) error {
+func _RelationshipsService_UpdateResourceRelationshipByUrnHs0_HTTP_Handler(srv RelationshipsServiceHTTPServer) func(ctx http.Context) error {
 	return func(ctx http.Context) error {
-		var in UpdateResourceRelationshipByURNHsRequest
+		var in UpdateResourceRelationshipByUrnHsRequest
 		if err := ctx.Bind(&in.PolicyRelationship); err != nil {
 			return err
 		}
 		if err := ctx.BindQuery(&in); err != nil {
 			return err
 		}
-		http.SetOperation(ctx, OperationRelationshipsServiceUpdateResourceRelationshipByURNHs)
+		http.SetOperation(ctx, OperationRelationshipsServiceUpdateResourceRelationshipByUrnHs)
 		h := ctx.Middleware(func(ctx context.Context, req interface{}) (interface{}, error) {
-			return srv.UpdateResourceRelationshipByURNHs(ctx, req.(*UpdateResourceRelationshipByURNHsRequest))
+			return srv.UpdateResourceRelationshipByUrnHs(ctx, req.(*UpdateResourceRelationshipByUrnHsRequest))
 		})
 		out, err := h(ctx, &in)
 		if err != nil {
 			return err
 		}
-		reply := out.(*UpdateResourceRelationshipByURNResponse)
+		reply := out.(*UpdateResourceRelationshipByUrnResponse)
 		return ctx.Result(200, reply)
 	}
 }
 
-func _RelationshipsService_DeleteResourceRelationshipByURN0_HTTP_Handler(srv RelationshipsServiceHTTPServer) func(ctx http.Context) error {
+func _RelationshipsService_DeleteResourceRelationshipByUrn0_HTTP_Handler(srv RelationshipsServiceHTTPServer) func(ctx http.Context) error {
 	return func(ctx http.Context) error {
-		var in DeleteResourceRelationshipByURNRequest
+		var in DeleteResourceRelationshipByUrnRequest
 		if err := ctx.BindQuery(&in); err != nil {
 			return err
 		}
-		http.SetOperation(ctx, OperationRelationshipsServiceDeleteResourceRelationshipByURN)
+		http.SetOperation(ctx, OperationRelationshipsServiceDeleteResourceRelationshipByUrn)
 		h := ctx.Middleware(func(ctx context.Context, req interface{}) (interface{}, error) {
-			return srv.DeleteResourceRelationshipByURN(ctx, req.(*DeleteResourceRelationshipByURNRequest))
+			return srv.DeleteResourceRelationshipByUrn(ctx, req.(*DeleteResourceRelationshipByUrnRequest))
 		})
 		out, err := h(ctx, &in)
 		if err != nil {
 			return err
 		}
-		reply := out.(*DeleteResourceRelationshipByURNResponse)
+		reply := out.(*DeleteResourceRelationshipByUrnResponse)
 		return ctx.Result(200, reply)
 	}
 }
 
 type RelationshipsServiceHTTPClient interface {
 	CreatePolicyRelationship(ctx context.Context, req *CreatePolicyRelationshipRequest, opts ...http.CallOption) (rsp *CreatePolicyRelationshipResponse, err error)
-	DeleteResourceRelationshipByURN(ctx context.Context, req *DeleteResourceRelationshipByURNRequest, opts ...http.CallOption) (rsp *DeleteResourceRelationshipByURNResponse, err error)
-	UpdateResourceRelationshipByURNHs(ctx context.Context, req *UpdateResourceRelationshipByURNHsRequest, opts ...http.CallOption) (rsp *UpdateResourceRelationshipByURNResponse, err error)
+	DeleteResourceRelationshipByUrn(ctx context.Context, req *DeleteResourceRelationshipByUrnRequest, opts ...http.CallOption) (rsp *DeleteResourceRelationshipByUrnResponse, err error)
+	UpdateResourceRelationshipByUrnHs(ctx context.Context, req *UpdateResourceRelationshipByUrnHsRequest, opts ...http.CallOption) (rsp *UpdateResourceRelationshipByUrnResponse, err error)
 }
 
 type RelationshipsServiceHTTPClientImpl struct {
@@ -126,11 +126,11 @@ func (c *RelationshipsServiceHTTPClientImpl) CreatePolicyRelationship(ctx contex
 	return &out, nil
 }
 
-func (c *RelationshipsServiceHTTPClientImpl) DeleteResourceRelationshipByURN(ctx context.Context, in *DeleteResourceRelationshipByURNRequest, opts ...http.CallOption) (*DeleteResourceRelationshipByURNResponse, error) {
-	var out DeleteResourceRelationshipByURNResponse
+func (c *RelationshipsServiceHTTPClientImpl) DeleteResourceRelationshipByUrn(ctx context.Context, in *DeleteResourceRelationshipByUrnRequest, opts ...http.CallOption) (*DeleteResourceRelationshipByUrnResponse, error) {
+	var out DeleteResourceRelationshipByUrnResponse
 	pattern := "/api/inventory/v1beta1/policy_relationships"
 	path := binding.EncodeURL(pattern, in, true)
-	opts = append(opts, http.Operation(OperationRelationshipsServiceDeleteResourceRelationshipByURN))
+	opts = append(opts, http.Operation(OperationRelationshipsServiceDeleteResourceRelationshipByUrn))
 	opts = append(opts, http.PathTemplate(pattern))
 	err := c.cc.Invoke(ctx, "DELETE", path, nil, &out, opts...)
 	if err != nil {
@@ -139,11 +139,11 @@ func (c *RelationshipsServiceHTTPClientImpl) DeleteResourceRelationshipByURN(ctx
 	return &out, nil
 }
 
-func (c *RelationshipsServiceHTTPClientImpl) UpdateResourceRelationshipByURNHs(ctx context.Context, in *UpdateResourceRelationshipByURNHsRequest, opts ...http.CallOption) (*UpdateResourceRelationshipByURNResponse, error) {
-	var out UpdateResourceRelationshipByURNResponse
+func (c *RelationshipsServiceHTTPClientImpl) UpdateResourceRelationshipByUrnHs(ctx context.Context, in *UpdateResourceRelationshipByUrnHsRequest, opts ...http.CallOption) (*UpdateResourceRelationshipByUrnResponse, error) {
+	var out UpdateResourceRelationshipByUrnResponse
 	pattern := "/api/inventory/v1beta1/policy_relationships"
 	path := binding.EncodeURL(pattern, in, false)
-	opts = append(opts, http.Operation(OperationRelationshipsServiceUpdateResourceRelationshipByURNHs))
+	opts = append(opts, http.Operation(OperationRelationshipsServiceUpdateResourceRelationshipByUrnHs))
 	opts = append(opts, http.PathTemplate(pattern))
 	err := c.cc.Invoke(ctx, "PUT", path, in.PolicyRelationship, &out, opts...)
 	if err != nil {

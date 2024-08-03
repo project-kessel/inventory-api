@@ -20,8 +20,8 @@ const _ = grpc.SupportPackageIsVersion9
 
 const (
 	RelationshipsService_CreatePolicyRelationship_FullMethodName          = "/api.kessel.inventory.v1beta1.RelationshipsService/CreatePolicyRelationship"
-	RelationshipsService_UpdateResourceRelationshipByURNHs_FullMethodName = "/api.kessel.inventory.v1beta1.RelationshipsService/UpdateResourceRelationshipByURNHs"
-	RelationshipsService_DeleteResourceRelationshipByURN_FullMethodName   = "/api.kessel.inventory.v1beta1.RelationshipsService/DeleteResourceRelationshipByURN"
+	RelationshipsService_UpdateResourceRelationshipByUrnHs_FullMethodName = "/api.kessel.inventory.v1beta1.RelationshipsService/UpdateResourceRelationshipByUrnHs"
+	RelationshipsService_DeleteResourceRelationshipByUrn_FullMethodName   = "/api.kessel.inventory.v1beta1.RelationshipsService/DeleteResourceRelationshipByUrn"
 )
 
 // RelationshipsServiceClient is the client API for RelationshipsService service.
@@ -29,8 +29,8 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type RelationshipsServiceClient interface {
 	CreatePolicyRelationship(ctx context.Context, in *CreatePolicyRelationshipRequest, opts ...grpc.CallOption) (*CreatePolicyRelationshipResponse, error)
-	UpdateResourceRelationshipByURNHs(ctx context.Context, in *UpdateResourceRelationshipByURNHsRequest, opts ...grpc.CallOption) (*UpdateResourceRelationshipByURNResponse, error)
-	DeleteResourceRelationshipByURN(ctx context.Context, in *DeleteResourceRelationshipByURNRequest, opts ...grpc.CallOption) (*DeleteResourceRelationshipByURNResponse, error)
+	UpdateResourceRelationshipByUrnHs(ctx context.Context, in *UpdateResourceRelationshipByUrnHsRequest, opts ...grpc.CallOption) (*UpdateResourceRelationshipByUrnResponse, error)
+	DeleteResourceRelationshipByUrn(ctx context.Context, in *DeleteResourceRelationshipByUrnRequest, opts ...grpc.CallOption) (*DeleteResourceRelationshipByUrnResponse, error)
 }
 
 type relationshipsServiceClient struct {
@@ -51,20 +51,20 @@ func (c *relationshipsServiceClient) CreatePolicyRelationship(ctx context.Contex
 	return out, nil
 }
 
-func (c *relationshipsServiceClient) UpdateResourceRelationshipByURNHs(ctx context.Context, in *UpdateResourceRelationshipByURNHsRequest, opts ...grpc.CallOption) (*UpdateResourceRelationshipByURNResponse, error) {
+func (c *relationshipsServiceClient) UpdateResourceRelationshipByUrnHs(ctx context.Context, in *UpdateResourceRelationshipByUrnHsRequest, opts ...grpc.CallOption) (*UpdateResourceRelationshipByUrnResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(UpdateResourceRelationshipByURNResponse)
-	err := c.cc.Invoke(ctx, RelationshipsService_UpdateResourceRelationshipByURNHs_FullMethodName, in, out, cOpts...)
+	out := new(UpdateResourceRelationshipByUrnResponse)
+	err := c.cc.Invoke(ctx, RelationshipsService_UpdateResourceRelationshipByUrnHs_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *relationshipsServiceClient) DeleteResourceRelationshipByURN(ctx context.Context, in *DeleteResourceRelationshipByURNRequest, opts ...grpc.CallOption) (*DeleteResourceRelationshipByURNResponse, error) {
+func (c *relationshipsServiceClient) DeleteResourceRelationshipByUrn(ctx context.Context, in *DeleteResourceRelationshipByUrnRequest, opts ...grpc.CallOption) (*DeleteResourceRelationshipByUrnResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(DeleteResourceRelationshipByURNResponse)
-	err := c.cc.Invoke(ctx, RelationshipsService_DeleteResourceRelationshipByURN_FullMethodName, in, out, cOpts...)
+	out := new(DeleteResourceRelationshipByUrnResponse)
+	err := c.cc.Invoke(ctx, RelationshipsService_DeleteResourceRelationshipByUrn_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -76,8 +76,8 @@ func (c *relationshipsServiceClient) DeleteResourceRelationshipByURN(ctx context
 // for forward compatibility.
 type RelationshipsServiceServer interface {
 	CreatePolicyRelationship(context.Context, *CreatePolicyRelationshipRequest) (*CreatePolicyRelationshipResponse, error)
-	UpdateResourceRelationshipByURNHs(context.Context, *UpdateResourceRelationshipByURNHsRequest) (*UpdateResourceRelationshipByURNResponse, error)
-	DeleteResourceRelationshipByURN(context.Context, *DeleteResourceRelationshipByURNRequest) (*DeleteResourceRelationshipByURNResponse, error)
+	UpdateResourceRelationshipByUrnHs(context.Context, *UpdateResourceRelationshipByUrnHsRequest) (*UpdateResourceRelationshipByUrnResponse, error)
+	DeleteResourceRelationshipByUrn(context.Context, *DeleteResourceRelationshipByUrnRequest) (*DeleteResourceRelationshipByUrnResponse, error)
 	mustEmbedUnimplementedRelationshipsServiceServer()
 }
 
@@ -91,11 +91,11 @@ type UnimplementedRelationshipsServiceServer struct{}
 func (UnimplementedRelationshipsServiceServer) CreatePolicyRelationship(context.Context, *CreatePolicyRelationshipRequest) (*CreatePolicyRelationshipResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CreatePolicyRelationship not implemented")
 }
-func (UnimplementedRelationshipsServiceServer) UpdateResourceRelationshipByURNHs(context.Context, *UpdateResourceRelationshipByURNHsRequest) (*UpdateResourceRelationshipByURNResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method UpdateResourceRelationshipByURNHs not implemented")
+func (UnimplementedRelationshipsServiceServer) UpdateResourceRelationshipByUrnHs(context.Context, *UpdateResourceRelationshipByUrnHsRequest) (*UpdateResourceRelationshipByUrnResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UpdateResourceRelationshipByUrnHs not implemented")
 }
-func (UnimplementedRelationshipsServiceServer) DeleteResourceRelationshipByURN(context.Context, *DeleteResourceRelationshipByURNRequest) (*DeleteResourceRelationshipByURNResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method DeleteResourceRelationshipByURN not implemented")
+func (UnimplementedRelationshipsServiceServer) DeleteResourceRelationshipByUrn(context.Context, *DeleteResourceRelationshipByUrnRequest) (*DeleteResourceRelationshipByUrnResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DeleteResourceRelationshipByUrn not implemented")
 }
 func (UnimplementedRelationshipsServiceServer) mustEmbedUnimplementedRelationshipsServiceServer() {}
 func (UnimplementedRelationshipsServiceServer) testEmbeddedByValue()                              {}
@@ -136,38 +136,38 @@ func _RelationshipsService_CreatePolicyRelationship_Handler(srv interface{}, ctx
 	return interceptor(ctx, in, info, handler)
 }
 
-func _RelationshipsService_UpdateResourceRelationshipByURNHs_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(UpdateResourceRelationshipByURNHsRequest)
+func _RelationshipsService_UpdateResourceRelationshipByUrnHs_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateResourceRelationshipByUrnHsRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(RelationshipsServiceServer).UpdateResourceRelationshipByURNHs(ctx, in)
+		return srv.(RelationshipsServiceServer).UpdateResourceRelationshipByUrnHs(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: RelationshipsService_UpdateResourceRelationshipByURNHs_FullMethodName,
+		FullMethod: RelationshipsService_UpdateResourceRelationshipByUrnHs_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(RelationshipsServiceServer).UpdateResourceRelationshipByURNHs(ctx, req.(*UpdateResourceRelationshipByURNHsRequest))
+		return srv.(RelationshipsServiceServer).UpdateResourceRelationshipByUrnHs(ctx, req.(*UpdateResourceRelationshipByUrnHsRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _RelationshipsService_DeleteResourceRelationshipByURN_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(DeleteResourceRelationshipByURNRequest)
+func _RelationshipsService_DeleteResourceRelationshipByUrn_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteResourceRelationshipByUrnRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(RelationshipsServiceServer).DeleteResourceRelationshipByURN(ctx, in)
+		return srv.(RelationshipsServiceServer).DeleteResourceRelationshipByUrn(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: RelationshipsService_DeleteResourceRelationshipByURN_FullMethodName,
+		FullMethod: RelationshipsService_DeleteResourceRelationshipByUrn_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(RelationshipsServiceServer).DeleteResourceRelationshipByURN(ctx, req.(*DeleteResourceRelationshipByURNRequest))
+		return srv.(RelationshipsServiceServer).DeleteResourceRelationshipByUrn(ctx, req.(*DeleteResourceRelationshipByUrnRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -184,12 +184,12 @@ var RelationshipsService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _RelationshipsService_CreatePolicyRelationship_Handler,
 		},
 		{
-			MethodName: "UpdateResourceRelationshipByURNHs",
-			Handler:    _RelationshipsService_UpdateResourceRelationshipByURNHs_Handler,
+			MethodName: "UpdateResourceRelationshipByUrnHs",
+			Handler:    _RelationshipsService_UpdateResourceRelationshipByUrnHs_Handler,
 		},
 		{
-			MethodName: "DeleteResourceRelationshipByURN",
-			Handler:    _RelationshipsService_DeleteResourceRelationshipByURN_Handler,
+			MethodName: "DeleteResourceRelationshipByUrn",
+			Handler:    _RelationshipsService_DeleteResourceRelationshipByUrn_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

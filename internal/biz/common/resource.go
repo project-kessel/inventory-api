@@ -8,20 +8,18 @@ type Metadata struct {
 	// Kessel Asset Inventory generated identifier.
 	ID int64 `gorm:"primaryKey"`
 
+	// Some identifier intrinsic to the resource itself that is unique across reporters
+	NaturalId string `gorm:"unique"`
+
+	// These fields / names have special meaning to gorm, which will handle them automatically.
 	CreatedAt time.Time
 	UpdatedAt time.Time
 
 	// The type of the Resource.
 	ResourceType string
 
-	// Date and time when the inventory item was first reported.
-	FirstReported time.Time
-
 	// Identity of the reporter that first reported this item.
 	FirstReportedBy string
-
-	// Date and time when the inventory item was last updated.
-	LastReported time.Time
 
 	// Identity of the reporter that last reported on this item.
 	LastReportedBy string
@@ -49,6 +47,12 @@ type Reporter struct {
 	// *always* the case.  So, allow it to be passed explicitly and then log a warning or something if the value
 	// doesn't match the inferred type.
 	ReporterType string `gorm:"primaryKey"`
+
+	// Date and time when the inventory item was first reported.
+	CreatedAt time.Time
+
+	// Date and time when the inventory item was last updated.
+	UpdatedAt time.Time
 
 	// LocalResourceId is the identifier assigned to the resource within the reporter's system.
 	LocalResourceId string `gorm:"primaryKey"`

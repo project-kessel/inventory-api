@@ -17,21 +17,21 @@ const (
 	resource_type = "rhelhost"
 )
 
-// HostsService handles requests for RHEL hosts
+// HostsService handles requests for Rhel hosts
 type HostsService struct {
 	pb.UnimplementedHostsServiceServer
 
 	Ctl *biz.HostUsecase
 }
 
-// New creates a new HostsService to handle requests for RHEL hosts
+// New creates a new HostsService to handle requests for Rhel hosts
 func New(c *biz.HostUsecase) *HostsService {
 	return &HostsService{
 		Ctl: c,
 	}
 }
 
-func (c *HostsService) CreateRHELHost(ctx context.Context, r *pb.CreateRHELHostRequest) (*pb.CreateRHELHostResponse, error) {
+func (c *HostsService) CreateRhelHost(ctx context.Context, r *pb.CreateRhelHostRequest) (*pb.CreateRhelHostResponse, error) {
 	if err := r.ValidateAll(); err != nil {
 		return nil, err
 	}
@@ -58,21 +58,21 @@ func (c *HostsService) CreateRHELHost(ctx context.Context, r *pb.CreateRHELHostR
 	}
 }
 
-func (c *HostsService) UpdateRHELHost(ctx context.Context, r *pb.UpdateRHELHostRequest) (*pb.UpdateRHELHostResponse, error) {
+func (c *HostsService) UpdateRhelHost(ctx context.Context, r *pb.UpdateRhelHostRequest) (*pb.UpdateRhelHostResponse, error) {
 	if err := r.ValidateAll(); err != nil {
 		return nil, err
 	}
 	return nil, nil
 }
 
-func (c *HostsService) DeleteRHELHost(ctx context.Context, r *pb.DeleteRHELHostRequest) (*pb.DeleteRHELHostResponse, error) {
+func (c *HostsService) DeleteRhelHost(ctx context.Context, r *pb.DeleteRhelHostRequest) (*pb.DeleteRhelHostResponse, error) {
 	if err := r.ValidateAll(); err != nil {
 		return nil, err
 	}
 	return nil, nil
 }
 
-func hostFromCreateRequest(r *pb.CreateRHELHostRequest, identity *authnapi.Identity) (*biz.Host, error) {
+func hostFromCreateRequest(r *pb.CreateRhelHostRequest, identity *authnapi.Identity) (*biz.Host, error) {
 	if identity.Principal != r.Host.ReporterData.ReporterInstanceId {
 		return nil, errors.Forbidden("FORBIDDEN", "Reporter identity must match the provided reporter instance identity")
 	}
@@ -82,9 +82,9 @@ func hostFromCreateRequest(r *pb.CreateRHELHostRequest, identity *authnapi.Ident
 	}, nil
 }
 
-func createResponseFromHost(h *biz.Host) *pb.CreateRHELHostResponse {
-	return &pb.CreateRHELHostResponse{
-		Host: &pb.RHELHost{
+func createResponseFromHost(h *biz.Host) *pb.CreateRhelHostResponse {
+	return &pb.CreateRhelHostResponse{
+		Host: &pb.RhelHost{
 			Metadata:  conv.MetadataFromModel(&h.Metadata),
 			Reporters: conv.ReportersFromModel(h.Metadata.Reporters),
 		},

@@ -1,8 +1,6 @@
 package common
 
 import (
-	"time"
-
 	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
 
 	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1"
@@ -17,16 +15,15 @@ func MetadataFromPb(in *pb.Metadata, reporter *pb.ReporterData, identity *authna
 	}
 
 	return &models.Metadata{
-		ID:           in.Id,
+		ID:        in.Id,
+		NaturalId: in.NaturalId,
+
 		ResourceType: in.ResourceType,
 		Workspace:    in.Workspace,
 		Tags:         tags,
 
 		FirstReportedBy: identity.Principal,
 		LastReportedBy:  identity.Principal,
-
-		FirstReported: time.Now(),
-		LastReported:  time.Now(),
 
 		Reporters: []*models.Reporter{ReporterFromPb(reporter, identity)},
 	}
@@ -53,9 +50,10 @@ func MetadataFromModel(in *models.Metadata) *pb.Metadata {
 
 	return &pb.Metadata{
 		Id:              in.ID,
+		NaturalId:       in.NaturalId,
 		ResourceType:    in.ResourceType,
-		FirstReported:   timestamppb.New(in.FirstReported),
-		LastReported:    timestamppb.New(in.LastReported),
+		FirstReported:   timestamppb.New(in.CreatedAt),
+		LastReported:    timestamppb.New(in.UpdatedAt),
 		FirstReportedBy: in.FirstReportedBy,
 		LastReportedBy:  in.LastReportedBy,
 		Tags:            tags,
@@ -71,6 +69,9 @@ func ReportersFromModel(in []*models.Reporter) []*pb.ReporterData {
 			ReporterVersion:    r.ReporterVersion,
 
 			LocalResourceId: r.LocalResourceId,
+
+			FirstReported: timestamppb.New(r.CreatedAt),
+			LastReported:  timestamppb.New(r.UpdatedAt),
 
 			ConsoleHref: r.ConsoleHref,
 			ApiHref:     r.ApiHref,

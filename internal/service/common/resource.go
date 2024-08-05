@@ -9,7 +9,7 @@ import (
 )
 
 func MetadataFromPb(in *pb.Metadata, reporter *pb.ReporterData, identity *authnapi.Identity) *biz.Metadata {
-	var labels []*biz.Labels
+	var labels []*biz.Label
 	for _, t := range in.Labels {
 		labels = append(labels, &biz.Label{Key: t.Key, Value: t.Value})
 	}

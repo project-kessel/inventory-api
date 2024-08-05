@@ -64,7 +64,7 @@ services:
     restart: "always"
     hostname: spicedb
     volumes:
-      - ./deploy/schema.yaml:/schema.yaml:ro,z
+      - ./deploy/schema.zed:/schema.zed:ro,z
     secrets:
       - spicedb_pre_shared
     ports:
@@ -74,7 +74,7 @@ services:
     environment:
       - "SPICEDB_GRPC_PRESHARED_KEY=${SPICEDB_GRPC_PRESHARED_KEY}"
       - "SPICEDB_DATASTORE_ENGINE=postgres"
-      - "SPICEDB_DATASTORE_BOOTSTRAP_FILES=/schema.yaml"
+      - "SPICEDB_DATASTORE_BOOTSTRAP_FILES=/schema.zed"
       - "SPICEDB_DATASTORE_CONN_URI=postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@database:5432/spicedb?sslmode=disable"
 
   migrate:

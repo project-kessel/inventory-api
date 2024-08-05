@@ -7,8 +7,9 @@ import (
 )
 
 type Options struct {
-	Addr    string `mapstructure:"address"`
-	Timeout int    `mapstructure:"timeout-seconds"`
+	Addr       string `mapstructure:"address"`
+	Timeout    int    `mapstructure:"timeout-seconds"`
+	PathPrefix string `mapstructure:"path-prefix"`
 
 	ServingCertFile string `mapstructure:"certfile"`
 	PrivateKeyFile  string `mapstructure:"keyfile"`
@@ -20,9 +21,10 @@ type Options struct {
 
 func NewOptions() *Options {
 	return &Options{
-		Addr:    "localhost:8080",
-		Timeout: 300,
-		CertOpt: 3, // https://pkg.go.dev/crypto/tls#ClientAuthType
+		Addr:       "localhost:8080",
+		PathPrefix: "/api/inventory",
+		Timeout:    300,
+		CertOpt:    3, // https://pkg.go.dev/crypto/tls#ClientAuthType
 	}
 }
 
@@ -32,8 +34,8 @@ func (o *Options) AddFlags(fs *pflag.FlagSet, prefix string) {
 	}
 
 	fs.StringVar(&o.Addr, prefix+"address", o.Addr, "host and port on which the server listens")
-
 	fs.IntVar(&o.Timeout, prefix+"timeout-seconds", o.Timeout, "request timeout in seconds")
+	fs.StringVar(&o.PathPrefix, prefix+"path-prefix", o.PathPrefix, "Prefix of all URL paths")
 
 	fs.StringVar(&o.ServingCertFile, prefix+"certfile", o.ServingCertFile, "the file containing the server's serving cert")
 	fs.StringVar(&o.PrivateKeyFile, prefix+"keyfile", o.PrivateKeyFile, "the file containing the server's private key for the serving cert")

@@ -80,6 +80,7 @@ func (c *Config) Complete() (CompletedConfig, error) {
 	c.TLSConfig = tlsConfig
 	opts := []http.ServerOption{
 		http.Address(c.Options.Addr),
+		http.PathPrefix(c.Options.PathPrefix),
 		http.TLSConfig(tlsConfig),
 		http.StrictSlash(true),
 		http.Timeout(time.Duration(c.Options.Timeout) * time.Second),

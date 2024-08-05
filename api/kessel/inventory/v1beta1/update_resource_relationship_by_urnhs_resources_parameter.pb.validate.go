@@ -36,24 +36,24 @@ var (
 )
 
 // Validate checks the field values on
-// UpdateResourceRelationshipByURNHsResourcesParameter with the rules defined
+// UpdateResourceRelationshipByUrnhsResourcesParameter with the rules defined
 // in the proto definition for this message. If any rules are violated, the
 // first error encountered is returned, or nil if there are no violations.
-func (m *UpdateResourceRelationshipByURNHsResourcesParameter) Validate() error {
+func (m *UpdateResourceRelationshipByUrnhsResourcesParameter) Validate() error {
 	return m.validate(false)
 }
 
 // ValidateAll checks the field values on
-// UpdateResourceRelationshipByURNHsResourcesParameter with the rules defined
+// UpdateResourceRelationshipByUrnhsResourcesParameter with the rules defined
 // in the proto definition for this message. If any rules are violated, the
 // result is a list of violation errors wrapped in
-// UpdateResourceRelationshipByURNHsResourcesParameterMultiError, or nil if
+// UpdateResourceRelationshipByUrnhsResourcesParameterMultiError, or nil if
 // none found.
-func (m *UpdateResourceRelationshipByURNHsResourcesParameter) ValidateAll() error {
+func (m *UpdateResourceRelationshipByUrnhsResourcesParameter) ValidateAll() error {
 	return m.validate(true)
 }
 
-func (m *UpdateResourceRelationshipByURNHsResourcesParameter) validate(all bool) error {
+func (m *UpdateResourceRelationshipByUrnhsResourcesParameter) validate(all bool) error {
 	if m == nil {
 		return nil
 	}
@@ -65,20 +65,20 @@ func (m *UpdateResourceRelationshipByURNHsResourcesParameter) validate(all bool)
 	// no validation rules for ObjectResource
 
 	if len(errors) > 0 {
-		return UpdateResourceRelationshipByURNHsResourcesParameterMultiError(errors)
+		return UpdateResourceRelationshipByUrnhsResourcesParameterMultiError(errors)
 	}
 
 	return nil
 }
 
-// UpdateResourceRelationshipByURNHsResourcesParameterMultiError is an error
+// UpdateResourceRelationshipByUrnhsResourcesParameterMultiError is an error
 // wrapping multiple validation errors returned by
-// UpdateResourceRelationshipByURNHsResourcesParameter.ValidateAll() if the
+// UpdateResourceRelationshipByUrnhsResourcesParameter.ValidateAll() if the
 // designated constraints aren't met.
-type UpdateResourceRelationshipByURNHsResourcesParameterMultiError []error
+type UpdateResourceRelationshipByUrnhsResourcesParameterMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
-func (m UpdateResourceRelationshipByURNHsResourcesParameterMultiError) Error() string {
+func (m UpdateResourceRelationshipByUrnhsResourcesParameterMultiError) Error() string {
 	var msgs []string
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
@@ -87,13 +87,13 @@ func (m UpdateResourceRelationshipByURNHsResourcesParameterMultiError) Error() s
 }
 
 // AllErrors returns a list of validation violation errors.
-func (m UpdateResourceRelationshipByURNHsResourcesParameterMultiError) AllErrors() []error { return m }
+func (m UpdateResourceRelationshipByUrnhsResourcesParameterMultiError) AllErrors() []error { return m }
 
-// UpdateResourceRelationshipByURNHsResourcesParameterValidationError is the
+// UpdateResourceRelationshipByUrnhsResourcesParameterValidationError is the
 // validation error returned by
-// UpdateResourceRelationshipByURNHsResourcesParameter.Validate if the
+// UpdateResourceRelationshipByUrnhsResourcesParameter.Validate if the
 // designated constraints aren't met.
-type UpdateResourceRelationshipByURNHsResourcesParameterValidationError struct {
+type UpdateResourceRelationshipByUrnhsResourcesParameterValidationError struct {
 	field  string
 	reason string
 	cause  error
@@ -101,30 +101,30 @@ type UpdateResourceRelationshipByURNHsResourcesParameterValidationError struct {
 }
 
 // Field function returns field value.
-func (e UpdateResourceRelationshipByURNHsResourcesParameterValidationError) Field() string {
+func (e UpdateResourceRelationshipByUrnhsResourcesParameterValidationError) Field() string {
 	return e.field
 }
 
 // Reason function returns reason value.
-func (e UpdateResourceRelationshipByURNHsResourcesParameterValidationError) Reason() string {
+func (e UpdateResourceRelationshipByUrnhsResourcesParameterValidationError) Reason() string {
 	return e.reason
 }
 
 // Cause function returns cause value.
-func (e UpdateResourceRelationshipByURNHsResourcesParameterValidationError) Cause() error {
+func (e UpdateResourceRelationshipByUrnhsResourcesParameterValidationError) Cause() error {
 	return e.cause
 }
 
 // Key function returns key value.
-func (e UpdateResourceRelationshipByURNHsResourcesParameterValidationError) Key() bool { return e.key }
+func (e UpdateResourceRelationshipByUrnhsResourcesParameterValidationError) Key() bool { return e.key }
 
 // ErrorName returns error name.
-func (e UpdateResourceRelationshipByURNHsResourcesParameterValidationError) ErrorName() string {
-	return "UpdateResourceRelationshipByURNHsResourcesParameterValidationError"
+func (e UpdateResourceRelationshipByUrnhsResourcesParameterValidationError) ErrorName() string {
+	return "UpdateResourceRelationshipByUrnhsResourcesParameterValidationError"
 }
 
 // Error satisfies the builtin error interface
-func (e UpdateResourceRelationshipByURNHsResourcesParameterValidationError) Error() string {
+func (e UpdateResourceRelationshipByUrnhsResourcesParameterValidationError) Error() string {
 	cause := ""
 	if e.cause != nil {
 		cause = fmt.Sprintf(" | caused by: %v", e.cause)
@@ -136,14 +136,14 @@ func (e UpdateResourceRelationshipByURNHsResourcesParameterValidationError) Erro
 	}
 
 	return fmt.Sprintf(
-		"invalid %sUpdateResourceRelationshipByURNHsResourcesParameter.%s: %s%s",
+		"invalid %sUpdateResourceRelationshipByUrnhsResourcesParameter.%s: %s%s",
 		key,
 		e.field,
 		e.reason,
 		cause)
 }
 
-var _ error = UpdateResourceRelationshipByURNHsResourcesParameterValidationError{}
+var _ error = UpdateResourceRelationshipByUrnhsResourcesParameterValidationError{}
 
 var _ interface {
 	Field() string
@@ -151,4 +151,4 @@ var _ interface {
 	Key() bool
 	Cause() error
 	ErrorName() string
-} = UpdateResourceRelationshipByURNHsResourcesParameterValidationError{}
+} = UpdateResourceRelationshipByUrnhsResourcesParameterValidationError{}

@@ -6,9 +6,9 @@ import public "kessel/inventory/v1beta1/k8s_cluster_detail_nodes_inner.proto";
 
 option go_package = "api/kessel/inventory/v1beta1;v1beta1";
 option java_multiple_files = true;
-option java_package = "api.kessel.inventory.v1beta1";
+option java_package = "org.project_kessel.api.inventory.v1beta1";
 
-message K8sClusterDetail {
+message K8SClusterDetail {
 
   // The OCP cluster ID or ARN etc for *KS
   string external_cluster_id = 219571597;
@@ -68,5 +68,5 @@ message K8sClusterDetail {
 
   Cloud_platformEnum cloud_platform = 476768062;
 
-  repeated K8sClusterDetailNodesInner Nodes = 75440785;
+  repeated K8SClusterDetailNodesInner Nodes = 75440785;
 }

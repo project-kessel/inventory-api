@@ -9,9 +9,9 @@ import (
 )
 
 func MetadataFromPb(in *pb.Metadata, reporter *pb.ReporterData, identity *authnapi.Identity) *models.Metadata {
-	var tags []*models.Tag
-	for _, t := range in.Tags {
-		tags = append(tags, &models.Tag{Key: t.Key, Value: t.Value})
+	var labels []*models.Labels
+	for _, t := range in.Labels {
+		labels = append(labels, &models.Label{Key: t.Key, Value: t.Value})
 	}
 
 	return &models.Metadata{
@@ -20,7 +20,7 @@ func MetadataFromPb(in *pb.Metadata, reporter *pb.ReporterData, identity *authna
 
 		ResourceType: in.ResourceType,
 		Workspace:    in.Workspace,
-		Tags:         tags,
+		Labels:       labels,
 
 		FirstReportedBy: identity.Principal,
 		LastReportedBy:  identity.Principal,
@@ -43,9 +43,9 @@ func ReporterFromPb(in *pb.ReporterData, identity *authnapi.Identity) *models.Re
 }
 
 func MetadataFromModel(in *models.Metadata) *pb.Metadata {
-	var tags []*pb.ResourceTag
-	for _, t := range in.Tags {
-		tags = append(tags, &pb.ResourceTag{Key: t.Key, Value: t.Value})
+	var labels []*pb.ResourceLabel
+	for _, t := range in.Labels {
+		labels = append(labels, &pb.ResourceLabel{Key: t.Key, Value: t.Value})
 	}
 
 	return &pb.Metadata{
@@ -56,7 +56,7 @@ func MetadataFromModel(in *models.Metadata) *pb.Metadata {
 		LastReported:    timestamppb.New(in.UpdatedAt),
 		FirstReportedBy: in.FirstReportedBy,
 		LastReportedBy:  in.LastReportedBy,
-		Tags:            tags,
+		Labels:          labels,
 	}
 }
 

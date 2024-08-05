@@ -465,24 +465,24 @@ var _ interface {
 	ErrorName() string
 } = UpdateResourceRelationshipByUrnHsRequestValidationError{}
 
-// Validate checks the field values on UpdateResourceRelationshipByUrnResponse
-// with the rules defined in the proto definition for this message. If any
-// rules are violated, the first error encountered is returned, or nil if
-// there are no violations.
-func (m *UpdateResourceRelationshipByUrnResponse) Validate() error {
+// Validate checks the field values on
+// UpdateResourceRelationshipByUrnHsResponse with the rules defined in the
+// proto definition for this message. If any rules are violated, the first
+// error encountered is returned, or nil if there are no violations.
+func (m *UpdateResourceRelationshipByUrnHsResponse) Validate() error {
 	return m.validate(false)
 }
 
 // ValidateAll checks the field values on
-// UpdateResourceRelationshipByUrnResponse with the rules defined in the proto
-// definition for this message. If any rules are violated, the result is a
-// list of violation errors wrapped in
-// UpdateResourceRelationshipByUrnResponseMultiError, or nil if none found.
-func (m *UpdateResourceRelationshipByUrnResponse) ValidateAll() error {
+// UpdateResourceRelationshipByUrnHsResponse with the rules defined in the
+// proto definition for this message. If any rules are violated, the result is
+// a list of violation errors wrapped in
+// UpdateResourceRelationshipByUrnHsResponseMultiError, or nil if none found.
+func (m *UpdateResourceRelationshipByUrnHsResponse) ValidateAll() error {
 	return m.validate(true)
 }
 
-func (m *UpdateResourceRelationshipByUrnResponse) validate(all bool) error {
+func (m *UpdateResourceRelationshipByUrnHsResponse) validate(all bool) error {
 	if m == nil {
 		return nil
 	}
@@ -490,20 +490,20 @@ func (m *UpdateResourceRelationshipByUrnResponse) validate(all bool) error {
 	var errors []error
 
 	if len(errors) > 0 {
-		return UpdateResourceRelationshipByUrnResponseMultiError(errors)
+		return UpdateResourceRelationshipByUrnHsResponseMultiError(errors)
 	}
 
 	return nil
 }
 
-// UpdateResourceRelationshipByUrnResponseMultiError is an error wrapping
+// UpdateResourceRelationshipByUrnHsResponseMultiError is an error wrapping
 // multiple validation errors returned by
-// UpdateResourceRelationshipByUrnResponse.ValidateAll() if the designated
+// UpdateResourceRelationshipByUrnHsResponse.ValidateAll() if the designated
 // constraints aren't met.
-type UpdateResourceRelationshipByUrnResponseMultiError []error
+type UpdateResourceRelationshipByUrnHsResponseMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
-func (m UpdateResourceRelationshipByUrnResponseMultiError) Error() string {
+func (m UpdateResourceRelationshipByUrnHsResponseMultiError) Error() string {
 	var msgs []string
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
@@ -512,12 +512,12 @@ func (m UpdateResourceRelationshipByUrnResponseMultiError) Error() string {
 }
 
 // AllErrors returns a list of validation violation errors.
-func (m UpdateResourceRelationshipByUrnResponseMultiError) AllErrors() []error { return m }
+func (m UpdateResourceRelationshipByUrnHsResponseMultiError) AllErrors() []error { return m }
 
-// UpdateResourceRelationshipByUrnResponseValidationError is the validation
-// error returned by UpdateResourceRelationshipByUrnResponse.Validate if the
+// UpdateResourceRelationshipByUrnHsResponseValidationError is the validation
+// error returned by UpdateResourceRelationshipByUrnHsResponse.Validate if the
 // designated constraints aren't met.
-type UpdateResourceRelationshipByUrnResponseValidationError struct {
+type UpdateResourceRelationshipByUrnHsResponseValidationError struct {
 	field  string
 	reason string
 	cause  error
@@ -525,24 +525,24 @@ type UpdateResourceRelationshipByUrnResponseValidationError struct {
 }
 
 // Field function returns field value.
-func (e UpdateResourceRelationshipByUrnResponseValidationError) Field() string { return e.field }
+func (e UpdateResourceRelationshipByUrnHsResponseValidationError) Field() string { return e.field }
 
 // Reason function returns reason value.
-func (e UpdateResourceRelationshipByUrnResponseValidationError) Reason() string { return e.reason }
+func (e UpdateResourceRelationshipByUrnHsResponseValidationError) Reason() string { return e.reason }
 
 // Cause function returns cause value.
-func (e UpdateResourceRelationshipByUrnResponseValidationError) Cause() error { return e.cause }
+func (e UpdateResourceRelationshipByUrnHsResponseValidationError) Cause() error { return e.cause }
 
 // Key function returns key value.
-func (e UpdateResourceRelationshipByUrnResponseValidationError) Key() bool { return e.key }
+func (e UpdateResourceRelationshipByUrnHsResponseValidationError) Key() bool { return e.key }
 
 // ErrorName returns error name.
-func (e UpdateResourceRelationshipByUrnResponseValidationError) ErrorName() string {
-	return "UpdateResourceRelationshipByUrnResponseValidationError"
+func (e UpdateResourceRelationshipByUrnHsResponseValidationError) ErrorName() string {
+	return "UpdateResourceRelationshipByUrnHsResponseValidationError"
 }
 
 // Error satisfies the builtin error interface
-func (e UpdateResourceRelationshipByUrnResponseValidationError) Error() string {
+func (e UpdateResourceRelationshipByUrnHsResponseValidationError) Error() string {
 	cause := ""
 	if e.cause != nil {
 		cause = fmt.Sprintf(" | caused by: %v", e.cause)
@@ -554,14 +554,14 @@ func (e UpdateResourceRelationshipByUrnResponseValidationError) Error() string {
 	}
 
 	return fmt.Sprintf(
-		"invalid %sUpdateResourceRelationshipByUrnResponse.%s: %s%s",
+		"invalid %sUpdateResourceRelationshipByUrnHsResponse.%s: %s%s",
 		key,
 		e.field,
 		e.reason,
 		cause)
 }
 
-var _ error = UpdateResourceRelationshipByUrnResponseValidationError{}
+var _ error = UpdateResourceRelationshipByUrnHsResponseValidationError{}
 
 var _ interface {
 	Field() string
@@ -569,7 +569,7 @@ var _ interface {
 	Key() bool
 	Cause() error
 	ErrorName() string
-} = UpdateResourceRelationshipByUrnResponseValidationError{}
+} = UpdateResourceRelationshipByUrnHsResponseValidationError{}
 
 // Validate checks the field values on DeleteResourceRelationshipByUrnRequest
 // with the rules defined in the proto definition for this message. If any

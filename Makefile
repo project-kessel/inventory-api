@@ -24,14 +24,13 @@ init:
 .PHONY: api
 # generate api proto
 api:
-	protoc --proto_path=./api \
-	       --proto_path=./third_party \
- 	       --go_out=paths=source_relative:./api \
- 	       --go-http_out=paths=source_relative:./api \
- 	       --go-grpc_out=paths=source_relative:./api \
-	       --openapi_out=fq_schema_naming=false,default_response=true,version=$(INVENTORY_SCHEMA_VERSION),title=$(TITLE):. \
-		   --validate_out="lang=go,paths=source_relative:./api" \
-	       $(API_PROTO_FILES)
+	@echo "Generating api protos"
+	@$(DOCKER) build -t custom-protoc ./api
+	@$(DOCKER) run -t --rm -v $(PWD)/api:/api -v $(PWD)/openapi.yaml:/openapi.yaml -v $(PWD)/third_party:/third_party \
+	-w=/api/ custom-protoc sh -c "buf generate && \
+		buf lint && \
+		buf breaking --against 'buf.build/project-kessel/inventory-api' "
+
 
 # .PHONY: api
 # # generate api proto

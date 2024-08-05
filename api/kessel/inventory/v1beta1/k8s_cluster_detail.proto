@@ -1,72 +1,72 @@
 syntax = "proto3";
 
-package api.kessel.inventory.v1beta1;
+package kessel.inventory.v1beta1;
 
-import public "kessel/inventory/v1beta1/k8s_cluster_detail_nodes_inner.proto";
+import "kessel/inventory/v1beta1/k8s_cluster_detail_nodes_inner.proto";
 
-option go_package = "api/kessel/inventory/v1beta1;v1beta1";
+option go_package = "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1";
 option java_multiple_files = true;
-option java_package = "api.kessel.inventory.v1beta1";
+option java_package = "org.project_kessel.api.inventory.v1beta1";
 
 message K8sClusterDetail {
+
+  // the aggregate status of the cluster
+  enum ClusterStatus {
+    CLUSTER_STATUS_UNSPECIFIED = 0;
+    CLUSTER_STATUS_READY = 1;
+    CLUSTER_STATUS_FAILED = 2;
+    CLUSTER_STATUS_OFFLINE = 3;
+  }
+
+  // The kubernetes vendor
+  enum KubeVendor {
+    KUBE_VENDOR_UNSPECIFIED = 0;
+    KUBE_VENDOR_OTHER = 1;
+    KUBE_VENDOR_AKS = 2;
+    KUBE_VENDOR_EKS = 3;
+    KUBE_VENDOR_IKS = 4;
+    KUBE_VENDOR_OPENSHIFT = 5;
+    KUBE_VENDOR_GKE = 6;
+  }
+
+  // The platform on which this cluster is hosted
+  enum CloudPlatform {
+    CLOUD_PLATFORM_UNSPECIFIED = 0;
+    CLOUD_PLATFORM_NONE_UPI = 1;
+    CLOUD_PLATFORM_BAREMETAL_IPI = 2;
+    CLOUD_PLATFORM_BAREMETAL_UPI = 3;
+    CLOUD_PLATFORM_AWS_IPI = 4;
+    CLOUD_PLATFORM_AWS_UPI = 5;
+    CLOUD_PLATFORM_AZURE_IPI = 6;
+    CLOUD_PLATFORM_AZURE_UPI = 7;
+    CLOUD_PLATFORM_IBMCLOUD_IPI = 8;
+    CLOUD_PLATFORM_IBMCLOUD_UPI = 9;
+    CLOUD_PLATFORM_KUBEVIRT_IPI = 10;
+    CLOUD_PLATFORM_OPENSTACK_IPI = 11;
+    CLOUD_PLATFORM_OPENSTACK_UPI = 12;
+    CLOUD_PLATFORM_GCP_IPI = 13;
+    CLOUD_PLATFORM_GCP_UPI = 14;
+    CLOUD_PLATFORM_NUTANIX_IPI = 15;
+    CLOUD_PLATFORM_NUTANIX_UPI = 16;
+    CLOUD_PLATFORM_VSPHERE_IPI = 17;
+    CLOUD_PLATFORM_VSPHERE_UPI = 18;
+    CLOUD_PLATFORM_OVIRT_IPI = 19;
+  }
 
   // The OCP cluster ID or ARN etc for *KS
   string external_cluster_id = 219571597;
 
-  // the aggregate status of the cluster
-  enum Cluster_statusEnum {
-    Cluster_statusEnum_UNKNOWN = 0;
-    Cluster_statusEnum_READY = 1;
-    Cluster_statusEnum_FAILED = 2;
-    Cluster_statusEnum_OFFLINE = 3;
-  }
-
-  Cluster_statusEnum cluster_status = 499346904;
+  ClusterStatus cluster_status = 499346904;
 
   // The version of kubernetes
   string kube_version = 395858490;
 
-  // The kubernetes vendor
-  enum Kube_vendorEnum {
-    Kube_vendorEnum_UNKNOWN = 0;
-    Kube_vendorEnum_OTHER = 1;
-    Kube_vendorEnum_AKS = 2;
-    Kube_vendorEnum_EKS = 3;
-    Kube_vendorEnum_IKS = 4;
-    Kube_vendorEnum_OPENSHIFT = 5;
-    Kube_vendorEnum_GKE = 6;
-  }
-
-  Kube_vendorEnum kube_vendor = 264191642;
+  KubeVendor kube_vendor = 264191642;
 
   // The version of the productized kubernetes distribution
   string vendor_version = 23961827;
 
-  // The platform on which this cluster is hosted
-  enum Cloud_platformEnum {
-    Cloud_platformEnum_UNKNOWN_IPI = 0;
-    Cloud_platformEnum_NONE_UPI = 1;
-    Cloud_platformEnum_BAREMETAL_IPI = 2;
-    Cloud_platformEnum_BAREMETAL_UPI = 3;
-    Cloud_platformEnum_AWS_IPI = 4;
-    Cloud_platformEnum_AWS_UPI = 5;
-    Cloud_platformEnum_AZURE_IPI = 6;
-    Cloud_platformEnum_AZURE_UPI = 7;
-    Cloud_platformEnum_IBMCLOUD_IPI = 8;
-    Cloud_platformEnum_IBMCLOUD_UPI = 9;
-    Cloud_platformEnum_KUBEVIRT_IPI = 10;
-    Cloud_platformEnum_OPENSTACK_IPI = 11;
-    Cloud_platformEnum_OPENSTACK_UPI = 12;
-    Cloud_platformEnum_GCP_IPI = 13;
-    Cloud_platformEnum_GCP_UPI = 14;
-    Cloud_platformEnum_NUTANIX_IPI = 15;
-    Cloud_platformEnum_NUTANIX_UPI = 16;
-    Cloud_platformEnum_VSPHERE_IPI = 17;
-    Cloud_platformEnum_VSPHERE_UPI = 18;
-    Cloud_platformEnum_OVIRT_IPI = 19;
-  }
+  CloudPlatform cloud_platform = 476768062;
 
-  Cloud_platformEnum cloud_platform = 476768062;
-
-  repeated K8sClusterDetailNodesInner Nodes = 75440785;
+  repeated K8sClusterDetailNodesInner nodes = 75440785;
 }

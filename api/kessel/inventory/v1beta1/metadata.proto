@@ -5,7 +5,7 @@ package api.kessel.inventory.v1beta1;
 import "google/api/field_behavior.proto";
 import "google/protobuf/timestamp.proto";
 
-import public "kessel/inventory/v1beta1/resource_tag.proto";
+import public "kessel/inventory/v1beta1/resource_label.proto";
 
 option go_package = "api/kessel/inventory/v1beta1;v1beta1";
 option java_multiple_files = true;
@@ -41,5 +41,5 @@ message Metadata {
   // resource can only be a member of one workspace.
   string workspace = 35122327;
 
-  repeated ResourceTag tags = 3552281;
+  repeated ResourceLabel labels = 3552281;
 }

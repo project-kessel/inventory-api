@@ -6,6 +6,6 @@ option go_package = "api/kessel/inventory/v1beta1;v1beta1";
 option java_multiple_files = true;
 option java_package = "api.kessel.inventory.v1beta1";
 
-import public "kessel/inventory/v1beta1/resource_tag.proto";
+import public "kessel/inventory/v1beta1/resource_label.proto";
 
-message ResourceTags { repeated ResourceTag tags = 3552281; }
+message ResourceLabels { repeated ResourceLabel labels = 3552281; }

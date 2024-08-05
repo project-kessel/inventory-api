@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package api.kessel.inventory.v1beta1;
 
-import public "kessel/inventory/v1beta1/resource_tag.proto";
+import public "kessel/inventory/v1beta1/resource_label.proto";
 
 option go_package = "api/kessel/inventory/v1beta1;v1beta1";
 option java_multiple_files = true;
@@ -21,5 +21,5 @@ message K8sClusterDetailNodesInner {
 
   // Map of string keys and string values that can be used to organize and
   // categorize (scope and select) resources
-  repeated ResourceTag labels = 36675587;
+  repeated ResourceLabel labels = 36675587;
 }

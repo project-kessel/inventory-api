@@ -10,9 +10,6 @@ option java_package = "org.project_kessel.api.inventory.v1beta1";
 
 message K8sClusterDetail {
 
-  // The OCP cluster ID or ARN etc for *KS
-  string external_cluster_id = 219571597;
-
   // the aggregate status of the cluster
   enum ClusterStatus {
     CLUSTER_STATUS_UNSPECIFIED = 0;
@@ -20,11 +17,6 @@ message K8sClusterDetail {
     CLUSTER_STATUS_FAILED = 2;
     CLUSTER_STATUS_OFFLINE = 3;
   }
-
-  ClusterStatus cluster_status = 499346904;
-
-  // The version of kubernetes
-  string kube_version = 395858490;
 
   // The kubernetes vendor
   enum KubeVendor {
@@ -36,11 +28,6 @@ message K8sClusterDetail {
     KUBE_VENDOR_OPENSHIFT = 5;
     KUBE_VENDOR_GKE = 6;
   }
-
-  KubeVendor kube_vendor = 264191642;
-
-  // The version of the productized kubernetes distribution
-  string vendor_version = 23961827;
 
   // The platform on which this cluster is hosted
   enum CloudPlatform {
@@ -65,6 +52,19 @@ message K8sClusterDetail {
     CLOUD_PLATFORM_VSPHERE_UPI = 18;
     CLOUD_PLATFORM_OVIRT_IPI = 19;
   }
+
+  // The OCP cluster ID or ARN etc for *KS
+  string external_cluster_id = 219571597;
+
+  ClusterStatus cluster_status = 499346904;
+
+  // The version of kubernetes
+  string kube_version = 395858490;
+
+  KubeVendor kube_vendor = 264191642;
+
+  // The version of the productized kubernetes distribution
+  string vendor_version = 23961827;
 
   CloudPlatform cloud_platform = 476768062;
 

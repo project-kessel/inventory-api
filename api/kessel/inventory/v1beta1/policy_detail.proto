@@ -1,8 +1,8 @@
 syntax = "proto3";
 
-package api.kessel.inventory.v1beta1;
+package kessel.inventory.v1beta1;
 
-option go_package = "api/kessel/inventory/v1beta1;v1beta1";
+option go_package = "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1";
 option java_multiple_files = true;
 option java_package = "api.kessel.inventory.v1beta1";
 
@@ -13,11 +13,12 @@ message PolicyDetail {
 
   // The kind of policy
   enum SeverityEnum {
-    SeverityEnum_LOW = 0;
-    SeverityEnum_MEDIUM = 1;
-    SeverityEnum_HIGH = 2;
-    SeverityEnum_CRITICAL = 3;
-    SeverityEnum_OTHER = 4;
+    SEVERITY_ENUM_UNSPECIFIED = 0;
+    SEVERITY_ENUM_LOW = 1;
+    SEVERITY_ENUM_MEDIUM = 2;
+    SEVERITY_ENUM_HIGH = 3;
+    SEVERITY_ENUM_CRITICAL = 4;
+    SEVERITY_ENUM_OTHER = 5;
   }
 
   SeverityEnum severity = 404558591;

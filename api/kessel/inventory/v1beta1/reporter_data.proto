@@ -1,25 +1,25 @@
 syntax = "proto3";
 
-package api.kessel.inventory.v1beta1;
+package kessel.inventory.v1beta1;
 
 import "google/api/field_behavior.proto";
 import "google/protobuf/timestamp.proto";
 
-option go_package = "api/kessel/inventory/v1beta1;v1beta1";
+option go_package = "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1";
 option java_multiple_files = true;
 option java_package = "api.kessel.inventory.v1beta1";
 
 message ReporterData {
 
-  enum Reporter_typeEnum {
-    Reporter_typeEnum_ACM = 0;
-    Reporter_typeEnum_HBI = 1;
-    Reporter_typeEnum_OCM = 2;
-    Reporter_typeEnum_OTHER = 3;
-    Reporter_typeEnum_UNKNOWN = 4;
+  enum ReporterTypeEnum {
+    REPORTER_TYPE_ENUM_UNSPECIFIED = 0;
+    REPORTER_TYPE_ENUM_ACM = 1;
+    REPORTER_TYPE_ENUM_HBI = 2;
+    REPORTER_TYPE_ENUM_OCM = 3;
+    REPORTER_TYPE_ENUM_OTHER = 4;
   }
 
-  Reporter_typeEnum reporter_type = 245778392;
+  ReporterTypeEnum reporter_type = 245778392;
 
   // The ID of the instance of the reporter. This is derived from the
   // authentication mechanism, i.e. authentication token.

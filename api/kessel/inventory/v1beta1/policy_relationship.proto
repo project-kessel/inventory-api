@@ -1,8 +1,8 @@
 syntax = "proto3";
 
-package api.kessel.inventory.v1beta1;
+package kessel.inventory.v1beta1;
 
-option go_package = "api/kessel/inventory/v1beta1;v1beta1";
+option go_package = "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1";
 option java_multiple_files = true;
 option java_package = "api.kessel.inventory.v1beta1";
 
@@ -23,10 +23,10 @@ message PolicyRelationship {
 
   // the aggregate status of the cluster
   enum StatusEnum {
-    StatusEnum_UNKNOWN = 0;
-    StatusEnum_OTHER = 1;
-    StatusEnum_NON_COMPLIANT = 2;
-    StatusEnum_COMPLIANT = 3;
+    STATUS_ENUM_UNKNOWN_UNSPECIFIED = 0;
+    STATUS_ENUM_OTHER = 1;
+    STATUS_ENUM_NON_COMPLIANT = 2;
+    STATUS_ENUM_COMPLIANT = 3;
   }
 
   StatusEnum status = 355610639;

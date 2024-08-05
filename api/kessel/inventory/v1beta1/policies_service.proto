@@ -1,12 +1,12 @@
 syntax = "proto3";
 
-package api.kessel.inventory.v1beta1;
+package kessel.inventory.v1beta1;
 
 import "google/api/annotations.proto";
 
-import public "kessel/inventory/v1beta1/policy.proto";
+import "kessel/inventory/v1beta1/policy.proto";
 
-option go_package = "api/kessel/inventory/v1beta1;v1beta1";
+option go_package = "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1";
 option java_multiple_files = true;
 option java_package = "api.kessel.inventory.v1beta1";
 

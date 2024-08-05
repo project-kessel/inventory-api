@@ -39,7 +39,7 @@ func RegisterKesselNotificationsIntegrationServiceHTTPServer(s *http.Server, srv
 func _KesselNotificationsIntegrationService_CreateNotificationsIntegration0_HTTP_Handler(srv KesselNotificationsIntegrationServiceHTTPServer) func(ctx http.Context) error {
 	return func(ctx http.Context) error {
 		var in CreateNotificationsIntegrationRequest
-		if err := ctx.Bind(&in.Integration); err != nil {
+		if err := ctx.Bind(&in); err != nil {
 			return err
 		}
 		if err := ctx.BindQuery(&in); err != nil {
@@ -61,7 +61,7 @@ func _KesselNotificationsIntegrationService_CreateNotificationsIntegration0_HTTP
 func _KesselNotificationsIntegrationService_UpdateNotificationsIntegration0_HTTP_Handler(srv KesselNotificationsIntegrationServiceHTTPServer) func(ctx http.Context) error {
 	return func(ctx http.Context) error {
 		var in UpdateNotificationsIntegrationRequest
-		if err := ctx.Bind(&in.Integration); err != nil {
+		if err := ctx.Bind(&in); err != nil {
 			return err
 		}
 		if err := ctx.BindQuery(&in); err != nil {
@@ -125,7 +125,7 @@ func (c *KesselNotificationsIntegrationServiceHTTPClientImpl) CreateNotification
 	path := binding.EncodeURL(pattern, in, false)
 	opts = append(opts, http.Operation(OperationKesselNotificationsIntegrationServiceCreateNotificationsIntegration))
 	opts = append(opts, http.PathTemplate(pattern))
-	err := c.cc.Invoke(ctx, "POST", path, in.Integration, &out, opts...)
+	err := c.cc.Invoke(ctx, "POST", path, in, &out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -151,7 +151,7 @@ func (c *KesselNotificationsIntegrationServiceHTTPClientImpl) UpdateNotification
 	path := binding.EncodeURL(pattern, in, false)
 	opts = append(opts, http.Operation(OperationKesselNotificationsIntegrationServiceUpdateNotificationsIntegration))
 	opts = append(opts, http.PathTemplate(pattern))
-	err := c.cc.Invoke(ctx, "PUT", path, in.Integration, &out, opts...)
+	err := c.cc.Invoke(ctx, "PUT", path, in, &out, opts...)
 	if err != nil {
 		return nil, err
 	}

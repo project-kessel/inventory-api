@@ -39,7 +39,7 @@ func RegisterKesselRhelHostServiceHTTPServer(s *http.Server, srv KesselRhelHostS
 func _KesselRhelHostService_CreateRhelHost0_HTTP_Handler(srv KesselRhelHostServiceHTTPServer) func(ctx http.Context) error {
 	return func(ctx http.Context) error {
 		var in CreateRhelHostRequest
-		if err := ctx.Bind(&in.RhelHost); err != nil {
+		if err := ctx.Bind(&in); err != nil {
 			return err
 		}
 		if err := ctx.BindQuery(&in); err != nil {
@@ -61,7 +61,7 @@ func _KesselRhelHostService_CreateRhelHost0_HTTP_Handler(srv KesselRhelHostServi
 func _KesselRhelHostService_UpdateRhelHost0_HTTP_Handler(srv KesselRhelHostServiceHTTPServer) func(ctx http.Context) error {
 	return func(ctx http.Context) error {
 		var in UpdateRhelHostRequest
-		if err := ctx.Bind(&in.RhelHost); err != nil {
+		if err := ctx.Bind(&in); err != nil {
 			return err
 		}
 		if err := ctx.BindQuery(&in); err != nil {
@@ -125,7 +125,7 @@ func (c *KesselRhelHostServiceHTTPClientImpl) CreateRhelHost(ctx context.Context
 	path := binding.EncodeURL(pattern, in, false)
 	opts = append(opts, http.Operation(OperationKesselRhelHostServiceCreateRhelHost))
 	opts = append(opts, http.PathTemplate(pattern))
-	err := c.cc.Invoke(ctx, "POST", path, in.RhelHost, &out, opts...)
+	err := c.cc.Invoke(ctx, "POST", path, in, &out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -151,7 +151,7 @@ func (c *KesselRhelHostServiceHTTPClientImpl) UpdateRhelHost(ctx context.Context
 	path := binding.EncodeURL(pattern, in, false)
 	opts = append(opts, http.Operation(OperationKesselRhelHostServiceUpdateRhelHost))
 	opts = append(opts, http.PathTemplate(pattern))
-	err := c.cc.Invoke(ctx, "PUT", path, in.RhelHost, &out, opts...)
+	err := c.cc.Invoke(ctx, "PUT", path, in, &out, opts...)
 	if err != nil {
 		return nil, err
 	}

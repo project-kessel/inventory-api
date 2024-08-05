@@ -20,7 +20,7 @@ func Migrate(db *gorm.DB, logger *log.Helper) error {
 		&hosts.Host{},
 		&common.Metadata{},
 		&common.Reporter{},
-		&common.Tag{},
+		&common.Label{},
 		// &k8sclusters.K8sCluster{},
 		// &policies.Policy{},
 		// &relationships.Relationship{},

@@ -2,11 +2,12 @@ package health
 
 import (
 	"context"
+
 	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1"
 )
 
 type HealthService struct {
-	pb.UnimplementedInventoryHealthServiceServer
+	pb.UnimplementedKesselInventoryHealthServiceServer
 }
 
 func NewHealthService() *HealthService {

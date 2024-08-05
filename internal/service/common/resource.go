@@ -5,16 +5,16 @@ import (
 
 	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1"
 	authnapi "github.com/project-kessel/inventory-api/internal/authn/api"
-	models "github.com/project-kessel/inventory-api/internal/biz/common"
+	biz "github.com/project-kessel/inventory-api/internal/biz/common"
 )
 
-func MetadataFromPb(in *pb.Metadata, reporter *pb.ReporterData, identity *authnapi.Identity) *models.Metadata {
-	var tags []*models.Tag
+func MetadataFromPb(in *pb.Metadata, reporter *pb.ReporterData, identity *authnapi.Identity) *biz.Metadata {
+	var tags []*biz.Tag
 	for _, t := range in.Tags {
-		tags = append(tags, &models.Tag{Key: t.Key, Value: t.Value})
+		tags = append(tags, &biz.Tag{Key: t.Key, Value: t.Value})
 	}
 
-	return &models.Metadata{
+	return &biz.Metadata{
 		ID:        in.Id,
 		NaturalId: in.NaturalId,
 
@@ -25,12 +25,12 @@ func MetadataFromPb(in *pb.Metadata, reporter *pb.ReporterData, identity *authna
 		FirstReportedBy: identity.Principal,
 		LastReportedBy:  identity.Principal,
 
-		Reporters: []*models.Reporter{ReporterFromPb(reporter, identity)},
+		Reporters: []*biz.Reporter{ReporterFromPb(reporter, identity)},
 	}
 }
 
-func ReporterFromPb(in *pb.ReporterData, identity *authnapi.Identity) *models.Reporter {
-	return &models.Reporter{
+func ReporterFromPb(in *pb.ReporterData, identity *authnapi.Identity) *biz.Reporter {
+	return &biz.Reporter{
 		ReporterID:      identity.Principal,
 		ReporterType:    in.ReporterType.String(),
 		ReporterVersion: in.ReporterVersion,
@@ -42,7 +42,7 @@ func ReporterFromPb(in *pb.ReporterData, identity *authnapi.Identity) *models.Re
 	}
 }
 
-func MetadataFromModel(in *models.Metadata) *pb.Metadata {
+func MetadataFromModel(in *biz.Metadata) *pb.Metadata {
 	var tags []*pb.ResourceTag
 	for _, t := range in.Tags {
 		tags = append(tags, &pb.ResourceTag{Key: t.Key, Value: t.Value})
@@ -60,7 +60,7 @@ func MetadataFromModel(in *models.Metadata) *pb.Metadata {
 	}
 }
 
-func ReportersFromModel(in []*models.Reporter) []*pb.ReporterData {
+func ReportersFromModel(in []*biz.Reporter) []*pb.ReporterData {
 	var reporters []*pb.ReporterData
 	for _, r := range in {
 		reporters = append(reporters, &pb.ReporterData{

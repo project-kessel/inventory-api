@@ -6,6 +6,10 @@ import (
 	"github.com/go-kratos/kratos/v2/log"
 )
 
+const (
+	ResourceType = "rhel-host"
+)
+
 // HostRepo is a Host repo.
 type HostRepo interface {
 	Save(context.Context, *Host) (*Host, error)

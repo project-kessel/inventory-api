@@ -6,6 +6,10 @@ import (
 	"github.com/go-kratos/kratos/v2/log"
 )
 
+const (
+	ResourceType = "policy"
+)
+
 type Policy struct {
 	Hello string
 }

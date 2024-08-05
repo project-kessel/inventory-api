@@ -13,10 +13,6 @@ import (
 	conv "github.com/project-kessel/inventory-api/internal/service/common"
 )
 
-const (
-	resource_type = "notificationsintegration"
-)
-
 // NotificationsIntegrationsService handles requests for Notifications Integrations
 type NotificationsIntegrationsService struct {
 	pb.UnimplementedNotificationsIntegrationsServiceServer
@@ -37,8 +33,8 @@ func (c *NotificationsIntegrationsService) CreateNotificationsIntegration(ctx co
 	}
 
 	//TODO: refactor / abstract resource type strings
-	if !strings.EqualFold(r.Integration.Metadata.ResourceType, resource_type) {
-		return nil, errors.BadRequest("BADREQUEST", fmt.Sprintf("incorrect resource type: expected %s", resource_type))
+	if !strings.EqualFold(r.Integration.Metadata.ResourceType, biz.ResourceType) {
+		return nil, errors.BadRequest("BADREQUEST", fmt.Sprintf("incorrect resource type: expected %s", biz.ResourceType))
 	}
 
 	identity, err := middleware.GetIdentity(ctx)

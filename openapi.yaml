@@ -6,6 +6,43 @@ info:
     title: ""
     version: 0.0.1
 paths:
+    /api/inventory/v1/livez:
+        get:
+            tags:
+                - InventoryHealthService
+            operationId: InventoryHealthService_GetLivez
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/GetLivezResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+    /api/inventory/v1/readyz:
+        get:
+            tags:
+                - InventoryHealthService
+            operationId: InventoryHealthService_GetReadyz
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/GetReadyzResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+    /api/inventory/v1beta1/hosts:
     /api/inventory/v1beta1/k8sClusters:
         post:
             tags:
@@ -861,6 +898,30 @@ components:
         kessel.inventory.v1beta1.DeleteRhelHostResponse:
             type: object
             properties: {}
+        GetLivezResponse:
+            type: object
+            properties:
+                status:
+                    type: string
+                code:
+                    type: integer
+                    format: uint32
+        GetReadyzResponse:
+            type: object
+            properties:
+                status:
+                    type: string
+                code:
+                    type: integer
+                    format: uint32
+        GoogleProtobufAny:
+            type: object
+            properties:
+                '@type':
+                    type: string
+                    description: The type of the serialized message.
+            additionalProperties: true
+            description: Contains an arbitrary serialized message along with a @type that describes the type of the serialized message.
         kessel.inventory.v1beta1.K8sCluster:
             required:
                 - metadata
@@ -1133,3 +1194,4 @@ tags:
     - name: KesselPolicyRelationshipService
     - name: KesselPolicyService
     - name: KesselRhelHostService
+    - name: InventoryHealthService

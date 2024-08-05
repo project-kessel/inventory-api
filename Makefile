@@ -89,6 +89,11 @@ inventory-up:
 inventory-down:
 	./scripts/stop-inventory.sh
 
+.PHONY: run
+# run api locally
+run: build
+	go run main.go serve --config .inventory-api.yaml
+
 help:
 # show help
 	@echo ''

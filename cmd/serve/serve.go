@@ -3,6 +3,7 @@ package serve
 import (
 	"context"
 	"fmt"
+	"github.com/project-kessel/inventory-api/internal/service/health"
 	"os"
 	"os/signal"
 	"syscall"
@@ -21,6 +22,7 @@ import (
 	"github.com/project-kessel/inventory-api/internal/server"
 	"github.com/project-kessel/inventory-api/internal/storage"
 
+	hb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1"
 	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1"
 
 	hostsrepo "github.com/project-kessel/inventory-api/internal/data/hosts"
@@ -174,6 +176,10 @@ func NewCommand(
 			relationships_service := relationshipssvc.New(relationships_controller)
 			pb.RegisterRelationshipsServiceServer(server.GrpcServer, relationships_service)
 			pb.RegisterRelationshipsServiceHTTPServer(server.HttpServer, relationships_service)
+
+			health_service := health.NewHealthService()
+			hb.RegisterInventoryHealthServiceServer(server.GrpcServer, health_service)
+			hb.RegisterInventoryHealthServiceHTTPServer(server.HttpServer, health_service)
 
 			srvErrs := make(chan error)
 			go func() {

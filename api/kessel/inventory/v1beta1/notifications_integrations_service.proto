@@ -49,7 +49,7 @@ message DeleteNotificationsIntegrationRequest {
 
 message DeleteNotificationsIntegrationResponse {}
 
-service NotificationsIntegrationsService {
+service KesselNotificationsIntegrationService {
   rpc CreateNotificationsIntegration(CreateNotificationsIntegrationRequest) returns (CreateNotificationsIntegrationResponse) {
     option (google.api.http) = {
       post : "/api/inventory/v1beta1/notificationsIntegrations"

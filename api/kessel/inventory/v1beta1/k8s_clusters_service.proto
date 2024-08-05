@@ -38,7 +38,7 @@ message DeleteK8sClusterRequest {
 
 message DeleteK8sClusterResponse {}
 
-service K8sClustersService {
+service KesselK8sClusterService {
   rpc CreateK8sCluster(CreateK8sClusterRequest) returns (CreateK8sClusterResponse) {
     option (google.api.http) = {
       post : "/api/inventory/v1beta1/k8sClusters"

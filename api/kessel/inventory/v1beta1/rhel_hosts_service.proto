@@ -49,7 +49,7 @@ message DeleteRhelHostRequest {
 
 message DeleteRhelHostResponse {}
 
-service HostsService {
+service KesselRhelHostService {
   rpc CreateRhelHost(CreateRhelHostRequest) returns (CreateRhelHostResponse) {
     option (google.api.http) = {
       post : "/api/inventory/v1beta1/rhelHosts"

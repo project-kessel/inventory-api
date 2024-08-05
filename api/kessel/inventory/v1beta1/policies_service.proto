@@ -38,7 +38,7 @@ message DeletePolicyRequest {
 
 message DeletePolicyResponse {}
 
-service PoliciesService {
+service KesselPolicyService {
   rpc CreatePolicy(CreatePolicyRequest) returns (CreatePolicyResponse) {
     option (google.api.http) = {
       post : "/api/inventory/v1beta1/policies"

@@ -45,7 +45,7 @@ message DeleteResourceRelationshipByUrnRequest {
 
 message DeleteResourceRelationshipByUrnResponse {}
 
-service RelationshipsService {
+service KesselPolicyRelationshipService {
   rpc CreatePolicyRelationship(CreatePolicyRelationshipRequest) returns (CreatePolicyRelationshipResponse) {
     option (google.api.http) = {
       post : "/api/inventory/v1beta1/policyRelationships"

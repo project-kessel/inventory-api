@@ -53,14 +53,14 @@ service KesselNotificationsIntegrationService {
   rpc CreateNotificationsIntegration(CreateNotificationsIntegrationRequest) returns (CreateNotificationsIntegrationResponse) {
     option (google.api.http) = {
       post : "/api/inventory/v1beta1/notificationsIntegrations"
-      body : "integration"
+      body : "*"
     };
   };
 
   rpc UpdateNotificationsIntegration(UpdateNotificationsIntegrationRequest) returns (UpdateNotificationsIntegrationResponse) {
     option (google.api.http) = {
       put : "/api/inventory/v1beta1/notificationsIntegrations/{resource}"
-      body : "integration"
+      body : "*"
     };
   };
 

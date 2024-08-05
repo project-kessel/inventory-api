@@ -42,14 +42,14 @@ service KesselPolicyService {
   rpc CreatePolicy(CreatePolicyRequest) returns (CreatePolicyResponse) {
     option (google.api.http) = {
       post : "/api/inventory/v1beta1/policies"
-      body : "policy"
+      body : "*"
     };
   };
 
   rpc UpdatePolicy(UpdatePolicyRequest) returns (UpdatePolicyResponse) {
     option (google.api.http) = {
       put : "/api/inventory/v1beta1/policies/{resource}"
-      body : "policy"
+      body : "*"
     };
   };
 

@@ -49,14 +49,14 @@ service KesselPolicyRelationshipService {
   rpc CreatePolicyRelationship(CreatePolicyRelationshipRequest) returns (CreatePolicyRelationshipResponse) {
     option (google.api.http) = {
       post : "/api/inventory/v1beta1/policyRelationships"
-      body : "policyRelationship"
+      body : "*"
     };
   };
 
   rpc UpdateResourceRelationshipByUrnHs(UpdateResourceRelationshipByUrnHsRequest) returns (UpdateResourceRelationshipByUrnHsResponse) {
     option (google.api.http) = {
       put: "/api/inventory/v1beta1/policyRelationships"
-      body : "policyRelationship"
+      body : "*"
     };
   };
 

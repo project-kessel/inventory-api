@@ -53,14 +53,14 @@ service KesselRhelHostService {
   rpc CreateRhelHost(CreateRhelHostRequest) returns (CreateRhelHostResponse) {
     option (google.api.http) = {
       post : "/api/inventory/v1beta1/rhelHosts"
-      body : "rhelHost"
+      body : "*"
     };
   };
 
   rpc UpdateRhelHost(UpdateRhelHostRequest) returns (UpdateRhelHostResponse) {
     option (google.api.http) = {
       put : "/api/inventory/v1beta1/rhelHosts/{resource}"
-      body : "rhelHost"
+      body : "*"
     };
   };
 

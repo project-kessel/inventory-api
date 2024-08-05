@@ -1,6 +1,7 @@
 package http
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"io"
@@ -76,7 +77,6 @@ func (c *Config) Complete() (CompletedConfig, error) {
 	} else {
 		tlsConfig = t
 	}
-
 	c.TLSConfig = tlsConfig
 	opts := []http.ServerOption{
 		http.Address(c.Options.Addr),
@@ -89,4 +89,15 @@ func (c *Config) Complete() (CompletedConfig, error) {
 		Options:       c.Options,
 		ServerOptions: opts,
 	}}, nil
+}
+
+func NewWhiteListMatcher(ctx context.Context, operation string) bool {
+	whiteList := make(map[string]struct{})
+	whiteList["/api.kessel.inventory.v1.InventoryHealthService/GetReadyz"] = struct{}{}
+	whiteList["/api.kessel.inventory.v1.InventoryHealthService/GetLivez"] = struct{}{}
+	whiteList["/grpc.health.v1.Health/Check"] = struct{}{}
+	if _, ok := whiteList[operation]; ok {
+		return false
+	}
+	return true
 }

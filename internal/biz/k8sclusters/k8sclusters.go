@@ -6,6 +6,10 @@ import (
 	"github.com/go-kratos/kratos/v2/log"
 )
 
+const (
+	ResourceType = "k8s-cluster"
+)
+
 type K8sCluster struct {
 	Hello string
 }

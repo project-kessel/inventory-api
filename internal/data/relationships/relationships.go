@@ -2,11 +2,12 @@ package relationships
 
 import (
 	"context"
+
 	"gorm.io/gorm"
 
 	"github.com/go-kratos/kratos/v2/log"
 
-	models "github.com/project-kessel/inventory-api/internal/biz/relationships"
+	biz "github.com/project-kessel/inventory-api/internal/biz/relationships"
 )
 
 type relationshipsRepo struct {
@@ -21,11 +22,11 @@ func New(g *gorm.DB, l *log.Helper) *relationshipsRepo {
 	}
 }
 
-func (r *relationshipsRepo) Save(context.Context, *models.Relationship) (*models.Relationship, error) {
+func (r *relationshipsRepo) Save(context.Context, *biz.Relationship) (*biz.Relationship, error) {
 	return nil, nil
 }
 
-func (r *relationshipsRepo) Update(context.Context, *models.Relationship) (*models.Relationship, error) {
+func (r *relationshipsRepo) Update(context.Context, *biz.Relationship) (*biz.Relationship, error) {
 	return nil, nil
 }
 
@@ -33,10 +34,10 @@ func (r *relationshipsRepo) Delete(context.Context, int64) error {
 	return nil
 }
 
-func (r *relationshipsRepo) FindByID(context.Context, int64) (*models.Relationship, error) {
+func (r *relationshipsRepo) FindByID(context.Context, int64) (*biz.Relationship, error) {
 	return nil, nil
 }
 
-func (r *relationshipsRepo) ListAll(context.Context) ([]*models.Relationship, error) {
+func (r *relationshipsRepo) ListAll(context.Context) ([]*biz.Relationship, error) {
 	return nil, nil
 }

@@ -3,10 +3,11 @@ package serve
 import (
 	"context"
 	"fmt"
-	"github.com/project-kessel/inventory-api/internal/service/health"
 	"os"
 	"os/signal"
 	"syscall"
+
+	"github.com/project-kessel/inventory-api/internal/service/health"
 
 	"github.com/spf13/cobra"
 	"gorm.io/gorm"
@@ -178,8 +179,8 @@ func NewCommand(
 			pb.RegisterKesselPolicyRelationshipServiceHTTPServer(server.HttpServer, relationships_service)
 
 			health_service := health.NewHealthService()
-			hb.RegisterInventoryHealthServiceServer(server.GrpcServer, health_service)
-			hb.RegisterInventoryHealthServiceHTTPServer(server.HttpServer, health_service)
+			hb.RegisterKesselInventoryHealthServiceServer(server.GrpcServer, health_service)
+			hb.RegisterKesselInventoryHealthServiceHTTPServer(server.HttpServer, health_service)
 
 			srvErrs := make(chan error)
 			go func() {

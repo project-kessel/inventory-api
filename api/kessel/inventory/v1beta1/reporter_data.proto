@@ -11,15 +11,15 @@ option java_package = "org.project_kessel.api.inventory.v1beta1";
 
 message ReporterData {
 
-  enum ReporterTypeEnum {
-    REPORTER_TYPE_ENUM_UNSPECIFIED = 0;
-    REPORTER_TYPE_ENUM_ACM = 1;
-    REPORTER_TYPE_ENUM_HBI = 2;
-    REPORTER_TYPE_ENUM_OCM = 3;
-    REPORTER_TYPE_ENUM_OTHER = 4;
+  enum ReporterType {
+    REPORTER_TYPE_UNSPECIFIED = 0;
+    REPORTER_TYPE_ACM = 1;
+    REPORTER_TYPE_HBI = 2;
+    REPORTER_TYPE_OCM = 3;
+    REPORTER_TYPE_OTHER = 4;
   }
 
-  ReporterTypeEnum reporter_type = 245778392;
+  ReporterType reporter_type = 245778392;
 
   // The ID of the instance of the reporter. This is derived from the
   // authentication mechanism, i.e. authentication token.

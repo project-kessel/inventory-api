@@ -12,14 +12,14 @@ message PolicyDetail {
   bool disabled = 270940796;
 
   // The kind of policy
-  enum SeverityEnum {
-    SEVERITY_ENUM_UNSPECIFIED = 0;
-    SEVERITY_ENUM_LOW = 1;
-    SEVERITY_ENUM_MEDIUM = 2;
-    SEVERITY_ENUM_HIGH = 3;
-    SEVERITY_ENUM_CRITICAL = 4;
-    SEVERITY_ENUM_OTHER = 5;
+  enum Severity {
+    SEVERITY_UNSPECIFIED = 0;
+    SEVERITY_LOW = 1;
+    SEVERITY_MEDIUM = 2;
+    SEVERITY_HIGH = 3;
+    SEVERITY_CRITICAL = 4;
+    SEVERITY_OTHER = 5;
   }
 
-  SeverityEnum severity = 404558591;
+  Severity severity = 404558591;
 }

@@ -52,21 +52,21 @@ message DeleteRhelHostResponse {}
 service HostsService {
   rpc CreateRhelHost(CreateRhelHostRequest) returns (CreateRhelHostResponse) {
     option (google.api.http) = {
-      post : "/api/inventory/v1beta1/hosts"
-      body : "host"
+      post : "/api/inventory/v1beta1/rhelHosts"
+      body : "rhelHost"
     };
   };
 
   rpc UpdateRhelHost(UpdateRhelHostRequest) returns (UpdateRhelHostResponse) {
     option (google.api.http) = {
-      put : "/api/inventory/v1beta1/hosts/{resource}"
-      body : "host"
+      put : "/api/inventory/v1beta1/rhelHosts/{resource}"
+      body : "rhelHost"
     };
   };
 
   rpc DeleteRhelHost(DeleteRhelHostRequest) returns (DeleteRhelHostResponse) {
     option (google.api.http) = {
-      delete : "/api/inventory/v1beta1/hosts/{resource}"
+      delete : "/api/inventory/v1beta1/rhelHosts/{resource}"
     };
   };
 }

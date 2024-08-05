@@ -52,21 +52,21 @@ message DeleteNotificationsIntegrationResponse {}
 service NotificationsIntegrationsService {
   rpc CreateNotificationsIntegration(CreateNotificationsIntegrationRequest) returns (CreateNotificationsIntegrationResponse) {
     option (google.api.http) = {
-      post : "/api/inventory/v1beta1/notificationsintegrations"
+      post : "/api/inventory/v1beta1/notificationsIntegrations"
       body : "integration"
     };
   };
 
   rpc UpdateNotificationsIntegration(UpdateNotificationsIntegrationRequest) returns (UpdateNotificationsIntegrationResponse) {
     option (google.api.http) = {
-      put : "/api/inventory/v1beta1/notificationsintegrations/{resource}"
+      put : "/api/inventory/v1beta1/notificationsIntegrations/{resource}"
       body : "integration"
     };
   };
 
   rpc DeleteNotificationsIntegration(DeleteNotificationsIntegrationRequest) returns (DeleteNotificationsIntegrationResponse) {
     option (google.api.http) = {
-      delete : "/api/inventory/v1beta1/notificationsintegrations/{resource}"
+      delete : "/api/inventory/v1beta1/notificationsIntegrations/{resource}"
     };
   };
 }

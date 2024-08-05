@@ -48,21 +48,21 @@ message DeleteResourceRelationshipByUrnResponse {}
 service RelationshipsService {
   rpc CreatePolicyRelationship(CreatePolicyRelationshipRequest) returns (CreatePolicyRelationshipResponse) {
     option (google.api.http) = {
-      post : "/api/inventory/v1beta1/policy_relationships"
+      post : "/api/inventory/v1beta1/policyRelationships"
       body : "policyRelationship"
     };
   };
 
   rpc UpdateResourceRelationshipByUrnHs(UpdateResourceRelationshipByUrnHsRequest) returns (UpdateResourceRelationshipByUrnHsResponse) {
     option (google.api.http) = {
-      put: "/api/inventory/v1beta1/policy_relationships"
+      put: "/api/inventory/v1beta1/policyRelationships"
       body : "policyRelationship"
     };
   };
 
   rpc DeleteResourceRelationshipByUrn(DeleteResourceRelationshipByUrnRequest) returns (DeleteResourceRelationshipByUrnResponse) {
     option (google.api.http) = {
-      delete: "/api/inventory/v1beta1/policy_relationships"
+      delete: "/api/inventory/v1beta1/policyRelationships"
     };
   };
 }

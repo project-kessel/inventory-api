@@ -19,33 +19,33 @@ var _ = binding.EncodeURL
 
 const _ = http.SupportPackageIsVersion1
 
-const OperationHostsServiceCreateRhelHost = "/kessel.inventory.v1beta1.HostsService/CreateRhelHost"
-const OperationHostsServiceDeleteRhelHost = "/kessel.inventory.v1beta1.HostsService/DeleteRhelHost"
-const OperationHostsServiceUpdateRhelHost = "/kessel.inventory.v1beta1.HostsService/UpdateRhelHost"
+const OperationKesselRhelHostServiceCreateRhelHost = "/kessel.inventory.v1beta1.KesselRhelHostService/CreateRhelHost"
+const OperationKesselRhelHostServiceDeleteRhelHost = "/kessel.inventory.v1beta1.KesselRhelHostService/DeleteRhelHost"
+const OperationKesselRhelHostServiceUpdateRhelHost = "/kessel.inventory.v1beta1.KesselRhelHostService/UpdateRhelHost"
 
-type HostsServiceHTTPServer interface {
+type KesselRhelHostServiceHTTPServer interface {
 	CreateRhelHost(context.Context, *CreateRhelHostRequest) (*CreateRhelHostResponse, error)
 	DeleteRhelHost(context.Context, *DeleteRhelHostRequest) (*DeleteRhelHostResponse, error)
 	UpdateRhelHost(context.Context, *UpdateRhelHostRequest) (*UpdateRhelHostResponse, error)
 }
 
-func RegisterHostsServiceHTTPServer(s *http.Server, srv HostsServiceHTTPServer) {
+func RegisterKesselRhelHostServiceHTTPServer(s *http.Server, srv KesselRhelHostServiceHTTPServer) {
 	r := s.Route("/")
-	r.POST("/api/inventory/v1beta1/hosts", _HostsService_CreateRhelHost0_HTTP_Handler(srv))
-	r.PUT("/api/inventory/v1beta1/hosts/{resource}", _HostsService_UpdateRhelHost0_HTTP_Handler(srv))
-	r.DELETE("/api/inventory/v1beta1/hosts/{resource}", _HostsService_DeleteRhelHost0_HTTP_Handler(srv))
+	r.POST("/api/inventory/v1beta1/rhelHosts", _KesselRhelHostService_CreateRhelHost0_HTTP_Handler(srv))
+	r.PUT("/api/inventory/v1beta1/rhelHosts/{resource}", _KesselRhelHostService_UpdateRhelHost0_HTTP_Handler(srv))
+	r.DELETE("/api/inventory/v1beta1/rhelHosts/{resource}", _KesselRhelHostService_DeleteRhelHost0_HTTP_Handler(srv))
 }
 
-func _HostsService_CreateRhelHost0_HTTP_Handler(srv HostsServiceHTTPServer) func(ctx http.Context) error {
+func _KesselRhelHostService_CreateRhelHost0_HTTP_Handler(srv KesselRhelHostServiceHTTPServer) func(ctx http.Context) error {
 	return func(ctx http.Context) error {
 		var in CreateRhelHostRequest
-		if err := ctx.Bind(&in.Host); err != nil {
+		if err := ctx.Bind(&in.RhelHost); err != nil {
 			return err
 		}
 		if err := ctx.BindQuery(&in); err != nil {
 			return err
 		}
-		http.SetOperation(ctx, OperationHostsServiceCreateRhelHost)
+		http.SetOperation(ctx, OperationKesselRhelHostServiceCreateRhelHost)
 		h := ctx.Middleware(func(ctx context.Context, req interface{}) (interface{}, error) {
 			return srv.CreateRhelHost(ctx, req.(*CreateRhelHostRequest))
 		})
@@ -58,10 +58,10 @@ func _HostsService_CreateRhelHost0_HTTP_Handler(srv HostsServiceHTTPServer) func
 	}
 }
 
-func _HostsService_UpdateRhelHost0_HTTP_Handler(srv HostsServiceHTTPServer) func(ctx http.Context) error {
+func _KesselRhelHostService_UpdateRhelHost0_HTTP_Handler(srv KesselRhelHostServiceHTTPServer) func(ctx http.Context) error {
 	return func(ctx http.Context) error {
 		var in UpdateRhelHostRequest
-		if err := ctx.Bind(&in.Host); err != nil {
+		if err := ctx.Bind(&in.RhelHost); err != nil {
 			return err
 		}
 		if err := ctx.BindQuery(&in); err != nil {
@@ -70,7 +70,7 @@ func _HostsService_UpdateRhelHost0_HTTP_Handler(srv HostsServiceHTTPServer) func
 		if err := ctx.BindVars(&in); err != nil {
 			return err
 		}
-		http.SetOperation(ctx, OperationHostsServiceUpdateRhelHost)
+		http.SetOperation(ctx, OperationKesselRhelHostServiceUpdateRhelHost)
 		h := ctx.Middleware(func(ctx context.Context, req interface{}) (interface{}, error) {
 			return srv.UpdateRhelHost(ctx, req.(*UpdateRhelHostRequest))
 		})
@@ -83,7 +83,7 @@ func _HostsService_UpdateRhelHost0_HTTP_Handler(srv HostsServiceHTTPServer) func
 	}
 }
 
-func _HostsService_DeleteRhelHost0_HTTP_Handler(srv HostsServiceHTTPServer) func(ctx http.Context) error {
+func _KesselRhelHostService_DeleteRhelHost0_HTTP_Handler(srv KesselRhelHostServiceHTTPServer) func(ctx http.Context) error {
 	return func(ctx http.Context) error {
 		var in DeleteRhelHostRequest
 		if err := ctx.BindQuery(&in); err != nil {
@@ -92,7 +92,7 @@ func _HostsService_DeleteRhelHost0_HTTP_Handler(srv HostsServiceHTTPServer) func
 		if err := ctx.BindVars(&in); err != nil {
 			return err
 		}
-		http.SetOperation(ctx, OperationHostsServiceDeleteRhelHost)
+		http.SetOperation(ctx, OperationKesselRhelHostServiceDeleteRhelHost)
 		h := ctx.Middleware(func(ctx context.Context, req interface{}) (interface{}, error) {
 			return srv.DeleteRhelHost(ctx, req.(*DeleteRhelHostRequest))
 		})
@@ -105,38 +105,38 @@ func _HostsService_DeleteRhelHost0_HTTP_Handler(srv HostsServiceHTTPServer) func
 	}
 }
 
-type HostsServiceHTTPClient interface {
+type KesselRhelHostServiceHTTPClient interface {
 	CreateRhelHost(ctx context.Context, req *CreateRhelHostRequest, opts ...http.CallOption) (rsp *CreateRhelHostResponse, err error)
 	DeleteRhelHost(ctx context.Context, req *DeleteRhelHostRequest, opts ...http.CallOption) (rsp *DeleteRhelHostResponse, err error)
 	UpdateRhelHost(ctx context.Context, req *UpdateRhelHostRequest, opts ...http.CallOption) (rsp *UpdateRhelHostResponse, err error)
 }
 
-type HostsServiceHTTPClientImpl struct {
+type KesselRhelHostServiceHTTPClientImpl struct {
 	cc *http.Client
 }
 
-func NewHostsServiceHTTPClient(client *http.Client) HostsServiceHTTPClient {
-	return &HostsServiceHTTPClientImpl{client}
+func NewKesselRhelHostServiceHTTPClient(client *http.Client) KesselRhelHostServiceHTTPClient {
+	return &KesselRhelHostServiceHTTPClientImpl{client}
 }
 
-func (c *HostsServiceHTTPClientImpl) CreateRhelHost(ctx context.Context, in *CreateRhelHostRequest, opts ...http.CallOption) (*CreateRhelHostResponse, error) {
+func (c *KesselRhelHostServiceHTTPClientImpl) CreateRhelHost(ctx context.Context, in *CreateRhelHostRequest, opts ...http.CallOption) (*CreateRhelHostResponse, error) {
 	var out CreateRhelHostResponse
-	pattern := "/api/inventory/v1beta1/hosts"
+	pattern := "/api/inventory/v1beta1/rhelHosts"
 	path := binding.EncodeURL(pattern, in, false)
-	opts = append(opts, http.Operation(OperationHostsServiceCreateRhelHost))
+	opts = append(opts, http.Operation(OperationKesselRhelHostServiceCreateRhelHost))
 	opts = append(opts, http.PathTemplate(pattern))
-	err := c.cc.Invoke(ctx, "POST", path, in.Host, &out, opts...)
+	err := c.cc.Invoke(ctx, "POST", path, in.RhelHost, &out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return &out, nil
 }
 
-func (c *HostsServiceHTTPClientImpl) DeleteRhelHost(ctx context.Context, in *DeleteRhelHostRequest, opts ...http.CallOption) (*DeleteRhelHostResponse, error) {
+func (c *KesselRhelHostServiceHTTPClientImpl) DeleteRhelHost(ctx context.Context, in *DeleteRhelHostRequest, opts ...http.CallOption) (*DeleteRhelHostResponse, error) {
 	var out DeleteRhelHostResponse
-	pattern := "/api/inventory/v1beta1/hosts/{resource}"
+	pattern := "/api/inventory/v1beta1/rhelHosts/{resource}"
 	path := binding.EncodeURL(pattern, in, true)
-	opts = append(opts, http.Operation(OperationHostsServiceDeleteRhelHost))
+	opts = append(opts, http.Operation(OperationKesselRhelHostServiceDeleteRhelHost))
 	opts = append(opts, http.PathTemplate(pattern))
 	err := c.cc.Invoke(ctx, "DELETE", path, nil, &out, opts...)
 	if err != nil {
@@ -145,13 +145,13 @@ func (c *HostsServiceHTTPClientImpl) DeleteRhelHost(ctx context.Context, in *Del
 	return &out, nil
 }
 
-func (c *HostsServiceHTTPClientImpl) UpdateRhelHost(ctx context.Context, in *UpdateRhelHostRequest, opts ...http.CallOption) (*UpdateRhelHostResponse, error) {
+func (c *KesselRhelHostServiceHTTPClientImpl) UpdateRhelHost(ctx context.Context, in *UpdateRhelHostRequest, opts ...http.CallOption) (*UpdateRhelHostResponse, error) {
 	var out UpdateRhelHostResponse
-	pattern := "/api/inventory/v1beta1/hosts/{resource}"
+	pattern := "/api/inventory/v1beta1/rhelHosts/{resource}"
 	path := binding.EncodeURL(pattern, in, false)
-	opts = append(opts, http.Operation(OperationHostsServiceUpdateRhelHost))
+	opts = append(opts, http.Operation(OperationKesselRhelHostServiceUpdateRhelHost))
 	opts = append(opts, http.PathTemplate(pattern))
-	err := c.cc.Invoke(ctx, "PUT", path, in.Host, &out, opts...)
+	err := c.cc.Invoke(ctx, "PUT", path, in.RhelHost, &out, opts...)
 	if err != nil {
 		return nil, err
 	}

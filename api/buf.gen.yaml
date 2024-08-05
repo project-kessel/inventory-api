@@ -11,11 +11,11 @@ plugins:
     opt: paths=source_relative
   - remote: buf.build/community/google-gnostic-openapi
     out: ../
-    opt: 
+    opt:
       - fq_schema_naming=true
       - default_response=false
   - local: protoc-gen-validate
-    opt: 
+    opt:
       - paths=source_relative
       - lang=go
     out: .

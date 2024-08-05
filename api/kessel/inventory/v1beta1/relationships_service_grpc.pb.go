@@ -19,177 +19,178 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	RelationshipsService_CreatePolicyRelationship_FullMethodName          = "/kessel.inventory.v1beta1.RelationshipsService/CreatePolicyRelationship"
-	RelationshipsService_UpdateResourceRelationshipByUrnHs_FullMethodName = "/kessel.inventory.v1beta1.RelationshipsService/UpdateResourceRelationshipByUrnHs"
-	RelationshipsService_DeleteResourceRelationshipByUrn_FullMethodName   = "/kessel.inventory.v1beta1.RelationshipsService/DeleteResourceRelationshipByUrn"
+	KesselPolicyRelationshipService_CreatePolicyRelationship_FullMethodName          = "/kessel.inventory.v1beta1.KesselPolicyRelationshipService/CreatePolicyRelationship"
+	KesselPolicyRelationshipService_UpdateResourceRelationshipByUrnHs_FullMethodName = "/kessel.inventory.v1beta1.KesselPolicyRelationshipService/UpdateResourceRelationshipByUrnHs"
+	KesselPolicyRelationshipService_DeleteResourceRelationshipByUrn_FullMethodName   = "/kessel.inventory.v1beta1.KesselPolicyRelationshipService/DeleteResourceRelationshipByUrn"
 )
 
-// RelationshipsServiceClient is the client API for RelationshipsService service.
+// KesselPolicyRelationshipServiceClient is the client API for KesselPolicyRelationshipService service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
-type RelationshipsServiceClient interface {
+type KesselPolicyRelationshipServiceClient interface {
 	CreatePolicyRelationship(ctx context.Context, in *CreatePolicyRelationshipRequest, opts ...grpc.CallOption) (*CreatePolicyRelationshipResponse, error)
 	UpdateResourceRelationshipByUrnHs(ctx context.Context, in *UpdateResourceRelationshipByUrnHsRequest, opts ...grpc.CallOption) (*UpdateResourceRelationshipByUrnHsResponse, error)
 	DeleteResourceRelationshipByUrn(ctx context.Context, in *DeleteResourceRelationshipByUrnRequest, opts ...grpc.CallOption) (*DeleteResourceRelationshipByUrnResponse, error)
 }
 
-type relationshipsServiceClient struct {
+type kesselPolicyRelationshipServiceClient struct {
 	cc grpc.ClientConnInterface
 }
 
-func NewRelationshipsServiceClient(cc grpc.ClientConnInterface) RelationshipsServiceClient {
-	return &relationshipsServiceClient{cc}
+func NewKesselPolicyRelationshipServiceClient(cc grpc.ClientConnInterface) KesselPolicyRelationshipServiceClient {
+	return &kesselPolicyRelationshipServiceClient{cc}
 }
 
-func (c *relationshipsServiceClient) CreatePolicyRelationship(ctx context.Context, in *CreatePolicyRelationshipRequest, opts ...grpc.CallOption) (*CreatePolicyRelationshipResponse, error) {
+func (c *kesselPolicyRelationshipServiceClient) CreatePolicyRelationship(ctx context.Context, in *CreatePolicyRelationshipRequest, opts ...grpc.CallOption) (*CreatePolicyRelationshipResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(CreatePolicyRelationshipResponse)
-	err := c.cc.Invoke(ctx, RelationshipsService_CreatePolicyRelationship_FullMethodName, in, out, cOpts...)
+	err := c.cc.Invoke(ctx, KesselPolicyRelationshipService_CreatePolicyRelationship_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *relationshipsServiceClient) UpdateResourceRelationshipByUrnHs(ctx context.Context, in *UpdateResourceRelationshipByUrnHsRequest, opts ...grpc.CallOption) (*UpdateResourceRelationshipByUrnHsResponse, error) {
+func (c *kesselPolicyRelationshipServiceClient) UpdateResourceRelationshipByUrnHs(ctx context.Context, in *UpdateResourceRelationshipByUrnHsRequest, opts ...grpc.CallOption) (*UpdateResourceRelationshipByUrnHsResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(UpdateResourceRelationshipByUrnHsResponse)
-	err := c.cc.Invoke(ctx, RelationshipsService_UpdateResourceRelationshipByUrnHs_FullMethodName, in, out, cOpts...)
+	err := c.cc.Invoke(ctx, KesselPolicyRelationshipService_UpdateResourceRelationshipByUrnHs_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *relationshipsServiceClient) DeleteResourceRelationshipByUrn(ctx context.Context, in *DeleteResourceRelationshipByUrnRequest, opts ...grpc.CallOption) (*DeleteResourceRelationshipByUrnResponse, error) {
+func (c *kesselPolicyRelationshipServiceClient) DeleteResourceRelationshipByUrn(ctx context.Context, in *DeleteResourceRelationshipByUrnRequest, opts ...grpc.CallOption) (*DeleteResourceRelationshipByUrnResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(DeleteResourceRelationshipByUrnResponse)
-	err := c.cc.Invoke(ctx, RelationshipsService_DeleteResourceRelationshipByUrn_FullMethodName, in, out, cOpts...)
+	err := c.cc.Invoke(ctx, KesselPolicyRelationshipService_DeleteResourceRelationshipByUrn_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-// RelationshipsServiceServer is the server API for RelationshipsService service.
-// All implementations must embed UnimplementedRelationshipsServiceServer
+// KesselPolicyRelationshipServiceServer is the server API for KesselPolicyRelationshipService service.
+// All implementations must embed UnimplementedKesselPolicyRelationshipServiceServer
 // for forward compatibility.
-type RelationshipsServiceServer interface {
+type KesselPolicyRelationshipServiceServer interface {
 	CreatePolicyRelationship(context.Context, *CreatePolicyRelationshipRequest) (*CreatePolicyRelationshipResponse, error)
 	UpdateResourceRelationshipByUrnHs(context.Context, *UpdateResourceRelationshipByUrnHsRequest) (*UpdateResourceRelationshipByUrnHsResponse, error)
 	DeleteResourceRelationshipByUrn(context.Context, *DeleteResourceRelationshipByUrnRequest) (*DeleteResourceRelationshipByUrnResponse, error)
-	mustEmbedUnimplementedRelationshipsServiceServer()
+	mustEmbedUnimplementedKesselPolicyRelationshipServiceServer()
 }
 
-// UnimplementedRelationshipsServiceServer must be embedded to have
+// UnimplementedKesselPolicyRelationshipServiceServer must be embedded to have
 // forward compatible implementations.
 //
 // NOTE: this should be embedded by value instead of pointer to avoid a nil
 // pointer dereference when methods are called.
-type UnimplementedRelationshipsServiceServer struct{}
+type UnimplementedKesselPolicyRelationshipServiceServer struct{}
 
-func (UnimplementedRelationshipsServiceServer) CreatePolicyRelationship(context.Context, *CreatePolicyRelationshipRequest) (*CreatePolicyRelationshipResponse, error) {
+func (UnimplementedKesselPolicyRelationshipServiceServer) CreatePolicyRelationship(context.Context, *CreatePolicyRelationshipRequest) (*CreatePolicyRelationshipResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CreatePolicyRelationship not implemented")
 }
-func (UnimplementedRelationshipsServiceServer) UpdateResourceRelationshipByUrnHs(context.Context, *UpdateResourceRelationshipByUrnHsRequest) (*UpdateResourceRelationshipByUrnHsResponse, error) {
+func (UnimplementedKesselPolicyRelationshipServiceServer) UpdateResourceRelationshipByUrnHs(context.Context, *UpdateResourceRelationshipByUrnHsRequest) (*UpdateResourceRelationshipByUrnHsResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method UpdateResourceRelationshipByUrnHs not implemented")
 }
-func (UnimplementedRelationshipsServiceServer) DeleteResourceRelationshipByUrn(context.Context, *DeleteResourceRelationshipByUrnRequest) (*DeleteResourceRelationshipByUrnResponse, error) {
+func (UnimplementedKesselPolicyRelationshipServiceServer) DeleteResourceRelationshipByUrn(context.Context, *DeleteResourceRelationshipByUrnRequest) (*DeleteResourceRelationshipByUrnResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method DeleteResourceRelationshipByUrn not implemented")
 }
-func (UnimplementedRelationshipsServiceServer) mustEmbedUnimplementedRelationshipsServiceServer() {}
-func (UnimplementedRelationshipsServiceServer) testEmbeddedByValue()                              {}
+func (UnimplementedKesselPolicyRelationshipServiceServer) mustEmbedUnimplementedKesselPolicyRelationshipServiceServer() {
+}
+func (UnimplementedKesselPolicyRelationshipServiceServer) testEmbeddedByValue() {}
 
-// UnsafeRelationshipsServiceServer may be embedded to opt out of forward compatibility for this service.
-// Use of this interface is not recommended, as added methods to RelationshipsServiceServer will
+// UnsafeKesselPolicyRelationshipServiceServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to KesselPolicyRelationshipServiceServer will
 // result in compilation errors.
-type UnsafeRelationshipsServiceServer interface {
-	mustEmbedUnimplementedRelationshipsServiceServer()
+type UnsafeKesselPolicyRelationshipServiceServer interface {
+	mustEmbedUnimplementedKesselPolicyRelationshipServiceServer()
 }
 
-func RegisterRelationshipsServiceServer(s grpc.ServiceRegistrar, srv RelationshipsServiceServer) {
-	// If the following call pancis, it indicates UnimplementedRelationshipsServiceServer was
+func RegisterKesselPolicyRelationshipServiceServer(s grpc.ServiceRegistrar, srv KesselPolicyRelationshipServiceServer) {
+	// If the following call pancis, it indicates UnimplementedKesselPolicyRelationshipServiceServer was
 	// embedded by pointer and is nil.  This will cause panics if an
 	// unimplemented method is ever invoked, so we test this at initialization
 	// time to prevent it from happening at runtime later due to I/O.
 	if t, ok := srv.(interface{ testEmbeddedByValue() }); ok {
 		t.testEmbeddedByValue()
 	}
-	s.RegisterService(&RelationshipsService_ServiceDesc, srv)
+	s.RegisterService(&KesselPolicyRelationshipService_ServiceDesc, srv)
 }
 
-func _RelationshipsService_CreatePolicyRelationship_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _KesselPolicyRelationshipService_CreatePolicyRelationship_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(CreatePolicyRelationshipRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(RelationshipsServiceServer).CreatePolicyRelationship(ctx, in)
+		return srv.(KesselPolicyRelationshipServiceServer).CreatePolicyRelationship(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: RelationshipsService_CreatePolicyRelationship_FullMethodName,
+		FullMethod: KesselPolicyRelationshipService_CreatePolicyRelationship_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(RelationshipsServiceServer).CreatePolicyRelationship(ctx, req.(*CreatePolicyRelationshipRequest))
+		return srv.(KesselPolicyRelationshipServiceServer).CreatePolicyRelationship(ctx, req.(*CreatePolicyRelationshipRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _RelationshipsService_UpdateResourceRelationshipByUrnHs_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _KesselPolicyRelationshipService_UpdateResourceRelationshipByUrnHs_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(UpdateResourceRelationshipByUrnHsRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(RelationshipsServiceServer).UpdateResourceRelationshipByUrnHs(ctx, in)
+		return srv.(KesselPolicyRelationshipServiceServer).UpdateResourceRelationshipByUrnHs(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: RelationshipsService_UpdateResourceRelationshipByUrnHs_FullMethodName,
+		FullMethod: KesselPolicyRelationshipService_UpdateResourceRelationshipByUrnHs_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(RelationshipsServiceServer).UpdateResourceRelationshipByUrnHs(ctx, req.(*UpdateResourceRelationshipByUrnHsRequest))
+		return srv.(KesselPolicyRelationshipServiceServer).UpdateResourceRelationshipByUrnHs(ctx, req.(*UpdateResourceRelationshipByUrnHsRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _RelationshipsService_DeleteResourceRelationshipByUrn_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _KesselPolicyRelationshipService_DeleteResourceRelationshipByUrn_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(DeleteResourceRelationshipByUrnRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(RelationshipsServiceServer).DeleteResourceRelationshipByUrn(ctx, in)
+		return srv.(KesselPolicyRelationshipServiceServer).DeleteResourceRelationshipByUrn(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: RelationshipsService_DeleteResourceRelationshipByUrn_FullMethodName,
+		FullMethod: KesselPolicyRelationshipService_DeleteResourceRelationshipByUrn_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(RelationshipsServiceServer).DeleteResourceRelationshipByUrn(ctx, req.(*DeleteResourceRelationshipByUrnRequest))
+		return srv.(KesselPolicyRelationshipServiceServer).DeleteResourceRelationshipByUrn(ctx, req.(*DeleteResourceRelationshipByUrnRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-// RelationshipsService_ServiceDesc is the grpc.ServiceDesc for RelationshipsService service.
+// KesselPolicyRelationshipService_ServiceDesc is the grpc.ServiceDesc for KesselPolicyRelationshipService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
-var RelationshipsService_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "kessel.inventory.v1beta1.RelationshipsService",
-	HandlerType: (*RelationshipsServiceServer)(nil),
+var KesselPolicyRelationshipService_ServiceDesc = grpc.ServiceDesc{
+	ServiceName: "kessel.inventory.v1beta1.KesselPolicyRelationshipService",
+	HandlerType: (*KesselPolicyRelationshipServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
 			MethodName: "CreatePolicyRelationship",
-			Handler:    _RelationshipsService_CreatePolicyRelationship_Handler,
+			Handler:    _KesselPolicyRelationshipService_CreatePolicyRelationship_Handler,
 		},
 		{
 			MethodName: "UpdateResourceRelationshipByUrnHs",
-			Handler:    _RelationshipsService_UpdateResourceRelationshipByUrnHs_Handler,
+			Handler:    _KesselPolicyRelationshipService_UpdateResourceRelationshipByUrnHs_Handler,
 		},
 		{
 			MethodName: "DeleteResourceRelationshipByUrn",
-			Handler:    _RelationshipsService_DeleteResourceRelationshipByUrn_Handler,
+			Handler:    _KesselPolicyRelationshipService_DeleteResourceRelationshipByUrn_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

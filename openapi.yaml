@@ -6,76 +6,11 @@ info:
     title: ""
     version: 0.0.1
 paths:
-    /api/inventory/v1beta1/hosts:
+    /api/inventory/v1beta1/k8sClusters:
         post:
             tags:
-                - HostsService
-            operationId: HostsService_CreateRhelHost
-            requestBody:
-                content:
-                    application/json:
-                        schema:
-                            $ref: '#/components/schemas/kessel.inventory.v1beta1.RhelHost'
-                required: true
-            responses:
-                "200":
-                    description: OK
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/kessel.inventory.v1beta1.CreateRhelHostResponse'
-    /api/inventory/v1beta1/hosts/{resource}:
-        put:
-            tags:
-                - HostsService
-            operationId: HostsService_UpdateRhelHost
-            parameters:
-                - name: resource
-                  in: path
-                  description: |-
-                    A resource instance using the format:
-                     \"<reporter_data.reporter_type>:<reporter_data.reporter_id>::<reporter_data.resourceId_alias>\"
-                  required: true
-                  schema:
-                    type: string
-            requestBody:
-                content:
-                    application/json:
-                        schema:
-                            $ref: '#/components/schemas/kessel.inventory.v1beta1.RhelHost'
-                required: true
-            responses:
-                "200":
-                    description: OK
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/kessel.inventory.v1beta1.UpdateRhelHostResponse'
-        delete:
-            tags:
-                - HostsService
-            operationId: HostsService_DeleteRhelHost
-            parameters:
-                - name: resource
-                  in: path
-                  description: |-
-                    A resource instance using the format:
-                     \"<reporter_data.reporter_type>:<reporter_data.reporter_id>::<reporter_data.resourceId_alias>\"
-                  required: true
-                  schema:
-                    type: string
-            responses:
-                "200":
-                    description: OK
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/kessel.inventory.v1beta1.DeleteRhelHostResponse'
-    /api/inventory/v1beta1/k8s_clusters:
-        post:
-            tags:
-                - K8SClustersService
-            operationId: K8SClustersService_CreateK8SCluster
+                - KesselK8SClusterService
+            operationId: KesselK8SClusterService_CreateK8SCluster
             parameters:
                 - name: k8sCluster.metadata.id
                   in: query
@@ -211,11 +146,11 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/kessel.inventory.v1beta1.CreateK8sClusterResponse'
-    /api/inventory/v1beta1/k8s_clusters/{resource}:
+    /api/inventory/v1beta1/k8sClusters/{resource}:
         put:
             tags:
-                - K8SClustersService
-            operationId: K8SClustersService_UpdateK8SCluster
+                - KesselK8SClusterService
+            operationId: KesselK8SClusterService_UpdateK8SCluster
             parameters:
                 - name: resource
                   in: path
@@ -361,8 +296,8 @@ paths:
                                 $ref: '#/components/schemas/kessel.inventory.v1beta1.UpdateK8sClusterResponse'
         delete:
             tags:
-                - K8SClustersService
-            operationId: K8SClustersService_DeleteK8SCluster
+                - KesselK8SClusterService
+            operationId: KesselK8SClusterService_DeleteK8SCluster
             parameters:
                 - name: resource
                   in: path
@@ -379,11 +314,11 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/kessel.inventory.v1beta1.DeleteK8sClusterResponse'
-    /api/inventory/v1beta1/notificationsintegrations:
+    /api/inventory/v1beta1/notificationsIntegrations:
         post:
             tags:
-                - NotificationsIntegrationsService
-            operationId: NotificationsIntegrationsService_CreateNotificationsIntegration
+                - KesselNotificationsIntegrationService
+            operationId: KesselNotificationsIntegrationService_CreateNotificationsIntegration
             requestBody:
                 content:
                     application/json:
@@ -397,11 +332,11 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/kessel.inventory.v1beta1.CreateNotificationsIntegrationResponse'
-    /api/inventory/v1beta1/notificationsintegrations/{resource}:
+    /api/inventory/v1beta1/notificationsIntegrations/{resource}:
         put:
             tags:
-                - NotificationsIntegrationsService
-            operationId: NotificationsIntegrationsService_UpdateNotificationsIntegration
+                - KesselNotificationsIntegrationService
+            operationId: KesselNotificationsIntegrationService_UpdateNotificationsIntegration
             parameters:
                 - name: resource
                   in: path
@@ -426,8 +361,8 @@ paths:
                                 $ref: '#/components/schemas/kessel.inventory.v1beta1.UpdateNotificationsIntegrationResponse'
         delete:
             tags:
-                - NotificationsIntegrationsService
-            operationId: NotificationsIntegrationsService_DeleteNotificationsIntegration
+                - KesselNotificationsIntegrationService
+            operationId: KesselNotificationsIntegrationService_DeleteNotificationsIntegration
             parameters:
                 - name: resource
                   in: path
@@ -447,8 +382,8 @@ paths:
     /api/inventory/v1beta1/policies:
         post:
             tags:
-                - PoliciesService
-            operationId: PoliciesService_CreatePolicy
+                - KesselPolicyService
+            operationId: KesselPolicyService_CreatePolicy
             requestBody:
                 content:
                     application/json:
@@ -465,8 +400,8 @@ paths:
     /api/inventory/v1beta1/policies/{resource}:
         put:
             tags:
-                - PoliciesService
-            operationId: PoliciesService_UpdatePolicy
+                - KesselPolicyService
+            operationId: KesselPolicyService_UpdatePolicy
             parameters:
                 - name: resource
                   in: path
@@ -491,8 +426,8 @@ paths:
                                 $ref: '#/components/schemas/kessel.inventory.v1beta1.UpdatePolicyResponse'
         delete:
             tags:
-                - PoliciesService
-            operationId: PoliciesService_DeletePolicy
+                - KesselPolicyService
+            operationId: KesselPolicyService_DeletePolicy
             parameters:
                 - name: resource
                   in: path
@@ -509,11 +444,11 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/kessel.inventory.v1beta1.DeletePolicyResponse'
-    /api/inventory/v1beta1/policy_relationships:
+    /api/inventory/v1beta1/policyRelationships:
         put:
             tags:
-                - RelationshipsService
-            operationId: RelationshipsService_UpdateResourceRelationshipByUrnHs
+                - KesselPolicyRelationshipService
+            operationId: KesselPolicyRelationshipService_UpdateResourceRelationshipByUrnHs
             parameters:
                 - name: resources.subjectResource
                   in: query
@@ -562,8 +497,8 @@ paths:
                                 $ref: '#/components/schemas/kessel.inventory.v1beta1.UpdateResourceRelationshipByUrnHsResponse'
         post:
             tags:
-                - RelationshipsService
-            operationId: RelationshipsService_CreatePolicyRelationship
+                - KesselPolicyRelationshipService
+            operationId: KesselPolicyRelationshipService_CreatePolicyRelationship
             parameters:
                 - name: policyRelationship.relationshipType
                   in: query
@@ -604,8 +539,8 @@ paths:
                                 $ref: '#/components/schemas/kessel.inventory.v1beta1.CreatePolicyRelationshipResponse'
         delete:
             tags:
-                - RelationshipsService
-            operationId: RelationshipsService_DeleteResourceRelationshipByUrn
+                - KesselPolicyRelationshipService
+            operationId: KesselPolicyRelationshipService_DeleteResourceRelationshipByUrn
             parameters:
                 - name: resources.subjectResource
                   in: query
@@ -622,6 +557,254 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/kessel.inventory.v1beta1.DeleteResourceRelationshipByUrnResponse'
+    /api/inventory/v1beta1/rhelHosts:
+        post:
+            tags:
+                - KesselRhelHostService
+            operationId: KesselRhelHostService_CreateRhelHost
+            parameters:
+                - name: host.metadata.id
+                  in: query
+                  description: Kessel Asset Inventory generated identifier.
+                  schema:
+                    type: string
+                - name: host.metadata.naturalId
+                  in: query
+                  description: Some identifier intrinsic to the resource itself that is unique across reporters
+                  schema:
+                    type: string
+                - name: host.metadata.resourceType
+                  in: query
+                  description: The type of the Resource
+                  schema:
+                    type: string
+                - name: host.metadata.firstReported
+                  in: query
+                  description: Date and time when the inventory item was first reported.
+                  schema:
+                    type: string
+                    format: date-time
+                - name: host.metadata.lastReported
+                  in: query
+                  description: Date and time when the inventory item was last updated.
+                  schema:
+                    type: string
+                    format: date-time
+                - name: host.metadata.firstReportedBy
+                  in: query
+                  description: Identifier of the reporter that first reported on this item.
+                  schema:
+                    type: string
+                - name: host.metadata.lastReportedBy
+                  in: query
+                  description: Identifier of the reporter that last reported on this item.
+                  schema:
+                    type: string
+                - name: host.metadata.workspace
+                  in: query
+                  description: |-
+                    The workspace in which this resource is a member for access control.  A
+                     resource can only be a member of one workspace.
+                  schema:
+                    type: string
+                - name: host.reporterData.reporterType
+                  in: query
+                  schema:
+                    type: integer
+                    format: enum
+                - name: host.reporterData.reporterInstanceId
+                  in: query
+                  description: |-
+                    The ID of the instance of the reporter. This is derived from the
+                     authentication mechanism, i.e. authentication token.
+                  schema:
+                    type: string
+                - name: host.reporterData.firstReported
+                  in: query
+                  description: Date and time when the inventory item was first reported by this reporter
+                  schema:
+                    type: string
+                    format: date-time
+                - name: host.reporterData.lastReported
+                  in: query
+                  description: Date and time when the inventory item was last updated by this reporter
+                  schema:
+                    type: string
+                    format: date-time
+                - name: host.reporterData.consoleHref
+                  in: query
+                  description: |-
+                    The URL for this resource in the reporter's management UI console. For
+                     example this would be the cluster URL in the HCC Console for an OCM
+                     reported cluster.
+                  schema:
+                    type: string
+                - name: host.reporterData.apiHref
+                  in: query
+                  description: Reporter specific API link to the resource.
+                  schema:
+                    type: string
+                - name: host.reporterData.localResourceId
+                  in: query
+                  description: |-
+                    The ID assigned to this resource by the reporter, for example OCM cluster
+                     ID, HBI's host id, or ACM managed cluster name etc.
+                  schema:
+                    type: string
+                - name: host.reporterData.reporterVersion
+                  in: query
+                  description: version of the reporter
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json: {}
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/kessel.inventory.v1beta1.CreateRhelHostResponse'
+    /api/inventory/v1beta1/rhelHosts/{resource}:
+        put:
+            tags:
+                - KesselRhelHostService
+            operationId: KesselRhelHostService_UpdateRhelHost
+            parameters:
+                - name: resource
+                  in: path
+                  description: |-
+                    A resource instance using the format:
+                     \"<reporter_data.reporter_type>:<reporter_data.reporter_id>::<reporter_data.resourceId_alias>\"
+                  required: true
+                  schema:
+                    type: string
+                - name: host.metadata.id
+                  in: query
+                  description: Kessel Asset Inventory generated identifier.
+                  schema:
+                    type: string
+                - name: host.metadata.naturalId
+                  in: query
+                  description: Some identifier intrinsic to the resource itself that is unique across reporters
+                  schema:
+                    type: string
+                - name: host.metadata.resourceType
+                  in: query
+                  description: The type of the Resource
+                  schema:
+                    type: string
+                - name: host.metadata.firstReported
+                  in: query
+                  description: Date and time when the inventory item was first reported.
+                  schema:
+                    type: string
+                    format: date-time
+                - name: host.metadata.lastReported
+                  in: query
+                  description: Date and time when the inventory item was last updated.
+                  schema:
+                    type: string
+                    format: date-time
+                - name: host.metadata.firstReportedBy
+                  in: query
+                  description: Identifier of the reporter that first reported on this item.
+                  schema:
+                    type: string
+                - name: host.metadata.lastReportedBy
+                  in: query
+                  description: Identifier of the reporter that last reported on this item.
+                  schema:
+                    type: string
+                - name: host.metadata.workspace
+                  in: query
+                  description: |-
+                    The workspace in which this resource is a member for access control.  A
+                     resource can only be a member of one workspace.
+                  schema:
+                    type: string
+                - name: host.reporterData.reporterType
+                  in: query
+                  schema:
+                    type: integer
+                    format: enum
+                - name: host.reporterData.reporterInstanceId
+                  in: query
+                  description: |-
+                    The ID of the instance of the reporter. This is derived from the
+                     authentication mechanism, i.e. authentication token.
+                  schema:
+                    type: string
+                - name: host.reporterData.firstReported
+                  in: query
+                  description: Date and time when the inventory item was first reported by this reporter
+                  schema:
+                    type: string
+                    format: date-time
+                - name: host.reporterData.lastReported
+                  in: query
+                  description: Date and time when the inventory item was last updated by this reporter
+                  schema:
+                    type: string
+                    format: date-time
+                - name: host.reporterData.consoleHref
+                  in: query
+                  description: |-
+                    The URL for this resource in the reporter's management UI console. For
+                     example this would be the cluster URL in the HCC Console for an OCM
+                     reported cluster.
+                  schema:
+                    type: string
+                - name: host.reporterData.apiHref
+                  in: query
+                  description: Reporter specific API link to the resource.
+                  schema:
+                    type: string
+                - name: host.reporterData.localResourceId
+                  in: query
+                  description: |-
+                    The ID assigned to this resource by the reporter, for example OCM cluster
+                     ID, HBI's host id, or ACM managed cluster name etc.
+                  schema:
+                    type: string
+                - name: host.reporterData.reporterVersion
+                  in: query
+                  description: version of the reporter
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json: {}
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/kessel.inventory.v1beta1.UpdateRhelHostResponse'
+        delete:
+            tags:
+                - KesselRhelHostService
+            operationId: KesselRhelHostService_DeleteRhelHost
+            parameters:
+                - name: resource
+                  in: path
+                  description: |-
+                    A resource instance using the format:
+                     \"<reporter_data.reporter_type>:<reporter_data.reporter_id>::<reporter_data.resourceId_alias>\"
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/kessel.inventory.v1beta1.DeleteRhelHostResponse'
 components:
     schemas:
         kessel.inventory.v1beta1.CreateK8sClusterResponse:
@@ -945,8 +1128,8 @@ components:
             type: object
             properties: {}
 tags:
-    - name: HostsService
-    - name: K8SClustersService
-    - name: NotificationsIntegrationsService
-    - name: PoliciesService
-    - name: RelationshipsService
+    - name: KesselK8SClusterService
+    - name: KesselNotificationsIntegrationService
+    - name: KesselPolicyRelationshipService
+    - name: KesselPolicyService
+    - name: KesselRhelHostService

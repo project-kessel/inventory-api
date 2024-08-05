@@ -19,24 +19,24 @@ var _ = binding.EncodeURL
 
 const _ = http.SupportPackageIsVersion1
 
-const OperationNotificationsIntegrationsServiceCreateNotificationsIntegration = "/kessel.inventory.v1beta1.NotificationsIntegrationsService/CreateNotificationsIntegration"
-const OperationNotificationsIntegrationsServiceDeleteNotificationsIntegration = "/kessel.inventory.v1beta1.NotificationsIntegrationsService/DeleteNotificationsIntegration"
-const OperationNotificationsIntegrationsServiceUpdateNotificationsIntegration = "/kessel.inventory.v1beta1.NotificationsIntegrationsService/UpdateNotificationsIntegration"
+const OperationKesselNotificationsIntegrationServiceCreateNotificationsIntegration = "/kessel.inventory.v1beta1.KesselNotificationsIntegrationService/CreateNotificationsIntegration"
+const OperationKesselNotificationsIntegrationServiceDeleteNotificationsIntegration = "/kessel.inventory.v1beta1.KesselNotificationsIntegrationService/DeleteNotificationsIntegration"
+const OperationKesselNotificationsIntegrationServiceUpdateNotificationsIntegration = "/kessel.inventory.v1beta1.KesselNotificationsIntegrationService/UpdateNotificationsIntegration"
 
-type NotificationsIntegrationsServiceHTTPServer interface {
+type KesselNotificationsIntegrationServiceHTTPServer interface {
 	CreateNotificationsIntegration(context.Context, *CreateNotificationsIntegrationRequest) (*CreateNotificationsIntegrationResponse, error)
 	DeleteNotificationsIntegration(context.Context, *DeleteNotificationsIntegrationRequest) (*DeleteNotificationsIntegrationResponse, error)
 	UpdateNotificationsIntegration(context.Context, *UpdateNotificationsIntegrationRequest) (*UpdateNotificationsIntegrationResponse, error)
 }
 
-func RegisterNotificationsIntegrationsServiceHTTPServer(s *http.Server, srv NotificationsIntegrationsServiceHTTPServer) {
+func RegisterKesselNotificationsIntegrationServiceHTTPServer(s *http.Server, srv KesselNotificationsIntegrationServiceHTTPServer) {
 	r := s.Route("/")
-	r.POST("/api/inventory/v1beta1/notificationsintegrations", _NotificationsIntegrationsService_CreateNotificationsIntegration0_HTTP_Handler(srv))
-	r.PUT("/api/inventory/v1beta1/notificationsintegrations/{resource}", _NotificationsIntegrationsService_UpdateNotificationsIntegration0_HTTP_Handler(srv))
-	r.DELETE("/api/inventory/v1beta1/notificationsintegrations/{resource}", _NotificationsIntegrationsService_DeleteNotificationsIntegration0_HTTP_Handler(srv))
+	r.POST("/api/inventory/v1beta1/notificationsIntegrations", _KesselNotificationsIntegrationService_CreateNotificationsIntegration0_HTTP_Handler(srv))
+	r.PUT("/api/inventory/v1beta1/notificationsIntegrations/{resource}", _KesselNotificationsIntegrationService_UpdateNotificationsIntegration0_HTTP_Handler(srv))
+	r.DELETE("/api/inventory/v1beta1/notificationsIntegrations/{resource}", _KesselNotificationsIntegrationService_DeleteNotificationsIntegration0_HTTP_Handler(srv))
 }
 
-func _NotificationsIntegrationsService_CreateNotificationsIntegration0_HTTP_Handler(srv NotificationsIntegrationsServiceHTTPServer) func(ctx http.Context) error {
+func _KesselNotificationsIntegrationService_CreateNotificationsIntegration0_HTTP_Handler(srv KesselNotificationsIntegrationServiceHTTPServer) func(ctx http.Context) error {
 	return func(ctx http.Context) error {
 		var in CreateNotificationsIntegrationRequest
 		if err := ctx.Bind(&in.Integration); err != nil {
@@ -45,7 +45,7 @@ func _NotificationsIntegrationsService_CreateNotificationsIntegration0_HTTP_Hand
 		if err := ctx.BindQuery(&in); err != nil {
 			return err
 		}
-		http.SetOperation(ctx, OperationNotificationsIntegrationsServiceCreateNotificationsIntegration)
+		http.SetOperation(ctx, OperationKesselNotificationsIntegrationServiceCreateNotificationsIntegration)
 		h := ctx.Middleware(func(ctx context.Context, req interface{}) (interface{}, error) {
 			return srv.CreateNotificationsIntegration(ctx, req.(*CreateNotificationsIntegrationRequest))
 		})
@@ -58,7 +58,7 @@ func _NotificationsIntegrationsService_CreateNotificationsIntegration0_HTTP_Hand
 	}
 }
 
-func _NotificationsIntegrationsService_UpdateNotificationsIntegration0_HTTP_Handler(srv NotificationsIntegrationsServiceHTTPServer) func(ctx http.Context) error {
+func _KesselNotificationsIntegrationService_UpdateNotificationsIntegration0_HTTP_Handler(srv KesselNotificationsIntegrationServiceHTTPServer) func(ctx http.Context) error {
 	return func(ctx http.Context) error {
 		var in UpdateNotificationsIntegrationRequest
 		if err := ctx.Bind(&in.Integration); err != nil {
@@ -70,7 +70,7 @@ func _NotificationsIntegrationsService_UpdateNotificationsIntegration0_HTTP_Hand
 		if err := ctx.BindVars(&in); err != nil {
 			return err
 		}
-		http.SetOperation(ctx, OperationNotificationsIntegrationsServiceUpdateNotificationsIntegration)
+		http.SetOperation(ctx, OperationKesselNotificationsIntegrationServiceUpdateNotificationsIntegration)
 		h := ctx.Middleware(func(ctx context.Context, req interface{}) (interface{}, error) {
 			return srv.UpdateNotificationsIntegration(ctx, req.(*UpdateNotificationsIntegrationRequest))
 		})
@@ -83,7 +83,7 @@ func _NotificationsIntegrationsService_UpdateNotificationsIntegration0_HTTP_Hand
 	}
 }
 
-func _NotificationsIntegrationsService_DeleteNotificationsIntegration0_HTTP_Handler(srv NotificationsIntegrationsServiceHTTPServer) func(ctx http.Context) error {
+func _KesselNotificationsIntegrationService_DeleteNotificationsIntegration0_HTTP_Handler(srv KesselNotificationsIntegrationServiceHTTPServer) func(ctx http.Context) error {
 	return func(ctx http.Context) error {
 		var in DeleteNotificationsIntegrationRequest
 		if err := ctx.BindQuery(&in); err != nil {
@@ -92,7 +92,7 @@ func _NotificationsIntegrationsService_DeleteNotificationsIntegration0_HTTP_Hand
 		if err := ctx.BindVars(&in); err != nil {
 			return err
 		}
-		http.SetOperation(ctx, OperationNotificationsIntegrationsServiceDeleteNotificationsIntegration)
+		http.SetOperation(ctx, OperationKesselNotificationsIntegrationServiceDeleteNotificationsIntegration)
 		h := ctx.Middleware(func(ctx context.Context, req interface{}) (interface{}, error) {
 			return srv.DeleteNotificationsIntegration(ctx, req.(*DeleteNotificationsIntegrationRequest))
 		})
@@ -105,25 +105,25 @@ func _NotificationsIntegrationsService_DeleteNotificationsIntegration0_HTTP_Hand
 	}
 }
 
-type NotificationsIntegrationsServiceHTTPClient interface {
+type KesselNotificationsIntegrationServiceHTTPClient interface {
 	CreateNotificationsIntegration(ctx context.Context, req *CreateNotificationsIntegrationRequest, opts ...http.CallOption) (rsp *CreateNotificationsIntegrationResponse, err error)
 	DeleteNotificationsIntegration(ctx context.Context, req *DeleteNotificationsIntegrationRequest, opts ...http.CallOption) (rsp *DeleteNotificationsIntegrationResponse, err error)
 	UpdateNotificationsIntegration(ctx context.Context, req *UpdateNotificationsIntegrationRequest, opts ...http.CallOption) (rsp *UpdateNotificationsIntegrationResponse, err error)
 }
 
-type NotificationsIntegrationsServiceHTTPClientImpl struct {
+type KesselNotificationsIntegrationServiceHTTPClientImpl struct {
 	cc *http.Client
 }
 
-func NewNotificationsIntegrationsServiceHTTPClient(client *http.Client) NotificationsIntegrationsServiceHTTPClient {
-	return &NotificationsIntegrationsServiceHTTPClientImpl{client}
+func NewKesselNotificationsIntegrationServiceHTTPClient(client *http.Client) KesselNotificationsIntegrationServiceHTTPClient {
+	return &KesselNotificationsIntegrationServiceHTTPClientImpl{client}
 }
 
-func (c *NotificationsIntegrationsServiceHTTPClientImpl) CreateNotificationsIntegration(ctx context.Context, in *CreateNotificationsIntegrationRequest, opts ...http.CallOption) (*CreateNotificationsIntegrationResponse, error) {
+func (c *KesselNotificationsIntegrationServiceHTTPClientImpl) CreateNotificationsIntegration(ctx context.Context, in *CreateNotificationsIntegrationRequest, opts ...http.CallOption) (*CreateNotificationsIntegrationResponse, error) {
 	var out CreateNotificationsIntegrationResponse
-	pattern := "/api/inventory/v1beta1/notificationsintegrations"
+	pattern := "/api/inventory/v1beta1/notificationsIntegrations"
 	path := binding.EncodeURL(pattern, in, false)
-	opts = append(opts, http.Operation(OperationNotificationsIntegrationsServiceCreateNotificationsIntegration))
+	opts = append(opts, http.Operation(OperationKesselNotificationsIntegrationServiceCreateNotificationsIntegration))
 	opts = append(opts, http.PathTemplate(pattern))
 	err := c.cc.Invoke(ctx, "POST", path, in.Integration, &out, opts...)
 	if err != nil {
@@ -132,11 +132,11 @@ func (c *NotificationsIntegrationsServiceHTTPClientImpl) CreateNotificationsInte
 	return &out, nil
 }
 
-func (c *NotificationsIntegrationsServiceHTTPClientImpl) DeleteNotificationsIntegration(ctx context.Context, in *DeleteNotificationsIntegrationRequest, opts ...http.CallOption) (*DeleteNotificationsIntegrationResponse, error) {
+func (c *KesselNotificationsIntegrationServiceHTTPClientImpl) DeleteNotificationsIntegration(ctx context.Context, in *DeleteNotificationsIntegrationRequest, opts ...http.CallOption) (*DeleteNotificationsIntegrationResponse, error) {
 	var out DeleteNotificationsIntegrationResponse
-	pattern := "/api/inventory/v1beta1/notificationsintegrations/{resource}"
+	pattern := "/api/inventory/v1beta1/notificationsIntegrations/{resource}"
 	path := binding.EncodeURL(pattern, in, true)
-	opts = append(opts, http.Operation(OperationNotificationsIntegrationsServiceDeleteNotificationsIntegration))
+	opts = append(opts, http.Operation(OperationKesselNotificationsIntegrationServiceDeleteNotificationsIntegration))
 	opts = append(opts, http.PathTemplate(pattern))
 	err := c.cc.Invoke(ctx, "DELETE", path, nil, &out, opts...)
 	if err != nil {
@@ -145,11 +145,11 @@ func (c *NotificationsIntegrationsServiceHTTPClientImpl) DeleteNotificationsInte
 	return &out, nil
 }
 
-func (c *NotificationsIntegrationsServiceHTTPClientImpl) UpdateNotificationsIntegration(ctx context.Context, in *UpdateNotificationsIntegrationRequest, opts ...http.CallOption) (*UpdateNotificationsIntegrationResponse, error) {
+func (c *KesselNotificationsIntegrationServiceHTTPClientImpl) UpdateNotificationsIntegration(ctx context.Context, in *UpdateNotificationsIntegrationRequest, opts ...http.CallOption) (*UpdateNotificationsIntegrationResponse, error) {
 	var out UpdateNotificationsIntegrationResponse
-	pattern := "/api/inventory/v1beta1/notificationsintegrations/{resource}"
+	pattern := "/api/inventory/v1beta1/notificationsIntegrations/{resource}"
 	path := binding.EncodeURL(pattern, in, false)
-	opts = append(opts, http.Operation(OperationNotificationsIntegrationsServiceUpdateNotificationsIntegration))
+	opts = append(opts, http.Operation(OperationKesselNotificationsIntegrationServiceUpdateNotificationsIntegration))
 	opts = append(opts, http.PathTemplate(pattern))
 	err := c.cc.Invoke(ctx, "PUT", path, in.Integration, &out, opts...)
 	if err != nil {

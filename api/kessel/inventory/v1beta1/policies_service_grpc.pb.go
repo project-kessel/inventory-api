@@ -19,177 +19,177 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	PoliciesService_CreatePolicy_FullMethodName = "/kessel.inventory.v1beta1.PoliciesService/CreatePolicy"
-	PoliciesService_UpdatePolicy_FullMethodName = "/kessel.inventory.v1beta1.PoliciesService/UpdatePolicy"
-	PoliciesService_DeletePolicy_FullMethodName = "/kessel.inventory.v1beta1.PoliciesService/DeletePolicy"
+	KesselPolicyService_CreatePolicy_FullMethodName = "/kessel.inventory.v1beta1.KesselPolicyService/CreatePolicy"
+	KesselPolicyService_UpdatePolicy_FullMethodName = "/kessel.inventory.v1beta1.KesselPolicyService/UpdatePolicy"
+	KesselPolicyService_DeletePolicy_FullMethodName = "/kessel.inventory.v1beta1.KesselPolicyService/DeletePolicy"
 )
 
-// PoliciesServiceClient is the client API for PoliciesService service.
+// KesselPolicyServiceClient is the client API for KesselPolicyService service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
-type PoliciesServiceClient interface {
+type KesselPolicyServiceClient interface {
 	CreatePolicy(ctx context.Context, in *CreatePolicyRequest, opts ...grpc.CallOption) (*CreatePolicyResponse, error)
 	UpdatePolicy(ctx context.Context, in *UpdatePolicyRequest, opts ...grpc.CallOption) (*UpdatePolicyResponse, error)
 	DeletePolicy(ctx context.Context, in *DeletePolicyRequest, opts ...grpc.CallOption) (*DeletePolicyResponse, error)
 }
 
-type policiesServiceClient struct {
+type kesselPolicyServiceClient struct {
 	cc grpc.ClientConnInterface
 }
 
-func NewPoliciesServiceClient(cc grpc.ClientConnInterface) PoliciesServiceClient {
-	return &policiesServiceClient{cc}
+func NewKesselPolicyServiceClient(cc grpc.ClientConnInterface) KesselPolicyServiceClient {
+	return &kesselPolicyServiceClient{cc}
 }
 
-func (c *policiesServiceClient) CreatePolicy(ctx context.Context, in *CreatePolicyRequest, opts ...grpc.CallOption) (*CreatePolicyResponse, error) {
+func (c *kesselPolicyServiceClient) CreatePolicy(ctx context.Context, in *CreatePolicyRequest, opts ...grpc.CallOption) (*CreatePolicyResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(CreatePolicyResponse)
-	err := c.cc.Invoke(ctx, PoliciesService_CreatePolicy_FullMethodName, in, out, cOpts...)
+	err := c.cc.Invoke(ctx, KesselPolicyService_CreatePolicy_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *policiesServiceClient) UpdatePolicy(ctx context.Context, in *UpdatePolicyRequest, opts ...grpc.CallOption) (*UpdatePolicyResponse, error) {
+func (c *kesselPolicyServiceClient) UpdatePolicy(ctx context.Context, in *UpdatePolicyRequest, opts ...grpc.CallOption) (*UpdatePolicyResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(UpdatePolicyResponse)
-	err := c.cc.Invoke(ctx, PoliciesService_UpdatePolicy_FullMethodName, in, out, cOpts...)
+	err := c.cc.Invoke(ctx, KesselPolicyService_UpdatePolicy_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *policiesServiceClient) DeletePolicy(ctx context.Context, in *DeletePolicyRequest, opts ...grpc.CallOption) (*DeletePolicyResponse, error) {
+func (c *kesselPolicyServiceClient) DeletePolicy(ctx context.Context, in *DeletePolicyRequest, opts ...grpc.CallOption) (*DeletePolicyResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(DeletePolicyResponse)
-	err := c.cc.Invoke(ctx, PoliciesService_DeletePolicy_FullMethodName, in, out, cOpts...)
+	err := c.cc.Invoke(ctx, KesselPolicyService_DeletePolicy_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-// PoliciesServiceServer is the server API for PoliciesService service.
-// All implementations must embed UnimplementedPoliciesServiceServer
+// KesselPolicyServiceServer is the server API for KesselPolicyService service.
+// All implementations must embed UnimplementedKesselPolicyServiceServer
 // for forward compatibility.
-type PoliciesServiceServer interface {
+type KesselPolicyServiceServer interface {
 	CreatePolicy(context.Context, *CreatePolicyRequest) (*CreatePolicyResponse, error)
 	UpdatePolicy(context.Context, *UpdatePolicyRequest) (*UpdatePolicyResponse, error)
 	DeletePolicy(context.Context, *DeletePolicyRequest) (*DeletePolicyResponse, error)
-	mustEmbedUnimplementedPoliciesServiceServer()
+	mustEmbedUnimplementedKesselPolicyServiceServer()
 }
 
-// UnimplementedPoliciesServiceServer must be embedded to have
+// UnimplementedKesselPolicyServiceServer must be embedded to have
 // forward compatible implementations.
 //
 // NOTE: this should be embedded by value instead of pointer to avoid a nil
 // pointer dereference when methods are called.
-type UnimplementedPoliciesServiceServer struct{}
+type UnimplementedKesselPolicyServiceServer struct{}
 
-func (UnimplementedPoliciesServiceServer) CreatePolicy(context.Context, *CreatePolicyRequest) (*CreatePolicyResponse, error) {
+func (UnimplementedKesselPolicyServiceServer) CreatePolicy(context.Context, *CreatePolicyRequest) (*CreatePolicyResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CreatePolicy not implemented")
 }
-func (UnimplementedPoliciesServiceServer) UpdatePolicy(context.Context, *UpdatePolicyRequest) (*UpdatePolicyResponse, error) {
+func (UnimplementedKesselPolicyServiceServer) UpdatePolicy(context.Context, *UpdatePolicyRequest) (*UpdatePolicyResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method UpdatePolicy not implemented")
 }
-func (UnimplementedPoliciesServiceServer) DeletePolicy(context.Context, *DeletePolicyRequest) (*DeletePolicyResponse, error) {
+func (UnimplementedKesselPolicyServiceServer) DeletePolicy(context.Context, *DeletePolicyRequest) (*DeletePolicyResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method DeletePolicy not implemented")
 }
-func (UnimplementedPoliciesServiceServer) mustEmbedUnimplementedPoliciesServiceServer() {}
-func (UnimplementedPoliciesServiceServer) testEmbeddedByValue()                         {}
+func (UnimplementedKesselPolicyServiceServer) mustEmbedUnimplementedKesselPolicyServiceServer() {}
+func (UnimplementedKesselPolicyServiceServer) testEmbeddedByValue()                             {}
 
-// UnsafePoliciesServiceServer may be embedded to opt out of forward compatibility for this service.
-// Use of this interface is not recommended, as added methods to PoliciesServiceServer will
+// UnsafeKesselPolicyServiceServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to KesselPolicyServiceServer will
 // result in compilation errors.
-type UnsafePoliciesServiceServer interface {
-	mustEmbedUnimplementedPoliciesServiceServer()
+type UnsafeKesselPolicyServiceServer interface {
+	mustEmbedUnimplementedKesselPolicyServiceServer()
 }
 
-func RegisterPoliciesServiceServer(s grpc.ServiceRegistrar, srv PoliciesServiceServer) {
-	// If the following call pancis, it indicates UnimplementedPoliciesServiceServer was
+func RegisterKesselPolicyServiceServer(s grpc.ServiceRegistrar, srv KesselPolicyServiceServer) {
+	// If the following call pancis, it indicates UnimplementedKesselPolicyServiceServer was
 	// embedded by pointer and is nil.  This will cause panics if an
 	// unimplemented method is ever invoked, so we test this at initialization
 	// time to prevent it from happening at runtime later due to I/O.
 	if t, ok := srv.(interface{ testEmbeddedByValue() }); ok {
 		t.testEmbeddedByValue()
 	}
-	s.RegisterService(&PoliciesService_ServiceDesc, srv)
+	s.RegisterService(&KesselPolicyService_ServiceDesc, srv)
 }
 
-func _PoliciesService_CreatePolicy_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _KesselPolicyService_CreatePolicy_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(CreatePolicyRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(PoliciesServiceServer).CreatePolicy(ctx, in)
+		return srv.(KesselPolicyServiceServer).CreatePolicy(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: PoliciesService_CreatePolicy_FullMethodName,
+		FullMethod: KesselPolicyService_CreatePolicy_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(PoliciesServiceServer).CreatePolicy(ctx, req.(*CreatePolicyRequest))
+		return srv.(KesselPolicyServiceServer).CreatePolicy(ctx, req.(*CreatePolicyRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _PoliciesService_UpdatePolicy_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _KesselPolicyService_UpdatePolicy_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(UpdatePolicyRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(PoliciesServiceServer).UpdatePolicy(ctx, in)
+		return srv.(KesselPolicyServiceServer).UpdatePolicy(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: PoliciesService_UpdatePolicy_FullMethodName,
+		FullMethod: KesselPolicyService_UpdatePolicy_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(PoliciesServiceServer).UpdatePolicy(ctx, req.(*UpdatePolicyRequest))
+		return srv.(KesselPolicyServiceServer).UpdatePolicy(ctx, req.(*UpdatePolicyRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _PoliciesService_DeletePolicy_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _KesselPolicyService_DeletePolicy_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(DeletePolicyRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(PoliciesServiceServer).DeletePolicy(ctx, in)
+		return srv.(KesselPolicyServiceServer).DeletePolicy(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: PoliciesService_DeletePolicy_FullMethodName,
+		FullMethod: KesselPolicyService_DeletePolicy_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(PoliciesServiceServer).DeletePolicy(ctx, req.(*DeletePolicyRequest))
+		return srv.(KesselPolicyServiceServer).DeletePolicy(ctx, req.(*DeletePolicyRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-// PoliciesService_ServiceDesc is the grpc.ServiceDesc for PoliciesService service.
+// KesselPolicyService_ServiceDesc is the grpc.ServiceDesc for KesselPolicyService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
-var PoliciesService_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "kessel.inventory.v1beta1.PoliciesService",
-	HandlerType: (*PoliciesServiceServer)(nil),
+var KesselPolicyService_ServiceDesc = grpc.ServiceDesc{
+	ServiceName: "kessel.inventory.v1beta1.KesselPolicyService",
+	HandlerType: (*KesselPolicyServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
 			MethodName: "CreatePolicy",
-			Handler:    _PoliciesService_CreatePolicy_Handler,
+			Handler:    _KesselPolicyService_CreatePolicy_Handler,
 		},
 		{
 			MethodName: "UpdatePolicy",
-			Handler:    _PoliciesService_UpdatePolicy_Handler,
+			Handler:    _KesselPolicyService_UpdatePolicy_Handler,
 		},
 		{
 			MethodName: "DeletePolicy",
-			Handler:    _PoliciesService_DeletePolicy_Handler,
+			Handler:    _KesselPolicyService_DeletePolicy_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

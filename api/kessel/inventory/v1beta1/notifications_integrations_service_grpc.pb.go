@@ -19,178 +19,178 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	NotificationsIntegrationsService_CreateNotificationsIntegration_FullMethodName = "/kessel.inventory.v1beta1.NotificationsIntegrationsService/CreateNotificationsIntegration"
-	NotificationsIntegrationsService_UpdateNotificationsIntegration_FullMethodName = "/kessel.inventory.v1beta1.NotificationsIntegrationsService/UpdateNotificationsIntegration"
-	NotificationsIntegrationsService_DeleteNotificationsIntegration_FullMethodName = "/kessel.inventory.v1beta1.NotificationsIntegrationsService/DeleteNotificationsIntegration"
+	KesselNotificationsIntegrationService_CreateNotificationsIntegration_FullMethodName = "/kessel.inventory.v1beta1.KesselNotificationsIntegrationService/CreateNotificationsIntegration"
+	KesselNotificationsIntegrationService_UpdateNotificationsIntegration_FullMethodName = "/kessel.inventory.v1beta1.KesselNotificationsIntegrationService/UpdateNotificationsIntegration"
+	KesselNotificationsIntegrationService_DeleteNotificationsIntegration_FullMethodName = "/kessel.inventory.v1beta1.KesselNotificationsIntegrationService/DeleteNotificationsIntegration"
 )
 
-// NotificationsIntegrationsServiceClient is the client API for NotificationsIntegrationsService service.
+// KesselNotificationsIntegrationServiceClient is the client API for KesselNotificationsIntegrationService service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
-type NotificationsIntegrationsServiceClient interface {
+type KesselNotificationsIntegrationServiceClient interface {
 	CreateNotificationsIntegration(ctx context.Context, in *CreateNotificationsIntegrationRequest, opts ...grpc.CallOption) (*CreateNotificationsIntegrationResponse, error)
 	UpdateNotificationsIntegration(ctx context.Context, in *UpdateNotificationsIntegrationRequest, opts ...grpc.CallOption) (*UpdateNotificationsIntegrationResponse, error)
 	DeleteNotificationsIntegration(ctx context.Context, in *DeleteNotificationsIntegrationRequest, opts ...grpc.CallOption) (*DeleteNotificationsIntegrationResponse, error)
 }
 
-type notificationsIntegrationsServiceClient struct {
+type kesselNotificationsIntegrationServiceClient struct {
 	cc grpc.ClientConnInterface
 }
 
-func NewNotificationsIntegrationsServiceClient(cc grpc.ClientConnInterface) NotificationsIntegrationsServiceClient {
-	return &notificationsIntegrationsServiceClient{cc}
+func NewKesselNotificationsIntegrationServiceClient(cc grpc.ClientConnInterface) KesselNotificationsIntegrationServiceClient {
+	return &kesselNotificationsIntegrationServiceClient{cc}
 }
 
-func (c *notificationsIntegrationsServiceClient) CreateNotificationsIntegration(ctx context.Context, in *CreateNotificationsIntegrationRequest, opts ...grpc.CallOption) (*CreateNotificationsIntegrationResponse, error) {
+func (c *kesselNotificationsIntegrationServiceClient) CreateNotificationsIntegration(ctx context.Context, in *CreateNotificationsIntegrationRequest, opts ...grpc.CallOption) (*CreateNotificationsIntegrationResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(CreateNotificationsIntegrationResponse)
-	err := c.cc.Invoke(ctx, NotificationsIntegrationsService_CreateNotificationsIntegration_FullMethodName, in, out, cOpts...)
+	err := c.cc.Invoke(ctx, KesselNotificationsIntegrationService_CreateNotificationsIntegration_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *notificationsIntegrationsServiceClient) UpdateNotificationsIntegration(ctx context.Context, in *UpdateNotificationsIntegrationRequest, opts ...grpc.CallOption) (*UpdateNotificationsIntegrationResponse, error) {
+func (c *kesselNotificationsIntegrationServiceClient) UpdateNotificationsIntegration(ctx context.Context, in *UpdateNotificationsIntegrationRequest, opts ...grpc.CallOption) (*UpdateNotificationsIntegrationResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(UpdateNotificationsIntegrationResponse)
-	err := c.cc.Invoke(ctx, NotificationsIntegrationsService_UpdateNotificationsIntegration_FullMethodName, in, out, cOpts...)
+	err := c.cc.Invoke(ctx, KesselNotificationsIntegrationService_UpdateNotificationsIntegration_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *notificationsIntegrationsServiceClient) DeleteNotificationsIntegration(ctx context.Context, in *DeleteNotificationsIntegrationRequest, opts ...grpc.CallOption) (*DeleteNotificationsIntegrationResponse, error) {
+func (c *kesselNotificationsIntegrationServiceClient) DeleteNotificationsIntegration(ctx context.Context, in *DeleteNotificationsIntegrationRequest, opts ...grpc.CallOption) (*DeleteNotificationsIntegrationResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(DeleteNotificationsIntegrationResponse)
-	err := c.cc.Invoke(ctx, NotificationsIntegrationsService_DeleteNotificationsIntegration_FullMethodName, in, out, cOpts...)
+	err := c.cc.Invoke(ctx, KesselNotificationsIntegrationService_DeleteNotificationsIntegration_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-// NotificationsIntegrationsServiceServer is the server API for NotificationsIntegrationsService service.
-// All implementations must embed UnimplementedNotificationsIntegrationsServiceServer
+// KesselNotificationsIntegrationServiceServer is the server API for KesselNotificationsIntegrationService service.
+// All implementations must embed UnimplementedKesselNotificationsIntegrationServiceServer
 // for forward compatibility.
-type NotificationsIntegrationsServiceServer interface {
+type KesselNotificationsIntegrationServiceServer interface {
 	CreateNotificationsIntegration(context.Context, *CreateNotificationsIntegrationRequest) (*CreateNotificationsIntegrationResponse, error)
 	UpdateNotificationsIntegration(context.Context, *UpdateNotificationsIntegrationRequest) (*UpdateNotificationsIntegrationResponse, error)
 	DeleteNotificationsIntegration(context.Context, *DeleteNotificationsIntegrationRequest) (*DeleteNotificationsIntegrationResponse, error)
-	mustEmbedUnimplementedNotificationsIntegrationsServiceServer()
+	mustEmbedUnimplementedKesselNotificationsIntegrationServiceServer()
 }
 
-// UnimplementedNotificationsIntegrationsServiceServer must be embedded to have
+// UnimplementedKesselNotificationsIntegrationServiceServer must be embedded to have
 // forward compatible implementations.
 //
 // NOTE: this should be embedded by value instead of pointer to avoid a nil
 // pointer dereference when methods are called.
-type UnimplementedNotificationsIntegrationsServiceServer struct{}
+type UnimplementedKesselNotificationsIntegrationServiceServer struct{}
 
-func (UnimplementedNotificationsIntegrationsServiceServer) CreateNotificationsIntegration(context.Context, *CreateNotificationsIntegrationRequest) (*CreateNotificationsIntegrationResponse, error) {
+func (UnimplementedKesselNotificationsIntegrationServiceServer) CreateNotificationsIntegration(context.Context, *CreateNotificationsIntegrationRequest) (*CreateNotificationsIntegrationResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CreateNotificationsIntegration not implemented")
 }
-func (UnimplementedNotificationsIntegrationsServiceServer) UpdateNotificationsIntegration(context.Context, *UpdateNotificationsIntegrationRequest) (*UpdateNotificationsIntegrationResponse, error) {
+func (UnimplementedKesselNotificationsIntegrationServiceServer) UpdateNotificationsIntegration(context.Context, *UpdateNotificationsIntegrationRequest) (*UpdateNotificationsIntegrationResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method UpdateNotificationsIntegration not implemented")
 }
-func (UnimplementedNotificationsIntegrationsServiceServer) DeleteNotificationsIntegration(context.Context, *DeleteNotificationsIntegrationRequest) (*DeleteNotificationsIntegrationResponse, error) {
+func (UnimplementedKesselNotificationsIntegrationServiceServer) DeleteNotificationsIntegration(context.Context, *DeleteNotificationsIntegrationRequest) (*DeleteNotificationsIntegrationResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method DeleteNotificationsIntegration not implemented")
 }
-func (UnimplementedNotificationsIntegrationsServiceServer) mustEmbedUnimplementedNotificationsIntegrationsServiceServer() {
+func (UnimplementedKesselNotificationsIntegrationServiceServer) mustEmbedUnimplementedKesselNotificationsIntegrationServiceServer() {
 }
-func (UnimplementedNotificationsIntegrationsServiceServer) testEmbeddedByValue() {}
+func (UnimplementedKesselNotificationsIntegrationServiceServer) testEmbeddedByValue() {}
 
-// UnsafeNotificationsIntegrationsServiceServer may be embedded to opt out of forward compatibility for this service.
-// Use of this interface is not recommended, as added methods to NotificationsIntegrationsServiceServer will
+// UnsafeKesselNotificationsIntegrationServiceServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to KesselNotificationsIntegrationServiceServer will
 // result in compilation errors.
-type UnsafeNotificationsIntegrationsServiceServer interface {
-	mustEmbedUnimplementedNotificationsIntegrationsServiceServer()
+type UnsafeKesselNotificationsIntegrationServiceServer interface {
+	mustEmbedUnimplementedKesselNotificationsIntegrationServiceServer()
 }
 
-func RegisterNotificationsIntegrationsServiceServer(s grpc.ServiceRegistrar, srv NotificationsIntegrationsServiceServer) {
-	// If the following call pancis, it indicates UnimplementedNotificationsIntegrationsServiceServer was
+func RegisterKesselNotificationsIntegrationServiceServer(s grpc.ServiceRegistrar, srv KesselNotificationsIntegrationServiceServer) {
+	// If the following call pancis, it indicates UnimplementedKesselNotificationsIntegrationServiceServer was
 	// embedded by pointer and is nil.  This will cause panics if an
 	// unimplemented method is ever invoked, so we test this at initialization
 	// time to prevent it from happening at runtime later due to I/O.
 	if t, ok := srv.(interface{ testEmbeddedByValue() }); ok {
 		t.testEmbeddedByValue()
 	}
-	s.RegisterService(&NotificationsIntegrationsService_ServiceDesc, srv)
+	s.RegisterService(&KesselNotificationsIntegrationService_ServiceDesc, srv)
 }
 
-func _NotificationsIntegrationsService_CreateNotificationsIntegration_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _KesselNotificationsIntegrationService_CreateNotificationsIntegration_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(CreateNotificationsIntegrationRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(NotificationsIntegrationsServiceServer).CreateNotificationsIntegration(ctx, in)
+		return srv.(KesselNotificationsIntegrationServiceServer).CreateNotificationsIntegration(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: NotificationsIntegrationsService_CreateNotificationsIntegration_FullMethodName,
+		FullMethod: KesselNotificationsIntegrationService_CreateNotificationsIntegration_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(NotificationsIntegrationsServiceServer).CreateNotificationsIntegration(ctx, req.(*CreateNotificationsIntegrationRequest))
+		return srv.(KesselNotificationsIntegrationServiceServer).CreateNotificationsIntegration(ctx, req.(*CreateNotificationsIntegrationRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _NotificationsIntegrationsService_UpdateNotificationsIntegration_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _KesselNotificationsIntegrationService_UpdateNotificationsIntegration_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(UpdateNotificationsIntegrationRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(NotificationsIntegrationsServiceServer).UpdateNotificationsIntegration(ctx, in)
+		return srv.(KesselNotificationsIntegrationServiceServer).UpdateNotificationsIntegration(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: NotificationsIntegrationsService_UpdateNotificationsIntegration_FullMethodName,
+		FullMethod: KesselNotificationsIntegrationService_UpdateNotificationsIntegration_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(NotificationsIntegrationsServiceServer).UpdateNotificationsIntegration(ctx, req.(*UpdateNotificationsIntegrationRequest))
+		return srv.(KesselNotificationsIntegrationServiceServer).UpdateNotificationsIntegration(ctx, req.(*UpdateNotificationsIntegrationRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _NotificationsIntegrationsService_DeleteNotificationsIntegration_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _KesselNotificationsIntegrationService_DeleteNotificationsIntegration_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(DeleteNotificationsIntegrationRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(NotificationsIntegrationsServiceServer).DeleteNotificationsIntegration(ctx, in)
+		return srv.(KesselNotificationsIntegrationServiceServer).DeleteNotificationsIntegration(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: NotificationsIntegrationsService_DeleteNotificationsIntegration_FullMethodName,
+		FullMethod: KesselNotificationsIntegrationService_DeleteNotificationsIntegration_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(NotificationsIntegrationsServiceServer).DeleteNotificationsIntegration(ctx, req.(*DeleteNotificationsIntegrationRequest))
+		return srv.(KesselNotificationsIntegrationServiceServer).DeleteNotificationsIntegration(ctx, req.(*DeleteNotificationsIntegrationRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-// NotificationsIntegrationsService_ServiceDesc is the grpc.ServiceDesc for NotificationsIntegrationsService service.
+// KesselNotificationsIntegrationService_ServiceDesc is the grpc.ServiceDesc for KesselNotificationsIntegrationService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
-var NotificationsIntegrationsService_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "kessel.inventory.v1beta1.NotificationsIntegrationsService",
-	HandlerType: (*NotificationsIntegrationsServiceServer)(nil),
+var KesselNotificationsIntegrationService_ServiceDesc = grpc.ServiceDesc{
+	ServiceName: "kessel.inventory.v1beta1.KesselNotificationsIntegrationService",
+	HandlerType: (*KesselNotificationsIntegrationServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
 			MethodName: "CreateNotificationsIntegration",
-			Handler:    _NotificationsIntegrationsService_CreateNotificationsIntegration_Handler,
+			Handler:    _KesselNotificationsIntegrationService_CreateNotificationsIntegration_Handler,
 		},
 		{
 			MethodName: "UpdateNotificationsIntegration",
-			Handler:    _NotificationsIntegrationsService_UpdateNotificationsIntegration_Handler,
+			Handler:    _KesselNotificationsIntegrationService_UpdateNotificationsIntegration_Handler,
 		},
 		{
 			MethodName: "DeleteNotificationsIntegration",
-			Handler:    _NotificationsIntegrationsService_DeleteNotificationsIntegration_Handler,
+			Handler:    _KesselNotificationsIntegrationService_DeleteNotificationsIntegration_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

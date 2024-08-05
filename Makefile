@@ -31,6 +31,14 @@ api:
 		buf lint && \
 		buf breaking --against 'buf.build/project-kessel/inventory-api' "
 
+.PHONY: api_breaking
+# generate api proto
+api_breaking:
+	@echo "Generating api protos, allowing breaking changes"
+	@$(DOCKER) build -t custom-protoc ./api
+	@$(DOCKER) run -t --rm -v $(PWD)/api:/api -v $(PWD)/openapi.yaml:/openapi.yaml -v $(PWD)/third_party:/third_party \
+	-w=/api/ custom-protoc sh -c "buf generate && \
+		buf lint"
 
 # .PHONY: api
 # # generate api proto

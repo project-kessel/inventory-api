@@ -13,10 +13,6 @@ import (
 	conv "github.com/project-kessel/inventory-api/internal/service/common"
 )
 
-const (
-	resource_type = "rhelhost"
-)
-
 // HostsService handles requests for Rhel hosts
 type HostsService struct {
 	pb.UnimplementedHostsServiceServer
@@ -37,8 +33,8 @@ func (c *HostsService) CreateRhelHost(ctx context.Context, r *pb.CreateRhelHostR
 	}
 
 	//TODO: refactor / abstract resource type strings
-	if !strings.EqualFold(r.Host.Metadata.ResourceType, resource_type) {
-		return nil, errors.BadRequest("BADREQUEST", fmt.Sprintf("incorrect resource type: expected %s", resource_type))
+	if !strings.EqualFold(r.Host.Metadata.ResourceType, biz.ResourceType) {
+		return nil, errors.BadRequest("BADREQUEST", fmt.Sprintf("incorrect resource type: expected %s", biz.ResourceType))
 	}
 
 	identity, err := middleware.GetIdentity(ctx)

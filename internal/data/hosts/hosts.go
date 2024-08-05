@@ -9,7 +9,7 @@ import (
 	"github.com/go-kratos/kratos/v2/log"
 
 	authzapi "github.com/project-kessel/inventory-api/internal/authz/api"
-	models "github.com/project-kessel/inventory-api/internal/biz/hosts"
+	biz "github.com/project-kessel/inventory-api/internal/biz/hosts"
 	eventingapi "github.com/project-kessel/inventory-api/internal/eventing/api"
 	"github.com/project-kessel/inventory-api/internal/middleware"
 )
@@ -32,7 +32,7 @@ func New(g *gorm.DB, a authzapi.Authorizer, e eventingapi.Manager, l *log.Helper
 	}
 }
 
-func (r *hostsRepo) Save(ctx context.Context, model *models.Host) (*models.Host, error) {
+func (r *hostsRepo) Save(ctx context.Context, model *biz.Host) (*biz.Host, error) {
 	identity, err := middleware.GetIdentity(ctx)
 	if err != nil {
 		return nil, nil
@@ -45,10 +45,10 @@ func (r *hostsRepo) Save(ctx context.Context, model *models.Host) (*models.Host,
 	if r.Eventer != nil {
 		// TODO: handle eventing errors
 		// TODO: Update the Object that's sent.  This is going to be what we actually emit.
-		producer, _ := r.Eventer.Lookup(identity, "rhelhost", model.ID)
+		producer, _ := r.Eventer.Lookup(identity, biz.ResourceType, model.ID)
 		evt := &eventingapi.Event{
 			EventType:    "Create",
-			ResourceType: "rhelhost",
+			ResourceType: biz.ResourceType,
 			Object:       model,
 		}
 		producer.Produce(ctx, evt)
@@ -56,7 +56,7 @@ func (r *hostsRepo) Save(ctx context.Context, model *models.Host) (*models.Host,
 	return model, nil
 }
 
-func (r *hostsRepo) Update(context.Context, *models.Host, string) (*models.Host, error) {
+func (r *hostsRepo) Update(context.Context, *biz.Host, string) (*biz.Host, error) {
 	return nil, nil
 }
 
@@ -64,18 +64,18 @@ func (r *hostsRepo) Delete(context.Context, string) error {
 	return nil
 }
 
-func (r *hostsRepo) FindByID(context.Context, string) (*models.Host, error) {
+func (r *hostsRepo) FindByID(context.Context, string) (*biz.Host, error) {
 	return nil, nil
 }
 
-func (r *hostsRepo) ListAll(context.Context) ([]*models.Host, error) {
-	// var model models.Host
+func (r *hostsRepo) ListAll(context.Context) ([]*biz.Host, error) {
+	// var model biz.Host
 	// var count int64
 	// if err := r.Db.Model(&model).Count(&count).Error; err != nil {
 	// 	return nil, err
 	// }
 
-	var results []*models.Host
+	var results []*biz.Host
 	if err := r.Db.Preload(clause.Associations).Find(&results).Error; err != nil {
 		return nil, err
 	}

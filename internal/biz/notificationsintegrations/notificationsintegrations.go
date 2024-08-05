@@ -6,6 +6,10 @@ import (
 	"github.com/go-kratos/kratos/v2/log"
 )
 
+const (
+	ResourceType = "notifications-integration"
+)
+
 // NotificationsIntegration is a NotificationsIntegration repo.
 type NotificationsIntegrationRepo interface {
 	Save(context.Context, *NotificationsIntegration) (*NotificationsIntegration, error)

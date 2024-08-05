@@ -6,6 +6,42 @@ info:
     title: Kessel Asset Inventory API
     version: 0.10.1
 paths:
+    /api/inventory/v1/livez:
+        get:
+            tags:
+                - InventoryHealthService
+            operationId: InventoryHealthService_GetLivez
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/GetLivezResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+    /api/inventory/v1/readyz:
+        get:
+            tags:
+                - InventoryHealthService
+            operationId: InventoryHealthService_GetReadyz
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/GetReadyzResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
     /api/inventory/v1beta1/hosts:
         post:
             tags:
@@ -476,6 +512,22 @@ components:
         DeleteResourceRelationshipByURNResponse:
             type: object
             properties: {}
+        GetLivezResponse:
+            type: object
+            properties:
+                status:
+                    type: string
+                code:
+                    type: integer
+                    format: uint32
+        GetReadyzResponse:
+            type: object
+            properties:
+                status:
+                    type: string
+                code:
+                    type: integer
+                    format: uint32
         GoogleProtobufAny:
             type: object
             properties:
@@ -755,6 +807,7 @@ components:
             properties: {}
 tags:
     - name: HostsService
+    - name: InventoryHealthService
     - name: K8SClustersService
     - name: NotificationsIntegrationsService
     - name: PoliciesService

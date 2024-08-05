@@ -1,14 +1,16 @@
 {
+  "host": {
     "metadata": {
-        "resource_type": "rhelhost",
-        "workspace": ""
+      "resource_type": "rhel-host",
+      "workspace": ""
     },
-    "reporter_data":{
-        "reporter_instance_id": "user@example.com",
-        "reporter_instance_type": "Reporter_typeEnum_OCM",
-        "reporter_version": "0.1",
-        "local_resource_id": "1",
-        "api_href": "www.example.com",
-        "console_href": "www.example.com"
+    "reporter_data": {
+      "reporter_type": "REPORTER_TYPE_OCM",
+      "reporter_instance_id": "user@example.com",
+      "reporter_version": "0.1",
+      "local_resource_id": "1",
+      "api_href": "www.example.com",
+      "console_href": "www.example.com"
     }
+  }
 }

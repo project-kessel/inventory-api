@@ -3,6 +3,7 @@ package grpc
 import (
 	"github.com/go-kratos/kratos/v2/middleware"
 	"github.com/go-kratos/kratos/v2/middleware/recovery"
+	"github.com/go-kratos/kratos/v2/middleware/selector"
 	kgrpc "github.com/go-kratos/kratos/v2/transport/grpc"
 )
 
@@ -13,7 +14,9 @@ func New(c CompletedConfig, authn middleware.Middleware) *kgrpc.Server {
 	var opts = []kgrpc.ServerOption{
 		kgrpc.Middleware(
 			recovery.Recovery(),
-			authn,
+			selector.Server(
+				authn,
+			).Match(NewWhiteListMatcher).Build(),
 		),
 	}
 	opts = append(opts, c.ServerOptions...)

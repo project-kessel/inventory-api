@@ -9,7 +9,7 @@ import (
 
 // PoliciesService handles requests for RHEL hosts
 type PoliciesService struct {
-	v1beta1.UnimplementedPoliciesServiceServer
+	v1beta1.UnimplementedKesselPolicyServiceServer
 
 	Controller *controller.PolicyUsecase
 }

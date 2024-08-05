@@ -65,7 +65,7 @@ func ReportersFromModel(in []*biz.Reporter) []*pb.ReporterData {
 	for _, r := range in {
 		reporters = append(reporters, &pb.ReporterData{
 			ReporterInstanceId: r.ReporterID,
-			ReporterType:       pb.ReporterData_ReporterTypeEnum(pb.ReporterData_ReporterTypeEnum_value[r.ReporterType]),
+			ReporterType:       pb.ReporterData_ReporterType(pb.ReporterData_ReporterType_value[r.ReporterType]),
 			ReporterVersion:    r.ReporterVersion,
 
 			LocalResourceId: r.LocalResourceId,

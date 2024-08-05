@@ -39,7 +39,7 @@ func RegisterKesselK8SClusterServiceHTTPServer(s *http.Server, srv KesselK8SClus
 func _KesselK8SClusterService_CreateK8SCluster0_HTTP_Handler(srv KesselK8SClusterServiceHTTPServer) func(ctx http.Context) error {
 	return func(ctx http.Context) error {
 		var in CreateK8SClusterRequest
-		if err := ctx.Bind(&in.K8SCluster); err != nil {
+		if err := ctx.Bind(&in); err != nil {
 			return err
 		}
 		if err := ctx.BindQuery(&in); err != nil {
@@ -61,7 +61,7 @@ func _KesselK8SClusterService_CreateK8SCluster0_HTTP_Handler(srv KesselK8SCluste
 func _KesselK8SClusterService_UpdateK8SCluster0_HTTP_Handler(srv KesselK8SClusterServiceHTTPServer) func(ctx http.Context) error {
 	return func(ctx http.Context) error {
 		var in UpdateK8SClusterRequest
-		if err := ctx.Bind(&in.K8SCluster); err != nil {
+		if err := ctx.Bind(&in); err != nil {
 			return err
 		}
 		if err := ctx.BindQuery(&in); err != nil {
@@ -125,7 +125,7 @@ func (c *KesselK8SClusterServiceHTTPClientImpl) CreateK8SCluster(ctx context.Con
 	path := binding.EncodeURL(pattern, in, false)
 	opts = append(opts, http.Operation(OperationKesselK8SClusterServiceCreateK8sCluster))
 	opts = append(opts, http.PathTemplate(pattern))
-	err := c.cc.Invoke(ctx, "POST", path, in.K8SCluster, &out, opts...)
+	err := c.cc.Invoke(ctx, "POST", path, in, &out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -151,7 +151,7 @@ func (c *KesselK8SClusterServiceHTTPClientImpl) UpdateK8SCluster(ctx context.Con
 	path := binding.EncodeURL(pattern, in, false)
 	opts = append(opts, http.Operation(OperationKesselK8SClusterServiceUpdateK8sCluster))
 	opts = append(opts, http.PathTemplate(pattern))
-	err := c.cc.Invoke(ctx, "PUT", path, in.K8SCluster, &out, opts...)
+	err := c.cc.Invoke(ctx, "PUT", path, in, &out, opts...)
 	if err != nil {
 		return nil, err
 	}

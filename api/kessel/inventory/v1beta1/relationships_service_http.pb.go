@@ -39,7 +39,7 @@ func RegisterKesselPolicyRelationshipServiceHTTPServer(s *http.Server, srv Kesse
 func _KesselPolicyRelationshipService_CreatePolicyRelationship0_HTTP_Handler(srv KesselPolicyRelationshipServiceHTTPServer) func(ctx http.Context) error {
 	return func(ctx http.Context) error {
 		var in CreatePolicyRelationshipRequest
-		if err := ctx.Bind(&in.PolicyRelationship); err != nil {
+		if err := ctx.Bind(&in); err != nil {
 			return err
 		}
 		if err := ctx.BindQuery(&in); err != nil {
@@ -61,7 +61,7 @@ func _KesselPolicyRelationshipService_CreatePolicyRelationship0_HTTP_Handler(srv
 func _KesselPolicyRelationshipService_UpdateResourceRelationshipByUrnHs0_HTTP_Handler(srv KesselPolicyRelationshipServiceHTTPServer) func(ctx http.Context) error {
 	return func(ctx http.Context) error {
 		var in UpdateResourceRelationshipByUrnHsRequest
-		if err := ctx.Bind(&in.PolicyRelationship); err != nil {
+		if err := ctx.Bind(&in); err != nil {
 			return err
 		}
 		if err := ctx.BindQuery(&in); err != nil {
@@ -119,7 +119,7 @@ func (c *KesselPolicyRelationshipServiceHTTPClientImpl) CreatePolicyRelationship
 	path := binding.EncodeURL(pattern, in, false)
 	opts = append(opts, http.Operation(OperationKesselPolicyRelationshipServiceCreatePolicyRelationship))
 	opts = append(opts, http.PathTemplate(pattern))
-	err := c.cc.Invoke(ctx, "POST", path, in.PolicyRelationship, &out, opts...)
+	err := c.cc.Invoke(ctx, "POST", path, in, &out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -145,7 +145,7 @@ func (c *KesselPolicyRelationshipServiceHTTPClientImpl) UpdateResourceRelationsh
 	path := binding.EncodeURL(pattern, in, false)
 	opts = append(opts, http.Operation(OperationKesselPolicyRelationshipServiceUpdateResourceRelationshipByUrnHs))
 	opts = append(opts, http.PathTemplate(pattern))
-	err := c.cc.Invoke(ctx, "PUT", path, in.PolicyRelationship, &out, opts...)
+	err := c.cc.Invoke(ctx, "PUT", path, in, &out, opts...)
 	if err != nil {
 		return nil, err
 	}

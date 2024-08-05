@@ -15,7 +15,7 @@ import (
 
 // HostsService handles requests for Rhel hosts
 type HostsService struct {
-	pb.UnimplementedHostsServiceServer
+	pb.UnimplementedKesselRhelHostServiceServer
 
 	Ctl *biz.HostUsecase
 }

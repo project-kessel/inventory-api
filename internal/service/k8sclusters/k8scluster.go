@@ -9,7 +9,7 @@ import (
 
 // K8sClustersService handles requests for k8s clusters
 type K8sClustersService struct {
-	v1beta1.UnimplementedK8SClustersServiceServer
+	v1beta1.UnimplementedKesselK8SClusterServiceServer
 
 	Controller *controller.K8sClusterUsecase
 }

@@ -39,7 +39,7 @@ func RegisterKesselPolicyServiceHTTPServer(s *http.Server, srv KesselPolicyServi
 func _KesselPolicyService_CreatePolicy0_HTTP_Handler(srv KesselPolicyServiceHTTPServer) func(ctx http.Context) error {
 	return func(ctx http.Context) error {
 		var in CreatePolicyRequest
-		if err := ctx.Bind(&in.Policy); err != nil {
+		if err := ctx.Bind(&in); err != nil {
 			return err
 		}
 		if err := ctx.BindQuery(&in); err != nil {
@@ -61,7 +61,7 @@ func _KesselPolicyService_CreatePolicy0_HTTP_Handler(srv KesselPolicyServiceHTTP
 func _KesselPolicyService_UpdatePolicy0_HTTP_Handler(srv KesselPolicyServiceHTTPServer) func(ctx http.Context) error {
 	return func(ctx http.Context) error {
 		var in UpdatePolicyRequest
-		if err := ctx.Bind(&in.Policy); err != nil {
+		if err := ctx.Bind(&in); err != nil {
 			return err
 		}
 		if err := ctx.BindQuery(&in); err != nil {
@@ -125,7 +125,7 @@ func (c *KesselPolicyServiceHTTPClientImpl) CreatePolicy(ctx context.Context, in
 	path := binding.EncodeURL(pattern, in, false)
 	opts = append(opts, http.Operation(OperationKesselPolicyServiceCreatePolicy))
 	opts = append(opts, http.PathTemplate(pattern))
-	err := c.cc.Invoke(ctx, "POST", path, in.Policy, &out, opts...)
+	err := c.cc.Invoke(ctx, "POST", path, in, &out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -151,7 +151,7 @@ func (c *KesselPolicyServiceHTTPClientImpl) UpdatePolicy(ctx context.Context, in
 	path := binding.EncodeURL(pattern, in, false)
 	opts = append(opts, http.Operation(OperationKesselPolicyServiceUpdatePolicy))
 	opts = append(opts, http.PathTemplate(pattern))
-	err := c.cc.Invoke(ctx, "PUT", path, in.Policy, &out, opts...)
+	err := c.cc.Invoke(ctx, "PUT", path, in, &out, opts...)
 	if err != nil {
 		return nil, err
 	}

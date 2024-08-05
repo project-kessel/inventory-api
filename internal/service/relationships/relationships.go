@@ -9,7 +9,7 @@ import (
 
 // RelationshipsService handles requests for RHEL hosts
 type RelationshipsService struct {
-	v1beta1.UnimplementedRelationshipsServiceServer
+	v1beta1.UnimplementedKesselPolicyRelationshipServiceServer
 
 	Controller *controller.RelationshipUsecase
 }
@@ -25,7 +25,7 @@ func (c *RelationshipsService) CreateRelationship(ctx context.Context, r *v1beta
 	return nil, nil
 }
 
-func (c *RelationshipsService) UpdateResourceRelationshipByUrnHs(ctx context.Context, r *v1beta1.UpdateResourceRelationshipByUrnHsRequest) (*v1beta1.UpdateResourceRelationshipByUrnResponse, error) {
+func (c *RelationshipsService) UpdateResourceRelationshipByUrnHs(ctx context.Context, r *v1beta1.UpdateResourceRelationshipByUrnHsRequest) (*v1beta1.UpdateResourceRelationshipByUrnHsResponse, error) {
 	return nil, nil
 }
 

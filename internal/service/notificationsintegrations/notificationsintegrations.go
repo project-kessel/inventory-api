@@ -15,7 +15,7 @@ import (
 
 // NotificationsIntegrationsService handles requests for Notifications Integrations
 type NotificationsIntegrationsService struct {
-	pb.UnimplementedNotificationsIntegrationsServiceServer
+	pb.UnimplementedKesselNotificationsIntegrationServiceServer
 
 	Ctl *biz.NotificationsIntegrationUsecase
 }

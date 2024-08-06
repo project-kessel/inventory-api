@@ -31,7 +31,7 @@ type Metadata struct {
 	// Write only reporter specific data
 	Reporters []*Reporter
 
-	Tags []*Tag
+	Labels []*Label
 }
 
 type Reporter struct {
@@ -65,7 +65,7 @@ type Reporter struct {
 	ApiHref     string
 }
 
-type Tag struct {
+type Label struct {
 	ID         int64 `gorm:"primaryKey"`
 	MetadataID int64
 

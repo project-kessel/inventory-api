@@ -93,8 +93,8 @@ func (c *Config) Complete() (CompletedConfig, error) {
 
 func NewWhiteListMatcher(ctx context.Context, operation string) bool {
 	whiteList := make(map[string]struct{})
-	whiteList["/api.kessel.inventory.v1.InventoryHealthService/GetReadyz"] = struct{}{}
-	whiteList["/api.kessel.inventory.v1.InventoryHealthService/GetLivez"] = struct{}{}
+	whiteList["/kessel.inventory.v1.KesselInventoryHealthService/GetReadyz"] = struct{}{}
+	whiteList["/kessel.inventory.v1.KesselInventoryHealthService/GetLivez"] = struct{}{}
 	whiteList["/grpc.health.v1.Health/Check"] = struct{}{}
 	if _, ok := whiteList[operation]; ok {
 		return false

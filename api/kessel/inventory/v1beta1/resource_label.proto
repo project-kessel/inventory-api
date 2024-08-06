@@ -6,6 +6,9 @@ option go_package = "github.com/project-kessel/inventory-api/api/kessel/inventor
 option java_multiple_files = true;
 option java_package = "org.project_kessel.api.inventory.v1beta1";
 
-import "kessel/inventory/v1beta1/resource_tag.proto";
+message ResourceLabel {
 
-message ResourceTags { repeated ResourceTag tags = 3552281; }
+  string key = 106079;
+
+  string value = 111972721;
+}

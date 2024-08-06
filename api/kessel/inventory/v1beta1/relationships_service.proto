@@ -5,7 +5,7 @@ package kessel.inventory.v1beta1;
 import "google/api/annotations.proto";
 
 import "kessel/inventory/v1beta1/policy_relationship.proto";
-import "kessel/inventory/v1beta1/update_resource_relationship_by_urnhs_resources_parameter.proto";
+import "kessel/inventory/v1beta1/resource_relationship_reference.proto";
 
 option go_package = "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1";
 option java_multiple_files = true;
@@ -21,11 +21,11 @@ message CreatePolicyRelationshipResponse {
   PolicyRelationship policy_relationship = 1;
 }
 
-message UpdateResourceRelationshipByUrnHsRequest {
+message UpdateResourceRelationshipRequest {
   // The subject {resource} and the object {resource}. A relationship is between
   // a Subject and an Object, e.g. a Policy (subject) has a propagated
   // relationship to an k8s cluster (object)
-  UpdateResourceRelationshipByUrnHsResourcesParameter resources = 1;
+  ResourceRelationshipReference resources = 1;
   // Update a resource relationship in Kessel Asset Inventory by the {subject
   // resource, object resource}. A relationship is between a Subject and an
   // Object, e.g. a Policy (subject) has a propagated relationship to an k8s
@@ -34,16 +34,18 @@ message UpdateResourceRelationshipByUrnHsRequest {
   PolicyRelationship policy_relationship = 2;
 }
 
-message UpdateResourceRelationshipByUrnHsResponse {}
+message UpdateResourceRelationshipResponse {}
 
-message DeleteResourceRelationshipByUrnRequest {
+message DeleteResourceRelationshipRequest {
   // The subject {resource} and the object {resource}. A relationship is between
   // a Subject and an Object, e.g. a Policy (subject) has a propagated
   // relationship to an k8s cluster (object)
-  UpdateResourceRelationshipByUrnHsResourcesParameter resources = 1;
+  oneof relationship {
+    ResourceRelationshipReference resources = 1;
+  };
 }
 
-message DeleteResourceRelationshipByUrnResponse {}
+message DeleteResourceRelationshipResponse {}
 
 service KesselPolicyRelationshipService {
   rpc CreatePolicyRelationship(CreatePolicyRelationshipRequest) returns (CreatePolicyRelationshipResponse) {
@@ -53,14 +55,14 @@ service KesselPolicyRelationshipService {
     };
   };
 
-  rpc UpdateResourceRelationshipByUrnHs(UpdateResourceRelationshipByUrnHsRequest) returns (UpdateResourceRelationshipByUrnHsResponse) {
+  rpc UpdateResourceRelationship(UpdateResourceRelationshipRequest) returns (UpdateResourceRelationshipResponse) {
     option (google.api.http) = {
       put: "/api/inventory/v1beta1/policyRelationships"
       body : "*"
     };
   };
 
-  rpc DeleteResourceRelationshipByUrn(DeleteResourceRelationshipByUrnRequest) returns (DeleteResourceRelationshipByUrnResponse) {
+  rpc DeleteResourceRelationship(DeleteResourceRelationshipRequest) returns (DeleteResourceRelationshipResponse) {
     option (google.api.http) = {
       delete: "/api/inventory/v1beta1/policyRelationships"
     };

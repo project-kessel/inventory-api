@@ -74,15 +74,22 @@ func init() {
 
 	configHelp := fmt.Sprintf("config file (default is $PWD/.%s.yaml)", Name)
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", configHelp)
-	viper.BindPFlag("config", rootCmd.PersistentFlags().Lookup("config"))
-
+	err := viper.BindPFlag("config", rootCmd.PersistentFlags().Lookup("config"))
+	if err != nil {
+		panic(err)
+	}
 	migrateCmd := migrate.NewCommand(options.Storage, log.With(rootLog, "group", "storage"))
 	rootCmd.AddCommand(migrateCmd)
-	viper.BindPFlags(migrateCmd.Flags())
-
+	err = viper.BindPFlags(migrateCmd.Flags())
+	if err != nil {
+		panic(err)
+	}
 	serveCmd := serve.NewCommand(options.Server, options.Storage, options.Authn, options.Authz, options.Eventing, log.With(rootLog, "group", "server"))
 	rootCmd.AddCommand(serveCmd)
-	viper.BindPFlags(serveCmd.Flags())
+	err = viper.BindPFlags(serveCmd.Flags())
+	if err != nil {
+		panic(err)
+	}
 }
 
 // initConfig reads in config file and ENV variables if set.
@@ -125,5 +132,8 @@ func initConfig() {
 	}
 
 	// put the values into the options struct.
-	viper.Unmarshal(&options)
+	err := viper.Unmarshal(&options)
+	if err != nil {
+		panic(err)
+	}
 }

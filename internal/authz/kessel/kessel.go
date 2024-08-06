@@ -33,9 +33,9 @@ func (a *KesselAuthz) Check(ctx context.Context, r *kessel.CheckRequest) (*kesse
 }
 
 func (a *KesselAuthz) CreateTuples(ctx context.Context, r *kessel.CreateTuplesRequest) (*kessel.CreateTuplesResponse, error) {
-	return a.CreateTuples(ctx, r)
+	return a.TupleService.CreateTuples(ctx, r)
 }
 
 func (a *KesselAuthz) DeleteTuples(ctx context.Context, r *kessel.DeleteTuplesRequest) (*kessel.DeleteTuplesResponse, error) {
-	return a.DeleteTuples(ctx, r)
+	return a.TupleService.DeleteTuples(ctx, r)
 }

@@ -22,9 +22,9 @@ func New() *ClientCertAuthenticator {
 func (a *ClientCertAuthenticator) Authenticate(ctx context.Context, t transport.Transporter) (*api.Identity, api.Decision) {
 	var cert *x509.Certificate
 
-	switch t.(type) {
+	switch t := t.(type) {
 	case *khttp.Transport:
-		tr, _ := t.(*khttp.Transport)
+		tr := t
 		r := tr.Request()
 
 		if r.TLS == nil {

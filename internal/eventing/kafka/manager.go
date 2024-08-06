@@ -123,6 +123,9 @@ func (p *kafkaProducer) Produce(ctx context.Context, event *api.Event) error {
 
 	// TODO: flesh out the cloudevent structure
 	e := cloudevents.NewEvent()
-	e.SetData(cloudevents.ApplicationJSON, event)
+	err := e.SetData(cloudevents.ApplicationJSON, event)
+	if err != nil {
+		return err
+	}
 	return p.Manager.Client.Send(cecontext.WithTopic(ctx, p.Topic), e)
 }

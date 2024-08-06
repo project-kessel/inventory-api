@@ -54,7 +54,10 @@ func (o *OAuth2Authenticator) Authenticate(ctx context.Context, t transport.Tran
 	// TODO: make JWT claim fields configurable
 	// extract the claims we care about
 	u := &Claims{}
-	tok.Claims(u)
+	err = tok.Claims(u)
+	if err != nil {
+		return nil, api.Deny
+	}
 	if u.Id == "" {
 		return nil, api.Deny
 	}

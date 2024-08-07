@@ -3,7 +3,7 @@ This repository implements a common inventory system with eventing.
 
 ```bash
 make init
-make api
+make api_breaking
 make build
 ./bin/inventory-api migrate --config .inventory-api.yaml
 ./bin/inventory-api serve --config .inventory-api.yaml

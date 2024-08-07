@@ -30,7 +30,7 @@ message UpdateResourceRelationshipByUrnHsRequest {
   // resource, object resource}. A relationship is between a Subject and an
   // Object, e.g. a Policy (subject) has a propagated relationship to an k8s
   // cluster (object).. The {resource} format
-  // \"<reporter_data.reporter_type>:<reporter_data.reporter_id>::<reporter_data.resourceId_alias>\".
+  // \"<reporter_data.reporter_type>:<reporter_data.resourceId_alias>\".
   PolicyRelationship policy_relationship = 2;
 }
 

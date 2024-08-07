@@ -1,0 +1,55 @@
+Generating api protos
+[1/2] STEP 1/12: FROM registry.access.redhat.com/ubi8/ubi-minimal:8.10 AS builder
+[1/2] STEP 2/12: ARG TARGETARCH
+--> Using cache 9a02b263d226a331ecd27b1bafa5ae8321b0c48cd5a01318e4fac0660999eb36
+--> 9a02b263d226
+[1/2] STEP 3/12: USER root
+--> Using cache 5d081bc7289020e1f865ffd25d152912ee3d90257ec63c3f99e718df541f23e2
+--> 5d081bc72890
+[1/2] STEP 4/12: RUN microdnf install -y tar gzip unzip
+--> Using cache 8974ea1309c1d433446ce0ec5f8eea5b9593e07012c585fbbaefa5ffc8853280
+--> 8974ea1309c1
+[1/2] STEP 5/12: RUN curl -O -J  https://dl.google.com/go/go1.22.5.linux-${TARGETARCH}.tar.gz
+--> Using cache a7cee8ab809e65788c01f6e7fd5e1d3961ab05a56ff811fa263c3f69229de1a4
+--> a7cee8ab809e
+[1/2] STEP 6/12: RUN tar -C /usr/local -xzf go1.22.5.linux-${TARGETARCH}.tar.gz
+--> Using cache 6ce3ab7eb4ec63ac65908f809dd2263ac0c05de1694f195d7f0d6ab074ef5138
+--> 6ce3ab7eb4ec
+[1/2] STEP 7/12: RUN ln -s /usr/local/go/bin/go /usr/local/bin/go
+--> Using cache 9ecaa9e70d0a51e9b01374f9ee6809233db7ede691c22011087187f2073813e9
+--> 9ecaa9e70d0a
+[1/2] STEP 8/12: RUN go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+--> Using cache 89242fbce14d84c55f95456876a04e078678a4db7e51734706fbae1afa004e45
+--> 89242fbce14d
+[1/2] STEP 9/12: RUN go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
+--> Using cache 8fb02a708a9c6a086d83882c17ae344bb57b976f342c6254434ded314a5628fc
+--> 8fb02a708a9c
+[1/2] STEP 10/12: RUN go install github.com/go-kratos/kratos/cmd/protoc-gen-go-http/v2@latest
+--> Using cache 8b2a427ead34d9782973618addff4ad38e257b46ec4d96d7fdcd26863df2aac8
+--> 8b2a427ead34
+[1/2] STEP 11/12: RUN go install github.com/envoyproxy/protoc-gen-validate@latest
+--> Using cache fa55da5ccabbb26d6966fc1b87cb4dc6d996db2ee51f6ce0704fc65db76f8b22
+--> fa55da5ccabb
+[1/2] STEP 12/12: RUN go install github.com/bufbuild/buf/cmd/buf@latest
+--> Using cache cfcd42e93b38c2064e203d90e982cb1f0cad037fffc85a7a39af66045b6ab007
+--> cfcd42e93b38
+[2/2] STEP 1/6: FROM registry.access.redhat.com/ubi8/ubi-minimal:8.10
+[2/2] STEP 2/6: COPY --from=builder /root/go/bin/protoc-gen-go /usr/local/bin/protoc-gen-go
+--> Using cache 2018a99b2c148faf13839c8a3986fea265ef28be7e40854333faa67be0453ea5
+--> 2018a99b2c14
+[2/2] STEP 3/6: COPY --from=builder /root/go/bin/protoc-gen-go-grpc /usr/local/bin/protoc-gen-go-grpc
+--> Using cache c2c8e20dcdd79000ac68bdd89f1678d96a882ac8785e49178e4c229639341708
+--> c2c8e20dcdd7
+[2/2] STEP 4/6: COPY --from=builder /root/go/bin/protoc-gen-go-http /usr/local/bin/protoc-gen-go-http
+--> Using cache 79e54fa07d2ad810e5887891a2ae04125943cada4ea304a2c9a07c6168a4a34c
+--> 79e54fa07d2a
+[2/2] STEP 5/6: COPY --from=builder /root/go/bin/protoc-gen-validate /usr/local/bin/protoc-gen-validate
+--> Using cache 75ba0881042e1d30e9fad98684d7459fa72858dcc8649b48f3b510b89d2059d4
+--> 75ba0881042e
+[2/2] STEP 6/6: COPY --from=builder /root/go/bin/buf /usr/local/bin/buf
+--> Using cache 3abd66573bfd8f13869cc902a8d5c669466283f0dc9e8ebbade69633967acb59
+[2/2] COMMIT custom-protoc
+--> 3abd66573bfd
+Successfully tagged localhost/custom-protoc:latest
+3abd66573bfd8f13869cc902a8d5c669466283f0dc9e8ebbade69633967acb59
+kessel/inventory/v1beta1/metadata.proto:14:1:Previously present field "1" with name "natural_id" on message "Metadata" was deleted.

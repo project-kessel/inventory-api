@@ -15,13 +15,10 @@ func MetadataFromPb(in *pb.Metadata, reporter *pb.ReporterData, identity *authna
 	}
 
 	return &biz.Metadata{
-		ID:        in.Id,
-		NaturalId: in.NaturalId,
-
-		ResourceType: in.ResourceType,
-		Workspace:    in.Workspace,
-		Labels:       labels,
-
+		ID:              in.Id,
+		ResourceType:    in.ResourceType,
+		Workspace:       in.Workspace,
+		Labels:          labels,
 		FirstReportedBy: identity.Principal,
 		LastReportedBy:  identity.Principal,
 
@@ -34,11 +31,9 @@ func ReporterFromPb(in *pb.ReporterData, identity *authnapi.Identity) *biz.Repor
 		ReporterID:      identity.Principal,
 		ReporterType:    in.ReporterType.String(),
 		ReporterVersion: in.ReporterVersion,
-
 		LocalResourceId: in.LocalResourceId,
-
-		ConsoleHref: in.ConsoleHref,
-		ApiHref:     in.ApiHref,
+		ConsoleHref:     in.ConsoleHref,
+		ApiHref:         in.ApiHref,
 	}
 }
 
@@ -50,7 +45,6 @@ func MetadataFromModel(in *biz.Metadata) *pb.Metadata {
 
 	return &pb.Metadata{
 		Id:              in.ID,
-		NaturalId:       in.NaturalId,
 		ResourceType:    in.ResourceType,
 		FirstReported:   timestamppb.New(in.CreatedAt),
 		LastReported:    timestamppb.New(in.UpdatedAt),

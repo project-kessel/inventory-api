@@ -15,9 +15,6 @@ message Metadata {
   // Kessel Asset Inventory generated identifier.
   int64 id = 3355 [ (google.api.field_behavior) = OUTPUT_ONLY ];
 
-  // Some identifier intrinsic to the resource itself that is unique across reporters
-  string natural_id = 1;
-
   // The type of the Resource
   string resource_type = 442752204;
 

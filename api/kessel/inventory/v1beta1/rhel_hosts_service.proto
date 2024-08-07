@@ -27,7 +27,7 @@ message CreateRhelHostResponse {
 
 message UpdateRhelHostRequest {
   // A resource instance using the format:
-  // \"<reporter_data.reporter_type>:<reporter_data.reporter_id>::<reporter_data.resourceId_alias>\"
+  // \"<reporter_data.reporter_type>:<reporter_data.resourceId_alias>\"
   string resource = 1 [
     (google.api.field_behavior) = REQUIRED
   ];
@@ -41,7 +41,7 @@ message UpdateRhelHostResponse {}
 
 message DeleteRhelHostRequest {
   // A resource instance using the format:
-  // \"<reporter_data.reporter_type>:<reporter_data.reporter_id>::<reporter_data.resourceId_alias>\"
+  // \"<reporter_data.reporter_type>:<reporter_data.resourceId_alias>\"
   string resource = 1 [
     (google.api.field_behavior) = REQUIRED
   ];

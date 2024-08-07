@@ -8,9 +8,6 @@ type Metadata struct {
 	// Kessel Asset Inventory generated identifier.
 	ID int64 `gorm:"primaryKey"`
 
-	// Some identifier intrinsic to the resource itself that is unique across reporters
-	NaturalId string `gorm:"unique"`
-
 	// These fields / names have special meaning to gorm, which will handle them automatically.
 	CreatedAt time.Time
 	UpdatedAt time.Time

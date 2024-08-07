@@ -22,7 +22,7 @@ message CreateK8sClusterResponse {
 
 message UpdateK8sClusterRequest {
   // The {resource} format
-  // \"<reporter_data.reporter_type>:<reporter_data.reporter_id>::<reporter_data.resourceId_alias>\".
+  // \"<reporter_data.reporter_type>:<reporter_data.resourceId_alias>\".
   string resource = 1;
   // The k8s clsuter to update
   K8sCluster k8s_cluster = 2;
@@ -32,7 +32,7 @@ message UpdateK8sClusterResponse {}
 
 message DeleteK8sClusterRequest {
   // The {resource} format
-  // \"<reporter_data.reporter_type>:<reporter_data.reporter_id>::<reporter_data.resourceId_alias>\".
+  // \"<reporter_data.reporter_type>:<reporter_data.resourceId_alias>\".
   string resource = 1;
 }
 

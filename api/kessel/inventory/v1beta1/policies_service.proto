@@ -22,7 +22,7 @@ message CreatePolicyResponse {
 
 message UpdatePolicyRequest {
   // The {resource} format
-  // \"<reporter_data.reporter_type>:<reporter_data.reporter_id>::<reporter_data.resourceId_alias>\".
+  // \"<reporter_data.reporter_type>:<reporter_data.resourceId_alias>\".
   string resource = 1;
   // The Policy to update in Kessel Asset Inventory
   Policy policy = 2;
@@ -32,7 +32,7 @@ message UpdatePolicyResponse {}
 
 message DeletePolicyRequest {
   // The {resource} format
-  // \"<reporter_data.reporter_type>:<reporter_data.reporter_id>::<reporter_data.resourceId_alias>\".
+  // \"<reporter_data.reporter_type>:<reporter_data.resourceId_alias>\".
   string resource = 1;
 }
 

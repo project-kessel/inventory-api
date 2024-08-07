@@ -123,7 +123,7 @@ type UpdateK8SClusterRequest struct {
 	unknownFields protoimpl.UnknownFields
 
 	// The {resource} format
-	// \"<reporter_data.reporter_type>:<reporter_data.reporter_id>::<reporter_data.resourceId_alias>\".
+	// \"<reporter_data.reporter_type>:<reporter_data.resourceId_alias>\".
 	Resource string `protobuf:"bytes,1,opt,name=resource,proto3" json:"resource,omitempty"`
 	// The k8s clsuter to update
 	K8SCluster *K8SCluster `protobuf:"bytes,2,opt,name=k8s_cluster,json=k8sCluster,proto3" json:"k8s_cluster,omitempty"`
@@ -219,7 +219,7 @@ type DeleteK8SClusterRequest struct {
 	unknownFields protoimpl.UnknownFields
 
 	// The {resource} format
-	// \"<reporter_data.reporter_type>:<reporter_data.reporter_id>::<reporter_data.resourceId_alias>\".
+	// \"<reporter_data.reporter_type>:<reporter_data.resourceId_alias>\".
 	Resource string `protobuf:"bytes,1,opt,name=resource,proto3" json:"resource,omitempty"`
 }
 

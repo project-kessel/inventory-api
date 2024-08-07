@@ -97,29 +97,26 @@ func initConfig() {
 	if cfgFile != "" {
 		viper.SetConfigFile(cfgFile)
 	} else {
-		configFilePath, exists := os.LookupEnv("INVENTORY_API_CONFIG")
-		if !exists {
-			log.Fatal("Environment variable INVENTORY_API_CONFIG is not set")
-		}
-		absPath, err := filepath.Abs(configFilePath)
-		if err != nil {
-			log.Fatalf("Failed to resolve absolute path for config file: %v", err)
-		}
-		// Set the config file path
-		viper.SetConfigFile(absPath)
-		if err := viper.ReadInConfig(); err != nil {
-			log.Fatalf("Error reading INVENTORY_API_CONFIG file, %s", err)
-		}
+		if configFilePath, exists := os.LookupEnv("INVENTORY_API_CONFIG"); exists {
+			absPath, err := filepath.Abs(configFilePath)
+			if err != nil {
+				log.Fatalf("Failed to resolve absolute path for config file: %v", err)
+			}
+			// Set the config file path
+			viper.SetConfigFile(absPath)
+			if err := viper.ReadInConfig(); err != nil {
+				log.Fatalf("Error reading INVENTORY_API_CONFIG file, %s", err)
+			}
+		} else {
+			home, err := os.UserHomeDir()
+			cobra.CheckErr(err)
 
-		// home, err := os.UserHomeDir()
-		// cobra.CheckErr(err)
-		//
-		// viper.AddConfigPath(".")
-		// viper.AddConfigPath(home)
-		// viper.SetConfigType("yaml")
-		//
-		// configName := Name
-		// viper.SetConfigName(configName)
+			viper.AddConfigPath(".")
+			viper.AddConfigPath(home)
+			viper.SetConfigType("yaml")
+
+			viper.SetConfigName("." + Name)
+		}
 	}
 
 	viper.SetEnvPrefix(Name)
@@ -127,8 +124,9 @@ func initConfig() {
 
 	if err := viper.ReadInConfig(); err != nil {
 		panic(err)
-		// msg := fmt.Sprintf("Using config file: %s", viper.ConfigFileUsed())
-		// logger.Debug(msg)
+	} else {
+		msg := fmt.Sprintf("Using config file: %s", viper.ConfigFileUsed())
+		logger.Debug(msg)
 	}
 
 	// put the values into the options struct.

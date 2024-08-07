@@ -1,6 +1,7 @@
 {
   "host": {
     "metadata": {
+      "naturalId": "2",
       "resource_type": "rhel-host",
       "workspace": ""
     },

@@ -102,6 +102,12 @@ inventory-down:
 run: build
 	go run main.go serve --config .inventory-api.yaml
 
+.PHONY: migrate
+# run database migrations
+migrate: build
+	./bin/inventory-api migrate --config .inventory-api.yaml
+
+
 help:
 # show help
 	@echo ''

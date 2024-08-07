@@ -10,8 +10,8 @@ type Decision string
 
 const (
 	Allow  Decision = "ALLOW"
-	Deny            = "DENY"
-	Ignore          = "IGNORE"
+	Deny   Decision = "DENY"
+	Ignore Decision = "IGNORE"
 )
 
 type Authenticator interface {

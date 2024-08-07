@@ -51,7 +51,10 @@ func (r *hostsRepo) Save(ctx context.Context, model *biz.Host) (*biz.Host, error
 			ResourceType: biz.ResourceType,
 			Object:       model,
 		}
-		producer.Produce(ctx, evt)
+		err = producer.Produce(ctx, evt)
+		if err != nil {
+			return nil, err
+		}
 	}
 	return model, nil
 }

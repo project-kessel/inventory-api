@@ -1,13 +1,32 @@
 # Common Inventory
 This repository implements a common inventory system with eventing.
 
+
+## Setup
 ```bash
 make init
-make api_breaking
-make build
-make migrate
-./bin/inventory-api serve --config .inventory-api.yaml
 ```
+## API Changes (check against buf repository)
+`make api`
+
+## API Breaking Changes
+`make api_breaking`
+
+## Build
+`make build`
+
+## Run inventory api locally
+### Run migration
+`make migrate`
+### Run service
+`make run`
+
+
+## Run docker-compose to setup
+```make inventory-up``` to setup inventory-api, relations-api, spicedb, postgres
+
+## Tear down docker-compose
+`make inventory-down`
 
 
 ## Example Usage
@@ -15,5 +34,9 @@ make migrate
 To add hosts to the inventory, use the following `curl` command:
 
 ```bash
-curl -H "Authorization: Bearer 1234" -H "Content-Type: application/json" --data "@data/host.json" http://localhost:8080/api/inventory/v1beta1/rhelHosts
+curl -H "Content-Type: application/json" --data "@data/host.json" http://localhost:8081/api/inventory/v1beta1/rhelHosts
 ```
+
+## Contribution
+`make pr-check`
+

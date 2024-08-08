@@ -21,8 +21,8 @@ FROM registry.access.redhat.com/ubi8/ubi-minimal:8.10
 
 COPY --from=builder /workspace/bin/inventory-api /usr/local/bin/
 
-EXPOSE 8080
-EXPOSE 9080
+EXPOSE 8081
+EXPOSE 9081
 
 USER 1001
 ENV PATH="$PATH:/usr/local/bin"

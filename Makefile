@@ -1,6 +1,9 @@
 GOHOSTOS:=$(shell go env GOHOSTOS)
 GOPATH:=$(shell go env GOPATH)
+
+ifeq ($(DOCKER),)
 DOCKER:=$(shell command -v podman || command -v docker)
+endif
 
 API_PROTO_FILES:=$(shell find api -name *.proto)
 
@@ -26,7 +29,7 @@ init:
 api:
 	@echo "Generating api protos"
 	@$(DOCKER) build -t custom-protoc ./api
-	@$(DOCKER) run -t --rm -v $(PWD)/api:/api -v $(PWD)/openapi.yaml:/openapi.yaml -v $(PWD)/third_party:/third_party \
+	@$(DOCKER) run -t --rm -v $(PWD)/api:/api:rw,z -v $(PWD)/openapi.yaml:/openapi.yaml:rw,z -v $(PWD)/third_party:/third_party:ro,z \
 	-w=/api/ custom-protoc sh -c "buf generate && \
 		buf lint && \
 		buf breaking --against 'buf.build/project-kessel/inventory-api' "
@@ -36,7 +39,7 @@ api:
 api_breaking:
 	@echo "Generating api protos, allowing breaking changes"
 	@$(DOCKER) build -t custom-protoc ./api
-	@$(DOCKER) run -t --rm -v $(PWD)/api:/api -v $(PWD)/openapi.yaml:/openapi.yaml -v $(PWD)/third_party:/third_party \
+	@$(DOCKER) run -t --rm -v $(PWD)/api:/api:rw,z -v $(PWD)/openapi.yaml:/openapi.yaml:rw,z -v $(PWD)/third_party:/third_party:ro,z \
 	-w=/api/ custom-protoc sh -c "buf generate && \
 		buf lint"
 

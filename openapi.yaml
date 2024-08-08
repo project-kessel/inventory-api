@@ -532,6 +532,7 @@ components:
                     type: string
                     description: Kessel Asset Inventory generated identifier.
                 resourceType:
+                    readOnly: true
                     type: string
                     description: The type of the Resource
                 firstReported:

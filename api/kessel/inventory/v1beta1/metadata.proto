@@ -16,7 +16,8 @@ message Metadata {
   int64 id = 3355 [ (google.api.field_behavior) = OUTPUT_ONLY ];
 
   // The type of the Resource
-  string resource_type = 442752204;
+  string resource_type = 442752204
+      [ (google.api.field_behavior) = OUTPUT_ONLY ];
 
   // Date and time when the inventory item was first reported.
   google.protobuf.Timestamp first_reported = 13874816

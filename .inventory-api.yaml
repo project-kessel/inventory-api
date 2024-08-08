@@ -1,11 +1,10 @@
 server:
   http:
-    address: localhost:8080
+    address: localhost:8081
   grpc:
-    address: localhost:9080
+    address: localhost:9081
 authn:
-  psk:
-    pre-shared-key-file: config/psks.yaml 
+   allow-unauthenticated: true
 authz:
   impl: allow-all
 eventing:

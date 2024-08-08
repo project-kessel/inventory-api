@@ -59,10 +59,6 @@ func (c *Config) Complete() CompletedConfig {
 		dsnBuilder.WriteString(fmt.Sprintf("sslrootcert=%s ", c.SSLRootCert))
 	}
 
-	for k, v := range c.Extra {
-		dsnBuilder.WriteString(fmt.Sprintf("%s=%s ", k, v))
-	}
-
 	dsn := strings.TrimSpace(dsnBuilder.String())
 
 	return CompletedConfig{&completedConfig{DSN: dsn}}

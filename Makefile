@@ -1,7 +1,8 @@
 GOHOSTOS:=$(shell go env GOHOSTOS)
 GOPATH:=$(shell go env GOPATH)
+
 ifeq ($(DOCKER),)
-DOCKER:=$(shell type -P podman || type -P docker)
+DOCKER:=$(shell command -v podman || command -v docker)
 endif
 
 API_PROTO_FILES:=$(shell find api -name *.proto)

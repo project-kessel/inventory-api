@@ -35,7 +35,8 @@ var (
 		"trace.id", tracing.TraceID(),
 		"span.id", tracing.SpanID(),
 	)
-	logger = log.NewHelper(rootLog)
+
+	logger = log.NewHelper(log.NewFilter(rootLog, log.FilterLevel(log.LevelInfo)))
 
 	rootCmd = &cobra.Command{
 		Use:     Name,

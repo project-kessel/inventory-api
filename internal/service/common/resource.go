@@ -51,6 +51,7 @@ func MetadataFromModel(in *biz.Metadata) *pb.Metadata {
 		FirstReportedBy: in.FirstReportedBy,
 		LastReportedBy:  in.LastReportedBy,
 		Labels:          labels,
+		Workspace:       in.Workspace,
 	}
 }
 

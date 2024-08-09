@@ -1,0 +1,154 @@
+apiVersion: template.openshift.io/v1
+kind: Template
+metadata:
+  name: inventory
+objects:
+  - apiVersion: v1
+    kind: Secret
+    metadata:
+      name: postgres-secret
+    stringData:
+      POSTGRESQL_DATABASE: authz
+      POSTGRESQL_USER: authz
+      POSTGRESQL_PASSWORD: SuperSecretPassword
+  - apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: inventory-api-config
+    data:
+      server-config.yaml: |
+        server:
+          http:
+            address: 0.0.0.0:8081
+          grpc:
+            address: 0.0.0.0:9081
+        authn:
+          allow-unauthenticated: true
+        authz:
+          impl: allow-all
+        eventing:
+          eventer: stdout
+          kafka:
+        storage:
+          database: postgres
+          sqlite3:
+            dsn: inventory.db
+          postgres:
+            host: "invdatabase"
+            port: "5433"
+            user: "authz"
+            password: "SuperSecretPassword"
+            dbname: "authz"
+  - apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      labels:
+        app: invpostgres
+      name: invpostgres
+    spec:
+      selector:
+        matchLabels:
+          app: invpostgres
+      template:
+        metadata:
+          labels:
+            app: invpostgres
+        spec:
+          containers:
+          - env:
+            - name: POSTGRESQL_DATABASE
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret
+                  key: POSTGRESQL_DATABASE
+            - name: POSTGRESQL_USER
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret
+                  key: POSTGRESQL_USER
+            - name: POSTGRESQL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret
+                  key: POSTGRESQL_PASSWORD
+            - name: PGDATA
+              value: /temp/data
+            image: registry.redhat.io/rhel9/postgresql-15:1-54
+            imagePullPolicy: Always
+            name: postgres
+            ports:
+            - containerPort: 5432
+              protocol: TCP
+            resources:
+              limits:
+                cpu: 60m
+                memory: 256Mi
+              requests:
+                cpu: 30m
+                memory: 128Mi
+          restartPolicy: Always
+  - apiVersion: v1
+    kind: Service
+    metadata:
+      labels:
+        app: invpostgres
+      name: invpostgres
+    spec:
+      ports:
+      - name: http
+        port: 5432
+        protocol: TCP
+      selector:
+        app: invpostgres
+  - apiVersion: cloud.redhat.com/v1alpha1
+    kind: ClowdApp
+    metadata:
+      name: inventory
+    spec:
+      envName: ${ENV_NAME}
+#      testing:
+#        iqePlugin: inventory_api
+      replicas: 1
+      deployments:
+        - name: inventory
+          podSpec:
+            image: ${INVENTORY_IMAGE}:${INVENTORY_IMAGE_TAG}
+            livenessProbe:
+              httpGet:
+                path: /api/inventory/v1/livez
+                port: 8081
+            readinessProbe:
+              httpGet:
+                path: /api/inventory/v1/readyz
+                port: 8081
+            env:
+              - name: INVENTORY_API_CONFIG
+                value: "/inventory-api-compose.yaml"
+            volumeMounts:
+                - name: config-volume
+                  mountPath: /inventory-api-compose.yaml
+                  subPath: inventory-api-compose.yaml
+#                - name: psks-volume
+#                  mountPath: /psks.yaml
+#                  subPath: psks.yaml
+            volumes:
+              - name: config-volume
+                configMap:
+                  name: inventory-api-config
+          webServices:
+            public:
+              enabled: true
+              apiPath: inventory
+parameters:
+  - description: Name of the ClowdApp
+    name: CLOWDAPP_NAME
+    value: inventory
+  - description : ClowdEnvironment name
+    name: ENV_NAME
+    value: insights-ephemeral
+  - description: App Image
+    name: INVENTORY_IMAGE
+    value: quay.io/cloudservices/kessel-inventory
+  - description: Image Tag
+    name: INVENTORY_IMAGE_TAG
+    value: latest

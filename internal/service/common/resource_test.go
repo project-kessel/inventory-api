@@ -1,9 +1,9 @@
 package common
 
 import (
-	"github.com/magiconair/properties/assert"
 	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1"
 	biz "github.com/project-kessel/inventory-api/internal/biz/common"
+	"github.com/stretchr/testify/assert"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"testing"
 	"time"

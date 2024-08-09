@@ -10,13 +10,16 @@ RUN tar -C /usr/local -xzf go1.22.5.linux-${TARGETARCH}.tar.gz
 RUN ln -s /usr/local/go/bin/go /usr/local/bin/go
 
 # Install protoc plugins
-RUN go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
-RUN go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
-RUN go install github.com/go-kratos/kratos/cmd/protoc-gen-go-http/v2@latest
-RUN go install github.com/envoyproxy/protoc-gen-validate@latest
-RUN go install github.com/google/gnostic/cmd/protoc-gen-openapi@latest
+# Latest versions as of 2024-08-08
+RUN go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.34.2
+RUN go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.5.1
+RUN go install github.com/go-kratos/kratos/cmd/protoc-gen-go-http/v2@v2.0.0-20240725023016-d6fca5e3e984
+RUN go install github.com/envoyproxy/protoc-gen-validate@v1.1.0
+RUN go install github.com/google/gnostic/cmd/protoc-gen-openapi@v0.7.0
+
 # Install Buf
-RUN go install github.com/bufbuild/buf/cmd/buf@latest
+# Latest versions as of 2024-08-08
+RUN go install github.com/bufbuild/buf/cmd/buf@v1.36.0
 
 FROM registry.access.redhat.com/ubi8/ubi-minimal:8.10
 

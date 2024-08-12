@@ -40,3 +40,20 @@ curl -H "Content-Type: application/json" --data "@data/host.json" http://localho
 ## Contribution
 `make pr-check`
 
+
+## Running Inventory api with sso (keycloak) docker compose setup
+`make inventory-up-sso`
+
+* Set up a keycloak instance running at port 8084 with [myrealm](myrealm.json)
+* Set up a default service account with clientId: `test-svc` and password. Refer [get-token](scripts/get-token.sh)
+* Refer [sso-invetory-api.yaml](sso-inventory-api.yaml) for configuration
+* Refer [docker-compose-sso.yaml](docker-compose-sso.yaml) for docker-compose
+
+Use service account user as `reporter_instance_id`
+```
+"reporter_instance_id": "service-account-svc-test"
+```
+Refer [host-service-account.json](data/host-service-account.json)
+
+### Generate a sso token
+`make get-token`

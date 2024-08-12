@@ -7,7 +7,7 @@
     '''\/example.*\.pem$''',
                 
     # Ignore anything with the word funkymonkey anywhere in the path
-    '''foobar''','''yPsw5e6ab4bvAGe5H''',
+    '''foobar''','''yPsw5e6ab4bvAGe5H''','''h91qw8bPiDj9R6VSORsI5TYbceGU5PMH''',
 
     # Ignore some long path
     '''examples\/some\/long\/path\/server.key$''',
@@ -17,4 +17,5 @@
   regexes = [
     # Ignore lines containing pickles
     '''yPsw5e6ab4bvAGe5H''',
+    '''h91qw8bPiDj9R6VSORsI5TYbceGU5PMH''',
   ]

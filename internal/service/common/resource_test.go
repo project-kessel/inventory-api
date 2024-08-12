@@ -118,6 +118,43 @@ func TestMetadataFromPb(t *testing.T) {
 	assert.Equal(t, actual, &expected)
 }
 
+func TestReporterFromPb(t *testing.T) {
+	firstReported := time.Time{}.Add(100)
+	lastReported := firstReported.Add(500)
+
+	actual := ReporterFromPb(&pb.ReporterData{
+		ReporterType:       pb.ReporterData_REPORTER_TYPE_ACM,
+		ReporterInstanceId: "id-01",
+		FirstReported:      timestamppb.New(firstReported),
+		LastReported:       timestamppb.New(lastReported),
+		ConsoleHref:        "console-href",
+		ApiHref:            "api-href",
+		LocalResourceId:    "local-res-01",
+		ReporterVersion:    "version-123",
+	}, &authnapi.Identity{
+		Tenant:     "",
+		Principal:  "principal-01",
+		Groups:     nil,
+		IsReporter: false,
+		Type:       "",
+		Href:       "",
+		IsGuest:    false,
+	})
+	expected := biz.Reporter{
+		MetadataID:      0,
+		ReporterID:      "principal-01",
+		ReporterType:    pb.ReporterData_REPORTER_TYPE_ACM.String(),
+		CreatedAt:       firstReported,
+		UpdatedAt:       lastReported,
+		LocalResourceId: "local-res-01",
+		ReporterVersion: "version-123",
+		ConsoleHref:     "console-href",
+		ApiHref:         "api-href",
+	}
+
+	assert.Equal(t, actual, &expected)
+}
+
 func TestMetadataFromModel(t *testing.T) {
 	created := time.Time{}.Add(100)
 	updated := created.Add(500)
@@ -127,4 +164,62 @@ func TestMetadataFromModel(t *testing.T) {
 	expected := createPbMetadata(created, updated)
 
 	assert.Equal(t, actual, &expected)
+}
+
+func TestReportersFromModel(t *testing.T) {
+	created1 := time.Time{}.Add(100)
+	updated1 := created1.Add(500)
+
+	created2 := time.Time{}.Add(200)
+	updated2 := created2.Add(333)
+
+	actual := ReportersFromModel([]*biz.Reporter{
+		{
+			MetadataID:      100,
+			ReporterID:      "reporter-01",
+			ReporterType:    pb.ReporterData_REPORTER_TYPE_ACM.String(),
+			CreatedAt:       created1,
+			UpdatedAt:       updated1,
+			LocalResourceId: "local-resource-1",
+			ReporterVersion: "reporter-version-1",
+			ConsoleHref:     "console-href-1",
+			ApiHref:         "api-href-1",
+		},
+		{
+			MetadataID:      233,
+			ReporterID:      "reporter-02",
+			ReporterType:    pb.ReporterData_REPORTER_TYPE_OCM.String(),
+			CreatedAt:       created2,
+			UpdatedAt:       updated2,
+			LocalResourceId: "local-resource-2",
+			ReporterVersion: "reporter-version-2",
+			ConsoleHref:     "console-href-2",
+			ApiHref:         "api-href-2",
+		},
+	})
+
+	expected := []*pb.ReporterData{
+		{
+			ReporterType:       pb.ReporterData_REPORTER_TYPE_ACM,
+			ReporterInstanceId: "reporter-01",
+			FirstReported:      timestamppb.New(created1),
+			LastReported:       timestamppb.New(updated1),
+			ConsoleHref:        "console-href-1",
+			ApiHref:            "api-href-1",
+			LocalResourceId:    "local-resource-1",
+			ReporterVersion:    "reporter-version-1",
+		},
+		{
+			ReporterType:       pb.ReporterData_REPORTER_TYPE_OCM,
+			ReporterInstanceId: "reporter-02",
+			FirstReported:      timestamppb.New(created2),
+			LastReported:       timestamppb.New(updated2),
+			ConsoleHref:        "console-href-2",
+			ApiHref:            "api-href-2",
+			LocalResourceId:    "local-resource-2",
+			ReporterVersion:    "reporter-version-2",
+		},
+	}
+
+	assert.Equal(t, expected, actual)
 }

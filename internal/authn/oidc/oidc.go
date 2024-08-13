@@ -27,7 +27,7 @@ func New(c CompletedConfig) (*OAuth2Authenticator, error) {
 		return nil, err
 	}
 
-	oidcConfig := &coreosoidc.Config{ClientID: c.ClientId}
+	oidcConfig := &coreosoidc.Config{ClientID: c.ClientId, SkipClientIDCheck: c.SkipClientIDCheck, SkipIssuerCheck: c.SkipIssuerCheck}
 	return &OAuth2Authenticator{
 		CompletedConfig: c,
 		ClientContext:   ctx,
@@ -62,8 +62,10 @@ func (o *OAuth2Authenticator) Authenticate(ctx context.Context, t transport.Tran
 		return nil, api.Deny
 	}
 
-	if u.Audience != o.CompletedConfig.ClientId {
-		return nil, api.Deny
+	if o.EnforceAudCheck {
+		if u.Audience != o.CompletedConfig.ClientId {
+			return nil, api.Deny
+		}
 	}
 
 	// TODO: What are the tenant and group claims?
@@ -75,6 +77,7 @@ func (o *OAuth2Authenticator) Authenticate(ctx context.Context, t transport.Tran
 type Claims struct {
 	Id       string `json:"preferred_username"`
 	Audience string `json:"aud"`
+	Issuer   string `json:"iss"`
 }
 
 func (l *OAuth2Authenticator) Verify(token string) (*coreosoidc.IDToken, error) {

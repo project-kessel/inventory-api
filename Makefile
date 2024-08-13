@@ -101,9 +101,21 @@ pr-check:
 inventory-up:
 	./scripts/start-inventory.sh
 
+.PHONY: inventory-up-sso
+inventory-up-sso:
+	./scripts/start-inventory-kc.sh
+
+.PHONY: get-token
+get-token:
+	./scripts/get-token.sh
+
 .PHONY: inventory-down
 inventory-down:
 	./scripts/stop-inventory.sh
+
+.PHONY: inventory-down-sso
+inventory-down-sso:
+	./scripts/stop-inventory-kc.sh
 
 .PHONY: run
 # run api locally

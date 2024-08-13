@@ -56,6 +56,11 @@ api_breaking:
 build:
 	mkdir -p bin/ && go build -ldflags "-X cmd.Version=$(VERSION)" -o ./bin/ ./...
 
+.PHONY: clean
+# removes all binaries
+clean:
+	rm -rf bin/
+
 .PHONY: test
 # run all tests
 test:

@@ -46,7 +46,7 @@ curl -H "Content-Type: application/json" --data "@data/host.json" http://localho
 
 * Set up a keycloak instance running at port 8084 with [myrealm](myrealm.json)
 * Set up a default service account with clientId: `test-svc` and password. Refer [get-token](scripts/get-token.sh)
-* Refer [sso-invetory-api.yaml](sso-inventory-api.yaml) for configuration
+* Refer [sso-inventory-api.yaml](sso-inventory-api.yaml) for configuration
 * Refer [docker-compose-sso.yaml](docker-compose-sso.yaml) for docker-compose
 
 Use service account user as `reporter_instance_id`

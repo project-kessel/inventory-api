@@ -64,9 +64,13 @@ clean:
 .PHONY: test
 # run all tests
 test:
-	@echo ""
-	@echo "Running tests."
-	go test ./... -count=1
+	@echo "" 
+	@echo "Running tests." 
+	@go test ./... -count=1 -coverprofile=coverage.out 
+	@echo "Overall test coverage:" 
+	@go tool cover -func=coverage.out | grep total: | awk '{print $$3}' 
+	@rm coverage.out
+
 
 .PHONY: generate
 # generate

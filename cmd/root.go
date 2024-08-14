@@ -42,6 +42,19 @@ var (
 		Use:     Name,
 		Version: Version,
 		Short:   "A simple common inventory system",
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			if err := viper.ReadInConfig(); err != nil {
+				return err
+			} else {
+				msg := fmt.Sprintf("Using config file: %s", viper.ConfigFileUsed())
+				logger.Debug(msg)
+			}
+
+			// put the values into the options struct.
+			err := viper.Unmarshal(&options)
+
+			return err
+		},
 	}
 
 	options = struct {
@@ -122,17 +135,4 @@ func initConfig() {
 
 	viper.SetEnvPrefix(Name)
 	viper.AutomaticEnv()
-
-	if err := viper.ReadInConfig(); err != nil {
-		panic(err)
-	} else {
-		msg := fmt.Sprintf("Using config file: %s", viper.ConfigFileUsed())
-		logger.Debug(msg)
-	}
-
-	// put the values into the options struct.
-	err := viper.Unmarshal(&options)
-	if err != nil {
-		panic(err)
-	}
 }

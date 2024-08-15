@@ -60,6 +60,6 @@ func TestRootCommand(t *testing.T) {
 func TestInvalidConfigFile(t *testing.T) {
 	rootCmd.SetArgs([]string{"migrate", "--config", "not-found"})
 	assert.Panics(t, func() {
-		rootCmd.Execute()
+		_ = rootCmd.Execute()
 	})
 }

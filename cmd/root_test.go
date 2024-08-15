@@ -20,7 +20,7 @@ func (m *MockedCommandRun) RunE(cmd *cobra.Command, args []string) error {
 func setupMockRunE() map[string]*MockedCommandRun {
 	mocks := make(map[string]*MockedCommandRun)
 
-	for _, cmd := range rootCmd.Commands() {
+	for _, cmd := range append(rootCmd.Commands(), rootCmd) {
 		mockedCommandRunE := new(MockedCommandRun)
 		mockedCommandRunE.On("RunE", mock.Anything, mock.Anything).Return(nil)
 		mocks[cmd.Name()] = mockedCommandRunE
@@ -43,10 +43,10 @@ func assertCommandCalled(t *testing.T, command string, mocked map[string]*Mocked
 }
 
 func TestRootCommand(t *testing.T) {
-	commands := []string{"migrate", "serve"}
+	commands := []string{"migrate", "serve", ""} // root command
 	for _, command := range commands {
 		t.Run(command+" by setting storage.database to postgres", func(t *testing.T) {
-			rootCmd.SetArgs([]string{command, "--storage.database=postgres"})
+			rootCmd.SetArgs([]string{command, "--config", "../.inventory-api.yaml", "--storage.database=postgres"})
 
 			mocked := setupMockRunE()
 			assert.Nil(t, rootCmd.Execute())
@@ -55,4 +55,11 @@ func TestRootCommand(t *testing.T) {
 			assert.Equal(t, "postgres", viper.GetString("storage.database"))
 		})
 	}
+}
+
+func TestInvalidConfigFile(t *testing.T) {
+	rootCmd.SetArgs([]string{"migrate", "--config", "not-found"})
+	assert.Panics(t, func() {
+		rootCmd.Execute()
+	})
 }

@@ -34,7 +34,5 @@ func NewCommand(options *storage.Options, logger log.Logger) *cobra.Command {
 		},
 	}
 
-	options.AddFlags(cmd.Flags(), "storage")
-
 	return cmd
 }

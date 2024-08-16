@@ -42,19 +42,6 @@ var (
 		Use:     Name,
 		Version: Version,
 		Short:   "A simple common inventory system",
-		PreRunE: func(cmd *cobra.Command, args []string) error {
-			if err := viper.ReadInConfig(); err != nil {
-				return err
-			} else {
-				msg := fmt.Sprintf("Using config file: %s", viper.ConfigFileUsed())
-				logger.Debug(msg)
-			}
-
-			// put the values into the options struct.
-			err := viper.Unmarshal(&options)
-
-			return err
-		},
 	}
 
 	options = struct {
@@ -118,9 +105,6 @@ func initConfig() {
 			}
 			// Set the config file path
 			viper.SetConfigFile(absPath)
-			if err := viper.ReadInConfig(); err != nil {
-				log.Fatalf("Error reading INVENTORY_API_CONFIG file, %s", err)
-			}
 		} else {
 			home, err := os.UserHomeDir()
 			cobra.CheckErr(err)
@@ -135,4 +119,11 @@ func initConfig() {
 
 	viper.SetEnvPrefix(Name)
 	viper.AutomaticEnv()
+
+	if err := viper.ReadInConfig(); err != nil {
+		log.Fatalf("Failed to read config file: %v", err)
+	}
+	if err := viper.Unmarshal(&options); err != nil {
+		log.Fatalf("Failed to unmarshal config to options: %v", err)
+	}
 }

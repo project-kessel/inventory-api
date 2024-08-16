@@ -8,7 +8,9 @@ endif
 API_PROTO_FILES:=$(shell find api -name *.proto)
 
 TITLE:="Kessel Asset Inventory API"
+ifeq ($(VERSION),)
 VERSION:=$(shell git describe --tags --always)
+endif
 INVENTORY_SCHEMA_VERSION=0.11.0
 
 .PHONY: init
@@ -103,11 +105,11 @@ pr-check:
 
 .PHONY: inventory-up
 inventory-up:
-	./scripts/start-inventory.sh
+	INVENTORY_VERSION=$(VERSION) ./scripts/start-inventory.sh
 
 .PHONY: inventory-up-sso
 inventory-up-sso:
-	./scripts/start-inventory-kc.sh
+	INVENTORY_VERSION=$(VERSION)  ./scripts/start-inventory-kc.sh
 
 .PHONY: get-token
 get-token:

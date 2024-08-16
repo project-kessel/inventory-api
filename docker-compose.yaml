@@ -8,6 +8,8 @@ services:
 #      - "INVENTORY_API_STORAGE_POSTGRES_PASSWORD=${POSTGRES_PASSWORD}"
     build:
       dockerfile: Dockerfile
+      args:
+        VERSION: $INVENTORY_VERSION
     volumes:
       - ./inventory-api-compose.yaml:/inventory-api-compose.yaml:ro,z
       - ./config/psks.yaml:/psks.yaml:ro,z
@@ -22,6 +24,8 @@ services:
       INVENTORY_API_CONFIG: /inventory-api-compose.yaml
     build:
       dockerfile: Dockerfile
+      args:
+        VERSION: $INVENTORY_VERSION
     volumes:
       - ./inventory-api-compose.yaml:/inventory-api-compose.yaml:ro,z
     command: ["migrate"]

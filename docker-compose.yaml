@@ -9,7 +9,7 @@ services:
     build:
       dockerfile: Dockerfile
       args:
-        VERSION: $INVENTORY_VERSION
+        VERSION: dev
     volumes:
       - ./inventory-api-compose.yaml:/inventory-api-compose.yaml:ro,z
       - ./config/psks.yaml:/psks.yaml:ro,z
@@ -25,7 +25,7 @@ services:
     build:
       dockerfile: Dockerfile
       args:
-        VERSION: $INVENTORY_VERSION
+        VERSION: dev
     volumes:
       - ./inventory-api-compose.yaml:/inventory-api-compose.yaml:ro,z
     command: ["migrate"]

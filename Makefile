@@ -105,11 +105,11 @@ pr-check:
 
 .PHONY: inventory-up
 inventory-up:
-	INVENTORY_VERSION=$(VERSION) ./scripts/start-inventory.sh
+	./scripts/start-inventory.sh
 
 .PHONY: inventory-up-sso
 inventory-up-sso:
-	INVENTORY_VERSION=$(VERSION)  ./scripts/start-inventory-kc.sh
+	./scripts/start-inventory-kc.sh
 
 .PHONY: get-token
 get-token:

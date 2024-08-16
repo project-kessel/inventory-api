@@ -37,6 +37,31 @@ To add hosts to the inventory, use the following `curl` command:
 curl -H "Content-Type: application/json" --data "@data/host.json" http://localhost:8081/api/inventory/v1beta1/rhelHosts
 ```
 
+Depending on the config file you're using, the curl command will require additional headers for authorization of the request.
+
+### Running with `make run`
+
+We are using the included `.inventory-api.yaml` file which allows guest access.
+Guest access currently [makes use](https://github.com/project-kessel/inventory-api/blob/main/internal/authn/guest/guest.go#L20) of the `user-agent` header to
+populate the Identity header.
+
+[data/host.json](./data/host.json) uses the `reporter_id: user@example.com`, hence you will need the following command:
+
+```bash
+curl -H "Content-Type: application/json" --user-agent user@example.com --data "@data/host.json" http://localhost:8081/api/inventory/v1beta1/rhelHosts
+```
+
+### Running with `make inventory-up`
+
+This provides a [PSK file](https://github.com/project-kessel/inventory-api/blob/main/config/psks.yaml#L1) with a token "1234".
+The default port in this setup are `8081` (http) and `9091`.
+
+The following command will add the host to the inventory:
+
+```bash
+curl -H "Content-Type: application/json" -H "Authorization: bearer 1234" --data "@data/host.json" http://localhost:8081/api/inventory/v1beta1/rhelHosts
+```
+
 ## Contribution
 `make pr-check`
 

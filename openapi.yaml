@@ -265,11 +265,11 @@ paths:
                 - KesselPolicyRelationshipService
             operationId: KesselPolicyRelationshipService_DeleteResourceRelationshipByUrn
             parameters:
-                - name: resources.subjectResource
+                - name: resources.subject_resource
                   in: query
                   schema:
                     type: string
-                - name: resources.objectResource
+                - name: resources.object_resource
                   in: query
                   schema:
                     type: string
@@ -366,14 +366,14 @@ components:
         kessel.inventory.v1beta1.CreateK8sClusterRequest:
             type: object
             properties:
-                k8sCluster:
+                k8s_cluster:
                     allOf:
                         - $ref: '#/components/schemas/kessel.inventory.v1beta1.K8sCluster'
                     description: The k8s cluster to create in Kessel Asset Inventory
         kessel.inventory.v1beta1.CreateK8sClusterResponse:
             type: object
             properties:
-                k8sCluster:
+                k8s_cluster:
                     allOf:
                         - $ref: '#/components/schemas/kessel.inventory.v1beta1.K8sCluster'
                     description: The K8s cluster created in Kessel Asset Inventory
@@ -398,14 +398,14 @@ components:
         kessel.inventory.v1beta1.CreatePolicyRelationshipRequest:
             type: object
             properties:
-                policyRelationship:
+                policy_relationship:
                     allOf:
                         - $ref: '#/components/schemas/kessel.inventory.v1beta1.PolicyRelationship'
                     description: The resource relationship to create in Kessel Asset Inventory
         kessel.inventory.v1beta1.CreatePolicyRelationshipResponse:
             type: object
             properties:
-                policyRelationship:
+                policy_relationship:
                     allOf:
                         - $ref: '#/components/schemas/kessel.inventory.v1beta1.PolicyRelationship'
                     description: The resource relationship created in Kessel Asset Inventory
@@ -465,7 +465,7 @@ components:
                     allOf:
                         - $ref: '#/components/schemas/kessel.inventory.v1beta1.Metadata'
                     description: Metadata about this resource
-                reporterData:
+                reporter_data:
                     writeOnly: true
                     allOf:
                         - $ref: '#/components/schemas/kessel.inventory.v1beta1.ReporterData'
@@ -483,22 +483,22 @@ components:
         kessel.inventory.v1beta1.K8sClusterDetail:
             type: object
             properties:
-                externalClusterId:
+                external_cluster_id:
                     type: string
                     description: The OCP cluster ID or ARN etc for *KS
-                clusterStatus:
+                cluster_status:
                     type: integer
                     format: enum
-                kubeVersion:
+                kube_version:
                     type: string
                     description: The version of kubernetes
-                kubeVendor:
+                kube_vendor:
                     type: integer
                     format: enum
-                vendorVersion:
+                vendor_version:
                     type: string
                     description: The version of the productized kubernetes distribution
-                cloudPlatform:
+                cloud_platform:
                     type: integer
                     format: enum
                 nodes:
@@ -531,25 +531,25 @@ components:
                     readOnly: true
                     type: string
                     description: Kessel Asset Inventory generated identifier.
-                resourceType:
+                resource_type:
                     readOnly: true
                     type: string
                     description: The type of the Resource
-                firstReported:
+                first_reported:
                     readOnly: true
                     type: string
                     description: Date and time when the inventory item was first reported.
                     format: date-time
-                lastReported:
+                last_reported:
                     readOnly: true
                     type: string
                     description: Date and time when the inventory item was last updated.
                     format: date-time
-                firstReportedBy:
+                first_reported_by:
                     readOnly: true
                     type: string
                     description: Identifier of the reporter that first reported on this item.
-                lastReportedBy:
+                last_reported_by:
                     readOnly: true
                     type: string
                     description: Identifier of the reporter that last reported on this item.
@@ -571,7 +571,7 @@ components:
                     allOf:
                         - $ref: '#/components/schemas/kessel.inventory.v1beta1.Metadata'
                     description: Metadata about this resource
-                reporterData:
+                reporter_data:
                     writeOnly: true
                     allOf:
                         - $ref: '#/components/schemas/kessel.inventory.v1beta1.ReporterData'
@@ -593,7 +593,7 @@ components:
                     allOf:
                         - $ref: '#/components/schemas/kessel.inventory.v1beta1.Metadata'
                     description: Metadata about this resource
-                reporterData:
+                reporter_data:
                     writeOnly: true
                     allOf:
                         - $ref: '#/components/schemas/kessel.inventory.v1beta1.ReporterData'
@@ -620,16 +620,16 @@ components:
         kessel.inventory.v1beta1.PolicyRelationship:
             type: object
             properties:
-                relationshipType:
+                relationship_type:
                     type: string
                     description: The type of Resource relationship
-                policyId:
+                policy_id:
                     type: string
                     description: |-
                         The resource ID assigned to the resource by Kessel Asset Inventory. A
                          reporter alias may also be used as a resource ID using the format:
                          \"hcrn:<reporter_data.reporter_type>:<reporter_data.reporter_id>::<reporter_data.resourceId_alias>\"
-                k8sClusterId:
+                k8s_cluster_id:
                     type: string
                     description: |-
                         The resource ID assigned to the resource by Kessel Asset Inventory. A
@@ -641,40 +641,40 @@ components:
         kessel.inventory.v1beta1.ReporterData:
             type: object
             properties:
-                reporterType:
+                reporter_type:
                     type: integer
                     format: enum
-                reporterInstanceId:
+                reporter_instance_id:
                     readOnly: true
                     type: string
                     description: |-
                         The ID of the instance of the reporter. This is derived from the
                          authentication mechanism, i.e. authentication token.
-                firstReported:
+                first_reported:
                     readOnly: true
                     type: string
                     description: Date and time when the inventory item was first reported by this reporter
                     format: date-time
-                lastReported:
+                last_reported:
                     readOnly: true
                     type: string
                     description: Date and time when the inventory item was last updated by this reporter
                     format: date-time
-                consoleHref:
+                console_href:
                     type: string
                     description: |-
                         The URL for this resource in the reporter's management UI console. For
                          example this would be the cluster URL in the HCC Console for an OCM
                          reported cluster.
-                apiHref:
+                api_href:
                     type: string
                     description: Reporter specific API link to the resource.
-                localResourceId:
+                local_resource_id:
                     type: string
                     description: |-
                         The ID assigned to this resource by the reporter, for example OCM cluster
                          ID, HBI's host id, or ACM managed cluster name etc.
-                reporterVersion:
+                reporter_version:
                     type: string
                     description: version of the reporter
         kessel.inventory.v1beta1.ResourceLabel:
@@ -693,7 +693,7 @@ components:
                     allOf:
                         - $ref: '#/components/schemas/kessel.inventory.v1beta1.Metadata'
                     description: Metadata about this resource
-                reporterData:
+                reporter_data:
                     writeOnly: true
                     allOf:
                         - $ref: '#/components/schemas/kessel.inventory.v1beta1.ReporterData'
@@ -714,7 +714,7 @@ components:
                     description: |-
                         The {resource} format
                          \"<reporter_data.reporter_type>:<reporter_data.resourceId_alias>\".
-                k8sCluster:
+                k8s_cluster:
                     allOf:
                         - $ref: '#/components/schemas/kessel.inventory.v1beta1.K8sCluster'
                     description: The k8s clsuter to update
@@ -764,7 +764,7 @@ components:
                         The subject {resource} and the object {resource}. A relationship is between
                          a Subject and an Object, e.g. a Policy (subject) has a propagated
                          relationship to an k8s cluster (object)
-                policyRelationship:
+                policy_relationship:
                     allOf:
                         - $ref: '#/components/schemas/kessel.inventory.v1beta1.PolicyRelationship'
                     description: |-
@@ -776,9 +776,9 @@ components:
         kessel.inventory.v1beta1.UpdateResourceRelationshipByUrnHsResourcesParameter:
             type: object
             properties:
-                subjectResource:
+                subject_resource:
                     type: string
-                objectResource:
+                object_resource:
                     type: string
         kessel.inventory.v1beta1.UpdateResourceRelationshipByUrnHsResponse:
             type: object

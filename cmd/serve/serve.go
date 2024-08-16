@@ -205,7 +205,6 @@ func NewCommand(
 	}
 
 	serverOptions.AddFlags(cmd.Flags(), "server")
-	storageOptions.AddFlags(cmd.Flags(), "storage")
 	authnOptions.AddFlags(cmd.Flags(), "authn")
 	authzOptions.AddFlags(cmd.Flags(), "authz")
 	eventingOptions.AddFlags(cmd.Flags(), "eventing")

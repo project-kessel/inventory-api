@@ -42,19 +42,6 @@ var (
 		Use:     Name,
 		Version: Version,
 		Short:   "A simple common inventory system",
-		PreRunE: func(cmd *cobra.Command, args []string) error {
-			if err := viper.ReadInConfig(); err != nil {
-				return err
-			} else {
-				msg := fmt.Sprintf("Using config file: %s", viper.ConfigFileUsed())
-				logger.Debug(msg)
-			}
-
-			// put the values into the options struct.
-			err := viper.Unmarshal(&options)
-
-			return err
-		},
 	}
 
 	options = struct {
@@ -88,7 +75,16 @@ func init() {
 
 	configHelp := fmt.Sprintf("config file (default is $PWD/.%s.yaml)", Name)
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", configHelp)
-	err := viper.BindPFlag("config", rootCmd.PersistentFlags().Lookup("config"))
+
+	// options.Storage is used in both commands
+	// viper/cobra do not handle well when the same key is used in multiple sub-commands
+	// and the last one takes precedence
+	// Set them as persistent flags in the main command
+	// Another solution might involve into creating our own set of flags to prevent having two separate objects for
+	// the same flag.
+	options.Storage.AddFlags(rootCmd.PersistentFlags(), "storage")
+
+	err := viper.BindPFlags(rootCmd.PersistentFlags())
 	if err != nil {
 		panic(err)
 	}
@@ -135,4 +131,15 @@ func initConfig() {
 
 	viper.SetEnvPrefix(Name)
 	viper.AutomaticEnv()
+
+	if err := viper.ReadInConfig(); err != nil {
+		panic(err)
+	} else {
+		logger.Infof("Using config file: %s", viper.ConfigFileUsed())
+	}
+
+	// put the values into the options struct.
+	if err := viper.Unmarshal(&options); err != nil {
+		panic(err)
+	}
 }

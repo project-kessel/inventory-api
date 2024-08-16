@@ -11,11 +11,19 @@ RUN ln -s /usr/local/go/bin/go /usr/local/bin/go
 
 WORKDIR /workspace
 
-COPY . ./
+COPY go.mod go.sum ./
 
 ENV CGO_ENABLED 1
-RUN go mod vendor
-RUN make build
+RUN go mod download
+
+COPY api ./api
+COPY cmd ./cmd
+COPY internal ./internal
+COPY third_party ./third_party
+COPY main.go Makefile ./
+
+ARG VERSION
+RUN VERSION=${VERSION} make build
 
 FROM registry.access.redhat.com/ubi8/ubi-minimal:8.10
 

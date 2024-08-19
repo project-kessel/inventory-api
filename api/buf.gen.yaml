@@ -13,7 +13,7 @@ plugins:
     out: ../
     opt:
       - fq_schema_naming=true
-      - default_response=false
+      - default_response=true
       - naming=proto
   - local: protoc-gen-validate
     opt:

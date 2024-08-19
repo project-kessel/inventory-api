@@ -18,6 +18,12 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/kessel.inventory.v1.GetLivezResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/google.rpc.Status'
     /api/inventory/v1/readyz:
         get:
             tags:
@@ -30,6 +36,12 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/kessel.inventory.v1.GetReadyzResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/google.rpc.Status'
     /api/inventory/v1beta1/k8sClusters:
         post:
             tags:
@@ -48,6 +60,12 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/kessel.inventory.v1beta1.CreateK8sClusterResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/google.rpc.Status'
     /api/inventory/v1beta1/k8sClusters/{resource}:
         put:
             tags:
@@ -75,6 +93,12 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/kessel.inventory.v1beta1.UpdateK8sClusterResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/google.rpc.Status'
         delete:
             tags:
                 - KesselK8SClusterService
@@ -95,6 +119,12 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/kessel.inventory.v1beta1.DeleteK8sClusterResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/google.rpc.Status'
     /api/inventory/v1beta1/notificationsIntegrations:
         post:
             tags:
@@ -113,6 +143,12 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/kessel.inventory.v1beta1.CreateNotificationsIntegrationResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/google.rpc.Status'
     /api/inventory/v1beta1/notificationsIntegrations/{resource}:
         put:
             tags:
@@ -140,6 +176,12 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/kessel.inventory.v1beta1.UpdateNotificationsIntegrationResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/google.rpc.Status'
         delete:
             tags:
                 - KesselNotificationsIntegrationService
@@ -160,6 +202,12 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/kessel.inventory.v1beta1.DeleteNotificationsIntegrationResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/google.rpc.Status'
     /api/inventory/v1beta1/policies:
         post:
             tags:
@@ -178,6 +226,12 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/kessel.inventory.v1beta1.CreatePolicyResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/google.rpc.Status'
     /api/inventory/v1beta1/policies/{resource}:
         put:
             tags:
@@ -205,6 +259,12 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/kessel.inventory.v1beta1.UpdatePolicyResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/google.rpc.Status'
         delete:
             tags:
                 - KesselPolicyService
@@ -225,6 +285,12 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/kessel.inventory.v1beta1.DeletePolicyResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/google.rpc.Status'
     /api/inventory/v1beta1/policyRelationships:
         put:
             tags:
@@ -243,6 +309,12 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/kessel.inventory.v1beta1.UpdateResourceRelationshipByUrnHsResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/google.rpc.Status'
         post:
             tags:
                 - KesselPolicyRelationshipService
@@ -260,6 +332,12 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/kessel.inventory.v1beta1.CreatePolicyRelationshipResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/google.rpc.Status'
         delete:
             tags:
                 - KesselPolicyRelationshipService
@@ -280,6 +358,12 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/kessel.inventory.v1beta1.DeleteResourceRelationshipByUrnResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/google.rpc.Status'
     /api/inventory/v1beta1/rhelHosts:
         post:
             tags:
@@ -298,6 +382,12 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/kessel.inventory.v1beta1.CreateRhelHostResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/google.rpc.Status'
     /api/inventory/v1beta1/rhelHosts/{resource}:
         put:
             tags:
@@ -325,6 +415,12 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/kessel.inventory.v1beta1.UpdateRhelHostResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/google.rpc.Status'
         delete:
             tags:
                 - KesselRhelHostService
@@ -345,8 +441,38 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/kessel.inventory.v1beta1.DeleteRhelHostResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/google.rpc.Status'
 components:
     schemas:
+        google.protobuf.Any:
+            type: object
+            properties:
+                '@type':
+                    type: string
+                    description: The type of the serialized message.
+            additionalProperties: true
+            description: Contains an arbitrary serialized message along with a @type that describes the type of the serialized message.
+        google.rpc.Status:
+            type: object
+            properties:
+                code:
+                    type: integer
+                    description: The status code, which should be an enum value of [google.rpc.Code][google.rpc.Code].
+                    format: int32
+                message:
+                    type: string
+                    description: A developer-facing error message, which should be in English. Any user-facing error message should be localized and sent in the [google.rpc.Status.details][google.rpc.Status.details] field, or localized by the client.
+                details:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/google.protobuf.Any'
+                    description: A list of messages that carry the error details.  There is a common set of message types for APIs to use.
+            description: 'The `Status` type defines a logical error model that is suitable for different programming environments, including REST APIs and RPC APIs. It is used by [gRPC](https://github.com/grpc). Each `Status` message contains three pieces of data: error code, error message, and error details. You can find out more about this error model and how to work with it in the [API Design Guide](https://cloud.google.com/apis/design/errors).'
         kessel.inventory.v1.GetLivezResponse:
             type: object
             properties:

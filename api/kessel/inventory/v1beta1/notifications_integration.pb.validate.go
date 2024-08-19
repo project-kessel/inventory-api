@@ -57,68 +57,62 @@ func (m *NotificationsIntegration) validate(all bool) error {
 
 	var errors []error
 
-	if m.GetMetadata() == nil {
-		err := NotificationsIntegrationValidationError{
-			field:  "Metadata",
-			reason: "value is required",
-		}
-		if !all {
-			return err
-		}
-		errors = append(errors, err)
-	}
-
-	if a := m.GetMetadata(); a != nil {
-
-	}
-
-	if m.GetReporterData() == nil {
-		err := NotificationsIntegrationValidationError{
-			field:  "ReporterData",
-			reason: "value is required",
-		}
-		if !all {
-			return err
-		}
-		errors = append(errors, err)
-	}
-
-	if a := m.GetReporterData(); a != nil {
-
-	}
-
-	for idx, item := range m.GetReporters() {
-		_, _ = idx, item
-
-		if all {
-			switch v := interface{}(item).(type) {
-			case interface{ ValidateAll() error }:
-				if err := v.ValidateAll(); err != nil {
-					errors = append(errors, NotificationsIntegrationValidationError{
-						field:  fmt.Sprintf("Reporters[%v]", idx),
-						reason: "embedded message failed validation",
-						cause:  err,
-					})
-				}
-			case interface{ Validate() error }:
-				if err := v.Validate(); err != nil {
-					errors = append(errors, NotificationsIntegrationValidationError{
-						field:  fmt.Sprintf("Reporters[%v]", idx),
-						reason: "embedded message failed validation",
-						cause:  err,
-					})
-				}
-			}
-		} else if v, ok := interface{}(item).(interface{ Validate() error }); ok {
-			if err := v.Validate(); err != nil {
-				return NotificationsIntegrationValidationError{
-					field:  fmt.Sprintf("Reporters[%v]", idx),
+	if all {
+		switch v := interface{}(m.GetMetadata()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, NotificationsIntegrationValidationError{
+					field:  "Metadata",
 					reason: "embedded message failed validation",
 					cause:  err,
-				}
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, NotificationsIntegrationValidationError{
+					field:  "Metadata",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
 			}
 		}
+	} else if v, ok := interface{}(m.GetMetadata()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return NotificationsIntegrationValidationError{
+				field:  "Metadata",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
 
+	if all {
+		switch v := interface{}(m.GetReporterData()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, NotificationsIntegrationValidationError{
+					field:  "ReporterData",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, NotificationsIntegrationValidationError{
+					field:  "ReporterData",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetReporterData()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return NotificationsIntegrationValidationError{
+				field:  "ReporterData",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
 	}
 
 	if len(errors) > 0 {

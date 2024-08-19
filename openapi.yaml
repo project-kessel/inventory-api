@@ -372,11 +372,7 @@ components:
                     description: The k8s cluster to create in Kessel Asset Inventory
         kessel.inventory.v1beta1.CreateK8sClusterResponse:
             type: object
-            properties:
-                k8s_cluster:
-                    allOf:
-                        - $ref: '#/components/schemas/kessel.inventory.v1beta1.K8sCluster'
-                    description: The K8s cluster created in Kessel Asset Inventory
+            properties: {}
         kessel.inventory.v1beta1.CreateNotificationsIntegrationRequest:
             required:
                 - integration
@@ -387,14 +383,8 @@ components:
                         - $ref: '#/components/schemas/kessel.inventory.v1beta1.NotificationsIntegration'
                     description: The NotificationsIntegration to create in Kessel Asset Inventory
         kessel.inventory.v1beta1.CreateNotificationsIntegrationResponse:
-            required:
-                - integration
             type: object
-            properties:
-                integration:
-                    allOf:
-                        - $ref: '#/components/schemas/kessel.inventory.v1beta1.NotificationsIntegration'
-                    description: The NotificationsIntegration created in Kessel Asset Inventory
+            properties: {}
         kessel.inventory.v1beta1.CreatePolicyRelationshipRequest:
             type: object
             properties:
@@ -418,11 +408,7 @@ components:
                     description: The policy to create in Kessel Asset Inventory
         kessel.inventory.v1beta1.CreatePolicyResponse:
             type: object
-            properties:
-                policy:
-                    allOf:
-                        - $ref: '#/components/schemas/kessel.inventory.v1beta1.Policy'
-                    description: The policy created in Kessel Asset Inventory
+            properties: {}
         kessel.inventory.v1beta1.CreateRhelHostRequest:
             required:
                 - host
@@ -433,14 +419,8 @@ components:
                         - $ref: '#/components/schemas/kessel.inventory.v1beta1.RhelHost'
                     description: The Rhel Host to create in Kessel Asset Inventory
         kessel.inventory.v1beta1.CreateRhelHostResponse:
-            required:
-                - host
             type: object
-            properties:
-                host:
-                    allOf:
-                        - $ref: '#/components/schemas/kessel.inventory.v1beta1.RhelHost'
-                    description: The Rhel Host created in Kessel Asset Inventory
+            properties: {}
         kessel.inventory.v1beta1.DeleteK8sClusterResponse:
             type: object
             properties: {}
@@ -457,8 +437,6 @@ components:
             type: object
             properties: {}
         kessel.inventory.v1beta1.K8sCluster:
-            required:
-                - metadata
             type: object
             properties:
                 metadata:
@@ -466,20 +444,13 @@ components:
                         - $ref: '#/components/schemas/kessel.inventory.v1beta1.Metadata'
                     description: Metadata about this resource
                 reporter_data:
-                    writeOnly: true
                     allOf:
                         - $ref: '#/components/schemas/kessel.inventory.v1beta1.ReporterData'
-                    description: Write only reporter specific data
-                reporters:
-                    readOnly: true
-                    type: array
-                    items:
-                        $ref: '#/components/schemas/kessel.inventory.v1beta1.ReporterData'
-                    description: |-
-                        The entities that registered this item in the Kessel Asset Inventory. The
-                         same resource may be registered by multiple reporters.
+                    description: Reporter specific data
                 data:
-                    $ref: '#/components/schemas/kessel.inventory.v1beta1.K8sClusterDetail'
+                    allOf:
+                        - $ref: '#/components/schemas/kessel.inventory.v1beta1.K8sClusterDetail'
+                    description: K8s Cluster specific data
         kessel.inventory.v1beta1.K8sClusterDetail:
             type: object
             properties:
@@ -563,8 +534,6 @@ components:
                     items:
                         $ref: '#/components/schemas/kessel.inventory.v1beta1.ResourceLabel'
         kessel.inventory.v1beta1.NotificationsIntegration:
-            required:
-                - metadata
             type: object
             properties:
                 metadata:
@@ -572,21 +541,10 @@ components:
                         - $ref: '#/components/schemas/kessel.inventory.v1beta1.Metadata'
                     description: Metadata about this resource
                 reporter_data:
-                    writeOnly: true
                     allOf:
                         - $ref: '#/components/schemas/kessel.inventory.v1beta1.ReporterData'
                     description: Write only reporter specific data
-                reporters:
-                    readOnly: true
-                    type: array
-                    items:
-                        $ref: '#/components/schemas/kessel.inventory.v1beta1.ReporterData'
-                    description: |-
-                        The entities that registered this item in the Kessel Asset Inventory. The
-                         same resource may be registered by multiple reporters.
         kessel.inventory.v1beta1.Policy:
-            required:
-                - metadata
             type: object
             properties:
                 metadata:
@@ -594,20 +552,13 @@ components:
                         - $ref: '#/components/schemas/kessel.inventory.v1beta1.Metadata'
                     description: Metadata about this resource
                 reporter_data:
-                    writeOnly: true
                     allOf:
                         - $ref: '#/components/schemas/kessel.inventory.v1beta1.ReporterData'
                     description: Write only reporter specific data
-                reporters:
-                    readOnly: true
-                    type: array
-                    items:
-                        $ref: '#/components/schemas/kessel.inventory.v1beta1.ReporterData'
-                    description: |-
-                        The entities that registered this item in the Kessel Asset Inventory. The
-                         same resource may be registered by multiple reporters.
                 data:
-                    $ref: '#/components/schemas/kessel.inventory.v1beta1.PolicyDetail'
+                    allOf:
+                        - $ref: '#/components/schemas/kessel.inventory.v1beta1.PolicyDetail'
+                    description: Policy specific data
         kessel.inventory.v1beta1.PolicyDetail:
             type: object
             properties:
@@ -685,8 +636,6 @@ components:
                 value:
                     type: string
         kessel.inventory.v1beta1.RhelHost:
-            required:
-                - metadata
             type: object
             properties:
                 metadata:
@@ -694,18 +643,9 @@ components:
                         - $ref: '#/components/schemas/kessel.inventory.v1beta1.Metadata'
                     description: Metadata about this resource
                 reporter_data:
-                    writeOnly: true
                     allOf:
                         - $ref: '#/components/schemas/kessel.inventory.v1beta1.ReporterData'
                     description: Write only reporter specific data
-                reporters:
-                    readOnly: true
-                    type: array
-                    items:
-                        $ref: '#/components/schemas/kessel.inventory.v1beta1.ReporterData'
-                    description: |-
-                        The entities that registered this item in the Kessel Asset Inventory. The
-                         same resource may be registered by multiple reporters.
         kessel.inventory.v1beta1.UpdateK8sClusterRequest:
             type: object
             properties:

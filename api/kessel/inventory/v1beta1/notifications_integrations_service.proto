@@ -18,12 +18,7 @@ message CreateNotificationsIntegrationRequest {
   ];
 }
 
-message CreateNotificationsIntegrationResponse {
-  // The NotificationsIntegration created in Kessel Asset Inventory
-  NotificationsIntegration integration = 1 [
-    (google.api.field_behavior) = REQUIRED
-  ];
-}
+message CreateNotificationsIntegrationResponse {}
 
 message UpdateNotificationsIntegrationRequest {
   // A resource instance using the format:

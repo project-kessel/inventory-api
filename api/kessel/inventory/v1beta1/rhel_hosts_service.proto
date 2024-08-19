@@ -18,12 +18,7 @@ message CreateRhelHostRequest {
   ];
 }
 
-message CreateRhelHostResponse {
-  // The Rhel Host created in Kessel Asset Inventory
-  RhelHost host = 1 [
-    (google.api.field_behavior) = REQUIRED
-  ];
-}
+message CreateRhelHostResponse {}
 
 message UpdateRhelHostRequest {
   // A resource instance using the format:

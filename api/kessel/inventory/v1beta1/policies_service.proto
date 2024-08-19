@@ -15,10 +15,7 @@ message CreatePolicyRequest {
   Policy policy = 1;
 }
 
-message CreatePolicyResponse {
-  // The policy created in Kessel Asset Inventory
-  Policy policy = 1;
-}
+message CreatePolicyResponse {}
 
 message UpdatePolicyRequest {
   // The {resource} format

@@ -2,8 +2,6 @@ syntax = "proto3";
 
 package kessel.inventory.v1beta1;
 
-import "google/api/field_behavior.proto";
-
 import "kessel/inventory/v1beta1/k8s_cluster_detail.proto";
 import "kessel/inventory/v1beta1/metadata.proto";
 import "kessel/inventory/v1beta1/reporter_data.proto";
@@ -15,16 +13,11 @@ option java_outer_classname = "K8sClusterProto";
 
 message K8sCluster {
   // Metadata about this resource
-  Metadata metadata = 1 [ (google.api.field_behavior) = REQUIRED ];
+  Metadata metadata = 1;
 
-  // Write only reporter specific data
-  ReporterData reporter_data = 245278792
-      [ (google.api.field_behavior) = INPUT_ONLY ];
-
-  // The entities that registered this item in the Kessel Asset Inventory. The
-  // same resource may be registered by multiple reporters.
-  repeated ReporterData reporters = 353323086
-      [ (google.api.field_behavior) = OUTPUT_ONLY ];
-
+  // Reporter specific data
+  ReporterData reporter_data = 245278792;
+ 
+  // K8s Cluster specific data
   K8sClusterDetail data = 2122698;
 }

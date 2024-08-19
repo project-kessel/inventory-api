@@ -24,5 +24,6 @@ message K8sClusterDetailNodesInner {
 
   // Map of string keys and string values that can be used to organize and
   // categorize (scope and select) resources
-  repeated ResourceLabel labels = 36675587 [ (validate.rules).any.required = true ];
+  // Todo: Do we require at least 1 label?
+  repeated ResourceLabel labels = 36675587 [ (validate.rules).repeated.items.message.required = true ];
 }

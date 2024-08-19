@@ -68,6 +68,17 @@ func (m *ReporterData) validate(all bool) error {
 		errors = append(errors, err)
 	}
 
+	if _, ok := ReporterData_ReporterType_name[int32(m.GetReporterType())]; !ok {
+		err := ReporterDataValidationError{
+			field:  "ReporterType",
+			reason: "value must be one of the defined enum values",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
 	// no validation rules for ReporterInstanceId
 
 	if all {

@@ -79,12 +79,34 @@ func (m *K8SClusterDetail) validate(all bool) error {
 		errors = append(errors, err)
 	}
 
+	if _, ok := K8SClusterDetail_ClusterStatus_name[int32(m.GetClusterStatus())]; !ok {
+		err := K8SClusterDetailValidationError{
+			field:  "ClusterStatus",
+			reason: "value must be one of the defined enum values",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
 	// no validation rules for KubeVersion
 
 	if _, ok := _K8SClusterDetail_KubeVendor_NotInLookup[m.GetKubeVendor()]; ok {
 		err := K8SClusterDetailValidationError{
 			field:  "KubeVendor",
 			reason: "value must not be in list [KUBE_VENDOR_UNSPECIFIED]",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if _, ok := K8SClusterDetail_KubeVendor_name[int32(m.GetKubeVendor())]; !ok {
+		err := K8SClusterDetailValidationError{
+			field:  "KubeVendor",
+			reason: "value must be one of the defined enum values",
 		}
 		if !all {
 			return err
@@ -114,10 +136,10 @@ func (m *K8SClusterDetail) validate(all bool) error {
 		errors = append(errors, err)
 	}
 
-	if m.GetNodes() == nil {
+	if _, ok := K8SClusterDetail_CloudPlatform_name[int32(m.GetCloudPlatform())]; !ok {
 		err := K8SClusterDetailValidationError{
-			field:  "Nodes",
-			reason: "value is required",
+			field:  "CloudPlatform",
+			reason: "value must be one of the defined enum values",
 		}
 		if !all {
 			return err
@@ -125,7 +147,59 @@ func (m *K8SClusterDetail) validate(all bool) error {
 		errors = append(errors, err)
 	}
 
-	if a := m.GetNodes(); a != nil {
+	if len(m.GetNodes()) < 1 {
+		err := K8SClusterDetailValidationError{
+			field:  "Nodes",
+			reason: "value must contain at least 1 item(s)",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	for idx, item := range m.GetNodes() {
+		_, _ = idx, item
+
+		if item == nil {
+			err := K8SClusterDetailValidationError{
+				field:  fmt.Sprintf("Nodes[%v]", idx),
+				reason: "value is required",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+
+		if all {
+			switch v := interface{}(item).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, K8SClusterDetailValidationError{
+						field:  fmt.Sprintf("Nodes[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, K8SClusterDetailValidationError{
+						field:  fmt.Sprintf("Nodes[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(item).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return K8SClusterDetailValidationError{
+					field:  fmt.Sprintf("Nodes[%v]", idx),
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
 
 	}
 

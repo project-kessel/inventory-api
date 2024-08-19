@@ -97,8 +97,33 @@ func (m *NotificationsIntegration) validate(all bool) error {
 		errors = append(errors, err)
 	}
 
-	if a := m.GetReporterData(); a != nil {
-
+	if all {
+		switch v := interface{}(m.GetReporterData()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, NotificationsIntegrationValidationError{
+					field:  "ReporterData",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, NotificationsIntegrationValidationError{
+					field:  "ReporterData",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetReporterData()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return NotificationsIntegrationValidationError{
+				field:  "ReporterData",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
 	}
 
 	for idx, item := range m.GetReporters() {

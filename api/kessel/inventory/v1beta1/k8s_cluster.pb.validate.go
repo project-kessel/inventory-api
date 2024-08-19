@@ -97,8 +97,33 @@ func (m *K8SCluster) validate(all bool) error {
 		errors = append(errors, err)
 	}
 
-	if a := m.GetReporterData(); a != nil {
-
+	if all {
+		switch v := interface{}(m.GetReporterData()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, K8SClusterValidationError{
+					field:  "ReporterData",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, K8SClusterValidationError{
+					field:  "ReporterData",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetReporterData()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return K8SClusterValidationError{
+				field:  "ReporterData",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
 	}
 
 	if m.GetResourceData() == nil {
@@ -112,8 +137,33 @@ func (m *K8SCluster) validate(all bool) error {
 		errors = append(errors, err)
 	}
 
-	if a := m.GetResourceData(); a != nil {
-
+	if all {
+		switch v := interface{}(m.GetResourceData()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, K8SClusterValidationError{
+					field:  "ResourceData",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, K8SClusterValidationError{
+					field:  "ResourceData",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetResourceData()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return K8SClusterValidationError{
+				field:  "ResourceData",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
 	}
 
 	if len(errors) > 0 {

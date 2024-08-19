@@ -57,9 +57,27 @@ func (m *ResourceLabel) validate(all bool) error {
 
 	var errors []error
 
-	// no validation rules for Key
+	if utf8.RuneCountInString(m.GetKey()) < 1 {
+		err := ResourceLabelValidationError{
+			field:  "Key",
+			reason: "value length must be at least 1 runes",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
 
-	// no validation rules for Value
+	if utf8.RuneCountInString(m.GetValue()) < 1 {
+		err := ResourceLabelValidationError{
+			field:  "Value",
+			reason: "value length must be at least 1 runes",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
 
 	if len(errors) > 0 {
 		return ResourceLabelMultiError(errors)

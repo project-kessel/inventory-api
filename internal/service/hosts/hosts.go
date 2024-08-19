@@ -2,9 +2,9 @@ package hosts
 
 import (
 	"context"
+	"github.com/go-kratos/kratos/v2/errors"
 	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1"
 	authnapi "github.com/project-kessel/inventory-api/internal/authn/api"
-	bizcommon "github.com/project-kessel/inventory-api/internal/biz/common"
 	biz "github.com/project-kessel/inventory-api/internal/biz/hosts"
 	"github.com/project-kessel/inventory-api/internal/middleware"
 	conv "github.com/project-kessel/inventory-api/internal/service/common"
@@ -26,7 +26,7 @@ func New(c *biz.HostUsecase) *HostsService {
 
 func (c *HostsService) CreateRhelHost(ctx context.Context, r *pb.CreateRhelHostRequest) (*pb.CreateRhelHostResponse, error) {
 	if err := r.ValidateAll(); err != nil {
-		return nil, err
+		return nil, errors.BadRequest("BADREQUEST", err.Error())
 	}
 
 	// TODO: Use in UPDATE
@@ -67,13 +67,13 @@ func (c *HostsService) DeleteRhelHost(ctx context.Context, r *pb.DeleteRhelHostR
 }
 
 func hostFromCreateRequest(r *pb.CreateRhelHostRequest, identity *authnapi.Identity) (*biz.Host, error) {
-	var metadata = bizcommon.Metadata{}
+	var metadata = &pb.Metadata{}
 	if r.Host.Metadata != nil {
-		metadata = *conv.MetadataFromPb(r.Host.Metadata, r.Host.ReporterData, identity)
+		metadata = r.Host.Metadata
 	}
 
 	return &biz.Host{
-		Metadata: metadata,
+		Metadata: *conv.MetadataFromPb(metadata, r.Host.ReporterData, identity),
 	}, nil
 }
 

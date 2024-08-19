@@ -17,7 +17,7 @@ message Policy {
   Metadata metadata = 1;
 
   // Write only reporter specific data
-  ReporterData reporter_data = 245278792 [ (validate.rules).any.required = true ];
+  ReporterData reporter_data = 245278792 [ (validate.rules).message.required = true ];
 
-  PolicyDetail resource_data = 2122698 [ (validate.rules).any.required = true ];
+  PolicyDetail resource_data = 2122698 [ (validate.rules).message.required = true ];
 }

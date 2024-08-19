@@ -3,7 +3,6 @@ syntax = "proto3";
 package kessel.inventory.v1beta1;
 
 import "google/api/annotations.proto";
-import "google/api/field_behavior.proto";
 
 import "kessel/inventory/v1beta1/rhel_host.proto";
 
@@ -13,28 +12,20 @@ option java_package = "org.project_kessel.api.inventory.v1beta1";
 
 message CreateRhelHostRequest {
   // The Rhel Host to create in Kessel Asset Inventory
-  RhelHost host = 1 [
-    (google.api.field_behavior) = REQUIRED
-  ];
+  RhelHost host = 1;
 }
 
 message CreateRhelHostResponse {
   // The Rhel Host created in Kessel Asset Inventory
-  RhelHost host = 1 [
-    (google.api.field_behavior) = REQUIRED
-  ];
+  RhelHost host = 1;
 }
 
 message UpdateRhelHostRequest {
   // A resource instance using the format:
   // \"<reporter_data.reporter_type>:<reporter_data.resourceId_alias>\"
-  string resource = 1 [
-    (google.api.field_behavior) = REQUIRED
-  ];
+  string resource = 1;
   // The Rhel host to update
-  RhelHost host = 2 [
-    (google.api.field_behavior) = REQUIRED
-  ];
+  RhelHost host = 2;
 }
 
 message UpdateRhelHostResponse {}
@@ -42,9 +33,7 @@ message UpdateRhelHostResponse {}
 message DeleteRhelHostRequest {
   // A resource instance using the format:
   // \"<reporter_data.reporter_type>:<reporter_data.resourceId_alias>\"
-  string resource = 1 [
-    (google.api.field_behavior) = REQUIRED
-  ];
+  string resource = 1;
 }
 
 message DeleteRhelHostResponse {}

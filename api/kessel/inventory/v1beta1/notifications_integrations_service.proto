@@ -3,7 +3,6 @@ syntax = "proto3";
 package kessel.inventory.v1beta1;
 
 import "google/api/annotations.proto";
-import "google/api/field_behavior.proto";
 
 import "kessel/inventory/v1beta1/notifications_integration.proto";
 
@@ -13,28 +12,20 @@ option java_package = "org.project_kessel.api.inventory.v1beta1";
 
 message CreateNotificationsIntegrationRequest {
   // The NotificationsIntegration to create in Kessel Asset Inventory
-  NotificationsIntegration integration = 1 [
-    (google.api.field_behavior) = REQUIRED
-  ];
+  NotificationsIntegration integration = 1;
 }
 
 message CreateNotificationsIntegrationResponse {
   // The NotificationsIntegration created in Kessel Asset Inventory
-  NotificationsIntegration integration = 1 [
-    (google.api.field_behavior) = REQUIRED
-  ];
+  NotificationsIntegration integration = 1;
 }
 
 message UpdateNotificationsIntegrationRequest {
   // A resource instance using the format:
   // \"<reporter_data.reporter_type>:<reporter_data.resourceId_alias>\"
-  string resource = 1 [
-    (google.api.field_behavior) = REQUIRED
-  ];
+  string resource = 1;
   // The NotificationsIntegration to update
-  NotificationsIntegration integration = 2 [
-    (google.api.field_behavior) = REQUIRED
-  ];
+  NotificationsIntegration integration = 2;
 }
 
 message UpdateNotificationsIntegrationResponse {}
@@ -42,9 +33,7 @@ message UpdateNotificationsIntegrationResponse {}
 message DeleteNotificationsIntegrationRequest {
   // A resource instance using the format:
   // \"<reporter_data.reporter_type>:<reporter_data.resourceId_alias>\"
-  string resource = 1 [
-    (google.api.field_behavior) = REQUIRED
-  ];
+  string resource = 1;
 }
 
 message DeleteNotificationsIntegrationResponse {}

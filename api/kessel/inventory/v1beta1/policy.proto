@@ -25,5 +25,5 @@ message Policy {
   repeated ReporterData reporters = 353323086
       [ (google.api.field_behavior) = OUTPUT_ONLY ];
 
-  PolicyDetail data = 2122698;
+  PolicyDetail resource_data = 2122698;
 }

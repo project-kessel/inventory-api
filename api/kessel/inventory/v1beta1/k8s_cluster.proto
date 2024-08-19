@@ -26,5 +26,5 @@ message K8sCluster {
   repeated ReporterData reporters = 353323086
       [ (google.api.field_behavior) = OUTPUT_ONLY ];
 
-  K8sClusterDetail data = 2122698;
+  K8sClusterDetail resource_data = 2122698;
 }

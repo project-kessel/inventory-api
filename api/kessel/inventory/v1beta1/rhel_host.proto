@@ -14,14 +14,15 @@ option java_package = "org.project_kessel.api.inventory.v1beta1";
 
 message RhelHost {
   // Metadata about this resource
-  Metadata metadata = 1 [ (validate.rules).any.required = true ];
+  Metadata metadata = 1 [ (validate.rules).message = {required: false, skip: false} ];
 
   // Write only reporter specific data
   ReporterData reporter_data = 245278792
-      [ (google.api.field_behavior) = INPUT_ONLY ];
+      [ (google.api.field_behavior) = INPUT_ONLY, (validate.rules).message.required = true ];
 
-  // The entities that registered this item in the Kessel Asset Inventory. The
-  // same resource may be registered by multiple reporters.
-  repeated ReporterData reporters = 353323086
-      [ (google.api.field_behavior) = OUTPUT_ONLY ];
+  // Todo: This is no longer required?
+//  // The entities that registered this item in the Kessel Asset Inventory. The
+//  // same resource may be registered by multiple reporters.
+//  repeated ReporterData reporters = 353323086
+//      [ (google.api.field_behavior) = OUTPUT_ONLY ];
 }

@@ -2,12 +2,14 @@ syntax = "proto3";
 
 package kessel.inventory.v1beta1;
 
+import "validate/validate.proto";
+
 option go_package = "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1";
 option java_multiple_files = true;
 option java_package = "org.project_kessel.api.inventory.v1beta1";
 
 message PolicyDetail {
-  
+
   // The kind of policy
   enum Severity {
     SEVERITY_UNSPECIFIED = 0;
@@ -21,5 +23,5 @@ message PolicyDetail {
   // Defines if the policy is currently enabled or disabled across all targets
   bool disabled = 270940796;
 
-  Severity severity = 404558591;
+  Severity severity = 404558591 [ (validate.rules).enum.defined_only = true ];
 }

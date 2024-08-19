@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package kessel.inventory.v1beta1;
 
+import "validate/validate.proto";
+
 import "kessel/inventory/v1beta1/k8s_cluster_detail.proto";
 import "kessel/inventory/v1beta1/metadata.proto";
 import "kessel/inventory/v1beta1/reporter_data.proto";
@@ -16,7 +18,7 @@ message K8sCluster {
   Metadata metadata = 1;
 
   // Write only reporter specific data
-  ReporterData reporter_data = 245278792;
+  ReporterData reporter_data = 245278792 [ (validate.rules).any.required = true ];
 
-  K8sClusterDetail resource_data = 2122698;
+  K8sClusterDetail resource_data = 2122698 [ (validate.rules).any.required = true ];
 }

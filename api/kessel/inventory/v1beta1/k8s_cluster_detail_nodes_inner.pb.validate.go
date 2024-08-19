@@ -57,43 +57,51 @@ func (m *K8SClusterDetailNodesInner) validate(all bool) error {
 
 	var errors []error
 
-	// no validation rules for Name
-
-	// no validation rules for Cpu
-
-	// no validation rules for Memory
-
-	for idx, item := range m.GetLabels() {
-		_, _ = idx, item
-
-		if all {
-			switch v := interface{}(item).(type) {
-			case interface{ ValidateAll() error }:
-				if err := v.ValidateAll(); err != nil {
-					errors = append(errors, K8SClusterDetailNodesInnerValidationError{
-						field:  fmt.Sprintf("Labels[%v]", idx),
-						reason: "embedded message failed validation",
-						cause:  err,
-					})
-				}
-			case interface{ Validate() error }:
-				if err := v.Validate(); err != nil {
-					errors = append(errors, K8SClusterDetailNodesInnerValidationError{
-						field:  fmt.Sprintf("Labels[%v]", idx),
-						reason: "embedded message failed validation",
-						cause:  err,
-					})
-				}
-			}
-		} else if v, ok := interface{}(item).(interface{ Validate() error }); ok {
-			if err := v.Validate(); err != nil {
-				return K8SClusterDetailNodesInnerValidationError{
-					field:  fmt.Sprintf("Labels[%v]", idx),
-					reason: "embedded message failed validation",
-					cause:  err,
-				}
-			}
+	if utf8.RuneCountInString(m.GetName()) < 1 {
+		err := K8SClusterDetailNodesInnerValidationError{
+			field:  "Name",
+			reason: "value length must be at least 1 runes",
 		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if utf8.RuneCountInString(m.GetCpu()) < 1 {
+		err := K8SClusterDetailNodesInnerValidationError{
+			field:  "Cpu",
+			reason: "value length must be at least 1 runes",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if utf8.RuneCountInString(m.GetMemory()) < 1 {
+		err := K8SClusterDetailNodesInnerValidationError{
+			field:  "Memory",
+			reason: "value length must be at least 1 runes",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if m.GetLabels() == nil {
+		err := K8SClusterDetailNodesInnerValidationError{
+			field:  "Labels",
+			reason: "value is required",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if a := m.GetLabels(); a != nil {
 
 	}
 

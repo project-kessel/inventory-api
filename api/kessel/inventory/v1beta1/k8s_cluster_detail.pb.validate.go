@@ -57,49 +57,75 @@ func (m *K8SClusterDetail) validate(all bool) error {
 
 	var errors []error
 
-	// no validation rules for ExternalClusterId
+	if utf8.RuneCountInString(m.GetExternalClusterId()) < 1 {
+		err := K8SClusterDetailValidationError{
+			field:  "ExternalClusterId",
+			reason: "value length must be at least 1 runes",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
 
-	// no validation rules for ClusterStatus
+	if _, ok := _K8SClusterDetail_ClusterStatus_NotInLookup[m.GetClusterStatus()]; ok {
+		err := K8SClusterDetailValidationError{
+			field:  "ClusterStatus",
+			reason: "value must not be in list [CLUSTER_STATUS_UNSPECIFIED]",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
 
 	// no validation rules for KubeVersion
 
-	// no validation rules for KubeVendor
-
-	// no validation rules for VendorVersion
-
-	// no validation rules for CloudPlatform
-
-	for idx, item := range m.GetNodes() {
-		_, _ = idx, item
-
-		if all {
-			switch v := interface{}(item).(type) {
-			case interface{ ValidateAll() error }:
-				if err := v.ValidateAll(); err != nil {
-					errors = append(errors, K8SClusterDetailValidationError{
-						field:  fmt.Sprintf("Nodes[%v]", idx),
-						reason: "embedded message failed validation",
-						cause:  err,
-					})
-				}
-			case interface{ Validate() error }:
-				if err := v.Validate(); err != nil {
-					errors = append(errors, K8SClusterDetailValidationError{
-						field:  fmt.Sprintf("Nodes[%v]", idx),
-						reason: "embedded message failed validation",
-						cause:  err,
-					})
-				}
-			}
-		} else if v, ok := interface{}(item).(interface{ Validate() error }); ok {
-			if err := v.Validate(); err != nil {
-				return K8SClusterDetailValidationError{
-					field:  fmt.Sprintf("Nodes[%v]", idx),
-					reason: "embedded message failed validation",
-					cause:  err,
-				}
-			}
+	if _, ok := _K8SClusterDetail_KubeVendor_NotInLookup[m.GetKubeVendor()]; ok {
+		err := K8SClusterDetailValidationError{
+			field:  "KubeVendor",
+			reason: "value must not be in list [KUBE_VENDOR_UNSPECIFIED]",
 		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if utf8.RuneCountInString(m.GetVendorVersion()) < 1 {
+		err := K8SClusterDetailValidationError{
+			field:  "VendorVersion",
+			reason: "value length must be at least 1 runes",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if _, ok := _K8SClusterDetail_CloudPlatform_NotInLookup[m.GetCloudPlatform()]; ok {
+		err := K8SClusterDetailValidationError{
+			field:  "CloudPlatform",
+			reason: "value must not be in list [CLOUD_PLATFORM_UNSPECIFIED]",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if m.GetNodes() == nil {
+		err := K8SClusterDetailValidationError{
+			field:  "Nodes",
+			reason: "value is required",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if a := m.GetNodes(); a != nil {
 
 	}
 
@@ -180,3 +206,15 @@ var _ interface {
 	Cause() error
 	ErrorName() string
 } = K8SClusterDetailValidationError{}
+
+var _K8SClusterDetail_ClusterStatus_NotInLookup = map[K8SClusterDetail_ClusterStatus]struct{}{
+	0: {},
+}
+
+var _K8SClusterDetail_KubeVendor_NotInLookup = map[K8SClusterDetail_KubeVendor]struct{}{
+	0: {},
+}
+
+var _K8SClusterDetail_CloudPlatform_NotInLookup = map[K8SClusterDetail_CloudPlatform]struct{}{
+	0: {},
+}

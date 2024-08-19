@@ -85,62 +85,34 @@ func (m *Policy) validate(all bool) error {
 		}
 	}
 
-	if all {
-		switch v := interface{}(m.GetReporterData()).(type) {
-		case interface{ ValidateAll() error }:
-			if err := v.ValidateAll(); err != nil {
-				errors = append(errors, PolicyValidationError{
-					field:  "ReporterData",
-					reason: "embedded message failed validation",
-					cause:  err,
-				})
-			}
-		case interface{ Validate() error }:
-			if err := v.Validate(); err != nil {
-				errors = append(errors, PolicyValidationError{
-					field:  "ReporterData",
-					reason: "embedded message failed validation",
-					cause:  err,
-				})
-			}
+	if m.GetReporterData() == nil {
+		err := PolicyValidationError{
+			field:  "ReporterData",
+			reason: "value is required",
 		}
-	} else if v, ok := interface{}(m.GetReporterData()).(interface{ Validate() error }); ok {
-		if err := v.Validate(); err != nil {
-			return PolicyValidationError{
-				field:  "ReporterData",
-				reason: "embedded message failed validation",
-				cause:  err,
-			}
+		if !all {
+			return err
 		}
+		errors = append(errors, err)
 	}
 
-	if all {
-		switch v := interface{}(m.GetResourceData()).(type) {
-		case interface{ ValidateAll() error }:
-			if err := v.ValidateAll(); err != nil {
-				errors = append(errors, PolicyValidationError{
-					field:  "ResourceData",
-					reason: "embedded message failed validation",
-					cause:  err,
-				})
-			}
-		case interface{ Validate() error }:
-			if err := v.Validate(); err != nil {
-				errors = append(errors, PolicyValidationError{
-					field:  "ResourceData",
-					reason: "embedded message failed validation",
-					cause:  err,
-				})
-			}
+	if a := m.GetReporterData(); a != nil {
+
+	}
+
+	if m.GetResourceData() == nil {
+		err := PolicyValidationError{
+			field:  "ResourceData",
+			reason: "value is required",
 		}
-	} else if v, ok := interface{}(m.GetResourceData()).(interface{ Validate() error }); ok {
-		if err := v.Validate(); err != nil {
-			return PolicyValidationError{
-				field:  "ResourceData",
-				reason: "embedded message failed validation",
-				cause:  err,
-			}
+		if !all {
+			return err
 		}
+		errors = append(errors, err)
+	}
+
+	if a := m.GetResourceData(); a != nil {
+
 	}
 
 	if len(errors) > 0 {

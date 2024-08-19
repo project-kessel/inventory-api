@@ -188,35 +188,6 @@ func (m *CreateK8SClusterResponse) validate(all bool) error {
 
 	var errors []error
 
-	if all {
-		switch v := interface{}(m.GetK8SCluster()).(type) {
-		case interface{ ValidateAll() error }:
-			if err := v.ValidateAll(); err != nil {
-				errors = append(errors, CreateK8SClusterResponseValidationError{
-					field:  "K8SCluster",
-					reason: "embedded message failed validation",
-					cause:  err,
-				})
-			}
-		case interface{ Validate() error }:
-			if err := v.Validate(); err != nil {
-				errors = append(errors, CreateK8SClusterResponseValidationError{
-					field:  "K8SCluster",
-					reason: "embedded message failed validation",
-					cause:  err,
-				})
-			}
-		}
-	} else if v, ok := interface{}(m.GetK8SCluster()).(interface{ Validate() error }); ok {
-		if err := v.Validate(); err != nil {
-			return CreateK8SClusterResponseValidationError{
-				field:  "K8SCluster",
-				reason: "embedded message failed validation",
-				cause:  err,
-			}
-		}
-	}
-
 	if len(errors) > 0 {
 		return CreateK8SClusterResponseMultiError(errors)
 	}

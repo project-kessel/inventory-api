@@ -57,19 +57,33 @@ func (m *NotificationsIntegration) validate(all bool) error {
 
 	var errors []error
 
-	if m.GetMetadata() == nil {
-		err := NotificationsIntegrationValidationError{
-			field:  "Metadata",
-			reason: "value is required",
+	if all {
+		switch v := interface{}(m.GetMetadata()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, NotificationsIntegrationValidationError{
+					field:  "Metadata",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, NotificationsIntegrationValidationError{
+					field:  "Metadata",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
 		}
-		if !all {
-			return err
+	} else if v, ok := interface{}(m.GetMetadata()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return NotificationsIntegrationValidationError{
+				field:  "Metadata",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
 		}
-		errors = append(errors, err)
-	}
-
-	if a := m.GetMetadata(); a != nil {
-
 	}
 
 	if m.GetReporterData() == nil {

@@ -29,12 +29,6 @@ func (c *HostsService) CreateRhelHost(ctx context.Context, r *pb.CreateRhelHostR
 		return nil, errors.BadRequest("BADREQUEST", err.Error())
 	}
 
-	// TODO: Use in UPDATE
-	////TODO: refactor / abstract resource type strings
-	//if !strings.EqualFold(r.Host.Metadata.ResourceType, biz.ResourceType) {
-	//	return nil, errors.BadRequest("BADREQUEST", fmt.Sprintf("incorrect resource type: expected %s", biz.ResourceType))
-	//}
-
 	identity, err := middleware.GetIdentity(ctx)
 	if err != nil {
 		return nil, err

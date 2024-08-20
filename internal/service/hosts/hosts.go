@@ -62,12 +62,12 @@ func (c *HostsService) DeleteRhelHost(ctx context.Context, r *pb.DeleteRhelHostR
 
 func hostFromCreateRequest(r *pb.CreateRhelHostRequest, identity *authnapi.Identity) (*biz.Host, error) {
 	var metadata = &pb.Metadata{}
-	if r.Host.Metadata != nil {
-		metadata = r.Host.Metadata
+	if r.RhelHost.Metadata != nil {
+		metadata = r.RhelHost.Metadata
 	}
 
 	return &biz.Host{
-		Metadata: *conv.MetadataFromPb(metadata, r.Host.ReporterData, identity),
+		Metadata: *conv.CreatedMetadataFromPb(metadata, r.RhelHost.ReporterData, identity),
 	}, nil
 }
 

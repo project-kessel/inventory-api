@@ -13,7 +13,7 @@ option java_package = "org.project_kessel.api.inventory.v1beta1";
 
 message CreateRhelHostRequest {
   // The Rhel Host to create in Kessel Asset Inventory
-  RhelHost host = 1 [ (validate.rules).message.required = true ];
+  RhelHost rhel_host = 1 [ (validate.rules).message.required = true ];
 }
 
 message CreateRhelHostResponse {}
@@ -23,7 +23,7 @@ message UpdateRhelHostRequest {
   // \"<reporter_data.reporter_type>:<reporter_data.resourceId_alias>\"
   string resource = 1 [ (validate.rules).string.min_len = 1 ];
   // The Rhel host to update
-  RhelHost host = 2 [ (validate.rules).message.required = true ];
+  RhelHost rhel_host = 2 [ (validate.rules).message.required = true ];
 }
 
 message UpdateRhelHostResponse {}

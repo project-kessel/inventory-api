@@ -57,7 +57,7 @@ func TestCreateHostWithRequiredDataIsSuccess(t *testing.T) {
 	ctx := mockContext()
 
 	request := pb.CreateRhelHostRequest{
-		Host: &pb.RhelHost{
+		RhelHost: &pb.RhelHost{
 			Metadata: nil,
 			ReporterData: &pb.ReporterData{
 				ReporterType:    pb.ReporterData_REPORTER_TYPE_OCM,
@@ -82,7 +82,7 @@ func TestCreateHostWithOptionalAttributesIsSuccess(t *testing.T) {
 	ctx := mockContext()
 
 	request := pb.CreateRhelHostRequest{
-		Host: &pb.RhelHost{
+		RhelHost: &pb.RhelHost{
 			Metadata: &pb.Metadata{
 				Labels:    []*pb.ResourceLabel{},
 				Workspace: "foobar",
@@ -112,7 +112,7 @@ func TestCreateInvalidHostIsBadRequest(t *testing.T) {
 	ctx := mockContext()
 
 	request := pb.CreateRhelHostRequest{
-		Host: &pb.RhelHost{
+		RhelHost: &pb.RhelHost{
 			Metadata: nil,
 			ReporterData: &pb.ReporterData{
 				ReporterType: pb.ReporterData_REPORTER_TYPE_OCM,

@@ -548,15 +548,6 @@ components:
                     allOf:
                         - $ref: '#/components/schemas/kessel.inventory.v1beta1.ReporterData'
                     description: Write only reporter specific data
-                reporters:
-                    readOnly: true
-                    type: array
-                    items:
-                        $ref: '#/components/schemas/kessel.inventory.v1beta1.ReporterData'
-                    description: |-
-                        Todo: Reporters also goes away?
-                         The entities that registered this item in the Kessel Asset Inventory. The
-                         same resource may be registered by multiple reporters.
         kessel.inventory.v1beta1.Policy:
             type: object
             properties:

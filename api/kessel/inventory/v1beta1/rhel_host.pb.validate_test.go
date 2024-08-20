@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-func TestMetadataIsOptional(t *testing.T) {
+func TestRhelHostOptionalMetadata(t *testing.T) {
 	host := RhelHost{
 		ReporterData: &ReporterData{
 			ReporterType:    ReporterData_REPORTER_TYPE_OCM,
@@ -17,7 +17,7 @@ func TestMetadataIsOptional(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func TestMetadataIsValidatedIfFound(t *testing.T) {
+func TestRhelHostMetadataIsValidatedIfFound(t *testing.T) {
 	host := RhelHost{
 		ReporterData: &ReporterData{
 			ReporterType:    ReporterData_REPORTER_TYPE_OCM,
@@ -35,7 +35,7 @@ func TestMetadataIsValidatedIfFound(t *testing.T) {
 	assert.ErrorContains(t, err, "Metadata.Labels")
 }
 
-func TestReporterDataIsValidated(t *testing.T) {
+func TestRhelHostReporterDataIsValidated(t *testing.T) {
 	host := RhelHost{}
 	err := host.ValidateAll()
 

@@ -9,7 +9,6 @@ import (
 	"github.com/project-kessel/inventory-api/internal/middleware"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	"strconv"
 	"testing"
 )
 
@@ -72,69 +71,6 @@ func TestCreateHostWithRequiredDataIsSuccess(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func TestCreateHostWithLabelsIsSuccess(t *testing.T) {
-	repo := new(HostRepoMock)
-	hostUsecase := hosts.New(repo, log.DefaultLogger)
-
-	service := HostsService{
-		Ctl: hostUsecase,
-	}
-
-	ctx := mockContext()
-
-	request := pb.CreateRhelHostRequest{
-		Host: &pb.RhelHost{
-			Metadata: &pb.Metadata{
-				Labels: []*pb.ResourceLabel{
-					{
-						Key:   "foo",
-						Value: "bar",
-					},
-					{
-						Key:   "foo",
-						Value: "baz",
-					},
-				},
-			},
-			ReporterData: &pb.ReporterData{
-				ReporterType:    pb.ReporterData_REPORTER_TYPE_OCM,
-				LocalResourceId: "testing",
-			},
-		},
-	}
-
-	_, err := service.CreateRhelHost(ctx, &request)
-
-	assert.NoError(t, err)
-}
-
-func TestCreateHostWithEmptyLabelArrayIsSuccess(t *testing.T) {
-	repo := new(HostRepoMock)
-	hostUsecase := hosts.New(repo, log.DefaultLogger)
-
-	service := HostsService{
-		Ctl: hostUsecase,
-	}
-
-	ctx := mockContext()
-
-	request := pb.CreateRhelHostRequest{
-		Host: &pb.RhelHost{
-			Metadata: &pb.Metadata{
-				Labels: []*pb.ResourceLabel{},
-			},
-			ReporterData: &pb.ReporterData{
-				ReporterType:    pb.ReporterData_REPORTER_TYPE_OCM,
-				LocalResourceId: "testing",
-			},
-		},
-	}
-
-	_, err := service.CreateRhelHost(ctx, &request)
-
-	assert.NoError(t, err)
-}
-
 func TestCreateHostWithOptionalAttributesIsSuccess(t *testing.T) {
 	repo := new(HostRepoMock)
 	hostUsecase := hosts.New(repo, log.DefaultLogger)
@@ -166,43 +102,7 @@ func TestCreateHostWithOptionalAttributesIsSuccess(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func TestCreateHostWithInvalidReporterTypesBadRequest(t *testing.T) {
-	repo := new(HostRepoMock)
-	hostUsecase := hosts.New(repo, log.DefaultLogger)
-
-	service := HostsService{
-		Ctl: hostUsecase,
-	}
-	ctx := mockContext()
-
-	invalidReporterTypes := []int32{
-		int32(pb.ReporterData_REPORTER_TYPE_UNSPECIFIED),
-		15,
-		99,
-	}
-
-	for _, reporterType := range invalidReporterTypes {
-		t.Run(strconv.Itoa(int(reporterType)), func(t *testing.T) {
-			request := pb.CreateRhelHostRequest{
-				Host: &pb.RhelHost{
-					Metadata: nil,
-					ReporterData: &pb.ReporterData{
-						LocalResourceId: "testing",
-						ReporterType:    pb.ReporterData_ReporterType(reporterType),
-					},
-				},
-			}
-
-			_, err := service.CreateRhelHost(ctx, &request)
-
-			assert.ErrorContains(t, err, "400")
-			assert.ErrorContains(t, err, "invalid RhelHost.ReporterData")
-			assert.ErrorContains(t, err, "invalid ReporterData.ReporterType")
-		})
-	}
-}
-
-func TestCreateHostWithInvalidLocalResourceIdBadRequest(t *testing.T) {
+func TestCreateInvalidHostIsBadRequest(t *testing.T) {
 	repo := new(HostRepoMock)
 	hostUsecase := hosts.New(repo, log.DefaultLogger)
 
@@ -223,38 +123,4 @@ func TestCreateHostWithInvalidLocalResourceIdBadRequest(t *testing.T) {
 	_, err := service.CreateRhelHost(ctx, &request)
 
 	assert.ErrorContains(t, err, "400")
-	assert.ErrorContains(t, err, "invalid RhelHost.ReporterData")
-	assert.ErrorContains(t, err, "invalid ReporterData.LocalResourceId")
-}
-
-func TestCreateHostWithInvalidLabelIsBadRequest(t *testing.T) {
-	repo := new(HostRepoMock)
-	hostUsecase := hosts.New(repo, log.DefaultLogger)
-
-	service := HostsService{
-		Ctl: hostUsecase,
-	}
-	ctx := mockContext()
-
-	request := pb.CreateRhelHostRequest{
-		Host: &pb.RhelHost{
-			Metadata: &pb.Metadata{
-				Labels: []*pb.ResourceLabel{
-					{
-						Key: "",
-					},
-				},
-			},
-			ReporterData: &pb.ReporterData{
-				ReporterType:    pb.ReporterData_REPORTER_TYPE_OCM,
-				LocalResourceId: "resource-id",
-			},
-		},
-	}
-
-	_, err := service.CreateRhelHost(ctx, &request)
-
-	assert.ErrorContains(t, err, "400")
-	assert.ErrorContains(t, err, "invalid RhelHost.Metadata")
-	assert.ErrorContains(t, err, "invalid Metadata.Labels")
 }

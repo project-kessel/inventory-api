@@ -1,9 +1,7 @@
 package common
 
 import (
-	"fmt"
 	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
-	"strings"
 
 	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1"
 	authnapi "github.com/project-kessel/inventory-api/internal/authn/api"

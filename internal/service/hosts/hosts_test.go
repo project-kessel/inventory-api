@@ -2,6 +2,8 @@ package hosts
 
 import (
 	"context"
+	"testing"
+
 	"github.com/go-kratos/kratos/v2/log"
 	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1"
 	"github.com/project-kessel/inventory-api/internal/authn/api"
@@ -9,7 +11,6 @@ import (
 	"github.com/project-kessel/inventory-api/internal/middleware"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	"testing"
 )
 
 type HostRepoMock struct {
@@ -60,7 +61,7 @@ func TestCreateHostWithRequiredDataIsSuccess(t *testing.T) {
 		RhelHost: &pb.RhelHost{
 			Metadata: nil,
 			ReporterData: &pb.ReporterData{
-				ReporterType:    pb.ReporterData_REPORTER_TYPE_OCM,
+				ReporterType:    pb.ReporterData_OCM,
 				LocalResourceId: "testing",
 			},
 		},
@@ -88,7 +89,7 @@ func TestCreateHostWithOptionalAttributesIsSuccess(t *testing.T) {
 				Workspace: "foobar",
 			},
 			ReporterData: &pb.ReporterData{
-				ReporterType:    pb.ReporterData_REPORTER_TYPE_OCM,
+				ReporterType:    pb.ReporterData_OCM,
 				LocalResourceId: "testing",
 				ConsoleHref:     "http://my-console",
 				ApiHref:         "http://my-api",
@@ -115,7 +116,7 @@ func TestCreateInvalidHostIsBadRequest(t *testing.T) {
 		RhelHost: &pb.RhelHost{
 			Metadata: nil,
 			ReporterData: &pb.ReporterData{
-				ReporterType: pb.ReporterData_REPORTER_TYPE_OCM,
+				ReporterType: pb.ReporterData_OCM,
 			},
 		},
 	}

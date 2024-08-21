@@ -20,7 +20,7 @@ message ReporterData {
     NOTIFICATIONS = 5;
   }
 
-  ReporterType reporter_type = 245778392;
+  ReporterType reporter_type = 245778392 [ (validate.rules).enum = {not_in: [0], defined_only: true} ];
 
   // The ID of the instance of the reporter. This is derived from the
   // authentication mechanism, i.e. authentication token.

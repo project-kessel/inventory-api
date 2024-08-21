@@ -74,5 +74,5 @@ message K8sClusterDetail {
 
   CloudPlatform cloud_platform = 476768062 [ (validate.rules).enum = {not_in: [0], defined_only: true} ];
 
-  repeated K8sClusterDetailNodesInner nodes = 75440785;
+  repeated K8sClusterDetailNodesInner nodes = 75440785 [ (validate.rules).repeated = {min_items: 1, items: { message: { required: true}}} ];
 }

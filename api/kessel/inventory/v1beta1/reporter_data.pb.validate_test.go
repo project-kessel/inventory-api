@@ -1,14 +1,15 @@
 package v1beta1
 
 import (
-	"github.com/stretchr/testify/assert"
 	"strconv"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestReporterDataValid(t *testing.T) {
 	reporter := ReporterData{
-		ReporterType:    ReporterData_REPORTER_TYPE_OCM,
+		ReporterType:    ReporterData_OCM,
 		LocalResourceId: "my-id",
 	}
 

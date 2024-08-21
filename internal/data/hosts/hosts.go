@@ -2,7 +2,6 @@ package hosts
 
 import (
 	"context"
-
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 
@@ -35,7 +34,7 @@ func New(g *gorm.DB, a authzapi.Authorizer, e eventingapi.Manager, l *log.Helper
 func (r *hostsRepo) Save(ctx context.Context, model *biz.Host) (*biz.Host, error) {
 	identity, err := middleware.GetIdentity(ctx)
 	if err != nil {
-		return nil, nil
+		return nil, err
 	}
 
 	if err := r.Db.Session(&gorm.Session{FullSaveAssociations: true}).Create(model).Error; err != nil {
@@ -63,12 +62,27 @@ func (r *hostsRepo) Update(context.Context, *biz.Host, string) (*biz.Host, error
 	return nil, nil
 }
 
-func (r *hostsRepo) Delete(context.Context, string) error {
+func (r *hostsRepo) Delete(ctx context.Context, resource string) error {
+	//identity, err := middleware.GetIdentity(ctx)
+	//if err != nil {
+	//	return err
+	//}
+	//
+	//r.Db.Session(&gorm.Session{FullSaveAssociations: true}).Where("metadata.resource")
+
 	return nil
 }
 
-func (r *hostsRepo) FindByID(context.Context, string) (*biz.Host, error) {
-	return nil, nil
+func (r *hostsRepo) FindByID(ctx context.Context, localResourceId string) (*biz.Host, error) {
+	host := biz.Host{}
+
+	err := r.Db.Session(&gorm.Session{}).Joins("Metadata").Take(&host, "metadata.local_resource_id = ?", localResourceId).Error
+	if err != nil {
+		log.Infof("err: %v", err)
+		return nil, err
+	}
+
+	return &host, nil
 }
 
 func (r *hostsRepo) ListAll(context.Context) ([]*biz.Host, error) {

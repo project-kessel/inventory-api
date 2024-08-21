@@ -2,6 +2,8 @@ package notificationsintegrations
 
 import (
 	"context"
+	"testing"
+
 	"github.com/go-kratos/kratos/v2/log"
 	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1"
 	"github.com/project-kessel/inventory-api/internal/authn/api"
@@ -9,7 +11,6 @@ import (
 	"github.com/project-kessel/inventory-api/internal/middleware"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	"testing"
 )
 
 type NotificationIntegrationsRepoMock struct {
@@ -60,7 +61,7 @@ func TestCreateNotificationIntegrationWithRequiredDataIsSuccess(t *testing.T) {
 		Integration: &pb.NotificationsIntegration{
 			Metadata: nil,
 			ReporterData: &pb.ReporterData{
-				ReporterType:    pb.ReporterData_REPORTER_TYPE_HBI,
+				ReporterType:    pb.ReporterData_HBI,
 				LocalResourceId: "testing",
 			},
 		},
@@ -85,7 +86,7 @@ func TestCreateInvalidNotificationIntegrationIsBadRequest(t *testing.T) {
 		Integration: &pb.NotificationsIntegration{
 			Metadata: nil,
 			ReporterData: &pb.ReporterData{
-				ReporterType: pb.ReporterData_REPORTER_TYPE_HBI,
+				ReporterType: pb.ReporterData_HBI,
 			},
 		},
 	}

@@ -57,20 +57,120 @@ func (m *K8SClusterDetail) validate(all bool) error {
 
 	var errors []error
 
-	// no validation rules for ExternalClusterId
+	if utf8.RuneCountInString(m.GetExternalClusterId()) < 1 {
+		err := K8SClusterDetailValidationError{
+			field:  "ExternalClusterId",
+			reason: "value length must be at least 1 runes",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
 
-	// no validation rules for ClusterStatus
+	if _, ok := _K8SClusterDetail_ClusterStatus_NotInLookup[m.GetClusterStatus()]; ok {
+		err := K8SClusterDetailValidationError{
+			field:  "ClusterStatus",
+			reason: "value must not be in list [CLUSTER_STATUS_UNSPECIFIED]",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if _, ok := K8SClusterDetail_ClusterStatus_name[int32(m.GetClusterStatus())]; !ok {
+		err := K8SClusterDetailValidationError{
+			field:  "ClusterStatus",
+			reason: "value must be one of the defined enum values",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
 
 	// no validation rules for KubeVersion
 
-	// no validation rules for KubeVendor
+	if _, ok := _K8SClusterDetail_KubeVendor_NotInLookup[m.GetKubeVendor()]; ok {
+		err := K8SClusterDetailValidationError{
+			field:  "KubeVendor",
+			reason: "value must not be in list [KUBE_VENDOR_UNSPECIFIED]",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
 
-	// no validation rules for VendorVersion
+	if _, ok := K8SClusterDetail_KubeVendor_name[int32(m.GetKubeVendor())]; !ok {
+		err := K8SClusterDetailValidationError{
+			field:  "KubeVendor",
+			reason: "value must be one of the defined enum values",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
 
-	// no validation rules for CloudPlatform
+	if utf8.RuneCountInString(m.GetVendorVersion()) < 1 {
+		err := K8SClusterDetailValidationError{
+			field:  "VendorVersion",
+			reason: "value length must be at least 1 runes",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if _, ok := _K8SClusterDetail_CloudPlatform_NotInLookup[m.GetCloudPlatform()]; ok {
+		err := K8SClusterDetailValidationError{
+			field:  "CloudPlatform",
+			reason: "value must not be in list [CLOUD_PLATFORM_UNSPECIFIED]",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if _, ok := K8SClusterDetail_CloudPlatform_name[int32(m.GetCloudPlatform())]; !ok {
+		err := K8SClusterDetailValidationError{
+			field:  "CloudPlatform",
+			reason: "value must be one of the defined enum values",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if len(m.GetNodes()) < 1 {
+		err := K8SClusterDetailValidationError{
+			field:  "Nodes",
+			reason: "value must contain at least 1 item(s)",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
 
 	for idx, item := range m.GetNodes() {
 		_, _ = idx, item
+
+		if item == nil {
+			err := K8SClusterDetailValidationError{
+				field:  fmt.Sprintf("Nodes[%v]", idx),
+				reason: "value is required",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(item).(type) {
@@ -180,3 +280,15 @@ var _ interface {
 	Cause() error
 	ErrorName() string
 } = K8SClusterDetailValidationError{}
+
+var _K8SClusterDetail_ClusterStatus_NotInLookup = map[K8SClusterDetail_ClusterStatus]struct{}{
+	0: {},
+}
+
+var _K8SClusterDetail_KubeVendor_NotInLookup = map[K8SClusterDetail_KubeVendor]struct{}{
+	0: {},
+}
+
+var _K8SClusterDetail_CloudPlatform_NotInLookup = map[K8SClusterDetail_CloudPlatform]struct{}{
+	0: {},
+}

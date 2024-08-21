@@ -57,14 +57,52 @@ func (m *K8SClusterDetailNodesInner) validate(all bool) error {
 
 	var errors []error
 
-	// no validation rules for Name
+	if utf8.RuneCountInString(m.GetName()) < 1 {
+		err := K8SClusterDetailNodesInnerValidationError{
+			field:  "Name",
+			reason: "value length must be at least 1 runes",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
 
-	// no validation rules for Cpu
+	if utf8.RuneCountInString(m.GetCpu()) < 1 {
+		err := K8SClusterDetailNodesInnerValidationError{
+			field:  "Cpu",
+			reason: "value length must be at least 1 runes",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
 
-	// no validation rules for Memory
+	if utf8.RuneCountInString(m.GetMemory()) < 1 {
+		err := K8SClusterDetailNodesInnerValidationError{
+			field:  "Memory",
+			reason: "value length must be at least 1 runes",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
 
 	for idx, item := range m.GetLabels() {
 		_, _ = idx, item
+
+		if item == nil {
+			err := K8SClusterDetailNodesInnerValidationError{
+				field:  fmt.Sprintf("Labels[%v]", idx),
+				reason: "value is required",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
 
 		if all {
 			switch v := interface{}(item).(type) {

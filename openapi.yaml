@@ -544,17 +544,13 @@ components:
         kessel.inventory.v1beta1.CreateRhelHostRequest:
             type: object
             properties:
-                host:
+                rhel_host:
                     allOf:
                         - $ref: '#/components/schemas/kessel.inventory.v1beta1.RhelHost'
                     description: The Rhel Host to create in Kessel Asset Inventory
         kessel.inventory.v1beta1.CreateRhelHostResponse:
             type: object
-            properties:
-                host:
-                    allOf:
-                        - $ref: '#/components/schemas/kessel.inventory.v1beta1.RhelHost'
-                    description: The Rhel Host created in Kessel Asset Inventory
+            properties: {}
         kessel.inventory.v1beta1.DeleteK8sClusterResponse:
             type: object
             properties: {}
@@ -627,6 +623,7 @@ components:
                     description: |-
                         Map of string keys and string values that can be used to organize and
                          categorize (scope and select) resources
+                         Todo: Do we require at least 1 label?
         kessel.inventory.v1beta1.Metadata:
             type: object
             properties:
@@ -677,14 +674,6 @@ components:
                     allOf:
                         - $ref: '#/components/schemas/kessel.inventory.v1beta1.ReporterData'
                     description: Write only reporter specific data
-                reporters:
-                    readOnly: true
-                    type: array
-                    items:
-                        $ref: '#/components/schemas/kessel.inventory.v1beta1.ReporterData'
-                    description: |-
-                        The entities that registered this item in the Kessel Asset Inventory. The
-                         same resource may be registered by multiple reporters.
         kessel.inventory.v1beta1.Policy:
             type: object
             properties:
@@ -786,14 +775,6 @@ components:
                     allOf:
                         - $ref: '#/components/schemas/kessel.inventory.v1beta1.ReporterData'
                     description: Write only reporter specific data
-                reporters:
-                    readOnly: true
-                    type: array
-                    items:
-                        $ref: '#/components/schemas/kessel.inventory.v1beta1.ReporterData'
-                    description: |-
-                        The entities that registered this item in the Kessel Asset Inventory. The
-                         same resource may be registered by multiple reporters.
         kessel.inventory.v1beta1.UpdateK8sClusterRequest:
             type: object
             properties:
@@ -876,7 +857,7 @@ components:
                     description: |-
                         A resource instance using the format:
                          \"<reporter_data.reporter_type>:<reporter_data.resourceId_alias>\"
-                host:
+                rhel_host:
                     allOf:
                         - $ref: '#/components/schemas/kessel.inventory.v1beta1.RhelHost'
                     description: The Rhel host to update

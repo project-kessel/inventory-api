@@ -57,12 +57,23 @@ func (m *CreateRhelHostRequest) validate(all bool) error {
 
 	var errors []error
 
+	if m.GetRhelHost() == nil {
+		err := CreateRhelHostRequestValidationError{
+			field:  "RhelHost",
+			reason: "value is required",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
 	if all {
-		switch v := interface{}(m.GetHost()).(type) {
+		switch v := interface{}(m.GetRhelHost()).(type) {
 		case interface{ ValidateAll() error }:
 			if err := v.ValidateAll(); err != nil {
 				errors = append(errors, CreateRhelHostRequestValidationError{
-					field:  "Host",
+					field:  "RhelHost",
 					reason: "embedded message failed validation",
 					cause:  err,
 				})
@@ -70,16 +81,16 @@ func (m *CreateRhelHostRequest) validate(all bool) error {
 		case interface{ Validate() error }:
 			if err := v.Validate(); err != nil {
 				errors = append(errors, CreateRhelHostRequestValidationError{
-					field:  "Host",
+					field:  "RhelHost",
 					reason: "embedded message failed validation",
 					cause:  err,
 				})
 			}
 		}
-	} else if v, ok := interface{}(m.GetHost()).(interface{ Validate() error }); ok {
+	} else if v, ok := interface{}(m.GetRhelHost()).(interface{ Validate() error }); ok {
 		if err := v.Validate(); err != nil {
 			return CreateRhelHostRequestValidationError{
-				field:  "Host",
+				field:  "RhelHost",
 				reason: "embedded message failed validation",
 				cause:  err,
 			}
@@ -188,35 +199,6 @@ func (m *CreateRhelHostResponse) validate(all bool) error {
 
 	var errors []error
 
-	if all {
-		switch v := interface{}(m.GetHost()).(type) {
-		case interface{ ValidateAll() error }:
-			if err := v.ValidateAll(); err != nil {
-				errors = append(errors, CreateRhelHostResponseValidationError{
-					field:  "Host",
-					reason: "embedded message failed validation",
-					cause:  err,
-				})
-			}
-		case interface{ Validate() error }:
-			if err := v.Validate(); err != nil {
-				errors = append(errors, CreateRhelHostResponseValidationError{
-					field:  "Host",
-					reason: "embedded message failed validation",
-					cause:  err,
-				})
-			}
-		}
-	} else if v, ok := interface{}(m.GetHost()).(interface{ Validate() error }); ok {
-		if err := v.Validate(); err != nil {
-			return CreateRhelHostResponseValidationError{
-				field:  "Host",
-				reason: "embedded message failed validation",
-				cause:  err,
-			}
-		}
-	}
-
 	if len(errors) > 0 {
 		return CreateRhelHostResponseMultiError(errors)
 	}
@@ -319,14 +301,34 @@ func (m *UpdateRhelHostRequest) validate(all bool) error {
 
 	var errors []error
 
-	// no validation rules for Resource
+	if utf8.RuneCountInString(m.GetResource()) < 1 {
+		err := UpdateRhelHostRequestValidationError{
+			field:  "Resource",
+			reason: "value length must be at least 1 runes",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if m.GetRhelHost() == nil {
+		err := UpdateRhelHostRequestValidationError{
+			field:  "RhelHost",
+			reason: "value is required",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
 
 	if all {
-		switch v := interface{}(m.GetHost()).(type) {
+		switch v := interface{}(m.GetRhelHost()).(type) {
 		case interface{ ValidateAll() error }:
 			if err := v.ValidateAll(); err != nil {
 				errors = append(errors, UpdateRhelHostRequestValidationError{
-					field:  "Host",
+					field:  "RhelHost",
 					reason: "embedded message failed validation",
 					cause:  err,
 				})
@@ -334,16 +336,16 @@ func (m *UpdateRhelHostRequest) validate(all bool) error {
 		case interface{ Validate() error }:
 			if err := v.Validate(); err != nil {
 				errors = append(errors, UpdateRhelHostRequestValidationError{
-					field:  "Host",
+					field:  "RhelHost",
 					reason: "embedded message failed validation",
 					cause:  err,
 				})
 			}
 		}
-	} else if v, ok := interface{}(m.GetHost()).(interface{ Validate() error }); ok {
+	} else if v, ok := interface{}(m.GetRhelHost()).(interface{ Validate() error }); ok {
 		if err := v.Validate(); err != nil {
 			return UpdateRhelHostRequestValidationError{
-				field:  "Host",
+				field:  "RhelHost",
 				reason: "embedded message failed validation",
 				cause:  err,
 			}
@@ -554,7 +556,16 @@ func (m *DeleteRhelHostRequest) validate(all bool) error {
 
 	var errors []error
 
-	// no validation rules for Resource
+	if utf8.RuneCountInString(m.GetResource()) < 1 {
+		err := DeleteRhelHostRequestValidationError{
+			field:  "Resource",
+			reason: "value length must be at least 1 runes",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
 
 	if len(errors) > 0 {
 		return DeleteRhelHostRequestMultiError(errors)

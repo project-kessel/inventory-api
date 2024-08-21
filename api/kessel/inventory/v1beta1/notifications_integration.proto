@@ -18,10 +18,5 @@ message NotificationsIntegration {
 
   // Write only reporter specific data
   ReporterData reporter_data = 245278792
-      [ (google.api.field_behavior) = INPUT_ONLY, (validate.rules).any.required = true ];
-
-  // The entities that registered this item in the Kessel Asset Inventory. The
-  // same resource may be registered by multiple reporters.
-  repeated ReporterData reporters = 353323086
-      [ (google.api.field_behavior) = OUTPUT_ONLY ];
+      [ (google.api.field_behavior) = INPUT_ONLY, (validate.rules).message.required = true ];
 }

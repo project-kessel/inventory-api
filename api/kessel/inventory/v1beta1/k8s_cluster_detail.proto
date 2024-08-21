@@ -70,7 +70,7 @@ message K8sClusterDetail {
   KubeVendor kube_vendor = 264191642 [ (validate.rules).enum = {not_in: [0], defined_only: true} ];
 
   // The version of the productized kubernetes distribution
-  string vendor_version = 23961827;
+  string vendor_version = 23961827 [ (validate.rules).string.min_len = 1 ];
 
   CloudPlatform cloud_platform = 476768062;
 

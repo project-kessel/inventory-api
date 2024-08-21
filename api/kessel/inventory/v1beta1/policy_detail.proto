@@ -13,11 +13,11 @@ message PolicyDetail {
   // The kind of policy
   enum Severity {
     SEVERITY_UNSPECIFIED = 0;
-    SEVERITY_LOW = 1;
-    SEVERITY_MEDIUM = 2;
-    SEVERITY_HIGH = 3;
-    SEVERITY_CRITICAL = 4;
-    SEVERITY_OTHER = 5;
+    SEVERITY_OTHER = 1;
+    LOW = 2;
+    MEDIUM = 3;
+    HIGH = 4;
+    CRITICAL = 5;
   }
 
   // Defines if the policy is currently enabled or disabled across all targets

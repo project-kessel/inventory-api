@@ -67,7 +67,7 @@ message K8sClusterDetail {
   // The version of kubernetes
   string kube_version = 395858490;
 
-  KubeVendor kube_vendor = 264191642;
+  KubeVendor kube_vendor = 264191642 [ (validate.rules).enum = {not_in: [0], defined_only: true} ];
 
   // The version of the productized kubernetes distribution
   string vendor_version = 23961827;

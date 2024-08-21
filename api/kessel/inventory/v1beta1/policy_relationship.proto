@@ -12,8 +12,8 @@ message PolicyRelationship {
   enum Status {
     STATUS_UNSPECIFIED = 0;
     STATUS_OTHER = 1;
-    STATUS_NON_COMPLIANT = 2;
-    STATUS_COMPLIANT = 3;
+    NON_COMPLIANT = 2;
+    COMPLIANT = 3;
   }
 
   // The type of Resource relationship
@@ -21,12 +21,12 @@ message PolicyRelationship {
 
   // The resource ID assigned to the resource by Kessel Asset Inventory. A
   // reporter alias may also be used as a resource ID using the format:
-  // \"hcrn:<reporter_data.reporter_type>:<reporter_data.reporter_id>::<reporter_data.resourceId_alias>\"
+  // \"hcrn:<reporter_data.reporter_type>:<reporter_data.reporter_id>::<reporter_data.local_resource_id>\"
   int64 policy_id = 225679544;
 
   // The resource ID assigned to the resource by Kessel Asset Inventory. A
   // reporter alias may also be used as a resource ID using the format:
-  // \"hcrn:<reporter_data.reporter_type>:<reporter_data.reporter_id>::<reporter_data.resourceId_alias>\"
+  // \"hcrn:<reporter_data.reporter_type>:<reporter_data.reporter_id>::<reporter_data.local_resource_id>\"
   int64 k8s_cluster_id = 240280960;
 
   Status status = 355610639;

@@ -16,7 +16,7 @@ func MetadataFromPb(in *pb.Metadata, reporter *pb.ReporterData, identity *authna
 	}
 
 	return &biz.Metadata{
-		ID:              in.Id, // Todo: Is this a relation's ID?
+		ID:              in.Id,
 		ResourceType:    bizhosts.ResourceType,
 		Workspace:       in.Workspace,
 		CreatedAt:       timestamppb.Now().AsTime(),

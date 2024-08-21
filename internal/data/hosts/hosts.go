@@ -62,14 +62,7 @@ func (r *hostsRepo) Update(context.Context, *biz.Host, string) (*biz.Host, error
 	return nil, nil
 }
 
-func (r *hostsRepo) Delete(ctx context.Context, resource string) error {
-	//identity, err := middleware.GetIdentity(ctx)
-	//if err != nil {
-	//	return err
-	//}
-	//
-	//r.Db.Session(&gorm.Session{FullSaveAssociations: true}).Where("metadata.resource")
-
+func (r *hostsRepo) Delete(context.Context, string) error {
 	return nil
 }
 
@@ -78,7 +71,6 @@ func (r *hostsRepo) FindByID(ctx context.Context, localResourceId string) (*biz.
 
 	err := r.Db.Session(&gorm.Session{}).Joins("Metadata").Take(&host, "metadata.local_resource_id = ?", localResourceId).Error
 	if err != nil {
-		log.Infof("err: %v", err)
 		return nil, err
 	}
 

@@ -498,7 +498,9 @@ components:
                     description: The k8s cluster to create in Kessel Asset Inventory
         kessel.inventory.v1beta1.CreateK8sClusterResponse:
             type: object
-            properties: {}
+            properties:
+                k8s_cluster:
+                    $ref: '#/components/schemas/kessel.inventory.v1beta1.K8sCluster'
         kessel.inventory.v1beta1.CreateNotificationsIntegrationRequest:
             type: object
             properties:
@@ -789,7 +791,9 @@ components:
                     description: The k8s clsuter to update
         kessel.inventory.v1beta1.UpdateK8sClusterResponse:
             type: object
-            properties: {}
+            properties:
+                k8s_cluster:
+                    $ref: '#/components/schemas/kessel.inventory.v1beta1.K8sCluster'
         kessel.inventory.v1beta1.UpdateNotificationsIntegrationRequest:
             type: object
             properties:

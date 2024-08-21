@@ -5,20 +5,16 @@ import (
 
 	"gorm.io/gorm"
 
-	"github.com/go-kratos/kratos/v2/log"
-
 	biz "github.com/project-kessel/inventory-api/internal/biz/relationships"
 )
 
 type relationshipsRepo struct {
-	DB  *gorm.DB
-	Log *log.Helper
+	DB *gorm.DB
 }
 
-func New(g *gorm.DB, l *log.Helper) *relationshipsRepo {
+func New(g *gorm.DB) *relationshipsRepo {
 	return &relationshipsRepo{
-		DB:  g,
-		Log: l,
+		DB: g,
 	}
 }
 

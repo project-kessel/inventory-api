@@ -5,10 +5,10 @@ import (
 )
 
 type Options struct {
-	DefaultTopic                       string `mapstructure:"default-topic"`
-	BuiltInFeatures                    string `mapstructure:"builtin-features"`
-	ClientId                           string `mapstructure:"client-id"`
-	MetadataBrokerList                 string `mapstructure:"metadata-broker-list"`
+	DefaultTopic    string `mapstructure:"default-topic"`
+	BuiltInFeatures string `mapstructure:"builtin-features"`
+	ClientId        string `mapstructure:"client-id"`
+	//MetadataBrokerList                 string `mapstructure:"metadata-broker-list"`
 	BootstrapServers                   string `mapstructure:"bootstrap-servers"`
 	MessageMaxBytes                    int    `mapstructure:"message-max-bytes"`
 	MessageCopyMaxBytes                int    `mapstructure:"message-copy-max-bytes"`
@@ -92,10 +92,10 @@ type Options struct {
 
 func NewOptions() *Options {
 	return &Options{
-		DefaultTopic:                       "kessel-inventory",
-		BuiltInFeatures:                    "gzip, snappy, ssl, sasl, regex, lz4, sasl_plain, sasl_scram, plugins, zstd, sasl_oauthbearer, http, oidc",
-		ClientId:                           "rdkafka",
-		MetadataBrokerList:                 "",
+		DefaultTopic:    "kessel-inventory",
+		BuiltInFeatures: "gzip, snappy, ssl, sasl, regex, lz4, sasl_plain, sasl_scram, plugins, zstd, sasl_oauthbearer, http, oidc",
+		ClientId:        "rdkafka",
+		//MetadataBrokerList:                 "",
 		BootstrapServers:                   "",
 		MessageMaxBytes:                    1000000,
 		MessageCopyMaxBytes:                65535,
@@ -187,7 +187,7 @@ func (o *Options) AddFlags(fs *pflag.FlagSet, prefix string) {
 
 	fs.StringVar(&o.BuiltInFeatures, prefix+"builtin-features", o.BuiltInFeatures, "Indicates the builtin features for this build of librdkafka. An application can either query this value or attempt to set it with its list of required features to check for library support. \n*Type: CSV flags*")
 	fs.StringVar(&o.ClientId, prefix+"client-id", o.BuiltInFeatures, "Client identifier. \n*Type: string*")
-	fs.StringVar(&o.MetadataBrokerList, prefix+"metadata-broker-list", o.MetadataBrokerList, "Initial list of brokers as a CSV list of broker host or host:port. The application may also use `rd_kafka_brokers_add()` to add brokers during runtime. \n*Type: string*")
+	//fs.StringVar(&o.MetadataBrokerList, prefix+"metadata-broker-list", o.MetadataBrokerList, "Initial list of brokers as a CSV list of broker host or host:port. The application may also use `rd_kafka_brokers_add()` to add brokers during runtime. \n*Type: string*")
 	fs.StringVar(&o.BootstrapServers, prefix+"bootstrap-servers", o.BootstrapServers, "Alias for `metadata.broker.list`: Initial list of brokers as a CSV list of broker host or host:port. The application may also use `rd_kafka_brokers_add()` to add brokers during runtime. \n*Type: string*")
 	fs.IntVar(&o.MessageMaxBytes, prefix+"message-max-bytes", o.MessageMaxBytes, "Maximum Kafka protocol request message size. Due to differing framing overhead between protocol versions the producer is unable to reliably enforce a strict max message limit at produce time and may exceed the maximum size by one message in protocol ProduceRequests, the broker will enforce the the topic's `max.message.bytes` limit (see Apache Kafka documentation). \n*Type: integer*")
 	fs.IntVar(&o.MessageCopyMaxBytes, prefix+"message-copy-max-bytes", o.MessageCopyMaxBytes, "Maximum size for message to be copied to buffer. Messages larger than this will be passed by reference (zero-copy) at the expense of larger iovecs. \n*Type: integer*")
@@ -196,7 +196,7 @@ func (o *Options) AddFlags(fs *pflag.FlagSet, prefix string) {
 	fs.IntVar(&o.MaxInFlight, prefix+"max-in-flight", o.MaxInFlight, "Alias for `max.in.flight.requests.per.connection`: Maximum number of in-flight requests per broker connection. This is a generic property applied to all broker communication, however it is primarily relevant to produce requests. In particular, note that other mechanisms limit the number of outstanding consumer fetch request per broker to one. \n*Type: integer*")
 	fs.IntVar(&o.TopicMetadataRefreshIntervalMs, prefix+"topic-metadata-refresh-interval-ms", o.TopicMetadataRefreshIntervalMs, "Period of time in milliseconds at which topic and broker metadata is refreshed in order to proactively discover any new brokers, topics, partitions or partition leader changes. Use -1 to disable the intervalled refresh (not recommended). If there are no locally referenced topics (no topic objects created, no messages produced, no subscription or no assignment) then only the broker list will be refreshed every interval but no more often than every 10s. \n*Type: integer*")
 	fs.IntVar(&o.MetadataMaxAgeMs, prefix+"metadata-max-age-ms", o.MetadataMaxAgeMs, "Metadata cache max age. Defaults to topic.metadata.refresh.interval.ms * 3 \n*Type: integer*")
-	fs.IntVar(&o.TopicMetadataRefreshFastIntervalMs, prefix+"topic-metadata-refresh-fast-interval-ms", o.TopicMetadataPropagationMaxMs, "When a topic loses its leader a new metadata request will be enqueued immediately and then with this initial interval, exponentially increasing upto `retry.backoff.max.ms`, until the topic metadata has been refreshed. If not set explicitly, it will be defaulted to `retry.backoff.ms`. This is used to recover quickly from transitioning leader brokers. \n*Type: integer*")
+	fs.IntVar(&o.TopicMetadataRefreshFastIntervalMs, prefix+"topic-metadata-refresh-fast-interval-ms", o.TopicMetadataRefreshFastIntervalMs, "When a topic loses its leader a new metadata request will be enqueued immediately and then with this initial interval, exponentially increasing upto `retry.backoff.max.ms`, until the topic metadata has been refreshed. If not set explicitly, it will be defaulted to `retry.backoff.ms`. This is used to recover quickly from transitioning leader brokers. \n*Type: integer*")
 	fs.BoolVar(&o.TopicMetadataRefreshSparse, prefix+"topic-metadata-refresh-sparse", o.TopicMetadataRefreshSparse, "Sparse metadata requests (consumes less network bandwidth) \n*Type: boolean*")
 	fs.IntVar(&o.TopicMetadataPropagationMaxMs, prefix+"topic-metadata-propagation-max-ms", o.ApiVersionRequestTimeoutMs, "Apache Kafka topic creation is asynchronous and it takes some time for a new topic to propagate throughout the cluster to all brokers. If a client requests topic metadata after manual topic creation but before the topic has been fully propagated to the broker the client is requesting metadata from, the topic will seem to be non-existent and the client will mark the topic as such, failing queued produced messages with `ERR__UNKNOWN_TOPIC`. This setting delays marking a topic as non-existent until the configured propagation max time has passed. The maximum propagation time is calculated from the time the topic is first referenced in the client, e.g., on produce(). \n*Type: integer*")
 	fs.StringVar(&o.TopicBlacklist, prefix+"topic-blacklist", o.TopicBlacklist, "Topic blacklist, a comma-separated list of regular expressions for matching topic names that should be ignored in broker metadata information as if the topics did not exist. \n*Type: pattern list*")

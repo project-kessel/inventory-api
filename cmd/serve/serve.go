@@ -135,7 +135,9 @@ func NewCommand(
 			}
 
 			// construct eventing
-			eventingManager, err := eventing.New(eventingConfig, log.NewHelper(log.With(logger, "subsystem", "eventing")))
+			// Note that we pass the server id here to act as the Source URI in cloudevents
+			// If a server ID isn't configured explicitly, `os.Hostname()` is used.
+			eventingManager, err := eventing.New(eventingConfig, serverConfig.Options.Id, log.NewHelper(log.With(logger, "subsystem", "eventing")))
 			if err != nil {
 				return err
 			}
@@ -144,35 +146,35 @@ func NewCommand(
 			server := server.New(serverConfig, middleware.Authentication(authenticator), logger)
 
 			// wire together notificationsintegrations handling
-			notifs_repo := notifsrepo.New(db, authorizer, eventingManager, log.NewHelper(log.With(logger, "subsystem", "notificationsintegrations_repo")))
+			notifs_repo := notifsrepo.New(db, authorizer, eventingManager)
 			notifs_controller := notifsctl.New(notifs_repo, log.With(logger, "subsystem", "notificationsintegrations_controller"))
 			notifs_service := notifssvc.New(notifs_controller)
 			pb.RegisterKesselNotificationsIntegrationServiceServer(server.GrpcServer, notifs_service)
 			pb.RegisterKesselNotificationsIntegrationServiceHTTPServer(server.HttpServer, notifs_service)
 
 			// wire together hosts handling
-			hosts_repo := hostsrepo.New(db, authorizer, eventingManager, log.NewHelper(log.With(logger, "subsystem", "hosts_repo")))
+			hosts_repo := hostsrepo.New(db, authorizer, eventingManager)
 			hosts_controller := hostsctl.New(hosts_repo, log.With(logger, "subsystem", "hosts_controller"))
 			hosts_service := hostssvc.New(hosts_controller)
 			pb.RegisterKesselRhelHostServiceServer(server.GrpcServer, hosts_service)
 			pb.RegisterKesselRhelHostServiceHTTPServer(server.HttpServer, hosts_service)
 
 			// wire together k8sclusters handling
-			k8sclusters_repo := k8sclustersrepo.New(db, log.NewHelper(log.With(logger, "subsystem", "k8sclusters_repo")))
+			k8sclusters_repo := k8sclustersrepo.New(db, authorizer, eventingManager)
 			k8sclusters_controller := k8sclustersctl.New(k8sclusters_repo, log.With(logger, "subsystem", "k8sclusters_controller"))
 			k8sclusters_service := k8sclusterssvc.New(k8sclusters_controller)
 			pb.RegisterKesselK8SClusterServiceServer(server.GrpcServer, k8sclusters_service)
 			pb.RegisterKesselK8SClusterServiceHTTPServer(server.HttpServer, k8sclusters_service)
 
 			// wire together policies handling
-			policies_repo := policiesrepo.New(db, log.NewHelper(log.With(logger, "subsystem", "policies_repo")))
+			policies_repo := policiesrepo.New(db, authorizer, eventingManager)
 			policies_controller := policiesctl.New(policies_repo, log.With(logger, "subsystem", "policies_controller"))
 			policies_service := policiessvc.New(policies_controller)
 			pb.RegisterKesselPolicyServiceServer(server.GrpcServer, policies_service)
 			pb.RegisterKesselPolicyServiceHTTPServer(server.HttpServer, policies_service)
 
 			// wire together relationships handling
-			relationships_repo := relationshipsrepo.New(db, log.NewHelper(log.With(logger, "subsystem", "relationships_repo")))
+			relationships_repo := relationshipsrepo.New(db)
 			relationships_controller := relationshipsctl.New(relationships_repo, log.With(logger, "subsystem", "relationships_controller"))
 			relationships_service := relationshipssvc.New(relationships_controller)
 			pb.RegisterKesselPolicyRelationshipServiceServer(server.GrpcServer, relationships_service)

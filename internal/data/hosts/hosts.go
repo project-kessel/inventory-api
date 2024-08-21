@@ -2,11 +2,10 @@ package hosts
 
 import (
 	"context"
+	"time"
 
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
-
-	"github.com/go-kratos/kratos/v2/log"
 
 	authzapi "github.com/project-kessel/inventory-api/internal/authz/api"
 	biz "github.com/project-kessel/inventory-api/internal/biz/hosts"
@@ -15,20 +14,16 @@ import (
 )
 
 type hostsRepo struct {
-	Db      *gorm.DB
+	DB      *gorm.DB
 	Authz   authzapi.Authorizer
 	Eventer eventingapi.Manager
-
-	Log *log.Helper
 }
 
-func New(g *gorm.DB, a authzapi.Authorizer, e eventingapi.Manager, l *log.Helper) *hostsRepo {
+func New(g *gorm.DB, a authzapi.Authorizer, e eventingapi.Manager) *hostsRepo {
 	return &hostsRepo{
-		Db:      g,
+		DB:      g,
 		Authz:   a,
 		Eventer: e,
-
-		Log: l,
 	}
 }
 
@@ -38,19 +33,17 @@ func (r *hostsRepo) Save(ctx context.Context, model *biz.Host) (*biz.Host, error
 		return nil, nil
 	}
 
-	if err := r.Db.Session(&gorm.Session{FullSaveAssociations: true}).Create(model).Error; err != nil {
+	if err := r.DB.Session(&gorm.Session{FullSaveAssociations: true}).Create(model).Error; err != nil {
 		return nil, err
 	}
 
 	if r.Eventer != nil {
-		// TODO: handle eventing errors
 		// TODO: Update the Object that's sent.  This is going to be what we actually emit.
 		producer, _ := r.Eventer.Lookup(identity, biz.ResourceType, model.ID)
-		evt := &eventingapi.Event{
-			EventType:    "Create",
-			ResourceType: biz.ResourceType,
-			Object:       model,
-		}
+		evt := eventingapi.NewAddEvent(biz.ResourceType, model.Metadata.UpdatedAt, &eventingapi.EventResource[struct{}]{
+			Metadata:     &model.Metadata,
+			ReporterData: model.Metadata.Reporters[0],
+		})
 		err = producer.Produce(ctx, evt)
 		if err != nil {
 			return nil, err
@@ -59,11 +52,50 @@ func (r *hostsRepo) Save(ctx context.Context, model *biz.Host) (*biz.Host, error
 	return model, nil
 }
 
-func (r *hostsRepo) Update(context.Context, *biz.Host, string) (*biz.Host, error) {
-	return nil, nil
+// Update updates a model in the database, updates related tuples in the relations-api, and issues an update event.
+// The `id` is possibly of the form <reporter_type:local_resource_id>.
+func (r *hostsRepo) Update(ctx context.Context, model *biz.Host, id string) (*biz.Host, error) {
+	identity, err := middleware.GetIdentity(ctx)
+	if err != nil {
+		return nil, nil
+	}
+
+	// TODO: update the model in inventory
+
+	if r.Eventer != nil {
+		producer, _ := r.Eventer.Lookup(identity, biz.ResourceType, model.ID)
+		evt := eventingapi.NewUpdateEvent(biz.ResourceType, model.Metadata.UpdatedAt, &eventingapi.EventResource[struct{}]{
+			Metadata:     &model.Metadata,
+			ReporterData: model.Metadata.Reporters[0],
+		})
+		err = producer.Produce(ctx, evt)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return model, nil
 }
 
-func (r *hostsRepo) Delete(context.Context, string) error {
+// Delete deletes a model from the database, removes related tuples from the relations-api, and issues a delete event.
+// The `id` is possibly of the form <reporter_type:local_resource_id>.
+func (r *hostsRepo) Delete(ctx context.Context, id string) error {
+	identity, err := middleware.GetIdentity(ctx)
+	if err != nil {
+		return nil
+	}
+
+	// TODO: delete the model from inventory
+
+	if r.Eventer != nil {
+		// TODO: without persistence, we can't lookup the inventory assigned id or other model specific info.
+		var dummyId int64 = 0
+		producer, _ := r.Eventer.Lookup(identity, biz.ResourceType, dummyId)
+		evt := eventingapi.NewDeleteEvent(biz.ResourceType, id, time.Now().UTC(), identity)
+		err = producer.Produce(ctx, evt)
+		if err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -79,7 +111,7 @@ func (r *hostsRepo) ListAll(context.Context) ([]*biz.Host, error) {
 	// }
 
 	var results []*biz.Host
-	if err := r.Db.Preload(clause.Associations).Find(&results).Error; err != nil {
+	if err := r.DB.Preload(clause.Associations).Find(&results).Error; err != nil {
 		return nil, err
 	}
 

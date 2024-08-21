@@ -1,11 +1,14 @@
 package common
 
 import (
+	"fmt"
 	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
+	"strings"
 
 	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1"
 	authnapi "github.com/project-kessel/inventory-api/internal/authn/api"
 	biz "github.com/project-kessel/inventory-api/internal/biz/common"
+	bizhosts "github.com/project-kessel/inventory-api/internal/biz/hosts"
 )
 
 func MetadataFromPb(in *pb.Metadata, reporter *pb.ReporterData, identity *authnapi.Identity) *biz.Metadata {
@@ -15,14 +18,15 @@ func MetadataFromPb(in *pb.Metadata, reporter *pb.ReporterData, identity *authna
 	}
 
 	return &biz.Metadata{
-		ID:              in.Id,
-		ResourceType:    in.ResourceType,
+		ID:              in.Id, // Todo: Is this a relation's ID?
+		ResourceType:    bizhosts.ResourceType,
 		Workspace:       in.Workspace,
-		CreatedAt:       in.FirstReported.AsTime(),
-		UpdatedAt:       in.LastReported.AsTime(),
+		CreatedAt:       timestamppb.Now().AsTime(),
+		UpdatedAt:       timestamppb.Now().AsTime(),
 		Labels:          labels,
 		FirstReportedBy: identity.Principal,
 		LastReportedBy:  identity.Principal,
+		LocalResourceId: reporter.LocalResourceId,
 
 		Reporters: []*biz.Reporter{ReporterFromPb(reporter, identity)},
 	}
@@ -36,8 +40,8 @@ func ReporterFromPb(in *pb.ReporterData, identity *authnapi.Identity) *biz.Repor
 		LocalResourceId: in.LocalResourceId,
 		ConsoleHref:     in.ConsoleHref,
 		ApiHref:         in.ApiHref,
-		CreatedAt:       in.FirstReported.AsTime(),
-		UpdatedAt:       in.LastReported.AsTime(),
+		CreatedAt:       timestamppb.Now().AsTime(),
+		UpdatedAt:       timestamppb.Now().AsTime(),
 	}
 }
 

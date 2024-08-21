@@ -3,6 +3,7 @@ syntax = "proto3";
 package kessel.inventory.v1beta1;
 
 import "kessel/inventory/v1beta1/k8s_cluster_detail_nodes_inner.proto";
+import "validate/validate.proto";
 
 option go_package = "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1";
 option java_multiple_files = true;

@@ -22,7 +22,7 @@ message CreateNotificationsIntegrationResponse {
 
 message UpdateNotificationsIntegrationRequest {
   // A resource instance using the format:
-  // \"<reporter_data.reporter_type>:<reporter_data.resourceId_alias>\"
+  // \"<reporter_data.reporter_type>:<reporter_data.local_resource_id>\"
   string resource = 1;
   // The NotificationsIntegration to update
   NotificationsIntegration integration = 2;
@@ -32,7 +32,7 @@ message UpdateNotificationsIntegrationResponse {}
 
 message DeleteNotificationsIntegrationRequest {
   // A resource instance using the format:
-  // \"<reporter_data.reporter_type>:<reporter_data.resourceId_alias>\"
+  // \"<reporter_data.reporter_type>:<reporter_data.local_resource_id>\"
   string resource = 1;
 }
 

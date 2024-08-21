@@ -1,14 +1,15 @@
 package v1beta1
 
 import (
-	"github.com/stretchr/testify/assert"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestNotificationIntegrationOptionalMetadata(t *testing.T) {
 	notifintegration := NotificationsIntegration{
 		ReporterData: &ReporterData{
-			ReporterType:    ReporterData_REPORTER_TYPE_OCM,
+			ReporterType:    ReporterData_OCM,
 			LocalResourceId: "foo",
 		},
 	}
@@ -20,7 +21,7 @@ func TestNotificationIntegrationOptionalMetadata(t *testing.T) {
 func TestNotificationIntegrationMetadataIsValidatedIfFound(t *testing.T) {
 	notifintegration := NotificationsIntegration{
 		ReporterData: &ReporterData{
-			ReporterType:    ReporterData_REPORTER_TYPE_OCM,
+			ReporterType:    ReporterData_OCM,
 			LocalResourceId: "foo",
 		},
 		Metadata: &Metadata{

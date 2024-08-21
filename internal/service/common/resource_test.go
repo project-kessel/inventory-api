@@ -1,13 +1,14 @@
 package common
 
 import (
+	"testing"
+	"time"
+
 	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1"
 	authnapi "github.com/project-kessel/inventory-api/internal/authn/api"
 	biz "github.com/project-kessel/inventory-api/internal/biz/common"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/protobuf/types/known/timestamppb"
-	"testing"
-	"time"
 )
 
 func createPbMetadata(created time.Time, updated time.Time) pb.Metadata {
@@ -79,7 +80,7 @@ func TestMetadataFromPb(t *testing.T) {
 	actual := MetadataFromPb(
 		&pbMetadata,
 		&pb.ReporterData{
-			ReporterType:       pb.ReporterData_REPORTER_TYPE_HBI,
+			ReporterType:       pb.ReporterData_HBI,
 			ReporterInstanceId: "instance-001",
 			FirstReported:      timestamppb.New(created),
 			LastReported:       timestamppb.New(updated),
@@ -105,7 +106,7 @@ func TestMetadataFromPb(t *testing.T) {
 		{
 			MetadataID:      0,
 			ReporterID:      "anakin",
-			ReporterType:    pb.ReporterData_REPORTER_TYPE_HBI.String(),
+			ReporterType:    pb.ReporterData_HBI.String(),
 			CreatedAt:       created,
 			UpdatedAt:       updated,
 			LocalResourceId: "local-01",
@@ -123,7 +124,7 @@ func TestReporterFromPb(t *testing.T) {
 	lastReported := firstReported.Add(500)
 
 	actual := ReporterFromPb(&pb.ReporterData{
-		ReporterType:       pb.ReporterData_REPORTER_TYPE_ACM,
+		ReporterType:       pb.ReporterData_ACM,
 		ReporterInstanceId: "id-01",
 		FirstReported:      timestamppb.New(firstReported),
 		LastReported:       timestamppb.New(lastReported),
@@ -143,7 +144,7 @@ func TestReporterFromPb(t *testing.T) {
 	expected := biz.Reporter{
 		MetadataID:      0,
 		ReporterID:      "principal-01",
-		ReporterType:    pb.ReporterData_REPORTER_TYPE_ACM.String(),
+		ReporterType:    pb.ReporterData_ACM.String(),
 		CreatedAt:       firstReported,
 		UpdatedAt:       lastReported,
 		LocalResourceId: "local-res-01",
@@ -177,7 +178,7 @@ func TestReportersFromModel(t *testing.T) {
 		{
 			MetadataID:      100,
 			ReporterID:      "reporter-01",
-			ReporterType:    pb.ReporterData_REPORTER_TYPE_ACM.String(),
+			ReporterType:    pb.ReporterData_ACM.String(),
 			CreatedAt:       created1,
 			UpdatedAt:       updated1,
 			LocalResourceId: "local-resource-1",
@@ -188,7 +189,7 @@ func TestReportersFromModel(t *testing.T) {
 		{
 			MetadataID:      233,
 			ReporterID:      "reporter-02",
-			ReporterType:    pb.ReporterData_REPORTER_TYPE_OCM.String(),
+			ReporterType:    pb.ReporterData_OCM.String(),
 			CreatedAt:       created2,
 			UpdatedAt:       updated2,
 			LocalResourceId: "local-resource-2",
@@ -200,7 +201,7 @@ func TestReportersFromModel(t *testing.T) {
 
 	expected := []*pb.ReporterData{
 		{
-			ReporterType:       pb.ReporterData_REPORTER_TYPE_ACM,
+			ReporterType:       pb.ReporterData_ACM,
 			ReporterInstanceId: "reporter-01",
 			FirstReported:      timestamppb.New(created1),
 			LastReported:       timestamppb.New(updated1),
@@ -210,7 +211,7 @@ func TestReportersFromModel(t *testing.T) {
 			ReporterVersion:    "reporter-version-1",
 		},
 		{
-			ReporterType:       pb.ReporterData_REPORTER_TYPE_OCM,
+			ReporterType:       pb.ReporterData_OCM,
 			ReporterInstanceId: "reporter-02",
 			FirstReported:      timestamppb.New(created2),
 			LastReported:       timestamppb.New(updated2),

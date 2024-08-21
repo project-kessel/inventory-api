@@ -130,7 +130,7 @@ type UpdateResourceRelationshipByUrnHsRequest struct {
 	// resource, object resource}. A relationship is between a Subject and an
 	// Object, e.g. a Policy (subject) has a propagated relationship to an k8s
 	// cluster (object).. The {resource} format
-	// \"<reporter_data.reporter_type>:<reporter_data.resourceId_alias>\".
+	// \"<reporter_data.reporter_type>:<reporter_data.local_resource_id>\".
 	PolicyRelationship *PolicyRelationship `protobuf:"bytes,2,opt,name=policy_relationship,json=policyRelationship,proto3" json:"policy_relationship,omitempty"`
 }
 

@@ -7,7 +7,7 @@ import (
 )
 
 const (
-	ResourceType = "notifications-integration"
+	ResourceType = "notifications/integration"
 )
 
 // NotificationsIntegration is a NotificationsIntegration repo.

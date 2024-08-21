@@ -57,27 +57,7 @@ func (m *ReporterData) validate(all bool) error {
 
 	var errors []error
 
-	if _, ok := _ReporterData_ReporterType_NotInLookup[m.GetReporterType()]; ok {
-		err := ReporterDataValidationError{
-			field:  "ReporterType",
-			reason: "value must not be in list [REPORTER_TYPE_UNSPECIFIED]",
-		}
-		if !all {
-			return err
-		}
-		errors = append(errors, err)
-	}
-
-	if _, ok := ReporterData_ReporterType_name[int32(m.GetReporterType())]; !ok {
-		err := ReporterDataValidationError{
-			field:  "ReporterType",
-			reason: "value must be one of the defined enum values",
-		}
-		if !all {
-			return err
-		}
-		errors = append(errors, err)
-	}
+	// no validation rules for ReporterType
 
 	// no validation rules for ReporterInstanceId
 
@@ -143,16 +123,7 @@ func (m *ReporterData) validate(all bool) error {
 
 	// no validation rules for ApiHref
 
-	if utf8.RuneCountInString(m.GetLocalResourceId()) < 1 {
-		err := ReporterDataValidationError{
-			field:  "LocalResourceId",
-			reason: "value length must be at least 1 runes",
-		}
-		if !all {
-			return err
-		}
-		errors = append(errors, err)
-	}
+	// no validation rules for LocalResourceId
 
 	// no validation rules for ReporterVersion
 
@@ -232,7 +203,3 @@ var _ interface {
 	Cause() error
 	ErrorName() string
 } = ReporterDataValidationError{}
-
-var _ReporterData_ReporterType_NotInLookup = map[ReporterData_ReporterType]struct{}{
-	0: {},
-}

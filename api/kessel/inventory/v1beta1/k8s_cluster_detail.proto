@@ -2,8 +2,6 @@ syntax = "proto3";
 
 package kessel.inventory.v1beta1;
 
-import "validate/validate.proto";
-
 import "kessel/inventory/v1beta1/k8s_cluster_detail_nodes_inner.proto";
 
 option go_package = "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1";
@@ -16,60 +14,64 @@ message K8sClusterDetail {
   // the aggregate status of the cluster
   enum ClusterStatus {
     CLUSTER_STATUS_UNSPECIFIED = 0;
-    CLUSTER_STATUS_READY = 1;
-    CLUSTER_STATUS_FAILED = 2;
-    CLUSTER_STATUS_OFFLINE = 3;
+    CLUSTER_STATUS_OTHER = 1; 
+    READY = 2;
+    FAILED = 3;
+    OFFLINE = 4;
   }
 
   // The kubernetes vendor
   enum KubeVendor {
     KUBE_VENDOR_UNSPECIFIED = 0;
     KUBE_VENDOR_OTHER = 1;
-    KUBE_VENDOR_AKS = 2;
-    KUBE_VENDOR_EKS = 3;
-    KUBE_VENDOR_IKS = 4;
-    KUBE_VENDOR_OPENSHIFT = 5;
-    KUBE_VENDOR_GKE = 6;
+    AKS = 2;
+    EKS = 3;
+    IKS = 4;
+    OPENSHIFT = 5;
+    GKE = 6;
   }
 
   // The platform on which this cluster is hosted
   enum CloudPlatform {
     CLOUD_PLATFORM_UNSPECIFIED = 0;
-    CLOUD_PLATFORM_NONE_UPI = 1;
-    CLOUD_PLATFORM_BAREMETAL_IPI = 2;
-    CLOUD_PLATFORM_BAREMETAL_UPI = 3;
-    CLOUD_PLATFORM_AWS_IPI = 4;
-    CLOUD_PLATFORM_AWS_UPI = 5;
-    CLOUD_PLATFORM_AZURE_IPI = 6;
-    CLOUD_PLATFORM_AZURE_UPI = 7;
-    CLOUD_PLATFORM_IBMCLOUD_IPI = 8;
-    CLOUD_PLATFORM_IBMCLOUD_UPI = 9;
-    CLOUD_PLATFORM_KUBEVIRT_IPI = 10;
-    CLOUD_PLATFORM_OPENSTACK_IPI = 11;
-    CLOUD_PLATFORM_OPENSTACK_UPI = 12;
-    CLOUD_PLATFORM_GCP_IPI = 13;
-    CLOUD_PLATFORM_GCP_UPI = 14;
-    CLOUD_PLATFORM_NUTANIX_IPI = 15;
-    CLOUD_PLATFORM_NUTANIX_UPI = 16;
-    CLOUD_PLATFORM_VSPHERE_IPI = 17;
-    CLOUD_PLATFORM_VSPHERE_UPI = 18;
-    CLOUD_PLATFORM_OVIRT_IPI = 19;
+    CLOUD_PLATFORM_OTHER = 1;
+    NONE_UPI = 2;
+    BAREMETAL_IPI = 3;
+    BAREMETAL_UPI = 4;
+    AWS_IPI = 5;
+    AWS_UPI = 6;
+    AZURE_IPI = 7;
+    AZURE_UPI = 8;
+    IBMCLOUD_IPI = 9;
+    IBMCLOUD_UPI = 10;
+    KUBEVIRT_IPI = 11;
+    OPENSTACK_IPI = 12;
+    OPENSTACK_UPI = 13;
+    GCP_IPI = 14;
+    GCP_UPI = 15;
+    NUTANIX_IPI = 16;
+    NUTANIX_UPI = 17;
+    VSPHERE_IPI = 18;
+    VSPHERE_UPI = 19;
+    OVIRT_IPI = 20;
+   
+    
   }
 
   // The OCP cluster ID or ARN etc for *KS
-  string external_cluster_id = 219571597 [ (validate.rules).string.min_len = 1 ];
+  string external_cluster_id = 219571597;
 
-  ClusterStatus cluster_status = 499346904 [ (validate.rules).enum = {not_in: [0], defined_only: true} ];
+  ClusterStatus cluster_status = 499346904;
 
   // The version of kubernetes
   string kube_version = 395858490;
 
-  KubeVendor kube_vendor = 264191642 [ (validate.rules).enum = {not_in: [0], defined_only: true} ];
+  KubeVendor kube_vendor = 264191642;
 
   // The version of the productized kubernetes distribution
-  string vendor_version = 23961827 [ (validate.rules).string.min_len = 1 ];
+  string vendor_version = 23961827;
 
-  CloudPlatform cloud_platform = 476768062 [ (validate.rules).enum = {not_in: [0], defined_only: true} ];
+  CloudPlatform cloud_platform = 476768062;
 
-  repeated K8sClusterDetailNodesInner nodes = 75440785 [ (validate.rules).repeated = {min_items: 1, items: { message: { required: true}}} ];
+  repeated K8sClusterDetailNodesInner nodes = 75440785;
 }

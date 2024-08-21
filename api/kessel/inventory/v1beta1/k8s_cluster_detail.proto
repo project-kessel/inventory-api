@@ -14,11 +14,10 @@ message K8sClusterDetail {
   // the aggregate status of the cluster
   enum ClusterStatus {
     CLUSTER_STATUS_UNSPECIFIED = 0;
-    CLUSTER_STATUS_OTHER = 1;
-    READY = 2;
-    FAILED = 3;
-    OFFLINE = 4;
-    
+    READY = 1;
+    FAILED = 2;
+    OFFLINE = 3;
+    CLUSTER_STATUS_OTHER = 4; 
   }
 
   // The kubernetes vendor
@@ -35,26 +34,26 @@ message K8sClusterDetail {
   // The platform on which this cluster is hosted
   enum CloudPlatform {
     CLOUD_PLATFORM_UNSPECIFIED = 0;
-    CLOUD_PLATFORM_OTHER = 1;
-    NONE_UPI = 2;
-    BAREMETAL_IPI = 3;
-    BAREMETAL_UPI = 4;
-    AWS_IPI = 5;
-    AWS_UPI = 6;
-    AZURE_IPI = 7;
-    AZURE_UPI = 8;
-    IBMCLOUD_IPI = 9;
-    IBMCLOUD_UPI = 10;
-    KUBEVIRT_IPI = 11;
-    OPENSTACK_IPI = 12;
-    OPENSTACK_UPI = 13;
-    GCP_IPI = 14;
-    GCP_UPI = 15;
-    NUTANIX_IPI = 16;
-    NUTANIX_UPI = 17;
-    VSPHERE_IPI = 18;
-    VSPHERE_UPI = 19;
-    OVIRT_IPI = 20;
+    NONE_UPI = 1;
+    BAREMETAL_IPI = 2;
+    BAREMETAL_UPI = 3;
+    AWS_IPI = 4;
+    AWS_UPI = 5;
+    AZURE_IPI = 6;
+    AZURE_UPI = 7;
+    IBMCLOUD_IPI = 8;
+    IBMCLOUD_UPI = 9;
+    KUBEVIRT_IPI = 10;
+    OPENSTACK_IPI = 11;
+    OPENSTACK_UPI = 12;
+    GCP_IPI = 13;
+    GCP_UPI = 14;
+    NUTANIX_IPI = 15;
+    NUTANIX_UPI = 16;
+    VSPHERE_IPI = 17;
+    VSPHERE_UPI = 18;
+    OVIRT_IPI = 19;
+    CLOUD_PLATFORM_OTHER = 20;
     
   }
 

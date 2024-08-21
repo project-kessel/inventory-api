@@ -2,4 +2,4 @@
   tenant: "Example"
   principal: "user@example.com"
   is_reporter: true
-  type: "Reporter_typeEnum_OCM"
+  type: "REPORTER_TYPE_ACM"

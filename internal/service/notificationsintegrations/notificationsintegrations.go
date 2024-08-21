@@ -2,6 +2,7 @@ package notificationsintegrations
 
 import (
 	"context"
+
 	"github.com/go-kratos/kratos/v2/errors"
 	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1"
 	authnapi "github.com/project-kessel/inventory-api/internal/authn/api"
@@ -35,7 +36,7 @@ func (c *NotificationsIntegrationsService) CreateNotificationsIntegration(ctx co
 	}
 
 	if h, err := notificationsIntegrationFromCreateRequest(r, identity); err == nil {
-		if resp, err := c.Ctl.CreateNotificationsIntegration(ctx, h); err == nil {
+		if resp, err := c.Ctl.Create(ctx, h); err == nil {
 			return createResponseFromNotificationsIntegration(resp), nil
 
 		} else {

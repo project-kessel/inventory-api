@@ -2,6 +2,7 @@ package kafka
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/go-kratos/kratos/v2/log"
 
@@ -16,6 +17,7 @@ import (
 
 type KafkaManager struct {
 	Config   CompletedConfig
+	Source   string
 	Protocol *confluent.Protocol
 	Client   cloudevents.Client
 	Errors   <-chan error
@@ -23,7 +25,7 @@ type KafkaManager struct {
 	Logger *log.Helper
 }
 
-func New(config CompletedConfig, logger *log.Helper) (*KafkaManager, error) {
+func New(config CompletedConfig, source string, logger *log.Helper) (*KafkaManager, error) {
 	logger.Info("Using eventing: kafka")
 	if sender, err := confluent.New(
 		confluent.WithSenderTopic(config.DefaultTopic),
@@ -31,7 +33,7 @@ func New(config CompletedConfig, logger *log.Helper) (*KafkaManager, error) {
 	); err != nil {
 		return nil, err
 	} else {
-		client, err := cloudevents.NewClient(sender, cloudevents.WithTimeNow(), cloudevents.WithUUIDs())
+		client, err := cloudevents.NewClient(sender, cloudevents.WithUUIDs())
 		if err != nil {
 			return nil, err
 		}
@@ -75,6 +77,7 @@ func New(config CompletedConfig, logger *log.Helper) (*KafkaManager, error) {
 
 		return &KafkaManager{
 			Config:   config,
+			Source:   source,
 			Protocol: sender,
 			Client:   client,
 			Errors:   errChan,
@@ -120,12 +123,25 @@ func NewProducer(manager *KafkaManager, topic string, identity *authnapi.Identit
 
 // Produce creates the cloud event and sends it on the Kafka Topic
 func (p *kafkaProducer) Produce(ctx context.Context, event *api.Event) error {
-
-	// TODO: flesh out the cloudevent structure
 	e := cloudevents.NewEvent()
-	err := e.SetData(cloudevents.ApplicationJSON, event)
+
+	e.SetSource(p.Manager.Source)
+	e.SetSpecVersion(cloudevents.VersionV1)
+	e.SetType(fmt.Sprintf("%s:%s", event.EventType, event.ResourceType))
+
+	e.SetTime(event.EventTime)
+
+	err := e.SetData(cloudevents.ApplicationJSON, event.Resource)
 	if err != nil {
 		return err
 	}
-	return p.Manager.Client.Send(cecontext.WithTopic(ctx, p.Topic), e)
+
+	ret := p.Manager.Client.Send(cecontext.WithTopic(ctx, p.Topic), e)
+	if cloudevents.IsUndelivered(ret) {
+		p.Logger.Infof("Failed to send %v", ret)
+	} else {
+		p.Logger.Infof("Kafka returned: %v", ret)
+	}
+
+	return ret
 }

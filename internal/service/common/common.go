@@ -1,6 +1,8 @@
 package common
 
 import (
+	"time"
+
 	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
 
 	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1"
@@ -14,21 +16,34 @@ func MetadataFromPb(in *pb.Metadata, reporter *pb.ReporterData, identity *authna
 		labels = append(labels, &biz.Label{Key: t.Key, Value: t.Value})
 	}
 
+	var updatedAt time.Time
+	if in.LastReported != nil {
+		updatedAt = in.LastReported.AsTime()
+	} else {
+		updatedAt = time.Now().UTC()
+	}
+
 	return &biz.Metadata{
 		ID:              in.Id,
 		ResourceType:    in.ResourceType,
 		Workspace:       in.Workspace,
 		CreatedAt:       in.FirstReported.AsTime(),
-		UpdatedAt:       in.LastReported.AsTime(),
+		UpdatedAt:       updatedAt,
 		Labels:          labels,
 		FirstReportedBy: identity.Principal,
 		LastReportedBy:  identity.Principal,
 
-		Reporters: []*biz.Reporter{ReporterFromPb(reporter, identity)},
+		Reporters: []*biz.Reporter{ReporterFromPb(reporter, identity, updatedAt)},
 	}
 }
 
-func ReporterFromPb(in *pb.ReporterData, identity *authnapi.Identity) *biz.Reporter {
+func ReporterFromPb(in *pb.ReporterData, identity *authnapi.Identity, defaultUpdatedAt time.Time) *biz.Reporter {
+	var updatedAt time.Time
+	if in.LastReported != nil {
+		updatedAt = in.LastReported.AsTime()
+	} else {
+		updatedAt = defaultUpdatedAt
+	}
 	return &biz.Reporter{
 		ReporterID:      identity.Principal,
 		ReporterType:    in.ReporterType.String(),
@@ -37,7 +52,7 @@ func ReporterFromPb(in *pb.ReporterData, identity *authnapi.Identity) *biz.Repor
 		ConsoleHref:     in.ConsoleHref,
 		ApiHref:         in.ApiHref,
 		CreatedAt:       in.FirstReported.AsTime(),
-		UpdatedAt:       in.LastReported.AsTime(),
+		UpdatedAt:       updatedAt,
 	}
 }
 

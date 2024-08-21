@@ -13,10 +13,11 @@ message ReporterData {
 
   enum ReporterType {
     REPORTER_TYPE_UNSPECIFIED = 0;
-    REPORTER_TYPE_ACM = 1;
-    REPORTER_TYPE_HBI = 2;
-    REPORTER_TYPE_OCM = 3;
-    REPORTER_TYPE_OTHER = 4;
+    REPORTER_TYPE_OTHER = 1;
+    ACM = 2;
+    HBI = 3;
+    OCM = 4;
+    NOTIFICATIONS = 5;
   }
 
   ReporterType reporter_type = 245778392;

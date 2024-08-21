@@ -3,6 +3,8 @@ name: buf.build/project-kessel/inventory-api
 lint:
   use:
     - DEFAULT
+  except:
+   - ENUM_VALUE_PREFIX
 breaking:
   use:
     - FILE

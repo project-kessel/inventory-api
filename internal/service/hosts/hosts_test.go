@@ -11,6 +11,7 @@ import (
 	"github.com/project-kessel/inventory-api/internal/middleware"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"gorm.io/gorm"
 )
 
 type HostRepoMock struct {
@@ -30,11 +31,25 @@ func (m *HostRepoMock) Delete(ctx context.Context, hostId string) error {
 }
 
 func (m *HostRepoMock) FindByID(ctx context.Context, hostId string) (*hosts.Host, error) {
-	return nil, nil
+	margs := m.Called(ctx, hostId)
+
+	err := margs.Error(1)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return margs.Get(0).(*hosts.Host), err
 }
 
 func (m *HostRepoMock) ListAll(ctx context.Context) ([]*hosts.Host, error) {
 	return []*hosts.Host{}, nil
+}
+
+func newHostRepoMock() *HostRepoMock {
+	repo := new(HostRepoMock)
+	repo.On("FindByID", mock.Anything, mock.Anything).Return(nil, gorm.ErrRecordNotFound)
+	return repo
 }
 
 func mockContext() context.Context {
@@ -48,7 +63,7 @@ func mockContext() context.Context {
 }
 
 func TestCreateHostWithRequiredDataIsSuccess(t *testing.T) {
-	repo := new(HostRepoMock)
+	repo := newHostRepoMock()
 	hostUsecase := hosts.New(repo, log.DefaultLogger)
 
 	service := HostsService{
@@ -73,7 +88,7 @@ func TestCreateHostWithRequiredDataIsSuccess(t *testing.T) {
 }
 
 func TestCreateHostWithOptionalAttributesIsSuccess(t *testing.T) {
-	repo := new(HostRepoMock)
+	repo := newHostRepoMock()
 	hostUsecase := hosts.New(repo, log.DefaultLogger)
 
 	service := HostsService{
@@ -104,7 +119,7 @@ func TestCreateHostWithOptionalAttributesIsSuccess(t *testing.T) {
 }
 
 func TestCreateInvalidHostIsBadRequest(t *testing.T) {
-	repo := new(HostRepoMock)
+	repo := newHostRepoMock()
 	hostUsecase := hosts.New(repo, log.DefaultLogger)
 
 	service := HostsService{

@@ -67,7 +67,7 @@ func hostFromCreateRequest(r *pb.CreateRhelHostRequest, identity *authnapi.Ident
 	}
 
 	return &biz.Host{
-		Metadata: *conv.MetadataFromPb(metadata, r.RhelHost.ReporterData, identity),
+		Metadata: *conv.MetadataFromPb(metadata, r.RhelHost.ReporterData, identity, biz.ResourceType),
 	}, nil
 }
 

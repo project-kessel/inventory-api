@@ -47,6 +47,7 @@ func createBizMetadata(created time.Time, updated time.Time) biz.Metadata {
 		LastReportedBy:  "luke",
 		Workspace:       "droids",
 		Reporters:       nil,
+		LocalResourceId: "local-01",
 		Labels: []*biz.Label{
 			{
 				ID:         0,
@@ -98,6 +99,7 @@ func TestMetadataFromPb(t *testing.T) {
 			Href:       "",
 			IsGuest:    false,
 		},
+		"astromech",
 	)
 
 	expected := createBizMetadata(created, updated)

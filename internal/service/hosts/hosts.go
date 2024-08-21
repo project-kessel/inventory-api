@@ -2,6 +2,7 @@ package hosts
 
 import (
 	"context"
+
 	"github.com/go-kratos/kratos/v2/errors"
 	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1"
 	authnapi "github.com/project-kessel/inventory-api/internal/authn/api"
@@ -35,9 +36,9 @@ func (c *HostsService) CreateRhelHost(ctx context.Context, r *pb.CreateRhelHostR
 	}
 
 	if h, err := hostFromCreateRequest(r, identity); err == nil {
-		if resp, err := c.Ctl.CreateHost(ctx, h); err == nil {
+		h.Metadata.ResourceType = biz.ResourceType
+		if resp, err := c.Ctl.Create(ctx, h); err == nil {
 			return createResponseFromHost(resp), nil
-
 		} else {
 			return nil, err
 		}
@@ -71,6 +72,6 @@ func hostFromCreateRequest(r *pb.CreateRhelHostRequest, identity *authnapi.Ident
 	}, nil
 }
 
-func createResponseFromHost(h *biz.Host) *pb.CreateRhelHostResponse {
+func createResponseFromHost(*biz.Host) *pb.CreateRhelHostResponse {
 	return &pb.CreateRhelHostResponse{}
 }

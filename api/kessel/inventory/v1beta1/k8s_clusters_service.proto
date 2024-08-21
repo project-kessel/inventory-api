@@ -15,7 +15,9 @@ message CreateK8sClusterRequest {
   K8sCluster k8s_cluster = 1;
 }
 
-message CreateK8sClusterResponse {}
+message CreateK8sClusterResponse {
+  K8sCluster k8s_cluster = 1;
+}
 
 message UpdateK8sClusterRequest {
   // The {resource} format
@@ -25,7 +27,9 @@ message UpdateK8sClusterRequest {
   K8sCluster k8s_cluster = 2;
 }
 
-message UpdateK8sClusterResponse {}
+message UpdateK8sClusterResponse {
+  K8sCluster k8s_cluster = 1;
+}
 
 message DeleteK8sClusterRequest {
   // The {resource} format

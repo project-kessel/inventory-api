@@ -30,12 +30,32 @@ func New(repo NotificationsIntegrationRepo, logger log.Logger) *NotificationsInt
 	return &NotificationsIntegrationUsecase{repo: repo, log: log.NewHelper(logger)}
 }
 
-// CreateNotificationsIntegration creates a NotificationsIntegration in the repository and returns the new NotificationsIntegration.
-func (uc *NotificationsIntegrationUsecase) CreateNotificationsIntegration(ctx context.Context, i *NotificationsIntegration) (*NotificationsIntegration, error) {
+// Create creates a NotificationsIntegration in the repository and returns the new NotificationsIntegration.
+func (uc *NotificationsIntegrationUsecase) Create(ctx context.Context, i *NotificationsIntegration) (*NotificationsIntegration, error) {
 	if ret, err := uc.repo.Save(ctx, i); err != nil {
 		return nil, err
 	} else {
-		uc.log.WithContext(ctx).Infof("CreateNotificationsIntegration: %v", i.ID)
+		uc.log.WithContext(ctx).Infof("Create Notifications Integration: %v", i.ID)
 		return ret, nil
+	}
+}
+
+// Update updates a NotificationsIntegration in the repository and returns the updated NotificationsIntegration.
+func (uc *NotificationsIntegrationUsecase) Update(ctx context.Context, i *NotificationsIntegration, id string) (*NotificationsIntegration, error) {
+	if ret, err := uc.repo.Update(ctx, i, id); err != nil {
+		return nil, err
+	} else {
+		uc.log.WithContext(ctx).Infof("Update Notifications Integration: %v", i.ID)
+		return ret, nil
+	}
+}
+
+// Delete deletes a NotificationsIntegration in the repository.
+func (uc *NotificationsIntegrationUsecase) Delete(ctx context.Context, id string) error {
+	if err := uc.repo.Delete(ctx, id); err != nil {
+		return err
+	} else {
+		uc.log.WithContext(ctx).Infof("Delete Notifications Integration: %v", id)
+		return nil
 	}
 }

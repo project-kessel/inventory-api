@@ -111,6 +111,10 @@ inventory-up:
 inventory-up-sso:
 	./scripts/start-inventory-kc.sh
 
+.PHONY: inventory-up-kafka
+inventory-up-kafka:
+	./scripts/start-inventory-kafka.sh
+
 .PHONY: get-token
 get-token:
 	./scripts/get-token.sh
@@ -122,6 +126,10 @@ inventory-down:
 .PHONY: inventory-down-sso
 inventory-down-sso:
 	./scripts/stop-inventory-kc.sh
+
+.PHONY: inventory-down-kafka
+inventory-down-kafka:
+	./scripts/stop-inventory-kafka.sh
 
 .PHONY: run
 # run api locally

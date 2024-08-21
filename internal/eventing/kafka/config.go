@@ -32,6 +32,7 @@ func (c *Config) Complete() (CompletedConfig, error) {
 	if c.KafkaConfig != nil {
 		config = c.KafkaConfig
 	} else {
+		config = &kafka.ConfigMap{}
 		// the debug key doesn't allow an empty value
 		if c.Debug != "" {
 			if err := config.SetKey("debug", c.Debug); err != nil {
@@ -45,9 +46,9 @@ func (c *Config) Complete() (CompletedConfig, error) {
 		if err := config.SetKey("client.id", c.ClientId); err != nil {
 			return CompletedConfig{}, err
 		}
-		if err := config.SetKey("metadata.broker.list", c.MetadataBrokerList); err != nil {
-			return CompletedConfig{}, err
-		}
+		// if err := config.SetKey("metadata.broker.list", c.MetadataBrokerList); err != nil {
+		// 	return CompletedConfig{}, err
+		// }
 		if err := config.SetKey("bootstrap.servers", c.BootstrapServers); err != nil {
 			return CompletedConfig{}, err
 		}

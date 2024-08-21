@@ -1,6 +1,7 @@
 {
   "rhelHost": {
     "metadata": {
+      "resource_type": "rhel-host",
       "workspace": ""
     },
     "reporter_data": {

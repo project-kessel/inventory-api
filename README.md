@@ -90,3 +90,30 @@ Sample request with the authorization header
 
 `curl -H "Authorization: bearer ${TOKEN}"  -H "Content-Type: application/json" --data "@data/host-service-account.json" http://localhost:8081/api/inventory/v1beta1/rhelHosts`
 
+## Running Inventory api with kafka
+Starts a local strimzi kafka and zookeeper:
+```bash
+make inventory-up-kakfa
+```
+
+Start `inventory-api` using the `./kafka-inventory-api.yaml` config.
+```bash
+./bin/inventory-api serve --config ./kafka-inventory-api.yaml
+```
+
+In a separate terminal exec into the kafka pod so you can watch messages.
+```bash
+podman exec -i -t inventory-api_kafka_1 /bin/bash
+```
+
+Start consuming messages in the pod.
+```bash
+./bin/kafka-console-consumer.sh --bootstrap-server localhost:9092 --topic kessel-inventory
+```
+
+In a separate terminal, post a resource to `inventory-api`:
+```bash
+curl -H "Authorization: Bearer 1234" -H "Content-Type: application/json" --data "@data/k8s-cluster.json" http://localhost:8081/api/inventory/v1beta1/k8sClusters
+```
+
+Manually stop the `inventory-api` and then run `make inventory-down-kafka`

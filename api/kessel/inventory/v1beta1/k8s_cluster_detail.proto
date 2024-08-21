@@ -72,7 +72,7 @@ message K8sClusterDetail {
   // The version of the productized kubernetes distribution
   string vendor_version = 23961827 [ (validate.rules).string.min_len = 1 ];
 
-  CloudPlatform cloud_platform = 476768062;
+  CloudPlatform cloud_platform = 476768062 [ (validate.rules).enum = {not_in: [0], defined_only: true} ];
 
   repeated K8sClusterDetailNodesInner nodes = 75440785;
 }

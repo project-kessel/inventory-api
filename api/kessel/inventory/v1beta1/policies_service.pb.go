@@ -123,7 +123,7 @@ type UpdatePolicyRequest struct {
 	unknownFields protoimpl.UnknownFields
 
 	// The {resource} format
-	// \"<reporter_data.reporter_type>:<reporter_data.resourceId_alias>\".
+	// \"<reporter_data.reporter_type>:<reporter_data.local_resource_id>\".
 	Resource string `protobuf:"bytes,1,opt,name=resource,proto3" json:"resource,omitempty"`
 	// The Policy to update in Kessel Asset Inventory
 	Policy *Policy `protobuf:"bytes,2,opt,name=policy,proto3" json:"policy,omitempty"`
@@ -219,7 +219,7 @@ type DeletePolicyRequest struct {
 	unknownFields protoimpl.UnknownFields
 
 	// The {resource} format
-	// \"<reporter_data.reporter_type>:<reporter_data.resourceId_alias>\".
+	// \"<reporter_data.reporter_type>:<reporter_data.local_resource_id>\".
 	Resource string `protobuf:"bytes,1,opt,name=resource,proto3" json:"resource,omitempty"`
 }
 

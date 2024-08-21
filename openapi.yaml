@@ -76,7 +76,7 @@ paths:
                   in: path
                   description: |-
                     The {resource} format
-                     \"<reporter_data.reporter_type>:<reporter_data.resourceId_alias>\".
+                     \"<reporter_data.reporter_type>:<reporter_data.local_resource_id>\".
                   required: true
                   schema:
                     type: string
@@ -108,7 +108,7 @@ paths:
                   in: path
                   description: |-
                     The {resource} format
-                     \"<reporter_data.reporter_type>:<reporter_data.resourceId_alias>\".
+                     \"<reporter_data.reporter_type>:<reporter_data.local_resource_id>\".
                   required: true
                   schema:
                     type: string
@@ -159,7 +159,7 @@ paths:
                   in: path
                   description: |-
                     A resource instance using the format:
-                     \"<reporter_data.reporter_type>:<reporter_data.resourceId_alias>\"
+                     \"<reporter_data.reporter_type>:<reporter_data.local_resource_id>\"
                   required: true
                   schema:
                     type: string
@@ -191,7 +191,7 @@ paths:
                   in: path
                   description: |-
                     A resource instance using the format:
-                     \"<reporter_data.reporter_type>:<reporter_data.resourceId_alias>\"
+                     \"<reporter_data.reporter_type>:<reporter_data.local_resource_id>\"
                   required: true
                   schema:
                     type: string
@@ -242,7 +242,7 @@ paths:
                   in: path
                   description: |-
                     The {resource} format
-                     \"<reporter_data.reporter_type>:<reporter_data.resourceId_alias>\".
+                     \"<reporter_data.reporter_type>:<reporter_data.local_resource_id>\".
                   required: true
                   schema:
                     type: string
@@ -274,7 +274,7 @@ paths:
                   in: path
                   description: |-
                     The {resource} format
-                     \"<reporter_data.reporter_type>:<reporter_data.resourceId_alias>\".
+                     \"<reporter_data.reporter_type>:<reporter_data.local_resource_id>\".
                   required: true
                   schema:
                     type: string
@@ -398,7 +398,7 @@ paths:
                   in: path
                   description: |-
                     A resource instance using the format:
-                     \"<reporter_data.reporter_type>:<reporter_data.resourceId_alias>\"
+                     \"<reporter_data.reporter_type>:<reporter_data.local_resource_id>\"
                   required: true
                   schema:
                     type: string
@@ -430,7 +430,7 @@ paths:
                   in: path
                   description: |-
                     A resource instance using the format:
-                     \"<reporter_data.reporter_type>:<reporter_data.resourceId_alias>\"
+                     \"<reporter_data.reporter_type>:<reporter_data.local_resource_id>\"
                   required: true
                   schema:
                     type: string
@@ -782,7 +782,7 @@ components:
                     type: string
                     description: |-
                         The {resource} format
-                         \"<reporter_data.reporter_type>:<reporter_data.resourceId_alias>\".
+                         \"<reporter_data.reporter_type>:<reporter_data.local_resource_id>\".
                 k8s_cluster:
                     allOf:
                         - $ref: '#/components/schemas/kessel.inventory.v1beta1.K8sCluster'
@@ -797,7 +797,7 @@ components:
                     type: string
                     description: |-
                         A resource instance using the format:
-                         \"<reporter_data.reporter_type>:<reporter_data.resourceId_alias>\"
+                         \"<reporter_data.reporter_type>:<reporter_data.local_resource_id>\"
                 integration:
                     allOf:
                         - $ref: '#/components/schemas/kessel.inventory.v1beta1.NotificationsIntegration'
@@ -812,7 +812,7 @@ components:
                     type: string
                     description: |-
                         The {resource} format
-                         \"<reporter_data.reporter_type>:<reporter_data.resourceId_alias>\".
+                         \"<reporter_data.reporter_type>:<reporter_data.local_resource_id>\".
                 policy:
                     allOf:
                         - $ref: '#/components/schemas/kessel.inventory.v1beta1.Policy'
@@ -838,7 +838,7 @@ components:
                          resource, object resource}. A relationship is between a Subject and an
                          Object, e.g. a Policy (subject) has a propagated relationship to an k8s
                          cluster (object).. The {resource} format
-                         \"<reporter_data.reporter_type>:<reporter_data.resourceId_alias>\".
+                         \"<reporter_data.reporter_type>:<reporter_data.local_resource_id>\".
         kessel.inventory.v1beta1.UpdateResourceRelationshipByUrnHsResourcesParameter:
             type: object
             properties:
@@ -856,7 +856,7 @@ components:
                     type: string
                     description: |-
                         A resource instance using the format:
-                         \"<reporter_data.reporter_type>:<reporter_data.resourceId_alias>\"
+                         \"<reporter_data.reporter_type>:<reporter_data.local_resource_id>\"
                 rhel_host:
                     allOf:
                         - $ref: '#/components/schemas/kessel.inventory.v1beta1.RhelHost'

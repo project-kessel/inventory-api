@@ -114,7 +114,7 @@ type UpdateRhelHostRequest struct {
 	unknownFields protoimpl.UnknownFields
 
 	// A resource instance using the format:
-	// \"<reporter_data.reporter_type>:<reporter_data.resourceId_alias>\"
+	// \"<reporter_data.reporter_type>:<reporter_data.local_resource_id>\"
 	Resource string `protobuf:"bytes,1,opt,name=resource,proto3" json:"resource,omitempty"`
 	// The Rhel host to update
 	RhelHost *RhelHost `protobuf:"bytes,2,opt,name=rhel_host,json=rhelHost,proto3" json:"rhel_host,omitempty"`
@@ -210,7 +210,7 @@ type DeleteRhelHostRequest struct {
 	unknownFields protoimpl.UnknownFields
 
 	// A resource instance using the format:
-	// \"<reporter_data.reporter_type>:<reporter_data.resourceId_alias>\"
+	// \"<reporter_data.reporter_type>:<reporter_data.local_resource_id>\"
 	Resource string `protobuf:"bytes,1,opt,name=resource,proto3" json:"resource,omitempty"`
 }
 

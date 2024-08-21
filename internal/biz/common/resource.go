@@ -15,6 +15,9 @@ type Metadata struct {
 	// The type of the Resource.
 	ResourceType string
 
+	// Local Resource Id
+	LocalResourceId string
+
 	// Identity of the reporter that first reported this item.
 	FirstReportedBy string
 

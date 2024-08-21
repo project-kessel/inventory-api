@@ -2,6 +2,10 @@ package hosts
 
 import (
 	"context"
+	"errors"
+	"fmt"
+	"github.com/project-kessel/inventory-api/internal/biz/common"
+	"gorm.io/gorm"
 
 	"github.com/go-kratos/kratos/v2/log"
 )
@@ -32,6 +36,13 @@ func New(repo HostRepo, logger log.Logger) *HostUsecase {
 
 // CreateHost creates a Host in the repository and returns the new Host.
 func (uc *HostUsecase) CreateHost(ctx context.Context, h *Host) (*Host, error) {
+	_, err := uc.repo.FindByID(ctx, h.Metadata.LocalResourceId)
+	if err == nil {
+		return nil, fmt.Errorf("resource with local_resource_id: `%v` already exists for resource type: `%v`", h.Metadata.LocalResourceId, h.Metadata.ResourceType)
+	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, err
+	}
+
 	if ret, err := uc.repo.Save(ctx, h); err != nil {
 		return nil, err
 	} else {

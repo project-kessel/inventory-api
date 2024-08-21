@@ -20,7 +20,7 @@ message CreateRhelHostResponse {}
 
 message UpdateRhelHostRequest {
   // A resource instance using the format:
-  // \"<reporter_data.reporter_type>:<reporter_data.resourceId_alias>\"
+  // \"<reporter_data.reporter_type>:<reporter_data.local_resource_id>\"
   string resource = 1 [ (validate.rules).string.min_len = 1 ];
   // The Rhel host to update
   RhelHost rhel_host = 2 [ (validate.rules).message.required = true ];
@@ -30,7 +30,7 @@ message UpdateRhelHostResponse {}
 
 message DeleteRhelHostRequest {
   // A resource instance using the format:
-  // \"<reporter_data.reporter_type>:<reporter_data.resourceId_alias>\"
+  // \"<reporter_data.reporter_type>:<reporter_data.local_resource_id>\"
   string resource = 1 [ (validate.rules).string.min_len = 1 ];
 }
 

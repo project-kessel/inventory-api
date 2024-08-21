@@ -2,9 +2,6 @@ package hosts
 
 import (
 	"context"
-	"fmt"
-	"strings"
-
 	"github.com/go-kratos/kratos/v2/errors"
 	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1"
 	authnapi "github.com/project-kessel/inventory-api/internal/authn/api"
@@ -29,12 +26,7 @@ func New(c *biz.HostUsecase) *HostsService {
 
 func (c *HostsService) CreateRhelHost(ctx context.Context, r *pb.CreateRhelHostRequest) (*pb.CreateRhelHostResponse, error) {
 	if err := r.ValidateAll(); err != nil {
-		return nil, err
-	}
-
-	//TODO: refactor / abstract resource type strings
-	if !strings.EqualFold(r.Host.Metadata.ResourceType, biz.ResourceType) {
-		return nil, errors.BadRequest("BADREQUEST", fmt.Sprintf("incorrect resource type: expected %s", biz.ResourceType))
+		return nil, errors.BadRequest("BADREQUEST", err.Error())
 	}
 
 	identity, err := middleware.GetIdentity(ctx)
@@ -69,20 +61,16 @@ func (c *HostsService) DeleteRhelHost(ctx context.Context, r *pb.DeleteRhelHostR
 }
 
 func hostFromCreateRequest(r *pb.CreateRhelHostRequest, identity *authnapi.Identity) (*biz.Host, error) {
-	if identity.Principal != r.Host.ReporterData.ReporterInstanceId {
-		return nil, errors.Forbidden("FORBIDDEN", "Reporter identity must match the provided reporter instance identity")
+	var metadata = &pb.Metadata{}
+	if r.RhelHost.Metadata != nil {
+		metadata = r.RhelHost.Metadata
 	}
 
 	return &biz.Host{
-		Metadata: *conv.MetadataFromPb(r.Host.Metadata, r.Host.ReporterData, identity),
+		Metadata: *conv.MetadataFromPb(metadata, r.RhelHost.ReporterData, identity),
 	}, nil
 }
 
 func createResponseFromHost(h *biz.Host) *pb.CreateRhelHostResponse {
-	return &pb.CreateRhelHostResponse{
-		Host: &pb.RhelHost{
-			Metadata:  conv.MetadataFromModel(&h.Metadata),
-			Reporters: conv.ReportersFromModel(h.Metadata.Reporters),
-		},
-	}
+	return &pb.CreateRhelHostResponse{}
 }

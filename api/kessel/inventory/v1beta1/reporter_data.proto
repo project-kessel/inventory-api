@@ -3,6 +3,7 @@ syntax = "proto3";
 package kessel.inventory.v1beta1;
 
 import "google/api/field_behavior.proto";
+import "validate/validate.proto";
 import "google/protobuf/timestamp.proto";
 
 option go_package = "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1";
@@ -19,11 +20,11 @@ message ReporterData {
     REPORTER_TYPE_OTHER = 4;
   }
 
-  ReporterType reporter_type = 245778392;
+  ReporterType reporter_type = 245778392 [ (validate.rules).enum = {not_in: [0], defined_only: true} ];
 
   // The ID of the instance of the reporter. This is derived from the
   // authentication mechanism, i.e. authentication token.
-  string reporter_instance_id = 241085112 
+  string reporter_instance_id = 241085112
       [ (google.api.field_behavior) = OUTPUT_ONLY ];
 
   // Date and time when the inventory item was first reported by this reporter
@@ -44,7 +45,7 @@ message ReporterData {
 
   // The ID assigned to this resource by the reporter, for example OCM cluster
   // ID, HBI's host id, or ACM managed cluster name etc.
-  string local_resource_id = 508976189;
+  string local_resource_id = 508976189 [ (validate.rules).string.min_len = 1 ];
 
   // version of the reporter
   string reporter_version = 269629306;

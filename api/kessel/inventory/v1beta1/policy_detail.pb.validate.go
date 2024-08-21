@@ -59,7 +59,16 @@ func (m *PolicyDetail) validate(all bool) error {
 
 	// no validation rules for Disabled
 
-	// no validation rules for Severity
+	if _, ok := PolicyDetail_Severity_name[int32(m.GetSeverity())]; !ok {
+		err := PolicyDetailValidationError{
+			field:  "Severity",
+			reason: "value must be one of the defined enum values",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
 
 	if len(errors) > 0 {
 		return PolicyDetailMultiError(errors)

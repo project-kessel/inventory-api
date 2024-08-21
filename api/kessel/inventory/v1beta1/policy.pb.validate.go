@@ -85,6 +85,17 @@ func (m *Policy) validate(all bool) error {
 		}
 	}
 
+	if m.GetReporterData() == nil {
+		err := PolicyValidationError{
+			field:  "ReporterData",
+			reason: "value is required",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
 	if all {
 		switch v := interface{}(m.GetReporterData()).(type) {
 		case interface{ ValidateAll() error }:
@@ -112,6 +123,17 @@ func (m *Policy) validate(all bool) error {
 				cause:  err,
 			}
 		}
+	}
+
+	if m.GetResourceData() == nil {
+		err := PolicyValidationError{
+			field:  "ResourceData",
+			reason: "value is required",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
 	}
 
 	if all {

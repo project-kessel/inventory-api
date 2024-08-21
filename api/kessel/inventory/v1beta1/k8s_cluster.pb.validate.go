@@ -86,6 +86,17 @@ func (m *K8SCluster) validate(all bool) error {
 		}
 	}
 
+	if m.GetReporterData() == nil {
+		err := K8SClusterValidationError{
+			field:  "ReporterData",
+			reason: "value is required",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
 	if all {
 		switch v := interface{}(m.GetReporterData()).(type) {
 		case interface{ ValidateAll() error }:
@@ -113,6 +124,17 @@ func (m *K8SCluster) validate(all bool) error {
 				cause:  err,
 			}
 		}
+	}
+
+	if m.GetResourceData() == nil {
+		err := K8SClusterValidationError{
+			field:  "ResourceData",
+			reason: "value is required",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
 	}
 
 	if all {

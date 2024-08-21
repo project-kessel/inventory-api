@@ -61,7 +61,7 @@ message K8sClusterDetail {
   // The OCP cluster ID or ARN etc for *KS
   string external_cluster_id = 219571597 [ (validate.rules).string.min_len = 1 ];
 
-  ClusterStatus cluster_status = 499346904;
+  ClusterStatus cluster_status = 499346904  [ (validate.rules).enum = {not_in: [0], defined_only: true} ];
 
   // The version of kubernetes
   string kube_version = 395858490;

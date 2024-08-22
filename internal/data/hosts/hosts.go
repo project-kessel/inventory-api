@@ -2,6 +2,7 @@ package hosts
 
 import (
 	"context"
+	"github.com/project-kessel/inventory-api/internal/biz/common"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 
@@ -66,10 +67,18 @@ func (r *hostsRepo) Delete(context.Context, string) error {
 	return nil
 }
 
-func (r *hostsRepo) FindByID(ctx context.Context, localResourceId string) (*biz.Host, error) {
+func (r *hostsRepo) FindByID(ctx context.Context, resourceId common.ResourceId) (*biz.Host, error) {
 	host := biz.Host{}
 
-	err := r.Db.Session(&gorm.Session{}).Joins("Metadata").Take(&host, "metadata.local_resource_id = ?", localResourceId).Error
+	reporter := common.Reporter{}
+	session := gorm.Session{}
+
+	err := r.Db.Session(&session).Take(&reporter, "local_resource_id = ? and reporter_type = ? and reporter_id = ?", resourceId.LocalResourceId, resourceId.ReporterType, resourceId.ReporterId).Error
+	if err != nil {
+		return nil, err
+	}
+
+	r.Db.Session(&session).Joins("Metadata").Take(&host, "metadata.id = ?", reporter.MetadataID)
 	if err != nil {
 		return nil, err
 	}

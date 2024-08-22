@@ -47,7 +47,6 @@ func createBizMetadata(created time.Time, updated time.Time) biz.Metadata {
 		LastReportedBy:  "luke",
 		Workspace:       "droids",
 		Reporters:       nil,
-		LocalResourceId: "local-01",
 		Labels: []*biz.Label{
 			{
 				ID:         0,

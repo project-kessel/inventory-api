@@ -22,7 +22,6 @@ func MetadataFromPb(in *pb.Metadata, reporter *pb.ReporterData, identity *authna
 		Labels:          labels,
 		FirstReportedBy: identity.Principal,
 		LastReportedBy:  identity.Principal,
-		LocalResourceId: reporter.LocalResourceId,
 
 		Reporters: []*biz.Reporter{ReporterFromPb(reporter, identity)},
 	}

@@ -2,6 +2,7 @@ package hosts
 
 import (
 	"context"
+	"github.com/project-kessel/inventory-api/internal/biz/common"
 	"testing"
 
 	"github.com/go-kratos/kratos/v2/log"
@@ -30,7 +31,7 @@ func (m *HostRepoMock) Delete(ctx context.Context, hostId string) error {
 	return nil
 }
 
-func (m *HostRepoMock) FindByID(ctx context.Context, hostId string) (*hosts.Host, error) {
+func (m *HostRepoMock) FindByID(ctx context.Context, hostId common.ResourceId) (*hosts.Host, error) {
 	margs := m.Called(ctx, hostId)
 
 	err := margs.Error(1)

@@ -5,8 +5,6 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/google/uuid"
-
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
@@ -72,10 +70,6 @@ func Execute() {
 
 // init adds all child commands to the root command and sets flags appropriately.
 func init() {
-
-	// enable the randomness pool to improve uuid generation performance
-	uuid.EnableRandPool()
-
 	// initializers are run as part of Command.PreRun
 	cobra.OnInitialize(initConfig)
 

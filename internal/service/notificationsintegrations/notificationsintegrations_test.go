@@ -71,27 +71,3 @@ func TestCreateNotificationIntegrationWithRequiredDataIsSuccess(t *testing.T) {
 
 	assert.NoError(t, err)
 }
-
-func TestCreateInvalidNotificationIntegrationIsBadRequest(t *testing.T) {
-	repo := new(NotificationIntegrationsRepoMock)
-	notificationsintegrationsUsecase := biz.New(repo, log.DefaultLogger)
-
-	service := NotificationsIntegrationsService{
-		Ctl: notificationsintegrationsUsecase,
-	}
-
-	ctx := mockContext()
-
-	request := pb.CreateNotificationsIntegrationRequest{
-		Integration: &pb.NotificationsIntegration{
-			Metadata: nil,
-			ReporterData: &pb.ReporterData{
-				ReporterType: pb.ReporterData_HBI,
-			},
-		},
-	}
-
-	_, err := service.CreateNotificationsIntegration(ctx, &request)
-
-	assert.ErrorContains(t, err, "400")
-}

@@ -3,7 +3,6 @@ package hosts
 import (
 	"context"
 
-	"github.com/go-kratos/kratos/v2/errors"
 	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/resources"
 	authnapi "github.com/project-kessel/inventory-api/internal/authn/api"
 	biz "github.com/project-kessel/inventory-api/internal/biz/hosts"
@@ -26,10 +25,6 @@ func New(c *biz.HostUsecase) *HostsService {
 }
 
 func (c *HostsService) CreateRhelHost(ctx context.Context, r *pb.CreateRhelHostRequest) (*pb.CreateRhelHostResponse, error) {
-	if err := r.ValidateAll(); err != nil {
-		return nil, errors.BadRequest("BADREQUEST", err.Error())
-	}
-
 	identity, err := middleware.GetIdentity(ctx)
 	if err != nil {
 		return nil, err
@@ -48,16 +43,10 @@ func (c *HostsService) CreateRhelHost(ctx context.Context, r *pb.CreateRhelHostR
 }
 
 func (c *HostsService) UpdateRhelHost(ctx context.Context, r *pb.UpdateRhelHostRequest) (*pb.UpdateRhelHostResponse, error) {
-	if err := r.ValidateAll(); err != nil {
-		return nil, err
-	}
 	return nil, nil
 }
 
 func (c *HostsService) DeleteRhelHost(ctx context.Context, r *pb.DeleteRhelHostRequest) (*pb.DeleteRhelHostResponse, error) {
-	if err := r.ValidateAll(); err != nil {
-		return nil, err
-	}
 	return nil, nil
 }
 

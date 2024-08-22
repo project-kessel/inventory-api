@@ -102,26 +102,3 @@ func TestCreateHostWithOptionalAttributesIsSuccess(t *testing.T) {
 
 	assert.NoError(t, err)
 }
-
-func TestCreateInvalidHostIsBadRequest(t *testing.T) {
-	repo := new(HostRepoMock)
-	hostUsecase := hosts.New(repo, log.DefaultLogger)
-
-	service := HostsService{
-		Ctl: hostUsecase,
-	}
-	ctx := mockContext()
-
-	request := pb.CreateRhelHostRequest{
-		RhelHost: &pb.RhelHost{
-			Metadata: nil,
-			ReporterData: &pb.ReporterData{
-				ReporterType: pb.ReporterData_OCM,
-			},
-		},
-	}
-
-	_, err := service.CreateRhelHost(ctx, &request)
-
-	assert.ErrorContains(t, err, "400")
-}

@@ -8,29 +8,9 @@ import (
 
 func TestPolicyValidatesSuccessfullyWithValidData(t *testing.T) {
 	policy := Policy{
-		Metadata: &Metadata{
-			Id:           12345,
-			ResourceType: "policy",
-			Workspace:    "workspace-name",
-			Labels: []*ResourceLabel{
-				{
-					Key:   "apps.open-cluster-management.io/reconcile-rate",
-					Value: "high",
-				},
-			},
-		},
-		ReporterData: &ReporterData{
-			ReporterInstanceId: "reporter-id",
-			ReporterType:       1, //ACM
-			ConsoleHref:        "https://example.com/console",
-			ApiHref:            "https://example.com/api",
-			LocalResourceId:    "local-resource-id",
-			ReporterVersion:    "2.12",
-		},
-		ResourceData: &PolicyDetail{
-			Disabled: false,
-			Severity: 1,
-		},
+		Metadata:     &Metadata{},
+		ReporterData: &ReporterData{},
+		ResourceData: &PolicyDetail{},
 	}
 	err := policy.ValidateAll()
 	assert.NoError(t, err)
@@ -38,21 +18,9 @@ func TestPolicyValidatesSuccessfullyWithValidData(t *testing.T) {
 
 func TestPolicyValidationFailsWithMissingReporterData(t *testing.T) {
 	policy := Policy{
-		Metadata: &Metadata{
-			Id:           12345,
-			ResourceType: "policy",
-			Workspace:    "workspace-name",
-			Labels: []*ResourceLabel{
-				{
-					Key:   "apps.open-cluster-management.io/reconcile-rate",
-					Value: "high",
-				},
-			},
-		},
-		ResourceData: &PolicyDetail{
-			Disabled: false,
-			Severity: 1,
-		},
+		Metadata: &Metadata{},
+
+		ResourceData: &PolicyDetail{},
 	}
 	err := policy.ValidateAll()
 	assert.ErrorContains(t, err, "Policy.ReporterData")
@@ -60,25 +28,8 @@ func TestPolicyValidationFailsWithMissingReporterData(t *testing.T) {
 
 func TestPolicyValidationFailsWithMissingResourceData(t *testing.T) {
 	policy := Policy{
-		Metadata: &Metadata{
-			Id:           12345,
-			ResourceType: "policy",
-			Workspace:    "workspace-name",
-			Labels: []*ResourceLabel{
-				{
-					Key:   "apps.open-cluster-management.io/reconcile-rate",
-					Value: "high",
-				},
-			},
-		},
-		ReporterData: &ReporterData{
-			ReporterInstanceId: "reporter-id",
-			ReporterType:       1, //ACM
-			ConsoleHref:        "https://example.com/console",
-			ApiHref:            "https://example.com/api",
-			LocalResourceId:    "local-resource-id",
-			ReporterVersion:    "2.12",
-		},
+		Metadata:     &Metadata{},
+		ReporterData: &ReporterData{},
 	}
 	err := policy.ValidateAll()
 	assert.ErrorContains(t, err, "Policy.ResourceData")

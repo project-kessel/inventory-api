@@ -9,8 +9,8 @@ import (
 
 const (
 	ADD    string = "add"
-	UPDATE        = "update"
-	REMOVE        = "remove"
+	UPDATE string = "update"
+	REMOVE string = "remove"
 )
 
 // TODO this is a bit of a hack for now to convert the models into the shape expected by event consumers

@@ -4,11 +4,12 @@ go 1.22.5
 
 require (
 	github.com/authzed/grpcutil v0.0.0-20230908193239-4286bb1d6403
+	buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go v1.34.2-20240717164558-a6c49f84cc0f.2
+	github.com/bufbuild/protovalidate-go v0.6.4
 	github.com/cloudevents/sdk-go/protocol/kafka_confluent/v2 v2.0.0-20240718090307-5f0cc73d49ff
 	github.com/cloudevents/sdk-go/v2 v2.15.2
 	github.com/confluentinc/confluent-kafka-go/v2 v2.5.0
 	github.com/coreos/go-oidc/v3 v3.11.0
-	github.com/envoyproxy/protoc-gen-validate v1.1.0
 	github.com/go-kratos/kratos/v2 v2.8.0
 	github.com/golang-jwt/jwt/v5 v5.2.1
 	github.com/google/wire v0.6.0
@@ -29,14 +30,18 @@ require (
 
 require (
 	github.com/certifi/gocertifi v0.0.0-20210507211836-431795d63e8d // indirect
+	github.com/antlr4-go/antlr/v4 v4.13.0 // indirect
 	github.com/containerd/platforms v0.2.1 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
+	github.com/envoyproxy/protoc-gen-validate v1.1.0 // indirect
 	github.com/fsnotify/fsnotify v1.7.0 // indirect
 	github.com/go-jose/go-jose/v4 v4.0.2 // indirect
 	github.com/go-kratos/aegis v0.2.0 // indirect
 	github.com/go-logr/logr v1.4.2 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-playground/form/v4 v4.2.1 // indirect
+	github.com/google/cel-go v0.21.0 // indirect
+	github.com/google/subcommands v1.2.0 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/gorilla/mux v1.8.1 // indirect
 	github.com/grpc-ecosystem/go-grpc-middleware v1.4.0 // indirect
@@ -61,6 +66,7 @@ require (
 	github.com/sourcegraph/conc v0.3.0 // indirect
 	github.com/spf13/afero v1.11.0 // indirect
 	github.com/spf13/cast v1.6.0 // indirect
+	github.com/stoewer/go-strcase v1.3.0 // indirect
 	github.com/stretchr/objx v0.5.2 // indirect
 	github.com/subosito/gotenv v1.6.0 // indirect
 	go.opentelemetry.io/otel v1.28.0 // indirect

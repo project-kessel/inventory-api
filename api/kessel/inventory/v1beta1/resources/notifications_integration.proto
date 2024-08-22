@@ -3,7 +3,7 @@ syntax = "proto3";
 package kessel.inventory.v1beta1.resources;
 
 import "google/api/field_behavior.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 import "kessel/inventory/v1beta1/resources/metadata.proto";
 import "kessel/inventory/v1beta1/resources/reporter_data.proto";
@@ -18,5 +18,5 @@ message NotificationsIntegration {
 
   // Write only reporter specific data
   ReporterData reporter_data = 245278792
-      [ (google.api.field_behavior) = INPUT_ONLY, (validate.rules).message.required = true ];
+      [ (google.api.field_behavior) = INPUT_ONLY, (buf.validate.field).required = true ];
 }

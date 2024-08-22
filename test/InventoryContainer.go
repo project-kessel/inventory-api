@@ -27,6 +27,7 @@ type LocalInventoryContainer struct {
 	kccontainer       *dockertest.Resource
 	dbcontainer       *dockertest.Resource
 	migrationResource *dockertest.Resource
+	tempDir           string
 }
 
 func CreateInventoryAPIContainer(logger log.Logger) (*LocalInventoryContainer, error) {
@@ -47,7 +48,7 @@ func CreateInventoryAPIContainer(logger log.Logger) (*LocalInventoryContainer, e
 
 	dbName := strings.Trim(dbresource.Container.Name, "/")
 
-	srcPath := "../inventory-api-compose.yaml"
+	srcPath := "../.inventory-api.yaml"
 
 	// Copy file to a temporary directory
 	tempFilePath, tempDir, err := copyFileToTempDir(srcPath)
@@ -55,11 +56,13 @@ func CreateInventoryAPIContainer(logger log.Logger) (*LocalInventoryContainer, e
 		log.Fatalf("Error copying file: %s", err)
 	}
 	log.Info(tempFilePath)
-	defer os.RemoveAll(tempDir)
+	log.Info(tempDir)
+	//defer os.RemoveAll(tempDir)
 	// Create application container
 	dbhost := fmt.Sprintf("--storage.postgres.host=%s", dbName)
 	migrationCmds := []string{"migrate", "--storage.database=postgres",
 		dbhost,
+		"--storage.postgres.port=5432",
 		"--storage.postgres.password=secret",
 		"--storage.postgres.user=admin",
 		"--storage.postgres.dbname=invdb",
@@ -73,6 +76,7 @@ func CreateInventoryAPIContainer(logger log.Logger) (*LocalInventoryContainer, e
 		log.Fatalf("Error copying file: %s", err)
 	}
 	log.Info(tempRealmFilePath)
+	log.Info(tempRealmDir)
 	defer os.RemoveAll(tempRealmDir)
 
 	kcresource, err := createKeycloakContainer(pool, network, tempRealmFilePath)
@@ -102,6 +106,7 @@ func CreateInventoryAPIContainer(logger log.Logger) (*LocalInventoryContainer, e
 		"serve",
 		"--storage.database=postgres",
 		dbhost,
+		"--storage.postgres.port=5432",
 		"--storage.postgres.password=secret",
 		"--storage.postgres.user=admin",
 		"--storage.postgres.dbname=invdb",
@@ -127,6 +132,7 @@ func CreateInventoryAPIContainer(logger log.Logger) (*LocalInventoryContainer, e
 		network:           networkName,
 		pool:              pool,
 		kccontainer:       kcresource,
+		tempDir:           tempDir,
 		migrationResource: migrationResource,
 	}, nil
 }
@@ -142,7 +148,7 @@ func createInventoryContainer(name string, cmds []string, tempDir string, pool *
 		},
 	}, &dockertest.RunOptions{
 		Name:      name,
-		Env:       []string{"INVENTORY_API_CONFIG=/inv-configs/inventory-api-compose.yaml"},
+		Env:       []string{"INVENTORY_API_CONFIG=/inv-configs/.inventory-api.yaml"},
 		Cmd:       cmds,
 		NetworkID: network.ID,
 		Mounts: []string{
@@ -335,6 +341,7 @@ func GetJWTToken(baseURL string) (*TokenResponse, error) {
 }
 
 func (l *LocalInventoryContainer) Close() {
+	os.RemoveAll(l.tempDir)
 	err := l.pool.Purge(l.container)
 	if err != nil {
 		log.NewHelper(l.logger).Error("Could not purge Kessel Inventory Container from test. Please delete manually.")

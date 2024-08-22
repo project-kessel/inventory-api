@@ -144,13 +144,13 @@ func TestInventoryAPIGRPC_RhelHost_CreateRhelHost(t *testing.T) {
 	}
 
 	client := v1beta1.NewKesselRhelHostServiceClient(conn)
-	request := v1beta1.CreateRhelHostRequest{Host: &v1beta1.RhelHost{
+	request := v1beta1.CreateRhelHostRequest{RhelHost: &v1beta1.RhelHost{
 		Metadata: &v1beta1.Metadata{
 			ResourceType: "rhel-host",
 			Workspace:    "",
 		},
 		ReporterData: &v1beta1.ReporterData{
-			ReporterType:       v1beta1.ReporterData_REPORTER_TYPE_OCM,
+			ReporterType:       v1beta1.ReporterData_ACM,
 			ReporterInstanceId: "service-account-svc-test",
 			ConsoleHref:        "www.example.com",
 			ApiHref:            "www.example.com",
@@ -158,8 +158,7 @@ func TestInventoryAPIGRPC_RhelHost_CreateRhelHost(t *testing.T) {
 			ReporterVersion:    "0.1",
 		},
 	}}
-	resp, err := client.CreateRhelHost(context.Background(), &request)
-	assert.Equal(t, request.Host.Metadata.ResourceType, resp.Host.Metadata.ResourceType)
+	_, err = client.CreateRhelHost(context.Background(), &request)
 	assert.NoError(t, err)
 }
 

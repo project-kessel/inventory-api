@@ -98,6 +98,7 @@ func TestMetadataFromPb(t *testing.T) {
 			Href:       "",
 			IsGuest:    false,
 		},
+		"astromech",
 	)
 
 	expected := createBizMetadata(created, updated)

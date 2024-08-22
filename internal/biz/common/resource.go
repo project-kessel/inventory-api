@@ -69,3 +69,10 @@ type Label struct {
 	Key   string
 	Value string
 }
+
+// ResourceId Acts as a resource id from the standpoint of a reporter
+type ResourceId struct {
+	LocalResourceId string
+	ReporterType    string
+	ReporterId      string
+}

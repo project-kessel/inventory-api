@@ -2,7 +2,7 @@ package hosts
 
 import (
 	"context"
-
+	"github.com/project-kessel/inventory-api/internal/biz/common"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 
@@ -35,7 +35,7 @@ func New(g *gorm.DB, a authzapi.Authorizer, e eventingapi.Manager, l *log.Helper
 func (r *hostsRepo) Save(ctx context.Context, model *biz.Host) (*biz.Host, error) {
 	identity, err := middleware.GetIdentity(ctx)
 	if err != nil {
-		return nil, nil
+		return nil, err
 	}
 
 	if err := r.Db.Session(&gorm.Session{FullSaveAssociations: true}).Create(model).Error; err != nil {
@@ -67,8 +67,23 @@ func (r *hostsRepo) Delete(context.Context, string) error {
 	return nil
 }
 
-func (r *hostsRepo) FindByID(context.Context, string) (*biz.Host, error) {
-	return nil, nil
+func (r *hostsRepo) FindByID(ctx context.Context, resourceId common.ResourceId) (*biz.Host, error) {
+	host := biz.Host{}
+
+	reporter := common.Reporter{}
+	session := gorm.Session{}
+
+	err := r.Db.Session(&session).Take(&reporter, "local_resource_id = ? and reporter_type = ? and reporter_id = ?", resourceId.LocalResourceId, resourceId.ReporterType, resourceId.ReporterId).Error
+	if err != nil {
+		return nil, err
+	}
+
+	r.Db.Session(&session).Joins("Metadata").Take(&host, "metadata.id = ?", reporter.MetadataID)
+	if err != nil {
+		return nil, err
+	}
+
+	return &host, nil
 }
 
 func (r *hostsRepo) ListAll(context.Context) ([]*biz.Host, error) {

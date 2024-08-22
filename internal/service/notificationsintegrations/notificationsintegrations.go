@@ -67,7 +67,7 @@ func notificationsIntegrationFromCreateRequest(r *pb.CreateNotificationsIntegrat
 	}
 
 	return &biz.NotificationsIntegration{
-		Metadata: *conv.MetadataFromPb(metadata, r.Integration.ReporterData, identity),
+		Metadata: *conv.MetadataFromPb(metadata, r.Integration.ReporterData, identity, biz.ResourceType),
 	}, nil
 }
 

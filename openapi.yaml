@@ -388,17 +388,20 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/google.rpc.Status'
-    /api/inventory/v1beta1/rhelHosts/{resource}:
+    /api/inventory/v1beta1/rhelHosts/{reporter_type}:{local_resource_id}:
         put:
             tags:
                 - KesselRhelHostService
             operationId: KesselRhelHostService_UpdateRhelHost
             parameters:
-                - name: resource
+                - name: reporter_type
                   in: path
-                  description: |-
-                    A resource instance using the format:
-                     \"<reporter_data.reporter_type>:<reporter_data.local_resource_id>\"
+                  required: true
+                  schema:
+                    type: integer
+                    format: enum
+                - name: local_resource_id
+                  in: path
                   required: true
                   schema:
                     type: string
@@ -426,11 +429,14 @@ paths:
                 - KesselRhelHostService
             operationId: KesselRhelHostService_DeleteRhelHost
             parameters:
-                - name: resource
+                - name: reporter_type
                   in: path
-                  description: |-
-                    A resource instance using the format:
-                     \"<reporter_data.reporter_type>:<reporter_data.local_resource_id>\"
+                  required: true
+                  schema:
+                    type: integer
+                    format: enum
+                - name: local_resource_id
+                  in: path
                   required: true
                   schema:
                     type: string
@@ -852,11 +858,11 @@ components:
         kessel.inventory.v1beta1.UpdateRhelHostRequest:
             type: object
             properties:
-                resource:
+                reporter_type:
+                    type: integer
+                    format: enum
+                local_resource_id:
                     type: string
-                    description: |-
-                        A resource instance using the format:
-                         \"<reporter_data.reporter_type>:<reporter_data.local_resource_id>\"
                 rhel_host:
                     allOf:
                         - $ref: '#/components/schemas/kessel.inventory.v1beta1.RhelHost'

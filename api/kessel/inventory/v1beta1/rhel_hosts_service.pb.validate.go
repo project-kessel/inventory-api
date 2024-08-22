@@ -301,9 +301,31 @@ func (m *UpdateRhelHostRequest) validate(all bool) error {
 
 	var errors []error
 
-	if utf8.RuneCountInString(m.GetResource()) < 1 {
+	if _, ok := _UpdateRhelHostRequest_ReporterType_NotInLookup[m.GetReporterType()]; ok {
 		err := UpdateRhelHostRequestValidationError{
-			field:  "Resource",
+			field:  "ReporterType",
+			reason: "value must not be in list [REPORTER_TYPE_UNSPECIFIED]",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if _, ok := ReporterData_ReporterType_name[int32(m.GetReporterType())]; !ok {
+		err := UpdateRhelHostRequestValidationError{
+			field:  "ReporterType",
+			reason: "value must be one of the defined enum values",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if utf8.RuneCountInString(m.GetLocalResourceId()) < 1 {
+		err := UpdateRhelHostRequestValidationError{
+			field:  "LocalResourceId",
 			reason: "value length must be at least 1 runes",
 		}
 		if !all {
@@ -432,6 +454,10 @@ var _ interface {
 	ErrorName() string
 } = UpdateRhelHostRequestValidationError{}
 
+var _UpdateRhelHostRequest_ReporterType_NotInLookup = map[ReporterData_ReporterType]struct{}{
+	0: {},
+}
+
 // Validate checks the field values on UpdateRhelHostResponse with the rules
 // defined in the proto definition for this message. If any rules are
 // violated, the first error encountered is returned, or nil if there are no violations.
@@ -556,9 +582,31 @@ func (m *DeleteRhelHostRequest) validate(all bool) error {
 
 	var errors []error
 
-	if utf8.RuneCountInString(m.GetResource()) < 1 {
+	if _, ok := _DeleteRhelHostRequest_ReporterType_NotInLookup[m.GetReporterType()]; ok {
 		err := DeleteRhelHostRequestValidationError{
-			field:  "Resource",
+			field:  "ReporterType",
+			reason: "value must not be in list [REPORTER_TYPE_UNSPECIFIED]",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if _, ok := ReporterData_ReporterType_name[int32(m.GetReporterType())]; !ok {
+		err := DeleteRhelHostRequestValidationError{
+			field:  "ReporterType",
+			reason: "value must be one of the defined enum values",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if utf8.RuneCountInString(m.GetLocalResourceId()) < 1 {
+		err := DeleteRhelHostRequestValidationError{
+			field:  "LocalResourceId",
 			reason: "value length must be at least 1 runes",
 		}
 		if !all {
@@ -646,6 +694,10 @@ var _ interface {
 	Cause() error
 	ErrorName() string
 } = DeleteRhelHostRequestValidationError{}
+
+var _DeleteRhelHostRequest_ReporterType_NotInLookup = map[ReporterData_ReporterType]struct{}{
+	0: {},
+}
 
 // Validate checks the field values on DeleteRhelHostResponse with the rules
 // defined in the proto definition for this message. If any rules are

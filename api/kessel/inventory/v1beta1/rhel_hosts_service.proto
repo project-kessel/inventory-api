@@ -6,6 +6,7 @@ import "google/api/annotations.proto";
 import "validate/validate.proto";
 
 import "kessel/inventory/v1beta1/rhel_host.proto";
+import "kessel/inventory/v1beta1/reporter_data.proto";
 
 option go_package = "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1";
 option java_multiple_files = true;
@@ -19,19 +20,18 @@ message CreateRhelHostRequest {
 message CreateRhelHostResponse {}
 
 message UpdateRhelHostRequest {
-  // A resource instance using the format:
-  // \"<reporter_data.reporter_type>:<reporter_data.local_resource_id>\"
-  string resource = 1 [ (validate.rules).string.min_len = 1 ];
+  ReporterData.ReporterType reporter_type = 1 [ (validate.rules).enum = {not_in: [0], defined_only: true} ];
+  string local_resource_id = 2 [ (validate.rules).string.min_len = 1 ];
+
   // The Rhel host to update
-  RhelHost rhel_host = 2 [ (validate.rules).message.required = true ];
+  RhelHost rhel_host = 10 [ (validate.rules).message.required = true ];
 }
 
 message UpdateRhelHostResponse {}
 
 message DeleteRhelHostRequest {
-  // A resource instance using the format:
-  // \"<reporter_data.reporter_type>:<reporter_data.local_resource_id>\"
-  string resource = 1 [ (validate.rules).string.min_len = 1 ];
+  ReporterData.ReporterType reporter_type = 1 [ (validate.rules).enum = {not_in: [0], defined_only: true} ];
+  string local_resource_id = 2 [ (validate.rules).string.min_len = 1 ];
 }
 
 message DeleteRhelHostResponse {}
@@ -46,14 +46,14 @@ service KesselRhelHostService {
 
   rpc UpdateRhelHost(UpdateRhelHostRequest) returns (UpdateRhelHostResponse) {
     option (google.api.http) = {
-      put : "/api/inventory/v1beta1/rhelHosts/{resource}"
+      put : "/api/inventory/v1beta1/rhelHosts/{reporter_type}:{local_resource_id}"
       body : "*"
     };
   };
 
   rpc DeleteRhelHost(DeleteRhelHostRequest) returns (DeleteRhelHostResponse) {
     option (google.api.http) = {
-      delete : "/api/inventory/v1beta1/rhelHosts/{resource}"
+      delete : "/api/inventory/v1beta1/rhelHosts/{reporter_type}:{local_resource_id}"
     };
   };
 }

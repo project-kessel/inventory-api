@@ -8,8 +8,14 @@ import (
 
 func TestPolicyValidatesSuccessfullyWithValidData(t *testing.T) {
 	policy := Policy{
-		Metadata:     &Metadata{},
-		ReporterData: &ReporterData{},
+		Metadata: &Metadata{},
+		ReporterData: &ReporterData{
+			ReporterInstanceId: "reporter-id",
+			ReporterType:       1, //ACM
+			ConsoleHref:        "https://example.com/console",
+			ApiHref:            "https://example.com/api",
+			LocalResourceId:    "local-resource-id",
+			ReporterVersion:    "2.12"},
 		ResourceData: &PolicyDetail{},
 	}
 	err := policy.ValidateAll()
@@ -28,8 +34,15 @@ func TestPolicyValidationFailsWithMissingReporterData(t *testing.T) {
 
 func TestPolicyValidationFailsWithMissingResourceData(t *testing.T) {
 	policy := Policy{
-		Metadata:     &Metadata{},
-		ReporterData: &ReporterData{},
+		Metadata: &Metadata{},
+		ReporterData: &ReporterData{
+			ReporterInstanceId: "reporter-id",
+			ReporterType:       1, //ACM
+			ConsoleHref:        "https://example.com/console",
+			ApiHref:            "https://example.com/api",
+			LocalResourceId:    "local-resource-id",
+			ReporterVersion:    "2.12",
+		},
 	}
 	err := policy.ValidateAll()
 	assert.ErrorContains(t, err, "Policy.ResourceData")

@@ -31,7 +31,7 @@ init:
 api:
 	@echo "Generating api protos"
 	@$(DOCKER) build -t custom-protoc ./api
-	@$(DOCKER) run -t --rm -v $(PWD)/api:/api:rw,z -v $(PWD)/openapi.yaml:/openapi.yaml:rw,z -v $(PWD)/third_party:/third_party:ro,z \
+	@$(DOCKER) run -t --rm -v $(PWD)/api:/api:rw,z -v $(PWD)/openapi.yaml:/openapi.yaml:rw,z \
 	-w=/api/ custom-protoc sh -c "buf generate && \
 		buf lint && \
 		buf breaking --against 'buf.build/project-kessel/inventory-api' "
@@ -41,7 +41,7 @@ api:
 api_breaking:
 	@echo "Generating api protos, allowing breaking changes"
 	@$(DOCKER) build -t custom-protoc ./api
-	@$(DOCKER) run -t --rm -v $(PWD)/api:/api:rw,z -v $(PWD)/openapi.yaml:/openapi.yaml:rw,z -v $(PWD)/third_party:/third_party:ro,z \
+	@$(DOCKER) run -t --rm -v $(PWD)/api:/api:rw,z -v $(PWD)/openapi.yaml:/openapi.yaml:rw,z \
 	-w=/api/ custom-protoc sh -c "buf generate && \
 		buf lint"
 
@@ -50,7 +50,7 @@ api_breaking:
 # api:
 # 	@echo "Generating api protos"
 # 	@$(DOCKER) build -t custom-protoc ./api
-# 	@$(DOCKER) run -t --rm -v $(PWD)/api:/api:rw -v $(PWD)/openapi.yaml:/openapi.yaml:rw -v $(PWD)/third_party:/third_party:rw \
+# 	@$(DOCKER) run -t --rm -v $(PWD)/api:/api:rw -v $(PWD)/openapi.yaml:/openapi.yaml:rw \
 # 	-w=/api/ custom-protoc sh -c "buf generate && buf lint"
 
 .PHONY: build
@@ -66,11 +66,11 @@ clean:
 .PHONY: test
 # run all tests
 test:
-	@echo "" 
-	@echo "Running tests." 
-	@go test ./... -count=1 -coverprofile=coverage.out 
-	@echo "Overall test coverage:" 
-	@go tool cover -func=coverage.out | grep total: | awk '{print $$3}' 
+	@echo ""
+	@echo "Running tests."
+	@go test ./... -count=1 -coverprofile=coverage.out
+	@echo "Overall test coverage:"
+	@go tool cover -func=coverage.out | grep total: | awk '{print $$3}'
 	@rm coverage.out
 
 

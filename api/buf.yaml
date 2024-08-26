@@ -5,9 +5,15 @@ lint:
     - DEFAULT
   except:
    - ENUM_VALUE_PREFIX
+  ignore:
+     - third_party
 breaking:
   use:
     - FILE
+  except:
+    - ENUM_VALUE_PREFIX
+  ignore:
+    - third_party
 deps:
   - buf.build/googleapis/googleapis
   - buf.build/envoyproxy/protoc-gen-validate

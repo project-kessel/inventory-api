@@ -2,7 +2,6 @@ package kessel
 
 import (
 	"context"
-
 	"github.com/go-kratos/kratos/v2/log"
 	authzapi "github.com/project-kessel/inventory-api/internal/authz/api"
 
@@ -10,8 +9,8 @@ import (
 )
 
 type KesselAuthz struct {
-	CheckService kessel.KesselCheckServiceHTTPClient
-	TupleService kessel.KesselTupleServiceHTTPClient
+	CheckService kessel.KesselCheckServiceClient
+	TupleService kessel.KesselTupleServiceClient
 
 	Logger *log.Helper
 }
@@ -20,11 +19,11 @@ var _ authzapi.Authorizer = &KesselAuthz{}
 
 func New(ctx context.Context, config CompletedConfig, logger *log.Helper) (*KesselAuthz, error) {
 	logger.Info("Using authorizer: kessel")
-	return &KesselAuthz{
-		CheckService: kessel.NewKesselCheckServiceHTTPClient(config.HttpClient),
-		TupleService: kessel.NewKesselTupleServiceHTTPClient(config.HttpClient),
 
-		Logger: logger,
+	return &KesselAuthz{
+		CheckService: kessel.NewKesselCheckServiceClient(config.gRPCConn),
+		TupleService: kessel.NewKesselTupleServiceClient(config.gRPCConn),
+		Logger:       logger,
 	}, nil
 }
 

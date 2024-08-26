@@ -117,3 +117,30 @@ curl -H "Authorization: Bearer 1234" -H "Content-Type: application/json" --data 
 ```
 
 Manually stop the `inventory-api` and then run `make inventory-down-kafka`
+## Enable integration with Kessel relations API
+Update the .inventory-api.yaml or inventory-api-compose.yaml
+
+```yaml
+
+authz:
+  impl: kessel
+  kessel:
+    insecure-client: true
+    url: <relations-gRPC-host>:<port>
+    enable_oidc_auth: false
+```
+Enable oidc authentication with sso
+
+```yaml
+
+authz:
+  impl: kessel
+  kessel:
+    insecure-client: true 
+    url: <relations-gRPC-host>:<port>
+    enable_oidc_auth: true
+    sa_client_id: <service-account-id>
+    sa_client_secret: <secret>
+    sso_token_endpoint: https://host:port/realms/$REALM/protocol/openid-connect/token
+
+```

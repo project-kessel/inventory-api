@@ -1,0 +1,37 @@
+{
+  "k8s_cluster": {
+    "metadata": {
+      "resource_type": "k8s-cluster",
+      "workspace": ""
+    },
+    "reporter_data": {
+      "reporter_type": "ACM",
+      "reporter_instance_id": "user@example.com",
+      "reporter_version": "0.1",
+      "local_resource_id": "1",
+      "api_href": "www.example.com",
+      "console_href": "www.example.com"
+    },
+    "resource_data": {
+      "external_cluster_id": "1234",
+      "cluster_status": "READY",
+      "kube_version": "1.31",
+      "kube_vendor": "OPENSHIFT",
+      "vendor_version": "4.16",
+      "cloud_platform": "AWS_UPI",
+      "nodes": [
+        {
+          "name": "www.example.com",
+          "cpu": "7500m",
+          "memory": "30973224Ki",
+          "labels": [
+            {
+              "key": "has_monster_gpu",
+              "value": "yes"
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

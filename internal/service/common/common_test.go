@@ -140,7 +140,7 @@ func TestReporterFromPb(t *testing.T) {
 		Type:       "",
 		Href:       "",
 		IsGuest:    false,
-	})
+	}, lastReported)
 	expected := biz.Reporter{
 		MetadataID:      0,
 		ReporterID:      "principal-01",

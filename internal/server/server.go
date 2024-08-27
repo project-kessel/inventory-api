@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/go-kratos/kratos/v2"
 	"github.com/go-kratos/kratos/v2/log"
@@ -37,6 +38,7 @@ func New(c CompletedConfig, authn middleware.Middleware, logger log.Logger) *Ser
 }
 
 func (s *Server) Run(ctx context.Context) error {
+	fmt.Println("Server Run")
 	s.App = kratos.New(
 		kratos.ID(s.Id),
 		kratos.Name(s.Name),

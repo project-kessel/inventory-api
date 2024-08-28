@@ -4,8 +4,8 @@ import (
 	"context"
 
 	"github.com/go-kratos/kratos/v2/errors"
-	"github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1"
-	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1"
+	"github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/resources"
+	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/resources"
 	authnapi "github.com/project-kessel/inventory-api/internal/authn/api"
 	biz "github.com/project-kessel/inventory-api/internal/biz/k8spolicies"
 	"github.com/project-kessel/inventory-api/internal/middleware"
@@ -14,7 +14,7 @@ import (
 
 // K8sPoliciesService handles requests for K8s Policies
 type K8sPolicyService struct {
-	v1beta1.UnimplementedKesselK8SPolicyServiceServer
+	resources.UnimplementedKesselK8SPolicyServiceServer
 
 	Ctl *biz.K8sPolicyUsecase
 }
@@ -26,7 +26,7 @@ func New(c *biz.K8sPolicyUsecase) *K8sPolicyService {
 	}
 }
 
-func (c *K8sPolicyService) CreateK8SPolicy(ctx context.Context, r *v1beta1.CreateK8SPolicyRequest) (*v1beta1.CreateK8SPolicyResponse, error) {
+func (c *K8sPolicyService) CreateK8SPolicy(ctx context.Context, r *resources.CreateK8SPolicyRequest) (*resources.CreateK8SPolicyResponse, error) {
 	if err := r.ValidateAll(); err != nil {
 		return nil, errors.BadRequest("BADREQUEST", err.Error())
 	}
@@ -48,11 +48,11 @@ func (c *K8sPolicyService) CreateK8SPolicy(ctx context.Context, r *v1beta1.Creat
 	}
 }
 
-func (c *K8sPolicyService) UpdateK8SPolicy(ctx context.Context, r *v1beta1.UpdateK8SPolicyRequest) (*v1beta1.UpdateK8SPolicyResponse, error) {
+func (c *K8sPolicyService) UpdateK8SPolicy(ctx context.Context, r *resources.UpdateK8SPolicyRequest) (*resources.UpdateK8SPolicyResponse, error) {
 	return nil, nil
 }
 
-func (c *K8sPolicyService) DeleteK8SPolicy(ctx context.Context, r *v1beta1.DeleteK8SPolicyRequest) (*v1beta1.DeleteK8SPolicyResponse, error) {
+func (c *K8sPolicyService) DeleteK8SPolicy(ctx context.Context, r *resources.DeleteK8SPolicyRequest) (*resources.DeleteK8SPolicyResponse, error) {
 	return nil, nil
 }
 

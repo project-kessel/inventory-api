@@ -1,4 +1,4 @@
-package policies
+package k8spolicies
 
 import (
 	"context"
@@ -7,26 +7,26 @@ import (
 	"gorm.io/gorm"
 
 	authzapi "github.com/project-kessel/inventory-api/internal/authz/api"
-	biz "github.com/project-kessel/inventory-api/internal/biz/policies"
+	biz "github.com/project-kessel/inventory-api/internal/biz/k8spolicies"
 	eventingapi "github.com/project-kessel/inventory-api/internal/eventing/api"
 	"github.com/project-kessel/inventory-api/internal/middleware"
 )
 
-type policiesRepo struct {
+type k8spoliciesRepo struct {
 	DB      *gorm.DB
 	Authz   authzapi.Authorizer
 	Eventer eventingapi.Manager
 }
 
-func New(g *gorm.DB, a authzapi.Authorizer, e eventingapi.Manager) *policiesRepo {
-	return &policiesRepo{
+func New(g *gorm.DB, a authzapi.Authorizer, e eventingapi.Manager) *k8spoliciesRepo {
+	return &k8spoliciesRepo{
 		DB:      g,
 		Authz:   a,
 		Eventer: e,
 	}
 }
 
-func (r *policiesRepo) Save(ctx context.Context, model *biz.Policy) (*biz.Policy, error) {
+func (r *k8spoliciesRepo) Save(ctx context.Context, model *biz.K8sPolicy) (*biz.K8sPolicy, error) {
 	identity, err := middleware.GetIdentity(ctx)
 	if err != nil {
 		return nil, nil
@@ -39,7 +39,7 @@ func (r *policiesRepo) Save(ctx context.Context, model *biz.Policy) (*biz.Policy
 	if r.Eventer != nil {
 		producer, _ := r.Eventer.Lookup(identity, biz.ResourceType, model.ID)
 		// TODO: Update the Object that's sent.  This is going to be what we actually emit.
-		evt := eventingapi.NewAddEvent(biz.ResourceType, model.Metadata.UpdatedAt, &eventingapi.EventResource[biz.PolicyDetail]{
+		evt := eventingapi.NewAddEvent(biz.ResourceType, model.Metadata.UpdatedAt, &eventingapi.EventResource[biz.K8sPolicyDetail]{
 			Metadata:     &model.Metadata,
 			ReporterData: model.Metadata.Reporters[0],
 			ResourceData: model.ResourceData,
@@ -54,7 +54,7 @@ func (r *policiesRepo) Save(ctx context.Context, model *biz.Policy) (*biz.Policy
 
 // Update updates a model in the database, updates related tuples in the relations-api, and issues an update event.
 // The `id` is possibly of the form <reporter_type:local_resource_id>.
-func (r *policiesRepo) Update(ctx context.Context, model *biz.Policy, id string) (*biz.Policy, error) {
+func (r *k8spoliciesRepo) Update(ctx context.Context, model *biz.K8sPolicy, id string) (*biz.K8sPolicy, error) {
 	identity, err := middleware.GetIdentity(ctx)
 	if err != nil {
 		return nil, nil
@@ -64,7 +64,7 @@ func (r *policiesRepo) Update(ctx context.Context, model *biz.Policy, id string)
 
 	if r.Eventer != nil {
 		producer, _ := r.Eventer.Lookup(identity, biz.ResourceType, model.ID)
-		evt := eventingapi.NewUpdateEvent(biz.ResourceType, model.Metadata.UpdatedAt, &eventingapi.EventResource[biz.PolicyDetail]{
+		evt := eventingapi.NewUpdateEvent(biz.ResourceType, model.Metadata.UpdatedAt, &eventingapi.EventResource[biz.K8sPolicyDetail]{
 			Metadata:     &model.Metadata,
 			ReporterData: model.Metadata.Reporters[0],
 			ResourceData: model.ResourceData,
@@ -79,7 +79,7 @@ func (r *policiesRepo) Update(ctx context.Context, model *biz.Policy, id string)
 
 // Delete deletes a model from the database, removes related tuples from the relations-api, and issues a delete event.
 // The `id` is possibly of the form <reporter_type:local_resource_id>.
-func (r *policiesRepo) Delete(ctx context.Context, id string) error {
+func (r *k8spoliciesRepo) Delete(ctx context.Context, id string) error {
 	identity, err := middleware.GetIdentity(ctx)
 	if err != nil {
 		return nil
@@ -100,10 +100,10 @@ func (r *policiesRepo) Delete(ctx context.Context, id string) error {
 	return nil
 }
 
-func (r *policiesRepo) FindByID(context.Context, string) (*biz.Policy, error) {
+func (r *k8spoliciesRepo) FindByID(context.Context, string) (*biz.K8sPolicy, error) {
 	return nil, nil
 }
 
-func (r *policiesRepo) ListAll(context.Context) ([]*biz.Policy, error) {
+func (r *k8spoliciesRepo) ListAll(context.Context) ([]*biz.K8sPolicy, error) {
 	return nil, nil
 }

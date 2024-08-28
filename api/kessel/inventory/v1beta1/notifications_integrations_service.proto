@@ -41,21 +41,21 @@ message DeleteNotificationsIntegrationResponse {}
 service KesselNotificationsIntegrationService {
   rpc CreateNotificationsIntegration(CreateNotificationsIntegrationRequest) returns (CreateNotificationsIntegrationResponse) {
     option (google.api.http) = {
-      post : "/api/inventory/v1beta1/notificationsIntegrations"
+      post : "/api/inventory/v1beta1/notifications-integrations"
       body : "*"
     };
   };
 
   rpc UpdateNotificationsIntegration(UpdateNotificationsIntegrationRequest) returns (UpdateNotificationsIntegrationResponse) {
     option (google.api.http) = {
-      put : "/api/inventory/v1beta1/notificationsIntegrations/{resource}"
+      put : "/api/inventory/v1beta1/notifications-integrations/{resource}"
       body : "*"
     };
   };
 
   rpc DeleteNotificationsIntegration(DeleteNotificationsIntegrationRequest) returns (DeleteNotificationsIntegrationResponse) {
     option (google.api.http) = {
-      delete : "/api/inventory/v1beta1/notificationsIntegrations/{resource}"
+      delete : "/api/inventory/v1beta1/notifications-integrations/{resource}"
     };
   };
 }

@@ -1,10 +1,10 @@
-package policies
+package k8spolicies
 
 import (
 	"github.com/project-kessel/inventory-api/internal/biz/common"
 )
 
-type Policy struct {
+type K8sPolicy struct {
 	// Kessel Asset Inventory generated identifier.
 	ID int64 `gorm:"primaryKey"`
 
@@ -14,10 +14,10 @@ type Policy struct {
 
 	// this should be a gorm json type.
 	// see https://github.com/go-gorm/datatypes
-	ResourceData *PolicyDetail `json:"resource_data"`
+	ResourceData *K8sPolicyDetail `json:"resource_data"`
 }
 
-type PolicyDetail struct {
+type K8sPolicyDetail struct {
 	Disabled bool   `json:"disabled"`
 	Severity string `json:"severity"`
 }

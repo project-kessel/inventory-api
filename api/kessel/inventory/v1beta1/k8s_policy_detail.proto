@@ -8,7 +8,7 @@ option go_package = "github.com/project-kessel/inventory-api/api/kessel/inventor
 option java_multiple_files = true;
 option java_package = "org.project_kessel.api.inventory.v1beta1";
 
-message PolicyDetail {
+message K8sPolicyDetail {
 
   // The kind of policy
   enum Severity {
@@ -21,7 +21,7 @@ message PolicyDetail {
   }
 
   // Defines if the policy is currently enabled or disabled across all targets
-  bool disabled = 270940796;
+  bool disabled = 270940797;
 
-  Severity severity = 404558591 [ (validate.rules).enum.defined_only = true ];
+  Severity severity = 404558592 [ (validate.rules).enum.defined_only = true ];
 }

@@ -5,7 +5,7 @@ import (
 
 	"github.com/project-kessel/inventory-api/internal/biz/hosts"
 	"github.com/project-kessel/inventory-api/internal/biz/k8sclusters"
-	"github.com/project-kessel/inventory-api/internal/biz/policies"
+	"github.com/project-kessel/inventory-api/internal/biz/k8spolicies"
 	"github.com/project-kessel/inventory-api/internal/biz/relationships"
 )
 
@@ -14,7 +14,7 @@ var (
 	ProviderSet = wire.NewSet(
 		hosts.New,
 		k8sclusters.New,
-		policies.New,
+		k8spolicies.New,
 		relationships.New,
 	)
 )

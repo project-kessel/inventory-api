@@ -31,9 +31,9 @@ type KesselRhelHostServiceHTTPServer interface {
 
 func RegisterKesselRhelHostServiceHTTPServer(s *http.Server, srv KesselRhelHostServiceHTTPServer) {
 	r := s.Route("/")
-	r.POST("/api/inventory/v1beta1/rhelHosts", _KesselRhelHostService_CreateRhelHost0_HTTP_Handler(srv))
-	r.PUT("/api/inventory/v1beta1/rhelHosts/{resource}", _KesselRhelHostService_UpdateRhelHost0_HTTP_Handler(srv))
-	r.DELETE("/api/inventory/v1beta1/rhelHosts/{resource}", _KesselRhelHostService_DeleteRhelHost0_HTTP_Handler(srv))
+	r.POST("/api/inventory/v1beta1/rhel-hosts", _KesselRhelHostService_CreateRhelHost0_HTTP_Handler(srv))
+	r.PUT("/api/inventory/v1beta1/rhel-hosts/{resource}", _KesselRhelHostService_UpdateRhelHost0_HTTP_Handler(srv))
+	r.DELETE("/api/inventory/v1beta1/rhel-hosts/{resource}", _KesselRhelHostService_DeleteRhelHost0_HTTP_Handler(srv))
 }
 
 func _KesselRhelHostService_CreateRhelHost0_HTTP_Handler(srv KesselRhelHostServiceHTTPServer) func(ctx http.Context) error {
@@ -121,7 +121,7 @@ func NewKesselRhelHostServiceHTTPClient(client *http.Client) KesselRhelHostServi
 
 func (c *KesselRhelHostServiceHTTPClientImpl) CreateRhelHost(ctx context.Context, in *CreateRhelHostRequest, opts ...http.CallOption) (*CreateRhelHostResponse, error) {
 	var out CreateRhelHostResponse
-	pattern := "/api/inventory/v1beta1/rhelHosts"
+	pattern := "/api/inventory/v1beta1/rhel-hosts"
 	path := binding.EncodeURL(pattern, in, false)
 	opts = append(opts, http.Operation(OperationKesselRhelHostServiceCreateRhelHost))
 	opts = append(opts, http.PathTemplate(pattern))
@@ -134,7 +134,7 @@ func (c *KesselRhelHostServiceHTTPClientImpl) CreateRhelHost(ctx context.Context
 
 func (c *KesselRhelHostServiceHTTPClientImpl) DeleteRhelHost(ctx context.Context, in *DeleteRhelHostRequest, opts ...http.CallOption) (*DeleteRhelHostResponse, error) {
 	var out DeleteRhelHostResponse
-	pattern := "/api/inventory/v1beta1/rhelHosts/{resource}"
+	pattern := "/api/inventory/v1beta1/rhel-hosts/{resource}"
 	path := binding.EncodeURL(pattern, in, true)
 	opts = append(opts, http.Operation(OperationKesselRhelHostServiceDeleteRhelHost))
 	opts = append(opts, http.PathTemplate(pattern))
@@ -147,7 +147,7 @@ func (c *KesselRhelHostServiceHTTPClientImpl) DeleteRhelHost(ctx context.Context
 
 func (c *KesselRhelHostServiceHTTPClientImpl) UpdateRhelHost(ctx context.Context, in *UpdateRhelHostRequest, opts ...http.CallOption) (*UpdateRhelHostResponse, error) {
 	var out UpdateRhelHostResponse
-	pattern := "/api/inventory/v1beta1/rhelHosts/{resource}"
+	pattern := "/api/inventory/v1beta1/rhel-hosts/{resource}"
 	path := binding.EncodeURL(pattern, in, false)
 	opts = append(opts, http.Operation(OperationKesselRhelHostServiceUpdateRhelHost))
 	opts = append(opts, http.PathTemplate(pattern))

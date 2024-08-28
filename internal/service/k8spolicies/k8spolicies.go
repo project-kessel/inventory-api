@@ -3,9 +3,14 @@ package k8spolicies
 import (
 	"context"
 
+<<<<<<< HEAD
 	"github.com/go-kratos/kratos/v2/errors"
 	"github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/resources"
 	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/resources"
+=======
+	"github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1"
+	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1"
+>>>>>>> 5fcde0a (Update cluster & policy validation)
 	authnapi "github.com/project-kessel/inventory-api/internal/authn/api"
 	biz "github.com/project-kessel/inventory-api/internal/biz/k8spolicies"
 	"github.com/project-kessel/inventory-api/internal/middleware"
@@ -26,11 +31,7 @@ func New(c *biz.K8sPolicyUsecase) *K8sPolicyService {
 	}
 }
 
-func (c *K8sPolicyService) CreateK8SPolicy(ctx context.Context, r *resources.CreateK8SPolicyRequest) (*resources.CreateK8SPolicyResponse, error) {
-	if err := r.ValidateAll(); err != nil {
-		return nil, errors.BadRequest("BADREQUEST", err.Error())
-	}
-
+func (c *K8sPolicyService) CreateK8SPolicy(ctx context.Context, r *v1beta1.CreateK8SPolicyRequest) (*v1beta1.CreateK8SPolicyResponse, error) {
 	identity, err := middleware.GetIdentity(ctx)
 	if err != nil {
 		return nil, err

@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1"
+	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/resources"
 	authnapi "github.com/project-kessel/inventory-api/internal/authn/api"
 	biz "github.com/project-kessel/inventory-api/internal/biz/common"
 	"github.com/stretchr/testify/assert"

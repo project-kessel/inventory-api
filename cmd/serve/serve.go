@@ -24,7 +24,8 @@ import (
 	"github.com/project-kessel/inventory-api/internal/storage"
 
 	hb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1"
-	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1"
+	rel "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/relationships"
+	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/resources"
 
 	hostsrepo "github.com/project-kessel/inventory-api/internal/data/hosts"
 	k8sclustersrepo "github.com/project-kessel/inventory-api/internal/data/k8sclusters"
@@ -177,8 +178,8 @@ func NewCommand(
 			relationships_repo := relationshipsrepo.New(db)
 			relationships_controller := relationshipsctl.New(relationships_repo, log.With(logger, "subsystem", "relationships_controller"))
 			relationships_service := relationshipssvc.New(relationships_controller)
-			pb.RegisterKesselPolicyRelationshipServiceServer(server.GrpcServer, relationships_service)
-			pb.RegisterKesselPolicyRelationshipServiceHTTPServer(server.HttpServer, relationships_service)
+			rel.RegisterKesselPolicyRelationshipServiceServer(server.GrpcServer, relationships_service)
+			rel.RegisterKesselPolicyRelationshipServiceHTTPServer(server.HttpServer, relationships_service)
 
 			health_service := health.NewHealthService()
 			hb.RegisterKesselInventoryHealthServiceServer(server.GrpcServer, health_service)

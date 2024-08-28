@@ -3,13 +3,13 @@ package relationships
 import (
 	"context"
 
-	"github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1"
+	"github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/relationships"
 	controller "github.com/project-kessel/inventory-api/internal/biz/relationships"
 )
 
 // RelationshipsService handles requests for RHEL hosts
 type RelationshipsService struct {
-	v1beta1.UnimplementedKesselPolicyRelationshipServiceServer
+	relationships.UnimplementedKesselPolicyRelationshipServiceServer
 
 	Controller *controller.RelationshipUsecase
 }
@@ -21,14 +21,14 @@ func New(c *controller.RelationshipUsecase) *RelationshipsService {
 	}
 }
 
-func (c *RelationshipsService) CreateRelationship(ctx context.Context, r *v1beta1.CreatePolicyRelationshipRequest) (*v1beta1.CreatePolicyRelationshipResponse, error) {
+func (c *RelationshipsService) CreateRelationship(ctx context.Context, r *relationships.CreatePolicyRelationshipRequest) (*relationships.CreatePolicyRelationshipResponse, error) {
 	return nil, nil
 }
 
-func (c *RelationshipsService) UpdateResourceRelationshipByUrnHs(ctx context.Context, r *v1beta1.UpdateResourceRelationshipByUrnHsRequest) (*v1beta1.UpdateResourceRelationshipByUrnHsResponse, error) {
+func (c *RelationshipsService) UpdateResourceRelationshipByUrnHs(ctx context.Context, r *relationships.UpdateResourceRelationshipByUrnHsRequest) (*relationships.UpdateResourceRelationshipByUrnHsResponse, error) {
 	return nil, nil
 }
 
-func (c *RelationshipsService) DeleteResourceRelationshipByUrn(ctx context.Context, r *v1beta1.DeleteResourceRelationshipByUrnRequest) (*v1beta1.DeleteResourceRelationshipByUrnResponse, error) {
+func (c *RelationshipsService) DeleteResourceRelationshipByUrn(ctx context.Context, r *relationships.DeleteResourceRelationshipByUrnRequest) (*relationships.DeleteResourceRelationshipByUrnResponse, error) {
 	return nil, nil
 }

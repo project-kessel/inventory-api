@@ -5,6 +5,7 @@ lint:
     - DEFAULT
   except:
    - ENUM_VALUE_PREFIX
+   - PACKAGE_VERSION_SUFFIX
 breaking:
   use:
     - FILE

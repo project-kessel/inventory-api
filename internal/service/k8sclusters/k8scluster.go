@@ -7,8 +7,8 @@ import (
 
 	"github.com/go-kratos/kratos/v2/errors"
 
-	"github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1"
-	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1"
+	"github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/resources"
+	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/resources"
 	authnapi "github.com/project-kessel/inventory-api/internal/authn/api"
 	biz "github.com/project-kessel/inventory-api/internal/biz/k8sclusters"
 	"github.com/project-kessel/inventory-api/internal/middleware"
@@ -17,7 +17,7 @@ import (
 
 // K8sClustersService handles requests for k8s clusters
 type K8sClustersService struct {
-	v1beta1.UnimplementedKesselK8SClusterServiceServer
+	resources.UnimplementedKesselK8SClusterServiceServer
 
 	Ctl *biz.K8sClusterUsecase
 }
@@ -29,7 +29,7 @@ func New(c *biz.K8sClusterUsecase) *K8sClustersService {
 	}
 }
 
-func (c *K8sClustersService) CreateK8SCluster(ctx context.Context, r *v1beta1.CreateK8SClusterRequest) (*v1beta1.CreateK8SClusterResponse, error) {
+func (c *K8sClustersService) CreateK8SCluster(ctx context.Context, r *resources.CreateK8SClusterRequest) (*resources.CreateK8SClusterResponse, error) {
 	if err := r.ValidateAll(); err != nil {
 		return nil, err
 	}
@@ -55,11 +55,11 @@ func (c *K8sClustersService) CreateK8SCluster(ctx context.Context, r *v1beta1.Cr
 	}
 }
 
-func (c *K8sClustersService) UpdateK8SCluster(ctx context.Context, r *v1beta1.UpdateK8SClusterRequest) (*v1beta1.UpdateK8SClusterResponse, error) {
+func (c *K8sClustersService) UpdateK8SCluster(ctx context.Context, r *resources.UpdateK8SClusterRequest) (*resources.UpdateK8SClusterResponse, error) {
 	return nil, nil
 }
 
-func (c *K8sClustersService) DeleteK8SCluster(ctx context.Context, r *v1beta1.DeleteK8SClusterRequest) (*v1beta1.DeleteK8SClusterResponse, error) {
+func (c *K8sClustersService) DeleteK8SCluster(ctx context.Context, r *resources.DeleteK8SClusterRequest) (*resources.DeleteK8SClusterResponse, error) {
 	return nil, nil
 }
 

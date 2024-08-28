@@ -39,21 +39,21 @@ message DeleteRhelHostResponse {}
 service KesselRhelHostService {
   rpc CreateRhelHost(CreateRhelHostRequest) returns (CreateRhelHostResponse) {
     option (google.api.http) = {
-      post : "/api/inventory/v1beta1/rhelHosts"
+      post : "/api/inventory/v1beta1/rhel-hosts"
       body : "*"
     };
   };
 
   rpc UpdateRhelHost(UpdateRhelHostRequest) returns (UpdateRhelHostResponse) {
     option (google.api.http) = {
-      put : "/api/inventory/v1beta1/rhelHosts/{resource}"
+      put : "/api/inventory/v1beta1/rhel-hosts/{resource}"
       body : "*"
     };
   };
 
   rpc DeleteRhelHost(DeleteRhelHostRequest) returns (DeleteRhelHostResponse) {
     option (google.api.http) = {
-      delete : "/api/inventory/v1beta1/rhelHosts/{resource}"
+      delete : "/api/inventory/v1beta1/rhel-hosts/{resource}"
     };
   };
 }

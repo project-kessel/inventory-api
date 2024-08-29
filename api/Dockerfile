@@ -1,4 +1,4 @@
-FROM registry.access.redhat.com/ubi8/ubi-minimal:8.10 AS builder
+FROM registry.access.redhat.com/ubi8/ubi-minimal:8.10-1052.1724178568 AS builder
 
 ARG TARGETARCH
 USER root
@@ -21,7 +21,7 @@ RUN go install github.com/google/gnostic/cmd/protoc-gen-openapi@v0.7.0
 # Latest versions as of 2024-08-08
 RUN go install github.com/bufbuild/buf/cmd/buf@v1.36.0
 
-FROM registry.access.redhat.com/ubi8/ubi-minimal:8.10
+FROM registry.access.redhat.com/ubi8/ubi-minimal:8.10-1052.1724178568
 
 
 COPY --from=builder /root/go/bin/protoc-gen-go /usr/local/bin/protoc-gen-go

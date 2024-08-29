@@ -34,7 +34,7 @@ make init
 To add hosts to the inventory, use the following `curl` command:
 
 ```bash
-curl -H "Content-Type: application/json" --data "@data/host.json" http://localhost:8081/api/inventory/v1beta1/rhelHosts
+curl -H "Content-Type: application/json" --data "@data/host.json" http://localhost:8081/api/inventory/v1beta1/resources/rhel-hosts
 ```
 
 Depending on the config file you're using, the curl command will require additional headers for authorization of the request.
@@ -48,7 +48,7 @@ populate the Identity header.
 [data/host.json](./data/host.json) uses the `reporter_id: user@example.com`, hence you will need the following command:
 
 ```bash
-curl -H "Content-Type: application/json" --user-agent user@example.com --data "@data/host.json" http://localhost:8081/api/inventory/v1beta1/rhelHosts
+curl -H "Content-Type: application/json" --user-agent user@example.com --data "@data/host.json" http://localhost:8081/api/inventory/v1beta1/resources/rhel-hosts
 ```
 
 ### Running with `make inventory-up`
@@ -59,7 +59,7 @@ The default port in this setup are `8081` (http) and `9091`.
 The following command will add the host to the inventory:
 
 ```bash
-curl -H "Content-Type: application/json" -H "Authorization: bearer 1234" --data "@data/host.json" http://localhost:8081/api/inventory/v1beta1/rhelHosts
+curl -H "Content-Type: application/json" -H "Authorization: bearer 1234" --data "@data/host.json" http://localhost:8081/api/inventory/v1beta1/resources/rhel-hosts
 ```
 
 ## Contribution
@@ -88,7 +88,7 @@ Export the token generated
 
 Sample request with the authorization header
 
-`curl -H "Authorization: bearer ${TOKEN}"  -H "Content-Type: application/json" --data "@data/host-service-account.json" http://localhost:8081/api/inventory/v1beta1/rhelHosts`
+`curl -H "Authorization: bearer ${TOKEN}"  -H "Content-Type: application/json" --data "@data/host-service-account.json" http://localhost:8081/api/inventory/v1beta1/resources/rhel-hosts`
 
 ## Running Inventory api with kafka
 Starts a local strimzi kafka and zookeeper:
@@ -113,7 +113,7 @@ Start consuming messages in the pod.
 
 In a separate terminal, post a resource to `inventory-api`:
 ```bash
-curl -H "Authorization: Bearer 1234" -H "Content-Type: application/json" --data "@data/k8s-cluster.json" http://localhost:8081/api/inventory/v1beta1/k8sClusters
+curl -H "Authorization: Bearer 1234" -H "Content-Type: application/json" --data "@data/k8s-cluster.json" http://localhost:8081/api/inventory/v1beta1/k8s-clusters
 ```
 
 Manually stop the `inventory-api` and then run `make inventory-down-kafka`

@@ -126,21 +126,19 @@ authz:
   impl: kessel
   kessel:
     insecure-client: true
-    url: <relations-gRPC-host>:<port>
-    enable_oidc_auth: false
+    url: localhost:9000
+    enable-oidc-auth: false
 ```
 Enable oidc authentication with sso
 
 ```yaml
-
 authz:
   impl: kessel
   kessel:
-    insecure-client: true 
-    url: <relations-gRPC-host>:<port>
-    enable_oidc_auth: true
-    sa_client_id: <service-account-id>
-    sa_client_secret: <secret>
-    sso_token_endpoint: https://host:port/realms/$REALM/protocol/openid-connect/token
-
+    insecure-client: true
+    url: localhost:9000
+    enable-oidc-auth: true
+    sa-client-id: "svc-test"
+    sa-client-secret: "<secret>"
+    sso-token-endpoint: "http://localhost:8084/realms/redhat-external/protocol/openid-connect/token"
 ```

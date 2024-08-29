@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/bufbuild/protovalidate-go"
-	"github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1"
+	"github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/resources"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -22,10 +22,10 @@ func TestValidation_ValidRequest(t *testing.T) {
 		return "success", nil
 	}
 
-	resp, err := m(handler)(context.Background(), &v1beta1.CreateRhelHostRequest{
-		RhelHost: &v1beta1.RhelHost{
-			Metadata: &v1beta1.Metadata{},
-			ReporterData: &v1beta1.ReporterData{
+	resp, err := m(handler)(context.Background(), &resources.CreateRhelHostRequest{
+		RhelHost: &resources.RhelHost{
+			Metadata: &resources.Metadata{},
+			ReporterData: &resources.ReporterData{
 				ReporterType:    1,
 				LocalResourceId: "1",
 			},
@@ -46,8 +46,7 @@ func TestValidation_InvalidRequest(t *testing.T) {
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return nil, nil
 	}
-
-	resp, err := m(handler)(context.Background(), &v1beta1.CreateRhelHostRequest{})
+	resp, err := m(handler)(context.Background(), &resources.CreateRhelHostRequest{})
 	assert.Error(t, err)
 	assert.Equal(t, resp, nil)
 }

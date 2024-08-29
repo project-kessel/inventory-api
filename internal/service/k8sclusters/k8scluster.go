@@ -29,7 +29,7 @@ func New(c *biz.K8sClusterUsecase) *K8sClustersService {
 	}
 }
 
-func (c *K8sClustersService) CreateK8SCluster(ctx context.Context, r *v1beta1.CreateK8SClusterRequest) (*v1beta1.CreateK8SClusterResponse, error) {
+func (c *K8sClustersService) CreateK8SCluster(ctx context.Context, r *resources.CreateK8SClusterRequest) (*resources.CreateK8SClusterResponse, error) {
 	if !strings.EqualFold(r.K8SCluster.Metadata.ResourceType, biz.ResourceType) {
 		return nil, errors.BadRequest("BADREQUEST", fmt.Sprintf("incorrect resource type: expected %s", biz.ResourceType))
 	}

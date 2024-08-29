@@ -22,9 +22,9 @@ func (o *Options) AddFlags(fs *pflag.FlagSet, prefix string) {
 		prefix = prefix + "."
 	}
 	fs.StringVar(&o.ClientId, prefix+"client-id", o.ClientId, "the clientId issued by the authorization server that represents the application")
-	fs.StringVar(&o.AuthorizationServerURL, prefix+"authn-server-url", o.AuthorizationServerURL, "the URL to the authorization server")
+	fs.StringVar(&o.AuthorizationServerURL, prefix+"authn-server-url", o.AuthorizationServerURL, "the url to the authorization server")
 	fs.BoolVarP(&o.InsecureClient, prefix+"insecure-client", "k", o.InsecureClient, "validate authorization server certs?")
-	fs.BoolVarP(&o.SkipClientIDCheck, prefix+"skip-client-id-check", "", o.SkipClientIDCheck, "if true, no ClientID check performed. Must be true if ClientID field is empty.")
+	fs.BoolVarP(&o.SkipClientIDCheck, prefix+"skip-client-id-check", "", o.SkipClientIDCheck, "if true, no clientId check performed. Must be true if clientId field is empty.")
 	fs.BoolVarP(&o.EnforceAudCheck, prefix+"enforce-aud-check", "", o.EnforceAudCheck, "enforce aud claim check for clientId configured")
 	fs.BoolVarP(&o.SkipIssuerCheck, prefix+"skip-issuer-check", "", o.SkipIssuerCheck, "intended for specialized such as testing cases where the the caller wishes to defer issuer validation")
 }

@@ -542,6 +542,10 @@ components:
                     allOf:
                         - $ref: '#/components/schemas/kessel.inventory.v1beta1.relationships.Metadata'
                     description: Metadata about this resource
+                reporter_data:
+                    allOf:
+                        - $ref: '#/components/schemas/kessel.inventory.v1beta1.relationships.ReporterData'
+                    description: Write only reporter specific data
                 relationship_data:
                     $ref: '#/components/schemas/kessel.inventory.v1beta1.relationships.PolicyRelationshipDetail'
         kessel.inventory.v1beta1.relationships.PolicyRelationshipDetail:
@@ -562,6 +566,37 @@ components:
                 status:
                     type: integer
                     format: enum
+        kessel.inventory.v1beta1.relationships.ReporterData:
+            type: object
+            properties:
+                reporter_type:
+                    type: integer
+                    format: enum
+                reporter_instance_id:
+                    readOnly: true
+                    type: string
+                    description: |-
+                        The ID of the instance of the reporter. This is derived from the
+                         authentication mechanism, i.e. authentication token.
+                reporter_version:
+                    type: string
+                    description: version of the reporter
+                first_reported:
+                    readOnly: true
+                    type: string
+                    description: Date and time when the inventory item was first reported by this reporter
+                    format: date-time
+                last_reported:
+                    readOnly: true
+                    type: string
+                    description: Date and time when the inventory item was last updated by this reporter
+                    format: date-time
+                subject_local_resource_id:
+                    type: string
+                    description: "The ID assigned by the reporter to resource which is the subject of the relationship. For example \n OCM cluster ID, HBI's host id, or ACM managed cluster name etc."
+                object_local_resource_id:
+                    type: string
+                    description: "The ID assigned by the reporter to resource which is the object of the relationship. For example \n OCM cluster ID, HBI's host id, or ACM managed cluster name etc."
         kessel.inventory.v1beta1.relationships.UpdateResourceRelationshipByUrnHsRequest:
             type: object
             properties:

@@ -3,6 +3,7 @@ syntax = "proto3";
 package kessel.inventory.v1beta1.relationships;
 
 import "kessel/inventory/v1beta1/relationships/metadata.proto";
+import "kessel/inventory/v1beta1/relationships/reporter_data.proto";
 import "kessel/inventory/v1beta1/relationships/policy_relationship_detail.proto";
 import "validate/validate.proto";
 
@@ -14,6 +15,9 @@ message PolicyRelationship {
 
   // Metadata about this resource
   Metadata metadata = 1 [ (validate.rules).message = {required: false, skip: false} ];
+
+  // Write only reporter specific data
+  ReporterData reporter_data = 245278793 [ (validate.rules).message.required = true ];
   
   PolicyRelationshipDetail relationship_data = 2122699 [ (validate.rules).message.required = true ];
 }

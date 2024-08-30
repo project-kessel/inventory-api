@@ -506,13 +506,48 @@ components:
         kessel.inventory.v1beta1.relationships.DeleteResourceRelationshipByUrnResponse:
             type: object
             properties: {}
+        kessel.inventory.v1beta1.relationships.Metadata:
+            type: object
+            properties:
+                id:
+                    readOnly: true
+                    type: string
+                    description: Kessel Asset Inventory generated identifier.
+                relationship_type:
+                    readOnly: true
+                    type: string
+                    description: The type of Resource relationship
+                first_reported:
+                    readOnly: true
+                    type: string
+                    description: Date and time when the inventory item was first reported.
+                    format: date-time
+                last_reported:
+                    readOnly: true
+                    type: string
+                    description: Date and time when the inventory item was last updated.
+                    format: date-time
+                first_reported_by:
+                    readOnly: true
+                    type: string
+                    description: Identifier of the reporter that first reported on this item.
+                last_reported_by:
+                    readOnly: true
+                    type: string
+                    description: Identifier of the reporter that last reported on this item.
         kessel.inventory.v1beta1.relationships.PolicyRelationship:
             type: object
             properties:
-                relationship_type:
-                    type: string
-                    description: The type of Resource relationship
-                policy_id:
+                metadata:
+                    allOf:
+                        - $ref: '#/components/schemas/kessel.inventory.v1beta1.relationships.Metadata'
+                    description: Metadata about this resource
+                relationship_data:
+                    $ref: '#/components/schemas/kessel.inventory.v1beta1.relationships.PolicyRelationshipDetail'
+        kessel.inventory.v1beta1.relationships.PolicyRelationshipDetail:
+            type: object
+            properties:
+                k8s_policy_id:
                     type: string
                     description: |-
                         The resource ID assigned to the resource by Kessel Asset Inventory. A

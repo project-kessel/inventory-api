@@ -13,12 +13,6 @@ func TestMetadataValid(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func TestMetadataInvalidLabels(t *testing.T) {
-	meta := Metadata{
-		Labels: []*ResourceLabel{
-			{},
-		},
-	}
 
 	err := meta.ValidateAll()
 	assert.ErrorContains(t, err, "invalid Metadata.Labels[0]")

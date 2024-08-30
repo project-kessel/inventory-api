@@ -2,9 +2,9 @@ package kessel
 
 import (
 	"context"
-	"crypto/tls"
-
-	kratoshttp "github.com/go-kratos/kratos/v2/transport/http"
+	"github.com/authzed/grpcutil"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 type Config struct {
@@ -15,8 +15,17 @@ func NewConfig(o *Options) *Config {
 	return &Config{Options: o}
 }
 
+type tokenClientConfig struct {
+	clientId       string
+	clientSecret   string
+	url            string
+	enableOIDCAuth bool
+	insecure       bool
+}
+
 type completedConfig struct {
-	HttpClient *kratoshttp.Client
+	gRPCConn    *grpc.ClientConn
+	tokenConfig *tokenClientConfig
 }
 
 type CompletedConfig struct {
@@ -24,14 +33,31 @@ type CompletedConfig struct {
 }
 
 func (c *Config) Complete(ctx context.Context) (CompletedConfig, []error) {
-	client, err := kratoshttp.NewClient(
-		ctx,
-		kratoshttp.WithEndpoint(c.URL),
-		kratoshttp.WithTLSConfig(&tls.Config{InsecureSkipVerify: c.Insecure}),
+	var opts []grpc.DialOption
+	opts = append(opts, grpc.EmptyDialOption{})
+
+	if c.Insecure {
+		opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	} else {
+		tlsConfig, _ := grpcutil.WithSystemCerts(grpcutil.VerifyCA)
+		opts = append(opts, tlsConfig)
+	}
+
+	conn, err := grpc.NewClient(
+		c.URL,
+		opts...,
 	)
 	if err != nil {
 		return CompletedConfig{}, []error{err}
 	}
 
-	return CompletedConfig{&completedConfig{HttpClient: client}}, nil
+	tokenReq := &tokenClientConfig{
+		clientId:       c.ClientId,
+		clientSecret:   c.ClientSecret,
+		url:            c.TokenEndpoint,
+		enableOIDCAuth: c.EnableOidcAuth,
+		insecure:       c.Insecure,
+	}
+
+	return CompletedConfig{&completedConfig{gRPCConn: conn, tokenConfig: tokenReq}}, nil
 }

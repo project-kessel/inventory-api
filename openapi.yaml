@@ -46,12 +46,12 @@ paths:
         put:
             tags:
                 - KesselK8SPolicyIsPropagatedToK8SClusterService
-            operationId: KesselK8SPolicyIsPropagatedToK8SClusterService_UpdateResourceRelationshipByUrnHs
+            operationId: KesselK8SPolicyIsPropagatedToK8SClusterService_UpdateK8SPolicyIsPropagatedToK8SCluster
             requestBody:
                 content:
                     application/json:
                         schema:
-                            $ref: '#/components/schemas/kessel.inventory.v1beta1.relationships.UpdateResourceRelationshipByUrnHsRequest'
+                            $ref: '#/components/schemas/kessel.inventory.v1beta1.relationships.UpdateK8SPolicyIsPropagatedToK8SClusterRequest'
                 required: true
             responses:
                 "200":
@@ -59,7 +59,7 @@ paths:
                     content:
                         application/json:
                             schema:
-                                $ref: '#/components/schemas/kessel.inventory.v1beta1.relationships.UpdateResourceRelationshipByUrnHsResponse'
+                                $ref: '#/components/schemas/kessel.inventory.v1beta1.relationships.UpdateK8SPolicyIsPropagatedToK8SClusterResponse'
                 default:
                     description: Default error response
                     content:
@@ -92,13 +92,13 @@ paths:
         delete:
             tags:
                 - KesselK8SPolicyIsPropagatedToK8SClusterService
-            operationId: KesselK8SPolicyIsPropagatedToK8SClusterService_DeleteResourceRelationshipByUrn
+            operationId: KesselK8SPolicyIsPropagatedToK8SClusterService_DeleteK8SPolicyIsPropagatedToK8SCluster
             parameters:
-                - name: resources.subject_resource
+                - name: resources.subject_urn
                   in: query
                   schema:
                     type: string
-                - name: resources.object_resource
+                - name: resources.object_urn
                   in: query
                   schema:
                     type: string
@@ -108,7 +108,7 @@ paths:
                     content:
                         application/json:
                             schema:
-                                $ref: '#/components/schemas/kessel.inventory.v1beta1.relationships.DeleteResourceRelationshipByUrnResponse'
+                                $ref: '#/components/schemas/kessel.inventory.v1beta1.relationships.DeleteK8SPolicyIsPropagatedToK8SClusterResponse'
                 default:
                     description: Default error response
                     content:
@@ -492,14 +492,14 @@ components:
         kessel.inventory.v1beta1.relationships.CreateK8SPolicyIsPropagatedToK8SClusterRequest:
             type: object
             properties:
-                policy_relationship:
+                k8spolicy_ispropagatedto_k8scluster:
                     allOf:
                         - $ref: '#/components/schemas/kessel.inventory.v1beta1.relationships.K8SPolicyIsPropagatedToK8SCluster'
                     description: The resource relationship to create in Kessel Asset Inventory
         kessel.inventory.v1beta1.relationships.CreateK8SPolicyIsPropagatedToK8SClusterResponse:
             type: object
             properties: {}
-        kessel.inventory.v1beta1.relationships.DeleteResourceRelationshipByUrnResponse:
+        kessel.inventory.v1beta1.relationships.DeleteK8SPolicyIsPropagatedToK8SClusterResponse:
             type: object
             properties: {}
         kessel.inventory.v1beta1.relationships.K8SPolicyIsPropagatedToK8SCluster:
@@ -593,12 +593,19 @@ components:
                 object_local_resource_id:
                     type: string
                     description: "The ID assigned by the reporter to resource which is the object of the relationship. For example \n OCM cluster ID, HBI's host id, or ACM managed cluster name etc."
-        kessel.inventory.v1beta1.relationships.UpdateResourceRelationshipByUrnHsRequest:
+        kessel.inventory.v1beta1.relationships.ResourceRelationshipByUrnHsHcrnsParameter:
+            type: object
+            properties:
+                subject_urn:
+                    type: string
+                object_urn:
+                    type: string
+        kessel.inventory.v1beta1.relationships.UpdateK8SPolicyIsPropagatedToK8SClusterRequest:
             type: object
             properties:
                 resources:
                     allOf:
-                        - $ref: '#/components/schemas/kessel.inventory.v1beta1.relationships.UpdateResourceRelationshipByUrnHsResourcesParameter'
+                        - $ref: '#/components/schemas/kessel.inventory.v1beta1.relationships.ResourceRelationshipByUrnHsHcrnsParameter'
                     description: |-
                         The subject {resource} and the object {resource}. A relationship is between
                          a Subject and an Object, e.g. a k8s-policy (subject) has a is-propagated-to
@@ -612,14 +619,7 @@ components:
                          Object, e.g. a  k8s-policy (subject) has a is-propagated-to
                          relationship to an k8s-cluster (object).. The {resource} format
                          \"<reporter_data.reporter_type>:<reporter_data.local_resource_id>\".
-        kessel.inventory.v1beta1.relationships.UpdateResourceRelationshipByUrnHsResourcesParameter:
-            type: object
-            properties:
-                subject_resource:
-                    type: string
-                object_resource:
-                    type: string
-        kessel.inventory.v1beta1.relationships.UpdateResourceRelationshipByUrnHsResponse:
+        kessel.inventory.v1beta1.relationships.UpdateK8SPolicyIsPropagatedToK8SClusterResponse:
             type: object
             properties: {}
         kessel.inventory.v1beta1.resources.CreateK8sClusterRequest:

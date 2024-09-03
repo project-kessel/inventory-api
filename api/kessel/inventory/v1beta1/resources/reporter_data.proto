@@ -4,7 +4,7 @@ package kessel.inventory.v1beta1.resources;
 
 import "google/api/field_behavior.proto";
 import "google/protobuf/timestamp.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option go_package = "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/resources";
 option java_multiple_files = true;
@@ -21,7 +21,7 @@ message ReporterData {
     NOTIFICATIONS = 5;
   }
 
-  ReporterType reporter_type = 245778392 [ (validate.rules).enum = {not_in: [0], defined_only: true} ];
+  ReporterType reporter_type = 245778392 [ (buf.validate.field).enum = {not_in: [0], defined_only: true} ];
 
   // The ID of the instance of the reporter. This is derived from the
   // authentication mechanism, i.e. authentication token.
@@ -46,7 +46,7 @@ message ReporterData {
 
   // The ID assigned to this resource by the reporter, for example OCM cluster
   // ID, HBI's host id, or ACM managed cluster name etc.
-  string local_resource_id = 508976189 [ (validate.rules).string.min_len = 1 ];
+  string local_resource_id = 508976189 [ (buf.validate.field).string.min_len = 1 ];
 
   // version of the reporter
   string reporter_version = 269629306;

@@ -3,7 +3,6 @@ package notificationsintegrations
 import (
 	"context"
 
-	"github.com/go-kratos/kratos/v2/errors"
 	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/resources"
 	authnapi "github.com/project-kessel/inventory-api/internal/authn/api"
 	biz "github.com/project-kessel/inventory-api/internal/biz/notificationsintegrations"
@@ -26,10 +25,6 @@ func New(c *biz.NotificationsIntegrationUsecase) *NotificationsIntegrationsServi
 }
 
 func (c *NotificationsIntegrationsService) CreateNotificationsIntegration(ctx context.Context, r *pb.CreateNotificationsIntegrationRequest) (*pb.CreateNotificationsIntegrationResponse, error) {
-	if err := r.ValidateAll(); err != nil {
-		return nil, errors.BadRequest("BADREQUEST", err.Error())
-	}
-
 	identity, err := middleware.GetIdentity(ctx)
 	if err != nil {
 		return nil, err
@@ -48,16 +43,10 @@ func (c *NotificationsIntegrationsService) CreateNotificationsIntegration(ctx co
 }
 
 func (c *NotificationsIntegrationsService) UpdateNotificationsIntegration(ctx context.Context, r *pb.UpdateNotificationsIntegrationRequest) (*pb.UpdateNotificationsIntegrationResponse, error) {
-	if err := r.ValidateAll(); err != nil {
-		return nil, err
-	}
 	return nil, nil
 }
 
 func (c *NotificationsIntegrationsService) DeleteNotificationsIntegration(ctx context.Context, r *pb.DeleteNotificationsIntegrationRequest) (*pb.DeleteNotificationsIntegrationResponse, error) {
-	if err := r.ValidateAll(); err != nil {
-		return nil, err
-	}
 	return nil, nil
 }
 

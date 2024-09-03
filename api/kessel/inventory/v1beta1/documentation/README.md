@@ -57,7 +57,7 @@ Similar to the metadata, some of this information is created by the Asset Invent
 - **_last\_reported_**
 
 
-**Multiple Reporters**
+##### Multiple Reporters
 
 The above talks about the reporter_data object from a request body perspective, i.e. what a single reporter passes in on an API call. In reality, there can be multiple reporters for the same resource instance. For example, ACM can report on the creation of a cluster. ACS can report on the security monitoring of a cluster. 
 

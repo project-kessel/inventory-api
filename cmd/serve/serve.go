@@ -3,6 +3,7 @@ package serve
 import (
 	"context"
 	"fmt"
+	"github.com/project-kessel/inventory-api/internal/server/otel"
 	"os"
 	"os/signal"
 	"syscall"
@@ -143,8 +144,16 @@ func NewCommand(
 				return err
 			}
 
+			metricsProvider, err := otel.NewMeterProvider(serverConfig)
+			if err != nil {
+				return err
+			}
+			metrics, err := otel.NewMeter(serverConfig, metricsProvider)
+			if err != nil {
+				return err
+			}
 			// construct servers
-			server := server.New(serverConfig, middleware.Authentication(authenticator), logger)
+			server := server.New(serverConfig, middleware.Authentication(authenticator), logger, metrics)
 
 			// wire together notificationsintegrations handling
 			notifs_repo := notifsrepo.New(db, authorizer, eventingManager)

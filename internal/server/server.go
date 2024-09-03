@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"go.opentelemetry.io/otel/metric"
 
 	"github.com/go-kratos/kratos/v2"
 	"github.com/go-kratos/kratos/v2/log"
@@ -24,12 +25,12 @@ type Server struct {
 	Logger log.Logger
 }
 
-func New(c CompletedConfig, authn middleware.Middleware, logger log.Logger) *Server {
+func New(c CompletedConfig, authn middleware.Middleware, logger log.Logger, metrics metric.Meter) *Server {
 	s := &Server{
 		Id:         c.Options.Id,
 		Name:       c.Options.Name,
-		HttpServer: http.New(c.HttpConfig, authn),
-		GrpcServer: grpc.New(c.GrpcConfig, authn),
+		HttpServer: http.New(c.HttpConfig, authn, metrics),
+		GrpcServer: grpc.New(c.GrpcConfig, authn, metrics),
 		Logger:     log.With(logger, "service.id", c.Options.Id),
 	}
 

@@ -21,19 +21,19 @@ message CreateNotificationsIntegrationResponse {
 }
 
 message UpdateNotificationsIntegrationRequest {
-  // A resource instance using the format:
-  // \"<reporter_data.reporter_type>:<reporter_data.local_resource_id>\"
-  string resource = 1;
-  // The NotificationsIntegration to update
-  NotificationsIntegration integration = 2;
+  // The resource to be updated will be defined by 
+  // \"<reporter_data.reporter_type>:<reporter_instaance_id>:<reporter_data.local_resource_id>\"
+  // from the request body.
+  NotificationsIntegration integration = 1;
 }
 
 message UpdateNotificationsIntegrationResponse {}
 
 message DeleteNotificationsIntegrationRequest {
-  // A resource instance using the format:
-  // \"<reporter_data.reporter_type>:<reporter_data.local_resource_id>\"
-  string resource = 1;
+  // The resource to be deleted will be defined by 
+  // \"<reporter_data.reporter_type>:<reporter_instaance_id>:<reporter_data.local_resource_id>\"
+  // from the request body.
+  NotificationsIntegration integration = 1;
 }
 
 message DeleteNotificationsIntegrationResponse {}
@@ -48,14 +48,14 @@ service KesselNotificationsIntegrationService {
 
   rpc UpdateNotificationsIntegration(UpdateNotificationsIntegrationRequest) returns (UpdateNotificationsIntegrationResponse) {
     option (google.api.http) = {
-      put : "/api/inventory/v1beta1/resources/notifications-integrations/{resource}"
+      put : "/api/inventory/v1beta1/resources/notifications-integrations"
       body : "*"
     };
   };
 
   rpc DeleteNotificationsIntegration(DeleteNotificationsIntegrationRequest) returns (DeleteNotificationsIntegrationResponse) {
     option (google.api.http) = {
-      delete : "/api/inventory/v1beta1/resources/notifications-integrations/{resource}"
+      delete : "/api/inventory/v1beta1/resources/notifications-integrations"
     };
   };
 }

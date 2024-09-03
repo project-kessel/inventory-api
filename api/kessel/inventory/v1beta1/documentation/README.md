@@ -10,11 +10,9 @@ This document does not supersede any information in the API specification. This 
 A management service creates, modifies or deletes a managed resource in its local inventory. To aid in the integration of the Red Hat Hybrid Cloud Management solution, they will report all of these operations to the management fabric via the Asset Inventory APIs. With the Asset Inventory APIs, these services are referenced as Reporters. 
 <br><br>When a new resource is created in the Reporter’s private inventory, the Reporter will issue a POST to the managemnt fabric. The endpoint is structured as follows: 
 …/api/inventory/”api-version”/resources/”resource-type”. 
+
 An example would be: …/api/inventory/v1beta1/resources/k8s-clusters. 
 
-
- management service creates, modifies or deletes a managed resource in its local inventory. To aid in the integration of the Red Hat Hybrid Cloud Management solution, they will report all of these operations to the management fabric via the Asset Inventory APIs. With the Asset Inventory APIs, these services are referenced as Reporters. 
-<br><br>When a new resource is created in the Report’s inventory, they will issue a POST to the mgmt fabric. The endpoints are structured as follows: …/api/inventory/”api version”/resources/”resource_type”. <br><br>An example would be: …/api/inventory/v1beta1/resources/k8sClusters. 
 
 ### The Request Body
 The request body is the resource type. This top level json object is comprised of 3 objects: metadata, reporter_data and resource_data, i.e. 
@@ -40,15 +38,15 @@ The only metadata that a Reporter can provide is:
 #### Reporter_data
 
 This object represents data that is specific to the reporter who called the Asset Inventory API in order to report on this resource. The information that a reporter provides for this object is: 
-- **wreporter_type** 
+- **"reporter\_type"** 
 - **reporter_version**
 - **local_resource_id** 
 - **console_href**
 - **api_href** 
 
-The "reporter_type" and "reporter_version", along with the system generated 'reporter_instance_id", help to identify the reporter.
+The "reporter\_type" and "reporter\_version", along with the system generated "reporter\_instance\_id", help to identify the reporter.
 
-The "local_resource_id" is the identification of the resource within the Reporter’s domain. 
+The "local\_resource\_id" is the identification of the resource within the Reporter’s domain. 
 
 The two hrefs are used if a consumer of an event (or query) from Asset Inventory and they wanted to consume additional domain-specific information about the resource. For example, ACM reports on a cluster. One could use an href to query into ACM to find out some health information of that cluster.
 <br><br>NOTE: These hrefs only provide how to access this information. One still has to have the appropriate credentials of the Reporter in order to access the data referenced by these URLs.

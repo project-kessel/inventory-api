@@ -4,7 +4,7 @@ package kessel.inventory.v1beta1.relationships;
 
 import "google/api/field_behavior.proto";
 import "google/protobuf/timestamp.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option go_package = "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/relationships";
 option java_multiple_files = true;
@@ -21,7 +21,7 @@ message ReporterData {
     NOTIFICATIONS = 5;
   }
 
-  ReporterType reporter_type = 245778393 [ (validate.rules).enum = {not_in: [0], defined_only: true} ];
+  ReporterType reporter_type = 245778393 [ (buf.validate.field).enum = {not_in: [0], defined_only: true} ];
 
   // The ID of the instance of the reporter. This is derived from the
   // authentication mechanism, i.e. authentication token.
@@ -41,9 +41,9 @@ message ReporterData {
 
   // The ID assigned by the reporter to resource which is the subject of the relationship. For example 
   // OCM cluster ID, HBI's host id, or ACM managed cluster name etc.
-  string subject_local_resource_id = 508976190 [ (validate.rules).string.min_len = 1 ];
+  string subject_local_resource_id = 508976190 [ (buf.validate.field).string.min_len = 1 ];
 
   // The ID assigned by the reporter to resource which is the object of the relationship. For example 
   // OCM cluster ID, HBI's host id, or ACM managed cluster name etc.
-  string object_local_resource_id = 508976191 [ (validate.rules).string.min_len = 1 ];
+  string object_local_resource_id = 508976191 [ (buf.validate.field).string.min_len = 1 ];
 }

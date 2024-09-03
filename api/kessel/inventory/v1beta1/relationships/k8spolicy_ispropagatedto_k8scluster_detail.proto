@@ -6,9 +6,8 @@ option go_package = "github.com/project-kessel/inventory-api/api/kessel/inventor
 option java_multiple_files = true;
 option java_package = "org.project_kessel.api.inventory.v1beta1.relationships";
 
-message PolicyRelationshipDetail {
+message K8SPolicyIsPropagatedToK8SClusterDetail {
 
-  
   // the aggregate status of the cluster
   enum Status {
     STATUS_UNSPECIFIED = 0;
@@ -17,7 +16,7 @@ message PolicyRelationshipDetail {
     COMPLIANT = 3;
   }
 
-   // The resource ID assigned to the resource by Kessel Asset Inventory. A
+  // The resource ID assigned to the resource by Kessel Asset Inventory. A
   // reporter alias may also be used as a resource ID using the format:
   // \"hcrn:<reporter_data.reporter_type>:<reporter_data.reporter_id>::<reporter_data.local_resource_id>\"
   int64 k8s_policy_id = 225679544;

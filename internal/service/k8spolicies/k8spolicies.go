@@ -3,7 +3,6 @@ package k8spolicies
 import (
 	"context"
 
-	"github.com/go-kratos/kratos/v2/errors"
 	"github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/resources"
 	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/resources"
 	authnapi "github.com/project-kessel/inventory-api/internal/authn/api"
@@ -27,10 +26,6 @@ func New(c *biz.K8sPolicyUsecase) *K8sPolicyService {
 }
 
 func (c *K8sPolicyService) CreateK8SPolicy(ctx context.Context, r *resources.CreateK8SPolicyRequest) (*resources.CreateK8SPolicyResponse, error) {
-	if err := r.ValidateAll(); err != nil {
-		return nil, errors.BadRequest("BADREQUEST", err.Error())
-	}
-
 	identity, err := middleware.GetIdentity(ctx)
 	if err != nil {
 		return nil, err

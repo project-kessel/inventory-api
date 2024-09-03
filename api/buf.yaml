@@ -13,4 +13,4 @@ breaking:
     - kessel/inventory/v1beta1
 deps:
   - buf.build/googleapis/googleapis
-  - buf.build/envoyproxy/protoc-gen-validate
+  - buf.build/bufbuild/protovalidate

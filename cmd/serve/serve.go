@@ -178,8 +178,8 @@ func NewCommand(
 			relationships_repo := relationshipsrepo.New(db)
 			relationships_controller := relationshipsctl.New(relationships_repo, log.With(logger, "subsystem", "relationships_controller"))
 			relationships_service := relationshipssvc.New(relationships_controller)
-			rel.RegisterKesselPolicyRelationshipServiceServer(server.GrpcServer, relationships_service)
-			rel.RegisterKesselPolicyRelationshipServiceHTTPServer(server.HttpServer, relationships_service)
+			rel.RegisterKesselK8SPolicyIsPropagatedToK8SClusterServiceServer(server.GrpcServer, relationships_service)
+			rel.RegisterKesselK8SPolicyIsPropagatedToK8SClusterServiceHTTPServer(server.HttpServer, relationships_service)
 
 			health_service := health.NewHealthService()
 			hb.RegisterKesselInventoryHealthServiceServer(server.GrpcServer, health_service)

@@ -42,11 +42,11 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/google.rpc.Status'
-    /api/inventory/v1beta1/resource-relationships/policyRelationships:
+    /api/inventory/v1beta1/resource-relationships/k8s-policy.is-propagated.to-k8s-cluster:
         put:
             tags:
-                - KesselPolicyRelationshipService
-            operationId: KesselPolicyRelationshipService_UpdateResourceRelationshipByUrnHs
+                - KesselK8SPolicyIsPropagatedToK8SClusterService
+            operationId: KesselK8SPolicyIsPropagatedToK8SClusterService_UpdateResourceRelationshipByUrnHs
             requestBody:
                 content:
                     application/json:
@@ -68,13 +68,13 @@ paths:
                                 $ref: '#/components/schemas/google.rpc.Status'
         post:
             tags:
-                - KesselPolicyRelationshipService
-            operationId: KesselPolicyRelationshipService_CreatePolicyRelationship
+                - KesselK8SPolicyIsPropagatedToK8SClusterService
+            operationId: KesselK8SPolicyIsPropagatedToK8SClusterService_CreateK8SPolicyIsPropagatedToK8SCluster
             requestBody:
                 content:
                     application/json:
                         schema:
-                            $ref: '#/components/schemas/kessel.inventory.v1beta1.relationships.CreatePolicyRelationshipRequest'
+                            $ref: '#/components/schemas/kessel.inventory.v1beta1.relationships.CreateK8SPolicyIsPropagatedToK8SClusterRequest'
                 required: true
             responses:
                 "200":
@@ -82,7 +82,7 @@ paths:
                     content:
                         application/json:
                             schema:
-                                $ref: '#/components/schemas/kessel.inventory.v1beta1.relationships.CreatePolicyRelationshipResponse'
+                                $ref: '#/components/schemas/kessel.inventory.v1beta1.relationships.CreateK8SPolicyIsPropagatedToK8SClusterResponse'
                 default:
                     description: Default error response
                     content:
@@ -91,8 +91,8 @@ paths:
                                 $ref: '#/components/schemas/google.rpc.Status'
         delete:
             tags:
-                - KesselPolicyRelationshipService
-            operationId: KesselPolicyRelationshipService_DeleteResourceRelationshipByUrn
+                - KesselK8SPolicyIsPropagatedToK8SClusterService
+            operationId: KesselK8SPolicyIsPropagatedToK8SClusterService_DeleteResourceRelationshipByUrn
             parameters:
                 - name: resources.subject_resource
                   in: query
@@ -489,23 +489,50 @@ components:
                 code:
                     type: integer
                     format: uint32
-        kessel.inventory.v1beta1.relationships.CreatePolicyRelationshipRequest:
+        kessel.inventory.v1beta1.relationships.CreateK8SPolicyIsPropagatedToK8SClusterRequest:
             type: object
             properties:
                 policy_relationship:
                     allOf:
-                        - $ref: '#/components/schemas/kessel.inventory.v1beta1.relationships.PolicyRelationship'
+                        - $ref: '#/components/schemas/kessel.inventory.v1beta1.relationships.K8SPolicyIsPropagatedToK8SCluster'
                     description: The resource relationship to create in Kessel Asset Inventory
-        kessel.inventory.v1beta1.relationships.CreatePolicyRelationshipResponse:
+        kessel.inventory.v1beta1.relationships.CreateK8SPolicyIsPropagatedToK8SClusterResponse:
             type: object
-            properties:
-                policy_relationship:
-                    allOf:
-                        - $ref: '#/components/schemas/kessel.inventory.v1beta1.relationships.PolicyRelationship'
-                    description: The resource relationship created in Kessel Asset Inventory
+            properties: {}
         kessel.inventory.v1beta1.relationships.DeleteResourceRelationshipByUrnResponse:
             type: object
             properties: {}
+        kessel.inventory.v1beta1.relationships.K8SPolicyIsPropagatedToK8SCluster:
+            type: object
+            properties:
+                metadata:
+                    allOf:
+                        - $ref: '#/components/schemas/kessel.inventory.v1beta1.relationships.Metadata'
+                    description: Metadata about this resource
+                reporter_data:
+                    allOf:
+                        - $ref: '#/components/schemas/kessel.inventory.v1beta1.relationships.ReporterData'
+                    description: Write only reporter specific data
+                relationship_data:
+                    $ref: '#/components/schemas/kessel.inventory.v1beta1.relationships.K8SPolicyIsPropagatedToK8SClusterDetail'
+        kessel.inventory.v1beta1.relationships.K8SPolicyIsPropagatedToK8SClusterDetail:
+            type: object
+            properties:
+                k8s_policy_id:
+                    type: string
+                    description: |-
+                        The resource ID assigned to the resource by Kessel Asset Inventory. A
+                         reporter alias may also be used as a resource ID using the format:
+                         \"hcrn:<reporter_data.reporter_type>:<reporter_data.reporter_id>::<reporter_data.local_resource_id>\"
+                k8s_cluster_id:
+                    type: string
+                    description: |-
+                        The resource ID assigned to the resource by Kessel Asset Inventory. A
+                         reporter alias may also be used as a resource ID using the format:
+                         \"hcrn:<reporter_data.reporter_type>:<reporter_data.reporter_id>::<reporter_data.local_resource_id>\"
+                status:
+                    type: integer
+                    format: enum
         kessel.inventory.v1beta1.relationships.Metadata:
             type: object
             properties:
@@ -535,37 +562,6 @@ components:
                     readOnly: true
                     type: string
                     description: Identifier of the reporter that last reported on this item.
-        kessel.inventory.v1beta1.relationships.PolicyRelationship:
-            type: object
-            properties:
-                metadata:
-                    allOf:
-                        - $ref: '#/components/schemas/kessel.inventory.v1beta1.relationships.Metadata'
-                    description: Metadata about this resource
-                reporter_data:
-                    allOf:
-                        - $ref: '#/components/schemas/kessel.inventory.v1beta1.relationships.ReporterData'
-                    description: Write only reporter specific data
-                relationship_data:
-                    $ref: '#/components/schemas/kessel.inventory.v1beta1.relationships.PolicyRelationshipDetail'
-        kessel.inventory.v1beta1.relationships.PolicyRelationshipDetail:
-            type: object
-            properties:
-                k8s_policy_id:
-                    type: string
-                    description: |-
-                        The resource ID assigned to the resource by Kessel Asset Inventory. A
-                         reporter alias may also be used as a resource ID using the format:
-                         \"hcrn:<reporter_data.reporter_type>:<reporter_data.reporter_id>::<reporter_data.local_resource_id>\"
-                k8s_cluster_id:
-                    type: string
-                    description: |-
-                        The resource ID assigned to the resource by Kessel Asset Inventory. A
-                         reporter alias may also be used as a resource ID using the format:
-                         \"hcrn:<reporter_data.reporter_type>:<reporter_data.reporter_id>::<reporter_data.local_resource_id>\"
-                status:
-                    type: integer
-                    format: enum
         kessel.inventory.v1beta1.relationships.ReporterData:
             type: object
             properties:
@@ -605,16 +601,16 @@ components:
                         - $ref: '#/components/schemas/kessel.inventory.v1beta1.relationships.UpdateResourceRelationshipByUrnHsResourcesParameter'
                     description: |-
                         The subject {resource} and the object {resource}. A relationship is between
-                         a Subject and an Object, e.g. a Policy (subject) has a propagated
-                         relationship to an k8s cluster (object)
-                policy_relationship:
+                         a Subject and an Object, e.g. a k8s-policy (subject) has a is-propagated-to
+                         relationship to an k8s-cluster (object)
+                k8spolicy_ispropagatedto_k8scluster:
                     allOf:
-                        - $ref: '#/components/schemas/kessel.inventory.v1beta1.relationships.PolicyRelationship'
+                        - $ref: '#/components/schemas/kessel.inventory.v1beta1.relationships.K8SPolicyIsPropagatedToK8SCluster'
                     description: |-
                         Update a resource relationship in Kessel Asset Inventory by the {subject
                          resource, object resource}. A relationship is between a Subject and an
-                         Object, e.g. a Policy (subject) has a propagated relationship to an k8s
-                         cluster (object).. The {resource} format
+                         Object, e.g. a  k8s-policy (subject) has a is-propagated-to
+                         relationship to an k8s-cluster (object).. The {resource} format
                          \"<reporter_data.reporter_type>:<reporter_data.local_resource_id>\".
         kessel.inventory.v1beta1.relationships.UpdateResourceRelationshipByUrnHsResourcesParameter:
             type: object
@@ -941,7 +937,7 @@ components:
 tags:
     - name: KesselInventoryHealthService
     - name: KesselK8SClusterService
+    - name: KesselK8SPolicyIsPropagatedToK8SClusterService
     - name: KesselK8SPolicyService
     - name: KesselNotificationsIntegrationService
-    - name: KesselPolicyRelationshipService
     - name: KesselRhelHostService

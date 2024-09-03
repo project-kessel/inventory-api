@@ -5,7 +5,7 @@ package kessel.inventory.v1beta1.relationships;
 import "google/api/annotations.proto";
 
 import "kessel/inventory/v1beta1/relationships/k8spolicy_ispropagatedto_k8scluster.proto";
-import "kessel/inventory/v1beta1/relationships/update_resource_relationship_by_urnhs_resources_parameter.proto";
+import "kessel/inventory/v1beta1/relationships/resource_relationship_by_urnhs_hcrns_parameter.proto";
 
 option go_package = "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/relationships";
 option java_multiple_files = true;
@@ -19,11 +19,11 @@ message CreateK8SPolicyIsPropagatedToK8SClusterRequest {
 message CreateK8SPolicyIsPropagatedToK8SClusterResponse {}
 
 
-message UpdateResourceRelationshipByUrnHsRequest {
+message UpdateK8SPolicyIsPropagatedToK8SClusterRequest {
   // The subject {resource} and the object {resource}. A relationship is between
   // a Subject and an Object, e.g. a k8s-policy (subject) has a is-propagated-to
   // relationship to an k8s-cluster (object)
-  UpdateResourceRelationshipByUrnHsResourcesParameter resources = 1;
+  ResourceRelationshipByUrnHsHcrnsParameter resources = 1;
   // Update a resource relationship in Kessel Asset Inventory by the {subject
   // resource, object resource}. A relationship is between a Subject and an
   // Object, e.g. a  k8s-policy (subject) has a is-propagated-to
@@ -32,33 +32,33 @@ message UpdateResourceRelationshipByUrnHsRequest {
   K8SPolicyIsPropagatedToK8SCluster k8spolicy_ispropagatedto_k8scluster = 2;
 }
 
-message UpdateResourceRelationshipByUrnHsResponse {}
+message UpdateK8SPolicyIsPropagatedToK8SClusterResponse {}
 
-message DeleteResourceRelationshipByUrnRequest {
+message DeleteK8SPolicyIsPropagatedToK8SClusterRequest {
   // The subject {resource} and the object {resource}. A relationship is between
   // a Subject and an Object, e.g. a k8s-policy (subject) has a is-propagated-to
   // relationship to an k8s-cluster (object)
-  UpdateResourceRelationshipByUrnHsResourcesParameter resources = 1;
+  ResourceRelationshipByUrnHsHcrnsParameter resources = 1;
 }
 
-message DeleteResourceRelationshipByUrnResponse {}
+message DeleteK8SPolicyIsPropagatedToK8SClusterResponse {}
 
 service KesselK8SPolicyIsPropagatedToK8SClusterService {
-  rpc CreateK8SPolicyIsPropagatedToK8SCluster (CreateK8SPolicyIsPropagatedToK8SClusterRequest) returns (CreateK8SPolicyIsPropagatedToK8SClusterResponse) {
+  rpc CreateK8SPolicyIsPropagatedToK8SCluster(CreateK8SPolicyIsPropagatedToK8SClusterRequest) returns (CreateK8SPolicyIsPropagatedToK8SClusterResponse) {
     option (google.api.http) = {
       post : "/api/inventory/v1beta1/resource-relationships/k8s-policy.is-propagated.to-k8s-cluster"
       body : "*"
     };
   };
 
-  rpc UpdateResourceRelationshipByUrnHs(UpdateResourceRelationshipByUrnHsRequest) returns (UpdateResourceRelationshipByUrnHsResponse) {
+  rpc UpdateK8SPolicyIsPropagatedToK8SCluster(UpdateK8SPolicyIsPropagatedToK8SClusterRequest) returns (UpdateK8SPolicyIsPropagatedToK8SClusterResponse) {
     option (google.api.http) = {
       put: "/api/inventory/v1beta1/resource-relationships/k8s-policy.is-propagated.to-k8s-cluster"
       body : "*"
     };
   };
 
-  rpc DeleteResourceRelationshipByUrn(DeleteResourceRelationshipByUrnRequest) returns (DeleteResourceRelationshipByUrnResponse) {
+  rpc DeleteK8SPolicyIsPropagatedToK8SCluster(DeleteK8SPolicyIsPropagatedToK8SClusterRequest) returns (DeleteK8SPolicyIsPropagatedToK8SClusterResponse) {
     option (google.api.http) = {
       delete: "/api/inventory/v1beta1/resource-relationships/k8s-policy.is-propagated.to-k8s-cluster"
     };

@@ -284,24 +284,24 @@ var _ interface {
 	ErrorName() string
 } = CreateK8SPolicyIsPropagatedToK8SClusterResponseValidationError{}
 
-// Validate checks the field values on UpdateResourceRelationshipByUrnHsRequest
-// with the rules defined in the proto definition for this message. If any
-// rules are violated, the first error encountered is returned, or nil if
-// there are no violations.
-func (m *UpdateResourceRelationshipByUrnHsRequest) Validate() error {
+// Validate checks the field values on
+// UpdateK8SPolicyIsPropagatedToK8SClusterRequest with the rules defined in
+// the proto definition for this message. If any rules are violated, the first
+// error encountered is returned, or nil if there are no violations.
+func (m *UpdateK8SPolicyIsPropagatedToK8SClusterRequest) Validate() error {
 	return m.validate(false)
 }
 
 // ValidateAll checks the field values on
-// UpdateResourceRelationshipByUrnHsRequest with the rules defined in the
-// proto definition for this message. If any rules are violated, the result is
-// a list of violation errors wrapped in
-// UpdateResourceRelationshipByUrnHsRequestMultiError, or nil if none found.
-func (m *UpdateResourceRelationshipByUrnHsRequest) ValidateAll() error {
+// UpdateK8SPolicyIsPropagatedToK8SClusterRequest with the rules defined in
+// the proto definition for this message. If any rules are violated, the
+// result is a list of violation errors wrapped in
+// UpdateK8SPolicyIsPropagatedToK8SClusterRequestMultiError, or nil if none found.
+func (m *UpdateK8SPolicyIsPropagatedToK8SClusterRequest) ValidateAll() error {
 	return m.validate(true)
 }
 
-func (m *UpdateResourceRelationshipByUrnHsRequest) validate(all bool) error {
+func (m *UpdateK8SPolicyIsPropagatedToK8SClusterRequest) validate(all bool) error {
 	if m == nil {
 		return nil
 	}
@@ -312,7 +312,7 @@ func (m *UpdateResourceRelationshipByUrnHsRequest) validate(all bool) error {
 		switch v := interface{}(m.GetResources()).(type) {
 		case interface{ ValidateAll() error }:
 			if err := v.ValidateAll(); err != nil {
-				errors = append(errors, UpdateResourceRelationshipByUrnHsRequestValidationError{
+				errors = append(errors, UpdateK8SPolicyIsPropagatedToK8SClusterRequestValidationError{
 					field:  "Resources",
 					reason: "embedded message failed validation",
 					cause:  err,
@@ -320,7 +320,7 @@ func (m *UpdateResourceRelationshipByUrnHsRequest) validate(all bool) error {
 			}
 		case interface{ Validate() error }:
 			if err := v.Validate(); err != nil {
-				errors = append(errors, UpdateResourceRelationshipByUrnHsRequestValidationError{
+				errors = append(errors, UpdateK8SPolicyIsPropagatedToK8SClusterRequestValidationError{
 					field:  "Resources",
 					reason: "embedded message failed validation",
 					cause:  err,
@@ -329,7 +329,7 @@ func (m *UpdateResourceRelationshipByUrnHsRequest) validate(all bool) error {
 		}
 	} else if v, ok := interface{}(m.GetResources()).(interface{ Validate() error }); ok {
 		if err := v.Validate(); err != nil {
-			return UpdateResourceRelationshipByUrnHsRequestValidationError{
+			return UpdateK8SPolicyIsPropagatedToK8SClusterRequestValidationError{
 				field:  "Resources",
 				reason: "embedded message failed validation",
 				cause:  err,
@@ -341,7 +341,7 @@ func (m *UpdateResourceRelationshipByUrnHsRequest) validate(all bool) error {
 		switch v := interface{}(m.GetK8SpolicyIspropagatedtoK8Scluster()).(type) {
 		case interface{ ValidateAll() error }:
 			if err := v.ValidateAll(); err != nil {
-				errors = append(errors, UpdateResourceRelationshipByUrnHsRequestValidationError{
+				errors = append(errors, UpdateK8SPolicyIsPropagatedToK8SClusterRequestValidationError{
 					field:  "K8SpolicyIspropagatedtoK8Scluster",
 					reason: "embedded message failed validation",
 					cause:  err,
@@ -349,7 +349,7 @@ func (m *UpdateResourceRelationshipByUrnHsRequest) validate(all bool) error {
 			}
 		case interface{ Validate() error }:
 			if err := v.Validate(); err != nil {
-				errors = append(errors, UpdateResourceRelationshipByUrnHsRequestValidationError{
+				errors = append(errors, UpdateK8SPolicyIsPropagatedToK8SClusterRequestValidationError{
 					field:  "K8SpolicyIspropagatedtoK8Scluster",
 					reason: "embedded message failed validation",
 					cause:  err,
@@ -358,7 +358,7 @@ func (m *UpdateResourceRelationshipByUrnHsRequest) validate(all bool) error {
 		}
 	} else if v, ok := interface{}(m.GetK8SpolicyIspropagatedtoK8Scluster()).(interface{ Validate() error }); ok {
 		if err := v.Validate(); err != nil {
-			return UpdateResourceRelationshipByUrnHsRequestValidationError{
+			return UpdateK8SPolicyIsPropagatedToK8SClusterRequestValidationError{
 				field:  "K8SpolicyIspropagatedtoK8Scluster",
 				reason: "embedded message failed validation",
 				cause:  err,
@@ -367,20 +367,20 @@ func (m *UpdateResourceRelationshipByUrnHsRequest) validate(all bool) error {
 	}
 
 	if len(errors) > 0 {
-		return UpdateResourceRelationshipByUrnHsRequestMultiError(errors)
+		return UpdateK8SPolicyIsPropagatedToK8SClusterRequestMultiError(errors)
 	}
 
 	return nil
 }
 
-// UpdateResourceRelationshipByUrnHsRequestMultiError is an error wrapping
-// multiple validation errors returned by
-// UpdateResourceRelationshipByUrnHsRequest.ValidateAll() if the designated
-// constraints aren't met.
-type UpdateResourceRelationshipByUrnHsRequestMultiError []error
+// UpdateK8SPolicyIsPropagatedToK8SClusterRequestMultiError is an error
+// wrapping multiple validation errors returned by
+// UpdateK8SPolicyIsPropagatedToK8SClusterRequest.ValidateAll() if the
+// designated constraints aren't met.
+type UpdateK8SPolicyIsPropagatedToK8SClusterRequestMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
-func (m UpdateResourceRelationshipByUrnHsRequestMultiError) Error() string {
+func (m UpdateK8SPolicyIsPropagatedToK8SClusterRequestMultiError) Error() string {
 	var msgs []string
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
@@ -389,12 +389,13 @@ func (m UpdateResourceRelationshipByUrnHsRequestMultiError) Error() string {
 }
 
 // AllErrors returns a list of validation violation errors.
-func (m UpdateResourceRelationshipByUrnHsRequestMultiError) AllErrors() []error { return m }
+func (m UpdateK8SPolicyIsPropagatedToK8SClusterRequestMultiError) AllErrors() []error { return m }
 
-// UpdateResourceRelationshipByUrnHsRequestValidationError is the validation
-// error returned by UpdateResourceRelationshipByUrnHsRequest.Validate if the
-// designated constraints aren't met.
-type UpdateResourceRelationshipByUrnHsRequestValidationError struct {
+// UpdateK8SPolicyIsPropagatedToK8SClusterRequestValidationError is the
+// validation error returned by
+// UpdateK8SPolicyIsPropagatedToK8SClusterRequest.Validate if the designated
+// constraints aren't met.
+type UpdateK8SPolicyIsPropagatedToK8SClusterRequestValidationError struct {
 	field  string
 	reason string
 	cause  error
@@ -402,24 +403,26 @@ type UpdateResourceRelationshipByUrnHsRequestValidationError struct {
 }
 
 // Field function returns field value.
-func (e UpdateResourceRelationshipByUrnHsRequestValidationError) Field() string { return e.field }
+func (e UpdateK8SPolicyIsPropagatedToK8SClusterRequestValidationError) Field() string { return e.field }
 
 // Reason function returns reason value.
-func (e UpdateResourceRelationshipByUrnHsRequestValidationError) Reason() string { return e.reason }
+func (e UpdateK8SPolicyIsPropagatedToK8SClusterRequestValidationError) Reason() string {
+	return e.reason
+}
 
 // Cause function returns cause value.
-func (e UpdateResourceRelationshipByUrnHsRequestValidationError) Cause() error { return e.cause }
+func (e UpdateK8SPolicyIsPropagatedToK8SClusterRequestValidationError) Cause() error { return e.cause }
 
 // Key function returns key value.
-func (e UpdateResourceRelationshipByUrnHsRequestValidationError) Key() bool { return e.key }
+func (e UpdateK8SPolicyIsPropagatedToK8SClusterRequestValidationError) Key() bool { return e.key }
 
 // ErrorName returns error name.
-func (e UpdateResourceRelationshipByUrnHsRequestValidationError) ErrorName() string {
-	return "UpdateResourceRelationshipByUrnHsRequestValidationError"
+func (e UpdateK8SPolicyIsPropagatedToK8SClusterRequestValidationError) ErrorName() string {
+	return "UpdateK8SPolicyIsPropagatedToK8SClusterRequestValidationError"
 }
 
 // Error satisfies the builtin error interface
-func (e UpdateResourceRelationshipByUrnHsRequestValidationError) Error() string {
+func (e UpdateK8SPolicyIsPropagatedToK8SClusterRequestValidationError) Error() string {
 	cause := ""
 	if e.cause != nil {
 		cause = fmt.Sprintf(" | caused by: %v", e.cause)
@@ -431,14 +434,14 @@ func (e UpdateResourceRelationshipByUrnHsRequestValidationError) Error() string 
 	}
 
 	return fmt.Sprintf(
-		"invalid %sUpdateResourceRelationshipByUrnHsRequest.%s: %s%s",
+		"invalid %sUpdateK8SPolicyIsPropagatedToK8SClusterRequest.%s: %s%s",
 		key,
 		e.field,
 		e.reason,
 		cause)
 }
 
-var _ error = UpdateResourceRelationshipByUrnHsRequestValidationError{}
+var _ error = UpdateK8SPolicyIsPropagatedToK8SClusterRequestValidationError{}
 
 var _ interface {
 	Field() string
@@ -446,26 +449,26 @@ var _ interface {
 	Key() bool
 	Cause() error
 	ErrorName() string
-} = UpdateResourceRelationshipByUrnHsRequestValidationError{}
+} = UpdateK8SPolicyIsPropagatedToK8SClusterRequestValidationError{}
 
 // Validate checks the field values on
-// UpdateResourceRelationshipByUrnHsResponse with the rules defined in the
-// proto definition for this message. If any rules are violated, the first
+// UpdateK8SPolicyIsPropagatedToK8SClusterResponse with the rules defined in
+// the proto definition for this message. If any rules are violated, the first
 // error encountered is returned, or nil if there are no violations.
-func (m *UpdateResourceRelationshipByUrnHsResponse) Validate() error {
+func (m *UpdateK8SPolicyIsPropagatedToK8SClusterResponse) Validate() error {
 	return m.validate(false)
 }
 
 // ValidateAll checks the field values on
-// UpdateResourceRelationshipByUrnHsResponse with the rules defined in the
-// proto definition for this message. If any rules are violated, the result is
-// a list of violation errors wrapped in
-// UpdateResourceRelationshipByUrnHsResponseMultiError, or nil if none found.
-func (m *UpdateResourceRelationshipByUrnHsResponse) ValidateAll() error {
+// UpdateK8SPolicyIsPropagatedToK8SClusterResponse with the rules defined in
+// the proto definition for this message. If any rules are violated, the
+// result is a list of violation errors wrapped in
+// UpdateK8SPolicyIsPropagatedToK8SClusterResponseMultiError, or nil if none found.
+func (m *UpdateK8SPolicyIsPropagatedToK8SClusterResponse) ValidateAll() error {
 	return m.validate(true)
 }
 
-func (m *UpdateResourceRelationshipByUrnHsResponse) validate(all bool) error {
+func (m *UpdateK8SPolicyIsPropagatedToK8SClusterResponse) validate(all bool) error {
 	if m == nil {
 		return nil
 	}
@@ -473,20 +476,20 @@ func (m *UpdateResourceRelationshipByUrnHsResponse) validate(all bool) error {
 	var errors []error
 
 	if len(errors) > 0 {
-		return UpdateResourceRelationshipByUrnHsResponseMultiError(errors)
+		return UpdateK8SPolicyIsPropagatedToK8SClusterResponseMultiError(errors)
 	}
 
 	return nil
 }
 
-// UpdateResourceRelationshipByUrnHsResponseMultiError is an error wrapping
-// multiple validation errors returned by
-// UpdateResourceRelationshipByUrnHsResponse.ValidateAll() if the designated
-// constraints aren't met.
-type UpdateResourceRelationshipByUrnHsResponseMultiError []error
+// UpdateK8SPolicyIsPropagatedToK8SClusterResponseMultiError is an error
+// wrapping multiple validation errors returned by
+// UpdateK8SPolicyIsPropagatedToK8SClusterResponse.ValidateAll() if the
+// designated constraints aren't met.
+type UpdateK8SPolicyIsPropagatedToK8SClusterResponseMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
-func (m UpdateResourceRelationshipByUrnHsResponseMultiError) Error() string {
+func (m UpdateK8SPolicyIsPropagatedToK8SClusterResponseMultiError) Error() string {
 	var msgs []string
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
@@ -495,12 +498,13 @@ func (m UpdateResourceRelationshipByUrnHsResponseMultiError) Error() string {
 }
 
 // AllErrors returns a list of validation violation errors.
-func (m UpdateResourceRelationshipByUrnHsResponseMultiError) AllErrors() []error { return m }
+func (m UpdateK8SPolicyIsPropagatedToK8SClusterResponseMultiError) AllErrors() []error { return m }
 
-// UpdateResourceRelationshipByUrnHsResponseValidationError is the validation
-// error returned by UpdateResourceRelationshipByUrnHsResponse.Validate if the
-// designated constraints aren't met.
-type UpdateResourceRelationshipByUrnHsResponseValidationError struct {
+// UpdateK8SPolicyIsPropagatedToK8SClusterResponseValidationError is the
+// validation error returned by
+// UpdateK8SPolicyIsPropagatedToK8SClusterResponse.Validate if the designated
+// constraints aren't met.
+type UpdateK8SPolicyIsPropagatedToK8SClusterResponseValidationError struct {
 	field  string
 	reason string
 	cause  error
@@ -508,24 +512,28 @@ type UpdateResourceRelationshipByUrnHsResponseValidationError struct {
 }
 
 // Field function returns field value.
-func (e UpdateResourceRelationshipByUrnHsResponseValidationError) Field() string { return e.field }
+func (e UpdateK8SPolicyIsPropagatedToK8SClusterResponseValidationError) Field() string {
+	return e.field
+}
 
 // Reason function returns reason value.
-func (e UpdateResourceRelationshipByUrnHsResponseValidationError) Reason() string { return e.reason }
+func (e UpdateK8SPolicyIsPropagatedToK8SClusterResponseValidationError) Reason() string {
+	return e.reason
+}
 
 // Cause function returns cause value.
-func (e UpdateResourceRelationshipByUrnHsResponseValidationError) Cause() error { return e.cause }
+func (e UpdateK8SPolicyIsPropagatedToK8SClusterResponseValidationError) Cause() error { return e.cause }
 
 // Key function returns key value.
-func (e UpdateResourceRelationshipByUrnHsResponseValidationError) Key() bool { return e.key }
+func (e UpdateK8SPolicyIsPropagatedToK8SClusterResponseValidationError) Key() bool { return e.key }
 
 // ErrorName returns error name.
-func (e UpdateResourceRelationshipByUrnHsResponseValidationError) ErrorName() string {
-	return "UpdateResourceRelationshipByUrnHsResponseValidationError"
+func (e UpdateK8SPolicyIsPropagatedToK8SClusterResponseValidationError) ErrorName() string {
+	return "UpdateK8SPolicyIsPropagatedToK8SClusterResponseValidationError"
 }
 
 // Error satisfies the builtin error interface
-func (e UpdateResourceRelationshipByUrnHsResponseValidationError) Error() string {
+func (e UpdateK8SPolicyIsPropagatedToK8SClusterResponseValidationError) Error() string {
 	cause := ""
 	if e.cause != nil {
 		cause = fmt.Sprintf(" | caused by: %v", e.cause)
@@ -537,14 +545,14 @@ func (e UpdateResourceRelationshipByUrnHsResponseValidationError) Error() string
 	}
 
 	return fmt.Sprintf(
-		"invalid %sUpdateResourceRelationshipByUrnHsResponse.%s: %s%s",
+		"invalid %sUpdateK8SPolicyIsPropagatedToK8SClusterResponse.%s: %s%s",
 		key,
 		e.field,
 		e.reason,
 		cause)
 }
 
-var _ error = UpdateResourceRelationshipByUrnHsResponseValidationError{}
+var _ error = UpdateK8SPolicyIsPropagatedToK8SClusterResponseValidationError{}
 
 var _ interface {
 	Field() string
@@ -552,26 +560,26 @@ var _ interface {
 	Key() bool
 	Cause() error
 	ErrorName() string
-} = UpdateResourceRelationshipByUrnHsResponseValidationError{}
+} = UpdateK8SPolicyIsPropagatedToK8SClusterResponseValidationError{}
 
-// Validate checks the field values on DeleteResourceRelationshipByUrnRequest
-// with the rules defined in the proto definition for this message. If any
-// rules are violated, the first error encountered is returned, or nil if
-// there are no violations.
-func (m *DeleteResourceRelationshipByUrnRequest) Validate() error {
+// Validate checks the field values on
+// DeleteK8SPolicyIsPropagatedToK8SClusterRequest with the rules defined in
+// the proto definition for this message. If any rules are violated, the first
+// error encountered is returned, or nil if there are no violations.
+func (m *DeleteK8SPolicyIsPropagatedToK8SClusterRequest) Validate() error {
 	return m.validate(false)
 }
 
 // ValidateAll checks the field values on
-// DeleteResourceRelationshipByUrnRequest with the rules defined in the proto
-// definition for this message. If any rules are violated, the result is a
-// list of violation errors wrapped in
-// DeleteResourceRelationshipByUrnRequestMultiError, or nil if none found.
-func (m *DeleteResourceRelationshipByUrnRequest) ValidateAll() error {
+// DeleteK8SPolicyIsPropagatedToK8SClusterRequest with the rules defined in
+// the proto definition for this message. If any rules are violated, the
+// result is a list of violation errors wrapped in
+// DeleteK8SPolicyIsPropagatedToK8SClusterRequestMultiError, or nil if none found.
+func (m *DeleteK8SPolicyIsPropagatedToK8SClusterRequest) ValidateAll() error {
 	return m.validate(true)
 }
 
-func (m *DeleteResourceRelationshipByUrnRequest) validate(all bool) error {
+func (m *DeleteK8SPolicyIsPropagatedToK8SClusterRequest) validate(all bool) error {
 	if m == nil {
 		return nil
 	}
@@ -582,7 +590,7 @@ func (m *DeleteResourceRelationshipByUrnRequest) validate(all bool) error {
 		switch v := interface{}(m.GetResources()).(type) {
 		case interface{ ValidateAll() error }:
 			if err := v.ValidateAll(); err != nil {
-				errors = append(errors, DeleteResourceRelationshipByUrnRequestValidationError{
+				errors = append(errors, DeleteK8SPolicyIsPropagatedToK8SClusterRequestValidationError{
 					field:  "Resources",
 					reason: "embedded message failed validation",
 					cause:  err,
@@ -590,7 +598,7 @@ func (m *DeleteResourceRelationshipByUrnRequest) validate(all bool) error {
 			}
 		case interface{ Validate() error }:
 			if err := v.Validate(); err != nil {
-				errors = append(errors, DeleteResourceRelationshipByUrnRequestValidationError{
+				errors = append(errors, DeleteK8SPolicyIsPropagatedToK8SClusterRequestValidationError{
 					field:  "Resources",
 					reason: "embedded message failed validation",
 					cause:  err,
@@ -599,7 +607,7 @@ func (m *DeleteResourceRelationshipByUrnRequest) validate(all bool) error {
 		}
 	} else if v, ok := interface{}(m.GetResources()).(interface{ Validate() error }); ok {
 		if err := v.Validate(); err != nil {
-			return DeleteResourceRelationshipByUrnRequestValidationError{
+			return DeleteK8SPolicyIsPropagatedToK8SClusterRequestValidationError{
 				field:  "Resources",
 				reason: "embedded message failed validation",
 				cause:  err,
@@ -608,20 +616,20 @@ func (m *DeleteResourceRelationshipByUrnRequest) validate(all bool) error {
 	}
 
 	if len(errors) > 0 {
-		return DeleteResourceRelationshipByUrnRequestMultiError(errors)
+		return DeleteK8SPolicyIsPropagatedToK8SClusterRequestMultiError(errors)
 	}
 
 	return nil
 }
 
-// DeleteResourceRelationshipByUrnRequestMultiError is an error wrapping
-// multiple validation errors returned by
-// DeleteResourceRelationshipByUrnRequest.ValidateAll() if the designated
-// constraints aren't met.
-type DeleteResourceRelationshipByUrnRequestMultiError []error
+// DeleteK8SPolicyIsPropagatedToK8SClusterRequestMultiError is an error
+// wrapping multiple validation errors returned by
+// DeleteK8SPolicyIsPropagatedToK8SClusterRequest.ValidateAll() if the
+// designated constraints aren't met.
+type DeleteK8SPolicyIsPropagatedToK8SClusterRequestMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
-func (m DeleteResourceRelationshipByUrnRequestMultiError) Error() string {
+func (m DeleteK8SPolicyIsPropagatedToK8SClusterRequestMultiError) Error() string {
 	var msgs []string
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
@@ -630,12 +638,13 @@ func (m DeleteResourceRelationshipByUrnRequestMultiError) Error() string {
 }
 
 // AllErrors returns a list of validation violation errors.
-func (m DeleteResourceRelationshipByUrnRequestMultiError) AllErrors() []error { return m }
+func (m DeleteK8SPolicyIsPropagatedToK8SClusterRequestMultiError) AllErrors() []error { return m }
 
-// DeleteResourceRelationshipByUrnRequestValidationError is the validation
-// error returned by DeleteResourceRelationshipByUrnRequest.Validate if the
-// designated constraints aren't met.
-type DeleteResourceRelationshipByUrnRequestValidationError struct {
+// DeleteK8SPolicyIsPropagatedToK8SClusterRequestValidationError is the
+// validation error returned by
+// DeleteK8SPolicyIsPropagatedToK8SClusterRequest.Validate if the designated
+// constraints aren't met.
+type DeleteK8SPolicyIsPropagatedToK8SClusterRequestValidationError struct {
 	field  string
 	reason string
 	cause  error
@@ -643,24 +652,26 @@ type DeleteResourceRelationshipByUrnRequestValidationError struct {
 }
 
 // Field function returns field value.
-func (e DeleteResourceRelationshipByUrnRequestValidationError) Field() string { return e.field }
+func (e DeleteK8SPolicyIsPropagatedToK8SClusterRequestValidationError) Field() string { return e.field }
 
 // Reason function returns reason value.
-func (e DeleteResourceRelationshipByUrnRequestValidationError) Reason() string { return e.reason }
+func (e DeleteK8SPolicyIsPropagatedToK8SClusterRequestValidationError) Reason() string {
+	return e.reason
+}
 
 // Cause function returns cause value.
-func (e DeleteResourceRelationshipByUrnRequestValidationError) Cause() error { return e.cause }
+func (e DeleteK8SPolicyIsPropagatedToK8SClusterRequestValidationError) Cause() error { return e.cause }
 
 // Key function returns key value.
-func (e DeleteResourceRelationshipByUrnRequestValidationError) Key() bool { return e.key }
+func (e DeleteK8SPolicyIsPropagatedToK8SClusterRequestValidationError) Key() bool { return e.key }
 
 // ErrorName returns error name.
-func (e DeleteResourceRelationshipByUrnRequestValidationError) ErrorName() string {
-	return "DeleteResourceRelationshipByUrnRequestValidationError"
+func (e DeleteK8SPolicyIsPropagatedToK8SClusterRequestValidationError) ErrorName() string {
+	return "DeleteK8SPolicyIsPropagatedToK8SClusterRequestValidationError"
 }
 
 // Error satisfies the builtin error interface
-func (e DeleteResourceRelationshipByUrnRequestValidationError) Error() string {
+func (e DeleteK8SPolicyIsPropagatedToK8SClusterRequestValidationError) Error() string {
 	cause := ""
 	if e.cause != nil {
 		cause = fmt.Sprintf(" | caused by: %v", e.cause)
@@ -672,14 +683,14 @@ func (e DeleteResourceRelationshipByUrnRequestValidationError) Error() string {
 	}
 
 	return fmt.Sprintf(
-		"invalid %sDeleteResourceRelationshipByUrnRequest.%s: %s%s",
+		"invalid %sDeleteK8SPolicyIsPropagatedToK8SClusterRequest.%s: %s%s",
 		key,
 		e.field,
 		e.reason,
 		cause)
 }
 
-var _ error = DeleteResourceRelationshipByUrnRequestValidationError{}
+var _ error = DeleteK8SPolicyIsPropagatedToK8SClusterRequestValidationError{}
 
 var _ interface {
 	Field() string
@@ -687,26 +698,26 @@ var _ interface {
 	Key() bool
 	Cause() error
 	ErrorName() string
-} = DeleteResourceRelationshipByUrnRequestValidationError{}
+} = DeleteK8SPolicyIsPropagatedToK8SClusterRequestValidationError{}
 
-// Validate checks the field values on DeleteResourceRelationshipByUrnResponse
-// with the rules defined in the proto definition for this message. If any
-// rules are violated, the first error encountered is returned, or nil if
-// there are no violations.
-func (m *DeleteResourceRelationshipByUrnResponse) Validate() error {
+// Validate checks the field values on
+// DeleteK8SPolicyIsPropagatedToK8SClusterResponse with the rules defined in
+// the proto definition for this message. If any rules are violated, the first
+// error encountered is returned, or nil if there are no violations.
+func (m *DeleteK8SPolicyIsPropagatedToK8SClusterResponse) Validate() error {
 	return m.validate(false)
 }
 
 // ValidateAll checks the field values on
-// DeleteResourceRelationshipByUrnResponse with the rules defined in the proto
-// definition for this message. If any rules are violated, the result is a
-// list of violation errors wrapped in
-// DeleteResourceRelationshipByUrnResponseMultiError, or nil if none found.
-func (m *DeleteResourceRelationshipByUrnResponse) ValidateAll() error {
+// DeleteK8SPolicyIsPropagatedToK8SClusterResponse with the rules defined in
+// the proto definition for this message. If any rules are violated, the
+// result is a list of violation errors wrapped in
+// DeleteK8SPolicyIsPropagatedToK8SClusterResponseMultiError, or nil if none found.
+func (m *DeleteK8SPolicyIsPropagatedToK8SClusterResponse) ValidateAll() error {
 	return m.validate(true)
 }
 
-func (m *DeleteResourceRelationshipByUrnResponse) validate(all bool) error {
+func (m *DeleteK8SPolicyIsPropagatedToK8SClusterResponse) validate(all bool) error {
 	if m == nil {
 		return nil
 	}
@@ -714,20 +725,20 @@ func (m *DeleteResourceRelationshipByUrnResponse) validate(all bool) error {
 	var errors []error
 
 	if len(errors) > 0 {
-		return DeleteResourceRelationshipByUrnResponseMultiError(errors)
+		return DeleteK8SPolicyIsPropagatedToK8SClusterResponseMultiError(errors)
 	}
 
 	return nil
 }
 
-// DeleteResourceRelationshipByUrnResponseMultiError is an error wrapping
-// multiple validation errors returned by
-// DeleteResourceRelationshipByUrnResponse.ValidateAll() if the designated
-// constraints aren't met.
-type DeleteResourceRelationshipByUrnResponseMultiError []error
+// DeleteK8SPolicyIsPropagatedToK8SClusterResponseMultiError is an error
+// wrapping multiple validation errors returned by
+// DeleteK8SPolicyIsPropagatedToK8SClusterResponse.ValidateAll() if the
+// designated constraints aren't met.
+type DeleteK8SPolicyIsPropagatedToK8SClusterResponseMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
-func (m DeleteResourceRelationshipByUrnResponseMultiError) Error() string {
+func (m DeleteK8SPolicyIsPropagatedToK8SClusterResponseMultiError) Error() string {
 	var msgs []string
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
@@ -736,12 +747,13 @@ func (m DeleteResourceRelationshipByUrnResponseMultiError) Error() string {
 }
 
 // AllErrors returns a list of validation violation errors.
-func (m DeleteResourceRelationshipByUrnResponseMultiError) AllErrors() []error { return m }
+func (m DeleteK8SPolicyIsPropagatedToK8SClusterResponseMultiError) AllErrors() []error { return m }
 
-// DeleteResourceRelationshipByUrnResponseValidationError is the validation
-// error returned by DeleteResourceRelationshipByUrnResponse.Validate if the
-// designated constraints aren't met.
-type DeleteResourceRelationshipByUrnResponseValidationError struct {
+// DeleteK8SPolicyIsPropagatedToK8SClusterResponseValidationError is the
+// validation error returned by
+// DeleteK8SPolicyIsPropagatedToK8SClusterResponse.Validate if the designated
+// constraints aren't met.
+type DeleteK8SPolicyIsPropagatedToK8SClusterResponseValidationError struct {
 	field  string
 	reason string
 	cause  error
@@ -749,24 +761,28 @@ type DeleteResourceRelationshipByUrnResponseValidationError struct {
 }
 
 // Field function returns field value.
-func (e DeleteResourceRelationshipByUrnResponseValidationError) Field() string { return e.field }
+func (e DeleteK8SPolicyIsPropagatedToK8SClusterResponseValidationError) Field() string {
+	return e.field
+}
 
 // Reason function returns reason value.
-func (e DeleteResourceRelationshipByUrnResponseValidationError) Reason() string { return e.reason }
+func (e DeleteK8SPolicyIsPropagatedToK8SClusterResponseValidationError) Reason() string {
+	return e.reason
+}
 
 // Cause function returns cause value.
-func (e DeleteResourceRelationshipByUrnResponseValidationError) Cause() error { return e.cause }
+func (e DeleteK8SPolicyIsPropagatedToK8SClusterResponseValidationError) Cause() error { return e.cause }
 
 // Key function returns key value.
-func (e DeleteResourceRelationshipByUrnResponseValidationError) Key() bool { return e.key }
+func (e DeleteK8SPolicyIsPropagatedToK8SClusterResponseValidationError) Key() bool { return e.key }
 
 // ErrorName returns error name.
-func (e DeleteResourceRelationshipByUrnResponseValidationError) ErrorName() string {
-	return "DeleteResourceRelationshipByUrnResponseValidationError"
+func (e DeleteK8SPolicyIsPropagatedToK8SClusterResponseValidationError) ErrorName() string {
+	return "DeleteK8SPolicyIsPropagatedToK8SClusterResponseValidationError"
 }
 
 // Error satisfies the builtin error interface
-func (e DeleteResourceRelationshipByUrnResponseValidationError) Error() string {
+func (e DeleteK8SPolicyIsPropagatedToK8SClusterResponseValidationError) Error() string {
 	cause := ""
 	if e.cause != nil {
 		cause = fmt.Sprintf(" | caused by: %v", e.cause)
@@ -778,14 +794,14 @@ func (e DeleteResourceRelationshipByUrnResponseValidationError) Error() string {
 	}
 
 	return fmt.Sprintf(
-		"invalid %sDeleteResourceRelationshipByUrnResponse.%s: %s%s",
+		"invalid %sDeleteK8SPolicyIsPropagatedToK8SClusterResponse.%s: %s%s",
 		key,
 		e.field,
 		e.reason,
 		cause)
 }
 
-var _ error = DeleteResourceRelationshipByUrnResponseValidationError{}
+var _ error = DeleteK8SPolicyIsPropagatedToK8SClusterResponseValidationError{}
 
 var _ interface {
 	Field() string
@@ -793,4 +809,4 @@ var _ interface {
 	Key() bool
 	Cause() error
 	ErrorName() string
-} = DeleteResourceRelationshipByUrnResponseValidationError{}
+} = DeleteK8SPolicyIsPropagatedToK8SClusterResponseValidationError{}

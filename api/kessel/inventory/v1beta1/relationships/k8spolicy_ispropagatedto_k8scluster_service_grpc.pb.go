@@ -20,8 +20,8 @@ const _ = grpc.SupportPackageIsVersion9
 
 const (
 	KesselK8SPolicyIsPropagatedToK8SClusterService_CreateK8SPolicyIsPropagatedToK8SCluster_FullMethodName = "/kessel.inventory.v1beta1.relationships.KesselK8SPolicyIsPropagatedToK8SClusterService/CreateK8SPolicyIsPropagatedToK8SCluster"
-	KesselK8SPolicyIsPropagatedToK8SClusterService_UpdateResourceRelationshipByUrnHs_FullMethodName       = "/kessel.inventory.v1beta1.relationships.KesselK8SPolicyIsPropagatedToK8SClusterService/UpdateResourceRelationshipByUrnHs"
-	KesselK8SPolicyIsPropagatedToK8SClusterService_DeleteResourceRelationshipByUrn_FullMethodName         = "/kessel.inventory.v1beta1.relationships.KesselK8SPolicyIsPropagatedToK8SClusterService/DeleteResourceRelationshipByUrn"
+	KesselK8SPolicyIsPropagatedToK8SClusterService_UpdateK8SPolicyIsPropagatedToK8SCluster_FullMethodName = "/kessel.inventory.v1beta1.relationships.KesselK8SPolicyIsPropagatedToK8SClusterService/UpdateK8SPolicyIsPropagatedToK8SCluster"
+	KesselK8SPolicyIsPropagatedToK8SClusterService_DeleteK8SPolicyIsPropagatedToK8SCluster_FullMethodName = "/kessel.inventory.v1beta1.relationships.KesselK8SPolicyIsPropagatedToK8SClusterService/DeleteK8SPolicyIsPropagatedToK8SCluster"
 )
 
 // KesselK8SPolicyIsPropagatedToK8SClusterServiceClient is the client API for KesselK8SPolicyIsPropagatedToK8SClusterService service.
@@ -29,8 +29,8 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type KesselK8SPolicyIsPropagatedToK8SClusterServiceClient interface {
 	CreateK8SPolicyIsPropagatedToK8SCluster(ctx context.Context, in *CreateK8SPolicyIsPropagatedToK8SClusterRequest, opts ...grpc.CallOption) (*CreateK8SPolicyIsPropagatedToK8SClusterResponse, error)
-	UpdateResourceRelationshipByUrnHs(ctx context.Context, in *UpdateResourceRelationshipByUrnHsRequest, opts ...grpc.CallOption) (*UpdateResourceRelationshipByUrnHsResponse, error)
-	DeleteResourceRelationshipByUrn(ctx context.Context, in *DeleteResourceRelationshipByUrnRequest, opts ...grpc.CallOption) (*DeleteResourceRelationshipByUrnResponse, error)
+	UpdateK8SPolicyIsPropagatedToK8SCluster(ctx context.Context, in *UpdateK8SPolicyIsPropagatedToK8SClusterRequest, opts ...grpc.CallOption) (*UpdateK8SPolicyIsPropagatedToK8SClusterResponse, error)
+	DeleteK8SPolicyIsPropagatedToK8SCluster(ctx context.Context, in *DeleteK8SPolicyIsPropagatedToK8SClusterRequest, opts ...grpc.CallOption) (*DeleteK8SPolicyIsPropagatedToK8SClusterResponse, error)
 }
 
 type kesselK8SPolicyIsPropagatedToK8SClusterServiceClient struct {
@@ -51,20 +51,20 @@ func (c *kesselK8SPolicyIsPropagatedToK8SClusterServiceClient) CreateK8SPolicyIs
 	return out, nil
 }
 
-func (c *kesselK8SPolicyIsPropagatedToK8SClusterServiceClient) UpdateResourceRelationshipByUrnHs(ctx context.Context, in *UpdateResourceRelationshipByUrnHsRequest, opts ...grpc.CallOption) (*UpdateResourceRelationshipByUrnHsResponse, error) {
+func (c *kesselK8SPolicyIsPropagatedToK8SClusterServiceClient) UpdateK8SPolicyIsPropagatedToK8SCluster(ctx context.Context, in *UpdateK8SPolicyIsPropagatedToK8SClusterRequest, opts ...grpc.CallOption) (*UpdateK8SPolicyIsPropagatedToK8SClusterResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(UpdateResourceRelationshipByUrnHsResponse)
-	err := c.cc.Invoke(ctx, KesselK8SPolicyIsPropagatedToK8SClusterService_UpdateResourceRelationshipByUrnHs_FullMethodName, in, out, cOpts...)
+	out := new(UpdateK8SPolicyIsPropagatedToK8SClusterResponse)
+	err := c.cc.Invoke(ctx, KesselK8SPolicyIsPropagatedToK8SClusterService_UpdateK8SPolicyIsPropagatedToK8SCluster_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *kesselK8SPolicyIsPropagatedToK8SClusterServiceClient) DeleteResourceRelationshipByUrn(ctx context.Context, in *DeleteResourceRelationshipByUrnRequest, opts ...grpc.CallOption) (*DeleteResourceRelationshipByUrnResponse, error) {
+func (c *kesselK8SPolicyIsPropagatedToK8SClusterServiceClient) DeleteK8SPolicyIsPropagatedToK8SCluster(ctx context.Context, in *DeleteK8SPolicyIsPropagatedToK8SClusterRequest, opts ...grpc.CallOption) (*DeleteK8SPolicyIsPropagatedToK8SClusterResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(DeleteResourceRelationshipByUrnResponse)
-	err := c.cc.Invoke(ctx, KesselK8SPolicyIsPropagatedToK8SClusterService_DeleteResourceRelationshipByUrn_FullMethodName, in, out, cOpts...)
+	out := new(DeleteK8SPolicyIsPropagatedToK8SClusterResponse)
+	err := c.cc.Invoke(ctx, KesselK8SPolicyIsPropagatedToK8SClusterService_DeleteK8SPolicyIsPropagatedToK8SCluster_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -76,8 +76,8 @@ func (c *kesselK8SPolicyIsPropagatedToK8SClusterServiceClient) DeleteResourceRel
 // for forward compatibility.
 type KesselK8SPolicyIsPropagatedToK8SClusterServiceServer interface {
 	CreateK8SPolicyIsPropagatedToK8SCluster(context.Context, *CreateK8SPolicyIsPropagatedToK8SClusterRequest) (*CreateK8SPolicyIsPropagatedToK8SClusterResponse, error)
-	UpdateResourceRelationshipByUrnHs(context.Context, *UpdateResourceRelationshipByUrnHsRequest) (*UpdateResourceRelationshipByUrnHsResponse, error)
-	DeleteResourceRelationshipByUrn(context.Context, *DeleteResourceRelationshipByUrnRequest) (*DeleteResourceRelationshipByUrnResponse, error)
+	UpdateK8SPolicyIsPropagatedToK8SCluster(context.Context, *UpdateK8SPolicyIsPropagatedToK8SClusterRequest) (*UpdateK8SPolicyIsPropagatedToK8SClusterResponse, error)
+	DeleteK8SPolicyIsPropagatedToK8SCluster(context.Context, *DeleteK8SPolicyIsPropagatedToK8SClusterRequest) (*DeleteK8SPolicyIsPropagatedToK8SClusterResponse, error)
 	mustEmbedUnimplementedKesselK8SPolicyIsPropagatedToK8SClusterServiceServer()
 }
 
@@ -91,11 +91,11 @@ type UnimplementedKesselK8SPolicyIsPropagatedToK8SClusterServiceServer struct{}
 func (UnimplementedKesselK8SPolicyIsPropagatedToK8SClusterServiceServer) CreateK8SPolicyIsPropagatedToK8SCluster(context.Context, *CreateK8SPolicyIsPropagatedToK8SClusterRequest) (*CreateK8SPolicyIsPropagatedToK8SClusterResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CreateK8SPolicyIsPropagatedToK8SCluster not implemented")
 }
-func (UnimplementedKesselK8SPolicyIsPropagatedToK8SClusterServiceServer) UpdateResourceRelationshipByUrnHs(context.Context, *UpdateResourceRelationshipByUrnHsRequest) (*UpdateResourceRelationshipByUrnHsResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method UpdateResourceRelationshipByUrnHs not implemented")
+func (UnimplementedKesselK8SPolicyIsPropagatedToK8SClusterServiceServer) UpdateK8SPolicyIsPropagatedToK8SCluster(context.Context, *UpdateK8SPolicyIsPropagatedToK8SClusterRequest) (*UpdateK8SPolicyIsPropagatedToK8SClusterResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UpdateK8SPolicyIsPropagatedToK8SCluster not implemented")
 }
-func (UnimplementedKesselK8SPolicyIsPropagatedToK8SClusterServiceServer) DeleteResourceRelationshipByUrn(context.Context, *DeleteResourceRelationshipByUrnRequest) (*DeleteResourceRelationshipByUrnResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method DeleteResourceRelationshipByUrn not implemented")
+func (UnimplementedKesselK8SPolicyIsPropagatedToK8SClusterServiceServer) DeleteK8SPolicyIsPropagatedToK8SCluster(context.Context, *DeleteK8SPolicyIsPropagatedToK8SClusterRequest) (*DeleteK8SPolicyIsPropagatedToK8SClusterResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DeleteK8SPolicyIsPropagatedToK8SCluster not implemented")
 }
 func (UnimplementedKesselK8SPolicyIsPropagatedToK8SClusterServiceServer) mustEmbedUnimplementedKesselK8SPolicyIsPropagatedToK8SClusterServiceServer() {
 }
@@ -137,38 +137,38 @@ func _KesselK8SPolicyIsPropagatedToK8SClusterService_CreateK8SPolicyIsPropagated
 	return interceptor(ctx, in, info, handler)
 }
 
-func _KesselK8SPolicyIsPropagatedToK8SClusterService_UpdateResourceRelationshipByUrnHs_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(UpdateResourceRelationshipByUrnHsRequest)
+func _KesselK8SPolicyIsPropagatedToK8SClusterService_UpdateK8SPolicyIsPropagatedToK8SCluster_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateK8SPolicyIsPropagatedToK8SClusterRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(KesselK8SPolicyIsPropagatedToK8SClusterServiceServer).UpdateResourceRelationshipByUrnHs(ctx, in)
+		return srv.(KesselK8SPolicyIsPropagatedToK8SClusterServiceServer).UpdateK8SPolicyIsPropagatedToK8SCluster(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: KesselK8SPolicyIsPropagatedToK8SClusterService_UpdateResourceRelationshipByUrnHs_FullMethodName,
+		FullMethod: KesselK8SPolicyIsPropagatedToK8SClusterService_UpdateK8SPolicyIsPropagatedToK8SCluster_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(KesselK8SPolicyIsPropagatedToK8SClusterServiceServer).UpdateResourceRelationshipByUrnHs(ctx, req.(*UpdateResourceRelationshipByUrnHsRequest))
+		return srv.(KesselK8SPolicyIsPropagatedToK8SClusterServiceServer).UpdateK8SPolicyIsPropagatedToK8SCluster(ctx, req.(*UpdateK8SPolicyIsPropagatedToK8SClusterRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _KesselK8SPolicyIsPropagatedToK8SClusterService_DeleteResourceRelationshipByUrn_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(DeleteResourceRelationshipByUrnRequest)
+func _KesselK8SPolicyIsPropagatedToK8SClusterService_DeleteK8SPolicyIsPropagatedToK8SCluster_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteK8SPolicyIsPropagatedToK8SClusterRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(KesselK8SPolicyIsPropagatedToK8SClusterServiceServer).DeleteResourceRelationshipByUrn(ctx, in)
+		return srv.(KesselK8SPolicyIsPropagatedToK8SClusterServiceServer).DeleteK8SPolicyIsPropagatedToK8SCluster(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: KesselK8SPolicyIsPropagatedToK8SClusterService_DeleteResourceRelationshipByUrn_FullMethodName,
+		FullMethod: KesselK8SPolicyIsPropagatedToK8SClusterService_DeleteK8SPolicyIsPropagatedToK8SCluster_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(KesselK8SPolicyIsPropagatedToK8SClusterServiceServer).DeleteResourceRelationshipByUrn(ctx, req.(*DeleteResourceRelationshipByUrnRequest))
+		return srv.(KesselK8SPolicyIsPropagatedToK8SClusterServiceServer).DeleteK8SPolicyIsPropagatedToK8SCluster(ctx, req.(*DeleteK8SPolicyIsPropagatedToK8SClusterRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -185,12 +185,12 @@ var KesselK8SPolicyIsPropagatedToK8SClusterService_ServiceDesc = grpc.ServiceDes
 			Handler:    _KesselK8SPolicyIsPropagatedToK8SClusterService_CreateK8SPolicyIsPropagatedToK8SCluster_Handler,
 		},
 		{
-			MethodName: "UpdateResourceRelationshipByUrnHs",
-			Handler:    _KesselK8SPolicyIsPropagatedToK8SClusterService_UpdateResourceRelationshipByUrnHs_Handler,
+			MethodName: "UpdateK8SPolicyIsPropagatedToK8SCluster",
+			Handler:    _KesselK8SPolicyIsPropagatedToK8SClusterService_UpdateK8SPolicyIsPropagatedToK8SCluster_Handler,
 		},
 		{
-			MethodName: "DeleteResourceRelationshipByUrn",
-			Handler:    _KesselK8SPolicyIsPropagatedToK8SClusterService_DeleteResourceRelationshipByUrn_Handler,
+			MethodName: "DeleteK8SPolicyIsPropagatedToK8SCluster",
+			Handler:    _KesselK8SPolicyIsPropagatedToK8SClusterService_DeleteK8SPolicyIsPropagatedToK8SCluster_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

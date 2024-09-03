@@ -25,10 +25,10 @@ func (c *RelationshipsService) CreateRelationship(ctx context.Context, r *relati
 	return nil, nil
 }
 
-func (c *RelationshipsService) UpdateResourceRelationshipByUrnHs(ctx context.Context, r *relationships.UpdateResourceRelationshipByUrnHsRequest) (*relationships.UpdateResourceRelationshipByUrnHsResponse, error) {
+func (c *RelationshipsService) UpdateResourceRelationshipByUrnHs(ctx context.Context, r *relationships.UpdateK8SPolicyIsPropagatedToK8SClusterRequest) (*relationships.UpdateK8SPolicyIsPropagatedToK8SClusterResponse, error) {
 	return nil, nil
 }
 
-func (c *RelationshipsService) DeleteResourceRelationshipByUrn(ctx context.Context, r *relationships.DeleteResourceRelationshipByUrnRequest) (*relationships.DeleteResourceRelationshipByUrnResponse, error) {
+func (c *RelationshipsService) DeleteResourceRelationshipByUrn(ctx context.Context, r *relationships.DeleteK8SPolicyIsPropagatedToK8SClusterRequest) (*relationships.DeleteK8SPolicyIsPropagatedToK8SClusterResponse, error) {
 	return nil, nil
 }

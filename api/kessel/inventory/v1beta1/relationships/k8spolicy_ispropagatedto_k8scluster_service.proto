@@ -5,7 +5,6 @@ package kessel.inventory.v1beta1.relationships;
 import "google/api/annotations.proto";
 
 import "kessel/inventory/v1beta1/relationships/k8spolicy_ispropagatedto_k8scluster.proto";
-import "kessel/inventory/v1beta1/relationships/resource_relationship_by_urnhs_hcrns_parameter.proto";
 
 option go_package = "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/relationships";
 option java_multiple_files = true;
@@ -18,27 +17,22 @@ message CreateK8SPolicyIsPropagatedToK8SClusterRequest {
 
 message CreateK8SPolicyIsPropagatedToK8SClusterResponse {}
 
-
 message UpdateK8SPolicyIsPropagatedToK8SClusterRequest {
-  // The subject {resource} and the object {resource}. A relationship is between
-  // a Subject and an Object, e.g. a k8s-policy (subject) has a is-propagated-to
-  // relationship to an k8s-cluster (object)
-  ResourceRelationshipByUrnHsHcrnsParameter resources = 1;
-  // Update a resource relationship in Kessel Asset Inventory by the {subject
-  // resource, object resource}. A relationship is between a Subject and an
-  // Object, e.g. a  k8s-policy (subject) has a is-propagated-to
-  // relationship to an k8s-cluster (object).. The {resource} format
-  // \"<reporter_data.reporter_type>:<reporter_data.local_resource_id>\".
-  K8SPolicyIsPropagatedToK8SCluster k8spolicy_ispropagatedto_k8scluster = 2;
+  // The resource-relationship to be updated will be defined by 
+  // \"<reporter_data.reporter_type>:<reporter_instance_id>:<reporter_data.subject_local_resource_id>\"
+  // AND \"<reporter_data.reporter_type>:<reporter_instance_id>:<reporter_data.object_local_resource_id>\"
+  // from the request body.
+  K8SPolicyIsPropagatedToK8SCluster k8spolicy_ispropagatedto_k8scluster = 1;
 }
 
 message UpdateK8SPolicyIsPropagatedToK8SClusterResponse {}
 
 message DeleteK8SPolicyIsPropagatedToK8SClusterRequest {
-  // The subject {resource} and the object {resource}. A relationship is between
-  // a Subject and an Object, e.g. a k8s-policy (subject) has a is-propagated-to
-  // relationship to an k8s-cluster (object)
-  ResourceRelationshipByUrnHsHcrnsParameter resources = 1;
+  // The resource-relationship to be deleted will be defined by 
+  // \"<reporter_data.reporter_type>:<reporter_instance_id>:<reporter_data.subject_local_resource_id>\"
+  // AND \"<reporter_data.reporter_type>:<reporter_instance_id>:<reporter_data.object_local_resource_id>\"
+  // from the request body.
+  K8SPolicyIsPropagatedToK8SCluster k8spolicy_ispropagatedto_k8scluster = 1;
 }
 
 message DeleteK8SPolicyIsPropagatedToK8SClusterResponse {}

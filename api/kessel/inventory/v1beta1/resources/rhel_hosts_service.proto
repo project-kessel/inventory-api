@@ -19,19 +19,19 @@ message CreateRhelHostRequest {
 message CreateRhelHostResponse {}
 
 message UpdateRhelHostRequest {
-  // A resource instance using the format:
-  // \"<reporter_data.reporter_type>:<reporter_data.local_resource_id>\"
-  string resource = 1 [ (buf.validate.field).string.min_len = 1 ];
-  // The Rhel host to update
-  RhelHost rhel_host = 2 [ (buf.validate.field).required = true ];
+  // The resource to be updated will be defined by 
+  // \"<reporter_data.reporter_type>:<reporter_instaance_id>:<reporter_data.local_resource_id>\"
+  // from the request body.
+  RhelHost rhel_host = 1 [ (buf.validate.field).required = true ];
 }
 
 message UpdateRhelHostResponse {}
 
 message DeleteRhelHostRequest {
-  // A resource instance using the format:
-  // \"<reporter_data.reporter_type>:<reporter_data.local_resource_id>\"
-  string resource = 1 [ (buf.validate.field).string.min_len = 1 ];
+  // The resource to be updated will be defined by 
+  // \"<reporter_data.reporter_type>:<reporter_instaance_id>:<reporter_data.local_resource_id>\"
+  // from the request body.
+  RhelHost rhel_host = 1 [ (buf.validate.field).required = true ];
 }
 
 message DeleteRhelHostResponse {}
@@ -46,14 +46,14 @@ service KesselRhelHostService {
 
   rpc UpdateRhelHost(UpdateRhelHostRequest) returns (UpdateRhelHostResponse) {
     option (google.api.http) = {
-      put : "/api/inventory/v1beta1/resources/rhel-hosts/{resource}"
+      put : "/api/inventory/v1beta1/resources/rhel-hosts"
       body : "*"
     };
   };
 
   rpc DeleteRhelHost(DeleteRhelHostRequest) returns (DeleteRhelHostResponse) {
     option (google.api.http) = {
-      delete : "/api/inventory/v1beta1/resources/rhel-hosts/{resource}"
+      delete : "/api/inventory/v1beta1/resources/rhel-hosts"
     };
   };
 }

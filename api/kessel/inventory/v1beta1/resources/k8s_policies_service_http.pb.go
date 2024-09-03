@@ -32,8 +32,8 @@ type KesselK8SPolicyServiceHTTPServer interface {
 func RegisterKesselK8SPolicyServiceHTTPServer(s *http.Server, srv KesselK8SPolicyServiceHTTPServer) {
 	r := s.Route("/")
 	r.POST("/api/inventory/v1beta1/resources/k8s-policies", _KesselK8SPolicyService_CreateK8SPolicy0_HTTP_Handler(srv))
-	r.PUT("/api/inventory/v1beta1/resources/k8s-policies/{resource}", _KesselK8SPolicyService_UpdateK8SPolicy0_HTTP_Handler(srv))
-	r.DELETE("/api/inventory/v1beta1/resources/k8s-policies/{resource}", _KesselK8SPolicyService_DeleteK8SPolicy0_HTTP_Handler(srv))
+	r.PUT("/api/inventory/v1beta1/resources/k8s-policies", _KesselK8SPolicyService_UpdateK8SPolicy0_HTTP_Handler(srv))
+	r.DELETE("/api/inventory/v1beta1/resources/k8s-policies", _KesselK8SPolicyService_DeleteK8SPolicy0_HTTP_Handler(srv))
 }
 
 func _KesselK8SPolicyService_CreateK8SPolicy0_HTTP_Handler(srv KesselK8SPolicyServiceHTTPServer) func(ctx http.Context) error {
@@ -67,9 +67,6 @@ func _KesselK8SPolicyService_UpdateK8SPolicy0_HTTP_Handler(srv KesselK8SPolicySe
 		if err := ctx.BindQuery(&in); err != nil {
 			return err
 		}
-		if err := ctx.BindVars(&in); err != nil {
-			return err
-		}
 		http.SetOperation(ctx, OperationKesselK8SPolicyServiceUpdateK8sPolicy)
 		h := ctx.Middleware(func(ctx context.Context, req interface{}) (interface{}, error) {
 			return srv.UpdateK8SPolicy(ctx, req.(*UpdateK8SPolicyRequest))
@@ -87,9 +84,6 @@ func _KesselK8SPolicyService_DeleteK8SPolicy0_HTTP_Handler(srv KesselK8SPolicySe
 	return func(ctx http.Context) error {
 		var in DeleteK8SPolicyRequest
 		if err := ctx.BindQuery(&in); err != nil {
-			return err
-		}
-		if err := ctx.BindVars(&in); err != nil {
 			return err
 		}
 		http.SetOperation(ctx, OperationKesselK8SPolicyServiceDeleteK8sPolicy)
@@ -134,7 +128,7 @@ func (c *KesselK8SPolicyServiceHTTPClientImpl) CreateK8SPolicy(ctx context.Conte
 
 func (c *KesselK8SPolicyServiceHTTPClientImpl) DeleteK8SPolicy(ctx context.Context, in *DeleteK8SPolicyRequest, opts ...http.CallOption) (*DeleteK8SPolicyResponse, error) {
 	var out DeleteK8SPolicyResponse
-	pattern := "/api/inventory/v1beta1/resources/k8s-policies/{resource}"
+	pattern := "/api/inventory/v1beta1/resources/k8s-policies"
 	path := binding.EncodeURL(pattern, in, true)
 	opts = append(opts, http.Operation(OperationKesselK8SPolicyServiceDeleteK8sPolicy))
 	opts = append(opts, http.PathTemplate(pattern))
@@ -147,7 +141,7 @@ func (c *KesselK8SPolicyServiceHTTPClientImpl) DeleteK8SPolicy(ctx context.Conte
 
 func (c *KesselK8SPolicyServiceHTTPClientImpl) UpdateK8SPolicy(ctx context.Context, in *UpdateK8SPolicyRequest, opts ...http.CallOption) (*UpdateK8SPolicyResponse, error) {
 	var out UpdateK8SPolicyResponse
-	pattern := "/api/inventory/v1beta1/resources/k8s-policies/{resource}"
+	pattern := "/api/inventory/v1beta1/resources/k8s-policies"
 	path := binding.EncodeURL(pattern, in, false)
 	opts = append(opts, http.Operation(OperationKesselK8SPolicyServiceUpdateK8sPolicy))
 	opts = append(opts, http.PathTemplate(pattern))

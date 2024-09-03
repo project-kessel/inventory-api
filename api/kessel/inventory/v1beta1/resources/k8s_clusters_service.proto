@@ -20,11 +20,10 @@ message CreateK8sClusterResponse {
 }
 
 message UpdateK8sClusterRequest {
-  // The {resource} format
-  // \"<reporter_data.reporter_type>:<reporter_data.local_resource_id>\".
-  string resource = 1;
-  // The k8s clsuter to update
-  K8sCluster k8s_cluster = 2;
+  // The resource to be updated will be defined by 
+  // \"<reporter_data.reporter_type>:<reporter_instaance_id>:<reporter_data.local_resource_id>\"
+  // from the request body.
+  K8sCluster k8s_cluster = 1;
 }
 
 message UpdateK8sClusterResponse {
@@ -32,9 +31,10 @@ message UpdateK8sClusterResponse {
 }
 
 message DeleteK8sClusterRequest {
-  // The {resource} format
-  // \"<reporter_data.reporter_type>:<reporter_data.local_resource_id>\".
-  string resource = 1;
+  // The resource to be deleted will be defined by 
+  // \"<reporter_data.reporter_type>:<reporter_instaance_id>:<reporter_data.local_resource_id>\" 
+  // from the request body.
+  K8sCluster k8s_cluster = 1;
 }
 
 message DeleteK8sClusterResponse {}
@@ -49,14 +49,14 @@ service KesselK8sClusterService {
 
   rpc UpdateK8sCluster(UpdateK8sClusterRequest) returns (UpdateK8sClusterResponse) {
     option (google.api.http) = {
-      put : "/api/inventory/v1beta1/resources/k8s-clusters/{resource}"
+      put : "/api/inventory/v1beta1/resources/k8s-clusters"
       body : "*"
     };
   };
 
   rpc DeleteK8sCluster(DeleteK8sClusterRequest) returns (DeleteK8sClusterResponse) {
     option (google.api.http) = {
-      delete : "/api/inventory/v1beta1/resources/k8s-clusters/{resource}"
+      delete : "/api/inventory/v1beta1/resources/k8s-clusters"
     };
   };
 }

@@ -20,20 +20,20 @@ var _ = binding.EncodeURL
 const _ = http.SupportPackageIsVersion1
 
 const OperationKesselK8SPolicyIsPropagatedToK8SClusterServiceCreateK8SPolicyIsPropagatedToK8SCluster = "/kessel.inventory.v1beta1.relationships.KesselK8SPolicyIsPropagatedToK8SClusterService/CreateK8SPolicyIsPropagatedToK8SCluster"
-const OperationKesselK8SPolicyIsPropagatedToK8SClusterServiceDeleteResourceRelationshipByUrn = "/kessel.inventory.v1beta1.relationships.KesselK8SPolicyIsPropagatedToK8SClusterService/DeleteResourceRelationshipByUrn"
-const OperationKesselK8SPolicyIsPropagatedToK8SClusterServiceUpdateResourceRelationshipByUrnHs = "/kessel.inventory.v1beta1.relationships.KesselK8SPolicyIsPropagatedToK8SClusterService/UpdateResourceRelationshipByUrnHs"
+const OperationKesselK8SPolicyIsPropagatedToK8SClusterServiceDeleteK8SPolicyIsPropagatedToK8SCluster = "/kessel.inventory.v1beta1.relationships.KesselK8SPolicyIsPropagatedToK8SClusterService/DeleteK8SPolicyIsPropagatedToK8SCluster"
+const OperationKesselK8SPolicyIsPropagatedToK8SClusterServiceUpdateK8SPolicyIsPropagatedToK8SCluster = "/kessel.inventory.v1beta1.relationships.KesselK8SPolicyIsPropagatedToK8SClusterService/UpdateK8SPolicyIsPropagatedToK8SCluster"
 
 type KesselK8SPolicyIsPropagatedToK8SClusterServiceHTTPServer interface {
 	CreateK8SPolicyIsPropagatedToK8SCluster(context.Context, *CreateK8SPolicyIsPropagatedToK8SClusterRequest) (*CreateK8SPolicyIsPropagatedToK8SClusterResponse, error)
-	DeleteResourceRelationshipByUrn(context.Context, *DeleteResourceRelationshipByUrnRequest) (*DeleteResourceRelationshipByUrnResponse, error)
-	UpdateResourceRelationshipByUrnHs(context.Context, *UpdateResourceRelationshipByUrnHsRequest) (*UpdateResourceRelationshipByUrnHsResponse, error)
+	DeleteK8SPolicyIsPropagatedToK8SCluster(context.Context, *DeleteK8SPolicyIsPropagatedToK8SClusterRequest) (*DeleteK8SPolicyIsPropagatedToK8SClusterResponse, error)
+	UpdateK8SPolicyIsPropagatedToK8SCluster(context.Context, *UpdateK8SPolicyIsPropagatedToK8SClusterRequest) (*UpdateK8SPolicyIsPropagatedToK8SClusterResponse, error)
 }
 
 func RegisterKesselK8SPolicyIsPropagatedToK8SClusterServiceHTTPServer(s *http.Server, srv KesselK8SPolicyIsPropagatedToK8SClusterServiceHTTPServer) {
 	r := s.Route("/")
 	r.POST("/api/inventory/v1beta1/resource-relationships/k8s-policy.is-propagated.to-k8s-cluster", _KesselK8SPolicyIsPropagatedToK8SClusterService_CreateK8SPolicyIsPropagatedToK8SCluster0_HTTP_Handler(srv))
-	r.PUT("/api/inventory/v1beta1/resource-relationships/k8s-policy.is-propagated.to-k8s-cluster", _KesselK8SPolicyIsPropagatedToK8SClusterService_UpdateResourceRelationshipByUrnHs0_HTTP_Handler(srv))
-	r.DELETE("/api/inventory/v1beta1/resource-relationships/k8s-policy.is-propagated.to-k8s-cluster", _KesselK8SPolicyIsPropagatedToK8SClusterService_DeleteResourceRelationshipByUrn0_HTTP_Handler(srv))
+	r.PUT("/api/inventory/v1beta1/resource-relationships/k8s-policy.is-propagated.to-k8s-cluster", _KesselK8SPolicyIsPropagatedToK8SClusterService_UpdateK8SPolicyIsPropagatedToK8SCluster0_HTTP_Handler(srv))
+	r.DELETE("/api/inventory/v1beta1/resource-relationships/k8s-policy.is-propagated.to-k8s-cluster", _KesselK8SPolicyIsPropagatedToK8SClusterService_DeleteK8SPolicyIsPropagatedToK8SCluster0_HTTP_Handler(srv))
 }
 
 func _KesselK8SPolicyIsPropagatedToK8SClusterService_CreateK8SPolicyIsPropagatedToK8SCluster0_HTTP_Handler(srv KesselK8SPolicyIsPropagatedToK8SClusterServiceHTTPServer) func(ctx http.Context) error {
@@ -58,51 +58,51 @@ func _KesselK8SPolicyIsPropagatedToK8SClusterService_CreateK8SPolicyIsPropagated
 	}
 }
 
-func _KesselK8SPolicyIsPropagatedToK8SClusterService_UpdateResourceRelationshipByUrnHs0_HTTP_Handler(srv KesselK8SPolicyIsPropagatedToK8SClusterServiceHTTPServer) func(ctx http.Context) error {
+func _KesselK8SPolicyIsPropagatedToK8SClusterService_UpdateK8SPolicyIsPropagatedToK8SCluster0_HTTP_Handler(srv KesselK8SPolicyIsPropagatedToK8SClusterServiceHTTPServer) func(ctx http.Context) error {
 	return func(ctx http.Context) error {
-		var in UpdateResourceRelationshipByUrnHsRequest
+		var in UpdateK8SPolicyIsPropagatedToK8SClusterRequest
 		if err := ctx.Bind(&in); err != nil {
 			return err
 		}
 		if err := ctx.BindQuery(&in); err != nil {
 			return err
 		}
-		http.SetOperation(ctx, OperationKesselK8SPolicyIsPropagatedToK8SClusterServiceUpdateResourceRelationshipByUrnHs)
+		http.SetOperation(ctx, OperationKesselK8SPolicyIsPropagatedToK8SClusterServiceUpdateK8SPolicyIsPropagatedToK8SCluster)
 		h := ctx.Middleware(func(ctx context.Context, req interface{}) (interface{}, error) {
-			return srv.UpdateResourceRelationshipByUrnHs(ctx, req.(*UpdateResourceRelationshipByUrnHsRequest))
+			return srv.UpdateK8SPolicyIsPropagatedToK8SCluster(ctx, req.(*UpdateK8SPolicyIsPropagatedToK8SClusterRequest))
 		})
 		out, err := h(ctx, &in)
 		if err != nil {
 			return err
 		}
-		reply := out.(*UpdateResourceRelationshipByUrnHsResponse)
+		reply := out.(*UpdateK8SPolicyIsPropagatedToK8SClusterResponse)
 		return ctx.Result(200, reply)
 	}
 }
 
-func _KesselK8SPolicyIsPropagatedToK8SClusterService_DeleteResourceRelationshipByUrn0_HTTP_Handler(srv KesselK8SPolicyIsPropagatedToK8SClusterServiceHTTPServer) func(ctx http.Context) error {
+func _KesselK8SPolicyIsPropagatedToK8SClusterService_DeleteK8SPolicyIsPropagatedToK8SCluster0_HTTP_Handler(srv KesselK8SPolicyIsPropagatedToK8SClusterServiceHTTPServer) func(ctx http.Context) error {
 	return func(ctx http.Context) error {
-		var in DeleteResourceRelationshipByUrnRequest
+		var in DeleteK8SPolicyIsPropagatedToK8SClusterRequest
 		if err := ctx.BindQuery(&in); err != nil {
 			return err
 		}
-		http.SetOperation(ctx, OperationKesselK8SPolicyIsPropagatedToK8SClusterServiceDeleteResourceRelationshipByUrn)
+		http.SetOperation(ctx, OperationKesselK8SPolicyIsPropagatedToK8SClusterServiceDeleteK8SPolicyIsPropagatedToK8SCluster)
 		h := ctx.Middleware(func(ctx context.Context, req interface{}) (interface{}, error) {
-			return srv.DeleteResourceRelationshipByUrn(ctx, req.(*DeleteResourceRelationshipByUrnRequest))
+			return srv.DeleteK8SPolicyIsPropagatedToK8SCluster(ctx, req.(*DeleteK8SPolicyIsPropagatedToK8SClusterRequest))
 		})
 		out, err := h(ctx, &in)
 		if err != nil {
 			return err
 		}
-		reply := out.(*DeleteResourceRelationshipByUrnResponse)
+		reply := out.(*DeleteK8SPolicyIsPropagatedToK8SClusterResponse)
 		return ctx.Result(200, reply)
 	}
 }
 
 type KesselK8SPolicyIsPropagatedToK8SClusterServiceHTTPClient interface {
 	CreateK8SPolicyIsPropagatedToK8SCluster(ctx context.Context, req *CreateK8SPolicyIsPropagatedToK8SClusterRequest, opts ...http.CallOption) (rsp *CreateK8SPolicyIsPropagatedToK8SClusterResponse, err error)
-	DeleteResourceRelationshipByUrn(ctx context.Context, req *DeleteResourceRelationshipByUrnRequest, opts ...http.CallOption) (rsp *DeleteResourceRelationshipByUrnResponse, err error)
-	UpdateResourceRelationshipByUrnHs(ctx context.Context, req *UpdateResourceRelationshipByUrnHsRequest, opts ...http.CallOption) (rsp *UpdateResourceRelationshipByUrnHsResponse, err error)
+	DeleteK8SPolicyIsPropagatedToK8SCluster(ctx context.Context, req *DeleteK8SPolicyIsPropagatedToK8SClusterRequest, opts ...http.CallOption) (rsp *DeleteK8SPolicyIsPropagatedToK8SClusterResponse, err error)
+	UpdateK8SPolicyIsPropagatedToK8SCluster(ctx context.Context, req *UpdateK8SPolicyIsPropagatedToK8SClusterRequest, opts ...http.CallOption) (rsp *UpdateK8SPolicyIsPropagatedToK8SClusterResponse, err error)
 }
 
 type KesselK8SPolicyIsPropagatedToK8SClusterServiceHTTPClientImpl struct {
@@ -126,11 +126,11 @@ func (c *KesselK8SPolicyIsPropagatedToK8SClusterServiceHTTPClientImpl) CreateK8S
 	return &out, nil
 }
 
-func (c *KesselK8SPolicyIsPropagatedToK8SClusterServiceHTTPClientImpl) DeleteResourceRelationshipByUrn(ctx context.Context, in *DeleteResourceRelationshipByUrnRequest, opts ...http.CallOption) (*DeleteResourceRelationshipByUrnResponse, error) {
-	var out DeleteResourceRelationshipByUrnResponse
+func (c *KesselK8SPolicyIsPropagatedToK8SClusterServiceHTTPClientImpl) DeleteK8SPolicyIsPropagatedToK8SCluster(ctx context.Context, in *DeleteK8SPolicyIsPropagatedToK8SClusterRequest, opts ...http.CallOption) (*DeleteK8SPolicyIsPropagatedToK8SClusterResponse, error) {
+	var out DeleteK8SPolicyIsPropagatedToK8SClusterResponse
 	pattern := "/api/inventory/v1beta1/resource-relationships/k8s-policy.is-propagated.to-k8s-cluster"
 	path := binding.EncodeURL(pattern, in, true)
-	opts = append(opts, http.Operation(OperationKesselK8SPolicyIsPropagatedToK8SClusterServiceDeleteResourceRelationshipByUrn))
+	opts = append(opts, http.Operation(OperationKesselK8SPolicyIsPropagatedToK8SClusterServiceDeleteK8SPolicyIsPropagatedToK8SCluster))
 	opts = append(opts, http.PathTemplate(pattern))
 	err := c.cc.Invoke(ctx, "DELETE", path, nil, &out, opts...)
 	if err != nil {
@@ -139,11 +139,11 @@ func (c *KesselK8SPolicyIsPropagatedToK8SClusterServiceHTTPClientImpl) DeleteRes
 	return &out, nil
 }
 
-func (c *KesselK8SPolicyIsPropagatedToK8SClusterServiceHTTPClientImpl) UpdateResourceRelationshipByUrnHs(ctx context.Context, in *UpdateResourceRelationshipByUrnHsRequest, opts ...http.CallOption) (*UpdateResourceRelationshipByUrnHsResponse, error) {
-	var out UpdateResourceRelationshipByUrnHsResponse
+func (c *KesselK8SPolicyIsPropagatedToK8SClusterServiceHTTPClientImpl) UpdateK8SPolicyIsPropagatedToK8SCluster(ctx context.Context, in *UpdateK8SPolicyIsPropagatedToK8SClusterRequest, opts ...http.CallOption) (*UpdateK8SPolicyIsPropagatedToK8SClusterResponse, error) {
+	var out UpdateK8SPolicyIsPropagatedToK8SClusterResponse
 	pattern := "/api/inventory/v1beta1/resource-relationships/k8s-policy.is-propagated.to-k8s-cluster"
 	path := binding.EncodeURL(pattern, in, false)
-	opts = append(opts, http.Operation(OperationKesselK8SPolicyIsPropagatedToK8SClusterServiceUpdateResourceRelationshipByUrnHs))
+	opts = append(opts, http.Operation(OperationKesselK8SPolicyIsPropagatedToK8SClusterServiceUpdateK8SPolicyIsPropagatedToK8SCluster))
 	opts = append(opts, http.PathTemplate(pattern))
 	err := c.cc.Invoke(ctx, "PUT", path, in, &out, opts...)
 	if err != nil {

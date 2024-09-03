@@ -9,7 +9,7 @@ import (
 
 // RelationshipsService handles requests for RHEL hosts
 type RelationshipsService struct {
-	relationships.UnimplementedKesselPolicyRelationshipServiceServer
+	relationships.UnimplementedKesselK8SPolicyIsPropagatedToK8SClusterServiceServer
 
 	Controller *controller.RelationshipUsecase
 }
@@ -21,7 +21,7 @@ func New(c *controller.RelationshipUsecase) *RelationshipsService {
 	}
 }
 
-func (c *RelationshipsService) CreateRelationship(ctx context.Context, r *relationships.CreatePolicyRelationshipRequest) (*relationships.CreatePolicyRelationshipResponse, error) {
+func (c *RelationshipsService) CreateRelationship(ctx context.Context, r *relationships.CreateK8SPolicyIsPropagatedToK8SClusterRequest) (*relationships.CreateK8SPolicyIsPropagatedToK8SClusterResponse, error) {
 	return nil, nil
 }
 

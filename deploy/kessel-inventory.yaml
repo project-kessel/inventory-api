@@ -148,7 +148,7 @@ parameters:
     value: insights-ephemeral
   - description: App Image
     name: INVENTORY_IMAGE
-    value: quay.io/cloudservices/kessel-inventory
+    value: quay.io/redhat-services-prod/project-kessel-tenant/kessel-inventory-main/inventory-api-main
   - description: Image Tag
     name: INVENTORY_IMAGE_TAG
     value: latest

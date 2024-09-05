@@ -6,6 +6,7 @@ import "google/api/annotations.proto";
 import "buf/validate/validate.proto";
 
 import "kessel/inventory/v1beta1/resources/rhel_host.proto";
+import "kessel/inventory/v1beta1/resources/reporter_data.proto";
 
 option go_package = "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/resources";
 option java_multiple_files = true;
@@ -31,7 +32,7 @@ message DeleteRhelHostRequest {
   // The resource to be updated will be defined by 
   // \"<reporter_data.reporter_type>:<reporter_instaance_id>:<reporter_data.local_resource_id>\"
   // from the request body.
-  RhelHost rhel_host = 1 [ (buf.validate.field).required = true ];
+  ReporterData reporter_data = 1 [ (buf.validate.field).required = true ];
 }
 
 message DeleteRhelHostResponse {}

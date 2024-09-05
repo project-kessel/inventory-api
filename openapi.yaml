@@ -447,9 +447,9 @@ components:
         kessel.inventory.v1beta1.relationships.DeleteK8SPolicyIsPropagatedToK8SClusterRequest:
             type: object
             properties:
-                k8spolicy_ispropagatedto_k8scluster:
+                reporter_data:
                     allOf:
-                        - $ref: '#/components/schemas/kessel.inventory.v1beta1.relationships.K8SPolicyIsPropagatedToK8SCluster'
+                        - $ref: '#/components/schemas/kessel.inventory.v1beta1.relationships.ReporterData'
                     description: "The resource-relationship to be deleted will be defined by \n \\\"<reporter_data.reporter_type>:<reporter_instance_id>:<reporter_data.subject_local_resource_id>\\\"\n AND \\\"<reporter_data.reporter_type>:<reporter_instance_id>:<reporter_data.object_local_resource_id>\\\"\n from the request body."
         kessel.inventory.v1beta1.relationships.DeleteK8SPolicyIsPropagatedToK8SClusterResponse:
             type: object
@@ -594,9 +594,9 @@ components:
         kessel.inventory.v1beta1.resources.DeleteK8sClusterRequest:
             type: object
             properties:
-                k8s_cluster:
+                reporter_data:
                     allOf:
-                        - $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.K8sCluster'
+                        - $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.ReporterData'
                     description: "The resource to be deleted will be defined by \n \\\"<reporter_data.reporter_type>:<reporter_instaance_id>:<reporter_data.local_resource_id>\\\" \n from the request body."
         kessel.inventory.v1beta1.resources.DeleteK8sClusterResponse:
             type: object
@@ -604,9 +604,9 @@ components:
         kessel.inventory.v1beta1.resources.DeleteK8sPolicyRequest:
             type: object
             properties:
-                k8s_policy:
+                reporter_data:
                     allOf:
-                        - $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.K8sPolicy'
+                        - $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.ReporterData'
                     description: "The resource to be deleted will be defined by \n \\\"<reporter_data.reporter_type>:<reporter_instaance_id>:<reporter_data.local_resource_id>\\\"\n from the request body."
         kessel.inventory.v1beta1.resources.DeleteK8sPolicyResponse:
             type: object
@@ -614,9 +614,9 @@ components:
         kessel.inventory.v1beta1.resources.DeleteNotificationsIntegrationRequest:
             type: object
             properties:
-                integration:
+                reporter_data:
                     allOf:
-                        - $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.NotificationsIntegration'
+                        - $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.ReporterData'
                     description: "The resource to be deleted will be defined by \n \\\"<reporter_data.reporter_type>:<reporter_instaance_id>:<reporter_data.local_resource_id>\\\"\n from the request body."
         kessel.inventory.v1beta1.resources.DeleteNotificationsIntegrationResponse:
             type: object
@@ -624,9 +624,9 @@ components:
         kessel.inventory.v1beta1.resources.DeleteRhelHostRequest:
             type: object
             properties:
-                rhel_host:
+                reporter_data:
                     allOf:
-                        - $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.RhelHost'
+                        - $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.ReporterData'
                     description: "The resource to be updated will be defined by \n \\\"<reporter_data.reporter_type>:<reporter_instaance_id>:<reporter_data.local_resource_id>\\\"\n from the request body."
         kessel.inventory.v1beta1.resources.DeleteRhelHostResponse:
             type: object

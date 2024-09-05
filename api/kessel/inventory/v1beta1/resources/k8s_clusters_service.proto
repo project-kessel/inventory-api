@@ -3,8 +3,10 @@ syntax = "proto3";
 package kessel.inventory.v1beta1.resources;
 
 import "google/api/annotations.proto";
+import "buf/validate/validate.proto";
 
 import "kessel/inventory/v1beta1/resources/k8s_cluster.proto";
+import "kessel/inventory/v1beta1/resources/reporter_data.proto";
 
 option go_package = "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/resources";
 option java_multiple_files = true;
@@ -30,7 +32,7 @@ message DeleteK8sClusterRequest {
   // The resource to be deleted will be defined by 
   // \"<reporter_data.reporter_type>:<reporter_instaance_id>:<reporter_data.local_resource_id>\" 
   // from the request body.
-  K8sCluster k8s_cluster = 1;
+  ReporterData reporter_data = 1 [ (buf.validate.field).required = true ];
 }
 
 message DeleteK8sClusterResponse {}

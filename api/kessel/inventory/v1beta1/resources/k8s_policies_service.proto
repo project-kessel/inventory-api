@@ -3,8 +3,10 @@ syntax = "proto3";
 package kessel.inventory.v1beta1.resources;
 
 import "google/api/annotations.proto";
+import "buf/validate/validate.proto";
 
 import "kessel/inventory/v1beta1/resources/k8s_policy.proto";
+import "kessel/inventory/v1beta1/resources/reporter_data.proto";
 
 option go_package = "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/resources";
 option java_multiple_files = true;
@@ -12,7 +14,7 @@ option java_package = "org.project_kessel.api.inventory.v1beta1.resources";
 
 message CreateK8sPolicyRequest {
   // The policy to create in Kessel Asset Inventory
-  K8sPolicy k8s_policy = 1;
+  K8sPolicy k8s_policy = 1 [ (buf.validate.field).required = true ];
 }
 
 message CreateK8sPolicyResponse {}
@@ -21,7 +23,7 @@ message UpdateK8sPolicyRequest {
   // The resource to be updated will be defined by 
   // \"<reporter_data.reporter_type>:<reporter_instaance_id>:<reporter_data.local_resource_id>\"
   // from the request body.
-   K8sPolicy k8s_policy = 1;
+   K8sPolicy k8s_policy = 1 [ (buf.validate.field).required = true ];
 }
 
 message UpdateK8sPolicyResponse {}
@@ -30,7 +32,7 @@ message DeleteK8sPolicyRequest {
   // The resource to be deleted will be defined by 
   // \"<reporter_data.reporter_type>:<reporter_instaance_id>:<reporter_data.local_resource_id>\"
   // from the request body.
-  K8sPolicy k8s_policy = 1;
+  ReporterData reporter_data = 1 [ (buf.validate.field).required = true ];
 }
 
 message DeleteK8sPolicyResponse {}

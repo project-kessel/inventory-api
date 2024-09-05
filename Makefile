@@ -141,6 +141,10 @@ run: build
 migrate: build
 	./bin/inventory-api migrate --config .inventory-api.yaml
 
+.PHONY: update-schema
+# fetch the latest schema from github.com/RedHatInsights/kessel-config
+update-schema:
+	./scripts/get-schema-yaml.sh > ./deploy/schema.yaml
 
 help:
 # show help

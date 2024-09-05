@@ -15,10 +15,7 @@ message CreateNotificationsIntegrationRequest {
   NotificationsIntegration integration = 1;
 }
 
-message CreateNotificationsIntegrationResponse {
-  // The NotificationsIntegration created in Kessel Asset Inventory
-  NotificationsIntegration integration = 1;
-}
+message CreateNotificationsIntegrationResponse {}
 
 message UpdateNotificationsIntegrationRequest {
   // The resource to be updated will be defined by 
@@ -56,6 +53,7 @@ service KesselNotificationsIntegrationService {
   rpc DeleteNotificationsIntegration(DeleteNotificationsIntegrationRequest) returns (DeleteNotificationsIntegrationResponse) {
     option (google.api.http) = {
       delete : "/api/inventory/v1beta1/resources/notifications-integrations"
+      body : "*"
     };
   };
 }

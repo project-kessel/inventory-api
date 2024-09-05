@@ -54,6 +54,7 @@ service KesselRhelHostService {
   rpc DeleteRhelHost(DeleteRhelHostRequest) returns (DeleteRhelHostResponse) {
     option (google.api.http) = {
       delete : "/api/inventory/v1beta1/resources/rhel-hosts"
+      body : "*"
     };
   };
 }

@@ -83,6 +83,9 @@ func _KesselK8SPolicyIsPropagatedToK8SClusterService_UpdateK8SPolicyIsPropagated
 func _KesselK8SPolicyIsPropagatedToK8SClusterService_DeleteK8SPolicyIsPropagatedToK8SCluster0_HTTP_Handler(srv KesselK8SPolicyIsPropagatedToK8SClusterServiceHTTPServer) func(ctx http.Context) error {
 	return func(ctx http.Context) error {
 		var in DeleteK8SPolicyIsPropagatedToK8SClusterRequest
+		if err := ctx.Bind(&in); err != nil {
+			return err
+		}
 		if err := ctx.BindQuery(&in); err != nil {
 			return err
 		}
@@ -129,10 +132,10 @@ func (c *KesselK8SPolicyIsPropagatedToK8SClusterServiceHTTPClientImpl) CreateK8S
 func (c *KesselK8SPolicyIsPropagatedToK8SClusterServiceHTTPClientImpl) DeleteK8SPolicyIsPropagatedToK8SCluster(ctx context.Context, in *DeleteK8SPolicyIsPropagatedToK8SClusterRequest, opts ...http.CallOption) (*DeleteK8SPolicyIsPropagatedToK8SClusterResponse, error) {
 	var out DeleteK8SPolicyIsPropagatedToK8SClusterResponse
 	pattern := "/api/inventory/v1beta1/resource-relationships/k8s-policy.is-propagated.to-k8s-cluster"
-	path := binding.EncodeURL(pattern, in, true)
+	path := binding.EncodeURL(pattern, in, false)
 	opts = append(opts, http.Operation(OperationKesselK8SPolicyIsPropagatedToK8SClusterServiceDeleteK8SPolicyIsPropagatedToK8SCluster))
 	opts = append(opts, http.PathTemplate(pattern))
-	err := c.cc.Invoke(ctx, "DELETE", path, nil, &out, opts...)
+	err := c.cc.Invoke(ctx, "DELETE", path, in, &out, opts...)
 	if err != nil {
 		return nil, err
 	}

@@ -83,6 +83,9 @@ func _KesselRhelHostService_UpdateRhelHost0_HTTP_Handler(srv KesselRhelHostServi
 func _KesselRhelHostService_DeleteRhelHost0_HTTP_Handler(srv KesselRhelHostServiceHTTPServer) func(ctx http.Context) error {
 	return func(ctx http.Context) error {
 		var in DeleteRhelHostRequest
+		if err := ctx.Bind(&in); err != nil {
+			return err
+		}
 		if err := ctx.BindQuery(&in); err != nil {
 			return err
 		}
@@ -129,10 +132,10 @@ func (c *KesselRhelHostServiceHTTPClientImpl) CreateRhelHost(ctx context.Context
 func (c *KesselRhelHostServiceHTTPClientImpl) DeleteRhelHost(ctx context.Context, in *DeleteRhelHostRequest, opts ...http.CallOption) (*DeleteRhelHostResponse, error) {
 	var out DeleteRhelHostResponse
 	pattern := "/api/inventory/v1beta1/resources/rhel-hosts"
-	path := binding.EncodeURL(pattern, in, true)
+	path := binding.EncodeURL(pattern, in, false)
 	opts = append(opts, http.Operation(OperationKesselRhelHostServiceDeleteRhelHost))
 	opts = append(opts, http.PathTemplate(pattern))
-	err := c.cc.Invoke(ctx, "DELETE", path, nil, &out, opts...)
+	err := c.cc.Invoke(ctx, "DELETE", path, in, &out, opts...)
 	if err != nil {
 		return nil, err
 	}

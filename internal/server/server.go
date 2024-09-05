@@ -24,16 +24,37 @@ type Server struct {
 	Logger log.Logger
 }
 
-func New(c CompletedConfig, authn middleware.Middleware, logger log.Logger) *Server {
+func New(c CompletedConfig, authn middleware.Middleware, logger log.Logger) (*Server, error) {
 	s := &Server{
-		Id:         c.Options.Id,
-		Name:       c.Options.Name,
-		HttpServer: http.New(c.HttpConfig, authn),
-		GrpcServer: grpc.New(c.GrpcConfig, authn),
-		Logger:     log.With(logger, "service.id", c.Options.Id),
+		Id:     c.Options.Id,
+		Name:   c.Options.Name,
+		Logger: log.With(logger, "service.id", c.Options.Id),
 	}
 
-	return s
+	meterProvider, err := NewMeterProvider(s)
+	if err != nil {
+		return nil, err
+	}
+
+	meter, err := NewMeter(meterProvider)
+	if err != nil {
+		return nil, err
+	}
+
+	httpServer, err := http.New(c.HttpConfig, authn, meter)
+	if err != nil {
+		return nil, err
+	}
+
+	grpcServer, err := grpc.New(c.GrpcConfig, authn, meter)
+	if err != nil {
+		return nil, err
+	}
+
+	s.HttpServer = httpServer
+	s.GrpcServer = grpcServer
+
+	return s, nil
 }
 
 func (s *Server) Run(ctx context.Context) error {

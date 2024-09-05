@@ -83,6 +83,9 @@ func _KesselNotificationsIntegrationService_UpdateNotificationsIntegration0_HTTP
 func _KesselNotificationsIntegrationService_DeleteNotificationsIntegration0_HTTP_Handler(srv KesselNotificationsIntegrationServiceHTTPServer) func(ctx http.Context) error {
 	return func(ctx http.Context) error {
 		var in DeleteNotificationsIntegrationRequest
+		if err := ctx.Bind(&in); err != nil {
+			return err
+		}
 		if err := ctx.BindQuery(&in); err != nil {
 			return err
 		}
@@ -129,10 +132,10 @@ func (c *KesselNotificationsIntegrationServiceHTTPClientImpl) CreateNotification
 func (c *KesselNotificationsIntegrationServiceHTTPClientImpl) DeleteNotificationsIntegration(ctx context.Context, in *DeleteNotificationsIntegrationRequest, opts ...http.CallOption) (*DeleteNotificationsIntegrationResponse, error) {
 	var out DeleteNotificationsIntegrationResponse
 	pattern := "/api/inventory/v1beta1/resources/notifications-integrations"
-	path := binding.EncodeURL(pattern, in, true)
+	path := binding.EncodeURL(pattern, in, false)
 	opts = append(opts, http.Operation(OperationKesselNotificationsIntegrationServiceDeleteNotificationsIntegration))
 	opts = append(opts, http.PathTemplate(pattern))
-	err := c.cc.Invoke(ctx, "DELETE", path, nil, &out, opts...)
+	err := c.cc.Invoke(ctx, "DELETE", path, in, &out, opts...)
 	if err != nil {
 		return nil, err
 	}

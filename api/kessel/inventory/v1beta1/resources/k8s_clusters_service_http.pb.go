@@ -83,6 +83,9 @@ func _KesselK8SClusterService_UpdateK8SCluster0_HTTP_Handler(srv KesselK8SCluste
 func _KesselK8SClusterService_DeleteK8SCluster0_HTTP_Handler(srv KesselK8SClusterServiceHTTPServer) func(ctx http.Context) error {
 	return func(ctx http.Context) error {
 		var in DeleteK8SClusterRequest
+		if err := ctx.Bind(&in); err != nil {
+			return err
+		}
 		if err := ctx.BindQuery(&in); err != nil {
 			return err
 		}
@@ -129,10 +132,10 @@ func (c *KesselK8SClusterServiceHTTPClientImpl) CreateK8SCluster(ctx context.Con
 func (c *KesselK8SClusterServiceHTTPClientImpl) DeleteK8SCluster(ctx context.Context, in *DeleteK8SClusterRequest, opts ...http.CallOption) (*DeleteK8SClusterResponse, error) {
 	var out DeleteK8SClusterResponse
 	pattern := "/api/inventory/v1beta1/resources/k8s-clusters"
-	path := binding.EncodeURL(pattern, in, true)
+	path := binding.EncodeURL(pattern, in, false)
 	opts = append(opts, http.Operation(OperationKesselK8SClusterServiceDeleteK8sCluster))
 	opts = append(opts, http.PathTemplate(pattern))
-	err := c.cc.Invoke(ctx, "DELETE", path, nil, &out, opts...)
+	err := c.cc.Invoke(ctx, "DELETE", path, in, &out, opts...)
 	if err != nil {
 		return nil, err
 	}

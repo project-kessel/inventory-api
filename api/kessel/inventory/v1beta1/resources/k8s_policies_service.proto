@@ -15,10 +15,7 @@ message CreateK8sPolicyRequest {
   K8sPolicy k8s_policy = 1;
 }
 
-message CreateK8sPolicyResponse {
-  // The policy created in Kessel Asset Inventory
-  K8sPolicy k8s_policy = 1;
-}
+message CreateK8sPolicyResponse {}
 
 message UpdateK8sPolicyRequest {
   // The resource to be updated will be defined by 
@@ -56,6 +53,7 @@ service KesselK8sPolicyService {
   rpc DeleteK8sPolicy(DeleteK8sPolicyRequest) returns (DeleteK8sPolicyResponse) {
     option (google.api.http) = {
       delete : "/api/inventory/v1beta1/resources/k8s-policies"
+      body : "*"
     };
   };
 }

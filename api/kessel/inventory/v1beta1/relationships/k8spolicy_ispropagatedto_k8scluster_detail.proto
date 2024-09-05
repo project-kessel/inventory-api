@@ -3,6 +3,7 @@ syntax = "proto3";
 package kessel.inventory.v1beta1.relationships;
 
 import "google/api/field_behavior.proto";
+import "buf/validate/validate.proto";
 
 option go_package = "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/relationships";
 option java_multiple_files = true;

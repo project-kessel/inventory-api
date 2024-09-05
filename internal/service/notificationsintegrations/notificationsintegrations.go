@@ -62,9 +62,5 @@ func notificationsIntegrationFromCreateRequest(r *pb.CreateNotificationsIntegrat
 }
 
 func createResponseFromNotificationsIntegration(h *biz.NotificationsIntegration) *pb.CreateNotificationsIntegrationResponse {
-	return &pb.CreateNotificationsIntegrationResponse{
-		Integration: &pb.NotificationsIntegration{
-			Metadata: conv.MetadataFromModel(&h.Metadata),
-		},
-	}
+	return &pb.CreateNotificationsIntegrationResponse{}
 }

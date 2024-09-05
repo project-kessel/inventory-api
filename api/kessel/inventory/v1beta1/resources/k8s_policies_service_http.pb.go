@@ -83,6 +83,9 @@ func _KesselK8SPolicyService_UpdateK8SPolicy0_HTTP_Handler(srv KesselK8SPolicySe
 func _KesselK8SPolicyService_DeleteK8SPolicy0_HTTP_Handler(srv KesselK8SPolicyServiceHTTPServer) func(ctx http.Context) error {
 	return func(ctx http.Context) error {
 		var in DeleteK8SPolicyRequest
+		if err := ctx.Bind(&in); err != nil {
+			return err
+		}
 		if err := ctx.BindQuery(&in); err != nil {
 			return err
 		}
@@ -129,10 +132,10 @@ func (c *KesselK8SPolicyServiceHTTPClientImpl) CreateK8SPolicy(ctx context.Conte
 func (c *KesselK8SPolicyServiceHTTPClientImpl) DeleteK8SPolicy(ctx context.Context, in *DeleteK8SPolicyRequest, opts ...http.CallOption) (*DeleteK8SPolicyResponse, error) {
 	var out DeleteK8SPolicyResponse
 	pattern := "/api/inventory/v1beta1/resources/k8s-policies"
-	path := binding.EncodeURL(pattern, in, true)
+	path := binding.EncodeURL(pattern, in, false)
 	opts = append(opts, http.Operation(OperationKesselK8SPolicyServiceDeleteK8sPolicy))
 	opts = append(opts, http.PathTemplate(pattern))
-	err := c.cc.Invoke(ctx, "DELETE", path, nil, &out, opts...)
+	err := c.cc.Invoke(ctx, "DELETE", path, in, &out, opts...)
 	if err != nil {
 		return nil, err
 	}

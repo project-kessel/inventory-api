@@ -72,12 +72,7 @@ func k8sClusterFromCreateRequest(r *pb.CreateK8SClusterRequest, identity *authna
 }
 
 func createResponseFromK8sCluster(c *biz.K8SCluster) *pb.CreateK8SClusterResponse {
-	return &pb.CreateK8SClusterResponse{
-		K8SCluster: &pb.K8SCluster{
-			Metadata:     conv.MetadataFromModel(&c.Metadata),
-			ResourceData: pbResourceDataFromModel(c.ResourceData),
-		},
-	}
+	return &pb.CreateK8SClusterResponse{}
 }
 
 func resourceDataFromPb(r *pb.K8SClusterDetail) *biz.K8SClusterDetail {

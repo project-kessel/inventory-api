@@ -93,99 +93,12 @@ paths:
             tags:
                 - KesselK8SPolicyIsPropagatedToK8SClusterService
             operationId: KesselK8SPolicyIsPropagatedToK8SClusterService_DeleteK8SPolicyIsPropagatedToK8SCluster
-            parameters:
-                - name: k8spolicy_ispropagatedto_k8scluster.metadata.id
-                  in: query
-                  description: Kessel Asset Inventory generated identifier.
-                  schema:
-                    type: string
-                - name: k8spolicy_ispropagatedto_k8scluster.metadata.relationship_type
-                  in: query
-                  description: The type of Resource relationship
-                  schema:
-                    type: string
-                - name: k8spolicy_ispropagatedto_k8scluster.metadata.first_reported
-                  in: query
-                  description: Date and time when the inventory item was first reported.
-                  schema:
-                    type: string
-                    format: date-time
-                - name: k8spolicy_ispropagatedto_k8scluster.metadata.last_reported
-                  in: query
-                  description: Date and time when the inventory item was last updated.
-                  schema:
-                    type: string
-                    format: date-time
-                - name: k8spolicy_ispropagatedto_k8scluster.metadata.first_reported_by
-                  in: query
-                  description: Identifier of the reporter that first reported on this item.
-                  schema:
-                    type: string
-                - name: k8spolicy_ispropagatedto_k8scluster.metadata.last_reported_by
-                  in: query
-                  description: Identifier of the reporter that last reported on this item.
-                  schema:
-                    type: string
-                - name: k8spolicy_ispropagatedto_k8scluster.reporter_data.reporter_type
-                  in: query
-                  schema:
-                    type: integer
-                    format: enum
-                - name: k8spolicy_ispropagatedto_k8scluster.reporter_data.reporter_instance_id
-                  in: query
-                  description: |-
-                    The ID of the instance of the reporter. This is derived from the
-                     authentication mechanism, i.e. authentication token.
-                  schema:
-                    type: string
-                - name: k8spolicy_ispropagatedto_k8scluster.reporter_data.reporter_version
-                  in: query
-                  description: version of the reporter
-                  schema:
-                    type: string
-                - name: k8spolicy_ispropagatedto_k8scluster.reporter_data.first_reported
-                  in: query
-                  description: Date and time when the inventory item was first reported by this reporter
-                  schema:
-                    type: string
-                    format: date-time
-                - name: k8spolicy_ispropagatedto_k8scluster.reporter_data.last_reported
-                  in: query
-                  description: Date and time when the inventory item was last updated by this reporter
-                  schema:
-                    type: string
-                    format: date-time
-                - name: k8spolicy_ispropagatedto_k8scluster.reporter_data.subject_local_resource_id
-                  in: query
-                  description: "The ID assigned by the reporter to resource which is the subject of the relationship. For example \n OCM cluster ID, HBI's host id, or ACM managed cluster name etc."
-                  schema:
-                    type: string
-                - name: k8spolicy_ispropagatedto_k8scluster.reporter_data.object_local_resource_id
-                  in: query
-                  description: "The ID assigned by the reporter to resource which is the object of the relationship. For example \n OCM cluster ID, HBI's host id, or ACM managed cluster name etc."
-                  schema:
-                    type: string
-                - name: k8spolicy_ispropagatedto_k8scluster.relationship_data.k8s_policy_id
-                  in: query
-                  description: |-
-                    The resource ID assigned to the resource by Kessel Asset Inventory. A
-                     reporter alias may also be used as a resource ID using the format:
-                     \"hcrn:<reporter_data.reporter_type>:<reporter_data.reporter_id>::<reporter_data.local_resource_id>\"
-                  schema:
-                    type: string
-                - name: k8spolicy_ispropagatedto_k8scluster.relationship_data.k8s_cluster_id
-                  in: query
-                  description: |-
-                    The resource ID assigned to the resource by Kessel Asset Inventory. A
-                     reporter alias may also be used as a resource ID using the format:
-                     \"hcrn:<reporter_data.reporter_type>:<reporter_data.reporter_id>::<reporter_data.local_resource_id>\"
-                  schema:
-                    type: string
-                - name: k8spolicy_ispropagatedto_k8scluster.relationship_data.status
-                  in: query
-                  schema:
-                    type: integer
-                    format: enum
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/kessel.inventory.v1beta1.relationships.DeleteK8SPolicyIsPropagatedToK8SClusterRequest'
+                required: true
             responses:
                 "200":
                     description: OK
@@ -250,125 +163,12 @@ paths:
             tags:
                 - KesselK8SClusterService
             operationId: KesselK8SClusterService_DeleteK8SCluster
-            parameters:
-                - name: k8s_cluster.metadata.id
-                  in: query
-                  description: Kessel Asset Inventory generated identifier.
-                  schema:
-                    type: string
-                - name: k8s_cluster.metadata.resource_type
-                  in: query
-                  description: The type of the Resource
-                  schema:
-                    type: string
-                - name: k8s_cluster.metadata.first_reported
-                  in: query
-                  description: Date and time when the inventory item was first reported.
-                  schema:
-                    type: string
-                    format: date-time
-                - name: k8s_cluster.metadata.last_reported
-                  in: query
-                  description: Date and time when the inventory item was last updated.
-                  schema:
-                    type: string
-                    format: date-time
-                - name: k8s_cluster.metadata.first_reported_by
-                  in: query
-                  description: Identifier of the reporter that first reported on this item.
-                  schema:
-                    type: string
-                - name: k8s_cluster.metadata.last_reported_by
-                  in: query
-                  description: Identifier of the reporter that last reported on this item.
-                  schema:
-                    type: string
-                - name: k8s_cluster.metadata.workspace
-                  in: query
-                  description: |-
-                    The workspace in which this resource is a member for access control.  A
-                     resource can only be a member of one workspace.
-                  schema:
-                    type: string
-                - name: k8s_cluster.reporter_data.reporter_type
-                  in: query
-                  schema:
-                    type: integer
-                    format: enum
-                - name: k8s_cluster.reporter_data.reporter_instance_id
-                  in: query
-                  description: |-
-                    The ID of the instance of the reporter. This is derived from the
-                     authentication mechanism, i.e. authentication token.
-                  schema:
-                    type: string
-                - name: k8s_cluster.reporter_data.first_reported
-                  in: query
-                  description: Date and time when the inventory item was first reported by this reporter
-                  schema:
-                    type: string
-                    format: date-time
-                - name: k8s_cluster.reporter_data.last_reported
-                  in: query
-                  description: Date and time when the inventory item was last updated by this reporter
-                  schema:
-                    type: string
-                    format: date-time
-                - name: k8s_cluster.reporter_data.console_href
-                  in: query
-                  description: |-
-                    The URL for this resource in the reporter's management UI console. For
-                     example this would be the cluster URL in the HCC Console for an OCM
-                     reported cluster.
-                  schema:
-                    type: string
-                - name: k8s_cluster.reporter_data.api_href
-                  in: query
-                  description: Reporter specific API link to the resource.
-                  schema:
-                    type: string
-                - name: k8s_cluster.reporter_data.local_resource_id
-                  in: query
-                  description: |-
-                    The ID assigned to this resource by the reporter, for example OCM cluster
-                     ID, HBI's host id, or ACM managed cluster name etc.
-                  schema:
-                    type: string
-                - name: k8s_cluster.reporter_data.reporter_version
-                  in: query
-                  description: version of the reporter
-                  schema:
-                    type: string
-                - name: k8s_cluster.resource_data.external_cluster_id
-                  in: query
-                  description: The OCP cluster ID or ARN etc for *KS
-                  schema:
-                    type: string
-                - name: k8s_cluster.resource_data.cluster_status
-                  in: query
-                  schema:
-                    type: integer
-                    format: enum
-                - name: k8s_cluster.resource_data.kube_version
-                  in: query
-                  description: The version of kubernetes
-                  schema:
-                    type: string
-                - name: k8s_cluster.resource_data.kube_vendor
-                  in: query
-                  schema:
-                    type: integer
-                    format: enum
-                - name: k8s_cluster.resource_data.vendor_version
-                  in: query
-                  description: The version of the productized kubernetes distribution
-                  schema:
-                    type: string
-                - name: k8s_cluster.resource_data.cloud_platform
-                  in: query
-                  schema:
-                    type: integer
-                    format: enum
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.DeleteK8sClusterRequest'
+                required: true
             responses:
                 "200":
                     description: OK
@@ -433,105 +233,12 @@ paths:
             tags:
                 - KesselK8SPolicyService
             operationId: KesselK8SPolicyService_DeleteK8SPolicy
-            parameters:
-                - name: k8s_policy.metadata.id
-                  in: query
-                  description: Kessel Asset Inventory generated identifier.
-                  schema:
-                    type: string
-                - name: k8s_policy.metadata.resource_type
-                  in: query
-                  description: The type of the Resource
-                  schema:
-                    type: string
-                - name: k8s_policy.metadata.first_reported
-                  in: query
-                  description: Date and time when the inventory item was first reported.
-                  schema:
-                    type: string
-                    format: date-time
-                - name: k8s_policy.metadata.last_reported
-                  in: query
-                  description: Date and time when the inventory item was last updated.
-                  schema:
-                    type: string
-                    format: date-time
-                - name: k8s_policy.metadata.first_reported_by
-                  in: query
-                  description: Identifier of the reporter that first reported on this item.
-                  schema:
-                    type: string
-                - name: k8s_policy.metadata.last_reported_by
-                  in: query
-                  description: Identifier of the reporter that last reported on this item.
-                  schema:
-                    type: string
-                - name: k8s_policy.metadata.workspace
-                  in: query
-                  description: |-
-                    The workspace in which this resource is a member for access control.  A
-                     resource can only be a member of one workspace.
-                  schema:
-                    type: string
-                - name: k8s_policy.reporter_data.reporter_type
-                  in: query
-                  schema:
-                    type: integer
-                    format: enum
-                - name: k8s_policy.reporter_data.reporter_instance_id
-                  in: query
-                  description: |-
-                    The ID of the instance of the reporter. This is derived from the
-                     authentication mechanism, i.e. authentication token.
-                  schema:
-                    type: string
-                - name: k8s_policy.reporter_data.first_reported
-                  in: query
-                  description: Date and time when the inventory item was first reported by this reporter
-                  schema:
-                    type: string
-                    format: date-time
-                - name: k8s_policy.reporter_data.last_reported
-                  in: query
-                  description: Date and time when the inventory item was last updated by this reporter
-                  schema:
-                    type: string
-                    format: date-time
-                - name: k8s_policy.reporter_data.console_href
-                  in: query
-                  description: |-
-                    The URL for this resource in the reporter's management UI console. For
-                     example this would be the cluster URL in the HCC Console for an OCM
-                     reported cluster.
-                  schema:
-                    type: string
-                - name: k8s_policy.reporter_data.api_href
-                  in: query
-                  description: Reporter specific API link to the resource.
-                  schema:
-                    type: string
-                - name: k8s_policy.reporter_data.local_resource_id
-                  in: query
-                  description: |-
-                    The ID assigned to this resource by the reporter, for example OCM cluster
-                     ID, HBI's host id, or ACM managed cluster name etc.
-                  schema:
-                    type: string
-                - name: k8s_policy.reporter_data.reporter_version
-                  in: query
-                  description: version of the reporter
-                  schema:
-                    type: string
-                - name: k8s_policy.resource_data.disabled
-                  in: query
-                  description: Defines if the policy is currently enabled or disabled across all targets
-                  schema:
-                    type: boolean
-                - name: k8s_policy.resource_data.severity
-                  in: query
-                  schema:
-                    type: integer
-                    format: enum
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.DeleteK8sPolicyRequest'
+                required: true
             responses:
                 "200":
                     description: OK
@@ -596,95 +303,12 @@ paths:
             tags:
                 - KesselNotificationsIntegrationService
             operationId: KesselNotificationsIntegrationService_DeleteNotificationsIntegration
-            parameters:
-                - name: integration.metadata.id
-                  in: query
-                  description: Kessel Asset Inventory generated identifier.
-                  schema:
-                    type: string
-                - name: integration.metadata.resource_type
-                  in: query
-                  description: The type of the Resource
-                  schema:
-                    type: string
-                - name: integration.metadata.first_reported
-                  in: query
-                  description: Date and time when the inventory item was first reported.
-                  schema:
-                    type: string
-                    format: date-time
-                - name: integration.metadata.last_reported
-                  in: query
-                  description: Date and time when the inventory item was last updated.
-                  schema:
-                    type: string
-                    format: date-time
-                - name: integration.metadata.first_reported_by
-                  in: query
-                  description: Identifier of the reporter that first reported on this item.
-                  schema:
-                    type: string
-                - name: integration.metadata.last_reported_by
-                  in: query
-                  description: Identifier of the reporter that last reported on this item.
-                  schema:
-                    type: string
-                - name: integration.metadata.workspace
-                  in: query
-                  description: |-
-                    The workspace in which this resource is a member for access control.  A
-                     resource can only be a member of one workspace.
-                  schema:
-                    type: string
-                - name: integration.reporter_data.reporter_type
-                  in: query
-                  schema:
-                    type: integer
-                    format: enum
-                - name: integration.reporter_data.reporter_instance_id
-                  in: query
-                  description: |-
-                    The ID of the instance of the reporter. This is derived from the
-                     authentication mechanism, i.e. authentication token.
-                  schema:
-                    type: string
-                - name: integration.reporter_data.first_reported
-                  in: query
-                  description: Date and time when the inventory item was first reported by this reporter
-                  schema:
-                    type: string
-                    format: date-time
-                - name: integration.reporter_data.last_reported
-                  in: query
-                  description: Date and time when the inventory item was last updated by this reporter
-                  schema:
-                    type: string
-                    format: date-time
-                - name: integration.reporter_data.console_href
-                  in: query
-                  description: |-
-                    The URL for this resource in the reporter's management UI console. For
-                     example this would be the cluster URL in the HCC Console for an OCM
-                     reported cluster.
-                  schema:
-                    type: string
-                - name: integration.reporter_data.api_href
-                  in: query
-                  description: Reporter specific API link to the resource.
-                  schema:
-                    type: string
-                - name: integration.reporter_data.local_resource_id
-                  in: query
-                  description: |-
-                    The ID assigned to this resource by the reporter, for example OCM cluster
-                     ID, HBI's host id, or ACM managed cluster name etc.
-                  schema:
-                    type: string
-                - name: integration.reporter_data.reporter_version
-                  in: query
-                  description: version of the reporter
-                  schema:
-                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.DeleteNotificationsIntegrationRequest'
+                required: true
             responses:
                 "200":
                     description: OK
@@ -749,95 +373,12 @@ paths:
             tags:
                 - KesselRhelHostService
             operationId: KesselRhelHostService_DeleteRhelHost
-            parameters:
-                - name: rhel_host.metadata.id
-                  in: query
-                  description: Kessel Asset Inventory generated identifier.
-                  schema:
-                    type: string
-                - name: rhel_host.metadata.resource_type
-                  in: query
-                  description: The type of the Resource
-                  schema:
-                    type: string
-                - name: rhel_host.metadata.first_reported
-                  in: query
-                  description: Date and time when the inventory item was first reported.
-                  schema:
-                    type: string
-                    format: date-time
-                - name: rhel_host.metadata.last_reported
-                  in: query
-                  description: Date and time when the inventory item was last updated.
-                  schema:
-                    type: string
-                    format: date-time
-                - name: rhel_host.metadata.first_reported_by
-                  in: query
-                  description: Identifier of the reporter that first reported on this item.
-                  schema:
-                    type: string
-                - name: rhel_host.metadata.last_reported_by
-                  in: query
-                  description: Identifier of the reporter that last reported on this item.
-                  schema:
-                    type: string
-                - name: rhel_host.metadata.workspace
-                  in: query
-                  description: |-
-                    The workspace in which this resource is a member for access control.  A
-                     resource can only be a member of one workspace.
-                  schema:
-                    type: string
-                - name: rhel_host.reporter_data.reporter_type
-                  in: query
-                  schema:
-                    type: integer
-                    format: enum
-                - name: rhel_host.reporter_data.reporter_instance_id
-                  in: query
-                  description: |-
-                    The ID of the instance of the reporter. This is derived from the
-                     authentication mechanism, i.e. authentication token.
-                  schema:
-                    type: string
-                - name: rhel_host.reporter_data.first_reported
-                  in: query
-                  description: Date and time when the inventory item was first reported by this reporter
-                  schema:
-                    type: string
-                    format: date-time
-                - name: rhel_host.reporter_data.last_reported
-                  in: query
-                  description: Date and time when the inventory item was last updated by this reporter
-                  schema:
-                    type: string
-                    format: date-time
-                - name: rhel_host.reporter_data.console_href
-                  in: query
-                  description: |-
-                    The URL for this resource in the reporter's management UI console. For
-                     example this would be the cluster URL in the HCC Console for an OCM
-                     reported cluster.
-                  schema:
-                    type: string
-                - name: rhel_host.reporter_data.api_href
-                  in: query
-                  description: Reporter specific API link to the resource.
-                  schema:
-                    type: string
-                - name: rhel_host.reporter_data.local_resource_id
-                  in: query
-                  description: |-
-                    The ID assigned to this resource by the reporter, for example OCM cluster
-                     ID, HBI's host id, or ACM managed cluster name etc.
-                  schema:
-                    type: string
-                - name: rhel_host.reporter_data.reporter_version
-                  in: query
-                  description: version of the reporter
-                  schema:
-                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.DeleteRhelHostRequest'
+                required: true
             responses:
                 "200":
                     description: OK
@@ -903,6 +444,13 @@ components:
         kessel.inventory.v1beta1.relationships.CreateK8SPolicyIsPropagatedToK8SClusterResponse:
             type: object
             properties: {}
+        kessel.inventory.v1beta1.relationships.DeleteK8SPolicyIsPropagatedToK8SClusterRequest:
+            type: object
+            properties:
+                k8spolicy_ispropagatedto_k8scluster:
+                    allOf:
+                        - $ref: '#/components/schemas/kessel.inventory.v1beta1.relationships.K8SPolicyIsPropagatedToK8SCluster'
+                    description: "The resource-relationship to be deleted will be defined by \n \\\"<reporter_data.reporter_type>:<reporter_instance_id>:<reporter_data.subject_local_resource_id>\\\"\n AND \\\"<reporter_data.reporter_type>:<reporter_instance_id>:<reporter_data.object_local_resource_id>\\\"\n from the request body."
         kessel.inventory.v1beta1.relationships.DeleteK8SPolicyIsPropagatedToK8SClusterResponse:
             type: object
             properties: {}
@@ -1016,9 +564,7 @@ components:
                     description: The k8s cluster to create in Kessel Asset Inventory
         kessel.inventory.v1beta1.resources.CreateK8sClusterResponse:
             type: object
-            properties:
-                k8s_cluster:
-                    $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.K8sCluster'
+            properties: {}
         kessel.inventory.v1beta1.resources.CreateK8sPolicyRequest:
             type: object
             properties:
@@ -1028,11 +574,7 @@ components:
                     description: The policy to create in Kessel Asset Inventory
         kessel.inventory.v1beta1.resources.CreateK8sPolicyResponse:
             type: object
-            properties:
-                k8s_policy:
-                    allOf:
-                        - $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.K8sPolicy'
-                    description: The policy created in Kessel Asset Inventory
+            properties: {}
         kessel.inventory.v1beta1.resources.CreateNotificationsIntegrationRequest:
             type: object
             properties:
@@ -1042,11 +584,7 @@ components:
                     description: The NotificationsIntegration to create in Kessel Asset Inventory
         kessel.inventory.v1beta1.resources.CreateNotificationsIntegrationResponse:
             type: object
-            properties:
-                integration:
-                    allOf:
-                        - $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.NotificationsIntegration'
-                    description: The NotificationsIntegration created in Kessel Asset Inventory
+            properties: {}
         kessel.inventory.v1beta1.resources.CreateRhelHostRequest:
             type: object
             properties:
@@ -1057,15 +595,43 @@ components:
         kessel.inventory.v1beta1.resources.CreateRhelHostResponse:
             type: object
             properties: {}
+        kessel.inventory.v1beta1.resources.DeleteK8sClusterRequest:
+            type: object
+            properties:
+                k8s_cluster:
+                    allOf:
+                        - $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.K8sCluster'
+                    description: "The resource to be deleted will be defined by \n \\\"<reporter_data.reporter_type>:<reporter_instaance_id>:<reporter_data.local_resource_id>\\\" \n from the request body."
         kessel.inventory.v1beta1.resources.DeleteK8sClusterResponse:
             type: object
             properties: {}
+        kessel.inventory.v1beta1.resources.DeleteK8sPolicyRequest:
+            type: object
+            properties:
+                k8s_policy:
+                    allOf:
+                        - $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.K8sPolicy'
+                    description: "The resource to be deleted will be defined by \n \\\"<reporter_data.reporter_type>:<reporter_instaance_id>:<reporter_data.local_resource_id>\\\"\n from the request body."
         kessel.inventory.v1beta1.resources.DeleteK8sPolicyResponse:
             type: object
             properties: {}
+        kessel.inventory.v1beta1.resources.DeleteNotificationsIntegrationRequest:
+            type: object
+            properties:
+                integration:
+                    allOf:
+                        - $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.NotificationsIntegration'
+                    description: "The resource to be deleted will be defined by \n \\\"<reporter_data.reporter_type>:<reporter_instaance_id>:<reporter_data.local_resource_id>\\\"\n from the request body."
         kessel.inventory.v1beta1.resources.DeleteNotificationsIntegrationResponse:
             type: object
             properties: {}
+        kessel.inventory.v1beta1.resources.DeleteRhelHostRequest:
+            type: object
+            properties:
+                rhel_host:
+                    allOf:
+                        - $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.RhelHost'
+                    description: "The resource to be updated will be defined by \n \\\"<reporter_data.reporter_type>:<reporter_instaance_id>:<reporter_data.local_resource_id>\\\"\n from the request body."
         kessel.inventory.v1beta1.resources.DeleteRhelHostResponse:
             type: object
             properties: {}
@@ -1266,9 +832,7 @@ components:
                     description: "The resource to be updated will be defined by \n \\\"<reporter_data.reporter_type>:<reporter_instaance_id>:<reporter_data.local_resource_id>\\\"\n from the request body."
         kessel.inventory.v1beta1.resources.UpdateK8sClusterResponse:
             type: object
-            properties:
-                k8s_cluster:
-                    $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.K8sCluster'
+            properties: {}
         kessel.inventory.v1beta1.resources.UpdateK8sPolicyRequest:
             type: object
             properties:

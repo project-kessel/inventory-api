@@ -67,14 +67,5 @@ func k8sPolicyFromCreateRequest(r *pb.CreateK8SPolicyRequest, identity *authnapi
 }
 
 func createResponseFromK8sPolicy(p *biz.K8sPolicy) *pb.CreateK8SPolicyResponse {
-	// TODO: Error handling if the string lookups fail in the pb maps
-	return &pb.CreateK8SPolicyResponse{
-		K8SPolicy: &pb.K8SPolicy{
-			Metadata: conv.MetadataFromModel(&p.Metadata),
-			ResourceData: &pb.K8SPolicyDetail{
-				Disabled: p.ResourceData.Disabled,
-				Severity: pb.K8SPolicyDetail_Severity(pb.K8SPolicyDetail_Severity_value[p.ResourceData.Severity]),
-			},
-		},
-	}
+	return &pb.CreateK8SPolicyResponse{}
 }

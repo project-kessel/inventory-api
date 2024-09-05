@@ -55,6 +55,7 @@ service KesselK8SPolicyIsPropagatedToK8SClusterService {
   rpc DeleteK8SPolicyIsPropagatedToK8SCluster(DeleteK8SPolicyIsPropagatedToK8SClusterRequest) returns (DeleteK8SPolicyIsPropagatedToK8SClusterResponse) {
     option (google.api.http) = {
       delete: "/api/inventory/v1beta1/resource-relationships/k8s-policy.is-propagated.to-k8s-cluster"
+      body : "*"
     };
   };
 }

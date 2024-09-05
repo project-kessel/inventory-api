@@ -105,35 +105,3 @@ func resourceDataFromPb(r *pb.K8SClusterDetail) *biz.K8SClusterDetail {
 	}
 	return rd
 }
-
-func pbResourceDataFromModel(m *biz.K8SClusterDetail) *pb.K8SClusterDetail {
-	var nodes []*pb.K8SClusterDetailNodesInner
-	for _, n := range m.Nodes {
-		var labels []*pb.ResourceLabel
-		for _, l := range n.Labels {
-			labels = append(labels, &pb.ResourceLabel{Key: l.Key, Value: l.Value})
-		}
-
-		nodes = append(nodes, &pb.K8SClusterDetailNodesInner{
-			Name:   n.Name,
-			Cpu:    n.Cpu,
-			Memory: n.Memory,
-			Labels: labels,
-		})
-	}
-
-	// TODO: Error handling if the string lookups fail in the pb maps
-	rd := &pb.K8SClusterDetail{
-		ExternalClusterId: m.ExternalClusterId,
-		ClusterStatus:     pb.K8SClusterDetail_ClusterStatus(pb.K8SClusterDetail_ClusterStatus_value[m.ClusterStatus]),
-
-		KubeVersion: m.KubeVersion,
-		KubeVendor:  pb.K8SClusterDetail_KubeVendor(pb.K8SClusterDetail_KubeVendor_value[m.KubeVendor]),
-
-		VendorVersion: m.VendorVersion,
-		CloudPlatform: pb.K8SClusterDetail_CloudPlatform(pb.K8SClusterDetail_CloudPlatform_value[m.CloudPlatform]),
-
-		Nodes: nodes,
-	}
-	return rd
-}

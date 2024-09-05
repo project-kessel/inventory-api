@@ -471,17 +471,13 @@ components:
             type: object
             properties:
                 k8s_policy_id:
+                    readOnly: true
                     type: string
-                    description: |-
-                        The resource ID assigned to the resource by Kessel Asset Inventory. A
-                         reporter alias may also be used as a resource ID using the format:
-                         \"hcrn:<reporter_data.reporter_type>:<reporter_data.reporter_id>::<reporter_data.local_resource_id>\"
+                    description: The resource ID assigned to the resource by Kessel Asset Inventory.
                 k8s_cluster_id:
+                    readOnly: true
                     type: string
-                    description: |-
-                        The resource ID assigned to the resource by Kessel Asset Inventory. A
-                         reporter alias may also be used as a resource ID using the format:
-                         \"hcrn:<reporter_data.reporter_type>:<reporter_data.reporter_id>::<reporter_data.local_resource_id>\"
+                    description: The resource ID assigned to the resource by Kessel Asset Inventory.
                 status:
                     type: integer
                     format: enum

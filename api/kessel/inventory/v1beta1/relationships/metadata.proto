@@ -13,6 +13,9 @@ message Metadata {
   // Kessel Asset Inventory generated identifier.
   int64 id = 3356 [ (google.api.field_behavior) = OUTPUT_ONLY ];
 
+    // Organization ID 
+  int64 org_id = 4457 [ (google.api.field_behavior) = OUTPUT_ONLY ];
+
   // The type of Resource relationship
   string relationship_type = 251000036 
         [ (google.api.field_behavior) = OUTPUT_ONLY ];

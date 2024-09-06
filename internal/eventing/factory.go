@@ -15,7 +15,11 @@ func New(c CompletedConfig, source string, logger *log.Helper) (api.Manager, err
 	case "stdout":
 		return stdout.New(logger)
 	case "kafka":
-		return kafka.New(c.Kafka, source, logger)
+		km, err := kafka.New(c.Kafka, source, logger)
+		if err != nil {
+			return nil, err
+		}
+		return km, nil
 	}
 
 	return nil, fmt.Errorf("unrecognized eventer type: %s", c.Eventer)

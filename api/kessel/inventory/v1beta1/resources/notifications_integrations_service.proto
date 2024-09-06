@@ -3,6 +3,7 @@ syntax = "proto3";
 package kessel.inventory.v1beta1.resources;
 
 import "google/api/annotations.proto";
+import "buf/validate/validate.proto";
 
 import "kessel/inventory/v1beta1/resources/notifications_integration.proto";
 import "kessel/inventory/v1beta1/resources/reporter_data.proto";
@@ -13,7 +14,7 @@ option java_package = "org.project_kessel.api.inventory.v1beta1.resources";
 
 message CreateNotificationsIntegrationRequest {
   // The NotificationsIntegration to create in Kessel Asset Inventory
-  NotificationsIntegration integration = 1;
+  NotificationsIntegration integration = 1 [ (buf.validate.field).required = true ];
 }
 
 message CreateNotificationsIntegrationResponse {}
@@ -22,7 +23,7 @@ message UpdateNotificationsIntegrationRequest {
   // The resource to be updated will be defined by 
   // \"<reporter_data.reporter_type>:<reporter_instaance_id>:<reporter_data.local_resource_id>\"
   // from the request body.
-  NotificationsIntegration integration = 1;
+  NotificationsIntegration integration = 1 [ (buf.validate.field).required = true ];
 }
 
 message UpdateNotificationsIntegrationResponse {}
@@ -31,7 +32,7 @@ message DeleteNotificationsIntegrationRequest {
   // The resource to be deleted will be defined by 
   // \"<reporter_data.reporter_type>:<reporter_instaance_id>:<reporter_data.local_resource_id>\"
   // from the request body.
-  ReporterData reporter_data = 1;
+  ReporterData reporter_data = 1 [ (buf.validate.field).required = true ];
 }
 
 message DeleteNotificationsIntegrationResponse {}

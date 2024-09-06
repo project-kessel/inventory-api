@@ -14,7 +14,7 @@ message Metadata {
   int64 id = 3356 [ (google.api.field_behavior) = OUTPUT_ONLY ];
 
     // Organization ID 
-  int64 org_id = 4457 [ (google.api.field_behavior) = OUTPUT_ONLY ];
+  int64 org_id = 4457;
 
   // The type of Resource relationship
   string relationship_type = 251000036 

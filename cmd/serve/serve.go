@@ -144,7 +144,10 @@ func NewCommand(
 			}
 
 			// construct servers
-			server := server.New(serverConfig, middleware.Authentication(authenticator), logger)
+			server, err := server.New(serverConfig, middleware.Authentication(authenticator), logger)
+			if err != nil {
+				return err
+			}
 
 			// wire together notificationsintegrations handling
 			notifs_repo := notifsrepo.New(db, authorizer, eventingManager)

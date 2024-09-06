@@ -7,19 +7,34 @@ import (
 	"github.com/go-kratos/kratos/v2/middleware/selector"
 	kgrpc "github.com/go-kratos/kratos/v2/transport/grpc"
 	m "github.com/project-kessel/inventory-api/internal/middleware"
+
+	"github.com/go-kratos/kratos/v2/middleware/metrics"
+	"go.opentelemetry.io/otel/metric"
 )
 
 // New creates a new a gRPC server.
-func New(c CompletedConfig, authn middleware.Middleware) *kgrpc.Server {
+func New(c CompletedConfig, authn middleware.Middleware, meter metric.Meter) (*kgrpc.Server, error) {
+	requests, err := metrics.DefaultRequestsCounter(meter, metrics.DefaultServerRequestsCounterName)
+	if err != nil {
+		return nil, err
+	}
+	seconds, err := metrics.DefaultSecondsHistogram(meter, metrics.DefaultServerSecondsHistogramName)
+	if err != nil {
+		return nil, err
+	}
 	validator, err := protovalidate.New()
 	if err != nil {
-		return nil
+		return nil, err
 	}
 	// TODO: pass in health, authn middleware
 	var opts = []kgrpc.ServerOption{
 		kgrpc.Middleware(
 			recovery.Recovery(),
 			m.Validation(validator),
+			metrics.Server(
+				metrics.WithRequests(requests),
+				metrics.WithSeconds(seconds),
+			),
 			selector.Server(
 				authn,
 			).Match(NewWhiteListMatcher).Build(),
@@ -27,5 +42,5 @@ func New(c CompletedConfig, authn middleware.Middleware) *kgrpc.Server {
 	}
 	opts = append(opts, c.ServerOptions...)
 	srv := kgrpc.NewServer(opts...)
-	return srv
+	return srv, nil
 }

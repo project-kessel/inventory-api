@@ -3,19 +3,19 @@ package health
 import (
 	"context"
 	"github.com/go-kratos/kratos/v2/log"
-	"gorm.io/gorm"
-
 	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1"
+	biz "github.com/project-kessel/inventory-api/internal/biz/health"
 )
 
 type HealthService struct {
 	pb.UnimplementedKesselInventoryHealthServiceServer
-	DB *gorm.DB
+
+	Ctl *biz.HealthUsecase
 }
 
-func NewHealthService(db *gorm.DB) *HealthService {
+func New(c *biz.HealthUsecase) *HealthService {
 	return &HealthService{
-		DB: db,
+		Ctl: c,
 	}
 }
 
@@ -28,30 +28,6 @@ func (s *HealthService) GetLivez(ctx context.Context, req *pb.GetLivezRequest) (
 }
 
 func (s *HealthService) GetReadyz(ctx context.Context, req *pb.GetReadyzRequest) (*pb.GetReadyzResponse, error) {
-	//determine storage type based on Gorm Dialector
-	storageType := s.DB.Dialector.Name()
-	log.Infof("Checking readiness for storage type: %s", storageType)
 
-	sqlDB, err := s.DB.DB()
-	if err != nil {
-		log.Errorf("Failed to retrieve DB: %v", err)
-		return &pb.GetReadyzResponse{
-			Status: "STORAGE UNHEALTHY: " + storageType,
-			Code:   500,
-		}, nil
-	}
-	err = sqlDB.PingContext(ctx)
-	if err != nil {
-		log.Errorf("Failed to ping database: %v", err)
-		return &pb.GetReadyzResponse{
-			Status: "FAILED TO PING DB: " + storageType,
-			Code:   500,
-		}, nil
-	}
-
-	log.Infof("Storage type %s is healthy", storageType)
-	return &pb.GetReadyzResponse{
-		Status: "OK: " + storageType,
-		Code:   200,
-	}, nil
+	return s.Ctl.IsBackendAvailable(ctx)
 }

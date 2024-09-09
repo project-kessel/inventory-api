@@ -184,7 +184,7 @@ func NewCommand(
 			rel.RegisterKesselK8SPolicyIsPropagatedToK8SClusterServiceServer(server.GrpcServer, relationships_service)
 			rel.RegisterKesselK8SPolicyIsPropagatedToK8SClusterServiceHTTPServer(server.HttpServer, relationships_service)
 
-			health_service := health.NewHealthService()
+			health_service := health.NewHealthService(db)
 			hb.RegisterKesselInventoryHealthServiceServer(server.GrpcServer, health_service)
 			hb.RegisterKesselInventoryHealthServiceHTTPServer(server.HttpServer, health_service)
 

@@ -4,7 +4,6 @@ package kessel.inventory.v1beta1.relationships;
 
 import "google/api/field_behavior.proto";
 import "google/protobuf/timestamp.proto";
-import "buf/validate/validate.proto";
 
 option go_package = "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/relationships";
 option java_multiple_files = true;
@@ -15,7 +14,7 @@ message Metadata {
   int64 id = 3356 [ (google.api.field_behavior) = OUTPUT_ONLY ];
 
     // Organization ID 
-  int64 org_id = 4457 [(buf.validate.field).required = true ];
+  int64 org_id = 4457;
 
   // The type of Resource relationship
   string relationship_type = 251000036 

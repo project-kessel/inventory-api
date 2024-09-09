@@ -2,7 +2,7 @@
   "rhelHost": {
     "metadata": {
       "resource_type": "rhel-host",
-      "workspace": ""
+      "workspace": "default"
     },
     "reporter_data": {
       "reporter_type": "OCM",

@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package kessel.inventory.v1beta1.resources;
 
+import "buf/validate/validate.proto";
 import "google/api/field_behavior.proto";
 import "google/protobuf/timestamp.proto";
 
@@ -37,7 +38,7 @@ message Metadata {
 
   // The workspace in which this resource is a member for access control.  A
   // resource can only be a member of one workspace.
-  string workspace = 35122327;
+  string workspace = 35122327 [ (buf.validate.field).string.min_len = 1 ];
 
   repeated ResourceLabel labels = 3552281;
 }

@@ -4,6 +4,7 @@ package kessel.inventory.v1beta1.resources;
 
 import "google/api/field_behavior.proto";
 import "google/protobuf/timestamp.proto";
+import "buf/validate/validate.proto";
 
 import "kessel/inventory/v1beta1/resources/resource_label.proto";
 
@@ -16,7 +17,7 @@ message Metadata {
   int64 id = 3355 [ (google.api.field_behavior) = OUTPUT_ONLY ];
 
   // Organization ID 
-  int64 org_id = 4456;
+  int64 org_id = 4456 [(buf.validate.field).required = true ];
 
   // The type of the Resource
   string resource_type = 442752204

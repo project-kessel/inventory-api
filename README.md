@@ -93,7 +93,7 @@ Sample request with the authorization header
 ## Running Inventory api with kafka
 Starts a local strimzi kafka and zookeeper:
 ```bash
-make inventory-up-kakfa
+make inventory-up-kafka
 ```
 
 Start `inventory-api` using the `./kafka-inventory-api.yaml` config.
@@ -103,7 +103,9 @@ Start `inventory-api` using the `./kafka-inventory-api.yaml` config.
 
 In a separate terminal exec into the kafka pod so you can watch messages.
 ```bash
-podman exec -i -t inventory-api_kafka_1 /bin/bash
+source ./scripts/check_docker_podman.sh
+KAFKA_CONTAINER_NAME=$(${DOCKER} ps | grep inventory-api-kafka | awk '{print $1}')
+${DOCKER} exec -i -t ${KAFKA_CONTAINER_NAME} /bin/bash
 ```
 
 Start consuming messages in the pod.
@@ -113,7 +115,7 @@ Start consuming messages in the pod.
 
 In a separate terminal, post a resource to `inventory-api`:
 ```bash
-curl -H "Authorization: Bearer 1234" -H "Content-Type: application/json" --data "@data/k8s-cluster.json" http://localhost:8081/api/inventory/v1beta1/k8s-clusters
+curl -H "Content-Type: application/json" -H "Authorization: bearer 1234" --data "@data/k8s-cluster.json" http://localhost:8081/api/inventory/v1beta1/resources/k8s-clusters
 ```
 
 Manually stop the `inventory-api` and then run `make inventory-down-kafka`

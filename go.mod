@@ -26,7 +26,7 @@ require (
 	go.opentelemetry.io/otel/sdk v1.29.0
 	go.opentelemetry.io/otel/sdk/metric v1.29.0
 	google.golang.org/genproto/googleapis/api v0.0.0-20240604185151-ef581f913117
-	google.golang.org/grpc v1.66.0
+	google.golang.org/grpc v1.66.1
 	google.golang.org/protobuf v1.34.2
 	gopkg.in/yaml.v3 v3.0.1
 	gorm.io/driver/postgres v1.5.9

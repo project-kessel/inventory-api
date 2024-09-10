@@ -85,3 +85,7 @@ schema: |-
     permission disable = workspace->notifications_integration_disable
     permission enable = workspace->notifications_integration_enable
   }
+
+  definition hbi/rhel_host {
+    relation workspace: rbac/workspace
+  }

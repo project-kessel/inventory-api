@@ -46,6 +46,14 @@ func (r *k8sclustersRepo) Save(ctx context.Context, model *biz.K8SCluster) (*biz
 			return nil, err
 		}
 	}
+
+	if r.Authz != nil {
+		_, err := r.Authz.SetWorkspace(ctx, model.ID, model.Metadata.Workspace, "acm", "k8scluster")
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	return model, nil
 }
 
@@ -71,6 +79,14 @@ func (r *k8sclustersRepo) Update(ctx context.Context, model *biz.K8SCluster, id 
 			return nil, err
 		}
 	}
+
+	if r.Authz != nil {
+		_, err := r.Authz.SetWorkspace(ctx, model.ID, model.Metadata.Workspace, "acm", "k8scluster")
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	return model, nil
 }
 
@@ -94,6 +110,9 @@ func (r *k8sclustersRepo) Delete(ctx context.Context, id string) error {
 			return err
 		}
 	}
+
+	// TODO: do we need to delete the workspace tuple?
+
 	return nil
 }
 

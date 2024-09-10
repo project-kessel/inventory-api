@@ -488,9 +488,6 @@ components:
                     readOnly: true
                     type: string
                     description: Kessel Asset Inventory generated identifier.
-                org_id:
-                    type: string
-                    description: Organization ID
                 relationship_type:
                     readOnly: true
                     type: string
@@ -721,9 +718,6 @@ components:
                     readOnly: true
                     type: string
                     description: Kessel Asset Inventory generated identifier.
-                org_id:
-                    type: string
-                    description: Organization ID
                 resource_type:
                     readOnly: true
                     type: string

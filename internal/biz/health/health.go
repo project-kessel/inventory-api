@@ -16,7 +16,7 @@ type HealthUsecase struct {
 	log  *log.Helper
 }
 
-// New creates a new a Host usecase.
+// New creates a new a Health usecase.
 func New(repo HealthRepo, logger log.Logger) *HealthUsecase {
 	return &HealthUsecase{repo: repo, log: log.NewHelper(logger)}
 }

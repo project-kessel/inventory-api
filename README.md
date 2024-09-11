@@ -144,3 +144,5 @@ authz:
     sa-client-secret: "<secret>"
     sso-token-endpoint: "http://localhost:8084/realms/redhat-external/protocol/openid-connect/token"
 ```
+## Debugging Inventory API using Vscode
+Follow the [DEBUG](./DEBUG.md) guide

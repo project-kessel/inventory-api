@@ -136,7 +136,7 @@ func (p *kafkaProducer) Produce(ctx context.Context, event *api.Event) error {
 		return err
 	}
 
-	ret := p.Manager.Client.Send(cecontext.WithTopic(ctx, p.Topic), e)
+	ret := p.Manager.Client.Send(confluent.WithMessageKey(cecontext.WithTopic(ctx, p.Topic), p.Manager.Source), e)
 	if cloudevents.IsUndelivered(ret) {
 		p.Logger.Infof("Failed to send %v", ret)
 	} else {

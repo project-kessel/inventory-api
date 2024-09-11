@@ -32,6 +32,6 @@ func (a *AllowAllAuthz) DeleteTuples(ctx context.Context, r *kessel.DeleteTuples
 	return &kessel.DeleteTuplesResponse{}, nil
 }
 
-func (a *AllowAllAuthz) SetWorkspace(ctx context.Context, id int64, workspace, name, namespace string) (*kessel.CreateTuplesResponse, error) {
+func (a *AllowAllAuthz) SetWorkspace(ctx context.Context, local_resource_id, workspace, name, namespace string) (*kessel.CreateTuplesResponse, error) {
 	return &kessel.CreateTuplesResponse{}, nil
 }

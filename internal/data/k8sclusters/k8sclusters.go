@@ -48,7 +48,7 @@ func (r *k8sclustersRepo) Save(ctx context.Context, model *biz.K8SCluster) (*biz
 	}
 
 	if r.Authz != nil {
-		_, err := r.Authz.SetWorkspace(ctx, model.ID, model.Metadata.Workspace, "acm", "k8scluster")
+		_, err := r.Authz.SetWorkspace(ctx, model.Metadata.Reporters[0].LocalResourceId, model.Metadata.Workspace, "acm", "k8scluster")
 		if err != nil {
 			return nil, err
 		}
@@ -81,7 +81,7 @@ func (r *k8sclustersRepo) Update(ctx context.Context, model *biz.K8SCluster, id 
 	}
 
 	if r.Authz != nil {
-		_, err := r.Authz.SetWorkspace(ctx, model.ID, model.Metadata.Workspace, "acm", "k8scluster")
+		_, err := r.Authz.SetWorkspace(ctx, model.Metadata.Reporters[0].LocalResourceId, model.Metadata.Workspace, "acm", "k8scluster")
 		if err != nil {
 			return nil, err
 		}

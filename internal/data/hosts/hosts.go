@@ -51,7 +51,7 @@ func (r *hostsRepo) Save(ctx context.Context, model *biz.Host) (*biz.Host, error
 	}
 
 	if r.Authz != nil {
-		_, err := r.Authz.SetWorkspace(ctx, model.ID, model.Metadata.Workspace, "hbi", "rhel_host")
+		_, err := r.Authz.SetWorkspace(ctx, model.Metadata.Reporters[0].LocalResourceId, model.Metadata.Workspace, "hbi", "rhel_host")
 		if err != nil {
 			return nil, err
 		}
@@ -83,7 +83,7 @@ func (r *hostsRepo) Update(ctx context.Context, model *biz.Host, id string) (*bi
 	}
 
 	if r.Authz != nil {
-		_, err := r.Authz.SetWorkspace(ctx, model.ID, model.Metadata.Workspace, "hbi", "rhel_host")
+		_, err := r.Authz.SetWorkspace(ctx, model.Metadata.Reporters[0].LocalResourceId, model.Metadata.Workspace, "hbi", "rhel_host")
 		if err != nil {
 			return nil, err
 		}

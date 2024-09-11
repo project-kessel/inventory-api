@@ -2,6 +2,8 @@ package kessel
 
 import (
 	"context"
+	"fmt"
+
 	"github.com/go-kratos/kratos/v2/log"
 	authzapi "github.com/project-kessel/inventory-api/internal/authz/api"
 	kessel "github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
@@ -68,4 +70,42 @@ func (a *KesselAuthz) DeleteTuples(ctx context.Context, r *kessel.DeleteTuplesRe
 		return nil, err
 	}
 	return a.TupleService.DeleteTuples(ctx, r, opts...)
+}
+
+func (a *KesselAuthz) SetWorkspace(ctx context.Context, local_resource_id, workspace, namespace, name string) (*kessel.CreateTuplesResponse, error) {
+	if workspace == "" {
+		return nil, fmt.Errorf("workspace is required")
+	}
+
+	// TODO: remove previous tuple for workspace
+
+	rels := []*kessel.Relationship{{
+		Resource: &kessel.ObjectReference{
+			Type: &kessel.ObjectType{
+				Name:      name,
+				Namespace: namespace,
+			},
+			Id: local_resource_id,
+		},
+		Relation: "workspace",
+		Subject: &kessel.SubjectReference{
+			Subject: &kessel.ObjectReference{
+				Type: &kessel.ObjectType{
+					Name:      "workspace",
+					Namespace: "rbac",
+				},
+				Id: workspace,
+			},
+		},
+	}}
+
+	response, err := a.CreateTuples(ctx, &kessel.CreateTuplesRequest{
+		Tuples: rels,
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return response, nil
 }

@@ -49,6 +49,14 @@ func (r *notificationsintegrationsRepo) Save(ctx context.Context, model *biz.Not
 			return nil, err
 		}
 	}
+
+	if r.Authz != nil {
+		_, err := r.Authz.SetWorkspace(ctx, model.Metadata.Reporters[0].LocalResourceId, model.Metadata.Workspace, "notifications", "integration")
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	return model, nil
 }
 
@@ -73,6 +81,14 @@ func (r *notificationsintegrationsRepo) Update(ctx context.Context, model *biz.N
 			return nil, err
 		}
 	}
+
+	if r.Authz != nil {
+		_, err := r.Authz.SetWorkspace(ctx, model.Metadata.Reporters[0].LocalResourceId, model.Metadata.Workspace, "notifications", "integration")
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	return model, nil
 }
 
@@ -96,6 +112,9 @@ func (r *notificationsintegrationsRepo) Delete(ctx context.Context, id string) e
 			return err
 		}
 	}
+
+	// TODO: delete the workspace tuple
+
 	return nil
 }
 

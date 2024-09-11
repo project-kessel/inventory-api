@@ -49,6 +49,14 @@ func (r *k8spoliciesRepo) Save(ctx context.Context, model *biz.K8sPolicy) (*biz.
 			return nil, err
 		}
 	}
+
+	if r.Authz != nil {
+		_, err := r.Authz.SetWorkspace(ctx, model.Metadata.Reporters[0].LocalResourceId, model.Metadata.Workspace, "acm", "k8spolicy")
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	return model, nil
 }
 
@@ -74,6 +82,14 @@ func (r *k8spoliciesRepo) Update(ctx context.Context, model *biz.K8sPolicy, id s
 			return nil, err
 		}
 	}
+
+	if r.Authz != nil {
+		_, err := r.Authz.SetWorkspace(ctx, model.Metadata.Reporters[0].LocalResourceId, model.Metadata.Workspace, "acm", "k8scluster")
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	return model, nil
 }
 
@@ -97,6 +113,9 @@ func (r *k8spoliciesRepo) Delete(ctx context.Context, id string) error {
 			return err
 		}
 	}
+
+	// TODO: delete the workspace tuple
+
 	return nil
 }
 

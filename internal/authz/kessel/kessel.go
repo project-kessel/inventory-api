@@ -3,7 +3,6 @@ package kessel
 import (
 	"context"
 	"fmt"
-	"strconv"
 
 	"github.com/go-kratos/kratos/v2/log"
 	authzapi "github.com/project-kessel/inventory-api/internal/authz/api"
@@ -73,7 +72,7 @@ func (a *KesselAuthz) DeleteTuples(ctx context.Context, r *kessel.DeleteTuplesRe
 	return a.TupleService.DeleteTuples(ctx, r, opts...)
 }
 
-func (a *KesselAuthz) SetWorkspace(ctx context.Context, id int64, workspace, namespace, name string) (*kessel.CreateTuplesResponse, error) {
+func (a *KesselAuthz) SetWorkspace(ctx context.Context, local_resource_id, workspace, namespace, name string) (*kessel.CreateTuplesResponse, error) {
 	if workspace == "" {
 		return nil, fmt.Errorf("workspace is required")
 	}
@@ -86,7 +85,7 @@ func (a *KesselAuthz) SetWorkspace(ctx context.Context, id int64, workspace, nam
 				Name:      name,
 				Namespace: namespace,
 			},
-			Id: strconv.FormatInt(id, 10),
+			Id: local_resource_id,
 		},
 		Relation: "workspace",
 		Subject: &kessel.SubjectReference{

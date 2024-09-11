@@ -51,7 +51,7 @@ func (r *notificationsintegrationsRepo) Save(ctx context.Context, model *biz.Not
 	}
 
 	if r.Authz != nil {
-		_, err := r.Authz.SetWorkspace(ctx, model.ID, model.Metadata.Workspace, "notifications", "integration")
+		_, err := r.Authz.SetWorkspace(ctx, model.Metadata.Reporters[0].LocalResourceId, model.Metadata.Workspace, "notifications", "integration")
 		if err != nil {
 			return nil, err
 		}
@@ -83,7 +83,7 @@ func (r *notificationsintegrationsRepo) Update(ctx context.Context, model *biz.N
 	}
 
 	if r.Authz != nil {
-		_, err := r.Authz.SetWorkspace(ctx, model.ID, model.Metadata.Workspace, "notifications", "integration")
+		_, err := r.Authz.SetWorkspace(ctx, model.Metadata.Reporters[0].LocalResourceId, model.Metadata.Workspace, "notifications", "integration")
 		if err != nil {
 			return nil, err
 		}

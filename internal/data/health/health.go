@@ -4,18 +4,21 @@ import (
 	"context"
 	"github.com/go-kratos/kratos/v2/log"
 	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1"
+	"github.com/project-kessel/inventory-api/internal/authz"
 	"gorm.io/gorm"
 	"net/http"
 	"time"
 )
 
 type healthRepo struct {
-	DB *gorm.DB
+	DB     *gorm.DB
+	Config *authz.CompletedConfig
 }
 
-func New(g *gorm.DB) *healthRepo {
+func New(g *gorm.DB, c *authz.CompletedConfig) *healthRepo {
 	return &healthRepo{
-		DB: g,
+		DB:     g,
+		Config: c,
 	}
 }
 
@@ -32,21 +35,24 @@ func (r *healthRepo) IsBackendAvailable(ctx context.Context) (*pb.GetReadyzRespo
 		log.Errorf("Failed to ping database: %v", err)
 		return newResponse("FAILED TO PING DB: "+storageType, 500), nil
 	} else {
-		log.Infof("Successfully pinged " + storageType + " database")
+		log.Infof("Successfully pinged %s database", storageType)
 	}
 
-	// check relations-api livez and readyz endpoints
-	log.Infof("Checking readiness of relations-api")
-	client := &http.Client{Timeout: 5 * time.Second}
-	if err := checkRelationsAPIEndpoint(client, "livez"); err != nil {
-		return newResponse("RELATIONS API UNHEALTHY (livez): "+err.Error(), 500), nil
-	}
-	if err := checkRelationsAPIEndpoint(client, "readyz"); err != nil {
-		return newResponse("RELATIONS API UNHEALTHY (readyz): "+err.Error(), 500), nil
-	}
+	if r.Config != nil && r.Config.Authz == "kessel" {
 
-	log.Infof("Storage type %s and relations API are healthy", storageType)
-	return newResponse("OK: "+storageType+" and relations API", 200), nil
+		log.Infof("Checking readiness of relations-api")
+		client := &http.Client{Timeout: 5 * time.Second}
+		if err := checkRelationsAPIEndpoint(client, "livez"); err != nil {
+			return newResponse("RELATIONS API UNHEALTHY (livez): "+err.Error(), 500), nil
+		}
+		if err := checkRelationsAPIEndpoint(client, "readyz"); err != nil {
+			return newResponse("RELATIONS API UNHEALTHY (readyz): "+err.Error(), 500), nil
+		}
+
+		log.Infof("Storage type %s and relations API are healthy", storageType)
+		return newResponse("OK: "+storageType+" and relations API", 200), nil
+	}
+	return newResponse("OK: "+storageType, 200), nil
 }
 
 func checkRelationsAPIEndpoint(client *http.Client, checkType string) error {
@@ -56,7 +62,7 @@ func checkRelationsAPIEndpoint(client *http.Client, checkType string) error {
 		return err
 	}
 	defer resp.Body.Close()
-	
+
 	log.Infof("relations-api %s check successful", checkType)
 	return nil
 }

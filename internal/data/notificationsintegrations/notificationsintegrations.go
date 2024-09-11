@@ -113,7 +113,7 @@ func (r *notificationsintegrationsRepo) Delete(ctx context.Context, id string) e
 		}
 	}
 
-	// TODO: do we need to delete the workspace tuple?
+	// TODO: delete the workspace tuple
 
 	return nil
 }

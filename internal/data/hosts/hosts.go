@@ -113,7 +113,7 @@ func (r *hostsRepo) Delete(ctx context.Context, id string) error {
 		}
 	}
 
-	// TODO: do we need to delete the workspace tuple?
+	// TODO: delete the workspace tuple
 
 	return nil
 }

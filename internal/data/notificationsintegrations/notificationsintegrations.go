@@ -13,6 +13,9 @@ import (
 	"github.com/project-kessel/inventory-api/internal/middleware"
 )
 
+const namespace = "notifications"
+const resourceType = "integration"
+
 type notificationsintegrationsRepo struct {
 	DB      *gorm.DB
 	Authz   authzapi.Authorizer
@@ -51,7 +54,7 @@ func (r *notificationsintegrationsRepo) Save(ctx context.Context, model *biz.Not
 	}
 
 	if r.Authz != nil {
-		_, err := r.Authz.SetWorkspace(ctx, model.Metadata.Reporters[0].LocalResourceId, model.Metadata.Workspace, "notifications", "integration")
+		_, err := r.Authz.SetWorkspace(ctx, model.Metadata.Reporters[0].LocalResourceId, model.Metadata.Workspace, namespace, resourceType)
 		if err != nil {
 			return nil, err
 		}
@@ -83,7 +86,7 @@ func (r *notificationsintegrationsRepo) Update(ctx context.Context, model *biz.N
 	}
 
 	if r.Authz != nil {
-		_, err := r.Authz.SetWorkspace(ctx, model.Metadata.Reporters[0].LocalResourceId, model.Metadata.Workspace, "notifications", "integration")
+		_, err := r.Authz.SetWorkspace(ctx, model.Metadata.Reporters[0].LocalResourceId, model.Metadata.Workspace, namespace, resourceType)
 		if err != nil {
 			return nil, err
 		}

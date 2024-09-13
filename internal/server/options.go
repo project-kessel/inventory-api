@@ -10,8 +10,9 @@ import (
 )
 
 type Options struct {
-	Id   string `mapstructure:"id"`
-	Name string `mapstructure:"name"`
+	Id        string `mapstructure:"id"`
+	Name      string `mapstructure:"name"`
+	PublicUrl string `mapstructure:"public_url"`
 
 	GrpcOptions *grpc.Options `mapstructure:"grpc"`
 	HttpOptions *http.Options `mapstructure:"http"`
@@ -35,6 +36,7 @@ func (o *Options) AddFlags(fs *pflag.FlagSet, prefix string) {
 
 	fs.StringVar(&o.Id, prefix+"id", o.Id, "id of the server")
 	fs.StringVar(&o.Name, prefix+"name", o.Name, "name of the server")
+	fs.StringVar(&o.PublicUrl, prefix+"public_url", o.Name, "Public url where the server is reachable")
 
 	o.GrpcOptions.AddFlags(fs, prefix+"grpc")
 	o.HttpOptions.AddFlags(fs, prefix+"http")

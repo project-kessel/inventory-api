@@ -36,7 +36,7 @@ func (r *k8sclustersRepo) Save(ctx context.Context, model *biz.K8SCluster) (*biz
 
 	if r.Eventer != nil {
 		producer, _ := r.Eventer.Lookup(identity, biz.ResourceType, model.ID)
-		evt := eventingapi.NewAddEvent(biz.ResourceType, model.Metadata.UpdatedAt, &eventingapi.EventResource[biz.K8SClusterDetail]{
+		evt := eventingapi.NewCreatedResourceEvent(biz.ResourceType, model.Metadata.UpdatedAt, &eventingapi.EventResource[biz.K8SClusterDetail]{
 			Metadata:     &model.Metadata,
 			ReporterData: model.Metadata.Reporters[0],
 			ResourceData: model.ResourceData,
@@ -69,7 +69,7 @@ func (r *k8sclustersRepo) Update(ctx context.Context, model *biz.K8SCluster, id 
 
 	if r.Eventer != nil {
 		producer, _ := r.Eventer.Lookup(identity, biz.ResourceType, model.ID)
-		evt := eventingapi.NewUpdateEvent(biz.ResourceType, model.Metadata.UpdatedAt, &eventingapi.EventResource[biz.K8SClusterDetail]{
+		evt := eventingapi.NewUpdatedResourceEvent(biz.ResourceType, model.Metadata.UpdatedAt, &eventingapi.EventResource[biz.K8SClusterDetail]{
 			Metadata:     &model.Metadata,
 			ReporterData: model.Metadata.Reporters[0],
 			ResourceData: model.ResourceData,
@@ -104,7 +104,7 @@ func (r *k8sclustersRepo) Delete(ctx context.Context, id string) error {
 		// TODO: without persistence, we can't lookup the inventory assigned id or info like the external cluster id.
 		var dummyId int64 = 0
 		producer, _ := r.Eventer.Lookup(identity, biz.ResourceType, dummyId)
-		evt := eventingapi.NewDeleteEvent(biz.ResourceType, id, time.Now().UTC(), identity)
+		evt := eventingapi.NewDeletedResourceEvent(biz.ResourceType, id, time.Now().UTC(), identity)
 		err = producer.Produce(ctx, evt)
 		if err != nil {
 			return err

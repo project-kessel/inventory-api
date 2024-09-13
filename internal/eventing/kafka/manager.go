@@ -3,6 +3,8 @@ package kafka
 import (
 	"context"
 	"fmt"
+	"github.com/google/uuid"
+	"strings"
 
 	"github.com/go-kratos/kratos/v2/log"
 	"go.opentelemetry.io/otel"
@@ -144,16 +146,32 @@ func NewProducer(manager *KafkaManager, topic string, identity *authnapi.Identit
 func (p *kafkaProducer) Produce(ctx context.Context, event *api.Event) error {
 	e := cloudevents.NewEvent()
 
-	e.SetSource(p.Manager.Source)
-	e.SetSpecVersion(cloudevents.VersionV1)
-	e.SetType(fmt.Sprintf("%s:%s", event.EventType, event.ResourceType))
-
-	e.SetTime(event.EventTime)
-
-	err := e.SetData(cloudevents.ApplicationJSON, event.Resource)
+	eventId, err := uuid.NewUUID() // Todo: we need to have an stable id if we implement some re-trying logic
 	if err != nil {
 		return err
 	}
+
+	e.SetSpecVersion(cloudevents.VersionV1)
+	e.SetType(makeCloudEventType(event.EventType, event.ResourceType, event.OperationType))
+	e.SetSource(p.Manager.Source)
+	e.SetID(eventId.String())
+	e.SetTime(event.EventTime)
+
+	err = e.SetData(cloudevents.ApplicationJSON, event.Resource)
+	if err != nil {
+		return err
+	}
+
+	resourceId := []string{}
+
+	switch event.EventType {
+	case api.EventTypeResource:
+		// TODO: Extract resource id
+	case api.EventTypeResourcesRelationship:
+		// TODO: Extract object/subject id
+	}
+
+	e.SetSubject(makeCloudEventSubject(event.EventType, resourceId...))
 
 	ret := p.Manager.Client.Send(confluent.WithMessageKey(cecontext.WithTopic(ctx, p.Topic), p.Manager.Source), e)
 	if cloudevents.IsUndelivered(ret) {
@@ -171,4 +189,12 @@ func (p *kafkaProducer) Produce(ctx context.Context, event *api.Event) error {
 		),
 	)
 	return ret
+}
+
+func makeCloudEventType(eventType, resourceType, operation string) string {
+	return fmt.Sprintf("redhat.inventory.%s.%s.%s", eventType, resourceType, operation)
+}
+
+func makeCloudEventSubject(eventType string, resourceIds ...string) string {
+	return strings.Join(append([]string{eventType}, resourceIds...), "/")
 }

@@ -40,7 +40,7 @@ func (r *notificationsintegrationsRepo) Save(ctx context.Context, model *biz.Not
 	if r.Eventer != nil {
 		// TODO: Update the Object that's sent.  This is going to be what we actually emit.
 		producer, _ := r.Eventer.Lookup(identity, biz.ResourceType, model.ID)
-		evt := eventingapi.NewAddEvent(biz.ResourceType, model.Metadata.UpdatedAt, &eventingapi.EventResource[struct{}]{
+		evt := eventingapi.NewCreatedResourceEvent(biz.ResourceType, model.Metadata.UpdatedAt, &eventingapi.EventResource[struct{}]{
 			Metadata:     &model.Metadata,
 			ReporterData: model.Metadata.Reporters[0],
 		})
@@ -72,7 +72,7 @@ func (r *notificationsintegrationsRepo) Update(ctx context.Context, model *biz.N
 
 	if r.Eventer != nil {
 		producer, _ := r.Eventer.Lookup(identity, biz.ResourceType, model.ID)
-		evt := eventingapi.NewUpdateEvent(biz.ResourceType, model.Metadata.UpdatedAt, &eventingapi.EventResource[struct{}]{
+		evt := eventingapi.NewUpdatedResourceEvent(biz.ResourceType, model.Metadata.UpdatedAt, &eventingapi.EventResource[struct{}]{
 			Metadata:     &model.Metadata,
 			ReporterData: model.Metadata.Reporters[0],
 		})
@@ -106,7 +106,7 @@ func (r *notificationsintegrationsRepo) Delete(ctx context.Context, id string) e
 		// TODO: without persistence, we can't lookup the inventory assigned id or other model specific info.
 		var dummyId int64 = 0
 		producer, _ := r.Eventer.Lookup(identity, biz.ResourceType, dummyId)
-		evt := eventingapi.NewDeleteEvent(biz.ResourceType, id, time.Now().UTC(), identity)
+		evt := eventingapi.NewDeletedResourceEvent(biz.ResourceType, id, time.Now().UTC(), identity)
 		err = producer.Produce(ctx, evt)
 		if err != nil {
 			return err

@@ -6,8 +6,6 @@ import (
 	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1"
 	authzapi "github.com/project-kessel/inventory-api/internal/authz/api"
 	"gorm.io/gorm"
-	"net/http"
-	"time"
 )
 
 type healthRepo struct {
@@ -37,34 +35,16 @@ func (r *healthRepo) IsBackendAvailable(ctx context.Context) (*pb.GetReadyzRespo
 	} else {
 		log.Infof("Successfully pinged %s database", storageType)
 	}
-
-	if r.Authz.KesselStatus(ctx) == true {
-
-		log.Infof("Checking readiness of relations-api")
-		client := &http.Client{Timeout: 5 * time.Second}
-		if err := checkRelationsAPIEndpoint(client, "livez"); err != nil {
-			return newResponse("RELATIONS API UNHEALTHY (livez): "+err.Error(), 500), nil
-		}
-		if err := checkRelationsAPIEndpoint(client, "readyz"); err != nil {
-			return newResponse("RELATIONS API UNHEALTHY (readyz): "+err.Error(), 500), nil
-		}
-
-		log.Infof("Storage type %s and relations API are healthy", storageType)
-		return newResponse("OK: "+storageType+" and relations-api", 200), nil
-	}
-	return newResponse("OK: "+storageType, 200), nil
-}
-
-func checkRelationsAPIEndpoint(client *http.Client, checkType string) error {
-	resp, err := client.Get("http://host.docker.internal:8000/api/authz/" + checkType)
+	// if kessel is enabled
+	health, err := r.Authz.Health(ctx)
+	log.Infof("health status %s error status %s", health, err)
 	if err != nil {
-		log.Errorf("Failed to perform %s check: %v", checkType, err)
-		return err
-	}
-	defer resp.Body.Close()
+		log.Infof("Checking readiness of relations-api")
 
-	log.Infof("relations-api %s check successful", checkType)
-	return nil
+		//log.Infof("Storage type %s and relations API are healthy", storageType)
+		return newResponse("KESSEL UNHEALTHY:"+health.GetStatus(), 500), nil
+	}
+	return newResponse("OK: "+storageType, 200), nil // relations down (500)
 }
 
 func newResponse(status string, code int) *pb.GetReadyzResponse {

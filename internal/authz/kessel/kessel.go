@@ -4,15 +4,27 @@ import (
 	"context"
 	"github.com/go-kratos/kratos/v2/log"
 	authzapi "github.com/project-kessel/inventory-api/internal/authz/api"
+	kesselv1 "github.com/project-kessel/relations-api/api/kessel/relations/v1"
 	kessel "github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
 	"google.golang.org/grpc"
 )
 
 type KesselAuthz struct {
-	CheckService kessel.KesselCheckServiceClient
-	TupleService kessel.KesselTupleServiceClient
-	tokenClient  *tokenClient
-	Logger       *log.Helper
+	HealthService kesselv1.KesselHealthServiceClient
+	CheckService  kessel.KesselCheckServiceClient
+	TupleService  kessel.KesselTupleServiceClient
+	tokenClient   *tokenClient
+	Logger        *log.Helper
+}
+
+func (a *KesselAuthz) Health(ctx context.Context) (*kesselv1.GetReadyzResponse, error) {
+
+	opts, err := a.getCallOptions()
+	if err != nil {
+		return nil, err
+	}
+	log.Infof("Checking readyz endpoint")
+	return a.HealthService.GetReadyz(ctx, &kesselv1.GetReadyzRequest{}, opts...)
 }
 
 var _ authzapi.Authorizer = &KesselAuthz{}
@@ -22,10 +34,11 @@ func New(ctx context.Context, config CompletedConfig, logger *log.Helper) (*Kess
 	tokenCli := NewTokenClient(config.tokenConfig)
 
 	return &KesselAuthz{
-		CheckService: kessel.NewKesselCheckServiceClient(config.gRPCConn),
-		TupleService: kessel.NewKesselTupleServiceClient(config.gRPCConn),
-		Logger:       logger,
-		tokenClient:  tokenCli,
+		HealthService: kesselv1.NewKesselHealthServiceClient(config.gRPCConn),
+		CheckService:  kessel.NewKesselCheckServiceClient(config.gRPCConn),
+		TupleService:  kessel.NewKesselTupleServiceClient(config.gRPCConn),
+		Logger:        logger,
+		tokenClient:   tokenCli,
 	}, nil
 }
 
@@ -68,8 +81,4 @@ func (a *KesselAuthz) DeleteTuples(ctx context.Context, r *kessel.DeleteTuplesRe
 		return nil, err
 	}
 	return a.TupleService.DeleteTuples(ctx, r, opts...)
-}
-
-func (a *KesselAuthz) KesselStatus(ctx context.Context) bool {
-	return true
 }

@@ -2,6 +2,7 @@ package allow
 
 import (
 	"context"
+	kesselv1 "github.com/project-kessel/relations-api/api/kessel/relations/v1"
 
 	"github.com/go-kratos/kratos/v2/log"
 	kessel "github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
@@ -18,6 +19,11 @@ func New(logger *log.Helper) *AllowAllAuthz {
 	}
 }
 
+func (a *AllowAllAuthz) Health(ctx context.Context) (*kesselv1.GetReadyzResponse, error) {
+	return &kesselv1.GetReadyzResponse{Status: "OK", Code: 200}, nil
+
+}
+
 func (a *AllowAllAuthz) Check(ctx context.Context, r *kessel.CheckRequest) (*kessel.CheckResponse, error) {
 	return &kessel.CheckResponse{
 		Allowed: kessel.CheckResponse_ALLOWED_TRUE,
@@ -30,8 +36,4 @@ func (a *AllowAllAuthz) CreateTuples(ctx context.Context, r *kessel.CreateTuples
 
 func (a *AllowAllAuthz) DeleteTuples(ctx context.Context, r *kessel.DeleteTuplesRequest) (*kessel.DeleteTuplesResponse, error) {
 	return &kessel.DeleteTuplesResponse{}, nil
-}
-
-func (a *AllowAllAuthz) KesselStatus(ctx context.Context) bool {
-	return false
 }

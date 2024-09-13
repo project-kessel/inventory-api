@@ -6,7 +6,11 @@ server:
 authn:
    allow-unauthenticated: true
 authz:
-  impl: allow-all
+  impl: kessel
+  kessel:
+    insecure-client: true
+    url: localhost:9000
+    enable_oidc_auth: false
 eventing:
   eventer: stdout
   kafka:

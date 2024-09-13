@@ -31,3 +31,7 @@ func (a *AllowAllAuthz) CreateTuples(ctx context.Context, r *kessel.CreateTuples
 func (a *AllowAllAuthz) DeleteTuples(ctx context.Context, r *kessel.DeleteTuplesRequest) (*kessel.DeleteTuplesResponse, error) {
 	return &kessel.DeleteTuplesResponse{}, nil
 }
+
+func (a *AllowAllAuthz) KesselStatus(ctx context.Context) bool {
+	return false
+}

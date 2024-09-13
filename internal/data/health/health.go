@@ -4,21 +4,21 @@ import (
 	"context"
 	"github.com/go-kratos/kratos/v2/log"
 	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1"
-	"github.com/project-kessel/inventory-api/internal/authz"
+	authzapi "github.com/project-kessel/inventory-api/internal/authz/api"
 	"gorm.io/gorm"
 	"net/http"
 	"time"
 )
 
 type healthRepo struct {
-	DB     *gorm.DB
-	Config *authz.CompletedConfig
+	DB    *gorm.DB
+	Authz authzapi.Authorizer
 }
 
-func New(g *gorm.DB, c *authz.CompletedConfig) *healthRepo {
+func New(g *gorm.DB, a authzapi.Authorizer) *healthRepo {
 	return &healthRepo{
-		DB:     g,
-		Config: c,
+		DB:    g,
+		Authz: a,
 	}
 }
 
@@ -38,7 +38,7 @@ func (r *healthRepo) IsBackendAvailable(ctx context.Context) (*pb.GetReadyzRespo
 		log.Infof("Successfully pinged %s database", storageType)
 	}
 
-	if r.Config != nil && r.Config.Authz == "kessel" {
+	if r.Authz.KesselStatus(ctx) == true {
 
 		log.Infof("Checking readiness of relations-api")
 		client := &http.Client{Timeout: 5 * time.Second}
@@ -50,7 +50,7 @@ func (r *healthRepo) IsBackendAvailable(ctx context.Context) (*pb.GetReadyzRespo
 		}
 
 		log.Infof("Storage type %s and relations API are healthy", storageType)
-		return newResponse("OK: "+storageType+" and relations API", 200), nil
+		return newResponse("OK: "+storageType+" and relations-api", 200), nil
 	}
 	return newResponse("OK: "+storageType, 200), nil
 }

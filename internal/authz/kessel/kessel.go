@@ -69,3 +69,7 @@ func (a *KesselAuthz) DeleteTuples(ctx context.Context, r *kessel.DeleteTuplesRe
 	}
 	return a.TupleService.DeleteTuples(ctx, r, opts...)
 }
+
+func (a *KesselAuthz) KesselStatus(ctx context.Context) bool {
+	return true
+}

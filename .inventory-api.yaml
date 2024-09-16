@@ -4,13 +4,9 @@ server:
   grpc:
     address: localhost:9081
 authn:
-   allow-unauthenticated: true
+  allow-unauthenticated: true
 authz:
-  impl: kessel
-  kessel:
-    insecure-client: true
-    url: localhost:9000
-    enable_oidc_auth: false
+  impl: allow-all
 eventing:
   eventer: stdout
   kafka:

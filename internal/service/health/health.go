@@ -10,7 +10,6 @@ import (
 
 type HealthService struct {
 	pb.UnimplementedKesselInventoryHealthServiceServer
-
 	Ctl    *biz.HealthUsecase
 	Config *authz.CompletedConfig
 }

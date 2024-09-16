@@ -22,29 +22,24 @@ func New(g *gorm.DB, a authzapi.Authorizer) *healthRepo {
 
 func (r *healthRepo) IsBackendAvailable(ctx context.Context) (*pb.GetReadyzResponse, error) {
 	storageType := r.DB.Dialector.Name()
-	log.Infof("Checking readiness for storage type: %s", storageType)
+	sqlDB, dbErr := r.DB.DB()
+	if dbErr == nil {
+		dbErr = sqlDB.PingContext(ctx)
+	}
+	health, apiErr := r.Authz.Health(ctx)
 
-	sqlDB, err := r.DB.DB()
-	if err != nil {
-		log.Errorf("Failed to retrieve DB: %v", err)
+	if dbErr != nil && apiErr != nil {
+		log.Errorf("STORAGE UNHEALTHY: %s and RELATIONS-API UNHEALTHY", storageType)
+		return newResponse("STORAGE UNHEALTHY: "+storageType+" and RELATIONS-API UNHEALTHY", 500), nil
+	} else if dbErr != nil {
+		log.Errorf("STORAGE UNHEALTHY: %s", storageType)
 		return newResponse("STORAGE UNHEALTHY: "+storageType, 500), nil
+	} else if apiErr != nil {
+		log.Errorf("RELATIONS-API UNHEALTHY")
+		return newResponse("RELATIONS-API UNHEALTHY", 500), nil
 	}
-	if err := sqlDB.PingContext(ctx); err != nil {
-		log.Errorf("Failed to ping database: %v", err)
-		return newResponse("FAILED TO PING DB: "+storageType, 500), nil
-	} else {
-		log.Infof("Successfully pinged %s database", storageType)
-	}
-	// if kessel is enabled
-	health, err := r.Authz.Health(ctx)
-	log.Infof("health status %s error status %s", health, err)
-	if err != nil {
-		log.Infof("Checking readiness of relations-api")
-
-		//log.Infof("Storage type %s and relations API are healthy", storageType)
-		return newResponse("KESSEL UNHEALTHY:"+health.GetStatus(), 500), nil
-	}
-	return newResponse("OK: "+storageType, 200), nil // relations down (500)
+	log.Infof("Storage type %s and relations-api %s", storageType, health.GetStatus())
+	return newResponse("Storage type "+storageType+" and relations-api "+health.GetStatus(), 200), nil
 }
 
 func newResponse(status string, code int) *pb.GetReadyzResponse {

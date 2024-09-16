@@ -10,7 +10,7 @@ import (
 )
 
 type KesselAuthz struct {
-	HealthService kesselv1.KesselHealthServiceClient
+	HealthService kesselv1.KesselRelationsHealthServiceClient
 	CheckService  kessel.KesselCheckServiceClient
 	TupleService  kessel.KesselTupleServiceClient
 	tokenClient   *tokenClient
@@ -18,12 +18,11 @@ type KesselAuthz struct {
 }
 
 func (a *KesselAuthz) Health(ctx context.Context) (*kesselv1.GetReadyzResponse, error) {
-
 	opts, err := a.getCallOptions()
 	if err != nil {
 		return nil, err
 	}
-	log.Infof("Checking readyz endpoint")
+	log.Infof("Checking relations-api readyz endpoint")
 	return a.HealthService.GetReadyz(ctx, &kesselv1.GetReadyzRequest{}, opts...)
 }
 
@@ -34,7 +33,7 @@ func New(ctx context.Context, config CompletedConfig, logger *log.Helper) (*Kess
 	tokenCli := NewTokenClient(config.tokenConfig)
 
 	return &KesselAuthz{
-		HealthService: kesselv1.NewKesselHealthServiceClient(config.gRPCConn),
+		HealthService: kesselv1.NewKesselRelationsHealthServiceClient(config.gRPCConn),
 		CheckService:  kessel.NewKesselCheckServiceClient(config.gRPCConn),
 		TupleService:  kessel.NewKesselTupleServiceClient(config.gRPCConn),
 		Logger:        logger,

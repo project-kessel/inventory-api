@@ -23,19 +23,6 @@ func New(g *gorm.DB, a authzapi.Authorizer, completedAuth authz.CompletedConfig)
 	}
 }
 
-//var authType = ""
-
-//func (r *healthRepo) CheckAuthorizer() {
-//	switch r.CompletedAuth.Authz {
-//	case authz.AllowAll:
-//		authType = "AllowAll"
-//	case authz.Kessel:
-//		authType = "Kessel"
-//	//default:
-//		authType = "Unknown"
-//	}
-//}
-
 func (r *healthRepo) IsBackendAvailable(ctx context.Context) (*pb.GetReadyzResponse, error) {
 	storageType := r.DB.Dialector.Name()
 	sqlDB, dbErr := r.DB.DB()

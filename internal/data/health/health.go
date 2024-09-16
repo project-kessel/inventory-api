@@ -4,6 +4,7 @@ import (
 	"context"
 	"github.com/go-kratos/kratos/v2/log"
 	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1"
+	"github.com/project-kessel/inventory-api/internal/authz"
 	authzapi "github.com/project-kessel/inventory-api/internal/authz/api"
 	"gorm.io/gorm"
 )
@@ -42,8 +43,11 @@ func (r *healthRepo) IsBackendAvailable(ctx context.Context) (*pb.GetReadyzRespo
 		log.Errorf("RELATIONS-API UNHEALTHY")
 		return newResponse("RELATIONS-API UNHEALTHY", 500), nil
 	}
-	log.Infof("Storage type %s and relations-api %s", storageType, health.GetStatus())
-	return newResponse("Storage type "+storageType+" and authz provider "+health.GetStatus(), 200), nil
+	if authz.Kessel == "kessel" {
+		log.Infof("Storage type %s and relations-api %s", storageType, health.GetStatus())
+		return newResponse("STORAGE "+storageType+" and RELATIONS-API", 200), nil
+	}
+	return newResponse("Storage type "+storageType, 200), nil
 }
 
 func newResponse(status string, code int) *pb.GetReadyzResponse {

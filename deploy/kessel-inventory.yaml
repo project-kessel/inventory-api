@@ -103,14 +103,14 @@ objects:
   - apiVersion: cloud.redhat.com/v1alpha1
     kind: ClowdApp
     metadata:
-      name: inventory
+      name: kessel-inventory
     spec:
       envName: ${ENV_NAME}
 #      testing:
 #        iqePlugin: inventory_api
       replicas: 1
       deployments:
-        - name: inventory
+        - name: api
           podSpec:
             image: ${INVENTORY_IMAGE}:${INVENTORY_IMAGE_TAG}
             livenessProbe:
@@ -140,12 +140,9 @@ objects:
               enabled: true
               apiPath: inventory
 parameters:
-  - description: Name of the ClowdApp
-    name: CLOWDAPP_NAME
-    value: inventory
-  - description : ClowdEnvironment name
+  - description: ClowdEnvironment name (ephemeral, stage, prod)
     name: ENV_NAME
-    value: insights-ephemeral
+    required: true
   - description: App Image
     name: INVENTORY_IMAGE
     value: quay.io/redhat-services-prod/project-kessel-tenant/kessel-inventory-main/inventory-api-main

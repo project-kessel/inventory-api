@@ -31,15 +31,19 @@ func (r *healthRepo) IsBackendAvailable(ctx context.Context) (*pb.GetReadyzRespo
 	if dbErr != nil && apiErr != nil {
 		log.Errorf("STORAGE UNHEALTHY: %s and RELATIONS-API UNHEALTHY", storageType)
 		return newResponse("STORAGE UNHEALTHY: "+storageType+" and RELATIONS-API UNHEALTHY", 500), nil
-	} else if dbErr != nil {
+	}
+
+	if dbErr != nil {
 		log.Errorf("STORAGE UNHEALTHY: %s", storageType)
 		return newResponse("STORAGE UNHEALTHY: "+storageType, 500), nil
-	} else if apiErr != nil {
+	}
+
+	if apiErr != nil {
 		log.Errorf("RELATIONS-API UNHEALTHY")
 		return newResponse("RELATIONS-API UNHEALTHY", 500), nil
 	}
 	log.Infof("Storage type %s and relations-api %s", storageType, health.GetStatus())
-	return newResponse("Storage type "+storageType+" and relations-api "+health.GetStatus(), 200), nil
+	return newResponse("Storage type "+storageType+" and authz provider "+health.GetStatus(), 200), nil
 }
 
 func newResponse(status string, code int) *pb.GetReadyzResponse {

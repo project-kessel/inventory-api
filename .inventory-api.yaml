@@ -4,7 +4,7 @@ server:
   grpc:
     address: localhost:9081
 authn:
-  allow-unauthenticated: true
+   allow-unauthenticated: true
 authz:
   impl: allow-all
 eventing:

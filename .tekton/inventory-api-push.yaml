@@ -4,17 +4,16 @@ metadata:
   annotations:
     build.appstudio.openshift.io/repo: https://github.com/project-kessel/inventory-api?rev={{revision}}
     build.appstudio.redhat.com/commit_sha: '{{revision}}'
-    build.appstudio.redhat.com/pull_request_number: '{{pull_request_number}}'
     build.appstudio.redhat.com/target_branch: '{{target_branch}}'
     pipelinesascode.tekton.dev/max-keep-runs: "3"
-    pipelinesascode.tekton.dev/on-cel-expression: event == "pull_request" && target_branch
+    pipelinesascode.tekton.dev/on-cel-expression: event == "push" && target_branch
       == "main"
   creationTimestamp: null
   labels:
-    appstudio.openshift.io/application: kessel-inventory-main
-    appstudio.openshift.io/component: inventory-api-main
+    appstudio.openshift.io/application: kessel
+    appstudio.openshift.io/component: inventory-api
     pipelines.appstudio.openshift.io/type: build
-  name: inventory-api-main-on-pull-request
+  name: inventory-api-on-push
   namespace: project-kessel-tenant
 spec:
   params:
@@ -23,13 +22,9 @@ spec:
   - name: revision
     value: '{{revision}}'
   - name: output-image
-    value: quay.io/redhat-user-workloads/project-kessel-tenant/kessel-inventory-main/inventory-api-main:on-pr-{{revision}}
-  - name: image-expires-after
-    value: 5d
+    value: quay.io/redhat-user-workloads/project-kessel-tenant/kessel/inventory-api:{{revision}}
   - name: dockerfile
     value: ./Dockerfile
-  - name: path-context
-    value: .
   pipelineSpec:
     finally:
     - name: show-sbom
@@ -407,7 +402,7 @@ spec:
         - name: name
           value: clamav-scan
         - name: bundle
-          value: quay.io/konflux-ci/tekton-catalog/task-clamav-scan:0.1@sha256:7bb17b937c9342f305468e8a6d0a22493e3ecde58977bd2ffc8b50e2fa234d58
+          value: quay.io/konflux-ci/tekton-catalog/task-clamav-scan:0.1@sha256:0e61e7fce97b089b216eccd8390b1c2a265454c81c6630449e0f648dfcd4fcfe
         - name: kind
           value: task
         resolver: bundles

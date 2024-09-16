@@ -49,6 +49,14 @@ func (r *hostsRepo) Save(ctx context.Context, model *biz.Host) (*biz.Host, error
 			return nil, err
 		}
 	}
+
+	if r.Authz != nil {
+		_, err := r.Authz.SetWorkspace(ctx, model.Metadata.Reporters[0].LocalResourceId, model.Metadata.Workspace, "hbi", "rhel_host")
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	return model, nil
 }
 
@@ -73,6 +81,14 @@ func (r *hostsRepo) Update(ctx context.Context, model *biz.Host, id string) (*bi
 			return nil, err
 		}
 	}
+
+	if r.Authz != nil {
+		_, err := r.Authz.SetWorkspace(ctx, model.Metadata.Reporters[0].LocalResourceId, model.Metadata.Workspace, "hbi", "rhel_host")
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	return model, nil
 }
 
@@ -96,6 +112,9 @@ func (r *hostsRepo) Delete(ctx context.Context, id string) error {
 			return err
 		}
 	}
+
+	// TODO: delete the workspace tuple
+
 	return nil
 }
 

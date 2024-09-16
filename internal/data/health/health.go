@@ -10,18 +10,34 @@ import (
 )
 
 type healthRepo struct {
-	DB    *gorm.DB
-	Authz authzapi.Authorizer
+	DB            *gorm.DB
+	Authz         authzapi.Authorizer
+	CompletedAuth authz.CompletedConfig
 }
 
-func New(g *gorm.DB, a authzapi.Authorizer) *healthRepo {
+func New(g *gorm.DB, a authzapi.Authorizer, completedAuth authz.CompletedConfig) *healthRepo {
 	return &healthRepo{
-		DB:    g,
-		Authz: a,
+		DB:            g,
+		Authz:         a,
+		CompletedAuth: completedAuth,
+	}
+}
+
+var authType = ""
+
+func (r *healthRepo) CheckAuthorizer() {
+	switch r.CompletedAuth.Authz {
+	case authz.AllowAll:
+		authType = "AllowAll"
+	case authz.Kessel:
+		authType = "Kessel"
+	default:
+		authType = "Unknown"
 	}
 }
 
 func (r *healthRepo) IsBackendAvailable(ctx context.Context) (*pb.GetReadyzResponse, error) {
+	r.CheckAuthorizer()
 	storageType := r.DB.Dialector.Name()
 	sqlDB, dbErr := r.DB.DB()
 	if dbErr == nil {
@@ -43,7 +59,7 @@ func (r *healthRepo) IsBackendAvailable(ctx context.Context) (*pb.GetReadyzRespo
 		log.Errorf("RELATIONS-API UNHEALTHY")
 		return newResponse("RELATIONS-API UNHEALTHY", 500), nil
 	}
-	if authz.Kessel == "kessel" {
+	if authType == "Kessel" {
 		log.Infof("Storage type %s and relations-api %s", storageType, health.GetStatus())
 		return newResponse("STORAGE "+storageType+" and RELATIONS-API", 200), nil
 	}

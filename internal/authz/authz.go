@@ -21,3 +21,16 @@ func New(ctx context.Context, config CompletedConfig, logger *log.Helper) (api.A
 		return nil, fmt.Errorf("Unrecognized authz.impl: %s", config.Authz)
 	}
 }
+
+func CheckAuthorizer(config CompletedConfig) string {
+	var authType string
+	switch config.Authz {
+	case AllowAll:
+		authType = "AllowAll"
+	case Kessel:
+		authType = "Kessel"
+	default:
+		authType = "Unknown"
+	}
+	return authType
+}

@@ -36,7 +36,7 @@ func (r *k8sclustersRepo) Save(ctx context.Context, model *biz.K8SCluster) (*biz
 
 	if r.Eventer != nil {
 		producer, _ := r.Eventer.Lookup(identity, biz.ResourceType, model.ID)
-		evt := eventingapi.NewCreatedResourceEvent(biz.ResourceType, model.Metadata.UpdatedAt, &eventingapi.EventResource[biz.K8SClusterDetail]{
+		evt := eventingapi.NewCreatedResourceEvent(biz.ResourceType, model.Metadata.Reporters[0].LocalResourceId, model.Metadata.UpdatedAt, &eventingapi.EventResource[biz.K8SClusterDetail]{
 			Metadata:     &model.Metadata,
 			ReporterData: model.Metadata.Reporters[0],
 			ResourceData: model.ResourceData,
@@ -69,7 +69,7 @@ func (r *k8sclustersRepo) Update(ctx context.Context, model *biz.K8SCluster, id 
 
 	if r.Eventer != nil {
 		producer, _ := r.Eventer.Lookup(identity, biz.ResourceType, model.ID)
-		evt := eventingapi.NewUpdatedResourceEvent(biz.ResourceType, model.Metadata.UpdatedAt, &eventingapi.EventResource[biz.K8SClusterDetail]{
+		evt := eventingapi.NewUpdatedResourceEvent(biz.ResourceType, model.Metadata.Reporters[0].LocalResourceId, model.Metadata.UpdatedAt, &eventingapi.EventResource[biz.K8SClusterDetail]{
 			Metadata:     &model.Metadata,
 			ReporterData: model.Metadata.Reporters[0],
 			ResourceData: model.ResourceData,

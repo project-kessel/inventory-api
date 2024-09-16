@@ -39,7 +39,7 @@ func (r *k8spoliciesRepo) Save(ctx context.Context, model *biz.K8sPolicy) (*biz.
 	if r.Eventer != nil {
 		producer, _ := r.Eventer.Lookup(identity, biz.ResourceType, model.ID)
 		// TODO: Update the Object that's sent.  This is going to be what we actually emit.
-		evt := eventingapi.NewCreatedResourceEvent(biz.ResourceType, model.Metadata.UpdatedAt, &eventingapi.EventResource[biz.K8sPolicyDetail]{
+		evt := eventingapi.NewCreatedResourceEvent(biz.ResourceType, model.Metadata.Reporters[0].LocalResourceId, model.Metadata.UpdatedAt, &eventingapi.EventResource[biz.K8sPolicyDetail]{
 			Metadata:     &model.Metadata,
 			ReporterData: model.Metadata.Reporters[0],
 			ResourceData: model.ResourceData,
@@ -72,7 +72,10 @@ func (r *k8spoliciesRepo) Update(ctx context.Context, model *biz.K8sPolicy, id s
 
 	if r.Eventer != nil {
 		producer, _ := r.Eventer.Lookup(identity, biz.ResourceType, model.ID)
-		evt := eventingapi.NewUpdatedResourceEvent(biz.ResourceType, model.Metadata.UpdatedAt, &eventingapi.EventResource[biz.K8sPolicyDetail]{
+		// Todo: model.Metadata.Reporters[0].LocalResourceId is the resourceId of the resource in the scope of the reporter.
+		// When we have multiple reporters we will need to make sure to publish the correct one in the eventing api.
+		// Is it the last one?
+		evt := eventingapi.NewUpdatedResourceEvent(biz.ResourceType, model.Metadata.Reporters[0].LocalResourceId, model.Metadata.UpdatedAt, &eventingapi.EventResource[biz.K8sPolicyDetail]{
 			Metadata:     &model.Metadata,
 			ReporterData: model.Metadata.Reporters[0],
 			ResourceData: model.ResourceData,

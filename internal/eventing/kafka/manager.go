@@ -3,10 +3,8 @@ package kafka
 import (
 	"context"
 	"fmt"
-	"github.com/google/uuid"
-	"strings"
-
 	"github.com/go-kratos/kratos/v2/log"
+	"github.com/google/uuid"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
@@ -162,18 +160,9 @@ func (p *kafkaProducer) Produce(ctx context.Context, event *api.Event) error {
 		return err
 	}
 
-	resourceId := []string{}
+	e.SetSubject(makeCloudEventSubject(event.EventType, event.ResourceId))
 
-	switch event.EventType {
-	case api.EventTypeResource:
-		// TODO: Extract resource id
-	case api.EventTypeResourcesRelationship:
-		// TODO: Extract object/subject id
-	}
-
-	e.SetSubject(makeCloudEventSubject(event.EventType, resourceId...))
-
-	ret := p.Manager.Client.Send(confluent.WithMessageKey(cecontext.WithTopic(ctx, p.Topic), p.Manager.Source), e)
+	ret := p.Manager.Client.Send(confluent.WithMessageKey(cecontext.WithTopic(cloudevents.WithEncodingStructured(ctx), p.Topic), p.Manager.Source), e)
 	if cloudevents.IsUndelivered(ret) {
 		p.Logger.Infof("Failed to send %v", ret)
 	} else {
@@ -195,6 +184,6 @@ func makeCloudEventType(eventType, resourceType, operation string) string {
 	return fmt.Sprintf("redhat.inventory.%s.%s.%s", eventType, resourceType, operation)
 }
 
-func makeCloudEventSubject(eventType string, resourceIds ...string) string {
-	return strings.Join(append([]string{eventType}, resourceIds...), "/")
+func makeCloudEventSubject(eventType string, resourceId string) string {
+	return fmt.Sprintf("%s/%s", eventType, resourceId)
 }

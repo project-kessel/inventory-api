@@ -3,11 +3,12 @@ package kafka
 import (
 	"context"
 	"fmt"
-
 	"github.com/go-kratos/kratos/v2/log"
+	"github.com/google/uuid"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
+	"strings"
 
 	confluent "github.com/cloudevents/sdk-go/protocol/kafka_confluent/v2"
 	cloudevents "github.com/cloudevents/sdk-go/v2"
@@ -144,18 +145,26 @@ func NewProducer(manager *KafkaManager, topic string, identity *authnapi.Identit
 func (p *kafkaProducer) Produce(ctx context.Context, event *api.Event) error {
 	e := cloudevents.NewEvent()
 
-	e.SetSource(p.Manager.Source)
-	e.SetSpecVersion(cloudevents.VersionV1)
-	e.SetType(fmt.Sprintf("%s:%s", event.EventType, event.ResourceType))
-
-	e.SetTime(event.EventTime)
-
-	err := e.SetData(cloudevents.ApplicationJSON, event.Resource)
+	eventId, err := uuid.NewUUID() // Todo: we need to have an stable id if we implement some re-trying logic
 	if err != nil {
 		return err
 	}
 
-	ret := p.Manager.Client.Send(confluent.WithMessageKey(cecontext.WithTopic(ctx, p.Topic), p.Manager.Source), e)
+	e.SetSpecVersion(cloudevents.VersionV1)
+	e.SetType(makeCloudEventType(event.EventType, event.ResourceType, event.OperationType))
+	e.SetSource(p.Manager.Source)
+	e.SetID(eventId.String())
+	e.SetTime(event.EventTime)
+
+	err = e.SetData(cloudevents.ApplicationJSON, event.Resource)
+	if err != nil {
+		return err
+	}
+
+	e.SetDataContentType("application/json")
+	e.SetSubject(makeCloudEventSubject(event.EventType, event.ResourceType, event.ResourceId))
+
+	ret := p.Manager.Client.Send(confluent.WithMessageKey(cecontext.WithTopic(cloudevents.WithEncodingStructured(ctx), p.Topic), p.Manager.Source), e)
 	if cloudevents.IsUndelivered(ret) {
 		p.Logger.Infof("Failed to send %v", ret)
 	} else {
@@ -171,4 +180,12 @@ func (p *kafkaProducer) Produce(ctx context.Context, event *api.Event) error {
 		),
 	)
 	return ret
+}
+
+func makeCloudEventType(eventType, resourceType, operation string) string {
+	return fmt.Sprintf("redhat.inventory.%s.%s.%s", eventType, resourceType, operation)
+}
+
+func makeCloudEventSubject(eventType, resourceType, resourceId string) string {
+	return "/" + strings.Join([]string{eventType, resourceType, resourceId}, "/")
 }

@@ -89,3 +89,4 @@ Export the token generated
 Sample request with the authorization header
 
 `curl -H "Authorization: bearer ${TOKEN}"  -H "Content-Type: application/json" --data "@data/host-service-account.json" http://localhost:8081/api/inventory/v1beta1/rhelHosts`
+

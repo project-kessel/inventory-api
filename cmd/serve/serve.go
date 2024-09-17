@@ -138,7 +138,7 @@ func NewCommand(
 			// construct eventing
 			// Note that we pass the server id here to act as the Source URI in cloudevents
 			// If a server ID isn't configured explicitly, `os.Hostname()` is used.
-			eventingManager, err := eventing.New(eventingConfig, serverConfig.Options.Id, log.NewHelper(log.With(logger, "subsystem", "eventing")))
+			eventingManager, err := eventing.New(eventingConfig, serverConfig.Options.PublicUrl, log.NewHelper(log.With(logger, "subsystem", "eventing")))
 			if err != nil {
 				return err
 			}

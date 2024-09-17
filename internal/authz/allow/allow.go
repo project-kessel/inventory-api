@@ -2,6 +2,7 @@ package allow
 
 import (
 	"context"
+	kesselv1 "github.com/project-kessel/relations-api/api/kessel/relations/v1"
 
 	"github.com/go-kratos/kratos/v2/log"
 	kessel "github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
@@ -16,6 +17,11 @@ func New(logger *log.Helper) *AllowAllAuthz {
 	return &AllowAllAuthz{
 		Logger: logger,
 	}
+}
+
+func (a *AllowAllAuthz) Health(ctx context.Context) (*kesselv1.GetReadyzResponse, error) {
+	return &kesselv1.GetReadyzResponse{Status: "OK", Code: 200}, nil
+
 }
 
 func (a *AllowAllAuthz) Check(ctx context.Context, r *kessel.CheckRequest) (*kessel.CheckResponse, error) {

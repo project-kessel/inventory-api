@@ -7,8 +7,6 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/project-kessel/inventory-api/internal/service/health"
-
 	"github.com/spf13/cobra"
 	"gorm.io/gorm"
 
@@ -27,18 +25,21 @@ import (
 	rel "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/relationships"
 	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/resources"
 
+	healthrepo "github.com/project-kessel/inventory-api/internal/data/health"
 	hostsrepo "github.com/project-kessel/inventory-api/internal/data/hosts"
 	k8sclustersrepo "github.com/project-kessel/inventory-api/internal/data/k8sclusters"
 	k8spoliciesrepo "github.com/project-kessel/inventory-api/internal/data/k8spolicies"
 	notifsrepo "github.com/project-kessel/inventory-api/internal/data/notificationsintegrations"
 	relationshipsrepo "github.com/project-kessel/inventory-api/internal/data/relationships"
 
+	healthctl "github.com/project-kessel/inventory-api/internal/biz/health"
 	hostsctl "github.com/project-kessel/inventory-api/internal/biz/hosts"
 	k8sclustersctl "github.com/project-kessel/inventory-api/internal/biz/k8sclusters"
 	k8spoliciesctl "github.com/project-kessel/inventory-api/internal/biz/k8spolicies"
 	notifsctl "github.com/project-kessel/inventory-api/internal/biz/notificationsintegrations"
 	relationshipsctl "github.com/project-kessel/inventory-api/internal/biz/relationships"
 
+	healthssvc "github.com/project-kessel/inventory-api/internal/service/health"
 	hostssvc "github.com/project-kessel/inventory-api/internal/service/hosts"
 	k8sclusterssvc "github.com/project-kessel/inventory-api/internal/service/k8sclusters"
 	k8spoliciessvc "github.com/project-kessel/inventory-api/internal/service/k8spolicies"
@@ -184,7 +185,9 @@ func NewCommand(
 			rel.RegisterKesselK8SPolicyIsPropagatedToK8SClusterServiceServer(server.GrpcServer, relationships_service)
 			rel.RegisterKesselK8SPolicyIsPropagatedToK8SClusterServiceHTTPServer(server.HttpServer, relationships_service)
 
-			health_service := health.NewHealthService()
+			health_repo := healthrepo.New(db, authorizer, authzConfig)
+			health_controller := healthctl.New(health_repo, log.With(logger, "subsystem", "health_controller"))
+			health_service := healthssvc.New(health_controller)
 			hb.RegisterKesselInventoryHealthServiceServer(server.GrpcServer, health_service)
 			hb.RegisterKesselInventoryHealthServiceHTTPServer(server.HttpServer, health_service)
 

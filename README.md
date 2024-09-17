@@ -31,6 +31,23 @@ make init
 
 ## Example Usage
 
+### Health check endpoints
+
+The inventory API includes health check endpoints for readiness and liveness probes.
+
+#### Readyz
+The readyz endpoint checks if the service is ready to handle requests.
+```bash
+curl http://localhost:8081/api/inventory/v1/readyz
+```
+
+#### Livez
+The livez endpoint checks if the service is alive and functioning correctly.
+```bash
+curl http://localhost:8081/api/inventory/v1/livez
+```
+
+### Add hosts to inventory
 To add hosts to the inventory, use the following `curl` command:
 
 ```bash

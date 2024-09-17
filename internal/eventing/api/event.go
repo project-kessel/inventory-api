@@ -14,6 +14,12 @@ type EventResource[Detail any] struct {
 	ResourceData *Detail       `json:"resource_data"`
 }
 
+type EventRelationship[Detail any] struct {
+	Metadata         *biz.RelationshipMetadata `json:"metadata"`
+	ReporterData     *biz.RelationshipReporter `json:"reporter_data"`
+	RelationshipData *Detail                   `json:"relationship_data"`
+}
+
 const (
 	EventTypeResource              = "resources"
 	EventTypeResourcesRelationship = "resources_relationship"
@@ -76,7 +82,7 @@ func NewDeletedResourceEvent(resourceType, resourceId string, lastReportedTime t
 	}
 }
 
-func NewCreatedResourcesRelationshipEvent[Detail any](relationshipType, subjectResourceId string, lastReportedTime time.Time, obj *EventResource[Detail]) *Event {
+func NewCreatedResourcesRelationshipEvent[Detail any](relationshipType, subjectResourceId string, lastReportedTime time.Time, obj *EventRelationship[Detail]) *Event {
 	return &Event{
 		EventType:     EventTypeResourcesRelationship,
 		OperationType: operationTypeCreated,
@@ -87,7 +93,7 @@ func NewCreatedResourcesRelationshipEvent[Detail any](relationshipType, subjectR
 	}
 }
 
-func NewUpdatedResourcesRelationshipEvent[Detail any](relationshipType, subjectResourceId string, lastReportedTime time.Time, obj *EventResource[Detail]) *Event {
+func NewUpdatedResourcesRelationshipEvent[Detail any](relationshipType, subjectResourceId string, lastReportedTime time.Time, obj *EventRelationship[Detail]) *Event {
 	return &Event{
 		EventType:     EventTypeResourcesRelationship,
 		OperationType: operationTypeUpdated,
@@ -98,23 +104,22 @@ func NewUpdatedResourcesRelationshipEvent[Detail any](relationshipType, subjectR
 	}
 }
 
-func NewDeletedResourcesRelationshipEvent(relationshipType, subjectResourceId string, lastReportedTime time.Time, requester *authnapi.Identity) *Event {
+func NewDeletedResourcesRelationshipEvent(relationshipType, subjectResourceId string, objectResourceId string, lastReportedTime time.Time, requester *authnapi.Identity) *Event {
 	return &Event{
 		EventType:     EventTypeResourcesRelationship,
 		OperationType: operationTypeDeleted,
 		EventTime:     lastReportedTime,
 		ResourceType:  relationshipType,
 		ResourceId:    subjectResourceId,
-		Resource:      "stub",
-		// Todo: We need a separate type - Metadata format is different on Relationships
-		//	Relation: &EventResource[struct{}]{
-		//		//Metadata: &biz.Metadata{},
-		//		//ReporterData: &biz.Reporter{
-		//		//	ReporterID:      requester.Principal,
-		//		//	ReporterType:    requester.Type,
-		//		//	LocalResourceId: resourceId,
-		//		//},
-		//		//ResourceData: nil,
-		//	},
+		Resource: &EventRelationship[struct{}]{
+			Metadata: &biz.RelationshipMetadata{},
+			ReporterData: &biz.RelationshipReporter{
+				ReporterID:             requester.Principal,
+				ReporterType:           requester.Type,
+				SubjectLocalResourceId: subjectResourceId,
+				ObjectLocalResourceId:  objectResourceId,
+			},
+			RelationshipData: nil,
+		},
 	}
 }

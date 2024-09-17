@@ -9,7 +9,7 @@ import (
 	notifs "github.com/project-kessel/inventory-api/internal/biz/notificationsintegrations"
 	// "github.com/project-kessel/inventory-api/internal/biz/k8sclusters"
 	// "github.com/project-kessel/inventory-api/internal/biz/policies"
-	// "github.com/project-kessel/inventory-api/internal/biz/relationships"
+	k8spolicyrelations "github.com/project-kessel/inventory-api/internal/biz/relationships/k8spolicy"
 )
 
 // Migrate the tables
@@ -21,9 +21,11 @@ func Migrate(db *gorm.DB, logger *log.Helper) error {
 		&common.Metadata{},
 		&common.Reporter{},
 		&common.Label{},
+		&common.RelationshipMetadata{},
+		&common.RelationshipReporter{},
 		// &k8sclusters.K8sCluster{},
 		// &policies.Policy{},
-		// &relationships.Relationship{},
+		&k8spolicyrelations.K8SPolicyIsPropagatedToK8SCluster{},
 	); err != nil {
 		return err
 	}

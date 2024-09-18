@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
+	"github.com/go-kratos/kratos/v2/log"
 	"github.com/xeipuuv/gojsonschema"
 	"os"
 	"testing"
@@ -73,23 +74,57 @@ const inventoryEventSchema = `{
 	"required": ["specversion", "type", "source", "id", "time", "datacontenttype", "data", "subject"]
 }`
 
+func getEnvOrDefault(envVar, defaultValue string) string {
+	val := os.Getenv(envVar)
+	if val == "" {
+		return defaultValue
+	}
+	return val
+}
+
 // Test_ACMKafkaConsumer reads events from a Kafka topic and verifies their schema.
 func Test_ACMKafkaConsumer(t *testing.T) {
 	t.Parallel()
-	kafkaBootstrapServers := os.Getenv("KAFKA_BOOTSTRAP_SERVERS")
-	if kafkaBootstrapServers == "" {
-		kafkaBootstrapServers = "localhost:9092"
-	}
-	topic := os.Getenv("KAFKA_TOPIC")
-	if topic == "" {
-		topic = "kessel-inventory"
-	}
+	kafkaBootstrapServers := getEnvOrDefault("KAFKA_BOOTSTRAP_SERVERS", "localhost:9092")
+	kafkaSecProtocol := os.Getenv("KAFKA_SECURITY_PROTOCOL")
+	kafkaCaLocation := os.Getenv("KAFKA_SSL_CA_LOCATION")
+	kafkaCertLocation := os.Getenv("KAFKA_SSL_CERT_LOCATION")
+	kafkaKeyLocation := os.Getenv("KAFKA_SSL_KEY_LOCATION")
+	topic := getEnvOrDefault("KAFKA_TOPIC", "kessel-inventory")
 
-	consumer, err := kafka.NewConsumer(&kafka.ConfigMap{
-		"bootstrap.servers": kafkaBootstrapServers, // Kafka server
+	config := &kafka.ConfigMap{
+		"bootstrap.servers": kafkaBootstrapServers,
 		"group.id":          "server",
 		"auto.offset.reset": "earliest",
-	})
+	}
+
+	if kafkaSecProtocol != "" {
+		if kafkaCaLocation == "" || kafkaCertLocation == "" || kafkaKeyLocation == "" {
+			log.Fatalf("SSL configuration is incomplete. Please provide KAFKA_SSL_CA_LOCATION, KAFKA_SSL_CERT_LOCATION, and KAFKA_SSL_KEY_LOCATION.")
+		}
+		err := config.SetKey("security.protocol", kafkaSecProtocol)
+		if err != nil {
+			err = fmt.Errorf("please provide KAFKA_SECURITY_PROTOCOL to set security.protocol")
+			log.Error(err)
+		}
+		err = config.SetKey("ssl.ca.location", kafkaCaLocation)
+		if err != nil {
+			err = fmt.Errorf("please provide KAFKA_SSL_CA_LOCATION to set ssl.ca.location")
+			log.Error(err)
+		}
+		err = config.SetKey("ssl.certificate.location", kafkaCertLocation)
+		if err != nil {
+			err = fmt.Errorf("please provide KAFKA_SSL_CERT_LOCATION to set ssl.certificate.location")
+			log.Error(err)
+		}
+		err = config.SetKey("ssl.key.location", kafkaKeyLocation)
+		if err != nil {
+			err = fmt.Errorf("please provide KAFKA_SSL_KEY_LOCATION to set ssl.key.location")
+			log.Error(err)
+		}
+	}
+
+	consumer, err := kafka.NewConsumer(config)
 	if err != nil {
 		t.Fatalf("Failed to create Kafka consumer: %v", err)
 	}

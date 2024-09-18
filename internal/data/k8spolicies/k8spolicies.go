@@ -12,6 +12,9 @@ import (
 	"github.com/project-kessel/inventory-api/internal/middleware"
 )
 
+const namespace = "acm"
+const resourceType = "k8spolicy"
+
 type k8spoliciesRepo struct {
 	DB      *gorm.DB
 	Authz   authzapi.Authorizer
@@ -51,7 +54,7 @@ func (r *k8spoliciesRepo) Save(ctx context.Context, model *biz.K8sPolicy) (*biz.
 	}
 
 	if r.Authz != nil {
-		_, err := r.Authz.SetWorkspace(ctx, model.Metadata.Reporters[0].LocalResourceId, model.Metadata.Workspace, "acm", "k8spolicy")
+		_, err := r.Authz.SetWorkspace(ctx, model.Metadata.Reporters[0].LocalResourceId, model.Metadata.Workspace, namespace, resourceType)
 		if err != nil {
 			return nil, err
 		}
@@ -87,7 +90,7 @@ func (r *k8spoliciesRepo) Update(ctx context.Context, model *biz.K8sPolicy, id s
 	}
 
 	if r.Authz != nil {
-		_, err := r.Authz.SetWorkspace(ctx, model.Metadata.Reporters[0].LocalResourceId, model.Metadata.Workspace, "acm", "k8spolicy")
+		_, err := r.Authz.SetWorkspace(ctx, model.Metadata.Reporters[0].LocalResourceId, model.Metadata.Workspace, namespace, resourceType)
 		if err != nil {
 			return nil, err
 		}

@@ -16,9 +16,9 @@ type K8SPolicyIsPropagatedToK8SClusterRepo struct {
 }
 
 type K8SPolicyIsPropagatedToK8SClusterDetail struct {
-	Status       string
-	K8SPolicyId  int64
-	K8SClusterId int64
+	Status       string `json:"status"`
+	K8SPolicyId  int64  `json:"k8s_policy_id"`
+	K8SClusterId int64  `json:"k8s_cluster_id"`
 }
 
 func New(g *gorm.DB, e eventingapi.Manager) *K8SPolicyIsPropagatedToK8SClusterRepo {

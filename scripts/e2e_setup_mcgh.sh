@@ -21,6 +21,7 @@ function initKinDCluster() {
 
 function pushInventoryImageKind() {
   clusterName="$1"
+  rm -f inventory-api.tar
   ${DOCKER} build --arch amd64 . -t localhost/inventory-api:latest
   ${DOCKER} save -o inventory-api.tar localhost/inventory-api:latest
   kind load image-archive inventory-api.tar --name "$clusterName"

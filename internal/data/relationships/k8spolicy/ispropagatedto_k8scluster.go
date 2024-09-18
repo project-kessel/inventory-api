@@ -2,6 +2,7 @@ package k8spolicy
 
 import (
 	"context"
+	"github.com/project-kessel/inventory-api/internal/biz/common"
 	biz "github.com/project-kessel/inventory-api/internal/biz/relationships/k8spolicy"
 	eventingapi "github.com/project-kessel/inventory-api/internal/eventing/api"
 	"github.com/project-kessel/inventory-api/internal/middleware"
@@ -67,9 +68,12 @@ func (r *K8SPolicyIsPropagatedToK8SClusterRepo) Update(ctx context.Context, mode
 
 	if r.Eventer != nil {
 		producer, _ := r.Eventer.Lookup(identity, biz.RelationType, model.ID)
-		evt := eventingapi.NewUpdatedResourcesRelationshipEvent(biz.RelationType, model.Metadata.Reporters[0].SubjectLocalResourceId, model.Metadata.UpdatedAt, &eventingapi.EventRelationship[struct{}]{
+		evt := eventingapi.NewUpdatedResourcesRelationshipEvent(biz.RelationType, model.Metadata.Reporters[0].SubjectLocalResourceId, model.Metadata.UpdatedAt, &eventingapi.EventRelationship[K8SPolicyIsPropagatedToK8SClusterDetail]{
 			Metadata:     &model.Metadata,
 			ReporterData: model.Metadata.Reporters[0],
+			RelationshipData: &K8SPolicyIsPropagatedToK8SClusterDetail{
+				Status: model.Status,
+			},
 		})
 		err = producer.Produce(ctx, evt)
 		if err != nil {
@@ -93,7 +97,20 @@ func (r *K8SPolicyIsPropagatedToK8SClusterRepo) Delete(ctx context.Context, id s
 		var dummyId int64 = 0
 		producer, _ := r.Eventer.Lookup(identity, biz.RelationType, dummyId)
 		// Todo: Load the model to fetch the (subject|object)_local_resource_id to fill in the model
-		evt := eventingapi.NewDeletedResourcesRelationshipEvent(biz.RelationType, id, id, time.Now().UTC(), identity)
+		evt := eventingapi.NewDeletedResourcesRelationshipEvent(biz.RelationType, id, time.Now().UTC(), &eventingapi.EventRelationship[K8SPolicyIsPropagatedToK8SClusterDetail]{
+			Metadata: &common.RelationshipMetadata{},
+			ReporterData: &common.RelationshipReporter{
+				ReporterID:             identity.Principal,
+				ReporterType:           identity.Type,
+				SubjectLocalResourceId: "local-id",
+				ObjectLocalResourceId:  "local-id",
+			},
+			RelationshipData: &K8SPolicyIsPropagatedToK8SClusterDetail{
+				Status:       "COMPLIANT",
+				K8SClusterId: 0,
+				K8SPolicyId:  0,
+			},
+		})
 		err = producer.Produce(ctx, evt)
 		if err != nil {
 			return err

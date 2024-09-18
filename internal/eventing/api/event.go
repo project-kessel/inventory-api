@@ -104,22 +104,13 @@ func NewUpdatedResourcesRelationshipEvent[Detail any](relationshipType, subjectR
 	}
 }
 
-func NewDeletedResourcesRelationshipEvent(relationshipType, subjectResourceId string, objectResourceId string, lastReportedTime time.Time, requester *authnapi.Identity) *Event {
+func NewDeletedResourcesRelationshipEvent[Detail any](relationshipType, subjectResourceId string, lastReportedTime time.Time, obj *EventRelationship[Detail]) *Event {
 	return &Event{
 		EventType:     EventTypeResourcesRelationship,
 		OperationType: operationTypeDeleted,
 		EventTime:     lastReportedTime,
 		ResourceType:  relationshipType,
 		ResourceId:    subjectResourceId,
-		Resource: &EventRelationship[struct{}]{
-			Metadata: &biz.RelationshipMetadata{},
-			ReporterData: &biz.RelationshipReporter{
-				ReporterID:             requester.Principal,
-				ReporterType:           requester.Type,
-				SubjectLocalResourceId: subjectResourceId,
-				ObjectLocalResourceId:  objectResourceId,
-			},
-			RelationshipData: nil,
-		},
+		Resource:      obj,
 	}
 }

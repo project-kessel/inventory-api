@@ -15,6 +15,10 @@ type K8SPolicyIsPropagatedToK8SClusterRepo struct {
 	Eventer eventingapi.Manager
 }
 
+type K8SPolicyIsPropagatedToK8SClusterDetail struct {
+	Status string
+}
+
 func New(g *gorm.DB, e eventingapi.Manager) *K8SPolicyIsPropagatedToK8SClusterRepo {
 	return &K8SPolicyIsPropagatedToK8SClusterRepo{
 		DB:      g,
@@ -35,9 +39,12 @@ func (r *K8SPolicyIsPropagatedToK8SClusterRepo) Save(ctx context.Context, model 
 	if r.Eventer != nil {
 		// TODO: Update the Object that's sent.  This is going to be what we actually emit.
 		producer, _ := r.Eventer.Lookup(identity, biz.RelationType, model.ID)
-		evt := eventingapi.NewCreatedResourcesRelationshipEvent(biz.RelationType, model.Metadata.Reporters[0].SubjectLocalResourceId, model.Metadata.UpdatedAt, &eventingapi.EventRelationship[struct{}]{
+		evt := eventingapi.NewCreatedResourcesRelationshipEvent(biz.RelationType, model.Metadata.Reporters[0].SubjectLocalResourceId, model.Metadata.UpdatedAt, &eventingapi.EventRelationship[K8SPolicyIsPropagatedToK8SClusterDetail]{
 			Metadata:     &model.Metadata,
 			ReporterData: model.Metadata.Reporters[0],
+			RelationshipData: &K8SPolicyIsPropagatedToK8SClusterDetail{
+				Status: model.Status,
+			},
 		})
 		err = producer.Produce(ctx, evt)
 		if err != nil {

@@ -59,6 +59,7 @@ func fromCreateRequest(r *relationships.CreateK8SPolicyIsPropagatedToK8SClusterR
 
 	return &biz.K8SPolicyIsPropagatedToK8SCluster{
 		Metadata: *conv.RelationshipMetadataFromPb(metadata, r.K8SpolicyIspropagatedtoK8Scluster.ReporterData, identity),
+		Status:   r.K8SpolicyIspropagatedtoK8Scluster.RelationshipData.Status.String(),
 	}, nil
 }
 

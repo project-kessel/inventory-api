@@ -17,6 +17,8 @@ type K8SPolicyIsPropagatedToK8SCluster struct {
 
 	MetadataID int64
 	Metadata   common.RelationshipMetadata
+
+	Status string
 }
 
 // K8SPolicyIsPropagatedToK8SClusterRepo is a K8SPolicyIsPropagatedToK8SCluster repo.

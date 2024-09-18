@@ -41,8 +41,8 @@ func New(repo K8SPolicyIsPropagatedToK8SClusterRepo, logger log.Logger) *K8SPoli
 	return &K8SPolicyIsPropagatedToK8SClusterUsecase{repo: repo, log: log.NewHelper(logger)}
 }
 
-// CreateK8SPolicyIsPropagatedToK8SCluster creates a K8SPolicyIsPropagatedToK8SCluster, and returns the new K8SPolicyIsPropagatedToK8SCluster.
-func (uc *K8SPolicyIsPropagatedToK8SClusterUsecase) CreateK8SPolicyIsPropagatedToK8SCluster(ctx context.Context, r *K8SPolicyIsPropagatedToK8SCluster) (*K8SPolicyIsPropagatedToK8SCluster, error) {
+// Create creates a K8SPolicyIsPropagatedToK8SCluster, and returns the new K8SPolicyIsPropagatedToK8SCluster.
+func (uc *K8SPolicyIsPropagatedToK8SClusterUsecase) Create(ctx context.Context, r *K8SPolicyIsPropagatedToK8SCluster) (*K8SPolicyIsPropagatedToK8SCluster, error) {
 	if ret, err := uc.repo.Save(ctx, r); err != nil {
 		return nil, err
 	} else {

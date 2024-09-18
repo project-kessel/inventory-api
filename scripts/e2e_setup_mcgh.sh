@@ -29,6 +29,7 @@ function pushInventoryImageKind() {
 
 function pushtestInventoryImageKind() {
   clusterName="$1"
+  rm -f inventory-e2e-tests.tar
   ${DOCKER} build --arch amd64 -t localhost/inventory-e2e-tests:latest -f Dockerfile-e2e
   ${DOCKER} save -o inventory-e2e-tests.tar localhost/inventory-e2e-tests:latest
   kind load image-archive inventory-e2e-tests.tar --name "$clusterName"

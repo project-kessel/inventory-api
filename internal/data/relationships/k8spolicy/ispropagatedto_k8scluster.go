@@ -104,11 +104,7 @@ func (r *K8SPolicyIsPropagatedToK8SClusterRepo) Delete(ctx context.Context, id s
 				ReporterType:           identity.Type,
 				SubjectLocalResourceId: "local-id",
 				ObjectLocalResourceId:  "local-id",
-			},
-			RelationshipData: &K8SPolicyIsPropagatedToK8SClusterDetail{
-				Status:       "COMPLIANT",
-				K8SClusterId: 0,
-				K8SPolicyId:  0,
+				ReporterVersion:        "1.0",
 			},
 		})
 		err = producer.Produce(ctx, evt)

@@ -17,7 +17,7 @@ type EventResource[Detail any] struct {
 type EventRelationship[Detail any] struct {
 	Metadata         *biz.RelationshipMetadata `json:"metadata"`
 	ReporterData     *biz.RelationshipReporter `json:"reporter_data"`
-	RelationshipData *Detail                   `json:"relationship_data"`
+	RelationshipData *Detail                   `json:"relationship_data,omitempty"`
 }
 
 const (

@@ -1,0 +1,32 @@
+FROM registry.access.redhat.com/ubi8/ubi-minimal:8.10-1052.1724178568 AS builder
+
+ARG TARGETARCH
+USER root
+RUN microdnf install -y tar gzip make which gcc gcc-c++ cyrus-sasl-lib findutils git
+
+# install platform specific go version
+RUN curl -O -J  https://dl.google.com/go/go1.22.5.linux-${TARGETARCH}.tar.gz
+RUN tar -C /usr/local -xzf go1.22.5.linux-${TARGETARCH}.tar.gz
+RUN ln -s /usr/local/go/bin/go /usr/local/bin/go
+
+WORKDIR /workspace
+
+COPY go.mod go.sum ./
+
+ENV CGO_ENABLED 1
+RUN go mod download
+
+COPY api ./api
+COPY test/e2e .
+
+RUN go mod tidy
+RUN go test -c -o e2e-inventory-tests
+
+FROM registry.access.redhat.com/ubi8/ubi-minimal:8.10-1052.1724178568
+
+COPY --from=builder /workspace/e2e-inventory-tests /usr/local/bin/
+
+USER 1001
+ENV PATH="$PATH:/usr/local/bin"
+ # Run the e2e tests
+CMD ["./usr/local/bin/e2e-inventory-tests", "-test.v"]

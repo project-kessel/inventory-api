@@ -27,6 +27,13 @@ function pushInventoryImageKind() {
   kind load image-archive inventory-api.tar --name "$clusterName"
 }
 
+function pushtestInventoryImageKind() {
+  clusterName="$1"
+  ${DOCKER} build --arch amd64 -t localhost/inventory-e2e-tests:latest -f Dockerfile-e2e
+  ${DOCKER} save -o inventory-e2e-tests.tar localhost/inventory-e2e-tests:latest
+  kind load image-archive inventory-e2e-tests.tar --name "$clusterName"
+}
+
 enableRouter() {
   kubectl create ns openshift-ingress --dry-run=client -o yaml | kubectl --context "$1" apply -f -
   GIT_PATH="https://raw.githubusercontent.com/openshift/router/release-4.16"
@@ -151,6 +158,7 @@ function wait_global_hub_ready() {
 
 initKinDCluster global-hub
 pushInventoryImageKind global-hub
+pushtestInventoryImageKind global-hub
 enableRouter kind-global-hub
 enableServiceCA kind-global-hub global-hub
 enableOLM kind-global-hub

@@ -69,7 +69,7 @@ test:
 	@echo ""
 	@echo "Running tests."
 	# TODO: e2e tests are taking too long to be enabled by default. They need to be sped up.
-	@go test ./... -count=1 -coverprofile=coverage.out -skip 'TestInventoryAPIGRPC_*|Test_ACMKafkaConsumer'
+	@go test ./... -count=1 -coverprofile=coverage.out -skip 'TestInventoryAPIGRPC_*|TestInventoryAPIHTTP_*|Test_ACMKafkaConsumer'
 	@echo "Overall test coverage:"
 	@go tool cover -func=coverage.out | grep total: | awk '{print $$3}'
 	@rm coverage.out

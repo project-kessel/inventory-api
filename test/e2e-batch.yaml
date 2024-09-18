@@ -9,8 +9,8 @@ spec:
         - name: inventory-e2e-tests
           image: localhost/inventory-e2e-tests:latest
           env:
-            - name: INV_GRPC_URL
-              value: "inventory.multicluster-global-hub.svc.cluster.local:9081"
+            - name: INV_HTTP_URL
+              value: "inventory.multicluster-global-hub.svc.cluster.local:8081"
             - name: KAFKA_BOOTSTRAP_SERVERS
               value: "kafka-kafka-bootstrap.multicluster-global-hub:9092"
       restartPolicy: Never

@@ -90,6 +90,10 @@ func Test_ACMKafkaConsumer(t *testing.T) {
 	kafkaCaLocation := os.Getenv("KAFKA_SSL_CA_LOCATION")
 	kafkaCertLocation := os.Getenv("KAFKA_SSL_CERT_LOCATION")
 	kafkaKeyLocation := os.Getenv("KAFKA_SSL_KEY_LOCATION")
+	kafkaKeyPassword := os.Getenv("KAFKA_SSL_KEY_PASSWORD")
+	kafkaClientCert := os.Getenv("KAFKA_CLIENT_CERT") // Client cert for mutual authentication
+	kafkaClientKey := os.Getenv("KAFKA_CLIENT_KEY")   // Client private key for mutual authentication
+
 	topic := getEnvOrDefault("KAFKA_TOPIC", "kessel-inventory")
 
 	config := &kafka.ConfigMap{
@@ -99,28 +103,53 @@ func Test_ACMKafkaConsumer(t *testing.T) {
 	}
 
 	if kafkaSecProtocol != "" {
-		if kafkaCaLocation == "" || kafkaCertLocation == "" || kafkaKeyLocation == "" {
-			log.Fatalf("SSL configuration is incomplete. Please provide KAFKA_SSL_CA_LOCATION, KAFKA_SSL_CERT_LOCATION, and KAFKA_SSL_KEY_LOCATION.")
-		}
 		err := config.SetKey("security.protocol", kafkaSecProtocol)
 		if err != nil {
 			err = fmt.Errorf("please provide KAFKA_SECURITY_PROTOCOL to set security.protocol")
 			log.Error(err)
 		}
-		err = config.SetKey("ssl.ca.location", kafkaCaLocation)
-		if err != nil {
-			err = fmt.Errorf("please provide KAFKA_SSL_CA_LOCATION to set ssl.ca.location")
-			log.Error(err)
+		if kafkaCaLocation != "" {
+			err = config.SetKey("ssl.ca.location", kafkaCaLocation)
+			if err != nil {
+				err = fmt.Errorf("please provide KAFKA_SSL_CA_LOCATION to set ssl.ca.location")
+				log.Error(err)
+			}
 		}
-		err = config.SetKey("ssl.certificate.location", kafkaCertLocation)
-		if err != nil {
-			err = fmt.Errorf("please provide KAFKA_SSL_CERT_LOCATION to set ssl.certificate.location")
-			log.Error(err)
+		if kafkaCertLocation != "" {
+			err = config.SetKey("ssl.certificate.location", kafkaCertLocation)
+			if err != nil {
+				err = fmt.Errorf("please provide KAFKA_SSL_CERT_LOCATION to set ssl.certificate.location")
+				log.Error(err)
+			}
 		}
-		err = config.SetKey("ssl.key.location", kafkaKeyLocation)
-		if err != nil {
-			err = fmt.Errorf("please provide KAFKA_SSL_KEY_LOCATION to set ssl.key.location")
-			log.Error(err)
+		if kafkaKeyLocation != "" {
+			err = config.SetKey("ssl.key.location", kafkaKeyLocation)
+			if err != nil {
+				err = fmt.Errorf("please provide KAFKA_SSL_KEY_LOCATION to set ssl.key.location")
+				log.Error(err)
+			}
+		}
+		if kafkaKeyPassword != "" {
+			err = config.SetKey("ssl.key.password", kafkaKeyPassword)
+			if err != nil {
+				err = fmt.Errorf("please provide KAFKA_SSL_KEY_PASSWORD to set ssl.key.password")
+				log.Error(err)
+			}
+		}
+
+		if kafkaClientCert != "" {
+			err = config.SetKey("ssl.keystore.location", kafkaClientCert) // Client certificate
+			if err != nil {
+				err = fmt.Errorf("please provide KAFKA_CLIENT_CERT to set ssl.keystore.location")
+				log.Error(err)
+			}
+		}
+		if kafkaClientKey != "" {
+			err = config.SetKey("ssl.keystore.password", kafkaClientKey) // Client key
+			if err != nil {
+				err = fmt.Errorf("please provide KAFKA_CLIENT_KEY to set ssl.keystore.password")
+				log.Error(err)
+			}
 		}
 	}
 

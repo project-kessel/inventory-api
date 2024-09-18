@@ -1,4 +1,4 @@
-package e2e
+package grpc
 
 import (
 	"context"
@@ -6,7 +6,6 @@ import (
 	"github.com/go-kratos/kratos/v2/log"
 	v1 "github.com/project-kessel/inventory-api/api/kessel/inventory/v1"
 	"github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/resources"
-
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"

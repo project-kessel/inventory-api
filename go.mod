@@ -4,7 +4,7 @@ go 1.22.5
 
 require (
 	buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go v1.34.2-20240717164558-a6c49f84cc0f.2
-	github.com/authzed/grpcutil v0.0.0-20230908193239-4286bb1d6403
+	github.com/authzed/grpcutil v0.0.0-20240123194739-2ea1e3d2d98b
 	github.com/bufbuild/protovalidate-go v0.6.5
 	github.com/cloudevents/sdk-go/protocol/kafka_confluent/v2 v2.0.0-20240718090307-5f0cc73d49ff
 	github.com/cloudevents/sdk-go/v2 v2.15.2
@@ -15,6 +15,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/google/wire v0.6.0
 	github.com/patrickmn/go-cache v2.1.0+incompatible
+	github.com/project-kessel/inventory-client-go v0.0.0-20240918112335-d9c72f85b234
 	github.com/project-kessel/relations-api v0.0.0-20240912181134-54bbd73bdde7
 	github.com/prometheus/client_golang v1.20.3
 	github.com/spf13/cobra v1.8.1

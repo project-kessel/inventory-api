@@ -116,11 +116,11 @@ objects:
             livenessProbe:
               httpGet:
                 path: /api/inventory/v1/livez
-                port: 8081
+                port: 8000
             readinessProbe:
               httpGet:
                 path: /api/inventory/v1/readyz
-                port: 8081
+                port: 8000
             env:
               - name: INVENTORY_API_CONFIG
                 value: "/inventory-api-compose.yaml"

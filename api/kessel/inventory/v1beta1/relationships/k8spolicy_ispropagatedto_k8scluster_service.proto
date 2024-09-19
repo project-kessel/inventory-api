@@ -34,7 +34,7 @@ message DeleteK8SPolicyIsPropagatedToK8SClusterRequest {
   // \"<reporter_data.reporter_type>:<reporter_instance_id>:<reporter_data.subject_local_resource_id>\"
   // AND \"<reporter_data.reporter_type>:<reporter_instance_id>:<reporter_data.object_local_resource_id>\"
   // from the request body.
-  ReporterData reporter_data = 1 [ (buf.validate.field).required = true ];
+  ReporterData reporter_data = 1 [ json_name = "reporter_data", (buf.validate.field).required = true ];
 }
 
 message DeleteK8SPolicyIsPropagatedToK8SClusterResponse {}

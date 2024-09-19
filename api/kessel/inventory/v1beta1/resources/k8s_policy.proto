@@ -17,7 +17,7 @@ message K8sPolicy {
   Metadata metadata = 1;
 
   // Write only reporter specific data
-  ReporterData reporter_data = 245278792 [ (buf.validate.field).required = true ];
+  ReporterData reporter_data = 245278792 [ json_name = "reporter_data", (buf.validate.field).required = true ];
 
-  K8sPolicyDetail resource_data = 2122698 [ (buf.validate.field).required = true ];
+  K8sPolicyDetail resource_data = 2122698 [ json_name = "resource_data", (buf.validate.field).required = true ];
 }

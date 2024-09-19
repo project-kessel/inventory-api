@@ -437,7 +437,7 @@ components:
         kessel.inventory.v1beta1.relationships.CreateK8SPolicyIsPropagatedToK8SClusterRequest:
             type: object
             properties:
-                k8spolicy_ispropagatedto_k8scluster:
+                k8s-policy_is-propagated-to_k8s-cluster:
                     allOf:
                         - $ref: '#/components/schemas/kessel.inventory.v1beta1.relationships.K8SPolicyIsPropagatedToK8SCluster'
                     description: The resource relationship to create in Kessel Asset Inventory
@@ -447,7 +447,7 @@ components:
         kessel.inventory.v1beta1.relationships.DeleteK8SPolicyIsPropagatedToK8SClusterRequest:
             type: object
             properties:
-                reporter_data:
+                reporterData:
                     allOf:
                         - $ref: '#/components/schemas/kessel.inventory.v1beta1.relationships.ReporterData'
                     description: "The resource-relationship to be deleted will be defined by \n \\\"<reporter_data.reporter_type>:<reporter_instance_id>:<reporter_data.subject_local_resource_id>\\\"\n AND \\\"<reporter_data.reporter_type>:<reporter_instance_id>:<reporter_data.object_local_resource_id>\\\"\n from the request body."
@@ -461,20 +461,20 @@ components:
                     allOf:
                         - $ref: '#/components/schemas/kessel.inventory.v1beta1.relationships.Metadata'
                     description: Metadata about this resource
-                reporter_data:
+                reporterData:
                     allOf:
                         - $ref: '#/components/schemas/kessel.inventory.v1beta1.relationships.ReporterData'
                     description: Write only reporter specific data
-                relationship_data:
+                relationshipData:
                     $ref: '#/components/schemas/kessel.inventory.v1beta1.relationships.K8SPolicyIsPropagatedToK8SClusterDetail'
         kessel.inventory.v1beta1.relationships.K8SPolicyIsPropagatedToK8SClusterDetail:
             type: object
             properties:
-                k8s_policy_id:
+                k8sPolicyId:
                     readOnly: true
                     type: string
                     description: The resource ID assigned to the resource by Kessel Asset Inventory.
-                k8s_cluster_id:
+                k8sClusterId:
                     readOnly: true
                     type: string
                     description: The resource ID assigned to the resource by Kessel Asset Inventory.
@@ -488,63 +488,63 @@ components:
                     readOnly: true
                     type: string
                     description: Kessel Asset Inventory generated identifier.
-                relationship_type:
+                relationshipType:
                     readOnly: true
                     type: string
                     description: The type of Resource relationship
-                first_reported:
+                firstReported:
                     readOnly: true
                     type: string
                     description: Date and time when the inventory item was first reported.
                     format: date-time
-                last_reported:
+                lastReported:
                     readOnly: true
                     type: string
                     description: Date and time when the inventory item was last updated.
                     format: date-time
-                first_reported_by:
+                firstReportedBy:
                     readOnly: true
                     type: string
                     description: Identifier of the reporter that first reported on this item.
-                last_reported_by:
+                lastReportedBy:
                     readOnly: true
                     type: string
                     description: Identifier of the reporter that last reported on this item.
         kessel.inventory.v1beta1.relationships.ReporterData:
             type: object
             properties:
-                reporter_type:
+                reporterType:
                     type: integer
                     format: enum
-                reporter_instance_id:
+                reporterInstanceId:
                     readOnly: true
                     type: string
                     description: |-
                         The ID of the instance of the reporter. This is derived from the
                          authentication mechanism, i.e. authentication token.
-                reporter_version:
+                reporterVersion:
                     type: string
                     description: version of the reporter
-                first_reported:
+                firstReported:
                     readOnly: true
                     type: string
                     description: Date and time when the inventory item was first reported by this reporter
                     format: date-time
-                last_reported:
+                lastReported:
                     readOnly: true
                     type: string
                     description: Date and time when the inventory item was last updated by this reporter
                     format: date-time
-                subject_local_resource_id:
+                subjectLocalResourceId:
                     type: string
                     description: "The ID assigned by the reporter to resource which is the subject of the relationship. For example \n OCM cluster ID, HBI's host id, or ACM managed cluster name etc."
-                object_local_resource_id:
+                objectLocalResourceId:
                     type: string
                     description: "The ID assigned by the reporter to resource which is the object of the relationship. For example \n OCM cluster ID, HBI's host id, or ACM managed cluster name etc."
         kessel.inventory.v1beta1.relationships.UpdateK8SPolicyIsPropagatedToK8SClusterRequest:
             type: object
             properties:
-                k8spolicy_ispropagatedto_k8scluster:
+                k8s-policy_is-propagated-to_k8s-cluster:
                     allOf:
                         - $ref: '#/components/schemas/kessel.inventory.v1beta1.relationships.K8SPolicyIsPropagatedToK8SCluster'
                     description: "The resource-relationship to be updated will be defined by \n \\\"<reporter_data.reporter_type>:<reporter_instance_id>:<reporter_data.subject_local_resource_id>\\\"\n AND \\\"<reporter_data.reporter_type>:<reporter_instance_id>:<reporter_data.object_local_resource_id>\\\"\n from the request body."
@@ -554,7 +554,7 @@ components:
         kessel.inventory.v1beta1.resources.CreateK8sClusterRequest:
             type: object
             properties:
-                k8s_cluster:
+                k8sCluster:
                     allOf:
                         - $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.K8sCluster'
                     description: The k8s cluster to create in Kessel Asset Inventory
@@ -564,7 +564,7 @@ components:
         kessel.inventory.v1beta1.resources.CreateK8sPolicyRequest:
             type: object
             properties:
-                k8s_policy:
+                k8sPolicy:
                     allOf:
                         - $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.K8sPolicy'
                     description: The policy to create in Kessel Asset Inventory
@@ -584,7 +584,7 @@ components:
         kessel.inventory.v1beta1.resources.CreateRhelHostRequest:
             type: object
             properties:
-                rhel_host:
+                rhelHost:
                     allOf:
                         - $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.RhelHost'
                     description: The Rhel Host to create in Kessel Asset Inventory
@@ -594,7 +594,7 @@ components:
         kessel.inventory.v1beta1.resources.DeleteK8sClusterRequest:
             type: object
             properties:
-                reporter_data:
+                reporterData:
                     allOf:
                         - $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.ReporterData'
                     description: "The resource to be deleted will be defined by \n \\\"<reporter_data.reporter_type>:<reporter_instaance_id>:<reporter_data.local_resource_id>\\\" \n from the request body."
@@ -604,7 +604,7 @@ components:
         kessel.inventory.v1beta1.resources.DeleteK8sPolicyRequest:
             type: object
             properties:
-                reporter_data:
+                reporterData:
                     allOf:
                         - $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.ReporterData'
                     description: "The resource to be deleted will be defined by \n \\\"<reporter_data.reporter_type>:<reporter_instaance_id>:<reporter_data.local_resource_id>\\\"\n from the request body."
@@ -614,7 +614,7 @@ components:
         kessel.inventory.v1beta1.resources.DeleteNotificationsIntegrationRequest:
             type: object
             properties:
-                reporter_data:
+                reporterData:
                     allOf:
                         - $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.ReporterData'
                     description: "The resource to be deleted will be defined by \n \\\"<reporter_data.reporter_type>:<reporter_instaance_id>:<reporter_data.local_resource_id>\\\"\n from the request body."
@@ -624,7 +624,7 @@ components:
         kessel.inventory.v1beta1.resources.DeleteRhelHostRequest:
             type: object
             properties:
-                reporter_data:
+                reporterData:
                     allOf:
                         - $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.ReporterData'
                     description: "The resource to be updated will be defined by \n \\\"<reporter_data.reporter_type>:<reporter_instaance_id>:<reporter_data.local_resource_id>\\\"\n from the request body."
@@ -638,31 +638,31 @@ components:
                     allOf:
                         - $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.Metadata'
                     description: Metadata about this resource
-                reporter_data:
+                reporterData:
                     allOf:
                         - $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.ReporterData'
                     description: Write only reporter specific data
-                resource_data:
+                resourceData:
                     $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.K8sClusterDetail'
         kessel.inventory.v1beta1.resources.K8sClusterDetail:
             type: object
             properties:
-                external_cluster_id:
+                externalClusterId:
                     type: string
                     description: The OCP cluster ID or ARN etc for *KS
-                cluster_status:
+                clusterStatus:
                     type: integer
                     format: enum
-                kube_version:
+                kubeVersion:
                     type: string
                     description: The version of kubernetes
-                kube_vendor:
+                kubeVendor:
                     type: integer
                     format: enum
-                vendor_version:
+                vendorVersion:
                     type: string
                     description: The version of the productized kubernetes distribution
-                cloud_platform:
+                cloudPlatform:
                     type: integer
                     format: enum
                 nodes:
@@ -696,11 +696,11 @@ components:
                     allOf:
                         - $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.Metadata'
                     description: Metadata about this resource
-                reporter_data:
+                reporterData:
                     allOf:
                         - $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.ReporterData'
                     description: Write only reporter specific data
-                resource_data:
+                resourceData:
                     $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.K8sPolicyDetail'
         kessel.inventory.v1beta1.resources.K8sPolicyDetail:
             type: object
@@ -718,25 +718,25 @@ components:
                     readOnly: true
                     type: string
                     description: Kessel Asset Inventory generated identifier.
-                resource_type:
+                resourceType:
                     readOnly: true
                     type: string
                     description: The type of the Resource
-                first_reported:
+                firstReported:
                     readOnly: true
                     type: string
                     description: Date and time when the inventory item was first reported.
                     format: date-time
-                last_reported:
+                lastReported:
                     readOnly: true
                     type: string
                     description: Date and time when the inventory item was last updated.
                     format: date-time
-                first_reported_by:
+                firstReportedBy:
                     readOnly: true
                     type: string
                     description: Identifier of the reporter that first reported on this item.
-                last_reported_by:
+                lastReportedBy:
                     readOnly: true
                     type: string
                     description: Identifier of the reporter that last reported on this item.
@@ -756,7 +756,7 @@ components:
                     allOf:
                         - $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.Metadata'
                     description: Metadata about this resource
-                reporter_data:
+                reporterData:
                     writeOnly: true
                     allOf:
                         - $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.ReporterData'
@@ -764,40 +764,40 @@ components:
         kessel.inventory.v1beta1.resources.ReporterData:
             type: object
             properties:
-                reporter_type:
+                reporterType:
                     type: integer
                     format: enum
-                reporter_instance_id:
+                reporterInstanceId:
                     readOnly: true
                     type: string
                     description: |-
                         The ID of the instance of the reporter. This is derived from the
                          authentication mechanism, i.e. authentication token.
-                first_reported:
+                firstReported:
                     readOnly: true
                     type: string
                     description: Date and time when the inventory item was first reported by this reporter
                     format: date-time
-                last_reported:
+                lastReported:
                     readOnly: true
                     type: string
                     description: Date and time when the inventory item was last updated by this reporter
                     format: date-time
-                console_href:
+                consoleHref:
                     type: string
                     description: |-
                         The URL for this resource in the reporter's management UI console. For
                          example this would be the cluster URL in the HCC Console for an OCM
                          reported cluster.
-                api_href:
+                apiHref:
                     type: string
                     description: Reporter specific API link to the resource.
-                local_resource_id:
+                localResourceId:
                     type: string
                     description: |-
                         The ID assigned to this resource by the reporter, for example OCM cluster
                          ID, HBI's host id, or ACM managed cluster name etc.
-                reporter_version:
+                reporterVersion:
                     type: string
                     description: version of the reporter
         kessel.inventory.v1beta1.resources.ResourceLabel:
@@ -814,7 +814,7 @@ components:
                     allOf:
                         - $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.Metadata'
                     description: Metadata about this resource
-                reporter_data:
+                reporterData:
                     writeOnly: true
                     allOf:
                         - $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.ReporterData'
@@ -822,7 +822,7 @@ components:
         kessel.inventory.v1beta1.resources.UpdateK8sClusterRequest:
             type: object
             properties:
-                k8s_cluster:
+                k8sCluster:
                     allOf:
                         - $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.K8sCluster'
                     description: "The resource to be updated will be defined by \n \\\"<reporter_data.reporter_type>:<reporter_instaance_id>:<reporter_data.local_resource_id>\\\"\n from the request body."
@@ -832,7 +832,7 @@ components:
         kessel.inventory.v1beta1.resources.UpdateK8sPolicyRequest:
             type: object
             properties:
-                k8s_policy:
+                k8sPolicy:
                     allOf:
                         - $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.K8sPolicy'
                     description: "The resource to be updated will be defined by \n \\\"<reporter_data.reporter_type>:<reporter_instaance_id>:<reporter_data.local_resource_id>\\\"\n from the request body."
@@ -852,7 +852,7 @@ components:
         kessel.inventory.v1beta1.resources.UpdateRhelHostRequest:
             type: object
             properties:
-                rhel_host:
+                rhelHost:
                     allOf:
                         - $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.RhelHost'
                     description: "The resource to be updated will be defined by \n \\\"<reporter_data.reporter_type>:<reporter_instaance_id>:<reporter_data.local_resource_id>\\\"\n from the request body."

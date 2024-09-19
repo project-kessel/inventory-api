@@ -14,4 +14,4 @@ plugins:
     opt:
       - fq_schema_naming=true
       - default_response=true
-      - naming=proto
+      - naming=json

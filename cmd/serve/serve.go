@@ -3,6 +3,9 @@ package serve
 import (
 	"context"
 	"fmt"
+	relationshipsctl "github.com/project-kessel/inventory-api/internal/biz/relationships/k8spolicy"
+	relationshipsrepo "github.com/project-kessel/inventory-api/internal/data/relationships/k8spolicy"
+	relationshipssvc "github.com/project-kessel/inventory-api/internal/service/relationships/k8spolicy"
 	"os"
 	"os/signal"
 	"syscall"
@@ -25,26 +28,21 @@ import (
 	rel "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/relationships"
 	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/resources"
 
-	healthrepo "github.com/project-kessel/inventory-api/internal/data/health"
-	hostsrepo "github.com/project-kessel/inventory-api/internal/data/hosts"
-	k8sclustersrepo "github.com/project-kessel/inventory-api/internal/data/k8sclusters"
-	k8spoliciesrepo "github.com/project-kessel/inventory-api/internal/data/k8spolicies"
-	notifsrepo "github.com/project-kessel/inventory-api/internal/data/notificationsintegrations"
-	relationshipsrepo "github.com/project-kessel/inventory-api/internal/data/relationships"
-
 	healthctl "github.com/project-kessel/inventory-api/internal/biz/health"
 	hostsctl "github.com/project-kessel/inventory-api/internal/biz/hosts"
 	k8sclustersctl "github.com/project-kessel/inventory-api/internal/biz/k8sclusters"
 	k8spoliciesctl "github.com/project-kessel/inventory-api/internal/biz/k8spolicies"
 	notifsctl "github.com/project-kessel/inventory-api/internal/biz/notificationsintegrations"
-	relationshipsctl "github.com/project-kessel/inventory-api/internal/biz/relationships"
-
+	healthrepo "github.com/project-kessel/inventory-api/internal/data/health"
+	hostsrepo "github.com/project-kessel/inventory-api/internal/data/hosts"
+	k8sclustersrepo "github.com/project-kessel/inventory-api/internal/data/k8sclusters"
+	k8spoliciesrepo "github.com/project-kessel/inventory-api/internal/data/k8spolicies"
+	notifsrepo "github.com/project-kessel/inventory-api/internal/data/notificationsintegrations"
 	healthssvc "github.com/project-kessel/inventory-api/internal/service/health"
 	hostssvc "github.com/project-kessel/inventory-api/internal/service/hosts"
 	k8sclusterssvc "github.com/project-kessel/inventory-api/internal/service/k8sclusters"
 	k8spoliciessvc "github.com/project-kessel/inventory-api/internal/service/k8spolicies"
 	notifssvc "github.com/project-kessel/inventory-api/internal/service/notificationsintegrations"
-	relationshipssvc "github.com/project-kessel/inventory-api/internal/service/relationships"
 )
 
 func NewCommand(
@@ -179,7 +177,7 @@ func NewCommand(
 			pb.RegisterKesselK8SPolicyServiceHTTPServer(server.HttpServer, k8spolicies_service)
 
 			// wire together relationships handling
-			relationships_repo := relationshipsrepo.New(db)
+			relationships_repo := relationshipsrepo.New(db, eventingManager)
 			relationships_controller := relationshipsctl.New(relationships_repo, log.With(logger, "subsystem", "relationships_controller"))
 			relationships_service := relationshipssvc.New(relationships_controller)
 			rel.RegisterKesselK8SPolicyIsPropagatedToK8SClusterServiceServer(server.GrpcServer, relationships_service)

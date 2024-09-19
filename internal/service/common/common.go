@@ -1,6 +1,7 @@
 package common
 
 import (
+	relationshipspb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/relationships"
 	"time"
 
 	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
@@ -53,6 +54,44 @@ func ReporterFromPb(in *pb.ReporterData, identity *authnapi.Identity, defaultUpd
 		ApiHref:         in.ApiHref,
 		CreatedAt:       in.FirstReported.AsTime(),
 		UpdatedAt:       updatedAt,
+	}
+}
+
+func RelationshipMetadataFromPb(in *relationshipspb.Metadata, reporter *relationshipspb.ReporterData, identity *authnapi.Identity) *biz.RelationshipMetadata {
+	var updatedAt time.Time
+	if in.LastReported != nil {
+		updatedAt = in.LastReported.AsTime()
+	} else {
+		updatedAt = time.Now().UTC()
+	}
+
+	return &biz.RelationshipMetadata{
+		ID:               in.Id,
+		RelationshipType: in.RelationshipType,
+		CreatedAt:        in.FirstReported.AsTime(),
+		UpdatedAt:        updatedAt,
+		FirstReportedBy:  identity.Principal,
+		LastReportedBy:   identity.Principal,
+
+		Reporters: []*biz.RelationshipReporter{RelationshipReporterFromPb(reporter, identity, updatedAt)},
+	}
+}
+
+func RelationshipReporterFromPb(in *relationshipspb.ReporterData, identity *authnapi.Identity, defaultUpdatedAt time.Time) *biz.RelationshipReporter {
+	var updatedAt time.Time
+	if in.LastReported != nil {
+		updatedAt = in.LastReported.AsTime()
+	} else {
+		updatedAt = defaultUpdatedAt
+	}
+	return &biz.RelationshipReporter{
+		ReporterID:             identity.Principal,
+		ReporterType:           in.ReporterType.String(),
+		ReporterVersion:        in.ReporterVersion,
+		SubjectLocalResourceId: in.SubjectLocalResourceId,
+		ObjectLocalResourceId:  in.ObjectLocalResourceId,
+		CreatedAt:              in.FirstReported.AsTime(),
+		UpdatedAt:              updatedAt,
 	}
 }
 

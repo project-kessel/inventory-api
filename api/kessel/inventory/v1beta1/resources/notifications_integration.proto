@@ -18,5 +18,5 @@ message NotificationsIntegration {
 
   // Write only reporter specific data
   ReporterData reporter_data = 245278792
-      [ (google.api.field_behavior) = INPUT_ONLY, (buf.validate.field).required = true ];
+      [ json_name = "reporter_data", (google.api.field_behavior) = INPUT_ONLY, (buf.validate.field).required = true ];
 }

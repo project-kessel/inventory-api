@@ -20,10 +20,10 @@ message K8SPolicyIsPropagatedToK8SClusterDetail {
   }
 
   // The resource ID assigned to the resource by Kessel Asset Inventory. 
-  int64 k8s_policy_id = 225679544 [ (google.api.field_behavior) = OUTPUT_ONLY ];
+  int64 k8s_policy_id = 225679544 [ json_name = "k8s_policy_id", (google.api.field_behavior) = OUTPUT_ONLY ];
 
   // The resource ID assigned to the resource by Kessel Asset Inventory. 
-  int64 k8s_cluster_id = 240280960 [ (google.api.field_behavior) = OUTPUT_ONLY ];
+  int64 k8s_cluster_id = 240280960 [ json_name = "k8s_cluster_id", (google.api.field_behavior) = OUTPUT_ONLY ];
 
-  Status status = 355610639 [ (buf.validate.field).enum = {not_in: [0], defined_only: true} ];
+  Status status = 355610639 [ json_name = "status",(buf.validate.field).enum = {not_in: [0], defined_only: true} ];
 }

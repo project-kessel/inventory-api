@@ -32,7 +32,7 @@ message DeleteNotificationsIntegrationRequest {
   // The resource to be deleted will be defined by 
   // \"<reporter_data.reporter_type>:<reporter_instaance_id>:<reporter_data.local_resource_id>\"
   // from the request body.
-  ReporterData reporter_data = 1 [ (buf.validate.field).required = true ];
+  ReporterData reporter_data = 1 [ json_name = "reporter_data", (buf.validate.field).required = true ];
 }
 
 message DeleteNotificationsIntegrationResponse {}

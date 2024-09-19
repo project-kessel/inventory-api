@@ -42,7 +42,7 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/google.rpc.Status'
-    /api/inventory/v1beta1/resource-relationships/k8s-policy.is-propagated.to-k8s-cluster:
+    /api/inventory/v1beta1/resource-relationships/k8s-policy_is-propagated-to_k8s-cluster:
         put:
             tags:
                 - KesselK8SPolicyIsPropagatedToK8SClusterService
@@ -437,7 +437,7 @@ components:
         kessel.inventory.v1beta1.relationships.CreateK8SPolicyIsPropagatedToK8SClusterRequest:
             type: object
             properties:
-                k8spolicy_ispropagatedto_k8scluster:
+                k8s-policy_is-propagated-to_k8s-cluster:
                     allOf:
                         - $ref: '#/components/schemas/kessel.inventory.v1beta1.relationships.K8SPolicyIsPropagatedToK8SCluster'
                     description: The resource relationship to create in Kessel Asset Inventory
@@ -544,7 +544,7 @@ components:
         kessel.inventory.v1beta1.relationships.UpdateK8SPolicyIsPropagatedToK8SClusterRequest:
             type: object
             properties:
-                k8spolicy_ispropagatedto_k8scluster:
+                k8s-policy_is-propagated-to_k8s-cluster:
                     allOf:
                         - $ref: '#/components/schemas/kessel.inventory.v1beta1.relationships.K8SPolicyIsPropagatedToK8SCluster'
                     description: "The resource-relationship to be updated will be defined by \n \\\"<reporter_data.reporter_type>:<reporter_instance_id>:<reporter_data.subject_local_resource_id>\\\"\n AND \\\"<reporter_data.reporter_type>:<reporter_instance_id>:<reporter_data.object_local_resource_id>\\\"\n from the request body."

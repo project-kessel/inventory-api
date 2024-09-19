@@ -15,22 +15,22 @@ message Metadata {
 
   // The type of Resource relationship
   string relationship_type = 251000036 
-        [ (google.api.field_behavior) = OUTPUT_ONLY ];
+        [ json_name = "relationship_type", (google.api.field_behavior) = OUTPUT_ONLY ];
 
   // Date and time when the inventory item was first reported.
   google.protobuf.Timestamp first_reported = 13874817
-      [ (google.api.field_behavior) = OUTPUT_ONLY ];
+      [ json_name = "first_reported", (google.api.field_behavior) = OUTPUT_ONLY ];
 
   // Date and time when the inventory item was last updated.
   google.protobuf.Timestamp last_reported = 436473484
-      [ (google.api.field_behavior) = OUTPUT_ONLY ];
+      [ json_name = "last_reported", (google.api.field_behavior) = OUTPUT_ONLY ];
 
   // Identifier of the reporter that first reported on this item.
   string first_reported_by = 46112821
-      [ (google.api.field_behavior) = OUTPUT_ONLY ];
+      [ json_name = "first_reported_by", (google.api.field_behavior) = OUTPUT_ONLY ];
 
   // Identifier of the reporter that last reported on this item.
   string last_reported_by = 505008783
-      [ (google.api.field_behavior) = OUTPUT_ONLY ];
+      [ json_name = "last_reported_by", (google.api.field_behavior) = OUTPUT_ONLY ];
 
 }

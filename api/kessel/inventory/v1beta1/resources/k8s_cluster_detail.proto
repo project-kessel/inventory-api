@@ -60,19 +60,19 @@ message K8sClusterDetail {
   }
 
   // The OCP cluster ID or ARN etc for *KS
-  string external_cluster_id = 219571597 [ (buf.validate.field).string.min_len = 1 ];
+  string external_cluster_id = 219571597 [  json_name = "external_cluster_id", (buf.validate.field).string.min_len = 1 ];
 
-  ClusterStatus cluster_status = 499346904  [ (buf.validate.field).enum = {not_in: [0], defined_only: true} ];
+  ClusterStatus cluster_status = 499346904  [  json_name = "cluster_status", (buf.validate.field).enum = {not_in: [0], defined_only: true} ];
 
   // The version of kubernetes
-  string kube_version = 395858490;
+  string kube_version = 395858490 [  json_name = "kube_version" ];
 
-  KubeVendor kube_vendor = 264191642 [ (buf.validate.field).enum = {not_in: [0], defined_only: true} ];
+  KubeVendor kube_vendor = 264191642 [  json_name = "kube_vendor", (buf.validate.field).enum = {not_in: [0], defined_only: true} ];
 
   // The version of the productized kubernetes distribution
-  string vendor_version = 23961827 [ (buf.validate.field).string.min_len = 1 ];
+  string vendor_version = 23961827 [  json_name = "vendor_version", (buf.validate.field).string.min_len = 1 ];
 
-  CloudPlatform cloud_platform = 476768062 [ (buf.validate.field).enum = {not_in: [0], defined_only: true} ];
+  CloudPlatform cloud_platform = 476768062 [  json_name = "cloud_platform", (buf.validate.field).enum = {not_in: [0], defined_only: true} ];
 
   repeated K8sClusterDetailNodesInner nodes = 75440785 [ (buf.validate.field).repeated = {min_items: 1, items: { required: true}} ];
 }

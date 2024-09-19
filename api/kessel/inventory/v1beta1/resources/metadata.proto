@@ -17,23 +17,23 @@ message Metadata {
 
   // The type of the Resource
   string resource_type = 442752204
-      [ (google.api.field_behavior) = OUTPUT_ONLY ];
+      [ json_name = "resource_type", (google.api.field_behavior) = OUTPUT_ONLY ];
 
   // Date and time when the inventory item was first reported.
   google.protobuf.Timestamp first_reported = 13874816
-      [ (google.api.field_behavior) = OUTPUT_ONLY ];
+      [ json_name = "first_reported", (google.api.field_behavior) = OUTPUT_ONLY ];
 
   // Date and time when the inventory item was last updated.
   google.protobuf.Timestamp last_reported = 436473483
-      [ (google.api.field_behavior) = OUTPUT_ONLY ];
+      [ json_name = "last_reported", (google.api.field_behavior) = OUTPUT_ONLY ];
 
   // Identifier of the reporter that first reported on this item.
   string first_reported_by = 46112820
-      [ (google.api.field_behavior) = OUTPUT_ONLY ];
+      [ json_name = "first_reported_by", (google.api.field_behavior) = OUTPUT_ONLY ];
 
   // Identifier of the reporter that last reported on this item.
   string last_reported_by = 505008782
-      [ (google.api.field_behavior) = OUTPUT_ONLY ];
+      [ json_name = "last_reported_by", (google.api.field_behavior) = OUTPUT_ONLY ];
 
   // The workspace in which this resource is a member for access control.  A
   // resource can only be a member of one workspace.

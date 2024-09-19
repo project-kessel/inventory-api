@@ -21,33 +21,33 @@ message ReporterData {
     NOTIFICATIONS = 5;
   }
 
-  ReporterType reporter_type = 245778392 [ (buf.validate.field).enum = {not_in: [0], defined_only: true} ];
+  ReporterType reporter_type = 245778392 [ json_name = "reporter_type", (buf.validate.field).enum = {not_in: [0], defined_only: true} ];
 
   // The ID of the instance of the reporter. This is derived from the
   // authentication mechanism, i.e. authentication token.
   string reporter_instance_id = 241085112 
-      [ (google.api.field_behavior) = OUTPUT_ONLY ];
+      [ json_name = "reporter_instance_id", (google.api.field_behavior) = OUTPUT_ONLY ];
 
   // Date and time when the inventory item was first reported by this reporter
   google.protobuf.Timestamp first_reported = 13874816
-      [ (google.api.field_behavior) = OUTPUT_ONLY ];
+      [ json_name = "first_reported", (google.api.field_behavior) = OUTPUT_ONLY ];
 
   // Date and time when the inventory item was last updated by this reporter
   google.protobuf.Timestamp last_reported = 436473483
-      [ (google.api.field_behavior) = OUTPUT_ONLY ];
+      [ json_name = "last_reported", (google.api.field_behavior) = OUTPUT_ONLY ];
 
   // The URL for this resource in the reporter's management UI console. For
   // example this would be the cluster URL in the HCC Console for an OCM
   // reported cluster.
-  string console_href = 145854740;
+  string console_href = 145854740 [ json_name = "console_href" ];
 
   // Reporter specific API link to the resource.
-  string api_href = 430210609;
+  string api_href = 430210609 [ json_name = "api_href" ];
 
   // The ID assigned to this resource by the reporter, for example OCM cluster
   // ID, HBI's host id, or ACM managed cluster name etc.
-  string local_resource_id = 508976189 [ (buf.validate.field).string.min_len = 1 ];
+  string local_resource_id = 508976189 [ json_name = "local_resource_id", (buf.validate.field).string.min_len = 1 ];
 
   // version of the reporter
-  string reporter_version = 269629306;
+  string reporter_version = 269629306 [ json_name = "reporter_version" ];
 }

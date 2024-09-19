@@ -17,7 +17,7 @@ message K8SPolicyIsPropagatedToK8SCluster {
   Metadata metadata = 1 [ (buf.validate.field) = {required: false, ignore: IGNORE_ALWAYS} ];
 
   // Write only reporter specific data
-  ReporterData reporter_data = 245278793 [ (buf.validate.field).required = true ];
+  ReporterData reporter_data = 245278793 [ json_name = "reporter_data", (buf.validate.field).required = true ];
   
-  K8SPolicyIsPropagatedToK8SClusterDetail relationship_data = 2122699 [ (buf.validate.field).required = true ];
+  K8SPolicyIsPropagatedToK8SClusterDetail relationship_data = 2122699 [ json_name = "relationship_data", (buf.validate.field).required = true ];
 }

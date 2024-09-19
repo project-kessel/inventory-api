@@ -56,6 +56,26 @@ curl -H "Content-Type: application/json" --data "@data/host.json" http://localho
 
 Depending on the config file you're using, the curl command will require additional headers for authorization of the request.
 
+### Adding a new relationship (k8s-policy is propagated to k8s-cluster)
+
+To add a k8s-policy_ispropagatedto-k8s-cluster relationship you can use the following `curl` command:
+
+```bash
+curl -H "Content-Type: application/json" --data "@data/k8spolicy_ispropagatedto_k8scluster.json" http://localhost:8081/api/inventory/v1beta1/resource-relationships/k8s-policy.is-propagated.to-k8s-cluster
+```
+
+To update it, use the `PUT` verb as follows:
+
+```bash
+curl -X PUT -H "Content-Type: application/json" --data "@data/k8spolicy_ispropagatedto_k8scluster.json" http://localhost:8081/api/inventory/v1beta1/resource-relationships/k8s-policy.is-propagated.to-k8s-cluster
+```
+
+And finally, to delete it, use the `DELETE` verb, notice that the data file is different this time. We only need the reporter data to delete a relationship.
+
+```bash
+curl -X DELETE -H "Content-Type: application/json" --data "@data/relationship_reporter_data.json" http://localhost:8081/api/inventory/v1beta1/resource-relationships/k8s-policy.is-propagated.to-k8s-cluster
+```
+
 ### Running with `make run`
 
 We are using the included `.inventory-api.yaml` file which allows guest access.

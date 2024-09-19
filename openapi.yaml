@@ -42,7 +42,7 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/google.rpc.Status'
-    /api/inventory/v1beta1/resource-relationships/k8s-policy.is-propagated.to-k8s-cluster:
+    /api/inventory/v1beta1/resource-relationships/k8s-policy_is-propagated-to_k8s-cluster:
         put:
             tags:
                 - KesselK8SPolicyIsPropagatedToK8SClusterService

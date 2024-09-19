@@ -31,9 +31,9 @@ type KesselK8SPolicyIsPropagatedToK8SClusterServiceHTTPServer interface {
 
 func RegisterKesselK8SPolicyIsPropagatedToK8SClusterServiceHTTPServer(s *http.Server, srv KesselK8SPolicyIsPropagatedToK8SClusterServiceHTTPServer) {
 	r := s.Route("/")
-	r.POST("/api/inventory/v1beta1/resource-relationships/k8s-policy.is-propagated.to-k8s-cluster", _KesselK8SPolicyIsPropagatedToK8SClusterService_CreateK8SPolicyIsPropagatedToK8SCluster0_HTTP_Handler(srv))
-	r.PUT("/api/inventory/v1beta1/resource-relationships/k8s-policy.is-propagated.to-k8s-cluster", _KesselK8SPolicyIsPropagatedToK8SClusterService_UpdateK8SPolicyIsPropagatedToK8SCluster0_HTTP_Handler(srv))
-	r.DELETE("/api/inventory/v1beta1/resource-relationships/k8s-policy.is-propagated.to-k8s-cluster", _KesselK8SPolicyIsPropagatedToK8SClusterService_DeleteK8SPolicyIsPropagatedToK8SCluster0_HTTP_Handler(srv))
+	r.POST("/api/inventory/v1beta1/resource-relationships/k8s-policy_is-propagated-to_k8s-cluster", _KesselK8SPolicyIsPropagatedToK8SClusterService_CreateK8SPolicyIsPropagatedToK8SCluster0_HTTP_Handler(srv))
+	r.PUT("/api/inventory/v1beta1/resource-relationships/k8s-policy_is-propagated-to_k8s-cluster", _KesselK8SPolicyIsPropagatedToK8SClusterService_UpdateK8SPolicyIsPropagatedToK8SCluster0_HTTP_Handler(srv))
+	r.DELETE("/api/inventory/v1beta1/resource-relationships/k8s-policy_is-propagated-to_k8s-cluster", _KesselK8SPolicyIsPropagatedToK8SClusterService_DeleteK8SPolicyIsPropagatedToK8SCluster0_HTTP_Handler(srv))
 }
 
 func _KesselK8SPolicyIsPropagatedToK8SClusterService_CreateK8SPolicyIsPropagatedToK8SCluster0_HTTP_Handler(srv KesselK8SPolicyIsPropagatedToK8SClusterServiceHTTPServer) func(ctx http.Context) error {
@@ -118,7 +118,7 @@ func NewKesselK8SPolicyIsPropagatedToK8SClusterServiceHTTPClient(client *http.Cl
 
 func (c *KesselK8SPolicyIsPropagatedToK8SClusterServiceHTTPClientImpl) CreateK8SPolicyIsPropagatedToK8SCluster(ctx context.Context, in *CreateK8SPolicyIsPropagatedToK8SClusterRequest, opts ...http.CallOption) (*CreateK8SPolicyIsPropagatedToK8SClusterResponse, error) {
 	var out CreateK8SPolicyIsPropagatedToK8SClusterResponse
-	pattern := "/api/inventory/v1beta1/resource-relationships/k8s-policy.is-propagated.to-k8s-cluster"
+	pattern := "/api/inventory/v1beta1/resource-relationships/k8s-policy_is-propagated-to_k8s-cluster"
 	path := binding.EncodeURL(pattern, in, false)
 	opts = append(opts, http.Operation(OperationKesselK8SPolicyIsPropagatedToK8SClusterServiceCreateK8SPolicyIsPropagatedToK8SCluster))
 	opts = append(opts, http.PathTemplate(pattern))
@@ -131,7 +131,7 @@ func (c *KesselK8SPolicyIsPropagatedToK8SClusterServiceHTTPClientImpl) CreateK8S
 
 func (c *KesselK8SPolicyIsPropagatedToK8SClusterServiceHTTPClientImpl) DeleteK8SPolicyIsPropagatedToK8SCluster(ctx context.Context, in *DeleteK8SPolicyIsPropagatedToK8SClusterRequest, opts ...http.CallOption) (*DeleteK8SPolicyIsPropagatedToK8SClusterResponse, error) {
 	var out DeleteK8SPolicyIsPropagatedToK8SClusterResponse
-	pattern := "/api/inventory/v1beta1/resource-relationships/k8s-policy.is-propagated.to-k8s-cluster"
+	pattern := "/api/inventory/v1beta1/resource-relationships/k8s-policy_is-propagated-to_k8s-cluster"
 	path := binding.EncodeURL(pattern, in, false)
 	opts = append(opts, http.Operation(OperationKesselK8SPolicyIsPropagatedToK8SClusterServiceDeleteK8SPolicyIsPropagatedToK8SCluster))
 	opts = append(opts, http.PathTemplate(pattern))
@@ -144,7 +144,7 @@ func (c *KesselK8SPolicyIsPropagatedToK8SClusterServiceHTTPClientImpl) DeleteK8S
 
 func (c *KesselK8SPolicyIsPropagatedToK8SClusterServiceHTTPClientImpl) UpdateK8SPolicyIsPropagatedToK8SCluster(ctx context.Context, in *UpdateK8SPolicyIsPropagatedToK8SClusterRequest, opts ...http.CallOption) (*UpdateK8SPolicyIsPropagatedToK8SClusterResponse, error) {
 	var out UpdateK8SPolicyIsPropagatedToK8SClusterResponse
-	pattern := "/api/inventory/v1beta1/resource-relationships/k8s-policy.is-propagated.to-k8s-cluster"
+	pattern := "/api/inventory/v1beta1/resource-relationships/k8s-policy_is-propagated-to_k8s-cluster"
 	path := binding.EncodeURL(pattern, in, false)
 	opts = append(opts, http.Operation(OperationKesselK8SPolicyIsPropagatedToK8SClusterServiceUpdateK8SPolicyIsPropagatedToK8SCluster))
 	opts = append(opts, http.PathTemplate(pattern))

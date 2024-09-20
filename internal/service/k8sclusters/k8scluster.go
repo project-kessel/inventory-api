@@ -2,11 +2,6 @@ package k8sclusters
 
 import (
 	"context"
-	"fmt"
-	"strings"
-
-	"github.com/go-kratos/kratos/v2/errors"
-
 	"github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/resources"
 	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/resources"
 	authnapi "github.com/project-kessel/inventory-api/internal/authn/api"
@@ -30,10 +25,6 @@ func New(c *biz.K8sClusterUsecase) *K8sClustersService {
 }
 
 func (c *K8sClustersService) CreateK8SCluster(ctx context.Context, r *resources.CreateK8SClusterRequest) (*resources.CreateK8SClusterResponse, error) {
-	if !strings.EqualFold(r.K8SCluster.Metadata.ResourceType, biz.ResourceType) {
-		return nil, errors.BadRequest("BADREQUEST", fmt.Sprintf("incorrect resource type: expected %s", biz.ResourceType))
-	}
-
 	identity, err := middleware.GetIdentity(ctx)
 	if err != nil {
 		return nil, err
@@ -52,19 +43,37 @@ func (c *K8sClustersService) CreateK8SCluster(ctx context.Context, r *resources.
 }
 
 func (c *K8sClustersService) UpdateK8SCluster(ctx context.Context, r *resources.UpdateK8SClusterRequest) (*resources.UpdateK8SClusterResponse, error) {
-	return nil, nil
+	identity, err := middleware.GetIdentity(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	if k, err := k8sClusterFromUpdateRequest(r, identity); err == nil {
+		k.Metadata.ResourceType = biz.ResourceType
+		// Todo: Update to use the right ID
+		if resp, err := c.Ctl.Update(ctx, k, ""); err == nil {
+			return updateResponseFromK8sCluster(resp), nil
+		} else {
+			return nil, err
+		}
+	} else {
+		return nil, err
+	}
 }
 
 func (c *K8sClustersService) DeleteK8SCluster(ctx context.Context, r *resources.DeleteK8SClusterRequest) (*resources.DeleteK8SClusterResponse, error) {
-	return nil, nil
+	if input, err := fromDeleteRequest(r); err == nil {
+		if err := c.Ctl.Delete(ctx, input); err == nil {
+			return toDeleteResponse(), nil
+		} else {
+			return nil, err
+		}
+	} else {
+		return nil, err
+	}
 }
 
 func k8sClusterFromCreateRequest(r *pb.CreateK8SClusterRequest, identity *authnapi.Identity) (*biz.K8SCluster, error) {
-	if identity.Principal != r.K8SCluster.ReporterData.ReporterInstanceId {
-		msg := fmt.Sprintf("Reporter identity must match the provided reporter instance identity: %s != %s", identity.Principal, r.K8SCluster.ReporterData.ReporterInstanceId)
-		return nil, errors.Forbidden("FORBIDDEN", msg)
-	}
-
 	return &biz.K8SCluster{
 		Metadata:     *conv.MetadataFromPb(r.K8SCluster.Metadata, r.K8SCluster.ReporterData, identity),
 		ResourceData: resourceDataFromPb(r.K8SCluster.ResourceData),
@@ -73,6 +82,26 @@ func k8sClusterFromCreateRequest(r *pb.CreateK8SClusterRequest, identity *authna
 
 func createResponseFromK8sCluster(c *biz.K8SCluster) *pb.CreateK8SClusterResponse {
 	return &pb.CreateK8SClusterResponse{}
+}
+
+func k8sClusterFromUpdateRequest(r *pb.UpdateK8SClusterRequest, identity *authnapi.Identity) (*biz.K8SCluster, error) {
+	return &biz.K8SCluster{
+		Metadata:     *conv.MetadataFromPb(r.K8SCluster.Metadata, r.K8SCluster.ReporterData, identity),
+		ResourceData: resourceDataFromPb(r.K8SCluster.ResourceData),
+	}, nil
+}
+
+func updateResponseFromK8sCluster(c *biz.K8SCluster) *pb.UpdateK8SClusterResponse {
+	return &pb.UpdateK8SClusterResponse{}
+}
+
+func fromDeleteRequest(r *pb.DeleteK8SClusterRequest) (string, error) {
+	// Todo: Find out what IDs are we going to be using - is it inventory ids? or resources from reporters?
+	return r.ReporterData.LocalResourceId, nil
+}
+
+func toDeleteResponse() *pb.DeleteK8SClusterResponse {
+	return &pb.DeleteK8SClusterResponse{}
 }
 
 func resourceDataFromPb(r *pb.K8SClusterDetail) *biz.K8SClusterDetail {

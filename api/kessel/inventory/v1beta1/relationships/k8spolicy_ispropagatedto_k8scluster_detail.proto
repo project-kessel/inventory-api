@@ -15,8 +15,8 @@ message K8SPolicyIsPropagatedToK8SClusterDetail {
   enum Status {
     STATUS_UNSPECIFIED = 0;
     STATUS_OTHER = 1;
-    VIOLATION = 2;
-    NON_VIOLATION = 3;
+    VIOLATIONS = 2;
+    NO_VIOLATIONS = 3;
   }
 
   // The resource ID assigned to the resource by Kessel Asset Inventory. 

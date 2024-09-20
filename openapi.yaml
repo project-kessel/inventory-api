@@ -482,8 +482,8 @@ components:
                     enum:
                         - STATUS_UNSPECIFIED
                         - STATUS_OTHER
-                        - NON_COMPLIANT
-                        - COMPLIANT
+                        - VIOLATIONS
+                        - NO_VIOLATIONS
                     type: string
                     format: enum
         kessel.inventory.v1beta1.relationships.Metadata:

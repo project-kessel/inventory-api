@@ -109,9 +109,9 @@ For example, there is a _k8s-policy_ (foo) in Asset Inventory with its set of at
 
 When a new resource relationship is created in the Reporter’s private inventory, the Reporter will issue a POST to the management fabric. The endpoint are structured as follows: 
 
-`/api/inventory/{api-version}/resource-relationships/{relationship-type}` where _relationship-type_ is defined as “subject.relationship.object”. 
+`/api/inventory/{api-version}/resource-relationships/{relationship-type}` where _relationship-type_ is defined as “subject_relationship_object”. 
 
-An example would be: `/api/inventory/v1beta1/resource-relationships/k8s-policy.is-propagated.to-k8s-cluster` 
+An example would be: `/api/inventory/v1beta1/resource-relationships/k8s-policy_is-propagated-to_k8s-cluster` 
 
 The subject and object resources must both exist in Asset Inventory for the POST/PUT to be valid.
 

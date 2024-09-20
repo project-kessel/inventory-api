@@ -113,7 +113,8 @@ objects:
         - name: api
           podSpec:
             image: ${INVENTORY_IMAGE}:${INVENTORY_IMAGE_TAG}
-            command: ["serve"]
+            command: ["inventory-api"]
+            args: ["serve"]
             livenessProbe:
               httpGet:
                 path: /api/inventory/v1/livez

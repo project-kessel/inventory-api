@@ -1,0 +1,29 @@
+syntax = "proto3";
+
+package kessel.inventory.v1beta1.resources;
+
+import "buf/validate/validate.proto";
+
+import "kessel/inventory/v1beta1/resources/resource_label.proto";
+
+option go_package = "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/resources";
+option java_multiple_files = true;
+option java_package = "org.project_kessel.api.inventory.v1beta1.resources";
+option java_outer_classname = "K8sClusterDetailNodesInnerProto";
+
+message K8sClusterDetailNodesInner {
+
+  // The name of the node (this can contain private info)
+  string name = 3373707 [ (buf.validate.field).string.min_len = 1 ];
+
+  // CPU Capacity of the node defined in CPU units, e.g. \"0.5\"
+  string cpu = 98728 [ (buf.validate.field).string.min_len = 1 ];
+
+  // Memory Capacity of the node defined as MiB, e.g. \"50Mi\"
+  string memory = 4014849 [ (buf.validate.field).string.min_len = 1 ];
+
+  // Map of string keys and string values that can be used to organize and
+  // categorize (scope and select) resources
+  // Todo: Do we require at least 1 label?
+  repeated ResourceLabel labels = 36675587 [ (buf.validate.field).repeated.items.required = true ];
+}

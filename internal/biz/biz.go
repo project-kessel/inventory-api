@@ -2,11 +2,11 @@ package biz
 
 import (
 	"github.com/google/wire"
+	"github.com/project-kessel/inventory-api/internal/biz/relationships/k8spolicy"
 
 	"github.com/project-kessel/inventory-api/internal/biz/hosts"
 	"github.com/project-kessel/inventory-api/internal/biz/k8sclusters"
-	"github.com/project-kessel/inventory-api/internal/biz/policies"
-	"github.com/project-kessel/inventory-api/internal/biz/relationships"
+	"github.com/project-kessel/inventory-api/internal/biz/k8spolicies"
 )
 
 var (
@@ -14,7 +14,7 @@ var (
 	ProviderSet = wire.NewSet(
 		hosts.New,
 		k8sclusters.New,
-		policies.New,
-		relationships.New,
+		k8spolicies.New,
+		k8spolicy.New,
 	)
 )

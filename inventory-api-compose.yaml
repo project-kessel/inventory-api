@@ -7,7 +7,11 @@ authn:
  psk:
    pre-shared-key-file: /psks.yaml
 authz:
-  impl: allow-all
+  impl: kessel
+  kessel:
+    insecure-client: true
+    url: relations-api:9000
+    enable_oidc_auth: false
 eventing:
   eventer: stdout
   kafka:

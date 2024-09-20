@@ -1,0 +1,49 @@
+syntax = "proto3";
+
+package kessel.inventory.v1beta1.relationships;
+
+import "google/api/field_behavior.proto";
+import "google/protobuf/timestamp.proto";
+import "buf/validate/validate.proto";
+
+option go_package = "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/relationships";
+option java_multiple_files = true;
+option java_package = "org.project_kessel.api.inventory.v1beta1.relationships";
+
+message ReporterData {
+
+  enum ReporterType {
+    REPORTER_TYPE_UNSPECIFIED = 0;
+    REPORTER_TYPE_OTHER = 1;
+    ACM = 2;
+    HBI = 3;
+    OCM = 4;
+    NOTIFICATIONS = 5;
+  }
+
+  ReporterType reporter_type = 245778393 [ json_name = "reporter_type", (buf.validate.field).enum = {not_in: [0], defined_only: true} ];
+
+  // The ID of the instance of the reporter. This is derived from the
+  // authentication mechanism, i.e. authentication token.
+  string reporter_instance_id = 241085114 
+      [ json_name = "reporter_instance_id", (google.api.field_behavior) = OUTPUT_ONLY ];
+  
+  // version of the reporter
+  string reporter_version = 269629307 [ json_name = "reporter_version" ];
+
+  // Date and time when the inventory item was first reported by this reporter
+  google.protobuf.Timestamp first_reported = 13874817
+      [ json_name = "first_reported", (google.api.field_behavior) = OUTPUT_ONLY ];
+
+  // Date and time when the inventory item was last updated by this reporter
+  google.protobuf.Timestamp last_reported = 436473484
+      [ json_name = "last_reported", (google.api.field_behavior) = OUTPUT_ONLY ];
+
+  // The ID assigned by the reporter to resource which is the subject of the relationship. For example 
+  // OCM cluster ID, HBI's host id, or ACM managed cluster name etc.
+  string subject_local_resource_id = 508976190 [ json_name = "subject_local_resource_id", (buf.validate.field).string.min_len = 1 ];
+
+  // The ID assigned by the reporter to resource which is the object of the relationship. For example 
+  // OCM cluster ID, HBI's host id, or ACM managed cluster name etc.
+  string object_local_resource_id = 508976191 [ json_name = "object_local_resource_id", (buf.validate.field).string.min_len = 1 ];
+}

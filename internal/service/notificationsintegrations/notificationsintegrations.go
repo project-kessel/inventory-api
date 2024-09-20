@@ -2,11 +2,8 @@ package notificationsintegrations
 
 import (
 	"context"
-	"fmt"
-	"strings"
 
-	"github.com/go-kratos/kratos/v2/errors"
-	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1"
+	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/resources"
 	authnapi "github.com/project-kessel/inventory-api/internal/authn/api"
 	biz "github.com/project-kessel/inventory-api/internal/biz/notificationsintegrations"
 	"github.com/project-kessel/inventory-api/internal/middleware"
@@ -28,22 +25,13 @@ func New(c *biz.NotificationsIntegrationUsecase) *NotificationsIntegrationsServi
 }
 
 func (c *NotificationsIntegrationsService) CreateNotificationsIntegration(ctx context.Context, r *pb.CreateNotificationsIntegrationRequest) (*pb.CreateNotificationsIntegrationResponse, error) {
-	if err := r.ValidateAll(); err != nil {
-		return nil, err
-	}
-
-	//TODO: refactor / abstract resource type strings
-	if !strings.EqualFold(r.Integration.Metadata.ResourceType, biz.ResourceType) {
-		return nil, errors.BadRequest("BADREQUEST", fmt.Sprintf("incorrect resource type: expected %s", biz.ResourceType))
-	}
-
 	identity, err := middleware.GetIdentity(ctx)
 	if err != nil {
 		return nil, err
 	}
 
 	if h, err := notificationsIntegrationFromCreateRequest(r, identity); err == nil {
-		if resp, err := c.Ctl.CreateNotificationsIntegration(ctx, h); err == nil {
+		if resp, err := c.Ctl.Create(ctx, h); err == nil {
 			return createResponseFromNotificationsIntegration(resp), nil
 
 		} else {
@@ -55,34 +43,24 @@ func (c *NotificationsIntegrationsService) CreateNotificationsIntegration(ctx co
 }
 
 func (c *NotificationsIntegrationsService) UpdateNotificationsIntegration(ctx context.Context, r *pb.UpdateNotificationsIntegrationRequest) (*pb.UpdateNotificationsIntegrationResponse, error) {
-	if err := r.ValidateAll(); err != nil {
-		return nil, err
-	}
 	return nil, nil
 }
 
 func (c *NotificationsIntegrationsService) DeleteNotificationsIntegration(ctx context.Context, r *pb.DeleteNotificationsIntegrationRequest) (*pb.DeleteNotificationsIntegrationResponse, error) {
-	if err := r.ValidateAll(); err != nil {
-		return nil, err
-	}
 	return nil, nil
 }
 
 func notificationsIntegrationFromCreateRequest(r *pb.CreateNotificationsIntegrationRequest, identity *authnapi.Identity) (*biz.NotificationsIntegration, error) {
-	if identity.Principal != r.Integration.ReporterData.ReporterInstanceId {
-		return nil, errors.Forbidden("FORBIDDEN", "Reporter identity must match the provided reporter instance identity")
+	var metadata = &pb.Metadata{}
+	if r.Integration.Metadata != nil {
+		metadata = r.Integration.Metadata
 	}
 
 	return &biz.NotificationsIntegration{
-		Metadata: *conv.MetadataFromPb(r.Integration.Metadata, r.Integration.ReporterData, identity),
+		Metadata: *conv.MetadataFromPb(metadata, r.Integration.ReporterData, identity),
 	}, nil
 }
 
 func createResponseFromNotificationsIntegration(h *biz.NotificationsIntegration) *pb.CreateNotificationsIntegrationResponse {
-	return &pb.CreateNotificationsIntegrationResponse{
-		Integration: &pb.NotificationsIntegration{
-			Metadata:  conv.MetadataFromModel(&h.Metadata),
-			Reporters: conv.ReportersFromModel(h.Metadata.Reporters),
-		},
-	}
+	return &pb.CreateNotificationsIntegrationResponse{}
 }

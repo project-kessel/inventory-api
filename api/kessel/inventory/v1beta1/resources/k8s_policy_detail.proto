@@ -1,0 +1,27 @@
+syntax = "proto3";
+
+package kessel.inventory.v1beta1.resources;
+
+import "buf/validate/validate.proto";
+
+option go_package = "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/resources";
+option java_multiple_files = true;
+option java_package = "org.project_kessel.api.inventory.v1beta1.resources";
+
+message K8sPolicyDetail {
+
+  // The kind of policy
+  enum Severity {
+    SEVERITY_UNSPECIFIED = 0;
+    SEVERITY_OTHER = 1;
+    LOW = 2;
+    MEDIUM = 3;
+    HIGH = 4;
+    CRITICAL = 5;
+  }
+
+  // Defines if the policy is currently enabled or disabled across all targets
+  bool disabled = 270940797;
+
+  Severity severity = 404558592 [ (buf.validate.field).enum.defined_only = true ];
+}

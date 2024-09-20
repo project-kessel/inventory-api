@@ -9,6 +9,6 @@ type NotificationsIntegration struct {
 	ID int64 `gorm:"primaryKey"`
 
 	// required for gorm to associate the metadata table
-	MetadataID int64
-	Metadata   common.Metadata
+	MetadataID int64           `json:"-"`
+	Metadata   common.Metadata `json:"metadata"`
 }

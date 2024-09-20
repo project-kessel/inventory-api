@@ -34,8 +34,8 @@ type CompletedConfig struct {
 
 func (c *Config) Complete(ctx context.Context) (CompletedConfig, []error) {
 	cfg := &completedConfig{
-        Authz: c.Authz,
-    }
+		Authz: c.Authz,
+	}
 
 	if c.Authz == Kessel {
 		if ksl, errs := c.Kessel.Complete(ctx); errs != nil {

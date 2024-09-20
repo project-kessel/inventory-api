@@ -1,0 +1,63 @@
+syntax = "proto3";
+
+package kessel.inventory.v1beta1.relationships;
+
+import "google/api/annotations.proto";
+import "buf/validate/validate.proto";
+
+import "kessel/inventory/v1beta1/relationships/k8spolicy_ispropagatedto_k8scluster.proto";
+import "kessel/inventory/v1beta1/relationships/reporter_data.proto";
+
+option go_package = "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/relationships";
+option java_multiple_files = true;
+option java_package = "org.project_kessel.api.inventory.v1beta1.relationships";
+
+message CreateK8SPolicyIsPropagatedToK8SClusterRequest {
+  // The resource relationship to create in Kessel Asset Inventory
+  K8SPolicyIsPropagatedToK8SCluster k8spolicy_ispropagatedto_k8scluster = 1 [ json_name = "k8s-policy_is-propagated-to_k8s-cluster", (buf.validate.field).required = true ];
+}
+
+message CreateK8SPolicyIsPropagatedToK8SClusterResponse {}
+
+message UpdateK8SPolicyIsPropagatedToK8SClusterRequest {
+  // The resource-relationship to be updated will be defined by 
+  // \"<reporter_data.reporter_type>:<reporter_instance_id>:<reporter_data.subject_local_resource_id>\"
+  // AND \"<reporter_data.reporter_type>:<reporter_instance_id>:<reporter_data.object_local_resource_id>\"
+  // from the request body.
+  K8SPolicyIsPropagatedToK8SCluster k8spolicy_ispropagatedto_k8scluster = 1 [ json_name = "k8s-policy_is-propagated-to_k8s-cluster", (buf.validate.field).required = true ];
+}
+
+message UpdateK8SPolicyIsPropagatedToK8SClusterResponse {}
+
+message DeleteK8SPolicyIsPropagatedToK8SClusterRequest {
+  // The resource-relationship to be deleted will be defined by 
+  // \"<reporter_data.reporter_type>:<reporter_instance_id>:<reporter_data.subject_local_resource_id>\"
+  // AND \"<reporter_data.reporter_type>:<reporter_instance_id>:<reporter_data.object_local_resource_id>\"
+  // from the request body.
+  ReporterData reporter_data = 1 [ json_name = "reporter_data", (buf.validate.field).required = true ];
+}
+
+message DeleteK8SPolicyIsPropagatedToK8SClusterResponse {}
+
+service KesselK8SPolicyIsPropagatedToK8SClusterService {
+  rpc CreateK8SPolicyIsPropagatedToK8SCluster (CreateK8SPolicyIsPropagatedToK8SClusterRequest) returns (CreateK8SPolicyIsPropagatedToK8SClusterResponse) {
+    option (google.api.http) = {
+      post : "/api/inventory/v1beta1/resource-relationships/k8s-policy_is-propagated-to_k8s-cluster"
+      body : "*"
+    };
+  };
+
+  rpc UpdateK8SPolicyIsPropagatedToK8SCluster(UpdateK8SPolicyIsPropagatedToK8SClusterRequest) returns (UpdateK8SPolicyIsPropagatedToK8SClusterResponse) {
+    option (google.api.http) = {
+      put: "/api/inventory/v1beta1/resource-relationships/k8s-policy_is-propagated-to_k8s-cluster"
+      body : "*"
+    };
+  };
+
+  rpc DeleteK8SPolicyIsPropagatedToK8SCluster(DeleteK8SPolicyIsPropagatedToK8SClusterRequest) returns (DeleteK8SPolicyIsPropagatedToK8SClusterResponse) {
+    option (google.api.http) = {
+      delete: "/api/inventory/v1beta1/resource-relationships/k8s-policy_is-propagated-to_k8s-cluster"
+      body : "*"
+    };
+  };
+}

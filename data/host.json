@@ -1,12 +1,11 @@
 {
-  "host": {
+  "rhelHost": {
     "metadata": {
       "resource_type": "rhel-host",
-      "workspace": ""
+      "workspace": "workspace1"
     },
     "reporter_data": {
-      "reporter_type": "REPORTER_TYPE_OCM",
-      "reporter_instance_id": "user@example.com",
+      "reporter_type": "OCM",
       "reporter_version": "0.1",
       "local_resource_id": "1",
       "api_href": "www.example.com",

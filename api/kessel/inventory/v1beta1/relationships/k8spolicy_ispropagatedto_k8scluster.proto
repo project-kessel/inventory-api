@@ -1,0 +1,23 @@
+syntax = "proto3";
+
+package kessel.inventory.v1beta1.relationships;
+
+import "kessel/inventory/v1beta1/relationships/metadata.proto";
+import "kessel/inventory/v1beta1/relationships/reporter_data.proto";
+import "kessel/inventory/v1beta1/relationships/k8spolicy_ispropagatedto_k8scluster_detail.proto";
+import "buf/validate/validate.proto";
+
+option go_package = "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/relationships";
+option java_multiple_files = true;
+option java_package = "org.project_kessel.api.inventory.v1beta1.relationships";
+
+message K8SPolicyIsPropagatedToK8SCluster {
+
+  // Metadata about this resource
+  Metadata metadata = 1 [ (buf.validate.field) = {required: false, ignore: IGNORE_ALWAYS} ];
+
+  // Write only reporter specific data
+  ReporterData reporter_data = 245278793 [ json_name = "reporter_data", (buf.validate.field).required = true ];
+  
+  K8SPolicyIsPropagatedToK8SClusterDetail relationship_data = 2122699 [ json_name = "relationship_data", (buf.validate.field).required = true ];
+}

@@ -13,10 +13,5 @@ plugins:
     out: ../
     opt:
       - fq_schema_naming=true
-      - default_response=false
-      - naming=proto
-  - local: protoc-gen-validate
-    opt:
-      - paths=source_relative
-      - lang=go
-    out: .
+      - default_response=true
+      - naming=json

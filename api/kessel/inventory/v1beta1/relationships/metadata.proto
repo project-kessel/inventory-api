@@ -1,0 +1,36 @@
+syntax = "proto3";
+
+package kessel.inventory.v1beta1.relationships;
+
+import "google/api/field_behavior.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/relationships";
+option java_multiple_files = true;
+option java_package = "org.project_kessel.api.inventory.v1beta1.relationships";
+
+message Metadata {
+  // Kessel Asset Inventory generated identifier.
+  int64 id = 3356 [ (google.api.field_behavior) = OUTPUT_ONLY ];
+
+  // The type of Resource relationship
+  string relationship_type = 251000036 
+        [ json_name = "relationship_type", (google.api.field_behavior) = OUTPUT_ONLY ];
+
+  // Date and time when the inventory item was first reported.
+  google.protobuf.Timestamp first_reported = 13874817
+      [ json_name = "first_reported", (google.api.field_behavior) = OUTPUT_ONLY ];
+
+  // Date and time when the inventory item was last updated.
+  google.protobuf.Timestamp last_reported = 436473484
+      [ json_name = "last_reported", (google.api.field_behavior) = OUTPUT_ONLY ];
+
+  // Identifier of the reporter that first reported on this item.
+  string first_reported_by = 46112821
+      [ json_name = "first_reported_by", (google.api.field_behavior) = OUTPUT_ONLY ];
+
+  // Identifier of the reporter that last reported on this item.
+  string last_reported_by = 505008783
+      [ json_name = "last_reported_by", (google.api.field_behavior) = OUTPUT_ONLY ];
+
+}

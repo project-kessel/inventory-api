@@ -1,4 +1,4 @@
-package hosts
+package notificationsintegrations
 
 import (
 	"context"
@@ -8,29 +8,29 @@ import (
 	"gorm.io/gorm/clause"
 
 	authzapi "github.com/project-kessel/inventory-api/internal/authz/api"
-	biz "github.com/project-kessel/inventory-api/internal/biz/hosts"
+	biz "github.com/project-kessel/inventory-api/internal/biz/resources/notificationsintegrations"
 	eventingapi "github.com/project-kessel/inventory-api/internal/eventing/api"
 	"github.com/project-kessel/inventory-api/internal/middleware"
 )
 
-const namespace = "hbi"
-const resourceType = "rhel_host"
+const namespace = "notifications"
+const resourceType = "integration"
 
-type hostsRepo struct {
+type notificationsintegrationsRepo struct {
 	DB      *gorm.DB
 	Authz   authzapi.Authorizer
 	Eventer eventingapi.Manager
 }
 
-func New(g *gorm.DB, a authzapi.Authorizer, e eventingapi.Manager) *hostsRepo {
-	return &hostsRepo{
+func New(g *gorm.DB, a authzapi.Authorizer, e eventingapi.Manager) *notificationsintegrationsRepo {
+	return &notificationsintegrationsRepo{
 		DB:      g,
 		Authz:   a,
 		Eventer: e,
 	}
 }
 
-func (r *hostsRepo) Save(ctx context.Context, model *biz.Host) (*biz.Host, error) {
+func (r *notificationsintegrationsRepo) Save(ctx context.Context, model *biz.NotificationsIntegration) (*biz.NotificationsIntegration, error) {
 	identity, err := middleware.GetIdentity(ctx)
 	if err != nil {
 		return nil, nil
@@ -65,7 +65,7 @@ func (r *hostsRepo) Save(ctx context.Context, model *biz.Host) (*biz.Host, error
 
 // Update updates a model in the database, updates related tuples in the relations-api, and issues an update event.
 // The `id` is possibly of the form <reporter_type:local_resource_id>.
-func (r *hostsRepo) Update(ctx context.Context, model *biz.Host, id string) (*biz.Host, error) {
+func (r *notificationsintegrationsRepo) Update(ctx context.Context, model *biz.NotificationsIntegration, id string) (*biz.NotificationsIntegration, error) {
 	identity, err := middleware.GetIdentity(ctx)
 	if err != nil {
 		return nil, nil
@@ -97,7 +97,7 @@ func (r *hostsRepo) Update(ctx context.Context, model *biz.Host, id string) (*bi
 
 // Delete deletes a model from the database, removes related tuples from the relations-api, and issues a delete event.
 // The `id` is possibly of the form <reporter_type:local_resource_id>.
-func (r *hostsRepo) Delete(ctx context.Context, id string) error {
+func (r *notificationsintegrationsRepo) Delete(ctx context.Context, id string) error {
 	identity, err := middleware.GetIdentity(ctx)
 	if err != nil {
 		return nil
@@ -121,18 +121,18 @@ func (r *hostsRepo) Delete(ctx context.Context, id string) error {
 	return nil
 }
 
-func (r *hostsRepo) FindByID(context.Context, string) (*biz.Host, error) {
+func (r *notificationsintegrationsRepo) FindByID(context.Context, string) (*biz.NotificationsIntegration, error) {
 	return nil, nil
 }
 
-func (r *hostsRepo) ListAll(context.Context) ([]*biz.Host, error) {
-	// var model biz.Host
+func (r *notificationsintegrationsRepo) ListAll(context.Context) ([]*biz.NotificationsIntegration, error) {
+	// var model biz.NotificationsIntegration
 	// var count int64
 	// if err := r.Db.Model(&model).Count(&count).Error; err != nil {
 	// 	return nil, err
 	// }
 
-	var results []*biz.Host
+	var results []*biz.NotificationsIntegration
 	if err := r.DB.Preload(clause.Associations).Find(&results).Error; err != nil {
 		return nil, err
 	}

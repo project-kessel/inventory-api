@@ -3,10 +3,9 @@ package biz
 import (
 	"github.com/google/wire"
 	"github.com/project-kessel/inventory-api/internal/biz/relationships/k8spolicy"
-
-	"github.com/project-kessel/inventory-api/internal/biz/hosts"
-	"github.com/project-kessel/inventory-api/internal/biz/k8sclusters"
-	"github.com/project-kessel/inventory-api/internal/biz/k8spolicies"
+	"github.com/project-kessel/inventory-api/internal/biz/resources/hosts"
+	"github.com/project-kessel/inventory-api/internal/biz/resources/k8sclusters"
+	"github.com/project-kessel/inventory-api/internal/biz/resources/k8spolicies"
 )
 
 var (

@@ -7,7 +7,7 @@ import (
 	"gorm.io/gorm"
 
 	authzapi "github.com/project-kessel/inventory-api/internal/authz/api"
-	biz "github.com/project-kessel/inventory-api/internal/biz/k8sclusters"
+	biz "github.com/project-kessel/inventory-api/internal/biz/resources/k8sclusters"
 	eventingapi "github.com/project-kessel/inventory-api/internal/eventing/api"
 	"github.com/project-kessel/inventory-api/internal/middleware"
 )

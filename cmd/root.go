@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -27,16 +28,9 @@ var (
 	Name    = "inventory-api"
 	cfgFile string
 
-	rootLog = log.With(log.NewStdLogger(os.Stdout),
-		"ts", log.DefaultTimestamp,
-		"caller", log.DefaultCaller,
-		"service.name", Name,
-		"service.version", Version,
-		"trace.id", tracing.TraceID(),
-		"span.id", tracing.SpanID(),
-	)
+	logger *log.Helper
 
-	logger = log.NewHelper(log.NewFilter(rootLog, log.FilterLevel(log.LevelInfo)))
+	baseLogger log.Logger
 
 	rootCmd = &cobra.Command{
 		Use:     Name,
@@ -88,13 +82,17 @@ func init() {
 	if err != nil {
 		panic(err)
 	}
-	migrateCmd := migrate.NewCommand(options.Storage, log.With(rootLog, "group", "storage"))
+
+	logLevel := getLogLevel()
+	logger, baseLogger = initLogger(logLevel)
+
+	migrateCmd := migrate.NewCommand(options.Storage, baseLogger)
 	rootCmd.AddCommand(migrateCmd)
 	err = viper.BindPFlags(migrateCmd.Flags())
 	if err != nil {
 		panic(err)
 	}
-	serveCmd := serve.NewCommand(options.Server, options.Storage, options.Authn, options.Authz, options.Eventing, log.With(rootLog, "group", "server"))
+	serveCmd := serve.NewCommand(options.Server, options.Storage, options.Authn, options.Authz, options.Eventing, baseLogger)
 	rootCmd.AddCommand(serveCmd)
 	err = viper.BindPFlags(serveCmd.Flags())
 	if err != nil {
@@ -142,4 +140,51 @@ func initConfig() {
 	if err := viper.Unmarshal(&options); err != nil {
 		panic(err)
 	}
+}
+
+func getLogLevel() string {
+	viper.SetConfigFile("./inventory-api-compose.yaml")
+
+	if err := viper.ReadInConfig(); err != nil {
+		fmt.Printf("Error reading config file: %v. Using default log level 'info'.\n", err)
+		return "info" // Default log level in case of error
+	}
+
+	logLevel := viper.GetString("log.level")
+	fmt.Printf("Log Level is set to: %s\n", logLevel)
+	return logLevel
+}
+
+// initLogger initializes the logger based on the provided log level
+func initLogger(logLevel string) (*log.Helper, log.Logger) {
+	// Convert logLevel string to log.Level type
+	var level log.Level
+	switch strings.ToLower(logLevel) {
+	case "debug":
+		level = log.LevelDebug
+	case "info":
+		level = log.LevelInfo
+	case "warn":
+		level = log.LevelWarn
+	case "error":
+		level = log.LevelError
+	case "fatal":
+		level = log.LevelFatal
+	default:
+		fmt.Printf("Invalid log level '%s' provided. Defaulting to 'info' level.\n", logLevel)
+		level = log.LevelInfo
+	}
+
+	rootLogger := log.With(log.NewStdLogger(os.Stdout),
+		"ts", log.DefaultTimestamp,
+		"caller", log.DefaultCaller,
+		"service.name", Name,
+		"service.version", Version,
+		"trace.id", tracing.TraceID(),
+		"span.id", tracing.SpanID(),
+	)
+	filteredLogger := log.NewFilter(rootLogger, log.FilterLevel(level))
+	helperLogger := log.NewHelper(filteredLogger)
+
+	return helperLogger, filteredLogger
 }

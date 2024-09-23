@@ -11,6 +11,7 @@ import "kessel/inventory/v1beta1/resources/reporter_data.proto";
 option go_package = "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/resources";
 option java_multiple_files = true;
 option java_package = "org.project_kessel.api.inventory.v1beta1.resources";
+option java_outer_classname = "K8sPolicyProto";
 
 message K8sPolicy {
   // Metadata about this resource

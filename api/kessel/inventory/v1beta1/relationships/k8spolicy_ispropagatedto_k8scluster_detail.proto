@@ -8,6 +8,7 @@ import "buf/validate/validate.proto";
 option go_package = "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/relationships";
 option java_multiple_files = true;
 option java_package = "org.project_kessel.api.inventory.v1beta1.relationships";
+option java_outer_classname = "K8SPolicyIsPropagatedToK8SClusterDetailProto";
 
 message K8SPolicyIsPropagatedToK8SClusterDetail {
 

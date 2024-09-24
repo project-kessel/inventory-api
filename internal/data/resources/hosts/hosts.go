@@ -2,19 +2,19 @@ package hosts
 
 import (
 	"context"
-	"time"
-
-	"gorm.io/gorm"
-	"gorm.io/gorm/clause"
-
 	authzapi "github.com/project-kessel/inventory-api/internal/authz/api"
 	biz "github.com/project-kessel/inventory-api/internal/biz/resources/hosts"
 	eventingapi "github.com/project-kessel/inventory-api/internal/eventing/api"
 	"github.com/project-kessel/inventory-api/internal/middleware"
+	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
+	"time"
 )
 
 const namespace = "hbi"
 const resourceType = "rhel_host"
+
+type HostDetail = any
 
 type hostsRepo struct {
 	DB      *gorm.DB

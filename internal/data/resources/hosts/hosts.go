@@ -14,8 +14,6 @@ import (
 const namespace = "hbi"
 const resourceType = "rhel_host"
 
-type HostDetail = any
-
 type hostsRepo struct {
 	DB      *gorm.DB
 	Authz   authzapi.Authorizer

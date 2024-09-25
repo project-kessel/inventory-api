@@ -109,12 +109,12 @@ func initConfig() {
 		if configFilePath, exists := os.LookupEnv("INVENTORY_API_CONFIG"); exists {
 			absPath, err := filepath.Abs(configFilePath)
 			if err != nil {
-				fmt.Errorf("Failed to resolve absolute path for config file: %v", err)
+				fmt.Printf("Failed to resolve absolute path for config file: %v", err)
 			}
 			// Set the config file path
 			viper.SetConfigFile(absPath)
 			if err := viper.ReadInConfig(); err != nil {
-				fmt.Errorf("Error reading INVENTORY_API_CONFIG file, %s", err)
+				fmt.Printf("Error reading INVENTORY_API_CONFIG file, %s", err)
 			}
 		} else {
 			home, err := os.UserHomeDir()

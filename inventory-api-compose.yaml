@@ -26,4 +26,4 @@ storage:
     password: "yPsw5e6ab4bvAGe5H"
     dbname: "spicedb"
 log:
-  level: "info"
+  level: "warn"

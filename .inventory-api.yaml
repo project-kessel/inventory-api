@@ -21,3 +21,5 @@ storage:
     user:
     password:
     dbname:
+log:
+  level: "info"

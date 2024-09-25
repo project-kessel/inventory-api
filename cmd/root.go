@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -19,6 +20,7 @@ import (
 	"github.com/project-kessel/inventory-api/internal/eventing"
 	"github.com/project-kessel/inventory-api/internal/server"
 	"github.com/project-kessel/inventory-api/internal/storage"
+	clowder "github.com/redhatinsights/app-common-go/pkg/api/v1"
 )
 
 // go build -ldflags "-X cmd.Version=x.y.z"
@@ -88,6 +90,15 @@ func init() {
 	if err != nil {
 		panic(err)
 	}
+
+	if clowder.IsClowderEnabled() {
+		options.Storage.Postgres.Host = clowder.LoadedConfig.Database.Hostname
+		options.Storage.Postgres.Port = strconv.Itoa(clowder.LoadedConfig.Database.Port)
+		options.Storage.Postgres.User = clowder.LoadedConfig.Database.Username
+		options.Storage.Postgres.Password = clowder.LoadedConfig.Database.Password
+		options.Storage.Postgres.DbName = clowder.LoadedConfig.Database.Name
+	}
+
 	migrateCmd := migrate.NewCommand(options.Storage, log.With(rootLog, "group", "storage"))
 	rootCmd.AddCommand(migrateCmd)
 	err = viper.BindPFlags(migrateCmd.Flags())

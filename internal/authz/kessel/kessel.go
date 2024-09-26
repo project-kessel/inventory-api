@@ -3,6 +3,7 @@ package kessel
 import (
 	"context"
 	"fmt"
+	"github.com/spf13/viper"
 
 	"github.com/go-kratos/kratos/v2/log"
 	authzapi "github.com/project-kessel/inventory-api/internal/authz/api"
@@ -24,7 +25,9 @@ func (a *KesselAuthz) Health(ctx context.Context) (*kesselv1.GetReadyzResponse, 
 	if err != nil {
 		return nil, err
 	}
-	log.Infof("Checking relations-api readyz endpoint")
+	if viper.GetBool("log.readyz") {
+		log.Infof("Checking relations-api readyz endpoint")
+	}
 	return a.HealthService.GetReadyz(ctx, &kesselv1.GetReadyzRequest{}, opts...)
 }
 

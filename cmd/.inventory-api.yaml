@@ -24,3 +24,4 @@ storage:
 log:
   level: "info"
   livez: false
+  readyz: false

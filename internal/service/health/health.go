@@ -32,6 +32,8 @@ func (s *HealthService) GetLivez(ctx context.Context, req *pb.GetLivezRequest) (
 }
 
 func (s *HealthService) GetReadyz(ctx context.Context, req *pb.GetReadyzRequest) (*pb.GetReadyzResponse, error) {
-
+	if viper.GetBool("log.readyz") {
+		log.Infof("Performing readyz check")
+	}
 	return s.Ctl.IsBackendAvailable(ctx)
 }

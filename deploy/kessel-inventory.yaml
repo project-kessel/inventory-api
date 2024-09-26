@@ -53,11 +53,11 @@ objects:
           podSpec:
             initContainers:
             - name: migration
-              image: ${INVENTORY_IMAGE}:${INVENTORY_IMAGE_TAG}
+              image: ${INVENTORY_IMAGE}:${IMAGE_TAG}
               command: ["inventory-api"]
               args: ["migrate"]
               inheritEnv: true
-            image: ${INVENTORY_IMAGE}:${INVENTORY_IMAGE_TAG}
+            image: ${INVENTORY_IMAGE}:${IMAGE_TAG}
             command: ["inventory-api"]
             args: ["serve"]
             livenessProbe:
@@ -99,5 +99,5 @@ parameters:
     name: INVENTORY_IMAGE
     value: quay.io/redhat-services-prod/project-kessel-tenant/kessel-inventory/inventory-api
   - description: Image Tag
-    name: INVENTORY_IMAGE_TAG
-    value: latest
+    name: IMAGE_TAG
+    required: true

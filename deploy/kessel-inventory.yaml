@@ -4,15 +4,6 @@ metadata:
   name: inventory
 objects:
   - apiVersion: v1
-    kind: Secret
-    metadata:
-      name: postgres-secret
-    stringData:
-      POSTGRESQL_DATABASE: authz
-      POSTGRESQL_USER: authz
-      POSTGRESQL_PASSWORD: SuperSecretPassword
-
-  - apiVersion: v1
     kind: ConfigMap
     metadata:
       name: inventory-api-config
@@ -35,12 +26,6 @@ objects:
           database: postgres
           sqlite3:
             dsn: inventory.db
-          postgres:
-            host: "invpostgres"
-            port: "5432"
-            user: "authz"
-            password: "SuperSecretPassword"
-            dbname: "authz"
 
   - apiVersion: v1
     kind: ConfigMap
@@ -54,77 +39,14 @@ objects:
           is_reporter: true
           type: "REPORTER_TYPE_ACM"
 
-  - apiVersion: apps/v1
-    kind: Deployment
-    metadata:
-      labels:
-        app: invpostgres
-      name: invpostgres
-    spec:
-      selector:
-        matchLabels:
-          app: invpostgres
-      template:
-        metadata:
-          labels:
-            app: invpostgres
-        spec:
-          containers:
-          - env:
-            - name: POSTGRESQL_DATABASE
-              valueFrom:
-                secretKeyRef:
-                  name: postgres-secret
-                  key: POSTGRESQL_DATABASE
-            - name: POSTGRESQL_USER
-              valueFrom:
-                secretKeyRef:
-                  name: postgres-secret
-                  key: POSTGRESQL_USER
-            - name: POSTGRESQL_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: postgres-secret
-                  key: POSTGRESQL_PASSWORD
-            - name: PGDATA
-              value: /temp/data
-            image: registry.redhat.io/rhel9/postgresql-15:1-54
-            imagePullPolicy: Always
-            name: postgres
-            ports:
-            - containerPort: 5432
-              protocol: TCP
-            resources:
-              limits:
-                cpu: 60m
-                memory: 256Mi
-              requests:
-                cpu: 30m
-                memory: 128Mi
-          restartPolicy: Always
-
-  - apiVersion: v1
-    kind: Service
-    metadata:
-      labels:
-        app: invpostgres
-      name: invpostgres
-    spec:
-      ports:
-      - name: http
-        port: 5432
-        protocol: TCP
-      selector:
-        app: invpostgres
-
   - apiVersion: cloud.redhat.com/v1alpha1
     kind: ClowdApp
     metadata:
       name: kessel-inventory
     spec:
       envName: ${ENV_NAME}
-#      testing:
-#        iqePlugin: inventory_api
+      database:
+        name: kessel-inventory
       deployments:
         - name: api
           replicas: 1
@@ -147,8 +69,12 @@ objects:
                 path: /api/inventory/v1/readyz
                 port: 8000
             env:
+            - name: CLOWDER_ENABLED
+              value: "true"
             - name: INVENTORY_API_CONFIG
               value: "/inventory/inventory-api-config.yaml"
+            - name: PGDATA
+              value: /temp/data
             volumeMounts:
                 - name: config-volume
                   mountPath: "/inventory"

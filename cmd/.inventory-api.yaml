@@ -1,1 +1,25 @@
-../.inventory-api.yaml
+server:
+  public_url: http://localhost:8081
+  http:
+    address: localhost:8081
+  grpc:
+    address: localhost:9081
+authn:
+   allow-unauthenticated: true
+authz:
+  impl: allow-all
+eventing:
+  eventer: stdout
+  kafka:
+storage:
+  database: sqlite3
+  sqlite3:
+    dsn: inventory.db
+  postgres:
+    host: "localhost"
+    port: "5432"
+    user:
+    password:
+    dbname:
+log:
+  level: "info"

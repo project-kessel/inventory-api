@@ -6,6 +6,7 @@ import (
 	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1"
 	"github.com/project-kessel/inventory-api/internal/authz"
 	biz "github.com/project-kessel/inventory-api/internal/biz/health"
+	"github.com/spf13/viper"
 )
 
 type HealthService struct {
@@ -21,7 +22,9 @@ func New(c *biz.HealthUsecase) *HealthService {
 }
 
 func (s *HealthService) GetLivez(ctx context.Context, req *pb.GetLivezRequest) (*pb.GetLivezResponse, error) {
-	log.Infof("Performing livez check")
+	if viper.GetBool("log.livez") {
+		log.Infof("Performing livez check")
+	}
 	return &pb.GetLivezResponse{
 		Status: "OK",
 		Code:   200,

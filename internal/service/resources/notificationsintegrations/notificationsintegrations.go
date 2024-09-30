@@ -2,23 +2,28 @@ package notificationsintegrations
 
 import (
 	"context"
+	"github.com/project-kessel/inventory-api/internal/biz/model"
+	"github.com/project-kessel/inventory-api/internal/biz/resources"
 
 	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/resources"
 	authnapi "github.com/project-kessel/inventory-api/internal/authn/api"
-	biz "github.com/project-kessel/inventory-api/internal/biz/resources/notificationsintegrations"
 	"github.com/project-kessel/inventory-api/internal/middleware"
 	conv "github.com/project-kessel/inventory-api/internal/service/common"
+)
+
+const (
+	ResourceType = "notifications-integration"
 )
 
 // NotificationsIntegrationsService handles requests for Notifications Integrations
 type NotificationsIntegrationsService struct {
 	pb.UnimplementedKesselNotificationsIntegrationServiceServer
 
-	Ctl *biz.NotificationsIntegrationUsecase
+	Ctl *resources.Usecase
 }
 
 // New creates a new NotificationsIntegrationsService to handle requests for Notifications Integrations
-func New(c *biz.NotificationsIntegrationUsecase) *NotificationsIntegrationsService {
+func New(c *resources.Usecase) *NotificationsIntegrationsService {
 	return &NotificationsIntegrationsService{
 		Ctl: c,
 	}
@@ -73,33 +78,19 @@ func (c *NotificationsIntegrationsService) DeleteNotificationsIntegration(ctx co
 	}
 }
 
-func notificationsIntegrationFromCreateRequest(r *pb.CreateNotificationsIntegrationRequest, identity *authnapi.Identity) (*biz.NotificationsIntegration, error) {
-	var metadata = &pb.Metadata{}
-	if r.Integration.Metadata != nil {
-		metadata = r.Integration.Metadata
-	}
-
-	return &biz.NotificationsIntegration{
-		Metadata: *conv.MetadataFromPb(metadata, r.Integration.ReporterData, identity),
-	}, nil
+func notificationsIntegrationFromCreateRequest(r *pb.CreateNotificationsIntegrationRequest, identity *authnapi.Identity) (*model.Resource, error) {
+	return conv.ResourceFromPb(ResourceType, identity.Principal, nil, r.Integration.Metadata, r.Integration.ReporterData), nil
 }
 
-func createResponseFromNotificationsIntegration(h *biz.NotificationsIntegration) *pb.CreateNotificationsIntegrationResponse {
+func createResponseFromNotificationsIntegration(h *model.Resource) *pb.CreateNotificationsIntegrationResponse {
 	return &pb.CreateNotificationsIntegrationResponse{}
 }
 
-func notificationsIntegrationFromUpdateRequest(r *pb.UpdateNotificationsIntegrationRequest, identity *authnapi.Identity) (*biz.NotificationsIntegration, error) {
-	var metadata = &pb.Metadata{}
-	if r.Integration.Metadata != nil {
-		metadata = r.Integration.Metadata
-	}
-
-	return &biz.NotificationsIntegration{
-		Metadata: *conv.MetadataFromPb(metadata, r.Integration.ReporterData, identity),
-	}, nil
+func notificationsIntegrationFromUpdateRequest(r *pb.UpdateNotificationsIntegrationRequest, identity *authnapi.Identity) (*model.Resource, error) {
+	return conv.ResourceFromPb(ResourceType, identity.Principal, nil, r.Integration.Metadata, r.Integration.ReporterData), nil
 }
 
-func updateResponseFromNotificationsIntegration(h *biz.NotificationsIntegration) *pb.UpdateNotificationsIntegrationResponse {
+func updateResponseFromNotificationsIntegration(h *model.Resource) *pb.UpdateNotificationsIntegrationResponse {
 	return &pb.UpdateNotificationsIntegrationResponse{}
 }
 

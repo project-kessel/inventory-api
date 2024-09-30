@@ -15,6 +15,11 @@ type HealthService struct {
 	Config *authz.CompletedConfig
 }
 
+var (
+	livezLogged  = false
+	readyzLogged = false
+)
+
 func New(c *biz.HealthUsecase) *HealthService {
 	return &HealthService{
 		Ctl: c,
@@ -25,7 +30,10 @@ func (s *HealthService) GetLivez(ctx context.Context, req *pb.GetLivezRequest) (
 	if viper.GetBool("log.livez") {
 		log.Infof("Performing livez check")
 	} else {
-		log.Infof("Livez logs disabled")
+		if !livezLogged {
+			log.Infof("Livez logs disabled")
+			livezLogged = true
+		}
 	}
 	return &pb.GetLivezResponse{
 		Status: "OK",
@@ -37,7 +45,10 @@ func (s *HealthService) GetReadyz(ctx context.Context, req *pb.GetReadyzRequest)
 	if viper.GetBool("log.readyz") {
 		log.Infof("Performing readyz check")
 	} else {
-		log.Infof("Readyz logs disabled")
+		if !readyzLogged {
+			log.Infof("Readyz logs disabled")
+			readyzLogged = true
+		}
 	}
 	return s.Ctl.IsBackendAvailable(ctx)
 }

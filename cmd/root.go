@@ -83,6 +83,8 @@ func init() {
 		panic(err)
 	}
 
+	// TODO: Find a cleaner approach than explicitly calling initConfig
+	// Here we are calling the initConfig to ensure that the log level can be pulled from the inventory configuration file
 	initConfig()
 	logLevel := getLogLevel()
 	logger, baseLogger = initLogger(logLevel)

@@ -1,6 +1,8 @@
 set -exv
 
-IMAGE="quay.io/cloudservices/kessel-inventory"
+if [[ -z "$IMAGE" ]]; then
+    IMAGE="quay.io/cloudservices/kessel-inventory"
+fi
 IMAGE_TAG=$(git rev-parse --short=7 HEAD)
 GIT_COMMIT=$(git rev-parse --short HEAD)
 

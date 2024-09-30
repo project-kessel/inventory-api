@@ -18,7 +18,11 @@ objects:
           psk:
             pre-shared-key-file: /psks/psks.yaml
         authz:
-          impl: allow-all
+          impl: kessel
+          kessel:
+            insecure-client: true
+            url: kessel-relations-api:9000
+            enable_oidc_auth: false
         eventing:
           eventer: stdout
           kafka:
@@ -101,3 +105,4 @@ parameters:
   - description: Image Tag
     name: IMAGE_TAG
     required: true
+    value: latest

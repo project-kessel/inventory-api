@@ -1,5 +1,8 @@
 GOHOSTOS:=$(shell go env GOHOSTOS)
 GOPATH:=$(shell go env GOPATH)
+IMAGE ?="quay.io/cloudservices/kessel-inventory"
+IMAGE_TAG=$(git rev-parse --short=7 HEAD)
+GIT_COMMIT=$(git rev-parse --short HEAD)
 
 ifeq ($(DOCKER),)
 DOCKER:=$(shell command -v podman || command -v docker)
@@ -57,6 +60,10 @@ api_breaking:
 # build
 build:
 	mkdir -p bin/ && go build -ldflags "-X cmd.Version=$(VERSION)" -o ./bin/ ./...
+
+.PHONY: docker-build-push
+docker-build-push:
+	./build_deploy.sh
 
 .PHONY: clean
 # removes all binaries

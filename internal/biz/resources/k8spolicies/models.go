@@ -1,6 +1,7 @@
 package k8spolicies
 
 import (
+	"database/sql/driver"
 	"github.com/project-kessel/inventory-api/internal/biz/common"
 )
 
@@ -20,4 +21,13 @@ type K8sPolicy struct {
 type K8sPolicyDetail struct {
 	Disabled bool   `json:"disabled"`
 	Severity string `json:"severity"`
+}
+
+func (details *K8sPolicyDetail) Scan(value interface{}) error {
+	*details = K8sPolicyDetail{}
+	return common.Unmarshal(value, details)
+}
+
+func (details *K8sPolicyDetail) Value() (driver.Value, error) {
+	return common.Marshal(details)
 }

@@ -27,7 +27,7 @@ storage:
     dbname: "spicedb"
 log:
   level: "info"
-  livez: false
-  readyz: false
+  livez: true
+  readyz: true
 
 

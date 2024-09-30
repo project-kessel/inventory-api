@@ -23,4 +23,6 @@ storage:
     dbname:
 log:
   level: "info"
-  livez: false
+  livez: true
+  readyz: true
+

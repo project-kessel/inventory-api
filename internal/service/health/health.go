@@ -24,6 +24,8 @@ func New(c *biz.HealthUsecase) *HealthService {
 func (s *HealthService) GetLivez(ctx context.Context, req *pb.GetLivezRequest) (*pb.GetLivezResponse, error) {
 	if viper.GetBool("log.livez") {
 		log.Infof("Performing livez check")
+	} else {
+		log.Infof("Livez logs disabled")
 	}
 	return &pb.GetLivezResponse{
 		Status: "OK",
@@ -34,6 +36,8 @@ func (s *HealthService) GetLivez(ctx context.Context, req *pb.GetLivezRequest) (
 func (s *HealthService) GetReadyz(ctx context.Context, req *pb.GetReadyzRequest) (*pb.GetReadyzResponse, error) {
 	if viper.GetBool("log.readyz") {
 		log.Infof("Performing readyz check")
+	} else {
+		log.Infof("Readyz logs disabled")
 	}
 	return s.Ctl.IsBackendAvailable(ctx)
 }

@@ -1,6 +1,10 @@
 package common
 
 import (
+	"database/sql/driver"
+	"encoding/json"
+	"errors"
+	"fmt"
 	"time"
 )
 
@@ -117,4 +121,18 @@ type RelationshipReporter struct {
 
 	// The version of the reporter.
 	ReporterVersion string `json:"reporter_version"`
+}
+
+func Unmarshal(in interface{}, out interface{}) error {
+	bytes, ok := in.([]byte)
+	if !ok {
+		return errors.New(fmt.Sprint("Failed to unmarshal JSONB value:", in))
+	}
+
+	err := json.Unmarshal(bytes, &out)
+	return err
+}
+
+func Marshal(in interface{}) (driver.Value, error) {
+	return json.Marshal(in)
 }

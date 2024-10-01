@@ -1,6 +1,7 @@
 package k8sclusters
 
 import (
+	"database/sql/driver"
 	"github.com/project-kessel/inventory-api/internal/biz/common"
 )
 
@@ -45,4 +46,13 @@ type K8SClusterDetail struct {
 	VendorVersion string `json:"vendor_version"`
 	CloudPlatform string `json:"cloud_platform"`
 	Nodes         []Node `json:"nodes"`
+}
+
+func (details *K8SClusterDetail) Scan(value interface{}) error {
+	*details = K8SClusterDetail{}
+	return common.Unmarshal(value, details)
+}
+
+func (details *K8SClusterDetail) Value() (driver.Value, error) {
+	return common.Marshal(details)
 }

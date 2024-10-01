@@ -53,6 +53,9 @@ func TestRootCommand(t *testing.T) {
 
 			assertCommandCalled(t, command, mocked)
 			assert.Equal(t, "postgres", viper.GetString("storage.database"))
+			assert.Equal(t, "info", viper.GetString("log.level"))
+			assert.Equal(t, true, viper.GetBool("log.livez"))
+			assert.Equal(t, true, viper.GetBool("log.readyz"))
 		})
 	}
 }

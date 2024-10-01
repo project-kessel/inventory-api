@@ -15,6 +15,13 @@ make init
 ## Build
 `make build`
 
+## Build Container Images
+By default the quay repository is `quay.io/cloudservices/kessel-inventory`. If you wish to use another for testing, set IMAGE value first
+```shell
+export IMAGE=your-quay-repo # if desired
+make docker-build-push
+```
+
 ## Run inventory api locally
 ### Run migration
 `make migrate`

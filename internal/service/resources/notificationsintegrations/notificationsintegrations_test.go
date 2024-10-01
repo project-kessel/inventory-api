@@ -7,7 +7,7 @@ import (
 	"github.com/go-kratos/kratos/v2/log"
 	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/resources"
 	"github.com/project-kessel/inventory-api/internal/authn/api"
-	biz "github.com/project-kessel/inventory-api/internal/biz/notificationsintegrations"
+	biz "github.com/project-kessel/inventory-api/internal/biz/resources/notificationsintegrations"
 	"github.com/project-kessel/inventory-api/internal/middleware"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"

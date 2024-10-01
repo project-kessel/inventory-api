@@ -4,26 +4,19 @@ metadata:
   name: inventory
 objects:
   - apiVersion: v1
-    kind: Secret
-    metadata:
-      name: postgres-secret
-    stringData:
-      POSTGRESQL_DATABASE: authz
-      POSTGRESQL_USER: authz
-      POSTGRESQL_PASSWORD: SuperSecretPassword
-  - apiVersion: v1
     kind: ConfigMap
     metadata:
       name: inventory-api-config
     data:
-      server-config.yaml: |
+      inventory-api-config.yaml: |
         server:
           http:
-            address: 0.0.0.0:8081
+            address: 0.0.0.0:8000
           grpc:
-            address: 0.0.0.0:9081
+            address: 0.0.0.0:9000
         authn:
-          allow-unauthenticated: true
+          psk:
+            pre-shared-key-file: /psks/psks.yaml
         authz:
           impl: allow-all
         eventing:
@@ -33,86 +26,38 @@ objects:
           database: postgres
           sqlite3:
             dsn: inventory.db
-          postgres:
-            host: "invdatabase"
-            port: "5433"
-            user: "authz"
-            password: "SuperSecretPassword"
-            dbname: "authz"
-  - apiVersion: apps/v1
-    kind: Deployment
-    metadata:
-      labels:
-        app: invpostgres
-      name: invpostgres
-    spec:
-      selector:
-        matchLabels:
-          app: invpostgres
-      template:
-        metadata:
-          labels:
-            app: invpostgres
-        spec:
-          containers:
-          - env:
-            - name: POSTGRESQL_DATABASE
-              valueFrom:
-                secretKeyRef:
-                  name: postgres-secret
-                  key: POSTGRESQL_DATABASE
-            - name: POSTGRESQL_USER
-              valueFrom:
-                secretKeyRef:
-                  name: postgres-secret
-                  key: POSTGRESQL_USER
-            - name: POSTGRESQL_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: postgres-secret
-                  key: POSTGRESQL_PASSWORD
-            - name: PGDATA
-              value: /temp/data
-            image: registry.redhat.io/rhel9/postgresql-15:1-54
-            imagePullPolicy: Always
-            name: postgres
-            ports:
-            - containerPort: 5432
-              protocol: TCP
-            resources:
-              limits:
-                cpu: 60m
-                memory: 256Mi
-              requests:
-                cpu: 30m
-                memory: 128Mi
-          restartPolicy: Always
+
   - apiVersion: v1
-    kind: Service
+    kind: ConfigMap
     metadata:
-      labels:
-        app: invpostgres
-      name: invpostgres
-    spec:
-      ports:
-      - name: http
-        port: 5432
-        protocol: TCP
-      selector:
-        app: invpostgres
+      name: psks
+    data:
+      psks.yaml: |
+        "1234":
+          tenant: "Example"
+          principal: "user@example.com"
+          is_reporter: true
+          type: "REPORTER_TYPE_ACM"
+
   - apiVersion: cloud.redhat.com/v1alpha1
     kind: ClowdApp
     metadata:
       name: kessel-inventory
     spec:
       envName: ${ENV_NAME}
-#      testing:
-#        iqePlugin: inventory_api
-      replicas: 1
+      database:
+        name: kessel-inventory
       deployments:
         - name: api
+          replicas: 1
           podSpec:
-            image: ${INVENTORY_IMAGE}:${INVENTORY_IMAGE_TAG}
+            initContainers:
+            - name: migration
+              image: ${INVENTORY_IMAGE}:${IMAGE_TAG}
+              command: ["inventory-api"]
+              args: ["migrate"]
+              inheritEnv: true
+            image: ${INVENTORY_IMAGE}:${IMAGE_TAG}
             command: ["inventory-api"]
             args: ["serve"]
             livenessProbe:
@@ -124,19 +69,24 @@ objects:
                 path: /api/inventory/v1/readyz
                 port: 8000
             env:
-              - name: INVENTORY_API_CONFIG
-                value: "/inventory-api-compose.yaml"
+            - name: CLOWDER_ENABLED
+              value: "true"
+            - name: INVENTORY_API_CONFIG
+              value: "/inventory/inventory-api-config.yaml"
+            - name: PGDATA
+              value: /temp/data
             volumeMounts:
                 - name: config-volume
-                  mountPath: /inventory-api-compose.yaml
-                  subPath: inventory-api-compose.yaml
-#                - name: psks-volume
-#                  mountPath: /psks.yaml
-#                  subPath: psks.yaml
+                  mountPath: "/inventory"
+                - name: psks-volume
+                  mountPath: /psks
             volumes:
               - name: config-volume
                 configMap:
                   name: inventory-api-config
+              - name: psks-volume
+                configMap:
+                  name: psks
           webServices:
             public:
               enabled: true
@@ -147,7 +97,7 @@ parameters:
     required: true
   - description: App Image
     name: INVENTORY_IMAGE
-    value: quay.io/redhat-services-prod/project-kessel-tenant/kessel-inventory-main/inventory-api-main
+    value: quay.io/redhat-services-prod/project-kessel-tenant/kessel-inventory/inventory-api
   - description: Image Tag
-    name: INVENTORY_IMAGE_TAG
-    value: latest
+    name: IMAGE_TAG
+    required: true

@@ -5,8 +5,8 @@ import (
 
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/project-kessel/inventory-api/internal/biz/common"
-	"github.com/project-kessel/inventory-api/internal/biz/hosts"
-	notifs "github.com/project-kessel/inventory-api/internal/biz/notificationsintegrations"
+	"github.com/project-kessel/inventory-api/internal/biz/resources/hosts"
+	notifs "github.com/project-kessel/inventory-api/internal/biz/resources/notificationsintegrations"
 	// "github.com/project-kessel/inventory-api/internal/biz/k8sclusters"
 	// "github.com/project-kessel/inventory-api/internal/biz/policies"
 	k8spolicyrelations "github.com/project-kessel/inventory-api/internal/biz/relationships/k8spolicy"

@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"strconv"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -20,6 +21,7 @@ import (
 	"github.com/project-kessel/inventory-api/internal/eventing"
 	"github.com/project-kessel/inventory-api/internal/server"
 	"github.com/project-kessel/inventory-api/internal/storage"
+	clowder "github.com/redhatinsights/app-common-go/pkg/api/v1"
 )
 
 // go build -ldflags "-X cmd.Version=x.y.z"
@@ -83,6 +85,14 @@ func init() {
 		panic(err)
 	}
 
+	if clowder.IsClowderEnabled() {
+		options.Storage.Postgres.Host = clowder.LoadedConfig.Database.Hostname
+		options.Storage.Postgres.Port = strconv.Itoa(clowder.LoadedConfig.Database.Port)
+		options.Storage.Postgres.User = clowder.LoadedConfig.Database.Username
+		options.Storage.Postgres.Password = clowder.LoadedConfig.Database.Password
+		options.Storage.Postgres.DbName = clowder.LoadedConfig.Database.Name
+	}
+  
 	// TODO: Find a cleaner approach than explicitly calling initConfig
 	// Here we are calling the initConfig to ensure that the log level can be pulled from the inventory configuration file
 	initConfig()

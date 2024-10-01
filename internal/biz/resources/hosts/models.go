@@ -1,8 +1,6 @@
 package hosts
 
-import (
-	"github.com/project-kessel/inventory-api/internal/biz/common"
-)
+import "github.com/project-kessel/inventory-api/internal/biz/common"
 
 type Host struct {
 	// Kessel Asset Inventory generated identifier.

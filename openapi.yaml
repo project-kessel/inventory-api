@@ -479,7 +479,12 @@ components:
                     type: string
                     description: The resource ID assigned to the resource by Kessel Asset Inventory.
                 status:
-                    type: integer
+                    enum:
+                        - STATUS_UNSPECIFIED
+                        - STATUS_OTHER
+                        - VIOLATIONS
+                        - NO_VIOLATIONS
+                    type: string
                     format: enum
         kessel.inventory.v1beta1.relationships.Metadata:
             type: object
@@ -514,7 +519,14 @@ components:
             type: object
             properties:
                 reporter_type:
-                    type: integer
+                    enum:
+                        - REPORTER_TYPE_UNSPECIFIED
+                        - REPORTER_TYPE_OTHER
+                        - ACM
+                        - HBI
+                        - OCM
+                        - NOTIFICATIONS
+                    type: string
                     format: enum
                 reporter_instance_id:
                     readOnly: true
@@ -651,19 +663,55 @@ components:
                     type: string
                     description: The OCP cluster ID or ARN etc for *KS
                 cluster_status:
-                    type: integer
+                    enum:
+                        - CLUSTER_STATUS_UNSPECIFIED
+                        - CLUSTER_STATUS_OTHER
+                        - READY
+                        - FAILED
+                        - OFFLINE
+                    type: string
                     format: enum
                 kube_version:
                     type: string
                     description: The version of kubernetes
                 kube_vendor:
-                    type: integer
+                    enum:
+                        - KUBE_VENDOR_UNSPECIFIED
+                        - KUBE_VENDOR_OTHER
+                        - AKS
+                        - EKS
+                        - IKS
+                        - OPENSHIFT
+                        - GKE
+                    type: string
                     format: enum
                 vendor_version:
                     type: string
                     description: The version of the productized kubernetes distribution
                 cloud_platform:
-                    type: integer
+                    enum:
+                        - CLOUD_PLATFORM_UNSPECIFIED
+                        - CLOUD_PLATFORM_OTHER
+                        - NONE_UPI
+                        - BAREMETAL_IPI
+                        - BAREMETAL_UPI
+                        - AWS_IPI
+                        - AWS_UPI
+                        - AZURE_IPI
+                        - AZURE_UPI
+                        - IBMCLOUD_IPI
+                        - IBMCLOUD_UPI
+                        - KUBEVIRT_IPI
+                        - OPENSTACK_IPI
+                        - OPENSTACK_UPI
+                        - GCP_IPI
+                        - GCP_UPI
+                        - NUTANIX_IPI
+                        - NUTANIX_UPI
+                        - VSPHERE_IPI
+                        - VSPHERE_UPI
+                        - OVIRT_IPI
+                    type: string
                     format: enum
                 nodes:
                     type: array
@@ -709,7 +757,14 @@ components:
                     type: boolean
                     description: Defines if the policy is currently enabled or disabled across all targets
                 severity:
-                    type: integer
+                    enum:
+                        - SEVERITY_UNSPECIFIED
+                        - SEVERITY_OTHER
+                        - LOW
+                        - MEDIUM
+                        - HIGH
+                        - CRITICAL
+                    type: string
                     format: enum
         kessel.inventory.v1beta1.resources.Metadata:
             type: object
@@ -765,7 +820,14 @@ components:
             type: object
             properties:
                 reporter_type:
-                    type: integer
+                    enum:
+                        - REPORTER_TYPE_UNSPECIFIED
+                        - REPORTER_TYPE_OTHER
+                        - ACM
+                        - HBI
+                        - OCM
+                        - NOTIFICATIONS
+                    type: string
                     format: enum
                 reporter_instance_id:
                     readOnly: true

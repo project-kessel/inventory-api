@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/go-kratos/kratos/v2/transport/http"
+	v1 "github.com/project-kessel/inventory-api/api/kessel/inventory/v1"
 	"github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/resources"
 	"github.com/project-kessel/inventory-client-go/v1beta1"
 	"github.com/stretchr/testify/assert"
@@ -71,6 +72,52 @@ func TestMain(m *testing.M) {
 
 	result := m.Run()
 	os.Exit(result)
+}
+
+func TestInventoryAPIHTTP_Livez(t *testing.T) {
+	t.Parallel()
+	httpClient, err := http.NewClient(
+		context.Background(),
+		http.WithEndpoint(inventoryapi_http_url),
+	)
+	if err != nil {
+		t.Fatal("Failed to create HTTP client: ", err)
+	}
+
+	healthClient := v1.NewKesselInventoryHealthServiceHTTPClient(httpClient)
+	resp, err := healthClient.GetLivez(context.Background(), &v1.GetLivezRequest{})
+
+	assert.NoError(t, err)
+	assert.NotNil(t, resp)
+
+	expectedStatus := "OK"
+	expectedCode := uint32(200)
+
+	assert.Equal(t, expectedStatus, resp.Status)
+	assert.Equal(t, expectedCode, resp.Code)
+}
+
+func TestInventoryAPIHTTP_Readyz(t *testing.T) {
+	t.Parallel()
+	httpClient, err := http.NewClient(
+		context.Background(),
+		http.WithEndpoint(inventoryapi_http_url),
+	)
+	if err != nil {
+		t.Fatal("Failed to create HTTP client: ", err)
+	}
+
+	healthClient := v1.NewKesselInventoryHealthServiceHTTPClient(httpClient)
+	resp, err := healthClient.GetReadyz(context.Background(), &v1.GetReadyzRequest{})
+
+	assert.NoError(t, err)
+	assert.NotNil(t, resp)
+
+	expectedStatus := "Storage type sqlite"
+	expectedCode := uint32(200)
+
+	assert.Equal(t, expectedStatus, resp.Status)
+	assert.Equal(t, expectedCode, resp.Code)
 }
 
 func TestInventoryAPIHTTP_CreateRHELHost(t *testing.T) {

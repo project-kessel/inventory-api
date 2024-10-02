@@ -120,6 +120,23 @@ func TestInventoryAPIHTTP_Readyz(t *testing.T) {
 	assert.Equal(t, expectedCode, resp.Code)
 }
 
+func TestInventoryAPIHTTP_Metrics(t *testing.T) {
+	resp, err := nethttp.Get("http://localhost:8081/metrics")
+	if err != nil {
+		t.Fatal("Failed to send request: ", err)
+	}
+	defer resp.Body.Close()
+
+	assert.NoError(t, err)
+	assert.NotNil(t, resp)
+
+	expectedStatusCode := 200
+	expectedStatusString := "200 OK"
+
+	assert.Equal(t, expectedStatusCode, resp.StatusCode)
+	assert.Equal(t, expectedStatusString, resp.Status)
+}
+
 func TestInventoryAPIHTTP_CreateRHELHost(t *testing.T) {
 	t.Parallel()
 	c := v1beta1.NewConfig(

@@ -39,3 +39,11 @@ bin/
 .docker
 
 inventory.db
+
+inventory-api.tar
+inventory-e2e-tests.tar
+
+multicluster-global-hub/
+scripts/kubeconfig-global-hub
+
+

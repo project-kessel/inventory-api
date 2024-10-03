@@ -221,6 +221,44 @@ func TestInventoryAPIHTTP_K8SCluster_CreateK8SCluster(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+func TestInventoryAPIHTTP_K8SPolicy_CreateK8SPolicy(t *testing.T) {
+	t.Parallel()
+	c := v1beta1.NewConfig(
+		v1beta1.WithHTTPUrl(inventoryapi_http_url),
+		v1beta1.WithTLSInsecure(insecure),
+		v1beta1.WithHTTPTLSConfig(tlsConfig),
+	)
+	client, err := v1beta1.NewHttpClient(context.Background(), c)
+	if err != nil {
+		t.Error(err)
+	}
+
+	request := resources.CreateK8SPolicyRequest{
+		K8SPolicy: &resources.K8SPolicy{
+			Metadata: &resources.Metadata{
+				ResourceType: "k8s-policy",
+				Workspace:    "default",
+			},
+			ResourceData: &resources.K8SPolicyDetail{
+				Disabled: true,
+				Severity: resources.K8SPolicyDetail_MEDIUM,
+			},
+			ReporterData: &resources.ReporterData{
+				ReporterInstanceId: "user@example.com",
+				ReporterType:       resources.ReporterData_ACM,
+				ConsoleHref:        "www.example.com",
+				ApiHref:            "www.example.com",
+				LocalResourceId:    "1",
+				ReporterVersion:    "0.1",
+			},
+		},
+	}
+	opts := getCallOptions()
+	_, err = client.PolicyServiceClient.CreateK8SPolicy(context.Background(), &request, opts...)
+	assert.NoError(t, err)
+
+}
+
 func getCallOptions() []http.CallOption {
 	var opts []http.CallOption
 	header := nethttp.Header{}

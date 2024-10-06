@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
+	"strconv"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -19,6 +21,7 @@ import (
 	"github.com/project-kessel/inventory-api/internal/eventing"
 	"github.com/project-kessel/inventory-api/internal/server"
 	"github.com/project-kessel/inventory-api/internal/storage"
+	clowder "github.com/redhatinsights/app-common-go/pkg/api/v1"
 )
 
 // go build -ldflags "-X cmd.Version=x.y.z"
@@ -27,16 +30,9 @@ var (
 	Name    = "inventory-api"
 	cfgFile string
 
-	rootLog = log.With(log.NewStdLogger(os.Stdout),
-		"ts", log.DefaultTimestamp,
-		"caller", log.DefaultCaller,
-		"service.name", Name,
-		"service.version", Version,
-		"trace.id", tracing.TraceID(),
-		"span.id", tracing.SpanID(),
-	)
+	logger *log.Helper
 
-	logger = log.NewHelper(log.NewFilter(rootLog, log.FilterLevel(log.LevelInfo)))
+	baseLogger log.Logger
 
 	rootCmd = &cobra.Command{
 		Use:     Name,
@@ -88,13 +84,28 @@ func init() {
 	if err != nil {
 		panic(err)
 	}
-	migrateCmd := migrate.NewCommand(options.Storage, log.With(rootLog, "group", "storage"))
+
+	if clowder.IsClowderEnabled() {
+		options.Storage.Postgres.Host = clowder.LoadedConfig.Database.Hostname
+		options.Storage.Postgres.Port = strconv.Itoa(clowder.LoadedConfig.Database.Port)
+		options.Storage.Postgres.User = clowder.LoadedConfig.Database.Username
+		options.Storage.Postgres.Password = clowder.LoadedConfig.Database.Password
+		options.Storage.Postgres.DbName = clowder.LoadedConfig.Database.Name
+	}
+  
+	// TODO: Find a cleaner approach than explicitly calling initConfig
+	// Here we are calling the initConfig to ensure that the log level can be pulled from the inventory configuration file
+	initConfig()
+	logLevel := getLogLevel()
+	logger, baseLogger = initLogger(logLevel)
+
+	migrateCmd := migrate.NewCommand(options.Storage, baseLogger)
 	rootCmd.AddCommand(migrateCmd)
 	err = viper.BindPFlags(migrateCmd.Flags())
 	if err != nil {
 		panic(err)
 	}
-	serveCmd := serve.NewCommand(options.Server, options.Storage, options.Authn, options.Authz, options.Eventing, log.With(rootLog, "group", "server"))
+	serveCmd := serve.NewCommand(options.Server, options.Storage, options.Authn, options.Authz, options.Eventing, baseLogger)
 	rootCmd.AddCommand(serveCmd)
 	err = viper.BindPFlags(serveCmd.Flags())
 	if err != nil {
@@ -135,11 +146,52 @@ func initConfig() {
 	if err := viper.ReadInConfig(); err != nil {
 		panic(err)
 	} else {
-		logger.Infof("Using config file: %s", viper.ConfigFileUsed())
+		log.Infof("Using config file: %s", viper.ConfigFileUsed())
 	}
 
 	// put the values into the options struct.
 	if err := viper.Unmarshal(&options); err != nil {
 		panic(err)
 	}
+}
+
+func getLogLevel() string {
+
+	logLevel := viper.GetString("log.level")
+	fmt.Printf("Log Level is set to: %s\n", logLevel)
+	return logLevel
+}
+
+// initLogger initializes the logger based on the provided log level
+func initLogger(logLevel string) (*log.Helper, log.Logger) {
+	// Convert logLevel string to log.Level type
+	var level log.Level
+	switch strings.ToLower(logLevel) {
+	case "debug":
+		level = log.LevelDebug
+	case "info":
+		level = log.LevelInfo
+	case "warn":
+		level = log.LevelWarn
+	case "error":
+		level = log.LevelError
+	case "fatal":
+		level = log.LevelFatal
+	default:
+		fmt.Printf("Invalid log level '%s' provided. Defaulting to 'info' level.\n", logLevel)
+		level = log.LevelInfo
+	}
+
+	rootLogger := log.With(log.NewStdLogger(os.Stdout),
+		"ts", log.DefaultTimestamp,
+		"caller", log.DefaultCaller,
+		"service.name", Name,
+		"service.version", Version,
+		"trace.id", tracing.TraceID(),
+		"span.id", tracing.SpanID(),
+	)
+	filteredLogger := log.NewFilter(rootLogger, log.FilterLevel(level))
+	helperLogger := log.NewHelper(filteredLogger)
+
+	return helperLogger, filteredLogger
 }

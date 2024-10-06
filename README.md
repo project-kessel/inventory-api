@@ -15,6 +15,13 @@ make init
 ## Build
 `make build`
 
+## Build Container Images
+By default the quay repository is `quay.io/cloudservices/kessel-inventory`. If you wish to use another for testing, set IMAGE value first
+```shell
+export IMAGE=your-quay-repo # if desired
+make docker-build-push
+```
+
 ## Run inventory api locally
 ### Run migration
 `make migrate`
@@ -61,19 +68,19 @@ Depending on the config file you're using, the curl command will require additio
 To add a k8s-policy_ispropagatedto-k8s-cluster relationship you can use the following `curl` command:
 
 ```bash
-curl -H "Content-Type: application/json" --data "@data/k8spolicy_ispropagatedto_k8scluster.json" http://localhost:8081/api/inventory/v1beta1/resource-relationships/k8s-policy.is-propagated.to-k8s-cluster
+curl -H "Content-Type: application/json" --data "@data/k8spolicy_ispropagatedto_k8scluster.json" http://localhost:8081/api/inventory/v1beta1/resource-relationships/k8s-policy_is-propagated-to_k8s-cluster
 ```
 
 To update it, use the `PUT` verb as follows:
 
 ```bash
-curl -X PUT -H "Content-Type: application/json" --data "@data/k8spolicy_ispropagatedto_k8scluster.json" http://localhost:8081/api/inventory/v1beta1/resource-relationships/k8s-policy.is-propagated.to-k8s-cluster
+curl -X PUT -H "Content-Type: application/json" --data "@data/k8spolicy_ispropagatedto_k8scluster.json" http://localhost:8081/api/inventory/v1beta1/resource-relationships/k8s-policy_is-propagated-to_k8s-cluster
 ```
 
 And finally, to delete it, use the `DELETE` verb, notice that the data file is different this time. We only need the reporter data to delete a relationship.
 
 ```bash
-curl -X DELETE -H "Content-Type: application/json" --data "@data/relationship_reporter_data.json" http://localhost:8081/api/inventory/v1beta1/resource-relationships/k8s-policy.is-propagated.to-k8s-cluster
+curl -X DELETE -H "Content-Type: application/json" --data "@data/relationship_reporter_data.json" http://localhost:8081/api/inventory/v1beta1/resource-relationships/k8s-policy_is-propagated-to_k8s-cluster
 ```
 
 ### Running with `make run`

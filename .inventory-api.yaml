@@ -21,3 +21,8 @@ storage:
     user:
     password:
     dbname:
+log:
+  level: "info"
+  livez: true
+  readyz: true
+

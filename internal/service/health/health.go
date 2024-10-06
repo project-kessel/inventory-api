@@ -2,10 +2,12 @@ package health
 
 import (
 	"context"
+
 	"github.com/go-kratos/kratos/v2/log"
 	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1"
 	"github.com/project-kessel/inventory-api/internal/authz"
 	biz "github.com/project-kessel/inventory-api/internal/biz/health"
+	"github.com/spf13/viper"
 )
 
 type HealthService struct {
@@ -14,6 +16,11 @@ type HealthService struct {
 	Config *authz.CompletedConfig
 }
 
+var (
+	livezLogged  = false
+	readyzLogged = false
+)
+
 func New(c *biz.HealthUsecase) *HealthService {
 	return &HealthService{
 		Ctl: c,
@@ -21,7 +28,14 @@ func New(c *biz.HealthUsecase) *HealthService {
 }
 
 func (s *HealthService) GetLivez(ctx context.Context, req *pb.GetLivezRequest) (*pb.GetLivezResponse, error) {
-	log.Infof("Performing livez check")
+	if viper.GetBool("log.livez") {
+		log.Infof("Performing livez check")
+	} else {
+		if !livezLogged {
+			log.Infof("Livez logs disabled")
+			livezLogged = true
+		}
+	}
 	return &pb.GetLivezResponse{
 		Status: "OK",
 		Code:   200,
@@ -29,6 +43,13 @@ func (s *HealthService) GetLivez(ctx context.Context, req *pb.GetLivezRequest) (
 }
 
 func (s *HealthService) GetReadyz(ctx context.Context, req *pb.GetReadyzRequest) (*pb.GetReadyzResponse, error) {
-
+	if viper.GetBool("log.readyz") {
+		log.Infof("Performing readyz check")
+	} else {
+		if !readyzLogged {
+			log.Infof("Readyz logs disabled")
+			readyzLogged = true
+		}
+	}
 	return s.Ctl.IsBackendAvailable(ctx)
 }

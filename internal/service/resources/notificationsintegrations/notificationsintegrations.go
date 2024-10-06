@@ -5,7 +5,7 @@ import (
 
 	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/resources"
 	authnapi "github.com/project-kessel/inventory-api/internal/authn/api"
-	biz "github.com/project-kessel/inventory-api/internal/biz/notificationsintegrations"
+	biz "github.com/project-kessel/inventory-api/internal/biz/resources/notificationsintegrations"
 	"github.com/project-kessel/inventory-api/internal/middleware"
 	conv "github.com/project-kessel/inventory-api/internal/service/common"
 )
@@ -43,11 +43,34 @@ func (c *NotificationsIntegrationsService) CreateNotificationsIntegration(ctx co
 }
 
 func (c *NotificationsIntegrationsService) UpdateNotificationsIntegration(ctx context.Context, r *pb.UpdateNotificationsIntegrationRequest) (*pb.UpdateNotificationsIntegrationResponse, error) {
-	return nil, nil
+	identity, err := middleware.GetIdentity(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	if h, err := notificationsIntegrationFromUpdateRequest(r, identity); err == nil {
+		// Todo: Update to use the right ID
+		if resp, err := c.Ctl.Update(ctx, h, ""); err == nil {
+			return updateResponseFromNotificationsIntegration(resp), nil
+
+		} else {
+			return nil, err
+		}
+	} else {
+		return nil, err
+	}
 }
 
 func (c *NotificationsIntegrationsService) DeleteNotificationsIntegration(ctx context.Context, r *pb.DeleteNotificationsIntegrationRequest) (*pb.DeleteNotificationsIntegrationResponse, error) {
-	return nil, nil
+	if input, err := fromDeleteRequest(r); err == nil {
+		if err := c.Ctl.Delete(ctx, input); err == nil {
+			return toDeleteResponse(), nil
+		} else {
+			return nil, err
+		}
+	} else {
+		return nil, err
+	}
 }
 
 func notificationsIntegrationFromCreateRequest(r *pb.CreateNotificationsIntegrationRequest, identity *authnapi.Identity) (*biz.NotificationsIntegration, error) {
@@ -63,4 +86,28 @@ func notificationsIntegrationFromCreateRequest(r *pb.CreateNotificationsIntegrat
 
 func createResponseFromNotificationsIntegration(h *biz.NotificationsIntegration) *pb.CreateNotificationsIntegrationResponse {
 	return &pb.CreateNotificationsIntegrationResponse{}
+}
+
+func notificationsIntegrationFromUpdateRequest(r *pb.UpdateNotificationsIntegrationRequest, identity *authnapi.Identity) (*biz.NotificationsIntegration, error) {
+	var metadata = &pb.Metadata{}
+	if r.Integration.Metadata != nil {
+		metadata = r.Integration.Metadata
+	}
+
+	return &biz.NotificationsIntegration{
+		Metadata: *conv.MetadataFromPb(metadata, r.Integration.ReporterData, identity),
+	}, nil
+}
+
+func updateResponseFromNotificationsIntegration(h *biz.NotificationsIntegration) *pb.UpdateNotificationsIntegrationResponse {
+	return &pb.UpdateNotificationsIntegrationResponse{}
+}
+
+func fromDeleteRequest(r *pb.DeleteNotificationsIntegrationRequest) (string, error) {
+	// Todo: Find out what IDs are we going to be using - is it inventory ids? or resources from reporters?
+	return r.ReporterData.LocalResourceId, nil
+}
+
+func toDeleteResponse() *pb.DeleteNotificationsIntegrationResponse {
+	return &pb.DeleteNotificationsIntegrationResponse{}
 }

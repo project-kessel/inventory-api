@@ -5,11 +5,11 @@ import (
 
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/project-kessel/inventory-api/internal/biz/common"
-	"github.com/project-kessel/inventory-api/internal/biz/hosts"
-	notifs "github.com/project-kessel/inventory-api/internal/biz/notificationsintegrations"
-	// "github.com/project-kessel/inventory-api/internal/biz/k8sclusters"
-	// "github.com/project-kessel/inventory-api/internal/biz/policies"
 	k8spolicyrelations "github.com/project-kessel/inventory-api/internal/biz/relationships/k8spolicy"
+	"github.com/project-kessel/inventory-api/internal/biz/resources/hosts"
+	"github.com/project-kessel/inventory-api/internal/biz/resources/k8sclusters"
+	"github.com/project-kessel/inventory-api/internal/biz/resources/k8spolicies"
+	notifs "github.com/project-kessel/inventory-api/internal/biz/resources/notificationsintegrations"
 )
 
 // Migrate the tables
@@ -23,8 +23,8 @@ func Migrate(db *gorm.DB, logger *log.Helper) error {
 		&common.Label{},
 		&common.RelationshipMetadata{},
 		&common.RelationshipReporter{},
-		// &k8sclusters.K8sCluster{},
-		// &policies.Policy{},
+		&k8sclusters.K8SCluster{},
+		&k8spolicies.K8sPolicy{},
 		&k8spolicyrelations.K8SPolicyIsPropagatedToK8SCluster{},
 	); err != nil {
 		return err

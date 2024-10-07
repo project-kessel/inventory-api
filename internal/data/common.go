@@ -29,14 +29,14 @@ func DefaultResourceSendEvent(ctx context.Context, model *model.Resource, evente
 	return nil
 }
 
-func DefaultRelationshipSendEvent(ctx context.Context, model *model.Relationship, eventer eventingapi.Manager, operationType eventingapi.OperationType) error {
+func DefaultRelationshipSendEvent(ctx context.Context, model *model.Relationship, eventer eventingapi.Manager, reportedTime time.Time, operationType eventingapi.OperationType) error {
 	identity, err := middleware.GetIdentity(ctx)
 	if err != nil {
 		return err
 	}
 
 	producer, _ := eventer.Lookup(identity, model.RelationshipType, model.ID)
-	evt, err := eventingapi.NewRelationshipEvent(operationType, model, time.Now())
+	evt, err := eventingapi.NewRelationshipEvent(operationType, model, reportedTime)
 	if err != nil {
 		return err
 	}

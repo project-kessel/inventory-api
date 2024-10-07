@@ -7,6 +7,7 @@ import (
 	eventingapi "github.com/project-kessel/inventory-api/internal/eventing/api"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
+	"time"
 )
 
 type Repo struct {
@@ -27,7 +28,7 @@ func (r *Repo) Save(ctx context.Context, model *model.Relationship) (*model.Rela
 	}
 
 	if r.Eventer != nil {
-		err := data.DefaultRelationshipSendEvent(ctx, model, r.Eventer, eventingapi.OperationTypeCreated)
+		err := data.DefaultRelationshipSendEvent(ctx, model, r.Eventer, *model.CreatedAt, eventingapi.OperationTypeCreated)
 
 		if err != nil {
 			return nil, err
@@ -43,7 +44,7 @@ func (r *Repo) Update(ctx context.Context, model *model.Relationship, id string)
 	// TODO: update the model in inventory
 
 	if r.Eventer != nil {
-		err := data.DefaultRelationshipSendEvent(ctx, model, r.Eventer, eventingapi.OperationTypeUpdated)
+		err := data.DefaultRelationshipSendEvent(ctx, model, r.Eventer, *model.UpdatedAt, eventingapi.OperationTypeUpdated)
 
 		if err != nil {
 			return nil, err
@@ -71,7 +72,7 @@ func (r *Repo) Delete(ctx context.Context, id string) error {
 	// TODO: delete the model from inventory
 
 	if r.Eventer != nil {
-		err := data.DefaultRelationshipSendEvent(ctx, model, r.Eventer, eventingapi.OperationTypeDeleted)
+		err := data.DefaultRelationshipSendEvent(ctx, model, r.Eventer, time.Now(), eventingapi.OperationTypeDeleted)
 
 		if err != nil {
 			return err

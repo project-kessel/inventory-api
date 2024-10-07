@@ -17,9 +17,8 @@ type Resource struct {
 	ConsoleHref  string
 	ApiHref      string
 	Labels       Labels
-	// Todo: Should we use pointers here to let the database handle them for us?
-	CreatedAt *time.Time
-	UpdatedAt *time.Time
+	CreatedAt    *time.Time
+	UpdatedAt    *time.Time
 }
 
 type ResourceReporter struct {

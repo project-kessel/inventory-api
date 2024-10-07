@@ -38,7 +38,7 @@ type ResourceMetadata struct {
 	ResourceType string          `json:"resource_type"`
 	LastReported time.Time       `json:"last_reported"`
 	Workspace    string          `json:"workspace"`
-	Labels       []ResourceLabel `json:"Labels"`
+	Labels       []ResourceLabel `json:"labels,omitempty"`
 }
 
 type ResourceLabel struct {

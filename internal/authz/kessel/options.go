@@ -17,7 +17,10 @@ type Options struct {
 }
 
 func NewOptions() *Options {
-	return &Options{}
+	return &Options{
+		Insecure:       false,
+		EnableOidcAuth: true,
+	}
 }
 
 func (o *Options) AddFlags(fs *pflag.FlagSet, prefix string) {

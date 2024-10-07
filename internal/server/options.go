@@ -22,8 +22,8 @@ func NewOptions() *Options {
 	id, _ := os.Hostname()
 	return &Options{
 		Id:        id,
-		Name:      "kessel-asset-inventory",
-		PublicUrl: "http://localhost:8081",
+		Name:      "kessel-inventory-api",
+		PublicUrl: "http://localhost:8000",
 
 		GrpcOptions: grpc.NewOptions(),
 		HttpOptions: http.NewOptions(),

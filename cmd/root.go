@@ -2,26 +2,19 @@ package cmd
 
 import (
 	"fmt"
+	"github.com/project-kessel/inventory-api/internal/config"
+	clowder "github.com/redhatinsights/app-common-go/pkg/api/v1"
+	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 	"os"
 	"path/filepath"
 	"strings"
-	"strconv"
-
-	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/go-kratos/kratos/v2/middleware/tracing"
 
 	"github.com/project-kessel/inventory-api/cmd/migrate"
 	"github.com/project-kessel/inventory-api/cmd/serve"
-
-	"github.com/project-kessel/inventory-api/internal/authn"
-	"github.com/project-kessel/inventory-api/internal/authz"
-	"github.com/project-kessel/inventory-api/internal/eventing"
-	"github.com/project-kessel/inventory-api/internal/server"
-	"github.com/project-kessel/inventory-api/internal/storage"
-	clowder "github.com/redhatinsights/app-common-go/pkg/api/v1"
 )
 
 // go build -ldflags "-X cmd.Version=x.y.z"
@@ -40,19 +33,7 @@ var (
 		Short:   "A simple common inventory system",
 	}
 
-	options = struct {
-		Authn    *authn.Options    `mapstructure:"authn"`
-		Authz    *authz.Options    `mapstructure:"authz"`
-		Storage  *storage.Options  `mapstructure:"storage"`
-		Eventing *eventing.Options `mapstructure:"eventing"`
-		Server   *server.Options   `mapstructure:"server"`
-	}{
-		authn.NewOptions(),
-		authz.NewOptions(),
-		storage.NewOptions(),
-		eventing.NewOptions(),
-		server.NewOptions(),
-	}
+	options = config.NewOptionsConfig()
 )
 
 // Execute is called by main.main(). It only needs to happen once to the rootCmd.
@@ -85,19 +66,20 @@ func init() {
 		panic(err)
 	}
 
-	if clowder.IsClowderEnabled() {
-		options.Storage.Postgres.Host = clowder.LoadedConfig.Database.Hostname
-		options.Storage.Postgres.Port = strconv.Itoa(clowder.LoadedConfig.Database.Port)
-		options.Storage.Postgres.User = clowder.LoadedConfig.Database.Username
-		options.Storage.Postgres.Password = clowder.LoadedConfig.Database.Password
-		options.Storage.Postgres.DbName = clowder.LoadedConfig.Database.Name
-	}
-  
 	// TODO: Find a cleaner approach than explicitly calling initConfig
 	// Here we are calling the initConfig to ensure that the log level can be pulled from the inventory configuration file
 	initConfig()
 	logLevel := getLogLevel()
 	logger, baseLogger = initLogger(logLevel)
+
+	if clowder.IsClowderEnabled() {
+		options.InjectClowdAppConfig()
+	}
+
+	// for troubleshoot, when set to debug, configuration info is logged in more detail to stdout
+	if logLevel == "debug" {
+		config.LogConfigurationInfo(options)
+	}
 
 	migrateCmd := migrate.NewCommand(options.Storage, baseLogger)
 	rootCmd.AddCommand(migrateCmd)

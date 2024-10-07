@@ -11,7 +11,7 @@ authz:
   kessel:
     insecure-client: true
     url: relations-api:9000
-    enable_oidc_auth: false
+    enable-oidc-auth: false
 eventing:
   eventer: stdout
   kafka:
@@ -26,7 +26,7 @@ storage:
     password: "yPsw5e6ab4bvAGe5H"
     dbname: "spicedb"
 log:
-  level: "info"
+  level: "debug"
   livez: true
   readyz: true
 

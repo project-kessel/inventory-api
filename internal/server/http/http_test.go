@@ -11,7 +11,7 @@ func TestNewOptions(t *testing.T) {
 		opts := NewOptions()
 
 		expectedOpts := &Options{
-			Addr:    "localhost:8080",
+			Addr:    "0.0.0.0:8000",
 			Timeout: 300,
 			CertOpt: 3,
 		}

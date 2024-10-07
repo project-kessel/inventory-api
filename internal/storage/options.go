@@ -14,6 +14,11 @@ type Options struct {
 	Database string            `mapstructure:"database"`
 }
 
+const (
+	Postgres = "postgres"
+	Sqlite3  = "sqlite3"
+)
+
 func NewOptions() *Options {
 	return &Options{
 		Postgres: postgres.NewOptions(),

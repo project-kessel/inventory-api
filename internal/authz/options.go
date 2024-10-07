@@ -15,8 +15,9 @@ type Options struct {
 }
 
 const (
-	AllowAll = "allow-all"
-	Kessel   = "kessel"
+	AllowAll     = "allow-all"
+	Kessel       = "kessel"
+	RelationsAPI = "kessel-relations"
 )
 
 func NewOptions() *Options {

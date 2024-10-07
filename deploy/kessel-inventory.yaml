@@ -9,27 +9,15 @@ objects:
       name: inventory-api-config
     data:
       inventory-api-config.yaml: |
-        server:
-          http:
-            address: 0.0.0.0:8000
-          grpc:
-            address: 0.0.0.0:9000
         authn:
           psk:
             pre-shared-key-file: /psks/psks.yaml
         authz:
-          impl: kessel
           kessel:
             insecure-client: true
-            url: kessel-relations-api:9000
-            enable_oidc_auth: false
-        eventing:
-          eventer: stdout
-          kafka:
-        storage:
-          database: postgres
-          sqlite3:
-            dsn: inventory.db
+            enable-oidc-auth: false
+        log:
+          level: "info"
 
   - apiVersion: v1
     kind: ConfigMap
@@ -51,6 +39,8 @@ objects:
       envName: ${ENV_NAME}
       database:
         name: kessel-inventory
+      optionalDependencies:
+        - kessel-relations
       deployments:
         - name: api
           replicas: 1

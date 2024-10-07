@@ -1,9 +1,9 @@
 server:
-  public_url: http://localhost:8081
+  public_url: http://localhost:8000
   http:
-    address: localhost:8081
+    address: localhost:8000
   grpc:
-    address: localhost:9081
+    address: localhost:9000
 authn:
    allow-unauthenticated: true
 authz:

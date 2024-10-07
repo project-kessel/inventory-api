@@ -188,5 +188,33 @@ authz:
     sa-client-secret: "<secret>"
     sso-token-endpoint: "http://localhost:8084/realms/redhat-external/protocol/openid-connect/token"
 ```
+
+## Running in Ephemeral Cluster with Relations API using Bonfire
+
+Deploy Relations API first with Bonfire following the steps available [HERE](https://cuddly-tribble-gq7r66v.pages.github.io/kessel/ephemeral/)
+
+Once its running, deploy Inventory using Bonfire:
+
+`bonfire deploy kessel -C inventory-api --no-get-dependencies`
+
+If you wish to test changes you've made that are unmerged, you can deploy them to ephemeral using a local config file
+Note: this requires building the image first and pushing to your local quay (see make docker-build-push)
+
+```yaml
+# example local config under $HOME/.config/bonfire/config
+apps:
+- name: kessel
+  components:
+    - name: inventory-api
+      host: local
+      repo: /path/to/inventory-api-repo
+      path: deploy/kessel-inventory.yaml
+      parameters:
+        INVENTORY_IMAGE: quay.io/your-repo/image-name
+        IMAGE_TAG: your-image-tag # latest is not recommended due to pull policy
+```
+
+Then run `bonfire deploy kessel -c $HOME/.config/bonfire/config.yaml --local-config-method override --no-get-dependencies`
+
 ## Debugging Inventory API using Vscode
 Follow the [DEBUG](./DEBUG.md) guide

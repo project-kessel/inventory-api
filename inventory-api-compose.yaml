@@ -12,6 +12,7 @@ authz:
     insecure-client: true
     url: relations-api:9000
     enable-oidc-auth: false
+    principal-user-domain: 0.0.0.0:8084
 eventing:
   eventer: stdout
   kafka:

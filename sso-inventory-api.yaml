@@ -8,6 +8,7 @@ authn:
     authn-server-url: http://keycloak:8084/realms/redhat-external
     skip-client-id-check: true
     skip-issuer-check: true
+    principal-user-domain: 0.0.0.0:8084
 authz:
   impl: allow-all
 eventing:

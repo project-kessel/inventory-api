@@ -63,9 +63,7 @@ func RelationshipFromPb(relationshipType, reporterId string, relationshipData mo
 		RelationshipData: relationshipData,
 		RelationshipType: relationshipType,
 		SubjectId:        0,
-		SubjectResource:  model.Resource{},
 		ObjectId:         0,
-		ObjectResource:   model.Resource{},
 		Reporter: model.RelationshipReporter{
 			Reporter: model.Reporter{
 				ReporterId:      reporterId,

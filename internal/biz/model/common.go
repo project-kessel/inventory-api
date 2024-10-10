@@ -13,16 +13,16 @@ type GormDbAfterMigrationHook interface {
 }
 
 type Label struct {
-	Key   string
-	Value string
+	Key   string `json:"key"`
+	Value string `json:"value"`
 }
 
 type Labels []Label
 type JsonObject map[string]interface{}
 type Reporter struct {
-	ReporterId      string
-	ReporterType    string
-	ReporterVersion string
+	ReporterId      string `json:"reporter_id"`
+	ReporterType    string `json:"reporter_type"`
+	ReporterVersion string `json:"reporter_version"`
 }
 
 func (JsonObject) GormDBDataType(db *gorm.DB, field *schema.Field) string {

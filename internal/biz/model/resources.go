@@ -24,7 +24,7 @@ type Resource struct {
 
 type ResourceReporter struct {
 	Reporter
-	LocalResourceId string
+	LocalResourceId string `json:"local_resource_id"`
 }
 
 func (r *Resource) GormDbAfterMigration(db *gorm.DB, s *schema.Schema) error {

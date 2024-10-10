@@ -63,9 +63,7 @@ func (r *Repo) Delete(ctx context.Context, id string) error {
 		RelationshipData: nil,
 		RelationshipType: "",
 		SubjectId:        0,
-		SubjectResource:  model.Resource{},
 		ObjectId:         0,
-		ObjectResource:   model.Resource{},
 		Reporter:         model.RelationshipReporter{},
 	}
 

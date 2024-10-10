@@ -21,8 +21,8 @@ type Relationship struct {
 
 type RelationshipReporter struct {
 	Reporter
-	SubjectLocalResourceId string
-	ObjectLocalResourceId  string
+	SubjectLocalResourceId string `json:"subject_local_resource_id"`
+	ObjectLocalResourceId  string `json:"object_local_resource_id"`
 }
 
 func (RelationshipReporter) GormDBDataType(db *gorm.DB, field *schema.Field) string {

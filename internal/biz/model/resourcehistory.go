@@ -17,8 +17,7 @@ type ResourceHistory struct {
 	ConsoleHref  string
 	ApiHref      string
 	Labels       Labels
-	CreatedAt    *time.Time
-	// We don't need UpdatedAt in here. We won't update the history resource
+	Timestamp    *time.Time `gorm:"autoCreateTime"`
 
 	ResourceId    uint64        `gorm:"index"`
 	OperationType OperationType `gorm:"index"`

@@ -10,8 +10,7 @@ type RelationshipHistory struct {
 	SubjectId        uint64 `gorm:"index"`
 	ObjectId         uint64 `gorm:"index"`
 	Reporter         RelationshipReporter
-	CreatedAt        *time.Time
-	// We don't need UpdatedAt in here. We won't update the history resource
+	Timestamp        *time.Time `gorm:"autoCreateTime"`
 
 	RelationshipId uint64        `gorm:"index"`
 	OperationType  OperationType `gorm:"index"`

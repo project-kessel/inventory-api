@@ -8,6 +8,10 @@ import (
 	"gorm.io/gorm/schema"
 )
 
+type GormDbAfterMigrationHook interface {
+	GormDbAfterMigration(*gorm.DB, *schema.Schema) error
+}
+
 type Label struct {
 	Key   string
 	Value string

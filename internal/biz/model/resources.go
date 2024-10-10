@@ -3,6 +3,7 @@ package model
 import (
 	"database/sql/driver"
 	"encoding/json"
+	"fmt"
 	"gorm.io/gorm"
 	"gorm.io/gorm/schema"
 	"time"
@@ -24,6 +25,21 @@ type Resource struct {
 type ResourceReporter struct {
 	Reporter
 	LocalResourceId string
+}
+
+func (r *Resource) GormDbAfterMigration(db *gorm.DB, s *schema.Schema) error {
+	switch db.Dialector.Name() {
+	case "sqlite":
+		break
+	case "postgres":
+		const labelsIdx = "idx_resource_labels"
+		if !db.Migrator().HasIndex(r, labelsIdx) {
+			statement := fmt.Sprintf("CREATE INDEX %s on %s USING gin ( (%s) jsonb_path_ops );", labelsIdx, s.Table, s.LookUpField("Labels").DBName)
+			db.Exec(statement)
+		}
+		break
+	}
+	return nil
 }
 
 func (ResourceReporter) GormDBDataType(db *gorm.DB, field *schema.Field) string {

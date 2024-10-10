@@ -1,6 +1,9 @@
 package model
 
 import (
+	"fmt"
+	"gorm.io/gorm"
+	"gorm.io/gorm/schema"
 	"time"
 )
 
@@ -18,6 +21,21 @@ type ResourceHistory struct {
 
 	ResourceId       uint64
 	OriginalResource Resource `gorm:"foreignKey:ResourceId" json:"-"`
+}
+
+func (r *ResourceHistory) ResourceHistory(db *gorm.DB, s *schema.Schema) error {
+	switch db.Dialector.Name() {
+	case "sqlite":
+		break
+	case "postgres":
+		const labelsIdx = "idx_resource_history_labels"
+		if !db.Migrator().HasIndex(r, labelsIdx) {
+			statement := fmt.Sprintf("CREATE INDEX %s on %s USING gin ( (%s) jsonb_path_ops );", labelsIdx, s.Table, s.LookUpField("Labels").DBName)
+			db.Exec(statement)
+		}
+		break
+	}
+	return nil
 }
 
 func (*ResourceHistory) TableName() string {

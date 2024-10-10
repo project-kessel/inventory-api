@@ -10,15 +10,33 @@ import (
 // Migrate the tables
 // See https://gorm.io/docs/migration.html
 func Migrate(db *gorm.DB, logger *log.Helper) error {
-	if err := db.AutoMigrate(
+	models := []interface{}{
 		&model.ResourceHistory{},
 		&model.Resource{},
 		&model.Relationship{},
 		&model.RelationshipHistory{},
 		&model.LocalInventoryToResource{},
-	); err != nil {
+	}
+
+	if err := db.AutoMigrate(models...); err != nil {
 		return err
 	}
+
+	for _, m := range models {
+		if gormDbIndexStatement, ok := m.(model.GormDbAfterMigrationHook); ok {
+			statement := &gorm.Statement{DB: db}
+			err := statement.Parse(m)
+			if err != nil {
+				return err
+			}
+
+			err = gormDbIndexStatement.GormDbAfterMigration(db, statement.Schema)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
 	logger.Info("Migration successful!")
 	return nil
 }

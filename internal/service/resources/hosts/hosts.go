@@ -4,20 +4,25 @@ import (
 	"context"
 	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/resources"
 	authnapi "github.com/project-kessel/inventory-api/internal/authn/api"
-	biz "github.com/project-kessel/inventory-api/internal/biz/resources/hosts"
+	"github.com/project-kessel/inventory-api/internal/biz/model"
+	"github.com/project-kessel/inventory-api/internal/biz/resources"
 	"github.com/project-kessel/inventory-api/internal/middleware"
 	conv "github.com/project-kessel/inventory-api/internal/service/common"
+)
+
+const (
+	ResourceType = "rhel-host"
 )
 
 // HostsService handles requests for Rhel hosts
 type HostsService struct {
 	pb.UnimplementedKesselRhelHostServiceServer
 
-	Ctl *biz.HostUsecase
+	Ctl *resources.Usecase
 }
 
 // New creates a new HostsService to handle requests for Rhel hosts
-func New(c *biz.HostUsecase) *HostsService {
+func New(c *resources.Usecase) *HostsService {
 	return &HostsService{
 		Ctl: c,
 	}
@@ -30,7 +35,6 @@ func (c *HostsService) CreateRhelHost(ctx context.Context, r *pb.CreateRhelHostR
 	}
 
 	if h, err := hostFromCreateRequest(r, identity); err == nil {
-		h.Metadata.ResourceType = biz.ResourceType
 		if resp, err := c.Ctl.Create(ctx, h); err == nil {
 			return createResponseFromHost(resp), nil
 		} else {
@@ -48,7 +52,6 @@ func (c *HostsService) UpdateRhelHost(ctx context.Context, r *pb.UpdateRhelHostR
 	}
 
 	if h, err := hostFromUpdateRequest(r, identity); err == nil {
-		h.Metadata.ResourceType = biz.ResourceType
 		// Todo: Update to use the right ID
 		if resp, err := c.Ctl.Update(ctx, h, ""); err == nil {
 			return updateResponseFromHost(resp), nil
@@ -72,33 +75,19 @@ func (c *HostsService) DeleteRhelHost(ctx context.Context, r *pb.DeleteRhelHostR
 	}
 }
 
-func hostFromCreateRequest(r *pb.CreateRhelHostRequest, identity *authnapi.Identity) (*biz.Host, error) {
-	var metadata = &pb.Metadata{}
-	if r.RhelHost.Metadata != nil {
-		metadata = r.RhelHost.Metadata
-	}
-
-	return &biz.Host{
-		Metadata: *conv.MetadataFromPb(metadata, r.RhelHost.ReporterData, identity),
-	}, nil
+func hostFromCreateRequest(r *pb.CreateRhelHostRequest, identity *authnapi.Identity) (*model.Resource, error) {
+	return conv.ResourceFromPb(ResourceType, identity.Principal, nil, r.RhelHost.Metadata, r.RhelHost.ReporterData), nil
 }
 
-func createResponseFromHost(*biz.Host) *pb.CreateRhelHostResponse {
+func createResponseFromHost(resource *model.Resource) *pb.CreateRhelHostResponse {
 	return &pb.CreateRhelHostResponse{}
 }
 
-func hostFromUpdateRequest(r *pb.UpdateRhelHostRequest, identity *authnapi.Identity) (*biz.Host, error) {
-	var metadata = &pb.Metadata{}
-	if r.RhelHost.Metadata != nil {
-		metadata = r.RhelHost.Metadata
-	}
-
-	return &biz.Host{
-		Metadata: *conv.MetadataFromPb(metadata, r.RhelHost.ReporterData, identity),
-	}, nil
+func hostFromUpdateRequest(r *pb.UpdateRhelHostRequest, identity *authnapi.Identity) (*model.Resource, error) {
+	return conv.ResourceFromPb(ResourceType, identity.Principal, nil, r.RhelHost.Metadata, r.RhelHost.ReporterData), nil
 }
 
-func updateResponseFromHost(*biz.Host) *pb.UpdateRhelHostResponse {
+func updateResponseFromHost(resource *model.Resource) *pb.UpdateRhelHostResponse {
 	return &pb.UpdateRhelHostResponse{}
 }
 

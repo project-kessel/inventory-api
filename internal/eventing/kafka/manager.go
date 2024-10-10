@@ -2,18 +2,14 @@ package kafka
 
 import (
 	"context"
-	"fmt"
-	"github.com/go-kratos/kratos/v2/log"
-	"github.com/google/uuid"
-	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/metric"
-	"strings"
-
 	confluent "github.com/cloudevents/sdk-go/protocol/kafka_confluent/v2"
 	cloudevents "github.com/cloudevents/sdk-go/v2"
 	cecontext "github.com/cloudevents/sdk-go/v2/context"
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
+	"github.com/go-kratos/kratos/v2/log"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/metric"
 
 	authnapi "github.com/project-kessel/inventory-api/internal/authn/api"
 	"github.com/project-kessel/inventory-api/internal/eventing/api"
@@ -96,7 +92,7 @@ func (m *KafkaManager) Errs() <-chan error {
 }
 
 // Lookup figures out which topic should be used for the given identity and resource.
-func (m *KafkaManager) Lookup(identity *authnapi.Identity, resource_type string, resource_id int64) (api.Producer, error) {
+func (m *KafkaManager) Lookup(identity *authnapi.Identity, resource_type string, resource_id uint64) (api.Producer, error) {
 
 	// there is no complicated topic dispatch logic... for now.
 	producer, err := NewProducer(m, m.Config.DefaultTopic, identity)
@@ -145,24 +141,18 @@ func NewProducer(manager *KafkaManager, topic string, identity *authnapi.Identit
 func (p *kafkaProducer) Produce(ctx context.Context, event *api.Event) error {
 	e := cloudevents.NewEvent()
 
-	eventId, err := uuid.NewUUID() // Todo: we need to have an stable id if we implement some re-trying logic
-	if err != nil {
-		return err
-	}
-
 	e.SetSpecVersion(cloudevents.VersionV1)
-	e.SetType(makeCloudEventType(event.EventType, event.ResourceType, event.OperationType))
+	e.SetType(event.Type)
 	e.SetSource(p.Manager.Source)
-	e.SetID(eventId.String())
-	e.SetTime(event.EventTime)
+	e.SetID(event.Id)
+	e.SetTime(event.Time)
 
-	err = e.SetData(cloudevents.ApplicationJSON, event.Resource)
+	err := e.SetData(event.DataContentType, event.Data)
 	if err != nil {
 		return err
 	}
 
-	e.SetDataContentType("application/json")
-	e.SetSubject(makeCloudEventSubject(event.EventType, event.ResourceType, event.ResourceId))
+	e.SetSubject(event.Subject)
 
 	ret := p.Manager.Client.Send(confluent.WithMessageKey(cecontext.WithTopic(cloudevents.WithEncodingStructured(ctx), p.Topic), p.Manager.Source), e)
 	if cloudevents.IsUndelivered(ret) {
@@ -175,17 +165,8 @@ func (p *kafkaProducer) Produce(ctx context.Context, event *api.Event) error {
 		context.Background(),
 		1,
 		metric.WithAttributes(
-			attribute.String("event_type", event.EventType),
-			attribute.String("resource_type", event.ResourceType),
+			attribute.String("event_type", event.Type),
 		),
 	)
 	return ret
-}
-
-func makeCloudEventType(eventType, resourceType, operation string) string {
-	return fmt.Sprintf("redhat.inventory.%s.%s.%s", eventType, resourceType, operation)
-}
-
-func makeCloudEventSubject(eventType, resourceType, resourceId string) string {
-	return "/" + strings.Join([]string{eventType, resourceType, resourceId}, "/")
 }

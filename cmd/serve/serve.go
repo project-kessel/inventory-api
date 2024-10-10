@@ -3,16 +3,10 @@ package serve
 import (
 	"context"
 	"fmt"
-	relationshipsctl "github.com/project-kessel/inventory-api/internal/biz/relationships/k8spolicy"
-	hostsctl "github.com/project-kessel/inventory-api/internal/biz/resources/hosts"
-	k8sclustersctl "github.com/project-kessel/inventory-api/internal/biz/resources/k8sclusters"
-	k8spoliciesctl "github.com/project-kessel/inventory-api/internal/biz/resources/k8spolicies"
-	notifsctl "github.com/project-kessel/inventory-api/internal/biz/resources/notificationsintegrations"
-	relationshipsrepo "github.com/project-kessel/inventory-api/internal/data/relationships/k8spolicy"
-	hostsrepo "github.com/project-kessel/inventory-api/internal/data/resources/hosts"
-	k8sclustersrepo "github.com/project-kessel/inventory-api/internal/data/resources/k8sclusters"
-	k8spoliciesrepo "github.com/project-kessel/inventory-api/internal/data/resources/k8spolicies"
-	notifsrepo "github.com/project-kessel/inventory-api/internal/data/resources/notificationsintegrations"
+	relationshipsctl "github.com/project-kessel/inventory-api/internal/biz/relationships"
+	resourcesctl "github.com/project-kessel/inventory-api/internal/biz/resources"
+	relationshipsrepo "github.com/project-kessel/inventory-api/internal/data/relationships"
+	resourcerepo "github.com/project-kessel/inventory-api/internal/data/resources"
 	relationshipssvc "github.com/project-kessel/inventory-api/internal/service/relationships/k8spolicy"
 	hostssvc "github.com/project-kessel/inventory-api/internal/service/resources/hosts"
 	k8sclusterssvc "github.com/project-kessel/inventory-api/internal/service/resources/k8sclusters"
@@ -149,29 +143,29 @@ func NewCommand(
 			}
 
 			// wire together notificationsintegrations handling
-			notifs_repo := notifsrepo.New(db, authorizer, eventingManager)
-			notifs_controller := notifsctl.New(notifs_repo, log.With(logger, "subsystem", "notificationsintegrations_controller"))
+			notifs_repo := resourcerepo.New(db, authorizer, eventingManager, "notifications")
+			notifs_controller := resourcesctl.New(notifs_repo, log.With(logger, "subsystem", "notificationsintegrations_controller"))
 			notifs_service := notifssvc.New(notifs_controller)
 			pb.RegisterKesselNotificationsIntegrationServiceServer(server.GrpcServer, notifs_service)
 			pb.RegisterKesselNotificationsIntegrationServiceHTTPServer(server.HttpServer, notifs_service)
 
 			// wire together hosts handling
-			hosts_repo := hostsrepo.New(db, authorizer, eventingManager)
-			hosts_controller := hostsctl.New(hosts_repo, log.With(logger, "subsystem", "hosts_controller"))
+			hosts_repo := resourcerepo.New(db, authorizer, eventingManager, "hbi")
+			hosts_controller := resourcesctl.New(hosts_repo, log.With(logger, "subsystem", "hosts_controller"))
 			hosts_service := hostssvc.New(hosts_controller)
 			pb.RegisterKesselRhelHostServiceServer(server.GrpcServer, hosts_service)
 			pb.RegisterKesselRhelHostServiceHTTPServer(server.HttpServer, hosts_service)
 
 			// wire together k8sclusters handling
-			k8sclusters_repo := k8sclustersrepo.New(db, authorizer, eventingManager)
-			k8sclusters_controller := k8sclustersctl.New(k8sclusters_repo, log.With(logger, "subsystem", "k8sclusters_controller"))
+			k8sclusters_repo := resourcerepo.New(db, authorizer, eventingManager, "acm")
+			k8sclusters_controller := resourcesctl.New(k8sclusters_repo, log.With(logger, "subsystem", "k8sclusters_controller"))
 			k8sclusters_service := k8sclusterssvc.New(k8sclusters_controller)
 			pb.RegisterKesselK8SClusterServiceServer(server.GrpcServer, k8sclusters_service)
 			pb.RegisterKesselK8SClusterServiceHTTPServer(server.HttpServer, k8sclusters_service)
 
 			// wire together k8spolicies handling
-			k8spolicies_repo := k8spoliciesrepo.New(db, authorizer, eventingManager)
-			k8spolicies_controller := k8spoliciesctl.New(k8spolicies_repo, log.With(logger, "subsystem", "k8spolicies_controller"))
+			k8spolicies_repo := resourcerepo.New(db, authorizer, eventingManager, "acm")
+			k8spolicies_controller := resourcesctl.New(k8spolicies_repo, log.With(logger, "subsystem", "k8spolicies_controller"))
 			k8spolicies_service := k8spoliciessvc.New(k8spolicies_controller)
 			pb.RegisterKesselK8SPolicyServiceServer(server.GrpcServer, k8spolicies_service)
 			pb.RegisterKesselK8SPolicyServiceHTTPServer(server.HttpServer, k8spolicies_service)

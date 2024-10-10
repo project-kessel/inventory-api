@@ -2,30 +2,34 @@ package k8spolicies
 
 import (
 	"context"
+	"github.com/project-kessel/inventory-api/internal/biz/model"
+	"github.com/project-kessel/inventory-api/internal/biz/resources"
 
-	"github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/resources"
 	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/resources"
 	authnapi "github.com/project-kessel/inventory-api/internal/authn/api"
-	biz "github.com/project-kessel/inventory-api/internal/biz/resources/k8spolicies"
 	"github.com/project-kessel/inventory-api/internal/middleware"
 	conv "github.com/project-kessel/inventory-api/internal/service/common"
 )
 
+const (
+	ResourceType = "k8s-policy"
+)
+
 // K8sPoliciesService handles requests for K8s Policies
 type K8sPolicyService struct {
-	resources.UnimplementedKesselK8SPolicyServiceServer
+	pb.UnimplementedKesselK8SPolicyServiceServer
 
-	Ctl *biz.K8sPolicyUsecase
+	Ctl *resources.Usecase
 }
 
 // New creates a new K8sPoliciesService to handle requests for K8s Policies
-func New(c *biz.K8sPolicyUsecase) *K8sPolicyService {
+func New(c *resources.Usecase) *K8sPolicyService {
 	return &K8sPolicyService{
 		Ctl: c,
 	}
 }
 
-func (c *K8sPolicyService) CreateK8SPolicy(ctx context.Context, r *resources.CreateK8SPolicyRequest) (*resources.CreateK8SPolicyResponse, error) {
+func (c *K8sPolicyService) CreateK8SPolicy(ctx context.Context, r *pb.CreateK8SPolicyRequest) (*pb.CreateK8SPolicyResponse, error) {
 	identity, err := middleware.GetIdentity(ctx)
 	if err != nil {
 		return nil, err
@@ -43,7 +47,7 @@ func (c *K8sPolicyService) CreateK8SPolicy(ctx context.Context, r *resources.Cre
 	}
 }
 
-func (c *K8sPolicyService) UpdateK8SPolicy(ctx context.Context, r *resources.UpdateK8SPolicyRequest) (*resources.UpdateK8SPolicyResponse, error) {
+func (c *K8sPolicyService) UpdateK8SPolicy(ctx context.Context, r *pb.UpdateK8SPolicyRequest) (*pb.UpdateK8SPolicyResponse, error) {
 	identity, err := middleware.GetIdentity(ctx)
 	if err != nil {
 		return nil, err
@@ -62,7 +66,7 @@ func (c *K8sPolicyService) UpdateK8SPolicy(ctx context.Context, r *resources.Upd
 	}
 }
 
-func (c *K8sPolicyService) DeleteK8SPolicy(ctx context.Context, r *resources.DeleteK8SPolicyRequest) (*resources.DeleteK8SPolicyResponse, error) {
+func (c *K8sPolicyService) DeleteK8SPolicy(ctx context.Context, r *pb.DeleteK8SPolicyRequest) (*pb.DeleteK8SPolicyResponse, error) {
 	if input, err := fromDeleteRequest(r); err == nil {
 		if err := c.Ctl.Delete(ctx, input); err == nil {
 			return toDeleteResponse(), nil
@@ -74,41 +78,29 @@ func (c *K8sPolicyService) DeleteK8SPolicy(ctx context.Context, r *resources.Del
 	}
 }
 
-func k8sPolicyFromCreateRequest(r *pb.CreateK8SPolicyRequest, identity *authnapi.Identity) (*biz.K8sPolicy, error) {
-	var metadata = &pb.Metadata{}
-	if r.K8SPolicy.Metadata != nil {
-		metadata = r.K8SPolicy.Metadata
+func k8sPolicyFromCreateRequest(r *pb.CreateK8SPolicyRequest, identity *authnapi.Identity) (*model.Resource, error) {
+	resourceData, err := conv.ToJsonObject(r.K8SPolicy.ResourceData)
+	if err != nil {
+		return nil, err
 	}
 
-	return &biz.K8sPolicy{
-		Metadata: *conv.MetadataFromPb(metadata, r.K8SPolicy.ReporterData, identity),
-		ResourceData: &biz.K8sPolicyDetail{
-			Disabled: r.K8SPolicy.ResourceData.Disabled,
-			Severity: r.K8SPolicy.ResourceData.Severity.String(),
-		},
-	}, nil
+	return conv.ResourceFromPb(ResourceType, identity.Principal, resourceData, r.K8SPolicy.Metadata, r.K8SPolicy.ReporterData), nil
 }
 
-func createResponseFromK8sPolicy(p *biz.K8sPolicy) *pb.CreateK8SPolicyResponse {
+func createResponseFromK8sPolicy(p *model.Resource) *pb.CreateK8SPolicyResponse {
 	return &pb.CreateK8SPolicyResponse{}
 }
 
-func k8sPolicyFromUpdateRequest(r *pb.UpdateK8SPolicyRequest, identity *authnapi.Identity) (*biz.K8sPolicy, error) {
-	var metadata = &pb.Metadata{}
-	if r.K8SPolicy.Metadata != nil {
-		metadata = r.K8SPolicy.Metadata
+func k8sPolicyFromUpdateRequest(r *pb.UpdateK8SPolicyRequest, identity *authnapi.Identity) (*model.Resource, error) {
+	resourceData, err := conv.ToJsonObject(r.K8SPolicy.ResourceData)
+	if err != nil {
+		return nil, err
 	}
 
-	return &biz.K8sPolicy{
-		Metadata: *conv.MetadataFromPb(metadata, r.K8SPolicy.ReporterData, identity),
-		ResourceData: &biz.K8sPolicyDetail{
-			Disabled: r.K8SPolicy.ResourceData.Disabled,
-			Severity: r.K8SPolicy.ResourceData.Severity.String(),
-		},
-	}, nil
+	return conv.ResourceFromPb(ResourceType, identity.Principal, resourceData, r.K8SPolicy.Metadata, r.K8SPolicy.ReporterData), nil
 }
 
-func updateResponseFromK8sPolicy(p *biz.K8sPolicy) *pb.UpdateK8SPolicyResponse {
+func updateResponseFromK8sPolicy(p *model.Resource) *pb.UpdateK8SPolicyResponse {
 	return &pb.UpdateK8SPolicyResponse{}
 }
 

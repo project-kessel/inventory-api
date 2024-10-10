@@ -9,9 +9,10 @@ import (
 
 type ResourceHistory struct {
 	ID           uint64 `gorm:"primarykey"`
+	OrgId        string `gorm:"index"`
 	ResourceData JsonObject
 	ResourceType string
-	Workspace    string
+	WorkspaceId  string
 	Reporter     ResourceReporter
 	ConsoleHref  string
 	ApiHref      string

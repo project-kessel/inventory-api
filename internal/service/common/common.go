@@ -12,7 +12,7 @@ func ResourceFromPb(resourceType, reporterId string, resourceData model.JsonObje
 		ID:           0,
 		ResourceData: resourceData,
 		ResourceType: resourceType,
-		Workspace:    metadata.Workspace,
+		WorkspaceId:  metadata.Workspace,
 		Reporter: model.ResourceReporter{
 			Reporter: model.Reporter{
 				ReporterId:      reporterId,

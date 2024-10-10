@@ -81,7 +81,7 @@ func (r *Repo) Delete(ctx context.Context, id string) error {
 		ID:           0,
 		ResourceData: nil,
 		ResourceType: "",
-		Workspace:    "",
+		WorkspaceId:  "",
 		Reporter:     model.ResourceReporter{},
 		ConsoleHref:  "",
 		ApiHref:      "",

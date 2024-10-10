@@ -4,6 +4,7 @@ import "time"
 
 type RelationshipHistory struct {
 	ID               uint64 `gorm:"primarykey"`
+	OrgId            string `gorm:"index"`
 	RelationshipData JsonObject
 	RelationshipType string
 	SubjectId        uint64 `gorm:"index"`

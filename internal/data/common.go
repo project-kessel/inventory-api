@@ -50,7 +50,7 @@ func DefaultRelationshipSendEvent(ctx context.Context, model *model.Relationship
 }
 
 func DefaultSetWorkspace(ctx context.Context, namespace string, model *model.Resource, authz authzapi.Authorizer) error {
-	_, err := authz.SetWorkspace(ctx, model.Reporter.LocalResourceId, model.Workspace, namespace, model.ResourceType)
+	_, err := authz.SetWorkspace(ctx, model.Reporter.LocalResourceId, model.WorkspaceId, namespace, model.ResourceType)
 	if err != nil {
 		return err
 	}

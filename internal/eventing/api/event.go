@@ -115,7 +115,7 @@ func NewResourceEvent(operationType OperationType, resource *model.Resource, rep
 				Id:           resource.ID,
 				ResourceType: resource.ResourceType,
 				LastReported: *resource.UpdatedAt,
-				Workspace:    resource.Workspace,
+				Workspace:    resource.WorkspaceId,
 				Labels:       labels,
 			},
 			ReporterData: ResourceReporter{

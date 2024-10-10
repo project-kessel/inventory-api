@@ -12,10 +12,8 @@ type Relationship struct {
 	ID               uint64 `gorm:"primarykey"`
 	RelationshipData JsonObject
 	RelationshipType string
-	SubjectId        uint64
-	SubjectResource  Resource `gorm:"foreignKey:SubjectId" json:"-"`
-	ObjectId         uint64
-	ObjectResource   Resource `gorm:"foreignKey:ObjectId" json:"-"`
+	SubjectId        uint64 `gorm:"index"`
+	ObjectId         uint64 `gorm:"index"`
 	Reporter         RelationshipReporter
 	CreatedAt        *time.Time
 	UpdatedAt        *time.Time

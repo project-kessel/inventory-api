@@ -6,16 +6,13 @@ type RelationshipHistory struct {
 	ID               uint64 `gorm:"primarykey"`
 	RelationshipData JsonObject
 	RelationshipType string
-	SubjectId        uint64
-	SubjectResource  Resource `gorm:"foreignKey:SubjectId" json:"-"`
-	ObjectId         uint64
-	ObjectResource   Resource `gorm:"foreignKey:ObjectId" json:"-"`
+	SubjectId        uint64 `gorm:"index"`
+	ObjectId         uint64 `gorm:"index"`
 	Reporter         RelationshipReporter
 	CreatedAt        *time.Time
 	// We don't need UpdatedAt in here. We won't update the history resource
 
-	RelationshipId       uint64
-	OriginalRelationship Relationship `gorm:"foreignKey:RelationshipId" json:"-"`
+	RelationshipId uint64 `gorm:"index"`
 }
 
 func (*RelationshipHistory) TableName() string {

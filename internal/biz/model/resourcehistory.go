@@ -19,8 +19,7 @@ type ResourceHistory struct {
 	CreatedAt    *time.Time
 	// We don't need UpdatedAt in here. We won't update the history resource
 
-	ResourceId       uint64
-	OriginalResource Resource `gorm:"foreignKey:ResourceId" json:"-"`
+	ResourceId uint64 `gorm:"index"`
 }
 
 func (r *ResourceHistory) ResourceHistory(db *gorm.DB, s *schema.Schema) error {

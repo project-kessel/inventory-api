@@ -10,7 +10,5 @@ type LocalInventoryToResource struct {
 	ResourceType    string `gorm:"primarykey"`
 
 	// Reporter identification
-	// Todo: Do we need to keep the reporter_type or the reporter_id is enough?
-	ReporterId   string `gorm:"primarykey"`
-	ReporterType string `gorm:"primarykey"`
+	ReporterId string `gorm:"primarykey"`
 }

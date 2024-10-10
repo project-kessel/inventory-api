@@ -37,7 +37,6 @@ func (r *Resource) GormDbAfterMigration(db *gorm.DB, s *schema.Schema) error {
 			statement := fmt.Sprintf("CREATE INDEX %s on %s USING gin ( (%s) jsonb_path_ops );", labelsIdx, s.Table, s.LookUpField("Labels").DBName)
 			db.Exec(statement)
 		}
-		break
 	}
 	return nil
 }

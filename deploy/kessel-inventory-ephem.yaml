@@ -3,6 +3,34 @@ kind: Template
 metadata:
   name: inventory
 objects:
+  - apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: inventory-api-config
+    data:
+      inventory-api-config.yaml: |
+        authn:
+          psk:
+            pre-shared-key-file: /psks/psks.yaml
+        authz:
+          kessel:
+            insecure-client: true
+            enable-oidc-auth: false
+        log:
+          level: "info"
+
+  - apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: psks
+    data:
+      psks.yaml: |
+        "1234":
+          tenant: "Example"
+          principal: "user@example.com"
+          is_reporter: true
+          type: "REPORTER_TYPE_ACM"
+
   - apiVersion: cloud.redhat.com/v1alpha1
     kind: ClowdApp
     metadata:
@@ -44,10 +72,15 @@ objects:
             volumeMounts:
                 - name: config-volume
                   mountPath: "/inventory"
+                - name: psks-volume
+                  mountPath: /psks
             volumes:
               - name: config-volume
-                secret:
-                  secretName: inventory-api-config
+                configMap:
+                  name: inventory-api-config
+              - name: psks-volume
+                configMap:
+                  name: psks
           webServices:
             public:
               enabled: true

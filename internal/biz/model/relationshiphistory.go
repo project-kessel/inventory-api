@@ -12,7 +12,8 @@ type RelationshipHistory struct {
 	CreatedAt        *time.Time
 	// We don't need UpdatedAt in here. We won't update the history resource
 
-	RelationshipId uint64 `gorm:"index"`
+	RelationshipId uint64        `gorm:"index"`
+	OperationType  OperationType `gorm:"index"`
 }
 
 func (*RelationshipHistory) TableName() string {

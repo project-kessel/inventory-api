@@ -12,6 +12,23 @@ type GormDbAfterMigrationHook interface {
 	GormDbAfterMigration(*gorm.DB, *schema.Schema) error
 }
 
+type OperationType string
+
+const (
+	OperationTypeCreate OperationType = "CREATE"
+	OperationTypeUpdate OperationType = "UPDATE"
+	OperationTypeDelete OperationType = "DELETE"
+)
+
+func (o *OperationType) Scan(value interface{}) error {
+	*o = OperationType(value.([]byte))
+	return nil
+}
+
+func (o OperationType) Value() (driver.Value, error) {
+	return string(o), nil
+}
+
 type Label struct {
 	Key   string `json:"key"`
 	Value string `json:"value"`

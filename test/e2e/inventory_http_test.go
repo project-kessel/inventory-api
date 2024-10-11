@@ -151,7 +151,8 @@ func TestInventoryAPIHTTP_CreateRHELHost(t *testing.T) {
 	request := resources.CreateRhelHostRequest{RhelHost: &resources.RhelHost{
 		Metadata: &resources.Metadata{
 			ResourceType: "rhel-host",
-			Workspace:    "workspace1",
+			WorkspaceId:  "workspace1",
+			OrgId:        "",
 		},
 		ReporterData: &resources.ReporterData{
 			ReporterInstanceId: "user@example.com",
@@ -183,7 +184,8 @@ func TestInventoryAPIHTTP_K8SCluster_CreateK8SCluster(t *testing.T) {
 		K8SCluster: &resources.K8SCluster{
 			Metadata: &resources.Metadata{
 				ResourceType: "k8s-cluster",
-				Workspace:    "",
+				WorkspaceId:  "",
+				OrgId:        "",
 			},
 			ResourceData: &resources.K8SClusterDetail{
 				ExternalClusterId: "1234",
@@ -237,7 +239,8 @@ func TestInventoryAPIHTTP_K8SPolicy_CreateK8SPolicy(t *testing.T) {
 		K8SPolicy: &resources.K8SPolicy{
 			Metadata: &resources.Metadata{
 				ResourceType: "k8s-policy",
-				Workspace:    "default",
+				WorkspaceId:  "default",
+				OrgId:        "",
 			},
 			ResourceData: &resources.K8SPolicyDetail{
 				Disabled: true,

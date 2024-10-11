@@ -124,7 +124,8 @@ func TestInventoryAPIGRPC_RhelHost_CreateRhelHost(t *testing.T) {
 	request := resources.CreateRhelHostRequest{RhelHost: &resources.RhelHost{
 		Metadata: &resources.Metadata{
 			ResourceType: "rhel-host",
-			Workspace:    "workspace1",
+			WorkspaceId:  "workspace1",
+			OrgId:        "",
 		},
 		ReporterData: &resources.ReporterData{
 			ReporterInstanceId: "user@example.com",
@@ -156,7 +157,8 @@ func TestInventoryAPIGRPC_K8SCluster_CreateK8SCluster(t *testing.T) {
 		K8SCluster: &resources.K8SCluster{
 			Metadata: &resources.Metadata{
 				ResourceType: "k8s-cluster",
-				Workspace:    "",
+				WorkspaceId:  "",
+				OrgId:        "",
 			},
 			ResourceData: &resources.K8SClusterDetail{
 				ExternalClusterId: "1234",

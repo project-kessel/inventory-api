@@ -113,13 +113,10 @@ func NewResourceEvent(operationType OperationType, resource *model.Resource, rep
 	switch operationType {
 	case OperationTypeCreated:
 		createdAt = &reportedTime
-		break
 	case OperationTypeUpdated:
 		updatedAt = &reportedTime
-		break
 	case OperationTypeDeleted:
 		deletedAt = &reportedTime
-		break
 	}
 
 	return &Event{
@@ -169,13 +166,10 @@ func NewRelationshipEvent(operationType OperationType, relationship *model.Relat
 	switch operationType {
 	case OperationTypeCreated:
 		createdAt = &reportedTime
-		break
 	case OperationTypeUpdated:
 		updatedAt = &reportedTime
-		break
 	case OperationTypeDeleted:
 		deletedAt = &reportedTime
-		break
 	}
 
 	return &Event{

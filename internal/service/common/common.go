@@ -1,134 +1,77 @@
 package common
 
 import (
-	relationshipspb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/relationships"
-	"time"
-
-	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
-
-	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/resources"
-	authnapi "github.com/project-kessel/inventory-api/internal/authn/api"
-	biz "github.com/project-kessel/inventory-api/internal/biz/common"
+	"encoding/json"
+	pbrelation "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/relationships"
+	pbresource "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/resources"
+	"github.com/project-kessel/inventory-api/internal/biz/model"
 )
 
-func MetadataFromPb(in *pb.Metadata, reporter *pb.ReporterData, identity *authnapi.Identity) *biz.Metadata {
-	var labels []*biz.Label
-	for _, t := range in.Labels {
-		labels = append(labels, &biz.Label{Key: t.Key, Value: t.Value})
-	}
-
-	var updatedAt time.Time
-	if in.LastReported != nil {
-		updatedAt = in.LastReported.AsTime()
-	} else {
-		updatedAt = time.Now().UTC()
-	}
-
-	return &biz.Metadata{
-		ID:              in.Id,
-		ResourceType:    in.ResourceType,
-		Workspace:       in.Workspace,
-		CreatedAt:       in.FirstReported.AsTime(),
-		UpdatedAt:       updatedAt,
-		Labels:          labels,
-		FirstReportedBy: identity.Principal,
-		LastReportedBy:  identity.Principal,
-
-		Reporters: []*biz.Reporter{ReporterFromPb(reporter, identity, updatedAt)},
+func ResourceFromPb(resourceType, reporterId string, resourceData model.JsonObject, metadata *pbresource.Metadata, reporter *pbresource.ReporterData) *model.Resource {
+	return &model.Resource{
+		ID:           0,
+		ResourceData: resourceData,
+		ResourceType: resourceType,
+		WorkspaceId:  metadata.Workspace,
+		Reporter: model.ResourceReporter{
+			Reporter: model.Reporter{
+				ReporterId:      reporterId,
+				ReporterType:    reporter.ReporterType.String(),
+				ReporterVersion: reporter.ReporterVersion,
+			},
+			LocalResourceId: reporter.LocalResourceId,
+		},
+		ConsoleHref: reporter.ConsoleHref,
+		ApiHref:     reporter.ApiHref,
+		Labels:      labelsFromPb(metadata.Labels),
 	}
 }
 
-func ReporterFromPb(in *pb.ReporterData, identity *authnapi.Identity, defaultUpdatedAt time.Time) *biz.Reporter {
-	var updatedAt time.Time
-	if in.LastReported != nil {
-		updatedAt = in.LastReported.AsTime()
-	} else {
-		updatedAt = defaultUpdatedAt
+func ToJsonObject(in interface{}) (model.JsonObject, error) {
+	if in == nil {
+		return nil, nil
 	}
-	return &biz.Reporter{
-		ReporterID:      identity.Principal,
-		ReporterType:    in.ReporterType.String(),
-		ReporterVersion: in.ReporterVersion,
-		LocalResourceId: in.LocalResourceId,
-		ConsoleHref:     in.ConsoleHref,
-		ApiHref:         in.ApiHref,
-		CreatedAt:       in.FirstReported.AsTime(),
-		UpdatedAt:       updatedAt,
+
+	bytes, err := json.Marshal(in)
+	if err != nil {
+		return nil, err
 	}
+
+	resourceData := model.JsonObject{}
+	err = json.Unmarshal(bytes, &resourceData)
+	if err != nil {
+		return nil, err
+	}
+
+	return resourceData, err
 }
 
-func RelationshipMetadataFromPb(in *relationshipspb.Metadata, reporter *relationshipspb.ReporterData, identity *authnapi.Identity) *biz.RelationshipMetadata {
-	var updatedAt time.Time
-	if in.LastReported != nil {
-		updatedAt = in.LastReported.AsTime()
-	} else {
-		updatedAt = time.Now().UTC()
-	}
-
-	return &biz.RelationshipMetadata{
-		ID:               in.Id,
-		RelationshipType: in.RelationshipType,
-		CreatedAt:        in.FirstReported.AsTime(),
-		UpdatedAt:        updatedAt,
-		FirstReportedBy:  identity.Principal,
-		LastReportedBy:   identity.Principal,
-
-		Reporters: []*biz.RelationshipReporter{RelationshipReporterFromPb(reporter, identity, updatedAt)},
-	}
-}
-
-func RelationshipReporterFromPb(in *relationshipspb.ReporterData, identity *authnapi.Identity, defaultUpdatedAt time.Time) *biz.RelationshipReporter {
-	var updatedAt time.Time
-	if in.LastReported != nil {
-		updatedAt = in.LastReported.AsTime()
-	} else {
-		updatedAt = defaultUpdatedAt
-	}
-	return &biz.RelationshipReporter{
-		ReporterID:             identity.Principal,
-		ReporterType:           in.ReporterType.String(),
-		ReporterVersion:        in.ReporterVersion,
-		SubjectLocalResourceId: in.SubjectLocalResourceId,
-		ObjectLocalResourceId:  in.ObjectLocalResourceId,
-		CreatedAt:              in.FirstReported.AsTime(),
-		UpdatedAt:              updatedAt,
-	}
-}
-
-func MetadataFromModel(in *biz.Metadata) *pb.Metadata {
-	var labels []*pb.ResourceLabel
-	for _, t := range in.Labels {
-		labels = append(labels, &pb.ResourceLabel{Key: t.Key, Value: t.Value})
-	}
-
-	return &pb.Metadata{
-		Id:              in.ID,
-		ResourceType:    in.ResourceType,
-		FirstReported:   timestamppb.New(in.CreatedAt),
-		LastReported:    timestamppb.New(in.UpdatedAt),
-		FirstReportedBy: in.FirstReportedBy,
-		LastReportedBy:  in.LastReportedBy,
-		Labels:          labels,
-		Workspace:       in.Workspace,
-	}
-}
-
-func ReportersFromModel(in []*biz.Reporter) []*pb.ReporterData {
-	var reporters []*pb.ReporterData
-	for _, r := range in {
-		reporters = append(reporters, &pb.ReporterData{
-			ReporterInstanceId: r.ReporterID,
-			ReporterType:       pb.ReporterData_ReporterType(pb.ReporterData_ReporterType_value[r.ReporterType]),
-			ReporterVersion:    r.ReporterVersion,
-
-			LocalResourceId: r.LocalResourceId,
-
-			FirstReported: timestamppb.New(r.CreatedAt),
-			LastReported:  timestamppb.New(r.UpdatedAt),
-
-			ConsoleHref: r.ConsoleHref,
-			ApiHref:     r.ApiHref,
+func labelsFromPb(pbLabels []*pbresource.ResourceLabel) model.Labels {
+	labels := model.Labels{}
+	for _, pbLabel := range pbLabels {
+		labels = append(labels, model.Label{
+			Key:   pbLabel.Key,
+			Value: pbLabel.Value,
 		})
 	}
-	return reporters
+	return labels
+}
+
+func RelationshipFromPb(relationshipType, reporterId string, relationshipData model.JsonObject, metadata *pbrelation.Metadata, reporter *pbrelation.ReporterData) *model.Relationship {
+	return &model.Relationship{
+		ID:               0,
+		RelationshipData: relationshipData,
+		RelationshipType: relationshipType,
+		SubjectId:        0,
+		ObjectId:         0,
+		Reporter: model.RelationshipReporter{
+			Reporter: model.Reporter{
+				ReporterId:      reporterId,
+				ReporterType:    reporter.ReporterType.String(),
+				ReporterVersion: reporter.ReporterVersion,
+			},
+			SubjectLocalResourceId: reporter.SubjectLocalResourceId,
+			ObjectLocalResourceId:  reporter.ObjectLocalResourceId,
+		},
+	}
 }

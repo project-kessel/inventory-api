@@ -2,8 +2,8 @@ package resources
 
 import (
 	"context"
+	"github.com/project-kessel/inventory-api/internal/biz"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
-	"github.com/project-kessel/inventory-api/internal/data"
 	eventingapi "github.com/project-kessel/inventory-api/internal/eventing/api"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -28,7 +28,7 @@ func (r *Repo) Save(ctx context.Context, model *model.Relationship) (*model.Rela
 	}
 
 	if r.Eventer != nil {
-		err := data.DefaultRelationshipSendEvent(ctx, model, r.Eventer, *model.CreatedAt, eventingapi.OperationTypeCreated)
+		err := biz.DefaultRelationshipSendEvent(ctx, model, r.Eventer, *model.CreatedAt, eventingapi.OperationTypeCreated)
 
 		if err != nil {
 			return nil, err
@@ -44,7 +44,7 @@ func (r *Repo) Update(ctx context.Context, model *model.Relationship, id uint64)
 	// TODO: update the model in inventory
 
 	if r.Eventer != nil {
-		err := data.DefaultRelationshipSendEvent(ctx, model, r.Eventer, *model.UpdatedAt, eventingapi.OperationTypeUpdated)
+		err := biz.DefaultRelationshipSendEvent(ctx, model, r.Eventer, *model.UpdatedAt, eventingapi.OperationTypeUpdated)
 
 		if err != nil {
 			return nil, err
@@ -70,7 +70,7 @@ func (r *Repo) Delete(ctx context.Context, id uint64) error {
 	// TODO: delete the model from inventory
 
 	if r.Eventer != nil {
-		err := data.DefaultRelationshipSendEvent(ctx, model, r.Eventer, time.Now(), eventingapi.OperationTypeDeleted)
+		err := biz.DefaultRelationshipSendEvent(ctx, model, r.Eventer, time.Now(), eventingapi.OperationTypeDeleted)
 
 		if err != nil {
 			return err

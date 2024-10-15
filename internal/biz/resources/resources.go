@@ -4,8 +4,8 @@ import (
 	"context"
 	"github.com/go-kratos/kratos/v2/log"
 	authzapi "github.com/project-kessel/inventory-api/internal/authz/api"
+	"github.com/project-kessel/inventory-api/internal/biz"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
-	"github.com/project-kessel/inventory-api/internal/data"
 	eventingapi "github.com/project-kessel/inventory-api/internal/eventing/api"
 	"time"
 )
@@ -41,7 +41,7 @@ func (uc *Usecase) Create(ctx context.Context, m *model.Resource) (*model.Resour
 		return nil, err
 	} else {
 		if uc.Eventer != nil {
-			err := data.DefaultResourceSendEvent(ctx, m, uc.Eventer, *m.CreatedAt, eventingapi.OperationTypeCreated)
+			err := biz.DefaultResourceSendEvent(ctx, m, uc.Eventer, *m.CreatedAt, eventingapi.OperationTypeCreated)
 
 			if err != nil {
 				return nil, err
@@ -49,7 +49,7 @@ func (uc *Usecase) Create(ctx context.Context, m *model.Resource) (*model.Resour
 		}
 
 		if uc.Authz != nil {
-			err := data.DefaultSetWorkspace(ctx, uc.Namespace, m, uc.Authz)
+			err := biz.DefaultSetWorkspace(ctx, uc.Namespace, m, uc.Authz)
 			if err != nil {
 				return nil, err
 			}
@@ -67,7 +67,7 @@ func (uc *Usecase) Update(ctx context.Context, m *model.Resource, id string) (*m
 		return nil, err
 	} else {
 		if uc.Eventer != nil {
-			err := data.DefaultResourceSendEvent(ctx, m, uc.Eventer, *m.UpdatedAt, eventingapi.OperationTypeUpdated)
+			err := biz.DefaultResourceSendEvent(ctx, m, uc.Eventer, *m.UpdatedAt, eventingapi.OperationTypeUpdated)
 
 			if err != nil {
 				return nil, err
@@ -75,7 +75,7 @@ func (uc *Usecase) Update(ctx context.Context, m *model.Resource, id string) (*m
 		}
 
 		if uc.Authz != nil {
-			err := data.DefaultSetWorkspace(ctx, uc.Namespace, m, uc.Authz)
+			err := biz.DefaultSetWorkspace(ctx, uc.Namespace, m, uc.Authz)
 			if err != nil {
 				return nil, err
 			}
@@ -107,7 +107,7 @@ func (uc *Usecase) Delete(ctx context.Context, id string) error {
 		// TODO: delete the model from inventory
 
 		if uc.Eventer != nil {
-			err := data.DefaultResourceSendEvent(ctx, m, uc.Eventer, time.Now(), eventingapi.OperationTypeDeleted)
+			err := biz.DefaultResourceSendEvent(ctx, m, uc.Eventer, time.Now(), eventingapi.OperationTypeDeleted)
 
 			if err != nil {
 				return err

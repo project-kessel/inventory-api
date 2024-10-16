@@ -497,24 +497,26 @@ components:
                     readOnly: true
                     type: string
                     description: The type of Resource relationship
-                first_reported:
+                created_at:
                     readOnly: true
                     type: string
                     description: Date and time when the inventory item was first reported.
                     format: date-time
-                last_reported:
+                updated_at:
                     readOnly: true
                     type: string
                     description: Date and time when the inventory item was last updated.
                     format: date-time
-                first_reported_by:
+                deleted_at:
                     readOnly: true
                     type: string
-                    description: Identifier of the reporter that first reported on this item.
-                last_reported_by:
-                    readOnly: true
+                    description: Date and time when the inventory item was deleted.
+                    format: date-time
+                org_id:
                     type: string
-                    description: Identifier of the reporter that last reported on this item.
+                    description: |-
+                        The org id in which this resource is a member for access control.  A
+                         resource can only be a member of one org.
         kessel.inventory.v1beta1.relationships.ReporterData:
             type: object
             properties:
@@ -777,28 +779,30 @@ components:
                     readOnly: true
                     type: string
                     description: The type of the Resource
-                first_reported:
+                created_at:
                     readOnly: true
                     type: string
                     description: Date and time when the inventory item was first reported.
                     format: date-time
-                last_reported:
+                updated_at:
                     readOnly: true
                     type: string
                     description: Date and time when the inventory item was last updated.
                     format: date-time
-                first_reported_by:
+                deleted_at:
                     readOnly: true
                     type: string
-                    description: Identifier of the reporter that first reported on this item.
-                last_reported_by:
-                    readOnly: true
-                    type: string
-                    description: Identifier of the reporter that last reported on this item.
-                workspace:
+                    description: Date and time when the inventory item was deleted.
+                    format: date-time
+                org_id:
                     type: string
                     description: |-
-                        The workspace in which this resource is a member for access control.  A
+                        The org id in which this resource is a member for access control.  A
+                         resource can only be a member of one org.
+                workspace_id:
+                    type: string
+                    description: |-
+                        The workspace id in which this resource is a member for access control.  A
                          resource can only be a member of one workspace.
                 labels:
                     type: array
@@ -835,16 +839,6 @@ components:
                     description: |-
                         The ID of the instance of the reporter. This is derived from the
                          authentication mechanism, i.e. authentication token.
-                first_reported:
-                    readOnly: true
-                    type: string
-                    description: Date and time when the inventory item was first reported by this reporter
-                    format: date-time
-                last_reported:
-                    readOnly: true
-                    type: string
-                    description: Date and time when the inventory item was last updated by this reporter
-                    format: date-time
                 console_href:
                     type: string
                     description: |-

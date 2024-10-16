@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package kessel.inventory.v1beta1.relationships;
 
+import "buf/validate/validate.proto";
 import "google/api/field_behavior.proto";
 import "google/protobuf/timestamp.proto";
 
@@ -18,19 +19,19 @@ message Metadata {
         [ json_name = "relationship_type", (google.api.field_behavior) = OUTPUT_ONLY ];
 
   // Date and time when the inventory item was first reported.
-  google.protobuf.Timestamp first_reported = 13874817
-      [ json_name = "first_reported", (google.api.field_behavior) = OUTPUT_ONLY ];
+  google.protobuf.Timestamp created_at = 3400
+  [ json_name = "created_at", (google.api.field_behavior) = OUTPUT_ONLY ];
 
   // Date and time when the inventory item was last updated.
-  google.protobuf.Timestamp last_reported = 436473484
-      [ json_name = "last_reported", (google.api.field_behavior) = OUTPUT_ONLY ];
+  google.protobuf.Timestamp updated_at = 3401
+  [ json_name = "updated_at", (google.api.field_behavior) = OUTPUT_ONLY ];
 
-  // Identifier of the reporter that first reported on this item.
-  string first_reported_by = 46112821
-      [ json_name = "first_reported_by", (google.api.field_behavior) = OUTPUT_ONLY ];
+  // Date and time when the inventory item was deleted.
+  google.protobuf.Timestamp deleted_at = 3402
+  [ json_name = "deleted_at", (google.api.field_behavior) = OUTPUT_ONLY ];
 
-  // Identifier of the reporter that last reported on this item.
-  string last_reported_by = 505008783
-      [ json_name = "last_reported_by", (google.api.field_behavior) = OUTPUT_ONLY ];
+  // The org id in which this resource is a member for access control.  A
+  // resource can only be a member of one org.
+  string org_id = 3500 [ json_name = "org_id", (buf.validate.field).string.min_len = 1 ];
 
 }

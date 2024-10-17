@@ -5,7 +5,7 @@ import (
 	"fmt"
 	authnapi "github.com/project-kessel/inventory-api/internal/authn/api"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
-	"github.com/project-kessel/inventory-api/internal/biz/relationships"
+	relationshipsctl "github.com/project-kessel/inventory-api/internal/biz/relationships"
 	"github.com/project-kessel/inventory-api/internal/middleware"
 	conv "github.com/project-kessel/inventory-api/internal/service/common"
 
@@ -18,11 +18,11 @@ const RelationType = "k8s-policy_is-propagated-to_k8s-cluster"
 type K8SPolicyIsPropagatedToK8SClusterService struct {
 	pb.UnimplementedKesselK8SPolicyIsPropagatedToK8SClusterServiceServer
 
-	Controller *relationships.Usecase
+	Controller *relationshipsctl.Usecase
 }
 
 // New creates a new K8SPolicyIsPropagatedToK8SClusterService to handle requests for RHEL hosts
-func New(c *relationships.Usecase) *K8SPolicyIsPropagatedToK8SClusterService {
+func New(c *relationshipsctl.Usecase) *K8SPolicyIsPropagatedToK8SClusterService {
 	return &K8SPolicyIsPropagatedToK8SClusterService{
 		Controller: c,
 	}

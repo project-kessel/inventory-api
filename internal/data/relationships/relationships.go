@@ -2,8 +2,8 @@ package resources
 
 import (
 	"context"
+	"github.com/project-kessel/inventory-api/internal/biz"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
-	"github.com/project-kessel/inventory-api/internal/data"
 	eventingapi "github.com/project-kessel/inventory-api/internal/eventing/api"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -28,7 +28,7 @@ func (r *Repo) Save(ctx context.Context, model *model.Relationship) (*model.Rela
 	}
 
 	if r.Eventer != nil {
-		err := data.DefaultRelationshipSendEvent(ctx, model, r.Eventer, *model.CreatedAt, eventingapi.OperationTypeCreated)
+		err := biz.DefaultRelationshipSendEvent(ctx, model, r.Eventer, *model.CreatedAt, eventingapi.OperationTypeCreated)
 
 		if err != nil {
 			return nil, err
@@ -40,11 +40,11 @@ func (r *Repo) Save(ctx context.Context, model *model.Relationship) (*model.Rela
 
 // Update updates a model in the database, updates related tuples in the relations-api, and issues an update event.
 // The `id` is possibly of the form <reporter_type:local_resource_id>.
-func (r *Repo) Update(ctx context.Context, model *model.Relationship, id string) (*model.Relationship, error) {
+func (r *Repo) Update(ctx context.Context, model *model.Relationship, id uint64) (*model.Relationship, error) {
 	// TODO: update the model in inventory
 
 	if r.Eventer != nil {
-		err := data.DefaultRelationshipSendEvent(ctx, model, r.Eventer, *model.UpdatedAt, eventingapi.OperationTypeUpdated)
+		err := biz.DefaultRelationshipSendEvent(ctx, model, r.Eventer, *model.UpdatedAt, eventingapi.OperationTypeUpdated)
 
 		if err != nil {
 			return nil, err
@@ -56,7 +56,7 @@ func (r *Repo) Update(ctx context.Context, model *model.Relationship, id string)
 
 // Delete deletes a model from the database, removes related tuples from the relations-api, and issues a delete event.
 // The `id` is possibly of the form <reporter_type:local_resource_id>.
-func (r *Repo) Delete(ctx context.Context, id string) error {
+func (r *Repo) Delete(ctx context.Context, id uint64) error {
 	// TODO: Retrieve data from inventory so we have something to publish
 	model := &model.Relationship{
 		ID:               0,
@@ -70,7 +70,7 @@ func (r *Repo) Delete(ctx context.Context, id string) error {
 	// TODO: delete the model from inventory
 
 	if r.Eventer != nil {
-		err := data.DefaultRelationshipSendEvent(ctx, model, r.Eventer, time.Now(), eventingapi.OperationTypeDeleted)
+		err := biz.DefaultRelationshipSendEvent(ctx, model, r.Eventer, time.Now(), eventingapi.OperationTypeDeleted)
 
 		if err != nil {
 			return err
@@ -82,7 +82,7 @@ func (r *Repo) Delete(ctx context.Context, id string) error {
 	return nil
 }
 
-func (r *Repo) FindByID(context.Context, string) (*model.Relationship, error) {
+func (r *Repo) FindByID(context.Context, uint64) (*model.Relationship, error) {
 	return nil, nil
 }
 

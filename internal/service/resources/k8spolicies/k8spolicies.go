@@ -55,7 +55,11 @@ func (c *K8sPolicyService) UpdateK8SPolicy(ctx context.Context, r *pb.UpdateK8SP
 
 	if h, err := k8sPolicyFromUpdateRequest(r, identity); err == nil {
 		// Todo: Update to use the right ID
-		if resp, err := c.Ctl.Update(ctx, h, ""); err == nil {
+		if resp, err := c.Ctl.Update(ctx, h, model.ReporterResourceId{
+			LocalResourceId: r.K8SPolicy.ReporterData.LocalResourceId,
+			ResourceType:    ResourceType,
+			ReporterId:      identity.Principal,
+		}); err == nil {
 			return updateResponseFromK8sPolicy(resp), nil
 
 		} else {
@@ -67,8 +71,17 @@ func (c *K8sPolicyService) UpdateK8SPolicy(ctx context.Context, r *pb.UpdateK8SP
 }
 
 func (c *K8sPolicyService) DeleteK8SPolicy(ctx context.Context, r *pb.DeleteK8SPolicyRequest) (*pb.DeleteK8SPolicyResponse, error) {
-	if input, err := fromDeleteRequest(r); err == nil {
-		if err := c.Ctl.Delete(ctx, input); err == nil {
+	identity, err := middleware.GetIdentity(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	if localResourceId, err := fromDeleteRequest(r); err == nil {
+		if err := c.Ctl.Delete(ctx, model.ReporterResourceId{
+			LocalResourceId: localResourceId,
+			ResourceType:    ResourceType,
+			ReporterId:      identity.Principal,
+		}); err == nil {
 			return toDeleteResponse(), nil
 		} else {
 			return nil, err

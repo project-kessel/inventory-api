@@ -54,8 +54,11 @@ func (c *NotificationsIntegrationsService) UpdateNotificationsIntegration(ctx co
 	}
 
 	if h, err := notificationsIntegrationFromUpdateRequest(r, identity); err == nil {
-		// Todo: Update to use the right ID
-		if resp, err := c.Ctl.Update(ctx, h, ""); err == nil {
+		if resp, err := c.Ctl.Update(ctx, h, model.ReporterResourceId{
+			LocalResourceId: r.Integration.ReporterData.LocalResourceId,
+			ResourceType:    ResourceType,
+			ReporterId:      identity.Principal,
+		}); err == nil {
 			return updateResponseFromNotificationsIntegration(resp), nil
 
 		} else {
@@ -67,8 +70,17 @@ func (c *NotificationsIntegrationsService) UpdateNotificationsIntegration(ctx co
 }
 
 func (c *NotificationsIntegrationsService) DeleteNotificationsIntegration(ctx context.Context, r *pb.DeleteNotificationsIntegrationRequest) (*pb.DeleteNotificationsIntegrationResponse, error) {
-	if input, err := fromDeleteRequest(r); err == nil {
-		if err := c.Ctl.Delete(ctx, input); err == nil {
+	identity, err := middleware.GetIdentity(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	if localResourceId, err := fromDeleteRequest(r); err == nil {
+		if err := c.Ctl.Delete(ctx, model.ReporterResourceId{
+			LocalResourceId: localResourceId,
+			ResourceType:    ResourceType,
+			ReporterId:      identity.Principal,
+		}); err == nil {
 			return toDeleteResponse(), nil
 		} else {
 			return nil, err

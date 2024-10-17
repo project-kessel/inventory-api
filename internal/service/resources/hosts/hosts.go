@@ -53,7 +53,11 @@ func (c *HostsService) UpdateRhelHost(ctx context.Context, r *pb.UpdateRhelHostR
 
 	if h, err := hostFromUpdateRequest(r, identity); err == nil {
 		// Todo: Update to use the right ID
-		if resp, err := c.Ctl.Update(ctx, h, ""); err == nil {
+		if resp, err := c.Ctl.Update(ctx, h, model.ReporterResourceId{
+			LocalResourceId: r.RhelHost.ReporterData.LocalResourceId,
+			ResourceType:    ResourceType,
+			ReporterId:      identity.Principal,
+		}); err == nil {
 			return updateResponseFromHost(resp), nil
 		} else {
 			return nil, err
@@ -64,8 +68,17 @@ func (c *HostsService) UpdateRhelHost(ctx context.Context, r *pb.UpdateRhelHostR
 }
 
 func (c *HostsService) DeleteRhelHost(ctx context.Context, r *pb.DeleteRhelHostRequest) (*pb.DeleteRhelHostResponse, error) {
-	if input, err := fromDeleteRequest(r); err == nil {
-		if err := c.Ctl.Delete(ctx, input); err == nil {
+	identity, err := middleware.GetIdentity(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	if localResourceId, err := fromDeleteRequest(r); err == nil {
+		if err := c.Ctl.Delete(ctx, model.ReporterResourceId{
+			LocalResourceId: localResourceId,
+			ResourceType:    ResourceType,
+			ReporterId:      identity.Principal,
+		}); err == nil {
 			return toDeleteResponse(), nil
 		} else {
 			return nil, err

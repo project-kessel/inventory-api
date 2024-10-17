@@ -3,8 +3,8 @@ package resources
 import (
 	"context"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
+	"github.com/project-kessel/inventory-api/internal/data"
 	"gorm.io/gorm"
-	"gorm.io/gorm/clause"
 )
 
 type Repo struct {
@@ -17,36 +17,108 @@ func New(db *gorm.DB) *Repo {
 	}
 }
 
-func (r *Repo) Save(ctx context.Context, model *model.Resource) (*model.Resource, error) {
-	if err := r.DB.Session(&gorm.Session{FullSaveAssociations: true}).Create(model).Error; err != nil {
+func copyHistory(m *model.Resource, id uint64, operationType model.OperationType) *model.ResourceHistory {
+	return &model.ResourceHistory{
+		OrgId:         m.OrgId,
+		ResourceData:  m.ResourceData,
+		ResourceType:  m.ResourceType,
+		WorkspaceId:   m.WorkspaceId,
+		Reporter:      m.Reporter,
+		ConsoleHref:   m.ConsoleHref,
+		ApiHref:       m.ApiHref,
+		Labels:        m.Labels,
+		ResourceId:    id,
+		OperationType: operationType,
+	}
+}
+
+func (r *Repo) Save(ctx context.Context, m *model.Resource) (*model.Resource, error) {
+	session := r.DB.Session(&gorm.Session{})
+
+	if err := session.Create(m).Error; err != nil {
 		return nil, err
 	}
 
-	return model, nil
+	if err := session.Create(copyHistory(m, m.ID, model.OperationTypeCreate)).Error; err != nil {
+		return nil, err
+	}
+
+	if err := session.Create(&model.LocalInventoryToResource{
+		ResourceId: m.ID,
+		ReporterResourceId: model.ReporterResourceId{
+			LocalResourceId: m.Reporter.LocalResourceId,
+			ResourceType:    m.ResourceType,
+			ReporterId:      m.Reporter.ReporterId,
+		},
+	}).Error; err != nil {
+		return nil, err
+	}
+
+	return m, nil
 }
 
-func (r *Repo) Update(ctx context.Context, model *model.Resource, id uint64) (*model.Resource, error) {
-	// TODO: update the model in inventory
-	return model, nil
+func (r *Repo) Update(ctx context.Context, m *model.Resource, id uint64) (*model.Resource, error) {
+	session := r.DB.Session(&gorm.Session{})
+
+	oldResource, err := r.FindByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := session.Create(copyHistory(oldResource, oldResource.ID, model.OperationTypeUpdate)).Error; err != nil {
+		return nil, err
+	}
+
+	m.ID = id
+	if err := session.Save(m).Error; err != nil {
+		return nil, err
+	}
+
+	return m, nil
 }
 
-func (r *Repo) Delete(ctx context.Context, id uint64) error {
-	return nil
+func (r *Repo) Delete(ctx context.Context, id uint64) (*model.Resource, error) {
+	session := r.DB.Session(&gorm.Session{})
+
+	resource, err := r.FindByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := session.Create(copyHistory(resource, resource.ID, model.OperationTypeDelete)).Error; err != nil {
+		return nil, err
+	}
+
+	if err := session.Delete(resource).Error; err != nil {
+		return nil, err
+	}
+
+	return resource, nil
 }
 
-func (r *Repo) FindByID(context.Context, uint64) (*model.Resource, error) {
-	return nil, nil
+func (r *Repo) FindByID(ctx context.Context, id uint64) (*model.Resource, error) {
+	resource := model.Resource{}
+	if err := r.DB.Session(&gorm.Session{}).First(&resource, id).Error; err != nil {
+		return nil, err
+	}
+
+	return &resource, nil
+}
+
+func (r *Repo) FindByReporterResourceId(ctx context.Context, id model.ReporterResourceId) (*model.Resource, error) {
+	session := r.DB.Session(&gorm.Session{})
+
+	resourceId, err := data.GetLastResourceId(session, id)
+	if err != nil {
+		return nil, err
+	}
+
+	return r.FindByID(ctx, resourceId)
 }
 
 func (r *Repo) ListAll(context.Context) ([]*model.Resource, error) {
-	// var model biz.Resource
-	// var count int64
-	// if err := r.Db.Model(&model).Count(&count).Error; err != nil {
-	// 	return nil, err
-	// }
-
 	var results []*model.Resource
-	if err := r.DB.Preload(clause.Associations).Find(&results).Error; err != nil {
+	if err := r.DB.Find(&results).Error; err != nil {
 		return nil, err
 	}
 

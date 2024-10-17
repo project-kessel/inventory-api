@@ -54,7 +54,11 @@ func (c *K8sClustersService) UpdateK8SCluster(ctx context.Context, r *pb.UpdateK
 
 	if k, err := k8sClusterFromUpdateRequest(r, identity); err == nil {
 		// Todo: Update to use the right ID
-		if resp, err := c.Ctl.Update(ctx, k, ""); err == nil {
+		if resp, err := c.Ctl.Update(ctx, k, model.ReporterResourceId{
+			LocalResourceId: r.K8SCluster.ReporterData.LocalResourceId,
+			ResourceType:    ResourceType,
+			ReporterId:      identity.Principal,
+		}); err == nil {
 			return updateResponseFromK8sCluster(resp), nil
 		} else {
 			return nil, err
@@ -65,8 +69,17 @@ func (c *K8sClustersService) UpdateK8SCluster(ctx context.Context, r *pb.UpdateK
 }
 
 func (c *K8sClustersService) DeleteK8SCluster(ctx context.Context, r *pb.DeleteK8SClusterRequest) (*pb.DeleteK8SClusterResponse, error) {
-	if input, err := fromDeleteRequest(r); err == nil {
-		if err := c.Ctl.Delete(ctx, input); err == nil {
+	identity, err := middleware.GetIdentity(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	if localResourceId, err := fromDeleteRequest(r); err == nil {
+		if err := c.Ctl.Delete(ctx, model.ReporterResourceId{
+			LocalResourceId: localResourceId,
+			ResourceType:    ResourceType,
+			ReporterId:      identity.Principal,
+		}); err == nil {
 			return toDeleteResponse(), nil
 		} else {
 			return nil, err

@@ -2,20 +2,24 @@ package resources
 
 import (
 	"context"
+	"errors"
 	"github.com/go-kratos/kratos/v2/log"
 	authzapi "github.com/project-kessel/inventory-api/internal/authz/api"
 	"github.com/project-kessel/inventory-api/internal/biz"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
 	eventingapi "github.com/project-kessel/inventory-api/internal/eventing/api"
+	"gorm.io/gorm"
 	"time"
 )
 
 type ResourceRepository interface {
 	Save(ctx context.Context, resource *model.Resource) (*model.Resource, error)
 	Update(context.Context, *model.Resource, uint64) (*model.Resource, error)
-	Delete(context.Context, uint64) error
+	Delete(context.Context, uint64) (*model.Resource, error)
 	FindByID(context.Context, uint64) (*model.Resource, error)
+	FindByReporterResourceId(context.Context, model.ReporterResourceId) (*model.Resource, error)
 	ListAll(context.Context) ([]*model.Resource, error)
+	//LocalResourceToId(ctx context.Context, id model.ReporterResourceId) (uint64, error)
 }
 
 type Usecase struct {
@@ -37,6 +41,17 @@ func New(repository ResourceRepository, authz authzapi.Authorizer, eventer event
 }
 
 func (uc *Usecase) Create(ctx context.Context, m *model.Resource) (*model.Resource, error) {
+	// check if the resource already exists
+	_, err := uc.repository.FindByReporterResourceId(ctx, model.ReporterResourceId{
+		LocalResourceId: m.Reporter.LocalResourceId,
+		ResourceType:    m.ResourceType,
+		ReporterId:      m.Reporter.ReporterId,
+	})
+
+	if err == nil || !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, errors.New("resource already exists")
+	}
+
 	if ret, err := uc.repository.Save(ctx, m); err != nil {
 		return nil, err
 	} else {
@@ -61,9 +76,19 @@ func (uc *Usecase) Create(ctx context.Context, m *model.Resource) (*model.Resour
 }
 
 // Update updates a model in the database, updates related tuples in the relations-api, and issues an update event.
-// The `id` is possibly of the form <reporter_type:local_resource_id>.
-func (uc *Usecase) Update(ctx context.Context, m *model.Resource, id string) (*model.Resource, error) {
-	if ret, err := uc.repository.Update(ctx, m, 0); err != nil {
+func (uc *Usecase) Update(ctx context.Context, m *model.Resource, id model.ReporterResourceId) (*model.Resource, error) {
+	// check if the resource exists
+	existingResource, err := uc.repository.FindByReporterResourceId(ctx, model.ReporterResourceId{
+		LocalResourceId: m.Reporter.LocalResourceId,
+		ResourceType:    m.ResourceType,
+		ReporterId:      m.Reporter.ReporterId,
+	})
+
+	if err != nil && errors.Is(err, gorm.ErrRecordNotFound) {
+		return uc.Create(ctx, m)
+	}
+
+	if ret, err := uc.repository.Update(ctx, m, existingResource.ID); err != nil {
 		return nil, err
 	} else {
 		if uc.Eventer != nil {
@@ -75,6 +100,7 @@ func (uc *Usecase) Update(ctx context.Context, m *model.Resource, id string) (*m
 		}
 
 		if uc.Authz != nil {
+			// Todo: Update workspace if there is any change
 			err := biz.DefaultSetWorkspace(ctx, uc.Namespace, m, uc.Authz)
 			if err != nil {
 				return nil, err
@@ -87,25 +113,17 @@ func (uc *Usecase) Update(ctx context.Context, m *model.Resource, id string) (*m
 }
 
 // Delete deletes a model from the database, removes related tuples from the relations-api, and issues a delete event.
-// The `id` is possibly of the form <reporter_type:local_resource_id>.
-func (uc *Usecase) Delete(ctx context.Context, id string) error {
-	if err := uc.repository.Delete(ctx, 0); err != nil {
+func (uc *Usecase) Delete(ctx context.Context, id model.ReporterResourceId) error {
+	// check if the resource exists
+	existingResource, err := uc.repository.FindByReporterResourceId(ctx, id)
+
+	if err != nil && errors.Is(err, gorm.ErrRecordNotFound) {
+		return errors.New("resource not found")
+	}
+
+	if m, err := uc.repository.Delete(ctx, existingResource.ID); err != nil {
 		return err
 	} else {
-		// TODO: Retrieve data from inventory so we have something to publish
-		m := &model.Resource{
-			ID:           0,
-			ResourceData: nil,
-			ResourceType: "",
-			WorkspaceId:  "",
-			Reporter:     model.ResourceReporter{},
-			ConsoleHref:  "",
-			ApiHref:      "",
-			Labels:       nil,
-		}
-
-		// TODO: delete the model from inventory
-
 		if uc.Eventer != nil {
 			err := biz.DefaultResourceSendEvent(ctx, m, uc.Eventer, time.Now(), eventingapi.OperationTypeDeleted)
 

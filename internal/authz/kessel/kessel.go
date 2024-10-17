@@ -54,10 +54,18 @@ func New(ctx context.Context, config CompletedConfig, logger *log.Helper) (*Kess
 	}, nil
 }
 
+func (a *KesselAuthz) incrFailureCounter(method string) {
+	a.failureCounter.Add(context.Background(), 1, metric.WithAttributes(attribute.String("method", method)))
+}
+
+func (a *KesselAuthz) incrSuccessCounter(method string) {
+	a.successCounter.Add(context.Background(), 1, metric.WithAttributes(attribute.String("method", method)))
+}
+
 func (a *KesselAuthz) Health(ctx context.Context) (*kesselv1.GetReadyzResponse, error) {
 	opts, err := a.getCallOptions()
 	if err != nil {
-		a.failureCounter.Add(context.Background(), 1, metric.WithAttributes(attribute.String("method", "Health")))
+		a.incrFailureCounter("Health")
 		return nil, err
 	}
 	if viper.GetBool("log.readyz") {
@@ -65,28 +73,28 @@ func (a *KesselAuthz) Health(ctx context.Context) (*kesselv1.GetReadyzResponse, 
 	}
 	resp, err := a.HealthService.GetReadyz(ctx, &kesselv1.GetReadyzRequest{}, opts...)
 	if err != nil {
-		a.failureCounter.Add(context.Background(), 1, metric.WithAttributes(attribute.String("method", "Health")))
+		a.incrFailureCounter("Health")
 		return nil, err
 	}
 
-	a.successCounter.Add(context.Background(), 1, metric.WithAttributes(attribute.String("method", "Health")))
+	a.incrSuccessCounter("Health")
 	return resp, nil
 }
 
 func (a *KesselAuthz) Check(ctx context.Context, r *kessel.CheckRequest) (*kessel.CheckResponse, error) {
 	opts, err := a.getCallOptions()
 	if err != nil {
-		a.failureCounter.Add(context.Background(), 1, metric.WithAttributes(attribute.String("method", "Check")))
+		a.incrFailureCounter("Check")
 		return nil, err
 	}
 
 	resp, err := a.CheckService.Check(ctx, r, opts...)
 	if err != nil {
-		a.failureCounter.Add(context.Background(), 1, metric.WithAttributes(attribute.String("method", "Check")))
+		a.incrFailureCounter("Check")
 		return nil, err
 	}
 
-	a.successCounter.Add(context.Background(), 1, metric.WithAttributes(attribute.String("method", "Check")))
+	a.incrSuccessCounter("Check")
 	return resp, nil
 }
 
@@ -110,40 +118,40 @@ func (a *KesselAuthz) getCallOptions() ([]grpc.CallOption, error) {
 func (a *KesselAuthz) CreateTuples(ctx context.Context, r *kessel.CreateTuplesRequest) (*kessel.CreateTuplesResponse, error) {
 	opts, err := a.getCallOptions()
 	if err != nil {
-		a.failureCounter.Add(context.Background(), 1, metric.WithAttributes(attribute.String("method", "CreateTuples")))
+		a.incrFailureCounter("CreateTuples")
 		return nil, err
 	}
 
 	resp, err := a.TupleService.CreateTuples(ctx, r, opts...)
 	if err != nil {
-		a.failureCounter.Add(context.Background(), 1, metric.WithAttributes(attribute.String("method", "CreateTuples")))
+		a.incrFailureCounter("CreateTuples")
 		return nil, err
 	}
 
-	a.successCounter.Add(context.Background(), 1, metric.WithAttributes(attribute.String("method", "CreateTuples")))
+	a.incrSuccessCounter("CreateTuples")
 	return resp, nil
 }
 
 func (a *KesselAuthz) DeleteTuples(ctx context.Context, r *kessel.DeleteTuplesRequest) (*kessel.DeleteTuplesResponse, error) {
 	opts, err := a.getCallOptions()
 	if err != nil {
-		a.failureCounter.Add(context.Background(), 1, metric.WithAttributes(attribute.String("method", "DeleteTuples")))
+		a.incrFailureCounter("DeleteTuples")
 		return nil, err
 	}
 
 	resp, err := a.TupleService.DeleteTuples(ctx, r, opts...)
 	if err != nil {
-		a.failureCounter.Add(context.Background(), 1, metric.WithAttributes(attribute.String("method", "DeleteTuples")))
+		a.incrFailureCounter("DeleteTuples")
 		return nil, err
 	}
 
-	a.successCounter.Add(context.Background(), 1, metric.WithAttributes(attribute.String("method", "DeleteTuples")))
+	a.incrSuccessCounter("DeleteTuples")
 	return resp, nil
 }
 
 func (a *KesselAuthz) SetWorkspace(ctx context.Context, local_resource_id, workspace, namespace, name string) (*kessel.CreateTuplesResponse, error) {
 	if workspace == "" {
-		a.failureCounter.Add(context.Background(), 1, metric.WithAttributes(attribute.String("method", "SetWorkspace")))
+		a.incrFailureCounter("SetWorkspace")
 		return nil, fmt.Errorf("workspace is required")
 	}
 	// TODO: remove previous tuple for workspace
@@ -167,7 +175,7 @@ func (a *KesselAuthz) SetWorkspace(ctx context.Context, local_resource_id, works
 		},
 	}}
 
-	a.successCounter.Add(context.Background(), 1, metric.WithAttributes(attribute.String("method", "SetWorkspace")))
+	a.incrSuccessCounter("SetWorkspace")
 	return a.CreateTuples(ctx, &kessel.CreateTuplesRequest{
 		Tuples: rels,
 	})

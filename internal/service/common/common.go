@@ -12,7 +12,8 @@ func ResourceFromPb(resourceType, reporterId string, resourceData model.JsonObje
 		ID:           0,
 		ResourceData: resourceData,
 		ResourceType: resourceType,
-		WorkspaceId:  metadata.Workspace,
+		WorkspaceId:  metadata.WorkspaceId,
+		OrgId:        metadata.OrgId,
 		Reporter: model.ResourceReporter{
 			Reporter: model.Reporter{
 				ReporterId:      reporterId,
@@ -64,6 +65,7 @@ func RelationshipFromPb(relationshipType, reporterId string, relationshipData mo
 		RelationshipType: relationshipType,
 		SubjectId:        0,
 		ObjectId:         0,
+		OrgId:            metadata.OrgId,
 		Reporter: model.RelationshipReporter{
 			Reporter: model.Reporter{
 				ReporterId:      reporterId,

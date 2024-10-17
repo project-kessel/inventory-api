@@ -36,8 +36,11 @@ type RelationshipData struct {
 type ResourceMetadata struct {
 	Id           uint64          `json:"id"`
 	ResourceType string          `json:"resource_type"`
-	LastReported time.Time       `json:"last_reported"`
-	Workspace    string          `json:"workspace"`
+	OrgId        string          `json:"org_id"`
+	CreatedAt    *time.Time      `json:"created_at,omitempty"`
+	UpdatedAt    *time.Time      `json:"updated_at,omitempty"`
+	DeletedAt    *time.Time      `json:"deleted_at,omitempty"`
+	WorkspaceId  string          `json:"workspace_id"`
 	Labels       []ResourceLabel `json:"labels,omitempty"`
 }
 
@@ -47,19 +50,20 @@ type ResourceLabel struct {
 }
 
 type ResourceReporter struct {
-	ReporterInstanceId string    `json:"reporter_instance_id"`
-	LastReported       time.Time `json:"last_reported"`
-	ReporterType       string    `json:"reporter_type"`
-	ConsoleHref        string    `json:"console_href"`
-	ApiHref            string    `json:"api_href"`
-	LocalResourceId    string    `json:"local_resource_id"`
-	ReporterVersion    string    `json:"reporter_version"`
+	ReporterInstanceId string `json:"reporter_instance_id"`
+	ReporterType       string `json:"reporter_type"`
+	ConsoleHref        string `json:"console_href"`
+	ApiHref            string `json:"api_href"`
+	LocalResourceId    string `json:"local_resource_id"`
+	ReporterVersion    string `json:"reporter_version"`
 }
 
 type RelationshipMetadata struct {
-	Id               uint64    `json:"id"`
-	RelationshipType string    `json:"relationship_type"`
-	LastReported     time.Time `json:"last_reported"`
+	Id               uint64     `json:"id"`
+	RelationshipType string     `json:"relationship_type"`
+	CreatedAt        *time.Time `json:"created_at,omitempty"`
+	UpdatedAt        *time.Time `json:"updated_at,omitempty"`
+	DeletedAt        *time.Time `json:"deleted_at,omitempty"`
 }
 
 type RelationshipReporter struct {
@@ -102,6 +106,19 @@ func NewResourceEvent(operationType OperationType, resource *model.Resource, rep
 		})
 	}
 
+	var createdAt *time.Time
+	var updatedAt *time.Time
+	var deletedAt *time.Time
+
+	switch operationType {
+	case OperationTypeCreated:
+		createdAt = &reportedTime
+	case OperationTypeUpdated:
+		updatedAt = &reportedTime
+	case OperationTypeDeleted:
+		deletedAt = &reportedTime
+	}
+
 	return &Event{
 		Specversion:     "1.0",
 		Type:            makeEventType(eventType, resource.ResourceType, string(operationType.OperationType())),
@@ -113,14 +130,16 @@ func NewResourceEvent(operationType OperationType, resource *model.Resource, rep
 		Data: ResourceData{
 			Metadata: ResourceMetadata{
 				Id:           resource.ID,
+				OrgId:        resource.OrgId,
 				ResourceType: resource.ResourceType,
-				LastReported: *resource.UpdatedAt,
-				Workspace:    resource.WorkspaceId,
+				CreatedAt:    createdAt,
+				UpdatedAt:    updatedAt,
+				DeletedAt:    deletedAt,
+				WorkspaceId:  resource.WorkspaceId,
 				Labels:       labels,
 			},
 			ReporterData: ResourceReporter{
 				ReporterInstanceId: resource.Reporter.ReporterId,
-				LastReported:       *resource.UpdatedAt,
 				ReporterType:       resource.Reporter.ReporterType,
 				ConsoleHref:        resource.ConsoleHref,
 				ApiHref:            resource.ApiHref,
@@ -140,6 +159,19 @@ func NewRelationshipEvent(operationType OperationType, relationship *model.Relat
 		return nil, err
 	}
 
+	var createdAt *time.Time
+	var updatedAt *time.Time
+	var deletedAt *time.Time
+
+	switch operationType {
+	case OperationTypeCreated:
+		createdAt = &reportedTime
+	case OperationTypeUpdated:
+		updatedAt = &reportedTime
+	case OperationTypeDeleted:
+		deletedAt = &reportedTime
+	}
+
 	return &Event{
 		Specversion:     "1.0",
 		Type:            makeEventType(eventType, relationship.RelationshipType, string(operationType.OperationType())),
@@ -152,7 +184,9 @@ func NewRelationshipEvent(operationType OperationType, relationship *model.Relat
 			Metadata: RelationshipMetadata{
 				Id:               relationship.ID,
 				RelationshipType: relationship.RelationshipType,
-				LastReported:     *relationship.UpdatedAt,
+				CreatedAt:        createdAt,
+				UpdatedAt:        updatedAt,
+				DeletedAt:        deletedAt,
 			},
 			ReporterData: RelationshipReporter{
 				ReporterType:           relationship.Reporter.ReporterType,

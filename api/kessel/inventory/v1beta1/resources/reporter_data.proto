@@ -3,7 +3,6 @@ syntax = "proto3";
 package kessel.inventory.v1beta1.resources;
 
 import "google/api/field_behavior.proto";
-import "google/protobuf/timestamp.proto";
 import "buf/validate/validate.proto";
 
 option go_package = "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/resources";
@@ -27,14 +26,6 @@ message ReporterData {
   // authentication mechanism, i.e. authentication token.
   string reporter_instance_id = 241085112 
       [ json_name = "reporter_instance_id", (google.api.field_behavior) = OUTPUT_ONLY ];
-
-  // Date and time when the inventory item was first reported by this reporter
-  google.protobuf.Timestamp first_reported = 13874816
-      [ json_name = "first_reported", (google.api.field_behavior) = OUTPUT_ONLY ];
-
-  // Date and time when the inventory item was last updated by this reporter
-  google.protobuf.Timestamp last_reported = 436473483
-      [ json_name = "last_reported", (google.api.field_behavior) = OUTPUT_ONLY ];
 
   // The URL for this resource in the reporter's management UI console. For
   // example this would be the cluster URL in the HCC Console for an OCM

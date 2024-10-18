@@ -158,10 +158,10 @@ func TestUpdateResource(t *testing.T) {
 	assert.Nil(t, err)
 
 	// Updates
-	r2Copy := &(*r)
+	r2Copy := *r
 	r2Copy.WorkspaceId = "workspace-update-01"
 	r2Copy.OrgId = "org-update-01"
-	r2, err := repo.Update(ctx, r2Copy, r.ID)
+	r2, err := repo.Update(ctx, &r2Copy, r.ID)
 	assert.NotNil(t, r2)
 	assert.Nil(t, err)
 	assert.Equal(t, r.ID, r2.ID)

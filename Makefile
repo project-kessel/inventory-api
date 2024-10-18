@@ -1,5 +1,9 @@
-GOHOSTOS:=$(shell go env GOHOSTOS)
-GOPATH:=$(shell go env GOPATH)
+ifeq ($(GO),)
+GO:=$(shell command -v go)
+endif
+
+GOHOSTOS:=$(shell $(GO) env GOHOSTOS)
+GOPATH:=$(shell $(GO) env GOPATH)
 IMAGE ?="quay.io/cloudservices/kessel-inventory"
 IMAGE_TAG=$(git rev-parse --short=7 HEAD)
 GIT_COMMIT=$(git rev-parse --short HEAD)
@@ -19,15 +23,15 @@ INVENTORY_SCHEMA_VERSION=0.11.0
 .PHONY: init
 # init env
 init:
-	go install github.com/go-kratos/kratos/cmd/kratos/v2@latest
-	go install github.com/google/wire/cmd/wire@latest
-	go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
-	go get google.golang.org/grpc/cmd/protoc-gen-go-grpc
-	go install google.golang.org/grpc/cmd/protoc-gen-go-grpc
-	go install github.com/go-kratos/kratos/cmd/protoc-gen-go-http/v2@latest
-	go install github.com/google/gnostic/cmd/protoc-gen-openapi@latest
-	go get github.com/envoyproxy/protoc-gen-validate
-	go install github.com/envoyproxy/protoc-gen-validate
+	$(GO) install github.com/go-kratos/kratos/cmd/kratos/v2@latest
+	$(GO) install github.com/google/wire/cmd/wire@latest
+	$(GO) install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+	$(GO) get google.golang.org/grpc/cmd/protoc-gen-go-grpc
+	$(GO) install google.golang.org/grpc/cmd/protoc-gen-go-grpc
+	$(GO) install github.com/go-kratos/kratos/cmd/protoc-gen-go-http/v2@latest
+	$(GO) install github.com/google/gnostic/cmd/protoc-gen-openapi@latest
+	$(GO) get github.com/envoyproxy/protoc-gen-validate
+	$(GO) install github.com/envoyproxy/protoc-gen-validate
 
 .PHONY: api
 # generate api proto
@@ -59,7 +63,7 @@ api_breaking:
 .PHONY: build
 # build
 build:
-	mkdir -p bin/ && go build -ldflags "-X cmd.Version=$(VERSION)" -o ./bin/ ./...
+	mkdir -p bin/ && $(GO) build -ldflags "-X cmd.Version=$(VERSION)" -o ./bin/ ./...
 
 .PHONY: docker-build-push
 docker-build-push:
@@ -76,18 +80,18 @@ test:
 	@echo ""
 	@echo "Running tests."
 	# TODO: e2e tests are taking too long to be enabled by default. They need to be sped up.
-	@go test ./... -count=1 -coverprofile=coverage.out -skip 'TestInventoryAPIGRPC_*|TestInventoryAPIHTTP_*|Test_ACMKafkaConsumer'
+	@$(GO) test ./... -count=1 -coverprofile=coverage.out -skip 'TestInventoryAPIGRPC_*|TestInventoryAPIHTTP_*|Test_ACMKafkaConsumer'
 	@echo "Overall test coverage:"
-	@go tool cover -func=coverage.out | grep total: | awk '{print $$3}'
+	@$(GO) tool cover -func=coverage.out | grep total: | awk '{print $$3}'
 	@rm coverage.out
 
 
 .PHONY: generate
 # generate
 generate:
-	go mod tidy
-	go get github.com/google/wire/cmd/wire@latest
-	go generate ./...
+	$(GO) mod tidy
+	$(GO) get github.com/google/wire/cmd/wire@latest
+	$(GO) generate ./...
 
 .PHONY: all
 # generate all
@@ -142,7 +146,7 @@ inventory-down-kafka:
 .PHONY: run
 # run api locally
 run: build
-	go run main.go serve --config .inventory-api.yaml
+	$(GO) run main.go serve --config .inventory-api.yaml
 
 .PHONY: migrate
 # run database migrations

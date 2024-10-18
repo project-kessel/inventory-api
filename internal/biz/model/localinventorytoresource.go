@@ -16,5 +16,15 @@ type ReporterResourceId struct {
 	ResourceType    string `gorm:"primarykey"`
 
 	// Reporter identification
-	ReporterId string `gorm:"primarykey"`
+	ReporterId   string `gorm:"primarykey"`
+	ReporterType string `gorm:"primarykey"`
+}
+
+func ReporterResourceIdFromResource(resource *Resource) ReporterResourceId {
+	return ReporterResourceId{
+		LocalResourceId: resource.Reporter.LocalResourceId,
+		ResourceType:    resource.ResourceType,
+		ReporterId:      resource.Reporter.ReporterId,
+		ReporterType:    resource.Reporter.ReporterType,
+	}
 }

@@ -41,11 +41,7 @@ func New(repository ResourceRepository, authz authzapi.Authorizer, eventer event
 
 func (uc *Usecase) Create(ctx context.Context, m *model.Resource) (*model.Resource, error) {
 	// check if the resource already exists
-	_, err := uc.repository.FindByReporterResourceId(ctx, model.ReporterResourceId{
-		LocalResourceId: m.Reporter.LocalResourceId,
-		ResourceType:    m.ResourceType,
-		ReporterId:      m.Reporter.ReporterId,
-	})
+	_, err := uc.repository.FindByReporterResourceId(ctx, model.ReporterResourceIdFromResource(m))
 
 	if err == nil || !errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, errors.New("resource already exists")
@@ -77,11 +73,7 @@ func (uc *Usecase) Create(ctx context.Context, m *model.Resource) (*model.Resour
 // Update updates a model in the database, updates related tuples in the relations-api, and issues an update event.
 func (uc *Usecase) Update(ctx context.Context, m *model.Resource, id model.ReporterResourceId) (*model.Resource, error) {
 	// check if the resource exists
-	existingResource, err := uc.repository.FindByReporterResourceId(ctx, model.ReporterResourceId{
-		LocalResourceId: m.Reporter.LocalResourceId,
-		ResourceType:    m.ResourceType,
-		ReporterId:      m.Reporter.ReporterId,
-	})
+	existingResource, err := uc.repository.FindByReporterResourceId(ctx, model.ReporterResourceIdFromResource(m))
 
 	if err != nil && errors.Is(err, gorm.ErrRecordNotFound) {
 		return uc.Create(ctx, m)

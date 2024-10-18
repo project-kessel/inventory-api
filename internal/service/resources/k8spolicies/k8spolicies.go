@@ -55,11 +55,7 @@ func (c *K8sPolicyService) UpdateK8SPolicy(ctx context.Context, r *pb.UpdateK8SP
 
 	if h, err := k8sPolicyFromUpdateRequest(r, identity); err == nil {
 		// Todo: Update to use the right ID
-		if resp, err := c.Ctl.Update(ctx, h, model.ReporterResourceId{
-			LocalResourceId: r.K8SPolicy.ReporterData.LocalResourceId,
-			ResourceType:    ResourceType,
-			ReporterId:      identity.Principal,
-		}); err == nil {
+		if resp, err := c.Ctl.Update(ctx, h, model.ReporterResourceIdFromResource(h)); err == nil {
 			return updateResponseFromK8sPolicy(resp), nil
 
 		} else {
@@ -76,12 +72,8 @@ func (c *K8sPolicyService) DeleteK8SPolicy(ctx context.Context, r *pb.DeleteK8SP
 		return nil, err
 	}
 
-	if localResourceId, err := fromDeleteRequest(r); err == nil {
-		if err := c.Ctl.Delete(ctx, model.ReporterResourceId{
-			LocalResourceId: localResourceId,
-			ResourceType:    ResourceType,
-			ReporterId:      identity.Principal,
-		}); err == nil {
+	if resourceId, err := fromDeleteRequest(r, identity); err == nil {
+		if err := c.Ctl.Delete(ctx, resourceId); err == nil {
 			return toDeleteResponse(), nil
 		} else {
 			return nil, err
@@ -117,9 +109,8 @@ func updateResponseFromK8sPolicy(p *model.Resource) *pb.UpdateK8SPolicyResponse 
 	return &pb.UpdateK8SPolicyResponse{}
 }
 
-func fromDeleteRequest(r *pb.DeleteK8SPolicyRequest) (string, error) {
-	// Todo: Find out what IDs are we going to be using - is it inventory ids? or resources from reporters?
-	return r.ReporterData.LocalResourceId, nil
+func fromDeleteRequest(r *pb.DeleteK8SPolicyRequest, identity *authnapi.Identity) (model.ReporterResourceId, error) {
+	return conv.ReporterResourceIdFromPb(ResourceType, identity.Principal, r.ReporterData), nil
 }
 
 func toDeleteResponse() *pb.DeleteK8SPolicyResponse {

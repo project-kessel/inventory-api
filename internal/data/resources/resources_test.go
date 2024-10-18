@@ -97,13 +97,9 @@ func assertEqualResourceHistory(t *testing.T, r *model.Resource, rh *model.Resou
 
 func assertEqualLocalHistoryToResource(t *testing.T, r *model.Resource, litr *model.LocalInventoryToResource) {
 	litrExpected := &model.LocalInventoryToResource{
-		ResourceId: r.ID,
-		CreatedAt:  litr.CreatedAt,
-		ReporterResourceId: model.ReporterResourceId{
-			LocalResourceId: r.Reporter.LocalResourceId,
-			ResourceType:    r.ResourceType,
-			ReporterId:      r.Reporter.ReporterId,
-		},
+		ResourceId:         r.ID,
+		CreatedAt:          litr.CreatedAt,
+		ReporterResourceId: model.ReporterResourceIdFromResource(r),
 	}
 
 	assert.Equal(t, r.CreatedAt.Unix(), litr.CreatedAt.Unix())

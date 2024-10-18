@@ -44,12 +44,8 @@ func (r *Repo) Save(ctx context.Context, m *model.Resource) (*model.Resource, er
 	}
 
 	if err := session.Create(&model.LocalInventoryToResource{
-		ResourceId: m.ID,
-		ReporterResourceId: model.ReporterResourceId{
-			LocalResourceId: m.Reporter.LocalResourceId,
-			ResourceType:    m.ResourceType,
-			ReporterId:      m.Reporter.ReporterId,
-		},
+		ResourceId:         m.ID,
+		ReporterResourceId: model.ReporterResourceIdFromResource(m),
 	}).Error; err != nil {
 		return nil, err
 	}

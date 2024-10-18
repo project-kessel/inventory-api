@@ -52,12 +52,7 @@ func (c *HostsService) UpdateRhelHost(ctx context.Context, r *pb.UpdateRhelHostR
 	}
 
 	if h, err := hostFromUpdateRequest(r, identity); err == nil {
-		// Todo: Update to use the right ID
-		if resp, err := c.Ctl.Update(ctx, h, model.ReporterResourceId{
-			LocalResourceId: r.RhelHost.ReporterData.LocalResourceId,
-			ResourceType:    ResourceType,
-			ReporterId:      identity.Principal,
-		}); err == nil {
+		if resp, err := c.Ctl.Update(ctx, h, model.ReporterResourceIdFromResource(h)); err == nil {
 			return updateResponseFromHost(resp), nil
 		} else {
 			return nil, err
@@ -73,12 +68,8 @@ func (c *HostsService) DeleteRhelHost(ctx context.Context, r *pb.DeleteRhelHostR
 		return nil, err
 	}
 
-	if localResourceId, err := fromDeleteRequest(r); err == nil {
-		if err := c.Ctl.Delete(ctx, model.ReporterResourceId{
-			LocalResourceId: localResourceId,
-			ResourceType:    ResourceType,
-			ReporterId:      identity.Principal,
-		}); err == nil {
+	if resourceId, err := fromDeleteRequest(r, identity); err == nil {
+		if err := c.Ctl.Delete(ctx, resourceId); err == nil {
 			return toDeleteResponse(), nil
 		} else {
 			return nil, err
@@ -104,9 +95,8 @@ func updateResponseFromHost(resource *model.Resource) *pb.UpdateRhelHostResponse
 	return &pb.UpdateRhelHostResponse{}
 }
 
-func fromDeleteRequest(r *pb.DeleteRhelHostRequest) (string, error) {
-	// Todo: Find out what IDs are we going to be using - is it inventory ids? or resources from reporters?
-	return r.ReporterData.LocalResourceId, nil
+func fromDeleteRequest(r *pb.DeleteRhelHostRequest, identity *authnapi.Identity) (model.ReporterResourceId, error) {
+	return conv.ReporterResourceIdFromPb(ResourceType, identity.Principal, r.ReporterData), nil
 }
 
 func toDeleteResponse() *pb.DeleteRhelHostResponse {

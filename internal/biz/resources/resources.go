@@ -13,13 +13,12 @@ import (
 )
 
 type ResourceRepository interface {
-	Save(ctx context.Context, resource *model.Resource) (*model.Resource, error)
+	Save(context.Context, *model.Resource) (*model.Resource, error)
 	Update(context.Context, *model.Resource, uint64) (*model.Resource, error)
 	Delete(context.Context, uint64) (*model.Resource, error)
 	FindByID(context.Context, uint64) (*model.Resource, error)
 	FindByReporterResourceId(context.Context, model.ReporterResourceId) (*model.Resource, error)
 	ListAll(context.Context) ([]*model.Resource, error)
-	//LocalResourceToId(ctx context.Context, id model.ReporterResourceId) (uint64, error)
 }
 
 type Usecase struct {

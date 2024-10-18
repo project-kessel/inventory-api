@@ -60,12 +60,12 @@ func (r *Repo) Save(ctx context.Context, m *model.Resource) (*model.Resource, er
 func (r *Repo) Update(ctx context.Context, m *model.Resource, id uint64) (*model.Resource, error) {
 	session := r.DB.Session(&gorm.Session{})
 
-	oldResource, err := r.FindByID(ctx, id)
+	_, err := r.FindByID(ctx, id)
 	if err != nil {
 		return nil, err
 	}
 
-	if err := session.Create(copyHistory(oldResource, oldResource.ID, model.OperationTypeUpdate)).Error; err != nil {
+	if err := session.Create(copyHistory(m, id, model.OperationTypeUpdate)).Error; err != nil {
 		return nil, err
 	}
 

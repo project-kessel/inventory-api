@@ -41,12 +41,12 @@ func New(c CompletedConfig, authn middleware.Middleware, logger log.Logger) (*Se
 		return nil, err
 	}
 
-	httpServer, err := http.New(c.HttpConfig, authn, meter)
+	httpServer, err := http.New(c.HttpConfig, authn, meter, logger)
 	if err != nil {
 		return nil, err
 	}
 
-	grpcServer, err := grpc.New(c.GrpcConfig, authn, meter)
+	grpcServer, err := grpc.New(c.GrpcConfig, authn, meter, logger)
 	if err != nil {
 		return nil, err
 	}

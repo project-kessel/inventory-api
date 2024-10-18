@@ -21,7 +21,7 @@ const (
 )
 
 func (o *OperationType) Scan(value interface{}) error {
-	*o = OperationType(value.([]byte))
+	*o = OperationType(value.(string))
 	return nil
 }
 

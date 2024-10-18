@@ -54,7 +54,7 @@ func (c *K8sClustersService) UpdateK8SCluster(ctx context.Context, r *pb.UpdateK
 
 	if k, err := k8sClusterFromUpdateRequest(r, identity); err == nil {
 		// Todo: Update to use the right ID
-		if resp, err := c.Ctl.Update(ctx, k, ""); err == nil {
+		if resp, err := c.Ctl.Update(ctx, k, model.ReporterResourceIdFromResource(k)); err == nil {
 			return updateResponseFromK8sCluster(resp), nil
 		} else {
 			return nil, err
@@ -65,8 +65,13 @@ func (c *K8sClustersService) UpdateK8SCluster(ctx context.Context, r *pb.UpdateK
 }
 
 func (c *K8sClustersService) DeleteK8SCluster(ctx context.Context, r *pb.DeleteK8SClusterRequest) (*pb.DeleteK8SClusterResponse, error) {
-	if input, err := fromDeleteRequest(r); err == nil {
-		if err := c.Ctl.Delete(ctx, input); err == nil {
+	identity, err := middleware.GetIdentity(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	if resourceId, err := fromDeleteRequest(r, identity); err == nil {
+		if err := c.Ctl.Delete(ctx, resourceId); err == nil {
 			return toDeleteResponse(), nil
 		} else {
 			return nil, err
@@ -102,9 +107,8 @@ func updateResponseFromK8sCluster(c *model.Resource) *pb.UpdateK8SClusterRespons
 	return &pb.UpdateK8SClusterResponse{}
 }
 
-func fromDeleteRequest(r *pb.DeleteK8SClusterRequest) (string, error) {
-	// Todo: Find out what IDs are we going to be using - is it inventory ids? or resources from reporters?
-	return r.ReporterData.LocalResourceId, nil
+func fromDeleteRequest(r *pb.DeleteK8SClusterRequest, identity *authnapi.Identity) (model.ReporterResourceId, error) {
+	return conv.ReporterResourceIdFromPb(ResourceType, identity.Principal, r.ReporterData), nil
 }
 
 func toDeleteResponse() *pb.DeleteK8SClusterResponse {

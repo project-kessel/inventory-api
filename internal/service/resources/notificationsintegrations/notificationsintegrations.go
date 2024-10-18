@@ -54,8 +54,7 @@ func (c *NotificationsIntegrationsService) UpdateNotificationsIntegration(ctx co
 	}
 
 	if h, err := notificationsIntegrationFromUpdateRequest(r, identity); err == nil {
-		// Todo: Update to use the right ID
-		if resp, err := c.Ctl.Update(ctx, h, ""); err == nil {
+		if resp, err := c.Ctl.Update(ctx, h, model.ReporterResourceIdFromResource(h)); err == nil {
 			return updateResponseFromNotificationsIntegration(resp), nil
 
 		} else {
@@ -67,8 +66,13 @@ func (c *NotificationsIntegrationsService) UpdateNotificationsIntegration(ctx co
 }
 
 func (c *NotificationsIntegrationsService) DeleteNotificationsIntegration(ctx context.Context, r *pb.DeleteNotificationsIntegrationRequest) (*pb.DeleteNotificationsIntegrationResponse, error) {
-	if input, err := fromDeleteRequest(r); err == nil {
-		if err := c.Ctl.Delete(ctx, input); err == nil {
+	identity, err := middleware.GetIdentity(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	if resourceId, err := fromDeleteRequest(r, identity); err == nil {
+		if err := c.Ctl.Delete(ctx, resourceId); err == nil {
 			return toDeleteResponse(), nil
 		} else {
 			return nil, err
@@ -94,9 +98,8 @@ func updateResponseFromNotificationsIntegration(h *model.Resource) *pb.UpdateNot
 	return &pb.UpdateNotificationsIntegrationResponse{}
 }
 
-func fromDeleteRequest(r *pb.DeleteNotificationsIntegrationRequest) (string, error) {
-	// Todo: Find out what IDs are we going to be using - is it inventory ids? or resources from reporters?
-	return r.ReporterData.LocalResourceId, nil
+func fromDeleteRequest(r *pb.DeleteNotificationsIntegrationRequest, identity *authnapi.Identity) (model.ReporterResourceId, error) {
+	return conv.ReporterResourceIdFromPb(ResourceType, identity.Principal, r.ReporterData), nil
 }
 
 func toDeleteResponse() *pb.DeleteNotificationsIntegrationResponse {

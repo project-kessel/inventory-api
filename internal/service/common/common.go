@@ -7,6 +7,15 @@ import (
 	"github.com/project-kessel/inventory-api/internal/biz/model"
 )
 
+func ReporterResourceIdFromPb(resourceType, reporterId string, reporter *pbresource.ReporterData) model.ReporterResourceId {
+	return model.ReporterResourceId{
+		LocalResourceId: reporter.LocalResourceId,
+		ResourceType:    resourceType,
+		ReporterId:      reporterId,
+		ReporterType:    reporter.ReporterType.String(),
+	}
+}
+
 func ResourceFromPb(resourceType, reporterId string, resourceData model.JsonObject, metadata *pbresource.Metadata, reporter *pbresource.ReporterData) *model.Resource {
 	return &model.Resource{
 		ID:           0,

@@ -4,10 +4,8 @@ package oidc
 import (
 	"context"
 	"fmt"
-	"regexp"
-	"strings"
-
 	coreosoidc "github.com/coreos/go-oidc/v3/oidc"
+	"github.com/go-kratos/kratos/v2/log"
 	"github.com/go-kratos/kratos/v2/transport"
 
 	"github.com/project-kessel/inventory-api/internal/authn/api"
@@ -31,7 +29,7 @@ func New(c CompletedConfig) (*OAuth2Authenticator, error) {
 	}
 
 	if c.PrincipalUserDomain == "" {
-		c.PrincipalUserDomain = "redhat.com"
+		c.PrincipalUserDomain = "localhost"
 	}
 
 	oidcConfig := &coreosoidc.Config{ClientID: c.ClientId, SkipClientIDCheck: c.SkipClientIDCheck, SkipIssuerCheck: c.SkipIssuerCheck}
@@ -55,6 +53,7 @@ func (o *OAuth2Authenticator) Authenticate(ctx context.Context, t transport.Tran
 	// verify and parse it
 	tok, err := o.Verify(rawToken)
 	if err != nil {
+		log.Errorf("failed to verify the access token: %v", err)
 		return nil, api.Deny
 	}
 
@@ -72,8 +71,8 @@ func (o *OAuth2Authenticator) Authenticate(ctx context.Context, t transport.Tran
 		}
 	}
 
-	if issuerCheck(u.Issuer, o.PrincipalUserDomain) {
-		principal := fmt.Sprintf("%s:%s", o.PrincipalUserDomain, u.Subject)
+	if u.Subject != "" && o.PrincipalUserDomain != "" {
+		principal := fmt.Sprintf("%s/%s", o.PrincipalUserDomain, u.Subject)
 		return &api.Identity{Principal: principal}, api.Allow
 	}
 
@@ -91,29 +90,4 @@ type Claims struct {
 
 func (l *OAuth2Authenticator) Verify(token string) (*coreosoidc.IDToken, error) {
 	return l.Verifier.Verify(l.ClientContext, token)
-}
-
-func issuerCheck(issuer string, domain string) bool {
-	domain = strings.ToLower(domain)
-	issuer = strings.ToLower(issuer)
-
-	// Define a regex pattern to strip "http://", "https://", and any "/path-uri" part from the Issuer
-	re := regexp.MustCompile(`^(https?://)?([^/]+)`)
-
-	// Extract the host part from the input
-	match := re.FindStringSubmatch(issuer)
-	if len(match) < 3 {
-		return false
-	}
-	// The actual host without the scheme and path
-	actualIssuer := strings.ToLower(match[2])
-
-	if domain == actualIssuer {
-		return true
-	}
-
-	if strings.HasSuffix(actualIssuer, "."+domain) {
-		return true
-	}
-	return false
 }

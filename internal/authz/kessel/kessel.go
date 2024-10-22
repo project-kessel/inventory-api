@@ -3,6 +3,7 @@ package kessel
 import (
 	"context"
 	"fmt"
+
 	"github.com/spf13/viper"
 
 	"github.com/go-kratos/kratos/v2/log"
@@ -152,7 +153,7 @@ func (a *KesselAuthz) DeleteTuples(ctx context.Context, r *kessel.DeleteTuplesRe
 func (a *KesselAuthz) SetWorkspace(ctx context.Context, local_resource_id, workspace, namespace, name string) (*kessel.CreateTuplesResponse, error) {
 	if workspace == "" {
 		a.incrFailureCounter("SetWorkspace")
-		return nil, fmt.Errorf("workspace is required")
+		return nil, fmt.Errorf("workspace_id is required")
 	}
 	// TODO: remove previous tuple for workspace
 	rels := []*kessel.Relationship{{

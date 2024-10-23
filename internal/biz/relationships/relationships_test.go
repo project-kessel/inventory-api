@@ -160,9 +160,11 @@ func TestCreateNewResource(t *testing.T) {
 	useCase := New(repo, nil, log.DefaultLogger)
 	ctx := context.TODO()
 
-	r, err := useCase.Create(ctx, r)
+	rCreated, err := useCase.Create(ctx, r)
 	assert.Nil(t, err)
-	assert.Equal(t, &returnedRelationship, r)
+	assert.Equal(t, uint64(1), r.SubjectId)
+	assert.Equal(t, uint64(2), r.ObjectId)
+	assert.Equal(t, &returnedRelationship, rCreated)
 	repo.AssertExpectations(t)
 }
 
@@ -186,9 +188,11 @@ func TestUpdateNewResourceCreatesIt(t *testing.T) {
 	useCase := New(repo, nil, log.DefaultLogger)
 	ctx := context.TODO()
 
-	r, err := useCase.Update(ctx, r, model.ReporterRelationshipId{})
+	rCreated, err := useCase.Update(ctx, r, model.ReporterRelationshipId{})
 	assert.Nil(t, err)
-	assert.Equal(t, &returnedRelationship, r)
+	assert.Equal(t, uint64(1), r.SubjectId)
+	assert.Equal(t, uint64(2), r.ObjectId)
+	assert.Equal(t, &returnedRelationship, rCreated)
 	repo.AssertExpectations(t)
 }
 
@@ -199,7 +203,7 @@ func TestUpdateExistingResource(t *testing.T) {
 		ID: 10,
 	}
 
-	// Resource does not exist
+	// Resource exists
 	repo.On("FindResourceIdByReporterResourceId", mock.Anything, mock.Anything).Return((uint64)(1), nil).Once()
 	repo.On("FindResourceIdByReporterResourceId", mock.Anything, mock.Anything).Return((uint64)(2), nil).Once()
 	repo.On("FindRelationship", mock.Anything, (uint64)(1), (uint64)(2), mock.Anything).Return(&model.Relationship{
@@ -210,9 +214,11 @@ func TestUpdateExistingResource(t *testing.T) {
 	useCase := New(repo, nil, log.DefaultLogger)
 	ctx := context.TODO()
 
-	r, err := useCase.Update(ctx, r, model.ReporterRelationshipId{})
+	rUpdated, err := useCase.Update(ctx, r, model.ReporterRelationshipId{})
 	assert.Nil(t, err)
-	assert.Equal(t, &returnRelationship, r)
+	assert.Equal(t, uint64(1), r.SubjectId)
+	assert.Equal(t, uint64(2), r.ObjectId)
+	assert.Equal(t, &returnRelationship, rUpdated)
 	repo.AssertExpectations(t)
 }
 

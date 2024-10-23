@@ -99,8 +99,8 @@ func (uc *Usecase) Update(ctx context.Context, m *model.Relationship, id model.R
 		return uc.Create(ctx, m)
 	}
 
-	m.SubjectId = existingResource.SubjectId
-	m.ObjectId = existingResource.ObjectId
+	m.SubjectId = subjectId
+	m.ObjectId = objectId
 
 	if ret, err := uc.repository.Update(ctx, m, existingResource.ID); err != nil {
 		return nil, err

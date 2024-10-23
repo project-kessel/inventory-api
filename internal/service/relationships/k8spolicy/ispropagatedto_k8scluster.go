@@ -2,7 +2,6 @@ package k8spolicy
 
 import (
 	"context"
-	"fmt"
 	authnapi "github.com/project-kessel/inventory-api/internal/authn/api"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
 	relationshipsctl "github.com/project-kessel/inventory-api/internal/biz/relationships"
@@ -53,7 +52,7 @@ func (c *K8SPolicyIsPropagatedToK8SClusterService) UpdateK8SPolicyIsPropagatedTo
 
 	if input, err := fromUpdateRequest(r, identity); err == nil {
 		// Todo: Update to use the ID - it probably requires a change in the ORM
-		if resp, err := c.Controller.Update(ctx, input, ""); err == nil {
+		if resp, err := c.Controller.Update(ctx, input, model.ReporterRelationshipIdFromRelationship(input)); err == nil {
 			return toUpdateResponse(resp), nil
 		} else {
 			return nil, err
@@ -64,7 +63,12 @@ func (c *K8SPolicyIsPropagatedToK8SClusterService) UpdateK8SPolicyIsPropagatedTo
 }
 
 func (c *K8SPolicyIsPropagatedToK8SClusterService) DeleteK8SPolicyIsPropagatedToK8SCluster(ctx context.Context, r *pb.DeleteK8SPolicyIsPropagatedToK8SClusterRequest) (*pb.DeleteK8SPolicyIsPropagatedToK8SClusterResponse, error) {
-	if input, err := fromDeleteRequest(r); err == nil {
+	identity, err := middleware.GetIdentity(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	if input, err := fromDeleteRequest(r, identity); err == nil {
 		if err := c.Controller.Delete(ctx, input); err == nil {
 			return toDeleteResponse(), nil
 		} else {
@@ -81,7 +85,7 @@ func fromCreateRequest(r *pb.CreateK8SPolicyIsPropagatedToK8SClusterRequest, ide
 		return nil, err
 	}
 
-	return conv.RelationshipFromPb(RelationType, identity.Principal, relationshipData, r.K8SpolicyIspropagatedtoK8Scluster.Metadata, r.K8SpolicyIspropagatedtoK8Scluster.ReporterData), nil
+	return conv.RelationshipFromPb(RelationType, identity.Principal, relationshipData, r.K8SpolicyIspropagatedtoK8Scluster.Metadata, r.K8SpolicyIspropagatedtoK8Scluster.ReporterData)
 }
 
 func toCreateResponse(relationship *model.Relationship) *pb.CreateK8SPolicyIsPropagatedToK8SClusterResponse {
@@ -94,16 +98,15 @@ func fromUpdateRequest(r *pb.UpdateK8SPolicyIsPropagatedToK8SClusterRequest, ide
 		return nil, err
 	}
 
-	return conv.RelationshipFromPb(RelationType, identity.Principal, relationshipData, r.K8SpolicyIspropagatedtoK8Scluster.Metadata, r.K8SpolicyIspropagatedtoK8Scluster.ReporterData), nil
+	return conv.RelationshipFromPb(RelationType, identity.Principal, relationshipData, r.K8SpolicyIspropagatedtoK8Scluster.Metadata, r.K8SpolicyIspropagatedtoK8Scluster.ReporterData)
 }
 
 func toUpdateResponse(relationship *model.Relationship) *pb.UpdateK8SPolicyIsPropagatedToK8SClusterResponse {
 	return &pb.UpdateK8SPolicyIsPropagatedToK8SClusterResponse{}
 }
 
-func fromDeleteRequest(r *pb.DeleteK8SPolicyIsPropagatedToK8SClusterRequest) (string, error) {
-	// Todo: Find out what IDs are we going to be using - is it inventory ids? or resources from reporters?
-	return fmt.Sprintf("%s_%s", r.ReporterData.ObjectLocalResourceId, r.ReporterData.SubjectLocalResourceId), nil
+func fromDeleteRequest(r *pb.DeleteK8SPolicyIsPropagatedToK8SClusterRequest, identity *authnapi.Identity) (model.ReporterRelationshipId, error) {
+	return conv.ReporterRelationshipIdFromPb(RelationType, identity.Principal, r.ReporterData)
 }
 
 func toDeleteResponse() *pb.DeleteK8SPolicyIsPropagatedToK8SClusterResponse {

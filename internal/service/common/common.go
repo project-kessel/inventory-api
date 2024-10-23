@@ -2,9 +2,11 @@ package common
 
 import (
 	"encoding/json"
+	"errors"
 	pbrelation "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/relationships"
 	pbresource "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/resources"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
+	"strings"
 )
 
 func ReporterResourceIdFromPb(resourceType, reporterId string, reporter *pbresource.ReporterData) model.ReporterResourceId {
@@ -67,7 +69,45 @@ func labelsFromPb(pbLabels []*pbresource.ResourceLabel) model.Labels {
 	return labels
 }
 
-func RelationshipFromPb(relationshipType, reporterId string, relationshipData model.JsonObject, metadata *pbrelation.Metadata, reporter *pbrelation.ReporterData) *model.Relationship {
+func ReporterRelationshipIdFromPb(relationshipType, reporterId string, reporter *pbrelation.ReporterData) (model.ReporterRelationshipId, error) {
+	res := strings.Split(relationshipType, "_")
+
+	if len(res) != 3 {
+		return model.ReporterRelationshipId{}, errors.New("invalid relationship type, not in the expected format subject_relation_object ")
+	}
+
+	subjectType := res[0]
+	objectType := res[2]
+
+	return model.ReporterRelationshipId{
+		ReporterId:       reporterId,
+		ReporterType:     reporter.ReporterType.String(),
+		RelationshipType: relationshipType,
+		SubjectId: model.ReporterResourceId{
+			LocalResourceId: reporter.SubjectLocalResourceId,
+			ResourceType:    subjectType,
+			ReporterId:      reporterId,
+			ReporterType:    reporter.ReporterType.String(),
+		},
+		ObjectId: model.ReporterResourceId{
+			LocalResourceId: reporter.ObjectLocalResourceId,
+			ResourceType:    objectType,
+			ReporterId:      reporterId,
+			ReporterType:    reporter.ReporterType.String(),
+		},
+	}, nil
+}
+
+func RelationshipFromPb(relationshipType, reporterId string, relationshipData model.JsonObject, metadata *pbrelation.Metadata, reporter *pbrelation.ReporterData) (*model.Relationship, error) {
+	res := strings.Split(relationshipType, "_")
+
+	if len(res) != 3 {
+		return nil, errors.New("invalid relationship type, not in the expected format subject_relation_object ")
+	}
+
+	subjectType := res[0]
+	objectType := res[2]
+
 	return &model.Relationship{
 		ID:               0,
 		RelationshipData: relationshipData,
@@ -82,7 +122,9 @@ func RelationshipFromPb(relationshipType, reporterId string, relationshipData mo
 				ReporterVersion: reporter.ReporterVersion,
 			},
 			SubjectLocalResourceId: reporter.SubjectLocalResourceId,
+			SubjectResourceType:    subjectType,
 			ObjectLocalResourceId:  reporter.ObjectLocalResourceId,
+			ObjectResourceType:     objectType,
 		},
-	}
+	}, nil
 }

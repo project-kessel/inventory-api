@@ -2,7 +2,7 @@
   "k8s_cluster": {
     "metadata": {
       "resource_type": "k8s-cluster",
-      "workspace": ""
+      "workspace_id": ""
     },
     "reporter_data": {
       "reporter_type": "ACM",

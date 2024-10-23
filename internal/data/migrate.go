@@ -22,6 +22,14 @@ func Migrate(db *gorm.DB, logger *log.Helper) error {
 		return err
 	}
 
+	if db.Dialector.Name() == "sqlite" {
+		// Ensures sqlite honors the foreign keys
+		err := db.Exec("PRAGMA foreign_keys = ON").Error
+		if err != nil {
+			return err
+		}
+	}
+
 	for _, m := range models {
 		if gormDbIndexStatement, ok := m.(model.GormDbAfterMigrationHook); ok {
 			statement := &gorm.Statement{DB: db}

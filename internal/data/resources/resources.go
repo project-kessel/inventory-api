@@ -75,6 +75,7 @@ func (r *Repo) Update(ctx context.Context, m *model.Resource, id uint64) (*model
 
 func (r *Repo) Delete(ctx context.Context, id uint64) (*model.Resource, error) {
 	session := r.DB.Session(&gorm.Session{})
+	// Todo: Delete relations ?
 
 	resource, err := r.FindByID(ctx, id)
 	if err != nil {

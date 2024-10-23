@@ -7,6 +7,10 @@ import (
 
 func GetLastResourceId(DB *gorm.DB, reporterResourceId model.ReporterResourceId) (uint64, error) {
 	localInventoryToResourceId := model.LocalInventoryToResource{}
-	err := DB.Order("created_at DESC").First(&localInventoryToResourceId, "local_resource_id = ? AND reporter_id = ? AND resource_type = ?", reporterResourceId.LocalResourceId, reporterResourceId.ReporterId, reporterResourceId.ResourceType).Error
+	err := GetLastResourceIdQuery(DB, reporterResourceId).First(&localInventoryToResourceId).Error
 	return localInventoryToResourceId.ResourceId, err
+}
+
+func GetLastResourceIdQuery(DB *gorm.DB, reporterResourceId model.ReporterResourceId) *gorm.DB {
+	return DB.Table("local_inventory_to_resources").Select("resource_id").Where("local_resource_id = ? AND reporter_id = ? AND resource_type = ?", reporterResourceId.LocalResourceId, reporterResourceId.ReporterId, reporterResourceId.ResourceType)
 }

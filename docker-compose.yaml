@@ -1,5 +1,8 @@
 services:
   inventory-api:
+    depends_on:
+      - invdatabase
+      - invmigrate
     environment:
       INVENTORY_API_CONFIG: /inventory-api-compose.yaml
 #      - "INVENTORY_API_STORAGE_DBNAME=postgres"

@@ -3,13 +3,15 @@ package resources
 import (
 	"context"
 	"errors"
+	"fmt"
+	"time"
+
 	"github.com/go-kratos/kratos/v2/log"
 	authzapi "github.com/project-kessel/inventory-api/internal/authz/api"
 	"github.com/project-kessel/inventory-api/internal/biz"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
 	eventingapi "github.com/project-kessel/inventory-api/internal/eventing/api"
 	"gorm.io/gorm"
-	"time"
 )
 
 type ResourceRepository interface {
@@ -41,9 +43,11 @@ func New(repository ResourceRepository, authz authzapi.Authorizer, eventer event
 
 func (uc *Usecase) Create(ctx context.Context, m *model.Resource) (*model.Resource, error) {
 	// check if the resource already exists
-	_, err := uc.repository.FindByReporterResourceId(ctx, model.ReporterResourceIdFromResource(m))
-
-	if err == nil || !errors.Is(err, gorm.ErrRecordNotFound) {
+	resource, err := uc.repository.FindByReporterResourceId(ctx, model.ReporterResourceIdFromResource(m))
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, fmt.Errorf("failed querying for resource: %v", err)
+	}
+	if resource != nil {
 		return nil, errors.New("resource already exists")
 	}
 
@@ -75,8 +79,12 @@ func (uc *Usecase) Update(ctx context.Context, m *model.Resource, id model.Repor
 	// check if the resource exists
 	existingResource, err := uc.repository.FindByReporterResourceId(ctx, model.ReporterResourceIdFromResource(m))
 
-	if err != nil && errors.Is(err, gorm.ErrRecordNotFound) {
-		return uc.Create(ctx, m)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return uc.Create(ctx, m)
+		} else {
+			return nil, fmt.Errorf("failed querying for resource to update: %v", err)
+		}
 	}
 
 	if ret, err := uc.repository.Update(ctx, m, existingResource.ID); err != nil {
@@ -108,8 +116,12 @@ func (uc *Usecase) Delete(ctx context.Context, id model.ReporterResourceId) erro
 	// check if the resource exists
 	existingResource, err := uc.repository.FindByReporterResourceId(ctx, id)
 
-	if err != nil && errors.Is(err, gorm.ErrRecordNotFound) {
-		return errors.New("resource not found")
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return errors.New("resource not found")
+		} else {
+			return fmt.Errorf("failed querying for resource to delete: %v", err)
+		}
 	}
 
 	if m, err := uc.repository.Delete(ctx, existingResource.ID); err != nil {

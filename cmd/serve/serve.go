@@ -3,6 +3,7 @@ package serve
 import (
 	"context"
 	"fmt"
+	"github.com/project-kessel/inventory-api/cmd/common"
 	relationshipsctl "github.com/project-kessel/inventory-api/internal/biz/relationships"
 	resourcesctl "github.com/project-kessel/inventory-api/internal/biz/resources"
 	relationshipsrepo "github.com/project-kessel/inventory-api/internal/data/relationships"
@@ -45,12 +46,13 @@ func NewCommand(
 	authnOptions *authn.Options,
 	authzOptions *authz.Options,
 	eventingOptions *eventing.Options,
-	logger log.Logger,
+	loggerOptions common.LoggerOptions,
 ) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "serve",
 		Short: "Start the inventory server",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			_, logger := common.InitLogger(common.GetLogLevel(), loggerOptions)
 			ctx := context.Background()
 
 			// configure storage

@@ -146,7 +146,10 @@ inventory-down-kafka:
 .PHONY: run
 # run api locally
 run: build
-	$(GO) run main.go serve --config .inventory-api.yaml
+	$(GO) run main.go serve
+
+run-help: build
+	$(GO) run main.go serve --help
 
 .PHONY: migrate
 # run database migrations

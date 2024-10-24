@@ -2,6 +2,7 @@ package migrate
 
 import (
 	"github.com/go-kratos/kratos/v2/log"
+	"github.com/project-kessel/inventory-api/cmd/common"
 	"github.com/spf13/cobra"
 
 	"github.com/project-kessel/inventory-api/internal/data"
@@ -9,11 +10,13 @@ import (
 	"github.com/project-kessel/inventory-api/internal/storage"
 )
 
-func NewCommand(options *storage.Options, logger log.Logger) *cobra.Command {
+func NewCommand(options *storage.Options, loggerOptions common.LoggerOptions) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "migrate",
 		Short: "Create or migrate the database tables",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			_, logger := common.InitLogger(common.GetLogLevel(), loggerOptions)
+
 			if errs := options.Complete(); errs != nil {
 				return errors.NewAggregate(errs)
 			}

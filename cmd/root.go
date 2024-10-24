@@ -2,19 +2,16 @@ package cmd
 
 import (
 	"fmt"
+	"github.com/go-kratos/kratos/v2/log"
+	"github.com/project-kessel/inventory-api/cmd/common"
+	"github.com/project-kessel/inventory-api/cmd/migrate"
+	"github.com/project-kessel/inventory-api/cmd/serve"
 	"github.com/project-kessel/inventory-api/internal/config"
 	clowder "github.com/redhatinsights/app-common-go/pkg/api/v1"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"os"
 	"path/filepath"
-	"strings"
-
-	"github.com/go-kratos/kratos/v2/log"
-	"github.com/go-kratos/kratos/v2/middleware/tracing"
-
-	"github.com/project-kessel/inventory-api/cmd/migrate"
-	"github.com/project-kessel/inventory-api/cmd/serve"
 )
 
 // go build -ldflags "-X cmd.Version=x.y.z"
@@ -24,8 +21,6 @@ var (
 	cfgFile string
 
 	logger *log.Helper
-
-	baseLogger log.Logger
 
 	rootCmd = &cobra.Command{
 		Use:     Name,
@@ -45,10 +40,24 @@ func Execute() {
 	}
 }
 
+func Initialize() {
+	initConfig()
+
+	// for troubleshoot, when set to debug, configuration info is logged in more detail to stdout
+	logLevel := common.GetLogLevel()
+	logger, _ = common.InitLogger(logLevel, common.LoggerOptions{
+		ServiceName:    Name,
+		ServiceVersion: Version,
+	})
+	if logLevel == "debug" {
+		config.LogConfigurationInfo(options)
+	}
+}
+
 // init adds all child commands to the root command and sets flags appropriately.
 func init() {
 	// initializers are run as part of Command.PreRun
-	cobra.OnInitialize(initConfig)
+	cobra.OnInitialize(Initialize)
 
 	configHelp := fmt.Sprintf("config file (default is $PWD/.%s.yaml)", Name)
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", configHelp)
@@ -66,28 +75,22 @@ func init() {
 		panic(err)
 	}
 
-	// TODO: Find a cleaner approach than explicitly calling initConfig
-	// Here we are calling the initConfig to ensure that the log level can be pulled from the inventory configuration file
-	initConfig()
-	logLevel := getLogLevel()
-	logger, baseLogger = initLogger(logLevel)
-
 	if clowder.IsClowderEnabled() {
 		options.InjectClowdAppConfig()
 	}
 
-	// for troubleshoot, when set to debug, configuration info is logged in more detail to stdout
-	if logLevel == "debug" {
-		config.LogConfigurationInfo(options)
+	loggerOptions := common.LoggerOptions{
+		ServiceName:    Name,
+		ServiceVersion: Version,
 	}
 
-	migrateCmd := migrate.NewCommand(options.Storage, baseLogger)
+	migrateCmd := migrate.NewCommand(options.Storage, loggerOptions)
 	rootCmd.AddCommand(migrateCmd)
 	err = viper.BindPFlags(migrateCmd.Flags())
 	if err != nil {
 		panic(err)
 	}
-	serveCmd := serve.NewCommand(options.Server, options.Storage, options.Authn, options.Authz, options.Eventing, baseLogger)
+	serveCmd := serve.NewCommand(options.Server, options.Storage, options.Authn, options.Authz, options.Eventing, loggerOptions)
 	rootCmd.AddCommand(serveCmd)
 	err = viper.BindPFlags(serveCmd.Flags())
 	if err != nil {
@@ -135,45 +138,4 @@ func initConfig() {
 	if err := viper.Unmarshal(&options); err != nil {
 		panic(err)
 	}
-}
-
-func getLogLevel() string {
-
-	logLevel := viper.GetString("log.level")
-	fmt.Printf("Log Level is set to: %s\n", logLevel)
-	return logLevel
-}
-
-// initLogger initializes the logger based on the provided log level
-func initLogger(logLevel string) (*log.Helper, log.Logger) {
-	// Convert logLevel string to log.Level type
-	var level log.Level
-	switch strings.ToLower(logLevel) {
-	case "debug":
-		level = log.LevelDebug
-	case "info":
-		level = log.LevelInfo
-	case "warn":
-		level = log.LevelWarn
-	case "error":
-		level = log.LevelError
-	case "fatal":
-		level = log.LevelFatal
-	default:
-		fmt.Printf("Invalid log level '%s' provided. Defaulting to 'info' level.\n", logLevel)
-		level = log.LevelInfo
-	}
-
-	rootLogger := log.With(log.NewStdLogger(os.Stdout),
-		"ts", log.DefaultTimestamp,
-		"caller", log.DefaultCaller,
-		"service.name", Name,
-		"service.version", Version,
-		"trace.id", tracing.TraceID(),
-		"span.id", tracing.SpanID(),
-	)
-	filteredLogger := log.NewFilter(rootLogger, log.FilterLevel(level))
-	helperLogger := log.NewHelper(filteredLogger)
-
-	return helperLogger, filteredLogger
 }

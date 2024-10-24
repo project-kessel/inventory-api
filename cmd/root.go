@@ -22,8 +22,6 @@ var (
 
 	logger *log.Helper
 
-	baseLogger log.Logger
-
 	rootCmd = &cobra.Command{
 		Use:     Name,
 		Version: Version,
@@ -47,7 +45,7 @@ func Initialize() {
 
 	// for troubleshoot, when set to debug, configuration info is logged in more detail to stdout
 	logLevel := common.GetLogLevel()
-	logger, baseLogger = common.InitLogger(logLevel, common.LoggerOptions{
+	logger, _ = common.InitLogger(logLevel, common.LoggerOptions{
 		ServiceName:    Name,
 		ServiceVersion: Version,
 	})

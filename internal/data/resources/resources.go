@@ -86,6 +86,11 @@ func (r *Repo) Delete(ctx context.Context, id uint64) (*model.Resource, error) {
 		return nil, err
 	}
 
+	// Delete relationships - We don't yet care about keeping history of deleted relationships of a deleted resource.
+	if err := session.Where("subject_id = ? or object_id = ?", id, id).Delete(&model.Relationship{}).Error; err != nil {
+		return nil, err
+	}
+
 	if err := session.Delete(resource).Error; err != nil {
 		return nil, err
 	}

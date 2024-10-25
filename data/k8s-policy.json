@@ -2,7 +2,7 @@
   "k8s_policy": {
     "metadata": {
       "resource_type": "k8s-policy",
-      "workspace_id": ""
+      "workspace_id": "hbi/k8s_policy"
     },
     "reporter_data": {
       "reporter_type": "ACM",

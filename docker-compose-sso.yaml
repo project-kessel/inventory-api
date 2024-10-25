@@ -99,10 +99,9 @@ services:
       - "KEYCLOAK_ADMIN=admin"
       - "KEYCLOAK_ADMIN_PASSWORD=admin"
     volumes:
-      - ./myrealm.json:/opt/keycloak/data/import/myrealm.json
+      - ./myrealm.json:/opt/keycloak/data/import/myrealm.json:rw,z
     ports:
       - 8084:8084
-
   database:
     image: "postgres"
     command: -c track_commit_timestamp=on

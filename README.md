@@ -27,7 +27,7 @@ When running locally, (.inventory-api.yaml)[./.inventory-api.yaml] file is used.
 - Sets database implementation to sqlite3 and the database file to `inventory.db`
 - Configures log level to `INFO`.
 
-NOTE: You can update the (default settings)[./.inventory-api.yaml] file as required to test different scenarios. Refer to the command line help (`make run-help`)
+NOTE: You can update the [default settings](./.inventory-api.yaml) file as required to test different scenarios. Refer to the command line help (`make run-help`)
 for information on the different parameters.
 
 1. Clone the repository and navigate to the directory.
@@ -154,7 +154,7 @@ ${DOCKER} exec -i -t ${KAFKA_CONTAINER_NAME} /bin/bash
 ./bin/kafka-console-consumer.sh --bootstrap-server localhost:9092 --topic kessel-inventory
 ```
 
-To stop, manually stop the Kessel inventory and then run the following to stop kafka:
+Manually terminate Kessel inventory and then run the following to stop kafka:
 
 ```shell
 make inventory-down-kafka
@@ -290,15 +290,7 @@ curl -X PUT -H "Content-Type: application/json" --data "@data/k8spolicy_ispropag
 And finally, to delete it, notice that the data file is different this time. We only need the reporter data.
 
 ```shell
-curl -X DELETE -H "Content-Type: application/json" --data "@data/relationship_reporter_data.json" http://localhost:8080/api/inventory/v1beta1/resource-relationships/k8s-policy_is-propagated-to_k8s-cluster
-```
-
-## Testing
-
-Tests can be run using:
-
-```shell
-make test
+curl -X DELETE -H "Content-Type: application/json" --data "@data/relationship_reporter_data.json" http://localhost:8000/api/inventory/v1beta1/resource-relationships/k8s-policy_is-propagated-to_k8s-cluster
 ```
 
 ## Configuration
@@ -332,6 +324,14 @@ authz:
     sa-client-secret: "<secret>"
     sso-token-endpoint: "http://localhost:8084/realms/redhat-external/protocol/openid-connect/token"
 
+```
+
+## Testing
+
+Tests can be run using:
+
+```shell
+make test
 ```
 
 ## Contributing

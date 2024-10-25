@@ -80,6 +80,21 @@ func resource1() *model.Resource {
 	}
 }
 
+func TestCreateReturnsDbError(t *testing.T) {
+	resource := resource1()
+	repo := &MockedResourceRepository{}
+
+	// DB Error
+	repo.On("FindByReporterResourceId", mock.Anything, mock.Anything).Return((*model.Resource)(nil), gorm.ErrDuplicatedKey)
+
+	useCase := New(repo, nil, nil, "", log.DefaultLogger)
+	ctx := context.TODO()
+
+	_, err := useCase.Create(ctx, resource)
+	assert.ErrorIs(t, err, ErrDatabaseError)
+	repo.AssertExpectations(t)
+}
+
 func TestCreateResourceAlreadyExists(t *testing.T) {
 	resource := resource1()
 	repo := &MockedResourceRepository{}
@@ -91,7 +106,7 @@ func TestCreateResourceAlreadyExists(t *testing.T) {
 	ctx := context.TODO()
 
 	_, err := useCase.Create(ctx, resource)
-	assert.Error(t, err, "resource already exists")
+	assert.ErrorIs(t, err, ErrResourceAlreadyExists)
 	repo.AssertExpectations(t)
 }
 
@@ -111,6 +126,21 @@ func TestCreateNewResource(t *testing.T) {
 	r, err := useCase.Create(ctx, resource)
 	assert.Nil(t, err)
 	assert.Equal(t, &returnedResource, r)
+	repo.AssertExpectations(t)
+}
+
+func TestUpdateReturnsDbError(t *testing.T) {
+	resource := resource1()
+	repo := &MockedResourceRepository{}
+
+	// DB Error
+	repo.On("FindByReporterResourceId", mock.Anything, mock.Anything).Return((*model.Resource)(nil), gorm.ErrDuplicatedKey)
+
+	useCase := New(repo, nil, nil, "", log.DefaultLogger)
+	ctx := context.TODO()
+
+	_, err := useCase.Update(ctx, resource, model.ReporterResourceId{})
+	assert.ErrorIs(t, err, ErrDatabaseError)
 	repo.AssertExpectations(t)
 }
 
@@ -154,6 +184,20 @@ func TestUpdateExistingResource(t *testing.T) {
 	repo.AssertExpectations(t)
 }
 
+func TestDeleteReturnsDbError(t *testing.T) {
+	repo := &MockedResourceRepository{}
+
+	// DB Error
+	repo.On("FindByReporterResourceId", mock.Anything, mock.Anything).Return((*model.Resource)(nil), gorm.ErrDuplicatedKey)
+
+	useCase := New(repo, nil, nil, "", log.DefaultLogger)
+	ctx := context.TODO()
+
+	err := useCase.Delete(ctx, model.ReporterResourceId{})
+	assert.ErrorIs(t, err, ErrDatabaseError)
+	repo.AssertExpectations(t)
+}
+
 func TestDeleteNonexistentResource(t *testing.T) {
 	repo := &MockedResourceRepository{}
 
@@ -164,7 +208,7 @@ func TestDeleteNonexistentResource(t *testing.T) {
 	ctx := context.TODO()
 
 	err := useCase.Delete(ctx, model.ReporterResourceId{})
-	assert.Error(t, err, "resource not found")
+	assert.ErrorIs(t, err, ErrResourceNotFound)
 	repo.AssertExpectations(t)
 }
 

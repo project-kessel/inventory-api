@@ -3,7 +3,6 @@ package resources
 import (
 	"context"
 	"errors"
-	"fmt"
 	"time"
 
 	"github.com/go-kratos/kratos/v2/log"
@@ -22,6 +21,12 @@ type ResourceRepository interface {
 	FindByReporterResourceId(context.Context, model.ReporterResourceId) (*model.Resource, error)
 	ListAll(context.Context) ([]*model.Resource, error)
 }
+
+var (
+	ErrResourceNotFound      = errors.New("resource not found")
+	ErrDatabaseError         = errors.New("db error while querying for resource")
+	ErrResourceAlreadyExists = errors.New("resource already exists")
+)
 
 type Usecase struct {
 	repository ResourceRepository
@@ -45,10 +50,10 @@ func (uc *Usecase) Create(ctx context.Context, m *model.Resource) (*model.Resour
 	// check if the resource already exists
 	resource, err := uc.repository.FindByReporterResourceId(ctx, model.ReporterResourceIdFromResource(m))
 	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, fmt.Errorf("failed querying for resource: %v", err)
+		return nil, ErrDatabaseError
 	}
 	if resource != nil {
-		return nil, errors.New("resource already exists")
+		return nil, ErrResourceAlreadyExists
 	}
 
 	if ret, err := uc.repository.Save(ctx, m); err != nil {
@@ -83,7 +88,7 @@ func (uc *Usecase) Update(ctx context.Context, m *model.Resource, id model.Repor
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return uc.Create(ctx, m)
 		} else {
-			return nil, fmt.Errorf("failed querying for resource to update: %v", err)
+			return nil, ErrDatabaseError
 		}
 	}
 
@@ -118,9 +123,9 @@ func (uc *Usecase) Delete(ctx context.Context, id model.ReporterResourceId) erro
 
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return errors.New("resource not found")
+			return ErrResourceNotFound
 		} else {
-			return fmt.Errorf("failed querying for resource to delete: %v", err)
+			return ErrDatabaseError
 		}
 	}
 

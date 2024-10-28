@@ -98,4 +98,4 @@ parameters:
     value: latest
   - description: Number of replicas
     name: REPLICAS
-    value: 1
+    value: "1"

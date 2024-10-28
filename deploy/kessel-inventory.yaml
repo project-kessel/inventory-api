@@ -15,7 +15,7 @@ objects:
         - kessel-relations
       deployments:
         - name: api
-          replicas: 1
+          replicas: ${{REPLICAS}}
           podSpec:
             initContainers:
             - name: migration
@@ -52,6 +52,15 @@ objects:
             public:
               enabled: true
               apiPath: inventory
+  - kind: PodDisruptionBudget
+    apiVersion: policy/v1
+    metadata:
+      name: kessel-inventory-api-pdb
+    spec:
+      minAvailable: 1
+      selector:
+        matchLabels:
+          app: kessel-inventory
 parameters:
   - description: ClowdEnvironment name (ephemeral, stage, prod)
     name: ENV_NAME
@@ -63,3 +72,6 @@ parameters:
     name: IMAGE_TAG
     required: true
     value: latest
+  - description: Number of replicas
+    name: REPLICAS
+    value: 1

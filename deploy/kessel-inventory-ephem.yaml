@@ -43,7 +43,7 @@ objects:
         - kessel-relations
       deployments:
         - name: api
-          replicas: 1
+          replicas: ${{REPLICAS}}
           podSpec:
             initContainers:
             - name: migration
@@ -96,3 +96,6 @@ parameters:
     name: IMAGE_TAG
     required: true
     value: latest
+  - description: Number of replicas
+    name: REPLICAS
+    value: 1

@@ -1,6 +1,7 @@
 package authn
 
 import (
+	"fmt"
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/project-kessel/inventory-api/internal/authn/api"
 	"github.com/project-kessel/inventory-api/internal/authn/clientcert"
@@ -31,7 +32,7 @@ func New(config CompletedConfig, logger *log.Helper) (api.Authenticator, error) 
 		if a, err := oidc.New(*config.Oidc); err == nil {
 			d.Add(a)
 		} else {
-			return nil, err
+			return nil, fmt.Errorf("failed to load OIDC info: %v", err)
 		}
 	}
 

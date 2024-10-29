@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/go-kratos/kratos/v2"
 	"github.com/go-kratos/kratos/v2/log"
@@ -33,22 +34,22 @@ func New(c CompletedConfig, authn middleware.Middleware, logger log.Logger) (*Se
 
 	meterProvider, err := NewMeterProvider(s)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("init meter provider failed: %v", err)
 	}
 
 	meter, err := NewMeter(meterProvider)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("init meter failed: %v", err)
 	}
 
 	httpServer, err := http.New(c.HttpConfig, authn, meter, logger)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("init http server failed: %v", err)
 	}
 
 	grpcServer, err := grpc.New(c.GrpcConfig, authn, meter, logger)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("init grpc server failed: %v", err)
 	}
 
 	s.HttpServer = httpServer

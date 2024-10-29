@@ -25,7 +25,7 @@ func New(c CompletedConfig) (*OAuth2Authenticator, error) {
 	ctx := coreosoidc.ClientContext(context.Background(), c.Client)
 	provider, err := coreosoidc.NewProvider(ctx, c.AuthorizationServerURL)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create provider: %v", err)
 	}
 
 	if c.PrincipalUserDomain == "" {

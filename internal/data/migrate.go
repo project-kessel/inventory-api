@@ -1,6 +1,8 @@
 package data
 
 import (
+	"fmt"
+
 	"github.com/project-kessel/inventory-api/internal/biz/model"
 	"gorm.io/gorm"
 
@@ -19,7 +21,7 @@ func Migrate(db *gorm.DB, logger *log.Helper) error {
 	}
 
 	if err := db.AutoMigrate(models...); err != nil {
-		return err
+		return fmt.Errorf("auto migration has failed: %v", err)
 	}
 
 	for _, m := range models {
@@ -27,12 +29,12 @@ func Migrate(db *gorm.DB, logger *log.Helper) error {
 			statement := &gorm.Statement{DB: db}
 			err := statement.Parse(m)
 			if err != nil {
-				return err
+				return fmt.Errorf("statement parsing has failed: %v", err)
 			}
 
 			err = gormDbIndexStatement.GormDbAfterMigration(db, statement.Schema)
 			if err != nil {
-				return err
+				return fmt.Errorf("migration failure: %v", err)
 			}
 		}
 	}

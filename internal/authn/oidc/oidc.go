@@ -62,11 +62,13 @@ func (o *OAuth2Authenticator) Authenticate(ctx context.Context, t transport.Tran
 	u := &Claims{}
 	err = tok.Claims(u)
 	if err != nil {
+		log.Errorf("failed to extract claims: %v", err)
 		return nil, api.Deny
 	}
 
 	if o.EnforceAudCheck {
 		if u.Audience != o.CompletedConfig.ClientId {
+			log.Debugf("aud does not match the requesting client-id -- decision DENY")
 			return nil, api.Deny
 		}
 	}

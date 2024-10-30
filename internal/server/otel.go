@@ -3,6 +3,8 @@ package server
 // Taken from Kratos examples: https://github.com/go-kratos/examples/blob/main/otel/internal/dep/otel.go
 
 import (
+	"fmt"
+
 	"github.com/go-kratos/kratos/v2/middleware/metrics"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/exporters/prometheus"
@@ -19,7 +21,7 @@ func NewMeter(provider metric.MeterProvider) (metric.Meter, error) {
 func NewMeterProvider(s *Server) (metric.MeterProvider, error) {
 	exporter, err := prometheus.New()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to setup exporter for meter provider: %v", err)
 	}
 
 	provider := sdkmetric.NewMeterProvider(

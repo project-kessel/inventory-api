@@ -105,7 +105,7 @@ func (a *KesselAuthz) getCallOptions() ([]grpc.CallOption, error) {
 	if a.tokenClient.EnableOIDCAuth {
 		token, err := a.tokenClient.getToken()
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to request token: %v", err)
 		}
 		if a.tokenClient.Insecure {
 			opts = append(opts, WithInsecureBearerToken(token.AccessToken))

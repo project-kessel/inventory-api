@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"fmt"
 	"io"
 	"os"
 	"time"
@@ -45,7 +46,7 @@ func (c *Config) getTSLConfig() (*tls.Config, error) {
 		var err error
 		config.Certificates = make([]tls.Certificate, 1)
 		if config.Certificates[0], err = tls.LoadX509KeyPair(c.Options.ServingCertFile, c.Options.PrivateKeyFile); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to load X509 key pair: %v", err)
 		}
 
 		if c.Options.CertOpt > int(tls.NoClientCert) && c.Options.ClientCAFile != "" {
@@ -55,7 +56,7 @@ func (c *Config) getTSLConfig() (*tls.Config, error) {
 					caCertPool = x509.NewCertPool()
 					caCertPool.AppendCertsFromPEM(caCert)
 				} else {
-					return nil, err
+					return nil, fmt.Errorf("failed to load CA certificate: %v", err)
 				}
 			}
 

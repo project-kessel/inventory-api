@@ -10,7 +10,7 @@ require (
 	github.com/cloudevents/sdk-go/v2 v2.15.2
 	github.com/confluentinc/confluent-kafka-go/v2 v2.6.0
 	github.com/coreos/go-oidc/v3 v3.11.0
-	github.com/go-kratos/kratos/v2 v2.8.1
+	github.com/go-kratos/kratos/v2 v2.8.2
 	github.com/golang-jwt/jwt/v5 v5.2.1
 	github.com/google/uuid v1.6.0
 	github.com/patrickmn/go-cache v2.1.0+incompatible

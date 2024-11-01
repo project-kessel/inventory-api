@@ -1,173 +1,308 @@
 # Common Inventory
+
 This repository implements a common inventory system with eventing.
 
+[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-## Setup
-```bash
-make init
+## Table of Contents
+- [Development Setup](#development-setup)
+- [Example Usage](#example-usage)
+- [Configuration](#configuration)
+- [Testing](#testing)
+- [Contributing](#contributing)
+
+## Development Setup
+
+### Prerequisites
+- Go 1.23.1+
+- Make
+
+### Running locally
+
+When running locally, (.inventory-api.yaml)[./.inventory-api.yaml] file is used. By default, this configuration does the following:
+- Exposes the inventory API in `localhost` and using port `8000` for http and port `9000` for grpc.
+- Sets authentication mechanism to `allow-unauthenticated`, allowing users to be authenticated with their user-agent value.
+- Sets authorization mechanism to `allow-all`.
+- Configures eventing mechanism to go to stdout.
+- Sets database implementation to sqlite3 and the database file to `inventory.db`
+- Configures log level to `INFO`.
+
+NOTE: You can update the [default settings](./.inventory-api.yaml) file as required to test different scenarios. Refer to the command line help (`make run-help`)
+for information on the different parameters.
+
+1. Clone the repository and navigate to the directory.
+2. Install the required dependencies
+    ```shell
+    make init
+    ```
+
+3. Build the project
+    ```shell
+    make build
+    ```
+
+4. Run the database migration
+    ```shell
+    make migrate
+    ```
+
+5. Start the development server
+    ```shell
+    make run
+    ```
+
+### Overriding commands in the Makefile
+
+Due to various alternatives to running some images, we accept some arguments to override certains tools
+
+#### GO binary
+
+Since there are official instructions on how to [manage multiple installs](https://go.dev/doc/manage-install)
+We accept the `GO` parameter when running make. e.g.
+
+```shell
+GO=go1.23.1 make run
 ```
-## API Changes (check against buf repository)
-`make api`
 
-## API Breaking Changes
-`make api_breaking`
+or
 
-## Build
-`make build`
+```shell
+export GO=go1.23.1
+make run
+```
 
-## Build Container Images
-By default the quay repository is `quay.io/cloudservices/kessel-inventory`. If you wish to use another for testing, set IMAGE value first
+#### Podman / Docker
+
+We will use `podman` if it is installed, and we will fall back to `docker`. You can also specify if you want to ensure a particular binary is used
+by providing `DOCKER` parameter e.g.
+
+```shell
+DOCKER=docker make api 
+```
+
+or
+
+```shell
+export DOCKER=docker
+make api
+```
+
+### Debugging
+
+See [DEBUG](./DEBUG.md) for instructions on how to debug
+   
+### Alternatives way of running this service
+
+#### Kessel Inventory + Kessel Relations
+
+There is Make target to run inventory-api (with postgres) and relations api (with spicedb).
+It uses compose to build the current inventory code and spin up containers with the required dependecies.
+
+- This provides a [PSK file](./config/psks.yaml#L1) with a token "1234".
+- Default ports in this setup are `8081` for http and `9091` for grpc.
+- Refer to [inventory-api-compose.yaml](./inventory-api-compose.yaml) for additional configuration
+
+To start use:
+```shell
+make inventory-up
+```
+
+To stop use:
+
+```shell
+make inventory-down
+```
+
+#### Kessel-Inventory + Kafka
+
+In order to use the kafka configuration, one has to run strimzi and zookeeper. 
+You can do this by running;
+
+```shell
+make inventory-up-kafka
+```
+
+Start Kessel Inventory and configuring it to connect to kafka:
+```yaml
+eventing:
+  eventer: kafka
+  kafka:
+    bootstrap-servers: "localhost:9092"
+    # Adapt as required
+    # security-protocol: "SASL_PLAINTEXT"
+    # sasl-mechanism: PLAIN
+```
+
+You can use our default config with kafka by running:
+
+```shell
+INVENTORY_API_CONFIG="./kafka-inventory-api.yaml"  make run
+```
+
+- Refer to [kafka-inventory-api.yaml](./kafka-inventory-api.yaml) for additional configuration
+
+
+Once started, you can watch the messages using [kcat](https://github.com/edenhill/kcat) (formerly known as kafkacat)
+or by exec into the running container like this:
+
+```shell
+source ./scripts/check_docker_podman.sh
+KAFKA_CONTAINER_NAME=$(${DOCKER} ps | grep inventory-api-kafka | awk '{print $1}')
+${DOCKER} exec -i -t ${KAFKA_CONTAINER_NAME} /bin/bash
+
+# Once in the container
+./bin/kafka-console-consumer.sh --bootstrap-server localhost:9092 --topic kessel-inventory
+```
+
+Manually terminate Kessel inventory and then run the following to stop kafka:
+
+```shell
+make inventory-down-kafka
+```
+
+#### Kessel Inventory + Kessel Relations + Keycloak
+
+Similar as above, but instead of running Kafka, this will configure inventory to use a Keycloak service for authentication.
+
+- Sets up a keycloak instance running at port 8084 with [myrealm](myrealm.json) config file.
+- Set up a default service account with clientId: `test-svc`. Refer to [get-token](scripts/get-token.sh) to learn how to fetch a token.
+- Refer to [sso-inventory-api.yaml](./sso-inventory-api.yaml) for additional configuration
+
+To start use:
+```shell
+make inventory-up-sso
+```
+
+Once it has started, you will need to fetch a token and use it when making calls to the service.
+
+To get a token use:
+```shell
+make get-token
+```
+
+You can then export an ENV with that value and use in calls such as:
+
+```shell
+curl -H "Authorization: bearer ${TOKEN}" # ...
+```
+
+To stop use:
+
+```shell
+make inventory-down-sso
+```
+
+#### Running in Ephemeral Cluster with Relations API using Bonfire
+
+Instructions to deploy Kessel Inventory in an ephemeral cluster can be found on [Kessel docs](https://cuddly-tribble-gq7r66v.pages.github.io/kessel/inventory-api/ephemeral/)
+
+### API/Proto files Changes
+
+Once there is any change in the `proto` files (under (/api/kessel)[./api/kessel]) an update is required.
+
+This command will generate code and an (openapi)[./openapi.yaml] file from the `proto files`.
+```shell
+make api
+```
+
+We can run the following command to update if there are expected breaking changes.
+```shell
+make api_breaking
+```
+
+### Build Container Images
+
+By default, the quay repository is `quay.io/cloudservices/kessel-inventory`. If you wish to use another for testing, set IMAGE value first
 ```shell
 export IMAGE=your-quay-repo # if desired
 make docker-build-push
 ```
 
-## Run inventory api locally
-### Run migration
-`make migrate`
-### Run service
-`make run`
-
-
-## Run docker-compose to setup
-```make inventory-up``` to setup inventory-api, relations-api, spicedb, postgres
-
-## Tear down docker-compose
-`make inventory-down`
-
-
 ## Example Usage
+
+All these examples use the  REST API and assume we are running the default local version
+adjustments needs to be made to the curl requests if running  with different configuration, 
+such as port, authentication mechanisms, etc.
 
 ### Health check endpoints
 
-The inventory API includes health check endpoints for readiness and liveness probes.
+The Kessel Inventory includes health check endpoints for readiness and liveness probes.
 
 #### Readyz
 The readyz endpoint checks if the service is ready to handle requests.
-```bash
-curl http://localhost:8081/api/inventory/v1/readyz
+```shell
+curl http://localhost:8000/api/inventory/v1/readyz
 ```
 
 #### Livez
 The livez endpoint checks if the service is alive and functioning correctly.
-```bash
-curl http://localhost:8081/api/inventory/v1/livez
+```shell
+curl http://localhost:8000/api/inventory/v1/livez
 ```
 
-### Add hosts to inventory
-To add hosts to the inventory, use the following `curl` command:
+### Resource lifecycle
 
-```bash
-curl -H "Content-Type: application/json" --data "@data/host.json" http://localhost:8081/api/inventory/v1beta1/resources/rhel-hosts
+Resources can be added, updated and deleted to our inventory. Right now we support the following resources:
+- `rhel-host`
+- `integration`
+- `k8s-cluster`
+- `k8s-policy`
+
+To add a rhel-host to the inventory, use the following `curl` command
+
+```shell
+curl -H "Content-Type: application/json" --data "@data/host.json" http://localhost:8000/api/inventory/v1beta1/resources/rhel-hosts
 ```
 
-Depending on the config file you're using, the curl command will require additional headers for authorization of the request.
+To update it:
+
+```shell
+curl -XPUT -H "Content-Type: application/json" --data "@data/host.json" http://localhost:8000/api/inventory/v1beta1/resources/rhel-hosts
+```
+
+and finally, to delete it, note that we use a different file, as the only required information is the reporter data.
+
+```shell
+curl -XDELETE -H "Content-Type: application/json" --data "@data/host-reporter.json" http://localhost:8000/api/inventory/v1beta1/resources/rhel-hosts
+```
 
 ### Adding a new relationship (k8s-policy is propagated to k8s-cluster)
 
-To add a k8s-policy_ispropagatedto-k8s-cluster relationship you can use the following `curl` command:
+To add a `k8s-policy_ispropagatedto-k8s-cluster` relationship, first lets add the related resources `k8s-policy` and `k8s-cluster`.
 
-```bash
-curl -H "Content-Type: application/json" --data "@data/k8spolicy_ispropagatedto_k8scluster.json" http://localhost:8081/api/inventory/v1beta1/resource-relationships/k8s-policy_is-propagated-to_k8s-cluster
+```shell
+curl -H "Content-Type: application/json" --data "@data/k8s-cluster.json" http://localhost:8000/api/inventory/v1beta1/resources/k8s-clusters
+curl -H "Content-Type: application/json" --data "@data/k8s-policy.json" http://localhost:8000/api/inventory/v1beta1/resources/k8s-policies
 ```
 
-To update it, use the `PUT` verb as follows:
+And then you can create the relation:
 
-```bash
-curl -X PUT -H "Content-Type: application/json" --data "@data/k8spolicy_ispropagatedto_k8scluster.json" http://localhost:8081/api/inventory/v1beta1/resource-relationships/k8s-policy_is-propagated-to_k8s-cluster
+```shell
+curl -H "Content-Type: application/json" --data "@data/k8spolicy_ispropagatedto_k8scluster.json" http://localhost:8000/api/inventory/v1beta1/resource-relationships/k8s-policy_is-propagated-to_k8s-cluster
 ```
 
-And finally, to delete it, use the `DELETE` verb, notice that the data file is different this time. We only need the reporter data to delete a relationship.
+To update it:
 
-```bash
-curl -X DELETE -H "Content-Type: application/json" --data "@data/relationship_reporter_data.json" http://localhost:8081/api/inventory/v1beta1/resource-relationships/k8s-policy_is-propagated-to_k8s-cluster
+```shell
+curl -X PUT -H "Content-Type: application/json" --data "@data/k8spolicy_ispropagatedto_k8scluster.json" http://localhost:8000/api/inventory/v1beta1/resource-relationships/k8s-policy_is-propagated-to_k8s-cluster
 ```
 
-### Running with `make run`
+And finally, to delete it, notice that the data file is different this time. We only need the reporter data.
 
-We are using the included `.inventory-api.yaml` file which allows guest access.
-Guest access currently [makes use](https://github.com/project-kessel/inventory-api/blob/main/internal/authn/guest/guest.go#L20) of the `user-agent` header to
-populate the Identity header.
-
-[data/host.json](./data/host.json) uses the `reporter_id: user@example.com`, hence you will need the following command:
-
-```bash
-curl -H "Content-Type: application/json" --user-agent user@example.com --data "@data/host.json" http://localhost:8081/api/inventory/v1beta1/resources/rhel-hosts
+```shell
+curl -X DELETE -H "Content-Type: application/json" --data "@data/relationship_reporter_data.json" http://localhost:8000/api/inventory/v1beta1/resource-relationships/k8s-policy_is-propagated-to_k8s-cluster
 ```
 
-### Running with `make inventory-up`
+## Configuration
 
-This provides a [PSK file](https://github.com/project-kessel/inventory-api/blob/main/config/psks.yaml#L1) with a token "1234".
-The default port in this setup are `8081` (http) and `9091`.
+### Enable integration with Kessel relations
 
-The following command will add the host to the inventory:
+The default development config has this option disabled. You can check [Alternatives way of running this service](#alternatives-way-of-running-this-service)
+for configurations that have Kessel relations enabled. 
 
-```bash
-curl -H "Content-Type: application/json" -H "Authorization: bearer 1234" --data "@data/host.json" http://localhost:8081/api/inventory/v1beta1/resources/rhel-hosts
-```
-
-## Contribution
-`make pr-check`
-
-
-## Running Inventory api with sso (keycloak) docker compose setup
-`make inventory-up-sso`
-
-* Set up a keycloak instance running at port 8084 with [myrealm](myrealm.json)
-* Set up a default service account with clientId: `test-svc` and password. Refer [get-token](scripts/get-token.sh)
-* Refer [sso-inventory-api.yaml](sso-inventory-api.yaml) for configuration
-* Refer [docker-compose-sso.yaml](docker-compose-sso.yaml) for docker-compose
-
-Use service account user as `reporter_instance_id`
-```
-"reporter_instance_id": "service-account-svc-test"
-```
-Refer [host-service-account.json](data/host-service-account.json)
-
-### Generate a sso token
-`make get-token`
-
-Export the token generated
-`export TOKEN=`
-
-Sample request with the authorization header
-
-`curl -H "Authorization: bearer ${TOKEN}"  -H "Content-Type: application/json" --data "@data/host-service-account.json" http://localhost:8081/api/inventory/v1beta1/resources/rhel-hosts`
-
-## Running Inventory api with kafka
-Starts a local strimzi kafka and zookeeper:
-```bash
-make inventory-up-kafka
-```
-
-Start `inventory-api` using the `./kafka-inventory-api.yaml` config.
-```bash
-./bin/inventory-api serve --config ./kafka-inventory-api.yaml
-```
-
-In a separate terminal exec into the kafka pod so you can watch messages.
-```bash
-source ./scripts/check_docker_podman.sh
-KAFKA_CONTAINER_NAME=$(${DOCKER} ps | grep inventory-api-kafka | awk '{print $1}')
-${DOCKER} exec -i -t ${KAFKA_CONTAINER_NAME} /bin/bash
-```
-
-Start consuming messages in the pod.
-```bash
-./bin/kafka-console-consumer.sh --bootstrap-server localhost:9092 --topic kessel-inventory
-```
-
-In a separate terminal, post a resource to `inventory-api`:
-```bash
-curl -H "Content-Type: application/json" -H "Authorization: bearer 1234" --data "@data/k8s-cluster.json" http://localhost:8081/api/inventory/v1beta1/resources/k8s-clusters
-```
-
-Manually stop the `inventory-api` and then run `make inventory-down-kafka`
-## Enable integration with Kessel relations API
-Update the .inventory-api.yaml or inventory-api-compose.yaml
+Supposing Kessel relations is running in `localhost:9000`, you can enable it by updating the config as follows:
 
 ```yaml
-
 authz:
   impl: kessel
   kessel:
@@ -175,7 +310,8 @@ authz:
     url: localhost:9000
     enable-oidc-auth: false
 ```
-Enable oidc authentication with sso
+
+If you want to enable OIDC authentication with SSO, you can use this instead:
 
 ```yaml
 authz:
@@ -184,37 +320,24 @@ authz:
     insecure-client: true
     url: localhost:9000
     enable-oidc-auth: true
-    sa-client-id: "svc-test"
+    sa-client-id: "<service-id>"
     sa-client-secret: "<secret>"
     sso-token-endpoint: "http://localhost:8084/realms/redhat-external/protocol/openid-connect/token"
+
 ```
 
-## Running in Ephemeral Cluster with Relations API using Bonfire
+## Testing
 
-Deploy Relations API first with Bonfire following the steps available [HERE](https://cuddly-tribble-gq7r66v.pages.github.io/kessel/ephemeral/)
+Tests can be run using:
 
-Once its running, deploy Inventory using Bonfire:
-
-`bonfire deploy kessel -C inventory-api --no-get-dependencies`
-
-If you wish to test changes you've made that are unmerged, you can deploy them to ephemeral using a local config file
-Note: this requires building the image first and pushing to your local quay (see make docker-build-push)
-
-```yaml
-# example local config under $HOME/.config/bonfire/config
-apps:
-- name: kessel
-  components:
-    - name: inventory-api
-      host: local
-      repo: /path/to/inventory-api-repo
-      path: deploy/kessel-inventory.yaml
-      parameters:
-        INVENTORY_IMAGE: quay.io/your-repo/image-name
-        IMAGE_TAG: your-image-tag # latest is not recommended due to pull policy
+```shell
+make test
 ```
 
-Then run `bonfire deploy kessel -c $HOME/.config/bonfire/config.yaml --local-config-method override --no-get-dependencies`
+## Contributing
 
-## Debugging Inventory API using Vscode
-Follow the [DEBUG](./DEBUG.md) guide
+Follow the steps below to contribute:
+
+- Fork the project
+- Create a new branch for your feature
+- Submit a pull request

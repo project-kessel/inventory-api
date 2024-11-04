@@ -2,9 +2,10 @@ package psk
 
 import (
 	"fmt"
-	"gopkg.in/yaml.v3"
 	"io"
 	"os"
+
+	"gopkg.in/yaml.v3"
 )
 
 type Config struct {
@@ -48,10 +49,10 @@ func (c *Config) loadPreSharedKeys() error {
 			data, err := io.ReadAll(file)
 			if err == nil {
 				if err := yaml.Unmarshal(data, &c.Keys); err != nil {
-					return fmt.Errorf("failed to unmarshall preshared key: %v", err)
+					return fmt.Errorf("failed to unmarshal preshared key: %w", err)
 				}
 			} else {
-				return fmt.Errorf("failed to read preshared key file: %v", err)
+				return fmt.Errorf("failed to read preshared key file: %w", err)
 			}
 		} else {
 			return fmt.Errorf("Error opening preshared key file: %s [%s]", c.PreSharedKeyFile, err.Error())

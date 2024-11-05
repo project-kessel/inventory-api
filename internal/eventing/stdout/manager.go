@@ -3,6 +3,7 @@ package stdout
 import (
 	"context"
 	"encoding/json"
+	"github.com/google/uuid"
 	"os"
 
 	"github.com/go-kratos/kratos/v2/log"
@@ -36,7 +37,7 @@ func (m *StdOutManager) Errs() <-chan error {
 }
 
 // Lookup figures out which Producer should be used for the given identity and resource.
-func (m *StdOutManager) Lookup(identity *authnapi.Identity, resource_type string, resource_id uint64) (api.Producer, error) {
+func (m *StdOutManager) Lookup(identity *authnapi.Identity, resource_type string, resource_id uuid.UUID) (api.Producer, error) {
 	return m, nil
 }
 

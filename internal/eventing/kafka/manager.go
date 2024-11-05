@@ -7,6 +7,7 @@ import (
 	cecontext "github.com/cloudevents/sdk-go/v2/context"
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
 	"github.com/go-kratos/kratos/v2/log"
+	"github.com/google/uuid"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
@@ -92,7 +93,7 @@ func (m *KafkaManager) Errs() <-chan error {
 }
 
 // Lookup figures out which topic should be used for the given identity and resource.
-func (m *KafkaManager) Lookup(identity *authnapi.Identity, resource_type string, resource_id uint64) (api.Producer, error) {
+func (m *KafkaManager) Lookup(identity *authnapi.Identity, resource_type string, resource_id uuid.UUID) (api.Producer, error) {
 
 	// there is no complicated topic dispatch logic... for now.
 	producer, err := NewProducer(m, m.Config.DefaultTopic, identity)

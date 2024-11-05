@@ -1,10 +1,15 @@
 package model
 
-import "time"
+import (
+	"fmt"
+	"github.com/google/uuid"
+	"gorm.io/gorm"
+	"time"
+)
 
 type LocalInventoryToResource struct {
 	// Our local resource id
-	ResourceId uint64     `gorm:"primarykey"`
+	ResourceId uuid.UUID  `gorm:"type:uuid;primarykey"`
 	CreatedAt  *time.Time `gorm:"index"`
 
 	ReporterResourceId
@@ -59,4 +64,15 @@ func ReporterRelationshipIdFromRelationship(relationship *Relationship) Reporter
 			ReporterType:    relationship.Reporter.ReporterType,
 		},
 	}
+}
+
+func (r *LocalInventoryToResource) BeforeCreate(db *gorm.DB) error {
+	var err error
+	if r.ResourceId == uuid.Nil {
+		r.ResourceId, err = uuid.NewV7()
+		if err != nil {
+			return fmt.Errorf("failed to generate uuid: %w", err)
+		}
+	}
+	return nil
 }

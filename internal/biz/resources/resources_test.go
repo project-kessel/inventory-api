@@ -3,6 +3,7 @@ package resources
 import (
 	"context"
 	"github.com/go-kratos/kratos/v2/log"
+	"github.com/google/uuid"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -19,17 +20,17 @@ func (r *MockedResourceRepository) Save(ctx context.Context, resource *model.Res
 	return args.Get(0).(*model.Resource), args.Error(1)
 }
 
-func (r *MockedResourceRepository) Update(ctx context.Context, resource *model.Resource, id uint64) (*model.Resource, error) {
+func (r *MockedResourceRepository) Update(ctx context.Context, resource *model.Resource, id uuid.UUID) (*model.Resource, error) {
 	args := r.Called(ctx, resource, id)
 	return args.Get(0).(*model.Resource), args.Error(1)
 }
 
-func (r *MockedResourceRepository) Delete(ctx context.Context, id uint64) (*model.Resource, error) {
+func (r *MockedResourceRepository) Delete(ctx context.Context, id uuid.UUID) (*model.Resource, error) {
 	args := r.Called(ctx, id)
 	return args.Get(0).(*model.Resource), args.Error(1)
 }
 
-func (r *MockedResourceRepository) FindByID(ctx context.Context, id uint64) (*model.Resource, error) {
+func (r *MockedResourceRepository) FindByID(ctx context.Context, id uuid.UUID) (*model.Resource, error) {
 	args := r.Called(ctx, id)
 	return args.Get(0).(*model.Resource), args.Error(1)
 }
@@ -46,7 +47,7 @@ func (r *MockedResourceRepository) ListAll(ctx context.Context) ([]*model.Resour
 
 func resource1() *model.Resource {
 	return &model.Resource{
-		ID:    0,
+		ID:    uuid.UUID{},
 		OrgId: "my-org",
 		ResourceData: map[string]any{
 			"foo": "bar",
@@ -112,9 +113,12 @@ func TestCreateResourceAlreadyExists(t *testing.T) {
 
 func TestCreateNewResource(t *testing.T) {
 	resource := resource1()
+	id, err := uuid.NewV7()
+	assert.Nil(t, err)
+
 	repo := &MockedResourceRepository{}
 	returnedResource := model.Resource{
-		ID: 10,
+		ID: id,
 	}
 
 	repo.On("FindByReporterResourceId", mock.Anything, mock.Anything).Return((*model.Resource)(nil), gorm.ErrRecordNotFound)
@@ -146,12 +150,15 @@ func TestUpdateReturnsDbError(t *testing.T) {
 
 func TestUpdateNewResourceCreatesIt(t *testing.T) {
 	resource := resource1()
+	id, err := uuid.NewV7()
+	assert.Nil(t, err)
+
 	repo := &MockedResourceRepository{}
 	returnedResource := model.Resource{
-		ID: 10,
+		ID: id,
 	}
 
-	// Resource already exists
+	// Resource doesn't exist
 	repo.On("FindByReporterResourceId", mock.Anything, mock.Anything).Return((*model.Resource)(nil), gorm.ErrRecordNotFound)
 	repo.On("Save", mock.Anything, mock.Anything).Return(&returnedResource, nil)
 
@@ -166,13 +173,18 @@ func TestUpdateNewResourceCreatesIt(t *testing.T) {
 
 func TestUpdateExistingResource(t *testing.T) {
 	resource := resource1()
+	id, err := uuid.NewV7()
+	assert.Nil(t, err)
+
+	resource.ID = id
+
 	repo := &MockedResourceRepository{}
 	returnedResource := model.Resource{
-		ID: 10,
+		ID: id,
 	}
 
-	// Resource does not exist
-	repo.On("FindByReporterResourceId", mock.Anything, mock.Anything).Return(&model.Resource{}, nil)
+	// Resource already exists
+	repo.On("FindByReporterResourceId", mock.Anything, mock.Anything).Return(resource, nil)
 	repo.On("Update", mock.Anything, mock.Anything, mock.Anything).Return(&returnedResource, nil)
 
 	useCase := New(repo, nil, nil, "", log.DefaultLogger)
@@ -181,6 +193,7 @@ func TestUpdateExistingResource(t *testing.T) {
 	r, err := useCase.Update(ctx, resource, model.ReporterResourceId{})
 	assert.Nil(t, err)
 	assert.Equal(t, &returnedResource, r)
+	assert.Equal(t, resource.ID, r.ID)
 	repo.AssertExpectations(t)
 }
 
@@ -215,16 +228,18 @@ func TestDeleteNonexistentResource(t *testing.T) {
 func TestDeleteResource(t *testing.T) {
 	repo := &MockedResourceRepository{}
 	ctx := context.TODO()
+	id, err := uuid.NewV7()
+	assert.Nil(t, err)
 
 	// Resource already exists
 	repo.On("FindByReporterResourceId", mock.Anything, mock.Anything).Return(&model.Resource{
-		ID: 33,
+		ID: id,
 	}, nil)
-	repo.On("Delete", mock.Anything, (uint64)(33)).Return(&model.Resource{}, nil)
+	repo.On("Delete", mock.Anything, (uuid.UUID)(id)).Return(&model.Resource{}, nil)
 
 	useCase := New(repo, nil, nil, "", log.DefaultLogger)
 
-	err := useCase.Delete(ctx, model.ReporterResourceId{})
+	err = useCase.Delete(ctx, model.ReporterResourceId{})
 	assert.Nil(t, err)
 
 	repo.AssertExpectations(t)

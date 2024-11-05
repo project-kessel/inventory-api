@@ -3,6 +3,7 @@ package resources
 import (
 	"context"
 	"github.com/go-kratos/kratos/v2/log"
+	"github.com/google/uuid"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
 	"github.com/project-kessel/inventory-api/internal/data"
 	"github.com/project-kessel/inventory-api/internal/data/resources"
@@ -34,7 +35,7 @@ var (
 
 func resourceSubject() *model.Resource {
 	return &model.Resource{
-		ID:    0,
+		ID:    uuid.UUID{},
 		OrgId: orgId,
 		ResourceData: map[string]any{
 			"version": "11.33.12",
@@ -57,7 +58,7 @@ func resourceSubject() *model.Resource {
 
 func resourceObject() *model.Resource {
 	return &model.Resource{
-		ID:    0,
+		ID:    uuid.UUID{},
 		OrgId: orgId,
 		ResourceData: map[string]any{
 			"ssl_ready": true,
@@ -91,9 +92,9 @@ func resourceObject() *model.Resource {
 	}
 }
 
-func relationship1(subjectId, objectId uint64) *model.Relationship {
+func relationship1(subjectId, objectId uuid.UUID) *model.Relationship {
 	return &model.Relationship{
-		ID:               0,
+		ID:               uuid.UUID{},
 		OrgId:            orgId,
 		RelationshipData: nil,
 		RelationshipType: "software_has-a-bug_bug",
@@ -161,7 +162,7 @@ func assertEqualRelationshipHistory(t *testing.T, r *model.Relationship, rh *mod
 //	assert.Equal(t, litrExpected, litr)
 //}
 
-func createResource(t *testing.T, db *gorm.DB, resource *model.Resource) uint64 {
+func createResource(t *testing.T, db *gorm.DB, resource *model.Resource) uuid.UUID {
 	res, err := resources.New(db).Save(context.TODO(), resource)
 	assert.Nil(t, err)
 	return res.ID
@@ -198,22 +199,22 @@ func TestCreateRelationshipFailsIfEitherResourceIsNotFound(t *testing.T) {
 	ctx := context.TODO()
 
 	// Saving a relationship without subject or object fails
-	_, err := repo.Save(ctx, relationship1(0, 0))
+	_, err := repo.Save(ctx, relationship1(uuid.Nil, uuid.Nil))
 	assert.Error(t, err)
 
-	_, err = repo.Save(ctx, relationship1(4, 5))
+	_, err = repo.Save(ctx, relationship1(uuid.Nil, uuid.Nil))
 	assert.Error(t, err)
 
 	// Only subject
 	subjectId := createResource(t, db, resourceSubject())
-	_, err = repo.Save(ctx, relationship1(subjectId, 0))
+	_, err = repo.Save(ctx, relationship1(subjectId, uuid.Nil))
 	assert.Error(t, err)
 
 	// Only object
 	db = setupGorm(t)
 	repo = New(db)
 	objectId := createResource(t, db, resourceSubject())
-	_, err = repo.Save(ctx, relationship1(0, objectId))
+	_, err = repo.Save(ctx, relationship1(uuid.Nil, objectId))
 	assert.Error(t, err)
 }
 
@@ -222,8 +223,11 @@ func TestUpdateFailsIfRelationshipNotFound(t *testing.T) {
 	repo := New(db)
 	ctx := context.TODO()
 
+	id, err := uuid.NewV7()
+	assert.Nil(t, err)
+
 	// Update fails if id is not found
-	_, err := repo.Update(ctx, &model.Relationship{}, 999)
+	_, err = repo.Update(ctx, &model.Relationship{}, id)
 	assert.ErrorIs(t, err, gorm.ErrRecordNotFound)
 }
 
@@ -263,8 +267,11 @@ func TestDeleteFailsIfResourceNotFound(t *testing.T) {
 	repo := New(db)
 	ctx := context.TODO()
 
+	id, err := uuid.NewV7()
+	assert.Nil(t, err)
+
 	// Delete fails if id is not found
-	_, err := repo.Delete(ctx, 999)
+	_, err = repo.Delete(ctx, id)
 	assert.ErrorIs(t, err, gorm.ErrRecordNotFound)
 }
 

@@ -2,6 +2,7 @@ package resources
 
 import (
 	"context"
+	"github.com/google/uuid"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
 	"github.com/project-kessel/inventory-api/internal/data"
 	"gorm.io/gorm"
@@ -17,7 +18,7 @@ func New(db *gorm.DB) *Repo {
 	}
 }
 
-func copyHistory(m *model.Resource, id uint64, operationType model.OperationType) *model.ResourceHistory {
+func copyHistory(m *model.Resource, id uuid.UUID, operationType model.OperationType) *model.ResourceHistory {
 	return &model.ResourceHistory{
 		OrgId:         m.OrgId,
 		ResourceData:  m.ResourceData,
@@ -53,7 +54,7 @@ func (r *Repo) Save(ctx context.Context, m *model.Resource) (*model.Resource, er
 	return m, nil
 }
 
-func (r *Repo) Update(ctx context.Context, m *model.Resource, id uint64) (*model.Resource, error) {
+func (r *Repo) Update(ctx context.Context, m *model.Resource, id uuid.UUID) (*model.Resource, error) {
 	session := r.DB.Session(&gorm.Session{})
 
 	_, err := r.FindByID(ctx, id)
@@ -73,7 +74,7 @@ func (r *Repo) Update(ctx context.Context, m *model.Resource, id uint64) (*model
 	return m, nil
 }
 
-func (r *Repo) Delete(ctx context.Context, id uint64) (*model.Resource, error) {
+func (r *Repo) Delete(ctx context.Context, id uuid.UUID) (*model.Resource, error) {
 	session := r.DB.Session(&gorm.Session{})
 
 	resource, err := r.FindByID(ctx, id)
@@ -97,7 +98,7 @@ func (r *Repo) Delete(ctx context.Context, id uint64) (*model.Resource, error) {
 	return resource, nil
 }
 
-func (r *Repo) FindByID(ctx context.Context, id uint64) (*model.Resource, error) {
+func (r *Repo) FindByID(ctx context.Context, id uuid.UUID) (*model.Resource, error) {
 	resource := model.Resource{}
 	if err := r.DB.Session(&gorm.Session{}).First(&resource, id).Error; err != nil {
 		return nil, err

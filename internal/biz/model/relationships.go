@@ -3,18 +3,20 @@ package model
 import (
 	"database/sql/driver"
 	"encoding/json"
+	"fmt"
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 	"gorm.io/gorm/schema"
 	"time"
 )
 
 type Relationship struct {
-	ID               uint64 `gorm:"primarykey"`
-	OrgId            string `gorm:"index"`
+	ID               uuid.UUID `gorm:"type:uuid;primarykey"`
+	OrgId            string    `gorm:"index"`
 	RelationshipData JsonObject
 	RelationshipType string
-	SubjectId        uint64 `gorm:"index;not null"`
-	ObjectId         uint64 `gorm:"index;not null"`
+	SubjectId        uuid.UUID `gorm:"type:uuid;index;not null"`
+	ObjectId         uuid.UUID `gorm:"type:uuid;index;not null"`
 	Reporter         RelationshipReporter
 	CreatedAt        *time.Time
 	UpdatedAt        *time.Time
@@ -42,4 +44,15 @@ func (data RelationshipReporter) Value() (driver.Value, error) {
 
 func (data *RelationshipReporter) Scan(value interface{}) error {
 	return Scan(value, data)
+}
+
+func (r *Relationship) BeforeCreate(db *gorm.DB) error {
+	var err error
+	if r.ID == uuid.Nil {
+		r.ID, err = uuid.NewV7()
+		if err != nil {
+			return fmt.Errorf("failed to generate resource uuid: %w", err)
+		}
+	}
+	return nil
 }

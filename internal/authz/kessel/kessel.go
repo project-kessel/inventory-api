@@ -36,12 +36,12 @@ func New(ctx context.Context, config CompletedConfig, logger *log.Helper) (*Kess
 
 	successCounter, err := meter.Int64Counter("inventory_relations_api_success")
 	if err != nil {
-		return nil, fmt.Errorf("failed to create success counter: %v", err)
+		return nil, fmt.Errorf("failed to create success counter: %w", err)
 	}
 
 	failureCounter, err := meter.Int64Counter("inventory_relations_api_failure")
 	if err != nil {
-		return nil, fmt.Errorf("failed to create failure counter: %v", err)
+		return nil, fmt.Errorf("failed to create failure counter: %w", err)
 	}
 
 	return &KesselAuthz{
@@ -105,7 +105,7 @@ func (a *KesselAuthz) getCallOptions() ([]grpc.CallOption, error) {
 	if a.tokenClient.EnableOIDCAuth {
 		token, err := a.tokenClient.getToken()
 		if err != nil {
-			return nil, fmt.Errorf("failed to request token: %v", err)
+			return nil, fmt.Errorf("failed to request token: %w", err)
 		}
 		if a.tokenClient.Insecure {
 			opts = append(opts, WithInsecureBearerToken(token.AccessToken))

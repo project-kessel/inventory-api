@@ -4,6 +4,7 @@ package oidc
 import (
 	"context"
 	"fmt"
+
 	coreosoidc "github.com/coreos/go-oidc/v3/oidc"
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/go-kratos/kratos/v2/transport"
@@ -25,7 +26,7 @@ func New(c CompletedConfig) (*OAuth2Authenticator, error) {
 	ctx := coreosoidc.ClientContext(context.Background(), c.Client)
 	provider, err := coreosoidc.NewProvider(ctx, c.AuthorizationServerURL)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create provider: %v", err)
+		return nil, fmt.Errorf("failed to create provider: %w", err)
 	}
 
 	if c.PrincipalUserDomain == "" {

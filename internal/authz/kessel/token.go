@@ -112,7 +112,7 @@ func (a *tokenClient) getToken() (*TokenResponse, error) {
 	data.Set("grant_type", client_credentials_granttype)
 	req, err := http.NewRequest("POST", a.URL, bytes.NewBufferString(data.Encode()))
 	if err != nil {
-		return nil, fmt.Errorf("failed to create token request: %v", err)
+		return nil, fmt.Errorf("failed to create token request: %w", err)
 	}
 
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
@@ -120,14 +120,14 @@ func (a *tokenClient) getToken() (*TokenResponse, error) {
 
 	resp, err := client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("token request failed: %v", err)
+		return nil, fmt.Errorf("token request failed: %w", err)
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 
-		return nil, fmt.Errorf("failed to parse token response: %v", err)
+		return nil, fmt.Errorf("failed to parse token response: %w", err)
 	}
 
 	if resp.StatusCode != http.StatusOK {
@@ -136,7 +136,7 @@ func (a *tokenClient) getToken() (*TokenResponse, error) {
 
 	var tokenResponse TokenResponse
 	if err := json.Unmarshal(body, &tokenResponse); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal token response: %v", err)
+		return nil, fmt.Errorf("failed to unmarshal token response: %w", err)
 	}
 	a.cache.Set(cachedTokenKey, tokenResponse.AccessToken, cacheCleanupInterval)
 	return &tokenResponse, nil

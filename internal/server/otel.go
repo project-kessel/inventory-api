@@ -21,7 +21,7 @@ func NewMeter(provider metric.MeterProvider) (metric.Meter, error) {
 func NewMeterProvider(s *Server) (metric.MeterProvider, error) {
 	exporter, err := prometheus.New()
 	if err != nil {
-		return nil, fmt.Errorf("failed to setup exporter for meter provider: %v", err)
+		return nil, fmt.Errorf("failed to setup exporter for meter provider: %w", err)
 	}
 
 	provider := sdkmetric.NewMeterProvider(

@@ -21,7 +21,7 @@ func Migrate(db *gorm.DB, logger *log.Helper) error {
 	}
 
 	if err := db.AutoMigrate(models...); err != nil {
-		return fmt.Errorf("auto migration has failed: %v", err)
+		return fmt.Errorf("auto migration has failed: %w", err)
 	}
 
 	if db.Dialector.Name() == "sqlite" {
@@ -37,12 +37,12 @@ func Migrate(db *gorm.DB, logger *log.Helper) error {
 			statement := &gorm.Statement{DB: db}
 			err := statement.Parse(m)
 			if err != nil {
-				return fmt.Errorf("statement parsing has failed: %v", err)
+				return fmt.Errorf("statement parsing has failed: %w", err)
 			}
 
 			err = gormDbIndexStatement.GormDbAfterMigration(db, statement.Schema)
 			if err != nil {
-				return fmt.Errorf("migration failure: %v", err)
+				return fmt.Errorf("migration failure: %w", err)
 			}
 		}
 	}

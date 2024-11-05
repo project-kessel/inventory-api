@@ -34,22 +34,22 @@ func New(c CompletedConfig, authn middleware.Middleware, logger log.Logger) (*Se
 
 	meterProvider, err := NewMeterProvider(s)
 	if err != nil {
-		return nil, fmt.Errorf("init meter provider failed: %v", err)
+		return nil, fmt.Errorf("init meter provider failed: %w", err)
 	}
 
 	meter, err := NewMeter(meterProvider)
 	if err != nil {
-		return nil, fmt.Errorf("init meter failed: %v", err)
+		return nil, fmt.Errorf("init meter failed: %w", err)
 	}
 
 	httpServer, err := http.New(c.HttpConfig, authn, meter, logger)
 	if err != nil {
-		return nil, fmt.Errorf("init http server failed: %v", err)
+		return nil, fmt.Errorf("init http server failed: %w", err)
 	}
 
 	grpcServer, err := grpc.New(c.GrpcConfig, authn, meter, logger)
 	if err != nil {
-		return nil, fmt.Errorf("init grpc server failed: %v", err)
+		return nil, fmt.Errorf("init grpc server failed: %w", err)
 	}
 
 	s.HttpServer = httpServer

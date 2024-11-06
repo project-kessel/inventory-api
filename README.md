@@ -218,6 +218,14 @@ export IMAGE=your-quay-repo # if desired
 make docker-build-push
 ```
 
+### Build Container Images (macOS)
+This is an alternative to the above command for macOS users, but should work for any arch
+```shell
+export QUAY_REPO_INVENTORY=your-quay-repo # required
+podman login quay.io # required, this target assumes you are already logged in
+make build-push-minimal
+```
+
 ## Example Usage
 
 All these examples use the  REST API and assume we are running the default local version

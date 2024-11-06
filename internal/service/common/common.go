@@ -6,7 +6,10 @@ import (
 	pbrelation "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/relationships"
 	pbresource "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/resources"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
+	"google.golang.org/protobuf/types/known/structpb"
+	"google.golang.org/protobuf/types/known/timestamppb"
 	"strings"
+	"time"
 )
 
 func ReporterResourceIdFromPb(resourceType, reporterId string, reporter *pbresource.ReporterData) model.ReporterResourceId {
@@ -127,4 +130,50 @@ func RelationshipFromPb(relationshipType, reporterId string, relationshipData mo
 			ObjectResourceType:     objectType,
 		},
 	}, nil
+}
+
+func ToResourcePb(r *model.Resource, deletedAt *time.Time) (*pbresource.Resource, error) {
+	resourceData, err := structpb.NewStruct(r.ResourceData)
+
+	if err != nil {
+		return nil, err
+	}
+
+	var pbDeletedAt *timestamppb.Timestamp = nil
+	if deletedAt != nil {
+		pbDeletedAt = timestamppb.New(*deletedAt)
+	}
+
+	return &pbresource.Resource{
+		Metadata: &pbresource.Metadata{
+			Id:           r.ID,
+			ResourceType: r.ResourceType,
+			CreatedAt:    timestamppb.New(*r.CreatedAt),
+			UpdatedAt:    timestamppb.New(*r.UpdatedAt),
+			DeletedAt:    pbDeletedAt,
+			OrgId:        r.OrgId,
+			WorkspaceId:  r.WorkspaceId,
+			Labels:       ToLabelsPb(r.Labels),
+		},
+		ReporterData: &pbresource.ReporterData{
+			ReporterType:       pbresource.ReporterData_ReporterType(pbresource.ReporterData_ReporterType_value[r.Reporter.ReporterType]),
+			ReporterInstanceId: r.Reporter.ReporterId,
+			ConsoleHref:        r.ConsoleHref,
+			ApiHref:            r.ApiHref,
+			LocalResourceId:    r.Reporter.LocalResourceId,
+			ReporterVersion:    r.Reporter.ReporterVersion,
+		},
+		ResourceData: resourceData,
+	}, nil
+}
+
+func ToLabelsPb(labels model.Labels) []*pbresource.ResourceLabel {
+	pbLabels := []*pbresource.ResourceLabel{}
+	for _, label := range labels {
+		pbLabels = append(pbLabels, &pbresource.ResourceLabel{
+			Key:   label.Key,
+			Value: label.Value,
+		})
+	}
+	return pbLabels
 }

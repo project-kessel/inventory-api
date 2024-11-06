@@ -4,11 +4,13 @@ import (
 	"context"
 	"fmt"
 	"github.com/project-kessel/inventory-api/cmd/common"
+	getresourcescontroller "github.com/project-kessel/inventory-api/internal/biz/getresources"
 	relationshipsctl "github.com/project-kessel/inventory-api/internal/biz/relationships"
 	resourcesctl "github.com/project-kessel/inventory-api/internal/biz/resources"
 	relationshipsrepo "github.com/project-kessel/inventory-api/internal/data/relationships"
 	resourcerepo "github.com/project-kessel/inventory-api/internal/data/resources"
 	relationshipssvc "github.com/project-kessel/inventory-api/internal/service/relationships/k8spolicy"
+	getresourcesvc "github.com/project-kessel/inventory-api/internal/service/resources/getresource"
 	hostssvc "github.com/project-kessel/inventory-api/internal/service/resources/hosts"
 	k8sclusterssvc "github.com/project-kessel/inventory-api/internal/service/resources/k8sclusters"
 	k8spoliciessvc "github.com/project-kessel/inventory-api/internal/service/resources/k8spolicies"
@@ -171,6 +173,13 @@ func NewCommand(
 			k8spolicies_service := k8spoliciessvc.New(k8spolicies_controller)
 			pb.RegisterKesselK8SPolicyServiceServer(server.GrpcServer, k8spolicies_service)
 			pb.RegisterKesselK8SPolicyServiceHTTPServer(server.HttpServer, k8spolicies_service)
+
+			// wire together resource querying
+			getResourceRepo := resourcerepo.New(db)
+			getResourceController := getresourcescontroller.New(getResourceRepo, log.With(logger, "subsystem", "getresources_controller"))
+			getResourceService := getresourcesvc.New(getResourceController)
+			pb.RegisterResourceQueryServiceServer(server.GrpcServer, getResourceService)
+			pb.RegisterResourceQueryServiceHTTPServer(server.HttpServer, getResourceService)
 
 			// wire together relationships handling
 			relationships_repo := relationshipsrepo.New(db)

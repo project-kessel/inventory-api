@@ -21,6 +21,7 @@ type Resource struct {
 	Labels       Labels
 	CreatedAt    *time.Time
 	UpdatedAt    *time.Time
+	DeletedAt    *time.Time `gorm:"-:all"`
 }
 
 type ResourceReporter struct {

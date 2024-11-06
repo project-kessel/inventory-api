@@ -231,3 +231,31 @@ func TestDeleteAfterUpdate(t *testing.T) {
 	assert.Len(t, resourceHistory, 3)
 	assertEqualResourceHistory(t, r, &resourceHistory[2], model.OperationTypeDelete)
 }
+
+func TestFindByIdFound(t *testing.T) {
+	db := setupGorm(t)
+	repo := New(db)
+	ctx := context.TODO()
+
+	r, err := repo.Save(ctx, resource1())
+	assert.NotNil(t, r)
+	require.Nil(t, err)
+
+	r2, err := repo.FindByID(ctx, r.ID)
+	assert.Nil(t, err)
+	assertEqualResource(t, r, r2)
+}
+
+func TestFindByIdNotFound(t *testing.T) {
+	db := setupGorm(t)
+	repo := New(db)
+	ctx := context.TODO()
+
+	r, err := repo.Save(ctx, resource1())
+	assert.NotNil(t, r)
+	require.Nil(t, err)
+
+	r2, err := repo.FindByID(ctx, 404)
+	assert.ErrorIs(t, err, gorm.ErrRecordNotFound)
+	assert.Nil(t, r2)
+}

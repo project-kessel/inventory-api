@@ -1,4 +1,4 @@
-FROM registry.access.redhat.com/ubi8/ubi-minimal:8.10-1086 AS builder
+FROM registry.access.redhat.com/ubi8/ubi-minimal:8.10-1130 AS builder
 
 ARG TARGETARCH
 USER root
@@ -22,7 +22,7 @@ COPY test/e2e .
 RUN go mod tidy
 RUN go test -c -o e2e-inventory-tests
 
-FROM registry.access.redhat.com/ubi8/ubi-minimal:8.10-1086
+FROM registry.access.redhat.com/ubi8/ubi-minimal:8.10-1130
 
 COPY --from=builder /workspace/e2e-inventory-tests /usr/local/bin/
 

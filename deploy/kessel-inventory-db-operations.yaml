@@ -1,0 +1,91 @@
+apiVersion: template.openshift.io/v1
+kind: Template
+metadata:
+  name: inventory
+objects:
+  - apiVersion: cloud.redhat.com/v1alpha1
+    kind: ClowdApp
+    metadata:
+      name: kessel-inventory
+    spec:
+      envName: ${ENV_NAME}
+      database:
+        name: kessel-inventory
+      optionalDependencies:
+        - kessel-relations
+      deployments:
+        - name: api
+          replicas: ${{REPLICAS}}
+          podSpec:
+            initContainers:
+            - name: db-operations
+              image: registry.redhat.io/rhel9/postgresql-15:1-54
+              command: ["/bin/sh", "-c"]
+              args:
+                - cd /tmp && curl -OL https://github.com/jqlang/jq/releases/download/jq-1.7/jq-linux-amd64 && mv jq-linux-amd64 jq && chmod +x jq;
+                  export PGHOST=$(cat /cdapp/cdappconfig.json | ./jq -r '.database.hostname');
+                  export PGPORT=$(cat /cdapp/cdappconfig.json | ./jq -r '.database.port');
+                  export PGUSER=$(cat /cdapp/cdappconfig.json | ./jq -r '.database.username');
+                  export PGDATABASE=$(cat /cdapp/cdappconfig.json | ./jq -r '.database.name');
+                  export PGPASSWORD=$(cat /cdapp/cdappconfig.json | ./jq -r '.database.password');
+                  for i in local_inventory_to_resources relationship_history relationships resource_history resources;
+                  do psql -c "DROP TABLE $i";
+                  done;
+              inheritEnv: true
+            - name: migration
+              image: ${INVENTORY_IMAGE}:${IMAGE_TAG}
+              command: ["inventory-api"]
+              args: ["migrate"]
+              inheritEnv: true
+            image: ${INVENTORY_IMAGE}:${IMAGE_TAG}
+            command: ["inventory-api"]
+            args: ["serve"]
+            livenessProbe:
+              httpGet:
+                path: /api/inventory/v1/livez
+                port: 8000
+            readinessProbe:
+              httpGet:
+                path: /api/inventory/v1/readyz
+                port: 8000
+            env:
+            - name: CLOWDER_ENABLED
+              value: "true"
+            - name: INVENTORY_API_CONFIG
+              value: "/inventory/inventory-api-config.yaml"
+            - name: PGDATA
+              value: /temp/data
+            volumeMounts:
+                - name: config-volume
+                  mountPath: "/inventory"
+            volumes:
+              - name: config-volume
+                secret:
+                  secretName: inventory-api-config
+          webServices:
+            public:
+              enabled: true
+              apiPath: inventory
+  - kind: PodDisruptionBudget
+    apiVersion: policy/v1
+    metadata:
+      name: kessel-inventory-api-pdb
+    spec:
+      minAvailable: 1
+      selector:
+        matchLabels:
+          app: kessel-inventory
+parameters:
+  - description: ClowdEnvironment name (ephemeral, stage, prod)
+    name: ENV_NAME
+    required: true
+  - description: App Image
+    name: INVENTORY_IMAGE
+    value: quay.io/redhat-services-prod/project-kessel-tenant/kessel-inventory/inventory-api
+  - description: Image Tag
+    name: IMAGE_TAG
+    required: true
+    value: latest
+  - description: Number of replicas
+    name: REPLICAS
+    value: "1"

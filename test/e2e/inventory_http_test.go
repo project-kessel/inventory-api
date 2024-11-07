@@ -113,7 +113,7 @@ func TestInventoryAPIHTTP_Readyz(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, resp)
 
-	expectedStatus := "Storage type sqlite"
+	expectedStatus := "Storage type postgres"
 	expectedCode := uint32(200)
 
 	assert.Equal(t, expectedStatus, resp.Status)
@@ -121,7 +121,7 @@ func TestInventoryAPIHTTP_Readyz(t *testing.T) {
 }
 
 func TestInventoryAPIHTTP_Metrics(t *testing.T) {
-	resp, err := nethttp.Get("http://localhost:8081/metrics")
+	resp, err := nethttp.Get("http://" + inventoryapi_http_url + "/metrics")
 	if err != nil {
 		t.Fatal("Failed to send request: ", err)
 	}

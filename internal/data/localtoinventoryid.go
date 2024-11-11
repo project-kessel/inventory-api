@@ -1,11 +1,12 @@
 package data
 
 import (
+	"github.com/google/uuid"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
 	"gorm.io/gorm"
 )
 
-func GetLastResourceId(DB *gorm.DB, reporterResourceId model.ReporterResourceId) (uint64, error) {
+func GetLastResourceId(DB *gorm.DB, reporterResourceId model.ReporterResourceId) (uuid.UUID, error) {
 	localInventoryToResourceId := model.LocalInventoryToResource{}
 	err := GetLastResourceIdQuery(DB, reporterResourceId).First(&localInventoryToResourceId).Error
 	return localInventoryToResourceId.ResourceId, err

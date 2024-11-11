@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"github.com/go-kratos/kratos/v2/log"
+	"github.com/google/uuid"
 	"github.com/project-kessel/inventory-api/internal/biz"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
 	eventingapi "github.com/project-kessel/inventory-api/internal/eventing/api"
@@ -13,11 +14,11 @@ import (
 
 type ResourceRepository interface {
 	Save(ctx context.Context, resource *model.Relationship) (*model.Relationship, error)
-	Update(context.Context, *model.Relationship, uint64) (*model.Relationship, error)
-	Delete(context.Context, uint64) (*model.Relationship, error)
-	FindByID(context.Context, uint64) (*model.Relationship, error)
-	FindRelationship(ctx context.Context, subjectId, objectId uint64, relationshipType string) (*model.Relationship, error)
-	FindResourceIdByReporterResourceId(ctx context.Context, id model.ReporterResourceId) (uint64, error)
+	Update(context.Context, *model.Relationship, uuid.UUID) (*model.Relationship, error)
+	Delete(context.Context, uuid.UUID) (*model.Relationship, error)
+	FindByID(context.Context, uuid.UUID) (*model.Relationship, error)
+	FindRelationship(ctx context.Context, subjectId, objectId uuid.UUID, relationshipType string) (*model.Relationship, error)
+	FindResourceIdByReporterResourceId(ctx context.Context, id model.ReporterResourceId) (uuid.UUID, error)
 	ListAll(context.Context) ([]*model.Relationship, error)
 }
 

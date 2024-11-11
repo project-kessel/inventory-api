@@ -2,6 +2,7 @@ package resources
 
 import (
 	"context"
+	"github.com/google/uuid"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
 	"github.com/project-kessel/inventory-api/internal/data"
 	eventingapi "github.com/project-kessel/inventory-api/internal/eventing/api"
@@ -19,7 +20,7 @@ func New(db *gorm.DB) *Repo {
 	}
 }
 
-func copyHistory(m *model.Relationship, id uint64, operationType model.OperationType) *model.RelationshipHistory {
+func copyHistory(m *model.Relationship, id uuid.UUID, operationType model.OperationType) *model.RelationshipHistory {
 	return &model.RelationshipHistory{
 		OrgId:            m.OrgId,
 		RelationshipData: m.RelationshipData,
@@ -48,7 +49,7 @@ func (r *Repo) Save(ctx context.Context, m *model.Relationship) (*model.Relation
 
 // Update updates a model in the database, updates related tuples in the relations-api, and issues an update event.
 // The `id` is possibly of the form <reporter_type:local_resource_id>.
-func (r *Repo) Update(ctx context.Context, m *model.Relationship, id uint64) (*model.Relationship, error) {
+func (r *Repo) Update(ctx context.Context, m *model.Relationship, id uuid.UUID) (*model.Relationship, error) {
 	session := r.DB.Session(&gorm.Session{})
 
 	_, err := r.FindByID(ctx, id)
@@ -70,7 +71,7 @@ func (r *Repo) Update(ctx context.Context, m *model.Relationship, id uint64) (*m
 
 // Delete deletes a model from the database, removes related tuples from the relations-api, and issues a delete event.
 // The `id` is possibly of the form <reporter_type:local_resource_id>.
-func (r *Repo) Delete(ctx context.Context, id uint64) (*model.Relationship, error) {
+func (r *Repo) Delete(ctx context.Context, id uuid.UUID) (*model.Relationship, error) {
 	session := r.DB.Session(&gorm.Session{})
 
 	relationship, err := r.FindByID(ctx, id)
@@ -89,7 +90,7 @@ func (r *Repo) Delete(ctx context.Context, id uint64) (*model.Relationship, erro
 	return relationship, nil
 }
 
-func (r *Repo) FindByID(ctx context.Context, id uint64) (*model.Relationship, error) {
+func (r *Repo) FindByID(ctx context.Context, id uuid.UUID) (*model.Relationship, error) {
 	relationship := model.Relationship{}
 	if err := r.DB.Session(&gorm.Session{}).First(&relationship, id).Error; err != nil {
 		return nil, err
@@ -98,11 +99,11 @@ func (r *Repo) FindByID(ctx context.Context, id uint64) (*model.Relationship, er
 	return &relationship, nil
 }
 
-func (r *Repo) FindResourceIdByReporterResourceId(ctx context.Context, id model.ReporterResourceId) (uint64, error) {
+func (r *Repo) FindResourceIdByReporterResourceId(ctx context.Context, id model.ReporterResourceId) (uuid.UUID, error) {
 	return data.GetLastResourceId(r.DB.Session(&gorm.Session{}), id)
 }
 
-func (r *Repo) FindRelationship(ctx context.Context, subjectId, objectId uint64, relationshipType string) (*model.Relationship, error) {
+func (r *Repo) FindRelationship(ctx context.Context, subjectId, objectId uuid.UUID, relationshipType string) (*model.Relationship, error) {
 	session := r.DB.Session(&gorm.Session{})
 	relation := model.Relationship{}
 

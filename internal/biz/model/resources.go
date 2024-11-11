@@ -4,14 +4,15 @@ import (
 	"database/sql/driver"
 	"encoding/json"
 	"fmt"
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 	"gorm.io/gorm/schema"
 	"time"
 )
 
 type Resource struct {
-	ID           uint64 `gorm:"primarykey"`
-	OrgId        string `gorm:"index"`
+	ID           uuid.UUID `gorm:"type:uuid;primarykey"`
+	OrgId        string    `gorm:"index"`
 	ResourceData JsonObject
 	ResourceType string
 	WorkspaceId  string
@@ -52,4 +53,15 @@ func (data ResourceReporter) Value() (driver.Value, error) {
 
 func (data *ResourceReporter) Scan(value interface{}) error {
 	return Scan(value, data)
+}
+
+func (r *Resource) BeforeCreate(db *gorm.DB) error {
+	var err error
+	if r.ID == uuid.Nil {
+		r.ID, err = uuid.NewV7()
+		if err != nil {
+			return fmt.Errorf("failed to generate uuid: %w", err)
+		}
+	}
+	return nil
 }

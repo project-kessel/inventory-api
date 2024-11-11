@@ -2,14 +2,15 @@ package model
 
 import (
 	"fmt"
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 	"gorm.io/gorm/schema"
 	"time"
 )
 
 type ResourceHistory struct {
-	ID           uint64 `gorm:"primarykey"`
-	OrgId        string `gorm:"index"`
+	ID           uuid.UUID `gorm:"type:uuid;primarykey"`
+	OrgId        string    `gorm:"index"`
 	ResourceData JsonObject
 	ResourceType string
 	WorkspaceId  string
@@ -19,7 +20,7 @@ type ResourceHistory struct {
 	Labels       Labels
 	Timestamp    *time.Time `gorm:"autoCreateTime"`
 
-	ResourceId    uint64        `gorm:"index"`
+	ResourceId    uuid.UUID     `gorm:"type:uuid;index"`
 	OperationType OperationType `gorm:"index"`
 }
 
@@ -39,4 +40,15 @@ func (r *ResourceHistory) ResourceHistory(db *gorm.DB, s *schema.Schema) error {
 
 func (*ResourceHistory) TableName() string {
 	return "resource_history"
+}
+
+func (r *ResourceHistory) BeforeCreate(db *gorm.DB) error {
+	var err error
+	if r.ID == uuid.Nil {
+		r.ID, err = uuid.NewV7()
+		if err != nil {
+			return fmt.Errorf("failed to generate uuid: %w", err)
+		}
+	}
+	return nil
 }

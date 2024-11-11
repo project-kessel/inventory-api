@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"github.com/google/uuid"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
-	"strconv"
 	"strings"
 	"time"
 )
@@ -34,7 +33,7 @@ type RelationshipData struct {
 }
 
 type ResourceMetadata struct {
-	Id           uint64          `json:"id"`
+	Id           string          `json:"id"`
 	ResourceType string          `json:"resource_type"`
 	OrgId        string          `json:"org_id"`
 	CreatedAt    *time.Time      `json:"created_at,omitempty"`
@@ -59,7 +58,7 @@ type ResourceReporter struct {
 }
 
 type RelationshipMetadata struct {
-	Id               uint64     `json:"id"`
+	Id               string     `json:"id"`
 	RelationshipType string     `json:"relationship_type"`
 	CreatedAt        *time.Time `json:"created_at,omitempty"`
 	UpdatedAt        *time.Time `json:"updated_at,omitempty"`
@@ -124,12 +123,12 @@ func NewResourceEvent(operationType OperationType, resource *model.Resource, rep
 		Type:            makeEventType(eventType, resource.ResourceType, string(operationType.OperationType())),
 		Source:          "", // Todo: inventory uri
 		Id:              eventId.String(),
-		Subject:         makeEventSubject(eventType, resource.ResourceType, strconv.FormatUint(resource.ID, 10)),
+		Subject:         makeEventSubject(eventType, resource.ResourceType, resource.ID.String()),
 		Time:            reportedTime,
 		DataContentType: "application/json",
 		Data: ResourceData{
 			Metadata: ResourceMetadata{
-				Id:           resource.ID,
+				Id:           resource.ID.String(),
 				OrgId:        resource.OrgId,
 				ResourceType: resource.ResourceType,
 				CreatedAt:    createdAt,
@@ -177,12 +176,12 @@ func NewRelationshipEvent(operationType OperationType, relationship *model.Relat
 		Type:            makeEventType(eventType, relationship.RelationshipType, string(operationType.OperationType())),
 		Source:          "", // Todo: inventory uri
 		Id:              eventId.String(),
-		Subject:         makeEventSubject(eventType, relationship.RelationshipType, strconv.FormatUint(relationship.ID, 10)),
+		Subject:         makeEventSubject(eventType, relationship.RelationshipType, relationship.ID.String()),
 		Time:            reportedTime,
 		DataContentType: "application/json",
 		Data: RelationshipData{
 			Metadata: RelationshipMetadata{
-				Id:               relationship.ID,
+				Id:               relationship.ID.String(),
 				RelationshipType: relationship.RelationshipType,
 				CreatedAt:        createdAt,
 				UpdatedAt:        updatedAt,

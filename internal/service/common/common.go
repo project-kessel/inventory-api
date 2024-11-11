@@ -3,6 +3,7 @@ package common
 import (
 	"encoding/json"
 	"errors"
+	"github.com/google/uuid"
 	pbrelation "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/relationships"
 	pbresource "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/resources"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
@@ -20,7 +21,7 @@ func ReporterResourceIdFromPb(resourceType, reporterId string, reporter *pbresou
 
 func ResourceFromPb(resourceType, reporterId string, resourceData model.JsonObject, metadata *pbresource.Metadata, reporter *pbresource.ReporterData) *model.Resource {
 	return &model.Resource{
-		ID:           0,
+		ID:           uuid.UUID{},
 		ResourceData: resourceData,
 		ResourceType: resourceType,
 		WorkspaceId:  metadata.WorkspaceId,
@@ -109,11 +110,11 @@ func RelationshipFromPb(relationshipType, reporterId string, relationshipData mo
 	objectType := res[2]
 
 	return &model.Relationship{
-		ID:               0,
+		ID:               uuid.UUID{},
 		RelationshipData: relationshipData,
 		RelationshipType: relationshipType,
-		SubjectId:        0,
-		ObjectId:         0,
+		SubjectId:        uuid.UUID{},
+		ObjectId:         uuid.UUID{},
 		OrgId:            metadata.OrgId,
 		Reporter: model.RelationshipReporter{
 			Reporter: model.Reporter{

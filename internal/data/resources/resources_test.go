@@ -3,6 +3,7 @@ package resources
 import (
 	"context"
 	"github.com/go-kratos/kratos/v2/log"
+	"github.com/google/uuid"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
 	"github.com/project-kessel/inventory-api/internal/data"
 	"github.com/stretchr/testify/assert"
@@ -24,7 +25,7 @@ func setupGorm(t *testing.T) *gorm.DB {
 
 func resource1() *model.Resource {
 	return &model.Resource{
-		ID:    0,
+		ID:    uuid.UUID{},
 		OrgId: "my-org",
 		ResourceData: map[string]any{
 			"foo": "bar",
@@ -139,8 +140,11 @@ func TestUpdateFailsIfResourceNotFound(t *testing.T) {
 	repo := New(db)
 	ctx := context.TODO()
 
+	id, err := uuid.NewV7()
+	assert.Nil(t, err)
+
 	// Update fails if id is not found
-	_, err := repo.Update(ctx, &model.Resource{}, 999)
+	_, err = repo.Update(ctx, &model.Resource{}, id)
 	assert.ErrorIs(t, err, gorm.ErrRecordNotFound)
 }
 
@@ -179,8 +183,11 @@ func TestDeleteFailsIfResourceNotFound(t *testing.T) {
 	repo := New(db)
 	ctx := context.TODO()
 
+	id, err := uuid.NewV7()
+	assert.Nil(t, err)
+
 	// Delete fails if id is not found
-	_, err := repo.Delete(ctx, 999)
+	_, err = repo.Delete(ctx, id)
 	assert.ErrorIs(t, err, gorm.ErrRecordNotFound)
 }
 

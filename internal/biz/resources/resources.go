@@ -3,6 +3,7 @@ package resources
 import (
 	"context"
 	"errors"
+	"github.com/google/uuid"
 	"time"
 
 	"github.com/go-kratos/kratos/v2/log"
@@ -15,9 +16,9 @@ import (
 
 type ResourceRepository interface {
 	Save(context.Context, *model.Resource) (*model.Resource, error)
-	Update(context.Context, *model.Resource, uint64) (*model.Resource, error)
-	Delete(context.Context, uint64) (*model.Resource, error)
-	FindByID(context.Context, uint64) (*model.Resource, error)
+	Update(context.Context, *model.Resource, uuid.UUID) (*model.Resource, error)
+	Delete(context.Context, uuid.UUID) (*model.Resource, error)
+	FindByID(context.Context, uuid.UUID) (*model.Resource, error)
 	FindByReporterResourceId(context.Context, model.ReporterResourceId) (*model.Resource, error)
 	ListAll(context.Context) ([]*model.Resource, error)
 }

@@ -2,6 +2,7 @@ package health
 
 import (
 	"context"
+
 	"github.com/go-kratos/kratos/v2/log"
 	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1"
 	"github.com/project-kessel/inventory-api/internal/authz"
@@ -54,6 +55,20 @@ func (r *healthRepo) IsBackendAvailable(ctx context.Context) (*pb.GetReadyzRespo
 	}
 
 	return newResponse("Storage type "+storageType, 200), nil
+}
+
+func (r *healthRepo) IsRelationsAvailable(ctx context.Context) (*pb.GetReadyzResponse, error) {
+	health, apiErr := r.Authz.Health(ctx)
+	if apiErr != nil {
+		log.Errorf("RELATIONS-API UNHEALTHY")
+		return newResponse("RELATIONS-API UNHEALTHY", 500), nil
+	}
+	if authz.CheckAuthorizer(r.CompletedAuth) == "Kessel" {
+		if viper.GetBool("log.readyz") {
+			log.Infof("relations-api %s", health.GetStatus())
+		}
+	}
+	return newResponse("RELATIONS-API", 200), nil
 }
 
 func newResponse(status string, code int) *pb.GetReadyzResponse {

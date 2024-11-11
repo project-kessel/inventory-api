@@ -16,6 +16,12 @@ func NewCommand(options *storage.Options, loggerOptions common.LoggerOptions) *c
 		Short: "Create or migrate the database tables",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			_, logger := common.InitLogger(common.GetLogLevel(), loggerOptions)
+			logHelper := log.NewHelper(log.With(logger, "group", "storage"))
+
+			if options.DisablePersistence {
+				logHelper.Info("Persistence disabled, skipping database migration...")
+				return nil
+			}
 
 			if errs := options.Complete(); errs != nil {
 				return errors.NewAggregate(errs)
@@ -27,7 +33,6 @@ func NewCommand(options *storage.Options, loggerOptions common.LoggerOptions) *c
 
 			config := storage.NewConfig(options).Complete()
 
-			logHelper := log.NewHelper(log.With(logger, "group", "storage"))
 			db, err := storage.New(config, logHelper)
 			if err != nil {
 				return err

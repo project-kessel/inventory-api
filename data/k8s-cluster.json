@@ -1,8 +1,8 @@
 {
   "k8s_cluster": {
     "metadata": {
-      "resource_type": "k8s-cluster",
-      "workspace_id": "hbi/k8s_cluster"
+      "resource_type": "k8s_cluster",
+      "workspace_id": "01932c7e-e93e-719c-a488-3159877367b0"
     },
     "reporter_data": {
       "reporter_type": "ACM",

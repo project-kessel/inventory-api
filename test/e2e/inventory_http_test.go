@@ -5,16 +5,17 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
+	nethttp "net/http"
+	"os"
+	"strconv"
+	"testing"
+
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/go-kratos/kratos/v2/transport/http"
 	v1 "github.com/project-kessel/inventory-api/api/kessel/inventory/v1"
 	"github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/resources"
 	"github.com/project-kessel/inventory-client-go/v1beta1"
 	"github.com/stretchr/testify/assert"
-	nethttp "net/http"
-	"os"
-	"strconv"
-	"testing"
 )
 
 var inventoryapi_http_url string
@@ -150,7 +151,7 @@ func TestInventoryAPIHTTP_CreateRHELHost(t *testing.T) {
 	}
 	request := resources.CreateRhelHostRequest{RhelHost: &resources.RhelHost{
 		Metadata: &resources.Metadata{
-			ResourceType: "rhel-host",
+			ResourceType: "rhel_host",
 			WorkspaceId:  "workspace1",
 			OrgId:        "",
 		},
@@ -183,7 +184,7 @@ func TestInventoryAPIHTTP_K8SCluster_CreateK8SCluster(t *testing.T) {
 	request := resources.CreateK8SClusterRequest{
 		K8SCluster: &resources.K8SCluster{
 			Metadata: &resources.Metadata{
-				ResourceType: "k8s-cluster",
+				ResourceType: "k8s_cluster",
 				WorkspaceId:  "",
 				OrgId:        "",
 			},
@@ -238,7 +239,7 @@ func TestInventoryAPIHTTP_K8SPolicy_CreateK8SPolicy(t *testing.T) {
 	request := resources.CreateK8SPolicyRequest{
 		K8SPolicy: &resources.K8SPolicy{
 			Metadata: &resources.Metadata{
-				ResourceType: "k8s-policy",
+				ResourceType: "k8s_policy",
 				WorkspaceId:  "default",
 				OrgId:        "",
 			},

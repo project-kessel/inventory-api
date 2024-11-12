@@ -1,8 +1,8 @@
 {
   "rhel_host": {
     "metadata": {
-      "resource_type": "rhel-host",
-      "workspace_id": "hbi/rhel_host"
+      "resource_type": "rhel_host",
+      "workspace_id": "01932c7e-e93e-719c-a488-3159877367b0"
     },
     "reporter_data": {
       "reporter_type": "OCM",

@@ -1,0 +1,9 @@
+{
+  "reporter_data": {
+    "reporter_type": "OCM",
+    "reporter_version": "0.1",
+    "local_resource_id": "2",
+    "api_href": "www.example.com",
+    "console_href": "www.example.com"
+  }
+}

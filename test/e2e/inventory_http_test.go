@@ -156,18 +156,83 @@ func TestInventoryAPIHTTP_CreateRHELHost(t *testing.T) {
 			OrgId:        "",
 		},
 		ReporterData: &resources.ReporterData{
-			ReporterInstanceId: "user@example.com",
+			ReporterInstanceId: "user@email.com",
 			ReporterType:       resources.ReporterData_OCM,
-			ConsoleHref:        "www.example.com",
-			ApiHref:            "www.example.com",
-			LocalResourceId:    "1",
-			ReporterVersion:    "0.1",
+			ConsoleHref:        "www.web.com",
+			ApiHref:            "www.wb.com",
+			LocalResourceId:    "0123",
+			ReporterVersion:    "0.2",
 		},
 	}}
 	opts := getCallOptions()
 	_, err = client.RhelHostServiceClient.CreateRhelHost(context.Background(), &request, opts...)
 	assert.NoError(t, err)
 
+}
+
+func TestInventoryAPIHTTP_UpdateRHELHost(t *testing.T) {
+	t.Parallel()
+	c := v1beta1.NewConfig(
+		v1beta1.WithHTTPUrl(inventoryapi_http_url),
+		v1beta1.WithTLSInsecure(insecure),
+		v1beta1.WithHTTPTLSConfig(tlsConfig),
+	)
+	client, err := v1beta1.NewHttpClient(context.Background(), c)
+	if err != nil {
+		t.Error(err)
+	}
+
+	reporterData := &resources.ReporterData{
+		ReporterInstanceId: "user@email.com",
+		ReporterType:       resources.ReporterData_OCM,
+		ConsoleHref:        "www.web.com",
+		ApiHref:            "www.wb.com",
+		LocalResourceId:    "0123",
+		ReporterVersion:    "0.2",
+	}
+
+	request := resources.UpdateRhelHostRequest{RhelHost: &resources.RhelHost{
+		Metadata: &resources.Metadata{
+			ResourceType: "rhel-host",
+			WorkspaceId:  "workspace0",
+			OrgId:        "",
+		},
+		ReporterData: reporterData,
+	}}
+	opts := getCallOptions()
+	_, err = client.RhelHostServiceClient.UpdateRhelHost(context.Background(), &request, opts...)
+	assert.NoError(t, err)
+
+}
+
+func TestInventoryAPIHTTP_DeleteRHELHost(t *testing.T) {
+	t.Parallel()
+	c := v1beta1.NewConfig(
+		v1beta1.WithHTTPUrl(inventoryapi_http_url),
+		v1beta1.WithTLSInsecure(insecure),
+		v1beta1.WithHTTPTLSConfig(tlsConfig),
+	)
+	client, err := v1beta1.NewHttpClient(context.Background(), c)
+	if err != nil {
+		t.Error(err)
+	}
+
+	reporter := &resources.ReporterData{
+		ReporterInstanceId: "user@email.com",
+		ReporterType:       resources.ReporterData_OCM,
+		ConsoleHref:        "www.web.com",
+		ApiHref:            "www.wb.com",
+		LocalResourceId:    "0123",
+		ReporterVersion:    "0.2",
+	}
+
+	request1 := resources.DeleteRhelHostRequest{
+		ReporterData: reporter,
+	}
+
+	opts := getCallOptions()
+	_, err = client.RhelHostServiceClient.DeleteRhelHost(context.Background(), &request1, opts...)
+	assert.NoError(t, err)
 }
 
 func TestInventoryAPIHTTP_K8SCluster_CreateK8SCluster(t *testing.T) {
@@ -189,7 +254,7 @@ func TestInventoryAPIHTTP_K8SCluster_CreateK8SCluster(t *testing.T) {
 				OrgId:        "",
 			},
 			ResourceData: &resources.K8SClusterDetail{
-				ExternalClusterId: "1234",
+				ExternalClusterId: "01234",
 				ClusterStatus:     resources.K8SClusterDetail_READY,
 				KubeVersion:       "1.31",
 				KubeVendor:        resources.K8SClusterDetail_OPENSHIFT,
@@ -197,13 +262,13 @@ func TestInventoryAPIHTTP_K8SCluster_CreateK8SCluster(t *testing.T) {
 				CloudPlatform:     resources.K8SClusterDetail_AWS_UPI,
 				Nodes: []*resources.K8SClusterDetailNodesInner{
 					{
-						Name:   "www.example.com",
+						Name:   "www.web.com",
 						Cpu:    "7500m",
 						Memory: "30973224Ki",
 						Labels: []*resources.ResourceLabel{
 							{
 								Key:   "has_monster_gpu",
-								Value: "yes",
+								Value: "no",
 							},
 						},
 					},
@@ -214,7 +279,7 @@ func TestInventoryAPIHTTP_K8SCluster_CreateK8SCluster(t *testing.T) {
 				ReporterType:       resources.ReporterData_ACM,
 				ConsoleHref:        "www.example.com",
 				ApiHref:            "www.example.com",
-				LocalResourceId:    "1",
+				LocalResourceId:    "01234",
 				ReporterVersion:    "0.1",
 			},
 		},
@@ -222,6 +287,61 @@ func TestInventoryAPIHTTP_K8SCluster_CreateK8SCluster(t *testing.T) {
 	opts := getCallOptions()
 	_, err = client.K8sClusterService.CreateK8SCluster(context.Background(), &request, opts...)
 	assert.NoError(t, err)
+}
+
+func TestInventoryAPIHTTP_K8SCluster_UpdateK8SCluster(t *testing.T) {
+	t.Parallel()
+	c := v1beta1.NewConfig(
+		v1beta1.WithHTTPUrl(inventoryapi_http_url),
+		v1beta1.WithTLSInsecure(insecure),
+		v1beta1.WithHTTPTLSConfig(tlsConfig),
+	)
+	client, err := v1beta1.NewHttpClient(context.Background(), c)
+	if err != nil {
+		t.Error(err)
+	}
+	request := resources.UpdateK8SClusterRequest{
+		K8SCluster: &resources.K8SCluster{
+			Metadata: &resources.Metadata{
+				ResourceType: "k8s-cluster",
+				WorkspaceId:  "workspace1",
+				OrgId:        "",
+			},
+			ResourceData: &resources.K8SClusterDetail{
+				ExternalClusterId: "01234",
+				ClusterStatus:     resources.K8SClusterDetail_READY,
+				KubeVersion:       "1.31",
+				KubeVendor:        resources.K8SClusterDetail_OPENSHIFT,
+				VendorVersion:     "4.16",
+				CloudPlatform:     resources.K8SClusterDetail_AWS_UPI,
+				Nodes: []*resources.K8SClusterDetailNodesInner{
+					{
+						Name:   "www.web.com",
+						Cpu:    "7500m",
+						Memory: "30973224Ki",
+						Labels: []*resources.ResourceLabel{
+							{
+								Key:   "has_monster_gpu",
+								Value: "no",
+							},
+						},
+					},
+				},
+			},
+			ReporterData: &resources.ReporterData{
+				ReporterInstanceId: "user@example.com",
+				ReporterType:       resources.ReporterData_ACM,
+				ConsoleHref:        "www.example.com",
+				ApiHref:            "www.example.com",
+				LocalResourceId:    "01234",
+				ReporterVersion:    "0.1",
+			},
+		},
+	}
+	opts := getCallOptions()
+	_, err = client.K8sClusterService.UpdateK8SCluster(context.Background(), &request, opts...)
+	assert.NoError(t, err)
+
 }
 
 func TestInventoryAPIHTTP_K8SPolicy_CreateK8SPolicy(t *testing.T) {
@@ -244,21 +364,60 @@ func TestInventoryAPIHTTP_K8SPolicy_CreateK8SPolicy(t *testing.T) {
 				OrgId:        "",
 			},
 			ResourceData: &resources.K8SPolicyDetail{
-				Disabled: true,
-				Severity: resources.K8SPolicyDetail_MEDIUM,
+				Disabled: false,
+				Severity: resources.K8SPolicyDetail_HIGH,
 			},
 			ReporterData: &resources.ReporterData{
 				ReporterInstanceId: "user@example.com",
-				ReporterType:       resources.ReporterData_ACM,
+				ReporterType:       resources.ReporterData_OCM,
 				ConsoleHref:        "www.example.com",
 				ApiHref:            "www.example.com",
-				LocalResourceId:    "1",
+				LocalResourceId:    "012345",
 				ReporterVersion:    "0.1",
 			},
 		},
 	}
 	opts := getCallOptions()
 	_, err = client.PolicyServiceClient.CreateK8SPolicy(context.Background(), &request, opts...)
+	assert.NoError(t, err)
+
+}
+
+func TestInventoryAPIHTTP_K8SPolicy_UpdateK8SPolicy(t *testing.T) {
+	t.Parallel()
+	c := v1beta1.NewConfig(
+		v1beta1.WithHTTPUrl(inventoryapi_http_url),
+		v1beta1.WithTLSInsecure(insecure),
+		v1beta1.WithHTTPTLSConfig(tlsConfig),
+	)
+	client, err := v1beta1.NewHttpClient(context.Background(), c)
+	if err != nil {
+		t.Error(err)
+	}
+
+	request := resources.UpdateK8SPolicyRequest{
+		K8SPolicy: &resources.K8SPolicy{
+			Metadata: &resources.Metadata{
+				ResourceType: "k8s-policy",
+				WorkspaceId:  "workspace2",
+				OrgId:        "",
+			},
+			ResourceData: &resources.K8SPolicyDetail{
+				Disabled: false,
+				Severity: resources.K8SPolicyDetail_HIGH,
+			},
+			ReporterData: &resources.ReporterData{
+				ReporterInstanceId: "user@example.com",
+				ReporterType:       resources.ReporterData_OCM,
+				ConsoleHref:        "www.example.com",
+				ApiHref:            "www.example.com",
+				LocalResourceId:    "012345",
+				ReporterVersion:    "0.1",
+			},
+		},
+	}
+	opts := getCallOptions()
+	_, err = client.PolicyServiceClient.UpdateK8SPolicy(context.Background(), &request, opts...)
 	assert.NoError(t, err)
 
 }

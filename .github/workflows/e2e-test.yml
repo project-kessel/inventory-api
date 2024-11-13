@@ -22,7 +22,12 @@ jobs:
       - name: View Test Pod Logs
         run: |
           TEST_POD=$(kubectl get pods --selector=job-name=e2e-inventory-http-tests -o jsonpath='{.items[0].metadata.name}')
-          kubectl logs $TEST_POD
+          kubectl logs $TEST_POD | tee test_logs.txt
+          
+          if grep -q -E "FAIL" test_logs.txt; then
+            echo "Test failed. Errors found in logs."
+            exit 1
+          fi
 
       - name: Inventory Down - Kind Cluster
         run: make inventory-down-kind

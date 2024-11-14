@@ -17,7 +17,7 @@ spec:
     spec:
       initContainers:
         - name: migration
-          image: quay.io/redhat-services-prod/project-kessel-tenant/kessel-inventory/inventory-api:latest
+          image: localhost/inventory-api:e2e-test
           command:
             - /bin/sh
             - "-c"
@@ -51,7 +51,7 @@ spec:
               mountPath: "/inventory"
       containers:
         - name: api
-          image: quay.io/redhat-services-prod/project-kessel-tenant/kessel-inventory/inventory-api:latest
+          image: localhost/inventory-api:e2e-test
           command: ["inventory-api"]
           args: ["serve"]
           env:

@@ -392,6 +392,36 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/google.rpc.Status'
+    /api/inventory/v1beta1/resources/{resourceId}:
+        get:
+            tags:
+                - ResourceQueryService
+            operationId: ResourceQueryService_GetResourceByResourceId
+            parameters:
+                - name: resourceId
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.GetResourceByResourceIdRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.GetResourceByResourceIdResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/google.rpc.Status'
 components:
     schemas:
         google.protobuf.Any:
@@ -645,6 +675,16 @@ components:
         kessel.inventory.v1beta1.resources.DeleteRhelHostResponse:
             type: object
             properties: {}
+        kessel.inventory.v1beta1.resources.GetResourceByResourceIdRequest:
+            type: object
+            properties:
+                resourceId:
+                    type: string
+        kessel.inventory.v1beta1.resources.GetResourceByResourceIdResponse:
+            type: object
+            properties:
+                resource:
+                    $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.Resource'
         kessel.inventory.v1beta1.resources.K8sCluster:
             type: object
             properties:
@@ -856,6 +896,19 @@ components:
                 reporter_version:
                     type: string
                     description: version of the reporter
+        kessel.inventory.v1beta1.resources.Resource:
+            type: object
+            properties:
+                metadata:
+                    allOf:
+                        - $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.Metadata'
+                    description: Metadata about this resource
+                reporter_data:
+                    allOf:
+                        - $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.ReporterData'
+                    description: Write only reporter specific data
+                resource_data:
+                    type: object
         kessel.inventory.v1beta1.resources.ResourceLabel:
             type: object
             properties:
@@ -922,3 +975,4 @@ tags:
     - name: KesselK8SPolicyService
     - name: KesselNotificationsIntegrationService
     - name: KesselRhelHostService
+    - name: ResourceQueryService

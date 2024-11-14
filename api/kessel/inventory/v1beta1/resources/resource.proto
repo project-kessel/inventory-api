@@ -1,0 +1,24 @@
+syntax = "proto3";
+
+package kessel.inventory.v1beta1.resources;
+
+import "google/protobuf/struct.proto";
+
+import "buf/validate/validate.proto";
+
+import "kessel/inventory/v1beta1/resources/metadata.proto";
+import "kessel/inventory/v1beta1/resources/reporter_data.proto";
+
+option go_package = "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/resources";
+option java_multiple_files = true;
+option java_package = "org.project_kessel.api.inventory.v1beta1.resources";
+
+message Resource {
+  // Metadata about this resource
+  Metadata metadata = 1;
+
+  // Write only reporter specific data
+  ReporterData reporter_data = 2 [  json_name = "reporter_data", (buf.validate.field).required = true ];
+
+  .google.protobuf.Struct resource_data = 3 [ json_name = "resource_data" ];
+}

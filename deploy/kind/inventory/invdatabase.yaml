@@ -1,0 +1,45 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: invdatabase
+  labels:
+    app: invdatabase
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: invdatabase
+  template:
+    metadata:
+      labels:
+        app: invdatabase
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:latest
+          env:
+            - name: POSTGRES_DB
+              value: spicedb
+            - name: POSTGRES_USER
+              value: postgres
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: inventory-api-config
+                  key: db_password
+          ports:
+            - containerPort: 5432
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: invdatabase
+  labels:
+    app: invdatabase
+spec:
+  ports:
+    - port: 5433
+      targetPort: 5432
+  selector:
+    app: invdatabase
+  type: ClusterIP

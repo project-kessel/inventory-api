@@ -1,0 +1,31 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: e2e-inventory-http-tests
+spec:
+  template:
+    spec:
+      initContainers:
+        - name: wait-for-inventory
+          image: curlimages/curl:latest
+          command:
+            - /bin/sh
+            - "-c"
+            - |
+              echo "Waiting for kessel-inventory-service to be ready..."
+              while ! curl -s http://kessel-inventory-service/api/inventory/v1/readyz; do
+                echo "Inventory service not ready yet. Sleeping for 5 seconds..."
+                sleep 5
+              done
+              echo "Inventory service is ready!"
+      containers:
+        - name: e2e-http-tests
+          image: localhost/inventory-e2e-tests:e2e-test
+          env:
+            - name: INV_HTTP_URL
+              value: "kessel-inventory-service:80"
+            - name: KAFKA_BOOTSTRAP_SERVERS
+              value: "localhost:9092"
+          command: ["/usr/local/bin/e2e-inventory-tests", "-test.v"]
+      restartPolicy: Never
+  backoffLimit: 4

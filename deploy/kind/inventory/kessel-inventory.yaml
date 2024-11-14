@@ -1,0 +1,163 @@
+# Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kessel-inventory
+  labels:
+    app: kessel-inventory
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kessel-inventory
+  template:
+    metadata:
+      labels:
+        app: kessel-inventory
+    spec:
+      initContainers:
+        - name: migration
+          image: localhost/inventory-api:e2e-test
+          command:
+            - /bin/sh
+            - "-c"
+            - |
+              echo "Waiting for PostgreSQL to be ready..."
+              sleep 20 
+              
+              inventory-api migrate
+          env:
+            - name: CLOWDER_ENABLED
+              value: "true"
+            - name: INVENTORY_API_CONFIG
+              value: "/inventory/inventory-api-config.yaml"
+            - name: PGDATA
+              value: /temp/data
+            - name: POSTGRES_HOST
+              value: "invdatabase"
+            - name: POSTGRES_PORT
+              value: "5433"
+            - name: POSTGRES_USER
+              value: "postgres"
+            - name: POSTGRES_DB
+              value: "spicedb"
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: inventory-api-config
+                  key: db_password
+          volumeMounts:
+            - name: config-volume
+              mountPath: "/inventory"
+      containers:
+        - name: api
+          image: localhost/inventory-api:e2e-test
+          command: ["inventory-api"]
+          args: ["serve"]
+          env:
+            - name: CLOWDER_ENABLED
+              value: "true"
+            - name: INVENTORY_API_CONFIG
+              value: "/inventory/inventory-api-config.yaml"
+            - name: PGDATA
+              value: /temp/data
+            - name: POSTGRES_HOST
+              value: "invdatabase"
+            - name: POSTGRES_PORT
+              value: "5433"
+            - name: POSTGRES_USER
+              value: "postgres"
+            - name: POSTGRES_DB
+              value: "spicedb"
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: inventory-api-config
+                  key: db_password
+          livenessProbe:
+            httpGet:
+              path: /api/inventory/v1/livez
+              port: 8081
+          readinessProbe:
+            httpGet:
+              path: /api/inventory/v1/readyz
+              port: 8081
+          volumeMounts:
+            - name: psks-volume
+              mountPath: "/psks.yaml"
+              subPath: psks.yaml
+            - name: config-volume
+              mountPath: "/inventory"
+      volumes:
+        - name: config-volume
+          secret:
+            secretName: inventory-api-config
+        - name: psks-volume
+          configMap:
+            name: inventory-api-psks
+---
+# Services
+apiVersion: v1
+kind: Service
+metadata:
+  name: kessel-inventory-service
+  labels:
+    app: kessel-inventory
+spec:
+  selector:
+    app: kessel-inventory
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 8081
+---
+# PodDisruptionBudget
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: kessel-inventory-api-pdb
+  labels:
+    app: kessel-inventory
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: kessel-inventory
+---
+# Secret
+apiVersion: v1
+kind: Secret
+metadata:
+  name: inventory-api-config
+type: Opaque
+stringData:
+  inventory-api-config.yaml: |
+    server:
+      http:
+        address: 0.0.0.0:8081
+      grpc:
+        address: 0.0.0.0:9081
+    authn:
+      psk:
+        pre-shared-key-file: /psks.yaml
+    authz:
+      impl: allow-all
+    eventing:
+      eventer: stdout
+      kafka:
+    storage:
+      database: postgres
+      sqlite3:
+        dsn: inventory.db
+      postgres:
+        host: "invdatabase"
+        port: "5433"
+        user: "postgres"
+        password: "yPsw5e6ab4bvAGe5H"
+        dbname: "spicedb"
+    log:
+      level: "debug"
+      livez: true
+      readyz: true
+  db_password: "yPsw5e6ab4bvAGe5H"
+

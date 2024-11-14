@@ -5,15 +5,6 @@ source ./scripts/check_docker_podman.sh
 
 kind create cluster --name inventory-cluster
 
-kubectl create secret docker-registry redhat-registry-secret \
-  --docker-server=$DOCKER_SERVER \
-  --docker-username=$QUAY_USERNAME \
-  --docker-password=$QUAY_PASSWORD \
-  --docker-email=$QUAY_EMAIL
-
-kubectl create serviceaccount default
-kubectl patch serviceaccount default -p '{"imagePullSecrets": [{"name": "redhat-registry-secret"}]}'
-
 # build/tag image
 ${DOCKER} build -t localhost/inventory-api:latest -f Dockerfile .
 ${DOCKER} build -t localhost/inventory-e2e-tests:latest -f Dockerfile-e2e .

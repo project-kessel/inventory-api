@@ -6,16 +6,17 @@ import (
 )
 
 type Config struct {
-	Database string
-	DSN      string
+	Options *Options
+	DSN     string
 
 	Postgres *postgres.Config
 	SqlLite3 *sqlite3.Config
 }
 
 type completedConfig struct {
-	Database string
-	DSN      string
+	Options *Options
+
+	DSN string
 }
 
 type CompletedConfig struct {
@@ -24,7 +25,7 @@ type CompletedConfig struct {
 
 func NewConfig(o *Options) *Config {
 	cfg := &Config{
-		Database: o.Database,
+		Options: o,
 	}
 
 	switch o.Database {
@@ -39,15 +40,16 @@ func NewConfig(o *Options) *Config {
 
 func (c *Config) Complete() CompletedConfig {
 	cfg := &completedConfig{
-		Database: c.Database,
-		DSN:      c.DSN,
+		Options: c.Options,
+
+		DSN: c.DSN,
 	}
 
 	if c.DSN != "" {
 		return CompletedConfig{cfg}
 	}
 
-	switch c.Database {
+	switch c.Options.Database {
 	case "postgres":
 		cfg.DSN = c.Postgres.Complete().DSN
 	case "sqlite3":

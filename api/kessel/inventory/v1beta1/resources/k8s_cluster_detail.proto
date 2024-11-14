@@ -64,6 +64,8 @@ message K8sClusterDetail {
 
   ClusterStatus cluster_status = 499346904  [  json_name = "cluster_status", (buf.validate.field).enum = {not_in: [0], defined_only: true} ];
 
+  string cluster_reason = 499346905 [  json_name = "cluster_reason"];
+
   // The version of kubernetes
   string kube_version = 395858490 [  json_name = "kube_version" ];
 

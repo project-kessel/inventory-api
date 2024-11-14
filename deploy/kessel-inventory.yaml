@@ -18,11 +18,11 @@ objects:
           replicas: ${{REPLICAS}}
           podSpec:
             initContainers:
-              - name: migration
-                image: ${INVENTORY_IMAGE}:${IMAGE_TAG}
-                command: ["inventory-api"]
-                args: ["migrate"]
-                inheritEnv: true
+            - name: migration
+              image: ${INVENTORY_IMAGE}:${IMAGE_TAG}
+              command: ["inventory-api"]
+              args: ["migrate"]
+              inheritEnv: true
             image: ${INVENTORY_IMAGE}:${IMAGE_TAG}
             command: ["inventory-api"]
             args: ["serve"]
@@ -35,15 +35,15 @@ objects:
                 path: /api/inventory/v1/readyz
                 port: 8000
             env:
-              - name: CLOWDER_ENABLED
-                value: "true"
-              - name: INVENTORY_API_CONFIG
-                value: "/inventory/inventory-api-config.yaml"
-              - name: PGDATA
-                value: /temp/data
+            - name: CLOWDER_ENABLED
+              value: "true"
+            - name: INVENTORY_API_CONFIG
+              value: "/inventory/inventory-api-config.yaml"
+            - name: PGDATA
+              value: /temp/data
             volumeMounts:
-              - name: config-volume
-                mountPath: "/inventory"
+                - name: config-volume
+                  mountPath: "/inventory"
             volumes:
               - name: config-volume
                 secret:

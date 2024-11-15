@@ -137,7 +137,7 @@ func TestInventoryAPIHTTP_RHELHostLifecycle(t *testing.T) {
 			},
 			ReporterData: &resources.ReporterData{
 				ReporterInstanceId: "user@example.com",
-				ReporterType:       resources.ReporterData_OCM,
+				ReporterType:       resources.ReporterData_ACM,
 				ConsoleHref:        "www.example.com",
 				ApiHref:            "www.example.com",
 				LocalResourceId:    "0123",
@@ -158,7 +158,7 @@ func TestInventoryAPIHTTP_RHELHostLifecycle(t *testing.T) {
 			},
 			ReporterData: &resources.ReporterData{
 				ReporterInstanceId: "user@example.com",
-				ReporterType:       resources.ReporterData_OCM,
+				ReporterType:       resources.ReporterData_ACM,
 				ConsoleHref:        "www.example.com",
 				ApiHref:            "www.example.com",
 				LocalResourceId:    "0123",
@@ -172,7 +172,7 @@ func TestInventoryAPIHTTP_RHELHostLifecycle(t *testing.T) {
 	deleteRequest := resources.DeleteRhelHostRequest{
 		ReporterData: &resources.ReporterData{
 			ReporterInstanceId: "user@example.com",
-			ReporterType:       resources.ReporterData_OCM,
+			ReporterType:       resources.ReporterData_ACM,
 			ConsoleHref:        "www.example.com",
 			ApiHref:            "www.example.com",
 			LocalResourceId:    "0123",
@@ -316,7 +316,7 @@ func TestInventoryAPIHTTP_K8SPolicyLifecycle(t *testing.T) {
 			},
 			ReporterData: &resources.ReporterData{
 				ReporterInstanceId: "user@example.com",
-				ReporterType:       resources.ReporterData_OCM,
+				ReporterType:       resources.ReporterData_ACM,
 				ConsoleHref:        "www.example.com",
 				ApiHref:            "www.example.com",
 				LocalResourceId:    "012345",
@@ -341,7 +341,7 @@ func TestInventoryAPIHTTP_K8SPolicyLifecycle(t *testing.T) {
 			},
 			ReporterData: &resources.ReporterData{
 				ReporterInstanceId: "user@example.com",
-				ReporterType:       resources.ReporterData_OCM,
+				ReporterType:       resources.ReporterData_ACM,
 				ConsoleHref:        "www.example.com",
 				ApiHref:            "www.example.com",
 				LocalResourceId:    "012345",
@@ -356,7 +356,7 @@ func TestInventoryAPIHTTP_K8SPolicyLifecycle(t *testing.T) {
 	deleteRequest := resources.DeleteK8SPolicyRequest{
 		ReporterData: &resources.ReporterData{
 			ReporterInstanceId: "user@example.com",
-			ReporterType:       resources.ReporterData_OCM,
+			ReporterType:       resources.ReporterData_ACM,
 			ConsoleHref:        "www.example.com",
 			ApiHref:            "www.example.com",
 			LocalResourceId:    "012345",

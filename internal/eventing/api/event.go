@@ -59,7 +59,7 @@ type ResourceReporter struct {
 }
 
 type RelationshipMetadata struct {
-	Id               string     `json:"id"`
+	Id               int64      `json:"id"`
 	RelationshipType string     `json:"relationship_type"`
 	CreatedAt        *time.Time `json:"created_at,omitempty"`
 	UpdatedAt        *time.Time `json:"updated_at,omitempty"`

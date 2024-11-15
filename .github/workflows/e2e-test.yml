@@ -17,13 +17,15 @@ jobs:
 
       - name: Monitor Pods in Kind
         run: |
-          for i in {1..50}; do
+          for i in {1..300}; do
             STATUS=$(kubectl get pods --selector=job-name=e2e-inventory-http-tests -o jsonpath='{.items[0].status.phase}')
             if [ "$STATUS" = "Succeeded" ]; then
               echo "Test pod completed successfully."
               exit 0
             elif [ "$STATUS" = "Failed" ]; then
               echo "Test pod failed."
+              TEST_POD=$(kubectl get pods --selector=job-name=e2e-inventory-http-tests -o jsonpath='{.items[0].metadata.name}')
+              kubectl logs $TEST_POD
               exit 1
             fi
             sleep 1

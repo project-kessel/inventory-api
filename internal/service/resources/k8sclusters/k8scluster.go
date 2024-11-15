@@ -2,6 +2,7 @@ package k8sclusters
 
 import (
 	"context"
+
 	"github.com/project-kessel/inventory-api/internal/biz/resources"
 
 	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/resources"
@@ -12,7 +13,7 @@ import (
 )
 
 const (
-	ResourceType = "k8s-cluster"
+	ResourceType = "k8s_cluster"
 )
 
 // K8sClustersService handles requests for k8s clusters

@@ -2,6 +2,7 @@ package k8spolicies
 
 import (
 	"context"
+
 	"github.com/project-kessel/inventory-api/internal/biz/model"
 	"github.com/project-kessel/inventory-api/internal/biz/resources"
 
@@ -12,7 +13,7 @@ import (
 )
 
 const (
-	ResourceType = "k8s-policy"
+	ResourceType = "k8s_policy"
 )
 
 // K8sPoliciesService handles requests for K8s Policies

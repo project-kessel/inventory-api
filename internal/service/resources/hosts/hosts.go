@@ -2,6 +2,7 @@ package hosts
 
 import (
 	"context"
+
 	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/resources"
 	authnapi "github.com/project-kessel/inventory-api/internal/authn/api"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
@@ -11,7 +12,7 @@ import (
 )
 
 const (
-	ResourceType = "rhel-host"
+	ResourceType = "rhel_host"
 )
 
 // HostsService handles requests for Rhel hosts

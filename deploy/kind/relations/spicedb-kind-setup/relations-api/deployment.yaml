@@ -1,0 +1,39 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: relationships
+  labels:
+    app: relationships
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: relationships
+  template:
+    metadata:
+      labels:
+        app: relationships
+    spec:
+      containers:
+        - name: relationships
+          image: quay.io/cloudservices/kessel-relations:latest
+          ports:
+            - containerPort: 8000
+            - containerPort: 9000
+          env:
+            - name: SPICEDB_PRESHARED
+              valueFrom:
+                secretKeyRef:
+                  key: preshared_key
+                  name: dev-spicedb-config
+            - name: SPICEDB_ENDPOINT
+              value: spicedb-cr:50051
+            - name: SPICEDB_SCHEMA_FILE
+              value: /etc/schema/schema.zed
+          volumeMounts:
+            - name: schema
+              mountPath: /etc/schema
+      volumes:
+        - name: schema
+          configMap:
+            name: spicedb-schema

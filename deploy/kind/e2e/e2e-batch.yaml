@@ -3,6 +3,7 @@ kind: Job
 metadata:
   name: e2e-inventory-http-tests
 spec:
+  completions: 1
   template:
     spec:
       initContainers:
@@ -13,7 +14,7 @@ spec:
             - "-c"
             - |
               echo "Waiting for kessel-inventory-service to be ready..."
-              while ! curl -s http://kessel-inventory-service/api/inventory/v1/readyz; do
+              while ! curl -s http://kessel-inventory-service:8081/api/inventory/v1/readyz; do
                 echo "Inventory service not ready yet. Sleeping for 5 seconds..."
                 sleep 5
               done
@@ -23,7 +24,7 @@ spec:
           image: localhost/inventory-e2e-tests:e2e-test
           env:
             - name: INV_HTTP_URL
-              value: "kessel-inventory-service:80"
+              value: "kessel-inventory-service:8081"
             - name: KAFKA_BOOTSTRAP_SERVERS
               value: "localhost:9092"
           command: ["/usr/local/bin/e2e-inventory-tests", "-test.v"]

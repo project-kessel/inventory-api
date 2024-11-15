@@ -138,7 +138,7 @@ func TestInventoryAPIHTTP_Metrics(t *testing.T) {
 	assert.Equal(t, expectedStatusString, resp.Status)
 }
 
-func TestInventoryAPIHTTP_CreateRHELHost(t *testing.T) {
+func TestInventoryAPIHTTP_RHELHostLifecycle(t *testing.T) {
 	t.Parallel()
 	c := v1beta1.NewConfig(
 		v1beta1.WithHTTPUrl(inventoryapi_http_url),
@@ -149,12 +149,49 @@ func TestInventoryAPIHTTP_CreateRHELHost(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	request := resources.CreateRhelHostRequest{RhelHost: &resources.RhelHost{
-		Metadata: &resources.Metadata{
-			ResourceType: "rhel_host",
-			WorkspaceId:  "workspace1",
-			OrgId:        "",
+
+	createRequest := resources.CreateRhelHostRequest{
+		RhelHost: &resources.RhelHost{
+			Metadata: &resources.Metadata{
+				ResourceType: "rhel_host",
+				WorkspaceId:  "workspace0",
+				OrgId:        "",
+			},
+			ReporterData: &resources.ReporterData{
+				ReporterInstanceId: "user@email.com",
+				ReporterType:       resources.ReporterData_OCM,
+				ConsoleHref:        "www.web.com",
+				ApiHref:            "www.wb.com",
+				LocalResourceId:    "0123",
+				ReporterVersion:    "0.2",
+			},
 		},
+	}
+	opts := getCallOptions()
+	_, err = client.RhelHostServiceClient.CreateRhelHost(context.Background(), &createRequest, opts...)
+	assert.NoError(t, err)
+
+	updateRequest := resources.UpdateRhelHostRequest{
+		RhelHost: &resources.RhelHost{
+			Metadata: &resources.Metadata{
+				ResourceType: "rhel_host",
+				WorkspaceId:  "workspace0",
+				OrgId:        "",
+			},
+			ReporterData: &resources.ReporterData{
+				ReporterInstanceId: "user@email.com",
+				ReporterType:       resources.ReporterData_OCM,
+				ConsoleHref:        "www.web.com",
+				ApiHref:            "www.wb.com",
+				LocalResourceId:    "0123",
+				ReporterVersion:    "0.2",
+			},
+		},
+	}
+	_, err = client.RhelHostServiceClient.UpdateRhelHost(context.Background(), &updateRequest, opts...)
+	assert.NoError(t, err)
+
+	deleteRequest := resources.DeleteRhelHostRequest{
 		ReporterData: &resources.ReporterData{
 			ReporterInstanceId: "user@email.com",
 			ReporterType:       resources.ReporterData_OCM,
@@ -163,75 +200,8 @@ func TestInventoryAPIHTTP_CreateRHELHost(t *testing.T) {
 			LocalResourceId:    "0123",
 			ReporterVersion:    "0.2",
 		},
-	}}
-	opts := getCallOptions()
-	_, err = client.RhelHostServiceClient.CreateRhelHost(context.Background(), &request, opts...)
-	assert.NoError(t, err)
-
-}
-
-func TestInventoryAPIHTTP_UpdateRHELHost(t *testing.T) {
-	t.Parallel()
-	c := v1beta1.NewConfig(
-		v1beta1.WithHTTPUrl(inventoryapi_http_url),
-		v1beta1.WithTLSInsecure(insecure),
-		v1beta1.WithHTTPTLSConfig(tlsConfig),
-	)
-	client, err := v1beta1.NewHttpClient(context.Background(), c)
-	if err != nil {
-		t.Error(err)
 	}
-
-	reporterData := &resources.ReporterData{
-		ReporterInstanceId: "user@email.com",
-		ReporterType:       resources.ReporterData_OCM,
-		ConsoleHref:        "www.web.com",
-		ApiHref:            "www.wb.com",
-		LocalResourceId:    "0123",
-		ReporterVersion:    "0.2",
-	}
-
-	request := resources.UpdateRhelHostRequest{RhelHost: &resources.RhelHost{
-		Metadata: &resources.Metadata{
-			ResourceType: "rhel-host",
-			WorkspaceId:  "workspace0",
-			OrgId:        "",
-		},
-		ReporterData: reporterData,
-	}}
-	opts := getCallOptions()
-	_, err = client.RhelHostServiceClient.UpdateRhelHost(context.Background(), &request, opts...)
-	assert.NoError(t, err)
-
-}
-
-func TestInventoryAPIHTTP_DeleteRHELHost(t *testing.T) {
-	t.Parallel()
-	c := v1beta1.NewConfig(
-		v1beta1.WithHTTPUrl(inventoryapi_http_url),
-		v1beta1.WithTLSInsecure(insecure),
-		v1beta1.WithHTTPTLSConfig(tlsConfig),
-	)
-	client, err := v1beta1.NewHttpClient(context.Background(), c)
-	if err != nil {
-		t.Error(err)
-	}
-
-	reporter := &resources.ReporterData{
-		ReporterInstanceId: "user@email.com",
-		ReporterType:       resources.ReporterData_OCM,
-		ConsoleHref:        "www.web.com",
-		ApiHref:            "www.wb.com",
-		LocalResourceId:    "0123",
-		ReporterVersion:    "0.2",
-	}
-
-	request1 := resources.DeleteRhelHostRequest{
-		ReporterData: reporter,
-	}
-
-	opts := getCallOptions()
-	_, err = client.RhelHostServiceClient.DeleteRhelHost(context.Background(), &request1, opts...)
+	_, err = client.RhelHostServiceClient.DeleteRhelHost(context.Background(), &deleteRequest, opts...)
 	assert.NoError(t, err)
 }
 

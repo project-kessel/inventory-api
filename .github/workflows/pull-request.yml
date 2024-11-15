@@ -14,3 +14,4 @@ jobs:
           lint: true
           breaking: true
           input: "api"
+          pr_comment: true

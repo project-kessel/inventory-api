@@ -138,8 +138,7 @@ stringData:
       grpc:
         address: 0.0.0.0:9081
     authn:
-      psk:
-        pre-shared-key-file: /psks.yaml
+      allow-unauthenticated: true
     authz:
       impl: allow-all
     eventing:

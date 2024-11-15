@@ -2,10 +2,11 @@ package api
 
 import (
 	"fmt"
-	"github.com/google/uuid"
-	"github.com/project-kessel/inventory-api/internal/biz/model"
 	"strings"
 	"time"
+
+	"github.com/google/uuid"
+	"github.com/project-kessel/inventory-api/internal/biz/model"
 )
 
 // Todo: get rid of this Event and have an Event (as event output) with all the assignments going on the New* functions
@@ -33,7 +34,7 @@ type RelationshipData struct {
 }
 
 type ResourceMetadata struct {
-	Id           string          `json:"id"`
+	Id           int64           `json:"id"`
 	ResourceType string          `json:"resource_type"`
 	OrgId        string          `json:"org_id"`
 	CreatedAt    *time.Time      `json:"created_at,omitempty"`

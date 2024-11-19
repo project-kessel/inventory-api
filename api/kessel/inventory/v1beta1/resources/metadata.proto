@@ -13,7 +13,7 @@ option java_package = "org.project_kessel.api.inventory.v1beta1.resources";
 
 message Metadata {
   // Kessel Asset Inventory generated identifier.
-  int64 id = 3355 [ (google.api.field_behavior) = OUTPUT_ONLY ];
+  string id = 3355 [ (google.api.field_behavior) = OUTPUT_ONLY ];
 
   // The type of the Resource
   string resource_type = 442752204

@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	ResourceType = "notifications-integration"
+	ResourceType = "integration"
 )
 
 // NotificationsIntegrationsService handles requests for Notifications Integrations

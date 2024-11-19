@@ -9,6 +9,8 @@ objects:
       name: inventory-api-config
     data:
       inventory-api-config.yaml: |
+        storage:
+          disable-persistence: false
         authn:
           psk:
             pre-shared-key-file: /psks/psks.yaml
@@ -48,10 +50,12 @@ objects:
             initContainers:
             - name: migration
               image: ${INVENTORY_IMAGE}:${IMAGE_TAG}
+              imagePullPolicy: Always
               command: ["inventory-api"]
               args: ["migrate"]
               inheritEnv: true
             image: ${INVENTORY_IMAGE}:${IMAGE_TAG}
+            imagePullPolicy: Always
             command: ["inventory-api"]
             args: ["serve"]
             livenessProbe:

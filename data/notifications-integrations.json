@@ -1,0 +1,13 @@
+{
+  "integration": {
+      "metadata": {
+          "workspace_id": "1234",
+          "resource_type": "notifications/integration"
+      },
+      "reporter_data": {
+          "reporter_instance_id": "service-account-1",
+          "reporter_type": "NOTIFICATIONS",
+          "local_resource_id": "1234"
+      }
+  }
+}

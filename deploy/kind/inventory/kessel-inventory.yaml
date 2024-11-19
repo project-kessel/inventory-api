@@ -142,17 +142,18 @@ stringData:
       #psk:
           #pre-shared-key-file: /psks.yaml
     authz:
-      #impl: allow-all
-      impl: kessel
-      kessel:
-        insecure-client: true
-        url: http://relationships-service.default.svc.cluster.local:8000
-        enable-oidc-auth: false
-        principal-user-domain: 0.0.0.0:8084
+      impl: allow-all
+      #impl: kessel
+      #kessel:
+        #insecure-client: true
+        #url: http://relationships-service.default.svc.cluster.local:8000
+        #enable-oidc-auth: false
+        #principal-user-domain: http://relationships-service.default.svc.cluster.local:8000
     eventing:
       eventer: stdout
       kafka:
     storage:
+      disable-persistence: true
       database: postgres
       sqlite3:
         dsn: inventory.db

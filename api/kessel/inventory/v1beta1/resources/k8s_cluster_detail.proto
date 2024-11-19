@@ -74,5 +74,5 @@ message K8sClusterDetail {
 
   CloudPlatform cloud_platform = 476768062 [  json_name = "cloud_platform", (buf.validate.field).enum = {not_in: [0], defined_only: true} ];
 
-  repeated K8sClusterDetailNodesInner nodes = 75440785 [ (buf.validate.field).repeated = {min_items: 1, items: { required: true}} ];
+  repeated K8sClusterDetailNodesInner nodes = 75440785;
 }

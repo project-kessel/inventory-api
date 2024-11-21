@@ -4,6 +4,7 @@ metadata:
   name: e2e-inventory-http-tests
 spec:
   completions: 1
+  backoffLimit: 0
   template:
     spec:
       initContainers:
@@ -26,7 +27,6 @@ spec:
             - name: INV_HTTP_URL
               value: "kessel-inventory-service:8081"
             - name: KAFKA_BOOTSTRAP_SERVERS
-              value: "localhost:9092"
+              value: "my-cluster-kafka-bootstrap:9092"
           command: ["/usr/local/bin/e2e-inventory-tests", "-test.v"]
       restartPolicy: Never
-  backoffLimit: 4

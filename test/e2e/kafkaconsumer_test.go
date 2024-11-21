@@ -82,6 +82,28 @@ func getEnvOrDefault(envVar, defaultValue string) string {
 	return val
 }
 
+func ensureTopicExists(adminClient *kafka.AdminClient, topic string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	topicSpec := kafka.TopicSpecification{
+		Topic:             topic,
+		NumPartitions:     3,
+		ReplicationFactor: 3,
+	}
+
+	results, err := adminClient.CreateTopics(ctx, []kafka.TopicSpecification{topicSpec})
+	if err != nil {
+		return fmt.Errorf("failed to create topic: %v", err)
+	}
+	for _, result := range results {
+		if result.Error.Code() != kafka.ErrNoError && result.Error.Code() != kafka.ErrTopicAlreadyExists {
+			return fmt.Errorf("failed to create topic %s: %v", result.Topic, result.Error)
+		}
+	}
+	return nil
+}
+
 // Test_ACMKafkaConsumer reads events from a Kafka topic and verifies their schema.
 func Test_ACMKafkaConsumer(t *testing.T) {
 	t.Parallel()
@@ -95,6 +117,19 @@ func Test_ACMKafkaConsumer(t *testing.T) {
 	kafkaClientKey := os.Getenv("KAFKA_CLIENT_KEY")   // Client private key for mutual authentication
 
 	topic := getEnvOrDefault("KAFKA_TOPIC", "kessel-inventory")
+
+	adminConfig := &kafka.ConfigMap{
+		"bootstrap.servers": kafkaBootstrapServers,
+	}
+	adminClient, err := kafka.NewAdminClient(adminConfig)
+	if err != nil {
+		t.Fatalf("Failed to create Kafka admin client: %v", err)
+	}
+	defer adminClient.Close()
+
+	if err := ensureTopicExists(adminClient, topic); err != nil {
+		t.Fatalf("Failed to ensure topic exists: %v", err)
+	}
 
 	config := &kafka.ConfigMap{
 		"bootstrap.servers": kafkaBootstrapServers,

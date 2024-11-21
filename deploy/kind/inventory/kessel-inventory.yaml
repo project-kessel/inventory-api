@@ -148,8 +148,9 @@ stringData:
         url: relationships-service.default.svc.cluster.local:9000
         enable-oidc-auth: false
     eventing:
-      eventer: stdout
+      eventer: kafka
       kafka:
+        bootstrap-servers: "my-cluster-kafka-bootstrap.default.svc.cluster.local:9092"
     storage:
       disable-persistence: true
       database: postgres

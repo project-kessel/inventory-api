@@ -8,7 +8,7 @@ spec:
     logLevel: debug
     datastoreEngine: postgres
     #datastoreTLSSecretName: datastore-tls
-    replicas: 2
+    replicas: 1
   secretName: spicedb-config
 
 ---
@@ -31,3 +31,4 @@ stringData:
 #    --- example aws rds ca cert
 #     -----END CERTIFICATE-----
 # ---
+

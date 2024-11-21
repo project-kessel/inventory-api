@@ -15,58 +15,27 @@ jobs:
       - name: Inventory Up - Kind Cluster
         run: make inventory-up-kind
 
-      - name: Monitor Pods in Kind
-        run: |
-
-          for i in {1..100}; do
-            MIGRATE_STATUS=$(kubectl get pods -l job-name=spicedb-cr-migrate -o jsonpath='{.status.containerStatuses[0].ready}')
-            if [ "$MIGRATE_STATUS" = "Completed" ]; then
-              echo "SpiceDB migration completed."
-              break
-            elif [ "$MIGRATE_STATUS" = "Failed" ]; then
-              echo "SpiceDB migration failed."
-              exit 1
-            fi
-            sleep 1
-          done 
-          
-          for i in {1..100}; do
-            ZK_STATUS=$(kubectl get pods my-cluster-zookeeper-0 -o jsonpath='{.status.phase}')
-            ZK_READY=$(kubectl get pods my-cluster-zookeeper-0 -o jsonpath='{.status.containerStatuses[0].ready}')
-            if [ "$ZK_STATUS" = "Running" ] && [ "$ZK_READY" = "true" ]; then
-              echo "Zookeeper is running and ready."
-              exit 0
-            else
-              echo "Zookeeper is not ready yet. Status: $ZK_STATUS, Ready: $ZK_READY"
-              
-            fi
-            sleep 1
-          done
-
-          echo "Timeout reached while waiting for Zookeeper to be ready."
-          exit 1
-      
-
       - name: View Test Pod Logs
         run: |
-          for i in {1..300}; do
+          TEST_POD=$(kubectl get pods --selector=job-name=e2e-inventory-http-tests -o jsonpath='{.items[0].metadata.name}')
+          for i in {1..50}; do
             STATUS=$(kubectl get pods --selector=job-name=e2e-inventory-http-tests -o jsonpath='{.items[0].status.containerStatuses[0].state.terminated.reason}')
             TEST_POD=$(kubectl get pods --selector=job-name=e2e-inventory-http-tests -o jsonpath='{.items[0].metadata.name}')
             if [ "$STATUS" = "Completed" ]; then
-              echo "Test pod completed successfully."
+              echo "E2E test pod completed successfully."
               kubectl logs $TEST_POD
               kubectl get pods
+              kubectl get svc
               exit 0
             elif [ "$STATUS" = "Error" ]; then
-              echo "Test pod failed."
+              echo "E2E test pod failed."
               kubectl logs $TEST_POD
               kubectl get pods
               exit 1
             fi
-            sleep 1
+            sleep 3
           done
-
+          kubectl logs $TEST_POD
 
       - name: Inventory Down - Kind Cluster
         run: make inventory-down-kind
-

@@ -76,7 +76,10 @@ func init() {
 	}
 
 	if clowder.IsClowderEnabled() {
-		options.InjectClowdAppConfig()
+		err := options.InjectClowdAppConfig()
+		if err != nil {
+			panic(err)
+		}
 	}
 
 	loggerOptions := common.LoggerOptions{

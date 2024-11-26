@@ -62,3 +62,4 @@ done
 
 kubectl apply -f deploy/kind/e2e/e2e-batch.yaml
 echo "Setup complete."
+sleep 20

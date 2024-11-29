@@ -2,8 +2,8 @@ package eventing
 
 import (
 	"errors"
+	"github.com/project-kessel/inventory-api/eventing/kafka"
 
-	"github.com/project-kessel/inventory-api/internal/eventing/kafka"
 	"github.com/spf13/pflag"
 )
 

@@ -4,13 +4,13 @@ import (
 	"context"
 	"errors"
 	"github.com/google/uuid"
+	"github.com/project-kessel/inventory-api/eventing/api"
 	"time"
 
 	"github.com/go-kratos/kratos/v2/log"
 	authzapi "github.com/project-kessel/inventory-api/internal/authz/api"
 	"github.com/project-kessel/inventory-api/internal/biz"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
-	eventingapi "github.com/project-kessel/inventory-api/internal/eventing/api"
 	"github.com/project-kessel/inventory-api/internal/server"
 	"gorm.io/gorm"
 )
@@ -33,14 +33,14 @@ var (
 type Usecase struct {
 	repository         ResourceRepository
 	Authz              authzapi.Authorizer
-	Eventer            eventingapi.Manager
+	Eventer            api.Manager
 	Namespace          string
 	log                *log.Helper
 	Server             server.Server
 	DisablePersistence bool
 }
 
-func New(repository ResourceRepository, authz authzapi.Authorizer, eventer eventingapi.Manager, namespace string, logger log.Logger, disablePersistence bool) *Usecase {
+func New(repository ResourceRepository, authz authzapi.Authorizer, eventer api.Manager, namespace string, logger log.Logger, disablePersistence bool) *Usecase {
 	return &Usecase{
 		repository:         repository,
 		Authz:              authz,
@@ -76,7 +76,7 @@ func (uc *Usecase) Create(ctx context.Context, m *model.Resource) (*model.Resour
 	}
 
 	if uc.Eventer != nil {
-		err := biz.DefaultResourceSendEvent(ctx, m, uc.Eventer, *m.CreatedAt, eventingapi.OperationTypeCreated)
+		err := biz.DefaultResourceSendEvent(ctx, m, uc.Eventer, *m.CreatedAt, api.OperationTypeCreated)
 
 		if err != nil {
 			return nil, err
@@ -122,7 +122,7 @@ func (uc *Usecase) Update(ctx context.Context, m *model.Resource, id model.Repor
 	}
 
 	if uc.Eventer != nil {
-		err := biz.DefaultResourceSendEvent(ctx, m, uc.Eventer, *m.UpdatedAt, eventingapi.OperationTypeUpdated)
+		err := biz.DefaultResourceSendEvent(ctx, m, uc.Eventer, *m.UpdatedAt, api.OperationTypeUpdated)
 
 		if err != nil {
 			return nil, err
@@ -167,7 +167,7 @@ func (uc *Usecase) Delete(ctx context.Context, id model.ReporterResourceId) erro
 	}
 
 	if uc.Eventer != nil {
-		err := biz.DefaultResourceSendEvent(ctx, m, uc.Eventer, time.Now(), eventingapi.OperationTypeDeleted)
+		err := biz.DefaultResourceSendEvent(ctx, m, uc.Eventer, time.Now(), api.OperationTypeDeleted)
 
 		if err != nil {
 			return err

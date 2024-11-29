@@ -3,9 +3,9 @@ package resources
 import (
 	"context"
 	"github.com/google/uuid"
+	eventingapi "github.com/project-kessel/inventory-api/eventing/api"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
 	"github.com/project-kessel/inventory-api/internal/data"
-	eventingapi "github.com/project-kessel/inventory-api/internal/eventing/api"
 	"gorm.io/gorm"
 )
 

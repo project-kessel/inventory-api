@@ -23,11 +23,11 @@ import (
 
 	"github.com/go-kratos/kratos/v2/log"
 
+	eventing "github.com/project-kessel/inventory-api/eventing"
+	eventingapi "github.com/project-kessel/inventory-api/eventing/api"
 	"github.com/project-kessel/inventory-api/internal/authn"
 	"github.com/project-kessel/inventory-api/internal/authz"
 	"github.com/project-kessel/inventory-api/internal/errors"
-	"github.com/project-kessel/inventory-api/internal/eventing"
-	eventingapi "github.com/project-kessel/inventory-api/internal/eventing/api"
 	"github.com/project-kessel/inventory-api/internal/middleware"
 	"github.com/project-kessel/inventory-api/internal/server"
 	"github.com/project-kessel/inventory-api/internal/storage"

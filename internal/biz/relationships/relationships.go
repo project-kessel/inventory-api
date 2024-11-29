@@ -3,13 +3,13 @@ package resources
 import (
 	"context"
 	"errors"
+	"github.com/project-kessel/inventory-api/eventing/api"
 	"time"
 
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/google/uuid"
 	"github.com/project-kessel/inventory-api/internal/biz"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
-	eventingapi "github.com/project-kessel/inventory-api/internal/eventing/api"
 	"gorm.io/gorm"
 )
 
@@ -25,7 +25,7 @@ type ResourceRepository interface {
 
 type Usecase struct {
 	repository         ResourceRepository
-	eventer            eventingapi.Manager
+	eventer            api.Manager
 	log                *log.Helper
 	DisablePersistence bool
 }
@@ -37,7 +37,7 @@ var (
 	ErrRelationshipNotFound = errors.New("relationship not found")
 )
 
-func New(repository ResourceRepository, eventer eventingapi.Manager, logger log.Logger, disablePersistence bool) *Usecase {
+func New(repository ResourceRepository, eventer api.Manager, logger log.Logger, disablePersistence bool) *Usecase {
 	return &Usecase{
 		repository:         repository,
 		eventer:            eventer,
@@ -84,7 +84,7 @@ func (uc *Usecase) Create(ctx context.Context, m *model.Relationship) (*model.Re
 	}
 
 	if uc.eventer != nil {
-		err := biz.DefaultRelationshipSendEvent(ctx, m, uc.eventer, *m.CreatedAt, eventingapi.OperationTypeCreated)
+		err := biz.DefaultRelationshipSendEvent(ctx, m, uc.eventer, *m.CreatedAt, api.OperationTypeCreated)
 
 		if err != nil {
 			return nil, err
@@ -131,7 +131,7 @@ func (uc *Usecase) Update(ctx context.Context, m *model.Relationship, id model.R
 	}
 
 	if uc.eventer != nil {
-		err := biz.DefaultRelationshipSendEvent(ctx, m, uc.eventer, *m.UpdatedAt, eventingapi.OperationTypeUpdated)
+		err := biz.DefaultRelationshipSendEvent(ctx, m, uc.eventer, *m.UpdatedAt, api.OperationTypeUpdated)
 
 		if err != nil {
 			return nil, err
@@ -172,7 +172,7 @@ func (uc *Usecase) Delete(ctx context.Context, id model.ReporterRelationshipId) 
 	}
 
 	if uc.eventer != nil {
-		err := biz.DefaultRelationshipSendEvent(ctx, m, uc.eventer, time.Now(), eventingapi.OperationTypeDeleted)
+		err := biz.DefaultRelationshipSendEvent(ctx, m, uc.eventer, time.Now(), api.OperationTypeDeleted)
 
 		if err != nil {
 			return err

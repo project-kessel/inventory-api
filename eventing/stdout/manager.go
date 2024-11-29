@@ -4,11 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"github.com/google/uuid"
+	api "github.com/project-kessel/inventory-api/eventing/api"
 	"os"
 
 	"github.com/go-kratos/kratos/v2/log"
 	authnapi "github.com/project-kessel/inventory-api/internal/authn/api"
-	"github.com/project-kessel/inventory-api/internal/eventing/api"
 )
 
 type StdOutManager struct {

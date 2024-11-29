@@ -3,9 +3,9 @@ package config
 import (
 	"fmt"
 	"github.com/go-kratos/kratos/v2/log"
+	"github.com/project-kessel/inventory-api/eventing"
 	"github.com/project-kessel/inventory-api/internal/authn"
 	"github.com/project-kessel/inventory-api/internal/authz"
-	"github.com/project-kessel/inventory-api/internal/eventing"
 	"github.com/project-kessel/inventory-api/internal/server"
 	"github.com/project-kessel/inventory-api/internal/storage"
 	clowder "github.com/redhatinsights/app-common-go/pkg/api/v1"

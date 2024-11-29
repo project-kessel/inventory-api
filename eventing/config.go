@@ -1,7 +1,7 @@
 package eventing
 
 import (
-	"github.com/project-kessel/inventory-api/internal/eventing/kafka"
+	"github.com/project-kessel/inventory-api/eventing/kafka"
 )
 
 type Config struct {

@@ -15,15 +15,26 @@ jobs:
       - name: Inventory Up - Kind Cluster
         run: make inventory-up-kind
 
-      - name: Monitor Pods in Kind
-        run: |
-          timeout 90s kubectl get pods -w || exit 0
-
       - name: View Test Pod Logs
         run: |
           TEST_POD=$(kubectl get pods --selector=job-name=e2e-inventory-http-tests -o jsonpath='{.items[0].metadata.name}')
+          for i in {1..50}; do
+            STATUS=$(kubectl get pods --selector=job-name=e2e-inventory-http-tests -o jsonpath='{.items[0].status.containerStatuses[0].state.terminated.reason}')
+            if [ "$STATUS" = "Completed" ]; then
+              echo "E2E test pod completed successfully."
+              kubectl logs $TEST_POD
+              kubectl get pods
+              kubectl get svc
+              exit 0
+            elif [ "$STATUS" = "Error" ]; then
+              echo "E2E test pod failed."
+              kubectl logs $TEST_POD
+              kubectl get pods
+              exit 1
+            fi
+            sleep 3
+          done
           kubectl logs $TEST_POD
 
       - name: Inventory Down - Kind Cluster
         run: make inventory-down-kind
-

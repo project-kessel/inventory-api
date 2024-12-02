@@ -1,9 +1,10 @@
 package api
 
 import (
-	"github.com/project-kessel/inventory-api/internal/biz/model"
 	"time"
 )
+
+type JsonObject map[string]interface{}
 
 type Event struct {
 	Specversion     string      `json:"specversion"`
@@ -19,13 +20,13 @@ type Event struct {
 type ResourceData struct {
 	Metadata     ResourceMetadata `json:"metadata"`
 	ReporterData ResourceReporter `json:"reporter_data"`
-	ResourceData model.JsonObject `json:"resource_data,omitempty"`
+	ResourceData JsonObject       `json:"resource_data,omitempty"`
 }
 
 type RelationshipData struct {
 	Metadata     RelationshipMetadata `json:"metadata"`
 	ReporterData RelationshipReporter `json:"reporter_data"`
-	ResourceData model.JsonObject     `json:"resource_data,omitempty"`
+	ResourceData JsonObject           `json:"resource_data,omitempty"`
 }
 
 type ResourceMetadata struct {

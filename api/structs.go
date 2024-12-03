@@ -4,8 +4,10 @@ import (
 	"time"
 )
 
+// JsonObject type taken from: https://github.com/project-kessel/inventory-api/blob/main/internal/biz/model/common.go
 type JsonObject map[string]interface{}
 
+// Event types taken from: https://github.com/project-kessel/inventory-api/blob/main/internal/eventing/api/event.go
 type Event struct {
 	Specversion     string      `json:"specversion"`
 	Type            string      `json:"type"`

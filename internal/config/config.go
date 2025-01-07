@@ -2,6 +2,8 @@ package config
 
 import (
 	"fmt"
+	"strconv"
+
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/project-kessel/inventory-api/internal/authn"
 	"github.com/project-kessel/inventory-api/internal/authz"
@@ -9,7 +11,6 @@ import (
 	"github.com/project-kessel/inventory-api/internal/server"
 	"github.com/project-kessel/inventory-api/internal/storage"
 	clowder "github.com/redhatinsights/app-common-go/pkg/api/v1"
-	"strconv"
 )
 
 // OptionsConfig contains the settings for each configuration option
@@ -47,10 +48,12 @@ func LogConfigurationInfo(options *OptionsConfig) {
 	}
 
 	if options.Storage.Database == storage.Postgres {
-		log.Debugf("Storage Configuration: Host: %s, DB: %s, Port: %s",
+		log.Debugf("Storage Configuration: Host: %s, DB: %s, Port: %s, SSLMode: %s, RDSCACert: %s",
 			options.Storage.Postgres.Host,
 			options.Storage.Postgres.DbName,
 			options.Storage.Postgres.Port,
+			options.Storage.Postgres.SSLMode,
+			options.Storage.Postgres.SSLRootCert,
 		)
 	}
 
@@ -64,7 +67,7 @@ func LogConfigurationInfo(options *OptionsConfig) {
 }
 
 // InjectClowdAppConfig updates service options based on values in the ClowdApp AppConfig
-func (o *OptionsConfig) InjectClowdAppConfig() {
+func (o *OptionsConfig) InjectClowdAppConfig() error {
 	// check for authz config
 	for _, endpoint := range clowder.LoadedConfig.Endpoints {
 		if endpoint.App == authz.RelationsAPI {
@@ -73,8 +76,12 @@ func (o *OptionsConfig) InjectClowdAppConfig() {
 	}
 	// check for db config
 	if clowder.LoadedConfig.Database != nil {
-		o.ConfigureStorage(clowder.LoadedConfig.Database)
+		err := o.ConfigureStorage(clowder.LoadedConfig)
+		if err != nil {
+			return fmt.Errorf("failed to configure storage: %w", err)
+		}
 	}
+	return nil
 }
 
 // ConfigureAuthz updates Authz settings based on ClowdApp AppConfig
@@ -84,11 +91,21 @@ func (o *OptionsConfig) ConfigureAuthz(endpoint clowder.DependencyEndpoint) {
 }
 
 // ConfigureStorage updates Storage settings based on ClowdApp AppConfig
-func (o *OptionsConfig) ConfigureStorage(database *clowder.DatabaseConfig) {
+func (o *OptionsConfig) ConfigureStorage(appconfig *clowder.AppConfig) error {
 	o.Storage.Database = storage.Postgres
-	o.Storage.Postgres.Host = database.Hostname
-	o.Storage.Postgres.Port = strconv.Itoa(database.Port)
-	o.Storage.Postgres.User = database.Username
-	o.Storage.Postgres.Password = database.Password
-	o.Storage.Postgres.DbName = database.Name
+	o.Storage.Postgres.Host = appconfig.Database.Hostname
+	o.Storage.Postgres.Port = strconv.Itoa(appconfig.Database.Port)
+	o.Storage.Postgres.User = appconfig.Database.Username
+	o.Storage.Postgres.Password = appconfig.Database.Password
+	o.Storage.Postgres.DbName = appconfig.Database.Name
+
+	if appconfig.Database.RdsCa != nil {
+		caPath, err := appconfig.RdsCa()
+		if err != nil {
+			return fmt.Errorf("failed to load rds ca: %w", err)
+		}
+		o.Storage.Postgres.SSLMode = "verify-full"
+		o.Storage.Postgres.SSLRootCert = caPath
+	}
+	return nil
 }

@@ -1,4 +1,4 @@
-FROM registry.access.redhat.com/ubi8/ubi-minimal:8.10-1130 AS builder
+FROM registry.access.redhat.com/ubi8/ubi-minimal:8.10-1154 AS builder
 
 ARG TARGETARCH
 USER root
@@ -24,7 +24,7 @@ COPY main.go Makefile ./
 ARG VERSION
 RUN VERSION=${VERSION} make build
 
-FROM registry.access.redhat.com/ubi8/ubi-minimal:8.10-1130
+FROM registry.access.redhat.com/ubi8/ubi-minimal:8.10-1154
 
 COPY --from=builder /workspace/bin/inventory-api /usr/local/bin/
 

@@ -1,9 +1,26 @@
+FIPS_ENABLED?=true
+
 ifeq ($(GO),)
 GO:=$(shell command -v go)
 endif
 
 GOHOSTOS:=$(shell $(GO) env GOHOSTOS)
 GOPATH:=$(shell $(GO) env GOPATH)
+GOOS?=$(shell $(GO) env GOOS)
+GOARCH?=$(shell $(GO) env GOARCH)
+GOBIN?=$(shell $(GO) env GOBIN)
+GOFLAGS_MOD ?=
+
+GOENV=GOOS=${GOOS} GOARCH=${GOARCH} CGO_ENABLED=1 GOFLAGS="${GOFLAGS_MOD}"
+GOBUILDFLAGS=-gcflags="all=-trimpath=${GOPATH}" -asmflags="all=-trimpath=${GOPATH}"
+
+ifeq (${FIPS_ENABLED}, true)
+GOFLAGS_MOD+=-tags=fips_enabled
+GOFLAGS_MOD:=$(strip ${GOFLAGS_MOD})
+GOENV+=GOEXPERIMENT=strictfipsruntime,boringcrypto
+GOENV:=$(strip ${GOENV})
+endif
+
 IMAGE ?="quay.io/cloudservices/kessel-inventory"
 IMAGE_TAG=$(git rev-parse --short=7 HEAD)
 GIT_COMMIT=$(git rev-parse --short HEAD)
@@ -63,6 +80,12 @@ api_breaking:
 .PHONY: build
 # build
 build:
+	$(warning Setting GOEXPERIMENT=strictfipsruntime,boringcrypto - this generally causes builds to fail unless building inside the provided Dockerfile. If building locally, run `make local-build`)
+	mkdir -p bin/ && ${GOENV} GOOS=${GOOS} ${GO} build ${GOBUILDFLAGS} -ldflags "-X cmd.Version=$(VERSION)" -o ./bin/ ./...
+
+.PHONY: local-build
+# local-build to ensure FIPS is not enabled which would likely result in a failed build locally
+local-build:
 	mkdir -p bin/ && $(GO) build -ldflags "-X cmd.Version=$(VERSION)" -o ./bin/ ./...
 
 .PHONY: docker-build-push

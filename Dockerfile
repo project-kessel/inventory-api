@@ -2,12 +2,7 @@ FROM registry.access.redhat.com/ubi8/ubi-minimal:8.10-1154 AS builder
 
 ARG TARGETARCH
 USER root
-RUN microdnf install -y tar gzip make which gcc gcc-c++ cyrus-sasl-lib findutils git
-
-# install platform specific go version
-RUN curl -O -J  https://dl.google.com/go/go1.22.5.linux-${TARGETARCH}.tar.gz
-RUN tar -C /usr/local -xzf go1.22.5.linux-${TARGETARCH}.tar.gz
-RUN ln -s /usr/local/go/bin/go /usr/local/bin/go
+RUN microdnf install -y tar gzip make which gcc gcc-c++ cyrus-sasl-lib findutils git go-toolset
 
 WORKDIR /workspace
 
@@ -24,9 +19,16 @@ COPY main.go Makefile ./
 ARG VERSION
 RUN VERSION=${VERSION} make build
 
+# adds fips-detect tool for FIPS validation -- likely not needed long term
+RUN mkdir /tmp/go && GOPATH=/tmp/go GOCACHE=/tmp/go go install github.com/acardace/fips-detect@latest
+
 FROM registry.access.redhat.com/ubi8/ubi-minimal:8.10-1154
 
+# installs RHEL fork of go to be able to validate with go tools for FIPS -- likely not needed long term
+RUN microdnf install -y go-toolset
+
 COPY --from=builder /workspace/bin/inventory-api /usr/local/bin/
+COPY --from=builder /tmp/go/bin/fips-detect /usr/local/bin/
 
 EXPOSE 8081
 EXPOSE 9081

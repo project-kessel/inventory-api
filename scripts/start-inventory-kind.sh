@@ -3,6 +3,33 @@ set -e
 
 source ./scripts/check_docker_podman.sh
 
+check_kafka_readiness() {
+  local pod_name=$1
+  local max_retries=$2
+  local retry_count=0
+
+  echo "Waiting for pod $pod_name readiness..."
+
+  while true; do
+    kubectl exec $pod_name -- /opt/kafka/kafka_readiness.sh >/dev/null 2>&1
+    if [[ $? -eq 0 ]]; then
+      echo "Pod $pod_name is ready."
+      break
+    else
+      echo "Pod $pod_name is not ready yet. Retrying in 10 seconds..."
+      sleep 10
+      ((retry_count++))
+      if [[ $retry_count -ge $max_retries ]]; then
+        echo "Timeout waiting for pod $pod_name readiness."
+        echo "Logs from pod $pod_name:"
+        kubectl logs $pod_name
+        echo "Describing pod $pod_name:"
+        kubectl describe pod $pod_name
+        exit 1
+      fi
+    fi
+  done
+}
 kind create cluster --name inventory-cluster
 
 # build/tag image
@@ -46,20 +73,31 @@ kubectl apply -f deploy/kind/relations/spicedb-kind-setup/relations-api/deployme
 kubectl apply -f deploy/kind/relations/spicedb-kind-setup/relations-api/svc.yaml
 
 
+echo "Waiting for all pods to be ready (1/1)..."
+MAX_RETRIES=18
 
-echo "Waiting for all pods to be fully ready..."
+
 while true; do
-  PODS_READY=$(kubectl get pods --no-headers | awk '{print $2}' | grep -v '^1/1$' | wc -l)
-  if [ "$PODS_READY" -eq 0 ]; then
-    echo "All pods are ready!"
+  POD_STATUSES=$(kubectl get pods --no-headers)
+
+  NOT_READY=$(echo "$POD_STATUSES" | awk '{print $2}' | grep -v '^1/1$' | wc -l)
+
+  if [ "$NOT_READY" -eq 0 ]; then
+    echo "All pods are ready (1/1)."
+    echo "Delaying readiness checks to allow Kafka pods to initialize..."
+    sleep 15
+    check_kafka_readiness "my-cluster-kafka-0" $MAX_RETRIES
+    check_kafka_readiness "my-cluster-kafka-1" $MAX_RETRIES
+    check_kafka_readiness "my-cluster-kafka-2" $MAX_RETRIES
+
     break
-  else
-    echo "Waiting for pods to be ready... ($PODS_READY not ready yet)"
-    kubectl get pods
-    sleep 30
   fi
+
+  echo "Waiting for pods to be ready... ($NOT_READY pods not ready)"
+  kubectl get pods
+  sleep 5
+
 done
 
 kubectl apply -f deploy/kind/e2e/e2e-batch.yaml
 echo "Setup complete."
-sleep 20

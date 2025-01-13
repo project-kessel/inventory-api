@@ -2,6 +2,8 @@ package resources
 
 import (
 	"context"
+	"testing"
+
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/google/uuid"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
@@ -10,7 +12,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
-	"testing"
 )
 
 func setupGorm(t *testing.T) *gorm.DB {
@@ -237,4 +238,51 @@ func TestDeleteAfterUpdate(t *testing.T) {
 	assert.Nil(t, db.Find(&resourceHistory).Error)
 	assert.Len(t, resourceHistory, 3)
 	assertEqualResourceHistory(t, r, &resourceHistory[2], model.OperationTypeDelete)
+}
+
+func TestFindByReporterResourceId(t *testing.T) {
+	db := setupGorm(t)
+	repo := New(db)
+	ctx := context.TODO()
+
+	// Saving a resource not present in the system saves correctly
+	r, err := repo.Save(ctx, resource1())
+	assert.NotNil(t, r)
+	assert.Nil(t, err)
+
+	// use nil value ReporterResource Id to check negative case
+	reporterResourceId := model.ReporterResourceId{}
+
+	resource, err := repo.FindByReporterResourceId(ctx, reporterResourceId)
+	assert.NotNil(t, err)
+	assert.Nil(t, resource)
+
+	// check that resource is retrievable via ReporterResourceID object
+	reporterResourceId = model.ReporterResourceIdFromResource(r)
+
+	resource, err = repo.FindByReporterResourceId(ctx, reporterResourceId)
+	assert.Nil(t, err)
+	assert.NotNil(t, resource)
+}
+
+func TestListAll(t *testing.T) {
+	db := setupGorm(t)
+	repo := New(db)
+	ctx := context.TODO()
+
+	// check negative case without any resources, slice with 0 elements returned
+	resources, err := repo.ListAll(ctx)
+	assert.Nil(t, err)
+	assert.Len(t, resources, 0)
+
+	// create a single resource
+	r, err := repo.Save(ctx, resource1())
+	assert.NotNil(t, r)
+	assert.Nil(t, err)
+
+	// check positive case, a single resource is returned
+	resources, err = repo.ListAll(ctx)
+	assert.Nil(t, err)
+	assert.Len(t, resources, 1)
+	assertEqualResource(t, resources[0], r)
 }

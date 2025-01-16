@@ -392,6 +392,94 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/google.rpc.Status'
+    /api/inventory/v1beta1/resources/{resource.metadata.resource_type}:
+        put:
+            tags:
+                - KesselResourceService
+            operationId: KesselResourceService_UpdateResource
+            parameters:
+                - name: resource.metadata.resource_type
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.UpdateResourceRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.UpdateResourceResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/google.rpc.Status'
+        post:
+            tags:
+                - KesselResourceService
+            operationId: KesselResourceService_CreateResource
+            parameters:
+                - name: resource.metadata.resource_type
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.CreateResourceRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.CreateResourceResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/google.rpc.Status'
+        delete:
+            tags:
+                - KesselResourceService
+            operationId: KesselResourceService_DeleteResource
+            parameters:
+                - name: resource.metadata.resource_type
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.DeleteResourceRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.DeleteResourceResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/google.rpc.Status'
 components:
     schemas:
         google.protobuf.Any:
@@ -595,6 +683,14 @@ components:
         kessel.inventory.v1beta1.resources.CreateNotificationsIntegrationResponse:
             type: object
             properties: {}
+        kessel.inventory.v1beta1.resources.CreateResourceRequest:
+            type: object
+            properties:
+                resource:
+                    $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.Resource'
+        kessel.inventory.v1beta1.resources.CreateResourceResponse:
+            type: object
+            properties: {}
         kessel.inventory.v1beta1.resources.CreateRhelHostRequest:
             type: object
             properties:
@@ -633,6 +729,14 @@ components:
                         - $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.ReporterData'
                     description: "The resource to be deleted will be defined by \n \\\"<reporter_data.reporter_type>:<reporter_instaance_id>:<reporter_data.local_resource_id>\\\"\n from the request body."
         kessel.inventory.v1beta1.resources.DeleteNotificationsIntegrationResponse:
+            type: object
+            properties: {}
+        kessel.inventory.v1beta1.resources.DeleteResourceRequest:
+            type: object
+            properties:
+                resource:
+                    $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.Resource'
+        kessel.inventory.v1beta1.resources.DeleteResourceResponse:
             type: object
             properties: {}
         kessel.inventory.v1beta1.resources.DeleteRhelHostRequest:
@@ -858,6 +962,15 @@ components:
                 reporter_version:
                     type: string
                     description: version of the reporter
+        kessel.inventory.v1beta1.resources.Resource:
+            type: object
+            properties:
+                metadata:
+                    $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.Metadata'
+                reporter_data:
+                    type: object
+                resource_data:
+                    type: object
         kessel.inventory.v1beta1.resources.ResourceLabel:
             type: object
             properties:
@@ -907,6 +1020,14 @@ components:
         kessel.inventory.v1beta1.resources.UpdateNotificationsIntegrationResponse:
             type: object
             properties: {}
+        kessel.inventory.v1beta1.resources.UpdateResourceRequest:
+            type: object
+            properties:
+                resource:
+                    $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.Resource'
+        kessel.inventory.v1beta1.resources.UpdateResourceResponse:
+            type: object
+            properties: {}
         kessel.inventory.v1beta1.resources.UpdateRhelHostRequest:
             type: object
             properties:
@@ -923,4 +1044,5 @@ tags:
     - name: KesselK8SPolicyIsPropagatedToK8SClusterService
     - name: KesselK8SPolicyService
     - name: KesselNotificationsIntegrationService
+    - name: KesselResourceService
     - name: KesselRhelHostService

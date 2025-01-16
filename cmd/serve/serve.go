@@ -13,11 +13,7 @@ import (
 	relationshipsrepo "github.com/project-kessel/inventory-api/internal/data/relationships"
 	resourcerepo "github.com/project-kessel/inventory-api/internal/data/resources"
 	relationshipssvc "github.com/project-kessel/inventory-api/internal/service/relationships/k8spolicy"
-	hostssvc "github.com/project-kessel/inventory-api/internal/service/resources/hosts"
-	k8sclusterssvc "github.com/project-kessel/inventory-api/internal/service/resources/k8sclusters"
-	k8spoliciessvc "github.com/project-kessel/inventory-api/internal/service/resources/k8spolicies"
-	notifssvc "github.com/project-kessel/inventory-api/internal/service/resources/notificationsintegrations"
-
+	resourcessvc "github.com/project-kessel/inventory-api/internal/service/resources/resources"
 	"github.com/spf13/cobra"
 	"gorm.io/gorm"
 
@@ -39,6 +35,10 @@ import (
 	healthctl "github.com/project-kessel/inventory-api/internal/biz/health"
 	healthrepo "github.com/project-kessel/inventory-api/internal/data/health"
 	healthssvc "github.com/project-kessel/inventory-api/internal/service/health"
+	hostssvc "github.com/project-kessel/inventory-api/internal/service/resources/hosts"
+	k8sclusterssvc "github.com/project-kessel/inventory-api/internal/service/resources/k8sclusters"
+	k8spoliciessvc "github.com/project-kessel/inventory-api/internal/service/resources/k8spolicies"
+	notifssvc "github.com/project-kessel/inventory-api/internal/service/resources/notificationsintegrations"
 )
 
 func NewCommand(
@@ -172,6 +172,12 @@ func NewCommand(
 			k8spolicies_service := k8spoliciessvc.New(k8spolicies_controller)
 			pb.RegisterKesselK8SPolicyServiceServer(server.GrpcServer, k8spolicies_service)
 			pb.RegisterKesselK8SPolicyServiceHTTPServer(server.HttpServer, k8spolicies_service)
+
+			resource_repo := resourcerepo.New(db)
+			resource_controller := resourcesctl.New(resource_repo, authorizer, eventingManager, "resource", log.With(logger, "subsystem", "resource_controller"), storageConfig.Options.DisablePersistence)
+			resource_service := resourcessvc.New(resource_controller)
+			pb.RegisterKesselResourceServiceServer(server.GrpcServer, resource_service)
+			pb.RegisterKesselResourceServiceHTTPServer(server.HttpServer, resource_service)
 
 			// wire together relationships handling
 			relationships_repo := relationshipsrepo.New(db)

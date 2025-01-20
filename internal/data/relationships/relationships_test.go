@@ -2,6 +2,8 @@ package resources
 
 import (
 	"context"
+	"testing"
+
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/google/uuid"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
@@ -11,7 +13,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
-	"testing"
 )
 
 func setupGorm(t *testing.T) *gorm.DB {
@@ -326,4 +327,56 @@ func TestDeleteAfterUpdate(t *testing.T) {
 	assert.Nil(t, db.Find(&relationshipHistory).Error)
 	assert.Len(t, relationshipHistory, 3)
 	assertEqualRelationshipHistory(t, r, &relationshipHistory[2], model.OperationTypeDelete)
+}
+
+func TestFindRelationship(t *testing.T) {
+	db := setupGorm(t)
+	repo := New(db)
+	ctx := context.TODO()
+
+	subjectId := createResource(t, db, resourceSubject())
+	objectId := createResource(t, db, resourceObject())
+
+	// Saving a relationship not present in the system saves correctly
+	r, err := repo.Save(ctx, relationship1(subjectId, objectId))
+	assert.NotNil(t, r)
+	assert.Nil(t, err)
+
+	// relationship should be found via IDs and type
+	relationship, err := repo.FindRelationship(ctx, subjectId, objectId, "software_has-a-bug_bug")
+
+	assert.Nil(t, err)
+	assert.NotNil(t, relationship)
+	assertEqualRelationship(t, relationship, r)
+
+	// no relationship should be found if type does not match
+	relationship, err = repo.FindRelationship(ctx, subjectId, objectId, "invalid")
+
+	assert.NotNil(t, err)
+	assert.Nil(t, relationship)
+}
+
+func TestListAll(t *testing.T) {
+	db := setupGorm(t)
+	repo := New(db)
+	ctx := context.TODO()
+
+	subjectId := createResource(t, db, resourceSubject())
+	objectId := createResource(t, db, resourceObject())
+
+	// first check negative case with zero relationships
+	relationships, err := repo.ListAll(ctx)
+	assert.Nil(t, err)
+	assert.Len(t, relationships, 0)
+
+	// Saving a relationship not present in the system saves correctly
+	r, err := repo.Save(ctx, relationship1(subjectId, objectId))
+	assert.NotNil(t, r)
+	assert.Nil(t, err)
+
+	// ListAll should now return a single relationship
+	relationships, err = repo.ListAll(ctx)
+	assert.Nil(t, err)
+	assert.Len(t, relationships, 1)
+	assertEqualRelationship(t, relationships[0], r)
 }

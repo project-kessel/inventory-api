@@ -1,0 +1,15 @@
+syntax = "proto3";
+
+package kessel.inventory.v1beta1.resources;
+
+
+//import "google/protobuf/any.proto";
+
+option go_package = "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/resources";
+option java_multiple_files = true;
+option java_package = "org.project_kessel.api.inventory.v1beta1.resources";
+
+
+message ResourceData {
+  string resource_data = 395858490 [  json_name = "resource_data"];
+}

@@ -1,0 +1,26 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "disabled": {
+      "type": "boolean",
+      "description": "Defines if the policy is currently enabled or disabled across all targets."
+    },
+    "severity": {
+      "type": "string",
+      "enum": [
+        "SEVERITY_UNSPECIFIED",
+        "SEVERITY_OTHER",
+        "LOW",
+        "MEDIUM",
+        "HIGH",
+        "CRITICAL"
+      ],
+      "description": "The severity level of the policy."
+    }
+  },
+  "required": [
+    "disabled",
+    "severity"
+  ]
+}

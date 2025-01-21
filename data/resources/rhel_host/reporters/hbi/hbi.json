@@ -5,7 +5,7 @@
     "reporter_type": {
       "type": "string",
       "enum": [
-        "OCM"
+        "HBI"
       ]
     },
     "console_href": { "type": "string" },

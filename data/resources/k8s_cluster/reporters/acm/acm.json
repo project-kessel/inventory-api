@@ -1,0 +1,10 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "external_cluster_id": { "type": "integer" },
+    "cluster_status": { "type": "string" }
+  },
+  "required": ["external_cluster_id", "cluster_status"]
+}
+

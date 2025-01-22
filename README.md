@@ -96,11 +96,13 @@ See [DEBUG](./DEBUG.md) for instructions on how to debug
 
 #### Kessel Inventory + Kessel Relations
 
-There is Make target to run inventory-api (with postgres) and relations api (with spicedb).
-It uses compose to build the current inventory code and spin up containers with the required dependecies.
+In order to test Kessel Inventory with Kessel Relations, we recommend cloning the Relations API repo locally and leveraging their existing [Docker Compose process](https://github.com/project-kessel/relations-api/tree/main?tab=readme-ov-file#spicedb-using-dockerpodman) to spin up the Relations API.
 
-- This provides a [PSK file](./config/psks.yaml#L1) with a token "1234".
-- Default ports in this setup are `8081` for http and `9091` for grpc.
+Both Inventory and Relations compose files are configured to use the same docker network (`kessel`) to ensure network connectivity between all containers.
+
+For the Inventory Compose deployment:
+- A [PSK file](./config/psks.yaml#L1) is provided with the token "1234".
+- Default ports in this setup are `8081` for http and `9091` for grpc to not conflict with Relations
 - Refer to [inventory-api-compose.yaml](./inventory-api-compose.yaml) for additional configuration
 
 To start use:
@@ -168,6 +170,8 @@ Similar as above, but instead of running Kafka, this will configure inventory to
 - Sets up a keycloak instance running at port 8084 with [myrealm](myrealm.json) config file.
 - Set up a default service account with clientId: `test-svc`. Refer to [get-token](scripts/get-token.sh) to learn how to fetch a token.
 - Refer to [sso-inventory-api.yaml](./sso-inventory-api.yaml) for additional configuration
+
+As before you'll need to run the Relations Compose steps available in the [Relations API repo](https://github.com/project-kessel/relations-api/tree/main?tab=readme-ov-file#spicedb-using-dockerpodman)
 
 To start use:
 ```shell

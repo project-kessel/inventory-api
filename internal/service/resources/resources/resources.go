@@ -12,10 +12,6 @@ import (
 	conv "github.com/project-kessel/inventory-api/internal/service/common"
 )
 
-const (
-	ResourceType = "k8s_cluster" // TODO should be dynamic
-)
-
 type ResourceService struct {
 	pb.UnimplementedKesselResourceServiceServer
 
@@ -101,20 +97,34 @@ func (c *ResourceService) resourceFromCreateRequest(r *pb.CreateResourceRequest,
 	}
 
 	// Create the Resource object using the parsed and converted parts
-	return conv.ResourceFromPb(ResourceType, identity.Principal, resourceData, r.Resource.Metadata, r.Resource.ReporterData), nil
+	return conv.ResourceFromPb(string(r.ResourceType), identity.Principal, resourceData, r.Resource.Metadata, r.Resource.ReporterData), nil
 }
 
 func (c *ResourceService) resourceFromUpdateRequest(r *pb.UpdateResourceRequest, identity *authnapi.Identity) (*model.Resource, error) {
-	resourceData, err := conv.ToJsonObject(r.Resource.ResourceData)
-	if err != nil {
-		return nil, err
+
+	if r.Resource.ResourceData == nil {
+		log.Errorf("Resource data empty")
 	}
 
-	return conv.ResourceFromPb(ResourceType, identity.Principal, resourceData, r.Resource.Metadata, r.Resource.ReporterData), nil
+	// Extract the `resource_data` field as a string
+	resourceDataStr := r.Resource.ResourceData.GetResourceData()
+
+	// Check if the extracted data is empty
+	if resourceDataStr == "" {
+		log.Errorf("Resource data string is empty")
+	}
+
+	// Parse the JSON string into a map
+	var resourceData map[string]interface{}
+	if err := json.Unmarshal([]byte(resourceDataStr), &resourceData); err != nil {
+		log.Errorf("Failed to unmarshall json")
+	}
+
+	return conv.ResourceFromPb(string(r.ResourceType), identity.Principal, resourceData, r.Resource.Metadata, r.Resource.ReporterData), nil
 }
 
 func (c *ResourceService) resourceIdFromDeleteRequest(r *pb.DeleteResourceRequest, identity *authnapi.Identity) (model.ReporterResourceId, error) {
-	return conv.ReporterResourceIdFromPb(ResourceType, identity.Principal, r.Resource.ReporterData), nil
+	return conv.ReporterResourceIdFromPb(string(r.ResourceType), identity.Principal, r.Resource.ReporterData), nil
 }
 
 func createResponseFromResource(c *model.Resource) *pb.CreateResourceResponse {

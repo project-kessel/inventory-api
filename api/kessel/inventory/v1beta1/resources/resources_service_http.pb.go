@@ -31,9 +31,9 @@ type KesselResourceServiceHTTPServer interface {
 
 func RegisterKesselResourceServiceHTTPServer(s *http.Server, srv KesselResourceServiceHTTPServer) {
 	r := s.Route("/")
-	r.POST("/api/inventory/v1beta1/resources/{resource_type}", _KesselResourceService_CreateResource0_HTTP_Handler(srv))
-	r.PUT("/api/inventory/v1beta1/resources/{resource_type}", _KesselResourceService_UpdateResource0_HTTP_Handler(srv))
-	r.DELETE("/api/inventory/v1beta1/resources/{resource_type}", _KesselResourceService_DeleteResource0_HTTP_Handler(srv))
+	r.POST("/api/inventory/v1beta1/resources/{resource.metadata.resource_type}", _KesselResourceService_CreateResource0_HTTP_Handler(srv))
+	r.PUT("/api/inventory/v1beta1/resources/{resource.metadata.resource_type}", _KesselResourceService_UpdateResource0_HTTP_Handler(srv))
+	r.DELETE("/api/inventory/v1beta1/resources/{resource.metadata.resource_type}", _KesselResourceService_DeleteResource0_HTTP_Handler(srv))
 }
 
 func _KesselResourceService_CreateResource0_HTTP_Handler(srv KesselResourceServiceHTTPServer) func(ctx http.Context) error {
@@ -127,7 +127,7 @@ func NewKesselResourceServiceHTTPClient(client *http.Client) KesselResourceServi
 
 func (c *KesselResourceServiceHTTPClientImpl) CreateResource(ctx context.Context, in *CreateResourceRequest, opts ...http.CallOption) (*CreateResourceResponse, error) {
 	var out CreateResourceResponse
-	pattern := "/api/inventory/v1beta1/resources/{resource_type}"
+	pattern := "/api/inventory/v1beta1/resources/{resource.metadata.resource_type}"
 	path := binding.EncodeURL(pattern, in, false)
 	opts = append(opts, http.Operation(OperationKesselResourceServiceCreateResource))
 	opts = append(opts, http.PathTemplate(pattern))
@@ -140,7 +140,7 @@ func (c *KesselResourceServiceHTTPClientImpl) CreateResource(ctx context.Context
 
 func (c *KesselResourceServiceHTTPClientImpl) DeleteResource(ctx context.Context, in *DeleteResourceRequest, opts ...http.CallOption) (*DeleteResourceResponse, error) {
 	var out DeleteResourceResponse
-	pattern := "/api/inventory/v1beta1/resources/{resource_type}"
+	pattern := "/api/inventory/v1beta1/resources/{resource.metadata.resource_type}"
 	path := binding.EncodeURL(pattern, in, false)
 	opts = append(opts, http.Operation(OperationKesselResourceServiceDeleteResource))
 	opts = append(opts, http.PathTemplate(pattern))
@@ -153,7 +153,7 @@ func (c *KesselResourceServiceHTTPClientImpl) DeleteResource(ctx context.Context
 
 func (c *KesselResourceServiceHTTPClientImpl) UpdateResource(ctx context.Context, in *UpdateResourceRequest, opts ...http.CallOption) (*UpdateResourceResponse, error) {
 	var out UpdateResourceResponse
-	pattern := "/api/inventory/v1beta1/resources/{resource_type}"
+	pattern := "/api/inventory/v1beta1/resources/{resource.metadata.resource_type}"
 	path := binding.EncodeURL(pattern, in, false)
 	opts = append(opts, http.Operation(OperationKesselResourceServiceUpdateResource))
 	opts = append(opts, http.PathTemplate(pattern))

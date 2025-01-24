@@ -967,15 +967,10 @@ components:
             properties:
                 metadata:
                     $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.Metadata'
-                reporterData:
-                    $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.ReporterData'
-                resourceData:
-                    $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.ResourceData'
-        kessel.inventory.v1beta1.resources.ResourceData:
-            type: object
-            properties:
+                reporter_data:
+                    type: object
                 resource_data:
-                    type: string
+                    type: object
         kessel.inventory.v1beta1.resources.ResourceLabel:
             type: object
             properties:

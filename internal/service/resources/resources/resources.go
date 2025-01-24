@@ -2,7 +2,6 @@ package resourceservice
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"github.com/go-kratos/kratos/v2/log"
 	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/resources"
@@ -18,6 +17,7 @@ type ResourceService struct {
 	pb.UnimplementedKesselResourceServiceServer
 
 	Ctl *resources.Usecase
+	//ResourceType string
 }
 
 func New(c *resources.Usecase) *ResourceService {
@@ -96,21 +96,21 @@ func (c *ResourceService) resourceFromCreateRequest(r *pb.CreateResourceRequest,
 	}
 
 	// Extract the `resource_data` field as a string
-	resourceDataStr := r.Resource.ResourceData.GetResourceData()
+	resourceData := r.Resource.GetResourceData().AsMap()
 
 	// Check if the extracted data is empty
-	if resourceDataStr == "" {
+	if resourceData == nil {
 		log.Errorf("Resource data string is empty")
 	}
 
-	// Parse the JSON string into a map
-	var resourceData map[string]interface{}
-	if err := json.Unmarshal([]byte(resourceDataStr), &resourceData); err != nil {
-		log.Errorf("Failed to unmarshall json")
+	reporterData := r.Resource.GetReporterData().AsMap()
+
+	if reporterData == nil {
+		log.Errorf("Reporter data string is empty")
 	}
 
 	// Create the Resource object using the parsed and converted parts
-	return conv.ResourceFromPb(r.Resource.Metadata.ResourceType, identity.Principal, resourceData, r.Resource.Metadata, r.Resource.ReporterData), nil
+	return conv.ResourceFromJSON(r.Resource.Metadata.ResourceType, identity.Principal, resourceData, r.Resource.Metadata, reporterData), nil
 }
 
 func (c *ResourceService) resourceFromUpdateRequest(r *pb.UpdateResourceRequest, identity *authnapi.Identity) (*model.Resource, error) {
@@ -120,24 +120,28 @@ func (c *ResourceService) resourceFromUpdateRequest(r *pb.UpdateResourceRequest,
 	}
 
 	// Extract the `resource_data` field as a string
-	resourceDataStr := r.Resource.ResourceData.GetResourceData()
+	resourceData := r.Resource.GetResourceData().AsMap()
 
 	// Check if the extracted data is empty
-	if resourceDataStr == "" {
+	if resourceData == nil {
 		log.Errorf("Resource data string is empty")
 	}
 
-	// Parse the JSON string into a map
-	var resourceData map[string]interface{}
-	if err := json.Unmarshal([]byte(resourceDataStr), &resourceData); err != nil {
-		log.Errorf("Failed to unmarshall json")
-	}
+	reporterData := r.Resource.GetReporterData().AsMap()
 
-	return conv.ResourceFromPb(r.Resource.Metadata.ResourceType, identity.Principal, resourceData, r.Resource.Metadata, r.Resource.ReporterData), nil
+	if reporterData == nil {
+		log.Errorf("Reporter data string is empty")
+	}
+	return conv.ResourceFromJSON(r.Resource.Metadata.ResourceType, identity.Principal, resourceData, r.Resource.Metadata, reporterData), nil
 }
 
 func (c *ResourceService) resourceIdFromDeleteRequest(r *pb.DeleteResourceRequest, identity *authnapi.Identity) (model.ReporterResourceId, error) {
-	return conv.ReporterResourceIdFromPb(r.Resource.Metadata.ResourceType, identity.Principal, r.Resource.ReporterData), nil
+	reporterData := r.Resource.GetReporterData().AsMap()
+
+	if reporterData == nil {
+		log.Errorf("Reporter data string is empty")
+	}
+	return conv.ReporterResourceIdFromJSON(r.Resource.Metadata.ResourceType, identity.Principal, reporterData), nil
 }
 
 func createResponseFromResource(c *model.Resource) *pb.CreateResourceResponse {

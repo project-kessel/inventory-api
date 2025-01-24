@@ -40,6 +40,36 @@ func ResourceFromPb(resourceType, reporterId string, resourceData model.JsonObje
 	}
 }
 
+func ReporterResourceIdFromJSON(resourceType, reporterId string, reporter model.JsonObject) model.ReporterResourceId {
+	return model.ReporterResourceId{
+		LocalResourceId: reporter["local_resource_id"].(string),
+		ResourceType:    resourceType,
+		ReporterId:      reporterId,
+		ReporterType:    reporter["reporter_type"].(string),
+	}
+}
+
+func ResourceFromJSON(resourceType, reporterId string, resourceData model.JsonObject, metadata *pbresource.Metadata, reporter model.JsonObject) *model.Resource {
+	return &model.Resource{
+		ID:           uuid.UUID{},
+		ResourceData: resourceData,
+		ResourceType: resourceType,
+		WorkspaceId:  metadata.WorkspaceId,
+		OrgId:        metadata.OrgId,
+		Reporter: model.ResourceReporter{
+			Reporter: model.Reporter{
+				ReporterId:      reporterId,
+				ReporterType:    reporter["reporter_type"].(string),
+				ReporterVersion: reporter["reporter_version"].(string),
+			},
+			LocalResourceId: reporter["local_resource_id"].(string),
+		},
+		ConsoleHref: reporter["console_href"].(string),
+		ApiHref:     reporter["api_href"].(string),
+		Labels:      labelsFromPb(metadata.Labels),
+	}
+}
+
 func ToJsonObject(in interface{}) (model.JsonObject, error) {
 	if in == nil {
 		return nil, nil

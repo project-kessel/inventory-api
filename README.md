@@ -50,7 +50,7 @@ for information on the different parameters.
 5. Start the development server
 
     ```shell
-    make run MODE=local
+    make run
     ```
 
 ### Overriding commands in the Makefile

@@ -88,7 +88,7 @@ func k8sClusterFromCreateRequest(r *pb.CreateK8SClusterRequest, identity *authna
 		return nil, err
 	}
 
-	return conv.ResourceFromPb(r.K8SCluster.Metadata.ResourceType, identity.Principal, resourceData, r.K8SCluster.Metadata, r.K8SCluster.ReporterData), nil
+	return conv.ResourceFromPb(ResourceType, identity.Principal, resourceData, r.K8SCluster.Metadata, r.K8SCluster.ReporterData), nil
 }
 
 func createResponseFromK8sCluster(c *model.Resource) *pb.CreateK8SClusterResponse {

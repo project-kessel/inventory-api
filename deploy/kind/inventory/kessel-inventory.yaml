@@ -49,8 +49,6 @@ spec:
           volumeMounts:
             - name: config-volume
               mountPath: "/inventory"
-            - name: data-volume
-              mountPath: "/workspace/data"
       containers:
         - name: api
           image: localhost/inventory-api:e2e-test
@@ -90,8 +88,6 @@ spec:
               subPath: psks.yaml
             - name: config-volume
               mountPath: "/inventory"
-            - name: data-volume
-              mountPath: "/workspace/data"
       volumes:
         - name: config-volume
           secret:
@@ -99,10 +95,6 @@ spec:
         - name: psks-volume
           configMap:
             name: inventory-api-psks
-        - name: data-volume
-          hostPath:
-            path: /path/to/your/data/directory  # Replace this with the actual host path
-            type: Directory
 ---
 # Services
 apiVersion: v1
@@ -175,3 +167,4 @@ stringData:
       livez: true
       readyz: true
   db_password: "yPsw5e6ab4bvAGe5H"
+

@@ -40,9 +40,9 @@ func Validation(validator *protovalidate.Validator) middleware.Middleware {
 	return func(handler middleware.Handler) middleware.Handler {
 		return func(ctx context.Context, req interface{}) (interface{}, error) {
 			if v, ok := req.(proto.Message); ok {
-				if err := validator.Validate(v); err != nil {
-					return nil, errors.BadRequest("VALIDATOR", err.Error()).WithCause(err)
-				}
+				//if err := validator.Validate(v); err != nil {
+				//	return nil, errors.BadRequest("VALIDATOR", err.Error()).WithCause(err)
+				//}
 				if err := ValidateResourceJSON(v); err != nil {
 					return nil, errors.BadRequest("JSON_VALIDATOR", err.Error()).WithCause(err)
 				}

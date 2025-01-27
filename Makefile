@@ -183,10 +183,20 @@ inventory-down-kind:
 
 .PHONY: run
 # run api locally
-run: build
+run: 
+ifeq ($(MODE),local)
+	$(MAKE) local-build
+else
+	$(MAKE) build
+endif
 	$(GO) run main.go serve
 
-run-help: build
+run-help:
+ifeq ($(MODE),local)
+	$(MAKE) local-build
+else
+	$(MAKE) build
+endif
 	$(GO) run main.go serve --help
 
 .PHONY: migrate

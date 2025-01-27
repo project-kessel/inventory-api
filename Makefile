@@ -142,7 +142,7 @@ pr-check:
 	make generate;
 	make test;
 	make lint;
-	make build;
+	make local-build;
 	#
 
 .PHONY: inventory-up
@@ -183,10 +183,10 @@ inventory-down-kind:
 
 .PHONY: run
 # run api locally
-run: build
+run: local-build
 	$(GO) run main.go serve
 
-run-help: build
+run-help: local-build
 	$(GO) run main.go serve --help
 
 .PHONY: migrate

@@ -48,7 +48,6 @@ for information on the different parameters.
     ```
 
 5. Start the development server
-
     ```shell
     make run
     ```

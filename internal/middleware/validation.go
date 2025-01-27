@@ -21,7 +21,10 @@ const (
 	resourceDir = "data/resources"
 )
 
-var AllowedResourceTypes = map[string]struct{}{}
+var (
+	AllowedResourceTypes = map[string]struct{}{}
+	abstractResources    = map[string]struct{}{} // Tracks resource types marked as abstract (no resource_data)
+)
 
 func Validation(validator *protovalidate.Validator) middleware.Middleware {
 	resourceDirs, err := os.ReadDir(resourceDir)
@@ -74,20 +77,21 @@ func ValidateResourceJSON(msg proto.Message) error {
 		return fmt.Errorf("missing or invalid resource_type")
 	}
 
-	resourceSchema, err := loadSchema(resourceType)
-	if err != nil {
-		return fmt.Errorf("failed to load schema for '%s': %w", resourceType, err)
-	}
-
-	// Handle `resource_data` as a JSON object
-	resourceData, ok := resource["resource_data"].(map[string]interface{})
-	if !ok {
-		return fmt.Errorf("missing or invalid resource_data field")
-	}
-
-	// Validate `resource_data` against the schema
-	if err := validateJSONAgainstSchema(resourceSchema, resourceData); err != nil {
-		return fmt.Errorf("resource validation failed: %w", err)
+	// Check for `resource_data` and handle abstract resources
+	resourceData, resourceDataExists := resource["resource_data"].(map[string]interface{})
+	if !resourceDataExists {
+		abstractResources[resourceType] = struct{}{}
+	} else if _, isAbstract := abstractResources[resourceType]; isAbstract {
+		return fmt.Errorf("resource_type '%s' is abstract and cannot have resource_data", resourceType)
+	} else {
+		// Validate `resource_data` if present and not abstract
+		resourceSchema, err := loadSchema(resourceType)
+		if err != nil {
+			return fmt.Errorf("failed to load schema for '%s': %w", resourceType, err)
+		}
+		if err := validateJSONAgainstSchema(resourceSchema, resourceData); err != nil {
+			return fmt.Errorf("resource validation failed: %w", err)
+		}
 	}
 
 	reporterData, ok := resource["reporter_data"].(map[string]interface{})

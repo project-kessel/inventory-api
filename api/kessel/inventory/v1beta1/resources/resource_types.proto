@@ -13,6 +13,6 @@ message Resource {
     Metadata metadata = 1;
 
     google.protobuf.Struct reporter_data = 324342 [  json_name = "reporter_data"];
-    google.protobuf.Struct resource_data = 395858490 [  json_name = "resource_data"];
+    optional google.protobuf.Struct resource_data = 395858490 [  json_name = "resource_data"];
 
 }

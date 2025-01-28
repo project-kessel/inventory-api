@@ -2,10 +2,6 @@ services:
   inventory-api:
     environment:
       INVENTORY_API_CONFIG: /inventory-api-compose.yaml
-#      - "INVENTORY_API_STORAGE_DBNAME=postgres"
-#      - "INVENTORY_API_STORAGE_POSTGRES_DBNAME=database"
-#      - "INVENTORY_API_STORAGE_POSTGRES_USER=${POSTGRES_USER}"
-#      - "INVENTORY_API_STORAGE_POSTGRES_PASSWORD=${POSTGRES_PASSWORD}"
     build:
       dockerfile: Dockerfile
     volumes:
@@ -18,6 +14,8 @@ services:
       - "9081:9081"
     depends_on:
       - keycloak
+    networks:
+      - kessel
 
   invmigrate:
     environment:
@@ -30,6 +28,8 @@ services:
     restart: "on-failure"
     depends_on:
       - invdatabase
+    networks:
+      - kessel
 
   invdatabase:
     image: "postgres"
@@ -43,57 +43,12 @@ services:
       - "POSTGRES_PASSWORD=${POSTGRES_PASSWORD}"
       - "POSTGRES_DB=${POSTGRES_DBNAME}"
       - "PGPORT=5433"
-
-  relations-api:
-    image: "quay.io/cloudservices/kessel-relations:latest"
-    hostname: relations-api
-    environment:
-      - "SPICEDB_PRESHARED=${SPICEDB_GRPC_PRESHARED_KEY}"
-      # - "SPICEDB_PRESHARED_FILE=/run/secrets/spicedb_pre_shared"
-      - "SPICEDB_ENDPOINT=spicedb:50051"
-    secrets:
-      - spicedb_pre_shared
-    restart: "always"
-    ports:
-      - "8000:8000"
-      - "9000:9000"
-    depends_on:
-      - spicedb
-
-  spicedb:
-    image: "authzed/spicedb"
-    command: "serve"
-    restart: "always"
-    hostname: spicedb
-    volumes:
-      - ./deploy/schema.yaml:/schema.yaml:ro,z
-    secrets:
-      - spicedb_pre_shared
-    ports:
-      - "8080:8080"
-      - "9090:9090"
-      - "50051:50051"
-    environment:
-      - "SPICEDB_GRPC_PRESHARED_KEY=${SPICEDB_GRPC_PRESHARED_KEY}"
-      - "SPICEDB_DATASTORE_ENGINE=postgres"
-      - "SPICEDB_DATASTORE_BOOTSTRAP_FILES=/schema.yaml"
-      - "SPICEDB_DATASTORE_CONN_URI=postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@database:5432/spicedb?sslmode=disable"
-
-  migrate:
-    image: "authzed/spicedb"
-    command: "datastore migrate head"
-    restart: "on-failure"
-    secrets:
-      - spicedb_pre_shared
-    environment:
-      - "SPICEDB_DATASTORE_ENGINE=postgres"
-      - "SPICEDB_DATASTORE_CONN_URI=postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@database:5432/spicedb?sslmode=disable"
-    depends_on:
-      - database
+    networks:
+      - kessel
 
   keycloak:
     image: "quay.io/keycloak/keycloak:latest"
-    command: "start-dev --http-port=8084 --import-realm"
+    command: "start-dev --http-port=8084 --db-url-port 5434 --import-realm"
     restart: "on-failure"
     environment:
       - "KEYCLOAK_ADMIN=admin"
@@ -102,20 +57,22 @@ services:
       - ./myrealm.json:/opt/keycloak/data/import/myrealm.json:rw,z
     ports:
       - 8084:8084
+    networks:
+      - kessel
+
   database:
     image: "postgres"
     command: -c track_commit_timestamp=on
     hostname: database
     ports:
-      - "5432:5432"
+      - "5434:5434"
     environment:
       - "POSTGRES_PASSWORD=${POSTGRES_PASSWORD}"
       - "POSTGRES_DB=${POSTGRES_DBNAME}"
+    networks:
+      - kessel
 
-configs:
-  spicedb_pre_shared:
-    environment: "SPICEDB_GRPC_PRESHARED_KEY"
-
-secrets:
-  spicedb_pre_shared:
-    file: ./.secrets/local-spicedb-secret
+networks:
+  kessel:
+    name: kessel
+    external: true

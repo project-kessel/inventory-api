@@ -38,7 +38,8 @@ for information on the different parameters.
 
 3. Build the project
     ```shell
-    make build
+    # when building locally, use the local-build option as FIPS_ENABLED is set by default for builds
+    make local-build
     ```
 
 4. Run the database migration
@@ -77,7 +78,7 @@ We will use `podman` if it is installed, and we will fall back to `docker`. You 
 by providing `DOCKER` parameter e.g.
 
 ```shell
-DOCKER=docker make api 
+DOCKER=docker make api
 ```
 
 or
@@ -90,16 +91,18 @@ make api
 ### Debugging
 
 See [DEBUG](./DEBUG.md) for instructions on how to debug
-   
+
 ### Alternatives way of running this service
 
 #### Kessel Inventory + Kessel Relations
 
-There is Make target to run inventory-api (with postgres) and relations api (with spicedb).
-It uses compose to build the current inventory code and spin up containers with the required dependecies.
+In order to test Kessel Inventory with Kessel Relations, we recommend cloning the Relations API repo locally and leveraging their existing [Docker Compose process](https://github.com/project-kessel/relations-api/tree/main?tab=readme-ov-file#spicedb-using-dockerpodman) to spin up the Relations API.
 
-- This provides a [PSK file](./config/psks.yaml#L1) with a token "1234".
-- Default ports in this setup are `8081` for http and `9091` for grpc.
+Both Inventory and Relations compose files are configured to use the same docker network (`kessel`) to ensure network connectivity between all containers.
+
+For the Inventory Compose deployment:
+- A [PSK file](./config/psks.yaml#L1) is provided with the token "1234".
+- Default ports in this setup are `8081` for http and `9091` for grpc to not conflict with Relations
 - Refer to [inventory-api-compose.yaml](./inventory-api-compose.yaml) for additional configuration
 
 To start use:
@@ -115,7 +118,7 @@ make inventory-down
 
 #### Kessel-Inventory + Kafka
 
-In order to use the kafka configuration, one has to run strimzi and zookeeper. 
+In order to use the kafka configuration, one has to run strimzi and zookeeper.
 You can do this by running;
 
 ```shell
@@ -167,6 +170,8 @@ Similar as above, but instead of running Kafka, this will configure inventory to
 - Sets up a keycloak instance running at port 8084 with [myrealm](myrealm.json) config file.
 - Set up a default service account with clientId: `test-svc`. Refer to [get-token](scripts/get-token.sh) to learn how to fetch a token.
 - Refer to [sso-inventory-api.yaml](./sso-inventory-api.yaml) for additional configuration
+
+As before you'll need to run the Relations Compose steps available in the [Relations API repo](https://github.com/project-kessel/relations-api/tree/main?tab=readme-ov-file#spicedb-using-dockerpodman)
 
 To start use:
 ```shell
@@ -229,8 +234,10 @@ make build-push-minimal
 ## Example Usage
 
 All these examples use the  REST API and assume we are running the default local version
-adjustments needs to be made to the curl requests if running  with different configuration, 
+adjustments needs to be made to the curl requests if running  with different configuration,
 such as port, authentication mechanisms, etc.
+
+> Note: When testing in Stage, the current schema leveraged by Relations only supports notifications integrations and not any of the infra we have in our API (RHEL hosts, K8s Clusters, etc). Testing with any other resource type will throw errors from Relations API but will still succeed in Inventory API
 
 ### Health check endpoints
 
@@ -252,7 +259,7 @@ curl http://localhost:8000/api/inventory/v1/livez
 
 Resources can be added, updated and deleted to our inventory. Right now we support the following resources:
 - `rhel-host`
-- `integration`
+- `notifications-integration`
 - `k8s-cluster`
 - `k8s-policy`
 
@@ -273,6 +280,16 @@ and finally, to delete it, note that we use a different file, as the only requir
 ```shell
 curl -XDELETE -H "Content-Type: application/json" --data "@data/host-reporter.json" http://localhost:8000/api/inventory/v1beta1/resources/rhel-hosts
 ```
+
+To add a notifications integration (useful for testing in stage)
+
+```shell
+# create the integration (auth is required for stage -- see internal docs)
+curl -H "Content-Type: application/json" -H "Authorization: Bearer $TOKEN" -d @data/notifications-integrations.json localhost:8000/api/inventory/v1beta1/resources/notifications-integrations
+
+# delete the integration
+curl -X DELETE -H "Content-Type: application/json" -H "Authorization: Bearer $TOKEN" -d @data/notifications-integration-reporter.json localhost:8000/api/inventory/v1beta1/resources/notifications-integrations
+
 
 ### Adding a new relationship (k8s-policy is propagated to k8s-cluster)
 
@@ -306,7 +323,7 @@ curl -X DELETE -H "Content-Type: application/json" --data "@data/relationship_re
 ### Enable integration with Kessel relations
 
 The default development config has this option disabled. You can check [Alternatives way of running this service](#alternatives-way-of-running-this-service)
-for configurations that have Kessel relations enabled. 
+for configurations that have Kessel relations enabled.
 
 Supposing Kessel relations is running in `localhost:9000`, you can enable it by updating the config as follows:
 
@@ -340,6 +357,21 @@ Tests can be run using:
 
 ```shell
 make test
+```
+
+## Validating FIPS
+
+Inventory API is configured to build with FIPS capable libraries and produce FIPS capaable binaries when running on FIPS enabled clusters.
+
+To validate the current running container is FIPS capable:
+
+```shell
+# exec or rsh into running pod
+# using fips-detect (https://github.com/acardace/fips-detect)
+fips-detect /usr/local/bin/inventory-api
+
+# using go tool
+go tool nm /usr/local/bin/inventory-api | grep FIPS
 ```
 
 ## Contributing

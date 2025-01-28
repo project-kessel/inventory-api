@@ -17,7 +17,7 @@ check_kafka_readiness() {
       break
     else
       echo "Pod $pod_name is not ready yet. Retrying in 10 seconds..."
-      sleep 10
+      sleep 15
       ((retry_count++))
       if [[ $retry_count -ge $max_retries ]]; then
         echo "Timeout waiting for pod $pod_name readiness."
@@ -30,7 +30,13 @@ check_kafka_readiness() {
     fi
   done
 }
-kind create cluster --name inventory-cluster
+
+# check for existing cluster to add some idempotency when testing locally
+# the existing cluster check exits with 1 if none are found, temp turn off auto exit with `set`
+set +e
+EXISTING_CLUSTER=$(kind get clusters 2> /dev/null | grep inventory-cluster)
+set -e
+if [[ -z "$EXISTING_CLUSTER" ]]; then kind create cluster --name inventory-cluster; fi
 
 # build/tag image
 ${DOCKER} build -t localhost/inventory-api:latest -f Dockerfile .
@@ -48,7 +54,8 @@ ${DOCKER} save -o inventory-e2e-tests.tar localhost/inventory-e2e-tests:e2e-test
 kind load image-archive inventory-api.tar --name inventory-cluster
 kind load image-archive inventory-e2e-tests.tar --name inventory-cluster
 
-kubectl create configmap inventory-api-psks --from-file=config/psks.yaml
+# checks for the config map first, or creates it if not found
+kubectl get configmap inventory-api-psks || kubectl create configmap inventory-api-psks --from-file=config/psks.yaml
 
 kubectl apply -f https://strimzi.io/install/latest\?namespace\=default
 kubectl apply -f deploy/kind/inventory/kessel-inventory.yaml
@@ -59,8 +66,8 @@ kubectl apply -f deploy/kind/inventory/strimzi.yaml
 kubectl apply -f https://projectcontour.io/quickstart/contour.yaml
 kubectl get crd httpproxies.projectcontour.io
 
-# add configmap for spicedb schema
-kubectl create configmap spicedb-schema --from-file=deploy/schema.zed
+# checks for the config map first, or creates it if not found
+kubectl get configmap spicedb-schema || kubectl create configmap spicedb-schema --from-file=deploy/schema.zed
 
 kubectl apply -f deploy/kind/relations/spicedb-kind-setup/postgres/secret.yaml
 kubectl apply -f deploy/kind/relations/spicedb-kind-setup/postgres/postgresql.yaml
@@ -74,7 +81,7 @@ kubectl apply -f deploy/kind/relations/spicedb-kind-setup/relations-api/svc.yaml
 
 
 echo "Waiting for all pods to be ready (1/1)..."
-MAX_RETRIES=18
+MAX_RETRIES=30
 
 
 while true; do

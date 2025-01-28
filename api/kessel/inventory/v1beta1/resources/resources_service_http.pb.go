@@ -89,9 +89,6 @@ func _KesselResourceService_UpdateResource0_HTTP_Handler(srv KesselResourceServi
 func _KesselResourceService_DeleteResource0_HTTP_Handler(srv KesselResourceServiceHTTPServer) func(ctx http.Context) error {
 	return func(ctx http.Context) error {
 		var in DeleteResourceRequest
-		if err := ctx.Bind(&in); err != nil {
-			return err
-		}
 		if err := ctx.BindQuery(&in); err != nil {
 			return err
 		}
@@ -141,10 +138,10 @@ func (c *KesselResourceServiceHTTPClientImpl) CreateResource(ctx context.Context
 func (c *KesselResourceServiceHTTPClientImpl) DeleteResource(ctx context.Context, in *DeleteResourceRequest, opts ...http.CallOption) (*DeleteResourceResponse, error) {
 	var out DeleteResourceResponse
 	pattern := "/api/inventory/v1beta1/resources/{resource.metadata.resource_type}"
-	path := binding.EncodeURL(pattern, in, false)
+	path := binding.EncodeURL(pattern, in, true)
 	opts = append(opts, http.Operation(OperationKesselResourceServiceDeleteResource))
 	opts = append(opts, http.PathTemplate(pattern))
-	err := c.cc.Invoke(ctx, "DELETE", path, in, &out, opts...)
+	err := c.cc.Invoke(ctx, "DELETE", path, nil, &out, opts...)
 	if err != nil {
 		return nil, err
 	}

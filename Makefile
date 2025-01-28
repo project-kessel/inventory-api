@@ -191,7 +191,7 @@ run-help: local-build
 
 .PHONY: migrate
 # run database migrations
-migrate: build
+migrate: local-build
 	./bin/inventory-api migrate --config .inventory-api.yaml
 
 .PHONY: update-schema

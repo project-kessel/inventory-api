@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/bufbuild/protovalidate-go"
 	"github.com/go-kratos/kratos/v2/errors"
+	"github.com/go-kratos/kratos/v2/log"
 	"github.com/go-kratos/kratos/v2/middleware"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
@@ -17,24 +18,28 @@ import (
 	"github.com/xeipuuv/gojsonschema"
 )
 
-const (
-	resourceDir = "data/resources"
-)
+const defaultResourceDir = "data/resources"
 
 var (
+	resourceDir          = os.Getenv("RESOURCE_DIR")
 	AllowedResourceTypes = map[string]struct{}{}
 	abstractResources    = map[string]struct{}{} // Tracks resource types marked as abstract (no resource_data)
 )
 
 func Validation(validator *protovalidate.Validator) middleware.Middleware {
+	if resourceDir == "" {
+		resourceDir = defaultResourceDir
+	}
 	resourceDirs, err := os.ReadDir(resourceDir)
 	if err != nil {
-		panic(err)
+		log.Fatalf("Failed to read resource directory %s: %v", resourceDir, err)
 	}
+
 	for _, dir := range resourceDirs {
 		if !dir.IsDir() {
 			continue
 		}
+
 		AllowedResourceTypes[dir.Name()] = struct{}{}
 	}
 	return func(handler middleware.Handler) middleware.Handler {

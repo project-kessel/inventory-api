@@ -15,6 +15,7 @@ COPY api ./api
 COPY cmd ./cmd
 COPY internal ./internal
 COPY main.go Makefile ./
+COPY data/resources ./data/resources
 
 ARG VERSION
 RUN VERSION=${VERSION} make build
@@ -35,6 +36,7 @@ EXPOSE 9081
 
 USER 1001
 ENV PATH="$PATH:/usr/local/bin"
+ENV RESOURCE_DIR="/app/data/resources"
 ENTRYPOINT ["inventory-api"]
 
 LABEL name="kessel-inventory-api" \

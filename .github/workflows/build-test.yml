@@ -23,10 +23,19 @@ jobs:
         with:
           go-version: '1.22.x'
           cache: true
+          fetch-depth: 0
       - name: Install dependencies
         run: go get ./...
       - name: Build
         run: go build -tags release -v ./...
+      - name: Copy `data/resources` to the correct location
+        run: |
+          ls -la data 
+          mkdir -p app/data/resources
+          cp -r data/resources/* app/data/resources/ || echo "No test data to copy"
+          ls -la app/data/resources
+      - name: Set Environment Variable for Resource Directory
+        run: echo "RESOURCE_DIR=$(pwd)/data/resources" >> $GITHUB_ENV
       - name: Test
         run: make test
       - name: Archive code coverage results

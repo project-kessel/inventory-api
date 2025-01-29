@@ -36,7 +36,7 @@ EXPOSE 9081
 
 USER 1001
 ENV PATH="$PATH:/usr/local/bin"
-ENV RESOURCE_DIR="/app/data/resources"
+ENV RESOURCE_DIR="data/resources"
 ENTRYPOINT ["inventory-api"]
 
 LABEL name="kessel-inventory-api" \

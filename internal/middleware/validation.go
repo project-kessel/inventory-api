@@ -34,6 +34,7 @@ func Validation(validator *protovalidate.Validator) middleware.Middleware {
 	if err != nil {
 		log.Fatalf("Failed to read resource directory %s: %v", resourceDir, err)
 	}
+	log.Infof("Read resource directory %s:", resourceDir)
 
 	for _, dir := range resourceDirs {
 		if !dir.IsDir() {

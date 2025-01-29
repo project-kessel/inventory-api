@@ -274,7 +274,7 @@ curl -H "Content-Type: application/json" --data "@data/host.json" http://localho
 To hit the gRPC endpoint use the following `grpcurl` command
 
 ```
-grpcurl -plaintext -d '{"rhel_host": { "metadata": {"resource_type": "rhel_host","workspace_id": "01932c7e-e93e-719c-a488-3159877367b0"},"reporter_data": {"reporter_type": "OCM","reporter_version": "0.1","local_resource_id": "1","api_href": "www.example.com","console_href": "www.example.com"}}}' localhost:9000 kessel.inventory.v1beta1.resources.KesselRhelHostService.CreateRhelHost 
+grpcurl -plaintext -d @ localhost:9000 kessel.inventory.v1beta1.resources.KesselRhelHostService.CreateRhelHost < data/host.json
 ```
 
 To update it:
@@ -288,7 +288,7 @@ curl -XPUT -H "Content-Type: application/json" --data "@data/host.json" http://l
 To hit the gRPC endpoint
 
 ``` 
-grpcurl -plaintext -d '{"rhel_host": { "metadata": {"resource_type": "rhel_host","workspace_id": "01932c7e-e93e-719c-a488-3159877367b0"},"reporter_data": {"reporter_type": "OCM","reporter_version": "0.1","local_resource_id": "1","api_href": "www.example1.com","console_href": "www.example.com"}}}' localhost:9000 kessel.inventory.v1beta1.resources.KesselRhelHostService.UpdateRhelHost
+grpcurl -plaintext -d @ localhost:9000 kessel.inventory.v1beta1.resources.KesselRhelHostService.UpdateRhelHost < data/host.json
 ```
 
 
@@ -303,7 +303,7 @@ curl -XDELETE -H "Content-Type: application/json" --data "@data/host-reporter.js
 To hit the gRPC endpoint
 
 ``` 
-grpcurl -plaintext -d '{"reporter_data": {"reporter_type": "OCM","reporter_version": "0.1","local_resource_id": "1","api_href": "www.example1.com","console_href": "www.example.com"}}' localhost:9000 kessel.inventory.v1beta1.resources.KesselRhelHostService.DeleteRhelHost
+grpcurl -plaintext -d @ localhost:9000 kessel.inventory.v1beta1.resources.KesselRhelHostService.DeleteRhelHost < data/host-reporter.json
 ```
 To add a notifications integration (useful for testing in stage)
 

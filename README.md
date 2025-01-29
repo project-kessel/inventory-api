@@ -263,24 +263,48 @@ Resources can be added, updated and deleted to our inventory. Right now we suppo
 - `k8s-cluster`
 - `k8s-policy`
 
-To add a rhel-host to the inventory, use the following `curl` command
+To add a rhel-host to the inventory:
+
+To hit the REST endpoint use the following `curl` command
 
 ```shell
 curl -H "Content-Type: application/json" --data "@data/host.json" http://localhost:8000/api/inventory/v1beta1/resources/rhel-hosts
 ```
 
+To hit the gRPC endpoint use the following `grpcurl` command
+
+```
+grpcurl -plaintext -d '{"rhel_host": { "metadata": {"resource_type": "rhel_host","workspace_id": "01932c7e-e93e-719c-a488-3159877367b0"},"reporter_data": {"reporter_type": "OCM","reporter_version": "0.1","local_resource_id": "1","api_href": "www.example.com","console_href": "www.example.com"}}}' localhost:9000 kessel.inventory.v1beta1.resources.KesselRhelHostService.CreateRhelHost 
+```
+
 To update it:
+
+To hit the REST endpoint
 
 ```shell
 curl -XPUT -H "Content-Type: application/json" --data "@data/host.json" http://localhost:8000/api/inventory/v1beta1/resources/rhel-hosts
 ```
 
+To hit the gRPC endpoint
+
+``` 
+grpcurl -plaintext -d '{"rhel_host": { "metadata": {"resource_type": "rhel_host","workspace_id": "01932c7e-e93e-719c-a488-3159877367b0"},"reporter_data": {"reporter_type": "OCM","reporter_version": "0.1","local_resource_id": "1","api_href": "www.example1.com","console_href": "www.example.com"}}}' localhost:9000 kessel.inventory.v1beta1.resources.KesselRhelHostService.UpdateRhelHost
+```
+
+
 and finally, to delete it, note that we use a different file, as the only required information is the reporter data.
+
+To hit the REST endpoint
 
 ```shell
 curl -XDELETE -H "Content-Type: application/json" --data "@data/host-reporter.json" http://localhost:8000/api/inventory/v1beta1/resources/rhel-hosts
 ```
 
+To hit the gRPC endpoint
+
+``` 
+grpcurl -plaintext -d '{"reporter_data": {"reporter_type": "OCM","reporter_version": "0.1","local_resource_id": "1","api_href": "www.example1.com","console_href": "www.example.com"}}' localhost:9000 kessel.inventory.v1beta1.resources.KesselRhelHostService.DeleteRhelHost
+```
 To add a notifications integration (useful for testing in stage)
 
 ```shell

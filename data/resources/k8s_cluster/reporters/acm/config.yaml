@@ -1,0 +1,12 @@
+---
+resource_type: k8s_cluster
+reporter_name: acm
+namespace: acm # this is the name of the field of the resource that contains this reporter's data
+# relation_properties:
+# - relation: is_fedramp
+#   expr: {{ .acm.fedramp }}
+#   subject: user:*
+# - relation: has_addon_strimzi
+#   expr: {{ "strimzi" in .acm.addons }}
+#   subject: plan:{{.acm.subscription.plan}}
+

@@ -91,47 +91,75 @@ func (c *ResourceService) DeleteResource(ctx context.Context, r *pb.DeleteResour
 
 func (c *ResourceService) resourceFromCreateRequest(r *pb.CreateResourceRequest, identity *authnapi.Identity) (*model.Resource, error) {
 
-	if r.Resource.ResourceData == nil {
-		log.Errorf("Resource data empty")
+	resourceType := r.Resource.Metadata.ResourceType
+	_, isAbstract := v.AbstractResources[resourceType]
+
+	if isAbstract {
+		if r.Resource.ResourceData != nil {
+			log.Errorf("Resource data is not allowed for abstract resource_type: %s", resourceType)
+			return nil, fmt.Errorf("resource_type '%s' is abstract and cannot have resource_data", resourceType)
+		}
+	} else {
+		// If the resource is not abstract, ensure `resource_data` is provided
+		if r.Resource.ResourceData == nil {
+			log.Errorf("Resource data is required but missing for resource_type: %s", resourceType)
+			return nil, fmt.Errorf("resource_data is required for resource_type: %s", resourceType)
+		}
 	}
 
-	// Extract the `resource_data` field as a string
-	resourceData := r.Resource.GetResourceData().AsMap()
-
-	// Check if the extracted data is empty
-	if resourceData == nil {
-		log.Errorf("Resource data string is empty")
+	// Extract `resource_data` if not abstract
+	var resourceData map[string]interface{}
+	if !isAbstract {
+		resourceData = r.Resource.GetResourceData().AsMap()
+		if resourceData == nil {
+			log.Errorf("Resource data is empty for resource_type: %s", resourceType)
+			return nil, fmt.Errorf("resource_data is invalid or empty for resource_type: %s", resourceType)
+		}
 	}
 
 	reporterData := r.Resource.GetReporterData().AsMap()
-
 	if reporterData == nil {
-		log.Errorf("Reporter data string is empty")
+		log.Errorf("Reporter data is empty for resource_type: %s", resourceType)
+		return nil, fmt.Errorf("reporter_data is required for resource_type: %s", resourceType)
 	}
-
 	// Create the Resource object using the parsed and converted parts
 	return conv.ResourceFromJSON(r.Resource.Metadata.ResourceType, identity.Principal, resourceData, r.Resource.Metadata, reporterData), nil
 }
 
 func (c *ResourceService) resourceFromUpdateRequest(r *pb.UpdateResourceRequest, identity *authnapi.Identity) (*model.Resource, error) {
 
-	if r.Resource.ResourceData == nil {
-		log.Errorf("Resource data empty")
+	resourceType := r.Resource.Metadata.ResourceType
+	_, isAbstract := v.AbstractResources[resourceType]
+
+	if isAbstract {
+		if r.Resource.ResourceData != nil {
+			log.Errorf("Resource data is not allowed for abstract resource_type: %s", resourceType)
+			return nil, fmt.Errorf("resource_type '%s' is abstract and cannot have resource_data", resourceType)
+		}
+	} else {
+		// If the resource is not abstract, ensure `resource_data` is provided
+		if r.Resource.ResourceData == nil {
+			log.Errorf("Resource data is required but missing for resource_type: %s", resourceType)
+			return nil, fmt.Errorf("resource_data is required for resource_type: %s", resourceType)
+		}
 	}
 
-	// Extract the `resource_data` field as a string
-	resourceData := r.Resource.GetResourceData().AsMap()
-
-	// Check if the extracted data is empty
-	if resourceData == nil {
-		log.Errorf("Resource data string is empty")
+	// Extract `resource_data` if not abstract
+	var resourceData map[string]interface{}
+	if !isAbstract {
+		resourceData = r.Resource.GetResourceData().AsMap()
+		if resourceData == nil {
+			log.Errorf("Resource data is empty for resource_type: %s", resourceType)
+			return nil, fmt.Errorf("resource_data is invalid or empty for resource_type: %s", resourceType)
+		}
 	}
 
 	reporterData := r.Resource.GetReporterData().AsMap()
-
 	if reporterData == nil {
-		log.Errorf("Reporter data string is empty")
+		log.Errorf("Reporter data is empty for resource_type: %s", resourceType)
+		return nil, fmt.Errorf("reporter_data is required for resource_type: %s", resourceType)
 	}
+
 	return conv.ResourceFromJSON(r.Resource.Metadata.ResourceType, identity.Principal, resourceData, r.Resource.Metadata, reporterData), nil
 }
 

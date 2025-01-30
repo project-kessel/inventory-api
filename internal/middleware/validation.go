@@ -23,7 +23,7 @@ const defaultResourceDir = "data/resources"
 var (
 	resourceDir          = os.Getenv("RESOURCE_DIR")
 	AllowedResourceTypes = map[string]struct{}{}
-	abstractResources    = map[string]struct{}{} // Tracks resource types marked as abstract (no resource_data)
+	AbstractResources    = map[string]struct{}{} // Tracks resource types marked as abstract (no resource_data)
 )
 
 func Validation(validator *protovalidate.Validator) middleware.Middleware {
@@ -46,9 +46,9 @@ func Validation(validator *protovalidate.Validator) middleware.Middleware {
 	return func(handler middleware.Handler) middleware.Handler {
 		return func(ctx context.Context, req interface{}) (interface{}, error) {
 			if v, ok := req.(proto.Message); ok {
-				//if err := validator.Validate(v); err != nil {
-				//	return nil, errors.BadRequest("VALIDATOR", err.Error()).WithCause(err)
-				//}
+				if err := validator.Validate(v); err != nil {
+					return nil, errors.BadRequest("VALIDATOR", err.Error()).WithCause(err)
+				}
 				if err := ValidateResourceJSON(v); err != nil {
 					return nil, errors.BadRequest("JSON_VALIDATOR", err.Error()).WithCause(err)
 				}
@@ -86,8 +86,8 @@ func ValidateResourceJSON(msg proto.Message) error {
 	// Check for `resource_data` and handle abstract resources
 	resourceData, resourceDataExists := resource["resource_data"].(map[string]interface{})
 	if !resourceDataExists {
-		abstractResources[resourceType] = struct{}{}
-	} else if _, isAbstract := abstractResources[resourceType]; isAbstract {
+		AbstractResources[resourceType] = struct{}{}
+	} else if _, isAbstract := AbstractResources[resourceType]; isAbstract {
 		return fmt.Errorf("resource_type '%s' is abstract and cannot have resource_data", resourceType)
 	} else {
 		// Validate `resource_data` if present and not abstract

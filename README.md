@@ -19,7 +19,7 @@ This repository implements a common inventory system with eventing.
 
 ### Running locally
 
-When running locally, (.inventory-api.yaml)[./.inventory-api.yaml] file is used. By default, this configuration does the following:
+When running locally, the [default settings](./.inventory-api.yaml) file is used. By default, this configuration does the following:
 - Exposes the inventory API in `localhost` and using port `8000` for http and port `9000` for grpc.
 - Sets authentication mechanism to `allow-unauthenticated`, allowing users to be authenticated with their user-agent value.
 - Sets authorization mechanism to `allow-all`.
@@ -263,24 +263,48 @@ Resources can be added, updated and deleted to our inventory. Right now we suppo
 - `k8s-cluster`
 - `k8s-policy`
 
-To add a rhel-host to the inventory, use the following `curl` command
+To add a rhel-host to the inventory:
+
+To hit the REST endpoint use the following `curl` command
 
 ```shell
 curl -H "Content-Type: application/json" --data "@data/host.json" http://localhost:8000/api/inventory/v1beta1/resources/rhel-hosts
 ```
 
+To hit the gRPC endpoint use the following `grpcurl` command
+
+```
+grpcurl -plaintext -d @ localhost:9000 kessel.inventory.v1beta1.resources.KesselRhelHostService.CreateRhelHost < data/host.json
+```
+
 To update it:
+
+To hit the REST endpoint
 
 ```shell
 curl -XPUT -H "Content-Type: application/json" --data "@data/host.json" http://localhost:8000/api/inventory/v1beta1/resources/rhel-hosts
 ```
 
+To hit the gRPC endpoint
+
+``` 
+grpcurl -plaintext -d @ localhost:9000 kessel.inventory.v1beta1.resources.KesselRhelHostService.UpdateRhelHost < data/host.json
+```
+
+
 and finally, to delete it, note that we use a different file, as the only required information is the reporter data.
+
+To hit the REST endpoint
 
 ```shell
 curl -XDELETE -H "Content-Type: application/json" --data "@data/host-reporter.json" http://localhost:8000/api/inventory/v1beta1/resources/rhel-hosts
 ```
 
+To hit the gRPC endpoint
+
+``` 
+grpcurl -plaintext -d @ localhost:9000 kessel.inventory.v1beta1.resources.KesselRhelHostService.DeleteRhelHost < data/host-reporter.json
+```
 To add a notifications integration (useful for testing in stage)
 
 ```shell
@@ -358,6 +382,8 @@ Tests can be run using:
 ```shell
 make test
 ```
+
+For end-to-test info see [here](./test/README.md).
 
 ## Validating FIPS
 

@@ -33,13 +33,14 @@ func New(c CompletedConfig, authn middleware.Middleware, meter metric.Meter, log
 		kgrpc.Middleware(
 			recovery.Recovery(),
 			logging.Server(logger),
-			m.Validation(validator),
+
 			metrics.Server(
 				metrics.WithRequests(requests),
 				metrics.WithSeconds(seconds),
 			),
 			selector.Server(
 				authn,
+				m.Validation(validator),
 			).Match(NewWhiteListMatcher).Build(),
 		),
 	}

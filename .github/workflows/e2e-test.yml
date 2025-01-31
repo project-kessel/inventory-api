@@ -12,6 +12,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Set Environment Variable for Resource Directory
+        run: echo "RESOURCE_DIR=$(pwd)/data/resources" >> $GITHUB_ENV
+
       - name: Inventory Up - Kind Cluster
         run: make inventory-up-kind
 

@@ -3,9 +3,7 @@ syntax = "proto3";
 package kessel.inventory.v1beta1.resources;
 
 import "kessel/inventory/v1beta1/resources/metadata.proto";
-//import "kessel/inventory/v1beta1/resources/resource_data.proto";
 import "google/protobuf/struct.proto";
-//import "kessel/inventory/v1beta1/resources/reporter_data.proto";
 
 option go_package = "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/resources";
 option java_multiple_files = true;

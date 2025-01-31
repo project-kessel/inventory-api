@@ -5,6 +5,7 @@ services:
       - invmigrate
     environment:
       INVENTORY_API_CONFIG: /inventory-api-compose.yaml
+      RESOURCE_DIR: /app/data/resources
     build:
       dockerfile: Dockerfile
       args:
@@ -12,6 +13,7 @@ services:
     volumes:
       - ./inventory-api-compose.yaml:/inventory-api-compose.yaml:ro,z
       - ./config/psks.yaml:/psks.yaml:ro,z
+      - ./data/resources:/app/data/resources:ro,z # Mount the data/resources directory
     command: ["serve"]
     restart: "always"
     ports:

@@ -46,9 +46,13 @@ spec:
                 secretKeyRef:
                   name: inventory-api-config
                   key: db_password
+            - name: RESOURCE_DIR
+              value: "/inventory/data/resources"
           volumeMounts:
             - name: config-volume
               mountPath: "/inventory"
+            - name: resources-volume
+              mountPath: "/inventory/data/resources"
       containers:
         - name: api
           image: localhost/inventory-api:e2e-test
@@ -74,6 +78,8 @@ spec:
                 secretKeyRef:
                   name: inventory-api-config
                   key: db_password
+            - name: RESOURCE_DIR
+              value: "/inventory/data/resources"
           livenessProbe:
             httpGet:
               path: /api/inventory/v1/livez
@@ -88,6 +94,8 @@ spec:
               subPath: psks.yaml
             - name: config-volume
               mountPath: "/inventory"
+            - name: resources-volume
+              mountPath: "/inventory/data/resources"
       volumes:
         - name: config-volume
           secret:
@@ -95,6 +103,9 @@ spec:
         - name: psks-volume
           configMap:
             name: inventory-api-psks
+        - name: resources-volume
+          configMap:
+            name: inventory-api-resources
 ---
 # Services
 apiVersion: v1

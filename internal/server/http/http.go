@@ -34,13 +34,13 @@ func New(c CompletedConfig, authn middleware.Middleware, meter metric.Meter, log
 		http.Middleware(
 			recovery.Recovery(),
 			logging.Server(logger),
-			m.Validation(validator),
 			metrics.Server(
 				metrics.WithSeconds(seconds),
 				metrics.WithRequests(requests),
 			),
 			selector.Server(
 				authn,
+				m.Validation(validator),
 			).Match(NewWhiteListMatcher).Build(),
 		),
 	}

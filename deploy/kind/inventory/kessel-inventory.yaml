@@ -46,6 +46,8 @@ spec:
                 secretKeyRef:
                   name: inventory-api-config
                   key: db_password
+            - name: RESOURCE_DIR
+              value: "/inventory/data/resources"
           volumeMounts:
             - name: config-volume
               mountPath: "/inventory"

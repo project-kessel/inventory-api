@@ -19,7 +19,7 @@ This repository implements a common inventory system with eventing.
 
 ### Running locally
 
-When running locally, (.inventory-api.yaml)[./.inventory-api.yaml] file is used. By default, this configuration does the following:
+When running locally, the [default settings](./.inventory-api.yaml) file is used. By default, this configuration does the following:
 - Exposes the inventory API in `localhost` and using port `8000` for http and port `9000` for grpc.
 - Sets authentication mechanism to `allow-unauthenticated`, allowing users to be authenticated with their user-agent value.
 - Sets authorization mechanism to `allow-all`.
@@ -382,6 +382,8 @@ Tests can be run using:
 ```shell
 make test
 ```
+
+For end-to-test info see [here](./test/README.md).
 
 ## Validating FIPS
 

@@ -51,6 +51,8 @@ spec:
           volumeMounts:
             - name: config-volume
               mountPath: "/inventory"
+            - name: resources-volume
+              mountPath: "/inventory/data/resources"
       containers:
         - name: api
           image: localhost/inventory-api:e2e-test

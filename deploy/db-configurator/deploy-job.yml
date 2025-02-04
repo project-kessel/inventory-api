@@ -9,10 +9,10 @@ objects:
   metadata:
     name: inventory-api-db-configurator
   spec:
+  # ensures the job is removed after 60 mins
+    ttlSecondsAfterFinished: 3600
     template:
       spec:
-        # ensures the job is removed after 60 mins
-        ttlSecondsAfterFinished: 3600
         restartPolicy: OnFailure
         containers:
           - name: inventory-api-db-configurator

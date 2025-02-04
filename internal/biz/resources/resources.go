@@ -175,7 +175,7 @@ func (uc *Usecase) Delete(ctx context.Context, id model.ReporterResourceId) erro
 	}
 
 	if uc.Authz != nil {
-		_, err := uc.Authz.UnsetWorkspace(ctx, id.LocalResourceId, uc.Namespace, id.ResourceType)
+		err := biz.DefaultUnsetWorkspace(ctx, uc.Namespace, id.LocalResourceId, id.ResourceType, uc.Authz)
 		if err != nil {
 			return err
 		}

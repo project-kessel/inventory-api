@@ -2,16 +2,16 @@ package grpc
 
 import (
 	"github.com/bufbuild/protovalidate-go"
+	"github.com/go-kratos/kratos/v2/log"
 	"github.com/go-kratos/kratos/v2/middleware"
 	"github.com/go-kratos/kratos/v2/middleware/logging"
+	"github.com/go-kratos/kratos/v2/middleware/metrics"
 	"github.com/go-kratos/kratos/v2/middleware/recovery"
 	"github.com/go-kratos/kratos/v2/middleware/selector"
 	kgrpc "github.com/go-kratos/kratos/v2/transport/grpc"
 	m "github.com/project-kessel/inventory-api/internal/middleware"
-
-	"github.com/go-kratos/kratos/v2/log"
-	"github.com/go-kratos/kratos/v2/middleware/metrics"
 	"go.opentelemetry.io/otel/metric"
+	"google.golang.org/grpc"
 )
 
 // New creates a new a gRPC server.
@@ -29,6 +29,7 @@ func New(c CompletedConfig, authn middleware.Middleware, meter metric.Meter, log
 		return nil, err
 	}
 	// TODO: pass in health, authn middleware
+	kgrpc.Options(grpc.ChainUnaryInterceptor(m.UnaryServerInterceptor))
 	var opts = []kgrpc.ServerOption{
 		kgrpc.Middleware(
 			recovery.Recovery(),

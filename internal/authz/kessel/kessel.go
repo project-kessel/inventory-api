@@ -3,6 +3,7 @@ package kessel
 import (
 	"context"
 	"fmt"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/spf13/viper"
 
@@ -148,6 +149,19 @@ func (a *KesselAuthz) DeleteTuples(ctx context.Context, r *kessel.DeleteTuplesRe
 
 	a.incrSuccessCounter("DeleteTuples")
 	return resp, nil
+}
+
+func (a *KesselAuthz) UnsetWorkspace(ctx context.Context, local_resource_id, namespace, name string) (*kessel.DeleteTuplesResponse, error) {
+
+	req := &kessel.RelationTupleFilter{
+		ResourceNamespace: proto.String(namespace),
+		ResourceType:      proto.String(name),
+		ResourceId:        proto.String(local_resource_id),
+		Relation:          proto.String("workspace"),
+	}
+	return a.DeleteTuples(ctx, &kessel.DeleteTuplesRequest{
+		Filter: req,
+	})
 }
 
 func (a *KesselAuthz) SetWorkspace(ctx context.Context, local_resource_id, workspace, namespace, name string) (*kessel.CreateTuplesResponse, error) {

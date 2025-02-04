@@ -174,7 +174,12 @@ func (uc *Usecase) Delete(ctx context.Context, id model.ReporterResourceId) erro
 		}
 	}
 
-	// TODO: delete the workspace tuple
+	if uc.Authz != nil {
+		_, err := uc.Authz.UnsetWorkspace(ctx, id.LocalResourceId, uc.Namespace, id.ResourceType)
+		if err != nil {
+			return err
+		}
+	}
 
 	uc.log.WithContext(ctx).Infof("Deleted Resource: %v(%v)", m.ID, m.ResourceType)
 	return nil

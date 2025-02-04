@@ -237,3 +237,10 @@ func UnaryServerInterceptor(ctx context.Context, req interface{}, info *grpc.Una
 	// If the request is not of type *Payload, pass it down the chain as-is.
 	return handler(ctx, req)
 }
+
+func HttpInterceptor(handler middleware.Handler) middleware.Handler {
+	return func(ctx context.Context, req interface{}) (interface{}, error) {
+		return handler(ctx, req)
+	}
+	return nil
+}

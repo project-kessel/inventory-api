@@ -88,6 +88,8 @@ export DOCKER=docker
 make api
 ```
 
+> Note: The `podman-compose` provider struggles with compose files that leverage `depends_on` as it can't properly handle the dependency graphs. You can fix this issue on Linux by installing the `docker-compose-plugin` or also having `docker-compose` installed. When installed, podman uses the `docker-compose` provider by default instead. The benefit of the `docker-compose-plugin` is that it doesn't require the full Docker setup or docker daemon!
+
 ### Debugging
 
 See [DEBUG](./DEBUG.md) for instructions on how to debug
@@ -287,7 +289,7 @@ curl -XPUT -H "Content-Type: application/json" --data "@data/host.json" http://l
 
 To hit the gRPC endpoint
 
-``` 
+```
 grpcurl -plaintext -d @ localhost:9000 kessel.inventory.v1beta1.resources.KesselRhelHostService.UpdateRhelHost < data/host.json
 ```
 
@@ -302,7 +304,7 @@ curl -XDELETE -H "Content-Type: application/json" --data "@data/host-reporter.js
 
 To hit the gRPC endpoint
 
-``` 
+```
 grpcurl -plaintext -d @ localhost:9000 kessel.inventory.v1beta1.resources.KesselRhelHostService.DeleteRhelHost < data/host-reporter.json
 ```
 To add a notifications integration (useful for testing in stage)

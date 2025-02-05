@@ -57,3 +57,12 @@ func DefaultSetWorkspace(ctx context.Context, namespace string, model *model.Res
 
 	return nil
 }
+
+func DefaultUnsetWorkspace(ctx context.Context, namespace string, localResourceId string, resourceType string, authz authzapi.Authorizer) error {
+	_, err := authz.UnsetWorkspace(ctx, localResourceId, namespace, resourceType)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}

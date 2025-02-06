@@ -9,7 +9,7 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-func Validation(validator *protovalidate.Validator) middleware.Middleware {
+func Validation(validator protovalidate.Validator) middleware.Middleware {
 	return func(handler middleware.Handler) middleware.Handler {
 		return func(ctx context.Context, req interface{}) (interface{}, error) {
 			if v, ok := req.(proto.Message); ok {

@@ -88,6 +88,8 @@ spec:
               subPath: psks.yaml
             - name: config-volume
               mountPath: "/inventory"
+            - name: resource-volume
+              mountPath: "/data/resources"   
       volumes:
         - name: config-volume
           secret:
@@ -95,6 +97,8 @@ spec:
         - name: psks-volume
           configMap:
             name: inventory-api-psks
+        - name: resource-volume
+          emptyDir: {}
 ---
 # Services
 apiVersion: v1

@@ -8,9 +8,6 @@ import (
 	"github.com/go-kratos/kratos/v2/errors"
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/go-kratos/kratos/v2/middleware"
-	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/resources"
-	"github.com/project-kessel/inventory-api/internal/biz/model"
-	"google.golang.org/grpc"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 	"gopkg.in/yaml.v3"
@@ -49,12 +46,13 @@ func Validation(validator *protovalidate.Validator) middleware.Middleware {
 	return func(handler middleware.Handler) middleware.Handler {
 		return func(ctx context.Context, req interface{}) (interface{}, error) {
 			if v, ok := req.(proto.Message); ok {
+
 				if err := validator.Validate(v); err != nil {
 					return nil, errors.BadRequest("VALIDATOR", err.Error()).WithCause(err)
 				}
-				//if err := ValidateResourceJSON(v); err != nil {
-				//	return nil, errors.BadRequest("JSON_VALIDATOR", err.Error()).WithCause(err)
-				//}
+				if err := ValidateResourceJSON(v); err != nil {
+					return nil, errors.BadRequest("JSON_VALIDATOR", err.Error()).WithCause(err)
+				}
 			}
 			return handler(ctx, req)
 		}
@@ -72,59 +70,67 @@ func ValidateResourceJSON(msg proto.Message) error {
 		return fmt.Errorf("failed to unmarshal JSON: %w", err)
 	}
 
-	resource, ok := resourceMap["resource"].(map[string]interface{})
-	if !ok {
-		return fmt.Errorf("missing or invalid resource field")
+	// Retrieve the dynamic resource type (top-level key)
+	var resourceType string
+	for key := range resourceMap {
+		resourceType = key
+		break
 	}
 
-	metadata, ok := resource["metadata"].(map[string]interface{})
+	resourceData, ok := resourceMap[resourceType].(map[string]interface{})
 	if !ok {
-		return fmt.Errorf("missing or invalid metadata field")
-	}
-	resourceType, ok := metadata["resource_type"].(string)
-	if !ok {
-		return fmt.Errorf("missing or invalid resource_type")
+		return fmt.Errorf("missing or invalid resource field for resource '%s'", resourceType)
 	}
 
-	// Check for `resource_data` and handle abstract resources
-	resourceData, resourceDataExists := resource["resource_data"].(map[string]interface{})
+	metadata, ok := resourceData["metadata"].(map[string]interface{})
+	if !ok {
+		return fmt.Errorf("missing or invalid metadata field for resource '%s'", resourceType)
+	}
+
+	resourceTypeMetadata, ok := metadata["resource_type"].(string)
+	if !ok {
+		return fmt.Errorf("missing or invalid resource_type for resource '%s'", resourceType)
+	}
+
+	resourceDataField, resourceDataExists := resourceData["resource_data"].(map[string]interface{})
 	if !resourceDataExists {
-		AbstractResources[resourceType] = struct{}{}
-	} else if _, isAbstract := AbstractResources[resourceType]; isAbstract {
-		return fmt.Errorf("resource_type '%s' is abstract and cannot have resource_data", resourceType)
+		AbstractResources[resourceTypeMetadata] = struct{}{}
+	} else if _, isAbstract := AbstractResources[resourceTypeMetadata]; isAbstract {
+		return fmt.Errorf("resource_type '%s' is abstract and cannot have resource_data", resourceTypeMetadata)
 	} else {
-		// Validate `resource_data` if present and not abstract
-		resourceSchema, err := loadSchema(resourceType)
+		// Validate resource_data if not abstract
+		resourceSchema, err := loadSchema(resourceTypeMetadata)
 		if err != nil {
-			return fmt.Errorf("failed to load schema for '%s': %w", resourceType, err)
+			return fmt.Errorf("failed to load schema for '%s': %w", resourceTypeMetadata, err)
 		}
-		if err := validateJSONAgainstSchema(resourceSchema, resourceData); err != nil {
-			return fmt.Errorf("resource validation failed: %w", err)
+		if err := validateJSONAgainstSchema(resourceSchema, resourceDataField); err != nil {
+			return fmt.Errorf("resource validation failed for '%s': %w", resourceTypeMetadata, err)
 		}
 	}
 
-	reporterData, ok := resource["reporter_data"].(map[string]interface{})
+	reporterData, ok := resourceData["reporter_data"].(map[string]interface{})
 	if !ok {
-		return fmt.Errorf("missing or invalid reporter_data field")
+		return fmt.Errorf("missing or invalid reporter_data field for resource '%s'", resourceType)
 	}
+
 	reporterType, ok := reporterData["reporter_type"].(string)
 	if !ok {
-		return fmt.Errorf("missing or invalid reporter_type")
+		return fmt.Errorf("missing or invalid reporter_type for resource '%s'", resourceType)
 	}
 
 	// Check for valid resource -> reporter combinations
-	if err := ValidateCombination(resourceType, reporterType); err != nil {
-		return fmt.Errorf("resource-reporter compatibility validation failed: %w", err)
+	if err := ValidateCombination(resourceTypeMetadata, reporterType); err != nil {
+		return fmt.Errorf("resource-reporter compatibility validation failed for resource '%s': %w", resourceType, err)
 	}
 
-	reporterSchema, err := loadReporterSchema(resourceType, strings.ToLower(reporterType))
+	reporterSchema, err := loadReporterSchema(resourceTypeMetadata, strings.ToLower(reporterType))
 	if err != nil {
 		return fmt.Errorf("failed to load reporter schema for '%s': %w", reporterType, err)
 	}
 
-	// Validate `reporter_data` against the reporter schema
+	// Validate reporter_data against the reporter schema
 	if err := validateJSONAgainstSchema(reporterSchema, reporterData); err != nil {
-		return fmt.Errorf("reporter validation failed: %w", err)
+		return fmt.Errorf("reporter validation failed for resource '%s': %w", resourceType, err)
 	}
 
 	return nil
@@ -200,47 +206,4 @@ func loadValidReporters(resourceType string) ([]string, error) {
 	}
 
 	return config.ResourceReporters, nil
-}
-
-func UnaryServerInterceptor(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
-	type ResourceData struct {
-		Metadata     model.JsonObject `json:"metadata"`
-		ReporterData model.JsonObject `json:"reporter_data"`
-		ResourceData model.JsonObject `json:"resource_data,omitempty"`
-	}
-	if payload, ok := req.(*pb.UpdateK8SClusterRequest); ok {
-		// For debugging.
-		fmt.Println("Received payload:", payload)
-
-		// Create a generic resource by transforming fields from the payload.
-		resource := &ResourceData{
-			Metadata: model.JsonObject{
-				"resource_type": payload.K8SCluster.Metadata.ResourceType,
-				"workspace_id":  payload.K8SCluster.Metadata.WorkspaceId,
-			},
-			ReporterData: model.JsonObject{
-				"reporter_type":     payload.K8SCluster.ReporterData.ReporterType,
-				"reporter_version":  payload.K8SCluster.ReporterData.ReporterVersion,
-				"local_resource_id": payload.K8SCluster.ReporterData.LocalResourceId,
-				"api_href":          payload.K8SCluster.ReporterData.ApiHref,
-				"console_href":      payload.K8SCluster.ReporterData.ConsoleHref,
-			},
-			ResourceData: model.JsonObject{
-				"external_cluster_id": payload.K8SCluster.ResourceData.ExternalClusterId,
-			},
-		}
-
-		// Pass the transformed resource down the chain.
-		return handler(ctx, resource)
-	}
-
-	// If the request is not of type *Payload, pass it down the chain as-is.
-	return handler(ctx, req)
-}
-
-func HttpInterceptor(handler middleware.Handler) middleware.Handler {
-	return func(ctx context.Context, req interface{}) (interface{}, error) {
-		return handler(ctx, req)
-	}
-	return nil
 }

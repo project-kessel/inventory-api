@@ -10,19 +10,19 @@ option java_multiple_files = true;
 option java_package = "org.project_kessel.api.inventory.v1beta1.resources";
 
 message CreateResourceRequest {
-  ResourceType resource = 1 [json_name = "resource"];
+  Resource resource = 1 [json_name = "resource"];
 }
 
 message CreateResourceResponse {}
 
 message UpdateResourceRequest {
-    ResourceType resource = 1 [json_name = "resource"];
+    Resource resource = 1 [json_name = "resource"];
 }
 
 message UpdateResourceResponse {}
 
 message DeleteResourceRequest {
-  ResourceType resource = 1 [json_name = "resource"];
+  Resource resource = 1 [json_name = "resource"];
 }
 
 message DeleteResourceResponse {}

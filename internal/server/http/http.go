@@ -40,10 +40,9 @@ func New(c CompletedConfig, authn middleware.Middleware, meter metric.Meter, log
 				metrics.WithRequests(requests),
 			),
 			selector.Server(
+				m.TransformMiddleware(),
 				authn,
-				m.HttpInterceptor()
 				m.Validation(validator),
-
 			).Match(NewWhiteListMatcher).Build(),
 		),
 	}

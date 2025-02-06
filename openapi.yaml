@@ -723,7 +723,7 @@ components:
             type: object
             properties:
                 resource:
-                    $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.ResourceType'
+                    $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.Resource'
         kessel.inventory.v1beta1.resources.CreateResourceResponse:
             type: object
             properties: {}
@@ -993,14 +993,7 @@ components:
                 reporter_version:
                     type: string
                     description: version of the reporter
-        kessel.inventory.v1beta1.resources.ResourceLabel:
-            type: object
-            properties:
-                key:
-                    type: string
-                value:
-                    type: string
-        kessel.inventory.v1beta1.resources.ResourceType:
+        kessel.inventory.v1beta1.resources.Resource:
             type: object
             properties:
                 metadata:
@@ -1009,6 +1002,13 @@ components:
                     type: object
                 resource_data:
                     type: object
+        kessel.inventory.v1beta1.resources.ResourceLabel:
+            type: object
+            properties:
+                key:
+                    type: string
+                value:
+                    type: string
         kessel.inventory.v1beta1.resources.RhelHost:
             type: object
             properties:
@@ -1055,7 +1055,7 @@ components:
             type: object
             properties:
                 resource:
-                    $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.ResourceType'
+                    $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.Resource'
         kessel.inventory.v1beta1.resources.UpdateResourceResponse:
             type: object
             properties: {}

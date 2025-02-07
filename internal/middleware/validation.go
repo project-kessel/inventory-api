@@ -89,7 +89,7 @@ func validateResourceJSON(msg proto.Message) error {
 
 	reporterData, ok := resource["reporter_data"].(map[string]interface{})
 	if !ok {
-		return fmt.Errorf("missing or invalid reporter_data field for resource '%s'", resourceType)
+		return fmt.Errorf("missing or invalid reporter_data field for resource '%s'", metadataResourceType)
 	}
 
 	reporterType, ok := reporterData["reporter_type"].(string)

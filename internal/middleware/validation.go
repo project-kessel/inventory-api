@@ -68,7 +68,7 @@ func validateResourceJSON(msg proto.Message) error {
 
 	metadataResourceType, ok := metadata["resource_type"].(string)
 	if !ok {
-		return fmt.Errorf("missing or invalid resource_type for resource '%s'", resourceType)
+		return fmt.Errorf("missing or invalid resource_type for resource '%s'", metadataResourceType)
 	}
 
 	resourceDataField, resourceDataExists := resource["resource_data"].(map[string]interface{})

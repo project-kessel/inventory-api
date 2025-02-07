@@ -128,7 +128,7 @@ func TransformMiddleware() middleware.Middleware {
 					}
 					var resource interface{}
 					switch requestURI {
-					case "/api/inventory/v1beta1/resources/k8s_cluster":
+					case "/api/inventory/v1beta1/resources/k8s-clusters":
 						var k8spayload K8SClusterPayload
 						if err := json.Unmarshal(body, &k8spayload); err != nil {
 							return nil, err
@@ -142,7 +142,7 @@ func TransformMiddleware() middleware.Middleware {
 						}
 						resource = createRhelHostResource(rhelHostpayload)
 
-					case "/api/inventory/v1beta1/resources/notification_integration":
+					case "/api/inventory/v1beta1/resources/notifications-integrations":
 						var integrationPayload IntegrationPayload
 						if err := json.Unmarshal(body, &integrationPayload); err != nil {
 							return nil, err
@@ -215,10 +215,10 @@ func createK8SClusterResource(payload K8SClusterPayload) *pb.UpdateResourceReque
 	}
 }
 
-func createNotificationIntegrationResource(payload IntegrationPayload) *pb.CreateResourceRequest {
+func createNotificationIntegrationResource(payload IntegrationPayload) *pb.UpdateResourceRequest {
 	reporterData, _ := createReporterData(payload.NotificationsIntegration.ReporterData)
 
-	return &pb.CreateResourceRequest{
+	return &pb.UpdateResourceRequest{
 		Resource: &pb.Resource{
 			Metadata: &pb.Metadata{
 				ResourceType: payload.NotificationsIntegration.Metadata.ResourceType,

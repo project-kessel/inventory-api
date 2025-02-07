@@ -32,10 +32,6 @@ func (c *ResourceService) CreateResource(ctx context.Context, r *pb.CreateResour
 		return nil, err
 	}
 
-	if !isValidResourceType(r.Resource.Metadata.ResourceType) {
-		return nil, fmt.Errorf("invalid resource_type: %s", r.Resource.Metadata.ResourceType)
-	}
-
 	if resource, err := c.resourceFromCreateRequest(r, identity); err == nil {
 		if resp, err := c.Ctl.Create(ctx, resource); err == nil {
 			return createResponseFromResource(resp), nil
@@ -53,10 +49,6 @@ func (c *ResourceService) UpdateResource(ctx context.Context, r *pb.UpdateResour
 		return nil, err
 	}
 
-	if !isValidResourceType(r.Resource.Metadata.ResourceType) {
-		return nil, fmt.Errorf("invalid resource_type: %s", r.Resource.Metadata.ResourceType)
-	}
-
 	if resource, err := c.resourceFromUpdateRequest(r, identity); err == nil {
 		if resp, err := c.Ctl.Update(ctx, resource, model.ReporterResourceIdFromResource(resource)); err == nil {
 			return updateResponseFromResource(resp), nil
@@ -72,10 +64,6 @@ func (c *ResourceService) DeleteResource(ctx context.Context, r *pb.DeleteResour
 	identity, err := middleware.GetIdentity(ctx)
 	if err != nil {
 		return nil, err
-	}
-
-	if !isValidResourceType(r.Resource.Metadata.ResourceType) {
-		return nil, fmt.Errorf("invalid resource_type: %s", r.Resource.Metadata.ResourceType)
 	}
 
 	if resourceId, err := c.resourceIdFromDeleteRequest(r, identity); err == nil {
@@ -182,9 +170,4 @@ func updateResponseFromResource(c *model.Resource) *pb.UpdateResourceResponse {
 
 func toDeleteResponse() *pb.DeleteResourceResponse {
 	return &pb.DeleteResourceResponse{}
-}
-
-func isValidResourceType(resourceType string) bool {
-	_, exists := v.AllowedResourceTypes[resourceType]
-	return exists
 }

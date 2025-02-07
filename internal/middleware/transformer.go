@@ -135,7 +135,7 @@ func TransformMiddleware() middleware.Middleware {
 						}
 						resource = createK8SClusterResource(k8spayload)
 
-					case "/api/inventory/v1beta1/resources/rhel_host":
+					case "/api/inventory/v1beta1/resources/rhel-hosts":
 						var rhelHostpayload RhelHostPayload
 						if err := json.Unmarshal(body, &rhelHostpayload); err != nil {
 							return nil, err

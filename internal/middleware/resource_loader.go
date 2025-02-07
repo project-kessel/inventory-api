@@ -7,6 +7,10 @@ import (
 
 const defaultResourceDir = "data/resources"
 
+var (
+	AllowedResourceTypes = map[string]struct{}{}
+)
+
 func LoadResources() {
 	if resourceDir == "" {
 		resourceDir = defaultResourceDir

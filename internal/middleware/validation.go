@@ -16,9 +16,8 @@ import (
 )
 
 var (
-	resourceDir          = os.Getenv("RESOURCE_DIR")
-	AllowedResourceTypes = map[string]struct{}{}
-	AbstractResources    = map[string]struct{}{} // Tracks resource types marked as abstract (no resource_data)
+	resourceDir       = os.Getenv("RESOURCE_DIR")
+	AbstractResources = map[string]struct{}{} // Tracks resource types marked as abstract (no resource_data)
 )
 
 func Validation(validator *protovalidate.Validator) middleware.Middleware {
@@ -57,38 +56,38 @@ func validateResourceJSON(msg proto.Message) error {
 		break
 	}
 
-	resourceData, ok := resourceMap[resourceType].(map[string]interface{})
+	resource, ok := resourceMap[resourceType].(map[string]interface{})
 	if !ok {
 		return fmt.Errorf("missing or invalid resource field for resource '%s'", resourceType)
 	}
 
-	metadata, ok := resourceData["metadata"].(map[string]interface{})
+	metadata, ok := resource["metadata"].(map[string]interface{})
 	if !ok {
 		return fmt.Errorf("missing or invalid metadata field for resource '%s'", resourceType)
 	}
 
-	resourceTypeMetadata, ok := metadata["resource_type"].(string)
+	metadataResourceType, ok := metadata["resource_type"].(string)
 	if !ok {
 		return fmt.Errorf("missing or invalid resource_type for resource '%s'", resourceType)
 	}
 
-	resourceDataField, resourceDataExists := resourceData["resource_data"].(map[string]interface{})
+	resourceDataField, resourceDataExists := resource["resource_data"].(map[string]interface{})
 	if !resourceDataExists {
-		AbstractResources[resourceTypeMetadata] = struct{}{}
-	} else if _, isAbstract := AbstractResources[resourceTypeMetadata]; isAbstract {
-		return fmt.Errorf("resource_type '%s' is abstract and cannot have resource_data", resourceTypeMetadata)
+		AbstractResources[metadataResourceType] = struct{}{}
+	} else if _, isAbstract := AbstractResources[metadataResourceType]; isAbstract {
+		return fmt.Errorf("resource_type '%s' is abstract and cannot have resource_data", metadataResourceType)
 	} else {
 		// Validate resource_data if not abstract
-		resourceSchema, err := LoadSchema(resourceTypeMetadata)
+		resourceSchema, err := LoadResourceSchema(metadataResourceType)
 		if err != nil {
-			return fmt.Errorf("failed to load schema for '%s': %w", resourceTypeMetadata, err)
+			return fmt.Errorf("failed to load schema for '%s': %w", metadataResourceType, err)
 		}
 		if err := validateJSONAgainstSchema(resourceSchema, resourceDataField); err != nil {
-			return fmt.Errorf("resource validation failed for '%s': %w", resourceTypeMetadata, err)
+			return fmt.Errorf("resource validation failed for '%s': %w", metadataResourceType, err)
 		}
 	}
 
-	reporterData, ok := resourceData["reporter_data"].(map[string]interface{})
+	reporterData, ok := resource["reporter_data"].(map[string]interface{})
 	if !ok {
 		return fmt.Errorf("missing or invalid reporter_data field for resource '%s'", resourceType)
 	}
@@ -99,11 +98,11 @@ func validateResourceJSON(msg proto.Message) error {
 	}
 
 	// Check for valid resource -> reporter combinations
-	if err := ValidateCombination(resourceTypeMetadata, reporterType); err != nil {
+	if err := ValidateCombination(metadataResourceType, reporterType); err != nil {
 		return fmt.Errorf("resource-reporter compatibility validation failed for resource '%s': %w", resourceType, err)
 	}
 
-	reporterSchema, err := LoadReporterSchema(resourceTypeMetadata, strings.ToLower(reporterType))
+	reporterSchema, err := LoadReporterSchema(metadataResourceType, strings.ToLower(reporterType))
 	if err != nil {
 		return fmt.Errorf("failed to load reporter schema for '%s': %w", reporterType, err)
 	}

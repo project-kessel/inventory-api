@@ -20,7 +20,7 @@ var (
 	AbstractResources = map[string]struct{}{} // Tracks resource types marked as abstract (no resource_data)
 )
 
-func Validation(validator *protovalidate.Validator) middleware.Middleware {
+func Validation(validator protovalidate.Validator) middleware.Middleware {
 	LoadResources()
 	return func(handler middleware.Handler) middleware.Handler {
 		return func(ctx context.Context, req interface{}) (interface{}, error) {

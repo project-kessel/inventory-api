@@ -698,7 +698,7 @@ data:
               "text": "crcs02ue1-prometheus",
               "value": "PDD8BE47D10408F45"
             },
-            "description": "Choose between the production (crcp01ue1-prometheus) or stage (crcs02ue1-prometheus) environments",
+            "description": "Choose between the production, stage, or Govcloud environments",
             "hide": 0,
             "includeAll": false,
             "label": "Datasource",
@@ -707,7 +707,7 @@ data:
             "options": [],
             "query": "prometheus",
             "refresh": 1,
-            "regex": "/(crcp01ue1-prometheus)|(crcs02ue1-prometheus)/",
+            "regex": "/(crcp01ue1-prometheus)|(crcfrp01ugw1-prometheus)|(crcs02ue1-prometheus)|(crcfrs01ugw1-prometheus)/",
             "skipUrlSync": false,
             "type": "datasource"
           }
@@ -721,7 +721,7 @@ data:
       "timezone": "browser",
       "title": "Kessel - Inventory API",
       "uid": "ddxs3i6o0xpmof",
-      "version": 1,
+      "version": 2,
       "weekStart": ""
     }
 kind: ConfigMap

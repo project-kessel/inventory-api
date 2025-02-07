@@ -38,6 +38,10 @@ func (a *AllowAllAuthz) DeleteTuples(ctx context.Context, r *kessel.DeleteTuples
 	return &kessel.DeleteTuplesResponse{}, nil
 }
 
+func (a *AllowAllAuthz) UnsetWorkspace(ctx context.Context, local_resource_id, name, namespace string) (*kessel.DeleteTuplesResponse, error) {
+	return &kessel.DeleteTuplesResponse{}, nil
+}
+
 func (a *AllowAllAuthz) SetWorkspace(ctx context.Context, local_resource_id, workspace, name, namespace string) (*kessel.CreateTuplesResponse, error) {
 	return &kessel.CreateTuplesResponse{}, nil
 }

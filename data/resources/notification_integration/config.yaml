@@ -1,0 +1,3 @@
+resource_type: notification_integration
+resource_reporters:
+  - NOTIFICATIONS

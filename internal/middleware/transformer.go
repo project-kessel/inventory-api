@@ -175,6 +175,12 @@ func TransformMiddleware() middleware.Middleware {
 							return nil, err
 						}
 						resource = createNotificationIntegrationResource(integrationPayload)
+
+					case "/api/inventory/v1beta1/resource-relationships/k8s-policy_is-propagated-to_k8s-cluster":
+						return handler(ctx, body)
+
+					default:
+						return nil, fmt.Errorf("invalid endpoint: %s", requestURI)
 					}
 
 					if resource != nil {

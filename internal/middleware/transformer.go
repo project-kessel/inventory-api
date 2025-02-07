@@ -48,6 +48,26 @@ type K8SClusterPayload struct {
 	} `json:"k8s_cluster"`
 }
 
+type K8SPolicyPayload struct {
+	K8SPolicy struct {
+		Metadata struct {
+			ResourceType string `json:"resource_type"`
+			WorkspaceID  string `json:"workspace_id"`
+		} `json:"metadata"`
+		ReporterData struct {
+			ReporterType    string `json:"reporter_type"`
+			ReporterVersion string `json:"reporter_version"`
+			LocalResourceID string `json:"local_resource_id"`
+			APIHref         string `json:"api_href"`
+			ConsoleHref     string `json:"console_href"`
+		} `json:"reporter_data"`
+		ResourceData struct {
+			Disabled bool   `json:"disabled"`
+			Severity string `json:"severity"`
+		} `json:"resource_data"`
+	} `json:"k8s_policy"`
+}
+
 type IntegrationPayload struct {
 	NotificationsIntegration struct {
 		Metadata struct {
@@ -135,6 +155,13 @@ func TransformMiddleware() middleware.Middleware {
 						}
 						resource = createK8SClusterResource(k8spayload)
 
+					case "/api/inventory/v1beta1/resources/k8s-policies":
+						var k8spolicyPayload K8SPolicyPayload
+						if err := json.Unmarshal(body, &k8spolicyPayload); err != nil {
+							return nil, err
+						}
+						resource = createK8SPolicyResource(k8spolicyPayload)
+
 					case "/api/inventory/v1beta1/resources/rhel-hosts":
 						var rhelHostpayload RhelHostPayload
 						if err := json.Unmarshal(body, &rhelHostpayload); err != nil {
@@ -208,6 +235,26 @@ func createK8SClusterResource(payload K8SClusterPayload) *pb.UpdateResourceReque
 			Metadata: &pb.Metadata{
 				ResourceType: payload.K8SCluster.Metadata.ResourceType,
 				WorkspaceId:  payload.K8SCluster.Metadata.WorkspaceID,
+			},
+			ReporterData: reporterData,
+			ResourceData: resourceData,
+		},
+	}
+}
+
+func createK8SPolicyResource(payload K8SPolicyPayload) *pb.UpdateResourceRequest {
+	reporterData, _ := createReporterData(payload.K8SPolicy.ReporterData)
+
+	resourceData, _ := structpb.NewStruct(map[string]interface{}{
+		"severity": payload.K8SPolicy.ResourceData.Severity,
+		"disabled": payload.K8SPolicy.ResourceData.Disabled,
+	})
+
+	return &pb.UpdateResourceRequest{
+		Resource: &pb.Resource{
+			Metadata: &pb.Metadata{
+				ResourceType: payload.K8SPolicy.Metadata.ResourceType,
+				WorkspaceId:  payload.K8SPolicy.Metadata.WorkspaceID,
 			},
 			ReporterData: reporterData,
 			ResourceData: resourceData,

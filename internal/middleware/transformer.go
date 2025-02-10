@@ -248,7 +248,7 @@ func createK8SClusterResource(payload K8SClusterPayload) *pb.UpdateResourceReque
 	}
 }
 
-func createK8SPolicyResource(payload K8SPolicyPayload) *pb.UpdateResourceRequest {
+func createK8SPolicyResource(payload K8SPolicyPayload) *pb.CreateResourceRequest {
 	reporterData, _ := createReporterData(payload.K8SPolicy.ReporterData)
 
 	resourceData, _ := structpb.NewStruct(map[string]interface{}{
@@ -256,7 +256,7 @@ func createK8SPolicyResource(payload K8SPolicyPayload) *pb.UpdateResourceRequest
 		"disabled": payload.K8SPolicy.ResourceData.Disabled,
 	})
 
-	return &pb.UpdateResourceRequest{
+	return &pb.CreateResourceRequest{
 		Resource: &pb.Resource{
 			Metadata: &pb.Metadata{
 				ResourceType: payload.K8SPolicy.Metadata.ResourceType,

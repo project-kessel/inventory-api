@@ -1,3 +1,5 @@
 resource_type: k8s_policy
+resource_name: # implement later
+endpoint_name:
 resource_reporters:
   - ACM

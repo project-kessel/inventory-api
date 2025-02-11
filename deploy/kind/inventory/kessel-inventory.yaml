@@ -16,6 +16,21 @@ spec:
         app: kessel-inventory
     spec:
       initContainers:
+        - name: copy-resources
+          image: busybox
+          command:
+            - /bin/sh
+            - "-c"
+            - |
+              echo "Extracting resources from tarball..."
+              tar -xzf /mnt/resources/resources.tar.gz -C /data/resources
+              echo "Extraction complete!"
+          volumeMounts:
+            - name: resources-tarball
+              mountPath: "/mnt/resources"
+            - name: resource-volume
+              mountPath: "/data/resources"
+
         - name: migration
           image: localhost/inventory-api:e2e-test
           command:
@@ -46,6 +61,8 @@ spec:
                 secretKeyRef:
                   name: inventory-api-config
                   key: db_password
+            - name: RESOURCE_DIR
+              value: "/data/resources"
           volumeMounts:
             - name: config-volume
               mountPath: "/inventory"
@@ -101,6 +118,9 @@ spec:
             name: inventory-api-psks
         - name: resource-volume
           emptyDir: {}
+        - name: resources-tarball
+          configMap:
+            name: resources-tarball
 ---
 # Services
 apiVersion: v1

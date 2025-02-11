@@ -17,7 +17,7 @@ eventing:
   eventer: stdout
   kafka:
 storage:
-  disable-persistence: false
+  disable-persistence: true
   database: sqlite3
   sqlite3:
     dsn: inventory.db

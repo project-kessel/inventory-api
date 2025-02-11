@@ -11,6 +11,7 @@ import (
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/xeipuuv/gojsonschema"
@@ -22,7 +23,16 @@ var (
 )
 
 func Validation(validator protovalidate.Validator) middleware.Middleware {
-	LoadResources()
+	if resourceDirFilePath, exists := os.LookupEnv("RESOURCE_DIR"); exists {
+		fmt.Println(resourceDirFilePath)
+		absPath, err := filepath.Abs(resourceDirFilePath)
+		if err != nil {
+			fmt.Errorf("failed to resolve absolute path for RESOURCE_DIR file: %v", err)
+		}
+		resourceDir = absPath
+	}
+	LoadResources(resourceDir)
+
 	return func(handler middleware.Handler) middleware.Handler {
 		return func(ctx context.Context, req interface{}) (interface{}, error) {
 			if v, ok := req.(proto.Message); ok {

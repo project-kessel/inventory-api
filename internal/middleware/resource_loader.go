@@ -32,7 +32,7 @@ func getResourceType(configPath string) (string, error) {
 }
 
 // LoadResources loads in the resources configured in  the data/resources directory
-func LoadResources() {
+func LoadResources(resourceDir string) {
 	if resourceDir == "" {
 		resourceDir = "data/resources"
 		log.Infof("Using local resources directory")

@@ -7,8 +7,6 @@ import (
 	"path/filepath"
 )
 
-const defaultResourceDir = "data/resources"
-
 // Config struct to read `resource_type` from `config.yaml`
 type Config struct {
 	ResourceType string `yaml:"resource_type"`
@@ -33,10 +31,11 @@ func getResourceType(configPath string) (string, error) {
 	return config.ResourceType, nil
 }
 
-// Updated LoadResources function
+// LoadResources loads in the resources configured in  the data/resources directory
 func LoadResources() {
 	if resourceDir == "" {
-		resourceDir = defaultResourceDir
+		resourceDir = "data/resources"
+		log.Infof("Using local resources directory")
 	}
 
 	// Read all directories in `resourceDir`

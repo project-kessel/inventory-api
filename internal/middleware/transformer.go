@@ -158,6 +158,8 @@ func TransformMiddleware() middleware.Middleware {
 							resource = createK8SClusterResource(k8spayload)
 						} else if method == "PUT" {
 							resource = updateK8SClusterResource(k8spayload)
+						} else {
+							return handler(ctx, body)
 						}
 
 					case "/api/inventory/v1beta1/resources/k8s-policies":
@@ -169,6 +171,8 @@ func TransformMiddleware() middleware.Middleware {
 							resource = createK8SPolicyResource(k8spolicyPayload)
 						} else if method == "PUT" {
 							resource = updateK8SPolicyResource(k8spolicyPayload)
+						} else {
+							return handler(ctx, body)
 						}
 
 					case "/api/inventory/v1beta1/resources/rhel-hosts":
@@ -180,6 +184,8 @@ func TransformMiddleware() middleware.Middleware {
 							resource = createRhelHostResource(rhelHostpayload)
 						} else if method == "PUT" {
 							resource = updateRhelHostResource(rhelHostpayload)
+						} else {
+							resource = deleteRhelHostResource(rhelHostpayload)
 						}
 
 					case "/api/inventory/v1beta1/resources/notifications-integrations":
@@ -192,6 +198,8 @@ func TransformMiddleware() middleware.Middleware {
 							resource = createNotificationIntegrationResource(integrationPayload)
 						} else if method == "PUT" {
 							resource = updateNotificationIntegrationResource(integrationPayload)
+						} else {
+							return handler(ctx, body)
 						}
 
 					case "/api/inventory/v1beta1/resource-relationships/k8s-policy_is-propagated-to_k8s-cluster":
@@ -229,6 +237,20 @@ func updateRhelHostResource(hostpayload RhelHostPayload) interface{} {
 	reporterData, _ := createReporterData(hostpayload.RhelHost.ReporterData)
 
 	return &pb.UpdateResourceRequest{
+		Resource: &pb.Resource{
+			Metadata: &pb.Metadata{
+				ResourceType: hostpayload.RhelHost.Metadata.ResourceType,
+				WorkspaceId:  hostpayload.RhelHost.Metadata.WorkspaceID,
+			},
+			ReporterData: reporterData,
+		},
+	}
+}
+
+func deleteRhelHostResource(hostpayload RhelHostPayload) interface{} {
+	reporterData, _ := createReporterData(hostpayload.RhelHost.ReporterData)
+
+	return &pb.DeleteResourceRequest{
 		Resource: &pb.Resource{
 			Metadata: &pb.Metadata{
 				ResourceType: hostpayload.RhelHost.Metadata.ResourceType,

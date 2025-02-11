@@ -7,6 +7,7 @@ import (
 	"github.com/bufbuild/protovalidate-go"
 	"github.com/go-kratos/kratos/v2/errors"
 	"github.com/go-kratos/kratos/v2/middleware"
+	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/resources"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 	"os"
@@ -25,12 +26,19 @@ func Validation(validator protovalidate.Validator) middleware.Middleware {
 	return func(handler middleware.Handler) middleware.Handler {
 		return func(ctx context.Context, req interface{}) (interface{}, error) {
 			if v, ok := req.(proto.Message); ok {
-
-				if err := validator.Validate(v); err != nil {
-					return nil, errors.BadRequest("VALIDATOR", err.Error()).WithCause(err)
-				}
-				if err := validateResourceJSON(v); err != nil {
-					return nil, errors.BadRequest("JSON_VALIDATOR", err.Error()).WithCause(err)
+				if _, isDelete := v.(*pb.DeleteResourceRequest); isDelete {
+					// run the protovalidate validation if it is a delete request
+					if err := validator.Validate(v); err != nil {
+						return nil, errors.BadRequest("VALIDATOR", err.Error()).WithCause(err)
+					}
+				} else {
+					// Otherwise, run both protovalidate and JSON validation.
+					if err := validator.Validate(v); err != nil {
+						return nil, errors.BadRequest("VALIDATOR", err.Error()).WithCause(err)
+					}
+					if err := validateResourceJSON(v); err != nil {
+						return nil, errors.BadRequest("JSON_VALIDATOR", err.Error()).WithCause(err)
+					}
 				}
 			}
 			return handler(ctx, req)

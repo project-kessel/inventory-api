@@ -42,6 +42,79 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/google.rpc.Status'
+    /api/inventory/v1beta1/relations/check:
+        post:
+            tags:
+                - KesselCheckService
+            description: "Checks for the existence of a single Relationship \n (a Relation between a Resource and a Subject or Subject Set)."
+            operationId: KesselCheckService_CheckForView
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/kessel.inventory.v1beta1.relations.CheckForViewRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/kessel.inventory.v1beta1.relations.CheckForViewResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/google.rpc.Status'
+    /api/inventory/v1beta1/relations/checkforcreate:
+        post:
+            tags:
+                - KesselCheckService
+            operationId: KesselCheckService_CheckForCreate
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/kessel.inventory.v1beta1.relations.CheckForCreateRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/kessel.inventory.v1beta1.relations.CheckForCreateResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/google.rpc.Status'
+    /api/inventory/v1beta1/relations/checkforupdate:
+        post:
+            tags:
+                - KesselCheckService
+            operationId: KesselCheckService_CheckForUpdate
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/kessel.inventory.v1beta1.relations.CheckForUpdateRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/kessel.inventory.v1beta1.relations.CheckForUpdateResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/google.rpc.Status'
     /api/inventory/v1beta1/resource-relationships/k8s-policy_is-propagated-to_k8s-cluster:
         put:
             tags:
@@ -434,6 +507,108 @@ components:
                 code:
                     type: integer
                     format: uint32
+        kessel.inventory.v1beta1.relations.CheckForCreateRequest:
+            type: object
+            properties:
+                parent:
+                    allOf:
+                        - $ref: '#/components/schemas/kessel.inventory.v1beta1.relations.ObjectReference'
+                    description: |-
+                        Required parameters (from an authz perspective)
+                         	- resource type (located in Metadata, could be discrete argument)
+                         		Alternatively: the workspace-level 'create' permission for the resource type. Note: this parameter is not normally part of the CreateResource call (but may need to be if this is rolled into CreateResource and it cannot be derived from the resource type)
+                         	- parent object type and id (typically a workspace, located in Metadata, could be discrete argument)
+                         Note: may be part of CreateResource or separate depending on consistency algorithm requirements
+                createPermission:
+                    type: string
+                subject:
+                    $ref: '#/components/schemas/kessel.inventory.v1beta1.relations.SubjectReference'
+            description: may make sense to get away with just checkforview and checkforupdate.
+        kessel.inventory.v1beta1.relations.CheckForCreateResponse:
+            type: object
+            properties:
+                allowed:
+                    enum:
+                        - ALLOWED_UNSPECIFIED
+                        - ALLOWED_TRUE
+                        - ALLOWED_FALSE
+                    type: string
+                    format: enum
+        kessel.inventory.v1beta1.relations.CheckForUpdateRequest:
+            type: object
+            properties:
+                parent:
+                    allOf:
+                        - $ref: '#/components/schemas/kessel.inventory.v1beta1.relations.ObjectReference'
+                    description: |-
+                        Required parameters (from an authz perspective)
+                         - resource type and id
+                         - permission (cannot be derived from type as types may have multiple edit permissions Ex: https://github.com/RedHatInsights/rbac-config/blob/master/configs/prod/schemas/src/notifications.ksl#L37)
+                         - user (possibly derived from an identity token)
+                relation:
+                    type: string
+                subject:
+                    $ref: '#/components/schemas/kessel.inventory.v1beta1.relations.SubjectReference'
+        kessel.inventory.v1beta1.relations.CheckForUpdateResponse:
+            type: object
+            properties:
+                allowed:
+                    enum:
+                        - ALLOWED_UNSPECIFIED
+                        - ALLOWED_TRUE
+                        - ALLOWED_FALSE
+                    type: string
+                    format: enum
+        kessel.inventory.v1beta1.relations.CheckForViewRequest:
+            type: object
+            properties:
+                parent:
+                    allOf:
+                        - $ref: '#/components/schemas/kessel.inventory.v1beta1.relations.ObjectReference'
+                    description: |-
+                        Required parameters (from an authz perspective)
+                         - resource type and id
+                         - permission (cannot be derived from the type as a type may have multiple 'read' permissions. Ex: https://github.com/RedHatInsights/rbac-config/blob/master/configs/prod/schemas/src/notifications.ksl#L31)
+                         - user (possibly derived from an identity token)
+                relation:
+                    type: string
+                subject:
+                    $ref: '#/components/schemas/kessel.inventory.v1beta1.relations.SubjectReference'
+        kessel.inventory.v1beta1.relations.CheckForViewResponse:
+            type: object
+            properties:
+                allowed:
+                    enum:
+                        - ALLOWED_UNSPECIFIED
+                        - ALLOWED_TRUE
+                        - ALLOWED_FALSE
+                    type: string
+                    format: enum
+        kessel.inventory.v1beta1.relations.ObjectReference:
+            type: object
+            properties:
+                type:
+                    $ref: '#/components/schemas/kessel.inventory.v1beta1.relations.ObjectType'
+                id:
+                    type: string
+        kessel.inventory.v1beta1.relations.ObjectType:
+            type: object
+            properties:
+                namespace:
+                    type: string
+                name:
+                    type: string
+        kessel.inventory.v1beta1.relations.SubjectReference:
+            type: object
+            properties:
+                relation:
+                    type: string
+                    description: |-
+                        An optional relation which points to a set of Subjects instead of the single Subject.
+                         e.g. "members" or "owners" of a group identified in `subject`.
+                subject:
+                    $ref: '#/components/schemas/kessel.inventory.v1beta1.relations.ObjectReference'
+            description: A reference to a Subject or, if a `relation` is provided, a Subject Set.
         kessel.inventory.v1beta1.relationships.CreateK8SPolicyIsPropagatedToK8SClusterRequest:
             type: object
             properties:
@@ -918,6 +1093,7 @@ components:
             type: object
             properties: {}
 tags:
+    - name: KesselCheckService
     - name: KesselInventoryHealthService
     - name: KesselK8SClusterService
     - name: KesselK8SPolicyIsPropagatedToK8SClusterService

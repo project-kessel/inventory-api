@@ -345,6 +345,7 @@ github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2/go.mod h1:iKH
 github.com/power-devops/perfstat v0.0.0-20221212215047-62379fc7944b h1:0LFwY6Q3gMACTjAbMZBjXAqTOzOwFaj2Ld6cjeQ7Rig=
 github.com/power-devops/perfstat v0.0.0-20221212215047-62379fc7944b/go.mod h1:OmDBASR4679mdNQnz2pUhc2G8CO2JrUAVFDRBDP/hJE=
 <<<<<<< HEAD
+<<<<<<< HEAD
 github.com/project-kessel/inventory-client-go v0.0.0-20250213094514-4b90870d8dcf h1:RIKxvHBg98bak8Z58gNOgYbBZsOOLYKNRpLVSNhdNA8=
 github.com/project-kessel/inventory-client-go v0.0.0-20250213094514-4b90870d8dcf/go.mod h1:ghVJESku3BJcPp3A8RTuHIErM0RptidPKoi0xGTlgrk=
 github.com/project-kessel/relations-api v0.0.0-20241021205601-90db9ba90a73 h1:w/VpkTj8lEw4/EoCVjMj7Yiq3qI6jAPJ35vEWpiMKdk=
@@ -352,6 +353,8 @@ github.com/project-kessel/relations-api v0.0.0-20241021205601-90db9ba90a73/go.mo
 github.com/prometheus/client_golang v1.21.0 h1:DIsaGmiaBkSangBgMtWdNfxbMNdku5IK6iNhrEqWvdA=
 github.com/prometheus/client_golang v1.21.0/go.mod h1:U9NM32ykUErtVBxdvD3zfi+EuFkkaBvMb09mIfe0Zgg=
 =======
+=======
+>>>>>>> 55ce529 (Route check requests to relations)
 github.com/project-kessel/inventory-client-go v0.0.0-20240918112335-d9c72f85b234 h1:Ms0bb3nq9slmvRIRhPxTocC/nVJtUrRDlEnmcXgP7as=
 github.com/project-kessel/inventory-client-go v0.0.0-20240918112335-d9c72f85b234/go.mod h1:ghVJESku3BJcPp3A8RTuHIErM0RptidPKoi0xGTlgrk=
 github.com/project-kessel/relations-api v0.0.0-20250210140221-f9f55b969da0 h1:sR8zwcm0a3vIoUenPqQrlzGax8lFh/q7KgBrFy6z9oQ=

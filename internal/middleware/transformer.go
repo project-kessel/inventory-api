@@ -159,7 +159,7 @@ func TransformMiddleware() middleware.Middleware {
 						} else if method == "PUT" {
 							resource = updateK8SClusterResource(k8spayload)
 						} else {
-							return handler(ctx, body)
+							resource = deleteK8SClusterResource(k8spayload)
 						}
 
 					case "/api/inventory/v1beta1/resources/k8s-policies":
@@ -172,7 +172,7 @@ func TransformMiddleware() middleware.Middleware {
 						} else if method == "PUT" {
 							resource = updateK8SPolicyResource(k8spolicyPayload)
 						} else {
-							return handler(ctx, body)
+							resource = deleteK8SPolicyResource(k8spolicyPayload)
 						}
 
 					case "/api/inventory/v1beta1/resources/rhel-hosts":
@@ -199,7 +199,7 @@ func TransformMiddleware() middleware.Middleware {
 						} else if method == "PUT" {
 							resource = updateNotificationIntegrationResource(integrationPayload)
 						} else {
-							return handler(ctx, body)
+							resource = deleteNotificationIntegrationResource(integrationPayload)
 						}
 
 					case "/api/inventory/v1beta1/resource-relationships/k8s-policy_is-propagated-to_k8s-cluster":
@@ -301,6 +301,7 @@ func createK8SClusterResource(payload K8SClusterPayload) *pb.CreateResourceReque
 		},
 	}
 }
+
 func updateK8SClusterResource(payload K8SClusterPayload) *pb.UpdateResourceRequest {
 	reporterData, _ := createReporterData(payload.K8SCluster.ReporterData)
 
@@ -322,6 +323,20 @@ func updateK8SClusterResource(payload K8SClusterPayload) *pb.UpdateResourceReque
 			},
 			ReporterData: reporterData,
 			ResourceData: resourceData,
+		},
+	}
+}
+
+func deleteK8SClusterResource(payload K8SClusterPayload) *pb.DeleteResourceRequest {
+	reporterData, _ := createReporterData(payload.K8SCluster.ReporterData)
+
+	return &pb.DeleteResourceRequest{
+		Resource: &pb.Resource{
+			Metadata: &pb.Metadata{
+				ResourceType: payload.K8SCluster.Metadata.ResourceType,
+				WorkspaceId:  payload.K8SCluster.Metadata.WorkspaceID,
+			},
+			ReporterData: reporterData,
 		},
 	}
 }
@@ -366,6 +381,20 @@ func updateK8SPolicyResource(payload K8SPolicyPayload) *pb.UpdateResourceRequest
 	}
 }
 
+func deleteK8SPolicyResource(payload K8SPolicyPayload) *pb.DeleteResourceRequest {
+	reporterData, _ := createReporterData(payload.K8SPolicy.ReporterData)
+
+	return &pb.DeleteResourceRequest{
+		Resource: &pb.Resource{
+			Metadata: &pb.Metadata{
+				ResourceType: payload.K8SPolicy.Metadata.ResourceType,
+				WorkspaceId:  payload.K8SPolicy.Metadata.WorkspaceID,
+			},
+			ReporterData: reporterData,
+		},
+	}
+}
+
 func createNotificationIntegrationResource(payload IntegrationPayload) *pb.CreateResourceRequest {
 	reporterData, _ := createReporterData(payload.NotificationsIntegration.ReporterData)
 
@@ -384,6 +413,20 @@ func updateNotificationIntegrationResource(payload IntegrationPayload) *pb.Updat
 	reporterData, _ := createReporterData(payload.NotificationsIntegration.ReporterData)
 
 	return &pb.UpdateResourceRequest{
+		Resource: &pb.Resource{
+			Metadata: &pb.Metadata{
+				ResourceType: payload.NotificationsIntegration.Metadata.ResourceType,
+				WorkspaceId:  payload.NotificationsIntegration.Metadata.WorkspaceID,
+			},
+			ReporterData: reporterData,
+		},
+	}
+}
+
+func deleteNotificationIntegrationResource(payload IntegrationPayload) *pb.DeleteResourceRequest {
+	reporterData, _ := createReporterData(payload.NotificationsIntegration.ReporterData)
+
+	return &pb.DeleteResourceRequest{
 		Resource: &pb.Resource{
 			Metadata: &pb.Metadata{
 				ResourceType: payload.NotificationsIntegration.Metadata.ResourceType,

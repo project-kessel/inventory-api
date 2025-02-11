@@ -21,7 +21,7 @@ import (
 
 type KesselAuthz struct {
 	HealthService  kesselv1.KesselRelationsHealthServiceClient
-	CheckService   pb.KesselCheckServiceClient
+	CheckService   kessel.KesselCheckServiceClient
 	TupleService   kessel.KesselTupleServiceClient
 	tokenClient    *tokenClient
 	Logger         *log.Helper
@@ -49,7 +49,7 @@ func New(ctx context.Context, config CompletedConfig, logger *log.Helper) (*Kess
 
 	return &KesselAuthz{
 		HealthService:  kesselv1.NewKesselRelationsHealthServiceClient(config.gRPCConn),
-		CheckService:   pb.NewKesselCheckServiceClient(config.gRPCConn),
+		CheckService:   kessel.NewKesselCheckServiceClient(config.gRPCConn),
 		TupleService:   kessel.NewKesselTupleServiceClient(config.gRPCConn),
 		Logger:         logger,
 		tokenClient:    tokenCli,
@@ -92,14 +92,38 @@ func (a *KesselAuthz) CheckForView(ctx context.Context, r *pb.CheckForViewReques
 		return nil, err
 	}
 
-	resp, err := a.CheckService.CheckForView(ctx, r, opts...)
+	resp, err := a.CheckService.Check(ctx, &kessel.CheckRequest{
+		Resource: &kessel.ObjectReference{
+			Id: r.GetParent().GetId(),
+			Type: &kessel.ObjectType{
+				Name:      r.GetParent().GetType().GetName(),
+				Namespace: r.GetParent().GetType().GetNamespace(),
+			},
+		},
+		Relation: r.GetRelation(),
+		Subject: &kessel.SubjectReference{
+			Relation: r.GetSubject().Relation,
+			Subject: &kessel.ObjectReference{
+				Id: r.GetSubject().GetSubject().GetId(),
+				Type: &kessel.ObjectType{
+					Name:      r.GetSubject().GetSubject().GetType().GetName(),
+					Namespace: r.GetSubject().GetSubject().GetType().GetNamespace(),
+				},
+			},
+		},
+		Consistency: &kessel.Consistency{
+			Requirement: &kessel.Consistency_AtLeastAsFresh{AtLeastAsFresh: &kessel.ConsistencyToken{}},
+		},
+	}, opts...)
 	if err != nil {
 		a.incrFailureCounter("CheckForView")
 		return nil, err
 	}
 
 	a.incrSuccessCounter("CheckForView")
-	return resp, nil
+	return &pb.CheckForViewResponse{
+		Allowed: pb.CheckForViewResponse_Allowed(resp.GetAllowed()),
+	}, nil
 }
 
 func (a *KesselAuthz) CheckForUpdate(ctx context.Context, r *pb.CheckForUpdateRequest) (*pb.CheckForUpdateResponse, error) {
@@ -109,14 +133,37 @@ func (a *KesselAuthz) CheckForUpdate(ctx context.Context, r *pb.CheckForUpdateRe
 		return nil, err
 	}
 
-	resp, err := a.CheckService.CheckForUpdate(ctx, r, opts...)
+	resp, err := a.CheckService.CheckForUpdate(ctx, &kessel.CheckForUpdateRequest{
+		Resource: &kessel.ObjectReference{
+			Id: r.GetParent().GetId(),
+			Type: &kessel.ObjectType{
+				Name:      r.GetParent().GetType().GetName(),
+				Namespace: r.GetParent().GetType().GetNamespace(),
+			},
+		},
+		Relation: r.GetRelation(),
+		Subject: &kessel.SubjectReference{
+			Relation: r.GetSubject().Relation,
+			Subject: &kessel.ObjectReference{
+				Id: r.GetSubject().GetSubject().GetId(),
+				Type: &kessel.ObjectType{
+					Name:      r.GetSubject().GetSubject().GetType().GetName(),
+					Namespace: r.GetSubject().GetSubject().GetType().GetNamespace(),
+				},
+			},
+		},
+	}, opts...)
 	if err != nil {
 		a.incrFailureCounter("CheckForUpdate")
 		return nil, err
 	}
 
+	// do smth with consistency token?
+
 	a.incrSuccessCounter("CheckForUpdate")
-	return resp, nil
+	return &pb.CheckForUpdateResponse{
+		Allowed: pb.CheckForUpdateResponse_Allowed(resp.GetAllowed()),
+	}, nil
 }
 
 func (a *KesselAuthz) CheckForCreate(ctx context.Context, r *pb.CheckForCreateRequest) (*pb.CheckForCreateResponse, error) {
@@ -126,14 +173,37 @@ func (a *KesselAuthz) CheckForCreate(ctx context.Context, r *pb.CheckForCreateRe
 		return nil, err
 	}
 
-	resp, err := a.CheckService.CheckForCreate(ctx, r, opts...)
+	resp, err := a.CheckService.CheckForUpdate(ctx, &kessel.CheckForUpdateRequest{
+		Resource: &kessel.ObjectReference{
+			Id: r.GetParent().GetId(),
+			Type: &kessel.ObjectType{
+				Name:      r.GetParent().GetType().GetName(),
+				Namespace: r.GetParent().GetType().GetNamespace(),
+			},
+		},
+		Relation: r.GetCreatePermission(),
+		Subject: &kessel.SubjectReference{
+			Relation: r.GetSubject().Relation,
+			Subject: &kessel.ObjectReference{
+				Id: r.GetSubject().GetSubject().GetId(),
+				Type: &kessel.ObjectType{
+					Name:      r.GetSubject().GetSubject().GetType().GetName(),
+					Namespace: r.GetSubject().GetSubject().GetType().GetNamespace(),
+				},
+			},
+		},
+	}, opts...)
 	if err != nil {
 		a.incrFailureCounter("CheckForCreate")
 		return nil, err
 	}
 
+	// do smth with consistency token?
+
 	a.incrSuccessCounter("CheckForCreate")
-	return resp, nil
+	return &pb.CheckForCreateResponse{
+		Allowed: pb.CheckForCreateResponse_Allowed(resp.GetAllowed()),
+	}, nil
 }
 
 func (a *KesselAuthz) getCallOptions() ([]grpc.CallOption, error) {

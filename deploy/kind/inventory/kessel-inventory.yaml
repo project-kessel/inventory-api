@@ -74,6 +74,8 @@ spec:
                 secretKeyRef:
                   name: inventory-api-config
                   key: db_password
+            - name: RESOURCE_DIR
+              value: "data/resources"
           livenessProbe:
             httpGet:
               path: /api/inventory/v1/livez

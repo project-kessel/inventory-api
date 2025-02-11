@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/bufbuild/protovalidate-go"
 	"github.com/go-kratos/kratos/v2/errors"
+	"github.com/go-kratos/kratos/v2/log"
 	"github.com/go-kratos/kratos/v2/middleware"
 	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/resources"
 	"google.golang.org/protobuf/encoding/protojson"
@@ -27,7 +28,7 @@ func Validation(validator protovalidate.Validator) middleware.Middleware {
 		fmt.Println(resourceDirFilePath)
 		absPath, err := filepath.Abs(resourceDirFilePath)
 		if err != nil {
-			fmt.Errorf("failed to resolve absolute path for RESOURCE_DIR file: %v", err)
+			log.Errorf("failed to resolve absolute path for RESOURCE_DIR file: %v", err)
 		}
 		resourceDir = absPath
 	}

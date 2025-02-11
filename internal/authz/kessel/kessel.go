@@ -3,11 +3,13 @@ package kessel
 import (
 	"context"
 	"fmt"
+
 	"google.golang.org/protobuf/proto"
 
 	"github.com/spf13/viper"
 
 	"github.com/go-kratos/kratos/v2/log"
+	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/relations"
 	authzapi "github.com/project-kessel/inventory-api/internal/authz/api"
 	kesselv1 "github.com/project-kessel/relations-api/api/kessel/relations/v1"
 	kessel "github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
@@ -19,7 +21,7 @@ import (
 
 type KesselAuthz struct {
 	HealthService  kesselv1.KesselRelationsHealthServiceClient
-	CheckService   kessel.KesselCheckServiceClient
+	CheckService   pb.KesselCheckServiceClient
 	TupleService   kessel.KesselTupleServiceClient
 	tokenClient    *tokenClient
 	Logger         *log.Helper
@@ -47,7 +49,7 @@ func New(ctx context.Context, config CompletedConfig, logger *log.Helper) (*Kess
 
 	return &KesselAuthz{
 		HealthService:  kesselv1.NewKesselRelationsHealthServiceClient(config.gRPCConn),
-		CheckService:   kessel.NewKesselCheckServiceClient(config.gRPCConn),
+		CheckService:   pb.NewKesselCheckServiceClient(config.gRPCConn),
 		TupleService:   kessel.NewKesselTupleServiceClient(config.gRPCConn),
 		Logger:         logger,
 		tokenClient:    tokenCli,
@@ -83,20 +85,54 @@ func (a *KesselAuthz) Health(ctx context.Context) (*kesselv1.GetReadyzResponse, 
 	return resp, nil
 }
 
-func (a *KesselAuthz) Check(ctx context.Context, r *kessel.CheckRequest) (*kessel.CheckResponse, error) {
+func (a *KesselAuthz) CheckForView(ctx context.Context, r *pb.CheckForViewRequest) (*pb.CheckForViewResponse, error) {
 	opts, err := a.getCallOptions()
 	if err != nil {
-		a.incrFailureCounter("Check")
+		a.incrFailureCounter("CheckForView")
 		return nil, err
 	}
 
-	resp, err := a.CheckService.Check(ctx, r, opts...)
+	resp, err := a.CheckService.CheckForView(ctx, r, opts...)
 	if err != nil {
-		a.incrFailureCounter("Check")
+		a.incrFailureCounter("CheckForView")
 		return nil, err
 	}
 
-	a.incrSuccessCounter("Check")
+	a.incrSuccessCounter("CheckForView")
+	return resp, nil
+}
+
+func (a *KesselAuthz) CheckForUpdate(ctx context.Context, r *pb.CheckForUpdateRequest) (*pb.CheckForUpdateResponse, error) {
+	opts, err := a.getCallOptions()
+	if err != nil {
+		a.incrFailureCounter("CheckForUpdate")
+		return nil, err
+	}
+
+	resp, err := a.CheckService.CheckForUpdate(ctx, r, opts...)
+	if err != nil {
+		a.incrFailureCounter("CheckForUpdate")
+		return nil, err
+	}
+
+	a.incrSuccessCounter("CheckForUpdate")
+	return resp, nil
+}
+
+func (a *KesselAuthz) CheckForCreate(ctx context.Context, r *pb.CheckForCreateRequest) (*pb.CheckForCreateResponse, error) {
+	opts, err := a.getCallOptions()
+	if err != nil {
+		a.incrFailureCounter("CheckForCreate")
+		return nil, err
+	}
+
+	resp, err := a.CheckService.CheckForCreate(ctx, r, opts...)
+	if err != nil {
+		a.incrFailureCounter("CheckForCreate")
+		return nil, err
+	}
+
+	a.incrSuccessCounter("CheckForCreate")
 	return resp, nil
 }
 

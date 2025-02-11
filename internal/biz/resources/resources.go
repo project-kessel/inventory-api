@@ -64,6 +64,15 @@ func (uc *Usecase) Create(ctx context.Context, m *model.Resource) (*model.Resour
 	ret := m // Default to returning the input model in case persistence is disabled
 	updatedResources := []*model.Resource{}
 
+	if uc.Authz != nil {
+		ct, err := biz.DefaultSetWorkspace(ctx, uc.Namespace, m, uc.Authz)
+		if err != nil {
+			return nil, err
+		}
+
+		m.ConsistencyToken = ct
+	}
+
 	if !uc.DisablePersistence {
 		// check if the resource already exists
 		existingResource, err := uc.reporterResourceRepository.FindByReporterData(ctx, m.ReporterId, m.ReporterResourceId)

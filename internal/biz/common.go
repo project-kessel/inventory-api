@@ -53,10 +53,10 @@ func DefaultRelationshipSendEvent(ctx context.Context, m *model.Relationship, ev
 func DefaultSetWorkspace(ctx context.Context, namespace string, model *model.Resource, authz authzapi.Authorizer) error {
 	_, err := authz.SetWorkspace(ctx, model.Reporter.LocalResourceId, model.WorkspaceId, namespace, model.ResourceType) //nolint:staticcheck
 	if err != nil {
-		return err
+		return "", err
 	}
 
-	return nil
+	return r.ConsistencyToken.Token, nil
 }
 
 func DefaultUnsetWorkspace(ctx context.Context, namespace string, localResourceId string, resourceType string, authz authzapi.Authorizer) error {

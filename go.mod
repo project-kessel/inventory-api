@@ -1,6 +1,6 @@
 module github.com/project-kessel/inventory-api
 
-go 1.22.9
+go 1.22.12
 
 require (
 	buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go v1.36.4-20250130201111-63bb56e20495.1

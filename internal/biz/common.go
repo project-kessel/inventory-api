@@ -56,7 +56,11 @@ func DefaultSetWorkspace(ctx context.Context, namespace string, model *model.Res
 		return "", err
 	}
 
-	return r.ConsistencyToken.Token, nil
+	if r.ConsistencyToken != nil {
+		return r.ConsistencyToken.Token, nil
+	} else {
+		return "", nil
+	}
 }
 
 func DefaultUnsetWorkspace(ctx context.Context, namespace string, localResourceId string, resourceType string, authz authzapi.Authorizer) error {

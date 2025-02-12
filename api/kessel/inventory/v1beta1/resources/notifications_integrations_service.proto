@@ -37,6 +37,13 @@ message DeleteNotificationsIntegrationRequest {
 
 message DeleteNotificationsIntegrationResponse {}
 
+message ListNotificationsIntegrationsRequest {
+
+}
+message ListNotificationsIntegrationsResponse {
+  repeated NotificationsIntegration integrations = 1;
+}
+
 service KesselNotificationsIntegrationService {
   rpc CreateNotificationsIntegration(CreateNotificationsIntegrationRequest) returns (CreateNotificationsIntegrationResponse) {
     option (google.api.http) = {
@@ -55,6 +62,13 @@ service KesselNotificationsIntegrationService {
   rpc DeleteNotificationsIntegration(DeleteNotificationsIntegrationRequest) returns (DeleteNotificationsIntegrationResponse) {
     option (google.api.http) = {
       delete : "/api/inventory/v1beta1/resources/notifications-integrations"
+      body : "*"
+    };
+  };
+  
+  rpc ListNotificationsIntegrations(ListNotificationsIntegrationsRequest) returns (ListNotificationsIntegrationsResponse) {
+    option (google.api.http) = {
+      get : "/api/inventory/v1beta1/resources/notifications-integrations"
       body : "*"
     };
   };

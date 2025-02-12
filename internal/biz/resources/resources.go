@@ -13,6 +13,7 @@ import (
 	"github.com/project-kessel/inventory-api/internal/biz/model"
 	eventingapi "github.com/project-kessel/inventory-api/internal/eventing/api"
 	"github.com/project-kessel/inventory-api/internal/server"
+	kessel "github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
 	"gorm.io/gorm"
 )
 
@@ -95,6 +96,64 @@ func (uc *Usecase) Create(ctx context.Context, m *model.Resource) (*model.Resour
 
 	uc.log.WithContext(ctx).Infof("Created Resource: %v(%v)", m.ID, m.ResourceType)
 	return ret, nil
+}
+
+func (uc *Usecase) CheckForView(ctx context.Context, permission string, sub *kessel.SubjectReference, id model.ReporterResourceId) (bool, error) {
+	res, err := uc.repository.FindByReporterResourceId(ctx, id)
+	if err != nil {
+		return false, err
+	}
+
+	allowed, _, err := uc.Authz.CheckForView(ctx, uc.Namespace, permission, res, sub)
+	if err != nil {
+		return false, err
+	}
+
+	if allowed == kessel.CheckResponse_ALLOWED_TRUE {
+		return true, nil
+	} else {
+		return false, nil
+	}
+}
+
+func (uc *Usecase) CheckForUpdate(ctx context.Context, permission string, sub *kessel.SubjectReference, id model.ReporterResourceId) (bool, error) {
+	res, err := uc.repository.FindByReporterResourceId(ctx, id)
+	if err != nil {
+		return false, err
+	}
+
+	allowed, consistency, err := uc.Authz.CheckForUpdate(ctx, uc.Namespace, permission, res, sub)
+	if err != nil {
+		return false, err
+	}
+
+	if allowed == kessel.CheckForUpdateResponse_ALLOWED_TRUE {
+		if consistency != nil {
+			res.ConsistencyToken = consistency.Token
+			uc.repository.Update(ctx, res, res.ID)
+		}
+		return true, nil
+	} else {
+		return false, nil
+	}
+}
+
+func (uc *Usecase) CheckForCreate(ctx context.Context, permission string, sub *kessel.SubjectReference, id model.ReporterResourceId) (bool, error) {
+	res, err := uc.repository.FindByReporterResourceId(ctx, id)
+	if err != nil {
+		return false, err
+	}
+
+	allowed, _, err := uc.Authz.CheckForUpdate(ctx, uc.Namespace, permission, res, sub)
+	if err != nil {
+		return false, err
+	}
+
+	if allowed == kessel.CheckForUpdateResponse_ALLOWED_TRUE {
+		return true, nil
+	} else {
+		return false, nil
+	}
 }
 
 // Update updates a model in the database, updates related tuples in the relations-api, and issues an update event.

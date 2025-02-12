@@ -43,6 +43,7 @@ message CheckForViewRequest {
 	ObjectReference parent = 1 [(buf.validate.field).required = true];
 	string relation = 2 [(buf.validate.field).string.min_len = 1];
 	SubjectReference subject = 3 [(buf.validate.field).required = true];
+	// Consistency consistency = 4;
 }
 
 message CheckForViewResponse {
@@ -73,7 +74,6 @@ message CheckForUpdateResponse {
 		// e.g.  ALLOWED_CONDITIONAL = 3;
 	}
 	Allowed allowed = 1;
-	// ConsistencyToken consistency_token = 2;
 }
 
 // may make sense to get away with just checkforview and checkforupdate.
@@ -96,5 +96,4 @@ message CheckForCreateResponse { // same response, diff implementation.
 		// e.g.  ALLOWED_CONDITIONAL = 3;
 	}
 	Allowed allowed = 1;
-	// ConsistencyToken consistency_token = 2;
 }

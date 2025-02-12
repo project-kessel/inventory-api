@@ -180,7 +180,7 @@ type CheckForViewRequest struct {
 	// - user (possibly derived from an identity token)
 	Parent   *ObjectReference  `protobuf:"bytes,1,opt,name=parent,proto3" json:"parent,omitempty"`
 	Relation string            `protobuf:"bytes,2,opt,name=relation,proto3" json:"relation,omitempty"`
-	Subject  *SubjectReference `protobuf:"bytes,3,opt,name=subject,proto3" json:"subject,omitempty"`
+	Subject  *SubjectReference `protobuf:"bytes,3,opt,name=subject,proto3" json:"subject,omitempty"` // Consistency consistency = 4;
 }
 
 func (x *CheckForViewRequest) Reset() {
@@ -355,7 +355,7 @@ type CheckForUpdateResponse struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	Allowed CheckForUpdateResponse_Allowed `protobuf:"varint,1,opt,name=allowed,proto3,enum=kessel.inventory.v1beta1.relations.CheckForUpdateResponse_Allowed" json:"allowed,omitempty"` // ConsistencyToken consistency_token = 2;
+	Allowed CheckForUpdateResponse_Allowed `protobuf:"varint,1,opt,name=allowed,proto3,enum=kessel.inventory.v1beta1.relations.CheckForUpdateResponse_Allowed" json:"allowed,omitempty"`
 }
 
 func (x *CheckForUpdateResponse) Reset() {
@@ -472,7 +472,7 @@ type CheckForCreateResponse struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	Allowed CheckForCreateResponse_Allowed `protobuf:"varint,1,opt,name=allowed,proto3,enum=kessel.inventory.v1beta1.relations.CheckForCreateResponse_Allowed" json:"allowed,omitempty"` // ConsistencyToken consistency_token = 2;
+	Allowed CheckForCreateResponse_Allowed `protobuf:"varint,1,opt,name=allowed,proto3,enum=kessel.inventory.v1beta1.relations.CheckForCreateResponse_Allowed" json:"allowed,omitempty"`
 }
 
 func (x *CheckForCreateResponse) Reset() {

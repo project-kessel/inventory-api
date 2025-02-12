@@ -3,8 +3,9 @@ package resources
 import (
 	"context"
 	"errors"
-	"github.com/google/uuid"
 	"time"
+
+	"github.com/google/uuid"
 
 	"github.com/go-kratos/kratos/v2/log"
 	authzapi "github.com/project-kessel/inventory-api/internal/authz/api"
@@ -54,6 +55,15 @@ func New(repository ResourceRepository, authz authzapi.Authorizer, eventer event
 func (uc *Usecase) Create(ctx context.Context, m *model.Resource) (*model.Resource, error) {
 	ret := m // Default to returning the input model in case persistence is disabled
 
+	if uc.Authz != nil {
+		ct, err := biz.DefaultSetWorkspace(ctx, uc.Namespace, m, uc.Authz)
+		if err != nil {
+			return nil, err
+		}
+
+		m.ConsistencyToken = ct
+	}
+
 	if !uc.DisablePersistence {
 		// check if the resource already exists
 		resource, err := uc.repository.FindByReporterResourceId(ctx, model.ReporterResourceIdFromResource(m))
@@ -78,13 +88,6 @@ func (uc *Usecase) Create(ctx context.Context, m *model.Resource) (*model.Resour
 	if uc.Eventer != nil {
 		err := biz.DefaultResourceSendEvent(ctx, m, uc.Eventer, *m.CreatedAt, eventingapi.OperationTypeCreated)
 
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	if uc.Authz != nil {
-		err := biz.DefaultSetWorkspace(ctx, uc.Namespace, m, uc.Authz)
 		if err != nil {
 			return nil, err
 		}
@@ -131,7 +134,7 @@ func (uc *Usecase) Update(ctx context.Context, m *model.Resource, id model.Repor
 
 	if uc.Authz != nil {
 		// Todo: Update workspace if there is any change
-		err := biz.DefaultSetWorkspace(ctx, uc.Namespace, m, uc.Authz)
+		_, err := biz.DefaultSetWorkspace(ctx, uc.Namespace, m, uc.Authz)
 		if err != nil {
 			return nil, err
 		}

@@ -4,24 +4,26 @@ import (
 	"database/sql/driver"
 	"encoding/json"
 	"fmt"
+	"time"
+
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 	"gorm.io/gorm/schema"
-	"time"
 )
 
 type Resource struct {
-	ID           uuid.UUID `gorm:"type:uuid;primarykey"`
-	OrgId        string    `gorm:"index"`
-	ResourceData JsonObject
-	ResourceType string
-	WorkspaceId  string
-	Reporter     ResourceReporter
-	ConsoleHref  string
-	ApiHref      string
-	Labels       Labels
-	CreatedAt    *time.Time
-	UpdatedAt    *time.Time
+	ID               uuid.UUID `gorm:"type:uuid;primarykey"`
+	OrgId            string    `gorm:"index"`
+	ResourceData     JsonObject
+	ResourceType     string
+	WorkspaceId      string
+	Reporter         ResourceReporter
+	ConsoleHref      string
+	ApiHref          string
+	Labels           Labels
+	CreatedAt        *time.Time
+	UpdatedAt        *time.Time
+	ConsistencyToken string
 }
 
 type ResourceReporter struct {

@@ -2,9 +2,11 @@ package allow
 
 import (
 	"context"
+
 	kesselv1 "github.com/project-kessel/relations-api/api/kessel/relations/v1"
 
 	"github.com/go-kratos/kratos/v2/log"
+	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/relations"
 	kessel "github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
 )
 
@@ -24,9 +26,21 @@ func (a *AllowAllAuthz) Health(ctx context.Context) (*kesselv1.GetReadyzResponse
 
 }
 
-func (a *AllowAllAuthz) Check(ctx context.Context, r *kessel.CheckRequest) (*kessel.CheckResponse, error) {
-	return &kessel.CheckResponse{
-		Allowed: kessel.CheckResponse_ALLOWED_TRUE,
+func (a *AllowAllAuthz) CheckForView(ctx context.Context, r *pb.CheckForViewRequest) (*pb.CheckForViewResponse, error) {
+	return &pb.CheckForViewResponse{
+		Allowed: pb.CheckForViewResponse_ALLOWED_TRUE,
+	}, nil
+}
+
+func (a *AllowAllAuthz) CheckForUpdate(ctx context.Context, r *pb.CheckForUpdateRequest) (*pb.CheckForUpdateResponse, error) {
+	return &pb.CheckForUpdateResponse{
+		Allowed: pb.CheckForUpdateResponse_ALLOWED_TRUE,
+	}, nil
+}
+
+func (a *AllowAllAuthz) CheckForCreate(ctx context.Context, r *pb.CheckForCreateRequest) (*pb.CheckForCreateResponse, error) {
+	return &pb.CheckForCreateResponse{
+		Allowed: pb.CheckForCreateResponse_ALLOWED_TRUE,
 	}, nil
 }
 

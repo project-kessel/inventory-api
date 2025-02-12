@@ -3,11 +3,13 @@ package kessel
 import (
 	"context"
 	"fmt"
+
 	"google.golang.org/protobuf/proto"
 
 	"github.com/spf13/viper"
 
 	"github.com/go-kratos/kratos/v2/log"
+	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/relations"
 	authzapi "github.com/project-kessel/inventory-api/internal/authz/api"
 	kesselv1 "github.com/project-kessel/relations-api/api/kessel/relations/v1"
 	kessel "github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
@@ -83,21 +85,125 @@ func (a *KesselAuthz) Health(ctx context.Context) (*kesselv1.GetReadyzResponse, 
 	return resp, nil
 }
 
-func (a *KesselAuthz) Check(ctx context.Context, r *kessel.CheckRequest) (*kessel.CheckResponse, error) {
+func (a *KesselAuthz) CheckForView(ctx context.Context, r *pb.CheckForViewRequest) (*pb.CheckForViewResponse, error) {
 	opts, err := a.getCallOptions()
 	if err != nil {
-		a.incrFailureCounter("Check")
+		a.incrFailureCounter("CheckForView")
 		return nil, err
 	}
 
-	resp, err := a.CheckService.Check(ctx, r, opts...)
+	resp, err := a.CheckService.Check(ctx, &kessel.CheckRequest{
+		Resource: &kessel.ObjectReference{
+			Id: r.GetParent().GetId(),
+			Type: &kessel.ObjectType{
+				Name:      r.GetParent().GetType().GetName(),
+				Namespace: r.GetParent().GetType().GetNamespace(),
+			},
+		},
+		Relation: r.GetRelation(),
+		Subject: &kessel.SubjectReference{
+			Relation: r.GetSubject().Relation,
+			Subject: &kessel.ObjectReference{
+				Id: r.GetSubject().GetSubject().GetId(),
+				Type: &kessel.ObjectType{
+					Name:      r.GetSubject().GetSubject().GetType().GetName(),
+					Namespace: r.GetSubject().GetSubject().GetType().GetNamespace(),
+				},
+			},
+		},
+		Consistency: &kessel.Consistency{
+			Requirement: &kessel.Consistency_AtLeastAsFresh{AtLeastAsFresh: &kessel.ConsistencyToken{}},
+		},
+	}, opts...)
 	if err != nil {
-		a.incrFailureCounter("Check")
+		a.incrFailureCounter("CheckForView")
 		return nil, err
 	}
 
-	a.incrSuccessCounter("Check")
-	return resp, nil
+	a.incrSuccessCounter("CheckForView")
+	return &pb.CheckForViewResponse{
+		Allowed: pb.CheckForViewResponse_Allowed(resp.GetAllowed()),
+	}, nil
+}
+
+func (a *KesselAuthz) CheckForUpdate(ctx context.Context, r *pb.CheckForUpdateRequest) (*pb.CheckForUpdateResponse, error) {
+	opts, err := a.getCallOptions()
+	if err != nil {
+		a.incrFailureCounter("CheckForUpdate")
+		return nil, err
+	}
+
+	resp, err := a.CheckService.CheckForUpdate(ctx, &kessel.CheckForUpdateRequest{
+		Resource: &kessel.ObjectReference{
+			Id: r.GetParent().GetId(),
+			Type: &kessel.ObjectType{
+				Name:      r.GetParent().GetType().GetName(),
+				Namespace: r.GetParent().GetType().GetNamespace(),
+			},
+		},
+		Relation: r.GetRelation(),
+		Subject: &kessel.SubjectReference{
+			Relation: r.GetSubject().Relation,
+			Subject: &kessel.ObjectReference{
+				Id: r.GetSubject().GetSubject().GetId(),
+				Type: &kessel.ObjectType{
+					Name:      r.GetSubject().GetSubject().GetType().GetName(),
+					Namespace: r.GetSubject().GetSubject().GetType().GetNamespace(),
+				},
+			},
+		},
+	}, opts...)
+	if err != nil {
+		a.incrFailureCounter("CheckForUpdate")
+		return nil, err
+	}
+
+	// do smth with consistency token?
+
+	a.incrSuccessCounter("CheckForUpdate")
+	return &pb.CheckForUpdateResponse{
+		Allowed: pb.CheckForUpdateResponse_Allowed(resp.GetAllowed()),
+	}, nil
+}
+
+func (a *KesselAuthz) CheckForCreate(ctx context.Context, r *pb.CheckForCreateRequest) (*pb.CheckForCreateResponse, error) {
+	opts, err := a.getCallOptions()
+	if err != nil {
+		a.incrFailureCounter("CheckForCreate")
+		return nil, err
+	}
+
+	resp, err := a.CheckService.CheckForUpdate(ctx, &kessel.CheckForUpdateRequest{
+		Resource: &kessel.ObjectReference{
+			Id: r.GetParent().GetId(),
+			Type: &kessel.ObjectType{
+				Name:      r.GetParent().GetType().GetName(),
+				Namespace: r.GetParent().GetType().GetNamespace(),
+			},
+		},
+		Relation: r.GetCreatePermission(),
+		Subject: &kessel.SubjectReference{
+			Relation: r.GetSubject().Relation,
+			Subject: &kessel.ObjectReference{
+				Id: r.GetSubject().GetSubject().GetId(),
+				Type: &kessel.ObjectType{
+					Name:      r.GetSubject().GetSubject().GetType().GetName(),
+					Namespace: r.GetSubject().GetSubject().GetType().GetNamespace(),
+				},
+			},
+		},
+	}, opts...)
+	if err != nil {
+		a.incrFailureCounter("CheckForCreate")
+		return nil, err
+	}
+
+	// do smth with consistency token?
+
+	a.incrSuccessCounter("CheckForCreate")
+	return &pb.CheckForCreateResponse{
+		Allowed: pb.CheckForCreateResponse_Allowed(resp.GetAllowed()),
+	}, nil
 }
 
 func (a *KesselAuthz) getCallOptions() ([]grpc.CallOption, error) {

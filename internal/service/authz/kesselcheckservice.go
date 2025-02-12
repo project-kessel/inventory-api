@@ -3,7 +3,7 @@ package service
 import (
 	"context"
 
-	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/relations"
+	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/authz"
 	authnapi "github.com/project-kessel/inventory-api/internal/authn/api"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
 	resources "github.com/project-kessel/inventory-api/internal/biz/resources"

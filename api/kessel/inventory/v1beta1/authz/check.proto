@@ -1,35 +1,35 @@
 syntax = "proto3";
 
-package kessel.inventory.v1beta1.relations;
+package kessel.inventory.v1beta1.authz;
 
 import "google/api/annotations.proto";
-import "kessel/inventory/v1beta1/relations/common.proto";
+import "kessel/inventory/v1beta1/authz/common.proto";
 import "buf/validate/validate.proto";
 
-option go_package = "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/relations";
+option go_package = "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/authz";
 option java_multiple_files = true;
-option java_package = "org.project_kessel.api.inventory.v1beta1.relations";
+option java_package = "org.project_kessel.api.inventory.v1beta1.authz";
 
 service KesselCheckService {
 	// Checks for the existence of a single Relationship 
 	// (a Relation between a Resource and a Subject or Subject Set).
 	rpc CheckForView (CheckForViewRequest) returns (CheckForViewResponse) {
 		option (google.api.http) = {
-			post: "/api/inventory/v1beta1/relations/check"
+			post: "/api/inventory/v1beta1/authz/check"
 			body: "*"
 		};
 	};
 	
 	rpc CheckForUpdate (CheckForUpdateRequest) returns (CheckForUpdateResponse) {
 		option (google.api.http) = {
-			post: "/api/inventory/v1beta1/relations/checkforupdate"
+			post: "/api/inventory/v1beta1/authz/checkforupdate"
 			body: "*"
 		};
 	};
 
 	rpc CheckForCreate (CheckForCreateRequest) returns (CheckForCreateResponse) {
 		option (google.api.http) = {
-			post: "/api/inventory/v1beta1/relations/checkforcreate"
+			post: "/api/inventory/v1beta1/authz/checkforcreate"
 			body: "*"
 		};
 	};

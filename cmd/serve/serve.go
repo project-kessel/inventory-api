@@ -34,7 +34,7 @@ import (
 	"github.com/project-kessel/inventory-api/internal/storage"
 
 	hb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1"
-	authz2 "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/relations"
+	authz2 "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/authz"
 	rel "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/relationships"
 	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/resources"
 

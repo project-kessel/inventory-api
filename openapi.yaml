@@ -42,7 +42,7 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/google.rpc.Status'
-    /api/inventory/v1beta1/relations/check:
+    /api/inventory/v1beta1/authz/check:
         post:
             tags:
                 - KesselCheckService
@@ -52,7 +52,7 @@ paths:
                 content:
                     application/json:
                         schema:
-                            $ref: '#/components/schemas/kessel.inventory.v1beta1.relations.CheckForViewRequest'
+                            $ref: '#/components/schemas/kessel.inventory.v1beta1.authz.CheckForViewRequest'
                 required: true
             responses:
                 "200":
@@ -60,14 +60,14 @@ paths:
                     content:
                         application/json:
                             schema:
-                                $ref: '#/components/schemas/kessel.inventory.v1beta1.relations.CheckForViewResponse'
+                                $ref: '#/components/schemas/kessel.inventory.v1beta1.authz.CheckForViewResponse'
                 default:
                     description: Default error response
                     content:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/google.rpc.Status'
-    /api/inventory/v1beta1/relations/checkforcreate:
+    /api/inventory/v1beta1/authz/checkforcreate:
         post:
             tags:
                 - KesselCheckService
@@ -76,7 +76,7 @@ paths:
                 content:
                     application/json:
                         schema:
-                            $ref: '#/components/schemas/kessel.inventory.v1beta1.relations.CheckForCreateRequest'
+                            $ref: '#/components/schemas/kessel.inventory.v1beta1.authz.CheckForCreateRequest'
                 required: true
             responses:
                 "200":
@@ -84,14 +84,14 @@ paths:
                     content:
                         application/json:
                             schema:
-                                $ref: '#/components/schemas/kessel.inventory.v1beta1.relations.CheckForCreateResponse'
+                                $ref: '#/components/schemas/kessel.inventory.v1beta1.authz.CheckForCreateResponse'
                 default:
                     description: Default error response
                     content:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/google.rpc.Status'
-    /api/inventory/v1beta1/relations/checkforupdate:
+    /api/inventory/v1beta1/authz/checkforupdate:
         post:
             tags:
                 - KesselCheckService
@@ -100,7 +100,7 @@ paths:
                 content:
                     application/json:
                         schema:
-                            $ref: '#/components/schemas/kessel.inventory.v1beta1.relations.CheckForUpdateRequest'
+                            $ref: '#/components/schemas/kessel.inventory.v1beta1.authz.CheckForUpdateRequest'
                 required: true
             responses:
                 "200":
@@ -108,7 +108,7 @@ paths:
                     content:
                         application/json:
                             schema:
-                                $ref: '#/components/schemas/kessel.inventory.v1beta1.relations.CheckForUpdateResponse'
+                                $ref: '#/components/schemas/kessel.inventory.v1beta1.authz.CheckForUpdateResponse'
                 default:
                     description: Default error response
                     content:
@@ -326,6 +326,29 @@ paths:
                             schema:
                                 $ref: '#/components/schemas/google.rpc.Status'
     /api/inventory/v1beta1/resources/notifications-integrations:
+        get:
+            tags:
+                - KesselNotificationsIntegrationService
+            operationId: KesselNotificationsIntegrationService_ListNotificationsIntegrations
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.ListNotificationsIntegrationsRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.ListNotificationsIntegrationsResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/google.rpc.Status'
         put:
             tags:
                 - KesselNotificationsIntegrationService
@@ -507,12 +530,12 @@ components:
                 code:
                     type: integer
                     format: uint32
-        kessel.inventory.v1beta1.relations.CheckForCreateRequest:
+        kessel.inventory.v1beta1.authz.CheckForCreateRequest:
             type: object
             properties:
                 parent:
                     allOf:
-                        - $ref: '#/components/schemas/kessel.inventory.v1beta1.relations.ObjectReference'
+                        - $ref: '#/components/schemas/kessel.inventory.v1beta1.authz.ObjectReference'
                     description: |-
                         Required parameters (from an authz perspective)
                          	- resource type (located in Metadata, could be discrete argument)
@@ -522,9 +545,9 @@ components:
                 createPermission:
                     type: string
                 subject:
-                    $ref: '#/components/schemas/kessel.inventory.v1beta1.relations.SubjectReference'
+                    $ref: '#/components/schemas/kessel.inventory.v1beta1.authz.SubjectReference'
             description: may make sense to get away with just checkforview and checkforupdate.
-        kessel.inventory.v1beta1.relations.CheckForCreateResponse:
+        kessel.inventory.v1beta1.authz.CheckForCreateResponse:
             type: object
             properties:
                 allowed:
@@ -534,12 +557,12 @@ components:
                         - ALLOWED_FALSE
                     type: string
                     format: enum
-        kessel.inventory.v1beta1.relations.CheckForUpdateRequest:
+        kessel.inventory.v1beta1.authz.CheckForUpdateRequest:
             type: object
             properties:
                 parent:
                     allOf:
-                        - $ref: '#/components/schemas/kessel.inventory.v1beta1.relations.ObjectReference'
+                        - $ref: '#/components/schemas/kessel.inventory.v1beta1.authz.ObjectReference'
                     description: |-
                         Required parameters (from an authz perspective)
                          - resource type and id
@@ -548,8 +571,8 @@ components:
                 relation:
                     type: string
                 subject:
-                    $ref: '#/components/schemas/kessel.inventory.v1beta1.relations.SubjectReference'
-        kessel.inventory.v1beta1.relations.CheckForUpdateResponse:
+                    $ref: '#/components/schemas/kessel.inventory.v1beta1.authz.SubjectReference'
+        kessel.inventory.v1beta1.authz.CheckForUpdateResponse:
             type: object
             properties:
                 allowed:
@@ -559,12 +582,12 @@ components:
                         - ALLOWED_FALSE
                     type: string
                     format: enum
-        kessel.inventory.v1beta1.relations.CheckForViewRequest:
+        kessel.inventory.v1beta1.authz.CheckForViewRequest:
             type: object
             properties:
                 parent:
                     allOf:
-                        - $ref: '#/components/schemas/kessel.inventory.v1beta1.relations.ObjectReference'
+                        - $ref: '#/components/schemas/kessel.inventory.v1beta1.authz.ObjectReference'
                     description: |-
                         Required parameters (from an authz perspective)
                          - resource type and id
@@ -573,8 +596,8 @@ components:
                 relation:
                     type: string
                 subject:
-                    $ref: '#/components/schemas/kessel.inventory.v1beta1.relations.SubjectReference'
-        kessel.inventory.v1beta1.relations.CheckForViewResponse:
+                    $ref: '#/components/schemas/kessel.inventory.v1beta1.authz.SubjectReference'
+        kessel.inventory.v1beta1.authz.CheckForViewResponse:
             type: object
             properties:
                 allowed:
@@ -584,21 +607,21 @@ components:
                         - ALLOWED_FALSE
                     type: string
                     format: enum
-        kessel.inventory.v1beta1.relations.ObjectReference:
+        kessel.inventory.v1beta1.authz.ObjectReference:
             type: object
             properties:
                 type:
-                    $ref: '#/components/schemas/kessel.inventory.v1beta1.relations.ObjectType'
+                    $ref: '#/components/schemas/kessel.inventory.v1beta1.authz.ObjectType'
                 id:
                     type: string
-        kessel.inventory.v1beta1.relations.ObjectType:
+        kessel.inventory.v1beta1.authz.ObjectType:
             type: object
             properties:
                 namespace:
                     type: string
                 name:
                     type: string
-        kessel.inventory.v1beta1.relations.SubjectReference:
+        kessel.inventory.v1beta1.authz.SubjectReference:
             type: object
             properties:
                 relation:
@@ -607,7 +630,7 @@ components:
                         An optional relation which points to a set of Subjects instead of the single Subject.
                          e.g. "members" or "owners" of a group identified in `subject`.
                 subject:
-                    $ref: '#/components/schemas/kessel.inventory.v1beta1.relations.ObjectReference'
+                    $ref: '#/components/schemas/kessel.inventory.v1beta1.authz.ObjectReference'
             description: A reference to a Subject or, if a `relation` is provided, a Subject Set.
         kessel.inventory.v1beta1.relationships.CreateK8SPolicyIsPropagatedToK8SClusterRequest:
             type: object
@@ -945,6 +968,16 @@ components:
                         - CRITICAL
                     type: string
                     format: enum
+        kessel.inventory.v1beta1.resources.ListNotificationsIntegrationsRequest:
+            type: object
+            properties: {}
+        kessel.inventory.v1beta1.resources.ListNotificationsIntegrationsResponse:
+            type: object
+            properties:
+                integrations:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.NotificationsIntegration'
         kessel.inventory.v1beta1.resources.Metadata:
             type: object
             properties:

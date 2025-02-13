@@ -12,6 +12,7 @@ import (
 	resourcesctl "github.com/project-kessel/inventory-api/internal/biz/resources"
 	relationshipsrepo "github.com/project-kessel/inventory-api/internal/data/relationships"
 	resourcerepo "github.com/project-kessel/inventory-api/internal/data/resources"
+	authzsvc "github.com/project-kessel/inventory-api/internal/service/authz"
 	relationshipssvc "github.com/project-kessel/inventory-api/internal/service/relationships/k8spolicy"
 	hostssvc "github.com/project-kessel/inventory-api/internal/service/resources/hosts"
 	k8sclusterssvc "github.com/project-kessel/inventory-api/internal/service/resources/k8sclusters"
@@ -33,6 +34,7 @@ import (
 	"github.com/project-kessel/inventory-api/internal/storage"
 
 	hb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1"
+	authz2 "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/authz"
 	rel "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/relationships"
 	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/resources"
 
@@ -151,6 +153,13 @@ func NewCommand(
 			notifs_service := notifssvc.New(notifs_controller)
 			pb.RegisterKesselNotificationsIntegrationServiceServer(server.GrpcServer, notifs_service)
 			pb.RegisterKesselNotificationsIntegrationServiceHTTPServer(server.HttpServer, notifs_service)
+
+			// wire together authz handling
+			authz_repo := resourcerepo.New(db)
+			authz_controller := resourcesctl.New(authz_repo, authorizer, eventingManager, "authz", log.With(logger, "subsystem", "authz_controller"), storageConfig.Options.DisablePersistence)
+			authz_service := authzsvc.New(authz_controller)
+			authz2.RegisterKesselCheckServiceServer(server.GrpcServer, authz_service)
+			authz2.RegisterKesselCheckServiceHTTPServer(server.HttpServer, authz_service)
 
 			// wire together hosts handling
 			hosts_repo := resourcerepo.New(db)

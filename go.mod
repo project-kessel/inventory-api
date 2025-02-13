@@ -14,7 +14,7 @@ require (
 	github.com/golang-jwt/jwt/v5 v5.2.1
 	github.com/google/uuid v1.6.0
 	github.com/patrickmn/go-cache v2.1.0+incompatible
-	github.com/project-kessel/inventory-client-go v0.0.0-20240918112335-d9c72f85b234
+	github.com/project-kessel/inventory-client-go v0.0.0-20250213094514-4b90870d8dcf
 	github.com/project-kessel/relations-api v0.0.0-20241021205601-90db9ba90a73
 	github.com/prometheus/client_golang v1.20.5
 	github.com/redhatinsights/app-common-go v1.6.8

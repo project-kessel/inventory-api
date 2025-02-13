@@ -3,8 +3,9 @@ package resources
 import (
 	"context"
 	"errors"
-	"github.com/google/uuid"
 	"time"
+
+	"github.com/google/uuid"
 
 	"github.com/go-kratos/kratos/v2/log"
 	authzapi "github.com/project-kessel/inventory-api/internal/authz/api"
@@ -16,11 +17,12 @@ import (
 )
 
 type ResourceRepository interface {
-	Save(context.Context, *model.Resource) (*model.Resource, error)
+	Create(context.Context, *model.Resource) (*model.Resource, error)
 	Update(context.Context, *model.Resource, uuid.UUID) (*model.Resource, error)
 	Delete(context.Context, uuid.UUID) (*model.Resource, error)
 	FindByID(context.Context, uuid.UUID) (*model.Resource, error)
 	FindByReporterResourceId(context.Context, model.ReporterResourceId) (*model.Resource, error)
+	FindByReporterData(context.Context, string, string) (*model.Resource, error)
 	ListAll(context.Context) ([]*model.Resource, error)
 }
 
@@ -56,15 +58,20 @@ func (uc *Usecase) Create(ctx context.Context, m *model.Resource) (*model.Resour
 
 	if !uc.DisablePersistence {
 		// check if the resource already exists
-		resource, err := uc.repository.FindByReporterResourceId(ctx, model.ReporterResourceIdFromResource(m))
+		existingResource, err := uc.repository.FindByReporterData(ctx, m.ReporterId, m.ReporterResourceId)
+		if err != nil && errors.Is(err, gorm.ErrRecordNotFound) {
+			// Deprecated: fallback case for backwards compatibility
+			existingResource, err = uc.repository.FindByReporterResourceId(ctx, model.ReporterResourceIdFromResource(m))
+		}
+
 		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, ErrDatabaseError
 		}
-		if resource != nil {
+
+		if existingResource != nil {
 			return nil, ErrResourceAlreadyExists
 		}
-
-		ret, err = uc.repository.Save(ctx, m)
+		ret, err = uc.repository.Create(ctx, m)
 		if err != nil {
 			return nil, err
 		}
@@ -100,7 +107,11 @@ func (uc *Usecase) Update(ctx context.Context, m *model.Resource, id model.Repor
 
 	if !uc.DisablePersistence {
 		// check if the resource exists
-		existingResource, err := uc.repository.FindByReporterResourceId(ctx, model.ReporterResourceIdFromResource(m))
+		existingResource, err := uc.repository.FindByReporterData(ctx, m.ReporterId, m.ReporterResourceId)
+		if err != nil && errors.Is(err, gorm.ErrRecordNotFound) {
+			// Deprecated: fallback case for backwards compatibility
+			existingResource, err = uc.repository.FindByReporterResourceId(ctx, model.ReporterResourceIdFromResource(m))
+		}
 
 		if err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -150,7 +161,12 @@ func (uc *Usecase) Delete(ctx context.Context, id model.ReporterResourceId) erro
 
 	if !uc.DisablePersistence {
 		// check if the resource exists
-		existingResource, err := uc.repository.FindByReporterResourceId(ctx, id)
+		existingResource, err := uc.repository.FindByReporterData(ctx, id.ReporterId, id.LocalResourceId)
+
+		if err != nil && errors.Is(err, gorm.ErrRecordNotFound) {
+			// Deprecated: fallback case for backwards compatibility
+			existingResource, err = uc.repository.FindByReporterResourceId(ctx, id)
+		}
 
 		if err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {

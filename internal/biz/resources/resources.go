@@ -136,13 +136,13 @@ func (uc *Usecase) Create(ctx context.Context, m *model.Resource) (*model.Resour
 	return ret, nil
 }
 
-func (uc *Usecase) CheckForView(ctx context.Context, permission string, sub *kessel.SubjectReference, id model.ReporterResourceId) (bool, error) {
+func (uc *Usecase) CheckForView(ctx context.Context, permission, namespace string, sub *kessel.SubjectReference, id model.ReporterResourceId) (bool, error) {
 	res, err := uc.repository.FindByReporterResourceId(ctx, id)
 	if err != nil {
 		return false, err
 	}
 
-	allowed, _, err := uc.Authz.CheckForView(ctx, uc.Namespace, permission, res, sub)
+	allowed, _, err := uc.Authz.CheckForView(ctx, namespace, permission, res, sub)
 	if err != nil {
 		return false, err
 	}
@@ -154,13 +154,13 @@ func (uc *Usecase) CheckForView(ctx context.Context, permission string, sub *kes
 	}
 }
 
-func (uc *Usecase) CheckForUpdate(ctx context.Context, permission string, sub *kessel.SubjectReference, id model.ReporterResourceId) (bool, error) {
+func (uc *Usecase) CheckForUpdate(ctx context.Context, permission, namespace string, sub *kessel.SubjectReference, id model.ReporterResourceId) (bool, error) {
 	res, err := uc.repository.FindByReporterResourceId(ctx, id)
 	if err != nil {
 		return false, err
 	}
 
-	allowed, consistency, err := uc.Authz.CheckForUpdate(ctx, uc.Namespace, permission, res, sub)
+	allowed, consistency, err := uc.Authz.CheckForUpdate(ctx, namespace, permission, res, sub)
 	if err != nil {
 		return false, err
 	}
@@ -176,13 +176,13 @@ func (uc *Usecase) CheckForUpdate(ctx context.Context, permission string, sub *k
 	}
 }
 
-func (uc *Usecase) CheckForCreate(ctx context.Context, permission string, sub *kessel.SubjectReference, id model.ReporterResourceId) (bool, error) {
+func (uc *Usecase) CheckForCreate(ctx context.Context, permission, namespace string, sub *kessel.SubjectReference, id model.ReporterResourceId) (bool, error) {
 	res, err := uc.repository.FindByReporterResourceId(ctx, id)
 	if err != nil {
 		return false, err
 	}
 
-	allowed, _, err := uc.Authz.CheckForUpdate(ctx, uc.Namespace, permission, res, sub)
+	allowed, _, err := uc.Authz.CheckForUpdate(ctx, namespace, permission, res, sub)
 	if err != nil {
 		return false, err
 	}

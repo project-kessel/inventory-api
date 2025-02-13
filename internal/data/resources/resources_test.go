@@ -114,7 +114,7 @@ func TestCreateResource(t *testing.T) {
 	ctx := context.TODO()
 
 	// Saving a resource not present in the system saves correctly
-	r, err := repo.Save(ctx, resource1())
+	r, err := repo.Create(ctx, resource1())
 	assert.NotNil(t, r)
 	assert.Nil(t, err)
 
@@ -154,7 +154,7 @@ func TestUpdateResource(t *testing.T) {
 	repo := New(db)
 	ctx := context.TODO()
 
-	r, err := repo.Save(ctx, resource1())
+	r, err := repo.Create(ctx, resource1())
 	assert.NotNil(t, r)
 	assert.Nil(t, err)
 
@@ -197,7 +197,7 @@ func TestDeleteAfterCreate(t *testing.T) {
 	repo := New(db)
 	ctx := context.TODO()
 
-	r, err := repo.Save(ctx, resource1())
+	r, err := repo.Create(ctx, resource1())
 	assert.NotNil(t, r)
 	assert.Nil(t, err)
 
@@ -221,7 +221,7 @@ func TestDeleteAfterUpdate(t *testing.T) {
 	ctx := context.TODO()
 
 	// Create
-	r, err := repo.Save(ctx, resource1())
+	r, err := repo.Create(ctx, resource1())
 	assert.NotNil(t, r)
 	assert.Nil(t, err)
 
@@ -246,7 +246,7 @@ func TestFindByReporterResourceId(t *testing.T) {
 	ctx := context.TODO()
 
 	// Saving a resource not present in the system saves correctly
-	r, err := repo.Save(ctx, resource1())
+	r, err := repo.Create(ctx, resource1())
 	assert.NotNil(t, r)
 	assert.Nil(t, err)
 
@@ -276,7 +276,7 @@ func TestListAll(t *testing.T) {
 	assert.Len(t, resources, 0)
 
 	// create a single resource
-	r, err := repo.Save(ctx, resource1())
+	r, err := repo.Create(ctx, resource1())
 	assert.NotNil(t, r)
 	assert.Nil(t, err)
 

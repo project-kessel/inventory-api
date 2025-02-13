@@ -16,7 +16,7 @@ type MockedResourceRepository struct {
 	mock.Mock
 }
 
-func (r *MockedResourceRepository) Save(ctx context.Context, resource *model.Resource) (*model.Resource, error) {
+func (r *MockedResourceRepository) Create(ctx context.Context, resource *model.Resource) (*model.Resource, error) {
 	args := r.Called(ctx, resource)
 	return args.Get(0).(*model.Resource), args.Error(1)
 }
@@ -38,6 +38,11 @@ func (r *MockedResourceRepository) FindByID(ctx context.Context, id uuid.UUID) (
 
 func (r *MockedResourceRepository) FindByReporterResourceId(ctx context.Context, id model.ReporterResourceId) (*model.Resource, error) {
 	args := r.Called(ctx, id)
+	return args.Get(0).(*model.Resource), args.Error(1)
+}
+
+func (r *MockedResourceRepository) FindByReporterData(ctx context.Context, reporterId string, resourceId string) (*model.Resource, error) {
+	args := r.Called(ctx, reporterId, resourceId)
 	return args.Get(0).(*model.Resource), args.Error(1)
 }
 

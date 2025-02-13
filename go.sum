@@ -80,6 +80,8 @@ github.com/cncf/xds/go v0.0.0-20240905190251-b4127c9b8d78 h1:QVw89YDxXxEe+l8gU8E
 github.com/cncf/xds/go v0.0.0-20240905190251-b4127c9b8d78/go.mod h1:W+zGtBO5Y1IgJhy4+A9GOqVhqLpfZi+vwmdNXUehLA8=
 github.com/compose-spec/compose-go/v2 v2.1.3 h1:bD67uqLuL/XgkAK6ir3xZvNLFPxPScEi1KW7R5esrLE=
 github.com/compose-spec/compose-go/v2 v2.1.3/go.mod h1:lFN0DrMxIncJGYAXTfWuajfwj5haBJqrBkarHcnjJKc=
+github.com/confluentinc/confluent-kafka-go/v2 v2.3.0 h1:icCHutJouWlQREayFwCc7lxDAhws08td+W3/gdqgZts=
+github.com/confluentinc/confluent-kafka-go/v2 v2.3.0/go.mod h1:/VTy8iEpe6mD9pkCH5BhijlUl8ulUXymKv1Qig5Rgb8=
 github.com/confluentinc/confluent-kafka-go/v2 v2.8.0 h1:0HlcSNWg4LpLA9nIjzUMIqWHI+w0S68UN7alXAc3TeA=
 github.com/confluentinc/confluent-kafka-go/v2 v2.8.0/go.mod h1:hScqtFIGUI1wqHIgM3mjoqEou4VweGGGX7dMpcUKves=
 github.com/containerd/console v1.0.4 h1:F2g4+oChYvBTsASRTz8NP6iIAi97J3TtSAsLbIFn4ro=
@@ -346,6 +348,8 @@ github.com/power-devops/perfstat v0.0.0-20221212215047-62379fc7944b h1:0LFwY6Q3g
 github.com/power-devops/perfstat v0.0.0-20221212215047-62379fc7944b/go.mod h1:OmDBASR4679mdNQnz2pUhc2G8CO2JrUAVFDRBDP/hJE=
 github.com/project-kessel/inventory-client-go v0.0.0-20240918112335-d9c72f85b234 h1:Ms0bb3nq9slmvRIRhPxTocC/nVJtUrRDlEnmcXgP7as=
 github.com/project-kessel/inventory-client-go v0.0.0-20240918112335-d9c72f85b234/go.mod h1:ghVJESku3BJcPp3A8RTuHIErM0RptidPKoi0xGTlgrk=
+github.com/project-kessel/inventory-client-go v0.0.0-20250213094514-4b90870d8dcf h1:RIKxvHBg98bak8Z58gNOgYbBZsOOLYKNRpLVSNhdNA8=
+github.com/project-kessel/inventory-client-go v0.0.0-20250213094514-4b90870d8dcf/go.mod h1:ghVJESku3BJcPp3A8RTuHIErM0RptidPKoi0xGTlgrk=
 github.com/project-kessel/relations-api v0.0.0-20241021205601-90db9ba90a73 h1:w/VpkTj8lEw4/EoCVjMj7Yiq3qI6jAPJ35vEWpiMKdk=
 github.com/project-kessel/relations-api v0.0.0-20241021205601-90db9ba90a73/go.mod h1:eFvW2RvCRuvjpfpovZHlgw7JLQLIU0G0GVX0SXd7FUE=
 github.com/prometheus/client_golang v1.20.5 h1:cxppBPuYhUnsO6yo/aoRol4L7q7UFfdm+bR9r+8l63Y=

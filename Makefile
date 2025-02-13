@@ -1,4 +1,5 @@
 FIPS_ENABLED?=true
+export RESOURCE_DIR=data/resources
 
 ifeq ($(GO),)
 GO:=$(shell command -v go)

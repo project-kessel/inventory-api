@@ -8,13 +8,13 @@ require (
 	github.com/bufbuild/protovalidate-go v0.9.1
 	github.com/cloudevents/sdk-go/protocol/kafka_confluent/v2 v2.0.0-20241021120453-70fb95191324
 	github.com/cloudevents/sdk-go/v2 v2.15.2
-	github.com/confluentinc/confluent-kafka-go/v2 v2.8.0
+	github.com/confluentinc/confluent-kafka-go/v2 v2.3.0
 	github.com/coreos/go-oidc/v3 v3.12.0
 	github.com/go-kratos/kratos/v2 v2.8.3
 	github.com/golang-jwt/jwt/v5 v5.2.1
 	github.com/google/uuid v1.6.0
 	github.com/patrickmn/go-cache v2.1.0+incompatible
-	github.com/project-kessel/inventory-client-go v0.0.0-20240918112335-d9c72f85b234
+	github.com/project-kessel/inventory-client-go v0.0.0-20250213094514-4b90870d8dcf
 	github.com/project-kessel/relations-api v0.0.0-20241021205601-90db9ba90a73
 	github.com/prometheus/client_golang v1.20.5
 	github.com/redhatinsights/app-common-go v1.6.8

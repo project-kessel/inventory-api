@@ -1,0 +1,21 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "reporter_type": {
+      "type": "string",
+      "enum": [
+        "NOTIFICATIONS"
+      ],
+      "description": "The type of reporter, fixed to 'NOTIFICATIONS' for this schema."
+    },
+    "local_resource_id": {
+      "type": "string",
+      "description": "A string representing the local identifier of the resource."
+    }
+  },
+  "required": [
+    "reporter_type",
+    "local_resource_id"
+  ]
+}

@@ -27,6 +27,8 @@ jobs:
         run: go get ./...
       - name: Build
         run: go build -tags release -v ./...
+      - name: Set Environment Variable for Resource Directory
+        run: echo "RESOURCE_DIR=$(pwd)/data/resources" >> $GITHUB_ENV
       - name: Test
         run: make test
       - name: Archive code coverage results

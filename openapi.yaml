@@ -806,6 +806,11 @@ components:
                     description: |-
                         The workspace id in which this resource is a member for access control.  A
                          resource can only be a member of one workspace.
+                inventory_id:
+                    type: string
+                    description: |-
+                        The inventory_id in which this resource is grouped by. Many resources can
+                         be grouped by the same inventory_id, by different Reporters
                 labels:
                     type: array
                     items:

@@ -22,6 +22,7 @@ type ResourceRepository interface {
 	Update(context.Context, *model.Resource, uuid.UUID) (*model.Resource, error)
 	Delete(context.Context, uuid.UUID) (*model.Resource, error)
 	FindByID(context.Context, uuid.UUID) (*model.Resource, error)
+	FindByWorkspaceId(context.Context, string) ([]*model.Resource, error)
 	FindByReporterResourceId(context.Context, model.ReporterResourceId) (*model.Resource, error)
 	ListAll(context.Context) ([]*model.Resource, error)
 }
@@ -154,6 +155,31 @@ func (uc *Usecase) CheckForCreate(ctx context.Context, permission, namespace str
 	} else {
 		return false, nil
 	}
+}
+
+func (uc *Usecase) ListResourcesInWorkspace(ctx context.Context, permission, namespace string, sub *kessel.SubjectReference, id string) (chan *model.Resource, chan error, error) {
+	resource_chan := make(chan *model.Resource)
+	error_chan := make(chan error)
+
+	resources, err := uc.repository.FindByWorkspaceId(ctx, id)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	go func() {
+		for _, resource := range resources {
+			if allowed, _, err := uc.Authz.CheckForView(ctx, namespace, permission, resource, sub); err != nil && allowed == kessel.CheckResponse_ALLOWED_TRUE {
+				resource_chan <- resource
+			} else if err != nil {
+				error_chan <- err
+			}
+		}
+
+		close(resource_chan)
+		close(error_chan)
+	}()
+
+	return resource_chan, error_chan, nil
 }
 
 // Update updates a model in the database, updates related tuples in the relations-api, and issues an update event.

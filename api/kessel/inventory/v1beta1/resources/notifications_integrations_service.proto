@@ -5,6 +5,7 @@ package kessel.inventory.v1beta1.resources;
 import "google/api/annotations.proto";
 import "buf/validate/validate.proto";
 
+import "kessel/inventory/v1beta1/authz/common.proto";
 import "kessel/inventory/v1beta1/resources/notifications_integration.proto";
 import "kessel/inventory/v1beta1/resources/reporter_data.proto";
 
@@ -38,10 +39,18 @@ message DeleteNotificationsIntegrationRequest {
 message DeleteNotificationsIntegrationResponse {}
 
 message ListNotificationsIntegrationsRequest {
+	// resource type and parent relationship
+	// permission (unless some variation of 'this is the permission used for visibility' can be baked into the schema- this is different from the permission parameter in CheckForView because only checks for actual visibility likely matter here)
+	// parent resource type and id
 
+  authz.ObjectType resource_type = 1 [(buf.validate.field).required = true];
+	string relation = 2 [(buf.validate.field).string.min_len = 1];
+	authz.SubjectReference subject = 3 [(buf.validate.field).required = true];
+  authz.ObjectReference parent = 4 [(buf.validate.field).required = true]; 
 }
+
 message ListNotificationsIntegrationsResponse {
-  repeated NotificationsIntegration integrations = 1;
+  NotificationsIntegration integrations = 1;
 }
 
 service KesselNotificationsIntegrationService {
@@ -66,7 +75,7 @@ service KesselNotificationsIntegrationService {
     };
   };
   
-  rpc ListNotificationsIntegrations(ListNotificationsIntegrationsRequest) returns (ListNotificationsIntegrationsResponse) {
+  rpc ListNotificationsIntegrations(ListNotificationsIntegrationsRequest) returns (stream ListNotificationsIntegrationsResponse) {
     option (google.api.http) = {
       get : "/api/inventory/v1beta1/resources/notifications-integrations"
       body : "*"

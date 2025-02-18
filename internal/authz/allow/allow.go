@@ -35,6 +35,11 @@ func (a *AllowAllAuthz) CheckForUpdate(context.Context, string, string, *model.R
 	return v1beta1.CheckForUpdateResponse_ALLOWED_TRUE, nil, nil
 }
 
+// this doesn't really make sense in the context of allow?
+func (a *AllowAllAuthz) LookupResources(context.Context, string, string, *model.Resource, *v1beta1.SubjectReference) (chan *kessel.ObjectReference, chan *kessel.ConsistencyToken, chan error, error) {
+	return make(chan *kessel.ObjectReference), make(chan *kessel.ConsistencyToken), nil, nil
+}
+
 func (a *AllowAllAuthz) CreateTuples(ctx context.Context, r *kessel.CreateTuplesRequest) (*kessel.CreateTuplesResponse, error) {
 	return &kessel.CreateTuplesResponse{}, nil
 }

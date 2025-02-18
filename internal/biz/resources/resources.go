@@ -22,6 +22,7 @@ type ReporterResourceRepository interface {
 	Update(context.Context, *model.Resource, uuid.UUID) (*model.Resource, []*model.Resource, error)
 	Delete(context.Context, uuid.UUID) (*model.Resource, error)
 	FindByID(context.Context, uuid.UUID) (*model.Resource, error)
+	FindByWorkspaceId(context.Context, string) ([]*model.Resource, error)
 	FindByReporterResourceId(context.Context, model.ReporterResourceId) (*model.Resource, error)
 	FindByReporterData(context.Context, string, string) (*model.Resource, error)
 	ListAll(context.Context) ([]*model.Resource, error)
@@ -137,7 +138,7 @@ func (uc *Usecase) Create(ctx context.Context, m *model.Resource) (*model.Resour
 }
 
 func (uc *Usecase) CheckForView(ctx context.Context, permission, namespace string, sub *kessel.SubjectReference, id model.ReporterResourceId) (bool, error) {
-	res, err := uc.repository.FindByReporterResourceId(ctx, id)
+	res, err := uc.reporterResourceRepository.FindByReporterResourceId(ctx, id)
 	if err != nil {
 		return false, err
 	}
@@ -155,7 +156,7 @@ func (uc *Usecase) CheckForView(ctx context.Context, permission, namespace strin
 }
 
 func (uc *Usecase) CheckForUpdate(ctx context.Context, permission, namespace string, sub *kessel.SubjectReference, id model.ReporterResourceId) (bool, error) {
-	res, err := uc.repository.FindByReporterResourceId(ctx, id)
+	res, err := uc.reporterResourceRepository.FindByReporterResourceId(ctx, id)
 	if err != nil {
 		return false, err
 	}
@@ -168,7 +169,7 @@ func (uc *Usecase) CheckForUpdate(ctx context.Context, permission, namespace str
 	if allowed == kessel.CheckForUpdateResponse_ALLOWED_TRUE {
 		if consistency != nil {
 			res.ConsistencyToken = consistency.Token
-			uc.repository.Update(ctx, res, res.ID)
+			uc.reporterResourceRepository.Update(ctx, res, res.ID)
 		}
 		return true, nil
 	} else {
@@ -177,7 +178,7 @@ func (uc *Usecase) CheckForUpdate(ctx context.Context, permission, namespace str
 }
 
 func (uc *Usecase) CheckForCreate(ctx context.Context, permission, namespace string, sub *kessel.SubjectReference, id model.ReporterResourceId) (bool, error) {
-	res, err := uc.repository.FindByReporterResourceId(ctx, id)
+	res, err := uc.reporterResourceRepository.FindByReporterResourceId(ctx, id)
 	if err != nil {
 		return false, err
 	}
@@ -192,6 +193,31 @@ func (uc *Usecase) CheckForCreate(ctx context.Context, permission, namespace str
 	} else {
 		return false, nil
 	}
+}
+
+func (uc *Usecase) ListResourcesInWorkspace(ctx context.Context, permission, namespace string, sub *kessel.SubjectReference, id string) (chan *model.Resource, chan error, error) {
+	resource_chan := make(chan *model.Resource)
+	error_chan := make(chan error)
+
+	resources, err := uc.reporterResourceRepository.FindByWorkspaceId(ctx, id)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	go func() {
+		for _, resource := range resources {
+			if allowed, _, err := uc.Authz.CheckForView(ctx, namespace, permission, resource, sub); err != nil && allowed == kessel.CheckResponse_ALLOWED_TRUE {
+				resource_chan <- resource
+			} else if err != nil {
+				error_chan <- err
+			}
+		}
+
+		close(resource_chan)
+		close(error_chan)
+	}()
+
+	return resource_chan, error_chan, nil
 }
 
 // Update updates a model in the database, updates related tuples in the relations-api, and issues an update event.

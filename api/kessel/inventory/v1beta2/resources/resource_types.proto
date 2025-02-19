@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+package kessel.inventory.v1beta2.resources;
+
+import "kessel/inventory/v1beta2/resources/metadata.proto";
+import "google/protobuf/struct.proto";
+
+option go_package = "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2/resources";
+option java_multiple_files = true;
+option java_package = "org.project_kessel.api.inventory.v1beta2.resources";
+
+message Resource {
+    Metadata metadata = 1;
+    google.protobuf.Struct reporter_data = 324342 [  json_name = "reporter_data"];
+    optional google.protobuf.Struct resource_data = 395858490 [  json_name = "resource_data"];
+
+}

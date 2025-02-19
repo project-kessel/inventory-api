@@ -516,6 +516,130 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/google.rpc.Status'
+    /api/inventory/v1beta2/resources/{resource.metadata.resource_type}:
+        put:
+            tags:
+                - KesselResourceService
+            operationId: KesselResourceService_UpdateResource
+            parameters:
+                - name: resource.metadata.resource_type
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/kessel.inventory.v1beta2.resources.UpdateResourceRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/kessel.inventory.v1beta2.resources.UpdateResourceResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/google.rpc.Status'
+        post:
+            tags:
+                - KesselResourceService
+            operationId: KesselResourceService_CreateResource
+            parameters:
+                - name: resource.metadata.resource_type
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/kessel.inventory.v1beta2.resources.CreateResourceRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/kessel.inventory.v1beta2.resources.CreateResourceResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/google.rpc.Status'
+        delete:
+            tags:
+                - KesselResourceService
+            operationId: KesselResourceService_DeleteResource
+            parameters:
+                - name: resource.metadata.resource_type
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+                - name: resource.metadata.id
+                  in: query
+                  description: Kessel Asset Inventory generated identifier.
+                  schema:
+                    type: string
+                - name: resource.metadata.resource_type
+                  in: query
+                  description: The type of the Resource
+                  schema:
+                    type: string
+                - name: resource.metadata.created_at
+                  in: query
+                  description: Date and time when the inventory item was first reported.
+                  schema:
+                    type: string
+                    format: date-time
+                - name: resource.metadata.updated_at
+                  in: query
+                  description: Date and time when the inventory item was last updated.
+                  schema:
+                    type: string
+                    format: date-time
+                - name: resource.metadata.deleted_at
+                  in: query
+                  description: Date and time when the inventory item was deleted.
+                  schema:
+                    type: string
+                    format: date-time
+                - name: resource.metadata.org_id
+                  in: query
+                  description: |-
+                    The org id in which this resource is a member for access control.  A
+                     resource can only be a member of one org.
+                  schema:
+                    type: string
+                - name: resource.metadata.workspace_id
+                  in: query
+                  description: |-
+                    The workspace id in which this resource is a member for access control.  A
+                     resource can only be a member of one workspace.
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/kessel.inventory.v1beta2.resources.DeleteResourceResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/google.rpc.Status'
 components:
     schemas:
         google.protobuf.Any:
@@ -1069,11 +1193,87 @@ components:
         kessel.inventory.v1beta1.resources.UpdateRhelHostResponse:
             type: object
             properties: {}
+        kessel.inventory.v1beta2.resources.CreateResourceRequest:
+            type: object
+            properties:
+                resource:
+                    $ref: '#/components/schemas/kessel.inventory.v1beta2.resources.Resource'
+        kessel.inventory.v1beta2.resources.CreateResourceResponse:
+            type: object
+            properties: {}
+        kessel.inventory.v1beta2.resources.DeleteResourceResponse:
+            type: object
+            properties: {}
+        kessel.inventory.v1beta2.resources.Metadata:
+            type: object
+            properties:
+                id:
+                    readOnly: true
+                    type: string
+                    description: Kessel Asset Inventory generated identifier.
+                resource_type:
+                    readOnly: true
+                    type: string
+                    description: The type of the Resource
+                created_at:
+                    readOnly: true
+                    type: string
+                    description: Date and time when the inventory item was first reported.
+                    format: date-time
+                updated_at:
+                    readOnly: true
+                    type: string
+                    description: Date and time when the inventory item was last updated.
+                    format: date-time
+                deleted_at:
+                    readOnly: true
+                    type: string
+                    description: Date and time when the inventory item was deleted.
+                    format: date-time
+                org_id:
+                    type: string
+                    description: |-
+                        The org id in which this resource is a member for access control.  A
+                         resource can only be a member of one org.
+                workspace_id:
+                    type: string
+                    description: |-
+                        The workspace id in which this resource is a member for access control.  A
+                         resource can only be a member of one workspace.
+                labels:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/kessel.inventory.v1beta2.resources.ResourceLabel'
+        kessel.inventory.v1beta2.resources.Resource:
+            type: object
+            properties:
+                metadata:
+                    $ref: '#/components/schemas/kessel.inventory.v1beta2.resources.Metadata'
+                reporter_data:
+                    type: object
+                resource_data:
+                    type: object
+        kessel.inventory.v1beta2.resources.ResourceLabel:
+            type: object
+            properties:
+                key:
+                    type: string
+                value:
+                    type: string
+        kessel.inventory.v1beta2.resources.UpdateResourceRequest:
+            type: object
+            properties:
+                resource:
+                    $ref: '#/components/schemas/kessel.inventory.v1beta2.resources.Resource'
+        kessel.inventory.v1beta2.resources.UpdateResourceResponse:
+            type: object
+            properties: {}
 tags:
     - name: KesselInventoryHealthService
     - name: KesselK8SClusterService
     - name: KesselK8SPolicyIsPropagatedToK8SClusterService
     - name: KesselK8SPolicyService
     - name: KesselNotificationsIntegrationService
+    - name: KesselResourceService
     - name: KesselResourceService
     - name: KesselRhelHostService

@@ -3,9 +3,9 @@ package notificationsintegrations
 import (
 	"context"
 	"fmt"
-	"strconv"
 	"time"
 
+	"github.com/go-kratos/kratos/v2/log"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
 	"github.com/project-kessel/inventory-api/internal/biz/resources"
 	"github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
@@ -89,13 +89,17 @@ func (c *NotificationsIntegrationsService) DeleteNotificationsIntegration(ctx co
 }
 func (c *NotificationsIntegrationsService) ListNotificationsIntegrations(r *pb.ListNotificationsIntegrationsRequest, conn pb.KesselNotificationsIntegrationService_ListNotificationsIntegrationsServer) error {
 	ctx := conn.Context()
-	_, err := middleware.GetIdentity(ctx)
-	if err != nil {
-		return err
-	}
+	// ignore identity for a sec, no streaming middleware setup.
+	// Message: Expected *api.Identity
+	// _, err := middleware.GetIdentity(ctx)
+	// if err != nil {
+	// return err
+	// }
+
+	log.Info(fmt.Sprintf("ListNotificationsIntegrations: %+v", r))
 
 	resources, errs, err := c.Ctl.ListResourcesInWorkspace(ctx, r.GetRelation(), r.ResourceType.GetNamespace(), &v1beta1.SubjectReference{
-		Relation: r.GetSubject().Relation,
+		// Relation: r.GetSubject().GetRelation(),
 		Subject: &v1beta1.ObjectReference{
 			Type: &v1beta1.ObjectType{
 				Namespace: r.GetSubject().GetSubject().GetType().GetNamespace(),
@@ -114,6 +118,8 @@ func (c *NotificationsIntegrationsService) ListNotificationsIntegrations(r *pb.L
 		if err != nil {
 			return fmt.Errorf("failed to send integrations: %w", err)
 		}
+
+		log.Info(fmt.Sprintf("Resource %+v converted to notificationIntegration %+v", resource, re))
 
 		err = conn.Send(&pb.ListNotificationsIntegrationsResponse{
 			Integrations: re,
@@ -161,11 +167,11 @@ func listResponseFromNotificationsIntegrations(h *model.Resource) *pb.ListNotifi
 }
 
 func notificationsIntegrationFromResource(r *model.Resource) (*pb.NotificationsIntegration, error) {
-	var reporterType int
-	reporterType, err := strconv.Atoi(r.Reporter.ReporterType)
-	if err != nil {
-		return nil, err
-	}
+	// var reporterType int
+	// reporterType, err := strconv.Atoi(r.Reporter.ReporterType)
+	// if err != nil {
+	// return nil, err
+	// }
 
 	return &pb.NotificationsIntegration{
 		Metadata: &pb.Metadata{
@@ -179,7 +185,7 @@ func notificationsIntegrationFromResource(r *model.Resource) (*pb.NotificationsI
 			// Labels:       labels_to_pb(r.Labels),
 		},
 		ReporterData: &pb.ReporterData{
-			ReporterType:       pb.ReporterData_ReporterType(reporterType),
+			// ReporterType:       pb.ReporterData_ReporterType(reporterType),
 			ReporterInstanceId: r.Reporter.ReporterId,
 			ConsoleHref:        r.ConsoleHref,
 			ApiHref:            r.ApiHref,

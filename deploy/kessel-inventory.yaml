@@ -52,6 +52,10 @@ objects:
             public:
               enabled: true
               apiPath: inventory
+
+      testing:
+        iqePlugin: kessel-inventory
+
   - kind: PodDisruptionBudget
     apiVersion: policy/v1
     metadata:

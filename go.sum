@@ -1,5 +1,5 @@
-buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go v1.36.5-20250130201111-63bb56e20495.1 h1:cKwn1vgPveeXRDvrt2H+FI5AiBzbG5obrolK8eCAY6U=
-buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go v1.36.5-20250130201111-63bb56e20495.1/go.mod h1:eOqrCVUfhh7SLo00urDe/XhJHljj0dWMZirS0aX7cmc=
+buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go v1.36.5-20250219170025-d39267d9df8f.1 h1:Y0dvIjy09SvloaRbMLTH//k1qDzWcxNm8uBrCwp75ug=
+buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go v1.36.5-20250219170025-d39267d9df8f.1/go.mod h1:eOqrCVUfhh7SLo00urDe/XhJHljj0dWMZirS0aX7cmc=
 cel.dev/expr v0.19.1 h1:NciYrtDRIR0lNCnH1LFJegdjspNx9fI59O7TWcua/W4=
 cel.dev/expr v0.19.1/go.mod h1:MrpN08Q+lEBs+bGYdLxxHkZoUSsCp0nSKTs0nTymJgw=
 cloud.google.com/go v0.26.0/go.mod h1:aQUYkXzVsufM+DwF1aE+0xfcU+56JwCaLick0ClmMTw=
@@ -344,8 +344,6 @@ github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 h1:Jamvg5psRI
 github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
 github.com/power-devops/perfstat v0.0.0-20221212215047-62379fc7944b h1:0LFwY6Q3gMACTjAbMZBjXAqTOzOwFaj2Ld6cjeQ7Rig=
 github.com/power-devops/perfstat v0.0.0-20221212215047-62379fc7944b/go.mod h1:OmDBASR4679mdNQnz2pUhc2G8CO2JrUAVFDRBDP/hJE=
-github.com/project-kessel/inventory-client-go v0.0.0-20240918112335-d9c72f85b234 h1:Ms0bb3nq9slmvRIRhPxTocC/nVJtUrRDlEnmcXgP7as=
-github.com/project-kessel/inventory-client-go v0.0.0-20240918112335-d9c72f85b234/go.mod h1:ghVJESku3BJcPp3A8RTuHIErM0RptidPKoi0xGTlgrk=
 github.com/project-kessel/inventory-client-go v0.0.0-20250213094514-4b90870d8dcf h1:RIKxvHBg98bak8Z58gNOgYbBZsOOLYKNRpLVSNhdNA8=
 github.com/project-kessel/inventory-client-go v0.0.0-20250213094514-4b90870d8dcf/go.mod h1:ghVJESku3BJcPp3A8RTuHIErM0RptidPKoi0xGTlgrk=
 github.com/project-kessel/relations-api v0.0.0-20241021205601-90db9ba90a73 h1:w/VpkTj8lEw4/EoCVjMj7Yiq3qI6jAPJ35vEWpiMKdk=

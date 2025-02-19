@@ -3,6 +3,7 @@ package resources
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -17,8 +18,8 @@ import (
 )
 
 type ResourceRepository interface {
-	Create(context.Context, *model.Resource) (*model.Resource, error)
-	Update(context.Context, *model.Resource, uuid.UUID) (*model.Resource, error)
+	Create(context.Context, *model.Resource) (*model.Resource, []*model.Resource, error)
+	Update(context.Context, *model.Resource, uuid.UUID) (*model.Resource, []*model.Resource, error)
 	Delete(context.Context, uuid.UUID) (*model.Resource, error)
 	FindByID(context.Context, uuid.UUID) (*model.Resource, error)
 	FindByReporterResourceId(context.Context, model.ReporterResourceId) (*model.Resource, error)
@@ -26,35 +27,44 @@ type ResourceRepository interface {
 	ListAll(context.Context) ([]*model.Resource, error)
 }
 
+type InventoryResourceRepository interface {
+	FindByID(context.Context, uuid.UUID) (*model.InventoryResource, error)
+}
+
 var (
-	ErrResourceNotFound      = errors.New("resource not found")
-	ErrDatabaseError         = errors.New("db error while querying for resource")
-	ErrResourceAlreadyExists = errors.New("resource already exists")
+	ErrResourceNotFound             = errors.New("resource not found")
+	ErrDatabaseError                = errors.New("db error while querying for resource")
+	ErrResourceAlreadyExists        = errors.New("resource already exists")
+	ErrInvalidInventoryResourceID   = errors.New("inventory ID does not exist")
+	ErrInvalidInventoryResourceType = errors.New("invalid resource type")
 )
 
 type Usecase struct {
-	repository         ResourceRepository
-	Authz              authzapi.Authorizer
-	Eventer            eventingapi.Manager
-	Namespace          string
-	log                *log.Helper
-	Server             server.Server
-	DisablePersistence bool
+	repository                  ResourceRepository
+	inventoryResourceRepository InventoryResourceRepository
+	Authz                       authzapi.Authorizer
+	Eventer                     eventingapi.Manager
+	Namespace                   string
+	log                         *log.Helper
+	Server                      server.Server
+	DisablePersistence          bool
 }
 
-func New(repository ResourceRepository, authz authzapi.Authorizer, eventer eventingapi.Manager, namespace string, logger log.Logger, disablePersistence bool) *Usecase {
+func New(repository ResourceRepository, inventoryResourceRepository InventoryResourceRepository, authz authzapi.Authorizer, eventer eventingapi.Manager, namespace string, logger log.Logger, disablePersistence bool) *Usecase {
 	return &Usecase{
-		repository:         repository,
-		Authz:              authz,
-		Eventer:            eventer,
-		Namespace:          namespace,
-		log:                log.NewHelper(logger),
-		DisablePersistence: disablePersistence,
+		repository:                  repository,
+		inventoryResourceRepository: inventoryResourceRepository,
+		Authz:                       authz,
+		Eventer:                     eventer,
+		Namespace:                   namespace,
+		log:                         log.NewHelper(logger),
+		DisablePersistence:          disablePersistence,
 	}
 }
 
 func (uc *Usecase) Create(ctx context.Context, m *model.Resource) (*model.Resource, error) {
 	ret := m // Default to returning the input model in case persistence is disabled
+	updatedResources := []*model.Resource{}
 
 	if !uc.DisablePersistence {
 		// check if the resource already exists
@@ -71,7 +81,22 @@ func (uc *Usecase) Create(ctx context.Context, m *model.Resource) (*model.Resour
 		if existingResource != nil {
 			return nil, ErrResourceAlreadyExists
 		}
-		ret, err = uc.repository.Create(ctx, m)
+
+		// Inventory Resource Validations
+		if m.InventoryId != nil {
+			// Validate the inventory resource exists
+			inventoryResource, err := uc.inventoryResourceRepository.FindByID(ctx, *m.InventoryId)
+			if err != nil {
+				return nil, ErrInvalidInventoryResourceID
+			}
+			// Validate the inventory resource type matches the resource type
+			if inventoryResource.ResourceType != m.ResourceType {
+				return nil, fmt.Errorf("%w: expected %s, given %s", ErrInvalidInventoryResourceType,
+					inventoryResource.ResourceType, m.ResourceType)
+			}
+		}
+
+		ret, updatedResources, err = uc.repository.Create(ctx, m)
 		if err != nil {
 			return nil, err
 		}
@@ -83,17 +108,33 @@ func (uc *Usecase) Create(ctx context.Context, m *model.Resource) (*model.Resour
 	}
 
 	if uc.Eventer != nil {
+		// Send event for the created resource
 		err := biz.DefaultResourceSendEvent(ctx, m, uc.Eventer, *m.CreatedAt, eventingapi.OperationTypeCreated)
-
 		if err != nil {
 			return nil, err
+		}
+
+		// Send events for any updated resources
+		for _, updatedResource := range updatedResources {
+			err := biz.DefaultResourceSendEvent(ctx, updatedResource, uc.Eventer, *updatedResource.UpdatedAt, eventingapi.OperationTypeUpdated)
+			if err != nil {
+				return nil, err
+			}
 		}
 	}
 
 	if uc.Authz != nil {
+		// Send workspace for the created resource
 		err := biz.DefaultSetWorkspace(ctx, uc.Namespace, m, uc.Authz)
 		if err != nil {
 			return nil, err
+		}
+		// Send workspace for any updated resources
+		for _, updatedResource := range updatedResources {
+			err := biz.DefaultSetWorkspace(ctx, uc.Namespace, updatedResource, uc.Authz)
+			if err != nil {
+				return nil, err
+			}
 		}
 	}
 
@@ -104,6 +145,7 @@ func (uc *Usecase) Create(ctx context.Context, m *model.Resource) (*model.Resour
 // Update updates a model in the database, updates related tuples in the relations-api, and issues an update event.
 func (uc *Usecase) Update(ctx context.Context, m *model.Resource, id model.ReporterResourceId) (*model.Resource, error) {
 	ret := m // Default to returning the input model in case persistence is disabled
+	updatedResources := []*model.Resource{}
 
 	if !uc.DisablePersistence {
 		// check if the resource exists
@@ -121,7 +163,21 @@ func (uc *Usecase) Update(ctx context.Context, m *model.Resource, id model.Repor
 			return nil, ErrDatabaseError
 		}
 
-		ret, err = uc.repository.Update(ctx, m, existingResource.ID)
+		// Inventory Resource Validations
+		if m.InventoryId != nil {
+			// Validate the inventory resource exists
+			inventoryResource, err := uc.inventoryResourceRepository.FindByID(ctx, *m.InventoryId)
+			if err != nil {
+				return nil, ErrInvalidInventoryResourceID
+			}
+			// Validate the inventory resource type matches the resource type
+			if inventoryResource.ResourceType != m.ResourceType {
+				return nil, fmt.Errorf("%w: expected %s, given %s", ErrInvalidInventoryResourceType,
+					inventoryResource.ResourceType, m.ResourceType)
+			}
+		}
+
+		ret, updatedResources, err = uc.repository.Update(ctx, m, existingResource.ID)
 		if err != nil {
 			return nil, err
 		}
@@ -130,21 +186,24 @@ func (uc *Usecase) Update(ctx context.Context, m *model.Resource, id model.Repor
 		// TODO: remove this when persistence is always enabled
 		now := time.Now()
 		m.UpdatedAt = &now
+		updatedResources = append(updatedResources, m)
 	}
 
 	if uc.Eventer != nil {
-		err := biz.DefaultResourceSendEvent(ctx, m, uc.Eventer, *m.UpdatedAt, eventingapi.OperationTypeUpdated)
-
-		if err != nil {
-			return nil, err
+		for _, updatedResource := range updatedResources {
+			err := biz.DefaultResourceSendEvent(ctx, updatedResource, uc.Eventer, *updatedResource.UpdatedAt, eventingapi.OperationTypeUpdated)
+			if err != nil {
+				return nil, err
+			}
 		}
 	}
 
 	if uc.Authz != nil {
-		// Todo: Update workspace if there is any change
-		err := biz.DefaultSetWorkspace(ctx, uc.Namespace, m, uc.Authz)
-		if err != nil {
-			return nil, err
+		for _, updatedResource := range updatedResources {
+			err := biz.DefaultSetWorkspace(ctx, uc.Namespace, updatedResource, uc.Authz)
+			if err != nil {
+				return nil, err
+			}
 		}
 	}
 

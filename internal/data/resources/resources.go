@@ -35,36 +35,40 @@ func copyHistory(m *model.Resource, id uuid.UUID, operationType model.OperationT
 	}
 }
 
-func (r *Repo) Create(ctx context.Context, m *model.Resource) (*model.Resource, error) {
-	var inventoryResource model.InventoryResource
+func (r *Repo) Create(ctx context.Context, m *model.Resource) (*model.Resource, []*model.Resource, error) {
 	db := r.DB.Session(&gorm.Session{})
 	tx := db.Begin()
+	updatedResources := []*model.Resource{}
 
-	// If reporter includes inventory ID, check if it exists
-	if m.InventoryId != uuid.Nil {
-		if err := tx.First(&inventoryResource, m.InventoryId).Error; err != nil {
-			// Bad Inventory ID
-			tx.Rollback()
-			return nil, fmt.Errorf("fetching inventory resource: %w", err)
+	if m.InventoryId == nil {
+		// New inventory resource
+		inventoryResource := model.InventoryResource{
+			ResourceType: m.ResourceType,
+			WorkspaceId:  m.WorkspaceId,
 		}
-		m.InventoryId = inventoryResource.ID
-	} else {
 		// Create a new inventory resource
 		if err := tx.Create(&inventoryResource).Error; err != nil {
 			tx.Rollback()
-			return nil, fmt.Errorf("creating inventory resource: %w", err)
+			return nil, nil, fmt.Errorf("creating inventory resource: %w", err)
 		}
-		m.InventoryId = inventoryResource.ID
+		m.InventoryId = &inventoryResource.ID
 	}
 
 	if err := tx.Create(m).Error; err != nil {
 		tx.Rollback()
-		return nil, err
+		return nil, nil, err
 	}
 
 	if err := tx.Create(copyHistory(m, m.ID, model.OperationTypeCreate)).Error; err != nil {
 		tx.Rollback()
-		return nil, err
+		return nil, nil, err
+	}
+
+	// Handle workspace updates for other resources with the same inventory ID
+	updatedResources, err := r.handleWorkspaceUpdates(tx, m, updatedResources)
+	if err != nil {
+		tx.Rollback()
+		return nil, nil, err
 	}
 
 	// Deprecated
@@ -74,31 +78,45 @@ func (r *Repo) Create(ctx context.Context, m *model.Resource) (*model.Resource, 
 		ReporterResourceId: model.ReporterResourceIdFromResource(m),
 	}).Error; err != nil {
 		tx.Rollback()
-		return nil, err
+		return nil, nil, err
 	}
 
 	tx.Commit()
-	return m, nil
+	return m, updatedResources, nil
 }
 
-func (r *Repo) Update(ctx context.Context, m *model.Resource, id uuid.UUID) (*model.Resource, error) {
-	session := r.DB.Session(&gorm.Session{})
+func (r *Repo) Update(ctx context.Context, m *model.Resource, id uuid.UUID) (*model.Resource, []*model.Resource, error) {
+	db := r.DB.Session(&gorm.Session{})
+	updatedResources := []*model.Resource{}
 
 	_, err := r.FindByID(ctx, id)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	if err := session.Create(copyHistory(m, id, model.OperationTypeUpdate)).Error; err != nil {
-		return nil, err
+	tx := db.Begin()
+	if err := tx.Create(copyHistory(m, id, model.OperationTypeUpdate)).Error; err != nil {
+		tx.Rollback()
+		return nil, nil, err
 	}
 
 	m.ID = id
-	if err := session.Save(m).Error; err != nil {
-		return nil, err
+	if err := tx.Save(m).Error; err != nil {
+		tx.Rollback()
+		return nil, nil, err
 	}
 
-	return m, nil
+	updatedResources = append(updatedResources, m)
+
+	// Handle workspace updates for other resources with the same inventory ID
+	updatedResources, err = r.handleWorkspaceUpdates(tx, m, updatedResources)
+	if err != nil {
+		tx.Rollback()
+		return nil, nil, err
+	}
+
+	tx.Commit()
+	return m, updatedResources, nil
 }
 
 func (r *Repo) Delete(ctx context.Context, id uuid.UUID) (*model.Resource, error) {
@@ -126,16 +144,18 @@ func (r *Repo) Delete(ctx context.Context, id uuid.UUID) (*model.Resource, error
 		return nil, err
 	}
 
-	// Delete Inventory Resource if no other resources are referencing it
-	var count int64
-	if err := tx.Model(&model.Resource{}).Where("inventory_id = ?", resource.InventoryId).Count(&count).Error; err != nil {
-		tx.Rollback()
-		return nil, err
-	}
-	if count == 0 {
-		if err := tx.Delete(&model.InventoryResource{}, resource.InventoryId).Error; err != nil {
+	if resource.InventoryId != nil {
+		// Delete Inventory Resource if no other resources are referencing it
+		var count int64
+		if err := tx.Model(&model.Resource{}).Where("inventory_id = ?", *resource.InventoryId).Count(&count).Error; err != nil {
 			tx.Rollback()
 			return nil, err
+		}
+		if count == 0 {
+			if err := tx.Delete(&model.InventoryResource{}, *resource.InventoryId).Error; err != nil {
+				tx.Rollback()
+				return nil, err
+			}
 		}
 	}
 
@@ -183,4 +203,38 @@ func (r *Repo) ListAll(context.Context) ([]*model.Resource, error) {
 	}
 
 	return results, nil
+}
+
+func (r *Repo) handleWorkspaceUpdates(tx *gorm.DB, m *model.Resource, updatedResources []*model.Resource) ([]*model.Resource, error) {
+	if m.InventoryId != nil {
+		var inventoryResource model.InventoryResource
+		if err := tx.First(&inventoryResource, m.InventoryId).Error; err != nil {
+			return nil, fmt.Errorf("fetching inventory resource: %w", err)
+		}
+		// if workspace changes, update inventory resource
+		if inventoryResource.WorkspaceId != m.WorkspaceId {
+			inventoryResource.WorkspaceId = m.WorkspaceId
+			if err := tx.Save(&inventoryResource).Error; err != nil {
+				return nil, fmt.Errorf("updating inventory resource workspace ID: %w", err)
+			}
+			// get all resources with same inventory ID
+			var resources []model.Resource
+			if err := tx.Where("inventory_id = ?", m.InventoryId).Find(&resources).Error; err != nil {
+				return nil, fmt.Errorf("fetching resources with inventory ID: %w", err)
+			}
+			// iterate all resources, update the workspace ID and save
+			for _, resource := range resources {
+				if m.ID == resource.ID {
+					// skip the primary resource being updated
+					continue
+				}
+				resource.WorkspaceId = m.WorkspaceId
+				if err := tx.Save(&resource).Error; err != nil {
+					return nil, fmt.Errorf("updating resource workspace ID: %w", err)
+				}
+				updatedResources = append(updatedResources, &resource)
+			}
+		}
+	}
+	return updatedResources, nil
 }

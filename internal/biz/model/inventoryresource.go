@@ -8,7 +8,9 @@ import (
 )
 
 type InventoryResource struct {
-	ID uuid.UUID `gorm:"type:uuid;primarykey"`
+	ID           uuid.UUID `gorm:"type:uuid;primarykey"`
+	ResourceType string
+	WorkspaceId  string
 }
 
 func (r *InventoryResource) BeforeCreate(db *gorm.DB) error {

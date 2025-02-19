@@ -12,9 +12,9 @@ import (
 )
 
 type Resource struct {
-	ID           uuid.UUID `gorm:"type:uuid;primarykey"`
-	InventoryId  uuid.UUID `gorm:"index"`
-	OrgId        string    `gorm:"index"`
+	ID           uuid.UUID  `gorm:"type:uuid;primarykey"`
+	InventoryId  *uuid.UUID `gorm:"index"`
+	OrgId        string     `gorm:"index"`
 	ResourceData JsonObject
 	ResourceType string
 	WorkspaceId  string

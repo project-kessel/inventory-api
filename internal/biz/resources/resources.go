@@ -166,13 +166,19 @@ func (uc *Usecase) ListResourcesInWorkspace(ctx context.Context, permission, nam
 		return nil, nil, err
 	}
 
+	log.Infof("ListResourcesInWorkspace: resources %+v", resources)
+
 	go func() {
 		for _, resource := range resources {
-			if allowed, _, err := uc.Authz.CheckForView(ctx, namespace, permission, resource, sub); err != nil && allowed == kessel.CheckResponse_ALLOWED_TRUE {
+			log.Infof("ListResourcesInWorkspace: checkforview on %+v", resource)
+			if allowed, _, err := uc.Authz.CheckForView(ctx, namespace, permission, resource, sub); err == nil && allowed == kessel.CheckResponse_ALLOWED_TRUE {
 				resource_chan <- resource
 			} else if err != nil {
 				error_chan <- err
+			} else if allowed != kessel.CheckResponse_ALLOWED_TRUE {
+				log.Infof("Response was not allowed: %v", allowed)
 			}
+
 		}
 
 		close(resource_chan)

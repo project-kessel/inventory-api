@@ -89,18 +89,10 @@ func (c *NotificationsIntegrationsService) DeleteNotificationsIntegration(ctx co
 }
 func (c *NotificationsIntegrationsService) ListNotificationsIntegrations(r *pb.ListNotificationsIntegrationsRequest, conn pb.KesselNotificationsIntegrationService_ListNotificationsIntegrationsServer) error {
 	ctx := conn.Context()
-	identity, err := middleware.GetIdentity(ctx)
+	_, err := middleware.GetIdentity(ctx)
 	if err != nil {
 		return err
 	}
-
-	// if resources, err := notificationsIntegrationsFromListRequest(identity, r); err == nil {
-	// 	if resp, err := c.Ctl.ListNotificationsIntegrations(ctx, r.GetRelation(), r.GetResourceType().Namespace, r.GetSubject(), *resource); err == nil {
-	// 		return listResponseFromNotificationsIntegrations(resp), nil
-	// 	}
-	// } else {
-	// 	return nil, err
-	// }
 
 	resources, errs, err := c.Ctl.ListResourcesInWorkspace(ctx, r.GetRelation(), r.ResourceType.GetNamespace(), &v1beta1.SubjectReference{
 		Relation: r.GetSubject().Relation,
@@ -163,10 +155,6 @@ func fromDeleteRequest(r *pb.DeleteNotificationsIntegrationRequest, identity *au
 func toDeleteResponse() *pb.DeleteNotificationsIntegrationResponse {
 	return &pb.DeleteNotificationsIntegrationResponse{}
 }
-
-// func notificationsIntegrationsFromListRequest(identity *authnapi.Identity, r *pb.ListNotificationsIntegrationsRequest) (*model.Resource, error) {
-// 	return conv.ResourceFromPb()
-// }
 
 func listResponseFromNotificationsIntegrations(h *model.Resource) *pb.ListNotificationsIntegrationsResponse {
 	return &pb.ListNotificationsIntegrationsResponse{}

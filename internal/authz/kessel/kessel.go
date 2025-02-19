@@ -2,9 +2,7 @@ package kessel
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"io"
 
 	"google.golang.org/protobuf/proto"
 
@@ -197,63 +195,65 @@ func (a *KesselAuthz) CheckForUpdate(ctx context.Context, namespace string, upda
 	return resp.GetAllowed(), resp.GetConsistencyToken(), nil
 }
 
-func (a *KesselAuthz) LookupResources(ctx context.Context, namespace string, permission string, resource *model.Resource, sub *kessel.SubjectReference) (chan *kessel.ObjectReference, chan *kessel.ConsistencyToken, chan error, error) {
-	client, err := a.LookupService.LookupResources(ctx, &kessel.LookupResourcesRequest{
-		ResourceType: &kessel.ObjectType{
-			Namespace: namespace,
-			Name:      resource.ResourceType,
-		},
-		Relation: permission,
-		Subject:  sub,
-		// Pagination: &kessel.RequestPagination{},
-		Consistency: &kessel.Consistency{
-			Requirement: &kessel.Consistency_AtLeastAsFresh{
-				AtLeastAsFresh: &kessel.ConsistencyToken{Token: resource.ConsistencyToken},
-			},
-		},
-	})
+// Useful for a prefiltering list endpoint.
+// func (a *KesselAuthz) LookupResources(ctx context.Context, namespace string, permission string, resource *model.Resource, sub *kessel.SubjectReference) (chan *kessel.ObjectReference, chan *kessel.ConsistencyToken, chan error, error) {
+// 	client, err := a.LookupService.LookupResources(ctx, &kessel.LookupResourcesRequest{
+// 		ResourceType: &kessel.ObjectType{
+// 			Namespace: namespace,
+// 			Name:      resource.ResourceType,
+// 		},
+// 		Relation: permission,
+// 		Subject:  sub,
+// 		// Pagination: &kessel.RequestPagination{},
+// 		Consistency: &kessel.Consistency{
+// 			Requirement: &kessel.Consistency_AtLeastAsFresh{
+// 				AtLeastAsFresh: &kessel.ConsistencyToken{Token: resource.ConsistencyToken},
+// 			},
+// 		},
+// 	})
 
-	if err != nil {
-		return nil, nil, nil, err
-	}
+// 	if err != nil {
+// 		return nil, nil, nil, err
+// 	}
 
-	resources := make(chan *kessel.ObjectReference)
-	consistencyTokens := make(chan *kessel.ConsistencyToken)
+// 	resources := make(chan *kessel.ObjectReference)
+// 	consistencyTokens := make(chan *kessel.ConsistencyToken)
 
-	errs := make(chan error, 1)
+// 	errs := make(chan error, 1)
 
-	go func() {
-		for {
-			msg, err := client.Recv()
-			if err != nil {
-				if !errors.Is(err, io.EOF) {
-					errs <- err
-				}
-				close(errs)
-				close(resources)
-				close(consistencyTokens)
-				return
-			}
+// 	go func() {
+// 		for {
+// 			msg, err := client.Recv()
+// 			if err != nil {
+// 				if !errors.Is(err, io.EOF) {
+// 					errs <- err
+// 				}
+// 				close(errs)
+// 				close(resources)
+// 				close(consistencyTokens)
+// 				return
+// 			}
 
-			// continuation := biz.ContinuationToken("")
-			// if msg.AfterResultCursor != nil {
-			// continuation = biz.ContinuationToken(msg.AfterResultCursor.Token)
-			// }
+// 			// continuation := biz.ContinuationToken("")
+// 			// if msg.AfterResultCursor != nil {
+// 			// continuation = biz.ContinuationToken(msg.AfterResultCursor.Token)
+// 			// }
 
-			// resId := msg.GetResource()
-			resources <- msg.GetResource()
-			consistencyTokens <- msg.GetConsistencyToken()
-		}
-	}()
+// 			// resId := msg.GetResource()
+// 			resources <- msg.GetResource()
+// 			consistencyTokens <- msg.GetConsistencyToken()
+// 		}
+// 	}()
 
-	// thing is we need to not just get back the ids,
-	// we need to find the integrations
-	// to return as well
+// 	// thing is we need to not just get back the ids,
+// 	// we need to find the integrations
+// 	// to return as well
 
-	// maybe we do that elsewhere.
+// 	// maybe we do that elsewhere.
 
-	return resources, consistencyTokens, errs, nil
-}
+// 	return resources, consistencyTokens, errs, nil
+// }
+
 func (a *KesselAuthz) SetWorkspace(ctx context.Context, local_resource_id, workspace, namespace, name string) (*kessel.CreateTuplesResponse, error) {
 	if workspace == "" {
 		a.incrFailureCounter("SetWorkspace")

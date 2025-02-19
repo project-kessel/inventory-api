@@ -209,6 +209,7 @@ func TestUpdateResource(t *testing.T) {
 	assert.NotNil(t, r)
 	assert.Nil(t, err)
 	assert.Len(t, updatedResources, 0) // no updates
+	createdAt := r.CreatedAt
 
 	// Updates
 	r2Copy := *r
@@ -219,6 +220,7 @@ func TestUpdateResource(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, r.ID, r2.ID)
 	assert.Len(t, updatedResources, 1) // r1 was updated
+	assert.Equal(t, createdAt.Unix(), r2.CreatedAt.Unix())
 
 	// The resource is now in the database and is equal to the return value from Update
 	resource := model.Resource{}

@@ -89,7 +89,7 @@ func (r *Repo) Update(ctx context.Context, m *model.Resource, id uuid.UUID) (*mo
 	db := r.DB.Session(&gorm.Session{})
 	updatedResources := []*model.Resource{}
 
-	_, err := r.FindByID(ctx, id)
+	resource, err := r.FindByID(ctx, id)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -101,6 +101,7 @@ func (r *Repo) Update(ctx context.Context, m *model.Resource, id uuid.UUID) (*mo
 	}
 
 	m.ID = id
+	m.CreatedAt = resource.CreatedAt
 	if err := tx.Save(m).Error; err != nil {
 		tx.Rollback()
 		return nil, nil, err

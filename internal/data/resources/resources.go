@@ -2,6 +2,8 @@ package resources
 
 import (
 	"context"
+
+	"github.com/go-kratos/kratos/v2/log"
 	"github.com/google/uuid"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
 	"github.com/project-kessel/inventory-api/internal/data"
@@ -105,6 +107,19 @@ func (r *Repo) FindByID(ctx context.Context, id uuid.UUID) (*model.Resource, err
 	}
 
 	return &resource, nil
+}
+
+func (r *Repo) FindByWorkspaceId(ctx context.Context, workspace_id string) ([]*model.Resource, error) {
+	session := r.DB.Session(&gorm.Session{})
+	data := []*model.Resource{}
+
+	log.Infof("FindByWorkspaceId: %s", workspace_id)
+	if err := session.Where("workspace_id = ?", workspace_id).Find(&data).Error; err == nil {
+		log.Infof("FindByWorkspaceId: data %+v", data)
+		return data, nil
+	} else {
+		return nil, err
+	}
 }
 
 func (r *Repo) FindByReporterResourceId(ctx context.Context, id model.ReporterResourceId) (*model.Resource, error) {

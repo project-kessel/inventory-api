@@ -970,14 +970,20 @@ components:
                     format: enum
         kessel.inventory.v1beta1.resources.ListNotificationsIntegrationsRequest:
             type: object
-            properties: {}
+            properties:
+                resourceType:
+                    $ref: '#/components/schemas/kessel.inventory.v1beta1.authz.ObjectType'
+                relation:
+                    type: string
+                subject:
+                    $ref: '#/components/schemas/kessel.inventory.v1beta1.authz.SubjectReference'
+                parent:
+                    $ref: '#/components/schemas/kessel.inventory.v1beta1.authz.ObjectReference'
         kessel.inventory.v1beta1.resources.ListNotificationsIntegrationsResponse:
             type: object
             properties:
                 integrations:
-                    type: array
-                    items:
-                        $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.NotificationsIntegration'
+                    $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.NotificationsIntegration'
         kessel.inventory.v1beta1.resources.Metadata:
             type: object
             properties:

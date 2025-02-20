@@ -2,11 +2,12 @@ package biz
 
 import (
 	"context"
+	"time"
+
 	authzapi "github.com/project-kessel/inventory-api/internal/authz/api"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
 	eventingapi "github.com/project-kessel/inventory-api/internal/eventing/api"
 	"github.com/project-kessel/inventory-api/internal/middleware"
-	"time"
 )
 
 func DefaultResourceSendEvent(ctx context.Context, model *model.Resource, eventer eventingapi.Manager, reportedTime time.Time, operationType eventingapi.OperationType) error {
@@ -50,7 +51,7 @@ func DefaultRelationshipSendEvent(ctx context.Context, m *model.Relationship, ev
 }
 
 func DefaultSetWorkspace(ctx context.Context, namespace string, model *model.Resource, authz authzapi.Authorizer) error {
-	_, err := authz.SetWorkspace(ctx, model.Reporter.LocalResourceId, model.WorkspaceId, namespace, model.ResourceType)
+	_, err := authz.SetWorkspace(ctx, model.Reporter.LocalResourceId, model.WorkspaceId, namespace, model.ResourceType) //nolint:staticcheck
 	if err != nil {
 		return err
 	}

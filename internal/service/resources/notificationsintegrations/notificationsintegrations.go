@@ -113,6 +113,8 @@ func (c *NotificationsIntegrationsService) ListNotificationsIntegrations(r *pb.L
 		return fmt.Errorf("failed to retrieve integrations: %w", err)
 	}
 
+	log.Infof("ListNotificationsIntegrations: got some resources %v", resources)
+
 	for resource := range resources {
 		re, err := notificationsIntegrationFromResource(resource)
 		if err != nil {

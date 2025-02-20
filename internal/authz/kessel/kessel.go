@@ -169,6 +169,8 @@ func (a *KesselAuthz) CheckForView(ctx context.Context, namespace string, viewPe
 		},
 	})
 
+	log.Infof("CheckForView resp: %v err: %v", resp, err)
+
 	if err != nil {
 		return kessel.CheckResponse_ALLOWED_UNSPECIFIED, nil, err
 	}

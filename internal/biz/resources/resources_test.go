@@ -12,44 +12,44 @@ import (
 	"gorm.io/gorm"
 )
 
-type MockedResourceRepository struct {
+type MockedReporterResourceRepository struct {
 	mock.Mock
 }
 type MockedInventoryResourceRepository struct {
 	mock.Mock
 }
 
-func (r *MockedResourceRepository) Create(ctx context.Context, resource *model.Resource) (*model.Resource, []*model.Resource, error) {
+func (r *MockedReporterResourceRepository) Create(ctx context.Context, resource *model.Resource) (*model.Resource, []*model.Resource, error) {
 	args := r.Called(ctx, resource)
 	return args.Get(0).(*model.Resource), args.Get(1).([]*model.Resource), args.Error(2)
 }
 
-func (r *MockedResourceRepository) Update(ctx context.Context, resource *model.Resource, id uuid.UUID) (*model.Resource, []*model.Resource, error) {
+func (r *MockedReporterResourceRepository) Update(ctx context.Context, resource *model.Resource, id uuid.UUID) (*model.Resource, []*model.Resource, error) {
 	args := r.Called(ctx, resource, id)
 	return args.Get(0).(*model.Resource), args.Get(1).([]*model.Resource), args.Error(2)
 }
 
-func (r *MockedResourceRepository) Delete(ctx context.Context, id uuid.UUID) (*model.Resource, error) {
+func (r *MockedReporterResourceRepository) Delete(ctx context.Context, id uuid.UUID) (*model.Resource, error) {
 	args := r.Called(ctx, id)
 	return args.Get(0).(*model.Resource), args.Error(1)
 }
 
-func (r *MockedResourceRepository) FindByID(ctx context.Context, id uuid.UUID) (*model.Resource, error) {
+func (r *MockedReporterResourceRepository) FindByID(ctx context.Context, id uuid.UUID) (*model.Resource, error) {
 	args := r.Called(ctx, id)
 	return args.Get(0).(*model.Resource), args.Error(1)
 }
 
-func (r *MockedResourceRepository) FindByReporterResourceId(ctx context.Context, id model.ReporterResourceId) (*model.Resource, error) {
+func (r *MockedReporterResourceRepository) FindByReporterResourceId(ctx context.Context, id model.ReporterResourceId) (*model.Resource, error) {
 	args := r.Called(ctx, id)
 	return args.Get(0).(*model.Resource), args.Error(1)
 }
 
-func (r *MockedResourceRepository) FindByReporterData(ctx context.Context, reporterId string, resourceId string) (*model.Resource, error) {
+func (r *MockedReporterResourceRepository) FindByReporterData(ctx context.Context, reporterId string, resourceId string) (*model.Resource, error) {
 	args := r.Called(ctx, reporterId, resourceId)
 	return args.Get(0).(*model.Resource), args.Error(1)
 }
 
-func (r *MockedResourceRepository) ListAll(ctx context.Context) ([]*model.Resource, error) {
+func (r *MockedReporterResourceRepository) ListAll(ctx context.Context) ([]*model.Resource, error) {
 	args := r.Called(ctx)
 	return args.Get(0).([]*model.Resource), args.Error(1)
 }
@@ -97,7 +97,7 @@ func resource1() *model.Resource {
 
 func TestCreateReturnsDbError(t *testing.T) {
 	resource := resource1()
-	repo := &MockedResourceRepository{}
+	repo := &MockedReporterResourceRepository{}
 	inventoryRepo := &MockedInventoryResourceRepository{}
 
 	// DB Error
@@ -113,7 +113,7 @@ func TestCreateReturnsDbError(t *testing.T) {
 
 func TestCreateReturnsDbErrorBackwardsCompatible(t *testing.T) {
 	resource := resource1()
-	repo := &MockedResourceRepository{}
+	repo := &MockedReporterResourceRepository{}
 	inventoryRepo := &MockedInventoryResourceRepository{}
 
 	// Validates backwards compatibility, record was not found via new method
@@ -131,7 +131,7 @@ func TestCreateReturnsDbErrorBackwardsCompatible(t *testing.T) {
 
 func TestCreateResourceAlreadyExists(t *testing.T) {
 	resource := resource1()
-	repo := &MockedResourceRepository{}
+	repo := &MockedReporterResourceRepository{}
 	inventoryRepo := &MockedInventoryResourceRepository{}
 
 	// Resource already exists
@@ -147,7 +147,7 @@ func TestCreateResourceAlreadyExists(t *testing.T) {
 
 func TestCreateResourceAlreadyExistsBackwardsCompatible(t *testing.T) {
 	resource := resource1()
-	repo := &MockedResourceRepository{}
+	repo := &MockedReporterResourceRepository{}
 	inventoryRepo := &MockedInventoryResourceRepository{}
 
 	// Validates backwards compatibility
@@ -168,7 +168,7 @@ func TestCreateNewResource(t *testing.T) {
 	id, err := uuid.NewV7()
 	assert.Nil(t, err)
 
-	repo := &MockedResourceRepository{}
+	repo := &MockedReporterResourceRepository{}
 	inventoryRepo := &MockedInventoryResourceRepository{}
 	returnedResource := model.Resource{
 		ID: id,
@@ -195,7 +195,7 @@ func TestCreateNewResourceWithInventoryID(t *testing.T) {
 	assert.Nil(t, err)
 	resource.InventoryId = &inventoryId
 
-	repo := &MockedResourceRepository{}
+	repo := &MockedReporterResourceRepository{}
 	inventoryRepo := &MockedInventoryResourceRepository{}
 	returnedResource := model.Resource{
 		ID:          id,
@@ -236,7 +236,7 @@ func TestCreateNewResourceWithInventoryID(t *testing.T) {
 
 func TestUpdateReturnsDbError(t *testing.T) {
 	resource := resource1()
-	repo := &MockedResourceRepository{}
+	repo := &MockedReporterResourceRepository{}
 	inventoryRepo := &MockedInventoryResourceRepository{}
 
 	// DB Error
@@ -251,7 +251,7 @@ func TestUpdateReturnsDbError(t *testing.T) {
 }
 func TestUpdateReturnsDbErrorBackwardsCompatible(t *testing.T) {
 	resource := resource1()
-	repo := &MockedResourceRepository{}
+	repo := &MockedReporterResourceRepository{}
 	inventoryRepo := &MockedInventoryResourceRepository{}
 
 	// Validates backwards compatibility
@@ -272,7 +272,7 @@ func TestUpdateNewResourceCreatesIt(t *testing.T) {
 	id, err := uuid.NewV7()
 	assert.Nil(t, err)
 
-	repo := &MockedResourceRepository{}
+	repo := &MockedReporterResourceRepository{}
 	inventoryRepo := &MockedInventoryResourceRepository{}
 	returnedResource := model.Resource{
 		ID: id,
@@ -299,7 +299,7 @@ func TestUpdateExistingResource(t *testing.T) {
 
 	resource.ID = id
 
-	repo := &MockedResourceRepository{}
+	repo := &MockedReporterResourceRepository{}
 	inventoryRepo := &MockedInventoryResourceRepository{}
 	returnedResource := model.Resource{
 		ID: id,
@@ -325,7 +325,7 @@ func TestUpdateExistingResourceBackwardsCompatible(t *testing.T) {
 
 	resource.ID = id
 
-	repo := &MockedResourceRepository{}
+	repo := &MockedReporterResourceRepository{}
 	inventoryRepo := &MockedInventoryResourceRepository{}
 	returnedResource := model.Resource{
 		ID: id,
@@ -357,7 +357,7 @@ func TestUpdateResourceWithInventoryID(t *testing.T) {
 
 	resource.ID = id
 
-	repo := &MockedResourceRepository{}
+	repo := &MockedReporterResourceRepository{}
 	inventoryRepo := &MockedInventoryResourceRepository{}
 	returnedResource := model.Resource{
 		ID:          id,
@@ -397,7 +397,7 @@ func TestUpdateResourceWithInventoryID(t *testing.T) {
 }
 
 func TestDeleteReturnsDbError(t *testing.T) {
-	repo := &MockedResourceRepository{}
+	repo := &MockedReporterResourceRepository{}
 	inventoryRepo := &MockedInventoryResourceRepository{}
 
 	// Validates backwards compatibility
@@ -411,7 +411,7 @@ func TestDeleteReturnsDbError(t *testing.T) {
 	repo.AssertExpectations(t)
 }
 func TestDeleteReturnsDbErrorBackwardsCompatible(t *testing.T) {
-	repo := &MockedResourceRepository{}
+	repo := &MockedReporterResourceRepository{}
 	inventoryRepo := &MockedInventoryResourceRepository{}
 
 	// Validates backwards compatibility
@@ -428,7 +428,7 @@ func TestDeleteReturnsDbErrorBackwardsCompatible(t *testing.T) {
 }
 
 func TestDeleteNonexistentResource(t *testing.T) {
-	repo := &MockedResourceRepository{}
+	repo := &MockedReporterResourceRepository{}
 	inventoryRepo := &MockedInventoryResourceRepository{}
 
 	// Resource already exists
@@ -444,7 +444,7 @@ func TestDeleteNonexistentResource(t *testing.T) {
 }
 
 func TestDeleteResource(t *testing.T) {
-	repo := &MockedResourceRepository{}
+	repo := &MockedReporterResourceRepository{}
 	inventoryRepo := &MockedInventoryResourceRepository{}
 	ctx := context.TODO()
 	id, err := uuid.NewV7()
@@ -465,7 +465,7 @@ func TestDeleteResource(t *testing.T) {
 }
 
 func TestDeleteResourceBackwardsCompatible(t *testing.T) {
-	repo := &MockedResourceRepository{}
+	repo := &MockedReporterResourceRepository{}
 	inventoryRepo := &MockedInventoryResourceRepository{}
 	ctx := context.TODO()
 	id, err := uuid.NewV7()
@@ -490,7 +490,7 @@ func TestDeleteResourceBackwardsCompatible(t *testing.T) {
 func TestCreateResource_PersistenceDisabled(t *testing.T) {
 	ctx := context.TODO()
 	resource := resource1()
-	repo := &MockedResourceRepository{}
+	repo := &MockedReporterResourceRepository{}
 	inventoryRepo := &MockedInventoryResourceRepository{}
 
 	// Mock as if persistence is not disabled, for assurance
@@ -520,7 +520,7 @@ func TestCreateResource_PersistenceDisabled(t *testing.T) {
 func TestUpdateResource_PersistenceDisabled(t *testing.T) {
 	ctx := context.TODO()
 	resource := resource1()
-	repo := &MockedResourceRepository{}
+	repo := &MockedReporterResourceRepository{}
 	inventoryRepo := &MockedInventoryResourceRepository{}
 
 	// Mock as if persistence is not disabled, for assurance
@@ -549,7 +549,7 @@ func TestDeleteResource_PersistenceDisabled(t *testing.T) {
 	id, err := uuid.NewV7()
 	assert.Nil(t, err)
 
-	repo := &MockedResourceRepository{}
+	repo := &MockedReporterResourceRepository{}
 	inventoryRepo := &MockedInventoryResourceRepository{}
 
 	// Mock as if persistence is not disabled, for assurance

@@ -17,7 +17,7 @@ import (
 	"gorm.io/gorm"
 )
 
-type ResourceRepository interface {
+type ReporterResourceRepository interface {
 	Create(context.Context, *model.Resource) (*model.Resource, []*model.Resource, error)
 	Update(context.Context, *model.Resource, uuid.UUID) (*model.Resource, []*model.Resource, error)
 	Delete(context.Context, uuid.UUID) (*model.Resource, error)
@@ -40,7 +40,7 @@ var (
 )
 
 type Usecase struct {
-	repository                  ResourceRepository
+	reporterResourceRepository  ReporterResourceRepository
 	inventoryResourceRepository InventoryResourceRepository
 	Authz                       authzapi.Authorizer
 	Eventer                     eventingapi.Manager
@@ -50,9 +50,10 @@ type Usecase struct {
 	DisablePersistence          bool
 }
 
-func New(repository ResourceRepository, inventoryResourceRepository InventoryResourceRepository, authz authzapi.Authorizer, eventer eventingapi.Manager, namespace string, logger log.Logger, disablePersistence bool) *Usecase {
+func New(reporterResourceRepository ReporterResourceRepository, inventoryResourceRepository InventoryResourceRepository,
+	authz authzapi.Authorizer, eventer eventingapi.Manager, namespace string, logger log.Logger, disablePersistence bool) *Usecase {
 	return &Usecase{
-		repository:                  repository,
+		reporterResourceRepository:  reporterResourceRepository,
 		inventoryResourceRepository: inventoryResourceRepository,
 		Authz:                       authz,
 		Eventer:                     eventer,
@@ -68,10 +69,10 @@ func (uc *Usecase) Create(ctx context.Context, m *model.Resource) (*model.Resour
 
 	if !uc.DisablePersistence {
 		// check if the resource already exists
-		existingResource, err := uc.repository.FindByReporterData(ctx, m.ReporterId, m.ReporterResourceId)
+		existingResource, err := uc.reporterResourceRepository.FindByReporterData(ctx, m.ReporterId, m.ReporterResourceId)
 		if err != nil && errors.Is(err, gorm.ErrRecordNotFound) {
 			// Deprecated: fallback case for backwards compatibility
-			existingResource, err = uc.repository.FindByReporterResourceId(ctx, model.ReporterResourceIdFromResource(m))
+			existingResource, err = uc.reporterResourceRepository.FindByReporterResourceId(ctx, model.ReporterResourceIdFromResource(m))
 		}
 
 		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
@@ -96,7 +97,7 @@ func (uc *Usecase) Create(ctx context.Context, m *model.Resource) (*model.Resour
 			}
 		}
 
-		ret, updatedResources, err = uc.repository.Create(ctx, m)
+		ret, updatedResources, err = uc.reporterResourceRepository.Create(ctx, m)
 		if err != nil {
 			return nil, err
 		}
@@ -149,10 +150,10 @@ func (uc *Usecase) Update(ctx context.Context, m *model.Resource, id model.Repor
 
 	if !uc.DisablePersistence {
 		// check if the resource exists
-		existingResource, err := uc.repository.FindByReporterData(ctx, m.ReporterId, m.ReporterResourceId)
+		existingResource, err := uc.reporterResourceRepository.FindByReporterData(ctx, m.ReporterId, m.ReporterResourceId)
 		if err != nil && errors.Is(err, gorm.ErrRecordNotFound) {
 			// Deprecated: fallback case for backwards compatibility
-			existingResource, err = uc.repository.FindByReporterResourceId(ctx, model.ReporterResourceIdFromResource(m))
+			existingResource, err = uc.reporterResourceRepository.FindByReporterResourceId(ctx, model.ReporterResourceIdFromResource(m))
 		}
 
 		if err != nil {
@@ -177,7 +178,7 @@ func (uc *Usecase) Update(ctx context.Context, m *model.Resource, id model.Repor
 			}
 		}
 
-		ret, updatedResources, err = uc.repository.Update(ctx, m, existingResource.ID)
+		ret, updatedResources, err = uc.reporterResourceRepository.Update(ctx, m, existingResource.ID)
 		if err != nil {
 			return nil, err
 		}
@@ -220,11 +221,11 @@ func (uc *Usecase) Delete(ctx context.Context, id model.ReporterResourceId) erro
 
 	if !uc.DisablePersistence {
 		// check if the resource exists
-		existingResource, err := uc.repository.FindByReporterData(ctx, id.ReporterId, id.LocalResourceId)
+		existingResource, err := uc.reporterResourceRepository.FindByReporterData(ctx, id.ReporterId, id.LocalResourceId)
 
 		if err != nil && errors.Is(err, gorm.ErrRecordNotFound) {
 			// Deprecated: fallback case for backwards compatibility
-			existingResource, err = uc.repository.FindByReporterResourceId(ctx, id)
+			existingResource, err = uc.reporterResourceRepository.FindByReporterResourceId(ctx, id)
 		}
 
 		if err != nil {
@@ -235,7 +236,7 @@ func (uc *Usecase) Delete(ctx context.Context, id model.ReporterResourceId) erro
 			return ErrDatabaseError
 		}
 
-		m, err = uc.repository.Delete(ctx, existingResource.ID)
+		m, err = uc.reporterResourceRepository.Delete(ctx, existingResource.ID)
 		if err != nil {
 			return err
 		}

@@ -48,4 +48,6 @@ inventory-e2e-tests.tar
 multicluster-global-hub/
 scripts/kubeconfig-global-hub
 
+resources.tar.gz
+
 

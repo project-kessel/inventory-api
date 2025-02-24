@@ -8,10 +8,12 @@ import (
 	"github.com/go-kratos/kratos/v2/transport"
 	"github.com/go-kratos/kratos/v2/transport/http"
 	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/resources"
+	pbv2 "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2/resources"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/structpb"
 	"io"
+	"strings"
 )
 
 type K8SClusterPayload struct {
@@ -142,76 +144,91 @@ func TransformMiddleware() middleware.Middleware {
 			if tr, ok := transport.FromServerContext(ctx); ok {
 				if ht, ok := tr.(*http.Transport); ok {
 					requestURI := ht.Request().RequestURI
-					method := ht.Request().Method
-					body, err := io.ReadAll(ht.Request().Body)
-					if err != nil {
-						return nil, err
+					if strings.Contains(requestURI, "v1beta2") {
+						method := ht.Request().Method
+						body, err := io.ReadAll(ht.Request().Body)
+						if err != nil {
+							return nil, err
+						}
+
+						var data map[string]interface{}
+						err = json.Unmarshal([]byte(body), &data)
+						if err != nil {
+							return nil, err
+						}
+						var topLevelKey string
+						for key := range data {
+							topLevelKey = key
+							break // Since there's only one top-level key, we can break after the first iteration
+						}
+						var resource interface{}
+						//For the payload Backwards compatibility
+						switch topLevelKey {
+						case "k8s_cluster":
+							var k8spayload K8SClusterPayload
+							if err := json.Unmarshal(body, &k8spayload); err != nil {
+								return nil, err
+							}
+							if method == "POST" {
+								resource = createK8SClusterResource(k8spayload)
+							} else if method == "PUT" {
+								resource = updateK8SClusterResource(k8spayload)
+							} else {
+								resource = deleteK8SClusterResource(k8spayload)
+							}
+
+						case "k8s_policy":
+							var k8spolicyPayload K8SPolicyPayload
+							if err := json.Unmarshal(body, &k8spolicyPayload); err != nil {
+								return nil, err
+							}
+							if method == "POST" {
+								resource = createK8SPolicyResource(k8spolicyPayload)
+							} else if method == "PUT" {
+								resource = updateK8SPolicyResource(k8spolicyPayload)
+							} else {
+								resource = deleteK8SPolicyResource(k8spolicyPayload)
+							}
+
+						case "rhel_host":
+							var rhelHostpayload RhelHostPayload
+							if err := json.Unmarshal(body, &rhelHostpayload); err != nil {
+								return nil, err
+							}
+							if method == "POST" {
+								resource = createRhelHostResource(rhelHostpayload)
+							} else if method == "PUT" {
+								resource = updateRhelHostResource(rhelHostpayload)
+							} else {
+								resource = deleteRhelHostResource(rhelHostpayload)
+							}
+
+						case "integrations":
+							var integrationPayload IntegrationPayload
+							if err := json.Unmarshal(body, &integrationPayload); err != nil {
+								return nil, err
+							}
+
+							if method == "POST" {
+								resource = createNotificationIntegrationResource(integrationPayload)
+							} else if method == "PUT" {
+								resource = updateNotificationIntegrationResource(integrationPayload)
+							} else {
+								resource = deleteNotificationIntegrationResource(integrationPayload)
+							}
+
+						case "k8s-policy_is-propagated-to_k8s-cluster":
+							return handler(ctx, body)
+
+						default:
+							return handler(ctx, req)
+						}
+
+						if resource != nil {
+							return handler(ctx, resource)
+						}
 					}
-					var resource interface{}
-					switch requestURI {
-					case "/api/inventory/v1beta1/resources/k8s-clusters":
-						var k8spayload K8SClusterPayload
-						if err := json.Unmarshal(body, &k8spayload); err != nil {
-							return nil, err
-						}
-						if method == "POST" {
-							resource = createK8SClusterResource(k8spayload)
-						} else if method == "PUT" {
-							resource = updateK8SClusterResource(k8spayload)
-						} else {
-							resource = deleteK8SClusterResource(k8spayload)
-						}
-
-					case "/api/inventory/v1beta1/resources/k8s-policies":
-						var k8spolicyPayload K8SPolicyPayload
-						if err := json.Unmarshal(body, &k8spolicyPayload); err != nil {
-							return nil, err
-						}
-						if method == "POST" {
-							resource = createK8SPolicyResource(k8spolicyPayload)
-						} else if method == "PUT" {
-							resource = updateK8SPolicyResource(k8spolicyPayload)
-						} else {
-							resource = deleteK8SPolicyResource(k8spolicyPayload)
-						}
-
-					case "/api/inventory/v1beta1/resources/rhel-hosts":
-						var rhelHostpayload RhelHostPayload
-						if err := json.Unmarshal(body, &rhelHostpayload); err != nil {
-							return nil, err
-						}
-						if method == "POST" {
-							resource = createRhelHostResource(rhelHostpayload)
-						} else if method == "PUT" {
-							resource = updateRhelHostResource(rhelHostpayload)
-						} else {
-							resource = deleteRhelHostResource(rhelHostpayload)
-						}
-
-					case "/api/inventory/v1beta1/resources/notifications-integrations":
-						var integrationPayload IntegrationPayload
-						if err := json.Unmarshal(body, &integrationPayload); err != nil {
-							return nil, err
-						}
-
-						if method == "POST" {
-							resource = createNotificationIntegrationResource(integrationPayload)
-						} else if method == "PUT" {
-							resource = updateNotificationIntegrationResource(integrationPayload)
-						} else {
-							resource = deleteNotificationIntegrationResource(integrationPayload)
-						}
-
-					case "/api/inventory/v1beta1/resource-relationships/k8s-policy_is-propagated-to_k8s-cluster":
-						return handler(ctx, body)
-
-					default:
-						return nil, fmt.Errorf("invalid endpoint: %s", requestURI)
-					}
-
-					if resource != nil {
-						return handler(ctx, resource)
-					}
+					return handler(ctx, req)
 				}
 			}
 			return handler(ctx, req)
@@ -222,9 +239,9 @@ func TransformMiddleware() middleware.Middleware {
 func createRhelHostResource(hostpayload RhelHostPayload) interface{} {
 	reporterData, _ := createReporterData(hostpayload.RhelHost.ReporterData)
 
-	return &pb.CreateResourceRequest{
-		Resource: &pb.Resource{
-			Metadata: &pb.Metadata{
+	return &pbv2.CreateResourceRequest{
+		Resource: &pbv2.Resource{
+			Metadata: &pbv2.Metadata{
 				ResourceType: hostpayload.RhelHost.Metadata.ResourceType,
 				WorkspaceId:  hostpayload.RhelHost.Metadata.WorkspaceID,
 			},
@@ -236,9 +253,9 @@ func createRhelHostResource(hostpayload RhelHostPayload) interface{} {
 func updateRhelHostResource(hostpayload RhelHostPayload) interface{} {
 	reporterData, _ := createReporterData(hostpayload.RhelHost.ReporterData)
 
-	return &pb.UpdateResourceRequest{
-		Resource: &pb.Resource{
-			Metadata: &pb.Metadata{
+	return &pbv2.UpdateResourceRequest{
+		Resource: &pbv2.Resource{
+			Metadata: &pbv2.Metadata{
 				ResourceType: hostpayload.RhelHost.Metadata.ResourceType,
 				WorkspaceId:  hostpayload.RhelHost.Metadata.WorkspaceID,
 			},
@@ -250,9 +267,9 @@ func updateRhelHostResource(hostpayload RhelHostPayload) interface{} {
 func deleteRhelHostResource(hostpayload RhelHostPayload) interface{} {
 	reporterData, _ := createReporterData(hostpayload.RhelHost.ReporterData)
 
-	return &pb.DeleteResourceRequest{
-		Resource: &pb.Resource{
-			Metadata: &pb.Metadata{
+	return &pbv2.DeleteResourceRequest{
+		Resource: &pbv2.Resource{
+			Metadata: &pbv2.Metadata{
 				ResourceType: hostpayload.RhelHost.Metadata.ResourceType,
 				WorkspaceId:  hostpayload.RhelHost.Metadata.WorkspaceID,
 			},
@@ -277,7 +294,7 @@ func createReporterData(reporter struct {
 	})
 }
 
-func createK8SClusterResource(payload K8SClusterPayload) *pb.CreateResourceRequest {
+func createK8SClusterResource(payload K8SClusterPayload) *pbv2.CreateResourceRequest {
 	reporterData, _ := createReporterData(payload.K8SCluster.ReporterData)
 
 	resourceData, _ := structpb.NewStruct(map[string]interface{}{
@@ -290,9 +307,9 @@ func createK8SClusterResource(payload K8SClusterPayload) *pb.CreateResourceReque
 		"cloud_platform":      payload.K8SCluster.ResourceData.CloudPlatform,
 	})
 
-	return &pb.CreateResourceRequest{
-		Resource: &pb.Resource{
-			Metadata: &pb.Metadata{
+	return &pbv2.CreateResourceRequest{
+		Resource: &pbv2.Resource{
+			Metadata: &pbv2.Metadata{
 				ResourceType: payload.K8SCluster.Metadata.ResourceType,
 				WorkspaceId:  payload.K8SCluster.Metadata.WorkspaceID,
 			},
@@ -302,7 +319,7 @@ func createK8SClusterResource(payload K8SClusterPayload) *pb.CreateResourceReque
 	}
 }
 
-func updateK8SClusterResource(payload K8SClusterPayload) *pb.UpdateResourceRequest {
+func updateK8SClusterResource(payload K8SClusterPayload) *pbv2.UpdateResourceRequest {
 	reporterData, _ := createReporterData(payload.K8SCluster.ReporterData)
 
 	resourceData, _ := structpb.NewStruct(map[string]interface{}{
@@ -315,9 +332,9 @@ func updateK8SClusterResource(payload K8SClusterPayload) *pb.UpdateResourceReque
 		"cloud_platform":      payload.K8SCluster.ResourceData.CloudPlatform,
 	})
 
-	return &pb.UpdateResourceRequest{
-		Resource: &pb.Resource{
-			Metadata: &pb.Metadata{
+	return &pbv2.UpdateResourceRequest{
+		Resource: &pbv2.Resource{
+			Metadata: &pbv2.Metadata{
 				ResourceType: payload.K8SCluster.Metadata.ResourceType,
 				WorkspaceId:  payload.K8SCluster.Metadata.WorkspaceID,
 			},
@@ -327,12 +344,12 @@ func updateK8SClusterResource(payload K8SClusterPayload) *pb.UpdateResourceReque
 	}
 }
 
-func deleteK8SClusterResource(payload K8SClusterPayload) *pb.DeleteResourceRequest {
+func deleteK8SClusterResource(payload K8SClusterPayload) *pbv2.DeleteResourceRequest {
 	reporterData, _ := createReporterData(payload.K8SCluster.ReporterData)
 
-	return &pb.DeleteResourceRequest{
-		Resource: &pb.Resource{
-			Metadata: &pb.Metadata{
+	return &pbv2.DeleteResourceRequest{
+		Resource: &pbv2.Resource{
+			Metadata: &pbv2.Metadata{
 				ResourceType: payload.K8SCluster.Metadata.ResourceType,
 				WorkspaceId:  payload.K8SCluster.Metadata.WorkspaceID,
 			},
@@ -341,7 +358,7 @@ func deleteK8SClusterResource(payload K8SClusterPayload) *pb.DeleteResourceReque
 	}
 }
 
-func createK8SPolicyResource(payload K8SPolicyPayload) *pb.CreateResourceRequest {
+func createK8SPolicyResource(payload K8SPolicyPayload) *pbv2.CreateResourceRequest {
 	reporterData, _ := createReporterData(payload.K8SPolicy.ReporterData)
 
 	resourceData, _ := structpb.NewStruct(map[string]interface{}{
@@ -349,9 +366,9 @@ func createK8SPolicyResource(payload K8SPolicyPayload) *pb.CreateResourceRequest
 		"disabled": payload.K8SPolicy.ResourceData.Disabled,
 	})
 
-	return &pb.CreateResourceRequest{
-		Resource: &pb.Resource{
-			Metadata: &pb.Metadata{
+	return &pbv2.CreateResourceRequest{
+		Resource: &pbv2.Resource{
+			Metadata: &pbv2.Metadata{
 				ResourceType: payload.K8SPolicy.Metadata.ResourceType,
 				WorkspaceId:  payload.K8SPolicy.Metadata.WorkspaceID,
 			},
@@ -361,7 +378,7 @@ func createK8SPolicyResource(payload K8SPolicyPayload) *pb.CreateResourceRequest
 	}
 }
 
-func updateK8SPolicyResource(payload K8SPolicyPayload) *pb.UpdateResourceRequest {
+func updateK8SPolicyResource(payload K8SPolicyPayload) *pbv2.UpdateResourceRequest {
 	reporterData, _ := createReporterData(payload.K8SPolicy.ReporterData)
 
 	resourceData, _ := structpb.NewStruct(map[string]interface{}{
@@ -369,9 +386,9 @@ func updateK8SPolicyResource(payload K8SPolicyPayload) *pb.UpdateResourceRequest
 		"disabled": payload.K8SPolicy.ResourceData.Disabled,
 	})
 
-	return &pb.UpdateResourceRequest{
-		Resource: &pb.Resource{
-			Metadata: &pb.Metadata{
+	return &pbv2.UpdateResourceRequest{
+		Resource: &pbv2.Resource{
+			Metadata: &pbv2.Metadata{
 				ResourceType: payload.K8SPolicy.Metadata.ResourceType,
 				WorkspaceId:  payload.K8SPolicy.Metadata.WorkspaceID,
 			},
@@ -381,12 +398,12 @@ func updateK8SPolicyResource(payload K8SPolicyPayload) *pb.UpdateResourceRequest
 	}
 }
 
-func deleteK8SPolicyResource(payload K8SPolicyPayload) *pb.DeleteResourceRequest {
+func deleteK8SPolicyResource(payload K8SPolicyPayload) *pbv2.DeleteResourceRequest {
 	reporterData, _ := createReporterData(payload.K8SPolicy.ReporterData)
 
-	return &pb.DeleteResourceRequest{
-		Resource: &pb.Resource{
-			Metadata: &pb.Metadata{
+	return &pbv2.DeleteResourceRequest{
+		Resource: &pbv2.Resource{
+			Metadata: &pbv2.Metadata{
 				ResourceType: payload.K8SPolicy.Metadata.ResourceType,
 				WorkspaceId:  payload.K8SPolicy.Metadata.WorkspaceID,
 			},
@@ -395,12 +412,12 @@ func deleteK8SPolicyResource(payload K8SPolicyPayload) *pb.DeleteResourceRequest
 	}
 }
 
-func createNotificationIntegrationResource(payload IntegrationPayload) *pb.CreateResourceRequest {
+func createNotificationIntegrationResource(payload IntegrationPayload) *pbv2.CreateResourceRequest {
 	reporterData, _ := createReporterData(payload.NotificationsIntegration.ReporterData)
 
-	return &pb.CreateResourceRequest{
-		Resource: &pb.Resource{
-			Metadata: &pb.Metadata{
+	return &pbv2.CreateResourceRequest{
+		Resource: &pbv2.Resource{
+			Metadata: &pbv2.Metadata{
 				ResourceType: payload.NotificationsIntegration.Metadata.ResourceType,
 				WorkspaceId:  payload.NotificationsIntegration.Metadata.WorkspaceID,
 			},
@@ -409,12 +426,12 @@ func createNotificationIntegrationResource(payload IntegrationPayload) *pb.Creat
 	}
 }
 
-func updateNotificationIntegrationResource(payload IntegrationPayload) *pb.UpdateResourceRequest {
+func updateNotificationIntegrationResource(payload IntegrationPayload) *pbv2.UpdateResourceRequest {
 	reporterData, _ := createReporterData(payload.NotificationsIntegration.ReporterData)
 
-	return &pb.UpdateResourceRequest{
-		Resource: &pb.Resource{
-			Metadata: &pb.Metadata{
+	return &pbv2.UpdateResourceRequest{
+		Resource: &pbv2.Resource{
+			Metadata: &pbv2.Metadata{
 				ResourceType: payload.NotificationsIntegration.Metadata.ResourceType,
 				WorkspaceId:  payload.NotificationsIntegration.Metadata.WorkspaceID,
 			},
@@ -423,12 +440,12 @@ func updateNotificationIntegrationResource(payload IntegrationPayload) *pb.Updat
 	}
 }
 
-func deleteNotificationIntegrationResource(payload IntegrationPayload) *pb.DeleteResourceRequest {
+func deleteNotificationIntegrationResource(payload IntegrationPayload) *pbv2.DeleteResourceRequest {
 	reporterData, _ := createReporterData(payload.NotificationsIntegration.ReporterData)
 
-	return &pb.DeleteResourceRequest{
-		Resource: &pb.Resource{
-			Metadata: &pb.Metadata{
+	return &pbv2.DeleteResourceRequest{
+		Resource: &pbv2.Resource{
+			Metadata: &pbv2.Metadata{
 				ResourceType: payload.NotificationsIntegration.Metadata.ResourceType,
 				WorkspaceId:  payload.NotificationsIntegration.Metadata.WorkspaceID,
 			},

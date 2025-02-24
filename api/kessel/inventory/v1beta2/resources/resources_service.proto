@@ -30,21 +30,21 @@ message DeleteResourceResponse {}
 service KesselResourceService {
   rpc CreateResource(CreateResourceRequest) returns (CreateResourceResponse) {
     option (google.api.http) = {
-      post: "/api/inventory/v1beta2/resources/{resource.metadata.resource_type}"
+      post: "/api/inventory/v1beta2/resources"
       body: "*"
     };
   }
 
   rpc UpdateResource(UpdateResourceRequest) returns (UpdateResourceResponse) {
     option (google.api.http) = {
-      put: "/api/inventory/v1beta2/resources/{resource.metadata.resource_type}"
+      put: "/api/inventory/v1beta2/resources"
       body: "*"
     };
   }
 
   rpc DeleteResource(DeleteResourceRequest) returns (DeleteResourceResponse) {
     option (google.api.http) = {
-      delete: "/api/inventory/v1beta2/resources/{resource.metadata.resource_type}"
+      delete: "/api/inventory/v1beta2/resources"
     };
   }
 }

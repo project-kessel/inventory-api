@@ -16,6 +16,9 @@
   },
   "required": [
     "reporter_type",
-    "local_resource_id"
+    "local_resource_id",
+    "api_href",
+    "reporter_version",
+    "console_href"
   ]
 }

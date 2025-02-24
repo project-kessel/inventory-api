@@ -3,6 +3,7 @@ package middleware
 import (
 	"context"
 	"fmt"
+	"strings"
 )
 
 type contextKey struct {
@@ -24,4 +25,8 @@ func GetFromContext[V any, I any](i I) func(context.Context) (*V, error) {
 		return req, nil
 
 	})
+}
+
+func NormalizeResourceType(resourceType string) string {
+	return strings.ReplaceAll(resourceType, "/", "_")
 }

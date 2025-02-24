@@ -6,6 +6,7 @@ import (
 	"github.com/google/uuid"
 	pbrelation "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/relationships"
 	pbresource "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/resources"
+	pbresourcev2 "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2/resources"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
 	"strings"
 )
@@ -40,6 +41,27 @@ func ResourceFromPb(resourceType, reporterId string, resourceData model.JsonObje
 	}
 }
 
+func ResourceFromPbv2(resourceType, reporterId string, resourceData model.JsonObject, metadata *pbresourcev2.Metadata, reporter *pbresource.ReporterData) *model.Resource {
+	return &model.Resource{
+		ID:           uuid.UUID{},
+		ResourceData: resourceData,
+		ResourceType: resourceType,
+		WorkspaceId:  metadata.WorkspaceId,
+		OrgId:        metadata.OrgId,
+		Reporter: model.ResourceReporter{
+			Reporter: model.Reporter{
+				ReporterId:      reporterId,
+				ReporterType:    reporter.ReporterType.String(),
+				ReporterVersion: reporter.ReporterVersion,
+			},
+			LocalResourceId: reporter.LocalResourceId,
+		},
+		ConsoleHref: reporter.ConsoleHref,
+		ApiHref:     reporter.ApiHref,
+		Labels:      labelsFromPbv2(metadata.Labels),
+	}
+}
+
 func ReporterResourceIdFromJSON(resourceType, reporterId string, reporter model.JsonObject) model.ReporterResourceId {
 	return model.ReporterResourceId{
 		LocalResourceId: reporter["local_resource_id"].(string),
@@ -49,7 +71,7 @@ func ReporterResourceIdFromJSON(resourceType, reporterId string, reporter model.
 	}
 }
 
-func ResourceFromJSON(resourceType, reporterId string, resourceData model.JsonObject, metadata *pbresource.Metadata, reporter model.JsonObject) *model.Resource {
+func ResourceFromJSON(resourceType, reporterId string, resourceData model.JsonObject, metadata *pbresourcev2.Metadata, reporter model.JsonObject) *model.Resource {
 	return &model.Resource{
 		ID:           uuid.UUID{},
 		ResourceData: resourceData,
@@ -66,7 +88,7 @@ func ResourceFromJSON(resourceType, reporterId string, resourceData model.JsonOb
 		},
 		ConsoleHref: reporter["console_href"].(string),
 		ApiHref:     reporter["api_href"].(string),
-		Labels:      labelsFromPb(metadata.Labels),
+		Labels:      labelsFromPbv2(metadata.Labels),
 	}
 }
 
@@ -90,6 +112,17 @@ func ToJsonObject(in interface{}) (model.JsonObject, error) {
 }
 
 func labelsFromPb(pbLabels []*pbresource.ResourceLabel) model.Labels {
+	labels := model.Labels{}
+	for _, pbLabel := range pbLabels {
+		labels = append(labels, model.Label{
+			Key:   pbLabel.Key,
+			Value: pbLabel.Value,
+		})
+	}
+	return labels
+}
+
+func labelsFromPbv2(pbLabels []*pbresourcev2.ResourceLabel) model.Labels {
 	labels := model.Labels{}
 	for _, pbLabel := range pbLabels {
 		labels = append(labels, model.Label{

@@ -23,18 +23,29 @@ func ValidateCombination(resourceType, reporterType string) error {
 }
 
 // LoadResourceSchema finds the resources schema based on the directory structure of data/resources
-func LoadResourceSchema(resourceType string) (string, error) {
-	schemaPath := filepath.Join("data/resources", resourceType, resourceType+".json")
+func LoadResourceSchema(resourceType string, dir string) (string, bool, error) {
+	schemaPath := filepath.Join(dir, resourceType, resourceType+".json")
+	// Check if file exists
+	if _, err := os.Stat(schemaPath); err != nil {
+		if os.IsNotExist(err) {
+			return "", false, nil
+		}
+		return "", false, fmt.Errorf("failed to check schema file for '%s': %w", resourceType, err)
+	}
+
+	// Read file
 	data, err := os.ReadFile(schemaPath)
 	if err != nil {
-		return "", fmt.Errorf("failed to read schema file for '%s': %w", resourceType, err)
+		return "", false, fmt.Errorf("failed to read schema file for '%s': %w", resourceType, err)
 	}
-	return string(data), nil
+
+	return string(data), true, nil
 }
 
 // LoadReporterSchema finds the reporters schemas based on the directory structure of data/resources
-func LoadReporterSchema(resourceType string, reporterType string) (string, error) {
-	schemaPath := filepath.Join("data/resources", resourceType, "reporters", reporterType, reporterType+".json")
+func LoadReporterSchema(resourceType string, reporterType string, dir string) (string, error) {
+	schemaPath := filepath.Join(dir, resourceType, "reporters", reporterType, reporterType+".json")
+
 	data, err := os.ReadFile(schemaPath)
 	if err != nil {
 		return "", fmt.Errorf("failed to read schema file for '%s' and reporter '%s': %w", resourceType, reporterType, err)
@@ -44,16 +55,22 @@ func LoadReporterSchema(resourceType string, reporterType string) (string, error
 
 // LoadValidReporters Takes the resource_type from the provided config.yaml and compares it to the defined reporter_types
 func LoadValidReporters(resourceType string) ([]string, error) {
-	configPath := filepath.Join("data/resources", resourceType, "config.yaml")
-	data, err := os.ReadFile(configPath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read config file for '%s': %w", resourceType, err)
-	}
-
 	var config struct {
 		ResourceReporters []string `yaml:"resource_reporters"`
 	}
-	if err := yaml.Unmarshal(data, &config); err != nil {
+
+	cacheKey := fmt.Sprintf("config:%s", resourceType)
+	cachedConfig, ok := schemaCache.Load(cacheKey)
+	if !ok {
+		return nil, fmt.Errorf("config not found for resource type '%s'", resourceType)
+	}
+
+	configData, ok := cachedConfig.([]byte)
+	if !ok {
+		return nil, fmt.Errorf("invalid config data type for resource type '%s' (expected string)", resourceType)
+	}
+
+	if err := yaml.Unmarshal(configData, &config); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal config for '%s': %w", resourceType, err)
 	}
 

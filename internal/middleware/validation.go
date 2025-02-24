@@ -32,7 +32,10 @@ func Validation(validator protovalidate.Validator) middleware.Middleware {
 		}
 		resourceDir = absPath
 	}
-	LoadResources(resourceDir)
+
+	if err := PreloadAllSchemas(resourceDir); err != nil {
+		log.Fatalf("Failed to preload schemas: %v", err)
+	}
 
 	return func(handler middleware.Handler) middleware.Handler {
 		return func(ctx context.Context, req interface{}) (interface{}, error) {
@@ -90,6 +93,9 @@ func validateResourceJSON(msg proto.Message) error {
 		return fmt.Errorf("missing or invalid resource_type for resource '%s'", metadataResourceType)
 	}
 
+	// Normalize the resource_type for cases with /
+	normalizedResourceType := NormalizeResourceType(metadataResourceType)
+
 	resourceDataField, resourceDataExists := resource["resource_data"].(map[string]interface{})
 	if !resourceDataExists {
 		AbstractResources[metadataResourceType] = struct{}{}
@@ -97,12 +103,12 @@ func validateResourceJSON(msg proto.Message) error {
 		return fmt.Errorf("resource_type '%s' is abstract and cannot have resource_data", metadataResourceType)
 	} else {
 		// Validate resource_data if not abstract
-		resourceSchema, err := LoadResourceSchema(metadataResourceType)
+		resourceSchema, err := getSchemaFromCache(fmt.Sprintf("%s:%s", "resource", strings.ToLower(normalizedResourceType)))
 		if err != nil {
-			return fmt.Errorf("failed to load schema for '%s': %w", metadataResourceType, err)
+			return fmt.Errorf("failed to load reporter schema '%s': %w", normalizedResourceType, err)
 		}
 		if err := validateJSONAgainstSchema(resourceSchema, resourceDataField); err != nil {
-			return fmt.Errorf("resource validation failed for '%s': %w", metadataResourceType, err)
+			return fmt.Errorf("resource validation failed for '%s': %w", normalizedResourceType, err)
 		}
 	}
 
@@ -117,11 +123,11 @@ func validateResourceJSON(msg proto.Message) error {
 	}
 
 	// Check for valid resource -> reporter combinations
-	if err := ValidateCombination(metadataResourceType, reporterType); err != nil {
+	if err := ValidateCombination(normalizedResourceType, reporterType); err != nil {
 		return fmt.Errorf("resource-reporter compatibility validation failed for resource '%s': %w", resourceType, err)
 	}
 
-	reporterSchema, err := LoadReporterSchema(metadataResourceType, strings.ToLower(reporterType))
+	reporterSchema, err := getSchemaFromCache(fmt.Sprintf("%s:%s", normalizedResourceType, strings.ToLower(reporterType)))
 	if err != nil {
 		return fmt.Errorf("failed to load reporter schema for '%s': %w", reporterType, err)
 	}

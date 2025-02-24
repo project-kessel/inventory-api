@@ -516,17 +516,11 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/google.rpc.Status'
-    /api/inventory/v1beta2/resources/{resource.metadata.resource_type}:
+    /api/inventory/v1beta2/resources:
         put:
             tags:
                 - KesselResourceService
             operationId: KesselResourceService_UpdateResource
-            parameters:
-                - name: resource.metadata.resource_type
-                  in: path
-                  required: true
-                  schema:
-                    type: string
             requestBody:
                 content:
                     application/json:
@@ -550,12 +544,6 @@ paths:
             tags:
                 - KesselResourceService
             operationId: KesselResourceService_CreateResource
-            parameters:
-                - name: resource.metadata.resource_type
-                  in: path
-                  required: true
-                  schema:
-                    type: string
             requestBody:
                 content:
                     application/json:
@@ -580,11 +568,6 @@ paths:
                 - KesselResourceService
             operationId: KesselResourceService_DeleteResource
             parameters:
-                - name: resource.metadata.resource_type
-                  in: path
-                  required: true
-                  schema:
-                    type: string
                 - name: resource.metadata.id
                   in: query
                   description: Kessel Asset Inventory generated identifier.

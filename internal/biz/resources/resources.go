@@ -3,7 +3,6 @@ package resources
 import (
 	"context"
 	"errors"
-	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -32,11 +31,9 @@ type InventoryResourceRepository interface {
 }
 
 var (
-	ErrResourceNotFound             = errors.New("resource not found")
-	ErrDatabaseError                = errors.New("db error while querying for resource")
-	ErrResourceAlreadyExists        = errors.New("resource already exists")
-	ErrInvalidInventoryResourceID   = errors.New("inventory ID does not exist")
-	ErrInvalidInventoryResourceType = errors.New("invalid resource type")
+	ErrResourceNotFound      = errors.New("resource not found")
+	ErrDatabaseError         = errors.New("db error while querying for resource")
+	ErrResourceAlreadyExists = errors.New("resource already exists")
 )
 
 type Usecase struct {
@@ -81,20 +78,6 @@ func (uc *Usecase) Create(ctx context.Context, m *model.Resource) (*model.Resour
 
 		if existingResource != nil {
 			return nil, ErrResourceAlreadyExists
-		}
-
-		// Inventory Resource Validations
-		if m.InventoryId != nil {
-			// Validate the inventory resource exists
-			inventoryResource, err := uc.inventoryResourceRepository.FindByID(ctx, *m.InventoryId)
-			if err != nil {
-				return nil, ErrInvalidInventoryResourceID
-			}
-			// Validate the inventory resource type matches the resource type
-			if inventoryResource.ResourceType != m.ResourceType {
-				return nil, fmt.Errorf("%w: expected %s, given %s", ErrInvalidInventoryResourceType,
-					inventoryResource.ResourceType, m.ResourceType)
-			}
 		}
 
 		ret, updatedResources, err = uc.reporterResourceRepository.Create(ctx, m)
@@ -162,20 +145,6 @@ func (uc *Usecase) Update(ctx context.Context, m *model.Resource, id model.Repor
 			}
 
 			return nil, ErrDatabaseError
-		}
-
-		// Inventory Resource Validations
-		if m.InventoryId != nil {
-			// Validate the inventory resource exists
-			inventoryResource, err := uc.inventoryResourceRepository.FindByID(ctx, *m.InventoryId)
-			if err != nil {
-				return nil, ErrInvalidInventoryResourceID
-			}
-			// Validate the inventory resource type matches the resource type
-			if inventoryResource.ResourceType != m.ResourceType {
-				return nil, fmt.Errorf("%w: expected %s, given %s", ErrInvalidInventoryResourceType,
-					inventoryResource.ResourceType, m.ResourceType)
-			}
 		}
 
 		ret, updatedResources, err = uc.reporterResourceRepository.Update(ctx, m, existingResource.ID)

@@ -21,12 +21,6 @@ func ReporterResourceIdFromPb(resourceType, reporterId string, reporter *pbresou
 }
 
 func ResourceFromPb(resourceType, reporterId string, resourceData model.JsonObject, metadata *pbresource.Metadata, reporter *pbresource.ReporterData) *model.Resource {
-	var inventoryId *uuid.UUID
-	if metadata.InventoryId != "" {
-		parsedId := uuid.MustParse(metadata.InventoryId)
-		inventoryId = &parsedId
-	}
-
 	return &model.Resource{
 		ID:                 uuid.UUID{},
 		ResourceData:       resourceData,
@@ -35,7 +29,6 @@ func ResourceFromPb(resourceType, reporterId string, resourceData model.JsonObje
 		OrgId:              metadata.OrgId,
 		ReporterResourceId: reporter.LocalResourceId,
 		ReporterId:         reporter.ReporterType.String(),
-		InventoryId:        inventoryId,
 		Reporter: model.ResourceReporter{
 			Reporter: model.Reporter{
 				ReporterId:      reporterId,

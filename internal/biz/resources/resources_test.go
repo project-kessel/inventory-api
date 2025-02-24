@@ -187,53 +187,6 @@ func TestCreateNewResource(t *testing.T) {
 	repo.AssertExpectations(t)
 }
 
-func TestCreateNewResourceWithInventoryID(t *testing.T) {
-	resource := resource1()
-	id, err := uuid.NewV7()
-	assert.Nil(t, err)
-	inventoryId, err := uuid.NewV7()
-	assert.Nil(t, err)
-	resource.InventoryId = &inventoryId
-
-	repo := &MockedReporterResourceRepository{}
-	inventoryRepo := &MockedInventoryResourceRepository{}
-	returnedResource := model.Resource{
-		ID:          id,
-		InventoryId: &inventoryId,
-	}
-
-	repo.On("FindByReporterData", mock.Anything, mock.Anything, mock.Anything).Return((*model.Resource)(nil), gorm.ErrRecordNotFound)
-	repo.On("FindByReporterResourceId", mock.Anything, mock.Anything).Return((*model.Resource)(nil), gorm.ErrRecordNotFound)
-	inventoryRepo.On("FindByID", mock.Anything, mock.Anything).Return((*model.InventoryResource)(nil), gorm.ErrRecordNotFound).Once()
-
-	useCase := New(repo, inventoryRepo, nil, nil, "", log.DefaultLogger, false)
-	ctx := context.TODO()
-
-	// Non-existent inventory ID
-	r, err := useCase.Create(ctx, resource)
-	assert.Nil(t, r)
-	assert.ErrorIs(t, err, ErrInvalidInventoryResourceID)
-	repo.AssertNotCalled(t, "Create")
-
-	// Resource type mismatch
-	resource.ResourceType = "some-other-resource-type"
-	inventoryRepo.On("FindByID", mock.Anything, mock.Anything).Return(&model.InventoryResource{ID: inventoryId, ResourceType: "some-resource-type"}, nil).Once()
-	r, err = useCase.Create(ctx, resource)
-	assert.Nil(t, r)
-	assert.ErrorIs(t, err, ErrInvalidInventoryResourceType)
-	repo.AssertNotCalled(t, "Create")
-
-	// Valid
-	updatedResources := []*model.Resource{}
-	updatedResources = append(updatedResources, &returnedResource)
-	repo.On("Create", mock.Anything, mock.Anything).Return(&returnedResource, updatedResources, nil)
-	inventoryRepo.On("FindByID", mock.Anything, mock.Anything).Return(&model.InventoryResource{ID: inventoryId, ResourceType: resource.ResourceType}, nil)
-	r, err = useCase.Create(ctx, resource)
-	assert.NotNil(t, r)
-	assert.Nil(t, err)
-	repo.AssertCalled(t, "Create", mock.Anything, mock.Anything)
-}
-
 func TestUpdateReturnsDbError(t *testing.T) {
 	resource := resource1()
 	repo := &MockedReporterResourceRepository{}
@@ -345,55 +298,6 @@ func TestUpdateExistingResourceBackwardsCompatible(t *testing.T) {
 	assert.Equal(t, &returnedResource, r)
 	assert.Equal(t, resource.ID, r.ID)
 	repo.AssertExpectations(t)
-}
-
-func TestUpdateResourceWithInventoryID(t *testing.T) {
-	resource := resource1()
-	id, err := uuid.NewV7()
-	assert.Nil(t, err)
-	inventoryId, err := uuid.NewV7()
-	assert.Nil(t, err)
-	resource.InventoryId = &inventoryId
-
-	resource.ID = id
-
-	repo := &MockedReporterResourceRepository{}
-	inventoryRepo := &MockedInventoryResourceRepository{}
-	returnedResource := model.Resource{
-		ID:          id,
-		InventoryId: &inventoryId,
-	}
-
-	// Resource exists
-	repo.On("FindByReporterData", mock.Anything, mock.Anything, mock.Anything).Return(resource, nil)
-	inventoryRepo.On("FindByID", mock.Anything, mock.Anything).Return((*model.InventoryResource)(nil), gorm.ErrRecordNotFound).Once()
-
-	useCase := New(repo, inventoryRepo, nil, nil, "", log.DefaultLogger, false)
-	ctx := context.TODO()
-
-	// Non-existent inventory ID
-	r, err := useCase.Update(ctx, resource, model.ReporterResourceId{})
-	assert.Nil(t, r)
-	assert.ErrorIs(t, err, ErrInvalidInventoryResourceID)
-	repo.AssertNotCalled(t, "Update")
-
-	// Resource type mismatch
-	resource.ResourceType = "some-other-resource-type"
-	inventoryRepo.On("FindByID", mock.Anything, mock.Anything).Return(&model.InventoryResource{ID: inventoryId, ResourceType: "some-resource-type"}, nil).Once()
-	r, err = useCase.Update(ctx, resource, model.ReporterResourceId{})
-	assert.Nil(t, r)
-	assert.ErrorIs(t, err, ErrInvalidInventoryResourceType)
-	repo.AssertNotCalled(t, "Update")
-
-	// Valid
-	updatedResources := []*model.Resource{}
-	updatedResources = append(updatedResources, &returnedResource)
-	repo.On("Update", mock.Anything, mock.Anything, mock.Anything).Return(&returnedResource, updatedResources, nil)
-	inventoryRepo.On("FindByID", mock.Anything, mock.Anything).Return(&model.InventoryResource{ID: inventoryId, ResourceType: resource.ResourceType}, nil)
-	r, err = useCase.Update(ctx, resource, model.ReporterResourceId{})
-	assert.NotNil(t, r)
-	assert.Nil(t, err)
-	repo.AssertCalled(t, "Update", mock.Anything, mock.Anything, mock.Anything)
 }
 
 func TestDeleteReturnsDbError(t *testing.T) {

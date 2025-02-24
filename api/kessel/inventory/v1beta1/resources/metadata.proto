@@ -39,9 +39,5 @@ message Metadata {
   // resource can only be a member of one workspace.
   string workspace_id = 3501 [ json_name = "workspace_id" ];
 
-  // The inventory_id in which this resource is grouped by. Many resources can
-  // be grouped by the same inventory_id, by different Reporters
-  string inventory_id = 3502 [ json_name = "inventory_id" ];
-
   repeated ResourceLabel labels = 3552281;
 }

@@ -8,7 +8,7 @@ import (
 	"github.com/go-kratos/kratos/v2/errors"
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/go-kratos/kratos/v2/middleware"
-	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/resources"
+	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2/resources"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 	"os"

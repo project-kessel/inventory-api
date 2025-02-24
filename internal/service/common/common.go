@@ -3,11 +3,12 @@ package common
 import (
 	"encoding/json"
 	"errors"
+	"strings"
+
 	"github.com/google/uuid"
 	pbrelation "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/relationships"
 	pbresource "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/resources"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
-	"strings"
 )
 
 func ReporterResourceIdFromPb(resourceType, reporterId string, reporter *pbresource.ReporterData) model.ReporterResourceId {
@@ -21,11 +22,13 @@ func ReporterResourceIdFromPb(resourceType, reporterId string, reporter *pbresou
 
 func ResourceFromPb(resourceType, reporterId string, resourceData model.JsonObject, metadata *pbresource.Metadata, reporter *pbresource.ReporterData) *model.Resource {
 	return &model.Resource{
-		ID:           uuid.UUID{},
-		ResourceData: resourceData,
-		ResourceType: resourceType,
-		WorkspaceId:  metadata.WorkspaceId,
-		OrgId:        metadata.OrgId,
+		ID:                 uuid.UUID{},
+		ResourceData:       resourceData,
+		ResourceType:       resourceType,
+		WorkspaceId:        metadata.WorkspaceId,
+		OrgId:              metadata.OrgId,
+		ReporterResourceId: reporter.LocalResourceId,
+		ReporterId:         reporter.ReporterType.String(),
 		Reporter: model.ResourceReporter{
 			Reporter: model.Reporter{
 				ReporterId:      reporterId,

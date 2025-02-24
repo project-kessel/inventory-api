@@ -12,38 +12,51 @@ import (
 	"gorm.io/gorm"
 )
 
-type MockedResourceRepository struct {
+type MockedReporterResourceRepository struct {
+	mock.Mock
+}
+type MockedInventoryResourceRepository struct {
 	mock.Mock
 }
 
-func (r *MockedResourceRepository) Save(ctx context.Context, resource *model.Resource) (*model.Resource, error) {
+func (r *MockedReporterResourceRepository) Create(ctx context.Context, resource *model.Resource) (*model.Resource, []*model.Resource, error) {
 	args := r.Called(ctx, resource)
-	return args.Get(0).(*model.Resource), args.Error(1)
+	return args.Get(0).(*model.Resource), args.Get(1).([]*model.Resource), args.Error(2)
 }
 
-func (r *MockedResourceRepository) Update(ctx context.Context, resource *model.Resource, id uuid.UUID) (*model.Resource, error) {
+func (r *MockedReporterResourceRepository) Update(ctx context.Context, resource *model.Resource, id uuid.UUID) (*model.Resource, []*model.Resource, error) {
 	args := r.Called(ctx, resource, id)
-	return args.Get(0).(*model.Resource), args.Error(1)
+	return args.Get(0).(*model.Resource), args.Get(1).([]*model.Resource), args.Error(2)
 }
 
-func (r *MockedResourceRepository) Delete(ctx context.Context, id uuid.UUID) (*model.Resource, error) {
+func (r *MockedReporterResourceRepository) Delete(ctx context.Context, id uuid.UUID) (*model.Resource, error) {
 	args := r.Called(ctx, id)
 	return args.Get(0).(*model.Resource), args.Error(1)
 }
 
-func (r *MockedResourceRepository) FindByID(ctx context.Context, id uuid.UUID) (*model.Resource, error) {
+func (r *MockedReporterResourceRepository) FindByID(ctx context.Context, id uuid.UUID) (*model.Resource, error) {
 	args := r.Called(ctx, id)
 	return args.Get(0).(*model.Resource), args.Error(1)
 }
 
-func (r *MockedResourceRepository) FindByReporterResourceId(ctx context.Context, id model.ReporterResourceId) (*model.Resource, error) {
+func (r *MockedReporterResourceRepository) FindByReporterResourceId(ctx context.Context, id model.ReporterResourceId) (*model.Resource, error) {
 	args := r.Called(ctx, id)
 	return args.Get(0).(*model.Resource), args.Error(1)
 }
 
-func (r *MockedResourceRepository) ListAll(ctx context.Context) ([]*model.Resource, error) {
+func (r *MockedReporterResourceRepository) FindByReporterData(ctx context.Context, reporterId string, resourceId string) (*model.Resource, error) {
+	args := r.Called(ctx, reporterId, resourceId)
+	return args.Get(0).(*model.Resource), args.Error(1)
+}
+
+func (r *MockedReporterResourceRepository) ListAll(ctx context.Context) ([]*model.Resource, error) {
 	args := r.Called(ctx)
 	return args.Get(0).([]*model.Resource), args.Error(1)
+}
+
+func (r *MockedInventoryResourceRepository) FindByID(ctx context.Context, id uuid.UUID) (*model.InventoryResource, error) {
+	args := r.Called(ctx, id)
+	return args.Get(0).(*model.InventoryResource), args.Error(1)
 }
 
 func resource1() *model.Resource {
@@ -84,12 +97,31 @@ func resource1() *model.Resource {
 
 func TestCreateReturnsDbError(t *testing.T) {
 	resource := resource1()
-	repo := &MockedResourceRepository{}
+	repo := &MockedReporterResourceRepository{}
+	inventoryRepo := &MockedInventoryResourceRepository{}
 
+	// DB Error
+	repo.On("FindByReporterData", mock.Anything, mock.Anything, mock.Anything).Return((*model.Resource)(nil), gorm.ErrDuplicatedKey)
+
+	useCase := New(repo, inventoryRepo, nil, nil, "", log.DefaultLogger, false)
+	ctx := context.TODO()
+
+	_, err := useCase.Create(ctx, resource)
+	assert.ErrorIs(t, err, ErrDatabaseError)
+	repo.AssertExpectations(t)
+}
+
+func TestCreateReturnsDbErrorBackwardsCompatible(t *testing.T) {
+	resource := resource1()
+	repo := &MockedReporterResourceRepository{}
+	inventoryRepo := &MockedInventoryResourceRepository{}
+
+	// Validates backwards compatibility, record was not found via new method
+	repo.On("FindByReporterData", mock.Anything, mock.Anything, mock.Anything).Return((*model.Resource)(nil), gorm.ErrRecordNotFound)
 	// DB Error
 	repo.On("FindByReporterResourceId", mock.Anything, mock.Anything).Return((*model.Resource)(nil), gorm.ErrDuplicatedKey)
 
-	useCase := New(repo, nil, nil, "", log.DefaultLogger, false)
+	useCase := New(repo, inventoryRepo, nil, nil, "", log.DefaultLogger, false)
 	ctx := context.TODO()
 
 	_, err := useCase.Create(ctx, resource)
@@ -99,12 +131,31 @@ func TestCreateReturnsDbError(t *testing.T) {
 
 func TestCreateResourceAlreadyExists(t *testing.T) {
 	resource := resource1()
-	repo := &MockedResourceRepository{}
+	repo := &MockedReporterResourceRepository{}
+	inventoryRepo := &MockedInventoryResourceRepository{}
 
+	// Resource already exists
+	repo.On("FindByReporterData", mock.Anything, mock.Anything, mock.Anything).Return(&model.Resource{}, nil)
+
+	useCase := New(repo, inventoryRepo, nil, nil, "", log.DefaultLogger, false)
+	ctx := context.TODO()
+
+	_, err := useCase.Create(ctx, resource)
+	assert.ErrorIs(t, err, ErrResourceAlreadyExists)
+	repo.AssertExpectations(t)
+}
+
+func TestCreateResourceAlreadyExistsBackwardsCompatible(t *testing.T) {
+	resource := resource1()
+	repo := &MockedReporterResourceRepository{}
+	inventoryRepo := &MockedInventoryResourceRepository{}
+
+	// Validates backwards compatibility
+	repo.On("FindByReporterData", mock.Anything, mock.Anything, mock.Anything).Return(&model.Resource{}, gorm.ErrRecordNotFound)
 	// Resource already exists
 	repo.On("FindByReporterResourceId", mock.Anything, mock.Anything).Return(&model.Resource{}, nil)
 
-	useCase := New(repo, nil, nil, "", log.DefaultLogger, false)
+	useCase := New(repo, inventoryRepo, nil, nil, "", log.DefaultLogger, false)
 	ctx := context.TODO()
 
 	_, err := useCase.Create(ctx, resource)
@@ -117,15 +168,17 @@ func TestCreateNewResource(t *testing.T) {
 	id, err := uuid.NewV7()
 	assert.Nil(t, err)
 
-	repo := &MockedResourceRepository{}
+	repo := &MockedReporterResourceRepository{}
+	inventoryRepo := &MockedInventoryResourceRepository{}
 	returnedResource := model.Resource{
 		ID: id,
 	}
 
+	repo.On("FindByReporterData", mock.Anything, mock.Anything, mock.Anything).Return((*model.Resource)(nil), gorm.ErrRecordNotFound)
 	repo.On("FindByReporterResourceId", mock.Anything, mock.Anything).Return((*model.Resource)(nil), gorm.ErrRecordNotFound)
-	repo.On("Save", mock.Anything, mock.Anything).Return(&returnedResource, nil)
+	repo.On("Create", mock.Anything, mock.Anything).Return(&returnedResource, []*model.Resource{}, nil)
 
-	useCase := New(repo, nil, nil, "", log.DefaultLogger, false)
+	useCase := New(repo, inventoryRepo, nil, nil, "", log.DefaultLogger, false)
 	ctx := context.TODO()
 
 	r, err := useCase.Create(ctx, resource)
@@ -136,12 +189,30 @@ func TestCreateNewResource(t *testing.T) {
 
 func TestUpdateReturnsDbError(t *testing.T) {
 	resource := resource1()
-	repo := &MockedResourceRepository{}
+	repo := &MockedReporterResourceRepository{}
+	inventoryRepo := &MockedInventoryResourceRepository{}
 
+	// DB Error
+	repo.On("FindByReporterData", mock.Anything, mock.Anything, mock.Anything).Return((*model.Resource)(nil), gorm.ErrDuplicatedKey)
+
+	useCase := New(repo, inventoryRepo, nil, nil, "", log.DefaultLogger, false)
+	ctx := context.TODO()
+
+	_, err := useCase.Update(ctx, resource, model.ReporterResourceId{})
+	assert.ErrorIs(t, err, ErrDatabaseError)
+	repo.AssertExpectations(t)
+}
+func TestUpdateReturnsDbErrorBackwardsCompatible(t *testing.T) {
+	resource := resource1()
+	repo := &MockedReporterResourceRepository{}
+	inventoryRepo := &MockedInventoryResourceRepository{}
+
+	// Validates backwards compatibility
+	repo.On("FindByReporterData", mock.Anything, mock.Anything, mock.Anything).Return((*model.Resource)(nil), gorm.ErrRecordNotFound)
 	// DB Error
 	repo.On("FindByReporterResourceId", mock.Anything, mock.Anything).Return((*model.Resource)(nil), gorm.ErrDuplicatedKey)
 
-	useCase := New(repo, nil, nil, "", log.DefaultLogger, false)
+	useCase := New(repo, inventoryRepo, nil, nil, "", log.DefaultLogger, false)
 	ctx := context.TODO()
 
 	_, err := useCase.Update(ctx, resource, model.ReporterResourceId{})
@@ -154,16 +225,18 @@ func TestUpdateNewResourceCreatesIt(t *testing.T) {
 	id, err := uuid.NewV7()
 	assert.Nil(t, err)
 
-	repo := &MockedResourceRepository{}
+	repo := &MockedReporterResourceRepository{}
+	inventoryRepo := &MockedInventoryResourceRepository{}
 	returnedResource := model.Resource{
 		ID: id,
 	}
 
 	// Resource doesn't exist
+	repo.On("FindByReporterData", mock.Anything, mock.Anything, mock.Anything).Return((*model.Resource)(nil), gorm.ErrRecordNotFound)
 	repo.On("FindByReporterResourceId", mock.Anything, mock.Anything).Return((*model.Resource)(nil), gorm.ErrRecordNotFound)
-	repo.On("Save", mock.Anything, mock.Anything).Return(&returnedResource, nil)
+	repo.On("Create", mock.Anything, mock.Anything).Return(&returnedResource, []*model.Resource{}, nil)
 
-	useCase := New(repo, nil, nil, "", log.DefaultLogger, false)
+	useCase := New(repo, inventoryRepo, nil, nil, "", log.DefaultLogger, false)
 	ctx := context.TODO()
 
 	r, err := useCase.Update(ctx, resource, model.ReporterResourceId{})
@@ -179,16 +252,45 @@ func TestUpdateExistingResource(t *testing.T) {
 
 	resource.ID = id
 
-	repo := &MockedResourceRepository{}
+	repo := &MockedReporterResourceRepository{}
+	inventoryRepo := &MockedInventoryResourceRepository{}
 	returnedResource := model.Resource{
 		ID: id,
 	}
 
 	// Resource already exists
-	repo.On("FindByReporterResourceId", mock.Anything, mock.Anything).Return(resource, nil)
-	repo.On("Update", mock.Anything, mock.Anything, mock.Anything).Return(&returnedResource, nil)
+	repo.On("FindByReporterData", mock.Anything, mock.Anything, mock.Anything).Return(resource, nil)
+	repo.On("Update", mock.Anything, mock.Anything, mock.Anything).Return(&returnedResource, []*model.Resource{}, nil)
 
-	useCase := New(repo, nil, nil, "", log.DefaultLogger, false)
+	useCase := New(repo, inventoryRepo, nil, nil, "", log.DefaultLogger, false)
+	ctx := context.TODO()
+
+	r, err := useCase.Update(ctx, resource, model.ReporterResourceId{})
+	assert.Nil(t, err)
+	assert.Equal(t, &returnedResource, r)
+	assert.Equal(t, resource.ID, r.ID)
+	repo.AssertExpectations(t)
+}
+func TestUpdateExistingResourceBackwardsCompatible(t *testing.T) {
+	resource := resource1()
+	id, err := uuid.NewV7()
+	assert.Nil(t, err)
+
+	resource.ID = id
+
+	repo := &MockedReporterResourceRepository{}
+	inventoryRepo := &MockedInventoryResourceRepository{}
+	returnedResource := model.Resource{
+		ID: id,
+	}
+
+	// Validates backwards compatibility
+	repo.On("FindByReporterData", mock.Anything, mock.Anything, mock.Anything).Return((*model.Resource)(nil), gorm.ErrRecordNotFound)
+	// Resource already exists
+	repo.On("FindByReporterResourceId", mock.Anything, mock.Anything).Return(resource, nil)
+	repo.On("Update", mock.Anything, mock.Anything, mock.Anything).Return(&returnedResource, []*model.Resource{}, nil)
+
+	useCase := New(repo, inventoryRepo, nil, nil, "", log.DefaultLogger, false)
 	ctx := context.TODO()
 
 	r, err := useCase.Update(ctx, resource, model.ReporterResourceId{})
@@ -199,12 +301,29 @@ func TestUpdateExistingResource(t *testing.T) {
 }
 
 func TestDeleteReturnsDbError(t *testing.T) {
-	repo := &MockedResourceRepository{}
+	repo := &MockedReporterResourceRepository{}
+	inventoryRepo := &MockedInventoryResourceRepository{}
 
+	// Validates backwards compatibility
+	repo.On("FindByReporterData", mock.Anything, mock.Anything, mock.Anything).Return((*model.Resource)(nil), gorm.ErrDuplicatedKey)
+
+	useCase := New(repo, inventoryRepo, nil, nil, "", log.DefaultLogger, false)
+	ctx := context.TODO()
+
+	err := useCase.Delete(ctx, model.ReporterResourceId{})
+	assert.ErrorIs(t, err, ErrDatabaseError)
+	repo.AssertExpectations(t)
+}
+func TestDeleteReturnsDbErrorBackwardsCompatible(t *testing.T) {
+	repo := &MockedReporterResourceRepository{}
+	inventoryRepo := &MockedInventoryResourceRepository{}
+
+	// Validates backwards compatibility
+	repo.On("FindByReporterData", mock.Anything, mock.Anything, mock.Anything).Return((*model.Resource)(nil), gorm.ErrRecordNotFound)
 	// DB Error
 	repo.On("FindByReporterResourceId", mock.Anything, mock.Anything).Return((*model.Resource)(nil), gorm.ErrDuplicatedKey)
 
-	useCase := New(repo, nil, nil, "", log.DefaultLogger, false)
+	useCase := New(repo, inventoryRepo, nil, nil, "", log.DefaultLogger, false)
 	ctx := context.TODO()
 
 	err := useCase.Delete(ctx, model.ReporterResourceId{})
@@ -213,12 +332,14 @@ func TestDeleteReturnsDbError(t *testing.T) {
 }
 
 func TestDeleteNonexistentResource(t *testing.T) {
-	repo := &MockedResourceRepository{}
+	repo := &MockedReporterResourceRepository{}
+	inventoryRepo := &MockedInventoryResourceRepository{}
 
 	// Resource already exists
+	repo.On("FindByReporterData", mock.Anything, mock.Anything, mock.Anything).Return((*model.Resource)(nil), gorm.ErrRecordNotFound)
 	repo.On("FindByReporterResourceId", mock.Anything, mock.Anything).Return((*model.Resource)(nil), gorm.ErrRecordNotFound)
 
-	useCase := New(repo, nil, nil, "", log.DefaultLogger, false)
+	useCase := New(repo, inventoryRepo, nil, nil, "", log.DefaultLogger, false)
 	ctx := context.TODO()
 
 	err := useCase.Delete(ctx, model.ReporterResourceId{})
@@ -227,18 +348,42 @@ func TestDeleteNonexistentResource(t *testing.T) {
 }
 
 func TestDeleteResource(t *testing.T) {
-	repo := &MockedResourceRepository{}
+	repo := &MockedReporterResourceRepository{}
+	inventoryRepo := &MockedInventoryResourceRepository{}
 	ctx := context.TODO()
 	id, err := uuid.NewV7()
 	assert.Nil(t, err)
 
+	// Resource already exists
+	repo.On("FindByReporterData", mock.Anything, mock.Anything, mock.Anything).Return(&model.Resource{
+		ID: id,
+	}, nil)
+	repo.On("Delete", mock.Anything, (uuid.UUID)(id)).Return(&model.Resource{}, nil)
+
+	useCase := New(repo, inventoryRepo, nil, nil, "", log.DefaultLogger, false)
+
+	err = useCase.Delete(ctx, model.ReporterResourceId{})
+	assert.Nil(t, err)
+
+	repo.AssertExpectations(t)
+}
+
+func TestDeleteResourceBackwardsCompatible(t *testing.T) {
+	repo := &MockedReporterResourceRepository{}
+	inventoryRepo := &MockedInventoryResourceRepository{}
+	ctx := context.TODO()
+	id, err := uuid.NewV7()
+	assert.Nil(t, err)
+
+	// Validates backwards compatibility
+	repo.On("FindByReporterData", mock.Anything, mock.Anything, mock.Anything).Return((*model.Resource)(nil), gorm.ErrRecordNotFound)
 	// Resource already exists
 	repo.On("FindByReporterResourceId", mock.Anything, mock.Anything).Return(&model.Resource{
 		ID: id,
 	}, nil)
 	repo.On("Delete", mock.Anything, (uuid.UUID)(id)).Return(&model.Resource{}, nil)
 
-	useCase := New(repo, nil, nil, "", log.DefaultLogger, false)
+	useCase := New(repo, inventoryRepo, nil, nil, "", log.DefaultLogger, false)
 
 	err = useCase.Delete(ctx, model.ReporterResourceId{})
 	assert.Nil(t, err)
@@ -249,14 +394,16 @@ func TestDeleteResource(t *testing.T) {
 func TestCreateResource_PersistenceDisabled(t *testing.T) {
 	ctx := context.TODO()
 	resource := resource1()
-	repo := &MockedResourceRepository{}
+	repo := &MockedReporterResourceRepository{}
+	inventoryRepo := &MockedInventoryResourceRepository{}
 
 	// Mock as if persistence is not disabled, for assurance
+	repo.On("FindByReporterData", mock.Anything, mock.Anything, mock.Anything).Return(&model.Resource{}, nil)
 	repo.On("FindByReporterResourceId", mock.Anything, mock.Anything).Return(&model.Resource{}, nil)
-	repo.On("Save", mock.Anything, mock.Anything).Return(nil, nil)
+	repo.On("Create", mock.Anything, mock.Anything).Return(nil, nil)
 
 	disablePersistence := true
-	useCase := New(repo, nil, nil, "", log.DefaultLogger, disablePersistence)
+	useCase := New(repo, inventoryRepo, nil, nil, "", log.DefaultLogger, disablePersistence)
 
 	// Create the resource
 	r, err := useCase.Create(ctx, resource)
@@ -269,31 +416,35 @@ func TestCreateResource_PersistenceDisabled(t *testing.T) {
 	assert.Equal(t, resource, r)
 
 	// Assert that the repository methods were not called since persistence is disabled
+	repo.AssertNotCalled(t, "FindByReporterData")
 	repo.AssertNotCalled(t, "FindByReporterResourceId")
-	repo.AssertNotCalled(t, "Save")
+	repo.AssertNotCalled(t, "Create")
 }
 
 func TestUpdateResource_PersistenceDisabled(t *testing.T) {
 	ctx := context.TODO()
 	resource := resource1()
-	repo := &MockedResourceRepository{}
+	repo := &MockedReporterResourceRepository{}
+	inventoryRepo := &MockedInventoryResourceRepository{}
 
 	// Mock as if persistence is not disabled, for assurance
+	repo.On("FindByReporterData", mock.Anything, mock.Anything, mock.Anything).Return(&model.Resource{}, nil)
 	repo.On("FindByReporterResourceId", mock.Anything, mock.Anything).Return(&model.Resource{}, nil)
 	repo.On("Update", mock.Anything, mock.Anything, mock.Anything).Return(nil, nil)
-	repo.On("Save", mock.Anything, mock.Anything, mock.Anything).Return(nil, nil)
+	repo.On("Create", mock.Anything, mock.Anything, mock.Anything).Return(nil, nil)
 
 	disablePersistence := true
-	useCase := New(repo, nil, nil, "", log.DefaultLogger, disablePersistence)
+	useCase := New(repo, inventoryRepo, nil, nil, "", log.DefaultLogger, disablePersistence)
 
 	r, err := useCase.Update(ctx, resource, model.ReporterResourceId{})
 	assert.Nil(t, err)
 	assert.Equal(t, resource, r)
 
 	// Assert that the repository methods were not called since persistence is disabled
+	repo.AssertNotCalled(t, "FindByReporterData")
 	repo.AssertNotCalled(t, "FindByReporterResourceId")
 	repo.AssertNotCalled(t, "Update")
-	repo.AssertNotCalled(t, "Save")
+	repo.AssertNotCalled(t, "Create")
 }
 
 func TestDeleteResource_PersistenceDisabled(t *testing.T) {
@@ -302,7 +453,8 @@ func TestDeleteResource_PersistenceDisabled(t *testing.T) {
 	id, err := uuid.NewV7()
 	assert.Nil(t, err)
 
-	repo := &MockedResourceRepository{}
+	repo := &MockedReporterResourceRepository{}
+	inventoryRepo := &MockedInventoryResourceRepository{}
 
 	// Mock as if persistence is not disabled, for assurance
 	repo.On("FindByReporterResourceId", mock.Anything, mock.Anything).Return(&model.Resource{
@@ -311,7 +463,7 @@ func TestDeleteResource_PersistenceDisabled(t *testing.T) {
 	repo.On("Delete", mock.Anything, (uint64)(33)).Return(&model.Resource{}, nil)
 
 	disablePersistence := true
-	useCase := New(repo, nil, nil, "", log.DefaultLogger, disablePersistence)
+	useCase := New(repo, inventoryRepo, nil, nil, "", log.DefaultLogger, disablePersistence)
 
 	err = useCase.Delete(ctx, model.ReporterResourceId{})
 	assert.Nil(t, err)

@@ -268,9 +268,9 @@ func (c *Config) Complete() (CompletedConfig, error) {
 		if err := config.SetKey("client.dns.lookup", c.ClientDnsLookup); err != nil {
 			return CompletedConfig{}, err
 		}
-		if err := config.SetKey("enable.metrics.push", c.EnableMetricsPush); err != nil {
-			return CompletedConfig{}, err
-		}
+		//if err := config.SetKey("enable.metrics.push", c.EnableMetricsPush); err != nil {
+		//	return CompletedConfig{}, err
+		//}
 		if err := config.SetKey("client.rack", c.ClientRack); err != nil {
 			return CompletedConfig{}, err
 		}

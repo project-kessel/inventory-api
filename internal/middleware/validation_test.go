@@ -1,5 +1,6 @@
 package middleware
 
+//TODO: update validation tests to suit new validation
 //func TestValidation_ValidRequest(t *testing.T) {
 //	t.Parallel()
 //

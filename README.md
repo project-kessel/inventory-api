@@ -54,7 +54,7 @@ for information on the different parameters.
 
 ### Overriding commands in the Makefile
 
-Due to various alternatives to running some images, we accept some arguments to override certains tools
+Due to various alternatives to running some images, we accept some arguments to override certain tools
 
 #### GO binary
 
@@ -116,6 +116,24 @@ To stop use:
 
 ```shell
 make inventory-down
+```
+
+#### Kessel Inventory + Kessel Relations using built binaries
+
+Inventory and Relations can also be run locally using built binaries, but the default config for Inventory will conflict with Relations.
+
+To run Relations locally, see the [Relations README](https://github.com/project-kessel/relations-api?tab=readme-ov-file#prerequisites)
+
+Relations will also require SpiceDB, this can be run using Podman/Docker (See relevant section also in the [Relations README](https://github.com/project-kessel/relations-api?tab=readme-ov-file#spicedb-using-dockerpodman))
+
+For Inventory, an alternate config is available, pre-configured to expect a local running Relations API
+```shell
+# Setup
+make local-build
+make migrate
+
+# run with the relations friendly config file
+./bin/inventory-api serve --config config/inventory-w-relations.yaml
 ```
 
 #### Kessel-Inventory + Kafka
@@ -395,11 +413,22 @@ To validate the current running container is FIPS capable:
 
 ```shell
 # exec or rsh into running pod
-# using fips-detect (https://github.com/acardace/fips-detect)
-fips-detect /usr/local/bin/inventory-api
+# Reference the fips_enabled file that ubi9 creates for the host
+cat /proc/sys/crypto/fips_enabled
+# Expected output:
+1
 
-# using go tool
+# Check go tool for the binary
 go tool nm /usr/local/bin/inventory-api | grep FIPS
+# Expected output should reference openssl FIPS settings
+
+# Ensure openssl providers have a FIPS provider active
+openssl list -providers | grep -A 3 fips
+# Expected output
+  fips
+    name: Red Hat Enterprise Linux 9 - OpenSSL FIPS Provider
+    version: 3.0.7-395c1a240fbfffd8
+    status: active
 ```
 
 ## Contributing

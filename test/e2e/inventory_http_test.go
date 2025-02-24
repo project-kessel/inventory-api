@@ -369,6 +369,69 @@ func TestInventoryAPIHTTP_K8SPolicyLifecycle(t *testing.T) {
 	assert.NoError(t, err, "Failed to delete K8sPolicy")
 }
 
+func TestInventoryAPIHTTP_NotificationsIntegrationLifecycle(t *testing.T) {
+	t.Parallel()
+
+	c := v1beta1.NewConfig(
+		v1beta1.WithHTTPUrl(inventoryapi_http_url),
+		v1beta1.WithTLSInsecure(insecure),
+		v1beta1.WithHTTPTLSConfig(tlsConfig),
+	)
+	client, err := v1beta1.NewHttpClient(context.Background(), c)
+	if err != nil {
+		t.Fatal("Failed to create HTTP client: ", err)
+	}
+
+	createRequest := resources.CreateNotificationsIntegrationRequest{
+		Integration: &resources.NotificationsIntegration{
+			Metadata: &resources.Metadata{
+				ResourceType: "notifications/integration",
+				WorkspaceId:  "ws-456",
+			},
+			ReporterData: &resources.ReporterData{
+				ReporterType:    resources.ReporterData_NOTIFICATIONS,
+				ConsoleHref:     "https://console.notifications.example.com",
+				ApiHref:         "https://api.notifications.example.com",
+				LocalResourceId: "notifications-001",
+				ReporterVersion: "1.0",
+			},
+		},
+	}
+
+	opts := getCallOptions()
+	_, err = client.NotificationIntegrationClient.CreateNotificationsIntegration(context.Background(), &createRequest, opts...)
+	assert.NoError(t, err, "Failed to create Notifications Integration")
+
+	updateRequest := resources.UpdateNotificationsIntegrationRequest{
+		Integration: &resources.NotificationsIntegration{
+			Metadata: &resources.Metadata{
+				ResourceType: "notifications/integration",
+				WorkspaceId:  "ws-789",
+			},
+			ReporterData: &resources.ReporterData{
+				ReporterType:    resources.ReporterData_NOTIFICATIONS,
+				ConsoleHref:     "https://console.notifications.example.com",
+				ApiHref:         "https://api.notifications.example.com",
+				LocalResourceId: "notifications-001",
+				ReporterVersion: "1.1",
+			},
+		},
+	}
+
+	_, err = client.NotificationIntegrationClient.UpdateNotificationsIntegration(context.Background(), &updateRequest, opts...)
+	assert.NoError(t, err, "Failed to update Notifications Integration")
+
+	deleteRequest := resources.DeleteNotificationsIntegrationRequest{
+		ReporterData: &resources.ReporterData{
+			ReporterType:    resources.ReporterData_NOTIFICATIONS,
+			LocalResourceId: "notifications-001",
+		},
+	}
+
+	_, err = client.NotificationIntegrationClient.DeleteNotificationsIntegration(context.Background(), &deleteRequest, opts...)
+	assert.NoError(t, err, "Failed to delete Notifications Integration")
+}
+
 func TestInventoryAPIHTTP_K8SPolicy_is_propagated_to_K8sClusterLifecycle(t *testing.T) {
 	t.Parallel()
 	c := v1beta1.NewConfig(

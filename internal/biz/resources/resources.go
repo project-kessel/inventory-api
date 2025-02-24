@@ -159,7 +159,7 @@ func (uc *Usecase) CheckForCreate(ctx context.Context, permission, namespace str
 
 func (uc *Usecase) ListResourcesInWorkspace(ctx context.Context, permission, namespace string, sub *kessel.SubjectReference, id string) (chan *model.Resource, chan error, error) {
 	resource_chan := make(chan *model.Resource)
-	error_chan := make(chan error)
+	error_chan := make(chan error, 1)
 
 	resources, err := uc.repository.FindByWorkspaceId(ctx, id)
 	if err != nil {
@@ -175,6 +175,7 @@ func (uc *Usecase) ListResourcesInWorkspace(ctx context.Context, permission, nam
 				resource_chan <- resource
 			} else if err != nil {
 				error_chan <- err
+				break
 			} else if allowed != kessel.CheckResponse_ALLOWED_TRUE {
 				log.Infof("Response was not allowed: %v", allowed)
 			}

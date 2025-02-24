@@ -196,6 +196,7 @@ func TestInventoryAPIHTTP_K8SClusterLifecycle(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
+	clusterReason := "READY"
 	request := resources.CreateK8SClusterRequest{
 		K8SCluster: &resources.K8SCluster{
 			Metadata: &resources.Metadata{
@@ -206,6 +207,7 @@ func TestInventoryAPIHTTP_K8SClusterLifecycle(t *testing.T) {
 			ResourceData: &resources.K8SClusterDetail{
 				ExternalClusterId: "01234",
 				ClusterStatus:     resources.K8SClusterDetail_READY,
+				ClusterReason:     &clusterReason,
 				KubeVersion:       "1.31",
 				KubeVendor:        resources.K8SClusterDetail_OPENSHIFT,
 				VendorVersion:     "4.16",
@@ -236,7 +238,7 @@ func TestInventoryAPIHTTP_K8SClusterLifecycle(t *testing.T) {
 	}
 	opts := getCallOptions()
 	_, err = client.K8sClusterService.CreateK8SCluster(context.Background(), &request, opts...)
-	assert.NoError(t, err)
+	assert.NoError(t, err, "Failed to create K8sCluster")
 
 	updateRequest := resources.UpdateK8SClusterRequest{
 		K8SCluster: &resources.K8SCluster{
@@ -248,6 +250,7 @@ func TestInventoryAPIHTTP_K8SClusterLifecycle(t *testing.T) {
 			ResourceData: &resources.K8SClusterDetail{
 				ExternalClusterId: "01234",
 				ClusterStatus:     resources.K8SClusterDetail_OFFLINE,
+				ClusterReason:     &clusterReason,
 				KubeVersion:       "1.31",
 				KubeVendor:        resources.K8SClusterDetail_OPENSHIFT,
 				VendorVersion:     "4.16",
@@ -468,6 +471,7 @@ func TestInventoryAPIHTTP_K8SPolicy_is_propagated_to_K8sClusterLifecycle(t *test
 	_, err = client.PolicyServiceClient.CreateK8SPolicy(context.Background(), &request, opts...)
 	assert.NoError(t, err, "Failed to create K8sPolicy")
 
+	clusterReason := "READY"
 	request1 := resources.CreateK8SClusterRequest{
 		K8SCluster: &resources.K8SCluster{
 			Metadata: &resources.Metadata{
@@ -478,6 +482,7 @@ func TestInventoryAPIHTTP_K8SPolicy_is_propagated_to_K8sClusterLifecycle(t *test
 			ResourceData: &resources.K8SClusterDetail{
 				ExternalClusterId: "01234",
 				ClusterStatus:     resources.K8SClusterDetail_READY,
+				ClusterReason:     &clusterReason,
 				KubeVersion:       "1.31",
 				KubeVendor:        resources.K8SClusterDetail_OPENSHIFT,
 				VendorVersion:     "4.16",

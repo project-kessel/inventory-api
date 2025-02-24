@@ -177,7 +177,7 @@ func NewCommand(
 			pb.RegisterKesselK8SPolicyServiceHTTPServer(server.HttpServer, k8spolicies_service)
 
 			resource_repo := resourcerepo.New(db)
-			resource_controller := resourcesctl.New(resource_repo, authorizer, eventingManager, "resource", log.With(logger, "subsystem", "resource_controller"), storageConfig.Options.DisablePersistence)
+			resource_controller := resourcesctl.New(resource_repo, inventoryresources_repo, authorizer, eventingManager, "resource", log.With(logger, "subsystem", "resource_controller"), storageConfig.Options.DisablePersistence)
 			resource_service := resourcessvc.New(resource_controller)
 			pbv2.RegisterKesselResourceServiceServer(server.GrpcServer, resource_service)
 			pbv2.RegisterKesselResourceServiceHTTPServer(server.HttpServer, resource_service)

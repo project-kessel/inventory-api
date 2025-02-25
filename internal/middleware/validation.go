@@ -8,6 +8,7 @@ import (
 	"github.com/go-kratos/kratos/v2/errors"
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/go-kratos/kratos/v2/middleware"
+	rel "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/relationships"
 	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/resources"
 	pb2 "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2/resources"
 	"google.golang.org/protobuf/encoding/protojson"
@@ -37,6 +38,17 @@ func isDeleteRequest(v interface{}) bool {
 	}
 }
 
+func isRelationshipRequest(v interface{}) bool {
+	switch v.(type) {
+	case *rel.CreateK8SPolicyIsPropagatedToK8SClusterRequest,
+		*rel.UpdateK8SPolicyIsPropagatedToK8SClusterRequest,
+		*rel.DeleteK8SPolicyIsPropagatedToK8SClusterRequest:
+		return true
+	default:
+		return false
+	}
+}
+
 func Validation(validator protovalidate.Validator) middleware.Middleware {
 	if resourceDirFilePath, exists := os.LookupEnv("RESOURCE_DIR"); exists {
 		fmt.Println(resourceDirFilePath)
@@ -54,7 +66,7 @@ func Validation(validator protovalidate.Validator) middleware.Middleware {
 	return func(handler middleware.Handler) middleware.Handler {
 		return func(ctx context.Context, req interface{}) (interface{}, error) {
 			if v, ok := req.(proto.Message); ok {
-				if isDeleteRequest(v) {
+				if isDeleteRequest(v) || isRelationshipRequest(v) {
 					// run the protovalidate validation if it is a delete request
 					if err := validator.Validate(v); err != nil {
 						return nil, errors.BadRequest("VALIDATOR", err.Error()).WithCause(err)

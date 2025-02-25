@@ -67,7 +67,7 @@ func Validation(validator protovalidate.Validator) middleware.Middleware {
 		return func(ctx context.Context, req interface{}) (interface{}, error) {
 			if v, ok := req.(proto.Message); ok {
 				if isDeleteRequest(v) || isRelationshipRequest(v) {
-					// run the protovalidate validation if it is a delete request
+					// run the protovalidate validation if it is a delete or relationship request
 					if err := validator.Validate(v); err != nil {
 						return nil, errors.BadRequest("VALIDATOR", err.Error()).WithCause(err)
 					}

@@ -450,12 +450,12 @@ func TestInventoryAPIHTTP_K8SPolicy_is_propagated_to_K8sClusterLifecycle(t *test
 		K8SPolicy: &resources.K8SPolicy{
 			Metadata: &resources.Metadata{
 				ResourceType: "k8s_policy",
-				WorkspaceId:  "workspace8",
+				WorkspaceId:  "workspace81",
 				OrgId:        "",
 			},
 			ResourceData: &resources.K8SPolicyDetail{
 				Disabled: true,
-				Severity: resources.K8SPolicyDetail_HIGH,
+				Severity: resources.K8SPolicyDetail_LOW,
 			},
 			ReporterData: &resources.ReporterData{
 				ReporterInstanceId: "user@example.com",

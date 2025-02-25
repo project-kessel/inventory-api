@@ -126,7 +126,7 @@ func Test_ACMKafkaConsumer(t *testing.T) {
 		t.Fatalf("Failed to create Kafka admin client: %v", err)
 	}
 	defer adminClient.Close()
-
+	time.Sleep(10 * time.Second)
 	if err := ensureTopicExists(adminClient, topic); err != nil {
 		t.Fatalf("Failed to ensure topic exists: %v", err)
 	}

@@ -217,7 +217,7 @@ func TransformMiddleware() middleware.Middleware {
 								resource = deleteNotificationIntegrationResource(integrationPayload)
 							}
 
-						case "k8spolicy_ispropagatedto_k8scluster":
+						case "k8spolicy_is-propagated-to_k8scluster":
 							return handler(ctx, body)
 
 						default:

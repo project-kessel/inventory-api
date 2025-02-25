@@ -9,19 +9,15 @@ import (
 	"github.com/go-kratos/kratos/v2/transport/http"
 	v1 "github.com/project-kessel/inventory-api/api/kessel/inventory/v1"
 	"github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/relationships"
-	"google.golang.org/protobuf/types/known/timestamppb"
-	"time"
-
-	//"github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/relationships"
 	"github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/resources"
 	"github.com/project-kessel/inventory-client-go/v1beta1"
 	"github.com/stretchr/testify/assert"
-	//"google.golang.org/protobuf/types/known/timestamppb"
+	"google.golang.org/protobuf/types/known/timestamppb"
 	nethttp "net/http"
 	"os"
 	"strconv"
 	"testing"
-	//"time"
+	"time"
 )
 
 var inventoryapi_http_url string
@@ -454,11 +450,11 @@ func TestInventoryAPIHTTP_K8SPolicy_is_propagated_to_K8sClusterLifecycle(t *test
 		K8SPolicy: &resources.K8SPolicy{
 			Metadata: &resources.Metadata{
 				ResourceType: "k8s_policy",
-				WorkspaceId:  "workspace2",
+				WorkspaceId:  "workspace8",
 				OrgId:        "",
 			},
 			ResourceData: &resources.K8SPolicyDetail{
-				Disabled: false,
+				Disabled: true,
 				Severity: resources.K8SPolicyDetail_HIGH,
 			},
 			ReporterData: &resources.ReporterData{
@@ -466,7 +462,7 @@ func TestInventoryAPIHTTP_K8SPolicy_is_propagated_to_K8sClusterLifecycle(t *test
 				ReporterType:       resources.ReporterData_ACM,
 				ConsoleHref:        "www.example.com",
 				ApiHref:            "www.example.com",
-				LocalResourceId:    "789",
+				LocalResourceId:    "012345",
 				ReporterVersion:    "0.1",
 			},
 		},

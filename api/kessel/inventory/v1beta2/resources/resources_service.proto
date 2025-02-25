@@ -1,0 +1,50 @@
+syntax = "proto3";
+
+package kessel.inventory.v1beta2.resources;
+
+import "google/api/annotations.proto";
+import "kessel/inventory/v1beta2/resources/resource_types.proto";
+
+option go_package = "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2/resources";
+option java_multiple_files = true;
+option java_package = "org.project_kessel.api.inventory.v1beta2.resources";
+
+message CreateResourceRequest {
+  Resource resource = 1 [json_name = "resource"];
+}
+
+message CreateResourceResponse {}
+
+message UpdateResourceRequest {
+    Resource resource = 1 [json_name = "resource"];
+}
+
+message UpdateResourceResponse {}
+
+message DeleteResourceRequest {
+  Resource resource = 1 [json_name = "resource"];
+}
+
+message DeleteResourceResponse {}
+
+service KesselResourceService {
+  rpc CreateResource(CreateResourceRequest) returns (CreateResourceResponse) {
+    option (google.api.http) = {
+      post: "/api/inventory/v1beta2/resources"
+      body: "*"
+    };
+  }
+
+  rpc UpdateResource(UpdateResourceRequest) returns (UpdateResourceResponse) {
+    option (google.api.http) = {
+      put: "/api/inventory/v1beta2/resources"
+      body: "*"
+    };
+  }
+
+  rpc DeleteResource(DeleteResourceRequest) returns (DeleteResourceResponse) {
+    option (google.api.http) = {
+      delete: "/api/inventory/v1beta2/resources"
+    };
+  }
+}

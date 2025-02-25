@@ -30,17 +30,19 @@ func New(c CompletedConfig, authn middleware.Middleware, meter metric.Meter, log
 		return nil, err
 	}
 	// TODO: pass in health, authn middleware
+
 	var opts = []http.ServerOption{
 		http.Middleware(
 			recovery.Recovery(),
 			logging.Server(logger),
-			m.Validation(validator),
 			metrics.Server(
 				metrics.WithSeconds(seconds),
 				metrics.WithRequests(requests),
 			),
 			selector.Server(
+				m.TransformMiddleware(),
 				authn,
+				m.Validation(validator),
 			).Match(NewWhiteListMatcher).Build(),
 		),
 	}

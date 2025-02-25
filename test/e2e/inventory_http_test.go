@@ -139,7 +139,7 @@ func TestInventoryAPIHTTP_RHELHostLifecycle(t *testing.T) {
 			},
 			ReporterData: &resources.ReporterData{
 				ReporterInstanceId: "user@example.com",
-				ReporterType:       resources.ReporterData_ACM,
+				ReporterType:       resources.ReporterData_HBI,
 				ConsoleHref:        "www.example.com",
 				ApiHref:            "www.example.com",
 				LocalResourceId:    "0123",
@@ -160,7 +160,7 @@ func TestInventoryAPIHTTP_RHELHostLifecycle(t *testing.T) {
 			},
 			ReporterData: &resources.ReporterData{
 				ReporterInstanceId: "user@example.com",
-				ReporterType:       resources.ReporterData_ACM,
+				ReporterType:       resources.ReporterData_HBI,
 				ConsoleHref:        "www.exampleConsole.com",
 				ApiHref:            "www.exampleAPI.com",
 				LocalResourceId:    "0123",
@@ -174,9 +174,9 @@ func TestInventoryAPIHTTP_RHELHostLifecycle(t *testing.T) {
 	deleteRequest := resources.DeleteRhelHostRequest{
 		ReporterData: &resources.ReporterData{
 			ReporterInstanceId: "user@example.com",
-			ReporterType:       resources.ReporterData_ACM,
-			ConsoleHref:        "www.exampleConsole.com",
-			ApiHref:            "www.exampleAPI.com",
+			ReporterType:       resources.ReporterData_HBI,
+			ConsoleHref:        "www.example.com",
+			ApiHref:            "www.example.com",
 			LocalResourceId:    "0123",
 			ReporterVersion:    "0.1",
 		},
@@ -196,6 +196,7 @@ func TestInventoryAPIHTTP_K8SClusterLifecycle(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
+	clusterReason := "READY"
 	request := resources.CreateK8SClusterRequest{
 		K8SCluster: &resources.K8SCluster{
 			Metadata: &resources.Metadata{
@@ -206,6 +207,7 @@ func TestInventoryAPIHTTP_K8SClusterLifecycle(t *testing.T) {
 			ResourceData: &resources.K8SClusterDetail{
 				ExternalClusterId: "01234",
 				ClusterStatus:     resources.K8SClusterDetail_READY,
+				ClusterReason:     &clusterReason,
 				KubeVersion:       "1.31",
 				KubeVendor:        resources.K8SClusterDetail_OPENSHIFT,
 				VendorVersion:     "4.16",
@@ -236,7 +238,7 @@ func TestInventoryAPIHTTP_K8SClusterLifecycle(t *testing.T) {
 	}
 	opts := getCallOptions()
 	_, err = client.K8sClusterService.CreateK8SCluster(context.Background(), &request, opts...)
-	assert.NoError(t, err)
+	assert.NoError(t, err, "Failed to create K8sCluster")
 
 	updateRequest := resources.UpdateK8SClusterRequest{
 		K8SCluster: &resources.K8SCluster{
@@ -248,6 +250,7 @@ func TestInventoryAPIHTTP_K8SClusterLifecycle(t *testing.T) {
 			ResourceData: &resources.K8SClusterDetail{
 				ExternalClusterId: "01234",
 				ClusterStatus:     resources.K8SClusterDetail_OFFLINE,
+				ClusterReason:     &clusterReason,
 				KubeVersion:       "1.31",
 				KubeVendor:        resources.K8SClusterDetail_OPENSHIFT,
 				VendorVersion:     "4.16",
@@ -313,7 +316,7 @@ func TestInventoryAPIHTTP_K8SPolicyLifecycle(t *testing.T) {
 				OrgId:        "",
 			},
 			ResourceData: &resources.K8SPolicyDetail{
-				Disabled: false,
+				Disabled: true,
 				Severity: resources.K8SPolicyDetail_HIGH,
 			},
 			ReporterData: &resources.ReporterData{
@@ -447,19 +450,19 @@ func TestInventoryAPIHTTP_K8SPolicy_is_propagated_to_K8sClusterLifecycle(t *test
 		K8SPolicy: &resources.K8SPolicy{
 			Metadata: &resources.Metadata{
 				ResourceType: "k8s_policy",
-				WorkspaceId:  "workspace2",
+				WorkspaceId:  "workspace81",
 				OrgId:        "",
 			},
 			ResourceData: &resources.K8SPolicyDetail{
-				Disabled: false,
-				Severity: resources.K8SPolicyDetail_HIGH,
+				Disabled: true,
+				Severity: resources.K8SPolicyDetail_LOW,
 			},
 			ReporterData: &resources.ReporterData{
 				ReporterInstanceId: "user@example.com",
 				ReporterType:       resources.ReporterData_ACM,
 				ConsoleHref:        "www.example.com",
 				ApiHref:            "www.example.com",
-				LocalResourceId:    "789",
+				LocalResourceId:    "012345",
 				ReporterVersion:    "0.1",
 			},
 		},
@@ -468,6 +471,7 @@ func TestInventoryAPIHTTP_K8SPolicy_is_propagated_to_K8sClusterLifecycle(t *test
 	_, err = client.PolicyServiceClient.CreateK8SPolicy(context.Background(), &request, opts...)
 	assert.NoError(t, err, "Failed to create K8sPolicy")
 
+	clusterReason := "READY"
 	request1 := resources.CreateK8SClusterRequest{
 		K8SCluster: &resources.K8SCluster{
 			Metadata: &resources.Metadata{
@@ -478,6 +482,7 @@ func TestInventoryAPIHTTP_K8SPolicy_is_propagated_to_K8sClusterLifecycle(t *test
 			ResourceData: &resources.K8SClusterDetail{
 				ExternalClusterId: "01234",
 				ClusterStatus:     resources.K8SClusterDetail_READY,
+				ClusterReason:     &clusterReason,
 				KubeVersion:       "1.31",
 				KubeVendor:        resources.K8SClusterDetail_OPENSHIFT,
 				VendorVersion:     "4.16",

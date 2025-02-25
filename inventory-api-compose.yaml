@@ -4,20 +4,21 @@ server:
   grpc:
     address: 0.0.0.0:9081
 authn:
-  psk:
-    pre-shared-key-file: /psks.yaml
+  allow-unauthenticated: true
+#  psk:
+#    pre-shared-key-file: /psks.yaml
 authz:
-  impl: kessel
-  kessel:
-    insecure-client: true
-    url: relations-api:9000
-    enable-oidc-auth: false
-    principal-user-domain: 0.0.0.0:8084
+  impl: allow-all
+#  kessel:
+#    insecure-client: true
+#    url: relations-api:9000
+#    enable-oidc-auth: false
+#    principal-user-domain: 0.0.0.0:8084
 eventing:
   eventer: stdout
   kafka:
 storage:
-  disable-persistence: false
+  disable-persistence: true
   database: postgres
   sqlite3:
     dsn: inventory.db

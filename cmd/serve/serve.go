@@ -3,6 +3,7 @@ package serve
 import (
 	"context"
 	"fmt"
+	pbv2 "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2/resources"
 	"os"
 	"os/signal"
 	"syscall"
@@ -18,7 +19,7 @@ import (
 	k8sclusterssvc "github.com/project-kessel/inventory-api/internal/service/resources/k8sclusters"
 	k8spoliciessvc "github.com/project-kessel/inventory-api/internal/service/resources/k8spolicies"
 	notifssvc "github.com/project-kessel/inventory-api/internal/service/resources/notificationsintegrations"
-
+	resourcessvc "github.com/project-kessel/inventory-api/internal/service/resources/resources"
 	"github.com/spf13/cobra"
 	"gorm.io/gorm"
 
@@ -36,7 +37,6 @@ import (
 	hb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1"
 	rel "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/relationships"
 	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/resources"
-
 	healthctl "github.com/project-kessel/inventory-api/internal/biz/health"
 	healthrepo "github.com/project-kessel/inventory-api/internal/data/health"
 	healthssvc "github.com/project-kessel/inventory-api/internal/service/health"
@@ -175,6 +175,12 @@ func NewCommand(
 			k8spolicies_service := k8spoliciessvc.New(k8spolicies_controller)
 			pb.RegisterKesselK8SPolicyServiceServer(server.GrpcServer, k8spolicies_service)
 			pb.RegisterKesselK8SPolicyServiceHTTPServer(server.HttpServer, k8spolicies_service)
+
+			resource_repo := resourcerepo.New(db)
+			resource_controller := resourcesctl.New(resource_repo, inventoryresources_repo, authorizer, eventingManager, "resource", log.With(logger, "subsystem", "resource_controller"), storageConfig.Options.DisablePersistence)
+			resource_service := resourcessvc.New(resource_controller)
+			pbv2.RegisterKesselResourceServiceServer(server.GrpcServer, resource_service)
+			pbv2.RegisterKesselResourceServiceHTTPServer(server.HttpServer, resource_service)
 
 			// wire together relationships handling
 			relationships_repo := relationshipsrepo.New(db)

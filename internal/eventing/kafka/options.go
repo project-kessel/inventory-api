@@ -84,10 +84,10 @@ type Options struct {
 	SaslOauthBearerTokenEndpointUrl  string `mapstructure:"sasl-oauthbearer-token-endpoint-url"`
 	PluginLibraryPaths               string `mapstructure:"plugin-library-paths"`
 	ClientDnsLookup                  string `mapstructure:"client-dns-lookup"`
-	EnableMetricsPush                bool   `mapstructure:"enable-metrics-push"`
-	ClientRack                       string `mapstructure:"client-rack"`
-	RetryBackoffMs                   int    `mapstructure:"retry-backoff-ms"`
-	RetryBackoffMaxMs                int    `mapstructure:"retry-backoff-max-ms"`
+	//EnableMetricsPush                bool   `mapstructure:"enable-metrics-push"`
+	ClientRack        string `mapstructure:"client-rack"`
+	RetryBackoffMs    int    `mapstructure:"retry-backoff-ms"`
+	RetryBackoffMaxMs int    `mapstructure:"retry-backoff-max-ms"`
 }
 
 func NewOptions() *Options {
@@ -171,10 +171,10 @@ func NewOptions() *Options {
 		SaslOauthBearerTokenEndpointUrl:  "",
 		PluginLibraryPaths:               "",
 		ClientDnsLookup:                  "use_all_dns_ips",
-		EnableMetricsPush:                true,
-		ClientRack:                       "",
-		RetryBackoffMs:                   100,
-		RetryBackoffMaxMs:                1000,
+		//EnableMetricsPush:                true,
+		ClientRack:        "",
+		RetryBackoffMs:    100,
+		RetryBackoffMaxMs: 1000,
 	}
 }
 
@@ -263,7 +263,7 @@ func (o *Options) AddFlags(fs *pflag.FlagSet, prefix string) {
 	fs.StringVar(&o.SaslOauthBearerTokenEndpointUrl, prefix+"sasl-oauthbearer-token-endpoint-url", o.SaslOauthBearerTokenEndpointUrl, "OAuth/OIDC issuer token endpoint HTTP(S) URI used to retrieve token. Only used when `sasl.oauthbearer.method` is set to \"oidc\". \n*Type: string*")
 	fs.StringVar(&o.PluginLibraryPaths, prefix+"plugin-library-paths", o.PluginLibraryPaths, "List of plugin libraries to load (; separated). The library search path is platform dependent (see dlopen(3) for Unix and LoadLibrary() for Windows). If no filename extension is specified the platform-specific extension (such as .dll or .so) will be appended automatically. \n*Type: string*")
 	fs.StringVar(&o.ClientDnsLookup, prefix+"client-dns-lookup", o.ClientDnsLookup, "Controls how the client uses DNS lookups. By default, when the lookup returns multiple IP addresses for a hostname, they will all be attempted for connection before the connection is considered failed. This applies to both bootstrap and advertised servers. If the value is set to `resolve_canonical_bootstrap_servers_only`, each entry will be resolved and expanded into a list of canonical names. **WARNING**: `resolve_canonical_bootstrap_servers_only` must only be used with `GSSAPI` (Kerberos) as `sasl.mechanism`, as it's the only purpose of this configuration value. **NOTE**: Default here is different from the Java client's default behavior, which connects only to the first IP address returned for a hostname.  \n*Type: enum value*")
-	fs.BoolVar(&o.EnableMetricsPush, prefix+"enable-metrics-push", o.EnableMetricsPush, "Whether to enable pushing of client metrics to the cluster, if the cluster has a client metrics subscription which matches this client \n*Type: boolean*")
+	//fs.BoolVar(&o.EnableMetricsPush, prefix+"enable-metrics-push", o.EnableMetricsPush, "Whether to enable pushing of client metrics to the cluster, if the cluster has a client metrics subscription which matches this client \n*Type: boolean*")
 	fs.StringVar(&o.ClientRack, prefix+"client-rack", o.ClientRack, "A rack identifier for this client. This can be any string value which indicates where this client is physically located. It corresponds with the broker config `broker.rack`. \n*Type: string*")
 	fs.IntVar(&o.RetryBackoffMs, prefix+"retry-backoff-ms", o.RetryBackoffMs, "The backoff time in milliseconds before retrying a protocol request, this is the first backoff time, and will be backed off exponentially until number of retries is exhausted, and it's capped by retry.backoff.max.ms. \n*Type: integer*")
 	fs.IntVar(&o.RetryBackoffMaxMs, prefix+"retry-backoff-max-ms", o.RetryBackoffMaxMs, "The max backoff time in milliseconds before retrying a protocol request, this is the atmost backoff allowed for exponentially backed off requests. \n*Type: integer*")

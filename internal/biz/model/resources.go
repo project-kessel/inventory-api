@@ -15,7 +15,7 @@ type Resource struct {
 	ID           uuid.UUID  `gorm:"type:uuid;primarykey"`
 	InventoryId  *uuid.UUID `gorm:"index"`
 	OrgId        string     `gorm:"index"`
-	ResourceData JsonObject
+	ResourceData JsonObject `json:"resource_data"`
 	ResourceType string
 	WorkspaceId  string
 	ConsoleHref  string

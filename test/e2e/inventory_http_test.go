@@ -316,7 +316,7 @@ func TestInventoryAPIHTTP_K8SPolicyLifecycle(t *testing.T) {
 				OrgId:        "",
 			},
 			ResourceData: &resources.K8SPolicyDetail{
-				Disabled: false,
+				Disabled: true,
 				Severity: resources.K8SPolicyDetail_HIGH,
 			},
 			ReporterData: &resources.ReporterData{

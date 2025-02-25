@@ -8,7 +8,8 @@ import (
 	"github.com/go-kratos/kratos/v2/errors"
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/go-kratos/kratos/v2/middleware"
-	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2/resources"
+	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/resources"
+	pb2 "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2/resources"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 	"os"
@@ -22,6 +23,19 @@ var (
 	resourceDir       = os.Getenv("RESOURCE_DIR")
 	AbstractResources = map[string]struct{}{} // Tracks resource types marked as abstract (no resource_data)
 )
+
+func isDeleteRequest(v interface{}) bool {
+	switch v.(type) {
+	case *pb.DeleteK8SClusterRequest,
+		*pb.DeleteRhelHostRequest,
+		*pb.DeleteK8SPolicyRequest,
+		*pb.DeleteNotificationsIntegrationRequest,
+		*pb2.DeleteResourceRequest:
+		return true
+	default:
+		return false
+	}
+}
 
 func Validation(validator protovalidate.Validator) middleware.Middleware {
 	if resourceDirFilePath, exists := os.LookupEnv("RESOURCE_DIR"); exists {
@@ -40,7 +54,7 @@ func Validation(validator protovalidate.Validator) middleware.Middleware {
 	return func(handler middleware.Handler) middleware.Handler {
 		return func(ctx context.Context, req interface{}) (interface{}, error) {
 			if v, ok := req.(proto.Message); ok {
-				if _, isDelete := v.(*pb.DeleteResourceRequest); isDelete {
+				if isDeleteRequest(v) {
 					// run the protovalidate validation if it is a delete request
 					if err := validator.Validate(v); err != nil {
 						return nil, errors.BadRequest("VALIDATOR", err.Error()).WithCause(err)

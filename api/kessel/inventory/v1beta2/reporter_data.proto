@@ -1,0 +1,14 @@
+syntax = "proto3";
+
+package kessel.inventory.v1beta2;
+
+message ReporterData{
+  string reporterType = 1;
+  string reporterInstanceId = 2;
+  string reporterVersion = 3;
+  string localResourceId = 4;
+  string apiHref = 5;
+  string consoleHref = 6;
+  //TODO: This needs to be in Json schema
+  string resourceData = 7;
+}

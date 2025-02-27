@@ -1,0 +1,13 @@
+syntax = "proto3";
+
+package kessel.inventory.v1beta2;
+import "kessel/inventory/v1beta2/reporter_data.proto";
+
+message Resource {
+
+ string resourceType = 1;
+ ReporterData reporterData = 2;
+ //TODO: This needs to be read from schema
+ string commonResourceData = 3;
+
+}

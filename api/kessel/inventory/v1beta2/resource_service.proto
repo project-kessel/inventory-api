@@ -2,11 +2,8 @@ syntax = "proto3";
 
 package kessel.inventory.v1beta2;
 
-import "google/api/annotations.proto";
-import "buf/validate/validate.proto";
-
 import "kessel/inventory/v1beta2/resource.proto";
-import "kessel/inventory/v1beta2/reporter_data.proto";
+import "google/api/annotations.proto";
 
 option go_package = "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2";
 option java_multiple_files = true;
@@ -19,8 +16,8 @@ message ReportResourceRequest {
 message ReportResourceResponse {}
 
 message DeleteResourceRequest {
-  string localResourceId = 1;
-  string reporterType = 2;
+  string local_resource_id = 1;
+  string reporter_type = 2;
 }
 
 message DeleteResourceResponse {}

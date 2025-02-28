@@ -1,0 +1,17 @@
+{
+  "resource": {
+    "resource_type": "k8s_cluster",
+    "reporter_data": {
+      "reporter_type": "ACM",
+      "reporter_instance_id": "123",
+      "reporter_version": "0.1",
+      "local_resource_id": "2",
+      "api_href": "www.example.com",
+      "console_href": "www.example.com",
+      "resource_data": "schema-driven-value"
+    },
+    "common_resource_data": {
+      "workspace_id": "123"
+    }
+  }
+}

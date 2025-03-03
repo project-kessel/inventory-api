@@ -28,7 +28,6 @@ func (c *ResourceService) ReportResource(ctx context.Context, r *pb.ReportResour
 	if err != nil {
 		return nil, err
 	}
-
 	if h, err := toResource(r, identity); err == nil {
 		if resp, err := c.Ctl.Create(ctx, h); err == nil {
 			return fromResource(resp), nil
@@ -47,16 +46,16 @@ func (c *ResourceService) DeleteResource(ctx context.Context, r *pb.DeleteResour
 }
 
 func toResource(r *pb.ReportResourceRequest, identity *authnapi.Identity) (*model.Resource, error) {
-	var resourceType = r.Resource.ResourceType
-	resourceData, err := conv.ToJsonObject(r.Resource.ReporterData.ResourceData)
-	if err != nil {
-		return nil, err
-	}
+	log.Info("Report Resource Request: ", r)
+	var resourceType = r.Resource.GetResourceType()
+	//TODO: Fix this
+	//resourceData, err := conv.ToJsonObject(r.Resource.ReporterData.ResourceData)
+
 	var workspaceId, err2 = conv.ExtractWorkspaceId(r.Resource.CommonResourceData)
 	if err2 != nil {
 		return nil, err2
 	}
-	return conv.ResourceFromPb(resourceType, identity.Principal, resourceData, workspaceId, r.Resource.ReporterData), nil
+	return conv.ResourceFromPb(resourceType, identity.Principal, nil, workspaceId, r.Resource.ReporterData), nil
 }
 
 func fromResource(h *model.Resource) *pb.ReportResourceResponse {

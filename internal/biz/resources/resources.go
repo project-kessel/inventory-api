@@ -140,7 +140,12 @@ func (uc *Usecase) Create(ctx context.Context, m *model.Resource) (*model.Resour
 func (uc *Usecase) CheckForView(ctx context.Context, permission, namespace string, sub *kessel.SubjectReference, id model.ReporterResourceId) (bool, error) {
 	res, err := uc.reporterResourceRepository.FindByReporterResourceId(ctx, id)
 	if err != nil {
-		return false, err
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			// resource doesn't exist.
+			return false, nil
+		} else {
+			return false, err
+		}
 	}
 
 	allowed, _, err := uc.Authz.CheckForView(ctx, namespace, permission, res, sub)
@@ -158,7 +163,12 @@ func (uc *Usecase) CheckForView(ctx context.Context, permission, namespace strin
 func (uc *Usecase) CheckForUpdate(ctx context.Context, permission, namespace string, sub *kessel.SubjectReference, id model.ReporterResourceId) (bool, error) {
 	res, err := uc.reporterResourceRepository.FindByReporterResourceId(ctx, id)
 	if err != nil {
-		return false, err
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			// resource doesn't exist yet.
+			res = &model.Resource{ResourceType: id.ResourceType, Reporter: model.ResourceReporter{LocalResourceId: id.LocalResourceId}}
+		} else {
+			return false, err
+		}
 	}
 
 	allowed, consistency, err := uc.Authz.CheckForUpdate(ctx, namespace, permission, res, sub)
@@ -180,7 +190,12 @@ func (uc *Usecase) CheckForUpdate(ctx context.Context, permission, namespace str
 func (uc *Usecase) CheckForCreate(ctx context.Context, permission, namespace string, sub *kessel.SubjectReference, id model.ReporterResourceId) (bool, error) {
 	res, err := uc.reporterResourceRepository.FindByReporterResourceId(ctx, id)
 	if err != nil {
-		return false, err
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			// resource doesn't exist.
+			res = &model.Resource{ResourceType: id.ResourceType, Reporter: model.ResourceReporter{LocalResourceId: id.LocalResourceId}}
+		} else {
+			return false, err
+		}
 	}
 
 	allowed, _, err := uc.Authz.CheckForUpdate(ctx, namespace, permission, res, sub)

@@ -89,6 +89,10 @@ objects:
             public:
               enabled: true
               apiPath: inventory
+
+      testing:
+        iqePlugin: kessel-inventory
+
 parameters:
   - description: ClowdEnvironment name (ephemeral, stage, prod)
     name: ENV_NAME

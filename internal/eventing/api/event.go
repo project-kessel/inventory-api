@@ -2,10 +2,11 @@ package api
 
 import (
 	"fmt"
-	"github.com/google/uuid"
-	"github.com/project-kessel/inventory-api/internal/biz/model"
 	"strings"
 	"time"
+
+	"github.com/google/uuid"
+	"github.com/project-kessel/inventory-api/internal/biz/model"
 )
 
 // Todo: get rid of this Event and have an Event (as event output) with all the assignments going on the New* functions
@@ -138,12 +139,12 @@ func NewResourceEvent(operationType OperationType, resource *model.Resource, rep
 				Labels:       labels,
 			},
 			ReporterData: ResourceReporter{
-				ReporterInstanceId: resource.Reporter.ReporterId,
-				ReporterType:       resource.Reporter.ReporterType,
+				ReporterInstanceId: resource.Reporter.ReporterId,   //nolint:staticcheck
+				ReporterType:       resource.Reporter.ReporterType, //nolint:staticcheck
 				ConsoleHref:        resource.ConsoleHref,
 				ApiHref:            resource.ApiHref,
-				LocalResourceId:    resource.Reporter.LocalResourceId,
-				ReporterVersion:    resource.Reporter.ReporterVersion,
+				LocalResourceId:    resource.Reporter.LocalResourceId, //nolint:staticcheck
+				ReporterVersion:    resource.Reporter.ReporterVersion, //nolint:staticcheck
 			},
 			ResourceData: resource.ResourceData,
 		},

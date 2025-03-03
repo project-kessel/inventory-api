@@ -26,3 +26,5 @@ for i in {1..50}; do
   sleep 3
 done
 kubectl logs $TEST_POD
+echo "Unexpected timeout, test pod did not complete"
+exit 1

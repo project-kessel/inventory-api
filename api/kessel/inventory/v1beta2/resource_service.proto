@@ -33,7 +33,9 @@ service KesselResourceService {
   rpc DeleteResource(DeleteResourceRequest) returns (DeleteResourceResponse) {
     option (google.api.http) = {
       delete : "/api/inventory/v1beta2/resources"
-      body : "*"
+      additional_bindings {
+        get: "/api/inventory/v1beta2/resources?local_resource_id={local_resource_id}&reporter_type={reporter_type}"
+      }
     };
   };
 }

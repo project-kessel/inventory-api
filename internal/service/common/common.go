@@ -46,10 +46,11 @@ func ResourceFromPbv1beta1(resourceType, reporterId string, resourceData model.J
 
 func ResourceFromPb(resourceType, reporterId string, resourceData model.JsonObject, workspaceId string, reporter *pbresourcev1beta2.ReporterData) *model.Resource {
 	return &model.Resource{
-		ID:           uuid.UUID{},
-		ResourceData: resourceData,
-		ResourceType: resourceType,
-		WorkspaceId:  workspaceId,
+		ID:                 uuid.UUID{},
+		ResourceData:       resourceData,
+		ResourceType:       resourceType,
+		WorkspaceId:        workspaceId,
+		ReporterResourceId: reporter.LocalResourceId,
 		Reporter: model.ResourceReporter{
 			Reporter: model.Reporter{
 				ReporterId:      reporterId,

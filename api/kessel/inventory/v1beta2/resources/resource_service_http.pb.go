@@ -2,9 +2,9 @@
 // versions:
 // - protoc-gen-go-http v2.8.0
 // - protoc             (unknown)
-// source: kessel/inventory/v1beta2/resource_service.proto
+// source: kessel/inventory/v1beta2/resources/resource_service.proto
 
-package v1beta2
+package resources
 
 import (
 	context "context"
@@ -19,8 +19,8 @@ var _ = binding.EncodeURL
 
 const _ = http.SupportPackageIsVersion1
 
-const OperationKesselResourceServiceDeleteResource = "/kessel.inventory.v1beta2.KesselResourceService/DeleteResource"
-const OperationKesselResourceServiceReportResource = "/kessel.inventory.v1beta2.KesselResourceService/ReportResource"
+const OperationKesselResourceServiceDeleteResource = "/kessel.inventory.v1beta2.resources.KesselResourceService/DeleteResource"
+const OperationKesselResourceServiceReportResource = "/kessel.inventory.v1beta2.resources.KesselResourceService/ReportResource"
 
 type KesselResourceServiceHTTPServer interface {
 	DeleteResource(context.Context, *DeleteResourceRequest) (*DeleteResourceResponse, error)

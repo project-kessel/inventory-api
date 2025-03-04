@@ -3,6 +3,7 @@ package serve
 import (
 	"context"
 	"fmt"
+	"github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2/resources"
 	"os"
 	"os/signal"
 	"syscall"
@@ -38,8 +39,6 @@ import (
 	hb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1"
 	rel "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/relationships"
 	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/resources"
-	pbv1beta2 "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2"
-
 	healthctl "github.com/project-kessel/inventory-api/internal/biz/health"
 	healthrepo "github.com/project-kessel/inventory-api/internal/data/health"
 	healthssvc "github.com/project-kessel/inventory-api/internal/service/health"
@@ -149,16 +148,15 @@ func NewCommand(
 				return err
 			}
 
+			inventoryresources_repo := inventoryResourcesRepo.New(db)
 
 			// wire together resource handling
 			//v1beta2
 			resource_repo := resourcerepo.New(db)
-			resource_controller := resourcesctl.New(resource_repo, authorizer, eventingManager, "notifications", log.With(logger, "subsystem", "notificationsintegrations_controller"), storageConfig.Options.DisablePersistence)
+			resource_controller := resourcesctl.New(resource_repo, inventoryresources_repo, authorizer, eventingManager, "notifications", log.With(logger, "subsystem", "notificationsintegrations_controller"), storageConfig.Options.DisablePersistence)
 			resource_service := resourcesvc.New(resource_controller)
-			pbv1beta2.RegisterKesselResourceServiceServer(server.GrpcServer, resource_service)
-			pbv1beta2.RegisterKesselResourceServiceHTTPServer(server.HttpServer, resource_service)
-
-			inventoryresources_repo := inventoryResourcesRepo.New(db)
+			resources.RegisterKesselResourceServiceServer(server.GrpcServer, resource_service)
+			resources.RegisterKesselResourceServiceHTTPServer(server.HttpServer, resource_service)
 
 			// wire together notificationsintegrations handling
 			notifs_repo := resourcerepo.New(db)

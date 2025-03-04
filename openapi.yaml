@@ -401,7 +401,7 @@ paths:
                 content:
                     application/json:
                         schema:
-                            $ref: '#/components/schemas/kessel.inventory.v1beta2.ReportResourceRequest'
+                            $ref: '#/components/schemas/kessel.inventory.v1beta2.resources.ReportResourceRequest'
                 required: true
             responses:
                 "200":
@@ -409,7 +409,7 @@ paths:
                     content:
                         application/json:
                             schema:
-                                $ref: '#/components/schemas/kessel.inventory.v1beta2.ReportResourceResponse'
+                                $ref: '#/components/schemas/kessel.inventory.v1beta2.resources.ReportResourceResponse'
                 default:
                     description: Default error response
                     content:
@@ -424,7 +424,7 @@ paths:
                 content:
                     application/json:
                         schema:
-                            $ref: '#/components/schemas/kessel.inventory.v1beta2.DeleteResourceRequest'
+                            $ref: '#/components/schemas/kessel.inventory.v1beta2.resources.DeleteResourceRequest'
                 required: true
             responses:
                 "200":
@@ -432,7 +432,7 @@ paths:
                     content:
                         application/json:
                             schema:
-                                $ref: '#/components/schemas/kessel.inventory.v1beta2.DeleteResourceResponse'
+                                $ref: '#/components/schemas/kessel.inventory.v1beta2.resources.DeleteResourceResponse'
                 default:
                     description: Default error response
                     content:
@@ -964,25 +964,25 @@ components:
         kessel.inventory.v1beta1.resources.UpdateRhelHostResponse:
             type: object
             properties: {}
-        kessel.inventory.v1beta2.DeleteResourceRequest:
+        kessel.inventory.v1beta2.resources.DeleteResourceRequest:
             type: object
             properties:
                 localResourceId:
                     type: string
                 reporterType:
                     type: string
-        kessel.inventory.v1beta2.DeleteResourceResponse:
+        kessel.inventory.v1beta2.resources.DeleteResourceResponse:
             type: object
             properties: {}
-        kessel.inventory.v1beta2.ReportResourceRequest:
+        kessel.inventory.v1beta2.resources.ReportResourceRequest:
             type: object
             properties:
                 resource:
-                    $ref: '#/components/schemas/kessel.inventory.v1beta2.Resource'
-        kessel.inventory.v1beta2.ReportResourceResponse:
+                    $ref: '#/components/schemas/kessel.inventory.v1beta2.resources.Resource'
+        kessel.inventory.v1beta2.resources.ReportResourceResponse:
             type: object
             properties: {}
-        kessel.inventory.v1beta2.ReporterData:
+        kessel.inventory.v1beta2.resources.ReporterData:
             type: object
             properties:
                 reporterType:
@@ -998,17 +998,17 @@ components:
                 consoleHref:
                     type: string
                 resourceData:
-                    type: string
+                    type: object
                     description: 'TODO: This needs to be in Json schema'
-        kessel.inventory.v1beta2.Resource:
+        kessel.inventory.v1beta2.resources.Resource:
             type: object
             properties:
                 resourceType:
                     type: string
                 reporterData:
-                    $ref: '#/components/schemas/kessel.inventory.v1beta2.ReporterData'
+                    $ref: '#/components/schemas/kessel.inventory.v1beta2.resources.ReporterData'
                 commonResourceData:
-                    type: string
+                    type: object
                     description: 'TODO: This needs to be read from schema'
 tags:
     - name: KesselInventoryHealthService

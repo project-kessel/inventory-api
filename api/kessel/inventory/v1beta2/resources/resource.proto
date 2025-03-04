@@ -12,7 +12,6 @@ message Resource {
 
  string resource_type = 1;
  ReporterData reporter_data = 2;
- //TODO: This needs to be read from schema
  google.protobuf.Struct common_resource_data = 3 [  json_name = "commonResourceData"];
 
 }

@@ -14,6 +14,5 @@ message ReporterData{
   string local_resource_id = 4;
   string api_href = 5;
   string console_href = 6;
-  //TODO: This needs to be in Json schema
   google.protobuf.Struct resource_data = 7 [  json_name = "resourceData"];
 }

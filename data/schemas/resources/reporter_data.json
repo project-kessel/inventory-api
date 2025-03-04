@@ -5,7 +5,11 @@
     "reporter_type": {
       "type": "string",
       "enum": [
-        "HBI"
+        "HBI",
+        "ACM",
+        "OCM",
+        "ACS",
+        "NOTIFICATIONS"
       ]
     },
     "console_href": { "type": "string" },
@@ -21,3 +25,4 @@
     "reporter_version"
   ]
 }
+

@@ -136,6 +136,12 @@ func validateResourceJSON(msg proto.Message) error {
 	}
 	fmt.Printf("DEBUG: Extracted reporterType: %s\n", reporterType)
 
+	// Compare resource_type and reporter_type with each other and make sure the correct combination is used.
+	err = ValidateResourceReporterCombination(resourceType, reporterType)
+	if err != nil {
+		return err
+	}
+
 	// Step 6: Try loading the resource schema
 	fmt.Println("DEBUG: Validating schema for resource type:", resourceType)
 	resourceDataSchema, err := getSchemaFromCache(fmt.Sprintf("resource:%s", strings.ToLower(resourceType)))

@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 )
 
-func ValidateCombination(resourceType, reporterType string) error {
+func ValidateResourceReporterCombination(resourceType, reporterType string) error {
 	resourceReporters, err := LoadValidReporters(resourceType)
 	if err != nil {
 		return fmt.Errorf("failed to load valid reporters for '%s': %w", resourceType, err)

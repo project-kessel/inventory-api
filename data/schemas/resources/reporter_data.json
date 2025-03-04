@@ -18,11 +18,11 @@
     "reporter_version": { "type": "string" }
   },
   "required": [
-    "reporter_type",
-    "console_href",
-    "api_href",
-    "local_resource_id",
-    "reporter_version"
+    "reporterType",
+    "consoleHref",
+    "apiHref",
+    "localResourceId",
+    "reporterVersion"
   ]
 }
 

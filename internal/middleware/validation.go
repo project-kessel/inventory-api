@@ -130,13 +130,13 @@ func validateResourceJSON(msg proto.Message) error {
 	}
 	fmt.Printf("DEBUG: Extracted reporterData: %+v\n", reporterData)
 
+	// compare against resource_type
 	reporterType, ok := reporterData["reporterType"].(string)
 	if !ok {
 		return fmt.Errorf("ERROR: Missing or invalid 'reporterType' field for resource '%s'", resourceType)
 	}
 	fmt.Printf("DEBUG: Extracted reporterType: %s\n", reporterType)
 
-	// Compare resource_type and reporter_type with each other and make sure the correct combination is used.
 	err = ValidateResourceReporterCombination(resourceType, reporterType)
 	if err != nil {
 		return err
@@ -147,7 +147,10 @@ func validateResourceJSON(msg proto.Message) error {
 	resourceDataSchema, err := getSchemaFromCache(fmt.Sprintf("resource:%s", strings.ToLower(resourceType)))
 
 	if err != nil {
-		// If schema is missing, assume it is an abstract resource (No resource_data validation)
+		// Fail if no schema exists but resource_data is provided
+		if _, exists := reporterData["resourceData"].(map[string]interface{}); exists {
+			return fmt.Errorf("ERROR: No schema found for '%s', but 'resourceData' was provided. Submission is not allowed", resourceType)
+		}
 		fmt.Printf("WARNING: No schema found for '%s'. Treating as an abstract resource.\n", resourceType)
 	} else {
 		// Step 7: Validate `resourceData` if schema exists
@@ -172,16 +175,16 @@ func validateResourceJSON(msg proto.Message) error {
 		}
 	}
 
-	//// Step 9: Always validate `reporterData`
-	//fmt.Println("DEBUG: Validating 'reporterData' against schema...")
-	//reporterSchema, err := getSchemaFromCache("common:reporter_data")
-	//if err != nil {
-	//	return fmt.Errorf("ERROR: Failed to load reporter schema: %w", err)
-	//}
+	// Step 9: Always validate `reporterData`
+	fmt.Println("DEBUG: Validating 'reporterData' against schema...")
+	reporterSchema, err := getSchemaFromCache("common:reporter_data")
+	if err != nil {
+		return fmt.Errorf("ERROR: Failed to load reporter schema: %w", err)
+	}
 
-	//if err := validateJSONSchema(reporterSchema, reporterData); err != nil {
-	//	return fmt.Errorf("ERROR: 'reporterData' validation failed for resource '%s': %w", resourceType, err)
-	//}
+	if err := validateJSONSchema(reporterSchema, reporterData); err != nil {
+		return fmt.Errorf("ERROR: 'reporterData' validation failed for resource '%s': %w", resourceType, err)
+	}
 
 	fmt.Println("DEBUG: Validation successfully passed!")
 	return nil

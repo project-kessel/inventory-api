@@ -3,7 +3,7 @@ package resources
 import (
 	"context"
 	"github.com/go-kratos/kratos/v2/log"
-	pbv1beta2 "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2/resources"
+	pbv1beta2 "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2"
 	"github.com/project-kessel/inventory-api/internal/biz/resources"
 )
 

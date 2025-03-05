@@ -38,7 +38,7 @@ import (
 	hb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1"
 	rel "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/relationships"
 	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/resources"
-	pbv1beta2 "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2/resources"
+	pbv1beta2 "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2"
 	healthctl "github.com/project-kessel/inventory-api/internal/biz/health"
 	healthrepo "github.com/project-kessel/inventory-api/internal/data/health"
 	healthssvc "github.com/project-kessel/inventory-api/internal/service/health"

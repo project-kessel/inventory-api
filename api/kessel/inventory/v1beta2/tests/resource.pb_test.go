@@ -2,6 +2,7 @@ package resources_test
 
 import (
 	"fmt"
+	"github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2"
 	pbv1beta2 "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2/resources"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/protobuf/types/known/structpb"
@@ -34,7 +35,7 @@ func ValidateResourceRequest(req *pbv1beta2.ReportResourceRequest) error {
 }
 
 // Validate ReporterData structure
-func validateReporterData(reporter *pbv1beta2.ReporterData) error {
+func validateReporterData(reporter *v1beta2.ReporterData) error {
 	if reporter == nil {
 		return fmt.Errorf("reporter_data is required")
 	}
@@ -102,7 +103,7 @@ func TestResourceValidation(t *testing.T) {
 			request: &pbv1beta2.ReportResourceRequest{
 				Resource: &pbv1beta2.Resource{
 					ResourceType: "rhel_host",
-					ReporterData: &pbv1beta2.ReporterData{
+					ReporterData: &v1beta2.ReporterData{
 						ReporterType:       "HBI",
 						ReporterInstanceId: "user@example.com",
 						ReporterVersion:    "0.1",
@@ -125,7 +126,7 @@ func TestResourceValidation(t *testing.T) {
 			request: &pbv1beta2.ReportResourceRequest{
 				Resource: &pbv1beta2.Resource{
 					ResourceType: "rhel_host",
-					ReporterData: &pbv1beta2.ReporterData{
+					ReporterData: &v1beta2.ReporterData{
 						ReporterType:       "HBI",
 						ReporterInstanceId: "user@example.com",
 						ReporterVersion:    "0.1",

@@ -401,7 +401,7 @@ paths:
                 content:
                     application/json:
                         schema:
-                            $ref: '#/components/schemas/kessel.inventory.v1beta2.resources.ReportResourceRequest'
+                            $ref: '#/components/schemas/kessel.inventory.v1beta2.ReportResourceRequest'
                 required: true
             responses:
                 "200":
@@ -409,7 +409,7 @@ paths:
                     content:
                         application/json:
                             schema:
-                                $ref: '#/components/schemas/kessel.inventory.v1beta2.resources.ReportResourceResponse'
+                                $ref: '#/components/schemas/kessel.inventory.v1beta2.ReportResourceResponse'
                 default:
                     description: Default error response
                     content:
@@ -424,7 +424,7 @@ paths:
                 content:
                     application/json:
                         schema:
-                            $ref: '#/components/schemas/kessel.inventory.v1beta2.resources.DeleteResourceRequest'
+                            $ref: '#/components/schemas/kessel.inventory.v1beta2.DeleteResourceRequest'
                 required: true
             responses:
                 "200":
@@ -432,7 +432,7 @@ paths:
                     content:
                         application/json:
                             schema:
-                                $ref: '#/components/schemas/kessel.inventory.v1beta2.resources.DeleteResourceResponse'
+                                $ref: '#/components/schemas/kessel.inventory.v1beta2.DeleteResourceResponse'
                 default:
                     description: Default error response
                     content:
@@ -964,25 +964,25 @@ components:
         kessel.inventory.v1beta1.resources.UpdateRhelHostResponse:
             type: object
             properties: {}
-        kessel.inventory.v1beta2.resources.DeleteResourceRequest:
+        kessel.inventory.v1beta2.DeleteResourceRequest:
             type: object
             properties:
                 localResourceId:
                     type: string
                 reporterType:
                     type: string
-        kessel.inventory.v1beta2.resources.DeleteResourceResponse:
+        kessel.inventory.v1beta2.DeleteResourceResponse:
             type: object
             properties: {}
-        kessel.inventory.v1beta2.resources.ReportResourceRequest:
+        kessel.inventory.v1beta2.ReportResourceRequest:
             type: object
             properties:
                 resource:
-                    $ref: '#/components/schemas/kessel.inventory.v1beta2.resources.Resource'
-        kessel.inventory.v1beta2.resources.ReportResourceResponse:
+                    $ref: '#/components/schemas/kessel.inventory.v1beta2.Resource'
+        kessel.inventory.v1beta2.ReportResourceResponse:
             type: object
             properties: {}
-        kessel.inventory.v1beta2.resources.ReporterData:
+        kessel.inventory.v1beta2.ReporterData:
             type: object
             properties:
                 reporterType:
@@ -999,13 +999,13 @@ components:
                     type: string
                 resourceData:
                     type: object
-        kessel.inventory.v1beta2.resources.Resource:
+        kessel.inventory.v1beta2.Resource:
             type: object
             properties:
                 resourceType:
                     type: string
                 reporterData:
-                    $ref: '#/components/schemas/kessel.inventory.v1beta2.resources.ReporterData'
+                    $ref: '#/components/schemas/kessel.inventory.v1beta2.ReporterData'
                 commonResourceData:
                     type: object
 tags:

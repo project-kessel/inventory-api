@@ -7,7 +7,8 @@ import (
 	"github.com/go-kratos/kratos/v2/middleware"
 	"github.com/go-kratos/kratos/v2/transport"
 	"github.com/go-kratos/kratos/v2/transport/http"
-	pbv2 "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2/resources"
+	"github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2"
+	pbv2 "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2"
 	"google.golang.org/protobuf/types/known/structpb"
 	"io"
 	"strings"
@@ -111,7 +112,7 @@ func createResourceRequest(payload ResourcePayload) (*pbv2.ReportResourceRequest
 	return &pbv2.ReportResourceRequest{
 		Resource: &pbv2.Resource{
 			ResourceType: payload.Resource.ResourceType,
-			ReporterData: &pbv2.ReporterData{
+			ReporterData: &v1beta2.ReporterData{
 				ReporterType:       payload.Resource.ReporterData.ReporterType,
 				ReporterInstanceId: payload.Resource.ReporterData.ReporterInstanceID,
 				ReporterVersion:    payload.Resource.ReporterData.ReporterVersion,

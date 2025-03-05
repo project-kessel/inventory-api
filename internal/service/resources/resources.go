@@ -28,9 +28,9 @@ func (c *ResourceService) ReportResource(ctx context.Context, r *pb.ReportResour
 	if err != nil {
 		return nil, err
 	}
-	if h, err := toResource(r, identity); err == nil {
-		if resp, err := c.Ctl.Create(ctx, h); err == nil {
-			return fromResource(resp), nil
+	if h, err := requestToResource(r, identity); err == nil {
+		if resp, err := c.Ctl.Upsert(ctx, h); err == nil {
+			return responseFromResource(resp), nil
 
 		} else {
 			return nil, err
@@ -45,7 +45,7 @@ func (c *ResourceService) DeleteResource(ctx context.Context, r *pb.DeleteResour
 	return nil, nil
 }
 
-func toResource(r *pb.ReportResourceRequest, identity *authnapi.Identity) (*model.Resource, error) {
+func requestToResource(r *pb.ReportResourceRequest, identity *authnapi.Identity) (*model.Resource, error) {
 	log.Info("Report Resource Request: ", r)
 	var resourceType = r.Resource.GetResourceType()
 	//TODO: Fix this
@@ -58,6 +58,6 @@ func toResource(r *pb.ReportResourceRequest, identity *authnapi.Identity) (*mode
 	return conv.ResourceFromPb(resourceType, identity.Principal, nil, workspaceId, r.Resource.ReporterData), nil
 }
 
-func fromResource(h *model.Resource) *pb.ReportResourceResponse {
+func responseFromResource(h *model.Resource) *pb.ReportResourceResponse {
 	return &pb.ReportResourceResponse{}
 }

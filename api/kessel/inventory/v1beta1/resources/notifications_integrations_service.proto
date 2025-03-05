@@ -44,8 +44,8 @@ message ListNotificationsIntegrationsRequest {
 	// parent resource type and id
 
   authz.ObjectType resource_type = 1 [(buf.validate.field).required = true];
-	string relation = 2 [(buf.validate.field).string.min_len = 1];
-	authz.SubjectReference subject = 3 [(buf.validate.field).required = true];
+  string relation = 2 [(buf.validate.field).string.min_len = 1];
+  authz.SubjectReference subject = 3 [(buf.validate.field).required = true];
   authz.ObjectReference parent = 4 [(buf.validate.field).required = true]; 
 }
 

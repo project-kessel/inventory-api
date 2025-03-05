@@ -66,15 +66,6 @@ func (uc *Usecase) Create(ctx context.Context, m *model.Resource) (*model.Resour
 	ret := m // Default to returning the input model in case persistence is disabled
 	updatedResources := []*model.Resource{}
 
-	if uc.Authz != nil {
-		ct, err := biz.DefaultSetWorkspace(ctx, uc.Namespace, m, uc.Authz)
-		if err != nil {
-			return nil, err
-		}
-
-		m.ConsistencyToken = ct
-	}
-
 	if !uc.DisablePersistence {
 		// check if the resource already exists
 		existingResource, err := uc.reporterResourceRepository.FindByReporterData(ctx, m.ReporterId, m.ReporterResourceId)
@@ -120,16 +111,21 @@ func (uc *Usecase) Create(ctx context.Context, m *model.Resource) (*model.Resour
 
 	if uc.Authz != nil {
 		// Send workspace for the created resource
-		err := biz.DefaultSetWorkspace(ctx, uc.Namespace, m, uc.Authz)
+		ct, err := biz.DefaultSetWorkspace(ctx, uc.Namespace, m, uc.Authz)
 		if err != nil {
 			return nil, err
 		}
+
+		m.ConsistencyToken = ct
+
 		// Send workspace for any updated resources
 		for _, updatedResource := range updatedResources {
-			err := biz.DefaultSetWorkspace(ctx, uc.Namespace, updatedResource, uc.Authz)
+			ct, err := biz.DefaultSetWorkspace(ctx, uc.Namespace, updatedResource, uc.Authz)
 			if err != nil {
 				return nil, err
 			}
+
+			updatedResource.ConsistencyToken = ct
 		}
 	}
 
@@ -286,10 +282,11 @@ func (uc *Usecase) Update(ctx context.Context, m *model.Resource, id model.Repor
 
 	if uc.Authz != nil {
 		for _, updatedResource := range updatedResources {
-			err := biz.DefaultSetWorkspace(ctx, uc.Namespace, updatedResource, uc.Authz)
+			ct, err := biz.DefaultSetWorkspace(ctx, uc.Namespace, updatedResource, uc.Authz)
 			if err != nil {
 				return nil, err
 			}
+			updatedResource.ConsistencyToken = ct
 		}
 	}
 

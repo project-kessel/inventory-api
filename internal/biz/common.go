@@ -50,8 +50,8 @@ func DefaultRelationshipSendEvent(ctx context.Context, m *model.Relationship, ev
 	return nil
 }
 
-func DefaultSetWorkspace(ctx context.Context, namespace string, model *model.Resource, authz authzapi.Authorizer) error {
-	_, err := authz.SetWorkspace(ctx, model.Reporter.LocalResourceId, model.WorkspaceId, namespace, model.ResourceType) //nolint:staticcheck
+func DefaultSetWorkspace(ctx context.Context, namespace string, model *model.Resource, authz authzapi.Authorizer) (string, error) {
+	r, err := authz.SetWorkspace(ctx, model.Reporter.LocalResourceId, model.WorkspaceId, namespace, model.ResourceType) //nolint:staticcheck
 	if err != nil {
 		return "", err
 	}

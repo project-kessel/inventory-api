@@ -2,11 +2,12 @@ package common
 
 import (
 	"fmt"
+	"os"
+	"strings"
+
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/go-kratos/kratos/v2/middleware/tracing"
 	"github.com/spf13/viper"
-	"os"
-	"strings"
 )
 
 type LoggerOptions struct {

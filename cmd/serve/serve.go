@@ -159,7 +159,7 @@ func NewCommand(
 
 			// wire together authz handling
 			authz_repo := resourcerepo.New(db)
-			authz_controller := resourcesctl.New(authz_repo, authorizer, eventingManager, "authz", log.With(logger, "subsystem", "authz_controller"), storageConfig.Options.DisablePersistence)
+			authz_controller := resourcesctl.New(authz_repo, inventoryresources_repo, authorizer, eventingManager, "authz", log.With(logger, "subsystem", "authz_controller"), storageConfig.Options.DisablePersistence)
 			authz_service := authzsvc.New(authz_controller)
 			authz2.RegisterKesselCheckServiceServer(server.GrpcServer, authz_service)
 			authz2.RegisterKesselCheckServiceHTTPServer(server.HttpServer, authz_service)

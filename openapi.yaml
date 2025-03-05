@@ -999,7 +999,6 @@ components:
                     type: string
                 resourceData:
                     type: object
-                    description: 'TODO: This needs to be in Json schema'
         kessel.inventory.v1beta2.resources.Resource:
             type: object
             properties:
@@ -1009,7 +1008,6 @@ components:
                     $ref: '#/components/schemas/kessel.inventory.v1beta2.resources.ReporterData'
                 commonResourceData:
                     type: object
-                    description: 'TODO: This needs to be read from schema'
 tags:
     - name: KesselInventoryHealthService
     - name: KesselK8SClusterService

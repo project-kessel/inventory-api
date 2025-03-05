@@ -13,42 +13,6 @@ import (
 	"strings"
 )
 
-//func UnaryServerInterceptor(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
-//      type ResourceData struct {
-//              Metadata     model.JsonObject `json:"metadata"`
-//              ReporterData model.JsonObject `json:"reporter_data"`
-//              ResourceData model.JsonObject `json:"resource_data,omitempty"`
-//      }
-//      if payload, ok := req.(*pb.UpdateK8SClusterRequest); ok {
-//              // For debugging.
-//              fmt.Println("Received payload:", payload)
-//
-//              // Create a generic resource by transforming fields from the payload.
-//              resource := &ResourceData{
-//                      Metadata: model.JsonObject{
-//                              "resource_type": payload.K8SCluster.Metadata.ResourceType,
-//                              "workspace_id":  payload.K8SCluster.Metadata.WorkspaceId,
-//                      },
-//                      ReporterData: model.JsonObject{
-//                              "reporter_type":     payload.K8SCluster.ReporterData.ReporterType,
-//                              "reporter_version":  payload.K8SCluster.ReporterData.ReporterVersion,
-//                              "local_resource_id": payload.K8SCluster.ReporterData.LocalResourceId,
-//                              "api_href":          payload.K8SCluster.ReporterData.ApiHref,
-//                              "console_href":      payload.K8SCluster.ReporterData.ConsoleHref,
-//                      },
-//                      ResourceData: model.JsonObject{
-//                              "external_cluster_id": payload.K8SCluster.ResourceData.ExternalClusterId,
-//                      },
-//              }
-//
-//              // Pass the transformed resource down the chain.
-//              return handler(ctx, resource)
-//      }
-//
-//      // If the request is not of type *Payload, pass it down the chain as-is.
-//      return handler(ctx, req)
-//}
-
 type ReporterDataPayload struct {
 	ReporterType       string                 `json:"reporter_type"`
 	ReporterInstanceID string                 `json:"reporter_instance_id"`

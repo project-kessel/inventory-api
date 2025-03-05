@@ -4,25 +4,8 @@
   "properties": {
     "reporter_type": {
       "type": "string",
-      "enum": [
-        "HBI",
-        "ACM",
-        "OCM",
-        "ACS",
-        "NOTIFICATIONS"
-      ]
-    },
-    "console_href": { "type": "string" },
-    "api_href": { "type": "string" },
-    "local_resource_id": { "type": "string" },
-    "reporter_version": { "type": "string" }
+      "enum": ["ACM", "HBI", "OCM", "NOTIFICATIONS"]
+    }
   },
-  "required": [
-    "reporterType",
-    "consoleHref",
-    "apiHref",
-    "localResourceId",
-    "reporterVersion"
-  ]
+  "required": ["reporter_type"]
 }
-

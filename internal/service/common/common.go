@@ -53,9 +53,8 @@ func ResourceFromPb(resourceType, reporterId string, resourceData model.JsonObje
 		ReporterResourceId: reporter.LocalResourceId,
 		Reporter: model.ResourceReporter{
 			Reporter: model.Reporter{
-				ReporterId:      reporterId,
-				ReporterType:    reporter.ReporterType,
-				ReporterVersion: reporter.ReporterVersion,
+				ReporterId:   reporterId,
+				ReporterType: reporter.ReporterType,
 			},
 			LocalResourceId: reporter.LocalResourceId,
 		},

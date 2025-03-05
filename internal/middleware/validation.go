@@ -40,13 +40,13 @@ func Validation(validator protovalidate.Validator) middleware.Middleware {
 				}
 
 				switch v.(type) {
-				case *pbv1beta2.DeleteResourceRequest:
-					if err := validateResourceDeletion(v); err != nil {
-						return nil, errors.BadRequest("DELETE_VALIDATOR", err.Error()).WithCause(err)
-					}
 				case *pbv1beta2.ReportResourceRequest:
 					if err := validateResourceReporterJSON(v); err != nil {
-						return nil, errors.BadRequest("JSON_VALIDATOR", err.Error()).WithCause(err)
+						return nil, errors.BadRequest("REPORT_RESOURCE_JSON_VALIDATOR", err.Error()).WithCause(err)
+					}
+				case *pbv1beta2.DeleteResourceRequest:
+					if err := validateResourceDeletionJSON(v); err != nil {
+						return nil, errors.BadRequest("DELETE_RESOURCE_JSON_VALIDATOR", err.Error()).WithCause(err)
 					}
 				}
 			}
@@ -56,34 +56,32 @@ func Validation(validator protovalidate.Validator) middleware.Middleware {
 }
 
 func validateResourceReporterJSON(msg proto.Message) error {
-	fmt.Println("DEBUG: Starting JSON validation...")
-
 	data, err := marshalProtoToJSON(msg)
 	if err != nil {
 		return err
 	}
 
-	resourceMap, err := unmarshalJSONToMap(data)
+	reportResourceMap, err := unmarshalJSONToMap(data)
 	if err != nil {
 		return err
 	}
 
-	resource, err := extractResourceField(resourceMap)
+	resource, err := extractMapField(reportResourceMap, "resource")
 	if err != nil {
 		return err
 	}
 
-	resourceType, err := extractResourceType(resource)
+	resourceType, err := extractStringField(resource, "resourceType")
 	if err != nil {
 		return err
 	}
 
-	reporterData, err := extractReporterData(resource, resourceType)
+	reporterData, err := extractMapField(resource, "reporterData")
 	if err != nil {
 		return err
 	}
 
-	reporterType, err := extractResourceReporterType(reporterData, resourceType)
+	reporterType, err := extractStringField(reporterData, "reporterType")
 	if err != nil {
 		return err
 	}
@@ -92,7 +90,7 @@ func validateResourceReporterJSON(msg proto.Message) error {
 		return err
 	}
 
-	if err := validateResourceSchema(resourceType, reporterData); err != nil {
+	if err := validateReporterResourceData(resourceType, reporterData); err != nil {
 		return err
 	}
 
@@ -107,24 +105,27 @@ func validateResourceReporterJSON(msg proto.Message) error {
 	return nil
 }
 
-func validateResourceDeletion(msg proto.Message) error {
-	fmt.Println("DEBUG: Starting resource deletion validation...")
-
+// Validates resource deletion by extracting required fields from the request.
+func validateResourceDeletionJSON(msg proto.Message) error {
 	data, err := marshalProtoToJSON(msg)
 	if err != nil {
 		return err
 	}
 
-	deleteMap, err := unmarshalJSONToMap(data)
+	deleteResourceMap, err := unmarshalJSONToMap(data)
 	if err != nil {
 		return err
 	}
 
-	localResourceID, reporterType, err := extractDeleteFields(deleteMap)
+	_, err = extractStringField(deleteResourceMap, "localResourceId")
 	if err != nil {
 		return err
 	}
 
-	log.Debugf("DEBUG: Valid deletion request for reporterType '%s' with localResourceID '%s'\n", reporterType, localResourceID)
+	_, err = extractStringField(deleteResourceMap, "reporterType")
+	if err != nil {
+		return err
+	}
+
 	return nil
 }

@@ -30,7 +30,7 @@ func (c *ResourceService) ReportResource(ctx context.Context, r *pb.ReportResour
 	}
 	if h, err := requestToResource(r, identity); err == nil {
 		if resp, err := c.Ctl.Upsert(ctx, h); err == nil {
-			return responseFromResource(resp), nil
+			return fromResource(resp), nil
 
 		} else {
 			return nil, err
@@ -58,6 +58,6 @@ func requestToResource(r *pb.ReportResourceRequest, identity *authnapi.Identity)
 	return conv.ResourceFromPb(resourceType, identity.Principal, nil, workspaceId, r.Resource.ReporterData), nil
 }
 
-func responseFromResource(h *model.Resource) *pb.ReportResourceResponse {
+func fromResource(h *model.Resource) *pb.ReportResourceResponse {
 	return &pb.ReportResourceResponse{}
 }

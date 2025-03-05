@@ -61,8 +61,9 @@ func New(reporterResourceRepository ReporterResourceRepository, inventoryResourc
 }
 
 func (uc *Usecase) Upsert(ctx context.Context, m *model.Resource) (*model.Resource, error) {
+	log.Info("upserting resource: ", m)
 	ret := m // Default to returning the input model in case persistence is disabled
-	
+
 	if !uc.DisablePersistence {
 		// check if the resource already exists
 		existingResource, err := uc.reporterResourceRepository.FindByReporterResourceId(ctx, model.ReporterResourceIdFromResource(m))
@@ -70,13 +71,15 @@ func (uc *Usecase) Upsert(ctx context.Context, m *model.Resource) (*model.Resour
 		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, ErrDatabaseError
 		}
-
+		log.Info("found existing resource: ", existingResource)
 		if existingResource != nil {
+			log.Info("Updating resource: ", m)
 			_, _, err := uc.reporterResourceRepository.Update(ctx, m, existingResource.ID)
 			if err != nil {
 				return nil, err
 			}
 		}
+		log.Info("Creating resource: ", m)
 		ret, _, err = uc.reporterResourceRepository.Create(ctx, m)
 		if err != nil {
 			return nil, err

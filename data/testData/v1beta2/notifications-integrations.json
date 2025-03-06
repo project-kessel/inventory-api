@@ -1,0 +1,16 @@
+
+{
+      "resource_type": "integration",
+      "reporter_data": {
+          "reporter_instance_id": "service-account-1",
+          "reporter_type": "NOTIFICATIONS",
+          "local_resource_id": "1234",
+          "reporter_version": "0.1",
+          "api_href": "www.example.com",
+          "console_href": "www.example.com",
+          "resource_data": "schema-driven-value"
+      },
+      "common_resource_data": {
+          "workspace_id": "123"
+      }
+  }

@@ -1,0 +1,19 @@
+{
+  "k8s_policy": {
+    "metadata": {
+      "resource_type": "k8s_policy",
+      "workspace_id": "01932c7e-e93e-719c-a488-3159877367b0"
+    },
+    "reporter_data": {
+      "reporter_type": "ACM",
+      "reporter_version": "0.1",
+      "local_resource_id": "1",
+      "api_href": "www.example.com",
+      "console_href": "www.example.com"
+    },
+    "resource_data": {
+      "disabled": true,
+      "severity": "MEDIUM"
+    }
+  }
+}

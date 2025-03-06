@@ -1,0 +1,3 @@
+resource_type: k8s_policy
+resource_reporters:
+  - ACM

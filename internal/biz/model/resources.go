@@ -26,6 +26,7 @@ type Resource struct {
 	// Reporter Fields
 	ReporterResourceId string `json:"reporter_resource_id"`
 	ReporterId         string `json:"reporter_id"`
+	ReporterType       string `json:"reporter_type"`
 	// Deprecated: Use Reporter Fields instead(ReporterId, ReporterResourceId)
 	Reporter ResourceReporter
 }

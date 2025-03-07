@@ -74,7 +74,6 @@ func createReporterData(reporter ReporterDataPayload) (*structpb.Struct, error) 
 	resMap := map[string]interface{}{
 		"reporter_type":        reporter.ReporterType,
 		"reporter_instance_id": reporter.ReporterInstanceID,
-		"reporter_version":     reporter.ReporterVersion,
 		"local_resource_id":    reporter.LocalResourceID,
 		"api_href":             reporter.APIHref,
 		"console_href":         reporter.ConsoleHref,

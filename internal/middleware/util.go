@@ -114,19 +114,26 @@ func validateReporterData(reporterData map[string]interface{}, resourceType stri
 func validateReporterResourceData(resourceType string, reporterData map[string]interface{}) error {
 	resourceDataSchema, err := getSchemaFromCache(fmt.Sprintf("resource:%s", strings.ToLower(resourceType)))
 
+	_, hasResourceData := reporterData["resourceData"]
+
+	if err == nil && !hasResourceData {
+		return fmt.Errorf("schema found for '%s', but no 'resourceData' provided. Submission is not allowed", resourceType)
+	}
+
 	if err != nil {
-		if _, exists := reporterData["resourceData"].(map[string]interface{}); exists {
+		if hasResourceData {
 			return fmt.Errorf("no schema found for '%s', but 'resourceData' was provided. Submission is not allowed", resourceType)
 		}
 		log.Warnf("no schema found for %s, treating as an abstract resource", resourceType)
 		return nil
 	}
 
-	if resourceData, exists := reporterData["resourceData"].(map[string]interface{}); exists {
-		if err := validateJSONSchema(resourceDataSchema, resourceData); err != nil {
+	if hasResourceData {
+		if err := validateJSONSchema(resourceDataSchema, reporterData["resourceData"].(map[string]interface{})); err != nil {
 			return fmt.Errorf("resourceData validation failed for '%s': %w", resourceType, err)
 		}
 	}
+
 	return nil
 }
 

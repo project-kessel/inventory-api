@@ -118,9 +118,11 @@ func (uc *Usecase) Create(ctx context.Context, m *model.Resource) (*model.Resour
 
 		m.ConsistencyToken = ct
 
-		_, _, err = uc.reporterResourceRepository.Update(ctx, m, m.ID)
-		if err != nil {
-			return nil, err
+		if !uc.DisablePersistence {
+			_, _, err = uc.reporterResourceRepository.Update(ctx, m, m.ID)
+			if err != nil {
+				return nil, err
+			}
 		}
 
 		// Send workspace for any updated resources

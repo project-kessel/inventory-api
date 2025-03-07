@@ -14,7 +14,7 @@ var schemaCache sync.Map
 func PreloadAllSchemas(resourceDir string) error {
 	// Set default resource directory if not provided
 	if resourceDir == "" {
-		resourceDir = "data/schemas/resources"
+		resourceDir = "data/schema/resources"
 		log.Infof("Using local resources directory: %s", resourceDir)
 	}
 

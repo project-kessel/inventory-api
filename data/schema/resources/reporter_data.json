@@ -7,5 +7,5 @@
       "enum": ["ACM", "HBI", "OCM", "NOTIFICATIONS"]
     }
   },
-  "required": ["reporter_type"]
+  "required": ["reporterType"]
 }

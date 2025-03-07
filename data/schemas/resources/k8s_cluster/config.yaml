@@ -1,5 +1,0 @@
-resource_type: k8s_cluster
-resource_reporters:
-  - ACM
-  - ACS
-  - OCM

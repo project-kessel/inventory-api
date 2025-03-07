@@ -118,6 +118,11 @@ func (uc *Usecase) Create(ctx context.Context, m *model.Resource) (*model.Resour
 
 		m.ConsistencyToken = ct
 
+		_, _, err = uc.reporterResourceRepository.Update(ctx, m, m.ID)
+		if err != nil {
+			return nil, err
+		}
+
 		// Send workspace for any updated resources
 		for _, updatedResource := range updatedResources {
 			ct, err := biz.DefaultSetWorkspace(ctx, uc.Namespace, updatedResource, uc.Authz)
@@ -175,7 +180,10 @@ func (uc *Usecase) CheckForUpdate(ctx context.Context, permission, namespace str
 	if allowed == kessel.CheckForUpdateResponse_ALLOWED_TRUE {
 		if consistency != nil {
 			res.ConsistencyToken = consistency.Token
-			uc.reporterResourceRepository.Update(ctx, res, res.ID)
+			_, _, err := uc.reporterResourceRepository.Update(ctx, res, res.ID)
+			if err != nil {
+				return false, nil
+			}
 		}
 		return true, nil
 	} else {
@@ -282,11 +290,10 @@ func (uc *Usecase) Update(ctx context.Context, m *model.Resource, id model.Repor
 
 	if uc.Authz != nil {
 		for _, updatedResource := range updatedResources {
-			ct, err := biz.DefaultSetWorkspace(ctx, uc.Namespace, updatedResource, uc.Authz)
+			_, err := biz.DefaultSetWorkspace(ctx, uc.Namespace, updatedResource, uc.Authz)
 			if err != nil {
 				return nil, err
 			}
-			updatedResource.ConsistencyToken = ct
 		}
 	}
 

@@ -99,7 +99,6 @@ func (c *NotificationsIntegrationsService) ListNotificationsIntegrations(r *pb.L
 	log.Info(fmt.Sprintf("ListNotificationsIntegrations: %+v", r))
 
 	resources, errs, err := c.Ctl.ListResourcesInWorkspace(ctx, r.GetRelation(), r.ResourceType.GetNamespace(), &v1beta1.SubjectReference{
-		// Relation: r.GetSubject().GetRelation(),
 		Subject: &v1beta1.ObjectReference{
 			Type: &v1beta1.ObjectType{
 				Namespace: r.GetSubject().GetSubject().GetType().GetNamespace(),
@@ -164,17 +163,7 @@ func toDeleteResponse() *pb.DeleteNotificationsIntegrationResponse {
 	return &pb.DeleteNotificationsIntegrationResponse{}
 }
 
-func listResponseFromNotificationsIntegrations(h *model.Resource) *pb.ListNotificationsIntegrationsResponse {
-	return &pb.ListNotificationsIntegrationsResponse{}
-}
-
 func notificationsIntegrationFromResource(r *model.Resource) (*pb.NotificationsIntegration, error) {
-	// var reporterType int
-	// reporterType, err := strconv.Atoi(r.Reporter.ReporterType)
-	// if err != nil {
-	// return nil, err
-	// }
-
 	return &pb.NotificationsIntegration{
 		Metadata: &pb.Metadata{
 			Id:           r.ID.String(),
@@ -184,10 +173,8 @@ func notificationsIntegrationFromResource(r *model.Resource) (*pb.NotificationsI
 			DeletedAt:    nil,
 			OrgId:        r.OrgId,
 			WorkspaceId:  r.WorkspaceId,
-			// Labels:       labels_to_pb(r.Labels),
 		},
 		ReporterData: &pb.ReporterData{
-			// ReporterType:       pb.ReporterData_ReporterType(reporterType),
 			ReporterInstanceId: r.Reporter.ReporterId,
 			ConsoleHref:        r.ConsoleHref,
 			ApiHref:            r.ApiHref,

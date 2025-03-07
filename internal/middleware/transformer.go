@@ -115,7 +115,6 @@ func createResourceRequest(payload ResourcePayload) (*pbv2.ReportResourceRequest
 			ReporterData: &v1beta2.ReporterData{
 				ReporterType:       payload.Resource.ReporterData.ReporterType,
 				ReporterInstanceId: payload.Resource.ReporterData.ReporterInstanceID,
-				ReporterVersion:    payload.Resource.ReporterData.ReporterVersion,
 				LocalResourceId:    payload.Resource.ReporterData.LocalResourceID,
 				ApiHref:            payload.Resource.ReporterData.APIHref,
 				ConsoleHref:        payload.Resource.ReporterData.ConsoleHref,

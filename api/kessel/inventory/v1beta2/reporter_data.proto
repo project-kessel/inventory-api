@@ -11,7 +11,6 @@ option java_package = "org.project_kessel.api.inventory.v1beta2";
 message ReporterData{
   string reporter_type = 1 [(buf.validate.field).string = {min_len: 1}];
   string reporter_instance_id = 2  [(buf.validate.field).string = {min_len: 1}];
-  string reporter_version = 3  [(buf.validate.field).string = {min_len: 1}];
   string local_resource_id = 4  [(buf.validate.field).string = {min_len: 1}];
   string api_href = 5  [(buf.validate.field).string = {min_len: 1}];
   string console_href = 6 [(buf.validate.field).string = {min_len: 1}];

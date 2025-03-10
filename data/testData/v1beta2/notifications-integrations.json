@@ -7,8 +7,7 @@
           "local_resource_id": "1234",
           "reporter_version": "0.1",
           "api_href": "www.example.com",
-          "console_href": "www.example.com",
-          "resource_data": "schema-driven-value"
+          "console_href": "www.example.com"
       },
       "common_resource_data": {
           "workspace_id": "123"

@@ -53,13 +53,7 @@ func ResourceFromPb(resourceType, reporterId string, resourceData model.JsonObje
 		ReporterResourceId: reporter.LocalResourceId,
 		ReporterId:         reporterId,
 		ReporterType:       reporter.ReporterType,
-		Reporter: model.ResourceReporter{
-			Reporter: model.Reporter{
-				ReporterId:   reporterId,
-				ReporterType: reporter.ReporterType,
-			},
-			LocalResourceId: reporter.LocalResourceId,
-		},
+
 		ConsoleHref: reporter.ConsoleHref,
 		ApiHref:     reporter.ApiHref,
 	}

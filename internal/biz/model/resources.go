@@ -16,7 +16,6 @@ type Resource struct {
 	InventoryId  *uuid.UUID `gorm:"index"`
 	OrgId        string     `gorm:"index"`
 	ResourceData JsonObject
-	ResourceType string
 	WorkspaceId  string
 	ConsoleHref  string
 	ApiHref      string
@@ -24,11 +23,23 @@ type Resource struct {
 	CreatedAt    *time.Time
 	UpdatedAt    *time.Time
 	// Reporter Fields
+	ResourceType       string
 	ReporterResourceId string `json:"reporter_resource_id"`
-	ReporterId         string `json:"reporter_id"`
 	ReporterType       string `json:"reporter_type"`
+	ReporterInstanceId string `json:"reporter_instance_id"`
+	//Unique Indexes
+	ReporterResourceUniqueIndex
+	// Reporter Principal
+	ReporterId string `json:"reporter_id"`
 	// Deprecated: Use Reporter Fields instead(ReporterId, ReporterResourceId)
 	Reporter ResourceReporter
+}
+
+type ReporterResourceUniqueIndex struct {
+	ResourceType       string `gorm:"uniqueIndex:reporter_resource_unique_index"`
+	ReporterResourceId string `gorm:"uniqueIndex:reporter_resource_unique_index"`
+	ReporterType       string `gorm:"uniqueIndex:reporter_resource_unique_index"`
+	ReporterInstanceId string `gorm:"uniqueIndex:reporter_resource_unique_index"`
 }
 
 type ResourceReporter struct {

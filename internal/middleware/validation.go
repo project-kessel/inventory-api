@@ -2,7 +2,7 @@ package middleware
 
 import (
 	"context"
-	"fmt"
+
 	"github.com/bufbuild/protovalidate-go"
 	"github.com/go-kratos/kratos/v2/errors"
 	"github.com/go-kratos/kratos/v2/log"
@@ -20,7 +20,6 @@ var (
 
 func Validation(validator protovalidate.Validator) middleware.Middleware {
 	if resourceDirFilePath, exists := os.LookupEnv("RESOURCE_DIR"); exists {
-		fmt.Println(resourceDirFilePath)
 		absPath, err := filepath.Abs(resourceDirFilePath)
 		if err != nil {
 			log.Errorf("failed to resolve absolute path for RESOURCE_DIR file: %v", err)

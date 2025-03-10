@@ -90,7 +90,7 @@ func validateCommonResourceData(resource map[string]interface{}) error {
 	}
 
 	if commonResourceData, exists := resource["commonResourceData"].(map[string]interface{}); exists {
-		if err := validateJSONSchema(commonSchema, commonResourceData); err != nil {
+		if err := ValidateJSONSchema(commonSchema, commonResourceData); err != nil {
 			return fmt.Errorf("commonResourceData validation failed: %w", err)
 		}
 	}
@@ -104,7 +104,7 @@ func validateReporterData(reporterData map[string]interface{}, resourceType stri
 		return fmt.Errorf("failed to load reporter schema: %w", err)
 	}
 
-	if err := validateJSONSchema(reporterSchema, reporterData); err != nil {
+	if err := ValidateJSONSchema(reporterSchema, reporterData); err != nil {
 		return fmt.Errorf("reporterData validation failed for resource '%s': %w", resourceType, err)
 	}
 	return nil
@@ -129,7 +129,7 @@ func validateReporterResourceData(resourceType string, reporterData map[string]i
 	}
 
 	if hasResourceData {
-		if err := validateJSONSchema(resourceDataSchema, reporterData["resourceData"].(map[string]interface{})); err != nil {
+		if err := ValidateJSONSchema(resourceDataSchema, reporterData["resourceData"].(map[string]interface{})); err != nil {
 			return fmt.Errorf("resourceData validation failed for '%s': %w", resourceType, err)
 		}
 	}
@@ -137,7 +137,7 @@ func validateReporterResourceData(resourceType string, reporterData map[string]i
 	return nil
 }
 
-func validateJSONSchema(schemaStr string, jsonData interface{}) error {
+func ValidateJSONSchema(schemaStr string, jsonData interface{}) error {
 	schemaLoader := gojsonschema.NewStringLoader(schemaStr)
 	dataLoader := gojsonschema.NewGoLoader(jsonData)
 

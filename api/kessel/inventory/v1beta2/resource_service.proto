@@ -4,6 +4,7 @@ package kessel.inventory.v1beta2;
 
 import "kessel/inventory/v1beta2/resource.proto";
 import "google/api/annotations.proto";
+import "buf/validate/validate.proto";
 
 option go_package = "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2";
 option java_multiple_files = true;
@@ -16,8 +17,8 @@ message ReportResourceRequest {
 message ReportResourceResponse {}
 
 message DeleteResourceRequest {
-  string local_resource_id = 1;
-  string reporter_type = 2;
+  string local_resource_id = 1 [(buf.validate.field).string = {min_len: 1}];
+  string reporter_type = 2 [(buf.validate.field).string = {min_len: 1}];
 }
 
 message DeleteResourceResponse {}

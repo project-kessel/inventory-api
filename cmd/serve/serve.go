@@ -3,8 +3,6 @@ package serve
 import (
 	"context"
 	"fmt"
-	pbv1beta2 "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2"
-	resourcesvc "github.com/project-kessel/inventory-api/internal/service/resources"
 	"os"
 	"os/signal"
 	"syscall"
@@ -20,6 +18,8 @@ import (
 	k8sclusterssvc "github.com/project-kessel/inventory-api/internal/service/resources/k8sclusters"
 	k8spoliciessvc "github.com/project-kessel/inventory-api/internal/service/resources/k8spolicies"
 	notifssvc "github.com/project-kessel/inventory-api/internal/service/resources/notificationsintegrations"
+	//v1beta2
+	resourcesvc "github.com/project-kessel/inventory-api/internal/service/resources"
 
 	"github.com/spf13/cobra"
 	"gorm.io/gorm"
@@ -38,6 +38,7 @@ import (
 	hb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1"
 	rel "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/relationships"
 	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/resources"
+	pbv1beta2 "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2"
 	healthctl "github.com/project-kessel/inventory-api/internal/biz/health"
 	healthrepo "github.com/project-kessel/inventory-api/internal/data/health"
 	healthssvc "github.com/project-kessel/inventory-api/internal/service/health"

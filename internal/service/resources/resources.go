@@ -28,16 +28,16 @@ func (c *ResourceService) ReportResource(ctx context.Context, r *pb.ReportResour
 	if err != nil {
 		return nil, err
 	}
-	if h, err := requestToResource(r, identity); err == nil {
-		if resp, err := c.Ctl.Upsert(ctx, h); err == nil {
-			return responseFromResource(resp), nil
 
-		} else {
-			return nil, err
-		}
-	} else {
+	resource, err := requestToResource(r, identity)
+	if err != nil {
 		return nil, err
 	}
+	response, err := c.Ctl.Upsert(ctx, resource)
+	if err != nil {
+		return nil, err
+	}
+	return responseFromResource(response), nil
 }
 
 func (c *ResourceService) DeleteResource(ctx context.Context, r *pb.DeleteResourceRequest) (*pb.DeleteResourceResponse, error) {
@@ -49,13 +49,16 @@ func requestToResource(r *pb.ReportResourceRequest, identity *authnapi.Identity)
 	log.Info("Report Resource Request: ", r)
 	var resourceType = r.Resource.GetResourceType()
 	//TODO: Fix this
-	//resourceData, err := conv.ToJsonObject(r.Resource.ReporterData.ResourceData)
+	resourceData, err := conv.ToJsonObject(r.Resource.ReporterData.ResourceData)
+	if err != nil {
+		return nil, err
+	}
 
 	var workspaceId, err2 = conv.ExtractWorkspaceId(r.Resource.CommonResourceData)
 	if err2 != nil {
 		return nil, err2
 	}
-	return conv.ResourceFromPb(resourceType, identity.Principal, nil, workspaceId, r.Resource.ReporterData), nil
+	return conv.ResourceFromPb(resourceType, identity.Principal, resourceData, workspaceId, r.Resource.ReporterData), nil
 }
 
 func responseFromResource(h *model.Resource) *pb.ReportResourceResponse {

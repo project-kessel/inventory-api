@@ -31,6 +31,41 @@ func getProjectRootPath() (string, error) {
 	return "", fmt.Errorf("project root not found")
 }
 
+func loadCommonSchemaAndValidate(t *testing.T, schemaDir string, commonResourceData map[string]interface{}) {
+	commonSchema, err := middleware.LoadCommonResourceDataSchema(schemaDir)
+	if err != nil {
+		t.Fatalf("Failed to load common resource schema: %v", err)
+	}
+
+	err = middleware.ValidateJSONSchema(commonSchema, commonResourceData)
+	if err != nil {
+		t.Fatalf("Validation failed for commonResourceData: %v", err)
+	}
+}
+
+func runValidationTest(t *testing.T, tt struct {
+	name               string
+	resourceType       string
+	reporterData       map[string]interface{}
+	commonResourceData map[string]interface{}
+	expectErr          bool
+	expectedErrMsg     string
+	schemaExpected     bool
+}, schemaDir string) {
+	err := middleware.ValidateReporterResourceData(tt.resourceType, tt.reporterData)
+
+	if tt.expectErr {
+		assert.NotNil(t, err, "Expected error but got nil")
+		assert.Contains(t, err.Error(), tt.expectedErrMsg, "Error message mismatch")
+	} else {
+		assert.Nil(t, err, "Unexpected error occurred")
+	}
+
+	if tt.commonResourceData != nil {
+		loadCommonSchemaAndValidate(t, schemaDir, tt.commonResourceData)
+	}
+}
+
 func TestSchemaValidation(t *testing.T) {
 	projectRoot, err := getProjectRootPath()
 	if err != nil {
@@ -38,15 +73,20 @@ func TestSchemaValidation(t *testing.T) {
 	}
 
 	schemaDir := filepath.Join(projectRoot, "data", "schema", "resources")
+	if err := middleware.PreloadAllSchemas(schemaDir); err != nil {
+		t.Fatalf("Failed to preload schemas: %v", err)
+	}
 
 	tests := []struct {
-		name           string
-		resourceType   string
-		reporterData   map[string]interface{}
-		expectErr      bool
-		expectedErrMsg string
-		schemaExpected bool
+		name               string
+		resourceType       string
+		reporterData       map[string]interface{}
+		commonResourceData map[string]interface{}
+		expectErr          bool
+		expectedErrMsg     string
+		schemaExpected     bool
 	}{
+		// Valid test cases
 		{
 			name:         "Valid K8s Cluster with resourceData",
 			resourceType: "k8s_cluster",
@@ -66,6 +106,9 @@ func TestSchemaValidation(t *testing.T) {
 					"cloud_platform":      "AWS_UPI",
 				},
 			},
+			commonResourceData: map[string]interface{}{
+				"workspace_id": "workspace-123",
+			},
 			expectErr:      false,
 			schemaExpected: true,
 		},
@@ -78,6 +121,9 @@ func TestSchemaValidation(t *testing.T) {
 				"local_resource_id":    "rhel-host-001",
 				"api_href":             "https://api.rhel.example.com",
 				"console_href":         "https://console.rhel.example.com",
+			},
+			commonResourceData: map[string]interface{}{
+				"workspace_id": "workspace-123",
 			},
 			expectErr:      false,
 			schemaExpected: false,
@@ -96,6 +142,9 @@ func TestSchemaValidation(t *testing.T) {
 					"severity": "MEDIUM",
 				},
 			},
+			commonResourceData: map[string]interface{}{
+				"workspace_id": "workspace-123",
+			},
 			expectErr:      false,
 			schemaExpected: true,
 		},
@@ -109,11 +158,14 @@ func TestSchemaValidation(t *testing.T) {
 				"api_href":             "https://api.notifications.example.com",
 				"console_href":         "https://console.notifications.example.com",
 			},
+			commonResourceData: map[string]interface{}{
+				"workspace_id": "workspace-123",
+			},
 			expectErr:      false,
 			schemaExpected: false,
 		},
 
-		// bad test cases
+		// Bad test cases
 		{
 			name:         "K8s Cluster missing resourceData",
 			resourceType: "k8s_cluster",
@@ -124,6 +176,9 @@ func TestSchemaValidation(t *testing.T) {
 				"api_href":             "www.example.com",
 				"console_href":         "www.example.com",
 				"resourceData":         map[string]interface{}{},
+			},
+			commonResourceData: map[string]interface{}{
+				"workspace_id": "workspace-123",
 			},
 			expectErr:      true,
 			expectedErrMsg: "validation failed: (root): external_cluster_id is required; (root): cluster_status is required; (root): cluster_reason is required; (root): kube_version is required; (root): kube_vendor is required; (root): vendor_version is required; (root): cloud_platform is required",
@@ -143,11 +198,13 @@ func TestSchemaValidation(t *testing.T) {
 					// Missing cluster_status, cluster_reason, kube_version, kube_vendor, vendor_version, cloud_platform
 				},
 			},
+			commonResourceData: map[string]interface{}{
+				"workspace_id": "workspace-123",
+			},
 			expectErr:      true,
 			expectedErrMsg: "validation failed: (root): cluster_status is required; (root): cluster_reason is required; (root): kube_version is required; (root): kube_vendor is required; (root): vendor_version is required; (root): cloud_platform is required",
 			schemaExpected: true,
 		},
-
 		{
 			name:         "K8s Cluster with incorrect data types",
 			resourceType: "k8s_cluster",
@@ -158,7 +215,7 @@ func TestSchemaValidation(t *testing.T) {
 				"api_href":             "www.example.com",
 				"console_href":         "www.example.com",
 				"resourceData": map[string]interface{}{
-					"external_cluster_id": 1234,
+					"external_cluster_id": 1234, // Invalid type
 					"cluster_status":      "READY",
 					"cluster_reason":      "All systems operational",
 					"kube_version":        "1.31",
@@ -167,11 +224,13 @@ func TestSchemaValidation(t *testing.T) {
 					"cloud_platform":      "AWS_UPI",
 				},
 			},
+			commonResourceData: map[string]interface{}{
+				"workspace_id": "workspace-123",
+			},
 			expectErr:      true,
 			expectedErrMsg: "validation failed: external_cluster_id: Invalid type. Expected: string, given: integer",
 			schemaExpected: true,
 		},
-
 		{
 			name:         "RHEL Host with resourceData (which is not expected)",
 			resourceType: "rhel_host",
@@ -184,6 +243,9 @@ func TestSchemaValidation(t *testing.T) {
 				"resourceData": map[string]interface{}{
 					"unexpected_key": "unexpected_value",
 				},
+			},
+			commonResourceData: map[string]interface{}{
+				"workspace_id": "workspace-123",
 			},
 			expectErr:      true,
 			expectedErrMsg: "no schema found for 'rhel_host', but 'resourceData' was provided",
@@ -203,6 +265,9 @@ func TestSchemaValidation(t *testing.T) {
 					"unexpected_key": "unexpected_value",
 				},
 			},
+			commonResourceData: map[string]interface{}{
+				"workspace_id": "workspace-123",
+			},
 			expectErr:      true,
 			expectedErrMsg: "no schema found for 'notifications_integration', but 'resourceData' was provided",
 			schemaExpected: false,
@@ -221,6 +286,9 @@ func TestSchemaValidation(t *testing.T) {
 					"unexpected_field": "data",
 				},
 			},
+			commonResourceData: map[string]interface{}{
+				"workspace_id": "workspace-123",
+			},
 			expectErr:      true,
 			expectedErrMsg: "no schema found for 'unknown_resource', but 'resourceData' was provided",
 			schemaExpected: false,
@@ -229,25 +297,7 @@ func TestSchemaValidation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			schema, exists, err := middleware.LoadResourceSchema(tt.resourceType, schemaDir)
-
-			if tt.schemaExpected && !exists {
-				t.Fatalf("Schema for '%s' does not exist but was expected", tt.resourceType)
-			}
-
-			if !tt.schemaExpected {
-				assert.Nil(t, err, "Unexpected error occurred for resource without schema")
-				return
-			}
-
-			err = middleware.ValidateJSONSchema(schema, tt.reporterData["resourceData"].(map[string]interface{}))
-
-			if tt.expectErr {
-				assert.NotNil(t, err, "Expected error but got nil")
-				assert.Contains(t, err.Error(), tt.expectedErrMsg, "Error message mismatch")
-			} else {
-				assert.Nil(t, err, "Unexpected error occurred")
-			}
+			runValidationTest(t, tt, schemaDir)
 		})
 	}
 }

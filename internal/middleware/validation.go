@@ -89,11 +89,11 @@ func validateResourceReporterJSON(msg proto.Message) error {
 		return err
 	}
 
-	if err := validateReporterResourceData(resourceType, reporterData); err != nil {
+	if err := ValidateReporterResourceData(resourceType, reporterData); err != nil {
 		return err
 	}
 
-	if err := validateCommonResourceData(resource); err != nil {
+	if err := ValidateCommonResourceData(resource); err != nil {
 		return err
 	}
 

@@ -83,7 +83,7 @@ func extractStringField(data map[string]interface{}, key string) (string, error)
 }
 
 // Validates the "commonResourceData" field using a predefined schema.
-func validateCommonResourceData(resource map[string]interface{}) error {
+func ValidateCommonResourceData(resource map[string]interface{}) error {
 	commonSchema, err := getSchemaFromCache("common:common_resource_data")
 	if err != nil {
 		return fmt.Errorf("failed to load common resource schema: %w", err)
@@ -111,7 +111,7 @@ func validateReporterData(reporterData map[string]interface{}, resourceType stri
 }
 
 // Validates the reporter resource schema by checking if it exists and ensuring resourceData follows its structure.
-func validateReporterResourceData(resourceType string, reporterData map[string]interface{}) error {
+func ValidateReporterResourceData(resourceType string, reporterData map[string]interface{}) error {
 	resourceDataSchema, err := getSchemaFromCache(fmt.Sprintf("resource:%s", strings.ToLower(resourceType)))
 
 	_, hasResourceData := reporterData["resourceData"]

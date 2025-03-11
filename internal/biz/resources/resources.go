@@ -13,6 +13,7 @@ import (
 	"github.com/project-kessel/inventory-api/internal/biz/model"
 	eventingapi "github.com/project-kessel/inventory-api/internal/eventing/api"
 	"github.com/project-kessel/inventory-api/internal/server"
+	kessel "github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
 	"gorm.io/gorm"
 )
 
@@ -21,6 +22,7 @@ type ReporterResourceRepository interface {
 	Update(context.Context, *model.Resource, uuid.UUID) (*model.Resource, []*model.Resource, error)
 	Delete(context.Context, uuid.UUID) (*model.Resource, error)
 	FindByID(context.Context, uuid.UUID) (*model.Resource, error)
+	FindByWorkspaceId(context.Context, string) ([]*model.Resource, error)
 	FindByReporterResourceId(context.Context, model.ReporterResourceId) (*model.Resource, error)
 	FindByReporterData(context.Context, string, string) (*model.Resource, error)
 	ListAll(context.Context) ([]*model.Resource, error)
@@ -109,21 +111,141 @@ func (uc *Usecase) Create(ctx context.Context, m *model.Resource) (*model.Resour
 
 	if uc.Authz != nil {
 		// Send workspace for the created resource
-		err := biz.DefaultSetWorkspace(ctx, uc.Namespace, m, uc.Authz)
+		ct, err := biz.DefaultSetWorkspace(ctx, uc.Namespace, m, uc.Authz)
 		if err != nil {
 			return nil, err
 		}
-		// Send workspace for any updated resources
-		for _, updatedResource := range updatedResources {
-			err := biz.DefaultSetWorkspace(ctx, uc.Namespace, updatedResource, uc.Authz)
+
+		m.ConsistencyToken = ct
+
+		if !uc.DisablePersistence {
+			_, _, err = uc.reporterResourceRepository.Update(ctx, m, m.ID)
 			if err != nil {
 				return nil, err
 			}
+		}
+
+		// Send workspace for any updated resources
+		for _, updatedResource := range updatedResources {
+			ct, err := biz.DefaultSetWorkspace(ctx, uc.Namespace, updatedResource, uc.Authz)
+			if err != nil {
+				return nil, err
+			}
+
+			updatedResource.ConsistencyToken = ct
 		}
 	}
 
 	uc.log.WithContext(ctx).Infof("Created Resource: %v(%v)", m.ID, m.ResourceType)
 	return ret, nil
+}
+
+func (uc *Usecase) CheckForView(ctx context.Context, permission, namespace string, sub *kessel.SubjectReference, id model.ReporterResourceId) (bool, error) {
+	res, err := uc.reporterResourceRepository.FindByReporterResourceId(ctx, id)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			// resource doesn't exist.
+			return false, nil
+		} else {
+			return false, err
+		}
+	}
+
+	allowed, _, err := uc.Authz.CheckForView(ctx, namespace, permission, res, sub)
+	if err != nil {
+		return false, err
+	}
+
+	if allowed == kessel.CheckResponse_ALLOWED_TRUE {
+		return true, nil
+	} else {
+		return false, nil
+	}
+}
+
+func (uc *Usecase) CheckForUpdate(ctx context.Context, permission, namespace string, sub *kessel.SubjectReference, id model.ReporterResourceId) (bool, error) {
+	res, err := uc.reporterResourceRepository.FindByReporterResourceId(ctx, id)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			// resource doesn't exist yet.
+			res = &model.Resource{ResourceType: id.ResourceType, Reporter: model.ResourceReporter{LocalResourceId: id.LocalResourceId}}
+		} else {
+			return false, err
+		}
+	}
+
+	allowed, consistency, err := uc.Authz.CheckForUpdate(ctx, namespace, permission, res, sub)
+	if err != nil {
+		return false, err
+	}
+
+	if allowed == kessel.CheckForUpdateResponse_ALLOWED_TRUE {
+		if consistency != nil {
+			res.ConsistencyToken = consistency.Token
+			_, _, err := uc.reporterResourceRepository.Update(ctx, res, res.ID)
+			if err != nil {
+				return false, nil
+			}
+		}
+		return true, nil
+	} else {
+		return false, nil
+	}
+}
+
+func (uc *Usecase) CheckForCreate(ctx context.Context, permission, namespace string, sub *kessel.SubjectReference, id model.ReporterResourceId) (bool, error) {
+	res, err := uc.reporterResourceRepository.FindByReporterResourceId(ctx, id)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			// resource doesn't exist.
+			res = &model.Resource{ResourceType: id.ResourceType, Reporter: model.ResourceReporter{LocalResourceId: id.LocalResourceId}}
+		} else {
+			return false, err
+		}
+	}
+
+	allowed, _, err := uc.Authz.CheckForUpdate(ctx, namespace, permission, res, sub)
+	if err != nil {
+		return false, err
+	}
+
+	if allowed == kessel.CheckForUpdateResponse_ALLOWED_TRUE {
+		return true, nil
+	} else {
+		return false, nil
+	}
+}
+
+func (uc *Usecase) ListResourcesInWorkspace(ctx context.Context, permission, namespace string, sub *kessel.SubjectReference, id string) (chan *model.Resource, chan error, error) {
+	resource_chan := make(chan *model.Resource)
+	error_chan := make(chan error, 1)
+
+	resources, err := uc.reporterResourceRepository.FindByWorkspaceId(ctx, id)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	log.Infof("ListResourcesInWorkspace: resources %+v", resources)
+
+	go func() {
+		for _, resource := range resources {
+			log.Infof("ListResourcesInWorkspace: checkforview on %+v", resource)
+			if allowed, _, err := uc.Authz.CheckForView(ctx, namespace, permission, resource, sub); err == nil && allowed == kessel.CheckResponse_ALLOWED_TRUE {
+				resource_chan <- resource
+			} else if err != nil {
+				error_chan <- err
+				break
+			} else if allowed != kessel.CheckResponse_ALLOWED_TRUE {
+				log.Infof("Response was not allowed: %v", allowed)
+			}
+
+		}
+
+		close(resource_chan)
+		close(error_chan)
+	}()
+
+	return resource_chan, error_chan, nil
 }
 
 // Update updates a model in the database, updates related tuples in the relations-api, and issues an update event.
@@ -170,7 +292,7 @@ func (uc *Usecase) Update(ctx context.Context, m *model.Resource, id model.Repor
 
 	if uc.Authz != nil {
 		for _, updatedResource := range updatedResources {
-			err := biz.DefaultSetWorkspace(ctx, uc.Namespace, updatedResource, uc.Authz)
+			_, err := biz.DefaultSetWorkspace(ctx, uc.Namespace, updatedResource, uc.Authz)
 			if err != nil {
 				return nil, err
 			}

@@ -59,6 +59,11 @@ func (r *MockedInventoryResourceRepository) FindByID(ctx context.Context, id uui
 	return args.Get(0).(*model.InventoryResource), args.Error(1)
 }
 
+func (r *MockedReporterResourceRepository) FindByWorkspaceId(ctx context.Context, workspace_id string) ([]*model.Resource, error) {
+	args := r.Called(ctx)
+	return args.Get(0).([]*model.Resource), args.Error(1)
+}
+
 func resource1() *model.Resource {
 	return &model.Resource{
 		ID:    uuid.UUID{},

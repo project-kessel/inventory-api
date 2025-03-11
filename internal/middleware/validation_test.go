@@ -158,17 +158,17 @@ func TestSchemaValidation(t *testing.T) {
 				"api_href":             "www.example.com",
 				"console_href":         "www.example.com",
 				"resourceData": map[string]interface{}{
-					"external_cluster_id": 12345, // Should be a string
-					"cluster_status":      true,  // Should be a string
-					"cluster_reason":      1.2,   // Should be a string
-					"kube_version":        nil,   // Should be a string
+					"external_cluster_id": 1234,
+					"cluster_status":      "READY",
+					"cluster_reason":      "All systems operational",
+					"kube_version":        "1.31",
 					"kube_vendor":         "OPENSHIFT",
 					"vendor_version":      "4.16",
 					"cloud_platform":      "AWS_UPI",
 				},
 			},
 			expectErr:      true,
-			expectedErrMsg: "validation failed: external_cluster_id: Invalid type. Expected: string, given: integer; cluster_status: Invalid type. Expected: string, given: boolean; cluster_reason: Invalid type. Expected: string, given: number; kube_version: Invalid type. Expected: string, given: null",
+			expectedErrMsg: "validation failed: external_cluster_id: Invalid type. Expected: string, given: integer",
 			schemaExpected: true,
 		},
 

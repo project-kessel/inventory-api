@@ -1,7 +1,8 @@
 ---
 resource_type: k8s_cluster
 reporter_name: acm
-namespace: acm # this is the name of the field of the resource that contains this reporter's data
+namespace: acm
+# this is the name of the field of the resource that contains this reporter's data
 # relation_properties:
 # - relation: is_fedramp
 #   expr: {{ .acm.fedramp }}

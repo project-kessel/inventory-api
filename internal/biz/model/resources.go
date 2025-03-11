@@ -43,6 +43,15 @@ type ReporterResourceUniqueIndex struct {
 	ReporterInstanceId string `gorm:"uniqueIndex:reporter_resource_unique_index"`
 }
 
+func ReporterResourceIdv1beta2FromResource(resource *Resource) ReporterResourceUniqueIndex {
+	return ReporterResourceUniqueIndex{
+		ReporterResourceId: resource.ReporterResourceId,
+		ResourceType:       resource.ResourceType,
+		ReporterInstanceId: resource.ReporterInstanceId,
+		ReporterType:       resource.ReporterType,
+	}
+}
+
 type ResourceReporter struct {
 	Reporter
 	LocalResourceId string `json:"local_resource_id"`

@@ -22,6 +22,7 @@ type ReporterResourceRepository interface {
 	Delete(context.Context, uuid.UUID) (*model.Resource, error)
 	FindByID(context.Context, uuid.UUID) (*model.Resource, error)
 	FindByReporterResourceId(context.Context, model.ReporterResourceId) (*model.Resource, error)
+	FindByReporterResourceIdv1beta2(context.Context, model.ReporterResourceUniqueIndex) (*model.Resource, error)
 	FindByReporterData(context.Context, string, string) (*model.Resource, error)
 	ListAll(context.Context) ([]*model.Resource, error)
 }
@@ -66,7 +67,7 @@ func (uc *Usecase) Upsert(ctx context.Context, m *model.Resource) (*model.Resour
 
 	if !uc.DisablePersistence {
 		// check if the resource already exists
-		existingResource, err := uc.reporterResourceRepository.FindByReporterResourceId(ctx, model.ReporterResourceIdFromResource(m))
+		existingResource, err := uc.reporterResourceRepository.FindByReporterResourceIdv1beta2(ctx, model.ReporterResourceIdv1beta2FromResource(m))
 
 		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, ErrDatabaseError
@@ -74,9 +75,11 @@ func (uc *Usecase) Upsert(ctx context.Context, m *model.Resource) (*model.Resour
 		log.Info("found existing resource: ", existingResource)
 		if existingResource != nil {
 			log.Info("Updating resource: ", m)
-			_, _, err := uc.reporterResourceRepository.Update(ctx, m, existingResource.ID)
+			update, _, err := uc.reporterResourceRepository.Update(ctx, m, existingResource.ID)
 			if err != nil {
 				return nil, err
+			} else {
+				return update, nil
 			}
 		}
 		log.Info("Creating resource: ", m)

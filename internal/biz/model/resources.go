@@ -27,6 +27,7 @@ type Resource struct {
 	ReporterResourceId string `json:"reporter_resource_id"`
 	ReporterType       string `json:"reporter_type"`
 	ReporterInstanceId string `json:"reporter_instance_id"`
+	ReporterVersion    string `json:"reporter_version"`
 	//Unique Indexes
 	ReporterResourceUniqueIndex
 	// Reporter Principal

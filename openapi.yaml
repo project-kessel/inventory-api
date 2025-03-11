@@ -1014,6 +1014,8 @@ components:
                     type: string
                 reporterInstanceId:
                     type: string
+                reporterVersion:
+                    type: string
                 localResourceId:
                     type: string
                 apiHref:

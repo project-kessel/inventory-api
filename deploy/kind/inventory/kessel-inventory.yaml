@@ -16,6 +16,21 @@ spec:
         app: kessel-inventory
     spec:
       initContainers:
+        - name: copy-resources
+          image: busybox
+          command:
+            - /bin/sh
+            - "-c"
+            - |
+              echo "Extracting resources from tarball..."
+              tar -xzf /mnt/resources/resources.tar.gz -C /data/schema/resources
+              echo "Extraction complete!"
+          volumeMounts:
+            - name: resources-tarball
+              mountPath: "/mnt/resources"
+            - name: resource-volume
+              mountPath: "/data/schema/resources"
+
         - name: migration
           image: localhost/inventory-api:e2e-test
           command:
@@ -46,6 +61,8 @@ spec:
                 secretKeyRef:
                   name: inventory-api-config
                   key: db_password
+            - name: RESOURCE_DIR
+              value: "/data/schema/resources"
           volumeMounts:
             - name: config-volume
               mountPath: "/inventory"
@@ -74,6 +91,8 @@ spec:
                 secretKeyRef:
                   name: inventory-api-config
                   key: db_password
+            - name: RESOURCE_DIR
+              value: "/data/schema/resources"
           livenessProbe:
             httpGet:
               path: /api/inventory/v1/livez
@@ -88,6 +107,8 @@ spec:
               subPath: psks.yaml
             - name: config-volume
               mountPath: "/inventory"
+            - name: resource-volume
+              mountPath: "/data/schema/resources"
       volumes:
         - name: config-volume
           secret:
@@ -95,6 +116,11 @@ spec:
         - name: psks-volume
           configMap:
             name: inventory-api-psks
+        - name: resource-volume
+          emptyDir: {}
+        - name: resources-tarball
+          configMap:
+            name: resources-tarball
 ---
 # Services
 apiVersion: v1
@@ -167,4 +193,3 @@ stringData:
       livez: true
       readyz: true
   db_password: "yPsw5e6ab4bvAGe5H"
-

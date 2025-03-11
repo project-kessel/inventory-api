@@ -56,6 +56,8 @@ kind load image-archive inventory-e2e-tests.tar --name inventory-cluster
 
 # checks for the config map first, or creates it if not found
 kubectl get configmap inventory-api-psks || kubectl create configmap inventory-api-psks --from-file=config/psks.yaml
+[ -f resources.tar.gz ] || tar czf resources.tar.gz -C data/schema/resources .
+kubectl get configmap resources-tarball || kubectl create configmap resources-tarball --from-file=resources.tar.gz
 
 kubectl apply -f https://strimzi.io/install/latest\?namespace\=default
 kubectl apply -f deploy/kind/inventory/kessel-inventory.yaml

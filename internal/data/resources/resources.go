@@ -102,6 +102,7 @@ func (r *Repo) Update(ctx context.Context, m *model.Resource, id uuid.UUID) (*mo
 
 	m.ID = id
 	m.CreatedAt = resource.CreatedAt
+	m.InventoryId = resource.InventoryId
 	if err := tx.Save(m).Error; err != nil {
 		tx.Rollback()
 		return nil, nil, err

@@ -19,6 +19,11 @@ type MockedInventoryResourceRepository struct {
 	mock.Mock
 }
 
+func (r *MockedReporterResourceRepository) Upsert(ctx context.Context, resource *model.Resource) (*model.Resource, []*model.Resource, error) {
+	args := r.Called(ctx, resource)
+	return args.Get(0).(*model.Resource), args.Get(1).([]*model.Resource), args.Error(2)
+}
+
 func (r *MockedReporterResourceRepository) Create(ctx context.Context, resource *model.Resource) (*model.Resource, []*model.Resource, error) {
 	args := r.Called(ctx, resource)
 	return args.Get(0).(*model.Resource), args.Get(1).([]*model.Resource), args.Error(2)
@@ -40,6 +45,11 @@ func (r *MockedReporterResourceRepository) FindByID(ctx context.Context, id uuid
 }
 
 func (r *MockedReporterResourceRepository) FindByReporterResourceId(ctx context.Context, id model.ReporterResourceId) (*model.Resource, error) {
+	args := r.Called(ctx, id)
+	return args.Get(0).(*model.Resource), args.Error(1)
+}
+
+func (r *MockedReporterResourceRepository) FindByReporterResourceIdv1beta2(ctx context.Context, id model.ReporterResourceUniqueIndex) (*model.Resource, error) {
 	args := r.Called(ctx, id)
 	return args.Get(0).(*model.Resource), args.Error(1)
 }
@@ -94,6 +104,24 @@ func resource1() *model.Resource {
 		},
 	}
 }
+
+func resourceWithReporterInstanceId() *model.Resource {
+	return &model.Resource{
+		ID: uuid.UUID{},
+		ResourceData: map[string]any{
+			"foo": "bar",
+		},
+		ResourceType:       "my-resource",
+		WorkspaceId:        "my-workspace",
+		ConsoleHref:        "/etc/console",
+		ApiHref:            "/etc/api",
+		ReporterType:       "ACM",
+		ReporterInstanceId: "25",
+		ReporterResourceId: "200",
+	}
+}
+
+// Tests for Create
 
 func TestCreateReturnsDbError(t *testing.T) {
 	resource := resource1()
@@ -186,6 +214,73 @@ func TestCreateNewResource(t *testing.T) {
 	assert.Equal(t, &returnedResource, r)
 	repo.AssertExpectations(t)
 }
+
+// Tests for Upsert
+
+func TestUpsertReturnsDbError(t *testing.T) {
+	resource := resource1()
+	repo := &MockedReporterResourceRepository{}
+	inventoryRepo := &MockedInventoryResourceRepository{}
+
+	// DB Error
+	repo.On("FindByReporterResourceIdv1beta2", mock.Anything, mock.Anything, mock.Anything).Return((*model.Resource)(nil), gorm.ErrDuplicatedKey)
+
+	useCase := New(repo, inventoryRepo, nil, nil, "", log.DefaultLogger, false)
+	ctx := context.TODO()
+
+	_, err := useCase.Upsert(ctx, resource)
+	assert.ErrorIs(t, err, ErrDatabaseError)
+	repo.AssertExpectations(t)
+}
+
+func TestUpsertUpdatesExistingResource(t *testing.T) {
+	existingResource := resourceWithReporterInstanceId()
+
+	updatedResource := *existingResource
+	updatedResource.ConsoleHref = "updated console href"
+
+	repo := &MockedReporterResourceRepository{}
+	inventoryRepo := &MockedInventoryResourceRepository{}
+
+	// Resource already exists
+	repo.On("FindByReporterResourceIdv1beta2", mock.Anything, mock.Anything, mock.Anything).Return(existingResource, nil)
+	repo.On("Update", mock.Anything, mock.Anything, mock.Anything).Return(&updatedResource, []*model.Resource{}, nil)
+
+	useCase := New(repo, inventoryRepo, nil, nil, "", log.DefaultLogger, false)
+	ctx := context.TODO()
+
+	r, err := useCase.Upsert(ctx, &updatedResource)
+	assert.Nil(t, err)
+	assert.Equal(t, &updatedResource, r)
+	repo.AssertExpectations(t)
+}
+
+func TestUpsertCreatesResourceIfNotExisting(t *testing.T) {
+	resource := resource1()
+
+	repo := &MockedReporterResourceRepository{}
+	inventoryRepo := &MockedInventoryResourceRepository{}
+	returnedResource := model.Resource{
+		ReporterType:       resource.ReporterType,
+		ReporterInstanceId: resource.ReporterInstanceId,
+		ResourceType:       resource.ResourceType,
+		ReporterResourceId: resource.ReporterResourceId,
+	}
+
+	// Resource doesn't exist
+	repo.On("FindByReporterResourceIdv1beta2", mock.Anything, mock.Anything, mock.Anything).Return((*model.Resource)(nil), gorm.ErrRecordNotFound)
+	repo.On("Create", mock.Anything, mock.Anything).Return(&returnedResource, []*model.Resource{}, nil)
+
+	useCase := New(repo, inventoryRepo, nil, nil, "", log.DefaultLogger, false)
+	ctx := context.TODO()
+
+	r, err := useCase.Upsert(ctx, resource)
+	assert.Nil(t, err)
+	assert.Equal(t, &returnedResource, r)
+	repo.AssertExpectations(t)
+}
+
+// Tests for Update
 
 func TestUpdateReturnsDbError(t *testing.T) {
 	resource := resource1()

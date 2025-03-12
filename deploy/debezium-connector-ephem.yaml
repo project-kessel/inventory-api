@@ -1,0 +1,133 @@
+apiVersion: template.openshift.io/v1
+kind: Template
+metadata:
+  name: kessel-debezium-connector
+objects:
+  - apiVersion: rbac.authorization.k8s.io/v1
+    kind: Role
+    metadata:
+      name: connector-configuration-role
+    rules:
+    - apiGroups: [""]
+      resources: ["secrets"]
+      resourceNames: ["kessel-inventory-db"]
+      verbs: ["get"]
+  - apiVersion: rbac.authorization.k8s.io/v1
+    kind: RoleBinding
+    metadata:
+      name: connector-configuration-rolebinding
+    subjects:
+    - kind: ServiceAccount
+      name: kessel-connect-connect
+      namespace: ${NAMESPACE}
+    roleRef:
+      kind: Role
+      name: connector-configuration-role
+      apiGroup: rbac.authorization.k8s.io
+  - apiVersion: kafka.strimzi.io/v1beta2
+    kind: KafkaConnect
+    metadata:
+      name: kessel-connect
+      annotations:
+        strimzi.io/use-connector-resources: "true"
+    spec:
+      replicas: 3
+      bootstrapServers: "${BOOTSTRAP_SERVERS}:9092"
+      version: ${KAFKA_CONNECT_VERSION}
+      config:
+        config.providers: secrets
+        config.providers.secrets.class: io.strimzi.kafka.KubernetesSecretConfigProvider
+        group.id: kessel-connect
+        offset.storage.topic: kessel-connect-cluster-offsets
+        config.storage.topic: kessel-connect-cluster-configs
+        status.storage.topic: kessel-connect-cluster-status
+      build:
+        output:
+          type: docker
+          image: ${KESSEL_CONNECT_IMAGE}:${IMAGE_TAG}
+          pushSecret: kessel-connect-push-secret
+        plugins:
+        - name: debezium-postgres-connector
+          artifacts:
+            - type: zip
+              url: https://maven.repository.redhat.com/ga/io/debezium/debezium-connector-postgres/2.5.4.Final-redhat-00001/debezium-connector-postgres-2.5.4.Final-redhat-00001-plugin.zip
+            - type: zip
+              url: https://maven.repository.redhat.com/ga/io/debezium/debezium-scripting/2.5.4.Final-redhat-00001/debezium-scripting-2.5.4.Final-redhat-00001.zip
+            - type: jar
+              url: https://repo1.maven.org/maven2/org/apache/groovy/groovy/4.0.22/groovy-4.0.22.jar
+            - type: jar
+              url: https://repo1.maven.org/maven2/org/apache/groovy/groovy-jsr223/4.0.22/groovy-jsr223-4.0.22.jar
+            - type: jar
+              url: https://repo1.maven.org/maven2/org/apache/groovy/groovy-json/4.0.22/groovy-json-4.0.22.jar
+  - apiVersion: kafka.strimzi.io/v1beta2
+    kind: KafkaConnector
+    metadata:
+      name: kessel-inventory-source-connector
+      labels:
+        strimzi.io/cluster: ${KAFKA_CONNECT_INSTANCE}
+    spec:
+      class: io.debezium.connector.postgresql.PostgresConnector
+      tasksMax: ${{MAX_TASKS}}
+      config:
+        database.server.name: ${DB_SERVERNAME}
+        database.dbname: ${secrets:kessel-inventory-db:db.name}
+        database.hostname: ${secrets:kessel-inventory-db:db.host}
+        database.port: ${secrets:kessel-inventory-db:db.port}
+        database.user: ${secrets:kessel-inventory-db:db.user}
+        database.password: ${secrets:kessel-inventory-db:db.password}
+        topic.prefix: kessel-inventory
+        table.include.list: public.outbox_events
+        transforms: outbox
+        transforms.outbox.type: io.debezium.transforms.outbox.EventRouter
+        plugin.name: pgoutput
+        heartbeat.interval.ms: ${DEBEZIUM_HEARTBEAT_INTERVAL_MS}
+        heartbeat.action.query: ${DEBEZIUM_ACTION_QUERY}
+        topic.heartbeat.prefix: ${TOPIC_HEARTBEAT_PREFIX}
+parameters:
+- description: Bootstrap server address
+  name: BOOTSTRAP_SERVERS
+  required: true
+- description: Quay repo to store KafkaConnect images after build
+  name: KESSEL_CONNECT_IMAGE
+  value: quay.io/cloudservices/kessel-connect
+- description: Image Tag
+  name: IMAGE_TAG
+  value: latest
+- description: Kafka Connect version
+  name: KAFKA_CONNECT_VERSION
+  required: true
+  value: 3.6.0
+- name: DB_SERVERNAME
+  required: true
+  description: Logical name that identifies and provides a namespace for the particular database server
+  value: kessel-inventory-db
+- name: DB_NAME
+  required: true
+  description: Name for the database
+- name: DB_HOSTNAME
+  required: true
+  description: URI for the target postgres database
+- name: DB_PORT
+  value: "5432"
+  description: Port on which the target postgres database is listening for connections
+- name: DB_USER
+  description: Username the connector should use to connect to the target postgres database
+  required: true
+- name: DB_PASSWORD
+  description: Password for the above user on the target postgres database
+  required: true
+- name: KAFKA_CONNECT_INSTANCE
+  value: kessel-connect
+  description: Name of the target Kafka Connect instance for Connector
+- name: MAX_TASKS
+  value: "1"
+  description: How many tasks the Kafka Connect instance can create to process this Connector's work
+- name: TOPIC_HEARTBEAT_PREFIX
+  value: debezium-heartbeat
+  description: Prefix for the connector heartbeat topic
+- name: DEBEZIUM_ACTION_QUERY
+  value: "SELECT pg_logical_emit_message(false, 'heartbeat', now()::varchar);"
+  description: Query action that runs for each heartbeat event
+- name: DEBEZIUM_HEARTBEAT_INTERVAL_MS
+  value: "300000"
+  description: The interval for the Debezium heartbeat in ms

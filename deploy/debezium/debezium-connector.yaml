@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: Template
 metadata:
-  name: kafka-connectors
+  name: kafka-connector
 objects:
 - apiVersion: kafka.strimzi.io/v1beta2
   kind: KafkaConnector

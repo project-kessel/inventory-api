@@ -307,7 +307,7 @@ func TestSchemaValidation(t *testing.T) {
 			schemaExpected: true,
 		},
 		{
-			name:         "Valid RHEL Host (No schema expected)",
+			name:         "Valid RHEL Host with Resource Data",
 			resourceType: "rhel_host",
 			reporterData: map[string]interface{}{
 				"reporter_type":        "HBI",
@@ -315,6 +315,12 @@ func TestSchemaValidation(t *testing.T) {
 				"local_resource_id":    "rhel-host-001",
 				"api_href":             "https://api.rhel.example.com",
 				"console_href":         "https://console.rhel.example.com",
+				"resourceData": map[string]interface{}{
+					"satellite_id":          "123",
+					"sub_manager_id":        "abc",
+					"insights_inventory_id": "257",
+					"ansible_host":          "abc",
+				},
 			},
 			commonResourceData: map[string]interface{}{
 				"workspace_id": "workspace-123",
@@ -427,7 +433,23 @@ func TestSchemaValidation(t *testing.T) {
 			expectedErrMsg: "validation failed: external_cluster_id: Invalid type. Expected: string, given: integer",
 			schemaExpected: true,
 		},
-
+		{
+			name:         "RHEL Host without resourceData (which is not expected)",
+			resourceType: "rhel_host",
+			reporterData: map[string]interface{}{
+				"reporter_type":        "HBI",
+				"reporter_instance_id": "org-123",
+				"local_resource_id":    "rhel-host-001",
+				"api_href":             "https://api.rhel.example.com",
+				"console_href":         "https://console.rhel.example.com",
+			},
+			commonResourceData: map[string]interface{}{
+				"workspace_id": "workspace-123",
+			},
+			expectErr:      true,
+			expectedErrMsg: "schema found for 'rhel_host', but no 'resourceData",
+			schemaExpected: true,
+		},
 		{
 			name:         "Notifications Integration with resourceData (which is not expected)",
 			resourceType: "notifications_integration",

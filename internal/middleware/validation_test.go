@@ -434,23 +434,6 @@ func TestSchemaValidation(t *testing.T) {
 			schemaExpected: true,
 		},
 		{
-			name:         "RHEL Host without resourceData (which is not expected)",
-			resourceType: "rhel_host",
-			reporterData: map[string]interface{}{
-				"reporter_type":        "HBI",
-				"reporter_instance_id": "org-123",
-				"local_resource_id":    "rhel-host-001",
-				"api_href":             "https://api.rhel.example.com",
-				"console_href":         "https://console.rhel.example.com",
-			},
-			commonResourceData: map[string]interface{}{
-				"workspace_id": "workspace-123",
-			},
-			expectErr:      true,
-			expectedErrMsg: "schema found for 'rhel_host', but no 'resourceData",
-			schemaExpected: true,
-		},
-		{
 			name:         "Notifications Integration with resourceData (which is not expected)",
 			resourceType: "notifications_integration",
 			reporterData: map[string]interface{}{

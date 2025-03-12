@@ -55,9 +55,9 @@ func LoadReporterSchema(baseSchemaDir string) (string, error) {
 }
 
 // Load Common Resource Data Schema
-func LoadCommonResourceDataSchema(baseSchemaDir string) (string, error) {
+func LoadCommonResourceDataSchema(resourceType string, baseSchemaDir string) (string, error) {
 
-	schemaPath := filepath.Join(baseSchemaDir, "common_resource_data.json")
+	schemaPath := filepath.Join(baseSchemaDir, resourceType, "common_resource_data.json")
 
 	data, err := os.ReadFile(schemaPath)
 	if err != nil {

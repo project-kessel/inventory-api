@@ -225,8 +225,8 @@ func TestUnmarshalJSONToMap(t *testing.T) {
 	}
 }
 
-func loadCommonSchemaAndValidate(t *testing.T, schemaDir string, commonResourceData map[string]interface{}) {
-	commonSchema, err := middleware.LoadCommonResourceDataSchema(schemaDir)
+func loadCommonSchemaAndValidate(t *testing.T, resourceType string, schemaDir string, commonResourceData map[string]interface{}) {
+	commonSchema, err := middleware.LoadCommonResourceDataSchema(resourceType, schemaDir)
 	if err != nil {
 		t.Fatalf("Failed to load common resource schema: %v", err)
 	}
@@ -256,7 +256,7 @@ func runValidationTest(t *testing.T, tt struct {
 	}
 
 	if tt.commonResourceData != nil {
-		loadCommonSchemaAndValidate(t, schemaDir, tt.commonResourceData)
+		loadCommonSchemaAndValidate(t, tt.resourceType, schemaDir, tt.commonResourceData)
 	}
 }
 
@@ -471,7 +471,7 @@ func TestSchemaValidation(t *testing.T) {
 				"workspace_id": "workspace-123",
 			},
 			expectErr:      true,
-			expectedErrMsg: "no schema found for 'unknown_resource', but 'resourceData' was provided",
+			expectedErrMsg: "no schema found for 'unknown_resource', but 'resourceData' was provided. Submission is not allowed",
 			schemaExpected: false,
 		},
 	}

@@ -26,13 +26,6 @@ func PreloadAllSchemas(resourceDir string) error {
 
 	log.Infof("Reading resource directory: %s", resourceDir)
 
-	// Load the common resource data schema
-	commonResourceSchema, err := LoadCommonResourceDataSchema(resourceDir)
-	if err != nil {
-		return fmt.Errorf("failed to load common resource schema: %w", err)
-	}
-	schemaCache.Store("common:common_resource_data", commonResourceSchema)
-
 	reporterDataSchema, err := LoadReporterSchema(resourceDir)
 	if err != nil {
 		return fmt.Errorf("failed to load common resource schema: %w", err)
@@ -49,6 +42,13 @@ func PreloadAllSchemas(resourceDir string) error {
 		if err != nil {
 			return err
 		}
+
+		// Load the common resource data schema
+		commonResourceSchema, err := LoadCommonResourceDataSchema(resourceType, resourceDir)
+		if err != nil {
+			return fmt.Errorf("failed to load common resource schema: %w", err)
+		}
+		schemaCache.Store("common:common_resource_data", commonResourceSchema)
 
 		// Load resource schema using LoadResourceSchema
 		resourceSchema, isResourceExists, err := LoadResourceSchema(resourceType, resourceDir)

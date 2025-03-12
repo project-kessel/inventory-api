@@ -36,7 +36,7 @@ func NormalizeResourceType(resourceType string) string {
 	return strings.ReplaceAll(resourceType, "/", "_")
 }
 
-func marshalProtoToJSON(msg proto.Message) ([]byte, error) {
+func MarshalProtoToJSON(msg proto.Message) ([]byte, error) {
 	data, err := protojson.Marshal(msg)
 	if err != nil {
 		return nil, fmt.Errorf("ERROR: Failed to marshal message: %w", err)
@@ -44,7 +44,7 @@ func marshalProtoToJSON(msg proto.Message) ([]byte, error) {
 	return data, nil
 }
 
-func unmarshalJSONToMap(data []byte) (map[string]interface{}, error) {
+func UnmarshalJSONToMap(data []byte) (map[string]interface{}, error) {
 	var resourceMap map[string]interface{}
 	if err := json.Unmarshal(data, &resourceMap); err != nil {
 		return nil, fmt.Errorf("ERROR: Failed to unmarshal JSON: %w", err)
@@ -53,7 +53,7 @@ func unmarshalJSONToMap(data []byte) (map[string]interface{}, error) {
 }
 
 // Extracts a Map Field from another map
-func extractMapField(data map[string]interface{}, key string) (map[string]interface{}, error) {
+func ExtractMapField(data map[string]interface{}, key string) (map[string]interface{}, error) {
 	value, exists := data[key]
 	if !exists {
 		return nil, fmt.Errorf("ERROR: Missing '%s' field in payload", key)
@@ -68,7 +68,7 @@ func extractMapField(data map[string]interface{}, key string) (map[string]interf
 }
 
 // Extracts a String Field from a map
-func extractStringField(data map[string]interface{}, key string) (string, error) {
+func ExtractStringField(data map[string]interface{}, key string) (string, error) {
 	value, exists := data[key]
 	if !exists {
 		return "", fmt.Errorf("missing '%s' field in payload", key)
@@ -114,26 +114,35 @@ func validateReporterData(reporterData map[string]interface{}, resourceType stri
 func ValidateReporterResourceData(resourceType string, reporterData map[string]interface{}) error {
 	resourceDataSchema, err := getSchemaFromCache(fmt.Sprintf("resource:%s", strings.ToLower(resourceType)))
 
-	_, hasResourceData := reporterData["resourceData"]
+	resourceData, hasResourceData := reporterData["resourceData"]
 
-	if err == nil && !hasResourceData {
-		return fmt.Errorf("schema found for '%s', but no 'resourceData' provided. Submission is not allowed", resourceType)
-	}
-
+	// Case 1: If no schema exists for the resourceType, treat it as an abstract resource and log a warning
 	if err != nil {
 		if hasResourceData {
+			// If resourceData is provided but no schema is found, return error
 			return fmt.Errorf("no schema found for '%s', but 'resourceData' was provided. Submission is not allowed", resourceType)
 		}
 		log.Warnf("no schema found for %s, treating as an abstract resource", resourceType)
 		return nil
 	}
 
+	// Case 2: If resourceData is provided, validate it
 	if hasResourceData {
-		if err := ValidateJSONSchema(resourceDataSchema, reporterData["resourceData"].(map[string]interface{})); err != nil {
-			return fmt.Errorf("resourceData validation failed for '%s': %w", resourceType, err)
+		if resourceDataMap, ok := resourceData.(map[string]interface{}); ok {
+			// If resourceData is empty but the schema allows it, pass validation
+			if len(resourceDataMap) == 0 {
+				log.Warnf("Resource data for '%s' is empty, but it's allowed by the schema", resourceType)
+			} else {
+				// If resourceData is populated, validate it against the schema
+				if err := ValidateJSONSchema(resourceDataSchema, resourceDataMap); err != nil {
+					return fmt.Errorf("resourceData validation failed for '%s': %w", resourceType, err)
+				}
+			}
+		} else {
+			// If resourceData is not a valid map, return an error
+			return fmt.Errorf("resourceData should be a valid map for resource '%s'", resourceType)
 		}
 	}
-
 	return nil
 }
 

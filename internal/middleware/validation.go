@@ -55,32 +55,32 @@ func Validation(validator protovalidate.Validator) middleware.Middleware {
 }
 
 func validateResourceReporterJSON(msg proto.Message) error {
-	data, err := marshalProtoToJSON(msg)
+	data, err := MarshalProtoToJSON(msg)
 	if err != nil {
 		return err
 	}
 
-	reportResourceMap, err := unmarshalJSONToMap(data)
+	reportResourceMap, err := UnmarshalJSONToMap(data)
 	if err != nil {
 		return err
 	}
 
-	resource, err := extractMapField(reportResourceMap, "resource")
+	resource, err := ExtractMapField(reportResourceMap, "resource")
 	if err != nil {
 		return err
 	}
 
-	resourceType, err := extractStringField(resource, "resourceType")
+	resourceType, err := ExtractStringField(resource, "resourceType")
 	if err != nil {
 		return err
 	}
 
-	reporterData, err := extractMapField(resource, "reporterData")
+	reporterData, err := ExtractMapField(resource, "reporterData")
 	if err != nil {
 		return err
 	}
 
-	reporterType, err := extractStringField(reporterData, "reporterType")
+	reporterType, err := ExtractStringField(reporterData, "reporterType")
 	if err != nil {
 		return err
 	}
@@ -106,22 +106,22 @@ func validateResourceReporterJSON(msg proto.Message) error {
 
 // Validates resource deletion by extracting required fields from the request.
 func validateResourceDeletionJSON(msg proto.Message) error {
-	data, err := marshalProtoToJSON(msg)
+	data, err := MarshalProtoToJSON(msg)
 	if err != nil {
 		return err
 	}
 
-	deleteResourceMap, err := unmarshalJSONToMap(data)
+	deleteResourceMap, err := UnmarshalJSONToMap(data)
 	if err != nil {
 		return err
 	}
 
-	_, err = extractStringField(deleteResourceMap, "localResourceId")
+	_, err = ExtractStringField(deleteResourceMap, "localResourceId")
 	if err != nil {
 		return err
 	}
 
-	_, err = extractStringField(deleteResourceMap, "reporterType")
+	_, err = ExtractStringField(deleteResourceMap, "reporterType")
 	if err != nil {
 		return err
 	}

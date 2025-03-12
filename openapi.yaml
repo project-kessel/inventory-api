@@ -420,15 +420,12 @@ paths:
             tags:
                 - KesselResourceService
             operationId: KesselResourceService_DeleteResource
-            parameters:
-                - name: localResourceId
-                  in: query
-                  schema:
-                    type: string
-                - name: reporterType
-                  in: query
-                  schema:
-                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/kessel.inventory.v1beta2.DeleteResourceRequest'
+                required: true
             responses:
                 "200":
                     description: OK
@@ -996,6 +993,13 @@ components:
         kessel.inventory.v1beta1.resources.UpdateRhelHostResponse:
             type: object
             properties: {}
+        kessel.inventory.v1beta2.DeleteResourceRequest:
+            type: object
+            properties:
+                localResourceId:
+                    type: string
+                reporterType:
+                    type: string
         kessel.inventory.v1beta2.DeleteResourceResponse:
             type: object
             properties: {}

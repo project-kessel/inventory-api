@@ -2,6 +2,7 @@ package resources
 
 import (
 	"context"
+	"fmt"
 	"github.com/go-kratos/kratos/v2/log"
 	authnapi "github.com/project-kessel/inventory-api/internal/authn/api"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
@@ -41,9 +42,28 @@ func (c *ResourceService) ReportResource(ctx context.Context, r *pb.ReportResour
 	return responseFromResource(), nil
 }
 
+// DeleteResource NOT Deleting the correct resources
 func (c *ResourceService) DeleteResource(ctx context.Context, r *pb.DeleteResourceRequest) (*pb.DeleteResourceResponse, error) {
 	log.Info("I am in the new Resource Service Delete method!", ctx, r)
-	return nil, nil
+
+	identity, err := middleware.GetIdentity(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get identity: %w", err)
+	}
+
+	reporterResource, err := requestToDeleteResource(r, identity)
+	if err != nil {
+		log.Error("Failed to build reporter resource ID: ", err)
+		return nil, fmt.Errorf("failed to build reporter resource ID: %w", err)
+	}
+
+	err = c.Ctl.Delete(ctx, reporterResource)
+	if err != nil {
+		log.Error("Failed to delete resource: ", err)
+		return nil, fmt.Errorf("failed to delete resource: %w", err)
+	}
+
+	return responseFromDeleteResource(), nil
 }
 
 func requestToResource(r *pb.ReportResourceRequest, identity *authnapi.Identity) (*model.Resource, error) {
@@ -61,6 +81,26 @@ func requestToResource(r *pb.ReportResourceRequest, identity *authnapi.Identity)
 	return conv.ResourceFromPb(resourceType, identity.Principal, resourceData, workspaceId, r.Resource.ReporterData), nil
 }
 
+func requestToDeleteResource(r *pb.DeleteResourceRequest, identity *authnapi.Identity) (model.ReporterResourceId, error) {
+	log.Info("Delete Resource Request: ", r)
+
+	localResourceId := r.GetLocalResourceId()
+	reporterType := r.GetReporterType()
+
+	reporterResourceId := model.ReporterResourceId{
+		LocalResourceId: localResourceId,
+		ReporterType:    reporterType,
+		ReporterId:      identity.Principal,
+		ResourceType:    identity.Type,
+	}
+
+	return reporterResourceId, nil
+}
+
 func responseFromResource() *pb.ReportResourceResponse {
 	return &pb.ReportResourceResponse{}
+}
+
+func responseFromDeleteResource() *pb.DeleteResourceResponse {
+	return &pb.DeleteResourceResponse{}
 }

@@ -22,6 +22,8 @@ storage:
     user:
     password:
     dbname:
+resources:
+  schemaPath: "data/schema/resources"
 log:
   level: "info"
   livez: true

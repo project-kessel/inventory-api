@@ -3,6 +3,7 @@ package middleware
 import (
 	"fmt"
 	"github.com/go-kratos/kratos/v2/log"
+	"github.com/spf13/viper"
 	"gopkg.in/yaml.v3"
 	"os"
 	"path/filepath"
@@ -14,7 +15,7 @@ var schemaCache sync.Map
 func PreloadAllSchemas(resourceDir string) error {
 	// Set default resource directory if not provided
 	if resourceDir == "" {
-		resourceDir = "data/schema/resources"
+		resourceDir = viper.GetString("resources.schemaPath")
 		log.Infof("Using local resources directory: %s", resourceDir)
 	}
 

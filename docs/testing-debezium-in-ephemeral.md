@@ -38,10 +38,10 @@ oc port-forward svc/kessel-inventory-db 5432:5432
 # Make sure you have the creds exported first
 source deploy/debezium/debezium-db-config-env
 
-psql "postgresql://${DB_USER}:${DB_PASSWORD}@localhost:${DB_PORT}/${DB_NAME}" -f deploy/debezium/outbox.sql
+make setup-outbox
 
-# You can validate the table is properly configured with:
-psql "postgresql://${DB_USER}:${DB_PASSWORD}@localhost:${DB_PORT}/${DB_NAME}" -c "\d+ outbox_events"
+# You can validate the table is properly configured setup with:
+make validate-outbox
 ```
 
 ## Deploy the Debezium Connector
@@ -49,13 +49,9 @@ psql "postgresql://${DB_USER}:${DB_PASSWORD}@localhost:${DB_PORT}/${DB_NAME}" -c
 To deploy Debezium, process and apply the OpenShift template, passing the environment variables sourced earlier
 
 ```shell
-oc process --local -f deploy/debezium/debezium-connector.yaml \
-    -p DB_NAME=$DB_NAME \
-    -p DB_HOSTNAME=$DB_HOSTNAME \
-    -p DB_PORT=$DB_PORT \
-    -p DB_USER=$DB_USER \
-    -p DB_PASSWORD=$DB_PASSWORD \
-    -p KAFKA_CONNECT_INSTANCE=$KAFKA_CONNECT_INSTANCE | oc apply -f -
+make deploy-debezium
+
+# if you need to remove the connector you can also `make undeploy-debezium`
 ```
 
 This should deploy the Kafka Connector which can be checked using:
@@ -94,27 +90,26 @@ source deploy/debezium/debezium-db-config-env
 
 ```shell
 # Create the tuple record in the outbox table
-psql "postgresql://${DB_USER}:${DB_PASSWORD}@localhost:${DB_PORT}/${DB_NAME}" -f deploy/debezium/sample-tuple.sql
+make outbox-tuple-record
 
 # Create a resource record in the outbox table
-psql "postgresql://${DB_USER}:${DB_PASSWORD}@localhost:${DB_PORT}/${DB_NAME}" -f deploy/debezium/sample-resource.sql
+make outbox-resource-record
+
+# You can validate the records in Postgres with:
+make get-outbox-tuples
+make get-outbox-resources
 ```
 
 ### Check that the Messages were Produced
 
 ```shell
-# Capture the bootstrap server address -- you will need it for next steps
-oc get svc -o json | jq -r '.items[] | select(.metadata.name | test("^env-ephemeral.*-kafka-bootstrap")) | "\(.metadata.name).\(.metadata.namespace).svc"'
+# Check Tuple messages
+make check-tuple-messages
 
-# rsh into the Connect pod
-oc rsh ${KAFKA_CONNECT_INSTANCE}-connect-0
+# !!! note, the consumer process runs continuously, to exit, hit Ctrl+c !!!
 
-# Use the consumer script to look at messages for each topic
-bin/kafka-console-consumer.sh --bootstrap-server <YOUR_BOOTSTRAP_SERVER>:9092 --topic outbox.event.kessel.tuples --from-beginning
-
-# note, the consumer process runs continously, to exit, hit Ctrl+c
-
-bin/kafka-console-consumer.sh --bootstrap-server <YOUR_BOOTSTRAP_SERVER>:9092 --topic outbox.event.kessel.resources --from-beginning
+# Check Resource messages
+make check-resource-messages
 ```
 
 ## Cleanup

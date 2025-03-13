@@ -122,16 +122,15 @@ func ValidateReporterResourceData(resourceType string, reporterData map[string]i
 			// If resourceData is provided but no schema is found, return error
 			return fmt.Errorf("no schema found for '%s', but 'resourceData' was provided. Submission is not allowed", resourceType)
 		}
-		log.Warnf("no schema found for %s, treating as an abstract resource", resourceType)
+		log.Debugf("no schema found for %s, treating as an abstract resource", resourceType)
 		return nil
 	}
 
 	// Case 2: If resourceData is provided, validate it
 	if hasResourceData {
 		if resourceDataMap, ok := resourceData.(map[string]interface{}); ok {
-			// If resourceData is empty but the schema allows it, pass validation
 			if len(resourceDataMap) == 0 {
-				log.Warnf("Resource data for '%s' is empty, but it's allowed by the schema", resourceType)
+				// If resourceData is empty but the schema allows it, pass validation
 			} else {
 				// If resourceData is populated, validate it against the schema
 				if err := ValidateJSONSchema(resourceDataSchema, resourceDataMap); err != nil {

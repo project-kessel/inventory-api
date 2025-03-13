@@ -1,7 +1,10 @@
 package middleware
 
 import (
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
+	"github.com/spf13/viper"
 	"gopkg.in/yaml.v3"
 	"os"
 	"path/filepath"
@@ -66,8 +69,17 @@ func LoadCommonResourceDataSchema(resourceType string, baseSchemaDir string) (st
 	return string(data), nil
 }
 
-// LoadValidReporters Takes the resource_type from the provided config.yaml and compares it to the defined reporter_types
+// LoadValidReporters retrieves valid reporters for a given resource type.
+// It either loads from the cache (JSON-based) or the filesystem (YAML-based).
 func LoadValidReporters(resourceType string) ([]string, error) {
+	if viper.GetBool("resources.use_cache") {
+		return loadFromCache(resourceType)
+	}
+	return loadFromFilesystem(resourceType)
+}
+
+// LoadValidReporters Takes the resource_type from the provided config.yaml and compares it to the defined reporter_types
+func loadFromFilesystem(resourceType string) ([]string, error) {
 	var config struct {
 		ResourceReporters []string `yaml:"resource_reporters"`
 	}
@@ -89,6 +101,58 @@ func LoadValidReporters(resourceType string) ([]string, error) {
 
 	if config.ResourceReporters == nil {
 		return nil, fmt.Errorf("missing 'resource_reporters' field in config for '%s'", resourceType)
+	}
+
+	return config.ResourceReporters, nil
+}
+
+func loadFromCache(resourceType string) ([]string, error) {
+	cacheKey := fmt.Sprintf("config:%s", resourceType)
+
+	// Retrieve the config from cache
+	cachedConfig, ok := schemaCache.Load(cacheKey)
+	if !ok {
+		return nil, fmt.Errorf("config not found in cache for resource type '%s'", resourceType)
+	}
+
+	// Debugging log
+	fmt.Printf("DEBUG: Type of cachedConfig for %s: %T\n", resourceType, cachedConfig)
+
+	var configData []byte
+
+	// Handle different cases
+	switch v := cachedConfig.(type) {
+	case string:
+		decoded, err := base64.StdEncoding.DecodeString(v)
+		if err != nil {
+			// If not Base64, assume it's plain YAML
+			configData = []byte(v)
+		} else {
+			configData = decoded
+		}
+	case []byte:
+		configData = v
+	case map[string]interface{}:
+		// Convert JSON object back to bytes
+		jsonData, err := json.Marshal(v)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal JSON config for '%s': %w", resourceType, err)
+		}
+		configData = jsonData
+	default:
+		return nil, fmt.Errorf("unexpected data type for '%s' in cache: %T", resourceType, cachedConfig)
+	}
+
+	// Parse YAML or JSON
+	var config struct {
+		ResourceReporters []string `yaml:"resource_reporters" json:"resource_reporters"`
+	}
+	if err := yaml.Unmarshal(configData, &config); err != nil {
+		return nil, fmt.Errorf("failed to parse config for '%s': %w", resourceType, err)
+	}
+
+	if config.ResourceReporters == nil {
+		return nil, fmt.Errorf("missing 'resource_reporters' field in cache for '%s'", resourceType)
 	}
 
 	return config.ResourceReporters, nil

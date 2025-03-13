@@ -24,6 +24,7 @@ storage:
     dbname:
 resources:
   schemaPath: "data/schema/resources"
+  use_cache: false
 log:
   level: "info"
   livez: true

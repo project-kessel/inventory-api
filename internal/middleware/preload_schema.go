@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/spf13/viper"
@@ -13,6 +14,15 @@ import (
 var schemaCache sync.Map
 
 func PreloadAllSchemas(resourceDir string) error {
+	if viper.GetBool("resources.use_schema") {
+		LoadSchemaCacheFromJSON("schema_cache.json")
+	} else {
+		PreloadAllSchemasFromFilesystem(resourceDir)
+	}
+	return nil
+}
+
+func PreloadAllSchemasFromFilesystem(resourceDir string) error {
 	// Set default resource directory if not provided
 	if resourceDir == "" {
 		resourceDir = viper.GetString("resources.schemaPath")
@@ -87,7 +97,28 @@ func PreloadAllSchemas(resourceDir string) error {
 			schemaCache.Store(fmt.Sprintf("%s:%s", normalizeResourceType, reporterType), reporterSchema)
 		}
 	}
+	DumpSchemaCacheToJSON("schema_cache.json")
+	return nil
+}
 
+// LoadSchemaCacheFromJSON loads schema cache from a JSON file
+func LoadSchemaCacheFromJSON(filePath string) error {
+	jsonData, err := os.ReadFile(filePath)
+	if err != nil {
+		return fmt.Errorf("failed to read schema cache file: %w", err)
+	}
+
+	cacheMap := make(map[string]interface{})
+	err = json.Unmarshal(jsonData, &cacheMap)
+	if err != nil {
+		return fmt.Errorf("failed to unmarshal schema cache JSON: %w", err)
+	}
+
+	for key, value := range cacheMap {
+		schemaCache.Store(key, value)
+	}
+
+	log.Infof("Schema cache successfully loaded from %s", filePath)
 	return nil
 }
 
@@ -121,4 +152,27 @@ func loadConfigFile(resourceDir string, resourceType string) (struct {
 	configResourceType := NormalizeResourceType(config.ResourceType)
 	schemaCache.Store(fmt.Sprintf("config:%s", configResourceType), configData)
 	return config, nil
+}
+
+// DumpSchemaCacheToJSON saves the schema cache to a JSON file
+func DumpSchemaCacheToJSON(filePath string) error {
+	cacheMap := make(map[string]interface{})
+
+	schemaCache.Range(func(key, value interface{}) bool {
+		cacheMap[key.(string)] = value
+		return true
+	})
+
+	jsonData, err := json.MarshalIndent(cacheMap, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to marshal schema cache: %w", err)
+	}
+
+	err = os.WriteFile(filePath, jsonData, 0644)
+	if err != nil {
+		return fmt.Errorf("failed to write schema cache to file: %w", err)
+	}
+
+	log.Infof("Schema cache successfully dumped to %s", filePath)
+	return nil
 }

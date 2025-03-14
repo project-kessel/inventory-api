@@ -8,6 +8,8 @@ import (
 	"github.com/xeipuuv/gojsonschema"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
+	"os"
+	"path/filepath"
 	"strings"
 )
 
@@ -162,4 +164,25 @@ func ValidateJSONSchema(schemaStr string, jsonData interface{}) error {
 		return fmt.Errorf("validation failed: %s", strings.Join(errMsgs, "; "))
 	}
 	return nil
+}
+
+func GetProjectRootPath() (string, error) {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return "", fmt.Errorf("failed to get current working directory: %w", err)
+	}
+
+	for {
+		if _, err := os.Stat(filepath.Join(cwd, "go.mod")); err == nil {
+			return cwd, nil
+		}
+
+		parent := filepath.Dir(cwd)
+		if parent == cwd {
+			break
+		}
+		cwd = parent
+	}
+
+	return "", fmt.Errorf("project root not found")
 }

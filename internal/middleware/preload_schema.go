@@ -81,10 +81,18 @@ func PreloadAllSchemasFromFilesystem(resourceDir string) error {
 			}
 		}
 	}
-	if err := DumpSchemaCacheToJSON("schema_cache.json"); err != nil {
+
+	projectRoot, err := GetProjectRootPath()
+	if err != nil {
+		return fmt.Errorf("failed to determine project root: %w", err)
+	}
+
+	schemaCachePath := filepath.Join(projectRoot, "schema_cache.json")
+	if err := DumpSchemaCacheToJSON(schemaCachePath); err != nil {
 		log.Errorf("Failed to dump schema cache to JSON: %v", err)
 		return err
 	}
+	return nil
 	return nil
 }
 

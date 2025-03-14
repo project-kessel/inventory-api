@@ -1,36 +1,13 @@
 package middleware_test
 
 import (
-	"fmt"
 	pbv1beta2 "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2"
-	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/project-kessel/inventory-api/internal/middleware"
 	"github.com/stretchr/testify/assert"
 )
-
-func getProjectRootPath() (string, error) {
-	cwd, err := os.Getwd()
-	if err != nil {
-		return "", fmt.Errorf("failed to get current working directory: %w", err)
-	}
-
-	for {
-		if _, err := os.Stat(filepath.Join(cwd, "go.mod")); err == nil {
-			return cwd, nil
-		}
-
-		parent := filepath.Dir(cwd)
-		if parent == cwd {
-			break
-		}
-		cwd = parent
-	}
-
-	return "", fmt.Errorf("project root not found")
-}
 
 // Helper functions
 func TestNormalizeResourceTypeCase(t *testing.T) {
@@ -261,7 +238,7 @@ func runValidationTest(t *testing.T, tt struct {
 }
 
 func TestSchemaValidation(t *testing.T) {
-	projectRoot, err := getProjectRootPath()
+	projectRoot, err := middleware.GetProjectRootPath()
 	if err != nil {
 		t.Fatalf("Failed to determine project root: %v", err)
 	}

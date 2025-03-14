@@ -90,7 +90,7 @@ func k8sPolicyFromCreateRequest(r *pb.CreateK8SPolicyRequest, identity *authnapi
 		return nil, err
 	}
 
-	return conv.ResourceFromPb(ResourceType, identity.Principal, resourceData, r.K8SPolicy.Metadata, r.K8SPolicy.ReporterData), nil
+	return conv.ResourceFromPbv1beta1(ResourceType, identity.Principal, resourceData, r.K8SPolicy.Metadata, r.K8SPolicy.ReporterData), nil
 }
 
 func createResponseFromK8sPolicy(p *model.Resource) *pb.CreateK8SPolicyResponse {
@@ -103,7 +103,7 @@ func k8sPolicyFromUpdateRequest(r *pb.UpdateK8SPolicyRequest, identity *authnapi
 		return nil, err
 	}
 
-	return conv.ResourceFromPb(ResourceType, identity.Principal, resourceData, r.K8SPolicy.Metadata, r.K8SPolicy.ReporterData), nil
+	return conv.ResourceFromPbv1beta1(ResourceType, identity.Principal, resourceData, r.K8SPolicy.Metadata, r.K8SPolicy.ReporterData), nil
 }
 
 func updateResponseFromK8sPolicy(p *model.Resource) *pb.UpdateK8SPolicyResponse {

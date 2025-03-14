@@ -163,6 +163,7 @@ func TestCreateResourceWithInventoryId(t *testing.T) {
 	res2.InventoryId = r.InventoryId
 	// Force workspace update
 	res2.WorkspaceId = "workspace-02"
+	res2.ReporterInstanceId = "345"
 
 	r2, updatedResources, err := repo.Create(ctx, res2)
 	assert.NotNil(t, r2)

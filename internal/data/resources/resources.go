@@ -102,6 +102,7 @@ func (r *Repo) Update(ctx context.Context, m *model.Resource, id uuid.UUID) (*mo
 
 	m.ID = id
 	m.CreatedAt = resource.CreatedAt
+	m.InventoryId = resource.InventoryId
 	if err := tx.Save(m).Error; err != nil {
 		tx.Rollback()
 		return nil, nil, err
@@ -183,6 +184,20 @@ func (r *Repo) FindByReporterResourceId(ctx context.Context, id model.ReporterRe
 	}
 
 	return r.FindByID(ctx, resourceId)
+}
+
+func (r *Repo) FindByReporterResourceIdv1beta2(ctx context.Context, id model.ReporterResourceUniqueIndex) (*model.Resource, error) {
+	resource := model.Resource{}
+	if err := r.DB.Session(&gorm.Session{}).Where(&model.ReporterResourceUniqueIndex{
+		ReporterInstanceId: id.ReporterInstanceId,
+		ReporterResourceId: id.ReporterResourceId,
+		ResourceType:       id.ResourceType,
+		ReporterType:       id.ReporterType,
+	}).First(&resource).Error; err != nil {
+		return nil, err
+	}
+
+	return &resource, nil
 }
 
 func (r *Repo) FindByReporterData(ctx context.Context, reporterId string, reporterResourceId string) (*model.Resource, error) {

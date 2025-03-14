@@ -1,0 +1,21 @@
+{
+  "resource": {
+    "resource_type": "rhel_host",
+    "reporter_data": {
+      "reporter_type": "OCM",
+      "reporter_version": "0.1",
+      "local_resource_id": "1",
+      "api_href": "www.example.com",
+      "console_href": "www.example.com",
+      "resource_data": {
+        "satellite_id": "123",
+        "sub_manager_id": "abc",
+        "insights_inventory_id": "257",
+        "ansible_host": "abc"
+      }
+    },
+    "common_resource_data": {
+      "workspace_id": "01932c7e-e93e-719c-a488-3159877367b0"
+    }
+  }
+}

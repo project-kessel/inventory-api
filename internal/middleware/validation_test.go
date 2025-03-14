@@ -285,8 +285,9 @@ func TestSchemaValidation(t *testing.T) {
 			name:         "Valid K8s Cluster with resourceData",
 			resourceType: "k8s_cluster",
 			reporterData: map[string]interface{}{
-				"reporter_type":        "OCM",
+				"reporterType":         "OCM",
 				"reporter_instance_id": "user@example.com",
+				"reporter_version":     "0.1",
 				"local_resource_id":    "cluster-123",
 				"api_href":             "www.example.com",
 				"console_href":         "www.example.com",
@@ -310,7 +311,7 @@ func TestSchemaValidation(t *testing.T) {
 			name:         "Valid RHEL Host with Resource Data",
 			resourceType: "rhel_host",
 			reporterData: map[string]interface{}{
-				"reporter_type":        "HBI",
+				"reporterType":         "HBI",
 				"reporter_instance_id": "org-123",
 				"local_resource_id":    "rhel-host-001",
 				"api_href":             "https://api.rhel.example.com",
@@ -332,7 +333,7 @@ func TestSchemaValidation(t *testing.T) {
 			name:         "Valid K8s Policy",
 			resourceType: "k8s_policy",
 			reporterData: map[string]interface{}{
-				"reporter_type":        "ACM",
+				"reporterType":         "ACM",
 				"reporter_instance_id": "org-123",
 				"local_resource_id":    "k8s-policy-001",
 				"api_href":             "https://api.k8s.example.com",
@@ -352,7 +353,7 @@ func TestSchemaValidation(t *testing.T) {
 			name:         "Valid Notifications Integration (No schema expected)",
 			resourceType: "notifications_integration",
 			reporterData: map[string]interface{}{
-				"reporter_type":        "NOTIFICATIONS",
+				"reporterType":         "NOTIFICATIONS",
 				"reporter_instance_id": "1",
 				"local_resource_id":    "notifications-001",
 				"api_href":             "https://api.notifications.example.com",
@@ -370,7 +371,7 @@ func TestSchemaValidation(t *testing.T) {
 			name:         "K8s Cluster missing resourceData",
 			resourceType: "k8s_cluster",
 			reporterData: map[string]interface{}{
-				"reporter_type":        "OCM",
+				"reporterType":         "OCM",
 				"reporter_instance_id": "user@example.com",
 				"local_resource_id":    "cluster-123",
 				"api_href":             "www.example.com",
@@ -390,7 +391,7 @@ func TestSchemaValidation(t *testing.T) {
 			name:         "K8s Cluster with missing required fields in resourceData",
 			resourceType: "k8s_cluster",
 			reporterData: map[string]interface{}{
-				"reporter_type":        "OCM",
+				"reporterType":         "OCM",
 				"reporter_instance_id": "user@example.com",
 				"local_resource_id":    "cluster-123",
 				"api_href":             "www.example.com",
@@ -411,7 +412,7 @@ func TestSchemaValidation(t *testing.T) {
 			name:         "K8s Cluster with incorrect data types",
 			resourceType: "k8s_cluster",
 			reporterData: map[string]interface{}{
-				"reporter_type":        "OCM",
+				"reporterType":         "OCM",
 				"reporter_instance_id": "user@example.com",
 				"local_resource_id":    "cluster-123",
 				"api_href":             "www.example.com",
@@ -437,7 +438,7 @@ func TestSchemaValidation(t *testing.T) {
 			name:         "Notifications Integration with resourceData (which is not expected)",
 			resourceType: "notifications_integration",
 			reporterData: map[string]interface{}{
-				"reporter_type":        "NOTIFICATIONS",
+				"reporterType":         "NOTIFICATIONS",
 				"reporter_instance_id": "1",
 				"local_resource_id":    "notifications-001",
 				"api_href":             "https://api.notifications.example.com",
@@ -450,7 +451,7 @@ func TestSchemaValidation(t *testing.T) {
 				"workspace_id": "workspace-123",
 			},
 			expectErr:      true,
-			expectedErrMsg: "no schema found for 'notifications_integration', but 'resourceData' was provided",
+			expectedErrMsg: "resourceData validation failed for 'notifications_integration:notifications': validation failed: (root): reporter_type is required; (root): reporter_instance_id is required; (root): local_resource_id is required",
 			schemaExpected: false,
 		},
 

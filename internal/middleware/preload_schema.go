@@ -51,7 +51,11 @@ func PreloadAllSchemasFromFilesystem(resourceDir string) error {
 			schemaCache.Store(fmt.Sprintf("common:%s", resourceType), commonResourceSchema)
 		}
 
-		loadConfigFile(resourceDir, resourceType)
+		_, err = loadConfigFile(resourceDir, resourceType)
+		if err != nil {
+			log.Errorf("Failed to load config file for '%s': %v", resourceType, err)
+			return err
+		}
 
 		reportersDir := filepath.Join(resourceDir, resourceType, "reporters")
 		if _, err := os.Stat(reportersDir); os.IsNotExist(err) {

@@ -14,90 +14,73 @@ import (
 var schemaCache sync.Map
 
 func PreloadAllSchemas(resourceDir string) error {
-	if viper.GetBool("resources.use_schema") {
-		LoadSchemaCacheFromJSON("schema_cache.json")
+	if viper.GetBool("resources.use_cache") {
+		if err := LoadSchemaCacheFromJSON("schema_cache.json"); err != nil {
+			log.Errorf("Failed to load schema cache from JSON: %v", err)
+			return err
+		}
+		log.Info("Using JSON cache based on resources directory")
 	} else {
-		PreloadAllSchemasFromFilesystem(resourceDir)
+		if err := PreloadAllSchemasFromFilesystem(resourceDir); err != nil {
+			log.Errorf("Failed to preload schemas from filesystem: %v", err)
+			return err
+		}
+		log.Infof("Using local resources directory: %s", resourceDir)
 	}
 	return nil
 }
 
 func PreloadAllSchemasFromFilesystem(resourceDir string) error {
-	// Set default resource directory if not provided
 	if resourceDir == "" {
 		resourceDir = viper.GetString("resources.schemaPath")
-		log.Infof("Using local resources directory: %s", resourceDir)
 	}
-
-	// Read all resource directories
 	resourceDirs, err := os.ReadDir(resourceDir)
 	if err != nil {
-		return fmt.Errorf("Failed to read resource directory %s: %w", resourceDir, err)
+		return fmt.Errorf("no directories inside schema directory")
 	}
-
-	log.Infof("Reading resource directory: %s", resourceDir)
-
-	reporterDataSchema, err := LoadReporterSchema(resourceDir)
-	if err != nil {
-		return fmt.Errorf("failed to load common resource schema: %w", err)
-	}
-	schemaCache.Store("common:reporter_data", reporterDataSchema)
 
 	for _, dir := range resourceDirs {
 		if !dir.IsDir() {
 			continue
 		}
+		resourceType := NormalizeResourceType(dir.Name())
 
-		resourceType := dir.Name()
-		_, err := loadConfigFile(resourceDir, resourceType)
-		if err != nil {
-			return err
-		}
-
-		// Load the common resource data schema
+		// Load and store common resource schema
 		commonResourceSchema, err := LoadCommonResourceDataSchema(resourceType, resourceDir)
-		if err != nil {
-			return fmt.Errorf("failed to load common resource schema: %w", err)
-		}
-		schemaCache.Store("common:common_resource_data", commonResourceSchema)
-
-		// Load resource schema using LoadResourceSchema
-		resourceSchema, isResourceExists, err := LoadResourceSchema(resourceType, resourceDir)
-		if err != nil {
-			return fmt.Errorf("failed to load resource schema for '%s': %w", resourceType, err)
+		if err == nil {
+			schemaCache.Store(fmt.Sprintf("common:%s", resourceType), commonResourceSchema)
 		}
 
-		if isResourceExists {
-			schemaCache.Store(fmt.Sprintf("resource:%s", resourceType), resourceSchema)
-		}
+		loadConfigFile(resourceDir, resourceType)
 
-		// Load reporter schemas using LoadReporterSchema
 		reportersDir := filepath.Join(resourceDir, resourceType, "reporters")
-
 		if _, err := os.Stat(reportersDir); os.IsNotExist(err) {
-			continue // Skip if no reporters directory exists
+			continue
 		}
 
 		reporterDirs, err := os.ReadDir(reportersDir)
 		if err != nil {
-			return fmt.Errorf("failed to read reporters directory for '%s': %w", resourceType, err)
+			log.Errorf("Failed to read reporters directory for '%s': %v", resourceType, err)
+			continue
 		}
 
-		// Iterate through reporters and load their schemas
-		normalizeResourceType := NormalizeResourceType(resourceType)
 		for _, reporter := range reporterDirs {
 			if !reporter.IsDir() {
 				continue
 			}
 			reporterType := reporter.Name()
-			reporterSchema, err := LoadReporterSchema(resourceDir)
-			if err != nil {
-				return fmt.Errorf("failed to load reporter schema for '%s' and reporter '%s': %w", resourceType, reporterType, err)
+			reporterSchema, isReporterSchemaExists, err := LoadResourceSchema(resourceType, reporterType, resourceDir)
+			if err == nil && isReporterSchemaExists {
+				schemaCache.Store(fmt.Sprintf("%s:%s", resourceType, reporterType), reporterSchema)
+			} else {
+				log.Warnf("No schema found for %s:%s", resourceType, reporterType)
 			}
-			schemaCache.Store(fmt.Sprintf("%s:%s", normalizeResourceType, reporterType), reporterSchema)
 		}
 	}
-	DumpSchemaCacheToJSON("schema_cache.json")
+	if err := DumpSchemaCacheToJSON("schema_cache.json"); err != nil {
+		log.Errorf("Failed to dump schema cache to JSON: %v", err)
+		return err
+	}
 	return nil
 }
 
@@ -173,6 +156,5 @@ func DumpSchemaCacheToJSON(filePath string) error {
 		return fmt.Errorf("failed to write schema cache to file: %w", err)
 	}
 
-	log.Infof("Schema cache successfully dumped to %s", filePath)
 	return nil
 }

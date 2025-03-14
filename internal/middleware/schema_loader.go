@@ -26,8 +26,9 @@ func ValidateResourceReporterCombination(resourceType, reporterType string) erro
 }
 
 // LoadResourceSchema finds the resources schema based on the directory structure of data/resources
-func LoadResourceSchema(resourceType string, dir string) (string, bool, error) {
-	schemaPath := filepath.Join(dir, resourceType, resourceType+".json")
+func LoadResourceSchema(resourceType string, reporterType string, dir string) (string, bool, error) {
+	schemaPath := filepath.Join(dir, resourceType, "reporters", reporterType, fmt.Sprintf("%s.json", resourceType))
+
 	// Check if file exists
 	if _, err := os.Stat(schemaPath); err != nil {
 		if os.IsNotExist(err) {
@@ -43,18 +44,6 @@ func LoadResourceSchema(resourceType string, dir string) (string, bool, error) {
 	}
 
 	return string(data), true, nil
-}
-
-// Load Common Resource Data Schema
-func LoadReporterSchema(baseSchemaDir string) (string, error) {
-
-	schemaPath := filepath.Join(baseSchemaDir, "reporter_data.json")
-
-	data, err := os.ReadFile(schemaPath)
-	if err != nil {
-		return "", fmt.Errorf("failed to read common reporter schema: %w", err)
-	}
-	return string(data), nil
 }
 
 // Load Common Resource Data Schema

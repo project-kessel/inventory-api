@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"context"
+	"github.com/spf13/viper"
 
 	"github.com/bufbuild/protovalidate-go"
 	"github.com/go-kratos/kratos/v2/errors"
@@ -14,7 +15,7 @@ import (
 )
 
 var (
-	resourceDir       = os.Getenv("RESOURCE_DIR")
+	resourceDir       = viper.GetString("resources.schemaPath")
 	AbstractResources = map[string]struct{}{} // Tracks resource types marked as abstract (no resource_data)
 )
 
@@ -93,11 +94,7 @@ func validateResourceReporterJSON(msg proto.Message) error {
 		return err
 	}
 
-	if err := ValidateCommonResourceData(resource); err != nil {
-		return err
-	}
-
-	if err := validateReporterData(reporterData, resourceType); err != nil {
+	if err := ValidateCommonResourceData(resourceType, resource); err != nil {
 		return err
 	}
 

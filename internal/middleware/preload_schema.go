@@ -93,7 +93,6 @@ func PreloadAllSchemasFromFilesystem(resourceDir string) error {
 		return err
 	}
 	return nil
-	return nil
 }
 
 // LoadSchemaCacheFromJSON loads schema cache from a JSON file

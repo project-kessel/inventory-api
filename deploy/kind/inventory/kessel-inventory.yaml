@@ -190,6 +190,7 @@ stringData:
         dbname: "spicedb"
     resources:
       schemaPath: "data/schema/resources"
+      use_cache: true
     log:
       level: "debug"
       livez: true

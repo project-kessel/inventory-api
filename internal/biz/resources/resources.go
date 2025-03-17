@@ -3,6 +3,7 @@ package resources
 import (
 	"context"
 	"errors"
+	"github.com/project-kessel/inventory-api/internal/consumer"
 	"time"
 
 	"github.com/google/uuid"
@@ -43,6 +44,7 @@ type Usecase struct {
 	inventoryResourceRepository InventoryResourceRepository
 	Authz                       authzapi.Authorizer
 	Eventer                     eventingapi.Manager
+	Consumer                    consumer.InventoryConsumer
 	Namespace                   string
 	log                         *log.Helper
 	Server                      server.Server

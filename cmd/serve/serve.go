@@ -3,6 +3,7 @@ package serve
 import (
 	"context"
 	"fmt"
+	"github.com/project-kessel/inventory-api/internal/consumer"
 	"os"
 	"os/signal"
 	"syscall"
@@ -50,6 +51,7 @@ func NewCommand(
 	authnOptions *authn.Options,
 	authzOptions *authz.Options,
 	eventingOptions *eventing.Options,
+	consumerOptions *consumer.Options,
 	loggerOptions common.LoggerOptions,
 ) *cobra.Command {
 	cmd := &cobra.Command{
@@ -104,6 +106,18 @@ func NewCommand(
 				return errors.NewAggregate(errs)
 			}
 
+			// configure consumer
+			if errs := consumerOptions.Complete(); errs != nil {
+				return errors.NewAggregate(errs)
+			}
+			if errs := consumerOptions.Validate(); errs != nil {
+				return errors.NewAggregate(errs)
+			}
+			consumerConfig, errs := consumer.NewConfig(consumerOptions).Complete()
+			if errs != nil {
+				return errors.NewAggregate(errs)
+			}
+
 			// configure the server
 			if errs := serverOptions.Complete(); errs != nil {
 				return errors.NewAggregate(errs)
@@ -138,6 +152,11 @@ func NewCommand(
 			// Note that we pass the server id here to act as the Source URI in cloudevents
 			// If a server ID isn't configured explicitly, `os.Hostname()` is used.
 			eventingManager, err := eventing.New(eventingConfig, serverConfig.Options.PublicUrl, log.NewHelper(log.With(logger, "subsystem", "eventing")))
+			if err != nil {
+				return err
+			}
+
+			consumer, err := consumer.New(consumerConfig, storageConfig, authzConfig, authorizer, log.NewHelper(log.With(logger, "subsystem", "consumer")))
 			if err != nil {
 				return err
 			}
@@ -202,6 +221,8 @@ func NewCommand(
 			go func() {
 				srvErrs <- server.Run(ctx)
 			}()
+
+			go consumer.Consume()
 
 			quit := make(chan os.Signal, 1)
 			signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)

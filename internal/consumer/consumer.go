@@ -319,7 +319,6 @@ func (i *InventoryConsumer) Errs() <-chan error {
 func (i *InventoryConsumer) Shutdown() error {
 	// TODO, shutting down the consumer should attempt to commit the offset if we've processed the message
 	// for now it just stops the consumer connection
-
 	err := i.Consumer.Close()
 	if err != nil {
 		i.Logger.Errorf("Error closing kafka consumer: %v", err)

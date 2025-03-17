@@ -98,6 +98,7 @@ require (
 	golang.org/x/sys v0.30.0 // indirect
 	golang.org/x/text v0.22.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250124145028-65684f501c47 // indirect
+	gopkg.in/ini.v1 v1.67.0 // indirect
 )
 
 // Revert to packagaes that can use verions of go <= 1.22.9

@@ -1,9 +1,9 @@
 server:
-  public_url: http://localhost:8000
+  public_url: http://localhost:8081
   http:
-    address: localhost:8000
+    address: localhost:8081
   grpc:
-    address: localhost:9000
+    address: localhost:9081
 authn:
    allow-unauthenticated: true
 #   oidc:
@@ -15,7 +15,7 @@ authz:
   impl: kessel
   kessel:
     insecure-client: true
-    url: relations-api:9000
+    url: localhost:9000
     enable-oidc-auth: false
 eventing:
   eventer: stdout

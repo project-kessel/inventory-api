@@ -3,6 +3,7 @@ package resources
 import (
 	"context"
 	"errors"
+	"github.com/project-kessel/inventory-api/internal/consumer"
 	"time"
 
 	"github.com/project-kessel/inventory-api/internal/consumer"

@@ -9,6 +9,8 @@ import (
 
 	"github.com/project-kessel/inventory-api/internal/consumer"
 
+	"github.com/project-kessel/inventory-api/internal/consumer"
+
 	"github.com/project-kessel/inventory-api/cmd/common"
 	relationshipsctl "github.com/project-kessel/inventory-api/internal/biz/relationships"
 	resourcesctl "github.com/project-kessel/inventory-api/internal/biz/resources"
@@ -21,6 +23,7 @@ import (
 	k8sclusterssvc "github.com/project-kessel/inventory-api/internal/service/resources/k8sclusters"
 	k8spoliciessvc "github.com/project-kessel/inventory-api/internal/service/resources/k8spolicies"
 	notifssvc "github.com/project-kessel/inventory-api/internal/service/resources/notificationsintegrations"
+
 	//v1beta2
 	resourcesvc "github.com/project-kessel/inventory-api/internal/service/resources"
 

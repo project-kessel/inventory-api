@@ -6,6 +6,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/project-kessel/inventory-api/internal/consumer"
+
 	"github.com/google/uuid"
 
 	"github.com/go-kratos/kratos/v2/log"
@@ -48,6 +50,7 @@ type Usecase struct {
 	inventoryResourceRepository InventoryResourceRepository
 	Authz                       authzapi.Authorizer
 	Eventer                     eventingapi.Manager
+	Consumer                    consumer.InventoryConsumer
 	Namespace                   string
 	log                         *log.Helper
 	Server                      server.Server

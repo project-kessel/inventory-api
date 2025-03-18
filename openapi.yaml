@@ -47,12 +47,12 @@ paths:
             tags:
                 - KesselCheckService
             description: "Checks for the existence of a single Relationship \n (a Relation between a Resource and a Subject or Subject Set)."
-            operationId: KesselCheckService_CheckForView
+            operationId: KesselCheckService_Check
             requestBody:
                 content:
                     application/json:
                         schema:
-                            $ref: '#/components/schemas/kessel.inventory.v1beta1.authz.CheckForViewRequest'
+                            $ref: '#/components/schemas/kessel.inventory.v1beta1.authz.CheckRequest'
                 required: true
             responses:
                 "200":
@@ -60,31 +60,7 @@ paths:
                     content:
                         application/json:
                             schema:
-                                $ref: '#/components/schemas/kessel.inventory.v1beta1.authz.CheckForViewResponse'
-                default:
-                    description: Default error response
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/google.rpc.Status'
-    /api/inventory/v1beta1/authz/checkforcreate:
-        post:
-            tags:
-                - KesselCheckService
-            operationId: KesselCheckService_CheckForCreate
-            requestBody:
-                content:
-                    application/json:
-                        schema:
-                            $ref: '#/components/schemas/kessel.inventory.v1beta1.authz.CheckForCreateRequest'
-                required: true
-            responses:
-                "200":
-                    description: OK
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/kessel.inventory.v1beta1.authz.CheckForCreateResponse'
+                                $ref: '#/components/schemas/kessel.inventory.v1beta1.authz.CheckResponse'
                 default:
                     description: Default error response
                     content:
@@ -530,33 +506,6 @@ components:
                 code:
                     type: integer
                     format: uint32
-        kessel.inventory.v1beta1.authz.CheckForCreateRequest:
-            type: object
-            properties:
-                parent:
-                    allOf:
-                        - $ref: '#/components/schemas/kessel.inventory.v1beta1.authz.ObjectReference'
-                    description: |-
-                        Required parameters (from an authz perspective)
-                         	- resource type (located in Metadata, could be discrete argument)
-                         		Alternatively: the workspace-level 'create' permission for the resource type. Note: this parameter is not normally part of the CreateResource call (but may need to be if this is rolled into CreateResource and it cannot be derived from the resource type)
-                         	- parent object type and id (typically a workspace, located in Metadata, could be discrete argument)
-                         Note: may be part of CreateResource or separate depending on consistency algorithm requirements
-                createPermission:
-                    type: string
-                subject:
-                    $ref: '#/components/schemas/kessel.inventory.v1beta1.authz.SubjectReference'
-            description: may make sense to get away with just checkforview and checkforupdate.
-        kessel.inventory.v1beta1.authz.CheckForCreateResponse:
-            type: object
-            properties:
-                allowed:
-                    enum:
-                        - ALLOWED_UNSPECIFIED
-                        - ALLOWED_TRUE
-                        - ALLOWED_FALSE
-                    type: string
-                    format: enum
         kessel.inventory.v1beta1.authz.CheckForUpdateRequest:
             type: object
             properties:
@@ -582,7 +531,7 @@ components:
                         - ALLOWED_FALSE
                     type: string
                     format: enum
-        kessel.inventory.v1beta1.authz.CheckForViewRequest:
+        kessel.inventory.v1beta1.authz.CheckRequest:
             type: object
             properties:
                 parent:
@@ -597,7 +546,7 @@ components:
                     type: string
                 subject:
                     $ref: '#/components/schemas/kessel.inventory.v1beta1.authz.SubjectReference'
-        kessel.inventory.v1beta1.authz.CheckForViewResponse:
+        kessel.inventory.v1beta1.authz.CheckResponse:
             type: object
             properties:
                 allowed:

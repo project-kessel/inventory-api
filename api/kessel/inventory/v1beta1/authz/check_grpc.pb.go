@@ -19,9 +19,8 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	KesselCheckService_CheckForView_FullMethodName   = "/kessel.inventory.v1beta1.authz.KesselCheckService/CheckForView"
+	KesselCheckService_Check_FullMethodName          = "/kessel.inventory.v1beta1.authz.KesselCheckService/Check"
 	KesselCheckService_CheckForUpdate_FullMethodName = "/kessel.inventory.v1beta1.authz.KesselCheckService/CheckForUpdate"
-	KesselCheckService_CheckForCreate_FullMethodName = "/kessel.inventory.v1beta1.authz.KesselCheckService/CheckForCreate"
 )
 
 // KesselCheckServiceClient is the client API for KesselCheckService service.
@@ -30,9 +29,8 @@ const (
 type KesselCheckServiceClient interface {
 	// Checks for the existence of a single Relationship
 	// (a Relation between a Resource and a Subject or Subject Set).
-	CheckForView(ctx context.Context, in *CheckForViewRequest, opts ...grpc.CallOption) (*CheckForViewResponse, error)
+	Check(ctx context.Context, in *CheckRequest, opts ...grpc.CallOption) (*CheckResponse, error)
 	CheckForUpdate(ctx context.Context, in *CheckForUpdateRequest, opts ...grpc.CallOption) (*CheckForUpdateResponse, error)
-	CheckForCreate(ctx context.Context, in *CheckForCreateRequest, opts ...grpc.CallOption) (*CheckForCreateResponse, error)
 }
 
 type kesselCheckServiceClient struct {
@@ -43,10 +41,10 @@ func NewKesselCheckServiceClient(cc grpc.ClientConnInterface) KesselCheckService
 	return &kesselCheckServiceClient{cc}
 }
 
-func (c *kesselCheckServiceClient) CheckForView(ctx context.Context, in *CheckForViewRequest, opts ...grpc.CallOption) (*CheckForViewResponse, error) {
+func (c *kesselCheckServiceClient) Check(ctx context.Context, in *CheckRequest, opts ...grpc.CallOption) (*CheckResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(CheckForViewResponse)
-	err := c.cc.Invoke(ctx, KesselCheckService_CheckForView_FullMethodName, in, out, cOpts...)
+	out := new(CheckResponse)
+	err := c.cc.Invoke(ctx, KesselCheckService_Check_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -63,25 +61,14 @@ func (c *kesselCheckServiceClient) CheckForUpdate(ctx context.Context, in *Check
 	return out, nil
 }
 
-func (c *kesselCheckServiceClient) CheckForCreate(ctx context.Context, in *CheckForCreateRequest, opts ...grpc.CallOption) (*CheckForCreateResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(CheckForCreateResponse)
-	err := c.cc.Invoke(ctx, KesselCheckService_CheckForCreate_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
 // KesselCheckServiceServer is the server API for KesselCheckService service.
 // All implementations must embed UnimplementedKesselCheckServiceServer
 // for forward compatibility.
 type KesselCheckServiceServer interface {
 	// Checks for the existence of a single Relationship
 	// (a Relation between a Resource and a Subject or Subject Set).
-	CheckForView(context.Context, *CheckForViewRequest) (*CheckForViewResponse, error)
+	Check(context.Context, *CheckRequest) (*CheckResponse, error)
 	CheckForUpdate(context.Context, *CheckForUpdateRequest) (*CheckForUpdateResponse, error)
-	CheckForCreate(context.Context, *CheckForCreateRequest) (*CheckForCreateResponse, error)
 	mustEmbedUnimplementedKesselCheckServiceServer()
 }
 
@@ -92,14 +79,11 @@ type KesselCheckServiceServer interface {
 // pointer dereference when methods are called.
 type UnimplementedKesselCheckServiceServer struct{}
 
-func (UnimplementedKesselCheckServiceServer) CheckForView(context.Context, *CheckForViewRequest) (*CheckForViewResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method CheckForView not implemented")
+func (UnimplementedKesselCheckServiceServer) Check(context.Context, *CheckRequest) (*CheckResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Check not implemented")
 }
 func (UnimplementedKesselCheckServiceServer) CheckForUpdate(context.Context, *CheckForUpdateRequest) (*CheckForUpdateResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CheckForUpdate not implemented")
-}
-func (UnimplementedKesselCheckServiceServer) CheckForCreate(context.Context, *CheckForCreateRequest) (*CheckForCreateResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method CheckForCreate not implemented")
 }
 func (UnimplementedKesselCheckServiceServer) mustEmbedUnimplementedKesselCheckServiceServer() {}
 func (UnimplementedKesselCheckServiceServer) testEmbeddedByValue()                            {}
@@ -122,20 +106,20 @@ func RegisterKesselCheckServiceServer(s grpc.ServiceRegistrar, srv KesselCheckSe
 	s.RegisterService(&KesselCheckService_ServiceDesc, srv)
 }
 
-func _KesselCheckService_CheckForView_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(CheckForViewRequest)
+func _KesselCheckService_Check_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CheckRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(KesselCheckServiceServer).CheckForView(ctx, in)
+		return srv.(KesselCheckServiceServer).Check(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: KesselCheckService_CheckForView_FullMethodName,
+		FullMethod: KesselCheckService_Check_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(KesselCheckServiceServer).CheckForView(ctx, req.(*CheckForViewRequest))
+		return srv.(KesselCheckServiceServer).Check(ctx, req.(*CheckRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -158,24 +142,6 @@ func _KesselCheckService_CheckForUpdate_Handler(srv interface{}, ctx context.Con
 	return interceptor(ctx, in, info, handler)
 }
 
-func _KesselCheckService_CheckForCreate_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(CheckForCreateRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(KesselCheckServiceServer).CheckForCreate(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: KesselCheckService_CheckForCreate_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(KesselCheckServiceServer).CheckForCreate(ctx, req.(*CheckForCreateRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 // KesselCheckService_ServiceDesc is the grpc.ServiceDesc for KesselCheckService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -184,16 +150,12 @@ var KesselCheckService_ServiceDesc = grpc.ServiceDesc{
 	HandlerType: (*KesselCheckServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
-			MethodName: "CheckForView",
-			Handler:    _KesselCheckService_CheckForView_Handler,
+			MethodName: "Check",
+			Handler:    _KesselCheckService_Check_Handler,
 		},
 		{
 			MethodName: "CheckForUpdate",
 			Handler:    _KesselCheckService_CheckForUpdate_Handler,
-		},
-		{
-			MethodName: "CheckForCreate",
-			Handler:    _KesselCheckService_CheckForCreate_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

@@ -140,7 +140,7 @@ func (uc *Usecase) Create(ctx context.Context, m *model.Resource) (*model.Resour
 	return ret, nil
 }
 
-func (uc *Usecase) CheckForView(ctx context.Context, permission, namespace string, sub *kessel.SubjectReference, id model.ReporterResourceId) (bool, error) {
+func (uc *Usecase) Check(ctx context.Context, permission, namespace string, sub *kessel.SubjectReference, id model.ReporterResourceId) (bool, error) {
 	res, err := uc.reporterResourceRepository.FindByReporterResourceId(ctx, id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -151,7 +151,7 @@ func (uc *Usecase) CheckForView(ctx context.Context, permission, namespace strin
 		}
 	}
 
-	allowed, _, err := uc.Authz.CheckForView(ctx, namespace, permission, res, sub)
+	allowed, _, err := uc.Authz.Check(ctx, namespace, permission, res, sub)
 	if err != nil {
 		return false, err
 	}
@@ -193,29 +193,6 @@ func (uc *Usecase) CheckForUpdate(ctx context.Context, permission, namespace str
 	}
 }
 
-func (uc *Usecase) CheckForCreate(ctx context.Context, permission, namespace string, sub *kessel.SubjectReference, id model.ReporterResourceId) (bool, error) {
-	res, err := uc.reporterResourceRepository.FindByReporterResourceId(ctx, id)
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			// resource doesn't exist.
-			res = &model.Resource{ResourceType: id.ResourceType, Reporter: model.ResourceReporter{LocalResourceId: id.LocalResourceId}}
-		} else {
-			return false, err
-		}
-	}
-
-	allowed, _, err := uc.Authz.CheckForUpdate(ctx, namespace, permission, res, sub)
-	if err != nil {
-		return false, err
-	}
-
-	if allowed == kessel.CheckForUpdateResponse_ALLOWED_TRUE {
-		return true, nil
-	} else {
-		return false, nil
-	}
-}
-
 func (uc *Usecase) ListResourcesInWorkspace(ctx context.Context, permission, namespace string, sub *kessel.SubjectReference, id string) (chan *model.Resource, chan error, error) {
 	resource_chan := make(chan *model.Resource)
 	error_chan := make(chan error, 1)
@@ -230,7 +207,7 @@ func (uc *Usecase) ListResourcesInWorkspace(ctx context.Context, permission, nam
 	go func() {
 		for _, resource := range resources {
 			log.Infof("ListResourcesInWorkspace: checkforview on %+v", resource)
-			if allowed, _, err := uc.Authz.CheckForView(ctx, namespace, permission, resource, sub); err == nil && allowed == kessel.CheckResponse_ALLOWED_TRUE {
+			if allowed, _, err := uc.Authz.Check(ctx, namespace, permission, resource, sub); err == nil && allowed == kessel.CheckResponse_ALLOWED_TRUE {
 				resource_chan <- resource
 			} else if err != nil {
 				error_chan <- err

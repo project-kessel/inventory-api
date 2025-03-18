@@ -150,7 +150,7 @@ func (a *KesselAuthz) UnsetWorkspace(ctx context.Context, local_resource_id, nam
 	})
 }
 
-func (a *KesselAuthz) CheckForView(ctx context.Context, namespace string, viewPermission string, resource *model.Resource, sub *kessel.SubjectReference) (kessel.CheckResponse_Allowed, *kessel.ConsistencyToken, error) {
+func (a *KesselAuthz) Check(ctx context.Context, namespace string, viewPermission string, resource *model.Resource, sub *kessel.SubjectReference) (kessel.CheckResponse_Allowed, *kessel.ConsistencyToken, error) {
 	log.Infof("CheckForView: on %+v", resource)
 	resp, err := a.CheckService.Check(ctx, &kessel.CheckRequest{
 		Resource: &kessel.ObjectReference{

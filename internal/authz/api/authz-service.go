@@ -10,7 +10,7 @@ import (
 
 type Authorizer interface {
 	Health(ctx context.Context) (*kesselv1.GetReadyzResponse, error)
-	CheckForView(context.Context, string, string, *model.Resource, *kessel.SubjectReference) (kessel.CheckResponse_Allowed, *kessel.ConsistencyToken, error)
+	Check(context.Context, string, string, *model.Resource, *kessel.SubjectReference) (kessel.CheckResponse_Allowed, *kessel.ConsistencyToken, error)
 	CheckForUpdate(context.Context, string, string, *model.Resource, *kessel.SubjectReference) (kessel.CheckForUpdateResponse_Allowed, *kessel.ConsistencyToken, error)
 	CreateTuples(context.Context, *kessel.CreateTuplesRequest) (*kessel.CreateTuplesResponse, error)
 	DeleteTuples(context.Context, *kessel.DeleteTuplesRequest) (*kessel.DeleteTuplesResponse, error)

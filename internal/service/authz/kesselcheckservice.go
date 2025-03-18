@@ -28,14 +28,14 @@ func New(c *resources.Usecase) *KesselCheckServiceService {
 	}
 }
 
-func (s *KesselCheckServiceService) CheckForView(ctx context.Context, req *pb.CheckForViewRequest) (*pb.CheckForViewResponse, error) {
+func (s *KesselCheckServiceService) Check(ctx context.Context, req *pb.CheckRequest) (*pb.CheckResponse, error) {
 	identity, err := middleware.GetIdentity(ctx)
 	if err != nil {
 		return nil, err
 	}
 
 	if resource, err := authzFromRequest(identity, req.Parent); err == nil {
-		if resp, err := s.Ctl.CheckForView(ctx, req.GetRelation(), req.Parent.Type.GetNamespace(), &v1beta1.SubjectReference{
+		if resp, err := s.Ctl.Check(ctx, req.GetRelation(), req.Parent.Type.GetNamespace(), &v1beta1.SubjectReference{
 			Relation: req.GetSubject().Relation,
 			Subject: &v1beta1.ObjectReference{
 				Type: &v1beta1.ObjectType{
@@ -79,31 +79,6 @@ func (s *KesselCheckServiceService) CheckForUpdate(ctx context.Context, req *pb.
 		return nil, err
 	}
 }
-func (s *KesselCheckServiceService) CheckForCreate(ctx context.Context, req *pb.CheckForCreateRequest) (*pb.CheckForCreateResponse, error) {
-	identity, err := middleware.GetIdentity(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	if resource, err := authzFromRequest(identity, req.Parent); err == nil {
-		if resp, err := s.Ctl.CheckForCreate(ctx, req.GetCreatePermission(), req.Parent.Type.GetNamespace(), &v1beta1.SubjectReference{
-			Relation: req.GetSubject().Relation,
-			Subject: &v1beta1.ObjectReference{
-				Type: &v1beta1.ObjectType{
-					Namespace: req.GetSubject().GetSubject().GetType().GetNamespace(),
-					Name:      req.GetSubject().GetSubject().GetType().GetName(),
-				},
-				Id: req.GetSubject().GetSubject().GetId(),
-			},
-		}, *resource); err == nil {
-			return createResponseFromAuthzRequest(resp), nil
-		} else {
-			return nil, err
-		}
-	} else {
-		return nil, err
-	}
-}
 
 func authzFromRequest(identity *authnapi.Identity, resource *pb.ObjectReference) (*model.ReporterResourceId, error) {
 	return &model.ReporterResourceId{
@@ -114,11 +89,11 @@ func authzFromRequest(identity *authnapi.Identity, resource *pb.ObjectReference)
 	}, nil
 }
 
-func viewResponseFromAuthzRequest(allowed bool) *pb.CheckForViewResponse {
+func viewResponseFromAuthzRequest(allowed bool) *pb.CheckResponse {
 	if allowed {
-		return &pb.CheckForViewResponse{Allowed: pb.CheckForViewResponse_ALLOWED_TRUE}
+		return &pb.CheckResponse{Allowed: pb.CheckResponse_ALLOWED_TRUE}
 	} else {
-		return &pb.CheckForViewResponse{Allowed: pb.CheckForViewResponse_ALLOWED_FALSE}
+		return &pb.CheckResponse{Allowed: pb.CheckResponse_ALLOWED_FALSE}
 	}
 }
 
@@ -127,13 +102,5 @@ func updateResponseFromAuthzRequest(allowed bool) *pb.CheckForUpdateResponse {
 		return &pb.CheckForUpdateResponse{Allowed: pb.CheckForUpdateResponse_ALLOWED_TRUE}
 	} else {
 		return &pb.CheckForUpdateResponse{Allowed: pb.CheckForUpdateResponse_ALLOWED_FALSE}
-	}
-}
-
-func createResponseFromAuthzRequest(allowed bool) *pb.CheckForCreateResponse {
-	if allowed {
-		return &pb.CheckForCreateResponse{Allowed: pb.CheckForCreateResponse_ALLOWED_TRUE}
-	} else {
-		return &pb.CheckForCreateResponse{Allowed: pb.CheckForCreateResponse_ALLOWED_FALSE}
 	}
 }

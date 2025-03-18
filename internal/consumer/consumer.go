@@ -10,6 +10,10 @@ import (
 
 	"go.opentelemetry.io/otel"
 
+	"os"
+	"os/signal"
+	"syscall"
+
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/project-kessel/inventory-api/internal/authz"

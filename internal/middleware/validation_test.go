@@ -286,7 +286,7 @@ func TestSchemaValidation(t *testing.T) {
 		},
 		{
 			name:         "Valid RHEL Host with Resource Data",
-			resourceType: "rhel_host",
+			resourceType: "host",
 			reporterData: map[string]interface{}{
 				"reporterType":         "HBI",
 				"reporter_instance_id": "org-123",
@@ -294,9 +294,9 @@ func TestSchemaValidation(t *testing.T) {
 				"api_href":             "https://api.rhel.example.com",
 				"console_href":         "https://console.rhel.example.com",
 				"resourceData": map[string]interface{}{
-					"satellite_id":          "123",
-					"sub_manager_id":        "abc",
-					"insights_inventory_id": "257",
+					"satellite_id":          "550e8400-e29b-41d4-a716-446655440000",
+					"sub_manager_id":        "550e8400-e29b-41d4-a716-446655440000",
+					"insights_inventory_id": "550e8400-e29b-41d4-a716-446655440000",
 					"ansible_host":          "abc",
 				},
 			},

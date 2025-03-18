@@ -154,7 +154,7 @@ func NewCommand(
 				return err
 			}
 
-			consumer, err := consumer.New(consumerConfig, db, storageOptions.DisablePersistence, authzConfig, authorizer, log.NewHelper(log.With(logger, "subsystem", "consumer")))
+			consumer, err := consumer.New(consumerConfig, db, authzConfig, authorizer, log.NewHelper(log.With(logger, "subsystem", "consumer")))
 			if err != nil {
 				return err
 			}

@@ -1,5 +1,5 @@
 ---
-resource_type: rhel_host
+resource_type: host
 reporter_name: hbi
 namespace: hbi # this is the name of the field of the resource that contains this reporter's data
 # relation_properties:

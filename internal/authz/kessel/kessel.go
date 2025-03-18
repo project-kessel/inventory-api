@@ -151,7 +151,17 @@ func (a *KesselAuthz) UnsetWorkspace(ctx context.Context, local_resource_id, nam
 }
 
 func (a *KesselAuthz) Check(ctx context.Context, namespace string, viewPermission string, resource *model.Resource, sub *kessel.SubjectReference) (kessel.CheckResponse_Allowed, *kessel.ConsistencyToken, error) {
-	log.Infof("CheckForView: on %+v", resource)
+	log.Infof("Check: on %+v", resource)
+	consistency := &kessel.Consistency{Requirement: &kessel.Consistency_MinimizeLatency{MinimizeLatency: true}}
+
+	if resource.ConsistencyToken != "" {
+		consistency = &kessel.Consistency{
+			Requirement: &kessel.Consistency_AtLeastAsFresh{
+				AtLeastAsFresh: &kessel.ConsistencyToken{Token: resource.ConsistencyToken},
+			},
+		}
+	}
+
 	resp, err := a.CheckService.Check(ctx, &kessel.CheckRequest{
 		Resource: &kessel.ObjectReference{
 			Type: &kessel.ObjectType{
@@ -160,13 +170,9 @@ func (a *KesselAuthz) Check(ctx context.Context, namespace string, viewPermissio
 			},
 			Id: resource.Reporter.LocalResourceId,
 		},
-		Relation: viewPermission,
-		Subject:  sub,
-		Consistency: &kessel.Consistency{
-			Requirement: &kessel.Consistency_AtLeastAsFresh{
-				AtLeastAsFresh: &kessel.ConsistencyToken{Token: resource.ConsistencyToken},
-			},
-		},
+		Relation:    viewPermission,
+		Subject:     sub,
+		Consistency: consistency,
 	})
 
 	log.Infof("CheckForView resp: %v err: %v", resp, err)

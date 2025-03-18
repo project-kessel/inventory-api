@@ -29,7 +29,7 @@ func Validation(validator protovalidate.Validator) middleware.Middleware {
 	}
 
 	if err := PreloadAllSchemas(resourceDir); err != nil {
-		log.Fatalf("Failed to preload schemas: %v", err)
+		log.Warnf("Failed to preload schemas: %v", err)
 	}
 
 	return func(handler middleware.Handler) middleware.Handler {

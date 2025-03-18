@@ -82,11 +82,12 @@ func PreloadAllSchemasFromFilesystem(resourceDir string) error {
 		}
 	}
 
-	schemaCachePath := filepath.Join("./schema_cache.json")
-	if err := DumpSchemaCacheToJSON(schemaCachePath); err != nil {
-		log.Errorf("Failed to dump schema cache to JSON: %v", err)
-		return err
-	}
+	// E2E tests will not run with this enabled
+	//schemaCachePath := filepath.Join("./schema_cache.json")
+	//if err := DumpSchemaCacheToJSON(schemaCachePath); err != nil {
+	//	log.Errorf("Failed to dump schema cache to JSON: %v", err)
+	//	return err
+	//}
 	return nil
 }
 
@@ -143,24 +144,24 @@ func loadConfigFile(resourceDir string, resourceType string) (struct {
 	return config, nil
 }
 
-// DumpSchemaCacheToJSON saves the schema cache to a JSON file
-func DumpSchemaCacheToJSON(filePath string) error {
-	cacheMap := make(map[string]interface{})
-
-	schemaCache.Range(func(key, value interface{}) bool {
-		cacheMap[key.(string)] = value
-		return true
-	})
-
-	jsonData, err := json.MarshalIndent(cacheMap, "", "  ")
-	if err != nil {
-		return fmt.Errorf("failed to marshal schema cache: %w", err)
-	}
-
-	err = os.WriteFile(filePath, jsonData, 0644)
-	if err != nil {
-		return fmt.Errorf("failed to write schema cache to file: %w", err)
-	}
-
-	return nil
-}
+//// DumpSchemaCacheToJSON saves the schema cache to a JSON file
+//func DumpSchemaCacheToJSON(filePath string) error {
+//	cacheMap := make(map[string]interface{})
+//
+//	schemaCache.Range(func(key, value interface{}) bool {
+//		cacheMap[key.(string)] = value
+//		return true
+//	})
+//
+//	jsonData, err := json.MarshalIndent(cacheMap, "", "  ")
+//	if err != nil {
+//		return fmt.Errorf("failed to marshal schema cache: %w", err)
+//	}
+//
+//	err = os.WriteFile(filePath, jsonData, 0644)
+//	if err != nil {
+//		return fmt.Errorf("failed to write schema cache to file: %w", err)
+//	}
+//
+//	return nil
+//}

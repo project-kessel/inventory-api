@@ -6,11 +6,6 @@ server:
     address: localhost:9081
 authn:
    allow-unauthenticated: true
-#   oidc:
-#     authn-server-url: http://localhost:8084/realms/redhat-external
-#     skip-client-id-check: true
-#     skip-issuer-check: true
-#     principal-user-domain: localhost
 authz:
   impl: kessel
   kessel:

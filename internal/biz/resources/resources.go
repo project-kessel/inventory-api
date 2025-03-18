@@ -180,13 +180,18 @@ func (uc *Usecase) CheckForUpdate(ctx context.Context, permission, namespace str
 	}
 
 	if allowed == kessel.CheckForUpdateResponse_ALLOWED_TRUE {
+		if id.ResourceType == "workspace" && namespace == "rbac" { //TODO: delete this when workspaces are resources
+			return true, nil
+		}
+
 		if consistency != nil {
 			res.ConsistencyToken = consistency.Token
 			_, _, err := uc.reporterResourceRepository.Update(ctx, res, res.ID)
 			if err != nil {
-				return false, nil
+				return false, err
 			}
 		}
+
 		return true, nil
 	} else {
 		return false, nil

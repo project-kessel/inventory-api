@@ -8,6 +8,7 @@ import (
 	"github.com/project-kessel/inventory-api/cmd/common"
 	"github.com/project-kessel/inventory-api/internal/middleware"
 	"github.com/spf13/cobra"
+	"gopkg.in/yaml.v3"
 	"os"
 	"path/filepath"
 )
@@ -28,13 +29,42 @@ func readJSONFile(filePath string) (string, error) {
 	return string(data), nil
 }
 
-// Encode YAML file content to Base64
+// Normalize the "resource_type" field in YAML content
+func normalizeYAMLResourceType(yamlContent []byte) ([]byte, error) {
+	// Parse YAML into a map
+	var yamlData map[string]interface{}
+	if err := yaml.Unmarshal(yamlContent, &yamlData); err != nil {
+		return nil, fmt.Errorf("failed to parse YAML: %w", err)
+	}
+
+	// Normalize "resource_type" if it exists
+	if resourceType, exists := yamlData["resource_type"].(string); exists {
+		normalized := middleware.NormalizeResourceType(resourceType)
+		yamlData["resource_type"] = normalized
+	}
+
+	// Convert back to YAML format
+	normalizedYAML, err := yaml.Marshal(yamlData)
+	if err != nil {
+		return nil, fmt.Errorf("failed to serialize YAML: %w", err)
+	}
+
+	return normalizedYAML, nil
+}
+
+// Read YAML file, normalize resource_type, and encode to Base64
 func encodeYAMLToBase64(filePath string) (string, error) {
 	data, err := os.ReadFile(filePath)
 	if err != nil {
 		return "", err
 	}
-	encoded := base64.StdEncoding.EncodeToString(data)
+
+	normalizedData, err := normalizeYAMLResourceType(data)
+	if err != nil {
+		return "", err
+	}
+
+	encoded := base64.StdEncoding.EncodeToString(normalizedData)
 	return encoded, nil
 }
 

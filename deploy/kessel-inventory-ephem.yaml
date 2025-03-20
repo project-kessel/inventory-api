@@ -41,6 +41,7 @@ objects:
       envName: ${ENV_NAME}
       database:
         name: kessel-inventory
+        version: 16
       optionalDependencies:
         - kessel-relations
       deployments:

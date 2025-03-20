@@ -59,6 +59,9 @@ func NewCommand(
 			_, logger := common.InitLogger(common.GetLogLevel(), loggerOptions)
 			ctx := context.Background()
 
+			var consumerConfig consumer.CompletedConfig
+			var inventoryConsumer consumer.InventoryConsumer
+
 			// configure storage
 			if errs := storageOptions.Complete(); errs != nil {
 				return errors.NewAggregate(errs)
@@ -104,16 +107,18 @@ func NewCommand(
 				return errors.NewAggregate(errs)
 			}
 
-			// configure consumer
-			if errs := consumerOptions.Complete(); errs != nil {
-				return errors.NewAggregate(errs)
-			}
-			if errs := consumerOptions.Validate(); errs != nil {
-				return errors.NewAggregate(errs)
-			}
-			consumerConfig, errs := consumer.NewConfig(consumerOptions).Complete()
-			if errs != nil {
-				return errors.NewAggregate(errs)
+			// configure inventoryConsumer
+			if !storageOptions.DisablePersistence {
+				if errs := consumerOptions.Complete(); errs != nil {
+					return errors.NewAggregate(errs)
+				}
+				if errs := consumerOptions.Validate(); errs != nil {
+					return errors.NewAggregate(errs)
+				}
+				consumerConfig, errs = consumer.NewConfig(consumerOptions).Complete()
+				if errs != nil {
+					return errors.NewAggregate(errs)
+				}
 			}
 
 			// configure the server
@@ -154,11 +159,12 @@ func NewCommand(
 				return err
 			}
 
-			consumer, err := consumer.New(consumerConfig, db, authzConfig, authorizer, log.NewHelper(log.With(logger, "subsystem", "consumer")))
-			if err != nil {
-				return err
+			if !storageOptions.DisablePersistence {
+				inventoryConsumer, err = consumer.New(consumerConfig, db, authzConfig, authorizer, log.NewHelper(log.With(logger, "subsystem", "inventoryConsumer")))
+				if err != nil {
+					return err
+				}
 			}
-
 			// construct servers
 			server, err := server.New(serverConfig, middleware.Authentication(authenticator), logger)
 			if err != nil {
@@ -213,12 +219,14 @@ func NewCommand(
 				srvErrs <- server.Run(ctx)
 			}()
 
-			go consumer.Consume()
+			if !storageOptions.DisablePersistence {
+				go inventoryConsumer.Consume()
+			}
 
 			quit := make(chan os.Signal, 1)
 			signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 
-			shutdown := shutdown(db, server, eventingManager, log.NewHelper(logger))
+			shutdown := shutdown(db, server, eventingManager, inventoryConsumer, log.NewHelper(logger))
 
 			select {
 			case err := <-srvErrs:
@@ -227,6 +235,8 @@ func NewCommand(
 				shutdown(sig)
 			case emErr := <-eventingManager.Errs():
 				shutdown(emErr)
+			case cmErr := <-inventoryConsumer.Errs():
+				shutdown(cmErr)
 			}
 			return nil
 		},
@@ -240,7 +250,7 @@ func NewCommand(
 	return cmd
 }
 
-func shutdown(db *gorm.DB, srv *server.Server, em eventingapi.Manager, logger *log.Helper) func(reason interface{}) {
+func shutdown(db *gorm.DB, srv *server.Server, em eventingapi.Manager, cm consumer.InventoryConsumer, logger *log.Helper) func(reason interface{}) {
 	return func(reason interface{}) {
 		log.Info(fmt.Sprintf("Server Shutdown: %s", reason))
 
@@ -255,6 +265,12 @@ func shutdown(db *gorm.DB, srv *server.Server, em eventingapi.Manager, logger *l
 		defer cancel()
 		if err := em.Shutdown(ctx); err != nil {
 			logger.Error(fmt.Sprintf("Error Gracefully Shutting Down Eventing: %v", err))
+		}
+
+		if !cm.Consumer.IsClosed() {
+			if err := cm.Shutdown(); err != nil {
+				logger.Error(fmt.Sprintf("Error Gracefully Shutting Down Consumer: %v", err))
+			}
 		}
 
 		if sqlDB, err := db.DB(); err != nil {

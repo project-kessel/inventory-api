@@ -15,8 +15,7 @@ import (
 )
 
 var (
-	resourceDir       = viper.GetString("resources.schemaPath")
-	AbstractResources = map[string]struct{}{} // Tracks resource types marked as abstract (no resource_data)
+	resourceDir = viper.GetString("resources.schemaPath")
 )
 
 func Validation(validator protovalidate.Validator) middleware.Middleware {

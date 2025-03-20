@@ -10,6 +10,8 @@ import (
 	"github.com/project-kessel/inventory-api/internal/authz/api"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
 	kessel "github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"gorm.io/gorm"
 	"os"
 	"os/signal"
@@ -23,6 +25,7 @@ type InventoryConsumer struct {
 	DB          *gorm.DB
 	AuthzConfig authz.CompletedConfig
 	Authorizer  api.Authorizer
+	Errors      chan error
 	Logger      *log.Helper
 }
 
@@ -47,12 +50,14 @@ func New(config CompletedConfig, db *gorm.DB, authz authz.CompletedConfig, autho
 		return InventoryConsumer{}, err
 	}
 
+	var errChan chan error
 	return InventoryConsumer{
 		Consumer:    consumer,
 		Config:      config,
 		DB:          db,
 		AuthzConfig: authz,
 		Authorizer:  authorizer,
+		Errors:      errChan,
 		Logger:      logger,
 	}, nil
 }
@@ -88,18 +93,30 @@ func (i *InventoryConsumer) Consume() error {
 
 			switch e := event.(type) {
 			case *kafka.Message:
-				// TODO, failures due to tuples already existing should not prevent moving on to the next message,
-				// need some idempotency for message replays
-				resp, err := i.CreateTuple(context.Background(), e.Value)
-				if err != nil {
-					i.Logger.Infof("failed to create tuple: %v", err)
-					continue
+				// capture the operation from the event headers
+				var operation string
+				for _, v := range e.Headers {
+					if v.Key == "operation" {
+						operation = string(v.Value)
+					}
 				}
 
-				err = i.UpdateConsistencyToken(e.Key, resp)
-				if err != nil {
-					i.Logger.Infof("failed to update consistency token: %v", err)
-					continue
+				switch operation {
+				case "created":
+					i.Logger.Infof("Operation is: %v", operation)
+					resp, err := i.CreateTuple(context.Background(), e.Value)
+					if err != nil {
+						i.Logger.Infof("failed to create tuple: %v", err)
+						continue
+					}
+
+					err = i.UpdateConsistencyToken(e.Key, resp)
+					if err != nil {
+						i.Logger.Infof("failed to update consistency token: %v", err)
+						continue
+					}
+				default:
+					i.Logger.Infof("Operation is unknown: %v -- doing nothing", operation)
 				}
 
 				// TODO: Commiting on every message is not ideal - we will need to revisit this as we consume more messages
@@ -113,9 +130,10 @@ func (i *InventoryConsumer) Consume() error {
 				i.Logger.Infof("consumed event from topic %s, partition %d at offset %s: key = %-10s value = %s\n",
 					*e.TopicPartition.Topic, e.TopicPartition.Partition, e.TopicPartition.Offset, string(e.Key), string(e.Value))
 			case kafka.Error:
-				fmt.Fprintf(os.Stderr, "%% error: %v: %v\n", e.Code(), e)
-				if e.Code() == kafka.ErrAllBrokersDown {
+				i.Logger.Errorf("consumer error: %v: %v\n", e.Code(), e)
+				if e.Code() == kafka.ErrAllBrokersDown || e.IsFatal() {
 					run = false
+					i.Errors <- e
 				}
 			default:
 				fmt.Printf("event type ignored %v\n", e)
@@ -149,10 +167,62 @@ func (i *InventoryConsumer) CreateTuple(ctx context.Context, msg []byte) (string
 		Tuples: []*kessel.Relationship{tuple},
 	})
 	if err != nil {
-		return "", fmt.Errorf("error creating tuple: %v", err)
+		// If the tuple exists already, capture the token using Check to ensure idempotent updates to tokens in DB
+		if status.Convert(err).Code() == codes.AlreadyExists {
+			i.Logger.Info("tuple: already exists; fetching consistency token")
+			check, err := i.Authorizer.Check(ctx, &kessel.CheckRequest{
+				Resource: tuple.Resource,
+				Relation: tuple.Relation,
+				Subject:  tuple.Subject,
+			})
+			if err != nil {
+				return "", fmt.Errorf("failed to fetch consistency token: %v", err)
+			}
+			return check.GetConsistencyToken().Token, nil
+		} else {
+			return "", fmt.Errorf("error creating tuple: %v", err)
+		}
 	}
-	i.Logger.Infof("tuple created: %+v", tuple)
+	i.Logger.Infof("created tuple: %v", resp)
+	return resp.GetConsistencyToken().Token, nil
+}
 
+// DeleteTuple calls the Relations API to create a tuple from the message payload received and returns the consistency token
+func (i *InventoryConsumer) DeleteTuple(ctx context.Context, msg []byte) (string, error) {
+	var msgPayload *MessagePayload
+	var tuple *kessel.Relationship
+
+	// msg value is expected to be a valid JSON body for a single relation
+	err := json.Unmarshal(msg, &msgPayload)
+	if err != nil {
+		return "", fmt.Errorf("error unmarshalling msgPayload: %v", err)
+	}
+
+	err = json.Unmarshal([]byte(fmt.Sprintf("%v", msgPayload.RelationsTuple)), &tuple)
+	if err != nil {
+		return "", fmt.Errorf("error unmarshalling tuple payload: %v", err)
+	}
+
+	resp, err := i.Authorizer.CreateTuples(ctx, &kessel.CreateTuplesRequest{
+		Tuples: []*kessel.Relationship{tuple},
+	})
+	if err != nil {
+		// If the tuple exists already, capture the token using Check to ensure idempotent updates to tokens in DB
+		if status.Convert(err).Code() == codes.AlreadyExists {
+			i.Logger.Info("tuple: already exists; fetching consistency token")
+			check, err := i.Authorizer.Check(ctx, &kessel.CheckRequest{
+				Resource: tuple.Resource,
+				Relation: tuple.Relation,
+				Subject:  tuple.Subject,
+			})
+			if err != nil {
+				return "", fmt.Errorf("failed to fetch consistency token: %v", err)
+			}
+			return check.GetConsistencyToken().Token, nil
+		} else {
+			return "", fmt.Errorf("error creating tuple: %v", err)
+		}
+	}
 	return resp.GetConsistencyToken().Token, nil
 }
 
@@ -171,10 +241,16 @@ func (i *InventoryConsumer) UpdateConsistencyToken(msg []byte, token string) err
 	return nil
 }
 
+// Errs returns any errors put on the error channel to ensure proper shutdown of services
+func (i *InventoryConsumer) Errs() <-chan error {
+	return i.Errors
+}
+
 // Shutdown ensures the consumer is properly shutdown, whether by server or due to rebalance
 func (i *InventoryConsumer) Shutdown() error {
 	// TODO, shutting down the consumer should attempt to commit the offset if we've processed the message
 	// for now it just stops the consumer connection
+
 	err := i.Consumer.Close()
 	if err != nil {
 		i.Logger.Errorf("Error closing kafka consumer: %v", err)

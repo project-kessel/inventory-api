@@ -20,9 +20,11 @@ objects:
       database.user: ${DB_USER}
       database.password: ${DB_PASSWORD}
       topic.prefix: kessel-inventory
+      table.whitelist: public.outbox_events
       table.include.list: public.outbox_events
       transforms: outbox
       transforms.outbox.type: io.debezium.transforms.outbox.EventRouter
+      transforms.outbox.table.fields.additional.placement: operation:header
       plugin.name: pgoutput
       heartbeat.interval.ms: ${DEBEZIUM_HEARTBEAT_INTERVAL_MS}
       heartbeat.action.query: ${DEBEZIUM_ACTION_QUERY}

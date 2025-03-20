@@ -269,8 +269,8 @@ get-outbox-resources:
 
 .PHONY: check-tuple-messages
 check-tuple-messages:
-	oc rsh ${KAFKA_CONNECT_INSTANCE}-connect-0 bin/kafka-console-consumer.sh --bootstrap-server ${BOOTSTRAP_SERVER}:9092 --topic outbox.event.kessel.tuples --from-beginning
+	oc rsh ${KAFKA_CONNECT_INSTANCE}-connect-0 bin/kafka-console-consumer.sh --bootstrap-server ${BOOTSTRAP_SERVER}:9092 --topic outbox.event.kessel.tuples --from-beginning --property print.headers=true --property print.key=true
 
 .PHONY: check-resource-messages
 check-resource-messages:
-	oc rsh ${KAFKA_CONNECT_INSTANCE}-connect-0 bin/kafka-console-consumer.sh --bootstrap-server ${BOOTSTRAP_SERVER}:9092 --topic outbox.event.kessel.resources --from-beginning
+	oc rsh ${KAFKA_CONNECT_INSTANCE}-connect-0 bin/kafka-console-consumer.sh --bootstrap-server ${BOOTSTRAP_SERVER}:9092 --topic outbox.event.kessel.resources --from-beginning --property print.headers=true --property print.key=true

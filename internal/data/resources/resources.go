@@ -179,12 +179,12 @@ func (r *Repo) FindByWorkspaceId(ctx context.Context, workspace_id string) ([]*m
 	data := []*model.Resource{}
 
 	log.Infof("FindByWorkspaceId: %s", workspace_id)
-	if err := session.Where("workspace_id = ?", workspace_id).Find(&data).Error; err == nil {
-		log.Infof("FindByWorkspaceId: data %+v", data)
-		return data, nil
-	} else {
+	if err := session.Where("workspace_id = ?", workspace_id).Find(&data).Error; err != nil {
 		return nil, err
 	}
+
+	log.Infof("FindByWorkspaceId: data %+v", data)
+	return data, nil
 }
 
 // Deprecated: Prefer FindByReporterData instead

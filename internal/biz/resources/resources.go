@@ -186,14 +186,14 @@ func (uc *Usecase) CheckForUpdate(ctx context.Context, permission, namespace str
 			res.ConsistencyToken = consistency.Token
 			_, _, err := uc.reporterResourceRepository.Update(ctx, res, res.ID)
 			if err != nil {
-				return false, err
+				return false, err // we're allowed, but failed to update consistency token
 			}
 		}
 
 		return true, nil
-	} else {
-		return false, nil
 	}
+
+	return false, nil
 }
 
 func (uc *Usecase) ListResourcesInWorkspace(ctx context.Context, permission, namespace string, sub *kessel.SubjectReference, id string) (chan *model.Resource, chan error, error) {

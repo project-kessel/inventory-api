@@ -78,7 +78,6 @@ service KesselNotificationsIntegrationService {
   rpc ListNotificationsIntegrations(ListNotificationsIntegrationsRequest) returns (stream ListNotificationsIntegrationsResponse) {
     option (google.api.http) = {
       get : "/api/inventory/v1beta1/resources/notifications-integrations"
-      body : "*"
     };
   };
 }

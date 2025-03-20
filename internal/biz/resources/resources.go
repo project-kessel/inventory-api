@@ -146,9 +146,8 @@ func (uc *Usecase) Check(ctx context.Context, permission, namespace string, sub 
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			// resource doesn't exist.
 			return false, nil
-		} else {
-			return false, err
 		}
+		return false, err
 	}
 
 	allowed, _, err := uc.Authz.Check(ctx, namespace, permission, res, sub)
@@ -158,9 +157,8 @@ func (uc *Usecase) Check(ctx context.Context, permission, namespace string, sub 
 
 	if allowed == kessel.CheckResponse_ALLOWED_TRUE {
 		return true, nil
-	} else {
-		return false, nil
 	}
+	return false, nil
 }
 
 func (uc *Usecase) CheckForUpdate(ctx context.Context, permission, namespace string, sub *kessel.SubjectReference, id model.ReporterResourceId) (bool, error) {
@@ -210,6 +208,9 @@ func (uc *Usecase) ListResourcesInWorkspace(ctx context.Context, permission, nam
 	log.Infof("ListResourcesInWorkspace: resources %+v", resources)
 
 	go func() {
+		defer close(resource_chan)
+		defer close(error_chan)
+
 		for _, resource := range resources {
 			log.Infof("ListResourcesInWorkspace: checkforview on %+v", resource)
 			if allowed, _, err := uc.Authz.Check(ctx, namespace, permission, resource, sub); err == nil && allowed == kessel.CheckResponse_ALLOWED_TRUE {
@@ -220,11 +221,7 @@ func (uc *Usecase) ListResourcesInWorkspace(ctx context.Context, permission, nam
 			} else if allowed != kessel.CheckResponse_ALLOWED_TRUE {
 				log.Infof("Response was not allowed: %v", allowed)
 			}
-
 		}
-
-		close(resource_chan)
-		close(error_chan)
 	}()
 
 	return resource_chan, error_chan, nil

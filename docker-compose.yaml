@@ -12,6 +12,7 @@ services:
     volumes:
       - ./inventory-api-compose.yaml:/inventory-api-compose.yaml:ro,z
       - ./config/psks.yaml:/psks.yaml:ro,z
+      - ./schema_cache.json:/schema_cache.json:rw,z
     command: ["serve"]
     restart: "always"
     ports:
@@ -29,6 +30,7 @@ services:
         VERSION: dev
     volumes:
       - ./inventory-api-compose.yaml:/inventory-api-compose.yaml:ro,z
+      - ./schema_cache.json:/schema_cache.json:rw,z
     command: ["migrate"]
     restart: "on-failure"
     depends_on:

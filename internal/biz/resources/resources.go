@@ -22,6 +22,7 @@ type ReporterResourceRepository interface {
 	Delete(context.Context, uuid.UUID) (*model.Resource, error)
 	FindByID(context.Context, uuid.UUID) (*model.Resource, error)
 	FindByReporterResourceId(context.Context, model.ReporterResourceId) (*model.Resource, error)
+	FindByReporterResourceIdv1beta2(context.Context, model.ReporterResourceUniqueIndex) (*model.Resource, error)
 	FindByReporterData(context.Context, string, string) (*model.Resource, error)
 	ListAll(context.Context) ([]*model.Resource, error)
 }
@@ -58,6 +59,43 @@ func New(reporterResourceRepository ReporterResourceRepository, inventoryResourc
 		log:                         log.NewHelper(logger),
 		DisablePersistence:          disablePersistence,
 	}
+}
+
+func (uc *Usecase) Upsert(ctx context.Context, m *model.Resource) (*model.Resource, error) {
+	log.Info("upserting resource: ", m)
+	ret := m // Default to returning the input model in case persistence is disabled
+
+	if !uc.DisablePersistence {
+		// check if the resource already exists
+		existingResource, err := uc.reporterResourceRepository.FindByReporterResourceIdv1beta2(ctx, model.ReporterResourceIdv1beta2FromResource(m))
+
+		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrDatabaseError
+		}
+		log.Info("found existing resource: ", existingResource)
+		if existingResource != nil {
+			log.Info("Updating resource: ", m)
+			update, _, err := uc.reporterResourceRepository.Update(ctx, m, existingResource.ID)
+			if err != nil {
+				return nil, err
+			} else {
+				return update, nil
+			}
+		}
+		log.Info("Creating resource: ", m)
+		ret, _, err = uc.reporterResourceRepository.Create(ctx, m)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		// mock the created at time for eventing
+		// TODO: remove this when persistence is always enabled
+		now := time.Now()
+		m.CreatedAt = &now
+	}
+
+	uc.log.WithContext(ctx).Infof("Created Resource: %v(%v)", m.ID, m.ResourceType)
+	return ret, nil
 }
 
 func (uc *Usecase) Create(ctx context.Context, m *model.Resource) (*model.Resource, error) {

@@ -1,0 +1,3 @@
+resource_type: host
+reporter_name: hbi
+namespace: hbi

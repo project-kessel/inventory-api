@@ -27,6 +27,9 @@ storage:
     user: "postgres"
     password: "yPsw5e6ab4bvAGe5H"
     dbname: "spicedb"
+resources:
+  schemaPath: "data/schema/resources"
+  use_cache: true
 log:
   level: "debug"
   livez: true

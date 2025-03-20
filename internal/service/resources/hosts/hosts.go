@@ -81,7 +81,7 @@ func (c *HostsService) DeleteRhelHost(ctx context.Context, r *pb.DeleteRhelHostR
 }
 
 func hostFromCreateRequest(r *pb.CreateRhelHostRequest, identity *authnapi.Identity) (*model.Resource, error) {
-	return conv.ResourceFromPb(ResourceType, identity.Principal, nil, r.RhelHost.Metadata, r.RhelHost.ReporterData), nil
+	return conv.ResourceFromPbv1beta1(ResourceType, identity.Principal, nil, r.RhelHost.Metadata, r.RhelHost.ReporterData), nil
 }
 
 func createResponseFromHost(resource *model.Resource) *pb.CreateRhelHostResponse {
@@ -89,7 +89,7 @@ func createResponseFromHost(resource *model.Resource) *pb.CreateRhelHostResponse
 }
 
 func hostFromUpdateRequest(r *pb.UpdateRhelHostRequest, identity *authnapi.Identity) (*model.Resource, error) {
-	return conv.ResourceFromPb(ResourceType, identity.Principal, nil, r.RhelHost.Metadata, r.RhelHost.ReporterData), nil
+	return conv.ResourceFromPbv1beta1(ResourceType, identity.Principal, nil, r.RhelHost.Metadata, r.RhelHost.ReporterData), nil
 }
 
 func updateResponseFromHost(resource *model.Resource) *pb.UpdateRhelHostResponse {

@@ -1,0 +1,3 @@
+resource_type: k8s_cluster
+reporter_name: ocm
+namespace: ocm

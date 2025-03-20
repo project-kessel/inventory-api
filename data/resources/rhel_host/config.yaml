@@ -1,3 +1,0 @@
-resource_type: rhel_host
-resource_reporters:
-  - HBI

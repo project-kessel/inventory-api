@@ -19,17 +19,17 @@ type MockedInventoryResourceRepository struct {
 	mock.Mock
 }
 
-func (r *MockedReporterResourceRepository) Create(ctx context.Context, resource *model.Resource) (*model.Resource, []*model.Resource, error) {
+func (r *MockedReporterResourceRepository) Create(ctx context.Context, resource *model.Resource, namespace string) (*model.Resource, error) {
 	args := r.Called(ctx, resource)
-	return args.Get(0).(*model.Resource), args.Get(1).([]*model.Resource), args.Error(2)
+	return args.Get(0).(*model.Resource), args.Error(1)
 }
 
-func (r *MockedReporterResourceRepository) Update(ctx context.Context, resource *model.Resource, id uuid.UUID) (*model.Resource, []*model.Resource, error) {
+func (r *MockedReporterResourceRepository) Update(ctx context.Context, resource *model.Resource, id uuid.UUID, namespace string) (*model.Resource, error) {
 	args := r.Called(ctx, resource, id)
-	return args.Get(0).(*model.Resource), args.Get(1).([]*model.Resource), args.Error(2)
+	return args.Get(0).(*model.Resource), args.Error(1)
 }
 
-func (r *MockedReporterResourceRepository) Delete(ctx context.Context, id uuid.UUID) (*model.Resource, error) {
+func (r *MockedReporterResourceRepository) Delete(ctx context.Context, id uuid.UUID, namespace string) (*model.Resource, error) {
 	args := r.Called(ctx, id)
 	return args.Get(0).(*model.Resource), args.Error(1)
 }

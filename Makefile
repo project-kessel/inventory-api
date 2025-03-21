@@ -223,13 +223,10 @@ help:
 .DEFAULT_GOAL := help
 
 ### Debezium Helpers
-.PHONY: setup-outbox
-setup-outbox:
-	psql "postgresql://${DB_USER}:${DB_PASSWORD}@localhost:${DB_PORT}/${DB_NAME}" -f deploy/debezium/outbox.sql
 
 .PHONY: validate-outbox
 validate-outbox:
-	psql "postgresql://${DB_USER}:${DB_PASSWORD}@localhost:${DB_PORT}/${DB_NAME}" -c "\d+ outbox_events"
+	psql "postgresql://${DB_USER}:${DB_PASSWORD}@localhost:${LOCAL_DB_PORT}/${DB_NAME}" -c "\d+ outbox_events"
 
 .PHONY: deploy-debezium
 deploy-debezium:
@@ -253,24 +250,24 @@ undeploy-debezium:
 
 .PHONY: outbox-tuple-record
 outbox-tuple-record:
-	psql "postgresql://${DB_USER}:${DB_PASSWORD}@localhost:${DB_PORT}/${DB_NAME}" -f deploy/debezium/sample-tuple.sql
+	psql "postgresql://${DB_USER}:${DB_PASSWORD}@localhost:${LOCAL_DB_PORT}/${DB_NAME}" -f deploy/debezium/sample-tuple.sql
 
 .PHONY: outbox-resource-record
 outbox-resource-record:
-	psql "postgresql://${DB_USER}:${DB_PASSWORD}@localhost:${DB_PORT}/${DB_NAME}" -f deploy/debezium/sample-resource.sql
+	psql "postgresql://${DB_USER}:${DB_PASSWORD}@localhost:${LOCAL_DB_PORT}/${DB_NAME}" -f deploy/debezium/sample-resource.sql
 
 .PHONY: get-outbox-tuples
 get-outbox-tuples:
-	psql "postgresql://${DB_USER}:${DB_PASSWORD}@localhost:${DB_PORT}/${DB_NAME}" -x -c "select * from outbox_events where aggregatetype='kessel.tuples'"
+	psql "postgresql://${DB_USER}:${DB_PASSWORD}@localhost:${LOCAL_DB_PORT}/${DB_NAME}" -x -c "select * from outbox_events where aggregatetype='kessel.tuples'"
 
 .PHONY: get-outbox-resources
 get-outbox-resources:
-	psql "postgresql://${DB_USER}:${DB_PASSWORD}@localhost:${DB_PORT}/${DB_NAME}" -x -c "select * from outbox_events where aggregatetype='kessel.resources'"
+	psql "postgresql://${DB_USER}:${DB_PASSWORD}@localhost:${LOCAL_DB_PORT}/${DB_NAME}" -x -c "select * from outbox_events where aggregatetype='kessel.resources'"
 
 .PHONY: check-tuple-messages
 check-tuple-messages:
-	oc rsh ${KAFKA_CONNECT_INSTANCE}-connect-0 bin/kafka-console-consumer.sh --bootstrap-server ${BOOTSTRAP_SERVER}:9092 --topic outbox.event.kessel.tuples --from-beginning
+	oc rsh ${KAFKA_CONNECT_INSTANCE}-connect-0 bin/kafka-console-consumer.sh --bootstrap-server ${BOOTSTRAP_SERVER}:9092 --topic outbox.event.kessel.tuples --from-beginning --property print.headers=true --property print.key=true
 
 .PHONY: check-resource-messages
 check-resource-messages:
-	oc rsh ${KAFKA_CONNECT_INSTANCE}-connect-0 bin/kafka-console-consumer.sh --bootstrap-server ${BOOTSTRAP_SERVER}:9092 --topic outbox.event.kessel.resources --from-beginning
+	oc rsh ${KAFKA_CONNECT_INSTANCE}-connect-0 bin/kafka-console-consumer.sh --bootstrap-server ${BOOTSTRAP_SERVER}:9092 --topic outbox.event.kessel.resources --from-beginning --property print.headers=true --property print.key=true

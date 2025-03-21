@@ -38,9 +38,7 @@ oc port-forward svc/kessel-inventory-db 5432:5432
 # Make sure you have the creds exported first
 source deploy/debezium/debezium-db-config-env
 
-make setup-outbox
-
-# You can validate the table is properly configured setup with:
+# You can validate the table is properly setup with:
 make validate-outbox
 ```
 

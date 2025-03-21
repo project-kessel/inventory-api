@@ -194,9 +194,8 @@ func (i *InventoryConsumer) CreateTuple(ctx context.Context, msg []byte) (string
 				return "", fmt.Errorf("failed to fetch consistency token: %v", err)
 			}
 			return check.GetConsistencyToken().Token, nil
-		} else {
-			return "", fmt.Errorf("error creating tuple: %v", err)
 		}
+		return "", fmt.Errorf("error creating tuple: %v", err)
 	}
 	i.Logger.Infof("created tuple: %v", resp)
 	return resp.GetConsistencyToken().Token, nil

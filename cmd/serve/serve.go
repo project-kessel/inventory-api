@@ -220,7 +220,9 @@ func NewCommand(
 			}()
 
 			if !storageOptions.DisablePersistence {
-				go inventoryConsumer.Consume()
+				go func() {
+					_ = inventoryConsumer.Consume()
+				}()
 			}
 
 			quit := make(chan os.Signal, 1)

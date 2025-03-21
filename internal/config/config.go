@@ -2,10 +2,8 @@ package config
 
 import (
 	"fmt"
-	"strconv"
-	"strings"
-
 	"github.com/project-kessel/inventory-api/internal/consumer"
+	"strconv"
 
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/project-kessel/inventory-api/internal/authn"
@@ -86,10 +84,6 @@ func (o *OptionsConfig) InjectClowdAppConfig() error {
 			return fmt.Errorf("failed to configure storage: %w", err)
 		}
 	}
-	// check for consumer config
-	if clowder.LoadedConfig.Kafka != nil && strings.Contains(fmt.Sprint(clowder.LoadedConfig.Metadata.EnvName), "ephemeral") {
-		o.ConfigureConsumer(clowder.LoadedConfig)
-	}
 	return nil
 }
 
@@ -117,9 +111,4 @@ func (o *OptionsConfig) ConfigureStorage(appconfig *clowder.AppConfig) error {
 		o.Storage.Postgres.SSLRootCert = caPath
 	}
 	return nil
-}
-
-// ConfigureConsumer updates Consumer settings based on ClowdApp AppConfig
-func (o *OptionsConfig) ConfigureConsumer(appconfig *clowder.AppConfig) {
-	o.Consumer.BootstrapServers = fmt.Sprintf("%s:%d", appconfig.Kafka.Brokers[0].Hostname, appconfig.Kafka.Brokers[0].Port)
 }

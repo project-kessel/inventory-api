@@ -2,9 +2,12 @@ package config
 
 import (
 	"fmt"
-	"github.com/project-kessel/inventory-api/internal/consumer"
 	"strconv"
 	"strings"
+
+	"github.com/project-kessel/inventory-api/internal/consumer"
+
+	"strconv"
 
 	"github.com/project-kessel/inventory-api/internal/consumer"
 

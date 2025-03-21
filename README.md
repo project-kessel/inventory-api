@@ -437,4 +437,5 @@ Follow the steps below to contribute:
 
 - Fork the project
 - Create a new branch for your feature
+- Run tests and Pr check
 - Submit a pull request

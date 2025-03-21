@@ -37,8 +37,8 @@ type KeyPayload struct {
 
 // MessagePayload stores the event message value captured from the topic as emitted by Debezium
 type MessagePayload struct {
-	MessageSchema  map[string]interface{} `json:"schema"`
-	RelationsTuple interface{}            `json:"payload"`
+	MessageSchema    map[string]interface{} `json:"schema"`
+	RelationsRequest interface{}            `json:"payload"`
 }
 
 // New instantiates a new InventoryConsumer
@@ -95,6 +95,7 @@ func (i *InventoryConsumer) Consume() error {
 			case *kafka.Message:
 				// capture the operation from the event headers
 				var operation string
+				var resp interface{}
 				for _, v := range e.Headers {
 					if v.Key == "operation" {
 						operation = string(v.Value)
@@ -104,19 +105,33 @@ func (i *InventoryConsumer) Consume() error {
 				switch operation {
 				case "created":
 					i.Logger.Infof("Operation is: %v", operation)
-					resp, err := i.CreateTuple(context.Background(), e.Value)
+					resp, err = i.CreateTuple(context.Background(), e.Value)
 					if err != nil {
 						i.Logger.Infof("failed to create tuple: %v", err)
 						continue
 					}
-
-					err = i.UpdateConsistencyToken(e.Key, resp)
+				case "updated":
+					i.Logger.Infof("Operation is: %v", operation)
+					resp, err = i.UpdateTuple(context.Background(), e.Value)
 					if err != nil {
-						i.Logger.Infof("failed to update consistency token: %v", err)
+						i.Logger.Infof("failed to update tuple: %v", err)
+						continue
+					}
+				case "deleted":
+					i.Logger.Infof("Operation is: %v", operation)
+					resp, err = i.DeleteTuple(context.Background(), e.Value)
+					if err != nil {
+						i.Logger.Infof("failed to delete tuple: %v", err)
 						continue
 					}
 				default:
-					i.Logger.Infof("Operation is unknown: %v -- doing nothing", operation)
+					i.Logger.Infof("unknown operation: %v -- doing nothing", operation)
+				}
+
+				err = i.UpdateConsistencyToken(e.Key, fmt.Sprint(resp))
+				if err != nil {
+					i.Logger.Infof("failed to update consistency token: %v", err)
+					continue
 				}
 
 				// TODO: Commiting on every message is not ideal - we will need to revisit this as we consume more messages
@@ -158,7 +173,7 @@ func (i *InventoryConsumer) CreateTuple(ctx context.Context, msg []byte) (string
 		return "", fmt.Errorf("error unmarshalling msgPayload: %v", err)
 	}
 
-	err = json.Unmarshal([]byte(fmt.Sprintf("%v", msgPayload.RelationsTuple)), &tuple)
+	err = json.Unmarshal([]byte(fmt.Sprintf("%v", msgPayload.RelationsRequest)), &tuple)
 	if err != nil {
 		return "", fmt.Errorf("error unmarshalling tuple payload: %v", err)
 	}
@@ -187,8 +202,8 @@ func (i *InventoryConsumer) CreateTuple(ctx context.Context, msg []byte) (string
 	return resp.GetConsistencyToken().Token, nil
 }
 
-// DeleteTuple calls the Relations API to create a tuple from the message payload received and returns the consistency token
-func (i *InventoryConsumer) DeleteTuple(ctx context.Context, msg []byte) (string, error) {
+// UpdateTuple calls the Relations API to create a tuple from the message payload received and returns the consistency token
+func (i *InventoryConsumer) UpdateTuple(ctx context.Context, msg []byte) (string, error) {
 	var msgPayload *MessagePayload
 	var tuple *kessel.Relationship
 
@@ -198,30 +213,45 @@ func (i *InventoryConsumer) DeleteTuple(ctx context.Context, msg []byte) (string
 		return "", fmt.Errorf("error unmarshalling msgPayload: %v", err)
 	}
 
-	err = json.Unmarshal([]byte(fmt.Sprintf("%v", msgPayload.RelationsTuple)), &tuple)
+	err = json.Unmarshal([]byte(fmt.Sprintf("%v", msgPayload.RelationsRequest)), &tuple)
 	if err != nil {
 		return "", fmt.Errorf("error unmarshalling tuple payload: %v", err)
 	}
 
 	resp, err := i.Authorizer.CreateTuples(ctx, &kessel.CreateTuplesRequest{
 		Tuples: []*kessel.Relationship{tuple},
+		Upsert: true,
+	})
+	// TODO: we should understand what kind of errors to look for here in case we need to commit in loop or not
+	if err != nil {
+		return "", fmt.Errorf("error updating tuple: %v", err)
+	}
+
+	i.Logger.Infof("updated tuple: %v", resp)
+	return resp.GetConsistencyToken().Token, nil
+}
+
+// DeleteTuple calls the Relations API to create a tuple from the message payload received and returns the consistency token
+func (i *InventoryConsumer) DeleteTuple(ctx context.Context, msg []byte) (string, error) {
+	var msgPayload *MessagePayload
+	var filter *kessel.RelationTupleFilter
+
+	// msg value is expected to be a valid JSON body for a single relation
+	err := json.Unmarshal(msg, &msgPayload)
+	if err != nil {
+		return "", fmt.Errorf("error unmarshalling msgPayload: %v", err)
+	}
+
+	err = json.Unmarshal([]byte(fmt.Sprintf("%v", msgPayload.RelationsRequest)), &filter)
+	if err != nil {
+		return "", fmt.Errorf("error unmarshalling tuple payload: %v", err)
+	}
+
+	resp, err := i.Authorizer.DeleteTuples(ctx, &kessel.DeleteTuplesRequest{
+		Filter: filter,
 	})
 	if err != nil {
-		// If the tuple exists already, capture the token using Check to ensure idempotent updates to tokens in DB
-		if status.Convert(err).Code() == codes.AlreadyExists {
-			i.Logger.Info("tuple: already exists; fetching consistency token")
-			check, err := i.Authorizer.Check(ctx, &kessel.CheckRequest{
-				Resource: tuple.Resource,
-				Relation: tuple.Relation,
-				Subject:  tuple.Subject,
-			})
-			if err != nil {
-				return "", fmt.Errorf("failed to fetch consistency token: %v", err)
-			}
-			return check.GetConsistencyToken().Token, nil
-		} else {
-			return "", fmt.Errorf("error creating tuple: %v", err)
-		}
+		return "", fmt.Errorf("error deleting tuple: %v", err)
 	}
 	return resp.GetConsistencyToken().Token, nil
 }

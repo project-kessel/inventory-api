@@ -20,8 +20,8 @@ objects:
       database.user: ${DB_USER}
       database.password: ${DB_PASSWORD}
       topic.prefix: kessel-inventory
-      table.whitelist: public.outbox_events
-      table.include.list: public.outbox_events
+      table.whitelist: public.outbox_events # Required for Debezium < v1.3.0 support
+      table.include.list: public.outbox_events # Required for Debezium > v1.3.0
       transforms: outbox
       transforms.outbox.type: io.debezium.transforms.outbox.EventRouter
       transforms.outbox.table.fields.additional.placement: operation:header

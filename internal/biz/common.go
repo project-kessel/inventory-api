@@ -10,7 +10,7 @@ import (
 	"github.com/project-kessel/inventory-api/internal/middleware"
 )
 
-func DefaultResourceSendEvent(ctx context.Context, model *model.Resource, eventer eventingapi.Manager, reportedTime time.Time, operationType eventingapi.OperationType) error {
+func DefaultResourceSendEvent(ctx context.Context, model *model.Resource, eventer eventingapi.Manager, reportedTime time.Time, operationType model.EventOperationType) error {
 	identity, err := middleware.GetIdentity(ctx)
 	if err != nil {
 		return err
@@ -30,7 +30,7 @@ func DefaultResourceSendEvent(ctx context.Context, model *model.Resource, evente
 	return nil
 }
 
-func DefaultRelationshipSendEvent(ctx context.Context, m *model.Relationship, eventer eventingapi.Manager, reportedTime time.Time, operationType eventingapi.OperationType) error {
+func DefaultRelationshipSendEvent(ctx context.Context, m *model.Relationship, eventer eventingapi.Manager, reportedTime time.Time, operationType model.EventOperationType) error {
 	identity, err := middleware.GetIdentity(ctx)
 	if err != nil {
 		return err

@@ -18,9 +18,10 @@ objects:
             insecure-client: true
             enable-oidc-auth: false
         consumer:
-          topic: outbox.events.kessel.tuples
+          bootstrap-servers: ${BOOTSTRAP_SERVER}:9092
+          topic: outbox.event.kessel.tuples
         log:
-          level: "info"
+          level: "debug"
 
   - apiVersion: v1
     kind: ConfigMap
@@ -116,3 +117,6 @@ parameters:
   - description: Number of replicas
     name: REPLICAS
     value: "1"
+  - description: URL for the Kafka bootstrap servers
+    name: BOOTSTRAP_SERVER
+    required: true

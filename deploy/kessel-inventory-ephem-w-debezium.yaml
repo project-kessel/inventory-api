@@ -116,3 +116,6 @@ parameters:
   - description: Number of replicas
     name: REPLICAS
     value: "1"
+  - description: URL for the Kafka bootstrap servers
+    name: BOOTSTRAP_SERVER
+    required: true

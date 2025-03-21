@@ -111,15 +111,15 @@ func (uc *Usecase) Create(ctx context.Context, m *model.Resource) (*model.Resour
 
 	if uc.Authz != nil {
 		// Send workspace for the created resource
-		ct, err := biz.DefaultSetWorkspace(ctx, uc.Namespace, m, uc.Authz)
+		ct, err := biz.DefaultSetWorkspace(ctx, uc.Namespace, ret, uc.Authz)
 		if err != nil {
 			return nil, err
 		}
 
-		m.ConsistencyToken = ct
+		ret.ConsistencyToken = ct
 
 		if !uc.DisablePersistence {
-			_, _, err = uc.reporterResourceRepository.Update(ctx, m, m.ID)
+			_, _, err = uc.reporterResourceRepository.Update(ctx, ret, ret.ID)
 			if err != nil {
 				return nil, err
 			}

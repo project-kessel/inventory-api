@@ -175,11 +175,11 @@ func notificationsIntegrationFromResource(r *model.Resource) (*pb.NotificationsI
 			WorkspaceId:  r.WorkspaceId,
 		},
 		ReporterData: &pb.ReporterData{
-			ReporterInstanceId: r.Reporter.ReporterId,
+			ReporterInstanceId: r.ReporterId,
 			ConsoleHref:        r.ConsoleHref,
 			ApiHref:            r.ApiHref,
-			LocalResourceId:    r.Reporter.LocalResourceId,
-			ReporterVersion:    r.Reporter.ReporterVersion,
+			LocalResourceId:    r.ReporterResourceId,
+			// ReporterVersion:    r.Reporter.ReporterVersion,
 		},
 	}, nil
 }

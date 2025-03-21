@@ -166,7 +166,7 @@ func (uc *Usecase) CheckForUpdate(ctx context.Context, permission, namespace str
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			// resource doesn't exist yet.
-			res = &model.Resource{ResourceType: id.ResourceType, Reporter: model.ResourceReporter{LocalResourceId: id.LocalResourceId}}
+			res = &model.Resource{ResourceType: id.ResourceType, ReporterResourceId: id.LocalResourceId}
 		} else {
 			return false, err
 		}

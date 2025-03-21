@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"github.com/project-kessel/inventory-api/internal/consumer"
 	"strconv"
 
 	"github.com/go-kratos/kratos/v2/log"
@@ -19,6 +20,7 @@ type OptionsConfig struct {
 	Authz    *authz.Options
 	Storage  *storage.Options
 	Eventing *eventing.Options
+	Consumer *consumer.Options
 	Server   *server.Options
 }
 
@@ -29,6 +31,7 @@ func NewOptionsConfig() *OptionsConfig {
 		authz.NewOptions(),
 		storage.NewOptions(),
 		eventing.NewOptions(),
+		consumer.NewOptions(),
 		server.NewOptions(),
 	}
 }

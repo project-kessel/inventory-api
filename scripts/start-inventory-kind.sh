@@ -92,7 +92,7 @@ while true; do
   if [ "$NOT_READY" -eq 0 ]; then
     echo "All pods are ready (1/1)."
     echo "Delaying readiness checks to allow Kafka pods to initialize..."
-    sleep 15
+    sleep 30
     check_kafka_readiness "my-cluster-kafka-0" $MAX_RETRIES
     check_kafka_readiness "my-cluster-kafka-1" $MAX_RETRIES
     check_kafka_readiness "my-cluster-kafka-2" $MAX_RETRIES

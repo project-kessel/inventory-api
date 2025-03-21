@@ -12,8 +12,7 @@ objects:
         storage:
           disable-persistence: false
         authn:
-          psk:
-            pre-shared-key-file: /psks/psks.yaml
+          allow-unauthenticated: true
         authz:
           kessel:
             insecure-client: true

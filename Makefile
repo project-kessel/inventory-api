@@ -223,49 +223,34 @@ help:
 .DEFAULT_GOAL := help
 
 ### Debezium Helpers
-.PHONY: setup-outbox
-setup-outbox:
-	psql "postgresql://${DB_USER}:${DB_PASSWORD}@localhost:${DB_PORT}/${DB_NAME}" -f deploy/debezium/outbox.sql
 
 .PHONY: validate-outbox
 validate-outbox:
-	psql "postgresql://${DB_USER}:${DB_PASSWORD}@localhost:${DB_PORT}/${DB_NAME}" -c "\d+ outbox_events"
+	psql "postgresql://${DB_USER}:${DB_PASSWORD}@localhost:${LOCAL_DB_PORT}/${DB_NAME}" -c "\d+ outbox_events"
 
 .PHONY: deploy-debezium
 deploy-debezium:
-	oc process --local -f deploy/debezium/debezium-connector.yaml \
-    -p DB_NAME=${DB_NAME} \
-    -p DB_HOSTNAME=${DB_HOSTNAME} \
-    -p DB_PORT=${DB_PORT} \
-    -p DB_USER=${DB_USER} \
-    -p DB_PASSWORD=${DB_PASSWORD} \
-    -p KAFKA_CONNECT_INSTANCE=${KAFKA_CONNECT_INSTANCE} | oc apply -f -
+	./scripts/deploy-debezium.sh
 
 .PHONY: undeploy-debezium
 undeploy-debezium:
-	oc process --local -f deploy/debezium/debezium-connector.yaml \
-    -p DB_NAME=${DB_NAME} \
-    -p DB_HOSTNAME=${DB_HOSTNAME} \
-    -p DB_PORT=${DB_PORT} \
-    -p DB_USER=${DB_USER} \
-    -p DB_PASSWORD=${DB_PASSWORD} \
-    -p KAFKA_CONNECT_INSTANCE=${KAFKA_CONNECT_INSTANCE} | oc delete -f -
+	./scripts/remove-debezium.sh
 
 .PHONY: outbox-tuple-record
 outbox-tuple-record:
-	psql "postgresql://${DB_USER}:${DB_PASSWORD}@localhost:${DB_PORT}/${DB_NAME}" -f deploy/debezium/sample-tuple.sql
+	psql "postgresql://${DB_USER}:${DB_PASSWORD}@localhost:${LOCAL_DB_PORT}/${DB_NAME}" -f deploy/debezium/sample-tuple.sql
 
 .PHONY: outbox-resource-record
 outbox-resource-record:
-	psql "postgresql://${DB_USER}:${DB_PASSWORD}@localhost:${DB_PORT}/${DB_NAME}" -f deploy/debezium/sample-resource.sql
+	psql "postgresql://${DB_USER}:${DB_PASSWORD}@localhost:${LOCAL_DB_PORT}/${DB_NAME}" -f deploy/debezium/sample-resource.sql
 
 .PHONY: get-outbox-tuples
 get-outbox-tuples:
-	psql "postgresql://${DB_USER}:${DB_PASSWORD}@localhost:${DB_PORT}/${DB_NAME}" -x -c "select * from outbox_events where aggregatetype='kessel.tuples'"
+	psql "postgresql://${DB_USER}:${DB_PASSWORD}@localhost:${LOCAL_DB_PORT}/${DB_NAME}" -x -c "select * from outbox_events where aggregatetype='kessel.tuples'"
 
 .PHONY: get-outbox-resources
 get-outbox-resources:
-	psql "postgresql://${DB_USER}:${DB_PASSWORD}@localhost:${DB_PORT}/${DB_NAME}" -x -c "select * from outbox_events where aggregatetype='kessel.resources'"
+	psql "postgresql://${DB_USER}:${DB_PASSWORD}@localhost:${LOCAL_DB_PORT}/${DB_NAME}" -x -c "select * from outbox_events where aggregatetype='kessel.resources'"
 
 .PHONY: check-tuple-messages
 check-tuple-messages:

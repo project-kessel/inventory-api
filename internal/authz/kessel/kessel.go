@@ -3,12 +3,14 @@ package kessel
 import (
 	"context"
 	"fmt"
+
 	"google.golang.org/protobuf/proto"
 
 	"github.com/spf13/viper"
 
 	"github.com/go-kratos/kratos/v2/log"
 	authzapi "github.com/project-kessel/inventory-api/internal/authz/api"
+	"github.com/project-kessel/inventory-api/internal/biz/model"
 	kesselv1 "github.com/project-kessel/relations-api/api/kessel/relations/v1"
 	kessel "github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
 	"go.opentelemetry.io/otel"
@@ -21,6 +23,7 @@ type KesselAuthz struct {
 	HealthService  kesselv1.KesselRelationsHealthServiceClient
 	CheckService   kessel.KesselCheckServiceClient
 	TupleService   kessel.KesselTupleServiceClient
+	LookupService  kessel.KesselLookupServiceClient
 	tokenClient    *tokenClient
 	Logger         *log.Helper
 	successCounter metric.Int64Counter
@@ -80,23 +83,6 @@ func (a *KesselAuthz) Health(ctx context.Context) (*kesselv1.GetReadyzResponse, 
 	}
 
 	a.incrSuccessCounter("Health")
-	return resp, nil
-}
-
-func (a *KesselAuthz) Check(ctx context.Context, r *kessel.CheckRequest) (*kessel.CheckResponse, error) {
-	opts, err := a.getCallOptions()
-	if err != nil {
-		a.incrFailureCounter("Check")
-		return nil, err
-	}
-
-	resp, err := a.CheckService.Check(ctx, r, opts...)
-	if err != nil {
-		a.incrFailureCounter("Check")
-		return nil, err
-	}
-
-	a.incrSuccessCounter("Check")
 	return resp, nil
 }
 
@@ -162,6 +148,60 @@ func (a *KesselAuthz) UnsetWorkspace(ctx context.Context, local_resource_id, nam
 	return a.DeleteTuples(ctx, &kessel.DeleteTuplesRequest{
 		Filter: req,
 	})
+}
+
+func (a *KesselAuthz) Check(ctx context.Context, namespace string, viewPermission string, resource *model.Resource, sub *kessel.SubjectReference) (kessel.CheckResponse_Allowed, *kessel.ConsistencyToken, error) {
+	log.Infof("Check: on %+v", resource)
+	consistency := &kessel.Consistency{Requirement: &kessel.Consistency_MinimizeLatency{MinimizeLatency: true}}
+
+	if resource.ConsistencyToken != "" {
+		consistency = &kessel.Consistency{
+			Requirement: &kessel.Consistency_AtLeastAsFresh{
+				AtLeastAsFresh: &kessel.ConsistencyToken{Token: resource.ConsistencyToken},
+			},
+		}
+	}
+
+	resp, err := a.CheckService.Check(ctx, &kessel.CheckRequest{
+		Resource: &kessel.ObjectReference{
+			Type: &kessel.ObjectType{
+				Namespace: namespace,
+				Name:      resource.ResourceType,
+			},
+			Id: resource.ReporterResourceId,
+		},
+		Relation:    viewPermission,
+		Subject:     sub,
+		Consistency: consistency,
+	})
+
+	log.Infof("CheckForView resp: %v err: %v", resp, err)
+
+	if err != nil {
+		return kessel.CheckResponse_ALLOWED_UNSPECIFIED, nil, err
+	}
+
+	return resp.GetAllowed(), resp.GetConsistencyToken(), nil
+}
+
+func (a *KesselAuthz) CheckForUpdate(ctx context.Context, namespace string, updatePermission string, resource *model.Resource, sub *kessel.SubjectReference) (kessel.CheckForUpdateResponse_Allowed, *kessel.ConsistencyToken, error) {
+	resp, err := a.CheckService.CheckForUpdate(ctx, &kessel.CheckForUpdateRequest{
+		Resource: &kessel.ObjectReference{
+			Type: &kessel.ObjectType{
+				Namespace: namespace,
+				Name:      resource.ResourceType,
+			},
+			Id: resource.ReporterResourceId,
+		},
+		Relation: updatePermission,
+		Subject:  sub,
+	})
+
+	if err != nil {
+		return kessel.CheckForUpdateResponse_ALLOWED_UNSPECIFIED, nil, err
+	}
+
+	return resp.GetAllowed(), resp.GetConsistencyToken(), nil
 }
 
 func (a *KesselAuthz) SetWorkspace(ctx context.Context, local_resource_id, workspace, namespace, name string) (*kessel.CreateTuplesResponse, error) {

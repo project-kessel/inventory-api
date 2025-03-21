@@ -2,6 +2,7 @@ package resources
 
 import (
 	"context"
+
 	"github.com/google/uuid"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
 	"github.com/project-kessel/inventory-api/internal/data"

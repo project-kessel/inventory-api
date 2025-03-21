@@ -359,6 +359,31 @@ func TestFindByReporterData(t *testing.T) {
 	assert.Nil(t, resource)
 }
 
+func TestFindByWorkspaceId(t *testing.T) {
+	db := setupGorm(t)
+	repo := New(db)
+	ctx := context.TODO()
+	res := resource1()
+	res.ReporterId = "ACM"
+	res.ReporterResourceId = "123"
+	res.WorkspaceId = "1234"
+
+	// Saving a resource not present in the system saves correctly
+	r, _, err := repo.Create(ctx, res)
+	assert.NotNil(t, r)
+	assert.Nil(t, err)
+
+	// find resource we just created by workspace id
+	resources, err := repo.FindByWorkspaceId(ctx, "1234")
+	assert.Nil(t, err)
+	assert.NotEqual(t, []*model.Resource{}, resources)
+
+	// find no resources with workspace id: random
+	resources, err = repo.FindByWorkspaceId(ctx, "random")
+	assert.Nil(t, err)
+	assert.Equal(t, []*model.Resource{}, resources)
+}
+
 func TestListAll(t *testing.T) {
 	db := setupGorm(t)
 	repo := New(db)

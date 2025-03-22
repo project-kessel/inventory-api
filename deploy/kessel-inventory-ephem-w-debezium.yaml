@@ -18,7 +18,6 @@ objects:
             insecure-client: true
             enable-oidc-auth: false
         consumer:
-          bootstrap-servers: ${BOOTSTRAP_SERVER}:9092
           topic: outbox.event.kessel.tuples
         log:
           level: "debug"
@@ -45,10 +44,10 @@ objects:
         name: kessel-inventory
         version: 16
       kafkaTopics:
-        - topicName: outbox.events.kessel.tuples
+        - topicName: outbox.event.kessel.tuples
           partitions: 1
           replicas: 1
-        - topicName: outbox.events.kessel.resources
+        - topicName: outbox.event.kessel.resources
           partitions: 1
           replicas: 1
       optionalDependencies:
@@ -117,6 +116,3 @@ parameters:
   - description: Number of replicas
     name: REPLICAS
     value: "1"
-  - description: URL for the Kafka bootstrap servers
-    name: BOOTSTRAP_SERVER
-    required: true

@@ -2,6 +2,8 @@ package consumer
 
 import (
 	"fmt"
+	clowder "github.com/redhatinsights/app-common-go/pkg/api/v1"
+
 	"github.com/spf13/pflag"
 )
 
@@ -45,7 +47,7 @@ func (o *Options) AddFlags(fs *pflag.FlagSet, prefix string) {
 func (o *Options) Validate() []error {
 	var errs []error
 
-	if len(o.BootstrapServers) == 0 {
+	if len(o.BootstrapServers) == 0 && !clowder.IsClowderEnabled() {
 		errs = append(errs, fmt.Errorf("bootstrap servers can not be empty"))
 	}
 
@@ -53,7 +55,5 @@ func (o *Options) Validate() []error {
 }
 
 func (o *Options) Complete() []error {
-	var errs []error
-
-	return errs
+	return nil
 }

@@ -1,0 +1,19 @@
+#!/bin/bash
+
+# Helpful script for capturing DB creds to interpolate into the
+# Debezium Connector deployment since ephemeral Kafka Connect is not configured
+# for the KubernetesSecretConfigProvider
+
+export KAFKA_CONNECT_INSTANCE=$(oc get kc -o jsonpath='{.items[*].metadata.name}')
+export BOOTSTRAP_SERVER=$(oc get svc -o json | jq -r '.items[] | select(.metadata.name | test("^env-ephemeral.*-kafka-bootstrap")) | "\(.metadata.name).\(.metadata.namespace).svc"')
+
+DB_SECRET=$(oc get secret kessel-inventory-db -o json 2> /dev/null)
+
+if [[ ! -z "$DB_SECRET" ]] ; then
+    export DB_NAME=$(echo $DB_SECRET | jq -r '.data."db.name" | @base64d')
+    export DB_HOSTNAME=$(echo $DB_SECRET | jq -r '.data."db.host" | @base64d')
+    export DB_PORT="5432"
+    export LOCAL_DB_PORT="5432"
+    export DB_USER=$(echo $DB_SECRET | jq -r '.data."db.user" | @base64d')
+    export DB_PASSWORD=$(echo $DB_SECRET | jq -r '.data."db.password" | @base64d')
+fi

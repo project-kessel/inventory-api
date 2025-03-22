@@ -1,0 +1,118 @@
+apiVersion: template.openshift.io/v1
+kind: Template
+metadata:
+  name: inventory
+objects:
+  - apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: inventory-api-config
+    data:
+      inventory-api-config.yaml: |
+        storage:
+          disable-persistence: false
+        authn:
+          allow-unauthenticated: true
+        authz:
+          kessel:
+            insecure-client: true
+            enable-oidc-auth: false
+        consumer:
+          topic: outbox.events.kessel.tuples
+        log:
+          level: "info"
+
+  - apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: psks
+    data:
+      psks.yaml: |
+        "1234":
+          tenant: "Example"
+          principal: "user@example.com"
+          is_reporter: true
+          type: "REPORTER_TYPE_ACM"
+
+  - apiVersion: cloud.redhat.com/v1alpha1
+    kind: ClowdApp
+    metadata:
+      name: kessel-inventory
+    spec:
+      envName: ${ENV_NAME}
+      database:
+        name: kessel-inventory
+        version: 16
+      kafkaTopics:
+        - topicName: outbox.events.kessel.tuples
+          partitions: 1
+          replicas: 1
+        - topicName: outbox.events.kessel.resources
+          partitions: 1
+          replicas: 1
+      optionalDependencies:
+        - kessel-relations
+      deployments:
+        - name: api
+          replicas: ${{REPLICAS}}
+          podSpec:
+            initContainers:
+            - name: migration
+              image: ${INVENTORY_IMAGE}:${IMAGE_TAG}
+              imagePullPolicy: Always
+              command: ["inventory-api"]
+              args: ["migrate"]
+              inheritEnv: true
+            image: ${INVENTORY_IMAGE}:${IMAGE_TAG}
+            imagePullPolicy: Always
+            command: ["inventory-api"]
+            args: ["serve"]
+            livenessProbe:
+              httpGet:
+                path: /api/inventory/v1/livez
+                port: 8000
+            readinessProbe:
+              httpGet:
+                path: /api/inventory/v1/readyz
+                port: 8000
+            env:
+            - name: CLOWDER_ENABLED
+              value: "true"
+            - name: INVENTORY_API_CONFIG
+              value: "/inventory/inventory-api-config.yaml"
+            - name: PGDATA
+              value: /temp/data
+            volumeMounts:
+                - name: config-volume
+                  mountPath: "/inventory"
+                - name: psks-volume
+                  mountPath: /psks
+            volumes:
+              - name: config-volume
+                configMap:
+                  name: inventory-api-config
+              - name: psks-volume
+                configMap:
+                  name: psks
+          webServices:
+            public:
+              enabled: true
+              apiPath: inventory
+
+      testing:
+        iqePlugin: kessel-inventory
+
+parameters:
+  - description: ClowdEnvironment name (ephemeral, stage, prod)
+    name: ENV_NAME
+    required: true
+  - description: App Image
+    name: INVENTORY_IMAGE
+    value: quay.io/redhat-services-prod/project-kessel-tenant/kessel-inventory/inventory-api
+  - description: Image Tag
+    name: IMAGE_TAG
+    required: true
+    value: latest
+  - description: Number of replicas
+    name: REPLICAS
+    value: "1"

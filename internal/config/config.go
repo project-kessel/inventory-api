@@ -126,5 +126,4 @@ func (o *OptionsConfig) ConfigureStorage(appconfig *clowder.AppConfig) error {
 // ConfigureConsumer updates Consumer settings based on ClowdApp AppConfig
 func (o *OptionsConfig) ConfigureConsumer() {
 	o.Consumer.BootstrapServers = clowder.KafkaServers[0]
-	log.Info("Bootstrap inside inject: ", o.Consumer.BootstrapServers)
 }

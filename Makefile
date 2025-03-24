@@ -222,40 +222,42 @@ help:
 
 .DEFAULT_GOAL := help
 
-### Debezium Helpers
+### Feature branch feature-RHCLOUD-38753 Helpers
 
-.PHONY: validate-outbox
-validate-outbox:
-	psql "postgresql://${DB_USER}:${DB_PASSWORD}@localhost:${LOCAL_DB_PORT}/${DB_NAME}" -c "\d+ outbox_events"
+.SILENT: check-kafka-status
+check-kafka-status:
+	echo "Kafka Cluster Ready: $(shell oc get kafka inventory-kafka -o jsonpath='{.status.conditions[].status}')"
+	echo "Kafka Connect Ready: $(shell oc get kc inventory-kafka-connect -o jsonpath='{.status.conditions[].status}')"
+	echo "Kafka Connector Ready: $(shell oc get kctr kessel-inventory-source-connector -o jsonpath='{.status.conditions[].status}')"
+	echo "Kafka Tuple Topic Ready: $(shell oc get kt outbox.event.kessel.tuples -o jsonpath='{.status.conditions[].status}')"
+	echo "Kafka Resources Topic Ready: $(shell oc get kt outbox.event.kessel.resources -o jsonpath='{.status.conditions[].status}')"
 
-.PHONY: deploy-debezium
-deploy-debezium:
-	./scripts/deploy-debezium.sh
+.PHONY: create-test-notification
+create-test-notification:
+	curl -H "Content-Type: application/json" -d @data/notifications-integrations.json localhost:8000/api/inventory/v1beta1/resources/notifications-integrations
 
-.PHONY: undeploy-debezium
-undeploy-debezium:
-	./scripts/remove-debezium.sh
+.PHONY: update-test-notification
+update-test-notification:
+	curl -X PUT -H "Content-Type: application/json" -d @data/notifications-integrations.json localhost:8000/api/inventory/v1beta1/resources/notifications-integrations
 
-.PHONY: outbox-tuple-record
-outbox-tuple-record:
-	psql "postgresql://${DB_USER}:${DB_PASSWORD}@localhost:${LOCAL_DB_PORT}/${DB_NAME}" -f deploy/debezium/sample-tuple.sql
-
-.PHONY: outbox-resource-record
-outbox-resource-record:
-	psql "postgresql://${DB_USER}:${DB_PASSWORD}@localhost:${LOCAL_DB_PORT}/${DB_NAME}" -f deploy/debezium/sample-resource.sql
-
-.PHONY: get-outbox-tuples
-get-outbox-tuples:
-	psql "postgresql://${DB_USER}:${DB_PASSWORD}@localhost:${LOCAL_DB_PORT}/${DB_NAME}" -x -c "select * from outbox_events where aggregatetype='kessel.tuples'"
-
-.PHONY: get-outbox-resources
-get-outbox-resources:
-	psql "postgresql://${DB_USER}:${DB_PASSWORD}@localhost:${LOCAL_DB_PORT}/${DB_NAME}" -x -c "select * from outbox_events where aggregatetype='kessel.resources'"
+.PHONY: delete-test-notification
+delete-test-notification:
+	curl -X DELETE -H "Content-Type: application/json" -d @data/notifications-integration-reporter.json localhost:8000/api/inventory/v1beta1/resources/notifications-integrations
 
 .PHONY: check-tuple-messages
 check-tuple-messages:
-	oc rsh ${KAFKA_CONNECT_INSTANCE}-connect-0 bin/kafka-console-consumer.sh --bootstrap-server ${BOOTSTRAP_SERVER}:9092 --topic outbox.event.kessel.tuples --from-beginning --property print.headers=true --property print.key=true
+	oc rsh inventory-kafka-connect-connect-0 bin/kafka-console-consumer.sh --bootstrap-server inventory-kafka-kafka-bootstrap:9092 --topic outbox.event.kessel.tuples --from-beginning --property print.headers=true --property print.key=true
 
 .PHONY: check-resource-messages
 check-resource-messages:
-	oc rsh ${KAFKA_CONNECT_INSTANCE}-connect-0 bin/kafka-console-consumer.sh --bootstrap-server ${BOOTSTRAP_SERVER}:9092 --topic outbox.event.kessel.resources --from-beginning --property print.headers=true --property print.key=true
+	oc rsh inventory-kafka-connect-connect-0 bin/kafka-console-consumer.sh --bootstrap-server inventory-kafka-kafka-bootstrap:9092 --topic outbox.event.kessel.resources --from-beginning --property print.headers=true --property print.key=true
+
+.PHONY: check-tuple
+check-tuple:
+	MESSAGE='{"filter":{"resource_id":"4321","resource_type":"integration","resource_namespace":"notifications","relation":"t_workspace","subject_filter":{"subject_type":"workspace","subject_namespace":"rbac","subject_id":"1234"}}}' && \
+	grpcurl -plaintext -d $${MESSAGE} localhost:9000 kessel.relations.v1beta1.KesselTupleService.ReadTuples
+
+.PHONY: check-token-update
+check-token-update:
+	psql "postgresql://${DB_USER}:${DB_PASSWORD}@localhost:${LOCAL_DB_PORT}/${DB_NAME}" -x -c "select id,inventory_id,consistency_token,workspace_id,reporter from resources;"
+

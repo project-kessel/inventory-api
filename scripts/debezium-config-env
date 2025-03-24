@@ -1,11 +1,9 @@
 #!/bin/bash
 
-# Helpful script for capturing DB creds to interpolate into the
-# Debezium Connector deployment since ephemeral Kafka Connect is not configured
-# for the KubernetesSecretConfigProvider
+# for feature branch "feature-RHCLOUD-38543"
 
-export KAFKA_CONNECT_INSTANCE=$(oc get kc -o jsonpath='{.items[*].metadata.name}')
-export BOOTSTRAP_SERVER=$(oc get svc -o json | jq -r '.items[] | select(.metadata.name | test("^env-ephemeral.*-kafka-bootstrap")) | "\(.metadata.name).\(.metadata.namespace).svc"')
+export KAFKA_CONNECT_INSTANCE="inventory-kafka-connect"
+export BOOTSTRAP_SERVER="inventory-kafka-kafka-bootstrap"
 
 DB_SECRET=$(oc get secret kessel-inventory-db -o json 2> /dev/null)
 

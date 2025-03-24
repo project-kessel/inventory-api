@@ -190,6 +190,29 @@ func TestResourceValidation(t *testing.T) {
 			},
 			expectErr: false,
 		},
+		// Valid RHEL Host w/ inventory_id
+		{
+			name: "Valid K8s_cluster",
+			request: &ReportResourceRequest{
+				Resource: &Resource{
+					InventoryId:  "12",
+					ResourceType: "k8s_cluster",
+					ReporterData: &ReporterData{
+						ReporterType:       "ACM",
+						ReporterInstanceId: "user@example.com",
+						LocalResourceId:    "0123",
+						ApiHref:            "www.example.com",
+						ConsoleHref:        "www.example.com",
+					},
+					CommonResourceData: &structpb.Struct{
+						Fields: map[string]*structpb.Value{
+							"workspace_id": {Kind: &structpb.Value_StringValue{StringValue: "workspace"}},
+						},
+					},
+				},
+			},
+			expectErr: false,
+		},
 		// Missing `ResourceType`
 		{
 			name: "Missing resource_type",

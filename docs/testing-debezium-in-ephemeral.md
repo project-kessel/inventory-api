@@ -1,114 +1,148 @@
 # Testing Debezium in Ephemeral
 
+> Note: This process is currently very specific to feature branch work being done on [feature-RHCLOUD-38543](https://github.com/project-kessel/inventory-api/tree/feature-RHCLOUD-38543) and is not applicable to the main branch
+
 ## Prerequistes
 You'll need:
 1) [Bonfire](https://github.com/RedHatInsights/bonfire?tab=readme-ov-file#installing-locally) cli
-2) [`psql`](https://www.postgresql.org/download/) cli
-3) [`jq`](https://github.com/jqlang/jq?tab=readme-ov-file#installation) cli
+2) [`jq`](https://github.com/jqlang/jq?tab=readme-ov-file#installation) cli
+3) [`grpcurl`](https://github.com/fullstorydev/grpcurl?tab=readme-ov-file#installation) cli
+3) A personal build of the Inventory container pushed to your Quay
+4) Local bonfire config to set the correct image and deployment file
 4) Access to the Ephemeral cluster (which will require Red Hat Corp VPN)
+
+
+### Inventory Image
+
+The changes in this feature branch are not automatically build by Konflux/AppSRE and require you to build and leverage your own image
+
+To build your own image:
+```shell
+# For Linux
+export IMAGE=your-quay-repo # if desired
+make docker-build-push
+
+# For MacOS
+export QUAY_REPO_INVENTORY=your-quay-repo # required
+podman login quay.io # required, this target assumes you are already logged in
+make build-push-minimal
+```
+
+### Setup Local Bonfire Config
+
+In order to deploy the correct image and manifests to Ephemeral, add or update any Kessel Inventory configuration in your local bonfire config ($HOME/.config/bonfire/config.yaml) to the below:
+
+```yaml
+apps:
+- name: kessel
+  components:
+    - name: kessel-inventory
+      host: local
+      repo: </path/to/cloned/inventory-api-repo>
+      path: deploy/kessel-inventory-ephem-w-debezium.yaml
+      parameters:
+        INVENTORY_IMAGE: quay.io/<YOUR_QUAY_REPO>/kessel-inventory
+        IMAGE_TAG: "<YOUR_IMAGE_TAG>"
+```
 
 ## Deploy Inventory
 
-Using Bonfire to deploy inventory will provide us with all the systems we need to test debezium. This includes the Postgres database that Debezium will capture changes from.
+Using Bonfire to deploy inventory with the new image and deploy file will provide us with all the systems we need to test run Inventory with the new consumer process and Debezium connector.
 
 To Deploy:
 
-`bonfire deploy kessel -C kessel-inventory --no-get-dependencies`
+`bonfire deploy kessel -C kessel-inventory`
 
-This will deploy Inventory alone with no Relations API. If you need Relations (future state testing), remove the `--no-get-dependencies` flag and it will also get deployed
+The full deployment will include:
+* Inventory API
+* Relations API
+* Kafka Cluster
+* Kafka Connect cluster with Debezium plugin
+* Kafka Connector to configure Debezium
+* Kafka Topics leveraged by the Consumer and Debezium
+* Postgres DB's for both services
 
 > NOTE: By default ephemeral env's are nuked after 1 hour.
 > If you need more time, extend that duration now before you forget: `bonfire namespace extend -d 4h # sets it to 4 hours`
 
-## Prep for Debezium Deployment
+Once the deployment completes, it make still take a little bit of time for the Kafka setup to complete. You can validate all Kafka services are ready by checking them with:
 
-The Ephemeral environment already provides a Kafka Cluster and Kafka Connect cluster with Debezium installed, so all that is needed is the Kakfa Connector to configure Debezium for our database and topics
+ `make check-kafka-status`.
 
-### Database Setup
+ When ready, all systems will output `True`
 
-To deploy the connector, we need the database credentials for the Postgres database created. You can easily export those values by sourcing the `debezium-config-env` file: `source deploy/debezium/debezium-config-env`
+## Testing
 
-Until Inventory API handles configuring the outbox table on used by Debezium, this step must be manually done ahead of time.
+When creating a resource (in this setup, a notifications integration) in Invenotry API, the expected outcome should be:
+* Resource is added to Inventory via API and reflected in Inventory DB
+* Resource is created then removed from outbox tables
+* Debezium captures the changes and produces a message to the resources and tuples outboxs
+* The Inventory Consumer process captures the message in the tuples topic, and created the relationship in SpiceDB via Relations API
+* The consumer captures the consistency token in the response and updates the resource in Inventory DB with the token
+
+
+### Test Process
+
+1) Create a Notification's Integration using the Inventory API
 
 ```shell
-# Port forward postgres to your laptop
-oc port-forward svc/kessel-inventory-db 5432:5432
+# port-forward the api
+oc port-forward svc/kessel-inventory-api 8000:8000
 
-# In another terminal tab/window, setup the outbox table
-# Make sure you have the creds exported first
-source deploy/debezium/debezium-config-env
-
-# You can validate the table is properly setup with:
-make validate-outbox
+# create the notification
+make create-test-notification
 ```
 
-## Deploy the Debezium Connector
-
-To deploy Debezium, process and apply the OpenShift template, passing the environment variables sourced earlier
+2) Validate that Debezium captured the change and produced the expected messages
 
 ```shell
-make deploy-debezium
-
-# if you need to remove the connector you can also `make undeploy-debezium`
-```
-
-This should deploy the Kafka Connector which can be checked using:
-
-```shell
-$ oc get kctr kessel-inventory-source-connector
-
-# example output -- Ready status should be 'True' if there are no errors
-NAME                                CLUSTER                         CONNECTOR CLASS                                      MAX TASKS   READY
-kessel-inventory-source-connector   env-ephemeral-uupuy9-dc11006e   io.debezium.connector.postgresql.PostgresConnector   1           True
-```
-
-If the Connector is Ready, everything is all setup for testing. If the connector is not ready, review the connector object and see if there are any errors or issues
-
-```shell
-oc describe kctr kessel-inventory-source-connector
-```
-
-## Testing the Debezium Connector
-
-To test the Debezium Connector, we need to create a record in the outbox table with the correct `aggregatetype` and `payload` for the usecase:
-* To produce resource creation/change events, the `aggregatetype` should be `kessel.resources` and the payload should contain an event using our [current event format](https://github.com/project-kessel/inventory-api/blob/4e924e0a731501c51dc523821f66070e3595d4f0/internal/eventing/api/event.go#L13)
-* To produce tuple creation/change events, the `aggregatetype` should be `kessel.tuples`, and the payload should be a JSON request body for creating a tuple
-
-### Setup
-
-```shell
-# Port forward postgres to your laptop
-oc port-forward svc/kessel-inventory-db 5432:5432
-
-# In another terminal tab/window, export DB creds if not already
-source deploy/debezium/debezium-config-env
-```
-
-### Create Records in the Outbox table
-
-```shell
-# Create the tuple record in the outbox table
-make outbox-tuple-record
-
-# Create a resource record in the outbox table
-make outbox-resource-record
-
-# You can validate the records in Postgres with:
-make get-outbox-tuples
-make get-outbox-resources
-```
-
-### Check that the Messages were Produced
-
-```shell
-# Check Tuple messages
+# Check Tuple messages -- it may take a few seconds before any messages appear
 make check-tuple-messages
 
 # !!! note, the consumer process runs continuously, to exit, hit Ctrl+c !!!
 
-# Check Resource messages
+# Check Resource messages -- it may take a few seconds before any messages appear
 make check-resource-messages
+
+# !!! note, the consumer process runs continuously, to exit, hit Ctrl+c !!!
 ```
+
+3) Validate that the Consumer processed the tuple message via Inventory pod logs
+
+```shell
+oc logs <INVENTORY_POD_NAME> | grep "consumed event"
+
+# example expected output
+INFO ts=2025-03-24T16:01:11Z caller=log/log.go:30 service.name=inventory-api service.version=0.1.0 trace.id= span.id= subsystem=inventoryConsumer msg=consumed event from topic outbox.event.kessel.tuples, partition 0 at offset 0: key = {"schema":{"type":"string","optional":false},"payload":"0195c8e2-edb8-7ead-a8a2-0ba7e275bc56"} value = {"schema":{"type":"string","optional":true,"name":"io.debezium.data.Json","version":1},"payload":"{\"subject\": {\"subject\": {\"id\": \"1234\", \"type\": {\"name\": \"workspace\", \"namespace\": \"rbac\"}}}, \"relation\": \"workspace\", \"resource\": {\"id\": \"4321\", \"type\": {\"name\": \"integration\", \"namespace\": \"notifications\"}}}"}
+```
+
+4) Validate the relation has been created in SpiceDB
+
+```shell
+# port-forward the relations api
+oc port-forward svc/kessel-relations-api 9000:9000
+
+# Read the tuple
+make check-tuple
+```
+
+5) Validate the token has been updated in Inventory DB
+
+```shell
+# set env vars for DB creds
+source scripts/debezium-config-env
+
+# port forward DB
+oc port-forward svc/kessel-inventory-db 5432:5432
+
+# check the resources table
+make check-token-update
+```
+
+
+The same process can also be applied to updating and deleting the notifications resource by changing the make command run in step 1:
+* Update: `make update-test-notification`
+* Delete: `make delete-test-notification`
 
 ## Cleanup
 

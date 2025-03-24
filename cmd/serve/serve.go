@@ -249,7 +249,10 @@ func NewCommand(
 
 			if !storageOptions.DisablePersistence {
 				go func() {
-					_ = inventoryConsumer.Consume()
+					err := inventoryConsumer.Consume()
+					if err != nil {
+						inventoryConsumer.Errors <- err
+					}
 				}()
 			}
 

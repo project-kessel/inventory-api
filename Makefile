@@ -222,7 +222,7 @@ help:
 
 .DEFAULT_GOAL := help
 
-### Feature branch feature-RHCLOUD-38753 Helpers
+### Feature branch feature-RHCLOUD-38543 Helpers
 
 .SILENT: check-kafka-status
 check-kafka-status:

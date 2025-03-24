@@ -28,7 +28,7 @@ storage:
     dbname: "test"
 consumer:
   bootstrap-servers: localhost:9092
-  topic: zookie-outbox
+  topic: outbox.event.kessel.tuples
 log:
   level: "info"
   livez: true

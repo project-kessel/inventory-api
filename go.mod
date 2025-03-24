@@ -11,7 +11,7 @@ require (
 	github.com/confluentinc/confluent-kafka-go/v2 v2.8.0
 	github.com/coreos/go-oidc/v3 v3.12.0
 	github.com/go-kratos/kratos/v2 v2.8.4
-	github.com/golang-jwt/jwt/v5 v5.2.1
+	github.com/golang-jwt/jwt/v5 v5.2.2
 	github.com/google/uuid v1.6.0
 	github.com/patrickmn/go-cache v2.1.0+incompatible
 	github.com/project-kessel/inventory-client-go v0.0.0-20250220124954-dedacb3f2537

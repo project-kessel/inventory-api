@@ -12,17 +12,18 @@ import (
 )
 
 type Resource struct {
-	ID           uuid.UUID  `gorm:"type:uuid;primarykey"`
-	InventoryId  *uuid.UUID `gorm:"index"`
-	OrgId        string     `gorm:"index"`
-	ResourceData JsonObject
-	ResourceType string
-	WorkspaceId  string
-	ConsoleHref  string
-	ApiHref      string
-	Labels       Labels
-	CreatedAt    *time.Time
-	UpdatedAt    *time.Time
+	ID               uuid.UUID  `gorm:"type:uuid;primarykey"`
+	InventoryId      *uuid.UUID `gorm:"index"`
+	OrgId            string     `gorm:"index"`
+	ResourceData     JsonObject
+	ResourceType     string
+	WorkspaceId      string
+	ConsoleHref      string
+	ApiHref          string
+	Labels           Labels
+	CreatedAt        *time.Time
+	UpdatedAt        *time.Time
+	ConsistencyToken string
 	// Reporter Fields
 	ReporterResourceId string `json:"reporter_resource_id"`
 	ReporterId         string `json:"reporter_id"`

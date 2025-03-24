@@ -230,23 +230,11 @@ validate-outbox:
 
 .PHONY: deploy-debezium
 deploy-debezium:
-	oc process --local -f deploy/debezium/debezium-connector.yaml \
-    -p DB_NAME=${DB_NAME} \
-    -p DB_HOSTNAME=${DB_HOSTNAME} \
-    -p DB_PORT=${DB_PORT} \
-    -p DB_USER=${DB_USER} \
-    -p DB_PASSWORD=${DB_PASSWORD} \
-    -p KAFKA_CONNECT_INSTANCE=${KAFKA_CONNECT_INSTANCE} | oc apply -f -
+	./scripts/deploy-debezium.sh
 
 .PHONY: undeploy-debezium
 undeploy-debezium:
-	oc process --local -f deploy/debezium/debezium-connector.yaml \
-    -p DB_NAME=${DB_NAME} \
-    -p DB_HOSTNAME=${DB_HOSTNAME} \
-    -p DB_PORT=${DB_PORT} \
-    -p DB_USER=${DB_USER} \
-    -p DB_PASSWORD=${DB_PASSWORD} \
-    -p KAFKA_CONNECT_INSTANCE=${KAFKA_CONNECT_INSTANCE} | oc delete -f -
+	./scripts/remove-debezium.sh
 
 .PHONY: outbox-tuple-record
 outbox-tuple-record:

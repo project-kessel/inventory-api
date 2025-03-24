@@ -53,7 +53,5 @@ func (o *Options) Validate() []error {
 }
 
 func (o *Options) Complete() []error {
-	var errs []error
-
-	return errs
+	return nil
 }

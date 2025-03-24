@@ -81,7 +81,6 @@ func init() {
 			panic(err)
 		}
 	}
-
 	loggerOptions := common.LoggerOptions{
 		ServiceName:    Name,
 		ServiceVersion: Version,

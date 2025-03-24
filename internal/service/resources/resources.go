@@ -78,7 +78,13 @@ func requestToResource(r *pb.ReportResourceRequest, identity *authnapi.Identity)
 	if err2 != nil {
 		return nil, err2
 	}
-	return conv.ResourceFromPb(resourceType, identity.Principal, resourceData, workspaceId, r.Resource.ReporterData), nil
+
+	var inventoryId, err3 = conv.ExtractInventoryId(r.Resource.InventoryId)
+	if err3 != nil {
+		return nil, err3
+	}
+
+	return conv.ResourceFromPb(resourceType, identity.Principal, resourceData, workspaceId, r.Resource.ReporterData, inventoryId), nil
 }
 
 func requestToDeleteResource(r *pb.DeleteResourceRequest, identity *authnapi.Identity) (model.ReporterResourceId, error) {

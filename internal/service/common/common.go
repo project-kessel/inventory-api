@@ -44,9 +44,10 @@ func ResourceFromPbv1beta1(resourceType, reporterId string, resourceData model.J
 	}
 }
 
-func ResourceFromPb(resourceType, reporterId string, resourceData model.JsonObject, workspaceId string, reporter *pbresourcev1beta2.ReporterData) *model.Resource {
+func ResourceFromPb(resourceType, reporterId string, resourceData model.JsonObject, workspaceId string, reporter *pbresourcev1beta2.ReporterData, inventoryId *uuid.UUID) *model.Resource {
 	return &model.Resource{
 		ID:                 uuid.UUID{},
+		InventoryId:        inventoryId,
 		ResourceData:       resourceData,
 		ResourceType:       resourceType,
 		WorkspaceId:        workspaceId,
@@ -85,6 +86,17 @@ func ExtractWorkspaceId(in interface{}) (string, error) {
 		return "", nil
 	}
 	return "someWorkspaceId", nil
+}
+
+func ExtractInventoryId(inventoryIDStr string) (*uuid.UUID, error) {
+	if inventoryIDStr != "" {
+		inventoryID, err := uuid.Parse(inventoryIDStr)
+		if err != nil {
+			return nil, nil
+		}
+		return &inventoryID, nil
+	}
+	return nil, nil
 }
 
 func labelsFromPb(pbLabels []*pbresource.ResourceLabel) model.Labels {

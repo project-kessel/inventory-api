@@ -1031,6 +1031,8 @@ components:
         kessel.inventory.v1beta2.Resource:
             type: object
             properties:
+                inventoryId:
+                    type: string
                 resourceType:
                     type: string
                 reporterData:

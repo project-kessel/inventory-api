@@ -200,6 +200,19 @@ func (r *Repo) FindByReporterResourceIdv1beta2(ctx context.Context, id model.Rep
 	return &resource, nil
 }
 
+func (r *Repo) FindByInventoryIdAndReporterResourceId(ctx context.Context, inventoryId *uuid.UUID, ReporterResourceId string, reporterType string) (*model.Resource, error) {
+	resource := model.Resource{}
+	if err := r.DB.Session(&gorm.Session{}).Where(&model.Resource{
+		InventoryId:        inventoryId,
+		ReporterResourceId: ReporterResourceId,
+		ResourceType:       reporterType,
+	}).First(&resource).Error; err != nil {
+		return nil, err
+	}
+
+	return &resource, nil
+}
+
 func (r *Repo) FindByReporterData(ctx context.Context, reporterId string, reporterResourceId string) (*model.Resource, error) {
 	resource := model.Resource{}
 	if err := r.DB.Session(&gorm.Session{}).Where(&model.Resource{

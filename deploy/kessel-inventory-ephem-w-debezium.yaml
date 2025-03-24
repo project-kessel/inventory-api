@@ -17,8 +17,10 @@ objects:
           kessel:
             insecure-client: true
             enable-oidc-auth: false
+        consumer:
+          topic: outbox.event.kessel.tuples
         log:
-          level: "info"
+          level: "debug"
 
   - apiVersion: v1
     kind: ConfigMap
@@ -41,6 +43,13 @@ objects:
       database:
         name: kessel-inventory
         version: 16
+      kafkaTopics:
+        - topicName: outbox.event.kessel.tuples
+          partitions: 1
+          replicas: 1
+        - topicName: outbox.event.kessel.resources
+          partitions: 1
+          replicas: 1
       optionalDependencies:
         - kessel-relations
       deployments:

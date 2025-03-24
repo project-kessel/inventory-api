@@ -26,7 +26,7 @@ The Ephemeral environment already provides a Kafka Cluster and Kafka Connect clu
 
 ### Database Setup
 
-To deploy the connector, we need the database credentials for the Postgres database created. You can easily export those values by sourcing the `debezium-db-config-env` file: `source deploy/debezium/debezium-db-config-env`
+To deploy the connector, we need the database credentials for the Postgres database created. You can easily export those values by sourcing the `debezium-config-env` file: `source deploy/debezium/debezium-config-env`
 
 Until Inventory API handles configuring the outbox table on used by Debezium, this step must be manually done ahead of time.
 
@@ -36,11 +36,9 @@ oc port-forward svc/kessel-inventory-db 5432:5432
 
 # In another terminal tab/window, setup the outbox table
 # Make sure you have the creds exported first
-source deploy/debezium/debezium-db-config-env
+source deploy/debezium/debezium-config-env
 
-make setup-outbox
-
-# You can validate the table is properly configured setup with:
+# You can validate the table is properly setup with:
 make validate-outbox
 ```
 
@@ -83,7 +81,7 @@ To test the Debezium Connector, we need to create a record in the outbox table w
 oc port-forward svc/kessel-inventory-db 5432:5432
 
 # In another terminal tab/window, export DB creds if not already
-source deploy/debezium/debezium-db-config-env
+source deploy/debezium/debezium-config-env
 ```
 
 ### Create Records in the Outbox table

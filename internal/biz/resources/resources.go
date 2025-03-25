@@ -212,7 +212,7 @@ func (uc *Usecase) Update(ctx context.Context, m *model.Resource, id model.Repor
 
 // Delete deletes a model from the database, removes related tuples from the relations-api, and issues a delete event.
 func (uc *Usecase) Delete(ctx context.Context, id model.ReporterResourceId) error {
-	var m *model.Resource
+	m := &model.Resource{}
 
 	if !uc.DisablePersistence {
 		// check if the resource exists

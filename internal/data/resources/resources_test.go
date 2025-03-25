@@ -404,7 +404,7 @@ func TestFindByWorkspaceId(t *testing.T) {
 	res.WorkspaceId = "1234"
 
 	// Saving a resource not present in the system saves correctly
-	r, _, err := repo.Create(ctx, res)
+	r, err := repo.Create(ctx, res, namespace)
 	assert.NotNil(t, r)
 	assert.Nil(t, err)
 

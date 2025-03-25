@@ -107,7 +107,7 @@ func (uc *Usecase) Upsert(ctx context.Context, m *model.Resource) (*model.Resour
 					return nil, err
 				}
 
-				ret, _, err = uc.reporterResourceRepository.Create(ctx, m)
+				_, _, err = uc.reporterResourceRepository.Create(ctx, m)
 				if err != nil {
 					return nil, err
 				}

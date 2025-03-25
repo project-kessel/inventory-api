@@ -25,7 +25,6 @@ type Resource struct {
 	UpdatedAt        *time.Time
 	ConsistencyToken string
 	// Reporter Fields
-	ResourceType       string
 	ReporterResourceId string `json:"reporter_resource_id"`
 	ReporterType       string `json:"reporter_type"`
 	ReporterInstanceId string `json:"reporter_instance_id"`

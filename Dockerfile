@@ -1,4 +1,4 @@
-FROM registry.access.redhat.com/ubi9/ubi-minimal:9.5-1741850109 AS builder
+FROM registry.access.redhat.com/ubi9/ubi-minimal:9.5-1742914212 AS builder
 
 ARG TARGETARCH
 USER root
@@ -19,7 +19,7 @@ COPY main.go Makefile ./
 ARG VERSION
 RUN VERSION=${VERSION} make build
 
-FROM registry.access.redhat.com/ubi9/ubi-minimal:9.5-1741850109
+FROM registry.access.redhat.com/ubi9/ubi-minimal:9.5-1742914212
 
 # installs RHEL fork of go to be able to validate with go tools for FIPS -- likely not needed long term
 RUN microdnf install -y go-toolset

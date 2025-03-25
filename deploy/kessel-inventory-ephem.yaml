@@ -12,8 +12,7 @@ objects:
         storage:
           disable-persistence: false
         authn:
-          psk:
-            pre-shared-key-file: /psks/psks.yaml
+          allow-unauthenticated: true
         authz:
           kessel:
             insecure-client: true
@@ -41,6 +40,7 @@ objects:
       envName: ${ENV_NAME}
       database:
         name: kessel-inventory
+        version: 16
       optionalDependencies:
         - kessel-relations
       deployments:

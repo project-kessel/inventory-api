@@ -26,7 +26,8 @@ type ReporterResourceRepository interface {
 	FindByReporterResourceId(context.Context, model.ReporterResourceId) (*model.Resource, error)
 	FindByReporterResourceIdv1beta2(context.Context, model.ReporterResourceUniqueIndex) (*model.Resource, error)
 	FindByReporterData(context.Context, string, string) (*model.Resource, error)
-	FindByInventoryIdAndReporterResourceId(ctx context.Context, inventoryId *uuid.UUID, ReporterResourceId string, reporterType string) (*model.Resource, error)
+	FindByInventoryIdAndResourceType(ctx context.Context, inventoryId *uuid.UUID, resourceType string) (*model.Resource, error)
+	FindByInventoryIdAndReporter(ctx context.Context, inventoryId *uuid.UUID, reporterInstanceId string, reporterType string) (*model.Resource, error)
 	ListAll(context.Context) ([]*model.Resource, error)
 }
 
@@ -92,27 +93,25 @@ func (uc *Usecase) Upsert(ctx context.Context, m *model.Resource) (*model.Resour
 
 		if m.InventoryId != nil {
 			// Multiple reporters should have same inventory id.
-			existingInventoryIdResource, err := uc.reporterResourceRepository.FindByInventoryIdAndReporterResourceId(ctx, m.InventoryId, m.ReporterResourceId, m.ReporterType)
+			existingInventoryIdResource, err := uc.reporterResourceRepository.FindByInventoryIdAndResourceType(ctx, m.InventoryId, m.ResourceType)
 			if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 				return nil, ErrDatabaseError
 			}
 
 			if existingInventoryIdResource != nil {
-				if existingInventoryIdResource.ReporterResourceId != m.ReporterResourceId {
-					ret, _, err = uc.reporterResourceRepository.Create(ctx, m)
-					if err != nil {
-						return nil, err
-					}
+				existingResourceRepo, err := uc.reporterResourceRepository.FindByInventoryIdAndReporter(ctx, m.InventoryId, m.ReporterInstanceId, m.ReporterType)
+				if existingResourceRepo != nil {
+					return nil, ErrResourceAlreadyExists
+				}
+				if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 					return nil, err
 				}
-				return nil, ErrResourceAlreadyExists
-			}
-			inventoryResource, err := uc.inventoryResourceRepository.FindByID(ctx, *m.InventoryId)
-			if err != nil {
+
+				ret, _, err = uc.reporterResourceRepository.Create(ctx, m)
+				if err != nil {
+					return nil, err
+				}
 				return nil, err
-			}
-			if inventoryResource == nil {
-				return nil, ErrResourceNotFound
 			}
 		}
 

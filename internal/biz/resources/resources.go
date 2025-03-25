@@ -136,7 +136,7 @@ func (uc *Usecase) CheckForUpdate(ctx context.Context, permission, namespace str
 
 		if consistency != nil {
 			res.ConsistencyToken = consistency.Token
-			_, _, err := uc.reporterResourceRepository.Update(ctx, res, res.ID)
+			_, err := uc.reporterResourceRepository.Update(ctx, res, res.ID, uc.Namespace)
 			if err != nil {
 				return false, err // we're allowed, but failed to update consistency token
 			}

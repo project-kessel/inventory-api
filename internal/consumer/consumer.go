@@ -187,19 +187,23 @@ func (i *InventoryConsumer) CreateTuple(ctx context.Context, msg []byte) (string
 		// If the tuple exists already, capture the token using Check to ensure idempotent updates to tokens in DB
 		if status.Convert(err).Code() == codes.AlreadyExists {
 			i.Logger.Info("tuple: already exists; fetching consistency token")
-			check, err := i.Authorizer.Check(ctx, &kessel.CheckRequest{
-				Resource: tuple.Resource,
-				Relation: tuple.Relation,
-				Subject:  tuple.Subject,
-			})
+
+			namespace := tuple.GetResource().GetType().GetNamespace()
+			relation := tuple.GetRelation()
+			subject := tuple.GetSubject()
+			resource := &model.Resource{
+				ResourceType:       tuple.GetResource().GetType().GetName(),
+				ReporterResourceId: tuple.GetResource().GetId(),
+			}
+			_, token, err := i.Authorizer.Check(ctx, namespace, relation, resource, subject)
 			if err != nil {
 				return "", fmt.Errorf("failed to fetch consistency token: %v", err)
 			}
-			return check.GetConsistencyToken().Token, nil
+			return token.GetToken(), nil
 		}
 		return "", fmt.Errorf("error creating tuple: %v", err)
 	}
-	return resp.GetConsistencyToken().Token, nil
+	return resp.GetConsistencyToken().GetToken(), nil
 }
 
 // UpdateTuple calls the Relations API to create a tuple from the message payload received and returns the consistency token

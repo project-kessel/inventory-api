@@ -51,6 +51,21 @@ func (r *MockedReporterResourceRepository) FindByReporterResourceId(ctx context.
 	return args.Get(0).(*model.Resource), args.Error(1)
 }
 
+func (r *MockedReporterResourceRepository) FindByInventoryIdAndReporter(ctx context.Context, inventoryId *uuid.UUID, reporterResourceId string, reporterType string) (*model.Resource, error) {
+	args := r.Called(ctx, inventoryId, reporterResourceId, reporterType)
+	return args.Get(0).(*model.Resource), args.Error(1)
+}
+
+func (r *MockedReporterResourceRepository) FindByReporterResourceIdv1beta2(ctx context.Context, id model.ReporterResourceUniqueIndex) (*model.Resource, error) {
+	args := r.Called(ctx, id)
+	return args.Get(0).(*model.Resource), args.Error(1)
+}
+
+func (r *MockedReporterResourceRepository) FindByInventoryIdAndResourceType(ctx context.Context, inventoryId *uuid.UUID, resourceType string) (*model.Resource, error) {
+	args := r.Called(ctx, inventoryId, resourceType)
+	return args.Get(0).(*model.Resource), args.Error(1)
+}
+
 func (r *MockedReporterResourceRepository) FindByReporterData(ctx context.Context, reporterId string, resourceId string) (*model.Resource, error) {
 	args := r.Called(ctx, reporterId, resourceId)
 	return args.Get(0).(*model.Resource), args.Error(1)

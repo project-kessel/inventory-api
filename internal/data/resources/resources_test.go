@@ -144,6 +144,11 @@ func TestCreateResource(t *testing.T) {
 	assert.Nil(t, db.Find(&inventoryResource).Error)
 	assert.Len(t, inventoryResource, 1)
 	assert.Equal(t, *resource.InventoryId, inventoryResource[0].ID)
+
+	// Nothing exists in the outbox (expected)
+	outboxEvents := []model.OutboxEvent{}
+	assert.Nil(t, db.Find(&outboxEvents).Error)
+	assert.Len(t, outboxEvents, 0)
 }
 
 func TestCreateResourceWithInventoryId(t *testing.T) {
@@ -188,6 +193,10 @@ func TestCreateResourceWithInventoryId(t *testing.T) {
 	// Workspace for InventoryResource was updated to resource2's workspace
 	assert.Equal(t, resource2.WorkspaceId, inventoryResource[0].WorkspaceId)
 
+	// Nothing exists in the outbox (expected)
+	outboxEvents := []model.OutboxEvent{}
+	assert.Nil(t, db.Find(&outboxEvents).Error)
+	assert.Len(t, outboxEvents, 0)
 }
 
 func TestUpdateFailsIfResourceNotFound(t *testing.T) {
@@ -201,6 +210,11 @@ func TestUpdateFailsIfResourceNotFound(t *testing.T) {
 	// Update fails if id is not found
 	_, err = repo.Update(ctx, &model.Resource{}, id, namespace)
 	assert.ErrorIs(t, err, gorm.ErrRecordNotFound)
+
+	// Nothing exists in the outbox (expected)
+	outboxEvents := []model.OutboxEvent{}
+	assert.Nil(t, db.Find(&outboxEvents).Error)
+	assert.Len(t, outboxEvents, 0)
 }
 
 func TestUpdateResource(t *testing.T) {
@@ -239,6 +253,11 @@ func TestUpdateResource(t *testing.T) {
 	assert.Len(t, inventoryResource, 1)
 	// Workspace for InventoryResource was updated to r2's workspace
 	assert.Equal(t, r2.WorkspaceId, inventoryResource[0].WorkspaceId)
+
+	// Nothing exists in the outbox (expected)
+	outboxEvents := []model.OutboxEvent{}
+	assert.Nil(t, db.Find(&outboxEvents).Error)
+	assert.Len(t, outboxEvents, 0)
 }
 
 func TestDeleteFailsIfResourceNotFound(t *testing.T) {
@@ -252,6 +271,11 @@ func TestDeleteFailsIfResourceNotFound(t *testing.T) {
 	// Delete fails if id is not found
 	_, err = repo.Delete(ctx, id, namespace)
 	assert.ErrorIs(t, err, gorm.ErrRecordNotFound)
+
+	// Nothing exists in the outbox (expected)
+	outboxEvents := []model.OutboxEvent{}
+	assert.Nil(t, db.Find(&outboxEvents).Error)
+	assert.Len(t, outboxEvents, 0)
 }
 
 func TestDeleteAfterCreate(t *testing.T) {
@@ -285,6 +309,11 @@ func TestDeleteAfterCreate(t *testing.T) {
 	// Ensure InventoryResource is cleaned up
 	assert.Nil(t, db.Find(&inventoryResource).Count(&count).Error)
 	assert.Equal(t, int64(0), count)
+
+	// Nothing exists in the outbox (expected)
+	outboxEvents := []model.OutboxEvent{}
+	assert.Nil(t, db.Find(&outboxEvents).Error)
+	assert.Len(t, outboxEvents, 0)
 }
 
 func TestDeleteAfterUpdate(t *testing.T) {
@@ -310,6 +339,11 @@ func TestDeleteAfterUpdate(t *testing.T) {
 	assert.Nil(t, db.Find(&resourceHistory).Error)
 	assert.Len(t, resourceHistory, 3)
 	assertEqualResourceHistory(t, r, &resourceHistory[2], model.OperationTypeDelete)
+
+	// Nothing exists in the outbox (expected)
+	outboxEvents := []model.OutboxEvent{}
+	assert.Nil(t, db.Find(&outboxEvents).Error)
+	assert.Len(t, outboxEvents, 0)
 }
 
 func TestFindByReporterResourceId(t *testing.T) {

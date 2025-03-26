@@ -37,10 +37,11 @@ import (
 	"github.com/project-kessel/inventory-api/internal/storage"
 
 	hb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1"
-	authz2 "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/authz"
+	authzv1beta1 "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/authz"
 	rel "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/relationships"
 	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/resources"
 	pbv1beta2 "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2"
+	authzv1beta2 "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2/authz"
 	healthctl "github.com/project-kessel/inventory-api/internal/biz/health"
 	healthrepo "github.com/project-kessel/inventory-api/internal/data/health"
 	healthssvc "github.com/project-kessel/inventory-api/internal/service/health"
@@ -152,14 +153,22 @@ func NewCommand(
 
 			inventoryresources_repo := inventoryResourcesRepo.New(db)
 
-			// wire together resource handling
 			//v1beta2
+			// wire together resource handling
 			resource_repo := resourcerepo.New(db)
 			resource_controller := resourcesctl.New(resource_repo, inventoryresources_repo, authorizer, eventingManager, "notifications", log.With(logger, "subsystem", "notificationsintegrations_controller"), storageConfig.Options.DisablePersistence)
 			resource_service := resourcesvc.New(resource_controller)
 			pbv1beta2.RegisterKesselResourceServiceServer(server.GrpcServer, resource_service)
 			pbv1beta2.RegisterKesselResourceServiceHTTPServer(server.HttpServer, resource_service)
 
+			// wire together authz handling
+			authz_repov2 := resourcerepo.New(db)
+			authz_controllerv2 := resourcesctl.New(authz_repov2, inventoryresources_repo, authorizer, eventingManager, "authz", log.With(logger, "subsystem", "authz_controller"), storageConfig.Options.DisablePersistence)
+			authz_servicev2 := authzsvc.NewV1beta2(authz_controllerv2)
+			authzv1beta2.RegisterKesselCheckServiceServer(server.GrpcServer, authz_servicev2)
+			authzv1beta2.RegisterKesselCheckServiceHTTPServer(server.HttpServer, authz_servicev2)
+
+			//v1beta1
 			// wire together notificationsintegrations handling
 			notifs_repo := resourcerepo.New(db)
 			notifs_controller := resourcesctl.New(notifs_repo, inventoryresources_repo, authorizer, eventingManager, "notifications", log.With(logger, "subsystem", "notificationsintegrations_controller"), storageConfig.Options.DisablePersistence)
@@ -171,8 +180,8 @@ func NewCommand(
 			authz_repo := resourcerepo.New(db)
 			authz_controller := resourcesctl.New(authz_repo, inventoryresources_repo, authorizer, eventingManager, "authz", log.With(logger, "subsystem", "authz_controller"), storageConfig.Options.DisablePersistence)
 			authz_service := authzsvc.New(authz_controller)
-			authz2.RegisterKesselCheckServiceServer(server.GrpcServer, authz_service)
-			authz2.RegisterKesselCheckServiceHTTPServer(server.HttpServer, authz_service)
+			authzv1beta1.RegisterKesselCheckServiceServer(server.GrpcServer, authz_service)
+			authzv1beta1.RegisterKesselCheckServiceHTTPServer(server.HttpServer, authz_service)
 
 			// wire together hosts handling
 			hosts_repo := resourcerepo.New(db)

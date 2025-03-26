@@ -91,7 +91,7 @@ func (uc *Usecase) Upsert(ctx context.Context, m *model.Resource) (*model.Resour
 		}
 
 		log.Info("Creating resource: ", m)
-		ret, err2 := createNewReporterResource(ctx, m, ret, err, uc)
+		ret, err2 := createNewReporterResource(ctx, m, uc)
 		if err2 != nil {
 			return ret, err2
 		}
@@ -106,9 +106,9 @@ func (uc *Usecase) Upsert(ctx context.Context, m *model.Resource) (*model.Resour
 	return ret, nil
 }
 
-func createNewReporterResource(ctx context.Context, m *model.Resource, ret *model.Resource, err error, uc *Usecase) (*model.Resource, error) {
-
+func createNewReporterResource(ctx context.Context, m *model.Resource, uc *Usecase) (*model.Resource, error) {
 	ret, updatedResources, err := uc.reporterResourceRepository.Create(ctx, m)
+
 	if err != nil {
 		return nil, err
 	}

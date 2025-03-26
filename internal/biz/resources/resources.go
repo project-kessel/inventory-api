@@ -255,13 +255,11 @@ func (uc *Usecase) CheckForUpdate(ctx context.Context, permission, namespace str
 			return true, nil
 		}
 
-		if recordToken {
-			if consistency != nil {
-				res.ConsistencyToken = consistency.Token
-				_, _, err := uc.reporterResourceRepository.Update(ctx, res, res.ID)
-				if err != nil {
-					return false, err // we're allowed, but failed to update consistency token
-				}
+		if recordToken && consistency != nil {
+			res.ConsistencyToken = consistency.Token
+			_, _, err := uc.reporterResourceRepository.Update(ctx, res, res.ID)
+			if err != nil {
+				return false, err // we're allowed, but failed to update consistency token
 			}
 		}
 

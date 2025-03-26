@@ -1,0 +1,4 @@
+resource_type: k8s_policy
+reporter_name: acm
+namespace: acm
+

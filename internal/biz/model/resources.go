@@ -26,9 +26,31 @@ type Resource struct {
 	ConsistencyToken string
 	// Reporter Fields
 	ReporterResourceId string `json:"reporter_resource_id"`
-	ReporterId         string `json:"reporter_id"`
+	ReporterType       string `json:"reporter_type"`
+	ReporterInstanceId string `json:"reporter_instance_id"`
+	ReporterVersion    string `json:"reporter_version"`
+	//Unique Indexes
+	ReporterResourceUniqueIndex
+	// Reporter Principal
+	ReporterId string `json:"reporter_id"`
 	// Deprecated: Use Reporter Fields instead(ReporterId, ReporterResourceId)
 	Reporter ResourceReporter
+}
+
+type ReporterResourceUniqueIndex struct {
+	ResourceType       string `gorm:"uniqueIndex:reporter_resource_unique_index"`
+	ReporterResourceId string `gorm:"uniqueIndex:reporter_resource_unique_index"`
+	ReporterType       string `gorm:"uniqueIndex:reporter_resource_unique_index"`
+	ReporterInstanceId string `gorm:"uniqueIndex:reporter_resource_unique_index"`
+}
+
+func ReporterResourceIdv1beta2FromResource(resource *Resource) ReporterResourceUniqueIndex {
+	return ReporterResourceUniqueIndex{
+		ReporterResourceId: resource.ReporterResourceId,
+		ResourceType:       resource.ResourceType,
+		ReporterInstanceId: resource.ReporterInstanceId,
+		ReporterType:       resource.ReporterType,
+	}
 }
 
 type ResourceReporter struct {

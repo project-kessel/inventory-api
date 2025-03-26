@@ -1,0 +1,5 @@
+resource_type: k8s_cluster
+reporter_name: acm
+namespace: acm
+
+

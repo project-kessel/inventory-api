@@ -5,6 +5,7 @@ import (
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/project-kessel/inventory-api/cmd/common"
 	"github.com/project-kessel/inventory-api/cmd/migrate"
+	"github.com/project-kessel/inventory-api/cmd/schema"
 	"github.com/project-kessel/inventory-api/cmd/serve"
 	"github.com/project-kessel/inventory-api/internal/config"
 	clowder "github.com/redhatinsights/app-common-go/pkg/api/v1"
@@ -96,6 +97,12 @@ func init() {
 	serveCmd := serve.NewCommand(options.Server, options.Storage, options.Authn, options.Authz, options.Eventing, loggerOptions)
 	rootCmd.AddCommand(serveCmd)
 	err = viper.BindPFlags(serveCmd.Flags())
+	if err != nil {
+		panic(err)
+	}
+	schemaCmd := schema.NewCommand(loggerOptions)
+	rootCmd.AddCommand(schemaCmd)
+	err = viper.BindPFlags(schemaCmd.Flags())
 	if err != nil {
 		panic(err)
 	}

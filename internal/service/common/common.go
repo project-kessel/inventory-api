@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 	pbrelation "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/relationships"
 	pbresource "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/resources"
+	pbresourcev1beta2 "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
 )
 
@@ -20,7 +21,7 @@ func ReporterResourceIdFromPb(resourceType, reporterId string, reporter *pbresou
 	}
 }
 
-func ResourceFromPb(resourceType, reporterId string, resourceData model.JsonObject, metadata *pbresource.Metadata, reporter *pbresource.ReporterData) *model.Resource {
+func ResourceFromPbv1beta1(resourceType, reporterId string, resourceData model.JsonObject, metadata *pbresource.Metadata, reporter *pbresource.ReporterData) *model.Resource {
 	return &model.Resource{
 		ID:                 uuid.UUID{},
 		ResourceData:       resourceData,
@@ -43,6 +44,23 @@ func ResourceFromPb(resourceType, reporterId string, resourceData model.JsonObje
 	}
 }
 
+func ResourceFromPb(resourceType, reporterId string, resourceData model.JsonObject, workspaceId string, reporter *pbresourcev1beta2.ReporterData, inventoryId *uuid.UUID) *model.Resource {
+	return &model.Resource{
+		ID:                 uuid.UUID{},
+		InventoryId:        inventoryId,
+		ResourceData:       resourceData,
+		ResourceType:       resourceType,
+		WorkspaceId:        workspaceId,
+		ReporterResourceId: reporter.LocalResourceId,
+		ReporterId:         reporterId,
+		ReporterType:       reporter.ReporterType,
+		ReporterInstanceId: reporter.ReporterInstanceId,
+		ReporterVersion:    reporter.ReporterVersion,
+		ConsoleHref:        reporter.ConsoleHref,
+		ApiHref:            reporter.ApiHref,
+	}
+}
+
 func ToJsonObject(in interface{}) (model.JsonObject, error) {
 	if in == nil {
 		return nil, nil
@@ -60,6 +78,25 @@ func ToJsonObject(in interface{}) (model.JsonObject, error) {
 	}
 
 	return resourceData, err
+}
+
+// TODO: Figure out how to store workspaceId in schema
+func ExtractWorkspaceId(in interface{}) (string, error) {
+	if in == nil {
+		return "", nil
+	}
+	return "someWorkspaceId", nil
+}
+
+func ExtractInventoryId(inventoryIDStr string) (*uuid.UUID, error) {
+	if inventoryIDStr != "" {
+		inventoryID, err := uuid.Parse(inventoryIDStr)
+		if err != nil {
+			return nil, nil
+		}
+		return &inventoryID, nil
+	}
+	return nil, nil
 }
 
 func labelsFromPb(pbLabels []*pbresource.ResourceLabel) model.Labels {

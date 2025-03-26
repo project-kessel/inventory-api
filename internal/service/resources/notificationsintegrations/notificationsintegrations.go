@@ -140,7 +140,7 @@ func (c *NotificationsIntegrationsService) ListNotificationsIntegrations(r *pb.L
 }
 
 func notificationsIntegrationFromCreateRequest(r *pb.CreateNotificationsIntegrationRequest, identity *authnapi.Identity) (*model.Resource, error) {
-	return conv.ResourceFromPb(ResourceType, identity.Principal, nil, r.Integration.Metadata, r.Integration.ReporterData), nil
+	return conv.ResourceFromPbv1beta1(ResourceType, identity.Principal, nil, r.Integration.Metadata, r.Integration.ReporterData), nil
 }
 
 func createResponseFromNotificationsIntegration(h *model.Resource) *pb.CreateNotificationsIntegrationResponse {
@@ -148,7 +148,7 @@ func createResponseFromNotificationsIntegration(h *model.Resource) *pb.CreateNot
 }
 
 func notificationsIntegrationFromUpdateRequest(r *pb.UpdateNotificationsIntegrationRequest, identity *authnapi.Identity) (*model.Resource, error) {
-	return conv.ResourceFromPb(ResourceType, identity.Principal, nil, r.Integration.Metadata, r.Integration.ReporterData), nil
+	return conv.ResourceFromPbv1beta1(ResourceType, identity.Principal, nil, r.Integration.Metadata, r.Integration.ReporterData), nil
 }
 
 func updateResponseFromNotificationsIntegration(h *model.Resource) *pb.UpdateNotificationsIntegrationResponse {

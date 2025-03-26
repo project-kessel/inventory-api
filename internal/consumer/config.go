@@ -59,6 +59,9 @@ func (c *Config) Complete() (CompletedConfig, []error) {
 		if err := config.SetKey("auto.offset.reset", c.AutoOffsetReset); err != nil {
 			errs = append(errs, fmt.Errorf("cannot set auto.offset.reset value: %w", err))
 		}
+		if err := config.SetKey("statistics.interval.ms", c.StatisticsInterval); err != nil {
+			errs = append(errs, fmt.Errorf("cannot set statistics.interval.ms value: %w", err))
+		}
 	}
 
 	if len(errs) > 0 {

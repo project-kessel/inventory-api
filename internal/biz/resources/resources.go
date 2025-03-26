@@ -215,11 +215,10 @@ func updateExistingReporterResource(ctx context.Context, m *model.Resource, exis
 func (uc *Usecase) Check(ctx context.Context, permission, namespace string, sub *kessel.SubjectReference, id model.ReporterResourceId) (bool, error) {
 	res, err := uc.reporterResourceRepository.FindByReporterResourceId(ctx, id)
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			// resource doesn't exist.
-			return false, nil
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return false, err
 		}
-		return false, err
+		res = &model.Resource{ResourceType: id.ResourceType, ReporterResourceId: id.LocalResourceId}
 	}
 
 	allowed, _, err := uc.Authz.Check(ctx, namespace, permission, res, sub)
@@ -235,9 +234,11 @@ func (uc *Usecase) Check(ctx context.Context, permission, namespace string, sub 
 
 func (uc *Usecase) CheckForUpdate(ctx context.Context, permission, namespace string, sub *kessel.SubjectReference, id model.ReporterResourceId) (bool, error) {
 	res, err := uc.reporterResourceRepository.FindByReporterResourceId(ctx, id)
+	recordToken := true
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			// resource doesn't exist yet.
+			recordToken = false
 			res = &model.Resource{ResourceType: id.ResourceType, ReporterResourceId: id.LocalResourceId}
 		} else {
 			return false, err
@@ -254,11 +255,13 @@ func (uc *Usecase) CheckForUpdate(ctx context.Context, permission, namespace str
 			return true, nil
 		}
 
-		if consistency != nil {
-			res.ConsistencyToken = consistency.Token
-			_, _, err := uc.reporterResourceRepository.Update(ctx, res, res.ID)
-			if err != nil {
-				return false, err // we're allowed, but failed to update consistency token
+		if recordToken {
+			if consistency != nil {
+				res.ConsistencyToken = consistency.Token
+				_, _, err := uc.reporterResourceRepository.Update(ctx, res, res.ID)
+				if err != nil {
+					return false, err // we're allowed, but failed to update consistency token
+				}
 			}
 		}
 

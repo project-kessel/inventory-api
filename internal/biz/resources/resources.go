@@ -107,8 +107,8 @@ func (uc *Usecase) Upsert(ctx context.Context, m *model.Resource) (*model.Resour
 }
 
 func createNewReporterResource(ctx context.Context, m *model.Resource, ret *model.Resource, err error, uc *Usecase) (*model.Resource, error) {
-	updatedResources := []*model.Resource{}
-	ret, updatedResources, err = uc.reporterResourceRepository.Create(ctx, m)
+
+	ret, updatedResources, err := uc.reporterResourceRepository.Create(ctx, m)
 	if err != nil {
 		return nil, err
 	}
@@ -178,8 +178,6 @@ func validateSameResourceFromMultipleReportersShareInventoryId(ctx context.Conte
 }
 
 func updateExistingReporterResource(ctx context.Context, m *model.Resource, existingResource *model.Resource, uc *Usecase) (*model.Resource, error) {
-	ret := m // Default to returning the input model in case persistence is disabled
-	updatedResources := []*model.Resource{}
 
 	if m.InventoryId != nil && existingResource.InventoryId.String() != m.InventoryId.String() {
 		return nil, ErrInventoryIdMismatch

@@ -38,8 +38,8 @@ spec:
             - "-c"
             - |
               echo "Waiting for PostgreSQL to be ready..."
-              sleep 20 
-              
+              sleep 20
+
               inventory-api migrate
           env:
             - name: CLOWDER_ENABLED
@@ -177,8 +177,11 @@ stringData:
       eventer: kafka
       kafka:
         bootstrap-servers: "my-cluster-kafka-bootstrap.default.svc.cluster.local:9092"
+    consumer:
+      bootstrap-servers: "my-cluster-kafka-bootstrap.default.svc.cluster.local:9092"
+      topic: outbox.event.kessel.tuples
     storage:
-      disable-persistence: true
+      disable-persistence: false
       database: postgres
       sqlite3:
         dsn: inventory.db

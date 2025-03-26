@@ -102,7 +102,7 @@ type EventRelationshipReporter struct {
 	ReporterInstanceId     string `json:"reporter_instance_id"`
 }
 
-func NewResourceEvent(operationType EventOperationType, resource *Resource) (*ResourceEvent, error) {
+func newResourceEvent(operationType EventOperationType, resource *Resource) (*ResourceEvent, error) {
 	const eventType = "resources"
 	now := time.Now()
 
@@ -171,7 +171,7 @@ func NewResourceEvent(operationType EventOperationType, resource *Resource) (*Re
 func convertResourceToResourceEvent(resource Resource, operationType EventOperationType) (JsonObject, error) {
 	payload := JsonObject{}
 
-	resourceEvent, err := NewResourceEvent(operationType, &resource)
+	resourceEvent, err := newResourceEvent(operationType, &resource)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create resource event: %w", err)
 	}
@@ -184,7 +184,7 @@ func convertResourceToResourceEvent(resource Resource, operationType EventOperat
 
 	return payload, nil
 }
-func convertResourceToSetTupleEvent(resource Resource, namespace string, operationType EventOperationType) (JsonObject, error) {
+func convertResourceToSetTupleEvent(resource Resource, namespace string) (JsonObject, error) {
 	payload := JsonObject{}
 
 	relationship := &kessel.Relationship{
@@ -193,7 +193,7 @@ func convertResourceToSetTupleEvent(resource Resource, namespace string, operati
 				Name:      resource.ResourceType,
 				Namespace: namespace,
 			},
-			Id: resource.Reporter.LocalResourceId,
+			Id: resource.ReporterResourceId,
 		},
 		Relation: "workspace",
 		Subject: &kessel.SubjectReference{
@@ -219,7 +219,7 @@ func convertResourceToSetTupleEvent(resource Resource, namespace string, operati
 	return payload, nil
 }
 
-func convertResourceToUnsetTupleEvent(resource Resource, namespace string, operationType EventOperationType) (JsonObject, error) {
+func convertResourceToUnsetTupleEvent(resource Resource, namespace string) (JsonObject, error) {
 	payload := JsonObject{}
 
 	tuple := &kessel.RelationTupleFilter{
@@ -261,9 +261,9 @@ func NewOutboxEventsFromResource(resource Resource, namespace string, operationT
 	// Build tuple event
 	switch operationType.OperationType() {
 	case OperationTypeDeleted:
-		tuplePayload, err = convertResourceToUnsetTupleEvent(resource, namespace, operationType)
+		tuplePayload, err = convertResourceToUnsetTupleEvent(resource, namespace)
 	default:
-		tuplePayload, err = convertResourceToSetTupleEvent(resource, namespace, operationType)
+		tuplePayload, err = convertResourceToSetTupleEvent(resource, namespace)
 	}
 
 	if err != nil {

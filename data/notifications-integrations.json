@@ -1,7 +1,7 @@
 {
   "integration": {
       "metadata": {
-          "workspace_id": "my_workspace",
+          "workspace_id": "1234",
           "resource_type": "notifications/integration"
       },
       "reporter_data": {

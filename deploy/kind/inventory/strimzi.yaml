@@ -1,3 +1,4 @@
+---
 apiVersion: kafka.strimzi.io/v1beta2
 kind: Kafka
 metadata:
@@ -32,3 +33,52 @@ spec:
     storage:
       type: ephemeral
 
+---
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaConnect
+metadata:
+  annotations:
+    strimzi.io/use-connector-resources: "true"
+  name: inventory-kafka-connect
+spec:
+  bootstrapServers: my-cluster-kafka-bootstrap.default.svc.cluster.local:9092
+  config:
+    group.id: connect-cluster
+    config.storage.topic: connect-cluster-configs
+    offset.storage.topic: connect-cluster-offsets
+    status.storage.topic: connect-cluster-status
+    topic.creation.enable: true
+    config.storage.replication.factor: 1
+    offset.storage.replication.factor: 1
+    status.storage.replication.factor: 1
+    offset.storage.partitions: 1
+    status.storage.partitions: 1
+    config.storage.partitions: 1
+  image: localhost/kafka-connect:e2e-test
+  replicas: 3
+  version: 3.8.0
+
+---
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaConnector
+metadata:
+  name: kessel-inventory-source-connector
+  labels:
+    strimzi.io/cluster: inventory-kafka-connect
+spec:
+  class: io.debezium.connector.postgresql.PostgresConnector
+  tasksMax: 1
+  config:
+    database.server.name: kessel-inventory-db
+    database.dbname: spicedb
+    database.hostname: invdatabase
+    database.port: 5433
+    database.user: postgres
+    database.password: "yPsw5e6ab4bvAGe5H"
+    topic.prefix: kessel-inventory
+    table.whitelist: public.outbox_events # Required for Debezium < v1.3.0 support
+    table.include.list: public.outbox_events # Required for Debezium > v1.3.0
+    transforms: outbox
+    transforms.outbox.type: io.debezium.transforms.outbox.EventRouter
+    transforms.outbox.table.fields.additional.placement: operation:header
+    plugin.name: pgoutput

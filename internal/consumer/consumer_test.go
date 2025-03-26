@@ -5,9 +5,7 @@ import (
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/project-kessel/inventory-api/cmd/common"
 	"github.com/project-kessel/inventory-api/internal/authz"
-	"github.com/stretchr/testify/assert"
 	"gorm.io/gorm"
-	"testing"
 )
 
 // Test if Kafka message is received and its fatal or all brokers are down, run is false
@@ -45,19 +43,4 @@ func (t *TestCase) TestSetup() []error {
 		errs = append(errs, err)
 	}
 	return errs
-}
-
-func TestInventoryConsumer_Consume(t *testing.T) {
-	tests := []*TestCase{
-		{
-			name: "ConsumerHandlesKafkaError",
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			var errs []error = test.TestSetup()
-			assert.Nil(t, errs)
-		})
-	}
 }

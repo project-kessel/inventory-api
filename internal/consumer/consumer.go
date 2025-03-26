@@ -19,6 +19,10 @@ import (
 	"gorm.io/gorm"
 )
 
+type Consumer interface {
+	Consume() error
+}
+
 // InventoryConsumer defines a Kafka Consumer with required clients and configs to call Relations API and update the Inventory DB with consistency tokens
 type InventoryConsumer struct {
 	Consumer    *kafka.Consumer
@@ -147,10 +151,12 @@ func (i *InventoryConsumer) Consume() error {
 				i.Logger.Infof("consumed event from topic %s, partition %d at offset %s: key = %-10s value = %s\n",
 					*e.TopicPartition.Topic, e.TopicPartition.Partition, e.TopicPartition.Offset, string(e.Key), string(e.Value))
 			case kafka.Error:
-				i.Logger.Errorf("consumer error: %v: %v\n", e.Code(), e)
-				if e.Code() == kafka.ErrAllBrokersDown || e.IsFatal() {
+				if e.IsFatal() {
 					run = false
 					i.Errors <- e
+				} else {
+					i.Logger.Errorf("recoverable consumer error: %v: %v -- will retry\n", e.Code(), e)
+					continue
 				}
 			default:
 				fmt.Printf("event type ignored %v\n", e)

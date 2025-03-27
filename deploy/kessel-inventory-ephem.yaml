@@ -48,6 +48,21 @@ objects:
           replicas: ${{REPLICAS}}
           podSpec:
             initContainers:
+            - name: copy-resources
+              image: busybox
+              imagePullPolicy: Always
+              command:
+                - /bin/sh
+                - "-c"
+                - |
+                  echo "Extracting resources from tarball..."
+                  tar -xzf /mnt/resources/resources.tar.gz -C /data/schema/resources
+                  echo "Extraction complete!"
+              volumeMounts:
+                - name: resources-tarball
+                  mountPath: "/mnt/resources"
+                - name: resource-volume
+                  mountPath: "/data/schema/resources"
             - name: migration
               image: ${INVENTORY_IMAGE}:${IMAGE_TAG}
               imagePullPolicy: Always
@@ -73,11 +88,15 @@ objects:
               value: "/inventory/inventory-api-config.yaml"
             - name: PGDATA
               value: /temp/data
+            - name: RESOURCE_DIR
+              value: "/data/schema/resources"
             volumeMounts:
                 - name: config-volume
                   mountPath: "/inventory"
                 - name: psks-volume
                   mountPath: /psks
+                - name: resource-volume
+                  mountPath: "/data/schema/resources"
             volumes:
               - name: config-volume
                 configMap:
@@ -85,6 +104,11 @@ objects:
               - name: psks-volume
                 configMap:
                   name: psks
+              - name: resource-volume
+                emptyDir: { }
+              - name: resources-tarball
+                configMap:
+                  name: resources-tarball
           webServices:
             public:
               enabled: true

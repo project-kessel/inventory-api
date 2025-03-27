@@ -214,6 +214,9 @@ func updateExistingReporterResource(ctx context.Context, m *model.Resource, exis
 func (uc *Usecase) Check(ctx context.Context, permission, namespace string, sub *kessel.SubjectReference, id model.ReporterResourceId) (bool, error) {
 	res, err := uc.reporterResourceRepository.FindByReporterResourceId(ctx, id)
 	if err != nil {
+		// If the resource doesn't exist in inventory (ie. no consistency token available)
+		// we send a check request with minimize latency
+		// err otherwise.
 		if !errors.Is(err, gorm.ErrRecordNotFound) {
 			return false, err
 		}
@@ -237,6 +240,8 @@ func (uc *Usecase) CheckForUpdate(ctx context.Context, permission, namespace str
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			// resource doesn't exist yet.
+			// DONT write consistency token
+			// no actual resource exists in DB to update
 			recordToken = false
 			res = &model.Resource{ResourceType: id.ResourceType, ReporterResourceId: id.LocalResourceId}
 		} else {
@@ -254,6 +259,7 @@ func (uc *Usecase) CheckForUpdate(ctx context.Context, permission, namespace str
 			return true, nil
 		}
 
+		// Only update consistency token if resource exists in DB.
 		if recordToken && consistency != nil {
 			res.ConsistencyToken = consistency.Token
 			_, _, err := uc.reporterResourceRepository.Update(ctx, res, res.ID)

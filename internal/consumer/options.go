@@ -7,6 +7,7 @@ import (
 )
 
 type Options struct {
+	Enabled            bool   `mapstructure:"enabled"`
 	BootstrapServers   string `mapstructure:"bootstrap-servers"`
 	ConsumerGroupID    string `mapstructure:"consumer-group-id"`
 	Topic              string `mapstructure:"topic"`
@@ -21,6 +22,7 @@ type Options struct {
 
 func NewOptions() *Options {
 	return &Options{
+		Enabled:            true,
 		ConsumerGroupID:    "inventory-consumer",
 		Topic:              "outbox.event.kessel.tuples",
 		SessionTimeout:     "45000",
@@ -37,6 +39,7 @@ func (o *Options) AddFlags(fs *pflag.FlagSet, prefix string) {
 	if prefix != "" {
 		prefix = prefix + "."
 	}
+	fs.BoolVar(&o.Enabled, prefix+"enabled", o.Enabled, "Toggle for enabling or disabling the consumer (default: true)")
 	fs.StringVar(&o.BootstrapServers, prefix+"bootstrap-servers", o.BootstrapServers, "sets the bootstrap server address and port for Kafka")
 	fs.StringVar(&o.ConsumerGroupID, prefix+"consumer-groupd-id", o.ConsumerGroupID, "sets the Kafka consumer group name (default: inventory-consumer)")
 	fs.StringVar(&o.Topic, prefix+"topic", o.Topic, "Kafka topic to monitor for events")
@@ -51,7 +54,7 @@ func (o *Options) AddFlags(fs *pflag.FlagSet, prefix string) {
 func (o *Options) Validate() []error {
 	var errs []error
 
-	if len(o.BootstrapServers) == 0 {
+	if len(o.BootstrapServers) == 0 && o.Enabled {
 		errs = append(errs, fmt.Errorf("bootstrap servers can not be empty"))
 	}
 

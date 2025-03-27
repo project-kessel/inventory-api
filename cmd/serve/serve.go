@@ -124,9 +124,11 @@ func NewCommand(
 				if errs := consumerOptions.Validate(); errs != nil {
 					return errors.NewAggregate(errs)
 				}
-				consumerConfig, errs = consumer.NewConfig(consumerOptions).Complete()
-				if errs != nil {
-					return errors.NewAggregate(errs)
+				if consumerOptions.Enabled {
+					consumerConfig, errs = consumer.NewConfig(consumerOptions).Complete()
+					if errs != nil {
+						return errors.NewAggregate(errs)
+					}
 				}
 			}
 
@@ -168,7 +170,7 @@ func NewCommand(
 				return err
 			}
 
-			if !storageOptions.DisablePersistence {
+			if !storageOptions.DisablePersistence && consumerOptions.Enabled {
 				inventoryConsumer, err = consumer.New(consumerConfig, db, authzConfig, authorizer, log.NewHelper(log.With(logger, "subsystem", "inventoryConsumer")))
 				if err != nil {
 					return err
@@ -251,7 +253,7 @@ func NewCommand(
 				srvErrs <- server.Run(ctx)
 			}()
 
-			if !storageOptions.DisablePersistence {
+			if !storageOptions.DisablePersistence && consumerOptions.Enabled {
 				go func() {
 					err := inventoryConsumer.Consume()
 					if err != nil {
@@ -304,9 +306,11 @@ func shutdown(db *gorm.DB, srv *server.Server, em eventingapi.Manager, cm consum
 			logger.Error(fmt.Sprintf("Error Gracefully Shutting Down Eventing: %v", err))
 		}
 
-		if !cm.Consumer.IsClosed() {
-			if err := cm.Shutdown(); err != nil {
-				logger.Error(fmt.Sprintf("Error Gracefully Shutting Down Consumer: %v", err))
+		if cm != (consumer.InventoryConsumer{}) {
+			if !cm.Consumer.IsClosed() {
+				if err := cm.Shutdown(); err != nil {
+					logger.Error(fmt.Sprintf("Error Gracefully Shutting Down Consumer: %v", err))
+				}
 			}
 		}
 

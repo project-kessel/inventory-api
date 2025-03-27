@@ -195,7 +195,6 @@ func TestResourceValidation(t *testing.T) {
 			name: "Valid K8s_cluster",
 			request: &ReportResourceRequest{
 				Resource: &Resource{
-					InventoryId:  "12",
 					ResourceType: "k8s_cluster",
 					ReporterData: &ReporterData{
 						ReporterType:       "ACM",

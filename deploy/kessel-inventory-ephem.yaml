@@ -104,6 +104,8 @@ objects:
                   mountPath: /psks
                 - name: resource-volume
                   mountPath: "/data/schema/resources"
+                - name: resources-tarball
+                  mountPath: "/mnt/resources"
             volumes:
               - name: config-volume
                 configMap:

@@ -5,6 +5,8 @@ import (
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
 )
 
+const clientID = "inventory-consumer"
+
 type Config struct {
 	*Options
 	KafkaConfig *kafka.ConfigMap
@@ -37,6 +39,9 @@ func (c *Config) Complete() (CompletedConfig, []error) {
 			if err := config.SetKey("debug", c.Debug); err != nil {
 				errs = append(errs, fmt.Errorf("cannot set debug value: %w", err))
 			}
+		}
+		if err := config.SetKey("client.id", clientID); err != nil {
+			errs = append(errs, fmt.Errorf("cannot set client.id value: %w", err))
 		}
 		if err := config.SetKey("bootstrap.servers", c.BootstrapServers); err != nil {
 			errs = append(errs, fmt.Errorf("cannot set bootstrap.servers value: %w", err))

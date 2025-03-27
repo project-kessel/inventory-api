@@ -38,7 +38,7 @@ type InventoryConsumer struct {
 	AuthzConfig      authz.CompletedConfig
 	Authorizer       api.Authorizer
 	Errors           chan error
-	MetricsCollector MetricsCollector
+	MetricsCollector *MetricsCollector
 	Logger           *log.Helper
 }
 
@@ -51,8 +51,9 @@ func New(config CompletedConfig, db *gorm.DB, authz authz.CompletedConfig, autho
 		return InventoryConsumer{}, err
 	}
 
-	mc := MetricsCollector{}
-	err = mc.New(otel.Meter("github.com/project-kessel/inventory-api/blob/main/internal/server/otel"))
+	var mc MetricsCollector
+	meter := otel.Meter("github.com/project-kessel/inventory-api/blob/main/internal/server/otel")
+	err = mc.New(meter)
 	if err != nil {
 		logger.Errorf("error creating metrics collector: %v", err)
 		return InventoryConsumer{}, err
@@ -67,7 +68,7 @@ func New(config CompletedConfig, db *gorm.DB, authz authz.CompletedConfig, autho
 		AuthzConfig:      authz,
 		Authorizer:       authorizer,
 		Errors:           errChan,
-		MetricsCollector: mc,
+		MetricsCollector: &mc,
 		Logger:           logger,
 	}, nil
 }
@@ -80,8 +81,8 @@ type KeyPayload struct {
 
 // MessagePayload stores the event message value captured from the topic as emitted by Debezium
 type MessagePayload struct {
-	MessageSchema    map[string]interface{} `json:"schema"`
-	RelationsRequest interface{}            `json:"payload"`
+	MessageSchema    map[string]interface{}          `json:"schema"`
+	RelationsRequest map[string]*kessel.Relationship `json:"payload"`
 }
 
 // Consume begins the consumption loop for the Consumer
@@ -167,6 +168,7 @@ func (i *InventoryConsumer) Consume() error {
 				}
 				i.Logger.Infof("consumed event from topic %s, partition %d at offset %s: key = %-10s value = %s\n",
 					*e.TopicPartition.Topic, e.TopicPartition.Partition, e.TopicPartition.Offset, string(e.Key), string(e.Value))
+
 			case kafka.Error:
 				if e.IsFatal() {
 					run = false
@@ -175,6 +177,15 @@ func (i *InventoryConsumer) Consume() error {
 					i.Logger.Errorf("recoverable consumer error: %v: %v -- will retry\n", e.Code(), e)
 					continue
 				}
+
+			case *kafka.Stats:
+				var stats StatsData
+				err = json.Unmarshal([]byte(e.String()), &stats)
+				if err != nil {
+					i.Logger.Errorf("error unmarshalling stats: %v", err)
+					continue
+				}
+				i.MetricsCollector.Collect(stats)
 			default:
 				fmt.Printf("event type ignored %v\n", e)
 			}

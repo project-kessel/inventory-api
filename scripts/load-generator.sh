@@ -1,17 +1,15 @@
 #!/bin/bash
 
-LIVEZ_URL="localhost:8000/api/inventory/v1/livez"
-INVENTORY_URL="localhost:8000/api/inventory/v1beta1/resources/notifications-integrations"
-
 # prints a handy help menu with usage
 help_me() {
-    echo "USAGE: load-generator.sh {-n <NUM_RUNS>} {-i <INTERVAL>} [-h]"
+    echo "USAGE: load-generator.sh {-n <NUM_RUNS>} {-i <INTERVAL>} {-p <PORT_NUM>} [-h]"
     echo "load-generator: creates load on inventory API by creating, updating, and deleting resources for test purposes"
-    echo "It requires a running local Inventory API or port-forwarding connection to one in ephemeral"
+    echo "It requires a local running Inventory API or port-forwarding connection to one in ephemeral (usig port defined with -p)"
     echo ""
     echo "REQUIRED ARGUMENTS:"
     echo "  -n NUM_RUNS: The number of times to run a test loop (one run is one create, update, and delete loop"
     echo "  -i INTERVAL: Amount of time between runs"
+    echo "  -p PORT_NUM: Port number used for Inventory API"
     echo ""
     echo "OPTIONS:"
     echo "  -h Prints usage information"
@@ -30,18 +28,22 @@ livez_check() {
   fi
 }
 
-while getopts "n:i:h" flag; do
+while getopts "n:i:p:h" flag; do
     case "${flag}" in
-        n) INTERVAL=${OPTARG};;
-        i) NUM_RUNS=${OPTARG};;
+        n) NUM_RUNS=${OPTARG};;
+        i) INTERVAL=${OPTARG};;
+        p) PORT_NUM=${OPTARG};;
         h) help_me;;
     esac
 done
 
-if [[  -z "${NUM_RUNS}" || -z "${INTERVAL}" ]]; then
+if [[  -z "${NUM_RUNS}" || -z "${INTERVAL}"  || -z "${PORT_NUM}" ]]; then
   echo "Error: required arguments not provided"
   help_me
 fi
+
+LIVEZ_URL="localhost:${PORT_NUM}/api/inventory/v1/livez"
+INVENTORY_URL="localhost:${PORT_NUM}/api/inventory/v1beta1/resources/notifications-integrations"
 
 for ((i = 0 ; i < ${NUM_RUNS} ; i++)); do
   livez_check

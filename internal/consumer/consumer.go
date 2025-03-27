@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"go.opentelemetry.io/otel"
 	"os"
 	"os/signal"
 	"syscall"
@@ -21,29 +22,24 @@ import (
 
 type Consumer interface {
 	Consume() error
+	CreateTuple(ctx context.Context, msg []byte) (string, error)
+	UpdateTuple(ctx context.Context, msg []byte) (string, error)
+	DeleteTuple(ctx context.Context, msg []byte) (string, error)
+	UpdateConsistencyToken(msg []byte, token string) error
+	Errs() <-chan error
+	Shutdown() error
 }
 
 // InventoryConsumer defines a Kafka Consumer with required clients and configs to call Relations API and update the Inventory DB with consistency tokens
 type InventoryConsumer struct {
-	Consumer    *kafka.Consumer
-	Config      CompletedConfig
-	DB          *gorm.DB
-	AuthzConfig authz.CompletedConfig
-	Authorizer  api.Authorizer
-	Errors      chan error
-	Logger      *log.Helper
-}
-
-// KeyPayload stores the event message key captured from the topic as emitted by Debezium
-type KeyPayload struct {
-	MessageSchema map[string]interface{} `json:"schema"`
-	InventoryID   string                 `json:"payload"`
-}
-
-// MessagePayload stores the event message value captured from the topic as emitted by Debezium
-type MessagePayload struct {
-	MessageSchema    map[string]interface{} `json:"schema"`
-	RelationsRequest interface{}            `json:"payload"`
+	Consumer         *kafka.Consumer
+	Config           CompletedConfig
+	DB               *gorm.DB
+	AuthzConfig      authz.CompletedConfig
+	Authorizer       api.Authorizer
+	Errors           chan error
+	MetricsCollector *MetricsCollector
+	Logger           *log.Helper
 }
 
 // New instantiates a new InventoryConsumer
@@ -55,16 +51,38 @@ func New(config CompletedConfig, db *gorm.DB, authz authz.CompletedConfig, autho
 		return InventoryConsumer{}, err
 	}
 
+	var mc MetricsCollector
+	meter := otel.Meter("github.com/project-kessel/inventory-api/blob/main/internal/server/otel")
+	err = mc.New(meter)
+	if err != nil {
+		logger.Errorf("error creating metrics collector: %v", err)
+		return InventoryConsumer{}, err
+	}
+
 	var errChan chan error
+
 	return InventoryConsumer{
-		Consumer:    consumer,
-		Config:      config,
-		DB:          db,
-		AuthzConfig: authz,
-		Authorizer:  authorizer,
-		Errors:      errChan,
-		Logger:      logger,
+		Consumer:         consumer,
+		Config:           config,
+		DB:               db,
+		AuthzConfig:      authz,
+		Authorizer:       authorizer,
+		Errors:           errChan,
+		MetricsCollector: &mc,
+		Logger:           logger,
 	}, nil
+}
+
+// KeyPayload stores the event message key captured from the topic as emitted by Debezium
+type KeyPayload struct {
+	MessageSchema map[string]interface{} `json:"schema"`
+	InventoryID   string                 `json:"payload"`
+}
+
+// MessagePayload stores the event message value captured from the topic as emitted by Debezium
+type MessagePayload struct {
+	MessageSchema    map[string]interface{}          `json:"schema"`
+	RelationsRequest map[string]*kessel.Relationship `json:"payload"`
 }
 
 // Consume begins the consumption loop for the Consumer
@@ -150,6 +168,7 @@ func (i *InventoryConsumer) Consume() error {
 				}
 				i.Logger.Infof("consumed event from topic %s, partition %d at offset %s: key = %-10s value = %s\n",
 					*e.TopicPartition.Topic, e.TopicPartition.Partition, e.TopicPartition.Offset, string(e.Key), string(e.Value))
+
 			case kafka.Error:
 				if e.IsFatal() {
 					run = false
@@ -158,6 +177,15 @@ func (i *InventoryConsumer) Consume() error {
 					i.Logger.Errorf("recoverable consumer error: %v: %v -- will retry\n", e.Code(), e)
 					continue
 				}
+
+			case *kafka.Stats:
+				var stats StatsData
+				err = json.Unmarshal([]byte(e.String()), &stats)
+				if err != nil {
+					i.Logger.Errorf("error unmarshalling stats: %v", err)
+					continue
+				}
+				i.MetricsCollector.Collect(stats)
 			default:
 				fmt.Printf("event type ignored %v\n", e)
 			}

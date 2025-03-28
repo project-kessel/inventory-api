@@ -572,9 +572,17 @@ func TestCheck_MissingResource(t *testing.T) {
 	m := &MockAuthz{}
 
 	repo.On("FindByReporterResourceId", mock.Anything, mock.Anything).Return(&model.Resource{}, gorm.ErrRecordNotFound)
+	m.On("Check", mock.Anything, mock.Anything, "notifications_integration_view", mock.Anything, mock.Anything).Return(v1beta1.CheckResponse_ALLOWED_TRUE, &v1beta1.ConsistencyToken{}, nil)
 
 	useCase := New(repo, inventoryRepo, m, nil, "", log.DefaultLogger, false)
 	allowed, err := useCase.Check(ctx, "notifications_integration_view", "rbac", &v1beta1.SubjectReference{}, model.ReporterResourceId{})
+
+	assert.Nil(t, err)
+	assert.True(t, allowed)
+
+	// check negative case
+	m.On("Check", mock.Anything, mock.Anything, "notifications_integration_write", mock.Anything, mock.Anything).Return(v1beta1.CheckResponse_ALLOWED_FALSE, &v1beta1.ConsistencyToken{}, nil)
+	allowed, err = useCase.Check(ctx, "notifications_integration_write", "rbac", &v1beta1.SubjectReference{}, model.ReporterResourceId{})
 
 	assert.Nil(t, err)
 	assert.False(t, allowed)
@@ -683,57 +691,6 @@ func TestCheckForUpdate_ErrorWithKessel(t *testing.T) {
 	repo.AssertExpectations(t)
 }
 
-func TestCheckForUpdate_MissingResourceAllowed_ConsistencyToken(t *testing.T) {
-	ctx := context.TODO()
-
-	inventoryRepo := &MockedInventoryResourceRepository{}
-	repo := &MockedReporterResourceRepository{}
-	m := &MockAuthz{}
-
-	repo.On("FindByReporterResourceId", mock.Anything, mock.Anything).Return(&model.Resource{}, gorm.ErrRecordNotFound)
-	m.On("CheckForUpdate", mock.Anything, mock.Anything, "notifications_integration_write", mock.Anything, mock.Anything).Return(v1beta1.CheckForUpdateResponse_ALLOWED_TRUE, &v1beta1.ConsistencyToken{Token: "some-token"}, nil)
-
-	// Resource doesn't exist.
-	repo.On("Update", mock.Anything, mock.Anything, mock.Anything).Return(&model.Resource{}, []*model.Resource{}, nil)
-
-	useCase := New(repo, inventoryRepo, m, nil, "", log.DefaultLogger, false)
-	allowed, err := useCase.CheckForUpdate(ctx, "notifications_integration_write", "rbac", &v1beta1.SubjectReference{}, model.ReporterResourceId{ResourceType: "integration", LocalResourceId: "foo-resource"})
-
-	assert.Nil(t, err)
-	assert.True(t, allowed)
-
-	// check negative case (no consistency token)
-	m.On("CheckForUpdate", mock.Anything, mock.Anything, "notifications_integration_view", mock.Anything, mock.Anything).Return(v1beta1.CheckForUpdateResponse_ALLOWED_TRUE, &v1beta1.ConsistencyToken{}, nil)
-	allowed, err = useCase.CheckForUpdate(ctx, "notifications_integration_view", "rbac", &v1beta1.SubjectReference{}, model.ReporterResourceId{ResourceType: "integration", LocalResourceId: "foo-resource"})
-
-	assert.Nil(t, err)
-	assert.True(t, allowed)
-
-	repo.AssertExpectations(t)
-}
-
-func TestCheckForUpdate_MissingResourceAllowedFalse_ConsistencyToken(t *testing.T) {
-	ctx := context.TODO()
-
-	inventoryRepo := &MockedInventoryResourceRepository{}
-	repo := &MockedReporterResourceRepository{}
-	m := &MockAuthz{}
-
-	repo.On("FindByReporterResourceId", mock.Anything, mock.Anything).Return(&model.Resource{}, gorm.ErrRecordNotFound)
-	m.On("CheckForUpdate", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(v1beta1.CheckForUpdateResponse_ALLOWED_TRUE, &v1beta1.ConsistencyToken{Token: "some-token"}, nil)
-
-	// Resource doesn't exist.
-	repo.On("Update", mock.Anything, mock.Anything, mock.Anything).Return(&model.Resource{}, []*model.Resource{}, errors.New("error saving"))
-
-	useCase := New(repo, inventoryRepo, m, nil, "", log.DefaultLogger, false)
-	allowed, err := useCase.CheckForUpdate(ctx, "notifications_integration_view", "rbac", &v1beta1.SubjectReference{}, model.ReporterResourceId{ResourceType: "integration", LocalResourceId: "foo-resource"})
-
-	assert.NotNil(t, err)
-	assert.False(t, allowed)
-
-	repo.AssertExpectations(t)
-}
-
 func TestCheckForUpdate_WorkspaceAllowed(t *testing.T) {
 	ctx := context.TODO()
 	resource := resource1()
@@ -754,7 +711,29 @@ func TestCheckForUpdate_WorkspaceAllowed(t *testing.T) {
 	repo.AssertExpectations(t)
 }
 
-func TestCheckForUpdate_AllowedFalse(t *testing.T) {
+func TestCheckForUpdate_MissingResource_Allowed(t *testing.T) {
+	ctx := context.TODO()
+
+	inventoryRepo := &MockedInventoryResourceRepository{}
+	repo := &MockedReporterResourceRepository{}
+	m := &MockAuthz{}
+
+	repo.On("FindByReporterResourceId", mock.Anything, mock.Anything).Return(&model.Resource{}, gorm.ErrRecordNotFound)
+	m.On("CheckForUpdate", mock.Anything, mock.Anything, "notifications_integration_view", mock.Anything, mock.Anything).Return(v1beta1.CheckForUpdateResponse_ALLOWED_TRUE, &v1beta1.ConsistencyToken{}, nil)
+
+	useCase := New(repo, inventoryRepo, m, nil, "", log.DefaultLogger, false)
+	allowed, err := useCase.CheckForUpdate(ctx, "notifications_integration_view", "rbac", &v1beta1.SubjectReference{}, model.ReporterResourceId{})
+
+	// no consistency token being written.
+
+	assert.Nil(t, err)
+	assert.True(t, allowed)
+
+	repo.AssertExpectations(t)
+
+}
+
+func TestCheckForUpdate_Allowed(t *testing.T) {
 	ctx := context.TODO()
 	resource := resource1()
 
@@ -763,10 +742,20 @@ func TestCheckForUpdate_AllowedFalse(t *testing.T) {
 	m := &MockAuthz{}
 
 	repo.On("FindByReporterResourceId", mock.Anything, mock.Anything).Return(resource, nil)
-	m.On("CheckForUpdate", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(v1beta1.CheckForUpdateResponse_ALLOWED_FALSE, &v1beta1.ConsistencyToken{}, nil)
+	m.On("CheckForUpdate", mock.Anything, mock.Anything, "notifications_integration_view", mock.Anything, mock.Anything).Return(v1beta1.CheckForUpdateResponse_ALLOWED_TRUE, &v1beta1.ConsistencyToken{}, nil)
+
+	repo.On("Update", mock.Anything, mock.Anything, mock.Anything).Return(&model.Resource{}, []*model.Resource{}, nil)
 
 	useCase := New(repo, inventoryRepo, m, nil, "", log.DefaultLogger, false)
 	allowed, err := useCase.CheckForUpdate(ctx, "notifications_integration_view", "rbac", &v1beta1.SubjectReference{}, model.ReporterResourceId{})
+
+	assert.Nil(t, err)
+	assert.True(t, allowed)
+
+	// check negative case
+	m.On("CheckForUpdate", mock.Anything, mock.Anything, "notifications_integration_write", mock.Anything, mock.Anything).Return(v1beta1.CheckForUpdateResponse_ALLOWED_FALSE, &v1beta1.ConsistencyToken{}, nil)
+
+	allowed, err = useCase.CheckForUpdate(ctx, "notifications_integration_write", "rbac", &v1beta1.SubjectReference{}, model.ReporterResourceId{})
 
 	assert.Nil(t, err)
 	assert.False(t, allowed)

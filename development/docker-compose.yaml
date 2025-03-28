@@ -1,50 +1,48 @@
 ### Top-Level targets allow you to deploy services based on Test Setup
 ### See README for details
 services:
-  # full-setup:
-  #   image: bash:3.1-alpine3.21
-  #   command: ["echo", "starting full-setup"]
-  #   depends_on:
-  #   - inventory-api
-  #   - zookeeper
-  #   - kafka
-  #   - kafka-setup
-  #   - connect
-  #   - connect-setup
-  #   networks:
-  #     - kessel
-  #   restart: on-failure
+  full-setup:
+    image: bash:3.1-alpine3.21
+    command: ["echo", "starting full-setup"]
+    depends_on:
+    - inventory-api
+    - kafka-setup
+    - connect-setup
+    networks:
+      - kessel
+    restart: on-failure
 
-  # full-setup-relations-ready:
-  #   image: bash:3.1-alpine3.21
-  #   command: ["echo", "starting full-setup-relations-ready"]
-  #   depends_on:
-  #   - inventory-api
-  #   - kafka-setup
-  #   - connect-setup
-  #   networks:
-  #     - kessel
+  full-setup-relations-ready:
+    image: bash:3.1-alpine3.21
+    command: ["echo", "starting full-setup-relations-ready"]
+    depends_on:
+    - inventory-api
+    - kafka-setup
+    - connect-setup
+    networks:
+      - kessel
 
-  # full-setup-w-sso:
-  #   image: bash:3.1-alpine3.21
-  #   command: ["echo", "starting full-setup-w-sso"]
-  #   depends_on:
-  #   - inventory-api
-  #   - kafka-setup
-  #   - connect-setup
-  #   networks:
-  #     - kessel
+  full-setup-w-sso:
+    image: bash:3.1-alpine3.21
+    command: ["echo", "starting full-setup-w-sso"]
+    depends_on:
+    - inventory-api
+    - kafka-setup
+    - connect-setup
+    - keycloak
+    networks:
+      - kessel
 
-  # split-setup:
-  #   image: bash:3.1-alpine3.21
-  #   command: ["echo", "starting split-setup"]
-  #   depends_on:
-  #   - invdatabase
-  #   - invmigrate
-  #   - kafka-setup
-  #   - connect-setup
-  #   networks:
-  #     - kessel
+  split-setup:
+    image: bash:3.1-alpine3.21
+    command: ["echo", "starting split-setup"]
+    depends_on:
+    - invdatabase
+    - invmigrate
+    - kafka-setup
+    - connect-setup
+    networks:
+      - kessel
 
 
 ### Individual services

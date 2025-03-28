@@ -25,9 +25,10 @@ When running locally, the [default settings](./.inventory-api.yaml) file is used
 - Sets authorization mechanism to `allow-all`.
 - Configures eventing mechanism to go to stdout.
 - Sets database implementation to sqlite3 and the database file to `inventory.db`
+- Sets the Inventory Consumer service to disabled
 - Configures log level to `INFO`.
 
-NOTE: You can update the [default settings](./.inventory-api.yaml) file as required to test different scenarios. Refer to the command line help (`make run-help`)
+NOTE: You can update the [default settings](./.inventory-api.yaml) file as required to test different scenarios. Refer to the command line help (`make run-help`) or leverage one of the many pre-defined Docker Compose Test Setups
 for information on the different parameters.
 
 1. Clone the repository and navigate to the directory.

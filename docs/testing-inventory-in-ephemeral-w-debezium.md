@@ -1,4 +1,4 @@
-# Testing Debezium in Ephemeral
+# Testing Inventory in in Ephemeral with Debezium
 
 > Note: This process is currently very specific to feature branch work being done on [feature-RHCLOUD-38543](https://github.com/project-kessel/inventory-api/tree/feature-RHCLOUD-38543) and is not applicable to the main branch
 

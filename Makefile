@@ -157,6 +157,10 @@ inventory-up:
 inventory-up-relations-ready:
 	./scripts/start-inventory.sh full-setup-relations-ready 8081 9081
 
+.PHONY: inventory-up-split
+inventory-up-split:
+	./scripts/start-inventory.sh split-setup 8000 9000
+
 .PHONY: inventory-up-sso
 inventory-up-sso:
 	./scripts/start-inventory-kc.sh full-setup-w-sso 8081 9081

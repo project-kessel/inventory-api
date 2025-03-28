@@ -21,6 +21,7 @@ services:
     - connect-setup
     networks:
       - kessel
+    restart: on-failure
 
   full-setup-w-sso:
     image: bash:3.1-alpine3.21
@@ -32,6 +33,7 @@ services:
     - keycloak
     networks:
       - kessel
+    restart: on-failure
 
   split-setup:
     image: bash:3.1-alpine3.21
@@ -43,7 +45,7 @@ services:
     - connect-setup
     networks:
       - kessel
-
+    restart: on-failure
 
 ### Individual services
   inventory-api:
@@ -58,7 +60,7 @@ services:
       args:
         VERSION: dev
     volumes:
-      - ./configs/${CONFIG}:/inventory-api-compose.yaml:ro,z
+      - ./configs/${CONFIG}.yaml:/inventory-api-compose.yaml:ro,z
     command: ["serve"]
     restart: "always"
     ports:
@@ -76,7 +78,7 @@ services:
       args:
         VERSION: dev
     volumes:
-      - ./configs/${CONFIG}:/inventory-api-compose.yaml:ro,z
+      - ./configs/${CONFIG}.yaml:/inventory-api-compose.yaml:ro,z
     command: ["migrate"]
     restart: "on-failure"
     depends_on:

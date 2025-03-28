@@ -24,6 +24,8 @@ storage:
   database: sqlite3
   sqlite3:
     dsn: inventory.db
+consumer:
+  enabled: false
 log:
   level: "info"
   livez: true

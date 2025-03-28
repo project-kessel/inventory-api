@@ -113,8 +113,9 @@ make migrate
 # run with the relations friendly config file
 ./bin/inventory-api serve --config development/configs/local-w-relations.yaml
 ```
+> NOTE: The below setups all involve spinning up Kafka infrastrcture with configuration jobs that run after. It can take about to a minute before the full Kafka stack is ready to go.
 
-#### Kessel Inventory Full Setup (Docker Compose)
+#### Kessel Inventory Full Setup using Docker Compose
 
 Testing locally is fine for simple changes but in order to test the full application, it requires all the dependent baking services.
 
@@ -138,7 +139,7 @@ To stop:
 make inventory-down
 ```
 
-#### Kessel Inventory + Kessel Relations
+#### Kessel Inventory + Kessel Relations using Docker Compose
 
 An Relations-ready version of the Full Setup configuration exists that can be easily used with Relations API.
 
@@ -159,7 +160,7 @@ To stop Inventory:
 ```shell
 make inventory-down
 ```
-#### Local Kessel Inventory + Docker Infra (Split Setup)
+#### Local Kessel Inventory + Docker Compose Infra (Split Setup)
 
 The Split Setup involves using a locally running Inventory API, but all other infra (Postgres, Kafka, etc) are deployed via Docker. This setup is great for debugging the local running binary but still have all the dependent services to test the full application.
 
@@ -173,11 +174,11 @@ Then to run Inventory:
 # Setup
 make local-build
 
-# run with the split config file
-./bin/inventory-api serve --config development/configs/split-setup.yaml
+# run with the split config file (postgres host flag overwrites config locally which is set for Docker internal address)
+./bin/inventory-api serve --config development/configs/split-setup.yaml --storage.postgres.host localhost
 ```
 
-#### Kessel Inventory + Kessel Relations + SSO (Keycloak)
+#### Kessel Inventory + Kessel Relations + SSO (Keycloak) using Docker Compose
 
 This setup expands on the Relations-ready Full Setup by:
 - Setting up a Keycloak instance running at port 8084 with [myrealm](development/configs/myrealm.json) config file.

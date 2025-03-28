@@ -30,7 +30,7 @@ func NewOptions() *Options {
 		MaxPollInterval:    "300000",
 		EnableAutoCommit:   "false",
 		AutoOffsetReset:    "earliest",
-		StatisticsInterval: "15000",
+		StatisticsInterval: "60000",
 		Debug:              "",
 	}
 }
@@ -48,7 +48,7 @@ func (o *Options) AddFlags(fs *pflag.FlagSet, prefix string) {
 	fs.StringVar(&o.MaxPollInterval, prefix+"max-poll", o.MaxPollInterval, "length of time consumer can go without polling before considered dead (default: 300000ms)")
 	fs.StringVar(&o.EnableAutoCommit, prefix+"enable-auto-commit", o.EnableAutoCommit, "enables auto commit on consumer when messages are consumed (default: false)")
 	fs.StringVar(&o.AutoOffsetReset, prefix+"auto-offset-reset", o.AutoOffsetReset, "action to take when there is no initial offset in offset store (default: earliest)")
-	fs.StringVar(&o.StatisticsInterval, prefix+"statistics-interval", o.StatisticsInterval, "librdkafka statistics emit interval (default: 15000ms)")
+	fs.StringVar(&o.StatisticsInterval, prefix+"statistics-interval", o.StatisticsInterval, "librdkafka statistics emit interval (default: 60000ms)")
 }
 
 func (o *Options) Validate() []error {

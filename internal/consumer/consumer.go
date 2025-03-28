@@ -4,16 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"go.opentelemetry.io/otel"
 	"os"
 	"os/signal"
 	"syscall"
 
-	"go.opentelemetry.io/otel"
+	"github.com/project-kessel/inventory-api/internal/authz/allow"
+	kessel2 "github.com/project-kessel/inventory-api/internal/authz/kessel"
 
-	"os"
-	"os/signal"
-	"syscall"
+	"go.opentelemetry.io/otel"
 
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
 	"github.com/go-kratos/kratos/v2/log"
@@ -107,6 +105,14 @@ func (i *InventoryConsumer) Consume() error {
 	sigchan := make(chan os.Signal, 1)
 	signal.Notify(sigchan, syscall.SIGINT, syscall.SIGTERM)
 
+	var relationsEnabled bool
+	switch i.Authorizer.(type) {
+	case *kessel2.KesselAuthz:
+		relationsEnabled = true
+	case *allow.AllowAllAuthz:
+		relationsEnabled = false
+	}
+
 	// Process messages
 	run := true
 	i.Logger.Info("Consumer ready: waiting for messages...")
@@ -135,17 +141,21 @@ func (i *InventoryConsumer) Consume() error {
 				switch operation {
 				case "created":
 					i.Logger.Infof("operation=%s tuple=%s", operation, e.Value)
-					resp, err = i.CreateTuple(context.Background(), e.Value)
-					if err != nil {
-						i.Logger.Infof("failed to create tuple: %v", err)
-						continue
+					if relationsEnabled {
+						resp, err = i.CreateTuple(context.Background(), e.Value)
+						if err != nil {
+							i.Logger.Infof("failed to create tuple: %v", err)
+							continue
+						}
 					}
 				case "updated":
 					i.Logger.Infof("operation=%s tuple=%s", operation, e.Value)
-					resp, err = i.UpdateTuple(context.Background(), e.Value)
-					if err != nil {
-						i.Logger.Infof("failed to update tuple: %v", err)
-						continue
+					if relationsEnabled {
+						resp, err = i.UpdateTuple(context.Background(), e.Value)
+						if err != nil {
+							i.Logger.Infof("failed to update tuple: %v", err)
+							continue
+						}
 					}
 				case "deleted":
 					i.Logger.Infof("operation=%s tuple=%s", operation, e.Value)

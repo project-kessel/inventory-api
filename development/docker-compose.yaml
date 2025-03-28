@@ -1,0 +1,208 @@
+### Top-Level targets allow you to deploy services based on Test Setup
+### See README for details
+services:
+  # full-setup:
+  #   image: bash:3.1-alpine3.21
+  #   command: ["echo", "starting full-setup"]
+  #   depends_on:
+  #   - inventory-api
+  #   - zookeeper
+  #   - kafka
+  #   - kafka-setup
+  #   - connect
+  #   - connect-setup
+  #   networks:
+  #     - kessel
+  #   restart: on-failure
+
+  # full-setup-relations-ready:
+  #   image: bash:3.1-alpine3.21
+  #   command: ["echo", "starting full-setup-relations-ready"]
+  #   depends_on:
+  #   - inventory-api
+  #   - kafka-setup
+  #   - connect-setup
+  #   networks:
+  #     - kessel
+
+  # full-setup-w-sso:
+  #   image: bash:3.1-alpine3.21
+  #   command: ["echo", "starting full-setup-w-sso"]
+  #   depends_on:
+  #   - inventory-api
+  #   - kafka-setup
+  #   - connect-setup
+  #   networks:
+  #     - kessel
+
+  # split-setup:
+  #   image: bash:3.1-alpine3.21
+  #   command: ["echo", "starting split-setup"]
+  #   depends_on:
+  #   - invdatabase
+  #   - invmigrate
+  #   - kafka-setup
+  #   - connect-setup
+  #   networks:
+  #     - kessel
+
+
+### Individual services
+  inventory-api:
+    depends_on:
+      - invdatabase
+      - invmigrate
+    environment:
+      INVENTORY_API_CONFIG: /inventory-api-compose.yaml
+    build:
+      context: ../
+      dockerfile: Dockerfile
+      args:
+        VERSION: dev
+    volumes:
+      - ./configs/${CONFIG}:/inventory-api-compose.yaml:ro,z
+    command: ["serve"]
+    restart: "always"
+    ports:
+      - "${HTTP_PORT}:${HTTP_PORT}"
+      - "${GRPC_PORT}:${GRPC_PORT}"
+    networks:
+      - kessel
+
+  invmigrate:
+    environment:
+      INVENTORY_API_CONFIG: /inventory-api-compose.yaml
+    build:
+      context: ../
+      dockerfile: Dockerfile
+      args:
+        VERSION: dev
+    volumes:
+      - ./configs/${CONFIG}:/inventory-api-compose.yaml:ro,z
+    command: ["migrate"]
+    restart: "on-failure"
+    depends_on:
+      - invdatabase
+    networks:
+      - kessel
+
+  invdatabase:
+    image: "postgres"
+    command: ["docker-entrypoint.sh", "-p", "5433", "-c", "config_file=/etc/postgresql/postgresql.conf"]
+    hostname: invdatabase
+    expose:
+      - "5433"
+    ports:
+      - "5433:5433"
+    volumes:
+      - ./configs/postgresql.conf:/etc/postgresql/postgresql.conf:ro,z
+    environment:
+      - "POSTGRES_PASSWORD=yPsw5e6ab4bvAGe5H"
+      - "POSTGRES_DB=spicedb"
+      - "PGPORT=5433"
+    networks:
+      - kessel
+
+  zookeeper:
+    image: quay.io/strimzi/kafka:latest-kafka-3.8.0
+    command: [
+      "sh", "-c",
+      "bin/zookeeper-server-start.sh config/zookeeper.properties"
+    ]
+    ports:
+      - "2181:2181"
+    environment:
+      LOG_DIR: /tmp/logs
+    networks:
+      - kessel
+
+  kafka:
+    image: quay.io/strimzi/kafka:latest-kafka-3.8.0
+    command: [
+      "sh", "-c",
+      "bin/kafka-server-start.sh config/server.properties --override listeners=$${KAFKA_LISTENERS} --override advertised.listeners=$${KAFKA_ADVERTISED_LISTENERS} --override zookeeper.connect=$${KAFKA_ZOOKEEPER_CONNECT}"
+    ]
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+    environment:
+      LOG_DIR: "/tmp/logs"
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
+      KAFKA_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+    networks:
+      - kessel
+
+  kafka-setup:
+    image: quay.io/strimzi/kafka:latest-kafka-3.8.0
+    depends_on:
+      - kafka
+    entrypoint: [ '/bin/sh', '-c' ]
+    command: |
+      "
+      bin/kafka-topics.sh --bootstrap-server kafka:9092 --list
+
+      echo -e 'Creating kafka topics'
+      bin/kafka-topics.sh --bootstrap-server kafka:9092 --create --if-not-exists --topic outbox.event.kessel.resources --replication-factor 1 --partitions 1
+      bin/kafka-topics.sh --bootstrap-server kafka:9092 --create --if-not-exists --topic outbox.event.kessel.tuples --replication-factor 1 --partitions 1
+
+      echo -e 'Successfully created the following topics:'
+      bin/kafka-topics.sh --bootstrap-server kafka:9092 --list
+      "
+    networks:
+      - kessel
+
+  connect:
+    ports:
+      - 8083:8083
+    environment:
+      - GROUP_ID=1
+      - CONFIG_STORAGE_TOPIC=my_connect_configs
+      - OFFSET_STORAGE_TOPIC=my_connect_offsets
+      - STATUS_STORAGE_TOPIC=my_connect_statuses
+      - BOOTSTRAP_SERVERS=kafka:9092
+    depends_on:
+      - zookeeper
+      - kafka
+      - invdatabase
+    image: quay.io/debezium/connect:2.5
+    restart: "always"
+    networks:
+      - kessel
+
+  connect-setup:
+    image: quay.io/curl/curl:latest
+    depends_on:
+      - kafka
+      - connect
+    command: [
+      "/bin/sh", "-c",
+      "sleep 45 && curl -d @/debezium-connector.json -H 'Content-Type: application/json' -X POST http://connect:8083/connectors"
+    ]
+    volumes:
+      - ./configs/debezium-connector.json:/debezium-connector.json:ro,z
+    restart: on-failure:30
+    networks:
+      - kessel
+
+  keycloak:
+    image: "quay.io/keycloak/keycloak:latest"
+    command: "start-dev --http-port=8084 --db-url-port 5434 --import-realm"
+    restart: "on-failure"
+    environment:
+      - "KEYCLOAK_ADMIN=admin"
+      - "KEYCLOAK_ADMIN_PASSWORD=admin"
+    volumes:
+      - ./configs/myrealm.json:/opt/keycloak/data/import/myrealm.json:rw,z
+    ports:
+      - 8084:8084
+    networks:
+      - kessel
+
+networks:
+  kessel:
+    name: kessel
+    external: true

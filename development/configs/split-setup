@@ -4,29 +4,24 @@ server:
   grpc:
     address: 0.0.0.0:9081
 authn:
-  psk:
-    pre-shared-key-file: /psks.yaml
+  allow-unauthenticated: true
 authz:
-  impl: kessel
-  kessel:
-    insecure-client: true
-    url: relations-api:9000
-    enable-oidc-auth: false
-    principal-user-domain: 0.0.0.0:8084
+  impl: allow-all
 eventing:
   eventer: stdout
   kafka:
 storage:
   disable-persistence: false
   database: postgres
-  sqlite3:
-    dsn: inventory.db
   postgres:
-    host: "invdatabase"
+    host: "localhost"
     port: "5433"
     user: "postgres"
     password: "yPsw5e6ab4bvAGe5H"
     dbname: "spicedb"
+consumer:
+  enabled: true
+  bootstrap-servers: localhost:9092
 log:
   level: "debug"
   livez: true

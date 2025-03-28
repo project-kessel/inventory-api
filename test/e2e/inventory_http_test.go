@@ -143,7 +143,7 @@ func TestInventoryAPIHTTP_RHELHostLifecycle(t *testing.T) {
 			},
 			ReporterData: &resources.ReporterData{
 				ReporterInstanceId: "user@example.com",
-				ReporterType:       resources.ReporterData_ACM,
+				ReporterType:       resources.ReporterData_HBI,
 				ConsoleHref:        "www.example.com",
 				ApiHref:            "www.example.com",
 				LocalResourceId:    "0123",
@@ -164,7 +164,7 @@ func TestInventoryAPIHTTP_RHELHostLifecycle(t *testing.T) {
 			},
 			ReporterData: &resources.ReporterData{
 				ReporterInstanceId: "user@example.com",
-				ReporterType:       resources.ReporterData_ACM,
+				ReporterType:       resources.ReporterData_HBI,
 				ConsoleHref:        "www.exampleConsole.com",
 				ApiHref:            "www.exampleAPI.com",
 				LocalResourceId:    "0123",
@@ -178,7 +178,7 @@ func TestInventoryAPIHTTP_RHELHostLifecycle(t *testing.T) {
 	deleteRequest := resources.DeleteRhelHostRequest{
 		ReporterData: &resources.ReporterData{
 			ReporterInstanceId: "user@example.com",
-			ReporterType:       resources.ReporterData_ACM,
+			ReporterType:       resources.ReporterData_HBI,
 			ConsoleHref:        "www.exampleConsole.com",
 			ApiHref:            "www.exampleAPI.com",
 			LocalResourceId:    "0123",

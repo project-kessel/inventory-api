@@ -30,7 +30,7 @@ storage:
     dbname: "spicedb"
 consumer:
   enabled: true
-  bootstrap-servers: kafka:9092
+  bootstrap-servers: kafka:9093
 log:
   level: "info"
   livez: true

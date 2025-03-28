@@ -1,8 +1,8 @@
 server:
   http:
-    address: 0.0.0.0:8081
+    address: 0.0.0.0:8000
   grpc:
-    address: 0.0.0.0:9081
+    address: 0.0.0.0:9000
 authn:
   allow-unauthenticated: true
 authz:
@@ -14,7 +14,7 @@ storage:
   disable-persistence: false
   database: postgres
   postgres:
-    host: "localhost"
+    host: "invdatabase"
     port: "5433"
     user: "postgres"
     password: "yPsw5e6ab4bvAGe5H"

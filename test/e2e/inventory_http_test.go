@@ -10,8 +10,12 @@ import (
 	v1 "github.com/project-kessel/inventory-api/api/kessel/inventory/v1"
 	"github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/relationships"
 	"github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/resources"
+	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2"
+	common "github.com/project-kessel/inventory-client-go/common"
 	"github.com/project-kessel/inventory-client-go/v1beta1"
+	v1beta2 "github.com/project-kessel/inventory-client-go/v1beta2"
 	"github.com/stretchr/testify/assert"
+	"google.golang.org/protobuf/types/known/structpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	nethttp "net/http"
 	"os"
@@ -121,10 +125,10 @@ func TestInventoryAPIHTTP_Metrics(t *testing.T) {
 
 func TestInventoryAPIHTTP_RHELHostLifecycle(t *testing.T) {
 	t.Parallel()
-	c := v1beta1.NewConfig(
-		v1beta1.WithHTTPUrl(inventoryapi_http_url),
-		v1beta1.WithTLSInsecure(insecure),
-		v1beta1.WithHTTPTLSConfig(tlsConfig),
+	c := common.NewConfig(
+		common.WithHTTPUrl(inventoryapi_http_url),
+		common.WithTLSInsecure(insecure),
+		common.WithHTTPTLSConfig(tlsConfig),
 	)
 	client, err := v1beta1.NewHttpClient(context.Background(), c)
 	if err != nil {
@@ -187,10 +191,10 @@ func TestInventoryAPIHTTP_RHELHostLifecycle(t *testing.T) {
 
 func TestInventoryAPIHTTP_K8SClusterLifecycle(t *testing.T) {
 	t.Parallel()
-	c := v1beta1.NewConfig(
-		v1beta1.WithHTTPUrl(inventoryapi_http_url),
-		v1beta1.WithTLSInsecure(insecure),
-		v1beta1.WithHTTPTLSConfig(tlsConfig),
+	c := common.NewConfig(
+		common.WithHTTPUrl(inventoryapi_http_url),
+		common.WithTLSInsecure(insecure),
+		common.WithHTTPTLSConfig(tlsConfig),
 	)
 	client, err := v1beta1.NewHttpClient(context.Background(), c)
 	if err != nil {
@@ -296,10 +300,10 @@ func TestInventoryAPIHTTP_K8SClusterLifecycle(t *testing.T) {
 
 func TestInventoryAPIHTTP_K8SPolicyLifecycle(t *testing.T) {
 	t.Parallel()
-	c := v1beta1.NewConfig(
-		v1beta1.WithHTTPUrl(inventoryapi_http_url),
-		v1beta1.WithTLSInsecure(insecure),
-		v1beta1.WithHTTPTLSConfig(tlsConfig),
+	c := common.NewConfig(
+		common.WithHTTPUrl(inventoryapi_http_url),
+		common.WithTLSInsecure(insecure),
+		common.WithHTTPTLSConfig(tlsConfig),
 	)
 	client, err := v1beta1.NewHttpClient(context.Background(), c)
 	if err != nil {
@@ -372,10 +376,10 @@ func TestInventoryAPIHTTP_K8SPolicyLifecycle(t *testing.T) {
 func TestInventoryAPIHTTP_NotificationsIntegrationLifecycle(t *testing.T) {
 	t.Parallel()
 
-	c := v1beta1.NewConfig(
-		v1beta1.WithHTTPUrl(inventoryapi_http_url),
-		v1beta1.WithTLSInsecure(insecure),
-		v1beta1.WithHTTPTLSConfig(tlsConfig),
+	c := common.NewConfig(
+		common.WithHTTPUrl(inventoryapi_http_url),
+		common.WithTLSInsecure(insecure),
+		common.WithHTTPTLSConfig(tlsConfig),
 	)
 	client, err := v1beta1.NewHttpClient(context.Background(), c)
 	if err != nil {
@@ -434,10 +438,10 @@ func TestInventoryAPIHTTP_NotificationsIntegrationLifecycle(t *testing.T) {
 
 func TestInventoryAPIHTTP_K8SPolicy_is_propagated_to_K8sClusterLifecycle(t *testing.T) {
 	t.Parallel()
-	c := v1beta1.NewConfig(
-		v1beta1.WithHTTPUrl(inventoryapi_http_url),
-		v1beta1.WithTLSInsecure(insecure),
-		v1beta1.WithHTTPTLSConfig(tlsConfig),
+	c := common.NewConfig(
+		common.WithHTTPUrl(inventoryapi_http_url),
+		common.WithTLSInsecure(insecure),
+		common.WithHTTPTLSConfig(tlsConfig),
 	)
 	client, err := v1beta1.NewHttpClient(context.Background(), c)
 	if err != nil {
@@ -565,6 +569,46 @@ func TestInventoryAPIHTTP_K8SPolicy_is_propagated_to_K8sClusterLifecycle(t *test
 	}
 
 	_, err = client.K8SPolicyIsPropagatedToK8SClusterServiceHTTPClient.DeleteK8SPolicyIsPropagatedToK8SCluster(context.Background(), &deleteRequest, opts...)
+	assert.NoError(t, err, "Failed to delete relationship between K8sPolicy and K8sCluster")
+}
+
+// V1Beta2
+func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle(t *testing.T) {
+	t.Parallel()
+
+	c := common.NewConfig(
+		common.WithHTTPUrl(inventoryapi_http_url),
+		common.WithTLSInsecure(insecure),
+		common.WithHTTPTLSConfig(tlsConfig),
+	)
+
+	client, err := v1beta2.NewHttpClient(context.Background(), c)
+	assert.NoError(t, err, "Failed to create v1beta2 HTTP client")
+
+	resourceData := &structpb.Struct{}
+	commonData := &structpb.Struct{}
+
+	commonData.Fields = map[string]*structpb.Value{
+		"workspace_id": structpb.NewStringValue("workspace-v2"),
+	}
+
+	req := pb.ReportResourceRequest{
+		Resource: &pb.Resource{
+			ResourceType: "k8s_cluster",
+			ReporterData: &pb.ReporterData{
+				ReporterType:       "ACM",
+				ReporterInstanceId: "testuser@example.com",
+				ReporterVersion:    "0.1",
+				LocalResourceId:    "k8s-abc-123",
+				ApiHref:            "https://example.com/api",
+				ConsoleHref:        "https://example.com/console",
+				ResourceData:       resourceData,
+			},
+			CommonResourceData: commonData,
+		},
+	}
+	opts := getCallOptions()
+	_, err = client.KesselResourceService.ReportResource(context.Background(), &req, opts...)
 	assert.NoError(t, err, "Failed to delete relationship between K8sPolicy and K8sCluster")
 }
 

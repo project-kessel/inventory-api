@@ -187,7 +187,7 @@ make inventory-down-kafka
 
 Similar as above, but instead of running Kafka, this will configure inventory to use a Keycloak service for authentication.
 
-- Sets up a keycloak instance running at port 8084 with [myrealm](myrealm.json) config file.
+- Sets up a keycloak instance running at port 8084 with [myrealm](development/configs/myrealm.json) config file.
 - Set up a default service account with clientId: `test-svc`. Refer to [get-token](scripts/get-token.sh) to learn how to fetch a token.
 - Refer to [sso-inventory-api.yaml](./sso-inventory-api.yaml) for additional configuration
 

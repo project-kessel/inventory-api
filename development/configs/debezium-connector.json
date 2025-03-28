@@ -1,0 +1,17 @@
+{
+  "name": "debezium-connector",
+  "config": {
+    "connector.class": "io.debezium.connector.postgresql.PostgresConnector",
+    "database.hostname": "invdatabase",
+    "database.port": "5433",
+    "database.user": "postgres",
+    "database.password": "yPsw5e6ab4bvAGe5H",
+    "database.dbname" : "spicedb",
+    "topic.prefix": "kessel-inventory",
+    "table.include.list": "public.outbox_events",
+    "transforms": "outbox",
+    "transforms.outbox.type": "io.debezium.transforms.outbox.EventRouter",
+    "transforms.outbox.table.fields.additional.placement": "operation:header",
+    "plugin.name": "pgoutput"
+  }
+}

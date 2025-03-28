@@ -3,6 +3,7 @@ package resources
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -336,7 +337,11 @@ func (uc *Usecase) Delete(ctx context.Context, id model.ReporterResourceId) erro
 	}
 
 	if uc.Authz != nil {
-		err := biz.DefaultUnsetWorkspace(ctx, uc.Namespace, id.LocalResourceId, id.ResourceType, uc.Authz)
+		namespace := uc.Namespace
+		if id.ReporterType != "" {
+			namespace = strings.ToLower(id.ReporterType)
+		}
+		err := biz.DefaultUnsetWorkspace(ctx, namespace, id.LocalResourceId, id.ResourceType, uc.Authz)
 		if err != nil {
 			return err
 		}

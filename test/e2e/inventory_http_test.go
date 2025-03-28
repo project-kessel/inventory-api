@@ -609,7 +609,16 @@ func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle(t *testing.T) {
 	}
 	opts := getCallOptions()
 	_, err = client.KesselResourceService.ReportResource(context.Background(), &req, opts...)
-	assert.NoError(t, err, "Failed to delete relationship between K8sPolicy and K8sCluster")
+	assert.NoError(t, err, "Failed to Report Resource")
+
+	delReq := pb.DeleteResourceRequest{
+		LocalResourceId: "k8s-abc-123",
+		ReporterType:    "ACM",
+	}
+
+	_, err = client.KesselResourceService.DeleteResource(context.Background(), &delReq, opts...)
+	assert.NoError(t, err, "Failed to Delete Resource")
+
 }
 
 func getCallOptions() []http.CallOption {

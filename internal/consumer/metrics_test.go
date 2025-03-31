@@ -1,0 +1,31 @@
+package consumer
+
+import (
+	"github.com/stretchr/testify/assert"
+	"reflect"
+	"testing"
+)
+
+func TestMetrics_New(t *testing.T) {
+	test := TestCase{
+		name:        "TestMetricsNew_DefaultMeters",
+		description: "ensures a metrics collector is configured with all default meters",
+	}
+	var errs []error
+	errs = test.TestSetup()
+	assert.Nil(t, errs)
+
+	t.Run(test.name, func(t *testing.T) {
+		structValues := reflect.ValueOf(test.metrics)
+		numField := structValues.NumField()
+
+		// ensures all fields in struct are properly instantiated
+		for i := 0; i < numField; i++ {
+			field := structValues.Field(i)
+			assert.True(t, field.IsValid())
+			assert.True(t, !field.IsZero())
+		}
+		// ensures the number of fields in the type and instantiated version match
+		assert.Equal(t, reflect.TypeOf(MetricsCollector{}).NumField(), reflect.TypeOf(test.metrics).NumField())
+	})
+}

@@ -22,6 +22,9 @@ storage:
 consumer:
   enabled: true
   bootstrap-servers: kafka:9093
+resources:
+  schemaPath: "data/schema/resources"
+  use_cache: true
 log:
   level: "info"
   livez: true

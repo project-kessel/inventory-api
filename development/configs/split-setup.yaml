@@ -22,6 +22,9 @@ storage:
 consumer:
   enabled: true
   bootstrap-servers: localhost:9092
+resources:
+  schemaPath: "data/schema/resources"
+  use_cache: true
 log:
   level: "debug"
   livez: true

@@ -7,8 +7,6 @@ import (
 
 	"github.com/project-kessel/inventory-api/internal/consumer"
 
-	"github.com/project-kessel/inventory-api/internal/consumer"
-
 	"github.com/google/uuid"
 
 	"github.com/go-kratos/kratos/v2/log"

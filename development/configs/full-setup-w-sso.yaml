@@ -22,14 +22,18 @@ eventing:
 storage:
   disable-persistence: false
   database: postgres
-  sqlite3:
-    dsn: inventory.db
   postgres:
     host: "invdatabase"
     port: "5433"
     user: "postgres"
     password: "yPsw5e6ab4bvAGe5H"
     dbname: "spicedb"
+consumer:
+  enabled: true
+  bootstrap-servers: kafka:9093
+resources:
+  schemaPath: "data/schema/resources"
+  use_cache: true
 log:
   level: "info"
   livez: true

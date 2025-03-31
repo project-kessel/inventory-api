@@ -8,6 +8,9 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/project-kessel/inventory-api/internal/authz/allow"
+	"github.com/project-kessel/inventory-api/internal/authz/kessel"
+
 	"go.opentelemetry.io/otel"
 
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
@@ -15,7 +18,7 @@ import (
 	"github.com/project-kessel/inventory-api/internal/authz"
 	"github.com/project-kessel/inventory-api/internal/authz/api"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
-	kessel "github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
+	"github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"gorm.io/gorm"
@@ -102,6 +105,14 @@ func (i *InventoryConsumer) Consume() error {
 	sigchan := make(chan os.Signal, 1)
 	signal.Notify(sigchan, syscall.SIGINT, syscall.SIGTERM)
 
+	var relationsEnabled bool
+	switch i.Authorizer.(type) {
+	case *kessel.KesselAuthz:
+		relationsEnabled = true
+	case *allow.AllowAllAuthz:
+		relationsEnabled = false
+	}
+
 	// Process messages
 	run := true
 	i.Logger.Info("Consumer ready: waiting for messages...")
@@ -128,32 +139,38 @@ func (i *InventoryConsumer) Consume() error {
 				}
 
 				switch operation {
-				case "created":
+				case string(model.OperationTypeCreated):
 					i.Logger.Infof("operation=%s tuple=%s", operation, e.Value)
-					resp, err = i.CreateTuple(context.Background(), e.Value)
-					if err != nil {
-						i.Logger.Infof("failed to create tuple: %v", err)
-						continue
+					if relationsEnabled {
+						resp, err = i.CreateTuple(context.Background(), e.Value)
+						if err != nil {
+							i.Logger.Infof("failed to create tuple: %v", err)
+							continue
+						}
 					}
-				case "updated":
+				case string(model.OperationTypeUpdated):
 					i.Logger.Infof("operation=%s tuple=%s", operation, e.Value)
-					resp, err = i.UpdateTuple(context.Background(), e.Value)
-					if err != nil {
-						i.Logger.Infof("failed to update tuple: %v", err)
-						continue
+					if relationsEnabled {
+						resp, err = i.UpdateTuple(context.Background(), e.Value)
+						if err != nil {
+							i.Logger.Infof("failed to update tuple: %v", err)
+							continue
+						}
 					}
-				case "deleted":
+				case string(model.OperationTypeDeleted):
 					i.Logger.Infof("operation=%s tuple=%s", operation, e.Value)
-					_, err = i.DeleteTuple(context.Background(), e.Value)
-					if err != nil {
-						i.Logger.Infof("failed to delete tuple: %v", err)
-						continue
+					if relationsEnabled {
+						_, err = i.DeleteTuple(context.Background(), e.Value)
+						if err != nil {
+							i.Logger.Infof("failed to delete tuple: %v", err)
+							continue
+						}
 					}
 				default:
 					i.Logger.Infof("unknown operation: %v -- doing nothing", operation)
 				}
 
-				if operation != string(model.OperationTypeDeleted.OperationType()) {
+				if operation != string(model.OperationTypeDeleted) {
 					err = i.UpdateConsistencyToken(e.Key, fmt.Sprint(resp))
 					if err != nil {
 						i.Logger.Infof("failed to update consistency token: %v", err)
@@ -204,7 +221,7 @@ func (i *InventoryConsumer) Consume() error {
 // CreateTuple calls the Relations API to create a tuple from the message payload received and returns the consistency token
 func (i *InventoryConsumer) CreateTuple(ctx context.Context, msg []byte) (string, error) {
 	var msgPayload *MessagePayload
-	var tuple *kessel.Relationship
+	var tuple *v1beta1.Relationship
 
 	// msg value is expected to be a valid JSON body for a single relation
 	err := json.Unmarshal(msg, &msgPayload)
@@ -217,8 +234,8 @@ func (i *InventoryConsumer) CreateTuple(ctx context.Context, msg []byte) (string
 		return "", fmt.Errorf("error unmarshaling tuple payload: %v", err)
 	}
 
-	resp, err := i.Authorizer.CreateTuples(ctx, &kessel.CreateTuplesRequest{
-		Tuples: []*kessel.Relationship{tuple},
+	resp, err := i.Authorizer.CreateTuples(ctx, &v1beta1.CreateTuplesRequest{
+		Tuples: []*v1beta1.Relationship{tuple},
 	})
 	if err != nil {
 		// If the tuple exists already, capture the token using Check to ensure idempotent updates to tokens in DB
@@ -246,7 +263,7 @@ func (i *InventoryConsumer) CreateTuple(ctx context.Context, msg []byte) (string
 // UpdateTuple calls the Relations API to create a tuple from the message payload received and returns the consistency token
 func (i *InventoryConsumer) UpdateTuple(ctx context.Context, msg []byte) (string, error) {
 	var msgPayload *MessagePayload
-	var tuple *kessel.Relationship
+	var tuple *v1beta1.Relationship
 
 	// msg value is expected to be a valid JSON body for a single relation
 	err := json.Unmarshal(msg, &msgPayload)
@@ -259,8 +276,8 @@ func (i *InventoryConsumer) UpdateTuple(ctx context.Context, msg []byte) (string
 		return "", fmt.Errorf("error unmarshaling tuple payload: %v", err)
 	}
 
-	resp, err := i.Authorizer.CreateTuples(ctx, &kessel.CreateTuplesRequest{
-		Tuples: []*kessel.Relationship{tuple},
+	resp, err := i.Authorizer.CreateTuples(ctx, &v1beta1.CreateTuplesRequest{
+		Tuples: []*v1beta1.Relationship{tuple},
 		Upsert: true,
 	})
 	// TODO: we should understand what kind of errors to look for here in case we need to commit in loop or not
@@ -273,7 +290,7 @@ func (i *InventoryConsumer) UpdateTuple(ctx context.Context, msg []byte) (string
 // DeleteTuple calls the Relations API to create a tuple from the message payload received and returns the consistency token
 func (i *InventoryConsumer) DeleteTuple(ctx context.Context, msg []byte) (string, error) {
 	var msgPayload *MessagePayload
-	var filter *kessel.RelationTupleFilter
+	var filter *v1beta1.RelationTupleFilter
 
 	// msg value is expected to be a valid JSON body for a single relation
 	err := json.Unmarshal(msg, &msgPayload)
@@ -286,7 +303,7 @@ func (i *InventoryConsumer) DeleteTuple(ctx context.Context, msg []byte) (string
 		return "", fmt.Errorf("error unmarshaling tuple payload: %v", err)
 	}
 
-	resp, err := i.Authorizer.DeleteTuples(ctx, &kessel.DeleteTuplesRequest{
+	resp, err := i.Authorizer.DeleteTuples(ctx, &v1beta1.DeleteTuplesRequest{
 		Filter: filter,
 	})
 	if err != nil {

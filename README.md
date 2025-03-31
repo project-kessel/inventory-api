@@ -23,11 +23,11 @@ When running locally, the [default settings](./.inventory-api.yaml) file is used
 - Exposes the inventory API in `localhost` and using port `8000` for http and port `9000` for grpc.
 - Sets authentication mechanism to `allow-unauthenticated`, allowing users to be authenticated with their user-agent value.
 - Sets authorization mechanism to `allow-all`.
-- Configures eventing mechanism to go to stdout.
 - Sets database implementation to sqlite3 and the database file to `inventory.db`
+- Sets the Inventory Consumer service to disabled
 - Configures log level to `INFO`.
 
-NOTE: You can update the [default settings](./.inventory-api.yaml) file as required to test different scenarios. Refer to the command line help (`make run-help`)
+NOTE: You can update the [default settings](./.inventory-api.yaml) file as required to test different scenarios. Refer to the command line help (`make run-help`) or leverage one of the many pre-defined Docker Compose Test Setups
 for information on the different parameters.
 
 1. Clone the repository and navigate to the directory.
@@ -96,29 +96,7 @@ See [DEBUG](./DEBUG.md) for instructions on how to debug
 
 ### Alternatives way of running this service
 
-#### Kessel Inventory + Kessel Relations
-
-In order to test Kessel Inventory with Kessel Relations, we recommend cloning the Relations API repo locally and leveraging their existing [Docker Compose process](https://github.com/project-kessel/relations-api/tree/main?tab=readme-ov-file#spicedb-using-dockerpodman) to spin up the Relations API.
-
-Both Inventory and Relations compose files are configured to use the same docker network (`kessel`) to ensure network connectivity between all containers.
-
-For the Inventory Compose deployment:
-- A [PSK file](./config/psks.yaml#L1) is provided with the token "1234".
-- Default ports in this setup are `8081` for http and `9091` for grpc to not conflict with Relations
-- Refer to [inventory-api-compose.yaml](./inventory-api-compose.yaml) for additional configuration
-
-To start use:
-```shell
-make inventory-up
-```
-
-To stop use:
-
-```shell
-make inventory-down
-```
-
-#### Kessel Inventory + Kessel Relations using built binaries
+#### Local Kessel Inventory + Kessel Relations using built binaries
 
 Inventory and Relations can also be run locally using built binaries, but the default config for Inventory will conflict with Relations.
 
@@ -133,63 +111,79 @@ make local-build
 make migrate
 
 # run with the relations friendly config file
-./bin/inventory-api serve --config config/inventory-w-relations.yaml
+./bin/inventory-api serve --config development/configs/local-w-relations.yaml
 ```
+> NOTE: The below setups all involve spinning up Kafka infrastrcture with configuration jobs that run after. It can take about to a minute before the full Kafka stack is ready to go.
 
-#### Kessel-Inventory + Kafka
+#### Kessel Inventory Full Setup using Docker Compose
 
-In order to use the kafka configuration, one has to run strimzi and zookeeper.
-You can do this by running;
+Testing locally is fine for simple changes but in order to test the full application, it requires all the dependent baking services.
 
+The Full Setup option for Docker Compose:
+- Exposes the inventory API in `localhost` and using port `8000` for http and port `9000` for grpc.
+- Sets both AuthN and AuthZ to Allow
+- Deploys and configures Inventory to leverage postgres
+- Deploys and configures Kafka, Zookeeper and Kafka Connect with Debezium configured for the Outbox table
+- Enables and configures the Inventory Consumer for the local Kafka cluster
+- Configures Inventory API using the [Full-Setup](development/configs/full-setup.yaml) config file
+
+This setup allows testing the full inventory stack, but does not require Relations API. Calls that would get made to Relations API are just logged by the consumer.
+
+To start with Full Setup configuration:
 ```shell
-make inventory-up-kafka
+make inventory-up
 ```
 
-Start Kessel Inventory and configuring it to connect to kafka:
-```yaml
-eventing:
-  eventer: kafka
-  kafka:
-    bootstrap-servers: "localhost:9092"
-    # Adapt as required
-    # security-protocol: "SASL_PLAINTEXT"
-    # sasl-mechanism: PLAIN
-```
-
-You can use our default config with kafka by running:
-
+To stop:
 ```shell
-INVENTORY_API_CONFIG="./kafka-inventory-api.yaml"  make run
+make inventory-down
 ```
 
-- Refer to [kafka-inventory-api.yaml](./kafka-inventory-api.yaml) for additional configuration
+#### Kessel Inventory + Kessel Relations using Docker Compose
 
+An Relations-ready version of the Full Setup configuration exists that can be easily used with Relations API.
 
-Once started, you can watch the messages using [kcat](https://github.com/edenhill/kcat) (formerly known as kafkacat)
-or by exec into the running container like this:
+The only notable differences being:
+- Inventory is configured to use ports `8081`, and `9081` to not conflict with Relations API
+- Configures Inventory API using the [Full-Setup-Relations-Ready](development/configs/full-setup-relations-ready.yaml) config file
 
+To start the Relations-ready version of Inventory:
 ```shell
-source ./scripts/check_docker_podman.sh
-KAFKA_CONTAINER_NAME=$(${DOCKER} ps | grep inventory-api-kafka | awk '{print $1}')
-${DOCKER} exec -i -t ${KAFKA_CONTAINER_NAME} /bin/bash
-
-# Once in the container
-./bin/kafka-console-consumer.sh --bootstrap-server localhost:9092 --topic kessel-inventory
+make inventory-up-relations-ready
 ```
 
-Manually terminate Kessel inventory and then run the following to stop kafka:
+To deploy Relations API, it's recommended to clone the Relations API repo locally and leverage their existing [Docker Compose process](https://github.com/project-kessel/relations-api/tree/main?tab=readme-ov-file#spicedb-using-dockerpodman) to spin up the Relations API.
 
+Both Inventory and Relations compose files are configured to use the same docker network (`kessel`) to ensure network connectivity between all containers.
+
+To stop Inventory:
 ```shell
-make inventory-down-kafka
+make inventory-down
+```
+#### Local Kessel Inventory + Docker Compose Infra (Split Setup)
+
+The Split Setup involves using a locally running Inventory API, but all other infra (Postgres, Kafka, etc) are deployed via Docker. This setup is great for debugging the local running binary but still have all the dependent services to test the full application.
+
+To start the Split Setup:
+```shell
+make inventory-up-split
 ```
 
-#### Kessel Inventory + Kessel Relations + Keycloak
+Then to run Inventory:
+```shell
+# Setup
+make local-build
 
-Similar as above, but instead of running Kafka, this will configure inventory to use a Keycloak service for authentication.
+# run with the split config file (postgres host flag overwrites config locally which is set for Docker internal address)
+./bin/inventory-api serve --config development/configs/split-setup.yaml --storage.postgres.host localhost
+```
 
-- Sets up a keycloak instance running at port 8084 with [myrealm](myrealm.json) config file.
-- Set up a default service account with clientId: `test-svc`. Refer to [get-token](scripts/get-token.sh) to learn how to fetch a token.
-- Refer to [sso-inventory-api.yaml](./sso-inventory-api.yaml) for additional configuration
+#### Kessel Inventory + Kessel Relations + SSO (Keycloak) using Docker Compose
+
+This setup expands on the Relations-ready Full Setup by:
+- Setting up a Keycloak instance running at port 8084 with [myrealm](development/configs/myrealm.json) config file.
+- Setting up a default service account with clientId: `test-svc`. Refer to [get-token](scripts/get-token.sh) to learn how to fetch a token.
+- Configures Inventory API using the [Full-Setup-w-SSO](development/configs/full-setup-w-sso.yaml) config file
 
 As before you'll need to run the Relations Compose steps available in the [Relations API repo](https://github.com/project-kessel/relations-api/tree/main?tab=readme-ov-file#spicedb-using-dockerpodman)
 
@@ -214,12 +208,12 @@ curl -H "Authorization: bearer ${TOKEN}" # ...
 To stop use:
 
 ```shell
-make inventory-down-sso
+make inventory-down
 ```
 
 #### Running in Ephemeral Cluster with Relations API using Bonfire
 
-Instructions to deploy Kessel Inventory in an ephemeral cluster can be found on [Kessel docs](https://cuddly-tribble-gq7r66v.pages.github.io/kessel/inventory-api/ephemeral/)
+See [Testing Inventory in Ephemeral with Debezium](./docs/testing-inventory-in-ephemeral-w-debezium.md) for instructions on how to deploy Kessel Inventory in the ephemeral cluster.
 
 ### API/Proto files Changes
 

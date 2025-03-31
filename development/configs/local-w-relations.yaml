@@ -1,9 +1,12 @@
+# This config is designed to run with Relations locally
+# ports have been updated to prevent conflicts
+# authz configured for local running relations binary
 server:
   public_url: http://localhost:8081
   http:
     address: localhost:8081
   grpc:
-    address: localhost:9081
+    address: localhost:9091
 authn:
    allow-unauthenticated: true
 authz:
@@ -12,6 +15,7 @@ authz:
     insecure-client: true
     url: localhost:9000
     enable-oidc-auth: false
+    principal-user-domain: 0.0.0.0:8084
 eventing:
   eventer: stdout
   kafka:
@@ -20,15 +24,11 @@ storage:
   database: sqlite3
   sqlite3:
     dsn: inventory.db
-  postgres:
-    host: "localhost"
-    port: "5432"
-    user: "test"
-    password: "test"
-    dbname: "test"
 consumer:
-  bootstrap-servers: localhost:9092
-  topic: outbox.event.kessel.tuples
+  enabled: false
+resources:
+  schemaPath: "data/schema/resources"
+  use_cache: true
 log:
   level: "info"
   livez: true

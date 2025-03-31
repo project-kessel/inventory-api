@@ -2,10 +2,12 @@ package consumer
 
 import (
 	"fmt"
+
 	"github.com/spf13/pflag"
 )
 
 type Options struct {
+	Enabled            bool   `mapstructure:"enabled"`
 	BootstrapServers   string `mapstructure:"bootstrap-servers"`
 	ConsumerGroupID    string `mapstructure:"consumer-group-id"`
 	Topic              string `mapstructure:"topic"`
@@ -20,6 +22,7 @@ type Options struct {
 
 func NewOptions() *Options {
 	return &Options{
+		Enabled:            true,
 		ConsumerGroupID:    "inventory-consumer",
 		Topic:              "outbox.event.kessel.tuples",
 		SessionTimeout:     "45000",
@@ -27,7 +30,7 @@ func NewOptions() *Options {
 		MaxPollInterval:    "300000",
 		EnableAutoCommit:   "false",
 		AutoOffsetReset:    "earliest",
-		StatisticsInterval: "15000",
+		StatisticsInterval: "60000",
 		Debug:              "",
 	}
 }
@@ -36,6 +39,7 @@ func (o *Options) AddFlags(fs *pflag.FlagSet, prefix string) {
 	if prefix != "" {
 		prefix = prefix + "."
 	}
+	fs.BoolVar(&o.Enabled, prefix+"enabled", o.Enabled, "Toggle for enabling or disabling the consumer (default: true)")
 	fs.StringVar(&o.BootstrapServers, prefix+"bootstrap-servers", o.BootstrapServers, "sets the bootstrap server address and port for Kafka")
 	fs.StringVar(&o.ConsumerGroupID, prefix+"consumer-groupd-id", o.ConsumerGroupID, "sets the Kafka consumer group name (default: inventory-consumer)")
 	fs.StringVar(&o.Topic, prefix+"topic", o.Topic, "Kafka topic to monitor for events")
@@ -44,13 +48,13 @@ func (o *Options) AddFlags(fs *pflag.FlagSet, prefix string) {
 	fs.StringVar(&o.MaxPollInterval, prefix+"max-poll", o.MaxPollInterval, "length of time consumer can go without polling before considered dead (default: 300000ms)")
 	fs.StringVar(&o.EnableAutoCommit, prefix+"enable-auto-commit", o.EnableAutoCommit, "enables auto commit on consumer when messages are consumed (default: false)")
 	fs.StringVar(&o.AutoOffsetReset, prefix+"auto-offset-reset", o.AutoOffsetReset, "action to take when there is no initial offset in offset store (default: earliest)")
-	fs.StringVar(&o.StatisticsInterval, prefix+"statistics-interval", o.StatisticsInterval, "librdkafka statistics emit interval (default: 15000ms)")
+	fs.StringVar(&o.StatisticsInterval, prefix+"statistics-interval", o.StatisticsInterval, "librdkafka statistics emit interval (default: 60000ms)")
 }
 
 func (o *Options) Validate() []error {
 	var errs []error
 
-	if len(o.BootstrapServers) == 0 {
+	if len(o.BootstrapServers) == 0 && o.Enabled {
 		errs = append(errs, fmt.Errorf("bootstrap servers can not be empty"))
 	}
 

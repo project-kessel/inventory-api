@@ -4,8 +4,7 @@ server:
   grpc:
     address: 0.0.0.0:9081
 authn:
-  psk:
-    pre-shared-key-file: /psks.yaml
+  allow-unauthenticated: true
 authz:
   impl: kessel
   kessel:
@@ -19,8 +18,6 @@ eventing:
 storage:
   disable-persistence: false
   database: postgres
-  sqlite3:
-    dsn: inventory.db
   postgres:
     host: "invdatabase"
     port: "5433"
@@ -30,8 +27,11 @@ storage:
 resources:
   schemaPath: "data/schema/resources"
   use_cache: true
+consumer:
+  enabled: true
+  bootstrap-servers: kafka:9093
 log:
-  level: "debug"
+  level: "info"
   livez: true
   readyz: true
 

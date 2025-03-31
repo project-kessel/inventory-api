@@ -151,15 +151,19 @@ pr-check:
 
 .PHONY: inventory-up
 inventory-up:
-	./scripts/start-inventory.sh
+	./scripts/start-inventory.sh full-setup 8000 9000
+
+.PHONY: inventory-up-relations-ready
+inventory-up-relations-ready:
+	./scripts/start-inventory.sh full-setup-relations-ready 8081 9081
+
+.PHONY: inventory-up-split
+inventory-up-split:
+	./scripts/start-inventory.sh split-setup 8000 9000
 
 .PHONY: inventory-up-sso
 inventory-up-sso:
-	./scripts/start-inventory-kc.sh
-
-.PHONY: inventory-up-kafka
-inventory-up-kafka:
-	./scripts/start-inventory-kafka.sh
+	./scripts/start-inventory-kc.sh full-setup-w-sso 8081 9081
 
 .PHONY: inventory-up-kind
 inventory-up-kind:
@@ -172,14 +176,6 @@ get-token:
 .PHONY: inventory-down
 inventory-down:
 	./scripts/stop-inventory.sh
-
-.PHONY: inventory-down-sso
-inventory-down-sso:
-	./scripts/stop-inventory-kc.sh
-
-.PHONY: inventory-down-kafka
-inventory-down-kafka:
-	./scripts/stop-inventory-kafka.sh
 
 .PHONY: inventory-down-kind
 inventory-down-kind:

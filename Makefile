@@ -234,15 +234,15 @@ check-kafka-status:
 
 .PHONY: create-test-notification
 create-test-notification:
-	curl -H "Content-Type: application/json" -d @data/notifications-integrations.json localhost:8000/api/inventory/v1beta1/resources/notifications-integrations
+	curl -H "Content-Type: application/json" -d @data/testData/v1beta1/notifications-integrations.json localhost:8000/api/inventory/v1beta1/resources/notifications-integrations
 
 .PHONY: update-test-notification
 update-test-notification:
-	curl -X PUT -H "Content-Type: application/json" -d @data/notifications-integrations.json localhost:8000/api/inventory/v1beta1/resources/notifications-integrations
+	curl -X PUT -H "Content-Type: application/json" -d @data/testData/v1beta1/notifications-integrations.json localhost:8000/api/inventory/v1beta1/resources/notifications-integrations
 
 .PHONY: delete-test-notification
 delete-test-notification:
-	curl -X DELETE -H "Content-Type: application/json" -d @data/notifications-integration-reporter.json localhost:8000/api/inventory/v1beta1/resources/notifications-integrations
+	curl -X DELETE -H "Content-Type: application/json" -d @data/testData/v1beta1/notifications-integration-reporter.json localhost:8000/api/inventory/v1beta1/resources/notifications-integrations
 
 .PHONY: check-tuple-messages
 check-tuple-messages:

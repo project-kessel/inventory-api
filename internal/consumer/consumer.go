@@ -4,10 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"go.opentelemetry.io/otel"
 	"os"
 	"os/signal"
 	"syscall"
+
+	"go.opentelemetry.io/otel"
 
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
 	"github.com/go-kratos/kratos/v2/log"
@@ -81,8 +82,8 @@ type KeyPayload struct {
 
 // MessagePayload stores the event message value captured from the topic as emitted by Debezium
 type MessagePayload struct {
-	MessageSchema    map[string]interface{}          `json:"schema"`
-	RelationsRequest map[string]*kessel.Relationship `json:"payload"`
+	MessageSchema    map[string]interface{} `json:"schema"`
+	RelationsRequest interface{}            `json:"payload"`
 }
 
 // Consume begins the consumption loop for the Consumer
@@ -143,7 +144,7 @@ func (i *InventoryConsumer) Consume() error {
 					}
 				case "deleted":
 					i.Logger.Infof("operation=%s tuple=%s", operation, e.Value)
-					resp, err = i.DeleteTuple(context.Background(), e.Value)
+					_, err = i.DeleteTuple(context.Background(), e.Value)
 					if err != nil {
 						i.Logger.Infof("failed to delete tuple: %v", err)
 						continue
@@ -152,10 +153,12 @@ func (i *InventoryConsumer) Consume() error {
 					i.Logger.Infof("unknown operation: %v -- doing nothing", operation)
 				}
 
-				err = i.UpdateConsistencyToken(e.Key, fmt.Sprint(resp))
-				if err != nil {
-					i.Logger.Infof("failed to update consistency token: %v", err)
-					continue
+				if operation != string(model.OperationTypeDeleted.OperationType()) {
+					err = i.UpdateConsistencyToken(e.Key, fmt.Sprint(resp))
+					if err != nil {
+						i.Logger.Infof("failed to update consistency token: %v", err)
+						continue
+					}
 				}
 
 				// TODO: Commiting on every message is not ideal - we will need to revisit this as we consume more messages

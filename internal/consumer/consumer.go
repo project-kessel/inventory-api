@@ -153,10 +153,12 @@ func (i *InventoryConsumer) Consume() error {
 					i.Logger.Infof("unknown operation: %v -- doing nothing", operation)
 				}
 
-				err = i.UpdateConsistencyToken(e.Key, fmt.Sprint(resp))
-				if err != nil {
-					i.Logger.Infof("failed to update consistency token: %v", err)
-					continue
+				if operation != string(model.OperationTypeDeleted.OperationType()) {
+					err = i.UpdateConsistencyToken(e.Key, fmt.Sprint(resp))
+					if err != nil {
+						i.Logger.Infof("failed to update consistency token: %v", err)
+						continue
+					}
 				}
 
 				// TODO: Commiting on every message is not ideal - we will need to revisit this as we consume more messages
@@ -296,11 +298,6 @@ func (i *InventoryConsumer) DeleteTuple(ctx context.Context, msg []byte) (string
 // UpdateConsistencyToken updates the resource in the inventory DB to add the consistency token
 func (i *InventoryConsumer) UpdateConsistencyToken(msg []byte, token string) error {
 	var msgPayload *KeyPayload
-
-	// no consistency token to update with
-	if token == "" {
-		return nil
-	}
 
 	// msg key is expected to be the inventory_id of a resource
 	err := json.Unmarshal(msg, &msgPayload)

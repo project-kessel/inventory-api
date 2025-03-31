@@ -82,8 +82,8 @@ type KeyPayload struct {
 
 // MessagePayload stores the event message value captured from the topic as emitted by Debezium
 type MessagePayload struct {
-	MessageSchema    map[string]interface{}          `json:"schema"`
-	RelationsRequest map[string]*kessel.Relationship `json:"payload"`
+	MessageSchema    map[string]interface{} `json:"schema"`
+	RelationsRequest interface{}            `json:"payload"`
 }
 
 // Consume begins the consumption loop for the Consumer

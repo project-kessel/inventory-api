@@ -18,7 +18,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/patrickmn/go-cache v2.1.0+incompatible
 	github.com/project-kessel/inventory-client-go v0.0.0-20250220124954-dedacb3f2537
-	github.com/project-kessel/relations-api v0.0.0-20250314150016-f4fdda3f12b0
+	github.com/project-kessel/relations-api v0.0.0-20250325175123-adb587fbff16
 	github.com/prometheus/client_golang v1.21.1
 	github.com/redhatinsights/app-common-go v1.6.8
 	github.com/spf13/cobra v1.9.1

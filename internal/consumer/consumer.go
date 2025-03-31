@@ -4,10 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"go.opentelemetry.io/otel"
 	"os"
 	"os/signal"
 	"syscall"
+
+	"go.opentelemetry.io/otel"
 
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
 	"github.com/go-kratos/kratos/v2/log"
@@ -143,7 +144,7 @@ func (i *InventoryConsumer) Consume() error {
 					}
 				case "deleted":
 					i.Logger.Infof("operation=%s tuple=%s", operation, e.Value)
-					resp, err = i.DeleteTuple(context.Background(), e.Value)
+					_, err = i.DeleteTuple(context.Background(), e.Value)
 					if err != nil {
 						i.Logger.Infof("failed to delete tuple: %v", err)
 						continue
@@ -295,6 +296,11 @@ func (i *InventoryConsumer) DeleteTuple(ctx context.Context, msg []byte) (string
 // UpdateConsistencyToken updates the resource in the inventory DB to add the consistency token
 func (i *InventoryConsumer) UpdateConsistencyToken(msg []byte, token string) error {
 	var msgPayload *KeyPayload
+
+	// no consistency token to update with
+	if token == "" {
+		return nil
+	}
 
 	// msg key is expected to be the inventory_id of a resource
 	err := json.Unmarshal(msg, &msgPayload)

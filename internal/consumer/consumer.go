@@ -356,7 +356,3 @@ func (i *InventoryConsumer) Shutdown() error {
 	}
 	return nil
 }
-
-//func (i *InventoryConsumer) WithRetry(attemp int, backoff int, operation func()) {
-//
-//}

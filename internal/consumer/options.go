@@ -3,21 +3,23 @@ package consumer
 import (
 	"fmt"
 
+	"github.com/project-kessel/inventory-api/internal/consumer/retry"
 	"github.com/spf13/pflag"
 )
 
 type Options struct {
-	Enabled            bool   `mapstructure:"enabled"`
-	BootstrapServers   string `mapstructure:"bootstrap-servers"`
-	ConsumerGroupID    string `mapstructure:"consumer-group-id"`
-	Topic              string `mapstructure:"topic"`
-	SessionTimeout     string `mapstructure:"session-timeout"`
-	HeartbeatInterval  string `mapstructure:"heartbeat-interval"`
-	MaxPollInterval    string `mapstructure:"max-poll-interval"`
-	EnableAutoCommit   string `mapstructure:"enable-auto-commit"`
-	AutoOffsetReset    string `mapstructure:"auto-offset-reset"`
-	StatisticsInterval string `mapstructure:"statistics-interval-ms"`
-	Debug              string `mapstructure:"debug"`
+	Enabled            bool           `mapstructure:"enabled"`
+	BootstrapServers   string         `mapstructure:"bootstrap-servers"`
+	ConsumerGroupID    string         `mapstructure:"consumer-group-id"`
+	Topic              string         `mapstructure:"topic"`
+	SessionTimeout     string         `mapstructure:"session-timeout"`
+	HeartbeatInterval  string         `mapstructure:"heartbeat-interval"`
+	MaxPollInterval    string         `mapstructure:"max-poll-interval"`
+	EnableAutoCommit   string         `mapstructure:"enable-auto-commit"`
+	AutoOffsetReset    string         `mapstructure:"auto-offset-reset"`
+	StatisticsInterval string         `mapstructure:"statistics-interval-ms"`
+	Debug              string         `mapstructure:"debug"`
+	RetryOptions       *retry.Options `mapstructure:"retry-options"`
 }
 
 func NewOptions() *Options {
@@ -32,6 +34,7 @@ func NewOptions() *Options {
 		AutoOffsetReset:    "earliest",
 		StatisticsInterval: "60000",
 		Debug:              "",
+		RetryOptions:       retry.NewOptions(),
 	}
 }
 
@@ -48,7 +51,10 @@ func (o *Options) AddFlags(fs *pflag.FlagSet, prefix string) {
 	fs.StringVar(&o.MaxPollInterval, prefix+"max-poll", o.MaxPollInterval, "length of time consumer can go without polling before considered dead (default: 300000ms)")
 	fs.StringVar(&o.EnableAutoCommit, prefix+"enable-auto-commit", o.EnableAutoCommit, "enables auto commit on consumer when messages are consumed (default: false)")
 	fs.StringVar(&o.AutoOffsetReset, prefix+"auto-offset-reset", o.AutoOffsetReset, "action to take when there is no initial offset in offset store (default: earliest)")
-	fs.StringVar(&o.StatisticsInterval, prefix+"statistics-interval", o.StatisticsInterval, "librdkafka statistics emit interval (default: 60000ms)")
+	fs.StringVar(&o.StatisticsInterval, prefix+"statistics-interval", o.StatisticsInterval, "librdkafka statistics emit interval (default: 15000ms)")
+
+	o.RetryOptions.AddFlags(fs, prefix+"retry-options")
+
 }
 
 func (o *Options) Validate() []error {

@@ -3,8 +3,6 @@ module github.com/project-kessel/inventory-api
 // Bumping to versions above 1.22.9 will break the E2E tests
 go 1.22.9
 
-toolchain go1.24.0
-
 require (
 	buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go v1.36.5-20250307204501-0409229c3780.1
 	github.com/authzed/grpcutil v0.0.0-20240123194739-2ea1e3d2d98b

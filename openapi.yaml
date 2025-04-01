@@ -600,35 +600,6 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/google.rpc.Status'
-    /api/inventory/v1beta2/resources?localResourceId={reporter_type:
-        get:
-            tags:
-                - KesselResourceService
-            operationId: KesselResourceService_DeleteResource
-            parameters:
-                - name: localResourceId
-                  in: path
-                  required: true
-                  schema:
-                    type: string
-                - name: reporterType
-                  in: path
-                  required: true
-                  schema:
-                    type: string
-            responses:
-                "200":
-                    description: OK
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/kessel.inventory.v1beta2.DeleteResourceResponse'
-                default:
-                    description: Default error response
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/google.rpc.Status'
 components:
     schemas:
         google.protobuf.Any:

@@ -3,6 +3,7 @@ package common
 import (
 	"encoding/json"
 	"errors"
+	"google.golang.org/protobuf/types/known/structpb"
 	"strings"
 
 	"github.com/google/uuid"
@@ -81,11 +82,13 @@ func ToJsonObject(in interface{}) (model.JsonObject, error) {
 }
 
 // TODO: Figure out how to store workspaceId in schema
-func ExtractWorkspaceId(in interface{}) (string, error) {
-	if in == nil {
-		return "", nil
+func ExtractWorkspaceId(commonResourceData *structpb.Struct) (string, error) {
+	var workspaceId string
+	if commonResourceData != nil {
+		workspaceId = commonResourceData.GetFields()["workspace_id"].GetStringValue()
+		return workspaceId, nil
 	}
-	return "someWorkspaceId", nil
+	return workspaceId, nil
 }
 
 func ExtractInventoryId(inventoryIDStr string) (*uuid.UUID, error) {

@@ -2,10 +2,12 @@ package serve
 
 import (
 	"context"
+	e "errors"
 	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/project-kessel/inventory-api/internal/consumer"
 
@@ -168,12 +170,6 @@ func NewCommand(
 				return err
 			}
 
-			if !storageOptions.DisablePersistence && consumerOptions.Enabled {
-				inventoryConsumer, err = consumer.New(consumerConfig, db, authzConfig, authorizer, log.NewHelper(log.With(logger, "subsystem", "inventoryConsumer")))
-				if err != nil {
-					return err
-				}
-			}
 			// construct servers
 			server, err := server.New(serverConfig, middleware.Authentication(authenticator), logger)
 			if err != nil {
@@ -251,19 +247,40 @@ func NewCommand(
 				srvErrs <- server.Run(ctx)
 			}()
 
+			shutdown := shutdown(db, server, eventingManager, inventoryConsumer, log.NewHelper(logger))
+
 			if !storageOptions.DisablePersistence && consumerOptions.Enabled {
 				go func() {
-					err := inventoryConsumer.Consume()
-					if err != nil {
-						inventoryConsumer.Errors <- err
+					retries := 0
+					for retries < consumerOptions.RetryOptions.ConsumerMaxRetries {
+						// If the consumer cannot process a message, the consumer loop is restarted
+						// This is to ensure we re-read the message and prevent it being dropped and moving to next message.
+						// To re-read the current message, we have to recreate the consumer connection so that the earliest offset is used
+						inventoryConsumer, err = consumer.New(consumerConfig, db, authzConfig, authorizer, log.NewHelper(log.With(logger, "subsystem", "inventoryConsumer")))
+						if err != nil {
+							shutdown(err)
+						}
+						err = inventoryConsumer.Consume()
+						if e.Is(err, consumer.ClosedError) {
+							inventoryConsumer.Logger.Errorf("consumer unable to process current message -- restarting consumer")
+							retries++
+							if retries < consumerOptions.RetryOptions.ConsumerMaxRetries {
+								backoff := time.Duration(inventoryConsumer.RetryOptions.BackoffFactor*retries*300) * time.Millisecond
+								inventoryConsumer.Logger.Errorf("retrying in %v", backoff)
+								time.Sleep(backoff)
+							}
+							continue
+						} else {
+							inventoryConsumer.Logger.Errorf("consumer unable to process messages: %v", err)
+							shutdown(err)
+						}
 					}
+					shutdown(fmt.Errorf("consumer unable to process current message -- max retries reached"))
 				}()
 			}
 
 			quit := make(chan os.Signal, 1)
 			signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
-
-			shutdown := shutdown(db, server, eventingManager, inventoryConsumer, log.NewHelper(logger))
 
 			select {
 			case err := <-srvErrs:
@@ -283,6 +300,7 @@ func NewCommand(
 	authnOptions.AddFlags(cmd.Flags(), "authn")
 	authzOptions.AddFlags(cmd.Flags(), "authz")
 	eventingOptions.AddFlags(cmd.Flags(), "eventing")
+	consumerOptions.AddFlags(cmd.Flags(), "consumer")
 
 	return cmd
 }

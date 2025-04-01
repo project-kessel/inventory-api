@@ -70,9 +70,12 @@ func LogConfigurationInfo(options *OptionsConfig) {
 		)
 	}
 
-	log.Debugf("Consumer Configuration: Bootstrap Server: %s, Topic: %s",
+	log.Debugf("Consumer Configuration: Bootstrap Server: %s, Topic: %s, Consumer Max Retries: %d, Operation Max Retries: %d, Backoff Factor: %d",
 		options.Consumer.BootstrapServers,
-		options.Consumer.Topic)
+		options.Consumer.Topic,
+		options.Consumer.RetryOptions.ConsumerMaxRetries,
+		options.Consumer.RetryOptions.OperationMaxRetries,
+		options.Consumer.RetryOptions.BackoffFactor)
 }
 
 // InjectClowdAppConfig updates service options based on values in the ClowdApp AppConfig

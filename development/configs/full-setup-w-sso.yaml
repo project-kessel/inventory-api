@@ -31,6 +31,10 @@ storage:
 consumer:
   enabled: true
   bootstrap-servers: kafka:9093
+  retry-options:
+    consumer-max-retries: 3
+    operation-max-retries: 4
+    backoff-factor: 5
 resources:
   schemaPath: "data/schema/resources"
   use_cache: true

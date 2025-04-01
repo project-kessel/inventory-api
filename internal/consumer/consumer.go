@@ -3,10 +3,13 @@ package consumer
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"github.com/project-kessel/inventory-api/internal/consumer/retry"
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/project-kessel/inventory-api/internal/authz/allow"
 	"github.com/project-kessel/inventory-api/internal/authz/kessel"
@@ -24,14 +27,17 @@ import (
 	"gorm.io/gorm"
 )
 
+var ClosedError = errors.New("consumer closed")
+
 type Consumer interface {
 	Consume() error
-	CreateTuple(ctx context.Context, msg []byte) (string, error)
-	UpdateTuple(ctx context.Context, msg []byte) (string, error)
-	DeleteTuple(ctx context.Context, msg []byte) (string, error)
-	UpdateConsistencyToken(msg []byte, token string) error
+	CreateTuple(ctx context.Context, tuple *v1beta1.Relationship) (string, error)
+	UpdateTuple(ctx context.Context, tuple *v1beta1.Relationship) (string, error)
+	DeleteTuple(ctx context.Context, filter *v1beta1.RelationTupleFilter) (string, error)
+	UpdateConsistencyToken(inventoryID, token string) error
 	Errs() <-chan error
 	Shutdown() error
+	Retry(operation func() (string, error)) (string, error)
 }
 
 // InventoryConsumer defines a Kafka Consumer with required clients and configs to call Relations API and update the Inventory DB with consistency tokens
@@ -44,6 +50,7 @@ type InventoryConsumer struct {
 	Errors           chan error
 	MetricsCollector *MetricsCollector
 	Logger           *log.Helper
+	RetryOptions     *retry.Options
 }
 
 // New instantiates a new InventoryConsumer
@@ -63,6 +70,12 @@ func New(config CompletedConfig, db *gorm.DB, authz authz.CompletedConfig, autho
 		return InventoryConsumer{}, err
 	}
 
+	retryOptions := &retry.Options{
+		ConsumerMaxRetries:  config.RetryConfig.ConsumerMaxRetries,
+		OperationMaxRetries: config.RetryConfig.OperationMaxRetries,
+		BackoffFactor:       config.RetryConfig.BackoffFactor,
+	}
+
 	var errChan chan error
 
 	return InventoryConsumer{
@@ -74,6 +87,7 @@ func New(config CompletedConfig, db *gorm.DB, authz authz.CompletedConfig, autho
 		Errors:           errChan,
 		MetricsCollector: &mc,
 		Logger:           logger,
+		RetryOptions:     retryOptions,
 	}, nil
 }
 
@@ -142,27 +156,48 @@ func (i *InventoryConsumer) Consume() error {
 				case string(model.OperationTypeCreated):
 					i.Logger.Infof("operation=%s tuple=%s", operation, e.Value)
 					if relationsEnabled {
-						resp, err = i.CreateTuple(context.Background(), e.Value)
+						tuple, err := ParseCreateOrUpdateMessage(e.Value)
+						if err != nil {
+							i.Logger.Errorf("failed to parse message for tuple: %v", err)
+						}
+						resp, err = i.Retry(func() (string, error) {
+							return i.CreateTuple(context.Background(), tuple)
+						})
 						if err != nil {
 							i.Logger.Infof("failed to create tuple: %v", err)
+							run = false
 							continue
 						}
 					}
 				case string(model.OperationTypeUpdated):
 					i.Logger.Infof("operation=%s tuple=%s", operation, e.Value)
 					if relationsEnabled {
-						resp, err = i.UpdateTuple(context.Background(), e.Value)
+						tuple, err := ParseCreateOrUpdateMessage(e.Value)
+						if err != nil {
+							i.Logger.Errorf("failed to parse message for tuple: %v", err)
+						}
+						resp, err = i.Retry(func() (string, error) {
+							return i.UpdateTuple(context.Background(), tuple)
+						})
 						if err != nil {
 							i.Logger.Infof("failed to update tuple: %v", err)
+							run = false
 							continue
 						}
 					}
 				case string(model.OperationTypeDeleted):
 					i.Logger.Infof("operation=%s tuple=%s", operation, e.Value)
 					if relationsEnabled {
-						_, err = i.DeleteTuple(context.Background(), e.Value)
+						filter, err := ParseDeleteMessage(e.Value)
+						if err != nil {
+							i.Logger.Errorf("failed to parse message for filter: %v", err)
+						}
+						_, err = i.Retry(func() (string, error) {
+							return i.DeleteTuple(context.Background(), filter)
+						})
 						if err != nil {
 							i.Logger.Infof("failed to delete tuple: %v", err)
+							run = false
 							continue
 						}
 					}
@@ -171,7 +206,11 @@ func (i *InventoryConsumer) Consume() error {
 				}
 
 				if operation != string(model.OperationTypeDeleted) {
-					err = i.UpdateConsistencyToken(e.Key, fmt.Sprint(resp))
+					inventoryID, err := ParseMessageKey(e.Key)
+					if err != nil {
+						i.Logger.Errorf("failed to parse message key for for ID: %v", err)
+					}
+					err = i.UpdateConsistencyToken(inventoryID, fmt.Sprint(resp))
 					if err != nil {
 						i.Logger.Infof("failed to update consistency token: %v", err)
 						continue
@@ -212,27 +251,59 @@ func (i *InventoryConsumer) Consume() error {
 		}
 	}
 	err = i.Shutdown()
-	if err != nil {
+	if !errors.Is(err, ClosedError) {
 		return fmt.Errorf("error in consumer shutdown: %v", err)
 	}
-	return nil
+	return err
 }
 
-// CreateTuple calls the Relations API to create a tuple from the message payload received and returns the consistency token
-func (i *InventoryConsumer) CreateTuple(ctx context.Context, msg []byte) (string, error) {
+func ParseCreateOrUpdateMessage(msg []byte) (*v1beta1.Relationship, error) {
 	var msgPayload *MessagePayload
 	var tuple *v1beta1.Relationship
 
 	// msg value is expected to be a valid JSON body for a single relation
 	err := json.Unmarshal(msg, &msgPayload)
 	if err != nil {
-		return "", fmt.Errorf("error unmarshaling msgPayload: %v", err)
+		return nil, fmt.Errorf("error unmarshaling msgPayload: %v", err)
 	}
 
 	err = json.Unmarshal([]byte(fmt.Sprintf("%v", msgPayload.RelationsRequest)), &tuple)
 	if err != nil {
-		return "", fmt.Errorf("error unmarshaling tuple payload: %v", err)
+		return nil, fmt.Errorf("error unmarshaling tuple payload: %v", err)
 	}
+	return tuple, nil
+}
+
+func ParseDeleteMessage(msg []byte) (*v1beta1.RelationTupleFilter, error) {
+	var msgPayload *MessagePayload
+	var filter *v1beta1.RelationTupleFilter
+
+	// msg value is expected to be a valid JSON body for a single relation
+	err := json.Unmarshal(msg, &msgPayload)
+	if err != nil {
+		return nil, fmt.Errorf("error unmarshaling msgPayload: %v", err)
+	}
+
+	err = json.Unmarshal([]byte(fmt.Sprintf("%v", msgPayload.RelationsRequest)), &filter)
+	if err != nil {
+		return nil, fmt.Errorf("error unmarshaling tuple payload: %v", err)
+	}
+	return filter, nil
+}
+
+func ParseMessageKey(msg []byte) (string, error) {
+	var msgPayload *KeyPayload
+
+	// msg key is expected to be the inventory_id of a resource
+	err := json.Unmarshal(msg, &msgPayload)
+	if err != nil {
+		return "", fmt.Errorf("error unmarshaling msgPayload: %v", err)
+	}
+	return msgPayload.InventoryID, nil
+}
+
+// CreateTuple calls the Relations API to create a tuple from the message payload received and returns the consistency token
+func (i *InventoryConsumer) CreateTuple(ctx context.Context, tuple *v1beta1.Relationship) (string, error) {
 
 	resp, err := i.Authorizer.CreateTuples(ctx, &v1beta1.CreateTuplesRequest{
 		Tuples: []*v1beta1.Relationship{tuple},
@@ -261,21 +332,7 @@ func (i *InventoryConsumer) CreateTuple(ctx context.Context, msg []byte) (string
 }
 
 // UpdateTuple calls the Relations API to create a tuple from the message payload received and returns the consistency token
-func (i *InventoryConsumer) UpdateTuple(ctx context.Context, msg []byte) (string, error) {
-	var msgPayload *MessagePayload
-	var tuple *v1beta1.Relationship
-
-	// msg value is expected to be a valid JSON body for a single relation
-	err := json.Unmarshal(msg, &msgPayload)
-	if err != nil {
-		return "", fmt.Errorf("error unmarshaling msgPayload: %v", err)
-	}
-
-	err = json.Unmarshal([]byte(fmt.Sprintf("%v", msgPayload.RelationsRequest)), &tuple)
-	if err != nil {
-		return "", fmt.Errorf("error unmarshaling tuple payload: %v", err)
-	}
-
+func (i *InventoryConsumer) UpdateTuple(ctx context.Context, tuple *v1beta1.Relationship) (string, error) {
 	resp, err := i.Authorizer.CreateTuples(ctx, &v1beta1.CreateTuplesRequest{
 		Tuples: []*v1beta1.Relationship{tuple},
 		Upsert: true,
@@ -288,21 +345,7 @@ func (i *InventoryConsumer) UpdateTuple(ctx context.Context, msg []byte) (string
 }
 
 // DeleteTuple calls the Relations API to create a tuple from the message payload received and returns the consistency token
-func (i *InventoryConsumer) DeleteTuple(ctx context.Context, msg []byte) (string, error) {
-	var msgPayload *MessagePayload
-	var filter *v1beta1.RelationTupleFilter
-
-	// msg value is expected to be a valid JSON body for a single relation
-	err := json.Unmarshal(msg, &msgPayload)
-	if err != nil {
-		return "", fmt.Errorf("error unmarshaling msgPayload: %v", err)
-	}
-
-	err = json.Unmarshal([]byte(fmt.Sprintf("%v", msgPayload.RelationsRequest)), &filter)
-	if err != nil {
-		return "", fmt.Errorf("error unmarshaling tuple payload: %v", err)
-	}
-
+func (i *InventoryConsumer) DeleteTuple(ctx context.Context, filter *v1beta1.RelationTupleFilter) (string, error) {
 	resp, err := i.Authorizer.DeleteTuples(ctx, &v1beta1.DeleteTuplesRequest{
 		Filter: filter,
 	})
@@ -313,17 +356,9 @@ func (i *InventoryConsumer) DeleteTuple(ctx context.Context, msg []byte) (string
 }
 
 // UpdateConsistencyToken updates the resource in the inventory DB to add the consistency token
-func (i *InventoryConsumer) UpdateConsistencyToken(msg []byte, token string) error {
-	var msgPayload *KeyPayload
-
-	// msg key is expected to be the inventory_id of a resource
-	err := json.Unmarshal(msg, &msgPayload)
-	if err != nil {
-		return fmt.Errorf("error unmarshaling msgPayload: %v", err)
-	}
-
+func (i *InventoryConsumer) UpdateConsistencyToken(inventoryID, token string) error {
 	// this will update all records for the same inventory_id with current consistency token
-	i.DB.Model(model.Resource{}).Where("inventory_id = ?", msgPayload.InventoryID).Update("consistency_token", token)
+	i.DB.Model(model.Resource{}).Where("inventory_id = ?", inventoryID).Update("consistency_token", token)
 	return nil
 }
 
@@ -336,11 +371,37 @@ func (i *InventoryConsumer) Errs() <-chan error {
 func (i *InventoryConsumer) Shutdown() error {
 	// TODO, shutting down the consumer should attempt to commit the offset if we've processed the message
 	// for now it just stops the consumer connection
-
-	err := i.Consumer.Close()
-	if err != nil {
-		i.Logger.Errorf("Error closing kafka consumer: %v", err)
-		return err
+	if !i.Consumer.IsClosed() {
+		err := i.Consumer.Close()
+		if err != nil {
+			i.Logger.Errorf("Error closing kafka consumer: %v", err)
+			return err
+		}
+		return ClosedError
 	}
-	return nil
+	return ClosedError
+}
+
+// Retry executes the given function and will retry on failure with backoff until max retries is reached
+func (i *InventoryConsumer) Retry(operation func() (string, error)) (string, error) {
+	attempts := 0
+	var resp interface{}
+	var err error
+
+	for attempts < i.RetryOptions.OperationMaxRetries {
+		resp, err = operation()
+		if err != nil {
+			i.Logger.Errorf("request failed: %v", err)
+			attempts++
+			if attempts < i.RetryOptions.OperationMaxRetries {
+				backoff := time.Duration(i.RetryOptions.BackoffFactor*attempts*300) * time.Millisecond
+				i.Logger.Errorf("retrying in %v", backoff)
+				time.Sleep(backoff)
+			}
+			continue
+		}
+		return fmt.Sprintf("%s", resp), nil
+	}
+	i.Logger.Errorf("Error processing request (max attempts reached: %v): %v", attempts, err)
+	return "", err
 }

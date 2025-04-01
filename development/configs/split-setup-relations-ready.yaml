@@ -1,12 +1,17 @@
 server:
   http:
-    address: 0.0.0.0:8000
+    address: 0.0.0.0:8081
   grpc:
-    address: 0.0.0.0:9000
+    address: 0.0.0.0:9081
 authn:
   allow-unauthenticated: true
 authz:
-  impl: allow-all
+  impl: kessel
+  kessel:
+    insecure-client: true
+    url: relations-api:9000
+    enable-oidc-auth: false
+    principal-user-domain: 0.0.0.0:8084
 eventing:
   eventer: stdout
   kafka:

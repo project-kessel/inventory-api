@@ -178,6 +178,26 @@ make local-build
 ./bin/inventory-api serve --config development/configs/split-setup.yaml --storage.postgres.host localhost
 ```
 
+#### Split Setup + Kessel Relations
+
+Same as Split Setup which leverages a local Inventory API and Docker for the dependent infra, but updates the Inventory API server ports to not conflict with a running Relations API
+
+To deploy Relations API, it's recommended to clone the Relations API repo locally and leverage their existing [Docker Compose process](https://github.com/project-kessel/relations-api/tree/main?tab=readme-ov-file#spicedb-using-dockerpodman) to spin up the Relations API.
+
+To start the Relations-ready Split Setup:
+```shell
+make inventory-up-split-relations-ready
+```
+
+Then to run Inventory:
+```shell
+# Setup
+make local-build
+
+# run with the split config file (postgres host flag overwrites config locally which is set for Docker internal address)
+./bin/inventory-api serve --config development/configs/split-setup-relations-ready.yaml --storage.postgres.host localhost
+```
+
 #### Kessel Inventory + Kessel Relations + SSO (Keycloak) using Docker Compose
 
 This setup expands on the Relations-ready Full Setup by:

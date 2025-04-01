@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/project-kessel/inventory-api/internal/consumer"
+	"github.com/project-kessel/inventory-api/internal/pubsub"
 
 	"github.com/google/uuid"
 
@@ -53,10 +54,12 @@ type Usecase struct {
 	log                         *log.Helper
 	Server                      server.Server
 	DisablePersistence          bool
+	ListenManager               pubsub.ListenManager
 }
 
 func New(reporterResourceRepository ReporterResourceRepository, inventoryResourceRepository InventoryResourceRepository,
-	authz authzapi.Authorizer, eventer eventingapi.Manager, namespace string, logger log.Logger, disablePersistence bool) *Usecase {
+	authz authzapi.Authorizer, eventer eventingapi.Manager, namespace string, logger log.Logger, disablePersistence bool,
+	listenManager pubsub.ListenManager) *Usecase {
 	return &Usecase{
 		reporterResourceRepository:  reporterResourceRepository,
 		inventoryResourceRepository: inventoryResourceRepository,
@@ -65,6 +68,7 @@ func New(reporterResourceRepository ReporterResourceRepository, inventoryResourc
 		Namespace:                   namespace,
 		log:                         log.NewHelper(logger),
 		DisablePersistence:          disablePersistence,
+		ListenManager:               listenManager,
 	}
 }
 
@@ -97,11 +101,6 @@ func (uc *Usecase) Upsert(ctx context.Context, m *model.Resource) (*model.Resour
 		if err2 != nil {
 			return ret, err2
 		}
-	} else {
-		// mock the created at time for eventing
-		// TODO: remove this when persistence is always enabled
-		now := time.Now()
-		m.CreatedAt = &now
 	}
 
 	uc.log.WithContext(ctx).Infof("Created Resource: %v(%v)", m.ID, m.ResourceType)
@@ -269,6 +268,42 @@ func (uc *Usecase) Create(ctx context.Context, m *model.Resource) (*model.Resour
 		ret, err = uc.reporterResourceRepository.Create(ctx, m, uc.Namespace)
 		if err != nil {
 			return nil, err
+		}
+
+		uuidTx, err := uuid.NewV7()
+		if err != nil {
+			return nil, err
+		}
+
+		uc.log.WithContext(ctx).Infof("Waiting for notification: %v", uuidTx.String())
+
+		timeoutCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+		defer cancel()
+
+		subscription := uc.ListenManager.Subscribe(uuidTx.String())
+		defer subscription.Unsubscribe(ctx)
+
+	loop:
+		for {
+			select {
+			case notification := <-subscription.NotificationC():
+				if string(notification) == uuidTx.String() {
+					uc.log.WithContext(ctx).Infof("Received valid notification: %v", notification)
+					uc.log.WithContext(ctx).Infof("breaking with valid notification")
+					break loop
+				}
+				uc.log.WithContext(ctx).Infof("Received invalid notification: %v", notification)
+			case <-timeoutCtx.Done():
+				if timeoutCtx.Err() == context.DeadlineExceeded {
+					uc.log.WithContext(ctx).Info("Timeout occurred while waiting for notification")
+				} else if timeoutCtx.Err() != nil {
+					uc.log.WithContext(ctx).Errorf("Context error while waiting for notification: %v", timeoutCtx.Err())
+				} else {
+					uc.log.WithContext(ctx).Info("Context canceled while waiting for notification")
+				}
+				uc.log.WithContext(ctx).Infof("breaking due to timeout")
+				break loop
+			}
 		}
 	}
 

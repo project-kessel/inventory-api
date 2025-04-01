@@ -25,7 +25,7 @@ func Migrate(db *gorm.DB, logger *log.Helper) error {
 		return fmt.Errorf("auto migration has failed: %w", err)
 	}
 
-	if db.Dialector.Name() == "sqlite" {
+	if db.Name() == "sqlite" {
 		// Ensures sqlite honors the foreign keys
 		err := db.Exec("PRAGMA foreign_keys = ON").Error
 		if err != nil {

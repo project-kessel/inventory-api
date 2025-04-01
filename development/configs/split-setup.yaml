@@ -22,6 +22,10 @@ storage:
 consumer:
   enabled: true
   bootstrap-servers: localhost:9092
+  retry-options:
+    consumer-max-retries: 3
+    operation-max-retries: 4
+    backoff-factor: 5
 resources:
   schemaPath: "data/schema/resources"
   use_cache: true

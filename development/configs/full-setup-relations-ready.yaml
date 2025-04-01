@@ -30,6 +30,10 @@ resources:
 consumer:
   enabled: true
   bootstrap-servers: kafka:9093
+  retry-options:
+    consumer-max-retries: 3
+    operation-max-retries: 4
+    backoff-factor: 5
 log:
   level: "info"
   livez: true

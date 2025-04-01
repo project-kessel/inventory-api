@@ -2,6 +2,7 @@ package consumer
 
 import (
 	"fmt"
+	"github.com/project-kessel/inventory-api/internal/consumer/retry"
 
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
 )
@@ -11,11 +12,15 @@ const clientID = "inventory-consumer"
 type Config struct {
 	*Options
 	KafkaConfig *kafka.ConfigMap
+
+	RetryConfig *retry.Config
 }
 
 type completedConfig struct {
+	*Options
 	Topic       string
 	KafkaConfig *kafka.ConfigMap
+	RetryConfig *retry.Config
 }
 
 type CompletedConfig struct {
@@ -23,9 +28,11 @@ type CompletedConfig struct {
 }
 
 func NewConfig(o *Options) *Config {
-	return &Config{
+	cfg := &Config{
 		Options: o,
 	}
+	cfg.RetryConfig = retry.NewConfig(o.RetryOptions)
+	return cfg
 }
 
 func (c *Config) Complete() (CompletedConfig, []error) {
@@ -73,9 +80,10 @@ func (c *Config) Complete() (CompletedConfig, []error) {
 	if len(errs) > 0 {
 		return CompletedConfig{}, errs
 	}
-
 	return CompletedConfig{&completedConfig{
 		KafkaConfig: config,
 		Topic:       c.Topic,
+		Options:     c.Options,
+		RetryConfig: c.RetryConfig,
 	}}, nil
 }

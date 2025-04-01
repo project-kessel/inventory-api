@@ -3,6 +3,7 @@ package consumer
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/project-kessel/inventory-api/internal/consumer/retry"
 	"os"
@@ -26,7 +27,7 @@ import (
 	"gorm.io/gorm"
 )
 
-type Operation[T any] func(any, any) (T, error)
+var ClosedError = errors.New("consumer closed")
 
 type Consumer interface {
 	Consume() error
@@ -69,6 +70,12 @@ func New(config CompletedConfig, db *gorm.DB, authz authz.CompletedConfig, autho
 		return InventoryConsumer{}, err
 	}
 
+	retryOptions := &retry.Options{
+		ConsumerMaxRetries:  config.RetryConfig.ConsumerMaxRetries,
+		OperationMaxRetries: config.RetryConfig.OperationMaxRetries,
+		BackoffFactor:       config.RetryConfig.BackoffFactor,
+	}
+
 	var errChan chan error
 
 	return InventoryConsumer{
@@ -80,7 +87,7 @@ func New(config CompletedConfig, db *gorm.DB, authz authz.CompletedConfig, autho
 		Errors:           errChan,
 		MetricsCollector: &mc,
 		Logger:           logger,
-		RetryOptions:     retry.NewOptions(),
+		RetryOptions:     retryOptions,
 	}, nil
 }
 
@@ -244,10 +251,10 @@ func (i *InventoryConsumer) Consume() error {
 		}
 	}
 	err = i.Shutdown()
-	if err != nil {
+	if !errors.Is(err, ClosedError) {
 		return fmt.Errorf("error in consumer shutdown: %v", err)
 	}
-	return nil
+	return err
 }
 
 func ParseCreateOrUpdateMessage(msg []byte) (*v1beta1.Relationship, error) {
@@ -370,8 +377,9 @@ func (i *InventoryConsumer) Shutdown() error {
 			i.Logger.Errorf("Error closing kafka consumer: %v", err)
 			return err
 		}
+		return ClosedError
 	}
-	return nil
+	return ClosedError
 }
 
 // Retry executes the given function and will retry on failure with backoff until max retries is reached

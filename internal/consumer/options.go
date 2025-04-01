@@ -2,8 +2,8 @@ package consumer
 
 import (
 	"fmt"
-
 	"github.com/project-kessel/inventory-api/internal/consumer/retry"
+
 	"github.com/spf13/pflag"
 )
 
@@ -32,7 +32,7 @@ func NewOptions() *Options {
 		MaxPollInterval:    "300000",
 		EnableAutoCommit:   "false",
 		AutoOffsetReset:    "earliest",
-		StatisticsInterval: "30000",
+		StatisticsInterval: "60000",
 		Debug:              "",
 		RetryOptions:       retry.NewOptions(),
 	}
@@ -51,10 +51,9 @@ func (o *Options) AddFlags(fs *pflag.FlagSet, prefix string) {
 	fs.StringVar(&o.MaxPollInterval, prefix+"max-poll", o.MaxPollInterval, "length of time consumer can go without polling before considered dead (default: 300000ms)")
 	fs.StringVar(&o.EnableAutoCommit, prefix+"enable-auto-commit", o.EnableAutoCommit, "enables auto commit on consumer when messages are consumed (default: false)")
 	fs.StringVar(&o.AutoOffsetReset, prefix+"auto-offset-reset", o.AutoOffsetReset, "action to take when there is no initial offset in offset store (default: earliest)")
-	fs.StringVar(&o.StatisticsInterval, prefix+"statistics-interval", o.StatisticsInterval, "librdkafka statistics emit interval (default: 15000ms)")
+	fs.StringVar(&o.StatisticsInterval, prefix+"statistics-interval", o.StatisticsInterval, "librdkafka statistics emit interval (default: 60000ms)")
 
 	o.RetryOptions.AddFlags(fs, prefix+"retry-options")
-
 }
 
 func (o *Options) Validate() []error {
@@ -63,7 +62,6 @@ func (o *Options) Validate() []error {
 	if len(o.BootstrapServers) == 0 && o.Enabled {
 		errs = append(errs, fmt.Errorf("bootstrap servers can not be empty"))
 	}
-
 	return errs
 }
 

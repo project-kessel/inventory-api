@@ -150,6 +150,24 @@ func NewCommand(
 			if err != nil {
 				return err
 			}
+			// construct pubsub
+			pubSubLogger := log.NewHelper(log.With(logger, "subsystem", "pubsub"))
+			pgxPool, err := storage.NewPgx(storageConfig, pubSubLogger)
+			if err != nil {
+				// TODO should not completely fail for sqllite
+				return err
+			}
+
+			// setup the driver listener
+			listener := pubsub.NewDriver(pgxPool)
+			err = listener.Listen(ctx, "consumer-notifications")
+			if err != nil {
+				return fmt.Errorf("error setting up listener: %v", err)
+			}
+
+			// setup the notifier
+			listenManager := pubsub.NewListenManager(pubSubLogger, listener)
+			go listenManager.Run(ctx)
 
 			// START: construct pubsub (postgres only)
 			var listenManager *pubsub.ListenManager

@@ -68,7 +68,7 @@ func (o *OAuth2Authenticator) Authenticate(ctx context.Context, t transport.Tran
 	}
 
 	if o.EnforceAudCheck {
-		if u.Audience != o.CompletedConfig.ClientId {
+		if u.Audience != o.ClientId {
 			log.Debugf("aud does not match the requesting client-id -- decision DENY")
 			return nil, api.Deny
 		}

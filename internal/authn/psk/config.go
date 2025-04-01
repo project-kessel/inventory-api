@@ -45,7 +45,11 @@ func (c *Config) loadPreSharedKeys() error {
 	if len(c.PreSharedKeyFile) > 0 {
 		// TODO: fsnotify to reload the keys when the PSK file changes.
 		if file, err := os.Open(c.PreSharedKeyFile); err == nil {
-			defer file.Close()
+			defer func() {
+				if err := file.Close(); err != nil {
+					fmt.Printf("failed to close consumer: %v", err)
+				}
+			}()
 			data, err := io.ReadAll(file)
 			if err == nil {
 				if err := yaml.Unmarshal(data, &c.Keys); err != nil {
@@ -55,7 +59,7 @@ func (c *Config) loadPreSharedKeys() error {
 				return fmt.Errorf("failed to read preshared key file: %w", err)
 			}
 		} else {
-			return fmt.Errorf("Error opening preshared key file: %s [%s]", c.PreSharedKeyFile, err.Error())
+			return fmt.Errorf("error opening preshared key file: %s [%s]", c.PreSharedKeyFile, err.Error())
 		}
 	}
 	return nil

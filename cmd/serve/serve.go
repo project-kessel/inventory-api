@@ -253,13 +253,13 @@ func NewCommand(
 				go func() {
 					retries := 0
 					for retries < consumerOptions.RetryOptions.ConsumerMaxRetries {
+						// If the consumer cannot process a message, the consumer loop is restarted
+						// This is to ensure we re-read the message and prevent it being dropped and moving to next message.
+						// To re-read the current message, we have to recreate the consumer connection so that the earliest offset is used
 						inventoryConsumer, err = consumer.New(consumerConfig, db, authzConfig, authorizer, log.NewHelper(log.With(logger, "subsystem", "inventoryConsumer")))
 						if err != nil {
 							shutdown(err)
 						}
-						// Consume loop runs with retries and backoff
-						// If the consumer cannot process a message, the consumer loop is restarted after multiple failed attemps to
-						// re-read the message and prevent it being dropped and moving to next message
 						err = inventoryConsumer.Consume()
 						if e.Is(err, consumer.ClosedError) {
 							inventoryConsumer.Logger.Errorf("consumer unable to process current message -- restarting consumer")

@@ -32,7 +32,7 @@ func NewOptions() *Options {
 		MaxPollInterval:    "300000",
 		EnableAutoCommit:   "false",
 		AutoOffsetReset:    "earliest",
-		StatisticsInterval: "60000",
+		StatisticsInterval: "30000",
 		Debug:              "",
 		RetryOptions:       retry.NewOptions(),
 	}

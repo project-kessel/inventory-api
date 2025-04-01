@@ -15,17 +15,15 @@ func TestMetrics_New(t *testing.T) {
 	errs = test.TestSetup()
 	assert.Nil(t, errs)
 
-	t.Run(test.name, func(t *testing.T) {
-		structValues := reflect.ValueOf(test.metrics)
-		numField := structValues.NumField()
+	structValues := reflect.ValueOf(test.metrics)
+	numField := structValues.NumField()
 
-		// ensures all fields in struct are properly instantiated
-		for i := 0; i < numField; i++ {
-			field := structValues.Field(i)
-			assert.True(t, field.IsValid())
-			assert.True(t, !field.IsZero())
-		}
-		// ensures the number of fields in the type and instantiated version match
-		assert.Equal(t, reflect.TypeOf(MetricsCollector{}).NumField(), reflect.TypeOf(test.metrics).NumField())
-	})
+	// ensures all fields in struct are properly instantiated
+	for i := 0; i < numField; i++ {
+		field := structValues.Field(i)
+		assert.True(t, field.IsValid())
+		assert.True(t, !field.IsZero())
+	}
+	// ensures the number of fields in the type and instantiated version match
+	assert.Equal(t, reflect.TypeOf(MetricsCollector{}).NumField(), reflect.TypeOf(test.metrics).NumField())
 }

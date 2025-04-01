@@ -1,34 +1,14 @@
 package consumer
 
 import (
-	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/project-kessel/inventory-api/cmd/common"
 	"github.com/project-kessel/inventory-api/internal/authz"
-	"github.com/project-kessel/inventory-api/internal/consumer/retry"
+	"github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
 	"github.com/stretchr/testify/assert"
 	"go.opentelemetry.io/otel"
 	"gorm.io/gorm"
 	"testing"
-)
-
-// Matches expected defaults set during NewOptions calls
-const (
-	DefaultClientID            = "inventory-consumer"
-	DefaultEnabled             = true
-	DefaultBootstrapServers    = "localhost:9092"
-	DefaultConsumerGroupID     = "inventory-consumer"
-	DefaultTopic               = "outbox.event.kessel.tuples"
-	DefaultSessionTimeout      = "45000"
-	DefaultHeartbeatInterval   = "3000"
-	DefaultMaxPollInterval     = "300000"
-	DefaultEnableAutoCommit    = "false"
-	DefaultAutoOffsetReset     = "earliest"
-	DefaultStatisticsInterval  = "60000"
-	DefaultDebug               = ""
-	DefaultConsumerMaxRetries  = "3"
-	DefaultOperationMaxRetries = "3"
-	DefaultBackoffFactor       = "4"
 )
 
 type TestCase struct {
@@ -69,98 +49,84 @@ func (t *TestCase) TestSetup() []error {
 	return errs
 }
 
-func TestOptions_NewOptions(t *testing.T) {
+func TestNewConsumerSetup(t *testing.T) {
 	test := TestCase{
-		name:        "TestNewOptions_DefaultSettings",
-		description: "ensures default options are properly set",
+		name:        "TestNewConsumerSetup",
+		description: "ensures setting up a new consumer, including options and configs functions",
 	}
 	var errs []error
 	errs = test.TestSetup()
 	assert.Nil(t, errs)
-
-	t.Run(test.name, func(t *testing.T) {
-		expected := &Options{
-			Enabled:            DefaultEnabled,
-			BootstrapServers:   DefaultBootstrapServers,
-			ConsumerGroupID:    DefaultConsumerGroupID,
-			Topic:              DefaultTopic,
-			SessionTimeout:     DefaultSessionTimeout,
-			HeartbeatInterval:  DefaultHeartbeatInterval,
-			MaxPollInterval:    DefaultMaxPollInterval,
-			EnableAutoCommit:   DefaultEnableAutoCommit,
-			AutoOffsetReset:    DefaultAutoOffsetReset,
-			StatisticsInterval: DefaultStatisticsInterval,
-			Debug:              DefaultDebug,
-			RetryOptions: &retry.Options{
-				ConsumerMaxRetries:  DefaultConsumerMaxRetries,
-				OperationMaxRetries: DefaultOperationMaxRetries,
-				BackoffFactor:       DefaultBackoffFactor,
-			},
-		}
-		assert.Equal(t, expected, test.options)
-	})
-}
-
-func TestConfig_CompletedConfig(t *testing.T) {
-	test := TestCase{
-		name:        "TestCompletedConfig",
-		description: "ensures completedConfig has all fields set and is set to default values",
-	}
-	var errs []error
-	errs = test.TestSetup()
-	assert.Nil(t, errs)
-
-	t.Run(test.name, func(t *testing.T) {
-		expected := CompletedConfig{
-			completedConfig: &completedConfig{
-				Topic: "outbox.event.kessel.tuples",
-				KafkaConfig: &kafka.ConfigMap{
-					"client.id":              DefaultClientID,
-					"bootstrap.servers":      DefaultBootstrapServers,
-					"group.id":               DefaultConsumerGroupID,
-					"session.timeout.ms":     DefaultSessionTimeout,
-					"heartbeat.interval.ms":  DefaultHeartbeatInterval,
-					"max.poll.interval.ms":   DefaultMaxPollInterval,
-					"enable.auto.commit":     DefaultEnableAutoCommit,
-					"auto.offset.reset":      DefaultAutoOffsetReset,
-					"statistics.interval.ms": DefaultStatisticsInterval,
-				},
-			},
-		}
-		assert.Equal(t, expected.completedConfig.Topic, test.completedConfig.Topic)
-		assert.Equal(t, *expected.completedConfig.KafkaConfig, *test.completedConfig.KafkaConfig)
-	})
 }
 
 func TestParseCreateOrUpdateMessage(t *testing.T) {
 	testMsg := `{"schema":{"type":"string","optional":false,"name":"io.debezium.data.Json","version":1},"payload":"{\"subject\":{\"subject\":{\"id\":\"1234\", \"type\":{\"name\":\"workspace\",\"namespace\":\"rbac\"}}},\"relation\":\"t_workspace\",\"resource\":{\"id\":\"4321\",\"type\":{\"name\":\"integration\",\"namespace\":\"notifications\"}}}"}`
+	expected := &v1beta1.Relationship{
+		Resource: &v1beta1.ObjectReference{
+			Type: &v1beta1.ObjectType{
+				Namespace: "notifications",
+				Name:      "integration",
+			},
+			Id: "4321",
+		},
+		Relation: "t_workspace",
+		Subject: &v1beta1.SubjectReference{
+			Subject: &v1beta1.ObjectReference{
+				Type: &v1beta1.ObjectType{
+					Namespace: "rbac",
+					Name:      "workspace",
+				},
+				Id: "1234",
+			},
+		},
+	}
 	tuple, err := ParseCreateOrUpdateMessage([]byte(testMsg))
 	assert.Nil(t, err)
-	assert.Equal(t, tuple.Subject.Subject.Id, "1234")
-	assert.Equal(t, tuple.Subject.Subject.Type.Name, "workspace")
-	assert.Equal(t, tuple.Subject.Subject.Type.Namespace, "rbac")
-	assert.Equal(t, tuple.Relation, "t_workspace")
-	assert.Equal(t, tuple.Resource.Id, "4321")
-	assert.Equal(t, tuple.Resource.Type.Name, "integration")
-	assert.Equal(t, tuple.Resource.Type.Namespace, "notifications")
+	assert.Equal(t, tuple.Subject.Subject.Id, expected.Subject.Subject.Id)
+	assert.Equal(t, tuple.Subject.Subject.Type.Name, expected.Subject.Subject.Type.Name)
+	assert.Equal(t, tuple.Subject.Subject.Type.Namespace, expected.Subject.Subject.Type.Namespace)
+	assert.Equal(t, tuple.Relation, expected.Relation)
+	assert.Equal(t, tuple.Resource.Id, expected.Resource.Id)
+	assert.Equal(t, tuple.Resource.Type.Name, expected.Resource.Type.Name)
+	assert.Equal(t, tuple.Resource.Type.Namespace, expected.Resource.Type.Namespace)
 }
 
 func TestParseDeleteMessage(t *testing.T) {
 	testMsg := `{"schema":{"type":"string","optional":false,"name":"io.debezium.data.Json","version":1},"payload":"{\"resource_id\":\"4321\",\"resource_type\":\"integration\",\"resource_namespace\":\"notifications\",\"relation\":\"t_workspace\",\"subject_filter\":{\"subject_type\":\"workspace\",\"subject_namespace\":\"rbac\",\"subject_id\":\"1234\"}}"}`
+	resourceNamespace := "notifications"
+	resourceType := "integration"
+	resourceId := "4321"
+	relation := "t_workspace"
+	subjectType := "workspace"
+	subjectNamespace := "rbac"
+	subjectId := "1234"
+
+	expected := &v1beta1.RelationTupleFilter{
+		ResourceNamespace: &resourceNamespace,
+		ResourceType:      &resourceType,
+		ResourceId:        &resourceId,
+		Relation:          &relation,
+		SubjectFilter: &v1beta1.SubjectFilter{
+			SubjectNamespace: &subjectNamespace,
+			SubjectType:      &subjectType,
+			SubjectId:        &subjectId,
+		},
+	}
 	filter, err := ParseDeleteMessage([]byte(testMsg))
 	assert.Nil(t, err)
-	assert.Equal(t, *filter.ResourceId, "4321")
-	assert.Equal(t, *filter.ResourceType, "integration")
-	assert.Equal(t, *filter.ResourceNamespace, "notifications")
-	assert.Equal(t, *filter.Relation, "t_workspace")
-	assert.Equal(t, *filter.SubjectFilter.SubjectId, "1234")
-	assert.Equal(t, *filter.SubjectFilter.SubjectType, "workspace")
-	assert.Equal(t, *filter.SubjectFilter.SubjectNamespace, "rbac")
+	assert.Equal(t, filter.ResourceId, expected.ResourceId)
+	assert.Equal(t, filter.ResourceType, expected.ResourceType)
+	assert.Equal(t, filter.ResourceNamespace, expected.ResourceNamespace)
+	assert.Equal(t, filter.Relation, expected.Relation)
+	assert.Equal(t, filter.SubjectFilter.SubjectId, expected.SubjectFilter.SubjectId)
+	assert.Equal(t, filter.SubjectFilter.SubjectType, expected.SubjectFilter.SubjectType)
+	assert.Equal(t, filter.SubjectFilter.SubjectNamespace, expected.SubjectFilter.SubjectNamespace)
 }
 
 func TestParseMessageKey(t *testing.T) {
 	testMsg := `{"schema":{"type":"string","optional":false},"payload":"00000000-0000-0000-0000-000000000000"}`
+	expected := "00000000-0000-0000-0000-000000000000"
 	key, err := ParseMessageKey([]byte(testMsg))
 	assert.Nil(t, err)
-	assert.Equal(t, key, "00000000-0000-0000-0000-000000000000")
+	assert.Equal(t, key, expected)
 }

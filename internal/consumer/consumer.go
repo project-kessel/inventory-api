@@ -4,9 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/project-kessel/inventory-api/internal/consumer/retry"
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/project-kessel/inventory-api/internal/authz/allow"
 	"github.com/project-kessel/inventory-api/internal/authz/kessel"
@@ -24,14 +26,17 @@ import (
 	"gorm.io/gorm"
 )
 
+type Operation[T any] func(any, any) (T, error)
+
 type Consumer interface {
 	Consume() error
-	CreateTuple(ctx context.Context, msg []byte) (string, error)
-	UpdateTuple(ctx context.Context, msg []byte) (string, error)
-	DeleteTuple(ctx context.Context, msg []byte) (string, error)
-	UpdateConsistencyToken(msg []byte, token string) error
+	CreateTuple(ctx context.Context, tuple *v1beta1.Relationship) (string, error)
+	UpdateTuple(ctx context.Context, tuple *v1beta1.Relationship) (string, error)
+	DeleteTuple(ctx context.Context, filter *v1beta1.RelationTupleFilter) (string, error)
+	UpdateConsistencyToken(inventoryID, token string) error
 	Errs() <-chan error
 	Shutdown() error
+	Retry(operation func() (string, error)) (string, error)
 }
 
 // InventoryConsumer defines a Kafka Consumer with required clients and configs to call Relations API and update the Inventory DB with consistency tokens
@@ -44,6 +49,7 @@ type InventoryConsumer struct {
 	Errors           chan error
 	MetricsCollector *MetricsCollector
 	Logger           *log.Helper
+	RetryOptions     *retry.Options
 }
 
 // New instantiates a new InventoryConsumer
@@ -74,6 +80,7 @@ func New(config CompletedConfig, db *gorm.DB, authz authz.CompletedConfig, autho
 		Errors:           errChan,
 		MetricsCollector: &mc,
 		Logger:           logger,
+		RetryOptions:     retry.NewOptions(),
 	}, nil
 }
 
@@ -146,9 +153,12 @@ func (i *InventoryConsumer) Consume() error {
 						if err != nil {
 							i.Logger.Errorf("failed to parse message for tuple: %v", err)
 						}
-						resp, err = i.CreateTuple(context.Background(), tuple)
+						resp, err = i.Retry(func() (string, error) {
+							return i.CreateTuple(context.Background(), tuple)
+						})
 						if err != nil {
 							i.Logger.Infof("failed to create tuple: %v", err)
+							run = false
 							continue
 						}
 					}
@@ -159,9 +169,12 @@ func (i *InventoryConsumer) Consume() error {
 						if err != nil {
 							i.Logger.Errorf("failed to parse message for tuple: %v", err)
 						}
-						resp, err = i.UpdateTuple(context.Background(), tuple)
+						resp, err = i.Retry(func() (string, error) {
+							return i.UpdateTuple(context.Background(), tuple)
+						})
 						if err != nil {
 							i.Logger.Infof("failed to update tuple: %v", err)
+							run = false
 							continue
 						}
 					}
@@ -172,9 +185,12 @@ func (i *InventoryConsumer) Consume() error {
 						if err != nil {
 							i.Logger.Errorf("failed to parse message for filter: %v", err)
 						}
-						_, err = i.DeleteTuple(context.Background(), filter)
+						_, err = i.Retry(func() (string, error) {
+							return i.DeleteTuple(context.Background(), filter)
+						})
 						if err != nil {
 							i.Logger.Infof("failed to delete tuple: %v", err)
+							run = false
 							continue
 						}
 					}
@@ -348,11 +364,36 @@ func (i *InventoryConsumer) Errs() <-chan error {
 func (i *InventoryConsumer) Shutdown() error {
 	// TODO, shutting down the consumer should attempt to commit the offset if we've processed the message
 	// for now it just stops the consumer connection
-
-	err := i.Consumer.Close()
-	if err != nil {
-		i.Logger.Errorf("Error closing kafka consumer: %v", err)
-		return err
+	if !i.Consumer.IsClosed() {
+		err := i.Consumer.Close()
+		if err != nil {
+			i.Logger.Errorf("Error closing kafka consumer: %v", err)
+			return err
+		}
 	}
 	return nil
+}
+
+// Retry executes the given function and will retry on failure with backoff until max retries is reached
+func (i *InventoryConsumer) Retry(operation func() (string, error)) (string, error) {
+	attempts := 0
+	var resp interface{}
+	var err error
+
+	for attempts < i.RetryOptions.OperationMaxRetries {
+		resp, err = operation()
+		if err != nil {
+			i.Logger.Errorf("request failed: %v", err)
+			attempts++
+			if attempts < i.RetryOptions.OperationMaxRetries {
+				backoff := time.Duration(i.RetryOptions.BackoffFactor*attempts*300) * time.Millisecond
+				i.Logger.Errorf("retrying in %v", backoff)
+				time.Sleep(backoff)
+			}
+			continue
+		}
+		return fmt.Sprintf("%s", resp), nil
+	}
+	i.Logger.Errorf("Error processing request (max attempts reached: %v): %v", attempts, err)
+	return "", err
 }

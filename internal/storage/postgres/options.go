@@ -88,7 +88,7 @@ func (o *Options) Validate() []error {
 			"verify-full": 0,
 		}
 		if _, ok := validModes[o.SSLMode]; !ok {
-			return []error{fmt.Errorf("Invalid sslmode: %s", o.SSLMode)}
+			return []error{fmt.Errorf("invalid sslmode: %s", o.SSLMode)}
 		}
 	}
 	return nil

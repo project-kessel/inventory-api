@@ -30,8 +30,7 @@ type KesselResourceServiceHTTPServer interface {
 func RegisterKesselResourceServiceHTTPServer(s *http.Server, srv KesselResourceServiceHTTPServer) {
 	r := s.Route("/")
 	r.POST("/api/inventory/v1beta2/resources", _KesselResourceService_ReportResource0_HTTP_Handler(srv))
-	r.GET("/api/inventory/v1beta2/resources?local_resource_id={local_resource_id}&reporter_type={reporter_type}", _KesselResourceService_DeleteResource0_HTTP_Handler(srv))
-	r.DELETE("/api/inventory/v1beta2/resources", _KesselResourceService_DeleteResource1_HTTP_Handler(srv))
+	r.DELETE("/api/inventory/v1beta2/resources", _KesselResourceService_DeleteResource0_HTTP_Handler(srv))
 }
 
 func _KesselResourceService_ReportResource0_HTTP_Handler(srv KesselResourceServiceHTTPServer) func(ctx http.Context) error {
@@ -57,28 +56,6 @@ func _KesselResourceService_ReportResource0_HTTP_Handler(srv KesselResourceServi
 }
 
 func _KesselResourceService_DeleteResource0_HTTP_Handler(srv KesselResourceServiceHTTPServer) func(ctx http.Context) error {
-	return func(ctx http.Context) error {
-		var in DeleteResourceRequest
-		if err := ctx.BindQuery(&in); err != nil {
-			return err
-		}
-		if err := ctx.BindVars(&in); err != nil {
-			return err
-		}
-		http.SetOperation(ctx, OperationKesselResourceServiceDeleteResource)
-		h := ctx.Middleware(func(ctx context.Context, req interface{}) (interface{}, error) {
-			return srv.DeleteResource(ctx, req.(*DeleteResourceRequest))
-		})
-		out, err := h(ctx, &in)
-		if err != nil {
-			return err
-		}
-		reply := out.(*DeleteResourceResponse)
-		return ctx.Result(200, reply)
-	}
-}
-
-func _KesselResourceService_DeleteResource1_HTTP_Handler(srv KesselResourceServiceHTTPServer) func(ctx http.Context) error {
 	return func(ctx http.Context) error {
 		var in DeleteResourceRequest
 		if err := ctx.Bind(&in); err != nil {

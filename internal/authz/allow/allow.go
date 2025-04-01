@@ -3,12 +3,10 @@ package allow
 import (
 	"context"
 
-	kesselv1 "github.com/project-kessel/relations-api/api/kessel/relations/v1"
-	"github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
-
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
-	kessel "github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
+	kesselv1 "github.com/project-kessel/relations-api/api/kessel/relations/v1"
+	"github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
 )
 
 type AllowAllAuthz struct {
@@ -35,18 +33,18 @@ func (a *AllowAllAuthz) CheckForUpdate(context.Context, string, string, *model.R
 	return v1beta1.CheckForUpdateResponse_ALLOWED_TRUE, nil, nil
 }
 
-func (a *AllowAllAuthz) CreateTuples(ctx context.Context, r *kessel.CreateTuplesRequest) (*kessel.CreateTuplesResponse, error) {
-	return &kessel.CreateTuplesResponse{}, nil
+func (a *AllowAllAuthz) CreateTuples(ctx context.Context, r *v1beta1.CreateTuplesRequest) (*v1beta1.CreateTuplesResponse, error) {
+	return &v1beta1.CreateTuplesResponse{}, nil
 }
 
-func (a *AllowAllAuthz) DeleteTuples(ctx context.Context, r *kessel.DeleteTuplesRequest) (*kessel.DeleteTuplesResponse, error) {
-	return &kessel.DeleteTuplesResponse{}, nil
+func (a *AllowAllAuthz) DeleteTuples(ctx context.Context, r *v1beta1.DeleteTuplesRequest) (*v1beta1.DeleteTuplesResponse, error) {
+	return &v1beta1.DeleteTuplesResponse{}, nil
 }
 
-func (a *AllowAllAuthz) UnsetWorkspace(ctx context.Context, local_resource_id, name, namespace string) (*kessel.DeleteTuplesResponse, error) {
-	return &kessel.DeleteTuplesResponse{}, nil
+func (a *AllowAllAuthz) UnsetWorkspace(ctx context.Context, local_resource_id, name, namespace string) (*v1beta1.DeleteTuplesResponse, error) {
+	return &v1beta1.DeleteTuplesResponse{}, nil
 }
 
-func (a *AllowAllAuthz) SetWorkspace(ctx context.Context, local_resource_id, workspace, name, namespace string) (*kessel.CreateTuplesResponse, error) {
-	return &kessel.CreateTuplesResponse{}, nil
+func (a *AllowAllAuthz) SetWorkspace(ctx context.Context, local_resource_id, workspace, name, namespace string) (*v1beta1.CreateTuplesResponse, error) {
+	return &v1beta1.CreateTuplesResponse{}, nil
 }

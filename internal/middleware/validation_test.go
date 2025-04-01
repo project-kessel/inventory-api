@@ -144,12 +144,13 @@ func TestExtractFields(t *testing.T) {
 			var result interface{}
 			var err error
 
-			if tt.testType == "map" {
+			switch tt.testType {
+			case "map":
 				result, err = middleware.ExtractMapField(tt.input, tt.key)
-			} else if tt.testType == "string" {
+			case "string":
 				result, err = middleware.ExtractStringField(tt.input, tt.key)
 			}
-
+			
 			if tt.expectErr {
 				assert.Error(t, err, "Expected error but got nil")
 			} else {

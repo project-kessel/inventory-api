@@ -267,7 +267,11 @@ func shutdown(db *gorm.DB, srv *server.Server, em eventingapi.Manager, logger *l
 		if sqlDB, err := db.DB(); err != nil {
 			logger.Error(fmt.Sprintf("Error Gracefully Shutting Down Storage: %v", err))
 		} else {
-			sqlDB.Close()
+			defer func() {
+				if err := sqlDB.Close(); err != nil {
+					fmt.Printf("failed to close consumer: %v", err)
+				}
+			}()
 		}
 	}
 }

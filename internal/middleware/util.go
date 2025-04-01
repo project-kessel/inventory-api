@@ -23,11 +23,11 @@ func GetFromContext[V any, I any](i I) func(context.Context) (*V, error) {
 	return (func(ctx context.Context) (*V, error) {
 		obj := ctx.Value(i)
 		if obj == nil {
-			return nil, fmt.Errorf("Expected %s", typ)
+			return nil, fmt.Errorf("expected %s", typ)
 		}
 		req, ok := obj.(*V)
 		if !ok {
-			return nil, fmt.Errorf("Object stored in request context couldn't convert to %s", typ)
+			return nil, fmt.Errorf("object stored in request context couldn't convert to %s", typ)
 		}
 		return req, nil
 

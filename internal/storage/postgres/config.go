@@ -32,31 +32,31 @@ func (c *Config) Complete() CompletedConfig {
 
 	dsnBuilder := new(strings.Builder)
 	if c.Host != "" {
-		dsnBuilder.WriteString(fmt.Sprintf("host=%s ", c.Host))
+		fmt.Fprintf(dsnBuilder, "host=%s ", c.Host)
 	}
 
 	if c.Port != "" {
-		dsnBuilder.WriteString(fmt.Sprintf("port=%s ", c.Port))
+		fmt.Fprintf(dsnBuilder, "port=%s ", c.Port)
 	}
 
 	if c.DbName != "" {
-		dsnBuilder.WriteString(fmt.Sprintf("dbname=%s ", c.DbName))
+		fmt.Fprintf(dsnBuilder, "dbname=%s ", c.DbName)
 	}
 
 	if c.User != "" {
-		dsnBuilder.WriteString(fmt.Sprintf("user=%s ", c.User))
+		fmt.Fprintf(dsnBuilder, "user=%s ", c.User)
 	}
 
 	if c.Password != "" {
-		dsnBuilder.WriteString(fmt.Sprintf("password=%s ", c.Password))
+		fmt.Fprintf(dsnBuilder, "password=%s ", c.Password)
 	}
 
 	if c.SSLMode != "" {
-		dsnBuilder.WriteString(fmt.Sprintf("sslmode=%s ", c.SSLMode))
+		fmt.Fprintf(dsnBuilder, "sslmode=%s ", c.SSLMode)
 	}
 
 	if c.SSLRootCert != "" {
-		dsnBuilder.WriteString(fmt.Sprintf("sslrootcert=%s ", c.SSLRootCert))
+		fmt.Fprintf(dsnBuilder, "sslrootcert=%s ", c.SSLRootCert)
 	}
 
 	dsn := strings.TrimSpace(dsnBuilder.String())

@@ -212,6 +212,29 @@ func updateExistingReporterResource(ctx context.Context, m *model.Resource, exis
 	return ret, nil
 }
 
+func (uc *Usecase) LookupResources(ctx context.Context, permission, namespace string, sub *kessel.SubjectReference, id model.ReporterResourceId) (bool, error) {
+	res, err := uc.reporterResourceRepository.FindByReporterResourceId(ctx, id)
+	if err != nil {
+		// If the resource doesn't exist in inventory (ie. no consistency token available)
+		// we send a check request with minimize latency
+		// err otherwise.
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return false, err
+		}
+		res = &model.Resource{ResourceType: id.ResourceType, ReporterResourceId: id.LocalResourceId}
+	}
+
+	allowed, _, err := uc.Authz.Check(ctx, namespace, permission, res, sub)
+	if err != nil {
+		return false, err
+	}
+
+	if allowed == kessel.CheckResponse_ALLOWED_TRUE {
+		return true, nil
+	}
+	return false, nil
+}
+
 func (uc *Usecase) Check(ctx context.Context, permission, namespace string, sub *kessel.SubjectReference, id model.ReporterResourceId) (bool, error) {
 	res, err := uc.reporterResourceRepository.FindByReporterResourceId(ctx, id)
 	if err != nil {

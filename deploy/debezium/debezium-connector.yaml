@@ -13,12 +13,12 @@ objects:
     class: io.debezium.connector.postgresql.PostgresConnector
     tasksMax: ${{MAX_TASKS}}
     config:
-      database.server.name: ${DB_SERVERNAME}
-      database.dbname: ${DB_NAME}
-      database.hostname: ${DB_HOSTNAME}
-      database.port: ${DB_PORT}
-      database.user: ${DB_USER}
-      database.password: ${DB_PASSWORD}
+      database.server.name: kessel-inventory-db
+      database.dbname: ${secrets:kessel-inventory-db:db.name}
+      database.hostname: ${secrets:kessel-inventory-db:db.host}
+      database.port: ${secrets:kessel-inventory-db:db.port}
+      database.user: ${secrets:kessel-inventory-db:db.user}
+      database.password: ${secrets:kessel-inventory-db:db.password}
       topic.prefix: kessel-inventory
       table.include.list: public.outbox_events
       transforms: outbox
@@ -28,25 +28,6 @@ objects:
       heartbeat.action.query: ${DEBEZIUM_ACTION_QUERY}
       topic.heartbeat.prefix: ${TOPIC_HEARTBEAT_PREFIX}
 parameters:
-- name: DB_SERVERNAME
-  required: true
-  description: Logical name that identifies and provides a namespace for the particular database server
-  value: kessel-inventory-db
-- name: DB_NAME
-  required: true
-  description: Name for the database
-- name: DB_HOSTNAME
-  required: true
-  description: URI for the target postgres database
-- name: DB_PORT
-  value: "5432"
-  description: Port on which the target postgres database is listening for connections
-- name: DB_USER
-  description: Username the connector should use to connect to the target postgres database
-  required: true
-- name: DB_PASSWORD
-  description: Password for the above user on the target postgres database
-  required: true
 - name: KAFKA_CONNECT_INSTANCE
   value: platform-kafka-connect
   description: Name of the target Kafka Connect instance for Connector

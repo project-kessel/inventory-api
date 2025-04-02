@@ -5,14 +5,16 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/project-kessel/inventory-api/internal/consumer/retry"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
+	"github.com/project-kessel/inventory-api/internal/consumer/retry"
+
 	"github.com/project-kessel/inventory-api/internal/authz/allow"
 	"github.com/project-kessel/inventory-api/internal/authz/kessel"
+	"github.com/project-kessel/inventory-api/internal/pubsub"
 
 	"go.opentelemetry.io/otel"
 
@@ -51,10 +53,11 @@ type InventoryConsumer struct {
 	MetricsCollector *MetricsCollector
 	Logger           *log.Helper
 	RetryOptions     *retry.Options
+	Notifier         *pubsub.Notifier
 }
 
 // New instantiates a new InventoryConsumer
-func New(config CompletedConfig, db *gorm.DB, authz authz.CompletedConfig, authorizer api.Authorizer, logger *log.Helper) (InventoryConsumer, error) {
+func New(config CompletedConfig, db *gorm.DB, authz authz.CompletedConfig, authorizer api.Authorizer, notifier *pubsub.Notifier, logger *log.Helper) (InventoryConsumer, error) {
 	logger.Info("Setting up kafka consumer")
 	consumer, err := kafka.NewConsumer(config.KafkaConfig)
 	if err != nil {
@@ -88,6 +91,7 @@ func New(config CompletedConfig, db *gorm.DB, authz authz.CompletedConfig, autho
 		MetricsCollector: &mc,
 		Logger:           logger,
 		RetryOptions:     retryOptions,
+		Notifier:         notifier,
 	}, nil
 }
 
@@ -145,16 +149,20 @@ func (i *InventoryConsumer) Consume() error {
 			case *kafka.Message:
 				// capture the operation from the event headers
 				var operation string
+				var txid string
 				var resp interface{}
 				for _, v := range e.Headers {
-					if v.Key == "operation" {
+					switch v.Key {
+					case "operation":
 						operation = string(v.Value)
+					case "txid":
+						txid = string(v.Value)
 					}
 				}
 
 				switch operation {
 				case string(model.OperationTypeCreated):
-					i.Logger.Infof("operation=%s tuple=%s", operation, e.Value)
+					i.Logger.Infof("operation=%s tuple=%s txid=%s", operation, e.Value, txid)
 					if relationsEnabled {
 						tuple, err := ParseCreateOrUpdateMessage(e.Value)
 						if err != nil {
@@ -164,13 +172,13 @@ func (i *InventoryConsumer) Consume() error {
 							return i.CreateTuple(context.Background(), tuple)
 						})
 						if err != nil {
-							i.Logger.Infof("failed to create tuple: %v", err)
+							i.Logger.Errorf("failed to create tuple: %v", err)
 							run = false
 							continue
 						}
 					}
 				case string(model.OperationTypeUpdated):
-					i.Logger.Infof("operation=%s tuple=%s", operation, e.Value)
+					i.Logger.Infof("operation=%s tuple=%s txid=%s", operation, e.Value, txid)
 					if relationsEnabled {
 						tuple, err := ParseCreateOrUpdateMessage(e.Value)
 						if err != nil {
@@ -180,7 +188,7 @@ func (i *InventoryConsumer) Consume() error {
 							return i.UpdateTuple(context.Background(), tuple)
 						})
 						if err != nil {
-							i.Logger.Infof("failed to update tuple: %v", err)
+							i.Logger.Errorf("failed to update tuple: %v", err)
 							run = false
 							continue
 						}
@@ -196,7 +204,7 @@ func (i *InventoryConsumer) Consume() error {
 							return i.DeleteTuple(context.Background(), filter)
 						})
 						if err != nil {
-							i.Logger.Infof("failed to delete tuple: %v", err)
+							i.Logger.Errorf("failed to delete tuple: %v", err)
 							run = false
 							continue
 						}
@@ -212,9 +220,22 @@ func (i *InventoryConsumer) Consume() error {
 					}
 					err = i.UpdateConsistencyToken(inventoryID, fmt.Sprint(resp))
 					if err != nil {
-						i.Logger.Infof("failed to update consistency token: %v", err)
+						i.Logger.Errorf("failed to update consistency token: %v", err)
 						continue
 					}
+				}
+
+				// if txid is present, we need to notify the producer that we've processed the message
+				if i.Notifier != nil && txid != "" {
+					err := i.Notifier.Notify(context.Background(), txid)
+					if err != nil {
+						i.Logger.Errorf("failed to notify producer: %v", err)
+						// Do not continue here, we should still commit the offset
+					} else {
+						i.Logger.Debugf("notified producer of processed message: %s" + txid)
+					}
+				} else {
+					i.Logger.Debugf("skipping notification to producer: txid not present or notifier not initialized")
 				}
 
 				// TODO: Commiting on every message is not ideal - we will need to revisit this as we consume more messages

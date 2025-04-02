@@ -36,7 +36,7 @@ func copyHistory(m *model.Resource, id uuid.UUID, operationType model.OperationT
 	}
 }
 
-func (r *Repo) Create(ctx context.Context, m *model.Resource, namespace string) (*model.Resource, error) {
+func (r *Repo) Create(ctx context.Context, m *model.Resource, namespace string, txid string) (*model.Resource, error) {
 	db := r.DB.Session(&gorm.Session{})
 	tx := db.Begin()
 	updatedResources := []*model.Resource{}
@@ -83,7 +83,7 @@ func (r *Repo) Create(ctx context.Context, m *model.Resource, namespace string) 
 	}
 
 	// Publish outbox events for primary resource
-	err = handleOutboxEvents(tx, *m, namespace, model.OperationTypeCreated)
+	err = handleOutboxEvents(tx, *m, namespace, model.OperationTypeCreated, txid)
 	if err != nil {
 		tx.Rollback()
 		return nil, err
@@ -91,7 +91,7 @@ func (r *Repo) Create(ctx context.Context, m *model.Resource, namespace string) 
 
 	// Publish outbox events for other resources with the same inventory ID
 	for _, updatedResource := range updatedResources {
-		err = handleOutboxEvents(tx, *updatedResource, namespace, model.OperationTypeUpdated)
+		err = handleOutboxEvents(tx, *updatedResource, namespace, model.OperationTypeUpdated, "")
 		if err != nil {
 			tx.Rollback()
 			return nil, err
@@ -102,7 +102,7 @@ func (r *Repo) Create(ctx context.Context, m *model.Resource, namespace string) 
 	return m, nil
 }
 
-func (r *Repo) Update(ctx context.Context, m *model.Resource, id uuid.UUID, namespace string) (*model.Resource, error) {
+func (r *Repo) Update(ctx context.Context, m *model.Resource, id uuid.UUID, namespace string, txid string) (*model.Resource, error) {
 	db := r.DB.Session(&gorm.Session{})
 	updatedResources := []*model.Resource{}
 
@@ -125,8 +125,6 @@ func (r *Repo) Update(ctx context.Context, m *model.Resource, id uuid.UUID, name
 		return nil, err
 	}
 
-	updatedResources = append(updatedResources, m)
-
 	// Handle workspace updates for other resources with the same inventory ID
 	updatedResources, err = r.handleWorkspaceUpdates(tx, m, updatedResources)
 	if err != nil {
@@ -134,9 +132,16 @@ func (r *Repo) Update(ctx context.Context, m *model.Resource, id uuid.UUID, name
 		return nil, err
 	}
 
+	// Publish outbox events for primary resource
+	err = handleOutboxEvents(tx, *m, namespace, model.OperationTypeUpdated, txid)
+	if err != nil {
+		tx.Rollback()
+		return nil, err
+	}
+
 	// Publish outbox event for the primary resource and other resources with the same inventory ID
 	for _, updatedResource := range updatedResources {
-		err = handleOutboxEvents(tx, *updatedResource, namespace, model.OperationTypeUpdated)
+		err = handleOutboxEvents(tx, *updatedResource, namespace, model.OperationTypeUpdated, "")
 		if err != nil {
 			tx.Rollback()
 			return nil, err
@@ -187,7 +192,7 @@ func (r *Repo) Delete(ctx context.Context, id uuid.UUID, namespace string) (*mod
 		}
 	}
 
-	err = handleOutboxEvents(tx, *resource, namespace, model.OperationTypeDeleted)
+	err = handleOutboxEvents(tx, *resource, namespace, model.OperationTypeDeleted, "")
 	if err != nil {
 		tx.Rollback()
 		return nil, err
@@ -325,8 +330,8 @@ func (r *Repo) handleWorkspaceUpdates(tx *gorm.DB, m *model.Resource, updatedRes
 	return updatedResources, nil
 }
 
-func handleOutboxEvents(tx *gorm.DB, resource model.Resource, namespace string, operationType model.EventOperationType) error {
-	resourceMessage, tupleMessage, err := model.NewOutboxEventsFromResource(resource, namespace, operationType)
+func handleOutboxEvents(tx *gorm.DB, resource model.Resource, namespace string, operationType model.EventOperationType, txid string) error {
+	resourceMessage, tupleMessage, err := model.NewOutboxEventsFromResource(resource, namespace, operationType, txid)
 	if err != nil {
 		return err
 	}

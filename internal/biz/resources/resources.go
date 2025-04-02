@@ -3,7 +3,6 @@ package resources
 import (
 	"context"
 	"errors"
-	"fmt"
 	"time"
 
 	"github.com/project-kessel/inventory-api/internal/consumer"
@@ -56,11 +55,13 @@ type Usecase struct {
 	Server                      server.Server
 	DisablePersistence          bool
 	ListenManager               pubsub.ListenManagerImpl
+	ReadAfterWriteEnabled       bool
+	ReadAfterWriteAllowlist     []string
 }
 
 func New(reporterResourceRepository ReporterResourceRepository, inventoryResourceRepository InventoryResourceRepository,
 	authz authzapi.Authorizer, eventer eventingapi.Manager, namespace string, logger log.Logger, disablePersistence bool,
-	listenManager pubsub.ListenManagerImpl) *Usecase {
+	listenManager pubsub.ListenManagerImpl, readAfterWriteEnabled bool, readAfterWriteAllowlist []string) *Usecase {
 	return &Usecase{
 		reporterResourceRepository:  reporterResourceRepository,
 		inventoryResourceRepository: inventoryResourceRepository,
@@ -70,7 +71,8 @@ func New(reporterResourceRepository ReporterResourceRepository, inventoryResourc
 		log:                         log.NewHelper(logger),
 		DisablePersistence:          disablePersistence,
 		ListenManager:               listenManager,
-		Consumer:                    consumer,
+		ReadAfterWriteEnabled:       readAfterWriteEnabled,
+		ReadAfterWriteAllowlist:     readAfterWriteAllowlist,
 	}
 }
 
@@ -272,18 +274,6 @@ func (uc *Usecase) ListResourcesInWorkspace(ctx context.Context, permission, nam
 	return resource_chan, error_chan, nil
 }
 
-// Check if request comes from SP in allowlist
-func isSPInAllowlist(m *model.Resource, allowlist []string) bool {
-	fmt.Printf("SPs in allowlist: %+q\n", allowlist)
-	for _, sp := range allowlist {
-		if sp == m.ReporterId || sp == "*" { // either specific SP or everyone
-			return true
-		}
-	}
-
-	return false
-}
-
 // Deprecated. Remove after notifications and ACM migrates to v1beta2
 func (uc *Usecase) Create(ctx context.Context, m *model.Resource) (*model.Resource, error) {
 	ret := m // Default to returning the input model in case persistence is disabled
@@ -323,12 +313,19 @@ func (uc *Usecase) Create(ctx context.Context, m *model.Resource) (*model.Resour
 		}
 
 		if uc.ListenManager != nil {
-			timeoutCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
-			defer cancel()
 
-			err = subscription.BlockForNotification(timeoutCtx)
-			if err != nil {
-				return nil, err
+			// read after write functionality is enabled globally.
+			// And executed if request came from service provider in allowlist
+			if uc.ReadAfterWriteEnabled && isSPInAllowlist(m, uc.ReadAfterWriteAllowlist) {
+
+				// 30 sec max timeout
+				timeoutCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+				defer cancel()
+
+				err = subscription.BlockForNotification(timeoutCtx)
+				if err != nil {
+					return nil, err
+				}
 			}
 		}
 	}
@@ -424,4 +421,16 @@ func (uc *Usecase) Delete(ctx context.Context, id model.ReporterResourceId) erro
 	uc.log.WithContext(ctx).Infof("Deleted Resource: %v(%v)", m.ID, m.ResourceType)
 	return nil
 
+}
+
+// Check if request comes from SP in allowlist
+func isSPInAllowlist(m *model.Resource, allowlist []string) bool {
+	for _, sp := range allowlist {
+		// either specific SP or everyone
+		if sp == m.ReporterId || sp == "*" {
+			return true
+		}
+	}
+
+	return false
 }

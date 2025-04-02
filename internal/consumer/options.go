@@ -3,37 +3,42 @@ package consumer
 import (
 	"fmt"
 
+	"github.com/project-kessel/inventory-api/internal/consumer/retry"
 	"github.com/spf13/pflag"
 )
 
 type Options struct {
-	Enabled                 bool     `mapstructure:"enabled"`
-	BootstrapServers        string   `mapstructure:"bootstrap-servers"`
-	ConsumerGroupID         string   `mapstructure:"consumer-group-id"`
-	Topic                   string   `mapstructure:"topic"`
-	ReadAfterWriteEnabled   bool     `mapstructure:"read-after-write-enabled"`
-	ReadAfterWriteAllowlist []string `mapstructure:"read-after-write-allowlist"`
-	SessionTimeout          string   `mapstructure:"session-timeout"`
-	HeartbeatInterval       string   `mapstructure:"heartbeat-interval"`
-	MaxPollInterval         string   `mapstructure:"max-poll-interval"`
-	EnableAutoCommit        string   `mapstructure:"enable-auto-commit"`
-	AutoOffsetReset         string   `mapstructure:"auto-offset-reset"`
-	StatisticsInterval      string   `mapstructure:"statistics-interval-ms"`
-	Debug                   string   `mapstructure:"debug"`
+	Enabled                 bool           `mapstructure:"enabled"`
+	BootstrapServers        string         `mapstructure:"bootstrap-servers"`
+	ConsumerGroupID         string         `mapstructure:"consumer-group-id"`
+	Topic                   string         `mapstructure:"topic"`
+	SessionTimeout          string         `mapstructure:"session-timeout"`
+	HeartbeatInterval       string         `mapstructure:"heartbeat-interval"`
+	MaxPollInterval         string         `mapstructure:"max-poll-interval"`
+	EnableAutoCommit        string         `mapstructure:"enable-auto-commit"`
+	AutoOffsetReset         string         `mapstructure:"auto-offset-reset"`
+	StatisticsInterval      string         `mapstructure:"statistics-interval-ms"`
+	Debug                   string         `mapstructure:"debug"`
+	RetryOptions            *retry.Options `mapstructure:"retry-options"`
+	ReadAfterWriteEnabled   bool           `mapstructure:"read-after-write-enabled"`
+	ReadAfterWriteAllowlist []string       `mapstructure:"read-after-write-allowlist"`
 }
 
 func NewOptions() *Options {
 	return &Options{
-		Enabled:            true,
-		ConsumerGroupID:    "inventory-consumer",
-		Topic:              "outbox.event.kessel.tuples",
-		SessionTimeout:     "45000",
-		HeartbeatInterval:  "3000",
-		MaxPollInterval:    "300000",
-		EnableAutoCommit:   "false",
-		AutoOffsetReset:    "earliest",
-		StatisticsInterval: "60000",
-		Debug:              "",
+		Enabled:                 true,
+		ConsumerGroupID:         "inventory-consumer",
+		Topic:                   "outbox.event.kessel.tuples",
+		SessionTimeout:          "45000",
+		HeartbeatInterval:       "3000",
+		MaxPollInterval:         "300000",
+		EnableAutoCommit:        "false",
+		AutoOffsetReset:         "earliest",
+		StatisticsInterval:      "60000",
+		Debug:                   "",
+		RetryOptions:            retry.NewOptions(),
+		ReadAfterWriteEnabled:   true,
+		ReadAfterWriteAllowlist: []string{},
 	}
 }
 

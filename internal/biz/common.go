@@ -2,6 +2,7 @@ package biz
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	authzapi "github.com/project-kessel/inventory-api/internal/authz/api"
@@ -51,7 +52,10 @@ func DefaultRelationshipSendEvent(ctx context.Context, m *model.Relationship, ev
 }
 
 func DefaultSetWorkspace(ctx context.Context, namespace string, model *model.Resource, authz authzapi.Authorizer) (string, error) {
-	r, err := authz.SetWorkspace(ctx, model.Reporter.LocalResourceId, model.WorkspaceId, namespace, model.ResourceType) //nolint:staticcheck
+	if model.ReporterType != "" {
+		namespace = strings.ToLower(model.ReporterType)
+	}
+	r, err := authz.SetWorkspace(ctx, model.ReporterResourceId, model.WorkspaceId, namespace, model.ResourceType) //nolint:staticcheck
 	if err != nil {
 		return "", err
 	}

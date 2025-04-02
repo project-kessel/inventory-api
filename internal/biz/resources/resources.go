@@ -348,6 +348,7 @@ func (uc *Usecase) Delete(ctx context.Context, id model.ReporterResourceId) erro
 		if id.ReporterType != "" {
 			namespace = strings.ToLower(id.ReporterType)
 		}
+
 		resourceType := uc.Namespace
 		if id.ResourceType != "" {
 			namespace = strings.ToLower(id.ResourceType)

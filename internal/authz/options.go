@@ -40,7 +40,7 @@ func (o *Options) Validate() []error {
 	var errs []error
 
 	if o.Authz != AllowAll && o.Authz != Kessel {
-		errs = append(errs, fmt.Errorf("Invalid authz.impl: %s.  Options are 'allow-all' and 'kessel'", o.Authz))
+		errs = append(errs, fmt.Errorf("invalid authz.impl: %s.  Options are 'allow-all' and 'kessel'", o.Authz))
 	}
 
 	if o.Authz == Kessel {

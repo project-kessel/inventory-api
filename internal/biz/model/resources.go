@@ -59,7 +59,7 @@ type ResourceReporter struct {
 }
 
 func (r *Resource) GormDbAfterMigration(db *gorm.DB, s *schema.Schema) error {
-	switch db.Dialector.Name() {
+	switch db.Name() {
 	case "sqlite":
 		break
 	case "postgres":

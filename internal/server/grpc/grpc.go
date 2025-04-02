@@ -28,7 +28,7 @@ func New(c CompletedConfig, authn middleware.Middleware, meter metric.Meter, log
 	if err != nil {
 		return nil, err
 	}
-	// TODO: pass in health, authn middleware
+	// TODO: pass in health, auth middleware
 	var opts = []kgrpc.ServerOption{
 		kgrpc.Middleware(
 			recovery.Recovery(),

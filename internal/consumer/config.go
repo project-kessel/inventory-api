@@ -3,6 +3,7 @@ package consumer
 import (
 	"fmt"
 
+	"github.com/project-kessel/inventory-api/internal/consumer/auth"
 	"github.com/project-kessel/inventory-api/internal/consumer/retry"
 
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
@@ -15,6 +16,7 @@ type Config struct {
 	KafkaConfig *kafka.ConfigMap
 
 	RetryConfig *retry.Config
+	AuthConfig  *auth.Config
 }
 
 type completedConfig struct {
@@ -22,6 +24,7 @@ type completedConfig struct {
 	Topic                   string
 	KafkaConfig             *kafka.ConfigMap
 	RetryConfig             *retry.Config
+	AuthConfig              *auth.Config
 	ReadAfterWriteEnabled   bool
 	ReadAfterWriteAllowlist []string
 }
@@ -35,6 +38,7 @@ func NewConfig(o *Options) *Config {
 		Options: o,
 	}
 	cfg.RetryConfig = retry.NewConfig(o.RetryOptions)
+	cfg.AuthConfig = auth.NewConfig(o.AuthOptions)
 	return cfg
 }
 
@@ -51,6 +55,22 @@ func (c *Config) Complete() (CompletedConfig, []error) {
 				errs = append(errs, fmt.Errorf("cannot set debug value: %w", err))
 			}
 		}
+
+		if c.AuthConfig.Enabled {
+			if err := config.SetKey("security.protocol", c.AuthConfig.SecurityProtocol); err != nil {
+				errs = append(errs, fmt.Errorf("cannot set security.protocol value: %w", err))
+			}
+			if err := config.SetKey("sasl.mechanism", c.AuthConfig.SASLMechanism); err != nil {
+				errs = append(errs, fmt.Errorf("cannot set sasl.mechanism value: %w", err))
+			}
+			if err := config.SetKey("sasl.username", c.AuthConfig.SASLUsername); err != nil {
+				errs = append(errs, fmt.Errorf("cannot set sasl.username value: %w", err))
+			}
+			if err := config.SetKey("sasl.password", c.AuthConfig.SASLPassword); err != nil {
+				errs = append(errs, fmt.Errorf("cannot set sasl.password value: %w", err))
+			}
+		}
+
 		if err := config.SetKey("client.id", clientID); err != nil {
 			errs = append(errs, fmt.Errorf("cannot set client.id value: %w", err))
 		}
@@ -88,7 +108,9 @@ func (c *Config) Complete() (CompletedConfig, []error) {
 		Topic:                   c.Topic,
 		Options:                 c.Options,
 		RetryConfig:             c.RetryConfig,
+		AuthConfig:              c.AuthConfig,
 		ReadAfterWriteEnabled:   c.ReadAfterWriteEnabled,
 		ReadAfterWriteAllowlist: c.ReadAfterWriteAllowlist,
+		KafkaConfig:             config,
 	}}, nil
 }

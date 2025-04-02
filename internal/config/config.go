@@ -81,10 +81,17 @@ func LogConfigurationInfo(options *OptionsConfig) {
 		options.Consumer.RetryOptions.BackoffFactor,
 	)
 
+	log.Debugf("Consumer Auth Settings: Enabled: %v, Security Protocol: %s, Mechanism: %s, Username: %s",
+		options.Consumer.AuthOptions.Enabled,
+		options.Consumer.AuthOptions.SecurityProtocol,
+		options.Consumer.AuthOptions.SASLMechanism,
+		options.Consumer.AuthOptions.SASLUsername)
+
 	log.Debugf("Consistency Configuration: Read-After-Write Enabled: %t, Read-After-Write Allowlist: %+s",
 		options.Consistency.ReadAfterWriteEnabled,
 		options.Consistency.ReadAfterWriteAllowlist,
 	)
+
 }
 
 // InjectClowdAppConfig updates service options based on values in the ClowdApp AppConfig

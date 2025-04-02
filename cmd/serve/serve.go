@@ -11,6 +11,7 @@ import (
 
 	"github.com/project-kessel/inventory-api/internal/consistency"
 	"github.com/project-kessel/inventory-api/internal/consumer"
+	"github.com/project-kessel/inventory-api/internal/pubsub"
 
 	"github.com/project-kessel/inventory-api/cmd/common"
 	relationshipsctl "github.com/project-kessel/inventory-api/internal/biz/relationships"
@@ -18,7 +19,6 @@ import (
 	inventoryResourcesRepo "github.com/project-kessel/inventory-api/internal/data/inventoryresources"
 	relationshipsrepo "github.com/project-kessel/inventory-api/internal/data/relationships"
 	resourcerepo "github.com/project-kessel/inventory-api/internal/data/resources"
-	"github.com/project-kessel/inventory-api/internal/pubsub"
 	authzsvc "github.com/project-kessel/inventory-api/internal/service/authz"
 	relationshipssvc "github.com/project-kessel/inventory-api/internal/service/relationships/k8spolicy"
 	hostssvc "github.com/project-kessel/inventory-api/internal/service/resources/hosts"
@@ -83,7 +83,7 @@ func NewCommand(
 			}
 			storageConfig := storage.NewConfig(storageOptions).Complete()
 
-			// // configure authn
+			// // configure auth
 			if errs := authnOptions.Complete(); errs != nil {
 				return errors.NewAggregate(errs)
 			}
@@ -341,7 +341,7 @@ func NewCommand(
 	}
 
 	serverOptions.AddFlags(cmd.Flags(), "server")
-	authnOptions.AddFlags(cmd.Flags(), "authn")
+	authnOptions.AddFlags(cmd.Flags(), "auth")
 	authzOptions.AddFlags(cmd.Flags(), "authz")
 	eventingOptions.AddFlags(cmd.Flags(), "eventing")
 	consumerOptions.AddFlags(cmd.Flags(), "consumer")

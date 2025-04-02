@@ -16,11 +16,11 @@ import (
 func New(config CompletedConfig, logger *log.Helper) (api.Authenticator, error) {
 	d := delegator.New()
 
-	// client certs authn
+	// client certs auth
 	logger.Info("Will check for client certs")
 	d.Add(clientcert.New())
 
-	// pre shared key authn
+	// pre shared key auth
 	if config.PreSharedKeys != nil {
 		logger.Infof("Loading pre-shared-keys from %s", config.PreSharedKeys.PreSharedKeyFile)
 		a := psk.New(*config.PreSharedKeys)

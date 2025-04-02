@@ -3,7 +3,9 @@ package consumer
 import (
 	"fmt"
 
+	"github.com/project-kessel/inventory-api/internal/consumer/auth"
 	"github.com/project-kessel/inventory-api/internal/consumer/retry"
+
 	"github.com/spf13/pflag"
 )
 
@@ -20,6 +22,7 @@ type Options struct {
 	StatisticsInterval      string         `mapstructure:"statistics-interval-ms"`
 	Debug                   string         `mapstructure:"debug"`
 	RetryOptions            *retry.Options `mapstructure:"retry-options"`
+	AuthOptions             *auth.Options  `mapstructure:"auth"`
 	ReadAfterWriteEnabled   bool           `mapstructure:"read-after-write-enabled"`
 	ReadAfterWriteAllowlist []string       `mapstructure:"read-after-write-allowlist"`
 }
@@ -36,6 +39,7 @@ func NewOptions() *Options {
 		AutoOffsetReset:         "earliest",
 		StatisticsInterval:      "60000",
 		Debug:                   "",
+		AuthOptions:             auth.NewOptions(),
 		RetryOptions:            retry.NewOptions(),
 		ReadAfterWriteEnabled:   true,
 		ReadAfterWriteAllowlist: []string{},
@@ -57,8 +61,9 @@ func (o *Options) AddFlags(fs *pflag.FlagSet, prefix string) {
 	fs.StringVar(&o.MaxPollInterval, prefix+"max-poll", o.MaxPollInterval, "length of time consumer can go without polling before considered dead (default: 300000ms)")
 	fs.StringVar(&o.EnableAutoCommit, prefix+"enable-auto-commit", o.EnableAutoCommit, "enables auto commit on consumer when messages are consumed (default: false)")
 	fs.StringVar(&o.AutoOffsetReset, prefix+"auto-offset-reset", o.AutoOffsetReset, "action to take when there is no initial offset in offset store (default: earliest)")
-	fs.StringVar(&o.StatisticsInterval, prefix+"statistics-interval", o.StatisticsInterval, "librdkafka statistics emit interval (default: 60000ms)")
+	fs.StringVar(&o.StatisticsInterval, prefix+"statistics-interval", o.StatisticsInterval, "librdkafka statistics emit interval (default: 30000ms)")
 
+	o.AuthOptions.AddFlags(fs, prefix+"auth")
 	o.RetryOptions.AddFlags(fs, prefix+"retry-options")
 }
 

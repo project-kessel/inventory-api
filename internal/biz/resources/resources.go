@@ -215,11 +215,13 @@ func updateExistingReporterResource(ctx context.Context, m *model.Resource, exis
 func (uc *Usecase) Check(ctx context.Context, permission, namespace string, sub *kessel.SubjectReference, id model.ReporterResourceId) (bool, error) {
 	res, err := uc.reporterResourceRepository.FindByReporterResourceId(ctx, id)
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			// resource doesn't exist.
-			return false, nil
+		// If the resource doesn't exist in inventory (ie. no consistency token available)
+		// we send a check request with minimize latency
+		// err otherwise.
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return false, err
 		}
-		return false, err
+		res = &model.Resource{ResourceType: id.ResourceType, ReporterResourceId: id.LocalResourceId}
 	}
 
 	allowed, _, err := uc.Authz.Check(ctx, namespace, permission, res, sub)
@@ -235,9 +237,13 @@ func (uc *Usecase) Check(ctx context.Context, permission, namespace string, sub 
 
 func (uc *Usecase) CheckForUpdate(ctx context.Context, permission, namespace string, sub *kessel.SubjectReference, id model.ReporterResourceId) (bool, error) {
 	res, err := uc.reporterResourceRepository.FindByReporterResourceId(ctx, id)
+	recordToken := true
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			// resource doesn't exist yet.
+			// DONT write consistency token
+			// no actual resource exists in DB to update
+			recordToken = false
 			res = &model.Resource{ResourceType: id.ResourceType, ReporterResourceId: id.LocalResourceId}
 		} else {
 			return false, err
@@ -254,7 +260,8 @@ func (uc *Usecase) CheckForUpdate(ctx context.Context, permission, namespace str
 			return true, nil
 		}
 
-		if consistency != nil {
+		// Only update consistency token if resource exists in DB.
+		if recordToken && consistency != nil {
 			res.ConsistencyToken = consistency.Token
 			_, _, err := uc.reporterResourceRepository.Update(ctx, res, res.ID)
 			if err != nil {
@@ -341,7 +348,6 @@ func (uc *Usecase) Delete(ctx context.Context, id model.ReporterResourceId) erro
 		if id.ReporterType != "" {
 			namespace = strings.ToLower(id.ReporterType)
 		}
-
 		resourceType := uc.Namespace
 		if id.ResourceType != "" {
 			namespace = strings.ToLower(id.ResourceType)

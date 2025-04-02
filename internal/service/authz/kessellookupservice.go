@@ -2,14 +2,10 @@ package service
 
 import (
 	"context"
-	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/authz"
 
 	pbv1beta2 "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2/authz"
-	authnapi "github.com/project-kessel/inventory-api/internal/authn/api"
-	"github.com/project-kessel/inventory-api/internal/biz/model"
 	"github.com/project-kessel/inventory-api/internal/biz/resources"
-	"github.com/project-kessel/inventory-api/internal/middleware"
-	"github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
+	kessel "github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
 )
 
 type KesselLookupService struct {
@@ -24,44 +20,56 @@ func NewKesselLookupService(c *resources.Usecase) *KesselLookupService {
 }
 
 func (s *KesselLookupService) LookupResources(ctx context.Context, req *pbv1beta2.LookupResourcesRequest) (*pbv1beta2.LookupResourcesResponse, error) {
-	identity, err := middleware.GetIdentity(ctx)
+	kesselRequest := toLookupResourceRequest(req)
+	response, err := s.Ctl.LookupResources(ctx, kesselRequest)
 	if err != nil {
+		return toLookupResourceResponse(&response), nil
+	} else {
 		return nil, err
 	}
+}
 
-	if resource, err := requestToLookup(identity, req.Parent); err == nil {
-		if resp, err := s.Ctl.LookupResources(ctx, req.GetRelation(), req.Parent.Type.GetNamespace(), &v1beta1.SubjectReference{
-			Relation: req.GetSubject().Relation,
-			Subject: &v1beta1.ObjectReference{
-				Type: &v1beta1.ObjectType{
-					Namespace: req.GetSubject().GetSubject().GetType().GetNamespace(),
-					Name:      req.GetSubject().GetSubject().GetType().GetName(),
+func toLookupResourceRequest(request *pbv1beta2.LookupResourcesRequest) *kessel.LookupResourcesRequest {
+	if request == nil {
+		return nil
+	}
+
+	return &kessel.LookupResourcesRequest{
+		ResourceType: &kessel.ObjectType{
+			Namespace: request.ResourceType.Namespace,
+			Name:      request.ResourceType.Name,
+		},
+		Relation: request.Relation,
+		Subject: &kessel.SubjectReference{
+			Relation: request.Subject.Relation,
+			Subject: &kessel.ObjectReference{
+				Type: &kessel.ObjectType{
+					Name:      request.Subject.Subject.Type.Name,
+					Namespace: request.Subject.Subject.Type.Namespace,
 				},
-				Id: req.GetSubject().GetSubject().GetId(),
+				Id: request.Subject.Subject.Id,
 			},
-		}, *resource); err == nil {
-			return lookupResourceResponse(resp), nil
-		} else {
-			return nil, err
-		}
-	} else {
-		return nil, err
+		},
+		Pagination: &kessel.RequestPagination{
+			Limit:             request.Pagination.Limit,
+			ContinuationToken: request.Pagination.ContinuationToken,
+		},
 	}
 }
 
-func requestToLookup(identity *authnapi.Identity, resource *pb.ObjectReference) (*model.ReporterResourceId, error) {
-	return &model.ReporterResourceId{
-		LocalResourceId: resource.Id,
-		ResourceType:    resource.Type.Name,
-		ReporterId:      identity.Principal,
-		ReporterType:    identity.Type,
-	}, nil
-}
+func toLookupResourceResponse(response *kessel.LookupResourcesResponse) *pbv1beta2.LookupResourcesResponse {
 
-func lookupResourceResponse(allowed bool) *pbv1beta2.LookupResourcesResponse {
-	if allowed {
-		return &pbv1beta2.LookupResourcesResponse{Allowed: pb.CheckResponse_ALLOWED_TRUE}
-	} else {
-		return &pbv1beta2.LookupResourcesResponse{Allowed: pb.CheckResponse_ALLOWED_FALSE}
+	return &pbv1beta2.LookupResourcesResponse{
+		Resource: &pbv1beta2.ObjectReference{
+			Type: &pbv1beta2.ObjectType{
+				Namespace: response.Resource.Type.Namespace,
+				Name:      response.Resource.Type.Name,
+			},
+			Id: response.Resource.Id,
+		},
+		Pagination: &pbv1beta2.ResponsePagination{
+			ContinuationToken: response.Pagination.ContinuationToken,
+		},
 	}
+
 }

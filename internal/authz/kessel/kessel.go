@@ -52,6 +52,7 @@ func New(ctx context.Context, config CompletedConfig, logger *log.Helper) (*Kess
 		HealthService:  kesselv1.NewKesselRelationsHealthServiceClient(config.gRPCConn),
 		CheckService:   kessel.NewKesselCheckServiceClient(config.gRPCConn),
 		TupleService:   kessel.NewKesselTupleServiceClient(config.gRPCConn),
+		LookupService:  kessel.NewKesselLookupServiceClient(config.gRPCConn),
 		Logger:         logger,
 		tokenClient:    tokenCli,
 		successCounter: successCounter,
@@ -135,6 +136,10 @@ func (a *KesselAuthz) DeleteTuples(ctx context.Context, r *kessel.DeleteTuplesRe
 
 	a.incrSuccessCounter("DeleteTuples")
 	return resp, nil
+}
+
+func (a *KesselAuthz) LookupResources(ctx context.Context, r *kessel.LookupResourcesRequest) (kessel.LookupResourcesResponse, error) {
+	return a.LookupResources(ctx, r)
 }
 
 func (a *KesselAuthz) UnsetWorkspace(ctx context.Context, local_resource_id, namespace, name string) (*kessel.DeleteTuplesResponse, error) {

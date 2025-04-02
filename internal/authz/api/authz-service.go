@@ -12,6 +12,7 @@ type Authorizer interface {
 	Health(ctx context.Context) (*kesselv1.GetReadyzResponse, error)
 	Check(context.Context, string, string, *model.Resource, *kessel.SubjectReference) (kessel.CheckResponse_Allowed, *kessel.ConsistencyToken, error)
 	CheckForUpdate(context.Context, string, string, *model.Resource, *kessel.SubjectReference) (kessel.CheckForUpdateResponse_Allowed, *kessel.ConsistencyToken, error)
+	LookupResources(context.Context, *kessel.LookupResourcesRequest) (kessel.LookupResourcesResponse, error)
 	CreateTuples(context.Context, *kessel.CreateTuplesRequest) (*kessel.CreateTuplesResponse, error)
 	DeleteTuples(context.Context, *kessel.DeleteTuplesRequest) (*kessel.DeleteTuplesResponse, error)
 	UnsetWorkspace(context.Context, string, string, string) (*kessel.DeleteTuplesResponse, error)

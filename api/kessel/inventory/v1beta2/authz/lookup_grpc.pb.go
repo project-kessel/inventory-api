@@ -19,7 +19,6 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	KesselLookupService_LookupSubjects_FullMethodName  = "/kessel.inventory.v1beta2.authz.KesselLookupService/LookupSubjects"
 	KesselLookupService_LookupResources_FullMethodName = "/kessel.inventory.v1beta2.authz.KesselLookupService/LookupResources"
 )
 
@@ -27,7 +26,6 @@ const (
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type KesselLookupServiceClient interface {
-	LookupSubjects(ctx context.Context, in *LookupSubjectsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[LookupSubjectsResponse], error)
 	LookupResources(ctx context.Context, in *LookupResourcesRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[LookupResourcesResponse], error)
 }
 
@@ -39,28 +37,9 @@ func NewKesselLookupServiceClient(cc grpc.ClientConnInterface) KesselLookupServi
 	return &kesselLookupServiceClient{cc}
 }
 
-func (c *kesselLookupServiceClient) LookupSubjects(ctx context.Context, in *LookupSubjectsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[LookupSubjectsResponse], error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &KesselLookupService_ServiceDesc.Streams[0], KesselLookupService_LookupSubjects_FullMethodName, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	x := &grpc.GenericClientStream[LookupSubjectsRequest, LookupSubjectsResponse]{ClientStream: stream}
-	if err := x.ClientStream.SendMsg(in); err != nil {
-		return nil, err
-	}
-	if err := x.ClientStream.CloseSend(); err != nil {
-		return nil, err
-	}
-	return x, nil
-}
-
-// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
-type KesselLookupService_LookupSubjectsClient = grpc.ServerStreamingClient[LookupSubjectsResponse]
-
 func (c *kesselLookupServiceClient) LookupResources(ctx context.Context, in *LookupResourcesRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[LookupResourcesResponse], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &KesselLookupService_ServiceDesc.Streams[1], KesselLookupService_LookupResources_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &KesselLookupService_ServiceDesc.Streams[0], KesselLookupService_LookupResources_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -81,7 +60,6 @@ type KesselLookupService_LookupResourcesClient = grpc.ServerStreamingClient[Look
 // All implementations must embed UnimplementedKesselLookupServiceServer
 // for forward compatibility.
 type KesselLookupServiceServer interface {
-	LookupSubjects(*LookupSubjectsRequest, grpc.ServerStreamingServer[LookupSubjectsResponse]) error
 	LookupResources(*LookupResourcesRequest, grpc.ServerStreamingServer[LookupResourcesResponse]) error
 	mustEmbedUnimplementedKesselLookupServiceServer()
 }
@@ -93,9 +71,6 @@ type KesselLookupServiceServer interface {
 // pointer dereference when methods are called.
 type UnimplementedKesselLookupServiceServer struct{}
 
-func (UnimplementedKesselLookupServiceServer) LookupSubjects(*LookupSubjectsRequest, grpc.ServerStreamingServer[LookupSubjectsResponse]) error {
-	return status.Errorf(codes.Unimplemented, "method LookupSubjects not implemented")
-}
 func (UnimplementedKesselLookupServiceServer) LookupResources(*LookupResourcesRequest, grpc.ServerStreamingServer[LookupResourcesResponse]) error {
 	return status.Errorf(codes.Unimplemented, "method LookupResources not implemented")
 }
@@ -120,17 +95,6 @@ func RegisterKesselLookupServiceServer(s grpc.ServiceRegistrar, srv KesselLookup
 	s.RegisterService(&KesselLookupService_ServiceDesc, srv)
 }
 
-func _KesselLookupService_LookupSubjects_Handler(srv interface{}, stream grpc.ServerStream) error {
-	m := new(LookupSubjectsRequest)
-	if err := stream.RecvMsg(m); err != nil {
-		return err
-	}
-	return srv.(KesselLookupServiceServer).LookupSubjects(m, &grpc.GenericServerStream[LookupSubjectsRequest, LookupSubjectsResponse]{ServerStream: stream})
-}
-
-// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
-type KesselLookupService_LookupSubjectsServer = grpc.ServerStreamingServer[LookupSubjectsResponse]
-
 func _KesselLookupService_LookupResources_Handler(srv interface{}, stream grpc.ServerStream) error {
 	m := new(LookupResourcesRequest)
 	if err := stream.RecvMsg(m); err != nil {
@@ -150,11 +114,6 @@ var KesselLookupService_ServiceDesc = grpc.ServiceDesc{
 	HandlerType: (*KesselLookupServiceServer)(nil),
 	Methods:     []grpc.MethodDesc{},
 	Streams: []grpc.StreamDesc{
-		{
-			StreamName:    "LookupSubjects",
-			Handler:       _KesselLookupService_LookupSubjects_Handler,
-			ServerStreams: true,
-		},
 		{
 			StreamName:    "LookupResources",
 			Handler:       _KesselLookupService_LookupResources_Handler,

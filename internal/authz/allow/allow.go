@@ -33,6 +33,10 @@ func (a *AllowAllAuthz) CheckForUpdate(context.Context, string, string, *model.R
 	return v1beta1.CheckForUpdateResponse_ALLOWED_TRUE, nil, nil
 }
 
+func (a *AllowAllAuthz) LookupResources(ctx context.Context, r *v1beta1.LookupResourcesRequest) (v1beta1.LookupResourcesResponse, error) {
+	return a.LookupResources(ctx, r)
+}
+
 func (a *AllowAllAuthz) CreateTuples(ctx context.Context, r *v1beta1.CreateTuplesRequest) (*v1beta1.CreateTuplesResponse, error) {
 	return &v1beta1.CreateTuplesResponse{}, nil
 }

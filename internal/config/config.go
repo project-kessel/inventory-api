@@ -75,7 +75,10 @@ func LogConfigurationInfo(options *OptionsConfig) {
 		options.Consumer.Topic,
 		options.Consumer.RetryOptions.ConsumerMaxRetries,
 		options.Consumer.RetryOptions.OperationMaxRetries,
-		options.Consumer.RetryOptions.BackoffFactor)
+		options.Consumer.RetryOptions.BackoffFactor,
+		options.Consumer.ReadAfterWriteEnabled,
+		options.Consumer.ReadAfterWriteAllowlist,
+	)
 }
 
 // InjectClowdAppConfig updates service options based on values in the ClowdApp AppConfig

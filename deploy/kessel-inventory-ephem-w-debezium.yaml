@@ -20,6 +20,8 @@ objects:
         consumer:
           bootstrap-servers: inventory-kafka-kafka-bootstrap:9092
           topic: outbox.event.kessel.tuples
+          read-after-write-enabled: true # false == off for all service providers
+          read-after-write-allowlist: [] # specify "*" to require all requests
         log:
           level: "debug"
 

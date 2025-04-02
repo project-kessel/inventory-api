@@ -3,6 +3,7 @@ package resources
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/project-kessel/inventory-api/internal/consumer"
@@ -69,6 +70,7 @@ func New(reporterResourceRepository ReporterResourceRepository, inventoryResourc
 		log:                         log.NewHelper(logger),
 		DisablePersistence:          disablePersistence,
 		ListenManager:               listenManager,
+		Consumer:                    consumer,
 	}
 }
 
@@ -268,6 +270,18 @@ func (uc *Usecase) ListResourcesInWorkspace(ctx context.Context, permission, nam
 	}()
 
 	return resource_chan, error_chan, nil
+}
+
+// Check if request comes from SP in allowlist
+func isSPInAllowlist(m *model.Resource, allowlist []string) bool {
+	fmt.Printf("SPs in allowlist: %+q\n", allowlist)
+	for _, sp := range allowlist {
+		if sp == m.ReporterId || sp == "*" { // either specific SP or everyone
+			return true
+		}
+	}
+
+	return false
 }
 
 // Deprecated. Remove after notifications and ACM migrates to v1beta2

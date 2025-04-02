@@ -152,6 +152,13 @@ func (a *KesselAuthz) UnsetWorkspace(ctx context.Context, local_resource_id, nam
 
 func (a *KesselAuthz) Check(ctx context.Context, namespace string, viewPermission string, resource *model.Resource, sub *kessel.SubjectReference) (kessel.CheckResponse_Allowed, *kessel.ConsistencyToken, error) {
 	log.Infof("Check: on %+v", resource)
+
+	opts, err := a.getCallOptions()
+	if err != nil {
+		a.incrFailureCounter("Check")
+		return kessel.CheckResponse_ALLOWED_UNSPECIFIED, nil, err
+	}
+
 	// If resource doesn't exist in inventory DB
 	// default send a minimize_latency check request
 	consistency := &kessel.Consistency{Requirement: &kessel.Consistency_MinimizeLatency{MinimizeLatency: true}}
@@ -175,18 +182,26 @@ func (a *KesselAuthz) Check(ctx context.Context, namespace string, viewPermissio
 		Relation:    viewPermission,
 		Subject:     sub,
 		Consistency: consistency,
-	})
+	}, opts...)
 
 	log.Infof("CheckForView resp: %v err: %v", resp, err)
 
 	if err != nil {
+		a.incrFailureCounter("Check")
 		return kessel.CheckResponse_ALLOWED_UNSPECIFIED, nil, err
 	}
 
+	a.incrSuccessCounter("Check")
 	return resp.GetAllowed(), resp.GetConsistencyToken(), nil
 }
 
 func (a *KesselAuthz) CheckForUpdate(ctx context.Context, namespace string, updatePermission string, resource *model.Resource, sub *kessel.SubjectReference) (kessel.CheckForUpdateResponse_Allowed, *kessel.ConsistencyToken, error) {
+	opts, err := a.getCallOptions()
+	if err != nil {
+		a.incrFailureCounter("CheckForUpdate")
+		return kessel.CheckForUpdateResponse_ALLOWED_UNSPECIFIED, nil, err
+	}
+
 	resp, err := a.CheckService.CheckForUpdate(ctx, &kessel.CheckForUpdateRequest{
 		Resource: &kessel.ObjectReference{
 			Type: &kessel.ObjectType{
@@ -197,12 +212,14 @@ func (a *KesselAuthz) CheckForUpdate(ctx context.Context, namespace string, upda
 		},
 		Relation: updatePermission,
 		Subject:  sub,
-	})
+	}, opts...)
 
 	if err != nil {
+		a.incrFailureCounter("CheckForUpdate")
 		return kessel.CheckForUpdateResponse_ALLOWED_UNSPECIFIED, nil, err
 	}
 
+	a.incrSuccessCounter("CheckForUpdate")
 	return resp.GetAllowed(), resp.GetConsistencyToken(), nil
 }
 

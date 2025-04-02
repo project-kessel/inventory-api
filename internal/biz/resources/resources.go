@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/project-kessel/inventory-api/internal/consumer"
+	"github.com/project-kessel/inventory-api/internal/pubsub"
 
 	"github.com/google/uuid"
 
@@ -19,8 +20,8 @@ import (
 )
 
 type ReporterResourceRepository interface {
-	Create(context.Context, *model.Resource, string) (*model.Resource, error)
-	Update(context.Context, *model.Resource, uuid.UUID, string) (*model.Resource, error)
+	Create(context.Context, *model.Resource, string, string) (*model.Resource, error)
+	Update(context.Context, *model.Resource, uuid.UUID, string, string) (*model.Resource, error)
 	Delete(context.Context, uuid.UUID, string) (*model.Resource, error)
 	FindByID(context.Context, uuid.UUID) (*model.Resource, error)
 	FindByWorkspaceId(context.Context, string) ([]*model.Resource, error)
@@ -53,10 +54,12 @@ type Usecase struct {
 	log                         *log.Helper
 	Server                      server.Server
 	DisablePersistence          bool
+	ListenManager               *pubsub.ListenManager
 }
 
 func New(reporterResourceRepository ReporterResourceRepository, inventoryResourceRepository InventoryResourceRepository,
-	authz authzapi.Authorizer, eventer eventingapi.Manager, namespace string, logger log.Logger, disablePersistence bool) *Usecase {
+	authz authzapi.Authorizer, eventer eventingapi.Manager, namespace string, logger log.Logger, disablePersistence bool,
+	listenManager *pubsub.ListenManager) *Usecase {
 	return &Usecase{
 		reporterResourceRepository:  reporterResourceRepository,
 		inventoryResourceRepository: inventoryResourceRepository,
@@ -65,12 +68,22 @@ func New(reporterResourceRepository ReporterResourceRepository, inventoryResourc
 		Namespace:                   namespace,
 		log:                         log.NewHelper(logger),
 		DisablePersistence:          disablePersistence,
+		ListenManager:               listenManager,
 	}
 }
 
 func (uc *Usecase) Upsert(ctx context.Context, m *model.Resource) (*model.Resource, error) {
 	log.Info("upserting resource: ", m)
 	ret := m // Default to returning the input model in case persistence is disabled
+	var subscription pubsub.Subscription
+
+	// Generate txid for data layer
+	// TODO: Replace this when inventory api has proper api-level transaction ids
+	txid, err := uuid.NewV7()
+	if err != nil {
+		return nil, err
+	}
+	txidStr := txid.String()
 
 	if !uc.DisablePersistence {
 		// check if the resource already exists
@@ -79,9 +92,15 @@ func (uc *Usecase) Upsert(ctx context.Context, m *model.Resource) (*model.Resour
 		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, ErrDatabaseError
 		}
+
+		if uc.ListenManager != nil {
+			subscription = uc.ListenManager.Subscribe(txid.String())
+			defer subscription.Unsubscribe(ctx)
+		}
+
 		log.Info("found existing resource: ", existingResource)
 		if existingResource != nil {
-			return updateExistingReporterResource(ctx, m, existingResource, uc)
+			return updateExistingReporterResource(ctx, m, existingResource, uc, txidStr)
 		}
 
 		//TODO: Bug here that needs to be fixed : https://issues.redhat.com/browse/RHCLOUD-39044
@@ -93,23 +112,28 @@ func (uc *Usecase) Upsert(ctx context.Context, m *model.Resource) (*model.Resour
 		}
 
 		log.Info("Creating resource: ", m)
-		ret, err2 := createNewReporterResource(ctx, m, uc)
+		ret, err2 := createNewReporterResource(ctx, m, uc, txidStr)
 		if err2 != nil {
 			return ret, err2
 		}
-	} else {
-		// mock the created at time for eventing
-		// TODO: remove this when persistence is always enabled
-		now := time.Now()
-		m.CreatedAt = &now
+
+		if uc.ListenManager != nil {
+			timeoutCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+			defer cancel()
+
+			err = subscription.BlockForNotification(timeoutCtx)
+			if err != nil {
+				return nil, err
+			}
+		}
 	}
 
 	uc.log.WithContext(ctx).Infof("Created Resource: %v(%v)", m.ID, m.ResourceType)
 	return ret, nil
 }
 
-func createNewReporterResource(ctx context.Context, m *model.Resource, uc *Usecase) (*model.Resource, error) {
-	ret, err := uc.reporterResourceRepository.Create(ctx, m, uc.Namespace)
+func createNewReporterResource(ctx context.Context, m *model.Resource, uc *Usecase, txid string) (*model.Resource, error) {
+	ret, err := uc.reporterResourceRepository.Create(ctx, m, uc.Namespace, txid)
 
 	if err != nil {
 		return nil, err
@@ -137,13 +161,13 @@ func validateSameResourceFromMultipleReportersShareInventoryId(ctx context.Conte
 	return nil
 }
 
-func updateExistingReporterResource(ctx context.Context, m *model.Resource, existingResource *model.Resource, uc *Usecase) (*model.Resource, error) {
+func updateExistingReporterResource(ctx context.Context, m *model.Resource, existingResource *model.Resource, uc *Usecase, txid string) (*model.Resource, error) {
 
 	if m.InventoryId != nil && existingResource.InventoryId.String() != m.InventoryId.String() {
 		return nil, ErrInventoryIdMismatch
 	}
 	log.Info("Updating resource: ", m)
-	ret, err := uc.reporterResourceRepository.Update(ctx, m, existingResource.ID, uc.Namespace)
+	ret, err := uc.reporterResourceRepository.Update(ctx, m, existingResource.ID, uc.Namespace, txid)
 	if err != nil {
 		return nil, err
 	}
@@ -203,7 +227,7 @@ func (uc *Usecase) CheckForUpdate(ctx context.Context, permission, namespace str
 		// Only update consistency token if resource exists in DB.
 		if recordToken && consistency != nil {
 			res.ConsistencyToken = consistency.Token
-			_, err := uc.reporterResourceRepository.Update(ctx, res, res.ID, uc.Namespace)
+			_, err := uc.reporterResourceRepository.Update(ctx, res, res.ID, uc.Namespace, "")
 			if err != nil {
 				return false, err // we're allowed, but failed to update consistency token
 			}
@@ -249,6 +273,14 @@ func (uc *Usecase) ListResourcesInWorkspace(ctx context.Context, permission, nam
 // Deprecated. Remove after notifications and ACM migrates to v1beta2
 func (uc *Usecase) Create(ctx context.Context, m *model.Resource) (*model.Resource, error) {
 	ret := m // Default to returning the input model in case persistence is disabled
+	var subscription pubsub.Subscription
+
+	// Generate txid for data layer
+	// TODO: Replace this when inventory api has proper api-level transaction ids
+	txid, err := uuid.NewV7()
+	if err != nil {
+		return nil, err
+	}
 
 	if !uc.DisablePersistence {
 		// check if the resource already exists
@@ -266,9 +298,24 @@ func (uc *Usecase) Create(ctx context.Context, m *model.Resource) (*model.Resour
 			return nil, ErrResourceAlreadyExists
 		}
 
-		ret, err = uc.reporterResourceRepository.Create(ctx, m, uc.Namespace)
+		if uc.ListenManager != nil {
+			subscription = uc.ListenManager.Subscribe(txid.String())
+			defer subscription.Unsubscribe(ctx)
+		}
+
+		ret, err = uc.reporterResourceRepository.Create(ctx, m, uc.Namespace, txid.String())
 		if err != nil {
 			return nil, err
+		}
+
+		if uc.ListenManager != nil {
+			timeoutCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+			defer cancel()
+
+			err = subscription.BlockForNotification(timeoutCtx)
+			if err != nil {
+				return nil, err
+			}
 		}
 	}
 
@@ -281,6 +328,15 @@ func (uc *Usecase) Create(ctx context.Context, m *model.Resource) (*model.Resour
 // Update updates a model in the database, updates related tuples in the relations-api, and issues an update event.
 func (uc *Usecase) Update(ctx context.Context, m *model.Resource, id model.ReporterResourceId) (*model.Resource, error) {
 	ret := m // Default to returning the input model in case persistence is disabled
+	var subscription pubsub.Subscription
+
+	// Generate txid for data layer
+	// TODO: Replace this when inventory api has proper api-level transaction ids
+	txid, err := uuid.NewV7()
+	if err != nil {
+		return nil, err
+	}
+	txidStr := txid.String()
 
 	if !uc.DisablePersistence {
 		// check if the resource exists
@@ -298,9 +354,24 @@ func (uc *Usecase) Update(ctx context.Context, m *model.Resource, id model.Repor
 			return nil, ErrDatabaseError
 		}
 
-		ret, err = uc.reporterResourceRepository.Update(ctx, m, existingResource.ID, uc.Namespace)
+		if uc.ListenManager != nil {
+			subscription = uc.ListenManager.Subscribe(txid.String())
+			defer subscription.Unsubscribe(ctx)
+		}
+
+		ret, err = uc.reporterResourceRepository.Update(ctx, m, existingResource.ID, uc.Namespace, txidStr)
 		if err != nil {
 			return nil, err
+		}
+
+		if uc.ListenManager != nil {
+			timeoutCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+			defer cancel()
+
+			err = subscription.BlockForNotification(timeoutCtx)
+			if err != nil {
+				return nil, err
+			}
 		}
 	}
 

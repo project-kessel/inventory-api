@@ -24,6 +24,7 @@ type OutboxEvent struct {
 	AggregateType AggregateType      `gorm:"column:aggregatetype;type:varchar(255);not null"`
 	AggregateID   string             `gorm:"column:aggregateid;type:varchar(255);not null"`
 	Operation     EventOperationType `gorm:"type:varchar(255);not null"`
+	TxId          string             `gorm:"column:txid;type:varchar(255)"`
 	Payload       JsonObject
 }
 
@@ -241,7 +242,7 @@ func convertResourceToUnsetTupleEvent(resource Resource, namespace string) (Json
 	return payload, nil
 }
 
-func NewOutboxEventsFromResource(resource Resource, namespace string, operationType EventOperationType) (*OutboxEvent, *OutboxEvent, error) {
+func NewOutboxEventsFromResource(resource Resource, namespace string, operationType EventOperationType, txid string) (*OutboxEvent, *OutboxEvent, error) {
 	var tuplePayload JsonObject
 	var tupleEvent *OutboxEvent
 
@@ -255,6 +256,7 @@ func NewOutboxEventsFromResource(resource Resource, namespace string, operationT
 		Operation:     operationType,
 		AggregateType: ResourceAggregateType,
 		AggregateID:   resource.InventoryId.String(),
+		TxId:          "",
 		Payload:       payload,
 	}
 
@@ -274,6 +276,7 @@ func NewOutboxEventsFromResource(resource Resource, namespace string, operationT
 		Operation:     operationType,
 		AggregateType: TupleAggregateType,
 		AggregateID:   resource.InventoryId.String(),
+		TxId:          txid,
 		Payload:       tuplePayload,
 	}
 

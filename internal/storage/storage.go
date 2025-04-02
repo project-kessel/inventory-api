@@ -1,9 +1,11 @@
 package storage
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/go-kratos/kratos/v2/log"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"gorm.io/driver/postgres"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
@@ -37,4 +39,24 @@ func New(c CompletedConfig, logger *log.Helper) (*gorm.DB, error) {
 	}
 
 	return db, nil
+}
+func NewPgx(c CompletedConfig, logger *log.Helper) (*pgxpool.Pool, error) {
+	ctx := context.Background()
+	logger.Info("Persistence disabled: ", c.Options.DisablePersistence)
+
+	if c.Options.DisablePersistence || c.Options.Database != "postgres" {
+		logger.Info("Skipping database connection for PGX...")
+		return nil, nil
+	}
+
+	pool, err := pgxpool.New(ctx, c.DSN)
+
+	if err != nil {
+		return nil, fmt.Errorf("error pgx connection to DB: %v", err)
+	}
+	if err = pool.Ping(ctx); err != nil {
+		return nil, fmt.Errorf("error pgx pinging DB: %v", err)
+	}
+
+	return pool, nil
 }

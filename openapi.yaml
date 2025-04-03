@@ -1249,6 +1249,8 @@ components:
             properties:
                 resource:
                     $ref: '#/components/schemas/kessel.inventory.v1beta2.Resource'
+                readAfterWriteEnabled:
+                    type: boolean
         kessel.inventory.v1beta2.ReportResourceResponse:
             type: object
             properties: {}

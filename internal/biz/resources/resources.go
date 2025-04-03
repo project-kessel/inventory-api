@@ -76,7 +76,7 @@ func New(reporterResourceRepository ReporterResourceRepository, inventoryResourc
 	}
 }
 
-func (uc *Usecase) Upsert(ctx context.Context, m *model.Resource) (*model.Resource, error) {
+func (uc *Usecase) Upsert(ctx context.Context, m *model.Resource, requestReadAfterWrite bool) (*model.Resource, error) {
 	log.Info("upserting resource: ", m)
 	ret := m // Default to returning the input model in case persistence is disabled
 	var subscription pubsub.Subscription
@@ -124,8 +124,9 @@ func (uc *Usecase) Upsert(ctx context.Context, m *model.Resource) (*model.Resour
 		if uc.ListenManager != nil {
 
 			// read after write functionality is enabled globally.
-			// And executed if request came from service provider in allowlist
-			if uc.ReadAfterWriteEnabled && isSPInAllowlist(m, uc.ReadAfterWriteAllowlist) {
+			// And executed if request specifies or
+			// request came from service provider in allowlist
+			if uc.ReadAfterWriteEnabled && (requestReadAfterWrite || isSPInAllowlist(m, uc.ReadAfterWriteAllowlist)) {
 
 				timeoutCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 				defer cancel()

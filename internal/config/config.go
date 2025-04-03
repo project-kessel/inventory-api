@@ -70,7 +70,7 @@ func LogConfigurationInfo(options *OptionsConfig) {
 		)
 	}
 
-	log.Debugf("Consumer Configuration: Bootstrap Server: %s, Topic: %s, Consumer Max Retries: %d, Operation Max Retries: %d, Backoff Factor: %d",
+	log.Debugf("Consumer Configuration: Bootstrap Server: %s, Topic: %s, Consumer Max Retries: %d, Operation Max Retries: %d, Backoff Factor: %d, Read-After-Write Enabled: %t, Read-After-Write Allowlist: %+s",
 		options.Consumer.BootstrapServers,
 		options.Consumer.Topic,
 		options.Consumer.RetryOptions.ConsumerMaxRetries,

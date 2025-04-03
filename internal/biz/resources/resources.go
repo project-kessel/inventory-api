@@ -54,12 +54,12 @@ type Usecase struct {
 	log                         *log.Helper
 	Server                      server.Server
 	DisablePersistence          bool
-	ListenManager               *pubsub.ListenManager
+	ListenManager               pubsub.ListenManagerImpl
 }
 
 func New(reporterResourceRepository ReporterResourceRepository, inventoryResourceRepository InventoryResourceRepository,
 	authz authzapi.Authorizer, eventer eventingapi.Manager, namespace string, logger log.Logger, disablePersistence bool,
-	listenManager *pubsub.ListenManager) *Usecase {
+	listenManager pubsub.ListenManagerImpl) *Usecase {
 	return &Usecase{
 		reporterResourceRepository:  reporterResourceRepository,
 		inventoryResourceRepository: inventoryResourceRepository,
@@ -95,7 +95,7 @@ func (uc *Usecase) Upsert(ctx context.Context, m *model.Resource) (*model.Resour
 
 		if uc.ListenManager != nil {
 			subscription = uc.ListenManager.Subscribe(txid.String())
-			defer subscription.Unsubscribe(ctx)
+			defer subscription.Unsubscribe()
 		}
 
 		log.Info("found existing resource: ", existingResource)
@@ -300,7 +300,7 @@ func (uc *Usecase) Create(ctx context.Context, m *model.Resource) (*model.Resour
 
 		if uc.ListenManager != nil {
 			subscription = uc.ListenManager.Subscribe(txid.String())
-			defer subscription.Unsubscribe(ctx)
+			defer subscription.Unsubscribe()
 		}
 
 		ret, err = uc.reporterResourceRepository.Create(ctx, m, uc.Namespace, txid.String())
@@ -356,7 +356,7 @@ func (uc *Usecase) Update(ctx context.Context, m *model.Resource, id model.Repor
 
 		if uc.ListenManager != nil {
 			subscription = uc.ListenManager.Subscribe(txid.String())
-			defer subscription.Unsubscribe(ctx)
+			defer subscription.Unsubscribe()
 		}
 
 		ret, err = uc.reporterResourceRepository.Update(ctx, m, existingResource.ID, uc.Namespace, txidStr)

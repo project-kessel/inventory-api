@@ -1,14 +1,16 @@
 package consumer
 
 import (
+	"testing"
+
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/project-kessel/inventory-api/cmd/common"
 	"github.com/project-kessel/inventory-api/internal/authz"
+	"github.com/project-kessel/inventory-api/internal/pubsub"
 	"github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
 	"github.com/stretchr/testify/assert"
 	"go.opentelemetry.io/otel"
 	"gorm.io/gorm"
-	"testing"
 )
 
 type TestCase struct {
@@ -38,7 +40,9 @@ func (t *TestCase) TestSetup() []error {
 	errs = t.options.Validate()
 	t.completedConfig, errs = NewConfig(t.options).Complete()
 
-	t.inv, err = New(t.completedConfig, &gorm.DB{}, authz.CompletedConfig{}, nil, t.logger)
+	notifier := &pubsub.NotifierMock{}
+
+	t.inv, err = New(t.completedConfig, &gorm.DB{}, authz.CompletedConfig{}, nil, notifier, t.logger)
 	if err != nil {
 		errs = append(errs, err)
 	}

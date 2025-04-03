@@ -11,6 +11,8 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+const txid = "txid"
+
 func createTestResource() *Resource {
 	now := time.Now()
 	id, err := uuid.NewV7()
@@ -64,7 +66,7 @@ func createTestResource() *Resource {
 func TestNewOutboxEventsFromResourceCreated(t *testing.T) {
 	resource := createTestResource()
 	namespace := "foobar-namespace"
-	resourceEvent, tupleEvent, err := NewOutboxEventsFromResource(*resource, namespace, OperationTypeCreated)
+	resourceEvent, tupleEvent, err := NewOutboxEventsFromResource(*resource, namespace, OperationTypeCreated, txid)
 	assert.Nil(t, err)
 	assert.NotNil(t, resourceEvent)
 	assert.NotNil(t, tupleEvent)
@@ -75,7 +77,7 @@ func TestNewOutboxEventsFromResourceCreated(t *testing.T) {
 func TestNewOutboxEventsFromResourceUpdated(t *testing.T) {
 	resource := createTestResource()
 	namespace := "foobar-namespace"
-	resourceEvent, tupleEvent, err := NewOutboxEventsFromResource(*resource, namespace, OperationTypeUpdated)
+	resourceEvent, tupleEvent, err := NewOutboxEventsFromResource(*resource, namespace, OperationTypeUpdated, txid)
 	assert.Nil(t, err)
 	assert.NotNil(t, resourceEvent)
 	assert.NotNil(t, tupleEvent)
@@ -86,7 +88,7 @@ func TestNewOutboxEventsFromResourceUpdated(t *testing.T) {
 func TestNewOutboxEventsFromResourceDeleted(t *testing.T) {
 	resource := createTestResource()
 	namespace := "foobar-namespace"
-	resourceEvent, tupleEvent, err := NewOutboxEventsFromResource(*resource, namespace, OperationTypeDeleted)
+	resourceEvent, tupleEvent, err := NewOutboxEventsFromResource(*resource, namespace, OperationTypeDeleted, txid)
 	assert.Nil(t, err)
 	assert.NotNil(t, resourceEvent)
 	assert.NotNil(t, tupleEvent)
@@ -102,6 +104,7 @@ func assertSetTupleEvent(t *testing.T, resource *Resource, event *OutboxEvent, n
 	err = json.Unmarshal(payloadJson, &tupleEvent)
 	assert.Nil(t, err)
 
+	assert.Equal(t, event.TxId, txid)
 	assert.Equal(t, resource.ResourceType, tupleEvent.Resource.Type.Name)
 	assert.Equal(t, namespace, tupleEvent.Resource.Type.Namespace)
 	assert.Equal(t, resource.ReporterResourceId, tupleEvent.Resource.Id)

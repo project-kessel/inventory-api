@@ -18,20 +18,20 @@ type Driver interface {
 	Notify(ctx context.Context, payload string) error
 }
 
-func NewDriver(dbp *pgxpool.Pool) Driver {
-	return &driver{
+func NewPgxDriver(dbp *pgxpool.Pool) Driver {
+	return &pgxdriver{
 		mu:     sync.Mutex{},
 		dbPool: dbp,
 	}
 }
 
-type driver struct {
+type pgxdriver struct {
 	conn   *pgxpool.Conn
 	dbPool *pgxpool.Pool
 	mu     sync.Mutex
 }
 
-func (d *driver) Close(ctx context.Context) error {
+func (d *pgxdriver) Close(ctx context.Context) error {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
@@ -45,7 +45,7 @@ func (d *driver) Close(ctx context.Context) error {
 	return err
 }
 
-func (d *driver) Connect(ctx context.Context) error {
+func (d *pgxdriver) Connect(ctx context.Context) error {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
@@ -62,32 +62,26 @@ func (d *driver) Connect(ctx context.Context) error {
 	return nil
 }
 
-func (d *driver) Listen(ctx context.Context) error {
+func (d *pgxdriver) Listen(ctx context.Context) error {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	_, err := d.conn.Exec(ctx, "listen consumer_notifications")
 	return err
 }
 
-func (d *driver) Ping(ctx context.Context) error {
+func (d *pgxdriver) Ping(ctx context.Context) error {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	return d.conn.Ping(ctx)
 }
 
-func (d *driver) WaitForNotification(ctx context.Context) (*Notification, error) {
+func (d *pgxdriver) WaitForNotification(ctx context.Context) (*Notification, error) {
+	if err := d.ensureConnected(ctx); err != nil {
+		return nil, fmt.Errorf("WaitForNotification: error re-establishing connection: %w", err)
+	}
+
 	d.mu.Lock()
 	defer d.mu.Unlock()
-
-	// If the connection has been lost for some reason, re-establish it
-	if d.conn == nil || d.conn.Conn().IsClosed() {
-		d.conn.Release()
-		d.conn = nil
-
-		if err := d.Connect(ctx); err != nil {
-			return nil, fmt.Errorf("waitForNotification: error re-establishing pgx connection: %w", err)
-		}
-	}
 
 	pgn, err := d.conn.Conn().WaitForNotification(ctx)
 
@@ -103,16 +97,59 @@ func (d *driver) WaitForNotification(ctx context.Context) (*Notification, error)
 	return &n, nil
 }
 
-func (d *driver) Notify(ctx context.Context, payload string) error {
+func (d *pgxdriver) Notify(ctx context.Context, payload string) error {
 	// If the connection has been lost for some reason, re-establish it
-	if d.conn == nil || d.conn.Conn().IsClosed() {
-		d.conn.Release()
-		d.conn = nil
-
-		if err := d.Connect(ctx); err != nil {
-			return fmt.Errorf("notify: error re-establishing pgx connection: %w", err)
-		}
+	if err := d.ensureConnected(ctx); err != nil {
+		return fmt.Errorf("Notify: error re-establishing connection: %w", err)
 	}
 	_, err := d.conn.Exec(ctx, `select pg_notify('consumer_notifications', $1)`, payload)
 	return err
+}
+
+func (d *pgxdriver) ensureConnected(ctx context.Context) error {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
+	if d.conn == nil || d.conn.Conn().IsClosed() {
+		if d.conn != nil {
+			d.conn.Release()
+			d.conn = nil
+		}
+		if err := d.Connect(ctx); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+const (
+	mockChannel = "mock_channel"
+	mockPayload = "mock_payload"
+)
+
+type DriverMock struct{}
+
+var _ Driver = &DriverMock{}
+
+func (d *DriverMock) Close(ctx context.Context) error {
+	return nil
+}
+func (d *DriverMock) Connect(ctx context.Context) error {
+	return nil
+}
+func (d *DriverMock) Listen(ctx context.Context) error {
+	return nil
+}
+func (d *DriverMock) Ping(ctx context.Context) error {
+	return nil
+}
+func (d *DriverMock) WaitForNotification(ctx context.Context) (*Notification, error) {
+	notif := &Notification{
+		Channel: mockChannel,
+		Payload: []byte(mockPayload),
+	}
+	return notif, nil
+}
+func (d *DriverMock) Notify(ctx context.Context, payload string) error {
+	return nil
 }

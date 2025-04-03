@@ -16,6 +16,7 @@ import (
 
 const (
 	namespace = "foobar"
+	emptyTxId = ""
 )
 
 func setupGorm(t *testing.T) *gorm.DB {
@@ -118,7 +119,7 @@ func TestCreateResource(t *testing.T) {
 	ctx := context.TODO()
 
 	// Saving a resource not present in the system saves correctly
-	r, err := repo.Create(ctx, resource1(), namespace)
+	r, err := repo.Create(ctx, resource1(), namespace, emptyTxId)
 	assert.NotNil(t, r)
 	assert.Nil(t, err)
 
@@ -159,7 +160,7 @@ func TestCreateResourceWithInventoryId(t *testing.T) {
 	res2 := resource1()
 	res2.ID, _ = uuid.NewV7()
 
-	r, err := repo.Create(ctx, res1, namespace)
+	r, err := repo.Create(ctx, res1, namespace, emptyTxId)
 	assert.NotNil(t, r)
 	assert.Nil(t, err)
 
@@ -173,7 +174,7 @@ func TestCreateResourceWithInventoryId(t *testing.T) {
 	res2.WorkspaceId = "workspace-02"
 	res2.ReporterInstanceId = "345"
 
-	r2, err := repo.Create(ctx, res2, namespace)
+	r2, err := repo.Create(ctx, res2, namespace, emptyTxId)
 	assert.NotNil(t, r2)
 	assert.Nil(t, err)
 
@@ -208,7 +209,7 @@ func TestUpdateFailsIfResourceNotFound(t *testing.T) {
 	assert.Nil(t, err)
 
 	// Update fails if id is not found
-	_, err = repo.Update(ctx, &model.Resource{}, id, namespace)
+	_, err = repo.Update(ctx, &model.Resource{}, id, namespace, emptyTxId)
 	assert.ErrorIs(t, err, gorm.ErrRecordNotFound)
 
 	// Nothing exists in the outbox (expected)
@@ -222,7 +223,7 @@ func TestUpdateResource(t *testing.T) {
 	repo := New(db)
 	ctx := context.TODO()
 
-	r, err := repo.Create(ctx, resource1(), namespace)
+	r, err := repo.Create(ctx, resource1(), namespace, emptyTxId)
 	assert.NotNil(t, r)
 	assert.Nil(t, err)
 	createdAt := r.CreatedAt
@@ -231,7 +232,7 @@ func TestUpdateResource(t *testing.T) {
 	r2Copy := *r
 	r2Copy.WorkspaceId = "workspace-update-01"
 	r2Copy.OrgId = "org-update-01"
-	r2, err := repo.Update(ctx, &r2Copy, r.ID, namespace)
+	r2, err := repo.Update(ctx, &r2Copy, r.ID, namespace, emptyTxId)
 	assert.NotNil(t, r2)
 	assert.Nil(t, err)
 	assert.Equal(t, r.ID, r2.ID)
@@ -283,7 +284,7 @@ func TestDeleteAfterCreate(t *testing.T) {
 	repo := New(db)
 	ctx := context.TODO()
 
-	r, err := repo.Create(ctx, resource1(), namespace)
+	r, err := repo.Create(ctx, resource1(), namespace, emptyTxId)
 	assert.NotNil(t, r)
 	assert.Nil(t, err)
 
@@ -322,12 +323,12 @@ func TestDeleteAfterUpdate(t *testing.T) {
 	ctx := context.TODO()
 
 	// Create
-	r, err := repo.Create(ctx, resource1(), namespace)
+	r, err := repo.Create(ctx, resource1(), namespace, emptyTxId)
 	assert.NotNil(t, r)
 	assert.Nil(t, err)
 
 	// Updates
-	_, err = repo.Update(ctx, resource1(), r.ID, namespace)
+	_, err = repo.Update(ctx, resource1(), r.ID, namespace, emptyTxId)
 	assert.Nil(t, err)
 
 	// Delete
@@ -352,7 +353,7 @@ func TestFindByReporterResourceId(t *testing.T) {
 	ctx := context.TODO()
 
 	// Saving a resource not present in the system saves correctly
-	r, err := repo.Create(ctx, resource1(), namespace)
+	r, err := repo.Create(ctx, resource1(), namespace, emptyTxId)
 	assert.NotNil(t, r)
 	assert.Nil(t, err)
 
@@ -380,7 +381,7 @@ func TestFindByReporterData(t *testing.T) {
 	res.ReporterResourceId = "123"
 
 	// Saving a resource not present in the system saves correctly
-	r, err := repo.Create(ctx, res, namespace)
+	r, err := repo.Create(ctx, res, namespace, emptyTxId)
 	assert.NotNil(t, r)
 	assert.Nil(t, err)
 
@@ -404,7 +405,7 @@ func TestFindByWorkspaceId(t *testing.T) {
 	res.WorkspaceId = "1234"
 
 	// Saving a resource not present in the system saves correctly
-	r, err := repo.Create(ctx, res, namespace)
+	r, err := repo.Create(ctx, res, namespace, emptyTxId)
 	assert.NotNil(t, r)
 	assert.Nil(t, err)
 
@@ -430,7 +431,7 @@ func TestListAll(t *testing.T) {
 	assert.Len(t, resources, 0)
 
 	// create a single resource
-	r, err := repo.Create(ctx, resource1(), namespace)
+	r, err := repo.Create(ctx, resource1(), namespace, emptyTxId)
 	assert.NotNil(t, r)
 	assert.Nil(t, err)
 

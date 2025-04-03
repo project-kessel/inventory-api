@@ -122,12 +122,18 @@ func (uc *Usecase) Upsert(ctx context.Context, m *model.Resource) (*model.Resour
 		}
 
 		if uc.ListenManager != nil {
-			timeoutCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
-			defer cancel()
 
-			err = subscription.BlockForNotification(timeoutCtx)
-			if err != nil {
-				return nil, err
+			// read after write functionality is enabled globally.
+			// And executed if request came from service provider in allowlist
+			if uc.ReadAfterWriteEnabled && isSPInAllowlist(m, uc.ReadAfterWriteAllowlist) {
+
+				timeoutCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+				defer cancel()
+
+				err = subscription.BlockForNotification(timeoutCtx)
+				if err != nil {
+					return nil, err
+				}
 			}
 		}
 	}
@@ -376,12 +382,18 @@ func (uc *Usecase) Update(ctx context.Context, m *model.Resource, id model.Repor
 		}
 
 		if uc.ListenManager != nil {
-			timeoutCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
-			defer cancel()
 
-			err = subscription.BlockForNotification(timeoutCtx)
-			if err != nil {
-				return nil, err
+			// read after write functionality is enabled globally.
+			// And executed if request came from service provider in allowlist
+			if uc.ReadAfterWriteEnabled && isSPInAllowlist(m, uc.ReadAfterWriteAllowlist) {
+
+				timeoutCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+				defer cancel()
+
+				err = subscription.BlockForNotification(timeoutCtx)
+				if err != nil {
+					return nil, err
+				}
 			}
 		}
 	}

@@ -1,6 +1,7 @@
 package config
 
 import (
+	. "github.com/project-kessel/inventory-api/cmd/common"
 	"os"
 	"testing"
 
@@ -15,10 +16,6 @@ func ParseCA(t *testing.T, path string) string {
 		return ""
 	}
 	return string(file)
-}
-
-func ToPointer[T any](v T) *T {
-	return &v
 }
 
 func TestConfigureStorage(t *testing.T) {

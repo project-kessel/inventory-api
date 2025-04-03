@@ -4,13 +4,19 @@ import (
 	"testing"
 
 	"github.com/go-kratos/kratos/v2/log"
-	"github.com/project-kessel/inventory-api/cmd/common"
+	. "github.com/project-kessel/inventory-api/cmd/common"
 	"github.com/project-kessel/inventory-api/internal/authz"
 	"github.com/project-kessel/inventory-api/internal/pubsub"
 	"github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
 	"github.com/stretchr/testify/assert"
 	"go.opentelemetry.io/otel"
 	"gorm.io/gorm"
+)
+
+const (
+	testMessageKey            = `{"schema":{"type":"string","optional":false},"payload":"00000000-0000-0000-0000-000000000000"}`
+	testCreateOrUpdateMessage = `{"schema":{"type":"string","optional":false,"name":"io.debezium.data.Json","version":1},"payload":"{\"subject\":{\"subject\":{\"id\":\"1234\", \"type\":{\"name\":\"workspace\",\"namespace\":\"rbac\"}}},\"relation\":\"t_workspace\",\"resource\":{\"id\":\"4321\",\"type\":{\"name\":\"integration\",\"namespace\":\"notifications\"}}}"}`
+	testDeleteMessage         = `{"schema":{"type":"string","optional":false,"name":"io.debezium.data.Json","version":1},"payload":"{\"resource_id\":\"4321\",\"resource_type\":\"integration\",\"resource_namespace\":\"notifications\",\"relation\":\"t_workspace\",\"subject_filter\":{\"subject_type\":\"workspace\",\"subject_namespace\":\"rbac\",\"subject_id\":\"1234\"}}"}`
 )
 
 type TestCase struct {
@@ -30,7 +36,7 @@ func (t *TestCase) TestSetup() []error {
 	t.options.BootstrapServers = []string{"localhost:9092"}
 	t.config = NewConfig(t.options)
 
-	_, logger := common.InitLogger("info", common.LoggerOptions{})
+	_, logger := InitLogger("info", LoggerOptions{})
 	t.logger = log.NewHelper(log.With(logger, "subsystem", "inventoryConsumer"))
 
 	var errs []error
@@ -53,19 +59,8 @@ func (t *TestCase) TestSetup() []error {
 	return errs
 }
 
-func TestNewConsumerSetup(t *testing.T) {
-	test := TestCase{
-		name:        "TestNewConsumerSetup",
-		description: "ensures setting up a new consumer, including options and configs functions",
-	}
-	var errs []error
-	errs = test.TestSetup()
-	assert.Nil(t, errs)
-}
-
-func TestParseCreateOrUpdateMessage(t *testing.T) {
-	testMsg := `{"schema":{"type":"string","optional":false,"name":"io.debezium.data.Json","version":1},"payload":"{\"subject\":{\"subject\":{\"id\":\"1234\", \"type\":{\"name\":\"workspace\",\"namespace\":\"rbac\"}}},\"relation\":\"t_workspace\",\"resource\":{\"id\":\"4321\",\"type\":{\"name\":\"integration\",\"namespace\":\"notifications\"}}}"}`
-	expected := &v1beta1.Relationship{
+func makeTuple() *v1beta1.Relationship {
+	return &v1beta1.Relationship{
 		Resource: &v1beta1.ObjectReference{
 			Type: &v1beta1.ObjectType{
 				Namespace: "notifications",
@@ -84,7 +79,34 @@ func TestParseCreateOrUpdateMessage(t *testing.T) {
 			},
 		},
 	}
-	tuple, err := ParseCreateOrUpdateMessage([]byte(testMsg))
+}
+
+func makeFilter() *v1beta1.RelationTupleFilter {
+	return &v1beta1.RelationTupleFilter{
+		ResourceNamespace: ToPointer("notifications"),
+		ResourceType:      ToPointer("integration"),
+		ResourceId:        ToPointer("4321"),
+		Relation:          ToPointer("t_workspace"),
+		SubjectFilter: &v1beta1.SubjectFilter{
+			SubjectNamespace: ToPointer("rbac"),
+			SubjectType:      ToPointer("workspace"),
+			SubjectId:        ToPointer("1234"),
+		},
+	}
+}
+
+func TestNewConsumerSetup(t *testing.T) {
+	test := TestCase{
+		name:        "TestNewConsumerSetup",
+		description: "ensures setting up a new consumer, including options and configs functions",
+	}
+	errs := test.TestSetup()
+	assert.Nil(t, errs)
+}
+
+func TestParseCreateOrUpdateMessage(t *testing.T) {
+	expected := makeTuple()
+	tuple, err := ParseCreateOrUpdateMessage([]byte(testCreateOrUpdateMessage))
 	assert.Nil(t, err)
 	assert.Equal(t, tuple.Subject.Subject.Id, expected.Subject.Subject.Id)
 	assert.Equal(t, tuple.Subject.Subject.Type.Name, expected.Subject.Subject.Type.Name)
@@ -96,41 +118,21 @@ func TestParseCreateOrUpdateMessage(t *testing.T) {
 }
 
 func TestParseDeleteMessage(t *testing.T) {
-	testMsg := `{"schema":{"type":"string","optional":false,"name":"io.debezium.data.Json","version":1},"payload":"{\"resource_id\":\"4321\",\"resource_type\":\"integration\",\"resource_namespace\":\"notifications\",\"relation\":\"t_workspace\",\"subject_filter\":{\"subject_type\":\"workspace\",\"subject_namespace\":\"rbac\",\"subject_id\":\"1234\"}}"}`
-	resourceNamespace := "notifications"
-	resourceType := "integration"
-	resourceId := "4321"
-	relation := "t_workspace"
-	subjectType := "workspace"
-	subjectNamespace := "rbac"
-	subjectId := "1234"
-
-	expected := &v1beta1.RelationTupleFilter{
-		ResourceNamespace: &resourceNamespace,
-		ResourceType:      &resourceType,
-		ResourceId:        &resourceId,
-		Relation:          &relation,
-		SubjectFilter: &v1beta1.SubjectFilter{
-			SubjectNamespace: &subjectNamespace,
-			SubjectType:      &subjectType,
-			SubjectId:        &subjectId,
-		},
-	}
-	filter, err := ParseDeleteMessage([]byte(testMsg))
+	expected := makeFilter()
+	filter, err := ParseDeleteMessage([]byte(testDeleteMessage))
 	assert.Nil(t, err)
 	assert.Equal(t, filter.ResourceId, expected.ResourceId)
 	assert.Equal(t, filter.ResourceType, expected.ResourceType)
 	assert.Equal(t, filter.ResourceNamespace, expected.ResourceNamespace)
 	assert.Equal(t, filter.Relation, expected.Relation)
-	assert.Equal(t, filter.SubjectFilter.SubjectId, expected.SubjectFilter.SubjectId)
-	assert.Equal(t, filter.SubjectFilter.SubjectType, expected.SubjectFilter.SubjectType)
-	assert.Equal(t, filter.SubjectFilter.SubjectNamespace, expected.SubjectFilter.SubjectNamespace)
+	assert.Equal(t, *filter.SubjectFilter.SubjectId, *expected.SubjectFilter.SubjectId)
+	assert.Equal(t, *filter.SubjectFilter.SubjectType, *expected.SubjectFilter.SubjectType)
+	assert.Equal(t, *filter.SubjectFilter.SubjectNamespace, *expected.SubjectFilter.SubjectNamespace)
 }
 
 func TestParseMessageKey(t *testing.T) {
-	testMsg := `{"schema":{"type":"string","optional":false},"payload":"00000000-0000-0000-0000-000000000000"}`
 	expected := "00000000-0000-0000-0000-000000000000"
-	key, err := ParseMessageKey([]byte(testMsg))
+	key, err := ParseMessageKey([]byte(testMessageKey))
 	assert.Nil(t, err)
 	assert.Equal(t, key, expected)
 }

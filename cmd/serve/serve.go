@@ -11,7 +11,6 @@ import (
 
 	"github.com/project-kessel/inventory-api/internal/consistency"
 	"github.com/project-kessel/inventory-api/internal/consumer"
-	"github.com/project-kessel/inventory-api/internal/pubsub"
 
 	"github.com/project-kessel/inventory-api/cmd/common"
 	relationshipsctl "github.com/project-kessel/inventory-api/internal/biz/relationships"

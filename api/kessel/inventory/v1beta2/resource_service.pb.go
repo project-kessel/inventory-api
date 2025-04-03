@@ -27,8 +27,9 @@ type ReportResourceRequest struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	Resource    *Resource `protobuf:"bytes,1,opt,name=resource,proto3" json:"resource,omitempty"`
-	WaitForSync bool      `protobuf:"varint,2,opt,name=wait_for_sync,json=waitForSync,proto3" json:"wait_for_sync,omitempty"`
+	Resource *Resource `protobuf:"bytes,1,opt,name=resource,proto3" json:"resource,omitempty"`
+	// Will wait for synchronous processes to complete before returning
+	WaitForSync bool `protobuf:"varint,2,opt,name=wait_for_sync,json=waitForSync,proto3" json:"wait_for_sync,omitempty"`
 }
 
 func (x *ReportResourceRequest) Reset() {

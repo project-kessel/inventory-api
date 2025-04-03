@@ -16,6 +16,7 @@ option java_package = "org.project_kessel.api.inventory.v1beta1.resources";
 message CreateNotificationsIntegrationRequest {
   // The NotificationsIntegration to create in Kessel Asset Inventory
   NotificationsIntegration integration = 1 [ (buf.validate.field).required = true ];
+  bool wait_for_sync = 2; 
 }
 
 message CreateNotificationsIntegrationResponse {}
@@ -25,6 +26,7 @@ message UpdateNotificationsIntegrationRequest {
   // \"<reporter_data.reporter_type>:<reporter_instaance_id>:<reporter_data.local_resource_id>\"
   // from the request body.
   NotificationsIntegration integration = 1 [ (buf.validate.field).required = true ];
+  bool wait_for_sync = 2; 
 }
 
 message UpdateNotificationsIntegrationResponse {}

@@ -37,7 +37,7 @@ func (c *K8sPolicyService) CreateK8SPolicy(ctx context.Context, r *pb.CreateK8SP
 	}
 
 	if h, err := k8sPolicyFromCreateRequest(r, identity); err == nil {
-		if resp, err := c.Ctl.Create(ctx, h); err == nil {
+		if resp, err := c.Ctl.Create(ctx, h, r.GetWaitForSync()); err == nil {
 			return createResponseFromK8sPolicy(resp), nil
 
 		} else {
@@ -56,7 +56,7 @@ func (c *K8sPolicyService) UpdateK8SPolicy(ctx context.Context, r *pb.UpdateK8SP
 
 	if h, err := k8sPolicyFromUpdateRequest(r, identity); err == nil {
 		// Todo: Update to use the right ID
-		if resp, err := c.Ctl.Update(ctx, h, model.ReporterResourceIdFromResource(h)); err == nil {
+		if resp, err := c.Ctl.Update(ctx, h, model.ReporterResourceIdFromResource(h), r.GetWaitForSync()); err == nil {
 			return updateResponseFromK8sPolicy(resp), nil
 
 		} else {

@@ -2,7 +2,6 @@ package service
 
 import (
 	"fmt"
-
 	pbv1beta2 "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2/authz"
 	"github.com/project-kessel/inventory-api/internal/biz/resources"
 	kessel "github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
@@ -64,10 +63,10 @@ func toLookupResourceRequest(request *pbv1beta2.LookupResourcesRequest) *kessel.
 				Id: request.Subject.Subject.Id,
 			},
 		},
-		Pagination: &kessel.RequestPagination{
-			Limit:             request.Pagination.Limit,
-			ContinuationToken: request.Pagination.ContinuationToken,
-		},
+		//Pagination: &kessel.RequestPagination{
+		//	Limit:             request.Pagination.Limit,
+		//	ContinuationToken: request.Pagination.ContinuationToken,
+		//},
 	}
 }
 
@@ -80,8 +79,8 @@ func toLookupResourceResponse(response *kessel.LookupResourcesResponse) *pbv1bet
 			},
 			Id: response.Resource.Id,
 		},
-		Pagination: &pbv1beta2.ResponsePagination{
-			ContinuationToken: response.Pagination.ContinuationToken,
-		},
+		//Pagination: &pbv1beta2.ResponsePagination{
+		//	ContinuationToken: response.Pagination.ContinuationToken,
+		//},
 	}
 }

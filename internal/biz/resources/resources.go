@@ -509,7 +509,26 @@ func (uc *Usecase) LookupResourcesStream(ctx context.Context, req *kessel.Lookup
 		defer close(resChan)
 		defer close(errChan)
 
-		// return data?
+		for i := range resChan {
+			select {
+			case <-ctx.Done():
+				errChan <- ctx.Err()
+				return
+			case resChan <- kessel.LookupResourcesResponse{
+				Resource: &kessel.ObjectReference{
+					Type: &kessel.ObjectType{
+						Namespace: req.ResourceType.Namespace,
+						Name:      req.ResourceType.Name,
+					},
+					Id: i.Resource.Id,
+				},
+				//Pagination: &kessel.ResponsePagination{
+				//	ContinuationToken: "", // set if needed
+				//},
+			}:
+				time.Sleep(100 * time.Millisecond) // simulate streaming
+			}
+		}
 	}()
 
 	return resChan, errChan, nil

@@ -522,9 +522,9 @@ func (uc *Usecase) LookupResourcesStream(ctx context.Context, req *kessel.Lookup
 					},
 					Id: i.Resource.Id,
 				},
-				//Pagination: &kessel.ResponsePagination{
-				//	ContinuationToken: "", // set if needed
-				//},
+				Pagination: &kessel.ResponsePagination{
+					ContinuationToken: "", // set if needed
+				},
 			}:
 				time.Sleep(100 * time.Millisecond) // simulate streaming
 			}

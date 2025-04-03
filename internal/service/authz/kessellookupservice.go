@@ -63,10 +63,10 @@ func toLookupResourceRequest(request *pbv1beta2.LookupResourcesRequest) *kessel.
 				Id: request.Subject.Subject.Id,
 			},
 		},
-		//Pagination: &kessel.RequestPagination{
-		//	Limit:             request.Pagination.Limit,
-		//	ContinuationToken: request.Pagination.ContinuationToken,
-		//},
+		Pagination: &kessel.RequestPagination{
+			Limit:             request.Pagination.Limit,
+			ContinuationToken: request.Pagination.ContinuationToken,
+		},
 	}
 }
 

@@ -153,14 +153,14 @@ func NewCommand(
 
 			// START: construct pubsub (postgres only)
 			var listenManager *pubsub.ListenManager
-			var notifier *pubsub.Notifier
+			var notifier *pubsub.PgxNotifier
 			if storageConfig.Options.Database == "postgres" {
 				pubSubLogger := log.NewHelper(log.With(logger, "subsystem", "pubsub"))
 				pgxPool, err := storage.NewPgx(storageConfig, pubSubLogger)
 				if err != nil {
 					return err
 				}
-				listenerDriver := pubsub.NewDriver(pgxPool)
+				listenerDriver := pubsub.NewPgxDriver(pgxPool)
 				if err := listenerDriver.Connect(ctx); err != nil {
 					return fmt.Errorf("error setting up listenerDriver: %v", err)
 				}
@@ -172,11 +172,11 @@ func NewCommand(
 				go listenManager.Run(ctx)
 
 				// Run notifier on a separate connection, as the listener requires it's own
-				notifierDriver := pubsub.NewDriver(pgxPool)
+				notifierDriver := pubsub.NewPgxDriver(pgxPool)
 				if err := notifierDriver.Connect(ctx); err != nil {
 					return fmt.Errorf("error setting up notifierDriver: %v", err)
 				}
-				notifier = pubsub.NewNotifier(notifierDriver)
+				notifier = pubsub.NewPgxNotifier(notifierDriver)
 			}
 			// STOP: construct pubsub
 

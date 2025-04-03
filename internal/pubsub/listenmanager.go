@@ -12,50 +12,13 @@ import (
 
 type ListenManagerImpl interface {
 	Subscribe(txId string) Subscription
+	WaitAndDistribute(ctx context.Context) error
 	Run(ctx context.Context) error
-}
-
-type Subscription interface {
-	NotificationC() <-chan []byte
-	Unsubscribe(ctx context.Context)
-	BlockForNotification(ctx context.Context) error
 }
 
 type Notification struct {
 	Channel string `json:"channel"`
 	Payload []byte `json:"payload"`
-}
-
-type subscription struct {
-	txId          string
-	listenChan    chan []byte
-	listenManager *ListenManager
-	unsubOnce     sync.Once
-}
-
-func (s *subscription) NotificationC() <-chan []byte { return s.listenChan }
-
-func (s *subscription) Unsubscribe(ctx context.Context) {
-	s.unsubOnce.Do(func() {
-		// Unlisten uses background context in case of cancellation.
-		if err := s.listenManager.unsubscribe(context.Background(), s); err != nil {
-			s.listenManager.logger.Error("error unlistening on channel", "err", err, "txId", s.txId)
-		}
-	})
-}
-
-func (s *subscription) BlockForNotification(ctx context.Context) error {
-	s.listenManager.logger.Debugf("Blocking for notification: %v", s.txId)
-	for {
-		select {
-		case notification := <-s.NotificationC():
-			if string(notification) == s.txId {
-				return nil
-			}
-		case <-ctx.Done():
-			return fmt.Errorf("Context cancelled while waiting for notification")
-		}
-	}
 }
 
 type ListenManager struct {
@@ -98,7 +61,7 @@ func (l *ListenManager) Subscribe(txId string) Subscription {
 	return sub
 }
 
-func (l *ListenManager) waitAndDistribute(ctx context.Context) error {
+func (l *ListenManager) WaitAndDistribute(ctx context.Context) error {
 	notification, err := func() (*Notification, error) {
 		const listenTimeout = 30 * time.Second
 
@@ -150,7 +113,7 @@ func (l *ListenManager) unsubscribe(ctx context.Context, sub *subscription) erro
 
 func (l *ListenManager) Run(ctx context.Context) error {
 	for {
-		err := l.waitAndDistribute(ctx)
+		err := l.WaitAndDistribute(ctx)
 		if err != nil || ctx.Err() != nil {
 			return err
 		}

@@ -53,11 +53,11 @@ type InventoryConsumer struct {
 	MetricsCollector *MetricsCollector
 	Logger           *log.Helper
 	RetryOptions     *retry.Options
-	Notifier         *pubsub.Notifier
+	Notifier         pubsub.Notifier
 }
 
 // New instantiates a new InventoryConsumer
-func New(config CompletedConfig, db *gorm.DB, authz authz.CompletedConfig, authorizer api.Authorizer, notifier *pubsub.Notifier, logger *log.Helper) (InventoryConsumer, error) {
+func New(config CompletedConfig, db *gorm.DB, authz authz.CompletedConfig, authorizer api.Authorizer, notifier pubsub.Notifier, logger *log.Helper) (InventoryConsumer, error) {
 	logger.Info("Setting up kafka consumer")
 	consumer, err := kafka.NewConsumer(config.KafkaConfig)
 	if err != nil {

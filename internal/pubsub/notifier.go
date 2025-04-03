@@ -4,14 +4,28 @@ import (
 	"context"
 )
 
-type Notifier struct {
+type Notifier interface {
+	Notify(ctx context.Context, payload string) error
+}
+
+type PgxNotifier struct {
 	driver Driver
 }
 
-func NewNotifier(driver Driver) *Notifier {
-	return &Notifier{driver: driver}
+var _ Notifier = &PgxNotifier{}
+
+func NewPgxNotifier(driver Driver) *PgxNotifier {
+	return &PgxNotifier{driver: driver}
 }
 
-func (n *Notifier) Notify(ctx context.Context, payload string) error {
+func (n *PgxNotifier) Notify(ctx context.Context, payload string) error {
 	return n.driver.Notify(ctx, payload)
+}
+
+type NotifierMock struct{}
+
+var _ Notifier = &NotifierMock{}
+
+func (n *NotifierMock) Notify(ctx context.Context, payload string) error {
+	return nil
 }

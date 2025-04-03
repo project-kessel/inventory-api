@@ -97,7 +97,12 @@ func (uc *Usecase) Upsert(ctx context.Context, m *model.Resource, requestReadAft
 			return nil, ErrDatabaseError
 		}
 
-		if uc.ListenManager != nil {
+		// read after write functionality is enabled/disabled globally.
+		// And executed if request specifies or
+		// request came from service provider in allowlist
+		readAfterWriteEnabled := uc.ListenManager != nil && uc.ReadAfterWriteEnabled && (requestReadAfterWrite || isSPInAllowlist(m, uc.ReadAfterWriteAllowlist))
+
+		if readAfterWriteEnabled {
 			subscription = uc.ListenManager.Subscribe(txid.String())
 			defer subscription.Unsubscribe()
 		}
@@ -121,20 +126,13 @@ func (uc *Usecase) Upsert(ctx context.Context, m *model.Resource, requestReadAft
 			return ret, err2
 		}
 
-		if uc.ListenManager != nil {
+		if readAfterWriteEnabled {
+			timeoutCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+			defer cancel()
 
-			// read after write functionality is enabled globally.
-			// And executed if request specifies or
-			// request came from service provider in allowlist
-			if uc.ReadAfterWriteEnabled && (requestReadAfterWrite || isSPInAllowlist(m, uc.ReadAfterWriteAllowlist)) {
-
-				timeoutCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
-				defer cancel()
-
-				err = subscription.BlockForNotification(timeoutCtx)
-				if err != nil {
-					return nil, err
-				}
+			err = subscription.BlockForNotification(timeoutCtx)
+			if err != nil {
+				return nil, err
 			}
 		}
 	}
@@ -309,7 +307,11 @@ func (uc *Usecase) Create(ctx context.Context, m *model.Resource) (*model.Resour
 			return nil, ErrResourceAlreadyExists
 		}
 
-		if uc.ListenManager != nil {
+		// read after write functionality is enabled/disabled globally.
+		// And executed if request specifies or
+		// request came from service provider in allowlist
+		readAfterWriteEnabled := uc.ListenManager != nil && uc.ReadAfterWriteEnabled && isSPInAllowlist(m, uc.ReadAfterWriteAllowlist)
+		if readAfterWriteEnabled {
 			subscription = uc.ListenManager.Subscribe(txid.String())
 			defer subscription.Unsubscribe()
 		}
@@ -319,20 +321,15 @@ func (uc *Usecase) Create(ctx context.Context, m *model.Resource) (*model.Resour
 			return nil, err
 		}
 
-		if uc.ListenManager != nil {
+		if readAfterWriteEnabled {
 
-			// read after write functionality is enabled globally.
-			// And executed if request came from service provider in allowlist
-			if uc.ReadAfterWriteEnabled && isSPInAllowlist(m, uc.ReadAfterWriteAllowlist) {
+			// 30 sec max timeout
+			timeoutCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+			defer cancel()
 
-				// 30 sec max timeout
-				timeoutCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
-				defer cancel()
-
-				err = subscription.BlockForNotification(timeoutCtx)
-				if err != nil {
-					return nil, err
-				}
+			err = subscription.BlockForNotification(timeoutCtx)
+			if err != nil {
+				return nil, err
 			}
 		}
 	}
@@ -372,7 +369,12 @@ func (uc *Usecase) Update(ctx context.Context, m *model.Resource, id model.Repor
 			return nil, ErrDatabaseError
 		}
 
-		if uc.ListenManager != nil {
+		// read after write functionality is enabled/disabled globally.
+		// And executed if request specifies or
+		// request came from service provider in allowlist
+		readAfterWriteEnabled := uc.ListenManager != nil && uc.ReadAfterWriteEnabled && isSPInAllowlist(m, uc.ReadAfterWriteAllowlist)
+
+		if readAfterWriteEnabled {
 			subscription = uc.ListenManager.Subscribe(txid.String())
 			defer subscription.Unsubscribe()
 		}
@@ -382,19 +384,14 @@ func (uc *Usecase) Update(ctx context.Context, m *model.Resource, id model.Repor
 			return nil, err
 		}
 
-		if uc.ListenManager != nil {
+		if readAfterWriteEnabled {
 
-			// read after write functionality is enabled globally.
-			// And executed if request came from service provider in allowlist
-			if uc.ReadAfterWriteEnabled && isSPInAllowlist(m, uc.ReadAfterWriteAllowlist) {
+			timeoutCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+			defer cancel()
 
-				timeoutCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
-				defer cancel()
-
-				err = subscription.BlockForNotification(timeoutCtx)
-				if err != nil {
-					return nil, err
-				}
+			err = subscription.BlockForNotification(timeoutCtx)
+			if err != nil {
+				return nil, err
 			}
 		}
 	}

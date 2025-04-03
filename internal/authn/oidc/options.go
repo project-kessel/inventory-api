@@ -6,7 +6,7 @@ import (
 
 type Options struct {
 	ClientId               string `mapstructure:"client-id"`
-	AuthorizationServerURL string `mapstructure:"auth-server-url"`
+	AuthorizationServerURL string `mapstructure:"authn-server-url"`
 	InsecureClient         bool   `mapstructure:"insecure-client"`
 	SkipClientIDCheck      bool   `mapstructure:"skip-client-id-check"`
 	EnforceAudCheck        bool   `mapstructure:"enforce-aud-check"`
@@ -23,7 +23,7 @@ func (o *Options) AddFlags(fs *pflag.FlagSet, prefix string) {
 		prefix = prefix + "."
 	}
 	fs.StringVar(&o.ClientId, prefix+"client-id", o.ClientId, "the clientId issued by the authorization server that represents the application")
-	fs.StringVar(&o.AuthorizationServerURL, prefix+"auth-server-url", o.AuthorizationServerURL, "the url to the authorization server")
+	fs.StringVar(&o.AuthorizationServerURL, prefix+"authn-server-url", o.AuthorizationServerURL, "the url to the authorization server")
 	fs.StringVar(&o.PrincipalUserDomain, prefix+"principal-user-domain", o.PrincipalUserDomain, "Kessel requires principal IDs to be qualified by a domain, in order to future proof integration of identities from multiple issuers.")
 	fs.BoolVarP(&o.InsecureClient, prefix+"insecure-client", "k", o.InsecureClient, "validate authorization server certs?")
 	fs.BoolVarP(&o.SkipClientIDCheck, prefix+"skip-client-id-check", "", o.SkipClientIDCheck, "if true, no clientId check performed. Must be true if clientId field is empty.")

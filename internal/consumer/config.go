@@ -5,6 +5,7 @@ import (
 
 	"github.com/project-kessel/inventory-api/internal/consumer/auth"
 	"github.com/project-kessel/inventory-api/internal/consumer/retry"
+	"strings"
 
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
 )
@@ -74,7 +75,7 @@ func (c *Config) Complete() (CompletedConfig, []error) {
 		if err := config.SetKey("client.id", clientID); err != nil {
 			errs = append(errs, fmt.Errorf("cannot set client.id value: %w", err))
 		}
-		if err := config.SetKey("bootstrap.servers", c.BootstrapServers); err != nil {
+		if err := config.SetKey("bootstrap.servers", strings.Join(c.BootstrapServers, ",")); err != nil {
 			errs = append(errs, fmt.Errorf("cannot set bootstrap.servers value: %w", err))
 		}
 		if err := config.SetKey("group.id", c.ConsumerGroupID); err != nil {

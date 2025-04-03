@@ -34,6 +34,8 @@ consumer:
     consumer-max-retries: 3
     operation-max-retries: 4
     backoff-factor: 5
+  auth:
+    enabled: false
 log:
   level: "info"
   livez: true

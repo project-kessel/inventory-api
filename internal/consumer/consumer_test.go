@@ -27,7 +27,7 @@ type TestCase struct {
 // TestSetup creates a test struct that calls most of the initial constructor methods we intend to test in unit tests.
 func (t *TestCase) TestSetup() []error {
 	t.options = NewOptions()
-	t.options.BootstrapServers = "localhost:9092"
+	t.options.BootstrapServers = []string{"localhost:9092"}
 	t.config = NewConfig(t.options)
 
 	_, logger := common.InitLogger("info", common.LoggerOptions{})

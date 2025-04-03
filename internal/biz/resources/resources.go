@@ -500,3 +500,17 @@ func (uc *Usecase) Update(ctx context.Context, m *model.Resource, id model.Repor
 	return ret, nil
 
 }
+
+func (uc *Usecase) LookupResourcesStream(ctx context.Context, req *kessel.LookupResourcesRequest) (<-chan kessel.LookupResourcesResponse, <-chan error, error) {
+	resChan := make(chan kessel.LookupResourcesResponse)
+	errChan := make(chan error, 1)
+
+	go func() {
+		defer close(resChan)
+		defer close(errChan)
+
+		// return data?
+	}()
+
+	return resChan, errChan, nil
+}

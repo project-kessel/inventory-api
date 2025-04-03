@@ -1,7 +1,7 @@
 package service
 
 import (
-	"context"
+	"fmt"
 
 	pbv1beta2 "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2/authz"
 	"github.com/project-kessel/inventory-api/internal/biz/resources"
@@ -13,20 +13,34 @@ type KesselLookupService struct {
 	Ctl *resources.Usecase
 }
 
-func NewKesselLookupService(c *resources.Usecase) *KesselLookupService {
+func NewKesselLookupService(c *resources.Usecase) pbv1beta2.KesselLookupServiceServer {
 	return &KesselLookupService{
 		Ctl: c,
 	}
 }
 
-func (s *KesselLookupService) LookupResources(ctx context.Context, req *pbv1beta2.LookupResourcesRequest) (*pbv1beta2.LookupResourcesResponse, error) {
-	kesselRequest := toLookupResourceRequest(req)
-	response, err := s.Ctl.LookupResources(ctx, kesselRequest)
+func (s *KesselLookupService) LookupResources(
+	req *pbv1beta2.LookupResourcesRequest,
+	stream pbv1beta2.KesselLookupService_LookupResourcesServer,
+) error {
+	ctx := stream.Context()
+
+	results, errs, err := s.Ctl.LookupResourcesStream(ctx, toLookupResourceRequest(req))
 	if err != nil {
-		return toLookupResourceResponse(&response), nil
-	} else {
-		return nil, err
+		return fmt.Errorf("failed to retrieve resources: %w", err)
 	}
+
+	for res := range results {
+		if err := stream.Send(toLookupResourceResponse(&res)); err != nil {
+			return fmt.Errorf("error sending resource to client: %w", err)
+		}
+	}
+
+	if err, ok := <-errs; ok {
+		return fmt.Errorf("streaming error: %w", err)
+	}
+
+	return nil
 }
 
 func toLookupResourceRequest(request *pbv1beta2.LookupResourcesRequest) *kessel.LookupResourcesRequest {
@@ -58,7 +72,6 @@ func toLookupResourceRequest(request *pbv1beta2.LookupResourcesRequest) *kessel.
 }
 
 func toLookupResourceResponse(response *kessel.LookupResourcesResponse) *pbv1beta2.LookupResourcesResponse {
-
 	return &pbv1beta2.LookupResourcesResponse{
 		Resource: &pbv1beta2.ObjectReference{
 			Type: &pbv1beta2.ObjectType{
@@ -71,5 +84,4 @@ func toLookupResourceResponse(response *kessel.LookupResourcesResponse) *pbv1bet
 			ContinuationToken: response.Pagination.ContinuationToken,
 		},
 	}
-
 }

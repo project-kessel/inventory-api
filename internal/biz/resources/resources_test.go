@@ -864,3 +864,56 @@ func TestListResourcesInWorkspace_ResourcesAllowedError(t *testing.T) {
 
 	assert.NotEmpty(t, err_chan) // dont want any errors.
 }
+
+func TestIsSPInAllowlist(t *testing.T) {
+	tests := []struct {
+		name      string
+		resource  *model.Resource
+		allowlist []string
+		expected  bool
+	}{
+		{
+			name:      "SP in allowlist",
+			resource:  &model.Resource{ReporterId: "sp1"},
+			allowlist: []string{"sp1", "sp2"},
+			expected:  true,
+		},
+		{
+			name:      "SP not in allowlist",
+			resource:  &model.Resource{ReporterId: "sp3"},
+			allowlist: []string{"sp1", "sp2"},
+			expected:  false,
+		},
+		{
+			name:      "Wildcard '*' allows any SP",
+			resource:  &model.Resource{ReporterId: "sp3"},
+			allowlist: []string{"*"},
+			expected:  true,
+		},
+		{
+			name:      "SP in allowlist with wildcard",
+			resource:  &model.Resource{ReporterId: "sp3"},
+			allowlist: []string{"sp1", "*"},
+			expected:  true,
+		},
+		{
+			name:      "Empty allowlist",
+			resource:  &model.Resource{ReporterId: "sp1"},
+			allowlist: []string{},
+			expected:  false,
+		},
+		{
+			name:      "Allowlist with only wildcard",
+			resource:  &model.Resource{ReporterId: "sp4"},
+			allowlist: []string{"*"},
+			expected:  true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := isSPInAllowlist(tt.resource, tt.allowlist)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}

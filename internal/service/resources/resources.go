@@ -35,7 +35,7 @@ func (c *ResourceService) ReportResource(ctx context.Context, r *pb.ReportResour
 	if err != nil {
 		return nil, err
 	}
-	_, err = c.Ctl.Upsert(ctx, resource, r.GetReadAfterWriteEnabled())
+	_, err = c.Ctl.Upsert(ctx, resource, r.GetWaitForSync())
 	log.Info()
 	if err != nil {
 		return nil, err

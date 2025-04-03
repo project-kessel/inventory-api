@@ -3,6 +3,7 @@ package resources
 import (
 	"context"
 	"errors"
+	"google.golang.org/grpc"
 	"strings"
 	"time"
 
@@ -212,7 +213,7 @@ func updateExistingReporterResource(ctx context.Context, m *model.Resource, exis
 	return ret, nil
 }
 
-func (uc *Usecase) LookupResources(ctx context.Context, request *kessel.LookupResourcesRequest) (kessel.LookupResourcesResponse, error) {
+func (uc *Usecase) LookupResources(ctx context.Context, request *kessel.LookupResourcesRequest) (grpc.ServerStreamingClient[kessel.LookupResourcesResponse], error) {
 	return uc.Authz.LookupResources(ctx, request)
 }
 
@@ -499,37 +500,4 @@ func (uc *Usecase) Update(ctx context.Context, m *model.Resource, id model.Repor
 	uc.log.WithContext(ctx).Infof("Updated Resource: %v(%v)", m.ID, m.ResourceType)
 	return ret, nil
 
-}
-
-func (uc *Usecase) LookupResourcesStream(ctx context.Context, req *kessel.LookupResourcesRequest) (<-chan kessel.LookupResourcesResponse, <-chan error, error) {
-	resChan := make(chan kessel.LookupResourcesResponse)
-	errChan := make(chan error, 1)
-
-	go func() {
-		defer close(resChan)
-		defer close(errChan)
-
-		for i := range resChan {
-			select {
-			case <-ctx.Done():
-				errChan <- ctx.Err()
-				return
-			case resChan <- kessel.LookupResourcesResponse{
-				Resource: &kessel.ObjectReference{
-					Type: &kessel.ObjectType{
-						Namespace: req.ResourceType.Namespace,
-						Name:      req.ResourceType.Name,
-					},
-					Id: i.Resource.Id,
-				},
-				Pagination: &kessel.ResponsePagination{
-					ContinuationToken: "", // set if needed
-				},
-			}:
-				time.Sleep(100 * time.Millisecond) // simulate streaming
-			}
-		}
-	}()
-
-	return resChan, errChan, nil
 }

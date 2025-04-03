@@ -3,6 +3,9 @@ package resources
 import (
 	"context"
 	"errors"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/metadata"
+	"io"
 	"testing"
 
 	"github.com/go-kratos/kratos/v2/log"
@@ -24,6 +27,57 @@ type MockedInventoryResourceRepository struct {
 
 type MockAuthz struct {
 	mock.Mock
+}
+
+type MockLookupResourcesStream struct {
+	mock.Mock
+	responses []*v1beta1.LookupResourcesResponse
+	current   int
+}
+
+func (m *MockLookupResourcesStream) Recv() (*v1beta1.LookupResourcesResponse, error) {
+	if m.current >= len(m.responses) {
+		return nil, io.EOF
+	}
+	res := m.responses[m.current]
+	m.current++
+	return res, nil
+}
+
+func (m *MockLookupResourcesStream) Header() (metadata.MD, error) {
+	args := m.Called()
+	return args.Get(0).(metadata.MD), args.Error(1)
+}
+
+func (m *MockLookupResourcesStream) Trailer() metadata.MD {
+	args := m.Called()
+	return args.Get(0).(metadata.MD)
+}
+
+func (m *MockLookupResourcesStream) CloseSend() error {
+	args := m.Called()
+	return args.Error(0)
+}
+
+func (m *MockLookupResourcesStream) Context() context.Context {
+	args := m.Called()
+	return args.Get(0).(context.Context)
+}
+
+func (m *MockLookupResourcesStream) SendMsg(msg interface{}) error {
+	args := m.Called(msg)
+	return args.Error(0)
+}
+
+func (m *MockLookupResourcesStream) RecvMsg(msg interface{}) error {
+	args := m.Called(msg)
+	return args.Error(0)
+}
+
+// Update the MockAuthz LookupResources method to match the exact signature
+func (m *MockAuthz) LookupResources(ctx context.Context, request *v1beta1.LookupResourcesRequest) (grpc.ServerStreamingClient[v1beta1.LookupResourcesResponse], error) {
+	args := m.Called(ctx, request)
+	return args.Get(0).(grpc.ServerStreamingClient[v1beta1.LookupResourcesResponse]), args.Error(1)
 }
 
 func (r *MockedReporterResourceRepository) Create(ctx context.Context, resource *model.Resource) (*model.Resource, []*model.Resource, error) {

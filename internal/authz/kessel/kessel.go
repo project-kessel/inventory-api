@@ -138,8 +138,18 @@ func (a *KesselAuthz) DeleteTuples(ctx context.Context, r *kessel.DeleteTuplesRe
 	return resp, nil
 }
 
-func (a *KesselAuthz) LookupResources(ctx context.Context, r *kessel.LookupResourcesRequest) (kessel.LookupResourcesResponse, error) {
-	return a.LookupResources(ctx, r)
+func (a *KesselAuthz) LookupResources(ctx context.Context, in *kessel.LookupResourcesRequest) (grpc.ServerStreamingClient[kessel.LookupResourcesResponse], error) {
+	opts, err := a.getCallOptions()
+	if err != nil {
+		a.incrFailureCounter("LookupResources")
+		return nil, err
+	}
+	resp, err := a.LookupService.LookupResources(ctx, in, opts...)
+	if err != nil {
+		a.incrFailureCounter("LookupResources")
+		return nil, err
+	}
+	return resp, nil
 }
 
 func (a *KesselAuthz) UnsetWorkspace(ctx context.Context, local_resource_id, namespace, name string) (*kessel.DeleteTuplesResponse, error) {

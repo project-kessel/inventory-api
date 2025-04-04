@@ -7,14 +7,14 @@ You'll need:
 1) [Bonfire](https://github.com/RedHatInsights/bonfire?tab=readme-ov-file#installing-locally) cli
 2) [`jq`](https://github.com/jqlang/jq?tab=readme-ov-file#installation) cli
 3) [`grpcurl`](https://github.com/fullstorydev/grpcurl?tab=readme-ov-file#installation) cli
-3) A personal build of the Inventory container pushed to your Quay
-4) Local bonfire config to set the correct image and deployment file
-4) Access to the Ephemeral cluster (which will require Red Hat Corp VPN)
+4) A personal build of the Inventory container pushed to your Quay
+5) Local bonfire config to set the correct image and deployment file
+6) Access to the Ephemeral cluster (which will require Red Hat Corp VPN)
 
 
 ### Inventory Image
 
-The changes in this feature branch are not automatically build by Konflux/AppSRE and require you to build and leverage your own image
+The changes in this feature branch are not automatically built by Konflux/AppSRE and require you to build and leverage your own image
 
 To build your own image:
 ```shell
@@ -60,12 +60,13 @@ The full deployment will include:
 * Kafka Connect cluster with Debezium plugin
 * Kafka Connector to configure Debezium
 * Kafka Topics leveraged by the Consumer and Debezium
+* Kafka User to use for authenticating with Kafka
 * Postgres DB's for both services
 
 > NOTE: By default ephemeral env's are nuked after 1 hour.
 > If you need more time, extend that duration now before you forget: `bonfire namespace extend -d 4h # sets it to 4 hours`
 
-Once the deployment completes, it make still take a little bit of time for the Kafka setup to complete. You can validate all Kafka services are ready by checking them with:
+Once the deployment completes, it may take a little bit of time for the Kafka setup to complete. You can validate all Kafka services are ready by checking them with:
 
  `make check-kafka-status`.
 
@@ -73,10 +74,10 @@ Once the deployment completes, it make still take a little bit of time for the K
 
 ## Testing
 
-When creating a resource (in this setup, a notifications integration) in Invenotry API, the expected outcome should be:
+When creating a resource (in this setup, a notifications integration) in Inventory API, the expected outcome should be:
 * Resource is added to Inventory via API and reflected in Inventory DB
 * Resource is created then removed from outbox tables
-* Debezium captures the changes and produces a message to the resources and tuples outboxs
+* Debezium captures the changes and produces a message to the resources and tuples outboxes
 * The Inventory Consumer process captures the message in the tuples topic, and created the relationship in SpiceDB via Relations API
 * The consumer captures the consistency token in the response and updates the resource in Inventory DB with the token
 
@@ -147,3 +148,50 @@ The same process can also be applied to updating and deleting the notifications 
 ## Cleanup
 
 To tear it all down: `bonfire namespace release`
+
+## Testing the Inventory Consumer with Authentication Enabled
+
+The Kafka cluster deployed in this setup contains two listeners: One with no authentication and another that requires credentials using SASL_SCRAM. By default authentication is disabled for the consumer while the Connect cluster defaults to using the secure port. If you need to test the Inventory Consumer using authentication, the process slightly differs from the above.
+
+1) Deploy using Bonfire with authentication disabled and using the insecure port for Kafka (default settings)
+
+```yaml
+consumer:
+  enabled: true
+  bootstrap-servers: inventory-kafka-kafka-bootstrap:9092 # port 9092 does not require auth
+  topic: outbox.event.kessel.tuples
+  auth:
+    enabled: false
+    # when enabled is false, the below settings are ignored and not needed, they are just provided to make it easier to enable
+    security-protocol: sasl_plaintext
+    sasl-mechanism: SCRAM-SHA-512
+    sasl-username: inventory-consumer
+    sasl-password: REPLACE_ME
+```
+
+2) Once the deployment completes, fetch the Kafka User password that we'll need to provide to the consumer
+
+```shell
+oc get secret inventory-consumer -o json | jq -r '.data.password | @base64d'
+```
+
+3) Update the consumer settings in `deploy/kessel-inventory-ephem-w-debezium.yaml` with the password and enable authentication
+
+```yaml
+consumer:
+  enabled: true
+  bootstrap-servers: inventory-kafka-kafka-bootstrap:9094 # port 9094 requires auth credentials
+  topic: outbox.event.kessel.tuples
+  auth:
+    enabled: true # auth enabled
+    security-protocol: sasl_plaintext
+    sasl-mechanism: SCRAM-SHA-512
+    sasl-username: inventory-consumer
+    sasl-password: <PASSWORD-FROM-PREVIOUS-STEP>
+```
+
+4) Redeploy with bonfire: `bonfire deploy kessel -C kessel-inventory`
+
+5) Kick the Inventory pod so it loads the new configuration: `oc delete pods -l pod=kessel-inventory-api`
+
+The new running Inventory pod should now communicate with Kafka using the secure port and SCRAM credentials provided.

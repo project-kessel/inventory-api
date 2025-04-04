@@ -3,7 +3,6 @@ package config
 import (
 	"fmt"
 	"strconv"
-	"strings"
 
 	"github.com/project-kessel/inventory-api/internal/consistency"
 	"github.com/project-kessel/inventory-api/internal/consumer"
@@ -81,10 +80,17 @@ func LogConfigurationInfo(options *OptionsConfig) {
 		options.Consumer.RetryOptions.BackoffFactor,
 	)
 
+	log.Debugf("Consumer Auth Settings: Enabled: %v, Security Protocol: %s, Mechanism: %s, Username: %s",
+		options.Consumer.AuthOptions.Enabled,
+		options.Consumer.AuthOptions.SecurityProtocol,
+		options.Consumer.AuthOptions.SASLMechanism,
+		options.Consumer.AuthOptions.SASLUsername)
+
 	log.Debugf("Consistency Configuration: Read-After-Write Enabled: %t, Read-After-Write Allowlist: %+s",
 		options.Consistency.ReadAfterWriteEnabled,
 		options.Consistency.ReadAfterWriteAllowlist,
 	)
+
 }
 
 // InjectClowdAppConfig updates service options based on values in the ClowdApp AppConfig
@@ -103,8 +109,8 @@ func (o *OptionsConfig) InjectClowdAppConfig() error {
 		}
 	}
 	// check for consumer config
-	if strings.Contains(*clowder.LoadedConfig.Metadata.EnvName, "ephemeral") {
-		o.ConfigureConsumer()
+	if o.Consumer.Enabled {
+		o.ConfigureConsumer(clowder.LoadedConfig)
 	}
 	return nil
 }
@@ -136,6 +142,20 @@ func (o *OptionsConfig) ConfigureStorage(appconfig *clowder.AppConfig) error {
 }
 
 // ConfigureConsumer updates Consumer settings based on ClowdApp AppConfig
-func (o *OptionsConfig) ConfigureConsumer() {
-	o.Consumer.BootstrapServers = clowder.KafkaServers[0]
+func (o *OptionsConfig) ConfigureConsumer(appconfig *clowder.AppConfig) {
+	var brokers []string
+	for _, broker := range appconfig.Kafka.Brokers {
+		brokers = append(brokers, fmt.Sprintf("%s:%d", broker.Hostname, *broker.Port))
+	}
+	o.Consumer.BootstrapServers = brokers
+
+	if o.Consumer.AuthOptions.Enabled {
+		o.Consumer.AuthOptions.SecurityProtocol = *appconfig.Kafka.Brokers[0].SecurityProtocol
+
+		if appconfig.Kafka.Brokers[0].Sasl != nil {
+			o.Consumer.AuthOptions.SASLMechanism = *appconfig.Kafka.Brokers[0].Sasl.SaslMechanism
+			o.Consumer.AuthOptions.SASLUsername = *appconfig.Kafka.Brokers[0].Sasl.Username
+			o.Consumer.AuthOptions.SASLPassword = *appconfig.Kafka.Brokers[0].Sasl.Password
+		}
+	}
 }

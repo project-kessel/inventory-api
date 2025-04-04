@@ -3,7 +3,9 @@ package consumer
 import (
 	"fmt"
 
+	"github.com/project-kessel/inventory-api/internal/consumer/auth"
 	"github.com/project-kessel/inventory-api/internal/consumer/retry"
+	"strings"
 
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
 )
@@ -15,6 +17,7 @@ type Config struct {
 	KafkaConfig *kafka.ConfigMap
 
 	RetryConfig *retry.Config
+	AuthConfig  *auth.Config
 }
 
 type completedConfig struct {
@@ -22,6 +25,7 @@ type completedConfig struct {
 	Topic                   string
 	KafkaConfig             *kafka.ConfigMap
 	RetryConfig             *retry.Config
+	AuthConfig              *auth.Config
 	ReadAfterWriteEnabled   bool
 	ReadAfterWriteAllowlist []string
 }
@@ -35,6 +39,7 @@ func NewConfig(o *Options) *Config {
 		Options: o,
 	}
 	cfg.RetryConfig = retry.NewConfig(o.RetryOptions)
+	cfg.AuthConfig = auth.NewConfig(o.AuthOptions)
 	return cfg
 }
 
@@ -51,32 +56,34 @@ func (c *Config) Complete() (CompletedConfig, []error) {
 				errs = append(errs, fmt.Errorf("cannot set debug value: %w", err))
 			}
 		}
-		if err := config.SetKey("client.id", clientID); err != nil {
-			errs = append(errs, fmt.Errorf("cannot set client.id value: %w", err))
+		if c.AuthConfig.Enabled {
+			authSettings := map[string]string{
+				"security.protocol": c.AuthConfig.SecurityProtocol,
+				"sasl.mechanism":    c.AuthConfig.SASLMechanism,
+				"sasl.username":     c.AuthConfig.SASLUsername,
+				"sasl.password":     c.AuthConfig.SASLPassword,
+			}
+			for key, value := range authSettings {
+				if err := config.SetKey(key, value); err != nil {
+					errs = append(errs, fmt.Errorf("cannot set %s value: %w", key, err))
+				}
+			}
 		}
-		if err := config.SetKey("bootstrap.servers", c.BootstrapServers); err != nil {
-			errs = append(errs, fmt.Errorf("cannot set bootstrap.servers value: %w", err))
+		kafkaSettings := map[string]string{
+			"client.id":              clientID,
+			"bootstrap.servers":      strings.Join(c.BootstrapServers, ","),
+			"group.id":               c.ConsumerGroupID,
+			"session.timeout.ms":     c.SessionTimeout,
+			"heartbeat.interval.ms":  c.HeartbeatInterval,
+			"max.poll.interval.ms":   c.MaxPollInterval,
+			"enable.auto.commit":     c.EnableAutoCommit,
+			"auto.offset.reset":      c.AutoOffsetReset,
+			"statistics.interval.ms": c.StatisticsInterval,
 		}
-		if err := config.SetKey("group.id", c.ConsumerGroupID); err != nil {
-			errs = append(errs, fmt.Errorf("cannot set group.id value: %w", err))
-		}
-		if err := config.SetKey("session.timeout.ms", c.SessionTimeout); err != nil {
-			errs = append(errs, fmt.Errorf("cannot set session.timeout.ms value: %w", err))
-		}
-		if err := config.SetKey("heartbeat.interval.ms", c.HeartbeatInterval); err != nil {
-			errs = append(errs, fmt.Errorf("cannot set heartbeat.interval.ms value: %w", err))
-		}
-		if err := config.SetKey("max.poll.interval.ms", c.MaxPollInterval); err != nil {
-			errs = append(errs, fmt.Errorf("cannot set max.poll.interval.ms value: %w", err))
-		}
-		if err := config.SetKey("enable.auto.commit", c.EnableAutoCommit); err != nil {
-			errs = append(errs, fmt.Errorf("cannot set enable.auto.commit value: %w", err))
-		}
-		if err := config.SetKey("auto.offset.reset", c.AutoOffsetReset); err != nil {
-			errs = append(errs, fmt.Errorf("cannot set auto.offset.reset value: %w", err))
-		}
-		if err := config.SetKey("statistics.interval.ms", c.StatisticsInterval); err != nil {
-			errs = append(errs, fmt.Errorf("cannot set statistics.interval.ms value: %w", err))
+		for key, value := range kafkaSettings {
+			if err := config.SetKey(key, value); err != nil {
+				errs = append(errs, fmt.Errorf("cannot set %s value: %w", key, err))
+			}
 		}
 	}
 
@@ -88,6 +95,7 @@ func (c *Config) Complete() (CompletedConfig, []error) {
 		Topic:                   c.Topic,
 		Options:                 c.Options,
 		RetryConfig:             c.RetryConfig,
+		AuthConfig:              c.AuthConfig,
 		ReadAfterWriteEnabled:   c.ReadAfterWriteEnabled,
 		ReadAfterWriteAllowlist: c.ReadAfterWriteAllowlist,
 	}}, nil

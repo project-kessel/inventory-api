@@ -10,6 +10,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/project-kessel/inventory-api/internal/consumer/auth"
 	"github.com/project-kessel/inventory-api/internal/consumer/retry"
 
 	"github.com/project-kessel/inventory-api/internal/authz/allow"
@@ -52,6 +53,7 @@ type InventoryConsumer struct {
 	Errors           chan error
 	MetricsCollector *MetricsCollector
 	Logger           *log.Helper
+	AuthOptions      *auth.Options
 	RetryOptions     *retry.Options
 	Notifier         pubsub.Notifier
 }
@@ -73,6 +75,14 @@ func New(config CompletedConfig, db *gorm.DB, authz authz.CompletedConfig, autho
 		return InventoryConsumer{}, err
 	}
 
+	authnOptions := &auth.Options{
+		Enabled:          config.AuthConfig.Enabled,
+		SecurityProtocol: config.AuthConfig.SecurityProtocol,
+		SASLMechanism:    config.AuthConfig.SASLMechanism,
+		SASLUsername:     config.AuthConfig.SASLUsername,
+		SASLPassword:     config.AuthConfig.SASLPassword,
+	}
+
 	retryOptions := &retry.Options{
 		ConsumerMaxRetries:  config.RetryConfig.ConsumerMaxRetries,
 		OperationMaxRetries: config.RetryConfig.OperationMaxRetries,
@@ -90,6 +100,7 @@ func New(config CompletedConfig, db *gorm.DB, authz authz.CompletedConfig, autho
 		Errors:           errChan,
 		MetricsCollector: &mc,
 		Logger:           logger,
+		AuthOptions:      authnOptions,
 		RetryOptions:     retryOptions,
 		Notifier:         notifier,
 	}, nil

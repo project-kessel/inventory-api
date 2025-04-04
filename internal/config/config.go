@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/project-kessel/inventory-api/internal/consistency"
 	"github.com/project-kessel/inventory-api/internal/consumer"
 
 	"github.com/go-kratos/kratos/v2/log"
@@ -18,12 +19,13 @@ import (
 
 // OptionsConfig contains the settings for each configuration option
 type OptionsConfig struct {
-	Authn    *authn.Options
-	Authz    *authz.Options
-	Storage  *storage.Options
-	Eventing *eventing.Options
-	Consumer *consumer.Options
-	Server   *server.Options
+	Authn       *authn.Options
+	Authz       *authz.Options
+	Storage     *storage.Options
+	Eventing    *eventing.Options
+	Consumer    *consumer.Options
+	Server      *server.Options
+	Consistency *consistency.Options
 }
 
 // NewOptionsConfig returns a new OptionsConfig with default options set
@@ -35,6 +37,7 @@ func NewOptionsConfig() *OptionsConfig {
 		eventing.NewOptions(),
 		consumer.NewOptions(),
 		server.NewOptions(),
+		consistency.NewOptions(),
 	}
 }
 
@@ -75,7 +78,13 @@ func LogConfigurationInfo(options *OptionsConfig) {
 		options.Consumer.Topic,
 		options.Consumer.RetryOptions.ConsumerMaxRetries,
 		options.Consumer.RetryOptions.OperationMaxRetries,
-		options.Consumer.RetryOptions.BackoffFactor)
+		options.Consumer.RetryOptions.BackoffFactor,
+	)
+
+	log.Debugf("Consistency Configuration: Read-After-Write Enabled: %t, Read-After-Write Allowlist: %+s",
+		options.Consistency.ReadAfterWriteEnabled,
+		options.Consistency.ReadAfterWriteAllowlist,
+	)
 }
 
 // InjectClowdAppConfig updates service options based on values in the ClowdApp AppConfig

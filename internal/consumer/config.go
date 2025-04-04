@@ -2,6 +2,7 @@ package consumer
 
 import (
 	"fmt"
+
 	"github.com/project-kessel/inventory-api/internal/consumer/retry"
 
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
@@ -18,9 +19,11 @@ type Config struct {
 
 type completedConfig struct {
 	*Options
-	Topic       string
-	KafkaConfig *kafka.ConfigMap
-	RetryConfig *retry.Config
+	Topic                   string
+	KafkaConfig             *kafka.ConfigMap
+	RetryConfig             *retry.Config
+	ReadAfterWriteEnabled   bool
+	ReadAfterWriteAllowlist []string
 }
 
 type CompletedConfig struct {
@@ -81,9 +84,11 @@ func (c *Config) Complete() (CompletedConfig, []error) {
 		return CompletedConfig{}, errs
 	}
 	return CompletedConfig{&completedConfig{
-		KafkaConfig: config,
-		Topic:       c.Topic,
-		Options:     c.Options,
-		RetryConfig: c.RetryConfig,
+		KafkaConfig:             config,
+		Topic:                   c.Topic,
+		Options:                 c.Options,
+		RetryConfig:             c.RetryConfig,
+		ReadAfterWriteEnabled:   c.ReadAfterWriteEnabled,
+		ReadAfterWriteAllowlist: c.ReadAfterWriteAllowlist,
 	}}, nil
 }

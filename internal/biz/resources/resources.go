@@ -55,11 +55,13 @@ type Usecase struct {
 	Server                      server.Server
 	DisablePersistence          bool
 	ListenManager               pubsub.ListenManagerImpl
+	ReadAfterWriteEnabled       bool
+	ReadAfterWriteAllowlist     []string
 }
 
 func New(reporterResourceRepository ReporterResourceRepository, inventoryResourceRepository InventoryResourceRepository,
 	authz authzapi.Authorizer, eventer eventingapi.Manager, namespace string, logger log.Logger, disablePersistence bool,
-	listenManager pubsub.ListenManagerImpl) *Usecase {
+	listenManager pubsub.ListenManagerImpl, readAfterWriteEnabled bool, readAfterWriteAllowlist []string) *Usecase {
 	return &Usecase{
 		reporterResourceRepository:  reporterResourceRepository,
 		inventoryResourceRepository: inventoryResourceRepository,
@@ -69,10 +71,12 @@ func New(reporterResourceRepository ReporterResourceRepository, inventoryResourc
 		log:                         log.NewHelper(logger),
 		DisablePersistence:          disablePersistence,
 		ListenManager:               listenManager,
+		ReadAfterWriteEnabled:       readAfterWriteEnabled,
+		ReadAfterWriteAllowlist:     readAfterWriteAllowlist,
 	}
 }
 
-func (uc *Usecase) Upsert(ctx context.Context, m *model.Resource) (*model.Resource, error) {
+func (uc *Usecase) Upsert(ctx context.Context, m *model.Resource, wait_for_sync bool) (*model.Resource, error) {
 	log.Info("upserting resource: ", m)
 	ret := m // Default to returning the input model in case persistence is disabled
 	var subscription pubsub.Subscription
@@ -93,7 +97,8 @@ func (uc *Usecase) Upsert(ctx context.Context, m *model.Resource) (*model.Resour
 			return nil, ErrDatabaseError
 		}
 
-		if uc.ListenManager != nil {
+		readAfterWriteEnabled := computeReadAfterWrite(uc, wait_for_sync, m)
+		if readAfterWriteEnabled {
 			subscription = uc.ListenManager.Subscribe(txid.String())
 			defer subscription.Unsubscribe()
 		}
@@ -117,7 +122,7 @@ func (uc *Usecase) Upsert(ctx context.Context, m *model.Resource) (*model.Resour
 			return ret, err2
 		}
 
-		if uc.ListenManager != nil {
+		if readAfterWriteEnabled {
 			timeoutCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 			defer cancel()
 
@@ -271,7 +276,7 @@ func (uc *Usecase) ListResourcesInWorkspace(ctx context.Context, permission, nam
 }
 
 // Deprecated. Remove after notifications and ACM migrates to v1beta2
-func (uc *Usecase) Create(ctx context.Context, m *model.Resource) (*model.Resource, error) {
+func (uc *Usecase) Create(ctx context.Context, m *model.Resource, wait_for_sync bool) (*model.Resource, error) {
 	ret := m // Default to returning the input model in case persistence is disabled
 	var subscription pubsub.Subscription
 
@@ -298,7 +303,8 @@ func (uc *Usecase) Create(ctx context.Context, m *model.Resource) (*model.Resour
 			return nil, ErrResourceAlreadyExists
 		}
 
-		if uc.ListenManager != nil {
+		readAfterWriteEnabled := computeReadAfterWrite(uc, wait_for_sync, m)
+		if readAfterWriteEnabled {
 			subscription = uc.ListenManager.Subscribe(txid.String())
 			defer subscription.Unsubscribe()
 		}
@@ -308,7 +314,9 @@ func (uc *Usecase) Create(ctx context.Context, m *model.Resource) (*model.Resour
 			return nil, err
 		}
 
-		if uc.ListenManager != nil {
+		if readAfterWriteEnabled {
+
+			// 30 sec max timeout
 			timeoutCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 			defer cancel()
 
@@ -326,7 +334,7 @@ func (uc *Usecase) Create(ctx context.Context, m *model.Resource) (*model.Resour
 //Deprecated. Remove after notifications and ACM migrates to v1beta2
 
 // Update updates a model in the database, updates related tuples in the relations-api, and issues an update event.
-func (uc *Usecase) Update(ctx context.Context, m *model.Resource, id model.ReporterResourceId) (*model.Resource, error) {
+func (uc *Usecase) Update(ctx context.Context, m *model.Resource, id model.ReporterResourceId, wait_for_sync bool) (*model.Resource, error) {
 	ret := m // Default to returning the input model in case persistence is disabled
 	var subscription pubsub.Subscription
 
@@ -348,13 +356,14 @@ func (uc *Usecase) Update(ctx context.Context, m *model.Resource, id model.Repor
 
 		if err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
-				return uc.Create(ctx, m)
+				return uc.Create(ctx, m, wait_for_sync)
 			}
 
 			return nil, ErrDatabaseError
 		}
 
-		if uc.ListenManager != nil {
+		readAfterWriteEnabled := computeReadAfterWrite(uc, wait_for_sync, m)
+		if readAfterWriteEnabled {
 			subscription = uc.ListenManager.Subscribe(txid.String())
 			defer subscription.Unsubscribe()
 		}
@@ -364,7 +373,8 @@ func (uc *Usecase) Update(ctx context.Context, m *model.Resource, id model.Repor
 			return nil, err
 		}
 
-		if uc.ListenManager != nil {
+		if readAfterWriteEnabled {
+
 			timeoutCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 			defer cancel()
 
@@ -410,4 +420,23 @@ func (uc *Usecase) Delete(ctx context.Context, id model.ReporterResourceId) erro
 	uc.log.WithContext(ctx).Infof("Deleted Resource: %v(%v)", m.ID, m.ResourceType)
 	return nil
 
+}
+
+// Check if request comes from SP in allowlist
+func isSPInAllowlist(m *model.Resource, allowlist []string) bool {
+	for _, sp := range allowlist {
+		// either specific SP or everyone
+		if sp == m.ReporterId || sp == "*" {
+			return true
+		}
+	}
+
+	return false
+}
+
+func computeReadAfterWrite(uc *Usecase, wait_for_sync bool, m *model.Resource) bool {
+	// read after write functionality is enabled/disabled globally.
+	// And executed if request specifies or
+	// request came from service provider in allowlist
+	return uc.ListenManager != nil && uc.ReadAfterWriteEnabled && (wait_for_sync || isSPInAllowlist(m, uc.ReadAfterWriteAllowlist))
 }

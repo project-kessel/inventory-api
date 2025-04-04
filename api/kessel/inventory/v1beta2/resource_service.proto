@@ -12,6 +12,8 @@ option java_package = "org.project_kessel.api.inventory.v1beta2";
 
 message ReportResourceRequest {
   Resource resource = 1 [  json_name = "resource" ];
+  // Will wait for synchronous processes to complete before returning
+  bool wait_for_sync = 2; 
 }
 
 message ReportResourceResponse {}

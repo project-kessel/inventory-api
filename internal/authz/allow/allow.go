@@ -2,6 +2,9 @@ package allow
 
 import (
 	"context"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/metadata"
+	"io"
 
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
@@ -31,6 +34,43 @@ func (a *AllowAllAuthz) Check(context.Context, string, string, *model.Resource, 
 
 func (a *AllowAllAuthz) CheckForUpdate(context.Context, string, string, *model.Resource, *v1beta1.SubjectReference) (v1beta1.CheckForUpdateResponse_Allowed, *v1beta1.ConsistencyToken, error) {
 	return v1beta1.CheckForUpdateResponse_ALLOWED_TRUE, nil, nil
+}
+
+type mockLookupResourcesClient struct {
+	ctx context.Context
+}
+
+func (m *mockLookupResourcesClient) Recv() (*v1beta1.LookupResourcesResponse, error) {
+	// Return EOF immediately to indicate end of stream
+	return nil, io.EOF
+}
+
+func (m *mockLookupResourcesClient) Header() (metadata.MD, error) {
+	return nil, nil
+}
+
+func (m *mockLookupResourcesClient) Trailer() metadata.MD {
+	return nil
+}
+
+func (m *mockLookupResourcesClient) CloseSend() error {
+	return nil
+}
+
+func (m *mockLookupResourcesClient) Context() context.Context {
+	return m.ctx
+}
+
+func (m *mockLookupResourcesClient) SendMsg(msg interface{}) error {
+	return nil
+}
+
+func (m *mockLookupResourcesClient) RecvMsg(msg interface{}) error {
+	return nil
+}
+
+func (a *AllowAllAuthz) LookupResources(ctx context.Context, in *v1beta1.LookupResourcesRequest) (grpc.ServerStreamingClient[v1beta1.LookupResourcesResponse], error) {
+	return &mockLookupResourcesClient{ctx: ctx}, nil
 }
 
 func (a *AllowAllAuthz) CreateTuples(ctx context.Context, r *v1beta1.CreateTuplesRequest) (*v1beta1.CreateTuplesResponse, error) {

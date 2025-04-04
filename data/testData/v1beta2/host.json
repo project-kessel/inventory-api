@@ -1,0 +1,22 @@
+{
+  "resource": {
+    "resource_type": "host",
+    "reporter_data": {
+      "reporter_type": "HBI",
+      "reporter_version": "0.1",
+      "reporter_instance_id":"2",
+      "local_resource_id": "other2",
+      "api_href": "www.example.com",
+      "console_href": "www.example.com",
+      "resource_data": {
+        "satellite_id": "01932c7e-e93e-719c-a488-3159877367b0",
+        "sub_manager_id": "01932c7e-e93e-719c-a488-3159877367b0",
+        "insights_inventory_id": "01932c7e-e93e-719c-a488-3159877367b0",
+        "ansible_host": "abc"
+      }
+    },
+    "common_resource_data": {
+      "workspace_id": "ungrouped"
+    }
+  }
+}

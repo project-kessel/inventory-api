@@ -7,7 +7,7 @@ import (
 	pbv1beta2 "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2/authz"
 	authnapi "github.com/project-kessel/inventory-api/internal/authn/api"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
-	resources "github.com/project-kessel/inventory-api/internal/biz/resources"
+	"github.com/project-kessel/inventory-api/internal/biz/resources"
 	"github.com/project-kessel/inventory-api/internal/middleware"
 	"github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
 )

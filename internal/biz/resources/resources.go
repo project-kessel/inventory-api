@@ -3,6 +3,7 @@ package resources
 import (
 	"context"
 	"errors"
+	"google.golang.org/grpc"
 	"strings"
 	"time"
 
@@ -210,6 +211,10 @@ func updateExistingReporterResource(ctx context.Context, m *model.Resource, exis
 
 	uc.log.WithContext(ctx).Infof("Updated Resource: %v(%v)", m.ID, m.ResourceType)
 	return ret, nil
+}
+
+func (uc *Usecase) LookupResources(ctx context.Context, request *kessel.LookupResourcesRequest) (grpc.ServerStreamingClient[kessel.LookupResourcesResponse], error) {
+	return uc.Authz.LookupResources(ctx, request)
 }
 
 func (uc *Usecase) Check(ctx context.Context, permission, namespace string, sub *kessel.SubjectReference, id model.ReporterResourceId) (bool, error) {

@@ -6,6 +6,76 @@ info:
     title: ""
     version: 0.0.1
 paths:
+    /api/inventory/authz/v1beta2/resources:
+        get:
+            tags:
+                - KesselLookupService
+            operationId: KesselLookupService_LookupResources
+            parameters:
+                - name: resourceType.namespace
+                  in: query
+                  schema:
+                    type: string
+                - name: resourceType.name
+                  in: query
+                  schema:
+                    type: string
+                - name: relation
+                  in: query
+                  schema:
+                    type: string
+                - name: subject.relation
+                  in: query
+                  description: |-
+                    An optional relation which points to a set of Subjects instead of the single Subject.
+                     e.g. "members" or "owners" of a group identified in `subject`.
+                  schema:
+                    type: string
+                - name: subject.subject.type.namespace
+                  in: query
+                  schema:
+                    type: string
+                - name: subject.subject.type.name
+                  in: query
+                  schema:
+                    type: string
+                - name: subject.subject.id
+                  in: query
+                  schema:
+                    type: string
+                - name: pagination.limit
+                  in: query
+                  schema:
+                    type: integer
+                    format: uint32
+                - name: pagination.continuationToken
+                  in: query
+                  schema:
+                    type: string
+                - name: consistency.minimizeLatency
+                  in: query
+                  description: |-
+                    The service selects the fastest snapshot available.
+                     *Must* be set true if used.
+                  schema:
+                    type: boolean
+                - name: consistency.atLeastAsFresh.token
+                  in: query
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/kessel.inventory.v1beta2.authz.LookupResourcesResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/google.rpc.Status'
     /api/inventory/v1/livez:
         get:
             tags:
@@ -1301,6 +1371,21 @@ components:
                         - ALLOWED_FALSE
                     type: string
                     format: enum
+        kessel.inventory.v1beta2.authz.ConsistencyToken:
+            type: object
+            properties:
+                token:
+                    type: string
+            description: The ConsistencyToken is used to provide consistency between write and read requests.
+        kessel.inventory.v1beta2.authz.LookupResourcesResponse:
+            type: object
+            properties:
+                resource:
+                    $ref: '#/components/schemas/kessel.inventory.v1beta2.authz.ObjectReference'
+                pagination:
+                    $ref: '#/components/schemas/kessel.inventory.v1beta2.authz.ResponsePagination'
+                consistencyToken:
+                    $ref: '#/components/schemas/kessel.inventory.v1beta2.authz.ConsistencyToken'
         kessel.inventory.v1beta2.authz.ObjectReference:
             type: object
             properties:
@@ -1314,6 +1399,11 @@ components:
                 namespace:
                     type: string
                 name:
+                    type: string
+        kessel.inventory.v1beta2.authz.ResponsePagination:
+            type: object
+            properties:
+                continuationToken:
                     type: string
         kessel.inventory.v1beta2.authz.SubjectReference:
             type: object
@@ -1333,6 +1423,7 @@ tags:
     - name: KesselK8SClusterService
     - name: KesselK8SPolicyIsPropagatedToK8SClusterService
     - name: KesselK8SPolicyService
+    - name: KesselLookupService
     - name: KesselNotificationsIntegrationService
     - name: KesselResourceService
     - name: KesselRhelHostService

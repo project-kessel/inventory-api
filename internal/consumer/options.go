@@ -48,7 +48,7 @@ func (o *Options) AddFlags(fs *pflag.FlagSet, prefix string) {
 	}
 	fs.BoolVar(&o.Enabled, prefix+"enabled", o.Enabled, "Toggle for enabling or disabling the consumer (default: true)")
 	fs.StringVar(&o.BootstrapServers, prefix+"bootstrap-servers", o.BootstrapServers, "sets the bootstrap server address and port for Kafka")
-	fs.StringVar(&o.ConsumerGroupID, prefix+"consumer-groupd-id", o.ConsumerGroupID, "sets the Kafka consumer group name (default: inventory-consumer)")
+	fs.StringVar(&o.ConsumerGroupID, prefix+"consumer-group-id", o.ConsumerGroupID, "sets the Kafka consumer group name (default: inventory-consumer)")
 	fs.StringVar(&o.Topic, prefix+"topic", o.Topic, "Kafka topic to monitor for events")
 	fs.BoolVar(&o.ReadAfterWriteEnabled, prefix+"read-after-write-enabled", o.ReadAfterWriteEnabled, "Toggle for enabling or disabling the read after write consistency workflow (default: true)")
 	fs.StringArrayVar(&o.ReadAfterWriteAllowlist, prefix+"read-after-write-allowlist", o.ReadAfterWriteAllowlist, "List of services that require all requests to be read-after-write enabled (default: [])")

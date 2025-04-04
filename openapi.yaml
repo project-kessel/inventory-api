@@ -753,9 +753,6 @@ components:
                     allOf:
                         - $ref: '#/components/schemas/kessel.inventory.v1beta1.relationships.K8SPolicyIsPropagatedToK8SCluster'
                     description: The resource relationship to create in Kessel Asset Inventory
-                waitForSync:
-                    type: boolean
-                    description: Will wait for synchronous processes to complete before returning
         kessel.inventory.v1beta1.relationships.CreateK8SPolicyIsPropagatedToK8SClusterResponse:
             type: object
             properties: {}
@@ -877,9 +874,6 @@ components:
                     allOf:
                         - $ref: '#/components/schemas/kessel.inventory.v1beta1.relationships.K8SPolicyIsPropagatedToK8SCluster'
                     description: "The resource-relationship to be updated will be defined by \n \\\"<reporter_data.reporter_type>:<reporter_instance_id>:<reporter_data.subject_local_resource_id>\\\"\n AND \\\"<reporter_data.reporter_type>:<reporter_instance_id>:<reporter_data.object_local_resource_id>\\\"\n from the request body."
-                waitForSync:
-                    type: boolean
-                    description: Will wait for synchronous processes to complete before returning
         kessel.inventory.v1beta1.relationships.UpdateK8SPolicyIsPropagatedToK8SClusterResponse:
             type: object
             properties: {}

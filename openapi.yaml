@@ -918,6 +918,7 @@ components:
                     description: The NotificationsIntegration to create in Kessel Asset Inventory
                 waitForSync:
                     type: boolean
+                    description: Will wait for synchronous processes to complete before returning
         kessel.inventory.v1beta1.resources.CreateNotificationsIntegrationResponse:
             type: object
             properties: {}
@@ -1246,6 +1247,7 @@ components:
                     description: "The resource to be updated will be defined by \n \\\"<reporter_data.reporter_type>:<reporter_instaance_id>:<reporter_data.local_resource_id>\\\"\n from the request body."
                 waitForSync:
                     type: boolean
+                    description: Will wait for synchronous processes to complete before returning
         kessel.inventory.v1beta1.resources.UpdateNotificationsIntegrationResponse:
             type: object
             properties: {}

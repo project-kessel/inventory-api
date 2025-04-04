@@ -8,6 +8,7 @@ import (
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/google/uuid"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
+	"github.com/project-kessel/inventory-api/internal/pubsub"
 	kesselv1 "github.com/project-kessel/relations-api/api/kessel/relations/v1"
 	"github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
 	"github.com/stretchr/testify/assert"
@@ -23,6 +24,14 @@ type MockedInventoryResourceRepository struct {
 }
 
 type MockAuthz struct {
+	mock.Mock
+}
+
+type MockedListenManager struct {
+	mock.Mock
+}
+
+type MockedSubscription struct {
 	mock.Mock
 }
 
@@ -119,6 +128,35 @@ func (m *MockAuthz) UnsetWorkspace(ctx context.Context, namespace, localResource
 func (m *MockAuthz) SetWorkspace(ctx context.Context, local_resource_id, workspace, namespace, name string) (*v1beta1.CreateTuplesResponse, error) {
 	args := m.Called(ctx, local_resource_id, workspace, namespace, name)
 	return args.Get(0).(*v1beta1.CreateTuplesResponse), args.Error(1)
+}
+
+func (m *MockedListenManager) Subscribe(txid string) pubsub.Subscription {
+	args := m.Called(txid)
+	return args.Get(0).(pubsub.Subscription)
+}
+
+func (m *MockedListenManager) WaitAndDistribute(ctx context.Context) error {
+	args := m.Called(ctx)
+	return args.Error(0)
+}
+
+func (m *MockedListenManager) Run(ctx context.Context) error {
+	args := m.Called(ctx)
+	return args.Error(0)
+}
+
+func (m *MockedSubscription) NotificationC() <-chan []byte {
+	args := m.Called()
+	return args.Get(0).(chan []byte)
+}
+
+func (m *MockedSubscription) Unsubscribe() {
+	m.Called()
+}
+
+func (m *MockedSubscription) BlockForNotification(ctx context.Context) error {
+	args := m.Called(ctx)
+	return args.Error(0)
 }
 
 func resource1() *model.Resource {
@@ -251,7 +289,7 @@ func TestCreateNewResource(t *testing.T) {
 
 func TestCreateNewResource_ConsistencyToken(t *testing.T) {
 	// TODO: Follow up with leads on which consistency to support in v1beta1
-	t.Skip("TODO: Test is failing because sync consistency flow was ripped out")
+	// TODO: Check that consistency token is actually updated
 	resource := resource1()
 	id, err := uuid.NewV7()
 	assert.Nil(t, err)
@@ -259,6 +297,9 @@ func TestCreateNewResource_ConsistencyToken(t *testing.T) {
 	repo := &MockedReporterResourceRepository{}
 	inventoryRepo := &MockedInventoryResourceRepository{}
 	m := &MockAuthz{}
+	listenMan := &MockedListenManager{}
+	sub := MockedSubscription{}
+
 	returnedResource := model.Resource{
 		ID: id,
 	}
@@ -267,17 +308,21 @@ func TestCreateNewResource_ConsistencyToken(t *testing.T) {
 	repo.On("FindByReporterResourceId", mock.Anything, mock.Anything).Return((*model.Resource)(nil), gorm.ErrRecordNotFound)
 	repo.On("Create", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&returnedResource, nil)
 
-	m.On("SetWorkspace", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&v1beta1.CreateTuplesResponse{ConsistencyToken: &v1beta1.ConsistencyToken{Token: "foo-bar-consistency-token"}}, nil)
-	repo.On("Update", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&model.Resource{}, nil)
+	listenMan.On("Subscribe", mock.Anything).Return(&sub)
 
-	useCase := New(repo, inventoryRepo, m, nil, "", log.DefaultLogger, false, nil, false, []string{})
+	sub.On("Unsubscribe")
+	sub.On("BlockForNotification", mock.Anything).Return(nil)
+
+	useCase := New(repo, inventoryRepo, m, nil, "", log.DefaultLogger, false, listenMan, true, []string{})
 	ctx := context.TODO()
 
-	r, err := useCase.Create(ctx, resource, false)
+	r, err := useCase.Create(ctx, resource, true)
 
 	assert.Nil(t, err)
-	assert.Equal(t, "foo-bar-consistency-token", r.ConsistencyToken)
+	assert.NotNil(t, r)
 	repo.AssertExpectations(t)
+	listenMan.AssertExpectations(t)
+	sub.AssertExpectations(t)
 }
 
 func TestUpdateReturnsDbError(t *testing.T) {

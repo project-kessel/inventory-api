@@ -30,7 +30,8 @@ type CreateNotificationsIntegrationRequest struct {
 
 	// The NotificationsIntegration to create in Kessel Asset Inventory
 	Integration *NotificationsIntegration `protobuf:"bytes,1,opt,name=integration,proto3" json:"integration,omitempty"`
-	WaitForSync bool                      `protobuf:"varint,2,opt,name=wait_for_sync,json=waitForSync,proto3" json:"wait_for_sync,omitempty"`
+	// Will wait for synchronous processes to complete before returning
+	WaitForSync bool `protobuf:"varint,2,opt,name=wait_for_sync,json=waitForSync,proto3" json:"wait_for_sync,omitempty"`
 }
 
 func (x *CreateNotificationsIntegrationRequest) Reset() {
@@ -126,7 +127,8 @@ type UpdateNotificationsIntegrationRequest struct {
 	// \"<reporter_data.reporter_type>:<reporter_instaance_id>:<reporter_data.local_resource_id>\"
 	// from the request body.
 	Integration *NotificationsIntegration `protobuf:"bytes,1,opt,name=integration,proto3" json:"integration,omitempty"`
-	WaitForSync bool                      `protobuf:"varint,2,opt,name=wait_for_sync,json=waitForSync,proto3" json:"wait_for_sync,omitempty"`
+	// Will wait for synchronous processes to complete before returning
+	WaitForSync bool `protobuf:"varint,2,opt,name=wait_for_sync,json=waitForSync,proto3" json:"wait_for_sync,omitempty"`
 }
 
 func (x *UpdateNotificationsIntegrationRequest) Reset() {

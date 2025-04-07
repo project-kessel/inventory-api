@@ -14,3 +14,9 @@ jobs:
           lint: true
           breaking: true
           input: "api"
+      - name: buf breaking (ignore unstable packages)
+        run: |
+            buf breaking \
+              --error-format=github-actions \
+              --against "https://github.com/${{ github.repository }}.git#branch=${{ github.base_ref }},subdir=api" \
+              --ignore-unstable-packages

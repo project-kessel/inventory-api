@@ -2,7 +2,7 @@ version: v2
 name: buf.build/project-kessel/inventory-api
 lint:
   use:
-    - DEFAULT
+    - STANDARD
   except:
    - ENUM_VALUE_PREFIX
    - PACKAGE_VERSION_SUFFIX
@@ -11,6 +11,9 @@ breaking:
     - FILE
   ignore:
     - kessel/inventory/v1beta1
+build:
+  roots:
+    - kessel/inventory/v1beta2
 deps:
   - buf.build/googleapis/googleapis
   - buf.build/bufbuild/protovalidate

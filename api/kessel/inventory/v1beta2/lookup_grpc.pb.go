@@ -2,7 +2,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.5.1
 // - protoc             (unknown)
-// source: kessel/inventory/v1beta2/authz/lookup.proto
+// source: kessel/inventory/v1beta2/lookup.proto
 
 package v1beta2
 
@@ -19,7 +19,7 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	KesselLookupService_LookupResources_FullMethodName = "/kessel.inventory.v1beta2.authz.KesselLookupService/LookupResources"
+	KesselLookupService_LookupResources_FullMethodName = "/kessel.inventory.v1beta2.KesselLookupService/LookupResources"
 )
 
 // KesselLookupServiceClient is the client API for KesselLookupService service.
@@ -110,7 +110,7 @@ type KesselLookupService_LookupResourcesServer = grpc.ServerStreamingServer[Look
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
 var KesselLookupService_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "kessel.inventory.v1beta2.authz.KesselLookupService",
+	ServiceName: "kessel.inventory.v1beta2.KesselLookupService",
 	HandlerType: (*KesselLookupServiceServer)(nil),
 	Methods:     []grpc.MethodDesc{},
 	Streams: []grpc.StreamDesc{
@@ -120,5 +120,5 @@ var KesselLookupService_ServiceDesc = grpc.ServiceDesc{
 			ServerStreams: true,
 		},
 	},
-	Metadata: "kessel/inventory/v1beta2/authz/lookup.proto",
+	Metadata: "kessel/inventory/v1beta2/lookup.proto",
 }

@@ -2,7 +2,7 @@
 // versions:
 // - protoc-gen-go-http v2.8.0
 // - protoc             (unknown)
-// source: kessel/inventory/v1beta2/authz/check.proto
+// source: kessel/inventory/v1beta2/check.proto
 
 package v1beta2
 
@@ -19,8 +19,8 @@ var _ = binding.EncodeURL
 
 const _ = http.SupportPackageIsVersion1
 
-const OperationKesselCheckServiceCheck = "/kessel.inventory.v1beta2.authz.KesselCheckService/Check"
-const OperationKesselCheckServiceCheckForUpdate = "/kessel.inventory.v1beta2.authz.KesselCheckService/CheckForUpdate"
+const OperationKesselCheckServiceCheck = "/kessel.inventory.v1beta2.KesselCheckService/Check"
+const OperationKesselCheckServiceCheckForUpdate = "/kessel.inventory.v1beta2.KesselCheckService/CheckForUpdate"
 
 type KesselCheckServiceHTTPServer interface {
 	// Check Checks for the existence of a single Relationship

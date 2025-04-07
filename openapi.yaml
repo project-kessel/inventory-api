@@ -69,7 +69,7 @@ paths:
                     content:
                         application/json:
                             schema:
-                                $ref: '#/components/schemas/kessel.inventory.v1beta2.authz.LookupResourcesResponse'
+                                $ref: '#/components/schemas/kessel.inventory.v1beta2.LookupResourcesResponse'
                 default:
                     description: Default error response
                     content:
@@ -584,7 +584,7 @@ paths:
                 content:
                     application/json:
                         schema:
-                            $ref: '#/components/schemas/kessel.inventory.v1beta2.authz.CheckRequest'
+                            $ref: '#/components/schemas/kessel.inventory.v1beta2.CheckRequest'
                 required: true
             responses:
                 "200":
@@ -592,7 +592,7 @@ paths:
                     content:
                         application/json:
                             schema:
-                                $ref: '#/components/schemas/kessel.inventory.v1beta2.authz.CheckResponse'
+                                $ref: '#/components/schemas/kessel.inventory.v1beta2.CheckResponse'
                 default:
                     description: Default error response
                     content:
@@ -608,7 +608,7 @@ paths:
                 content:
                     application/json:
                         schema:
-                            $ref: '#/components/schemas/kessel.inventory.v1beta2.authz.CheckForUpdateRequest'
+                            $ref: '#/components/schemas/kessel.inventory.v1beta2.CheckForUpdateRequest'
                 required: true
             responses:
                 "200":
@@ -616,7 +616,7 @@ paths:
                     content:
                         application/json:
                             schema:
-                                $ref: '#/components/schemas/kessel.inventory.v1beta2.authz.CheckForUpdateResponse'
+                                $ref: '#/components/schemas/kessel.inventory.v1beta2.CheckForUpdateResponse'
                 default:
                     description: Default error response
                     content:
@@ -1275,6 +1275,62 @@ components:
         kessel.inventory.v1beta1.resources.UpdateRhelHostResponse:
             type: object
             properties: {}
+        kessel.inventory.v1beta2.CheckForUpdateRequest:
+            type: object
+            properties:
+                parent:
+                    allOf:
+                        - $ref: '#/components/schemas/kessel.inventory.v1beta2.ObjectReference'
+                    description: |-
+                        Required parameters (from an authz perspective)
+                         - resource type and id
+                         - permission (cannot be derived from type as types may have multiple edit permissions Ex: https://github.com/RedHatInsights/rbac-config/blob/master/configs/prod/schemas/src/notifications.ksl#L37)
+                         - user (possibly derived from an identity token)
+                relation:
+                    type: string
+                subject:
+                    $ref: '#/components/schemas/kessel.inventory.v1beta2.SubjectReference'
+        kessel.inventory.v1beta2.CheckForUpdateResponse:
+            type: object
+            properties:
+                allowed:
+                    enum:
+                        - ALLOWED_UNSPECIFIED
+                        - ALLOWED_TRUE
+                        - ALLOWED_FALSE
+                    type: string
+                    format: enum
+        kessel.inventory.v1beta2.CheckRequest:
+            type: object
+            properties:
+                parent:
+                    allOf:
+                        - $ref: '#/components/schemas/kessel.inventory.v1beta2.ObjectReference'
+                    description: |-
+                        Required parameters (from an authz perspective)
+                         - resource type and id
+                         - permission (cannot be derived from the type as a type may have multiple 'read' permissions. Ex: https://github.com/RedHatInsights/rbac-config/blob/master/configs/prod/schemas/src/notifications.ksl#L31)
+                         - user (possibly derived from an identity token)
+                relation:
+                    type: string
+                subject:
+                    $ref: '#/components/schemas/kessel.inventory.v1beta2.SubjectReference'
+        kessel.inventory.v1beta2.CheckResponse:
+            type: object
+            properties:
+                allowed:
+                    enum:
+                        - ALLOWED_UNSPECIFIED
+                        - ALLOWED_TRUE
+                        - ALLOWED_FALSE
+                    type: string
+                    format: enum
+        kessel.inventory.v1beta2.ConsistencyToken:
+            type: object
+            properties:
+                token:
+                    type: string
+            description: The ConsistencyToken is used to provide consistency between write and read requests.
         kessel.inventory.v1beta2.DeleteResourceRequest:
             type: object
             properties:
@@ -1285,6 +1341,29 @@ components:
         kessel.inventory.v1beta2.DeleteResourceResponse:
             type: object
             properties: {}
+        kessel.inventory.v1beta2.LookupResourcesResponse:
+            type: object
+            properties:
+                resource:
+                    $ref: '#/components/schemas/kessel.inventory.v1beta2.ObjectReference'
+                pagination:
+                    $ref: '#/components/schemas/kessel.inventory.v1beta2.ResponsePagination'
+                consistencyToken:
+                    $ref: '#/components/schemas/kessel.inventory.v1beta2.ConsistencyToken'
+        kessel.inventory.v1beta2.ObjectReference:
+            type: object
+            properties:
+                type:
+                    $ref: '#/components/schemas/kessel.inventory.v1beta2.ObjectType'
+                id:
+                    type: string
+        kessel.inventory.v1beta2.ObjectType:
+            type: object
+            properties:
+                namespace:
+                    type: string
+                name:
+                    type: string
         kessel.inventory.v1beta2.ReportResourceRequest:
             type: object
             properties:
@@ -1321,91 +1400,12 @@ components:
                     $ref: '#/components/schemas/kessel.inventory.v1beta2.ReporterData'
                 commonResourceData:
                     type: object
-        kessel.inventory.v1beta2.authz.CheckForUpdateRequest:
-            type: object
-            properties:
-                parent:
-                    allOf:
-                        - $ref: '#/components/schemas/kessel.inventory.v1beta2.authz.ObjectReference'
-                    description: |-
-                        Required parameters (from an authz perspective)
-                         - resource type and id
-                         - permission (cannot be derived from type as types may have multiple edit permissions Ex: https://github.com/RedHatInsights/rbac-config/blob/master/configs/prod/schemas/src/notifications.ksl#L37)
-                         - user (possibly derived from an identity token)
-                relation:
-                    type: string
-                subject:
-                    $ref: '#/components/schemas/kessel.inventory.v1beta2.authz.SubjectReference'
-        kessel.inventory.v1beta2.authz.CheckForUpdateResponse:
-            type: object
-            properties:
-                allowed:
-                    enum:
-                        - ALLOWED_UNSPECIFIED
-                        - ALLOWED_TRUE
-                        - ALLOWED_FALSE
-                    type: string
-                    format: enum
-        kessel.inventory.v1beta2.authz.CheckRequest:
-            type: object
-            properties:
-                parent:
-                    allOf:
-                        - $ref: '#/components/schemas/kessel.inventory.v1beta2.authz.ObjectReference'
-                    description: |-
-                        Required parameters (from an authz perspective)
-                         - resource type and id
-                         - permission (cannot be derived from the type as a type may have multiple 'read' permissions. Ex: https://github.com/RedHatInsights/rbac-config/blob/master/configs/prod/schemas/src/notifications.ksl#L31)
-                         - user (possibly derived from an identity token)
-                relation:
-                    type: string
-                subject:
-                    $ref: '#/components/schemas/kessel.inventory.v1beta2.authz.SubjectReference'
-        kessel.inventory.v1beta2.authz.CheckResponse:
-            type: object
-            properties:
-                allowed:
-                    enum:
-                        - ALLOWED_UNSPECIFIED
-                        - ALLOWED_TRUE
-                        - ALLOWED_FALSE
-                    type: string
-                    format: enum
-        kessel.inventory.v1beta2.authz.ConsistencyToken:
-            type: object
-            properties:
-                token:
-                    type: string
-            description: The ConsistencyToken is used to provide consistency between write and read requests.
-        kessel.inventory.v1beta2.authz.LookupResourcesResponse:
-            type: object
-            properties:
-                resource:
-                    $ref: '#/components/schemas/kessel.inventory.v1beta2.authz.ObjectReference'
-                pagination:
-                    $ref: '#/components/schemas/kessel.inventory.v1beta2.authz.ResponsePagination'
-                consistencyToken:
-                    $ref: '#/components/schemas/kessel.inventory.v1beta2.authz.ConsistencyToken'
-        kessel.inventory.v1beta2.authz.ObjectReference:
-            type: object
-            properties:
-                type:
-                    $ref: '#/components/schemas/kessel.inventory.v1beta2.authz.ObjectType'
-                id:
-                    type: string
-        kessel.inventory.v1beta2.authz.ObjectType:
-            type: object
-            properties:
-                namespace:
-                    type: string
-                name:
-                    type: string
-        kessel.inventory.v1beta2.authz.ResponsePagination:
+        kessel.inventory.v1beta2.ResponsePagination:
             type: object
             properties:
                 continuationToken:
                     type: string
-        kessel.inventory.v1beta2.authz.SubjectReference:
+        kessel.inventory.v1beta2.SubjectReference:
             type: object
             properties:
                 relation:
@@ -1414,7 +1414,7 @@ components:
                         An optional relation which points to a set of Subjects instead of the single Subject.
                          e.g. "members" or "owners" of a group identified in `subject`.
                 subject:
-                    $ref: '#/components/schemas/kessel.inventory.v1beta2.authz.ObjectReference'
+                    $ref: '#/components/schemas/kessel.inventory.v1beta2.ObjectReference'
             description: A reference to a Subject or, if a `relation` is provided, a Subject Set.
 tags:
     - name: KesselCheckService

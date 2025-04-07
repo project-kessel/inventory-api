@@ -111,7 +111,11 @@ func TestInventoryAPIHTTP_Metrics(t *testing.T) {
 	if err != nil {
 		t.Fatal("Failed to send request: ", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			fmt.Printf("failed to close consumer: %v", err)
+		}
+	}()
 	assert.NoError(t, err)
 	assert.NotNil(t, resp)
 	expectedStatusCode := 200

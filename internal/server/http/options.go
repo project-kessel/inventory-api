@@ -56,12 +56,12 @@ func (o *Options) Validate() []error {
 	}
 
 	if (o.ServingCertFile == "" && o.PrivateKeyFile != "") || (o.ServingCertFile != "" && o.PrivateKeyFile == "") {
-		err := fmt.Errorf("Both certfile and keyfile must be populated")
+		err := fmt.Errorf("both certfile and keyfile must be populated")
 		errors = append(errors, err)
 	}
 
 	if o.CertOpt < 0 || o.CertOpt > 4 {
-		err := fmt.Errorf("CertOpt must be >= 0 and <= 4")
+		err := fmt.Errorf("certOpt must be >= 0 and <= 4")
 		errors = append(errors, err)
 	}
 

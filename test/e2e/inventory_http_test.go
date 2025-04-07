@@ -30,7 +30,7 @@ func TestMain(m *testing.M) {
 	if inventoryapi_http_url == "" {
 		err := fmt.Errorf("INV_HTTP_URL environment variable not set")
 		log.Error(err)
-		inventoryapi_http_url = "localhost:8081"
+		inventoryapi_http_url = "localhost:8000"
 	}
 	insecure = true
 	insecureTLSstr := os.Getenv("INV_TLS_INSECURE")

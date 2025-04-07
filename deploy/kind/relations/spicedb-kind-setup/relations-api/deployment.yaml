@@ -29,7 +29,7 @@ spec:
             - name: SPICEDB_ENDPOINT
               value: spicedb-cr:50051
             - name: SPICEDB_SCHEMA_FILE
-              value: /etc/schema/schema.zed
+              value: /etc/schema/hbi/schema.zed
           volumeMounts:
             - name: schema
               mountPath: /etc/schema

@@ -1,6 +1,7 @@
 package consumer
 
 import (
+	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
 	"testing"
 
 	"github.com/go-kratos/kratos/v2/log"
@@ -135,4 +136,96 @@ func TestParseMessageKey(t *testing.T) {
 	key, err := ParseMessageKey([]byte(testMessageKey))
 	assert.Nil(t, err)
 	assert.Equal(t, key, expected)
+}
+
+func TestParseHeaders(t *testing.T) {
+	tests := []struct {
+		name              string
+		expectedOperation string
+		expectedTxid      string
+		msg               *kafka.Message
+	}{
+		{
+			name:              "Create Operation",
+			expectedOperation: "created",
+			expectedTxid:      "123456",
+			msg:               &kafka.Message{},
+		},
+		{
+			name:              "Update Operation",
+			expectedOperation: "updated",
+			expectedTxid:      "123456",
+			msg:               &kafka.Message{},
+		},
+		{
+			name:              "Delete Operation",
+			expectedOperation: "deleted",
+			expectedTxid:      "123456",
+			msg:               &kafka.Message{},
+		},
+		{
+			name:              "Fake Operation",
+			expectedOperation: "not-real",
+			expectedTxid:      "123456",
+			msg:               &kafka.Message{},
+		},
+		{
+			name:              "No Txid",
+			expectedOperation: "not-real",
+			expectedTxid:      "",
+			msg:               &kafka.Message{},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			headers := []kafka.Header{
+				{Key: "operation", Value: []byte(test.expectedOperation)},
+				{Key: "txid", Value: []byte(test.expectedTxid)},
+			}
+			test.msg.Headers = headers
+
+			parsedHeaders := ParseHeaders(test.msg)
+			assert.Equal(t, parsedHeaders["operation"], test.expectedOperation)
+			assert.Equal(t, parsedHeaders["txid"], test.expectedTxid)
+		})
+	}
+}
+
+func TestInventoryConsumer_Retry(t *testing.T) {
+	tests := []struct {
+		description   string
+		funcToExecute func() (string, error)
+		exectedResult string
+		expectedErr   error
+	}{
+		{
+			description:   "retry returns no error after executing function",
+			funcToExecute: func() (string, error) { return "success", nil },
+			exectedResult: "success",
+			expectedErr:   nil,
+		},
+		{
+			description:   "retry fails and returns MaxRetriesError",
+			funcToExecute: func() (string, error) { return "fail", MaxRetriesError },
+			exectedResult: "",
+			expectedErr:   MaxRetriesError,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.description, func(t *testing.T) {
+			tester := TestCase{
+				name:        "TestInventoryConsumer-Retry",
+				description: test.description,
+			}
+			errs := tester.TestSetup()
+			assert.Nil(t, errs)
+
+			result, err := tester.inv.Retry(test.funcToExecute)
+			assert.Equal(t, test.exectedResult, result)
+			assert.Equal(t, test.expectedErr, err)
+		})
+	}
+
 }

@@ -31,6 +31,7 @@ import (
 )
 
 var ClosedError = errors.New("consumer closed")
+var MaxRetriesError = errors.New("max retries reached")
 
 type Consumer interface {
 	Consume() error
@@ -158,19 +159,11 @@ func (i *InventoryConsumer) Consume() error {
 
 			switch e := event.(type) {
 			case *kafka.Message:
-				// capture the operation from the event headers
-				var operation string
-				var txid string
-				var resp interface{}
-				for _, v := range e.Headers {
-					switch v.Key {
-					case "operation":
-						operation = string(v.Value)
-					case "txid":
-						txid = string(v.Value)
-					}
-				}
+				headers := ParseHeaders(e)
+				operation := headers["operation"]
+				txid := headers["txid"]
 
+				var resp interface{}
 				switch operation {
 				case string(model.OperationTypeCreated):
 					i.Logger.Infof("operation=%s tuple=%s txid=%s", operation, e.Value, txid)
@@ -287,6 +280,20 @@ func (i *InventoryConsumer) Consume() error {
 		return fmt.Errorf("error in consumer shutdown: %v", err)
 	}
 	return err
+}
+
+func ParseHeaders(msg *kafka.Message) map[string]string {
+	headers := make(map[string]string)
+	for _, v := range msg.Headers {
+		switch v.Key {
+		case "operation":
+			headers["operation"] = string(v.Value)
+		case "txid":
+
+			headers["txid"] = string(v.Value)
+		}
+	}
+	return headers
 }
 
 func ParseCreateOrUpdateMessage(msg []byte) (*v1beta1.Relationship, error) {
@@ -435,5 +442,5 @@ func (i *InventoryConsumer) Retry(operation func() (string, error)) (string, err
 		return fmt.Sprintf("%s", resp), nil
 	}
 	i.Logger.Errorf("Error processing request (max attempts reached: %v): %v", attempts, err)
-	return "", err
+	return "", MaxRetriesError
 }

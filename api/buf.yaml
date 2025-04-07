@@ -11,9 +11,6 @@ breaking:
     - FILE
   ignore:
     - kessel/inventory/v1beta1
-build:
-  roots:
-    - kessel/inventory/v1beta2
 deps:
   - buf.build/googleapis/googleapis
   - buf.build/bufbuild/protovalidate

@@ -10,6 +10,7 @@ import (
 	v1 "github.com/project-kessel/inventory-api/api/kessel/inventory/v1"
 	"github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/relationships"
 	"github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/resources"
+	"github.com/project-kessel/inventory-client-go/common"
 	"github.com/project-kessel/inventory-client-go/v1beta1"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -121,10 +122,10 @@ func TestInventoryAPIHTTP_Metrics(t *testing.T) {
 
 func TestInventoryAPIHTTP_RHELHostLifecycle(t *testing.T) {
 	t.Parallel()
-	c := v1beta1.NewConfig(
-		v1beta1.WithHTTPUrl(inventoryapi_http_url),
-		v1beta1.WithTLSInsecure(insecure),
-		v1beta1.WithHTTPTLSConfig(tlsConfig),
+	c := common.NewConfig(
+		common.WithHTTPUrl(inventoryapi_http_url),
+		common.WithTLSInsecure(insecure),
+		common.WithHTTPTLSConfig(tlsConfig),
 	)
 	client, err := v1beta1.NewHttpClient(context.Background(), c)
 	if err != nil {
@@ -187,10 +188,10 @@ func TestInventoryAPIHTTP_RHELHostLifecycle(t *testing.T) {
 
 func TestInventoryAPIHTTP_K8SClusterLifecycle(t *testing.T) {
 	t.Parallel()
-	c := v1beta1.NewConfig(
-		v1beta1.WithHTTPUrl(inventoryapi_http_url),
-		v1beta1.WithTLSInsecure(insecure),
-		v1beta1.WithHTTPTLSConfig(tlsConfig),
+	c := common.NewConfig(
+		common.WithHTTPUrl(inventoryapi_http_url),
+		common.WithTLSInsecure(insecure),
+		common.WithHTTPTLSConfig(tlsConfig),
 	)
 	client, err := v1beta1.NewHttpClient(context.Background(), c)
 	if err != nil {
@@ -296,10 +297,10 @@ func TestInventoryAPIHTTP_K8SClusterLifecycle(t *testing.T) {
 
 func TestInventoryAPIHTTP_K8SPolicyLifecycle(t *testing.T) {
 	t.Parallel()
-	c := v1beta1.NewConfig(
-		v1beta1.WithHTTPUrl(inventoryapi_http_url),
-		v1beta1.WithTLSInsecure(insecure),
-		v1beta1.WithHTTPTLSConfig(tlsConfig),
+	c := common.NewConfig(
+		common.WithHTTPUrl(inventoryapi_http_url),
+		common.WithTLSInsecure(insecure),
+		common.WithHTTPTLSConfig(tlsConfig),
 	)
 	client, err := v1beta1.NewHttpClient(context.Background(), c)
 	if err != nil {
@@ -372,10 +373,10 @@ func TestInventoryAPIHTTP_K8SPolicyLifecycle(t *testing.T) {
 func TestInventoryAPIHTTP_NotificationsIntegrationLifecycle(t *testing.T) {
 	t.Parallel()
 
-	c := v1beta1.NewConfig(
-		v1beta1.WithHTTPUrl(inventoryapi_http_url),
-		v1beta1.WithTLSInsecure(insecure),
-		v1beta1.WithHTTPTLSConfig(tlsConfig),
+	c := common.NewConfig(
+		common.WithHTTPUrl(inventoryapi_http_url),
+		common.WithTLSInsecure(insecure),
+		common.WithHTTPTLSConfig(tlsConfig),
 	)
 	client, err := v1beta1.NewHttpClient(context.Background(), c)
 	if err != nil {
@@ -434,10 +435,10 @@ func TestInventoryAPIHTTP_NotificationsIntegrationLifecycle(t *testing.T) {
 
 func TestInventoryAPIHTTP_K8SPolicy_is_propagated_to_K8sClusterLifecycle(t *testing.T) {
 	t.Parallel()
-	c := v1beta1.NewConfig(
-		v1beta1.WithHTTPUrl(inventoryapi_http_url),
-		v1beta1.WithTLSInsecure(insecure),
-		v1beta1.WithHTTPTLSConfig(tlsConfig),
+	c := common.NewConfig(
+		common.WithHTTPUrl(inventoryapi_http_url),
+		common.WithTLSInsecure(insecure),
+		common.WithHTTPTLSConfig(tlsConfig),
 	)
 	client, err := v1beta1.NewHttpClient(context.Background(), c)
 	if err != nil {

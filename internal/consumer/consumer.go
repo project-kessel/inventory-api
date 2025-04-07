@@ -324,7 +324,12 @@ func ParseCreateOrUpdateMessage(msg []byte) (*v1beta1.Relationship, error) {
 		return nil, fmt.Errorf("error unmarshaling msgPayload: %v", err)
 	}
 
-	err = json.Unmarshal([]byte(fmt.Sprintf("%v", msgPayload.RelationsRequest)), &tuple)
+	payloadJson, err := json.Marshal(msgPayload.RelationsRequest)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling tuple payload: %v", err)
+	}
+
+	err = json.Unmarshal(payloadJson, &tuple)
 	if err != nil {
 		return nil, fmt.Errorf("error unmarshaling tuple payload: %v", err)
 	}
@@ -341,7 +346,12 @@ func ParseDeleteMessage(msg []byte) (*v1beta1.RelationTupleFilter, error) {
 		return nil, fmt.Errorf("error unmarshaling msgPayload: %v", err)
 	}
 
-	err = json.Unmarshal([]byte(fmt.Sprintf("%v", msgPayload.RelationsRequest)), &filter)
+	payloadJson, err := json.Marshal(msgPayload.RelationsRequest)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling tuple payload: %v", err)
+	}
+
+	err = json.Unmarshal(payloadJson, &filter)
 	if err != nil {
 		return nil, fmt.Errorf("error unmarshaling tuple payload: %v", err)
 	}

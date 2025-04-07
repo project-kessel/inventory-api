@@ -3,75 +3,82 @@ package e2e
 import (
 	"context"
 	"fmt"
-	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
-	"github.com/go-kratos/kratos/v2/log"
-	"github.com/xeipuuv/gojsonschema"
 	"os"
 	"testing"
 	"time"
+
+	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
+	"github.com/go-kratos/kratos/v2/log"
+	"github.com/xeipuuv/gojsonschema"
 )
 
 // JSONSchema for Inventory Event Structure
+// TODO: Require `source` format=uri when URI is available and set
 const inventoryEventSchema = `{
 	"title": "Inventory Event Structure",
 	"description": "The event schema will be compatible with CloudEvents, a specification for describing event data in a common way. The following describes how the fabric will align with the CloudEvent schema.",
 	"type": "object",
 	"properties": {
-		"specversion": {
-			"description": "Specifies the version of the CloudEvents spec targeted.",
-			"type": "string",
-			"enum": ["1.0"]
-		},
-		"type": {
-			"description": "We use a string comprised of redhat.inventory.(resources|resources_relationship).{resource_type}.(created|updated|deleted)",
-			"type": "string",
-			"pattern": "^redhat\\.inventory\\.(resources|resources_relationship)\\.[a-zA-Z0-9_-]+\\.(created|updated|deleted)$",
-			"examples": [
-				"redhat.inventory.resources.k8s_cluster.created",
-				"redhat.inventory.resources.k8s_cluster.updated",
-				"redhat.inventory.resources.k8s_cluster.deleted",
-				"redhat.inventory.resources_relationship.k8spolicy_ispropagatedto_k8scluster.created",
-				"redhat.inventory.resources_relationship.k8spolicy_ispropagatedto_k8scluster.updated",
-				"redhat.inventory.resources_relationship.k8spolicy_ispropagatedto_k8scluster.deleted"
-			]
-		},
-		"source": {
-			"description": "Describes the source (or app) that generated the event.",
-			"type": "string",
-			"format": "uri",
-			"examples": ["https://redhat.com"]
-		},
-		"id": {
-			"description": "Identifies the event. Unique for this source.",
-			"type": "string",
-			"format": "uuid",
-			"examples": ["afebabe-cafe-babe-cafe-babecafebabe"]
-		},
-		"time": {
-			"description": "Last reported from inventory-api",
-			"type": "string",
-			"format": "date-time",
-			"examples": ["2018-11-13T20:20:39+00:00"]
-		},
-		"datacontenttype": {
-			"description": "Content type of data value",
-			"type": "string",
-			"pattern": "^application\\/json$"
-		},
-		"data": {
-			"type": "object"
-		},
-		"subject": {
-			"description": "Represents the updated resource: (resource|resources-relation)/{resource_type}/{resource_id}",
-			"type": "string",
-			"pattern": "^\\/(resources|resources-relationships)\\/[a-zA-Z0-9_-]+\\/[a-zA-Z0-9-]+$",
-			"examples": [
-				"/resources/k8s_cluster/A234-1234-1234",
-				"/resources-relationships/k8spolicy_ispropagatedto_k8scluster/A234-1234-1234"
-			]
+		"payload": {
+			"description": "The payload of the event. This is the actual data that is being sent.",
+			"type": "object",
+			"properties": {
+				"specversion": {
+					"description": "Specifies the version of the CloudEvents spec targeted.",
+					"type": "string",
+					"enum": ["1.0"]
+				},
+				"type": {
+					"description": "We use a string comprised of redhat.inventory.(resources|resources_relationship).{resource_type}.(created|updated|deleted)",
+					"type": "string",
+					"pattern": "^redhat\\.inventory\\.(resources|resources_relationship)\\.[a-zA-Z0-9_-]+\\.(created|updated|deleted)$",
+					"examples": [
+						"redhat.inventory.resources.k8s_cluster.created",
+						"redhat.inventory.resources.k8s_cluster.updated",
+						"redhat.inventory.resources.k8s_cluster.deleted",
+						"redhat.inventory.resources_relationship.k8spolicy_ispropagatedto_k8scluster.created",
+						"redhat.inventory.resources_relationship.k8spolicy_ispropagatedto_k8scluster.updated",
+						"redhat.inventory.resources_relationship.k8spolicy_ispropagatedto_k8scluster.deleted"
+					]
+				},
+				"source": {
+					"description": "Describes the source (or app) that generated the event.",
+					"type": "string",
+					"examples": ["https://redhat.com"]
+				},
+				"id": {
+					"description": "Identifies the event. Unique for this source.",
+					"type": "string",
+					"format": "uuid",
+					"examples": ["afebabe-cafe-babe-cafe-babecafebabe"]
+				},
+				"time": {
+					"description": "Last reported from inventory-api",
+					"type": "string",
+					"format": "date-time",
+					"examples": ["2018-11-13T20:20:39+00:00"]
+				},
+				"datacontenttype": {
+					"description": "Content type of data value",
+					"type": "string",
+					"pattern": "^application\\/json$"
+				},
+				"data": {
+					"type": "object"
+				},
+				"subject": {
+					"description": "Represents the updated resource: (resource|resources-relation)/{resource_type}/{resource_id}",
+					"type": "string",
+					"pattern": "^\\/(resources|resources-relationships)\\/[a-zA-Z0-9_-]+\\/[a-zA-Z0-9-]+$",
+					"examples": [
+						"/resources/k8s_cluster/A234-1234-1234",
+						"/resources-relationships/k8spolicy_ispropagatedto_k8scluster/A234-1234-1234"
+					]
+				}
+			},
+			"required": ["specversion", "type", "source", "id", "time", "datacontenttype", "data", "subject"]
 		}
-	},
-	"required": ["specversion", "type", "source", "id", "time", "datacontenttype", "data", "subject"]
+	}
 }`
 
 func getEnvOrDefault(envVar, defaultValue string) string {
@@ -116,7 +123,7 @@ func Test_ACMKafkaConsumer(t *testing.T) {
 	kafkaClientCert := os.Getenv("KAFKA_CLIENT_CERT") // Client cert for mutual authentication
 	kafkaClientKey := os.Getenv("KAFKA_CLIENT_KEY")   // Client private key for mutual authentication
 
-	topic := getEnvOrDefault("KAFKA_TOPIC", "kessel-inventory")
+	topic := getEnvOrDefault("KAFKA_TOPIC", "outbox.event.kessel.resources")
 
 	adminConfig := &kafka.ConfigMap{
 		"bootstrap.servers": kafkaBootstrapServers,
@@ -226,8 +233,9 @@ func Test_ACMKafkaConsumer(t *testing.T) {
 				err = VerifyInventoryEventSchema(e.Value, inventoryEventSchema)
 				if err != nil {
 					t.Errorf("Schema validation failed: %v", err)
+				} else {
+					t.Logf("Schema validation passed")
 				}
-				t.Logf("Schema validation passed")
 				run = false
 			case kafka.Error:
 				fmt.Fprintf(os.Stderr, "%% Error: %v: %v\n", e.Code(), e)
@@ -261,6 +269,7 @@ func VerifyInventoryEventSchema(jsonMessage []byte, schema string) error {
 		for _, desc := range result.Errors() {
 			fmt.Printf("- %s\n", desc)
 		}
+		return fmt.Errorf("message validation failed")
 	}
 
 	return nil

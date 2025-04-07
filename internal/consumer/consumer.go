@@ -31,6 +31,7 @@ import (
 )
 
 var ClosedError = errors.New("consumer closed")
+var MaxRetriesError = errors.New("max retries reached")
 
 type Consumer interface {
 	Consume() error
@@ -158,70 +159,17 @@ func (i *InventoryConsumer) Consume() error {
 
 			switch e := event.(type) {
 			case *kafka.Message:
-				// capture the operation from the event headers
-				var operation string
-				var txid string
-				var resp interface{}
-				for _, v := range e.Headers {
-					switch v.Key {
-					case "operation":
-						operation = string(v.Value)
-					case "txid":
-						txid = string(v.Value)
-					}
-				}
+				headers := ParseHeaders(e)
+				operation := headers["operation"]
+				txid := headers["txid"]
 
-				switch operation {
-				case string(model.OperationTypeCreated):
-					i.Logger.Infof("operation=%s tuple=%s txid=%s", operation, e.Value, txid)
-					if relationsEnabled {
-						tuple, err := ParseCreateOrUpdateMessage(e.Value)
-						if err != nil {
-							i.Logger.Errorf("failed to parse message for tuple: %v", err)
-						}
-						resp, err = i.Retry(func() (string, error) {
-							return i.CreateTuple(context.Background(), tuple)
-						})
-						if err != nil {
-							i.Logger.Errorf("failed to create tuple: %v", err)
-							run = false
-							continue
-						}
-					}
-				case string(model.OperationTypeUpdated):
-					i.Logger.Infof("operation=%s tuple=%s txid=%s", operation, e.Value, txid)
-					if relationsEnabled {
-						tuple, err := ParseCreateOrUpdateMessage(e.Value)
-						if err != nil {
-							i.Logger.Errorf("failed to parse message for tuple: %v", err)
-						}
-						resp, err = i.Retry(func() (string, error) {
-							return i.UpdateTuple(context.Background(), tuple)
-						})
-						if err != nil {
-							i.Logger.Errorf("failed to update tuple: %v", err)
-							run = false
-							continue
-						}
-					}
-				case string(model.OperationTypeDeleted):
-					i.Logger.Infof("operation=%s tuple=%s", operation, e.Value)
-					if relationsEnabled {
-						filter, err := ParseDeleteMessage(e.Value)
-						if err != nil {
-							i.Logger.Errorf("failed to parse message for filter: %v", err)
-						}
-						_, err = i.Retry(func() (string, error) {
-							return i.DeleteTuple(context.Background(), filter)
-						})
-						if err != nil {
-							i.Logger.Errorf("failed to delete tuple: %v", err)
-							run = false
-							continue
-						}
-					}
-				default:
-					i.Logger.Infof("unknown operation: %v -- doing nothing", operation)
+				var resp interface{}
+
+				resp, err = i.ProcessMessage(headers, relationsEnabled, e)
+				if err != nil {
+					i.Logger.Errorf("error processing message: %v", err)
+					run = false
+					continue
 				}
 
 				if operation != string(model.OperationTypeDeleted) {
@@ -278,7 +226,7 @@ func (i *InventoryConsumer) Consume() error {
 				}
 				i.MetricsCollector.Collect(stats)
 			default:
-				fmt.Printf("event type ignored %v\n", e)
+				i.Logger.Infof("event type ignored %v", e)
 			}
 		}
 	}
@@ -287,6 +235,83 @@ func (i *InventoryConsumer) Consume() error {
 		return fmt.Errorf("error in consumer shutdown: %v", err)
 	}
 	return err
+}
+
+func (i *InventoryConsumer) ProcessMessage(headers map[string]string, relationsEnabled bool, msg *kafka.Message) (string, error) {
+	operation := headers["operation"]
+	txid := headers["txid"]
+
+	switch operation {
+	case string(model.OperationTypeCreated):
+		i.Logger.Infof("operation=%s tuple=%s txid=%s", operation, msg.Value, txid)
+		if relationsEnabled {
+			tuple, err := ParseCreateOrUpdateMessage(msg.Value)
+			if err != nil {
+				i.Logger.Errorf("failed to parse message for tuple: %v", err)
+				return "", err
+			}
+			resp, err := i.Retry(func() (string, error) {
+				return i.CreateTuple(context.Background(), tuple)
+			})
+			if err != nil {
+				i.Logger.Errorf("failed to create tuple: %v", err)
+				return "", err
+			}
+			return resp, nil
+		}
+
+	case string(model.OperationTypeUpdated):
+		i.Logger.Infof("operation=%s tuple=%s txid=%s", operation, msg.Value, txid)
+		if relationsEnabled {
+			tuple, err := ParseCreateOrUpdateMessage(msg.Value)
+			if err != nil {
+				i.Logger.Errorf("failed to parse message for tuple: %v", err)
+				return "", err
+			}
+			resp, err := i.Retry(func() (string, error) {
+				return i.UpdateTuple(context.Background(), tuple)
+			})
+			if err != nil {
+				i.Logger.Errorf("failed to update tuple: %v", err)
+				return "", err
+			}
+			return resp, nil
+		}
+	case string(model.OperationTypeDeleted):
+		i.Logger.Infof("operation=%s tuple=%s", operation, msg.Value)
+		if relationsEnabled {
+			filter, err := ParseDeleteMessage(msg.Value)
+			if err != nil {
+				i.Logger.Errorf("failed to parse message for filter: %v", err)
+				return "", err
+			}
+			_, err = i.Retry(func() (string, error) {
+				return i.DeleteTuple(context.Background(), filter)
+			})
+			if err != nil {
+				i.Logger.Errorf("failed to delete tuple: %v", err)
+				return "", err
+			}
+			return "", nil
+		}
+	default:
+		i.Logger.Infof("unknown operation: %v -- doing nothing", operation)
+	}
+	return "", nil
+}
+
+func ParseHeaders(msg *kafka.Message) map[string]string {
+	headers := make(map[string]string)
+	for _, v := range msg.Headers {
+		switch v.Key {
+		case "operation":
+			headers["operation"] = string(v.Value)
+		case "txid":
+
+			headers["txid"] = string(v.Value)
+		}
+	}
+	return headers
 }
 
 func ParseCreateOrUpdateMessage(msg []byte) (*v1beta1.Relationship, error) {
@@ -435,5 +460,5 @@ func (i *InventoryConsumer) Retry(operation func() (string, error)) (string, err
 		return fmt.Sprintf("%s", resp), nil
 	}
 	i.Logger.Errorf("Error processing request (max attempts reached: %v): %v", attempts, err)
-	return "", err
+	return "", MaxRetriesError
 }

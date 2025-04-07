@@ -3,13 +3,13 @@ package resources
 import (
 	"context"
 	"errors"
+	"github.com/project-kessel/inventory-api/internal/mocks"
 	"testing"
 
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/google/uuid"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
 	"github.com/project-kessel/inventory-api/internal/pubsub"
-	kesselv1 "github.com/project-kessel/relations-api/api/kessel/relations/v1"
 	"github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -20,10 +20,6 @@ type MockedReporterResourceRepository struct {
 	mock.Mock
 }
 type MockedInventoryResourceRepository struct {
-	mock.Mock
-}
-
-type MockAuthz struct {
 	mock.Mock
 }
 
@@ -93,41 +89,6 @@ func (r *MockedInventoryResourceRepository) FindByID(ctx context.Context, id uui
 func (r *MockedReporterResourceRepository) FindByWorkspaceId(ctx context.Context, workspace_id string) ([]*model.Resource, error) {
 	args := r.Called(ctx)
 	return args.Get(0).([]*model.Resource), args.Error(1)
-}
-
-func (m *MockAuthz) Health(ctx context.Context) (*kesselv1.GetReadyzResponse, error) {
-	args := m.Called(ctx)
-	return args.Get(0).(*kesselv1.GetReadyzResponse), args.Error(1)
-}
-
-func (m *MockAuthz) Check(ctx context.Context, namespace string, permission string, res *model.Resource, sub *v1beta1.SubjectReference) (v1beta1.CheckResponse_Allowed, *v1beta1.ConsistencyToken, error) {
-	args := m.Called(ctx, namespace, permission, res, sub)
-	return args.Get(0).(v1beta1.CheckResponse_Allowed), args.Get(1).(*v1beta1.ConsistencyToken), args.Error(2)
-}
-
-func (m *MockAuthz) CheckForUpdate(ctx context.Context, namespace string, permission string, res *model.Resource, sub *v1beta1.SubjectReference) (v1beta1.CheckForUpdateResponse_Allowed, *v1beta1.ConsistencyToken, error) {
-	args := m.Called(ctx, namespace, permission, res, sub)
-	return args.Get(0).(v1beta1.CheckForUpdateResponse_Allowed), args.Get(1).(*v1beta1.ConsistencyToken), args.Error(2)
-}
-
-func (m *MockAuthz) CreateTuples(ctx context.Context, req *v1beta1.CreateTuplesRequest) (*v1beta1.CreateTuplesResponse, error) {
-	args := m.Called(ctx, req)
-	return args.Get(0).(*v1beta1.CreateTuplesResponse), args.Error(1)
-}
-
-func (m *MockAuthz) DeleteTuples(ctx context.Context, request *v1beta1.DeleteTuplesRequest) (*v1beta1.DeleteTuplesResponse, error) {
-	args := m.Called(ctx, request)
-	return args.Get(0).(*v1beta1.DeleteTuplesResponse), args.Error(1)
-}
-
-func (m *MockAuthz) UnsetWorkspace(ctx context.Context, namespace, localResourceId, resourceType string) (*v1beta1.DeleteTuplesResponse, error) {
-	args := m.Called(ctx, namespace, localResourceId, resourceType)
-	return args.Get(0).(*v1beta1.DeleteTuplesResponse), args.Error(1)
-}
-
-func (m *MockAuthz) SetWorkspace(ctx context.Context, local_resource_id, workspace, namespace, name string) (*v1beta1.CreateTuplesResponse, error) {
-	args := m.Called(ctx, local_resource_id, workspace, namespace, name)
-	return args.Get(0).(*v1beta1.CreateTuplesResponse), args.Error(1)
 }
 
 func (m *MockedListenManager) Subscribe(txid string) pubsub.Subscription {
@@ -296,7 +257,7 @@ func TestCreateNewResource_ConsistencyToken(t *testing.T) {
 
 	repo := &MockedReporterResourceRepository{}
 	inventoryRepo := &MockedInventoryResourceRepository{}
-	m := &MockAuthz{}
+	m := &mocks.MockAuthz{}
 	listenMan := &MockedListenManager{}
 	sub := MockedSubscription{}
 
@@ -616,7 +577,7 @@ func TestCheck_MissingResource(t *testing.T) {
 
 	inventoryRepo := &MockedInventoryResourceRepository{}
 	repo := &MockedReporterResourceRepository{}
-	m := &MockAuthz{}
+	m := &mocks.MockAuthz{}
 
 	repo.On("FindByReporterResourceId", mock.Anything, mock.Anything).Return(&model.Resource{}, gorm.ErrRecordNotFound)
 	m.On("Check", mock.Anything, mock.Anything, "notifications_integration_view", mock.Anything, mock.Anything).Return(v1beta1.CheckResponse_ALLOWED_TRUE, &v1beta1.ConsistencyToken{}, nil)
@@ -642,7 +603,7 @@ func TestCheck_ResourceExistsError(t *testing.T) {
 
 	inventoryRepo := &MockedInventoryResourceRepository{}
 	repo := &MockedReporterResourceRepository{}
-	m := &MockAuthz{}
+	m := &mocks.MockAuthz{}
 
 	repo.On("FindByReporterResourceId", mock.Anything, mock.Anything).Return(&model.Resource{}, gorm.ErrUnsupportedDriver) // some random error
 
@@ -660,7 +621,7 @@ func TestCheck_ErrorWithKessel(t *testing.T) {
 
 	inventoryRepo := &MockedInventoryResourceRepository{}
 	repo := &MockedReporterResourceRepository{}
-	m := &MockAuthz{}
+	m := &mocks.MockAuthz{}
 
 	repo.On("FindByReporterResourceId", mock.Anything, mock.Anything).Return(&model.Resource{}, nil)
 	m.On("Check", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(v1beta1.CheckResponse_ALLOWED_FALSE, &v1beta1.ConsistencyToken{}, errors.New("failed during call to relations"))
@@ -680,7 +641,7 @@ func TestCheck_Allowed(t *testing.T) {
 
 	inventoryRepo := &MockedInventoryResourceRepository{}
 	repo := &MockedReporterResourceRepository{}
-	m := &MockAuthz{}
+	m := &mocks.MockAuthz{}
 
 	repo.On("FindByReporterResourceId", mock.Anything, mock.Anything).Return(resource, nil)
 	m.On("Check", mock.Anything, mock.Anything, "notifications_integration_write", mock.Anything, mock.Anything).Return(v1beta1.CheckResponse_ALLOWED_TRUE, &v1beta1.ConsistencyToken{}, nil)
@@ -706,7 +667,7 @@ func TestCheckForUpdate_ResourceExistsError(t *testing.T) {
 
 	inventoryRepo := &MockedInventoryResourceRepository{}
 	repo := &MockedReporterResourceRepository{}
-	m := &MockAuthz{}
+	m := &mocks.MockAuthz{}
 
 	repo.On("FindByReporterResourceId", mock.Anything, mock.Anything).Return(&model.Resource{}, gorm.ErrUnsupportedDriver) // some random error
 
@@ -724,7 +685,7 @@ func TestCheckForUpdate_ErrorWithKessel(t *testing.T) {
 
 	inventoryRepo := &MockedInventoryResourceRepository{}
 	repo := &MockedReporterResourceRepository{}
-	m := &MockAuthz{}
+	m := &mocks.MockAuthz{}
 
 	repo.On("FindByReporterResourceId", mock.Anything, mock.Anything).Return(&model.Resource{}, nil)
 	m.On("CheckForUpdate", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(v1beta1.CheckForUpdateResponse_ALLOWED_FALSE, &v1beta1.ConsistencyToken{}, errors.New("failed during call to relations"))
@@ -744,7 +705,7 @@ func TestCheckForUpdate_WorkspaceAllowed(t *testing.T) {
 
 	inventoryRepo := &MockedInventoryResourceRepository{}
 	repo := &MockedReporterResourceRepository{}
-	m := &MockAuthz{}
+	m := &mocks.MockAuthz{}
 
 	repo.On("FindByReporterResourceId", mock.Anything, mock.Anything).Return(resource, nil)
 	m.On("CheckForUpdate", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(v1beta1.CheckForUpdateResponse_ALLOWED_TRUE, &v1beta1.ConsistencyToken{}, nil)
@@ -763,7 +724,7 @@ func TestCheckForUpdate_MissingResource_Allowed(t *testing.T) {
 
 	inventoryRepo := &MockedInventoryResourceRepository{}
 	repo := &MockedReporterResourceRepository{}
-	m := &MockAuthz{}
+	m := &mocks.MockAuthz{}
 
 	repo.On("FindByReporterResourceId", mock.Anything, mock.Anything).Return(&model.Resource{}, gorm.ErrRecordNotFound)
 	m.On("CheckForUpdate", mock.Anything, mock.Anything, "notifications_integration_view", mock.Anything, mock.Anything).Return(v1beta1.CheckForUpdateResponse_ALLOWED_TRUE, &v1beta1.ConsistencyToken{}, nil)
@@ -786,7 +747,7 @@ func TestCheckForUpdate_Allowed(t *testing.T) {
 
 	inventoryRepo := &MockedInventoryResourceRepository{}
 	repo := &MockedReporterResourceRepository{}
-	m := &MockAuthz{}
+	m := &mocks.MockAuthz{}
 
 	repo.On("FindByReporterResourceId", mock.Anything, mock.Anything).Return(resource, nil)
 	m.On("CheckForUpdate", mock.Anything, mock.Anything, "notifications_integration_view", mock.Anything, mock.Anything).Return(v1beta1.CheckForUpdateResponse_ALLOWED_TRUE, &v1beta1.ConsistencyToken{}, nil)
@@ -815,7 +776,7 @@ func TestListResourcesInWorkspace_Error(t *testing.T) {
 
 	inventoryRepo := &MockedInventoryResourceRepository{}
 	repo := &MockedReporterResourceRepository{}
-	m := &MockAuthz{}
+	m := &mocks.MockAuthz{}
 
 	repo.On("FindByWorkspaceId", mock.Anything, mock.Anything).Return([]*model.Resource{}, errors.New("failed querying"))
 
@@ -834,7 +795,7 @@ func TestListResourcesInWorkspace_NoResources(t *testing.T) {
 
 	inventoryRepo := &MockedInventoryResourceRepository{}
 	repo := &MockedReporterResourceRepository{}
-	m := &MockAuthz{}
+	m := &mocks.MockAuthz{}
 
 	repo.On("FindByWorkspaceId", mock.Anything, mock.Anything).Return([]*model.Resource{}, nil)
 
@@ -856,7 +817,7 @@ func TestListResourcesInWorkspace_ResourcesAllowedTrue(t *testing.T) {
 
 	inventoryRepo := &MockedInventoryResourceRepository{}
 	repo := &MockedReporterResourceRepository{}
-	m := &MockAuthz{}
+	m := &mocks.MockAuthz{}
 
 	resource := resource1()
 
@@ -892,7 +853,7 @@ func TestListResourcesInWorkspace_ResourcesAllowedError(t *testing.T) {
 
 	inventoryRepo := &MockedInventoryResourceRepository{}
 	repo := &MockedReporterResourceRepository{}
-	m := &MockAuthz{}
+	m := &mocks.MockAuthz{}
 
 	resource := resource1()
 

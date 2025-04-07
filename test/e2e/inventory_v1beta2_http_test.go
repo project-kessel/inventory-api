@@ -32,12 +32,12 @@ func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle(t *testing.T) {
 
 	req := pbv1beta2.ReportResourceRequest{
 		Resource: &pbv1beta2.Resource{
-			ResourceType: "k8s_cluster",
+			ResourceType: "host",
 			ReporterData: &pbv1beta2.ReporterData{
-				ReporterType:       "ACM",
+				ReporterType:       "HBI",
 				ReporterInstanceId: "testuser@example.com",
 				ReporterVersion:    "0.1",
-				LocalResourceId:    "k8s-abc-123",
+				LocalResourceId:    "host-abc-123",
 				ApiHref:            "https://example.com/api",
 				ConsoleHref:        "https://example.com/console",
 				ResourceData:       resourceData,
@@ -50,8 +50,8 @@ func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle(t *testing.T) {
 	assert.NoError(t, err, "Failed to Report Resource")
 
 	delReq := pbv1beta2.DeleteResourceRequest{
-		LocalResourceId: "k8s-abc-123",
-		ReporterType:    "ACM",
+		LocalResourceId: "host-abc-123",
+		ReporterType:    "HBI",
 	}
 
 	_, err = client.KesselResourceService.DeleteResource(context.Background(), &delReq, opts...)

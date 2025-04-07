@@ -32,7 +32,7 @@ spec:
               value: /etc/schema/hbi/schema.zed
           volumeMounts:
             - name: schema
-              mountPath: /etc/schema
+              mountPath: /etc/schema/hbi
       volumes:
         - name: schema
           configMap:

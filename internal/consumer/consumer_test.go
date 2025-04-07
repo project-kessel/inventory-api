@@ -2,6 +2,9 @@ package consumer
 
 import (
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
+	"github.com/project-kessel/inventory-api/internal/biz/model"
+	"github.com/project-kessel/inventory-api/internal/mocks"
+	"github.com/stretchr/testify/mock"
 	"testing"
 
 	"github.com/go-kratos/kratos/v2/log"
@@ -53,10 +56,19 @@ func (t *TestCase) TestSetup() []error {
 	if err != nil {
 		errs = append(errs, err)
 	}
+
 	err = t.metrics.New(otel.Meter("github.com/project-kessel/inventory-api/blob/main/internal/server/otel"))
 	if err != nil {
 		errs = append(errs, err)
 	}
+
+	createTupleResponse := &v1beta1.CreateTuplesResponse{ConsistencyToken: &v1beta1.ConsistencyToken{Token: "test-token"}}
+	deleteTupleResponse := &v1beta1.DeleteTuplesResponse{ConsistencyToken: &v1beta1.ConsistencyToken{Token: "test-token"}}
+
+	m := &mocks.MockAuthz{}
+	m.On("CreateTuples", mock.Anything, mock.Anything).Return(createTupleResponse, nil)
+	m.On("DeleteTuples", mock.Anything, mock.Anything).Return(deleteTupleResponse, nil)
+	t.inv.Authorizer = m
 	return errs
 }
 
@@ -147,26 +159,26 @@ func TestParseHeaders(t *testing.T) {
 	}{
 		{
 			name:              "Create Operation",
-			expectedOperation: "created",
+			expectedOperation: string(model.OperationTypeCreated),
 			expectedTxid:      "123456",
 			msg:               &kafka.Message{},
 		},
 		{
 			name:              "Update Operation",
-			expectedOperation: "updated",
+			expectedOperation: string(model.OperationTypeUpdated),
 			expectedTxid:      "123456",
 			msg:               &kafka.Message{},
 		},
 		{
 			name:              "Delete Operation",
-			expectedOperation: "deleted",
-			expectedTxid:      "123456",
+			expectedOperation: string(model.OperationTypeDeleted),
+			expectedTxid:      "",
 			msg:               &kafka.Message{},
 		},
 		{
 			name:              "Fake Operation",
 			expectedOperation: "not-real",
-			expectedTxid:      "123456",
+			expectedTxid:      "",
 			msg:               &kafka.Message{},
 		},
 		{
@@ -182,12 +194,15 @@ func TestParseHeaders(t *testing.T) {
 			headers := []kafka.Header{
 				{Key: "operation", Value: []byte(test.expectedOperation)},
 				{Key: "txid", Value: []byte(test.expectedTxid)},
+				{Key: "unused-header", Value: []byte("unused-header-data")},
+				{Key: "another-unused-header", Value: []byte("another-unused-header-data")},
 			}
 			test.msg.Headers = headers
 
 			parsedHeaders := ParseHeaders(test.msg)
 			assert.Equal(t, parsedHeaders["operation"], test.expectedOperation)
 			assert.Equal(t, parsedHeaders["txid"], test.expectedTxid)
+			assert.LessOrEqual(t, len(parsedHeaders), 2)
 		})
 	}
 }
@@ -227,5 +242,86 @@ func TestInventoryConsumer_Retry(t *testing.T) {
 			assert.Equal(t, test.expectedErr, err)
 		})
 	}
+}
 
+func TestInventoryConsumer_ProcessMessage(t *testing.T) {
+	tests := []struct {
+		name              string
+		expectedOperation string
+		expectedTxid      string
+		msg               *kafka.Message
+		relationsEnabled  bool
+	}{
+		{
+			name:              "Create Operation",
+			expectedOperation: string(model.OperationTypeCreated),
+			expectedTxid:      "123456",
+			msg: &kafka.Message{
+				Key:   []byte(testMessageKey),
+				Value: []byte(testCreateOrUpdateMessage),
+			},
+			relationsEnabled: true,
+		},
+		{
+			name:              "Update Operation",
+			expectedOperation: string(model.OperationTypeUpdated),
+			expectedTxid:      "123456",
+			msg: &kafka.Message{
+				Key:   []byte(testMessageKey),
+				Value: []byte(testCreateOrUpdateMessage),
+			},
+			relationsEnabled: true,
+		},
+		{
+			name:              "Delete Operation",
+			expectedOperation: string(model.OperationTypeDeleted),
+			expectedTxid:      "",
+			msg: &kafka.Message{
+				Key:   []byte(testMessageKey),
+				Value: []byte(testDeleteMessage),
+			},
+			relationsEnabled: true,
+		},
+		{
+			name:              "Fake Operation",
+			expectedOperation: "fake-operation",
+			expectedTxid:      "123456",
+			msg:               &kafka.Message{},
+			relationsEnabled:  true,
+		},
+		{
+			name:              "Created but relations disabled",
+			expectedOperation: string(model.OperationTypeCreated),
+			expectedTxid:      "123456",
+			msg:               &kafka.Message{},
+			relationsEnabled:  false,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			tester := TestCase{}
+			errs := tester.TestSetup()
+			assert.Nil(t, errs)
+
+			headers := []kafka.Header{
+				{Key: "operation", Value: []byte(test.expectedOperation)},
+				{Key: "txid", Value: []byte(test.expectedTxid)},
+			}
+			test.msg.Headers = headers
+			parsedHeaders := ParseHeaders(test.msg)
+			assert.Equal(t, parsedHeaders["operation"], test.expectedOperation)
+			assert.Equal(t, parsedHeaders["txid"], test.expectedTxid)
+
+			if (test.expectedOperation == string(model.OperationTypeCreated) || test.expectedOperation == string(model.OperationTypeUpdated)) && test.relationsEnabled {
+				resp, err := tester.inv.ProcessMessage(parsedHeaders, test.relationsEnabled, test.msg)
+				assert.Nil(t, err)
+				assert.Equal(t, "test-token", resp)
+			} else {
+				resp, err := tester.inv.ProcessMessage(parsedHeaders, test.relationsEnabled, test.msg)
+				assert.Nil(t, err)
+				assert.Equal(t, "", resp)
+			}
+		})
+	}
 }

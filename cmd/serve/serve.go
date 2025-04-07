@@ -13,7 +13,6 @@ import (
 	inventoryResourcesRepo "github.com/project-kessel/inventory-api/internal/data/inventoryresources"
 	relationshipsrepo "github.com/project-kessel/inventory-api/internal/data/relationships"
 	resourcerepo "github.com/project-kessel/inventory-api/internal/data/resources"
-	authzsvc "github.com/project-kessel/inventory-api/internal/service/authz"
 	relationshipssvc "github.com/project-kessel/inventory-api/internal/service/relationships/k8spolicy"
 	hostssvc "github.com/project-kessel/inventory-api/internal/service/resources/hosts"
 	k8sclusterssvc "github.com/project-kessel/inventory-api/internal/service/resources/k8sclusters"
@@ -40,8 +39,8 @@ import (
 	authzv1beta1 "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/authz"
 	rel "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/relationships"
 	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/resources"
+	authzv1beta2 "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2"
 	pbv1beta2 "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2"
-	authzv1beta2 "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2/authz"
 	healthctl "github.com/project-kessel/inventory-api/internal/biz/health"
 	healthrepo "github.com/project-kessel/inventory-api/internal/data/health"
 	healthssvc "github.com/project-kessel/inventory-api/internal/service/health"
@@ -163,12 +162,12 @@ func NewCommand(
 
 			// wire together check service
 			check_controller := resourcesctl.New(resource_repo, inventoryresources_repo, authorizer, eventingManager, "authz", log.With(logger, "subsystem", "authz_controller"), storageConfig.Options.DisablePersistence)
-			check_service := authzsvc.NewV1beta2(check_controller)
+			check_service := resourcesvc.NewV1beta2(check_controller)
 			authzv1beta2.RegisterKesselCheckServiceServer(server.GrpcServer, check_service)
 			authzv1beta2.RegisterKesselCheckServiceHTTPServer(server.HttpServer, check_service)
 
 			lookup_controller := resourcesctl.New(resource_repo, inventoryresources_repo, authorizer, eventingManager, "authz", log.With(logger, "subsystem", "authz_controller"), storageConfig.Options.DisablePersistence)
-			lookup_service := authzsvc.NewKesselLookupService(lookup_controller)
+			lookup_service := resourcesvc.NewKesselLookupService(lookup_controller)
 			authzv1beta2.RegisterKesselLookupServiceServer(server.GrpcServer, lookup_service)
 			//TODO: http service not getting generated
 
@@ -183,7 +182,7 @@ func NewCommand(
 			// wire together authz handling
 			authz_repo := resourcerepo.New(db)
 			authz_controller := resourcesctl.New(authz_repo, inventoryresources_repo, authorizer, eventingManager, "authz", log.With(logger, "subsystem", "authz_controller"), storageConfig.Options.DisablePersistence)
-			authz_service := authzsvc.New(authz_controller)
+			authz_service := resourcesvc.New(authz_controller)
 			authzv1beta1.RegisterKesselCheckServiceServer(server.GrpcServer, authz_service)
 			authzv1beta1.RegisterKesselCheckServiceHTTPServer(server.HttpServer, authz_service)
 

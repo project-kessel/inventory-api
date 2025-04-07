@@ -4,7 +4,7 @@
 // 	protoc        (unknown)
 // source: kessel/inventory/v1beta2/authz/common.proto
 
-package authz
+package v1beta2
 
 import (
 	_ "buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go/buf/validate"

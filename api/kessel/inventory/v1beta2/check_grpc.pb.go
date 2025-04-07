@@ -4,7 +4,7 @@
 // - protoc             (unknown)
 // source: kessel/inventory/v1beta2/authz/check.proto
 
-package authz
+package v1beta2
 
 import (
 	context "context"

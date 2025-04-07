@@ -18,7 +18,7 @@ type ResourceService struct {
 	Ctl *resources.Usecase
 }
 
-func New(c *resources.Usecase) *ResourceService {
+func NewResourceService(c *resources.Usecase) *ResourceService {
 	return &ResourceService{
 		Ctl: c,
 	}

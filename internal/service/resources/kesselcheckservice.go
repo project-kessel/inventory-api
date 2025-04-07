@@ -1,10 +1,10 @@
-package service
+package resources
 
 import (
 	"context"
 
 	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/authz"
-	pbv1beta2 "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2/authz"
+	pbv1beta2 "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2"
 	authnapi "github.com/project-kessel/inventory-api/internal/authn/api"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
 	"github.com/project-kessel/inventory-api/internal/biz/resources"

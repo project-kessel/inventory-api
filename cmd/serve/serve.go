@@ -39,7 +39,6 @@ import (
 	authzv1beta1 "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/authz"
 	rel "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/relationships"
 	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/resources"
-	authzv1beta2 "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2"
 	pbv1beta2 "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2"
 	healthctl "github.com/project-kessel/inventory-api/internal/biz/health"
 	healthrepo "github.com/project-kessel/inventory-api/internal/data/health"
@@ -156,19 +155,19 @@ func NewCommand(
 			// wire together resource handling
 			resource_repo := resourcerepo.New(db)
 			resource_controller := resourcesctl.New(resource_repo, inventoryresources_repo, authorizer, eventingManager, "notifications", log.With(logger, "subsystem", "notificationsintegrations_controller"), storageConfig.Options.DisablePersistence)
-			resource_service := resourcesvc.New(resource_controller)
+			resource_service := resourcesvc.NewResourceService(resource_controller)
 			pbv1beta2.RegisterKesselResourceServiceServer(server.GrpcServer, resource_service)
 			pbv1beta2.RegisterKesselResourceServiceHTTPServer(server.HttpServer, resource_service)
 
 			// wire together check service
 			check_controller := resourcesctl.New(resource_repo, inventoryresources_repo, authorizer, eventingManager, "authz", log.With(logger, "subsystem", "authz_controller"), storageConfig.Options.DisablePersistence)
 			check_service := resourcesvc.NewV1beta2(check_controller)
-			authzv1beta2.RegisterKesselCheckServiceServer(server.GrpcServer, check_service)
-			authzv1beta2.RegisterKesselCheckServiceHTTPServer(server.HttpServer, check_service)
+			pbv1beta2.RegisterKesselCheckServiceServer(server.GrpcServer, check_service)
+			pbv1beta2.RegisterKesselCheckServiceHTTPServer(server.HttpServer, check_service)
 
 			lookup_controller := resourcesctl.New(resource_repo, inventoryresources_repo, authorizer, eventingManager, "authz", log.With(logger, "subsystem", "authz_controller"), storageConfig.Options.DisablePersistence)
 			lookup_service := resourcesvc.NewKesselLookupService(lookup_controller)
-			authzv1beta2.RegisterKesselLookupServiceServer(server.GrpcServer, lookup_service)
+			pbv1beta2.RegisterKesselLookupServiceServer(server.GrpcServer, lookup_service)
 			//TODO: http service not getting generated
 
 			//v1beta1

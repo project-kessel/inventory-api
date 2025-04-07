@@ -160,64 +160,16 @@ func (i *InventoryConsumer) Consume() error {
 			switch e := event.(type) {
 			case *kafka.Message:
 				headers := ParseHeaders(e)
-				operation := headers["operation"]
-				txid := headers["txid"]
 
 				var resp interface{}
-				switch operation {
-				case string(model.OperationTypeCreated):
-					i.Logger.Infof("operation=%s tuple=%s txid=%s", operation, e.Value, txid)
-					if relationsEnabled {
-						tuple, err := ParseCreateOrUpdateMessage(e.Value)
-						if err != nil {
-							i.Logger.Errorf("failed to parse message for tuple: %v", err)
-						}
-						resp, err = i.Retry(func() (string, error) {
-							return i.CreateTuple(context.Background(), tuple)
-						})
-						if err != nil {
-							i.Logger.Errorf("failed to create tuple: %v", err)
-							run = false
-							continue
-						}
-					}
-				case string(model.OperationTypeUpdated):
-					i.Logger.Infof("operation=%s tuple=%s txid=%s", operation, e.Value, txid)
-					if relationsEnabled {
-						tuple, err := ParseCreateOrUpdateMessage(e.Value)
-						if err != nil {
-							i.Logger.Errorf("failed to parse message for tuple: %v", err)
-						}
-						resp, err = i.Retry(func() (string, error) {
-							return i.UpdateTuple(context.Background(), tuple)
-						})
-						if err != nil {
-							i.Logger.Errorf("failed to update tuple: %v", err)
-							run = false
-							continue
-						}
-					}
-				case string(model.OperationTypeDeleted):
-					i.Logger.Infof("operation=%s tuple=%s", operation, e.Value)
-					if relationsEnabled {
-						filter, err := ParseDeleteMessage(e.Value)
-						if err != nil {
-							i.Logger.Errorf("failed to parse message for filter: %v", err)
-						}
-						_, err = i.Retry(func() (string, error) {
-							return i.DeleteTuple(context.Background(), filter)
-						})
-						if err != nil {
-							i.Logger.Errorf("failed to delete tuple: %v", err)
-							run = false
-							continue
-						}
-					}
-				default:
-					i.Logger.Infof("unknown operation: %v -- doing nothing", operation)
+				resp, err = i.ProcessMessage(headers, relationsEnabled, e)
+				if err != nil {
+					i.Logger.Errorf("error processing message: %v", err)
+					run = false
+					continue
 				}
 
-				if operation != string(model.OperationTypeDeleted) {
+				if headers["operation"] != string(model.OperationTypeDeleted) {
 					inventoryID, err := ParseMessageKey(e.Key)
 					if err != nil {
 						i.Logger.Errorf("failed to parse message key for for ID: %v", err)
@@ -230,13 +182,13 @@ func (i *InventoryConsumer) Consume() error {
 				}
 
 				// if txid is present, we need to notify the producer that we've processed the message
-				if i.Notifier != nil && txid != "" {
-					err := i.Notifier.Notify(context.Background(), txid)
+				if i.Notifier != nil && headers["txid"] != "" {
+					err := i.Notifier.Notify(context.Background(), headers["txid"])
 					if err != nil {
 						i.Logger.Errorf("failed to notify producer: %v", err)
 						// Do not continue here, we should still commit the offset
 					} else {
-						i.Logger.Debugf("notified producer of processed message: %s" + txid)
+						i.Logger.Debugf("notified producer of processed message: %s" + headers["txid"])
 					}
 				} else {
 					i.Logger.Debugf("skipping notification to producer: txid not present or notifier not initialized")
@@ -280,6 +232,66 @@ func (i *InventoryConsumer) Consume() error {
 		return fmt.Errorf("error in consumer shutdown: %v", err)
 	}
 	return err
+}
+
+func (i *InventoryConsumer) ProcessMessage(headers map[string]string, relationsEnabled bool, msg *kafka.Message) (interface{}, error) {
+	operation := headers["operation"]
+	txid := headers["txid"]
+
+	switch operation {
+	case string(model.OperationTypeCreated):
+		i.Logger.Infof("operation=%s tuple=%s txid=%s", operation, msg.Value, txid)
+		if relationsEnabled {
+			tuple, err := ParseCreateOrUpdateMessage(msg.Value)
+			if err != nil {
+				i.Logger.Errorf("failed to parse message for tuple: %v", err)
+			}
+			resp, err := i.Retry(func() (string, error) {
+				return i.CreateTuple(context.Background(), tuple)
+			})
+			if err != nil {
+				i.Logger.Errorf("failed to create tuple: %v", err)
+				return nil, err
+			}
+			return resp, nil
+		}
+
+	case string(model.OperationTypeUpdated):
+		i.Logger.Infof("operation=%s tuple=%s txid=%s", operation, msg.Value, txid)
+		if relationsEnabled {
+			tuple, err := ParseCreateOrUpdateMessage(msg.Value)
+			if err != nil {
+				i.Logger.Errorf("failed to parse message for tuple: %v", err)
+			}
+			resp, err := i.Retry(func() (string, error) {
+				return i.UpdateTuple(context.Background(), tuple)
+			})
+			if err != nil {
+				i.Logger.Errorf("failed to update tuple: %v", err)
+				return nil, err
+			}
+			return resp, nil
+		}
+	case string(model.OperationTypeDeleted):
+		i.Logger.Infof("operation=%s tuple=%s", operation, msg.Value)
+		if relationsEnabled {
+			filter, err := ParseDeleteMessage(msg.Value)
+			if err != nil {
+				i.Logger.Errorf("failed to parse message for filter: %v", err)
+			}
+			_, err = i.Retry(func() (string, error) {
+				return i.DeleteTuple(context.Background(), filter)
+			})
+			if err != nil {
+				i.Logger.Errorf("failed to delete tuple: %v", err)
+				return nil, err
+			}
+			return nil, nil
+		}
+	default:
+		i.Logger.Infof("unknown operation: %v -- doing nothing", operation)
+	}
+	return nil, nil
 }
 
 func ParseHeaders(msg *kafka.Message) map[string]string {

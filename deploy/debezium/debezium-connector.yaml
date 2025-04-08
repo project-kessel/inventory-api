@@ -1,0 +1,45 @@
+apiVersion: template.openshift.io/v1
+kind: Template
+metadata:
+  name: kafka-connector
+objects:
+- apiVersion: kafka.strimzi.io/v1beta2
+  kind: KafkaConnector
+  metadata:
+    name: kessel-inventory-source-connector
+    labels:
+      strimzi.io/cluster: ${KAFKA_CONNECT_INSTANCE}
+  spec:
+    class: io.debezium.connector.postgresql.PostgresConnector
+    tasksMax: ${{MAX_TASKS}}
+    config:
+      database.server.name: kessel-inventory-db
+      database.dbname: ${secrets:kessel-inventory-db:db.name}
+      database.hostname: ${secrets:kessel-inventory-db:db.host}
+      database.port: ${secrets:kessel-inventory-db:db.port}
+      database.user: ${secrets:kessel-inventory-db:db.user}
+      database.password: ${secrets:kessel-inventory-db:db.password}
+      topic.prefix: kessel-inventory
+      table.include.list: public.outbox_events
+      transforms: outbox
+      transforms.outbox.type: io.debezium.transforms.outbox.EventRouter
+      plugin.name: pgoutput
+      heartbeat.interval.ms: ${DEBEZIUM_HEARTBEAT_INTERVAL_MS}
+      heartbeat.action.query: ${DEBEZIUM_ACTION_QUERY}
+      topic.heartbeat.prefix: ${TOPIC_HEARTBEAT_PREFIX}
+parameters:
+- name: KAFKA_CONNECT_INSTANCE
+  value: platform-kafka-connect
+  description: Name of the target Kafka Connect instance for Connector
+- name: MAX_TASKS
+  value: "1"
+  description: How many tasks the Kafka Connect instance can create to process this Connector's work
+- name: TOPIC_HEARTBEAT_PREFIX
+  value: debezium-heartbeat
+  description: Prefix for the connector heartbeat topic
+- name: DEBEZIUM_ACTION_QUERY
+  value: "SELECT pg_logical_emit_message(false, 'heartbeat', now()::varchar);"
+  description: Query action that runs for each heartbeat event
+- name: DEBEZIUM_HEARTBEAT_INTERVAL_MS
+  value: "300000"
+  description: The interval for the Debezium heartbeat in ms

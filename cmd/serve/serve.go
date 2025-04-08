@@ -231,12 +231,12 @@ func NewCommand(
 			pbv1beta2.RegisterKesselResourceServiceHTTPServer(server.HttpServer, resource_service)
 
 			// wire together check service
-			check_controller := resourcesctl.New(resource_repo, inventoryresources_repo, authorizer, eventingManager, "authz", log.With(logger, "subsystem", "authz_controller"), storageConfig.Options.DisablePersistence)
+			check_controller := resourcesctl.New(resource_repo, inventoryresources_repo, authorizer, eventingManager, "authz", log.With(logger, "subsystem", "authz_controller"), storageConfig.Options.DisablePersistence, listenManager, consistencyConfig.ReadAfterWriteEnabled, consistencyConfig.ReadAfterWriteAllowlist)
 			check_service := authzsvc.NewV1beta2(check_controller)
 			authzv1beta2.RegisterKesselCheckServiceServer(server.GrpcServer, check_service)
 			authzv1beta2.RegisterKesselCheckServiceHTTPServer(server.HttpServer, check_service)
 
-			lookup_controller := resourcesctl.New(resource_repo, inventoryresources_repo, authorizer, eventingManager, "authz", log.With(logger, "subsystem", "authz_controller"), storageConfig.Options.DisablePersistence)
+			lookup_controller := resourcesctl.New(resource_repo, inventoryresources_repo, authorizer, eventingManager, "authz", log.With(logger, "subsystem", "authz_controller"), storageConfig.Options.DisablePersistence, listenManager, consistencyConfig.ReadAfterWriteEnabled, consistencyConfig.ReadAfterWriteAllowlist)
 			lookup_service := authzsvc.NewKesselLookupService(lookup_controller)
 			authzv1beta2.RegisterKesselLookupServiceServer(server.GrpcServer, lookup_service)
 			//TODO: http service not getting generated

@@ -11,7 +11,7 @@ import (
 )
 
 // V1Beta2
-func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle(t *testing.T) {
+func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_Host(t *testing.T) {
 	t.Parallel()
 
 	c := common.NewConfig(
@@ -58,3 +58,162 @@ func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle(t *testing.T) {
 	assert.NoError(t, err, "Failed to Delete Resource")
 
 }
+
+func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_Notifications(t *testing.T) {
+	t.Parallel()
+
+	c := common.NewConfig(
+		common.WithHTTPUrl(inventoryapi_http_url),
+		common.WithTLSInsecure(insecure),
+		common.WithHTTPTLSConfig(tlsConfig),
+	)
+
+	client, err := v1beta2.NewHttpClient(context.Background(), c)
+	assert.NoError(t, err, "Failed to create v1beta2 HTTP client")
+
+	resourceData := &structpb.Struct{}
+	commonData := &structpb.Struct{}
+
+	commonData.Fields = map[string]*structpb.Value{
+		"workspace_id": structpb.NewStringValue("workspace-v2"),
+	}
+
+	req := pbv1beta2.ReportResourceRequest{
+		Resource: &pbv1beta2.Resource{
+			ResourceType: "notifications_integration",
+			ReporterData: &pbv1beta2.ReporterData{
+				ReporterType:       "NOTIFICATIONS",
+				ReporterInstanceId: "testuser@example.com",
+				ReporterVersion:    "0.1",
+				LocalResourceId:    "notification-abc-123",
+				ApiHref:            "https://example.com/api",
+				ConsoleHref:        "https://example.com/console",
+				ResourceData:       resourceData,
+			},
+			CommonResourceData: commonData,
+		},
+	}
+	opts := getCallOptions()
+	_, err = client.KesselResourceService.ReportResource(context.Background(), &req, opts...)
+	assert.NoError(t, err, "Failed to Report Resource")
+
+	delReq := pbv1beta2.DeleteResourceRequest{
+		LocalResourceId: "notification-abc-123",
+		ReporterType:    "NOTIFICATIONS",
+	}
+
+	_, err = client.KesselResourceService.DeleteResource(context.Background(), &delReq, opts...)
+	assert.NoError(t, err, "Failed to Delete Resource")
+
+}
+
+func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_K8S_Cluster(t *testing.T) {
+	t.Parallel()
+
+	c := common.NewConfig(
+		common.WithHTTPUrl(inventoryapi_http_url),
+		common.WithTLSInsecure(insecure),
+		common.WithHTTPTLSConfig(tlsConfig),
+	)
+
+	client, err := v1beta2.NewHttpClient(context.Background(), c)
+	assert.NoError(t, err, "Failed to create v1beta2 HTTP client")
+
+	resourceData := &structpb.Struct{}
+	commonData := &structpb.Struct{}
+
+	commonData.Fields = map[string]*structpb.Value{
+		"workspace_id": structpb.NewStringValue("workspace-v2"),
+	}
+
+	req := pbv1beta2.ReportResourceRequest{
+		Resource: &pbv1beta2.Resource{
+			ResourceType: "k8s_cluster",
+			ReporterData: &pbv1beta2.ReporterData{
+				ReporterType:       "ACM",
+				ReporterInstanceId: "testuser@example.com",
+				ReporterVersion:    "0.1",
+				LocalResourceId:    "k8s_cluster-abc-123",
+				ApiHref:            "https://example.com/api",
+				ConsoleHref:        "https://example.com/console",
+				ResourceData:       resourceData,
+			},
+			CommonResourceData: commonData,
+		},
+	}
+	opts := getCallOptions()
+	_, err = client.KesselResourceService.ReportResource(context.Background(), &req, opts...)
+	assert.NoError(t, err, "Failed to Report Resource")
+
+	delReq := pbv1beta2.DeleteResourceRequest{
+		LocalResourceId: "k8s_cluster-abc-123",
+		ReporterType:    "ACM",
+	}
+
+	_, err = client.KesselResourceService.DeleteResource(context.Background(), &delReq, opts...)
+	assert.NoError(t, err, "Failed to Delete Resource")
+
+}
+
+func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_K8S_Policy(t *testing.T) {
+	t.Parallel()
+
+	c := common.NewConfig(
+		common.WithHTTPUrl(inventoryapi_http_url),
+		common.WithTLSInsecure(insecure),
+		common.WithHTTPTLSConfig(tlsConfig),
+	)
+
+	client, err := v1beta2.NewHttpClient(context.Background(), c)
+	assert.NoError(t, err, "Failed to create v1beta2 HTTP client")
+
+	resourceData := &structpb.Struct{}
+	commonData := &structpb.Struct{}
+
+	commonData.Fields = map[string]*structpb.Value{
+		"workspace_id": structpb.NewStringValue("workspace-v2"),
+	}
+
+	req := pbv1beta2.ReportResourceRequest{
+		Resource: &pbv1beta2.Resource{
+			ResourceType: "k8s_policy",
+			ReporterData: &pbv1beta2.ReporterData{
+				ReporterType:       "ACM",
+				ReporterInstanceId: "testuser@example.com",
+				ReporterVersion:    "0.1",
+				LocalResourceId:    "k8s_policy-abc-123",
+				ApiHref:            "https://example.com/api",
+				ConsoleHref:        "https://example.com/console",
+				ResourceData:       resourceData,
+			},
+			CommonResourceData: commonData,
+		},
+	}
+	opts := getCallOptions()
+	_, err = client.KesselResourceService.ReportResource(context.Background(), &req, opts...)
+	assert.NoError(t, err, "Failed to Report Resource")
+
+	delReq := pbv1beta2.DeleteResourceRequest{
+		LocalResourceId: "k8s_policy-abc-123",
+		ReporterType:    "ACM",
+	}
+
+	_, err = client.KesselResourceService.DeleteResource(context.Background(), &delReq, opts...)
+	assert.NoError(t, err, "Failed to Delete Resource")
+
+}
+
+// TODO
+//func TestInventoryAPIHTTP_v1beta2_AuthzLifecycle(t *testing.T) {
+//	t.Parallel()
+//
+//	c := common.NewConfig(
+//		common.WithHTTPUrl(inventoryapi_http_url),
+//		common.WithTLSInsecure(insecure),
+//		common.WithHTTPTLSConfig(tlsConfig),
+//	)
+//
+//	client, err := v1beta2.NewHttpClient(context.Background(), c)
+//	assert.NoError(t, err, "Failed to create v1beta2 HTTP client")
+//
+//}

@@ -30,7 +30,7 @@ func TestMain(m *testing.M) {
 	if inventoryapi_http_url == "" {
 		err := fmt.Errorf("INV_HTTP_URL environment variable not set")
 		log.Error(err)
-		inventoryapi_http_url = "localhost:8000"
+		inventoryapi_http_url = "localhost:8081"
 	}
 	insecure = true
 	insecureTLSstr := os.Getenv("INV_TLS_INSECURE")
@@ -124,7 +124,7 @@ func TestInventoryAPIHTTP_Metrics(t *testing.T) {
 	assert.Equal(t, expectedStatusString, resp.Status)
 }
 
-func TestInventoryAPIHTTP_RHELHostLifecycle(t *testing.T) {
+func TestInventoryAPIHTTP_v1beta1_RHELHostLifecycle(t *testing.T) {
 	t.Parallel()
 	c := common.NewConfig(
 		common.WithHTTPUrl(inventoryapi_http_url),
@@ -190,7 +190,7 @@ func TestInventoryAPIHTTP_RHELHostLifecycle(t *testing.T) {
 	assert.NoError(t, err, "Failed to delete RhelHost")
 }
 
-func TestInventoryAPIHTTP_K8SClusterLifecycle(t *testing.T) {
+func TestInventoryAPIHTTP_v1beta1_K8SClusterLifecycle(t *testing.T) {
 	t.Parallel()
 	c := common.NewConfig(
 		common.WithHTTPUrl(inventoryapi_http_url),
@@ -299,7 +299,7 @@ func TestInventoryAPIHTTP_K8SClusterLifecycle(t *testing.T) {
 	assert.NoError(t, err, "Failed to delete K8sCluster")
 }
 
-func TestInventoryAPIHTTP_K8SPolicyLifecycle(t *testing.T) {
+func TestInventoryAPIHTTP_v1beta1_K8SPolicyLifecycle(t *testing.T) {
 	t.Parallel()
 	c := common.NewConfig(
 		common.WithHTTPUrl(inventoryapi_http_url),
@@ -374,7 +374,7 @@ func TestInventoryAPIHTTP_K8SPolicyLifecycle(t *testing.T) {
 	assert.NoError(t, err, "Failed to delete K8sPolicy")
 }
 
-func TestInventoryAPIHTTP_NotificationsIntegrationLifecycle(t *testing.T) {
+func TestInventoryAPIHTTP_v1beta1_NotificationsIntegrationLifecycle(t *testing.T) {
 	t.Parallel()
 
 	c := common.NewConfig(
@@ -437,7 +437,7 @@ func TestInventoryAPIHTTP_NotificationsIntegrationLifecycle(t *testing.T) {
 	assert.NoError(t, err, "Failed to delete Notifications Integration")
 }
 
-func TestInventoryAPIHTTP_K8SPolicy_is_propagated_to_K8sClusterLifecycle(t *testing.T) {
+func TestInventoryAPIHTTP_v1beta1_K8SPolicy_is_propagated_to_K8sClusterLifecycle(t *testing.T) {
 	t.Parallel()
 	c := common.NewConfig(
 		common.WithHTTPUrl(inventoryapi_http_url),

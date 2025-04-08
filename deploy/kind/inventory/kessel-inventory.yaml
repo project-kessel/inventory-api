@@ -168,7 +168,6 @@ stringData:
       #psk:
           #pre-shared-key-file: /psks.yaml
     authz:
-      impl: kessel
       kessel:
         insecure-client: true
         url: relationships-service.default.svc.cluster.local:9000

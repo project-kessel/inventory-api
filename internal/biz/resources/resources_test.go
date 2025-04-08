@@ -1107,10 +1107,31 @@ func TestComputeReadAfterWrite(t *testing.T) {
 			expected:                false,
 		},
 		{
+			name:                    "Enable Read After Write, Wait for Sync, ALL SPs in Allowlist",
+			ReadAfterWriteEnabled:   true,
+			waitForSync:             true,
+			ReadAfterWriteAllowlist: []string{"*"},
+			expected:                true,
+		},
+		{
+			name:                    "Enable Read After Write, No Wait for Sync, ALL SPs in Allowlist",
+			ReadAfterWriteEnabled:   true,
+			waitForSync:             false,
+			ReadAfterWriteAllowlist: []string{"*"},
+			expected:                false,
+		},
+		{
 			name:                    "Enable Read After Write, Wait for Sync, No SP in Allowlist",
 			ReadAfterWriteEnabled:   true,
 			waitForSync:             true,
 			ReadAfterWriteAllowlist: []string{},
+			expected:                false,
+		},
+		{
+			name:                    "Enable Read After Write, Wait for Sync, SP not in Allowlist",
+			ReadAfterWriteEnabled:   true,
+			waitForSync:             true,
+			ReadAfterWriteAllowlist: []string{"SP2"},
 			expected:                false,
 		},
 		{

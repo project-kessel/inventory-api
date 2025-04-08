@@ -30,7 +30,6 @@ objects:
         consistency:
           read-after-write-enabled: true # false == off for all service providers
           read-after-write-allowlist: [] # specify ["*"] to require all requests
-
         log:
           level: "debug"
 

@@ -1084,6 +1084,61 @@ func TestIsSPInAllowlist(t *testing.T) {
 	}
 }
 
+func TestComputeReadAfterWrite(t *testing.T) {
+	tests := []struct {
+		name                    string
+		waitForSync             bool
+		ReadAfterWriteEnabled   bool
+		ReadAfterWriteAllowlist []string
+		expected                bool
+	}{
+		{
+			name:                    "Enable Read After Write, Wait for Sync, SP in Allowlist",
+			ReadAfterWriteEnabled:   true,
+			waitForSync:             true,
+			ReadAfterWriteAllowlist: []string{"SP1"},
+			expected:                true,
+		},
+		{
+			name:                    "Enable Read After Write, No Wait for Sync, SP in Allowlist",
+			ReadAfterWriteEnabled:   true,
+			waitForSync:             false,
+			ReadAfterWriteAllowlist: []string{"SP1"},
+			expected:                false,
+		},
+		{
+			name:                    "Enable Read After Write, Wait for Sync, No SP in Allowlist",
+			ReadAfterWriteEnabled:   true,
+			waitForSync:             true,
+			ReadAfterWriteAllowlist: []string{},
+			expected:                false,
+		},
+		{
+			name:                    "Disable Read After Write, No Wait for Sync, SP not in Allowlist",
+			ReadAfterWriteEnabled:   false,
+			waitForSync:             false,
+			ReadAfterWriteAllowlist: []string{"SP2"},
+			expected:                false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			uc := &Usecase{
+				ListenManager:           &pubsub.ListenManager{},
+				ReadAfterWriteEnabled:   tt.ReadAfterWriteEnabled,
+				ReadAfterWriteAllowlist: tt.ReadAfterWriteAllowlist,
+			}
+
+			m := &model.Resource{
+				ReporterId: "SP1",
+			}
+			assert.Equal(t, tt.expected, computeReadAfterWrite(uc, tt.waitForSync, m))
+
+		})
+	}
+}
+
 func TestUpsertReturnsDbError(t *testing.T) {
 	resource := resource1()
 	repo := &MockedReporterResourceRepository{}

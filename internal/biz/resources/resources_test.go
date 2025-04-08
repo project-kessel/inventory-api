@@ -3,8 +3,9 @@ package resources
 import (
 	"context"
 	"errors"
-	"github.com/project-kessel/inventory-api/internal/mocks"
 	"testing"
+
+	"github.com/project-kessel/inventory-api/internal/mocks"
 
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/google/uuid"
@@ -546,6 +547,41 @@ func TestUpdateResource_PersistenceDisabled(t *testing.T) {
 	repo.AssertNotCalled(t, "Create")
 }
 
+func TestUpdate_ReadAfterWrite(t *testing.T) {
+	resource := resource1()
+	id, err := uuid.NewV7()
+	assert.Nil(t, err)
+
+	repo := &MockedReporterResourceRepository{}
+	inventoryRepo := &MockedInventoryResourceRepository{}
+	authz := &mocks.MockAuthz{}
+	listenMan := &MockedListenManager{}
+	sub := MockedSubscription{}
+
+	returnedResource := model.Resource{
+		ID: id,
+	}
+
+	repo.On("FindByReporterData", mock.Anything, mock.Anything, mock.Anything).Return(resource, nil)
+	repo.On("Update", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&returnedResource, nil)
+
+	listenMan.On("Subscribe", mock.Anything).Return(&sub)
+
+	sub.On("Unsubscribe")
+	sub.On("BlockForNotification", mock.Anything).Return(nil)
+
+	useCase := New(repo, inventoryRepo, authz, nil, "", log.DefaultLogger, false, listenMan, true, []string{})
+	ctx := context.TODO()
+
+	r, err := useCase.Update(ctx, resource, model.ReporterResourceId{}, true)
+
+	assert.Nil(t, err)
+	assert.NotNil(t, r)
+	repo.AssertExpectations(t)
+	listenMan.AssertExpectations(t)
+	sub.AssertExpectations(t)
+}
+
 func TestDeleteResource_PersistenceDisabled(t *testing.T) {
 	ctx := context.TODO()
 
@@ -922,4 +958,68 @@ func TestIsSPInAllowlist(t *testing.T) {
 			assert.Equal(t, tt.expected, result)
 		})
 	}
+}
+
+func TestUpsertReturnsDbError(t *testing.T) {
+	resource := resource1()
+	repo := &MockedReporterResourceRepository{}
+	inventoryRepo := &MockedInventoryResourceRepository{}
+
+	// DB Error
+	repo.On("FindByReporterResourceIdv1beta2", mock.Anything, mock.Anything).Return((*model.Resource)(nil), gorm.ErrDuplicatedKey)
+
+	useCase := New(repo, inventoryRepo, nil, nil, "", log.DefaultLogger, false, nil, false, []string{})
+	ctx := context.TODO()
+
+	_, err := useCase.Upsert(ctx, resource, false)
+	assert.ErrorIs(t, err, ErrDatabaseError)
+	repo.AssertExpectations(t)
+}
+
+func TestUpsertReturnsExistingUpdatedResource(t *testing.T) {
+	resource := resource1()
+	repo := &MockedReporterResourceRepository{}
+	inventoryRepo := &MockedInventoryResourceRepository{}
+
+	// No Error
+	repo.On("FindByReporterResourceIdv1beta2", mock.Anything, mock.Anything).Return(resource, nil)
+	repo.On("Update", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(resource, nil)
+
+	useCase := New(repo, inventoryRepo, nil, nil, "", log.DefaultLogger, false, nil, false, []string{})
+	ctx := context.TODO()
+
+	res, err := useCase.Upsert(ctx, resource, false)
+	assert.Nil(t, err)
+	assert.NotNil(t, res)
+	repo.AssertExpectations(t)
+}
+
+func TestUpsert_ReadAfterWrite(t *testing.T) {
+	resource := resource1()
+
+	repo := &MockedReporterResourceRepository{}
+	inventoryRepo := &MockedInventoryResourceRepository{}
+	authz := &mocks.MockAuthz{}
+	listenMan := &MockedListenManager{}
+	sub := MockedSubscription{}
+
+	// no existing resource, need to create
+	repo.On("FindByReporterResourceIdv1beta2", mock.Anything, mock.Anything).Return((*model.Resource)(nil), gorm.ErrRecordNotFound)
+	repo.On("Create", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(resource, nil)
+
+	listenMan.On("Subscribe", mock.Anything).Return(&sub)
+
+	sub.On("Unsubscribe")
+	sub.On("BlockForNotification", mock.Anything).Return(nil)
+
+	useCase := New(repo, inventoryRepo, authz, nil, "", log.DefaultLogger, false, listenMan, true, []string{})
+	ctx := context.TODO()
+
+	r, err := useCase.Upsert(ctx, resource, true)
+
+	assert.Nil(t, err)
+	assert.NotNil(t, r)
+	repo.AssertExpectations(t)
+	listenMan.AssertExpectations(t)
+	sub.AssertExpectations(t)
 }

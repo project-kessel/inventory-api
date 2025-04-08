@@ -13,7 +13,7 @@ option java_package = "org.project_kessel.api.inventory.v1beta2";
 service KesselLookupService {
 	rpc LookupResources(LookupResourcesRequest) returns (stream LookupResourcesResponse) {
 		option (google.api.http) = {
-			get: "/api/inventory/authz/v1beta2/resources"
+			get: "/api/inventory/v1beta2/resources"
 		};
 	};
 }

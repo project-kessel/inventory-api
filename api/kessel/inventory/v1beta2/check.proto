@@ -15,14 +15,14 @@ service KesselCheckService {
 	// (a Relation between a Resource and a Subject or Subject Set).
 	rpc Check (CheckRequest) returns (CheckResponse) {
 		option (google.api.http) = {
-			post: "/api/inventory/v1beta2/authz/check"
+			post: "/api/inventory/v1beta2/check"
 			body: "*"
 		};
 	};
 
 	rpc CheckForUpdate (CheckForUpdateRequest) returns (CheckForUpdateResponse) {
 		option (google.api.http) = {
-			post: "/api/inventory/v1beta2/authz/checkforupdate"
+			post: "/api/inventory/v1beta2/checkforupdate"
 			body: "*"
 		};
 	};

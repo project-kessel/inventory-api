@@ -443,5 +443,5 @@ func computeReadAfterWrite(uc *Usecase, wait_for_sync bool, m *model.Resource) b
 	// read after write functionality is enabled/disabled globally.
 	// And executed if request specifies or
 	// request came from service provider in allowlist
-	return uc.ListenManager != nil && uc.ReadAfterWriteEnabled && (wait_for_sync || isSPInAllowlist(m, uc.ReadAfterWriteAllowlist))
+	return uc.ListenManager != nil && uc.ReadAfterWriteEnabled && (wait_for_sync && isSPInAllowlist(m, uc.ReadAfterWriteAllowlist))
 }

@@ -10,9 +10,9 @@ Modify [.inventory-api.yaml](../.inventory-api.yaml).
        ...
      consistency:
        read-after-write-enabled: true # false == off for all service providers
-       read-after-write-allowlist: [] # specify ["*"] to require all requests
+       read-after-write-allowlist: [] # specify ["*"] to allow any request to optionally r-a-w
      ```
-   - Ensure every request from a service provider is r-a-w enabled by updating the allowlist with their `reporter_id` field. For instance, for the Notifications service:
+   - Ensure every request from a service provider can be optionally r-a-w enabled by updating the allowlist with their `reporter_id` field. Individual requests will still be required to toggle `wait_for_sync` to behave as r-a-w. For instance, for the Notifications service:
      ```shell
      read-after-write-enabled: true
      read-after-write-allowlist: ["NOTIFICATIONS"]
@@ -38,12 +38,12 @@ consumer:
     ...
 consistency:
     read-after-write-enabled: true 
-    read-after-write-allowlist: ["*"] # ALL requests will be r-a-w
+    read-after-write-allowlist: ["*"] # ALL requests can optionally be r-a-w
 ```
 
 **Read After Write Enabled & Some Service Providers**
 
-NOTE: Requests that explicitly request for r-a-w via the `wait_for_sync` toggle will be allowed even if the SP is not in the allow list.
+NOTE: Requests that explicitly request for r-a-w via the `wait_for_sync` toggle will be allowed ONLY if the SP is in the allow list.
 
 inventory-api-config.yaml:
 ```shell
@@ -51,12 +51,12 @@ consumer:
     ...
 consistency:
     read-after-write-enabled: true 
-    read-after-write-allowlist: ["NOTIFICATIONS"] # All of notifications requests will be r-a-w
+    read-after-write-allowlist: ["NOTIFICATIONS"] # Notifications requests can optionally be r-a-w
 ```
 
 **Read After Write Enabled Globally (with Explicit Request)**
 
-NOTE: With no SPs in the allowlist all requests must explicitly request to be read after write. Otherwise, the behaviour will be fire-and-forget.
+NOTE: With no SPs in the allowlist all requests will be fire-and-forget.
 
 inventory-api-config.yaml:
 ```shell

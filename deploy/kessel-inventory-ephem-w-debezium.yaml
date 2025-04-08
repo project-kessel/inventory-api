@@ -30,9 +30,15 @@ objects:
         consistency:
           read-after-write-enabled: true # false == off for all service providers
           read-after-write-allowlist: [] # specify "*" to require all requests
-
         log:
           level: "debug"
+
+  - apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: resources-tarball
+    binaryData:
+        resources.tar.gz: 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
 
   - apiVersion: rbac.authorization.k8s.io/v1
     kind: Role
@@ -245,6 +251,8 @@ objects:
         transforms: outbox
         transforms.outbox.type: io.debezium.transforms.outbox.EventRouter
         transforms.outbox.table.fields.additional.placement: operation:header, txid:header
+        transforms.outbox.table.expand.json.payload: true
+        value.converter: org.apache.kafka.connect.json.JsonConverter
         plugin.name: pgoutput
         heartbeat.interval.ms: ${DEBEZIUM_HEARTBEAT_INTERVAL_MS}
         heartbeat.action.query: ${DEBEZIUM_ACTION_QUERY}
@@ -266,6 +274,21 @@ objects:
           replicas: ${{REPLICAS}}
           podSpec:
             initContainers:
+            - name: copy-resources
+              image: busybox
+              imagePullPolicy: Always
+              command:
+                - /bin/sh
+                - "-c"
+                - |
+                  echo "Extracting resources from tarball..."
+                  tar -xzf /mnt/resources/resources.tar.gz -C /data/schema/resources
+                  echo "Extraction complete!"
+              volumeMounts:
+                - name: resources-tarball
+                  mountPath: "/mnt/resources"
+                - name: resource-volume
+                  mountPath: "/data/schema/resources"
             - name: migration
               image: ${INVENTORY_IMAGE}:${IMAGE_TAG}
               imagePullPolicy: Always
@@ -291,13 +314,24 @@ objects:
               value: "/inventory/inventory-api-config.yaml"
             - name: PGDATA
               value: /temp/data
+            - name: RESOURCE_DIR
+              value: "/data/schema/resources"
             volumeMounts:
                 - name: config-volume
                   mountPath: "/inventory"
+                - name: resource-volume
+                  mountPath: "/data/schema/resources"
+                - name: resources-tarball
+                  mountPath: "/mnt/resources"
             volumes:
               - name: config-volume
                 configMap:
                   name: inventory-api-config
+              - name: resource-volume
+                emptyDir: { }
+              - name: resources-tarball
+                configMap:
+                  name: resources-tarball
           webServices:
             public:
               enabled: true

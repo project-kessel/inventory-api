@@ -122,7 +122,11 @@ func (a *tokenClient) getToken() (*TokenResponse, error) {
 	if err != nil {
 		return nil, fmt.Errorf("token request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			fmt.Printf("failed to close consumer: %v", err)
+		}
+	}()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {

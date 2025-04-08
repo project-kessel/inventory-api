@@ -28,7 +28,7 @@ type PaginationRequest struct {
 func Pagination(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		pageStr := r.URL.Query().Get("page")
-		var page int = 1
+		var page = 1
 		if pageStr != "" {
 			if p, err := strconv.Atoi(pageStr); err == nil && p > 0 {
 				page = p
@@ -36,7 +36,7 @@ func Pagination(next http.Handler) http.Handler {
 		}
 
 		sizeStr := r.URL.Query().Get("size")
-		var size int = 10
+		var size = 10
 		if sizeStr != "" {
 			if s, err := strconv.Atoi(sizeStr); err == nil && s > 0 {
 				size = s

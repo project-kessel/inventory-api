@@ -230,12 +230,16 @@ func NewCommand(
 			pbv1beta2.RegisterKesselResourceServiceServer(server.GrpcServer, resource_service)
 			pbv1beta2.RegisterKesselResourceServiceHTTPServer(server.HttpServer, resource_service)
 
-			// wire together authz handling
-			authz_repov2 := resourcerepo.New(db)
-			authz_controllerv2 := resourcesctl.New(authz_repov2, inventoryresources_repo, authorizer, eventingManager, "authz", log.With(logger, "subsystem", "authz_controller"), storageConfig.Options.DisablePersistence, listenManager, consistencyConfig.ReadAfterWriteEnabled, consistencyConfig.ReadAfterWriteAllowlist)
-			authz_servicev2 := authzsvc.NewV1beta2(authz_controllerv2)
-			authzv1beta2.RegisterKesselCheckServiceServer(server.GrpcServer, authz_servicev2)
-			authzv1beta2.RegisterKesselCheckServiceHTTPServer(server.HttpServer, authz_servicev2)
+			// wire together check service
+			check_controller := resourcesctl.New(resource_repo, inventoryresources_repo, authorizer, eventingManager, "authz", log.With(logger, "subsystem", "authz_controller"), storageConfig.Options.DisablePersistence)
+			check_service := authzsvc.NewV1beta2(check_controller)
+			authzv1beta2.RegisterKesselCheckServiceServer(server.GrpcServer, check_service)
+			authzv1beta2.RegisterKesselCheckServiceHTTPServer(server.HttpServer, check_service)
+
+			lookup_controller := resourcesctl.New(resource_repo, inventoryresources_repo, authorizer, eventingManager, "authz", log.With(logger, "subsystem", "authz_controller"), storageConfig.Options.DisablePersistence)
+			lookup_service := authzsvc.NewKesselLookupService(lookup_controller)
+			authzv1beta2.RegisterKesselLookupServiceServer(server.GrpcServer, lookup_service)
+			//TODO: http service not getting generated
 
 			//v1beta1
 			// wire together notificationsintegrations handling
@@ -377,7 +381,11 @@ func shutdown(db *gorm.DB, srv *server.Server, em eventingapi.Manager, cm consum
 		if sqlDB, err := db.DB(); err != nil {
 			logger.Error(fmt.Sprintf("Error Gracefully Shutting Down Storage: %v", err))
 		} else {
-			sqlDB.Close()
+			defer func() {
+				if err := sqlDB.Close(); err != nil {
+					fmt.Printf("failed to close consumer: %v", err)
+				}
+			}()
 		}
 	}
 }

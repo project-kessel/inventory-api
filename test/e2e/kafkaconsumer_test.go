@@ -192,7 +192,12 @@ func Test_ACMKafkaConsumer(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create Kafka consumer: %v", err)
 	}
-	defer consumer.Close()
+	// Defer the safe closing of the consumer
+	defer func() {
+		if err := consumer.Close(); err != nil {
+			fmt.Printf("failed to close consumer: %v", err)
+		}
+	}()
 
 	err = consumer.Subscribe(topic, nil)
 	if err != nil {

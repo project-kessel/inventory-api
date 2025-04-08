@@ -233,7 +233,7 @@ objects:
       class: io.debezium.connector.postgresql.PostgresConnector
       tasksMax: ${{MAX_TASKS}}
       config:
-        database.server.name: ${DB_SERVERNAME}
+        database.server.name: kessel-inventory-db
         database.dbname: ${secrets:kessel-inventory-db:db.name}
         database.hostname: ${secrets:kessel-inventory-db:db.host}
         database.port: ${secrets:kessel-inventory-db:db.port}

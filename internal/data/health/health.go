@@ -26,7 +26,7 @@ func New(g *gorm.DB, a authzapi.Authorizer, completedAuth authz.CompletedConfig)
 }
 
 func (r *healthRepo) IsBackendAvailable(ctx context.Context) (*pb.GetReadyzResponse, error) {
-	storageType := r.DB.Dialector.Name()
+	storageType := r.DB.Name()
 	sqlDB, dbErr := r.DB.DB()
 	if dbErr == nil {
 		dbErr = sqlDB.PingContext(ctx)

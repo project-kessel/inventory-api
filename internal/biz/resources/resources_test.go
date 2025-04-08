@@ -3,7 +3,11 @@ package resources
 import (
 	"context"
 	"errors"
+	"io"
 	"testing"
+
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/metadata"
 
 	"github.com/project-kessel/inventory-api/internal/mocks"
 
@@ -30,6 +34,138 @@ type MockedListenManager struct {
 
 type MockedSubscription struct {
 	mock.Mock
+}
+
+type MockLookupResourcesStream struct {
+	mock.Mock
+	responses []*v1beta1.LookupResourcesResponse
+	current   int
+}
+
+func (m *MockLookupResourcesStream) Recv() (*v1beta1.LookupResourcesResponse, error) {
+	if m.current >= len(m.responses) {
+		return nil, io.EOF
+	}
+	res := m.responses[m.current]
+	m.current++
+	return res, nil
+}
+
+func (m *MockLookupResourcesStream) Header() (metadata.MD, error) {
+	args := m.Called()
+	return args.Get(0).(metadata.MD), args.Error(1)
+}
+
+func (m *MockLookupResourcesStream) Trailer() metadata.MD {
+	args := m.Called()
+	return args.Get(0).(metadata.MD)
+}
+
+func (m *MockLookupResourcesStream) CloseSend() error {
+	args := m.Called()
+	return args.Error(0)
+}
+
+func (m *MockLookupResourcesStream) Context() context.Context {
+	args := m.Called()
+	return args.Get(0).(context.Context)
+}
+
+func (m *MockLookupResourcesStream) SendMsg(msg interface{}) error {
+	args := m.Called(msg)
+	return args.Error(0)
+}
+
+func (m *MockLookupResourcesStream) RecvMsg(msg interface{}) error {
+	args := m.Called(msg)
+	return args.Error(0)
+}
+
+// Update the MockAuthz LookupResources method to match the exact signature
+func (m *MockAuthz) LookupResources(ctx context.Context, request *v1beta1.LookupResourcesRequest) (grpc.ServerStreamingClient[v1beta1.LookupResourcesResponse], error) {
+	args := m.Called(ctx, request)
+	return args.Get(0).(grpc.ServerStreamingClient[v1beta1.LookupResourcesResponse]), args.Error(1)
+}
+
+func TestLookupResources_Success(t *testing.T) {
+	ctx := context.TODO()
+	repo := &MockedReporterResourceRepository{}
+	inventoryRepo := &MockedInventoryResourceRepository{}
+	authz := &MockAuthz{}
+
+	req := &v1beta1.LookupResourcesRequest{
+		ResourceType: &v1beta1.ObjectType{
+			Namespace: "test-namespace",
+			Name:      "test-resource",
+		},
+		Relation: "view",
+		Subject: &v1beta1.SubjectReference{
+			Subject: &v1beta1.ObjectReference{
+				Type: &v1beta1.ObjectType{
+					Namespace: "user",
+					Name:      "default",
+				},
+				Id: "user1",
+			},
+		},
+	}
+
+	mockResponses := []*v1beta1.LookupResourcesResponse{
+		{
+			Resource: &v1beta1.ObjectReference{
+				Type: &v1beta1.ObjectType{
+					Namespace: "test-namespace",
+					Name:      "test-resource",
+				},
+				Id: "resource1",
+			},
+		},
+		{
+			Resource: &v1beta1.ObjectReference{
+				Type: &v1beta1.ObjectType{
+					Namespace: "test-namespace",
+					Name:      "test-resource",
+				},
+				Id: "resource2",
+			},
+		},
+	}
+
+	// Set up mock stream
+	mockStream := &MockLookupResourcesStream{
+		responses: mockResponses,
+	}
+	mockStream.On("Recv").Return(mockResponses[0], nil).Once()
+	mockStream.On("Recv").Return(mockResponses[1], nil).Once()
+	mockStream.On("Recv").Return(nil, io.EOF).Once()
+	mockStream.On("Context").Return(ctx)
+
+	// Set up authz mock
+	authz.On("LookupResources", ctx, req).Return(mockStream, nil)
+
+	useCase := New(repo, inventoryRepo, authz, nil, "", log.DefaultLogger, false)
+	stream, err := useCase.LookupResources(ctx, req)
+
+	assert.Nil(t, err)
+	assert.NotNil(t, stream)
+
+	// Verify we can receive all responses
+	res1, err := stream.Recv()
+	assert.Nil(t, err)
+	assert.Equal(t, "resource1", res1.Resource.Id)
+
+	res2, err := stream.Recv()
+	assert.Nil(t, err)
+	assert.Equal(t, "resource2", res2.Resource.Id)
+
+	// Verify EOF
+	_, err = stream.Recv()
+	assert.Equal(t, io.EOF, err)
+}
+
+func (r *MockedReporterResourceRepository) Create(ctx context.Context, resource *model.Resource) (*model.Resource, []*model.Resource, error) {
+	args := r.Called(ctx, resource)
+	return args.Get(0).(*model.Resource), args.Get(1).([]*model.Resource), args.Error(2)
 }
 
 func (r *MockedReporterResourceRepository) Create(ctx context.Context, resource *model.Resource, namespace string, txid string) (*model.Resource, error) {

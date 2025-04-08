@@ -7,6 +7,7 @@ import (
 
 	"github.com/project-kessel/inventory-api/internal/consumer"
 	"github.com/project-kessel/inventory-api/internal/pubsub"
+	"google.golang.org/grpc"
 
 	"github.com/google/uuid"
 
@@ -179,6 +180,10 @@ func updateExistingReporterResource(ctx context.Context, m *model.Resource, exis
 
 	uc.log.WithContext(ctx).Infof("Updated Resource: %v(%v)", m.ID, m.ResourceType)
 	return ret, nil
+}
+
+func (uc *Usecase) LookupResources(ctx context.Context, request *kessel.LookupResourcesRequest) (grpc.ServerStreamingClient[kessel.LookupResourcesResponse], error) {
+	return uc.Authz.LookupResources(ctx, request)
 }
 
 func (uc *Usecase) Check(ctx context.Context, permission, namespace string, sub *kessel.SubjectReference, id model.ReporterResourceId) (bool, error) {

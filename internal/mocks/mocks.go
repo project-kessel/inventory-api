@@ -2,10 +2,12 @@ package mocks
 
 import (
 	"context"
+
 	"github.com/project-kessel/inventory-api/internal/biz/model"
 	kesselv1 "github.com/project-kessel/relations-api/api/kessel/relations/v1"
 	"github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
 	"github.com/stretchr/testify/mock"
+	"google.golang.org/grpc"
 )
 
 type MockAuthz struct {
@@ -45,4 +47,10 @@ func (m *MockAuthz) UnsetWorkspace(ctx context.Context, namespace, localResource
 func (m *MockAuthz) SetWorkspace(ctx context.Context, local_resource_id, workspace, namespace, name string) (*v1beta1.CreateTuplesResponse, error) {
 	args := m.Called(ctx, local_resource_id, workspace, namespace, name)
 	return args.Get(0).(*v1beta1.CreateTuplesResponse), args.Error(1)
+}
+
+// Update the MockAuthz LookupResources method to match the exact signature
+func (m *MockAuthz) LookupResources(ctx context.Context, request *v1beta1.LookupResourcesRequest) (grpc.ServerStreamingClient[v1beta1.LookupResourcesResponse], error) {
+	args := m.Called(ctx, request)
+	return args.Get(0).(grpc.ServerStreamingClient[v1beta1.LookupResourcesResponse]), args.Error(1)
 }

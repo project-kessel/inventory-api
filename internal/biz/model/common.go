@@ -67,7 +67,7 @@ func (data *Labels) Scan(value interface{}) error {
 }
 
 func GormDBDataType(db *gorm.DB, field *schema.Field) string {
-	switch db.Dialector.Name() {
+	switch db.Name() {
 	case "sqlite":
 		return "JSON"
 	case "postgres":

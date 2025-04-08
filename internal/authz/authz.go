@@ -18,7 +18,7 @@ func New(ctx context.Context, config CompletedConfig, logger *log.Helper) (api.A
 	case Kessel:
 		return kessel.New(ctx, config.Kessel, logger)
 	default:
-		return nil, fmt.Errorf("Unrecognized authz.impl: %s", config.Authz)
+		return nil, fmt.Errorf("unrecognized authz.impl: %s", config.Authz)
 	}
 }
 

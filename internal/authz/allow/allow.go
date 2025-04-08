@@ -2,13 +2,14 @@ package allow
 
 import (
 	"context"
-
-	kesselv1 "github.com/project-kessel/relations-api/api/kessel/relations/v1"
-	"github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/metadata"
+	"io"
 
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
-	kessel "github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
+	kesselv1 "github.com/project-kessel/relations-api/api/kessel/relations/v1"
+	"github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
 )
 
 type AllowAllAuthz struct {
@@ -35,18 +36,55 @@ func (a *AllowAllAuthz) CheckForUpdate(context.Context, string, string, *model.R
 	return v1beta1.CheckForUpdateResponse_ALLOWED_TRUE, nil, nil
 }
 
-func (a *AllowAllAuthz) CreateTuples(ctx context.Context, r *kessel.CreateTuplesRequest) (*kessel.CreateTuplesResponse, error) {
-	return &kessel.CreateTuplesResponse{}, nil
+type mockLookupResourcesClient struct {
+	ctx context.Context
 }
 
-func (a *AllowAllAuthz) DeleteTuples(ctx context.Context, r *kessel.DeleteTuplesRequest) (*kessel.DeleteTuplesResponse, error) {
-	return &kessel.DeleteTuplesResponse{}, nil
+func (m *mockLookupResourcesClient) Recv() (*v1beta1.LookupResourcesResponse, error) {
+	// Return EOF immediately to indicate end of stream
+	return nil, io.EOF
 }
 
-func (a *AllowAllAuthz) UnsetWorkspace(ctx context.Context, local_resource_id, name, namespace string) (*kessel.DeleteTuplesResponse, error) {
-	return &kessel.DeleteTuplesResponse{}, nil
+func (m *mockLookupResourcesClient) Header() (metadata.MD, error) {
+	return nil, nil
 }
 
-func (a *AllowAllAuthz) SetWorkspace(ctx context.Context, local_resource_id, workspace, name, namespace string) (*kessel.CreateTuplesResponse, error) {
-	return &kessel.CreateTuplesResponse{}, nil
+func (m *mockLookupResourcesClient) Trailer() metadata.MD {
+	return nil
+}
+
+func (m *mockLookupResourcesClient) CloseSend() error {
+	return nil
+}
+
+func (m *mockLookupResourcesClient) Context() context.Context {
+	return m.ctx
+}
+
+func (m *mockLookupResourcesClient) SendMsg(msg interface{}) error {
+	return nil
+}
+
+func (m *mockLookupResourcesClient) RecvMsg(msg interface{}) error {
+	return nil
+}
+
+func (a *AllowAllAuthz) LookupResources(ctx context.Context, in *v1beta1.LookupResourcesRequest) (grpc.ServerStreamingClient[v1beta1.LookupResourcesResponse], error) {
+	return &mockLookupResourcesClient{ctx: ctx}, nil
+}
+
+func (a *AllowAllAuthz) CreateTuples(ctx context.Context, r *v1beta1.CreateTuplesRequest) (*v1beta1.CreateTuplesResponse, error) {
+	return &v1beta1.CreateTuplesResponse{}, nil
+}
+
+func (a *AllowAllAuthz) DeleteTuples(ctx context.Context, r *v1beta1.DeleteTuplesRequest) (*v1beta1.DeleteTuplesResponse, error) {
+	return &v1beta1.DeleteTuplesResponse{}, nil
+}
+
+func (a *AllowAllAuthz) UnsetWorkspace(ctx context.Context, local_resource_id, name, namespace string) (*v1beta1.DeleteTuplesResponse, error) {
+	return &v1beta1.DeleteTuplesResponse{}, nil
+}
+
+func (a *AllowAllAuthz) SetWorkspace(ctx context.Context, local_resource_id, workspace, name, namespace string) (*v1beta1.CreateTuplesResponse, error) {
+	return &v1beta1.CreateTuplesResponse{}, nil
 }

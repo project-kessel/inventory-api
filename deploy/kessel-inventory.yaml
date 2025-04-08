@@ -11,6 +11,13 @@ objects:
       envName: ${ENV_NAME}
       database:
         name: kessel-inventory
+      kafkaTopics:
+      - topicName: outbox.event.kessel.tuples
+        partitions: 1
+        replicas: 3
+      - topicName: outbox.event.kessel.resources
+        partitions: 1
+        replicas: 3
       optionalDependencies:
         - kessel-relations
       deployments:

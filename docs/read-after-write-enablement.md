@@ -10,7 +10,7 @@ Modify [.inventory-api.yaml](../.inventory-api.yaml).
        ...
      consistency:
        read-after-write-enabled: true # false == off for all service providers
-       read-after-write-allowlist: [] # specify "*" to require all requests
+       read-after-write-allowlist: [] # specify ["*"] to require all requests
      ```
    - Ensure every request from a service provider is r-a-w enabled by updating the allowlist with their `reporter_id` field. For instance, for the Notifications service:
      ```shell

@@ -28,13 +28,13 @@ type KesselCheckServiceServiceV1beta2 struct {
 	Ctl *resources.Usecase
 }
 
-func New(c *resources.Usecase) *KesselCheckServiceService {
+func NewKesselCheckServiceV1beta1(c *resources.Usecase) *KesselCheckServiceService {
 	return &KesselCheckServiceService{
 		Ctl: c,
 	}
 }
 
-func NewV1beta2(c *resources.Usecase) *KesselCheckServiceServiceV1beta2 {
+func NewKesselCheckServiceV1beta2(c *resources.Usecase) *KesselCheckServiceServiceV1beta2 {
 	return &KesselCheckServiceServiceV1beta2{
 		Ctl: c,
 	}

@@ -155,18 +155,19 @@ func NewCommand(
 			// wire together resource handling
 			resource_repo := resourcerepo.New(db)
 			resource_controller := resourcesctl.New(resource_repo, inventoryresources_repo, authorizer, eventingManager, "notifications", log.With(logger, "subsystem", "notificationsintegrations_controller"), storageConfig.Options.DisablePersistence)
-			resource_service := resourcesvc.NewResourceService(resource_controller)
+			resource_service := resourcesvc.NewKesselResourceServiceV1beta2(resource_controller)
 			pbv1beta2.RegisterKesselResourceServiceServer(server.GrpcServer, resource_service)
 			pbv1beta2.RegisterKesselResourceServiceHTTPServer(server.HttpServer, resource_service)
 
 			// wire together check service
 			check_controller := resourcesctl.New(resource_repo, inventoryresources_repo, authorizer, eventingManager, "authz", log.With(logger, "subsystem", "authz_controller"), storageConfig.Options.DisablePersistence)
-			check_service := resourcesvc.NewV1beta2(check_controller)
+			check_service := resourcesvc.NewKesselCheckServiceV1beta2(check_controller)
 			pbv1beta2.RegisterKesselCheckServiceServer(server.GrpcServer, check_service)
 			pbv1beta2.RegisterKesselCheckServiceHTTPServer(server.HttpServer, check_service)
 
+			// wire together lookup service
 			lookup_controller := resourcesctl.New(resource_repo, inventoryresources_repo, authorizer, eventingManager, "authz", log.With(logger, "subsystem", "authz_controller"), storageConfig.Options.DisablePersistence)
-			lookup_service := resourcesvc.NewKesselLookupService(lookup_controller)
+			lookup_service := resourcesvc.NewKesselLookupServiceV1beta2(lookup_controller)
 			pbv1beta2.RegisterKesselLookupServiceServer(server.GrpcServer, lookup_service)
 			//TODO: http service not getting generated
 
@@ -181,7 +182,7 @@ func NewCommand(
 			// wire together authz handling
 			authz_repo := resourcerepo.New(db)
 			authz_controller := resourcesctl.New(authz_repo, inventoryresources_repo, authorizer, eventingManager, "authz", log.With(logger, "subsystem", "authz_controller"), storageConfig.Options.DisablePersistence)
-			authz_service := resourcesvc.New(authz_controller)
+			authz_service := resourcesvc.NewKesselCheckServiceV1beta1(authz_controller)
 			authzv1beta1.RegisterKesselCheckServiceServer(server.GrpcServer, authz_service)
 			authzv1beta1.RegisterKesselCheckServiceHTTPServer(server.HttpServer, authz_service)
 

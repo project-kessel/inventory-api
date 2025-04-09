@@ -246,7 +246,7 @@ func (m *MockAuthz) UnsetWorkspace(ctx context.Context, namespace, localResource
 	return args.Get(0).(*v1beta1.DeleteTuplesResponse), args.Error(1)
 }
 
-func (m *MockAuthz) SetWorkspace(ctx context.Context, local_resource_id, workspace, namespace, name string) (*v1beta1.CreateTuplesResponse, error) {
+func (m *MockAuthz) SetWorkspace(ctx context.Context, local_resource_id, workspace, namespace, name string, upsert bool) (*v1beta1.CreateTuplesResponse, error) {
 	args := m.Called(ctx, local_resource_id, workspace, namespace, name)
 	return args.Get(0).(*v1beta1.CreateTuplesResponse), args.Error(1)
 }

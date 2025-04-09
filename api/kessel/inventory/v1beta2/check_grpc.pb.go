@@ -2,9 +2,9 @@
 // versions:
 // - protoc-gen-go-grpc v1.5.1
 // - protoc             (unknown)
-// source: kessel/inventory/v1beta2/authz/check.proto
+// source: kessel/inventory/v1beta2/check.proto
 
-package authz
+package v1beta2
 
 import (
 	context "context"
@@ -19,8 +19,8 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	KesselCheckService_Check_FullMethodName          = "/kessel.inventory.v1beta2.authz.KesselCheckService/Check"
-	KesselCheckService_CheckForUpdate_FullMethodName = "/kessel.inventory.v1beta2.authz.KesselCheckService/CheckForUpdate"
+	KesselCheckService_Check_FullMethodName          = "/kessel.inventory.v1beta2.KesselCheckService/Check"
+	KesselCheckService_CheckForUpdate_FullMethodName = "/kessel.inventory.v1beta2.KesselCheckService/CheckForUpdate"
 )
 
 // KesselCheckServiceClient is the client API for KesselCheckService service.
@@ -146,7 +146,7 @@ func _KesselCheckService_CheckForUpdate_Handler(srv interface{}, ctx context.Con
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
 var KesselCheckService_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "kessel.inventory.v1beta2.authz.KesselCheckService",
+	ServiceName: "kessel.inventory.v1beta2.KesselCheckService",
 	HandlerType: (*KesselCheckServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
@@ -159,5 +159,5 @@ var KesselCheckService_ServiceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "kessel/inventory/v1beta2/authz/check.proto",
+	Metadata: "kessel/inventory/v1beta2/check.proto",
 }

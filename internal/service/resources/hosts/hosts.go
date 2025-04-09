@@ -22,8 +22,8 @@ type HostsService struct {
 	Ctl *resources.Usecase
 }
 
-// New creates a new HostsService to handle requests for Rhel hosts
-func New(c *resources.Usecase) *HostsService {
+// NewKesselRhelHostServiceV1beta1 creates a new HostsService to handle requests for Rhel hosts
+func NewKesselRhelHostServiceV1beta1(c *resources.Usecase) *HostsService {
 	return &HostsService{
 		Ctl: c,
 	}

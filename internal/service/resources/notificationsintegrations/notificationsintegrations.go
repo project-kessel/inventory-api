@@ -28,8 +28,8 @@ type NotificationsIntegrationsService struct {
 	Ctl *resources.Usecase
 }
 
-// New creates a new NotificationsIntegrationsService to handle requests for Notifications Integrations
-func New(c *resources.Usecase) *NotificationsIntegrationsService {
+// NewKesselNotificationsIntegrationsServiceV1beta1 creates a new NotificationsIntegrationsService to handle requests for Notifications Integrations
+func NewKesselNotificationsIntegrationsServiceV1beta1(c *resources.Usecase) *NotificationsIntegrationsService {
 	return &NotificationsIntegrationsService{
 		Ctl: c,
 	}

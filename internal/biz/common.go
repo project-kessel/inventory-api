@@ -51,11 +51,11 @@ func DefaultRelationshipSendEvent(ctx context.Context, m *model.Relationship, ev
 	return nil
 }
 
-func DefaultSetWorkspace(ctx context.Context, namespace string, model *model.Resource, authz authzapi.Authorizer) (string, error) {
+func DefaultSetWorkspace(ctx context.Context, namespace string, model *model.Resource, authz authzapi.Authorizer, upsert bool) (string, error) {
 	if model.ReporterType != "" {
 		namespace = strings.ToLower(model.ReporterType)
 	}
-	r, err := authz.SetWorkspace(ctx, model.ReporterResourceId, model.WorkspaceId, namespace, model.ResourceType) //nolint:staticcheck
+	r, err := authz.SetWorkspace(ctx, model.ReporterResourceId, model.WorkspaceId, namespace, model.ResourceType, upsert) //nolint:staticcheck
 	if err != nil {
 		return "", err
 	}

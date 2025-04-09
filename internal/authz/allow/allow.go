@@ -85,6 +85,6 @@ func (a *AllowAllAuthz) UnsetWorkspace(ctx context.Context, local_resource_id, n
 	return &v1beta1.DeleteTuplesResponse{}, nil
 }
 
-func (a *AllowAllAuthz) SetWorkspace(ctx context.Context, local_resource_id, workspace, name, namespace string) (*v1beta1.CreateTuplesResponse, error) {
+func (a *AllowAllAuthz) SetWorkspace(ctx context.Context, local_resource_id, workspace, name, namespace string, upsert bool) (*v1beta1.CreateTuplesResponse, error) {
 	return &v1beta1.CreateTuplesResponse{}, nil
 }

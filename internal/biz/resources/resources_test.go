@@ -246,8 +246,8 @@ func (m *MockAuthz) UnsetWorkspace(ctx context.Context, namespace, localResource
 	return args.Get(0).(*v1beta1.DeleteTuplesResponse), args.Error(1)
 }
 
-func (m *MockAuthz) SetWorkspace(ctx context.Context, local_resource_id, workspace, namespace, name string) (*v1beta1.CreateTuplesResponse, error) {
-	args := m.Called(ctx, local_resource_id, workspace, namespace, name)
+func (m *MockAuthz) SetWorkspace(ctx context.Context, local_resource_id, workspace, namespace, name string, upsert bool) (*v1beta1.CreateTuplesResponse, error) {
+	args := m.Called(ctx, local_resource_id, workspace, namespace, name, upsert)
 	return args.Get(0).(*v1beta1.CreateTuplesResponse), args.Error(1)
 }
 
@@ -395,7 +395,7 @@ func TestCreateNewResource_ConsistencyToken(t *testing.T) {
 	repo.On("FindByReporterResourceId", mock.Anything, mock.Anything).Return((*model.Resource)(nil), gorm.ErrRecordNotFound)
 	repo.On("Create", mock.Anything, mock.Anything).Return(&returnedResource, []*model.Resource{}, nil)
 
-	m.On("SetWorkspace", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&v1beta1.CreateTuplesResponse{ConsistencyToken: &v1beta1.ConsistencyToken{Token: "foo-bar-consistency-token"}}, nil)
+	m.On("SetWorkspace", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&v1beta1.CreateTuplesResponse{ConsistencyToken: &v1beta1.ConsistencyToken{Token: "foo-bar-consistency-token"}}, nil)
 	repo.On("Update", mock.Anything, mock.Anything, mock.Anything).Return(&model.Resource{}, []*model.Resource{}, nil)
 
 	useCase := New(repo, inventoryRepo, m, nil, "", log.DefaultLogger, false)

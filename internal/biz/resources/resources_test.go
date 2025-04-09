@@ -252,6 +252,7 @@ func resource1() *model.Resource {
 		ResourceData: map[string]any{
 			"foo": "bar",
 		},
+		ReporterId:   "reporter_id",
 		ResourceType: "my-resource",
 		WorkspaceId:  "my-workspace",
 		Reporter: model.ResourceReporter{
@@ -399,7 +400,7 @@ func TestCreateNewResource_ConsistencyToken(t *testing.T) {
 	sub.On("Unsubscribe")
 	sub.On("BlockForNotification", mock.Anything).Return(nil)
 
-	useCase := New(repo, inventoryRepo, m, nil, "", log.DefaultLogger, false, listenMan, true, []string{})
+	useCase := New(repo, inventoryRepo, m, nil, "", log.DefaultLogger, false, listenMan, true, []string{"reporter_id"})
 	ctx := context.TODO()
 
 	r, err := useCase.Create(ctx, resource, true)
@@ -694,7 +695,7 @@ func TestUpdate_ReadAfterWrite(t *testing.T) {
 	sub.On("Unsubscribe")
 	sub.On("BlockForNotification", mock.Anything).Return(nil)
 
-	useCase := New(repo, inventoryRepo, authz, nil, "", log.DefaultLogger, false, listenMan, true, []string{})
+	useCase := New(repo, inventoryRepo, authz, nil, "", log.DefaultLogger, false, listenMan, true, []string{"reporter_id"})
 	ctx := context.TODO()
 
 	r, err := useCase.Update(ctx, resource, model.ReporterResourceId{}, true)
@@ -1212,7 +1213,7 @@ func TestUpsert_ReadAfterWrite(t *testing.T) {
 	sub.On("Unsubscribe")
 	sub.On("BlockForNotification", mock.Anything).Return(nil)
 
-	useCase := New(repo, inventoryRepo, authz, nil, "", log.DefaultLogger, false, listenMan, true, []string{})
+	useCase := New(repo, inventoryRepo, authz, nil, "", log.DefaultLogger, false, listenMan, true, []string{"reporter_id"})
 	ctx := context.TODO()
 
 	r, err := useCase.Upsert(ctx, resource, true)

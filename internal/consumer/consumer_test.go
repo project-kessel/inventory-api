@@ -1,11 +1,12 @@
 package consumer
 
 import (
+	"testing"
+
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
 	"github.com/project-kessel/inventory-api/internal/mocks"
 	"github.com/stretchr/testify/mock"
-	"testing"
 
 	"github.com/go-kratos/kratos/v2/log"
 	. "github.com/project-kessel/inventory-api/cmd/common"
@@ -19,8 +20,8 @@ import (
 
 const (
 	testMessageKey            = `{"schema":{"type":"string","optional":false},"payload":"00000000-0000-0000-0000-000000000000"}`
-	testCreateOrUpdateMessage = `{"schema":{"type":"string","optional":false,"name":"io.debezium.data.Json","version":1},"payload":"{\"subject\":{\"subject\":{\"id\":\"1234\", \"type\":{\"name\":\"workspace\",\"namespace\":\"rbac\"}}},\"relation\":\"t_workspace\",\"resource\":{\"id\":\"4321\",\"type\":{\"name\":\"integration\",\"namespace\":\"notifications\"}}}"}`
-	testDeleteMessage         = `{"schema":{"type":"string","optional":false,"name":"io.debezium.data.Json","version":1},"payload":"{\"resource_id\":\"4321\",\"resource_type\":\"integration\",\"resource_namespace\":\"notifications\",\"relation\":\"t_workspace\",\"subject_filter\":{\"subject_type\":\"workspace\",\"subject_namespace\":\"rbac\",\"subject_id\":\"1234\"}}"}`
+	testCreateOrUpdateMessage = `{"schema":{"type":"string","optional":false,"name":"io.debezium.data.Json","version":1},"payload":{"subject":{"subject":{"id":"1234", "type":{"name":"workspace","namespace":"rbac"}}},"relation":"t_workspace","resource":{"id":"4321","type":{"name":"integration","namespace":"notifications"}}}}`
+	testDeleteMessage         = `{"schema":{"type":"string","optional":false,"name":"io.debezium.data.Json","version":1},"payload":{"resource_id":"4321","resource_type":"integration","resource_namespace":"notifications","relation":"t_workspace","subject_filter":{"subject_type":"workspace","subject_namespace":"rbac","subject_id":"1234"}}}`
 )
 
 type TestCase struct {

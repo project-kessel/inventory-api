@@ -2,9 +2,10 @@ package allow
 
 import (
 	"context"
+	"io"
+
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
-	"io"
 
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
@@ -85,6 +86,6 @@ func (a *AllowAllAuthz) UnsetWorkspace(ctx context.Context, local_resource_id, n
 	return &v1beta1.DeleteTuplesResponse{}, nil
 }
 
-func (a *AllowAllAuthz) SetWorkspace(ctx context.Context, local_resource_id, workspace, name, namespace string) (*v1beta1.CreateTuplesResponse, error) {
+func (a *AllowAllAuthz) SetWorkspace(ctx context.Context, local_resource_id, workspace, name, namespace string, upsert bool) (*v1beta1.CreateTuplesResponse, error) {
 	return &v1beta1.CreateTuplesResponse{}, nil
 }

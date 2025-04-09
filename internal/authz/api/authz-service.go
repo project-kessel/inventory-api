@@ -17,5 +17,5 @@ type Authorizer interface {
 	CreateTuples(context.Context, *kessel.CreateTuplesRequest) (*kessel.CreateTuplesResponse, error)
 	DeleteTuples(context.Context, *kessel.DeleteTuplesRequest) (*kessel.DeleteTuplesResponse, error)
 	UnsetWorkspace(context.Context, string, string, string) (*kessel.DeleteTuplesResponse, error)
-	SetWorkspace(context.Context, string, string, string, string) (*kessel.CreateTuplesResponse, error)
+	SetWorkspace(context.Context, string, string, string, string, bool) (*kessel.CreateTuplesResponse, error)
 }

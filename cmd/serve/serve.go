@@ -175,7 +175,7 @@ func NewCommand(
 			// wire together notificationsintegrations handling
 			notifs_repo := resourcerepo.New(db)
 			notifs_controller := resourcesctl.New(notifs_repo, inventoryresources_repo, authorizer, eventingManager, "notifications", log.With(logger, "subsystem", "notificationsintegrations_controller"), storageConfig.Options.DisablePersistence)
-			notifs_service := notifssvc.New(notifs_controller)
+			notifs_service := notifssvc.NewKesselNotificationsIntegrationsServiceV1beta1(notifs_controller)
 			pb.RegisterKesselNotificationsIntegrationServiceServer(server.GrpcServer, notifs_service)
 			pb.RegisterKesselNotificationsIntegrationServiceHTTPServer(server.HttpServer, notifs_service)
 
@@ -189,28 +189,28 @@ func NewCommand(
 			// wire together hosts handling
 			hosts_repo := resourcerepo.New(db)
 			hosts_controller := resourcesctl.New(hosts_repo, inventoryresources_repo, authorizer, eventingManager, "hbi", log.With(logger, "subsystem", "hosts_controller"), storageConfig.Options.DisablePersistence)
-			hosts_service := hostssvc.New(hosts_controller)
+			hosts_service := hostssvc.NewKesselRhelHostServiceV1beta1(hosts_controller)
 			pb.RegisterKesselRhelHostServiceServer(server.GrpcServer, hosts_service)
 			pb.RegisterKesselRhelHostServiceHTTPServer(server.HttpServer, hosts_service)
 
 			// wire together k8sclusters handling
 			k8sclusters_repo := resourcerepo.New(db)
 			k8sclusters_controller := resourcesctl.New(k8sclusters_repo, inventoryresources_repo, authorizer, eventingManager, "acm", log.With(logger, "subsystem", "k8sclusters_controller"), storageConfig.Options.DisablePersistence)
-			k8sclusters_service := k8sclusterssvc.New(k8sclusters_controller)
+			k8sclusters_service := k8sclusterssvc.NewKesselK8SClusterServiceV1beta1(k8sclusters_controller)
 			pb.RegisterKesselK8SClusterServiceServer(server.GrpcServer, k8sclusters_service)
 			pb.RegisterKesselK8SClusterServiceHTTPServer(server.HttpServer, k8sclusters_service)
 
 			// wire together k8spolicies handling
 			k8spolicies_repo := resourcerepo.New(db)
 			k8spolicies_controller := resourcesctl.New(k8spolicies_repo, inventoryresources_repo, authorizer, eventingManager, "acm", log.With(logger, "subsystem", "k8spolicies_controller"), storageConfig.Options.DisablePersistence)
-			k8spolicies_service := k8spoliciessvc.New(k8spolicies_controller)
+			k8spolicies_service := k8spoliciessvc.NewKesselK8SPolicyServiceV1beta1(k8spolicies_controller)
 			pb.RegisterKesselK8SPolicyServiceServer(server.GrpcServer, k8spolicies_service)
 			pb.RegisterKesselK8SPolicyServiceHTTPServer(server.HttpServer, k8spolicies_service)
 
 			// wire together relationships handling
 			relationships_repo := relationshipsrepo.New(db)
 			relationships_controller := relationshipsctl.New(relationships_repo, eventingManager, log.With(logger, "subsystem", "relationships_controller"), storageConfig.Options.DisablePersistence)
-			relationships_service := relationshipssvc.New(relationships_controller)
+			relationships_service := relationshipssvc.NewKesselK8SPolicyIsPropagatedToK8SClusterServiceV1beta1(relationships_controller)
 			rel.RegisterKesselK8SPolicyIsPropagatedToK8SClusterServiceServer(server.GrpcServer, relationships_service)
 			rel.RegisterKesselK8SPolicyIsPropagatedToK8SClusterServiceHTTPServer(server.HttpServer, relationships_service)
 

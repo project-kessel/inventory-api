@@ -238,7 +238,8 @@ func (a *KesselAuthz) CheckForUpdate(ctx context.Context, namespace string, upda
 	return resp.GetAllowed(), resp.GetConsistencyToken(), nil
 }
 
-func (a *KesselAuthz) SetWorkspace(ctx context.Context, local_resource_id, workspace, namespace, name string) (*kessel.CreateTuplesResponse, error) {
+// SetWorkspace upsert inserts the relationship in relations if it doesn't exist and otherwise does nothing
+func (a *KesselAuthz) SetWorkspace(ctx context.Context, local_resource_id, workspace, namespace, name string, upsert bool) (*kessel.CreateTuplesResponse, error) {
 	if workspace == "" {
 		a.incrFailureCounter("SetWorkspace")
 		return nil, fmt.Errorf("workspace_id is required")
@@ -266,6 +267,7 @@ func (a *KesselAuthz) SetWorkspace(ctx context.Context, local_resource_id, works
 
 	a.incrSuccessCounter("SetWorkspace")
 	return a.CreateTuples(ctx, &kessel.CreateTuplesRequest{
+		Upsert: upsert,
 		Tuples: rels,
 	})
 }

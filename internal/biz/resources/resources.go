@@ -134,7 +134,7 @@ func createNewReporterResource(ctx context.Context, m *model.Resource, uc *Useca
 
 	if uc.Authz != nil {
 		// Send workspace for the created resource
-		ct, err := biz.DefaultSetWorkspace(ctx, uc.Namespace, ret, uc.Authz)
+		ct, err := biz.DefaultSetWorkspace(ctx, uc.Namespace, ret, uc.Authz, false)
 		if err != nil {
 			return nil, err
 		}
@@ -149,7 +149,7 @@ func createNewReporterResource(ctx context.Context, m *model.Resource, uc *Useca
 		}
 		// Send workspace for any updated resources
 		for _, updatedResource := range updatedResources {
-			ct, err := biz.DefaultSetWorkspace(ctx, uc.Namespace, updatedResource, uc.Authz)
+			ct, err := biz.DefaultSetWorkspace(ctx, uc.Namespace, updatedResource, uc.Authz, false)
 			if err != nil {
 				return nil, err
 			}
@@ -202,7 +202,7 @@ func updateExistingReporterResource(ctx context.Context, m *model.Resource, exis
 
 	if uc.Authz != nil {
 		for _, updatedResource := range updatedResources {
-			_, err := biz.DefaultSetWorkspace(ctx, uc.Namespace, updatedResource, uc.Authz)
+			_, err := biz.DefaultSetWorkspace(ctx, uc.Namespace, updatedResource, uc.Authz, true)
 			if err != nil {
 				return nil, err
 			}
@@ -316,13 +316,16 @@ func (uc *Usecase) Delete(ctx context.Context, id model.ReporterResourceId) erro
 	m := &model.Resource{
 		// TODO: Create model
 	}
+
 	if !uc.DisablePersistence {
 		// check if the resource exists
 		existingResource, err := uc.reporterResourceRepository.FindByReporterData(ctx, id.ReporterId, id.LocalResourceId)
+
 		if err != nil && errors.Is(err, gorm.ErrRecordNotFound) {
 			// Deprecated: fallback case for backwards compatibility
 			existingResource, err = uc.reporterResourceRepository.FindByReporterResourceId(ctx, id)
 		}
+
 		if err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return ErrResourceNotFound
@@ -335,6 +338,7 @@ func (uc *Usecase) Delete(ctx context.Context, id model.ReporterResourceId) erro
 		if err != nil {
 			return err
 		}
+
 	}
 
 	if uc.Eventer != nil {
@@ -346,15 +350,20 @@ func (uc *Usecase) Delete(ctx context.Context, id model.ReporterResourceId) erro
 	}
 
 	if uc.Authz != nil {
+		var resourceType string
+
 		namespace := uc.Namespace
 		if id.ReporterType != "" {
 			namespace = strings.ToLower(id.ReporterType)
 		}
-		resourceType := m.ResourceType
-		err := biz.DefaultUnsetWorkspace(ctx, namespace, id.LocalResourceId, resourceType, uc.Authz)
-		if err != nil {
-			return err
+		if m.ResourceType != "" {
+			resourceType = m.ResourceType
+			err := biz.DefaultUnsetWorkspace(ctx, namespace, id.LocalResourceId, resourceType, uc.Authz)
+			if err != nil {
+				return err
+			}
 		}
+
 	}
 
 	uc.log.WithContext(ctx).Infof("Deleted Resource: %v(%v)", m.ID, m.ResourceType)
@@ -413,7 +422,7 @@ func (uc *Usecase) Create(ctx context.Context, m *model.Resource) (*model.Resour
 
 	if uc.Authz != nil {
 		// Send workspace for the created resource
-		ct, err := biz.DefaultSetWorkspace(ctx, uc.Namespace, ret, uc.Authz)
+		ct, err := biz.DefaultSetWorkspace(ctx, uc.Namespace, ret, uc.Authz, false)
 		if err != nil {
 			return nil, err
 		}
@@ -429,7 +438,7 @@ func (uc *Usecase) Create(ctx context.Context, m *model.Resource) (*model.Resour
 
 		// Send workspace for any updated resources
 		for _, updatedResource := range updatedResources {
-			ct, err := biz.DefaultSetWorkspace(ctx, uc.Namespace, updatedResource, uc.Authz)
+			ct, err := biz.DefaultSetWorkspace(ctx, uc.Namespace, updatedResource, uc.Authz, false)
 			if err != nil {
 				return nil, err
 			}
@@ -488,7 +497,7 @@ func (uc *Usecase) Update(ctx context.Context, m *model.Resource, id model.Repor
 
 	if uc.Authz != nil {
 		for _, updatedResource := range updatedResources {
-			_, err := biz.DefaultSetWorkspace(ctx, uc.Namespace, updatedResource, uc.Authz)
+			_, err := biz.DefaultSetWorkspace(ctx, uc.Namespace, updatedResource, uc.Authz, true)
 			if err != nil {
 				return nil, err
 			}

@@ -488,10 +488,6 @@
   	relation t_parent: rbac/workspace | rbac/tenant
   }
 
-  definition hbi/rhel_host {
-    relation t_workspace: rbac/workspace
-  }
-
   definition acm/k8s_cluster {
     relation t_workspace: rbac/workspace
   }

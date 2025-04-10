@@ -178,7 +178,7 @@ stringData:
       kafka:
         bootstrap-servers: "my-cluster-kafka-bootstrap.default.svc.cluster.local:9092"
     storage:
-      disable-persistence: true
+      disable-persistence: false
       database: postgres
       sqlite3:
         dsn: inventory.db

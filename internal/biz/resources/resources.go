@@ -82,14 +82,7 @@ func (uc *Usecase) Upsert(ctx context.Context, m *model.Resource, wait_for_sync 
 	log.Info("upserting resource: ", m)
 	ret := m // Default to returning the input model in case persistence is disabled
 	var subscription pubsub.Subscription
-
-	// Generate txid for data layer
-	// TODO: Replace this when inventory api has proper api-level transaction ids
-	txid, err := uuid.NewV7()
-	if err != nil {
-		return nil, err
-	}
-	txidStr := txid.String()
+	var txidStr string
 
 	if !uc.DisablePersistence {
 		// check if the resource already exists
@@ -101,7 +94,14 @@ func (uc *Usecase) Upsert(ctx context.Context, m *model.Resource, wait_for_sync 
 
 		readAfterWriteEnabled := computeReadAfterWrite(uc, wait_for_sync, m)
 		if readAfterWriteEnabled {
-			subscription = uc.ListenManager.Subscribe(txid.String())
+			// Generate txid for data layer
+			// TODO: Replace this when inventory api has proper api-level transaction ids
+			txid, err := uuid.NewV7()
+			if err != nil {
+				return nil, err
+			}
+			txidStr = txid.String()
+			subscription = uc.ListenManager.Subscribe(txidStr)
 			defer subscription.Unsubscribe()
 		}
 
@@ -285,13 +285,7 @@ func (uc *Usecase) ListResourcesInWorkspace(ctx context.Context, permission, nam
 func (uc *Usecase) Create(ctx context.Context, m *model.Resource, wait_for_sync bool) (*model.Resource, error) {
 	ret := m // Default to returning the input model in case persistence is disabled
 	var subscription pubsub.Subscription
-
-	// Generate txid for data layer
-	// TODO: Replace this when inventory api has proper api-level transaction ids
-	txid, err := uuid.NewV7()
-	if err != nil {
-		return nil, err
-	}
+	var txidStr string
 
 	if !uc.DisablePersistence {
 		// check if the resource already exists
@@ -311,11 +305,18 @@ func (uc *Usecase) Create(ctx context.Context, m *model.Resource, wait_for_sync 
 
 		readAfterWriteEnabled := computeReadAfterWrite(uc, wait_for_sync, m)
 		if readAfterWriteEnabled {
-			subscription = uc.ListenManager.Subscribe(txid.String())
+			// Generate txid for data layer
+			// TODO: Replace this when inventory api has proper api-level transaction ids
+			txid, err := uuid.NewV7()
+			if err != nil {
+				return nil, err
+			}
+			txidStr = txid.String()
+			subscription = uc.ListenManager.Subscribe(txidStr)
 			defer subscription.Unsubscribe()
 		}
 
-		ret, err = uc.reporterResourceRepository.Create(ctx, m, uc.Namespace, txid.String())
+		ret, err = uc.reporterResourceRepository.Create(ctx, m, uc.Namespace, txidStr)
 		if err != nil {
 			return nil, err
 		}
@@ -343,14 +344,7 @@ func (uc *Usecase) Create(ctx context.Context, m *model.Resource, wait_for_sync 
 func (uc *Usecase) Update(ctx context.Context, m *model.Resource, id model.ReporterResourceId, wait_for_sync bool) (*model.Resource, error) {
 	ret := m // Default to returning the input model in case persistence is disabled
 	var subscription pubsub.Subscription
-
-	// Generate txid for data layer
-	// TODO: Replace this when inventory api has proper api-level transaction ids
-	txid, err := uuid.NewV7()
-	if err != nil {
-		return nil, err
-	}
-	txidStr := txid.String()
+	var txidStr string
 
 	if !uc.DisablePersistence {
 		// check if the resource exists
@@ -370,7 +364,14 @@ func (uc *Usecase) Update(ctx context.Context, m *model.Resource, id model.Repor
 
 		readAfterWriteEnabled := computeReadAfterWrite(uc, wait_for_sync, m)
 		if readAfterWriteEnabled {
-			subscription = uc.ListenManager.Subscribe(txid.String())
+			// Generate txid for data layer
+			// TODO: Replace this when inventory api has proper api-level transaction ids
+			txid, err := uuid.NewV7()
+			if err != nil {
+				return nil, err
+			}
+			txidStr = txid.String()
+			subscription = uc.ListenManager.Subscribe(txidStr)
 			defer subscription.Unsubscribe()
 		}
 

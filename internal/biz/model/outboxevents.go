@@ -188,6 +188,11 @@ func convertResourceToResourceEvent(resource Resource, operationType EventOperat
 func convertResourceToSetTupleEvent(resource Resource, namespace string) (JsonObject, error) {
 	payload := JsonObject{}
 
+	if resource.ReporterType != "" {
+		// v1beta2 compatibility for namespace override, see common/DefaultSetWorkspace for parity
+		namespace = strings.ToLower(resource.ReporterType)
+	}
+
 	relationship := &kessel.Relationship{
 		Resource: &kessel.ObjectReference{
 			Type: &kessel.ObjectType{

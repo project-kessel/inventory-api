@@ -13,7 +13,7 @@ import (
 
 const txid = "txid"
 
-func createTestResource() *Resource {
+func createTestResource(isv1beta2 bool) *Resource {
 	now := time.Now()
 	id, err := uuid.NewV7()
 	if err != nil {
@@ -25,7 +25,7 @@ func createTestResource() *Resource {
 		panic(err)
 	}
 
-	return &Resource{
+	resource := &Resource{
 		ID:          id,
 		InventoryId: &inventoryId,
 		CreatedAt:   &now,
@@ -61,10 +61,17 @@ func createTestResource() *Resource {
 			},
 		},
 	}
+
+	if isv1beta2 {
+		// Should replace namespace
+		resource.ReporterType = "hbi"
+	}
+
+	return resource
 }
 
 func TestNewOutboxEventsFromResourceCreated(t *testing.T) {
-	resource := createTestResource()
+	resource := createTestResource(false)
 	namespace := "foobar-namespace"
 	resourceEvent, tupleEvent, err := NewOutboxEventsFromResource(*resource, namespace, OperationTypeCreated, txid)
 	assert.Nil(t, err)
@@ -75,7 +82,7 @@ func TestNewOutboxEventsFromResourceCreated(t *testing.T) {
 }
 
 func TestNewOutboxEventsFromResourceUpdated(t *testing.T) {
-	resource := createTestResource()
+	resource := createTestResource(false)
 	namespace := "foobar-namespace"
 	resourceEvent, tupleEvent, err := NewOutboxEventsFromResource(*resource, namespace, OperationTypeUpdated, txid)
 	assert.Nil(t, err)
@@ -86,7 +93,7 @@ func TestNewOutboxEventsFromResourceUpdated(t *testing.T) {
 }
 
 func TestNewOutboxEventsFromResourceDeleted(t *testing.T) {
-	resource := createTestResource()
+	resource := createTestResource(false)
 	namespace := "foobar-namespace"
 	resourceEvent, tupleEvent, err := NewOutboxEventsFromResource(*resource, namespace, OperationTypeDeleted, txid)
 	assert.Nil(t, err)
@@ -94,6 +101,17 @@ func TestNewOutboxEventsFromResourceDeleted(t *testing.T) {
 	assert.NotNil(t, tupleEvent)
 	assertResourceEvent(t, OperationTypeDeleted, resource, resourceEvent)
 	assertUnsetTupleEvent(t, resource, tupleEvent, namespace)
+}
+
+func TestNewOutboxEventsFromResourceCreated_v1beta2(t *testing.T) {
+	resource := createTestResource(true)
+	namespace := "foobar-namespace"
+	resourceEvent, tupleEvent, err := NewOutboxEventsFromResource(*resource, namespace, OperationTypeCreated, txid)
+	assert.Nil(t, err)
+	assert.NotNil(t, resourceEvent)
+	assert.NotNil(t, tupleEvent)
+	assertResourceEvent(t, OperationTypeCreated, resource, resourceEvent)
+	assertSetTupleEvent(t, resource, tupleEvent, resource.ReporterType) // Use reporter type as namespace for v1beta2
 }
 
 func assertSetTupleEvent(t *testing.T, resource *Resource, event *OutboxEvent, namespace string) {

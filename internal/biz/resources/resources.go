@@ -350,15 +350,20 @@ func (uc *Usecase) Delete(ctx context.Context, id model.ReporterResourceId) erro
 	}
 
 	if uc.Authz != nil {
-		resourceType := m.ResourceType
+		var resourceType string
+
 		namespace := uc.Namespace
 		if id.ReporterType != "" {
 			namespace = strings.ToLower(id.ReporterType)
 		}
-		err := biz.DefaultUnsetWorkspace(ctx, namespace, id.LocalResourceId, resourceType, uc.Authz)
-		if err != nil {
-			return err
+		if m.ResourceType != "" {
+			resourceType = m.ResourceType
+			err := biz.DefaultUnsetWorkspace(ctx, namespace, id.LocalResourceId, resourceType, uc.Authz)
+			if err != nil {
+				return err
+			}
 		}
+
 	}
 
 	uc.log.WithContext(ctx).Infof("Deleted Resource: %v(%v)", m.ID, m.ResourceType)

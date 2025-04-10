@@ -338,8 +338,8 @@ func (uc *Usecase) Delete(ctx context.Context, id model.ReporterResourceId) erro
 		if err != nil {
 			return err
 		}
+		resourceType = m.ResourceType
 	}
-	resourceType = m.ResourceType
 
 	if uc.Eventer != nil {
 		err := biz.DefaultResourceSendEvent(ctx, m, uc.Eventer, time.Now(), eventingapi.OperationTypeDeleted)

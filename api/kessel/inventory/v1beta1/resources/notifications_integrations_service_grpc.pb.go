@@ -19,10 +19,11 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	KesselNotificationsIntegrationService_CreateNotificationsIntegration_FullMethodName = "/kessel.inventory.v1beta1.resources.KesselNotificationsIntegrationService/CreateNotificationsIntegration"
-	KesselNotificationsIntegrationService_UpdateNotificationsIntegration_FullMethodName = "/kessel.inventory.v1beta1.resources.KesselNotificationsIntegrationService/UpdateNotificationsIntegration"
-	KesselNotificationsIntegrationService_DeleteNotificationsIntegration_FullMethodName = "/kessel.inventory.v1beta1.resources.KesselNotificationsIntegrationService/DeleteNotificationsIntegration"
-	KesselNotificationsIntegrationService_ListNotificationsIntegrations_FullMethodName  = "/kessel.inventory.v1beta1.resources.KesselNotificationsIntegrationService/ListNotificationsIntegrations"
+	KesselNotificationsIntegrationService_CreateNotificationsIntegration_FullMethodName  = "/kessel.inventory.v1beta1.resources.KesselNotificationsIntegrationService/CreateNotificationsIntegration"
+	KesselNotificationsIntegrationService_UpdateNotificationsIntegration_FullMethodName  = "/kessel.inventory.v1beta1.resources.KesselNotificationsIntegrationService/UpdateNotificationsIntegration"
+	KesselNotificationsIntegrationService_UpdateNotificationsIntegrations_FullMethodName = "/kessel.inventory.v1beta1.resources.KesselNotificationsIntegrationService/UpdateNotificationsIntegrations"
+	KesselNotificationsIntegrationService_DeleteNotificationsIntegration_FullMethodName  = "/kessel.inventory.v1beta1.resources.KesselNotificationsIntegrationService/DeleteNotificationsIntegration"
+	KesselNotificationsIntegrationService_ListNotificationsIntegrations_FullMethodName   = "/kessel.inventory.v1beta1.resources.KesselNotificationsIntegrationService/ListNotificationsIntegrations"
 )
 
 // KesselNotificationsIntegrationServiceClient is the client API for KesselNotificationsIntegrationService service.
@@ -31,6 +32,8 @@ const (
 type KesselNotificationsIntegrationServiceClient interface {
 	CreateNotificationsIntegration(ctx context.Context, in *CreateNotificationsIntegrationRequest, opts ...grpc.CallOption) (*CreateNotificationsIntegrationResponse, error)
 	UpdateNotificationsIntegration(ctx context.Context, in *UpdateNotificationsIntegrationRequest, opts ...grpc.CallOption) (*UpdateNotificationsIntegrationResponse, error)
+	// deprecated Temporary streaming update endpoint
+	UpdateNotificationsIntegrations(ctx context.Context, opts ...grpc.CallOption) (grpc.ClientStreamingClient[UpdateNotificationsIntegrationRequest, UpdateNotificationsIntegrationResponse], error)
 	DeleteNotificationsIntegration(ctx context.Context, in *DeleteNotificationsIntegrationRequest, opts ...grpc.CallOption) (*DeleteNotificationsIntegrationResponse, error)
 	ListNotificationsIntegrations(ctx context.Context, in *ListNotificationsIntegrationsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ListNotificationsIntegrationsResponse], error)
 }
@@ -63,6 +66,19 @@ func (c *kesselNotificationsIntegrationServiceClient) UpdateNotificationsIntegra
 	return out, nil
 }
 
+func (c *kesselNotificationsIntegrationServiceClient) UpdateNotificationsIntegrations(ctx context.Context, opts ...grpc.CallOption) (grpc.ClientStreamingClient[UpdateNotificationsIntegrationRequest, UpdateNotificationsIntegrationResponse], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &KesselNotificationsIntegrationService_ServiceDesc.Streams[0], KesselNotificationsIntegrationService_UpdateNotificationsIntegrations_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[UpdateNotificationsIntegrationRequest, UpdateNotificationsIntegrationResponse]{ClientStream: stream}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type KesselNotificationsIntegrationService_UpdateNotificationsIntegrationsClient = grpc.ClientStreamingClient[UpdateNotificationsIntegrationRequest, UpdateNotificationsIntegrationResponse]
+
 func (c *kesselNotificationsIntegrationServiceClient) DeleteNotificationsIntegration(ctx context.Context, in *DeleteNotificationsIntegrationRequest, opts ...grpc.CallOption) (*DeleteNotificationsIntegrationResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(DeleteNotificationsIntegrationResponse)
@@ -75,7 +91,7 @@ func (c *kesselNotificationsIntegrationServiceClient) DeleteNotificationsIntegra
 
 func (c *kesselNotificationsIntegrationServiceClient) ListNotificationsIntegrations(ctx context.Context, in *ListNotificationsIntegrationsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ListNotificationsIntegrationsResponse], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &KesselNotificationsIntegrationService_ServiceDesc.Streams[0], KesselNotificationsIntegrationService_ListNotificationsIntegrations_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &KesselNotificationsIntegrationService_ServiceDesc.Streams[1], KesselNotificationsIntegrationService_ListNotificationsIntegrations_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -98,6 +114,8 @@ type KesselNotificationsIntegrationService_ListNotificationsIntegrationsClient =
 type KesselNotificationsIntegrationServiceServer interface {
 	CreateNotificationsIntegration(context.Context, *CreateNotificationsIntegrationRequest) (*CreateNotificationsIntegrationResponse, error)
 	UpdateNotificationsIntegration(context.Context, *UpdateNotificationsIntegrationRequest) (*UpdateNotificationsIntegrationResponse, error)
+	// deprecated Temporary streaming update endpoint
+	UpdateNotificationsIntegrations(grpc.ClientStreamingServer[UpdateNotificationsIntegrationRequest, UpdateNotificationsIntegrationResponse]) error
 	DeleteNotificationsIntegration(context.Context, *DeleteNotificationsIntegrationRequest) (*DeleteNotificationsIntegrationResponse, error)
 	ListNotificationsIntegrations(*ListNotificationsIntegrationsRequest, grpc.ServerStreamingServer[ListNotificationsIntegrationsResponse]) error
 	mustEmbedUnimplementedKesselNotificationsIntegrationServiceServer()
@@ -115,6 +133,9 @@ func (UnimplementedKesselNotificationsIntegrationServiceServer) CreateNotificati
 }
 func (UnimplementedKesselNotificationsIntegrationServiceServer) UpdateNotificationsIntegration(context.Context, *UpdateNotificationsIntegrationRequest) (*UpdateNotificationsIntegrationResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method UpdateNotificationsIntegration not implemented")
+}
+func (UnimplementedKesselNotificationsIntegrationServiceServer) UpdateNotificationsIntegrations(grpc.ClientStreamingServer[UpdateNotificationsIntegrationRequest, UpdateNotificationsIntegrationResponse]) error {
+	return status.Errorf(codes.Unimplemented, "method UpdateNotificationsIntegrations not implemented")
 }
 func (UnimplementedKesselNotificationsIntegrationServiceServer) DeleteNotificationsIntegration(context.Context, *DeleteNotificationsIntegrationRequest) (*DeleteNotificationsIntegrationResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method DeleteNotificationsIntegration not implemented")
@@ -180,6 +201,13 @@ func _KesselNotificationsIntegrationService_UpdateNotificationsIntegration_Handl
 	return interceptor(ctx, in, info, handler)
 }
 
+func _KesselNotificationsIntegrationService_UpdateNotificationsIntegrations_Handler(srv interface{}, stream grpc.ServerStream) error {
+	return srv.(KesselNotificationsIntegrationServiceServer).UpdateNotificationsIntegrations(&grpc.GenericServerStream[UpdateNotificationsIntegrationRequest, UpdateNotificationsIntegrationResponse]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type KesselNotificationsIntegrationService_UpdateNotificationsIntegrationsServer = grpc.ClientStreamingServer[UpdateNotificationsIntegrationRequest, UpdateNotificationsIntegrationResponse]
+
 func _KesselNotificationsIntegrationService_DeleteNotificationsIntegration_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(DeleteNotificationsIntegrationRequest)
 	if err := dec(in); err != nil {
@@ -230,6 +258,11 @@ var KesselNotificationsIntegrationService_ServiceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams: []grpc.StreamDesc{
+		{
+			StreamName:    "UpdateNotificationsIntegrations",
+			Handler:       _KesselNotificationsIntegrationService_UpdateNotificationsIntegrations_Handler,
+			ClientStreams: true,
+		},
 		{
 			StreamName:    "ListNotificationsIntegrations",
 			Handler:       _KesselNotificationsIntegrationService_ListNotificationsIntegrations_Handler,

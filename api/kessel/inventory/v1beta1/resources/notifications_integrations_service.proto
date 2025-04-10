@@ -68,6 +68,11 @@ service KesselNotificationsIntegrationService {
     };
   };
 
+  // deprecated Temporary streaming update endpoint
+  rpc UpdateNotificationsIntegrations(stream UpdateNotificationsIntegrationRequest) returns (UpdateNotificationsIntegrationResponse) {
+
+  };
+
   rpc DeleteNotificationsIntegration(DeleteNotificationsIntegrationRequest) returns (DeleteNotificationsIntegrationResponse) {
     option (google.api.http) = {
       delete : "/api/inventory/v1beta1/resources/notifications-integrations"

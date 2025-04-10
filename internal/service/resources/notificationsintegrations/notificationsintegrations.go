@@ -2,7 +2,10 @@ package notificationsintegrations
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"google.golang.org/grpc"
+	"io"
 	"time"
 
 	"github.com/go-kratos/kratos/v2/log"
@@ -68,6 +71,24 @@ func (c *NotificationsIntegrationsService) UpdateNotificationsIntegration(ctx co
 		}
 	} else {
 		return nil, err
+	}
+}
+
+func (c *NotificationsIntegrationsService) UpdateNotificationsIntegrations(stream grpc.ClientStreamingServer[pb.UpdateNotificationsIntegrationRequest, pb.UpdateNotificationsIntegrationResponse]) error {
+	ctx := stream.Context()
+
+	for {
+		req, streamErr := stream.Recv()
+		if streamErr != nil {
+			if req == nil && errors.Is(streamErr, io.EOF) {
+				return stream.SendAndClose(&pb.UpdateNotificationsIntegrationResponse{})
+			}
+			return streamErr
+		}
+
+		if _, err := c.UpdateNotificationsIntegration(ctx, req); err != nil {
+			return err
+		}
 	}
 }
 

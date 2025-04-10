@@ -1,5 +1,5 @@
 #!/bin/bash
-set -e
+set -ex
 
 EXISTING_CLUSTER=$(kind get clusters 2> /dev/null | grep inventory-cluster)
 if [[ -z "$EXISTING_CLUSTER" ]]; then

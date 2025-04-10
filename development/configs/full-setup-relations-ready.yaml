@@ -1,0 +1,43 @@
+server:
+  http:
+    address: 0.0.0.0:8081
+  grpc:
+    address: 0.0.0.0:9081
+authn:
+  allow-unauthenticated: true
+authz:
+  impl: kessel
+  kessel:
+    insecure-client: true
+    url: relations-api:9000
+    enable-oidc-auth: false
+    principal-user-domain: 0.0.0.0:8084
+eventing:
+  eventer: stdout
+  kafka:
+storage:
+  disable-persistence: false
+  database: postgres
+  postgres:
+    host: "invdatabase"
+    port: "5433"
+    user: "postgres"
+    password: "yPsw5e6ab4bvAGe5H"
+    dbname: "spicedb"
+resources:
+  schemaPath: "data/schema/resources"
+  use_cache: true
+consumer:
+  enabled: true
+  bootstrap-servers: kafka:9093
+  retry-options:
+    consumer-max-retries: 3
+    operation-max-retries: 4
+    backoff-factor: 5
+  auth:
+    enabled: false
+log:
+  level: "info"
+  livez: true
+  readyz: true
+

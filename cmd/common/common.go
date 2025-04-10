@@ -21,6 +21,10 @@ func GetLogLevel() string {
 	return logLevel
 }
 
+func ToPointer[T any](v T) *T {
+	return &v
+}
+
 // InitLogger initializes the logger based on the provided log level
 func InitLogger(logLevel string, options LoggerOptions) (*log.Helper, log.Logger) {
 	// Convert logLevel string to log.Level type

@@ -54,7 +54,7 @@ objects:
             volumes:
               - name: config-volume
                 secret:
-                  secretName: inventory-api-config
+                  secretName: ${INVENTORY_API_CONFIG_SECRET}
           webServices:
             public:
               enabled: true
@@ -86,3 +86,6 @@ parameters:
   - description: Number of replicas
     name: REPLICAS
     value: "1"
+  - description: Name of the Inventory API Config K8s secret
+    name: INVENTORY_API_CONFIG_SECRET
+    value: inventory-api-config

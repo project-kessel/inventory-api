@@ -316,7 +316,6 @@ func (uc *Usecase) Delete(ctx context.Context, id model.ReporterResourceId) erro
 	m := &model.Resource{
 		// TODO: Create model
 	}
-	var resourceType = ""
 	if !uc.DisablePersistence {
 		// check if the resource exists
 		existingResource, err := uc.reporterResourceRepository.FindByReporterData(ctx, id.ReporterId, id.LocalResourceId)
@@ -351,6 +350,7 @@ func (uc *Usecase) Delete(ctx context.Context, id model.ReporterResourceId) erro
 		if id.ReporterType != "" {
 			namespace = strings.ToLower(id.ReporterType)
 		}
+		var resourceType = ""
 		resourceType = m.ResourceType
 		err := biz.DefaultUnsetWorkspace(ctx, namespace, id.LocalResourceId, resourceType, uc.Authz)
 		if err != nil {

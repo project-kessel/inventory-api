@@ -5,7 +5,6 @@ schema: |-
   	permission workspace = t_workspace
   	relation t_workspace: rbac/workspace
   }
-
   definition hbi/rhel_host {
   	permission update = t_workspace->inventory_host_update
   	permission view = t_workspace->inventory_host_view
@@ -487,10 +486,6 @@ schema: |-
   	permission notifications_integration_view_history = t_binding->notifications_integration_view_history + t_parent->notifications_integration_view_history
   	permission parent = t_parent
   	relation t_parent: rbac/workspace | rbac/tenant
-  }
-  
-  definition hbi/rhel_host {
-    relation t_workspace: rbac/workspace
   }
 
   definition acm/k8s_cluster {

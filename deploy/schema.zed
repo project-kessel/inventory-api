@@ -1,16 +1,15 @@
   definition hbi/host {
-  	permission update = t_workspace->inventory_host_update
-  	permission view = t_workspace->inventory_host_view
-  	permission workspace = t_workspace
-  	relation t_workspace: rbac/workspace
-  }
-
-  definition hbi/rhel_host {
-  	permission update = t_workspace->inventory_host_update
-  	permission view = t_workspace->inventory_host_view
-  	permission workspace = t_workspace
-  	relation t_workspace: rbac/workspace
-  }
+    	permission update = t_workspace->inventory_host_update
+    	permission view = t_workspace->inventory_host_view
+    	permission workspace = t_workspace
+    	relation t_workspace: rbac/workspace
+    }
+    definition hbi/rhel_host {
+    	permission update = t_workspace->inventory_host_update
+    	permission view = t_workspace->inventory_host_view
+    	permission workspace = t_workspace
+    	relation t_workspace: rbac/workspace
+    }
 
   definition notifications/integration {
   	permission delete = t_workspace->notifications_integration_delete

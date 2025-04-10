@@ -168,6 +168,7 @@ func NewCommand(
 			// START: construct pubsub (postgres only)
 			var listenManager *pubsub.ListenManager
 			var notifier *pubsub.PgxNotifier
+			listenManagerErr := make(chan error)
 			if storageConfig.Options.Database == "postgres" {
 				pubSubLogger := log.NewHelper(log.With(logger, "subsystem", "pubsub"))
 				pgxPool, err := storage.NewPgx(storageConfig, pubSubLogger)
@@ -184,13 +185,9 @@ func NewCommand(
 				}
 				listenManager = pubsub.NewListenManager(pubSubLogger, listenerDriver)
 
-				listManagerErr := make(chan error, 1)
 				go func() {
-					listManagerErr <- listenManager.Run(ctx)
+					listenManagerErr <- listenManager.Run(ctx)
 				}()
-				if err := <-listManagerErr; err != nil {
-					return fmt.Errorf("error running listenManager: %w", err)
-				}
 
 				// Run notifier on a separate connection, as the listener requires it's own
 				notifierDriver := pubsub.NewPgxDriver(pgxPool)
@@ -340,6 +337,8 @@ func NewCommand(
 			select {
 			case err := <-srvErrs:
 				shutdown(err)
+			case lmErr := <-listenManagerErr:
+				shutdown(lmErr)
 			case sig := <-quit:
 				shutdown(sig)
 			case emErr := <-eventingManager.Errs():

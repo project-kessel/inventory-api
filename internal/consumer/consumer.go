@@ -30,8 +30,8 @@ import (
 	"gorm.io/gorm"
 )
 
-var ClosedError = errors.New("consumer closed")
-var MaxRetriesError = errors.New("max retries reached")
+var ErrClosed = errors.New("consumer closed")
+var ErrMaxRetries = errors.New("max retries reached")
 
 type Consumer interface {
 	Consume() error
@@ -231,7 +231,7 @@ func (i *InventoryConsumer) Consume() error {
 		}
 	}
 	err = i.Shutdown()
-	if !errors.Is(err, ClosedError) {
+	if !errors.Is(err, ErrClosed) {
 		return fmt.Errorf("error in consumer shutdown: %v", err)
 	}
 	return err
@@ -444,9 +444,9 @@ func (i *InventoryConsumer) Shutdown() error {
 			i.Logger.Errorf("Error closing kafka consumer: %v", err)
 			return err
 		}
-		return ClosedError
+		return ErrClosed
 	}
-	return ClosedError
+	return ErrClosed
 }
 
 // Retry executes the given function and will retry on failure with backoff until max retries is reached
@@ -470,5 +470,5 @@ func (i *InventoryConsumer) Retry(operation func() (string, error)) (string, err
 		return fmt.Sprintf("%s", resp), nil
 	}
 	i.Logger.Errorf("Error processing request (max attempts reached: %v): %v", attempts, err)
-	return "", MaxRetriesError
+	return "", ErrMaxRetries
 }

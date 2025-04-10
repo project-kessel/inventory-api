@@ -2,6 +2,7 @@ package consumer
 
 import (
 	"context"
+
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
 )
@@ -155,7 +156,7 @@ func (m *MetricsCollector) Collect(stats StatsData) {
 	m.replyq.Record(ctx, stats.Replyq, stats.LabelSet(""))
 
 	// topics.partitions
-	for partitionKey, _ := range stats.Topics[outboxTopic].Partitions {
+	for partitionKey := range stats.Topics[outboxTopic].Partitions {
 		if partitionKey != "-1" {
 			m.fetchqCnt.Record(ctx, stats.Topics[outboxTopic].Partitions[partitionKey].FetchqCnt, stats.LabelSet(partitionKey))
 			m.fetchqSize.Record(ctx, stats.Topics[outboxTopic].Partitions[partitionKey].FetchqSize, stats.LabelSet(partitionKey))

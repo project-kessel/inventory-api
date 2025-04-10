@@ -183,7 +183,14 @@ func NewCommand(
 					return fmt.Errorf("error setting up listener: %v", err)
 				}
 				listenManager = pubsub.NewListenManager(pubSubLogger, listenerDriver)
-				go listenManager.Run(ctx)
+
+				listManagerErr := make(chan error, 1)
+				go func() {
+					listManagerErr <- listenManager.Run(ctx)
+				}()
+				if err := <-listManagerErr; err != nil {
+					return fmt.Errorf("error running listenManager: %w", err)
+				}
 
 				// Run notifier on a separate connection, as the listener requires it's own
 				notifierDriver := pubsub.NewPgxDriver(pgxPool)
@@ -309,7 +316,7 @@ func NewCommand(
 							shutdown(err)
 						}
 						err = inventoryConsumer.Consume()
-						if e.Is(err, consumer.ClosedError) {
+						if e.Is(err, consumer.ErrClosed) {
 							inventoryConsumer.Logger.Errorf("consumer unable to process current message -- restarting consumer")
 							retries++
 							if retries < consumerOptions.RetryOptions.ConsumerMaxRetries {

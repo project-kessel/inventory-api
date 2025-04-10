@@ -1,9 +1,10 @@
 package consumer
 
 import (
-	"github.com/stretchr/testify/assert"
 	"reflect"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestMetrics_New(t *testing.T) {
@@ -11,8 +12,7 @@ func TestMetrics_New(t *testing.T) {
 		name:        "TestMetricsNew_DefaultMeters",
 		description: "ensures a metrics collector is configured with all default meters",
 	}
-	var errs []error
-	errs = test.TestSetup()
+	errs := test.TestSetup()
 	assert.Nil(t, errs)
 
 	structValues := reflect.ValueOf(test.metrics)

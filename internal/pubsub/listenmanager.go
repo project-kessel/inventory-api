@@ -41,12 +41,6 @@ func NewListenManager(logger *log.Helper, driver Driver) *ListenManager {
 	}
 }
 
-type channelChange struct {
-	channel   string
-	close     func()
-	operation string
-}
-
 func (l *ListenManager) Subscribe(txId string) Subscription {
 	l.mu.Lock()
 	defer l.mu.Unlock()

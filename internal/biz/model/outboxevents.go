@@ -114,10 +114,7 @@ func newResourceEvent(operationType EventOperationType, resource *Resource) (*Re
 
 	var labels []EventResourceLabel
 	for _, val := range resource.Labels {
-		labels = append(labels, EventResourceLabel{
-			Key:   val.Key,
-			Value: val.Value,
-		})
+		labels = append(labels, EventResourceLabel(val))
 	}
 
 	var reportedTime time.Time
@@ -177,11 +174,15 @@ func convertResourceToResourceEvent(resource Resource, operationType EventOperat
 		return nil, fmt.Errorf("failed to create resource event: %w", err)
 	}
 
-	marshalledJson, error := json.Marshal(resourceEvent)
-	if error != nil {
-		return nil, fmt.Errorf("failed to marshal resource to json: %w", error)
+	marshalledJson, err := json.Marshal(resourceEvent)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal resource to json: %w", err)
 	}
-	json.Unmarshal(marshalledJson, &payload)
+
+	err = json.Unmarshal(marshalledJson, &payload)
+	if err != nil {
+		return nil, fmt.Errorf("failed to unmarshal json to payload: %w", err)
+	}
 
 	return payload, nil
 }

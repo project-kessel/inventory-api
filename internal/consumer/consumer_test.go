@@ -47,9 +47,17 @@ func (t *TestCase) TestSetup() []error {
 	var errs []error
 	var err error
 
-	errs = t.options.Complete()
-	errs = t.options.Validate()
-	t.completedConfig, errs = NewConfig(t.options).Complete()
+	if errList := t.options.Complete(); err != nil {
+		errs = append(errs, errList...)
+	}
+	if errList := t.options.Validate(); err != nil {
+		errs = append(errs, errList...)
+	}
+	cfg, errList := NewConfig(t.options).Complete()
+	t.completedConfig = cfg
+	if errList != nil {
+		errs = append(errs, errList...)
+	}
 
 	notifier := &pubsub.NotifierMock{}
 
@@ -223,9 +231,9 @@ func TestInventoryConsumer_Retry(t *testing.T) {
 		},
 		{
 			description:   "retry fails and returns MaxRetriesError",
-			funcToExecute: func() (string, error) { return "fail", MaxRetriesError },
+			funcToExecute: func() (string, error) { return "fail", ErrMaxRetries },
 			exectedResult: "",
-			expectedErr:   MaxRetriesError,
+			expectedErr:   ErrMaxRetries,
 		},
 	}
 

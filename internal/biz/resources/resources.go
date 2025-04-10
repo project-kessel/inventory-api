@@ -350,8 +350,7 @@ func (uc *Usecase) Delete(ctx context.Context, id model.ReporterResourceId) erro
 		if id.ReporterType != "" {
 			namespace = strings.ToLower(id.ReporterType)
 		}
-		var resourceType = ""
-		resourceType = m.ResourceType
+		resourceType := m.ResourceType
 		err := biz.DefaultUnsetWorkspace(ctx, namespace, id.LocalResourceId, resourceType, uc.Authz)
 		if err != nil {
 			return err

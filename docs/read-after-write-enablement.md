@@ -20,7 +20,7 @@ Modify [.inventory-api.yaml](../.inventory-api.yaml).
    - Rebuild inventory after making these changes.
 
 ## Ephemeral Setup
-Modify [kessel-inventory-ephem-w-debezium.yaml](../deploy/kessel-inventory-ephem-w-debezium.yaml).
+Modify [kessel-inventory-ephem.yaml](../deploy/kessel-inventory-ephem.yaml).
    - Follow the same steps as for [Local Setup](#local-setup), ensuring to update the `reporter_id` in the allowlist if necessary.
    - After changes are made, cycle the `inventory-api` pods or deploy them. For deployment instructions, refer to [ephemeral-testing.md](./ephemeral-testing.md).
 

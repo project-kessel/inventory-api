@@ -233,7 +233,7 @@ make inventory-down
 
 #### Running in Ephemeral Cluster with Relations API using Bonfire
 
-See [Testing Inventory in Ephemeral with Debezium](./docs/testing-inventory-in-ephemeral-w-debezium.md) for instructions on how to deploy Kessel Inventory in the ephemeral cluster.
+See [Testing Inventory in Ephemeral](./docs/ephemeral-testing.md) for instructions on how to deploy Kessel Inventory in the ephemeral cluster.
 
 ### API/Proto files Changes
 

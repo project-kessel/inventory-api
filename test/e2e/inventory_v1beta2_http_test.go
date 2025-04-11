@@ -3,6 +3,7 @@ package e2e
 import (
 	"context"
 	pbv1beta2 "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2"
+	authzbeta2 "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2/authz"
 	"github.com/project-kessel/inventory-client-go/common"
 	v1beta2 "github.com/project-kessel/inventory-client-go/v1beta2"
 	"github.com/stretchr/testify/assert"
@@ -13,7 +14,6 @@ import (
 // V1Beta2
 func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_Host(t *testing.T) {
 	t.Parallel()
-
 	c := common.NewConfig(
 		common.WithHTTPUrl(inventoryapi_http_url),
 		common.WithTLSInsecure(insecure),
@@ -203,17 +203,59 @@ func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_K8S_Policy(t *testing.T) {
 
 }
 
-// TODO
-//func TestInventoryAPIHTTP_v1beta2_AuthzLifecycle(t *testing.T) {
-//	t.Parallel()
-//
-//	c := common.NewConfig(
-//		common.WithHTTPUrl(inventoryapi_http_url),
-//		common.WithTLSInsecure(insecure),
-//		common.WithHTTPTLSConfig(tlsConfig),
-//	)
-//
-//	client, err := v1beta2.NewHttpClient(context.Background(), c)
-//	assert.NoError(t, err, "Failed to create v1beta2 HTTP client")
-//
-//}
+func TestInventoryAPIHTTP_v1beta2_AuthzLifecycle(t *testing.T) {
+	t.Parallel()
+
+	c := common.NewConfig(
+		common.WithHTTPUrl(inventoryapi_http_url),
+		common.WithTLSInsecure(insecure),
+		common.WithHTTPTLSConfig(tlsConfig),
+	)
+
+	client, err := v1beta2.NewHttpClient(context.Background(), c)
+	assert.NoError(t, err, "Failed to create v1beta2 HTTP client")
+
+	ctx := context.Background()
+
+	subject := &authzbeta2.SubjectReference{
+		Subject: &authzbeta2.ObjectReference{
+			Type: &authzbeta2.ObjectType{
+				Namespace: "rbac",
+				Name:      "principal",
+			},
+			Id: "bob",
+		},
+	}
+
+	parent := &authzbeta2.ObjectReference{
+		Type: &authzbeta2.ObjectType{
+			Namespace: "rbac",
+			Name:      "group",
+		},
+		Id: "bob_club",
+	}
+
+	// /authz/check
+	checkReq := &authzbeta2.CheckRequest{
+		Subject:  subject,
+		Relation: "member",
+		Parent:   parent,
+	}
+
+	checkResp, err := client.KesselCheckService.Check(ctx, checkReq)
+	assert.NoError(t, err, "check endpoint failed")
+	assert.NotNil(t, checkResp, "check response should not be nil")
+	assert.Equal(t, authzbeta2.CheckResponse_ALLOWED_FALSE, checkResp.Allowed)
+
+	// /authz/checkforupdate
+	checkUpdateReq := &authzbeta2.CheckForUpdateRequest{
+		Subject:  subject,
+		Relation: "member",
+		Parent:   parent,
+	}
+
+	checkUpdateResp, err := client.KesselCheckService.CheckForUpdate(ctx, checkUpdateReq)
+	assert.NoError(t, err, "checkforupdate endpoint failed")
+	assert.NotNil(t, checkUpdateResp, "checkforupdate response should not be nil")
+	assert.Equal(t, authzbeta2.CheckForUpdateResponse_ALLOWED_FALSE, checkUpdateResp.Allowed)
+}

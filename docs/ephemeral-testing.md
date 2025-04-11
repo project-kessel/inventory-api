@@ -20,7 +20,7 @@ Building your own container image to test with is easy, you just need a **public
 
 
 **To build the image on Linux:**
-1) Set the image repo for where the image should be pushed to: `export IMAGE=quay.io/my-repo/relations-api`
+1) Set the image repo for where the image should be pushed to: `export IMAGE=quay.io/my-repo/kessel-inventory`
 2) Set your  Quay.io credentials so your container engine can login to push:
 
 ```shell
@@ -33,7 +33,7 @@ export RH_REGISTRY_TOKEN=your-redhat-registry-token
 3) Build and push the image: `make docker-build-push`
 
 **On Mac:**
-1) Set the image repo for where the image should be pushed to: `export QUAY_REPO_RELATIONS=your-quay-repo`
+1) Set the image repo for where the image should be pushed to: `export QUAY_REPO_INVENTORY=your-quay-repo`
 2) Login to Quay with Podman/Docker and your Quay credentials: `podman login quay.io` or `docker login quay.io`
 3) Build and push the image: `make build-push-minimal`
 

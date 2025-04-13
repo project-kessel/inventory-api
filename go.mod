@@ -1,7 +1,9 @@
 module github.com/project-kessel/inventory-api
 
 // Bumping to versions above 1.22.9 will break the E2E tests
-go 1.22.9
+go 1.23.0
+
+toolchain go1.23.8
 
 require (
 	buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go v1.36.6-20250307204501-0409229c3780.1
@@ -95,7 +97,7 @@ require (
 	golang.org/x/sync v0.11.0 // indirect
 	golang.org/x/sys v0.30.0 // indirect
 	golang.org/x/text v0.22.0 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20250124145028-65684f501c47 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20250409194420-de1ac958c67a // indirect
 
 )
 

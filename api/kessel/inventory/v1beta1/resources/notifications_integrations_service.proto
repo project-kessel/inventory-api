@@ -27,7 +27,18 @@ message UpdateNotificationsIntegrationRequest {
   NotificationsIntegration integration = 1 [ (buf.validate.field).required = true ];
 }
 
+message UpdateNotificationsIntegrationsRequest {
+  // The resource to be updated will be defined by
+  // \"<reporter_data.reporter_type>:<reporter_instaance_id>:<reporter_data.local_resource_id>\"
+  // from the request body.
+  NotificationsIntegration integration = 1 [ (buf.validate.field).required = true ];
+}
+
 message UpdateNotificationsIntegrationResponse {}
+
+message UpdateNotificationsIntegrationsResponse {
+    int32 upserts_completed = 1;
+}
 
 message DeleteNotificationsIntegrationRequest {
   // The resource to be deleted will be defined by 
@@ -66,6 +77,11 @@ service KesselNotificationsIntegrationService {
       put : "/api/inventory/v1beta1/resources/notifications-integrations"
       body : "*"
     };
+  };
+
+  // deprecated Temporary streaming update endpoint
+  rpc UpdateNotificationsIntegrations(stream UpdateNotificationsIntegrationsRequest) returns (UpdateNotificationsIntegrationsResponse) {
+
   };
 
   rpc DeleteNotificationsIntegration(DeleteNotificationsIntegrationRequest) returns (DeleteNotificationsIntegrationResponse) {

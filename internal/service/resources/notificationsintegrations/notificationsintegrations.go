@@ -2,7 +2,10 @@ package notificationsintegrations
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"google.golang.org/grpc"
+	"io"
 	"time"
 
 	"github.com/go-kratos/kratos/v2/log"
@@ -68,6 +71,34 @@ func (c *NotificationsIntegrationsService) UpdateNotificationsIntegration(ctx co
 		}
 	} else {
 		return nil, err
+	}
+}
+
+// UpdateNotificationsIntegrations deprecated
+func (c *NotificationsIntegrationsService) UpdateNotificationsIntegrations(stream grpc.ClientStreamingServer[pb.UpdateNotificationsIntegrationsRequest, pb.UpdateNotificationsIntegrationsResponse]) error {
+	// authn streaming middleware does authenticate, but it does not currently pass the identity to the stream context
+	// we hardcode the identity here
+	identity := &authnapi.Identity{
+		Principal: "UpdateNotificationsIntegrations-bulk-upload",
+	}
+	ctx := context.WithValue(context.Background(), middleware.IdentityRequestKey, identity)
+
+	upserts := 0
+	for {
+		req, streamErr := stream.Recv()
+		if streamErr != nil {
+			if req == nil && errors.Is(streamErr, io.EOF) {
+				return stream.SendAndClose(&pb.UpdateNotificationsIntegrationsResponse{UpsertsCompleted: int32(upserts)})
+			}
+			return streamErr
+		}
+
+		if _, err := c.UpdateNotificationsIntegration(ctx, &pb.UpdateNotificationsIntegrationRequest{
+			Integration: req.GetIntegration(),
+		}); err != nil {
+			return err
+		}
+		upserts++
 	}
 }
 

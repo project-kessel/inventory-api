@@ -495,3 +495,8 @@ schema: |-
   definition acm/k8s_policy {
     relation t_workspace: rbac/workspace
   }
+  
+  definition notifications/notifications_integration {
+    relation t_workspace: rbac/workspace
+  }
+  

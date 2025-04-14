@@ -75,7 +75,7 @@ func (c *NotificationsIntegrationsService) UpdateNotificationsIntegration(ctx co
 }
 
 // UpdateNotificationsIntegrations deprecated
-func (c *NotificationsIntegrationsService) UpdateNotificationsIntegrations(stream grpc.ClientStreamingServer[pb.UpdateNotificationsIntegrationRequest, pb.UpdateNotificationsIntegrationsResponse]) error {
+func (c *NotificationsIntegrationsService) UpdateNotificationsIntegrations(stream grpc.ClientStreamingServer[pb.UpdateNotificationsIntegrationsRequest, pb.UpdateNotificationsIntegrationsResponse]) error {
 	// authn streaming middleware does authenticate, but it does not currently pass the identity to the stream context
 	// we hardcode the identity here
 	identity := &authnapi.Identity{
@@ -93,7 +93,9 @@ func (c *NotificationsIntegrationsService) UpdateNotificationsIntegrations(strea
 			return streamErr
 		}
 
-		if _, err := c.UpdateNotificationsIntegration(ctx, req); err != nil {
+		if _, err := c.UpdateNotificationsIntegration(ctx, &pb.UpdateNotificationsIntegrationRequest{
+			Integration: req.GetIntegration(),
+		}); err != nil {
 			return err
 		}
 		upserts++

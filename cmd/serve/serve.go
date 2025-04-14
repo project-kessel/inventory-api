@@ -169,7 +169,7 @@ func NewCommand(
 			lookup_controller := resourcesctl.New(resource_repo, inventoryresources_repo, authorizer, eventingManager, "authz", log.With(logger, "subsystem", "authz_controller"), storageConfig.Options.DisablePersistence)
 			lookup_service := resourcesvc.NewKesselLookupServiceV1beta2(lookup_controller)
 			pbv1beta2.RegisterKesselLookupServiceServer(server.GrpcServer, lookup_service)
-			//TODO: http service not getting generated
+
 
 			//v1beta1
 			// wire together notificationsintegrations handling

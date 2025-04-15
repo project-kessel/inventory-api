@@ -191,7 +191,7 @@ func (i *InventoryConsumer) Consume() error {
 						i.Logger.Errorf("failed to notify producer: %v", err)
 						// Do not continue here, we should still commit the offset
 					} else {
-						i.Logger.Debugf("notified producer of processed message: %s" + txid)
+						i.Logger.Debugf("notified producer of processed message: %s", txid)
 					}
 				} else {
 					i.Logger.Debugf("skipping notification to producer: txid not present or notifier not initialized")
@@ -307,7 +307,6 @@ func ParseHeaders(msg *kafka.Message) map[string]string {
 		case "operation":
 			headers["operation"] = string(v.Value)
 		case "txid":
-
 			headers["txid"] = string(v.Value)
 		}
 	}

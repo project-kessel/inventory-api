@@ -187,6 +187,9 @@ stringData:
         backoff-factor: 5
       auth:
         enabled: false
+    consistency:
+      read-after-write-enabled: true
+      read-after-write-allowlist: ["*"]
     storage:
       disable-persistence: false
       database: postgres

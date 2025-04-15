@@ -39,7 +39,7 @@ func (s *subscription) BlockForNotification(ctx context.Context) error {
 				return nil
 			}
 		case <-ctx.Done():
-			return fmt.Errorf("context cancelled while waiting for notification")
+			return fmt.Errorf("context cancelled while waiting for notification %v", context.Cause(ctx))
 		}
 	}
 }

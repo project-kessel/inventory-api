@@ -123,7 +123,8 @@ func Test_ACMKafkaConsumer(t *testing.T) {
 	kafkaClientCert := os.Getenv("KAFKA_CLIENT_CERT") // Client cert for mutual authentication
 	kafkaClientKey := os.Getenv("KAFKA_CLIENT_KEY")   // Client private key for mutual authentication
 
-	topic := getEnvOrDefault("KAFKA_TOPIC", "outbox.event.kessel.resources")
+	topic := getEnvOrDefault("KAFKA_TOPIC", "kessel-inventory")                           // Needed for old eventing e2e tests
+	outboxTopic := getEnvOrDefault("KAFKA_TOPIC_OUTBOX", "outbox.event.kessel.resources") // Needed for outbox eventing e2e tests
 
 	adminConfig := &kafka.ConfigMap{
 		"bootstrap.servers": kafkaBootstrapServers,
@@ -135,6 +136,10 @@ func Test_ACMKafkaConsumer(t *testing.T) {
 	defer adminClient.Close()
 
 	if err := ensureTopicExists(adminClient, topic); err != nil {
+		t.Fatalf("Failed to ensure topic exists: %v", err)
+	}
+
+	if err := ensureTopicExists(adminClient, outboxTopic); err != nil {
 		t.Fatalf("Failed to ensure topic exists: %v", err)
 	}
 
@@ -206,7 +211,7 @@ func Test_ACMKafkaConsumer(t *testing.T) {
 		}
 	}()
 
-	err = consumer.Subscribe(topic, nil)
+	err = consumer.Subscribe(outboxTopic, nil)
 	if err != nil {
 		t.Fatalf("Failed to subscribe to topic: %v", err)
 	}

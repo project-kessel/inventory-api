@@ -2,9 +2,9 @@
 // versions:
 // - protoc-gen-go-http v2.8.0
 // - protoc             (unknown)
-// source: kessel/inventory/v1beta2/authz/check.proto
+// source: kessel/inventory/v1beta2/check.proto
 
-package authz
+package v1beta2
 
 import (
 	context "context"
@@ -19,8 +19,8 @@ var _ = binding.EncodeURL
 
 const _ = http.SupportPackageIsVersion1
 
-const OperationKesselCheckServiceCheck = "/kessel.inventory.v1beta2.authz.KesselCheckService/Check"
-const OperationKesselCheckServiceCheckForUpdate = "/kessel.inventory.v1beta2.authz.KesselCheckService/CheckForUpdate"
+const OperationKesselCheckServiceCheck = "/kessel.inventory.v1beta2.KesselCheckService/Check"
+const OperationKesselCheckServiceCheckForUpdate = "/kessel.inventory.v1beta2.KesselCheckService/CheckForUpdate"
 
 type KesselCheckServiceHTTPServer interface {
 	// Check Checks for the existence of a single Relationship
@@ -31,8 +31,8 @@ type KesselCheckServiceHTTPServer interface {
 
 func RegisterKesselCheckServiceHTTPServer(s *http.Server, srv KesselCheckServiceHTTPServer) {
 	r := s.Route("/")
-	r.POST("/api/inventory/v1beta2/authz/check", _KesselCheckService_Check0_HTTP_Handler(srv))
-	r.POST("/api/inventory/v1beta2/authz/checkforupdate", _KesselCheckService_CheckForUpdate0_HTTP_Handler(srv))
+	r.POST("/api/inventory/v1beta2/check", _KesselCheckService_Check0_HTTP_Handler(srv))
+	r.POST("/api/inventory/v1beta2/checkforupdate", _KesselCheckService_CheckForUpdate0_HTTP_Handler(srv))
 }
 
 func _KesselCheckService_Check0_HTTP_Handler(srv KesselCheckServiceHTTPServer) func(ctx http.Context) error {
@@ -94,7 +94,7 @@ func NewKesselCheckServiceHTTPClient(client *http.Client) KesselCheckServiceHTTP
 
 func (c *KesselCheckServiceHTTPClientImpl) Check(ctx context.Context, in *CheckRequest, opts ...http.CallOption) (*CheckResponse, error) {
 	var out CheckResponse
-	pattern := "/api/inventory/v1beta2/authz/check"
+	pattern := "/api/inventory/v1beta2/check"
 	path := binding.EncodeURL(pattern, in, false)
 	opts = append(opts, http.Operation(OperationKesselCheckServiceCheck))
 	opts = append(opts, http.PathTemplate(pattern))
@@ -107,7 +107,7 @@ func (c *KesselCheckServiceHTTPClientImpl) Check(ctx context.Context, in *CheckR
 
 func (c *KesselCheckServiceHTTPClientImpl) CheckForUpdate(ctx context.Context, in *CheckForUpdateRequest, opts ...http.CallOption) (*CheckForUpdateResponse, error) {
 	var out CheckForUpdateResponse
-	pattern := "/api/inventory/v1beta2/authz/checkforupdate"
+	pattern := "/api/inventory/v1beta2/checkforupdate"
 	path := binding.EncodeURL(pattern, in, false)
 	opts = append(opts, http.Operation(OperationKesselCheckServiceCheckForUpdate))
 	opts = append(opts, http.PathTemplate(pattern))

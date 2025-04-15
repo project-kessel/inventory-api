@@ -91,11 +91,12 @@ func ExtractWorkspaceId(commonResourceData *structpb.Struct) (string, error) {
 	return workspaceId, nil
 }
 
-func ExtractInventoryId(inventoryIDStr string) (*uuid.UUID, error) {
-	if inventoryIDStr != "" {
-		inventoryID, err := uuid.Parse(inventoryIDStr)
+func ExtractInventoryId(data *structpb.Struct) (*uuid.UUID, error) {
+	idStr := data.Fields["inventory_id"].GetStringValue()
+	if idStr != "" {
+		inventoryID, err := uuid.Parse(idStr)
 		if err != nil {
-			return nil, nil
+			return nil, err
 		}
 		return &inventoryID, nil
 	}

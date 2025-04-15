@@ -229,6 +229,11 @@ func convertResourceToSetTupleEvent(resource Resource, namespace string) (JsonOb
 func convertResourceToUnsetTupleEvent(resource Resource, namespace string) (JsonObject, error) {
 	payload := JsonObject{}
 
+	if resource.ReporterType != "" {
+		// v1beta2 compatibility for namespace override, see common/DefaultSetWorkspace for parity
+		namespace = strings.ToLower(resource.ReporterType)
+	}
+
 	tuple := &kessel.RelationTupleFilter{
 		ResourceNamespace: proto.String(namespace),
 		ResourceType:      proto.String(resource.ResourceType),

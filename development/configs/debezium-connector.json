@@ -8,6 +8,7 @@
     "database.password": "yPsw5e6ab4bvAGe5H",
     "database.dbname" : "spicedb",
     "topic.prefix": "kessel-inventory",
+    "table.whitelist": "public.outbox_events",
     "table.include.list": "public.outbox_events",
     "transforms": "outbox",
     "transforms.outbox.type": "io.debezium.transforms.outbox.EventRouter",

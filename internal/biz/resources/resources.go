@@ -322,7 +322,6 @@ func (uc *Usecase) Create(ctx context.Context, m *model.Resource, wait_for_sync 
 		}
 
 		if readAfterWriteEnabled {
-
 			// 30 sec max timeout
 			timeoutCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 			defer cancel()

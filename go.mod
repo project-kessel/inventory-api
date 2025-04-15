@@ -1,9 +1,7 @@
 module github.com/project-kessel/inventory-api
 
 // Bumping to versions above 1.22.9 will break the E2E tests
-go 1.23.0
-
-toolchain go1.24.0
+go 1.22.9
 
 require (
 	buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go v1.36.6-20250307204501-0409229c3780.1
@@ -62,7 +60,7 @@ require (
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
-	github.com/jackc/pgx/v5 v5.7.4 // indirect
+	github.com/jackc/pgx/v5 v5.7.1 // indirect
 	github.com/jackc/puddle/v2 v2.2.2 // indirect
 	github.com/jinzhu/inflection v1.0.0 // indirect
 	github.com/jinzhu/now v1.1.5 // indirect
@@ -106,4 +104,4 @@ require (
 // Revert to packagaes that can use verions of go <= 1.22.9
 replace golang.org/x/crypto => golang.org/x/crypto v0.31.0
 
-replace golang.org/x/net => golang.org/x/net v0.36.0
+replace golang.org/x/net => golang.org/x/net v0.34.0

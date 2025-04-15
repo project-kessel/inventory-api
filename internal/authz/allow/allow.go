@@ -2,9 +2,10 @@ package allow
 
 import (
 	"context"
+	"io"
+
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
-	"io"
 
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/project-kessel/inventory-api/internal/biz/model"

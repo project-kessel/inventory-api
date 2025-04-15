@@ -24,6 +24,11 @@ storage:
   database: sqlite3
   sqlite3:
     dsn: inventory.db
+consumer:
+  enabled: false
+resources:
+  schemaPath: "data/schema/resources"
+  use_cache: true
 log:
   level: "info"
   livez: true

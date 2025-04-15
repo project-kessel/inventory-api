@@ -6,32 +6,21 @@ server:
     address: localhost:9000
 authn:
    allow-unauthenticated: true
-#   oidc:
-#     authn-server-url: http://localhost:8084/realms/redhat-external
-#     skip-client-id-check: true
-#     skip-issuer-check: true
-#     principal-user-domain: localhost
 authz:
   impl: allow-all
 eventing:
   eventer: stdout
-  kafka:
 storage:
   disable-persistence: false
   database: sqlite3
   sqlite3:
     dsn: inventory.db
-  postgres:
-    host: "localhost"
-    port: "5432"
-    user:
-    password:
-    dbname:
 resources:
   schemaPath: "data/schema/resources"
   use_cache: true
+consumer:
+  enabled: false
 log:
   level: "info"
   livez: true
   readyz: true
-

@@ -17,6 +17,10 @@ ENV CGO_ENABLED 1
 RUN go mod download
 
 COPY api ./api
+# Copy API files for gorm usage
+COPY cmd ./cmd
+COPY internal ./internal
+
 COPY test/e2e .
 
 RUN go mod tidy

@@ -74,23 +74,7 @@ type RelationshipReporter struct {
 	ReporterInstanceId     string `json:"reporter_instance_id"`
 }
 
-type OperationType interface {
-	OperationType() operationType
-}
-
-type operationType string
-
-const (
-	OperationTypeCreated operationType = "created"
-	OperationTypeUpdated operationType = "updated"
-	OperationTypeDeleted operationType = "deleted"
-)
-
-func (o operationType) OperationType() operationType {
-	return o
-}
-
-func NewResourceEvent(operationType OperationType, resource *model.Resource, reportedTime time.Time) (*Event, error) {
+func NewResourceEvent(operationType model.EventOperationType, resource *model.Resource, reportedTime time.Time) (*Event, error) {
 	const eventType = "resources"
 
 	eventId, err := uuid.NewUUID() // Todo: we need to have an stable id if we implement some re-trying logic
@@ -111,11 +95,11 @@ func NewResourceEvent(operationType OperationType, resource *model.Resource, rep
 	var deletedAt *time.Time
 
 	switch operationType {
-	case OperationTypeCreated:
+	case model.OperationTypeCreated:
 		createdAt = &reportedTime
-	case OperationTypeUpdated:
+	case model.OperationTypeUpdated:
 		updatedAt = &reportedTime
-	case OperationTypeDeleted:
+	case model.OperationTypeDeleted:
 		deletedAt = &reportedTime
 	}
 
@@ -151,7 +135,7 @@ func NewResourceEvent(operationType OperationType, resource *model.Resource, rep
 	}, nil
 }
 
-func NewRelationshipEvent(operationType OperationType, relationship *model.Relationship, reportedTime time.Time) (*Event, error) {
+func NewRelationshipEvent(operationType model.EventOperationType, relationship *model.Relationship, reportedTime time.Time) (*Event, error) {
 	const eventType = "resources-relationship"
 
 	eventId, err := uuid.NewUUID() // Todo: we need to have an stable id if we implement some re-trying logic
@@ -164,11 +148,11 @@ func NewRelationshipEvent(operationType OperationType, relationship *model.Relat
 	var deletedAt *time.Time
 
 	switch operationType {
-	case OperationTypeCreated:
+	case model.OperationTypeCreated:
 		createdAt = &reportedTime
-	case OperationTypeUpdated:
+	case model.OperationTypeUpdated:
 		updatedAt = &reportedTime
-	case OperationTypeDeleted:
+	case model.OperationTypeDeleted:
 		deletedAt = &reportedTime
 	}
 

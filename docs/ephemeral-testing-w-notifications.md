@@ -198,7 +198,7 @@ apps:
 
 ### Deploy
 
-After updating your config, ensuring your images are built, and publiclly available in Quay, run the following to deploy all 3 services
+After updating your config, ensuring your images are built, and publicly available in Quay, run the following to deploy all 3 services
 
 ```shell
 bonfire deploy notifications --source=appsre --ref-env insights-stage --timeout 600 --local-config-method merge

@@ -15,6 +15,8 @@ option java_package = "org.project_kessel.api.inventory.v1beta1.resources";
 message CreateK8sClusterRequest {
   // The k8s cluster to create in Kessel Asset Inventory
   K8sCluster k8s_cluster = 1 [  json_name = "k8s_cluster" ];
+  // Will wait for synchronous processes to complete before returning
+  bool wait_for_sync = 2; 
 }
 
 message CreateK8sClusterResponse {}
@@ -24,6 +26,8 @@ message UpdateK8sClusterRequest {
   // \"<reporter_data.reporter_type>:<reporter_instaance_id>:<reporter_data.local_resource_id>\"
   // from the request body.
   K8sCluster k8s_cluster = 1 [  json_name = "k8s_cluster" ];
+  // Will wait for synchronous processes to complete before returning
+  bool wait_for_sync = 2; 
 }
 
 message UpdateK8sClusterResponse {}

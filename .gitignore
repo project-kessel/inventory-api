@@ -44,6 +44,7 @@ inventory.db
 
 inventory-api.tar
 inventory-e2e-tests.tar
+kafka-connect.tar
 
 multicluster-global-hub/
 scripts/kubeconfig-global-hub

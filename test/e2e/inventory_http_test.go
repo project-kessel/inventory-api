@@ -5,27 +5,34 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
-	"github.com/go-kratos/kratos/v2/log"
-	"github.com/go-kratos/kratos/v2/transport/http"
-	v1 "github.com/project-kessel/inventory-api/api/kessel/inventory/v1"
-	"github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/relationships"
-	"github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/resources"
-	"github.com/project-kessel/inventory-client-go/common"
-	"github.com/project-kessel/inventory-client-go/v1beta1"
-	"github.com/stretchr/testify/assert"
-	"google.golang.org/protobuf/types/known/timestamppb"
 	nethttp "net/http"
 	"os"
 	"strconv"
 	"testing"
 	"time"
+
+	"github.com/go-kratos/kratos/v2/log"
+	"github.com/go-kratos/kratos/v2/transport/http"
+	v1 "github.com/project-kessel/inventory-api/api/kessel/inventory/v1"
+	"github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/relationships"
+	"github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/resources"
+	"github.com/project-kessel/inventory-api/internal/biz/model"
+	"github.com/project-kessel/inventory-client-go/common"
+	"github.com/project-kessel/inventory-client-go/v1beta1"
+	"github.com/stretchr/testify/assert"
+	"google.golang.org/protobuf/types/known/timestamppb"
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
 )
 
 var inventoryapi_http_url string
 var tlsConfig *tls.Config
 var insecure bool
+var db *gorm.DB
 
 func TestMain(m *testing.M) {
+	var err error
+
 	inventoryapi_http_url = os.Getenv("INV_HTTP_URL")
 	if inventoryapi_http_url == "" {
 		err := fmt.Errorf("INV_HTTP_URL environment variable not set")
@@ -67,6 +74,39 @@ func TestMain(m *testing.M) {
 		insecure = true
 		log.Info("TLS environment variables not set")
 	}
+
+	dbUser := os.Getenv("POSTGRES_USER")
+	if dbUser == "" {
+		err := fmt.Errorf("POSTGRES_USER environment variable not set")
+		log.Error(err)
+	}
+	dbPassword := os.Getenv("POSTGRES_PASSWORD")
+	if dbPassword == "" {
+		err := fmt.Errorf("POSTGRES_PASSWORD environment variable not set")
+		log.Error(err)
+	}
+	dbHost := os.Getenv("POSTGRES_HOST")
+	if dbHost == "" {
+		err := fmt.Errorf("POSTGRES_HOST environment variable not set")
+		log.Error(err)
+	}
+	dbPort := os.Getenv("POSTGRES_PORT")
+	if dbPort == "" {
+		err := fmt.Errorf("POSTGRES_PORT environment variable not set")
+		log.Error(err)
+	}
+	dbName := os.Getenv("POSTGRES_DB")
+	if dbName == "" {
+		err := fmt.Errorf("POSTGRES_DB environment variable not set")
+		log.Error(err)
+	}
+
+	dsn := "host=" + dbHost + " user=" + dbUser + " password=" + dbPassword + " port=" + dbPort + " dbname=" + dbName
+	db, err = gorm.Open(postgres.Open(dsn), &gorm.Config{})
+	if err != nil {
+		log.Errorf("failed to connect to database: %v", err)
+	}
+
 	result := m.Run()
 	os.Exit(result)
 }
@@ -136,6 +176,7 @@ func TestInventoryAPIHTTP_v1beta1_RHELHostLifecycle(t *testing.T) {
 		t.Error(err)
 	}
 	createRequest := resources.CreateRhelHostRequest{
+		WaitForSync: false,
 		RhelHost: &resources.RhelHost{
 			Metadata: &resources.Metadata{
 				ResourceType: "rhel_host",
@@ -157,6 +198,7 @@ func TestInventoryAPIHTTP_v1beta1_RHELHostLifecycle(t *testing.T) {
 	assert.NoError(t, err, "Failed to create RhelHost")
 
 	updateRequest := resources.UpdateRhelHostRequest{
+		WaitForSync: false,
 		RhelHost: &resources.RhelHost{
 			Metadata: &resources.Metadata{
 				ResourceType: "rhel_host",
@@ -571,6 +613,88 @@ func TestInventoryAPIHTTP_v1beta1_K8SPolicy_is_propagated_to_K8sClusterLifecycle
 
 	_, err = client.K8SPolicyIsPropagatedToK8SClusterServiceHTTPClient.DeleteK8SPolicyIsPropagatedToK8SCluster(context.Background(), &deleteRequest, opts...)
 	assert.NoError(t, err, "Failed to delete relationship between K8sPolicy and K8sCluster")
+}
+
+func TestInventoryAPIHTTP_NotificationsIntegrationLifecycle_WaitForSync(t *testing.T) {
+	t.Parallel()
+	resourceId := "notifications-consistent-001"
+
+	c := common.NewConfig(
+		common.WithHTTPUrl(inventoryapi_http_url),
+		common.WithTLSInsecure(insecure),
+		common.WithHTTPTLSConfig(tlsConfig),
+		common.WithTimeout(10*time.Second),
+	)
+	client, err := v1beta1.NewHttpClient(context.Background(), c)
+	if err != nil {
+		t.Fatal("Failed to create HTTP client: ", err)
+	}
+
+	createRequest := resources.CreateNotificationsIntegrationRequest{
+		Integration: &resources.NotificationsIntegration{
+			Metadata: &resources.Metadata{
+				ResourceType: "notifications/integration",
+				WorkspaceId:  "workspace10",
+			},
+			ReporterData: &resources.ReporterData{
+				ReporterType:    resources.ReporterData_NOTIFICATIONS,
+				ConsoleHref:     "https://console.notifications.example.com",
+				ApiHref:         "https://api.notifications.example.com",
+				LocalResourceId: resourceId,
+				ReporterVersion: "1.0",
+			},
+		},
+		WaitForSync: true,
+	}
+
+	opts := getCallOptions()
+	_, err = client.NotificationIntegrationClient.CreateNotificationsIntegration(context.Background(), &createRequest, opts...)
+	assert.NoError(t, err, "Failed to create Notifications Integration w/ WaitForSync")
+
+	var integration model.Resource
+	err = db.Where("reporter_resource_id = ?", resourceId).First(&integration).Error
+	if err != nil {
+		t.Fatalf("Failed to find Notifications Integration in DB: %v", err)
+	}
+	assert.NotNil(t, integration, "Notifications Integration not found in DB")
+	assert.NotEmpty(t, integration.ConsistencyToken, "Consistency token is empty")
+
+	updateRequest := resources.UpdateNotificationsIntegrationRequest{
+		Integration: &resources.NotificationsIntegration{
+			Metadata: &resources.Metadata{
+				ResourceType: "notifications/integration",
+				WorkspaceId:  "workspace11",
+			},
+			ReporterData: &resources.ReporterData{
+				ReporterType:    resources.ReporterData_NOTIFICATIONS,
+				ConsoleHref:     "https://console.notifications.example.com",
+				ApiHref:         "https://api.notifications.example.com",
+				LocalResourceId: resourceId,
+				ReporterVersion: "1.1",
+			},
+		},
+		WaitForSync: true,
+	}
+
+	_, err = client.NotificationIntegrationClient.UpdateNotificationsIntegration(context.Background(), &updateRequest, opts...)
+	assert.NoError(t, err, "Failed to update Notifications Integration w/ WaitForSync")
+
+	err = db.Where("reporter_resource_id = ?", resourceId).First(&integration).Error
+	if err != nil {
+		t.Fatalf("Failed to find Notifications Integration in DB: %v", err)
+	}
+	assert.NotNil(t, integration, "Notifications Integration not found in DB")
+	assert.NotEmpty(t, integration.ConsistencyToken, "Consistency token is empty")
+
+	deleteRequest := resources.DeleteNotificationsIntegrationRequest{
+		ReporterData: &resources.ReporterData{
+			ReporterType:    resources.ReporterData_NOTIFICATIONS,
+			LocalResourceId: resourceId,
+		},
+	}
+
+	_, err = client.NotificationIntegrationClient.DeleteNotificationsIntegration(context.Background(), &deleteRequest, opts...)
+	assert.NoError(t, err, "Failed to delete Notifications Integration")
 }
 
 func getCallOptions() []http.CallOption {

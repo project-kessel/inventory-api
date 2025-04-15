@@ -45,7 +45,7 @@ func (c *NotificationsIntegrationsService) CreateNotificationsIntegration(ctx co
 	}
 
 	if h, err := notificationsIntegrationFromCreateRequest(r, identity); err == nil {
-		if resp, err := c.Ctl.Create(ctx, h); err == nil {
+		if resp, err := c.Ctl.Create(ctx, h, r.GetWaitForSync()); err == nil {
 			return createResponseFromNotificationsIntegration(resp), nil
 
 		} else {
@@ -63,7 +63,7 @@ func (c *NotificationsIntegrationsService) UpdateNotificationsIntegration(ctx co
 	}
 
 	if h, err := notificationsIntegrationFromUpdateRequest(r, identity); err == nil {
-		if resp, err := c.Ctl.Update(ctx, h, model.ReporterResourceIdFromResource(h)); err == nil {
+		if resp, err := c.Ctl.Update(ctx, h, model.ReporterResourceIdFromResource(h), r.GetWaitForSync()); err == nil {
 			return updateResponseFromNotificationsIntegration(resp), nil
 
 		} else {

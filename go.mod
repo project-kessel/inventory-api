@@ -104,4 +104,4 @@ require (
 // Revert to packagaes that can use verions of go <= 1.22.9
 replace golang.org/x/crypto => golang.org/x/crypto v0.31.0
 
-replace golang.org/x/net => golang.org/x/net v0.34.0
+replace golang.org/x/net => golang.org/x/net v0.36.0

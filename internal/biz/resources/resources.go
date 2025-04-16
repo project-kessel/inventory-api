@@ -468,18 +468,15 @@ func (uc *Usecase) Update(ctx context.Context, m *model.Resource, id model.Repor
 
 		if err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
-				ret, updatedResources, err = uc.reporterResourceRepository.Create(ctx, m)
-				if err != nil {
-					return nil, err
-				}
-			} else {
-				return nil, ErrDatabaseError
+				return uc.Create(ctx, m)
 			}
-		} else {
-			ret, updatedResources, err = uc.reporterResourceRepository.Update(ctx, m, existingResource.ID)
-			if err != nil {
-				return nil, err
-			}
+
+			return nil, ErrDatabaseError
+		}
+
+		ret, updatedResources, err = uc.reporterResourceRepository.Update(ctx, m, existingResource.ID)
+		if err != nil {
+			return nil, err
 		}
 	} else {
 		// mock the updated at time for eventing

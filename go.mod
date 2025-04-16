@@ -15,7 +15,7 @@ require (
 	github.com/golang-jwt/jwt/v5 v5.2.2
 	github.com/google/uuid v1.6.0
 	github.com/patrickmn/go-cache v2.1.0+incompatible
-  github.com/project-kessel/inventory-client-go v0.0.0-20250416101527-aaa050442d37
+	github.com/project-kessel/inventory-client-go v0.0.0-20250416101527-aaa050442d37
 	github.com/project-kessel/relations-api v0.0.0-20250408111129-d8b61a77bd9a
 	github.com/prometheus/client_golang v1.21.1
 	github.com/redhatinsights/app-common-go v1.6.8
@@ -55,8 +55,6 @@ require (
 	github.com/go-playground/form/v4 v4.2.1 // indirect
 	github.com/go-viper/mapstructure/v2 v2.2.1 // indirect
 	github.com/google/cel-go v0.23.2 // indirect
-	github.com/google/subcommands v1.2.0 // indirect
-	github.com/google/wire v0.6.0 // indirect
 	github.com/gorilla/mux v1.8.1 // indirect
 	github.com/grpc-ecosystem/go-grpc-middleware v1.4.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
@@ -94,13 +92,11 @@ require (
 	go.uber.org/zap v1.27.0 // indirect
 	golang.org/x/crypto v0.35.0 // indirect
 	golang.org/x/exp v0.0.0-20241009180824-f66d83c29e7c // indirect
-	golang.org/x/mod v0.21.0 // indirect
 	golang.org/x/net v0.34.0 // indirect
 	golang.org/x/oauth2 v0.25.0 // indirect
 	golang.org/x/sync v0.11.0 // indirect
 	golang.org/x/sys v0.30.0 // indirect
 	golang.org/x/text v0.22.0 // indirect
-	golang.org/x/tools v0.26.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250124145028-65684f501c47 // indirect
 
 )
@@ -109,4 +105,3 @@ require (
 replace golang.org/x/crypto => golang.org/x/crypto v0.31.0
 
 replace golang.org/x/net => golang.org/x/net v0.34.0
-

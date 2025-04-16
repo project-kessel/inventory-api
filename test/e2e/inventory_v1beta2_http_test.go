@@ -3,7 +3,6 @@ package e2e
 import (
 	"context"
 	pbv1beta2 "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2"
-	authzbeta2 "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2/authz"
 	"github.com/project-kessel/inventory-client-go/common"
 	v1beta2 "github.com/project-kessel/inventory-client-go/v1beta2"
 	"github.com/stretchr/testify/assert"
@@ -217,9 +216,9 @@ func TestInventoryAPIHTTP_v1beta2_AuthzLifecycle(t *testing.T) {
 
 	ctx := context.Background()
 
-	subject := &authzbeta2.SubjectReference{
-		Subject: &authzbeta2.ObjectReference{
-			Type: &authzbeta2.ObjectType{
+	subject := &pbv1beta2.SubjectReference{
+		Subject: &pbv1beta2.ObjectReference{
+			Type: &pbv1beta2.ObjectType{
 				Namespace: "rbac",
 				Name:      "principal",
 			},
@@ -227,8 +226,8 @@ func TestInventoryAPIHTTP_v1beta2_AuthzLifecycle(t *testing.T) {
 		},
 	}
 
-	parent := &authzbeta2.ObjectReference{
-		Type: &authzbeta2.ObjectType{
+	parent := &pbv1beta2.ObjectReference{
+		Type: &pbv1beta2.ObjectType{
 			Namespace: "rbac",
 			Name:      "group",
 		},
@@ -236,7 +235,7 @@ func TestInventoryAPIHTTP_v1beta2_AuthzLifecycle(t *testing.T) {
 	}
 
 	// /authz/check
-	checkReq := &authzbeta2.CheckRequest{
+	checkReq := &pbv1beta2.CheckRequest{
 		Subject:  subject,
 		Relation: "member",
 		Parent:   parent,
@@ -245,10 +244,10 @@ func TestInventoryAPIHTTP_v1beta2_AuthzLifecycle(t *testing.T) {
 	checkResp, err := client.KesselCheckService.Check(ctx, checkReq)
 	assert.NoError(t, err, "check endpoint failed")
 	assert.NotNil(t, checkResp, "check response should not be nil")
-	assert.Equal(t, authzbeta2.CheckResponse_ALLOWED_FALSE, checkResp.Allowed)
+	assert.Equal(t, pbv1beta2.CheckResponse_ALLOWED_FALSE, checkResp.Allowed)
 
 	// /authz/checkforupdate
-	checkUpdateReq := &authzbeta2.CheckForUpdateRequest{
+	checkUpdateReq := &pbv1beta2.CheckForUpdateRequest{
 		Subject:  subject,
 		Relation: "member",
 		Parent:   parent,
@@ -257,5 +256,5 @@ func TestInventoryAPIHTTP_v1beta2_AuthzLifecycle(t *testing.T) {
 	checkUpdateResp, err := client.KesselCheckService.CheckForUpdate(ctx, checkUpdateReq)
 	assert.NoError(t, err, "checkforupdate endpoint failed")
 	assert.NotNil(t, checkUpdateResp, "checkforupdate response should not be nil")
-	assert.Equal(t, authzbeta2.CheckForUpdateResponse_ALLOWED_FALSE, checkUpdateResp.Allowed)
+	assert.Equal(t, pbv1beta2.CheckForUpdateResponse_ALLOWED_FALSE, checkUpdateResp.Allowed)
 }

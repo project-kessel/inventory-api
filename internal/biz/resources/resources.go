@@ -422,7 +422,7 @@ func (uc *Usecase) Create(ctx context.Context, m *model.Resource) (*model.Resour
 
 	if uc.Authz != nil {
 		// Send workspace for the created resource
-		ct, err := biz.DefaultSetWorkspace(ctx, uc.Namespace, ret, uc.Authz, false)
+		ct, err := biz.DefaultSetWorkspace(ctx, uc.Namespace, ret, uc.Authz, true)
 		if err != nil {
 			return nil, err
 		}
@@ -438,7 +438,7 @@ func (uc *Usecase) Create(ctx context.Context, m *model.Resource) (*model.Resour
 
 		// Send workspace for any updated resources
 		for _, updatedResource := range updatedResources {
-			ct, err := biz.DefaultSetWorkspace(ctx, uc.Namespace, updatedResource, uc.Authz, false)
+			ct, err := biz.DefaultSetWorkspace(ctx, uc.Namespace, updatedResource, uc.Authz, true)
 			if err != nil {
 				return nil, err
 			}

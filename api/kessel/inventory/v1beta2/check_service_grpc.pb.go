@@ -2,7 +2,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.5.1
 // - protoc             (unknown)
-// source: kessel/inventory/v1beta2/check.proto
+// source: kessel/inventory/v1beta2/check_service.proto
 
 package v1beta2
 
@@ -159,5 +159,5 @@ var KesselCheckService_ServiceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "kessel/inventory/v1beta2/check.proto",
+	Metadata: "kessel/inventory/v1beta2/check_service.proto",
 }

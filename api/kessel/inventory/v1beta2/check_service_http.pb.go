@@ -2,7 +2,7 @@
 // versions:
 // - protoc-gen-go-http v2.8.0
 // - protoc             (unknown)
-// source: kessel/inventory/v1beta2/check.proto
+// source: kessel/inventory/v1beta2/check_service.proto
 
 package v1beta2
 

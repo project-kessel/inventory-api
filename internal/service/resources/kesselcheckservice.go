@@ -172,9 +172,9 @@ func viewResponseFromAuthzRequest(allowed bool) *pb.CheckResponse {
 
 func viewResponseFromAuthzRequestV1beta2(allowed bool) *pbv1beta2.CheckResponse {
 	if allowed {
-		return &pbv1beta2.CheckResponse{Allowed: pbv1beta2.CheckResponse_ALLOWED_TRUE}
+		return &pbv1beta2.CheckResponse{Allowed: pbv1beta2.Allowed_ALLOWED_TRUE}
 	} else {
-		return &pbv1beta2.CheckResponse{Allowed: pbv1beta2.CheckResponse_ALLOWED_FALSE}
+		return &pbv1beta2.CheckResponse{Allowed: pbv1beta2.Allowed_ALLOWED_FALSE}
 	}
 }
 
@@ -188,8 +188,8 @@ func updateResponseFromAuthzRequest(allowed bool) *pb.CheckForUpdateResponse {
 
 func updateResponseFromAuthzRequestV1beta2(allowed bool) *pbv1beta2.CheckForUpdateResponse {
 	if allowed {
-		return &pbv1beta2.CheckForUpdateResponse{Allowed: pbv1beta2.CheckForUpdateResponse_ALLOWED_TRUE}
+		return &pbv1beta2.CheckForUpdateResponse{Allowed: pbv1beta2.Allowed_ALLOWED_TRUE}
 	} else {
-		return &pbv1beta2.CheckForUpdateResponse{Allowed: pbv1beta2.CheckForUpdateResponse_ALLOWED_FALSE}
+		return &pbv1beta2.CheckForUpdateResponse{Allowed: pbv1beta2.Allowed_ALLOWED_FALSE}
 	}
 }

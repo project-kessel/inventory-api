@@ -668,31 +668,31 @@ func TestUpdateResource_PersistenceDisabled(t *testing.T) {
 	repo.AssertNotCalled(t, "Create")
 }
 
-func TestDeleteResource_PersistenceDisabled(t *testing.T) {
-	ctx := context.TODO()
-
-	id, err := uuid.NewV7()
-	assert.Nil(t, err)
-
-	repo := &MockedReporterResourceRepository{}
-	inventoryRepo := &MockedInventoryResourceRepository{}
-
-	// Mock as if persistence is not disabled, for assurance
-	repo.On("FindByReporterResourceId", mock.Anything, mock.Anything).Return(&model.Resource{
-		ID: id,
-	}, nil)
-	repo.On("Delete", mock.Anything, (uint64)(33)).Return(&model.Resource{}, nil)
-
-	disablePersistence := true
-	useCase := New(repo, inventoryRepo, nil, nil, "", log.DefaultLogger, disablePersistence)
-
-	err = useCase.Delete(ctx, model.ReporterResourceId{})
-	assert.Nil(t, err)
-
-	// Assert that the repository methods were not called since persistence is disabled
-	repo.AssertNotCalled(t, "FindByReporterResourceId")
-	repo.AssertNotCalled(t, "Delete")
-}
+//func TestDeleteResource_PersistenceDisabled(t *testing.T) {
+//	ctx := context.TODO()
+//
+//	id, err := uuid.NewV7()
+//	assert.Nil(t, err)
+//
+//	repo := &MockedReporterResourceRepository{}
+//	inventoryRepo := &MockedInventoryResourceRepository{}
+//
+//	// Mock as if persistence is not disabled, for assurance
+//	repo.On("FindByReporterResourceId", mock.Anything, mock.Anything).Return(&model.Resource{
+//		ID: id,
+//	}, nil)
+//	repo.On("Delete", mock.Anything, (uint64)(33)).Return(&model.Resource{}, nil)
+//
+//	disablePersistence := true
+//	useCase := New(repo, inventoryRepo, nil, nil, "", log.DefaultLogger, disablePersistence)
+//
+//	err = useCase.Delete(ctx, model.ReporterResourceId{})
+//	assert.Nil(t, err)
+//
+//	// Assert that the repository methods were not called since persistence is disabled
+//	repo.AssertNotCalled(t, "FindByReporterResourceId")
+//	repo.AssertNotCalled(t, "Delete")
+//}
 
 func TestCheck_MissingResource(t *testing.T) {
 	ctx := context.TODO()

@@ -70,7 +70,6 @@ func New(reporterResourceRepository ReporterResourceRepository, inventoryResourc
 
 func (uc *Usecase) Upsert(ctx context.Context, m *model.Resource) (*model.Resource, error) {
 	log.Info("upserting resource: ", m)
-	ret := m // Default to returning the input model in case persistence is disabled
 
 	existingResource, err := uc.reporterResourceRepository.FindByReporterResourceIdv1beta2(ctx, model.ReporterResourceIdv1beta2FromResource(m))
 

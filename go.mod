@@ -1,6 +1,6 @@
 module github.com/project-kessel/inventory-api
 
-// Bumping to versions above 1.22.9 will break the E2E tests
+// Tke care to bump versions with FIPS compliance in mind
 go 1.23.6
 
 require (
@@ -101,7 +101,3 @@ require (
 
 )
 
-// Revert to packagaes that can use verions of go <= 1.22.9
-//replace golang.org/x/crypto => golang.org/x/crypto v0.31.0
-
-//replace golang.org/x/net => golang.org/x/net v0.34.0

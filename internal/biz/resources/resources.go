@@ -72,36 +72,28 @@ func (uc *Usecase) Upsert(ctx context.Context, m *model.Resource) (*model.Resour
 	log.Info("upserting resource: ", m)
 	ret := m // Default to returning the input model in case persistence is disabled
 
-	if !uc.DisablePersistence {
-		// check if the resource already exists
-		existingResource, err := uc.reporterResourceRepository.FindByReporterResourceIdv1beta2(ctx, model.ReporterResourceIdv1beta2FromResource(m))
+	existingResource, err := uc.reporterResourceRepository.FindByReporterResourceIdv1beta2(ctx, model.ReporterResourceIdv1beta2FromResource(m))
 
-		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, ErrDatabaseError
-		}
-		log.Info("found existing resource: ", existingResource)
-		if existingResource != nil {
-			return updateExistingReporterResource(ctx, m, existingResource, uc)
-		}
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, ErrDatabaseError
+	}
+	log.Info("found existing resource: ", existingResource)
+	if existingResource != nil {
+		return updateExistingReporterResource(ctx, m, existingResource, uc)
+	}
 
-		//TODO: Bug here that needs to be fixed : https://issues.redhat.com/browse/RHCLOUD-39044
-		if m.InventoryId != nil {
-			err2 := validateSameResourceFromMultipleReportersShareInventoryId(ctx, m, uc)
-			if err2 != nil {
-				return nil, err2
-			}
-		}
-
-		log.Info("Creating resource: ", m)
-		ret, err2 := createNewReporterResource(ctx, m, uc)
+	//TODO: Bug here that needs to be fixed : https://issues.redhat.com/browse/RHCLOUD-39044
+	if m.InventoryId != nil {
+		err2 := validateSameResourceFromMultipleReportersShareInventoryId(ctx, m, uc)
 		if err2 != nil {
-			return ret, err2
+			return nil, err2
 		}
-	} else {
-		// mock the created at time for eventing
-		// TODO: remove this when persistence is always enabled
-		now := time.Now()
-		m.CreatedAt = &now
+	}
+
+	log.Info("Creating resource: ", m)
+	ret, err2 := createNewReporterResource(ctx, m, uc)
+	if err2 != nil {
+		return ret, err2
 	}
 
 	uc.log.WithContext(ctx).Infof("Created Resource: %v(%v)", m.ID, m.ResourceType)
@@ -317,28 +309,23 @@ func (uc *Usecase) Delete(ctx context.Context, id model.ReporterResourceId) erro
 		// TODO: Create model
 	}
 
-	if !uc.DisablePersistence {
-		// check if the resource exists
-		existingResource, err := uc.reporterResourceRepository.FindByReporterData(ctx, id.ReporterId, id.LocalResourceId)
+	existingResource, err := uc.reporterResourceRepository.FindByReporterData(ctx, id.ReporterId, id.LocalResourceId)
 
-		if err != nil && errors.Is(err, gorm.ErrRecordNotFound) {
-			// Deprecated: fallback case for backwards compatibility
-			existingResource, err = uc.reporterResourceRepository.FindByReporterResourceId(ctx, id)
+	if err != nil && errors.Is(err, gorm.ErrRecordNotFound) {
+		// Deprecated: fallback case for backwards compatibility
+		existingResource, err = uc.reporterResourceRepository.FindByReporterResourceId(ctx, id)
+	}
+
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return ErrResourceNotFound
 		}
+		return ErrDatabaseError
+	}
 
-		if err != nil {
-			if errors.Is(err, gorm.ErrRecordNotFound) {
-				return ErrResourceNotFound
-			}
-
-			return ErrDatabaseError
-		}
-
-		m, err = uc.reporterResourceRepository.Delete(ctx, existingResource.ID)
-		if err != nil {
-			return err
-		}
-
+	m, err = uc.reporterResourceRepository.Delete(ctx, existingResource.ID)
+	if err != nil {
+		return err
 	}
 
 	if uc.Eventer != nil {

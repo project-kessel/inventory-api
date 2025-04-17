@@ -653,9 +653,7 @@ func TestInventoryAPIHTTP_NotificationsIntegrationLifecycle_WaitForSync(t *testi
 
 	var integration model.Resource
 	err = db.Where("reporter_resource_id = ?", resourceId).First(&integration).Error
-	if err != nil {
-		t.Fatalf("Failed to find Notifications Integration in DB: %v", err)
-	}
+	assert.NoError(t, err, "Failed to find Notifications Integration in DB")
 	assert.NotNil(t, integration, "Notifications Integration not found in DB")
 	assert.NotEmpty(t, integration.ConsistencyToken, "Consistency token is empty")
 
@@ -680,9 +678,7 @@ func TestInventoryAPIHTTP_NotificationsIntegrationLifecycle_WaitForSync(t *testi
 	assert.NoError(t, err, "Failed to update Notifications Integration w/ WaitForSync")
 
 	err = db.Where("reporter_resource_id = ?", resourceId).First(&integration).Error
-	if err != nil {
-		t.Fatalf("Failed to find Notifications Integration in DB: %v", err)
-	}
+	assert.NoError(t, err, "Failed to find Notifications Integration in DB")
 	assert.NotNil(t, integration, "Notifications Integration not found in DB")
 	assert.NotEmpty(t, integration.ConsistencyToken, "Consistency token is empty")
 

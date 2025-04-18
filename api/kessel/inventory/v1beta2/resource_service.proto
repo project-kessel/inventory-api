@@ -17,11 +17,17 @@ message ReportResourceRequest {
 message ReportResourceResponse {}
 
 message DeleteResourceRequest {
-  string local_resource_id = 1 [(buf.validate.field).string = {min_len: 1}];
-  string reporter_type = 2 [(buf.validate.field).string = {min_len: 1}];
+ ResourceFilter filter = 1 [(buf.validate.field).required = true];
 }
 
 message DeleteResourceResponse {}
+
+message ResourceFilter{
+  optional string local_resource_id = 1 ;
+  optional string reporter_type = 2 ;
+  optional string resource_type = 3 ;
+  optional string reporter_instance_id = 4 ;
+}
 
 service KesselResourceService {
   rpc ReportResource(ReportResourceRequest) returns (ReportResourceResponse) {

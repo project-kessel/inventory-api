@@ -1333,10 +1333,8 @@ components:
         kessel.inventory.v1beta2.DeleteResourceRequest:
             type: object
             properties:
-                localResourceId:
-                    type: string
-                reporterType:
-                    type: string
+                filter:
+                    $ref: '#/components/schemas/kessel.inventory.v1beta2.ResourceFilter'
         kessel.inventory.v1beta2.DeleteResourceResponse:
             type: object
             properties: {}
@@ -1399,6 +1397,17 @@ components:
                     $ref: '#/components/schemas/kessel.inventory.v1beta2.ReporterData'
                 commonResourceData:
                     type: object
+        kessel.inventory.v1beta2.ResourceFilter:
+            type: object
+            properties:
+                localResourceId:
+                    type: string
+                reporterType:
+                    type: string
+                resourceType:
+                    type: string
+                reporterInstanceId:
+                    type: string
         kessel.inventory.v1beta2.ResponsePagination:
             type: object
             properties:

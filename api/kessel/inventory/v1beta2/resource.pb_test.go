@@ -2,6 +2,7 @@ package v1beta2
 
 import (
 	"fmt"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/protobuf/types/known/structpb"
@@ -76,11 +77,15 @@ func ValidateDeleteRequest(req *DeleteResourceRequest) error {
 		return fmt.Errorf("request cannot be nil")
 	}
 
-	if strings.TrimSpace(req.LocalResourceId) == "" {
+	if req.Filter == nil {
+		return fmt.Errorf("filter is required")
+	}
+
+	if req.Filter.LocalResourceId == nil || strings.TrimSpace(*req.Filter.LocalResourceId) == "" {
 		return fmt.Errorf("local_resource_id is required")
 	}
 
-	if strings.TrimSpace(req.ReporterType) == "" {
+	if req.Filter.ReporterType == nil || strings.TrimSpace(*req.Filter.ReporterType) == "" {
 		return fmt.Errorf("reporter_type is required")
 	}
 
@@ -391,8 +396,10 @@ func TestDeleteResourceValidation(t *testing.T) {
 		{
 			name: "Valid Delete Request",
 			request: &DeleteResourceRequest{
-				LocalResourceId: "0123",
-				ReporterType:    "HBI",
+				Filter: &ResourceFilter{
+					LocalResourceId: proto.String("0123"),
+					ReporterType:    proto.String("HBI"),
+				},
 			},
 			expectErr: false,
 		},
@@ -400,7 +407,9 @@ func TestDeleteResourceValidation(t *testing.T) {
 		{
 			name: "Missing local_resource_id",
 			request: &DeleteResourceRequest{
-				ReporterType: "HBI",
+				Filter: &ResourceFilter{
+					ReporterType: proto.String("HBI"),
+				},
 			},
 			expectErr: true,
 		},
@@ -408,7 +417,9 @@ func TestDeleteResourceValidation(t *testing.T) {
 		{
 			name: "Missing reporter_type",
 			request: &DeleteResourceRequest{
-				LocalResourceId: "0123",
+				Filter: &ResourceFilter{
+					LocalResourceId: proto.String("0123"),
+				},
 			},
 			expectErr: true,
 		},

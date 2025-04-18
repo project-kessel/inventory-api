@@ -90,8 +90,8 @@ func requestToResource(r *pb.ReportResourceRequest, identity *authnapi.Identity)
 func requestToDeleteResource(r *pb.DeleteResourceRequest, identity *authnapi.Identity) (model.ReporterResourceId, error) {
 	log.Info("Delete Resource Request: ", r)
 
-	localResourceId := r.GetLocalResourceId()
-	reporterType := r.GetReporterType()
+	localResourceId := r.GetFilter().GetLocalResourceId()
+	reporterType := r.GetFilter().GetReporterType()
 
 	reporterResourceId := model.ReporterResourceId{
 		LocalResourceId: localResourceId,

@@ -1278,13 +1278,7 @@ components:
             type: object
             properties:
                 parent:
-                    allOf:
-                        - $ref: '#/components/schemas/kessel.inventory.v1beta2.ObjectReference'
-                    description: |-
-                        Required parameters (from an authz perspective)
-                         - resource type and id
-                         - permission (cannot be derived from type as types may have multiple edit permissions Ex: https://github.com/RedHatInsights/rbac-config/blob/master/configs/prod/schemas/src/notifications.ksl#L37)
-                         - user (possibly derived from an identity token)
+                    $ref: '#/components/schemas/kessel.inventory.v1beta2.ObjectReference'
                 relation:
                     type: string
                 subject:
@@ -1329,7 +1323,6 @@ components:
             properties:
                 token:
                     type: string
-            description: The ConsistencyToken is used to provide consistency between write and read requests.
         kessel.inventory.v1beta2.DeleteResourceRequest:
             type: object
             properties:

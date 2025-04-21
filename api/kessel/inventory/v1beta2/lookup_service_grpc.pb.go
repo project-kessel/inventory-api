@@ -2,7 +2,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.5.1
 // - protoc             (unknown)
-// source: kessel/inventory/v1beta2/lookup.proto
+// source: kessel/inventory/v1beta2/lookup_service.proto
 
 package v1beta2
 
@@ -120,5 +120,5 @@ var KesselLookupService_ServiceDesc = grpc.ServiceDesc{
 			ServerStreams: true,
 		},
 	},
-	Metadata: "kessel/inventory/v1beta2/lookup.proto",
+	Metadata: "kessel/inventory/v1beta2/lookup_service.proto",
 }

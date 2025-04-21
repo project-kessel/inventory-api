@@ -3,7 +3,8 @@ syntax = "proto3";
 package kessel.inventory.v1beta2;
 
 import "buf/validate/validate.proto";
-import "kessel/inventory/v1beta2/common.proto";
+import "kessel/inventory/v1beta2/object_reference.proto";
+import "kessel/inventory/v1beta2/subject_reference.proto";
 
 option go_package = "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2";
 option java_multiple_files = true;

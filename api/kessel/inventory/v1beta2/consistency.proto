@@ -1,0 +1,26 @@
+syntax = "proto3";
+
+package kessel.inventory.v1beta2;
+
+import "buf/validate/validate.proto";
+import "kessel/inventory/v1beta2/consistency_token.proto";
+
+option go_package = "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2";
+option java_multiple_files = true;
+option java_package = "org.project_kessel.api.inventory.v1beta2";
+
+// Defines how a request is handled by the service.
+message Consistency {
+  oneof requirement {
+    option (buf.validate.oneof).required = true;
+
+    // The service selects the fastest snapshot available.
+    // *Must* be set true if used.
+    bool minimize_latency = 1 [(buf.validate.field).bool.const = true];
+
+    // All data used in the API call must be *at least as fresh*
+    // as found in the ConsistencyToken. More recent data might be used
+    // if available or faster.
+    ConsistencyToken at_least_as_fresh = 2;
+  }
+}

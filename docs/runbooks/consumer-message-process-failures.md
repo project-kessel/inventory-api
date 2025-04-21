@@ -2,7 +2,7 @@
 
 ## Prerequisites
 
-Remedations covered in this guide will require the following:
+Remediations covered in this guide will require the following:
 1) [zed cli](https://github.com/authzed/zed?tab=readme-ov-file#getting-started)
 2) Access to running Inventory API pod logs
 3) Access to a running container with Kafka CLI tools (covered in runbooks where needed)
@@ -30,7 +30,7 @@ zed context list
 To confirm the context is working:
 
 ```shell
-# port-forwad the spicedb service to your system
+# port-forward the spicedb service to your system
 oc port-forward svc/kessel-relations-spicedb 50051:50051
 
 # check the schema
@@ -158,6 +158,6 @@ If scaling down is needed: `oc scale -n kessel-prod --replicas 0 deployment/kess
 
 Make sure to scale back up after executing the offset update
 
-If the problem continues on subsequent messages, or if the failed object is supported based on Invenotry schjema definitions, but its not present in the Relations API schema definitions, there is likely a missing defintion to be added to the Relations schemas for the new resource type.
+If the problem persists on subsequent messages, or if the failed object is supported based on Inventory schema definitions, but is not present in the Relations API schema definitions, there is likely a missing defintion that still needs to be added to the Relations schemas for the new resource type.
 
 Either of these two situations will require a Kessel team members involvement.

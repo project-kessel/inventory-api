@@ -288,13 +288,13 @@ To add a rhel-host to the inventory:
 To hit the REST endpoint use the following `curl` command
 
 ```shell
-curl -H "Content-Type: application/json" --data "@data/host.json" http://localhost:8000/api/inventory/v1beta1/resources/rhel-hosts
+curl -H "Content-Type: application/json" --data "@data/testData/v1beta1/host.json" http://localhost:8000/api/inventory/v1beta1/resources/rhel-hosts
 ```
 
 To hit the gRPC endpoint use the following `grpcurl` command
 
 ```
-grpcurl -plaintext -d @ localhost:9000 kessel.inventory.v1beta1.resources.KesselRhelHostService.CreateRhelHost < data/host.json
+grpcurl -plaintext -d @ localhost:9000 kessel.inventory.v1beta1.resources.KesselRhelHostService.CreateRhelHost < data/testData/v1beta1/host.json
 ```
 
 To update it:
@@ -302,13 +302,13 @@ To update it:
 To hit the REST endpoint
 
 ```shell
-curl -XPUT -H "Content-Type: application/json" --data "@data/host.json" http://localhost:8000/api/inventory/v1beta1/resources/rhel-hosts
+curl -XPUT -H "Content-Type: application/json" --data "@data/testData/v1beta1/host.json" http://localhost:8000/api/inventory/v1beta1/resources/rhel-hosts
 ```
 
 To hit the gRPC endpoint
 
 ```
-grpcurl -plaintext -d @ localhost:9000 kessel.inventory.v1beta1.resources.KesselRhelHostService.UpdateRhelHost < data/host.json
+grpcurl -plaintext -d @ localhost:9000 kessel.inventory.v1beta1.resources.KesselRhelHostService.UpdateRhelHost < data/testData/v1beta1/host.json
 ```
 
 
@@ -317,49 +317,49 @@ and finally, to delete it, note that we use a different file, as the only requir
 To hit the REST endpoint
 
 ```shell
-curl -XDELETE -H "Content-Type: application/json" --data "@data/host-reporter.json" http://localhost:8000/api/inventory/v1beta1/resources/rhel-hosts
+curl -XDELETE -H "Content-Type: application/json" --data "@data/testData/v1beta1/host-reporter.json" http://localhost:8000/api/inventory/v1beta1/resources/rhel-hosts
 ```
 
 To hit the gRPC endpoint
 
 ```
-grpcurl -plaintext -d @ localhost:9000 kessel.inventory.v1beta1.resources.KesselRhelHostService.DeleteRhelHost < data/host-reporter.json
+grpcurl -plaintext -d @ localhost:9000 kessel.inventory.v1beta1.resources.KesselRhelHostService.DeleteRhelHost < data/testData/v1beta1/host-reporter.json
 ```
 To add a notifications integration (useful for testing in stage)
 
 ```shell
 # create the integration (auth is required for stage -- see internal docs)
-curl -H "Content-Type: application/json" -H "Authorization: Bearer $TOKEN" -d @data/notifications-integrations.json localhost:8000/api/inventory/v1beta1/resources/notifications-integrations
+curl -H "Content-Type: application/json" -H "Authorization: Bearer $TOKEN" -d @data/testData/v1beta1/notifications-integrations.json localhost:8000/api/inventory/v1beta1/resources/notifications-integrations
 
 # delete the integration
-curl -X DELETE -H "Content-Type: application/json" -H "Authorization: Bearer $TOKEN" -d @data/notifications-integration-reporter.json localhost:8000/api/inventory/v1beta1/resources/notifications-integrations
+curl -X DELETE -H "Content-Type: application/json" -H "Authorization: Bearer $TOKEN" -d @data/testData/v1beta1/notifications-integration-reporter.json localhost:8000/api/inventory/v1beta1/resources/notifications-integrations
 
-
+```
 ### Adding a new relationship (k8s-policy is propagated to k8s-cluster)
 
 To add a `k8s-policy_ispropagatedto-k8s-cluster` relationship, first lets add the related resources `k8s-policy` and `k8s-cluster`.
 
 ```shell
-curl -H "Content-Type: application/json" --data "@data/k8s-cluster.json" http://localhost:8000/api/inventory/v1beta1/resources/k8s-clusters
-curl -H "Content-Type: application/json" --data "@data/k8s-policy.json" http://localhost:8000/api/inventory/v1beta1/resources/k8s-policies
+curl -H "Content-Type: application/json" --data "@data/testData/v1beta1/k8s-cluster.json" http://localhost:8000/api/inventory/v1beta1/resources/k8s-clusters
+curl -H "Content-Type: application/json" --data "@data/testData/v1beta1/k8s-policy.json" http://localhost:8000/api/inventory/v1beta1/resources/k8s-policies
 ```
 
 And then you can create the relation:
 
 ```shell
-curl -H "Content-Type: application/json" --data "@data/k8spolicy_ispropagatedto_k8scluster.json" http://localhost:8000/api/inventory/v1beta1/resource-relationships/k8s-policy_is-propagated-to_k8s-cluster
+curl -H "Content-Type: application/json" --data "@data/testData/v1beta1/k8spolicy_ispropagatedto_k8scluster.json" http://localhost:8000/api/inventory/v1beta1/resource-relationships/k8s-policy_is-propagated-to_k8s-cluster
 ```
 
 To update it:
 
 ```shell
-curl -X PUT -H "Content-Type: application/json" --data "@data/k8spolicy_ispropagatedto_k8scluster.json" http://localhost:8000/api/inventory/v1beta1/resource-relationships/k8s-policy_is-propagated-to_k8s-cluster
+curl -X PUT -H "Content-Type: application/json" --data "@data/testData/v1beta1/k8spolicy_ispropagatedto_k8scluster.json" http://localhost:8000/api/inventory/v1beta1/resource-relationships/k8s-policy_is-propagated-to_k8s-cluster
 ```
 
 And finally, to delete it, notice that the data file is different this time. We only need the reporter data.
 
 ```shell
-curl -X DELETE -H "Content-Type: application/json" --data "@data/relationship_reporter_data.json" http://localhost:8000/api/inventory/v1beta1/resource-relationships/k8s-policy_is-propagated-to_k8s-cluster
+curl -X DELETE -H "Content-Type: application/json" --data "@data/testData/v1beta1/relationship_reporter_data.json" http://localhost:8000/api/inventory/v1beta1/resource-relationships/k8s-policy_is-propagated-to_k8s-cluster
 ```
 
 ## Configuration

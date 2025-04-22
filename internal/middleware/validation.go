@@ -75,25 +75,38 @@ func validateResourceReporterJSON(msg proto.Message) error {
 		return err
 	}
 
-	reporterData, err := ExtractMapField(resource, "reporterData")
+	reporterType, err := ExtractStringField(resource, "reporterType")
 	if err != nil {
 		return err
 	}
 
-	reporterType, err := ExtractStringField(reporterData, "reporterType")
+	resourceRepresentation, err := ExtractMapField(resource, "resourceRepresentation")
 	if err != nil {
 		return err
 	}
 
+	reporterData, err := ExtractMapField(resourceRepresentation, "reporter")
+	if err != nil {
+		return err
+	}
+
+	commonData, err := ExtractMapField(resourceRepresentation, "common")
+	if err != nil {
+		return err
+	}
+
+	// Validate the combination of type and reporter
 	if err := ValidateResourceReporterCombination(resourceType, reporterType); err != nil {
 		return err
 	}
 
-	if err := ValidateReporterResourceData(resourceType, reporterData); err != nil {
+	// Validate reporter-specific data
+	if err := ValidateReporterResourceData(resourceType, reporterType, reporterData); err != nil {
 		return err
 	}
 
-	if err := ValidateCommonResourceData(resourceType, resource); err != nil {
+	// Validate common data
+	if err := ValidateCommonResourceData(resourceType, commonData); err != nil {
 		return err
 	}
 

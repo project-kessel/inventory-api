@@ -69,12 +69,12 @@ func (c *ResourceService) DeleteResource(ctx context.Context, r *pb.DeleteResour
 func requestToResource(r *pb.ReportResourceRequest, identity *authnapi.Identity) (*model.Resource, error) {
 	log.Info("Report Resource Request: ", r)
 	var resourceType = r.Resource.GetResourceType()
-	resourceData, err := conv.ToJsonObject(r.Resource.ReporterData.ResourceData)
+	resourceData, err := conv.ToJsonObject(r.Resource)
 	if err != nil {
 		return nil, err
 	}
 
-	var workspaceId, err2 = conv.ExtractWorkspaceId(r.Resource.CommonResourceData)
+	var workspaceId, err2 = conv.ExtractWorkspaceId(r.Resource.ResourceRepresentation.Common)
 	if err2 != nil {
 		return nil, err2
 	}
@@ -83,8 +83,19 @@ func requestToResource(r *pb.ReportResourceRequest, identity *authnapi.Identity)
 	if err3 != nil {
 		return nil, err3
 	}
+	reporterType, err := conv.ExtractReporterType(r.Resource.ReporterType)
+	if err != nil {
+		log.Warn("Missing reporterType")
+		return nil, err
+	}
 
-	return conv.ResourceFromPb(resourceType, identity.Principal, resourceData, workspaceId, r.Resource.ReporterData, inventoryId), nil
+	reporterInstanceId, err := conv.ExtractReporterInstanceID(r.Resource.ReporterInstanceId)
+	if err != nil {
+		log.Warn("Missing reporterInstanceId")
+		return nil, err
+	}
+
+	return conv.ResourceFromPb(resourceType, reporterType, reporterInstanceId, identity.Principal, resourceData, workspaceId, r.Resource.ResourceRepresentation, inventoryId), nil
 }
 
 func requestToDeleteResource(r *pb.DeleteResourceRequest, identity *authnapi.Identity) (model.ReporterResourceId, error) {

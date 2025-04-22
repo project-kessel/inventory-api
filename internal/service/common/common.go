@@ -3,6 +3,7 @@ package common
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"google.golang.org/protobuf/types/known/structpb"
 	"strings"
 
@@ -45,20 +46,20 @@ func ResourceFromPbv1beta1(resourceType, reporterId string, resourceData model.J
 	}
 }
 
-func ResourceFromPb(resourceType, reporterId string, resourceData model.JsonObject, workspaceId string, reporter *pbresourcev1beta2.ReporterData, inventoryId *uuid.UUID) *model.Resource {
+func ResourceFromPb(resourceType, reporterType string, reporterInstanceId string, reporterId string, resourceData model.JsonObject, workspaceId string, resourceRep *pbresourcev1beta2.ResourceRepresentations, inventoryId *uuid.UUID) *model.Resource {
 	return &model.Resource{
 		ID:                 uuid.UUID{},
 		InventoryId:        inventoryId,
 		ResourceData:       resourceData,
 		ResourceType:       resourceType,
 		WorkspaceId:        workspaceId,
-		ReporterResourceId: reporter.LocalResourceId,
+		ReporterResourceId: resourceRep.Metadata.LocalResourceId,
 		ReporterId:         reporterId,
-		ReporterType:       reporter.ReporterType,
-		ReporterInstanceId: reporter.ReporterInstanceId,
-		ReporterVersion:    reporter.ReporterVersion,
-		ConsoleHref:        reporter.ConsoleHref,
-		ApiHref:            reporter.ApiHref,
+		ReporterType:       reporterType,
+		ReporterInstanceId: reporterInstanceId,
+		ReporterVersion:    resourceRep.Metadata.ReporterVersion,
+		ConsoleHref:        resourceRep.Metadata.ConsoleHref,
+		ApiHref:            resourceRep.Metadata.ApiHref,
 	}
 }
 
@@ -100,6 +101,20 @@ func ExtractInventoryId(inventoryIDStr string) (*uuid.UUID, error) {
 		return &inventoryID, nil
 	}
 	return nil, nil
+}
+
+func ExtractReporterType(reporterType string) (string, error) {
+	if reporterType == "" {
+		return "", fmt.Errorf("reporterType is required but was empty")
+	}
+	return reporterType, nil
+}
+
+func ExtractReporterInstanceID(reporterInstanceId string) (string, error) {
+	if reporterInstanceId == "" {
+		return "", fmt.Errorf("reporterInstanceId is required but was empty")
+	}
+	return reporterInstanceId, nil
 }
 
 func labelsFromPb(pbLabels []*pbresource.ResourceLabel) model.Labels {

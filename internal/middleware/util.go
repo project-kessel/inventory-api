@@ -85,66 +85,42 @@ func ExtractStringField(data map[string]interface{}, key string) (string, error)
 }
 
 // ValidateCommonResourceData Validates the "commonResourceData" field using a predefined schema.
-func ValidateCommonResourceData(resourceType string, resource map[string]interface{}) error {
-
+func ValidateCommonResourceData(resourceType string, commonData map[string]interface{}) error {
 	commonSchemaKey := fmt.Sprintf("common:%s", strings.ToLower(resourceType))
 	commonSchema, err := getSchemaFromCache(commonSchemaKey)
 	if err != nil {
 		return fmt.Errorf("failed to load common resource schema for '%s': %w", resourceType, err)
 	}
 
-	commonResourceData, exists := resource["commonResourceData"].(map[string]interface{})
-	if !exists {
-		return fmt.Errorf("missing required 'commonResourceData' for resource '%s'", resourceType)
-	}
-
-	if err := ValidateJSONSchema(commonSchema, commonResourceData); err != nil {
-		return fmt.Errorf("commonResourceData validation failed for '%s': %w", resourceType, err)
+	if err := ValidateJSONSchema(commonSchema, commonData); err != nil {
+		return fmt.Errorf("common resource data validation failed for '%s': %w", resourceType, err)
 	}
 
 	return nil
 }
 
-// Validates the reporter resource schema by checking if it exists and ensuring resourceData follows its structure.
-func ValidateReporterResourceData(resourceType string, reporterData map[string]interface{}) error {
-	// Extract reporterType from the provided data
-	reporterType, hasReporterType := reporterData["reporterType"].(string)
-	if !hasReporterType || reporterType == "" {
-		return fmt.Errorf("missing or invalid 'reporter_type' in reporterData for resource '%s'", resourceType)
-	}
-
-	// Construct the schema key using the new format: resourceType:reporterType
+// Validates the reporter-specific data against its schema based on resourceType and reporterType.
+func ValidateReporterResourceData(resourceType string, reporterType string, reporterData map[string]interface{}) error {
+	// Construct the schema key using the format: resourceType:reporterType
 	schemaKey := fmt.Sprintf("%s:%s", strings.ToLower(resourceType), strings.ToLower(reporterType))
 	resourceDataSchema, err := getSchemaFromCache(schemaKey)
 
-	// Extract resourceData
-	resourceData, hasResourceData := reporterData["resourceData"]
-
 	// Case 1: No schema found for resourceType:reporterType
 	if err != nil {
-		if hasResourceData {
-			return fmt.Errorf("no schema found for '%s', but 'resourceData' was provided. Submission is not allowed", schemaKey)
+		if len(reporterData) > 0 {
+			return fmt.Errorf("no schema found for '%s', but reporter data was provided. Submission is not allowed", schemaKey)
 		}
-		log.Debugf("no schema found for %s, treating as an abstract resource", schemaKey)
+		log.Debugf("no schema found for %s, treating as abstract reporter representation", schemaKey)
 		return nil
 	}
 
-	// Case 2: If resourceData is provided, validate it
-	if hasResourceData {
-		if resourceDataMap, ok := resourceData.(map[string]interface{}); ok {
-			if len(resourceDataMap) == 0 {
-				// If resourceData is empty but the schema allows it, pass validation
-			} else {
-				// Validate resourceData against the schema
-				if err := ValidateJSONSchema(resourceDataSchema, resourceDataMap); err != nil {
-					return fmt.Errorf("resourceData validation failed for '%s': %w", schemaKey, err)
-				}
-			}
-		} else {
-			// If resourceData is not a valid map, return an error
-			return fmt.Errorf("resourceData should be a valid map for resource '%s'", schemaKey)
+	// Case 2: Schema found, validate data (if present)
+	if len(reporterData) > 0 {
+		if err := ValidateJSONSchema(resourceDataSchema, reporterData); err != nil {
+			return fmt.Errorf("reporter data validation failed for '%s': %w", schemaKey, err)
 		}
 	}
+
 	return nil
 }
 

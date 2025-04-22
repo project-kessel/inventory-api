@@ -531,7 +531,7 @@ func TestDeleteReturnsDbError(t *testing.T) {
 	useCase := New(repo, inventoryRepo, nil, nil, "", log.DefaultLogger, false)
 	ctx := context.TODO()
 
-	err := useCase.Delete(ctx, model.ReporterResourceId{})
+	err := useCase.Deletev1beta1(ctx, model.ReporterResourceId{})
 	assert.ErrorIs(t, err, ErrDatabaseError)
 	repo.AssertExpectations(t)
 }
@@ -547,7 +547,7 @@ func TestDeleteReturnsDbErrorBackwardsCompatible(t *testing.T) {
 	useCase := New(repo, inventoryRepo, nil, nil, "", log.DefaultLogger, false)
 	ctx := context.TODO()
 
-	err := useCase.Delete(ctx, model.ReporterResourceId{})
+	err := useCase.Deletev1beta1(ctx, model.ReporterResourceId{})
 	assert.ErrorIs(t, err, ErrDatabaseError)
 	repo.AssertExpectations(t)
 }
@@ -563,7 +563,7 @@ func TestDeleteNonexistentResource(t *testing.T) {
 	useCase := New(repo, inventoryRepo, nil, nil, "", log.DefaultLogger, false)
 	ctx := context.TODO()
 
-	err := useCase.Delete(ctx, model.ReporterResourceId{})
+	err := useCase.Deletev1beta1(ctx, model.ReporterResourceId{})
 	assert.ErrorIs(t, err, ErrResourceNotFound)
 	repo.AssertExpectations(t)
 }
@@ -583,7 +583,7 @@ func TestDeleteResource(t *testing.T) {
 
 	useCase := New(repo, inventoryRepo, nil, nil, "", log.DefaultLogger, false)
 
-	err = useCase.Delete(ctx, model.ReporterResourceId{})
+	err = useCase.Deletev1beta1(ctx, model.ReporterResourceId{})
 	assert.Nil(t, err)
 
 	repo.AssertExpectations(t)
@@ -606,7 +606,7 @@ func TestDeleteResourceBackwardsCompatible(t *testing.T) {
 
 	useCase := New(repo, inventoryRepo, nil, nil, "", log.DefaultLogger, false)
 
-	err = useCase.Delete(ctx, model.ReporterResourceId{})
+	err = useCase.Deletev1beta1(ctx, model.ReporterResourceId{})
 	assert.Nil(t, err)
 
 	repo.AssertExpectations(t)

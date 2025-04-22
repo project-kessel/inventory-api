@@ -5,6 +5,7 @@ import (
 	"errors"
 	"google.golang.org/grpc"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -281,9 +282,6 @@ func (uc *Usecase) CheckForUpdate(ctx context.Context, permission, namespace str
 }
 
 func (uc *Usecase) ListResourcesInWorkspace(ctx context.Context, permission, namespace string, sub *kessel.SubjectReference, id string) (chan *model.Resource, chan error, error) {
-	resource_chan := make(chan *model.Resource)
-	error_chan := make(chan error, 1)
-
 	resources, err := uc.reporterResourceRepository.FindByWorkspaceId(ctx, id)
 	if err != nil {
 		return nil, nil, err
@@ -291,22 +289,29 @@ func (uc *Usecase) ListResourcesInWorkspace(ctx context.Context, permission, nam
 
 	log.Infof("ListResourcesInWorkspace: resources %+v", resources)
 
-	go func() {
-		defer close(resource_chan)
-		defer close(error_chan)
+	resource_chan := make(chan *model.Resource, len(resources))
+	error_chan := make(chan error, 1)
+	defer close(resource_chan)
+	defer close(error_chan)
 
-		for _, resource := range resources {
-			log.Infof("ListResourcesInWorkspace: checkforview on %+v", resource)
+	var wg sync.WaitGroup
+	for _, resource := range resources {
+		wg.Add(1)
+		log.Infof("ListResourcesInWorkspace: checkforview on %+v", resource)
+
+		go func() {
+			defer wg.Done()
+
 			if allowed, _, err := uc.Authz.Check(ctx, namespace, permission, resource, sub); err == nil && allowed == kessel.CheckResponse_ALLOWED_TRUE {
 				resource_chan <- resource
 			} else if err != nil {
 				error_chan <- err
-				break
 			} else if allowed != kessel.CheckResponse_ALLOWED_TRUE {
 				log.Infof("Response was not allowed: %v", allowed)
 			}
-		}
-	}()
+		}()
+	}
+	wg.Wait()
 
 	return resource_chan, error_chan, nil
 }

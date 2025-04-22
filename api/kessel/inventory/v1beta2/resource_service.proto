@@ -2,45 +2,28 @@ syntax = "proto3";
 
 package kessel.inventory.v1beta2;
 
-import "kessel/inventory/v1beta2/resource.proto";
 import "google/api/annotations.proto";
-import "buf/validate/validate.proto";
+import "kessel/inventory/v1beta2/report_resource_request.proto";
+import "kessel/inventory/v1beta2/report_resource_response.proto";
+import "kessel/inventory/v1beta2/delete_resource_request.proto";
+import "kessel/inventory/v1beta2/delete_resource_response.proto";
 
 option go_package = "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2";
 option java_multiple_files = true;
 option java_package = "org.project_kessel.api.inventory.v1beta2";
 
-message ReportResourceRequest {
-  Resource resource = 1 [  json_name = "resource" ];
-}
-
-message ReportResourceResponse {}
-
-message DeleteResourceRequest {
- ResourceFilter filter = 1 [(buf.validate.field).required = true];
-}
-
-message DeleteResourceResponse {}
-
-message ResourceFilter{
-  optional string local_resource_id = 1 ;
-  optional string reporter_type = 2 ;
-  optional string resource_type = 3 ;
-  optional string reporter_instance_id = 4 ;
-}
-
 service KesselResourceService {
   rpc ReportResource(ReportResourceRequest) returns (ReportResourceResponse) {
     option (google.api.http) = {
-      post : "/api/inventory/v1beta2/resources"
-      body : "*"
+      post: "/api/inventory/v1beta2/resources"
+      body: "*"
     };
-  };
+  }
 
   rpc DeleteResource(DeleteResourceRequest) returns (DeleteResourceResponse) {
     option (google.api.http) = {
-      delete : "/api/inventory/v1beta2/resources"
-      body : "*"
+      delete: "/api/inventory/v1beta2/resources"
+      body: "*"
     };
-  };
+  }
 }

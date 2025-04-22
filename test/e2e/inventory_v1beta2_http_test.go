@@ -244,7 +244,7 @@ func TestInventoryAPIHTTP_v1beta2_AuthzLifecycle(t *testing.T) {
 	checkResp, err := client.KesselCheckService.Check(ctx, checkReq)
 	assert.NoError(t, err, "check endpoint failed")
 	assert.NotNil(t, checkResp, "check response should not be nil")
-	assert.Equal(t, pbv1beta2.CheckResponse_ALLOWED_FALSE, checkResp.Allowed)
+	assert.Equal(t, pbv1beta2.Allowed_ALLOWED_FALSE, checkResp.GetAllowed())
 
 	// /authz/checkforupdate
 	checkUpdateReq := &pbv1beta2.CheckForUpdateRequest{
@@ -256,5 +256,5 @@ func TestInventoryAPIHTTP_v1beta2_AuthzLifecycle(t *testing.T) {
 	checkUpdateResp, err := client.KesselCheckService.CheckForUpdate(ctx, checkUpdateReq)
 	assert.NoError(t, err, "checkforupdate endpoint failed")
 	assert.NotNil(t, checkUpdateResp, "checkforupdate response should not be nil")
-	assert.Equal(t, pbv1beta2.CheckForUpdateResponse_ALLOWED_FALSE, checkUpdateResp.Allowed)
+	assert.Equal(t, pbv1beta2.Allowed_ALLOWED_FALSE, checkUpdateResp.GetAllowed())
 }

@@ -167,7 +167,9 @@ func (i *InventoryConsumer) Consume() error {
 
 				resp, err = i.ProcessMessage(headers, relationsEnabled, e)
 				if err != nil {
-					i.Logger.Errorf("error processing message: %v", err)
+					i.Logger.Errorf(
+						"error processing message from topic %s, partition %d at offset %s: %v",
+						*e.TopicPartition.Topic, e.TopicPartition.Partition, e.TopicPartition.Offset, err)
 					run = false
 					continue
 				}

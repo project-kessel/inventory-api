@@ -303,7 +303,67 @@ func (uc *Usecase) ListResourcesInWorkspace(ctx context.Context, permission, nam
 }
 
 // Delete deletes a model from the database, removes related tuples from the relations-api, and issues a delete event.
-func (uc *Usecase) Delete(ctx context.Context, id model.ReporterResourceId) error {
+func (uc *Usecase) Deletev1beta1(ctx context.Context, id model.ReporterResourceId) error {
+	m := &model.Resource{
+		// TODO: Create model
+	}
+
+	if !uc.DisablePersistence {
+		// check if the resource exists
+		existingResource, err := uc.reporterResourceRepository.FindByReporterData(ctx, id.ReporterId, id.LocalResourceId)
+
+		if err != nil && errors.Is(err, gorm.ErrRecordNotFound) {
+			// Deprecated: fallback case for backwards compatibility
+			existingResource, err = uc.reporterResourceRepository.FindByReporterResourceId(ctx, id)
+		}
+
+		if err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return ErrResourceNotFound
+			}
+
+			return ErrDatabaseError
+		}
+
+		m, err = uc.reporterResourceRepository.Delete(ctx, existingResource.ID)
+		if err != nil {
+			return err
+		}
+
+	}
+
+	if uc.Eventer != nil {
+		err := biz.DefaultResourceSendEvent(ctx, m, uc.Eventer, time.Now(), eventingapi.OperationTypeDeleted)
+
+		if err != nil {
+			return err
+		}
+	}
+
+	if uc.Authz != nil {
+		var resourceType string
+
+		namespace := uc.Namespace
+		if id.ReporterType != "" {
+			namespace = strings.ToLower(id.ReporterType)
+		}
+		if m.ResourceType != "" {
+			resourceType = m.ResourceType
+			err := biz.DefaultUnsetWorkspace(ctx, namespace, id.LocalResourceId, resourceType, uc.Authz)
+			if err != nil {
+				return err
+			}
+		}
+
+	}
+
+	uc.log.WithContext(ctx).Infof("Deleted Resource: %v(%v)", m.ID, m.ResourceType)
+	return nil
+
+}
+
+// Delete deletes a model from the database, removes related tuples from the relations-api, and issues a delete event.
+func (uc *Usecase) DeleteV1beta2(ctx context.Context, id model.ReporterResourceId) error {
 	m := &model.Resource{
 		// TODO: Create model
 	}

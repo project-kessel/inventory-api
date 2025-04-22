@@ -57,7 +57,7 @@ func (c *ResourceService) DeleteResource(ctx context.Context, r *pb.DeleteResour
 		return nil, fmt.Errorf("failed to build reporter resource ID: %w", err)
 	}
 
-	err = c.Ctl.Delete(ctx, reporterResource)
+	err = c.Ctl.DeleteV1beta2(ctx, reporterResource)
 	if err != nil {
 		log.Error("Failed to delete resource: ", err)
 		return nil, fmt.Errorf("failed to delete resource: %w", err)

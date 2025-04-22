@@ -5,7 +5,7 @@ package kessel.inventory.v1beta2;
 import "buf/validate/validate.proto";
 import "kessel/inventory/v1beta2/request_pagination.proto";
 import "kessel/inventory/v1beta2/subject_reference.proto";
-import "kessel/inventory/v1beta2/object_type.proto";
+import "kessel/inventory/v1beta2/resource_type.proto";
 import "kessel/inventory/v1beta2/consistency.proto";
 
 option go_package = "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2";
@@ -13,7 +13,7 @@ option java_multiple_files = true;
 option java_package = "org.project_kessel.api.inventory.v1beta2";
 
 message LookupResourcesRequest {
-  ObjectType resource_type = 1 [(buf.validate.field).required = true];
+  ResourceType resource_type = 1 [(buf.validate.field).required = true];
   string relation = 2 [(buf.validate.field).string.min_len = 1];
   SubjectReference subject = 3 [(buf.validate.field).required = true];
   optional RequestPagination pagination = 4;

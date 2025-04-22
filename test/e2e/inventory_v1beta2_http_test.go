@@ -217,8 +217,8 @@ func TestInventoryAPIHTTP_v1beta2_AuthzLifecycle(t *testing.T) {
 	ctx := context.Background()
 
 	subject := &pbv1beta2.SubjectReference{
-		Subject: &pbv1beta2.ObjectReference{
-			Type: &pbv1beta2.ObjectType{
+		Subject: &pbv1beta2.ResourceReference{
+			Type: &pbv1beta2.ResourceType{
 				Namespace: "rbac",
 				Name:      "principal",
 			},
@@ -226,8 +226,8 @@ func TestInventoryAPIHTTP_v1beta2_AuthzLifecycle(t *testing.T) {
 		},
 	}
 
-	parent := &pbv1beta2.ObjectReference{
-		Type: &pbv1beta2.ObjectType{
+	parent := &pbv1beta2.ResourceReference{
+		Type: &pbv1beta2.ResourceType{
 			Namespace: "rbac",
 			Name:      "group",
 		},

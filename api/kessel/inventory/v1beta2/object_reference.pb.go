@@ -2,7 +2,7 @@
 // versions:
 // 	protoc-gen-go v1.34.2
 // 	protoc        (unknown)
-// source: kessel/inventory/v1beta2/object_reference.proto
+// source: kessel/inventory/v1beta2/resource_reference.proto
 
 package v1beta2
 

@@ -80,8 +80,8 @@ func toLookupResourceRequest(request *pbv1beta2.LookupResourcesRequest) *kessel.
 
 func toLookupResourceResponse(response *kessel.LookupResourcesResponse) *pbv1beta2.LookupResourcesResponse {
 	return &pbv1beta2.LookupResourcesResponse{
-		Resource: &pbv1beta2.ObjectReference{
-			Type: &pbv1beta2.ObjectType{
+		Resource: &pbv1beta2.ResourceReference{
+			Type: &pbv1beta2.ResourceType{
 				Namespace: response.Resource.Type.Namespace,
 				Name:      response.Resource.Type.Name,
 			},

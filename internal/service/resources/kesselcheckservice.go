@@ -153,7 +153,7 @@ func authzFromRequest(identity *authnapi.Identity, resource *pb.ObjectReference)
 	}, nil
 }
 
-func authzFromRequestV1beta2(identity *authnapi.Identity, resource *pbv1beta2.ObjectReference) (*model.ReporterResourceId, error) {
+func authzFromRequestV1beta2(identity *authnapi.Identity, resource *pbv1beta2.ResourceReference) (*model.ReporterResourceId, error) {
 	return &model.ReporterResourceId{
 		LocalResourceId: resource.Id,
 		ResourceType:    resource.Type.Name,

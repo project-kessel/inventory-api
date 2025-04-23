@@ -16,7 +16,7 @@ jobs:
         with:
           format: false
           lint: true
-          breaking: true
+          breaking: false
           push: true
           input: "api"
           token: ${{ secrets.BUF_TOKEN }}

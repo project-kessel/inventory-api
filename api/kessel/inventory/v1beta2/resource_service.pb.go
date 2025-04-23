@@ -7,12 +7,10 @@
 package v1beta2
 
 import (
-	_ "buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go/buf/validate"
 	_ "google.golang.org/genproto/googleapis/api/annotations"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"
-	sync "sync"
 )
 
 const (
@@ -274,37 +272,22 @@ var file_kessel_inventory_v1beta2_resource_service_proto_rawDesc = []byte{
 	0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
 }
 
-var (
-	file_kessel_inventory_v1beta2_resource_service_proto_rawDescOnce sync.Once
-	file_kessel_inventory_v1beta2_resource_service_proto_rawDescData = file_kessel_inventory_v1beta2_resource_service_proto_rawDesc
-)
-
-func file_kessel_inventory_v1beta2_resource_service_proto_rawDescGZIP() []byte {
-	file_kessel_inventory_v1beta2_resource_service_proto_rawDescOnce.Do(func() {
-		file_kessel_inventory_v1beta2_resource_service_proto_rawDescData = protoimpl.X.CompressGZIP(file_kessel_inventory_v1beta2_resource_service_proto_rawDescData)
-	})
-	return file_kessel_inventory_v1beta2_resource_service_proto_rawDescData
-}
-
-var file_kessel_inventory_v1beta2_resource_service_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
 var file_kessel_inventory_v1beta2_resource_service_proto_goTypes = []any{
 	(*ReportResourceRequest)(nil),  // 0: kessel.inventory.v1beta2.ReportResourceRequest
-	(*ReportResourceResponse)(nil), // 1: kessel.inventory.v1beta2.ReportResourceResponse
-	(*DeleteResourceRequest)(nil),  // 2: kessel.inventory.v1beta2.DeleteResourceRequest
+	(*DeleteResourceRequest)(nil),  // 1: kessel.inventory.v1beta2.DeleteResourceRequest
+	(*ReportResourceResponse)(nil), // 2: kessel.inventory.v1beta2.ReportResourceResponse
 	(*DeleteResourceResponse)(nil), // 3: kessel.inventory.v1beta2.DeleteResourceResponse
-	(*Resource)(nil),               // 4: kessel.inventory.v1beta2.Resource
 }
 var file_kessel_inventory_v1beta2_resource_service_proto_depIdxs = []int32{
-	4, // 0: kessel.inventory.v1beta2.ReportResourceRequest.resource:type_name -> kessel.inventory.v1beta2.Resource
-	0, // 1: kessel.inventory.v1beta2.KesselResourceService.ReportResource:input_type -> kessel.inventory.v1beta2.ReportResourceRequest
-	2, // 2: kessel.inventory.v1beta2.KesselResourceService.DeleteResource:input_type -> kessel.inventory.v1beta2.DeleteResourceRequest
-	1, // 3: kessel.inventory.v1beta2.KesselResourceService.ReportResource:output_type -> kessel.inventory.v1beta2.ReportResourceResponse
-	3, // 4: kessel.inventory.v1beta2.KesselResourceService.DeleteResource:output_type -> kessel.inventory.v1beta2.DeleteResourceResponse
-	3, // [3:5] is the sub-list for method output_type
-	1, // [1:3] is the sub-list for method input_type
-	1, // [1:1] is the sub-list for extension type_name
-	1, // [1:1] is the sub-list for extension extendee
-	0, // [0:1] is the sub-list for field type_name
+	0, // 0: kessel.inventory.v1beta2.KesselResourceService.ReportResource:input_type -> kessel.inventory.v1beta2.ReportResourceRequest
+	1, // 1: kessel.inventory.v1beta2.KesselResourceService.DeleteResource:input_type -> kessel.inventory.v1beta2.DeleteResourceRequest
+	2, // 2: kessel.inventory.v1beta2.KesselResourceService.ReportResource:output_type -> kessel.inventory.v1beta2.ReportResourceResponse
+	3, // 3: kessel.inventory.v1beta2.KesselResourceService.DeleteResource:output_type -> kessel.inventory.v1beta2.DeleteResourceResponse
+	2, // [2:4] is the sub-list for method output_type
+	0, // [0:2] is the sub-list for method input_type
+	0, // [0:0] is the sub-list for extension type_name
+	0, // [0:0] is the sub-list for extension extendee
+	0, // [0:0] is the sub-list for field type_name
 }
 
 func init() { file_kessel_inventory_v1beta2_resource_service_proto_init() }
@@ -312,70 +295,22 @@ func file_kessel_inventory_v1beta2_resource_service_proto_init() {
 	if File_kessel_inventory_v1beta2_resource_service_proto != nil {
 		return
 	}
-	file_kessel_inventory_v1beta2_resource_proto_init()
-	if !protoimpl.UnsafeEnabled {
-		file_kessel_inventory_v1beta2_resource_service_proto_msgTypes[0].Exporter = func(v any, i int) any {
-			switch v := v.(*ReportResourceRequest); i {
-			case 0:
-				return &v.state
-			case 1:
-				return &v.sizeCache
-			case 2:
-				return &v.unknownFields
-			default:
-				return nil
-			}
-		}
-		file_kessel_inventory_v1beta2_resource_service_proto_msgTypes[1].Exporter = func(v any, i int) any {
-			switch v := v.(*ReportResourceResponse); i {
-			case 0:
-				return &v.state
-			case 1:
-				return &v.sizeCache
-			case 2:
-				return &v.unknownFields
-			default:
-				return nil
-			}
-		}
-		file_kessel_inventory_v1beta2_resource_service_proto_msgTypes[2].Exporter = func(v any, i int) any {
-			switch v := v.(*DeleteResourceRequest); i {
-			case 0:
-				return &v.state
-			case 1:
-				return &v.sizeCache
-			case 2:
-				return &v.unknownFields
-			default:
-				return nil
-			}
-		}
-		file_kessel_inventory_v1beta2_resource_service_proto_msgTypes[3].Exporter = func(v any, i int) any {
-			switch v := v.(*DeleteResourceResponse); i {
-			case 0:
-				return &v.state
-			case 1:
-				return &v.sizeCache
-			case 2:
-				return &v.unknownFields
-			default:
-				return nil
-			}
-		}
-	}
+	file_kessel_inventory_v1beta2_report_resource_request_proto_init()
+	file_kessel_inventory_v1beta2_report_resource_response_proto_init()
+	file_kessel_inventory_v1beta2_delete_resource_request_proto_init()
+	file_kessel_inventory_v1beta2_delete_resource_response_proto_init()
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_kessel_inventory_v1beta2_resource_service_proto_rawDesc,
 			NumEnums:      0,
-			NumMessages:   4,
+			NumMessages:   0,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
 		GoTypes:           file_kessel_inventory_v1beta2_resource_service_proto_goTypes,
 		DependencyIndexes: file_kessel_inventory_v1beta2_resource_service_proto_depIdxs,
-		MessageInfos:      file_kessel_inventory_v1beta2_resource_service_proto_msgTypes,
 	}.Build()
 	File_kessel_inventory_v1beta2_resource_service_proto = out.File
 	file_kessel_inventory_v1beta2_resource_service_proto_rawDesc = nil

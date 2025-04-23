@@ -1,8 +1,8 @@
-package service
+package resources
 
 import (
 	"fmt"
-	pbv1beta2 "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2/authz"
+	pbv1beta2 "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2"
 	"github.com/project-kessel/inventory-api/internal/biz/resources"
 	kessel "github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
 	"io"
@@ -13,7 +13,7 @@ type KesselLookupService struct {
 	Ctl *resources.Usecase
 }
 
-func NewKesselLookupService(c *resources.Usecase) pbv1beta2.KesselLookupServiceServer {
+func NewKesselLookupServiceV1beta2(c *resources.Usecase) pbv1beta2.KesselLookupServiceServer {
 	return &KesselLookupService{
 		Ctl: c,
 	}

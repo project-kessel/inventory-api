@@ -1,10 +1,10 @@
-package service
+package resources
 
 import (
 	"context"
 
 	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/authz"
-	pbv1beta2 "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2/authz"
+	pbv1beta2 "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2"
 	authnapi "github.com/project-kessel/inventory-api/internal/authn/api"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
 	"github.com/project-kessel/inventory-api/internal/biz/resources"
@@ -28,13 +28,13 @@ type KesselCheckServiceServiceV1beta2 struct {
 	Ctl *resources.Usecase
 }
 
-func New(c *resources.Usecase) *KesselCheckServiceService {
+func NewKesselCheckServiceV1beta1(c *resources.Usecase) *KesselCheckServiceService {
 	return &KesselCheckServiceService{
 		Ctl: c,
 	}
 }
 
-func NewV1beta2(c *resources.Usecase) *KesselCheckServiceServiceV1beta2 {
+func NewKesselCheckServiceV1beta2(c *resources.Usecase) *KesselCheckServiceServiceV1beta2 {
 	return &KesselCheckServiceServiceV1beta2{
 		Ctl: c,
 	}
@@ -172,9 +172,9 @@ func viewResponseFromAuthzRequest(allowed bool) *pb.CheckResponse {
 
 func viewResponseFromAuthzRequestV1beta2(allowed bool) *pbv1beta2.CheckResponse {
 	if allowed {
-		return &pbv1beta2.CheckResponse{Allowed: pbv1beta2.CheckResponse_ALLOWED_TRUE}
+		return &pbv1beta2.CheckResponse{Allowed: pbv1beta2.Allowed_ALLOWED_TRUE}
 	} else {
-		return &pbv1beta2.CheckResponse{Allowed: pbv1beta2.CheckResponse_ALLOWED_FALSE}
+		return &pbv1beta2.CheckResponse{Allowed: pbv1beta2.Allowed_ALLOWED_FALSE}
 	}
 }
 
@@ -188,8 +188,8 @@ func updateResponseFromAuthzRequest(allowed bool) *pb.CheckForUpdateResponse {
 
 func updateResponseFromAuthzRequestV1beta2(allowed bool) *pbv1beta2.CheckForUpdateResponse {
 	if allowed {
-		return &pbv1beta2.CheckForUpdateResponse{Allowed: pbv1beta2.CheckForUpdateResponse_ALLOWED_TRUE}
+		return &pbv1beta2.CheckForUpdateResponse{Allowed: pbv1beta2.Allowed_ALLOWED_TRUE}
 	} else {
-		return &pbv1beta2.CheckForUpdateResponse{Allowed: pbv1beta2.CheckForUpdateResponse_ALLOWED_FALSE}
+		return &pbv1beta2.CheckForUpdateResponse{Allowed: pbv1beta2.Allowed_ALLOWED_FALSE}
 	}
 }

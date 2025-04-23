@@ -19,7 +19,7 @@ type ResourceService struct {
 	Ctl *resources.Usecase
 }
 
-func New(c *resources.Usecase) *ResourceService {
+func NewKesselResourceServiceV1beta2(c *resources.Usecase) *ResourceService {
 	return &ResourceService{
 		Ctl: c,
 	}

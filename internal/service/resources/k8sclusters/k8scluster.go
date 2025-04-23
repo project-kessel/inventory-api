@@ -23,8 +23,8 @@ type K8sClustersService struct {
 	Ctl *resources.Usecase
 }
 
-// New creates a new K8sClusterService to handle requests for k8s clusters
-func New(c *resources.Usecase) *K8sClustersService {
+// NewKesselK8SClusterServiceV1beta1 creates a new K8sClusterService to handle requests for k8s clusters
+func NewKesselK8SClusterServiceV1beta1(c *resources.Usecase) *K8sClustersService {
 	return &K8sClustersService{
 		Ctl: c,
 	}

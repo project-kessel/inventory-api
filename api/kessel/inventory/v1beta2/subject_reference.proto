@@ -15,5 +15,5 @@ message SubjectReference {
   // An optional relation which points to a set of Subjects instead of the single Subject.
   // e.g. "members" or "owners" of a group identified in `subject`.
   optional string relation = 1;
-  ResourceReference subject = 2 [(buf.validate.field).required = true];
+  ResourceReference resource = 2 [(buf.validate.field).required = true];
 }

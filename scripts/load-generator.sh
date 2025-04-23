@@ -4,7 +4,7 @@
 help_me() {
     echo "USAGE: load-generator.sh {-n <NUM_RUNS>} {-i <INTERVAL>} {-p <PORT_NUM>} [-h]"
     echo "load-generator: creates load on inventory API by creating, updating, and deleting resources for test purposes"
-    echo "It requires a local running Inventory API or port-forwarding connection to one in ephemeral (usig port defined with -p)"
+    echo "It requires a local running Inventory API or port-forwarding connection to one in ephemeral (using port defined with -p)"
     echo ""
     echo "REQUIRED ARGUMENTS:"
     echo "  -n NUM_RUNS: The number of times to run a test loop (one run is one create, update, and delete loop"
@@ -61,14 +61,12 @@ for ((i = 0 ; i < ${NUM_RUNS} ; i++)); do
 
   echo "Creating resource..."
   curl -H "Content-Type: application/json" -d $REQUEST $INVENTORY_URL
-  sleep 1
 
   echo "Updating resource..."
   curl -X PUT -H "Content-Type: application/json" -d $REQUEST $INVENTORY_URL
-  sleep 1
+
   echo "Deleting resource..."
   curl -X DELETE -H "Content-Type: application/json" -d $DELETE_REQUEST $INVENTORY_URL
-  sleep 1
 
   sleep $INTERVAL
 done

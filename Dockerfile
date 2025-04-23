@@ -2,8 +2,8 @@ FROM registry.access.redhat.com/ubi9/ubi-minimal:9.5-1742914212 AS builder
 
 ARG TARGETARCH
 USER root
-RUN microdnf install -y tar gzip make which gcc gcc-c++ cyrus-sasl-lib findutils git
-RUN microdnf install -y go-toolset
+RUN microdnf install -y tar gzip make which gcc gcc-c++ cyrus-sasl-lib findutils git go-toolset
+
 WORKDIR /workspace
 
 COPY go.mod go.sum ./

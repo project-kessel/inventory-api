@@ -202,17 +202,15 @@ func (i *InventoryConsumer) Consume() error {
 				} else {
 					i.Logger.Debugf("skipping notification to producer: txid not present or notifier not initialized")
 				}
-
-				if !checkIfCommit(e.TopicPartition) {
-					toBeCommitted = append(toBeCommitted, e.TopicPartition)
-				} else {
-					toBeCommitted = append(toBeCommitted, e.TopicPartition)
+				toBeCommitted = append(toBeCommitted, e.TopicPartition)
+				if checkIfCommit(e.TopicPartition) {
 					commitedOffsets, err := i.Consumer.CommitOffsets(toBeCommitted)
 					if err != nil {
 						i.Logger.Errorf("failed to commit offsets: %v", err)
 						continue
 					}
 					i.Logger.Infof("offsets %s to %s committed", commitedOffsets[0].Offset, commitedOffsets[len(commitedOffsets)-1].Offset)
+					toBeCommitted = nil
 				}
 				i.Logger.Infof("consumed event from topic %s, partition %d at offset %s: key = %-10s value = %s\n",
 					*e.TopicPartition.Topic, e.TopicPartition.Partition, e.TopicPartition.Offset, string(e.Key), string(e.Value))

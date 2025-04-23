@@ -36,7 +36,7 @@ func (c *HostsService) CreateRhelHost(ctx context.Context, r *pb.CreateRhelHostR
 	}
 
 	if h, err := hostFromCreateRequest(r, identity); err == nil {
-		if resp, err := c.Ctl.Create(ctx, h, r.GetWaitForSync()); err == nil {
+		if resp, err := c.Ctl.Create(ctx, h); err == nil {
 			return createResponseFromHost(resp), nil
 		} else {
 			return nil, err
@@ -53,7 +53,7 @@ func (c *HostsService) UpdateRhelHost(ctx context.Context, r *pb.UpdateRhelHostR
 	}
 
 	if h, err := hostFromUpdateRequest(r, identity); err == nil {
-		if resp, err := c.Ctl.Update(ctx, h, model.ReporterResourceIdFromResource(h), r.GetWaitForSync()); err == nil {
+		if resp, err := c.Ctl.Update(ctx, h, model.ReporterResourceIdFromResource(h)); err == nil {
 			return updateResponseFromHost(resp), nil
 		} else {
 			return nil, err

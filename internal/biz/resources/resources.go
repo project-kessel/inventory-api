@@ -282,7 +282,7 @@ func (uc *Usecase) ListResourcesInWorkspace(ctx context.Context, permission, nam
 }
 
 // Deprecated. Remove after notifications and ACM migrates to v1beta2
-func (uc *Usecase) Create(ctx context.Context, m *model.Resource, wait_for_sync bool) (*model.Resource, error) {
+func (uc *Usecase) Create(ctx context.Context, m *model.Resource) (*model.Resource, error) {
 	ret := m // Default to returning the input model in case persistence is disabled
 	var subscription pubsub.Subscription
 	var txidStr string
@@ -303,33 +303,28 @@ func (uc *Usecase) Create(ctx context.Context, m *model.Resource, wait_for_sync 
 			return nil, ErrResourceAlreadyExists
 		}
 
-		readAfterWriteEnabled := computeReadAfterWrite(uc, wait_for_sync, m)
-		if readAfterWriteEnabled {
-			// Generate txid for data layer
-			// TODO: Replace this when inventory api has proper api-level transaction ids
-			txid, err := uuid.NewV7()
-			if err != nil {
-				return nil, err
-			}
-			txidStr = txid.String()
-			subscription = uc.ListenManager.Subscribe(txidStr)
-			defer subscription.Unsubscribe()
+		// Generate txid for data layer
+		// TODO: Replace this when inventory api has proper api-level transaction ids
+		txid, err := uuid.NewV7()
+		if err != nil {
+			return nil, err
 		}
+		txidStr = txid.String()
+		subscription = uc.ListenManager.Subscribe(txidStr)
+		defer subscription.Unsubscribe()
 
 		ret, err = uc.reporterResourceRepository.Create(ctx, m, uc.Namespace, txidStr)
 		if err != nil {
 			return nil, err
 		}
 
-		if readAfterWriteEnabled {
-			// 30 sec max timeout
-			timeoutCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
-			defer cancel()
+		// 30 sec max timeout
+		timeoutCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+		defer cancel()
 
-			err = subscription.BlockForNotification(timeoutCtx)
-			if err != nil {
-				return nil, err
-			}
+		err = subscription.BlockForNotification(timeoutCtx)
+		if err != nil {
+			return nil, err
 		}
 	}
 
@@ -340,7 +335,7 @@ func (uc *Usecase) Create(ctx context.Context, m *model.Resource, wait_for_sync 
 //Deprecated. Remove after notifications and ACM migrates to v1beta2
 
 // Update updates a model in the database, updates related tuples in the relations-api, and issues an update event.
-func (uc *Usecase) Update(ctx context.Context, m *model.Resource, id model.ReporterResourceId, wait_for_sync bool) (*model.Resource, error) {
+func (uc *Usecase) Update(ctx context.Context, m *model.Resource, id model.ReporterResourceId) (*model.Resource, error) {
 	ret := m // Default to returning the input model in case persistence is disabled
 	var subscription pubsub.Subscription
 	var txidStr string
@@ -355,39 +350,33 @@ func (uc *Usecase) Update(ctx context.Context, m *model.Resource, id model.Repor
 
 		if err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
-				return uc.Create(ctx, m, wait_for_sync)
+				return uc.Create(ctx, m)
 			}
 
 			return nil, ErrDatabaseError
 		}
 
-		readAfterWriteEnabled := computeReadAfterWrite(uc, wait_for_sync, m)
-		if readAfterWriteEnabled {
-			// Generate txid for data layer
-			// TODO: Replace this when inventory api has proper api-level transaction ids
-			txid, err := uuid.NewV7()
-			if err != nil {
-				return nil, err
-			}
-			txidStr = txid.String()
-			subscription = uc.ListenManager.Subscribe(txidStr)
-			defer subscription.Unsubscribe()
+		// Generate txid for data layer
+		// TODO: Replace this when inventory api has proper api-level transaction ids
+		txid, err := uuid.NewV7()
+		if err != nil {
+			return nil, err
 		}
+		txidStr = txid.String()
+		subscription = uc.ListenManager.Subscribe(txidStr)
+		defer subscription.Unsubscribe()
 
 		ret, err = uc.reporterResourceRepository.Update(ctx, m, existingResource.ID, uc.Namespace, txidStr)
 		if err != nil {
 			return nil, err
 		}
 
-		if readAfterWriteEnabled {
+		timeoutCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+		defer cancel()
 
-			timeoutCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
-			defer cancel()
-
-			err = subscription.BlockForNotification(timeoutCtx)
-			if err != nil {
-				return nil, err
-			}
+		err = subscription.BlockForNotification(timeoutCtx)
+		if err != nil {
+			return nil, err
 		}
 	}
 

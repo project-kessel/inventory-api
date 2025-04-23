@@ -170,13 +170,13 @@ func TestInventoryAPIHTTP_v1beta1_RHELHostLifecycle(t *testing.T) {
 		common.WithHTTPUrl(inventoryapi_http_url),
 		common.WithTLSInsecure(insecure),
 		common.WithHTTPTLSConfig(tlsConfig),
+		common.WithTimeout(10*time.Second),
 	)
 	client, err := v1beta1.NewHttpClient(context.Background(), c)
 	if err != nil {
 		t.Error(err)
 	}
 	createRequest := resources.CreateRhelHostRequest{
-		WaitForSync: false,
 		RhelHost: &resources.RhelHost{
 			Metadata: &resources.Metadata{
 				ResourceType: "rhel_host",
@@ -198,7 +198,6 @@ func TestInventoryAPIHTTP_v1beta1_RHELHostLifecycle(t *testing.T) {
 	assert.NoError(t, err, "Failed to create RhelHost")
 
 	updateRequest := resources.UpdateRhelHostRequest{
-		WaitForSync: false,
 		RhelHost: &resources.RhelHost{
 			Metadata: &resources.Metadata{
 				ResourceType: "rhel_host",
@@ -238,6 +237,7 @@ func TestInventoryAPIHTTP_v1beta1_K8SClusterLifecycle(t *testing.T) {
 		common.WithHTTPUrl(inventoryapi_http_url),
 		common.WithTLSInsecure(insecure),
 		common.WithHTTPTLSConfig(tlsConfig),
+		common.WithTimeout(10*time.Second),
 	)
 	client, err := v1beta1.NewHttpClient(context.Background(), c)
 	if err != nil {
@@ -347,6 +347,7 @@ func TestInventoryAPIHTTP_v1beta1_K8SPolicyLifecycle(t *testing.T) {
 		common.WithHTTPUrl(inventoryapi_http_url),
 		common.WithTLSInsecure(insecure),
 		common.WithHTTPTLSConfig(tlsConfig),
+		common.WithTimeout(10*time.Second),
 	)
 	client, err := v1beta1.NewHttpClient(context.Background(), c)
 	if err != nil {
@@ -423,6 +424,7 @@ func TestInventoryAPIHTTP_v1beta1_NotificationsIntegrationLifecycle(t *testing.T
 		common.WithHTTPUrl(inventoryapi_http_url),
 		common.WithTLSInsecure(insecure),
 		common.WithHTTPTLSConfig(tlsConfig),
+		common.WithTimeout(10*time.Second),
 	)
 	client, err := v1beta1.NewHttpClient(context.Background(), c)
 	if err != nil {
@@ -485,6 +487,7 @@ func TestInventoryAPIHTTP_v1beta1_K8SPolicy_is_propagated_to_K8sClusterLifecycle
 		common.WithHTTPUrl(inventoryapi_http_url),
 		common.WithTLSInsecure(insecure),
 		common.WithHTTPTLSConfig(tlsConfig),
+		common.WithTimeout(10*time.Second),
 	)
 	client, err := v1beta1.NewHttpClient(context.Background(), c)
 	if err != nil {
@@ -615,7 +618,7 @@ func TestInventoryAPIHTTP_v1beta1_K8SPolicy_is_propagated_to_K8sClusterLifecycle
 	assert.NoError(t, err, "Failed to delete relationship between K8sPolicy and K8sCluster")
 }
 
-func TestInventoryAPIHTTP_NotificationsIntegrationLifecycle_WaitForSync(t *testing.T) {
+func TestInventoryAPIHTTP_NotificationsIntegrationLifecycle_ConsistencyToken(t *testing.T) {
 	t.Parallel()
 	resourceId := "notifications-consistent-001"
 
@@ -644,12 +647,11 @@ func TestInventoryAPIHTTP_NotificationsIntegrationLifecycle_WaitForSync(t *testi
 				ReporterVersion: "1.0",
 			},
 		},
-		WaitForSync: true,
 	}
 
 	opts := getCallOptions()
 	_, err = client.NotificationIntegrationClient.CreateNotificationsIntegration(context.Background(), &createRequest, opts...)
-	assert.NoError(t, err, "Failed to create Notifications Integration w/ WaitForSync")
+	assert.NoError(t, err, "Failed to create Notifications Integration")
 
 	var integration model.Resource
 	err = db.Where("reporter_resource_id = ?", resourceId).First(&integration).Error
@@ -671,11 +673,10 @@ func TestInventoryAPIHTTP_NotificationsIntegrationLifecycle_WaitForSync(t *testi
 				ReporterVersion: "1.1",
 			},
 		},
-		WaitForSync: true,
 	}
 
 	_, err = client.NotificationIntegrationClient.UpdateNotificationsIntegration(context.Background(), &updateRequest, opts...)
-	assert.NoError(t, err, "Failed to update Notifications Integration w/ WaitForSync")
+	assert.NoError(t, err, "Failed to update Notifications Integration")
 
 	err = db.Where("reporter_resource_id = ?", resourceId).First(&integration).Error
 	assert.NoError(t, err, "Failed to find Notifications Integration in DB")

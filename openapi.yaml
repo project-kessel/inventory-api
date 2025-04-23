@@ -925,9 +925,6 @@ components:
                     allOf:
                         - $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.K8sCluster'
                     description: The k8s cluster to create in Kessel Asset Inventory
-                waitForSync:
-                    type: boolean
-                    description: Will wait for synchronous processes to complete before returning
         kessel.inventory.v1beta1.resources.CreateK8sClusterResponse:
             type: object
             properties: {}
@@ -938,9 +935,6 @@ components:
                     allOf:
                         - $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.K8sPolicy'
                     description: The policy to create in Kessel Asset Inventory
-                waitForSync:
-                    type: boolean
-                    description: Will wait for synchronous processes to complete before returning
         kessel.inventory.v1beta1.resources.CreateK8sPolicyResponse:
             type: object
             properties: {}
@@ -951,9 +945,6 @@ components:
                     allOf:
                         - $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.NotificationsIntegration'
                     description: The NotificationsIntegration to create in Kessel Asset Inventory
-                waitForSync:
-                    type: boolean
-                    description: Will wait for synchronous processes to complete before returning
         kessel.inventory.v1beta1.resources.CreateNotificationsIntegrationResponse:
             type: object
             properties: {}
@@ -964,9 +955,6 @@ components:
                     allOf:
                         - $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.RhelHost'
                     description: The Rhel Host to create in Kessel Asset Inventory
-                waitForSync:
-                    type: boolean
-                    description: Will wait for synchronous processes to complete before returning
         kessel.inventory.v1beta1.resources.CreateRhelHostResponse:
             type: object
             properties: {}
@@ -1254,9 +1242,6 @@ components:
                     allOf:
                         - $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.K8sCluster'
                     description: "The resource to be updated will be defined by \n \\\"<reporter_data.reporter_type>:<reporter_instaance_id>:<reporter_data.local_resource_id>\\\"\n from the request body."
-                waitForSync:
-                    type: boolean
-                    description: Will wait for synchronous processes to complete before returning
         kessel.inventory.v1beta1.resources.UpdateK8sClusterResponse:
             type: object
             properties: {}
@@ -1267,9 +1252,6 @@ components:
                     allOf:
                         - $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.K8sPolicy'
                     description: "The resource to be updated will be defined by \n \\\"<reporter_data.reporter_type>:<reporter_instaance_id>:<reporter_data.local_resource_id>\\\"\n from the request body."
-                waitForSync:
-                    type: boolean
-                    description: Will wait for synchronous processes to complete before returning
         kessel.inventory.v1beta1.resources.UpdateK8sPolicyResponse:
             type: object
             properties: {}
@@ -1280,9 +1262,6 @@ components:
                     allOf:
                         - $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.NotificationsIntegration'
                     description: "The resource to be updated will be defined by \n \\\"<reporter_data.reporter_type>:<reporter_instaance_id>:<reporter_data.local_resource_id>\\\"\n from the request body."
-                waitForSync:
-                    type: boolean
-                    description: Will wait for synchronous processes to complete before returning
         kessel.inventory.v1beta1.resources.UpdateNotificationsIntegrationResponse:
             type: object
             properties: {}
@@ -1293,9 +1272,6 @@ components:
                     allOf:
                         - $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.RhelHost'
                     description: "The resource to be updated will be defined by \n \\\"<reporter_data.reporter_type>:<reporter_instaance_id>:<reporter_data.local_resource_id>\\\"\n from the request body."
-                waitForSync:
-                    type: boolean
-                    description: Will wait for synchronous processes to complete before returning
         kessel.inventory.v1beta1.resources.UpdateRhelHostResponse:
             type: object
             properties: {}

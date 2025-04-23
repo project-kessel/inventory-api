@@ -4,13 +4,14 @@ syntax = "proto3";
 package kessel.inventory.v1beta2;
 
 import "buf/validate/validate.proto";
-import "kessel/inventory/v1beta2/resource_type.proto";
+import "kessel/inventory/v1beta2/reporter_reference.proto";
 
 option go_package = "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2";
 option java_multiple_files = true;
 option java_package = "org.project_kessel.api.inventory.v1beta2";// A reference to a Subject or, if a `relation` is provided, a Subject Set.
 
 message ResourceReference {
-  ResourceType type = 1 [(buf.validate.field).required = true];
-  string id = 2 [(buf.validate.field).string.min_len = 1];
+  string resource_type = 1 [(buf.validate.field).required = true];
+  string resource_id = 2 [(buf.validate.field).string.min_len = 1];
+  optional ReporterReference reporter = 3;
 }

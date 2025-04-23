@@ -218,20 +218,20 @@ func TestInventoryAPIHTTP_v1beta2_AuthzLifecycle(t *testing.T) {
 
 	subject := &pbv1beta2.SubjectReference{
 		Subject: &pbv1beta2.ResourceReference{
-			Type: &pbv1beta2.ResourceType{
-				Namespace: "rbac",
-				Name:      "principal",
+			ResourceId:   "bob",
+			ResourceType: "principal",
+			Reporter: &pbv1beta2.ReporterReference{
+				Type: "rbac",
 			},
-			Id: "bob",
 		},
 	}
 
 	parent := &pbv1beta2.ResourceReference{
-		Type: &pbv1beta2.ResourceType{
-			Namespace: "rbac",
-			Name:      "group",
+		ResourceId: "bob_club",
+		Reporter: &pbv1beta2.ReporterReference{
+			Type: "rbac",
 		},
-		Id: "bob_club",
+		ResourceType: "group",
 	}
 
 	// /authz/check

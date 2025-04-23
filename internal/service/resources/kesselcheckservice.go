@@ -73,14 +73,14 @@ func (s *KesselCheckServiceServiceV1beta2) Check(ctx context.Context, req *pbv1b
 	}
 
 	if resource, err := authzFromRequestV1beta2(identity, req.Parent); err == nil {
-		if resp, err := s.Ctl.Check(ctx, req.GetRelation(), req.Parent.Type.GetNamespace(), &v1beta1.SubjectReference{
+		if resp, err := s.Ctl.Check(ctx, req.GetRelation(), req.Parent.Reporter.GetType(), &v1beta1.SubjectReference{
 			Relation: req.GetSubject().Relation,
 			Subject: &v1beta1.ObjectReference{
 				Type: &v1beta1.ObjectType{
-					Namespace: req.GetSubject().GetSubject().GetType().GetNamespace(),
-					Name:      req.GetSubject().GetSubject().GetType().GetName(),
+					Namespace: req.GetSubject().GetSubject().Reporter.GetType(),
+					Name:      req.GetSubject().GetSubject().GetResourceType(),
 				},
-				Id: req.GetSubject().GetSubject().GetId(),
+				Id: req.GetSubject().GetSubject().GetResourceId(),
 			},
 		}, *resource); err == nil {
 			return viewResponseFromAuthzRequestV1beta2(resp), nil
@@ -125,14 +125,14 @@ func (s *KesselCheckServiceServiceV1beta2) CheckForUpdate(ctx context.Context, r
 	}
 
 	if resource, err := authzFromRequestV1beta2(identity, req.Parent); err == nil {
-		if resp, err := s.Ctl.CheckForUpdate(ctx, req.GetRelation(), req.Parent.Type.GetNamespace(), &v1beta1.SubjectReference{
+		if resp, err := s.Ctl.CheckForUpdate(ctx, req.GetRelation(), req.Parent.GetResourceType(), &v1beta1.SubjectReference{
 			Relation: req.GetSubject().Relation,
 			Subject: &v1beta1.ObjectReference{
 				Type: &v1beta1.ObjectType{
-					Namespace: req.GetSubject().GetSubject().GetType().GetNamespace(),
-					Name:      req.GetSubject().GetSubject().GetType().GetName(),
+					Namespace: req.GetSubject().GetSubject().GetReporter().GetType(),
+					Name:      req.GetSubject().GetSubject().GetResourceType(),
 				},
-				Id: req.GetSubject().GetSubject().GetId(),
+				Id: req.GetSubject().GetSubject().GetResourceId(),
 			},
 		}, *resource); err == nil {
 			return updateResponseFromAuthzRequestV1beta2(resp), nil
@@ -155,8 +155,8 @@ func authzFromRequest(identity *authnapi.Identity, resource *pb.ObjectReference)
 
 func authzFromRequestV1beta2(identity *authnapi.Identity, resource *pbv1beta2.ResourceReference) (*model.ReporterResourceId, error) {
 	return &model.ReporterResourceId{
-		LocalResourceId: resource.Id,
-		ResourceType:    resource.Type.Name,
+		LocalResourceId: resource.ResourceId,
+		ResourceType:    resource.ResourceType,
 		ReporterId:      identity.Principal,
 		ReporterType:    identity.Type,
 	}, nil

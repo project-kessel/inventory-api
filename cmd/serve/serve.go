@@ -299,7 +299,7 @@ func NewCommand(
 				srvErrs <- server.Run(ctx)
 			}()
 
-			shutdown := shutdown(db, server, eventingManager, inventoryConsumer, log.NewHelper(logger))
+			shutdown := shutdown(db, server, eventingManager, &inventoryConsumer, log.NewHelper(logger))
 
 			if !storageOptions.DisablePersistence && consumerOptions.Enabled {
 				go func() {
@@ -359,7 +359,7 @@ func NewCommand(
 	return cmd
 }
 
-func shutdown(db *gorm.DB, srv *server.Server, em eventingapi.Manager, cm consumer.InventoryConsumer, logger *log.Helper) func(reason interface{}) {
+func shutdown(db *gorm.DB, srv *server.Server, em eventingapi.Manager, cm *consumer.InventoryConsumer, logger *log.Helper) func(reason interface{}) {
 	return func(reason interface{}) {
 		log.Info(fmt.Sprintf("Server Shutdown: %s", reason))
 
@@ -376,12 +376,17 @@ func shutdown(db *gorm.DB, srv *server.Server, em eventingapi.Manager, cm consum
 			logger.Error(fmt.Sprintf("Error Gracefully Shutting Down Eventing: %v", err))
 		}
 
-		if cm != (consumer.InventoryConsumer{}) {
-			if !cm.Consumer.IsClosed() {
-				if err := cm.Shutdown(); err != nil {
-					logger.Error(fmt.Sprintf("Error Gracefully Shutting Down Consumer: %v", err))
+		if cm != nil {
+			defer func() {
+				err := cm.Shutdown()
+				if err != nil {
+					if e.Is(err, consumer.ErrClosed) {
+						logger.Warn("error shutting down consumer, consumer already closed")
+					} else {
+						logger.Error(fmt.Sprintf("Error Gracefully Shutting Down Consumer: %v", err))
+					}
 				}
-			}
+			}()
 		}
 
 		if sqlDB, err := db.DB(); err != nil {

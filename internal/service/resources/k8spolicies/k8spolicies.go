@@ -23,8 +23,8 @@ type K8sPolicyService struct {
 	Ctl *resources.Usecase
 }
 
-// New creates a new K8sPoliciesService to handle requests for K8s Policies
-func New(c *resources.Usecase) *K8sPolicyService {
+// NewKesselK8SPolicyServiceV1beta1 creates a new K8sPoliciesService to handle requests for K8s Policies
+func NewKesselK8SPolicyServiceV1beta1(c *resources.Usecase) *K8sPolicyService {
 	return &K8sPolicyService{
 		Ctl: c,
 	}

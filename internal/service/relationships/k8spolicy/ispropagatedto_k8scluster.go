@@ -20,8 +20,8 @@ type K8SPolicyIsPropagatedToK8SClusterService struct {
 	Controller *relationshipsctl.Usecase
 }
 
-// New creates a new K8SPolicyIsPropagatedToK8SClusterService to handle requests for RHEL hosts
-func New(c *relationshipsctl.Usecase) *K8SPolicyIsPropagatedToK8SClusterService {
+// NewKesselK8SPolicyIsPropagatedToK8SClusterServiceV1beta1 creates a new K8SPolicyIsPropagatedToK8SClusterService to handle requests for RHEL hosts
+func NewKesselK8SPolicyIsPropagatedToK8SClusterServiceV1beta1(c *relationshipsctl.Usecase) *K8SPolicyIsPropagatedToK8SClusterService {
 	return &K8SPolicyIsPropagatedToK8SClusterService{
 		Controller: c,
 	}

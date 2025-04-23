@@ -30,6 +30,8 @@ import (
 	"gorm.io/gorm"
 )
 
+const commitModulo = 10
+
 var ErrClosed = errors.New("consumer closed")
 var ErrMaxRetries = errors.New("max retries reached")
 
@@ -143,6 +145,8 @@ func (i *InventoryConsumer) Consume() error {
 		relationsEnabled = false
 	}
 
+	var toBeCommitted []kafka.TopicPartition
+
 	// Process messages
 	run := true
 	i.Logger.Info("Consumer ready: waiting for messages...")
@@ -199,13 +203,16 @@ func (i *InventoryConsumer) Consume() error {
 					i.Logger.Debugf("skipping notification to producer: txid not present or notifier not initialized")
 				}
 
-				// TODO: Commiting on every message is not ideal - we will need to revisit this as we consume more messages
-				// Potentially commit ever X number of messages or use an arbitrary value like:
-				// if topicPartition.Offset%10 == 0 { err := c.Commit() }
-				_, err = i.Consumer.Commit()
-				if err != nil {
-					i.Logger.Errorf("error on commit: %v", err)
-					continue
+				if !checkIfCommit(e.TopicPartition) {
+					toBeCommitted = append(toBeCommitted, e.TopicPartition)
+				} else {
+					toBeCommitted = append(toBeCommitted, e.TopicPartition)
+					commitedOffsets, err := i.Consumer.CommitOffsets(toBeCommitted)
+					if err != nil {
+						i.Logger.Errorf("failed to commit offsets: %v", err)
+						continue
+					}
+					i.Logger.Infof("offsets %s to %s committed", commitedOffsets[0].Offset, commitedOffsets[len(commitedOffsets)-1].Offset)
 				}
 				i.Logger.Infof("consumed event from topic %s, partition %d at offset %s: key = %-10s value = %s\n",
 					*e.TopicPartition.Topic, e.TopicPartition.Partition, e.TopicPartition.Offset, string(e.Key), string(e.Value))
@@ -368,6 +375,14 @@ func ParseMessageKey(msg []byte) (string, error) {
 		return "", fmt.Errorf("error unmarshaling msgPayload: %v", err)
 	}
 	return msgPayload.InventoryID, nil
+}
+
+// checkIfCommit returns true whenever the condition to commit a batch of offsets is met
+func checkIfCommit(partition kafka.TopicPartition) bool {
+	if partition.Offset%commitModulo != 0 {
+		return false
+	}
+	return true
 }
 
 // CreateTuple calls the Relations API to create a tuple from the message payload received and returns the consistency token

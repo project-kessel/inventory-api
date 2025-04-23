@@ -5,8 +5,8 @@ package kessel.inventory.v1beta2;
 import "buf/validate/validate.proto";
 import "kessel/inventory/v1beta2/request_pagination.proto";
 import "kessel/inventory/v1beta2/subject_reference.proto";
-import "kessel/inventory/v1beta2/resource_reference.proto";
 import "kessel/inventory/v1beta2/consistency.proto";
+import "kessel/inventory/v1beta2/representation_type.proto";
 
 option go_package = "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2";
 option java_multiple_files = true;

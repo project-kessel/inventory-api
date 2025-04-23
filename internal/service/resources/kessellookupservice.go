@@ -60,18 +60,18 @@ func toLookupResourceRequest(request *pbv1beta2.LookupResourcesRequest) *kessel.
 	}
 	return &kessel.LookupResourcesRequest{
 		ResourceType: &kessel.ObjectType{
-			Namespace: request.Resource.Reporter.GetType(),
-			Name:      request.Resource.GetResourceType(),
+			Namespace: request.ObjectType.GetReporterType(),
+			Name:      request.ObjectType.GetResourceType(),
 		},
 		Relation: request.Relation,
 		Subject: &kessel.SubjectReference{
 			Relation: request.Subject.Relation,
 			Subject: &kessel.ObjectReference{
 				Type: &kessel.ObjectType{
-					Name:      request.Subject.Subject.GetResourceType(),
-					Namespace: request.Subject.Subject.GetReporter().GetType(),
+					Name:      request.Subject.Resource.GetResourceType(),
+					Namespace: request.Subject.Resource.GetReporter().GetType(),
 				},
-				Id: request.Subject.Subject.GetResourceId(),
+				Id: request.Subject.Resource.GetResourceId(),
 			},
 		},
 		Pagination: pagination,
@@ -80,7 +80,7 @@ func toLookupResourceRequest(request *pbv1beta2.LookupResourcesRequest) *kessel.
 
 func toLookupResourceResponse(response *kessel.LookupResourcesResponse) *pbv1beta2.LookupResourcesResponse {
 	return &pbv1beta2.LookupResourcesResponse{
-		Resource: &pbv1beta2.ResourceReference{
+		Object: &pbv1beta2.ResourceReference{
 			Reporter: &pbv1beta2.ReporterReference{
 				Type: response.Resource.Type.Namespace,
 			},

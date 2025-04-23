@@ -72,15 +72,15 @@ func (s *KesselCheckServiceServiceV1beta2) Check(ctx context.Context, req *pbv1b
 		return nil, err
 	}
 
-	if resource, err := authzFromRequestV1beta2(identity, req.Parent); err == nil {
-		if resp, err := s.Ctl.Check(ctx, req.GetRelation(), req.Parent.Reporter.GetType(), &v1beta1.SubjectReference{
+	if resource, err := authzFromRequestV1beta2(identity, req.Object); err == nil {
+		if resp, err := s.Ctl.Check(ctx, req.GetRelation(), req.Object.Reporter.GetType(), &v1beta1.SubjectReference{
 			Relation: req.GetSubject().Relation,
 			Subject: &v1beta1.ObjectReference{
 				Type: &v1beta1.ObjectType{
-					Namespace: req.GetSubject().GetSubject().Reporter.GetType(),
-					Name:      req.GetSubject().GetSubject().GetResourceType(),
+					Namespace: req.GetSubject().Resource.GetReporter().GetType(),
+					Name:      req.GetSubject().Resource.GetResourceType(),
 				},
-				Id: req.GetSubject().GetSubject().GetResourceId(),
+				Id: req.GetSubject().Resource.GetResourceId(),
 			},
 		}, *resource); err == nil {
 			return viewResponseFromAuthzRequestV1beta2(resp), nil
@@ -124,15 +124,15 @@ func (s *KesselCheckServiceServiceV1beta2) CheckForUpdate(ctx context.Context, r
 		return nil, err
 	}
 
-	if resource, err := authzFromRequestV1beta2(identity, req.Parent); err == nil {
-		if resp, err := s.Ctl.CheckForUpdate(ctx, req.GetRelation(), req.Parent.GetResourceType(), &v1beta1.SubjectReference{
+	if resource, err := authzFromRequestV1beta2(identity, req.Object); err == nil {
+		if resp, err := s.Ctl.CheckForUpdate(ctx, req.GetRelation(), req.Object.GetResourceType(), &v1beta1.SubjectReference{
 			Relation: req.GetSubject().Relation,
 			Subject: &v1beta1.ObjectReference{
 				Type: &v1beta1.ObjectType{
-					Namespace: req.GetSubject().GetSubject().GetReporter().GetType(),
-					Name:      req.GetSubject().GetSubject().GetResourceType(),
+					Namespace: req.GetSubject().Resource.GetReporter().GetType(),
+					Name:      req.GetSubject().Resource.GetResourceType(),
 				},
-				Id: req.GetSubject().GetSubject().GetResourceId(),
+				Id: req.GetSubject().Resource.GetResourceId(),
 			},
 		}, *resource); err == nil {
 			return updateResponseFromAuthzRequestV1beta2(resp), nil

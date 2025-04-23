@@ -297,7 +297,7 @@ func (uc *Usecase) ListResourcesInWorkspace(ctx context.Context, permission, nam
 	var wg sync.WaitGroup
 	for _, resource := range resources {
 		wg.Add(1)
-		log.Infof("ListResourcesInWorkspace: checkforview on %+v", resource)
+		log.Debugf("ListResourcesInWorkspace: checkforview on %+v", resource)
 
 		go func() {
 			defer wg.Done()
@@ -307,7 +307,7 @@ func (uc *Usecase) ListResourcesInWorkspace(ctx context.Context, permission, nam
 			} else if err != nil {
 				error_chan <- err
 			} else if allowed != kessel.CheckResponse_ALLOWED_TRUE {
-				log.Infof("Response was not allowed: %v", allowed)
+				log.Debugf("ListResourcesInWorkspace: response was not allowed: %v", allowed)
 			}
 		}()
 	}

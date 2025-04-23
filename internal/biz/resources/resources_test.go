@@ -293,7 +293,7 @@ func TestCreateReturnsDbError(t *testing.T) {
 	useCase := New(repo, inventoryRepo, nil, nil, "", log.DefaultLogger, false, nil, false, []string{})
 	ctx := context.TODO()
 
-	_, err := useCase.Create(ctx, resource, false)
+	_, err := useCase.Create(ctx, resource)
 	assert.ErrorIs(t, err, ErrDatabaseError)
 	repo.AssertExpectations(t)
 }
@@ -311,7 +311,7 @@ func TestCreateReturnsDbErrorBackwardsCompatible(t *testing.T) {
 	useCase := New(repo, inventoryRepo, nil, nil, "", log.DefaultLogger, false, nil, false, []string{})
 	ctx := context.TODO()
 
-	_, err := useCase.Create(ctx, resource, false)
+	_, err := useCase.Create(ctx, resource)
 	assert.ErrorIs(t, err, ErrDatabaseError)
 	repo.AssertExpectations(t)
 }
@@ -327,7 +327,7 @@ func TestCreateResourceAlreadyExists(t *testing.T) {
 	useCase := New(repo, inventoryRepo, nil, nil, "", log.DefaultLogger, false, nil, false, []string{})
 	ctx := context.TODO()
 
-	_, err := useCase.Create(ctx, resource, false)
+	_, err := useCase.Create(ctx, resource)
 	assert.ErrorIs(t, err, ErrResourceAlreadyExists)
 	repo.AssertExpectations(t)
 }
@@ -345,7 +345,7 @@ func TestCreateResourceAlreadyExistsBackwardsCompatible(t *testing.T) {
 	useCase := New(repo, inventoryRepo, nil, nil, "", log.DefaultLogger, false, nil, false, []string{})
 	ctx := context.TODO()
 
-	_, err := useCase.Create(ctx, resource, false)
+	_, err := useCase.Create(ctx, resource)
 	assert.ErrorIs(t, err, ErrResourceAlreadyExists)
 	repo.AssertExpectations(t)
 }
@@ -357,6 +357,8 @@ func TestCreateNewResource(t *testing.T) {
 
 	repo := &MockedReporterResourceRepository{}
 	inventoryRepo := &MockedInventoryResourceRepository{}
+	listenMan := &MockedListenManager{}
+	sub := MockedSubscription{}
 	returnedResource := model.Resource{
 		ID: id,
 	}
@@ -365,13 +367,20 @@ func TestCreateNewResource(t *testing.T) {
 	repo.On("FindByReporterResourceId", mock.Anything, mock.Anything).Return((*model.Resource)(nil), gorm.ErrRecordNotFound)
 	repo.On("Create", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&returnedResource, nil)
 
-	useCase := New(repo, inventoryRepo, nil, nil, "", log.DefaultLogger, false, nil, false, []string{})
+	listenMan.On("Subscribe", mock.Anything).Return(&sub)
+
+	sub.On("Unsubscribe")
+	sub.On("BlockForNotification", mock.Anything).Return(nil)
+
+	useCase := New(repo, inventoryRepo, nil, nil, "", log.DefaultLogger, false, listenMan, false, []string{})
 	ctx := context.TODO()
 
-	r, err := useCase.Create(ctx, resource, false)
+	r, err := useCase.Create(ctx, resource)
 	assert.Nil(t, err)
 	assert.Equal(t, &returnedResource, r)
 	repo.AssertExpectations(t)
+	listenMan.AssertExpectations(t)
+	sub.AssertExpectations(t)
 }
 
 func TestCreateNewResource_ConsistencyToken(t *testing.T) {
@@ -403,7 +412,7 @@ func TestCreateNewResource_ConsistencyToken(t *testing.T) {
 	useCase := New(repo, inventoryRepo, m, nil, "", log.DefaultLogger, false, listenMan, true, []string{"reporter_id"})
 	ctx := context.TODO()
 
-	r, err := useCase.Create(ctx, resource, true)
+	r, err := useCase.Create(ctx, resource)
 
 	assert.Nil(t, err)
 	assert.NotNil(t, r)
@@ -423,7 +432,7 @@ func TestUpdateReturnsDbError(t *testing.T) {
 	useCase := New(repo, inventoryRepo, nil, nil, "", log.DefaultLogger, false, nil, false, []string{})
 	ctx := context.TODO()
 
-	_, err := useCase.Update(ctx, resource, model.ReporterResourceId{}, false)
+	_, err := useCase.Update(ctx, resource, model.ReporterResourceId{})
 	assert.ErrorIs(t, err, ErrDatabaseError)
 	repo.AssertExpectations(t)
 }
@@ -440,7 +449,7 @@ func TestUpdateReturnsDbErrorBackwardsCompatible(t *testing.T) {
 	useCase := New(repo, inventoryRepo, nil, nil, "", log.DefaultLogger, false, nil, false, []string{})
 	ctx := context.TODO()
 
-	_, err := useCase.Update(ctx, resource, model.ReporterResourceId{}, false)
+	_, err := useCase.Update(ctx, resource, model.ReporterResourceId{})
 	assert.ErrorIs(t, err, ErrDatabaseError)
 	repo.AssertExpectations(t)
 }
@@ -452,6 +461,8 @@ func TestUpdateNewResourceCreatesIt(t *testing.T) {
 
 	repo := &MockedReporterResourceRepository{}
 	inventoryRepo := &MockedInventoryResourceRepository{}
+	listenMan := &MockedListenManager{}
+	sub := MockedSubscription{}
 	returnedResource := model.Resource{
 		ID: id,
 	}
@@ -461,13 +472,20 @@ func TestUpdateNewResourceCreatesIt(t *testing.T) {
 	repo.On("FindByReporterResourceId", mock.Anything, mock.Anything).Return((*model.Resource)(nil), gorm.ErrRecordNotFound)
 	repo.On("Create", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&returnedResource, nil)
 
-	useCase := New(repo, inventoryRepo, nil, nil, "", log.DefaultLogger, false, nil, false, []string{})
+	listenMan.On("Subscribe", mock.Anything).Return(&sub)
+
+	sub.On("Unsubscribe")
+	sub.On("BlockForNotification", mock.Anything).Return(nil)
+
+	useCase := New(repo, inventoryRepo, nil, nil, "", log.DefaultLogger, false, listenMan, false, []string{})
 	ctx := context.TODO()
 
-	r, err := useCase.Update(ctx, resource, model.ReporterResourceId{}, false)
+	r, err := useCase.Update(ctx, resource, model.ReporterResourceId{})
 	assert.Nil(t, err)
 	assert.Equal(t, &returnedResource, r)
 	repo.AssertExpectations(t)
+	listenMan.AssertExpectations(t)
+	sub.AssertExpectations(t)
 }
 
 func TestUpdateExistingResource(t *testing.T) {
@@ -479,6 +497,8 @@ func TestUpdateExistingResource(t *testing.T) {
 
 	repo := &MockedReporterResourceRepository{}
 	inventoryRepo := &MockedInventoryResourceRepository{}
+	listenMan := &MockedListenManager{}
+	sub := MockedSubscription{}
 	returnedResource := model.Resource{
 		ID: id,
 	}
@@ -487,14 +507,21 @@ func TestUpdateExistingResource(t *testing.T) {
 	repo.On("FindByReporterData", mock.Anything, mock.Anything, mock.Anything).Return(resource, nil)
 	repo.On("Update", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&returnedResource, nil)
 
-	useCase := New(repo, inventoryRepo, nil, nil, "", log.DefaultLogger, false, nil, false, []string{})
+	listenMan.On("Subscribe", mock.Anything).Return(&sub)
+
+	sub.On("Unsubscribe")
+	sub.On("BlockForNotification", mock.Anything).Return(nil)
+
+	useCase := New(repo, inventoryRepo, nil, nil, "", log.DefaultLogger, false, listenMan, false, []string{})
 	ctx := context.TODO()
 
-	r, err := useCase.Update(ctx, resource, model.ReporterResourceId{}, false)
+	r, err := useCase.Update(ctx, resource, model.ReporterResourceId{})
 	assert.Nil(t, err)
 	assert.Equal(t, &returnedResource, r)
 	assert.Equal(t, resource.ID, r.ID)
 	repo.AssertExpectations(t)
+	listenMan.AssertExpectations(t)
+	sub.AssertExpectations(t)
 }
 func TestUpdateExistingResourceBackwardsCompatible(t *testing.T) {
 	resource := resource1()
@@ -505,6 +532,8 @@ func TestUpdateExistingResourceBackwardsCompatible(t *testing.T) {
 
 	repo := &MockedReporterResourceRepository{}
 	inventoryRepo := &MockedInventoryResourceRepository{}
+	listenMan := &MockedListenManager{}
+	sub := MockedSubscription{}
 	returnedResource := model.Resource{
 		ID: id,
 	}
@@ -515,14 +544,21 @@ func TestUpdateExistingResourceBackwardsCompatible(t *testing.T) {
 	repo.On("FindByReporterResourceId", mock.Anything, mock.Anything).Return(resource, nil)
 	repo.On("Update", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&returnedResource, nil)
 
-	useCase := New(repo, inventoryRepo, nil, nil, "", log.DefaultLogger, false, nil, false, []string{})
+	listenMan.On("Subscribe", mock.Anything).Return(&sub)
+
+	sub.On("Unsubscribe")
+	sub.On("BlockForNotification", mock.Anything).Return(nil)
+
+	useCase := New(repo, inventoryRepo, nil, nil, "", log.DefaultLogger, false, listenMan, false, []string{})
 	ctx := context.TODO()
 
-	r, err := useCase.Update(ctx, resource, model.ReporterResourceId{}, false)
+	r, err := useCase.Update(ctx, resource, model.ReporterResourceId{})
 	assert.Nil(t, err)
 	assert.Equal(t, &returnedResource, r)
 	assert.Equal(t, resource.ID, r.ID)
 	repo.AssertExpectations(t)
+	listenMan.AssertExpectations(t)
+	sub.AssertExpectations(t)
 }
 
 func TestDeleteReturnsDbError(t *testing.T) {
@@ -631,12 +667,12 @@ func TestCreateResource_PersistenceDisabled(t *testing.T) {
 	useCase := New(repo, inventoryRepo, nil, nil, "", log.DefaultLogger, disablePersistence, nil, false, []string{})
 
 	// Create the resource
-	r, err := useCase.Create(ctx, resource, false)
+	r, err := useCase.Create(ctx, resource)
 	assert.Nil(t, err)
 	assert.Equal(t, resource, r)
 
 	// Create the same resource again, should not return an error since persistence is disabled
-	r, err = useCase.Create(ctx, resource, false)
+	r, err = useCase.Create(ctx, resource)
 	assert.Nil(t, err)
 	assert.Equal(t, resource, r)
 
@@ -661,7 +697,7 @@ func TestUpdateResource_PersistenceDisabled(t *testing.T) {
 	disablePersistence := true
 	useCase := New(repo, inventoryRepo, nil, nil, "", log.DefaultLogger, disablePersistence, nil, false, []string{})
 
-	r, err := useCase.Update(ctx, resource, model.ReporterResourceId{}, false)
+	r, err := useCase.Update(ctx, resource, model.ReporterResourceId{})
 	assert.Nil(t, err)
 	assert.Equal(t, resource, r)
 
@@ -698,7 +734,7 @@ func TestUpdate_ReadAfterWrite(t *testing.T) {
 	useCase := New(repo, inventoryRepo, authz, nil, "", log.DefaultLogger, false, listenMan, true, []string{"reporter_id"})
 	ctx := context.TODO()
 
-	r, err := useCase.Update(ctx, resource, model.ReporterResourceId{}, true)
+	r, err := useCase.Update(ctx, resource, model.ReporterResourceId{})
 
 	assert.Nil(t, err)
 	assert.NotNil(t, r)

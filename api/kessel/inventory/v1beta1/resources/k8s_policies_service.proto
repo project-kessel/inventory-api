@@ -15,8 +15,6 @@ option java_package = "org.project_kessel.api.inventory.v1beta1.resources";
 message CreateK8sPolicyRequest {
   // The policy to create in Kessel Asset Inventory
   K8sPolicy k8s_policy = 1 [ json_name = "k8s_policy", (buf.validate.field).required = true ];
-  // Will wait for synchronous processes to complete before returning
-  bool wait_for_sync = 2; 
 }
 
 message CreateK8sPolicyResponse {}
@@ -26,8 +24,6 @@ message UpdateK8sPolicyRequest {
   // \"<reporter_data.reporter_type>:<reporter_instaance_id>:<reporter_data.local_resource_id>\"
   // from the request body.
    K8sPolicy k8s_policy = 1 [ json_name = "k8s_policy", (buf.validate.field).required = true ];
-  // Will wait for synchronous processes to complete before returning
-  bool wait_for_sync = 2; 
 }
 
 message UpdateK8sPolicyResponse {}

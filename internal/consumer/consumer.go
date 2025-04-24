@@ -49,6 +49,7 @@ type Consumer interface {
 // InventoryConsumer defines a Kafka Consumer with required clients and configs to call Relations API and update the Inventory DB with consistency tokens
 type InventoryConsumer struct {
 	Consumer         *kafka.Consumer
+	OffsetStorage    []kafka.TopicPartition
 	Config           CompletedConfig
 	DB               *gorm.DB
 	AuthzConfig      authz.CompletedConfig
@@ -96,6 +97,7 @@ func New(config CompletedConfig, db *gorm.DB, authz authz.CompletedConfig, autho
 
 	return InventoryConsumer{
 		Consumer:         consumer,
+		OffsetStorage:    make([]kafka.TopicPartition, 0),
 		Config:           config,
 		DB:               db,
 		AuthzConfig:      authz,
@@ -145,15 +147,12 @@ func (i *InventoryConsumer) Consume() error {
 		relationsEnabled = false
 	}
 
-	var toBeCommitted []kafka.TopicPartition
-
 	// Process messages
 	run := true
 	i.Logger.Info("Consumer ready: waiting for messages...")
 	for run {
 		select {
-		case sig := <-sigchan:
-			i.Logger.Infof("caught signal %v: terminating\n", sig)
+		case _ = <-sigchan:
 			run = false
 		default:
 			event := i.Consumer.Poll(100)
@@ -202,15 +201,17 @@ func (i *InventoryConsumer) Consume() error {
 				} else {
 					i.Logger.Debugf("skipping notification to producer: txid not present or notifier not initialized")
 				}
-				toBeCommitted = append(toBeCommitted, e.TopicPartition)
+
+				// store the current offset to be later batch committed
+				i.OffsetStorage = append(i.OffsetStorage, e.TopicPartition)
 				if checkIfCommit(e.TopicPartition) {
-					commitedOffsets, err := i.Consumer.CommitOffsets(toBeCommitted)
+					committedOffsets, err := i.commitStoredOffsets()
 					if err != nil {
 						i.Logger.Errorf("failed to commit offsets: %v", err)
 						continue
 					}
-					i.Logger.Infof("offsets %s to %s committed", commitedOffsets[0].Offset, commitedOffsets[len(commitedOffsets)-1].Offset)
-					toBeCommitted = nil
+					i.Logger.Infof("offsets %s to %s committed\n", committedOffsets[0].Offset, committedOffsets[len(committedOffsets)-1].Offset)
+					i.OffsetStorage = nil
 				}
 				i.Logger.Infof("consumed event from topic %s, partition %d at offset %s: key = %-10s value = %s\n",
 					*e.TopicPartition.Topic, e.TopicPartition.Partition, e.TopicPartition.Offset, string(e.Key), string(e.Value))
@@ -377,10 +378,16 @@ func ParseMessageKey(msg []byte) (string, error) {
 
 // checkIfCommit returns true whenever the condition to commit a batch of offsets is met
 func checkIfCommit(partition kafka.TopicPartition) bool {
-	if partition.Offset%commitModulo != 0 {
-		return false
+	return partition.Offset%commitModulo == 0
+}
+
+// commitStoredOffsets commits offsets for all processed messages since last offset commit
+func (i *InventoryConsumer) commitStoredOffsets() ([]kafka.TopicPartition, error) {
+	commitedOffsets, err := i.Consumer.CommitOffsets(i.OffsetStorage)
+	if err != nil {
+		return nil, err
 	}
-	return true
+	return commitedOffsets, nil
 }
 
 // CreateTuple calls the Relations API to create a tuple from the message payload received and returns the consistency token
@@ -450,9 +457,16 @@ func (i *InventoryConsumer) Errs() <-chan error {
 
 // Shutdown ensures the consumer is properly shutdown, whether by server or due to rebalance
 func (i *InventoryConsumer) Shutdown() error {
-	// TODO, shutting down the consumer should attempt to commit the offset if we've processed the message
-	// for now it just stops the consumer connection
 	if !i.Consumer.IsClosed() {
+		i.Logger.Info("shutting down consumer...")
+		if i.OffsetStorage != nil && len(i.OffsetStorage) > 0 {
+			committedOffsets, err := i.commitStoredOffsets()
+			if err != nil {
+				i.Logger.Errorf("failed to commit offsets before shutting down: %v", err)
+			} else {
+				i.Logger.Infof("offsets %s to %s committed\n", committedOffsets[0].Offset, committedOffsets[len(committedOffsets)-1].Offset)
+			}
+		}
 		err := i.Consumer.Close()
 		if err != nil {
 			i.Logger.Errorf("Error closing kafka consumer: %v", err)

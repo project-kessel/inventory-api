@@ -36,17 +36,6 @@ const commitModulo = 10
 var ErrClosed = errors.New("consumer closed")
 var ErrMaxRetries = errors.New("max retries reached")
 
-type Consumer interface {
-	Consume() error
-	CreateTuple(ctx context.Context, tuple *v1beta1.Relationship) (string, error)
-	UpdateTuple(ctx context.Context, tuple *v1beta1.Relationship) (string, error)
-	DeleteTuple(ctx context.Context, filter *v1beta1.RelationTupleFilter) (string, error)
-	UpdateConsistencyToken(inventoryID, token string) error
-	Errs() <-chan error
-	Shutdown() error
-	Retry(operation func() (string, error)) (string, error)
-}
-
 // InventoryConsumer defines a Kafka Consumer with required clients and configs to call Relations API and update the Inventory DB with consistency tokens
 type InventoryConsumer struct {
 	Consumer         *kafka.Consumer

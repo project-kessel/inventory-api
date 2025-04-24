@@ -47,7 +47,7 @@ func (s *KesselCheckServiceService) Check(ctx context.Context, req *pb.CheckRequ
 	}
 
 	if resource, err := authzFromRequest(identity, req.Parent); err == nil {
-		if resp, err := s.Ctl.Check(ctx, req.GetRelation(), req.Parent.Type.GetNamespace(), &v1beta1.SubjectReference{
+		if resp, err := s.Ctl.Check(ctx, req.GetRelation(), req.Parent.GetType().GetNamespace(), &v1beta1.SubjectReference{
 			Relation: req.GetSubject().Relation,
 			Subject: &v1beta1.ObjectReference{
 				Type: &v1beta1.ObjectType{
@@ -72,15 +72,15 @@ func (s *KesselCheckServiceServiceV1beta2) Check(ctx context.Context, req *pbv1b
 		return nil, err
 	}
 
-	if resource, err := authzFromRequestV1beta2(identity, req.Parent); err == nil {
-		if resp, err := s.Ctl.Check(ctx, req.GetRelation(), req.Parent.Type.GetNamespace(), &v1beta1.SubjectReference{
+	if resource, err := authzFromRequestV1beta2(identity, req.Object); err == nil {
+		if resp, err := s.Ctl.Check(ctx, req.GetRelation(), req.Object.Reporter.GetType(), &v1beta1.SubjectReference{
 			Relation: req.GetSubject().Relation,
 			Subject: &v1beta1.ObjectReference{
 				Type: &v1beta1.ObjectType{
-					Namespace: req.GetSubject().GetSubject().GetType().GetNamespace(),
-					Name:      req.GetSubject().GetSubject().GetType().GetName(),
+					Namespace: req.GetSubject().Resource.GetReporter().GetType(),
+					Name:      req.GetSubject().Resource.GetResourceType(),
 				},
-				Id: req.GetSubject().GetSubject().GetId(),
+				Id: req.GetSubject().Resource.GetResourceId(),
 			},
 		}, *resource); err == nil {
 			return viewResponseFromAuthzRequestV1beta2(resp), nil
@@ -124,15 +124,15 @@ func (s *KesselCheckServiceServiceV1beta2) CheckForUpdate(ctx context.Context, r
 		return nil, err
 	}
 
-	if resource, err := authzFromRequestV1beta2(identity, req.Parent); err == nil {
-		if resp, err := s.Ctl.CheckForUpdate(ctx, req.GetRelation(), req.Parent.Type.GetNamespace(), &v1beta1.SubjectReference{
+	if resource, err := authzFromRequestV1beta2(identity, req.Object); err == nil {
+		if resp, err := s.Ctl.CheckForUpdate(ctx, req.GetRelation(), req.Object.Reporter.GetType(), &v1beta1.SubjectReference{
 			Relation: req.GetSubject().Relation,
 			Subject: &v1beta1.ObjectReference{
 				Type: &v1beta1.ObjectType{
-					Namespace: req.GetSubject().GetSubject().GetType().GetNamespace(),
-					Name:      req.GetSubject().GetSubject().GetType().GetName(),
+					Namespace: req.GetSubject().Resource.GetReporter().GetType(),
+					Name:      req.GetSubject().Resource.GetResourceType(),
 				},
-				Id: req.GetSubject().GetSubject().GetId(),
+				Id: req.GetSubject().Resource.GetResourceId(),
 			},
 		}, *resource); err == nil {
 			return updateResponseFromAuthzRequestV1beta2(resp), nil
@@ -153,10 +153,10 @@ func authzFromRequest(identity *authnapi.Identity, resource *pb.ObjectReference)
 	}, nil
 }
 
-func authzFromRequestV1beta2(identity *authnapi.Identity, resource *pbv1beta2.ObjectReference) (*model.ReporterResourceId, error) {
+func authzFromRequestV1beta2(identity *authnapi.Identity, resource *pbv1beta2.ResourceReference) (*model.ReporterResourceId, error) {
 	return &model.ReporterResourceId{
-		LocalResourceId: resource.Id,
-		ResourceType:    resource.Type.Name,
+		LocalResourceId: resource.ResourceId,
+		ResourceType:    resource.ResourceType,
 		ReporterId:      identity.Principal,
 		ReporterType:    identity.Type,
 	}, nil

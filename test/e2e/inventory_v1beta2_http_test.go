@@ -217,28 +217,28 @@ func TestInventoryAPIHTTP_v1beta2_AuthzLifecycle(t *testing.T) {
 	ctx := context.Background()
 
 	subject := &pbv1beta2.SubjectReference{
-		Subject: &pbv1beta2.ObjectReference{
-			Type: &pbv1beta2.ObjectType{
-				Namespace: "rbac",
-				Name:      "principal",
+		Resource: &pbv1beta2.ResourceReference{
+			ResourceId:   "bob",
+			ResourceType: "principal",
+			Reporter: &pbv1beta2.ReporterReference{
+				Type: "rbac",
 			},
-			Id: "bob",
 		},
 	}
 
-	parent := &pbv1beta2.ObjectReference{
-		Type: &pbv1beta2.ObjectType{
-			Namespace: "rbac",
-			Name:      "group",
+	parent := &pbv1beta2.ResourceReference{
+		ResourceId: "bob_club",
+		Reporter: &pbv1beta2.ReporterReference{
+			Type: "rbac",
 		},
-		Id: "bob_club",
+		ResourceType: "group",
 	}
 
 	// /authz/check
 	checkReq := &pbv1beta2.CheckRequest{
 		Subject:  subject,
 		Relation: "member",
-		Parent:   parent,
+		Object:   parent,
 	}
 
 	checkResp, err := client.KesselCheckService.Check(ctx, checkReq)
@@ -250,7 +250,7 @@ func TestInventoryAPIHTTP_v1beta2_AuthzLifecycle(t *testing.T) {
 	checkUpdateReq := &pbv1beta2.CheckForUpdateRequest{
 		Subject:  subject,
 		Relation: "member",
-		Parent:   parent,
+		Object:   parent,
 	}
 
 	checkUpdateResp, err := client.KesselCheckService.CheckForUpdate(ctx, checkUpdateReq)

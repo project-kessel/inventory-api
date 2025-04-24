@@ -9,19 +9,19 @@ import (
 )
 
 type KesselLookupService struct {
-	pbv1beta2.UnimplementedKesselLookupServiceServer
+	pbv1beta2.UnimplementedKesselStreamedListServiceServer
 	Ctl *resources.Usecase
 }
 
-func NewKesselLookupServiceV1beta2(c *resources.Usecase) pbv1beta2.KesselLookupServiceServer {
+func NewKesselLookupServiceV1beta2(c *resources.Usecase) pbv1beta2.KesselStreamedListServiceServer {
 	return &KesselLookupService{
 		Ctl: c,
 	}
 }
 
 func (s *KesselLookupService) LookupResources(
-	req *pbv1beta2.LookupResourcesRequest,
-	stream pbv1beta2.KesselLookupService_LookupResourcesServer,
+	req *pbv1beta2.StreamedListObjectsRequest,
+	stream pbv1beta2.KesselStreamedListService_StreamedListObjectsServer,
 ) error {
 	ctx := stream.Context()
 	clientStream, err := s.Ctl.LookupResources(ctx, toLookupResourceRequest(req))
@@ -47,7 +47,7 @@ func (s *KesselLookupService) LookupResources(
 	}
 }
 
-func toLookupResourceRequest(request *pbv1beta2.LookupResourcesRequest) *kessel.LookupResourcesRequest {
+func toLookupResourceRequest(request *pbv1beta2.StreamedListObjectsRequest) *kessel.LookupResourcesRequest {
 	if request == nil {
 		return nil
 	}
@@ -78,8 +78,8 @@ func toLookupResourceRequest(request *pbv1beta2.LookupResourcesRequest) *kessel.
 	}
 }
 
-func toLookupResourceResponse(response *kessel.LookupResourcesResponse) *pbv1beta2.LookupResourcesResponse {
-	return &pbv1beta2.LookupResourcesResponse{
+func toLookupResourceResponse(response *kessel.LookupResourcesResponse) *pbv1beta2.StreamedListObjectsResponse {
+	return &pbv1beta2.StreamedListObjectsResponse{
 		Object: &pbv1beta2.ResourceReference{
 			Reporter: &pbv1beta2.ReporterReference{
 				Type: response.Resource.Type.Namespace,

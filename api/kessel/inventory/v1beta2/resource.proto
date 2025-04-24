@@ -13,7 +13,7 @@ message Resource {
  string resource_type = 2 [(buf.validate.field).string = {min_len: 1}];
  string reporter_type = 3 [(buf.validate.field).string = {min_len: 1}];
  string reporter_instance_id = 4 [(buf.validate.field).string = {min_len: 1}];
- ResourceRepresentations resource_representation = 7 [(buf.validate.field).required = false, json_name = "resourceRepresentation"];
+ ResourceRepresentations representations = 7 [(buf.validate.field).required = false, json_name = "representations"];
 
 }
 

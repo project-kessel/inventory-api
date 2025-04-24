@@ -1374,7 +1374,7 @@ components:
                     type: string
                 reporterInstanceId:
                     type: string
-                resourceRepresentation:
+                representations:
                     $ref: '#/components/schemas/kessel.inventory.v1beta2.ResourceRepresentations'
         kessel.inventory.v1beta2.ResourceReference:
             type: object
@@ -1388,7 +1388,7 @@ components:
         kessel.inventory.v1beta2.ResourceRepresentations:
             type: object
             properties:
-                representationMetadata:
+                metadata:
                     $ref: '#/components/schemas/kessel.inventory.v1beta2.RepresentationMetadata'
                 common:
                     type: object

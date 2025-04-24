@@ -32,7 +32,7 @@ resources:
   schemaPath: "data/schema/resources"
   use_cache: true
 log:
-  level: "debug"
+  level: "info"
   livez: true
   readyz: true
 

@@ -30,21 +30,11 @@ import (
 	"gorm.io/gorm"
 )
 
+// commitModulo is used to define the batch size of offsets based on the current offset being processed
 const commitModulo = 10
 
 var ErrClosed = errors.New("consumer closed")
 var ErrMaxRetries = errors.New("max retries reached")
-
-type Consumer interface {
-	Consume() error
-	CreateTuple(ctx context.Context, tuple *v1beta1.Relationship) (string, error)
-	UpdateTuple(ctx context.Context, tuple *v1beta1.Relationship) (string, error)
-	DeleteTuple(ctx context.Context, filter *v1beta1.RelationTupleFilter) (string, error)
-	UpdateConsistencyToken(inventoryID, token string) error
-	Errs() <-chan error
-	Shutdown() error
-	Retry(operation func() (string, error)) (string, error)
-}
 
 // InventoryConsumer defines a Kafka Consumer with required clients and configs to call Relations API and update the Inventory DB with consistency tokens
 type InventoryConsumer struct {
@@ -210,18 +200,19 @@ func (i *InventoryConsumer) Consume() error {
 						i.Logger.Errorf("failed to commit offsets: %v", err)
 						continue
 					}
-					i.Logger.Infof("offsets %s to %s committed\n", committedOffsets[0].Offset, committedOffsets[len(committedOffsets)-1].Offset)
+					i.Logger.Infof("offsets %s to %s committed", committedOffsets[0].Offset, committedOffsets[len(committedOffsets)-1].Offset)
 					i.OffsetStorage = nil
 				}
-				i.Logger.Infof("consumed event from topic %s, partition %d at offset %s: key = %-10s value = %s\n",
-					*e.TopicPartition.Topic, e.TopicPartition.Partition, e.TopicPartition.Offset, string(e.Key), string(e.Value))
+				i.Logger.Infof("consumed event from topic %s, partition %d at offset %s",
+					*e.TopicPartition.Topic, e.TopicPartition.Partition, e.TopicPartition.Offset)
+				i.Logger.Debugf("consumed event data: key = %-10s value = %s", string(e.Key), string(e.Value))
 
 			case kafka.Error:
 				if e.IsFatal() {
 					run = false
 					i.Errors <- e
 				} else {
-					i.Logger.Errorf("recoverable consumer error: %v: %v -- will retry\n", e.Code(), e)
+					i.Logger.Errorf("recoverable consumer error: %v: %v -- will retry", e.Code(), e)
 					continue
 				}
 
@@ -251,7 +242,8 @@ func (i *InventoryConsumer) ProcessMessage(headers map[string]string, relationsE
 
 	switch operation {
 	case string(model.OperationTypeCreated):
-		i.Logger.Infof("operation=%s tuple=%s txid=%s", operation, msg.Value, txid)
+		i.Logger.Infof("processing message: operation=%s, txid=%s", operation, txid)
+		i.Logger.Debugf("processed message tuple=%s", msg.Value)
 		if relationsEnabled {
 			tuple, err := ParseCreateOrUpdateMessage(msg.Value)
 			if err != nil {
@@ -269,7 +261,8 @@ func (i *InventoryConsumer) ProcessMessage(headers map[string]string, relationsE
 		}
 
 	case string(model.OperationTypeUpdated):
-		i.Logger.Infof("operation=%s tuple=%s txid=%s", operation, msg.Value, txid)
+		i.Logger.Infof("processing message: operation=%s, txid=%s", operation, txid)
+		i.Logger.Debugf("processed message tuple=%s", msg.Value)
 		if relationsEnabled {
 			tuple, err := ParseCreateOrUpdateMessage(msg.Value)
 			if err != nil {
@@ -286,7 +279,8 @@ func (i *InventoryConsumer) ProcessMessage(headers map[string]string, relationsE
 			return resp, nil
 		}
 	case string(model.OperationTypeDeleted):
-		i.Logger.Infof("operation=%s tuple=%s", operation, msg.Value)
+		i.Logger.Infof("processing message: operation=%s, txid=%s", operation, txid)
+		i.Logger.Debugf("processed message tuple=%s", msg.Value)
 		if relationsEnabled {
 			filter, err := ParseDeleteMessage(msg.Value)
 			if err != nil {
@@ -399,7 +393,7 @@ func (i *InventoryConsumer) CreateTuple(ctx context.Context, tuple *v1beta1.Rela
 	if err != nil {
 		// If the tuple exists already, capture the token using Check to ensure idempotent updates to tokens in DB
 		if status.Convert(err).Code() == codes.AlreadyExists {
-			i.Logger.Info("tuple: already exists; fetching consistency token")
+			i.Logger.Info("tuple already exists; fetching consistency token")
 
 			namespace := tuple.GetResource().GetType().GetNamespace()
 			relation := tuple.GetRelation()
@@ -464,7 +458,7 @@ func (i *InventoryConsumer) Shutdown() error {
 			if err != nil {
 				i.Logger.Errorf("failed to commit offsets before shutting down: %v", err)
 			} else {
-				i.Logger.Infof("offsets %s to %s committed\n", committedOffsets[0].Offset, committedOffsets[len(committedOffsets)-1].Offset)
+				i.Logger.Infof("offsets %s to %s committed", committedOffsets[0].Offset, committedOffsets[len(committedOffsets)-1].Offset)
 			}
 		}
 		err := i.Consumer.Close()

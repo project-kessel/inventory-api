@@ -2,8 +2,6 @@ package v1beta2
 
 import (
 	"fmt"
-	"google.golang.org/protobuf/proto"
-
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/protobuf/types/known/structpb"
 	"strings"
@@ -77,15 +75,15 @@ func ValidateDeleteRequest(req *DeleteResourceRequest) error {
 		return fmt.Errorf("request cannot be nil")
 	}
 
-	if req.Filter == nil {
-		return fmt.Errorf("filter is required")
+	if req.GetReference() == nil {
+		return fmt.Errorf("Resource Reference is required")
 	}
 
-	if req.Filter.LocalResourceId == nil || strings.TrimSpace(*req.Filter.LocalResourceId) == "" {
+	if strings.TrimSpace(req.GetReference().GetResourceId()) == "" {
 		return fmt.Errorf("local_resource_id is required")
 	}
 
-	if req.Filter.ReporterType == nil || strings.TrimSpace(*req.Filter.ReporterType) == "" {
+	if req.GetReference().GetReporter() == nil || strings.TrimSpace(req.GetReference().GetReporter().Type) == "" {
 		return fmt.Errorf("reporter_type is required")
 	}
 
@@ -396,9 +394,12 @@ func TestDeleteResourceValidation(t *testing.T) {
 		{
 			name: "Valid Delete Request",
 			request: &DeleteResourceRequest{
-				Filter: &ResourceFilter{
-					LocalResourceId: proto.String("0123"),
-					ReporterType:    proto.String("HBI"),
+				Reference: &ResourceReference{
+					ResourceId:   "0123",
+					ResourceType: "rhel_host",
+					Reporter: &ReporterReference{
+						Type: "HBI",
+					},
 				},
 			},
 			expectErr: false,
@@ -407,8 +408,11 @@ func TestDeleteResourceValidation(t *testing.T) {
 		{
 			name: "Missing local_resource_id",
 			request: &DeleteResourceRequest{
-				Filter: &ResourceFilter{
-					ReporterType: proto.String("HBI"),
+				Reference: &ResourceReference{
+					ResourceType: "rhel_host",
+					Reporter: &ReporterReference{
+						Type: "HBI",
+					},
 				},
 			},
 			expectErr: true,
@@ -417,8 +421,8 @@ func TestDeleteResourceValidation(t *testing.T) {
 		{
 			name: "Missing reporter_type",
 			request: &DeleteResourceRequest{
-				Filter: &ResourceFilter{
-					LocalResourceId: proto.String("0123"),
+				Reference: &ResourceReference{
+					ResourceType: "rhel_host",
 				},
 			},
 			expectErr: true,

@@ -13,3 +13,4 @@ message ResourceRepresentations {
   optional google.protobuf.Struct common = 2 [ json_name = "common"];
   optional google.protobuf.Struct reporter = 3 [ json_name = "reporter"];
 }
+

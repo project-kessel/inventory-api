@@ -40,7 +40,7 @@ func Validation(validator protovalidate.Validator) middleware.Middleware {
 
 				switch v.(type) {
 				case *pbv1beta2.ReportResourceRequest:
-					if err := validateResourceReporterJSON(v); err != nil {
+					if err := validateReportResourceJSON(v); err != nil {
 						return nil, errors.BadRequest("REPORT_RESOURCE_JSON_VALIDATOR", err.Error()).WithCause(err)
 					}
 				case *pbv1beta2.DeleteResourceRequest:
@@ -54,7 +54,7 @@ func Validation(validator protovalidate.Validator) middleware.Middleware {
 	}
 }
 
-func validateResourceReporterJSON(msg proto.Message) error {
+func validateReportResourceJSON(msg proto.Message) error {
 	data, err := MarshalProtoToJSON(msg)
 	if err != nil {
 		return err
@@ -95,18 +95,18 @@ func validateResourceReporterJSON(msg proto.Message) error {
 		return err
 	}
 
-	// Validate the combination of type and reporter
+	// Validate the combination of resource_type and reporter_type e.g. k8s_cluster & ACM
 	if err := ValidateResourceReporterCombination(resourceType, reporterType); err != nil {
 		return err
 	}
 
 	// Validate reporter-specific data
-	if err := ValidateReporterResourceData(resourceType, reporterType, reporterData); err != nil {
+	if err := ValidateReporterData(resourceType, reporterType, reporterData); err != nil {
 		return err
 	}
 
 	// Validate common data
-	if err := ValidateCommonResourceData(resourceType, commonData); err != nil {
+	if err := ValidateCommonData(resourceType, commonData); err != nil {
 		return err
 	}
 

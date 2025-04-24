@@ -85,7 +85,7 @@ func ExtractStringField(data map[string]interface{}, key string) (string, error)
 }
 
 // ValidateCommonResourceData Validates the "commonResourceData" field using a predefined schema.
-func ValidateCommonResourceData(resourceType string, commonData map[string]interface{}) error {
+func ValidateCommonData(resourceType string, commonData map[string]interface{}) error {
 	commonSchemaKey := fmt.Sprintf("common:%s", strings.ToLower(resourceType))
 	commonSchema, err := getSchemaFromCache(commonSchemaKey)
 	if err != nil {
@@ -100,7 +100,7 @@ func ValidateCommonResourceData(resourceType string, commonData map[string]inter
 }
 
 // Validates the reporter-specific data against its schema based on resourceType and reporterType.
-func ValidateReporterResourceData(resourceType string, reporterType string, reporterData map[string]interface{}) error {
+func ValidateReporterData(resourceType string, reporterType string, reporterData map[string]interface{}) error {
 	// Construct the schema key using the format: resourceType:reporterType
 	schemaKey := fmt.Sprintf("%s:%s", strings.ToLower(resourceType), strings.ToLower(reporterType))
 	resourceDataSchema, err := getSchemaFromCache(schemaKey)

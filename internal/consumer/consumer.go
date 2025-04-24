@@ -152,7 +152,7 @@ func (i *InventoryConsumer) Consume() error {
 	i.Logger.Info("Consumer ready: waiting for messages...")
 	for run {
 		select {
-		case _ = <-sigchan:
+		case <-sigchan:
 			run = false
 		default:
 			event := i.Consumer.Poll(100)
@@ -459,7 +459,7 @@ func (i *InventoryConsumer) Errs() <-chan error {
 func (i *InventoryConsumer) Shutdown() error {
 	if !i.Consumer.IsClosed() {
 		i.Logger.Info("shutting down consumer...")
-		if i.OffsetStorage != nil && len(i.OffsetStorage) > 0 {
+		if len(i.OffsetStorage) > 0 {
 			committedOffsets, err := i.commitStoredOffsets()
 			if err != nil {
 				i.Logger.Errorf("failed to commit offsets before shutting down: %v", err)

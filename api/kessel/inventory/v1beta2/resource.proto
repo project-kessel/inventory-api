@@ -16,3 +16,4 @@ message Resource {
  ResourceRepresentations resource_representation = 7 [(buf.validate.field).required = false, json_name = "resourceRepresentation"];
 
 }
+

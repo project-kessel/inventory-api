@@ -13,3 +13,4 @@ message RepresentationMetadata {
   string console_href = 3 [(buf.validate.field).string = {min_len: 1}];
   string reporter_version = 8;
 }
+

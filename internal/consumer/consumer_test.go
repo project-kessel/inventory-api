@@ -433,15 +433,45 @@ func TestCommitStoredOffsets(t *testing.T) {
 	tests := []struct {
 		name          string
 		storedOffsets []kafka.TopicPartition
-		expected      []kafka.TopicPartition
+		response      []kafka.TopicPartition
+		expected      []string
 	}{
 		{
-			name: "ensures all stored offsets are returned from offset commit",
+			name: "single stored offset is returned from offset commit",
 			storedOffsets: []kafka.TopicPartition{
-				{Offset: kafka.Offset(10), Partition: kafka.PartitionAny},
+				{Offset: kafka.Offset(10), Partition: 0},
 			},
-			expected: []kafka.TopicPartition{
-				{Offset: kafka.Offset(10), Partition: kafka.PartitionAny},
+			response: []kafka.TopicPartition{
+				{Offset: kafka.Offset(10), Partition: 0},
+			},
+			expected: []string{
+				"[0:10]",
+			},
+		},
+		{
+			name: "all stored offsets are returned from offset commit",
+			storedOffsets: []kafka.TopicPartition{
+				{Offset: kafka.Offset(10), Partition: 0},
+				{Offset: kafka.Offset(11), Partition: 0},
+				{Offset: kafka.Offset(1), Partition: 1},
+				{Offset: kafka.Offset(2), Partition: 1},
+				{Offset: kafka.Offset(12), Partition: 0},
+				{Offset: kafka.Offset(13), Partition: 0},
+				{Offset: kafka.Offset(3), Partition: 1},
+				{Offset: kafka.Offset(4), Partition: 1},
+			},
+			response: []kafka.TopicPartition{
+				{Offset: kafka.Offset(10), Partition: 0},
+				{Offset: kafka.Offset(11), Partition: 0},
+				{Offset: kafka.Offset(12), Partition: 0},
+				{Offset: kafka.Offset(13), Partition: 0},
+				{Offset: kafka.Offset(1), Partition: 1},
+				{Offset: kafka.Offset(2), Partition: 1},
+				{Offset: kafka.Offset(3), Partition: 1},
+				{Offset: kafka.Offset(4), Partition: 1},
+			},
+			expected: []string{
+				"[0:10]", "[0:11]", "[0:12]", "[0:13]", "[1:1]", "[1:2]", "[1:3]", "[1:4]",
 			},
 		},
 	}
@@ -452,7 +482,7 @@ func TestCommitStoredOffsets(t *testing.T) {
 			assert.Nil(t, errs)
 
 			c := &mocks.MockConsumer{}
-			c.On("CommitOffsets", mock.Anything).Return(test.expected, nil)
+			c.On("CommitOffsets", mock.Anything).Return(test.response, nil)
 			tester.inv.Consumer = c
 
 			committedOffsets, err := tester.inv.commitStoredOffsets()

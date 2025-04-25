@@ -74,3 +74,5 @@ func (m *MockConsumer) Poll(timeoutMs int) (event kafka.Event) { return nil }
 func (m *MockConsumer) IsClosed() bool { return true }
 
 func (m *MockConsumer) Close() error { return nil }
+
+func (m *MockConsumer) AssignmentLost() bool { return true }

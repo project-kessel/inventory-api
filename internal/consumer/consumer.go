@@ -48,6 +48,7 @@ type Consumer interface {
 	Poll(timeoutMs int) (event kafka.Event)
 	IsClosed() bool
 	Close() error
+	AssignmentLost() bool
 }
 
 // InventoryConsumer defines a Consumer with required clients and configs to call Relations API and update the Inventory DB with consistency tokens
@@ -524,7 +525,8 @@ func (i *InventoryConsumer) Retry(operation func() (string, error)) (string, err
 	return "", ErrMaxRetries
 }
 
-// RebalanceCallback logs when rebalance events occur and ensures any stored offsets are committed before losing the partition assignment. It is registered to the kafka subscription and is invoked  automatically whenever rebalances occur.
+// RebalanceCallback logs when rebalance events occur and ensures any stored offsets are committed before losing the partition assignment. It is registered to the kafka 'SubscribeTopics' call and is invoked  automatically whenever rebalances occurs.
+// Note, the RebalanceCb function must satisfy the function type func(*Consumer, Event). This function does so, but the consumer embedded in the InventoryConsumer called versus the passed on which is the same consumer in either case.
 func (i *InventoryConsumer) RebalanceCallback(consumer *kafka.Consumer, event kafka.Event) error {
 	switch ev := event.(type) {
 	case kafka.AssignedPartitions:

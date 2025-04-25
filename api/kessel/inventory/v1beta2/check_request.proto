@@ -3,7 +3,7 @@ syntax = "proto3";
 package kessel.inventory.v1beta2;
 
 import "buf/validate/validate.proto";
-import "kessel/inventory/v1beta2/object_reference.proto";
+import "kessel/inventory/v1beta2/resource_reference.proto";
 import "kessel/inventory/v1beta2/subject_reference.proto";
 
 option go_package = "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2";
@@ -15,7 +15,7 @@ message CheckRequest {
   // - resource type and id
   // - permission (cannot be derived from the type as a type may have multiple 'read' permissions. Ex: https://github.com/RedHatInsights/rbac-config/blob/master/configs/prod/schemas/src/notifications.ksl#L31)
   // - user (possibly derived from an identity token)
-  ObjectReference parent = 1 [(buf.validate.field).required = true];
+  ResourceReference object = 1 [(buf.validate.field).required = true];
   string relation = 2 [(buf.validate.field).string.min_len = 1];
   SubjectReference subject = 3 [(buf.validate.field).required = true];
 }

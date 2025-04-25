@@ -4,7 +4,7 @@ syntax = "proto3";
 package kessel.inventory.v1beta2;
 
 import "buf/validate/validate.proto";
-import "kessel/inventory/v1beta2/object_reference.proto";
+import "kessel/inventory/v1beta2/resource_reference.proto";
 
 option go_package = "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2";
 option java_multiple_files = true;
@@ -15,5 +15,5 @@ message SubjectReference {
   // An optional relation which points to a set of Subjects instead of the single Subject.
   // e.g. "members" or "owners" of a group identified in `subject`.
   optional string relation = 1;
-  ObjectReference subject = 2 [(buf.validate.field).required = true];
+  ResourceReference resource = 2 [(buf.validate.field).required = true];
 }

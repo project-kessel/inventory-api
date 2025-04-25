@@ -239,10 +239,9 @@ func NewCommand(
 			pbv1beta2.RegisterKesselCheckServiceHTTPServer(server.HttpServer, check_service)
 
 			// wire together lookup service
-			lookup_controller := resourcesctl.New(resource_repo, inventoryresources_repo, authorizer, eventingManager, "authz", log.With(logger, "subsystem", "authz_controller"), storageConfig.Options.DisablePersistence, listenManager, consistencyConfig.ReadAfterWriteEnabled, consistencyConfig.ReadAfterWriteAllowlist)
-			lookup_service := resourcesvc.NewKesselLookupServiceV1beta2(lookup_controller)
-			pbv1beta2.RegisterKesselLookupServiceServer(server.GrpcServer, lookup_service)
-
+			streamedlist_controller := resourcesctl.New(resource_repo, inventoryresources_repo, authorizer, eventingManager, "authz", log.With(logger, "subsystem", "authz_controller"), storageConfig.Options.DisablePersistence, listenManager, consistencyConfig.ReadAfterWriteEnabled, consistencyConfig.ReadAfterWriteAllowlist)
+			streamedlist_service := resourcesvc.NewKesselLookupServiceV1beta2(streamedlist_controller)
+			pbv1beta2.RegisterKesselStreamedListServiceServer(server.GrpcServer, streamedlist_service)
 			//TODO: http service not getting generated
 
 			//v1beta1

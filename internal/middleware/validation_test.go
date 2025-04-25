@@ -207,18 +207,6 @@ func TestUnmarshalJSONToMap(t *testing.T) {
 	}
 }
 
-//func loadCommonSchemaAndValidate(t *testing.T, resourceType string, schemaDir string, commonResourceData map[string]interface{}) {
-//	commonSchema, err := middleware.LoadCommonResourceDataSchema(resourceType, schemaDir)
-//	if err != nil {
-//		t.Fatalf("Failed to load common resource schema: %v", err)
-//	}
-//
-//	err = middleware.ValidateJSONSchema(commonSchema, commonResourceData)
-//	if err != nil {
-//		t.Fatalf("Validation failed for commonResourceData: %v", err)
-//	}
-//}
-
 func runValidationTest(
 	t *testing.T,
 	tt struct {
@@ -275,15 +263,15 @@ func ValidateResourceRequest(req *pbv1beta2.ReportResourceRequest) error {
 	}
 
 	// Validate common data
-	if err := validateCommonResourceData(repr.GetCommon()); err != nil {
+	if err := validateCommonRepresentation(repr.GetCommon()); err != nil {
 		return fmt.Errorf("invalid common_resource_data: %w", err)
 	}
 
 	return nil
 }
 
-// validateCommonResourceData checks for required fields in the common data block
-func validateCommonResourceData(common *structpb.Struct) error {
+// validateCommonRepresentation checks for required fields in the common data block
+func validateCommonRepresentation(common *structpb.Struct) error {
 	if common == nil {
 		return fmt.Errorf("common_resource_data is required")
 	}
@@ -483,27 +471,6 @@ func TestSchemaValidation(t *testing.T) {
 			},
 			expectErr: false, // If schema validation is NOT enforced in ValidateResourceRequest
 		},
-
-		/*{
-			name:         "Unknown resourceType",
-			resourceType: "unknown_resource",
-			reporterData: map[string]interface{}{
-				"reporter_type":        "CUSTOM",
-				"reporter_instance_id": "custom-001",
-				"local_resource_id":    "custom-123",
-				"api_href":             "www.example.com",
-				"console_href":         "www.example.com",
-				"resourceData": map[string]interface{}{
-					"unexpected_field": "data",
-				},
-			},
-			commonResourceData: map[string]interface{}{
-				"workspace_id": "workspace-123",
-			},
-			expectErr:      true,
-			expectedErrMsg: "no schema found for 'unknown_resource', but 'resourceData' was provided. Submission is not allowed",
-			schemaExpected: false,
-		},*/
 	}
 
 	for _, tt := range tests {

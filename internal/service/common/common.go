@@ -83,10 +83,10 @@ func ToJsonObject(in interface{}) (model.JsonObject, error) {
 }
 
 // TODO: Figure out how to store workspaceId in schema
-func ExtractWorkspaceId(commonResourceData *structpb.Struct) (string, error) {
+func ExtractWorkspaceId(commonRepresentation *structpb.Struct) (string, error) {
 	var workspaceId string
-	if commonResourceData != nil {
-		workspaceId = commonResourceData.GetFields()["workspace_id"].GetStringValue()
+	if commonRepresentation != nil {
+		workspaceId = commonRepresentation.GetFields()["workspace_id"].GetStringValue()
 		return workspaceId, nil
 	}
 	return workspaceId, nil

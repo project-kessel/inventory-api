@@ -235,7 +235,7 @@ func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_K8S_Policy(t *testing.T) {
 
 }
 
-func TestInventoryAPIHTTP_v1beta2_AuthzLifecycle(t *testing.T) {
+//func TestInventoryAPIHTTP_v1beta2_AuthzLifecycle(t *testing.T) {
 //	t.Parallel()
 //
 //	c := common.NewConfig(

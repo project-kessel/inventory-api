@@ -250,6 +250,7 @@ func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_K8S_Policy(t *testing.T) {
 //	ctx := context.Background()
 //
 //	subject := &pbv1beta2.SubjectReference{
+<<<<<<< HEAD
 //		Resource: &pbv1beta2.ResourceReference{
 //			ResourceId:   "bob",
 //			ResourceType: "principal",
@@ -265,13 +266,34 @@ func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_K8S_Policy(t *testing.T) {
 //			Type: "rbac",
 //		},
 //		ResourceType: "group",
+=======
+//		Subject: &pbv1beta2.ObjectReference{
+//			Type: &pbv1beta2.ObjectType{
+//				Namespace: "rbac",
+//				Name:      "principal",
+//			},
+//			Id: "bob",
+//		},
+//	}
+//
+//	parent := &pbv1beta2.ObjectReference{
+//		Type: &pbv1beta2.ObjectType{
+//			Namespace: "rbac",
+//			Name:      "group",
+//		},
+//		Id: "bob_club",
+>>>>>>> 10768c2 (update go.mod and comment out tests)
 //	}
 //
 //	// /authz/check
 //	checkReq := &pbv1beta2.CheckRequest{
 //		Subject:  subject,
 //		Relation: "member",
+<<<<<<< HEAD
 //		Object:   parent,
+=======
+//		Parent:   parent,
+>>>>>>> 10768c2 (update go.mod and comment out tests)
 //	}
 //
 //	checkResp, err := client.KesselCheckService.Check(ctx, checkReq)
@@ -283,7 +305,11 @@ func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_K8S_Policy(t *testing.T) {
 //	checkUpdateReq := &pbv1beta2.CheckForUpdateRequest{
 //		Subject:  subject,
 //		Relation: "member",
+<<<<<<< HEAD
 //		Object:   parent,
+=======
+//		Parent:   parent,
+>>>>>>> 10768c2 (update go.mod and comment out tests)
 //	}
 //
 //	checkUpdateResp, err := client.KesselCheckService.CheckForUpdate(ctx, checkUpdateReq)

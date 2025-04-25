@@ -80,7 +80,7 @@ func validateReportResourceJSON(msg proto.Message) error {
 		return err
 	}
 
-	resourceRepresentation, err := ExtractMapField(resource, "resourceRepresentation")
+	resourceRepresentation, err := ExtractMapField(resource, "representations")
 	if err != nil {
 		return err
 	}

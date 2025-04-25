@@ -3,6 +3,7 @@ package v1beta2
 import (
 	"fmt"
 	"github.com/stretchr/testify/assert"
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/structpb"
 	"strings"
 	"testing"
@@ -38,7 +39,7 @@ func ValidateResourceRequest(req *ReportResourceRequest) error {
 	if metadata.ApiHref == "" {
 		return fmt.Errorf("api_href is required")
 	}
-	if metadata.ConsoleHref == "" {
+	if metadata.ConsoleHref == proto.String("") {
 		return fmt.Errorf("console_href is required")
 	}
 
@@ -100,8 +101,8 @@ func TestResourceValidation(t *testing.T) {
 						Metadata: &RepresentationMetadata{
 							LocalResourceId: "0123",
 							ApiHref:         "https://api.example.com",
-							ConsoleHref:     "https://console.example.com",
-							ReporterVersion: "q",
+							ConsoleHref:     proto.String("https://console.example.com"),
+							ReporterVersion: proto.String("q"),
 						},
 						Common: &structpb.Struct{
 							Fields: map[string]*structpb.Value{
@@ -134,8 +135,8 @@ func TestResourceValidation(t *testing.T) {
 						Metadata: &RepresentationMetadata{
 							LocalResourceId: "cluster-123",
 							ApiHref:         "https://api.example.com",
-							ConsoleHref:     "https://console.example.com",
-							ReporterVersion: "1.0.0",
+							ConsoleHref:     proto.String("https://console.example.com"),
+							ReporterVersion: proto.String("1.0.0"),
 						},
 						Common: &structpb.Struct{
 							Fields: map[string]*structpb.Value{
@@ -166,8 +167,8 @@ func TestResourceValidation(t *testing.T) {
 						Metadata: &RepresentationMetadata{
 							LocalResourceId: "rhel-host-001",
 							ApiHref:         "https://api.rhel.example.com",
-							ConsoleHref:     "https://console.rhel.example.com",
-							ReporterVersion: "1.0.0",
+							ConsoleHref:     proto.String("https://console.rhel.example.com"),
+							ReporterVersion: proto.String("1.0.0"),
 						},
 						Common: &structpb.Struct{
 							Fields: map[string]*structpb.Value{
@@ -192,8 +193,8 @@ func TestResourceValidation(t *testing.T) {
 						Metadata: &RepresentationMetadata{
 							LocalResourceId: "notifications-001",
 							ApiHref:         "https://api.notifications.example.com",
-							ConsoleHref:     "https://console.notifications.example.com",
-							ReporterVersion: "1.0.0",
+							ConsoleHref:     proto.String("https://console.notifications.example.com"),
+							ReporterVersion: proto.String("1.0.0"),
 						},
 						Common: &structpb.Struct{
 							Fields: map[string]*structpb.Value{
@@ -211,7 +212,7 @@ func TestResourceValidation(t *testing.T) {
 			name: "Valid K8s Cluster with Inventory ID",
 			request: &ReportResourceRequest{
 				Resource: &Resource{
-					InventoryId:        "12",
+					InventoryId:        proto.String("12"),
 					Type:               "k8s_cluster",
 					ReporterType:       "ACM",
 					ReporterInstanceId: "user@example.com",
@@ -219,8 +220,8 @@ func TestResourceValidation(t *testing.T) {
 						Metadata: &RepresentationMetadata{
 							LocalResourceId: "0123",
 							ApiHref:         "https://api.example.com",
-							ConsoleHref:     "https://console.example.com",
-							ReporterVersion: "1.0.0",
+							ConsoleHref:     proto.String("https://console.example.com"),
+							ReporterVersion: proto.String("1.0.0"),
 						},
 						Common: &structpb.Struct{
 							Fields: map[string]*structpb.Value{
@@ -245,8 +246,8 @@ func TestResourceValidation(t *testing.T) {
 						Metadata: &RepresentationMetadata{
 							LocalResourceId: "0123",
 							ApiHref:         "https://api.example.com",
-							ConsoleHref:     "https://console.example.com",
-							ReporterVersion: "1.0.0",
+							ConsoleHref:     proto.String("https://console.example.com"),
+							ReporterVersion: proto.String("1.0.0"),
 						},
 						Common: &structpb.Struct{
 							Fields: map[string]*structpb.Value{
@@ -271,8 +272,8 @@ func TestResourceValidation(t *testing.T) {
 						Metadata: &RepresentationMetadata{
 							LocalResourceId: "0123",
 							ApiHref:         "https://api.example.com",
-							ConsoleHref:     "https://console.example.com",
-							ReporterVersion: "1.0.0",
+							ConsoleHref:     proto.String("https://console.example.com"),
+							ReporterVersion: proto.String("1.0.0"),
 						},
 						Common: &structpb.Struct{
 							Fields: map[string]*structpb.Value{
@@ -295,8 +296,8 @@ func TestResourceValidation(t *testing.T) {
 					Representations: &ResourceRepresentations{
 						Metadata: &RepresentationMetadata{
 							ApiHref:         "https://api.example.com",
-							ConsoleHref:     "https://console.example.com",
-							ReporterVersion: "1.0.0",
+							ConsoleHref:     proto.String("https://console.example.com"),
+							ReporterVersion: proto.String("1.0.0"),
 						},
 						Common: &structpb.Struct{
 							Fields: map[string]*structpb.Value{
@@ -320,8 +321,8 @@ func TestResourceValidation(t *testing.T) {
 					Representations: &ResourceRepresentations{
 						Metadata: &RepresentationMetadata{
 							LocalResourceId: "0123",
-							ConsoleHref:     "https://console.example.com",
-							ReporterVersion: "1.0.0",
+							ConsoleHref:     proto.String("https://console.example.com"),
+							ReporterVersion: proto.String("1.0.0"),
 						},
 						Common: &structpb.Struct{
 							Fields: map[string]*structpb.Value{
@@ -334,7 +335,7 @@ func TestResourceValidation(t *testing.T) {
 			expectErr: true,
 		},
 
-		// Missing `ConsoleHref`
+		// Missing `metadata`
 		{
 			name: "Missing ConsoleHref",
 			request: &ReportResourceRequest{
@@ -343,11 +344,6 @@ func TestResourceValidation(t *testing.T) {
 					ReporterType:       "ACM",
 					ReporterInstanceId: "user@example.com",
 					Representations: &ResourceRepresentations{
-						Metadata: &RepresentationMetadata{
-							LocalResourceId: "0123",
-							ApiHref:         "https://api.example.com",
-							ReporterVersion: "1.0.0",
-						},
 						Common: &structpb.Struct{
 							Fields: map[string]*structpb.Value{
 								"workspace_id": structpb.NewStringValue("workspace"),

@@ -6,6 +6,7 @@ import (
 	"github.com/project-kessel/inventory-client-go/common"
 	v1beta2 "github.com/project-kessel/inventory-client-go/v1beta2"
 	"github.com/stretchr/testify/assert"
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/structpb"
 	"testing"
 )
@@ -39,8 +40,8 @@ func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_Host(t *testing.T) {
 				Metadata: &pbv1beta2.RepresentationMetadata{
 					LocalResourceId: "host-abc-123",
 					ApiHref:         "https://example.com/api",
-					ConsoleHref:     "https://example.com/console",
-					ReporterVersion: "0.1",
+					ConsoleHref:     proto.String("https://example.com/console"),
+					ReporterVersion: proto.String("0.1"),
 				},
 				Common: &structpb.Struct{
 					Fields: map[string]*structpb.Value{
@@ -95,8 +96,8 @@ func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_Notifications(t *testing.T) 
 				Metadata: &pbv1beta2.RepresentationMetadata{
 					LocalResourceId: "notification-abc-123",
 					ApiHref:         "https://example.com/api",
-					ConsoleHref:     "https://example.com/console",
-					ReporterVersion: "0.1",
+					ConsoleHref:     proto.String("https://example.com/console"),
+					ReporterVersion: proto.String("0.1"),
 				},
 				Common: &structpb.Struct{
 					Fields: map[string]*structpb.Value{
@@ -154,8 +155,8 @@ func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_K8S_Cluster(t *testing.T) {
 				Metadata: &pbv1beta2.RepresentationMetadata{
 					LocalResourceId: "k8s_cluster-abc-123",
 					ApiHref:         "https://example.com/api",
-					ConsoleHref:     "https://example.com/console",
-					ReporterVersion: "0.1",
+					ConsoleHref:     proto.String("https://example.com/console"),
+					ReporterVersion: proto.String("0.1"),
 				},
 				Common: &structpb.Struct{
 					Fields: map[string]*structpb.Value{
@@ -208,8 +209,8 @@ func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_K8S_Policy(t *testing.T) {
 				Metadata: &pbv1beta2.RepresentationMetadata{
 					LocalResourceId: "k8s_policy-abc-123",
 					ApiHref:         "https://example.com/api",
-					ConsoleHref:     "https://example.com/console",
-					ReporterVersion: "0.1",
+					ConsoleHref:     proto.String("https://example.com/console"),
+					ReporterVersion: proto.String("0.1"),
 				},
 				Common: &structpb.Struct{
 					Fields: map[string]*structpb.Value{

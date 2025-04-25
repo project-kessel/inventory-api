@@ -3,6 +3,7 @@ package middleware_test
 import (
 	"fmt"
 	pbv1beta2 "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2"
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/structpb"
 	"path/filepath"
 	"strings"
@@ -221,11 +222,11 @@ func TestUnmarshalJSONToMap(t *testing.T) {
 func runValidationTest(
 	t *testing.T,
 	tt struct {
-		name      string
-		request   *pbv1beta2.ReportResourceRequest
-		expectErr bool
-		expectMsg string
-	},
+	name      string
+	request   *pbv1beta2.ReportResourceRequest
+	expectErr bool
+	expectMsg string
+},
 	validateFunc func(*pbv1beta2.ReportResourceRequest) error,
 ) {
 	err := validateFunc(tt.request)
@@ -269,7 +270,7 @@ func ValidateResourceRequest(req *pbv1beta2.ReportResourceRequest) error {
 	if strings.TrimSpace(repr.Metadata.ApiHref) == "" {
 		return fmt.Errorf("api_href is required")
 	}
-	if strings.TrimSpace(repr.Metadata.ConsoleHref) == "" {
+	if strings.TrimSpace(repr.Metadata.GetConsoleHref()) == "" {
 		return fmt.Errorf("console_href is required")
 	}
 
@@ -320,7 +321,7 @@ func TestSchemaValidation(t *testing.T) {
 						Metadata: &pbv1beta2.RepresentationMetadata{
 							LocalResourceId: "0123",
 							ApiHref:         "https://api.example.com",
-							ConsoleHref:     "https://console.example.com",
+							ConsoleHref:     proto.String("https://console.example.com"),
 						},
 						Common: &structpb.Struct{
 							Fields: map[string]*structpb.Value{
@@ -345,7 +346,7 @@ func TestSchemaValidation(t *testing.T) {
 						Metadata: &pbv1beta2.RepresentationMetadata{
 							LocalResourceId: "rhel-host-001",
 							ApiHref:         "https://api.rhel.example.com",
-							ConsoleHref:     "https://console.rhel.example.com",
+							ConsoleHref:     proto.String("https://console.rhel.example.com"),
 						},
 						Common: &structpb.Struct{
 							Fields: map[string]*structpb.Value{
@@ -376,7 +377,7 @@ func TestSchemaValidation(t *testing.T) {
 						Metadata: &pbv1beta2.RepresentationMetadata{
 							LocalResourceId: "k8s-policy-001",
 							ApiHref:         "https://api.k8s.example.com",
-							ConsoleHref:     "https://console.k8s.example.com",
+							ConsoleHref:     proto.String("https://console.k8s.example.com"),
 						},
 						Common: &structpb.Struct{
 							Fields: map[string]*structpb.Value{
@@ -405,7 +406,7 @@ func TestSchemaValidation(t *testing.T) {
 						Metadata: &pbv1beta2.RepresentationMetadata{
 							LocalResourceId: "notifications-001",
 							ApiHref:         "https://api.notifications.example.com",
-							ConsoleHref:     "https://console.notifications.example.com",
+							ConsoleHref:     proto.String("https://console.notifications.example.com"),
 						},
 						Common: &structpb.Struct{
 							Fields: map[string]*structpb.Value{
@@ -430,7 +431,7 @@ func TestSchemaValidation(t *testing.T) {
 						Metadata: &pbv1beta2.RepresentationMetadata{
 							LocalResourceId: "cluster-123",
 							ApiHref:         "www.example.com",
-							ConsoleHref:     "www.example.com",
+							ConsoleHref:     proto.String("www.example.com"),
 						},
 						Common: &structpb.Struct{
 							Fields: map[string]*structpb.Value{
@@ -465,7 +466,7 @@ func TestSchemaValidation(t *testing.T) {
 						Metadata: &pbv1beta2.RepresentationMetadata{
 							LocalResourceId: "notifications-001",
 							ApiHref:         "https://api.notifications.example.com",
-							ConsoleHref:     "https://console.notifications.example.com",
+							ConsoleHref:     proto.String("https://console.notifications.example.com"),
 						},
 						Common: &structpb.Struct{
 							Fields: map[string]*structpb.Value{

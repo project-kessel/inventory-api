@@ -1,7 +1,7 @@
 syntax = "proto3";
 
 package kessel.inventory.v1beta2;
-import "kessel/inventory/v1beta2/resource_representation.proto";
+import "kessel/inventory/v1beta2/resource_representations.proto";
 import "buf/validate/validate.proto";
 
 option go_package = "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2";

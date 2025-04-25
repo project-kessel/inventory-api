@@ -257,6 +257,7 @@ objects:
         heartbeat.interval.ms: ${DEBEZIUM_HEARTBEAT_INTERVAL_MS}
         heartbeat.action.query: ${DEBEZIUM_ACTION_QUERY}
         topic.heartbeat.prefix: ${TOPIC_HEARTBEAT_PREFIX}
+        poll.interval.ms: ${DEBEZIUM_POLL_INTERVAL_MS}
 
   - apiVersion: cloud.redhat.com/v1alpha1
     kind: ClowdApp
@@ -368,3 +369,6 @@ parameters:
   - name: DEBEZIUM_HEARTBEAT_INTERVAL_MS
     value: "300000"
     description: The interval for the Debezium heartbeat in ms
+  - name: DEBEZIUM_POLL_INTERVAL_MS
+    value: "250"
+    description: The interval for the Debezium batch processing

@@ -61,7 +61,13 @@ func (t *TestCase) TestSetup() []error {
 
 	notifier := &pubsub.NotifierMock{}
 
-	t.inv, err = New(t.completedConfig, &gorm.DB{}, authz.CompletedConfig{}, nil, notifier, t.logger)
+	authorizer := &mocks.MockAuthz{}
+	createTupleResponse := &v1beta1.CreateTuplesResponse{ConsistencyToken: &v1beta1.ConsistencyToken{Token: "test-token"}}
+	deleteTupleResponse := &v1beta1.DeleteTuplesResponse{ConsistencyToken: &v1beta1.ConsistencyToken{Token: "test-token"}}
+	authorizer.On("CreateTuples", mock.Anything, mock.Anything).Return(createTupleResponse, nil)
+	authorizer.On("DeleteTuples", mock.Anything, mock.Anything).Return(deleteTupleResponse, nil)
+
+	t.inv, err = New(t.completedConfig, &gorm.DB{}, authz.CompletedConfig{}, authorizer, notifier, t.logger)
 	if err != nil {
 		errs = append(errs, err)
 	}
@@ -71,13 +77,6 @@ func (t *TestCase) TestSetup() []error {
 		errs = append(errs, err)
 	}
 
-	createTupleResponse := &v1beta1.CreateTuplesResponse{ConsistencyToken: &v1beta1.ConsistencyToken{Token: "test-token"}}
-	deleteTupleResponse := &v1beta1.DeleteTuplesResponse{ConsistencyToken: &v1beta1.ConsistencyToken{Token: "test-token"}}
-
-	m := &mocks.MockAuthz{}
-	m.On("CreateTuples", mock.Anything, mock.Anything).Return(createTupleResponse, nil)
-	m.On("DeleteTuples", mock.Anything, mock.Anything).Return(deleteTupleResponse, nil)
-	t.inv.Authorizer = m
 	return errs
 }
 
@@ -360,6 +359,39 @@ func TestCheckIfCommit(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			actual := checkIfCommit(test.partition)
 			assert.Equal(t, test.expected, actual)
+		})
+	}
+}
+
+func TestCommitStoredOffsets(t *testing.T) {
+	tests := []struct {
+		name          string
+		storedOffsets []kafka.TopicPartition
+		expected      []kafka.TopicPartition
+	}{
+		{
+			name: "ensures all stored offsets are returned from offset commit",
+			storedOffsets: []kafka.TopicPartition{
+				{Offset: kafka.Offset(10), Partition: kafka.PartitionAny},
+			},
+			expected: []kafka.TopicPartition{
+				{Offset: kafka.Offset(10), Partition: kafka.PartitionAny},
+			},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			tester := TestCase{}
+			errs := tester.TestSetup()
+			assert.Nil(t, errs)
+
+			c := &mocks.MockConsumer{}
+			c.On("CommitOffsets", mock.Anything).Return(test.expected, nil)
+			tester.inv.Consumer = c
+
+			committedOffsets, err := tester.inv.commitStoredOffsets()
+			assert.Nil(t, err)
+			assert.Equal(t, test.expected, committedOffsets)
 		})
 	}
 }

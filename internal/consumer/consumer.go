@@ -36,9 +36,17 @@ const commitModulo = 10
 var ErrClosed = errors.New("consumer closed")
 var ErrMaxRetries = errors.New("max retries reached")
 
-// InventoryConsumer defines a Kafka Consumer with required clients and configs to call Relations API and update the Inventory DB with consistency tokens
+type Consumer interface {
+	CommitOffsets(offsets []kafka.TopicPartition) ([]kafka.TopicPartition, error)
+	SubscribeTopics(topics []string, rebalanceCb kafka.RebalanceCb) (err error)
+	Poll(timeoutMs int) (event kafka.Event)
+	IsClosed() bool
+	Close() error
+}
+
+// InventoryConsumer defines a Consumer with required clients and configs to call Relations API and update the Inventory DB with consistency tokens
 type InventoryConsumer struct {
-	Consumer         *kafka.Consumer
+	Consumer         Consumer
 	OffsetStorage    []kafka.TopicPartition
 	Config           CompletedConfig
 	DB               *gorm.DB

@@ -2,6 +2,7 @@ package mocks
 
 import (
 	"context"
+	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
 
 	"github.com/project-kessel/inventory-api/internal/biz/model"
 	kesselv1 "github.com/project-kessel/relations-api/api/kessel/relations/v1"
@@ -11,6 +12,10 @@ import (
 )
 
 type MockAuthz struct {
+	mock.Mock
+}
+
+type MockConsumer struct {
 	mock.Mock
 }
 
@@ -54,3 +59,18 @@ func (m *MockAuthz) LookupResources(ctx context.Context, request *v1beta1.Lookup
 	args := m.Called(ctx, request)
 	return args.Get(0).(grpc.ServerStreamingClient[v1beta1.LookupResourcesResponse]), args.Error(1)
 }
+
+func (m *MockConsumer) CommitOffsets(offsets []kafka.TopicPartition) ([]kafka.TopicPartition, error) {
+	args := m.Called(offsets)
+	return args.Get(0).([]kafka.TopicPartition), args.Error(1)
+}
+
+func (m *MockConsumer) SubscribeTopics(topics []string, rebalanceCb kafka.RebalanceCb) (err error) {
+	return nil
+}
+
+func (m *MockConsumer) Poll(timeoutMs int) (event kafka.Event) { return nil }
+
+func (m *MockConsumer) IsClosed() bool { return true }
+
+func (m *MockConsumer) Close() error { return nil }

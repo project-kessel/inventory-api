@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package kessel.inventory.v1beta2;
 
-import "kessel/inventory/v1beta2/object_reference.proto";
+import "kessel/inventory/v1beta2/resource_reference.proto";
 import "kessel/inventory/v1beta2/response_pagination.proto";
 import "kessel/inventory/v1beta2/consistency_token.proto";
 
@@ -10,8 +10,8 @@ option go_package = "github.com/project-kessel/inventory-api/api/kessel/inventor
 option java_multiple_files = true;
 option java_package = "org.project_kessel.api.inventory.v1beta2";
 
-message LookupResourcesResponse {
-  ObjectReference resource = 1;
+message StreamedListObjectsResponse {
+  ResourceReference object = 1;
   ResponsePagination pagination = 2;
   ConsistencyToken consistency_token = 3;
 }

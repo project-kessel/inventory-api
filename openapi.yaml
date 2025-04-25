@@ -556,14 +556,14 @@ paths:
     /api/inventory/v1beta2/resources:
         get:
             tags:
-                - KesselLookupService
-            operationId: KesselLookupService_LookupResources
+                - KesselStreamedListService
+            operationId: KesselStreamedListService_StreamedListObjects
             parameters:
-                - name: resourceType.namespace
+                - name: objectType.resourceType
                   in: query
                   schema:
                     type: string
-                - name: resourceType.name
+                - name: objectType.reporterType
                   in: query
                   schema:
                     type: string
@@ -578,15 +578,19 @@ paths:
                      e.g. "members" or "owners" of a group identified in `subject`.
                   schema:
                     type: string
-                - name: subject.subject.type.namespace
+                - name: subject.resource.resourceType
                   in: query
                   schema:
                     type: string
-                - name: subject.subject.type.name
+                - name: subject.resource.resourceId
                   in: query
                   schema:
                     type: string
-                - name: subject.subject.id
+                - name: subject.resource.reporter.type
+                  in: query
+                  schema:
+                    type: string
+                - name: subject.resource.reporter.instanceId
                   in: query
                   schema:
                     type: string
@@ -616,7 +620,7 @@ paths:
                     content:
                         application/json:
                             schema:
-                                $ref: '#/components/schemas/kessel.inventory.v1beta2.LookupResourcesResponse'
+                                $ref: '#/components/schemas/kessel.inventory.v1beta2.StreamedListObjectsResponse'
                 default:
                     description: Default error response
                     content:
@@ -1277,8 +1281,8 @@ components:
         kessel.inventory.v1beta2.CheckForUpdateRequest:
             type: object
             properties:
-                parent:
-                    $ref: '#/components/schemas/kessel.inventory.v1beta2.ObjectReference'
+                object:
+                    $ref: '#/components/schemas/kessel.inventory.v1beta2.ResourceReference'
                 relation:
                     type: string
                 subject:
@@ -1296,9 +1300,9 @@ components:
         kessel.inventory.v1beta2.CheckRequest:
             type: object
             properties:
-                parent:
+                object:
                     allOf:
-                        - $ref: '#/components/schemas/kessel.inventory.v1beta2.ObjectReference'
+                        - $ref: '#/components/schemas/kessel.inventory.v1beta2.ResourceReference'
                     description: |-
                         Required parameters (from an authz perspective)
                          - resource type and id
@@ -1333,29 +1337,6 @@ components:
         kessel.inventory.v1beta2.DeleteResourceResponse:
             type: object
             properties: {}
-        kessel.inventory.v1beta2.LookupResourcesResponse:
-            type: object
-            properties:
-                resource:
-                    $ref: '#/components/schemas/kessel.inventory.v1beta2.ObjectReference'
-                pagination:
-                    $ref: '#/components/schemas/kessel.inventory.v1beta2.ResponsePagination'
-                consistencyToken:
-                    $ref: '#/components/schemas/kessel.inventory.v1beta2.ConsistencyToken'
-        kessel.inventory.v1beta2.ObjectReference:
-            type: object
-            properties:
-                type:
-                    $ref: '#/components/schemas/kessel.inventory.v1beta2.ObjectType'
-                id:
-                    type: string
-        kessel.inventory.v1beta2.ObjectType:
-            type: object
-            properties:
-                namespace:
-                    type: string
-                name:
-                    type: string
         kessel.inventory.v1beta2.ReportResourceRequest:
             type: object
             properties:
@@ -1384,6 +1365,13 @@ components:
                     type: string
                 resourceData:
                     type: object
+        kessel.inventory.v1beta2.ReporterReference:
+            type: object
+            properties:
+                type:
+                    type: string
+                instanceId:
+                    type: string
         kessel.inventory.v1beta2.Resource:
             type: object
             properties:
@@ -1395,11 +1383,29 @@ components:
                     $ref: '#/components/schemas/kessel.inventory.v1beta2.ReporterData'
                 commonResourceData:
                     type: object
+        kessel.inventory.v1beta2.ResourceReference:
+            type: object
+            properties:
+                resourceType:
+                    type: string
+                resourceId:
+                    type: string
+                reporter:
+                    $ref: '#/components/schemas/kessel.inventory.v1beta2.ReporterReference'
         kessel.inventory.v1beta2.ResponsePagination:
             type: object
             properties:
                 continuationToken:
                     type: string
+        kessel.inventory.v1beta2.StreamedListObjectsResponse:
+            type: object
+            properties:
+                object:
+                    $ref: '#/components/schemas/kessel.inventory.v1beta2.ResourceReference'
+                pagination:
+                    $ref: '#/components/schemas/kessel.inventory.v1beta2.ResponsePagination'
+                consistencyToken:
+                    $ref: '#/components/schemas/kessel.inventory.v1beta2.ConsistencyToken'
         kessel.inventory.v1beta2.SubjectReference:
             type: object
             properties:
@@ -1408,8 +1414,8 @@ components:
                     description: |-
                         An optional relation which points to a set of Subjects instead of the single Subject.
                          e.g. "members" or "owners" of a group identified in `subject`.
-                subject:
-                    $ref: '#/components/schemas/kessel.inventory.v1beta2.ObjectReference'
+                resource:
+                    $ref: '#/components/schemas/kessel.inventory.v1beta2.ResourceReference'
             description: A reference to a Subject or, if a `relation` is provided, a Subject Set.
 tags:
     - name: KesselCheckService
@@ -1418,7 +1424,7 @@ tags:
     - name: KesselK8SClusterService
     - name: KesselK8SPolicyIsPropagatedToK8SClusterService
     - name: KesselK8SPolicyService
-    - name: KesselLookupService
     - name: KesselNotificationsIntegrationService
     - name: KesselResourceService
     - name: KesselRhelHostService
+    - name: KesselStreamedListService

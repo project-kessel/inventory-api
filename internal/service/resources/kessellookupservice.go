@@ -9,19 +9,19 @@ import (
 )
 
 type KesselLookupService struct {
-	pbv1beta2.UnimplementedKesselLookupServiceServer
+	pbv1beta2.UnimplementedKesselStreamedListServiceServer
 	Ctl *resources.Usecase
 }
 
-func NewKesselLookupServiceV1beta2(c *resources.Usecase) pbv1beta2.KesselLookupServiceServer {
+func NewKesselLookupServiceV1beta2(c *resources.Usecase) pbv1beta2.KesselStreamedListServiceServer {
 	return &KesselLookupService{
 		Ctl: c,
 	}
 }
 
 func (s *KesselLookupService) LookupResources(
-	req *pbv1beta2.LookupResourcesRequest,
-	stream pbv1beta2.KesselLookupService_LookupResourcesServer,
+	req *pbv1beta2.StreamedListObjectsRequest,
+	stream pbv1beta2.KesselStreamedListService_StreamedListObjectsServer,
 ) error {
 	ctx := stream.Context()
 	clientStream, err := s.Ctl.LookupResources(ctx, toLookupResourceRequest(req))
@@ -47,7 +47,7 @@ func (s *KesselLookupService) LookupResources(
 	}
 }
 
-func toLookupResourceRequest(request *pbv1beta2.LookupResourcesRequest) *kessel.LookupResourcesRequest {
+func toLookupResourceRequest(request *pbv1beta2.StreamedListObjectsRequest) *kessel.LookupResourcesRequest {
 	if request == nil {
 		return nil
 	}
@@ -60,32 +60,31 @@ func toLookupResourceRequest(request *pbv1beta2.LookupResourcesRequest) *kessel.
 	}
 	return &kessel.LookupResourcesRequest{
 		ResourceType: &kessel.ObjectType{
-			Namespace: request.ResourceType.Namespace,
-			Name:      request.ResourceType.Name,
+			Namespace: request.ObjectType.GetReporterType(),
+			Name:      request.ObjectType.GetResourceType(),
 		},
 		Relation: request.Relation,
 		Subject: &kessel.SubjectReference{
 			Relation: request.Subject.Relation,
 			Subject: &kessel.ObjectReference{
 				Type: &kessel.ObjectType{
-					Name:      request.Subject.Subject.Type.Name,
-					Namespace: request.Subject.Subject.Type.Namespace,
+					Name:      request.Subject.Resource.GetResourceType(),
+					Namespace: request.Subject.Resource.GetReporter().GetType(),
 				},
-				Id: request.Subject.Subject.Id,
+				Id: request.Subject.Resource.GetResourceId(),
 			},
 		},
 		Pagination: pagination,
 	}
 }
 
-func toLookupResourceResponse(response *kessel.LookupResourcesResponse) *pbv1beta2.LookupResourcesResponse {
-	return &pbv1beta2.LookupResourcesResponse{
-		Resource: &pbv1beta2.ObjectReference{
-			Type: &pbv1beta2.ObjectType{
-				Namespace: response.Resource.Type.Namespace,
-				Name:      response.Resource.Type.Name,
+func toLookupResourceResponse(response *kessel.LookupResourcesResponse) *pbv1beta2.StreamedListObjectsResponse {
+	return &pbv1beta2.StreamedListObjectsResponse{
+		Object: &pbv1beta2.ResourceReference{
+			Reporter: &pbv1beta2.ReporterReference{
+				Type: response.Resource.Type.Namespace,
 			},
-			Id: response.Resource.Id,
+			ResourceId: response.Resource.Id,
 		},
 		Pagination: &pbv1beta2.ResponsePagination{
 			ContinuationToken: response.Pagination.ContinuationToken,

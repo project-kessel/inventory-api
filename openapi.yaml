@@ -1312,6 +1312,8 @@ components:
                     type: string
                 subject:
                     $ref: '#/components/schemas/kessel.inventory.v1beta2.SubjectReference'
+                consistency:
+                    $ref: '#/components/schemas/kessel.inventory.v1beta2.Consistency'
         kessel.inventory.v1beta2.CheckResponse:
             type: object
             properties:
@@ -1322,6 +1324,22 @@ components:
                         - ALLOWED_FALSE
                     type: string
                     format: enum
+        kessel.inventory.v1beta2.Consistency:
+            type: object
+            properties:
+                minimizeLatency:
+                    type: boolean
+                    description: |-
+                        The service selects the fastest snapshot available.
+                         *Must* be set true if used.
+                atLeastAsFresh:
+                    allOf:
+                        - $ref: '#/components/schemas/kessel.inventory.v1beta2.ConsistencyToken'
+                    description: |-
+                        All data used in the API call must be *at least as fresh*
+                         as found in the ConsistencyToken. More recent data might be used
+                         if available or faster.
+            description: Defines how a request is handled by the service.
         kessel.inventory.v1beta2.ConsistencyToken:
             type: object
             properties:

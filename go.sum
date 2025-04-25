@@ -355,6 +355,8 @@ github.com/project-kessel/inventory-client-go v0.0.0-20250424151038-8425c8f4f969
 github.com/project-kessel/inventory-client-go v0.0.0-20250424151038-8425c8f4f969/go.mod h1:A2F4FxZ4tPJKYuS4T0ZGlJf0a1zK2dploXw6zPioUmE=
 github.com/project-kessel/relations-api v0.0.0-20250408111129-d8b61a77bd9a h1:sYfr1u53pjGOzF1zWeR1kWRfxO+i0DJQTCgnyhUyNso=
 github.com/project-kessel/relations-api v0.0.0-20250408111129-d8b61a77bd9a/go.mod h1:95vCl70L9t65lj2cDmyU26Dj9y99UFd895TH8DwZEno=
+github.com/project-kessel/relations-api v0.0.0-20250416203648-5c06eab71dcb h1:rDZDsZjpqfsM191X6R/5PKZ5aKQZvaeT6wClZVLPwhQ=
+github.com/project-kessel/relations-api v0.0.0-20250416203648-5c06eab71dcb/go.mod h1:HTica8pCtvAjtIUCsK4n0JfPwIU/owlXk1e8tkm0jRI=
 github.com/prometheus/client_golang v1.22.0 h1:rb93p9lokFEsctTys46VnV1kLCDpVZ0a/Y92Vm0Zc6Q=
 github.com/prometheus/client_golang v1.22.0/go.mod h1:R7ljNsLXhuQXYZYtw6GAE9AZg8Y7vEW5scdCXrWRXC0=
 github.com/prometheus/client_model v0.0.0-20190812154241-14fe0d1b01d4/go.mod h1:xMI15A0UPsDsEKsMN9yxemIoYk6Tm2C1GtYGdfGttqA=

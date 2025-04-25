@@ -32,7 +32,7 @@ func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_Host(t *testing.T) {
 
 	req := pbv1beta2.ReportResourceRequest{
 		Resource: &pbv1beta2.Resource{
-			ResourceType:       "host",
+			Type:               "host",
 			ReporterType:       "HBI",
 			ReporterInstanceId: "testuser@example.com",
 			Representations: &pbv1beta2.ResourceRepresentations{
@@ -88,7 +88,7 @@ func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_Notifications(t *testing.T) 
 
 	req := pbv1beta2.ReportResourceRequest{
 		Resource: &pbv1beta2.Resource{
-			ResourceType:       "notifications_integration",
+			Type:               "notifications_integration",
 			ReporterType:       "NOTIFICATIONS",
 			ReporterInstanceId: "testuser@example.com",
 			Representations: &pbv1beta2.ResourceRepresentations{
@@ -147,7 +147,7 @@ func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_K8S_Cluster(t *testing.T) {
 
 	req := pbv1beta2.ReportResourceRequest{
 		Resource: &pbv1beta2.Resource{
-			ResourceType:       "k8s_cluster",
+			Type:               "k8s_cluster",
 			ReporterType:       "ACM",
 			ReporterInstanceId: "testuser@example.com",
 			Representations: &pbv1beta2.ResourceRepresentations{
@@ -201,7 +201,7 @@ func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_K8S_Policy(t *testing.T) {
 
 	req := pbv1beta2.ReportResourceRequest{
 		Resource: &pbv1beta2.Resource{
-			ResourceType:       "k8s_policy",
+			Type:               "k8s_policy",
 			ReporterType:       "ACM",
 			ReporterInstanceId: "testuser@example.com",
 			Representations: &pbv1beta2.ResourceRepresentations{

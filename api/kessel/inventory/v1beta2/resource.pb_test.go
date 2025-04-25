@@ -17,7 +17,7 @@ func ValidateResourceRequest(req *ReportResourceRequest) error {
 	resource := req.Resource
 
 	// Validate required top-level fields
-	if strings.TrimSpace(resource.ResourceType) == "" {
+	if strings.TrimSpace(resource.Type) == "" {
 		return fmt.Errorf("resource_type is required")
 	}
 	if strings.TrimSpace(resource.ReporterType) == "" {
@@ -93,7 +93,7 @@ func TestResourceValidation(t *testing.T) {
 			name: "Valid RHEL Host with Reporter Data",
 			request: &ReportResourceRequest{
 				Resource: &Resource{
-					ResourceType:       "rhel_host",
+					Type:               "rhel_host",
 					ReporterType:       "HBI",
 					ReporterInstanceId: "user@example.com",
 					Representations: &ResourceRepresentations{
@@ -127,7 +127,7 @@ func TestResourceValidation(t *testing.T) {
 			name: "Valid K8s Cluster",
 			request: &ReportResourceRequest{
 				Resource: &Resource{
-					ResourceType:       "k8s_cluster",
+					Type:               "k8s_cluster",
 					ReporterType:       "OCM",
 					ReporterInstanceId: "user@example.com",
 					Representations: &ResourceRepresentations{
@@ -159,7 +159,7 @@ func TestResourceValidation(t *testing.T) {
 			name: "Valid RHEL Host (No Reporter Data)",
 			request: &ReportResourceRequest{
 				Resource: &Resource{
-					ResourceType:       "rhel_host",
+					Type:               "rhel_host",
 					ReporterType:       "HBI",
 					ReporterInstanceId: "org-123",
 					Representations: &ResourceRepresentations{
@@ -185,7 +185,7 @@ func TestResourceValidation(t *testing.T) {
 			name: "Valid Notifications Integration",
 			request: &ReportResourceRequest{
 				Resource: &Resource{
-					ResourceType:       "notifications_integration",
+					Type:               "notifications_integration",
 					ReporterType:       "NOTIFICATIONS",
 					ReporterInstanceId: "1",
 					Representations: &ResourceRepresentations{
@@ -212,7 +212,7 @@ func TestResourceValidation(t *testing.T) {
 			request: &ReportResourceRequest{
 				Resource: &Resource{
 					InventoryId:        "12",
-					ResourceType:       "k8s_cluster",
+					Type:               "k8s_cluster",
 					ReporterType:       "ACM",
 					ReporterInstanceId: "user@example.com",
 					Representations: &ResourceRepresentations{
@@ -238,7 +238,7 @@ func TestResourceValidation(t *testing.T) {
 			name: "Missing ReporterType",
 			request: &ReportResourceRequest{
 				Resource: &Resource{
-					ResourceType:       "k8s_cluster",
+					Type:               "k8s_cluster",
 					ReporterType:       "", // Missing
 					ReporterInstanceId: "user@example.com",
 					Representations: &ResourceRepresentations{
@@ -264,7 +264,7 @@ func TestResourceValidation(t *testing.T) {
 			name: "Missing ResourceType",
 			request: &ReportResourceRequest{
 				Resource: &Resource{
-					ResourceType:       "", // Missing
+					Type:               "", // Missing
 					ReporterType:       "ACM",
 					ReporterInstanceId: "user@example.com",
 					Representations: &ResourceRepresentations{
@@ -289,7 +289,7 @@ func TestResourceValidation(t *testing.T) {
 			name: "Missing LocalResourceId",
 			request: &ReportResourceRequest{
 				Resource: &Resource{
-					ResourceType:       "k8s_cluster",
+					Type:               "k8s_cluster",
 					ReporterType:       "OCM", // Missing
 					ReporterInstanceId: "user@example.com",
 					Representations: &ResourceRepresentations{
@@ -314,7 +314,7 @@ func TestResourceValidation(t *testing.T) {
 			name: "Missing ApiHref",
 			request: &ReportResourceRequest{
 				Resource: &Resource{
-					ResourceType:       "k8s_cluster",
+					Type:               "k8s_cluster",
 					ReporterType:       "ACM",
 					ReporterInstanceId: "user@example.com",
 					Representations: &ResourceRepresentations{
@@ -339,7 +339,7 @@ func TestResourceValidation(t *testing.T) {
 			name: "Missing ConsoleHref",
 			request: &ReportResourceRequest{
 				Resource: &Resource{
-					ResourceType:       "k8s_cluster",
+					Type:               "k8s_cluster",
 					ReporterType:       "ACM",
 					ReporterInstanceId: "user@example.com",
 					Representations: &ResourceRepresentations{

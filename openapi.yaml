@@ -1368,7 +1368,7 @@ components:
             properties:
                 inventoryId:
                     type: string
-                resourceType:
+                type:
                     type: string
                 reporterType:
                     type: string

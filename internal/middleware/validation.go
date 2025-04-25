@@ -70,7 +70,7 @@ func validateReportResourceJSON(msg proto.Message) error {
 		return err
 	}
 
-	resourceType, err := ExtractStringField(resource, "resourceType")
+	resourceType, err := ExtractStringField(resource, "type")
 	if err != nil {
 		return err
 	}

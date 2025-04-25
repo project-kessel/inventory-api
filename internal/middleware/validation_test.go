@@ -167,7 +167,7 @@ func TestExtractFields(t *testing.T) {
 func TestMarshalProtoToJSON(t *testing.T) {
 	msg := &pbv1beta2.ReportResourceRequest{
 		Resource: &pbv1beta2.Resource{
-			ResourceType: "k8s_cluster",
+			Type: "k8s_cluster",
 		},
 	}
 	jsonData, err := middleware.MarshalProtoToJSON(msg)
@@ -248,7 +248,7 @@ func ValidateResourceRequest(req *pbv1beta2.ReportResourceRequest) error {
 
 	res := req.Resource
 
-	if strings.TrimSpace(res.ResourceType) == "" {
+	if strings.TrimSpace(res.Type) == "" {
 		return fmt.Errorf("resource_type is required")
 	}
 	if strings.TrimSpace(res.ReporterType) == "" {
@@ -313,7 +313,7 @@ func TestSchemaValidation(t *testing.T) {
 			name: "Missing ReporterType",
 			request: &pbv1beta2.ReportResourceRequest{
 				Resource: &pbv1beta2.Resource{
-					ResourceType:       "k8s_cluster",
+					Type:               "k8s_cluster",
 					ReporterType:       "", // Intentionally invalid
 					ReporterInstanceId: "user@example.com",
 					Representations: &pbv1beta2.ResourceRepresentations{
@@ -338,7 +338,7 @@ func TestSchemaValidation(t *testing.T) {
 			name: "Valid RHEL Host with Resource Data",
 			request: &pbv1beta2.ReportResourceRequest{
 				Resource: &pbv1beta2.Resource{
-					ResourceType:       "host",
+					Type:               "host",
 					ReporterType:       "HBI",
 					ReporterInstanceId: "org-123",
 					Representations: &pbv1beta2.ResourceRepresentations{
@@ -369,7 +369,7 @@ func TestSchemaValidation(t *testing.T) {
 			name: "Valid K8s Policy",
 			request: &pbv1beta2.ReportResourceRequest{
 				Resource: &pbv1beta2.Resource{
-					ResourceType:       "k8s_policy",
+					Type:               "k8s_policy",
 					ReporterType:       "ACM",
 					ReporterInstanceId: "org-123",
 					Representations: &pbv1beta2.ResourceRepresentations{
@@ -398,7 +398,7 @@ func TestSchemaValidation(t *testing.T) {
 			name: "Valid Notifications Integration (No schema expected)",
 			request: &pbv1beta2.ReportResourceRequest{
 				Resource: &pbv1beta2.Resource{
-					ResourceType:       "notifications_integration",
+					Type:               "notifications_integration",
 					ReporterType:       "NOTIFICATIONS",
 					ReporterInstanceId: "1",
 					Representations: &pbv1beta2.ResourceRepresentations{
@@ -423,7 +423,7 @@ func TestSchemaValidation(t *testing.T) {
 			name: "K8s Cluster with incorrect data types (simulate type error)",
 			request: &pbv1beta2.ReportResourceRequest{
 				Resource: &pbv1beta2.Resource{
-					ResourceType:       "k8s_cluster",
+					Type:               "k8s_cluster",
 					ReporterType:       "OCM",
 					ReporterInstanceId: "user@example.com",
 					Representations: &pbv1beta2.ResourceRepresentations{
@@ -458,7 +458,7 @@ func TestSchemaValidation(t *testing.T) {
 			name: "Notifications Integration with unexpected reporter data",
 			request: &pbv1beta2.ReportResourceRequest{
 				Resource: &pbv1beta2.Resource{
-					ResourceType:       "notifications_integration",
+					Type:               "notifications_integration",
 					ReporterType:       "NOTIFICATIONS",
 					ReporterInstanceId: "1",
 					Representations: &pbv1beta2.ResourceRepresentations{

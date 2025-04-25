@@ -68,7 +68,7 @@ func (c *ResourceService) DeleteResource(ctx context.Context, r *pb.DeleteResour
 
 func requestToResource(r *pb.ReportResourceRequest, identity *authnapi.Identity) (*model.Resource, error) {
 	log.Info("Report Resource Request: ", r)
-	var resourceType = r.Resource.GetResourceType()
+	var resourceType = r.Resource.GetType()
 	resourceData, err := conv.ToJsonObject(r.Resource)
 	if err != nil {
 		return nil, err

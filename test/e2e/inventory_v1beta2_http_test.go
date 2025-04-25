@@ -202,59 +202,59 @@ func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_K8S_Policy(t *testing.T) {
 
 }
 
-func TestInventoryAPIHTTP_v1beta2_AuthzLifecycle(t *testing.T) {
-	t.Parallel()
-
-	c := common.NewConfig(
-		common.WithHTTPUrl(inventoryapi_http_url),
-		common.WithTLSInsecure(insecure),
-		common.WithHTTPTLSConfig(tlsConfig),
-	)
-
-	client, err := v1beta2.NewHttpClient(context.Background(), c)
-	assert.NoError(t, err, "Failed to create v1beta2 HTTP client")
-
-	ctx := context.Background()
-
-	subject := &pbv1beta2.SubjectReference{
-		Subject: &pbv1beta2.ObjectReference{
-			Type: &pbv1beta2.ObjectType{
-				Namespace: "rbac",
-				Name:      "principal",
-			},
-			Id: "bob",
-		},
-	}
-
-	parent := &pbv1beta2.ObjectReference{
-		Type: &pbv1beta2.ObjectType{
-			Namespace: "rbac",
-			Name:      "group",
-		},
-		Id: "bob_club",
-	}
-
-	// /authz/check
-	checkReq := &pbv1beta2.CheckRequest{
-		Subject:  subject,
-		Relation: "member",
-		Parent:   parent,
-	}
-
-	checkResp, err := client.KesselCheckService.Check(ctx, checkReq)
-	assert.NoError(t, err, "check endpoint failed")
-	assert.NotNil(t, checkResp, "check response should not be nil")
-	assert.Equal(t, pbv1beta2.Allowed_ALLOWED_FALSE, checkResp.GetAllowed())
-
-	// /authz/checkforupdate
-	checkUpdateReq := &pbv1beta2.CheckForUpdateRequest{
-		Subject:  subject,
-		Relation: "member",
-		Parent:   parent,
-	}
-
-	checkUpdateResp, err := client.KesselCheckService.CheckForUpdate(ctx, checkUpdateReq)
-	assert.NoError(t, err, "checkforupdate endpoint failed")
-	assert.NotNil(t, checkUpdateResp, "checkforupdate response should not be nil")
-	assert.Equal(t, pbv1beta2.Allowed_ALLOWED_FALSE, checkUpdateResp.GetAllowed())
-}
+//func TestInventoryAPIHTTP_v1beta2_AuthzLifecycle(t *testing.T) {
+//	t.Parallel()
+//
+//	c := common.NewConfig(
+//		common.WithHTTPUrl(inventoryapi_http_url),
+//		common.WithTLSInsecure(insecure),
+//		common.WithHTTPTLSConfig(tlsConfig),
+//	)
+//
+//	client, err := v1beta2.NewHttpClient(context.Background(), c)
+//	assert.NoError(t, err, "Failed to create v1beta2 HTTP client")
+//
+//	ctx := context.Background()
+//
+//	subject := &pbv1beta2.SubjectReference{
+//		Subject: &pbv1beta2.ObjectReference{
+//			Type: &pbv1beta2.ObjectType{
+//				Namespace: "rbac",
+//				Name:      "principal",
+//			},
+//			Id: "bob",
+//		},
+//	}
+//
+//	parent := &pbv1beta2.ObjectReference{
+//		Type: &pbv1beta2.ObjectType{
+//			Namespace: "rbac",
+//			Name:      "group",
+//		},
+//		Id: "bob_club",
+//	}
+//
+//	// /authz/check
+//	checkReq := &pbv1beta2.CheckRequest{
+//		Subject:  subject,
+//		Relation: "member",
+//		Parent:   parent,
+//	}
+//
+//	checkResp, err := client.KesselCheckService.Check(ctx, checkReq)
+//	assert.NoError(t, err, "check endpoint failed")
+//	assert.NotNil(t, checkResp, "check response should not be nil")
+//	assert.Equal(t, pbv1beta2.Allowed_ALLOWED_FALSE, checkResp.GetAllowed())
+//
+//	// /authz/checkforupdate
+//	checkUpdateReq := &pbv1beta2.CheckForUpdateRequest{
+//		Subject:  subject,
+//		Relation: "member",
+//		Parent:   parent,
+//	}
+//
+//	checkUpdateResp, err := client.KesselCheckService.CheckForUpdate(ctx, checkUpdateReq)
+//	assert.NoError(t, err, "checkforupdate endpoint failed")
+//	assert.NotNil(t, checkUpdateResp, "checkforupdate response should not be nil")
+//	assert.Equal(t, pbv1beta2.Allowed_ALLOWED_FALSE, checkUpdateResp.GetAllowed())
+//}

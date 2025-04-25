@@ -258,7 +258,7 @@ func ValidateResourceRequest(req *pbv1beta2.ReportResourceRequest) error {
 		return fmt.Errorf("reporter_instance_id is required")
 	}
 
-	repr := res.ResourceRepresentation
+	repr := res.Representations
 	if repr == nil || repr.Metadata == nil {
 		return fmt.Errorf("representation_metadata is required")
 	}
@@ -316,7 +316,7 @@ func TestSchemaValidation(t *testing.T) {
 					ResourceType:       "k8s_cluster",
 					ReporterType:       "", // Intentionally invalid
 					ReporterInstanceId: "user@example.com",
-					ResourceRepresentation: &pbv1beta2.ResourceRepresentations{
+					Representations: &pbv1beta2.ResourceRepresentations{
 						Metadata: &pbv1beta2.RepresentationMetadata{
 							LocalResourceId: "0123",
 							ApiHref:         "https://api.example.com",
@@ -341,7 +341,7 @@ func TestSchemaValidation(t *testing.T) {
 					ResourceType:       "host",
 					ReporterType:       "HBI",
 					ReporterInstanceId: "org-123",
-					ResourceRepresentation: &pbv1beta2.ResourceRepresentations{
+					Representations: &pbv1beta2.ResourceRepresentations{
 						Metadata: &pbv1beta2.RepresentationMetadata{
 							LocalResourceId: "rhel-host-001",
 							ApiHref:         "https://api.rhel.example.com",
@@ -372,7 +372,7 @@ func TestSchemaValidation(t *testing.T) {
 					ResourceType:       "k8s_policy",
 					ReporterType:       "ACM",
 					ReporterInstanceId: "org-123",
-					ResourceRepresentation: &pbv1beta2.ResourceRepresentations{
+					Representations: &pbv1beta2.ResourceRepresentations{
 						Metadata: &pbv1beta2.RepresentationMetadata{
 							LocalResourceId: "k8s-policy-001",
 							ApiHref:         "https://api.k8s.example.com",
@@ -401,7 +401,7 @@ func TestSchemaValidation(t *testing.T) {
 					ResourceType:       "notifications_integration",
 					ReporterType:       "NOTIFICATIONS",
 					ReporterInstanceId: "1",
-					ResourceRepresentation: &pbv1beta2.ResourceRepresentations{
+					Representations: &pbv1beta2.ResourceRepresentations{
 						Metadata: &pbv1beta2.RepresentationMetadata{
 							LocalResourceId: "notifications-001",
 							ApiHref:         "https://api.notifications.example.com",
@@ -426,7 +426,7 @@ func TestSchemaValidation(t *testing.T) {
 					ResourceType:       "k8s_cluster",
 					ReporterType:       "OCM",
 					ReporterInstanceId: "user@example.com",
-					ResourceRepresentation: &pbv1beta2.ResourceRepresentations{
+					Representations: &pbv1beta2.ResourceRepresentations{
 						Metadata: &pbv1beta2.RepresentationMetadata{
 							LocalResourceId: "cluster-123",
 							ApiHref:         "www.example.com",
@@ -461,7 +461,7 @@ func TestSchemaValidation(t *testing.T) {
 					ResourceType:       "notifications_integration",
 					ReporterType:       "NOTIFICATIONS",
 					ReporterInstanceId: "1",
-					ResourceRepresentation: &pbv1beta2.ResourceRepresentations{
+					Representations: &pbv1beta2.ResourceRepresentations{
 						Metadata: &pbv1beta2.RepresentationMetadata{
 							LocalResourceId: "notifications-001",
 							ApiHref:         "https://api.notifications.example.com",

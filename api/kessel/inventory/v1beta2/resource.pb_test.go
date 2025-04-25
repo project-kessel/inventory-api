@@ -28,7 +28,7 @@ func ValidateResourceRequest(req *ReportResourceRequest) error {
 	}
 
 	// Validate metadata
-	metadata := resource.ResourceRepresentation.GetMetadata()
+	metadata := resource.Representations.GetMetadata()
 	if metadata == nil {
 		return fmt.Errorf("representation_metadata is required")
 	}
@@ -43,7 +43,7 @@ func ValidateResourceRequest(req *ReportResourceRequest) error {
 	}
 
 	// Validate common data
-	if err := validateCommonResourceData(resource.ResourceRepresentation.GetCommon()); err != nil {
+	if err := validateCommonResourceData(resource.Representations.GetCommon()); err != nil {
 		return fmt.Errorf("invalid common_resource_data: %w", err)
 	}
 
@@ -96,7 +96,7 @@ func TestResourceValidation(t *testing.T) {
 					ResourceType:       "rhel_host",
 					ReporterType:       "HBI",
 					ReporterInstanceId: "user@example.com",
-					ResourceRepresentation: &ResourceRepresentations{
+					Representations: &ResourceRepresentations{
 						Metadata: &RepresentationMetadata{
 							LocalResourceId: "0123",
 							ApiHref:         "https://api.example.com",
@@ -130,7 +130,7 @@ func TestResourceValidation(t *testing.T) {
 					ResourceType:       "k8s_cluster",
 					ReporterType:       "OCM",
 					ReporterInstanceId: "user@example.com",
-					ResourceRepresentation: &ResourceRepresentations{
+					Representations: &ResourceRepresentations{
 						Metadata: &RepresentationMetadata{
 							LocalResourceId: "cluster-123",
 							ApiHref:         "https://api.example.com",
@@ -162,7 +162,7 @@ func TestResourceValidation(t *testing.T) {
 					ResourceType:       "rhel_host",
 					ReporterType:       "HBI",
 					ReporterInstanceId: "org-123",
-					ResourceRepresentation: &ResourceRepresentations{
+					Representations: &ResourceRepresentations{
 						Metadata: &RepresentationMetadata{
 							LocalResourceId: "rhel-host-001",
 							ApiHref:         "https://api.rhel.example.com",
@@ -188,7 +188,7 @@ func TestResourceValidation(t *testing.T) {
 					ResourceType:       "notifications_integration",
 					ReporterType:       "NOTIFICATIONS",
 					ReporterInstanceId: "1",
-					ResourceRepresentation: &ResourceRepresentations{
+					Representations: &ResourceRepresentations{
 						Metadata: &RepresentationMetadata{
 							LocalResourceId: "notifications-001",
 							ApiHref:         "https://api.notifications.example.com",
@@ -215,7 +215,7 @@ func TestResourceValidation(t *testing.T) {
 					ResourceType:       "k8s_cluster",
 					ReporterType:       "ACM",
 					ReporterInstanceId: "user@example.com",
-					ResourceRepresentation: &ResourceRepresentations{
+					Representations: &ResourceRepresentations{
 						Metadata: &RepresentationMetadata{
 							LocalResourceId: "0123",
 							ApiHref:         "https://api.example.com",
@@ -241,7 +241,7 @@ func TestResourceValidation(t *testing.T) {
 					ResourceType:       "k8s_cluster",
 					ReporterType:       "", // Missing
 					ReporterInstanceId: "user@example.com",
-					ResourceRepresentation: &ResourceRepresentations{
+					Representations: &ResourceRepresentations{
 						Metadata: &RepresentationMetadata{
 							LocalResourceId: "0123",
 							ApiHref:         "https://api.example.com",
@@ -267,7 +267,7 @@ func TestResourceValidation(t *testing.T) {
 					ResourceType:       "", // Missing
 					ReporterType:       "ACM",
 					ReporterInstanceId: "user@example.com",
-					ResourceRepresentation: &ResourceRepresentations{
+					Representations: &ResourceRepresentations{
 						Metadata: &RepresentationMetadata{
 							LocalResourceId: "0123",
 							ApiHref:         "https://api.example.com",
@@ -292,7 +292,7 @@ func TestResourceValidation(t *testing.T) {
 					ResourceType:       "k8s_cluster",
 					ReporterType:       "OCM", // Missing
 					ReporterInstanceId: "user@example.com",
-					ResourceRepresentation: &ResourceRepresentations{
+					Representations: &ResourceRepresentations{
 						Metadata: &RepresentationMetadata{
 							ApiHref:         "https://api.example.com",
 							ConsoleHref:     "https://console.example.com",
@@ -317,7 +317,7 @@ func TestResourceValidation(t *testing.T) {
 					ResourceType:       "k8s_cluster",
 					ReporterType:       "ACM",
 					ReporterInstanceId: "user@example.com",
-					ResourceRepresentation: &ResourceRepresentations{
+					Representations: &ResourceRepresentations{
 						Metadata: &RepresentationMetadata{
 							LocalResourceId: "0123",
 							ConsoleHref:     "https://console.example.com",
@@ -342,7 +342,7 @@ func TestResourceValidation(t *testing.T) {
 					ResourceType:       "k8s_cluster",
 					ReporterType:       "ACM",
 					ReporterInstanceId: "user@example.com",
-					ResourceRepresentation: &ResourceRepresentations{
+					Representations: &ResourceRepresentations{
 						Metadata: &RepresentationMetadata{
 							LocalResourceId: "0123",
 							ApiHref:         "https://api.example.com",

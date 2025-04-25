@@ -35,7 +35,7 @@ func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_Host(t *testing.T) {
 			ResourceType:       "host",
 			ReporterType:       "HBI",
 			ReporterInstanceId: "testuser@example.com",
-			ResourceRepresentation: &pbv1beta2.ResourceRepresentations{
+			Representations: &pbv1beta2.ResourceRepresentations{
 				Metadata: &pbv1beta2.RepresentationMetadata{
 					LocalResourceId: "host-abc-123",
 					ApiHref:         "https://example.com/api",
@@ -91,7 +91,7 @@ func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_Notifications(t *testing.T) 
 			ResourceType:       "notifications_integration",
 			ReporterType:       "NOTIFICATIONS",
 			ReporterInstanceId: "testuser@example.com",
-			ResourceRepresentation: &pbv1beta2.ResourceRepresentations{
+			Representations: &pbv1beta2.ResourceRepresentations{
 				Metadata: &pbv1beta2.RepresentationMetadata{
 					LocalResourceId: "notification-abc-123",
 					ApiHref:         "https://example.com/api",
@@ -150,7 +150,7 @@ func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_K8S_Cluster(t *testing.T) {
 			ResourceType:       "k8s_cluster",
 			ReporterType:       "ACM",
 			ReporterInstanceId: "testuser@example.com",
-			ResourceRepresentation: &pbv1beta2.ResourceRepresentations{
+			Representations: &pbv1beta2.ResourceRepresentations{
 				Metadata: &pbv1beta2.RepresentationMetadata{
 					LocalResourceId: "k8s_cluster-abc-123",
 					ApiHref:         "https://example.com/api",
@@ -204,7 +204,7 @@ func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_K8S_Policy(t *testing.T) {
 			ResourceType:       "k8s_policy",
 			ReporterType:       "ACM",
 			ReporterInstanceId: "testuser@example.com",
-			ResourceRepresentation: &pbv1beta2.ResourceRepresentations{
+			Representations: &pbv1beta2.ResourceRepresentations{
 				Metadata: &pbv1beta2.RepresentationMetadata{
 					LocalResourceId: "k8s_policy-abc-123",
 					ApiHref:         "https://example.com/api",

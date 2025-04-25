@@ -15,6 +15,7 @@
     "transforms.outbox.table.fields.additional.placement": "operation:header,txid:header",
     "transforms.outbox.table.expand.json.payload": true,
     "value.converter": "org.apache.kafka.connect.json.JsonConverter",
-    "plugin.name": "pgoutput"
+    "plugin.name": "pgoutput",
+    "poll.interval.ms": 250
   }
 }

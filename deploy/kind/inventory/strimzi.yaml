@@ -84,3 +84,4 @@ spec:
     transforms.outbox.table.expand.json.payload: true
     value.converter: org.apache.kafka.connect.json.JsonConverter
     plugin.name: pgoutput
+    poll.interval.ms: 250

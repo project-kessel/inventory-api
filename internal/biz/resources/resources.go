@@ -5,6 +5,7 @@ import (
 	"errors"
 	"google.golang.org/grpc"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -281,9 +282,6 @@ func (uc *Usecase) CheckForUpdate(ctx context.Context, permission, namespace str
 }
 
 func (uc *Usecase) ListResourcesInWorkspace(ctx context.Context, permission, namespace string, sub *kessel.SubjectReference, id string) (chan *model.Resource, chan error, error) {
-	resource_chan := make(chan *model.Resource)
-	error_chan := make(chan error, 1)
-
 	resources, err := uc.reporterResourceRepository.FindByWorkspaceId(ctx, id)
 	if err != nil {
 		return nil, nil, err
@@ -291,24 +289,49 @@ func (uc *Usecase) ListResourcesInWorkspace(ctx context.Context, permission, nam
 
 	log.Infof("ListResourcesInWorkspace: resources %+v", resources)
 
-	go func() {
-		defer close(resource_chan)
-		defer close(error_chan)
+	const NUM_WORKERS = 10
 
-		for _, resource := range resources {
-			log.Infof("ListResourcesInWorkspace: checkforview on %+v", resource)
-			if allowed, _, err := uc.Authz.Check(ctx, namespace, permission, resource, sub); err == nil && allowed == kessel.CheckResponse_ALLOWED_TRUE {
-				resource_chan <- resource
-			} else if err != nil {
-				error_chan <- err
-				break
-			} else if allowed != kessel.CheckResponse_ALLOWED_TRUE {
-				log.Infof("Response was not allowed: %v", allowed)
-			}
+	resourceChan := make(chan *model.Resource, len(resources))
+	allowedChan := make(chan *model.Resource, len(resources))
+	errorChan := make(chan error, 1)
+	var wg sync.WaitGroup
+
+	// start workers
+	for i := 0; i < NUM_WORKERS; i++ {
+		go uc.checkWorker(ctx, permission, namespace, sub, resourceChan, allowedChan, errorChan, &wg)
+	}
+
+	wg.Add(len(resources))
+	go func() {
+		defer close(allowedChan)
+		defer close(errorChan)
+
+		// feed workers with resources to check
+		for _, res := range resources {
+			resourceChan <- res
 		}
+		close(resourceChan)
+
+		// wait for workers to finish processing resources before close output channels
+		wg.Wait()
 	}()
 
-	return resource_chan, error_chan, nil
+	return allowedChan, errorChan, nil
+}
+
+func (uc *Usecase) checkWorker(ctx context.Context, permission, namespace string, sub *kessel.SubjectReference, resourceChan <-chan *model.Resource, allowedChan chan<- *model.Resource, errorChan chan<- error, wg *sync.WaitGroup) {
+	for resource := range resourceChan {
+		log.Debugf("ListResourcesInWorkspace: checkforview on %+v", resource)
+
+		if allowed, _, err := uc.Authz.Check(ctx, namespace, permission, resource, sub); err == nil && allowed == kessel.CheckResponse_ALLOWED_TRUE {
+			allowedChan <- resource
+		} else if err != nil {
+			errorChan <- err
+		} else if allowed != kessel.CheckResponse_ALLOWED_TRUE {
+			log.Debugf("ListResourcesInWorkspace: response was not allowed: %v", allowed)
+		}
+		wg.Done()
+	}
 }
 
 // Delete deletes a model from the database, removes related tuples from the relations-api, and issues a delete event.

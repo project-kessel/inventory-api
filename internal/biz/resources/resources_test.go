@@ -6,6 +6,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 	"io"
+	"sort"
 	"testing"
 
 	"github.com/go-kratos/kratos/v2/log"
@@ -278,6 +279,78 @@ func resource1() *model.Resource {
 			{
 				Key:   "label-1",
 				Value: "value-2",
+			},
+			{
+				Key:   "label-xyz",
+				Value: "value-xyz",
+			},
+		},
+	}
+}
+
+func resource2() *model.Resource {
+	return &model.Resource{
+		ID:    uuid.UUID{},
+		OrgId: "my-org2",
+		ResourceData: map[string]any{
+			"foo2": "bar2",
+		},
+		ResourceType: "my-resource2",
+		WorkspaceId:  "my-workspace",
+		Reporter: model.ResourceReporter{
+			Reporter: model.Reporter{
+				ReporterId:      "reporter_id",
+				ReporterType:    "reporter_type",
+				ReporterVersion: "1.0.2",
+			},
+			LocalResourceId: "foo-resource",
+		},
+		ConsoleHref: "/etc/console",
+		ApiHref:     "/etc/api",
+		Labels: model.Labels{
+			{
+				Key:   "label-2",
+				Value: "value-2",
+			},
+			{
+				Key:   "label-2",
+				Value: "value-3",
+			},
+			{
+				Key:   "label-xyz",
+				Value: "value-xyz",
+			},
+		},
+	}
+}
+
+func resource3() *model.Resource {
+	return &model.Resource{
+		ID:    uuid.UUID{},
+		OrgId: "my-org3",
+		ResourceData: map[string]any{
+			"foo3": "bar3",
+		},
+		ResourceType: "my-resource33",
+		WorkspaceId:  "my-workspace",
+		Reporter: model.ResourceReporter{
+			Reporter: model.Reporter{
+				ReporterId:      "reporter_id",
+				ReporterType:    "reporter_type",
+				ReporterVersion: "1.0.2",
+			},
+			LocalResourceId: "foo-resource",
+		},
+		ConsoleHref: "/etc/console",
+		ApiHref:     "/etc/api",
+		Labels: model.Labels{
+			{
+				Key:   "label-3",
+				Value: "value-3",
+			},
+			{
+				Key:   "label-2",
+				Value: "value-3",
 			},
 			{
 				Key:   "label-xyz",
@@ -954,6 +1027,11 @@ func TestListResourcesInWorkspace_ResourcesAllowedTrue(t *testing.T) {
 	res := <-resource_chan
 	assert.Equal(t, resource, res) // expecting to get back resource1
 
+	_, ok := <-resource_chan
+	if ok {
+		t.Error("resource_chan should have been closed")
+	}
+
 	assert.Empty(t, err_chan) // dont want any errors.
 
 	// check negative case (not allowed)
@@ -968,6 +1046,83 @@ func TestListResourcesInWorkspace_ResourcesAllowedTrue(t *testing.T) {
 	assert.Empty(t, err_chan) // dont want any errors.
 
 	repo.AssertExpectations(t)
+}
+
+func TestListResourcesInWorkspace_MultipleResourcesAllowedTrue(t *testing.T) {
+	ctx := context.TODO()
+
+	inventoryRepo := &MockedInventoryResourceRepository{}
+	repo := &MockedReporterResourceRepository{}
+	m := &MockAuthz{}
+
+	resource := resource1()
+	resource2 := resource2()
+	resource3 := resource3()
+
+	repo.On("FindByWorkspaceId", mock.Anything, mock.Anything).Return([]*model.Resource{resource, resource2, resource3}, nil)
+	m.On("Check", mock.Anything, mock.Anything, "notifications_integration_write", mock.Anything, mock.Anything).Return(v1beta1.CheckResponse_ALLOWED_TRUE, &v1beta1.ConsistencyToken{}, nil)
+
+	useCase := New(repo, inventoryRepo, m, nil, "", log.DefaultLogger, false)
+	resource_chan, err_chan, err := useCase.ListResourcesInWorkspace(ctx, "notifications_integration_write", "rbac", &v1beta1.SubjectReference{}, "foo-id")
+
+	assert.Nil(t, err)
+
+	out := make([]*model.Resource, 3)
+	out[0] = <-resource_chan
+	out[1] = <-resource_chan
+	out[2] = <-resource_chan
+
+	in := []*model.Resource{resource, resource2, resource3}
+	sort.Slice(in, func(i, j int) bool { return len(in[i].ResourceType) < len(in[j].ResourceType) })
+	sort.Slice(out, func(i, j int) bool { return len(out[i].ResourceType) < len(out[j].ResourceType) })
+	assert.Equal(t, in, out) // all 3 are there in any order
+
+	_, ok := <-resource_chan
+	if ok {
+		t.Error("resource_chan should have been closed") // and there was no other resource
+	}
+
+	assert.Empty(t, err_chan) // dont want any errors.
+}
+
+// not authorized for the middle one and error on the third should just pass first
+func TestListResourcesInWorkspace_MultipleResourcesOneFalseTwoTrueLastError(t *testing.T) {
+	ctx := context.TODO()
+
+	inventoryRepo := &MockedInventoryResourceRepository{}
+	repo := &MockedReporterResourceRepository{}
+	m := &MockAuthz{}
+
+	resource := resource1()
+	resource2 := resource2()
+	resource3 := resource3()
+	theError := errors.New("failed calling relations")
+
+	repo.On("FindByWorkspaceId", mock.Anything, mock.Anything).Return([]*model.Resource{resource, resource2, resource3}, nil)
+	m.On("Check", mock.Anything, mock.Anything, "notifications_integration_write", resource, mock.Anything).Return(v1beta1.CheckResponse_ALLOWED_FALSE, &v1beta1.ConsistencyToken{}, nil)
+	m.On("Check", mock.Anything, mock.Anything, "notifications_integration_write", resource2, mock.Anything).Return(v1beta1.CheckResponse_ALLOWED_TRUE, &v1beta1.ConsistencyToken{}, nil)
+	m.On("Check", mock.Anything, mock.Anything, "notifications_integration_write", resource3, mock.Anything).Return(v1beta1.CheckResponse_ALLOWED_UNSPECIFIED, &v1beta1.ConsistencyToken{}, theError)
+
+	useCase := New(repo, inventoryRepo, m, nil, "", log.DefaultLogger, false)
+	resource_chan, err_chan, err := useCase.ListResourcesInWorkspace(ctx, "notifications_integration_write", "rbac", &v1beta1.SubjectReference{}, "foo-id")
+
+	assert.Nil(t, err)
+
+	out_allowed := make([]*model.Resource, 1)
+	out_allowed[0] = <-resource_chan
+
+	in_allowed := []*model.Resource{resource2}
+	sort.Slice(in_allowed, func(i, j int) bool { return len(in_allowed[i].ResourceType) < len(in_allowed[j].ResourceType) })
+	sort.Slice(out_allowed, func(i, j int) bool { return len(out_allowed[i].ResourceType) < len(out_allowed[j].ResourceType) })
+	assert.Equal(t, in_allowed, out_allowed) // all 3 are there in any order
+
+	_, ok := <-resource_chan
+	if ok {
+		t.Error("resource_chan should have been closed") // and there was no other resource
+	}
+
+	backError := <-err_chan
+	assert.Equal(t, theError, backError) // dont want any errors.
 }
 
 func TestListResourcesInWorkspace_ResourcesAllowedError(t *testing.T) {
@@ -990,5 +1145,5 @@ func TestListResourcesInWorkspace_ResourcesAllowedError(t *testing.T) {
 	res := <-resource_chan
 	assert.Nil(t, res) // expecting no resource, as we errored
 
-	assert.NotEmpty(t, err_chan) // dont want any errors.
+	assert.NotEmpty(t, err_chan) // we want an errors.
 }

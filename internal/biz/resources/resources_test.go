@@ -1145,5 +1145,5 @@ func TestListResourcesInWorkspace_ResourcesAllowedError(t *testing.T) {
 	res := <-resource_chan
 	assert.Nil(t, res) // expecting no resource, as we errored
 
-	assert.NotEmpty(t, err_chan) // dont want any errors.
+	assert.NotEmpty(t, err_chan) // we want an errors.
 }

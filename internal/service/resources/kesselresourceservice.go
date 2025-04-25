@@ -79,7 +79,7 @@ func requestToResource(r *pb.ReportResourceRequest, identity *authnapi.Identity)
 		return nil, err2
 	}
 
-	var inventoryId, err3 = conv.ExtractInventoryId(r.Resource.InventoryId)
+	var inventoryId, err3 = conv.ExtractInventoryId(r.Resource.GetInventoryId())
 	if err3 != nil {
 		return nil, err3
 	}

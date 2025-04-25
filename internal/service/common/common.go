@@ -57,8 +57,8 @@ func ResourceFromPb(resourceType, reporterType string, reporterInstanceId string
 		ReporterId:         reporterId,
 		ReporterType:       reporterType,
 		ReporterInstanceId: reporterInstanceId,
-		ReporterVersion:    resourceRep.Metadata.ReporterVersion,
-		ConsoleHref:        resourceRep.Metadata.ConsoleHref,
+		ReporterVersion:    resourceRep.Metadata.GetReporterVersion(),
+		ConsoleHref:        resourceRep.Metadata.GetConsoleHref(),
 		ApiHref:            resourceRep.Metadata.ApiHref,
 	}
 }

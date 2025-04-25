@@ -84,40 +84,40 @@ func ExtractStringField(data map[string]interface{}, key string) (string, error)
 	return strValue, nil
 }
 
-// ValidateCommonResourceData Validates the "commonResourceData" field using a predefined schema.
-func ValidateCommonData(resourceType string, commonData map[string]interface{}) error {
+// ValidateCommonRepresentation Validates the "common" field in ResourceRepresentations using a predefined schema.
+func ValidateCommonRepresentation(resourceType string, commonRepresentation map[string]interface{}) error {
 	commonSchemaKey := fmt.Sprintf("common:%s", strings.ToLower(resourceType))
 	commonSchema, err := getSchemaFromCache(commonSchemaKey)
 	if err != nil {
-		return fmt.Errorf("failed to load common resource schema for '%s': %w", resourceType, err)
+		return fmt.Errorf("failed to load common representation schema for '%s': %w", resourceType, err)
 	}
 
-	if err := ValidateJSONSchema(commonSchema, commonData); err != nil {
-		return fmt.Errorf("common resource data validation failed for '%s': %w", resourceType, err)
+	if err := ValidateJSONSchema(commonSchema, commonRepresentation); err != nil {
+		return fmt.Errorf("common representation validation failed for '%s': %w", resourceType, err)
 	}
 
 	return nil
 }
 
-// Validates the reporter-specific data against its schema based on resourceType and reporterType.
-func ValidateReporterData(resourceType string, reporterType string, reporterData map[string]interface{}) error {
+// Validates the reporter-specific representation against its schema based on resourceType and reporterType.
+func ValidateReporterRepresentation(resourceType string, reporterType string, reporterRepresentation map[string]interface{}) error {
 	// Construct the schema key using the format: resourceType:reporterType
 	schemaKey := fmt.Sprintf("%s:%s", strings.ToLower(resourceType), strings.ToLower(reporterType))
-	resourceDataSchema, err := getSchemaFromCache(schemaKey)
+	reporterRepresentationSchema, err := getSchemaFromCache(schemaKey)
 
 	// Case 1: No schema found for resourceType:reporterType
 	if err != nil {
-		if len(reporterData) > 0 {
-			return fmt.Errorf("no schema found for '%s', but reporter data was provided. Submission is not allowed", schemaKey)
+		if len(reporterRepresentation) > 0 {
+			return fmt.Errorf("no schema found for '%s', but reporter representation was provided. Submission is not allowed", schemaKey)
 		}
 		log.Debugf("no schema found for %s, treating as abstract reporter representation", schemaKey)
 		return nil
 	}
 
 	// Case 2: Schema found, validate data (if present)
-	if len(reporterData) > 0 {
-		if err := ValidateJSONSchema(resourceDataSchema, reporterData); err != nil {
-			return fmt.Errorf("reporter data validation failed for '%s': %w", schemaKey, err)
+	if len(reporterRepresentation) > 0 {
+		if err := ValidateJSONSchema(reporterRepresentationSchema, reporterRepresentation); err != nil {
+			return fmt.Errorf("reporter representation validation failed for '%s': %w", schemaKey, err)
 		}
 	}
 

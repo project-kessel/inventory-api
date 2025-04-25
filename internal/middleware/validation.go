@@ -85,12 +85,12 @@ func validateReportResourceJSON(msg proto.Message) error {
 		return err
 	}
 
-	reporterData, err := ExtractMapField(resourceRepresentation, "reporter")
+	reporterRepresentation, err := ExtractMapField(resourceRepresentation, "reporter")
 	if err != nil {
 		return err
 	}
 
-	commonData, err := ExtractMapField(resourceRepresentation, "common")
+	commonRepresentation, err := ExtractMapField(resourceRepresentation, "common")
 	if err != nil {
 		return err
 	}
@@ -101,12 +101,12 @@ func validateReportResourceJSON(msg proto.Message) error {
 	}
 
 	// Validate reporter-specific data
-	if err := ValidateReporterData(resourceType, reporterType, reporterData); err != nil {
+	if err := ValidateReporterRepresentation(resourceType, reporterType, reporterRepresentation); err != nil {
 		return err
 	}
 
 	// Validate common data
-	if err := ValidateCommonData(resourceType, commonData); err != nil {
+	if err := ValidateCommonRepresentation(resourceType, commonRepresentation); err != nil {
 		return err
 	}
 

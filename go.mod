@@ -16,7 +16,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/patrickmn/go-cache v2.1.0+incompatible
 	github.com/project-kessel/inventory-client-go v0.0.0-20250424151038-8425c8f4f969
-	github.com/project-kessel/relations-api v0.0.0-20250416203648-5c06eab71dcb
+	github.com/project-kessel/relations-api v0.0.0-20250408111129-d8b61a77bd9a
 	github.com/prometheus/client_golang v1.22.0
 	github.com/redhatinsights/app-common-go v1.6.8
 	github.com/spf13/cobra v1.9.1
@@ -55,6 +55,8 @@ require (
 	github.com/go-playground/form/v4 v4.2.1 // indirect
 	github.com/go-viper/mapstructure/v2 v2.2.1 // indirect
 	github.com/google/cel-go v0.23.2 // indirect
+	github.com/google/subcommands v1.2.0 // indirect
+	github.com/google/wire v0.6.0 // indirect
 	github.com/gorilla/mux v1.8.1 // indirect
 	github.com/grpc-ecosystem/go-grpc-middleware v1.4.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
@@ -65,7 +67,6 @@ require (
 	github.com/jinzhu/inflection v1.0.0 // indirect
 	github.com/jinzhu/now v1.1.5 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
-	github.com/klauspost/compress v1.18.0 // indirect
 	github.com/mattn/go-sqlite3 v1.14.24 // indirect
 	github.com/moby/sys/capability v0.4.0 // indirect
 	github.com/moby/sys/userns v0.1.0 // indirect
@@ -92,11 +93,13 @@ require (
 	go.uber.org/zap v1.27.0 // indirect
 	golang.org/x/crypto v0.37.0 // indirect
 	golang.org/x/exp v0.0.0-20241009180824-f66d83c29e7c // indirect
+	golang.org/x/mod v0.21.0 // indirect
 	golang.org/x/net v0.39.0 // indirect
 	golang.org/x/oauth2 v0.29.0 // indirect
 	golang.org/x/sync v0.13.0 // indirect
 	golang.org/x/sys v0.32.0 // indirect
 	golang.org/x/text v0.24.0 // indirect
+	golang.org/x/tools v0.26.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250422160041-2d3770c4ea7f // indirect
 
 )

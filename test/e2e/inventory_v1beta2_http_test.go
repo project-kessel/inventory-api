@@ -312,27 +312,37 @@ func TestInventoryAPIHTTP_v1beta2_Host_WaitForSync(t *testing.T) {
 	client, err := v1beta2.NewHttpClient(context.Background(), c)
 	assert.NoError(t, err, "Failed to create v1beta2 HTTP client")
 
-	resourceData := &structpb.Struct{}
 	commonData := &structpb.Struct{}
-
 	commonData.Fields = map[string]*structpb.Value{
 		"workspace_id": structpb.NewStringValue("workspace-v2"),
 	}
 
+	reporterStruct, err := structpb.NewStruct(map[string]interface{}{
+		"disabled": true,
+		"severity": "MEDIUM",
+	})
+	assert.NoError(t, err, "Failed to create structpb for reporter")
+
 	req := pbv1beta2.ReportResourceRequest{
 		WaitForSync: true,
 		Resource: &pbv1beta2.Resource{
-			ResourceType: "host",
-			ReporterData: &pbv1beta2.ReporterData{
-				ReporterType:       "HBI",
-				ReporterInstanceId: "testuser@example.com",
-				ReporterVersion:    "0.1",
-				LocalResourceId:    resourceId,
-				ApiHref:            "https://example.com/api",
-				ConsoleHref:        "https://example.com/console",
-				ResourceData:       resourceData,
+			Type:               "host",
+			ReporterType:       "HBI",
+			ReporterInstanceId: "testuser@example.com",
+			Representations: &pbv1beta2.ResourceRepresentations{
+				Metadata: &pbv1beta2.RepresentationMetadata{
+					LocalResourceId: resourceId,
+					ApiHref:         "https://example.com/api",
+					ConsoleHref:     proto.String("https://example.com/console"),
+					ReporterVersion: proto.String("0.1"),
+				},
+				Common: &structpb.Struct{
+					Fields: map[string]*structpb.Value{
+						"workspace_id": structpb.NewStringValue("workspace-v2"),
+					},
+				},
+				Reporter: reporterStruct,
 			},
-			CommonResourceData: commonData,
 		},
 	}
 	opts := getCallOptions()

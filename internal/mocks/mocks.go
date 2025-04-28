@@ -2,6 +2,7 @@ package mocks
 
 import (
 	"context"
+
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
 
 	"github.com/project-kessel/inventory-api/internal/biz/model"
@@ -66,13 +67,26 @@ func (m *MockConsumer) CommitOffsets(offsets []kafka.TopicPartition) ([]kafka.To
 }
 
 func (m *MockConsumer) SubscribeTopics(topics []string, rebalanceCb kafka.RebalanceCb) (err error) {
-	return nil
+	args := m.Called(topics, rebalanceCb)
+	return args.Error(0)
 }
 
-func (m *MockConsumer) Poll(timeoutMs int) (event kafka.Event) { return nil }
+func (m *MockConsumer) Poll(timeoutMs int) (event kafka.Event) {
+	args := m.Called(timeoutMs)
+	return args.Get(0).(kafka.Event)
+}
 
-func (m *MockConsumer) IsClosed() bool { return true }
+func (m *MockConsumer) IsClosed() bool {
+	args := m.Called()
+	return args.Get(0).(bool)
+}
 
-func (m *MockConsumer) Close() error { return nil }
+func (m *MockConsumer) Close() error {
+	args := m.Called()
+	return args.Error(0)
+}
 
-func (m *MockConsumer) AssignmentLost() bool { return true }
+func (m *MockConsumer) AssignmentLost() bool {
+	args := m.Called()
+	return args.Get(0).(bool)
+}

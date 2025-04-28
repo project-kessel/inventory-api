@@ -434,22 +434,18 @@ func TestCommitStoredOffsets(t *testing.T) {
 		name          string
 		storedOffsets []kafka.TopicPartition
 		response      []kafka.TopicPartition
-		expected      []string
 	}{
 		{
-			name: "single stored offset is returned from offset commit",
+			name: "single stored offset is committed without error",
 			storedOffsets: []kafka.TopicPartition{
 				{Offset: kafka.Offset(10), Partition: 0},
 			},
 			response: []kafka.TopicPartition{
 				{Offset: kafka.Offset(10), Partition: 0},
-			},
-			expected: []string{
-				"[0:10]",
 			},
 		},
 		{
-			name: "all stored offsets are returned from offset commit",
+			name: "all stored offsets are committed without error",
 			storedOffsets: []kafka.TopicPartition{
 				{Offset: kafka.Offset(10), Partition: 0},
 				{Offset: kafka.Offset(11), Partition: 0},
@@ -469,9 +465,6 @@ func TestCommitStoredOffsets(t *testing.T) {
 				{Offset: kafka.Offset(2), Partition: 1},
 				{Offset: kafka.Offset(3), Partition: 1},
 				{Offset: kafka.Offset(4), Partition: 1},
-			},
-			expected: []string{
-				"[0:10]", "[0:11]", "[0:12]", "[0:13]", "[1:1]", "[1:2]", "[1:3]", "[1:4]",
 			},
 		},
 	}
@@ -485,9 +478,9 @@ func TestCommitStoredOffsets(t *testing.T) {
 			c.On("CommitOffsets", mock.Anything).Return(test.response, nil)
 			tester.inv.Consumer = c
 
-			committedOffsets, err := tester.inv.commitStoredOffsets()
+			err := tester.inv.commitStoredOffsets()
 			assert.Nil(t, err)
-			assert.Equal(t, test.expected, committedOffsets)
+			assert.Nil(t, tester.inv.OffsetStorage)
 		})
 	}
 }

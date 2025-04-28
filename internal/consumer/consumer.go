@@ -213,13 +213,11 @@ func (i *InventoryConsumer) Consume() error {
 				// store the current offset to be later batch committed
 				i.OffsetStorage = append(i.OffsetStorage, e.TopicPartition)
 				if checkIfCommit(e.TopicPartition) {
-					committedOffsets, err := i.commitStoredOffsets()
+					err := i.commitStoredOffsets()
 					if err != nil {
 						i.Logger.Errorf("failed to commit offsets: %v", err)
 						continue
 					}
-					i.Logger.Infof("offsets commited ([partition:offset]): %v", strings.Join(committedOffsets, ","))
-					i.OffsetStorage = nil
 				}
 				i.Logger.Infof("consumed event from topic %s, partition %d at offset %s",
 					*e.TopicPartition.Topic, e.TopicPartition.Partition, e.TopicPartition.Offset)
@@ -400,18 +398,25 @@ func checkIfCommit(partition kafka.TopicPartition) bool {
 	return partition.Offset%commitModulo == 0
 }
 
-// commitStoredOffsets commits offsets for all processed messages since last offset commit
-func (i *InventoryConsumer) commitStoredOffsets() ([]string, error) {
+// formatOffsets converts a slice of partitions with offset data into a more readable shorthand-coded string to capture what partitions and offsets were comitted
+func formatOffsets(offsets []kafka.TopicPartition) string {
 	var committedOffsets []string
-	committed, err := i.Consumer.CommitOffsets(i.OffsetStorage)
-	if err != nil {
-		return nil, err
-	}
-
-	for _, partition := range committed {
+	for _, partition := range offsets {
 		committedOffsets = append(committedOffsets, fmt.Sprintf("[%d:%s]", partition.Partition, partition.Offset.String()))
 	}
-	return committedOffsets, nil
+	return strings.Join(committedOffsets, ",")
+}
+
+// commitStoredOffsets commits offsets for all processed messages since last offset commit
+func (i *InventoryConsumer) commitStoredOffsets() error {
+	committed, err := i.Consumer.CommitOffsets(i.OffsetStorage)
+	if err != nil {
+		return err
+	}
+
+	i.Logger.Infof("offsets commited ([partition:offset]): %s", formatOffsets(committed))
+	i.OffsetStorage = nil
+	return nil
 }
 
 // CreateTuple calls the Relations API to create a tuple from the message payload received and returns the consistency token
@@ -484,11 +489,9 @@ func (i *InventoryConsumer) Shutdown() error {
 	if !i.Consumer.IsClosed() {
 		i.Logger.Info("shutting down consumer...")
 		if len(i.OffsetStorage) > 0 {
-			committedOffsets, err := i.commitStoredOffsets()
+			err := i.commitStoredOffsets()
 			if err != nil {
 				i.Logger.Errorf("failed to commit offsets before shutting down: %v", err)
-			} else {
-				i.Logger.Infof("offsets committed ([partition:offset]): %v", strings.Join(committedOffsets, ","))
 			}
 		}
 		err := i.Consumer.Close()
@@ -526,7 +529,7 @@ func (i *InventoryConsumer) Retry(operation func() (string, error)) (string, err
 }
 
 // RebalanceCallback logs when rebalance events occur and ensures any stored offsets are committed before losing the partition assignment. It is registered to the kafka 'SubscribeTopics' call and is invoked  automatically whenever rebalances occurs.
-// Note, the RebalanceCb function must satisfy the function type func(*Consumer, Event). This function does so, but the consumer embedded in the InventoryConsumer called versus the passed on which is the same consumer in either case.
+// Note, the RebalanceCb function must satisfy the function type func(*Consumer, Event). This function does so, but the consumer embedded in the InventoryConsumer is used versus the passed one which is the same consumer in either case.
 func (i *InventoryConsumer) RebalanceCallback(consumer *kafka.Consumer, event kafka.Event) error {
 	switch ev := event.(type) {
 	case kafka.AssignedPartitions:
@@ -540,13 +543,11 @@ func (i *InventoryConsumer) RebalanceCallback(consumer *kafka.Consumer, event ka
 		if i.Consumer.AssignmentLost() {
 			i.Logger.Warn("Assignment lost involuntarily, commit may fail")
 		}
-		committedOffsets, err := i.commitStoredOffsets()
+		err := i.commitStoredOffsets()
 		if err != nil {
 			i.Logger.Errorf("failed to commit offsets: %v", err)
 			return err
 		}
-		i.Logger.Infof("offsets committed ([partition:offset]): %v", strings.Join(committedOffsets, ","))
-		i.OffsetStorage = nil
 
 	default:
 		i.Logger.Error("Unxpected event type: %v", event)

@@ -1,20 +1,22 @@
 {
   "resource": {
-    "resource_type": "k8s_policy",
-    "reporter_data": {
-      "reporter_type": "ACM",
-      "reporter_instance_id": 25,
-      "reporter_version": "0.1",
-      "local_resource_id": "1",
-      "api_href": "www.example.com",
-      "console_href": "www.example.com",
-      "resource_data": {
+    "type": "k8s_policy",
+    "reporterType": "ACM",
+    "reporterInstanceId": "57a317b1-4040-4c26-8d41-dd589ba1d2eb",
+    "representations": {
+      "metadata": {
+        "localResourceId": "cdcebe29-67fb-4ac6-ba03-703a22ff4bc0",
+        "apiHref": "https://apiHref.com/",
+        "consoleHref": "https://www.console.com/",
+        "reporterVersion": "0.4.12"
+      },
+      "common": {
+        "workspace_id": "1c0753fe-48c1-44d8-823c-95d04cff5f91"
+      },
+      "reporter": {
         "disabled": true,
-        "severity": "MEDIUM"
+        "severity": "CRITICAL"
       }
-    },
-    "common_resource_data": {
-      "workspace_id": "01932c7e-e93e-719c-a488-3159877367b0"
     }
   }
 }

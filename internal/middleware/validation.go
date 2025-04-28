@@ -40,7 +40,7 @@ func Validation(validator protovalidate.Validator) middleware.Middleware {
 
 				switch v.(type) {
 				case *pbv1beta2.ReportResourceRequest:
-					if err := validateResourceReporterJSON(v); err != nil {
+					if err := validateReportResourceJSON(v); err != nil {
 						return nil, errors.BadRequest("REPORT_RESOURCE_JSON_VALIDATOR", err.Error()).WithCause(err)
 					}
 				case *pbv1beta2.DeleteResourceRequest:
@@ -54,7 +54,7 @@ func Validation(validator protovalidate.Validator) middleware.Middleware {
 	}
 }
 
-func validateResourceReporterJSON(msg proto.Message) error {
+func validateReportResourceJSON(msg proto.Message) error {
 	data, err := MarshalProtoToJSON(msg)
 	if err != nil {
 		return err
@@ -70,30 +70,43 @@ func validateResourceReporterJSON(msg proto.Message) error {
 		return err
 	}
 
-	resourceType, err := ExtractStringField(resource, "resourceType")
+	resourceType, err := ExtractStringField(resource, "type")
 	if err != nil {
 		return err
 	}
 
-	reporterData, err := ExtractMapField(resource, "reporterData")
+	reporterType, err := ExtractStringField(resource, "reporterType")
 	if err != nil {
 		return err
 	}
 
-	reporterType, err := ExtractStringField(reporterData, "reporterType")
+	resourceRepresentation, err := ExtractMapField(resource, "representations")
 	if err != nil {
 		return err
 	}
 
+	reporterRepresentation, err := ExtractMapField(resourceRepresentation, "reporter")
+	if err != nil {
+		return err
+	}
+
+	commonRepresentation, err := ExtractMapField(resourceRepresentation, "common")
+	if err != nil {
+		return err
+	}
+
+	// Validate the combination of resource_type and reporter_type e.g. k8s_cluster & ACM
 	if err := ValidateResourceReporterCombination(resourceType, reporterType); err != nil {
 		return err
 	}
 
-	if err := ValidateReporterResourceData(resourceType, reporterData); err != nil {
+	// Validate reporter-specific data
+	if err := ValidateReporterRepresentation(resourceType, reporterType, reporterRepresentation); err != nil {
 		return err
 	}
 
-	if err := ValidateCommonResourceData(resourceType, resource); err != nil {
+	// Validate common data
+	if err := ValidateCommonRepresentation(resourceType, commonRepresentation); err != nil {
 		return err
 	}
 

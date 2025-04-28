@@ -8,11 +8,13 @@ type Options struct {
 	SASLMechanism    string `mapstructure:"sasl-mechanism"`
 	SASLUsername     string `mapstructure:"sasl-username"`
 	SASLPassword     string `mapstructure:"sasl-password"`
+	CACert           string `mapstructure:"ca-cert"`
 }
 
 func NewOptions() *Options {
 	return &Options{
 		Enabled: false,
+		CACert:  "/etc/pki/tls/cert.pem",
 	}
 }
 
@@ -25,4 +27,5 @@ func (o *Options) AddFlags(fs *pflag.FlagSet, prefix string) {
 	fs.StringVar(&o.SASLMechanism, prefix+"sasl-mechanism", o.SASLMechanism, "sets the SASL mechanism")
 	fs.StringVar(&o.SASLUsername, prefix+"sasl-username", o.SASLUsername, "sets the username to use for authentication")
 	fs.StringVar(&o.SASLPassword, prefix+"sasl-password", o.SASLPassword, "sets the password to use for authentication")
+	fs.StringVar(&o.CACert, prefix+"ca-cert", o.CACert, "sets the file or directory path to CA certificate(s) for verifying the broker's key (default: /etc/pki/tls/cert.pem)")
 }

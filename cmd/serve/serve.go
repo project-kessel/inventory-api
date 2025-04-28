@@ -2,10 +2,15 @@ package serve
 
 import (
 	"context"
+	e "errors"
 	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
+
+	"github.com/project-kessel/inventory-api/internal/consistency"
+	"github.com/project-kessel/inventory-api/internal/consumer"
 
 	"github.com/project-kessel/inventory-api/cmd/common"
 	relationshipsctl "github.com/project-kessel/inventory-api/internal/biz/relationships"
@@ -13,11 +18,13 @@ import (
 	inventoryResourcesRepo "github.com/project-kessel/inventory-api/internal/data/inventoryresources"
 	relationshipsrepo "github.com/project-kessel/inventory-api/internal/data/relationships"
 	resourcerepo "github.com/project-kessel/inventory-api/internal/data/resources"
+	"github.com/project-kessel/inventory-api/internal/pubsub"
 	relationshipssvc "github.com/project-kessel/inventory-api/internal/service/relationships/k8spolicy"
 	hostssvc "github.com/project-kessel/inventory-api/internal/service/resources/hosts"
 	k8sclusterssvc "github.com/project-kessel/inventory-api/internal/service/resources/k8sclusters"
 	k8spoliciessvc "github.com/project-kessel/inventory-api/internal/service/resources/k8spolicies"
 	notifssvc "github.com/project-kessel/inventory-api/internal/service/resources/notificationsintegrations"
+
 	//v1beta2
 	resourcesvc "github.com/project-kessel/inventory-api/internal/service/resources"
 
@@ -51,6 +58,8 @@ func NewCommand(
 	authnOptions *authn.Options,
 	authzOptions *authz.Options,
 	eventingOptions *eventing.Options,
+	consumerOptions *consumer.Options,
+	consistencyOptions *consistency.Options,
 	loggerOptions common.LoggerOptions,
 ) *cobra.Command {
 	cmd := &cobra.Command{
@@ -59,6 +68,9 @@ func NewCommand(
 		RunE: func(cmd *cobra.Command, args []string) error {
 			_, logger := common.InitLogger(common.GetLogLevel(), loggerOptions)
 			ctx := context.Background()
+
+			var consumerConfig consumer.CompletedConfig
+			var inventoryConsumer consumer.InventoryConsumer
 
 			// configure storage
 			if errs := storageOptions.Complete(); errs != nil {
@@ -105,6 +117,34 @@ func NewCommand(
 				return errors.NewAggregate(errs)
 			}
 
+			// configure inventoryConsumer
+			if !storageOptions.DisablePersistence {
+				if errs := consumerOptions.Complete(); errs != nil {
+					return errors.NewAggregate(errs)
+				}
+				if errs := consumerOptions.Validate(); errs != nil {
+					return errors.NewAggregate(errs)
+				}
+				if consumerOptions.Enabled {
+					consumerConfig, errs = consumer.NewConfig(consumerOptions).Complete()
+					if errs != nil {
+						return errors.NewAggregate(errs)
+					}
+				}
+			}
+
+			// configure consistency
+			if errs := consistencyOptions.Complete(); errs != nil {
+				return errors.NewAggregate(errs)
+			}
+			if errs := consistencyOptions.Validate(); errs != nil {
+				return errors.NewAggregate(errs)
+			}
+			consistencyConfig, errs := consistency.NewConfig(consistencyOptions).Complete()
+			if errs != nil {
+				return errors.NewAggregate(errs)
+			}
+
 			// configure the server
 			if errs := serverOptions.Complete(); errs != nil {
 				return errors.NewAggregate(errs)
@@ -122,6 +162,39 @@ func NewCommand(
 			if err != nil {
 				return err
 			}
+
+			// START: construct pubsub (postgres only)
+			var listenManager *pubsub.ListenManager
+			var notifier *pubsub.PgxNotifier
+			listenManagerErr := make(chan error)
+			if storageConfig.Options.Database == "postgres" {
+				pubSubLogger := log.NewHelper(log.With(logger, "subsystem", "pubsub"))
+				pgxPool, err := storage.NewPgx(storageConfig, pubSubLogger)
+				if err != nil {
+					return err
+				}
+				listenerDriver := pubsub.NewPgxDriver(pgxPool)
+				if err := listenerDriver.Connect(ctx); err != nil {
+					return fmt.Errorf("error setting up listenerDriver: %v", err)
+				}
+				err = listenerDriver.Listen(ctx)
+				if err != nil {
+					return fmt.Errorf("error setting up listener: %v", err)
+				}
+				listenManager = pubsub.NewListenManager(pubSubLogger, listenerDriver)
+
+				go func() {
+					listenManagerErr <- listenManager.Run(ctx)
+				}()
+
+				// Run notifier on a separate connection, as the listener requires it's own
+				notifierDriver := pubsub.NewPgxDriver(pgxPool)
+				if err := notifierDriver.Connect(ctx); err != nil {
+					return fmt.Errorf("error setting up notifierDriver: %v", err)
+				}
+				notifier = pubsub.NewPgxNotifier(notifierDriver)
+			}
+			// STOP: construct pubsub
 
 			// construct authn
 			authenticator, err := authn.New(authnConfig, log.NewHelper(log.With(logger, "subsystem", "authn")))
@@ -154,54 +227,55 @@ func NewCommand(
 			//v1beta2
 			// wire together resource handling
 			resource_repo := resourcerepo.New(db)
-			resource_controller := resourcesctl.New(resource_repo, inventoryresources_repo, authorizer, eventingManager, "notifications", log.With(logger, "subsystem", "notificationsintegrations_controller"), storageConfig.Options.DisablePersistence)
+			resource_controller := resourcesctl.New(resource_repo, inventoryresources_repo, authorizer, eventingManager, "notifications", log.With(logger, "subsystem", "notificationsintegrations_controller"), storageConfig.Options.DisablePersistence, listenManager, consistencyConfig.ReadAfterWriteEnabled, consistencyConfig.ReadAfterWriteAllowlist)
 			resource_service := resourcesvc.NewKesselResourceServiceV1beta2(resource_controller)
 			pbv1beta2.RegisterKesselResourceServiceServer(server.GrpcServer, resource_service)
 			pbv1beta2.RegisterKesselResourceServiceHTTPServer(server.HttpServer, resource_service)
 
 			// wire together check service
-			check_controller := resourcesctl.New(resource_repo, inventoryresources_repo, authorizer, eventingManager, "authz", log.With(logger, "subsystem", "authz_controller"), storageConfig.Options.DisablePersistence)
+			check_controller := resourcesctl.New(resource_repo, inventoryresources_repo, authorizer, eventingManager, "authz", log.With(logger, "subsystem", "authz_controller"), storageConfig.Options.DisablePersistence, listenManager, consistencyConfig.ReadAfterWriteEnabled, consistencyConfig.ReadAfterWriteAllowlist)
 			check_service := resourcesvc.NewKesselCheckServiceV1beta2(check_controller)
 			pbv1beta2.RegisterKesselCheckServiceServer(server.GrpcServer, check_service)
 			pbv1beta2.RegisterKesselCheckServiceHTTPServer(server.HttpServer, check_service)
 
 			// wire together lookup service
-			streamedlist_controller := resourcesctl.New(resource_repo, inventoryresources_repo, authorizer, eventingManager, "authz", log.With(logger, "subsystem", "authz_controller"), storageConfig.Options.DisablePersistence)
+			streamedlist_controller := resourcesctl.New(resource_repo, inventoryresources_repo, authorizer, eventingManager, "authz", log.With(logger, "subsystem", "authz_controller"), storageConfig.Options.DisablePersistence, listenManager, consistencyConfig.ReadAfterWriteEnabled, consistencyConfig.ReadAfterWriteAllowlist)
 			streamedlist_service := resourcesvc.NewKesselLookupServiceV1beta2(streamedlist_controller)
 			pbv1beta2.RegisterKesselStreamedListServiceServer(server.GrpcServer, streamedlist_service)
+			//TODO: http service not getting generated
 
 			//v1beta1
 			// wire together notificationsintegrations handling
 			notifs_repo := resourcerepo.New(db)
-			notifs_controller := resourcesctl.New(notifs_repo, inventoryresources_repo, authorizer, eventingManager, "notifications", log.With(logger, "subsystem", "notificationsintegrations_controller"), storageConfig.Options.DisablePersistence)
+			notifs_controller := resourcesctl.New(notifs_repo, inventoryresources_repo, authorizer, eventingManager, "notifications", log.With(logger, "subsystem", "notificationsintegrations_controller"), storageConfig.Options.DisablePersistence, listenManager, consistencyConfig.ReadAfterWriteEnabled, consistencyConfig.ReadAfterWriteAllowlist)
 			notifs_service := notifssvc.NewKesselNotificationsIntegrationsServiceV1beta1(notifs_controller)
 			pb.RegisterKesselNotificationsIntegrationServiceServer(server.GrpcServer, notifs_service)
 			pb.RegisterKesselNotificationsIntegrationServiceHTTPServer(server.HttpServer, notifs_service)
 
 			// wire together authz handling
 			authz_repo := resourcerepo.New(db)
-			authz_controller := resourcesctl.New(authz_repo, inventoryresources_repo, authorizer, eventingManager, "authz", log.With(logger, "subsystem", "authz_controller"), storageConfig.Options.DisablePersistence)
+			authz_controller := resourcesctl.New(authz_repo, inventoryresources_repo, authorizer, eventingManager, "authz", log.With(logger, "subsystem", "authz_controller"), storageConfig.Options.DisablePersistence, listenManager, consistencyConfig.ReadAfterWriteEnabled, consistencyConfig.ReadAfterWriteAllowlist)
 			authz_service := resourcesvc.NewKesselCheckServiceV1beta1(authz_controller)
 			authzv1beta1.RegisterKesselCheckServiceServer(server.GrpcServer, authz_service)
 			authzv1beta1.RegisterKesselCheckServiceHTTPServer(server.HttpServer, authz_service)
 
 			// wire together hosts handling
 			hosts_repo := resourcerepo.New(db)
-			hosts_controller := resourcesctl.New(hosts_repo, inventoryresources_repo, authorizer, eventingManager, "hbi", log.With(logger, "subsystem", "hosts_controller"), storageConfig.Options.DisablePersistence)
+			hosts_controller := resourcesctl.New(hosts_repo, inventoryresources_repo, authorizer, eventingManager, "hbi", log.With(logger, "subsystem", "hosts_controller"), storageConfig.Options.DisablePersistence, listenManager, consistencyConfig.ReadAfterWriteEnabled, consistencyConfig.ReadAfterWriteAllowlist)
 			hosts_service := hostssvc.NewKesselRhelHostServiceV1beta1(hosts_controller)
 			pb.RegisterKesselRhelHostServiceServer(server.GrpcServer, hosts_service)
 			pb.RegisterKesselRhelHostServiceHTTPServer(server.HttpServer, hosts_service)
 
 			// wire together k8sclusters handling
 			k8sclusters_repo := resourcerepo.New(db)
-			k8sclusters_controller := resourcesctl.New(k8sclusters_repo, inventoryresources_repo, authorizer, eventingManager, "acm", log.With(logger, "subsystem", "k8sclusters_controller"), storageConfig.Options.DisablePersistence)
+			k8sclusters_controller := resourcesctl.New(k8sclusters_repo, inventoryresources_repo, authorizer, eventingManager, "acm", log.With(logger, "subsystem", "k8sclusters_controller"), storageConfig.Options.DisablePersistence, listenManager, consistencyConfig.ReadAfterWriteEnabled, consistencyConfig.ReadAfterWriteAllowlist)
 			k8sclusters_service := k8sclusterssvc.NewKesselK8SClusterServiceV1beta1(k8sclusters_controller)
 			pb.RegisterKesselK8SClusterServiceServer(server.GrpcServer, k8sclusters_service)
 			pb.RegisterKesselK8SClusterServiceHTTPServer(server.HttpServer, k8sclusters_service)
 
 			// wire together k8spolicies handling
 			k8spolicies_repo := resourcerepo.New(db)
-			k8spolicies_controller := resourcesctl.New(k8spolicies_repo, inventoryresources_repo, authorizer, eventingManager, "acm", log.With(logger, "subsystem", "k8spolicies_controller"), storageConfig.Options.DisablePersistence)
+			k8spolicies_controller := resourcesctl.New(k8spolicies_repo, inventoryresources_repo, authorizer, eventingManager, "acm", log.With(logger, "subsystem", "k8spolicies_controller"), storageConfig.Options.DisablePersistence, listenManager, consistencyConfig.ReadAfterWriteEnabled, consistencyConfig.ReadAfterWriteAllowlist)
 			k8spolicies_service := k8spoliciessvc.NewKesselK8SPolicyServiceV1beta1(k8spolicies_controller)
 			pb.RegisterKesselK8SPolicyServiceServer(server.GrpcServer, k8spolicies_service)
 			pb.RegisterKesselK8SPolicyServiceHTTPServer(server.HttpServer, k8spolicies_service)
@@ -224,18 +298,52 @@ func NewCommand(
 				srvErrs <- server.Run(ctx)
 			}()
 
+			shutdown := shutdown(db, server, eventingManager, &inventoryConsumer, log.NewHelper(logger))
+
+			if !storageOptions.DisablePersistence && consumerOptions.Enabled {
+				go func() {
+					retries := 0
+					for retries < consumerOptions.RetryOptions.ConsumerMaxRetries {
+						// If the consumer cannot process a message, the consumer loop is restarted
+						// This is to ensure we re-read the message and prevent it being dropped and moving to next message.
+						// To re-read the current message, we have to recreate the consumer connection so that the earliest offset is used
+						inventoryConsumer, err = consumer.New(consumerConfig, db, authzConfig, authorizer, notifier, log.NewHelper(log.With(logger, "subsystem", "inventoryConsumer")))
+						if err != nil {
+							shutdown(err)
+						}
+						err = inventoryConsumer.Consume()
+						if e.Is(err, consumer.ErrClosed) {
+							inventoryConsumer.Logger.Errorf("consumer unable to process current message -- restarting consumer")
+							retries++
+							if retries < consumerOptions.RetryOptions.ConsumerMaxRetries {
+								backoff := time.Duration(inventoryConsumer.RetryOptions.BackoffFactor*retries*300) * time.Millisecond
+								inventoryConsumer.Logger.Errorf("retrying in %v", backoff)
+								time.Sleep(backoff)
+							}
+							continue
+						} else {
+							inventoryConsumer.Logger.Errorf("consumer unable to process messages: %v", err)
+							shutdown(err)
+						}
+					}
+					shutdown(fmt.Errorf("consumer unable to process current message -- max retries reached"))
+				}()
+			}
+
 			quit := make(chan os.Signal, 1)
 			signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
-
-			shutdown := shutdown(db, server, eventingManager, log.NewHelper(logger))
 
 			select {
 			case err := <-srvErrs:
 				shutdown(err)
+			case lmErr := <-listenManagerErr:
+				shutdown(lmErr)
 			case sig := <-quit:
 				shutdown(sig)
 			case emErr := <-eventingManager.Errs():
 				shutdown(emErr)
+			case cmErr := <-inventoryConsumer.Errs():
+				shutdown(cmErr)
 			}
 			return nil
 		},
@@ -245,11 +353,12 @@ func NewCommand(
 	authnOptions.AddFlags(cmd.Flags(), "authn")
 	authzOptions.AddFlags(cmd.Flags(), "authz")
 	eventingOptions.AddFlags(cmd.Flags(), "eventing")
+	consumerOptions.AddFlags(cmd.Flags(), "consumer")
 
 	return cmd
 }
 
-func shutdown(db *gorm.DB, srv *server.Server, em eventingapi.Manager, logger *log.Helper) func(reason interface{}) {
+func shutdown(db *gorm.DB, srv *server.Server, em eventingapi.Manager, cm *consumer.InventoryConsumer, logger *log.Helper) func(reason interface{}) {
 	return func(reason interface{}) {
 		log.Info(fmt.Sprintf("Server Shutdown: %s", reason))
 
@@ -264,6 +373,19 @@ func shutdown(db *gorm.DB, srv *server.Server, em eventingapi.Manager, logger *l
 		defer cancel()
 		if err := em.Shutdown(ctx); err != nil {
 			logger.Error(fmt.Sprintf("Error Gracefully Shutting Down Eventing: %v", err))
+		}
+
+		if cm != nil {
+			defer func() {
+				err := cm.Shutdown()
+				if err != nil {
+					if e.Is(err, consumer.ErrClosed) {
+						logger.Warn("error shutting down consumer, consumer already closed")
+					} else {
+						logger.Error(fmt.Sprintf("Error Gracefully Shutting Down Consumer: %v", err))
+					}
+				}
+			}()
 		}
 
 		if sqlDB, err := db.DB(); err != nil {

@@ -28,5 +28,18 @@ spec:
               value: "kessel-inventory-service:8081"
             - name: KAFKA_BOOTSTRAP_SERVERS
               value: "my-cluster-kafka-bootstrap:9092"
+            - name: POSTGRES_HOST
+              value: "invdatabase"
+            - name: POSTGRES_PORT
+              value: "5433"
+            - name: POSTGRES_USER
+              value: "postgres"
+            - name: POSTGRES_DB
+              value: "spicedb"
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: inventory-api-config
+                  key: db_password
           command: ["/usr/local/bin/e2e-inventory-tests", "-test.v"]
       restartPolicy: Never

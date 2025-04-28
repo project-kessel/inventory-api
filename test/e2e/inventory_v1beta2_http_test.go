@@ -10,6 +10,7 @@ import (
 	"github.com/project-kessel/inventory-client-go/common"
 	v1beta2 "github.com/project-kessel/inventory-client-go/v1beta2"
 	"github.com/stretchr/testify/assert"
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
@@ -25,29 +26,37 @@ func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_Host(t *testing.T) {
 	client, err := v1beta2.NewHttpClient(context.Background(), c)
 	assert.NoError(t, err, "Failed to create v1beta2 HTTP client")
 
-	resourceData := &structpb.Struct{}
-	commonData := &structpb.Struct{}
-
-	commonData.Fields = map[string]*structpb.Value{
-		"workspace_id": structpb.NewStringValue("workspace-v2"),
-	}
+	reporterStruct, err := structpb.NewStruct(map[string]interface{}{
+		"satellite_id":          "550e8400-e29b-41d4-a716-446655440000",
+		"sub_manager_id":        "550e8400-e29b-41d4-a716-446655440000",
+		"insights_inventory_id": "550e8400-e29b-41d4-a716-446655440000",
+		"ansible_host":          "abc",
+	})
+	assert.NoError(t, err, "Failed to create structpb for host reporter")
 
 	req := pbv1beta2.ReportResourceRequest{
 		WaitForSync: false,
 		Resource: &pbv1beta2.Resource{
-			ResourceType: "host",
-			ReporterData: &pbv1beta2.ReporterData{
-				ReporterType:       "HBI",
-				ReporterInstanceId: "testuser@example.com",
-				ReporterVersion:    "0.1",
-				LocalResourceId:    "host-abc-123",
-				ApiHref:            "https://example.com/api",
-				ConsoleHref:        "https://example.com/console",
-				ResourceData:       resourceData,
+			Type:               "host",
+			ReporterType:       "HBI",
+			ReporterInstanceId: "testuser@example.com",
+			Representations: &pbv1beta2.ResourceRepresentations{
+				Metadata: &pbv1beta2.RepresentationMetadata{
+					LocalResourceId: "host-abc-123",
+					ApiHref:         "https://example.com/api",
+					ConsoleHref:     proto.String("https://example.com/console"),
+					ReporterVersion: proto.String("0.1"),
+				},
+				Common: &structpb.Struct{
+					Fields: map[string]*structpb.Value{
+						"workspace_id": structpb.NewStringValue("workspace-v2"),
+					},
+				},
+				Reporter: reporterStruct,
 			},
-			CommonResourceData: commonData,
 		},
 	}
+
 	opts := getCallOptions()
 	_, err = client.KesselResourceService.ReportResource(context.Background(), &req, opts...)
 	assert.NoError(t, err, "Failed to Report Resource")
@@ -74,28 +83,36 @@ func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_Notifications(t *testing.T) 
 	client, err := v1beta2.NewHttpClient(context.Background(), c)
 	assert.NoError(t, err, "Failed to create v1beta2 HTTP client")
 
-	resourceData := &structpb.Struct{}
-	commonData := &structpb.Struct{}
-
-	commonData.Fields = map[string]*structpb.Value{
-		"workspace_id": structpb.NewStringValue("workspace-v2"),
-	}
+	// will likely change the notifications json schema, this is here to satisfy validation
+	reporterStruct, err := structpb.NewStruct(map[string]interface{}{
+		"reporter_type":        "NOTIFICATIONS",
+		"reporter_instance_id": "testuser@example.com",
+		"local_resource_id":    "notification-abc-123",
+	})
+	assert.NoError(t, err, "Failed to create structpb for reporter")
 
 	req := pbv1beta2.ReportResourceRequest{
 		Resource: &pbv1beta2.Resource{
-			ResourceType: "notifications_integration",
-			ReporterData: &pbv1beta2.ReporterData{
-				ReporterType:       "NOTIFICATIONS",
-				ReporterInstanceId: "testuser@example.com",
-				ReporterVersion:    "0.1",
-				LocalResourceId:    "notification-abc-123",
-				ApiHref:            "https://example.com/api",
-				ConsoleHref:        "https://example.com/console",
-				ResourceData:       resourceData,
+			Type:               "notifications_integration",
+			ReporterType:       "NOTIFICATIONS",
+			ReporterInstanceId: "testuser@example.com",
+			Representations: &pbv1beta2.ResourceRepresentations{
+				Metadata: &pbv1beta2.RepresentationMetadata{
+					LocalResourceId: "notification-abc-123",
+					ApiHref:         "https://example.com/api",
+					ConsoleHref:     proto.String("https://example.com/console"),
+					ReporterVersion: proto.String("0.1"),
+				},
+				Common: &structpb.Struct{
+					Fields: map[string]*structpb.Value{
+						"workspace_id": structpb.NewStringValue("workspace-v2"),
+					},
+				},
+				Reporter: reporterStruct, // Notifications may not require a reporter block
 			},
-			CommonResourceData: commonData,
 		},
 	}
+
 	opts := getCallOptions()
 	_, err = client.KesselResourceService.ReportResource(context.Background(), &req, opts...)
 	assert.NoError(t, err, "Failed to Report Resource")
@@ -122,28 +139,39 @@ func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_K8S_Cluster(t *testing.T) {
 	client, err := v1beta2.NewHttpClient(context.Background(), c)
 	assert.NoError(t, err, "Failed to create v1beta2 HTTP client")
 
-	resourceData := &structpb.Struct{}
-	commonData := &structpb.Struct{}
-
-	commonData.Fields = map[string]*structpb.Value{
-		"workspace_id": structpb.NewStringValue("workspace-v2"),
-	}
+	reporterStruct, err := structpb.NewStruct(map[string]interface{}{
+		"external_cluster_id": "abcd-efgh-1234",
+		"cluster_status":      "READY",
+		"cluster_reason":      "All systems operational",
+		"kube_version":        "1.31",
+		"kube_vendor":         "OPENSHIFT",
+		"vendor_version":      "4.16",
+		"cloud_platform":      "AWS_UPI",
+	})
+	assert.NoError(t, err, "Failed to create structpb for cluster reporter")
 
 	req := pbv1beta2.ReportResourceRequest{
 		Resource: &pbv1beta2.Resource{
-			ResourceType: "k8s_cluster",
-			ReporterData: &pbv1beta2.ReporterData{
-				ReporterType:       "ACM",
-				ReporterInstanceId: "testuser@example.com",
-				ReporterVersion:    "0.1",
-				LocalResourceId:    "k8s_cluster-abc-123",
-				ApiHref:            "https://example.com/api",
-				ConsoleHref:        "https://example.com/console",
-				ResourceData:       resourceData,
+			Type:               "k8s_cluster",
+			ReporterType:       "ACM",
+			ReporterInstanceId: "testuser@example.com",
+			Representations: &pbv1beta2.ResourceRepresentations{
+				Metadata: &pbv1beta2.RepresentationMetadata{
+					LocalResourceId: "k8s_cluster-abc-123",
+					ApiHref:         "https://example.com/api",
+					ConsoleHref:     proto.String("https://example.com/console"),
+					ReporterVersion: proto.String("0.1"),
+				},
+				Common: &structpb.Struct{
+					Fields: map[string]*structpb.Value{
+						"workspace_id": structpb.NewStringValue("workspace-v2"),
+					},
+				},
+				Reporter: reporterStruct,
 			},
-			CommonResourceData: commonData,
 		},
 	}
+
 	opts := getCallOptions()
 	_, err = client.KesselResourceService.ReportResource(context.Background(), &req, opts...)
 	assert.NoError(t, err, "Failed to Report Resource")
@@ -170,28 +198,34 @@ func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_K8S_Policy(t *testing.T) {
 	client, err := v1beta2.NewHttpClient(context.Background(), c)
 	assert.NoError(t, err, "Failed to create v1beta2 HTTP client")
 
-	resourceData := &structpb.Struct{}
-	commonData := &structpb.Struct{}
-
-	commonData.Fields = map[string]*structpb.Value{
-		"workspace_id": structpb.NewStringValue("workspace-v2"),
-	}
+	reporterStruct, err := structpb.NewStruct(map[string]interface{}{
+		"disabled": true,
+		"severity": "MEDIUM",
+	})
+	assert.NoError(t, err, "Failed to create structpb for reporter")
 
 	req := pbv1beta2.ReportResourceRequest{
 		Resource: &pbv1beta2.Resource{
-			ResourceType: "k8s_policy",
-			ReporterData: &pbv1beta2.ReporterData{
-				ReporterType:       "ACM",
-				ReporterInstanceId: "testuser@example.com",
-				ReporterVersion:    "0.1",
-				LocalResourceId:    "k8s_policy-abc-123",
-				ApiHref:            "https://example.com/api",
-				ConsoleHref:        "https://example.com/console",
-				ResourceData:       resourceData,
+			Type:               "k8s_policy",
+			ReporterType:       "ACM",
+			ReporterInstanceId: "testuser@example.com",
+			Representations: &pbv1beta2.ResourceRepresentations{
+				Metadata: &pbv1beta2.RepresentationMetadata{
+					LocalResourceId: "k8s_policy-abc-123",
+					ApiHref:         "https://example.com/api",
+					ConsoleHref:     proto.String("https://example.com/console"),
+					ReporterVersion: proto.String("0.1"),
+				},
+				Common: &structpb.Struct{
+					Fields: map[string]*structpb.Value{
+						"workspace_id": structpb.NewStringValue("workspace-123"),
+					},
+				},
+				Reporter: reporterStruct,
 			},
-			CommonResourceData: commonData,
 		},
 	}
+
 	opts := getCallOptions()
 	_, err = client.KesselResourceService.ReportResource(context.Background(), &req, opts...)
 	assert.NoError(t, err, "Failed to Report Resource")
@@ -221,28 +255,28 @@ func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_K8S_Policy(t *testing.T) {
 //	ctx := context.Background()
 //
 //	subject := &pbv1beta2.SubjectReference{
-//		Subject: &pbv1beta2.ObjectReference{
-//			Type: &pbv1beta2.ObjectType{
-//				Namespace: "rbac",
-//				Name:      "principal",
+//		Resource: &pbv1beta2.ResourceReference{
+//			ResourceId:   "bob",
+//			ResourceType: "principal",
+//			Reporter: &pbv1beta2.ReporterReference{
+//				Type: "rbac",
 //			},
-//			Id: "bob",
 //		},
 //	}
 //
-//	parent := &pbv1beta2.ObjectReference{
-//		Type: &pbv1beta2.ObjectType{
-//			Namespace: "rbac",
-//			Name:      "group",
+//	parent := &pbv1beta2.ResourceReference{
+//		ResourceId: "bob_club",
+//		Reporter: &pbv1beta2.ReporterReference{
+//			Type: "rbac",
 //		},
-//		Id: "bob_club",
+//		ResourceType: "group",
 //	}
 //
 //	// /authz/check
 //	checkReq := &pbv1beta2.CheckRequest{
 //		Subject:  subject,
 //		Relation: "member",
-//		Parent:   parent,
+//		Object:   parent,
 //	}
 //
 //	checkResp, err := client.KesselCheckService.Check(ctx, checkReq)
@@ -254,7 +288,7 @@ func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_K8S_Policy(t *testing.T) {
 //	checkUpdateReq := &pbv1beta2.CheckForUpdateRequest{
 //		Subject:  subject,
 //		Relation: "member",
-//		Parent:   parent,
+//		Object:   parent,
 //	}
 //
 //	checkUpdateResp, err := client.KesselCheckService.CheckForUpdate(ctx, checkUpdateReq)

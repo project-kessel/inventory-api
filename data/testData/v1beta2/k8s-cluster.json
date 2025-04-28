@@ -1,38 +1,34 @@
 {
   "resource": {
-    "resource_type": "k8s_cluster",
-    "reporter_data": {
-      "reporter_type": "ACM",
-      "reporter_instance_id": 25,
-      "reporter_version": "0.1",
-      "local_resource_id": "2",
-      "api_href": "www.example.com",
-      "console_href": "www.example.com",
-      "resource_data": {
-        "external_cluster_id": "1234",
+    "type": "k8s_cluster",
+    "reporterType": "ACM",
+    "reporterInstanceId": "14c6b63e-49b2-4cc2-99de-5d914b657548",
+    "representations": {
+      "metadata": {
+        "localResourceId": "ae5c7a82-cb3b-4591-9b10-3ae1506d4f3d",
+        "apiHref": "https://apiHref.com/",
+        "consoleHref": "https://www.console.com/",
+        "reporterVersion": "0.2.0"
+      },
+      "common": {
+        "workspace_id": "aee8f698-9d43-49a1-b458-680a7c9dc046"
+      },
+      "reporter": {
+        "external_cluster_id": "9414df93-aefe-4153-ba8a-8765373d39b9",
         "cluster_status": "READY",
-        "kube_version": "1.31",
-        "kube_vendor": "OPENSHIFT",
-        "vendor_version": "4.16",
-        "cloud_platform": "AWS_UPI",
-        "cluster_reason": "some reason",
+        "cluster_reason": "reflect",
+        "kube_version": "2.7.0",
+        "kube_vendor": "KUBE_VENDOR_UNSPECIFIED",
+        "vendor_version": "3.3.1",
+        "cloud_platform": "BAREMETAL_IPI",
         "nodes": [
           {
             "name": "www.example.com",
             "cpu": "7500m",
-            "memory": "30973224Ki",
-            "labels": [
-              {
-                "key": "has_monster_gpu",
-                "value": "yes"
-              }
-            ]
+            "memory": "30973224Ki"
           }
         ]
       }
-    },
-    "common_resource_data" : {
-      "workspace_id" : "123"
     }
   }
 }

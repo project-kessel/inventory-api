@@ -3,7 +3,6 @@ package resources
 import (
 	"context"
 	"fmt"
-
 	"github.com/go-kratos/kratos/v2/log"
 	authnapi "github.com/project-kessel/inventory-api/internal/authn/api"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
@@ -35,7 +34,7 @@ func (c *ResourceService) ReportResource(ctx context.Context, r *pb.ReportResour
 	if err != nil {
 		return nil, err
 	}
-	_, err = c.Ctl.Upsert(ctx, resource, r.GetWaitForSync())
+	_, err = c.Ctl.Upsert(ctx, resource)
 	log.Info()
 	if err != nil {
 		return nil, err

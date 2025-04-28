@@ -19,6 +19,7 @@ func Migrate(db *gorm.DB, logger *log.Helper) error {
 		&model.RelationshipHistory{},
 		&model.LocalInventoryToResource{}, // Deprecated
 		&model.InventoryResource{},
+		&model.OutboxEvent{},
 	}
 
 	if err := db.AutoMigrate(models...); err != nil {

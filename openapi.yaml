@@ -1340,26 +1340,12 @@ components:
             properties:
                 resource:
                     $ref: '#/components/schemas/kessel.inventory.v1beta2.Resource'
+                waitForSync:
+                    type: boolean
+                    description: Will wait for synchronous processes to complete before returning
         kessel.inventory.v1beta2.ReportResourceResponse:
             type: object
             properties: {}
-        kessel.inventory.v1beta2.ReporterData:
-            type: object
-            properties:
-                reporterType:
-                    type: string
-                reporterInstanceId:
-                    type: string
-                reporterVersion:
-                    type: string
-                localResourceId:
-                    type: string
-                apiHref:
-                    type: string
-                consoleHref:
-                    type: string
-                resourceData:
-                    type: object
         kessel.inventory.v1beta2.ReporterReference:
             type: object
             properties:
@@ -1367,17 +1353,30 @@ components:
                     type: string
                 instanceId:
                     type: string
+        kessel.inventory.v1beta2.RepresentationMetadata:
+            type: object
+            properties:
+                localResourceId:
+                    type: string
+                apiHref:
+                    type: string
+                consoleHref:
+                    type: string
+                reporterVersion:
+                    type: string
         kessel.inventory.v1beta2.Resource:
             type: object
             properties:
                 inventoryId:
                     type: string
-                resourceType:
+                type:
                     type: string
-                reporterData:
-                    $ref: '#/components/schemas/kessel.inventory.v1beta2.ReporterData'
-                commonResourceData:
-                    type: object
+                reporterType:
+                    type: string
+                reporterInstanceId:
+                    type: string
+                representations:
+                    $ref: '#/components/schemas/kessel.inventory.v1beta2.ResourceRepresentations'
         kessel.inventory.v1beta2.ResourceReference:
             type: object
             properties:
@@ -1387,6 +1386,15 @@ components:
                     type: string
                 reporter:
                     $ref: '#/components/schemas/kessel.inventory.v1beta2.ReporterReference'
+        kessel.inventory.v1beta2.ResourceRepresentations:
+            type: object
+            properties:
+                metadata:
+                    $ref: '#/components/schemas/kessel.inventory.v1beta2.RepresentationMetadata'
+                common:
+                    type: object
+                reporter:
+                    type: object
         kessel.inventory.v1beta2.ResponsePagination:
             type: object
             properties:

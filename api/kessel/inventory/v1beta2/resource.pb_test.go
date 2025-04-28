@@ -3,6 +3,7 @@ package v1beta2
 import (
 	"fmt"
 	"github.com/stretchr/testify/assert"
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/structpb"
 	"strings"
 	"testing"
@@ -14,43 +15,37 @@ func ValidateResourceRequest(req *ReportResourceRequest) error {
 		return fmt.Errorf("resource request is nil or missing")
 	}
 
-	// Validate Resource Type
-	if req.Resource.ResourceType == "" {
+	resource := req.Resource
+
+	// Validate required top-level fields
+	if strings.TrimSpace(resource.Type) == "" {
 		return fmt.Errorf("resource_type is required")
 	}
-
-	// Validate Reporter Data
-	if err := validateReporterData(req.Resource.ReporterData); err != nil {
-		return fmt.Errorf("invalid reporter_data: %w", err)
+	if strings.TrimSpace(resource.ReporterType) == "" {
+		return fmt.Errorf("reporter_type is required")
+	}
+	if strings.TrimSpace(resource.ReporterInstanceId) == "" {
+		return fmt.Errorf("reporter_instance_id is required")
 	}
 
-	// Validate Common Resource Data
-	if err := validateCommonResourceData(req.Resource.CommonResourceData); err != nil {
+	// Validate metadata
+	metadata := resource.Representations.GetMetadata()
+	if metadata == nil {
+		return fmt.Errorf("representation_metadata is required")
+	}
+	if metadata.LocalResourceId == "" {
+		return fmt.Errorf("local_resource_id is required")
+	}
+	if metadata.ApiHref == "" {
+		return fmt.Errorf("api_href is required")
+	}
+	if metadata.ConsoleHref == proto.String("") {
+		return fmt.Errorf("console_href is required")
+	}
+
+	// Validate common data
+	if err := validateCommonResourceData(resource.Representations.GetCommon()); err != nil {
 		return fmt.Errorf("invalid common_resource_data: %w", err)
-	}
-
-	return nil
-}
-
-// Validate ReporterData structure
-func validateReporterData(reporter *ReporterData) error {
-	if reporter == nil {
-		return fmt.Errorf("reporter_data is required")
-	}
-
-	// Required string fields
-	requiredFields := map[string]string{
-		"reporter_type":        reporter.ReporterType,
-		"reporter_instance_id": reporter.ReporterInstanceId,
-		"local_resource_id":    reporter.LocalResourceId,
-		"api_href":             reporter.ApiHref,
-		"console_href":         reporter.ConsoleHref,
-	}
-
-	for field, value := range requiredFields {
-		if value == "" {
-			return fmt.Errorf("%s is required", field)
-		}
 	}
 
 	return nil
@@ -100,48 +95,63 @@ func TestResourceValidation(t *testing.T) {
 	}{
 		// Valid RHEL Host
 		{
-			name: "Valid RHEL Host",
+			name: "Valid RHEL Host with Reporter Data",
 			request: &ReportResourceRequest{
 				Resource: &Resource{
-					ResourceType: "rhel_host",
-					ReporterData: &ReporterData{
-						ReporterType:       "HBI",
-						ReporterInstanceId: "user@example.com",
-						LocalResourceId:    "0123",
-						ApiHref:            "www.example.com",
-						ConsoleHref:        "www.example.com",
-					},
-					CommonResourceData: &structpb.Struct{
-						Fields: map[string]*structpb.Value{
-							"workspace_id": {Kind: &structpb.Value_StringValue{StringValue: "workspace"}},
+					Type:               "rhel_host",
+					ReporterType:       "HBI",
+					ReporterInstanceId: "user@example.com",
+					Representations: &ResourceRepresentations{
+						Metadata: &RepresentationMetadata{
+							LocalResourceId: "0123",
+							ApiHref:         "https://api.example.com",
+							ConsoleHref:     proto.String("https://console.example.com"),
+							ReporterVersion: proto.String("q"),
+						},
+						Common: &structpb.Struct{
+							Fields: map[string]*structpb.Value{
+								"workspace_id": structpb.NewStringValue("workspace-abc"),
+							},
+						},
+						Reporter: &structpb.Struct{
+							Fields: map[string]*structpb.Value{
+								"satellite_id":          structpb.NewStringValue("f47ac10b-58cc-4372-a567-0e02b2c3d479"),
+								"sub_manager_id":        structpb.NewStringValue("6fa459ea-ee8a-3ca4-894e-db77e160355e"),
+								"insights_inventory_id": structpb.NewStringValue("1c6fb7dc-34dd-4ea5-a3a6-073acc33107b"),
+								"ansible_host":          structpb.NewStringValue("host.example.com"),
+							},
 						},
 					},
 				},
 			},
 			expectErr: false,
 		},
+
 		// Valid K8s Cluster
 		{
 			name: "Valid K8s Cluster",
 			request: &ReportResourceRequest{
 				Resource: &Resource{
-					ResourceType: "k8s_cluster",
-					ReporterData: &ReporterData{
-						ReporterType:       "OCM",
-						ReporterInstanceId: "user@example.com",
-						LocalResourceId:    "cluster-123",
-						ApiHref:            "www.example.com",
-						ConsoleHref:        "www.example.com",
-						ResourceData: &structpb.Struct{
+					Type:               "k8s_cluster",
+					ReporterType:       "OCM",
+					ReporterInstanceId: "user@example.com",
+					Representations: &ResourceRepresentations{
+						Metadata: &RepresentationMetadata{
+							LocalResourceId: "cluster-123",
+							ApiHref:         "https://api.example.com",
+							ConsoleHref:     proto.String("https://console.example.com"),
+							ReporterVersion: proto.String("1.0.0"),
+						},
+						Common: &structpb.Struct{
 							Fields: map[string]*structpb.Value{
-								"external_cluster_id": {Kind: &structpb.Value_StringValue{StringValue: "abcd-efgh-1234"}},
-								"cluster_status":      {Kind: &structpb.Value_StringValue{StringValue: "READY"}},
+								"workspace_id": structpb.NewStringValue("workspace"),
 							},
 						},
-					},
-					CommonResourceData: &structpb.Struct{
-						Fields: map[string]*structpb.Value{
-							"workspace_id": {Kind: &structpb.Value_StringValue{StringValue: "workspace"}},
+						Reporter: &structpb.Struct{
+							Fields: map[string]*structpb.Value{
+								"external_cluster_id": structpb.NewStringValue("abcd-efgh-1234"),
+								"cluster_status":      structpb.NewStringValue("READY"),
+							},
 						},
 					},
 				},
@@ -149,89 +159,104 @@ func TestResourceValidation(t *testing.T) {
 			expectErr: false,
 		},
 
-		// Valid RHEL Host (No `resource_data` required)
+		// Valid RHEL Host (No `reporter` required)
 		{
-			name: "Valid RHEL Host",
+			name: "Valid RHEL Host (No Reporter Data)",
 			request: &ReportResourceRequest{
 				Resource: &Resource{
-					ResourceType: "rhel_host",
-					ReporterData: &ReporterData{
-						ReporterType:       "HBI",
-						ReporterInstanceId: "org-123",
-						LocalResourceId:    "rhel-host-001",
-						ApiHref:            "https://api.rhel.example.com",
-						ConsoleHref:        "https://console.rhel.example.com",
-					},
-					CommonResourceData: &structpb.Struct{
-						Fields: map[string]*structpb.Value{
-							"workspace_id": {Kind: &structpb.Value_StringValue{StringValue: "ws-456"}},
+					Type:               "rhel_host",
+					ReporterType:       "HBI",
+					ReporterInstanceId: "org-123",
+					Representations: &ResourceRepresentations{
+						Metadata: &RepresentationMetadata{
+							LocalResourceId: "rhel-host-001",
+							ApiHref:         "https://api.rhel.example.com",
+							ConsoleHref:     proto.String("https://console.rhel.example.com"),
+							ReporterVersion: proto.String("1.0.0"),
+						},
+						Common: &structpb.Struct{
+							Fields: map[string]*structpb.Value{
+								"workspace_id": structpb.NewStringValue("ws-456"),
+							},
 						},
 					},
 				},
 			},
 			expectErr: false,
 		},
+
 		// Valid Notifications Integration
 		{
 			name: "Valid Notifications Integration",
 			request: &ReportResourceRequest{
 				Resource: &Resource{
-					ResourceType: "notifications_integration",
-					ReporterData: &ReporterData{
-						ReporterType:       "NOTIFICATIONS",
-						ReporterInstanceId: "1",
-						LocalResourceId:    "notifications-001",
-						ApiHref:            "https://api.notifications.example.com",
-						ConsoleHref:        "https://console.notifications.example.com",
-					},
-					CommonResourceData: &structpb.Struct{
-						Fields: map[string]*structpb.Value{
-							"workspace_id": {Kind: &structpb.Value_StringValue{StringValue: "ws-456"}},
+					Type:               "notifications_integration",
+					ReporterType:       "NOTIFICATIONS",
+					ReporterInstanceId: "1",
+					Representations: &ResourceRepresentations{
+						Metadata: &RepresentationMetadata{
+							LocalResourceId: "notifications-001",
+							ApiHref:         "https://api.notifications.example.com",
+							ConsoleHref:     proto.String("https://console.notifications.example.com"),
+							ReporterVersion: proto.String("1.0.0"),
+						},
+						Common: &structpb.Struct{
+							Fields: map[string]*structpb.Value{
+								"workspace_id": structpb.NewStringValue("ws-456"),
+							},
 						},
 					},
 				},
 			},
 			expectErr: false,
 		},
-		// Valid RHEL Host w/ inventory_id
+
+		// Valid k8s_cluster w/ inventory_id
 		{
-			name: "Valid K8s_cluster",
+			name: "Valid K8s Cluster with Inventory ID",
 			request: &ReportResourceRequest{
 				Resource: &Resource{
-					InventoryId:  "12",
-					ResourceType: "k8s_cluster",
-					ReporterData: &ReporterData{
-						ReporterType:       "ACM",
-						ReporterInstanceId: "user@example.com",
-						LocalResourceId:    "0123",
-						ApiHref:            "www.example.com",
-						ConsoleHref:        "www.example.com",
-					},
-					CommonResourceData: &structpb.Struct{
-						Fields: map[string]*structpb.Value{
-							"workspace_id": {Kind: &structpb.Value_StringValue{StringValue: "workspace"}},
+					InventoryId:        proto.String("12"),
+					Type:               "k8s_cluster",
+					ReporterType:       "ACM",
+					ReporterInstanceId: "user@example.com",
+					Representations: &ResourceRepresentations{
+						Metadata: &RepresentationMetadata{
+							LocalResourceId: "0123",
+							ApiHref:         "https://api.example.com",
+							ConsoleHref:     proto.String("https://console.example.com"),
+							ReporterVersion: proto.String("1.0.0"),
+						},
+						Common: &structpb.Struct{
+							Fields: map[string]*structpb.Value{
+								"workspace_id": structpb.NewStringValue("workspace"),
+							},
 						},
 					},
 				},
 			},
 			expectErr: false,
 		},
-		// Missing `ResourceType`
+
+		// Missing ReporterType
 		{
-			name: "Missing resource_type",
+			name: "Missing ReporterType",
 			request: &ReportResourceRequest{
 				Resource: &Resource{
-					ResourceType: "", // Missing
-					ReporterData: &ReporterData{
-						ReporterType:       "HBI",
-						ReporterInstanceId: "org-123",
-						LocalResourceId:    "rhel-host-001",
-						ApiHref:            "https://api.rhel.example.com",
-						ConsoleHref:        "https://console.rhel.example.com",
-					},
-					CommonResourceData: &structpb.Struct{
-						Fields: map[string]*structpb.Value{
-							"workspace_id": {Kind: &structpb.Value_StringValue{StringValue: "ws-456"}},
+					Type:               "k8s_cluster",
+					ReporterType:       "", // Missing
+					ReporterInstanceId: "user@example.com",
+					Representations: &ResourceRepresentations{
+						Metadata: &RepresentationMetadata{
+							LocalResourceId: "0123",
+							ApiHref:         "https://api.example.com",
+							ConsoleHref:     proto.String("https://console.example.com"),
+							ReporterVersion: proto.String("1.0.0"),
+						},
+						Common: &structpb.Struct{
+							Fields: map[string]*structpb.Value{
+								"workspace_id": structpb.NewStringValue("workspace"),
+							},
 						},
 					},
 				},
@@ -239,44 +264,25 @@ func TestResourceValidation(t *testing.T) {
 			expectErr: true,
 		},
 
-		// Missing `ReporterType`
+		// Missing ResourceType
 		{
 			name: "Missing ResourceType",
 			request: &ReportResourceRequest{
 				Resource: &Resource{
-					ResourceType: "k8s_cluster",
-					ReporterData: &ReporterData{
-						ReporterType:       "", // Missing
-						ReporterInstanceId: "user@example.com",
-						LocalResourceId:    "cluster-123",
-						ApiHref:            "www.example.com",
-						ConsoleHref:        "www.example.com",
-					},
-					CommonResourceData: &structpb.Struct{
-						Fields: map[string]*structpb.Value{
-							"workspace_id": {Kind: &structpb.Value_StringValue{StringValue: "workspace"}},
+					Type:               "", // Missing
+					ReporterType:       "ACM",
+					ReporterInstanceId: "user@example.com",
+					Representations: &ResourceRepresentations{
+						Metadata: &RepresentationMetadata{
+							LocalResourceId: "0123",
+							ApiHref:         "https://api.example.com",
+							ConsoleHref:     proto.String("https://console.example.com"),
+							ReporterVersion: proto.String("1.0.0"),
 						},
-					},
-				},
-			},
-			expectErr: true,
-		},
-		// Missing `ReporterInstanceId`
-		{
-			name: "Missing ReporterInstanceId",
-			request: &ReportResourceRequest{
-				Resource: &Resource{
-					ResourceType: "rhel_host",
-					ReporterData: &ReporterData{
-						ReporterType:       "HBI",
-						ReporterInstanceId: "",
-						LocalResourceId:    "rhel-host-001",
-						ApiHref:            "https://api.rhel.example.com",
-						ConsoleHref:        "https://console.rhel.example.com",
-					},
-					CommonResourceData: &structpb.Struct{
-						Fields: map[string]*structpb.Value{
-							"workspace_id": {Kind: &structpb.Value_StringValue{StringValue: "ws-456"}},
+						Common: &structpb.Struct{
+							Fields: map[string]*structpb.Value{
+								"workspace_id": structpb.NewStringValue("workspace"),
+							},
 						},
 					},
 				},
@@ -288,81 +294,66 @@ func TestResourceValidation(t *testing.T) {
 			name: "Missing LocalResourceId",
 			request: &ReportResourceRequest{
 				Resource: &Resource{
-					ResourceType: "rhel_host",
-					ReporterData: &ReporterData{
-						ReporterType:       "HBI",
-						ReporterInstanceId: "user@example.com",
-						LocalResourceId:    "",
-						ApiHref:            "https://api.rhel.example.com",
-						ConsoleHref:        "https://console.rhel.example.com",
-					},
-					CommonResourceData: &structpb.Struct{
-						Fields: map[string]*structpb.Value{
-							"workspace_id": {Kind: &structpb.Value_StringValue{StringValue: "ws-456"}},
+					Type:               "k8s_cluster",
+					ReporterType:       "OCM", // Missing
+					ReporterInstanceId: "user@example.com",
+					Representations: &ResourceRepresentations{
+						Metadata: &RepresentationMetadata{
+							ApiHref:         "https://api.example.com",
+							ConsoleHref:     proto.String("https://console.example.com"),
+							ReporterVersion: proto.String("1.0.0"),
+						},
+						Common: &structpb.Struct{
+							Fields: map[string]*structpb.Value{
+								"workspace_id": structpb.NewStringValue("workspace"),
+							},
 						},
 					},
 				},
 			},
 			expectErr: true,
 		},
+
 		// Missing `ApiHref`
 		{
 			name: "Missing ApiHref",
 			request: &ReportResourceRequest{
 				Resource: &Resource{
-					ResourceType: "rhel_host",
-					ReporterData: &ReporterData{
-						ReporterType:       "HBI",
-						ReporterInstanceId: "user@example.com",
-						LocalResourceId:    "rhel-host-001",
-						ApiHref:            "",
-						ConsoleHref:        "https://console.rhel.example.com",
-					},
-					CommonResourceData: &structpb.Struct{
-						Fields: map[string]*structpb.Value{
-							"workspace_id": {Kind: &structpb.Value_StringValue{StringValue: "ws-456"}},
+					Type:               "k8s_cluster",
+					ReporterType:       "ACM",
+					ReporterInstanceId: "user@example.com",
+					Representations: &ResourceRepresentations{
+						Metadata: &RepresentationMetadata{
+							LocalResourceId: "0123",
+							ConsoleHref:     proto.String("https://console.example.com"),
+							ReporterVersion: proto.String("1.0.0"),
+						},
+						Common: &structpb.Struct{
+							Fields: map[string]*structpb.Value{
+								"workspace_id": structpb.NewStringValue("workspace"),
+							},
 						},
 					},
 				},
 			},
 			expectErr: true,
 		},
-		// Missing `ConsoleHref`
+
+		// Missing `metadata`
 		{
 			name: "Missing ConsoleHref",
 			request: &ReportResourceRequest{
 				Resource: &Resource{
-					ResourceType: "rhel_host",
-					ReporterData: &ReporterData{
-						ReporterType:       "HBI",
-						ReporterInstanceId: "user@example.com",
-						LocalResourceId:    "rhel-host-001",
-						ApiHref:            "https://api.rhel.example.com",
-						ConsoleHref:        "",
-					},
-					CommonResourceData: &structpb.Struct{
-						Fields: map[string]*structpb.Value{
-							"workspace_id": {Kind: &structpb.Value_StringValue{StringValue: "ws-456"}},
+					Type:               "k8s_cluster",
+					ReporterType:       "ACM",
+					ReporterInstanceId: "user@example.com",
+					Representations: &ResourceRepresentations{
+						Common: &structpb.Struct{
+							Fields: map[string]*structpb.Value{
+								"workspace_id": structpb.NewStringValue("workspace"),
+							},
 						},
 					},
-				},
-			},
-			expectErr: true,
-		},
-		// Missing workspace ID
-		{
-			name: "Missing workspace_id",
-			request: &ReportResourceRequest{
-				Resource: &Resource{
-					ResourceType: "rhel_host",
-					ReporterData: &ReporterData{
-						ReporterType:       "HBI",
-						ReporterInstanceId: "user@example.com",
-						LocalResourceId:    "0123",
-						ApiHref:            "www.example.com",
-						ConsoleHref:        "www.example.com",
-					},
-					CommonResourceData: nil,
 				},
 			},
 			expectErr: true,

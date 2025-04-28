@@ -45,7 +45,6 @@ func (c *ResourceService) ReportResource(ctx context.Context, r *pb.ReportResour
 
 // DeleteResource NOT Deleting the correct resources
 func (c *ResourceService) DeleteResource(ctx context.Context, r *pb.DeleteResourceRequest) (*pb.DeleteResourceResponse, error) {
-	log.Info("I am in the new Resource Service Delete method!", ctx, r)
 
 	identity, err := middleware.GetIdentity(ctx)
 	if err != nil {
@@ -103,13 +102,14 @@ func requestToDeleteResource(r *pb.DeleteResourceRequest, identity *authnapi.Ide
 	log.Info("Delete Resource Request: ", r)
 
 	localResourceId := r.GetReference().GetResourceId()
-	reporterType := r.GetReference().GetResourceType()
+	reporterType := r.GetReference().GetReporter().GetType()
+	resourceType := r.GetReference().GetResourceType()
 
 	reporterResourceId := model.ReporterResourceId{
 		LocalResourceId: localResourceId,
 		ReporterType:    reporterType,
 		ReporterId:      identity.Principal,
-		ResourceType:    identity.Type,
+		ResourceType:    resourceType,
 	}
 
 	return reporterResourceId, nil

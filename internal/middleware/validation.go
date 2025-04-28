@@ -43,10 +43,6 @@ func Validation(validator protovalidate.Validator) middleware.Middleware {
 					if err := validateReportResourceJSON(v); err != nil {
 						return nil, errors.BadRequest("REPORT_RESOURCE_JSON_VALIDATOR", err.Error()).WithCause(err)
 					}
-				case *pbv1beta2.DeleteResourceRequest:
-					if err := validateResourceDeletionJSON(v); err != nil {
-						return nil, errors.BadRequest("DELETE_RESOURCE_JSON_VALIDATOR", err.Error()).WithCause(err)
-					}
 				}
 			}
 			return handler(ctx, req)
@@ -107,31 +103,6 @@ func validateReportResourceJSON(msg proto.Message) error {
 
 	// Validate common data
 	if err := ValidateCommonRepresentation(resourceType, commonRepresentation); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// Validates resource deletion by extracting required fields from the request.
-func validateResourceDeletionJSON(msg proto.Message) error {
-	data, err := MarshalProtoToJSON(msg)
-	if err != nil {
-		return err
-	}
-
-	deleteResourceMap, err := UnmarshalJSONToMap(data)
-	if err != nil {
-		return err
-	}
-
-	_, err = ExtractStringField(deleteResourceMap, "localResourceId")
-	if err != nil {
-		return err
-	}
-
-	_, err = ExtractStringField(deleteResourceMap, "reporterType")
-	if err != nil {
 		return err
 	}
 

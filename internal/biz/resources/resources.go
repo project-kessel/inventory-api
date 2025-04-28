@@ -289,7 +289,7 @@ func (uc *Usecase) ListResourcesInWorkspace(ctx context.Context, permission, nam
 
 	log.Infof("ListResourcesInWorkspace: resources %+v", resources)
 
-	const NUM_WORKERS = 10
+	const NUM_WORKERS = 100
 
 	resourceChan := make(chan *model.Resource, len(resources))
 	allowedChan := make(chan *model.Resource, len(resources))

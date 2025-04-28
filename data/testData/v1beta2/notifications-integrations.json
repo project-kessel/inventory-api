@@ -1,16 +1,23 @@
 {
-    "resource": {
-        "resource_type": "notifications_integration",
-        "reporter_data": {
-            "reporter_instance_id": "service-account-1",
-            "reporter_type": "NOTIFICATIONS",
-            "local_resource_id": "1234",
-            "reporter_version": "0.1",
-            "api_href": "www.example.com",
-            "console_href": "www.example.com"
-        },
-        "common_resource_data": {
-            "workspace_id": "123"
-        }
+  "resource": {
+    "type": "notifications_integration",
+    "reporterType": "NOTIFICATIONS",
+    "reporterInstanceId": "cc38fb9e-251d-4abe-9eaf-b71607558b2a",
+    "representations": {
+      "metadata": {
+        "localResourceId": "03c923f9-6747-4177-ae35-d36493a1c88e",
+        "apiHref": "https://www.campbell-butler.biz/",
+        "consoleHref": "http://www.benton.net/",
+        "reporterVersion": "1.5.7"
+      },
+      "common": {
+        "workspace_id": "1f00e06a-951d-4042-b25b-5ce7c32d833e"
+      },
+      "reporter": {
+        "reporter_type": "NOTIFICATIONS",
+        "reporter_instance_id": "f2e4e735-3936-4ee6-a881-b2e1f9326991",
+        "local_resource_id": "cbc86170-e959-42d8-bd2a-964a5a558475"
+      }
     }
+  }
 }

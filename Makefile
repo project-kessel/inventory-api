@@ -151,23 +151,15 @@ pr-check:
 
 .PHONY: inventory-up
 inventory-up:
-	./scripts/start-inventory.sh full-setup 8000 9000
-
-.PHONY: inventory-up-relations-ready
-inventory-up-relations-ready:
-	./scripts/start-inventory.sh full-setup-relations-ready 8081 9081
-
-.PHONY: inventory-up-split
-inventory-up-split:
-	./scripts/start-inventory.sh split-setup 8000 9000
-
-.PHONY: inventory-up-split-relations-ready
-inventory-up-split-relations-ready:
-	./scripts/start-inventory.sh split-setup-relations-ready 8081 9081
+	./scripts/start-inventory.sh
 
 .PHONY: inventory-up-sso
 inventory-up-sso:
-	./scripts/start-inventory-kc.sh full-setup-w-sso 8081 9081
+	./scripts/start-inventory-kc.sh
+
+.PHONY: inventory-up-kafka
+inventory-up-kafka:
+	./scripts/start-inventory-kafka.sh
 
 .PHONY: inventory-up-kind
 inventory-up-kind:
@@ -180,6 +172,14 @@ get-token:
 .PHONY: inventory-down
 inventory-down:
 	./scripts/stop-inventory.sh
+
+.PHONY: inventory-down-sso
+inventory-down-sso:
+	./scripts/stop-inventory-kc.sh
+
+.PHONY: inventory-down-kafka
+inventory-down-kafka:
+	./scripts/stop-inventory-kafka.sh
 
 .PHONY: inventory-down-kind
 inventory-down-kind:
@@ -222,42 +222,55 @@ help:
 
 .DEFAULT_GOAL := help
 
-### Feature branch feature-RHCLOUD-38543 Helpers
+### Debezium Helpers
+.PHONY: setup-outbox
+setup-outbox:
+	psql "postgresql://${DB_USER}:${DB_PASSWORD}@localhost:${DB_PORT}/${DB_NAME}" -f deploy/debezium/outbox.sql
 
-.SILENT: check-kafka-status
-check-kafka-status:
-	echo "Kafka Cluster Ready: $(shell oc get kafka inventory-kafka -o jsonpath='{.status.conditions[].status}')"
-	echo "Kafka Connect Ready: $(shell oc get kc inventory-kafka-connect -o jsonpath='{.status.conditions[].status}')"
-	echo "Kafka Connector Ready: $(shell oc get kctr kessel-inventory-source-connector -o jsonpath='{.status.conditions[].status}')"
-	echo "Kafka Tuple Topic Ready: $(shell oc get kt outbox.event.kessel.tuples -o jsonpath='{.status.conditions[].status}')"
-	echo "Kafka Resources Topic Ready: $(shell oc get kt outbox.event.kessel.resources -o jsonpath='{.status.conditions[].status}')"
+.PHONY: validate-outbox
+validate-outbox:
+	psql "postgresql://${DB_USER}:${DB_PASSWORD}@localhost:${DB_PORT}/${DB_NAME}" -c "\d+ outbox_events"
 
-.PHONY: create-test-notification
-create-test-notification:
-	curl -H "Content-Type: application/json" -d @data/testData/v1beta1/notifications-integrations.json localhost:8000/api/inventory/v1beta1/resources/notifications-integrations
+.PHONY: deploy-debezium
+deploy-debezium:
+	oc process --local -f deploy/debezium/debezium-connector.yaml \
+    -p DB_NAME=${DB_NAME} \
+    -p DB_HOSTNAME=${DB_HOSTNAME} \
+    -p DB_PORT=${DB_PORT} \
+    -p DB_USER=${DB_USER} \
+    -p DB_PASSWORD=${DB_PASSWORD} \
+    -p KAFKA_CONNECT_INSTANCE=${KAFKA_CONNECT_INSTANCE} | oc apply -f -
 
-.PHONY: update-test-notification
-update-test-notification:
-	curl -X PUT -H "Content-Type: application/json" -d @data/testData/v1beta1/notifications-integrations.json localhost:8000/api/inventory/v1beta1/resources/notifications-integrations
+.PHONY: undeploy-debezium
+undeploy-debezium:
+	oc process --local -f deploy/debezium/debezium-connector.yaml \
+    -p DB_NAME=${DB_NAME} \
+    -p DB_HOSTNAME=${DB_HOSTNAME} \
+    -p DB_PORT=${DB_PORT} \
+    -p DB_USER=${DB_USER} \
+    -p DB_PASSWORD=${DB_PASSWORD} \
+    -p KAFKA_CONNECT_INSTANCE=${KAFKA_CONNECT_INSTANCE} | oc delete -f -
 
-.PHONY: delete-test-notification
-delete-test-notification:
-	curl -X DELETE -H "Content-Type: application/json" -d @data/testData/v1beta1/notifications-integration-reporter.json localhost:8000/api/inventory/v1beta1/resources/notifications-integrations
+.PHONY: outbox-tuple-record
+outbox-tuple-record:
+	psql "postgresql://${DB_USER}:${DB_PASSWORD}@localhost:${DB_PORT}/${DB_NAME}" -f deploy/debezium/sample-tuple.sql
+
+.PHONY: outbox-resource-record
+outbox-resource-record:
+	psql "postgresql://${DB_USER}:${DB_PASSWORD}@localhost:${DB_PORT}/${DB_NAME}" -f deploy/debezium/sample-resource.sql
+
+.PHONY: get-outbox-tuples
+get-outbox-tuples:
+	psql "postgresql://${DB_USER}:${DB_PASSWORD}@localhost:${DB_PORT}/${DB_NAME}" -x -c "select * from outbox_events where aggregatetype='kessel.tuples'"
+
+.PHONY: get-outbox-resources
+get-outbox-resources:
+	psql "postgresql://${DB_USER}:${DB_PASSWORD}@localhost:${DB_PORT}/${DB_NAME}" -x -c "select * from outbox_events where aggregatetype='kessel.resources'"
 
 .PHONY: check-tuple-messages
 check-tuple-messages:
-	oc rsh inventory-kafka-connect-connect-0 bin/kafka-console-consumer.sh --bootstrap-server inventory-kafka-kafka-bootstrap:9092 --topic outbox.event.kessel.tuples --from-beginning --property print.headers=true --property print.key=true
+	oc rsh ${KAFKA_CONNECT_INSTANCE}-connect-0 bin/kafka-console-consumer.sh --bootstrap-server ${BOOTSTRAP_SERVER}:9092 --topic outbox.event.kessel.tuples --from-beginning
 
 .PHONY: check-resource-messages
 check-resource-messages:
-	oc rsh inventory-kafka-connect-connect-0 bin/kafka-console-consumer.sh --bootstrap-server inventory-kafka-kafka-bootstrap:9092 --topic outbox.event.kessel.resources --from-beginning --property print.headers=true --property print.key=true
-
-.PHONY: check-tuple
-check-tuple:
-	MESSAGE='{"filter":{"resource_id":"4321","resource_type":"integration","resource_namespace":"notifications","relation":"t_workspace","subject_filter":{"subject_type":"workspace","subject_namespace":"rbac","subject_id":"1234"}}}' && \
-	grpcurl -plaintext -d $${MESSAGE} localhost:9000 kessel.relations.v1beta1.KesselTupleService.ReadTuples
-
-.PHONY: check-token-update
-check-token-update:
-	psql "postgresql://${DB_USER}:${DB_PASSWORD}@localhost:${LOCAL_DB_PORT}/${DB_NAME}" -x -c "select id,inventory_id,consistency_token,workspace_id,reporter from resources;"
-
+	oc rsh ${KAFKA_CONNECT_INSTANCE}-connect-0 bin/kafka-console-consumer.sh --bootstrap-server ${BOOTSTRAP_SERVER}:9092 --topic outbox.event.kessel.resources --from-beginning

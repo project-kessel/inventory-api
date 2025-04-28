@@ -29,7 +29,7 @@ func readJSONFile(filePath string) (string, error) {
 	return string(data), nil
 }
 
-// Normalize the "resource_type" field in YAML content
+// Normalize the resources type field in YAML content
 func normalizeYAMLResourceType(yamlContent []byte) ([]byte, error) {
 	// Parse YAML into a map
 	var yamlData map[string]interface{}
@@ -37,7 +37,7 @@ func normalizeYAMLResourceType(yamlContent []byte) ([]byte, error) {
 		return nil, fmt.Errorf("failed to parse YAML: %w", err)
 	}
 
-	// Normalize "resource_type" if it exists
+	// Normalize the resources type if it exists
 	if resourceType, exists := yamlData["type"].(string); exists {
 		normalized := middleware.NormalizeResourceType(resourceType)
 		yamlData["type"] = normalized
@@ -52,7 +52,7 @@ func normalizeYAMLResourceType(yamlContent []byte) ([]byte, error) {
 	return normalizedYAML, nil
 }
 
-// Read YAML file, normalize resource_type, and encode to Base64
+// Read YAML file, normalize resource type, and encode to Base64
 func encodeYAMLToBase64(filePath string) (string, error) {
 	data, err := os.ReadFile(filePath)
 	if err != nil {

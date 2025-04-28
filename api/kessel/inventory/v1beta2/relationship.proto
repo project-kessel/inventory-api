@@ -21,6 +21,6 @@ option java_package = "org.project_kessel.api.inventory.v1beta2";
 // following the direction of typical graph traversal (Resource to Subject).
 message Relationship {
 ResourceReference object = 1 [(buf.validate.field).required = true];
-string relation = 2 [(buf.validate.field).string.min_len = 1];
+optional string relation = 2 [(buf.validate.field).string.min_len = 1];
 SubjectReference subject = 3 [(buf.validate.field).required = true];
 }

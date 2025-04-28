@@ -87,7 +87,7 @@ func toLookupResourceResponse(response *kessel.LookupResourcesResponse) *pbv1bet
 			ResourceId: response.Resource.Id,
 		},
 		Pagination: &pbv1beta2.ResponsePagination{
-			ContinuationToken: response.Pagination.ContinuationToken,
+			ContinuationToken: &response.Pagination.ContinuationToken,
 		},
 	}
 }

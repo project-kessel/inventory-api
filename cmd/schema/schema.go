@@ -38,9 +38,9 @@ func normalizeYAMLResourceType(yamlContent []byte) ([]byte, error) {
 	}
 
 	// Normalize "resource_type" if it exists
-	if resourceType, exists := yamlData["resource_type"].(string); exists {
+	if resourceType, exists := yamlData["type"].(string); exists {
 		normalized := middleware.NormalizeResourceType(resourceType)
-		yamlData["resource_type"] = normalized
+		yamlData["type"] = normalized
 	}
 
 	// Convert back to YAML format
@@ -85,7 +85,7 @@ func preloadSchemas() error {
 		resourcePath := filepath.Join(schemaDir, resource.Name())
 
 		// Load common resource data schema
-		commonSchemaPath := filepath.Join(resourcePath, "common_resource_data.json")
+		commonSchemaPath := filepath.Join(resourcePath, "common_representation.json")
 		if _, err := os.Stat(commonSchemaPath); err == nil {
 			if jsonData, err := readJSONFile(commonSchemaPath); err == nil {
 				schemaCache[fmt.Sprintf("common:%s", resourceType)] = jsonData

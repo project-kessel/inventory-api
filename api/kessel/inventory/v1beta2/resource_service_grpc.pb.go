@@ -7,10 +7,7 @@
 package v1beta2
 
 import (
-	context "context"
 	grpc "google.golang.org/grpc"
-	codes "google.golang.org/grpc/codes"
-	status "google.golang.org/grpc/status"
 )
 
 // This is a compile-time assertion to ensure that this generated file
@@ -18,17 +15,10 @@ import (
 // Requires gRPC-Go v1.64.0 or later.
 const _ = grpc.SupportPackageIsVersion9
 
-const (
-	KesselResourceService_ReportResource_FullMethodName = "/kessel.inventory.v1beta2.KesselResourceService/ReportResource"
-	KesselResourceService_DeleteResource_FullMethodName = "/kessel.inventory.v1beta2.KesselResourceService/DeleteResource"
-)
-
 // KesselResourceServiceClient is the client API for KesselResourceService service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type KesselResourceServiceClient interface {
-	ReportResource(ctx context.Context, in *ReportResourceRequest, opts ...grpc.CallOption) (*ReportResourceResponse, error)
-	DeleteResource(ctx context.Context, in *DeleteResourceRequest, opts ...grpc.CallOption) (*DeleteResourceResponse, error)
 }
 
 type kesselResourceServiceClient struct {
@@ -39,32 +29,10 @@ func NewKesselResourceServiceClient(cc grpc.ClientConnInterface) KesselResourceS
 	return &kesselResourceServiceClient{cc}
 }
 
-func (c *kesselResourceServiceClient) ReportResource(ctx context.Context, in *ReportResourceRequest, opts ...grpc.CallOption) (*ReportResourceResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(ReportResourceResponse)
-	err := c.cc.Invoke(ctx, KesselResourceService_ReportResource_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *kesselResourceServiceClient) DeleteResource(ctx context.Context, in *DeleteResourceRequest, opts ...grpc.CallOption) (*DeleteResourceResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(DeleteResourceResponse)
-	err := c.cc.Invoke(ctx, KesselResourceService_DeleteResource_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
 // KesselResourceServiceServer is the server API for KesselResourceService service.
 // All implementations must embed UnimplementedKesselResourceServiceServer
 // for forward compatibility.
 type KesselResourceServiceServer interface {
-	ReportResource(context.Context, *ReportResourceRequest) (*ReportResourceResponse, error)
-	DeleteResource(context.Context, *DeleteResourceRequest) (*DeleteResourceResponse, error)
 	mustEmbedUnimplementedKesselResourceServiceServer()
 }
 
@@ -75,12 +43,6 @@ type KesselResourceServiceServer interface {
 // pointer dereference when methods are called.
 type UnimplementedKesselResourceServiceServer struct{}
 
-func (UnimplementedKesselResourceServiceServer) ReportResource(context.Context, *ReportResourceRequest) (*ReportResourceResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method ReportResource not implemented")
-}
-func (UnimplementedKesselResourceServiceServer) DeleteResource(context.Context, *DeleteResourceRequest) (*DeleteResourceResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method DeleteResource not implemented")
-}
 func (UnimplementedKesselResourceServiceServer) mustEmbedUnimplementedKesselResourceServiceServer() {}
 func (UnimplementedKesselResourceServiceServer) testEmbeddedByValue()                               {}
 
@@ -102,58 +64,13 @@ func RegisterKesselResourceServiceServer(s grpc.ServiceRegistrar, srv KesselReso
 	s.RegisterService(&KesselResourceService_ServiceDesc, srv)
 }
 
-func _KesselResourceService_ReportResource_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(ReportResourceRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(KesselResourceServiceServer).ReportResource(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: KesselResourceService_ReportResource_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(KesselResourceServiceServer).ReportResource(ctx, req.(*ReportResourceRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _KesselResourceService_DeleteResource_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(DeleteResourceRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(KesselResourceServiceServer).DeleteResource(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: KesselResourceService_DeleteResource_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(KesselResourceServiceServer).DeleteResource(ctx, req.(*DeleteResourceRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 // KesselResourceService_ServiceDesc is the grpc.ServiceDesc for KesselResourceService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
 var KesselResourceService_ServiceDesc = grpc.ServiceDesc{
 	ServiceName: "kessel.inventory.v1beta2.KesselResourceService",
 	HandlerType: (*KesselResourceServiceServer)(nil),
-	Methods: []grpc.MethodDesc{
-		{
-			MethodName: "ReportResource",
-			Handler:    _KesselResourceService_ReportResource_Handler,
-		},
-		{
-			MethodName: "DeleteResource",
-			Handler:    _KesselResourceService_DeleteResource_Handler,
-		},
-	},
-	Streams:  []grpc.StreamDesc{},
-	Metadata: "kessel/inventory/v1beta2/resource_service.proto",
+	Methods:     []grpc.MethodDesc{},
+	Streams:     []grpc.StreamDesc{},
+	Metadata:    "kessel/inventory/v1beta2/resource_service.proto",
 }

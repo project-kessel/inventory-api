@@ -2,18 +2,18 @@ syntax = "proto3";
 
 package kessel.inventory.v1beta2;
 
-import "google/api/annotations.proto";
+/*import "google/api/annotations.proto";
 import "kessel/inventory/v1beta2/report_resource_request.proto";
 import "kessel/inventory/v1beta2/report_resource_response.proto";
 import "kessel/inventory/v1beta2/delete_resource_request.proto";
-import "kessel/inventory/v1beta2/delete_resource_response.proto";
+import "kessel/inventory/v1beta2/delete_resource_response.proto";*/
 
 option go_package = "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2";
 option java_multiple_files = true;
 option java_package = "org.project_kessel.api.inventory.v1beta2";
 
 service KesselResourceService {
-  rpc ReportResource(ReportResourceRequest) returns (ReportResourceResponse) {
+ /* rpc ReportResource(ReportResourceRequest) returns (ReportResourceResponse) {
     option (google.api.http) = {
       post: "/api/inventory/v1beta2/resources"
       body: "*"
@@ -25,5 +25,5 @@ service KesselResourceService {
       delete: "/api/inventory/v1beta2/resources"
       body: "*"
     };
-  }
+  }*/
 }

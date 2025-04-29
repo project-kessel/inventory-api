@@ -7,10 +7,7 @@
 package v1beta2
 
 import (
-	context "context"
 	grpc "google.golang.org/grpc"
-	codes "google.golang.org/grpc/codes"
-	status "google.golang.org/grpc/status"
 )
 
 // This is a compile-time assertion to ensure that this generated file
@@ -18,15 +15,10 @@ import (
 // Requires gRPC-Go v1.64.0 or later.
 const _ = grpc.SupportPackageIsVersion9
 
-const (
-	KesselStreamedListService_StreamedListObjects_FullMethodName = "/kessel.inventory.v1beta2.KesselStreamedListService/StreamedListObjects"
-)
-
 // KesselStreamedListServiceClient is the client API for KesselStreamedListService service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type KesselStreamedListServiceClient interface {
-	StreamedListObjects(ctx context.Context, in *StreamedListObjectsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[StreamedListObjectsResponse], error)
 }
 
 type kesselStreamedListServiceClient struct {
@@ -37,30 +29,10 @@ func NewKesselStreamedListServiceClient(cc grpc.ClientConnInterface) KesselStrea
 	return &kesselStreamedListServiceClient{cc}
 }
 
-func (c *kesselStreamedListServiceClient) StreamedListObjects(ctx context.Context, in *StreamedListObjectsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[StreamedListObjectsResponse], error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &KesselStreamedListService_ServiceDesc.Streams[0], KesselStreamedListService_StreamedListObjects_FullMethodName, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	x := &grpc.GenericClientStream[StreamedListObjectsRequest, StreamedListObjectsResponse]{ClientStream: stream}
-	if err := x.ClientStream.SendMsg(in); err != nil {
-		return nil, err
-	}
-	if err := x.ClientStream.CloseSend(); err != nil {
-		return nil, err
-	}
-	return x, nil
-}
-
-// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
-type KesselStreamedListService_StreamedListObjectsClient = grpc.ServerStreamingClient[StreamedListObjectsResponse]
-
 // KesselStreamedListServiceServer is the server API for KesselStreamedListService service.
 // All implementations must embed UnimplementedKesselStreamedListServiceServer
 // for forward compatibility.
 type KesselStreamedListServiceServer interface {
-	StreamedListObjects(*StreamedListObjectsRequest, grpc.ServerStreamingServer[StreamedListObjectsResponse]) error
 	mustEmbedUnimplementedKesselStreamedListServiceServer()
 }
 
@@ -71,9 +43,6 @@ type KesselStreamedListServiceServer interface {
 // pointer dereference when methods are called.
 type UnimplementedKesselStreamedListServiceServer struct{}
 
-func (UnimplementedKesselStreamedListServiceServer) StreamedListObjects(*StreamedListObjectsRequest, grpc.ServerStreamingServer[StreamedListObjectsResponse]) error {
-	return status.Errorf(codes.Unimplemented, "method StreamedListObjects not implemented")
-}
 func (UnimplementedKesselStreamedListServiceServer) mustEmbedUnimplementedKesselStreamedListServiceServer() {
 }
 func (UnimplementedKesselStreamedListServiceServer) testEmbeddedByValue() {}
@@ -96,17 +65,6 @@ func RegisterKesselStreamedListServiceServer(s grpc.ServiceRegistrar, srv Kessel
 	s.RegisterService(&KesselStreamedListService_ServiceDesc, srv)
 }
 
-func _KesselStreamedListService_StreamedListObjects_Handler(srv interface{}, stream grpc.ServerStream) error {
-	m := new(StreamedListObjectsRequest)
-	if err := stream.RecvMsg(m); err != nil {
-		return err
-	}
-	return srv.(KesselStreamedListServiceServer).StreamedListObjects(m, &grpc.GenericServerStream[StreamedListObjectsRequest, StreamedListObjectsResponse]{ServerStream: stream})
-}
-
-// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
-type KesselStreamedListService_StreamedListObjectsServer = grpc.ServerStreamingServer[StreamedListObjectsResponse]
-
 // KesselStreamedListService_ServiceDesc is the grpc.ServiceDesc for KesselStreamedListService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -114,12 +72,6 @@ var KesselStreamedListService_ServiceDesc = grpc.ServiceDesc{
 	ServiceName: "kessel.inventory.v1beta2.KesselStreamedListService",
 	HandlerType: (*KesselStreamedListServiceServer)(nil),
 	Methods:     []grpc.MethodDesc{},
-	Streams: []grpc.StreamDesc{
-		{
-			StreamName:    "StreamedListObjects",
-			Handler:       _KesselStreamedListService_StreamedListObjects_Handler,
-			ServerStreams: true,
-		},
-	},
-	Metadata: "kessel/inventory/v1beta2/streamed_list_service.proto",
+	Streams:     []grpc.StreamDesc{},
+	Metadata:    "kessel/inventory/v1beta2/streamed_list_service.proto",
 }

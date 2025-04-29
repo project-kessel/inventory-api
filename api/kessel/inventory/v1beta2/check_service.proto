@@ -2,11 +2,11 @@ syntax = "proto3";
 
 package kessel.inventory.v1beta2;
 
-import "google/api/annotations.proto";
+/*import "google/api/annotations.proto";
 import "kessel/inventory/v1beta2/check_request.proto";
 import "kessel/inventory/v1beta2/check_response.proto";
 import "kessel/inventory/v1beta2/check_for_update_request.proto";
-import "kessel/inventory/v1beta2/check_for_update_response.proto";
+import "kessel/inventory/v1beta2/check_for_update_response.proto";*/
 
 option go_package = "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2";
 option java_multiple_files = true;
@@ -15,7 +15,7 @@ option java_package = "org.project_kessel.api.inventory.v1beta2";
 service KesselCheckService {
   // Checks for the existence of a single Relationship
   // (a Relation between a Resource and a Subject or Subject Set).
-  rpc Check(CheckRequest) returns (CheckResponse) {
+  /*rpc Check(CheckRequest) returns (CheckResponse) {
     option (google.api.http) = {
       post: "/api/inventory/v1beta2/check"
       body: "*"
@@ -27,5 +27,5 @@ service KesselCheckService {
       post: "/api/inventory/v1beta2/checkforupdate"
       body: "*"
     };
-  }
+  }*/
 }

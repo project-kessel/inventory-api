@@ -505,11 +505,11 @@ paths:
     /api/inventory/v1beta2/check:
         post:
             tags:
-                - KesselCheckService
+                - KesselInventoryService
             description: |-
                 Checks for the existence of a single Relationship
                  (a Relation between a Resource and a Subject or Subject Set).
-            operationId: KesselCheckService_Check
+            operationId: KesselInventoryService_Check
             requestBody:
                 content:
                     application/json:
@@ -532,8 +532,8 @@ paths:
     /api/inventory/v1beta2/checkforupdate:
         post:
             tags:
-                - KesselCheckService
-            operationId: KesselCheckService_CheckForUpdate
+                - KesselInventoryService
+            operationId: KesselInventoryService_CheckForUpdate
             requestBody:
                 content:
                     application/json:
@@ -556,8 +556,8 @@ paths:
     /api/inventory/v1beta2/resources:
         get:
             tags:
-                - KesselStreamedListService
-            operationId: KesselStreamedListService_StreamedListObjects
+                - KesselInventoryService
+            operationId: KesselInventoryService_StreamedListObjects
             parameters:
                 - name: objectType.resourceType
                   in: query
@@ -629,8 +629,8 @@ paths:
                                 $ref: '#/components/schemas/google.rpc.Status'
         post:
             tags:
-                - KesselResourceService
-            operationId: KesselResourceService_ReportResource
+                - KesselInventoryService
+            operationId: KesselInventoryService_ReportResource
             requestBody:
                 content:
                     application/json:
@@ -652,8 +652,8 @@ paths:
                                 $ref: '#/components/schemas/google.rpc.Status'
         delete:
             tags:
-                - KesselResourceService
-            operationId: KesselResourceService_DeleteResource
+                - KesselInventoryService
+            operationId: KesselInventoryService_DeleteResource
             requestBody:
                 content:
                     application/json:
@@ -1421,12 +1421,10 @@ components:
             description: A reference to a Subject or, if a `relation` is provided, a Subject Set.
 tags:
     - name: KesselCheckService
-    - name: KesselCheckService
     - name: KesselInventoryHealthService
+    - name: KesselInventoryService
     - name: KesselK8SClusterService
     - name: KesselK8SPolicyIsPropagatedToK8SClusterService
     - name: KesselK8SPolicyService
     - name: KesselNotificationsIntegrationService
-    - name: KesselResourceService
     - name: KesselRhelHostService
-    - name: KesselStreamedListService

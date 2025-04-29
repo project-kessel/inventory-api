@@ -176,23 +176,30 @@ func NewCommand(
 			inventoryresources_repo := inventoryResourcesRepo.New(db)
 
 			//v1beta2
-			// wire together resource handling
+
+			// wire together inventory service handling
 			resource_repo := resourcerepo.New(db)
+			inventory_controller := resourcesctl.New(resource_repo, inventoryresources_repo, authorizer, eventingManager, "authz", log.With(logger, "subsystem", "authz_controller"), storageConfig.Options.DisablePersistence)
+			inventory_service := resourcesvc.NewKesselInventoryServiceV1beta2(inventory_controller)
+			pbv1beta2.RegisterKesselInventoryServiceServer(server.GrpcServer, inventory_service)
+			pbv1beta2.RegisterKesselInventoryServiceHTTPServer(server.HttpServer, inventory_service)
+
+			/* wire together resource handling
 			resource_controller := resourcesctl.New(resource_repo, inventoryresources_repo, authorizer, eventingManager, "notifications", log.With(logger, "subsystem", "notificationsintegrations_controller"), storageConfig.Options.DisablePersistence)
-			resource_service := resourcesvc.NewKesselResourceServiceV1beta2(resource_controller)
-			pbv1beta2.RegisterKesselResourceServiceServer(server.GrpcServer, resource_service)
-			pbv1beta2.RegisterKesselResourceServiceHTTPServer(server.HttpServer, resource_service)
+			resource_service := resourcesvc.NewKesselInventoryServiceV1beta2(resource_controller)
+			pbv1beta2.RegisterKesselInventoryServiceServer(server.GrpcServer, resource_service)
+			pbv1beta2.RegisterKesselInventoryServiceHTTPServer(server.HttpServer, resource_service)
 
 			// wire together check service
 			check_controller := resourcesctl.New(resource_repo, inventoryresources_repo, authorizer, eventingManager, "authz", log.With(logger, "subsystem", "authz_controller"), storageConfig.Options.DisablePersistence)
-			check_service := resourcesvc.NewKesselCheckServiceV1beta2(check_controller)
-			pbv1beta2.RegisterKesselCheckServiceServer(server.GrpcServer, check_service)
+			check_service := resourcesvc.NewKesselInventoryServiceV1beta2(check_controller)
+			pbv1beta2.RegisterKesselInventoryServiceServer(server.GrpcServer, check_service)
 			pbv1beta2.RegisterKesselCheckServiceHTTPServer(server.HttpServer, check_service)
 
 			// wire together lookup service
 			streamedlist_controller := resourcesctl.New(resource_repo, inventoryresources_repo, authorizer, eventingManager, "authz", log.With(logger, "subsystem", "authz_controller"), storageConfig.Options.DisablePersistence)
-			streamedlist_service := resourcesvc.NewKesselLookupServiceV1beta2(streamedlist_controller)
-			pbv1beta2.RegisterKesselStreamedListServiceServer(server.GrpcServer, streamedlist_service)
+			streamedlist_service := resourcesvc.NewKesselInventoryServiceV1beta2(streamedlist_controller)
+			pbv1beta2.RegisterKesselInventoryServiceServer(server.GrpcServer, streamedlist_service)*/
 
 			//v1beta1
 			// wire together notificationsintegrations handling

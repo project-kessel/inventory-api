@@ -29,7 +29,7 @@ type Options struct {
 
 func NewOptions() *Options {
 	return &Options{
-		Enabled:                 true,
+		Enabled:                 false,
 		ConsumerGroupID:         "inventory-consumer",
 		Topic:                   "outbox.event.kessel.tuples",
 		SessionTimeout:          "45000",

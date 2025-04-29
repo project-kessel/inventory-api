@@ -56,6 +56,7 @@ type InventoryConsumer struct {
 // New instantiates a new InventoryConsumer
 func New(config CompletedConfig, db *gorm.DB, authz authz.CompletedConfig, authorizer api.Authorizer, notifier pubsub.Notifier, logger *log.Helper) (InventoryConsumer, error) {
 	logger.Info("Setting up kafka consumer")
+	logger.Debugf("completed kafka config: %+v", config.KafkaConfig)
 	consumer, err := kafka.NewConsumer(config.KafkaConfig)
 	if err != nil {
 		logger.Errorf("error creating kafka consumer: %v", err)
@@ -71,11 +72,11 @@ func New(config CompletedConfig, db *gorm.DB, authz authz.CompletedConfig, autho
 	}
 
 	authnOptions := &auth.Options{
-		Enabled:          config.AuthConfig.Enabled,
-		SecurityProtocol: config.AuthConfig.SecurityProtocol,
-		SASLMechanism:    config.AuthConfig.SASLMechanism,
-		SASLUsername:     config.AuthConfig.SASLUsername,
-		SASLPassword:     config.AuthConfig.SASLPassword,
+		Enabled:          config.AuthConfig.Options.Enabled,          //nolint:staticcheck
+		SecurityProtocol: config.AuthConfig.Options.SecurityProtocol, //nolint:staticcheck
+		SASLMechanism:    config.AuthConfig.Options.SASLMechanism,    //nolint:staticcheck
+		SASLUsername:     config.AuthConfig.Options.SASLUsername,     //nolint:staticcheck
+		SASLPassword:     config.AuthConfig.Options.SASLPassword,     //nolint:staticcheck
 	}
 
 	retryOptions := &retry.Options{

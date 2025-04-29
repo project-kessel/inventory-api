@@ -7,5 +7,5 @@ option java_multiple_files = true;
 option java_package = "org.project_kessel.api.inventory.v1beta2";
 
 message ResponsePagination {
-  optional string continuation_token = 1;
+  string continuation_token = 1;
 }

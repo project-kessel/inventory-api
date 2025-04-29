@@ -47,10 +47,10 @@ func (t *TestCase) TestSetup() []error {
 	var errs []error
 	var err error
 
-	if errList := t.options.Complete(); err != nil {
+	if errList := t.options.Complete(); errList != nil {
 		errs = append(errs, errList...)
 	}
-	if errList := t.options.Validate(); err != nil {
+	if errList := t.options.Validate(); errList != nil {
 		errs = append(errs, errList...)
 	}
 	cfg, errList := NewConfig(t.options).Complete()

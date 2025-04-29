@@ -59,11 +59,10 @@ func (c *Config) Complete() (CompletedConfig, []error) {
 		}
 		if c.AuthConfig.Enabled {
 			authSettings := map[string]string{
-				"security.protocol": c.AuthConfig.SecurityProtocol,
-				"sasl.mechanism":    c.AuthConfig.SASLMechanism,
-				"sasl.username":     c.AuthConfig.SASLUsername,
-				"sasl.password":     c.AuthConfig.SASLPassword,
-				"ssl.ca.location":   c.AuthConfig.CACert,
+				"security.protocol": c.AuthConfig.Options.SecurityProtocol, //nolint:staticcheck
+				"sasl.mechanism":    c.AuthConfig.Options.SASLMechanism,    //nolint:staticcheck
+				"sasl.username":     c.AuthConfig.Options.SASLUsername,     //nolint:staticcheck
+				"sasl.password":     c.AuthConfig.Options.SASLPassword,     //nolint:staticcheck
 			}
 			for key, value := range authSettings {
 				if err := config.SetKey(key, value); err != nil {

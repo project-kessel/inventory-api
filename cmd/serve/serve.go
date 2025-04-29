@@ -15,6 +15,7 @@ import (
 	"github.com/project-kessel/inventory-api/cmd/common"
 	relationshipsctl "github.com/project-kessel/inventory-api/internal/biz/relationships"
 	resourcesctl "github.com/project-kessel/inventory-api/internal/biz/resources"
+	"github.com/project-kessel/inventory-api/internal/consumer"
 	inventoryResourcesRepo "github.com/project-kessel/inventory-api/internal/data/inventoryresources"
 	relationshipsrepo "github.com/project-kessel/inventory-api/internal/data/relationships"
 	resourcerepo "github.com/project-kessel/inventory-api/internal/data/resources"

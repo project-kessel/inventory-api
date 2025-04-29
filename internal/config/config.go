@@ -10,6 +10,7 @@ import (
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/project-kessel/inventory-api/internal/authn"
 	"github.com/project-kessel/inventory-api/internal/authz"
+	"github.com/project-kessel/inventory-api/internal/consumer"
 	"github.com/project-kessel/inventory-api/internal/eventing"
 	"github.com/project-kessel/inventory-api/internal/server"
 	"github.com/project-kessel/inventory-api/internal/storage"
@@ -158,4 +159,5 @@ func (o *OptionsConfig) ConfigureConsumer(appconfig *clowder.AppConfig) {
 			o.Consumer.AuthOptions.SASLPassword = *appconfig.Kafka.Brokers[0].Sasl.Password
 		}
 	}
+	log.Debugf("Inside Consumer Clowder Injection Auth Settings: %+v", o.Consumer.AuthOptions)
 }

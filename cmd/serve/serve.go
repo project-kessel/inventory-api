@@ -2,14 +2,17 @@ package serve
 
 import (
 	"context"
+	e "errors"
 	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/project-kessel/inventory-api/cmd/common"
 	relationshipsctl "github.com/project-kessel/inventory-api/internal/biz/relationships"
 	resourcesctl "github.com/project-kessel/inventory-api/internal/biz/resources"
+	"github.com/project-kessel/inventory-api/internal/consumer"
 	inventoryResourcesRepo "github.com/project-kessel/inventory-api/internal/data/inventoryresources"
 	relationshipsrepo "github.com/project-kessel/inventory-api/internal/data/relationships"
 	resourcerepo "github.com/project-kessel/inventory-api/internal/data/resources"
@@ -18,6 +21,7 @@ import (
 	k8sclusterssvc "github.com/project-kessel/inventory-api/internal/service/resources/k8sclusters"
 	k8spoliciessvc "github.com/project-kessel/inventory-api/internal/service/resources/k8spolicies"
 	notifssvc "github.com/project-kessel/inventory-api/internal/service/resources/notificationsintegrations"
+
 	//v1beta2
 	resourcesvc "github.com/project-kessel/inventory-api/internal/service/resources"
 
@@ -51,6 +55,7 @@ func NewCommand(
 	authnOptions *authn.Options,
 	authzOptions *authz.Options,
 	eventingOptions *eventing.Options,
+	consumerOptions *consumer.Options,
 	loggerOptions common.LoggerOptions,
 ) *cobra.Command {
 	cmd := &cobra.Command{
@@ -59,6 +64,9 @@ func NewCommand(
 		RunE: func(cmd *cobra.Command, args []string) error {
 			_, logger := common.InitLogger(common.GetLogLevel(), loggerOptions)
 			ctx := context.Background()
+
+			var consumerConfig consumer.CompletedConfig
+			var inventoryConsumer consumer.InventoryConsumer
 
 			// configure storage
 			if errs := storageOptions.Complete(); errs != nil {
@@ -103,6 +111,22 @@ func NewCommand(
 			eventingConfig, errs := eventing.NewConfig(eventingOptions).Complete()
 			if errs != nil {
 				return errors.NewAggregate(errs)
+			}
+
+			// configure inventoryConsumer
+			if !storageOptions.DisablePersistence {
+				if errs := consumerOptions.Complete(); errs != nil {
+					return errors.NewAggregate(errs)
+				}
+				if errs := consumerOptions.Validate(); errs != nil {
+					return errors.NewAggregate(errs)
+				}
+				if consumerOptions.Enabled {
+					consumerConfig, errs = consumer.NewConfig(consumerOptions).Complete()
+					if errs != nil {
+						return errors.NewAggregate(errs)
+					}
+				}
 			}
 
 			// configure the server
@@ -224,10 +248,40 @@ func NewCommand(
 				srvErrs <- server.Run(ctx)
 			}()
 
+			shutdown := shutdown(db, server, eventingManager, &inventoryConsumer, log.NewHelper(logger))
+
+			if !storageOptions.DisablePersistence && consumerOptions.Enabled {
+				go func() {
+					retries := 0
+					for retries < consumerOptions.RetryOptions.ConsumerMaxRetries {
+						// If the consumer cannot process a message, the consumer loop is restarted
+						// This is to ensure we re-read the message and prevent it being dropped and moving to next message.
+						// To re-read the current message, we have to recreate the consumer connection so that the earliest offset is used
+						inventoryConsumer, err = consumer.New(consumerConfig, db, authzConfig, authorizer, nil, log.NewHelper(log.With(logger, "subsystem", "inventoryConsumer")))
+						if err != nil {
+							shutdown(err)
+						}
+						err = inventoryConsumer.Consume()
+						if e.Is(err, consumer.ErrClosed) {
+							inventoryConsumer.Logger.Errorf("consumer unable to process current message -- restarting consumer")
+							retries++
+							if retries < consumerOptions.RetryOptions.ConsumerMaxRetries {
+								backoff := time.Duration(inventoryConsumer.RetryOptions.BackoffFactor*retries*300) * time.Millisecond
+								inventoryConsumer.Logger.Errorf("retrying in %v", backoff)
+								time.Sleep(backoff)
+							}
+							continue
+						} else {
+							inventoryConsumer.Logger.Errorf("consumer unable to process messages: %v", err)
+							shutdown(err)
+						}
+					}
+					shutdown(fmt.Errorf("consumer unable to process current message -- max retries reached"))
+				}()
+			}
+
 			quit := make(chan os.Signal, 1)
 			signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
-
-			shutdown := shutdown(db, server, eventingManager, log.NewHelper(logger))
 
 			select {
 			case err := <-srvErrs:
@@ -236,6 +290,8 @@ func NewCommand(
 				shutdown(sig)
 			case emErr := <-eventingManager.Errs():
 				shutdown(emErr)
+			case cmErr := <-inventoryConsumer.Errs():
+				shutdown(cmErr)
 			}
 			return nil
 		},
@@ -245,11 +301,12 @@ func NewCommand(
 	authnOptions.AddFlags(cmd.Flags(), "authn")
 	authzOptions.AddFlags(cmd.Flags(), "authz")
 	eventingOptions.AddFlags(cmd.Flags(), "eventing")
+	consumerOptions.AddFlags(cmd.Flags(), "consumer")
 
 	return cmd
 }
 
-func shutdown(db *gorm.DB, srv *server.Server, em eventingapi.Manager, logger *log.Helper) func(reason interface{}) {
+func shutdown(db *gorm.DB, srv *server.Server, em eventingapi.Manager, cm *consumer.InventoryConsumer, logger *log.Helper) func(reason interface{}) {
 	return func(reason interface{}) {
 		log.Info(fmt.Sprintf("Server Shutdown: %s", reason))
 
@@ -264,6 +321,19 @@ func shutdown(db *gorm.DB, srv *server.Server, em eventingapi.Manager, logger *l
 		defer cancel()
 		if err := em.Shutdown(ctx); err != nil {
 			logger.Error(fmt.Sprintf("Error Gracefully Shutting Down Eventing: %v", err))
+		}
+
+		if cm != nil {
+			defer func() {
+				err := cm.Shutdown()
+				if err != nil {
+					if e.Is(err, consumer.ErrClosed) {
+						logger.Warn("error shutting down consumer, consumer already closed")
+					} else {
+						logger.Error(fmt.Sprintf("Error Gracefully Shutting Down Consumer: %v", err))
+					}
+				}
+			}()
 		}
 
 		if sqlDB, err := db.DB(); err != nil {

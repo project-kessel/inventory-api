@@ -58,8 +58,13 @@ func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_Host(t *testing.T) {
 	assert.NoError(t, err, "Failed to Report Resource")
 
 	delReq := pbv1beta2.DeleteResourceRequest{
-		LocalResourceId: "host-abc-123",
-		ReporterType:    "HBI",
+		Reference: &pbv1beta2.ResourceReference{
+			ResourceType: "host",
+			ResourceId:   "host-abc-123",
+			Reporter: &pbv1beta2.ReporterReference{
+				Type: "HBI",
+			},
+		},
 	}
 
 	_, err = client.KesselResourceService.DeleteResource(context.Background(), &delReq, opts...)
@@ -114,8 +119,13 @@ func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_Notifications(t *testing.T) 
 	assert.NoError(t, err, "Failed to Report Resource")
 
 	delReq := pbv1beta2.DeleteResourceRequest{
-		LocalResourceId: "notification-abc-123",
-		ReporterType:    "NOTIFICATIONS",
+		Reference: &pbv1beta2.ResourceReference{
+			ResourceType: "integrations",
+			ResourceId:   "notification-abc-123",
+			Reporter: &pbv1beta2.ReporterReference{
+				Type: "NOTIFICATIONS",
+			},
+		},
 	}
 
 	_, err = client.KesselResourceService.DeleteResource(context.Background(), &delReq, opts...)
@@ -173,8 +183,13 @@ func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_K8S_Cluster(t *testing.T) {
 	assert.NoError(t, err, "Failed to Report Resource")
 
 	delReq := pbv1beta2.DeleteResourceRequest{
-		LocalResourceId: "k8s_cluster-abc-123",
-		ReporterType:    "ACM",
+		Reference: &pbv1beta2.ResourceReference{
+			ResourceType: "k8s_cluster",
+			ResourceId:   "k8s_cluster-abc-123",
+			Reporter: &pbv1beta2.ReporterReference{
+				Type: "ACM",
+			},
+		},
 	}
 
 	_, err = client.KesselResourceService.DeleteResource(context.Background(), &delReq, opts...)
@@ -227,8 +242,13 @@ func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_K8S_Policy(t *testing.T) {
 	assert.NoError(t, err, "Failed to Report Resource")
 
 	delReq := pbv1beta2.DeleteResourceRequest{
-		LocalResourceId: "k8s_policy-abc-123",
-		ReporterType:    "ACM",
+		Reference: &pbv1beta2.ResourceReference{
+			ResourceType: "k8s_policy",
+			ResourceId:   "k8s_policy-abc-123",
+			Reporter: &pbv1beta2.ReporterReference{
+				Type: "ACM",
+			},
+		},
 	}
 
 	_, err = client.KesselResourceService.DeleteResource(context.Background(), &delReq, opts...)

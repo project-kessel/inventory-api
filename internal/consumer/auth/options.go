@@ -12,7 +12,7 @@ type Options struct {
 
 func NewOptions() *Options {
 	return &Options{
-		Enabled: false,
+		Enabled: true,
 	}
 }
 

@@ -1,7 +1,6 @@
 package config
 
 import (
-	. "github.com/project-kessel/inventory-api/cmd/common"
 	"os"
 	"testing"
 
@@ -89,118 +88,29 @@ func TestConfigureStorage(t *testing.T) {
 }
 
 func TestConfigureAuthz(t *testing.T) {
-	test := struct {
+	tests := []struct {
 		name      string
 		appconfig *clowder.AppConfig
 		options   *OptionsConfig
 	}{
-		name: "ensures Authz info is set",
-		appconfig: &clowder.AppConfig{
-			Endpoints: []clowder.DependencyEndpoint{
-				clowder.DependencyEndpoint{
-					Hostname: "kessel-relations",
+		{
+			name: "ensures Authz info is set",
+			appconfig: &clowder.AppConfig{
+				Endpoints: []clowder.DependencyEndpoint{
+					clowder.DependencyEndpoint{
+						Hostname: "kessel-relations",
+					},
 				},
 			},
+			options: NewOptionsConfig(),
 		},
-		options: NewOptionsConfig(),
 	}
 
-	t.Run(test.name, func(t *testing.T) {
-		test.options.ConfigureAuthz(test.appconfig.Endpoints[0])
-		assert.Equal(t, "kessel", test.options.Authz.Authz)
-		assert.Equal(t, "kessel-relations:9000", test.options.Authz.Kessel.URL)
-	})
-
-}
-
-func TestConfigureConsumer(t *testing.T) {
-	tests := []struct {
-		name        string
-		appconfig   *clowder.AppConfig
-		options     *OptionsConfig
-		authEnabled bool
-		expected    []string
-	}{
-		{
-			name: "ensure boostrap server is set properly when only one is provided",
-			appconfig: &clowder.AppConfig{
-				Kafka: &clowder.KafkaConfig{
-					Brokers: []clowder.BrokerConfig{
-						{
-							Hostname: "test-kafka-server",
-							Port:     ToPointer(9092),
-						},
-					},
-				},
-			},
-			options:     NewOptionsConfig(),
-			authEnabled: false,
-			expected:    []string{"test-kafka-server:9092"},
-		},
-		{
-			name: "ensure boostrap server is set properly when multiple are provided",
-			appconfig: &clowder.AppConfig{
-				Kafka: &clowder.KafkaConfig{
-					Brokers: []clowder.BrokerConfig{
-						{
-							Hostname: "test-kafka-server-01",
-							Port:     ToPointer(9092),
-						},
-						{
-							Hostname: "test-kafka-server-02",
-							Port:     ToPointer(9092),
-						},
-						{
-							Hostname: "test-kafka-server-03",
-							Port:     ToPointer(9092),
-						},
-					},
-				},
-			},
-			options:     NewOptionsConfig(),
-			authEnabled: false,
-			expected:    []string{"test-kafka-server-01:9092", "test-kafka-server-02:9092", "test-kafka-server-03:9092"},
-		},
-		{
-			name: "ensure sasl settings are configured when present",
-			appconfig: &clowder.AppConfig{
-				Kafka: &clowder.KafkaConfig{
-					Brokers: []clowder.BrokerConfig{
-						{
-							Hostname:         "test-kafka-server-01",
-							Port:             ToPointer(9092),
-							SecurityProtocol: ToPointer("SASL_SSL"),
-							Sasl: &clowder.KafkaSASLConfig{
-								Password:         ToPointer("test-password"),
-								SaslMechanism:    ToPointer("SCRAM-SHA-512"),
-								SecurityProtocol: ToPointer("SASL_SSL"),
-								Username:         ToPointer("test-user"),
-							},
-						},
-					},
-				},
-			},
-			options:     NewOptionsConfig(),
-			authEnabled: true,
-			expected:    []string{"test-kafka-server-01:9092"},
-		},
-	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			test.options.Consumer.AuthOptions.Enabled = test.authEnabled
-			test.options.ConfigureConsumer(test.appconfig)
-			assert.Equal(t, test.expected, test.options.Consumer.BootstrapServers)
-			if test.authEnabled {
-				assert.Equal(t, test.options.Consumer.AuthOptions.SecurityProtocol, *test.appconfig.Kafka.Brokers[0].SecurityProtocol)
-				assert.Equal(t, test.options.Consumer.AuthOptions.SASLMechanism, *test.appconfig.Kafka.Brokers[0].Sasl.SaslMechanism)
-				assert.Equal(t, test.options.Consumer.AuthOptions.SASLUsername, *test.appconfig.Kafka.Brokers[0].Sasl.Username)
-				assert.Equal(t, test.options.Consumer.AuthOptions.SASLPassword, *test.appconfig.Kafka.Brokers[0].Sasl.Password)
-			} else {
-				assert.Equal(t, test.options.Consumer.AuthOptions.SecurityProtocol, "")
-				assert.Equal(t, test.options.Consumer.AuthOptions.SASLMechanism, "")
-				assert.Equal(t, test.options.Consumer.AuthOptions.SASLUsername, "")
-				assert.Equal(t, test.options.Consumer.AuthOptions.SASLPassword, "")
-			}
+			test.options.ConfigureAuthz(test.appconfig.Endpoints[0])
+			assert.Equal(t, "kessel", test.options.Authz.Authz)
+			assert.Equal(t, "kessel-relations:9000", test.options.Authz.Kessel.URL)
 		})
 	}
 }

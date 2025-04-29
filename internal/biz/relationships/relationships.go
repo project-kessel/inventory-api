@@ -84,7 +84,7 @@ func (uc *Usecase) Create(ctx context.Context, m *model.Relationship) (*model.Re
 	}
 
 	if uc.eventer != nil {
-		err := biz.DefaultRelationshipSendEvent(ctx, m, uc.eventer, *m.CreatedAt, model.OperationTypeCreated)
+		err := biz.DefaultRelationshipSendEvent(ctx, m, uc.eventer, *m.CreatedAt, eventingapi.OperationTypeCreated)
 
 		if err != nil {
 			return nil, err
@@ -131,7 +131,7 @@ func (uc *Usecase) Update(ctx context.Context, m *model.Relationship, id model.R
 	}
 
 	if uc.eventer != nil {
-		err := biz.DefaultRelationshipSendEvent(ctx, m, uc.eventer, *m.UpdatedAt, model.OperationTypeUpdated)
+		err := biz.DefaultRelationshipSendEvent(ctx, m, uc.eventer, *m.UpdatedAt, eventingapi.OperationTypeUpdated)
 
 		if err != nil {
 			return nil, err
@@ -172,7 +172,7 @@ func (uc *Usecase) Delete(ctx context.Context, id model.ReporterRelationshipId) 
 	}
 
 	if uc.eventer != nil {
-		err := biz.DefaultRelationshipSendEvent(ctx, m, uc.eventer, time.Now(), model.OperationTypeDeleted)
+		err := biz.DefaultRelationshipSendEvent(ctx, m, uc.eventer, time.Now(), eventingapi.OperationTypeDeleted)
 
 		if err != nil {
 			return err

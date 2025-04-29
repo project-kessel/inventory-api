@@ -1342,9 +1342,6 @@ components:
             properties:
                 resource:
                     $ref: '#/components/schemas/kessel.inventory.v1beta2.Resource'
-                waitForSync:
-                    type: boolean
-                    description: Will wait for synchronous processes to complete before returning
         kessel.inventory.v1beta2.ReportResourceResponse:
             type: object
             properties: {}

@@ -99,19 +99,19 @@ func requestToResource(r *pb.ReportResourceRequest, identity *authnapi.Identity)
 func requestToDeleteResource(r *pb.DeleteResourceRequest, identity *authnapi.Identity) (model.ReporterResourceId, error) {
 	log.Info("Delete Resource Request: ", r)
 
-	ref := r.GetReference()
-	if ref == nil {
+	reference := r.GetReference()
+	if reference == nil {
 		return model.ReporterResourceId{}, fmt.Errorf("reference is required but was nil")
 	}
 
-	reporter := ref.GetReporter()
+	reporter := reference.GetReporter()
 	if reporter == nil {
 		return model.ReporterResourceId{}, fmt.Errorf("reporter is required but was nil")
 	}
 
-	localResourceId := r.GetReference().GetResourceId()
-	reporterType := r.GetReference().GetReporter().GetType()
-	resourceType := r.GetReference().GetResourceType()
+	localResourceId := reference.GetResourceId()
+	reporterType := reporter.GetType()
+	resourceType := reference.GetResourceType()
 
 	reporterResourceId := model.ReporterResourceId{
 		LocalResourceId: localResourceId,

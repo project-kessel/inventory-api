@@ -149,7 +149,9 @@ func (o *OptionsConfig) ConfigureConsumer(appconfig *clowder.AppConfig) {
 	o.Consumer.BootstrapServers = brokers
 
 	if o.Consumer.AuthOptions.Enabled {
-		o.Consumer.AuthOptions.SecurityProtocol = *appconfig.Kafka.Brokers[0].SecurityProtocol
+		if appconfig.Kafka.Brokers[0].SecurityProtocol != nil {
+			o.Consumer.AuthOptions.SecurityProtocol = *appconfig.Kafka.Brokers[0].SecurityProtocol
+		}
 
 		if appconfig.Kafka.Brokers[0].Sasl != nil {
 			o.Consumer.AuthOptions.SASLMechanism = *appconfig.Kafka.Brokers[0].Sasl.SaslMechanism

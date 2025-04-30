@@ -48,6 +48,8 @@ var (
 	ErrInventoryIdMismatch   = errors.New("resource inventory id mismatch")
 )
 
+const listenTimeout = 10 * time.Second
+
 type Usecase struct {
 	reporterResourceRepository  ReporterResourceRepository
 	inventoryResourceRepository InventoryResourceRepository
@@ -127,7 +129,7 @@ func (uc *Usecase) Upsert(ctx context.Context, m *model.Resource, wait_for_sync 
 		}
 
 		if readAfterWriteEnabled {
-			timeoutCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+			timeoutCtx, cancel := context.WithTimeout(ctx, listenTimeout)
 			defer cancel()
 
 			err = subscription.BlockForNotification(timeoutCtx)
@@ -343,7 +345,7 @@ func (uc *Usecase) Create(ctx context.Context, m *model.Resource) (*model.Resour
 		}
 
 		// 30 sec max timeout
-		timeoutCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+		timeoutCtx, cancel := context.WithTimeout(ctx, listenTimeout)
 		defer cancel()
 
 		err = subscription.BlockForNotification(timeoutCtx)
@@ -395,7 +397,7 @@ func (uc *Usecase) Update(ctx context.Context, m *model.Resource, id model.Repor
 			return nil, err
 		}
 
-		timeoutCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+		timeoutCtx, cancel := context.WithTimeout(ctx, listenTimeout)
 		defer cancel()
 
 		err = subscription.BlockForNotification(timeoutCtx)

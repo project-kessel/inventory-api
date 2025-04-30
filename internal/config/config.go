@@ -7,6 +7,7 @@ import (
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/project-kessel/inventory-api/internal/authn"
 	"github.com/project-kessel/inventory-api/internal/authz"
+	"github.com/project-kessel/inventory-api/internal/consistency"
 	"github.com/project-kessel/inventory-api/internal/consumer"
 	"github.com/project-kessel/inventory-api/internal/eventing"
 	"github.com/project-kessel/inventory-api/internal/server"
@@ -16,12 +17,13 @@ import (
 
 // OptionsConfig contains the settings for each configuration option
 type OptionsConfig struct {
-	Authn    *authn.Options
-	Authz    *authz.Options
-	Storage  *storage.Options
-	Eventing *eventing.Options
-	Consumer *consumer.Options
-	Server   *server.Options
+	Authn       *authn.Options
+	Authz       *authz.Options
+	Storage     *storage.Options
+	Eventing    *eventing.Options
+	Consumer    *consumer.Options
+	Server      *server.Options
+	Consistency *consistency.Options
 }
 
 // NewOptionsConfig returns a new OptionsConfig with default options set
@@ -33,6 +35,7 @@ func NewOptionsConfig() *OptionsConfig {
 		eventing.NewOptions(),
 		consumer.NewOptions(),
 		server.NewOptions(),
+		consistency.NewOptions(),
 	}
 }
 
@@ -81,6 +84,12 @@ func LogConfigurationInfo(options *OptionsConfig) {
 		options.Consumer.AuthOptions.SecurityProtocol,
 		options.Consumer.AuthOptions.SASLMechanism,
 		options.Consumer.AuthOptions.SASLUsername)
+
+	log.Debugf("Consistency Configuration: Read-After-Write Enabled: %t, Read-After-Write Allowlist: %+s",
+		options.Consistency.ReadAfterWriteEnabled,
+		options.Consistency.ReadAfterWriteAllowlist,
+	)
+
 }
 
 // InjectClowdAppConfig updates service options based on values in the ClowdApp AppConfig
@@ -140,7 +149,9 @@ func (o *OptionsConfig) ConfigureConsumer(appconfig *clowder.AppConfig) {
 	o.Consumer.BootstrapServers = brokers
 
 	if o.Consumer.AuthOptions.Enabled {
-		o.Consumer.AuthOptions.SecurityProtocol = *appconfig.Kafka.Brokers[0].SecurityProtocol
+		if appconfig.Kafka.Brokers[0].SecurityProtocol != nil {
+			o.Consumer.AuthOptions.SecurityProtocol = *appconfig.Kafka.Brokers[0].SecurityProtocol
+		}
 
 		if appconfig.Kafka.Brokers[0].Sasl != nil {
 			o.Consumer.AuthOptions.SASLMechanism = *appconfig.Kafka.Brokers[0].Sasl.SaslMechanism

@@ -15,7 +15,6 @@ import (
 
 	"github.com/project-kessel/inventory-api/internal/authz/allow"
 	"github.com/project-kessel/inventory-api/internal/authz/kessel"
-
 	"github.com/project-kessel/inventory-api/internal/pubsub"
 
 	"go.opentelemetry.io/otel"

@@ -376,8 +376,13 @@ func TestInventoryAPIHTTP_v1beta2_Host_WaitForSync(t *testing.T) {
 	assert.NotEmpty(t, host.ConsistencyToken, "Consistency token is empty")
 
 	delReq := pbv1beta2.DeleteResourceRequest{
-		LocalResourceId: resourceId,
-		ReporterType:    "HBI",
+		Reference: &pbv1beta2.ResourceReference{
+			ResourceType: "HBI",
+			ResourceId:   "resourceId",
+			Reporter: &pbv1beta2.ReporterReference{
+				Type: "ACM",
+			},
+		},
 	}
 	_, err = client.KesselResourceService.DeleteResource(context.Background(), &delReq, opts...)
 	assert.NoError(t, err, "Failed to Delete Resource")

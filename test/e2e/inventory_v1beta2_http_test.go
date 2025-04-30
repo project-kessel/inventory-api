@@ -1,7 +1,7 @@
 package e2e
 
 //commenting this test out until we can find a better way to execute them
-/*import (
+import (
 	"context"
 	"testing"
 	"time"
@@ -14,7 +14,6 @@ package e2e
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/structpb"
 )
-
 
 // V1Beta2
 func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_Host(t *testing.T) {
@@ -388,4 +387,4 @@ func TestInventoryAPIHTTP_v1beta2_Host_WaitForSync(t *testing.T) {
 	}
 	_, err = client.KesselResourceService.DeleteResource(context.Background(), &delReq, opts...)
 	assert.NoError(t, err, "Failed to Delete Resource")
-}*/
+}

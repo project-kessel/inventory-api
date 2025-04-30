@@ -2,13 +2,16 @@ package e2e
 
 import (
 	"context"
+	"testing"
+	"time"
+
 	pbv1beta2 "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2"
+	"github.com/project-kessel/inventory-api/internal/biz/model"
 	"github.com/project-kessel/inventory-client-go/common"
 	v1beta2 "github.com/project-kessel/inventory-client-go/v1beta2"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/structpb"
-	"testing"
 )
 
 // V1Beta2
@@ -32,6 +35,7 @@ func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_Host(t *testing.T) {
 	assert.NoError(t, err, "Failed to create structpb for host reporter")
 
 	req := pbv1beta2.ReportResourceRequest{
+		WaitForSync: false,
 		Resource: &pbv1beta2.Resource{
 			Type:               "host",
 			ReporterType:       "HBI",
@@ -312,3 +316,74 @@ func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_K8S_Policy(t *testing.T) {
 //	assert.NotNil(t, checkUpdateResp, "checkforupdate response should not be nil")
 //	assert.Equal(t, pbv1beta2.Allowed_ALLOWED_FALSE, checkUpdateResp.GetAllowed())
 //}
+
+func TestInventoryAPIHTTP_v1beta2_Host_WaitForSync(t *testing.T) {
+	t.Parallel()
+
+	resourceId := "wait-for-sync-host-abc-123"
+
+	c := common.NewConfig(
+		common.WithHTTPUrl(inventoryapi_http_url),
+		common.WithTLSInsecure(insecure),
+		common.WithHTTPTLSConfig(tlsConfig),
+		common.WithTimeout(10*time.Second),
+	)
+
+	client, err := v1beta2.NewHttpClient(context.Background(), c)
+	assert.NoError(t, err, "Failed to create v1beta2 HTTP client")
+
+	commonData := &structpb.Struct{}
+	commonData.Fields = map[string]*structpb.Value{
+		"workspace_id": structpb.NewStringValue("workspace-v2"),
+	}
+
+	reporterStruct, err := structpb.NewStruct(map[string]interface{}{
+		"disabled": true,
+		"severity": "MEDIUM",
+	})
+	assert.NoError(t, err, "Failed to create structpb for reporter")
+
+	req := pbv1beta2.ReportResourceRequest{
+		WaitForSync: true,
+		Resource: &pbv1beta2.Resource{
+			Type:               "host",
+			ReporterType:       "HBI",
+			ReporterInstanceId: "testuser@example.com",
+			Representations: &pbv1beta2.ResourceRepresentations{
+				Metadata: &pbv1beta2.RepresentationMetadata{
+					LocalResourceId: resourceId,
+					ApiHref:         "https://example.com/api",
+					ConsoleHref:     proto.String("https://example.com/console"),
+					ReporterVersion: proto.String("0.1"),
+				},
+				Common: &structpb.Struct{
+					Fields: map[string]*structpb.Value{
+						"workspace_id": structpb.NewStringValue("workspace-v2"),
+					},
+				},
+				Reporter: reporterStruct,
+			},
+		},
+	}
+	opts := getCallOptions()
+	_, err = client.KesselResourceService.ReportResource(context.Background(), &req, opts...)
+	assert.NoError(t, err, "Failed to Report Resource")
+
+	var host model.Resource
+	err = db.Where("reporter_resource_id = ?", resourceId).First(&host).Error
+	assert.NoError(t, err, "Error fetching host from DB")
+	assert.NotNil(t, host, "Host not found in DB")
+	assert.NotEmpty(t, host.ConsistencyToken, "Consistency token is empty")
+
+	delReq := pbv1beta2.DeleteResourceRequest{
+		Reference: &pbv1beta2.ResourceReference{
+			ResourceType: "HBI",
+			ResourceId:   resourceId,
+			Reporter: &pbv1beta2.ReporterReference{
+				Type: "ACM",
+			},
+		},
+	}
+	_, err = client.KesselResourceService.DeleteResource(context.Background(), &delReq, opts...)
+	assert.NoError(t, err, "Failed to Delete Resource")
+}

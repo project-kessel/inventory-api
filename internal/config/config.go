@@ -148,5 +148,4 @@ func (o *OptionsConfig) ConfigureConsumer(appconfig *clowder.AppConfig) {
 			o.Consumer.AuthOptions.SASLPassword = *appconfig.Kafka.Brokers[0].Sasl.Password
 		}
 	}
-	log.Debugf("Inside Consumer Clowder Injection Auth Settings: %+v", o.Consumer.AuthOptions)
 }

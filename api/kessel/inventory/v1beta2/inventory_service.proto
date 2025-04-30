@@ -49,9 +49,5 @@ service KesselInventoryService {
     };
   }
 
-  rpc StreamedListObjects(StreamedListObjectsRequest) returns (stream StreamedListObjectsResponse) {
-    option (google.api.http) = {
-      get: "/api/inventory/v1beta2/resources"
-    };
-  }
+  rpc StreamedListObjects(StreamedListObjectsRequest) returns (stream StreamedListObjectsResponse);
 }

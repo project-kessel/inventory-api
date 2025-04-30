@@ -35,7 +35,7 @@ func (c *InventoryService) ReportResource(ctx context.Context, r *pb.ReportResou
 	if err != nil {
 		return nil, err
 	}
-	_, err = c.Ctl.Upsert(ctx, resource)
+	_, err = c.Ctl.Upsert(ctx, resource, r.GetWaitForSync())
 	log.Info()
 	if err != nil {
 		return nil, err

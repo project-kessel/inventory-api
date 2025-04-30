@@ -23,6 +23,9 @@ objects:
       table.include.list: public.outbox_events
       transforms: outbox
       transforms.outbox.type: io.debezium.transforms.outbox.EventRouter
+      transforms.outbox.table.fields.additional.placement: operation:header, txid:header
+      transforms.outbox.table.expand.json.payload: true
+      value.converter: org.apache.kafka.connect.json.JsonConverter
       plugin.name: pgoutput
       heartbeat.interval.ms: ${DEBEZIUM_HEARTBEAT_INTERVAL_MS}
       heartbeat.action.query: ${DEBEZIUM_ACTION_QUERY}

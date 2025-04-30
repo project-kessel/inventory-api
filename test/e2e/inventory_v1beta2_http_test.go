@@ -378,7 +378,7 @@ func TestInventoryAPIHTTP_v1beta2_Host_WaitForSync(t *testing.T) {
 	delReq := pbv1beta2.DeleteResourceRequest{
 		Reference: &pbv1beta2.ResourceReference{
 			ResourceType: "HBI",
-			ResourceId:   "resourceId",
+			ResourceId:   resourceId,
 			Reporter: &pbv1beta2.ReporterReference{
 				Type: "ACM",
 			},

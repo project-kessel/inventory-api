@@ -70,11 +70,15 @@ func ValidateDeleteRequest(req *DeleteResourceRequest) error {
 		return fmt.Errorf("request cannot be nil")
 	}
 
-	if strings.TrimSpace(req.LocalResourceId) == "" {
+	if req.GetReference() == nil {
+		return fmt.Errorf("Resource Reference is required")
+	}
+
+	if strings.TrimSpace(req.GetReference().GetResourceId()) == "" {
 		return fmt.Errorf("local_resource_id is required")
 	}
 
-	if strings.TrimSpace(req.ReporterType) == "" {
+	if req.GetReference().GetReporter() == nil || strings.TrimSpace(req.GetReference().GetReporter().Type) == "" {
 		return fmt.Errorf("reporter_type is required")
 	}
 
@@ -381,8 +385,13 @@ func TestDeleteResourceValidation(t *testing.T) {
 		{
 			name: "Valid Delete Request",
 			request: &DeleteResourceRequest{
-				LocalResourceId: "0123",
-				ReporterType:    "HBI",
+				Reference: &ResourceReference{
+					ResourceId:   "0123",
+					ResourceType: "rhel_host",
+					Reporter: &ReporterReference{
+						Type: "HBI",
+					},
+				},
 			},
 			expectErr: false,
 		},
@@ -390,7 +399,12 @@ func TestDeleteResourceValidation(t *testing.T) {
 		{
 			name: "Missing local_resource_id",
 			request: &DeleteResourceRequest{
-				ReporterType: "HBI",
+				Reference: &ResourceReference{
+					ResourceType: "rhel_host",
+					Reporter: &ReporterReference{
+						Type: "HBI",
+					},
+				},
 			},
 			expectErr: true,
 		},
@@ -398,7 +412,9 @@ func TestDeleteResourceValidation(t *testing.T) {
 		{
 			name: "Missing reporter_type",
 			request: &DeleteResourceRequest{
-				LocalResourceId: "0123",
+				Reference: &ResourceReference{
+					ResourceType: "rhel_host",
+				},
 			},
 			expectErr: true,
 		},

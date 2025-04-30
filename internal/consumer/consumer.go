@@ -71,11 +71,11 @@ func New(config CompletedConfig, db *gorm.DB, authz authz.CompletedConfig, autho
 	}
 
 	authnOptions := &auth.Options{
-		Enabled:          config.AuthConfig.Options.Enabled,          //nolint:staticcheck
-		SecurityProtocol: config.AuthConfig.Options.SecurityProtocol, //nolint:staticcheck
-		SASLMechanism:    config.AuthConfig.Options.SASLMechanism,    //nolint:staticcheck
-		SASLUsername:     config.AuthConfig.Options.SASLUsername,     //nolint:staticcheck
-		SASLPassword:     config.AuthConfig.Options.SASLPassword,     //nolint:staticcheck
+		Enabled:          config.AuthConfig.Enabled,
+		SecurityProtocol: config.AuthConfig.SecurityProtocol,
+		SASLMechanism:    config.AuthConfig.SASLMechanism,
+		SASLUsername:     config.AuthConfig.SASLUsername,
+		SASLPassword:     config.AuthConfig.SASLPassword,
 	}
 
 	retryOptions := &retry.Options{

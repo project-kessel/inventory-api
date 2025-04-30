@@ -1,4 +1,9 @@
 {
-  "reporter_type": "NOTIFICATIONS",
-  "local_resource_id": "78531200-4407-4f05-8e9b-cc741fd2945f"
+  "reference": {
+    "resource_type": "notifications_integration",
+    "resource_id": "78531200-4407-4f05-8e9b-cc741fd2945f",
+    "reporter": {
+      "type": "NOTIFICATIONS"
+    }
+  }
 }

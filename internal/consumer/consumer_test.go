@@ -40,6 +40,7 @@ func (t *TestCase) TestSetup() []error {
 	t.options = NewOptions()
 	t.options.BootstrapServers = []string{"localhost:9092"}
 	t.config = NewConfig(t.options)
+	t.config.AuthConfig.Enabled = false
 
 	_, logger := InitLogger("info", LoggerOptions{})
 	t.logger = log.NewHelper(log.With(logger, "subsystem", "inventoryConsumer"))

@@ -49,7 +49,7 @@ func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_Host(t *testing.T) {
 	conn.Connect()
 	assert.NoError(t, err, "Failed to connect gRPC client")
 
-	client := pbv1beta2.NewKesselResourceServiceClient(conn)
+	client := pbv1beta2.NewKesselInventoryServiceClient(conn)
 
 	reporterStruct, err := structpb.NewStruct(map[string]interface{}{
 		"satellite_id":          "550e8400-e29b-41d4-a716-446655440000",
@@ -119,7 +119,7 @@ func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_Notifications(t *testing.T) 
 	conn.Connect()
 	assert.NoError(t, err, "Failed to connect gRPC client")
 
-	client := pbv1beta2.NewKesselResourceServiceClient(conn)
+	client := pbv1beta2.NewKesselInventoryServiceClient(conn)
 
 	// will likely change the notifications json schema, this is here to satisfy validation
 	reporterStruct, err := structpb.NewStruct(map[string]interface{}{
@@ -189,7 +189,7 @@ func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_K8S_Cluster(t *testing.T) {
 	conn.Connect()
 	assert.NoError(t, err, "Failed to connect gRPC client")
 
-	client := pbv1beta2.NewKesselResourceServiceClient(conn)
+	client := pbv1beta2.NewKesselInventoryServiceClient(conn)
 
 	reporterStruct, err := structpb.NewStruct(map[string]interface{}{
 		"external_cluster_id": "abcd-efgh-1234",
@@ -262,7 +262,7 @@ func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_K8S_Policy(t *testing.T) {
 	conn.Connect()
 	assert.NoError(t, err, "Failed to connect gRPC client")
 
-	client := pbv1beta2.NewKesselResourceServiceClient(conn)
+	client := pbv1beta2.NewKesselInventoryServiceClient(conn)
 
 	reporterStruct, err := structpb.NewStruct(map[string]interface{}{
 		"disabled": true,
@@ -389,7 +389,7 @@ func TestInventoryAPIHTTP_v1beta2_Host_WaitForSync(t *testing.T) {
 	conn.Connect()
 	assert.NoError(t, err, "Failed to connect gRPC client")
 
-	client := pbv1beta2.NewKesselResourceServiceClient(conn)
+	client := pbv1beta2.NewKesselInventoryServiceClient(conn)
 
 	commonData := &structpb.Struct{}
 	commonData.Fields = map[string]*structpb.Value{

@@ -505,11 +505,11 @@ paths:
     /api/inventory/v1beta2/check:
         post:
             tags:
-                - KesselCheckService
+                - KesselInventoryService
             description: |-
                 Checks for the existence of a single Relationship
                  (a Relation between a Resource and a Subject or Subject Set).
-            operationId: KesselCheckService_Check
+            operationId: KesselInventoryService_Check
             requestBody:
                 content:
                     application/json:
@@ -532,8 +532,8 @@ paths:
     /api/inventory/v1beta2/checkforupdate:
         post:
             tags:
-                - KesselCheckService
-            operationId: KesselCheckService_CheckForUpdate
+                - KesselInventoryService
+            operationId: KesselInventoryService_CheckForUpdate
             requestBody:
                 content:
                     application/json:
@@ -554,83 +554,10 @@ paths:
                             schema:
                                 $ref: '#/components/schemas/google.rpc.Status'
     /api/inventory/v1beta2/resources:
-        get:
-            tags:
-                - KesselStreamedListService
-            operationId: KesselStreamedListService_StreamedListObjects
-            parameters:
-                - name: objectType.resourceType
-                  in: query
-                  schema:
-                    type: string
-                - name: objectType.reporterType
-                  in: query
-                  schema:
-                    type: string
-                - name: relation
-                  in: query
-                  schema:
-                    type: string
-                - name: subject.relation
-                  in: query
-                  description: |-
-                    An optional relation which points to a set of Subjects instead of the single Subject.
-                     e.g. "members" or "owners" of a group identified in `subject`.
-                  schema:
-                    type: string
-                - name: subject.resource.resourceType
-                  in: query
-                  schema:
-                    type: string
-                - name: subject.resource.resourceId
-                  in: query
-                  schema:
-                    type: string
-                - name: subject.resource.reporter.type
-                  in: query
-                  schema:
-                    type: string
-                - name: subject.resource.reporter.instanceId
-                  in: query
-                  schema:
-                    type: string
-                - name: pagination.limit
-                  in: query
-                  schema:
-                    type: integer
-                    format: uint32
-                - name: pagination.continuationToken
-                  in: query
-                  schema:
-                    type: string
-                - name: consistency.minimizeLatency
-                  in: query
-                  description: |-
-                    The service selects the fastest snapshot available.
-                     *Must* be set true if used.
-                  schema:
-                    type: boolean
-                - name: consistency.atLeastAsFresh.token
-                  in: query
-                  schema:
-                    type: string
-            responses:
-                "200":
-                    description: OK
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/kessel.inventory.v1beta2.StreamedListObjectsResponse'
-                default:
-                    description: Default error response
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/google.rpc.Status'
         post:
             tags:
-                - KesselResourceService
-            operationId: KesselResourceService_ReportResource
+                - KesselInventoryService
+            operationId: KesselInventoryService_ReportResource
             requestBody:
                 content:
                     application/json:
@@ -652,8 +579,8 @@ paths:
                                 $ref: '#/components/schemas/google.rpc.Status'
         delete:
             tags:
-                - KesselResourceService
-            operationId: KesselResourceService_DeleteResource
+                - KesselInventoryService
+            operationId: KesselInventoryService_DeleteResource
             requestBody:
                 content:
                     application/json:
@@ -1322,11 +1249,6 @@ components:
                         - ALLOWED_FALSE
                     type: string
                     format: enum
-        kessel.inventory.v1beta2.ConsistencyToken:
-            type: object
-            properties:
-                token:
-                    type: string
         kessel.inventory.v1beta2.DeleteResourceRequest:
             type: object
             properties:
@@ -1395,20 +1317,6 @@ components:
                     type: object
                 reporter:
                     type: object
-        kessel.inventory.v1beta2.ResponsePagination:
-            type: object
-            properties:
-                continuationToken:
-                    type: string
-        kessel.inventory.v1beta2.StreamedListObjectsResponse:
-            type: object
-            properties:
-                object:
-                    $ref: '#/components/schemas/kessel.inventory.v1beta2.ResourceReference'
-                pagination:
-                    $ref: '#/components/schemas/kessel.inventory.v1beta2.ResponsePagination'
-                consistencyToken:
-                    $ref: '#/components/schemas/kessel.inventory.v1beta2.ConsistencyToken'
         kessel.inventory.v1beta2.SubjectReference:
             type: object
             properties:
@@ -1422,12 +1330,10 @@ components:
             description: A reference to a Subject or, if a `relation` is provided, a Subject Set.
 tags:
     - name: KesselCheckService
-    - name: KesselCheckService
     - name: KesselInventoryHealthService
+    - name: KesselInventoryService
     - name: KesselK8SClusterService
     - name: KesselK8SPolicyIsPropagatedToK8SClusterService
     - name: KesselK8SPolicyService
     - name: KesselNotificationsIntegrationService
-    - name: KesselResourceService
     - name: KesselRhelHostService
-    - name: KesselStreamedListService

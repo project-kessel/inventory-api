@@ -136,6 +136,9 @@ spec:
     - protocol: TCP
       port: 8081
       targetPort: 8081
+    - protocol: TCP
+      port: 9081
+      targetPort: 9081
 ---
 # PodDisruptionBudget
 apiVersion: policy/v1

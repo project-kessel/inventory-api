@@ -166,53 +166,117 @@ func TestParseHeaders(t *testing.T) {
 		expectedOperation string
 		expectedTxid      string
 		msg               *kafka.Message
+		expectErr         bool
 	}{
 		{
 			name:              "Create Operation",
 			expectedOperation: string(model.OperationTypeCreated),
 			expectedTxid:      "123456",
-			msg:               &kafka.Message{},
+			msg: &kafka.Message{
+				Headers: []kafka.Header{
+					{Key: "operation", Value: []byte(string(model.OperationTypeCreated))},
+					{Key: "txid", Value: []byte("123456")},
+				},
+			},
+			expectErr: false,
 		},
 		{
 			name:              "Update Operation",
 			expectedOperation: string(model.OperationTypeUpdated),
 			expectedTxid:      "123456",
-			msg:               &kafka.Message{},
+			msg: &kafka.Message{
+				Headers: []kafka.Header{
+					{Key: "operation", Value: []byte(string(model.OperationTypeUpdated))},
+					{Key: "txid", Value: []byte("123456")},
+				},
+			},
+			expectErr: false,
 		},
 		{
 			name:              "Delete Operation",
 			expectedOperation: string(model.OperationTypeDeleted),
 			expectedTxid:      "",
-			msg:               &kafka.Message{},
+			msg: &kafka.Message{
+				Headers: []kafka.Header{
+					{Key: "operation", Value: []byte(string(model.OperationTypeDeleted))},
+					{Key: "txid", Value: []byte("")},
+				},
+			},
+			expectErr: false,
 		},
 		{
-			name:              "Fake Operation",
-			expectedOperation: "not-real",
+			name:              "No Txid Value",
+			expectedOperation: "any",
 			expectedTxid:      "",
-			msg:               &kafka.Message{},
+			msg: &kafka.Message{
+				Headers: []kafka.Header{
+					{Key: "operation", Value: []byte("any")},
+					{Key: "txid", Value: []byte("")},
+				},
+			},
+			expectErr: false,
 		},
 		{
-			name:              "No Txid",
-			expectedOperation: "not-real",
+			name:              "Missing Txid Header",
+			expectedOperation: "any",
 			expectedTxid:      "",
-			msg:               &kafka.Message{},
+			msg: &kafka.Message{
+				Headers: []kafka.Header{
+					{Key: "operation", Value: []byte("any")},
+				},
+			},
+			expectErr: true,
+		},
+		{
+			name:              "Missing Operation Header",
+			expectedOperation: "",
+			expectedTxid:      "123456",
+			msg: &kafka.Message{
+				Headers: []kafka.Header{
+					{Key: "txid", Value: []byte("123456")},
+				},
+			},
+			expectErr: true,
+		},
+		{
+			name:              "Missing Operation Value",
+			expectedOperation: "",
+			expectedTxid:      "123456",
+			msg: &kafka.Message{
+				Headers: []kafka.Header{
+					{Key: "operation", Value: []byte("")},
+					{Key: "txid", Value: []byte("123456")},
+				},
+			},
+			expectErr: true,
+		},
+		{
+			name:              "Extra Headers",
+			expectedOperation: string(model.OperationTypeCreated),
+			expectedTxid:      "123456",
+			msg: &kafka.Message{
+				Headers: []kafka.Header{
+					{Key: "operation", Value: []byte(string(model.OperationTypeCreated))},
+					{Key: "txid", Value: []byte("123456")},
+					{Key: "unused-header", Value: []byte("unused-header-data")},
+				},
+			},
+			expectErr: false,
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			headers := []kafka.Header{
-				{Key: "operation", Value: []byte(test.expectedOperation)},
-				{Key: "txid", Value: []byte(test.expectedTxid)},
-				{Key: "unused-header", Value: []byte("unused-header-data")},
-				{Key: "another-unused-header", Value: []byte("another-unused-header-data")},
+			parsedHeaders, err := ParseHeaders(test.msg)
+			if test.expectErr {
+				assert.NotNil(t, err)
+				assert.Nil(t, parsedHeaders)
+			} else {
+				assert.Nil(t, err)
+				assert.Equal(t, parsedHeaders["operation"], test.expectedOperation)
+				assert.Equal(t, parsedHeaders["txid"], test.expectedTxid)
+				assert.LessOrEqual(t, len(parsedHeaders), 2)
 			}
-			test.msg.Headers = headers
-
-			parsedHeaders := ParseHeaders(test.msg)
-			assert.Equal(t, parsedHeaders["operation"], test.expectedOperation)
-			assert.Equal(t, parsedHeaders["txid"], test.expectedTxid)
-			assert.LessOrEqual(t, len(parsedHeaders), 2)
 		})
 	}
 }
@@ -319,7 +383,8 @@ func TestInventoryConsumer_ProcessMessage(t *testing.T) {
 				{Key: "txid", Value: []byte(test.expectedTxid)},
 			}
 			test.msg.Headers = headers
-			parsedHeaders := ParseHeaders(test.msg)
+			parsedHeaders, err := ParseHeaders(test.msg)
+			assert.Nil(t, err)
 			assert.Equal(t, parsedHeaders["operation"], test.expectedOperation)
 			assert.Equal(t, parsedHeaders["txid"], test.expectedTxid)
 

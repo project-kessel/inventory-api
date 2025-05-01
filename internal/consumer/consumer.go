@@ -414,7 +414,7 @@ func (i *InventoryConsumer) commitStoredOffsets() error {
 		return err
 	}
 
-	i.Logger.Infof("offsets commited ([partition:offset]): %s", formatOffsets(committed))
+	i.Logger.Infof("offsets committed ([partition:offset]): %s", formatOffsets(committed))
 	i.OffsetStorage = nil
 	return nil
 }
@@ -550,7 +550,7 @@ func (i *InventoryConsumer) RebalanceCallback(consumer *kafka.Consumer, event ka
 		}
 
 	default:
-		i.Logger.Error("Unxpected event type: %v", event)
+		i.Logger.Error("Unexpected event type: %v", event)
 	}
 	return nil
 }

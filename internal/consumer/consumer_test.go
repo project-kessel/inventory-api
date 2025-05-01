@@ -1,6 +1,7 @@
 package consumer
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
@@ -431,9 +432,9 @@ func TestCheckIfCommit(t *testing.T) {
 
 func TestCommitStoredOffsets(t *testing.T) {
 	tests := []struct {
-		name          string
-		storedOffsets []kafka.TopicPartition
-		response      []kafka.TopicPartition
+		name                                      string
+		storedOffsets, response, remainingOffsets []kafka.TopicPartition
+		responseErr                               error
 	}{
 		{
 			name: "single stored offset is committed without error",
@@ -443,6 +444,8 @@ func TestCommitStoredOffsets(t *testing.T) {
 			response: []kafka.TopicPartition{
 				{Offset: kafka.Offset(10), Partition: 0},
 			},
+			remainingOffsets: nil,
+			responseErr:      nil,
 		},
 		{
 			name: "all stored offsets are committed without error",
@@ -459,13 +462,24 @@ func TestCommitStoredOffsets(t *testing.T) {
 			response: []kafka.TopicPartition{
 				{Offset: kafka.Offset(10), Partition: 0},
 				{Offset: kafka.Offset(11), Partition: 0},
-				{Offset: kafka.Offset(12), Partition: 0},
-				{Offset: kafka.Offset(13), Partition: 0},
 				{Offset: kafka.Offset(1), Partition: 1},
 				{Offset: kafka.Offset(2), Partition: 1},
+				{Offset: kafka.Offset(12), Partition: 0},
+				{Offset: kafka.Offset(13), Partition: 0},
 				{Offset: kafka.Offset(3), Partition: 1},
 				{Offset: kafka.Offset(4), Partition: 1},
 			},
+			remainingOffsets: nil,
+			responseErr:      nil,
+		},
+		{
+			name: "Consumer.CommitOffsets returns error; offset storage is not cleared",
+			storedOffsets: []kafka.TopicPartition{
+				{Offset: kafka.Offset(10), Partition: 1},
+			},
+			response:         nil,
+			remainingOffsets: []kafka.TopicPartition{{Offset: kafka.Offset(10), Partition: 1}},
+			responseErr:      errors.New("commit failed"),
 		},
 	}
 	for _, test := range tests {
@@ -475,12 +489,14 @@ func TestCommitStoredOffsets(t *testing.T) {
 			assert.Nil(t, errs)
 
 			c := &mocks.MockConsumer{}
-			c.On("CommitOffsets", mock.Anything).Return(test.response, nil)
+			c.On("CommitOffsets", mock.Anything).Return(test.response, test.responseErr)
 			tester.inv.Consumer = c
+			tester.inv.OffsetStorage = test.storedOffsets
 
 			err := tester.inv.commitStoredOffsets()
-			assert.Nil(t, err)
-			assert.Nil(t, tester.inv.OffsetStorage)
+			assert.Equal(t, err, test.responseErr)
+			assert.Equal(t, len(tester.inv.OffsetStorage), len(test.remainingOffsets))
+			assert.Equal(t, tester.inv.OffsetStorage, test.remainingOffsets)
 		})
 	}
 }

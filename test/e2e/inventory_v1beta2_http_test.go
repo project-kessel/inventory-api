@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	pbv1beta2 "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2"
+	"github.com/project-kessel/inventory-api/internal/biz/model"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/grpc"
 	grpcinsecure "google.golang.org/grpc/credentials/insecure"
@@ -98,200 +99,216 @@ func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_Host(t *testing.T) {
 	assert.NoError(t, err, "Failed to Delete Resource")
 }
 
-//func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_Notifications(t *testing.T) {
-//	t.Parallel()
-//
-//	// Set Dial Options
-//	var dialOpts []grpc.DialOption
-//	if insecureGRPC {
-//		dialOpts = append(dialOpts, grpc.WithTransportCredentials(grpcinsecure.NewCredentials()))
-//	} else {
-//		log.Errorf("could not configure insecure credentials") // TODO: configure correct TLS credentials
-//	}
-//
-//	conn, err := grpc.NewClient(inventoryapi_grpc_url, dialOpts...)
-//	assert.NoError(t, err, "Failed to create gRPC client")
-//	defer conn.Close()
-//
-//	client := pbv1beta2.NewKesselResourceServiceClient(conn)
-//
-//	// will likely change the notifications json schema, this is here to satisfy validation
-//	reporterStruct, err := structpb.NewStruct(map[string]interface{}{
-//		"reporter_type":        "NOTIFICATIONS",
-//		"reporter_instance_id": "testuser@example.com",
-//		"local_resource_id":    "notification-abc-123",
-//	})
-//	assert.NoError(t, err, "Failed to create structpb for reporter")
-//
-//	req := pbv1beta2.ReportResourceRequest{
-//		Resource: &pbv1beta2.Resource{
-//			Type:               "notifications_integration",
-//			ReporterType:       "NOTIFICATIONS",
-//			ReporterInstanceId: "testuser@example.com",
-//			Representations: &pbv1beta2.ResourceRepresentations{
-//				Metadata: &pbv1beta2.RepresentationMetadata{
-//					LocalResourceId: "notification-abc-123",
-//					ApiHref:         "https://example.com/api",
-//					ConsoleHref:     proto.String("https://example.com/console"),
-//					ReporterVersion: proto.String("0.1"),
-//				},
-//				Common: &structpb.Struct{
-//					Fields: map[string]*structpb.Value{
-//						"workspace_id": structpb.NewStringValue("workspace-v2"),
-//					},
-//				},
-//				Reporter: reporterStruct, // Notifications may not require a reporter block
-//			},
-//		},
-//	}
-//
-//	_, err = client.ReportResource(context.Background(), &req)
-//	assert.NoError(t, err, "Failed to Report Resource")
-//
-//	delReq := pbv1beta2.DeleteResourceRequest{
-//		Reference: &pbv1beta2.ResourceReference{
-//			ResourceType: "integrations",
-//			ResourceId:   "notification-abc-123",
-//			Reporter: &pbv1beta2.ReporterReference{
-//				Type: "NOTIFICATIONS",
-//			},
-//		},
-//	}
-//
-//	_, err = client.DeleteResource(context.Background(), &delReq)
-//	assert.NoError(t, err, "Failed to Delete Resource")
-//
-//}
-//
-//func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_K8S_Cluster(t *testing.T) {
-//	t.Parallel()
-//
-//	// Set Dial Options
-//	var dialOpts []grpc.DialOption
-//	if insecureGRPC {
-//		dialOpts = append(dialOpts, grpc.WithTransportCredentials(grpcinsecure.NewCredentials()))
-//	} else {
-//		log.Errorf("could not configure insecure credentials") // TODO: configure correct TLS credentials
-//	}
-//
-//	conn, err := grpc.NewClient(inventoryapi_grpc_url, dialOpts...)
-//	assert.NoError(t, err, "Failed to create gRPC client")
-//	defer conn.Close()
-//
-//	client := pbv1beta2.NewKesselResourceServiceClient(conn)
-//
-//	reporterStruct, err := structpb.NewStruct(map[string]interface{}{
-//		"external_cluster_id": "abcd-efgh-1234",
-//		"cluster_status":      "READY",
-//		"cluster_reason":      "All systems operational",
-//		"kube_version":        "1.31",
-//		"kube_vendor":         "OPENSHIFT",
-//		"vendor_version":      "4.16",
-//		"cloud_platform":      "AWS_UPI",
-//	})
-//	assert.NoError(t, err, "Failed to create structpb for cluster reporter")
-//
-//	req := pbv1beta2.ReportResourceRequest{
-//		Resource: &pbv1beta2.Resource{
-//			Type:               "k8s_cluster",
-//			ReporterType:       "ACM",
-//			ReporterInstanceId: "testuser@example.com",
-//			Representations: &pbv1beta2.ResourceRepresentations{
-//				Metadata: &pbv1beta2.RepresentationMetadata{
-//					LocalResourceId: "k8s_cluster-abc-123",
-//					ApiHref:         "https://example.com/api",
-//					ConsoleHref:     proto.String("https://example.com/console"),
-//					ReporterVersion: proto.String("0.1"),
-//				},
-//				Common: &structpb.Struct{
-//					Fields: map[string]*structpb.Value{
-//						"workspace_id": structpb.NewStringValue("workspace-v2"),
-//					},
-//				},
-//				Reporter: reporterStruct,
-//			},
-//		},
-//	}
-//
-//	_, err = client.ReportResource(context.Background(), &req)
-//	assert.NoError(t, err, "Failed to Report Resource")
-//
-//	delReq := pbv1beta2.DeleteResourceRequest{
-//		Reference: &pbv1beta2.ResourceReference{
-//			ResourceType: "k8s_cluster",
-//			ResourceId:   "k8s_cluster-abc-123",
-//			Reporter: &pbv1beta2.ReporterReference{
-//				Type: "ACM",
-//			},
-//		},
-//	}
-//
-//	_, err = client.DeleteResource(context.Background(), &delReq)
-//	assert.NoError(t, err, "Failed to Delete Resource")
-//
-//}
-//
-//func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_K8S_Policy(t *testing.T) {
-//	t.Parallel()
-//
-//	// Set Dial Options
-//	var dialOpts []grpc.DialOption
-//	if insecureGRPC {
-//		dialOpts = append(dialOpts, grpc.WithTransportCredentials(grpcinsecure.NewCredentials()))
-//	} else {
-//		log.Errorf("could not configure insecure credentials") // TODO: configure correct TLS credentials
-//	}
-//
-//	conn, err := grpc.NewClient(inventoryapi_grpc_url, dialOpts...)
-//	assert.NoError(t, err, "Failed to create gRPC client")
-//	defer conn.Close()
-//
-//	client := pbv1beta2.NewKesselResourceServiceClient(conn)
-//	reporterStruct, err := structpb.NewStruct(map[string]interface{}{
-//		"disabled": true,
-//		"severity": "MEDIUM",
-//	})
-//	assert.NoError(t, err, "Failed to create structpb for reporter")
-//
-//	req := pbv1beta2.ReportResourceRequest{
-//		Resource: &pbv1beta2.Resource{
-//			Type:               "k8s_policy",
-//			ReporterType:       "ACM",
-//			ReporterInstanceId: "testuser@example.com",
-//			Representations: &pbv1beta2.ResourceRepresentations{
-//				Metadata: &pbv1beta2.RepresentationMetadata{
-//					LocalResourceId: "k8s_policy-abc-123",
-//					ApiHref:         "https://example.com/api",
-//					ConsoleHref:     proto.String("https://example.com/console"),
-//					ReporterVersion: proto.String("0.1"),
-//				},
-//				Common: &structpb.Struct{
-//					Fields: map[string]*structpb.Value{
-//						"workspace_id": structpb.NewStringValue("workspace-123"),
-//					},
-//				},
-//				Reporter: reporterStruct,
-//			},
-//		},
-//	}
-//
-//	_, err = client.ReportResource(context.Background(), &req)
-//	assert.NoError(t, err, "Failed to Report Resource")
-//
-//	delReq := pbv1beta2.DeleteResourceRequest{
-//		Reference: &pbv1beta2.ResourceReference{
-//			ResourceType: "k8s_policy",
-//			ResourceId:   "k8s_policy-abc-123",
-//			Reporter: &pbv1beta2.ReporterReference{
-//				Type: "ACM",
-//			},
-//		},
-//	}
-//
-//	_, err = client.DeleteResource(context.Background(), &delReq)
-//	assert.NoError(t, err, "Failed to Delete Resource")
-//
-//}
+func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_Notifications(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+
+	conn, err := grpc.NewClient(
+		inventoryapi_grpc_url,
+		grpc.WithTransportCredentials(grpcinsecure.NewCredentials()),
+		grpc.WithPerRPCCredentials(&bearerAuth{token: "1234"}),
+	)
+	assert.NoError(t, err, "Failed to create gRPC client")
+	defer func() {
+		if connErr := conn.Close(); connErr != nil {
+			t.Logf("Failed to close gRPC connection: %v", connErr)
+		}
+	}()
+
+	conn.Connect()
+	assert.NoError(t, err, "Failed to connect gRPC client")
+
+	client := pbv1beta2.NewKesselResourceServiceClient(conn)
+
+	// will likely change the notifications json schema, this is here to satisfy validation
+	reporterStruct, err := structpb.NewStruct(map[string]interface{}{
+		"reporter_type":        "NOTIFICATIONS",
+		"reporter_instance_id": "testuser@example.com",
+		"local_resource_id":    "notification-abc-123",
+	})
+	assert.NoError(t, err, "Failed to create structpb for reporter")
+
+	req := pbv1beta2.ReportResourceRequest{
+		Resource: &pbv1beta2.Resource{
+			Type:               "notifications_integration",
+			ReporterType:       "NOTIFICATIONS",
+			ReporterInstanceId: "testuser@example.com",
+			Representations: &pbv1beta2.ResourceRepresentations{
+				Metadata: &pbv1beta2.RepresentationMetadata{
+					LocalResourceId: "notification-abc-123",
+					ApiHref:         "https://example.com/api",
+					ConsoleHref:     proto.String("https://example.com/console"),
+					ReporterVersion: proto.String("0.1"),
+				},
+				Common: &structpb.Struct{
+					Fields: map[string]*structpb.Value{
+						"workspace_id": structpb.NewStringValue("workspace-v2"),
+					},
+				},
+				Reporter: reporterStruct, // Notifications may not require a reporter block
+			},
+		},
+	}
+
+	_, err = client.ReportResource(ctx, &req)
+	assert.NoError(t, err, "Failed to Report Resource")
+
+	delReq := pbv1beta2.DeleteResourceRequest{
+		Reference: &pbv1beta2.ResourceReference{
+			ResourceType: "integrations",
+			ResourceId:   "notification-abc-123",
+			Reporter: &pbv1beta2.ReporterReference{
+				Type: "NOTIFICATIONS",
+			},
+		},
+	}
+
+	_, err = client.DeleteResource(ctx, &delReq)
+	assert.NoError(t, err, "Failed to Delete Resource")
+
+}
+
+func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_K8S_Cluster(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+
+	conn, err := grpc.NewClient(
+		inventoryapi_grpc_url,
+		grpc.WithTransportCredentials(grpcinsecure.NewCredentials()),
+		grpc.WithPerRPCCredentials(&bearerAuth{token: "1234"}),
+	)
+	assert.NoError(t, err, "Failed to create gRPC client")
+	defer func() {
+		if connErr := conn.Close(); connErr != nil {
+			t.Logf("Failed to close gRPC connection: %v", connErr)
+		}
+	}()
+
+	conn.Connect()
+	assert.NoError(t, err, "Failed to connect gRPC client")
+
+	client := pbv1beta2.NewKesselResourceServiceClient(conn)
+
+	reporterStruct, err := structpb.NewStruct(map[string]interface{}{
+		"external_cluster_id": "abcd-efgh-1234",
+		"cluster_status":      "READY",
+		"cluster_reason":      "All systems operational",
+		"kube_version":        "1.31",
+		"kube_vendor":         "OPENSHIFT",
+		"vendor_version":      "4.16",
+		"cloud_platform":      "AWS_UPI",
+	})
+	assert.NoError(t, err, "Failed to create structpb for cluster reporter")
+
+	req := pbv1beta2.ReportResourceRequest{
+		Resource: &pbv1beta2.Resource{
+			Type:               "k8s_cluster",
+			ReporterType:       "ACM",
+			ReporterInstanceId: "testuser@example.com",
+			Representations: &pbv1beta2.ResourceRepresentations{
+				Metadata: &pbv1beta2.RepresentationMetadata{
+					LocalResourceId: "k8s_cluster-abc-123",
+					ApiHref:         "https://example.com/api",
+					ConsoleHref:     proto.String("https://example.com/console"),
+					ReporterVersion: proto.String("0.1"),
+				},
+				Common: &structpb.Struct{
+					Fields: map[string]*structpb.Value{
+						"workspace_id": structpb.NewStringValue("workspace-v2"),
+					},
+				},
+				Reporter: reporterStruct,
+			},
+		},
+	}
+
+	_, err = client.ReportResource(ctx, &req)
+	assert.NoError(t, err, "Failed to Report Resource")
+
+	delReq := pbv1beta2.DeleteResourceRequest{
+		Reference: &pbv1beta2.ResourceReference{
+			ResourceType: "k8s_cluster",
+			ResourceId:   "k8s_cluster-abc-123",
+			Reporter: &pbv1beta2.ReporterReference{
+				Type: "ACM",
+			},
+		},
+	}
+
+	_, err = client.DeleteResource(ctx, &delReq)
+	assert.NoError(t, err, "Failed to Delete Resource")
+
+}
+
+func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_K8S_Policy(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+
+	conn, err := grpc.NewClient(
+		inventoryapi_grpc_url,
+		grpc.WithTransportCredentials(grpcinsecure.NewCredentials()),
+		grpc.WithPerRPCCredentials(&bearerAuth{token: "1234"}),
+	)
+	assert.NoError(t, err, "Failed to create gRPC client")
+	defer func() {
+		if connErr := conn.Close(); connErr != nil {
+			t.Logf("Failed to close gRPC connection: %v", connErr)
+		}
+	}()
+
+	conn.Connect()
+	assert.NoError(t, err, "Failed to connect gRPC client")
+
+	client := pbv1beta2.NewKesselResourceServiceClient(conn)
+
+	reporterStruct, err := structpb.NewStruct(map[string]interface{}{
+		"disabled": true,
+		"severity": "MEDIUM",
+	})
+	assert.NoError(t, err, "Failed to create structpb for reporter")
+
+	req := pbv1beta2.ReportResourceRequest{
+		Resource: &pbv1beta2.Resource{
+			Type:               "k8s_policy",
+			ReporterType:       "ACM",
+			ReporterInstanceId: "testuser@example.com",
+			Representations: &pbv1beta2.ResourceRepresentations{
+				Metadata: &pbv1beta2.RepresentationMetadata{
+					LocalResourceId: "k8s_policy-abc-123",
+					ApiHref:         "https://example.com/api",
+					ConsoleHref:     proto.String("https://example.com/console"),
+					ReporterVersion: proto.String("0.1"),
+				},
+				Common: &structpb.Struct{
+					Fields: map[string]*structpb.Value{
+						"workspace_id": structpb.NewStringValue("workspace-123"),
+					},
+				},
+				Reporter: reporterStruct,
+			},
+		},
+	}
+
+	_, err = client.ReportResource(ctx, &req)
+	assert.NoError(t, err, "Failed to Report Resource")
+
+	delReq := pbv1beta2.DeleteResourceRequest{
+		Reference: &pbv1beta2.ResourceReference{
+			ResourceType: "k8s_policy",
+			ResourceId:   "k8s_policy-abc-123",
+			Reporter: &pbv1beta2.ReporterReference{
+				Type: "ACM",
+			},
+		},
+	}
+
+	_, err = client.DeleteResource(ctx, &delReq)
+	assert.NoError(t, err, "Failed to Delete Resource")
+
+}
 
 //func TestInventoryAPIHTTP_v1beta2_AuthzLifecycle(t *testing.T) {
 //	t.Parallel()
@@ -350,77 +367,82 @@ func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_Host(t *testing.T) {
 //	assert.Equal(t, pbv1beta2.Allowed_ALLOWED_FALSE, checkUpdateResp.GetAllowed())
 //}
 
-//func TestInventoryAPIHTTP_v1beta2_Host_WaitForSync(t *testing.T) {
-//	t.Parallel()
-//
-//	resourceId := "wait-for-sync-host-abc-123"
-//
-//	// Set Dial Options
-//	var dialOpts []grpc.DialOption
-//	if insecureGRPC {
-//		dialOpts = append(dialOpts, grpc.WithTransportCredentials(grpcinsecure.NewCredentials()))
-//	} else {
-//		log.Errorf("could not configure insecure credentials") // TODO: configure correct TLS credentials
-//	}
-//
-//	conn, err := grpc.NewClient(inventoryapi_grpc_url, dialOpts...)
-//	assert.NoError(t, err, "Failed to create gRPC client")
-//	defer conn.Close()
-//
-//	client := pbv1beta2.NewKesselResourceServiceClient(conn)
-//
-//	commonData := &structpb.Struct{}
-//	commonData.Fields = map[string]*structpb.Value{
-//		"workspace_id": structpb.NewStringValue("workspace-v2"),
-//	}
-//
-//	reporterStruct, err := structpb.NewStruct(map[string]interface{}{
-//		"disabled": true,
-//		"severity": "MEDIUM",
-//	})
-//	assert.NoError(t, err, "Failed to create structpb for reporter")
-//
-//	req := pbv1beta2.ReportResourceRequest{
-//		WaitForSync: true,
-//		Resource: &pbv1beta2.Resource{
-//			Type:               "host",
-//			ReporterType:       "HBI",
-//			ReporterInstanceId: "testuser@example.com",
-//			Representations: &pbv1beta2.ResourceRepresentations{
-//				Metadata: &pbv1beta2.RepresentationMetadata{
-//					LocalResourceId: resourceId,
-//					ApiHref:         "https://example.com/api",
-//					ConsoleHref:     proto.String("https://example.com/console"),
-//					ReporterVersion: proto.String("0.1"),
-//				},
-//				Common: &structpb.Struct{
-//					Fields: map[string]*structpb.Value{
-//						"workspace_id": structpb.NewStringValue("workspace-v2"),
-//					},
-//				},
-//				Reporter: reporterStruct,
-//			},
-//		},
-//	}
-//
-//	_, err = client.ReportResource(context.Background(), &req)
-//	assert.NoError(t, err, "Failed to Report Resource")
-//
-//	var host model.Resource
-//	err = db.Where("reporter_resource_id = ?", resourceId).First(&host).Error
-//	assert.NoError(t, err, "Error fetching host from DB")
-//	assert.NotNil(t, host, "Host not found in DB")
-//	assert.NotEmpty(t, host.ConsistencyToken, "Consistency token is empty")
-//
-//	delReq := pbv1beta2.DeleteResourceRequest{
-//		Reference: &pbv1beta2.ResourceReference{
-//			ResourceType: "HBI",
-//			ResourceId:   resourceId,
-//			Reporter: &pbv1beta2.ReporterReference{
-//				Type: "ACM",
-//			},
-//		},
-//	}
-//	_, err = client.DeleteResource(context.Background(), &delReq)
-//	assert.NoError(t, err, "Failed to Delete Resource")
-//}
+func TestInventoryAPIHTTP_v1beta2_Host_WaitForSync(t *testing.T) {
+	t.Parallel()
+
+	resourceId := "wait-for-sync-host-abc-123"
+
+	ctx := context.Background()
+
+	conn, err := grpc.NewClient(
+		inventoryapi_grpc_url,
+		grpc.WithTransportCredentials(grpcinsecure.NewCredentials()),
+		grpc.WithPerRPCCredentials(&bearerAuth{token: "1234"}),
+	)
+	assert.NoError(t, err, "Failed to create gRPC client")
+	defer func() {
+		if connErr := conn.Close(); connErr != nil {
+			t.Logf("Failed to close gRPC connection: %v", connErr)
+		}
+	}()
+
+	conn.Connect()
+	assert.NoError(t, err, "Failed to connect gRPC client")
+
+	client := pbv1beta2.NewKesselResourceServiceClient(conn)
+
+	commonData := &structpb.Struct{}
+	commonData.Fields = map[string]*structpb.Value{
+		"workspace_id": structpb.NewStringValue("workspace-v2"),
+	}
+
+	reporterStruct, err := structpb.NewStruct(map[string]interface{}{
+		"disabled": true,
+		"severity": "MEDIUM",
+	})
+	assert.NoError(t, err, "Failed to create structpb for reporter")
+
+	req := pbv1beta2.ReportResourceRequest{
+		WaitForSync: true,
+		Resource: &pbv1beta2.Resource{
+			Type:               "host",
+			ReporterType:       "HBI",
+			ReporterInstanceId: "testuser@example.com",
+			Representations: &pbv1beta2.ResourceRepresentations{
+				Metadata: &pbv1beta2.RepresentationMetadata{
+					LocalResourceId: resourceId,
+					ApiHref:         "https://example.com/api",
+					ConsoleHref:     proto.String("https://example.com/console"),
+					ReporterVersion: proto.String("0.1"),
+				},
+				Common: &structpb.Struct{
+					Fields: map[string]*structpb.Value{
+						"workspace_id": structpb.NewStringValue("workspace-v2"),
+					},
+				},
+				Reporter: reporterStruct,
+			},
+		},
+	}
+
+	_, err = client.ReportResource(ctx, &req)
+	assert.NoError(t, err, "Failed to Report Resource")
+
+	var host model.Resource
+	err = db.Where("reporter_resource_id = ?", resourceId).First(&host).Error
+	assert.NoError(t, err, "Error fetching host from DB")
+	assert.NotNil(t, host, "Host not found in DB")
+	assert.NotEmpty(t, host.ConsistencyToken, "Consistency token is empty")
+
+	delReq := pbv1beta2.DeleteResourceRequest{
+		Reference: &pbv1beta2.ResourceReference{
+			ResourceType: "HBI",
+			ResourceId:   resourceId,
+			Reporter: &pbv1beta2.ReporterReference{
+				Type: "ACM",
+			},
+		},
+	}
+	_, err = client.DeleteResource(ctx, &delReq)
+	assert.NoError(t, err, "Failed to Delete Resource")
+}

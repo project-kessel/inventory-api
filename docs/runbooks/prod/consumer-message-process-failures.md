@@ -154,9 +154,9 @@ To update the Offset:
 
 The Inventory Consumer should move to the next message in the queue after completing and should continue processing as normal. Note, the `kafka-consumer-groups.sh` command generally expects the consumer to not be active in order to complete. It may be required to scale the deployment down to 0 replicas to complete this step. Consumer failures have a retry loop with backoff, executing the command in those waiting periods generally is sufficient.
 
-If scaling down is needed: `oc scale -n kessel-prod --replicas 0 deployment/kessel-inventory-api`
+If scaling down is needed: `oc patch app kessel-inventory --type='json' -p='[{"op": "replace", "path": "/spec/deployments/0/replicas", "value":0}]'`
 
-Make sure to scale back up after executing the offset update
+Make sure to scale back up after executing the offset update: `oc patch app kessel-inventory --type='json' -p='[{"op": "replace", "path": "/spec/deployments/0/replicas", "value":3}]'`
 
 If the problem persists on subsequent messages, or if the failed object is supported based on Inventory schema definitions, but is not present in the Relations API schema definitions, there is likely a missing defintion that still needs to be added to the Relations schemas for the new resource type.
 

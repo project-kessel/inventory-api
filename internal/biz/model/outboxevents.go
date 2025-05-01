@@ -194,6 +194,11 @@ func convertResourceToSetTupleEvent(resource Resource, namespace string) (JsonOb
 		namespace = strings.ToLower(resource.ReporterType)
 	}
 
+	// This is a temporary workaround for check/lookup
+	if namespace == "authz" {
+		namespace = "notifications"
+	}
+
 	relationship := &kessel.Relationship{
 		Resource: &kessel.ObjectReference{
 			Type: &kessel.ObjectType{
@@ -232,6 +237,11 @@ func convertResourceToUnsetTupleEvent(resource Resource, namespace string) (Json
 	if resource.ReporterType != "" {
 		// v1beta2 compatibility for namespace override, see common/DefaultSetWorkspace for parity
 		namespace = strings.ToLower(resource.ReporterType)
+	}
+
+	// This is a temporary workaround for check/lookup
+	if namespace == "authz" {
+		namespace = "notifications"
 	}
 
 	tuple := &kessel.RelationTupleFilter{

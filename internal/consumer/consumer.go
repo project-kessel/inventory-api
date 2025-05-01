@@ -5,8 +5,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"os"
 	"os/signal"
+	"slices"
 	"syscall"
 	"time"
 
@@ -32,6 +34,9 @@ import (
 
 // commitModulo is used to define the batch size of offsets based on the current offset being processed
 const commitModulo = 10
+
+// defines all required headers for message processing
+var requiredHeaders = []string{"operation", "txid"}
 
 var ErrClosed = errors.New("consumer closed")
 var ErrMaxRetries = errors.New("max retries reached")
@@ -153,7 +158,12 @@ func (i *InventoryConsumer) Consume() error {
 
 			switch e := event.(type) {
 			case *kafka.Message:
-				headers := ParseHeaders(e)
+				headers, err := ParseHeaders(e)
+				if err != nil {
+					i.Logger.Errorf("failed to parse message headers: %v", err)
+					run = false
+					continue
+				}
 				operation := headers["operation"]
 				txid := headers["txid"]
 
@@ -298,22 +308,29 @@ func (i *InventoryConsumer) ProcessMessage(headers map[string]string, relationsE
 			return "", nil
 		}
 	default:
-		i.Logger.Infof("unknown operation: %v -- doing nothing", operation)
+		i.Logger.Errorf("unknown operation type, message cannot be processed and will be dropped: offset=%s operation=%s msg=%s",
+			msg.TopicPartition.Offset.String(), operation, msg.Value)
 	}
 	return "", nil
 }
 
-func ParseHeaders(msg *kafka.Message) map[string]string {
+func ParseHeaders(msg *kafka.Message) (map[string]string, error) {
 	headers := make(map[string]string)
 	for _, v := range msg.Headers {
-		switch v.Key {
-		case "operation":
-			headers["operation"] = string(v.Value)
-		case "txid":
-			headers["txid"] = string(v.Value)
+		// ignores any extra headers
+		if slices.Contains(requiredHeaders, v.Key) {
+			headers[v.Key] = string(v.Value)
 		}
 	}
-	return headers
+
+	// ensures all required header keys are present after parsing, but only operation is required to have a value to process messages
+	headerKeys := slices.Sorted(maps.Keys(headers))
+	required := slices.Sorted(slices.Values(requiredHeaders))
+
+	if !slices.Equal(headerKeys, required) || headers["operation"] == "" {
+		return nil, fmt.Errorf("required headers are missing which would result in message processing failures: %+v", headers)
+	}
+	return headers, nil
 }
 
 func ParseCreateOrUpdateMessage(msg []byte) (*v1beta1.Relationship, error) {

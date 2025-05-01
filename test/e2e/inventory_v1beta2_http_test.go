@@ -39,7 +39,11 @@ func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_Host(t *testing.T) {
 		grpc.WithPerRPCCredentials(&bearerAuth{token: "1234"}),
 	)
 	assert.NoError(t, err, "Failed to create gRPC client")
-	defer conn.Close()
+	defer func() {
+		if connErr := conn.Close(); connErr != nil {
+			t.Logf("Failed to close gRPC connection: %v", connErr)
+		}
+	}()
 
 	conn.Connect()
 	assert.NoError(t, err, "Failed to connect gRPC client")

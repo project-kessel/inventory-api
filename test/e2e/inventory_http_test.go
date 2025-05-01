@@ -31,7 +31,6 @@ var insecure bool
 var db *gorm.DB
 
 // v1beta2
-var insecureGRPC bool
 var inventoryapi_grpc_url string
 
 func TestMain(m *testing.M) {

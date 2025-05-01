@@ -26,6 +26,8 @@ spec:
           env:
             - name: INV_HTTP_URL
               value: "kessel-inventory-service:8081"
+            - name: INV_GRPC_URL
+              value: "kessel-inventory-service:9081"
             - name: KAFKA_BOOTSTRAP_SERVERS
               value: "my-cluster-kafka-bootstrap:9092"
             - name: POSTGRES_HOST

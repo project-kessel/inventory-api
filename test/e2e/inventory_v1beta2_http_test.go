@@ -59,7 +59,7 @@ func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_Host(t *testing.T) {
 	}
 
 	opts := getCallOptions()
-	_, err = client.KesselResourceService.ReportResource(context.Background(), &req, opts...)
+	_, err = client.KesselInventoryService.ReportResource(context.Background(), &req, opts...)
 	assert.NoError(t, err, "Failed to Report Resource")
 
 	delReq := pbv1beta2.DeleteResourceRequest{
@@ -72,7 +72,7 @@ func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_Host(t *testing.T) {
 		},
 	}
 
-	_, err = client.KesselResourceService.DeleteResource(context.Background(), &delReq, opts...)
+	_, err = client.KesselInventoryService.DeleteResource(context.Background(), &delReq, opts...)
 	assert.NoError(t, err, "Failed to Delete Resource")
 
 }
@@ -120,7 +120,7 @@ func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_Notifications(t *testing.T) 
 	}
 
 	opts := getCallOptions()
-	_, err = client.KesselResourceService.ReportResource(context.Background(), &req, opts...)
+	_, err = client.KesselInventoryService.ReportResource(context.Background(), &req, opts...)
 	assert.NoError(t, err, "Failed to Report Resource")
 
 	delReq := pbv1beta2.DeleteResourceRequest{
@@ -133,7 +133,7 @@ func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_Notifications(t *testing.T) 
 		},
 	}
 
-	_, err = client.KesselResourceService.DeleteResource(context.Background(), &delReq, opts...)
+	_, err = client.KesselInventoryService.DeleteResource(context.Background(), &delReq, opts...)
 	assert.NoError(t, err, "Failed to Delete Resource")
 
 }
@@ -184,7 +184,7 @@ func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_K8S_Cluster(t *testing.T) {
 	}
 
 	opts := getCallOptions()
-	_, err = client.KesselResourceService.ReportResource(context.Background(), &req, opts...)
+	_, err = client.KesselInventoryService.ReportResource(context.Background(), &req, opts...)
 	assert.NoError(t, err, "Failed to Report Resource")
 
 	delReq := pbv1beta2.DeleteResourceRequest{
@@ -197,7 +197,7 @@ func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_K8S_Cluster(t *testing.T) {
 		},
 	}
 
-	_, err = client.KesselResourceService.DeleteResource(context.Background(), &delReq, opts...)
+	_, err = client.KesselInventoryService.DeleteResource(context.Background(), &delReq, opts...)
 	assert.NoError(t, err, "Failed to Delete Resource")
 
 }
@@ -243,7 +243,7 @@ func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_K8S_Policy(t *testing.T) {
 	}
 
 	opts := getCallOptions()
-	_, err = client.KesselResourceService.ReportResource(context.Background(), &req, opts...)
+	_, err = client.KesselInventoryService.ReportResource(context.Background(), &req, opts...)
 	assert.NoError(t, err, "Failed to Report Resource")
 
 	delReq := pbv1beta2.DeleteResourceRequest{
@@ -256,7 +256,7 @@ func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_K8S_Policy(t *testing.T) {
 		},
 	}
 
-	_, err = client.KesselResourceService.DeleteResource(context.Background(), &delReq, opts...)
+	_, err = client.KesselInventoryService.DeleteResource(context.Background(), &delReq, opts...)
 	assert.NoError(t, err, "Failed to Delete Resource")
 
 }
@@ -367,7 +367,7 @@ func TestInventoryAPIHTTP_v1beta2_Host_WaitForSync(t *testing.T) {
 		},
 	}
 	opts := getCallOptions()
-	_, err = client.KesselResourceService.ReportResource(context.Background(), &req, opts...)
+	_, err = client.KesselInventoryService.ReportResource(context.Background(), &req, opts...)
 	assert.NoError(t, err, "Failed to Report Resource")
 
 	var host model.Resource
@@ -385,6 +385,6 @@ func TestInventoryAPIHTTP_v1beta2_Host_WaitForSync(t *testing.T) {
 			},
 		},
 	}
-	_, err = client.KesselResourceService.DeleteResource(context.Background(), &delReq, opts...)
+	_, err = client.KesselInventoryService.DeleteResource(context.Background(), &delReq, opts...)
 	assert.NoError(t, err, "Failed to Delete Resource")
 }

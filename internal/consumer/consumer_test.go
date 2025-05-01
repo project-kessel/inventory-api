@@ -199,7 +199,7 @@ func TestParseHeaders(t *testing.T) {
 			msg: &kafka.Message{
 				Headers: []kafka.Header{
 					{Key: "operation", Value: []byte(string(model.OperationTypeDeleted))},
-					{Key: "txid", Value: []byte("")},
+					{Key: "txid", Value: []byte{}},
 				},
 			},
 			expectErr: false,
@@ -211,7 +211,7 @@ func TestParseHeaders(t *testing.T) {
 			msg: &kafka.Message{
 				Headers: []kafka.Header{
 					{Key: "operation", Value: []byte("any")},
-					{Key: "txid", Value: []byte("")},
+					{Key: "txid", Value: []byte{}},
 				},
 			},
 			expectErr: false,
@@ -244,7 +244,7 @@ func TestParseHeaders(t *testing.T) {
 			expectedTxid:      "123456",
 			msg: &kafka.Message{
 				Headers: []kafka.Header{
-					{Key: "operation", Value: []byte("")},
+					{Key: "operation", Value: []byte{}},
 					{Key: "txid", Value: []byte("123456")},
 				},
 			},

@@ -1,6 +1,5 @@
 package e2e
 
-//commenting this test out until we can find a better way to execute them
 import (
 	"context"
 	"fmt"

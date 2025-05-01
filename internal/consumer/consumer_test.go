@@ -1,6 +1,7 @@
 package consumer
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
@@ -62,7 +63,13 @@ func (t *TestCase) TestSetup() []error {
 
 	notifier := &pubsub.NotifierMock{}
 
-	t.inv, err = New(t.completedConfig, &gorm.DB{}, authz.CompletedConfig{}, nil, notifier, t.logger)
+	authorizer := &mocks.MockAuthz{}
+	createTupleResponse := &v1beta1.CreateTuplesResponse{ConsistencyToken: &v1beta1.ConsistencyToken{Token: "test-token"}}
+	deleteTupleResponse := &v1beta1.DeleteTuplesResponse{ConsistencyToken: &v1beta1.ConsistencyToken{Token: "test-token"}}
+	authorizer.On("CreateTuples", mock.Anything, mock.Anything).Return(createTupleResponse, nil)
+	authorizer.On("DeleteTuples", mock.Anything, mock.Anything).Return(deleteTupleResponse, nil)
+
+	t.inv, err = New(t.completedConfig, &gorm.DB{}, authz.CompletedConfig{}, authorizer, notifier, t.logger)
 	if err != nil {
 		errs = append(errs, err)
 	}
@@ -72,13 +79,6 @@ func (t *TestCase) TestSetup() []error {
 		errs = append(errs, err)
 	}
 
-	createTupleResponse := &v1beta1.CreateTuplesResponse{ConsistencyToken: &v1beta1.ConsistencyToken{Token: "test-token"}}
-	deleteTupleResponse := &v1beta1.DeleteTuplesResponse{ConsistencyToken: &v1beta1.ConsistencyToken{Token: "test-token"}}
-
-	m := &mocks.MockAuthz{}
-	m.On("CreateTuples", mock.Anything, mock.Anything).Return(createTupleResponse, nil)
-	m.On("DeleteTuples", mock.Anything, mock.Anything).Return(deleteTupleResponse, nil)
-	t.inv.Authorizer = m
 	return errs
 }
 
@@ -426,6 +426,77 @@ func TestCheckIfCommit(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			actual := checkIfCommit(test.partition)
 			assert.Equal(t, test.expected, actual)
+		})
+	}
+}
+
+func TestCommitStoredOffsets(t *testing.T) {
+	tests := []struct {
+		name                                      string
+		storedOffsets, response, remainingOffsets []kafka.TopicPartition
+		responseErr                               error
+	}{
+		{
+			name: "single stored offset is committed without error",
+			storedOffsets: []kafka.TopicPartition{
+				{Offset: kafka.Offset(10), Partition: 0},
+			},
+			response: []kafka.TopicPartition{
+				{Offset: kafka.Offset(10), Partition: 0},
+			},
+			remainingOffsets: nil,
+			responseErr:      nil,
+		},
+		{
+			name: "all stored offsets are committed without error",
+			storedOffsets: []kafka.TopicPartition{
+				{Offset: kafka.Offset(10), Partition: 0},
+				{Offset: kafka.Offset(11), Partition: 0},
+				{Offset: kafka.Offset(1), Partition: 1},
+				{Offset: kafka.Offset(2), Partition: 1},
+				{Offset: kafka.Offset(12), Partition: 0},
+				{Offset: kafka.Offset(13), Partition: 0},
+				{Offset: kafka.Offset(3), Partition: 1},
+				{Offset: kafka.Offset(4), Partition: 1},
+			},
+			response: []kafka.TopicPartition{
+				{Offset: kafka.Offset(10), Partition: 0},
+				{Offset: kafka.Offset(11), Partition: 0},
+				{Offset: kafka.Offset(1), Partition: 1},
+				{Offset: kafka.Offset(2), Partition: 1},
+				{Offset: kafka.Offset(12), Partition: 0},
+				{Offset: kafka.Offset(13), Partition: 0},
+				{Offset: kafka.Offset(3), Partition: 1},
+				{Offset: kafka.Offset(4), Partition: 1},
+			},
+			remainingOffsets: nil,
+			responseErr:      nil,
+		},
+		{
+			name: "Consumer.CommitOffsets returns error; offset storage is not cleared",
+			storedOffsets: []kafka.TopicPartition{
+				{Offset: kafka.Offset(10), Partition: 1},
+			},
+			response:         nil,
+			remainingOffsets: []kafka.TopicPartition{{Offset: kafka.Offset(10), Partition: 1}},
+			responseErr:      errors.New("commit failed"),
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			tester := TestCase{}
+			errs := tester.TestSetup()
+			assert.Nil(t, errs)
+
+			c := &mocks.MockConsumer{}
+			c.On("CommitOffsets", mock.Anything).Return(test.response, test.responseErr)
+			tester.inv.Consumer = c
+			tester.inv.OffsetStorage = test.storedOffsets
+
+			err := tester.inv.commitStoredOffsets()
+			assert.Equal(t, err, test.responseErr)
+			assert.Equal(t, len(tester.inv.OffsetStorage), len(test.remainingOffsets))
+			assert.Equal(t, tester.inv.OffsetStorage, test.remainingOffsets)
 		})
 	}
 }

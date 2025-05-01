@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/signal"
 	"slices"
+	"strings"
 	"syscall"
 	"time"
 
@@ -41,9 +42,18 @@ var requiredHeaders = []string{"operation", "txid"}
 var ErrClosed = errors.New("consumer closed")
 var ErrMaxRetries = errors.New("max retries reached")
 
-// InventoryConsumer defines a Kafka Consumer with required clients and configs to call Relations API and update the Inventory DB with consistency tokens
+type Consumer interface {
+	CommitOffsets(offsets []kafka.TopicPartition) ([]kafka.TopicPartition, error)
+	SubscribeTopics(topics []string, rebalanceCb kafka.RebalanceCb) (err error)
+	Poll(timeoutMs int) (event kafka.Event)
+	IsClosed() bool
+	Close() error
+	AssignmentLost() bool
+}
+
+// InventoryConsumer defines a Consumer with required clients and configs to call Relations API and update the Inventory DB with consistency tokens
 type InventoryConsumer struct {
-	Consumer         *kafka.Consumer
+	Consumer         Consumer
 	OffsetStorage    []kafka.TopicPartition
 	Config           CompletedConfig
 	DB               *gorm.DB
@@ -121,10 +131,7 @@ type MessagePayload struct {
 
 // Consume begins the consumption loop for the Consumer
 func (i *InventoryConsumer) Consume() error {
-	// TODO -- potentially leverage rebalanceCallback here to run something when rebalance occurs
-	// more specifically, if we start commiting after X number of messages, when consumer loses partition
-	// we can ensure to commit any offsets not yet commit. This is more futureproofing than critical for now
-	err := i.Consumer.SubscribeTopics([]string{i.Config.Topic}, nil)
+	err := i.Consumer.SubscribeTopics([]string{i.Config.Topic}, i.RebalanceCallback)
 	if err != nil {
 		i.Logger.Errorf("failed to subscribe to topic: %v", err)
 		i.Errors <- err
@@ -206,13 +213,11 @@ func (i *InventoryConsumer) Consume() error {
 				// store the current offset to be later batch committed
 				i.OffsetStorage = append(i.OffsetStorage, e.TopicPartition)
 				if checkIfCommit(e.TopicPartition) {
-					committedOffsets, err := i.commitStoredOffsets()
+					err := i.commitStoredOffsets()
 					if err != nil {
 						i.Logger.Errorf("failed to commit offsets: %v", err)
 						continue
 					}
-					i.Logger.Infof("offsets %s to %s committed", committedOffsets[0].Offset, committedOffsets[len(committedOffsets)-1].Offset)
-					i.OffsetStorage = nil
 				}
 				i.Logger.Infof("consumed event from topic %s, partition %d at offset %s",
 					*e.TopicPartition.Topic, e.TopicPartition.Partition, e.TopicPartition.Offset)
@@ -393,13 +398,25 @@ func checkIfCommit(partition kafka.TopicPartition) bool {
 	return partition.Offset%commitModulo == 0
 }
 
-// commitStoredOffsets commits offsets for all processed messages since last offset commit
-func (i *InventoryConsumer) commitStoredOffsets() ([]kafka.TopicPartition, error) {
-	commitedOffsets, err := i.Consumer.CommitOffsets(i.OffsetStorage)
-	if err != nil {
-		return nil, err
+// formatOffsets converts a slice of partitions with offset data into a more readable shorthand-coded string to capture what partitions and offsets were comitted
+func formatOffsets(offsets []kafka.TopicPartition) string {
+	var committedOffsets []string
+	for _, partition := range offsets {
+		committedOffsets = append(committedOffsets, fmt.Sprintf("[%d:%s]", partition.Partition, partition.Offset.String()))
 	}
-	return commitedOffsets, nil
+	return strings.Join(committedOffsets, ",")
+}
+
+// commitStoredOffsets commits offsets for all processed messages since last offset commit
+func (i *InventoryConsumer) commitStoredOffsets() error {
+	committed, err := i.Consumer.CommitOffsets(i.OffsetStorage)
+	if err != nil {
+		return err
+	}
+
+	i.Logger.Infof("offsets committed ([partition:offset]): %s", formatOffsets(committed))
+	i.OffsetStorage = nil
+	return nil
 }
 
 // CreateTuple calls the Relations API to create a tuple from the message payload received and returns the consistency token
@@ -472,11 +489,9 @@ func (i *InventoryConsumer) Shutdown() error {
 	if !i.Consumer.IsClosed() {
 		i.Logger.Info("shutting down consumer...")
 		if len(i.OffsetStorage) > 0 {
-			committedOffsets, err := i.commitStoredOffsets()
+			err := i.commitStoredOffsets()
 			if err != nil {
 				i.Logger.Errorf("failed to commit offsets before shutting down: %v", err)
-			} else {
-				i.Logger.Infof("offsets %s to %s committed", committedOffsets[0].Offset, committedOffsets[len(committedOffsets)-1].Offset)
 			}
 		}
 		err := i.Consumer.Close()
@@ -511,4 +526,31 @@ func (i *InventoryConsumer) Retry(operation func() (string, error)) (string, err
 	}
 	i.Logger.Errorf("Error processing request (max attempts reached: %v): %v", attempts, err)
 	return "", ErrMaxRetries
+}
+
+// RebalanceCallback logs when rebalance events occur and ensures any stored offsets are committed before losing the partition assignment. It is registered to the kafka 'SubscribeTopics' call and is invoked  automatically whenever rebalances occurs.
+// Note, the RebalanceCb function must satisfy the function type func(*Consumer, Event). This function does so, but the consumer embedded in the InventoryConsumer is used versus the passed one which is the same consumer in either case.
+func (i *InventoryConsumer) RebalanceCallback(consumer *kafka.Consumer, event kafka.Event) error {
+	switch ev := event.(type) {
+	case kafka.AssignedPartitions:
+		i.Logger.Warnf("consumer rebalance event type: %d new partition(s) assigned: %v\n",
+			len(ev.Partitions), ev.Partitions)
+
+	case kafka.RevokedPartitions:
+		i.Logger.Warnf("consumer rebalance event: %d partition(s) revoked: %v\n",
+			len(ev.Partitions), ev.Partitions)
+
+		if i.Consumer.AssignmentLost() {
+			i.Logger.Warn("Assignment lost involuntarily, commit may fail")
+		}
+		err := i.commitStoredOffsets()
+		if err != nil {
+			i.Logger.Errorf("failed to commit offsets: %v", err)
+			return err
+		}
+
+	default:
+		i.Logger.Error("Unexpected event type: %v", event)
+	}
+	return nil
 }

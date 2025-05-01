@@ -3,6 +3,8 @@ package mocks
 import (
 	"context"
 
+	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
+
 	"github.com/project-kessel/inventory-api/internal/biz/model"
 	kesselv1 "github.com/project-kessel/relations-api/api/kessel/relations/v1"
 	"github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
@@ -11,6 +13,10 @@ import (
 )
 
 type MockAuthz struct {
+	mock.Mock
+}
+
+type MockConsumer struct {
 	mock.Mock
 }
 
@@ -53,4 +59,34 @@ func (m *MockAuthz) SetWorkspace(ctx context.Context, local_resource_id, workspa
 func (m *MockAuthz) LookupResources(ctx context.Context, request *v1beta1.LookupResourcesRequest) (grpc.ServerStreamingClient[v1beta1.LookupResourcesResponse], error) {
 	args := m.Called(ctx, request)
 	return args.Get(0).(grpc.ServerStreamingClient[v1beta1.LookupResourcesResponse]), args.Error(1)
+}
+
+func (m *MockConsumer) CommitOffsets(offsets []kafka.TopicPartition) ([]kafka.TopicPartition, error) {
+	args := m.Called(offsets)
+	return args.Get(0).([]kafka.TopicPartition), args.Error(1)
+}
+
+func (m *MockConsumer) SubscribeTopics(topics []string, rebalanceCb kafka.RebalanceCb) (err error) {
+	args := m.Called(topics, rebalanceCb)
+	return args.Error(0)
+}
+
+func (m *MockConsumer) Poll(timeoutMs int) (event kafka.Event) {
+	args := m.Called(timeoutMs)
+	return args.Get(0).(kafka.Event)
+}
+
+func (m *MockConsumer) IsClosed() bool {
+	args := m.Called()
+	return args.Get(0).(bool)
+}
+
+func (m *MockConsumer) Close() error {
+	args := m.Called()
+	return args.Error(0)
+}
+
+func (m *MockConsumer) AssignmentLost() bool {
+	args := m.Called()
+	return args.Get(0).(bool)
 }

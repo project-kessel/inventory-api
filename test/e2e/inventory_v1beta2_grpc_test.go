@@ -3,29 +3,54 @@ package e2e
 //commenting this test out until we can find a better way to execute them
 import (
 	"context"
-	"testing"
-	"time"
-
+	"fmt"
 	pbv1beta2 "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
-	"github.com/project-kessel/inventory-client-go/common"
-	v1beta2 "github.com/project-kessel/inventory-client-go/v1beta2"
 	"github.com/stretchr/testify/assert"
+	"google.golang.org/grpc"
+	grpcinsecure "google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/structpb"
+	"testing"
 )
+
+// bearerAuth implements grpc.PerRPCCredentials to inject Authorization
+type bearerAuth struct {
+	token string
+}
+
+func (b *bearerAuth) GetRequestMetadata(ctx context.Context, uri ...string) (map[string]string, error) {
+	return map[string]string{
+		"authorization": fmt.Sprintf("Bearer %s", b.token),
+	}, nil
+}
+
+func (b *bearerAuth) RequireTransportSecurity() bool {
+	return false // Set to true if using TLS
+}
 
 // V1Beta2
 func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_Host(t *testing.T) {
 	t.Parallel()
-	c := common.NewConfig(
-		common.WithHTTPUrl(inventoryapi_http_url),
-		common.WithTLSInsecure(insecure),
-		common.WithHTTPTLSConfig(tlsConfig),
-	)
 
-	client, err := v1beta2.NewHttpClient(context.Background(), c)
-	assert.NoError(t, err, "Failed to create v1beta2 HTTP client")
+	ctx := context.Background()
+
+	conn, err := grpc.NewClient(
+		inventoryapi_grpc_url,
+		grpc.WithTransportCredentials(grpcinsecure.NewCredentials()),
+		grpc.WithPerRPCCredentials(&bearerAuth{token: "1234"}),
+	)
+	assert.NoError(t, err, "Failed to create gRPC client")
+	defer func() {
+		if connErr := conn.Close(); connErr != nil {
+			t.Logf("Failed to close gRPC connection: %v", connErr)
+		}
+	}()
+
+	conn.Connect()
+	assert.NoError(t, err, "Failed to connect gRPC client")
+
+	client := pbv1beta2.NewKesselInventoryServiceClient(conn)
 
 	reporterStruct, err := structpb.NewStruct(map[string]interface{}{
 		"satellite_id":          "550e8400-e29b-41d4-a716-446655440000",
@@ -35,7 +60,7 @@ func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_Host(t *testing.T) {
 	})
 	assert.NoError(t, err, "Failed to create structpb for host reporter")
 
-	req := pbv1beta2.ReportResourceRequest{
+	req := &pbv1beta2.ReportResourceRequest{
 		WaitForSync: false,
 		Resource: &pbv1beta2.Resource{
 			Type:               "host",
@@ -58,11 +83,10 @@ func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_Host(t *testing.T) {
 		},
 	}
 
-	opts := getCallOptions()
-	_, err = client.KesselInventoryService.ReportResource(context.Background(), &req, opts...)
+	_, err = client.ReportResource(ctx, req)
 	assert.NoError(t, err, "Failed to Report Resource")
 
-	delReq := pbv1beta2.DeleteResourceRequest{
+	delReq := &pbv1beta2.DeleteResourceRequest{
 		Reference: &pbv1beta2.ResourceReference{
 			ResourceType: "host",
 			ResourceId:   "host-abc-123",
@@ -72,22 +96,31 @@ func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_Host(t *testing.T) {
 		},
 	}
 
-	_, err = client.KesselInventoryService.DeleteResource(context.Background(), &delReq, opts...)
+	_, err = client.DeleteResource(ctx, delReq)
 	assert.NoError(t, err, "Failed to Delete Resource")
-
 }
 
 func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_Notifications(t *testing.T) {
 	t.Parallel()
 
-	c := common.NewConfig(
-		common.WithHTTPUrl(inventoryapi_http_url),
-		common.WithTLSInsecure(insecure),
-		common.WithHTTPTLSConfig(tlsConfig),
-	)
+	ctx := context.Background()
 
-	client, err := v1beta2.NewHttpClient(context.Background(), c)
-	assert.NoError(t, err, "Failed to create v1beta2 HTTP client")
+	conn, err := grpc.NewClient(
+		inventoryapi_grpc_url,
+		grpc.WithTransportCredentials(grpcinsecure.NewCredentials()),
+		grpc.WithPerRPCCredentials(&bearerAuth{token: "1234"}),
+	)
+	assert.NoError(t, err, "Failed to create gRPC client")
+	defer func() {
+		if connErr := conn.Close(); connErr != nil {
+			t.Logf("Failed to close gRPC connection: %v", connErr)
+		}
+	}()
+
+	conn.Connect()
+	assert.NoError(t, err, "Failed to connect gRPC client")
+
+	client := pbv1beta2.NewKesselInventoryServiceClient(conn)
 
 	// will likely change the notifications json schema, this is here to satisfy validation
 	reporterStruct, err := structpb.NewStruct(map[string]interface{}{
@@ -119,8 +152,7 @@ func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_Notifications(t *testing.T) 
 		},
 	}
 
-	opts := getCallOptions()
-	_, err = client.KesselInventoryService.ReportResource(context.Background(), &req, opts...)
+	_, err = client.ReportResource(ctx, &req)
 	assert.NoError(t, err, "Failed to Report Resource")
 
 	delReq := pbv1beta2.DeleteResourceRequest{
@@ -133,7 +165,7 @@ func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_Notifications(t *testing.T) 
 		},
 	}
 
-	_, err = client.KesselInventoryService.DeleteResource(context.Background(), &delReq, opts...)
+	_, err = client.DeleteResource(ctx, &delReq)
 	assert.NoError(t, err, "Failed to Delete Resource")
 
 }
@@ -141,14 +173,24 @@ func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_Notifications(t *testing.T) 
 func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_K8S_Cluster(t *testing.T) {
 	t.Parallel()
 
-	c := common.NewConfig(
-		common.WithHTTPUrl(inventoryapi_http_url),
-		common.WithTLSInsecure(insecure),
-		common.WithHTTPTLSConfig(tlsConfig),
-	)
+	ctx := context.Background()
 
-	client, err := v1beta2.NewHttpClient(context.Background(), c)
-	assert.NoError(t, err, "Failed to create v1beta2 HTTP client")
+	conn, err := grpc.NewClient(
+		inventoryapi_grpc_url,
+		grpc.WithTransportCredentials(grpcinsecure.NewCredentials()),
+		grpc.WithPerRPCCredentials(&bearerAuth{token: "1234"}),
+	)
+	assert.NoError(t, err, "Failed to create gRPC client")
+	defer func() {
+		if connErr := conn.Close(); connErr != nil {
+			t.Logf("Failed to close gRPC connection: %v", connErr)
+		}
+	}()
+
+	conn.Connect()
+	assert.NoError(t, err, "Failed to connect gRPC client")
+
+	client := pbv1beta2.NewKesselInventoryServiceClient(conn)
 
 	reporterStruct, err := structpb.NewStruct(map[string]interface{}{
 		"external_cluster_id": "abcd-efgh-1234",
@@ -183,8 +225,7 @@ func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_K8S_Cluster(t *testing.T) {
 		},
 	}
 
-	opts := getCallOptions()
-	_, err = client.KesselInventoryService.ReportResource(context.Background(), &req, opts...)
+	_, err = client.ReportResource(ctx, &req)
 	assert.NoError(t, err, "Failed to Report Resource")
 
 	delReq := pbv1beta2.DeleteResourceRequest{
@@ -197,7 +238,7 @@ func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_K8S_Cluster(t *testing.T) {
 		},
 	}
 
-	_, err = client.KesselInventoryService.DeleteResource(context.Background(), &delReq, opts...)
+	_, err = client.DeleteResource(ctx, &delReq)
 	assert.NoError(t, err, "Failed to Delete Resource")
 
 }
@@ -205,14 +246,24 @@ func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_K8S_Cluster(t *testing.T) {
 func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_K8S_Policy(t *testing.T) {
 	t.Parallel()
 
-	c := common.NewConfig(
-		common.WithHTTPUrl(inventoryapi_http_url),
-		common.WithTLSInsecure(insecure),
-		common.WithHTTPTLSConfig(tlsConfig),
-	)
+	ctx := context.Background()
 
-	client, err := v1beta2.NewHttpClient(context.Background(), c)
-	assert.NoError(t, err, "Failed to create v1beta2 HTTP client")
+	conn, err := grpc.NewClient(
+		inventoryapi_grpc_url,
+		grpc.WithTransportCredentials(grpcinsecure.NewCredentials()),
+		grpc.WithPerRPCCredentials(&bearerAuth{token: "1234"}),
+	)
+	assert.NoError(t, err, "Failed to create gRPC client")
+	defer func() {
+		if connErr := conn.Close(); connErr != nil {
+			t.Logf("Failed to close gRPC connection: %v", connErr)
+		}
+	}()
+
+	conn.Connect()
+	assert.NoError(t, err, "Failed to connect gRPC client")
+
+	client := pbv1beta2.NewKesselInventoryServiceClient(conn)
 
 	reporterStruct, err := structpb.NewStruct(map[string]interface{}{
 		"disabled": true,
@@ -242,8 +293,7 @@ func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_K8S_Policy(t *testing.T) {
 		},
 	}
 
-	opts := getCallOptions()
-	_, err = client.KesselInventoryService.ReportResource(context.Background(), &req, opts...)
+	_, err = client.ReportResource(ctx, &req)
 	assert.NoError(t, err, "Failed to Report Resource")
 
 	delReq := pbv1beta2.DeleteResourceRequest{
@@ -256,7 +306,7 @@ func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_K8S_Policy(t *testing.T) {
 		},
 	}
 
-	_, err = client.KesselInventoryService.DeleteResource(context.Background(), &delReq, opts...)
+	_, err = client.DeleteResource(ctx, &delReq)
 	assert.NoError(t, err, "Failed to Delete Resource")
 
 }
@@ -323,15 +373,24 @@ func TestInventoryAPIHTTP_v1beta2_Host_WaitForSync(t *testing.T) {
 
 	resourceId := "wait-for-sync-host-abc-123"
 
-	c := common.NewConfig(
-		common.WithHTTPUrl(inventoryapi_http_url),
-		common.WithTLSInsecure(insecure),
-		common.WithHTTPTLSConfig(tlsConfig),
-		common.WithTimeout(10*time.Second),
-	)
+	ctx := context.Background()
 
-	client, err := v1beta2.NewHttpClient(context.Background(), c)
-	assert.NoError(t, err, "Failed to create v1beta2 HTTP client")
+	conn, err := grpc.NewClient(
+		inventoryapi_grpc_url,
+		grpc.WithTransportCredentials(grpcinsecure.NewCredentials()),
+		grpc.WithPerRPCCredentials(&bearerAuth{token: "1234"}),
+	)
+	assert.NoError(t, err, "Failed to create gRPC client")
+	defer func() {
+		if connErr := conn.Close(); connErr != nil {
+			t.Logf("Failed to close gRPC connection: %v", connErr)
+		}
+	}()
+
+	conn.Connect()
+	assert.NoError(t, err, "Failed to connect gRPC client")
+
+	client := pbv1beta2.NewKesselInventoryServiceClient(conn)
 
 	commonData := &structpb.Struct{}
 	commonData.Fields = map[string]*structpb.Value{
@@ -366,8 +425,8 @@ func TestInventoryAPIHTTP_v1beta2_Host_WaitForSync(t *testing.T) {
 			},
 		},
 	}
-	opts := getCallOptions()
-	_, err = client.KesselInventoryService.ReportResource(context.Background(), &req, opts...)
+
+	_, err = client.ReportResource(ctx, &req)
 	assert.NoError(t, err, "Failed to Report Resource")
 
 	var host model.Resource
@@ -385,6 +444,6 @@ func TestInventoryAPIHTTP_v1beta2_Host_WaitForSync(t *testing.T) {
 			},
 		},
 	}
-	_, err = client.KesselInventoryService.DeleteResource(context.Background(), &delReq, opts...)
+	_, err = client.DeleteResource(ctx, &delReq)
 	assert.NoError(t, err, "Failed to Delete Resource")
 }

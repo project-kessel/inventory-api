@@ -2,6 +2,7 @@ package e2e
 
 import (
 	"context"
+	"github.com/go-kratos/kratos/v2/log"
 	pbv1beta2 "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
 	"github.com/stretchr/testify/assert"
@@ -21,7 +22,7 @@ func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_Host(t *testing.T) {
 	if insecureGRPC {
 		dialOpts = append(dialOpts, grpc.WithTransportCredentials(grpcinsecure.NewCredentials()))
 	} else {
-		// TODO: configure correct TLS credentials
+		log.Errorf("could not configure insecure credentials") // TODO: configure correct TLS credentials
 	}
 
 	conn, err := grpc.NewClient(inventoryapi_grpc_url, dialOpts...)
@@ -87,7 +88,7 @@ func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_Notifications(t *testing.T) 
 	if insecureGRPC {
 		dialOpts = append(dialOpts, grpc.WithTransportCredentials(grpcinsecure.NewCredentials()))
 	} else {
-		// TODO: configure correct TLS credentials
+		log.Errorf("could not configure insecure credentials") // TODO: configure correct TLS credentials
 	}
 
 	conn, err := grpc.NewClient(inventoryapi_grpc_url, dialOpts...)
@@ -152,7 +153,7 @@ func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_K8S_Cluster(t *testing.T) {
 	if insecureGRPC {
 		dialOpts = append(dialOpts, grpc.WithTransportCredentials(grpcinsecure.NewCredentials()))
 	} else {
-		// TODO: configure correct TLS credentials
+		log.Errorf("could not configure insecure credentials") // TODO: configure correct TLS credentials
 	}
 
 	conn, err := grpc.NewClient(inventoryapi_grpc_url, dialOpts...)
@@ -220,7 +221,7 @@ func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_K8S_Policy(t *testing.T) {
 	if insecureGRPC {
 		dialOpts = append(dialOpts, grpc.WithTransportCredentials(grpcinsecure.NewCredentials()))
 	} else {
-		// TODO: configure correct TLS credentials
+		log.Errorf("could not configure insecure credentials") // TODO: configure correct TLS credentials
 	}
 
 	conn, err := grpc.NewClient(inventoryapi_grpc_url, dialOpts...)
@@ -341,7 +342,7 @@ func TestInventoryAPIHTTP_v1beta2_Host_WaitForSync(t *testing.T) {
 	if insecureGRPC {
 		dialOpts = append(dialOpts, grpc.WithTransportCredentials(grpcinsecure.NewCredentials()))
 	} else {
-		// TODO: configure correct TLS credentials
+		log.Errorf("could not configure insecure credentials") // TODO: configure correct TLS credentials
 	}
 
 	conn, err := grpc.NewClient(inventoryapi_grpc_url, dialOpts...)

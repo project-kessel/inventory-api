@@ -30,6 +30,10 @@ var tlsConfig *tls.Config
 var insecure bool
 var db *gorm.DB
 
+// v1beta2
+var insecureGRPC bool
+var inventoryapi_grpc_url string
+
 func TestMain(m *testing.M) {
 	var err error
 
@@ -38,6 +42,12 @@ func TestMain(m *testing.M) {
 		err := fmt.Errorf("INV_HTTP_URL environment variable not set")
 		log.Error(err)
 		inventoryapi_http_url = "localhost:8081"
+	}
+	inventoryapi_grpc_url = os.Getenv("INV_GRPC_URL")
+	if inventoryapi_grpc_url == "" {
+		err := fmt.Errorf("INV_GRPC_URL environment variable not set")
+		log.Error(err)
+		inventoryapi_grpc_url = "localhost:9081"
 	}
 	insecure = true
 	insecureTLSstr := os.Getenv("INV_TLS_INSECURE")

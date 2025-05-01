@@ -2,29 +2,33 @@ package e2e
 
 import (
 	"context"
-	"testing"
-	"time"
-
 	pbv1beta2 "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
-	"github.com/project-kessel/inventory-client-go/common"
-	v1beta2 "github.com/project-kessel/inventory-client-go/v1beta2"
 	"github.com/stretchr/testify/assert"
+	"google.golang.org/grpc"
+	grpcinsecure "google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/structpb"
+	"testing"
 )
 
 // V1Beta2
 func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_Host(t *testing.T) {
 	t.Parallel()
-	c := common.NewConfig(
-		common.WithHTTPUrl(inventoryapi_http_url),
-		common.WithTLSInsecure(insecure),
-		common.WithHTTPTLSConfig(tlsConfig),
-	)
 
-	client, err := v1beta2.NewHttpClient(context.Background(), c)
-	assert.NoError(t, err, "Failed to create v1beta2 HTTP client")
+	// Set Dial Options
+	var dialOpts []grpc.DialOption
+	if insecureGRPC {
+		dialOpts = append(dialOpts, grpc.WithTransportCredentials(grpcinsecure.NewCredentials()))
+	} else {
+		// TODO: configure correct TLS credentials
+	}
+
+	conn, err := grpc.NewClient(inventoryapi_grpc_url, dialOpts...)
+	assert.NoError(t, err, "Failed to create gRPC client")
+	defer conn.Close()
+
+	client := pbv1beta2.NewKesselResourceServiceClient(conn)
 
 	reporterStruct, err := structpb.NewStruct(map[string]interface{}{
 		"satellite_id":          "550e8400-e29b-41d4-a716-446655440000",
@@ -34,7 +38,7 @@ func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_Host(t *testing.T) {
 	})
 	assert.NoError(t, err, "Failed to create structpb for host reporter")
 
-	req := pbv1beta2.ReportResourceRequest{
+	req := &pbv1beta2.ReportResourceRequest{
 		WaitForSync: false,
 		Resource: &pbv1beta2.Resource{
 			Type:               "host",
@@ -57,11 +61,11 @@ func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_Host(t *testing.T) {
 		},
 	}
 
-	opts := getCallOptions()
-	_, err = client.KesselResourceService.ReportResource(context.Background(), &req, opts...)
+	// No special opts needed for grpc.Invoke unless you want specific per-call behaviors
+	_, err = client.ReportResource(context.Background(), req)
 	assert.NoError(t, err, "Failed to Report Resource")
 
-	delReq := pbv1beta2.DeleteResourceRequest{
+	delReq := &pbv1beta2.DeleteResourceRequest{
 		Reference: &pbv1beta2.ResourceReference{
 			ResourceType: "host",
 			ResourceId:   "host-abc-123",
@@ -71,22 +75,26 @@ func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_Host(t *testing.T) {
 		},
 	}
 
-	_, err = client.KesselResourceService.DeleteResource(context.Background(), &delReq, opts...)
+	_, err = client.DeleteResource(context.Background(), delReq)
 	assert.NoError(t, err, "Failed to Delete Resource")
-
 }
 
 func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_Notifications(t *testing.T) {
 	t.Parallel()
 
-	c := common.NewConfig(
-		common.WithHTTPUrl(inventoryapi_http_url),
-		common.WithTLSInsecure(insecure),
-		common.WithHTTPTLSConfig(tlsConfig),
-	)
+	// Set Dial Options
+	var dialOpts []grpc.DialOption
+	if insecureGRPC {
+		dialOpts = append(dialOpts, grpc.WithTransportCredentials(grpcinsecure.NewCredentials()))
+	} else {
+		// TODO: configure correct TLS credentials
+	}
 
-	client, err := v1beta2.NewHttpClient(context.Background(), c)
-	assert.NoError(t, err, "Failed to create v1beta2 HTTP client")
+	conn, err := grpc.NewClient(inventoryapi_grpc_url, dialOpts...)
+	assert.NoError(t, err, "Failed to create gRPC client")
+	defer conn.Close()
+
+	client := pbv1beta2.NewKesselResourceServiceClient(conn)
 
 	// will likely change the notifications json schema, this is here to satisfy validation
 	reporterStruct, err := structpb.NewStruct(map[string]interface{}{
@@ -118,8 +126,7 @@ func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_Notifications(t *testing.T) 
 		},
 	}
 
-	opts := getCallOptions()
-	_, err = client.KesselResourceService.ReportResource(context.Background(), &req, opts...)
+	_, err = client.ReportResource(context.Background(), &req)
 	assert.NoError(t, err, "Failed to Report Resource")
 
 	delReq := pbv1beta2.DeleteResourceRequest{
@@ -132,7 +139,7 @@ func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_Notifications(t *testing.T) 
 		},
 	}
 
-	_, err = client.KesselResourceService.DeleteResource(context.Background(), &delReq, opts...)
+	_, err = client.DeleteResource(context.Background(), &delReq)
 	assert.NoError(t, err, "Failed to Delete Resource")
 
 }
@@ -140,14 +147,19 @@ func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_Notifications(t *testing.T) 
 func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_K8S_Cluster(t *testing.T) {
 	t.Parallel()
 
-	c := common.NewConfig(
-		common.WithHTTPUrl(inventoryapi_http_url),
-		common.WithTLSInsecure(insecure),
-		common.WithHTTPTLSConfig(tlsConfig),
-	)
+	// Set Dial Options
+	var dialOpts []grpc.DialOption
+	if insecureGRPC {
+		dialOpts = append(dialOpts, grpc.WithTransportCredentials(grpcinsecure.NewCredentials()))
+	} else {
+		// TODO: configure correct TLS credentials
+	}
 
-	client, err := v1beta2.NewHttpClient(context.Background(), c)
-	assert.NoError(t, err, "Failed to create v1beta2 HTTP client")
+	conn, err := grpc.NewClient(inventoryapi_grpc_url, dialOpts...)
+	assert.NoError(t, err, "Failed to create gRPC client")
+	defer conn.Close()
+
+	client := pbv1beta2.NewKesselResourceServiceClient(conn)
 
 	reporterStruct, err := structpb.NewStruct(map[string]interface{}{
 		"external_cluster_id": "abcd-efgh-1234",
@@ -182,8 +194,7 @@ func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_K8S_Cluster(t *testing.T) {
 		},
 	}
 
-	opts := getCallOptions()
-	_, err = client.KesselResourceService.ReportResource(context.Background(), &req, opts...)
+	_, err = client.ReportResource(context.Background(), &req)
 	assert.NoError(t, err, "Failed to Report Resource")
 
 	delReq := pbv1beta2.DeleteResourceRequest{
@@ -196,7 +207,7 @@ func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_K8S_Cluster(t *testing.T) {
 		},
 	}
 
-	_, err = client.KesselResourceService.DeleteResource(context.Background(), &delReq, opts...)
+	_, err = client.DeleteResource(context.Background(), &delReq)
 	assert.NoError(t, err, "Failed to Delete Resource")
 
 }
@@ -204,15 +215,19 @@ func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_K8S_Cluster(t *testing.T) {
 func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_K8S_Policy(t *testing.T) {
 	t.Parallel()
 
-	c := common.NewConfig(
-		common.WithHTTPUrl(inventoryapi_http_url),
-		common.WithTLSInsecure(insecure),
-		common.WithHTTPTLSConfig(tlsConfig),
-	)
+	// Set Dial Options
+	var dialOpts []grpc.DialOption
+	if insecureGRPC {
+		dialOpts = append(dialOpts, grpc.WithTransportCredentials(grpcinsecure.NewCredentials()))
+	} else {
+		// TODO: configure correct TLS credentials
+	}
 
-	client, err := v1beta2.NewHttpClient(context.Background(), c)
-	assert.NoError(t, err, "Failed to create v1beta2 HTTP client")
+	conn, err := grpc.NewClient(inventoryapi_grpc_url, dialOpts...)
+	assert.NoError(t, err, "Failed to create gRPC client")
+	defer conn.Close()
 
+	client := pbv1beta2.NewKesselResourceServiceClient(conn)
 	reporterStruct, err := structpb.NewStruct(map[string]interface{}{
 		"disabled": true,
 		"severity": "MEDIUM",
@@ -241,8 +256,7 @@ func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_K8S_Policy(t *testing.T) {
 		},
 	}
 
-	opts := getCallOptions()
-	_, err = client.KesselResourceService.ReportResource(context.Background(), &req, opts...)
+	_, err = client.ReportResource(context.Background(), &req)
 	assert.NoError(t, err, "Failed to Report Resource")
 
 	delReq := pbv1beta2.DeleteResourceRequest{
@@ -255,7 +269,7 @@ func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_K8S_Policy(t *testing.T) {
 		},
 	}
 
-	_, err = client.KesselResourceService.DeleteResource(context.Background(), &delReq, opts...)
+	_, err = client.DeleteResource(context.Background(), &delReq)
 	assert.NoError(t, err, "Failed to Delete Resource")
 
 }
@@ -322,15 +336,19 @@ func TestInventoryAPIHTTP_v1beta2_Host_WaitForSync(t *testing.T) {
 
 	resourceId := "wait-for-sync-host-abc-123"
 
-	c := common.NewConfig(
-		common.WithHTTPUrl(inventoryapi_http_url),
-		common.WithTLSInsecure(insecure),
-		common.WithHTTPTLSConfig(tlsConfig),
-		common.WithTimeout(10*time.Second),
-	)
+	// Set Dial Options
+	var dialOpts []grpc.DialOption
+	if insecureGRPC {
+		dialOpts = append(dialOpts, grpc.WithTransportCredentials(grpcinsecure.NewCredentials()))
+	} else {
+		// TODO: configure correct TLS credentials
+	}
 
-	client, err := v1beta2.NewHttpClient(context.Background(), c)
-	assert.NoError(t, err, "Failed to create v1beta2 HTTP client")
+	conn, err := grpc.NewClient(inventoryapi_grpc_url, dialOpts...)
+	assert.NoError(t, err, "Failed to create gRPC client")
+	defer conn.Close()
+
+	client := pbv1beta2.NewKesselResourceServiceClient(conn)
 
 	commonData := &structpb.Struct{}
 	commonData.Fields = map[string]*structpb.Value{
@@ -365,8 +383,8 @@ func TestInventoryAPIHTTP_v1beta2_Host_WaitForSync(t *testing.T) {
 			},
 		},
 	}
-	opts := getCallOptions()
-	_, err = client.KesselResourceService.ReportResource(context.Background(), &req, opts...)
+
+	_, err = client.ReportResource(context.Background(), &req)
 	assert.NoError(t, err, "Failed to Report Resource")
 
 	var host model.Resource
@@ -384,6 +402,6 @@ func TestInventoryAPIHTTP_v1beta2_Host_WaitForSync(t *testing.T) {
 			},
 		},
 	}
-	_, err = client.KesselResourceService.DeleteResource(context.Background(), &delReq, opts...)
+	_, err = client.DeleteResource(context.Background(), &delReq)
 	assert.NoError(t, err, "Failed to Delete Resource")
 }

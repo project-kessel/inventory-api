@@ -27,6 +27,7 @@ type ResourceRepresentations struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
+	// some representation metadata
 	Metadata *RepresentationMetadata `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
 	Common   *structpb.Struct        `protobuf:"bytes,2,opt,name=common,proto3,oneof" json:"common,omitempty"`
 	Reporter *structpb.Struct        `protobuf:"bytes,3,opt,name=reporter,proto3,oneof" json:"reporter,omitempty"`

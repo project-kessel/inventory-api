@@ -1312,7 +1312,9 @@ components:
             type: object
             properties:
                 metadata:
-                    $ref: '#/components/schemas/kessel.inventory.v1beta2.RepresentationMetadata'
+                    allOf:
+                        - $ref: '#/components/schemas/kessel.inventory.v1beta2.RepresentationMetadata'
+                    description: some representation metadata
                 common:
                     type: object
                 reporter:

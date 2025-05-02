@@ -45,6 +45,8 @@ def build_zed_command(inventory_id: str, payload: any, operation: str):
 
         # Call gabi to fetch current info on resource.
         inventory_resource_id, inventory_subject_id = fetch_inventory_resource_info(inventory_id)
+        if inventory_resource_id or not inventory_subject_id:
+            return None # Dont delete, as it still exists in inventory DB.
 
         # resource doesn't exist in inventory
         print("Resource doesn't exist in Inventory DB.")
@@ -95,7 +97,9 @@ def build_zed_command(inventory_id: str, payload: any, operation: str):
 
             # Call gabi to fetch current info on resource.
             inventory_resource_id, inventory_subject_id = fetch_inventory_resource_info(inventory_id)
-
+            if not inventory_resource_id or not inventory_subject_id:
+                return None # No resource in inventory DB.
+            
             # resource exists
             print("Resource exists in Inventory DB.")
 
@@ -133,6 +137,8 @@ def build_zed_command(inventory_id: str, payload: any, operation: str):
 
             # Call gabi to fetch current info on resource.
             inventory_resource_id, inventory_subject_id = fetch_inventory_resource_info(inventory_id)
+            if not inventory_resource_id or not inventory_subject_id:
+                return None # No resource in inventory DB.
 
             # zed relationship read fully consistent
             res = subprocess.run(
@@ -184,7 +190,7 @@ def fetch_inventory_resource_info(inventory_id):
     )
     gabi_output = res.stdout
     if gabi_output == "your query didn't return any results":
-        return None # Don't update anything.
+        return None, None # Don't update anything.
 
     # resource exists
     print("Resource exists in Inventory DB.")

@@ -49,9 +49,6 @@ type PartitionData struct {
 	LsOffset          int64  `json:"ls_offset"`
 	ConsumerLag       int64  `json:"consumer_lag"`
 	ConsumerLagStored int64  `json:"consumer_lag_stored"`
-	Rxmsgs            int64  `json:"rxmsgs"`
-	Rxbytes           int64  `json:"rxbytes"`
-	MsgsInflight      int64  `json:"msgs_inflight"`
 }
 
 type CGRPData struct {
@@ -86,6 +83,12 @@ type MetricsCollector struct {
 	rebalanceAge   metric.Int64Gauge
 	rebalanceCnt   metric.Int64Counter
 	assignmentSize metric.Int64Gauge
+
+	// App Specific Metrics
+	msgProcessed      metric.Int64Counter
+	msgProcessFailure metric.Int64Counter
+	consumerErrors    metric.Int64Counter
+	kafkaErrors       metric.Int64Counter
 }
 
 func (m *MetricsCollector) New(meter metric.Meter) error {
@@ -147,6 +150,20 @@ func (m *MetricsCollector) New(meter metric.Meter) error {
 	if m.assignmentSize, err = meter.Int64Gauge(prefix + "assignment_size"); err != nil {
 		return err
 	}
+
+	// create app metrics
+	if m.msgProcessed, err = meter.Int64Counter(prefix + "msgs_processed"); err != nil {
+		return err
+	}
+	if m.msgProcessFailure, err = meter.Int64Counter(prefix + "msg_process_failures"); err != nil {
+		return err
+	}
+	if m.consumerErrors, err = meter.Int64Counter(prefix + "consumer_errors"); err != nil {
+		return err
+	}
+	if m.kafkaErrors, err = meter.Int64Counter(prefix + "kafka_error_events"); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -177,9 +194,6 @@ func (m *MetricsCollector) Collect(stats StatsData) {
 			m.lsOffset.Record(ctx, stats.Topics[outboxTopic].Partitions[partitionKey].LsOffset, stats.LabelSet(partitionKey))
 			m.consumerLag.Record(ctx, stats.Topics[outboxTopic].Partitions[partitionKey].ConsumerLag, stats.LabelSet(partitionKey))
 			m.consumerLagStored.Record(ctx, stats.Topics[outboxTopic].Partitions[partitionKey].ConsumerLagStored, stats.LabelSet(partitionKey))
-			m.rxmsgs.Add(ctx, stats.Topics[outboxTopic].Partitions[partitionKey].Rxmsgs, stats.LabelSet(partitionKey))
-			m.rxbytes.Add(ctx, stats.Topics[outboxTopic].Partitions[partitionKey].Rxbytes, stats.LabelSet(partitionKey))
-			m.msgsInflight.Record(ctx, stats.Topics[outboxTopic].Partitions[partitionKey].MsgsInflight, stats.LabelSet(partitionKey))
 		}
 	}
 

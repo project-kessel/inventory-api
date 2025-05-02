@@ -2,7 +2,9 @@ package consumer
 
 import (
 	"context"
+	"fmt"
 
+	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
 )
@@ -73,9 +75,6 @@ type MetricsCollector struct {
 	lsOffset          metric.Int64Gauge
 	consumerLag       metric.Int64Gauge
 	consumerLagStored metric.Int64Gauge
-	rxmsgs            metric.Int64Counter
-	rxbytes           metric.Int64Counter
-	msgsInflight      metric.Int64Gauge
 
 	// CGRP Metrics
 	state          metric.Int64Gauge
@@ -122,15 +121,6 @@ func (m *MetricsCollector) New(meter metric.Meter) error {
 		return err
 	}
 	if m.consumerLagStored, err = meter.Int64Gauge(prefix + "consumer_lag_stored"); err != nil {
-		return err
-	}
-	if m.rxmsgs, err = meter.Int64Counter(prefix + "rxmsgs"); err != nil {
-		return err
-	}
-	if m.rxbytes, err = meter.Int64Counter(prefix + "rxbytes"); err != nil {
-		return err
-	}
-	if m.msgsInflight, err = meter.Int64Gauge(prefix + "msgs_inflight"); err != nil {
 		return err
 	}
 
@@ -211,4 +201,22 @@ func (m *MetricsCollector) Collect(stats StatsData) {
 	m.rebalanceAge.Record(ctx, stats.CGRP.RebalanceAge, stats.LabelSet(""), metric.WithAttributes(attribute.String("last_rebalance_reason", stats.CGRP.RebalanceReason)))
 	m.rebalanceCnt.Add(ctx, stats.CGRP.RebalanceCnt, stats.LabelSet(""))
 	m.assignmentSize.Record(ctx, stats.CGRP.AssignmentSize, stats.LabelSet(""))
+}
+
+func Incr(counter metric.Int64Counter, operation string, errReason error) {
+	ctx := context.TODO()
+	if errReason != nil {
+		counter.Add(ctx, 1, metric.WithAttributes(
+			attribute.String("operation", operation),
+			attribute.String("reason", fmt.Sprint(errReason))))
+	} else {
+		counter.Add(ctx, 1, nil)
+	}
+}
+
+func IncrKafkaError(counter metric.Int64Counter, kerror *kafka.Error) {
+	ctx := context.TODO()
+	counter.Add(ctx, 1, metric.WithAttributes(
+		attribute.String("code", kerror.Code().String()),
+		attribute.String("error", kerror.Error())))
 }

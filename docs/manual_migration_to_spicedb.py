@@ -45,11 +45,11 @@ def build_zed_command(inventory_id: str, payload: any, operation: str):
 
         # Call gabi to fetch current info on resource.
         inventory_resource_id, inventory_subject_id = fetch_inventory_resource_info(inventory_id)
-        if inventory_resource_id or not inventory_subject_id:
+        if inventory_resource_id or inventory_subject_id:
             return None # Dont delete, as it still exists in inventory DB.
 
         # resource doesn't exist in inventory
-        print("Resource doesn't exist in Inventory DB.")
+        print(f"Inventory ID: {inventory_id} doesn't exist in Inventory DB.")
 
         # zed relationship read fully consistent
         res = subprocess.run(
@@ -60,10 +60,11 @@ def build_zed_command(inventory_id: str, payload: any, operation: str):
                 capture_output=True,
                 text=True
             )
+        zed_output = res.stdout
         
         # exists.
-        if len(res.stdout) != 0:
-            print(f"Resource exists in SpiceDB: {res.stdout}")
+        if len(zed_output) != 0:
+            print(f"Resource exists in SpiceDB: {zed_output}")
 
             return (
                 f"zed relationship bulk-delete "
@@ -101,8 +102,6 @@ def build_zed_command(inventory_id: str, payload: any, operation: str):
                 return None # No resource in inventory DB.
             
             # resource exists
-            print("Resource exists in Inventory DB.")
-
             # check if tuple already exists!
 
             # zed relationship read fully consistent
@@ -115,10 +114,11 @@ def build_zed_command(inventory_id: str, payload: any, operation: str):
                     capture_output=True,
                     text=True
                 )
+            zed_output = res.stdout
             
             # exists.
-            if len(res.stdout) != 0:
-                print(f"Resource exists in SpiceDB: {res.stdout}")
+            if len(zed_output) != 0:
+                print(f"Resource exists in SpiceDB: {zed_output}")
                 return None
 
             # Only create if exists in inventory & doesn't exist in SpiceDB.
@@ -139,7 +139,7 @@ def build_zed_command(inventory_id: str, payload: any, operation: str):
             inventory_resource_id, inventory_subject_id = fetch_inventory_resource_info(inventory_id)
             if not inventory_resource_id or not inventory_subject_id:
                 return None # No resource in inventory DB.
-
+            
             # zed relationship read fully consistent
             res = subprocess.run(
                     f"zed relationship read "
@@ -193,7 +193,7 @@ def fetch_inventory_resource_info(inventory_id):
         return None, None # Don't update anything.
 
     # resource exists
-    print("Resource exists in Inventory DB.")
+    print(f"Inventory ID: {inventory_id} exists in Inventory DB.")
     parsed_data = json.loads(gabi_output)
     
     inventory_resource_id = parsed_data[0]["reporter_resource_id"]

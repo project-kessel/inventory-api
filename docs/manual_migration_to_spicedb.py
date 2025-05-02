@@ -27,7 +27,7 @@ def extract_json_payload(line: str):
     else:
         match = re.search(r'"payload":"({.+})"', line)
         payload_str = match.group(1).encode().decode("unicode_escape")
-        return None, json.loads(payload_str), "updated"
+        return None, json.loads(payload_str), "updated" # we dont really know???
 
 
 def build_zed_command(inventory_id: str, payload: any, operation: str):
@@ -37,11 +37,8 @@ def build_zed_command(inventory_id: str, payload: any, operation: str):
         resource_name = payload["resource_type"]
         resource_id = payload["resource_id"]
         relation = payload["relation"]
-        # 1
         # If the resource does not exist in inventory, check if tuple exists, if so delete the tuple
-		# (this is in the case of a delete operation message & no resource in inventory)
 		# (parse message, gabi call, zed relationship read, zed relationship delete) 
-        # call gabi
 
         # Call gabi to fetch current info on resource.
         inventory_resource_id, inventory_subject_id = fetch_inventory_resource_info(inventory_id)
@@ -71,8 +68,7 @@ def build_zed_command(inventory_id: str, payload: any, operation: str):
                 f"{resource_namespace}/{resource_name}:{resource_id} "
                 f"t_{relation} "
             )
-        else:
-            return None
+        return None
         
     else: # created or updated
         # parse message
@@ -92,8 +88,7 @@ def build_zed_command(inventory_id: str, payload: any, operation: str):
         subject_id = subject["id"]
     
         if operation == "created":
-            # 	2) If the resource exists in inventory, check if tuple exists, if not create
-            # (in the case of resource in inventory but not in spicedb.)
+            # If the resource exists in inventory, check if tuple exists, if not create
             # (parse message, gabi call, zed relationship read, zed relationship create)
 
             # Call gabi to fetch current info on resource.
@@ -119,7 +114,7 @@ def build_zed_command(inventory_id: str, payload: any, operation: str):
             # exists.
             if len(zed_output) != 0:
                 print(f"Resource exists in SpiceDB: {zed_output}")
-                return None
+                return None # Our job here is already done.
 
             # Only create if exists in inventory & doesn't exist in SpiceDB.
             return (
@@ -130,9 +125,8 @@ def build_zed_command(inventory_id: str, payload: any, operation: str):
             )
     
         elif operation == "updated":
-            # 4) if the resource exists in inventory, check if the tuple exists, if they do not match, apply the update to the tuple derived from the resource
-			# (so then this is an update okay,)
-			# (what about them needs to match? this is were im a bit confused...)
+            # if the resource exists in inventory, check if the tuple exists, if they do not match,
+            # apply the update to the tuple derived from the resource
 			# (parse mesasge, gabi call, zed relatonship read, zed relationship touch)
 
             # Call gabi to fetch current info on resource.

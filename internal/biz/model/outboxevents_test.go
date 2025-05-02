@@ -78,7 +78,7 @@ func TestNewOutboxEventsFromResourceCreated(t *testing.T) {
 	assert.NotNil(t, resourceEvent)
 	assert.NotNil(t, tupleEvent)
 	assertResourceEvent(t, OperationTypeCreated, resource, resourceEvent)
-	assertSetTupleEvent(t, resource, tupleEvent, namespace)
+	assertSetTupleEvent(t, resource, tupleEvent, resource.Reporter.ReporterType)
 }
 
 func TestNewOutboxEventsFromResourceUpdated(t *testing.T) {
@@ -89,7 +89,7 @@ func TestNewOutboxEventsFromResourceUpdated(t *testing.T) {
 	assert.NotNil(t, resourceEvent)
 	assert.NotNil(t, tupleEvent)
 	assertResourceEvent(t, OperationTypeUpdated, resource, resourceEvent)
-	assertSetTupleEvent(t, resource, tupleEvent, namespace)
+	assertSetTupleEvent(t, resource, tupleEvent, resource.Reporter.ReporterType)
 }
 
 func TestNewOutboxEventsFromResourceDeleted(t *testing.T) {
@@ -100,7 +100,7 @@ func TestNewOutboxEventsFromResourceDeleted(t *testing.T) {
 	assert.NotNil(t, resourceEvent)
 	assert.NotNil(t, tupleEvent)
 	assertResourceEvent(t, OperationTypeDeleted, resource, resourceEvent)
-	assertUnsetTupleEvent(t, resource, tupleEvent, namespace)
+	assertUnsetTupleEvent(t, resource, tupleEvent, resource.Reporter.ReporterType)
 }
 
 func TestNewOutboxEventsFromResourceCreated_v1beta2(t *testing.T) {

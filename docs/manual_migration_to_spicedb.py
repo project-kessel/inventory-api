@@ -14,7 +14,6 @@ def extract_json_payload(line: str):
         if not op_match:
             return None
         operation = op_match.group(1)
-        print("operation " + operation)
 
         # extract inventory_id from payload
         payload1_json = json.loads(parts[2])
@@ -27,10 +26,19 @@ def extract_json_payload(line: str):
     else:
         match = re.search(r'"payload":"({.+})"', line)
         payload_str = match.group(1).encode().decode("unicode_escape")
-        return None, json.loads(payload_str), "updated" # we dont really know???
+
+        # extract inventory_id from payload.
+        match_inventory_id = re.search(r'"payload":"(.{36})"', line)
+        if match_inventory_id:
+            inventory_id = match_inventory_id.group(1).encode().decode("unicode_escape")
+
+        # We don't really know what operation they are supposed to be doing tbh. 
+        # Update make be safe, but not entirely.
+        return inventory_id, json.loads(payload_str), "updated"
 
 
 def build_zed_command(inventory_id: str, payload: any, operation: str):
+    print(f"\nBuilding command for Inventory ID: {inventory_id}, operation: {operation}")
     if operation == "deleted":
         # parse message
         resource_namespace = payload["resource_namespace"]
@@ -61,13 +69,14 @@ def build_zed_command(inventory_id: str, payload: any, operation: str):
         
         # exists.
         if len(zed_output) != 0:
-            print(f"Resource exists in SpiceDB: {zed_output}")
+            print(f"Resource exists in SpiceDB: {zed_output}. Deleting...")
 
             return (
                 f"zed relationship bulk-delete "
                 f"{resource_namespace}/{resource_name}:{resource_id} "
                 f"t_{relation} "
             )
+        print("Resource doesn't exist in SpiceDB. Not deleting")
         return None
         
     else: # created or updated
@@ -113,10 +122,11 @@ def build_zed_command(inventory_id: str, payload: any, operation: str):
             
             # exists.
             if len(zed_output) != 0:
-                print(f"Resource exists in SpiceDB: {zed_output}")
+                print(f"Resource exists in SpiceDB: {zed_output}. Not creating.")
                 return None # Our job here is already done.
 
             # Only create if exists in inventory & doesn't exist in SpiceDB.
+            print("Resource exists in inventory, but not in SpiceDB. Creating...")
             return (
                 f"zed relationship create "
                 f"{resource_namespace}/{resource_name}:{resource_id} "
@@ -156,8 +166,10 @@ def build_zed_command(inventory_id: str, payload: any, operation: str):
                 sub_id = sections[2].split(":")[1]
 
                 if res_id == inventory_resource_id and sub_id == inventory_subject_id:
+                    print("Resources match, no need to update.")
                     return None # They match, no need to update.
 
+                print("Updating resource...")
                 return (
                     f"zed relationship touch "
                     f"{resource_namespace}/{resource_name}:{inventory_resource_id} "
@@ -166,6 +178,7 @@ def build_zed_command(inventory_id: str, payload: any, operation: str):
                 )
             
             # If it doesn't exist in spicedb but does in inventory, we should prob create?
+            print("Resource doesn't exist in SpiceDB but does in inventory, creating...")
             return (
                 f"zed relationship touch "
                 f"{resource_namespace}/{resource_name}:{inventory_resource_id} "
@@ -183,12 +196,15 @@ def fetch_inventory_resource_info(inventory_id):
         text=True
     )
     gabi_output = res.stdout
-    if gabi_output == "your query didn't return any results":
+    if "your query didn't return any results" in gabi_output: # there's some weird tabbing in output.
+        print("Nothing in inventory db.")
         return None, None # Don't update anything.
 
     # resource exists
     print(f"Inventory ID: {inventory_id} exists in Inventory DB.")
     parsed_data = json.loads(gabi_output)
+    if not parsed_data:
+        return None, None
     
     inventory_resource_id = parsed_data[0]["reporter_resource_id"]
     inventory_subject_id = parsed_data[0]["workspace_id"]

@@ -43,16 +43,8 @@ def build_zed_command(inventory_id: str, payload: any, operation: str):
 		# (parse message, gabi call, zed relationship read, zed relationship delete) 
         # call gabi
 
-        # res = gabi() # will need to parse some json.
-        print(f"Fetching info on inventory_id: {inventory_id}")
-        res = subprocess.run(
-            f"gabi exec \"select * from resources where inventory_id='{inventory_id}'",
-            shell=True,
-            capture_output=True,
-            text=True
-        )
-
-        print("What" + res.stdout)
+        # Call gabi to fetch current info on resource.
+        inventory_resource_id, inventory_subject_id = fetch_inventory_resource_info(inventory_id)
 
         # resource doesn't exist in inventory
         print("Resource doesn't exist in Inventory DB.")
@@ -79,7 +71,7 @@ def build_zed_command(inventory_id: str, payload: any, operation: str):
         else:
             return None
         
-    else:
+    else: # created or updated
         # parse message
         resource = payload["resource"]
         relation = payload["relation"]
@@ -92,7 +84,6 @@ def build_zed_command(inventory_id: str, payload: any, operation: str):
         resource_name = resource["type"]["name"]
         resource_id = resource["id"]
 
-        
         subject_ns = subject["type"]["namespace"]
         subject_name = subject["type"]["name"]
         subject_id = subject["id"]
@@ -102,17 +93,8 @@ def build_zed_command(inventory_id: str, payload: any, operation: str):
             # (in the case of resource in inventory but not in spicedb.)
             # (parse message, gabi call, zed relationship read, zed relationship create)
 
-            # res = gabi()
-
-            print(f"Fetching info on inventory_id: {inventory_id}")
-            res = subprocess.run(
-                f"gabi exec \"select * from resources where inventory_id='{inventory_id}'",
-                shell=True,
-                capture_output=True,
-                text=True
-            )
-
-            print(res.stdout)
+            # Call gabi to fetch current info on resource.
+            inventory_resource_id, inventory_subject_id = fetch_inventory_resource_info(inventory_id)
 
             # resource exists
             print("Resource exists in Inventory DB.")
@@ -150,26 +132,7 @@ def build_zed_command(inventory_id: str, payload: any, operation: str):
 			# (parse mesasge, gabi call, zed relatonship read, zed relationship touch)
 
             # Call gabi to fetch current info on resource.
-            print(f"Fetching info on inventory_id: {inventory_id}")
-            res = subprocess.run(
-                f"gabi exec \"select * from resources where inventory_id='{inventory_id}'\"",
-                shell=True,
-                capture_output=True,
-                text=True
-            )
-            gabi_output = res.stdout
-            if gabi_output == "your query didn't return any results":
-                return None # Don't update anything.
-    
-            # resource exists
-            print("Resource exists in Inventory DB.")
-            parsed_data = json.loads(gabi_output)
-            
-            inventory_resource_id = parsed_data[0]["reporter_resource_id"]
-            inventory_subject_id = parsed_data[0]["workspace_id"]
-
-            print(f"Inventory_resource_id: {inventory_resource_id}")
-            print(f"Inventory_subject_id: {inventory_subject_id}")
+            inventory_resource_id, inventory_subject_id = fetch_inventory_resource_info(inventory_id)
 
             # zed relationship read fully consistent
             res = subprocess.run(
@@ -210,6 +173,30 @@ def build_zed_command(inventory_id: str, payload: any, operation: str):
                 f"{subject_ns}/{subject_name}:{inventory_subject_id}"
             )
 
+def fetch_inventory_resource_info(inventory_id):
+    # Call gabi to fetch current info on resource.
+    print(f"Fetching info on inventory_id: {inventory_id}")
+    res = subprocess.run(
+        f"gabi exec \"select * from resources where inventory_id='{inventory_id}'\"",
+        shell=True,
+        capture_output=True,
+        text=True
+    )
+    gabi_output = res.stdout
+    if gabi_output == "your query didn't return any results":
+        return None # Don't update anything.
+
+    # resource exists
+    print("Resource exists in Inventory DB.")
+    parsed_data = json.loads(gabi_output)
+    
+    inventory_resource_id = parsed_data[0]["reporter_resource_id"]
+    inventory_subject_id = parsed_data[0]["workspace_id"]
+
+    print(f"Inventory_resource_id: {inventory_resource_id}")
+    print(f"Inventory_subject_id: {inventory_subject_id}")
+    return inventory_resource_id, inventory_subject_id
+
 
 def main():
     if len(sys.argv) != 2:
@@ -236,6 +223,7 @@ def main():
                 except subprocess.CalledProcessError as e:
                     print(f"Command failed with return code {e.returncode}")
                     sys.exit(e.returncode)
+
 
 if __name__ == "__main__":
     main()

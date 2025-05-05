@@ -14,6 +14,7 @@ const (
 	prefix      = "inventory_consumer_"
 )
 
+// LabelSet adds desired attributes to each metric recorded from stats messages to ensure consistent labeling.
 func (s *StatsData) LabelSet(key string) metric.MeasurementOption {
 	if key == "" {
 		m := metric.WithAttributes(
@@ -29,6 +30,7 @@ func (s *StatsData) LabelSet(key string) metric.MeasurementOption {
 	return m
 }
 
+// StatsData defines the key metrics to be monitored provided by a kafka.Stats message. It contains top-level metrics and objets within the message.
 type StatsData struct {
 	Name     string               `json:"name"`
 	ClientID string               `json:"client_id"`
@@ -37,11 +39,13 @@ type StatsData struct {
 	CGRP     CGRPData             `json:"cgrp"`
 }
 
+// TopicData contains metrics from the 'topic' section of a stats message
 type TopicData struct {
 	Topic      string                   `json:"topic"`
 	Partitions map[string]PartitionData `json:"partitions"`
 }
 
+// PartitionData contains metrics from the 'partitions' array section of a stats message
 type PartitionData struct {
 	FetchqCnt         int64  `json:"fetchq_cnt"`
 	FetchqSize        int64  `json:"fetchq_size"`
@@ -53,6 +57,7 @@ type PartitionData struct {
 	ConsumerLagStored int64  `json:"consumer_lag_stored"`
 }
 
+// CGRPData contains metrics from the 'cgrp' array section of a stats message. It captures metrics on the consumer group.
 type CGRPData struct {
 	State           string `json:"state"`
 	StateAge        int64  `json:"stageage"`
@@ -62,6 +67,7 @@ type CGRPData struct {
 	AssignmentSize  int64  `json:"assignment_size"`
 }
 
+// MetricsCollector captures metrics from stats messages and from custom app-centric messages
 type MetricsCollector struct {
 	// Top-Level Metrics
 	replyq metric.Int64Gauge
@@ -90,6 +96,7 @@ type MetricsCollector struct {
 	kafkaErrors       metric.Int64Counter
 }
 
+// New instsantiates a new MetricsCollector
 func (m *MetricsCollector) New(meter metric.Meter) error {
 	var err error
 
@@ -157,6 +164,7 @@ func (m *MetricsCollector) New(meter metric.Meter) error {
 	return nil
 }
 
+// Collect is called on every stats message received to scrape the metrics and report them in our metrics endpoint
 func (m *MetricsCollector) Collect(stats StatsData) {
 	// top-level
 	ctx := context.Background()
@@ -203,6 +211,7 @@ func (m *MetricsCollector) Collect(stats StatsData) {
 	m.assignmentSize.Record(ctx, stats.CGRP.AssignmentSize, stats.LabelSet(""))
 }
 
+// Incr increments a non-stats message based counter
 func Incr(counter metric.Int64Counter, operation string, errReason error) {
 	ctx := context.TODO()
 	if errReason != nil {
@@ -210,10 +219,12 @@ func Incr(counter metric.Int64Counter, operation string, errReason error) {
 			attribute.String("operation", operation),
 			attribute.String("reason", fmt.Sprint(errReason))))
 	} else {
-		counter.Add(ctx, 1, nil)
+		counter.Add(ctx, 1, metric.WithAttributes(
+			attribute.String("operation", operation)))
 	}
 }
 
+// IncrKafkaError increments the kakfaError counter when kafka.Error messages are received by the poll loop
 func IncrKafkaError(counter metric.Int64Counter, kerror *kafka.Error) {
 	ctx := context.TODO()
 	counter.Add(ctx, 1, metric.WithAttributes(

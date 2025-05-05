@@ -225,17 +225,17 @@ func (i *InventoryConsumer) Consume() error {
 						continue
 					}
 				}
+				Incr(i.MetricsCollector.msgProcessed, operation, nil)
 				i.Logger.Infof("consumed event from topic %s, partition %d at offset %s",
 					*e.TopicPartition.Topic, e.TopicPartition.Partition, e.TopicPartition.Offset)
 				i.Logger.Debugf("consumed event data: key = %-10s value = %s", string(e.Key), string(e.Value))
 
 			case kafka.Error:
+				IncrKafkaError(i.MetricsCollector.kafkaErrors, &e)
 				if e.IsFatal() {
-					IncrKafkaError(i.MetricsCollector.kafkaErrors, &e)
 					run = false
 					i.Errors <- e
 				} else {
-					IncrKafkaError(i.MetricsCollector.kafkaErrors, &e)
 					i.Logger.Errorf("recoverable consumer error: %v: %v -- will retry", e.Code(), e)
 					continue
 				}

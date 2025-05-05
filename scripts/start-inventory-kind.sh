@@ -64,8 +64,7 @@ kubectl get configmap inventory-api-psks || kubectl create configmap inventory-a
 [ -f resources.tar.gz ] || tar czf resources.tar.gz -C data/schema/resources .
 kubectl get configmap resources-tarball || kubectl create configmap resources-tarball --from-file=resources.tar.gz
 
-kubectl apply -f https://strimzi.io/install/latest\?namespace\=default
-kubectl patch deployment strimzi-cluster-operator --patch '{"spec": {"template": {"spec": {"containers": [{"name": "strimzi-cluster-operator","resources": {"limits": { "memory": "1024Mi" }}}]}}}}'
+kubectl apply -f deploy/kind/strimzi-operator/strimzi-cluster-operator-0.45.0.yaml
 kubectl apply -f deploy/kind/inventory/kessel-inventory.yaml
 kubectl apply -f deploy/kind/inventory/invdatabase.yaml
 kubectl apply -f deploy/kind/inventory/strimzi.yaml

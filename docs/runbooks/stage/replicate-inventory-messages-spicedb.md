@@ -49,7 +49,7 @@ If you don't already have a gabi config initialized, execute the `init` command:
 ```shell
 gabi config init
 ```
-There are two settings we need to setup, the `URL` and `TOKEN`. You can grab the `URL` from
+There are two settings we need to set up, the `URL` and `TOKEN`. You can grab the `URL` from
 the `gabi-kessel` route and the `TOKEN` from the token used to log into the cluster.
 Execute the following to set your url and token.
 ```shell

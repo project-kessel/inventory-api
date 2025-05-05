@@ -21,6 +21,7 @@ import (
 	"github.com/project-kessel/inventory-api/internal/pubsub"
 
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
 
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
 	"github.com/go-kratos/kratos/v2/log"
@@ -133,6 +134,7 @@ type MessagePayload struct {
 func (i *InventoryConsumer) Consume() error {
 	err := i.Consumer.SubscribeTopics([]string{i.Config.Topic}, i.RebalanceCallback)
 	if err != nil {
+		Incr(i.MetricsCollector.consumerErrors, "SubscribeTopics", err)
 		i.Logger.Errorf("failed to subscribe to topic: %v", err)
 		i.Errors <- err
 		return err
@@ -167,6 +169,7 @@ func (i *InventoryConsumer) Consume() error {
 			case *kafka.Message:
 				headers, err := ParseHeaders(e)
 				if err != nil {
+					Incr(i.MetricsCollector.msgProcessFailures, "ParseHeaders", fmt.Errorf("missing headers"))
 					i.Logger.Errorf("failed to parse message headers: %v", err)
 					run = false
 					continue
@@ -179,8 +182,8 @@ func (i *InventoryConsumer) Consume() error {
 				resp, err = i.ProcessMessage(headers, relationsEnabled, e)
 				if err != nil {
 					i.Logger.Errorf(
-						"error processing message from topic %s, partition %d at offset %s: %v",
-						*e.TopicPartition.Topic, e.TopicPartition.Partition, e.TopicPartition.Offset, err)
+						"error processing message: topic=%s partition=%d offset=%s",
+						*e.TopicPartition.Topic, e.TopicPartition.Partition, e.TopicPartition.Offset)
 					run = false
 					continue
 				}
@@ -188,10 +191,12 @@ func (i *InventoryConsumer) Consume() error {
 				if operation != string(model.OperationTypeDeleted) {
 					inventoryID, err := ParseMessageKey(e.Key)
 					if err != nil {
+						Incr(i.MetricsCollector.msgProcessFailures, "ParseMessageKey", err)
 						i.Logger.Errorf("failed to parse message key for for ID: %v", err)
 					}
 					err = i.UpdateConsistencyToken(inventoryID, fmt.Sprint(resp))
 					if err != nil {
+						Incr(i.MetricsCollector.consumerErrors, "UpdateConsistencyToken", err)
 						i.Logger.Errorf("failed to update consistency token: %v", err)
 						continue
 					}
@@ -201,6 +206,7 @@ func (i *InventoryConsumer) Consume() error {
 				if i.Notifier != nil && txid != "" {
 					err := i.Notifier.Notify(context.Background(), txid)
 					if err != nil {
+						Incr(i.MetricsCollector.consumerErrors, "Notify", err)
 						i.Logger.Errorf("failed to notify producer: %v", err)
 						// Do not continue here, we should still commit the offset
 					} else {
@@ -215,15 +221,20 @@ func (i *InventoryConsumer) Consume() error {
 				if checkIfCommit(e.TopicPartition) {
 					err := i.commitStoredOffsets()
 					if err != nil {
+						Incr(i.MetricsCollector.consumerErrors, "commitStoredOffsets", err)
 						i.Logger.Errorf("failed to commit offsets: %v", err)
 						continue
 					}
 				}
+				Incr(i.MetricsCollector.msgsProcessed, operation, nil)
 				i.Logger.Infof("consumed event from topic %s, partition %d at offset %s",
 					*e.TopicPartition.Topic, e.TopicPartition.Partition, e.TopicPartition.Offset)
 				i.Logger.Debugf("consumed event data: key = %-10s value = %s", string(e.Key), string(e.Value))
 
 			case kafka.Error:
+				Incr(i.MetricsCollector.kafkaErrorEvents, "kafka", nil,
+					attribute.String("code", e.Code().String()),
+					attribute.String("error", e.Error()))
 				if e.IsFatal() {
 					run = false
 					i.Errors <- e
@@ -236,6 +247,7 @@ func (i *InventoryConsumer) Consume() error {
 				var stats StatsData
 				err = json.Unmarshal([]byte(e.String()), &stats)
 				if err != nil {
+					Incr(i.MetricsCollector.msgProcessFailures, "StatsCollection", err)
 					i.Logger.Errorf("error unmarshalling stats: %v", err)
 					continue
 				}
@@ -263,6 +275,7 @@ func (i *InventoryConsumer) ProcessMessage(headers map[string]string, relationsE
 		if relationsEnabled {
 			tuple, err := ParseCreateOrUpdateMessage(msg.Value)
 			if err != nil {
+				Incr(i.MetricsCollector.msgProcessFailures, "ParseCreateOrUpdateMessage", err)
 				i.Logger.Errorf("failed to parse message for tuple: %v", err)
 				return "", err
 			}
@@ -270,6 +283,7 @@ func (i *InventoryConsumer) ProcessMessage(headers map[string]string, relationsE
 				return i.CreateTuple(context.Background(), tuple)
 			})
 			if err != nil {
+				Incr(i.MetricsCollector.msgProcessFailures, "CreateTuple", err)
 				i.Logger.Errorf("failed to create tuple: %v", err)
 				return "", err
 			}
@@ -282,6 +296,7 @@ func (i *InventoryConsumer) ProcessMessage(headers map[string]string, relationsE
 		if relationsEnabled {
 			tuple, err := ParseCreateOrUpdateMessage(msg.Value)
 			if err != nil {
+				Incr(i.MetricsCollector.msgProcessFailures, "ParseCreateOrUpdateMessage", err)
 				i.Logger.Errorf("failed to parse message for tuple: %v", err)
 				return "", err
 			}
@@ -289,6 +304,7 @@ func (i *InventoryConsumer) ProcessMessage(headers map[string]string, relationsE
 				return i.UpdateTuple(context.Background(), tuple)
 			})
 			if err != nil {
+				Incr(i.MetricsCollector.msgProcessFailures, "UpdateTuple", err)
 				i.Logger.Errorf("failed to update tuple: %v", err)
 				return "", err
 			}
@@ -300,6 +316,7 @@ func (i *InventoryConsumer) ProcessMessage(headers map[string]string, relationsE
 		if relationsEnabled {
 			filter, err := ParseDeleteMessage(msg.Value)
 			if err != nil {
+				Incr(i.MetricsCollector.msgProcessFailures, "ParseDeleteMessage", err)
 				i.Logger.Errorf("failed to parse message for filter: %v", err)
 				return "", err
 			}
@@ -307,12 +324,14 @@ func (i *InventoryConsumer) ProcessMessage(headers map[string]string, relationsE
 				return i.DeleteTuple(context.Background(), filter)
 			})
 			if err != nil {
+				Incr(i.MetricsCollector.msgProcessFailures, "DeleteTuple", err)
 				i.Logger.Errorf("failed to delete tuple: %v", err)
 				return "", err
 			}
 			return "", nil
 		}
 	default:
+		Incr(i.MetricsCollector.msgProcessFailures, "unknown-operation-type", nil)
 		i.Logger.Errorf("unknown operation type, message cannot be processed and will be dropped: offset=%s operation=%s msg=%s",
 			msg.TopicPartition.Offset.String(), operation, msg.Value)
 	}

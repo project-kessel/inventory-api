@@ -116,6 +116,9 @@ def build_updated_command(inventory_id, payload):
     if len(res.stdout) != 0:
         print(f"Resource exists in SpiceDB: {res.stdout}")
         sections = res.stdout.split()
+        if len(sections) < 3:
+            print(f"Unexpected output format from zed relationship read: {res.stdout}")
+            return None
         current_res_id = sections[0].split(":")[1]
         current_sub_id = sections[2].split(":")[1]
         if current_res_id == inv_res_id and current_sub_id == inv_sub_id:
@@ -168,7 +171,7 @@ def fetch_inventory_resource_info(inventory_id):
     parse_reporter = json.loads(parsed_data[0]["reporter"])
     inv_reporter_reporter_type = parse_reporter["reporter_type"].lower()
 
-    inv_reporter_type = inv_reporter_type if inv_reporter_type else inv_reporter_reporter_type
+    inv_reporter_type = inv_reporter_type or inv_reporter_reporter_type
 
     print(f"Inventory_resource_id: {inv_resource_id}")
     print(f"Inventory_subject_id: {inv_subject_id}")

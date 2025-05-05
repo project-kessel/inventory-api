@@ -48,18 +48,18 @@ def build_deleted_command(inventory_id, payload):
     relation = payload["relation"]
 
     # Call gabi to fetch current info on resource.
-    inv_res_id, inv_sub_id, inv_res_type, inv_report_id = fetch_inventory_resource_info(inventory_id)
-    if not all([inv_res_id, inv_sub_id, inv_res_type, inv_report_id]):
+    inv_res_id, inv_sub_id, inv_res_type, inv_report_type = fetch_inventory_resource_info(inventory_id)
+    if not all([inv_res_id, inv_sub_id, inv_res_type, inv_report_type]):
         return None # Dont delete, as it still exists in inventory DB.
 
     # zed relationship read fully consistent (drift check)
     res = subprocess.run(
-        f"zed relationship read {inv_report_id}/{inv_res_type}:{inv_res_id} t_{relation} --consistency-full",
+        f"zed relationship read {inv_report_type}/{inv_res_type}:{inv_res_id} t_{relation} --consistency-full",
         shell=True, capture_output=True, text=True
     )
     if len(res.stdout) != 0:
         print(f"Resource exists in SpiceDB: {res.stdout}. Deleting...")
-        return f"zed relationship bulk-delete {inv_report_id}/{inv_res_type}:{inv_res_id} t_{relation}"
+        return f"zed relationship bulk-delete {inv_report_type}/{inv_res_type}:{inv_res_id} t_{relation}"
 
     print("Resource doesn't exist in SpiceDB. Nothing to delete...")
     return None
@@ -76,20 +76,20 @@ def build_created_command(inventory_id, payload):
     subject_name = subject["type"]["name"]
 
     # Call gabi to fetch current info on resource.
-    inv_res_id, inv_sub_id, inv_res_type, inv_report_id = fetch_inventory_resource_info(inventory_id)
-    if not all([inv_res_id, inv_sub_id, inv_res_type, inv_report_id]):
+    inv_res_id, inv_sub_id, inv_res_type, inv_report_type = fetch_inventory_resource_info(inventory_id)
+    if not all([inv_res_id, inv_sub_id, inv_res_type, inv_report_type]):
         return None # No resource in inventory DB.
 
     # zed relationship read fully consistent (drift check)
     res = subprocess.run(
-        f"zed relationship read {inv_report_id}/{inv_res_type}:{inv_res_id} t_{relation} {subject_ns}/{subject_name}:{inv_sub_id} --consistency-full",
+        f"zed relationship read {inv_report_type}/{inv_res_type}:{inv_res_id} t_{relation} {subject_ns}/{subject_name}:{inv_sub_id} --consistency-full",
         shell=True, capture_output=True, text=True
     )
     if len(res.stdout) != 0:
         print(f"Resource exists in SpiceDB: {res.stdout}. Not creating.")
         return None # Our job here is already done.
     print("Resource exists in inventory, but not in SpiceDB. Creating...")
-    return f"zed relationship create {inv_report_id}/{inv_res_type}:{inv_res_id} t_{relation} {subject_ns}/{subject_name}:{inv_sub_id}"
+    return f"zed relationship create {inv_report_type}/{inv_res_type}:{inv_res_id} t_{relation} {subject_ns}/{subject_name}:{inv_sub_id}"
 
 def build_updated_command(inventory_id, payload):
     # if the resource exists in inventory, check if the tuple exists, if they do not match,
@@ -104,13 +104,13 @@ def build_updated_command(inventory_id, payload):
     subject_name = subject["type"]["name"]
 
     # Call gabi to fetch current info on resource.
-    inv_res_id, inv_sub_id, inv_res_type, inv_report_id = fetch_inventory_resource_info(inventory_id)
-    if not all([inv_res_id, inv_sub_id, inv_res_type, inv_report_id]):
+    inv_res_id, inv_sub_id, inv_res_type, inv_report_type = fetch_inventory_resource_info(inventory_id)
+    if not all([inv_res_id, inv_sub_id, inv_res_type, inv_report_type]):
         return None # No resource in inventory DB.
 
     # zed relationship read fully consistent (drift check)
     res = subprocess.run(
-        f"zed relationship read {inv_report_id}/{inv_res_type}:{inv_res_id} t_{relation} {subject_ns}/{subject_name}:{inv_sub_id} --consistency-full",
+        f"zed relationship read {inv_report_type}/{inv_res_type}:{inv_res_id} t_{relation} {subject_ns}/{subject_name}:{inv_sub_id} --consistency-full",
         shell=True, capture_output=True, text=True
     )
     if len(res.stdout) != 0:
@@ -122,10 +122,10 @@ def build_updated_command(inventory_id, payload):
             print("Resources match, no need to update.")
             return None # They match, no need to update.
         print("Updating resource...")
-        return f"zed relationship touch {inv_report_id}/{inv_res_type}:{inv_res_id} t_{relation} {subject_ns}/{subject_name}:{inv_sub_id}"
+        return f"zed relationship touch {inv_report_type}/{inv_res_type}:{inv_res_id} t_{relation} {subject_ns}/{subject_name}:{inv_sub_id}"
 
     print("Resource doesn't exist in SpiceDB but does in inventory, creating...")
-    return f"zed relationship touch {inv_report_id}/{inv_res_type}:{inv_res_id} t_{relation} {subject_ns}/{subject_name}:{inv_sub_id}"
+    return f"zed relationship touch {inv_report_type}/{inv_res_type}:{inv_res_id} t_{relation} {subject_ns}/{subject_name}:{inv_sub_id}"
     
 
 def build_zed_command(inventory_id: str, payload: any, operation: str):
@@ -144,7 +144,7 @@ def fetch_inventory_resource_info(inventory_id):
     # Call gabi to fetch current info on resource.
     print(f"Fetching info on inventory_id: {inventory_id}")
     res = subprocess.run(
-        f"gabi exec \"select reporter_resource_id, workspace_id, resource_type, reporter_id from resources where inventory_id='{inventory_id}'\"",
+        f"gabi exec \"select reporter_resource_id, workspace_id, resource_type, reporter_type, reporter from resources where inventory_id='{inventory_id}'\"",
         shell=True,
         capture_output=True,
         text=True
@@ -163,13 +163,18 @@ def fetch_inventory_resource_info(inventory_id):
     inv_resource_id = parsed_data[0]["reporter_resource_id"]
     inv_subject_id = parsed_data[0]["workspace_id"]
     inv_resource_type = parsed_data[0]["resource_type"]
-    inv_reporter_id = parsed_data[0]["reporter_id"].lower()
+
+    inv_reporter_type = parsed_data[0]["reporter_type"].lower()
+    parse_reporter = json.loads(parsed_data[0]["reporter"])
+    inv_reporter_reporter_type = parse_reporter["reporter_type"].lower()
+
+    inv_reporter_type = inv_reporter_type if inv_reporter_type else inv_reporter_reporter_type
 
     print(f"Inventory_resource_id: {inv_resource_id}")
     print(f"Inventory_subject_id: {inv_subject_id}")
     print(f"Inventory_resource_type: {inv_resource_type}")
-    print(f"Inventory_reporter_id: {inv_reporter_id}")
-    return inv_resource_id, inv_subject_id, inv_resource_type, inv_reporter_id
+    print(f"Inventory_reporter_type: {inv_reporter_type}")
+    return inv_resource_id, inv_subject_id, inv_resource_type, inv_reporter_type
 
 
 def main():

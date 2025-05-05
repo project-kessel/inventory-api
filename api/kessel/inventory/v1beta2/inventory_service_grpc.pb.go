@@ -33,9 +33,16 @@ type KesselInventoryServiceClient interface {
 	// Checks for the existence of a single Relationship
 	// (a Relation between a Resource and a Subject or Subject Set).
 	Check(ctx context.Context, in *CheckRequest, opts ...grpc.CallOption) (*CheckResponse, error)
+	// CheckForUpdate performs a fully consistent permission check to determine
+	// whether the subject has the necessary permission to update or modify the resource.
+	// This is intended for use prior to performing write operations to ensure that
+	// the authorization state is up-to-date and not stale.
 	CheckForUpdate(ctx context.Context, in *CheckForUpdateRequest, opts ...grpc.CallOption) (*CheckForUpdateResponse, error)
+	// Registers or reports a new resource to the inventory.
 	ReportResource(ctx context.Context, in *ReportResourceRequest, opts ...grpc.CallOption) (*ReportResourceResponse, error)
+	// Deletes a resource and its associated relations from the inventory.
 	DeleteResource(ctx context.Context, in *DeleteResourceRequest, opts ...grpc.CallOption) (*DeleteResourceResponse, error)
+	// Streams a list of objects/resources based on filter parameters.
 	StreamedListObjects(ctx context.Context, in *StreamedListObjectsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[StreamedListObjectsResponse], error)
 }
 
@@ -113,9 +120,16 @@ type KesselInventoryServiceServer interface {
 	// Checks for the existence of a single Relationship
 	// (a Relation between a Resource and a Subject or Subject Set).
 	Check(context.Context, *CheckRequest) (*CheckResponse, error)
+	// CheckForUpdate performs a fully consistent permission check to determine
+	// whether the subject has the necessary permission to update or modify the resource.
+	// This is intended for use prior to performing write operations to ensure that
+	// the authorization state is up-to-date and not stale.
 	CheckForUpdate(context.Context, *CheckForUpdateRequest) (*CheckForUpdateResponse, error)
+	// Registers or reports a new resource to the inventory.
 	ReportResource(context.Context, *ReportResourceRequest) (*ReportResourceResponse, error)
+	// Deletes a resource and its associated relations from the inventory.
 	DeleteResource(context.Context, *DeleteResourceRequest) (*DeleteResourceResponse, error)
+	// Streams a list of objects/resources based on filter parameters.
 	StreamedListObjects(*StreamedListObjectsRequest, grpc.ServerStreamingServer[StreamedListObjectsResponse]) error
 	mustEmbedUnimplementedKesselInventoryServiceServer()
 }

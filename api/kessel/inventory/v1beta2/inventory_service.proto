@@ -27,27 +27,30 @@ service KesselInventoryService {
       body: "*"
     };
   }
-
+  // CheckForUpdate performs a fully consistent permission check to determine
+  // whether the subject has the necessary permission to update or modify the resource.
+  // This is intended for use prior to performing write operations to ensure that
+  // the authorization state is up-to-date and not stale.
   rpc CheckForUpdate(CheckForUpdateRequest) returns (CheckForUpdateResponse) {
     option (google.api.http) = {
       post: "/api/inventory/v1beta2/checkforupdate"
       body: "*"
     };
   }
-
+  // Registers or reports a new resource to the inventory.
   rpc ReportResource(ReportResourceRequest) returns (ReportResourceResponse) {
     option (google.api.http) = {
       post: "/api/inventory/v1beta2/resources"
       body: "*"
     };
   }
-
+  // Deletes a resource and its associated relations from the inventory.
   rpc DeleteResource(DeleteResourceRequest) returns (DeleteResourceResponse) {
     option (google.api.http) = {
       delete: "/api/inventory/v1beta2/resources"
       body: "*"
     };
   }
-
+  // Streams a list of objects/resources based on filter parameters.
   rpc StreamedListObjects(StreamedListObjectsRequest) returns (stream StreamedListObjectsResponse);
 }

@@ -28,8 +28,14 @@ type KesselInventoryServiceHTTPServer interface {
 	// Check Checks for the existence of a single Relationship
 	// (a Relation between a Resource and a Subject or Subject Set).
 	Check(context.Context, *CheckRequest) (*CheckResponse, error)
+	// CheckForUpdate CheckForUpdate performs a fully consistent permission check to determine
+	// whether the subject has the necessary permission to update or modify the resource.
+	// This is intended for use prior to performing write operations to ensure that
+	// the authorization state is up-to-date and not stale.
 	CheckForUpdate(context.Context, *CheckForUpdateRequest) (*CheckForUpdateResponse, error)
+	// DeleteResource Deletes a resource and its associated relations from the inventory.
 	DeleteResource(context.Context, *DeleteResourceRequest) (*DeleteResourceResponse, error)
+	// ReportResource Registers or reports a new resource to the inventory.
 	ReportResource(context.Context, *ReportResourceRequest) (*ReportResourceResponse, error)
 }
 

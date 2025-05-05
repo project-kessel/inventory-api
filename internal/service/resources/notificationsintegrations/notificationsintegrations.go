@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/project-kessel/inventory-api/internal/biz/usecases/resources"
+	"github.com/project-kessel/inventory-api/internal/biz/usecase/resources"
 	"io"
 	"time"
 

@@ -2,7 +2,7 @@ package k8spolicies
 
 import (
 	"context"
-	"github.com/project-kessel/inventory-api/internal/biz/usecases/resources"
+	"github.com/project-kessel/inventory-api/internal/biz/usecase/resources"
 
 	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/resources"
 	authnapi "github.com/project-kessel/inventory-api/internal/authn/api"

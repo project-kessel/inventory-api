@@ -2,6 +2,7 @@ package consumer
 
 import (
 	"context"
+	"fmt"
 
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
@@ -12,6 +13,7 @@ const (
 	prefix      = "inventory_consumer_"
 )
 
+// LabelSet adds desired attributes to each metric recorded from stats messages to ensure consistent labeling.
 func (s *StatsData) LabelSet(key string) metric.MeasurementOption {
 	if key == "" {
 		m := metric.WithAttributes(
@@ -27,6 +29,7 @@ func (s *StatsData) LabelSet(key string) metric.MeasurementOption {
 	return m
 }
 
+// StatsData defines the key metrics to be monitored provided by a kafka.Stats message. It contains top-level metrics and objects within the message.
 type StatsData struct {
 	Name     string               `json:"name"`
 	ClientID string               `json:"client_id"`
@@ -35,11 +38,13 @@ type StatsData struct {
 	CGRP     CGRPData             `json:"cgrp"`
 }
 
+// TopicData contains metrics from the 'topic' section of a stats message
 type TopicData struct {
 	Topic      string                   `json:"topic"`
 	Partitions map[string]PartitionData `json:"partitions"`
 }
 
+// PartitionData contains metrics from the 'partitions' array section of a stats message
 type PartitionData struct {
 	FetchqCnt         int64  `json:"fetchq_cnt"`
 	FetchqSize        int64  `json:"fetchq_size"`
@@ -49,11 +54,9 @@ type PartitionData struct {
 	LsOffset          int64  `json:"ls_offset"`
 	ConsumerLag       int64  `json:"consumer_lag"`
 	ConsumerLagStored int64  `json:"consumer_lag_stored"`
-	Rxmsgs            int64  `json:"rxmsgs"`
-	Rxbytes           int64  `json:"rxbytes"`
-	MsgsInflight      int64  `json:"msgs_inflight"`
 }
 
+// CGRPData contains metrics from the 'cgrp' array section of a stats message. It captures metrics on the consumer group.
 type CGRPData struct {
 	State           string `json:"state"`
 	StateAge        int64  `json:"stageage"`
@@ -63,6 +66,7 @@ type CGRPData struct {
 	AssignmentSize  int64  `json:"assignment_size"`
 }
 
+// MetricsCollector captures metrics from stats messages and from custom app-centric messages
 type MetricsCollector struct {
 	// Top-Level Metrics
 	replyq metric.Int64Gauge
@@ -76,9 +80,6 @@ type MetricsCollector struct {
 	lsOffset          metric.Int64Gauge
 	consumerLag       metric.Int64Gauge
 	consumerLagStored metric.Int64Gauge
-	rxmsgs            metric.Int64Counter
-	rxbytes           metric.Int64Counter
-	msgsInflight      metric.Int64Gauge
 
 	// CGRP Metrics
 	state          metric.Int64Gauge
@@ -86,8 +87,15 @@ type MetricsCollector struct {
 	rebalanceAge   metric.Int64Gauge
 	rebalanceCnt   metric.Int64Counter
 	assignmentSize metric.Int64Gauge
+
+	// App Specific Metrics
+	msgsProcessed      metric.Int64Counter
+	msgProcessFailures metric.Int64Counter
+	consumerErrors     metric.Int64Counter
+	kafkaErrorEvents   metric.Int64Counter
 }
 
+// New instantiates a new MetricsCollector
 func (m *MetricsCollector) New(meter metric.Meter) error {
 	var err error
 
@@ -121,15 +129,6 @@ func (m *MetricsCollector) New(meter metric.Meter) error {
 	if m.consumerLagStored, err = meter.Int64Gauge(prefix + "consumer_lag_stored"); err != nil {
 		return err
 	}
-	if m.rxmsgs, err = meter.Int64Counter(prefix + "rxmsgs"); err != nil {
-		return err
-	}
-	if m.rxbytes, err = meter.Int64Counter(prefix + "rxbytes"); err != nil {
-		return err
-	}
-	if m.msgsInflight, err = meter.Int64Gauge(prefix + "msgs_inflight"); err != nil {
-		return err
-	}
 
 	// create cgrp metrics
 	if m.state, err = meter.Int64Gauge(prefix + "state"); err != nil {
@@ -147,9 +146,24 @@ func (m *MetricsCollector) New(meter metric.Meter) error {
 	if m.assignmentSize, err = meter.Int64Gauge(prefix + "assignment_size"); err != nil {
 		return err
 	}
+
+	// create app metrics
+	if m.msgsProcessed, err = meter.Int64Counter(prefix + "msgs_processed"); err != nil {
+		return err
+	}
+	if m.msgProcessFailures, err = meter.Int64Counter(prefix + "msg_process_failures"); err != nil {
+		return err
+	}
+	if m.consumerErrors, err = meter.Int64Counter(prefix + "consumer_errors"); err != nil {
+		return err
+	}
+	if m.kafkaErrorEvents, err = meter.Int64Counter(prefix + "kafka_error_events"); err != nil {
+		return err
+	}
 	return nil
 }
 
+// Collect is called on every stats message received to scrape the metrics and report them in our metrics endpoint
 func (m *MetricsCollector) Collect(stats StatsData) {
 	// top-level
 	ctx := context.Background()
@@ -177,9 +191,6 @@ func (m *MetricsCollector) Collect(stats StatsData) {
 			m.lsOffset.Record(ctx, stats.Topics[outboxTopic].Partitions[partitionKey].LsOffset, stats.LabelSet(partitionKey))
 			m.consumerLag.Record(ctx, stats.Topics[outboxTopic].Partitions[partitionKey].ConsumerLag, stats.LabelSet(partitionKey))
 			m.consumerLagStored.Record(ctx, stats.Topics[outboxTopic].Partitions[partitionKey].ConsumerLagStored, stats.LabelSet(partitionKey))
-			m.rxmsgs.Add(ctx, stats.Topics[outboxTopic].Partitions[partitionKey].Rxmsgs, stats.LabelSet(partitionKey))
-			m.rxbytes.Add(ctx, stats.Topics[outboxTopic].Partitions[partitionKey].Rxbytes, stats.LabelSet(partitionKey))
-			m.msgsInflight.Record(ctx, stats.Topics[outboxTopic].Partitions[partitionKey].MsgsInflight, stats.LabelSet(partitionKey))
 		}
 	}
 
@@ -197,4 +208,17 @@ func (m *MetricsCollector) Collect(stats StatsData) {
 	m.rebalanceAge.Record(ctx, stats.CGRP.RebalanceAge, stats.LabelSet(""), metric.WithAttributes(attribute.String("last_rebalance_reason", stats.CGRP.RebalanceReason)))
 	m.rebalanceCnt.Add(ctx, stats.CGRP.RebalanceCnt, stats.LabelSet(""))
 	m.assignmentSize.Record(ctx, stats.CGRP.AssignmentSize, stats.LabelSet(""))
+}
+
+// Incr increments a non-stats message based counter
+func Incr(counter metric.Int64Counter, operation string, errReason error, extraAttrs ...attribute.KeyValue) {
+	ctx := context.Background()
+	attrs := []attribute.KeyValue{
+		attribute.String("operation", operation),
+	}
+	if errReason != nil {
+		attrs = append(attrs, attribute.String("reason", fmt.Sprint(errReason)))
+	}
+	attrs = append(attrs, extraAttrs...)
+	counter.Add(ctx, 1, metric.WithAttributes(attrs...))
 }

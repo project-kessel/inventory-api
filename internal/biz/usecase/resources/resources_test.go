@@ -1278,8 +1278,12 @@ func TestIsSPInAllowlist(t *testing.T) {
 }
 
 func TestComputeReadAfterWrite(t *testing.T) {
+	var listenManager = &pubsub.ListenManager{}
+	var listenManagerNil *pubsub.ListenManager
+
 	tests := []struct {
 		name                    string
+		listenManager           pubsub.ListenManagerImpl
 		waitForSync             bool
 		ReadAfterWriteEnabled   bool
 		ReadAfterWriteAllowlist []string
@@ -1287,6 +1291,7 @@ func TestComputeReadAfterWrite(t *testing.T) {
 	}{
 		{
 			name:                    "Enable Read After Write, Wait for Sync, SP in Allowlist",
+			listenManager:           listenManager,
 			ReadAfterWriteEnabled:   true,
 			waitForSync:             true,
 			ReadAfterWriteAllowlist: []string{"SP1"},
@@ -1294,6 +1299,7 @@ func TestComputeReadAfterWrite(t *testing.T) {
 		},
 		{
 			name:                    "Enable Read After Write, No Wait for Sync, SP in Allowlist",
+			listenManager:           listenManager,
 			ReadAfterWriteEnabled:   true,
 			waitForSync:             false,
 			ReadAfterWriteAllowlist: []string{"SP1"},
@@ -1301,6 +1307,7 @@ func TestComputeReadAfterWrite(t *testing.T) {
 		},
 		{
 			name:                    "Enable Read After Write, Wait for Sync, ALL SPs in Allowlist",
+			listenManager:           listenManager,
 			ReadAfterWriteEnabled:   true,
 			waitForSync:             true,
 			ReadAfterWriteAllowlist: []string{"*"},
@@ -1308,6 +1315,7 @@ func TestComputeReadAfterWrite(t *testing.T) {
 		},
 		{
 			name:                    "Enable Read After Write, No Wait for Sync, ALL SPs in Allowlist",
+			listenManager:           listenManager,
 			ReadAfterWriteEnabled:   true,
 			waitForSync:             false,
 			ReadAfterWriteAllowlist: []string{"*"},
@@ -1315,6 +1323,7 @@ func TestComputeReadAfterWrite(t *testing.T) {
 		},
 		{
 			name:                    "Enable Read After Write, Wait for Sync, No SP in Allowlist",
+			listenManager:           listenManager,
 			ReadAfterWriteEnabled:   true,
 			waitForSync:             true,
 			ReadAfterWriteAllowlist: []string{},
@@ -1322,6 +1331,7 @@ func TestComputeReadAfterWrite(t *testing.T) {
 		},
 		{
 			name:                    "Enable Read After Write, Wait for Sync, SP not in Allowlist",
+			listenManager:           listenManager,
 			ReadAfterWriteEnabled:   true,
 			waitForSync:             true,
 			ReadAfterWriteAllowlist: []string{"SP2"},
@@ -1329,9 +1339,18 @@ func TestComputeReadAfterWrite(t *testing.T) {
 		},
 		{
 			name:                    "Disable Read After Write, No Wait for Sync, SP not in Allowlist",
+			listenManager:           listenManager,
 			ReadAfterWriteEnabled:   false,
 			waitForSync:             false,
 			ReadAfterWriteAllowlist: []string{"SP2"},
+			expected:                false,
+		},
+		{
+			name:                    "Nil ListenManager, Enabled Read After Write, Wait for Sync, SP in Allowlist",
+			listenManager:           listenManagerNil,
+			ReadAfterWriteEnabled:   true,
+			waitForSync:             true,
+			ReadAfterWriteAllowlist: []string{"*"},
 			expected:                false,
 		},
 	}
@@ -1339,7 +1358,7 @@ func TestComputeReadAfterWrite(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			uc := &Usecase{
-				ListenManager:           &pubsub.ListenManager{},
+				ListenManager:           tt.listenManager,
 				ReadAfterWriteEnabled:   tt.ReadAfterWriteEnabled,
 				ReadAfterWriteAllowlist: tt.ReadAfterWriteAllowlist,
 			}

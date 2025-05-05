@@ -2,6 +2,7 @@ package k8spolicy
 
 import (
 	"context"
+
 	authnapi "github.com/project-kessel/inventory-api/internal/authn/api"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
 	relationshipsctl "github.com/project-kessel/inventory-api/internal/biz/usecase/relationships"

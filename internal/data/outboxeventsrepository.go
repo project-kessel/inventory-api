@@ -1,8 +1,9 @@
 package data
 
 import (
-	"github.com/project-kessel/inventory-api/internal/biz/model"
 	"gorm.io/gorm"
+
+	"github.com/project-kessel/inventory-api/internal/biz/model"
 )
 
 // publishes an event to the outbox table and then deletes it

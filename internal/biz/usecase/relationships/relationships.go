@@ -3,14 +3,16 @@ package resources
 import (
 	"context"
 	"errors"
-	"github.com/project-kessel/inventory-api/internal/middleware"
 	"time"
+
+	"github.com/project-kessel/inventory-api/internal/middleware"
 
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/google/uuid"
+	"gorm.io/gorm"
+
 	"github.com/project-kessel/inventory-api/internal/biz/model"
 	eventingapi "github.com/project-kessel/inventory-api/internal/eventing/api"
-	"gorm.io/gorm"
 )
 
 type ResourceRepository interface {

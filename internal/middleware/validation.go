@@ -2,16 +2,19 @@ package middleware
 
 import (
 	"context"
+
 	"github.com/spf13/viper"
+
+	"os"
+	"path/filepath"
 
 	"github.com/bufbuild/protovalidate-go"
 	"github.com/go-kratos/kratos/v2/errors"
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/go-kratos/kratos/v2/middleware"
-	pbv1beta2 "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2"
 	"google.golang.org/protobuf/proto"
-	"os"
-	"path/filepath"
+
+	pbv1beta2 "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2"
 )
 
 var (

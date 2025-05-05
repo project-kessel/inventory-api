@@ -6,9 +6,10 @@ import (
 
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/google/uuid"
+	"gorm.io/gorm"
+
 	"github.com/project-kessel/inventory-api/internal/biz/model"
 	"github.com/project-kessel/inventory-api/internal/data"
-	"gorm.io/gorm"
 )
 
 type Repo struct {

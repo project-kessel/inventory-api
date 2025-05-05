@@ -1,9 +1,10 @@
 package config
 
 import (
-	. "github.com/project-kessel/inventory-api/cmd/common"
 	"os"
 	"testing"
+
+	. "github.com/project-kessel/inventory-api/cmd/common"
 
 	clowder "github.com/redhatinsights/app-common-go/pkg/api/v1"
 	"github.com/stretchr/testify/assert"

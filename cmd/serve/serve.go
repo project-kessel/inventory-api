@@ -4,14 +4,18 @@ import (
 	"context"
 	e "errors"
 	"fmt"
-	relationshipsctl "github.com/project-kessel/inventory-api/internal/biz/usecase/relationships"
-	resourcesctl "github.com/project-kessel/inventory-api/internal/biz/usecase/resources"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
+	"github.com/go-kratos/kratos/v2/log"
+	"github.com/spf13/cobra"
+	"gorm.io/gorm"
+
 	"github.com/project-kessel/inventory-api/cmd/common"
+	relationshipsctl "github.com/project-kessel/inventory-api/internal/biz/usecase/relationships"
+	resourcesctl "github.com/project-kessel/inventory-api/internal/biz/usecase/resources"
 	"github.com/project-kessel/inventory-api/internal/consistency"
 	"github.com/project-kessel/inventory-api/internal/consumer"
 	inventoryResourcesRepo "github.com/project-kessel/inventory-api/internal/data/inventoryresources"
@@ -26,11 +30,6 @@ import (
 
 	//v1beta2
 	resourcesvc "github.com/project-kessel/inventory-api/internal/service/resources"
-
-	"github.com/spf13/cobra"
-	"gorm.io/gorm"
-
-	"github.com/go-kratos/kratos/v2/log"
 
 	"github.com/project-kessel/inventory-api/internal/authn"
 	"github.com/project-kessel/inventory-api/internal/authz"

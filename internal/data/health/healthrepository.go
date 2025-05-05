@@ -4,11 +4,12 @@ import (
 	"context"
 
 	"github.com/go-kratos/kratos/v2/log"
+	"github.com/spf13/viper"
+	"gorm.io/gorm"
+
 	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1"
 	"github.com/project-kessel/inventory-api/internal/authz"
 	authzapi "github.com/project-kessel/inventory-api/internal/authz/api"
-	"github.com/spf13/viper"
-	"gorm.io/gorm"
 )
 
 type healthRepo struct {

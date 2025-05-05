@@ -4,10 +4,11 @@ import (
 	"context"
 
 	"github.com/google/uuid"
+	"gorm.io/gorm"
+
 	"github.com/project-kessel/inventory-api/internal/biz/model"
 	"github.com/project-kessel/inventory-api/internal/data"
 	eventingapi "github.com/project-kessel/inventory-api/internal/eventing/api"
-	"gorm.io/gorm"
 )
 
 type Repo struct {

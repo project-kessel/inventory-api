@@ -2,15 +2,18 @@ package middleware_test
 
 import (
 	"fmt"
-	pbv1beta2 "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2"
-	"google.golang.org/protobuf/proto"
-	"google.golang.org/protobuf/types/known/structpb"
 	"path/filepath"
 	"strings"
 	"testing"
 
-	"github.com/project-kessel/inventory-api/internal/middleware"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/structpb"
+
+	pbv1beta2 "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2"
+
 	"github.com/stretchr/testify/assert"
+
+	"github.com/project-kessel/inventory-api/internal/middleware"
 )
 
 // Helper functions
@@ -210,11 +213,11 @@ func TestUnmarshalJSONToMap(t *testing.T) {
 func runValidationTest(
 	t *testing.T,
 	tt struct {
-	name      string
-	request   *pbv1beta2.ReportResourceRequest
-	expectErr bool
-	expectMsg string
-},
+		name      string
+		request   *pbv1beta2.ReportResourceRequest
+		expectErr bool
+		expectMsg string
+	},
 	validateFunc func(*pbv1beta2.ReportResourceRequest) error,
 ) {
 	err := validateFunc(tt.request)

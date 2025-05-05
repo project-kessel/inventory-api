@@ -10,6 +10,7 @@ import (
 	"github.com/go-kratos/kratos/v2/transport"
 	kgrpc "github.com/go-kratos/kratos/v2/transport/grpc"
 	khttp "github.com/go-kratos/kratos/v2/transport/http"
+
 	"github.com/project-kessel/inventory-api/internal/authn/api"
 )
 

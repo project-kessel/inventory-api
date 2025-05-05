@@ -7,8 +7,9 @@ import (
 	"time"
 
 	"github.com/go-kratos/kratos/v2/log"
-	"github.com/project-kessel/inventory-api/cmd/common"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/project-kessel/inventory-api/cmd/common"
 )
 
 func TestSubscriptions(t *testing.T) {

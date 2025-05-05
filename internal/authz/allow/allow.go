@@ -8,9 +8,10 @@ import (
 	"google.golang.org/grpc/metadata"
 
 	"github.com/go-kratos/kratos/v2/log"
-	"github.com/project-kessel/inventory-api/internal/biz/model"
 	kesselv1 "github.com/project-kessel/relations-api/api/kessel/relations/v1"
 	"github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
+
+	"github.com/project-kessel/inventory-api/internal/biz/model"
 )
 
 type AllowAllAuthz struct {

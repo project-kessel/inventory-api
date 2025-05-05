@@ -3,9 +3,10 @@ package storage
 import (
 	"errors"
 
+	"github.com/spf13/pflag"
+
 	"github.com/project-kessel/inventory-api/internal/storage/postgres"
 	"github.com/project-kessel/inventory-api/internal/storage/sqlite3"
-	"github.com/spf13/pflag"
 )
 
 type Options struct {

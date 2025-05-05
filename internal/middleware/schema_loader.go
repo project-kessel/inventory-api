@@ -4,10 +4,11 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"github.com/spf13/viper"
-	"gopkg.in/yaml.v3"
 	"os"
 	"path/filepath"
+
+	"github.com/spf13/viper"
+	"gopkg.in/yaml.v3"
 )
 
 func ValidateResourceReporterCombination(resourceType, reporterType string) error {

@@ -4,7 +4,7 @@ import (
 	"context"
 	authnapi "github.com/project-kessel/inventory-api/internal/authn/api"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
-	relationshipsctl "github.com/project-kessel/inventory-api/internal/biz/relationships"
+	relationshipsctl "github.com/project-kessel/inventory-api/internal/biz/usecases/relationships"
 	"github.com/project-kessel/inventory-api/internal/middleware"
 	conv "github.com/project-kessel/inventory-api/internal/service/common"
 

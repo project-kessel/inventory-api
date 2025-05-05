@@ -49,7 +49,7 @@ def build_deleted_command(inventory_id, payload):
 
     # Call gabi to fetch current info on resource.
     inv_res_id, inv_sub_id, inv_res_type, inv_report_id = fetch_inventory_resource_info(inventory_id)
-    if inv_res_id or inv_sub_id:
+    if not all([inv_res_id, inv_sub_id, inv_res_type, inv_report_id]):
         return None # Dont delete, as it still exists in inventory DB.
 
     # zed relationship read fully consistent (drift check)
@@ -77,7 +77,7 @@ def build_created_command(inventory_id, payload):
 
     # Call gabi to fetch current info on resource.
     inv_res_id, inv_sub_id, inv_res_type, inv_report_id = fetch_inventory_resource_info(inventory_id)
-    if not inv_res_id or not inv_sub_id:
+    if not all([inv_res_id, inv_sub_id, inv_res_type, inv_report_id]):
         return None # No resource in inventory DB.
 
     # zed relationship read fully consistent (drift check)
@@ -105,7 +105,7 @@ def build_updated_command(inventory_id, payload):
 
     # Call gabi to fetch current info on resource.
     inv_res_id, inv_sub_id, inv_res_type, inv_report_id = fetch_inventory_resource_info(inventory_id)
-    if not inv_res_id or not inv_sub_id:
+    if not all([inv_res_id, inv_sub_id, inv_res_type, inv_report_id]):
         return None # No resource in inventory DB.
 
     # zed relationship read fully consistent (drift check)

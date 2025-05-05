@@ -36,7 +36,7 @@ def extract_json_payload(line: str):
         inventory_id = match_inventory_id.group(1).encode().decode("unicode_escape")
 
         # We don't really know what operation they are supposed to be doing tbh. 
-        # Update make be safe, but not entirely.
+        # Update might be safe, but not entirely.
         return inventory_id, json.loads(payload_str), "updated"
     
 
@@ -64,7 +64,7 @@ def build_deleted_command(inventory_id, payload):
         print(f"Resource exists in SpiceDB: {res.stdout}. Deleting...")
         return f"zed relationship bulk-delete {resource_namespace}/{resource_name}:{resource_id} t_{relation}"
 
-    print("Resource doesn't exist in SpiceDB. Not deleting")
+    print("Resource doesn't exist in SpiceDB. Nothing to delete...")
     return None
 
 def build_created_command(inventory_id, payload):

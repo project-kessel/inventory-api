@@ -30,7 +30,7 @@ func (s *StatsData) LabelSet(key string) metric.MeasurementOption {
 	return m
 }
 
-// StatsData defines the key metrics to be monitored provided by a kafka.Stats message. It contains top-level metrics and objets within the message.
+// StatsData defines the key metrics to be monitored provided by a kafka.Stats message. It contains top-level metrics and objects within the message.
 type StatsData struct {
 	Name     string               `json:"name"`
 	ClientID string               `json:"client_id"`
@@ -90,13 +90,13 @@ type MetricsCollector struct {
 	assignmentSize metric.Int64Gauge
 
 	// App Specific Metrics
-	msgProcessed      metric.Int64Counter
-	msgProcessFailure metric.Int64Counter
-	consumerErrors    metric.Int64Counter
-	kafkaErrors       metric.Int64Counter
+	msgsProcessed      metric.Int64Counter
+	msgProcessFailures metric.Int64Counter
+	consumerErrors     metric.Int64Counter
+	kafkaErrorEvents   metric.Int64Counter
 }
 
-// New instsantiates a new MetricsCollector
+// New instantiates a new MetricsCollector
 func (m *MetricsCollector) New(meter metric.Meter) error {
 	var err error
 
@@ -149,16 +149,16 @@ func (m *MetricsCollector) New(meter metric.Meter) error {
 	}
 
 	// create app metrics
-	if m.msgProcessed, err = meter.Int64Counter(prefix + "msgs_processed"); err != nil {
+	if m.msgsProcessed, err = meter.Int64Counter(prefix + "msgs_processed"); err != nil {
 		return err
 	}
-	if m.msgProcessFailure, err = meter.Int64Counter(prefix + "msg_process_failures"); err != nil {
+	if m.msgProcessFailures, err = meter.Int64Counter(prefix + "msg_process_failures"); err != nil {
 		return err
 	}
 	if m.consumerErrors, err = meter.Int64Counter(prefix + "consumer_errors"); err != nil {
 		return err
 	}
-	if m.kafkaErrors, err = meter.Int64Counter(prefix + "kafka_error_events"); err != nil {
+	if m.kafkaErrorEvents, err = meter.Int64Counter(prefix + "kafka_error_events"); err != nil {
 		return err
 	}
 	return nil
@@ -226,7 +226,7 @@ func Incr(counter metric.Int64Counter, operation string, errReason error) {
 
 // IncrKafkaError increments the kakfaError counter when kafka.Error messages are received by the poll loop
 func IncrKafkaError(counter metric.Int64Counter, kerror *kafka.Error) {
-	ctx := context.TODO()
+	ctx := context.Background()
 	counter.Add(ctx, 1, metric.WithAttributes(
 		attribute.String("code", kerror.Code().String()),
 		attribute.String("error", kerror.Error())))

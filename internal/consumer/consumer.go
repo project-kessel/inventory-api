@@ -21,6 +21,7 @@ import (
 	"github.com/project-kessel/inventory-api/internal/pubsub"
 
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
 
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
 	"github.com/go-kratos/kratos/v2/log"
@@ -231,7 +232,9 @@ func (i *InventoryConsumer) Consume() error {
 				i.Logger.Debugf("consumed event data: key = %-10s value = %s", string(e.Key), string(e.Value))
 
 			case kafka.Error:
-				IncrKafkaError(i.MetricsCollector.kafkaErrorEvents, &e)
+				Incr(i.MetricsCollector.kafkaErrorEvents, "kafka", nil,
+					attribute.String("code", e.Code().String()),
+					attribute.String("error", e.Error()))
 				if e.IsFatal() {
 					run = false
 					i.Errors <- e

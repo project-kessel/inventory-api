@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
 )
@@ -212,22 +211,14 @@ func (m *MetricsCollector) Collect(stats StatsData) {
 }
 
 // Incr increments a non-stats message based counter
-func Incr(counter metric.Int64Counter, operation string, errReason error) {
-	ctx := context.TODO()
-	if errReason != nil {
-		counter.Add(ctx, 1, metric.WithAttributes(
-			attribute.String("operation", operation),
-			attribute.String("reason", fmt.Sprint(errReason))))
-	} else {
-		counter.Add(ctx, 1, metric.WithAttributes(
-			attribute.String("operation", operation)))
-	}
-}
-
-// IncrKafkaError increments the kakfaError counter when kafka.Error messages are received by the poll loop
-func IncrKafkaError(counter metric.Int64Counter, kerror *kafka.Error) {
+func Incr(counter metric.Int64Counter, operation string, errReason error, extraAttrs ...attribute.KeyValue) {
 	ctx := context.Background()
-	counter.Add(ctx, 1, metric.WithAttributes(
-		attribute.String("code", kerror.Code().String()),
-		attribute.String("error", kerror.Error())))
+	attrs := []attribute.KeyValue{
+		attribute.String("operation", operation),
+	}
+	if errReason != nil {
+		attrs = append(attrs, attribute.String("reason", fmt.Sprint(errReason)))
+	}
+	attrs = append(attrs, extraAttrs...)
+	counter.Add(ctx, 1, metric.WithAttributes(attrs...))
 }

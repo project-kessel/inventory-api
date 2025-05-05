@@ -43,7 +43,7 @@ The read command should dump out the entire SpiceDB schema. An error is provided
 
 To install the `gabi` CLI, refer to [gabi's README](https://github.com/app-sre/gabi-cli) for specific instructions based on your OS
 
-In order to access Inventory's DB using the `gabi` cli, you'll need to configure a profile for the stage gabi instance. This will access to the gabi instance via its route and a token used to login to the cluster.
+In order to access Inventory's DB using the `gabi` cli, you'll need to configure a profile for the stage gabi instance. Accessing the Gabi instance requires its route and a token used to log into the cluster.
 
 If you don't already have a gabi config initialized, execute the `init` command: 
 ```shell

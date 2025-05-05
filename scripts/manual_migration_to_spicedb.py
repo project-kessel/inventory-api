@@ -45,24 +45,21 @@ def build_deleted_command(inventory_id, payload):
 	# (parse message, gabi call, zed relationship read, zed relationship delete) 
 
     # parse message
-    resource_namespace = payload["resource_namespace"]
-    resource_name = payload["resource_type"]
-    resource_id = payload["resource_id"]
     relation = payload["relation"]
 
     # Call gabi to fetch current info on resource.
-    inv_res_id, inv_sub_id = fetch_inventory_resource_info(inventory_id)
+    inv_res_id, inv_sub_id, inv_res_type, inv_report_id = fetch_inventory_resource_info(inventory_id)
     if inv_res_id or inv_sub_id:
         return None # Dont delete, as it still exists in inventory DB.
 
-    # zed relationship read fully consistent
+    # zed relationship read fully consistent (drift check)
     res = subprocess.run(
-        f"zed relationship read {resource_namespace}/{resource_name}:{resource_id} t_{relation} --consistency-full",
+        f"zed relationship read {inv_report_id}/{inv_res_type}:{inv_res_id} t_{relation} --consistency-full",
         shell=True, capture_output=True, text=True
     )
     if len(res.stdout) != 0:
         print(f"Resource exists in SpiceDB: {res.stdout}. Deleting...")
-        return f"zed relationship bulk-delete {resource_namespace}/{resource_name}:{resource_id} t_{relation}"
+        return f"zed relationship bulk-delete {inv_report_id}/{inv_res_type}:{inv_res_id} t_{relation}"
 
     print("Resource doesn't exist in SpiceDB. Nothing to delete...")
     return None
@@ -72,34 +69,27 @@ def build_created_command(inventory_id, payload):
     # (parse message, gabi call, zed relationship read, zed relationship create)
 
     # parse message
-    resource = payload["resource"]
     relation = payload["relation"]
     subject = payload["subject"]["subject"]
 
-    resource_namespace = resource["type"]["namespace"]
-    if resource_namespace == "authz":
-        resource_namespace = "notifications"
-    resource_name = resource["type"]["name"]
-    resource_id = resource["id"]
     subject_ns = subject["type"]["namespace"]
     subject_name = subject["type"]["name"]
-    subject_id = subject["id"]
 
     # Call gabi to fetch current info on resource.
-    inv_res_id, inv_sub_id = fetch_inventory_resource_info(inventory_id)
+    inv_res_id, inv_sub_id, inv_res_type, inv_report_id = fetch_inventory_resource_info(inventory_id)
     if not inv_res_id or not inv_sub_id:
         return None # No resource in inventory DB.
 
-    # zed relationship read fully consistent
+    # zed relationship read fully consistent (drift check)
     res = subprocess.run(
-        f"zed relationship read {resource_namespace}/{resource_name}:{resource_id} t_{relation} {subject_ns}/{subject_name}:{subject_id} --consistency-full",
+        f"zed relationship read {inv_report_id}/{inv_res_type}:{inv_res_id} t_{relation} {subject_ns}/{subject_name}:{inv_sub_id} --consistency-full",
         shell=True, capture_output=True, text=True
     )
     if len(res.stdout) != 0:
         print(f"Resource exists in SpiceDB: {res.stdout}. Not creating.")
         return None # Our job here is already done.
     print("Resource exists in inventory, but not in SpiceDB. Creating...")
-    return f"zed relationship create {resource_namespace}/{resource_name}:{resource_id} t_{relation} {subject_ns}/{subject_name}:{subject_id}"
+    return f"zed relationship create {inv_report_id}/{inv_res_type}:{inv_res_id} t_{relation} {subject_ns}/{subject_name}:{inv_sub_id}"
 
 def build_updated_command(inventory_id, payload):
     # if the resource exists in inventory, check if the tuple exists, if they do not match,
@@ -107,27 +97,20 @@ def build_updated_command(inventory_id, payload):
     # (parse mesasge, gabi call, zed relatonship read, zed relationship touch)
 
     # parse message
-    resource = payload["resource"]
     relation = payload["relation"]
     subject = payload["subject"]["subject"]
 
-    resource_namespace = resource["type"]["namespace"]
-    if resource_namespace == "authz":
-        resource_namespace = "notifications"
-    resource_name = resource["type"]["name"]
-    resource_id = resource["id"]
     subject_ns = subject["type"]["namespace"]
     subject_name = subject["type"]["name"]
-    subject_id = subject["id"]
 
     # Call gabi to fetch current info on resource.
-    inv_res_id, inv_sub_id = fetch_inventory_resource_info(inventory_id)
+    inv_res_id, inv_sub_id, inv_res_type, inv_report_id = fetch_inventory_resource_info(inventory_id)
     if not inv_res_id or not inv_sub_id:
         return None # No resource in inventory DB.
 
-    # zed relationship read fully consistent
+    # zed relationship read fully consistent (drift check)
     res = subprocess.run(
-        f"zed relationship read {resource_namespace}/{resource_name}:{resource_id} t_{relation} {subject_ns}/{subject_name}:{subject_id} --consistency-full",
+        f"zed relationship read {inv_report_id}/{inv_res_type}:{inv_res_id} t_{relation} {subject_ns}/{subject_name}:{inv_sub_id} --consistency-full",
         shell=True, capture_output=True, text=True
     )
     if len(res.stdout) != 0:
@@ -139,10 +122,10 @@ def build_updated_command(inventory_id, payload):
             print("Resources match, no need to update.")
             return None # They match, no need to update.
         print("Updating resource...")
-        return f"zed relationship touch {resource_namespace}/{resource_name}:{inv_res_id} t_{relation} {subject_ns}/{subject_name}:{inv_sub_id}"
+        return f"zed relationship touch {inv_report_id}/{inv_res_type}:{inv_res_id} t_{relation} {subject_ns}/{subject_name}:{inv_sub_id}"
 
     print("Resource doesn't exist in SpiceDB but does in inventory, creating...")
-    return f"zed relationship touch {resource_namespace}/{resource_name}:{inv_res_id} t_{relation} {subject_ns}/{subject_name}:{inv_sub_id}"
+    return f"zed relationship touch {inv_report_id}/{inv_res_type}:{inv_res_id} t_{relation} {subject_ns}/{subject_name}:{inv_sub_id}"
     
 
 def build_zed_command(inventory_id: str, payload: any, operation: str):
@@ -161,7 +144,7 @@ def fetch_inventory_resource_info(inventory_id):
     # Call gabi to fetch current info on resource.
     print(f"Fetching info on inventory_id: {inventory_id}")
     res = subprocess.run(
-        f"gabi exec \"select * from resources where inventory_id='{inventory_id}'\"",
+        f"gabi exec \"select reporter_resource_id, workspace_id, resource_type, reporter_id from resources where inventory_id='{inventory_id}'\"",
         shell=True,
         capture_output=True,
         text=True
@@ -169,20 +152,24 @@ def fetch_inventory_resource_info(inventory_id):
     gabi_output = res.stdout
     if "your query didn't return any results" in gabi_output: # there's some weird tabbing in output.
         print("Nothing in inventory db.")
-        return None, None # Don't update anything.
+        return None, None, None, None # Don't update anything.
 
     # resource exists
     print(f"Inventory ID: {inventory_id} exists in Inventory DB.")
     parsed_data = json.loads(gabi_output)
     if not parsed_data:
-        return None, None
+        return None, None, None, None
     
-    inventory_resource_id = parsed_data[0]["reporter_resource_id"]
-    inventory_subject_id = parsed_data[0]["workspace_id"]
+    inv_resource_id = parsed_data[0]["reporter_resource_id"]
+    inv_subject_id = parsed_data[0]["workspace_id"]
+    inv_resource_type = parsed_data[0]["resource_type"]
+    inv_reporter_id = parsed_data[0]["reporter_id"].lower()
 
-    print(f"Inventory_resource_id: {inventory_resource_id}")
-    print(f"Inventory_subject_id: {inventory_subject_id}")
-    return inventory_resource_id, inventory_subject_id
+    print(f"Inventory_resource_id: {inv_resource_id}")
+    print(f"Inventory_subject_id: {inv_subject_id}")
+    print(f"Inventory_resource_type: {inv_resource_type}")
+    print(f"Inventory_reporter_id: {inv_reporter_id}")
+    return inv_resource_id, inv_subject_id, inv_resource_type, inv_reporter_id
 
 
 def main():

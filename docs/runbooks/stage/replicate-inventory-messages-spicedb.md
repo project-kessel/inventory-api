@@ -112,7 +112,17 @@ EOF
 
 Save these messages to some file like `kafkadump.txt`.
 
-With our zed context and gabi config set up to stage and port-forwarding into the SpiceDB service, we can execute our [migration script](/docs/manual_migration_to_spicedb.py). Move the migration script to the same level as your `kafkadump.txt` file.
+**WARNING:**
+Before executing our script we must ensure the consumer is disabled such that no messages are processed at the same time
+we are trying to manually replicate resources to SpiceDB. If you do not disable the consumer before running the migration script, data between inventory and SpiceDB may not be consistent. 
+
+Disable the consumer in the inventory api config yaml. You may need to roll the pods for the change to take effect.
+```shell
+  consumer:
+    enabled: false
+```
+
+With our zed context and gabi config set up to stage and port-forwarding into the SpiceDB service, we can execute our [migration script](/scripts/manual_migration_to_spicedb.py). Move the migration script to the same location as your `kafkadump.txt` file.
 
 Run 
 ```shell
@@ -120,3 +130,10 @@ python3 manual_migration_to_spicedb.py kafkadump.txt
 ```
 
 Voila! Your inventory DB data should now be consistent with SpiceDB after reprocessing the failing messages!
+
+You can now reenable the consumer so messages can begin processing. You may need to roll the pods for the change to take effect.
+
+```shell
+  consumer:
+    enabled: true
+```

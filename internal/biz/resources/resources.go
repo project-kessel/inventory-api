@@ -15,6 +15,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/go-kratos/kratos/v2/log"
+	common "github.com/project-kessel/inventory-api/cmd/common"
 	authzapi "github.com/project-kessel/inventory-api/internal/authz/api"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
 	eventingapi "github.com/project-kessel/inventory-api/internal/eventing/api"
@@ -329,28 +330,31 @@ func (uc *Usecase) Create(ctx context.Context, m *model.Resource) (*model.Resour
 			return nil, ErrResourceAlreadyExists
 		}
 
-		// Generate txid for data layer
-		// TODO: Replace this when inventory api has proper api-level transaction ids
-		txid, err := uuid.NewV7()
-		if err != nil {
-			return nil, err
+		if !common.IsNil(uc.ListenManager) {
+			// Generate txid for data layer
+			// TODO: Replace this when inventory api has proper api-level transaction ids
+			txid, err := uuid.NewV7()
+			if err != nil {
+				return nil, err
+			}
+			txidStr = txid.String()
+			subscription = uc.ListenManager.Subscribe(txidStr)
+			defer subscription.Unsubscribe()
 		}
-		txidStr = txid.String()
-		subscription = uc.ListenManager.Subscribe(txidStr)
-		defer subscription.Unsubscribe()
 
 		ret, err = uc.reporterResourceRepository.Create(ctx, m, uc.Namespace, txidStr)
 		if err != nil {
 			return nil, err
 		}
 
-		// 30 sec max timeout
-		timeoutCtx, cancel := context.WithTimeout(ctx, listenTimeout)
-		defer cancel()
+		if !common.IsNil(uc.ListenManager) {
+			timeoutCtx, cancel := context.WithTimeout(ctx, listenTimeout)
+			defer cancel()
 
-		err = subscription.BlockForNotification(timeoutCtx)
-		if err != nil {
-			return nil, err
+			err = subscription.BlockForNotification(timeoutCtx)
+			if err != nil {
+				return nil, err
+			}
 		}
 	}
 
@@ -382,27 +386,31 @@ func (uc *Usecase) Update(ctx context.Context, m *model.Resource, id model.Repor
 			return nil, ErrDatabaseError
 		}
 
-		// Generate txid for data layer
-		// TODO: Replace this when inventory api has proper api-level transaction ids
-		txid, err := uuid.NewV7()
-		if err != nil {
-			return nil, err
+		if !common.IsNil(uc.ListenManager) {
+			// Generate txid for data layer
+			// TODO: Replace this when inventory api has proper api-level transaction ids
+			txid, err := uuid.NewV7()
+			if err != nil {
+				return nil, err
+			}
+			txidStr = txid.String()
+			subscription = uc.ListenManager.Subscribe(txidStr)
+			defer subscription.Unsubscribe()
 		}
-		txidStr = txid.String()
-		subscription = uc.ListenManager.Subscribe(txidStr)
-		defer subscription.Unsubscribe()
 
 		ret, err = uc.reporterResourceRepository.Update(ctx, m, existingResource.ID, uc.Namespace, txidStr)
 		if err != nil {
 			return nil, err
 		}
 
-		timeoutCtx, cancel := context.WithTimeout(ctx, listenTimeout)
-		defer cancel()
+		if !common.IsNil(uc.ListenManager) {
+			timeoutCtx, cancel := context.WithTimeout(ctx, listenTimeout)
+			defer cancel()
 
-		err = subscription.BlockForNotification(timeoutCtx)
-		if err != nil {
-			return nil, err
+			err = subscription.BlockForNotification(timeoutCtx)
+			if err != nil {
+				return nil, err
+			}
 		}
 	}
 
@@ -459,5 +467,5 @@ func computeReadAfterWrite(uc *Usecase, wait_for_sync bool, m *model.Resource) b
 	// read after write functionality is enabled/disabled globally.
 	// And executed if request specifies and
 	// came from service provider in allowlist
-	return uc.ListenManager != nil && uc.ReadAfterWriteEnabled && wait_for_sync && isSPInAllowlist(m, uc.ReadAfterWriteAllowlist)
+	return !common.IsNil(uc.ListenManager) && uc.ReadAfterWriteEnabled && wait_for_sync && isSPInAllowlist(m, uc.ReadAfterWriteAllowlist)
 }

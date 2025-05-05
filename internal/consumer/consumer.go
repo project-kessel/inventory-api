@@ -13,6 +13,7 @@ import (
 	"syscall"
 	"time"
 
+	common "github.com/project-kessel/inventory-api/cmd/common"
 	"github.com/project-kessel/inventory-api/internal/consumer/auth"
 	"github.com/project-kessel/inventory-api/internal/consumer/retry"
 
@@ -203,7 +204,7 @@ func (i *InventoryConsumer) Consume() error {
 				}
 
 				// if txid is present, we need to notify the producer that we've processed the message
-				if i.Notifier != nil && txid != "" {
+				if !common.IsNil(i.Notifier) && txid != "" {
 					err := i.Notifier.Notify(context.Background(), txid)
 					if err != nil {
 						Incr(i.MetricsCollector.consumerErrors, "Notify", err)

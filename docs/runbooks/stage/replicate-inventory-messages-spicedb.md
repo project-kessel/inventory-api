@@ -112,7 +112,7 @@ EOF
 
 Save these messages to some file like `kafkadump.txt`.
 
-With our zed context and gabi config setup to stage and port-forwarding into the SpiceDB service, we can execute our [migration script](/docs/manual_migration_to_spicedb.py). Move the migration script to the same level as your `kafkadump.txt` file.
+With our zed context and gabi config set up to stage and port-forwarding into the SpiceDB service, we can execute our [migration script](/docs/manual_migration_to_spicedb.py). Move the migration script to the same level as your `kafkadump.txt` file.
 
 Run 
 ```shell

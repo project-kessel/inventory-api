@@ -41,7 +41,7 @@ def extract_json_payload(line: str):
         if not payload.get("subject"):
             operation = "deleted"
 
-        return inventory_id, json.loads(payload_str), operation
+        return inventory_id, payload, operation
     
 
 def build_deleted_command(inventory_id, payload):

@@ -7,6 +7,7 @@ import (
 	"github.com/go-kratos/kratos/v2/middleware/recovery"
 	"github.com/go-kratos/kratos/v2/middleware/selector"
 	kgrpc "github.com/go-kratos/kratos/v2/transport/grpc"
+
 	m "github.com/project-kessel/inventory-api/internal/middleware"
 
 	"github.com/go-kratos/kratos/v2/log"

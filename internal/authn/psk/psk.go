@@ -5,6 +5,7 @@ import (
 	"context"
 
 	"github.com/go-kratos/kratos/v2/transport"
+
 	"github.com/project-kessel/inventory-api/internal/authn/api"
 	"github.com/project-kessel/inventory-api/internal/authn/util"
 )

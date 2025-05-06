@@ -2,11 +2,13 @@ package health
 
 import (
 	"context"
+
 	"github.com/go-kratos/kratos/v2/log"
+	"github.com/spf13/viper"
+
 	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1"
 	"github.com/project-kessel/inventory-api/internal/authz"
 	biz "github.com/project-kessel/inventory-api/internal/biz/health"
-	"github.com/spf13/viper"
 )
 
 type HealthService struct {

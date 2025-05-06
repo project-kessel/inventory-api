@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+
 	"github.com/google/uuid"
 
 	authnapi "github.com/project-kessel/inventory-api/internal/authn/api"

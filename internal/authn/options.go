@@ -1,9 +1,10 @@
 package authn
 
 import (
+	"github.com/spf13/pflag"
+
 	"github.com/project-kessel/inventory-api/internal/authn/oidc"
 	"github.com/project-kessel/inventory-api/internal/authn/psk"
-	"github.com/spf13/pflag"
 )
 
 type Options struct {

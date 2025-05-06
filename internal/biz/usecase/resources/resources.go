@@ -15,13 +15,14 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/go-kratos/kratos/v2/log"
+	kessel "github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
+	"gorm.io/gorm"
+
 	common "github.com/project-kessel/inventory-api/cmd/common"
 	authzapi "github.com/project-kessel/inventory-api/internal/authz/api"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
 	eventingapi "github.com/project-kessel/inventory-api/internal/eventing/api"
 	"github.com/project-kessel/inventory-api/internal/server"
-	kessel "github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
-	"gorm.io/gorm"
 )
 
 type ReporterResourceRepository interface {

@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/go-kratos/kratos/v2/log"
+
 	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1"
 )
 

@@ -5,6 +5,8 @@ import (
 	"strconv"
 
 	"github.com/go-kratos/kratos/v2/log"
+	clowder "github.com/redhatinsights/app-common-go/pkg/api/v1"
+
 	"github.com/project-kessel/inventory-api/internal/authn"
 	"github.com/project-kessel/inventory-api/internal/authz"
 	"github.com/project-kessel/inventory-api/internal/consistency"
@@ -12,7 +14,6 @@ import (
 	"github.com/project-kessel/inventory-api/internal/eventing"
 	"github.com/project-kessel/inventory-api/internal/server"
 	"github.com/project-kessel/inventory-api/internal/storage"
-	clowder "github.com/redhatinsights/app-common-go/pkg/api/v1"
 )
 
 // OptionsConfig contains the settings for each configuration option

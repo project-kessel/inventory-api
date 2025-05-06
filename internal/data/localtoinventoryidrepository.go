@@ -2,8 +2,9 @@ package data
 
 import (
 	"github.com/google/uuid"
-	"github.com/project-kessel/inventory-api/internal/biz/model"
 	"gorm.io/gorm"
+
+	"github.com/project-kessel/inventory-api/internal/biz/model"
 )
 
 func GetLastResourceId(DB *gorm.DB, reporterResourceId model.ReporterResourceId) (uuid.UUID, error) {

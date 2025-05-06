@@ -2,10 +2,11 @@ package model
 
 import (
 	"fmt"
+	"time"
+
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 	"gorm.io/gorm/schema"
-	"time"
 )
 
 type ResourceHistory struct {

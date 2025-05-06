@@ -3,12 +3,13 @@ package middleware
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/go-kratos/kratos/v2/log"
-	"github.com/spf13/viper"
-	"gopkg.in/yaml.v3"
 	"os"
 	"path/filepath"
 	"sync"
+
+	"github.com/go-kratos/kratos/v2/log"
+	"github.com/spf13/viper"
+	"gopkg.in/yaml.v3"
 )
 
 var schemaCache sync.Map

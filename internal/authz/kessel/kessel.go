@@ -9,14 +9,15 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/go-kratos/kratos/v2/log"
-	authzapi "github.com/project-kessel/inventory-api/internal/authz/api"
-	"github.com/project-kessel/inventory-api/internal/biz/model"
 	kesselv1 "github.com/project-kessel/relations-api/api/kessel/relations/v1"
 	kessel "github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
 	"google.golang.org/grpc"
+
+	authzapi "github.com/project-kessel/inventory-api/internal/authz/api"
+	"github.com/project-kessel/inventory-api/internal/biz/model"
 )
 
 type KesselAuthz struct {

@@ -61,7 +61,7 @@ func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_Host(t *testing.T) {
 	assert.NoError(t, err, "Failed to create structpb for host reporter")
 
 	req := &pbv1beta2.ReportResourceRequest{
-		WriteVisibility: pbv1beta2.ReportResourceRequest_MINIMIZE_LATENCY,
+		WriteVisibility: pbv1beta2.WriteVisibility_MINIMIZE_LATENCY,
 		Resource: &pbv1beta2.Resource{
 			Type:               "host",
 			ReporterType:       "HBI",
@@ -404,7 +404,7 @@ func TestInventoryAPIHTTP_v1beta2_Host_ConsistentWrite(t *testing.T) {
 	assert.NoError(t, err, "Failed to create structpb for reporter")
 
 	req := pbv1beta2.ReportResourceRequest{
-		WriteVisibility: pbv1beta2.ReportResourceRequest_IMMEDIATE,
+		WriteVisibility: pbv1beta2.WriteVisibility_IMMEDIATE,
 		Resource: &pbv1beta2.Resource{
 			Type:               "host",
 			ReporterType:       "HBI",

@@ -1285,7 +1285,7 @@ func TestComputeReadAfterWrite(t *testing.T) {
 	tests := []struct {
 		name                    string
 		listenManager           pubsub.ListenManagerImpl
-		writeVisibility         v1beta2.ReportResourceRequest_WriteVisibility
+		writeVisibility         v1beta2.WriteVisibility
 		ReadAfterWriteEnabled   bool
 		ReadAfterWriteAllowlist []string
 		expected                bool
@@ -1294,7 +1294,7 @@ func TestComputeReadAfterWrite(t *testing.T) {
 			name:                    "Enable Read After Write, Wait for Sync, SP in Allowlist",
 			listenManager:           listenManager,
 			ReadAfterWriteEnabled:   true,
-			writeVisibility:         v1beta2.ReportResourceRequest_IMMEDIATE,
+			writeVisibility:         v1beta2.WriteVisibility_IMMEDIATE,
 			ReadAfterWriteAllowlist: []string{"SP1"},
 			expected:                true,
 		},
@@ -1302,7 +1302,7 @@ func TestComputeReadAfterWrite(t *testing.T) {
 			name:                    "Enable Read After Write, No Wait for Sync, SP in Allowlist",
 			listenManager:           listenManager,
 			ReadAfterWriteEnabled:   true,
-			writeVisibility:         v1beta2.ReportResourceRequest_WRITE_VISIBILITY_UNSPECIFIED,
+			writeVisibility:         v1beta2.WriteVisibility_WRITE_VISIBILITY_UNSPECIFIED,
 			ReadAfterWriteAllowlist: []string{"SP1"},
 			expected:                false,
 		},
@@ -1310,7 +1310,7 @@ func TestComputeReadAfterWrite(t *testing.T) {
 			name:                    "Enable Read After Write, Wait for Sync, ALL SPs in Allowlist",
 			listenManager:           listenManager,
 			ReadAfterWriteEnabled:   true,
-			writeVisibility:         v1beta2.ReportResourceRequest_IMMEDIATE,
+			writeVisibility:         v1beta2.WriteVisibility_IMMEDIATE,
 			ReadAfterWriteAllowlist: []string{"*"},
 			expected:                true,
 		},
@@ -1318,7 +1318,7 @@ func TestComputeReadAfterWrite(t *testing.T) {
 			name:                    "Enable Read After Write, No Wait for Sync, ALL SPs in Allowlist",
 			listenManager:           listenManager,
 			ReadAfterWriteEnabled:   true,
-			writeVisibility:         v1beta2.ReportResourceRequest_WRITE_VISIBILITY_UNSPECIFIED,
+			writeVisibility:         v1beta2.WriteVisibility_WRITE_VISIBILITY_UNSPECIFIED,
 			ReadAfterWriteAllowlist: []string{"*"},
 			expected:                false,
 		},
@@ -1326,7 +1326,7 @@ func TestComputeReadAfterWrite(t *testing.T) {
 			name:                    "Enable Read After Write, Minimize Latency, ALL SPs in Allowlist",
 			listenManager:           listenManager,
 			ReadAfterWriteEnabled:   true,
-			writeVisibility:         v1beta2.ReportResourceRequest_MINIMIZE_LATENCY,
+			writeVisibility:         v1beta2.WriteVisibility_MINIMIZE_LATENCY,
 			ReadAfterWriteAllowlist: []string{"*"},
 			expected:                false,
 		},
@@ -1334,7 +1334,7 @@ func TestComputeReadAfterWrite(t *testing.T) {
 			name:                    "Enable Read After Write, Wait for Sync, No SP in Allowlist",
 			listenManager:           listenManager,
 			ReadAfterWriteEnabled:   true,
-			writeVisibility:         v1beta2.ReportResourceRequest_IMMEDIATE,
+			writeVisibility:         v1beta2.WriteVisibility_IMMEDIATE,
 			ReadAfterWriteAllowlist: []string{},
 			expected:                false,
 		},
@@ -1342,7 +1342,7 @@ func TestComputeReadAfterWrite(t *testing.T) {
 			name:                    "Enable Read After Write, Wait for Sync, SP not in Allowlist",
 			listenManager:           listenManager,
 			ReadAfterWriteEnabled:   true,
-			writeVisibility:         v1beta2.ReportResourceRequest_IMMEDIATE,
+			writeVisibility:         v1beta2.WriteVisibility_IMMEDIATE,
 			ReadAfterWriteAllowlist: []string{"SP2"},
 			expected:                false,
 		},
@@ -1350,7 +1350,7 @@ func TestComputeReadAfterWrite(t *testing.T) {
 			name:                    "Disable Read After Write, No Wait for Sync, SP not in Allowlist",
 			listenManager:           listenManager,
 			ReadAfterWriteEnabled:   false,
-			writeVisibility:         v1beta2.ReportResourceRequest_WRITE_VISIBILITY_UNSPECIFIED,
+			writeVisibility:         v1beta2.WriteVisibility_WRITE_VISIBILITY_UNSPECIFIED,
 			ReadAfterWriteAllowlist: []string{"SP2"},
 			expected:                false,
 		},
@@ -1358,7 +1358,7 @@ func TestComputeReadAfterWrite(t *testing.T) {
 			name:                    "Nil ListenManager, Enabled Read After Write, Wait for Sync, SP in Allowlist",
 			listenManager:           listenManagerNil,
 			ReadAfterWriteEnabled:   true,
-			writeVisibility:         v1beta2.ReportResourceRequest_IMMEDIATE,
+			writeVisibility:         v1beta2.WriteVisibility_IMMEDIATE,
 			ReadAfterWriteAllowlist: []string{"*"},
 			expected:                false,
 		},
@@ -1392,7 +1392,7 @@ func TestUpsertReturnsDbError(t *testing.T) {
 	useCase := New(repo, inventoryRepo, nil, nil, "", log.DefaultLogger, false, nil, false, []string{})
 	ctx := context.TODO()
 
-	_, err := useCase.Upsert(ctx, resource, v1beta2.ReportResourceRequest_WRITE_VISIBILITY_UNSPECIFIED)
+	_, err := useCase.Upsert(ctx, resource, v1beta2.WriteVisibility_WRITE_VISIBILITY_UNSPECIFIED)
 	assert.ErrorIs(t, err, ErrDatabaseError)
 	repo.AssertExpectations(t)
 }
@@ -1409,7 +1409,7 @@ func TestUpsertReturnsExistingUpdatedResource(t *testing.T) {
 	useCase := New(repo, inventoryRepo, nil, nil, "", log.DefaultLogger, false, nil, false, []string{})
 	ctx := context.TODO()
 
-	res, err := useCase.Upsert(ctx, resource, v1beta2.ReportResourceRequest_WRITE_VISIBILITY_UNSPECIFIED)
+	res, err := useCase.Upsert(ctx, resource, v1beta2.WriteVisibility_WRITE_VISIBILITY_UNSPECIFIED)
 	assert.Nil(t, err)
 	assert.NotNil(t, res)
 	repo.AssertExpectations(t)
@@ -1436,7 +1436,7 @@ func TestUpsert_ReadAfterWrite(t *testing.T) {
 	useCase := New(repo, inventoryRepo, authz, nil, "", log.DefaultLogger, false, listenMan, true, []string{"reporter_id"})
 	ctx := context.TODO()
 
-	r, err := useCase.Upsert(ctx, resource, v1beta2.ReportResourceRequest_IMMEDIATE)
+	r, err := useCase.Upsert(ctx, resource, v1beta2.WriteVisibility_IMMEDIATE)
 
 	assert.Nil(t, err)
 	assert.NotNil(t, r)

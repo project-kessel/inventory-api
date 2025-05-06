@@ -85,7 +85,7 @@ func New(reporterResourceRepository ReporterResourceRepository, inventoryResourc
 	}
 }
 
-func (uc *Usecase) Upsert(ctx context.Context, m *model.Resource, write_visibility v1beta2.ReportResourceRequest_WriteVisibility) (*model.Resource, error) {
+func (uc *Usecase) Upsert(ctx context.Context, m *model.Resource, write_visibility v1beta2.WriteVisibility) (*model.Resource, error) {
 	log.Info("upserting resource: ", m)
 	ret := m // Default to returning the input model in case persistence is disabled
 	var subscription pubsub.Subscription
@@ -465,11 +465,11 @@ func isSPInAllowlist(m *model.Resource, allowlist []string) bool {
 	return false
 }
 
-func computeReadAfterWrite(uc *Usecase, write_visibility v1beta2.ReportResourceRequest_WriteVisibility, m *model.Resource) bool {
+func computeReadAfterWrite(uc *Usecase, write_visibility v1beta2.WriteVisibility, m *model.Resource) bool {
 	// read after write functionality is enabled/disabled globally.
 	// And executed if request specifies and
 	// came from service provider in allowlist
-	if write_visibility == v1beta2.ReportResourceRequest_WRITE_VISIBILITY_UNSPECIFIED || write_visibility == v1beta2.ReportResourceRequest_MINIMIZE_LATENCY {
+	if write_visibility == v1beta2.WriteVisibility_WRITE_VISIBILITY_UNSPECIFIED || write_visibility == v1beta2.WriteVisibility_MINIMIZE_LATENCY {
 		return false
 	}
 	return !common.IsNil(uc.ListenManager) && uc.ReadAfterWriteEnabled && isSPInAllowlist(m, uc.ReadAfterWriteAllowlist)

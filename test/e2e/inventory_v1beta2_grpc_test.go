@@ -3,14 +3,16 @@ package e2e
 import (
 	"context"
 	"fmt"
-	pbv1beta2 "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2"
-	"github.com/project-kessel/inventory-api/internal/biz/model"
+	"testing"
+
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/grpc"
 	grpcinsecure "google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/structpb"
-	"testing"
+
+	pbv1beta2 "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2"
+	"github.com/project-kessel/inventory-api/internal/biz/model"
 )
 
 // bearerAuth implements grpc.PerRPCCredentials to inject Authorization
@@ -61,24 +63,23 @@ func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_Host(t *testing.T) {
 
 	req := &pbv1beta2.ReportResourceRequest{
 		WaitForSync: false,
-		Resource: &pbv1beta2.Resource{
-			Type:               "host",
-			ReporterType:       "HBI",
-			ReporterInstanceId: "testuser@example.com",
-			Representations: &pbv1beta2.ResourceRepresentations{
-				Metadata: &pbv1beta2.RepresentationMetadata{
-					LocalResourceId: "host-abc-123",
-					ApiHref:         "https://example.com/api",
-					ConsoleHref:     proto.String("https://example.com/console"),
-					ReporterVersion: proto.String("0.1"),
-				},
-				Common: &structpb.Struct{
-					Fields: map[string]*structpb.Value{
-						"workspace_id": structpb.NewStringValue("workspace-v2"),
-					},
-				},
-				Reporter: reporterStruct,
+
+		Type:               "host",
+		ReporterType:       "HBI",
+		ReporterInstanceId: "testuser@example.com",
+		Representations: &pbv1beta2.ResourceRepresentations{
+			Metadata: &pbv1beta2.RepresentationMetadata{
+				LocalResourceId: "host-abc-123",
+				ApiHref:         "https://example.com/api",
+				ConsoleHref:     proto.String("https://example.com/console"),
+				ReporterVersion: proto.String("0.1"),
 			},
+			Common: &structpb.Struct{
+				Fields: map[string]*structpb.Value{
+					"workspace_id": structpb.NewStringValue("workspace-v2"),
+				},
+			},
+			Reporter: reporterStruct,
 		},
 	}
 
@@ -130,24 +131,23 @@ func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_Notifications(t *testing.T) 
 	assert.NoError(t, err, "Failed to create structpb for reporter")
 
 	req := pbv1beta2.ReportResourceRequest{
-		Resource: &pbv1beta2.Resource{
-			Type:               "notifications_integration",
-			ReporterType:       "NOTIFICATIONS",
-			ReporterInstanceId: "testuser@example.com",
-			Representations: &pbv1beta2.ResourceRepresentations{
-				Metadata: &pbv1beta2.RepresentationMetadata{
-					LocalResourceId: "notification-abc-123",
-					ApiHref:         "https://example.com/api",
-					ConsoleHref:     proto.String("https://example.com/console"),
-					ReporterVersion: proto.String("0.1"),
-				},
-				Common: &structpb.Struct{
-					Fields: map[string]*structpb.Value{
-						"workspace_id": structpb.NewStringValue("workspace-v2"),
-					},
-				},
-				Reporter: reporterStruct, // Notifications may not require a reporter block
+
+		Type:               "notifications_integration",
+		ReporterType:       "NOTIFICATIONS",
+		ReporterInstanceId: "testuser@example.com",
+		Representations: &pbv1beta2.ResourceRepresentations{
+			Metadata: &pbv1beta2.RepresentationMetadata{
+				LocalResourceId: "notification-abc-123",
+				ApiHref:         "https://example.com/api",
+				ConsoleHref:     proto.String("https://example.com/console"),
+				ReporterVersion: proto.String("0.1"),
 			},
+			Common: &structpb.Struct{
+				Fields: map[string]*structpb.Value{
+					"workspace_id": structpb.NewStringValue("workspace-v2"),
+				},
+			},
+			Reporter: reporterStruct, // Notifications may not require a reporter block
 		},
 	}
 
@@ -203,24 +203,23 @@ func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_K8S_Cluster(t *testing.T) {
 	assert.NoError(t, err, "Failed to create structpb for cluster reporter")
 
 	req := pbv1beta2.ReportResourceRequest{
-		Resource: &pbv1beta2.Resource{
-			Type:               "k8s_cluster",
-			ReporterType:       "ACM",
-			ReporterInstanceId: "testuser@example.com",
-			Representations: &pbv1beta2.ResourceRepresentations{
-				Metadata: &pbv1beta2.RepresentationMetadata{
-					LocalResourceId: "k8s_cluster-abc-123",
-					ApiHref:         "https://example.com/api",
-					ConsoleHref:     proto.String("https://example.com/console"),
-					ReporterVersion: proto.String("0.1"),
-				},
-				Common: &structpb.Struct{
-					Fields: map[string]*structpb.Value{
-						"workspace_id": structpb.NewStringValue("workspace-v2"),
-					},
-				},
-				Reporter: reporterStruct,
+
+		Type:               "k8s_cluster",
+		ReporterType:       "ACM",
+		ReporterInstanceId: "testuser@example.com",
+		Representations: &pbv1beta2.ResourceRepresentations{
+			Metadata: &pbv1beta2.RepresentationMetadata{
+				LocalResourceId: "k8s_cluster-abc-123",
+				ApiHref:         "https://example.com/api",
+				ConsoleHref:     proto.String("https://example.com/console"),
+				ReporterVersion: proto.String("0.1"),
 			},
+			Common: &structpb.Struct{
+				Fields: map[string]*structpb.Value{
+					"workspace_id": structpb.NewStringValue("workspace-v2"),
+				},
+			},
+			Reporter: reporterStruct,
 		},
 	}
 
@@ -271,24 +270,23 @@ func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_K8S_Policy(t *testing.T) {
 	assert.NoError(t, err, "Failed to create structpb for reporter")
 
 	req := pbv1beta2.ReportResourceRequest{
-		Resource: &pbv1beta2.Resource{
-			Type:               "k8s_policy",
-			ReporterType:       "ACM",
-			ReporterInstanceId: "testuser@example.com",
-			Representations: &pbv1beta2.ResourceRepresentations{
-				Metadata: &pbv1beta2.RepresentationMetadata{
-					LocalResourceId: "k8s_policy-abc-123",
-					ApiHref:         "https://example.com/api",
-					ConsoleHref:     proto.String("https://example.com/console"),
-					ReporterVersion: proto.String("0.1"),
-				},
-				Common: &structpb.Struct{
-					Fields: map[string]*structpb.Value{
-						"workspace_id": structpb.NewStringValue("workspace-123"),
-					},
-				},
-				Reporter: reporterStruct,
+
+		Type:               "k8s_policy",
+		ReporterType:       "ACM",
+		ReporterInstanceId: "testuser@example.com",
+		Representations: &pbv1beta2.ResourceRepresentations{
+			Metadata: &pbv1beta2.RepresentationMetadata{
+				LocalResourceId: "k8s_policy-abc-123",
+				ApiHref:         "https://example.com/api",
+				ConsoleHref:     proto.String("https://example.com/console"),
+				ReporterVersion: proto.String("0.1"),
 			},
+			Common: &structpb.Struct{
+				Fields: map[string]*structpb.Value{
+					"workspace_id": structpb.NewStringValue("workspace-123"),
+				},
+			},
+			Reporter: reporterStruct,
 		},
 	}
 
@@ -404,24 +402,23 @@ func TestInventoryAPIHTTP_v1beta2_Host_WaitForSync(t *testing.T) {
 
 	req := pbv1beta2.ReportResourceRequest{
 		WaitForSync: true,
-		Resource: &pbv1beta2.Resource{
-			Type:               "host",
-			ReporterType:       "HBI",
-			ReporterInstanceId: "testuser@example.com",
-			Representations: &pbv1beta2.ResourceRepresentations{
-				Metadata: &pbv1beta2.RepresentationMetadata{
-					LocalResourceId: resourceId,
-					ApiHref:         "https://example.com/api",
-					ConsoleHref:     proto.String("https://example.com/console"),
-					ReporterVersion: proto.String("0.1"),
-				},
-				Common: &structpb.Struct{
-					Fields: map[string]*structpb.Value{
-						"workspace_id": structpb.NewStringValue("workspace-v2"),
-					},
-				},
-				Reporter: reporterStruct,
+		
+		Type:               "host",
+		ReporterType:       "HBI",
+		ReporterInstanceId: "testuser@example.com",
+		Representations: &pbv1beta2.ResourceRepresentations{
+			Metadata: &pbv1beta2.RepresentationMetadata{
+				LocalResourceId: resourceId,
+				ApiHref:         "https://example.com/api",
+				ConsoleHref:     proto.String("https://example.com/console"),
+				ReporterVersion: proto.String("0.1"),
 			},
+			Common: &structpb.Struct{
+				Fields: map[string]*structpb.Value{
+					"workspace_id": structpb.NewStringValue("workspace-v2"),
+				},
+			},
+			Reporter: reporterStruct,
 		},
 	}
 

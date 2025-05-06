@@ -219,34 +219,34 @@ func updateResponseFromAuthzRequestV1beta2(allowed bool) *pb.CheckForUpdateRespo
 
 func requestToResource(r *pb.ReportResourceRequest, identity *authnapi.Identity) (*model.Resource, error) {
 	log.Info("Report Resource Request: ", r)
-	var resourceType = r.Resource.GetType()
-	resourceData, err := conv.ToJsonObject(r.Resource)
+	var resourceType = r.GetType()
+	resourceData, err := conv.ToJsonObject(r)
 	if err != nil {
 		return nil, err
 	}
 
-	var workspaceId, err2 = conv.ExtractWorkspaceId(r.Resource.Representations.Common)
+	var workspaceId, err2 = conv.ExtractWorkspaceId(r.Representations.Common)
 	if err2 != nil {
 		return nil, err2
 	}
 
-	var inventoryId, err3 = conv.ExtractInventoryId(r.Resource.GetInventoryId())
+	var inventoryId, err3 = conv.ExtractInventoryId(r.GetInventoryId())
 	if err3 != nil {
 		return nil, err3
 	}
-	reporterType, err := conv.ExtractReporterType(r.Resource.ReporterType)
+	reporterType, err := conv.ExtractReporterType(r.ReporterType)
 	if err != nil {
 		log.Warn("Missing reporterType")
 		return nil, err
 	}
 
-	reporterInstanceId, err := conv.ExtractReporterInstanceID(r.Resource.ReporterInstanceId)
+	reporterInstanceId, err := conv.ExtractReporterInstanceID(r.ReporterInstanceId)
 	if err != nil {
 		log.Warn("Missing reporterInstanceId")
 		return nil, err
 	}
 
-	return conv.ResourceFromPb(resourceType, reporterType, reporterInstanceId, identity.Principal, resourceData, workspaceId, r.Resource.Representations, inventoryId), nil
+	return conv.ResourceFromPb(resourceType, reporterType, reporterInstanceId, identity.Principal, resourceData, workspaceId, r.Representations, inventoryId), nil
 }
 
 func requestToDeleteResource(r *pb.DeleteResourceRequest, identity *authnapi.Identity) (model.ReporterResourceId, error) {

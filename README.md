@@ -88,7 +88,7 @@ export DOCKER=docker
 make api
 ```
 
-> Note: The `podman-compose` provider struggles with compose files that leverage `depends_on` as it can't properly handle the dependency graphs. You can fix this issue on Linux by installing the `docker-compose-plugin` or also having `docker-compose` installed. When installed, podman uses the `docker-compose` provider by default instead. The benefit of the `docker-compose-plugin` is that it doesn't require the full Docker setup or docker daemon!
+> Note: The `podman-compose` provider struggles with compose files that leverage `depends_on` as it can't properly handle the dependency graphs. You can fix this issue on Linux by installing the `docker-compose-plugin` or also having `docker-compose` installed. When installed, podman uses the `docker-compose` provider by default instead. The benefit of the `docker-compose-plugin` is that it doesn't require the full Docker setup or Docker daemon!
 
 ### Debugging
 
@@ -154,7 +154,7 @@ make inventory-up-relations-ready
 
 To deploy Relations API, it's recommended to clone the Relations API repo locally and leverage their existing [Docker Compose process](https://github.com/project-kessel/relations-api/tree/main?tab=readme-ov-file#spicedb-using-dockerpodman) to spin up the Relations API.
 
-Both Inventory and Relations compose files are configured to use the same docker network (`kessel`) to ensure network connectivity between all containers.
+Both Inventory and Relations compose files are configured to use the same Docker network (`kessel`) to ensure network connectivity between all containers.
 
 To stop Inventory:
 ```shell
@@ -174,22 +174,25 @@ make inventory-up-w-monitoring
 
 To deploy Relations API, it's recommended to clone the Relations API repo locally and leverage their existing [Docker Compose process](https://github.com/project-kessel/relations-api/tree/main?tab=readme-ov-file#spicedb-using-dockerpodman) to spin up the Relations API.
 
-Both Inventory and Relations compose files are configured to use the same docker network (`kessel`) to ensure network connectivity between all containers.
+Both Inventory and Relations compose files are configured to use the same Docker network (`kessel`) to ensure network connectivity between all containers.
 
-To stop Inventory:
+To stop Inventory and the monitoring stack:
 ```shell
 make inventory-down
 ```
 
-> Note: If its your first time spinning up Grafana, there is an initial login configured that you'll need to reset.
+> Note: If it's your first time spinning up Grafana, there is an initial login configured that you'll need to reset.
 > username: `admin`
 > password: `admin`.
 > You will be prompted to reset it afterwards.
-> The local running prometheus is configured by default as a datasource so no other work is needed other than adding your own dashboards
+> The local running Prometheus is configured by default as a datasource so no other work is needed other than adding your own dashboards
 
 Grafana URL: http://localhost:3000
+
 Prometheus URL: http://localhost:9050
+
 Alertmanager URL: http://localhost:9093
+
 
 #### Local Kessel Inventory + Docker Compose Infra (Split Setup)
 

@@ -160,6 +160,37 @@ To stop Inventory:
 ```shell
 make inventory-down
 ```
+
+#### Kessel Inventory + Kessel Relations w Monitoring Stack using Docker Compose
+
+Useful for testing metrics, alerts, and dashboards locally where you can generate enough data and see it reflected in our Monitoring stack outside of Stage
+
+This setup uses the same setup as the previous one but includes Prometheus, Grafana, and Alertmanager. It will require Relations API to be running to ensure consumer metrics are captured.
+
+To start Inventory and the monitoring stack:
+```shell
+make inventory-up-w-monitoring
+```
+
+To deploy Relations API, it's recommended to clone the Relations API repo locally and leverage their existing [Docker Compose process](https://github.com/project-kessel/relations-api/tree/main?tab=readme-ov-file#spicedb-using-dockerpodman) to spin up the Relations API.
+
+Both Inventory and Relations compose files are configured to use the same docker network (`kessel`) to ensure network connectivity between all containers.
+
+To stop Inventory:
+```shell
+make inventory-down
+```
+
+> Note: If its your first time spinning up Grafana, there is an initial login configured that you'll need to reset.
+> username: `admin`
+> password: `admin`.
+> You will be prompted to reset it afterwards.
+> The local running prometheus is configured by default as a datasource so no other work is needed other than adding your own dashboards
+
+Grafana URL: http://localhost:3000
+Prometheus URL: http://localhost:9050
+Alertmanager URL: http://localhost:9093
+
 #### Local Kessel Inventory + Docker Compose Infra (Split Setup)
 
 The Split Setup involves using a locally running Inventory API, but all other infra (Postgres, Kafka, etc) are deployed via Docker. This setup is great for debugging the local running binary but still have all the dependent services to test the full application.

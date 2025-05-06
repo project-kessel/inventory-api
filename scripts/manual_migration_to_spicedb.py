@@ -49,21 +49,24 @@ def build_deleted_command(inventory_id, payload):
 	# (parse message, gabi call, zed relationship read, zed relationship delete) 
 
     # parse message
+    resource_namespace = payload["resource_namespace"]
+    resource_name = payload["resource_type"]
+    resource_id = payload["resource_id"]
     relation = payload["relation"]
 
     # Call gabi to fetch current info on resource.
     inv_res_id, inv_sub_id, inv_res_type, inv_report_type = fetch_inventory_resource_info(inventory_id)
-    if not all([inv_res_id, inv_sub_id, inv_res_type, inv_report_type]):
+    if all([inv_res_id, inv_sub_id, inv_res_type, inv_report_type]):
         return None # Dont delete, as it still exists in inventory DB.
 
     # zed relationship read fully consistent (drift check)
     res = subprocess.run(
-        f"zed relationship read {inv_report_type}/{inv_res_type}:{inv_res_id} t_{relation} --consistency-full",
+        f"zed relationship read {resource_namespace}/{resource_name}:{resource_id} t_{relation} --consistency-full",
         shell=True, capture_output=True, text=True
     )
     if len(res.stdout) != 0:
         print(f"Resource exists in SpiceDB: {res.stdout}. Deleting...")
-        return f"zed relationship bulk-delete {inv_report_type}/{inv_res_type}:{inv_res_id} t_{relation}"
+        return f"zed relationship bulk-delete {resource_namespace}/{resource_name}:{resource_id} t_{relation}"
 
     print("Resource doesn't exist in SpiceDB. Nothing to delete...")
     return None

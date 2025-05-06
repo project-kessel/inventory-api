@@ -9,6 +9,7 @@ import (
 
 	"sync"
 
+	"github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2"
 	"github.com/project-kessel/inventory-api/internal/consumer"
 	"github.com/project-kessel/inventory-api/internal/pubsub"
 
@@ -84,7 +85,7 @@ func New(reporterResourceRepository ReporterResourceRepository, inventoryResourc
 	}
 }
 
-func (uc *Usecase) Upsert(ctx context.Context, m *model.Resource, wait_for_sync bool) (*model.Resource, error) {
+func (uc *Usecase) Upsert(ctx context.Context, m *model.Resource, write_visibility v1beta2.ReportResourceRequest_WriteVisibility) (*model.Resource, error) {
 	log.Info("upserting resource: ", m)
 	ret := m // Default to returning the input model in case persistence is disabled
 	var subscription pubsub.Subscription
@@ -98,7 +99,7 @@ func (uc *Usecase) Upsert(ctx context.Context, m *model.Resource, wait_for_sync 
 			return nil, ErrDatabaseError
 		}
 
-		readAfterWriteEnabled := computeReadAfterWrite(uc, wait_for_sync, m)
+		readAfterWriteEnabled := computeReadAfterWrite(uc, write_visibility, m)
 		if readAfterWriteEnabled {
 			// Generate txid for data layer
 			// TODO: Replace this when inventory api has proper api-level transaction ids
@@ -464,9 +465,12 @@ func isSPInAllowlist(m *model.Resource, allowlist []string) bool {
 	return false
 }
 
-func computeReadAfterWrite(uc *Usecase, wait_for_sync bool, m *model.Resource) bool {
+func computeReadAfterWrite(uc *Usecase, write_visibility v1beta2.ReportResourceRequest_WriteVisibility, m *model.Resource) bool {
 	// read after write functionality is enabled/disabled globally.
 	// And executed if request specifies and
 	// came from service provider in allowlist
-	return !common.IsNil(uc.ListenManager) && uc.ReadAfterWriteEnabled && wait_for_sync && isSPInAllowlist(m, uc.ReadAfterWriteAllowlist)
+	if write_visibility == v1beta2.ReportResourceRequest_WRITE_VISIBILITY_UNSPECIFIED || write_visibility == v1beta2.ReportResourceRequest_MINIMIZE_LATENCY {
+		return false
+	}
+	return !common.IsNil(uc.ListenManager) && uc.ReadAfterWriteEnabled && isSPInAllowlist(m, uc.ReadAfterWriteAllowlist)
 }

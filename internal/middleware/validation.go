@@ -64,22 +64,17 @@ func validateReportResourceJSON(msg proto.Message) error {
 		return err
 	}
 
-	resource, err := ExtractMapField(reportResourceMap, "resource")
+	resourceType, err := ExtractStringField(reportResourceMap, "type")
 	if err != nil {
 		return err
 	}
 
-	resourceType, err := ExtractStringField(resource, "type")
+	reporterType, err := ExtractStringField(reportResourceMap, "reporterType")
 	if err != nil {
 		return err
 	}
 
-	reporterType, err := ExtractStringField(resource, "reporterType")
-	if err != nil {
-		return err
-	}
-
-	resourceRepresentation, err := ExtractMapField(resource, "representations")
+	resourceRepresentation, err := ExtractMapField(reportResourceMap, "representations")
 	if err != nil {
 		return err
 	}

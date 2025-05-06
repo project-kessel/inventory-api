@@ -402,7 +402,7 @@ func TestInventoryAPIHTTP_v1beta2_Host_WaitForSync(t *testing.T) {
 
 	req := pbv1beta2.ReportResourceRequest{
 		WaitForSync: true,
-		
+
 		Type:               "host",
 		ReporterType:       "HBI",
 		ReporterInstanceId: "testuser@example.com",

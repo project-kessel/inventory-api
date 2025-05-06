@@ -59,7 +59,6 @@ jobs:
         id: code-cov-report
         uses: codecov/codecov-action@v5
         with:
-          files: coverage.out
           verbose: true
           token: ${{ secrets.CODECOV_TOKEN }}
 

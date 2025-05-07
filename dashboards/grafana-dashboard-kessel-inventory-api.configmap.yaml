@@ -1329,7 +1329,7 @@ data:
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "sum(rate(inventory_consumer_msgs_processed_total[$__interval])) or up{job=\"kessel-inventory-api\"} * 0",
+              "expr": "sum(rate(inventory_consumer_msgs_processed_total[$__rate_interval]))",
               "instant": false,
               "legendFormat": "__auto",
               "range": true,
@@ -1420,7 +1420,8 @@ data:
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "sum(rate(inventory_consumer_msg_process_failures_total[$__interval])) / sum(rate(inventory_consumer_msgs_processed_total[$__interval])) or up{job=\"kessel-inventory-api\"} * 0",
+              "expr": "sum(rate(inventory_consumer_msg_process_failures_total[$__rate_interval])) / sum(rate(inventory_consumer_msgs_processed_total[$__rate_interval])) or sum(up{job=\"kessel-inventory-api\"}) * 0",
+              "format": "time_series",
               "instant": false,
               "legendFormat": "__auto",
               "range": true,
@@ -1513,7 +1514,7 @@ data:
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "sum(rate(inventory_consumer_consumer_errors_total[$__interval])) / sum(rate(inventory_consumer_msgs_processed_total[$__interval])) or up{job=\"kessel-inventory-api\"} * 0",
+              "expr": "sum(rate(inventory_consumer_consumer_errors_total[$__rate_interval])) / sum(rate(inventory_consumer_msgs_processed_total[$__rate_interval])) or sum(up{job=\"kessel-inventory-api\"}) * 0",
               "instant": false,
               "legendFormat": "__auto",
               "range": true,

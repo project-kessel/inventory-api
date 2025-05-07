@@ -47,6 +47,8 @@ jobs:
       actions: read
       pull-requests: write
     steps:
+      - name: Download coverage report
+        uses: actions/download-artifact@v4
       - name: coverage report
         id: coverage-report
         uses: fgrosse/go-coverage-report@v1.2.0
@@ -59,8 +61,6 @@ jobs:
           root-package: ""
       - name: coverage summary
         run: echo "${{ steps.coverage-report.outputs.coverage_report }}" >> "$GITHUB_STEP_SUMMARY"
-      - name: Download coverage report
-        uses: actions/download-artifact@v4
       - name: code-cov report
         id: code-cov-report
         uses: codecov/codecov-action@v5

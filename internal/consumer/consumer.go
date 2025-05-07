@@ -100,6 +100,7 @@ func New(config CompletedConfig, db *gorm.DB, authz authz.CompletedConfig, autho
 		ConsumerMaxRetries:  config.RetryConfig.ConsumerMaxRetries,
 		OperationMaxRetries: config.RetryConfig.OperationMaxRetries,
 		BackoffFactor:       config.RetryConfig.BackoffFactor,
+		MaxBackoffSeconds:   config.RetryConfig.MaxBackoffSeconds,
 	}
 
 	var errChan chan error

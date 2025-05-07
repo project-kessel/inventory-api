@@ -60,7 +60,7 @@ jobs:
       - name: coverage summary
         run: echo "${{ steps.coverage-report.outputs.coverage_report }}" >> "$GITHUB_STEP_SUMMARY"
       - name: Download coverage report
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v4
       - name: code-cov report
         id: code-cov-report
         uses: codecov/codecov-action@v5

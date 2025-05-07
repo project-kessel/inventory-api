@@ -3,7 +3,7 @@
   "common:k8s_cluster": "{\n  \"$schema\": \"http://json-schema.org/draft-07/schema#\",\n  \"type\": \"object\",\n  \"properties\": {\n    \"workspace_id\": { \"type\": \"string\" }\n  },\n  \"required\": [\n    \"workspace_id\"\n  ]\n}\n\n",
   "common:k8s_policy": "{\n  \"$schema\": \"http://json-schema.org/draft-07/schema#\",\n  \"type\": \"object\",\n  \"properties\": {\n    \"workspace_id\": { \"type\": \"string\" }\n  },\n  \"required\": [\n    \"workspace_id\"\n  ]\n}\n\n",
   "common:notifications_integration": "{\n  \"$schema\": \"http://json-schema.org/draft-07/schema#\",\n  \"type\": \"object\",\n  \"properties\": {\n    \"workspace_id\": { \"type\": \"string\" }\n  },\n  \"required\": [\n    \"workspace_id\"\n  ]\n}\n\n",
-  "config:host": "cmVzb3VyY2VfcmVwb3J0ZXJzOgogICAgLSBIQkkKcmVzb3VyY2VfdHlwZTogaG9zdAo=",
+  "config:host": "cmVzb3VyY2VfcmVwb3J0ZXJzOgogICAgLSBoYmkKcmVzb3VyY2VfdHlwZTogaG9zdAo=",
   "config:host:hbi": "bmFtZXNwYWNlOiBoYmkKcmVwb3J0ZXJfbmFtZTogaGJpCnJlc291cmNlX3R5cGU6IGhvc3QK",
   "config:k8s_cluster": "cmVzb3VyY2VfcmVwb3J0ZXJzOgogICAgLSBBQ00KICAgIC0gQUNTCiAgICAtIE9DTQpyZXNvdXJjZV90eXBlOiBrOHNfY2x1c3Rlcgo=",
   "config:k8s_cluster:acm": "bmFtZXNwYWNlOiBhY20KcmVwb3J0ZXJfbmFtZTogYWNtCnJlc291cmNlX3R5cGU6IGs4c19jbHVzdGVyCg==",

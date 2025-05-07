@@ -85,6 +85,7 @@ services:
         VERSION: dev
     volumes:
       - ./configs/${CONFIG}.yaml:/inventory-api-compose.yaml:ro,z
+      - ../schema_cache.json:/schema_cache.json:ro,z
     command: ["serve"]
     restart: "always"
     ports:

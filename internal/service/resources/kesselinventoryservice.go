@@ -119,7 +119,7 @@ func (s *InventoryService) CheckForUpdate(ctx context.Context, req *pb.CheckForU
 	}
 }
 
-func (s *InventoryService) LookupResources(
+func (s *InventoryService) StreamedListObjects(
 	req *pb.StreamedListObjectsRequest,
 	stream pb.KesselInventoryService_StreamedListObjectsServer,
 ) error {

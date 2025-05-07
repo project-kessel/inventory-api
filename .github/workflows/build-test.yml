@@ -48,17 +48,8 @@ jobs:
         with:
           name: code-coverage
           path: coverage.txt
+      - name: verify
         run: cat coverage.txt
-      - name: coverage report
-        id: coverage-report
-        uses: fgrosse/go-coverage-report@v1.2.0
-        with:
-          coverage-artifact-name: code-coverage
-          coverage-file-name: coverage.txt
-          skip-comment: true # requires write permission on pull requests
-          # below options help track coverage across forks
-          trim: github.com/project-kessel/inventory-api
-          root-package: ""
 
       - name: code-cov report
         id: code-cov-report

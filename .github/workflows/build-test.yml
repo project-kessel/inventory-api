@@ -49,15 +49,6 @@ jobs:
           name: code-coverage
           path: coverage.txt
         run: cat coverage.txt
-
-      - name: code-cov report
-        id: code-cov-report
-        uses: codecov/codecov-action@v5
-        with:
-          files: coverage.txt
-          disable_search: true
-          verbose: true
-          token: ${{ secrets.CODECOV_TOKEN }}
       - name: coverage report
         id: coverage-report
         uses: fgrosse/go-coverage-report@v1.2.0
@@ -67,4 +58,13 @@ jobs:
           skip-comment: true # requires write permission on pull requests
           # below options help track coverage across forks
           trim: github.com/project-kessel/inventory-api
-          root-package: "" 
+          root-package: ""
+
+      - name: code-cov report
+        id: code-cov-report
+        uses: codecov/codecov-action@v5
+        with:
+          files: coverage.txt
+          disable_search: true
+          verbose: true
+          token: ${{ secrets.CODECOV_TOKEN }}

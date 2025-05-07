@@ -12,7 +12,7 @@ Modify [.inventory-api.yaml](../.inventory-api.yaml).
        read-after-write-enabled: true # false == off for all service providers
        read-after-write-allowlist: [] # specify ["*"] to allow any request to optionally r-a-w
      ```
-   - Ensure every request from a service provider can be optionally r-a-w enabled by updating the allowlist with their `reporter_id` field. Individual requests will still be required to toggle `wait_for_sync` to behave as r-a-w. For instance, for the Notifications service:
+   - Ensure every request from a service provider can be optionally r-a-w enabled by updating the allowlist with their `reporter_id` field. Individual requests will still be required to toggle `write_visibility="IMMEDIATE"` to behave as r-a-w. For instance, for the Notifications service:
      ```shell
      read-after-write-enabled: true
      read-after-write-allowlist: ["NOTIFICATIONS"]
@@ -43,7 +43,7 @@ consistency:
 
 **Read After Write Enabled & Some Service Providers**
 
-NOTE: Requests that explicitly request for r-a-w via the `wait_for_sync` toggle will be allowed ONLY if the SP is in the allow list.
+NOTE: Requests that explicitly request for r-a-w via the `write_visibility="IMMEDIATE"` toggle will be allowed ONLY if the SP is in the allow list.
 
 inventory-api-config.yaml:
 ```shell

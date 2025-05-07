@@ -3,6 +3,8 @@ package e2e
 import (
 	"context"
 	"fmt"
+	"testing"
+
 	pbv1beta2 "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
 	"github.com/stretchr/testify/assert"
@@ -10,7 +12,6 @@ import (
 	grpcinsecure "google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/structpb"
-	"testing"
 )
 
 // bearerAuth implements grpc.PerRPCCredentials to inject Authorization
@@ -60,7 +61,7 @@ func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_Host(t *testing.T) {
 	assert.NoError(t, err, "Failed to create structpb for host reporter")
 
 	req := &pbv1beta2.ReportResourceRequest{
-		WaitForSync: false,
+		WriteVisibility: pbv1beta2.WriteVisibility_MINIMIZE_LATENCY,
 		Resource: &pbv1beta2.Resource{
 			Type:               "host",
 			ReporterType:       "HBI",
@@ -367,7 +368,7 @@ func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_K8S_Policy(t *testing.T) {
 //	assert.Equal(t, pbv1beta2.Allowed_ALLOWED_FALSE, checkUpdateResp.GetAllowed())
 //}
 
-func TestInventoryAPIHTTP_v1beta2_Host_WaitForSync(t *testing.T) {
+func TestInventoryAPIHTTP_v1beta2_Host_ConsistentWrite(t *testing.T) {
 	t.Parallel()
 
 	resourceId := "wait-for-sync-host-abc-123"
@@ -403,7 +404,7 @@ func TestInventoryAPIHTTP_v1beta2_Host_WaitForSync(t *testing.T) {
 	assert.NoError(t, err, "Failed to create structpb for reporter")
 
 	req := pbv1beta2.ReportResourceRequest{
-		WaitForSync: true,
+		WriteVisibility: pbv1beta2.WriteVisibility_IMMEDIATE,
 		Resource: &pbv1beta2.Resource{
 			Type:               "host",
 			ReporterType:       "HBI",

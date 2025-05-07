@@ -1262,9 +1262,22 @@ components:
             properties:
                 resource:
                     $ref: '#/components/schemas/kessel.inventory.v1beta2.Resource'
-                waitForSync:
-                    type: boolean
-                    description: Will wait for synchronous processes to complete before returning
+                writeVisibility:
+                    enum:
+                        - WRITE_VISIBILITY_UNSPECIFIED
+                        - MINIMIZE_LATENCY
+                        - IMMEDIATE
+                    type: string
+                    description: |-
+                        WriteVisibility specifies the behavior of the write operation.
+                         - WRITE_VISIBILITY_UNSPECIFIED: The default behavior of the write operation. Defaults to MINIMIZE_LATENCY
+                           strategy.
+                         - MINIMIZE_LATENCY: The write operation will be performed with the goal of minimizing latency
+                           by not waiting for data consistency acknowledgment.
+                         - IMMEDIATE: The write operation will be performed with the goal of ensuring immediate consistency
+                           by waiting for data consistency acknowledgment. Additional
+                           latency may be incurred.
+                    format: enum
         kessel.inventory.v1beta2.ReportResourceResponse:
             type: object
             properties: {}

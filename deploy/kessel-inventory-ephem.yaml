@@ -21,6 +21,11 @@ objects:
           enabled: true
           bootstrap-servers: inventory-kafka-kafka-bootstrap:9092
           topic: outbox.event.kessel.tuples
+          retry-options:
+            consumer-max-retries: -1
+            operation-max-retries: -1
+            backoff-factor: 5
+            max-backoff-seconds: 30
           auth:
             enabled: false
             security-protocol: sasl_plaintext

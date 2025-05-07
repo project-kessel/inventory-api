@@ -290,7 +290,7 @@ func NewCommand(
 			if !storageOptions.DisablePersistence && consumerOptions.Enabled {
 				go func() {
 					retries := 0
-					for retries < consumerOptions.RetryOptions.ConsumerMaxRetries {
+					for consumerOptions.RetryOptions.ConsumerMaxRetries == -1 || retries < consumerOptions.RetryOptions.ConsumerMaxRetries {
 						// If the consumer cannot process a message, the consumer loop is restarted
 						// This is to ensure we re-read the message and prevent it being dropped and moving to next message.
 						// To re-read the current message, we have to recreate the consumer connection so that the earliest offset is used
@@ -302,8 +302,8 @@ func NewCommand(
 						if e.Is(err, consumer.ErrClosed) {
 							inventoryConsumer.Logger.Errorf("consumer unable to process current message -- restarting consumer")
 							retries++
-							if retries < consumerOptions.RetryOptions.ConsumerMaxRetries {
-								backoff := time.Duration(inventoryConsumer.RetryOptions.BackoffFactor*retries*300) * time.Millisecond
+							if consumerOptions.RetryOptions.ConsumerMaxRetries == -1 || retries < consumerOptions.RetryOptions.ConsumerMaxRetries {
+								backoff := min(time.Duration(inventoryConsumer.RetryOptions.BackoffFactor*retries*300)*time.Millisecond, time.Duration(consumerOptions.RetryOptions.MaxBackoffSeconds)*time.Second)
 								inventoryConsumer.Logger.Errorf("retrying in %v", backoff)
 								time.Sleep(backoff)
 							}

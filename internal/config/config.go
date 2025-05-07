@@ -72,12 +72,13 @@ func LogConfigurationInfo(options *OptionsConfig) {
 		)
 	}
 
-	log.Debugf("Consumer Configuration: Bootstrap Server: %s, Topic: %s, Consumer Max Retries: %d, Operation Max Retries: %d, Backoff Factor: %d",
+	log.Debugf("Consumer Configuration: Bootstrap Server: %s, Topic: %s, Consumer Max Retries: %d, Operation Max Retries: %d, Backoff Factor: %d, Max Backoff Seconds: %d",
 		options.Consumer.BootstrapServers,
 		options.Consumer.Topic,
 		options.Consumer.RetryOptions.ConsumerMaxRetries,
 		options.Consumer.RetryOptions.OperationMaxRetries,
 		options.Consumer.RetryOptions.BackoffFactor,
+		options.Consumer.RetryOptions.MaxBackoffSeconds,
 	)
 
 	log.Debugf("Consumer Auth Settings: Enabled: %v, Security Protocol: %s, Mechanism: %s, Username: %s",

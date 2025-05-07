@@ -1260,8 +1260,16 @@ components:
         kessel.inventory.v1beta2.ReportResourceRequest:
             type: object
             properties:
-                resource:
-                    $ref: '#/components/schemas/kessel.inventory.v1beta2.Resource'
+                inventoryId:
+                    type: string
+                type:
+                    type: string
+                reporterType:
+                    type: string
+                reporterInstanceId:
+                    type: string
+                representations:
+                    $ref: '#/components/schemas/kessel.inventory.v1beta2.ResourceRepresentations'
                 writeVisibility:
                     enum:
                         - WRITE_VISIBILITY_UNSPECIFIED
@@ -1299,19 +1307,6 @@ components:
                     type: string
                 reporterVersion:
                     type: string
-        kessel.inventory.v1beta2.Resource:
-            type: object
-            properties:
-                inventoryId:
-                    type: string
-                type:
-                    type: string
-                reporterType:
-                    type: string
-                reporterInstanceId:
-                    type: string
-                representations:
-                    $ref: '#/components/schemas/kessel.inventory.v1beta2.ResourceRepresentations'
         kessel.inventory.v1beta2.ResourceReference:
             type: object
             properties:

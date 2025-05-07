@@ -170,9 +170,8 @@ func TestExtractFields(t *testing.T) {
 
 func TestMarshalProtoToJSON(t *testing.T) {
 	msg := &pbv1beta2.ReportResourceRequest{
-		Resource: &pbv1beta2.Resource{
-			Type: "k8s_cluster",
-		},
+
+		Type: "k8s_cluster",
 	}
 	jsonData, err := middleware.MarshalProtoToJSON(msg)
 	assert.NoError(t, err, "Expected no error while marshalling protobuf to JSON")
@@ -213,11 +212,11 @@ func TestUnmarshalJSONToMap(t *testing.T) {
 func runValidationTest(
 	t *testing.T,
 	tt struct {
-		name      string
-		request   *pbv1beta2.ReportResourceRequest
-		expectErr bool
-		expectMsg string
-	},
+	name      string
+	request   *pbv1beta2.ReportResourceRequest
+	expectErr bool
+	expectMsg string
+},
 	validateFunc func(*pbv1beta2.ReportResourceRequest) error,
 ) {
 	err := validateFunc(tt.request)
@@ -234,23 +233,21 @@ func runValidationTest(
 
 // ValidateResourceRequest validates the structure of a ReportResourceRequest
 func ValidateResourceRequest(req *pbv1beta2.ReportResourceRequest) error {
-	if req == nil || req.Resource == nil {
+	if req == nil {
 		return fmt.Errorf("resource request is nil or missing")
 	}
 
-	res := req.Resource
-
-	if strings.TrimSpace(res.Type) == "" {
+	if strings.TrimSpace(req.Type) == "" {
 		return fmt.Errorf("resource_type is required")
 	}
-	if strings.TrimSpace(res.ReporterType) == "" {
+	if strings.TrimSpace(req.ReporterType) == "" {
 		return fmt.Errorf("reporter_type is required")
 	}
-	if strings.TrimSpace(res.ReporterInstanceId) == "" {
+	if strings.TrimSpace(req.ReporterInstanceId) == "" {
 		return fmt.Errorf("reporter_instance_id is required")
 	}
 
-	repr := res.Representations
+	repr := req.Representations
 	if repr == nil || repr.Metadata == nil {
 		return fmt.Errorf("representation_metadata is required")
 	}
@@ -304,20 +301,19 @@ func TestSchemaValidation(t *testing.T) {
 		{
 			name: "Missing ReporterType",
 			request: &pbv1beta2.ReportResourceRequest{
-				Resource: &pbv1beta2.Resource{
-					Type:               "k8s_cluster",
-					ReporterType:       "", // Intentionally invalid
-					ReporterInstanceId: "user@example.com",
-					Representations: &pbv1beta2.ResourceRepresentations{
-						Metadata: &pbv1beta2.RepresentationMetadata{
-							LocalResourceId: "0123",
-							ApiHref:         "https://api.example.com",
-							ConsoleHref:     proto.String("https://console.example.com"),
-						},
-						Common: &structpb.Struct{
-							Fields: map[string]*structpb.Value{
-								"workspace_id": structpb.NewStringValue("workspace-123"),
-							},
+
+				Type:               "k8s_cluster",
+				ReporterType:       "", // Intentionally invalid
+				ReporterInstanceId: "user@example.com",
+				Representations: &pbv1beta2.ResourceRepresentations{
+					Metadata: &pbv1beta2.RepresentationMetadata{
+						LocalResourceId: "0123",
+						ApiHref:         "https://api.example.com",
+						ConsoleHref:     proto.String("https://console.example.com"),
+					},
+					Common: &structpb.Struct{
+						Fields: map[string]*structpb.Value{
+							"workspace_id": structpb.NewStringValue("workspace-123"),
 						},
 					},
 				},
@@ -329,28 +325,27 @@ func TestSchemaValidation(t *testing.T) {
 		{
 			name: "Valid RHEL Host with Resource Data",
 			request: &pbv1beta2.ReportResourceRequest{
-				Resource: &pbv1beta2.Resource{
-					Type:               "host",
-					ReporterType:       "HBI",
-					ReporterInstanceId: "org-123",
-					Representations: &pbv1beta2.ResourceRepresentations{
-						Metadata: &pbv1beta2.RepresentationMetadata{
-							LocalResourceId: "rhel-host-001",
-							ApiHref:         "https://api.rhel.example.com",
-							ConsoleHref:     proto.String("https://console.rhel.example.com"),
+
+				Type:               "host",
+				ReporterType:       "HBI",
+				ReporterInstanceId: "org-123",
+				Representations: &pbv1beta2.ResourceRepresentations{
+					Metadata: &pbv1beta2.RepresentationMetadata{
+						LocalResourceId: "rhel-host-001",
+						ApiHref:         "https://api.rhel.example.com",
+						ConsoleHref:     proto.String("https://console.rhel.example.com"),
+					},
+					Common: &structpb.Struct{
+						Fields: map[string]*structpb.Value{
+							"workspace_id": structpb.NewStringValue("workspace-123"),
 						},
-						Common: &structpb.Struct{
-							Fields: map[string]*structpb.Value{
-								"workspace_id": structpb.NewStringValue("workspace-123"),
-							},
-						},
-						Reporter: &structpb.Struct{
-							Fields: map[string]*structpb.Value{
-								"satellite_id":          structpb.NewStringValue("550e8400-e29b-41d4-a716-446655440000"),
-								"sub_manager_id":        structpb.NewStringValue("550e8400-e29b-41d4-a716-446655440000"),
-								"insights_inventory_id": structpb.NewStringValue("550e8400-e29b-41d4-a716-446655440000"),
-								"ansible_host":          structpb.NewStringValue("abc"),
-							},
+					},
+					Reporter: &structpb.Struct{
+						Fields: map[string]*structpb.Value{
+							"satellite_id":          structpb.NewStringValue("550e8400-e29b-41d4-a716-446655440000"),
+							"sub_manager_id":        structpb.NewStringValue("550e8400-e29b-41d4-a716-446655440000"),
+							"insights_inventory_id": structpb.NewStringValue("550e8400-e29b-41d4-a716-446655440000"),
+							"ansible_host":          structpb.NewStringValue("abc"),
 						},
 					},
 				},
@@ -360,26 +355,25 @@ func TestSchemaValidation(t *testing.T) {
 		{
 			name: "Valid K8s Policy",
 			request: &pbv1beta2.ReportResourceRequest{
-				Resource: &pbv1beta2.Resource{
-					Type:               "k8s_policy",
-					ReporterType:       "ACM",
-					ReporterInstanceId: "org-123",
-					Representations: &pbv1beta2.ResourceRepresentations{
-						Metadata: &pbv1beta2.RepresentationMetadata{
-							LocalResourceId: "k8s-policy-001",
-							ApiHref:         "https://api.k8s.example.com",
-							ConsoleHref:     proto.String("https://console.k8s.example.com"),
+
+				Type:               "k8s_policy",
+				ReporterType:       "ACM",
+				ReporterInstanceId: "org-123",
+				Representations: &pbv1beta2.ResourceRepresentations{
+					Metadata: &pbv1beta2.RepresentationMetadata{
+						LocalResourceId: "k8s-policy-001",
+						ApiHref:         "https://api.k8s.example.com",
+						ConsoleHref:     proto.String("https://console.k8s.example.com"),
+					},
+					Common: &structpb.Struct{
+						Fields: map[string]*structpb.Value{
+							"workspace_id": structpb.NewStringValue("workspace-123"),
 						},
-						Common: &structpb.Struct{
-							Fields: map[string]*structpb.Value{
-								"workspace_id": structpb.NewStringValue("workspace-123"),
-							},
-						},
-						Reporter: &structpb.Struct{
-							Fields: map[string]*structpb.Value{
-								"disabled": structpb.NewBoolValue(true),
-								"severity": structpb.NewStringValue("MEDIUM"),
-							},
+					},
+					Reporter: &structpb.Struct{
+						Fields: map[string]*structpb.Value{
+							"disabled": structpb.NewBoolValue(true),
+							"severity": structpb.NewStringValue("MEDIUM"),
 						},
 					},
 				},
@@ -389,20 +383,19 @@ func TestSchemaValidation(t *testing.T) {
 		{
 			name: "Valid Notifications Integration (No schema expected)",
 			request: &pbv1beta2.ReportResourceRequest{
-				Resource: &pbv1beta2.Resource{
-					Type:               "notifications_integration",
-					ReporterType:       "NOTIFICATIONS",
-					ReporterInstanceId: "1",
-					Representations: &pbv1beta2.ResourceRepresentations{
-						Metadata: &pbv1beta2.RepresentationMetadata{
-							LocalResourceId: "notifications-001",
-							ApiHref:         "https://api.notifications.example.com",
-							ConsoleHref:     proto.String("https://console.notifications.example.com"),
-						},
-						Common: &structpb.Struct{
-							Fields: map[string]*structpb.Value{
-								"workspace_id": structpb.NewStringValue("workspace-123"),
-							},
+
+				Type:               "notifications_integration",
+				ReporterType:       "NOTIFICATIONS",
+				ReporterInstanceId: "1",
+				Representations: &pbv1beta2.ResourceRepresentations{
+					Metadata: &pbv1beta2.RepresentationMetadata{
+						LocalResourceId: "notifications-001",
+						ApiHref:         "https://api.notifications.example.com",
+						ConsoleHref:     proto.String("https://console.notifications.example.com"),
+					},
+					Common: &structpb.Struct{
+						Fields: map[string]*structpb.Value{
+							"workspace_id": structpb.NewStringValue("workspace-123"),
 						},
 					},
 				},
@@ -414,32 +407,31 @@ func TestSchemaValidation(t *testing.T) {
 		{
 			name: "K8s Cluster with incorrect data types (simulate type error)",
 			request: &pbv1beta2.ReportResourceRequest{
-				Resource: &pbv1beta2.Resource{
-					Type:               "k8s_cluster",
-					ReporterType:       "OCM",
-					ReporterInstanceId: "user@example.com",
-					Representations: &pbv1beta2.ResourceRepresentations{
-						Metadata: &pbv1beta2.RepresentationMetadata{
-							LocalResourceId: "cluster-123",
-							ApiHref:         "www.example.com",
-							ConsoleHref:     proto.String("www.example.com"),
+
+				Type:               "k8s_cluster",
+				ReporterType:       "OCM",
+				ReporterInstanceId: "user@example.com",
+				Representations: &pbv1beta2.ResourceRepresentations{
+					Metadata: &pbv1beta2.RepresentationMetadata{
+						LocalResourceId: "cluster-123",
+						ApiHref:         "www.example.com",
+						ConsoleHref:     proto.String("www.example.com"),
+					},
+					Common: &structpb.Struct{
+						Fields: map[string]*structpb.Value{
+							"workspace_id": structpb.NewStringValue("workspace-123"),
 						},
-						Common: &structpb.Struct{
-							Fields: map[string]*structpb.Value{
-								"workspace_id": structpb.NewStringValue("workspace-123"),
-							},
-						},
-						Reporter: &structpb.Struct{
-							Fields: map[string]*structpb.Value{
-								// We're using a string instead of an int due to structpb limitations
-								"external_cluster_id": structpb.NewStringValue("1234"),
-								"cluster_status":      structpb.NewStringValue("READY"),
-								"cluster_reason":      structpb.NewStringValue("All systems operational"),
-								"kube_version":        structpb.NewStringValue("1.31"),
-								"kube_vendor":         structpb.NewStringValue("OPENSHIFT"),
-								"vendor_version":      structpb.NewStringValue("4.16"),
-								"cloud_platform":      structpb.NewStringValue("AWS_UPI"),
-							},
+					},
+					Reporter: &structpb.Struct{
+						Fields: map[string]*structpb.Value{
+							// We're using a string instead of an int due to structpb limitations
+							"external_cluster_id": structpb.NewStringValue("1234"),
+							"cluster_status":      structpb.NewStringValue("READY"),
+							"cluster_reason":      structpb.NewStringValue("All systems operational"),
+							"kube_version":        structpb.NewStringValue("1.31"),
+							"kube_vendor":         structpb.NewStringValue("OPENSHIFT"),
+							"vendor_version":      structpb.NewStringValue("4.16"),
+							"cloud_platform":      structpb.NewStringValue("AWS_UPI"),
 						},
 					},
 				},
@@ -449,25 +441,24 @@ func TestSchemaValidation(t *testing.T) {
 		{
 			name: "Notifications Integration with unexpected reporter data",
 			request: &pbv1beta2.ReportResourceRequest{
-				Resource: &pbv1beta2.Resource{
-					Type:               "notifications_integration",
-					ReporterType:       "NOTIFICATIONS",
-					ReporterInstanceId: "1",
-					Representations: &pbv1beta2.ResourceRepresentations{
-						Metadata: &pbv1beta2.RepresentationMetadata{
-							LocalResourceId: "notifications-001",
-							ApiHref:         "https://api.notifications.example.com",
-							ConsoleHref:     proto.String("https://console.notifications.example.com"),
+				
+				Type:               "notifications_integration",
+				ReporterType:       "NOTIFICATIONS",
+				ReporterInstanceId: "1",
+				Representations: &pbv1beta2.ResourceRepresentations{
+					Metadata: &pbv1beta2.RepresentationMetadata{
+						LocalResourceId: "notifications-001",
+						ApiHref:         "https://api.notifications.example.com",
+						ConsoleHref:     proto.String("https://console.notifications.example.com"),
+					},
+					Common: &structpb.Struct{
+						Fields: map[string]*structpb.Value{
+							"workspace_id": structpb.NewStringValue("workspace-123"),
 						},
-						Common: &structpb.Struct{
-							Fields: map[string]*structpb.Value{
-								"workspace_id": structpb.NewStringValue("workspace-123"),
-							},
-						},
-						Reporter: &structpb.Struct{
-							Fields: map[string]*structpb.Value{
-								"unexpected_key": structpb.NewStringValue("unexpected_value"),
-							},
+					},
+					Reporter: &structpb.Struct{
+						Fields: map[string]*structpb.Value{
+							"unexpected_key": structpb.NewStringValue("unexpected_value"),
 						},
 					},
 				},

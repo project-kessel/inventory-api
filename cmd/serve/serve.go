@@ -288,7 +288,6 @@ func NewCommand(
 			shutdown := shutdown(db, server, eventingManager, &inventoryConsumer, log.NewHelper(logger))
 
 			if !storageOptions.DisablePersistence && consumerOptions.Enabled {
-				const maxBackoff = 30 * time.Second
 				go func() {
 					retries := 0
 					for consumerOptions.RetryOptions.ConsumerMaxRetries == -1 || retries < consumerOptions.RetryOptions.ConsumerMaxRetries {
@@ -304,7 +303,7 @@ func NewCommand(
 							inventoryConsumer.Logger.Errorf("consumer unable to process current message -- restarting consumer")
 							retries++
 							if consumerOptions.RetryOptions.ConsumerMaxRetries == -1 || retries < consumerOptions.RetryOptions.ConsumerMaxRetries {
-								backoff := min(time.Duration(inventoryConsumer.RetryOptions.BackoffFactor*retries*300)*time.Millisecond, maxBackoff)
+								backoff := min(time.Duration(inventoryConsumer.RetryOptions.BackoffFactor*retries*300)*time.Millisecond, time.Duration(consumerOptions.RetryOptions.MaxBackoffSeconds)*time.Second)
 								inventoryConsumer.Logger.Errorf("retrying in %v", backoff)
 								time.Sleep(backoff)
 							}

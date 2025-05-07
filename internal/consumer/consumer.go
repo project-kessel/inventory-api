@@ -183,7 +183,6 @@ func (i *InventoryConsumer) Consume() error {
 
 				resp, err = i.ProcessMessage(headers, relationsEnabled, e)
 				if err != nil {
-					Incr(i.MetricsCollector.msgProcessFailures, "ProcessMessage", err)
 					i.Logger.Errorf(
 						"error processing message: topic=%s partition=%d offset=%s",
 						*e.TopicPartition.Topic, e.TopicPartition.Partition, e.TopicPartition.Offset)
@@ -529,7 +528,6 @@ func (i *InventoryConsumer) Shutdown() error {
 // Retry executes the given function and will retry on failure with backoff until max retries is reached
 func (i *InventoryConsumer) Retry(operation func() (string, error)) (string, error) {
 	attempts := 0
-	const maxBackoff = 30 * time.Second
 	var resp interface{}
 	var err error
 
@@ -540,7 +538,7 @@ func (i *InventoryConsumer) Retry(operation func() (string, error)) (string, err
 			i.Logger.Errorf("request failed: %v", err)
 			attempts++
 			if i.RetryOptions.OperationMaxRetries == -1 || attempts < i.RetryOptions.OperationMaxRetries {
-				backoff := min(time.Duration(i.RetryOptions.BackoffFactor*attempts*300)*time.Millisecond, maxBackoff)
+				backoff := min(time.Duration(i.RetryOptions.BackoffFactor*attempts*300)*time.Millisecond, time.Duration(i.RetryOptions.MaxBackoffSeconds)*time.Second)
 				i.Logger.Errorf("retrying in %v", backoff)
 				time.Sleep(backoff)
 			}

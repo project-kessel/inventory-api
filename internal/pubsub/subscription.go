@@ -2,9 +2,12 @@ package pubsub
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 )
+
+var ErrWaitContextCancelled = errors.New("context cancelled while waiting for notification")
 
 type Subscription interface {
 	NotificationC() <-chan []byte
@@ -39,7 +42,8 @@ func (s *subscription) BlockForNotification(ctx context.Context) error {
 				return nil
 			}
 		case <-ctx.Done():
-			return fmt.Errorf("context cancelled while waiting for notification %v", context.Cause(ctx))
+			s.listenManager.logger.Errorf("%s: %s", ErrWaitContextCancelled.Error(), s.txId)
+			return fmt.Errorf("%w: %v", ErrWaitContextCancelled, context.Cause(ctx))
 		}
 	}
 }

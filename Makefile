@@ -157,6 +157,10 @@ inventory-up:
 inventory-up-relations-ready:
 	./scripts/start-inventory.sh full-setup-relations-ready 8081 9081
 
+.PHONY: inventory-up-w-monitoring
+inventory-up-w-monitoring:
+	./scripts/start-inventory.sh full-kessel-w-monitoring 8081 9081
+
 .PHONY: inventory-up-split
 inventory-up-split:
 	./scripts/start-inventory.sh split-setup 8000 9000

@@ -49,13 +49,13 @@ jobs:
           name: code-coverage
           path: coverage.txt
       - name: verify
-        run: cat coverage.txt/*
+        run: ls -l coverage.txt/ && cat coverage.txt/*
 
       - name: code-cov report
         id: code-cov-report
         uses: codecov/codecov-action@v5
         with:
-          files: coverage.txt
+          files: coverage.txt/
           disable_search: true
           verbose: true
           token: ${{ secrets.CODECOV_TOKEN }}

@@ -62,8 +62,7 @@ func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_Host(t *testing.T) {
 	assert.NoError(t, err, "Failed to create structpb for host reporter")
 
 	req := &pbv1beta2.ReportResourceRequest{
-		WaitForSync: false,
-
+		WriteVisibility:    pbv1beta2.WriteVisibility_MINIMIZE_LATENCY,
 		Type:               "host",
 		ReporterType:       "HBI",
 		ReporterInstanceId: "testuser@example.com",
@@ -365,7 +364,7 @@ func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_K8S_Policy(t *testing.T) {
 //	assert.Equal(t, pbv1beta2.Allowed_ALLOWED_FALSE, checkUpdateResp.GetAllowed())
 //}
 
-func TestInventoryAPIHTTP_v1beta2_Host_WaitForSync(t *testing.T) {
+func TestInventoryAPIHTTP_v1beta2_Host_ConsistentWrite(t *testing.T) {
 	t.Parallel()
 
 	resourceId := "wait-for-sync-host-abc-123"
@@ -401,8 +400,7 @@ func TestInventoryAPIHTTP_v1beta2_Host_WaitForSync(t *testing.T) {
 	assert.NoError(t, err, "Failed to create structpb for reporter")
 
 	req := pbv1beta2.ReportResourceRequest{
-		WaitForSync: true,
-
+		WriteVisibility:    pbv1beta2.WriteVisibility_IMMEDIATE,
 		Type:               "host",
 		ReporterType:       "HBI",
 		ReporterInstanceId: "testuser@example.com",

@@ -3,6 +3,7 @@ syntax = "proto3";
 package kessel.inventory.v1beta2;
 
 import "kessel/inventory/v1beta2/resource_representations.proto";
+import "kessel/inventory/v1beta2/write_visibility.proto";
 import "buf/validate/validate.proto";
 
 option go_package = "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2";
@@ -15,6 +16,13 @@ message ReportResourceRequest {
   string reporter_type = 3 [(buf.validate.field).string = {min_len: 1}];
   string reporter_instance_id = 4 [(buf.validate.field).string = {min_len: 1}];
   ResourceRepresentations representations = 5 [(buf.validate.field).required = true];
-  // Will wait for synchronous processes to complete before returning
-  bool wait_for_sync = 6;
+  // WriteVisibility specifies the behavior of the write operation.
+  // - WRITE_VISIBILITY_UNSPECIFIED: The default behavior of the write operation. Defaults to MINIMIZE_LATENCY
+  //   strategy.
+  // - MINIMIZE_LATENCY: The write operation will be performed with the goal of minimizing latency
+  //   by not waiting for data consistency acknowledgment.
+  // - IMMEDIATE: The write operation will be performed with the goal of ensuring immediate consistency
+  //   by waiting for data consistency acknowledgment. Additional
+  //   latency may be incurred.
+  WriteVisibility write_visibility = 6 [(buf.validate.field).enum.defined_only = true];
 }

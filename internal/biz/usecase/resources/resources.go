@@ -137,6 +137,9 @@ func (uc *Usecase) Upsert(ctx context.Context, m *model.Resource, write_visibili
 
 			err = subscription.BlockForNotification(timeoutCtx)
 			if err != nil {
+				if errors.Is(err, pubsub.ErrWaitContextCancelled) {
+					return ret, nil
+				}
 				return nil, err
 			}
 		}
@@ -355,6 +358,9 @@ func (uc *Usecase) Create(ctx context.Context, m *model.Resource) (*model.Resour
 
 			err = subscription.BlockForNotification(timeoutCtx)
 			if err != nil {
+				if errors.Is(err, pubsub.ErrWaitContextCancelled) {
+					return ret, nil
+				}
 				return nil, err
 			}
 		}
@@ -411,6 +417,9 @@ func (uc *Usecase) Update(ctx context.Context, m *model.Resource, id model.Repor
 
 			err = subscription.BlockForNotification(timeoutCtx)
 			if err != nil {
+				if errors.Is(err, pubsub.ErrWaitContextCancelled) {
+					return ret, nil
+				}
 				return nil, err
 			}
 		}

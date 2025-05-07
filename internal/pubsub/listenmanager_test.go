@@ -59,7 +59,7 @@ func TestWaitTimeout(t *testing.T) {
 
 		err := subscription.BlockForNotification(timeoutCtx)
 		assert.Error(t, err)
-		assert.Equal(t, "context cancelled while waiting for notification context deadline exceeded", err.Error())
+		assert.Equal(t, "context cancelled while waiting for notification: context deadline exceeded", err.Error())
 	}()
 
 	wg.Wait()

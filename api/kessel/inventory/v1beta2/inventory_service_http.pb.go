@@ -25,26 +25,26 @@ const OperationKesselInventoryServiceDeleteResource = "/kessel.inventory.v1beta2
 const OperationKesselInventoryServiceReportResource = "/kessel.inventory.v1beta2.KesselInventoryService/ReportResource"
 
 type KesselInventoryServiceHTTPServer interface {
-	// Check Performs an authorization check to determine whether a subject has a specific
+	// Check Performs an relationship check to determine whether a subject has a specific
 	// permission or relationship on a resource.
 	//
 	// This API evaluates whether the provided subject is a member of the specified relation
 	// (e.g., "viewer", "editor", "admin") on the target object. It answers the question:
-	// "Is subject *X* authorized to perform action *Y* on resource *Z*?"
+	// "Does subject *X* have relation *Y* on object *Z*?"
 	//
 	// Common use cases include enforcing read access, conditional UI visibility,
 	// or authorization gating for downstream API calls.
 	Check(context.Context, *CheckRequest) (*CheckResponse, error)
-	// CheckForUpdate Performs a strongly consistent authorization check to determine whether a subject
-	// is allowed to perform a modifying action on a resource.
+	// CheckForUpdate Performs a strongly consistent relationship check to determine whether a subject
+	// has a specific relation to an object (representing, for example, a permission).
 	//
 	// This API answers the question:
 	// "Is subject *X* currently authorized to update or modify resource *Y*?"
 	// Unlike the basic `Check` endpoint, this method guarantees a fully up-to-date
-	// view of the authorization state (e.g., not relying on cached or eventually consistent data).
+	// view of the relationship state (e.g., not relying on cached or eventually consistent data).
 	//
-	// It is intended to be used just prior to a write operation (e.g., update, delete)
-	// to prevent unauthorized modifications due to stale permission models.
+	// It is intended to be used just prior to sensitive operation (e.g., update, delete)
+	// which depend on the current state of the relationship.
 	CheckForUpdate(context.Context, *CheckForUpdateRequest) (*CheckForUpdateResponse, error)
 	// DeleteResource Deletes a resource from the Kessel Inventory, along with all associated
 	// metadata, representations, and authorization relationships.
@@ -62,16 +62,30 @@ type KesselInventoryServiceHTTPServer interface {
 	// This call is destructive and should be made with care, as it can revoke
 	// previously granted access across the system.
 	DeleteResource(context.Context, *DeleteResourceRequest) (*DeleteResourceResponse, error)
-	// ReportResource Registers or updates a resource in the Kessel Inventory, along with reporter-specific
-	// metadata and representations.
+	// ReportResource Registers a new resource or updates an existing resource in Kessel Inventory.
 	//
-	// In addition to persisting resource data, this API implicitly establishes or updates
-	// relationships between the resource and subjects as reported. These relationships
-	// serve as the basis for authorization decisions and are evaluated using the `Check`
-	// and `CheckForUpdate` APIs.
+	// Reporters can use this API to report facts about their resources in order to
+	// facilitate integration, correlation, and access control.
 	//
-	// Reporters can contribute their own perspective of the resource via the `representations`
-	// field, enabling a multi-reporter model where access control is shaped by aggregated inputs.
+	// Each call can include:
+	// - Reporter-specific attributes and relationships (`representations.reporter`)
+	// - Shared attributes and relationships common to various reporters (`representations.common`)
+	// - Identifiers and metadata that allow correlation to an existing resource
+	//
+	// Multiple reporters may report representations for the same logical resource.
+	// Kessel Inventory makes a best-effort attempt to correlate these
+	// based on correlation keys provided for a given resource type
+	//
+	// The relationships reported through this API are used to determine relationship check outcomes
+	// via the Check and CheckForUpdate APIs.
+	//
+	// Reporters are responsible for ensuring delivery guarantees and message ordering
+	// appropriate to the sensitivity and consistency needs of their use case.
+	//
+	// This API does **not** guarantee immediate read-your-writes consistency by default.
+	//  If a reporter requires newly submitted resources or relationships to be visible
+	// in subsequent checks (e.g., `Check`), the request must explicitly set
+	// `write_visibility = IMMEDIATE`.
 	ReportResource(context.Context, *ReportResourceRequest) (*ReportResourceResponse, error)
 }
 

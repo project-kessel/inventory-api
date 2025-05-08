@@ -25,53 +25,53 @@ const OperationKesselInventoryServiceDeleteResource = "/kessel.inventory.v1beta2
 const OperationKesselInventoryServiceReportResource = "/kessel.inventory.v1beta2.KesselInventoryService/ReportResource"
 
 type KesselInventoryServiceHTTPServer interface {
-	// Check/ Performs an authorization check to determine whether a subject has a specific
-	/// permission or relationship on a resource.
-	///
-	/// This API evaluates whether the provided subject is a member of the specified relation
-	/// (e.g., "viewer", "editor", "admin") on the target object. It answers the question:
-	/// "Is subject *X* authorized to perform action *Y* on resource *Z*?"
-	///
-	/// Common use cases include enforcing read access, conditional UI visibility,
-	/// or authorization gating for downstream API calls.
+	// Check Performs an authorization check to determine whether a subject has a specific
+	// permission or relationship on a resource.
+	//
+	// This API evaluates whether the provided subject is a member of the specified relation
+	// (e.g., "viewer", "editor", "admin") on the target object. It answers the question:
+	// "Is subject *X* authorized to perform action *Y* on resource *Z*?"
+	//
+	// Common use cases include enforcing read access, conditional UI visibility,
+	// or authorization gating for downstream API calls.
 	Check(context.Context, *CheckRequest) (*CheckResponse, error)
-	// CheckForUpdate/ Performs a strongly consistent authorization check to determine whether a subject
-	/// is allowed to perform a modifying action on a resource.
-	///
-	/// This API answers the question:
-	/// "Is subject *X* currently authorized to update or modify resource *Y*?"
-	/// Unlike the basic `Check` endpoint, this method guarantees a fully up-to-date
-	/// view of the authorization state (e.g., not relying on cached or eventually consistent data).
-	///
-	/// It is intended to be used just prior to a write operation (e.g., update, delete)
-	/// to prevent unauthorized modifications due to stale permission models.
+	// CheckForUpdate Performs a strongly consistent authorization check to determine whether a subject
+	// is allowed to perform a modifying action on a resource.
+	//
+	// This API answers the question:
+	// "Is subject *X* currently authorized to update or modify resource *Y*?"
+	// Unlike the basic `Check` endpoint, this method guarantees a fully up-to-date
+	// view of the authorization state (e.g., not relying on cached or eventually consistent data).
+	//
+	// It is intended to be used just prior to a write operation (e.g., update, delete)
+	// to prevent unauthorized modifications due to stale permission models.
 	CheckForUpdate(context.Context, *CheckForUpdateRequest) (*CheckForUpdateResponse, error)
-	// DeleteResource/ Deletes a resource from the Kessel Inventory, along with all associated
-	/// metadata, representations, and authorization relationships.
-	///
-	/// This operation is typically used when a resource has been decommissioned or
-	/// is no longer reported by any authorized system. Deletion removes not only
-	/// the resource data, but also any subject-resource relationships that were
-	/// established via `ReportResource`.
-	///
-	/// As a result, authorization checks performed via the `Check` and
-	/// `CheckForUpdate` APIs will no longer resolve positively for the deleted
-	/// resource. Any access control decisions that depend on relationships tied to
-	/// this resource will be affected.
-	///
-	/// This call is destructive and should be made with care, as it can revoke
-	/// previously granted access across the system.
+	// DeleteResource Deletes a resource from the Kessel Inventory, along with all associated
+	// metadata, representations, and authorization relationships.
+	//
+	// This operation is typically used when a resource has been decommissioned or
+	// is no longer reported by any authorized system. Deletion removes not only
+	// the resource data, but also any subject-resource relationships that were
+	// established via `ReportResource`.
+	//
+	// As a result, authorization checks performed via the `Check` and
+	// `CheckForUpdate` APIs will no longer resolve positively for the deleted
+	// resource. Any access control decisions that depend on relationships tied to
+	// this resource will be affected.
+	//
+	// This call is destructive and should be made with care, as it can revoke
+	// previously granted access across the system.
 	DeleteResource(context.Context, *DeleteResourceRequest) (*DeleteResourceResponse, error)
-	// ReportResource/ Registers or updates a resource in the Kessel Inventory, along with reporter-specific
-	/// metadata and representations.
-	///
-	/// In addition to persisting resource data, this API implicitly establishes or updates
-	/// relationships between the resource and subjects as reported. These relationships
-	/// serve as the basis for authorization decisions and are evaluated using the `Check`
-	/// and `CheckForUpdate` APIs.
-	///
-	/// Reporters can contribute their own perspective of the resource via the `representations`
-	/// field, enabling a multi-reporter model where access control is shaped by aggregated inputs.
+	// ReportResource Registers or updates a resource in the Kessel Inventory, along with reporter-specific
+	// metadata and representations.
+	//
+	// In addition to persisting resource data, this API implicitly establishes or updates
+	// relationships between the resource and subjects as reported. These relationships
+	// serve as the basis for authorization decisions and are evaluated using the `Check`
+	// and `CheckForUpdate` APIs.
+	//
+	// Reporters can contribute their own perspective of the resource via the `representations`
+	// field, enabling a multi-reporter model where access control is shaped by aggregated inputs.
 	ReportResource(context.Context, *ReportResourceRequest) (*ReportResourceResponse, error)
 }
 

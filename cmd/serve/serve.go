@@ -9,9 +9,13 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/go-kratos/kratos/v2/log"
+	"github.com/spf13/cobra"
+	"gorm.io/gorm"
+
 	"github.com/project-kessel/inventory-api/cmd/common"
-	relationshipsctl "github.com/project-kessel/inventory-api/internal/biz/relationships"
-	resourcesctl "github.com/project-kessel/inventory-api/internal/biz/resources"
+	relationshipsctl "github.com/project-kessel/inventory-api/internal/biz/usecase/relationships"
+	resourcesctl "github.com/project-kessel/inventory-api/internal/biz/usecase/resources"
 	"github.com/project-kessel/inventory-api/internal/consistency"
 	"github.com/project-kessel/inventory-api/internal/consumer"
 	inventoryResourcesRepo "github.com/project-kessel/inventory-api/internal/data/inventoryresources"
@@ -26,11 +30,6 @@ import (
 
 	//v1beta2
 	resourcesvc "github.com/project-kessel/inventory-api/internal/service/resources"
-
-	"github.com/spf13/cobra"
-	"gorm.io/gorm"
-
-	"github.com/go-kratos/kratos/v2/log"
 
 	"github.com/project-kessel/inventory-api/internal/authn"
 	"github.com/project-kessel/inventory-api/internal/authz"
@@ -291,7 +290,7 @@ func NewCommand(
 			if !storageOptions.DisablePersistence && consumerOptions.Enabled {
 				go func() {
 					retries := 0
-					for retries < consumerOptions.RetryOptions.ConsumerMaxRetries {
+					for consumerOptions.RetryOptions.ConsumerMaxRetries == -1 || retries < consumerOptions.RetryOptions.ConsumerMaxRetries {
 						// If the consumer cannot process a message, the consumer loop is restarted
 						// This is to ensure we re-read the message and prevent it being dropped and moving to next message.
 						// To re-read the current message, we have to recreate the consumer connection so that the earliest offset is used
@@ -303,8 +302,8 @@ func NewCommand(
 						if e.Is(err, consumer.ErrClosed) {
 							inventoryConsumer.Logger.Errorf("consumer unable to process current message -- restarting consumer")
 							retries++
-							if retries < consumerOptions.RetryOptions.ConsumerMaxRetries {
-								backoff := time.Duration(inventoryConsumer.RetryOptions.BackoffFactor*retries*300) * time.Millisecond
+							if consumerOptions.RetryOptions.ConsumerMaxRetries == -1 || retries < consumerOptions.RetryOptions.ConsumerMaxRetries {
+								backoff := min(time.Duration(inventoryConsumer.RetryOptions.BackoffFactor*retries*300)*time.Millisecond, time.Duration(consumerOptions.RetryOptions.MaxBackoffSeconds)*time.Second)
 								inventoryConsumer.Logger.Errorf("retrying in %v", backoff)
 								time.Sleep(backoff)
 							}

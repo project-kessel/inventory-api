@@ -2,6 +2,7 @@ package kessel
 
 import (
 	"context"
+
 	"github.com/authzed/grpcutil"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"

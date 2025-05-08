@@ -23,6 +23,20 @@ services:
       - kessel
     restart: on-failure
 
+  full-kessel-w-monitoring:
+    image: bash:3.1-alpine3.21
+    command: ["echo", "starting full-kessel-w-monitoring"]
+    depends_on:
+    - inventory-api
+    - kafka-setup
+    - connect-setup
+    - prometheus
+    - grafana
+    - alertmanager
+    networks:
+      - kessel
+    restart: on-failure
+
   full-setup-w-sso:
     image: bash:3.1-alpine3.21
     command: ["echo", "starting full-setup-w-sso"]
@@ -71,6 +85,7 @@ services:
         VERSION: dev
     volumes:
       - ./configs/${CONFIG}.yaml:/inventory-api-compose.yaml:ro,z
+      - ../schema_cache.json:/schema_cache.json:ro,z
     command: ["serve"]
     restart: "always"
     ports:
@@ -216,6 +231,37 @@ services:
       - 8084:8084
     networks:
       - kessel
+
+  prometheus:
+    image: prom/prometheus
+    volumes:
+      - "./configs/monitoring/prometheus.yml:/etc/prometheus/prometheus.yml"
+    # - "./configs/monitoring/rules.yml:/etc/prometheus/rules.yml"
+    networks:
+      - kessel
+    ports:
+      - 9050:9090
+  alertmanager:
+    image: prom/alertmanager
+    # volumes:
+    #   - "./configs/monitoring/alertmanager.yml:/alertmanager/alertmanager.yml"
+    networks:
+      - kessel
+    ports:
+      - 9093:9093
+  grafana:
+    image: grafana/grafana-enterprise
+    container_name: grafana
+    restart: unless-stopped
+    ports:
+      - '3000:3000'
+    volumes:
+      - grafana-storage:/var/lib/grafana
+      - ./configs/monitoring/grafana-datasource.yml:/etc/grafana/provisioning/datasources/datasource.yml
+    networks:
+      - kessel
+volumes:
+  grafana-storage: {}
 
 networks:
   kessel:

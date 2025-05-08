@@ -35,9 +35,13 @@ def extract_json_payload(line: str):
             return None, None, None
         inventory_id = match_inventory_id.group(1).encode().decode("unicode_escape")
 
-        # We don't really know what operation they are supposed to be doing tbh. 
-        # Update might be safe, but not entirely.
-        return inventory_id, json.loads(payload_str), "updated"
+        # either updated or deleted depending on if a subject is defined.
+        operation = "updated"
+        payload = json.loads(payload_str)
+        if not payload.get("subject"):
+            operation = "deleted"
+
+        return inventory_id, payload, operation
     
 
 def build_deleted_command(inventory_id, payload):
@@ -45,21 +49,24 @@ def build_deleted_command(inventory_id, payload):
 	# (parse message, gabi call, zed relationship read, zed relationship delete) 
 
     # parse message
+    resource_namespace = payload["resource_namespace"]
+    resource_name = payload["resource_type"]
+    resource_id = payload["resource_id"]
     relation = payload["relation"]
 
     # Call gabi to fetch current info on resource.
     inv_res_id, inv_sub_id, inv_res_type, inv_report_type = fetch_inventory_resource_info(inventory_id)
-    if not all([inv_res_id, inv_sub_id, inv_res_type, inv_report_type]):
+    if all([inv_res_id, inv_sub_id, inv_res_type, inv_report_type]):
         return None # Dont delete, as it still exists in inventory DB.
 
     # zed relationship read fully consistent (drift check)
     res = subprocess.run(
-        f"zed relationship read {inv_report_type}/{inv_res_type}:{inv_res_id} t_{relation} --consistency-full",
+        f"zed relationship read {resource_namespace}/{resource_name}:{resource_id} t_{relation} --consistency-full",
         shell=True, capture_output=True, text=True
     )
     if len(res.stdout) != 0:
         print(f"Resource exists in SpiceDB: {res.stdout}. Deleting...")
-        return f"zed relationship bulk-delete {inv_report_type}/{inv_res_type}:{inv_res_id} t_{relation}"
+        return f"zed relationship bulk-delete {resource_namespace}/{resource_name}:{resource_id} t_{relation}"
 
     print("Resource doesn't exist in SpiceDB. Nothing to delete...")
     return None
@@ -190,6 +197,10 @@ def main():
     if not os.path.isfile(input_file):
         print(f"File not found: {input_file}")
         return
+    
+    dry_run = os.getenv("DRY_RUN", "false").lower() == "true"
+    if dry_run:
+        print("Dry run mode enabled.\n")
 
     with open(input_file, "r") as f:
         for line in f:
@@ -199,12 +210,17 @@ def main():
 
             cmd = build_zed_command(inventory_id, payload, operation)
             if cmd:
-                print(f"Running: {cmd}")
-                try:
-                    subprocess.run(cmd, shell=True, check=True)
-                except subprocess.CalledProcessError as e:
-                    print(f"Command failed with return code {e.returncode}")
-                    sys.exit(e.returncode)
+                if dry_run:
+                    print(f"Would update {inventory_id} with {cmd}")
+                else:
+                    print(f"Running: {cmd}")
+                    try:
+                        subprocess.run(cmd, shell=True, check=True)
+                    except subprocess.CalledProcessError as e:
+                        print(f"Command failed with return code {e.returncode}")
+                        sys.exit(e.returncode)
+            elif dry_run:
+                print(f"Skipping {inventory_id}, no update needed")
 
 
 if __name__ == "__main__":

@@ -26,13 +26,14 @@ import (
 
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
 	"github.com/go-kratos/kratos/v2/log"
-	"github.com/project-kessel/inventory-api/internal/authz"
-	"github.com/project-kessel/inventory-api/internal/authz/api"
-	"github.com/project-kessel/inventory-api/internal/biz/model"
 	"github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"gorm.io/gorm"
+
+	"github.com/project-kessel/inventory-api/internal/authz"
+	"github.com/project-kessel/inventory-api/internal/authz/api"
+	"github.com/project-kessel/inventory-api/internal/biz/model"
 )
 
 // commitModulo is used to define the batch size of offsets based on the current offset being processed
@@ -99,6 +100,7 @@ func New(config CompletedConfig, db *gorm.DB, authz authz.CompletedConfig, autho
 		ConsumerMaxRetries:  config.RetryConfig.ConsumerMaxRetries,
 		OperationMaxRetries: config.RetryConfig.OperationMaxRetries,
 		BackoffFactor:       config.RetryConfig.BackoffFactor,
+		MaxBackoffSeconds:   config.RetryConfig.MaxBackoffSeconds,
 	}
 
 	var errChan chan error
@@ -530,13 +532,14 @@ func (i *InventoryConsumer) Retry(operation func() (string, error)) (string, err
 	var resp interface{}
 	var err error
 
-	for attempts < i.RetryOptions.OperationMaxRetries {
+	for i.RetryOptions.OperationMaxRetries == -1 || attempts < i.RetryOptions.OperationMaxRetries {
 		resp, err = operation()
 		if err != nil {
+			Incr(i.MetricsCollector.msgProcessFailures, "Retry", err)
 			i.Logger.Errorf("request failed: %v", err)
 			attempts++
-			if attempts < i.RetryOptions.OperationMaxRetries {
-				backoff := time.Duration(i.RetryOptions.BackoffFactor*attempts*300) * time.Millisecond
+			if i.RetryOptions.OperationMaxRetries == -1 || attempts < i.RetryOptions.OperationMaxRetries {
+				backoff := min(time.Duration(i.RetryOptions.BackoffFactor*attempts*300)*time.Millisecond, time.Duration(i.RetryOptions.MaxBackoffSeconds)*time.Second)
 				i.Logger.Errorf("retrying in %v", backoff)
 				time.Sleep(backoff)
 			}

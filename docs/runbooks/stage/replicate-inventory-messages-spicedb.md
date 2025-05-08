@@ -124,6 +124,15 @@ Disable the consumer in the inventory api config yaml. You may need to roll the 
 
 With our zed context and gabi config set up to stage and port-forwarding into the SpiceDB service, we can execute our [migration script](/scripts/manual_migration_to_spicedb.py). Move the migration script to the same location as your `kafkadump.txt` file.
 
+To get started, you can execute a dry run of the changes before making live changes to things.
+
+Run
+```shell
+DRY_RUN=true python3 manual_migration_to_spicedb.py kafkadump.txt
+```
+
+If the changes look good and you're ready to go, execute without the `DRY_RUN` variable or set `DRY_RUN=false`
+
 Run 
 ```shell
 python3 manual_migration_to_spicedb.py kafkadump.txt
@@ -131,7 +140,7 @@ python3 manual_migration_to_spicedb.py kafkadump.txt
 
 Voila! Your inventory DB data should now be consistent with SpiceDB after reprocessing the failing messages!
 
-You can now reenable the consumer so messages can begin processing. You may need to roll the pods for the change to take effect.
+You can now re-enable the consumer so messages can begin processing. You may need to roll the pods for the change to take effect.
 
 ```shell
   consumer:

@@ -3,8 +3,9 @@ package data
 import (
 	"fmt"
 
-	"github.com/project-kessel/inventory-api/internal/biz/model"
 	"gorm.io/gorm"
+
+	"github.com/project-kessel/inventory-api/internal/biz/model"
 
 	"github.com/go-kratos/kratos/v2/log"
 )

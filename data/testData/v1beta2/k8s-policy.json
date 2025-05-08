@@ -1,5 +1,4 @@
 {
-  "resource": {
     "type": "k8s_policy",
     "reporterType": "ACM",
     "reporterInstanceId": "57a317b1-4040-4c26-8d41-dd589ba1d2eb",
@@ -18,5 +17,5 @@
         "severity": "CRITICAL"
       }
     }
-  }
 }
+

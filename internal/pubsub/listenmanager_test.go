@@ -7,8 +7,9 @@ import (
 	"time"
 
 	"github.com/go-kratos/kratos/v2/log"
-	"github.com/project-kessel/inventory-api/cmd/common"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/project-kessel/inventory-api/cmd/common"
 )
 
 func TestSubscriptions(t *testing.T) {
@@ -58,7 +59,7 @@ func TestWaitTimeout(t *testing.T) {
 
 		err := subscription.BlockForNotification(timeoutCtx)
 		assert.Error(t, err)
-		assert.Equal(t, "context cancelled while waiting for notification context deadline exceeded", err.Error())
+		assert.Equal(t, "context cancelled while waiting for notification: context deadline exceeded", err.Error())
 	}()
 
 	wg.Wait()

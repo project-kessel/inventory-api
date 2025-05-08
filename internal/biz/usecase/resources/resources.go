@@ -9,19 +9,21 @@ import (
 
 	"sync"
 
+	"github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2"
 	"github.com/project-kessel/inventory-api/internal/consumer"
 	"github.com/project-kessel/inventory-api/internal/pubsub"
 
 	"github.com/google/uuid"
 
 	"github.com/go-kratos/kratos/v2/log"
+	kessel "github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
+	"gorm.io/gorm"
+
 	common "github.com/project-kessel/inventory-api/cmd/common"
 	authzapi "github.com/project-kessel/inventory-api/internal/authz/api"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
 	eventingapi "github.com/project-kessel/inventory-api/internal/eventing/api"
 	"github.com/project-kessel/inventory-api/internal/server"
-	kessel "github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
-	"gorm.io/gorm"
 )
 
 type ReporterResourceRepository interface {
@@ -83,7 +85,7 @@ func New(reporterResourceRepository ReporterResourceRepository, inventoryResourc
 	}
 }
 
-func (uc *Usecase) Upsert(ctx context.Context, m *model.Resource, wait_for_sync bool) (*model.Resource, error) {
+func (uc *Usecase) Upsert(ctx context.Context, m *model.Resource, write_visibility v1beta2.WriteVisibility) (*model.Resource, error) {
 	log.Info("upserting resource: ", m)
 	ret := m // Default to returning the input model in case persistence is disabled
 	var subscription pubsub.Subscription
@@ -97,7 +99,7 @@ func (uc *Usecase) Upsert(ctx context.Context, m *model.Resource, wait_for_sync 
 			return nil, ErrDatabaseError
 		}
 
-		readAfterWriteEnabled := computeReadAfterWrite(uc, wait_for_sync, m)
+		readAfterWriteEnabled := computeReadAfterWrite(uc, write_visibility, m)
 		if readAfterWriteEnabled {
 			// Generate txid for data layer
 			// TODO: Replace this when inventory api has proper api-level transaction ids
@@ -135,6 +137,9 @@ func (uc *Usecase) Upsert(ctx context.Context, m *model.Resource, wait_for_sync 
 
 			err = subscription.BlockForNotification(timeoutCtx)
 			if err != nil {
+				if errors.Is(err, pubsub.ErrWaitContextCancelled) {
+					return ret, nil
+				}
 				return nil, err
 			}
 		}
@@ -353,6 +358,9 @@ func (uc *Usecase) Create(ctx context.Context, m *model.Resource) (*model.Resour
 
 			err = subscription.BlockForNotification(timeoutCtx)
 			if err != nil {
+				if errors.Is(err, pubsub.ErrWaitContextCancelled) {
+					return ret, nil
+				}
 				return nil, err
 			}
 		}
@@ -409,6 +417,9 @@ func (uc *Usecase) Update(ctx context.Context, m *model.Resource, id model.Repor
 
 			err = subscription.BlockForNotification(timeoutCtx)
 			if err != nil {
+				if errors.Is(err, pubsub.ErrWaitContextCancelled) {
+					return ret, nil
+				}
 				return nil, err
 			}
 		}
@@ -463,9 +474,12 @@ func isSPInAllowlist(m *model.Resource, allowlist []string) bool {
 	return false
 }
 
-func computeReadAfterWrite(uc *Usecase, wait_for_sync bool, m *model.Resource) bool {
+func computeReadAfterWrite(uc *Usecase, write_visibility v1beta2.WriteVisibility, m *model.Resource) bool {
 	// read after write functionality is enabled/disabled globally.
 	// And executed if request specifies and
 	// came from service provider in allowlist
-	return !common.IsNil(uc.ListenManager) && uc.ReadAfterWriteEnabled && wait_for_sync && isSPInAllowlist(m, uc.ReadAfterWriteAllowlist)
+	if write_visibility == v1beta2.WriteVisibility_WRITE_VISIBILITY_UNSPECIFIED || write_visibility == v1beta2.WriteVisibility_MINIMIZE_LATENCY {
+		return false
+	}
+	return !common.IsNil(uc.ListenManager) && uc.ReadAfterWriteEnabled && isSPInAllowlist(m, uc.ReadAfterWriteAllowlist)
 }

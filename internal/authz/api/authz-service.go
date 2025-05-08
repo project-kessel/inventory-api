@@ -2,11 +2,13 @@ package api
 
 import (
 	"context"
+
 	"google.golang.org/grpc"
 
-	"github.com/project-kessel/inventory-api/internal/biz/model"
 	kesselv1 "github.com/project-kessel/relations-api/api/kessel/relations/v1"
 	kessel "github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
+
+	"github.com/project-kessel/inventory-api/internal/biz/model"
 )
 
 type Authorizer interface {

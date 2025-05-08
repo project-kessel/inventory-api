@@ -1,7 +1,6 @@
 {
-  "resource": {
     "type": "host",
-    "reporterType": "HBI",
+    "reporterType": "hbi",
     "reporterInstanceId": "3088be62-1c60-4884-b133-9200542d0b3f",
     "representations": {
       "metadata": {
@@ -20,5 +19,5 @@
         "ansible_host": "host-1"
       }
     }
-  }
 }
+

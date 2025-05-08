@@ -18,39 +18,67 @@ option go_package = "github.com/project-kessel/inventory-api/api/kessel/inventor
 option java_multiple_files = true;
 option java_package = "org.project_kessel.api.inventory.v1beta2";
 
+// KesselInventoryService provides APIs to perform relationship checks
+// and manage inventory resource lifecycles (reporting and deletion).
 service KesselInventoryService {
-  // Checks for the existence of a single Relationship
-  // (a Relation between a Resource and a Subject or Subject Set).
+  /// Performs an authorization check to determine whether a subject has a specific
+  /// permission or relationship on a resource.
+  ///
+  /// This API evaluates whether the provided subject is a member of the specified relation
+  /// (e.g., "viewer", "editor", "admin") on the target object. It answers the question:
+  /// "Is subject *X* authorized to perform action *Y* on resource *Z*?"
+  ///
+  /// Common use cases include enforcing read access, conditional UI visibility,
+  /// or authorization gating for downstream API calls.
   rpc Check(CheckRequest) returns (CheckResponse) {
     option (google.api.http) = {
       post: "/api/inventory/v1beta2/check"
       body: "*"
     };
   }
-  // CheckForUpdate performs a fully consistent permission check to determine
-  // whether the subject has the necessary permission to update or modify the resource.
-  // This is intended for use prior to performing write operations to ensure that
-  // the authorization state is up-to-date and not stale.
+  /// Performs a strongly consistent authorization check to determine whether a subject
+  /// is allowed to perform a modifying action on a resource.
+  ///
+  /// This API answers the question:
+  /// "Is subject *X* currently authorized to update or modify resource *Y*?"
+  /// Unlike the basic `Check` endpoint, this method guarantees a fully up-to-date
+  /// view of the authorization state (e.g., not relying on cached or eventually consistent data).
+  ///
+  /// It is intended to be used just prior to a write operation (e.g., update, delete)
+  /// to prevent unauthorized modifications due to stale permission models.
   rpc CheckForUpdate(CheckForUpdateRequest) returns (CheckForUpdateResponse) {
     option (google.api.http) = {
       post: "/api/inventory/v1beta2/checkforupdate"
       body: "*"
     };
   }
-  // Registers or reports a new resource to the inventory.
+  // ReportResource registers a new resource or updates an existing resource
+  // in Kessel Inventory, along with its associated metadata and relationships.
+  //
+  // This is the primary entry point for reporting resource state changes.
   rpc ReportResource(ReportResourceRequest) returns (ReportResourceResponse) {
     option (google.api.http) = {
       post: "/api/inventory/v1beta2/resources"
       body: "*"
     };
   }
-  // Deletes a resource and its associated relations from the inventory.
+
+  // DeleteResource removes a resource and all associated relationships from
+  // Kessel Inventory.
+  //
+  // This is a destructive operation and should be used only when the resource
+  // is no longer relevant.
   rpc DeleteResource(DeleteResourceRequest) returns (DeleteResourceResponse) {
     option (google.api.http) = {
       delete: "/api/inventory/v1beta2/resources"
       body: "*"
     };
   }
-  // Streams a list of objects/resources based on filter parameters.
+
+  // StreamedListObjects streams a filtered list of resources that match the
+  // specified query criteria. This is useful for efficiently handling large
+  // result sets or paginated views.
+  //
+  // Results are returned as a server stream.
   rpc StreamedListObjects(StreamedListObjectsRequest) returns (stream StreamedListObjectsResponse);
 }

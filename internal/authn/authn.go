@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/go-kratos/kratos/v2/log"
+
 	"github.com/project-kessel/inventory-api/internal/authn/api"
 	"github.com/project-kessel/inventory-api/internal/authn/clientcert"
 	"github.com/project-kessel/inventory-api/internal/authn/delegator"

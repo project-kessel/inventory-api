@@ -5,12 +5,14 @@ import (
 	"errors"
 	"time"
 
+	"github.com/project-kessel/inventory-api/internal/middleware"
+
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/google/uuid"
-	"github.com/project-kessel/inventory-api/internal/biz"
+	"gorm.io/gorm"
+
 	"github.com/project-kessel/inventory-api/internal/biz/model"
 	eventingapi "github.com/project-kessel/inventory-api/internal/eventing/api"
-	"gorm.io/gorm"
 )
 
 type ResourceRepository interface {
@@ -84,7 +86,7 @@ func (uc *Usecase) Create(ctx context.Context, m *model.Relationship) (*model.Re
 	}
 
 	if uc.eventer != nil {
-		err := biz.DefaultRelationshipSendEvent(ctx, m, uc.eventer, *m.CreatedAt, model.OperationTypeCreated)
+		err := DefaultRelationshipSendEvent(ctx, m, uc.eventer, *m.CreatedAt, model.OperationTypeCreated)
 
 		if err != nil {
 			return nil, err
@@ -131,7 +133,7 @@ func (uc *Usecase) Update(ctx context.Context, m *model.Relationship, id model.R
 	}
 
 	if uc.eventer != nil {
-		err := biz.DefaultRelationshipSendEvent(ctx, m, uc.eventer, *m.UpdatedAt, model.OperationTypeUpdated)
+		err := DefaultRelationshipSendEvent(ctx, m, uc.eventer, *m.UpdatedAt, model.OperationTypeUpdated)
 
 		if err != nil {
 			return nil, err
@@ -172,7 +174,7 @@ func (uc *Usecase) Delete(ctx context.Context, id model.ReporterRelationshipId) 
 	}
 
 	if uc.eventer != nil {
-		err := biz.DefaultRelationshipSendEvent(ctx, m, uc.eventer, time.Now(), model.OperationTypeDeleted)
+		err := DefaultRelationshipSendEvent(ctx, m, uc.eventer, time.Now(), model.OperationTypeDeleted)
 
 		if err != nil {
 			return err
@@ -180,5 +182,27 @@ func (uc *Usecase) Delete(ctx context.Context, id model.ReporterRelationshipId) 
 	}
 
 	uc.log.WithContext(ctx).Infof("Deleted Relationship: %v(%v)", m.ID, m.RelationshipType)
+	return nil
+}
+
+// Moved here from common.go since it's not used outside this file, so keeping it here avoids maintaining an unnecessary common.go.
+
+func DefaultRelationshipSendEvent(ctx context.Context, m *model.Relationship, eventer eventingapi.Manager, reportedTime time.Time, operationType model.EventOperationType) error {
+	identity, err := middleware.GetIdentity(ctx)
+	if err != nil {
+		return err
+	}
+
+	producer, _ := eventer.Lookup(identity, m.RelationshipType, m.ID)
+	evt, err := eventingapi.NewRelationshipEvent(operationType, m, reportedTime)
+	if err != nil {
+		return err
+	}
+
+	err = producer.Produce(ctx, evt)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }

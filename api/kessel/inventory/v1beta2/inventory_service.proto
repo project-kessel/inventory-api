@@ -36,6 +36,7 @@ service KesselInventoryService {
       body: "*"
     };
   }
+
   /// Performs a strongly consistent authorization check to determine whether a subject
   /// is allowed to perform a modifying action on a resource.
   ///
@@ -52,10 +53,17 @@ service KesselInventoryService {
       body: "*"
     };
   }
-  // ReportResource registers a new resource or updates an existing resource
-  // in Kessel Inventory, along with its associated metadata and relationships.
-  //
-  // This is the primary entry point for reporting resource state changes.
+
+  /// Registers or updates a resource in the Kessel Inventory, along with reporter-specific
+  /// metadata and representations.
+  ///
+  /// In addition to persisting resource data, this API implicitly establishes or updates
+  /// relationships between the resource and subjects as reported. These relationships
+  /// serve as the basis for authorization decisions and are evaluated using the `Check`
+  /// and `CheckForUpdate` APIs.
+  ///
+  /// Reporters can contribute their own perspective of the resource via the `representations`
+  /// field, enabling a multi-reporter model where access control is shaped by aggregated inputs.
   rpc ReportResource(ReportResourceRequest) returns (ReportResourceResponse) {
     option (google.api.http) = {
       post: "/api/inventory/v1beta2/resources"
@@ -63,11 +71,21 @@ service KesselInventoryService {
     };
   }
 
-  // DeleteResource removes a resource and all associated relationships from
-  // Kessel Inventory.
-  //
-  // This is a destructive operation and should be used only when the resource
-  // is no longer relevant.
+  /// Deletes a resource from the Kessel Inventory, along with all associated
+  /// metadata, representations, and authorization relationships.
+  ///
+  /// This operation is typically used when a resource has been decommissioned or
+  /// is no longer reported by any authorized system. Deletion removes not only
+  /// the resource data, but also any subject-resource relationships that were
+  /// established via `ReportResource`.
+  ///
+  /// As a result, authorization checks performed via the `Check` and
+  /// `CheckForUpdate` APIs will no longer resolve positively for the deleted
+  /// resource. Any access control decisions that depend on relationships tied to
+  /// this resource will be affected.
+  ///
+  /// This call is destructive and should be made with care, as it can revoke
+  /// previously granted access across the system.
   rpc DeleteResource(DeleteResourceRequest) returns (DeleteResourceResponse) {
     option (google.api.http) = {
       delete: "/api/inventory/v1beta2/resources"

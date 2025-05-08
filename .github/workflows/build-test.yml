@@ -18,6 +18,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
@@ -33,24 +35,13 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: code-coverage
-          path: coverage.out
-
-
-  # XXX this will fail if main does not already have a coverage.out report uploaded by the previous job
-  code-coverage:
-    name: Code coverage report
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
-    needs: build-and-test
-    steps:
-      - name: coverage report
-        id: coverage-report
-        uses: fgrosse/go-coverage-report@v1.2.0
+          path: coverage.txt
+      - name: code-cov report
+        id: code-cov-report
+        uses: codecov/codecov-action@v5
         with:
-          coverage-file-name: coverage.out
-          skip-comment: true # requires write permission on pull requests
-          # below options help track coverage across forks
-          trim: github.com/project-kessel/inventory-api
-          root-package: ""
-      - name: coverage summary
-        run: echo "${{ steps.coverage-report.outputs.coverage_report }}" >> "$GITHUB_STEP_SUMMARY"
+          files: coverage.txt
+          disable_search: true
+          verbose: true
+          token: ${{ secrets.CODECOV_TOKEN }}
+

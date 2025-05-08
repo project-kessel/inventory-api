@@ -1,5 +1,4 @@
 {
-  "resource": {
     "type": "notifications_integration",
     "reporterType": "NOTIFICATIONS",
     "reporterInstanceId": "cc38fb9e-251d-4abe-9eaf-b71607558b2a",
@@ -19,5 +18,5 @@
         "local_resource_id": "cbc86170-e959-42d8-bd2a-964a5a558475"
       }
     }
-  }
 }
+

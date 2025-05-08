@@ -1,5 +1,4 @@
 {
-  "resource": {
     "type": "k8s_cluster",
     "reporterType": "ACM",
     "reporterInstanceId": "14c6b63e-49b2-4cc2-99de-5d914b657548",
@@ -30,5 +29,5 @@
         ]
       }
     }
-  }
 }
+

@@ -139,7 +139,13 @@ func TestLookupResources_Success(t *testing.T) {
 	// Set up authz mock
 	authz.On("LookupResources", ctx, req).Return(mockStream, nil)
 
-	useCase := New(repo, inventoryRepo, authz, nil, "", log.DefaultLogger, false, nil, true, []string{})
+	usecaseConfig := &UsecaseConfig{
+		DisablePersistence:      false,
+		ReadAfterWriteEnabled:   true,
+		ReadAfterWriteAllowlist: []string{},
+		ConsumerEnabled:         true,
+	}
+	useCase := New(repo, inventoryRepo, authz, nil, "", log.DefaultLogger, nil, usecaseConfig)
 	stream, err := useCase.LookupResources(ctx, req)
 
 	assert.Nil(t, err)
@@ -357,6 +363,13 @@ func resource3() *model.Resource {
 	}
 }
 
+var defaultUseCaseConfig = &UsecaseConfig{
+	DisablePersistence:      false,
+	ReadAfterWriteEnabled:   false,
+	ReadAfterWriteAllowlist: []string{},
+	ConsumerEnabled:         true,
+}
+
 func TestCreateReturnsDbError(t *testing.T) {
 	resource := resource1()
 	repo := &MockedReporterResourceRepository{}
@@ -365,7 +378,7 @@ func TestCreateReturnsDbError(t *testing.T) {
 	// DB Error
 	repo.On("FindByReporterData", mock.Anything, mock.Anything, mock.Anything).Return((*model.Resource)(nil), gorm.ErrDuplicatedKey)
 
-	useCase := New(repo, inventoryRepo, nil, nil, "", log.DefaultLogger, false, nil, false, []string{})
+	useCase := New(repo, inventoryRepo, nil, nil, "", log.DefaultLogger, nil, defaultUseCaseConfig)
 	ctx := context.TODO()
 
 	_, err := useCase.Create(ctx, resource)
@@ -383,7 +396,7 @@ func TestCreateReturnsDbErrorBackwardsCompatible(t *testing.T) {
 	// DB Error
 	repo.On("FindByReporterResourceId", mock.Anything, mock.Anything).Return((*model.Resource)(nil), gorm.ErrDuplicatedKey)
 
-	useCase := New(repo, inventoryRepo, nil, nil, "", log.DefaultLogger, false, nil, false, []string{})
+	useCase := New(repo, inventoryRepo, nil, nil, "", log.DefaultLogger, nil, defaultUseCaseConfig)
 	ctx := context.TODO()
 
 	_, err := useCase.Create(ctx, resource)
@@ -399,7 +412,7 @@ func TestCreateResourceAlreadyExists(t *testing.T) {
 	// Resource already exists
 	repo.On("FindByReporterData", mock.Anything, mock.Anything, mock.Anything).Return(&model.Resource{}, nil)
 
-	useCase := New(repo, inventoryRepo, nil, nil, "", log.DefaultLogger, false, nil, false, []string{})
+	useCase := New(repo, inventoryRepo, nil, nil, "", log.DefaultLogger, nil, defaultUseCaseConfig)
 	ctx := context.TODO()
 
 	_, err := useCase.Create(ctx, resource)
@@ -417,7 +430,7 @@ func TestCreateResourceAlreadyExistsBackwardsCompatible(t *testing.T) {
 	// Resource already exists
 	repo.On("FindByReporterResourceId", mock.Anything, mock.Anything).Return(&model.Resource{}, nil)
 
-	useCase := New(repo, inventoryRepo, nil, nil, "", log.DefaultLogger, false, nil, false, []string{})
+	useCase := New(repo, inventoryRepo, nil, nil, "", log.DefaultLogger, nil, defaultUseCaseConfig)
 	ctx := context.TODO()
 
 	_, err := useCase.Create(ctx, resource)
@@ -447,7 +460,7 @@ func TestCreateNewResource(t *testing.T) {
 	sub.On("Unsubscribe")
 	sub.On("BlockForNotification", mock.Anything).Return(nil)
 
-	useCase := New(repo, inventoryRepo, nil, nil, "", log.DefaultLogger, false, listenMan, false, []string{})
+	useCase := New(repo, inventoryRepo, nil, nil, "", log.DefaultLogger, listenMan, defaultUseCaseConfig)
 	ctx := context.TODO()
 
 	r, err := useCase.Create(ctx, resource)
@@ -456,6 +469,46 @@ func TestCreateNewResource(t *testing.T) {
 	repo.AssertExpectations(t)
 	listenMan.AssertExpectations(t)
 	sub.AssertExpectations(t)
+}
+
+func TestCreateNewResource_ConsumerDisabled(t *testing.T) {
+	resource := resource1()
+	id, err := uuid.NewV7()
+	assert.Nil(t, err)
+
+	repo := &MockedReporterResourceRepository{}
+	inventoryRepo := &MockedInventoryResourceRepository{}
+	listenMan := &MockedListenManager{}
+	sub := MockedSubscription{}
+	returnedResource := model.Resource{
+		ID: id,
+	}
+
+	repo.On("FindByReporterData", mock.Anything, mock.Anything, mock.Anything).Return((*model.Resource)(nil), gorm.ErrRecordNotFound)
+	repo.On("FindByReporterResourceId", mock.Anything, mock.Anything).Return((*model.Resource)(nil), gorm.ErrRecordNotFound)
+	repo.On("Create", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&returnedResource, nil)
+
+	listenMan.On("Subscribe", mock.Anything).Return(&sub)
+
+	sub.On("Unsubscribe")
+	sub.On("BlockForNotification", mock.Anything).Return(nil)
+
+	usecaseConfig := &UsecaseConfig{
+		DisablePersistence:      false,
+		ReadAfterWriteEnabled:   false,
+		ReadAfterWriteAllowlist: []string{},
+		ConsumerEnabled:         false,
+	}
+	useCase := New(repo, inventoryRepo, nil, nil, "", log.DefaultLogger, listenMan, usecaseConfig)
+	ctx := context.TODO()
+
+	r, err := useCase.Create(ctx, resource)
+	assert.Nil(t, err)
+	assert.Equal(t, &returnedResource, r)
+	repo.AssertExpectations(t)
+	listenMan.AssertNotCalled(t, "Subscribe")
+	sub.AssertNotCalled(t, "Unsubscribe")
+	sub.AssertNotCalled(t, "BlockForNotification")
 }
 
 func TestCreateNewResource_ConsistencyToken(t *testing.T) {
@@ -484,7 +537,13 @@ func TestCreateNewResource_ConsistencyToken(t *testing.T) {
 	sub.On("Unsubscribe")
 	sub.On("BlockForNotification", mock.Anything).Return(nil)
 
-	useCase := New(repo, inventoryRepo, m, nil, "", log.DefaultLogger, false, listenMan, true, []string{"reporter_id"})
+	usecaseConfig := &UsecaseConfig{
+		DisablePersistence:      false,
+		ReadAfterWriteEnabled:   true,
+		ReadAfterWriteAllowlist: []string{"reporter_id"},
+		ConsumerEnabled:         true,
+	}
+	useCase := New(repo, inventoryRepo, m, nil, "", log.DefaultLogger, listenMan, usecaseConfig)
 	ctx := context.TODO()
 
 	r, err := useCase.Create(ctx, resource)
@@ -504,7 +563,7 @@ func TestUpdateReturnsDbError(t *testing.T) {
 	// DB Error
 	repo.On("FindByReporterData", mock.Anything, mock.Anything, mock.Anything).Return((*model.Resource)(nil), gorm.ErrDuplicatedKey)
 
-	useCase := New(repo, inventoryRepo, nil, nil, "", log.DefaultLogger, false, nil, false, []string{})
+	useCase := New(repo, inventoryRepo, nil, nil, "", log.DefaultLogger, nil, defaultUseCaseConfig)
 	ctx := context.TODO()
 
 	_, err := useCase.Update(ctx, resource, model.ReporterResourceId{})
@@ -521,7 +580,7 @@ func TestUpdateReturnsDbErrorBackwardsCompatible(t *testing.T) {
 	// DB Error
 	repo.On("FindByReporterResourceId", mock.Anything, mock.Anything).Return((*model.Resource)(nil), gorm.ErrDuplicatedKey)
 
-	useCase := New(repo, inventoryRepo, nil, nil, "", log.DefaultLogger, false, nil, false, []string{})
+	useCase := New(repo, inventoryRepo, nil, nil, "", log.DefaultLogger, nil, defaultUseCaseConfig)
 	ctx := context.TODO()
 
 	_, err := useCase.Update(ctx, resource, model.ReporterResourceId{})
@@ -552,7 +611,7 @@ func TestUpdateNewResourceCreatesIt(t *testing.T) {
 	sub.On("Unsubscribe")
 	sub.On("BlockForNotification", mock.Anything).Return(nil)
 
-	useCase := New(repo, inventoryRepo, nil, nil, "", log.DefaultLogger, false, listenMan, false, []string{})
+	useCase := New(repo, inventoryRepo, nil, nil, "", log.DefaultLogger, listenMan, defaultUseCaseConfig)
 	ctx := context.TODO()
 
 	r, err := useCase.Update(ctx, resource, model.ReporterResourceId{})
@@ -587,7 +646,7 @@ func TestUpdateExistingResource(t *testing.T) {
 	sub.On("Unsubscribe")
 	sub.On("BlockForNotification", mock.Anything).Return(nil)
 
-	useCase := New(repo, inventoryRepo, nil, nil, "", log.DefaultLogger, false, listenMan, false, []string{})
+	useCase := New(repo, inventoryRepo, nil, nil, "", log.DefaultLogger, listenMan, defaultUseCaseConfig)
 	ctx := context.TODO()
 
 	r, err := useCase.Update(ctx, resource, model.ReporterResourceId{})
@@ -624,7 +683,7 @@ func TestUpdateExistingResourceBackwardsCompatible(t *testing.T) {
 	sub.On("Unsubscribe")
 	sub.On("BlockForNotification", mock.Anything).Return(nil)
 
-	useCase := New(repo, inventoryRepo, nil, nil, "", log.DefaultLogger, false, listenMan, false, []string{})
+	useCase := New(repo, inventoryRepo, nil, nil, "", log.DefaultLogger, listenMan, defaultUseCaseConfig)
 	ctx := context.TODO()
 
 	r, err := useCase.Update(ctx, resource, model.ReporterResourceId{})
@@ -643,7 +702,7 @@ func TestDeleteReturnsDbError(t *testing.T) {
 	// Validates backwards compatibility
 	repo.On("FindByReporterData", mock.Anything, mock.Anything, mock.Anything).Return((*model.Resource)(nil), gorm.ErrDuplicatedKey)
 
-	useCase := New(repo, inventoryRepo, nil, nil, "", log.DefaultLogger, false, nil, false, []string{})
+	useCase := New(repo, inventoryRepo, nil, nil, "", log.DefaultLogger, nil, defaultUseCaseConfig)
 	ctx := context.TODO()
 
 	err := useCase.Delete(ctx, model.ReporterResourceId{})
@@ -659,7 +718,7 @@ func TestDeleteReturnsDbErrorBackwardsCompatible(t *testing.T) {
 	// DB Error
 	repo.On("FindByReporterResourceId", mock.Anything, mock.Anything).Return((*model.Resource)(nil), gorm.ErrDuplicatedKey)
 
-	useCase := New(repo, inventoryRepo, nil, nil, "", log.DefaultLogger, false, nil, false, []string{})
+	useCase := New(repo, inventoryRepo, nil, nil, "", log.DefaultLogger, nil, defaultUseCaseConfig)
 	ctx := context.TODO()
 
 	err := useCase.Delete(ctx, model.ReporterResourceId{})
@@ -675,7 +734,7 @@ func TestDeleteNonexistentResource(t *testing.T) {
 	repo.On("FindByReporterData", mock.Anything, mock.Anything, mock.Anything).Return((*model.Resource)(nil), gorm.ErrRecordNotFound)
 	repo.On("FindByReporterResourceId", mock.Anything, mock.Anything).Return((*model.Resource)(nil), gorm.ErrRecordNotFound)
 
-	useCase := New(repo, inventoryRepo, nil, nil, "", log.DefaultLogger, false, nil, false, []string{})
+	useCase := New(repo, inventoryRepo, nil, nil, "", log.DefaultLogger, nil, defaultUseCaseConfig)
 	ctx := context.TODO()
 
 	err := useCase.Delete(ctx, model.ReporterResourceId{})
@@ -696,7 +755,7 @@ func TestDeleteResource(t *testing.T) {
 	}, nil)
 	repo.On("Delete", mock.Anything, (uuid.UUID)(id), mock.Anything).Return(&model.Resource{}, nil)
 
-	useCase := New(repo, inventoryRepo, nil, nil, "", log.DefaultLogger, false, nil, false, []string{})
+	useCase := New(repo, inventoryRepo, nil, nil, "", log.DefaultLogger, nil, defaultUseCaseConfig)
 
 	err = useCase.Delete(ctx, model.ReporterResourceId{})
 	assert.Nil(t, err)
@@ -719,7 +778,7 @@ func TestDeleteResourceBackwardsCompatible(t *testing.T) {
 	}, nil)
 	repo.On("Delete", mock.Anything, (uuid.UUID)(id), mock.Anything).Return(&model.Resource{}, nil)
 
-	useCase := New(repo, inventoryRepo, nil, nil, "", log.DefaultLogger, false, nil, false, []string{})
+	useCase := New(repo, inventoryRepo, nil, nil, "", log.DefaultLogger, nil, defaultUseCaseConfig)
 
 	err = useCase.Delete(ctx, model.ReporterResourceId{})
 	assert.Nil(t, err)
@@ -738,8 +797,13 @@ func TestCreateResource_PersistenceDisabled(t *testing.T) {
 	repo.On("FindByReporterResourceId", mock.Anything, mock.Anything).Return(&model.Resource{}, nil)
 	repo.On("Create", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, nil)
 
-	disablePersistence := true
-	useCase := New(repo, inventoryRepo, nil, nil, "", log.DefaultLogger, disablePersistence, nil, false, []string{})
+	usecaseConfig := &UsecaseConfig{
+		DisablePersistence:      true,
+		ReadAfterWriteEnabled:   false,
+		ReadAfterWriteAllowlist: []string{},
+		ConsumerEnabled:         true,
+	}
+	useCase := New(repo, inventoryRepo, nil, nil, "", log.DefaultLogger, nil, usecaseConfig)
 
 	// Create the resource
 	r, err := useCase.Create(ctx, resource)
@@ -769,8 +833,13 @@ func TestUpdateResource_PersistenceDisabled(t *testing.T) {
 	repo.On("Update", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, nil)
 	repo.On("Create", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, nil)
 
-	disablePersistence := true
-	useCase := New(repo, inventoryRepo, nil, nil, "", log.DefaultLogger, disablePersistence, nil, false, []string{})
+	usecaseConfig := &UsecaseConfig{
+		DisablePersistence:      true,
+		ReadAfterWriteEnabled:   false,
+		ReadAfterWriteAllowlist: []string{},
+		ConsumerEnabled:         true,
+	}
+	useCase := New(repo, inventoryRepo, nil, nil, "", log.DefaultLogger, nil, usecaseConfig)
 
 	r, err := useCase.Update(ctx, resource, model.ReporterResourceId{})
 	assert.Nil(t, err)
@@ -806,7 +875,13 @@ func TestUpdate_ReadAfterWrite(t *testing.T) {
 	sub.On("Unsubscribe")
 	sub.On("BlockForNotification", mock.Anything).Return(nil)
 
-	useCase := New(repo, inventoryRepo, authz, nil, "", log.DefaultLogger, false, listenMan, true, []string{"reporter_id"})
+	usecaseConfig := &UsecaseConfig{
+		DisablePersistence:      false,
+		ReadAfterWriteEnabled:   true,
+		ReadAfterWriteAllowlist: []string{"reporter_id"},
+		ConsumerEnabled:         true,
+	}
+	useCase := New(repo, inventoryRepo, authz, nil, "", log.DefaultLogger, listenMan, usecaseConfig)
 	ctx := context.TODO()
 
 	r, err := useCase.Update(ctx, resource, model.ReporterResourceId{})
@@ -816,6 +891,48 @@ func TestUpdate_ReadAfterWrite(t *testing.T) {
 	repo.AssertExpectations(t)
 	listenMan.AssertExpectations(t)
 	sub.AssertExpectations(t)
+}
+
+func TestUpdate_ConsumerDisabled(t *testing.T) {
+	resource := resource1()
+	id, err := uuid.NewV7()
+	assert.Nil(t, err)
+
+	repo := &MockedReporterResourceRepository{}
+	inventoryRepo := &MockedInventoryResourceRepository{}
+	authz := &mocks.MockAuthz{}
+	listenMan := &MockedListenManager{}
+	sub := MockedSubscription{}
+
+	returnedResource := model.Resource{
+		ID: id,
+	}
+
+	repo.On("FindByReporterData", mock.Anything, mock.Anything, mock.Anything).Return(resource, nil)
+	repo.On("Update", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&returnedResource, nil)
+
+	listenMan.On("Subscribe", mock.Anything).Return(&sub)
+
+	sub.On("Unsubscribe")
+	sub.On("BlockForNotification", mock.Anything).Return(nil)
+
+	usecaseConfig := &UsecaseConfig{
+		DisablePersistence:      false,
+		ReadAfterWriteEnabled:   true,
+		ReadAfterWriteAllowlist: []string{"reporter_id"},
+		ConsumerEnabled:         false,
+	}
+	useCase := New(repo, inventoryRepo, authz, nil, "", log.DefaultLogger, listenMan, usecaseConfig)
+	ctx := context.TODO()
+
+	r, err := useCase.Update(ctx, resource, model.ReporterResourceId{})
+
+	assert.Nil(t, err)
+	assert.NotNil(t, r)
+	repo.AssertExpectations(t)
+	listenMan.AssertNotCalled(t, "Subscribe")
+	sub.AssertNotCalled(t, "Unsubscribe")
+	sub.AssertNotCalled(t, "BlockForNotification")
 }
 
 func TestDeleteResource_PersistenceDisabled(t *testing.T) {
@@ -833,8 +950,13 @@ func TestDeleteResource_PersistenceDisabled(t *testing.T) {
 	}, nil)
 	repo.On("Delete", mock.Anything, (uint64)(33)).Return(&model.Resource{}, nil)
 
-	disablePersistence := true
-	useCase := New(repo, inventoryRepo, nil, nil, "", log.DefaultLogger, disablePersistence, nil, false, []string{})
+	usecaseConfig := &UsecaseConfig{
+		DisablePersistence:      true,
+		ReadAfterWriteEnabled:   false,
+		ReadAfterWriteAllowlist: []string{},
+		ConsumerEnabled:         true,
+	}
+	useCase := New(repo, inventoryRepo, nil, nil, "", log.DefaultLogger, nil, usecaseConfig)
 
 	err = useCase.Delete(ctx, model.ReporterResourceId{})
 	assert.Nil(t, err)
@@ -854,7 +976,7 @@ func TestCheck_MissingResource(t *testing.T) {
 	repo.On("FindByReporterResourceId", mock.Anything, mock.Anything).Return(&model.Resource{}, gorm.ErrRecordNotFound)
 	m.On("Check", mock.Anything, mock.Anything, "notifications_integration_view", mock.Anything, mock.Anything).Return(v1beta1.CheckResponse_ALLOWED_TRUE, &v1beta1.ConsistencyToken{}, nil)
 
-	useCase := New(repo, inventoryRepo, m, nil, "", log.DefaultLogger, false, nil, false, []string{})
+	useCase := New(repo, inventoryRepo, m, nil, "", log.DefaultLogger, nil, defaultUseCaseConfig)
 	allowed, err := useCase.Check(ctx, "notifications_integration_view", "rbac", &v1beta1.SubjectReference{}, model.ReporterResourceId{})
 
 	assert.Nil(t, err)
@@ -879,7 +1001,7 @@ func TestCheck_ResourceExistsError(t *testing.T) {
 
 	repo.On("FindByReporterResourceId", mock.Anything, mock.Anything).Return(&model.Resource{}, gorm.ErrUnsupportedDriver) // some random error
 
-	useCase := New(repo, inventoryRepo, m, nil, "", log.DefaultLogger, false, nil, false, []string{})
+	useCase := New(repo, inventoryRepo, m, nil, "", log.DefaultLogger, nil, defaultUseCaseConfig)
 	allowed, err := useCase.Check(ctx, "notifications_integration_view", "rbac", &v1beta1.SubjectReference{}, model.ReporterResourceId{})
 
 	assert.NotNil(t, err)
@@ -898,7 +1020,7 @@ func TestCheck_ErrorWithKessel(t *testing.T) {
 	repo.On("FindByReporterResourceId", mock.Anything, mock.Anything).Return(&model.Resource{}, nil)
 	m.On("Check", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(v1beta1.CheckResponse_ALLOWED_FALSE, &v1beta1.ConsistencyToken{}, errors.New("failed during call to relations"))
 
-	useCase := New(repo, inventoryRepo, m, nil, "", log.DefaultLogger, false, nil, false, []string{})
+	useCase := New(repo, inventoryRepo, m, nil, "", log.DefaultLogger, nil, defaultUseCaseConfig)
 	allowed, err := useCase.Check(ctx, "notifications_integration_view", "rbac", &v1beta1.SubjectReference{}, model.ReporterResourceId{})
 
 	assert.NotNil(t, err)
@@ -918,7 +1040,7 @@ func TestCheck_Allowed(t *testing.T) {
 	repo.On("FindByReporterResourceId", mock.Anything, mock.Anything).Return(resource, nil)
 	m.On("Check", mock.Anything, mock.Anything, "notifications_integration_write", mock.Anything, mock.Anything).Return(v1beta1.CheckResponse_ALLOWED_TRUE, &v1beta1.ConsistencyToken{}, nil)
 
-	useCase := New(repo, inventoryRepo, m, nil, "", log.DefaultLogger, false, nil, false, []string{})
+	useCase := New(repo, inventoryRepo, m, nil, "", log.DefaultLogger, nil, defaultUseCaseConfig)
 	allowed, err := useCase.Check(ctx, "notifications_integration_write", "rbac", &v1beta1.SubjectReference{}, model.ReporterResourceId{})
 
 	assert.Nil(t, err)
@@ -943,7 +1065,7 @@ func TestCheckForUpdate_ResourceExistsError(t *testing.T) {
 
 	repo.On("FindByReporterResourceId", mock.Anything, mock.Anything).Return(&model.Resource{}, gorm.ErrUnsupportedDriver) // some random error
 
-	useCase := New(repo, inventoryRepo, m, nil, "", log.DefaultLogger, false, nil, false, []string{})
+	useCase := New(repo, inventoryRepo, m, nil, "", log.DefaultLogger, nil, defaultUseCaseConfig)
 	allowed, err := useCase.CheckForUpdate(ctx, "notifications_integration_view", "rbac", &v1beta1.SubjectReference{}, model.ReporterResourceId{})
 
 	assert.NotNil(t, err)
@@ -962,7 +1084,7 @@ func TestCheckForUpdate_ErrorWithKessel(t *testing.T) {
 	repo.On("FindByReporterResourceId", mock.Anything, mock.Anything).Return(&model.Resource{}, nil)
 	m.On("CheckForUpdate", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(v1beta1.CheckForUpdateResponse_ALLOWED_FALSE, &v1beta1.ConsistencyToken{}, errors.New("failed during call to relations"))
 
-	useCase := New(repo, inventoryRepo, m, nil, "", log.DefaultLogger, false, nil, false, []string{})
+	useCase := New(repo, inventoryRepo, m, nil, "", log.DefaultLogger, nil, defaultUseCaseConfig)
 	allowed, err := useCase.CheckForUpdate(ctx, "notifications_integration_view", "rbac", &v1beta1.SubjectReference{}, model.ReporterResourceId{})
 
 	assert.NotNil(t, err)
@@ -982,7 +1104,7 @@ func TestCheckForUpdate_WorkspaceAllowed(t *testing.T) {
 	repo.On("FindByReporterResourceId", mock.Anything, mock.Anything).Return(resource, nil)
 	m.On("CheckForUpdate", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(v1beta1.CheckForUpdateResponse_ALLOWED_TRUE, &v1beta1.ConsistencyToken{}, nil)
 
-	useCase := New(repo, inventoryRepo, m, nil, "", log.DefaultLogger, false, nil, false, []string{})
+	useCase := New(repo, inventoryRepo, m, nil, "", log.DefaultLogger, nil, defaultUseCaseConfig)
 	allowed, err := useCase.CheckForUpdate(ctx, "notifications_integration_view", "rbac", &v1beta1.SubjectReference{}, model.ReporterResourceId{ResourceType: "workspace"})
 
 	assert.Nil(t, err)
@@ -1001,7 +1123,7 @@ func TestCheckForUpdate_MissingResource_Allowed(t *testing.T) {
 	repo.On("FindByReporterResourceId", mock.Anything, mock.Anything).Return(&model.Resource{}, gorm.ErrRecordNotFound)
 	m.On("CheckForUpdate", mock.Anything, mock.Anything, "notifications_integration_view", mock.Anything, mock.Anything).Return(v1beta1.CheckForUpdateResponse_ALLOWED_TRUE, &v1beta1.ConsistencyToken{}, nil)
 
-	useCase := New(repo, inventoryRepo, m, nil, "", log.DefaultLogger, false, nil, false, []string{})
+	useCase := New(repo, inventoryRepo, m, nil, "", log.DefaultLogger, nil, defaultUseCaseConfig)
 	allowed, err := useCase.CheckForUpdate(ctx, "notifications_integration_view", "rbac", &v1beta1.SubjectReference{}, model.ReporterResourceId{})
 
 	// no consistency token being written.
@@ -1026,7 +1148,7 @@ func TestCheckForUpdate_Allowed(t *testing.T) {
 
 	repo.On("Update", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&model.Resource{}, nil)
 
-	useCase := New(repo, inventoryRepo, m, nil, "", log.DefaultLogger, false, nil, false, []string{})
+	useCase := New(repo, inventoryRepo, m, nil, "", log.DefaultLogger, nil, defaultUseCaseConfig)
 	allowed, err := useCase.CheckForUpdate(ctx, "notifications_integration_view", "rbac", &v1beta1.SubjectReference{}, model.ReporterResourceId{})
 
 	assert.Nil(t, err)
@@ -1052,7 +1174,7 @@ func TestListResourcesInWorkspace_Error(t *testing.T) {
 
 	repo.On("FindByWorkspaceId", mock.Anything, mock.Anything).Return([]*model.Resource{}, errors.New("failed querying"))
 
-	useCase := New(repo, inventoryRepo, m, nil, "", log.DefaultLogger, false, nil, false, []string{})
+	useCase := New(repo, inventoryRepo, m, nil, "", log.DefaultLogger, nil, defaultUseCaseConfig)
 	resource_chan, err_chan, err := useCase.ListResourcesInWorkspace(ctx, "notifications_integration_view", "rbac", &v1beta1.SubjectReference{}, "foo-id")
 
 	assert.NotNil(t, err)
@@ -1071,7 +1193,7 @@ func TestListResourcesInWorkspace_NoResources(t *testing.T) {
 
 	repo.On("FindByWorkspaceId", mock.Anything, mock.Anything).Return([]*model.Resource{}, nil)
 
-	useCase := New(repo, inventoryRepo, m, nil, "", log.DefaultLogger, false, nil, false, []string{})
+	useCase := New(repo, inventoryRepo, m, nil, "", log.DefaultLogger, nil, defaultUseCaseConfig)
 	resource_chan, err_chan, err := useCase.ListResourcesInWorkspace(ctx, "notifications_integration_view", "rbac", &v1beta1.SubjectReference{}, "foo-id")
 
 	assert.Nil(t, err)
@@ -1096,7 +1218,7 @@ func TestListResourcesInWorkspace_ResourcesAllowedTrue(t *testing.T) {
 	repo.On("FindByWorkspaceId", mock.Anything, mock.Anything).Return([]*model.Resource{resource}, nil)
 	m.On("Check", mock.Anything, mock.Anything, "notifications_integration_write", mock.Anything, mock.Anything).Return(v1beta1.CheckResponse_ALLOWED_TRUE, &v1beta1.ConsistencyToken{}, nil)
 
-	useCase := New(repo, inventoryRepo, m, nil, "", log.DefaultLogger, false, nil, false, []string{})
+	useCase := New(repo, inventoryRepo, m, nil, "", log.DefaultLogger, nil, defaultUseCaseConfig)
 	resource_chan, err_chan, err := useCase.ListResourcesInWorkspace(ctx, "notifications_integration_write", "rbac", &v1beta1.SubjectReference{}, "foo-id")
 
 	assert.Nil(t, err)
@@ -1139,7 +1261,7 @@ func TestListResourcesInWorkspace_MultipleResourcesAllowedTrue(t *testing.T) {
 	repo.On("FindByWorkspaceId", mock.Anything, mock.Anything).Return([]*model.Resource{resource, resource2, resource3}, nil)
 	m.On("Check", mock.Anything, mock.Anything, "notifications_integration_write", mock.Anything, mock.Anything).Return(v1beta1.CheckResponse_ALLOWED_TRUE, &v1beta1.ConsistencyToken{}, nil)
 
-	useCase := New(repo, inventoryRepo, m, nil, "", log.DefaultLogger, false, nil, false, []string{})
+	useCase := New(repo, inventoryRepo, m, nil, "", log.DefaultLogger, nil, defaultUseCaseConfig)
 	resource_chan, err_chan, err := useCase.ListResourcesInWorkspace(ctx, "notifications_integration_write", "rbac", &v1beta1.SubjectReference{}, "foo-id")
 
 	assert.Nil(t, err)
@@ -1180,7 +1302,7 @@ func TestListResourcesInWorkspace_MultipleResourcesOneFalseTwoTrueLastError(t *t
 	m.On("Check", mock.Anything, mock.Anything, "notifications_integration_write", resource2, mock.Anything).Return(v1beta1.CheckResponse_ALLOWED_TRUE, &v1beta1.ConsistencyToken{}, nil)
 	m.On("Check", mock.Anything, mock.Anything, "notifications_integration_write", resource3, mock.Anything).Return(v1beta1.CheckResponse_ALLOWED_UNSPECIFIED, &v1beta1.ConsistencyToken{}, theError)
 
-	useCase := New(repo, inventoryRepo, m, nil, "", log.DefaultLogger, false, nil, false, []string{})
+	useCase := New(repo, inventoryRepo, m, nil, "", log.DefaultLogger, nil, defaultUseCaseConfig)
 	resource_chan, err_chan, err := useCase.ListResourcesInWorkspace(ctx, "notifications_integration_write", "rbac", &v1beta1.SubjectReference{}, "foo-id")
 
 	assert.Nil(t, err)
@@ -1214,7 +1336,7 @@ func TestListResourcesInWorkspace_ResourcesAllowedError(t *testing.T) {
 	repo.On("FindByWorkspaceId", mock.Anything, mock.Anything).Return([]*model.Resource{resource}, nil)
 	m.On("Check", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(v1beta1.CheckResponse_ALLOWED_TRUE, &v1beta1.ConsistencyToken{}, errors.New("failed calling relations"))
 
-	useCase := New(repo, inventoryRepo, m, nil, "", log.DefaultLogger, false, nil, false, []string{})
+	useCase := New(repo, inventoryRepo, m, nil, "", log.DefaultLogger, nil, defaultUseCaseConfig)
 	resource_chan, err_chan, err := useCase.ListResourcesInWorkspace(ctx, "notifications_integration_view", "rbac", &v1beta1.SubjectReference{}, "foo-id")
 
 	assert.Nil(t, err)
@@ -1366,10 +1488,15 @@ func TestComputeReadAfterWrite(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			uc := &Usecase{
-				ListenManager:           tt.listenManager,
+			usecaseConfig := &UsecaseConfig{
+				DisablePersistence:      false,
 				ReadAfterWriteEnabled:   tt.ReadAfterWriteEnabled,
 				ReadAfterWriteAllowlist: tt.ReadAfterWriteAllowlist,
+				ConsumerEnabled:         true,
+			}
+			uc := &Usecase{
+				ListenManager: tt.listenManager,
+				Config:        usecaseConfig,
 			}
 
 			m := &model.Resource{
@@ -1389,7 +1516,7 @@ func TestUpsertReturnsDbError(t *testing.T) {
 	// DB Error
 	repo.On("FindByReporterResourceIdv1beta2", mock.Anything, mock.Anything).Return((*model.Resource)(nil), gorm.ErrDuplicatedKey)
 
-	useCase := New(repo, inventoryRepo, nil, nil, "", log.DefaultLogger, false, nil, false, []string{})
+	useCase := New(repo, inventoryRepo, nil, nil, "", log.DefaultLogger, nil, defaultUseCaseConfig)
 	ctx := context.TODO()
 
 	_, err := useCase.Upsert(ctx, resource, v1beta2.WriteVisibility_WRITE_VISIBILITY_UNSPECIFIED)
@@ -1406,7 +1533,7 @@ func TestUpsertReturnsExistingUpdatedResource(t *testing.T) {
 	repo.On("FindByReporterResourceIdv1beta2", mock.Anything, mock.Anything).Return(resource, nil)
 	repo.On("Update", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(resource, nil)
 
-	useCase := New(repo, inventoryRepo, nil, nil, "", log.DefaultLogger, false, nil, false, []string{})
+	useCase := New(repo, inventoryRepo, nil, nil, "", log.DefaultLogger, nil, defaultUseCaseConfig)
 	ctx := context.TODO()
 
 	res, err := useCase.Upsert(ctx, resource, v1beta2.WriteVisibility_WRITE_VISIBILITY_UNSPECIFIED)
@@ -1433,7 +1560,13 @@ func TestUpsert_ReadAfterWrite(t *testing.T) {
 	sub.On("Unsubscribe")
 	sub.On("BlockForNotification", mock.Anything).Return(nil)
 
-	useCase := New(repo, inventoryRepo, authz, nil, "", log.DefaultLogger, false, listenMan, true, []string{"reporter_id"})
+	usecaseConfig := &UsecaseConfig{
+		DisablePersistence:      false,
+		ReadAfterWriteEnabled:   true,
+		ReadAfterWriteAllowlist: []string{"reporter_id"},
+		ConsumerEnabled:         true,
+	}
+	useCase := New(repo, inventoryRepo, authz, nil, "", log.DefaultLogger, listenMan, usecaseConfig)
 	ctx := context.TODO()
 
 	r, err := useCase.Upsert(ctx, resource, v1beta2.WriteVisibility_IMMEDIATE)
@@ -1443,4 +1576,41 @@ func TestUpsert_ReadAfterWrite(t *testing.T) {
 	repo.AssertExpectations(t)
 	listenMan.AssertExpectations(t)
 	sub.AssertExpectations(t)
+}
+
+func TestUpsert_ConsumerDisabled(t *testing.T) {
+	resource := resource1()
+
+	repo := &MockedReporterResourceRepository{}
+	inventoryRepo := &MockedInventoryResourceRepository{}
+	authz := &mocks.MockAuthz{}
+	listenMan := &MockedListenManager{}
+	sub := MockedSubscription{}
+
+	// no existing resource, need to create
+	repo.On("FindByReporterResourceIdv1beta2", mock.Anything, mock.Anything).Return((*model.Resource)(nil), gorm.ErrRecordNotFound)
+	repo.On("Create", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(resource, nil)
+
+	listenMan.On("Subscribe", mock.Anything).Return(&sub)
+
+	sub.On("Unsubscribe")
+	sub.On("BlockForNotification", mock.Anything).Return(nil)
+
+	usecaseConfig := &UsecaseConfig{
+		DisablePersistence:      false,
+		ReadAfterWriteEnabled:   true,
+		ReadAfterWriteAllowlist: []string{"reporter_id"},
+		ConsumerEnabled:         false,
+	}
+	useCase := New(repo, inventoryRepo, authz, nil, "", log.DefaultLogger, listenMan, usecaseConfig)
+	ctx := context.TODO()
+
+	r, err := useCase.Upsert(ctx, resource, v1beta2.WriteVisibility_IMMEDIATE)
+
+	assert.Nil(t, err)
+	assert.NotNil(t, r)
+	repo.AssertExpectations(t)
+	listenMan.AssertNotCalled(t, "Subscribe")
+	sub.AssertNotCalled(t, "Unsubscribe")
+	sub.AssertNotCalled(t, "BlockForNotification")
 }

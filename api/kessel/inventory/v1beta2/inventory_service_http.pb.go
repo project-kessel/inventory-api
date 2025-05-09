@@ -46,35 +46,33 @@ type KesselInventoryServiceHTTPServer interface {
 	// It is intended to be used just prior to sensitive operation (e.g., update, delete)
 	// which depend on the current state of the relationship.
 	CheckForUpdate(context.Context, *CheckForUpdateRequest) (*CheckForUpdateResponse, error)
-	// DeleteResource Deletes a resource from the Kessel Inventory, along with all associated
-	// metadata, representations, and authorization relationships.
+	// DeleteResource Reports to Kessel Inventory that a Reporter's representation of a Resource has been deleted.
 	//
 	// This operation is typically used when a resource has been decommissioned or
-	// is no longer reported by any authorized system. Deletion removes not only
-	// the resource data, but also any subject-resource relationships that were
-	// established via `ReportResource`.
+	// is no longer reported by any authorized system.
 	//
-	// As a result, authorization checks performed via the `Check` and
+	// As a result, relationship checks performed via the `Check` and
 	// `CheckForUpdate` APIs will no longer resolve positively for the deleted
-	// resource. Any access control decisions that depend on relationships tied to
+	// resource. Any decisions that depend on relationships tied to
 	// this resource will be affected.
 	//
-	// This call is destructive and should be made with care, as it can revoke
-	// previously granted access across the system.
+	// As an example, it can revoke previously granted access across the system.
 	DeleteResource(context.Context, *DeleteResourceRequest) (*DeleteResourceResponse, error)
-	// ReportResource Registers a new resource or updates an existing resource in Kessel Inventory.
+	// ReportResource Reports to Kessel Inventory that a Resource has been created or has been updated.
 	//
 	// Reporters can use this API to report facts about their resources in order to
 	// facilitate integration, correlation, and access control.
 	//
 	// Each call can include:
 	// - Reporter-specific attributes and relationships (`representations.reporter`)
-	// - Shared attributes and relationships common to various reporters (`representations.common`)
+	// - Shared attributes and relationships common to all reporters (`representations.common`)
 	// - Identifiers and metadata that allow correlation to an existing resource
 	//
-	// Multiple reporters may report representations for the same logical resource.
-	// Kessel Inventory makes a best-effort attempt to correlate these
+	// Multiple reporters may report representations for the same resource.
+	// Kessel Inventory correlates these
 	// based on correlation keys provided for a given resource type
+	//
+	// All versions of your reported facts will be retained and can be queried as needed
 	//
 	// The relationships reported through this API are used to determine relationship check outcomes
 	// via the Check and CheckForUpdate APIs.
@@ -86,6 +84,8 @@ type KesselInventoryServiceHTTPServer interface {
 	//  If a reporter requires newly submitted resources or relationships to be visible
 	// in subsequent checks (e.g., `Check`), the request must explicitly set
 	// `write_visibility = IMMEDIATE`.
+	//
+	//
 	ReportResource(context.Context, *ReportResourceRequest) (*ReportResourceResponse, error)
 }
 

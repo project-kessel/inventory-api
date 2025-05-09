@@ -7,7 +7,14 @@ option java_multiple_files = true;
 option java_package = "org.project_kessel.api.inventory.v1beta2";
 
 enum WriteVisibility {
+  // WRITE_VISIBILITY_UNSPECIFIED: The default behavior of the write operation. Defaults to MINIMIZE_LATENCY
+  //   strategy.
   WRITE_VISIBILITY_UNSPECIFIED = 0;
+  // MINIMIZE_LATENCY: The write operation will be performed with the goal of minimizing latency
+  //  by not waiting for data consistency acknowledgment.
   MINIMIZE_LATENCY = 1;
+  // IMMEDIATE: The write operation will be performed with the goal of ensuring immediate consistency
+  //  by waiting for data consistency acknowledgment. Additional
+  //  latency may be incurred
   IMMEDIATE = 2;
 }

@@ -10,19 +10,41 @@ option go_package = "github.com/project-kessel/inventory-api/api/kessel/inventor
 option java_multiple_files = true;
 option java_package = "org.project_kessel.api.inventory.v1beta2";
 
+// Request to register or update a *Reporter*'s *Representation* of a *Resource* in Kessel Inventory.
 message ReportResourceRequest {
+  // The Kessel Inventory-assigned ID of the *Resource*.
+  //
+  // Usually not required during reporting; populated internally during correlation.
   optional string inventory_id = 1;
+  // The canonical type of the *Resource* (e.g., "k8s_cluster", "host", "integration").
+  //
+  // Must be a previously agreed-upon value between the *Reporter* and Kessel Inventory.
+  // Must be consistent across all *Reporter Representations* of a given Type reported by a given *Reporter*.
+  // Used to:
+  // - Select the appropriate schema to validate the *Reporter Representation*
+  // - Identify a *Reporter's Representation* uniquely in Kessel Inventory
   string type = 2 [(buf.validate.field).string = {min_len: 1}];
+  // The type of the *Reporter* (e.g., "hbi", "acm", "acs", "notifications").
+  //
+  // Must be a previously agreed-upon value between the *Reporter* and Kessel Inventory.
+  // Must be consistent across all *Reporter Representations* reported by a given *Reporter*.
+  // Used to:
+  // - Select the appropriate schema to validate the *Reporter Representation*
+  // - Identify a *Reporter's Representation* uniquely in Kessel Inventory
   string reporter_type = 3 [(buf.validate.field).string = {min_len: 1}];
+  // Identifier for the specific instance of the *Reporter*.
+  // This may not be applicable to all Reporters
+  //
+  // Used to distinguish between multiple instances of the same `reporter_type`.
+  // Does not require prior coordination with Kessel Inventory.
   string reporter_instance_id = 4 [(buf.validate.field).string = {min_len: 1}];
   ResourceRepresentations representations = 5 [(buf.validate.field).required = true];
-  // WriteVisibility specifies the behavior of the write operation.
-  // - WRITE_VISIBILITY_UNSPECIFIED: The default behavior of the write operation. Defaults to MINIMIZE_LATENCY
-  //   strategy.
-  // - MINIMIZE_LATENCY: The write operation will be performed with the goal of minimizing latency
-  //   by not waiting for data consistency acknowledgment.
-  // - IMMEDIATE: The write operation will be performed with the goal of ensuring immediate consistency
-  //   by waiting for data consistency acknowledgment. Additional
-  //   latency may be incurred.
+  // Controls the visibility guarantees of the write operation in Kessel Inventory.
+  //
+  // - `MINIMIZE_LATENCY` (default): Optimizes for throughput; may delay visibility in `Check` results.
+  // - `IMMEDIATE`: Ensures read-your-writes consistency; higher latency due to synchronization.
+  //
+  // Use `IMMEDIATE` only if your use case requires strong consistency guarantees
+  // (e.g., writing and immediately checking access to the resource).
   WriteVisibility write_visibility = 6 [(buf.validate.field).enum.defined_only = true];
 }

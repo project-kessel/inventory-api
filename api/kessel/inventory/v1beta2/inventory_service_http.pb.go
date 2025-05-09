@@ -25,11 +25,67 @@ const OperationKesselInventoryServiceDeleteResource = "/kessel.inventory.v1beta2
 const OperationKesselInventoryServiceReportResource = "/kessel.inventory.v1beta2.KesselInventoryService/ReportResource"
 
 type KesselInventoryServiceHTTPServer interface {
-	// Check Checks for the existence of a single Relationship
-	// (a Relation between a Resource and a Subject or Subject Set).
+	// Check Performs an relationship check to determine whether a subject has a specific
+	// permission or relationship on a resource.
+	//
+	// This API evaluates whether the provided subject is a member of the specified relation
+	// (e.g., "viewer", "editor", "admin") on the target object. It answers the question:
+	// "Does subject *X* have relation *Y* on object *Z*?"
+	//
+	// Common use cases include enforcing read access, conditional UI visibility,
+	// or authorization gating for downstream API calls.
 	Check(context.Context, *CheckRequest) (*CheckResponse, error)
+	// CheckForUpdate Performs a strongly consistent relationship check to determine whether a subject
+	// has a specific relation to an object (representing, for example, a permission).
+	//
+	// This API answers the question:
+	// "Is subject *X* currently authorized to update or modify resource *Y*?"
+	// Unlike the basic `Check` endpoint, this method guarantees a fully up-to-date
+	// view of the relationship state (e.g., not relying on cached or eventually consistent data).
+	//
+	// It is intended to be used just prior to sensitive operation (e.g., update, delete)
+	// which depend on the current state of the relationship.
 	CheckForUpdate(context.Context, *CheckForUpdateRequest) (*CheckForUpdateResponse, error)
+	// DeleteResource Reports to Kessel Inventory that a Reporter's representation of a Resource has been deleted.
+	//
+	// This operation is typically used when a resource has been decommissioned or
+	// is no longer reported by any authorized system.
+	//
+	// As a result, relationship checks performed via the `Check` and
+	// `CheckForUpdate` APIs will no longer resolve positively for the deleted
+	// resource. Any decisions that depend on relationships tied to
+	// this resource will be affected.
+	//
+	// As an example, it can revoke previously granted access across the system.
 	DeleteResource(context.Context, *DeleteResourceRequest) (*DeleteResourceResponse, error)
+	// ReportResource Reports to Kessel Inventory that a Resource has been created or has been updated.
+	//
+	// Reporters can use this API to report facts about their resources in order to
+	// facilitate integration, correlation, and access control.
+	//
+	// Each call can include:
+	// - Reporter-specific attributes and relationships (`representations.reporter`)
+	// - Shared attributes and relationships common to all reporters (`representations.common`)
+	// - Identifiers and metadata that allow correlation to an existing resource
+	//
+	// Multiple reporters may report representations for the same resource.
+	// Kessel Inventory correlates these
+	// based on correlation keys provided for a given resource type
+	//
+	// All versions of your reported facts will be retained and can be queried as needed
+	//
+	// The relationships reported through this API are used to determine relationship check outcomes
+	// via the Check and CheckForUpdate APIs.
+	//
+	// Reporters are responsible for ensuring delivery guarantees and message ordering
+	// appropriate to the sensitivity and consistency needs of their use case.
+	//
+	// This API does **not** guarantee immediate read-your-writes consistency by default.
+	//  If a reporter requires newly submitted resources or relationships to be visible
+	// in subsequent checks (e.g., `Check`), the request must explicitly set
+	// `write_visibility = IMMEDIATE`.
+	//
+	//
 	ReportResource(context.Context, *ReportResourceRequest) (*ReportResourceResponse, error)
 }
 

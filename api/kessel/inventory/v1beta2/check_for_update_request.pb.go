@@ -26,6 +26,10 @@ type CheckForUpdateRequest struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
+	// Required parameters
+	// - resource type and id
+	// - permission (cannot be derived from type as types may have multiple edit permissions Ex: https://github.com/RedHatInsights/rbac-config/blob/master/configs/prod/schemas/src/notifications.ksl#L37)
+	// - user (possibly derived from an identity token)
 	Object   *ResourceReference `protobuf:"bytes,1,opt,name=object,proto3" json:"object,omitempty"`
 	Relation string             `protobuf:"bytes,2,opt,name=relation,proto3" json:"relation,omitempty"`
 	Subject  *SubjectReference  `protobuf:"bytes,3,opt,name=subject,proto3" json:"subject,omitempty"`

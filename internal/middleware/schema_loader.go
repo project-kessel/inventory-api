@@ -48,13 +48,13 @@ func LoadResourceSchema(resourceType string, reporterType string, dir string) (s
 }
 
 // Load Common Resource Data Schema
-func LoadCommonResourceDataSchema(resourceType string, baseSchemaDir string) (string, error) {
+func LoadCommonRepresentationDataSchema(resourceType string, baseSchemaDir string) (string, error) {
 
-	schemaPath := filepath.Join(baseSchemaDir, resourceType, "common_resource_data.json")
+	schemaPath := filepath.Join(baseSchemaDir, resourceType, "common_representation.json")
 
 	data, err := os.ReadFile(schemaPath)
 	if err != nil {
-		return "", fmt.Errorf("failed to read common resource schema: %w", err)
+		return "", fmt.Errorf("failed to read common representation schema: %w", err)
 	}
 	return string(data), nil
 }

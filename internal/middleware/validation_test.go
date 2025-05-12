@@ -212,11 +212,11 @@ func TestUnmarshalJSONToMap(t *testing.T) {
 func runValidationTest(
 	t *testing.T,
 	tt struct {
-	name      string
-	request   *pbv1beta2.ReportResourceRequest
-	expectErr bool
-	expectMsg string
-},
+		name      string
+		request   *pbv1beta2.ReportResourceRequest
+		expectErr bool
+		expectMsg string
+	},
 	validateFunc func(*pbv1beta2.ReportResourceRequest) error,
 ) {
 	err := validateFunc(tt.request)
@@ -327,7 +327,7 @@ func TestSchemaValidation(t *testing.T) {
 			request: &pbv1beta2.ReportResourceRequest{
 
 				Type:               "host",
-				ReporterType:       "HBI",
+				ReporterType:       "hbi",
 				ReporterInstanceId: "org-123",
 				Representations: &pbv1beta2.ResourceRepresentations{
 					Metadata: &pbv1beta2.RepresentationMetadata{
@@ -357,7 +357,7 @@ func TestSchemaValidation(t *testing.T) {
 			request: &pbv1beta2.ReportResourceRequest{
 
 				Type:               "k8s_policy",
-				ReporterType:       "ACM",
+				ReporterType:       "acm",
 				ReporterInstanceId: "org-123",
 				Representations: &pbv1beta2.ResourceRepresentations{
 					Metadata: &pbv1beta2.RepresentationMetadata{
@@ -385,7 +385,7 @@ func TestSchemaValidation(t *testing.T) {
 			request: &pbv1beta2.ReportResourceRequest{
 
 				Type:               "notifications_integration",
-				ReporterType:       "NOTIFICATIONS",
+				ReporterType:       "notifications",
 				ReporterInstanceId: "1",
 				Representations: &pbv1beta2.ResourceRepresentations{
 					Metadata: &pbv1beta2.RepresentationMetadata{
@@ -409,7 +409,7 @@ func TestSchemaValidation(t *testing.T) {
 			request: &pbv1beta2.ReportResourceRequest{
 
 				Type:               "k8s_cluster",
-				ReporterType:       "OCM",
+				ReporterType:       "ocm",
 				ReporterInstanceId: "user@example.com",
 				Representations: &pbv1beta2.ResourceRepresentations{
 					Metadata: &pbv1beta2.RepresentationMetadata{
@@ -441,9 +441,9 @@ func TestSchemaValidation(t *testing.T) {
 		{
 			name: "Notifications Integration with unexpected reporter data",
 			request: &pbv1beta2.ReportResourceRequest{
-				
+
 				Type:               "notifications_integration",
-				ReporterType:       "NOTIFICATIONS",
+				ReporterType:       "notifications",
 				ReporterInstanceId: "1",
 				Representations: &pbv1beta2.ResourceRepresentations{
 					Metadata: &pbv1beta2.RepresentationMetadata{

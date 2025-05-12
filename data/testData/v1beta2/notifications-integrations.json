@@ -1,6 +1,6 @@
 {
     "type": "notifications_integration",
-    "reporterType": "NOTIFICATIONS",
+    "reporterType": "notifications",
     "reporterInstanceId": "cc38fb9e-251d-4abe-9eaf-b71607558b2a",
     "representations": {
       "metadata": {
@@ -13,7 +13,7 @@
         "workspace_id": "1f00e06a-951d-4042-b25b-5ce7c32d833e"
       },
       "reporter": {
-        "reporter_type": "NOTIFICATIONS",
+        "reporter_type": "notifications",
         "reporter_instance_id": "f2e4e735-3936-4ee6-a881-b2e1f9326991",
         "local_resource_id": "cbc86170-e959-42d8-bd2a-964a5a558475"
       }

@@ -47,7 +47,7 @@ func PreloadAllSchemasFromFilesystem(resourceDir string) error {
 		resourceType := NormalizeResourceType(dir.Name())
 
 		// Load and store common resource schema
-		commonResourceSchema, err := LoadCommonResourceDataSchema(resourceType, resourceDir)
+		commonResourceSchema, err := LoadCommonRepresentationDataSchema(resourceType, resourceDir)
 		if err == nil {
 			schemaCache.Store(fmt.Sprintf("common:%s", resourceType), commonResourceSchema)
 		}

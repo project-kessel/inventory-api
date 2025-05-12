@@ -98,7 +98,7 @@ func TestResourceValidation(t *testing.T) {
 			request: &ReportResourceRequest{
 
 				Type:               "rhel_host",
-				ReporterType:       "HBI",
+				ReporterType:       "hbi",
 				ReporterInstanceId: "user@example.com",
 				Representations: &ResourceRepresentations{
 					Metadata: &RepresentationMetadata{
@@ -131,7 +131,7 @@ func TestResourceValidation(t *testing.T) {
 			request: &ReportResourceRequest{
 
 				Type:               "k8s_cluster",
-				ReporterType:       "OCM",
+				ReporterType:       "ocm",
 				ReporterInstanceId: "user@example.com",
 				Representations: &ResourceRepresentations{
 					Metadata: &RepresentationMetadata{
@@ -162,7 +162,7 @@ func TestResourceValidation(t *testing.T) {
 			request: &ReportResourceRequest{
 
 				Type:               "rhel_host",
-				ReporterType:       "HBI",
+				ReporterType:       "hbi",
 				ReporterInstanceId: "org-123",
 				Representations: &ResourceRepresentations{
 					Metadata: &RepresentationMetadata{
@@ -187,7 +187,7 @@ func TestResourceValidation(t *testing.T) {
 			request: &ReportResourceRequest{
 
 				Type:               "notifications_integration",
-				ReporterType:       "NOTIFICATIONS",
+				ReporterType:       "notifications",
 				ReporterInstanceId: "1",
 				Representations: &ResourceRepresentations{
 					Metadata: &RepresentationMetadata{
@@ -213,7 +213,7 @@ func TestResourceValidation(t *testing.T) {
 
 				InventoryId:        proto.String("12"),
 				Type:               "k8s_cluster",
-				ReporterType:       "ACM",
+				ReporterType:       "acm",
 				ReporterInstanceId: "user@example.com",
 				Representations: &ResourceRepresentations{
 					Metadata: &RepresentationMetadata{
@@ -263,7 +263,7 @@ func TestResourceValidation(t *testing.T) {
 			request: &ReportResourceRequest{
 
 				Type:               "", // Missing
-				ReporterType:       "ACM",
+				ReporterType:       "acm",
 				ReporterInstanceId: "user@example.com",
 				Representations: &ResourceRepresentations{
 					Metadata: &RepresentationMetadata{
@@ -287,7 +287,7 @@ func TestResourceValidation(t *testing.T) {
 			request: &ReportResourceRequest{
 
 				Type:               "k8s_cluster",
-				ReporterType:       "OCM", // Missing
+				ReporterType:       "ocm",
 				ReporterInstanceId: "user@example.com",
 				Representations: &ResourceRepresentations{
 					Metadata: &RepresentationMetadata{
@@ -311,7 +311,7 @@ func TestResourceValidation(t *testing.T) {
 			request: &ReportResourceRequest{
 
 				Type:               "k8s_cluster",
-				ReporterType:       "ACM",
+				ReporterType:       "acm",
 				ReporterInstanceId: "user@example.com",
 				Representations: &ResourceRepresentations{
 					Metadata: &RepresentationMetadata{
@@ -335,7 +335,7 @@ func TestResourceValidation(t *testing.T) {
 			request: &ReportResourceRequest{
 
 				Type:               "k8s_cluster",
-				ReporterType:       "ACM",
+				ReporterType:       "acm",
 				ReporterInstanceId: "user@example.com",
 				Representations: &ResourceRepresentations{
 					Common: &structpb.Struct{
@@ -378,7 +378,7 @@ func TestDeleteResourceValidation(t *testing.T) {
 					ResourceId:   "0123",
 					ResourceType: "rhel_host",
 					Reporter: &ReporterReference{
-						Type: "HBI",
+						Type: "hbi",
 					},
 				},
 			},
@@ -391,7 +391,7 @@ func TestDeleteResourceValidation(t *testing.T) {
 				Reference: &ResourceReference{
 					ResourceType: "rhel_host",
 					Reporter: &ReporterReference{
-						Type: "HBI",
+						Type: "hbi",
 					},
 				},
 			},

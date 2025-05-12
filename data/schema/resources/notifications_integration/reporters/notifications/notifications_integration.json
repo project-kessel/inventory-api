@@ -5,7 +5,7 @@
     "reporter_type": {
       "type": "string",
       "enum": [
-        "NOTIFICATIONS"
+        "notifications"
       ],
       "description": "The type of reporter, fixed to 'NOTIFICATIONS' for this schema."
     },

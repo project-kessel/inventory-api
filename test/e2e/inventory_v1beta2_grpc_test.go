@@ -64,7 +64,7 @@ func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_Host(t *testing.T) {
 	req := &pbv1beta2.ReportResourceRequest{
 		WriteVisibility:    pbv1beta2.WriteVisibility_MINIMIZE_LATENCY,
 		Type:               "host",
-		ReporterType:       "HBI",
+		ReporterType:       "hbi",
 		ReporterInstanceId: "testuser@example.com",
 		Representations: &pbv1beta2.ResourceRepresentations{
 			Metadata: &pbv1beta2.RepresentationMetadata{
@@ -123,7 +123,7 @@ func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_Notifications(t *testing.T) 
 
 	// will likely change the notifications json schema, this is here to satisfy validation
 	reporterStruct, err := structpb.NewStruct(map[string]interface{}{
-		"reporter_type":        "NOTIFICATIONS",
+		"reporter_type":        "notifications",
 		"reporter_instance_id": "testuser@example.com",
 		"local_resource_id":    "notification-abc-123",
 	})
@@ -132,7 +132,7 @@ func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_Notifications(t *testing.T) 
 	req := pbv1beta2.ReportResourceRequest{
 
 		Type:               "notifications_integration",
-		ReporterType:       "NOTIFICATIONS",
+		ReporterType:       "notifications",
 		ReporterInstanceId: "testuser@example.com",
 		Representations: &pbv1beta2.ResourceRepresentations{
 			Metadata: &pbv1beta2.RepresentationMetadata{
@@ -204,7 +204,7 @@ func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_K8S_Cluster(t *testing.T) {
 	req := pbv1beta2.ReportResourceRequest{
 
 		Type:               "k8s_cluster",
-		ReporterType:       "ACM",
+		ReporterType:       "acm",
 		ReporterInstanceId: "testuser@example.com",
 		Representations: &pbv1beta2.ResourceRepresentations{
 			Metadata: &pbv1beta2.RepresentationMetadata{
@@ -271,7 +271,7 @@ func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_K8S_Policy(t *testing.T) {
 	req := pbv1beta2.ReportResourceRequest{
 
 		Type:               "k8s_policy",
-		ReporterType:       "ACM",
+		ReporterType:       "acm",
 		ReporterInstanceId: "testuser@example.com",
 		Representations: &pbv1beta2.ResourceRepresentations{
 			Metadata: &pbv1beta2.RepresentationMetadata{
@@ -297,7 +297,7 @@ func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_K8S_Policy(t *testing.T) {
 			ResourceType: "k8s_policy",
 			ResourceId:   "k8s_policy-abc-123",
 			Reporter: &pbv1beta2.ReporterReference{
-				Type: "ACM",
+				Type: "acm",
 			},
 		},
 	}
@@ -402,7 +402,7 @@ func TestInventoryAPIHTTP_v1beta2_Host_ConsistentWrite(t *testing.T) {
 	req := pbv1beta2.ReportResourceRequest{
 		WriteVisibility:    pbv1beta2.WriteVisibility_IMMEDIATE,
 		Type:               "host",
-		ReporterType:       "HBI",
+		ReporterType:       "hbi",
 		ReporterInstanceId: "testuser@example.com",
 		Representations: &pbv1beta2.ResourceRepresentations{
 			Metadata: &pbv1beta2.RepresentationMetadata{
@@ -431,10 +431,10 @@ func TestInventoryAPIHTTP_v1beta2_Host_ConsistentWrite(t *testing.T) {
 
 	delReq := pbv1beta2.DeleteResourceRequest{
 		Reference: &pbv1beta2.ResourceReference{
-			ResourceType: "HBI",
+			ResourceType: "hbi",
 			ResourceId:   resourceId,
 			Reporter: &pbv1beta2.ReporterReference{
-				Type: "ACM",
+				Type: "acm",
 			},
 		},
 	}

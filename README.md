@@ -94,9 +94,9 @@ make api
 
 See [DEBUG](./DEBUG.md) for instructions on how to debug
 
-### Alternatives way of running this service
+## Alternatives way of running this service
 
-#### Local Kessel Inventory + Kessel Relations using built binaries
+### Local Kessel Inventory + Kessel Relations using built binaries
 
 Inventory and Relations can also be run locally using built binaries, but the default config for Inventory will conflict with Relations.
 
@@ -115,7 +115,7 @@ make migrate
 ```
 > NOTE: The below setups all involve spinning up Kafka infrastrcture with configuration jobs that run after. It can take about to a minute before the full Kafka stack is ready to go.
 
-#### Kessel Inventory Full Setup using Docker Compose
+### Kessel Inventory Full Setup using Docker Compose
 
 Testing locally is fine for simple changes but in order to test the full application, it requires all the dependent baking services.
 
@@ -139,7 +139,7 @@ To stop:
 make inventory-down
 ```
 
-#### Kessel Inventory + Kessel Relations using Docker Compose
+### Kessel Inventory + Kessel Relations using Docker Compose
 
 An Relations-ready version of the Full Setup configuration exists that can be easily used with Relations API.
 
@@ -161,7 +161,7 @@ To stop Inventory:
 make inventory-down
 ```
 
-#### Kessel Inventory + Kessel Relations w Monitoring Stack using Docker Compose
+### Kessel Inventory + Kessel Relations w Monitoring Stack using Docker Compose
 
 Useful for testing metrics, alerts, and dashboards locally where you can generate enough data and see it reflected in our Monitoring stack outside of Stage
 
@@ -194,7 +194,7 @@ Prometheus URL: http://localhost:9050
 Alertmanager URL: http://localhost:9093
 
 
-#### Local Kessel Inventory + Docker Compose Infra (Split Setup)
+### Local Kessel Inventory + Docker Compose Infra (Split Setup)
 
 The Split Setup involves using a locally running Inventory API, but all other infra (Postgres, Kafka, etc) are deployed via Docker. This setup is great for debugging the local running binary but still have all the dependent services to test the full application.
 
@@ -212,7 +212,7 @@ make local-build
 ./bin/inventory-api serve --config development/configs/split-setup.yaml --storage.postgres.host localhost
 ```
 
-#### Split Setup + Kessel Relations
+### Split Setup + Kessel Relations
 
 Same as Split Setup which leverages a local Inventory API and Docker for the dependent infra, but updates the Inventory API server ports to not conflict with a running Relations API
 
@@ -232,7 +232,7 @@ make local-build
 ./bin/inventory-api serve --config development/configs/split-setup-relations-ready.yaml --storage.postgres.host localhost
 ```
 
-#### Kessel Inventory + Kessel Relations + SSO (Keycloak) using Docker Compose
+### Kessel Inventory + Kessel Relations + SSO (Keycloak) using Docker Compose
 
 This setup expands on the Relations-ready Full Setup by:
 - Setting up a Keycloak instance running at port 8084 with [myrealm](development/configs/myrealm.json) config file.
@@ -265,7 +265,7 @@ To stop use:
 make inventory-down
 ```
 
-#### Running in Ephemeral Cluster with Relations API using Bonfire
+## Running in Ephemeral Cluster with Relations API using Bonfire
 
 See [Testing Inventory in Ephemeral](./docs/ephemeral-testing.md) for instructions on how to deploy Kessel Inventory in the ephemeral cluster.
 

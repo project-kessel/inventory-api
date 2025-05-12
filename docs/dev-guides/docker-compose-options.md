@@ -1,4 +1,4 @@
-# Alternatives way of running this service
+# Alternative ways of running this service
 
 ## Local Kessel Inventory + Kessel Relations using built binaries
 
@@ -17,11 +17,11 @@ make migrate
 # run with the relations friendly config file
 ./bin/inventory-api serve --config development/configs/local-w-relations.yaml
 ```
-> NOTE: The below setups all involve spinning up Kafka infrastrcture with configuration jobs that run after. It can take about to a minute before the full Kafka stack is ready to go.
+> NOTE: The below setups all involve spinning up Kafka infrastructure with configuration jobs that run after. It can take about to a minute before the full Kafka stack is ready to go.
 
 ## Kessel Inventory + Kessel Relations using Docker Compose
 
-An Relations-ready version of the Full Setup configuration exists that can be easily used with Relations API.
+A Relations-ready version of the Full Setup configuration exists that can be easily used with Relations API.
 
 The only notable differences being:
 - Inventory is configured to use ports `8081`, and `9081` to not conflict with Relations API

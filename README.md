@@ -120,7 +120,7 @@ To stop:
 make inventory-down
 ```
 
-### Alternatives way of running this service
+### Alternative ways of running this service
 
 There are numerous ways to run Inventory API using Docker Compose for various testing and debugging needs. For more options, see our [guide](./docs/dev-guides/docker-compose-options.md)
 

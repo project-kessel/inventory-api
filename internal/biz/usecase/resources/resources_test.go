@@ -1676,12 +1676,20 @@ func TestUpsert_WaitCircuitBreaker(t *testing.T) {
 	listenMan.AssertExpectations(t)
 	sub.AssertExpectations(t)
 	assert.Equal(t, gobreaker.StateOpen, cb.State()) // Circuit breaker should be open
+	// Attempt 4
+	r, err = useCase.Upsert(ctx, resource, v1beta2.WriteVisibility_IMMEDIATE)
+	assert.Nil(t, err) // No expected error because we treat a timeout as a success
+	assert.NotNil(t, r)
+	repo.AssertExpectations(t)
+	listenMan.AssertExpectations(t)
+	sub.AssertExpectations(t)
+	assert.Equal(t, gobreaker.StateOpen, cb.State()) // Circuit breaker should still be open
 	// Circuit breaker reset
 	blockForNotifCall.Unset()
 	time.Sleep(2 * time.Second)                               // Wait for the circuit breaker timeout
 	assert.Equal(t, gobreaker.StateHalfOpen, cb.State())      // Circuit breaker should be half-open after the timeout
 	sub.On("BlockForNotification", mock.Anything).Return(nil) // Prepare a successful notification
-	// Attempt 4
+	// Attempt 5
 	r, err = useCase.Upsert(ctx, resource, v1beta2.WriteVisibility_IMMEDIATE)
 	assert.Nil(t, err) // No expected error because we treat a timeout as a success
 	assert.NotNil(t, r)

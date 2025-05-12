@@ -29,13 +29,82 @@ const (
 // KesselInventoryServiceClient is the client API for KesselInventoryService service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
+//
+// KesselInventoryService provides APIs to perform relationship checks
+// and manage inventory resource lifecycles (reporting and deletion).
 type KesselInventoryServiceClient interface {
-	// Checks for the existence of a single Relationship
-	// (a Relation between a Resource and a Subject or Subject Set).
+	// Performs an relationship check to determine whether a subject has a specific
+	// permission or relationship on a resource.
+	//
+	// This API evaluates whether the provided subject is a member of the specified relation
+	// (e.g., "viewer", "editor", "admin") on the target object. It answers the question:
+	// "Does subject *X* have relation *Y* on object *Z*?"
+	//
+	// Common use cases include enforcing read access, conditional UI visibility,
+	// or authorization gating for downstream API calls.
 	Check(ctx context.Context, in *CheckRequest, opts ...grpc.CallOption) (*CheckResponse, error)
+	// Performs a strongly consistent relationship check to determine whether a subject
+	// has a specific relation to an object (representing, for example, a permission).
+	//
+	// This API answers the question:
+	// "Is subject *X* currently authorized to update or modify resource *Y*?"
+	// Unlike the basic `Check` endpoint, this method guarantees a fully up-to-date
+	// view of the relationship state (e.g., not relying on cached or eventually consistent data).
+	//
+	// It is intended to be used just prior to sensitive operation (e.g., update, delete)
+	// which depend on the current state of the relationship.
 	CheckForUpdate(ctx context.Context, in *CheckForUpdateRequest, opts ...grpc.CallOption) (*CheckForUpdateResponse, error)
+	// Reports to Kessel Inventory that a Resource has been created or has been updated.
+	//
+	// Reporters can use this API to report facts about their resources in order to
+	// facilitate integration, correlation, and access control.
+	//
+	// Each call can include:
+	// - Reporter-specific attributes and relationships (`representations.reporter`)
+	// - Shared attributes and relationships common to all reporters (`representations.common`)
+	// - Identifiers and metadata that allow correlation to an existing resource
+	//
+	// Multiple reporters may report representations for the same resource.
+	// Kessel Inventory correlates these
+	// based on correlation keys provided for a given resource type
+	//
+	// # All versions of your reported facts will be retained and can be queried as needed
+	//
+	// The relationships reported through this API are used to determine relationship check outcomes
+	// via the Check and CheckForUpdate APIs.
+	//
+	// Reporters are responsible for ensuring delivery guarantees and message ordering
+	// appropriate to the sensitivity and consistency needs of their use case.
+	//
+	// This API does **not** guarantee immediate read-your-writes consistency by default.
+	//
+	//	If a reporter requires newly submitted resources or relationships to be visible
+	//
+	// in subsequent checks (e.g., `Check`), the request must explicitly set
+	// `write_visibility = IMMEDIATE`.
 	ReportResource(ctx context.Context, in *ReportResourceRequest, opts ...grpc.CallOption) (*ReportResourceResponse, error)
+	// Reports to Kessel Inventory that a Reporter's representation of a Resource has been deleted.
+	//
+	// This operation is typically used when a resource has been decommissioned or
+	// is no longer reported by any authorized system.
+	//
+	// As a result, relationship checks performed via the `Check` and
+	// `CheckForUpdate` APIs will no longer resolve positively for the deleted
+	// resource. Any decisions that depend on relationships tied to
+	// this resource will be affected.
+	//
+	// As an example, it can revoke previously granted access across the system.
 	DeleteResource(ctx context.Context, in *DeleteResourceRequest, opts ...grpc.CallOption) (*DeleteResourceResponse, error)
+	// Streams a list of objects where the given subject has the specified relation.
+	//
+	// This relationship query answers the question:
+	// "Which objects of type *X* does subject *Y* have the *Z* relation to?"
+	//
+	// It is often used to power user-facing dashboards, filtered UIs, or policy-driven
+	// access lists. The result is streamed incrementally to support large datasets and
+	// reduce client-side latency or memory pressure.
+	//
+	// Pagination and consistency controls allow fine-tuned performance and data freshness.
 	StreamedListObjects(ctx context.Context, in *StreamedListObjectsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[StreamedListObjectsResponse], error)
 }
 
@@ -109,13 +178,82 @@ type KesselInventoryService_StreamedListObjectsClient = grpc.ServerStreamingClie
 // KesselInventoryServiceServer is the server API for KesselInventoryService service.
 // All implementations must embed UnimplementedKesselInventoryServiceServer
 // for forward compatibility.
+//
+// KesselInventoryService provides APIs to perform relationship checks
+// and manage inventory resource lifecycles (reporting and deletion).
 type KesselInventoryServiceServer interface {
-	// Checks for the existence of a single Relationship
-	// (a Relation between a Resource and a Subject or Subject Set).
+	// Performs an relationship check to determine whether a subject has a specific
+	// permission or relationship on a resource.
+	//
+	// This API evaluates whether the provided subject is a member of the specified relation
+	// (e.g., "viewer", "editor", "admin") on the target object. It answers the question:
+	// "Does subject *X* have relation *Y* on object *Z*?"
+	//
+	// Common use cases include enforcing read access, conditional UI visibility,
+	// or authorization gating for downstream API calls.
 	Check(context.Context, *CheckRequest) (*CheckResponse, error)
+	// Performs a strongly consistent relationship check to determine whether a subject
+	// has a specific relation to an object (representing, for example, a permission).
+	//
+	// This API answers the question:
+	// "Is subject *X* currently authorized to update or modify resource *Y*?"
+	// Unlike the basic `Check` endpoint, this method guarantees a fully up-to-date
+	// view of the relationship state (e.g., not relying on cached or eventually consistent data).
+	//
+	// It is intended to be used just prior to sensitive operation (e.g., update, delete)
+	// which depend on the current state of the relationship.
 	CheckForUpdate(context.Context, *CheckForUpdateRequest) (*CheckForUpdateResponse, error)
+	// Reports to Kessel Inventory that a Resource has been created or has been updated.
+	//
+	// Reporters can use this API to report facts about their resources in order to
+	// facilitate integration, correlation, and access control.
+	//
+	// Each call can include:
+	// - Reporter-specific attributes and relationships (`representations.reporter`)
+	// - Shared attributes and relationships common to all reporters (`representations.common`)
+	// - Identifiers and metadata that allow correlation to an existing resource
+	//
+	// Multiple reporters may report representations for the same resource.
+	// Kessel Inventory correlates these
+	// based on correlation keys provided for a given resource type
+	//
+	// # All versions of your reported facts will be retained and can be queried as needed
+	//
+	// The relationships reported through this API are used to determine relationship check outcomes
+	// via the Check and CheckForUpdate APIs.
+	//
+	// Reporters are responsible for ensuring delivery guarantees and message ordering
+	// appropriate to the sensitivity and consistency needs of their use case.
+	//
+	// This API does **not** guarantee immediate read-your-writes consistency by default.
+	//
+	//	If a reporter requires newly submitted resources or relationships to be visible
+	//
+	// in subsequent checks (e.g., `Check`), the request must explicitly set
+	// `write_visibility = IMMEDIATE`.
 	ReportResource(context.Context, *ReportResourceRequest) (*ReportResourceResponse, error)
+	// Reports to Kessel Inventory that a Reporter's representation of a Resource has been deleted.
+	//
+	// This operation is typically used when a resource has been decommissioned or
+	// is no longer reported by any authorized system.
+	//
+	// As a result, relationship checks performed via the `Check` and
+	// `CheckForUpdate` APIs will no longer resolve positively for the deleted
+	// resource. Any decisions that depend on relationships tied to
+	// this resource will be affected.
+	//
+	// As an example, it can revoke previously granted access across the system.
 	DeleteResource(context.Context, *DeleteResourceRequest) (*DeleteResourceResponse, error)
+	// Streams a list of objects where the given subject has the specified relation.
+	//
+	// This relationship query answers the question:
+	// "Which objects of type *X* does subject *Y* have the *Z* relation to?"
+	//
+	// It is often used to power user-facing dashboards, filtered UIs, or policy-driven
+	// access lists. The result is streamed incrementally to support large datasets and
+	// reduce client-side latency or memory pressure.
+	//
+	// Pagination and consistency controls allow fine-tuned performance and data freshness.
 	StreamedListObjects(*StreamedListObjectsRequest, grpc.ServerStreamingServer[StreamedListObjectsResponse]) error
 	mustEmbedUnimplementedKesselInventoryServiceServer()
 }

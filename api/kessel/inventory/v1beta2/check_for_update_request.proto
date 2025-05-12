@@ -11,6 +11,10 @@ option java_multiple_files = true;
 option java_package = "org.project_kessel.api.inventory.v1beta2";
 
 message CheckForUpdateRequest {
+  // Required parameters
+  // - resource type and id
+  // - permission (cannot be derived from type as types may have multiple edit permissions Ex: https://github.com/RedHatInsights/rbac-config/blob/master/configs/prod/schemas/src/notifications.ksl#L37)
+  // - user (possibly derived from an identity token)
   ResourceReference object = 1 [(buf.validate.field).required = true];
   string relation = 2 [(buf.validate.field).string.min_len = 1];
   SubjectReference subject = 3 [(buf.validate.field).required = true];

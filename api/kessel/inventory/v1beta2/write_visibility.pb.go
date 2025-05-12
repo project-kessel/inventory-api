@@ -23,9 +23,19 @@ const (
 type WriteVisibility int32
 
 const (
+	// WRITE_VISIBILITY_UNSPECIFIED: The default behavior of the write operation. Defaults to MINIMIZE_LATENCY
+	//
+	//	strategy.
 	WriteVisibility_WRITE_VISIBILITY_UNSPECIFIED WriteVisibility = 0
-	WriteVisibility_MINIMIZE_LATENCY             WriteVisibility = 1
-	WriteVisibility_IMMEDIATE                    WriteVisibility = 2
+	// MINIMIZE_LATENCY: The write operation will be performed with the goal of minimizing latency
+	//
+	//	by not waiting for data consistency acknowledgment.
+	WriteVisibility_MINIMIZE_LATENCY WriteVisibility = 1
+	// IMMEDIATE: The write operation will be performed with the goal of ensuring immediate consistency
+	//
+	//	by waiting for data consistency acknowledgment. Additional
+	//	latency may be incurred
+	WriteVisibility_IMMEDIATE WriteVisibility = 2
 )
 
 // Enum value maps for WriteVisibility.

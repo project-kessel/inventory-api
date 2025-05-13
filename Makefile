@@ -96,9 +96,10 @@ build-push-minimal:
 	./build_push_minimal.sh
 
 .PHONY: clean
-# removes all binaries
+# removes all binaries and any leftover tar packages from Kind build
 clean:
-	rm -rf bin/
+	rm -rf bin/ inventory-api.tar inventory-e2e-tests.tar kafka-connect.tar
+
 
 .PHONY: test
 # run all tests

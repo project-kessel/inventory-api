@@ -1652,7 +1652,7 @@ func TestUpsert_WaitCircuitBreaker(t *testing.T) {
 	useCase := New(repo, inventoryRepo, authz, nil, "", log.DefaultLogger, listenMan, cb, usecaseConfig)
 	ctx := context.TODO()
 
-	// Attempt 1
+	// Attempt 1 - Trigger failure
 	r, err := useCase.Upsert(ctx, resource, v1beta2.WriteVisibility_IMMEDIATE)
 	assert.Nil(t, err) // No expected error because we treat a timeout as a success
 	assert.NotNil(t, r)
@@ -1660,7 +1660,7 @@ func TestUpsert_WaitCircuitBreaker(t *testing.T) {
 	listenMan.AssertExpectations(t)
 	sub.AssertExpectations(t)
 	assert.Equal(t, gobreaker.StateClosed, cb.State()) // Circuit breaker should be closed
-	// Attempt 2
+	// Attempt 2 - Trigger failure
 	r, err = useCase.Upsert(ctx, resource, v1beta2.WriteVisibility_IMMEDIATE)
 	assert.Nil(t, err) // No expected error because we treat a timeout as a success
 	assert.NotNil(t, r)
@@ -1668,7 +1668,7 @@ func TestUpsert_WaitCircuitBreaker(t *testing.T) {
 	listenMan.AssertExpectations(t)
 	sub.AssertExpectations(t)
 	assert.Equal(t, gobreaker.StateClosed, cb.State()) // Circuit breaker should be closed
-	// Attempt 3
+	// Attempt 3 - Trigger final failure
 	r, err = useCase.Upsert(ctx, resource, v1beta2.WriteVisibility_IMMEDIATE)
 	assert.Nil(t, err) // No expected error because we treat a timeout as a success
 	assert.NotNil(t, r)
@@ -1676,7 +1676,7 @@ func TestUpsert_WaitCircuitBreaker(t *testing.T) {
 	listenMan.AssertExpectations(t)
 	sub.AssertExpectations(t)
 	assert.Equal(t, gobreaker.StateOpen, cb.State()) // Circuit breaker should be open
-	// Attempt 4
+	// Attempt 4 - test open state
 	r, err = useCase.Upsert(ctx, resource, v1beta2.WriteVisibility_IMMEDIATE)
 	assert.Nil(t, err) // No expected error because we treat a timeout as a success
 	assert.NotNil(t, r)
@@ -1689,7 +1689,7 @@ func TestUpsert_WaitCircuitBreaker(t *testing.T) {
 	time.Sleep(2 * time.Second)                               // Wait for the circuit breaker timeout
 	assert.Equal(t, gobreaker.StateHalfOpen, cb.State())      // Circuit breaker should be half-open after the timeout
 	sub.On("BlockForNotification", mock.Anything).Return(nil) // Prepare a successful notification
-	// Attempt 5
+	// Attempt 5 - test half-open state returned to closed
 	r, err = useCase.Upsert(ctx, resource, v1beta2.WriteVisibility_IMMEDIATE)
 	assert.Nil(t, err) // No expected error because we treat a timeout as a success
 	assert.NotNil(t, r)

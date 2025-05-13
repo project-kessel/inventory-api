@@ -153,9 +153,13 @@ func (uc *Usecase) Upsert(ctx context.Context, m *model.Resource, write_visibili
 			if err != nil {
 				switch {
 				case errors.Is(err, pubsub.ErrWaitContextCancelled):
+					uc.log.WithContext(ctx).Debugf("Reached timeout waiting for notification from consumer")
 					return ret, nil
 				case errors.Is(err, gobreaker.ErrOpenState):
 					uc.log.WithContext(ctx).Debugf("Circuit breaker is open, skipped waiting for notification from consumer")
+					return ret, nil
+				case errors.Is(err, gobreaker.ErrTooManyRequests):
+					uc.log.WithContext(ctx).Debugf("Circuit breaker is half-open, skipped waiting for notification from consumer")
 					return ret, nil
 				default:
 					return nil, err

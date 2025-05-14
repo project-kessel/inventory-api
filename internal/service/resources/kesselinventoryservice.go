@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/go-kratos/kratos/v2/log"
 	pbv1beta1 "github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
@@ -160,16 +161,16 @@ func toLookupResourceRequest(request *pb.StreamedListObjectsRequest) *pbv1beta1.
 	}
 	return &pbv1beta1.LookupResourcesRequest{
 		ResourceType: &pbv1beta1.ObjectType{
-			Namespace: request.ObjectType.GetReporterType(),
-			Name:      request.ObjectType.GetResourceType(),
+			Namespace: strings.ToLower(request.ObjectType.GetReporterType()),
+			Name:      strings.ToLower(request.ObjectType.GetResourceType()),
 		},
 		Relation: request.Relation,
 		Subject: &pbv1beta1.SubjectReference{
 			Relation: request.Subject.Relation,
 			Subject: &pbv1beta1.ObjectReference{
 				Type: &pbv1beta1.ObjectType{
-					Name:      request.Subject.Resource.GetResourceType(),
-					Namespace: request.Subject.Resource.GetReporter().GetType(),
+					Name:      strings.ToLower(request.Subject.Resource.GetResourceType()),
+					Namespace: strings.ToLower(request.Subject.Resource.GetReporter().GetType()),
 				},
 				Id: request.Subject.Resource.GetResourceId(),
 			},

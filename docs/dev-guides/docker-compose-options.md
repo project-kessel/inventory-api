@@ -45,7 +45,7 @@ make inventory-down
 
 Useful for testing metrics, alerts, and dashboards locally where you can generate enough data and see it reflected in our Monitoring stack outside of Stage
 
-This setup uses the same setup as the previous one but includes Prometheus, Grafana, and Alertmanager. It will require Relations API to be running to ensure consumer metrics are captured.
+This setup uses the same setup as the previous one but includes Prometheus, Grafana, and Alertmanager. It will require Relations API to be running to ensure consumer metrics are captured. Grafana is also pre-loaded with the local prometheus data source and loads our current dashboards which were extracted from our [dashboards folder](../../dashboards/)
 
 To start Inventory and the monitoring stack:
 ```shell
@@ -72,6 +72,10 @@ Grafana URL: http://localhost:3000
 Prometheus URL: http://localhost:9050
 
 Alertmanager URL: http://localhost:9093
+
+#### Testing Dashboard changes
+
+If the dashboards in the dashboards folder have been updated, you can update the json files pre-loaded by Grafana with the `make update-local-dashboards` command. For dashboard updates and testing, it's recommended to update the dashboards in AppSRE Stage Grafana, capture the changes into the ConfigMaps in dashboard directory, then use the `make update-local-dashboards` commands to extract the json. This is a great way to test locally where you can easily hit the API as much as you want to generate data and see it in Grafana
 
 
 ## Local Kessel Inventory + Docker Compose Infra (Split Setup)

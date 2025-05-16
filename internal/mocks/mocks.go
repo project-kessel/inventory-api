@@ -24,6 +24,26 @@ type MockAuthz struct {
 type MockConsumer struct {
 	mock.Mock
 }
+type MockedReporterResourceRepository struct {
+	mock.Mock
+}
+type MockedInventoryResourceRepository struct {
+	mock.Mock
+}
+
+type MockedListenManager struct {
+	mock.Mock
+}
+
+type MockedSubscription struct {
+	mock.Mock
+}
+
+type MockLookupResourcesStream struct {
+	mock.Mock
+	Responses []*v1beta1.LookupResourcesResponse
+	current   int
+}
 
 func (m *MockAuthz) Health(ctx context.Context) (*kesselv1.GetReadyzResponse, error) {
 	args := m.Called(ctx)
@@ -94,27 +114,6 @@ func (m *MockConsumer) Close() error {
 func (m *MockConsumer) AssignmentLost() bool {
 	args := m.Called()
 	return args.Get(0).(bool)
-}
-
-type MockedReporterResourceRepository struct {
-	mock.Mock
-}
-type MockedInventoryResourceRepository struct {
-	mock.Mock
-}
-
-type MockedListenManager struct {
-	mock.Mock
-}
-
-type MockedSubscription struct {
-	mock.Mock
-}
-
-type MockLookupResourcesStream struct {
-	mock.Mock
-	Responses []*v1beta1.LookupResourcesResponse
-	current   int
 }
 
 func (m *MockLookupResourcesStream) Recv() (*v1beta1.LookupResourcesResponse, error) {

@@ -1,4 +1,4 @@
-package consumer
+package metricscollector
 
 import (
 	"context"
@@ -89,10 +89,10 @@ type MetricsCollector struct {
 	assignmentSize metric.Int64Gauge
 
 	// App Specific Metrics
-	msgsProcessed      metric.Int64Counter
-	msgProcessFailures metric.Int64Counter
-	consumerErrors     metric.Int64Counter
-	kafkaErrorEvents   metric.Int64Counter
+	MsgsProcessed      metric.Int64Counter
+	MsgProcessFailures metric.Int64Counter
+	ConsumerErrors     metric.Int64Counter
+	KafkaErrorEvents   metric.Int64Counter
 }
 
 // New instantiates a new MetricsCollector
@@ -148,16 +148,16 @@ func (m *MetricsCollector) New(meter metric.Meter) error {
 	}
 
 	// create app metrics
-	if m.msgsProcessed, err = meter.Int64Counter(prefix + "msgs_processed"); err != nil {
+	if m.MsgsProcessed, err = meter.Int64Counter(prefix + "msgs_processed"); err != nil {
 		return err
 	}
-	if m.msgProcessFailures, err = meter.Int64Counter(prefix + "msg_process_failures"); err != nil {
+	if m.MsgProcessFailures, err = meter.Int64Counter(prefix + "msg_process_failures"); err != nil {
 		return err
 	}
-	if m.consumerErrors, err = meter.Int64Counter(prefix + "consumer_errors"); err != nil {
+	if m.ConsumerErrors, err = meter.Int64Counter(prefix + "consumer_errors"); err != nil {
 		return err
 	}
-	if m.kafkaErrorEvents, err = meter.Int64Counter(prefix + "kafka_error_events"); err != nil {
+	if m.KafkaErrorEvents, err = meter.Int64Counter(prefix + "kafka_error_events"); err != nil {
 		return err
 	}
 	return nil

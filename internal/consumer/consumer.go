@@ -16,6 +16,7 @@ import (
 	common "github.com/project-kessel/inventory-api/cmd/common"
 	"github.com/project-kessel/inventory-api/internal/consumer/auth"
 	"github.com/project-kessel/inventory-api/internal/consumer/retry"
+	"github.com/project-kessel/inventory-api/internal/metricscollector"
 
 	"github.com/project-kessel/inventory-api/internal/authz/allow"
 	"github.com/project-kessel/inventory-api/internal/authz/kessel"
@@ -63,7 +64,7 @@ type InventoryConsumer struct {
 	AuthzConfig      authz.CompletedConfig
 	Authorizer       api.Authorizer
 	Errors           chan error
-	MetricsCollector *MetricsCollector
+	MetricsCollector *metricscollector.MetricsCollector
 	Logger           *log.Helper
 	AuthOptions      *auth.Options
 	RetryOptions     *retry.Options
@@ -80,7 +81,7 @@ func New(config CompletedConfig, db *gorm.DB, authz authz.CompletedConfig, autho
 		return InventoryConsumer{}, err
 	}
 
-	var mc MetricsCollector
+	var mc metricscollector.MetricsCollector
 	meter := otel.Meter("github.com/project-kessel/inventory-api/blob/main/internal/server/otel")
 	err = mc.New(meter)
 	if err != nil {
@@ -137,7 +138,7 @@ type MessagePayload struct {
 func (i *InventoryConsumer) Consume() error {
 	err := i.Consumer.SubscribeTopics([]string{i.Config.Topic}, i.RebalanceCallback)
 	if err != nil {
-		Incr(i.MetricsCollector.consumerErrors, "SubscribeTopics", err)
+		metricscollector.Incr(i.MetricsCollector.ConsumerErrors, "SubscribeTopics", err)
 		i.Logger.Errorf("failed to subscribe to topic: %v", err)
 		i.Errors <- err
 		return err
@@ -172,7 +173,7 @@ func (i *InventoryConsumer) Consume() error {
 			case *kafka.Message:
 				headers, err := ParseHeaders(e)
 				if err != nil {
-					Incr(i.MetricsCollector.msgProcessFailures, "ParseHeaders", fmt.Errorf("missing headers"))
+					metricscollector.Incr(i.MetricsCollector.MsgProcessFailures, "ParseHeaders", fmt.Errorf("missing headers"))
 					i.Logger.Errorf("failed to parse message headers: %v", err)
 					run = false
 					continue
@@ -194,12 +195,12 @@ func (i *InventoryConsumer) Consume() error {
 				if operation != string(model.OperationTypeDeleted) {
 					inventoryID, err := ParseMessageKey(e.Key)
 					if err != nil {
-						Incr(i.MetricsCollector.msgProcessFailures, "ParseMessageKey", err)
+						metricscollector.Incr(i.MetricsCollector.MsgProcessFailures, "ParseMessageKey", err)
 						i.Logger.Errorf("failed to parse message key for for ID: %v", err)
 					}
 					err = i.UpdateConsistencyToken(inventoryID, fmt.Sprint(resp))
 					if err != nil {
-						Incr(i.MetricsCollector.consumerErrors, "UpdateConsistencyToken", err)
+						metricscollector.Incr(i.MetricsCollector.ConsumerErrors, "UpdateConsistencyToken", err)
 						i.Logger.Errorf("failed to update consistency token: %v", err)
 						continue
 					}
@@ -209,7 +210,7 @@ func (i *InventoryConsumer) Consume() error {
 				if !common.IsNil(i.Notifier) && txid != "" {
 					err := i.Notifier.Notify(context.Background(), txid)
 					if err != nil {
-						Incr(i.MetricsCollector.consumerErrors, "Notify", err)
+						metricscollector.Incr(i.MetricsCollector.ConsumerErrors, "Notify", err)
 						i.Logger.Errorf("failed to notify producer: %v", err)
 						// Do not continue here, we should still commit the offset
 					} else {
@@ -224,18 +225,18 @@ func (i *InventoryConsumer) Consume() error {
 				if checkIfCommit(e.TopicPartition) {
 					err := i.commitStoredOffsets()
 					if err != nil {
-						Incr(i.MetricsCollector.consumerErrors, "commitStoredOffsets", err)
+						metricscollector.Incr(i.MetricsCollector.ConsumerErrors, "commitStoredOffsets", err)
 						i.Logger.Errorf("failed to commit offsets: %v", err)
 						continue
 					}
 				}
-				Incr(i.MetricsCollector.msgsProcessed, operation, nil)
+				metricscollector.Incr(i.MetricsCollector.MsgsProcessed, operation, nil)
 				i.Logger.Infof("consumed event from topic %s, partition %d at offset %s",
 					*e.TopicPartition.Topic, e.TopicPartition.Partition, e.TopicPartition.Offset)
 				i.Logger.Debugf("consumed event data: key = %-10s value = %s", string(e.Key), string(e.Value))
 
 			case kafka.Error:
-				Incr(i.MetricsCollector.kafkaErrorEvents, "kafka", nil,
+				metricscollector.Incr(i.MetricsCollector.KafkaErrorEvents, "kafka", nil,
 					attribute.String("code", e.Code().String()),
 					attribute.String("error", e.Error()))
 				if e.IsFatal() {
@@ -247,10 +248,10 @@ func (i *InventoryConsumer) Consume() error {
 				}
 
 			case *kafka.Stats:
-				var stats StatsData
+				var stats metricscollector.StatsData
 				err = json.Unmarshal([]byte(e.String()), &stats)
 				if err != nil {
-					Incr(i.MetricsCollector.msgProcessFailures, "StatsCollection", err)
+					metricscollector.Incr(i.MetricsCollector.MsgProcessFailures, "StatsCollection", err)
 					i.Logger.Errorf("error unmarshalling stats: %v", err)
 					continue
 				}
@@ -278,7 +279,7 @@ func (i *InventoryConsumer) ProcessMessage(headers map[string]string, relationsE
 		if relationsEnabled {
 			tuple, err := ParseCreateOrUpdateMessage(msg.Value)
 			if err != nil {
-				Incr(i.MetricsCollector.msgProcessFailures, "ParseCreateOrUpdateMessage", err)
+				metricscollector.Incr(i.MetricsCollector.MsgProcessFailures, "ParseCreateOrUpdateMessage", err)
 				i.Logger.Errorf("failed to parse message for tuple: %v", err)
 				return "", err
 			}
@@ -286,7 +287,7 @@ func (i *InventoryConsumer) ProcessMessage(headers map[string]string, relationsE
 				return i.CreateTuple(context.Background(), tuple)
 			})
 			if err != nil {
-				Incr(i.MetricsCollector.msgProcessFailures, "CreateTuple", err)
+				metricscollector.Incr(i.MetricsCollector.MsgProcessFailures, "CreateTuple", err)
 				i.Logger.Errorf("failed to create tuple: %v", err)
 				return "", err
 			}
@@ -299,7 +300,7 @@ func (i *InventoryConsumer) ProcessMessage(headers map[string]string, relationsE
 		if relationsEnabled {
 			tuple, err := ParseCreateOrUpdateMessage(msg.Value)
 			if err != nil {
-				Incr(i.MetricsCollector.msgProcessFailures, "ParseCreateOrUpdateMessage", err)
+				metricscollector.Incr(i.MetricsCollector.MsgProcessFailures, "ParseCreateOrUpdateMessage", err)
 				i.Logger.Errorf("failed to parse message for tuple: %v", err)
 				return "", err
 			}
@@ -307,7 +308,7 @@ func (i *InventoryConsumer) ProcessMessage(headers map[string]string, relationsE
 				return i.UpdateTuple(context.Background(), tuple)
 			})
 			if err != nil {
-				Incr(i.MetricsCollector.msgProcessFailures, "UpdateTuple", err)
+				metricscollector.Incr(i.MetricsCollector.MsgProcessFailures, "UpdateTuple", err)
 				i.Logger.Errorf("failed to update tuple: %v", err)
 				return "", err
 			}
@@ -319,7 +320,7 @@ func (i *InventoryConsumer) ProcessMessage(headers map[string]string, relationsE
 		if relationsEnabled {
 			filter, err := ParseDeleteMessage(msg.Value)
 			if err != nil {
-				Incr(i.MetricsCollector.msgProcessFailures, "ParseDeleteMessage", err)
+				metricscollector.Incr(i.MetricsCollector.MsgProcessFailures, "ParseDeleteMessage", err)
 				i.Logger.Errorf("failed to parse message for filter: %v", err)
 				return "", err
 			}
@@ -327,14 +328,14 @@ func (i *InventoryConsumer) ProcessMessage(headers map[string]string, relationsE
 				return i.DeleteTuple(context.Background(), filter)
 			})
 			if err != nil {
-				Incr(i.MetricsCollector.msgProcessFailures, "DeleteTuple", err)
+				metricscollector.Incr(i.MetricsCollector.MsgProcessFailures, "DeleteTuple", err)
 				i.Logger.Errorf("failed to delete tuple: %v", err)
 				return "", err
 			}
 			return "", nil
 		}
 	default:
-		Incr(i.MetricsCollector.msgProcessFailures, "unknown-operation-type", nil)
+		metricscollector.Incr(i.MetricsCollector.MsgProcessFailures, "unknown-operation-type", nil)
 		i.Logger.Errorf("unknown operation type, message cannot be processed and will be dropped: offset=%s operation=%s msg=%s",
 			msg.TopicPartition.Offset.String(), operation, msg.Value)
 	}
@@ -535,7 +536,7 @@ func (i *InventoryConsumer) Retry(operation func() (string, error)) (string, err
 	for i.RetryOptions.OperationMaxRetries == -1 || attempts < i.RetryOptions.OperationMaxRetries {
 		resp, err = operation()
 		if err != nil {
-			Incr(i.MetricsCollector.msgProcessFailures, "Retry", err)
+			metricscollector.Incr(i.MetricsCollector.MsgProcessFailures, "Retry", err)
 			i.Logger.Errorf("request failed: %v", err)
 			attempts++
 			if i.RetryOptions.OperationMaxRetries == -1 || attempts < i.RetryOptions.OperationMaxRetries {

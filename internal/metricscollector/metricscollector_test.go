@@ -1,14 +1,15 @@
-package consumer
+package metricscollector
 
 import (
 	"reflect"
 	"testing"
 
+	"github.com/project-kessel/inventory-api/internal/consumer"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestMetrics_New(t *testing.T) {
-	test := TestCase{
+	test := consumer.TestCase{
 		name:        "TestMetricsNew_DefaultMeters",
 		description: "ensures a metrics collector is configured with all default meters",
 	}

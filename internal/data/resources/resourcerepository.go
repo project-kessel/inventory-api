@@ -103,6 +103,7 @@ func (r *Repo) Create(ctx context.Context, m *model.Resource, namespace string, 
 	}
 
 	tx.Commit()
+	metricscollector.Incr(r.MetricsCollector.OutboxEventWrites, string(model.OperationTypeCreated), nil)
 	return m, nil
 }
 
@@ -153,6 +154,7 @@ func (r *Repo) Update(ctx context.Context, m *model.Resource, id uuid.UUID, name
 	}
 
 	tx.Commit()
+	metricscollector.Incr(r.MetricsCollector.OutboxEventWrites, string(model.OperationTypeUpdated), nil)
 	return m, nil
 }
 
@@ -203,6 +205,7 @@ func (r *Repo) Delete(ctx context.Context, id uuid.UUID, namespace string) (*mod
 	}
 
 	tx.Commit()
+	metricscollector.Incr(r.MetricsCollector.OutboxEventWrites, string(model.OperationTypeDeleted), nil)
 	return resource, nil
 }
 

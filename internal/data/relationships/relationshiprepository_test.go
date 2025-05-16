@@ -38,7 +38,7 @@ func setupMetricsCollector(t *testing.T) *metricscollector.MetricsCollector {
 
 func setupTest(t *testing.T) (*gorm.DB, *metricscollector.MetricsCollector) {
 	db := setupGorm(t)
-	mc := &metricscollector.MetricsCollector{}
+	mc := setupMetricsCollector(t)
 	return db, mc
 }
 

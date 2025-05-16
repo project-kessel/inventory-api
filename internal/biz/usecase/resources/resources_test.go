@@ -7,8 +7,6 @@ import (
 	"sort"
 	"testing"
 
-	"google.golang.org/grpc/metadata"
-
 	"github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2"
 	"github.com/project-kessel/inventory-api/internal/mocks"
 
@@ -23,70 +21,10 @@ import (
 	"github.com/project-kessel/inventory-api/internal/pubsub"
 )
 
-type MockedReporterResourceRepository struct {
-	mock.Mock
-}
-type MockedInventoryResourceRepository struct {
-	mock.Mock
-}
-
-type MockedListenManager struct {
-	mock.Mock
-}
-
-type MockedSubscription struct {
-	mock.Mock
-}
-
-type MockLookupResourcesStream struct {
-	mock.Mock
-	responses []*v1beta1.LookupResourcesResponse
-	current   int
-}
-
-func (m *MockLookupResourcesStream) Recv() (*v1beta1.LookupResourcesResponse, error) {
-	if m.current >= len(m.responses) {
-		return nil, io.EOF
-	}
-	res := m.responses[m.current]
-	m.current++
-	return res, nil
-}
-
-func (m *MockLookupResourcesStream) Header() (metadata.MD, error) {
-	args := m.Called()
-	return args.Get(0).(metadata.MD), args.Error(1)
-}
-
-func (m *MockLookupResourcesStream) Trailer() metadata.MD {
-	args := m.Called()
-	return args.Get(0).(metadata.MD)
-}
-
-func (m *MockLookupResourcesStream) CloseSend() error {
-	args := m.Called()
-	return args.Error(0)
-}
-
-func (m *MockLookupResourcesStream) Context() context.Context {
-	args := m.Called()
-	return args.Get(0).(context.Context)
-}
-
-func (m *MockLookupResourcesStream) SendMsg(msg interface{}) error {
-	args := m.Called(msg)
-	return args.Error(0)
-}
-
-func (m *MockLookupResourcesStream) RecvMsg(msg interface{}) error {
-	args := m.Called(msg)
-	return args.Error(0)
-}
-
 func TestLookupResources_Success(t *testing.T) {
 	ctx := context.TODO()
-	repo := &MockedReporterResourceRepository{}
-	inventoryRepo := &MockedInventoryResourceRepository{}
+	repo := &mocks.MockedReporterResourceRepository{}
+	inventoryRepo := &mocks.MockedInventoryResourceRepository{}
 	authz := &mocks.MockAuthz{}
 
 	req := &v1beta1.LookupResourcesRequest{
@@ -128,8 +66,8 @@ func TestLookupResources_Success(t *testing.T) {
 	}
 
 	// Set up mock stream
-	mockStream := &MockLookupResourcesStream{
-		responses: mockResponses,
+	mockStream := &mocks.MockLookupResourcesStream{
+		Responses: mockResponses,
 	}
 	mockStream.On("Recv").Return(mockResponses[0], nil).Once()
 	mockStream.On("Recv").Return(mockResponses[1], nil).Once()
@@ -163,95 +101,6 @@ func TestLookupResources_Success(t *testing.T) {
 	// Verify EOF
 	_, err = stream.Recv()
 	assert.Equal(t, io.EOF, err)
-}
-
-func (r *MockedReporterResourceRepository) Create(ctx context.Context, resource *model.Resource, namespace string, txid string) (*model.Resource, error) {
-	args := r.Called(ctx, resource, namespace, txid)
-	return args.Get(0).(*model.Resource), args.Error(1)
-}
-
-func (r *MockedReporterResourceRepository) Update(ctx context.Context, resource *model.Resource, id uuid.UUID, namespace string, txid string) (*model.Resource, error) {
-	args := r.Called(ctx, resource, id, namespace, txid)
-	return args.Get(0).(*model.Resource), args.Error(1)
-}
-
-func (r *MockedReporterResourceRepository) Delete(ctx context.Context, id uuid.UUID, namespace string) (*model.Resource, error) {
-	args := r.Called(ctx, id, namespace)
-	return args.Get(0).(*model.Resource), args.Error(1)
-}
-
-func (r *MockedReporterResourceRepository) FindByID(ctx context.Context, id uuid.UUID) (*model.Resource, error) {
-	args := r.Called(ctx, id)
-	return args.Get(0).(*model.Resource), args.Error(1)
-}
-
-func (r *MockedReporterResourceRepository) FindByReporterResourceId(ctx context.Context, id model.ReporterResourceId) (*model.Resource, error) {
-	args := r.Called(ctx, id)
-	return args.Get(0).(*model.Resource), args.Error(1)
-}
-
-func (r *MockedReporterResourceRepository) FindByInventoryIdAndReporter(ctx context.Context, inventoryId *uuid.UUID, reporterResourceId string, reporterType string) (*model.Resource, error) {
-	args := r.Called(ctx, inventoryId, reporterResourceId, reporterType)
-	return args.Get(0).(*model.Resource), args.Error(1)
-}
-
-func (r *MockedReporterResourceRepository) FindByReporterResourceIdv1beta2(ctx context.Context, id model.ReporterResourceUniqueIndex) (*model.Resource, error) {
-	args := r.Called(ctx, id)
-	return args.Get(0).(*model.Resource), args.Error(1)
-}
-
-func (r *MockedReporterResourceRepository) FindByInventoryIdAndResourceType(ctx context.Context, inventoryId *uuid.UUID, resourceType string) (*model.Resource, error) {
-	args := r.Called(ctx, inventoryId, resourceType)
-	return args.Get(0).(*model.Resource), args.Error(1)
-}
-
-func (r *MockedReporterResourceRepository) FindByReporterData(ctx context.Context, reporterId string, resourceId string) (*model.Resource, error) {
-	args := r.Called(ctx, reporterId, resourceId)
-	return args.Get(0).(*model.Resource), args.Error(1)
-}
-
-func (r *MockedReporterResourceRepository) ListAll(ctx context.Context) ([]*model.Resource, error) {
-	args := r.Called(ctx)
-	return args.Get(0).([]*model.Resource), args.Error(1)
-}
-
-func (r *MockedInventoryResourceRepository) FindByID(ctx context.Context, id uuid.UUID) (*model.InventoryResource, error) {
-	args := r.Called(ctx, id)
-	return args.Get(0).(*model.InventoryResource), args.Error(1)
-}
-
-func (r *MockedReporterResourceRepository) FindByWorkspaceId(ctx context.Context, workspace_id string) ([]*model.Resource, error) {
-	args := r.Called(ctx)
-	return args.Get(0).([]*model.Resource), args.Error(1)
-}
-
-func (m *MockedListenManager) Subscribe(txid string) pubsub.Subscription {
-	args := m.Called(txid)
-	return args.Get(0).(pubsub.Subscription)
-}
-
-func (m *MockedListenManager) WaitAndDistribute(ctx context.Context) error {
-	args := m.Called(ctx)
-	return args.Error(0)
-}
-
-func (m *MockedListenManager) Run(ctx context.Context) error {
-	args := m.Called(ctx)
-	return args.Error(0)
-}
-
-func (m *MockedSubscription) NotificationC() <-chan []byte {
-	args := m.Called()
-	return args.Get(0).(chan []byte)
-}
-
-func (m *MockedSubscription) Unsubscribe() {
-	m.Called()
-}
-
-func (m *MockedSubscription) BlockForNotification(ctx context.Context) error {
-	args := m.Called(ctx)
-	return args.Error(0)
 }
 
 func resource1() *model.Resource {
@@ -372,8 +221,8 @@ var defaultUseCaseConfig = &UsecaseConfig{
 
 func TestCreateReturnsDbError(t *testing.T) {
 	resource := resource1()
-	repo := &MockedReporterResourceRepository{}
-	inventoryRepo := &MockedInventoryResourceRepository{}
+	repo := &mocks.MockedReporterResourceRepository{}
+	inventoryRepo := &mocks.MockedInventoryResourceRepository{}
 
 	// DB Error
 	repo.On("FindByReporterData", mock.Anything, mock.Anything, mock.Anything).Return((*model.Resource)(nil), gorm.ErrDuplicatedKey)
@@ -388,8 +237,8 @@ func TestCreateReturnsDbError(t *testing.T) {
 
 func TestCreateReturnsDbErrorBackwardsCompatible(t *testing.T) {
 	resource := resource1()
-	repo := &MockedReporterResourceRepository{}
-	inventoryRepo := &MockedInventoryResourceRepository{}
+	repo := &mocks.MockedReporterResourceRepository{}
+	inventoryRepo := &mocks.MockedInventoryResourceRepository{}
 
 	// Validates backwards compatibility, record was not found via new method
 	repo.On("FindByReporterData", mock.Anything, mock.Anything, mock.Anything).Return((*model.Resource)(nil), gorm.ErrRecordNotFound)
@@ -406,8 +255,8 @@ func TestCreateReturnsDbErrorBackwardsCompatible(t *testing.T) {
 
 func TestCreateResourceAlreadyExists(t *testing.T) {
 	resource := resource1()
-	repo := &MockedReporterResourceRepository{}
-	inventoryRepo := &MockedInventoryResourceRepository{}
+	repo := &mocks.MockedReporterResourceRepository{}
+	inventoryRepo := &mocks.MockedInventoryResourceRepository{}
 
 	// Resource already exists
 	repo.On("FindByReporterData", mock.Anything, mock.Anything, mock.Anything).Return(&model.Resource{}, nil)
@@ -422,8 +271,8 @@ func TestCreateResourceAlreadyExists(t *testing.T) {
 
 func TestCreateResourceAlreadyExistsBackwardsCompatible(t *testing.T) {
 	resource := resource1()
-	repo := &MockedReporterResourceRepository{}
-	inventoryRepo := &MockedInventoryResourceRepository{}
+	repo := &mocks.MockedReporterResourceRepository{}
+	inventoryRepo := &mocks.MockedInventoryResourceRepository{}
 
 	// Validates backwards compatibility
 	repo.On("FindByReporterData", mock.Anything, mock.Anything, mock.Anything).Return(&model.Resource{}, gorm.ErrRecordNotFound)
@@ -443,10 +292,10 @@ func TestCreateNewResource(t *testing.T) {
 	id, err := uuid.NewV7()
 	assert.Nil(t, err)
 
-	repo := &MockedReporterResourceRepository{}
-	inventoryRepo := &MockedInventoryResourceRepository{}
-	listenMan := &MockedListenManager{}
-	sub := MockedSubscription{}
+	repo := &mocks.MockedReporterResourceRepository{}
+	inventoryRepo := &mocks.MockedInventoryResourceRepository{}
+	listenMan := &mocks.MockedListenManager{}
+	sub := mocks.MockedSubscription{}
 	returnedResource := model.Resource{
 		ID: id,
 	}
@@ -476,10 +325,10 @@ func TestCreateNewResource_ConsumerDisabled(t *testing.T) {
 	id, err := uuid.NewV7()
 	assert.Nil(t, err)
 
-	repo := &MockedReporterResourceRepository{}
-	inventoryRepo := &MockedInventoryResourceRepository{}
-	listenMan := &MockedListenManager{}
-	sub := MockedSubscription{}
+	repo := &mocks.MockedReporterResourceRepository{}
+	inventoryRepo := &mocks.MockedInventoryResourceRepository{}
+	listenMan := &mocks.MockedListenManager{}
+	sub := mocks.MockedSubscription{}
 	returnedResource := model.Resource{
 		ID: id,
 	}
@@ -518,11 +367,11 @@ func TestCreateNewResource_ConsistencyToken(t *testing.T) {
 	id, err := uuid.NewV7()
 	assert.Nil(t, err)
 
-	repo := &MockedReporterResourceRepository{}
-	inventoryRepo := &MockedInventoryResourceRepository{}
+	repo := &mocks.MockedReporterResourceRepository{}
+	inventoryRepo := &mocks.MockedInventoryResourceRepository{}
 	m := &mocks.MockAuthz{}
-	listenMan := &MockedListenManager{}
-	sub := MockedSubscription{}
+	listenMan := &mocks.MockedListenManager{}
+	sub := mocks.MockedSubscription{}
 
 	returnedResource := model.Resource{
 		ID: id,
@@ -557,8 +406,8 @@ func TestCreateNewResource_ConsistencyToken(t *testing.T) {
 
 func TestUpdateReturnsDbError(t *testing.T) {
 	resource := resource1()
-	repo := &MockedReporterResourceRepository{}
-	inventoryRepo := &MockedInventoryResourceRepository{}
+	repo := &mocks.MockedReporterResourceRepository{}
+	inventoryRepo := &mocks.MockedInventoryResourceRepository{}
 
 	// DB Error
 	repo.On("FindByReporterData", mock.Anything, mock.Anything, mock.Anything).Return((*model.Resource)(nil), gorm.ErrDuplicatedKey)
@@ -572,8 +421,8 @@ func TestUpdateReturnsDbError(t *testing.T) {
 }
 func TestUpdateReturnsDbErrorBackwardsCompatible(t *testing.T) {
 	resource := resource1()
-	repo := &MockedReporterResourceRepository{}
-	inventoryRepo := &MockedInventoryResourceRepository{}
+	repo := &mocks.MockedReporterResourceRepository{}
+	inventoryRepo := &mocks.MockedInventoryResourceRepository{}
 
 	// Validates backwards compatibility
 	repo.On("FindByReporterData", mock.Anything, mock.Anything, mock.Anything).Return((*model.Resource)(nil), gorm.ErrRecordNotFound)
@@ -593,10 +442,10 @@ func TestUpdateNewResourceCreatesIt(t *testing.T) {
 	id, err := uuid.NewV7()
 	assert.Nil(t, err)
 
-	repo := &MockedReporterResourceRepository{}
-	inventoryRepo := &MockedInventoryResourceRepository{}
-	listenMan := &MockedListenManager{}
-	sub := MockedSubscription{}
+	repo := &mocks.MockedReporterResourceRepository{}
+	inventoryRepo := &mocks.MockedInventoryResourceRepository{}
+	listenMan := &mocks.MockedListenManager{}
+	sub := mocks.MockedSubscription{}
 	returnedResource := model.Resource{
 		ID: id,
 	}
@@ -629,10 +478,10 @@ func TestUpdateExistingResource(t *testing.T) {
 
 	resource.ID = id
 
-	repo := &MockedReporterResourceRepository{}
-	inventoryRepo := &MockedInventoryResourceRepository{}
-	listenMan := &MockedListenManager{}
-	sub := MockedSubscription{}
+	repo := &mocks.MockedReporterResourceRepository{}
+	inventoryRepo := &mocks.MockedInventoryResourceRepository{}
+	listenMan := &mocks.MockedListenManager{}
+	sub := mocks.MockedSubscription{}
 	returnedResource := model.Resource{
 		ID: id,
 	}
@@ -664,10 +513,10 @@ func TestUpdateExistingResourceBackwardsCompatible(t *testing.T) {
 
 	resource.ID = id
 
-	repo := &MockedReporterResourceRepository{}
-	inventoryRepo := &MockedInventoryResourceRepository{}
-	listenMan := &MockedListenManager{}
-	sub := MockedSubscription{}
+	repo := &mocks.MockedReporterResourceRepository{}
+	inventoryRepo := &mocks.MockedInventoryResourceRepository{}
+	listenMan := &mocks.MockedListenManager{}
+	sub := mocks.MockedSubscription{}
 	returnedResource := model.Resource{
 		ID: id,
 	}
@@ -696,8 +545,8 @@ func TestUpdateExistingResourceBackwardsCompatible(t *testing.T) {
 }
 
 func TestDeleteReturnsDbError(t *testing.T) {
-	repo := &MockedReporterResourceRepository{}
-	inventoryRepo := &MockedInventoryResourceRepository{}
+	repo := &mocks.MockedReporterResourceRepository{}
+	inventoryRepo := &mocks.MockedInventoryResourceRepository{}
 
 	// Validates backwards compatibility
 	repo.On("FindByReporterData", mock.Anything, mock.Anything, mock.Anything).Return((*model.Resource)(nil), gorm.ErrDuplicatedKey)
@@ -710,8 +559,8 @@ func TestDeleteReturnsDbError(t *testing.T) {
 	repo.AssertExpectations(t)
 }
 func TestDeleteReturnsDbErrorBackwardsCompatible(t *testing.T) {
-	repo := &MockedReporterResourceRepository{}
-	inventoryRepo := &MockedInventoryResourceRepository{}
+	repo := &mocks.MockedReporterResourceRepository{}
+	inventoryRepo := &mocks.MockedInventoryResourceRepository{}
 
 	// Validates backwards compatibility
 	repo.On("FindByReporterData", mock.Anything, mock.Anything, mock.Anything).Return((*model.Resource)(nil), gorm.ErrRecordNotFound)
@@ -727,8 +576,8 @@ func TestDeleteReturnsDbErrorBackwardsCompatible(t *testing.T) {
 }
 
 func TestDeleteNonexistentResource(t *testing.T) {
-	repo := &MockedReporterResourceRepository{}
-	inventoryRepo := &MockedInventoryResourceRepository{}
+	repo := &mocks.MockedReporterResourceRepository{}
+	inventoryRepo := &mocks.MockedInventoryResourceRepository{}
 
 	// Resource already exists
 	repo.On("FindByReporterData", mock.Anything, mock.Anything, mock.Anything).Return((*model.Resource)(nil), gorm.ErrRecordNotFound)
@@ -743,8 +592,8 @@ func TestDeleteNonexistentResource(t *testing.T) {
 }
 
 func TestDeleteResource(t *testing.T) {
-	repo := &MockedReporterResourceRepository{}
-	inventoryRepo := &MockedInventoryResourceRepository{}
+	repo := &mocks.MockedReporterResourceRepository{}
+	inventoryRepo := &mocks.MockedInventoryResourceRepository{}
 	ctx := context.TODO()
 	id, err := uuid.NewV7()
 	assert.Nil(t, err)
@@ -764,8 +613,8 @@ func TestDeleteResource(t *testing.T) {
 }
 
 func TestDeleteResourceBackwardsCompatible(t *testing.T) {
-	repo := &MockedReporterResourceRepository{}
-	inventoryRepo := &MockedInventoryResourceRepository{}
+	repo := &mocks.MockedReporterResourceRepository{}
+	inventoryRepo := &mocks.MockedInventoryResourceRepository{}
 	ctx := context.TODO()
 	id, err := uuid.NewV7()
 	assert.Nil(t, err)
@@ -789,8 +638,8 @@ func TestDeleteResourceBackwardsCompatible(t *testing.T) {
 func TestCreateResource_PersistenceDisabled(t *testing.T) {
 	ctx := context.TODO()
 	resource := resource1()
-	repo := &MockedReporterResourceRepository{}
-	inventoryRepo := &MockedInventoryResourceRepository{}
+	repo := &mocks.MockedReporterResourceRepository{}
+	inventoryRepo := &mocks.MockedInventoryResourceRepository{}
 
 	// Mock as if persistence is not disabled, for assurance
 	repo.On("FindByReporterData", mock.Anything, mock.Anything, mock.Anything).Return(&model.Resource{}, nil)
@@ -824,8 +673,8 @@ func TestCreateResource_PersistenceDisabled(t *testing.T) {
 func TestUpdateResource_PersistenceDisabled(t *testing.T) {
 	ctx := context.TODO()
 	resource := resource1()
-	repo := &MockedReporterResourceRepository{}
-	inventoryRepo := &MockedInventoryResourceRepository{}
+	repo := &mocks.MockedReporterResourceRepository{}
+	inventoryRepo := &mocks.MockedInventoryResourceRepository{}
 
 	// Mock as if persistence is not disabled, for assurance
 	repo.On("FindByReporterData", mock.Anything, mock.Anything, mock.Anything).Return(&model.Resource{}, nil)
@@ -857,11 +706,11 @@ func TestUpdate_ReadAfterWrite(t *testing.T) {
 	id, err := uuid.NewV7()
 	assert.Nil(t, err)
 
-	repo := &MockedReporterResourceRepository{}
-	inventoryRepo := &MockedInventoryResourceRepository{}
+	repo := &mocks.MockedReporterResourceRepository{}
+	inventoryRepo := &mocks.MockedInventoryResourceRepository{}
 	authz := &mocks.MockAuthz{}
-	listenMan := &MockedListenManager{}
-	sub := MockedSubscription{}
+	listenMan := &mocks.MockedListenManager{}
+	sub := mocks.MockedSubscription{}
 
 	returnedResource := model.Resource{
 		ID: id,
@@ -898,11 +747,11 @@ func TestUpdate_ConsumerDisabled(t *testing.T) {
 	id, err := uuid.NewV7()
 	assert.Nil(t, err)
 
-	repo := &MockedReporterResourceRepository{}
-	inventoryRepo := &MockedInventoryResourceRepository{}
+	repo := &mocks.MockedReporterResourceRepository{}
+	inventoryRepo := &mocks.MockedInventoryResourceRepository{}
 	authz := &mocks.MockAuthz{}
-	listenMan := &MockedListenManager{}
-	sub := MockedSubscription{}
+	listenMan := &mocks.MockedListenManager{}
+	sub := mocks.MockedSubscription{}
 
 	returnedResource := model.Resource{
 		ID: id,
@@ -941,8 +790,8 @@ func TestDeleteResource_PersistenceDisabled(t *testing.T) {
 	id, err := uuid.NewV7()
 	assert.Nil(t, err)
 
-	repo := &MockedReporterResourceRepository{}
-	inventoryRepo := &MockedInventoryResourceRepository{}
+	repo := &mocks.MockedReporterResourceRepository{}
+	inventoryRepo := &mocks.MockedInventoryResourceRepository{}
 
 	// Mock as if persistence is not disabled, for assurance
 	repo.On("FindByReporterResourceId", mock.Anything, mock.Anything).Return(&model.Resource{
@@ -969,8 +818,8 @@ func TestDeleteResource_PersistenceDisabled(t *testing.T) {
 func TestCheck_MissingResource(t *testing.T) {
 	ctx := context.TODO()
 
-	inventoryRepo := &MockedInventoryResourceRepository{}
-	repo := &MockedReporterResourceRepository{}
+	inventoryRepo := &mocks.MockedInventoryResourceRepository{}
+	repo := &mocks.MockedReporterResourceRepository{}
 	m := &mocks.MockAuthz{}
 
 	repo.On("FindByReporterResourceId", mock.Anything, mock.Anything).Return(&model.Resource{}, gorm.ErrRecordNotFound)
@@ -995,8 +844,8 @@ func TestCheck_MissingResource(t *testing.T) {
 func TestCheck_ResourceExistsError(t *testing.T) {
 	ctx := context.TODO()
 
-	inventoryRepo := &MockedInventoryResourceRepository{}
-	repo := &MockedReporterResourceRepository{}
+	inventoryRepo := &mocks.MockedInventoryResourceRepository{}
+	repo := &mocks.MockedReporterResourceRepository{}
 	m := &mocks.MockAuthz{}
 
 	repo.On("FindByReporterResourceId", mock.Anything, mock.Anything).Return(&model.Resource{}, gorm.ErrUnsupportedDriver) // some random error
@@ -1013,8 +862,8 @@ func TestCheck_ResourceExistsError(t *testing.T) {
 func TestCheck_ErrorWithKessel(t *testing.T) {
 	ctx := context.TODO()
 
-	inventoryRepo := &MockedInventoryResourceRepository{}
-	repo := &MockedReporterResourceRepository{}
+	inventoryRepo := &mocks.MockedInventoryResourceRepository{}
+	repo := &mocks.MockedReporterResourceRepository{}
 	m := &mocks.MockAuthz{}
 
 	repo.On("FindByReporterResourceId", mock.Anything, mock.Anything).Return(&model.Resource{}, nil)
@@ -1033,8 +882,8 @@ func TestCheck_Allowed(t *testing.T) {
 	ctx := context.TODO()
 	resource := resource1()
 
-	inventoryRepo := &MockedInventoryResourceRepository{}
-	repo := &MockedReporterResourceRepository{}
+	inventoryRepo := &mocks.MockedInventoryResourceRepository{}
+	repo := &mocks.MockedReporterResourceRepository{}
 	m := &mocks.MockAuthz{}
 
 	repo.On("FindByReporterResourceId", mock.Anything, mock.Anything).Return(resource, nil)
@@ -1059,8 +908,8 @@ func TestCheck_Allowed(t *testing.T) {
 func TestCheckForUpdate_ResourceExistsError(t *testing.T) {
 	ctx := context.TODO()
 
-	inventoryRepo := &MockedInventoryResourceRepository{}
-	repo := &MockedReporterResourceRepository{}
+	inventoryRepo := &mocks.MockedInventoryResourceRepository{}
+	repo := &mocks.MockedReporterResourceRepository{}
 	m := &mocks.MockAuthz{}
 
 	repo.On("FindByReporterResourceId", mock.Anything, mock.Anything).Return(&model.Resource{}, gorm.ErrUnsupportedDriver) // some random error
@@ -1077,8 +926,8 @@ func TestCheckForUpdate_ResourceExistsError(t *testing.T) {
 func TestCheckForUpdate_ErrorWithKessel(t *testing.T) {
 	ctx := context.TODO()
 
-	inventoryRepo := &MockedInventoryResourceRepository{}
-	repo := &MockedReporterResourceRepository{}
+	inventoryRepo := &mocks.MockedInventoryResourceRepository{}
+	repo := &mocks.MockedReporterResourceRepository{}
 	m := &mocks.MockAuthz{}
 
 	repo.On("FindByReporterResourceId", mock.Anything, mock.Anything).Return(&model.Resource{}, nil)
@@ -1097,8 +946,8 @@ func TestCheckForUpdate_WorkspaceAllowed(t *testing.T) {
 	ctx := context.TODO()
 	resource := resource1()
 
-	inventoryRepo := &MockedInventoryResourceRepository{}
-	repo := &MockedReporterResourceRepository{}
+	inventoryRepo := &mocks.MockedInventoryResourceRepository{}
+	repo := &mocks.MockedReporterResourceRepository{}
 	m := &mocks.MockAuthz{}
 
 	repo.On("FindByReporterResourceId", mock.Anything, mock.Anything).Return(resource, nil)
@@ -1116,8 +965,8 @@ func TestCheckForUpdate_WorkspaceAllowed(t *testing.T) {
 func TestCheckForUpdate_MissingResource_Allowed(t *testing.T) {
 	ctx := context.TODO()
 
-	inventoryRepo := &MockedInventoryResourceRepository{}
-	repo := &MockedReporterResourceRepository{}
+	inventoryRepo := &mocks.MockedInventoryResourceRepository{}
+	repo := &mocks.MockedReporterResourceRepository{}
 	m := &mocks.MockAuthz{}
 
 	repo.On("FindByReporterResourceId", mock.Anything, mock.Anything).Return(&model.Resource{}, gorm.ErrRecordNotFound)
@@ -1139,8 +988,8 @@ func TestCheckForUpdate_Allowed(t *testing.T) {
 	ctx := context.TODO()
 	resource := resource1()
 
-	inventoryRepo := &MockedInventoryResourceRepository{}
-	repo := &MockedReporterResourceRepository{}
+	inventoryRepo := &mocks.MockedInventoryResourceRepository{}
+	repo := &mocks.MockedReporterResourceRepository{}
 	m := &mocks.MockAuthz{}
 
 	repo.On("FindByReporterResourceId", mock.Anything, mock.Anything).Return(resource, nil)
@@ -1168,8 +1017,8 @@ func TestCheckForUpdate_Allowed(t *testing.T) {
 func TestListResourcesInWorkspace_Error(t *testing.T) {
 	ctx := context.TODO()
 
-	inventoryRepo := &MockedInventoryResourceRepository{}
-	repo := &MockedReporterResourceRepository{}
+	inventoryRepo := &mocks.MockedInventoryResourceRepository{}
+	repo := &mocks.MockedReporterResourceRepository{}
 	m := &mocks.MockAuthz{}
 
 	repo.On("FindByWorkspaceId", mock.Anything, mock.Anything).Return([]*model.Resource{}, errors.New("failed querying"))
@@ -1187,8 +1036,8 @@ func TestListResourcesInWorkspace_Error(t *testing.T) {
 func TestListResourcesInWorkspace_NoResources(t *testing.T) {
 	ctx := context.TODO()
 
-	inventoryRepo := &MockedInventoryResourceRepository{}
-	repo := &MockedReporterResourceRepository{}
+	inventoryRepo := &mocks.MockedInventoryResourceRepository{}
+	repo := &mocks.MockedReporterResourceRepository{}
 	m := &mocks.MockAuthz{}
 
 	repo.On("FindByWorkspaceId", mock.Anything, mock.Anything).Return([]*model.Resource{}, nil)
@@ -1209,8 +1058,8 @@ func TestListResourcesInWorkspace_NoResources(t *testing.T) {
 func TestListResourcesInWorkspace_ResourcesAllowedTrue(t *testing.T) {
 	ctx := context.TODO()
 
-	inventoryRepo := &MockedInventoryResourceRepository{}
-	repo := &MockedReporterResourceRepository{}
+	inventoryRepo := &mocks.MockedInventoryResourceRepository{}
+	repo := &mocks.MockedReporterResourceRepository{}
 	m := &mocks.MockAuthz{}
 
 	resource := resource1()
@@ -1250,8 +1099,8 @@ func TestListResourcesInWorkspace_ResourcesAllowedTrue(t *testing.T) {
 func TestListResourcesInWorkspace_MultipleResourcesAllowedTrue(t *testing.T) {
 	ctx := context.TODO()
 
-	inventoryRepo := &MockedInventoryResourceRepository{}
-	repo := &MockedReporterResourceRepository{}
+	inventoryRepo := &mocks.MockedInventoryResourceRepository{}
+	repo := &mocks.MockedReporterResourceRepository{}
 	m := &mocks.MockAuthz{}
 
 	resource := resource1()
@@ -1288,8 +1137,8 @@ func TestListResourcesInWorkspace_MultipleResourcesAllowedTrue(t *testing.T) {
 func TestListResourcesInWorkspace_MultipleResourcesOneFalseTwoTrueLastError(t *testing.T) {
 	ctx := context.TODO()
 
-	inventoryRepo := &MockedInventoryResourceRepository{}
-	repo := &MockedReporterResourceRepository{}
+	inventoryRepo := &mocks.MockedInventoryResourceRepository{}
+	repo := &mocks.MockedReporterResourceRepository{}
 	m := &mocks.MockAuthz{}
 
 	resource := resource1()
@@ -1327,8 +1176,8 @@ func TestListResourcesInWorkspace_MultipleResourcesOneFalseTwoTrueLastError(t *t
 func TestListResourcesInWorkspace_ResourcesAllowedError(t *testing.T) {
 	ctx := context.TODO()
 
-	inventoryRepo := &MockedInventoryResourceRepository{}
-	repo := &MockedReporterResourceRepository{}
+	inventoryRepo := &mocks.MockedInventoryResourceRepository{}
+	repo := &mocks.MockedReporterResourceRepository{}
 	m := &mocks.MockAuthz{}
 
 	resource := resource1()
@@ -1510,8 +1359,8 @@ func TestComputeReadAfterWrite(t *testing.T) {
 
 func TestUpsertReturnsDbError(t *testing.T) {
 	resource := resource1()
-	repo := &MockedReporterResourceRepository{}
-	inventoryRepo := &MockedInventoryResourceRepository{}
+	repo := &mocks.MockedReporterResourceRepository{}
+	inventoryRepo := &mocks.MockedInventoryResourceRepository{}
 
 	// DB Error
 	repo.On("FindByReporterResourceIdv1beta2", mock.Anything, mock.Anything).Return((*model.Resource)(nil), gorm.ErrDuplicatedKey)
@@ -1526,8 +1375,8 @@ func TestUpsertReturnsDbError(t *testing.T) {
 
 func TestUpsertReturnsExistingUpdatedResource(t *testing.T) {
 	resource := resource1()
-	repo := &MockedReporterResourceRepository{}
-	inventoryRepo := &MockedInventoryResourceRepository{}
+	repo := &mocks.MockedReporterResourceRepository{}
+	inventoryRepo := &mocks.MockedInventoryResourceRepository{}
 
 	// No Error
 	repo.On("FindByReporterResourceIdv1beta2", mock.Anything, mock.Anything).Return(resource, nil)
@@ -1545,11 +1394,11 @@ func TestUpsertReturnsExistingUpdatedResource(t *testing.T) {
 func TestUpsert_ReadAfterWrite(t *testing.T) {
 	resource := resource1()
 
-	repo := &MockedReporterResourceRepository{}
-	inventoryRepo := &MockedInventoryResourceRepository{}
+	repo := &mocks.MockedReporterResourceRepository{}
+	inventoryRepo := &mocks.MockedInventoryResourceRepository{}
 	authz := &mocks.MockAuthz{}
-	listenMan := &MockedListenManager{}
-	sub := MockedSubscription{}
+	listenMan := &mocks.MockedListenManager{}
+	sub := mocks.MockedSubscription{}
 
 	// no existing resource, need to create
 	repo.On("FindByReporterResourceIdv1beta2", mock.Anything, mock.Anything).Return((*model.Resource)(nil), gorm.ErrRecordNotFound)
@@ -1581,11 +1430,11 @@ func TestUpsert_ReadAfterWrite(t *testing.T) {
 func TestUpsert_ConsumerDisabled(t *testing.T) {
 	resource := resource1()
 
-	repo := &MockedReporterResourceRepository{}
-	inventoryRepo := &MockedInventoryResourceRepository{}
+	repo := &mocks.MockedReporterResourceRepository{}
+	inventoryRepo := &mocks.MockedInventoryResourceRepository{}
 	authz := &mocks.MockAuthz{}
-	listenMan := &MockedListenManager{}
-	sub := MockedSubscription{}
+	listenMan := &mocks.MockedListenManager{}
+	sub := mocks.MockedSubscription{}
 
 	// no existing resource, need to create
 	repo.On("FindByReporterResourceIdv1beta2", mock.Anything, mock.Anything).Return((*model.Resource)(nil), gorm.ErrRecordNotFound)

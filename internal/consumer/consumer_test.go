@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
+	"github.com/project-kessel/inventory-api/internal/metricscollector"
 	"github.com/stretchr/testify/mock"
 
 	"github.com/project-kessel/inventory-api/internal/biz/model"
@@ -34,7 +35,7 @@ type TestCase struct {
 	config          *Config
 	completedConfig CompletedConfig
 	inv             InventoryConsumer
-	metrics         MetricsCollector
+	metrics         metricscollector.MetricsCollector
 	logger          *log.Helper
 }
 

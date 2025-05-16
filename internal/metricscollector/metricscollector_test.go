@@ -1,21 +1,23 @@
-package consumer
+package metricscollector
 
 import (
 	"reflect"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"go.opentelemetry.io/otel"
 )
 
 func TestMetrics_New(t *testing.T) {
-	test := TestCase{
-		name:        "TestMetricsNew_DefaultMeters",
-		description: "ensures a metrics collector is configured with all default meters",
+	test := struct {
+		mc MetricsCollector
+	}{
+		mc: MetricsCollector{},
 	}
-	errs := test.TestSetup()
-	assert.Nil(t, errs)
+	err := test.mc.New(otel.Meter("github.com/project-kessel/inventory-api/blob/main/internal/server/otel"))
+	assert.Nil(t, err)
 
-	structValues := reflect.ValueOf(test.metrics)
+	structValues := reflect.ValueOf(test.mc)
 	numField := structValues.NumField()
 
 	// ensures all fields in struct are properly instantiated
@@ -25,5 +27,5 @@ func TestMetrics_New(t *testing.T) {
 		assert.True(t, !field.IsZero())
 	}
 	// ensures the number of fields in the type and instantiated version match
-	assert.Equal(t, reflect.TypeOf(MetricsCollector{}).NumField(), reflect.TypeOf(test.metrics).NumField())
+	assert.Equal(t, reflect.TypeOf(MetricsCollector{}).NumField(), reflect.TypeOf(test.mc).NumField())
 }

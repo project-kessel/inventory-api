@@ -32,6 +32,7 @@ func (b *bearerAuth) RequireTransportSecurity() bool {
 
 // V1Beta2
 func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_Host(t *testing.T) {
+	enableShortMode(t)
 	t.Parallel()
 
 	ctx := context.Background()
@@ -100,6 +101,7 @@ func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_Host(t *testing.T) {
 }
 
 func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_Notifications(t *testing.T) {
+	enableShortMode(t)
 	t.Parallel()
 
 	ctx := context.Background()
@@ -169,6 +171,7 @@ func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_Notifications(t *testing.T) 
 }
 
 func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_K8S_Cluster(t *testing.T) {
+	enableShortMode(t)
 	t.Parallel()
 
 	ctx := context.Background()
@@ -241,6 +244,7 @@ func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_K8S_Cluster(t *testing.T) {
 }
 
 func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_K8S_Policy(t *testing.T) {
+	enableShortMode(t)
 	t.Parallel()
 
 	ctx := context.Background()
@@ -365,6 +369,7 @@ func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_K8S_Policy(t *testing.T) {
 //}
 
 func TestInventoryAPIHTTP_v1beta2_Host_ConsistentWrite(t *testing.T) {
+	enableShortMode(t)
 	t.Parallel()
 
 	resourceId := "wait-for-sync-host-abc-123"
@@ -440,4 +445,10 @@ func TestInventoryAPIHTTP_v1beta2_Host_ConsistentWrite(t *testing.T) {
 	}
 	_, err = client.DeleteResource(ctx, &delReq)
 	assert.NoError(t, err, "Failed to Delete Resource")
+}
+
+func enableShortMode(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping long-running test in short mode")
+	}
 }

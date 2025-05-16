@@ -1,0 +1,52 @@
+name: v1beta2 unit test coverage
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  v1beta2-unit-test-coverage:
+    name: v1beta2 unit test coverage
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22.x'
+          cache: true
+
+      - name: Install Go dependencies
+        run: go get ./...
+        shell: bash
+
+      - name: Run v1beta2 + Internal Unit Tests (excluding v1beta1)
+        run: |
+          COVERPKG=$(go list -deps ./api/kessel/inventory/v1beta2/... ./internal/... | \
+            grep 'github.com/project-kessel/inventory-api' | \
+            grep -v '/v1beta1/' | \
+            paste -sd "," -)
+
+          echo "COVERPKG: $COVERPKG"
+
+          go test -short -covermode=atomic \
+            -coverpkg=$COVERPKG \
+            -coverprofile=v1beta2-coverage.out \
+            ./api/kessel/inventory/v1beta2/... ./internal/...
+        shell: bash
+
+
+      - name: Display v1beta2 Coverage Percentage
+        run: |
+          echo "### Total Coverage:" >> "$GITHUB_STEP_SUMMARY"
+          TOTAL_COVERAGE=$(go tool cover -func=v1beta2-coverage.out | grep total | awk '{print $3}')
+          echo "**${TOTAL_COVERAGE}**" | tee -a "$GITHUB_STEP_SUMMARY"
+        shell: bash
+
+
+

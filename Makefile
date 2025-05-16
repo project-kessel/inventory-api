@@ -190,6 +190,10 @@ inventory-down:
 inventory-down-kind:
 	./scripts/stop-inventory-kind.sh
 
+.PHONY: update-local-dashboards
+update-local-dashboards:
+	./scripts/update-local-dashboards.sh
+
 .PHONY: run
 # run api locally
 run: local-build

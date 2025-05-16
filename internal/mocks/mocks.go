@@ -2,6 +2,7 @@ package mocks
 
 import (
 	"context"
+	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1"
 
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
 
@@ -19,6 +20,20 @@ type MockAuthz struct {
 
 type MockConsumer struct {
 	mock.Mock
+}
+
+type MockHealthRepo struct {
+	mock.Mock
+}
+
+func (m *MockHealthRepo) IsBackendAvailable(ctx context.Context) (*pb.GetReadyzResponse, error) {
+	args := m.Called(ctx)
+	return args.Get(0).(*pb.GetReadyzResponse), args.Error(1)
+}
+
+func (m *MockHealthRepo) IsRelationsAvailable(ctx context.Context) (*pb.GetReadyzResponse, error) {
+	args := m.Called(ctx)
+	return args.Get(0).(*pb.GetReadyzResponse), args.Error(1)
 }
 
 func (m *MockAuthz) Health(ctx context.Context) (*kesselv1.GetReadyzResponse, error) {

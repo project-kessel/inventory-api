@@ -24,9 +24,11 @@ type MockAuthz struct {
 type MockConsumer struct {
 	mock.Mock
 }
+
 type MockedReporterResourceRepository struct {
 	mock.Mock
 }
+
 type MockedInventoryResourceRepository struct {
 	mock.Mock
 }

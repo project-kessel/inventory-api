@@ -6,6 +6,7 @@ import (
 
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/google/uuid"
+	"github.com/project-kessel/inventory-api/internal/metricscollector"
 	"gorm.io/gorm"
 
 	"github.com/project-kessel/inventory-api/internal/biz/model"
@@ -13,12 +14,14 @@ import (
 )
 
 type Repo struct {
-	DB *gorm.DB
+	DB               *gorm.DB
+	MetricsCollector *metricscollector.MetricsCollector
 }
 
-func New(db *gorm.DB) *Repo {
+func New(db *gorm.DB, mc *metricscollector.MetricsCollector) *Repo {
 	return &Repo{
-		DB: db,
+		DB:               db,
+		MetricsCollector: mc,
 	}
 }
 
@@ -100,6 +103,7 @@ func (r *Repo) Create(ctx context.Context, m *model.Resource, namespace string, 
 	}
 
 	tx.Commit()
+	metricscollector.Incr(r.MetricsCollector.OutboxEventWrites, string(model.OperationTypeCreated), nil)
 	return m, nil
 }
 
@@ -150,6 +154,7 @@ func (r *Repo) Update(ctx context.Context, m *model.Resource, id uuid.UUID, name
 	}
 
 	tx.Commit()
+	metricscollector.Incr(r.MetricsCollector.OutboxEventWrites, string(model.OperationTypeUpdated), nil)
 	return m, nil
 }
 
@@ -200,6 +205,7 @@ func (r *Repo) Delete(ctx context.Context, id uuid.UUID, namespace string) (*mod
 	}
 
 	tx.Commit()
+	metricscollector.Incr(r.MetricsCollector.OutboxEventWrites, string(model.OperationTypeDeleted), nil)
 	return resource, nil
 }
 

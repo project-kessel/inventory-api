@@ -6,8 +6,10 @@ import (
 
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/google/uuid"
+	"github.com/project-kessel/inventory-api/internal/metricscollector"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.opentelemetry.io/otel"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 
@@ -24,6 +26,20 @@ func setupGorm(t *testing.T) *gorm.DB {
 	require.Nil(t, err)
 
 	return db
+}
+
+func setupMetricsCollector(t *testing.T) *metricscollector.MetricsCollector {
+	mc := &metricscollector.MetricsCollector{}
+	meter := otel.Meter("github.com/project-kessel/inventory-api/blob/main/internal/server/otel")
+	err := mc.New(meter)
+	require.Nil(t, err)
+	return mc
+}
+
+func setupTest(t *testing.T) (*gorm.DB, *metricscollector.MetricsCollector) {
+	db := setupGorm(t)
+	mc := setupMetricsCollector(t)
+	return db, mc
 }
 
 var (
@@ -165,19 +181,19 @@ func assertEqualRelationshipHistory(t *testing.T, r *model.Relationship, rh *mod
 //	assert.Equal(t, litrExpected, litr)
 //}
 
-func createResource(t *testing.T, db *gorm.DB, resource *model.Resource) uuid.UUID {
-	res, err := resources.New(db).Create(context.TODO(), resource, "foobar-namespace", emptyTxId)
+func createResource(t *testing.T, db *gorm.DB, mc *metricscollector.MetricsCollector, resource *model.Resource) uuid.UUID {
+	res, err := resources.New(db, mc).Create(context.TODO(), resource, "foobar-namespace", emptyTxId)
 	assert.Nil(t, err)
 	return res.ID
 }
 
 func TestCreateRelationship(t *testing.T) {
-	db := setupGorm(t)
+	db, mc := setupTest(t)
 	repo := New(db)
 	ctx := context.TODO()
 
-	subjectId := createResource(t, db, resourceSubject())
-	objectId := createResource(t, db, resourceObject())
+	subjectId := createResource(t, db, mc, resourceSubject())
+	objectId := createResource(t, db, mc, resourceObject())
 
 	// Saving a relationship not present in the system saves correctly
 	r, err := repo.Save(ctx, relationship1(subjectId, objectId))
@@ -197,7 +213,7 @@ func TestCreateRelationship(t *testing.T) {
 }
 
 func TestCreateRelationshipFailsIfEitherResourceIsNotFound(t *testing.T) {
-	db := setupGorm(t)
+	db, mc := setupTest(t)
 	repo := New(db)
 	ctx := context.TODO()
 
@@ -209,14 +225,14 @@ func TestCreateRelationshipFailsIfEitherResourceIsNotFound(t *testing.T) {
 	assert.Error(t, err)
 
 	// Only subject
-	subjectId := createResource(t, db, resourceSubject())
+	subjectId := createResource(t, db, mc, resourceSubject())
 	_, err = repo.Save(ctx, relationship1(subjectId, uuid.Nil))
 	assert.Error(t, err)
 
 	// Only object
 	db = setupGorm(t)
 	repo = New(db)
-	objectId := createResource(t, db, resourceSubject())
+	objectId := createResource(t, db, mc, resourceSubject())
 	_, err = repo.Save(ctx, relationship1(uuid.Nil, objectId))
 	assert.Error(t, err)
 }
@@ -235,12 +251,12 @@ func TestUpdateFailsIfRelationshipNotFound(t *testing.T) {
 }
 
 func TestUpdateResource(t *testing.T) {
-	db := setupGorm(t)
+	db, mc := setupTest(t)
 	repo := New(db)
 	ctx := context.TODO()
 
-	subjectId := createResource(t, db, resourceSubject())
-	objectId := createResource(t, db, resourceObject())
+	subjectId := createResource(t, db, mc, resourceSubject())
+	objectId := createResource(t, db, mc, resourceObject())
 	r, err := repo.Save(ctx, relationship1(subjectId, objectId))
 	assert.NotNil(t, r)
 	assert.Nil(t, err)
@@ -279,12 +295,12 @@ func TestDeleteFailsIfResourceNotFound(t *testing.T) {
 }
 
 func TestDeleteAfterCreate(t *testing.T) {
-	db := setupGorm(t)
+	db, mc := setupTest(t)
 	repo := New(db)
 	ctx := context.TODO()
 
-	subjectId := createResource(t, db, resourceSubject())
-	objectId := createResource(t, db, resourceObject())
+	subjectId := createResource(t, db, mc, resourceSubject())
+	objectId := createResource(t, db, mc, resourceObject())
 	r, err := repo.Save(ctx, relationship1(subjectId, objectId))
 	assert.NotNil(t, r)
 	assert.Nil(t, err)
@@ -304,12 +320,12 @@ func TestDeleteAfterCreate(t *testing.T) {
 }
 
 func TestDeleteAfterUpdate(t *testing.T) {
-	db := setupGorm(t)
+	db, mc := setupTest(t)
 	repo := New(db)
 	ctx := context.TODO()
 
-	subjectId := createResource(t, db, resourceSubject())
-	objectId := createResource(t, db, resourceObject())
+	subjectId := createResource(t, db, mc, resourceSubject())
+	objectId := createResource(t, db, mc, resourceObject())
 
 	// Create
 	r, err := repo.Save(ctx, relationship1(subjectId, objectId))
@@ -332,12 +348,12 @@ func TestDeleteAfterUpdate(t *testing.T) {
 }
 
 func TestFindRelationship(t *testing.T) {
-	db := setupGorm(t)
+	db, mc := setupTest(t)
 	repo := New(db)
 	ctx := context.TODO()
 
-	subjectId := createResource(t, db, resourceSubject())
-	objectId := createResource(t, db, resourceObject())
+	subjectId := createResource(t, db, mc, resourceSubject())
+	objectId := createResource(t, db, mc, resourceObject())
 
 	// Saving a relationship not present in the system saves correctly
 	r, err := repo.Save(ctx, relationship1(subjectId, objectId))
@@ -359,12 +375,12 @@ func TestFindRelationship(t *testing.T) {
 }
 
 func TestListAll(t *testing.T) {
-	db := setupGorm(t)
+	db, mc := setupTest(t)
 	repo := New(db)
 	ctx := context.TODO()
 
-	subjectId := createResource(t, db, resourceSubject())
-	objectId := createResource(t, db, resourceObject())
+	subjectId := createResource(t, db, mc, resourceSubject())
+	objectId := createResource(t, db, mc, resourceObject())
 
 	// first check negative case with zero relationships
 	relationships, err := repo.ListAll(ctx)

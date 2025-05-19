@@ -36,7 +36,7 @@ data:
           "collapsed": false,
           "datasource": {
             "type": "prometheus",
-            "uid": "PDD8BE47D10408F45"
+            "uid": "$datasource"
           },
           "gridPos": {
             "h": 1,
@@ -50,7 +50,7 @@ data:
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "PDD8BE47D10408F45"
+                "uid": "$datasource"
               },
               "refId": "A"
             }
@@ -61,7 +61,7 @@ data:
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "PDD8BE47D10408F45"
+            "uid": "$datasource"
           },
           "fieldConfig": {
             "defaults": {
@@ -109,7 +109,7 @@ data:
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "PDD8BE47D10408F45"
+                "uid": "$datasource"
               },
               "editorMode": "code",
               "expr": "sum(kafka_connect_worker_connector_total_task_count{job=\"$job\",connector=\"$connector\"})",
@@ -125,7 +125,7 @@ data:
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "PDD8BE47D10408F45"
+            "uid": "$datasource"
           },
           "fieldConfig": {
             "defaults": {
@@ -173,7 +173,7 @@ data:
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "PDD8BE47D10408F45"
+                "uid": "$datasource"
               },
               "editorMode": "code",
               "expr": "sum(kafka_connect_worker_connector_running_task_count{job=\"$job\",connector=\"$connector\"})",
@@ -189,7 +189,7 @@ data:
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "PDD8BE47D10408F45"
+            "uid": "$datasource"
           },
           "fieldConfig": {
             "defaults": {
@@ -241,7 +241,7 @@ data:
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "PDD8BE47D10408F45"
+                "uid": "$datasource"
               },
               "editorMode": "code",
               "expr": "sum(kafka_connect_worker_connector_paused_task_count{job=\"$job\",connector=\"$connector\"})",
@@ -257,7 +257,7 @@ data:
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "PDD8BE47D10408F45"
+            "uid": "$datasource"
           },
           "fieldConfig": {
             "defaults": {
@@ -309,7 +309,7 @@ data:
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "PDD8BE47D10408F45"
+                "uid": "$datasource"
               },
               "editorMode": "code",
               "expr": "sum(kafka_connect_worker_connector_failed_task_count{job=\"$job\",connector=\"$connector\"})",
@@ -325,7 +325,7 @@ data:
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "PDD8BE47D10408F45"
+            "uid": "$datasource"
           },
           "fieldConfig": {
             "defaults": {
@@ -377,7 +377,7 @@ data:
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "PDD8BE47D10408F45"
+                "uid": "$datasource"
               },
               "editorMode": "code",
               "expr": "sum(kafka_connect_worker_connector_unassigned_task_count{job=\"$job\",connector=\"$connector\"})",
@@ -393,7 +393,7 @@ data:
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "PDD8BE47D10408F45"
+            "uid": "$datasource"
           },
           "fieldConfig": {
             "defaults": {
@@ -445,7 +445,7 @@ data:
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "PDD8BE47D10408F45"
+                "uid": "$datasource"
               },
               "editorMode": "code",
               "expr": "sum(kafka_connect_worker_connector_destroyed_task_count{job=\"$job\",connector=\"$connector\"})",
@@ -461,7 +461,7 @@ data:
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "PDD8BE47D10408F45"
+            "uid": "$datasource"
           },
           "description": "",
           "fieldConfig": {
@@ -550,7 +550,7 @@ data:
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "PDD8BE47D10408F45"
+                "uid": "$datasource"
               },
               "editorMode": "code",
               "expr": "sum (kafka_connect_connector_status{job=\"$job\",connector=\"$connector\",status=\"running\"})",
@@ -562,7 +562,7 @@ data:
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "PDD8BE47D10408F45"
+                "uid": "$datasource"
               },
               "editorMode": "code",
               "expr": "sum (kafka_connect_connector_status{job=\"$job\",connector=\"$connector\",status=\"stopped\"})",
@@ -574,7 +574,7 @@ data:
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "PDD8BE47D10408F45"
+                "uid": "$datasource"
               },
               "editorMode": "code",
               "expr": "sum (kafka_connect_connector_status{job=\"$job\",connector=\"$connector\",status=\"paused\"})",
@@ -590,7 +590,7 @@ data:
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "PDD8BE47D10408F45"
+            "uid": "$datasource"
           },
           "description": "",
           "fieldConfig": {
@@ -709,7 +709,7 @@ data:
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "PDD8BE47D10408F45"
+                "uid": "$datasource"
               },
               "editorMode": "code",
               "expr": "sum(kafka_connect_worker_connector_running_task_count{job=\"$job\",connector=\"$connector\"})",
@@ -721,7 +721,7 @@ data:
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "PDD8BE47D10408F45"
+                "uid": "$datasource"
               },
               "editorMode": "code",
               "expr": "sum(kafka_connect_worker_connector_failed_task_count{job=\"$job\",connector=\"$connector\"})",
@@ -733,7 +733,7 @@ data:
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "PDD8BE47D10408F45"
+                "uid": "$datasource"
               },
               "editorMode": "code",
               "expr": "sum(kafka_connect_worker_connector_paused_task_count{job=\"$job\",connector=\"$connector\"})",
@@ -745,7 +745,7 @@ data:
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "PDD8BE47D10408F45"
+                "uid": "$datasource"
               },
               "editorMode": "code",
               "expr": "sum(kafka_connect_worker_connector_unassigned_task_count{job=\"$job\",connector=\"$connector\"})",
@@ -757,7 +757,7 @@ data:
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "PDD8BE47D10408F45"
+                "uid": "$datasource"
               },
               "editorMode": "code",
               "expr": "sum(kafka_connect_worker_connector_destroyed_task_count{job=\"$job\",connector=\"$connector\"})",
@@ -773,7 +773,7 @@ data:
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "PDD8BE47D10408F45"
+            "uid": "$datasource"
           },
           "description": "Status of connectors over time",
           "fieldConfig": {
@@ -921,7 +921,7 @@ data:
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "PDD8BE47D10408F45"
+                "uid": "$datasource"
               },
               "editorMode": "code",
               "expr": "sum (kafka_connect_connector_status{job=\"$job\",connector=\"$connector\",status!=\"\"}) by (status) ",
@@ -940,7 +940,7 @@ data:
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "PDD8BE47D10408F45"
+            "uid": "$datasource"
           },
           "description": "Status of tasks over time",
           "fieldConfig": {
@@ -1103,7 +1103,7 @@ data:
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "PDD8BE47D10408F45"
+                "uid": "$datasource"
               },
               "editorMode": "code",
               "expr": "sum(kafka_connect_worker_connector_running_task_count{job=\"$job\",connector=\"$connector\"})",
@@ -1118,7 +1118,7 @@ data:
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "PDD8BE47D10408F45"
+                "uid": "$datasource"
               },
               "editorMode": "code",
               "expr": "sum(kafka_connect_worker_connector_failed_task_count{job=\"$job\",connector=\"$connector\"})",
@@ -1133,7 +1133,7 @@ data:
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "PDD8BE47D10408F45"
+                "uid": "$datasource"
               },
               "editorMode": "code",
               "expr": "sum(kafka_connect_worker_connector_paused_task_count{job=\"$job\",connector=\"$connector\"})",
@@ -1148,7 +1148,7 @@ data:
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "PDD8BE47D10408F45"
+                "uid": "$datasource"
               },
               "editorMode": "code",
               "expr": "sum(kafka_connect_worker_connector_destroyed_task_count{job=\"$job\",connector=\"$connector\"})",
@@ -1163,7 +1163,7 @@ data:
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "PDD8BE47D10408F45"
+                "uid": "$datasource"
               },
               "editorMode": "code",
               "expr": "sum(kafka_connect_worker_connector_unassigned_task_count{job=\"$job\",connector=\"$connector\"})",
@@ -1183,7 +1183,7 @@ data:
           "collapsed": false,
           "datasource": {
             "type": "prometheus",
-            "uid": "PDD8BE47D10408F45"
+            "uid": "$datasource"
           },
           "gridPos": {
             "h": 1,
@@ -1197,7 +1197,7 @@ data:
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "PDD8BE47D10408F45"
+                "uid": "$datasource"
               },
               "refId": "A"
             }
@@ -1208,7 +1208,7 @@ data:
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "PDD8BE47D10408F45"
+            "uid": "$datasource"
           },
           "fieldConfig": {
             "defaults": {
@@ -1294,7 +1294,7 @@ data:
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "PDD8BE47D10408F45"
+                "uid": "$datasource"
               },
               "editorMode": "code",
               "exemplar": true,
@@ -1311,7 +1311,7 @@ data:
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "PDD8BE47D10408F45"
+            "uid": "$datasource"
           },
           "fieldConfig": {
             "defaults": {
@@ -1397,7 +1397,7 @@ data:
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "PDD8BE47D10408F45"
+                "uid": "$datasource"
               },
               "editorMode": "code",
               "expr": "sum without(area)(jvm_memory_used_bytes{job=\"$job\"})",
@@ -1409,7 +1409,7 @@ data:
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "PDD8BE47D10408F45"
+                "uid": "$datasource"
               },
               "editorMode": "code",
               "expr": "jvm_memory_bytes_max{job=\"$job\",area=\"heap\"}",
@@ -1425,7 +1425,7 @@ data:
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "PDD8BE47D10408F45"
+            "uid": "$datasource"
           },
           "fieldConfig": {
             "defaults": {
@@ -1513,7 +1513,7 @@ data:
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "PDD8BE47D10408F45"
+                "uid": "$datasource"
               },
               "editorMode": "code",
               "expr": "sum without(gc)(rate(jvm_gc_collection_seconds_sum{job=\"$job\"}[5m]))",
@@ -1530,7 +1530,7 @@ data:
           "collapsed": false,
           "datasource": {
             "type": "prometheus",
-            "uid": "PDD8BE47D10408F45"
+            "uid": "$datasource"
           },
           "gridPos": {
             "h": 1,
@@ -1544,7 +1544,7 @@ data:
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "PDD8BE47D10408F45"
+                "uid": "$datasource"
               },
               "refId": "A"
             }
@@ -1555,7 +1555,7 @@ data:
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "PDD8BE47D10408F45"
+            "uid": "$datasource"
           },
           "description": "The average per-second number of records output from the transformations and written to Kafka for this task belonging to the named source connector in this worker. This is after transformations are applied and excludes any records filtered out by the transformations.",
           "fieldConfig": {
@@ -1642,7 +1642,7 @@ data:
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "PDD8BE47D10408F45"
+                "uid": "$datasource"
               },
               "editorMode": "code",
               "exemplar": true,
@@ -1661,7 +1661,7 @@ data:
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "PDD8BE47D10408F45"
+            "uid": "$datasource"
           },
           "description": "The average per-second number of records produced/polled (before transformation) by this task belonging to the named source connector in this worker.",
           "fieldConfig": {
@@ -1748,7 +1748,7 @@ data:
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "PDD8BE47D10408F45"
+                "uid": "$datasource"
               },
               "editorMode": "code",
               "exemplar": true,
@@ -1767,7 +1767,7 @@ data:
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "PDD8BE47D10408F45"
+            "uid": "$datasource"
           },
           "description": "The average number of records that have been produced by this task but not yet completely written to Kafka.",
           "fieldConfig": {
@@ -1854,7 +1854,7 @@ data:
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "PDD8BE47D10408F45"
+                "uid": "$datasource"
               },
               "editorMode": "code",
               "expr": "avg(kafka_connect_source_task_source_record_active_count{job=\"$job\",connector=\"$connector\",task!=\"\"})",
@@ -1872,7 +1872,7 @@ data:
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "PDD8BE47D10408F45"
+            "uid": "$datasource"
           },
           "description": "The maximum number of records that have been produced by this task but not yet completely written to Kafka.",
           "fieldConfig": {
@@ -1959,7 +1959,7 @@ data:
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "PDD8BE47D10408F45"
+                "uid": "$datasource"
               },
               "editorMode": "code",
               "expr": "max(kafka_connect_source_task_source_record_active_count{job=\"$job\",connector=\"$connector\",task!=\"\"})",
@@ -1977,7 +1977,7 @@ data:
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "PDD8BE47D10408F45"
+            "uid": "$datasource"
           },
           "description": "The average time in milliseconds taken by this task to poll for a batch of source records",
           "fieldConfig": {
@@ -2064,7 +2064,7 @@ data:
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "PDD8BE47D10408F45"
+                "uid": "$datasource"
               },
               "editorMode": "code",
               "expr": "kafka_connect_source_task_poll_batch_avg_time_ms{job=\"$job\",connector=\"$connector\",task!=\"\"}",
@@ -2082,7 +2082,7 @@ data:
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "PDD8BE47D10408F45"
+            "uid": "$datasource"
           },
           "description": "The maximum time in milliseconds taken by this task to poll for a batch of source records",
           "fieldConfig": {
@@ -2169,7 +2169,7 @@ data:
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "PDD8BE47D10408F45"
+                "uid": "$datasource"
               },
               "editorMode": "code",
               "expr": "kafka_connect_source_task_poll_batch_max_time_ms{job=\"$job\",connector=\"$connector\",task!=\"\"}",
@@ -2189,7 +2189,7 @@ data:
           "collapsed": false,
           "datasource": {
             "type": "prometheus",
-            "uid": "PDD8BE47D10408F45"
+            "uid": "$datasource"
           },
           "gridPos": {
             "h": 1,
@@ -2203,7 +2203,7 @@ data:
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "PDD8BE47D10408F45"
+                "uid": "$datasource"
               },
               "refId": "A"
             }
@@ -2214,7 +2214,7 @@ data:
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "PDD8BE47D10408F45"
+            "uid": "$datasource"
           },
           "description": "Total number of rebalances",
           "fieldConfig": {
@@ -2279,7 +2279,7 @@ data:
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "PDD8BE47D10408F45"
+                "uid": "$datasource"
               },
               "editorMode": "code",
               "exemplar": true,
@@ -2298,7 +2298,7 @@ data:
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "PDD8BE47D10408F45"
+            "uid": "$datasource"
           },
           "description": "Time since last rebalance",
           "fieldConfig": {
@@ -2364,7 +2364,7 @@ data:
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "PDD8BE47D10408F45"
+                "uid": "$datasource"
               },
               "editorMode": "code",
               "expr": "kafka_connect_worker_rebalance_time_since_last_rebalance_ms{job=\"$job\"} >= 0",
@@ -2382,7 +2382,7 @@ data:
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "PDD8BE47D10408F45"
+            "uid": "$datasource"
           },
           "description": "Rebalances average time",
           "fieldConfig": {
@@ -2470,7 +2470,7 @@ data:
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "PDD8BE47D10408F45"
+                "uid": "$datasource"
               },
               "editorMode": "code",
               "expr": "kafka_connect_worker_rebalance_rebalance_avg_time_ms{job=\"$job\"}",
@@ -2490,7 +2490,7 @@ data:
           "collapsed": false,
           "datasource": {
             "type": "prometheus",
-            "uid": "PDD8BE47D10408F45"
+            "uid": "$datasource"
           },
           "gridPos": {
             "h": 1,
@@ -2504,7 +2504,7 @@ data:
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "PDD8BE47D10408F45"
+                "uid": "$datasource"
               },
               "refId": "A"
             }
@@ -2515,7 +2515,7 @@ data:
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "PDD8BE47D10408F45"
+            "uid": "$datasource"
           },
           "description": "Average size of the batches processed by the connector",
           "fieldConfig": {
@@ -2602,7 +2602,7 @@ data:
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "PDD8BE47D10408F45"
+                "uid": "$datasource"
               },
               "editorMode": "code",
               "expr": "kafka_connect_connector_task_metrics_batch_size_avg{job=\"$job\",connector=\"$connector\"}",
@@ -2620,7 +2620,7 @@ data:
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "PDD8BE47D10408F45"
+            "uid": "$datasource"
           },
           "description": "Maximum size of the batches processed by the connector",
           "fieldConfig": {
@@ -2707,7 +2707,7 @@ data:
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "PDD8BE47D10408F45"
+                "uid": "$datasource"
               },
               "editorMode": "code",
               "expr": "kafka_connect_connector_task_metrics_batch_size_max{job=\"$job\",connector=\"$connector\"}",
@@ -2725,7 +2725,7 @@ data:
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "PDD8BE47D10408F45"
+            "uid": "$datasource"
           },
           "description": "Average percentage of the task’s offset commit attempts that succeeded",
           "fieldConfig": {
@@ -2814,7 +2814,7 @@ data:
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "PDD8BE47D10408F45"
+                "uid": "$datasource"
               },
               "editorMode": "code",
               "expr": "kafka_connect_connector_task_metrics_offset_commit_success_percentage{job=\"$job\",connector=\"$connector\"}",
@@ -2832,7 +2832,7 @@ data:
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "PDD8BE47D10408F45"
+            "uid": "$datasource"
           },
           "description": "The average time in milliseconds taken by this task to commit offsets",
           "fieldConfig": {
@@ -2919,7 +2919,7 @@ data:
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "PDD8BE47D10408F45"
+                "uid": "$datasource"
               },
               "expr": "kafka_connect_connector_task_metrics_offset_commit_avg_time_ms{job=\"kafka-connect\", env=\"$env\",instance=~\"$instance\",kafka_connect_cluster_id=~\"$kafka_connect_cluster_id\",connector=~\"$connector\"}",
               "format": "time_series",
@@ -2935,7 +2935,7 @@ data:
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "PDD8BE47D10408F45"
+            "uid": "$datasource"
           },
           "description": "The fraction of time this task has spent in the running state.",
           "fieldConfig": {
@@ -3024,7 +3024,7 @@ data:
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "PDD8BE47D10408F45"
+                "uid": "$datasource"
               },
               "editorMode": "code",
               "expr": "kafka_connect_connector_task_metrics_running_ratio{job=\"$job\",connector=\"$connector\"}",
@@ -3044,7 +3044,7 @@ data:
           "collapsed": false,
           "datasource": {
             "type": "prometheus",
-            "uid": "PDD8BE47D10408F45"
+            "uid": "$datasource"
           },
           "gridPos": {
             "h": 1,
@@ -3058,7 +3058,7 @@ data:
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "PDD8BE47D10408F45"
+                "uid": "$datasource"
               },
               "refId": "A"
             }
@@ -3069,7 +3069,7 @@ data:
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "PDD8BE47D10408F45"
+            "uid": "$datasource"
           },
           "description": "Total number of failures seen by task",
           "fieldConfig": {
@@ -3158,7 +3158,7 @@ data:
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "PDD8BE47D10408F45"
+                "uid": "$datasource"
               },
               "editorMode": "code",
               "expr": "kafka_connect_task_error_total_record_failures{job=\"$job\",connector=\"$connector\"}",
@@ -3176,7 +3176,7 @@ data:
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "PDD8BE47D10408F45"
+            "uid": "$datasource"
           },
           "description": "Total number of errors seen by task",
           "fieldConfig": {
@@ -3265,7 +3265,7 @@ data:
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "PDD8BE47D10408F45"
+                "uid": "$datasource"
               },
               "editorMode": "code",
               "expr": "kafka_connect_task_error_total_record_errors{job=\"$job\",connector=\"$connector\"}",
@@ -3283,7 +3283,7 @@ data:
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "PDD8BE47D10408F45"
+            "uid": "$datasource"
           },
           "description": "Total number of records skipped by task",
           "fieldConfig": {
@@ -3372,7 +3372,7 @@ data:
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "PDD8BE47D10408F45"
+                "uid": "$datasource"
               },
               "editorMode": "code",
               "expr": "kafka_connect_task_error_total_records_skipped{job=\"$job\",connector=\"$connector\"}",
@@ -3390,7 +3390,7 @@ data:
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "PDD8BE47D10408F45"
+            "uid": "$datasource"
           },
           "description": "The number of messages that was logged into either the dead letter queue or with Log4j",
           "fieldConfig": {
@@ -3479,7 +3479,7 @@ data:
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "PDD8BE47D10408F45"
+                "uid": "$datasource"
               },
               "editorMode": "code",
               "expr": "kafka_connect_task_error_total_errors_logged{job=\"$job\",connector=\"$connector\"}",
@@ -3497,7 +3497,7 @@ data:
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "PDD8BE47D10408F45"
+            "uid": "$datasource"
           },
           "description": "Total number of retries made by task",
           "fieldConfig": {
@@ -3586,7 +3586,7 @@ data:
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "PDD8BE47D10408F45"
+                "uid": "$datasource"
               },
               "editorMode": "code",
               "expr": "kafka_connect_task_error_total_retries{job=\"$job\",connector=\"$connector\"}",
@@ -3604,7 +3604,7 @@ data:
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "PDD8BE47D10408F45"
+            "uid": "$datasource"
           },
           "description": "Number of produce requests to the dead letter queue",
           "fieldConfig": {
@@ -3693,7 +3693,7 @@ data:
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "PDD8BE47D10408F45"
+                "uid": "$datasource"
               },
               "editorMode": "code",
               "exemplar": true,
@@ -3712,7 +3712,7 @@ data:
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "PDD8BE47D10408F45"
+            "uid": "$datasource"
           },
           "description": "Number of failed produce requests to the dead letter queue",
           "fieldConfig": {
@@ -3801,7 +3801,7 @@ data:
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "PDD8BE47D10408F45"
+                "uid": "$datasource"
               },
               "editorMode": "code",
               "exemplar": true,

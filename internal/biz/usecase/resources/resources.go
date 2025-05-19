@@ -11,6 +11,7 @@ import (
 
 	"github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2"
 	"github.com/project-kessel/inventory-api/internal/pubsub"
+	"github.com/sony/gobreaker"
 
 	"github.com/google/uuid"
 
@@ -64,6 +65,7 @@ type UsecaseConfig struct {
 type Usecase struct {
 	reporterResourceRepository  ReporterResourceRepository
 	inventoryResourceRepository InventoryResourceRepository
+	waitForNotifBreaker         *gobreaker.CircuitBreaker
 	Authz                       authzapi.Authorizer
 	Eventer                     eventingapi.Manager
 	Namespace                   string
@@ -75,10 +77,11 @@ type Usecase struct {
 
 func New(reporterResourceRepository ReporterResourceRepository, inventoryResourceRepository InventoryResourceRepository,
 	authz authzapi.Authorizer, eventer eventingapi.Manager, namespace string, logger log.Logger,
-	listenManager pubsub.ListenManagerImpl, usecaseConfig *UsecaseConfig) *Usecase {
+	listenManager pubsub.ListenManagerImpl, waitForNotifBreaker *gobreaker.CircuitBreaker, usecaseConfig *UsecaseConfig) *Usecase {
 	return &Usecase{
 		reporterResourceRepository:  reporterResourceRepository,
 		inventoryResourceRepository: inventoryResourceRepository,
+		waitForNotifBreaker:         waitForNotifBreaker,
 		Authz:                       authz,
 		Eventer:                     eventer,
 		Namespace:                   namespace,
@@ -138,12 +141,29 @@ func (uc *Usecase) Upsert(ctx context.Context, m *model.Resource, write_visibili
 			timeoutCtx, cancel := context.WithTimeout(ctx, listenTimeout)
 			defer cancel()
 
-			err = subscription.BlockForNotification(timeoutCtx)
-			if err != nil {
-				if errors.Is(err, pubsub.ErrWaitContextCancelled) {
-					return ret, nil
+			_, err := uc.waitForNotifBreaker.Execute(func() (interface{}, error) {
+				err = subscription.BlockForNotification(timeoutCtx)
+				if err != nil {
+					// Return error for circuit breaker
+					return nil, err
 				}
-				return nil, err
+				return nil, nil
+			})
+
+			if err != nil {
+				switch {
+				case errors.Is(err, pubsub.ErrWaitContextCancelled):
+					uc.log.WithContext(ctx).Debugf("Reached timeout waiting for notification from consumer")
+					return ret, nil
+				case errors.Is(err, gobreaker.ErrOpenState):
+					uc.log.WithContext(ctx).Debugf("Circuit breaker is open, skipped waiting for notification from consumer")
+					return ret, nil
+				case errors.Is(err, gobreaker.ErrTooManyRequests):
+					uc.log.WithContext(ctx).Debugf("Circuit breaker is half-open, skipped waiting for notification from consumer")
+					return ret, nil
+				default:
+					return nil, err
+				}
 			}
 		}
 	}

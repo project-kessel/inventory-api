@@ -257,7 +257,8 @@ services:
       - '3000:3000'
     volumes:
       - grafana-storage:/var/lib/grafana
-      - ./configs/monitoring/grafana-datasource.yml:/etc/grafana/provisioning/datasources/datasource.yml
+      - ./configs/monitoring/datasources:/etc/grafana/provisioning/datasources/
+      - ./configs/monitoring/dashboards:/etc/grafana/provisioning/dashboards/
     networks:
       - kessel
 volumes:

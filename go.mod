@@ -20,6 +20,7 @@ require (
 	github.com/project-kessel/relations-api v0.0.0-20250408111129-d8b61a77bd9a
 	github.com/prometheus/client_golang v1.22.0
 	github.com/redhatinsights/app-common-go v1.6.8
+	github.com/sony/gobreaker v1.0.0
 	github.com/spf13/cobra v1.9.1
 	github.com/spf13/pflag v1.0.6
 	github.com/spf13/viper v1.20.1

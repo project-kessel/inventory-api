@@ -6,8 +6,10 @@ import (
 
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/google/uuid"
+	"github.com/project-kessel/inventory-api/internal/metricscollector"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.opentelemetry.io/otel"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 
@@ -28,6 +30,21 @@ func setupGorm(t *testing.T) *gorm.DB {
 	require.Nil(t, err)
 
 	return db
+}
+
+func setupMetricsCollector(t *testing.T) *metricscollector.MetricsCollector {
+	mc := &metricscollector.MetricsCollector{}
+	meter := otel.Meter("github.com/project-kessel/inventory-api/blob/main/internal/server/otel")
+	err := mc.New(meter)
+	require.Nil(t, err)
+	return mc
+}
+
+func setupTest(t *testing.T) (*gorm.DB, *Repo) {
+	db := setupGorm(t)
+	mc := setupMetricsCollector(t)
+	repo := New(db, mc)
+	return db, repo
 }
 
 func resource1() *model.Resource {
@@ -115,8 +132,7 @@ func assertEqualLocalHistoryToResource(t *testing.T, r *model.Resource, litr *mo
 }
 
 func TestCreateResource(t *testing.T) {
-	db := setupGorm(t)
-	repo := New(db)
+	db, repo := setupTest(t)
 	ctx := context.TODO()
 
 	// Saving a resource not present in the system saves correctly
@@ -154,8 +170,7 @@ func TestCreateResource(t *testing.T) {
 }
 
 func TestCreateResourceWithInventoryId(t *testing.T) {
-	db := setupGorm(t)
-	repo := New(db)
+	db, repo := setupTest(t)
 	ctx := context.TODO()
 	res1 := resource1()
 	res2 := resource1()
@@ -202,8 +217,7 @@ func TestCreateResourceWithInventoryId(t *testing.T) {
 }
 
 func TestUpdateFailsIfResourceNotFound(t *testing.T) {
-	db := setupGorm(t)
-	repo := New(db)
+	db, repo := setupTest(t)
 	ctx := context.TODO()
 
 	id, err := uuid.NewV7()
@@ -220,8 +234,7 @@ func TestUpdateFailsIfResourceNotFound(t *testing.T) {
 }
 
 func TestUpdateResource(t *testing.T) {
-	db := setupGorm(t)
-	repo := New(db)
+	db, repo := setupTest(t)
 	ctx := context.TODO()
 
 	r, err := repo.Create(ctx, resource1(), namespace, emptyTxId)
@@ -263,8 +276,7 @@ func TestUpdateResource(t *testing.T) {
 }
 
 func TestDeleteFailsIfResourceNotFound(t *testing.T) {
-	db := setupGorm(t)
-	repo := New(db)
+	db, repo := setupTest(t)
 	ctx := context.TODO()
 
 	id, err := uuid.NewV7()
@@ -281,8 +293,7 @@ func TestDeleteFailsIfResourceNotFound(t *testing.T) {
 }
 
 func TestDeleteAfterCreate(t *testing.T) {
-	db := setupGorm(t)
-	repo := New(db)
+	db, repo := setupTest(t)
 	ctx := context.TODO()
 
 	r, err := repo.Create(ctx, resource1(), namespace, emptyTxId)
@@ -319,8 +330,7 @@ func TestDeleteAfterCreate(t *testing.T) {
 }
 
 func TestDeleteAfterUpdate(t *testing.T) {
-	db := setupGorm(t)
-	repo := New(db)
+	db, repo := setupTest(t)
 	ctx := context.TODO()
 
 	// Create
@@ -349,8 +359,7 @@ func TestDeleteAfterUpdate(t *testing.T) {
 }
 
 func TestFindByReporterResourceId(t *testing.T) {
-	db := setupGorm(t)
-	repo := New(db)
+	_, repo := setupTest(t)
 	ctx := context.TODO()
 
 	// Saving a resource not present in the system saves correctly
@@ -374,8 +383,7 @@ func TestFindByReporterResourceId(t *testing.T) {
 }
 
 func TestFindByReporterData(t *testing.T) {
-	db := setupGorm(t)
-	repo := New(db)
+	_, repo := setupTest(t)
 	ctx := context.TODO()
 	res := resource1()
 	res.ReporterId = "ACM"
@@ -397,8 +405,7 @@ func TestFindByReporterData(t *testing.T) {
 }
 
 func TestFindByWorkspaceId(t *testing.T) {
-	db := setupGorm(t)
-	repo := New(db)
+	_, repo := setupTest(t)
 	ctx := context.TODO()
 	res := resource1()
 	res.ReporterId = "ACM"
@@ -422,8 +429,7 @@ func TestFindByWorkspaceId(t *testing.T) {
 }
 
 func TestListAll(t *testing.T) {
-	db := setupGorm(t)
-	repo := New(db)
+	_, repo := setupTest(t)
 	ctx := context.TODO()
 
 	// check negative case without any resources, slice with 0 elements returned

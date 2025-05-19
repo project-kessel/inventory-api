@@ -5,6 +5,7 @@ import (
 	"strconv"
 
 	"github.com/go-kratos/kratos/v2/log"
+	"github.com/project-kessel/inventory-api/cmd/common"
 	clowder "github.com/redhatinsights/app-common-go/pkg/api/v1"
 
 	"github.com/project-kessel/inventory-api/internal/authn"
@@ -95,23 +96,25 @@ func LogConfigurationInfo(options *OptionsConfig) {
 }
 
 // InjectClowdAppConfig updates service options based on values in the ClowdApp AppConfig
-func (o *OptionsConfig) InjectClowdAppConfig() error {
+func (o *OptionsConfig) InjectClowdAppConfig(appconfig *clowder.AppConfig) error {
 	// check for authz config
-	for _, endpoint := range clowder.LoadedConfig.Endpoints {
-		if endpoint.App == authz.RelationsAPI {
-			o.ConfigureAuthz(endpoint)
+	if len(appconfig.Endpoints) > 0 {
+		for _, endpoint := range appconfig.Endpoints {
+			if endpoint.App == authz.RelationsAPI {
+				o.ConfigureAuthz(endpoint)
+			}
 		}
 	}
 	// check for db config
-	if clowder.LoadedConfig.Database != nil {
-		err := o.ConfigureStorage(clowder.LoadedConfig)
+	if !common.IsNil(appconfig.Database) {
+		err := o.ConfigureStorage(appconfig)
 		if err != nil {
 			return fmt.Errorf("failed to configure storage: %w", err)
 		}
 	}
 	// check for consumer config
-	if o.Consumer.Enabled {
-		o.ConfigureConsumer(clowder.LoadedConfig)
+	if !common.IsNil(appconfig.Kafka) {
+		o.ConfigureConsumer(appconfig)
 	}
 	return nil
 }
@@ -150,10 +153,8 @@ func (o *OptionsConfig) ConfigureConsumer(appconfig *clowder.AppConfig) {
 	}
 	o.Consumer.BootstrapServers = brokers
 
-	if o.Consumer.AuthOptions.Enabled {
-		if appconfig.Kafka.Brokers[0].SecurityProtocol != nil {
-			o.Consumer.AuthOptions.SecurityProtocol = *appconfig.Kafka.Brokers[0].SecurityProtocol
-		}
+	if len(appconfig.Kafka.Brokers) > 0 && appconfig.Kafka.Brokers[0].SecurityProtocol != nil {
+		o.Consumer.AuthOptions.SecurityProtocol = *appconfig.Kafka.Brokers[0].SecurityProtocol
 
 		if appconfig.Kafka.Brokers[0].Sasl != nil {
 			o.Consumer.AuthOptions.SASLMechanism = *appconfig.Kafka.Brokers[0].Sasl.SaslMechanism

@@ -2,6 +2,10 @@ package mocks
 
 import (
 	"context"
+	"github.com/google/uuid"
+	"github.com/project-kessel/inventory-api/internal/pubsub"
+	"google.golang.org/grpc/metadata"
+	"io"
 
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
 
@@ -19,6 +23,28 @@ type MockAuthz struct {
 
 type MockConsumer struct {
 	mock.Mock
+}
+
+type MockedReporterResourceRepository struct {
+	mock.Mock
+}
+
+type MockedInventoryResourceRepository struct {
+	mock.Mock
+}
+
+type MockedListenManager struct {
+	mock.Mock
+}
+
+type MockedSubscription struct {
+	mock.Mock
+}
+
+type MockLookupResourcesStream struct {
+	mock.Mock
+	Responses []*v1beta1.LookupResourcesResponse
+	current   int
 }
 
 func (m *MockAuthz) Health(ctx context.Context) (*kesselv1.GetReadyzResponse, error) {
@@ -90,4 +116,132 @@ func (m *MockConsumer) Close() error {
 func (m *MockConsumer) AssignmentLost() bool {
 	args := m.Called()
 	return args.Get(0).(bool)
+}
+
+func (m *MockLookupResourcesStream) Recv() (*v1beta1.LookupResourcesResponse, error) {
+	if m.current >= len(m.Responses) {
+		return nil, io.EOF
+	}
+	res := m.Responses[m.current]
+	m.current++
+	return res, nil
+}
+
+func (m *MockLookupResourcesStream) Header() (metadata.MD, error) {
+	args := m.Called()
+	return args.Get(0).(metadata.MD), args.Error(1)
+}
+
+func (m *MockLookupResourcesStream) Trailer() metadata.MD {
+	args := m.Called()
+	return args.Get(0).(metadata.MD)
+}
+
+func (m *MockLookupResourcesStream) CloseSend() error {
+	args := m.Called()
+	return args.Error(0)
+}
+
+func (m *MockLookupResourcesStream) Context() context.Context {
+	args := m.Called()
+	return args.Get(0).(context.Context)
+}
+
+func (m *MockLookupResourcesStream) SendMsg(msg interface{}) error {
+	args := m.Called(msg)
+	return args.Error(0)
+}
+
+func (m *MockLookupResourcesStream) RecvMsg(msg interface{}) error {
+	args := m.Called(msg)
+	return args.Error(0)
+}
+
+func (r *MockedReporterResourceRepository) Create(ctx context.Context, resource *model.Resource, namespace string, txid string) (*model.Resource, error) {
+	args := r.Called(ctx, resource, namespace, txid)
+	return args.Get(0).(*model.Resource), args.Error(1)
+}
+
+func (r *MockedReporterResourceRepository) Update(ctx context.Context, resource *model.Resource, id uuid.UUID, namespace string, txid string) (*model.Resource, error) {
+	args := r.Called(ctx, resource, id, namespace, txid)
+	return args.Get(0).(*model.Resource), args.Error(1)
+}
+
+func (r *MockedReporterResourceRepository) Delete(ctx context.Context, id uuid.UUID, namespace string) (*model.Resource, error) {
+	args := r.Called(ctx, id, namespace)
+	return args.Get(0).(*model.Resource), args.Error(1)
+}
+
+func (r *MockedReporterResourceRepository) FindByID(ctx context.Context, id uuid.UUID) (*model.Resource, error) {
+	args := r.Called(ctx, id)
+	return args.Get(0).(*model.Resource), args.Error(1)
+}
+
+func (r *MockedReporterResourceRepository) FindByReporterResourceId(ctx context.Context, id model.ReporterResourceId) (*model.Resource, error) {
+	args := r.Called(ctx, id)
+	return args.Get(0).(*model.Resource), args.Error(1)
+}
+
+func (r *MockedReporterResourceRepository) FindByInventoryIdAndReporter(ctx context.Context, inventoryId *uuid.UUID, reporterResourceId string, reporterType string) (*model.Resource, error) {
+	args := r.Called(ctx, inventoryId, reporterResourceId, reporterType)
+	return args.Get(0).(*model.Resource), args.Error(1)
+}
+
+func (r *MockedReporterResourceRepository) FindByReporterResourceIdv1beta2(ctx context.Context, id model.ReporterResourceUniqueIndex) (*model.Resource, error) {
+	args := r.Called(ctx, id)
+	return args.Get(0).(*model.Resource), args.Error(1)
+}
+
+func (r *MockedReporterResourceRepository) FindByInventoryIdAndResourceType(ctx context.Context, inventoryId *uuid.UUID, resourceType string) (*model.Resource, error) {
+	args := r.Called(ctx, inventoryId, resourceType)
+	return args.Get(0).(*model.Resource), args.Error(1)
+}
+
+func (r *MockedReporterResourceRepository) FindByReporterData(ctx context.Context, reporterId string, resourceId string) (*model.Resource, error) {
+	args := r.Called(ctx, reporterId, resourceId)
+	return args.Get(0).(*model.Resource), args.Error(1)
+}
+
+func (r *MockedReporterResourceRepository) ListAll(ctx context.Context) ([]*model.Resource, error) {
+	args := r.Called(ctx)
+	return args.Get(0).([]*model.Resource), args.Error(1)
+}
+
+func (r *MockedInventoryResourceRepository) FindByID(ctx context.Context, id uuid.UUID) (*model.InventoryResource, error) {
+	args := r.Called(ctx, id)
+	return args.Get(0).(*model.InventoryResource), args.Error(1)
+}
+
+func (r *MockedReporterResourceRepository) FindByWorkspaceId(ctx context.Context, workspace_id string) ([]*model.Resource, error) {
+	args := r.Called(ctx)
+	return args.Get(0).([]*model.Resource), args.Error(1)
+}
+
+func (m *MockedListenManager) Subscribe(txid string) pubsub.Subscription {
+	args := m.Called(txid)
+	return args.Get(0).(pubsub.Subscription)
+}
+
+func (m *MockedListenManager) WaitAndDistribute(ctx context.Context) error {
+	args := m.Called(ctx)
+	return args.Error(0)
+}
+
+func (m *MockedListenManager) Run(ctx context.Context) error {
+	args := m.Called(ctx)
+	return args.Error(0)
+}
+
+func (m *MockedSubscription) NotificationC() <-chan []byte {
+	args := m.Called()
+	return args.Get(0).(chan []byte)
+}
+
+func (m *MockedSubscription) Unsubscribe() {
+	m.Called()
+}
+
+func (m *MockedSubscription) BlockForNotification(ctx context.Context) error {
+	args := m.Called(ctx)
+	return args.Error(0)
 }

@@ -295,7 +295,7 @@ func TestCreateNewResource(t *testing.T) {
 	repo := &mocks.MockedReporterResourceRepository{}
 	inventoryRepo := &mocks.MockedInventoryResourceRepository{}
 	listenMan := &mocks.MockedListenManager{}
-	sub := mocks.MockedSubscription{}
+	sub := &mocks.MockedSubscription{}
 	returnedResource := model.Resource{
 		ID: id,
 	}
@@ -328,7 +328,7 @@ func TestCreateNewResource_ConsumerDisabled(t *testing.T) {
 	repo := &mocks.MockedReporterResourceRepository{}
 	inventoryRepo := &mocks.MockedInventoryResourceRepository{}
 	listenMan := &mocks.MockedListenManager{}
-	sub := mocks.MockedSubscription{}
+	sub := &mocks.MockedSubscription{}
 	returnedResource := model.Resource{
 		ID: id,
 	}
@@ -371,7 +371,7 @@ func TestCreateNewResource_ConsistencyToken(t *testing.T) {
 	inventoryRepo := &mocks.MockedInventoryResourceRepository{}
 	m := &mocks.MockAuthz{}
 	listenMan := &mocks.MockedListenManager{}
-	sub := mocks.MockedSubscription{}
+	sub := &mocks.MockedSubscription{}
 
 	returnedResource := model.Resource{
 		ID: id,
@@ -445,7 +445,7 @@ func TestUpdateNewResourceCreatesIt(t *testing.T) {
 	repo := &mocks.MockedReporterResourceRepository{}
 	inventoryRepo := &mocks.MockedInventoryResourceRepository{}
 	listenMan := &mocks.MockedListenManager{}
-	sub := mocks.MockedSubscription{}
+	sub := &mocks.MockedSubscription{}
 	returnedResource := model.Resource{
 		ID: id,
 	}
@@ -481,7 +481,7 @@ func TestUpdateExistingResource(t *testing.T) {
 	repo := &mocks.MockedReporterResourceRepository{}
 	inventoryRepo := &mocks.MockedInventoryResourceRepository{}
 	listenMan := &mocks.MockedListenManager{}
-	sub := mocks.MockedSubscription{}
+	sub := &mocks.MockedSubscription{}
 	returnedResource := model.Resource{
 		ID: id,
 	}
@@ -516,7 +516,7 @@ func TestUpdateExistingResourceBackwardsCompatible(t *testing.T) {
 	repo := &mocks.MockedReporterResourceRepository{}
 	inventoryRepo := &mocks.MockedInventoryResourceRepository{}
 	listenMan := &mocks.MockedListenManager{}
-	sub := mocks.MockedSubscription{}
+	sub := &mocks.MockedSubscription{}
 	returnedResource := model.Resource{
 		ID: id,
 	}
@@ -710,7 +710,7 @@ func TestUpdate_ReadAfterWrite(t *testing.T) {
 	inventoryRepo := &mocks.MockedInventoryResourceRepository{}
 	authz := &mocks.MockAuthz{}
 	listenMan := &mocks.MockedListenManager{}
-	sub := mocks.MockedSubscription{}
+	sub := &mocks.MockedSubscription{}
 
 	returnedResource := model.Resource{
 		ID: id,
@@ -751,7 +751,7 @@ func TestUpdate_ConsumerDisabled(t *testing.T) {
 	inventoryRepo := &mocks.MockedInventoryResourceRepository{}
 	authz := &mocks.MockAuthz{}
 	listenMan := &mocks.MockedListenManager{}
-	sub := mocks.MockedSubscription{}
+	sub := &mocks.MockedSubscription{}
 
 	returnedResource := model.Resource{
 		ID: id,
@@ -1398,7 +1398,7 @@ func TestUpsert_ReadAfterWrite(t *testing.T) {
 	inventoryRepo := &mocks.MockedInventoryResourceRepository{}
 	authz := &mocks.MockAuthz{}
 	listenMan := &mocks.MockedListenManager{}
-	sub := mocks.MockedSubscription{}
+	sub := &mocks.MockedSubscription{}
 
 	// no existing resource, need to create
 	repo.On("FindByReporterResourceIdv1beta2", mock.Anything, mock.Anything).Return((*model.Resource)(nil), gorm.ErrRecordNotFound)
@@ -1434,7 +1434,7 @@ func TestUpsert_ConsumerDisabled(t *testing.T) {
 	inventoryRepo := &mocks.MockedInventoryResourceRepository{}
 	authz := &mocks.MockAuthz{}
 	listenMan := &mocks.MockedListenManager{}
-	sub := mocks.MockedSubscription{}
+	sub := &mocks.MockedSubscription{}
 
 	// no existing resource, need to create
 	repo.On("FindByReporterResourceIdv1beta2", mock.Anything, mock.Anything).Return((*model.Resource)(nil), gorm.ErrRecordNotFound)

@@ -78,7 +78,7 @@ func init() {
 	}
 
 	if clowder.IsClowderEnabled() {
-		err := options.InjectClowdAppConfig()
+		err := options.InjectClowdAppConfig(clowder.LoadedConfig)
 		if err != nil {
 			panic(err)
 		}

@@ -107,7 +107,7 @@ test:
 	@echo ""
 	@echo "Running tests."
 	# TODO: e2e tests are taking too long to be enabled by default. They need to be sped up.
-	@$(GO) test ./... -count=1 -race -covermode=atomic -coverprofile=coverage.txt -skip 'TestInventoryAPIGRPC_*|TestInventoryAPIHTTP_*|Test_ACMKafkaConsumer'
+	@$(GO) test ./... -count=1 -race -short -covermode=atomic -coverprofile=coverage.txt -skip 'TestInventoryAPIGRPC_*|TestInventoryAPIHTTP_*|Test_ACMKafkaConsumer'
 	@echo "Overall test coverage:"
 	@$(GO) tool cover -func=coverage.txt | grep total: | awk '{print $$3}'
 

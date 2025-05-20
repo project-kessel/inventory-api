@@ -31,16 +31,35 @@ jobs:
         run: go build -tags release -v ./...
       - name: Test
         run: make test
+      - name: Run v1beta2 + Internal Unit Tests (excluding v1beta1)
+        run: |
+          COVERPKG=$(go list -deps ./api/kessel/inventory/v1beta2/... ./internal/... | \
+            grep 'github.com/project-kessel/inventory-api' | \
+            grep -v '/v1beta1/' | \
+            paste -sd "," -)
+
+          echo "COVERPKG: $COVERPKG"
+
+          go test -short -covermode=atomic \
+            -coverpkg=$COVERPKG \
+            -coverprofile=v1beta2-coverage.out \
+            ./api/kessel/inventory/v1beta2/... ./internal/...
+        shell: bash
       - name: Archive code coverage results
         uses: actions/upload-artifact@v4
         with:
           name: code-coverage
           path: coverage.txt
+      - name: Archive v1beta2 coverage
+        uses: actions/upload-artifact@v4
+        with:
+          name: v1beta2-code-coverage
+          path: v1beta2-coverage.out
       - name: code-cov report
         id: code-cov-report
         uses: codecov/codecov-action@v5
         with:
-          files: coverage.txt
+          files: coverage.txt,v1beta2-coverage.out
           disable_search: true
           verbose: true
           token: ${{ secrets.CODECOV_TOKEN }}

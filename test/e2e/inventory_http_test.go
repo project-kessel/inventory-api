@@ -120,7 +120,6 @@ func TestMain(m *testing.M) {
 	os.Exit(result)
 }
 func TestInventoryAPIHTTP_Livez(t *testing.T) {
-	enableShortMode(t)
 	t.Parallel()
 	httpClient, err := http.NewClient(
 		context.Background(),
@@ -139,7 +138,6 @@ func TestInventoryAPIHTTP_Livez(t *testing.T) {
 	assert.Equal(t, expectedCode, resp.Code)
 }
 func TestInventoryAPIHTTP_Readyz(t *testing.T) {
-	enableShortMode(t)
 	t.Parallel()
 	httpClient, err := http.NewClient(
 		context.Background(),
@@ -158,7 +156,6 @@ func TestInventoryAPIHTTP_Readyz(t *testing.T) {
 	assert.Equal(t, expectedCode, resp.Code)
 }
 func TestInventoryAPIHTTP_Metrics(t *testing.T) {
-	enableShortMode(t)
 	resp, err := nethttp.Get("http://" + inventoryapi_http_url + "/metrics")
 	if err != nil {
 		t.Fatal("Failed to send request: ", err)
@@ -177,7 +174,6 @@ func TestInventoryAPIHTTP_Metrics(t *testing.T) {
 }
 
 func TestInventoryAPIHTTP_v1beta1_RHELHostLifecycle(t *testing.T) {
-	enableShortMode(t)
 	t.Parallel()
 	c := common.NewConfig(
 		common.WithHTTPUrl(inventoryapi_http_url),
@@ -245,7 +241,6 @@ func TestInventoryAPIHTTP_v1beta1_RHELHostLifecycle(t *testing.T) {
 }
 
 func TestInventoryAPIHTTP_v1beta1_K8SClusterLifecycle(t *testing.T) {
-	enableShortMode(t)
 	t.Parallel()
 	c := common.NewConfig(
 		common.WithHTTPUrl(inventoryapi_http_url),
@@ -356,7 +351,6 @@ func TestInventoryAPIHTTP_v1beta1_K8SClusterLifecycle(t *testing.T) {
 }
 
 func TestInventoryAPIHTTP_v1beta1_K8SPolicyLifecycle(t *testing.T) {
-	enableShortMode(t)
 	t.Parallel()
 	c := common.NewConfig(
 		common.WithHTTPUrl(inventoryapi_http_url),
@@ -433,7 +427,6 @@ func TestInventoryAPIHTTP_v1beta1_K8SPolicyLifecycle(t *testing.T) {
 }
 
 func TestInventoryAPIHTTP_v1beta1_NotificationsIntegrationLifecycle(t *testing.T) {
-	enableShortMode(t)
 	t.Parallel()
 
 	c := common.NewConfig(
@@ -498,7 +491,6 @@ func TestInventoryAPIHTTP_v1beta1_NotificationsIntegrationLifecycle(t *testing.T
 }
 
 func TestInventoryAPIHTTP_v1beta1_K8SPolicy_is_propagated_to_K8sClusterLifecycle(t *testing.T) {
-	enableShortMode(t)
 	t.Parallel()
 	c := common.NewConfig(
 		common.WithHTTPUrl(inventoryapi_http_url),
@@ -636,7 +628,6 @@ func TestInventoryAPIHTTP_v1beta1_K8SPolicy_is_propagated_to_K8sClusterLifecycle
 }
 
 func TestInventoryAPIHTTP_NotificationsIntegrationLifecycle_ConsistencyToken(t *testing.T) {
-	enableShortMode(t)
 	t.Parallel()
 	resourceId := "notifications-consistent-001"
 

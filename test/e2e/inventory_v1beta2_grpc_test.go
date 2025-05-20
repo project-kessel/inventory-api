@@ -64,7 +64,7 @@ func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_Host(t *testing.T) {
 	req := &pbv1beta2.ReportResourceRequest{
 		WriteVisibility:    pbv1beta2.WriteVisibility_MINIMIZE_LATENCY,
 		Type:               "host",
-		ReporterType:       "HBI",
+		ReporterType:       "hbi",
 		ReporterInstanceId: "testuser@example.com",
 		Representations: &pbv1beta2.ResourceRepresentations{
 			Metadata: &pbv1beta2.RepresentationMetadata{
@@ -90,7 +90,7 @@ func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_Host(t *testing.T) {
 			ResourceType: "host",
 			ResourceId:   "host-abc-123",
 			Reporter: &pbv1beta2.ReporterReference{
-				Type: "HBI",
+				Type: "hbi",
 			},
 		},
 	}
@@ -402,7 +402,7 @@ func TestInventoryAPIHTTP_v1beta2_Host_ConsistentWrite(t *testing.T) {
 	req := pbv1beta2.ReportResourceRequest{
 		WriteVisibility:    pbv1beta2.WriteVisibility_IMMEDIATE,
 		Type:               "host",
-		ReporterType:       "HBI",
+		ReporterType:       "hbi",
 		ReporterInstanceId: "testuser@example.com",
 		Representations: &pbv1beta2.ResourceRepresentations{
 			Metadata: &pbv1beta2.RepresentationMetadata{
@@ -431,7 +431,7 @@ func TestInventoryAPIHTTP_v1beta2_Host_ConsistentWrite(t *testing.T) {
 
 	delReq := pbv1beta2.DeleteResourceRequest{
 		Reference: &pbv1beta2.ResourceReference{
-			ResourceType: "HBI",
+			ResourceType: "hbi",
 			ResourceId:   resourceId,
 			Reporter: &pbv1beta2.ReporterReference{
 				Type: "ACM",

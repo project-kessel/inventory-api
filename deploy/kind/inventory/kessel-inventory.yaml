@@ -197,6 +197,7 @@ stringData:
       read-after-write-allowlist: ["*"]
     storage:
       disable-persistence: false
+      max-serialization-retries: 10
       database: postgres
       sqlite3:
         dsn: inventory.db

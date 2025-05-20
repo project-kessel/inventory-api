@@ -12,6 +12,7 @@ eventing:
   kafka:
 storage:
   disable-persistence: false
+  max-serialization-retries: 10
   database: postgres
   postgres:
     host: "invdatabase"

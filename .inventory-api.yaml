@@ -12,6 +12,7 @@ eventing:
   eventer: stdout
 storage:
   disable-persistence: false
+  max-serialization-retries: 10
   database: sqlite3
   sqlite3:
     dsn: inventory.db

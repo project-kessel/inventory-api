@@ -2,6 +2,7 @@ package resources
 
 import (
 	"context"
+	"database/sql"
 	"testing"
 
 	"github.com/go-kratos/kratos/v2/log"
@@ -41,9 +42,10 @@ func setupMetricsCollector(t *testing.T) *metricscollector.MetricsCollector {
 }
 
 func setupTest(t *testing.T) (*gorm.DB, *Repo) {
+	maxSerializationRetries := 3
 	db := setupGorm(t)
 	mc := setupMetricsCollector(t)
-	repo := New(db, mc)
+	repo := New(db, mc, maxSerializationRetries)
 	return db, repo
 }
 
@@ -447,4 +449,128 @@ func TestListAll(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Len(t, resources, 1)
 	assertEqualResource(t, resources[0], r)
+}
+
+func TestFindByID(t *testing.T) {
+	_, repo := setupTest(t)
+	ctx := context.TODO()
+
+	// check negative case without any resources, nil is returned
+	resource, err := repo.FindByID(ctx, uuid.UUID{})
+	assert.Nil(t, resource)
+	assert.ErrorIs(t, err, gorm.ErrRecordNotFound)
+
+	// create a single resource
+	r, err := repo.Create(ctx, resource1(), namespace, emptyTxId)
+	assert.NotNil(t, r)
+	assert.Nil(t, err)
+
+	// check positive case, a single resource is returned
+	resource, err = repo.FindByID(ctx, r.ID)
+	assert.Nil(t, err)
+	assert.NotNil(t, resource)
+	assertEqualResource(t, resource, r)
+}
+
+func TestFindByIDWithTx(t *testing.T) {
+	db, repo := setupTest(t)
+	ctx := context.TODO()
+
+	tx := db.Begin(&sql.TxOptions{
+		ReadOnly: true,
+	})
+	// check negative case without any resources, nil is returned
+	resource, err := repo.FindByIDWithTx(ctx, tx, uuid.UUID{})
+	assert.ErrorIs(t, err, gorm.ErrRecordNotFound)
+	assert.Nil(t, resource)
+	err = tx.Commit().Error
+	assert.Nil(t, err)
+
+	// create a single resource
+	r, err := repo.Create(ctx, resource1(), namespace, emptyTxId)
+	assert.NotNil(t, r)
+	assert.Nil(t, err)
+
+	tx = db.Begin(&sql.TxOptions{
+		ReadOnly: true,
+	})
+	// check positive case, a single resource is returned
+	resource, err = repo.FindByIDWithTx(ctx, tx, r.ID)
+	assert.Nil(t, err)
+	assert.NotNil(t, resource)
+	assertEqualResource(t, resource, r)
+	err = tx.Commit().Error
+	assert.Nil(t, err)
+}
+
+func TestSerializableUpdateFails(t *testing.T) {
+	db, repo := setupTest(t)
+	ctx := context.TODO()
+
+	// create a single resource
+	r, err := repo.Create(ctx, resource1(), namespace, emptyTxId)
+	assert.NotNil(t, r)
+	assert.Nil(t, err)
+
+	conflictTx := db.Begin(&sql.TxOptions{
+		Isolation: sql.LevelSerializable,
+	})
+	r.WorkspaceId = "workspace-12345678"
+	err = conflictTx.Save(r).Error
+	assert.Nil(t, err)
+	// don't commit the transaction yet
+
+	// try to update the same resource in a new transaction
+	r2, err := repo.Update(ctx, r, r.ID, namespace, emptyTxId)
+	assert.Nil(t, r2)
+	assert.ErrorContains(t, err, "transaction failed") // Evidence of a serialization failure
+
+	// commit the first transaction
+	err = conflictTx.Commit().Error
+	assert.Nil(t, err)
+}
+
+func TestSerializableDeleteFails(t *testing.T) {
+	db, repo := setupTest(t)
+	ctx := context.TODO()
+
+	// create a single resource
+	r, err := repo.Create(ctx, resource1(), namespace, emptyTxId)
+	assert.NotNil(t, r)
+	assert.Nil(t, err)
+
+	conflictTx := db.Begin(&sql.TxOptions{
+		Isolation: sql.LevelSerializable,
+	})
+	err = conflictTx.Delete(r).Error
+	assert.Nil(t, err)
+	// don't commit the transaction yet
+
+	// try to delete the same resource in a new transaction
+	r2, err := repo.Delete(ctx, r.ID, namespace)
+	assert.Nil(t, r2)
+	assert.ErrorContains(t, err, "transaction failed") // Evidence of a serialization failure
+	// commit the first transaction
+	err = conflictTx.Commit().Error
+	assert.Nil(t, err)
+}
+
+func TestSerializableCreateFails(t *testing.T) {
+	db, repo := setupTest(t)
+	ctx := context.TODO()
+	resource := resource1()
+
+	conflictTx := db.Begin(&sql.TxOptions{
+		Isolation: sql.LevelSerializable,
+	})
+	conflictTx.Create(resource)
+	// don't commit the transaction yet
+
+	// try to create the same resource in a new transaction
+	r, err := repo.Create(ctx, resource, namespace, emptyTxId)
+	assert.Nil(t, r)
+	assert.ErrorContains(t, err, "transaction failed") // Evidence of a serialization failure
+	// commit the first transaction
+	err = conflictTx.Commit().Error
+	assert.Nil(t, err)
 }

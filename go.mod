@@ -99,5 +99,3 @@ require (
 	golang.org/x/text v0.24.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250422160041-2d3770c4ea7f // indirect
 )
-
-replace github.com/project-kessel/inventory-client-go => ../inventory-client-go

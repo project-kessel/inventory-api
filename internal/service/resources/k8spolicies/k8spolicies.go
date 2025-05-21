@@ -84,7 +84,7 @@ func (c *K8sPolicyService) DeleteK8SPolicy(ctx context.Context, r *pb.DeleteK8SP
 	}
 }
 
-func k8sPolicyFromCreateRequest(r *pb.CreateK8SPolicyRequest, identity *authnapi.Identity) (*model.Resource, error) {
+func k8sPolicyFromCreateRequest(r *pb.CreateK8SPolicyRequest, identity *authnapi.Identity) (*model.Representation, error) {
 	resourceData, err := conv.ToJsonObject(r.K8SPolicy.ResourceData)
 	if err != nil {
 		return nil, err
@@ -93,11 +93,11 @@ func k8sPolicyFromCreateRequest(r *pb.CreateK8SPolicyRequest, identity *authnapi
 	return conv.ResourceFromPbv1beta1(ResourceType, identity.Principal, resourceData, r.K8SPolicy.Metadata, r.K8SPolicy.ReporterData), nil
 }
 
-func createResponseFromK8sPolicy(p *model.Resource) *pb.CreateK8SPolicyResponse {
+func createResponseFromK8sPolicy(p *model.Representation) *pb.CreateK8SPolicyResponse {
 	return &pb.CreateK8SPolicyResponse{}
 }
 
-func k8sPolicyFromUpdateRequest(r *pb.UpdateK8SPolicyRequest, identity *authnapi.Identity) (*model.Resource, error) {
+func k8sPolicyFromUpdateRequest(r *pb.UpdateK8SPolicyRequest, identity *authnapi.Identity) (*model.Representation, error) {
 	resourceData, err := conv.ToJsonObject(r.K8SPolicy.ResourceData)
 	if err != nil {
 		return nil, err
@@ -106,7 +106,7 @@ func k8sPolicyFromUpdateRequest(r *pb.UpdateK8SPolicyRequest, identity *authnapi
 	return conv.ResourceFromPbv1beta1(ResourceType, identity.Principal, resourceData, r.K8SPolicy.Metadata, r.K8SPolicy.ReporterData), nil
 }
 
-func updateResponseFromK8sPolicy(p *model.Resource) *pb.UpdateK8SPolicyResponse {
+func updateResponseFromK8sPolicy(p *model.Representation) *pb.UpdateK8SPolicyResponse {
 	return &pb.UpdateK8SPolicyResponse{}
 }
 

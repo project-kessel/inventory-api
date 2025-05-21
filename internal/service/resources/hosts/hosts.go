@@ -81,19 +81,19 @@ func (c *HostsService) DeleteRhelHost(ctx context.Context, r *pb.DeleteRhelHostR
 	}
 }
 
-func hostFromCreateRequest(r *pb.CreateRhelHostRequest, identity *authnapi.Identity) (*model.Resource, error) {
+func hostFromCreateRequest(r *pb.CreateRhelHostRequest, identity *authnapi.Identity) (*model.Representation, error) {
 	return conv.ResourceFromPbv1beta1(ResourceType, identity.Principal, nil, r.RhelHost.Metadata, r.RhelHost.ReporterData), nil
 }
 
-func createResponseFromHost(resource *model.Resource) *pb.CreateRhelHostResponse {
+func createResponseFromHost(resource *model.Representation) *pb.CreateRhelHostResponse {
 	return &pb.CreateRhelHostResponse{}
 }
 
-func hostFromUpdateRequest(r *pb.UpdateRhelHostRequest, identity *authnapi.Identity) (*model.Resource, error) {
+func hostFromUpdateRequest(r *pb.UpdateRhelHostRequest, identity *authnapi.Identity) (*model.Representation, error) {
 	return conv.ResourceFromPbv1beta1(ResourceType, identity.Principal, nil, r.RhelHost.Metadata, r.RhelHost.ReporterData), nil
 }
 
-func updateResponseFromHost(resource *model.Resource) *pb.UpdateRhelHostResponse {
+func updateResponseFromHost(resource *model.Representation) *pb.UpdateRhelHostResponse {
 	return &pb.UpdateRhelHostResponse{}
 }
 

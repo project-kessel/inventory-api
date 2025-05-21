@@ -15,7 +15,7 @@ import (
 func Migrate(db *gorm.DB, logger *log.Helper) error {
 	models := []interface{}{
 		&model.ResourceHistory{},
-		&model.Resource{},
+		&model.Representation{},
 		&model.Relationship{},
 		&model.RelationshipHistory{},
 		&model.LocalInventoryToResource{}, // Deprecated

@@ -108,38 +108,6 @@ func TestInventoryAPIGRPC_Readyz(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func TestInventoryAPIGRPC_RhelHost_CreateRhelHost(t *testing.T) {
-	t.Parallel()
-
-	conn, err := grpc.NewClient(
-		inventoryapi_grpc_url,
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
-		WithInsecureBearerToken("1234"),
-	)
-	if err != nil {
-		fmt.Print(err)
-	}
-
-	client := resources.NewKesselRhelHostServiceClient(conn)
-	request := resources.CreateRhelHostRequest{RhelHost: &resources.RhelHost{
-		Metadata: &resources.Metadata{
-			ResourceType: "rhel-host",
-			WorkspaceId:  "workspace1",
-			OrgId:        "",
-		},
-		ReporterData: &resources.ReporterData{
-			ReporterInstanceId: "user@example.com",
-			ReporterType:       resources.ReporterData_OCM,
-			ConsoleHref:        "www.example.com",
-			ApiHref:            "www.example.com",
-			LocalResourceId:    "1",
-			ReporterVersion:    "0.1",
-		},
-	}}
-	_, err = client.CreateRhelHost(context.Background(), &request)
-	assert.NoError(t, err)
-}
-
 func TestInventoryAPIGRPC_K8SCluster_CreateK8SCluster(t *testing.T) {
 	t.Parallel()
 

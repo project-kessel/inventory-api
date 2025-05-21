@@ -88,11 +88,9 @@ build-schemas:
 	@echo ""
 	@echo "Tarball contents:"
 	@$(DOCKER) run --rm -v "$(PWD):/work" -w=/work/ custom-protoc tar -tzvf resources.tar.gz
-	@echo "===== BEGIN BASE64 ENCODED TARBALL ====="
-	@$(DOCKER) run --rm -v "$(PWD):/work" -w=/work/ custom-protoc base64 -w0 resources.tar.gz 2>/dev/null
-	@echo ""
-	@echo "===== END BASE64 ENCODED TARBALL ====="
-
+	@echo "====== resources-tarball configmap ======"
+	kubectl create configmap resources-tarball --dry-run=client --from-file=resources.tar.gz -o yaml
+	@echo "====== resources-tarball configmap ======"
 
 .PHONY: build
 # build

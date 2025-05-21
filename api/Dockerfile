@@ -22,6 +22,7 @@ RUN go install github.com/bufbuild/buf/cmd/buf@v1.36.0
 
 FROM registry.access.redhat.com/ubi9/ubi-minimal:9.6-1747218906
 
+RUN microdnf install -y tar gzip
 
 COPY --from=builder /root/go/bin/protoc-gen-go /usr/local/bin/protoc-gen-go
 COPY --from=builder /root/go/bin/protoc-gen-go-grpc /usr/local/bin/protoc-gen-go-grpc

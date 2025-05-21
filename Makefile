@@ -23,6 +23,7 @@ endif
 IMAGE ?="quay.io/cloudservices/kessel-inventory"
 IMAGE_TAG=$(git rev-parse --short=7 HEAD)
 GIT_COMMIT=$(git rev-parse --short HEAD)
+SCHEMA_PATH="data/schema/resources/"
 
 ifeq ($(DOCKER),)
 DOCKER:=$(shell command -v podman || command -v docker)
@@ -75,6 +76,23 @@ api_breaking:
 # 	@$(DOCKER) build -t custom-protoc ./api
 # 	@$(DOCKER) run -t --rm -v $(PWD)/api:/api:rw -v $(PWD)/openapi.yaml:/openapi.yaml:rw \
 # 	-w=/api/ custom-protoc sh -c "buf generate && buf lint"
+
+.PHONY: build-schemas
+# build schema tarball
+build-schemas:
+	@echo ""
+	@echo "Creating schemas tarball from: ${SCHEMA_PATH}"
+	@$(DOCKER) build -t custom-protoc ./api
+	@$(DOCKER) run -t --rm -v $(PWD):/work -v $(PWD)/${SCHEMA_PATH}:/data -w=/work/ custom-protoc sh -c "tar -czf resources.tar.gz -C /data ."
+	@echo "Schema tarball created: resources.tar.gz"
+	@echo ""
+	@echo "Tarball contents:"
+	@$(DOCKER) run --rm -v "$(PWD):/work" -w=/work/ custom-protoc tar -tzvf resources.tar.gz
+	@echo "===== BEGIN BASE64 ENCODED TARBALL ====="
+	@$(DOCKER) run --rm -v "$(PWD):/work" -w=/work/ custom-protoc base64 -w0 resources.tar.gz 2>/dev/null
+	@echo ""
+	@echo "===== END BASE64 ENCODED TARBALL ====="
+
 
 .PHONY: build
 # build

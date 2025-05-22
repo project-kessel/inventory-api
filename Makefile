@@ -82,11 +82,12 @@ api_breaking:
 build-schemas:
 	@echo ""
 	@echo "Creating schemas tarball from: ${SCHEMA_PATH}"
-	tar czf resources.tar.gz -C data/schema/resources .
+	@$(DOCKER) build -t custom-protoc ./api
+	@$(DOCKER) run -t --rm -v $(PWD):/work -v $(PWD)/${SCHEMA_PATH}:/data/schema/resources -w=/work/ custom-protoc sh -c "tar czf resources.tar.gz -C /data/schema/resources ."
 	@echo "Schema tarball created: resources.tar.gz"
 	@echo ""
 	@echo "Tarball contents:"
-	tar tzf resources.tar.gz
+	@$(DOCKER) run --rm -v "$(PWD):/work" -w=/work/ custom-protoc tar tzf resources.tar.gz
 	@echo "====== resources-tarball configmap ======"
 	kubectl create configmap resources-tarball --dry-run=client --from-file=resources.tar.gz -o yaml
 	@echo "====== resources-tarball configmap ======"

@@ -62,7 +62,7 @@ func (o *Options) AddFlags(fs *pflag.FlagSet, prefix string) {
 	fs.StringVar(&o.EnableAutoCommit, prefix+"enable-auto-commit", o.EnableAutoCommit, "enables auto commit on consumer when messages are consumed (default: false)")
 	fs.StringVar(&o.AutoOffsetReset, prefix+"auto-offset-reset", o.AutoOffsetReset, "action to take when there is no initial offset in offset store (default: earliest)")
 	fs.StringVar(&o.StatisticsInterval, prefix+"statistics-interval-ms", o.StatisticsInterval, "librdkafka statistics emit interval (default: 30000ms)")
-	fs.StringVar(&o.Debug, prefix+"debug", o.Debug, "A comma-separated list of debug contexts to enable")
+	fs.StringVar(&o.Debug, prefix+"debug", o.Debug, "a comma-separated list of debug contexts to enable (default: \"\"")
 
 	o.AuthOptions.AddFlags(fs, prefix+"auth")
 	o.RetryOptions.AddFlags(fs, prefix+"retry-options")

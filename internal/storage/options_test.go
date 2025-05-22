@@ -1,12 +1,11 @@
 package storage
 
 import (
-	"fmt"
-	"reflect"
 	"testing"
 
 	"github.com/project-kessel/inventory-api/internal/storage/postgres"
 	"github.com/project-kessel/inventory-api/internal/storage/sqlite3"
+	"github.com/project-kessel/inventory-api/test/helpers"
 	"github.com/spf13/pflag"
 	"github.com/stretchr/testify/assert"
 )
@@ -41,15 +40,7 @@ func TestOptions_AddFlags(t *testing.T) {
 	// the below logic ensures that every possible option defined in the Options type
 	// has a defined flag for that option; postgres and sqlite3 options are skipped in favor of testing
 	// in their own packages
-	structValues := reflect.ValueOf(*test.options)
-	for i := 0; i < structValues.Type().NumField(); i++ {
-		flagName := structValues.Type().Field(i).Tag.Get("mapstructure")
-		if flagName == "postgres" || flagName == "sqlite3" {
-			continue
-		} else {
-			assert.NotNil(t, fs.Lookup(fmt.Sprintf("%s.%s", prefix, flagName)))
-		}
-	}
+	helpers.AllOptionsHaveFlags(t, prefix, fs, *test.options, []string{"postgres", "sqlite3"})
 }
 
 func TestOptions_Validate(t *testing.T) {
@@ -71,10 +62,7 @@ func TestOptions_Validate(t *testing.T) {
 		{
 			name: "sqlite database",
 			options: &Options{
-				Database: "postgres",
-				Postgres: &postgres.Options{
-					SSLMode: "",
-				},
+				Database: "sqlite3",
 			},
 			expectError: false,
 		},

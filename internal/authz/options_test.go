@@ -1,11 +1,10 @@
 package authz
 
 import (
-	"fmt"
-	"reflect"
 	"testing"
 
 	"github.com/project-kessel/inventory-api/internal/authz/kessel"
+	"github.com/project-kessel/inventory-api/test/helpers"
 	"github.com/spf13/pflag"
 	"github.com/stretchr/testify/assert"
 )
@@ -37,15 +36,7 @@ func TestOptions_AddFlags(t *testing.T) {
 	// the below logic ensures that every possible option defined in the Options type
 	// has a defined flag for that option; kessel section is skipped in favor of testing
 	// in its own package
-	structValues := reflect.ValueOf(*test.options)
-	for i := 0; i < structValues.Type().NumField(); i++ {
-		flagName := structValues.Type().Field(i).Tag.Get("mapstructure")
-		if flagName == "kessel" {
-			continue
-		} else {
-			assert.NotNil(t, fs.Lookup(fmt.Sprintf("%s.%s", prefix, flagName)))
-		}
-	}
+	helpers.AllOptionsHaveFlags(t, prefix, fs, *test.options, []string{"kessel"})
 }
 
 func TestOptions_Validate(t *testing.T) {

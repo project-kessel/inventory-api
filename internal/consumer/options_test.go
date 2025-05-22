@@ -1,12 +1,11 @@
 package consumer
 
 import (
-	"fmt"
-	"reflect"
 	"testing"
 
 	"github.com/project-kessel/inventory-api/internal/consumer/auth"
 	"github.com/project-kessel/inventory-api/internal/consumer/retry"
+	"github.com/project-kessel/inventory-api/test/helpers"
 	"github.com/spf13/pflag"
 	"github.com/stretchr/testify/assert"
 )
@@ -50,15 +49,7 @@ func TestOptions_AddFlags(t *testing.T) {
 	// the below logic ensures that every possible option defined in the Options type
 	// has a defined flag for that option; auth and retry-options are skipped in favor of testing
 	// in their own packages
-	structValues := reflect.ValueOf(*test.options)
-	for i := 0; i < structValues.Type().NumField(); i++ {
-		flagName := structValues.Type().Field(i).Tag.Get("mapstructure")
-		if flagName == "auth" || flagName == "retry-options" {
-			continue
-		} else {
-			assert.NotNil(t, fs.Lookup(fmt.Sprintf("%s.%s", prefix, flagName)))
-		}
-	}
+	helpers.AllOptionsHaveFlags(t, prefix, fs, *test.options, []string{"auth", "retry-options"})
 }
 
 func TestOptions_Validate(t *testing.T) {
@@ -68,7 +59,7 @@ func TestOptions_Validate(t *testing.T) {
 		expectError bool
 	}{
 		{
-			name: "bootstrap servers is set",
+			name: "bootstrap servers is set and consumer is enabled",
 			options: &Options{
 				Enabled: true,
 				BootstrapServers: []string{
@@ -77,12 +68,29 @@ func TestOptions_Validate(t *testing.T) {
 			expectError: false,
 		},
 		{
-			name: "bootstrap servers is empty",
+			name: "bootstrap servers is empty and consumer is enabled",
 			options: &Options{
 				Enabled:          true,
 				BootstrapServers: []string{},
 			},
 			expectError: true,
+		},
+		{
+			name: "bootstrap servers is empty and consumer is disabled",
+			options: &Options{
+				Enabled:          false,
+				BootstrapServers: []string{},
+			},
+			expectError: false,
+		},
+		{
+			name: "bootstrap servers is set but consumer is disabled",
+			options: &Options{
+				Enabled: false,
+				BootstrapServers: []string{
+					"test-server:9092",
+				}},
+			expectError: false,
 		},
 	}
 

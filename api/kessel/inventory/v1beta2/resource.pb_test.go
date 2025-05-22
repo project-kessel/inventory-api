@@ -137,8 +137,6 @@ func TestResourceValidation(t *testing.T) {
 					Metadata: &RepresentationMetadata{
 						LocalResourceId: "cluster-123",
 						ApiHref:         "https://api.example.com",
-						ConsoleHref:     proto.String("https://console.example.com"),
-						ReporterVersion: proto.String("1.0.0"),
 					},
 					Common: &structpb.Struct{
 						Fields: map[string]*structpb.Value{

@@ -23,6 +23,7 @@ endif
 IMAGE ?="quay.io/cloudservices/kessel-inventory"
 IMAGE_TAG=$(git rev-parse --short=7 HEAD)
 GIT_COMMIT=$(git rev-parse --short HEAD)
+SCHEMA_PATH="data/schema/resources/"
 
 ifeq ($(DOCKER),)
 DOCKER:=$(shell command -v podman || command -v docker)
@@ -75,6 +76,21 @@ api_breaking:
 # 	@$(DOCKER) build -t custom-protoc ./api
 # 	@$(DOCKER) run -t --rm -v $(PWD)/api:/api:rw -v $(PWD)/openapi.yaml:/openapi.yaml:rw \
 # 	-w=/api/ custom-protoc sh -c "buf generate && buf lint"
+
+.PHONY: build-schemas
+# build schema tarball
+build-schemas:
+	@echo ""
+	@echo "Creating schemas tarball from: ${SCHEMA_PATH}"
+	@$(DOCKER) build -t custom-protoc ./api
+	@$(DOCKER) run -t --rm -v $(PWD):/work -v $(PWD)/${SCHEMA_PATH}:/data/schema/resources -w=/work/ custom-protoc sh -c "tar czf resources.tar.gz -C /data/schema/resources ."
+	@echo "Schema tarball created: resources.tar.gz"
+	@echo ""
+	@echo "Tarball contents:"
+	@$(DOCKER) run --rm -v "$(PWD):/work" -w=/work/ custom-protoc tar tzf resources.tar.gz
+	@echo "====== resources-tarball configmap ======"
+	kubectl create configmap resources-tarball --dry-run=client --from-file=resources.tar.gz -o yaml
+	@echo "====== resources-tarball configmap ======"
 
 .PHONY: build
 # build

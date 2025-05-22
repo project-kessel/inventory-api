@@ -130,9 +130,9 @@ See [Testing Inventory in Ephemeral](./docs/ephemeral-testing.md) for instructio
 
 ### API/Proto files Changes
 
-Once there is any change in the `proto` files (under (/api/kessel)[./api/kessel]) an update is required.
+Once there is any change in the `proto` files (under [/api/kessel](./api/kessel])) an update is required.
 
-This command will generate code and an (openapi)[./openapi.yaml] file from the `proto files`.
+This command will generate code and an [openapi](./openapi.yaml) file from the `proto files`.
 ```shell
 make api
 ```
@@ -141,6 +141,22 @@ We can run the following command to update if there are expected breaking change
 ```shell
 make api_breaking
 ```
+
+### Schema file changes
+
+Once there are any changes in the `schema` files under [/data/schema/resources](./data/schema/resources) an update is required.
+
+The schemas are loaded in as a tarball in a configmap, to generate the tarball execute:
+```shell
+make build-schemas
+```
+
+The command will output the `binaryData` for `resources.tar.gz`. 
+```shell
+binaryData:
+  resources.tar.gz: H4sIAEQ1L2gAA+2d3W7juBXHswWKoil62V4LaYG9mVEoUiTtAfbCmzg7xiRxNnZmd1ssDI2jJNqxpawkz05...
+```
+Copy this data to update the configmap `resources-tarball` in the [ephemeral deployment file](./deploy/kessel-inventory-ephem.yaml#L47) with the latest schema changes.
 
 ### Build Container Images
 

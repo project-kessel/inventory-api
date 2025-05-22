@@ -58,10 +58,11 @@ func (o *Options) AddFlags(fs *pflag.FlagSet, prefix string) {
 	fs.StringArrayVar(&o.ReadAfterWriteAllowlist, prefix+"read-after-write-allowlist", o.ReadAfterWriteAllowlist, "List of services that require all requests to be read-after-write enabled (default: [])")
 	fs.StringVar(&o.SessionTimeout, prefix+"session-timeout", o.SessionTimeout, "time a consumer can live without sending heartbeat (default: 45000ms)")
 	fs.StringVar(&o.HeartbeatInterval, prefix+"heartbeat-interval", o.HeartbeatInterval, "interval between heartbeats sent to Kafka (default: 3000ms, must be lower then session-timeout)")
-	fs.StringVar(&o.MaxPollInterval, prefix+"max-poll", o.MaxPollInterval, "length of time consumer can go without polling before considered dead (default: 300000ms)")
+	fs.StringVar(&o.MaxPollInterval, prefix+"max-poll-interval", o.MaxPollInterval, "length of time consumer can go without polling before considered dead (default: 300000ms)")
 	fs.StringVar(&o.EnableAutoCommit, prefix+"enable-auto-commit", o.EnableAutoCommit, "enables auto commit on consumer when messages are consumed (default: false)")
 	fs.StringVar(&o.AutoOffsetReset, prefix+"auto-offset-reset", o.AutoOffsetReset, "action to take when there is no initial offset in offset store (default: earliest)")
-	fs.StringVar(&o.StatisticsInterval, prefix+"statistics-interval", o.StatisticsInterval, "librdkafka statistics emit interval (default: 30000ms)")
+	fs.StringVar(&o.StatisticsInterval, prefix+"statistics-interval-ms", o.StatisticsInterval, "librdkafka statistics emit interval (default: 30000ms)")
+	fs.StringVar(&o.Debug, prefix+"debug", o.Debug, "A comma-separated list of debug contexts to enable")
 
 	o.AuthOptions.AddFlags(fs, prefix+"auth")
 	o.RetryOptions.AddFlags(fs, prefix+"retry-options")

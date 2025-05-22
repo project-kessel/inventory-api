@@ -72,6 +72,7 @@ func TestRequestToResource_Error_InvalidInventoryID(t *testing.T) {
 
 	assert.Error(t, err)
 	assert.Nil(t, resource)
+	assert.Contains(t, err.Error(), "invalid inventory ID")
 }
 
 func TestRequestToResource_Error_MissingReporterType(t *testing.T) {

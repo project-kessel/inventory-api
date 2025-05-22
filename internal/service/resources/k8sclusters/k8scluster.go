@@ -82,7 +82,7 @@ func (c *K8sClustersService) DeleteK8SCluster(ctx context.Context, r *pb.DeleteK
 	}
 }
 
-func k8sClusterFromCreateRequest(r *pb.CreateK8SClusterRequest, identity *authnapi.Identity) (*model.Resource, error) {
+func k8sClusterFromCreateRequest(r *pb.CreateK8SClusterRequest, identity *authnapi.Identity) (*model.Representation, error) {
 	resourceData, err := conv.ToJsonObject(r.K8SCluster.ResourceData)
 	if err != nil {
 		return nil, err
@@ -91,11 +91,11 @@ func k8sClusterFromCreateRequest(r *pb.CreateK8SClusterRequest, identity *authna
 	return conv.ResourceFromPbv1beta1(ResourceType, identity.Principal, resourceData, r.K8SCluster.Metadata, r.K8SCluster.ReporterData), nil
 }
 
-func createResponseFromK8sCluster(c *model.Resource) *pb.CreateK8SClusterResponse {
+func createResponseFromK8sCluster(c *model.Representation) *pb.CreateK8SClusterResponse {
 	return &pb.CreateK8SClusterResponse{}
 }
 
-func k8sClusterFromUpdateRequest(r *pb.UpdateK8SClusterRequest, identity *authnapi.Identity) (*model.Resource, error) {
+func k8sClusterFromUpdateRequest(r *pb.UpdateK8SClusterRequest, identity *authnapi.Identity) (*model.Representation, error) {
 	resourceData, err := conv.ToJsonObject(r.K8SCluster.ResourceData)
 	if err != nil {
 		return nil, err
@@ -104,7 +104,7 @@ func k8sClusterFromUpdateRequest(r *pb.UpdateK8SClusterRequest, identity *authna
 	return conv.ResourceFromPbv1beta1(ResourceType, identity.Principal, resourceData, r.K8SCluster.Metadata, r.K8SCluster.ReporterData), nil
 }
 
-func updateResponseFromK8sCluster(c *model.Resource) *pb.UpdateK8SClusterResponse {
+func updateResponseFromK8sCluster(c *model.Representation) *pb.UpdateK8SClusterResponse {
 	return &pb.UpdateK8SClusterResponse{}
 }
 

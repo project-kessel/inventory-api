@@ -671,7 +671,7 @@ func TestInventoryAPIHTTP_NotificationsIntegrationLifecycle_ConsistencyToken(t *
 	_, err = client.NotificationIntegrationClient.CreateNotificationsIntegration(context.Background(), &createRequest, opts...)
 	assert.NoError(t, err, "Failed to create Notifications Integration")
 
-	var integration model.Resource
+	var integration model.Representation
 	err = db.Where("reporter_resource_id = ?", resourceId).First(&integration).Error
 	assert.NoError(t, err, "Failed to find Notifications Integration in DB")
 	assert.NotNil(t, integration, "Notifications Integration not found in DB")

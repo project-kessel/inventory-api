@@ -105,8 +105,8 @@ func TestLookupResources_Success(t *testing.T) {
 	assert.Equal(t, io.EOF, err)
 }
 
-func resource1() *model.Resource {
-	return &model.Resource{
+func resource1() *model.Representation {
+	return &model.Representation{
 		ID:    uuid.UUID{},
 		OrgId: "my-org",
 		ResourceData: map[string]any{
@@ -142,8 +142,8 @@ func resource1() *model.Resource {
 	}
 }
 
-func resource2() *model.Resource {
-	return &model.Resource{
+func resource2() *model.Representation {
+	return &model.Representation{
 		ID:    uuid.UUID{},
 		OrgId: "my-org2",
 		ResourceData: map[string]any{
@@ -178,8 +178,8 @@ func resource2() *model.Resource {
 	}
 }
 
-func resource3() *model.Resource {
-	return &model.Resource{
+func resource3() *model.Representation {
+	return &model.Representation{
 		ID:    uuid.UUID{},
 		OrgId: "my-org3",
 		ResourceData: map[string]any{
@@ -235,7 +235,7 @@ func TestCreateReturnsDbError(t *testing.T) {
 	inventoryRepo := &mocks.MockedInventoryResourceRepository{}
 
 	// DB Error
-	repo.On("FindByReporterData", mock.Anything, mock.Anything, mock.Anything).Return((*model.Resource)(nil), gorm.ErrDuplicatedKey)
+	repo.On("FindByReporterData", mock.Anything, mock.Anything, mock.Anything).Return((*model.Representation)(nil), gorm.ErrDuplicatedKey)
 
 	useCase := New(repo, inventoryRepo, nil, nil, "", log.DefaultLogger, nil, cb, defaultUseCaseConfig)
 	ctx := context.TODO()
@@ -251,9 +251,9 @@ func TestCreateReturnsDbErrorBackwardsCompatible(t *testing.T) {
 	inventoryRepo := &mocks.MockedInventoryResourceRepository{}
 
 	// Validates backwards compatibility, record was not found via new method
-	repo.On("FindByReporterData", mock.Anything, mock.Anything, mock.Anything).Return((*model.Resource)(nil), gorm.ErrRecordNotFound)
+	repo.On("FindByReporterData", mock.Anything, mock.Anything, mock.Anything).Return((*model.Representation)(nil), gorm.ErrRecordNotFound)
 	// DB Error
-	repo.On("FindByReporterResourceId", mock.Anything, mock.Anything).Return((*model.Resource)(nil), gorm.ErrDuplicatedKey)
+	repo.On("FindByReporterResourceId", mock.Anything, mock.Anything).Return((*model.Representation)(nil), gorm.ErrDuplicatedKey)
 
 	useCase := New(repo, inventoryRepo, nil, nil, "", log.DefaultLogger, nil, cb, defaultUseCaseConfig)
 	ctx := context.TODO()
@@ -268,8 +268,8 @@ func TestCreateResourceAlreadyExists(t *testing.T) {
 	repo := &mocks.MockedReporterResourceRepository{}
 	inventoryRepo := &mocks.MockedInventoryResourceRepository{}
 
-	// Resource already exists
-	repo.On("FindByReporterData", mock.Anything, mock.Anything, mock.Anything).Return(&model.Resource{}, nil)
+	// Representation already exists
+	repo.On("FindByReporterData", mock.Anything, mock.Anything, mock.Anything).Return(&model.Representation{}, nil)
 
 	useCase := New(repo, inventoryRepo, nil, nil, "", log.DefaultLogger, nil, cb, defaultUseCaseConfig)
 	ctx := context.TODO()
@@ -285,9 +285,9 @@ func TestCreateResourceAlreadyExistsBackwardsCompatible(t *testing.T) {
 	inventoryRepo := &mocks.MockedInventoryResourceRepository{}
 
 	// Validates backwards compatibility
-	repo.On("FindByReporterData", mock.Anything, mock.Anything, mock.Anything).Return(&model.Resource{}, gorm.ErrRecordNotFound)
-	// Resource already exists
-	repo.On("FindByReporterResourceId", mock.Anything, mock.Anything).Return(&model.Resource{}, nil)
+	repo.On("FindByReporterData", mock.Anything, mock.Anything, mock.Anything).Return(&model.Representation{}, gorm.ErrRecordNotFound)
+	// Representation already exists
+	repo.On("FindByReporterResourceId", mock.Anything, mock.Anything).Return(&model.Representation{}, nil)
 
 	useCase := New(repo, inventoryRepo, nil, nil, "", log.DefaultLogger, nil, cb, defaultUseCaseConfig)
 	ctx := context.TODO()
@@ -306,12 +306,12 @@ func TestCreateNewResource(t *testing.T) {
 	inventoryRepo := &mocks.MockedInventoryResourceRepository{}
 	listenMan := &mocks.MockedListenManager{}
 	sub := mocks.MockedSubscription{}
-	returnedResource := model.Resource{
+	returnedResource := model.Representation{
 		ID: id,
 	}
 
-	repo.On("FindByReporterData", mock.Anything, mock.Anything, mock.Anything).Return((*model.Resource)(nil), gorm.ErrRecordNotFound)
-	repo.On("FindByReporterResourceId", mock.Anything, mock.Anything).Return((*model.Resource)(nil), gorm.ErrRecordNotFound)
+	repo.On("FindByReporterData", mock.Anything, mock.Anything, mock.Anything).Return((*model.Representation)(nil), gorm.ErrRecordNotFound)
+	repo.On("FindByReporterResourceId", mock.Anything, mock.Anything).Return((*model.Representation)(nil), gorm.ErrRecordNotFound)
 	repo.On("Create", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&returnedResource, nil)
 
 	listenMan.On("Subscribe", mock.Anything).Return(&sub)
@@ -339,12 +339,12 @@ func TestCreateNewResource_ConsumerDisabled(t *testing.T) {
 	inventoryRepo := &mocks.MockedInventoryResourceRepository{}
 	listenMan := &mocks.MockedListenManager{}
 	sub := mocks.MockedSubscription{}
-	returnedResource := model.Resource{
+	returnedResource := model.Representation{
 		ID: id,
 	}
 
-	repo.On("FindByReporterData", mock.Anything, mock.Anything, mock.Anything).Return((*model.Resource)(nil), gorm.ErrRecordNotFound)
-	repo.On("FindByReporterResourceId", mock.Anything, mock.Anything).Return((*model.Resource)(nil), gorm.ErrRecordNotFound)
+	repo.On("FindByReporterData", mock.Anything, mock.Anything, mock.Anything).Return((*model.Representation)(nil), gorm.ErrRecordNotFound)
+	repo.On("FindByReporterResourceId", mock.Anything, mock.Anything).Return((*model.Representation)(nil), gorm.ErrRecordNotFound)
 	repo.On("Create", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&returnedResource, nil)
 
 	listenMan.On("Subscribe", mock.Anything).Return(&sub)
@@ -383,12 +383,12 @@ func TestCreateNewResource_ConsistencyToken(t *testing.T) {
 	listenMan := &mocks.MockedListenManager{}
 	sub := mocks.MockedSubscription{}
 
-	returnedResource := model.Resource{
+	returnedResource := model.Representation{
 		ID: id,
 	}
 
-	repo.On("FindByReporterData", mock.Anything, mock.Anything, mock.Anything).Return((*model.Resource)(nil), gorm.ErrRecordNotFound)
-	repo.On("FindByReporterResourceId", mock.Anything, mock.Anything).Return((*model.Resource)(nil), gorm.ErrRecordNotFound)
+	repo.On("FindByReporterData", mock.Anything, mock.Anything, mock.Anything).Return((*model.Representation)(nil), gorm.ErrRecordNotFound)
+	repo.On("FindByReporterResourceId", mock.Anything, mock.Anything).Return((*model.Representation)(nil), gorm.ErrRecordNotFound)
 	repo.On("Create", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&returnedResource, nil)
 
 	listenMan.On("Subscribe", mock.Anything).Return(&sub)
@@ -420,7 +420,7 @@ func TestUpdateReturnsDbError(t *testing.T) {
 	inventoryRepo := &mocks.MockedInventoryResourceRepository{}
 
 	// DB Error
-	repo.On("FindByReporterData", mock.Anything, mock.Anything, mock.Anything).Return((*model.Resource)(nil), gorm.ErrDuplicatedKey)
+	repo.On("FindByReporterData", mock.Anything, mock.Anything, mock.Anything).Return((*model.Representation)(nil), gorm.ErrDuplicatedKey)
 
 	useCase := New(repo, inventoryRepo, nil, nil, "", log.DefaultLogger, nil, cb, defaultUseCaseConfig)
 	ctx := context.TODO()
@@ -435,9 +435,9 @@ func TestUpdateReturnsDbErrorBackwardsCompatible(t *testing.T) {
 	inventoryRepo := &mocks.MockedInventoryResourceRepository{}
 
 	// Validates backwards compatibility
-	repo.On("FindByReporterData", mock.Anything, mock.Anything, mock.Anything).Return((*model.Resource)(nil), gorm.ErrRecordNotFound)
+	repo.On("FindByReporterData", mock.Anything, mock.Anything, mock.Anything).Return((*model.Representation)(nil), gorm.ErrRecordNotFound)
 	// DB Error
-	repo.On("FindByReporterResourceId", mock.Anything, mock.Anything).Return((*model.Resource)(nil), gorm.ErrDuplicatedKey)
+	repo.On("FindByReporterResourceId", mock.Anything, mock.Anything).Return((*model.Representation)(nil), gorm.ErrDuplicatedKey)
 
 	useCase := New(repo, inventoryRepo, nil, nil, "", log.DefaultLogger, nil, cb, defaultUseCaseConfig)
 	ctx := context.TODO()
@@ -456,13 +456,13 @@ func TestUpdateNewResourceCreatesIt(t *testing.T) {
 	inventoryRepo := &mocks.MockedInventoryResourceRepository{}
 	listenMan := &mocks.MockedListenManager{}
 	sub := mocks.MockedSubscription{}
-	returnedResource := model.Resource{
+	returnedResource := model.Representation{
 		ID: id,
 	}
 
-	// Resource doesn't exist
-	repo.On("FindByReporterData", mock.Anything, mock.Anything, mock.Anything).Return((*model.Resource)(nil), gorm.ErrRecordNotFound)
-	repo.On("FindByReporterResourceId", mock.Anything, mock.Anything).Return((*model.Resource)(nil), gorm.ErrRecordNotFound)
+	// Representation doesn't exist
+	repo.On("FindByReporterData", mock.Anything, mock.Anything, mock.Anything).Return((*model.Representation)(nil), gorm.ErrRecordNotFound)
+	repo.On("FindByReporterResourceId", mock.Anything, mock.Anything).Return((*model.Representation)(nil), gorm.ErrRecordNotFound)
 	repo.On("Create", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&returnedResource, nil)
 
 	listenMan.On("Subscribe", mock.Anything).Return(&sub)
@@ -492,11 +492,11 @@ func TestUpdateExistingResource(t *testing.T) {
 	inventoryRepo := &mocks.MockedInventoryResourceRepository{}
 	listenMan := &mocks.MockedListenManager{}
 	sub := mocks.MockedSubscription{}
-	returnedResource := model.Resource{
+	returnedResource := model.Representation{
 		ID: id,
 	}
 
-	// Resource already exists
+	// Representation already exists
 	repo.On("FindByReporterData", mock.Anything, mock.Anything, mock.Anything).Return(resource, nil)
 	repo.On("Update", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&returnedResource, nil)
 
@@ -527,13 +527,13 @@ func TestUpdateExistingResourceBackwardsCompatible(t *testing.T) {
 	inventoryRepo := &mocks.MockedInventoryResourceRepository{}
 	listenMan := &mocks.MockedListenManager{}
 	sub := mocks.MockedSubscription{}
-	returnedResource := model.Resource{
+	returnedResource := model.Representation{
 		ID: id,
 	}
 
 	// Validates backwards compatibility
-	repo.On("FindByReporterData", mock.Anything, mock.Anything, mock.Anything).Return((*model.Resource)(nil), gorm.ErrRecordNotFound)
-	// Resource already exists
+	repo.On("FindByReporterData", mock.Anything, mock.Anything, mock.Anything).Return((*model.Representation)(nil), gorm.ErrRecordNotFound)
+	// Representation already exists
 	repo.On("FindByReporterResourceId", mock.Anything, mock.Anything).Return(resource, nil)
 	repo.On("Update", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&returnedResource, nil)
 
@@ -559,7 +559,7 @@ func TestDeleteReturnsDbError(t *testing.T) {
 	inventoryRepo := &mocks.MockedInventoryResourceRepository{}
 
 	// Validates backwards compatibility
-	repo.On("FindByReporterData", mock.Anything, mock.Anything, mock.Anything).Return((*model.Resource)(nil), gorm.ErrDuplicatedKey)
+	repo.On("FindByReporterData", mock.Anything, mock.Anything, mock.Anything).Return((*model.Representation)(nil), gorm.ErrDuplicatedKey)
 
 	useCase := New(repo, inventoryRepo, nil, nil, "", log.DefaultLogger, nil, cb, defaultUseCaseConfig)
 	ctx := context.TODO()
@@ -573,9 +573,9 @@ func TestDeleteReturnsDbErrorBackwardsCompatible(t *testing.T) {
 	inventoryRepo := &mocks.MockedInventoryResourceRepository{}
 
 	// Validates backwards compatibility
-	repo.On("FindByReporterData", mock.Anything, mock.Anything, mock.Anything).Return((*model.Resource)(nil), gorm.ErrRecordNotFound)
+	repo.On("FindByReporterData", mock.Anything, mock.Anything, mock.Anything).Return((*model.Representation)(nil), gorm.ErrRecordNotFound)
 	// DB Error
-	repo.On("FindByReporterResourceId", mock.Anything, mock.Anything).Return((*model.Resource)(nil), gorm.ErrDuplicatedKey)
+	repo.On("FindByReporterResourceId", mock.Anything, mock.Anything).Return((*model.Representation)(nil), gorm.ErrDuplicatedKey)
 
 	useCase := New(repo, inventoryRepo, nil, nil, "", log.DefaultLogger, nil, cb, defaultUseCaseConfig)
 	ctx := context.TODO()
@@ -589,9 +589,9 @@ func TestDeleteNonexistentResource(t *testing.T) {
 	repo := &mocks.MockedReporterResourceRepository{}
 	inventoryRepo := &mocks.MockedInventoryResourceRepository{}
 
-	// Resource already exists
-	repo.On("FindByReporterData", mock.Anything, mock.Anything, mock.Anything).Return((*model.Resource)(nil), gorm.ErrRecordNotFound)
-	repo.On("FindByReporterResourceId", mock.Anything, mock.Anything).Return((*model.Resource)(nil), gorm.ErrRecordNotFound)
+	// Representation already exists
+	repo.On("FindByReporterData", mock.Anything, mock.Anything, mock.Anything).Return((*model.Representation)(nil), gorm.ErrRecordNotFound)
+	repo.On("FindByReporterResourceId", mock.Anything, mock.Anything).Return((*model.Representation)(nil), gorm.ErrRecordNotFound)
 
 	useCase := New(repo, inventoryRepo, nil, nil, "", log.DefaultLogger, nil, cb, defaultUseCaseConfig)
 	ctx := context.TODO()
@@ -608,11 +608,11 @@ func TestDeleteResource(t *testing.T) {
 	id, err := uuid.NewV7()
 	assert.Nil(t, err)
 
-	// Resource already exists
-	repo.On("FindByReporterData", mock.Anything, mock.Anything, mock.Anything).Return(&model.Resource{
+	// Representation already exists
+	repo.On("FindByReporterData", mock.Anything, mock.Anything, mock.Anything).Return(&model.Representation{
 		ID: id,
 	}, nil)
-	repo.On("Delete", mock.Anything, (uuid.UUID)(id), mock.Anything).Return(&model.Resource{}, nil)
+	repo.On("Delete", mock.Anything, (uuid.UUID)(id), mock.Anything).Return(&model.Representation{}, nil)
 
 	useCase := New(repo, inventoryRepo, nil, nil, "", log.DefaultLogger, nil, cb, defaultUseCaseConfig)
 
@@ -630,12 +630,12 @@ func TestDeleteResourceBackwardsCompatible(t *testing.T) {
 	assert.Nil(t, err)
 
 	// Validates backwards compatibility
-	repo.On("FindByReporterData", mock.Anything, mock.Anything, mock.Anything).Return((*model.Resource)(nil), gorm.ErrRecordNotFound)
-	// Resource already exists
-	repo.On("FindByReporterResourceId", mock.Anything, mock.Anything).Return(&model.Resource{
+	repo.On("FindByReporterData", mock.Anything, mock.Anything, mock.Anything).Return((*model.Representation)(nil), gorm.ErrRecordNotFound)
+	// Representation already exists
+	repo.On("FindByReporterResourceId", mock.Anything, mock.Anything).Return(&model.Representation{
 		ID: id,
 	}, nil)
-	repo.On("Delete", mock.Anything, (uuid.UUID)(id), mock.Anything).Return(&model.Resource{}, nil)
+	repo.On("Delete", mock.Anything, (uuid.UUID)(id), mock.Anything).Return(&model.Representation{}, nil)
 
 	useCase := New(repo, inventoryRepo, nil, nil, "", log.DefaultLogger, nil, cb, defaultUseCaseConfig)
 
@@ -652,8 +652,8 @@ func TestCreateResource_PersistenceDisabled(t *testing.T) {
 	inventoryRepo := &mocks.MockedInventoryResourceRepository{}
 
 	// Mock as if persistence is not disabled, for assurance
-	repo.On("FindByReporterData", mock.Anything, mock.Anything, mock.Anything).Return(&model.Resource{}, nil)
-	repo.On("FindByReporterResourceId", mock.Anything, mock.Anything).Return(&model.Resource{}, nil)
+	repo.On("FindByReporterData", mock.Anything, mock.Anything, mock.Anything).Return(&model.Representation{}, nil)
+	repo.On("FindByReporterResourceId", mock.Anything, mock.Anything).Return(&model.Representation{}, nil)
 	repo.On("Create", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, nil)
 
 	usecaseConfig := &UsecaseConfig{
@@ -687,8 +687,8 @@ func TestUpdateResource_PersistenceDisabled(t *testing.T) {
 	inventoryRepo := &mocks.MockedInventoryResourceRepository{}
 
 	// Mock as if persistence is not disabled, for assurance
-	repo.On("FindByReporterData", mock.Anything, mock.Anything, mock.Anything).Return(&model.Resource{}, nil)
-	repo.On("FindByReporterResourceId", mock.Anything, mock.Anything).Return(&model.Resource{}, nil)
+	repo.On("FindByReporterData", mock.Anything, mock.Anything, mock.Anything).Return(&model.Representation{}, nil)
+	repo.On("FindByReporterResourceId", mock.Anything, mock.Anything).Return(&model.Representation{}, nil)
 	repo.On("Update", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, nil)
 	repo.On("Create", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, nil)
 
@@ -722,7 +722,7 @@ func TestUpdate_ReadAfterWrite(t *testing.T) {
 	listenMan := &mocks.MockedListenManager{}
 	sub := mocks.MockedSubscription{}
 
-	returnedResource := model.Resource{
+	returnedResource := model.Representation{
 		ID: id,
 	}
 
@@ -763,7 +763,7 @@ func TestUpdate_ConsumerDisabled(t *testing.T) {
 	listenMan := &mocks.MockedListenManager{}
 	sub := mocks.MockedSubscription{}
 
-	returnedResource := model.Resource{
+	returnedResource := model.Representation{
 		ID: id,
 	}
 
@@ -804,10 +804,10 @@ func TestDeleteResource_PersistenceDisabled(t *testing.T) {
 	inventoryRepo := &mocks.MockedInventoryResourceRepository{}
 
 	// Mock as if persistence is not disabled, for assurance
-	repo.On("FindByReporterResourceId", mock.Anything, mock.Anything).Return(&model.Resource{
+	repo.On("FindByReporterResourceId", mock.Anything, mock.Anything).Return(&model.Representation{
 		ID: id,
 	}, nil)
-	repo.On("Delete", mock.Anything, (uint64)(33)).Return(&model.Resource{}, nil)
+	repo.On("Delete", mock.Anything, (uint64)(33)).Return(&model.Representation{}, nil)
 
 	usecaseConfig := &UsecaseConfig{
 		DisablePersistence:      true,
@@ -832,7 +832,7 @@ func TestCheck_MissingResource(t *testing.T) {
 	repo := &mocks.MockedReporterResourceRepository{}
 	m := &mocks.MockAuthz{}
 
-	repo.On("FindByReporterResourceId", mock.Anything, mock.Anything).Return(&model.Resource{}, gorm.ErrRecordNotFound)
+	repo.On("FindByReporterResourceId", mock.Anything, mock.Anything).Return(&model.Representation{}, gorm.ErrRecordNotFound)
 	m.On("Check", mock.Anything, mock.Anything, "notifications_integration_view", mock.Anything, mock.Anything).Return(v1beta1.CheckResponse_ALLOWED_TRUE, &v1beta1.ConsistencyToken{}, nil)
 
 	useCase := New(repo, inventoryRepo, m, nil, "", log.DefaultLogger, nil, cb, defaultUseCaseConfig)
@@ -858,7 +858,7 @@ func TestCheck_ResourceExistsError(t *testing.T) {
 	repo := &mocks.MockedReporterResourceRepository{}
 	m := &mocks.MockAuthz{}
 
-	repo.On("FindByReporterResourceId", mock.Anything, mock.Anything).Return(&model.Resource{}, gorm.ErrUnsupportedDriver) // some random error
+	repo.On("FindByReporterResourceId", mock.Anything, mock.Anything).Return(&model.Representation{}, gorm.ErrUnsupportedDriver) // some random error
 
 	useCase := New(repo, inventoryRepo, m, nil, "", log.DefaultLogger, nil, cb, defaultUseCaseConfig)
 	allowed, err := useCase.Check(ctx, "notifications_integration_view", "rbac", &v1beta1.SubjectReference{}, model.ReporterResourceId{})
@@ -876,7 +876,7 @@ func TestCheck_ErrorWithKessel(t *testing.T) {
 	repo := &mocks.MockedReporterResourceRepository{}
 	m := &mocks.MockAuthz{}
 
-	repo.On("FindByReporterResourceId", mock.Anything, mock.Anything).Return(&model.Resource{}, nil)
+	repo.On("FindByReporterResourceId", mock.Anything, mock.Anything).Return(&model.Representation{}, nil)
 	m.On("Check", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(v1beta1.CheckResponse_ALLOWED_FALSE, &v1beta1.ConsistencyToken{}, errors.New("failed during call to relations"))
 
 	useCase := New(repo, inventoryRepo, m, nil, "", log.DefaultLogger, nil, cb, defaultUseCaseConfig)
@@ -922,7 +922,7 @@ func TestCheckForUpdate_ResourceExistsError(t *testing.T) {
 	repo := &mocks.MockedReporterResourceRepository{}
 	m := &mocks.MockAuthz{}
 
-	repo.On("FindByReporterResourceId", mock.Anything, mock.Anything).Return(&model.Resource{}, gorm.ErrUnsupportedDriver) // some random error
+	repo.On("FindByReporterResourceId", mock.Anything, mock.Anything).Return(&model.Representation{}, gorm.ErrUnsupportedDriver) // some random error
 
 	useCase := New(repo, inventoryRepo, m, nil, "", log.DefaultLogger, nil, cb, defaultUseCaseConfig)
 	allowed, err := useCase.CheckForUpdate(ctx, "notifications_integration_view", "rbac", &v1beta1.SubjectReference{}, model.ReporterResourceId{})
@@ -940,7 +940,7 @@ func TestCheckForUpdate_ErrorWithKessel(t *testing.T) {
 	repo := &mocks.MockedReporterResourceRepository{}
 	m := &mocks.MockAuthz{}
 
-	repo.On("FindByReporterResourceId", mock.Anything, mock.Anything).Return(&model.Resource{}, nil)
+	repo.On("FindByReporterResourceId", mock.Anything, mock.Anything).Return(&model.Representation{}, nil)
 	m.On("CheckForUpdate", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(v1beta1.CheckForUpdateResponse_ALLOWED_FALSE, &v1beta1.ConsistencyToken{}, errors.New("failed during call to relations"))
 
 	useCase := New(repo, inventoryRepo, m, nil, "", log.DefaultLogger, nil, cb, defaultUseCaseConfig)
@@ -979,7 +979,7 @@ func TestCheckForUpdate_MissingResource_Allowed(t *testing.T) {
 	repo := &mocks.MockedReporterResourceRepository{}
 	m := &mocks.MockAuthz{}
 
-	repo.On("FindByReporterResourceId", mock.Anything, mock.Anything).Return(&model.Resource{}, gorm.ErrRecordNotFound)
+	repo.On("FindByReporterResourceId", mock.Anything, mock.Anything).Return(&model.Representation{}, gorm.ErrRecordNotFound)
 	m.On("CheckForUpdate", mock.Anything, mock.Anything, "notifications_integration_view", mock.Anything, mock.Anything).Return(v1beta1.CheckForUpdateResponse_ALLOWED_TRUE, &v1beta1.ConsistencyToken{}, nil)
 
 	useCase := New(repo, inventoryRepo, m, nil, "", log.DefaultLogger, nil, cb, defaultUseCaseConfig)
@@ -1005,7 +1005,7 @@ func TestCheckForUpdate_Allowed(t *testing.T) {
 	repo.On("FindByReporterResourceId", mock.Anything, mock.Anything).Return(resource, nil)
 	m.On("CheckForUpdate", mock.Anything, mock.Anything, "notifications_integration_view", mock.Anything, mock.Anything).Return(v1beta1.CheckForUpdateResponse_ALLOWED_TRUE, &v1beta1.ConsistencyToken{}, nil)
 
-	repo.On("Update", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&model.Resource{}, nil)
+	repo.On("Update", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&model.Representation{}, nil)
 
 	useCase := New(repo, inventoryRepo, m, nil, "", log.DefaultLogger, nil, cb, defaultUseCaseConfig)
 	allowed, err := useCase.CheckForUpdate(ctx, "notifications_integration_view", "rbac", &v1beta1.SubjectReference{}, model.ReporterResourceId{})
@@ -1031,7 +1031,7 @@ func TestListResourcesInWorkspace_Error(t *testing.T) {
 	repo := &mocks.MockedReporterResourceRepository{}
 	m := &mocks.MockAuthz{}
 
-	repo.On("FindByWorkspaceId", mock.Anything, mock.Anything).Return([]*model.Resource{}, errors.New("failed querying"))
+	repo.On("FindByWorkspaceId", mock.Anything, mock.Anything).Return([]*model.Representation{}, errors.New("failed querying"))
 
 	useCase := New(repo, inventoryRepo, m, nil, "", log.DefaultLogger, nil, cb, defaultUseCaseConfig)
 	resource_chan, err_chan, err := useCase.ListResourcesInWorkspace(ctx, "notifications_integration_view", "rbac", &v1beta1.SubjectReference{}, "foo-id")
@@ -1050,7 +1050,7 @@ func TestListResourcesInWorkspace_NoResources(t *testing.T) {
 	repo := &mocks.MockedReporterResourceRepository{}
 	m := &mocks.MockAuthz{}
 
-	repo.On("FindByWorkspaceId", mock.Anything, mock.Anything).Return([]*model.Resource{}, nil)
+	repo.On("FindByWorkspaceId", mock.Anything, mock.Anything).Return([]*model.Representation{}, nil)
 
 	useCase := New(repo, inventoryRepo, m, nil, "", log.DefaultLogger, nil, cb, defaultUseCaseConfig)
 	resource_chan, err_chan, err := useCase.ListResourcesInWorkspace(ctx, "notifications_integration_view", "rbac", &v1beta1.SubjectReference{}, "foo-id")
@@ -1074,7 +1074,7 @@ func TestListResourcesInWorkspace_ResourcesAllowedTrue(t *testing.T) {
 
 	resource := resource1()
 
-	repo.On("FindByWorkspaceId", mock.Anything, mock.Anything).Return([]*model.Resource{resource}, nil)
+	repo.On("FindByWorkspaceId", mock.Anything, mock.Anything).Return([]*model.Representation{resource}, nil)
 	m.On("Check", mock.Anything, mock.Anything, "notifications_integration_write", mock.Anything, mock.Anything).Return(v1beta1.CheckResponse_ALLOWED_TRUE, &v1beta1.ConsistencyToken{}, nil)
 
 	useCase := New(repo, inventoryRepo, m, nil, "", log.DefaultLogger, nil, cb, defaultUseCaseConfig)
@@ -1117,7 +1117,7 @@ func TestListResourcesInWorkspace_MultipleResourcesAllowedTrue(t *testing.T) {
 	resource2 := resource2()
 	resource3 := resource3()
 
-	repo.On("FindByWorkspaceId", mock.Anything, mock.Anything).Return([]*model.Resource{resource, resource2, resource3}, nil)
+	repo.On("FindByWorkspaceId", mock.Anything, mock.Anything).Return([]*model.Representation{resource, resource2, resource3}, nil)
 	m.On("Check", mock.Anything, mock.Anything, "notifications_integration_write", mock.Anything, mock.Anything).Return(v1beta1.CheckResponse_ALLOWED_TRUE, &v1beta1.ConsistencyToken{}, nil)
 
 	useCase := New(repo, inventoryRepo, m, nil, "", log.DefaultLogger, nil, cb, defaultUseCaseConfig)
@@ -1125,12 +1125,12 @@ func TestListResourcesInWorkspace_MultipleResourcesAllowedTrue(t *testing.T) {
 
 	assert.Nil(t, err)
 
-	out := make([]*model.Resource, 3)
+	out := make([]*model.Representation, 3)
 	out[0] = <-resource_chan
 	out[1] = <-resource_chan
 	out[2] = <-resource_chan
 
-	in := []*model.Resource{resource, resource2, resource3}
+	in := []*model.Representation{resource, resource2, resource3}
 	sort.Slice(in, func(i, j int) bool { return len(in[i].ResourceType) < len(in[j].ResourceType) })
 	sort.Slice(out, func(i, j int) bool { return len(out[i].ResourceType) < len(out[j].ResourceType) })
 	assert.Equal(t, in, out) // all 3 are there in any order
@@ -1156,7 +1156,7 @@ func TestListResourcesInWorkspace_MultipleResourcesOneFalseTwoTrueLastError(t *t
 	resource3 := resource3()
 	theError := errors.New("failed calling relations")
 
-	repo.On("FindByWorkspaceId", mock.Anything, mock.Anything).Return([]*model.Resource{resource, resource2, resource3}, nil)
+	repo.On("FindByWorkspaceId", mock.Anything, mock.Anything).Return([]*model.Representation{resource, resource2, resource3}, nil)
 	m.On("Check", mock.Anything, mock.Anything, "notifications_integration_write", resource, mock.Anything).Return(v1beta1.CheckResponse_ALLOWED_FALSE, &v1beta1.ConsistencyToken{}, nil)
 	m.On("Check", mock.Anything, mock.Anything, "notifications_integration_write", resource2, mock.Anything).Return(v1beta1.CheckResponse_ALLOWED_TRUE, &v1beta1.ConsistencyToken{}, nil)
 	m.On("Check", mock.Anything, mock.Anything, "notifications_integration_write", resource3, mock.Anything).Return(v1beta1.CheckResponse_ALLOWED_UNSPECIFIED, &v1beta1.ConsistencyToken{}, theError)
@@ -1166,10 +1166,10 @@ func TestListResourcesInWorkspace_MultipleResourcesOneFalseTwoTrueLastError(t *t
 
 	assert.Nil(t, err)
 
-	out_allowed := make([]*model.Resource, 1)
+	out_allowed := make([]*model.Representation, 1)
 	out_allowed[0] = <-resource_chan
 
-	in_allowed := []*model.Resource{resource2}
+	in_allowed := []*model.Representation{resource2}
 	sort.Slice(in_allowed, func(i, j int) bool { return len(in_allowed[i].ResourceType) < len(in_allowed[j].ResourceType) })
 	sort.Slice(out_allowed, func(i, j int) bool { return len(out_allowed[i].ResourceType) < len(out_allowed[j].ResourceType) })
 	assert.Equal(t, in_allowed, out_allowed) // all 3 are there in any order
@@ -1192,7 +1192,7 @@ func TestListResourcesInWorkspace_ResourcesAllowedError(t *testing.T) {
 
 	resource := resource1()
 
-	repo.On("FindByWorkspaceId", mock.Anything, mock.Anything).Return([]*model.Resource{resource}, nil)
+	repo.On("FindByWorkspaceId", mock.Anything, mock.Anything).Return([]*model.Representation{resource}, nil)
 	m.On("Check", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(v1beta1.CheckResponse_ALLOWED_TRUE, &v1beta1.ConsistencyToken{}, errors.New("failed calling relations"))
 
 	useCase := New(repo, inventoryRepo, m, nil, "", log.DefaultLogger, nil, cb, defaultUseCaseConfig)
@@ -1209,43 +1209,43 @@ func TestListResourcesInWorkspace_ResourcesAllowedError(t *testing.T) {
 func TestIsSPInAllowlist(t *testing.T) {
 	tests := []struct {
 		name      string
-		resource  *model.Resource
+		resource  *model.Representation
 		allowlist []string
 		expected  bool
 	}{
 		{
 			name:      "SP in allowlist",
-			resource:  &model.Resource{ReporterId: "sp1"},
+			resource:  &model.Representation{ReporterId: "sp1"},
 			allowlist: []string{"sp1", "sp2"},
 			expected:  true,
 		},
 		{
 			name:      "SP not in allowlist",
-			resource:  &model.Resource{ReporterId: "sp3"},
+			resource:  &model.Representation{ReporterId: "sp3"},
 			allowlist: []string{"sp1", "sp2"},
 			expected:  false,
 		},
 		{
 			name:      "Wildcard '*' allows any SP",
-			resource:  &model.Resource{ReporterId: "sp3"},
+			resource:  &model.Representation{ReporterId: "sp3"},
 			allowlist: []string{"*"},
 			expected:  true,
 		},
 		{
 			name:      "SP in allowlist with wildcard",
-			resource:  &model.Resource{ReporterId: "sp3"},
+			resource:  &model.Representation{ReporterId: "sp3"},
 			allowlist: []string{"sp1", "*"},
 			expected:  true,
 		},
 		{
 			name:      "Empty allowlist",
-			resource:  &model.Resource{ReporterId: "sp1"},
+			resource:  &model.Representation{ReporterId: "sp1"},
 			allowlist: []string{},
 			expected:  false,
 		},
 		{
 			name:      "Allowlist with only wildcard",
-			resource:  &model.Resource{ReporterId: "sp4"},
+			resource:  &model.Representation{ReporterId: "sp4"},
 			allowlist: []string{"*"},
 			expected:  true,
 		},
@@ -1358,7 +1358,7 @@ func TestComputeReadAfterWrite(t *testing.T) {
 				Config:        usecaseConfig,
 			}
 
-			m := &model.Resource{
+			m := &model.Representation{
 				ReporterId: "SP1",
 			}
 			assert.Equal(t, tt.expected, computeReadAfterWrite(uc, tt.writeVisibility, m))
@@ -1373,7 +1373,7 @@ func TestUpsertReturnsDbError(t *testing.T) {
 	inventoryRepo := &mocks.MockedInventoryResourceRepository{}
 
 	// DB Error
-	repo.On("FindByReporterResourceIdv1beta2", mock.Anything, mock.Anything).Return((*model.Resource)(nil), gorm.ErrDuplicatedKey)
+	repo.On("FindByReporterResourceIdv1beta2", mock.Anything, mock.Anything).Return((*model.Representation)(nil), gorm.ErrDuplicatedKey)
 
 	useCase := New(repo, inventoryRepo, nil, nil, "", log.DefaultLogger, nil, cb, defaultUseCaseConfig)
 	ctx := context.TODO()
@@ -1411,7 +1411,7 @@ func TestUpsert_ReadAfterWrite(t *testing.T) {
 	sub := mocks.MockedSubscription{}
 
 	// no existing resource, need to create
-	repo.On("FindByReporterResourceIdv1beta2", mock.Anything, mock.Anything).Return((*model.Resource)(nil), gorm.ErrRecordNotFound)
+	repo.On("FindByReporterResourceIdv1beta2", mock.Anything, mock.Anything).Return((*model.Representation)(nil), gorm.ErrRecordNotFound)
 	repo.On("Create", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(resource, nil)
 
 	listenMan.On("Subscribe", mock.Anything).Return(&sub)
@@ -1447,7 +1447,7 @@ func TestUpsert_ConsumerDisabled(t *testing.T) {
 	sub := mocks.MockedSubscription{}
 
 	// no existing resource, need to create
-	repo.On("FindByReporterResourceIdv1beta2", mock.Anything, mock.Anything).Return((*model.Resource)(nil), gorm.ErrRecordNotFound)
+	repo.On("FindByReporterResourceIdv1beta2", mock.Anything, mock.Anything).Return((*model.Representation)(nil), gorm.ErrRecordNotFound)
 	repo.On("Create", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(resource, nil)
 
 	listenMan.On("Subscribe", mock.Anything).Return(&sub)
@@ -1483,7 +1483,7 @@ func TestUpsert_WaitCircuitBreaker(t *testing.T) {
 	listenMan := &mocks.MockedListenManager{}
 	sub := mocks.MockedSubscription{}
 
-	repo.On("FindByReporterResourceIdv1beta2", mock.Anything, mock.Anything).Return((*model.Resource)(nil), gorm.ErrRecordNotFound)
+	repo.On("FindByReporterResourceIdv1beta2", mock.Anything, mock.Anything).Return((*model.Representation)(nil), gorm.ErrRecordNotFound)
 	repo.On("Create", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(resource, nil)
 
 	listenMan.On("Subscribe", mock.Anything).Return(&sub)

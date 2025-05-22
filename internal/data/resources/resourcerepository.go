@@ -28,7 +28,7 @@ func New(db *gorm.DB, mc *metricscollector.MetricsCollector, maxSerializationRet
 	}
 }
 
-func copyHistory(m *model.Resource, id uuid.UUID, operationType model.OperationType) *model.ResourceHistory {
+func copyHistory(m *model.Representation, id uuid.UUID, operationType model.OperationType) *model.ResourceHistory {
 	return &model.ResourceHistory{
 		OrgId:         m.OrgId,
 		ResourceData:  m.ResourceData,
@@ -43,11 +43,11 @@ func copyHistory(m *model.Resource, id uuid.UUID, operationType model.OperationT
 	}
 }
 
-func (r *Repo) Create(ctx context.Context, m *model.Resource, namespace string, txid string) (*model.Resource, error) {
+func (r *Repo) Create(ctx context.Context, m *model.Representation, namespace string, txid string) (*model.Representation, error) {
 	db := r.DB.Session(&gorm.Session{})
-	var result *model.Resource
+	var result *model.Representation
 	err := r.handleSerializableTransaction(db, func(tx *gorm.DB) error {
-		updatedResources := []*model.Resource{}
+		updatedResources := []*model.Representation{}
 
 		if m.InventoryId == nil {
 			// New inventory resource
@@ -108,11 +108,11 @@ func (r *Repo) Create(ctx context.Context, m *model.Resource, namespace string, 
 	return result, nil
 }
 
-func (r *Repo) Update(ctx context.Context, m *model.Resource, id uuid.UUID, namespace string, txid string) (*model.Resource, error) {
+func (r *Repo) Update(ctx context.Context, m *model.Representation, id uuid.UUID, namespace string, txid string) (*model.Representation, error) {
 	db := r.DB.Session(&gorm.Session{})
-	var result *model.Resource
+	var result *model.Representation
 	err := r.handleSerializableTransaction(db, func(tx *gorm.DB) error {
-		updatedResources := []*model.Resource{}
+		updatedResources := []*model.Representation{}
 		resource, err := r.FindByIDWithTx(ctx, tx, id)
 		if err != nil {
 			return err
@@ -159,9 +159,9 @@ func (r *Repo) Update(ctx context.Context, m *model.Resource, id uuid.UUID, name
 	return result, nil
 }
 
-func (r *Repo) Delete(ctx context.Context, id uuid.UUID, namespace string) (*model.Resource, error) {
+func (r *Repo) Delete(ctx context.Context, id uuid.UUID, namespace string) (*model.Representation, error) {
 	db := r.DB.Session(&gorm.Session{})
-	var result *model.Resource
+	var result *model.Representation
 	err := r.handleSerializableTransaction(db, func(tx *gorm.DB) error {
 		resource, err := r.FindByIDWithTx(ctx, tx, id)
 		if err != nil {
@@ -182,9 +182,9 @@ func (r *Repo) Delete(ctx context.Context, id uuid.UUID, namespace string) (*mod
 		}
 
 		if resource.InventoryId != nil {
-			// Delete Inventory Resource if no other resources are referencing it
+			// Delete Inventory Representation if no other resources are referencing it
 			var count int64
-			if err := tx.Model(&model.Resource{}).Where("inventory_id = ?", *resource.InventoryId).Count(&count).Error; err != nil {
+			if err := tx.Model(&model.Representation{}).Where("inventory_id = ?", *resource.InventoryId).Count(&count).Error; err != nil {
 				return err
 			}
 			if count == 0 {
@@ -210,8 +210,8 @@ func (r *Repo) Delete(ctx context.Context, id uuid.UUID, namespace string) (*mod
 	return result, nil
 }
 
-func (r *Repo) FindByIDWithTx(ctx context.Context, tx *gorm.DB, id uuid.UUID) (*model.Resource, error) {
-	resource := model.Resource{}
+func (r *Repo) FindByIDWithTx(ctx context.Context, tx *gorm.DB, id uuid.UUID) (*model.Representation, error) {
+	resource := model.Representation{}
 	if err := tx.First(&resource, id).Error; err != nil {
 		return nil, err
 	}
@@ -219,8 +219,8 @@ func (r *Repo) FindByIDWithTx(ctx context.Context, tx *gorm.DB, id uuid.UUID) (*
 	return &resource, nil
 }
 
-func (r *Repo) FindByID(ctx context.Context, id uuid.UUID) (*model.Resource, error) {
-	resource := model.Resource{}
+func (r *Repo) FindByID(ctx context.Context, id uuid.UUID) (*model.Representation, error) {
+	resource := model.Representation{}
 	if err := r.DB.Session(&gorm.Session{}).First(&resource, id).Error; err != nil {
 		return nil, err
 	}
@@ -228,9 +228,9 @@ func (r *Repo) FindByID(ctx context.Context, id uuid.UUID) (*model.Resource, err
 	return &resource, nil
 }
 
-func (r *Repo) FindByWorkspaceId(ctx context.Context, workspace_id string) ([]*model.Resource, error) {
+func (r *Repo) FindByWorkspaceId(ctx context.Context, workspace_id string) ([]*model.Representation, error) {
 	session := r.DB.Session(&gorm.Session{})
-	data := []*model.Resource{}
+	data := []*model.Representation{}
 
 	log.Infof("FindByWorkspaceId: %s", workspace_id)
 	if err := session.Where("workspace_id = ?", workspace_id).Find(&data).Error; err != nil {
@@ -242,7 +242,7 @@ func (r *Repo) FindByWorkspaceId(ctx context.Context, workspace_id string) ([]*m
 }
 
 // Deprecated: Prefer FindByReporterData instead
-func (r *Repo) FindByReporterResourceId(ctx context.Context, id model.ReporterResourceId) (*model.Resource, error) {
+func (r *Repo) FindByReporterResourceId(ctx context.Context, id model.ReporterResourceId) (*model.Representation, error) {
 	session := r.DB.Session(&gorm.Session{})
 
 	resourceId, err := data.GetLastResourceId(session, id)
@@ -253,8 +253,8 @@ func (r *Repo) FindByReporterResourceId(ctx context.Context, id model.ReporterRe
 	return r.FindByID(ctx, resourceId)
 }
 
-func (r *Repo) FindByReporterResourceIdv1beta2(ctx context.Context, id model.ReporterResourceUniqueIndex) (*model.Resource, error) {
-	resource := model.Resource{}
+func (r *Repo) FindByReporterResourceIdv1beta2(ctx context.Context, id model.ReporterResourceUniqueIndex) (*model.Representation, error) {
+	resource := model.Representation{}
 	if err := r.DB.Session(&gorm.Session{}).Where(&model.ReporterResourceUniqueIndex{
 		ReporterInstanceId: id.ReporterInstanceId,
 		ReporterResourceId: id.ReporterResourceId,
@@ -267,9 +267,9 @@ func (r *Repo) FindByReporterResourceIdv1beta2(ctx context.Context, id model.Rep
 	return &resource, nil
 }
 
-func (r *Repo) FindByInventoryIdAndResourceType(ctx context.Context, inventoryId *uuid.UUID, resourceType string) (*model.Resource, error) {
-	resource := model.Resource{}
-	if err := r.DB.Session(&gorm.Session{}).Where(&model.Resource{
+func (r *Repo) FindByInventoryIdAndResourceType(ctx context.Context, inventoryId *uuid.UUID, resourceType string) (*model.Representation, error) {
+	resource := model.Representation{}
+	if err := r.DB.Session(&gorm.Session{}).Where(&model.Representation{
 		InventoryId:  inventoryId,
 		ResourceType: resourceType,
 	}).First(&resource).Error; err != nil {
@@ -279,9 +279,9 @@ func (r *Repo) FindByInventoryIdAndResourceType(ctx context.Context, inventoryId
 	return &resource, nil
 }
 
-func (r *Repo) FindByInventoryIdAndReporter(ctx context.Context, inventoryId *uuid.UUID, reporterInstanceId string, reporterType string) (*model.Resource, error) {
-	resource := model.Resource{}
-	if err := r.DB.Session(&gorm.Session{}).Where(&model.Resource{
+func (r *Repo) FindByInventoryIdAndReporter(ctx context.Context, inventoryId *uuid.UUID, reporterInstanceId string, reporterType string) (*model.Representation, error) {
+	resource := model.Representation{}
+	if err := r.DB.Session(&gorm.Session{}).Where(&model.Representation{
 		InventoryId:        inventoryId,
 		ReporterInstanceId: reporterInstanceId,
 		ResourceType:       reporterType,
@@ -292,9 +292,9 @@ func (r *Repo) FindByInventoryIdAndReporter(ctx context.Context, inventoryId *uu
 	return &resource, nil
 }
 
-func (r *Repo) FindByReporterData(ctx context.Context, reporterId string, reporterResourceId string) (*model.Resource, error) {
-	resource := model.Resource{}
-	if err := r.DB.Session(&gorm.Session{}).Where(&model.Resource{
+func (r *Repo) FindByReporterData(ctx context.Context, reporterId string, reporterResourceId string) (*model.Representation, error) {
+	resource := model.Representation{}
+	if err := r.DB.Session(&gorm.Session{}).Where(&model.Representation{
 		ReporterId:         reporterId,
 		ReporterResourceId: reporterResourceId,
 	}).First(&resource).Error; err != nil {
@@ -304,8 +304,8 @@ func (r *Repo) FindByReporterData(ctx context.Context, reporterId string, report
 	return &resource, nil
 }
 
-func (r *Repo) ListAll(context.Context) ([]*model.Resource, error) {
-	var results []*model.Resource
+func (r *Repo) ListAll(context.Context) ([]*model.Representation, error) {
+	var results []*model.Representation
 	if err := r.DB.Find(&results).Error; err != nil {
 		return nil, err
 	}
@@ -313,7 +313,7 @@ func (r *Repo) ListAll(context.Context) ([]*model.Resource, error) {
 	return results, nil
 }
 
-func (r *Repo) handleWorkspaceUpdates(tx *gorm.DB, m *model.Resource, updatedResources []*model.Resource) ([]*model.Resource, error) {
+func (r *Repo) handleWorkspaceUpdates(tx *gorm.DB, m *model.Representation, updatedResources []*model.Representation) ([]*model.Representation, error) {
 	if m.InventoryId != nil {
 		var inventoryResource model.InventoryResource
 		if err := tx.First(&inventoryResource, m.InventoryId).Error; err != nil {
@@ -326,7 +326,7 @@ func (r *Repo) handleWorkspaceUpdates(tx *gorm.DB, m *model.Resource, updatedRes
 				return nil, fmt.Errorf("updating inventory resource workspace ID: %w", err)
 			}
 			// get all resources with same inventory ID
-			var resources []model.Resource
+			var resources []model.Representation
 			if err := tx.Where("inventory_id = ?", m.InventoryId).Find(&resources).Error; err != nil {
 				return nil, fmt.Errorf("fetching resources with inventory ID: %w", err)
 			}
@@ -347,7 +347,7 @@ func (r *Repo) handleWorkspaceUpdates(tx *gorm.DB, m *model.Resource, updatedRes
 	return updatedResources, nil
 }
 
-func handleOutboxEvents(tx *gorm.DB, resource model.Resource, namespace string, operationType model.EventOperationType, txid string) error {
+func handleOutboxEvents(tx *gorm.DB, resource model.Representation, namespace string, operationType model.EventOperationType, txid string) error {
 	resourceMessage, tupleMessage, err := model.NewOutboxEventsFromResource(resource, namespace, operationType, txid)
 	if err != nil {
 		return err

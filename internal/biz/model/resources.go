@@ -11,7 +11,7 @@ import (
 	"gorm.io/gorm/schema"
 )
 
-type Resource struct {
+type Representation struct {
 	ID               uuid.UUID  `gorm:"type:uuid;primarykey"`
 	InventoryId      *uuid.UUID `gorm:"index"`
 	OrgId            string     `gorm:"index"`
@@ -44,7 +44,7 @@ type ReporterResourceUniqueIndex struct {
 	ReporterInstanceId string `gorm:"uniqueIndex:reporter_resource_unique_index"`
 }
 
-func ReporterResourceIdv1beta2FromResource(resource *Resource) ReporterResourceUniqueIndex {
+func ReporterResourceIdv1beta2FromResource(resource *Representation) ReporterResourceUniqueIndex {
 	return ReporterResourceUniqueIndex{
 		ReporterResourceId: resource.ReporterResourceId,
 		ResourceType:       resource.ResourceType,
@@ -58,7 +58,7 @@ type ResourceReporter struct {
 	LocalResourceId string `json:"local_resource_id"`
 }
 
-func (r *Resource) GormDbAfterMigration(db *gorm.DB, s *schema.Schema) error {
+func (r *Representation) GormDbAfterMigration(db *gorm.DB, s *schema.Schema) error {
 	switch db.Name() {
 	case "sqlite":
 		break
@@ -84,7 +84,7 @@ func (data *ResourceReporter) Scan(value interface{}) error {
 	return Scan(value, data)
 }
 
-func (r *Resource) BeforeCreate(db *gorm.DB) error {
+func (r *Representation) BeforeCreate(db *gorm.DB) error {
 	var err error
 	if r.ID == uuid.Nil {
 		r.ID, err = uuid.NewV7()

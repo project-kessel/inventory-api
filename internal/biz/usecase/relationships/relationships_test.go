@@ -96,7 +96,7 @@ func TestCreateRelationshipAlreadyExists(t *testing.T) {
 	r := relationship1(sid, oid)
 	repo := &MockedRelationshipRepository{}
 
-	// Resource already exists
+	// Representation already exists
 	repo.On("FindResourceIdByReporterResourceId", mock.Anything, mock.Anything).Return(sid, nil).Once()
 	repo.On("FindResourceIdByReporterResourceId", mock.Anything, mock.Anything).Return(oid, nil).Once()
 	repo.On("FindRelationship", mock.Anything, sid, oid, mock.Anything).Return(&model.Relationship{}, nil)
@@ -214,7 +214,7 @@ func TestUpdateNewRelationshipCreatesIt(t *testing.T) {
 		ID: rid,
 	}
 
-	// Resource already exists
+	// Representation already exists
 	repo.On("FindResourceIdByReporterResourceId", mock.Anything, mock.Anything).Return(sid, nil).Once()
 	repo.On("FindResourceIdByReporterResourceId", mock.Anything, mock.Anything).Return(oid, nil).Once()
 	// Create calls these again
@@ -254,7 +254,7 @@ func TestUpdateExistingRelationship(t *testing.T) {
 		OrgId: "my-new-org",
 	}
 
-	// Resource exists
+	// Representation exists
 	repo.On("FindResourceIdByReporterResourceId", mock.Anything, mock.Anything).Return(sid, nil).Once()
 	repo.On("FindResourceIdByReporterResourceId", mock.Anything, mock.Anything).Return(oid, nil).Once()
 	repo.On("FindRelationship", mock.Anything, sid, oid, mock.Anything).Return(r, nil)
@@ -275,7 +275,7 @@ func TestUpdateExistingRelationship(t *testing.T) {
 func TestDeleteNonexistentRelationship(t *testing.T) {
 	repo := &MockedRelationshipRepository{}
 
-	// Resource does not exist
+	// Representation does not exist
 	repo.On("FindResourceIdByReporterResourceId", mock.Anything, mock.Anything).Return(uuid.Nil, nil).Once()
 	repo.On("FindResourceIdByReporterResourceId", mock.Anything, mock.Anything).Return(uuid.Nil, nil).Once()
 	repo.On("FindRelationship", mock.Anything, uuid.Nil, uuid.Nil, mock.Anything).Return((*model.Relationship)(nil), gorm.ErrRecordNotFound)
@@ -295,7 +295,7 @@ func TestDeleteRelationship(t *testing.T) {
 	repo := &MockedRelationshipRepository{}
 	ctx := context.TODO()
 
-	// Resource already exists
+	// Representation already exists
 	repo.On("FindResourceIdByReporterResourceId", mock.Anything, mock.Anything).Return(uuid.Nil, nil).Once()
 	repo.On("FindResourceIdByReporterResourceId", mock.Anything, mock.Anything).Return(uuid.Nil, nil).Once()
 	repo.On("FindRelationship", mock.Anything, uuid.Nil, uuid.Nil, mock.Anything).Return(&model.Relationship{

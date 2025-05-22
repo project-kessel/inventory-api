@@ -456,7 +456,7 @@ func (i *InventoryConsumer) CreateTuple(ctx context.Context, tuple *v1beta1.Rela
 			namespace := tuple.GetResource().GetType().GetNamespace()
 			relation := tuple.GetRelation()
 			subject := tuple.GetSubject()
-			resource := &model.Resource{
+			resource := &model.Representation{
 				ResourceType:       tuple.GetResource().GetType().GetName(),
 				ReporterResourceId: tuple.GetResource().GetId(),
 			}
@@ -498,7 +498,7 @@ func (i *InventoryConsumer) DeleteTuple(ctx context.Context, filter *v1beta1.Rel
 // UpdateConsistencyToken updates the resource in the inventory DB to add the consistency token
 func (i *InventoryConsumer) UpdateConsistencyToken(inventoryID, token string) error {
 	// this will update all records for the same inventory_id with current consistency token
-	i.DB.Model(model.Resource{}).Where("inventory_id = ?", inventoryID).Update("consistency_token", token)
+	i.DB.Model(model.Representation{}).Where("inventory_id = ?", inventoryID).Update("consistency_token", token)
 	return nil
 }
 

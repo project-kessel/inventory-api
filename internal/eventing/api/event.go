@@ -75,7 +75,7 @@ type RelationshipReporter struct {
 	ReporterInstanceId     string `json:"reporter_instance_id"`
 }
 
-func NewResourceEvent(operationType model.EventOperationType, resource *model.Resource, reportedTime time.Time) (*Event, error) {
+func NewResourceEvent(operationType model.EventOperationType, resource *model.Representation, reportedTime time.Time) (*Event, error) {
 	const eventType = "resources"
 
 	eventId, err := uuid.NewUUID() // Todo: we need to have an stable id if we implement some re-trying logic

@@ -103,7 +103,7 @@ type EventRelationshipReporter struct {
 	ReporterInstanceId     string `json:"reporter_instance_id"`
 }
 
-func newResourceEvent(operationType EventOperationType, resource *Resource) (*ResourceEvent, error) {
+func newResourceEvent(operationType EventOperationType, resource *Representation) (*ResourceEvent, error) {
 	const eventType = "resources"
 	now := time.Now()
 
@@ -166,7 +166,7 @@ func newResourceEvent(operationType EventOperationType, resource *Resource) (*Re
 	}, nil
 }
 
-func convertResourceToResourceEvent(resource Resource, operationType EventOperationType) (JsonObject, error) {
+func convertResourceToResourceEvent(resource Representation, operationType EventOperationType) (JsonObject, error) {
 	payload := JsonObject{}
 
 	resourceEvent, err := newResourceEvent(operationType, &resource)
@@ -186,7 +186,7 @@ func convertResourceToResourceEvent(resource Resource, operationType EventOperat
 
 	return payload, nil
 }
-func convertResourceToSetTupleEvent(resource Resource, namespace string) (JsonObject, error) {
+func convertResourceToSetTupleEvent(resource Representation, namespace string) (JsonObject, error) {
 	payload := JsonObject{}
 
 	// Derive namespace from the resource when possible
@@ -228,7 +228,7 @@ func convertResourceToSetTupleEvent(resource Resource, namespace string) (JsonOb
 	return payload, nil
 }
 
-func convertResourceToUnsetTupleEvent(resource Resource, namespace string) (JsonObject, error) {
+func convertResourceToUnsetTupleEvent(resource Representation, namespace string) (JsonObject, error) {
 	payload := JsonObject{}
 
 	// Derive namespace from the resource when possible
@@ -257,7 +257,7 @@ func convertResourceToUnsetTupleEvent(resource Resource, namespace string) (Json
 	return payload, nil
 }
 
-func NewOutboxEventsFromResource(resource Resource, namespace string, operationType EventOperationType, txid string) (*OutboxEvent, *OutboxEvent, error) {
+func NewOutboxEventsFromResource(resource Representation, namespace string, operationType EventOperationType, txid string) (*OutboxEvent, *OutboxEvent, error) {
 	var tuplePayload JsonObject
 	var tupleEvent *OutboxEvent
 

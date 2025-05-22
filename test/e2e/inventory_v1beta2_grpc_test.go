@@ -84,7 +84,7 @@ func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_Host(t *testing.T) {
 	}
 
 	_, err = client.ReportResource(ctx, req)
-	assert.NoError(t, err, "Failed to Report Resource")
+	assert.NoError(t, err, "Failed to Report Representation")
 
 	delReq := &pbv1beta2.DeleteResourceRequest{
 		Reference: &pbv1beta2.ResourceReference{
@@ -97,7 +97,7 @@ func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_Host(t *testing.T) {
 	}
 
 	_, err = client.DeleteResource(ctx, delReq)
-	assert.NoError(t, err, "Failed to Delete Resource")
+	assert.NoError(t, err, "Failed to Delete Representation")
 }
 
 func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_Notifications(t *testing.T) {
@@ -153,7 +153,7 @@ func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_Notifications(t *testing.T) 
 	}
 
 	_, err = client.ReportResource(ctx, &req)
-	assert.NoError(t, err, "Failed to Report Resource")
+	assert.NoError(t, err, "Failed to Report Representation")
 
 	delReq := pbv1beta2.DeleteResourceRequest{
 		Reference: &pbv1beta2.ResourceReference{
@@ -166,7 +166,7 @@ func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_Notifications(t *testing.T) 
 	}
 
 	_, err = client.DeleteResource(ctx, &delReq)
-	assert.NoError(t, err, "Failed to Delete Resource")
+	assert.NoError(t, err, "Failed to Delete Representation")
 
 }
 
@@ -226,7 +226,7 @@ func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_K8S_Cluster(t *testing.T) {
 	}
 
 	_, err = client.ReportResource(ctx, &req)
-	assert.NoError(t, err, "Failed to Report Resource")
+	assert.NoError(t, err, "Failed to Report Representation")
 
 	delReq := pbv1beta2.DeleteResourceRequest{
 		Reference: &pbv1beta2.ResourceReference{
@@ -239,7 +239,7 @@ func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_K8S_Cluster(t *testing.T) {
 	}
 
 	_, err = client.DeleteResource(ctx, &delReq)
-	assert.NoError(t, err, "Failed to Delete Resource")
+	assert.NoError(t, err, "Failed to Delete Representation")
 
 }
 
@@ -294,7 +294,7 @@ func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_K8S_Policy(t *testing.T) {
 	}
 
 	_, err = client.ReportResource(ctx, &req)
-	assert.NoError(t, err, "Failed to Report Resource")
+	assert.NoError(t, err, "Failed to Report Representation")
 
 	delReq := pbv1beta2.DeleteResourceRequest{
 		Reference: &pbv1beta2.ResourceReference{
@@ -307,7 +307,7 @@ func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_K8S_Policy(t *testing.T) {
 	}
 
 	_, err = client.DeleteResource(ctx, &delReq)
-	assert.NoError(t, err, "Failed to Delete Resource")
+	assert.NoError(t, err, "Failed to Delete Representation")
 
 }
 
@@ -326,7 +326,7 @@ func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_K8S_Policy(t *testing.T) {
 //	ctx := context.Background()
 //
 //	subject := &pbv1beta2.SubjectReference{
-//		Resource: &pbv1beta2.ResourceReference{
+//		Representation: &pbv1beta2.ResourceReference{
 //			ResourceId:   "bob",
 //			ResourceType: "principal",
 //			Reporter: &pbv1beta2.ReporterReference{
@@ -426,9 +426,9 @@ func TestInventoryAPIHTTP_v1beta2_Host_ConsistentWrite(t *testing.T) {
 	}
 
 	_, err = client.ReportResource(ctx, &req)
-	assert.NoError(t, err, "Failed to Report Resource")
+	assert.NoError(t, err, "Failed to Report Representation")
 
-	var host model.Resource
+	var host model.Representation
 	err = db.Where("reporter_resource_id = ?", resourceId).First(&host).Error
 	assert.NoError(t, err, "Error fetching host from DB")
 	assert.NotNil(t, host, "Host not found in DB")
@@ -444,7 +444,7 @@ func TestInventoryAPIHTTP_v1beta2_Host_ConsistentWrite(t *testing.T) {
 		},
 	}
 	_, err = client.DeleteResource(ctx, &delReq)
-	assert.NoError(t, err, "Failed to Delete Resource")
+	assert.NoError(t, err, "Failed to Delete Representation")
 }
 
 func enableShortMode(t *testing.T) {

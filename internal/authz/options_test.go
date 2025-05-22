@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/project-kessel/inventory-api/internal/authz/kessel"
-	"github.com/project-kessel/inventory-api/test/helpers"
+	"github.com/project-kessel/inventory-api/internal/helpers"
 	"github.com/spf13/pflag"
 	"github.com/stretchr/testify/assert"
 )
@@ -40,15 +40,6 @@ func TestOptions_AddFlags(t *testing.T) {
 }
 
 func TestOptions_Validate(t *testing.T) {
-
-	//if o.Authz != AllowAll && o.Authz != Kessel {
-	//	errs = append(errs, fmt.Errorf("invalid authz.impl: %s.  Options are 'allow-all' and 'kessel'", o.Authz))
-	//}
-	//
-	//if o.Authz == Kessel {
-	//	errs = append(errs, o.Kessel.Validate()...)
-	//}
-
 	tests := []struct {
 		name        string
 		options     *Options

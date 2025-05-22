@@ -3,9 +3,9 @@ package storage
 import (
 	"testing"
 
+	"github.com/project-kessel/inventory-api/internal/helpers"
 	"github.com/project-kessel/inventory-api/internal/storage/postgres"
 	"github.com/project-kessel/inventory-api/internal/storage/sqlite3"
-	"github.com/project-kessel/inventory-api/test/helpers"
 	"github.com/spf13/pflag"
 	"github.com/stretchr/testify/assert"
 )

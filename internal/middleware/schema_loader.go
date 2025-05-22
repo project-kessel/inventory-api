@@ -75,7 +75,7 @@ func loadFromFilesystem(resourceType string) ([]string, error) {
 	}
 
 	cacheKey := fmt.Sprintf("config:%s", resourceType)
-	cachedConfig, ok := schemaCache.Load(cacheKey)
+	cachedConfig, ok := SchemaCache.Load(cacheKey)
 	if !ok {
 		return nil, fmt.Errorf("config not found for resource type '%s'", resourceType)
 	}
@@ -99,7 +99,7 @@ func loadFromFilesystem(resourceType string) ([]string, error) {
 func loadFromCache(resourceType string) ([]string, error) {
 	cacheKey := fmt.Sprintf("config:%s", resourceType)
 
-	cachedConfig, ok := schemaCache.Load(cacheKey)
+	cachedConfig, ok := SchemaCache.Load(cacheKey)
 	if !ok {
 		return nil, fmt.Errorf("config not found in cache for resource type '%s'", resourceType)
 	}

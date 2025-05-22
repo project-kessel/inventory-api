@@ -88,7 +88,7 @@ func ExtractStringField(data map[string]interface{}, key string) (string, error)
 // ValidateCommonRepresentation Validates the "common" field in ResourceRepresentations using a predefined schema.
 func ValidateCommonRepresentation(resourceType string, commonRepresentation map[string]interface{}) error {
 	commonSchemaKey := fmt.Sprintf("common:%s", strings.ToLower(resourceType))
-	commonSchema, err := getSchemaFromCache(commonSchemaKey)
+	commonSchema, err := GetSchemaFromCache(commonSchemaKey)
 	if err != nil {
 		return fmt.Errorf("failed to load common representation schema for '%s': %w", resourceType, err)
 	}
@@ -104,7 +104,7 @@ func ValidateCommonRepresentation(resourceType string, commonRepresentation map[
 func ValidateReporterRepresentation(resourceType string, reporterType string, reporterRepresentation map[string]interface{}) error {
 	// Construct the schema key using the format: resourceType:reporterType
 	schemaKey := fmt.Sprintf("%s:%s", strings.ToLower(resourceType), strings.ToLower(reporterType))
-	reporterRepresentationSchema, err := getSchemaFromCache(schemaKey)
+	reporterRepresentationSchema, err := GetSchemaFromCache(schemaKey)
 
 	// Case 1: No schema found for resourceType:reporterType
 	if err != nil {

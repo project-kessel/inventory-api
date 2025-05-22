@@ -154,7 +154,7 @@ func (c *NotificationsIntegrationsService) ListNotificationsIntegrations(r *pb.L
 			return fmt.Errorf("failed to send integrations: %w", err)
 		}
 
-		log.Info(fmt.Sprintf("Resource %+v converted to notificationIntegration %+v", resource, re))
+		log.Info(fmt.Sprintf("Representation %+v converted to notificationIntegration %+v", resource, re))
 
 		err = conn.Send(&pb.ListNotificationsIntegrationsResponse{
 			Integrations: re,
@@ -173,19 +173,19 @@ func (c *NotificationsIntegrationsService) ListNotificationsIntegrations(r *pb.L
 	return nil
 }
 
-func notificationsIntegrationFromCreateRequest(r *pb.CreateNotificationsIntegrationRequest, identity *authnapi.Identity) (*model.Resource, error) {
+func notificationsIntegrationFromCreateRequest(r *pb.CreateNotificationsIntegrationRequest, identity *authnapi.Identity) (*model.Representation, error) {
 	return conv.ResourceFromPbv1beta1(ResourceType, identity.Principal, nil, r.Integration.Metadata, r.Integration.ReporterData), nil
 }
 
-func createResponseFromNotificationsIntegration(h *model.Resource) *pb.CreateNotificationsIntegrationResponse {
+func createResponseFromNotificationsIntegration(h *model.Representation) *pb.CreateNotificationsIntegrationResponse {
 	return &pb.CreateNotificationsIntegrationResponse{}
 }
 
-func notificationsIntegrationFromUpdateRequest(r *pb.UpdateNotificationsIntegrationRequest, identity *authnapi.Identity) (*model.Resource, error) {
+func notificationsIntegrationFromUpdateRequest(r *pb.UpdateNotificationsIntegrationRequest, identity *authnapi.Identity) (*model.Representation, error) {
 	return conv.ResourceFromPbv1beta1(ResourceType, identity.Principal, nil, r.Integration.Metadata, r.Integration.ReporterData), nil
 }
 
-func updateResponseFromNotificationsIntegration(h *model.Resource) *pb.UpdateNotificationsIntegrationResponse {
+func updateResponseFromNotificationsIntegration(h *model.Representation) *pb.UpdateNotificationsIntegrationResponse {
 	return &pb.UpdateNotificationsIntegrationResponse{}
 }
 
@@ -197,7 +197,7 @@ func toDeleteResponse() *pb.DeleteNotificationsIntegrationResponse {
 	return &pb.DeleteNotificationsIntegrationResponse{}
 }
 
-func notificationsIntegrationFromResource(r *model.Resource) (*pb.NotificationsIntegration, error) {
+func notificationsIntegrationFromResource(r *model.Representation) (*pb.NotificationsIntegration, error) {
 	return &pb.NotificationsIntegration{
 		Metadata: &pb.Metadata{
 			Id:           r.ID.String(),

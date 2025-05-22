@@ -23,8 +23,8 @@ type Relationship struct {
 	UpdatedAt        *time.Time
 
 	// Used to create FKs
-	Subject Resource `gorm:"foreignKey:SubjectId"`
-	Object  Resource `gorm:"foreignKey:ObjectId"`
+	Subject Representation `gorm:"foreignKey:SubjectId"`
+	Object  Representation `gorm:"foreignKey:ObjectId"`
 }
 
 type RelationshipReporter struct {

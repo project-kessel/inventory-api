@@ -199,3 +199,19 @@ func TestUnmarshalJSONToMap(t *testing.T) {
 		})
 	}
 }
+
+func TestValidateReporterRepresentation_NoSchemaCases(t *testing.T) {
+
+	t.Run("returns error if no schema and data present", func(t *testing.T) {
+		// No schema stored in cache!
+		err := middleware.ValidateReporterRepresentation("host", "hbi", map[string]interface{}{"foo": "bar"})
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "no schema found for 'host:hbi', but reporter representation was provided")
+	})
+
+	t.Run("returns nil if no schema and data is empty", func(t *testing.T) {
+		// No schema stored in cache!
+		err := middleware.ValidateReporterRepresentation("host", "hbi", map[string]interface{}{})
+		assert.NoError(t, err)
+	})
+}

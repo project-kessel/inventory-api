@@ -52,7 +52,7 @@ func PreloadAllSchemasFromFilesystem(resourceDir string) error {
 			SchemaCache.Store(fmt.Sprintf("common:%s", resourceType), commonResourceSchema)
 		}
 
-		_, err = loadConfigFile(resourceDir, resourceType)
+		_, err = LoadConfigFile(resourceDir, resourceType)
 		if err != nil {
 			log.Errorf("Failed to load config file for '%s': %v", resourceType, err)
 			return err
@@ -115,7 +115,7 @@ func GetSchemaFromCache(cacheKey string) (string, error) {
 	return "", fmt.Errorf("schema not found for key '%s'", cacheKey)
 }
 
-func loadConfigFile(resourceDir string, resourceType string) (struct {
+func LoadConfigFile(resourceDir string, resourceType string) (struct {
 	ResourceType      string   `yaml:"resource_type"`
 	ResourceReporters []string `yaml:"resource_reporters"`
 }, error) {

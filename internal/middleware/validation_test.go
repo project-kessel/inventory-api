@@ -175,7 +175,7 @@ func TestValidateReportResourceJSON_FieldExtractionErrors(t *testing.T) {
 			name: "missing common in representations",
 			msg: &pbv1beta2.ReportResourceRequest{
 				Type:         "host",
-				ReporterType: "bar",
+				ReporterType: "hbi",
 				Representations: &pbv1beta2.ResourceRepresentations{
 					Metadata: baseMsg.Representations.Metadata,
 					Reporter: baseMsg.Representations.Reporter,
@@ -183,6 +183,19 @@ func TestValidateReportResourceJSON_FieldExtractionErrors(t *testing.T) {
 				},
 			},
 			expect: "Missing 'common'",
+		},
+		{
+			name: "missing common in representations",
+			msg: &pbv1beta2.ReportResourceRequest{
+				Type:         "host",
+				ReporterType: "bar",
+				Representations: &pbv1beta2.ResourceRepresentations{
+					Metadata: baseMsg.Representations.Metadata,
+					Reporter: baseMsg.Representations.Reporter,
+					Common:   baseMsg.Representations.Common,
+				},
+			},
+			expect: "invalid reporter_type: bar for resource_type: host",
 		},
 	}
 

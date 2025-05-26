@@ -168,3 +168,45 @@ resource_reporters:
 func resetSchemaCache() {
 	middleware.SchemaCache = sync.Map{}
 }
+
+func TestPreloadAllSchemasFromFilesystem_NegativeCases(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	// Case 1: root dir does not exist
+	resetSchemaCache()
+	err := middleware.PreloadAllSchemasFromFilesystem(filepath.Join(tmpDir, "not_exists"))
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "no directories inside schema directory")
+
+	// Case 2: resource subdir, missing config.yaml
+	resetSchemaCache()
+	resourceDir := filepath.Join(tmpDir, "resources")
+	hostDir := filepath.Join(resourceDir, "host")
+	reportersDir := filepath.Join(hostDir, "reporters")
+	err2 := os.MkdirAll(reportersDir, 0755)
+	assert.NoError(t, err2)
+	err3 := os.WriteFile(filepath.Join(hostDir, "common_representation.json"), []byte(`{}`), 0644)
+	assert.NoError(t, err3)
+	err = middleware.PreloadAllSchemasFromFilesystem(resourceDir)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to read config file for 'host'")
+
+	// Case 3: config.yaml exists but invalid yaml
+	resetSchemaCache()
+	err4 := os.WriteFile(filepath.Join(hostDir, "config.yaml"), []byte("bad: : yaml"), 0644)
+	assert.NoError(t, err4)
+	err = middleware.PreloadAllSchemasFromFilesystem(resourceDir)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to unmarshal config for 'host'")
+
+	// Case 4: reporters dir exists, but reporter config is missing (should warn, not fail)
+	resetSchemaCache()
+	err5 := os.WriteFile(filepath.Join(hostDir, "config.yaml"), []byte("resource_type: host\nresource_reporters:\n  - hbi\n"), 0644)
+	assert.NoError(t, err5)
+	hbiDir := filepath.Join(reportersDir, "hbi")
+	err6 := os.MkdirAll(hbiDir, 0755)
+	assert.NoError(t, err6)
+	// Don't write reporter config
+	err = middleware.PreloadAllSchemasFromFilesystem(resourceDir)
+	assert.NoError(t, err)
+}

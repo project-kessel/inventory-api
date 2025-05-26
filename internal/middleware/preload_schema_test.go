@@ -90,7 +90,6 @@ func TestGetSchemaFromCache_NotFound(t *testing.T) {
 	assert.Empty(t, schema)
 	assert.Contains(t, err.Error(), "schema not found")
 }
-
 func TestLoadConfigFile(t *testing.T) {
 	type testCase struct {
 		name         string
@@ -140,12 +139,13 @@ resource_reporters:
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			if tc.setupFile {
-				// Write test config.yaml
 				err := os.WriteFile(configPath, []byte(tc.fileContents), 0644)
 				assert.NoError(t, err)
 			} else {
 				err := os.Remove(configPath)
-				assert.NoError(t, err)
+				if err != nil && !os.IsNotExist(err) {
+					t.Fatalf("failed to remove config file: %v", err)
+				}
 			}
 
 			// reset SchemaCache before each test
@@ -164,6 +164,7 @@ resource_reporters:
 		})
 	}
 }
+
 func resetSchemaCache() {
 	middleware.SchemaCache = sync.Map{}
 }

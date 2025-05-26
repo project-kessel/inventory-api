@@ -117,3 +117,41 @@ func TestLoadValidReporters_FromFilesystem_ConfigNotFound(t *testing.T) {
 	assert.Error(t, err)
 	assert.Nil(t, reporters)
 }
+
+func TestLoadFromFilesystem_ConfigNotFound(t *testing.T) {
+
+	reporters, err := middleware.LoadFromFilesystem("notfound")
+	assert.Error(t, err)
+	assert.Nil(t, reporters)
+	assert.Contains(t, err.Error(), "config not found for resource type 'notfound'")
+}
+
+func TestLoadFromFilesystem_CachedTypeInvalid(t *testing.T) {
+	resourceType := "host"
+	middleware.SchemaCache.Store("config:"+resourceType, 12345) // not a []byte!
+
+	reporters, err := middleware.LoadFromFilesystem(resourceType)
+	assert.Error(t, err)
+	assert.Nil(t, reporters)
+	assert.Contains(t, err.Error(), "invalid config data type for resource type 'host'")
+}
+
+func TestLoadFromFilesystem_InvalidYAML(t *testing.T) {
+	resourceType := "host"
+	middleware.SchemaCache.Store("config:"+resourceType, []byte("invalid: : yaml"))
+
+	reporters, err := middleware.LoadFromFilesystem(resourceType)
+	assert.Error(t, err)
+	assert.Nil(t, reporters)
+	assert.Contains(t, err.Error(), "failed to unmarshal config for 'host'")
+}
+
+func TestLoadFromFilesystem_MissingReportersField(t *testing.T) {
+	resourceType := "host"
+	middleware.SchemaCache.Store("config:"+resourceType, []byte("not_reporters: foo\n"))
+
+	reporters, err := middleware.LoadFromFilesystem(resourceType)
+	assert.Error(t, err)
+	assert.Nil(t, reporters)
+	assert.Contains(t, err.Error(), "missing 'resource_reporters' field in config for 'host'")
+}

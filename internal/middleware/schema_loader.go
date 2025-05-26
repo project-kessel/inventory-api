@@ -63,13 +63,13 @@ func LoadCommonResourceDataSchema(resourceType string, baseSchemaDir string) (st
 // It either loads from the cache (JSON-based) or the filesystem (YAML-based).
 func LoadValidReporters(resourceType string) ([]string, error) {
 	if viper.GetBool("resources.use_cache") {
-		return loadFromCache(resourceType)
+		return LoadFromCache(resourceType)
 	}
-	return loadFromFilesystem(resourceType)
+	return LoadFromFilesystem(resourceType)
 }
 
 // LoadValidReporters Takes the resource_type from the provided config.yaml and compares it to the defined reporter_types
-func loadFromFilesystem(resourceType string) ([]string, error) {
+func LoadFromFilesystem(resourceType string) ([]string, error) {
 	var config struct {
 		ResourceReporters []string `yaml:"resource_reporters"`
 	}
@@ -96,7 +96,7 @@ func loadFromFilesystem(resourceType string) ([]string, error) {
 	return config.ResourceReporters, nil
 }
 
-func loadFromCache(resourceType string) ([]string, error) {
+func LoadFromCache(resourceType string) ([]string, error) {
 	cacheKey := fmt.Sprintf("config:%s", resourceType)
 
 	cachedConfig, ok := SchemaCache.Load(cacheKey)

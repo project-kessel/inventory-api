@@ -44,6 +44,10 @@ func copyHistory(m *model.Resource, id uuid.UUID, operationType model.OperationT
 }
 
 func (r *Repo) Create(ctx context.Context, m *model.Resource, namespace string, txid string) (*model.Resource, error) {
+	if m == nil {
+		return nil, fmt.Errorf("resource cannot be nil")
+	}
+
 	db := r.DB.Session(&gorm.Session{})
 	var result *model.Resource
 	err := r.handleSerializableTransaction(db, func(tx *gorm.DB) error {

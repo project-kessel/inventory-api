@@ -25,8 +25,8 @@ func ReporterResourceIdFromPb(resourceType, reporterId string, reporter *pbresou
 	}
 }
 
-func ResourceFromPbv1beta1(resourceType, reporterId string, resourceData model.JsonObject, metadata *pbresource.Metadata, reporter *pbresource.ReporterData) *model.Resource {
-	return &model.Resource{
+func ResourceFromPbv1beta1(resourceType, reporterId string, resourceData model.JsonObject, metadata *pbresource.Metadata, reporter *pbresource.ReporterData) *model.Representation {
+	return &model.Representation{
 		ID:                 uuid.UUID{},
 		ResourceData:       resourceData,
 		ResourceType:       resourceType,
@@ -48,8 +48,8 @@ func ResourceFromPbv1beta1(resourceType, reporterId string, resourceData model.J
 	}
 }
 
-func ResourceFromPb(resourceType, reporterType string, reporterInstanceId string, reporterId string, resourceData model.JsonObject, workspaceId string, resourceRep *pbresourcev1beta2.ResourceRepresentations, inventoryId *uuid.UUID) *model.Resource {
-	return &model.Resource{
+func ResourceFromPb(resourceType, reporterType string, reporterInstanceId string, reporterId string, resourceData model.JsonObject, workspaceId string, resourceRep *pbresourcev1beta2.ResourceRepresentations, inventoryId *uuid.UUID) *model.Representation {
+	return &model.Representation{
 		ID:                 uuid.UUID{},
 		InventoryId:        inventoryId,
 		ResourceData:       resourceData,

@@ -38,7 +38,7 @@ type ReporterRelationshipId struct {
 	SubjectId ReporterResourceId
 }
 
-func ReporterResourceIdFromResource(resource *Resource) ReporterResourceId {
+func ReporterResourceIdFromResource(resource *Representation) ReporterResourceId {
 	return ReporterResourceId{
 		LocalResourceId: resource.Reporter.LocalResourceId,
 		ResourceType:    resource.ResourceType,

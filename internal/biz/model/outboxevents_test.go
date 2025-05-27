@@ -13,7 +13,7 @@ import (
 
 const txid = "txid"
 
-func createTestResource(isv1beta2 bool) *Resource {
+func createTestResource(isv1beta2 bool) *Representation {
 	now := time.Now()
 	id, err := uuid.NewV7()
 	if err != nil {
@@ -25,7 +25,7 @@ func createTestResource(isv1beta2 bool) *Resource {
 		panic(err)
 	}
 
-	resource := &Resource{
+	resource := &Representation{
 		ID:          id,
 		InventoryId: &inventoryId,
 		CreatedAt:   &now,
@@ -114,7 +114,7 @@ func TestNewOutboxEventsFromResourceCreated_v1beta2(t *testing.T) {
 	assertSetTupleEvent(t, resource, tupleEvent, resource.ReporterType) // Use reporter type as namespace for v1beta2
 }
 
-func assertSetTupleEvent(t *testing.T, resource *Resource, event *OutboxEvent, namespace string) {
+func assertSetTupleEvent(t *testing.T, resource *Representation, event *OutboxEvent, namespace string) {
 	assert.NotNil(t, event)
 	payloadJson, err := json.Marshal(event.Payload)
 	assert.Nil(t, err)
@@ -132,7 +132,7 @@ func assertSetTupleEvent(t *testing.T, resource *Resource, event *OutboxEvent, n
 	assert.Equal(t, resource.WorkspaceId, tupleEvent.Subject.Subject.Id)
 }
 
-func assertUnsetTupleEvent(t *testing.T, resource *Resource, event *OutboxEvent, namespace string) {
+func assertUnsetTupleEvent(t *testing.T, resource *Representation, event *OutboxEvent, namespace string) {
 	assert.NotNil(t, event)
 	payloadJson, err := json.Marshal(event.Payload)
 	assert.Nil(t, err)
@@ -146,7 +146,7 @@ func assertUnsetTupleEvent(t *testing.T, resource *Resource, event *OutboxEvent,
 	assert.Equal(t, "workspace", *tupleEvent.Relation)
 }
 
-func assertResourceEvent(t *testing.T, operation eventOperationType, resource *Resource, event *OutboxEvent) {
+func assertResourceEvent(t *testing.T, operation eventOperationType, resource *Representation, event *OutboxEvent) {
 	assert.NotNil(t, event)
 	payloadJson, err := json.Marshal(event.Payload)
 	assert.Nil(t, err)

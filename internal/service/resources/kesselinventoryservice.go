@@ -217,8 +217,8 @@ func updateResponseFromAuthzRequestV1beta2(allowed bool) *pb.CheckForUpdateRespo
 	}
 }
 
-func requestToResource(r *pb.ReportResourceRequest, identity *authnapi.Identity) (*model.Resource, error) {
-	log.Info("Report Resource Request: ", r)
+func requestToResource(r *pb.ReportResourceRequest, identity *authnapi.Identity) (*model.Representation, error) {
+	log.Info("Report Representation Request: ", r)
 	var resourceType = r.GetType()
 	resourceData, err := conv.ToJsonObject(r)
 	if err != nil {
@@ -250,7 +250,7 @@ func requestToResource(r *pb.ReportResourceRequest, identity *authnapi.Identity)
 }
 
 func requestToDeleteResource(r *pb.DeleteResourceRequest, identity *authnapi.Identity) (model.ReporterResourceId, error) {
-	log.Info("Delete Resource Request: ", r)
+	log.Info("Delete Representation Request: ", r)
 
 	reference := r.GetReference()
 	if reference == nil {

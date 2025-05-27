@@ -52,8 +52,8 @@ var (
 	emptyTxId              = ""
 )
 
-func resourceSubject() *model.Resource {
-	return &model.Resource{
+func resourceSubject() *model.Representation {
+	return &model.Representation{
 		ID:    uuid.UUID{},
 		OrgId: orgId,
 		ResourceData: map[string]any{
@@ -75,8 +75,8 @@ func resourceSubject() *model.Resource {
 	}
 }
 
-func resourceObject() *model.Resource {
-	return &model.Resource{
+func resourceObject() *model.Representation {
+	return &model.Representation{
 		ID:    uuid.UUID{},
 		OrgId: orgId,
 		ResourceData: map[string]any{
@@ -181,7 +181,7 @@ func assertEqualRelationshipHistory(t *testing.T, r *model.Relationship, rh *mod
 //	assert.Equal(t, litrExpected, litr)
 //}
 
-func createResource(t *testing.T, db *gorm.DB, mc *metricscollector.MetricsCollector, resource *model.Resource) uuid.UUID {
+func createResource(t *testing.T, db *gorm.DB, mc *metricscollector.MetricsCollector, resource *model.Representation) uuid.UUID {
 	maxSerializationRetries := 3
 	res, err := resources.New(db, mc, maxSerializationRetries).Create(context.TODO(), resource, "foobar-namespace", emptyTxId)
 	assert.Nil(t, err)

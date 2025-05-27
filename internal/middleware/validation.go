@@ -43,7 +43,7 @@ func Validation(validator protovalidate.Validator) middleware.Middleware {
 
 				switch v.(type) {
 				case *pbv1beta2.ReportResourceRequest:
-					if err := validateReportResourceJSON(v); err != nil {
+					if err := ValidateReportResourceJSON(v); err != nil {
 						return nil, errors.BadRequest("REPORT_RESOURCE_JSON_VALIDATOR", err.Error()).WithCause(err)
 					}
 				}
@@ -53,7 +53,7 @@ func Validation(validator protovalidate.Validator) middleware.Middleware {
 	}
 }
 
-func validateReportResourceJSON(msg proto.Message) error {
+func ValidateReportResourceJSON(msg proto.Message) error {
 	data, err := MarshalProtoToJSON(msg)
 	if err != nil {
 		return err

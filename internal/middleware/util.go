@@ -4,8 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/go-kratos/kratos/v2/log"
@@ -88,7 +86,7 @@ func ExtractStringField(data map[string]interface{}, key string) (string, error)
 // ValidateCommonRepresentation Validates the "common" field in ResourceRepresentations using a predefined schema.
 func ValidateCommonRepresentation(resourceType string, commonRepresentation map[string]interface{}) error {
 	commonSchemaKey := fmt.Sprintf("common:%s", strings.ToLower(resourceType))
-	commonSchema, err := getSchemaFromCache(commonSchemaKey)
+	commonSchema, err := GetSchemaFromCache(commonSchemaKey)
 	if err != nil {
 		return fmt.Errorf("failed to load common representation schema for '%s': %w", resourceType, err)
 	}
@@ -104,7 +102,7 @@ func ValidateCommonRepresentation(resourceType string, commonRepresentation map[
 func ValidateReporterRepresentation(resourceType string, reporterType string, reporterRepresentation map[string]interface{}) error {
 	// Construct the schema key using the format: resourceType:reporterType
 	schemaKey := fmt.Sprintf("%s:%s", strings.ToLower(resourceType), strings.ToLower(reporterType))
-	reporterRepresentationSchema, err := getSchemaFromCache(schemaKey)
+	reporterRepresentationSchema, err := GetSchemaFromCache(schemaKey)
 
 	// Case 1: No schema found for resourceType:reporterType
 	if err != nil {
@@ -141,25 +139,4 @@ func ValidateJSONSchema(schemaStr string, jsonData interface{}) error {
 		return fmt.Errorf("validation failed: %s", strings.Join(errMsgs, "; "))
 	}
 	return nil
-}
-
-func GetProjectRootPath() (string, error) {
-	cwd, err := os.Getwd()
-	if err != nil {
-		return "", fmt.Errorf("failed to get current working directory: %w", err)
-	}
-
-	for {
-		if _, err := os.Stat(filepath.Join(cwd, "go.mod")); err == nil {
-			return cwd, nil
-		}
-
-		parent := filepath.Dir(cwd)
-		if parent == cwd {
-			break
-		}
-		cwd = parent
-	}
-
-	return "", fmt.Errorf("project root not found")
 }

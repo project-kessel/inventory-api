@@ -284,7 +284,7 @@ func (r *Repo) FindByInventoryIdAndReporter(ctx context.Context, inventoryId *uu
 	if err := r.DB.Session(&gorm.Session{}).Where(&model.Resource{
 		InventoryId:        inventoryId,
 		ReporterInstanceId: reporterInstanceId,
-		ResourceType:       reporterType,
+		ReporterType:       reporterType,
 	}).First(&resource).Error; err != nil {
 		return nil, err
 	}

@@ -44,34 +44,40 @@ func copyHistory(m *model.Resource, id uuid.UUID, operationType model.OperationT
 }
 
 func (r *Repo) Create(ctx context.Context, m *model.Resource, namespace string, txid string) (*model.Resource, error) {
+	if m == nil {
+		return nil, fmt.Errorf("resource cannot be nil")
+	}
+
 	db := r.DB.Session(&gorm.Session{})
 	var result *model.Resource
 	err := r.handleSerializableTransaction(db, func(tx *gorm.DB) error {
+		// Copy the resource to avoid modifying the original, necessary for serialized transaction retries
+		resource := *m
 		updatedResources := []*model.Resource{}
 
-		if m.InventoryId == nil {
+		if resource.InventoryId == nil {
 			// New inventory resource
 			inventoryResource := model.InventoryResource{
-				ResourceType: m.ResourceType,
-				WorkspaceId:  m.WorkspaceId,
+				ResourceType: resource.ResourceType,
+				WorkspaceId:  resource.WorkspaceId,
 			}
 			// Create a new inventory resource
 			if err := tx.Create(&inventoryResource).Error; err != nil {
 				return fmt.Errorf("creating inventory resource: %w", err)
 			}
-			m.InventoryId = &inventoryResource.ID
+			resource.InventoryId = &inventoryResource.ID
 		}
 
-		if err := tx.Create(m).Error; err != nil {
+		if err := tx.Create(&resource).Error; err != nil {
 			return err
 		}
 
-		if err := tx.Create(copyHistory(m, m.ID, model.OperationTypeCreate)).Error; err != nil {
+		if err := tx.Create(copyHistory(&resource, resource.ID, model.OperationTypeCreate)).Error; err != nil {
 			return err
 		}
 
 		// Handle workspace updates for other resources with the same inventory ID
-		updatedResources, err := r.handleWorkspaceUpdates(tx, m, updatedResources)
+		updatedResources, err := r.handleWorkspaceUpdates(tx, &resource, updatedResources)
 		if err != nil {
 			return err
 		}
@@ -79,14 +85,14 @@ func (r *Repo) Create(ctx context.Context, m *model.Resource, namespace string, 
 		// Deprecated
 		// TODO: Remove this when all resources are created with inventory ID
 		if err := tx.Create(&model.LocalInventoryToResource{
-			ResourceId:         m.ID,
-			ReporterResourceId: model.ReporterResourceIdFromResource(m),
+			ResourceId:         resource.ID,
+			ReporterResourceId: model.ReporterResourceIdFromResource(&resource),
 		}).Error; err != nil {
 			return err
 		}
 
 		// Publish outbox events for primary resource
-		err = handleOutboxEvents(tx, *m, namespace, model.OperationTypeCreated, txid)
+		err = handleOutboxEvents(tx, resource, namespace, model.OperationTypeCreated, txid)
 		if err != nil {
 			return err
 		}
@@ -98,7 +104,7 @@ func (r *Repo) Create(ctx context.Context, m *model.Resource, namespace string, 
 				return err
 			}
 		}
-		result = m
+		result = &resource
 		return nil
 	})
 	if err != nil {

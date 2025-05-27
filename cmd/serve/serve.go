@@ -374,6 +374,7 @@ func NewCommand(
 	authzOptions.AddFlags(cmd.Flags(), "authz")
 	eventingOptions.AddFlags(cmd.Flags(), "eventing")
 	consumerOptions.AddFlags(cmd.Flags(), "consumer")
+	consistencyOptions.AddFlags(cmd.Flags(), "consistency")
 
 	return cmd
 }

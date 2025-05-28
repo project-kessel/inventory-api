@@ -168,7 +168,7 @@ func (uc *Usecase) Upsert(ctx context.Context, m *model.Resource, write_visibili
 		}
 	}
 
-	uc.log.WithContext(ctx).Infof("Created Resource: %v(%v)", m.ID, m.ResourceType)
+	uc.log.WithContext(ctx).Infof("Upserted Resource: %v(%v)", ret.ID, ret.ResourceType)
 	return ret, nil
 }
 

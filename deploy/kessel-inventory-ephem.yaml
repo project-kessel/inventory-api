@@ -220,7 +220,7 @@ objects:
         status.storage.topic: connect-cluster-status
         config.providers: secrets
         config.providers.secrets.class: io.strimzi.kafka.KubernetesSecretConfigProvider
-      image: quay.io/cloudservices/kafka-connect:latest
+      image: quay.io/cloudservices/insights-kafka-connect:latest
       replicas: 1
       resources:
         limits:

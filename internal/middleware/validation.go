@@ -2,11 +2,11 @@ package middleware
 
 import (
 	"context"
-
+	"fmt"
 	"github.com/spf13/viper"
-
 	"os"
 	"path/filepath"
+	"regexp"
 
 	"github.com/bufbuild/protovalidate-go"
 	"github.com/go-kratos/kratos/v2/errors"
@@ -37,6 +37,15 @@ func Validation(validator protovalidate.Validator) middleware.Middleware {
 	return func(handler middleware.Handler) middleware.Handler {
 		return func(ctx context.Context, req interface{}) (interface{}, error) {
 			if v, ok := req.(proto.Message); ok {
+				log.Infof("Incoming request: %+v", req)
+
+				switch v.(type) {
+				case *pbv1beta2.StreamedListObjectsRequest:
+					if err := ValidateStreamedListObject(v); err != nil {
+						return nil, errors.BadRequest("STREAMED_LIST_OBJECT_JSON_VALIDATOR", err.Error()).WithCause(err)
+					}
+
+				}
 				if err := validator.Validate(v); err != nil {
 					return nil, errors.BadRequest("VALIDATOR", err.Error()).WithCause(err)
 				}
@@ -104,5 +113,36 @@ func ValidateReportResourceJSON(msg proto.Message) error {
 		return err
 	}
 
+	return nil
+}
+
+var representationTypePattern = regexp.MustCompile(`^([a-z][a-z0-9_]{1,61}[a-z0-9]/)*[a-z][a-z0-9_]{1,62}[a-z0-9]$`)
+
+func isValidRepresentationType(val string) bool {
+	return representationTypePattern.MatchString(val)
+}
+
+func ValidateRepresentationType(rt *pbv1beta2.RepresentationType) error {
+	if rt == nil {
+		return fmt.Errorf("object_type is required")
+	}
+	if !isValidRepresentationType(rt.GetResourceType()) {
+		return fmt.Errorf("resource_type does not match required pattern")
+	}
+	// reporter_type is optional
+	if rt.ReporterType != nil && *rt.ReporterType != "" && !isValidRepresentationType(rt.GetReporterType()) {
+		return fmt.Errorf("reporter_type does not match required pattern")
+	}
+	return nil
+}
+
+func ValidateStreamedListObject(msg proto.Message) error {
+	slo, ok := msg.(*pbv1beta2.StreamedListObjectsRequest)
+	if !ok {
+		return fmt.Errorf("expected StreamedListObjectsRequest")
+	}
+	if err := ValidateRepresentationType(slo.GetObjectType()); err != nil {
+		return err
+	}
 	return nil
 }

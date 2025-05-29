@@ -46,6 +46,7 @@ func New(c CompletedConfig, authn middleware.Middleware, meter metric.Meter, log
 		kgrpc.StreamMiddleware(
 			selector.Server(
 				authn,
+				m.Validation(validator),
 			).Match(NewWhiteListMatcher).Build(),
 		),
 	}

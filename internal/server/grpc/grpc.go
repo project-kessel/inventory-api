@@ -7,6 +7,7 @@ import (
 	"github.com/go-kratos/kratos/v2/middleware/recovery"
 	"github.com/go-kratos/kratos/v2/middleware/selector"
 	kgrpc "github.com/go-kratos/kratos/v2/transport/grpc"
+	"google.golang.org/grpc"
 
 	m "github.com/project-kessel/inventory-api/internal/middleware"
 
@@ -30,6 +31,9 @@ func New(c CompletedConfig, authn middleware.Middleware, meter metric.Meter, log
 		return nil, err
 	}
 	// TODO: pass in health, authn middleware
+	streamingInterceptor := []grpc.StreamServerInterceptor{
+		m.StreamValidationInterceptor(validator),
+	}
 	var opts = []kgrpc.ServerOption{
 		kgrpc.Middleware(
 			recovery.Recovery(),
@@ -43,13 +47,16 @@ func New(c CompletedConfig, authn middleware.Middleware, meter metric.Meter, log
 				authn,
 			).Match(NewWhiteListMatcher).Build(),
 		),
+		kgrpc.Options(grpc.ChainStreamInterceptor(
+			streamingInterceptor...,
+		)),
 		kgrpc.StreamMiddleware(
 			selector.Server(
 				authn,
-				m.Validation(validator),
 			).Match(NewWhiteListMatcher).Build(),
 		),
 	}
+
 	opts = append(opts, c.ServerOptions...)
 	srv := kgrpc.NewServer(opts...)
 	return srv, nil

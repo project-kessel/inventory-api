@@ -112,7 +112,7 @@ func ValidateReportResourceJSON(msg proto.Message) error {
 
 var representationTypePattern = regexp.MustCompile(`^([a-z][a-z0-9_]{1,61}[a-z0-9]/)*[a-z][a-z0-9_]{1,62}[a-z0-9]$`)
 
-func isValidRepresentationType(val string) bool {
+func IsValidRepresentationType(val string) bool {
 	return representationTypePattern.MatchString(val)
 }
 
@@ -120,11 +120,11 @@ func ValidateRepresentationType(rt *pbv1beta2.RepresentationType) error {
 	if rt == nil {
 		return fmt.Errorf("object_type is required")
 	}
-	if !isValidRepresentationType(rt.GetResourceType()) {
+	if !IsValidRepresentationType(rt.GetResourceType()) {
 		return fmt.Errorf("resource_type does not match required pattern")
 	}
 	// reporter_type is optional
-	if rt.ReporterType != nil && *rt.ReporterType != "" && !isValidRepresentationType(rt.GetReporterType()) {
+	if rt.ReporterType != nil && *rt.ReporterType != "" && !IsValidRepresentationType(rt.GetReporterType()) {
 		return fmt.Errorf("reporter_type does not match required pattern")
 	}
 	return nil

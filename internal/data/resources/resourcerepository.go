@@ -7,6 +7,8 @@ import (
 
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/mattn/go-sqlite3"
 	"github.com/project-kessel/inventory-api/internal/metricscollector"
 	"gorm.io/gorm"
 
@@ -382,17 +384,41 @@ func (r *Repo) handleSerializableTransaction(db *gorm.DB, txFunc func(tx *gorm.D
 		})
 		err = txFunc(tx)
 		if err != nil {
-			log.Debugf("transaction failed before commit (attempt %d/%d): %v", i+1, r.MaxSerializationRetries, err)
 			tx.Rollback()
-			continue
+			if isSerializationFailure(err, i, r.MaxSerializationRetries) {
+				continue
+			}
+			// Short-circuit if the error is not a serialization failure
+			return fmt.Errorf("transaction failed: %w", err)
 		}
 		err = tx.Commit().Error
 		if err != nil {
-			log.Debugf("error committing transaction (attempt %d/%d): %v", i+1, r.MaxSerializationRetries, err)
 			tx.Rollback()
-			continue
+			if isSerializationFailure(err, i, r.MaxSerializationRetries) {
+				continue
+			}
+			// Short-circuit if the error is not a serialization failure
+			return fmt.Errorf("committing transaction failed: %w", err)
 		}
 		return nil
 	}
+	log.Errorf("transaction failed after %d attempts: %v", r.MaxSerializationRetries, err)
 	return fmt.Errorf("transaction failed after %d attempts: %w", r.MaxSerializationRetries, err)
+}
+
+func isSerializationFailure(err error, attempt, maxRetries int) bool {
+	switch dbErr := err.(type) {
+	case *pgconn.PgError:
+		if dbErr.Code == "40001" {
+			log.Debugf("transaction serialization failure (attempt %d/%d): %v", attempt+1, maxRetries, err)
+			return true
+		}
+	case sqlite3.Error:
+		if dbErr.Code == sqlite3.ErrError {
+			// Isolation failures are captured under error code 1 (sqlite3.ErrError)
+			log.Debugf("transaction serialization failure (attempt %d/%d): %v", attempt+1, maxRetries, err)
+			return true
+		}
+	}
+	return false
 }

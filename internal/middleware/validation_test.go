@@ -2,6 +2,7 @@ package middleware_test
 
 import (
 	"github.com/spf13/viper"
+	"google.golang.org/protobuf/proto"
 	"testing"
 
 	"google.golang.org/protobuf/types/known/structpb"
@@ -206,4 +207,86 @@ func TestValidateReportResourceJSON_FieldExtractionErrors(t *testing.T) {
 			assert.Contains(t, err.Error(), tc.expect)
 		})
 	}
+}
+
+func TestIsValidRepresentationType(t *testing.T) {
+
+	assert.True(t, middleware.IsValidRepresentationType("hbi"))
+
+	assert.False(t, middleware.IsValidRepresentationType("HBI"))
+
+	// too long
+	assert.False(t, middleware.IsValidRepresentationType("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"))
+	// strange characters
+	assert.False(t, middleware.IsValidRepresentationType("h?!!!"))
+}
+
+func TestValidateRepresentationType(t *testing.T) {
+	// Valid
+	valid := &pbv1beta2.RepresentationType{
+		ResourceType: "host",
+		ReporterType: proto.String("hbi"),
+	}
+	assert.NoError(t, middleware.ValidateRepresentationType(valid))
+
+	// Nil
+	assert.EqualError(t, middleware.ValidateRepresentationType(nil), "object_type is required")
+
+	// Invalid resource_type
+	invalidResource := &pbv1beta2.RepresentationType{
+		ResourceType: "HBI", // uppercase is not allowed
+	}
+	assert.EqualError(t, middleware.ValidateRepresentationType(invalidResource), "resource_type does not match required pattern")
+
+	// Invalid reporter_type (not required, but if present must be valid)
+	invalidReporter := &pbv1beta2.RepresentationType{
+		ResourceType: "host",
+		ReporterType: proto.String("HBI"), // uppercase
+	}
+	assert.EqualError(t, middleware.ValidateRepresentationType(invalidReporter), "reporter_type does not match required pattern")
+
+	// ReporterType is nil (should not error)
+	assert.NoError(t, middleware.ValidateRepresentationType(&pbv1beta2.RepresentationType{
+		ResourceType: "host",
+		ReporterType: nil,
+	}))
+
+	// ReporterType is empty (should not error)
+	assert.NoError(t, middleware.ValidateRepresentationType(&pbv1beta2.RepresentationType{
+		ResourceType: "host",
+		ReporterType: proto.String(""),
+	}))
+}
+
+func TestValidateStreamedListObject(t *testing.T) {
+	// Valid case
+	valid := &pbv1beta2.StreamedListObjectsRequest{
+		ObjectType: &pbv1beta2.RepresentationType{
+			ResourceType: "host",
+			ReporterType: proto.String("hbi"),
+		},
+	}
+	assert.NoError(t, middleware.ValidateStreamedListObject(valid))
+
+	// Invalid type: not *StreamedListObjectsRequest
+	err := middleware.ValidateStreamedListObject(&pbv1beta2.ReportResourceRequest{})
+	assert.EqualError(t, err, "expected StreamedListObjectsRequest")
+
+	// Invalid ObjectType (resource_type bad)
+	invalidObjType := &pbv1beta2.StreamedListObjectsRequest{
+		ObjectType: &pbv1beta2.RepresentationType{
+			ResourceType: "HBI",
+			ReporterType: proto.String("hbi"),
+		},
+	}
+	err = middleware.ValidateStreamedListObject(invalidObjType)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "resource_type does not match required pattern")
+
+	// Nil ObjectType
+	nilObjType := &pbv1beta2.StreamedListObjectsRequest{
+		ObjectType: nil,
+	}
+	err = middleware.ValidateStreamedListObject(nilObjType)
+	assert.EqualError(t, err, "object_type is required")
 }

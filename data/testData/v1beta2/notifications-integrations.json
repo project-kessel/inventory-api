@@ -1,6 +1,6 @@
 {
     "type": "notifications_integration",
-    "reporterType": "NOTIFICATIONS",
+    "reporterType": "notifications",
     "reporterInstanceId": "cc38fb9e-251d-4abe-9eaf-b71607558b2a",
     "representations": {
       "metadata": {

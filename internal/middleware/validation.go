@@ -2,13 +2,14 @@ package middleware
 
 import (
 	"context"
-
+	"fmt"
 	"github.com/spf13/viper"
-
+	"google.golang.org/grpc"
 	"os"
 	"path/filepath"
+	"regexp"
 
-	"github.com/bufbuild/protovalidate-go"
+	"buf.build/go/protovalidate"
 	"github.com/go-kratos/kratos/v2/errors"
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/go-kratos/kratos/v2/middleware"
@@ -37,6 +38,8 @@ func Validation(validator protovalidate.Validator) middleware.Middleware {
 	return func(handler middleware.Handler) middleware.Handler {
 		return func(ctx context.Context, req interface{}) (interface{}, error) {
 			if v, ok := req.(proto.Message); ok {
+				log.Infof("Incoming request: %+v", req)
+
 				if err := validator.Validate(v); err != nil {
 					return nil, errors.BadRequest("VALIDATOR", err.Error()).WithCause(err)
 				}
@@ -105,4 +108,73 @@ func ValidateReportResourceJSON(msg proto.Message) error {
 	}
 
 	return nil
+}
+
+var representationTypePattern = regexp.MustCompile(`^([a-z][a-z0-9_]{1,61}[a-z0-9]/)*[a-z][a-z0-9_]{1,62}[a-z0-9]$`)
+
+func IsValidRepresentationType(val string) bool {
+	return representationTypePattern.MatchString(val)
+}
+
+func ValidateRepresentationType(rt *pbv1beta2.RepresentationType) error {
+	if rt == nil {
+		return fmt.Errorf("object_type is required")
+	}
+	if !IsValidRepresentationType(rt.GetResourceType()) {
+		return fmt.Errorf("resource_type does not match required pattern")
+	}
+	// reporter_type is optional
+	if rt.ReporterType != nil && *rt.ReporterType != "" && !IsValidRepresentationType(rt.GetReporterType()) {
+		return fmt.Errorf("reporter_type does not match required pattern")
+	}
+	return nil
+}
+
+func ValidateStreamedListObject(msg proto.Message) error {
+	slo, ok := msg.(*pbv1beta2.StreamedListObjectsRequest)
+	if !ok {
+		return fmt.Errorf("expected StreamedListObjectsRequest")
+	}
+	if err := ValidateRepresentationType(slo.GetObjectType()); err != nil {
+		return err
+	}
+	return nil
+}
+
+func StreamValidationInterceptor(validator protovalidate.Validator) grpc.StreamServerInterceptor {
+	return func(srv any, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
+		wrapper := &requestValidatingWrapper{ServerStream: ss, Validator: validator}
+		return handler(srv, wrapper)
+	}
+}
+
+type requestValidatingWrapper struct {
+	grpc.ServerStream
+	protovalidate.Validator
+}
+
+func (w *requestValidatingWrapper) RecvMsg(m interface{}) error {
+	err := w.ServerStream.RecvMsg(m)
+	if err != nil {
+		return err
+	}
+
+	if v, ok := m.(proto.Message); ok {
+		switch v.(type) {
+		case *pbv1beta2.StreamedListObjectsRequest:
+			if err := ValidateStreamedListObject(v); err != nil {
+				return errors.BadRequest("STREAMED_LIST_OBJECT_JSON_VALIDATOR", err.Error()).WithCause(err)
+			}
+
+		}
+		if err = w.Validate(v); err != nil {
+			return errors.BadRequest("VALIDATOR", err.Error()).WithCause(err)
+		}
+	}
+
+	return nil
+}
+
+func (w *requestValidatingWrapper) SendMsg(m interface{}) error {
+	return w.ServerStream.SendMsg(m)
 }

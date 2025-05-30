@@ -137,8 +137,6 @@ func TestResourceValidation(t *testing.T) {
 					Metadata: &RepresentationMetadata{
 						LocalResourceId: "cluster-123",
 						ApiHref:         "https://api.example.com",
-						ConsoleHref:     proto.String("https://console.example.com"),
-						ReporterVersion: proto.String("1.0.0"),
 					},
 					Common: &structpb.Struct{
 						Fields: map[string]*structpb.Value{
@@ -420,4 +418,61 @@ func TestDeleteResourceValidation(t *testing.T) {
 	}
 
 	t.Logf("Passed Tests: %d / %d", len(tests)-failedTests, len(tests))
+}
+
+func TestResource_Populated(t *testing.T) {
+	invID := "abc-123"
+	reps := &ResourceRepresentations{}
+	res := &Resource{
+		InventoryId:        &invID,
+		Type:               "host",
+		ReporterType:       "some_reporter",
+		ReporterInstanceId: "riid-001",
+		Representations:    reps,
+	}
+	assert.Equal(t, invID, res.GetInventoryId())
+	assert.Equal(t, "host", res.GetType())
+	assert.Equal(t, "some_reporter", res.GetReporterType())
+	assert.Equal(t, "riid-001", res.GetReporterInstanceId())
+	assert.Equal(t, reps, res.GetRepresentations())
+}
+
+func TestResource_Reset(t *testing.T) {
+	invID := "reset"
+	res := &Resource{
+		InventoryId:        &invID,
+		Type:               "host",
+		ReporterType:       "hbi",
+		ReporterInstanceId: "reset-01",
+		Representations:    &ResourceRepresentations{},
+	}
+	res.Reset()
+	// After Reset, all fields should be zero/nil
+	assert.Equal(t, "", res.GetInventoryId())
+	assert.Equal(t, "", res.GetType())
+	assert.Equal(t, "", res.GetReporterType())
+	assert.Equal(t, "", res.GetReporterInstanceId())
+	assert.Nil(t, res.GetRepresentations())
+}
+
+func TestResource_String(t *testing.T) {
+	res := &Resource{Type: "foobar"}
+	s := res.String()
+	assert.NotEmpty(t, s)
+	assert.Contains(t, s, "foobar")
+}
+
+func TestResource_ProtoMessage(t *testing.T) {
+	var res interface{} = &Resource{}
+	_, ok := res.(proto.Message)
+	assert.True(t, ok)
+}
+
+func TestResource_ProtoReflect(t *testing.T) {
+	res := &Resource{Type: "reflect-test"}
+	m := res.ProtoReflect()
+	assert.NotNil(t, m)
+	// Check that the returned message interface matches expectations
+	iface := m.Interface().(*Resource)
+	assert.Equal(t, "reflect-test", iface.GetType())
 }

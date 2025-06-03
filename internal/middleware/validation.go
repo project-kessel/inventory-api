@@ -1,21 +1,20 @@
 package middleware
 
 import (
+	"buf.build/go/protovalidate"
 	"context"
 	"fmt"
-	"github.com/spf13/viper"
-	"google.golang.org/grpc"
-	"os"
-	"path/filepath"
-	"regexp"
-
-	"buf.build/go/protovalidate"
 	"github.com/go-kratos/kratos/v2/errors"
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/go-kratos/kratos/v2/middleware"
-	"google.golang.org/protobuf/proto"
-
 	pbv1beta2 "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2"
+	"github.com/spf13/viper"
+	"google.golang.org/grpc"
+	"google.golang.org/protobuf/proto"
+	"os"
+	"path/filepath"
+	"regexp"
+	"strings"
 )
 
 var (
@@ -120,12 +119,17 @@ func ValidateRepresentationType(rt *pbv1beta2.RepresentationType) error {
 	if rt == nil {
 		return fmt.Errorf("object_type is required")
 	}
-	if !IsValidRepresentationType(rt.GetResourceType()) {
+	normalizedResourceType := strings.ToLower(rt.GetResourceType())
+	if !IsValidRepresentationType(normalizedResourceType) {
 		return fmt.Errorf("resource_type does not match required pattern")
 	}
 	// reporter_type is optional
-	if rt.ReporterType != nil && *rt.ReporterType != "" && !IsValidRepresentationType(rt.GetReporterType()) {
-		return fmt.Errorf("reporter_type does not match required pattern")
+	if rt.ReporterType != nil && *rt.ReporterType != "" {
+		reporter := strings.ToLower(rt.GetReporterType())
+		if !IsValidRepresentationType(reporter) {
+			return fmt.Errorf("reporter_type does not match required pattern")
+		}
+		*rt.ReporterType = reporter
 	}
 	return nil
 }

@@ -2,6 +2,7 @@ package v1beta2_test
 
 import (
 	"encoding/json"
+	"google.golang.org/protobuf/proto"
 	"testing"
 
 	"github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2"
@@ -119,4 +120,35 @@ func TestDeleteResourceRequest_ResetAndValidate(t *testing.T) {
 
 	req.Reset()
 	assert.Nil(t, req.Reference)
+}
+
+func TestDeleteResourceRequest_ProtoMessage(t *testing.T) {
+	var msg interface{} = &v1beta2.DeleteResourceRequest{}
+	_, ok := msg.(proto.Message)
+	assert.True(t, ok)
+}
+
+func TestDeleteResourceRequest_String(t *testing.T) {
+	req := &v1beta2.DeleteResourceRequest{
+		Reference: &v1beta2.ResourceReference{
+			ResourceType: "host",
+			ResourceId:   "host-123",
+		},
+	}
+	s := req.String()
+	assert.NotEmpty(t, s)
+	assert.Contains(t, s, "host-123")
+}
+
+func TestDeleteResourceRequest_String_Empty(t *testing.T) {
+	req := &v1beta2.DeleteResourceRequest{}
+	s := req.String()
+	assert.Equal(t, "", s)
+}
+
+func TestDeleteResourceRequest_ProtoReflect(t *testing.T) {
+	req := &v1beta2.DeleteResourceRequest{}
+	m := req.ProtoReflect()
+	assert.NotNil(t, m)
+	assert.Contains(t, m.Descriptor().Name(), "DeleteResourceRequest")
 }

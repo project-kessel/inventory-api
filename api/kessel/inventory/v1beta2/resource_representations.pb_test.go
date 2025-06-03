@@ -2,6 +2,7 @@ package v1beta2_test
 
 import (
 	"encoding/json"
+	"google.golang.org/protobuf/proto"
 	"testing"
 
 	"github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2"
@@ -65,4 +66,48 @@ func TestResourceRepresentations_InvalidJSON(t *testing.T) {
 
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "cannot unmarshal number into Go struct field")
+}
+
+func TestResourceRepresentations_Reset(t *testing.T) {
+	commonStruct, _ := structpb.NewStruct(map[string]interface{}{"workspace_id": "1"})
+	reporterStruct, _ := structpb.NewStruct(map[string]interface{}{"satellite_id": "2"})
+	rr := &v1beta2.ResourceRepresentations{
+		Metadata: &v1beta2.RepresentationMetadata{
+			LocalResourceId: "some-id",
+			ApiHref:         "some-url",
+		},
+		Common:   commonStruct,
+		Reporter: reporterStruct,
+	}
+
+	assert.NotNil(t, rr.Metadata)
+	assert.NotNil(t, rr.Common)
+	assert.NotNil(t, rr.Reporter)
+
+	rrString1 := rr.String()
+	assert.Contains(t, rrString1, "some-id")
+
+	rr.Reset()
+	assert.Nil(t, rr.Metadata)
+	assert.Nil(t, rr.Common)
+	assert.Nil(t, rr.Reporter)
+
+	rrString2 := rr.String()
+
+	assert.Empty(t, rrString2)
+	assert.NotContains(t, rrString2, "some-id")
+
+}
+
+func TestResourceRepresentations_ProtoMessage(t *testing.T) {
+	var rr interface{} = &v1beta2.ResourceRepresentations{}
+	_, ok := rr.(proto.Message)
+	assert.True(t, ok)
+}
+
+func TestResourceRepresentations_ProtoReflect(t *testing.T) {
+	rr := &v1beta2.ResourceRepresentations{}
+	m := rr.ProtoReflect()
+	assert.NotNil(t, m)
+	assert.Equal(t, "ResourceRepresentations", string(m.Descriptor().Name()))
 }

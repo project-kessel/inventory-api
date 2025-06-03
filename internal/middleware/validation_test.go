@@ -232,19 +232,31 @@ func TestValidateRepresentationType(t *testing.T) {
 	// Nil
 	assert.EqualError(t, middleware.ValidateRepresentationType(nil), "object_type is required")
 
+	// Valid resource_type
+	validResource := &pbv1beta2.RepresentationType{
+		ResourceType: "HBI", // uppercase is not allowed but inventory converts to lowercase for us
+	}
+	assert.NoError(t, middleware.ValidateRepresentationType(validResource))
+
+	// Valid reporter_type (not required, but if present must be valid)
+	validReporter := &pbv1beta2.RepresentationType{
+		ResourceType: "host",
+		ReporterType: proto.String("HBI"), // uppercase is not allowed but inventory converts to lowercase for us
+	}
+	assert.NoError(t, middleware.ValidateRepresentationType(validReporter))
+
 	// Invalid resource_type
 	invalidResource := &pbv1beta2.RepresentationType{
-		ResourceType: "HBI", // uppercase is not allowed
+		ResourceType: "HOST!", // uppercase is not allowed but inventory converts to lowercase for us
 	}
 	assert.EqualError(t, middleware.ValidateRepresentationType(invalidResource), "resource_type does not match required pattern")
 
 	// Invalid reporter_type (not required, but if present must be valid)
 	invalidReporter := &pbv1beta2.RepresentationType{
 		ResourceType: "host",
-		ReporterType: proto.String("HBI"), // uppercase
+		ReporterType: proto.String("HBI!"), // uppercase is not allowed but inventory converts to lowercase for us
 	}
 	assert.EqualError(t, middleware.ValidateRepresentationType(invalidReporter), "reporter_type does not match required pattern")
-
 	// ReporterType is nil (should not error)
 	assert.NoError(t, middleware.ValidateRepresentationType(&pbv1beta2.RepresentationType{
 		ResourceType: "host",
@@ -272,7 +284,7 @@ func TestValidateStreamedListObject(t *testing.T) {
 	err := middleware.ValidateStreamedListObject(&pbv1beta2.ReportResourceRequest{})
 	assert.EqualError(t, err, "expected StreamedListObjectsRequest")
 
-	// Invalid ObjectType (resource_type bad)
+	// Valid ObjectType (resource_type is uppercase but will be converted to lowercase)
 	invalidObjType := &pbv1beta2.StreamedListObjectsRequest{
 		ObjectType: &pbv1beta2.RepresentationType{
 			ResourceType: "HBI",
@@ -280,8 +292,7 @@ func TestValidateStreamedListObject(t *testing.T) {
 		},
 	}
 	err = middleware.ValidateStreamedListObject(invalidObjType)
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "resource_type does not match required pattern")
+	assert.NoError(t, err)
 
 	// Nil ObjectType
 	nilObjType := &pbv1beta2.StreamedListObjectsRequest{

@@ -9,6 +9,6 @@ option java_multiple_files = true;
 option java_package = "org.project_kessel.api.inventory.v1beta2";
 
 message RepresentationType {
-  string resource_type = 1 [(buf.validate.field).string.pattern = "^([a-z][a-z0-9_]{1,61}[a-z0-9]/)*[a-z][a-z0-9_]{1,62}[a-z0-9]$"];
-  optional string reporter_type = 2 [(buf.validate.field).string.pattern = "^([a-z][a-z0-9_]{1,61}[a-z0-9]/)*[a-z][a-z0-9_]{1,62}[a-z0-9]$"];
+  string resource_type = 1 [(buf.validate.field).string.min_len = 1];
+  optional string reporter_type = 2;
 }

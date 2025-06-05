@@ -3,6 +3,7 @@ package resources
 import (
 	"context"
 	"fmt"
+	kesselAuthz "github.com/project-kessel/inventory-api/internal/authz/kessel"
 	"io"
 
 	"github.com/go-kratos/kratos/v2/log"
@@ -158,10 +159,20 @@ func toLookupResourceRequest(request *pb.StreamedListObjectsRequest) *pbv1beta1.
 			ContinuationToken: request.Pagination.ContinuationToken,
 		}
 	}
+	normalizedNamespace := kesselAuthz.NormalizeRepresentationType(request.ObjectType.GetReporterType())
+	if !kesselAuthz.IsValidatedRepresentationType(normalizedNamespace) {
+		fmt.Errorf("reporter type does not match required pattern: %s", normalizedNamespace)
+		return nil
+	}
+	normalizedResourceType := kesselAuthz.NormalizeRepresentationType(request.ObjectType.GetResourceType())
+	if !kesselAuthz.IsValidatedRepresentationType(normalizedResourceType) {
+		fmt.Errorf("resource type does not match required pattern: %s", normalizedResourceType)
+		return nil
+	}
 	return &pbv1beta1.LookupResourcesRequest{
 		ResourceType: &pbv1beta1.ObjectType{
-			Namespace: request.ObjectType.GetReporterType(),
-			Name:      request.ObjectType.GetResourceType(),
+			Namespace: normalizedNamespace,
+			Name:      normalizedResourceType,
 		},
 		Relation: request.Relation,
 		Subject: &pbv1beta1.SubjectReference{
@@ -193,11 +204,21 @@ func toLookupResourceResponse(response *pbv1beta1.LookupResourcesResponse) *pb.S
 }
 
 func authzFromRequestV1beta2(identity *authnapi.Identity, resource *pb.ResourceReference) (*model.ReporterResourceId, error) {
+
+	normalizedResourceType := kesselAuthz.NormalizeRepresentationType(resource.ResourceType)
+	if !kesselAuthz.IsValidatedRepresentationType(normalizedResourceType) {
+		return nil, fmt.Errorf("reporterResourceId.ResourceType does not match spiceDB regex")
+	}
+	normalizedReporterType := kesselAuthz.NormalizeRepresentationType(resource.Reporter.Type)
+	if !kesselAuthz.IsValidatedRepresentationType(normalizedReporterType) {
+		return nil, fmt.Errorf("reporterResourceId.ReporterType does not match spiceDB regex")
+	}
+
 	return &model.ReporterResourceId{
 		LocalResourceId: resource.ResourceId,
-		ResourceType:    resource.ResourceType,
+		ResourceType:    normalizedResourceType,
 		ReporterId:      identity.Principal,
-		ReporterType:    identity.Type,
+		ReporterType:    normalizedReporterType,
 	}, nil
 }
 

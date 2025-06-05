@@ -3,6 +3,8 @@ package kessel
 import (
 	"context"
 	"fmt"
+	"regexp"
+	"strings"
 
 	"google.golang.org/protobuf/proto"
 
@@ -175,6 +177,17 @@ func (a *KesselAuthz) Check(ctx context.Context, namespace string, viewPermissio
 		return kessel.CheckResponse_ALLOWED_UNSPECIFIED, nil, err
 	}
 
+	normalizedNamespace := NormalizeRepresentationType(namespace)
+	if !IsValidatedRepresentationType(normalizedNamespace) {
+		a.incrFailureCounter("Check")
+		return kessel.CheckResponse_ALLOWED_UNSPECIFIED, nil, fmt.Errorf("reporter type does not match required pattern: %s", normalizedNamespace)
+	}
+	normalizedResourceType := NormalizeRepresentationType(resource.ResourceType)
+	if !IsValidatedRepresentationType(normalizedResourceType) {
+		a.incrFailureCounter("Check")
+		return kessel.CheckResponse_ALLOWED_UNSPECIFIED, nil, fmt.Errorf("resource type does not match required pattern: %s", normalizedResourceType)
+	}
+
 	// If resource doesn't exist in inventory DB
 	// default send a minimize_latency check request
 	consistency := &kessel.Consistency{Requirement: &kessel.Consistency_MinimizeLatency{MinimizeLatency: true}}
@@ -190,8 +203,8 @@ func (a *KesselAuthz) Check(ctx context.Context, namespace string, viewPermissio
 	resp, err := a.CheckService.Check(ctx, &kessel.CheckRequest{
 		Resource: &kessel.ObjectReference{
 			Type: &kessel.ObjectType{
-				Namespace: namespace,
-				Name:      resource.ResourceType,
+				Namespace: normalizedNamespace,
+				Name:      normalizedResourceType,
 			},
 			Id: resource.ReporterResourceId,
 		},
@@ -218,11 +231,21 @@ func (a *KesselAuthz) CheckForUpdate(ctx context.Context, namespace string, upda
 		return kessel.CheckForUpdateResponse_ALLOWED_UNSPECIFIED, nil, err
 	}
 
+	normalizedNamespace := NormalizeRepresentationType(namespace)
+	if !IsValidatedRepresentationType(normalizedNamespace) {
+		a.incrFailureCounter("CheckForUpdate")
+		return kessel.CheckForUpdateResponse_ALLOWED_UNSPECIFIED, nil, fmt.Errorf("namespace type does not match required pattern: %s", normalizedNamespace)
+	}
+	normalizedResourceType := NormalizeRepresentationType(resource.ResourceType)
+	if !IsValidatedRepresentationType(normalizedResourceType) {
+		a.incrFailureCounter("CheckForUpdate")
+		return kessel.CheckForUpdateResponse_ALLOWED_UNSPECIFIED, nil, fmt.Errorf("namespace type does not match required pattern: %s", normalizedResourceType)
+	}
 	resp, err := a.CheckService.CheckForUpdate(ctx, &kessel.CheckForUpdateRequest{
 		Resource: &kessel.ObjectReference{
 			Type: &kessel.ObjectType{
-				Namespace: namespace,
-				Name:      resource.ResourceType,
+				Namespace: normalizedNamespace,
+				Name:      normalizedResourceType,
 			},
 			Id: resource.ReporterResourceId,
 		},
@@ -246,11 +269,23 @@ func (a *KesselAuthz) SetWorkspace(ctx context.Context, local_resource_id, works
 		return nil, fmt.Errorf("workspace_id is required")
 	}
 	// TODO: remove previous tuple for workspace
+
+	normalizedNamespace := NormalizeRepresentationType(namespace)
+	if !IsValidatedRepresentationType(normalizedNamespace) {
+		a.incrFailureCounter("SetWorkspace")
+		return nil, fmt.Errorf("namespace type does not match required pattern: %s", normalizedNamespace)
+	}
+	normalizedName := NormalizeRepresentationType(name)
+	if !IsValidatedRepresentationType(normalizedName) {
+		a.incrFailureCounter("SetWorkspace")
+		return nil, fmt.Errorf("namespace type does not match required pattern: %s", normalizedName)
+	}
+
 	rels := []*kessel.Relationship{{
 		Resource: &kessel.ObjectReference{
 			Type: &kessel.ObjectType{
-				Name:      name,
-				Namespace: namespace,
+				Name:      normalizedName,
+				Namespace: normalizedNamespace,
 			},
 			Id: local_resource_id,
 		},
@@ -271,4 +306,16 @@ func (a *KesselAuthz) SetWorkspace(ctx context.Context, local_resource_id, works
 		Upsert: upsert,
 		Tuples: rels,
 	})
+}
+
+var representationTypePattern = regexp.MustCompile(`^([a-z][a-z0-9_]{1,61}[a-z0-9]/)*[a-z][a-z0-9_]{1,62}[a-z0-9]$`)
+
+// NormalizeAndValidateRepresentationType returns normalized (lowercased), original, error
+func NormalizeRepresentationType(val string) string {
+	normalized := strings.ToLower(val)
+	return normalized
+}
+
+func IsValidatedRepresentationType(val string) bool {
+	return representationTypePattern.MatchString(val)
 }

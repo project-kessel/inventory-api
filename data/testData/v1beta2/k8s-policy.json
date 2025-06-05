@@ -1,6 +1,6 @@
 {
     "type": "k8s_policy",
-    "reporterType": "acm",
+    "reporterType": "ACM",
     "reporterInstanceId": "57a317b1-4040-4c26-8d41-dd589ba1d2eb",
     "representations": {
       "metadata": {

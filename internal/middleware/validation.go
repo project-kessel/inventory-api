@@ -1,16 +1,20 @@
 package middleware
 
 import (
-	"buf.build/go/protovalidate"
 	"context"
+
+	"github.com/spf13/viper"
+
+	"os"
+	"path/filepath"
+
+	"github.com/bufbuild/protovalidate-go"
 	"github.com/go-kratos/kratos/v2/errors"
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/go-kratos/kratos/v2/middleware"
-	pbv1beta2 "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2"
-	"github.com/spf13/viper"
 	"google.golang.org/protobuf/proto"
-	"os"
-	"path/filepath"
+
+	pbv1beta2 "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2"
 )
 
 var (
@@ -33,7 +37,6 @@ func Validation(validator protovalidate.Validator) middleware.Middleware {
 	return func(handler middleware.Handler) middleware.Handler {
 		return func(ctx context.Context, req interface{}) (interface{}, error) {
 			if v, ok := req.(proto.Message); ok {
-
 				if err := validator.Validate(v); err != nil {
 					return nil, errors.BadRequest("VALIDATOR", err.Error()).WithCause(err)
 				}

@@ -177,17 +177,6 @@ func (a *KesselAuthz) Check(ctx context.Context, namespace string, viewPermissio
 		return kessel.CheckResponse_ALLOWED_UNSPECIFIED, nil, err
 	}
 
-	normalizedNamespace := NormalizeRepresentationType(namespace)
-	if !IsValidatedRepresentationType(normalizedNamespace) {
-		a.incrFailureCounter("Check")
-		return kessel.CheckResponse_ALLOWED_UNSPECIFIED, nil, fmt.Errorf("reporter type does not match required pattern: %s", normalizedNamespace)
-	}
-	normalizedResourceType := NormalizeRepresentationType(resource.ResourceType)
-	if !IsValidatedRepresentationType(normalizedResourceType) {
-		a.incrFailureCounter("Check")
-		return kessel.CheckResponse_ALLOWED_UNSPECIFIED, nil, fmt.Errorf("resource type does not match required pattern: %s", normalizedResourceType)
-	}
-
 	// If resource doesn't exist in inventory DB
 	// default send a minimize_latency check request
 	consistency := &kessel.Consistency{Requirement: &kessel.Consistency_MinimizeLatency{MinimizeLatency: true}}
@@ -203,8 +192,8 @@ func (a *KesselAuthz) Check(ctx context.Context, namespace string, viewPermissio
 	resp, err := a.CheckService.Check(ctx, &kessel.CheckRequest{
 		Resource: &kessel.ObjectReference{
 			Type: &kessel.ObjectType{
-				Namespace: normalizedNamespace,
-				Name:      normalizedResourceType,
+				Namespace: namespace,
+				Name:      resource.ResourceType,
 			},
 			Id: resource.ReporterResourceId,
 		},
@@ -231,21 +220,11 @@ func (a *KesselAuthz) CheckForUpdate(ctx context.Context, namespace string, upda
 		return kessel.CheckForUpdateResponse_ALLOWED_UNSPECIFIED, nil, err
 	}
 
-	normalizedNamespace := NormalizeRepresentationType(namespace)
-	if !IsValidatedRepresentationType(normalizedNamespace) {
-		a.incrFailureCounter("CheckForUpdate")
-		return kessel.CheckForUpdateResponse_ALLOWED_UNSPECIFIED, nil, fmt.Errorf("namespace type does not match required pattern: %s", normalizedNamespace)
-	}
-	normalizedResourceType := NormalizeRepresentationType(resource.ResourceType)
-	if !IsValidatedRepresentationType(normalizedResourceType) {
-		a.incrFailureCounter("CheckForUpdate")
-		return kessel.CheckForUpdateResponse_ALLOWED_UNSPECIFIED, nil, fmt.Errorf("namespace type does not match required pattern: %s", normalizedResourceType)
-	}
 	resp, err := a.CheckService.CheckForUpdate(ctx, &kessel.CheckForUpdateRequest{
 		Resource: &kessel.ObjectReference{
 			Type: &kessel.ObjectType{
-				Namespace: normalizedNamespace,
-				Name:      normalizedResourceType,
+				Namespace: namespace,
+				Name:      resource.ResourceType,
 			},
 			Id: resource.ReporterResourceId,
 		},

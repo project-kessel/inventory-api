@@ -125,7 +125,12 @@ func (s *InventoryService) StreamedListObjects(
 	stream pb.KesselInventoryService_StreamedListObjectsServer,
 ) error {
 	ctx := stream.Context()
-	clientStream, err := s.Ctl.LookupResources(ctx, toLookupResourceRequest(req))
+	lookupReq, err := toLookupResourceRequest(req)
+	if err != nil {
+		return fmt.Errorf("failed to build lookup request: %w", err)
+	}
+
+	clientStream, err := s.Ctl.LookupResources(ctx, lookupReq)
 	if err != nil {
 		return fmt.Errorf("failed to retrieve resources: %w", err)
 	}
@@ -148,9 +153,9 @@ func (s *InventoryService) StreamedListObjects(
 	}
 }
 
-func toLookupResourceRequest(request *pb.StreamedListObjectsRequest) *pbv1beta1.LookupResourcesRequest {
+func toLookupResourceRequest(request *pb.StreamedListObjectsRequest) (*pbv1beta1.LookupResourcesRequest, error) {
 	if request == nil {
-		return nil
+		return nil, fmt.Errorf("request is nil")
 	}
 	var pagination *pbv1beta1.RequestPagination
 	if request.Pagination != nil {
@@ -161,13 +166,11 @@ func toLookupResourceRequest(request *pb.StreamedListObjectsRequest) *pbv1beta1.
 	}
 	normalizedNamespace := kesselAuthz.NormalizeRepresentationType(request.ObjectType.GetReporterType())
 	if !kesselAuthz.IsValidatedRepresentationType(normalizedNamespace) {
-		fmt.Errorf("reporter type does not match required pattern: %s", normalizedNamespace)
-		return nil
+		return nil, fmt.Errorf("reporter type does not match required pattern: %s", normalizedNamespace)
 	}
 	normalizedResourceType := kesselAuthz.NormalizeRepresentationType(request.ObjectType.GetResourceType())
 	if !kesselAuthz.IsValidatedRepresentationType(normalizedResourceType) {
-		fmt.Errorf("resource type does not match required pattern: %s", normalizedResourceType)
-		return nil
+		return nil, fmt.Errorf("resource type does not match required pattern: %s", normalizedResourceType)
 	}
 	return &pbv1beta1.LookupResourcesRequest{
 		ResourceType: &pbv1beta1.ObjectType{
@@ -186,7 +189,7 @@ func toLookupResourceRequest(request *pb.StreamedListObjectsRequest) *pbv1beta1.
 			},
 		},
 		Pagination: pagination,
-	}
+	}, nil
 }
 
 func toLookupResourceResponse(response *pbv1beta1.LookupResourcesResponse) *pb.StreamedListObjectsResponse {
@@ -204,21 +207,11 @@ func toLookupResourceResponse(response *pbv1beta1.LookupResourcesResponse) *pb.S
 }
 
 func authzFromRequestV1beta2(identity *authnapi.Identity, resource *pb.ResourceReference) (*model.ReporterResourceId, error) {
-
-	normalizedResourceType := kesselAuthz.NormalizeRepresentationType(resource.ResourceType)
-	if !kesselAuthz.IsValidatedRepresentationType(normalizedResourceType) {
-		return nil, fmt.Errorf("reporterResourceId.ResourceType does not match spiceDB regex")
-	}
-	normalizedReporterType := kesselAuthz.NormalizeRepresentationType(resource.Reporter.Type)
-	if !kesselAuthz.IsValidatedRepresentationType(normalizedReporterType) {
-		return nil, fmt.Errorf("reporterResourceId.ReporterType does not match spiceDB regex")
-	}
-
 	return &model.ReporterResourceId{
 		LocalResourceId: resource.ResourceId,
-		ResourceType:    normalizedResourceType,
+		ResourceType:    resource.ResourceType,
 		ReporterId:      identity.Principal,
-		ReporterType:    normalizedReporterType,
+		ReporterType:    identity.Type,
 	}, nil
 }
 

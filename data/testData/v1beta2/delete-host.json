@@ -3,7 +3,7 @@
     "resource_type": "host",
     "resource_id": "dd1b73b9-3e33-4264-968c-e3ce55b9afec",
     "reporter": {
-      "type": "hbi"
+      "type": "HBI"
     }
   }
 }

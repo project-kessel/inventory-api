@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"regexp"
+	"strings"
 
 	"github.com/go-kratos/kratos/v2/log"
 	pbv1beta1 "github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
@@ -124,7 +126,12 @@ func (s *InventoryService) StreamedListObjects(
 	stream pb.KesselInventoryService_StreamedListObjectsServer,
 ) error {
 	ctx := stream.Context()
-	clientStream, err := s.Ctl.LookupResources(ctx, toLookupResourceRequest(req))
+	lookupReq, err := toLookupResourceRequest(req)
+	if err != nil {
+		return fmt.Errorf("failed to build lookup request: %w", err)
+	}
+
+	clientStream, err := s.Ctl.LookupResources(ctx, lookupReq)
 	if err != nil {
 		return fmt.Errorf("failed to retrieve resources: %w", err)
 	}
@@ -147,9 +154,9 @@ func (s *InventoryService) StreamedListObjects(
 	}
 }
 
-func toLookupResourceRequest(request *pb.StreamedListObjectsRequest) *pbv1beta1.LookupResourcesRequest {
+func toLookupResourceRequest(request *pb.StreamedListObjectsRequest) (*pbv1beta1.LookupResourcesRequest, error) {
 	if request == nil {
-		return nil
+		return nil, fmt.Errorf("request is nil")
 	}
 	var pagination *pbv1beta1.RequestPagination
 	if request.Pagination != nil {
@@ -158,10 +165,18 @@ func toLookupResourceRequest(request *pb.StreamedListObjectsRequest) *pbv1beta1.
 			ContinuationToken: request.Pagination.ContinuationToken,
 		}
 	}
+	normalizedNamespace := NormalizeRepresentationType(request.ObjectType.GetReporterType())
+	if !IsValidatedRepresentationType(normalizedNamespace) {
+		return nil, fmt.Errorf("reporter type does not match required pattern: %s", normalizedNamespace)
+	}
+	normalizedResourceType := NormalizeRepresentationType(request.ObjectType.GetResourceType())
+	if !IsValidatedRepresentationType(normalizedResourceType) {
+		return nil, fmt.Errorf("resource type does not match required pattern: %s", normalizedResourceType)
+	}
 	return &pbv1beta1.LookupResourcesRequest{
 		ResourceType: &pbv1beta1.ObjectType{
-			Namespace: request.ObjectType.GetReporterType(),
-			Name:      request.ObjectType.GetResourceType(),
+			Namespace: normalizedNamespace,
+			Name:      normalizedResourceType,
 		},
 		Relation: request.Relation,
 		Subject: &pbv1beta1.SubjectReference{
@@ -175,7 +190,7 @@ func toLookupResourceRequest(request *pb.StreamedListObjectsRequest) *pbv1beta1.
 			},
 		},
 		Pagination: pagination,
-	}
+	}, nil
 }
 
 func toLookupResourceResponse(response *pbv1beta1.LookupResourcesResponse) *pb.StreamedListObjectsResponse {
@@ -282,4 +297,15 @@ func responseFromResource() *pb.ReportResourceResponse {
 
 func responseFromDeleteResource() *pb.DeleteResourceResponse {
 	return &pb.DeleteResourceResponse{}
+}
+
+var representationTypePattern = regexp.MustCompile(`^([a-z][a-z0-9_]{1,61}[a-z0-9]/)*[a-z][a-z0-9_]{1,62}[a-z0-9]$`)
+
+func NormalizeRepresentationType(val string) string {
+	normalized := strings.ToLower(val)
+	return normalized
+}
+
+func IsValidatedRepresentationType(val string) bool {
+	return representationTypePattern.MatchString(val)
 }

@@ -301,7 +301,6 @@ func responseFromDeleteResource() *pb.DeleteResourceResponse {
 
 var representationTypePattern = regexp.MustCompile(`^([a-z][a-z0-9_]{1,61}[a-z0-9]/)*[a-z][a-z0-9_]{1,62}[a-z0-9]$`)
 
-// NormalizeAndValidateRepresentationType returns normalized (lowercased), original, error
 func NormalizeRepresentationType(val string) string {
 	normalized := strings.ToLower(val)
 	return normalized

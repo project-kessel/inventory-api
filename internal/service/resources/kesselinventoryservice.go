@@ -3,8 +3,9 @@ package resources
 import (
 	"context"
 	"fmt"
-	kesselAuthz "github.com/project-kessel/inventory-api/internal/authz/kessel"
 	"io"
+	"regexp"
+	"strings"
 
 	"github.com/go-kratos/kratos/v2/log"
 	pbv1beta1 "github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
@@ -164,12 +165,12 @@ func toLookupResourceRequest(request *pb.StreamedListObjectsRequest) (*pbv1beta1
 			ContinuationToken: request.Pagination.ContinuationToken,
 		}
 	}
-	normalizedNamespace := kesselAuthz.NormalizeRepresentationType(request.ObjectType.GetReporterType())
-	if !kesselAuthz.IsValidatedRepresentationType(normalizedNamespace) {
+	normalizedNamespace := NormalizeRepresentationType(request.ObjectType.GetReporterType())
+	if !IsValidatedRepresentationType(normalizedNamespace) {
 		return nil, fmt.Errorf("reporter type does not match required pattern: %s", normalizedNamespace)
 	}
-	normalizedResourceType := kesselAuthz.NormalizeRepresentationType(request.ObjectType.GetResourceType())
-	if !kesselAuthz.IsValidatedRepresentationType(normalizedResourceType) {
+	normalizedResourceType := NormalizeRepresentationType(request.ObjectType.GetResourceType())
+	if !IsValidatedRepresentationType(normalizedResourceType) {
 		return nil, fmt.Errorf("resource type does not match required pattern: %s", normalizedResourceType)
 	}
 	return &pbv1beta1.LookupResourcesRequest{
@@ -296,4 +297,16 @@ func responseFromResource() *pb.ReportResourceResponse {
 
 func responseFromDeleteResource() *pb.DeleteResourceResponse {
 	return &pb.DeleteResourceResponse{}
+}
+
+var representationTypePattern = regexp.MustCompile(`^([a-z][a-z0-9_]{1,61}[a-z0-9]/)*[a-z][a-z0-9_]{1,62}[a-z0-9]$`)
+
+// NormalizeAndValidateRepresentationType returns normalized (lowercased), original, error
+func NormalizeRepresentationType(val string) string {
+	normalized := strings.ToLower(val)
+	return normalized
+}
+
+func IsValidatedRepresentationType(val string) bool {
+	return representationTypePattern.MatchString(val)
 }

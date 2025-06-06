@@ -3,9 +3,6 @@ package kessel
 import (
 	"context"
 	"fmt"
-	"regexp"
-	"strings"
-
 	"google.golang.org/protobuf/proto"
 
 	"github.com/spf13/viper"
@@ -248,23 +245,11 @@ func (a *KesselAuthz) SetWorkspace(ctx context.Context, local_resource_id, works
 		return nil, fmt.Errorf("workspace_id is required")
 	}
 	// TODO: remove previous tuple for workspace
-
-	normalizedNamespace := NormalizeRepresentationType(namespace)
-	if !IsValidatedRepresentationType(normalizedNamespace) {
-		a.incrFailureCounter("SetWorkspace")
-		return nil, fmt.Errorf("namespace type does not match required pattern: %s", normalizedNamespace)
-	}
-	normalizedName := NormalizeRepresentationType(name)
-	if !IsValidatedRepresentationType(normalizedName) {
-		a.incrFailureCounter("SetWorkspace")
-		return nil, fmt.Errorf("namespace type does not match required pattern: %s", normalizedName)
-	}
-
 	rels := []*kessel.Relationship{{
 		Resource: &kessel.ObjectReference{
 			Type: &kessel.ObjectType{
-				Name:      normalizedName,
-				Namespace: normalizedNamespace,
+				Name:      name,
+				Namespace: namespace,
 			},
 			Id: local_resource_id,
 		},
@@ -285,16 +270,4 @@ func (a *KesselAuthz) SetWorkspace(ctx context.Context, local_resource_id, works
 		Upsert: upsert,
 		Tuples: rels,
 	})
-}
-
-var representationTypePattern = regexp.MustCompile(`^([a-z][a-z0-9_]{1,61}[a-z0-9]/)*[a-z][a-z0-9_]{1,62}[a-z0-9]$`)
-
-// NormalizeAndValidateRepresentationType returns normalized (lowercased), original, error
-func NormalizeRepresentationType(val string) string {
-	normalized := strings.ToLower(val)
-	return normalized
-}
-
-func IsValidatedRepresentationType(val string) bool {
-	return representationTypePattern.MatchString(val)
 }

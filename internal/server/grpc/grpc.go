@@ -1,7 +1,7 @@
 package grpc
 
 import (
-	"buf.build/go/protovalidate"
+	"github.com/bufbuild/protovalidate-go"
 	"github.com/go-kratos/kratos/v2/middleware"
 	"github.com/go-kratos/kratos/v2/middleware/logging"
 	"github.com/go-kratos/kratos/v2/middleware/recovery"

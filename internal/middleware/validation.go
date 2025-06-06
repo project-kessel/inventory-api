@@ -8,7 +8,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"buf.build/go/protovalidate"
+	"github.com/bufbuild/protovalidate-go"
 	"github.com/go-kratos/kratos/v2/errors"
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/go-kratos/kratos/v2/middleware"

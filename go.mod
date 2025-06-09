@@ -5,6 +5,7 @@ go 1.23.6
 
 require (
 	buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go v1.36.6-20250423154025-ec0af4932e5e.1
+	github.com/MicahParks/keyfunc/v3 v3.3.10
 	github.com/authzed/grpcutil v0.0.0-20250221190651-1985b19b35b8
 	github.com/bufbuild/protovalidate-go v0.9.2
 	github.com/cloudevents/sdk-go/protocol/kafka_confluent/v2 v2.0.0-20250313141547-88bebb1fe04f
@@ -42,6 +43,7 @@ require (
 
 require (
 	cel.dev/expr v0.20.0 // indirect
+	github.com/MicahParks/jwkset v0.8.0 // indirect
 	github.com/antlr4-go/antlr/v4 v4.13.1 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/certifi/gocertifi v0.0.0-20210507211836-431795d63e8d // indirect
@@ -97,5 +99,6 @@ require (
 	golang.org/x/sync v0.13.0 // indirect
 	golang.org/x/sys v0.32.0 // indirect
 	golang.org/x/text v0.24.0 // indirect
+	golang.org/x/time v0.9.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250422160041-2d3770c4ea7f // indirect
 )

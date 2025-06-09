@@ -124,6 +124,8 @@ func (s *InventoryService) StreamedListObjects(
 	stream pb.KesselInventoryService_StreamedListObjectsServer,
 ) error {
 	ctx := stream.Context()
+	//identity, _ := oidc.FromContextIdentity(ctx)
+	//log.Info(identity)
 	clientStream, err := s.Ctl.LookupResources(ctx, toLookupResourceRequest(req))
 	if err != nil {
 		return fmt.Errorf("failed to retrieve resources: %w", err)

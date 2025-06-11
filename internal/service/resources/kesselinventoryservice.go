@@ -8,14 +8,14 @@ import (
 	"strings"
 
 	"github.com/go-kratos/kratos/v2/log"
-	pbv1beta1 "github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
-
 	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2"
 	authnapi "github.com/project-kessel/inventory-api/internal/authn/api"
+	relations_repository "github.com/project-kessel/inventory-api/internal/authz/kessel"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
 	"github.com/project-kessel/inventory-api/internal/biz/usecase/resources"
 	"github.com/project-kessel/inventory-api/internal/middleware"
 	conv "github.com/project-kessel/inventory-api/internal/service/common"
+	pbv1beta1 "github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
 )
 
 type InventoryService struct {
@@ -126,7 +126,7 @@ func (s *InventoryService) StreamedListObjects(
 	stream pb.KesselInventoryService_StreamedListObjectsServer,
 ) error {
 	ctx := stream.Context()
-	lookupReq, err := toLookupResourceRequest(req)
+	lookupReq, err := relations_repository.ToLookupResourceRequest(req)
 	if err != nil {
 		return fmt.Errorf("failed to build lookup request: %w", err)
 	}
@@ -148,62 +148,9 @@ func (s *InventoryService) StreamedListObjects(
 		}
 
 		// Convert and send the response to the client
-		if err := stream.Send(toLookupResourceResponse(resp)); err != nil {
+		if err := stream.Send(relations_repository.ToLookupResourceResponse(resp)); err != nil {
 			return fmt.Errorf("error sending resource to client: %w", err)
 		}
-	}
-}
-
-func toLookupResourceRequest(request *pb.StreamedListObjectsRequest) (*pbv1beta1.LookupResourcesRequest, error) {
-	if request == nil {
-		return nil, fmt.Errorf("request is nil")
-	}
-	var pagination *pbv1beta1.RequestPagination
-	if request.Pagination != nil {
-		pagination = &pbv1beta1.RequestPagination{
-			Limit:             request.Pagination.Limit,
-			ContinuationToken: request.Pagination.ContinuationToken,
-		}
-	}
-	normalizedNamespace := NormalizeRepresentationType(request.ObjectType.GetReporterType())
-	if !IsValidatedRepresentationType(normalizedNamespace) {
-		return nil, fmt.Errorf("reporter type does not match required pattern: %s", normalizedNamespace)
-	}
-	normalizedResourceType := NormalizeRepresentationType(request.ObjectType.GetResourceType())
-	if !IsValidatedRepresentationType(normalizedResourceType) {
-		return nil, fmt.Errorf("resource type does not match required pattern: %s", normalizedResourceType)
-	}
-	return &pbv1beta1.LookupResourcesRequest{
-		ResourceType: &pbv1beta1.ObjectType{
-			Namespace: normalizedNamespace,
-			Name:      normalizedResourceType,
-		},
-		Relation: request.Relation,
-		Subject: &pbv1beta1.SubjectReference{
-			Relation: request.Subject.Relation,
-			Subject: &pbv1beta1.ObjectReference{
-				Type: &pbv1beta1.ObjectType{
-					Name:      request.Subject.Resource.GetResourceType(),
-					Namespace: request.Subject.Resource.GetReporter().GetType(),
-				},
-				Id: request.Subject.Resource.GetResourceId(),
-			},
-		},
-		Pagination: pagination,
-	}, nil
-}
-
-func toLookupResourceResponse(response *pbv1beta1.LookupResourcesResponse) *pb.StreamedListObjectsResponse {
-	return &pb.StreamedListObjectsResponse{
-		Object: &pb.ResourceReference{
-			Reporter: &pb.ReporterReference{
-				Type: response.Resource.Type.Namespace,
-			},
-			ResourceId: response.Resource.Id,
-		},
-		Pagination: &pb.ResponsePagination{
-			ContinuationToken: response.Pagination.ContinuationToken,
-		},
 	}
 }
 
@@ -299,14 +246,14 @@ func responseFromDeleteResource() *pb.DeleteResourceResponse {
 	return &pb.DeleteResourceResponse{}
 }
 
-var representationTypePattern = regexp.MustCompile(`^([a-z][a-z0-9_]{1,61}[a-z0-9]/)*[a-z][a-z0-9_]{1,62}[a-z0-9]$`)
+var typePattern = regexp.MustCompile(`^([a-z][a-z0-9_]{1,61}[a-z0-9]/)*[a-z][a-z0-9_]{1,62}[a-z0-9]$`)
 
 // NormalizeAndValidateRepresentationType returns normalized (lowercased), original, error
-func NormalizeRepresentationType(val string) string {
+func NormalizeType(val string) string {
 	normalized := strings.ToLower(val)
 	return normalized
 }
 
-func IsValidatedRepresentationType(val string) bool {
-	return representationTypePattern.MatchString(val)
+func IsValidType(val string) bool {
+	return typePattern.MatchString(val)
 }

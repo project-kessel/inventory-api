@@ -13,7 +13,7 @@ import (
 	"syscall"
 	"time"
 
-	common "github.com/project-kessel/inventory-api/cmd/common"
+	"github.com/project-kessel/inventory-api/cmd/common"
 	"github.com/project-kessel/inventory-api/internal/consumer/auth"
 	"github.com/project-kessel/inventory-api/internal/consumer/retry"
 	"github.com/project-kessel/inventory-api/internal/metricscollector"
@@ -27,7 +27,7 @@ import (
 
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
 	"github.com/go-kratos/kratos/v2/log"
-	"github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
+	relationsv1beta1 "github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"gorm.io/gorm"
@@ -361,9 +361,9 @@ func ParseHeaders(msg *kafka.Message) (map[string]string, error) {
 	return headers, nil
 }
 
-func ParseCreateOrUpdateMessage(msg []byte) (*v1beta1.Relationship, error) {
+func ParseCreateOrUpdateMessage(msg []byte) (*relationsv1beta1.Relationship, error) {
 	var msgPayload *MessagePayload
-	var tuple *v1beta1.Relationship
+	var tuple *relationsv1beta1.Relationship
 
 	// msg value is expected to be a valid JSON body for a single relation
 	err := json.Unmarshal(msg, &msgPayload)
@@ -383,9 +383,9 @@ func ParseCreateOrUpdateMessage(msg []byte) (*v1beta1.Relationship, error) {
 	return tuple, nil
 }
 
-func ParseDeleteMessage(msg []byte) (*v1beta1.RelationTupleFilter, error) {
+func ParseDeleteMessage(msg []byte) (*relationsv1beta1.RelationTupleFilter, error) {
 	var msgPayload *MessagePayload
-	var filter *v1beta1.RelationTupleFilter
+	var filter *relationsv1beta1.RelationTupleFilter
 
 	// msg value is expected to be a valid JSON body for a single relation
 	err := json.Unmarshal(msg, &msgPayload)
@@ -443,10 +443,10 @@ func (i *InventoryConsumer) commitStoredOffsets() error {
 }
 
 // CreateTuple calls the Relations API to create a tuple from the message payload received and returns the consistency token
-func (i *InventoryConsumer) CreateTuple(ctx context.Context, tuple *v1beta1.Relationship) (string, error) {
+func (i *InventoryConsumer) CreateTuple(ctx context.Context, tuple *relationsv1beta1.Relationship) (string, error) {
 
-	resp, err := i.Authorizer.CreateTuples(ctx, &v1beta1.CreateTuplesRequest{
-		Tuples: []*v1beta1.Relationship{tuple},
+	resp, err := i.Authorizer.CreateTuples(ctx, &relationsv1beta1.CreateTuplesRequest{
+		Tuples: []*relationsv1beta1.Relationship{tuple},
 	})
 	if err != nil {
 		// If the tuple exists already, capture the token using Check to ensure idempotent updates to tokens in DB
@@ -472,9 +472,9 @@ func (i *InventoryConsumer) CreateTuple(ctx context.Context, tuple *v1beta1.Rela
 }
 
 // UpdateTuple calls the Relations API to create a tuple from the message payload received and returns the consistency token
-func (i *InventoryConsumer) UpdateTuple(ctx context.Context, tuple *v1beta1.Relationship) (string, error) {
-	resp, err := i.Authorizer.CreateTuples(ctx, &v1beta1.CreateTuplesRequest{
-		Tuples: []*v1beta1.Relationship{tuple},
+func (i *InventoryConsumer) UpdateTuple(ctx context.Context, tuple *relationsv1beta1.Relationship) (string, error) {
+	resp, err := i.Authorizer.CreateTuples(ctx, &relationsv1beta1.CreateTuplesRequest{
+		Tuples: []*relationsv1beta1.Relationship{tuple},
 		Upsert: true,
 	})
 	// TODO: we should understand what kind of errors to look for here in case we need to commit in loop or not
@@ -485,8 +485,8 @@ func (i *InventoryConsumer) UpdateTuple(ctx context.Context, tuple *v1beta1.Rela
 }
 
 // DeleteTuple calls the Relations API to create a tuple from the message payload received and returns the consistency token
-func (i *InventoryConsumer) DeleteTuple(ctx context.Context, filter *v1beta1.RelationTupleFilter) (string, error) {
-	resp, err := i.Authorizer.DeleteTuples(ctx, &v1beta1.DeleteTuplesRequest{
+func (i *InventoryConsumer) DeleteTuple(ctx context.Context, filter *relationsv1beta1.RelationTupleFilter) (string, error) {
+	resp, err := i.Authorizer.DeleteTuples(ctx, &relationsv1beta1.DeleteTuplesRequest{
 		Filter: filter,
 	})
 	if err != nil {

@@ -3,6 +3,8 @@ package kessel
 import (
 	"context"
 	"fmt"
+	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2"
+	"strings"
 
 	"google.golang.org/protobuf/proto"
 
@@ -105,6 +107,11 @@ func (a *KesselAuthz) getCallOptions() ([]grpc.CallOption, error) {
 	return opts, nil
 }
 
+func NormalizeType(val string) string {
+	normalized := strings.ToLower(val)
+	return normalized
+}
+
 func (a *KesselAuthz) CreateTuples(ctx context.Context, r *kessel.CreateTuplesRequest) (*kessel.CreateTuplesResponse, error) {
 	opts, err := a.getCallOptions()
 	if err != nil {
@@ -151,6 +158,55 @@ func (a *KesselAuthz) LookupResources(ctx context.Context, in *kessel.LookupReso
 		return nil, err
 	}
 	return resp, nil
+}
+
+func ToLookupResourceRequest(request *pb.StreamedListObjectsRequest) (*kessel.LookupResourcesRequest, error) {
+	if request == nil {
+		return nil, fmt.Errorf("request is nil")
+	}
+	var pagination *kessel.RequestPagination
+	if request.Pagination != nil {
+		pagination = &kessel.RequestPagination{
+			Limit:             request.Pagination.Limit,
+			ContinuationToken: request.Pagination.ContinuationToken,
+		}
+	}
+	normalizedNamespace := NormalizeType(request.ObjectType.GetReporterType())
+
+	normalizedResourceType := NormalizeType(request.ObjectType.GetResourceType())
+
+	return &kessel.LookupResourcesRequest{
+		ResourceType: &kessel.ObjectType{
+			Namespace: normalizedNamespace,
+			Name:      normalizedResourceType,
+		},
+		Relation: request.Relation,
+		Subject: &kessel.SubjectReference{
+			Relation: request.Subject.Relation,
+			Subject: &kessel.ObjectReference{
+				Type: &kessel.ObjectType{
+					Name:      request.Subject.Resource.GetResourceType(),
+					Namespace: request.Subject.Resource.GetReporter().GetType(),
+				},
+				Id: request.Subject.Resource.GetResourceId(),
+			},
+		},
+		Pagination: pagination,
+	}, nil
+}
+
+func ToLookupResourceResponse(response *kessel.LookupResourcesResponse) *pb.StreamedListObjectsResponse {
+	return &pb.StreamedListObjectsResponse{
+		Object: &pb.ResourceReference{
+			Reporter: &pb.ReporterReference{
+				Type: response.Resource.Type.Namespace,
+			},
+			ResourceId: response.Resource.Id,
+		},
+		Pagination: &pb.ResponsePagination{
+			ContinuationToken: response.Pagination.ContinuationToken,
+		},
+	}
 }
 
 func (a *KesselAuthz) UnsetWorkspace(ctx context.Context, local_resource_id, namespace, name string) (*kessel.DeleteTuplesResponse, error) {

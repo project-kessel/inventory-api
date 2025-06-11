@@ -7,24 +7,24 @@ import (
 
 func TestIsValidatedRepresentationType(t *testing.T) {
 
-	assert.True(t, IsValidatedRepresentationType("hbi"))
+	assert.True(t, IsValidType("hbi"))
 
 	// capatalised type not normalized
-	assert.False(t, IsValidatedRepresentationType("HBI"))
+	assert.False(t, IsValidType("HBI"))
 
 	// normalize then validate
-	normalized := NormalizeRepresentationType("HBI")
-	assert.True(t, IsValidatedRepresentationType(normalized))
+	normalized := NormalizeType("HBI")
+	assert.True(t, IsValidType(normalized))
 	// too long
-	assert.False(t, IsValidatedRepresentationType("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"))
+	assert.False(t, IsValidType("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"))
 	// strange characters
-	assert.False(t, IsValidatedRepresentationType("h?!!!"))
+	assert.False(t, IsValidType("h?!!!"))
 }
 
 func TestNormalizeRepresentationType(t *testing.T) {
 	// normalize then validate
-	normalized := NormalizeRepresentationType("HBI")
-	assert.True(t, IsValidatedRepresentationType(normalized))
+	normalized := NormalizeType("HBI")
+	assert.True(t, IsValidType(normalized))
 
 	assert.Equal(t, "hbi", normalized)
 }

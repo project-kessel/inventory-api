@@ -3,7 +3,7 @@
   "type": "object",
   "properties": {
     "satellite_id": { "type": "string", "format": "uuid" },
-    "sub_manager_id": { "type": "string", "format": "uuid" },
+    "subscription_manager_id": { "type": "string", "format": "uuid" },
     "insights_inventory_id": { "type": "string", "format": "uuid" },
     "ansible_host": { "type": "string", "maxLength": 255 }
   },

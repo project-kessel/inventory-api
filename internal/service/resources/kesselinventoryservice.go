@@ -3,10 +3,6 @@ package resources
 import (
 	"context"
 	"fmt"
-	"io"
-	"regexp"
-	"strings"
-
 	"github.com/go-kratos/kratos/v2/log"
 	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2"
 	authnapi "github.com/project-kessel/inventory-api/internal/authn/api"
@@ -16,6 +12,7 @@ import (
 	"github.com/project-kessel/inventory-api/internal/middleware"
 	conv "github.com/project-kessel/inventory-api/internal/service/common"
 	pbv1beta1 "github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
+	"io"
 )
 
 type InventoryService struct {
@@ -244,16 +241,4 @@ func responseFromResource() *pb.ReportResourceResponse {
 
 func responseFromDeleteResource() *pb.DeleteResourceResponse {
 	return &pb.DeleteResourceResponse{}
-}
-
-var typePattern = regexp.MustCompile(`^([a-z][a-z0-9_]{1,61}[a-z0-9]/)*[a-z][a-z0-9_]{1,62}[a-z0-9]$`)
-
-// NormalizeAndValidateRepresentationType returns normalized (lowercased), original, error
-func NormalizeType(val string) string {
-	normalized := strings.ToLower(val)
-	return normalized
-}
-
-func IsValidType(val string) bool {
-	return typePattern.MatchString(val)
 }

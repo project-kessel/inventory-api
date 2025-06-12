@@ -101,9 +101,6 @@ while true; do
     echo "Delaying readiness checks to allow Kafka pods to initialize..."
     sleep 30
     check_kafka_readiness "my-cluster-kafka-0" $MAX_RETRIES
-    check_kafka_readiness "my-cluster-kafka-1" $MAX_RETRIES
-    check_kafka_readiness "my-cluster-kafka-2" $MAX_RETRIES
-
     break
   fi
 

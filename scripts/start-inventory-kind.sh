@@ -106,6 +106,8 @@ while true; do
 
   echo "Waiting for pods to be ready... ($NOT_READY pods not ready)"
   kubectl get pods
+  FAILED_PODS=$(kubectl get pods -o json | jq -r '.items[] | select(.status.phase != "Running") | .metadata.name')
+  for pod in ${FAILED_PODS[@]}; do echo "===Pod $pod not running, showing logs===" && kubectl logs $pod | tail; done
   sleep 5
 
 done

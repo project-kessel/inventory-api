@@ -9,6 +9,6 @@ option java_multiple_files = true;
 option java_package = "org.project_kessel.api.inventory.v1beta2";
 
 message ReporterReference {
-  string type = 1 [(buf.validate.field).string.min_len = 1];
-  optional string instance_id = 2;
+  string type = 1 [(buf.validate.field).string.min_len = 1, (buf.validate.field).string.pattern = "^[A-Za-z0-9_]+$"];
+  optional string instance_id = 2 [(buf.validate.field).string.pattern = "^[A-Za-z0-9_]+$"];
 }

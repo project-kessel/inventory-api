@@ -23,7 +23,7 @@ message ReportResourceRequest {
   // Used to:
   // - Select the appropriate schema to validate the *Reporter Representation*
   // - Identify a *Reporter's Representation* uniquely in Kessel Inventory
-  string type = 2 [(buf.validate.field).string = {min_len: 1}];
+  string type = 2 [(buf.validate.field).string = {min_len: 1}, (buf.validate.field).string.pattern = "^[A-Za-z0-9_-]+$"];
   // The type of the *Reporter* (e.g., "hbi", "acm", "acs", "notifications").
   //
   // Must be a previously agreed-upon value between the *Reporter* and Kessel Inventory.
@@ -31,7 +31,7 @@ message ReportResourceRequest {
   // Used to:
   // - Select the appropriate schema to validate the *Reporter Representation*
   // - Identify a *Reporter's Representation* uniquely in Kessel Inventory
-  string reporter_type = 3 [(buf.validate.field).string = {min_len: 1}];
+  string reporter_type = 3 [(buf.validate.field).string = {min_len: 1}, (buf.validate.field).string.pattern = "^[A-Za-z0-9_-]+$"];
   // Identifier for the specific instance of the *Reporter*.
   // This may not be applicable to all Reporters
   //

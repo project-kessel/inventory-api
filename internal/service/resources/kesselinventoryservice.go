@@ -3,17 +3,16 @@ package resources
 import (
 	"context"
 	"fmt"
-	"io"
-
 	"github.com/go-kratos/kratos/v2/log"
-	pbv1beta1 "github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
-
 	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2"
 	authnapi "github.com/project-kessel/inventory-api/internal/authn/api"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
 	"github.com/project-kessel/inventory-api/internal/biz/usecase/resources"
 	"github.com/project-kessel/inventory-api/internal/middleware"
 	conv "github.com/project-kessel/inventory-api/internal/service/common"
+	pbv1beta1 "github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
+	"io"
+	"strings"
 )
 
 type InventoryService struct {
@@ -124,7 +123,12 @@ func (s *InventoryService) StreamedListObjects(
 	stream pb.KesselInventoryService_StreamedListObjectsServer,
 ) error {
 	ctx := stream.Context()
-	clientStream, err := s.Ctl.LookupResources(ctx, toLookupResourceRequest(req))
+	lookupReq, err := toLookupResourceRequest(req)
+	if err != nil {
+		return fmt.Errorf("failed to build lookup request: %w", err)
+	}
+
+	clientStream, err := s.Ctl.LookupResources(ctx, lookupReq)
 	if err != nil {
 		return fmt.Errorf("failed to retrieve resources: %w", err)
 	}
@@ -147,9 +151,9 @@ func (s *InventoryService) StreamedListObjects(
 	}
 }
 
-func toLookupResourceRequest(request *pb.StreamedListObjectsRequest) *pbv1beta1.LookupResourcesRequest {
+func toLookupResourceRequest(request *pb.StreamedListObjectsRequest) (*pbv1beta1.LookupResourcesRequest, error) {
 	if request == nil {
-		return nil
+		return nil, fmt.Errorf("request is nil")
 	}
 	var pagination *pbv1beta1.RequestPagination
 	if request.Pagination != nil {
@@ -158,10 +162,13 @@ func toLookupResourceRequest(request *pb.StreamedListObjectsRequest) *pbv1beta1.
 			ContinuationToken: request.Pagination.ContinuationToken,
 		}
 	}
+	normalizedNamespace := normalizeType(request.ObjectType.GetReporterType())
+	normalizedResourceType := normalizeType(request.ObjectType.GetResourceType())
+
 	return &pbv1beta1.LookupResourcesRequest{
 		ResourceType: &pbv1beta1.ObjectType{
-			Namespace: request.ObjectType.GetReporterType(),
-			Name:      request.ObjectType.GetResourceType(),
+			Namespace: normalizedNamespace,
+			Name:      normalizedResourceType,
 		},
 		Relation: request.Relation,
 		Subject: &pbv1beta1.SubjectReference{
@@ -175,7 +182,12 @@ func toLookupResourceRequest(request *pb.StreamedListObjectsRequest) *pbv1beta1.
 			},
 		},
 		Pagination: pagination,
-	}
+	}, nil
+}
+
+func normalizeType(val string) string {
+	normalized := strings.ToLower(val)
+	return normalized
 }
 
 func toLookupResourceResponse(response *pbv1beta1.LookupResourcesResponse) *pb.StreamedListObjectsResponse {

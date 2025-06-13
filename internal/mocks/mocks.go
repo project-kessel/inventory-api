@@ -2,10 +2,11 @@ package mocks
 
 import (
 	"context"
+	"io"
+
 	"github.com/google/uuid"
 	"github.com/project-kessel/inventory-api/internal/pubsub"
 	"google.golang.org/grpc/metadata"
-	"io"
 
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
 

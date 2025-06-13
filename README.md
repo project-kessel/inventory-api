@@ -359,12 +359,3 @@ openssl list -providers | grep -A 3 fips
     version: 3.0.7-395c1a240fbfffd8
     status: active
 ```
-
-## Contributing
-
-Follow the steps below to contribute:
-
-- Fork the project
-- Create a new branch for your feature
-- Run tests and Pr check
-- Submit a pull request

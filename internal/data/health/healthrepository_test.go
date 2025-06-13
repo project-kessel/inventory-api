@@ -3,9 +3,10 @@ package health
 import (
 	"context"
 	"errors"
+	"testing"
+
 	"github.com/project-kessel/inventory-api/internal/mocks"
 	kesselv1 "github.com/project-kessel/relations-api/api/kessel/relations/v1"
-	"testing"
 
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/stretchr/testify/assert"

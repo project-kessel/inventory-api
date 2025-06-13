@@ -1,9 +1,10 @@
 package storage
 
 import (
+	"testing"
+
 	"github.com/project-kessel/inventory-api/internal/storage/postgres"
 	"github.com/project-kessel/inventory-api/internal/storage/sqlite3"
-	"testing"
 
 	"github.com/stretchr/testify/assert"
 )

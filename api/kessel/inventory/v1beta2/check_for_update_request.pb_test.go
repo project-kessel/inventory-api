@@ -2,9 +2,10 @@ package v1beta2
 
 import (
 	"encoding/json"
+	"testing"
+
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/protobuf/proto"
-	"testing"
 )
 
 func TestCheckForUpdateRequest_FullRoundTrip(t *testing.T) {

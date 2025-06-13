@@ -25,18 +25,30 @@ check_kafka_readiness() {
         kubectl logs $pod_name
         echo "Describing pod $pod_name:"
         kubectl describe pod $pod_name
+        rm -rf $TMP_DIR
+        rm -rf $KIND
         exit 1
       fi
     fi
   done
 }
 
+# default kind in github ubuntu running is not playing well with strimzi operator
+# purposefully installing an older version (0.27.0) to get tests back up and running till
+# and alternate solution is found
+
+TMP_DIR=$(mktemp -d)
+KIND=${TMP_DIR}/kind27
+wget -O $KIND https://github.com/kubernetes-sigs/kind/releases/download/v0.27.0/kind-linux-amd64
+chmod +x $KIND
+
+
 # check for existing cluster to add some idempotency when testing locally
 # the existing cluster check exits with 1 if none are found, temp turn off auto exit with `set`
 set +e
-EXISTING_CLUSTER=$(kind get clusters 2> /dev/null | grep inventory-cluster)
+EXISTING_CLUSTER=$($KIND get clusters 2> /dev/null | grep inventory-cluster)
 set -e
-if [[ -z "$EXISTING_CLUSTER" ]]; then kind create cluster --name inventory-cluster; fi
+if [[ -z "$EXISTING_CLUSTER" ]]; then $KIND create cluster --name inventory-cluster; fi
 
 # build/tag image
 ${DOCKER} build -t localhost/inventory-api:latest -f Dockerfile .
@@ -55,9 +67,9 @@ ${DOCKER} save -o inventory-api.tar localhost/inventory-api:e2e-test
 ${DOCKER} save -o inventory-e2e-tests.tar localhost/inventory-e2e-tests:e2e-test
 ${DOCKER} save -o kafka-connect.tar localhost/kafka-connect:e2e-test
 
-kind load image-archive inventory-api.tar --name inventory-cluster
-kind load image-archive inventory-e2e-tests.tar --name inventory-cluster
-kind load image-archive kafka-connect.tar --name inventory-cluster
+$KIND load image-archive inventory-api.tar --name inventory-cluster
+$KIND load image-archive inventory-e2e-tests.tar --name inventory-cluster
+$KIND load image-archive kafka-connect.tar --name inventory-cluster
 
 # checks for the config map first, or creates it if not found
 kubectl get configmap inventory-api-psks || kubectl create configmap inventory-api-psks --from-file=config/psks.yaml
@@ -101,9 +113,6 @@ while true; do
     echo "Delaying readiness checks to allow Kafka pods to initialize..."
     sleep 30
     check_kafka_readiness "my-cluster-kafka-0" $MAX_RETRIES
-    check_kafka_readiness "my-cluster-kafka-1" $MAX_RETRIES
-    check_kafka_readiness "my-cluster-kafka-2" $MAX_RETRIES
-
     break
   fi
 
@@ -115,3 +124,5 @@ done
 
 kubectl apply -f deploy/kind/e2e/e2e-batch.yaml
 echo "Setup complete."
+rm -rf $TMP_DIR
+rm -rf $KIND

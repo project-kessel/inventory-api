@@ -60,13 +60,13 @@ for ((i = 0 ; i < ${NUM_RUNS} ; i++)); do
     '{"reporter_data":{"reporter_type":"NOTIFICATIONS","local_resource_id":$local_resource_id}}')
 
   echo "Creating resource..."
-  curl -H "Content-Type: application/json" -d $REQUEST $INVENTORY_URL
+  curl -H "Content-Type: application/json" -H "Authorization: bearer $TOKEN"  -d $REQUEST $INVENTORY_URL
 
   echo "Updating resource..."
-  curl -X PUT -H "Content-Type: application/json" -d $REQUEST $INVENTORY_URL
+  curl -X PUT -H "Content-Type: application/json" -H "Authorization: bearer $TOKEN" -d $REQUEST $INVENTORY_URL
 
   echo "Deleting resource..."
-  curl -X DELETE -H "Content-Type: application/json" -d $DELETE_REQUEST $INVENTORY_URL
+  curl -X DELETE -H "Content-Type: application/json" -H "Authorization: bearer $TOKEN" -d $DELETE_REQUEST $INVENTORY_URL
 
   sleep $INTERVAL
 done

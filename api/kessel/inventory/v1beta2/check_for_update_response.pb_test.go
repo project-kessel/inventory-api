@@ -1,9 +1,10 @@
 package v1beta2
 
 import (
+	"testing"
+
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/protobuf/proto"
-	"testing"
 )
 
 func TestCheckForUpdateResponse_GetAllowed_Nil(t *testing.T) {

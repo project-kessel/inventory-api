@@ -1,11 +1,12 @@
 package cmd
 
 import (
+	"testing"
+
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	"testing"
 )
 
 type MockedCommandRun struct {

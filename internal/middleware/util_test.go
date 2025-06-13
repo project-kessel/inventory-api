@@ -1,10 +1,11 @@
 package middleware_test
 
 import (
+	"testing"
+
 	pbv1beta2 "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2"
 	"github.com/project-kessel/inventory-api/internal/middleware"
 	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 // Helper functions

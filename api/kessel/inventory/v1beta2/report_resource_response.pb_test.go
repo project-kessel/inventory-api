@@ -1,8 +1,9 @@
 package v1beta2
 
 import (
-	"google.golang.org/protobuf/proto"
 	"testing"
+
+	"google.golang.org/protobuf/proto"
 
 	"github.com/stretchr/testify/assert"
 )

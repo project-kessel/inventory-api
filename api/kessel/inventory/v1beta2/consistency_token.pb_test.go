@@ -2,8 +2,9 @@ package v1beta2
 
 import (
 	"encoding/json"
-	"google.golang.org/protobuf/proto"
 	"testing"
+
+	"google.golang.org/protobuf/proto"
 
 	"github.com/stretchr/testify/assert"
 )

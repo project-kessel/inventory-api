@@ -2,8 +2,9 @@ package v1beta2_test
 
 import (
 	"encoding/json"
-	"google.golang.org/protobuf/proto"
 	"testing"
+
+	"google.golang.org/protobuf/proto"
 
 	"github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2"
 	"github.com/stretchr/testify/assert"

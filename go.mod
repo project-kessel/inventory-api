@@ -4,8 +4,8 @@ module github.com/project-kessel/inventory-api
 go 1.23.9
 
 require (
-	buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go v1.36.6-20250425153114-8976f5be98c1.1
-	buf.build/go/protovalidate v0.12.0
+	buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go v1.36.6-20250613105001-9f2d3c737feb.1
+	buf.build/go/protovalidate v0.13.1
 	github.com/authzed/grpcutil v0.0.0-20250221190651-1985b19b35b8
 	github.com/cloudevents/sdk-go/protocol/kafka_confluent/v2 v2.0.0-20250313141547-88bebb1fe04f
 	github.com/cloudevents/sdk-go/v2 v2.16.0
@@ -18,7 +18,7 @@ require (
 	github.com/mattn/go-sqlite3 v1.14.28
 	github.com/patrickmn/go-cache v2.1.0+incompatible
 	github.com/project-kessel/inventory-client-go v0.0.0-20250424151038-8425c8f4f969
-	github.com/project-kessel/relations-api v0.0.0-20250408111129-d8b61a77bd9a
+	github.com/project-kessel/relations-api v0.0.0-20250613143552-c3db30c5c192
 	github.com/prometheus/client_golang v1.22.0
 	github.com/redhatinsights/app-common-go v1.6.8
 	github.com/sony/gobreaker v1.0.0

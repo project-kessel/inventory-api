@@ -3,6 +3,10 @@ package grpc
 import (
 	"context"
 	"fmt"
+	"os"
+	"testing"
+	"time"
+
 	"github.com/go-kratos/kratos/v2/log"
 	v1 "github.com/project-kessel/inventory-api/api/kessel/inventory/v1"
 	"github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/resources"
@@ -10,9 +14,6 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/health/grpc_health_v1"
-	"os"
-	"testing"
-	"time"
 )
 
 type insecuregRPCMetadataCreds map[string]string

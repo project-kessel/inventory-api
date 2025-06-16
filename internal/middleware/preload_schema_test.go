@@ -1,13 +1,14 @@
 package middleware_test
 
 import (
-	"github.com/project-kessel/inventory-api/internal/middleware"
-	"github.com/spf13/viper"
-	"github.com/stretchr/testify/assert"
 	"os"
 	"path/filepath"
 	"sync"
 	"testing"
+
+	"github.com/project-kessel/inventory-api/internal/middleware"
+	"github.com/spf13/viper"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestPreloadAllSchemas_UsesCachePath(t *testing.T) {

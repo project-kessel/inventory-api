@@ -1,8 +1,9 @@
 package middleware_test
 
 import (
-	"github.com/spf13/viper"
 	"testing"
+
+	"github.com/spf13/viper"
 
 	"google.golang.org/protobuf/types/known/structpb"
 
@@ -21,10 +22,10 @@ func AsStruct(t *testing.T, m map[string]interface{}) *structpb.Struct {
 
 func TestValidateReportResourceJSON_Success(t *testing.T) {
 	reporterStruct, err := structpb.NewStruct(map[string]interface{}{
-		"satellite_id":          "2c4196f1-0371-4f4c-8913-e113cfaa6e67",
-		"sub_manager_id":        "af94f92b-0b65-4cac-b449-6b77e665a08f",
-		"insights_inventory_id": "05707922-7b0a-4fe6-982d-6adbc7695b8f",
-		"ansible_host":          "host-1",
+		"satellite_id":            "2c4196f1-0371-4f4c-8913-e113cfaa6e67",
+		"subscription_manager_id": "af94f92b-0b65-4cac-b449-6b77e665a08f",
+		"insights_inventory_id":   "05707922-7b0a-4fe6-982d-6adbc7695b8f",
+		"ansible_host":            "host-1",
 	})
 	assert.NoError(t, err)
 
@@ -55,7 +56,7 @@ func TestValidateReportResourceJSON_Success(t *testing.T) {
 	  "type": "object",
 	  "properties": {
 		"satellite_id": { "type": "string", "format": "uuid" },
-		"sub_manager_id": { "type": "string", "format": "uuid" },
+		"subscription_manager_id": { "type": "string", "format": "uuid" },
 		"insights_inventory_id": { "type": "string", "format": "uuid" },
 		"ansible_host": { "type": "string", "maxLength": 255 }
 	  },
@@ -89,10 +90,10 @@ func TestValidateReportResourceJSON_FieldExtractionErrors(t *testing.T) {
 				ApiHref:         "url",
 			},
 			Reporter: AsStruct(t, map[string]interface{}{
-				"satellite_id":          "2c4196f1-0371-4f4c-8913-e113cfaa6e67",
-				"sub_manager_id":        "af94f92b-0b65-4cac-b449-6b77e665a08f",
-				"insights_inventory_id": "05707922-7b0a-4fe6-982d-6adbc7695b8f",
-				"ansible_host":          "host-1",
+				"satellite_id":            "2c4196f1-0371-4f4c-8913-e113cfaa6e67",
+				"subscription_manager_id": "af94f92b-0b65-4cac-b449-6b77e665a08f",
+				"insights_inventory_id":   "05707922-7b0a-4fe6-982d-6adbc7695b8f",
+				"ansible_host":            "host-1",
 			}),
 			Common: AsStruct(t, map[string]interface{}{
 				"workspace_id": "a64d17d0-aec3-410a-acd0-e0b85b22c076",
@@ -110,7 +111,7 @@ func TestValidateReportResourceJSON_FieldExtractionErrors(t *testing.T) {
 	  "type": "object",
 	  "properties": {
 		"satellite_id": { "type": "string", "format": "uuid" },
-		"sub_manager_id": { "type": "string", "format": "uuid" },
+		"subscription_manager_id": { "type": "string", "format": "uuid" },
 		"insights_inventory_id": { "type": "string", "format": "uuid" },
 		"ansible_host": { "type": "string", "maxLength": 255 }
 	  },

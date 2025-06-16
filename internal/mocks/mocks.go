@@ -2,11 +2,11 @@ package mocks
 
 import (
 	"context"
+	"io"
 
 	"github.com/google/uuid"
 	"github.com/project-kessel/inventory-api/internal/pubsub"
 	"google.golang.org/grpc/metadata"
-	"io"
 
 	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1"
 

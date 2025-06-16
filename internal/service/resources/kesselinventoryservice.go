@@ -3,6 +3,9 @@ package resources
 import (
 	"context"
 	"fmt"
+	"io"
+	"strings"
+
 	"github.com/go-kratos/kratos/v2/log"
 	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2"
 	authnapi "github.com/project-kessel/inventory-api/internal/authn/api"
@@ -11,8 +14,6 @@ import (
 	"github.com/project-kessel/inventory-api/internal/middleware"
 	conv "github.com/project-kessel/inventory-api/internal/service/common"
 	pbv1beta1 "github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
-	"io"
-	"strings"
 )
 
 type InventoryService struct {

@@ -16,3 +16,6 @@ plugins:
       - default_response=true
       - naming=json
       - enum_type=string
+  - local: protoc-gen-validate
+    out: .
+    opt: lang=go

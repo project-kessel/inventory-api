@@ -2,13 +2,15 @@ package resources_test
 
 import (
 	"context"
+
+	"io"
+	"testing"
+
 	krlog "github.com/go-kratos/kratos/v2/log"
 	"github.com/google/uuid"
 	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2"
 	relationsV1beta1 "github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
 	"google.golang.org/protobuf/types/known/structpb"
-	"io"
-	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"

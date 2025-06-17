@@ -1,8 +1,9 @@
 package middleware_test
 
 import (
-	"github.com/spf13/viper"
 	"testing"
+
+	"github.com/spf13/viper"
 
 	"google.golang.org/protobuf/types/known/structpb"
 

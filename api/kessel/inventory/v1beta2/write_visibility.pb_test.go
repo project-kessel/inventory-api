@@ -1,9 +1,10 @@
 package v1beta2
 
 import (
+	"testing"
+
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/protobuf/reflect/protoreflect"
-	"testing"
 )
 
 func TestWriteVisibility_Enum(t *testing.T) {

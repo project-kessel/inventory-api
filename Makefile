@@ -154,8 +154,12 @@ all:
 .PHONY: lint
 # run go linter with the repositories lint config
 lint:
-	@echo "Linting code."
-	@$(DOCKER) run -t --rm -v $(PWD):/app -w /app golangci/golangci-lint golangci-lint run -v
+	@echo "Running golangci-lint"
+	@$(DOCKER) run -t --rm -v $(PWD):/app -w /app golangci/golangci-lint:v2.1 golangci-lint run -v
+
+lint-fix:
+	@echo "Running golangci-lint run --fix"
+	@$(DOCKER) run -t --rm -v $(PWD):/app -w /app golangci/golangci-lint:v2.1 golangci-lint run --fix -v
 
 .PHONY: pr-check
 # generate pr-check

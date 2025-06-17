@@ -33,7 +33,7 @@ func (c *InventoryService) ReportResource(ctx context.Context, r *pb.ReportResou
 		return nil, err
 	}
 
-	resource, err := requestToResource(r, identity)
+	resource, err := RequestToResource(r, identity)
 	if err != nil {
 		return nil, err
 	}
@@ -42,7 +42,7 @@ func (c *InventoryService) ReportResource(ctx context.Context, r *pb.ReportResou
 	if err != nil {
 		return nil, err
 	}
-	return responseFromResource(), nil
+	return ResponseFromResource(), nil
 }
 
 func (c *InventoryService) DeleteResource(ctx context.Context, r *pb.DeleteResourceRequest) (*pb.DeleteResourceResponse, error) {
@@ -52,7 +52,7 @@ func (c *InventoryService) DeleteResource(ctx context.Context, r *pb.DeleteResou
 		return nil, fmt.Errorf("failed to get identity: %w", err)
 	}
 
-	reporterResource, err := requestToDeleteResource(r, identity)
+	reporterResource, err := RequestToDeleteResource(r, identity)
 	if err != nil {
 		log.Error("Failed to build reporter resource ID: ", err)
 		return nil, fmt.Errorf("failed to build reporter resource ID: %w", err)
@@ -64,7 +64,7 @@ func (c *InventoryService) DeleteResource(ctx context.Context, r *pb.DeleteResou
 		return nil, fmt.Errorf("failed to delete resource: %w", err)
 	}
 
-	return responseFromDeleteResource(), nil
+	return ResponseFromDeleteResource(), nil
 }
 
 func (s *InventoryService) Check(ctx context.Context, req *pb.CheckRequest) (*pb.CheckResponse, error) {
@@ -124,7 +124,7 @@ func (s *InventoryService) StreamedListObjects(
 	stream pb.KesselInventoryService_StreamedListObjectsServer,
 ) error {
 	ctx := stream.Context()
-	lookupReq, err := toLookupResourceRequest(req)
+	lookupReq, err := ToLookupResourceRequest(req)
 	if err != nil {
 		return fmt.Errorf("failed to build lookup request: %w", err)
 	}
@@ -146,13 +146,13 @@ func (s *InventoryService) StreamedListObjects(
 		}
 
 		// Convert and send the response to the client
-		if err := stream.Send(toLookupResourceResponse(resp)); err != nil {
+		if err := stream.Send(ToLookupResourceResponse(resp)); err != nil {
 			return fmt.Errorf("error sending resource to client: %w", err)
 		}
 	}
 }
 
-func toLookupResourceRequest(request *pb.StreamedListObjectsRequest) (*pbv1beta1.LookupResourcesRequest, error) {
+func ToLookupResourceRequest(request *pb.StreamedListObjectsRequest) (*pbv1beta1.LookupResourcesRequest, error) {
 	if request == nil {
 		return nil, fmt.Errorf("request is nil")
 	}
@@ -163,8 +163,8 @@ func toLookupResourceRequest(request *pb.StreamedListObjectsRequest) (*pbv1beta1
 			ContinuationToken: request.Pagination.ContinuationToken,
 		}
 	}
-	normalizedNamespace := normalizeType(request.ObjectType.GetReporterType())
-	normalizedResourceType := normalizeType(request.ObjectType.GetResourceType())
+	normalizedNamespace := NormalizeType(request.ObjectType.GetReporterType())
+	normalizedResourceType := NormalizeType(request.ObjectType.GetResourceType())
 
 	return &pbv1beta1.LookupResourcesRequest{
 		ResourceType: &pbv1beta1.ObjectType{
@@ -186,12 +186,12 @@ func toLookupResourceRequest(request *pb.StreamedListObjectsRequest) (*pbv1beta1
 	}, nil
 }
 
-func normalizeType(val string) string {
+func NormalizeType(val string) string {
 	normalized := strings.ToLower(val)
 	return normalized
 }
 
-func toLookupResourceResponse(response *pbv1beta1.LookupResourcesResponse) *pb.StreamedListObjectsResponse {
+func ToLookupResourceResponse(response *pbv1beta1.LookupResourcesResponse) *pb.StreamedListObjectsResponse {
 	return &pb.StreamedListObjectsResponse{
 		Object: &pb.ResourceReference{
 			Reporter: &pb.ReporterReference{
@@ -230,7 +230,7 @@ func updateResponseFromAuthzRequestV1beta2(allowed bool) *pb.CheckForUpdateRespo
 	}
 }
 
-func requestToResource(r *pb.ReportResourceRequest, identity *authnapi.Identity) (*model.Resource, error) {
+func RequestToResource(r *pb.ReportResourceRequest, identity *authnapi.Identity) (*model.Resource, error) {
 	log.Info("Report Resource Request: ", r)
 	var resourceType = r.GetType()
 	resourceData, err := conv.ToJsonObject(r)
@@ -262,7 +262,7 @@ func requestToResource(r *pb.ReportResourceRequest, identity *authnapi.Identity)
 	return conv.ResourceFromPb(resourceType, reporterType, reporterInstanceId, identity.Principal, resourceData, workspaceId, r.Representations, inventoryId), nil
 }
 
-func requestToDeleteResource(r *pb.DeleteResourceRequest, identity *authnapi.Identity) (model.ReporterResourceId, error) {
+func RequestToDeleteResource(r *pb.DeleteResourceRequest, identity *authnapi.Identity) (model.ReporterResourceId, error) {
 	log.Info("Delete Resource Request: ", r)
 
 	reference := r.GetReference()
@@ -289,10 +289,10 @@ func requestToDeleteResource(r *pb.DeleteResourceRequest, identity *authnapi.Ide
 	return reporterResourceId, nil
 }
 
-func responseFromResource() *pb.ReportResourceResponse {
+func ResponseFromResource() *pb.ReportResourceResponse {
 	return &pb.ReportResourceResponse{}
 }
 
-func responseFromDeleteResource() *pb.DeleteResourceResponse {
+func ResponseFromDeleteResource() *pb.DeleteResourceResponse {
 	return &pb.DeleteResourceResponse{}
 }

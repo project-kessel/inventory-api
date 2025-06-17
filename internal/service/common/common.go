@@ -98,7 +98,7 @@ func ExtractInventoryId(inventoryIDStr string) (*uuid.UUID, error) {
 	if inventoryIDStr != "" {
 		inventoryID, err := uuid.Parse(inventoryIDStr)
 		if err != nil {
-			return nil, nil
+			return nil, fmt.Errorf("invalid inventory ID: %w", err)
 		}
 		return &inventoryID, nil
 	}

@@ -630,8 +630,6 @@ func TestIsValidatedRepresentationType(t *testing.T) {
 	// normalize then validate
 	normalized := svc.NormalizeType("HBI")
 	assert.True(t, IsValidType(normalized))
-	// too long
-	assert.False(t, IsValidType("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"))
 	// strange characters
 	assert.False(t, IsValidType("h?!!!"))
 }

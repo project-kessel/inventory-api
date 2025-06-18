@@ -49,7 +49,7 @@ func New(c CompletedConfig, authn middleware.Middleware, authnConfig authn.Compl
 				metrics.WithSeconds(seconds),
 			),
 			selector.Server(
-				//authn,
+			//authn,
 			).Match(NewWhiteListMatcher).Build(),
 		),
 		kgrpc.Options(grpc.ChainStreamInterceptor(
@@ -57,7 +57,7 @@ func New(c CompletedConfig, authn middleware.Middleware, authnConfig authn.Compl
 		)),
 		kgrpc.StreamMiddleware(
 			selector.Server(
-				//authn,
+			//authn,
 			).Match(NewWhiteListMatcher).Build(),
 		),
 	}

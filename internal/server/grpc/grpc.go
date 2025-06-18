@@ -2,7 +2,6 @@ package grpc
 
 import (
 	"buf.build/go/protovalidate"
-	"github.com/bufbuild/protovalidate-go"
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/go-kratos/kratos/v2/middleware"
 	"github.com/go-kratos/kratos/v2/middleware/logging"
@@ -50,7 +49,7 @@ func New(c CompletedConfig, authn middleware.Middleware, authnConfig authn.Compl
 				metrics.WithSeconds(seconds),
 			),
 			selector.Server(
-			//authn,
+				//authn,
 			).Match(NewWhiteListMatcher).Build(),
 		),
 		kgrpc.Options(grpc.ChainStreamInterceptor(
@@ -58,7 +57,7 @@ func New(c CompletedConfig, authn middleware.Middleware, authnConfig authn.Compl
 		)),
 		kgrpc.StreamMiddleware(
 			selector.Server(
-			//authn,
+				//authn,
 			).Match(NewWhiteListMatcher).Build(),
 		),
 	}

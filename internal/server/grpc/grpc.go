@@ -11,7 +11,7 @@ import (
 	"github.com/go-kratos/kratos/v2/middleware/selector"
 	kgrpc "github.com/go-kratos/kratos/v2/transport/grpc"
 	"github.com/project-kessel/inventory-api/internal/authn"
-	"github.com/project-kessel/inventory-api/internal/authn/oidc"
+	"github.com/project-kessel/inventory-api/internal/authn/interceptor"
 	m "github.com/project-kessel/inventory-api/internal/middleware"
 	"go.opentelemetry.io/otel/metric"
 	"google.golang.org/grpc"
@@ -34,9 +34,9 @@ func New(c CompletedConfig, authn middleware.Middleware, authnConfig authn.Compl
 	// TODO: pass in health, authn middleware
 	var streamingInterceptor []grpc.StreamServerInterceptor
 	if authnConfig.Oidc != nil {
-		jwks, _ := oidc.FetchJwks(authnConfig.Oidc.AuthorizationServerURL)
+		jwks, _ := interceptor.FetchJwks(authnConfig.Oidc.AuthorizationServerURL)
 		streamingInterceptor = []grpc.StreamServerInterceptor{
-			oidc.StreamAuthInterceptor(jwks.Keyfunc),
+			interceptor.StreamAuthInterceptor(jwks.Keyfunc, authnConfig),
 		}
 	}
 

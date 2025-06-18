@@ -1,17 +1,20 @@
-package oidc
+package interceptor
 
 import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
+
 	"github.com/MicahParks/keyfunc/v3"
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/go-kratos/kratos/v2/middleware/auth/jwt"
 	jwtv5 "github.com/golang-jwt/jwt/v5"
+	"github.com/project-kessel/inventory-api/internal/authn"
 	"github.com/project-kessel/inventory-api/internal/authn/api"
+	"github.com/project-kessel/inventory-api/internal/authn/oidc"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
-	"strings"
 )
 
 type authKey struct{}
@@ -31,6 +34,7 @@ type contextKey struct {
 var IdentityRequestKey = &contextKey{"authnapi.Identity"}
 
 type authOptions struct {
+	oidc.CompletedConfig
 	signingMethod jwtv5.SigningMethod
 	claims        func() jwtv5.Claims
 	tokenHeader   map[string]interface{}
@@ -57,7 +61,7 @@ func WithSigningMethod(signingMethod jwtv5.SigningMethod) AuthOption {
 }
 
 // StreamAuthInterceptor is a gRPC stream server interceptor for JWT authentication.
-func StreamAuthInterceptor(keyFunc jwtv5.Keyfunc, opts ...AuthOption) grpc.StreamServerInterceptor {
+func StreamAuthInterceptor(keyFunc jwtv5.Keyfunc, config authn.CompletedConfig, opts ...AuthOption) grpc.StreamServerInterceptor {
 	o := &authOptions{
 		signingMethod: jwtv5.SigningMethodRS256,
 	}
@@ -112,7 +116,30 @@ func StreamAuthInterceptor(keyFunc jwtv5.Keyfunc, opts ...AuthOption) grpc.Strea
 		if err != nil {
 			return err
 		}
-		newCtx = NewContextIdentity(newCtx, api.Identity{Principal: sub})
+
+		audience, err := tokenInfo.Claims.GetAudience()
+		if err != nil {
+			return err
+		}
+
+		var audData []byte
+		err = audience.UnmarshalJSON(audData)
+		if err != nil {
+			return err
+		}
+		audClaim := string(audData[:])
+		if o.EnforceAudCheck {
+			if audClaim != o.ClientId {
+				log.Debugf("aud does not match the requesting client-id -- decision DENY")
+				return err
+			}
+		}
+
+		if sub != "" && o.PrincipalUserDomain != "" {
+			principal := fmt.Sprintf("%s/%s", o.PrincipalUserDomain, sub)
+			newCtx = NewContextIdentity(newCtx, api.Identity{Principal: principal})
+		}
+
 		wrappedStream := &authServerStream{ServerStream: ss, ctx: newCtx}
 		return handler(srv, wrappedStream)
 	}

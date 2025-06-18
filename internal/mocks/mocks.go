@@ -8,6 +8,8 @@ import (
 	"github.com/project-kessel/inventory-api/internal/pubsub"
 	"google.golang.org/grpc/metadata"
 
+	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1"
+
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
 
 	kesselv1 "github.com/project-kessel/relations-api/api/kessel/relations/v1"
@@ -17,6 +19,10 @@ import (
 
 	"github.com/project-kessel/inventory-api/internal/biz/model"
 )
+
+type MockHealthRepo struct {
+	mock.Mock
+}
 
 type MockAuthz struct {
 	mock.Mock
@@ -51,6 +57,17 @@ type MockLookupResourcesStream struct {
 func (m *MockAuthz) Health(ctx context.Context) (*kesselv1.GetReadyzResponse, error) {
 	args := m.Called(ctx)
 	return args.Get(0).(*kesselv1.GetReadyzResponse), args.Error(1)
+}
+
+func (m *MockHealthRepo) IsBackendAvailable(ctx context.Context) (*pb.GetReadyzResponse, error) {
+	args := m.Called(ctx)
+	return args.Get(0).(*pb.GetReadyzResponse), args.Error(1)
+}
+
+func (m *MockHealthRepo) IsRelationsAvailable(ctx context.Context) (*pb.GetReadyzResponse, error) {
+	args := m.Called(ctx)
+	return args.Get(0).(*pb.GetReadyzResponse), args.Error(1)
+
 }
 
 func (m *MockAuthz) Check(ctx context.Context, namespace string, permission string, res *model.Resource, sub *v1beta1.SubjectReference) (v1beta1.CheckResponse_Allowed, *v1beta1.ConsistencyToken, error) {

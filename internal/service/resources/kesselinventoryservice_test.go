@@ -2,6 +2,7 @@ package resources_test
 
 import (
 	"context"
+	"regexp"
 
 	"io"
 	"testing"
@@ -618,8 +619,33 @@ func TestToLookupResourceRequest(t *testing.T) {
 		},
 	}
 
-	result := svc.ToLookupResourceRequest(input)
+	result, _ := svc.ToLookupResourceRequest(input)
 	assert.Equal(t, expected, result)
+}
+
+func TestIsValidatedRepresentationType(t *testing.T) {
+
+	assert.True(t, IsValidType("hbi"))
+
+	// normalize then validate
+	normalized := svc.NormalizeType("HBI")
+	assert.True(t, IsValidType(normalized))
+	// strange characters
+	assert.False(t, IsValidType("h?!!!"))
+}
+
+func TestNormalizeRepresentationType(t *testing.T) {
+	// normalize then validate
+	normalized := svc.NormalizeType("HBI")
+	assert.True(t, IsValidType(normalized))
+
+	assert.Equal(t, "hbi", normalized)
+}
+
+var typePattern = regexp.MustCompile(`^[A-Za-z0-9_]+$`)
+
+func IsValidType(val string) bool {
+	return typePattern.MatchString(val)
 }
 
 func TestToLookupResourceResponse(t *testing.T) {

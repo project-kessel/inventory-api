@@ -2,8 +2,9 @@ package health_test
 
 import (
 	"context"
-	"github.com/spf13/viper"
 	"testing"
+
+	"github.com/spf13/viper"
 
 	"github.com/stretchr/testify/assert"
 

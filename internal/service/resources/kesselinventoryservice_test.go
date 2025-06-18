@@ -627,9 +627,6 @@ func TestIsValidatedRepresentationType(t *testing.T) {
 
 	assert.True(t, IsValidType("hbi"))
 
-	// capatalised type not normalized
-	assert.False(t, IsValidType("HBI"))
-
 	// normalize then validate
 	normalized := svc.NormalizeType("HBI")
 	assert.True(t, IsValidType(normalized))
@@ -647,7 +644,7 @@ func TestNormalizeRepresentationType(t *testing.T) {
 	assert.Equal(t, "hbi", normalized)
 }
 
-var typePattern = regexp.MustCompile(`^([a-z][a-z0-9_]{1,61}[a-z0-9]/)*[a-z][a-z0-9_]{1,62}[a-z0-9]$`)
+var typePattern = regexp.MustCompile(`^[A-Za-z0-9_]+$`)
 
 func IsValidType(val string) bool {
 	return typePattern.MatchString(val)

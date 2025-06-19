@@ -1,6 +1,8 @@
 package grpc
 
 import (
+	"fmt"
+
 	"buf.build/go/protovalidate"
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/go-kratos/kratos/v2/middleware"
@@ -33,9 +35,12 @@ func New(c CompletedConfig, authn middleware.Middleware, authnConfig authn.Compl
 	// TODO: pass in health, authn middleware
 	var streamingInterceptor []grpc.StreamServerInterceptor
 	if authnConfig.Oidc != nil {
-		jwks, _ := interceptor.FetchJwks(authnConfig.Oidc.AuthorizationServerURL)
+		streamAuth, err := interceptor.NewStreamAuthInterceptor(authnConfig)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create stream auth interceptor: %w", err)
+		}
 		streamingInterceptor = []grpc.StreamServerInterceptor{
-			interceptor.StreamAuthInterceptor(jwks.Keyfunc, authnConfig),
+			streamAuth.Interceptor(),
 		}
 	}
 
@@ -49,7 +54,7 @@ func New(c CompletedConfig, authn middleware.Middleware, authnConfig authn.Compl
 				metrics.WithSeconds(seconds),
 			),
 			selector.Server(
-			//authn,
+				authn,
 			).Match(NewWhiteListMatcher).Build(),
 		),
 		kgrpc.Options(grpc.ChainStreamInterceptor(

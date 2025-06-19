@@ -12,7 +12,6 @@ import (
 	jwtv5 "github.com/golang-jwt/jwt/v5"
 	"github.com/project-kessel/inventory-api/internal/authn"
 	"github.com/project-kessel/inventory-api/internal/authn/api"
-	"github.com/project-kessel/inventory-api/internal/authn/oidc"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 )
@@ -33,69 +32,97 @@ type contextKey struct {
 
 var IdentityRequestKey = &contextKey{"authnapi.Identity"}
 
-type authOptions struct {
-	oidc.CompletedConfig
+type StreamAuthConfig struct {
+	authn.CompletedConfig
 	signingMethod jwtv5.SigningMethod
 	claims        func() jwtv5.Claims
 	tokenHeader   map[string]interface{}
+	jwks          keyfunc.Keyfunc
 }
-type AuthOption func(*authOptions)
+type StreamAuthOption func(*StreamAuthConfig)
 
-func WithClaims(claimsFunc func() jwtv5.Claims) AuthOption {
-	return func(o *authOptions) {
+func WithClaims(claimsFunc func() jwtv5.Claims) StreamAuthOption {
+	return func(o *StreamAuthConfig) {
 		o.claims = claimsFunc
 	}
 }
 
-// WithTokenHeader withe customer tokenHeader for client side
-func WithTokenHeader(header map[string]interface{}) AuthOption {
-	return func(o *authOptions) {
+func WithTokenHeader(header map[string]interface{}) StreamAuthOption {
+	return func(o *StreamAuthConfig) {
 		o.tokenHeader = header
 	}
 }
 
-func WithSigningMethod(signingMethod jwtv5.SigningMethod) AuthOption {
-	return func(o *authOptions) {
+func WithSigningMethod(signingMethod jwtv5.SigningMethod) StreamAuthOption {
+	return func(o *StreamAuthConfig) {
 		o.signingMethod = signingMethod
 	}
 }
 
-// StreamAuthInterceptor is a gRPC stream server interceptor for JWT authentication.
-func StreamAuthInterceptor(keyFunc jwtv5.Keyfunc, config authn.CompletedConfig, opts ...AuthOption) grpc.StreamServerInterceptor {
-	o := &authOptions{
-		signingMethod: jwtv5.SigningMethodRS256,
+func NewStreamAuthInterceptor(config authn.CompletedConfig, opts ...StreamAuthOption) (*StreamAuthInterceptor, error) {
+	cfg := &StreamAuthConfig{
+		CompletedConfig: config,
+		signingMethod:   jwtv5.SigningMethodRS256,
 	}
+
+	if config.Oidc.PrincipalUserDomain == "" {
+		config.Oidc.PrincipalUserDomain = "localhost"
+	}
+
 	for _, opt := range opts {
-		opt(o)
+		opt(cfg)
 	}
+
+	if config.Oidc != nil {
+		jwks, err := FetchJwks(config.Oidc.AuthorizationServerURL)
+		if err != nil {
+			return nil, fmt.Errorf("failed to fetch JWKS: %w", err)
+		}
+		cfg.jwks = jwks
+	}
+
+	return &StreamAuthInterceptor{cfg: cfg}, nil
+}
+
+type StreamAuthInterceptor struct {
+	cfg *StreamAuthConfig
+}
+
+func (i *StreamAuthInterceptor) Interceptor() grpc.StreamServerInterceptor {
 	return func(srv interface{}, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
-		var newCtx context.Context
-		var err error
-		newCtx = ss.Context()
-		if keyFunc == nil {
+
+		if i.cfg.jwks == nil {
 			return jwt.ErrMissingKeyFunc
 		}
+
+		newCtx := ss.Context()
 		md, ok := metadata.FromIncomingContext(newCtx)
 		if !ok {
 			return jwt.ErrMissingJwtToken
 		}
+
 		authHeader, ok := md[authorizationKey]
 		if !ok || len(authHeader) == 0 {
 			return jwt.ErrMissingJwtToken
 		}
+
 		auths := strings.SplitN(authHeader[0], " ", 2)
 		if len(auths) != 2 || !strings.EqualFold(auths[0], bearerWord) {
 			return jwt.ErrMissingJwtToken
 		}
+
 		jwtToken := auths[1]
 		var (
 			tokenInfo *jwtv5.Token
+			err       error
 		)
-		if o.claims != nil {
-			tokenInfo, err = jwtv5.ParseWithClaims(jwtToken, o.claims(), keyFunc)
+
+		if i.cfg.claims != nil {
+			tokenInfo, err = jwtv5.ParseWithClaims(jwtToken, i.cfg.claims(), i.cfg.jwks.Keyfunc)
 		} else {
-			tokenInfo, err = jwtv5.Parse(jwtToken, keyFunc)
+			tokenInfo, err = jwtv5.Parse(jwtToken, i.cfg.jwks.Keyfunc)
 		}
+
 		if err != nil {
 			if errors.Is(err, jwtv5.ErrTokenMalformed) || errors.Is(err, jwtv5.ErrTokenUnverifiable) {
 				return jwt.ErrTokenInvalid
@@ -105,12 +132,15 @@ func StreamAuthInterceptor(keyFunc jwtv5.Keyfunc, config authn.CompletedConfig, 
 			}
 			return jwt.ErrTokenParseFail
 		}
+
 		if !tokenInfo.Valid {
 			return jwt.ErrTokenInvalid
 		}
-		if tokenInfo.Method != o.signingMethod {
+
+		if tokenInfo.Method != i.cfg.signingMethod {
 			return jwt.ErrUnSupportSigningMethod
 		}
+
 		newCtx = NewContext(newCtx, tokenInfo.Claims)
 		sub, err := tokenInfo.Claims.GetSubject()
 		if err != nil {
@@ -121,22 +151,19 @@ func StreamAuthInterceptor(keyFunc jwtv5.Keyfunc, config authn.CompletedConfig, 
 		if err != nil {
 			return err
 		}
-
-		var audData []byte
-		err = audience.UnmarshalJSON(audData)
-		if err != nil {
-			return err
+		if len(audience) == 0 {
+			return errors.New("no audience claim found")
 		}
-		audClaim := string(audData[:])
-		if o.EnforceAudCheck {
-			if audClaim != o.ClientId {
+
+		if i.cfg.Oidc.EnforceAudCheck {
+			if audience[0] != i.cfg.Oidc.ClientId {
 				log.Debugf("aud does not match the requesting client-id -- decision DENY")
-				return err
+				return errors.New("audience mismatch")
 			}
 		}
 
-		if sub != "" && o.PrincipalUserDomain != "" {
-			principal := fmt.Sprintf("%s/%s", o.PrincipalUserDomain, sub)
+		if sub != "" && i.cfg.Oidc.PrincipalUserDomain != "" {
+			principal := fmt.Sprintf("%s/%s", i.cfg.Oidc.PrincipalUserDomain, sub)
 			newCtx = NewContextIdentity(newCtx, api.Identity{Principal: principal})
 		}
 

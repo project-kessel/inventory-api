@@ -60,11 +60,6 @@ func New(c CompletedConfig, authn middleware.Middleware, authnConfig authn.Compl
 		kgrpc.Options(grpc.ChainStreamInterceptor(
 			streamingInterceptor...,
 		)),
-		kgrpc.StreamMiddleware(
-			selector.Server(
-			//authn,
-			).Match(NewWhiteListMatcher).Build(),
-		),
 	}
 	opts = append(opts, c.ServerOptions...)
 	srv := kgrpc.NewServer(opts...)

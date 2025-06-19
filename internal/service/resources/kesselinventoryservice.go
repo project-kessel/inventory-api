@@ -124,6 +124,9 @@ func (s *InventoryService) StreamedListObjects(
 	stream pb.KesselInventoryService_StreamedListObjectsServer,
 ) error {
 	ctx := stream.Context()
+	//Example: how to use get the identity from the stream context
+	//identity, err := interceptor.FromContextIdentity(ctx)
+	//log.Info(identity)
 	lookupReq, err := ToLookupResourceRequest(req)
 	if err != nil {
 		return fmt.Errorf("failed to build lookup request: %w", err)

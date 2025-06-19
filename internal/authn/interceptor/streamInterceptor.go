@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/project-kessel/inventory-api/internal/middleware"
+
 	"github.com/MicahParks/keyfunc/v3"
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/go-kratos/kratos/v2/middleware/auth/jwt"
@@ -25,12 +27,6 @@ const (
 	// authorizationKey holds the key used to store the JWT Token in the request tokenHeader.
 	authorizationKey string = "authorization"
 )
-
-type contextKey struct {
-	name string
-}
-
-var IdentityRequestKey = &contextKey{"authnapi.Identity"}
 
 type StreamAuthConfig struct {
 	authn.CompletedConfig
@@ -186,11 +182,11 @@ func NewContext(ctx context.Context, info jwtv5.Claims) context.Context {
 }
 
 func NewContextIdentity(ctx context.Context, identity api.Identity) context.Context {
-	return context.WithValue(ctx, IdentityRequestKey, identity)
+	return context.WithValue(ctx, middleware.IdentityRequestKey, identity)
 }
 
 func FromContextIdentity(ctx context.Context) (api.Identity, bool) {
-	identity, ok := ctx.Value(IdentityRequestKey).(api.Identity)
+	identity, ok := ctx.Value(middleware.IdentityRequestKey).(api.Identity)
 	return identity, ok
 }
 

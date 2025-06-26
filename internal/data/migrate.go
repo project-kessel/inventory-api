@@ -23,7 +23,7 @@ func Migrate(db *gorm.DB, logger *log.Helper) error {
 		&model.InventoryResource{},
 		&model.OutboxEvent{},
 		// v1beta2 models
-		&v1beta2.ResourceOption1{},
+		&v1beta2.Resource{},
 		&v1beta2.RepresentationReference{},
 		&v1beta2.CommonRepresentation{},
 		&v1beta2.ReporterRepresentation{},

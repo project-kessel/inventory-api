@@ -2,11 +2,11 @@ package v1beta2
 
 import "github.com/google/uuid"
 
-type ResourceOption1 struct {
+type Resource struct {
 	ID   uuid.UUID `gorm:"type:uuid;primaryKey"`
 	Type string    `gorm:"size:128"`
 }
 
-func (ResourceOption1) TableName() string {
+func (Resource) TableName() string {
 	return "resource"
 }

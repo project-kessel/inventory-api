@@ -1,11 +1,17 @@
 package v1beta2
 
-import "github.com/google/uuid"
+import (
+	"fmt"
+
+	"github.com/google/uuid"
+	"gorm.io/gorm"
+	"gorm.io/gorm/schema"
+)
 
 type RepresentationReference struct {
 	ResourceID uuid.UUID `gorm:"type:uuid;column:resource_id;index:unique_rep_ref_idx,unique;not null;constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
 
-	LocalResourceID       string `gorm:"column:local_resource_id;index:search_rep_ref_idx"`
+	LocalResourceID       string `gorm:"column:local_resource_id;"`
 	ReporterType          string `gorm:"column:reporter_type;index:unique_rep_ref_idx,unique"`
 	ResourceType          string `gorm:"column:resource_type;index:unique_rep_ref_idx,unique"`
 	ReporterInstanceID    string `gorm:"column:reporter_instance_id;index:unique_rep_ref_idx,unique"`
@@ -16,4 +22,42 @@ type RepresentationReference struct {
 
 func (RepresentationReference) TableName() string {
 	return "representation_references"
+}
+
+func (r *RepresentationReference) GormDbAfterMigration(db *gorm.DB, s *schema.Schema) error {
+	switch db.Name() {
+	case "sqlite":
+		// SQLite doesn't support covering indexes in the same way
+		break
+	case "postgres":
+		// Covering index for query patterns on local_resource_id, reporter_type, resource_type, reporter_instance_id
+		err := db.Exec(`
+			CREATE INDEX IF NOT EXISTS rep_ref_query_covering_idx 
+			ON representation_references (
+				local_resource_id,
+				reporter_type,
+				resource_type,
+				reporter_instance_id
+			)
+			INCLUDE (resource_id);
+		`).Error
+		if err != nil {
+			return fmt.Errorf("failed to create rep_ref_query_covering_idx: %w", err)
+		}
+
+		// Covering index for resource_id queries with commonly accessed columns included
+		err = db.Exec(`
+			CREATE INDEX IF NOT EXISTS rep_ref_resource_id_covering_idx
+			ON representation_references (resource_id)
+			INCLUDE (
+				reporter_type,
+				representation_version,
+				generation,
+				tombstone);
+		`).Error
+		if err != nil {
+			return fmt.Errorf("failed to create rep_ref_resource_id_covering_idx: %w", err)
+		}
+	}
+	return nil
 }

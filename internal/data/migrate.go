@@ -6,6 +6,7 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/project-kessel/inventory-api/internal/biz/model"
+	"github.com/project-kessel/inventory-api/internal/biz/model/v1beta2"
 
 	"github.com/go-kratos/kratos/v2/log"
 )
@@ -21,6 +22,11 @@ func Migrate(db *gorm.DB, logger *log.Helper) error {
 		&model.LocalInventoryToResource{}, // Deprecated
 		&model.InventoryResource{},
 		&model.OutboxEvent{},
+		// v1beta2 models
+		&v1beta2.ResourceOption1{},
+		&v1beta2.RepresentationReference{},
+		&v1beta2.CommonRepresentation{},
+		&v1beta2.ReporterRepresentation{},
 	}
 
 	if err := db.AutoMigrate(models...); err != nil {

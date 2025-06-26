@@ -406,9 +406,13 @@ func TestResourceWithReferencesRepositorySpecific(t *testing.T) {
 	})
 
 	t.Run("Search functionality", func(t *testing.T) {
+		// Create fresh database for this test
+		db := setupResourceTestDB(t)
+		repo := NewResourceWithReferencesRepository(db)
+
 		// Create test data
 		aggregate := createTestResourceWithReferences()
-		_, err := repo.Create(ctx, aggregate)
+		createdAggregate, err := repo.Create(ctx, aggregate)
 		require.NoError(t, err)
 
 		// Test the search
@@ -418,12 +422,12 @@ func TestResourceWithReferencesRepositorySpecific(t *testing.T) {
 		require.NoError(t, err)
 		assert.NotEmpty(t, refs)
 
-		// Verify all references belong to the same resource
-		if len(refs) > 0 {
-			resourceID := refs[0].ResourceID
-			for _, ref := range refs {
-				assert.Equal(t, resourceID, ref.ResourceID)
-			}
+		// Verify all references belong to the same resource (the one we created)
+		expectedResourceID := createdAggregate.Resource.ID
+		assert.Len(t, refs, 2, "Should return all references for the resource")
+
+		for _, ref := range refs {
+			assert.Equal(t, expectedResourceID, ref.ResourceID, "All references should belong to the created resource")
 		}
 	})
 }

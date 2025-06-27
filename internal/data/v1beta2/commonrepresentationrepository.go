@@ -30,31 +30,11 @@ func (r *CommonRepresentationRepository) CreateWithTx(ctx context.Context, db *g
 		return nil, fmt.Errorf("representation cannot be nil")
 	}
 
-	var result *v1beta2.CommonRepresentation
-
-	createFunc := func(tx *gorm.DB) error {
-		if err := tx.Create(representation).Error; err != nil {
-			return err
-		}
-
-		result = representation
-		return nil
+	err := WithTx(ctx, db, func(tx *gorm.DB) error {
+		return tx.Create(representation).Error
+	})
+	if err != nil {
+		return nil, err
 	}
-
-	// Check if we're already in a transaction
-	if isInTransaction(db) {
-		// We're already in a transaction, use it directly
-		err := createFunc(db.WithContext(ctx))
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		// Start a new transaction
-		err := db.WithContext(ctx).Transaction(createFunc)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	return result, nil
+	return representation, nil
 }

@@ -35,11 +35,7 @@ func (r *ResourceWithReferencesRepository) CreateWithTx(ctx context.Context, db 
 		return nil, fmt.Errorf("resource cannot be nil")
 	}
 
-	// Check if we're already in a transaction by checking the CommitOrRollback method
-	// If db is already a transaction, use it directly; otherwise start a new transaction
-	var result *v1beta2.ResourceWithReferences
-
-	createFunc := func(tx *gorm.DB) error {
+	err := WithTx(ctx, db, func(tx *gorm.DB) error {
 		// Generate ID for resource if not set
 		if aggregate.Resource.ID == uuid.Nil {
 			var err error
@@ -65,26 +61,13 @@ func (r *ResourceWithReferencesRepository) CreateWithTx(ctx context.Context, db 
 			}
 		}
 
-		result = aggregate
 		return nil
+	})
+	if err != nil {
+		return nil, err
 	}
 
-	// Check if we're already in a transaction
-	if isInTransaction(db) {
-		// We're already in a transaction, use it directly
-		err := createFunc(db.WithContext(ctx))
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		// Start a new transaction
-		err := db.WithContext(ctx).Transaction(createFunc)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	return result, nil
+	return aggregate, nil
 }
 
 // FindAllReferencesByReporterRepresentationId finds all representation references for the same resource_id

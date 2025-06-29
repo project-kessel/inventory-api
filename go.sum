@@ -73,8 +73,8 @@ github.com/certifi/gocertifi v0.0.0-20210507211836-431795d63e8d/go.mod h1:sGbDF6
 github.com/cespare/xxhash/v2 v2.3.0 h1:UL815xU9SqsFlibzuggzjXhog7bL6oX9BbNZnL2UFvs=
 github.com/cespare/xxhash/v2 v2.3.0/go.mod h1:VGX0DQ3Q6kWi7AoAeZDth3/j3BFtOZR5XLFGgcrjCOs=
 github.com/client9/misspell v0.3.4/go.mod h1:qj6jICC3Q7zFZvVWo7KLAzC3yx5G7kyvSDkc90ppPyw=
-github.com/cloudevents/sdk-go/protocol/kafka_confluent/v2 v2.0.0-20250313141547-88bebb1fe04f h1:nzIYQuc3cihJX8qC1p8GiSUmPls/ZvM9In+xj0ugBvA=
-github.com/cloudevents/sdk-go/protocol/kafka_confluent/v2 v2.0.0-20250313141547-88bebb1fe04f/go.mod h1:MK+cV9icGD4NzOT5YAQNJqURFWnRk+lg48ykDct21cM=
+github.com/cloudevents/sdk-go/protocol/kafka_confluent/v2 v2.0.0-20250623041731-a823fb4ac70b h1:AJb6fB5AQQi63Vc2sRq6+fP3NFAh2ZYFd0OEXMoYhJ8=
+github.com/cloudevents/sdk-go/protocol/kafka_confluent/v2 v2.0.0-20250623041731-a823fb4ac70b/go.mod h1:kaLkq3NOjRP46TTJbpxybTIPjUpHvZ/HnY3V882ldHU=
 github.com/cloudevents/sdk-go/v2 v2.16.1 h1:G91iUdqvl88BZ1GYYr9vScTj5zzXSyEuqbfE63gbu9Q=
 github.com/cloudevents/sdk-go/v2 v2.16.1/go.mod h1:v/kVOaWjNfbvc6tkhhlkhvLapj8Aa8kvXiH5GiOHCKI=
 github.com/cncf/udpa/go v0.0.0-20191209042840-269d4d468f6f/go.mod h1:M8M6+tZqaGXZJjfX53e64911xZQV5JYwmTeXPW+k8Sc=

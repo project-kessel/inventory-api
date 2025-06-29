@@ -4,7 +4,7 @@ module github.com/project-kessel/inventory-api
 go 1.23.9
 
 require (
-	buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go v1.36.6-20250613105001-9f2d3c737feb.1
+	buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go v1.36.6-20250625184727-c923a0c2a132.1
 	buf.build/go/protovalidate v0.13.1
 	github.com/MicahParks/keyfunc/v3 v3.3.10
 	github.com/authzed/grpcutil v0.0.0-20250221190651-1985b19b35b8

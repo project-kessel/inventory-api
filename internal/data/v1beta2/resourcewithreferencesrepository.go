@@ -27,34 +27,34 @@ func (r *ResourceWithReferencesRepository) Create(ctx context.Context, aggregate
 
 // CreateWithTx creates a new Resource with its RepresentationReferences using the provided database connection
 // If the provided db is already a transaction, it will use it; otherwise it will create a new transaction
-func (r *ResourceWithReferencesRepository) CreateWithTx(ctx context.Context, db *gorm.DB, aggregate *v1beta2.ResourceWithReferences) (*v1beta2.ResourceWithReferences, error) {
-	if aggregate == nil {
-		return nil, fmt.Errorf("aggregate cannot be nil")
+func (r *ResourceWithReferencesRepository) CreateWithTx(ctx context.Context, db *gorm.DB, resourceWithReferences *v1beta2.ResourceWithReferences) (*v1beta2.ResourceWithReferences, error) {
+	if resourceWithReferences == nil {
+		return nil, fmt.Errorf("resourceWithReferences cannot be nil")
 	}
-	if aggregate.Resource == nil {
+	if resourceWithReferences.Resource == nil {
 		return nil, fmt.Errorf("resource cannot be nil")
 	}
 
 	err := WithTx(ctx, db, func(tx *gorm.DB) error {
 		// Generate ID for resource if not set
-		if aggregate.Resource.ID == uuid.Nil {
+		if resourceWithReferences.Resource.ID == uuid.Nil {
 			var err error
-			aggregate.Resource.ID, err = uuid.NewV7()
+			resourceWithReferences.Resource.ID, err = uuid.NewV7()
 			if err != nil {
 				return fmt.Errorf("failed to generate uuid for resource: %w", err)
 			}
 		}
 
 		// Create the resource
-		if err := tx.Create(aggregate.Resource).Error; err != nil {
+		if err := tx.Create(resourceWithReferences.Resource).Error; err != nil {
 			return fmt.Errorf("failed to create resource: %w", err)
 		}
 
 		// Create representation references if they exist
-		for _, ref := range aggregate.RepresentationReferences {
+		for _, ref := range resourceWithReferences.RepresentationReferences {
 			if ref != nil {
 				// Set the resource ID reference
-				ref.ResourceID = aggregate.Resource.ID
+				ref.ResourceID = resourceWithReferences.Resource.ID
 				if err := tx.Create(ref).Error; err != nil {
 					return fmt.Errorf("failed to create representation reference: %w", err)
 				}
@@ -67,7 +67,7 @@ func (r *ResourceWithReferencesRepository) CreateWithTx(ctx context.Context, db 
 		return nil, err
 	}
 
-	return aggregate, nil
+	return resourceWithReferences, nil
 }
 
 // FindAllReferencesByReporterRepresentationId finds all representation references for the same resource_id

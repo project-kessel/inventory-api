@@ -47,7 +47,7 @@ func (c *InventoryService) ReportResource(ctx context.Context, r *pb.ReportResou
 		}
 
 		log.Info("Using new v1beta2 upsert implementation")
-		_, err = c.V1beta2Ctl.UpsertResource(ctx, r)
+		err = c.V1beta2Ctl.UpsertResource(ctx, r)
 		if err != nil {
 			return nil, err
 		}

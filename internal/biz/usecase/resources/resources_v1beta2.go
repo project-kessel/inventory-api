@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"time"
 
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/google/uuid"
@@ -30,19 +31,19 @@ type ResourceUsecase struct {
 
 // NewResourceUsecase creates a new v1beta2 usecase with minimal dependencies
 func NewResourceUsecase(
-	commonRepRepo modelsv1beta2.CommonRepresentationRepository,
-	reporterRepRepo modelsv1beta2.ReporterRepresentationRepository,
-	resourceRepo modelsv1beta2.ResourceWithReferencesRepository,
-	db *gorm.DB,
+	commonRepresentationRepository modelsv1beta2.CommonRepresentationRepository,
+	reporterRepresentationRepository modelsv1beta2.ReporterRepresentationRepository,
+	resourceWithReferencesRepository modelsv1beta2.ResourceWithReferencesRepository,
+	database *gorm.DB,
 	metricsCollector *metricscollector.MetricsCollector,
 	namespace string,
 	logger log.Logger,
 ) *ResourceUsecase {
 	return &ResourceUsecase{
-		CommonRepresentationRepository:   commonRepRepo,
-		ReporterRepresentationRepository: reporterRepRepo,
-		ResourceWithReferencesRepository: resourceRepo,
-		DB:                               db,
+		CommonRepresentationRepository:   commonRepresentationRepository,
+		ReporterRepresentationRepository: reporterRepresentationRepository,
+		ResourceWithReferencesRepository: resourceWithReferencesRepository,
+		DB:                               database,
 		MetricsCollector:                 metricsCollector,
 		Namespace:                        namespace,
 		Log:                              log.NewHelper(logger),
@@ -50,43 +51,41 @@ func NewResourceUsecase(
 }
 
 // UpsertResource implements the v1beta2 upsert algorithm with a simplified approach
-func (uc *ResourceUsecase) UpsertResource(ctx context.Context, req *v1beta2.ReportResourceRequest) (*model.Resource, error) {
-	uc.Log.WithContext(ctx).Info("Starting v1beta2 upsert for resource type: ", req.GetType())
-
-	var result *model.Resource
+func (usecase *ResourceUsecase) UpsertResource(ctx context.Context, request *v1beta2.ReportResourceRequest) error {
+	usecase.Log.WithContext(ctx).Info("Starting v1beta2 upsert for resource type: ", request.GetType())
 
 	// Use serializable transaction for consistency
-	err := uc.DB.Transaction(func(tx *gorm.DB) error {
+	err := usecase.DB.Transaction(func(transaction *gorm.DB) error {
 		// Generate transaction ID for outbox events
-		txid, err := uuid.NewV7()
+		transactionId, err := uuid.NewV7()
 		if err != nil {
 			return err
 		}
-		txidStr := txid.String()
+		transactionIdString := transactionId.String()
 
 		// Create reporter representation ID for lookup
-		reporterId := modelsv1beta2.ReporterRepresentationId{
-			LocalResourceID:    req.GetRepresentations().GetMetadata().GetLocalResourceId(),
-			ReporterType:       req.GetReporterType(),
-			ResourceType:       req.GetType(),
-			ReporterInstanceID: req.GetReporterInstanceId(),
+		reporterRepresentationId := modelsv1beta2.ReporterRepresentationId{
+			LocalResourceID:    request.GetRepresentations().GetMetadata().GetLocalResourceId(),
+			ReporterType:       request.GetReporterType(),
+			ResourceType:       request.GetType(),
+			ReporterInstanceID: request.GetReporterInstanceId(),
 		}
 
 		// Check if resource already exists
-		existingRefs, err := uc.ResourceWithReferencesRepository.FindAllReferencesByReporterRepresentationId(ctx, reporterId)
+		existingReferences, err := usecase.ResourceWithReferencesRepository.FindAllReferencesByReporterRepresentationId(ctx, reporterRepresentationId)
 		if err != nil {
 			return err
 		}
 
-		if len(existingRefs) == 0 {
+		if len(existingReferences) == 0 {
 			// Create new resource
-			result, err = uc.createNewResource(ctx, tx, req, txidStr)
+			err = usecase.createNewResource(ctx, transaction, request, transactionIdString)
 			if err != nil {
 				return err
 			}
 		} else {
 			// Update existing resource
-			result, err = uc.updateExistingResource(ctx, tx, req, existingRefs, txidStr)
+			err = usecase.updateExistingResource(ctx, transaction, request, existingReferences, transactionIdString)
 			if err != nil {
 				return err
 			}
@@ -96,142 +95,140 @@ func (uc *ResourceUsecase) UpsertResource(ctx context.Context, req *v1beta2.Repo
 	}, &sql.TxOptions{Isolation: sql.LevelSerializable})
 
 	if err != nil {
-		uc.Log.WithContext(ctx).Errorf("Failed to upsert resource: %v", err)
-		return nil, err
+		usecase.Log.WithContext(ctx).Errorf("Failed to upsert resource: %v", err)
+		return err
 	}
 
-	uc.Log.WithContext(ctx).Infof("Successfully upserted resource: %v", result.ID)
-	return result, nil
+	usecase.Log.WithContext(ctx).Info("Successfully upserted resource")
+	return nil
 }
 
 // createNewResource handles the creation scenario when no existing references are found
-func (uc *ResourceUsecase) createNewResource(ctx context.Context, tx *gorm.DB, req *v1beta2.ReportResourceRequest, txidStr string) (*model.Resource, error) {
+func (usecase *ResourceUsecase) createNewResource(ctx context.Context, transaction *gorm.DB, request *v1beta2.ReportResourceRequest, transactionIdString string) error {
 	// Generate new UUID for resource
 	resourceId, err := uuid.NewV7()
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	// Create Resource entity
 	resource := &modelsv1beta2.Resource{
 		ID:   resourceId,
-		Type: req.GetType(),
+		Type: request.GetType(),
 	}
 
 	// Create CommonRepresentation
-	commonRep := &modelsv1beta2.CommonRepresentation{
+	commonRepresentation := &modelsv1beta2.CommonRepresentation{
 		BaseRepresentation: modelsv1beta2.BaseRepresentation{
-			Data: req.GetRepresentations().GetCommon().AsMap(),
+			Data: request.GetRepresentations().GetCommon().AsMap(),
 		},
-		LocalResourceID: req.GetRepresentations().GetMetadata().GetLocalResourceId(),
-		ReporterType:    req.GetReporterType(),
-		ResourceType:    req.GetType(),
+		LocalResourceID: resourceId.String(),
+		ReporterType:    "inventory",
+		ResourceType:    request.GetType(),
 		Version:         1,
-		ReportedBy:      req.GetReporterInstanceId(),
+		ReportedBy:      request.GetReporterType() + "/" + request.GetReporterInstanceId(),
 	}
 
-	// Create ReporterRepresentation
-	reporterRep := &modelsv1beta2.ReporterRepresentation{
-		BaseRepresentation: modelsv1beta2.BaseRepresentation{
-			Data: req.GetRepresentations().GetReporter().AsMap(),
-		},
-		LocalResourceID:    req.GetRepresentations().GetMetadata().GetLocalResourceId(),
-		ReporterType:       req.GetReporterType(),
-		ResourceType:       req.GetType(),
-		Version:            1,
-		ReporterInstanceID: req.GetReporterInstanceId(),
-		Generation:         0,
-		APIHref:            req.GetRepresentations().GetMetadata().GetApiHref(),
-		ConsoleHref:        req.GetRepresentations().GetMetadata().GetConsoleHref(),
-		CommonVersion:      1,
-		Tombstone:          false,
-		ReporterVersion:    req.GetRepresentations().GetMetadata().GetReporterVersion(),
-	}
-
-	// Create RepresentationReference entries
-	commonRef := &modelsv1beta2.RepresentationReference{
+	// Create RepresentationReference for Common Representation
+	commonReference := &modelsv1beta2.RepresentationReference{
 		ResourceID:            resourceId,
-		LocalResourceID:       req.GetRepresentations().GetMetadata().GetLocalResourceId(),
-		ReporterType:          req.GetReporterType(),
-		ResourceType:          req.GetType(),
-		ReporterInstanceID:    req.GetReporterInstanceId(),
+		LocalResourceID:       resourceId.String(),
+		ReporterType:          "inventory",
+		ResourceType:          request.GetType(),
 		RepresentationVersion: 1,
-		Generation:            0,
+		Generation:            1,
 		Tombstone:             false,
 	}
 
-	reporterRef := &modelsv1beta2.RepresentationReference{
+	// Create ReporterRepresentation
+	reporterRepresentation := &modelsv1beta2.ReporterRepresentation{
+		BaseRepresentation: modelsv1beta2.BaseRepresentation{
+			Data: request.GetRepresentations().GetReporter().AsMap(),
+		},
+		LocalResourceID:    request.GetRepresentations().GetMetadata().GetLocalResourceId(),
+		ReporterType:       request.GetReporterType(),
+		ResourceType:       request.GetType(),
+		Version:            1,
+		ReporterInstanceID: request.GetReporterInstanceId(),
+		Generation:         1,
+		APIHref:            request.GetRepresentations().GetMetadata().GetApiHref(),
+		ConsoleHref:        request.GetRepresentations().GetMetadata().GetConsoleHref(),
+		CommonVersion:      1,
+		Tombstone:          false,
+		ReporterVersion:    request.GetRepresentations().GetMetadata().GetReporterVersion(),
+	}
+
+	// Create RepresentationReference for Reporter Representation
+	reporterReference := &modelsv1beta2.RepresentationReference{
 		ResourceID:            resourceId,
-		LocalResourceID:       req.GetRepresentations().GetMetadata().GetLocalResourceId(),
-		ReporterType:          req.GetReporterType(),
-		ResourceType:          req.GetType(),
-		ReporterInstanceID:    req.GetReporterInstanceId(),
+		LocalResourceID:       request.GetRepresentations().GetMetadata().GetLocalResourceId(),
+		ReporterType:          request.GetReporterType(),
+		ResourceType:          request.GetType(),
+		ReporterInstanceID:    request.GetReporterInstanceId(),
 		RepresentationVersion: 1,
-		Generation:            0,
+		Generation:            1,
 		Tombstone:             false,
 	}
 
 	// Create ResourceWithReferences aggregate
-	resourceWithRefs := &modelsv1beta2.ResourceWithReferences{
+	resourceWithReferences := &modelsv1beta2.ResourceWithReferences{
 		Resource:                 resource,
-		RepresentationReferences: []*modelsv1beta2.RepresentationReference{commonRef, reporterRef},
+		RepresentationReferences: []*modelsv1beta2.RepresentationReference{commonReference, reporterReference},
+	}
+
+	resourceRepository := usecase.ResourceWithReferencesRepository.(*datav1beta2.ResourceWithReferencesRepository)
+	_, err = resourceRepository.CreateWithTx(ctx, transaction, resourceWithReferences)
+	if err != nil {
+		return err
 	}
 
 	// Persist entities using WithTx methods
-	commonRepository := uc.CommonRepresentationRepository.(*datav1beta2.CommonRepresentationRepository)
-	_, err = commonRepository.CreateWithTx(ctx, tx, commonRep)
+	commonRepository := usecase.CommonRepresentationRepository.(*datav1beta2.CommonRepresentationRepository)
+	_, err = commonRepository.CreateWithTx(ctx, transaction, commonRepresentation)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	reporterRepository := uc.ReporterRepresentationRepository.(*datav1beta2.ReporterRepresentationRepository)
-	_, err = reporterRepository.CreateWithTx(ctx, tx, reporterRep)
+	reporterRepository := usecase.ReporterRepresentationRepository.(*datav1beta2.ReporterRepresentationRepository)
+	_, err = reporterRepository.CreateWithTx(ctx, transaction, reporterRepresentation)
 	if err != nil {
-		return nil, err
-	}
-
-	resourceRepository := uc.ResourceWithReferencesRepository.(*datav1beta2.ResourceWithReferencesRepository)
-	_, err = resourceRepository.CreateWithTx(ctx, tx, resourceWithRefs)
-	if err != nil {
-		return nil, err
+		return err
 	}
 
 	// Handle outbox events
-	err = uc.publishOutboxEvents(tx, resource, commonRep, reporterRep, model.OperationTypeCreated, txidStr)
+	err = usecase.publishOutboxEvents(transaction, resource, commonRepresentation, reporterRepresentation, model.OperationTypeCreated, transactionIdString)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	// Update metrics
-	metricscollector.Incr(uc.MetricsCollector.OutboxEventWrites, string(model.OperationTypeCreated), nil)
+	metricscollector.Incr(usecase.MetricsCollector.OutboxEventWrites, string(model.OperationTypeCreated), nil)
 
-	// Convert to legacy Resource format for return
-	legacyResource := uc.convertToLegacyResource(resource, commonRep, reporterRep)
-	return legacyResource, nil
+	return nil
 }
 
 // updateExistingResource handles the update scenario when existing references are found
-func (uc *ResourceUsecase) updateExistingResource(ctx context.Context, tx *gorm.DB, req *v1beta2.ReportResourceRequest, existingRefs []*modelsv1beta2.RepresentationReference, txidStr string) (*model.Resource, error) {
+func (usecase *ResourceUsecase) updateExistingResource(ctx context.Context, transaction *gorm.DB, request *v1beta2.ReportResourceRequest, existingReferences []*modelsv1beta2.RepresentationReference, transactionIdString string) error {
 	// For now, return an error - we'll implement this later
-	return nil, errors.New("update scenario not yet implemented")
+	return errors.New("update scenario not yet implemented")
 }
 
 // publishOutboxEvents creates and publishes outbox events for the resource
-func (uc *ResourceUsecase) publishOutboxEvents(tx *gorm.DB, resource *modelsv1beta2.Resource, commonRep *modelsv1beta2.CommonRepresentation, reporterRep *modelsv1beta2.ReporterRepresentation, operationType model.EventOperationType, txid string) error {
+func (usecase *ResourceUsecase) publishOutboxEvents(transaction *gorm.DB, resource *modelsv1beta2.Resource, commonRepresentation *modelsv1beta2.CommonRepresentation, reporterRepresentation *modelsv1beta2.ReporterRepresentation, operationType model.EventOperationType, transactionId string) error {
 	// Convert to legacy format for outbox events
-	legacyResource := uc.convertToLegacyResource(resource, commonRep, reporterRep)
+	legacyResource := usecase.convertToLegacyResource(resource, commonRepresentation, reporterRepresentation)
 
-	resourceMessage, tupleMessage, err := model.NewOutboxEventsFromResource(*legacyResource, uc.Namespace, operationType, txid)
+	resourceMessage, tupleMessage, err := model.NewOutboxEventsFromResource(*legacyResource, usecase.Namespace, operationType, transactionId)
 	if err != nil {
 		return err
 	}
 
-	err = data.PublishOutboxEvent(tx, resourceMessage)
+	err = data.PublishOutboxEvent(transaction, resourceMessage)
 	if err != nil {
 		return err
 	}
 
-	err = data.PublishOutboxEvent(tx, tupleMessage)
+	err = data.PublishOutboxEvent(transaction, tupleMessage)
 	if err != nil {
 		return err
 	}
@@ -240,24 +237,20 @@ func (uc *ResourceUsecase) publishOutboxEvents(tx *gorm.DB, resource *modelsv1be
 }
 
 // convertToLegacyResource converts v1beta2 models to legacy model.Resource
-func (uc *ResourceUsecase) convertToLegacyResource(resource *modelsv1beta2.Resource, commonRep *modelsv1beta2.CommonRepresentation, reporterRep *modelsv1beta2.ReporterRepresentation) *model.Resource {
+func (usecase *ResourceUsecase) convertToLegacyResource(resource *modelsv1beta2.Resource, commonRepresentation *modelsv1beta2.CommonRepresentation, reporterRepresentation *modelsv1beta2.ReporterRepresentation) *model.Resource {
 	// Extract basic fields from common representation data
-	var orgId, workspaceId string
-	var resourceData model.JsonObject
+	var organizationId, workspaceId string
 	var labels model.Labels
 
-	if commonRep.Data != nil {
-		if org, ok := commonRep.Data["org_id"].(string); ok {
-			orgId = org
+	if commonRepresentation.Data != nil {
+		if organization, ok := commonRepresentation.Data["org_id"].(string); ok {
+			organizationId = organization
 		}
-		if workspace, ok := commonRep.Data["workspace_id"].(string); ok {
+		if workspace, ok := commonRepresentation.Data["workspace_id"].(string); ok {
 			workspaceId = workspace
 		}
-		if data, ok := commonRep.Data["resource_data"].(model.JsonObject); ok {
-			resourceData = data
-		}
 		// Handle labels extraction if needed
-		if labelsData, ok := commonRep.Data["labels"].([]interface{}); ok {
+		if labelsData, ok := commonRepresentation.Data["labels"].([]interface{}); ok {
 			labels = make(model.Labels, len(labelsData))
 			for i, labelInterface := range labelsData {
 				if labelMap, ok := labelInterface.(map[string]interface{}); ok {
@@ -271,18 +264,38 @@ func (uc *ResourceUsecase) convertToLegacyResource(resource *modelsv1beta2.Resou
 		}
 	}
 
+	// Use the most recent timestamp from either representation
+	var createdAt, updatedAt *time.Time
+	if !commonRepresentation.CreatedAt.IsZero() {
+		createdAt = &commonRepresentation.CreatedAt
+	}
+	if !commonRepresentation.UpdatedAt.IsZero() {
+		updatedAt = &commonRepresentation.UpdatedAt
+	}
+
+	// If reporter representation has more recent timestamps, use those
+	if !reporterRepresentation.CreatedAt.IsZero() && (createdAt == nil || reporterRepresentation.CreatedAt.Before(*createdAt)) {
+		createdAt = &reporterRepresentation.CreatedAt
+	}
+	if !reporterRepresentation.UpdatedAt.IsZero() && (updatedAt == nil || reporterRepresentation.UpdatedAt.After(*updatedAt)) {
+		updatedAt = &reporterRepresentation.UpdatedAt
+	}
+
 	return &model.Resource{
 		ID:                 resource.ID,
 		ResourceType:       resource.Type,
-		OrgId:              orgId,
+		OrgId:              organizationId,
 		WorkspaceId:        workspaceId,
-		ResourceData:       resourceData,
+		ResourceData:       reporterRepresentation.Data,
 		Labels:             labels,
-		ReporterId:         reporterRep.ReporterInstanceID,
-		ReporterResourceId: reporterRep.LocalResourceID,
-		ConsoleHref:        reporterRep.ConsoleHref,
-		ApiHref:            reporterRep.APIHref,
-		ReporterType:       reporterRep.ReporterType,
+		ReporterId:         reporterRepresentation.ReporterInstanceID,
+		ReporterResourceId: reporterRepresentation.LocalResourceID,
+		ConsoleHref:        reporterRepresentation.ConsoleHref,
+		ApiHref:            reporterRepresentation.APIHref,
+		ReporterType:       reporterRepresentation.ReporterType,
+		ReporterVersion:    reporterRepresentation.ReporterVersion,
 		InventoryId:        &resource.ID, // In v1beta2, Resource.ID is the inventory ID
+		CreatedAt:          createdAt,
+		UpdatedAt:          updatedAt,
 	}
 }

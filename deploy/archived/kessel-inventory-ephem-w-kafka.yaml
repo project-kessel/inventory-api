@@ -282,7 +282,7 @@ objects:
           podSpec:
             initContainers:
             - name: copy-resources
-              image: busybox
+              image: registry.access.redhat.com/ubi9-minimal
               imagePullPolicy: Always
               command:
                 - /bin/sh

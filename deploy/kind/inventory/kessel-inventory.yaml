@@ -17,7 +17,7 @@ spec:
     spec:
       initContainers:
         - name: copy-resources
-          image: busybox
+          image: registry.access.redhat.com/ubi9-minimal
           command:
             - /bin/sh
             - "-c"

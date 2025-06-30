@@ -22,6 +22,7 @@ spec:
             - /bin/sh
             - "-c"
             - |
+              microdnf install -y tar && \
               echo "Extracting resources from tarball..."
               tar -xzf /mnt/resources/resources.tar.gz -C /data/schema/resources
               echo "Extraction complete!"

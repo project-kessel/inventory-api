@@ -26,12 +26,13 @@ objects:
           podSpec:
             initContainers:
             - name: copy-resources
-              image: busybox
+              image: registry.access.redhat.com/ubi9/ubi-minimal
               imagePullPolicy: Always
               command:
                 - /bin/sh
                 - "-c"
                 - |
+                  microdnf install -y tar && \
                   echo "Extracting resources from tarball..."
                   tar -xzf /mnt/resources/resources.tar.gz -C /data/schema/resources
                   echo "Extraction complete!"

@@ -1374,6 +1374,15 @@ components:
                          Use `IMMEDIATE` only if your use case requires strong consistency guarantees
                          (e.g., writing and immediately checking access to the resource).
                     format: enum
+                newPath:
+                    type: boolean
+                    description: |-
+                        Controls whether to use the new v1beta2 upsert implementation or the legacy implementation.
+
+                         - `false` (default): Uses the legacy upsert implementation
+                         - `true`: Uses the new v1beta2 upsert implementation with serializable transactions
+
+                         This flag is intended for gradual migration and testing purposes.
             description: Request to register or update a *Reporter*'s *Representation* of a *Resource* in Kessel Inventory.
         kessel.inventory.v1beta2.ReportResourceResponse:
             type: object

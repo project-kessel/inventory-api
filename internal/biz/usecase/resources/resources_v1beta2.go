@@ -209,7 +209,7 @@ func (usecase *ResourceUsecase) createNewResource(ctx context.Context, transacti
 
 // updateExistingResource handles the update scenario when existing references are found
 func (usecase *ResourceUsecase) updateExistingResource(ctx context.Context, transaction *gorm.DB, request *v1beta2.ReportResourceRequest, existingReferences []*modelsv1beta2.RepresentationReference, transactionIdString string) error {
-	// For now, return an error - we'll implement this later
+	// For now, return an error - we'll implement this later after adding repository methods
 	return errors.New("update scenario not yet implemented")
 }
 

@@ -85,3 +85,59 @@ func (r *ResourceWithReferencesRepository) FindAllReferencesByReporterRepresenta
 	err := query.Find(&refs).Error
 	return refs, err
 }
+
+// UpdateConsistencyToken updates the consistency_token field for a Resource by ID
+func (r *ResourceWithReferencesRepository) UpdateConsistencyToken(ctx context.Context, resourceID uuid.UUID, token string) error {
+	result := r.DB.WithContext(ctx).Model(&v1beta2.Resource{}).Where("id = ?", resourceID).Update("consistency_token", token)
+	if result.Error != nil {
+		return fmt.Errorf("failed to update consistency token: %w", result.Error)
+	}
+	return nil
+}
+
+// UpdateRepresentationVersion updates the representation_version field for RepresentationReferences
+// based on the provided filter criteria. Returns the number of rows affected.
+func (r *ResourceWithReferencesRepository) UpdateRepresentationVersion(ctx context.Context, filter v1beta2.RepresentationVersionUpdateFilter, newVersion int) (int64, error) {
+	query := r.DB.WithContext(ctx).Model(&v1beta2.RepresentationReference{}).
+		Where("resource_id = ?", filter.ResourceID)
+
+	// Add optional reporter_type filter
+	if filter.ReporterType != nil {
+		query = query.Where("reporter_type = ?", *filter.ReporterType)
+	}
+
+	// Add optional local_resource_id filter
+	if filter.LocalResourceID != nil {
+		query = query.Where("local_resource_id = ?", *filter.LocalResourceID)
+	}
+
+	result := query.Update("representation_version", newVersion)
+	if result.Error != nil {
+		return 0, fmt.Errorf("failed to update representation version: %w", result.Error)
+	}
+
+	return result.RowsAffected, nil
+}
+
+// UpdateCommonRepresentationVersion updates the representation version for "inventory" reporter type references
+// This is a convenience method for the common case of updating inventory (common) representations
+func (r *ResourceWithReferencesRepository) UpdateCommonRepresentationVersion(ctx context.Context, resourceID uuid.UUID, newVersion int) (int64, error) {
+	inventoryReporter := "inventory"
+	filter := v1beta2.RepresentationVersionUpdateFilter{
+		ResourceID:   resourceID,
+		ReporterType: &inventoryReporter,
+		// LocalResourceID is nil, so it updates all inventory references for the resource
+	}
+	return r.UpdateRepresentationVersion(ctx, filter, newVersion)
+}
+
+// UpdateReporterRepresentationVersion updates the representation version for a specific reporter and local resource
+// This is a convenience method for updating a specific reporter representation
+func (r *ResourceWithReferencesRepository) UpdateReporterRepresentationVersion(ctx context.Context, resourceID uuid.UUID, reporterType string, localResourceID string, newVersion int) (int64, error) {
+	filter := v1beta2.RepresentationVersionUpdateFilter{
+		ResourceID:      resourceID,
+		ReporterType:    &reporterType,
+		LocalResourceID: &localResourceID,
+	}
+	return r.UpdateRepresentationVersion(ctx, filter, newVersion)
+}

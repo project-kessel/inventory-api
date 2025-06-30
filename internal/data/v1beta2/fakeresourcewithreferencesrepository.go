@@ -111,6 +111,86 @@ func (f *FakeResourceWithReferencesRepository) FindAllReferencesByReporterRepres
 	return matchingRefs, nil
 }
 
+// UpdateConsistencyToken updates the consistency_token field for a Resource by ID
+func (f *FakeResourceWithReferencesRepository) UpdateConsistencyToken(ctx context.Context, resourceID uuid.UUID, token string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	resource, exists := f.resources[resourceID]
+	if !exists {
+		return fmt.Errorf("resource with ID %s not found", resourceID)
+	}
+
+	// Update the consistency token
+	resource.ConsistencyToken = token
+	return nil
+}
+
+// UpdateRepresentationVersion updates the representation_version field for RepresentationReferences
+// based on the provided filter criteria. Returns the number of rows affected.
+func (f *FakeResourceWithReferencesRepository) UpdateRepresentationVersion(ctx context.Context, filter v1beta2.RepresentationVersionUpdateFilter, newVersion int) (int64, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	// Check if resource exists
+	if _, exists := f.resources[filter.ResourceID]; !exists {
+		return 0, fmt.Errorf("resource with ID %s not found", filter.ResourceID)
+	}
+
+	refs, exists := f.references[filter.ResourceID]
+	if !exists {
+		// No references for this resource
+		return 0, nil
+	}
+
+	var updatedCount int64
+	for _, ref := range refs {
+		// Check if this reference matches the filter criteria
+		matches := true
+
+		// Check reporter_type filter
+		if filter.ReporterType != nil && ref.ReporterType != *filter.ReporterType {
+			matches = false
+		}
+
+		// Check local_resource_id filter
+		if filter.LocalResourceID != nil && ref.LocalResourceID != *filter.LocalResourceID {
+			matches = false
+		}
+
+		// Update if it matches
+		if matches {
+			ref.RepresentationVersion = newVersion
+			updatedCount++
+		}
+	}
+
+	return updatedCount, nil
+}
+
+// UpdateCommonRepresentationVersion updates the representation version for "inventory" reporter type references
+// This is a convenience method for the common case of updating inventory (common) representations
+func (f *FakeResourceWithReferencesRepository) UpdateCommonRepresentationVersion(ctx context.Context, resourceID uuid.UUID, newVersion int) (int64, error) {
+	inventoryReporter := "inventory"
+	filter := v1beta2.RepresentationVersionUpdateFilter{
+		ResourceID:   resourceID,
+		ReporterType: &inventoryReporter,
+		// LocalResourceID is nil, so it updates all inventory references for the resource
+	}
+	return f.UpdateRepresentationVersion(ctx, filter, newVersion)
+}
+
+// UpdateReporterRepresentationVersion updates the representation version for a specific reporter and local resource
+// This is a convenience method for updating a specific reporter representation
+func (f *FakeResourceWithReferencesRepository) UpdateReporterRepresentationVersion(ctx context.Context, resourceID uuid.UUID, reporterType string, localResourceID string, newVersion int) (int64, error) {
+	filter := v1beta2.RepresentationVersionUpdateFilter{
+		ResourceID:      resourceID,
+		ReporterType:    &reporterType,
+		LocalResourceID: &localResourceID,
+	}
+	return f.UpdateRepresentationVersion(ctx, filter, newVersion)
+}
+
 // Reset clears all data (useful for test cleanup)
 func (f *FakeResourceWithReferencesRepository) Reset() {
 	f.mu.Lock()

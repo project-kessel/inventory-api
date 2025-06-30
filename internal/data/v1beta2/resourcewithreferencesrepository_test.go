@@ -587,3 +587,454 @@ func TestFakeResourceWithReferencesRepositorySpecific(t *testing.T) {
 		}
 	})
 }
+
+// TestUpdateConsistencyToken tests the UpdateConsistencyToken method for both repositories
+func TestUpdateConsistencyToken(t *testing.T) {
+	t.Run("Real Repository", func(t *testing.T) {
+		testUpdateConsistencyTokenReal(t)
+	})
+
+	t.Run("Fake Repository", func(t *testing.T) {
+		repo := NewFakeResourceWithReferencesRepository()
+		testUpdateConsistencyToken(t, repo)
+	})
+}
+
+// testUpdateConsistencyTokenReal runs tests for the real repository with fresh databases
+func testUpdateConsistencyTokenReal(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("Update existing resource", func(t *testing.T) {
+		db := setupResourceTestDB(t)
+		repo := NewResourceWithReferencesRepository(db)
+
+		// Create a resource first
+		aggregate := createTestResourceWithReferences()
+		aggregate.Resource.ConsistencyToken = "initial-token"
+
+		result, err := repo.Create(ctx, aggregate)
+		require.NoError(t, err)
+		require.NotNil(t, result.Resource)
+
+		resourceID := result.Resource.ID
+		newToken := "updated-token-123"
+
+		// Update the consistency token
+		err = repo.UpdateConsistencyToken(ctx, resourceID, newToken)
+		assert.NoError(t, err)
+
+		// Verify the token was updated by checking directly in the database
+		var resource v1beta2.Resource
+		err = db.Where("id = ?", resourceID).First(&resource).Error
+		require.NoError(t, err)
+		assert.Equal(t, newToken, resource.ConsistencyToken)
+	})
+
+	t.Run("Update non-existent resource", func(t *testing.T) {
+		db := setupResourceTestDB(t)
+		repo := NewResourceWithReferencesRepository(db)
+
+		nonExistentID := uuid.New()
+		newToken := "some-token"
+
+		// Try to update a resource that doesn't exist
+		err := repo.UpdateConsistencyToken(ctx, nonExistentID, newToken)
+
+		// Should not return an error - GORM's Update method doesn't error when no rows are affected
+		// This matches the behavior of the consumer's UpdateConsistencyToken method
+		assert.NoError(t, err)
+	})
+
+	t.Run("Update with empty token", func(t *testing.T) {
+		db := setupResourceTestDB(t)
+		repo := NewResourceWithReferencesRepository(db)
+
+		// Create a resource first
+		aggregate := createTestResourceWithReferences()
+		aggregate.Resource.ConsistencyToken = "initial-token"
+
+		result, err := repo.Create(ctx, aggregate)
+		require.NoError(t, err)
+
+		resourceID := result.Resource.ID
+		emptyToken := ""
+
+		// Update with empty token
+		err = repo.UpdateConsistencyToken(ctx, resourceID, emptyToken)
+		assert.NoError(t, err)
+
+		// Verify the token was cleared
+		var resource v1beta2.Resource
+		err = db.Where("id = ?", resourceID).First(&resource).Error
+		require.NoError(t, err)
+		assert.Equal(t, emptyToken, resource.ConsistencyToken)
+	})
+}
+
+// testUpdateConsistencyToken runs tests for any repository implementation
+func testUpdateConsistencyToken(t *testing.T, repo v1beta2.ResourceWithReferencesRepository) {
+	ctx := context.Background()
+
+	t.Run("Update existing resource", func(t *testing.T) {
+		// Create a resource first
+		aggregate := createTestResourceWithReferences()
+		aggregate.Resource.ConsistencyToken = "initial-token"
+
+		result, err := repo.Create(ctx, aggregate)
+		require.NoError(t, err)
+		require.NotNil(t, result.Resource)
+
+		resourceID := result.Resource.ID
+		newToken := "updated-token-456"
+
+		// Update the consistency token
+		err = repo.UpdateConsistencyToken(ctx, resourceID, newToken)
+		assert.NoError(t, err)
+
+		// For fake repository, we can verify by getting all resources
+		if fakeRepo, ok := repo.(*FakeResourceWithReferencesRepository); ok {
+			resources := fakeRepo.GetAllResources()
+			found := false
+			for _, resource := range resources {
+				if resource.ID == resourceID {
+					assert.Equal(t, newToken, resource.ConsistencyToken)
+					found = true
+					break
+				}
+			}
+			assert.True(t, found, "Resource should be found in fake repository")
+		}
+	})
+
+	t.Run("Update non-existent resource", func(t *testing.T) {
+		nonExistentID := uuid.New()
+		newToken := "some-token"
+
+		// Try to update a resource that doesn't exist
+		err := repo.UpdateConsistencyToken(ctx, nonExistentID, newToken)
+
+		// For fake repository, this should return an error
+		if _, ok := repo.(*FakeResourceWithReferencesRepository); ok {
+			assert.Error(t, err)
+			assert.Contains(t, err.Error(), "not found")
+		} else {
+			// For real repository, GORM doesn't error when no rows are affected
+			assert.NoError(t, err)
+		}
+	})
+
+	t.Run("Update with nil UUID", func(t *testing.T) {
+		newToken := "some-token"
+
+		// Try to update with nil UUID
+		err := repo.UpdateConsistencyToken(ctx, uuid.Nil, newToken)
+
+		// Both implementations should handle this gracefully
+		// Real repository: GORM will just not find any rows to update
+		// Fake repository: Will not find the resource
+		if _, ok := repo.(*FakeResourceWithReferencesRepository); ok {
+			assert.Error(t, err)
+		} else {
+			assert.NoError(t, err)
+		}
+	})
+}
+
+// TestUpdateRepresentationVersion tests the UpdateRepresentationVersion method for both repositories
+func TestUpdateRepresentationVersion(t *testing.T) {
+	t.Run("Real Repository", func(t *testing.T) {
+		testUpdateRepresentationVersionReal(t)
+	})
+
+	t.Run("Fake Repository", func(t *testing.T) {
+		repo := NewFakeResourceWithReferencesRepository()
+		testUpdateRepresentationVersion(t, repo)
+	})
+}
+
+// testUpdateRepresentationVersionReal runs tests for the real repository with fresh databases
+func testUpdateRepresentationVersionReal(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("Update all references for resource", func(t *testing.T) {
+		db := setupResourceTestDB(t)
+		repo := NewResourceWithReferencesRepository(db)
+
+		// Create a resource with multiple references
+		aggregate := createTestResourceWithReferences()
+		result, err := repo.Create(ctx, aggregate)
+		require.NoError(t, err)
+
+		resourceID := result.Resource.ID
+		newVersion := 5
+
+		// Update all references (no filters)
+		filter := v1beta2.RepresentationVersionUpdateFilter{
+			ResourceID: resourceID,
+		}
+		rowsAffected, err := repo.UpdateRepresentationVersion(ctx, filter, newVersion)
+		assert.NoError(t, err)
+		assert.Equal(t, int64(2), rowsAffected)
+
+		// Verify the updates in database
+		var refs []v1beta2.RepresentationReference
+		err = db.Where("resource_id = ?", resourceID).Find(&refs).Error
+		require.NoError(t, err)
+		assert.Len(t, refs, 2)
+		for _, ref := range refs {
+			assert.Equal(t, newVersion, ref.RepresentationVersion)
+		}
+	})
+
+	t.Run("Update specific reporter type", func(t *testing.T) {
+		db := setupResourceTestDB(t)
+		repo := NewResourceWithReferencesRepository(db)
+
+		// Create a resource with multiple references
+		aggregate := createTestResourceWithReferences()
+		result, err := repo.Create(ctx, aggregate)
+		require.NoError(t, err)
+
+		resourceID := result.Resource.ID
+		newVersion := 7
+		targetReporter := "test-reporter"
+
+		// Update only test-reporter references
+		filter := v1beta2.RepresentationVersionUpdateFilter{
+			ResourceID:   resourceID,
+			ReporterType: &targetReporter,
+		}
+		rowsAffected, err := repo.UpdateRepresentationVersion(ctx, filter, newVersion)
+		assert.NoError(t, err)
+		assert.Equal(t, int64(1), rowsAffected)
+
+		// Verify only one reference was updated
+		var refs []v1beta2.RepresentationReference
+		err = db.Where("resource_id = ? AND reporter_type = ?", resourceID, targetReporter).Find(&refs).Error
+		require.NoError(t, err)
+		assert.Len(t, refs, 1)
+		assert.Equal(t, newVersion, refs[0].RepresentationVersion)
+
+		// Verify other reference was not updated
+		var otherRefs []v1beta2.RepresentationReference
+		err = db.Where("resource_id = ? AND reporter_type != ?", resourceID, targetReporter).Find(&otherRefs).Error
+		require.NoError(t, err)
+		assert.Len(t, otherRefs, 1)
+		assert.Equal(t, 1, otherRefs[0].RepresentationVersion) // Original version
+	})
+
+	t.Run("Update non-existent resource", func(t *testing.T) {
+		db := setupResourceTestDB(t)
+		repo := NewResourceWithReferencesRepository(db)
+
+		nonExistentID := uuid.New()
+		filter := v1beta2.RepresentationVersionUpdateFilter{
+			ResourceID: nonExistentID,
+		}
+		rowsAffected, err := repo.UpdateRepresentationVersion(ctx, filter, 5)
+		assert.NoError(t, err)
+		assert.Equal(t, int64(0), rowsAffected)
+	})
+}
+
+// testUpdateRepresentationVersion runs tests for any repository implementation
+func testUpdateRepresentationVersion(t *testing.T, repo v1beta2.ResourceWithReferencesRepository) {
+	ctx := context.Background()
+
+	t.Run("Update all references for resource", func(t *testing.T) {
+		// Create a resource with multiple references
+		aggregate := createTestResourceWithReferences()
+		result, err := repo.Create(ctx, aggregate)
+		require.NoError(t, err)
+
+		resourceID := result.Resource.ID
+		newVersion := 5
+
+		// Update all references (no filters)
+		filter := v1beta2.RepresentationVersionUpdateFilter{
+			ResourceID: resourceID,
+		}
+		rowsAffected, err := repo.UpdateRepresentationVersion(ctx, filter, newVersion)
+		assert.NoError(t, err)
+		assert.Equal(t, int64(2), rowsAffected)
+
+		// For fake repository, verify the updates
+		if fakeRepo, ok := repo.(*FakeResourceWithReferencesRepository); ok {
+			aggregates := fakeRepo.GetAllAggregates()
+			found := false
+			for _, agg := range aggregates {
+				if agg.Resource.ID == resourceID {
+					assert.Len(t, agg.RepresentationReferences, 2)
+					for _, ref := range agg.RepresentationReferences {
+						assert.Equal(t, newVersion, ref.RepresentationVersion)
+					}
+					found = true
+					break
+				}
+			}
+			assert.True(t, found, "Resource should be found in fake repository")
+		}
+	})
+
+	t.Run("Update non-existent resource", func(t *testing.T) {
+		nonExistentID := uuid.New()
+		filter := v1beta2.RepresentationVersionUpdateFilter{
+			ResourceID: nonExistentID,
+		}
+		rowsAffected, err := repo.UpdateRepresentationVersion(ctx, filter, 5)
+
+		// For fake repository, this should return an error
+		if _, ok := repo.(*FakeResourceWithReferencesRepository); ok {
+			assert.Error(t, err)
+			assert.Contains(t, err.Error(), "not found")
+			assert.Equal(t, int64(0), rowsAffected)
+		} else {
+			// For real repository, no error but 0 rows affected
+			assert.NoError(t, err)
+			assert.Equal(t, int64(0), rowsAffected)
+		}
+	})
+}
+
+// TestUpdateRepresentationVersionHelperMethods tests the convenience methods
+func TestUpdateRepresentationVersionHelperMethods(t *testing.T) {
+	t.Run("Real Repository", func(t *testing.T) {
+		testUpdateRepresentationVersionHelperMethodsReal(t)
+	})
+
+	t.Run("Fake Repository", func(t *testing.T) {
+		repo := NewFakeResourceWithReferencesRepository()
+		testUpdateRepresentationVersionHelperMethods(t, repo)
+	})
+}
+
+// testUpdateRepresentationVersionHelperMethodsReal tests helper methods for real repository
+func testUpdateRepresentationVersionHelperMethodsReal(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("UpdateCommonRepresentationVersion", func(t *testing.T) {
+		db := setupResourceTestDB(t)
+		repo := NewResourceWithReferencesRepository(db)
+
+		// Create a resource with inventory reporter reference
+		resourceID := uuid.New()
+		aggregate := &v1beta2.ResourceWithReferences{
+			Resource: &v1beta2.Resource{
+				ID:   resourceID,
+				Type: "test-resource-type",
+			},
+			RepresentationReferences: []*v1beta2.RepresentationReference{
+				{
+					ResourceID:            resourceID,
+					LocalResourceID:       "inventory-123",
+					ReporterType:          "inventory",
+					ResourceType:          "test-type",
+					ReporterInstanceID:    "inventory-instance",
+					RepresentationVersion: 1,
+					Generation:            1,
+				},
+				{
+					ResourceID:            resourceID,
+					LocalResourceID:       "other-123",
+					ReporterType:          "other-reporter",
+					ResourceType:          "test-type",
+					ReporterInstanceID:    "other-instance",
+					RepresentationVersion: 1,
+					Generation:            1,
+				},
+			},
+		}
+
+		_, err := repo.Create(ctx, aggregate)
+		require.NoError(t, err)
+
+		// Update common representation version
+		newVersion := 3
+		rowsAffected, err := repo.UpdateCommonRepresentationVersion(ctx, resourceID, newVersion)
+		assert.NoError(t, err)
+		assert.Equal(t, int64(1), rowsAffected)
+
+		// Verify only inventory reference was updated
+		var inventoryRef v1beta2.RepresentationReference
+		err = db.Where("resource_id = ? AND reporter_type = ?", resourceID, "inventory").First(&inventoryRef).Error
+		require.NoError(t, err)
+		assert.Equal(t, newVersion, inventoryRef.RepresentationVersion)
+
+		// Verify other reference was not updated
+		var otherRef v1beta2.RepresentationReference
+		err = db.Where("resource_id = ? AND reporter_type = ?", resourceID, "other-reporter").First(&otherRef).Error
+		require.NoError(t, err)
+		assert.Equal(t, 1, otherRef.RepresentationVersion)
+	})
+}
+
+// testUpdateRepresentationVersionHelperMethods tests helper methods for any repository
+func testUpdateRepresentationVersionHelperMethods(t *testing.T, repo v1beta2.ResourceWithReferencesRepository) {
+	ctx := context.Background()
+
+	t.Run("UpdateCommonRepresentationVersion", func(t *testing.T) {
+		// Reset fake repo if applicable
+		if fakeRepo, ok := repo.(*FakeResourceWithReferencesRepository); ok {
+			fakeRepo.Reset()
+		}
+
+		// Create a resource with inventory reporter reference
+		resourceID := uuid.New()
+		aggregate := &v1beta2.ResourceWithReferences{
+			Resource: &v1beta2.Resource{
+				ID:   resourceID,
+				Type: "test-resource-type",
+			},
+			RepresentationReferences: []*v1beta2.RepresentationReference{
+				{
+					ResourceID:            resourceID,
+					LocalResourceID:       "inventory-123",
+					ReporterType:          "inventory",
+					ResourceType:          "test-type",
+					ReporterInstanceID:    "inventory-instance",
+					RepresentationVersion: 1,
+					Generation:            1,
+				},
+				{
+					ResourceID:            resourceID,
+					LocalResourceID:       "other-123",
+					ReporterType:          "other-reporter",
+					ResourceType:          "test-type",
+					ReporterInstanceID:    "other-instance",
+					RepresentationVersion: 1,
+					Generation:            1,
+				},
+			},
+		}
+
+		_, err := repo.Create(ctx, aggregate)
+		require.NoError(t, err)
+
+		// Update common representation version
+		newVersion := 3
+		rowsAffected, err := repo.UpdateCommonRepresentationVersion(ctx, resourceID, newVersion)
+		assert.NoError(t, err)
+		assert.Equal(t, int64(1), rowsAffected)
+
+		// For fake repository, verify selective update
+		if fakeRepo, ok := repo.(*FakeResourceWithReferencesRepository); ok {
+			aggregates := fakeRepo.GetAllAggregates()
+			found := false
+			for _, agg := range aggregates {
+				if agg.Resource.ID == resourceID {
+					assert.Len(t, agg.RepresentationReferences, 2)
+					for _, ref := range agg.RepresentationReferences {
+						if ref.ReporterType == "inventory" {
+							assert.Equal(t, newVersion, ref.RepresentationVersion)
+						} else {
+							assert.Equal(t, 1, ref.RepresentationVersion) // Original version
+						}
+					}
+					found = true
+					break
+				}
+			}
+			assert.True(t, found, "Resource should be found in fake repository")
+		}
+	})
+}

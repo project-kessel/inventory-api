@@ -3,7 +3,6 @@ package resources
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"time"
 
 	"github.com/go-kratos/kratos/v2/log"
@@ -209,8 +208,151 @@ func (usecase *ResourceUsecase) createNewResource(ctx context.Context, transacti
 
 // updateExistingResource handles the update scenario when existing references are found
 func (usecase *ResourceUsecase) updateExistingResource(ctx context.Context, transaction *gorm.DB, request *v1beta2.ReportResourceRequest, existingReferences []*modelsv1beta2.RepresentationReference, transactionIdString string) error {
-	// For now, return an error - we'll implement this later after adding repository methods
-	return errors.New("update scenario not yet implemented")
+	// Get the resource ID from the first reference (all references should have the same resource_id)
+	resourceID := existingReferences[0].ResourceID
+
+	// Determine current versions for common and reporter representations
+	var currentCommonVersion int
+	var currentReporterVersion int
+
+	for _, ref := range existingReferences {
+		if ref.ReporterType == "inventory" {
+			currentCommonVersion = ref.RepresentationVersion
+		} else if ref.ReporterType == request.GetReporterType() {
+			currentReporterVersion = ref.RepresentationVersion
+		}
+	}
+
+	// Variables to track what we create for outbox events
+	var updatedCommonRepresentation *modelsv1beta2.CommonRepresentation
+	var updatedReporterRepresentation *modelsv1beta2.ReporterRepresentation
+
+	// Handle common representation update if provided
+	if request.GetRepresentations().GetCommon() != nil {
+		newCommonVersion := currentCommonVersion + 1
+
+		// Create new CommonRepresentation with incremented version
+		updatedCommonRepresentation = &modelsv1beta2.CommonRepresentation{
+			BaseRepresentation: modelsv1beta2.BaseRepresentation{
+				Data: request.GetRepresentations().GetCommon().AsMap(),
+			},
+			LocalResourceID: resourceID.String(),
+			ReporterType:    "inventory",
+			ResourceType:    request.GetType(),
+			Version:         newCommonVersion,
+			ReportedBy:      request.GetReporterType() + "/" + request.GetReporterInstanceId(),
+		}
+
+		// Persist the new common representation
+		commonRepository := usecase.CommonRepresentationRepository.(*datav1beta2.CommonRepresentationRepository)
+		_, err := commonRepository.CreateWithTx(ctx, transaction, updatedCommonRepresentation)
+		if err != nil {
+			return err
+		}
+
+		// Update the representation_version in RepresentationReference for inventory
+		resourceRepository := usecase.ResourceWithReferencesRepository.(*datav1beta2.ResourceWithReferencesRepository)
+		_, err = resourceRepository.UpdateCommonRepresentationVersionWithTx(ctx, transaction, resourceID, newCommonVersion)
+		if err != nil {
+			return err
+		}
+	}
+
+	// Handle reporter representation update if provided
+	if request.GetRepresentations().GetReporter() != nil {
+		newReporterVersion := currentReporterVersion + 1
+
+		// Find the generation for this reporter
+		var generation int
+		for _, ref := range existingReferences {
+			if ref.ReporterType == request.GetReporterType() {
+				generation = ref.Generation
+				break
+			}
+		}
+
+		// Determine the common version to use - only set if common was updated in this request
+		commonVersionToUse := 0 // Default to 0 when no common update
+		if updatedCommonRepresentation != nil {
+			commonVersionToUse = updatedCommonRepresentation.Version
+		}
+
+		// Create new ReporterRepresentation with incremented version
+		updatedReporterRepresentation = &modelsv1beta2.ReporterRepresentation{
+			BaseRepresentation: modelsv1beta2.BaseRepresentation{
+				Data: request.GetRepresentations().GetReporter().AsMap(),
+			},
+			LocalResourceID:    request.GetRepresentations().GetMetadata().GetLocalResourceId(),
+			ReporterType:       request.GetReporterType(),
+			ResourceType:       request.GetType(),
+			Version:            newReporterVersion,
+			ReporterInstanceID: request.GetReporterInstanceId(),
+			Generation:         generation,
+			APIHref:            request.GetRepresentations().GetMetadata().GetApiHref(),
+			ConsoleHref:        request.GetRepresentations().GetMetadata().GetConsoleHref(),
+			CommonVersion:      commonVersionToUse, // Use updated common version if common was updated, otherwise current
+			Tombstone:          false,
+			ReporterVersion:    request.GetRepresentations().GetMetadata().GetReporterVersion(),
+		}
+
+		// Persist the new reporter representation
+		reporterRepository := usecase.ReporterRepresentationRepository.(*datav1beta2.ReporterRepresentationRepository)
+		_, err := reporterRepository.CreateWithTx(ctx, transaction, updatedReporterRepresentation)
+		if err != nil {
+			return err
+		}
+
+		// Update the representation_version in RepresentationReference for this reporter
+		resourceRepository := usecase.ResourceWithReferencesRepository.(*datav1beta2.ResourceWithReferencesRepository)
+		_, err = resourceRepository.UpdateReporterRepresentationVersionWithTx(ctx, transaction, resourceID, request.GetReporterType(), request.GetRepresentations().GetMetadata().GetLocalResourceId(), newReporterVersion)
+		if err != nil {
+			return err
+		}
+	}
+
+	// Load the resource for outbox events (we only need this one query)
+	var resource modelsv1beta2.Resource
+	err := transaction.Where("id = ?", resourceID).First(&resource).Error
+	if err != nil {
+		return err
+	}
+
+	// For outbox events, we need to handle the case where only some representations were updated
+	// If no common representation was updated, we need to get the latest one
+	if updatedCommonRepresentation == nil {
+		updatedCommonRepresentation = &modelsv1beta2.CommonRepresentation{}
+		err = transaction.Where("local_resource_id = ? AND reporter_type = ? AND resource_type = ?",
+			resourceID.String(), "inventory", request.GetType()).
+			Order("version DESC").First(updatedCommonRepresentation).Error
+		if err != nil {
+			return err
+		}
+	}
+
+	// If no reporter representation was updated, we need to get the latest one
+	if updatedReporterRepresentation == nil {
+		updatedReporterRepresentation = &modelsv1beta2.ReporterRepresentation{}
+		err = transaction.Where("local_resource_id = ? AND reporter_type = ? AND resource_type = ? AND reporter_instance_id = ?",
+			request.GetRepresentations().GetMetadata().GetLocalResourceId(),
+			request.GetReporterType(),
+			request.GetType(),
+			request.GetReporterInstanceId()).
+			Order("version DESC").First(updatedReporterRepresentation).Error
+		if err != nil {
+			return err
+		}
+	}
+
+	// Handle outbox events for update using the representations we have (either newly created or loaded)
+	err = usecase.publishOutboxEvents(transaction, &resource, updatedCommonRepresentation, updatedReporterRepresentation, model.OperationTypeUpdated, transactionIdString)
+	if err != nil {
+		return err
+	}
+
+	// Update metrics
+	metricscollector.Incr(usecase.MetricsCollector.OutboxEventWrites, string(model.OperationTypeUpdated), nil)
+
+	return nil
 }
 
 // publishOutboxEvents creates and publishes outbox events for the resource

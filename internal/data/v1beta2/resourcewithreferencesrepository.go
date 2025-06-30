@@ -141,3 +141,25 @@ func (r *ResourceWithReferencesRepository) UpdateReporterRepresentationVersion(c
 	}
 	return r.UpdateRepresentationVersion(ctx, filter, newVersion)
 }
+
+// UpdateCommonRepresentationVersionWithTx updates the representation version for "inventory" reporter type using the provided transaction
+func (r *ResourceWithReferencesRepository) UpdateCommonRepresentationVersionWithTx(ctx context.Context, tx *gorm.DB, resourceID uuid.UUID, newVersion int) (int64, error) {
+	result := tx.WithContext(ctx).Model(&v1beta2.RepresentationReference{}).
+		Where("resource_id = ? AND reporter_type = ?", resourceID, "inventory").
+		Update("representation_version", newVersion)
+	if result.Error != nil {
+		return 0, fmt.Errorf("failed to update common representation version: %w", result.Error)
+	}
+	return result.RowsAffected, nil
+}
+
+// UpdateReporterRepresentationVersionWithTx updates the representation version for a specific reporter using the provided transaction
+func (r *ResourceWithReferencesRepository) UpdateReporterRepresentationVersionWithTx(ctx context.Context, tx *gorm.DB, resourceID uuid.UUID, reporterType string, localResourceID string, newVersion int) (int64, error) {
+	result := tx.WithContext(ctx).Model(&v1beta2.RepresentationReference{}).
+		Where("resource_id = ? AND reporter_type = ? AND local_resource_id = ?", resourceID, reporterType, localResourceID).
+		Update("representation_version", newVersion)
+	if result.Error != nil {
+		return 0, fmt.Errorf("failed to update reporter representation version: %w", result.Error)
+	}
+	return result.RowsAffected, nil
+}

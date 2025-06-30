@@ -20,7 +20,7 @@ This repository implements a common inventory system with eventing.
 ## Development Setup
 
 ### Prerequisites
-- Go 1.23.6
+- Go 1.23.9
 - Make
 
 ### Debugging

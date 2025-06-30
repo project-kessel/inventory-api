@@ -17,7 +17,7 @@ spec:
     spec:
       initContainers:
         - name: copy-resources
-          image: registry.access.redhat.com/ubi9-minimal
+          image: registry.access.redhat.com/ubi9
           command:
             - /bin/sh
             - "-c"

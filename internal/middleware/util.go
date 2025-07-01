@@ -40,7 +40,7 @@ func NormalizeResourceType(resourceType string) string {
 func MarshalProtoToJSON(msg proto.Message) ([]byte, error) {
 	data, err := protojson.Marshal(msg)
 	if err != nil {
-		return nil, fmt.Errorf("ERROR: Failed to marshal message: %w", err)
+		return nil, fmt.Errorf("failed to marshal message: %w", err)
 	}
 	return data, nil
 }
@@ -48,7 +48,7 @@ func MarshalProtoToJSON(msg proto.Message) ([]byte, error) {
 func UnmarshalJSONToMap(data []byte) (map[string]interface{}, error) {
 	var resourceMap map[string]interface{}
 	if err := json.Unmarshal(data, &resourceMap); err != nil {
-		return nil, fmt.Errorf("ERROR: Failed to unmarshal JSON: %w", err)
+		return nil, fmt.Errorf("failed to unmarshal JSON: %w", err)
 	}
 	return resourceMap, nil
 }
@@ -77,14 +77,14 @@ func ExtractMapField(data map[string]interface{}, key string, opts ...ExtractOpt
 	value, exists := data[key]
 	if !exists {
 		if config.validateFieldExists {
-			return nil, fmt.Errorf("ERROR: Missing '%s' field in payload", key)
+			return nil, fmt.Errorf("missing '%s' field in payload", key)
 		}
 		return nil, nil // Return nil without error when field doesn't exist and not required
 	}
 
 	mapValue, ok := value.(map[string]interface{})
 	if !ok {
-		return nil, fmt.Errorf("ERROR: '%s' is not a valid object", key)
+		return nil, fmt.Errorf("'%s' is not a valid object", key)
 	}
 
 	return mapValue, nil
@@ -129,7 +129,7 @@ func ValidateCommonRepresentation(resourceType string, commonRepresentation map[
 
 	// If schema has required fields but commonRepresentation is nil/empty, that's an error
 	if hasRequiredFields && (commonRepresentation == nil || len(commonRepresentation) == 0) {
-		return fmt.Errorf("ERROR: Missing 'common' field in payload - schema for '%s' has required fields", resourceType)
+		return fmt.Errorf("missing 'common' field in payload - schema for '%s' has required fields", resourceType)
 	}
 
 	// Validate data if present
@@ -185,7 +185,7 @@ func ValidateReporterRepresentation(resourceType string, reporterType string, re
 
 	// If schema has required fields but reporterRepresentation is nil/empty, that's an error
 	if hasRequiredFields && (reporterRepresentation == nil || len(reporterRepresentation) == 0) {
-		return fmt.Errorf("ERROR: Missing 'reporter' field in payload - schema for '%s' has required fields", schemaKey)
+		return fmt.Errorf("missing 'reporter' field in payload - schema for '%s' has required fields", schemaKey)
 	}
 
 	// Case 3: Validate data if present

@@ -159,7 +159,7 @@ func TestValidateReportResourceJSON_FieldExtractionErrors(t *testing.T) {
 				ReporterType:    "hbi",
 				Representations: nil,
 			},
-			expect: "Missing 'representations'",
+			expect: "missing 'representations'",
 		},
 		{
 			name: "missing reporter in representations",
@@ -172,7 +172,7 @@ func TestValidateReportResourceJSON_FieldExtractionErrors(t *testing.T) {
 					// No Reporter
 				},
 			},
-			expect: "Missing 'reporter'",
+			expect: "missing 'reporter'",
 		},
 		{
 			name: "missing common in representations",
@@ -185,7 +185,7 @@ func TestValidateReportResourceJSON_FieldExtractionErrors(t *testing.T) {
 					// No Common
 				},
 			},
-			expect: "Missing 'common'",
+			expect: "missing 'common'",
 		},
 		{
 			name: "missing common in representations",
@@ -364,7 +364,7 @@ func TestValidateReportResourceJSON_SchemaBasedValidation(t *testing.T) {
 				"required": ["workspace_id"]
 			}`,
 			expectError:   true,
-			expectedError: "Missing 'reporter' field in payload - schema for 'k8s_policy:acm' has required fields",
+			expectedError: "missing 'reporter' field in payload - schema for 'k8s_policy:acm' has required fields",
 		},
 		{
 			name: "Common schema with required fields - missing common data should fail",
@@ -402,7 +402,7 @@ func TestValidateReportResourceJSON_SchemaBasedValidation(t *testing.T) {
 				"required": ["workspace_id"]
 			}`,
 			expectError:   true,
-			expectedError: "Missing 'common' field in payload - schema for 'k8s_policy' has required fields",
+			expectedError: "missing 'common' field in payload - schema for 'k8s_policy' has required fields",
 		},
 	}
 

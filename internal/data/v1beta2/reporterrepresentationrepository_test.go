@@ -28,6 +28,7 @@ func setupReporterTestDB(t *testing.T) *gorm.DB {
 
 // createTestReporterRepresentation creates a test ReporterRepresentation
 func createTestReporterRepresentation() *v1beta2.ReporterRepresentation {
+	cv := 1
 	return &v1beta2.ReporterRepresentation{
 		BaseRepresentation: v1beta2.BaseRepresentation{
 			Data: model.JsonObject{"reporter": "data"},
@@ -40,7 +41,7 @@ func createTestReporterRepresentation() *v1beta2.ReporterRepresentation {
 		Generation:         1,
 		APIHref:            "https://api.example.com/resource/123",
 		ConsoleHref:        "https://console.example.com/resource/123",
-		CommonVersion:      1,
+		CommonVersion:      &cv,
 		Tombstone:          false,
 		ReporterVersion:    "1.0.0",
 	}

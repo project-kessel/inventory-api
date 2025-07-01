@@ -106,6 +106,7 @@ func (usecase *ResourceUsecase) UpsertResource(ctx context.Context, request *v1b
 func (usecase *ResourceUsecase) createNewResource(ctx context.Context, transaction *gorm.DB, request *v1beta2.ReportResourceRequest, transactionIdString string) error {
 	// Generate new UUID for resource
 	resourceId, err := uuid.NewV7()
+	cv := 1
 	if err != nil {
 		return err
 	}
@@ -152,7 +153,7 @@ func (usecase *ResourceUsecase) createNewResource(ctx context.Context, transacti
 		Generation:         1,
 		APIHref:            request.GetRepresentations().GetMetadata().GetApiHref(),
 		ConsoleHref:        request.GetRepresentations().GetMetadata().GetConsoleHref(),
-		CommonVersion:      1,
+		CommonVersion:      &cv,
 		Tombstone:          false,
 		ReporterVersion:    request.GetRepresentations().GetMetadata().GetReporterVersion(),
 	}
@@ -272,9 +273,9 @@ func (usecase *ResourceUsecase) updateExistingResource(ctx context.Context, tran
 		}
 
 		// Determine the common version to use - only set if common was updated in this request
-		commonVersionToUse := 0 // Default to 0 when no common update
+		var commonVersionPtr *int
 		if updatedCommonRepresentation != nil {
-			commonVersionToUse = updatedCommonRepresentation.Version
+			commonVersionPtr = &updatedCommonRepresentation.Version
 		}
 
 		// Create new ReporterRepresentation with incremented version
@@ -290,7 +291,7 @@ func (usecase *ResourceUsecase) updateExistingResource(ctx context.Context, tran
 			Generation:         generation,
 			APIHref:            request.GetRepresentations().GetMetadata().GetApiHref(),
 			ConsoleHref:        request.GetRepresentations().GetMetadata().GetConsoleHref(),
-			CommonVersion:      commonVersionToUse, // Use updated common version if common was updated, otherwise current
+			CommonVersion:      commonVersionPtr, // Use updated common version if common was updated, otherwise nil
 			Tombstone:          false,
 			ReporterVersion:    request.GetRepresentations().GetMetadata().GetReporterVersion(),
 		}

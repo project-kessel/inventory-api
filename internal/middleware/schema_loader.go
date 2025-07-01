@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/spf13/viper"
 	"gopkg.in/yaml.v3"
@@ -17,9 +18,9 @@ func ValidateResourceReporterCombination(resourceType, reporterType string) erro
 		return fmt.Errorf("failed to load valid reporters for '%s': %w", resourceType, err)
 	}
 
-	// check if the resources reporter_type exists in the list of resource_reporters
+	// do a case insensitive check if reporter_type exists in the list of resource_reporters
 	for _, validReporter := range resourceReporters {
-		if reporterType == validReporter {
+		if strings.EqualFold(reporterType, validReporter) {
 			return nil
 		}
 	}

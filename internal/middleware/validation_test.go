@@ -115,7 +115,9 @@ func TestValidateReportResourceJSON_FieldExtractionErrors(t *testing.T) {
 		"insights_inventory_id": { "type": "string", "format": "uuid" },
 		"ansible_host": { "type": "string", "maxLength": 255 }
 	  },
-	  "required": []
+	  "required": [
+		"subscription_manager_id"
+		]
 	}`)
 
 	middleware.SchemaCache.Store("common:host", `{

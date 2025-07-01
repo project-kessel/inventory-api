@@ -145,9 +145,116 @@ func TestExtractFields(t *testing.T) {
 
 			switch tt.testType {
 			case "map":
-				result, err = middleware.ExtractMapField(tt.input, tt.key)
+				result, err = middleware.ExtractMapField(tt.input, tt.key, middleware.ValidateFieldExists())
 			case "string":
-				result, err = middleware.ExtractStringField(tt.input, tt.key)
+				result, err = middleware.ExtractStringField(tt.input, tt.key, middleware.ValidateFieldExists())
+			}
+
+			if tt.expectErr {
+				assert.Error(t, err, "Expected error but got nil")
+			} else {
+				assert.NoError(t, err, "Unexpected error")
+				assert.Equal(t, tt.expected, result, "Extracted value doesn't match")
+			}
+		})
+	}
+}
+
+func TestExtractFieldsWithOptions(t *testing.T) {
+	tests := []struct {
+		name      string
+		input     map[string]interface{}
+		key       string
+		option    middleware.ExtractOption
+		expected  interface{}
+		expectErr bool
+		testType  string // "map" or "string"
+	}{
+		// Tests for ValidateFieldExists option
+		{
+			name: "Map extraction with ValidateFieldExists - representations field exists",
+			input: map[string]interface{}{
+				"representations": map[string]interface{}{
+					"reporter": map[string]interface{}{"satellite_id": "123"},
+					"common":   map[string]interface{}{"workspace_id": "ws-456"},
+				},
+			},
+			key:    "representations",
+			option: middleware.ValidateFieldExists(),
+			expected: map[string]interface{}{
+				"reporter": map[string]interface{}{"satellite_id": "123"},
+				"common":   map[string]interface{}{"workspace_id": "ws-456"},
+			},
+			expectErr: false,
+			testType:  "map",
+		},
+		{
+			name:      "Map extraction with ValidateFieldExists - representations field missing",
+			input:     map[string]interface{}{"type": "host", "reporterType": "hbi"},
+			key:       "representations",
+			option:    middleware.ValidateFieldExists(),
+			expected:  nil,
+			expectErr: true,
+			testType:  "map",
+		},
+		{
+			name:      "String extraction with ValidateFieldExists - reporterType exists",
+			input:     map[string]interface{}{"type": "host", "reporterType": "hbi"},
+			key:       "reporterType",
+			option:    middleware.ValidateFieldExists(),
+			expected:  "hbi",
+			expectErr: false,
+			testType:  "string",
+		},
+		{
+			name:      "String extraction with ValidateFieldExists - reporterType missing",
+			input:     map[string]interface{}{"type": "host"},
+			key:       "reporterType",
+			option:    middleware.ValidateFieldExists(),
+			expected:  "",
+			expectErr: true,
+			testType:  "string",
+		},
+
+		// Tests for default behavior (no options)
+		{
+			name:      "Map extraction with no options - representations missing (default behavior)",
+			input:     map[string]interface{}{"type": "host", "reporterType": "hbi"},
+			key:       "representations",
+			option:    nil,
+			expected:  map[string]interface{}(nil),
+			expectErr: false,
+			testType:  "map",
+		},
+		{
+			name:      "String extraction with no options - reporterType missing (default behavior)",
+			input:     map[string]interface{}{"type": "k8s_policy"},
+			key:       "reporterType",
+			option:    nil,
+			expected:  "",
+			expectErr: false,
+			testType:  "string",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var result interface{}
+			var err error
+
+			switch tt.testType {
+			case "map":
+				if tt.option != nil {
+					result, err = middleware.ExtractMapField(tt.input, tt.key, tt.option)
+				} else {
+					result, err = middleware.ExtractMapField(tt.input, tt.key)
+				}
+			case "string":
+				if tt.option != nil {
+					result, err = middleware.ExtractStringField(tt.input, tt.key, tt.option)
+				} else {
+					result, err = middleware.ExtractStringField(tt.input, tt.key)
+				}
 			}
 
 			if tt.expectErr {

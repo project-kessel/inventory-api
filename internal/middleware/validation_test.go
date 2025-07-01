@@ -210,3 +210,223 @@ func TestValidateReportResourceJSON_FieldExtractionErrors(t *testing.T) {
 		})
 	}
 }
+
+func TestValidateReportResourceJSON_SchemaBasedValidation(t *testing.T) {
+	viper.Set("resources.use_cache", true)
+
+	// Setup config for k8s_policy with acm reporter
+	middleware.SchemaCache.Store("config:k8s_policy", map[string]interface{}{
+		"resource_reporters": []string{"acm"},
+	})
+
+	tests := []struct {
+		name           string
+		msg            *pbv1beta2.ReportResourceRequest
+		reporterSchema string
+		commonSchema   string
+		expectError    bool
+		expectedError  string
+	}{
+		{
+			name: "Reporter schema with NO required fields - missing reporter data should pass",
+			msg: &pbv1beta2.ReportResourceRequest{
+				Type:         "k8s_policy",
+				ReporterType: "acm",
+				Representations: &pbv1beta2.ResourceRepresentations{
+					Metadata: &pbv1beta2.RepresentationMetadata{
+						LocalResourceId: "policy-123",
+						ApiHref:         "url",
+					},
+					// No Reporter field
+					Common: AsStruct(t, map[string]interface{}{
+						"workspace_id": "ws-456",
+					}),
+				},
+			},
+			reporterSchema: `{
+				"$schema": "http://json-schema.org/draft-07/schema#",
+				"type": "object",
+				"properties": {
+					"policy_id": { "type": "string" },
+					"policy_name": { "type": "string" }
+				},
+				"required": []
+			}`,
+			commonSchema: `{
+				"$schema": "http://json-schema.org/draft-07/schema#",
+				"type": "object",
+				"properties": {
+					"workspace_id": { "type": "string" }
+				},
+				"required": ["workspace_id"]
+			}`,
+			expectError: false,
+		},
+		{
+			name: "Common schema with NO required fields - missing common data should pass",
+			msg: &pbv1beta2.ReportResourceRequest{
+				Type:         "k8s_policy",
+				ReporterType: "acm",
+				Representations: &pbv1beta2.ResourceRepresentations{
+					Metadata: &pbv1beta2.RepresentationMetadata{
+						LocalResourceId: "policy-123",
+						ApiHref:         "url",
+					},
+					Reporter: AsStruct(t, map[string]interface{}{
+						"policy_id":   "pol-abc123",
+						"policy_name": "security-policy",
+					}),
+					// No Common field
+				},
+			},
+			reporterSchema: `{
+				"$schema": "http://json-schema.org/draft-07/schema#",
+				"type": "object",
+				"properties": {
+					"policy_id": { "type": "string" },
+					"policy_name": { "type": "string" }
+				},
+				"required": []
+			}`,
+			commonSchema: `{
+				"$schema": "http://json-schema.org/draft-07/schema#",
+				"type": "object",
+				"properties": {
+					"workspace_id": { "type": "string" },
+					"organization_id": { "type": "string" }
+				},
+				"required": []
+			}`,
+			expectError: false,
+		},
+		{
+			name: "Both schemas with NO required fields - missing both reporter and common should pass",
+			msg: &pbv1beta2.ReportResourceRequest{
+				Type:         "k8s_policy",
+				ReporterType: "acm",
+				Representations: &pbv1beta2.ResourceRepresentations{
+					Metadata: &pbv1beta2.RepresentationMetadata{
+						LocalResourceId: "policy-123",
+						ApiHref:         "url",
+					},
+					// No Reporter or Common fields
+				},
+			},
+			reporterSchema: `{
+				"$schema": "http://json-schema.org/draft-07/schema#",
+				"type": "object",
+				"properties": {
+					"policy_id": { "type": "string" },
+					"policy_name": { "type": "string" }
+				}
+			}`,
+			commonSchema: `{
+				"$schema": "http://json-schema.org/draft-07/schema#",
+				"type": "object",
+				"properties": {
+					"workspace_id": { "type": "string" },
+					"organization_id": { "type": "string" }
+				}
+			}`,
+			expectError: false,
+		},
+		{
+			name: "Reporter schema with required fields - missing reporter data should fail",
+			msg: &pbv1beta2.ReportResourceRequest{
+				Type:         "k8s_policy",
+				ReporterType: "acm",
+				Representations: &pbv1beta2.ResourceRepresentations{
+					Metadata: &pbv1beta2.RepresentationMetadata{
+						LocalResourceId: "policy-123",
+						ApiHref:         "url",
+					},
+					// No Reporter field
+					Common: AsStruct(t, map[string]interface{}{
+						"workspace_id": "ws-456",
+					}),
+				},
+			},
+			reporterSchema: `{
+				"$schema": "http://json-schema.org/draft-07/schema#",
+				"type": "object",
+				"properties": {
+					"policy_id": { "type": "string" },
+					"policy_name": { "type": "string" }
+				},
+				"required": ["policy_id"]
+			}`,
+			commonSchema: `{
+				"$schema": "http://json-schema.org/draft-07/schema#",
+				"type": "object",
+				"properties": {
+					"workspace_id": { "type": "string" }
+				},
+				"required": ["workspace_id"]
+			}`,
+			expectError:   true,
+			expectedError: "Missing 'reporter' field in payload - schema for 'k8s_policy:acm' has required fields",
+		},
+		{
+			name: "Common schema with required fields - missing common data should fail",
+			msg: &pbv1beta2.ReportResourceRequest{
+				Type:         "k8s_policy",
+				ReporterType: "acm",
+				Representations: &pbv1beta2.ResourceRepresentations{
+					Metadata: &pbv1beta2.RepresentationMetadata{
+						LocalResourceId: "policy-123",
+						ApiHref:         "url",
+					},
+					Reporter: AsStruct(t, map[string]interface{}{
+						"policy_id":   "pol-abc123",
+						"policy_name": "security-policy",
+					}),
+					// No Common field
+				},
+			},
+			reporterSchema: `{
+				"$schema": "http://json-schema.org/draft-07/schema#",
+				"type": "object",
+				"properties": {
+					"policy_id": { "type": "string" },
+					"policy_name": { "type": "string" }
+				},
+				"required": []
+			}`,
+			commonSchema: `{
+				"$schema": "http://json-schema.org/draft-07/schema#",
+				"type": "object",
+				"properties": {
+					"workspace_id": { "type": "string" },
+					"organization_id": { "type": "string" }
+				},
+				"required": ["workspace_id"]
+			}`,
+			expectError:   true,
+			expectedError: "Missing 'common' field in payload - schema for 'k8s_policy' has required fields",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			// Setup schemas in cache
+			middleware.SchemaCache.Store("k8s_policy:acm", tc.reporterSchema)
+			middleware.SchemaCache.Store("common:k8s_policy", tc.commonSchema)
+
+			// Test the function
+			err := middleware.ValidateReportResourceJSON(tc.msg)
+
+			if tc.expectError {
+				assert.Error(t, err)
+				if tc.expectedError != "" {
+					assert.Contains(t, err.Error(), tc.expectedError)
+				}
+			} else {
+				assert.NoError(t, err)
+			}
+
+			// Cleanup
+			middleware.SchemaCache.Delete("k8s_policy:acm")
+			middleware.SchemaCache.Delete("common:k8s_policy")
+		})
+	}
+}

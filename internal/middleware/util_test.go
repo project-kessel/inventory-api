@@ -1,6 +1,8 @@
 package middleware_test
 
 import (
+	"fmt"
+	"strings"
 	"testing"
 
 	pbv1beta2 "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2"
@@ -322,4 +324,329 @@ func TestValidateReporterRepresentation_NoSchemaCases(t *testing.T) {
 		err := middleware.ValidateReporterRepresentation("host", "hbi", map[string]interface{}{})
 		assert.NoError(t, err)
 	})
+}
+
+func TestValidateReporterRepresentation(t *testing.T) {
+	tests := []struct {
+		name                   string
+		resourceType           string
+		reporterType           string
+		reporterRepresentation map[string]interface{}
+		schema                 string
+		expectError            bool
+		expectedErrorContains  string
+	}{
+		{
+			name:         "Schema with required fields - valid reporter data provided",
+			resourceType: "host",
+			reporterType: "hbi",
+			reporterRepresentation: map[string]interface{}{
+				"satellite_id":            "2c4196f1-0371-4f4c-8913-e113cfaa6e67",
+				"subscription_manager_id": "af94f92b-0b65-4cac-b449-6b77e665a08f",
+				"insights_inventory_id":   "05707922-7b0a-4fe6-982d-6adbc7695b8f",
+				"ansible_host":            "host-1",
+			},
+			schema: `{
+				"$schema": "http://json-schema.org/draft-07/schema#",
+				"type": "object",
+				"properties": {
+					"satellite_id": { "type": "string", "format": "uuid" },
+					"subscription_manager_id": { "type": "string", "format": "uuid" },
+					"insights_inventory_id": { "type": "string", "format": "uuid" },
+					"ansible_host": { "type": "string", "maxLength": 255 }
+				},
+				"required": ["subscription_manager_id"]
+			}`,
+			expectError: false,
+		},
+		{
+			name:                   "Schema with required fields - missing reporter data",
+			resourceType:           "host",
+			reporterType:           "hbi",
+			reporterRepresentation: nil,
+			schema: `{
+				"$schema": "http://json-schema.org/draft-07/schema#",
+				"type": "object",
+				"properties": {
+					"satellite_id": { "type": "string", "format": "uuid" },
+					"subscription_manager_id": { "type": "string", "format": "uuid" }
+				},
+				"required": ["subscription_manager_id"]
+			}`,
+			expectError:           true,
+			expectedErrorContains: "Missing 'reporter' field in payload - schema for 'host:hbi' has required fields",
+		},
+		{
+			name:                   "Schema with required fields - empty reporter data",
+			resourceType:           "k8s_cluster",
+			reporterType:           "acm",
+			reporterRepresentation: map[string]interface{}{},
+			schema: `{
+				"$schema": "http://json-schema.org/draft-07/schema#",
+				"type": "object",
+				"properties": {
+					"cluster_id": { "type": "string" },
+					"cluster_name": { "type": "string" }
+				},
+				"required": ["cluster_id"]
+			}`,
+			expectError:           true,
+			expectedErrorContains: "Missing 'reporter' field in payload - schema for 'k8s_cluster:acm' has required fields",
+		},
+		{
+			name:                   "Schema with NO required fields - missing reporter data (should pass)",
+			resourceType:           "k8s_policy",
+			reporterType:           "acm",
+			reporterRepresentation: nil,
+			schema: `{
+				"$schema": "http://json-schema.org/draft-07/schema#",
+				"type": "object",
+				"properties": {
+					"policy_id": { "type": "string" },
+					"policy_name": { "type": "string" }
+				},
+				"required": []
+			}`,
+			expectError: false,
+		},
+		{
+			name:                   "Schema with NO required fields - empty reporter data (should pass)",
+			resourceType:           "k8s_policy",
+			reporterType:           "acm",
+			reporterRepresentation: map[string]interface{}{},
+			schema: `{
+				"$schema": "http://json-schema.org/draft-07/schema#",
+				"type": "object",
+				"properties": {
+					"policy_id": { "type": "string" },
+					"policy_name": { "type": "string" }
+				},
+				"required": []
+			}`,
+			expectError: false,
+		},
+		{
+			name:         "Schema with NO required fields - valid reporter data provided",
+			resourceType: "k8s_cluster",
+			reporterType: "ocm",
+			reporterRepresentation: map[string]interface{}{
+				"cluster_id":   "cluster-abc123",
+				"cluster_name": "production-cluster",
+			},
+			schema: `{
+				"$schema": "http://json-schema.org/draft-07/schema#",
+				"type": "object",
+				"properties": {
+					"cluster_id": { "type": "string" },
+					"cluster_name": { "type": "string" }
+				}
+			}`,
+			expectError: false,
+		},
+		{
+			name:         "Schema validation fails - invalid data type",
+			resourceType: "host",
+			reporterType: "hbi",
+			reporterRepresentation: map[string]interface{}{
+				"subscription_manager_id": 12345, // Should be string, not number
+			},
+			schema: `{
+				"$schema": "http://json-schema.org/draft-07/schema#",
+				"type": "object",
+				"properties": {
+					"subscription_manager_id": { "type": "string" }
+				},
+				"required": ["subscription_manager_id"]
+			}`,
+			expectError:           true,
+			expectedErrorContains: "validation failed",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Setup schema in cache
+			schemaKey := fmt.Sprintf("%s:%s", strings.ToLower(tt.resourceType), strings.ToLower(tt.reporterType))
+			middleware.SchemaCache.Store(schemaKey, tt.schema)
+
+			// Test the function
+			err := middleware.ValidateReporterRepresentation(tt.resourceType, tt.reporterType, tt.reporterRepresentation)
+
+			if tt.expectError {
+				assert.Error(t, err)
+				if tt.expectedErrorContains != "" {
+					assert.Contains(t, err.Error(), tt.expectedErrorContains)
+				}
+			} else {
+				assert.NoError(t, err)
+			}
+
+			// Cleanup
+			middleware.SchemaCache.Delete(schemaKey)
+		})
+	}
+}
+
+func TestValidateCommonRepresentation(t *testing.T) {
+	tests := []struct {
+		name                  string
+		resourceType          string
+		commonRepresentation  map[string]interface{}
+		schema                string
+		expectError           bool
+		expectedErrorContains string
+	}{
+		{
+			name:         "Schema with required fields - valid common data provided",
+			resourceType: "host",
+			commonRepresentation: map[string]interface{}{
+				"workspace_id": "ws-a64d17d0-aec3-410a-acd0-e0b85b22c076",
+			},
+			schema: `{
+				"$schema": "http://json-schema.org/draft-07/schema#",
+				"type": "object",
+				"properties": {
+					"workspace_id": { "type": "string" }
+				},
+				"required": ["workspace_id"]
+			}`,
+			expectError: false,
+		},
+		{
+			name:                 "Schema with required fields - missing common data",
+			resourceType:         "host",
+			commonRepresentation: nil,
+			schema: `{
+				"$schema": "http://json-schema.org/draft-07/schema#",
+				"type": "object",
+				"properties": {
+					"workspace_id": { "type": "string" }
+				},
+				"required": ["workspace_id"]
+			}`,
+			expectError:           true,
+			expectedErrorContains: "Missing 'common' field in payload - schema for 'host' has required fields",
+		},
+		{
+			name:                 "Schema with required fields - empty common data",
+			resourceType:         "k8s_cluster",
+			commonRepresentation: map[string]interface{}{},
+			schema: `{
+				"$schema": "http://json-schema.org/draft-07/schema#",
+				"type": "object",
+				"properties": {
+					"workspace_id": { "type": "string" },
+					"organization_id": { "type": "string" }
+				},
+				"required": ["workspace_id"]
+			}`,
+			expectError:           true,
+			expectedErrorContains: "Missing 'common' field in payload - schema for 'k8s_cluster' has required fields",
+		},
+		{
+			name:                 "Schema with NO required fields - missing common data (should pass)",
+			resourceType:         "k8s_policy",
+			commonRepresentation: nil,
+			schema: `{
+				"$schema": "http://json-schema.org/draft-07/schema#",
+				"type": "object",
+				"properties": {
+					"workspace_id": { "type": "string" },
+					"organization_id": { "type": "string" }
+				},
+				"required": []
+			}`,
+			expectError: false,
+		},
+		{
+			name:                 "Schema with NO required fields - empty common data (should pass)",
+			resourceType:         "k8s_policy",
+			commonRepresentation: map[string]interface{}{},
+			schema: `{
+				"$schema": "http://json-schema.org/draft-07/schema#",
+				"type": "object",
+				"properties": {
+					"workspace_id": { "type": "string" },
+					"organization_id": { "type": "string" }
+				}
+			}`,
+			expectError: false,
+		},
+		{
+			name:         "Schema with NO required fields - valid common data provided",
+			resourceType: "notifications_integration",
+			commonRepresentation: map[string]interface{}{
+				"workspace_id":    "ws-456",
+				"organization_id": "org-789",
+			},
+			schema: `{
+				"$schema": "http://json-schema.org/draft-07/schema#",
+				"type": "object",
+				"properties": {
+					"workspace_id": { "type": "string" },
+					"organization_id": { "type": "string" }
+				}
+			}`,
+			expectError: false,
+		},
+		{
+			name:         "Schema validation fails - invalid data type",
+			resourceType: "host",
+			commonRepresentation: map[string]interface{}{
+				"workspace_id": 12345, // Should be string, not number
+			},
+			schema: `{
+				"$schema": "http://json-schema.org/draft-07/schema#",
+				"type": "object",
+				"properties": {
+					"workspace_id": { "type": "string" }
+				},
+				"required": ["workspace_id"]
+			}`,
+			expectError:           true,
+			expectedErrorContains: "validation failed",
+		},
+		{
+			name:         "Schema validation fails - missing required field in data",
+			resourceType: "k8s_cluster",
+			commonRepresentation: map[string]interface{}{
+				"organization_id": "org-123",
+				// Missing required workspace_id
+			},
+			schema: `{
+				"$schema": "http://json-schema.org/draft-07/schema#",
+				"type": "object",
+				"properties": {
+					"workspace_id": { "type": "string" },
+					"organization_id": { "type": "string" }
+				},
+				"required": ["workspace_id", "organization_id"]
+			}`,
+			expectError:           true,
+			expectedErrorContains: "validation failed",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Setup schema in cache
+			schemaKey := fmt.Sprintf("common:%s", strings.ToLower(tt.resourceType))
+			middleware.SchemaCache.Store(schemaKey, tt.schema)
+
+			// Test the function
+			err := middleware.ValidateCommonRepresentation(tt.resourceType, tt.commonRepresentation)
+
+			if tt.expectError {
+				assert.Error(t, err)
+				if tt.expectedErrorContains != "" {
+					assert.Contains(t, err.Error(), tt.expectedErrorContains)
+				}
+			} else {
+				assert.NoError(t, err)
+			}
+
+			// Cleanup
+			middleware.SchemaCache.Delete(schemaKey)
+		})
+	}
 }

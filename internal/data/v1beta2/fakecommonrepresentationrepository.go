@@ -51,6 +51,12 @@ func (f *FakeCommonRepresentationRepository) Create(ctx context.Context, represe
 	return &copy, nil
 }
 
+// CreateWithTx creates a new CommonRepresentation (fake implementation ignores transaction)
+func (f *FakeCommonRepresentationRepository) CreateWithTx(ctx context.Context, db interface{}, representation *v1beta2.CommonRepresentation) (*v1beta2.CommonRepresentation, error) {
+	// For fake implementation, just delegate to Create (ignore transaction)
+	return f.Create(ctx, representation)
+}
+
 // Reset clears all data (useful for test cleanup)
 func (f *FakeCommonRepresentationRepository) Reset() {
 	f.mu.Lock()

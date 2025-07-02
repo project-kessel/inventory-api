@@ -63,6 +63,12 @@ func (f *FakeReporterRepresentationRepository) Create(ctx context.Context, repre
 	return &copy, nil
 }
 
+// CreateWithTx creates a new ReporterRepresentation (fake implementation ignores transaction)
+func (f *FakeReporterRepresentationRepository) CreateWithTx(ctx context.Context, db interface{}, representation *v1beta2.ReporterRepresentation) (*v1beta2.ReporterRepresentation, error) {
+	// For fake implementation, just delegate to Create (ignore transaction)
+	return f.Create(ctx, representation)
+}
+
 // Reset clears all data (useful for test cleanup)
 func (f *FakeReporterRepresentationRepository) Reset() {
 	f.mu.Lock()

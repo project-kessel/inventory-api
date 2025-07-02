@@ -11,16 +11,18 @@ import (
 
 // FakeResourceWithReferencesRepository is an in-memory fake implementation for testing
 type FakeResourceWithReferencesRepository struct {
-	mu         sync.RWMutex
-	resources  map[uuid.UUID]*v1beta2.Resource
-	references map[uuid.UUID][]*v1beta2.RepresentationReference // resourceID -> references
+	mu            sync.RWMutex
+	resources     map[uuid.UUID]*v1beta2.Resource
+	references    map[uuid.UUID][]*v1beta2.RepresentationReference // resourceID -> references
+	creationOrder []uuid.UUID                                      // Track creation order for consistent GetAllAggregates
 }
 
 // NewFakeResourceWithReferencesRepository creates a new fake repository
 func NewFakeResourceWithReferencesRepository() *FakeResourceWithReferencesRepository {
 	return &FakeResourceWithReferencesRepository{
-		resources:  make(map[uuid.UUID]*v1beta2.Resource),
-		references: make(map[uuid.UUID][]*v1beta2.RepresentationReference),
+		resources:     make(map[uuid.UUID]*v1beta2.Resource),
+		references:    make(map[uuid.UUID][]*v1beta2.RepresentationReference),
+		creationOrder: []uuid.UUID{},
 	}
 }
 
@@ -73,7 +75,15 @@ func (f *FakeResourceWithReferencesRepository) Create(ctx context.Context, aggre
 		RepresentationReferences: refCopies,
 	}
 
+	f.creationOrder = append(f.creationOrder, resourceID)
+
 	return result, nil
+}
+
+// CreateWithTx creates a new ResourceWithReferences (fake implementation ignores transaction)
+func (f *FakeResourceWithReferencesRepository) CreateWithTx(ctx context.Context, db interface{}, aggregate *v1beta2.ResourceWithReferences) (*v1beta2.ResourceWithReferences, error) {
+	// For fake implementation, just delegate to Create (ignore transaction)
+	return f.Create(ctx, aggregate)
 }
 
 // FindAllReferencesByReporterRepresentationId finds all representation references for the same resource_id
@@ -191,12 +201,25 @@ func (f *FakeResourceWithReferencesRepository) UpdateReporterRepresentationVersi
 	return f.UpdateRepresentationVersion(ctx, filter, newVersion)
 }
 
+// UpdateCommonRepresentationVersionWithTx updates the representation version for "inventory" reporter type using the provided transaction
+func (f *FakeResourceWithReferencesRepository) UpdateCommonRepresentationVersionWithTx(ctx context.Context, tx interface{}, resourceID uuid.UUID, newVersion int) (int64, error) {
+	// For fake implementation, ignore transaction and delegate to non-tx method
+	return f.UpdateCommonRepresentationVersion(ctx, resourceID, newVersion)
+}
+
+// UpdateReporterRepresentationVersionWithTx updates the representation version for a specific reporter using the provided transaction
+func (f *FakeResourceWithReferencesRepository) UpdateReporterRepresentationVersionWithTx(ctx context.Context, tx interface{}, resourceID uuid.UUID, reporterType string, localResourceID string, newVersion int) (int64, error) {
+	// For fake implementation, ignore transaction and delegate to non-tx method
+	return f.UpdateReporterRepresentationVersion(ctx, resourceID, reporterType, localResourceID, newVersion)
+}
+
 // Reset clears all data (useful for test cleanup)
 func (f *FakeResourceWithReferencesRepository) Reset() {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.resources = make(map[uuid.UUID]*v1beta2.Resource)
 	f.references = make(map[uuid.UUID][]*v1beta2.RepresentationReference)
+	f.creationOrder = []uuid.UUID{}
 }
 
 // Count returns the number of stored resources
@@ -225,7 +248,8 @@ func (f *FakeResourceWithReferencesRepository) GetAllAggregates() []*v1beta2.Res
 	defer f.mu.RUnlock()
 
 	result := make([]*v1beta2.ResourceWithReferences, 0, len(f.resources))
-	for resourceID, resource := range f.resources {
+	for _, resourceID := range f.creationOrder {
+		resource := f.resources[resourceID]
 		resourceCopy := *resource
 
 		var refCopies []*v1beta2.RepresentationReference

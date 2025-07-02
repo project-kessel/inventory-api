@@ -118,14 +118,6 @@ func createK8sClusterReporterData() map[string]interface{} {
 	}
 }
 
-// createK8sPolicyReporterData returns sample k8s_policy reporter data for testing
-func createK8sPolicyReporterData() map[string]interface{} {
-	return map[string]interface{}{
-		"policy_id":   "pol-abc123",
-		"policy_name": "security-policy",
-	}
-}
-
 // createCommonData returns sample common data for testing
 func createCommonData() map[string]interface{} {
 	return map[string]interface{}{

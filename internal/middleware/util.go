@@ -128,12 +128,12 @@ func ValidateCommonRepresentation(resourceType string, commonRepresentation map[
 	}
 
 	// If schema has required fields but commonRepresentation is nil/empty, that's an error
-	if hasRequiredFields && (commonRepresentation == nil || len(commonRepresentation) == 0) {
+	if hasRequiredFields && len(commonRepresentation) == 0 {
 		return fmt.Errorf("missing 'common' field in payload - schema for '%s' has required fields", resourceType)
 	}
 
 	// Validate data if present
-	if commonRepresentation != nil && len(commonRepresentation) > 0 {
+	if len(commonRepresentation) > 0 {
 		if err := ValidateJSONSchema(commonSchema, commonRepresentation); err != nil {
 			return fmt.Errorf("common representation validation failed for '%s': %w", resourceType, err)
 		}
@@ -170,7 +170,7 @@ func ValidateReporterRepresentation(resourceType string, reporterType string, re
 
 	// Case 1: No schema found for resourceType:reporterType
 	if err != nil {
-		if reporterRepresentation != nil && len(reporterRepresentation) > 0 {
+		if len(reporterRepresentation) > 0 {
 			return fmt.Errorf("no schema found for '%s', but reporter representation was provided. Submission is not allowed", schemaKey)
 		}
 		log.Debugf("no schema found for %s, treating as abstract reporter representation", schemaKey)
@@ -184,12 +184,12 @@ func ValidateReporterRepresentation(resourceType string, reporterType string, re
 	}
 
 	// If schema has required fields but reporterRepresentation is nil/empty, that's an error
-	if hasRequiredFields && (reporterRepresentation == nil || len(reporterRepresentation) == 0) {
+	if hasRequiredFields && len(reporterRepresentation) == 0 {
 		return fmt.Errorf("missing 'reporter' field in payload - schema for '%s' has required fields", schemaKey)
 	}
 
 	// Case 3: Validate data if present
-	if reporterRepresentation != nil && len(reporterRepresentation) > 0 {
+	if len(reporterRepresentation) > 0 {
 		if err := ValidateJSONSchema(reporterRepresentationSchema, reporterRepresentation); err != nil {
 			return fmt.Errorf("reporter representation validation failed for '%s': %w", schemaKey, err)
 		}

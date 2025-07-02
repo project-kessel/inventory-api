@@ -12,6 +12,7 @@ import (
 	"github.com/project-kessel/inventory-api/internal/biz/usecase"
 	relationshipsctl "github.com/project-kessel/inventory-api/internal/biz/usecase/v1beta1/relationships"
 	resourcesctl "github.com/project-kessel/inventory-api/internal/biz/usecase/v1beta1/resources"
+	"github.com/project-kessel/inventory-api/internal/data"
 	"github.com/project-kessel/inventory-api/internal/service"
 	relationshipssvc "github.com/project-kessel/inventory-api/internal/service/v1beta1/relationships/k8spolicy"
 	resourcesvc "github.com/project-kessel/inventory-api/internal/service/v1beta1/resources"
@@ -267,7 +268,8 @@ func NewCommand(
 			v1beta2_common_repo := datav1beta2.NewCommonRepresentationRepository(db)
 			v1beta2_reporter_repo := datav1beta2.NewReporterRepresentationRepository(db)
 			v1beta2_resource_repo := datav1beta2.NewResourceWithReferencesRepository(db)
-			v1beta2_controller := usecase.NewResourceUsecase(v1beta2_common_repo, v1beta2_reporter_repo, v1beta2_resource_repo, db, mc, "notifications", log.With(logger, "subsystem", "v1beta2_controller"))
+			v1beta2_transaction_manager := data.NewTransactionManager(storageConfig.Options.MaxSerializationRetries)
+			v1beta2_controller := usecase.NewResourceUsecase(v1beta2_common_repo, v1beta2_reporter_repo, v1beta2_resource_repo, db, v1beta2_transaction_manager, mc, "notifications", log.With(logger, "subsystem", "v1beta2_controller"))
 
 			inventory_service := service.NewKesselInventoryServiceV1beta2(inventory_controller)
 			inventory_service.SetV1beta2Controller(v1beta2_controller)

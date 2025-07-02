@@ -1,4 +1,4 @@
-package service_test
+package service
 
 import (
 	"context"
@@ -22,7 +22,6 @@ import (
 	authnapi "github.com/project-kessel/inventory-api/internal/authn/api"
 	"github.com/project-kessel/inventory-api/internal/middleware"
 	"github.com/project-kessel/inventory-api/internal/mocks"
-	svc "github.com/project-kessel/inventory-api/internal/service"
 )
 
 type MockRepo = mocks.MockedReporterResourceRepository
@@ -47,7 +46,7 @@ func TestRequestToResource_Success(t *testing.T) {
 	}
 	identity := &authnapi.Identity{Principal: "reporter-1"}
 
-	resource, err := svc.RequestToResource(req, identity)
+	resource, err := RequestToResource(req, identity)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, resource)
@@ -71,7 +70,7 @@ func TestRequestToResource_Error_InvalidInventoryID(t *testing.T) {
 	}
 	identity := &authnapi.Identity{Principal: "reporter-1"}
 
-	resource, err := svc.RequestToResource(req, identity)
+	resource, err := RequestToResource(req, identity)
 
 	assert.Error(t, err)
 	assert.Nil(t, resource)
@@ -92,7 +91,7 @@ func TestRequestToResource_Error_MissingReporterType(t *testing.T) {
 	}
 	identity := &authnapi.Identity{Principal: "reporter-1"}
 
-	resource, err := svc.RequestToResource(req, identity)
+	resource, err := RequestToResource(req, identity)
 
 	assert.Error(t, err)
 	assert.Nil(t, resource)
@@ -113,7 +112,7 @@ func TestRequestToResource_Error_MissingReporterInstanceId(t *testing.T) {
 	}
 	identity := &authnapi.Identity{Principal: "reporter-1"}
 
-	resource, err := svc.RequestToResource(req, identity)
+	resource, err := RequestToResource(req, identity)
 
 	assert.Error(t, err)
 	assert.Nil(t, resource)
@@ -144,7 +143,7 @@ func TestInventoryService_ReportResource_MissingReporterType(t *testing.T) {
 	uc := &usecase.Usecase{
 		Log: krlog.NewHelper(krlog.NewStdLogger(io.Discard)),
 	}
-	service := svc.NewKesselInventoryServiceV1beta2(uc)
+	service := NewKesselInventoryServiceV1beta2(uc)
 
 	resp, err := service.ReportResource(ctx, req)
 
@@ -176,7 +175,7 @@ func TestInventoryService_ReportResource_MissingReporterInstanceId(t *testing.T)
 	uc := &usecase.Usecase{
 		Log: krlog.NewHelper(krlog.NewStdLogger(io.Discard)),
 	}
-	service := svc.NewKesselInventoryServiceV1beta2(uc)
+	service := NewKesselInventoryServiceV1beta2(uc)
 
 	resp, err := service.ReportResource(ctx, req)
 
@@ -212,7 +211,7 @@ func TestInventoryService_ReportResource_InvalidJsonObject(t *testing.T) {
 		Log: krlog.NewHelper(krlog.NewStdLogger(io.Discard)),
 	}
 
-	service := svc.NewKesselInventoryServiceV1beta2(uc)
+	service := NewKesselInventoryServiceV1beta2(uc)
 
 	resp, err := service.ReportResource(ctx, req)
 
@@ -246,7 +245,7 @@ func TestInventoryService_ReportResource_InvalidInventoryId(t *testing.T) {
 	uc := &usecase.Usecase{
 		Log: krlog.NewHelper(krlog.NewStdLogger(io.Discard)),
 	}
-	service := svc.NewKesselInventoryServiceV1beta2(uc)
+	service := NewKesselInventoryServiceV1beta2(uc)
 
 	resp, err := service.ReportResource(ctx, req)
 
@@ -256,7 +255,7 @@ func TestInventoryService_ReportResource_InvalidInventoryId(t *testing.T) {
 }
 
 func TestResponseFromResource(t *testing.T) {
-	resp := svc.ResponseFromResource()
+	resp := ResponseFromResource()
 
 	assert.NotNil(t, resp)
 	assert.IsType(t, &pb.ReportResourceResponse{}, resp)
@@ -302,7 +301,7 @@ func TestInventoryService_DeleteResource_Success(t *testing.T) {
 		Log:                        krlog.NewHelper(krlog.NewStdLogger(io.Discard)),
 	}
 
-	service := svc.NewKesselInventoryServiceV1beta2(uc)
+	service := NewKesselInventoryServiceV1beta2(uc)
 
 	resp, err := service.DeleteResource(ctx, req)
 
@@ -318,7 +317,7 @@ func TestInventoryService_DeleteResource_NoIdentity(t *testing.T) {
 	req := &pb.DeleteResourceRequest{}
 
 	uc := &usecase.Usecase{}
-	service := svc.NewKesselInventoryServiceV1beta2(uc)
+	service := NewKesselInventoryServiceV1beta2(uc)
 
 	resp, err := service.DeleteResource(ctx, req)
 
@@ -336,7 +335,7 @@ func TestInventoryService_DeleteResource_InvalidRequest(t *testing.T) {
 	}
 
 	uc := &usecase.Usecase{}
-	service := svc.NewKesselInventoryServiceV1beta2(uc)
+	service := NewKesselInventoryServiceV1beta2(uc)
 
 	resp, err := service.DeleteResource(ctx, req)
 
@@ -390,7 +389,7 @@ func TestInventoryService_Check_Allowed(t *testing.T) {
 		Config:                     cfg,
 	}
 
-	service := svc.NewKesselInventoryServiceV1beta2(uc)
+	service := NewKesselInventoryServiceV1beta2(uc)
 
 	resp, err := service.Check(ctx, req)
 
@@ -448,7 +447,7 @@ func TestInventoryService_CheckForUpdate_Allowed(t *testing.T) {
 		Config:                     cfg,
 	}
 
-	service := svc.NewKesselInventoryServiceV1beta2(uc)
+	service := NewKesselInventoryServiceV1beta2(uc)
 
 	resp, err := service.CheckForUpdate(ctx, req)
 
@@ -506,7 +505,7 @@ func TestInventoryService_Check_Denied(t *testing.T) {
 		Config:                     cfg,
 	}
 
-	service := svc.NewKesselInventoryServiceV1beta2(uc)
+	service := NewKesselInventoryServiceV1beta2(uc)
 
 	resp, err := service.Check(ctx, req)
 
@@ -564,7 +563,7 @@ func TestInventoryService_CheckForUpdate_Denied(t *testing.T) {
 		Config:                     cfg,
 	}
 
-	service := svc.NewKesselInventoryServiceV1beta2(uc)
+	service := NewKesselInventoryServiceV1beta2(uc)
 
 	resp, err := service.CheckForUpdate(ctx, req)
 
@@ -619,7 +618,7 @@ func TestToLookupResourceRequest(t *testing.T) {
 		},
 	}
 
-	result, _ := svc.ToLookupResourceRequest(input)
+	result, _ := ToLookupResourceRequest(input)
 	assert.Equal(t, expected, result)
 }
 
@@ -628,7 +627,7 @@ func TestIsValidatedRepresentationType(t *testing.T) {
 	assert.True(t, IsValidType("hbi"))
 
 	// normalize then validate
-	normalized := svc.NormalizeType("HBI")
+	normalized := NormalizeType("HBI")
 	assert.True(t, IsValidType(normalized))
 	// strange characters
 	assert.False(t, IsValidType("h?!!!"))
@@ -636,7 +635,7 @@ func TestIsValidatedRepresentationType(t *testing.T) {
 
 func TestNormalizeRepresentationType(t *testing.T) {
 	// normalize then validate
-	normalized := svc.NormalizeType("HBI")
+	normalized := NormalizeType("HBI")
 	assert.True(t, IsValidType(normalized))
 
 	assert.Equal(t, "hbi", normalized)
@@ -674,6 +673,6 @@ func TestToLookupResourceResponse(t *testing.T) {
 		},
 	}
 
-	result := svc.ToLookupResourceResponse(input)
+	result := ToLookupResourceResponse(input)
 	assert.Equal(t, expected, result)
 }

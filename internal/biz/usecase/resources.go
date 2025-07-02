@@ -1,4 +1,4 @@
-package resources
+package usecase
 
 import (
 	"context"
@@ -7,11 +7,11 @@ import (
 
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/google/uuid"
+	v1beta3 "github.com/project-kessel/inventory-api/internal/biz/model/v1beta2"
 	"gorm.io/gorm"
 
 	"github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
-	modelsv1beta2 "github.com/project-kessel/inventory-api/internal/biz/model/v1beta2"
 	"github.com/project-kessel/inventory-api/internal/data"
 	datav1beta2 "github.com/project-kessel/inventory-api/internal/data/v1beta2"
 	"github.com/project-kessel/inventory-api/internal/metricscollector"
@@ -19,9 +19,9 @@ import (
 
 // ResourceUsecase handles v1beta2 resource operations with a simplified approach
 type ResourceUsecase struct {
-	CommonRepresentationRepository   modelsv1beta2.CommonRepresentationRepository
-	ReporterRepresentationRepository modelsv1beta2.ReporterRepresentationRepository
-	ResourceWithReferencesRepository modelsv1beta2.ResourceWithReferencesRepository
+	CommonRepresentationRepository   v1beta3.CommonRepresentationRepository
+	ReporterRepresentationRepository v1beta3.ReporterRepresentationRepository
+	ResourceWithReferencesRepository v1beta3.ResourceWithReferencesRepository
 	DB                               *gorm.DB
 	MetricsCollector                 *metricscollector.MetricsCollector
 	Namespace                        string
@@ -30,9 +30,9 @@ type ResourceUsecase struct {
 
 // NewResourceUsecase creates a new v1beta2 usecase with minimal dependencies
 func NewResourceUsecase(
-	commonRepresentationRepository modelsv1beta2.CommonRepresentationRepository,
-	reporterRepresentationRepository modelsv1beta2.ReporterRepresentationRepository,
-	resourceWithReferencesRepository modelsv1beta2.ResourceWithReferencesRepository,
+	commonRepresentationRepository v1beta3.CommonRepresentationRepository,
+	reporterRepresentationRepository v1beta3.ReporterRepresentationRepository,
+	resourceWithReferencesRepository v1beta3.ResourceWithReferencesRepository,
 	database *gorm.DB,
 	metricsCollector *metricscollector.MetricsCollector,
 	namespace string,
@@ -63,7 +63,7 @@ func (usecase *ResourceUsecase) UpsertResource(ctx context.Context, request *v1b
 		transactionIdString := transactionId.String()
 
 		// Create reporter representation ID for lookup
-		reporterRepresentationId := modelsv1beta2.ReporterRepresentationId{
+		reporterRepresentationId := v1beta3.ReporterRepresentationId{
 			LocalResourceID:    request.GetRepresentations().GetMetadata().GetLocalResourceId(),
 			ReporterType:       request.GetReporterType(),
 			ResourceType:       request.GetType(),
@@ -112,14 +112,14 @@ func (usecase *ResourceUsecase) createNewResource(ctx context.Context, transacti
 	}
 
 	// Create Resource entity
-	resource := &modelsv1beta2.Resource{
+	resource := &v1beta3.Resource{
 		ID:   resourceId,
 		Type: request.GetType(),
 	}
 
 	// Create CommonRepresentation
-	commonRepresentation := &modelsv1beta2.CommonRepresentation{
-		BaseRepresentation: modelsv1beta2.BaseRepresentation{
+	commonRepresentation := &v1beta3.CommonRepresentation{
+		BaseRepresentation: v1beta3.BaseRepresentation{
 			Data: request.GetRepresentations().GetCommon().AsMap(),
 		},
 		LocalResourceID: resourceId.String(),
@@ -130,7 +130,7 @@ func (usecase *ResourceUsecase) createNewResource(ctx context.Context, transacti
 	}
 
 	// Create RepresentationReference for Common Representation
-	commonReference := &modelsv1beta2.RepresentationReference{
+	commonReference := &v1beta3.RepresentationReference{
 		ResourceID:            resourceId,
 		LocalResourceID:       resourceId.String(),
 		ReporterType:          "inventory",
@@ -141,8 +141,8 @@ func (usecase *ResourceUsecase) createNewResource(ctx context.Context, transacti
 	}
 
 	// Create ReporterRepresentation
-	reporterRepresentation := &modelsv1beta2.ReporterRepresentation{
-		BaseRepresentation: modelsv1beta2.BaseRepresentation{
+	reporterRepresentation := &v1beta3.ReporterRepresentation{
+		BaseRepresentation: v1beta3.BaseRepresentation{
 			Data: request.GetRepresentations().GetReporter().AsMap(),
 		},
 		LocalResourceID:    request.GetRepresentations().GetMetadata().GetLocalResourceId(),
@@ -159,7 +159,7 @@ func (usecase *ResourceUsecase) createNewResource(ctx context.Context, transacti
 	}
 
 	// Create RepresentationReference for Reporter Representation
-	reporterReference := &modelsv1beta2.RepresentationReference{
+	reporterReference := &v1beta3.RepresentationReference{
 		ResourceID:            resourceId,
 		LocalResourceID:       request.GetRepresentations().GetMetadata().GetLocalResourceId(),
 		ReporterType:          request.GetReporterType(),
@@ -171,9 +171,9 @@ func (usecase *ResourceUsecase) createNewResource(ctx context.Context, transacti
 	}
 
 	// Create ResourceWithReferences aggregate
-	resourceWithReferences := &modelsv1beta2.ResourceWithReferences{
+	resourceWithReferences := &v1beta3.ResourceWithReferences{
 		Resource:                 resource,
-		RepresentationReferences: []*modelsv1beta2.RepresentationReference{commonReference, reporterReference},
+		RepresentationReferences: []*v1beta3.RepresentationReference{commonReference, reporterReference},
 	}
 
 	resourceRepository := usecase.ResourceWithReferencesRepository.(*datav1beta2.ResourceWithReferencesRepository)
@@ -208,7 +208,7 @@ func (usecase *ResourceUsecase) createNewResource(ctx context.Context, transacti
 }
 
 // updateExistingResource handles the update scenario when existing references are found
-func (usecase *ResourceUsecase) updateExistingResource(ctx context.Context, transaction *gorm.DB, request *v1beta2.ReportResourceRequest, existingReferences []*modelsv1beta2.RepresentationReference, transactionIdString string) error {
+func (usecase *ResourceUsecase) updateExistingResource(ctx context.Context, transaction *gorm.DB, request *v1beta2.ReportResourceRequest, existingReferences []*v1beta3.RepresentationReference, transactionIdString string) error {
 	// Get the resource ID from the first reference (all references should have the same resource_id)
 	resourceID := existingReferences[0].ResourceID
 
@@ -225,16 +225,16 @@ func (usecase *ResourceUsecase) updateExistingResource(ctx context.Context, tran
 	}
 
 	// Variables to track what we create for outbox events
-	var updatedCommonRepresentation *modelsv1beta2.CommonRepresentation
-	var updatedReporterRepresentation *modelsv1beta2.ReporterRepresentation
+	var updatedCommonRepresentation *v1beta3.CommonRepresentation
+	var updatedReporterRepresentation *v1beta3.ReporterRepresentation
 
 	// Handle common representation update if provided
 	if request.GetRepresentations().GetCommon() != nil {
 		newCommonVersion := currentCommonVersion + 1
 
 		// Create new CommonRepresentation with incremented version
-		updatedCommonRepresentation = &modelsv1beta2.CommonRepresentation{
-			BaseRepresentation: modelsv1beta2.BaseRepresentation{
+		updatedCommonRepresentation = &v1beta3.CommonRepresentation{
+			BaseRepresentation: v1beta3.BaseRepresentation{
 				Data: request.GetRepresentations().GetCommon().AsMap(),
 			},
 			LocalResourceID: resourceID.String(),
@@ -279,8 +279,8 @@ func (usecase *ResourceUsecase) updateExistingResource(ctx context.Context, tran
 		}
 
 		// Create new ReporterRepresentation with incremented version
-		updatedReporterRepresentation = &modelsv1beta2.ReporterRepresentation{
-			BaseRepresentation: modelsv1beta2.BaseRepresentation{
+		updatedReporterRepresentation = &v1beta3.ReporterRepresentation{
+			BaseRepresentation: v1beta3.BaseRepresentation{
 				Data: request.GetRepresentations().GetReporter().AsMap(),
 			},
 			LocalResourceID:    request.GetRepresentations().GetMetadata().GetLocalResourceId(),
@@ -312,7 +312,7 @@ func (usecase *ResourceUsecase) updateExistingResource(ctx context.Context, tran
 	}
 
 	// Load the resource for outbox events (we only need this one query)
-	var resource modelsv1beta2.Resource
+	var resource v1beta3.Resource
 	err := transaction.Where("id = ?", resourceID).First(&resource).Error
 	if err != nil {
 		return err
@@ -321,7 +321,7 @@ func (usecase *ResourceUsecase) updateExistingResource(ctx context.Context, tran
 	// For outbox events, we need to handle the case where only some representations were updated
 	// If no common representation was updated, we need to get the latest one
 	if updatedCommonRepresentation == nil {
-		updatedCommonRepresentation = &modelsv1beta2.CommonRepresentation{}
+		updatedCommonRepresentation = &v1beta3.CommonRepresentation{}
 		err = transaction.Where("local_resource_id = ? AND reporter_type = ? AND resource_type = ?",
 			resourceID.String(), "inventory", request.GetType()).
 			Order("version DESC").First(updatedCommonRepresentation).Error
@@ -332,7 +332,7 @@ func (usecase *ResourceUsecase) updateExistingResource(ctx context.Context, tran
 
 	// If no reporter representation was updated, we need to get the latest one
 	if updatedReporterRepresentation == nil {
-		updatedReporterRepresentation = &modelsv1beta2.ReporterRepresentation{}
+		updatedReporterRepresentation = &v1beta3.ReporterRepresentation{}
 		err = transaction.Where("local_resource_id = ? AND reporter_type = ? AND resource_type = ? AND reporter_instance_id = ?",
 			request.GetRepresentations().GetMetadata().GetLocalResourceId(),
 			request.GetReporterType(),
@@ -357,7 +357,7 @@ func (usecase *ResourceUsecase) updateExistingResource(ctx context.Context, tran
 }
 
 // publishOutboxEvents creates and publishes outbox events for the resource
-func (usecase *ResourceUsecase) publishOutboxEvents(transaction *gorm.DB, resource *modelsv1beta2.Resource, commonRepresentation *modelsv1beta2.CommonRepresentation, reporterRepresentation *modelsv1beta2.ReporterRepresentation, operationType model.EventOperationType, transactionId string) error {
+func (usecase *ResourceUsecase) publishOutboxEvents(transaction *gorm.DB, resource *v1beta3.Resource, commonRepresentation *v1beta3.CommonRepresentation, reporterRepresentation *v1beta3.ReporterRepresentation, operationType model.EventOperationType, transactionId string) error {
 	// Convert to legacy format for outbox events
 	legacyResource := usecase.convertToLegacyResource(resource, commonRepresentation, reporterRepresentation)
 
@@ -380,7 +380,7 @@ func (usecase *ResourceUsecase) publishOutboxEvents(transaction *gorm.DB, resour
 }
 
 // convertToLegacyResource converts v1beta2 models to legacy model.Resource
-func (usecase *ResourceUsecase) convertToLegacyResource(resource *modelsv1beta2.Resource, commonRepresentation *modelsv1beta2.CommonRepresentation, reporterRepresentation *modelsv1beta2.ReporterRepresentation) *model.Resource {
+func (usecase *ResourceUsecase) convertToLegacyResource(resource *v1beta3.Resource, commonRepresentation *v1beta3.CommonRepresentation, reporterRepresentation *v1beta3.ReporterRepresentation) *model.Resource {
 	// Extract basic fields from common representation data
 	var organizationId, workspaceId string
 	var labels model.Labels

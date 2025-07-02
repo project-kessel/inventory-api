@@ -7,15 +7,14 @@ import (
 	"io"
 	"time"
 
-	"github.com/project-kessel/inventory-api/internal/biz/usecase/resources"
+	"github.com/project-kessel/inventory-api/internal/biz/model"
+	"github.com/project-kessel/inventory-api/internal/biz/usecase/v1beta1/resources"
 
 	"google.golang.org/grpc"
 
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
 	"google.golang.org/protobuf/types/known/timestamppb"
-
-	"github.com/project-kessel/inventory-api/internal/biz/model"
 
 	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/resources"
 	authnapi "github.com/project-kessel/inventory-api/internal/authn/api"

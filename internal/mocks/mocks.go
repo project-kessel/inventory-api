@@ -5,6 +5,7 @@ import (
 	"io"
 
 	"github.com/google/uuid"
+	"github.com/project-kessel/inventory-api/internal/biz/model"
 	"github.com/project-kessel/inventory-api/internal/pubsub"
 	"google.golang.org/grpc/metadata"
 
@@ -16,8 +17,6 @@ import (
 	"github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
 	"github.com/stretchr/testify/mock"
 	"google.golang.org/grpc"
-
-	"github.com/project-kessel/inventory-api/internal/biz/model"
 )
 
 type MockHealthRepo struct {

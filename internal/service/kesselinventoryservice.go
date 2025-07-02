@@ -1,4 +1,4 @@
-package resources
+package service
 
 import (
 	"context"
@@ -6,11 +6,13 @@ import (
 	"io"
 	"strings"
 
+	"github.com/project-kessel/inventory-api/internal/biz/model"
+	"github.com/project-kessel/inventory-api/internal/biz/usecase"
+	"github.com/project-kessel/inventory-api/internal/biz/usecase/v1beta1/resources"
+
 	"github.com/go-kratos/kratos/v2/log"
 	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2"
 	authnapi "github.com/project-kessel/inventory-api/internal/authn/api"
-	"github.com/project-kessel/inventory-api/internal/biz/model"
-	"github.com/project-kessel/inventory-api/internal/biz/usecase/resources"
 	"github.com/project-kessel/inventory-api/internal/middleware"
 	conv "github.com/project-kessel/inventory-api/internal/service/common"
 	pbv1beta1 "github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
@@ -19,7 +21,7 @@ import (
 type InventoryService struct {
 	pb.UnimplementedKesselInventoryServiceServer
 	Ctl        *resources.Usecase
-	V1beta2Ctl *resources.ResourceUsecase
+	V1beta2Ctl *usecase.ResourceUsecase
 }
 
 func NewKesselInventoryServiceV1beta2(c *resources.Usecase) *InventoryService {
@@ -29,7 +31,7 @@ func NewKesselInventoryServiceV1beta2(c *resources.Usecase) *InventoryService {
 	}
 }
 
-func (s *InventoryService) SetV1beta2Controller(v1beta2Ctl *resources.ResourceUsecase) {
+func (s *InventoryService) SetV1beta2Controller(v1beta2Ctl *usecase.ResourceUsecase) {
 	s.V1beta2Ctl = v1beta2Ctl
 }
 

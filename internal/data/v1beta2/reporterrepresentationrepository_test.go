@@ -5,13 +5,13 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/project-kessel/inventory-api/internal/biz/model/v1beta2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 
 	"github.com/project-kessel/inventory-api/internal/biz/model"
-	"github.com/project-kessel/inventory-api/internal/biz/model/v1beta2"
 )
 
 // setupReporterTestDB creates an in-memory SQLite database for testing

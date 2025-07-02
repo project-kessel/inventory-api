@@ -3,12 +3,11 @@ package data
 import (
 	"fmt"
 
+	"github.com/project-kessel/inventory-api/internal/biz/model/v1beta2"
 	"gorm.io/gorm"
 
-	"github.com/project-kessel/inventory-api/internal/biz/model"
-	"github.com/project-kessel/inventory-api/internal/biz/model/v1beta2"
-
 	"github.com/go-kratos/kratos/v2/log"
+	"github.com/project-kessel/inventory-api/internal/biz/model"
 )
 
 // Migrate the tables

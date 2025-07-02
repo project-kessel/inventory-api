@@ -5,6 +5,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/project-kessel/inventory-api/internal/biz/model"
 	"google.golang.org/grpc"
 
 	"sync"
@@ -19,9 +20,8 @@ import (
 	kessel "github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
 	"gorm.io/gorm"
 
-	common "github.com/project-kessel/inventory-api/cmd/common"
+	"github.com/project-kessel/inventory-api/cmd/common"
 	authzapi "github.com/project-kessel/inventory-api/internal/authz/api"
-	"github.com/project-kessel/inventory-api/internal/biz/model"
 	eventingapi "github.com/project-kessel/inventory-api/internal/eventing/api"
 	"github.com/project-kessel/inventory-api/internal/server"
 )

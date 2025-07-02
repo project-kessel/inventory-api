@@ -9,6 +9,17 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/project-kessel/inventory-api/internal/biz/usecase"
+	relationshipsctl "github.com/project-kessel/inventory-api/internal/biz/usecase/v1beta1/relationships"
+	resourcesctl "github.com/project-kessel/inventory-api/internal/biz/usecase/v1beta1/resources"
+	"github.com/project-kessel/inventory-api/internal/service"
+	relationshipssvc "github.com/project-kessel/inventory-api/internal/service/v1beta1/relationships/k8spolicy"
+	resourcesvc "github.com/project-kessel/inventory-api/internal/service/v1beta1/resources"
+	hostssvc "github.com/project-kessel/inventory-api/internal/service/v1beta1/resources/hosts"
+	k8sclusterssvc "github.com/project-kessel/inventory-api/internal/service/v1beta1/resources/k8sclusters"
+	k8spoliciessvc "github.com/project-kessel/inventory-api/internal/service/v1beta1/resources/k8spolicies"
+	notifssvc "github.com/project-kessel/inventory-api/internal/service/v1beta1/resources/notificationsintegrations"
+
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/project-kessel/inventory-api/internal/metricscollector"
 	"github.com/sony/gobreaker"
@@ -17,8 +28,6 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/project-kessel/inventory-api/cmd/common"
-	relationshipsctl "github.com/project-kessel/inventory-api/internal/biz/usecase/relationships"
-	resourcesctl "github.com/project-kessel/inventory-api/internal/biz/usecase/resources"
 	"github.com/project-kessel/inventory-api/internal/consistency"
 	"github.com/project-kessel/inventory-api/internal/consumer"
 	inventoryResourcesRepo "github.com/project-kessel/inventory-api/internal/data/inventoryresources"
@@ -26,14 +35,6 @@ import (
 	resourcerepo "github.com/project-kessel/inventory-api/internal/data/resources"
 	datav1beta2 "github.com/project-kessel/inventory-api/internal/data/v1beta2"
 	"github.com/project-kessel/inventory-api/internal/pubsub"
-	relationshipssvc "github.com/project-kessel/inventory-api/internal/service/relationships/k8spolicy"
-	hostssvc "github.com/project-kessel/inventory-api/internal/service/resources/hosts"
-	k8sclusterssvc "github.com/project-kessel/inventory-api/internal/service/resources/k8sclusters"
-	k8spoliciessvc "github.com/project-kessel/inventory-api/internal/service/resources/k8spolicies"
-	notifssvc "github.com/project-kessel/inventory-api/internal/service/resources/notificationsintegrations"
-
-	//v1beta2
-	resourcesvc "github.com/project-kessel/inventory-api/internal/service/resources"
 
 	"github.com/project-kessel/inventory-api/internal/authn"
 	"github.com/project-kessel/inventory-api/internal/authz"
@@ -266,9 +267,9 @@ func NewCommand(
 			v1beta2_common_repo := datav1beta2.NewCommonRepresentationRepository(db)
 			v1beta2_reporter_repo := datav1beta2.NewReporterRepresentationRepository(db)
 			v1beta2_resource_repo := datav1beta2.NewResourceWithReferencesRepository(db)
-			v1beta2_controller := resourcesctl.NewResourceUsecase(v1beta2_common_repo, v1beta2_reporter_repo, v1beta2_resource_repo, db, mc, "notifications", log.With(logger, "subsystem", "v1beta2_controller"))
+			v1beta2_controller := usecase.NewResourceUsecase(v1beta2_common_repo, v1beta2_reporter_repo, v1beta2_resource_repo, db, mc, "notifications", log.With(logger, "subsystem", "v1beta2_controller"))
 
-			inventory_service := resourcesvc.NewKesselInventoryServiceV1beta2(inventory_controller)
+			inventory_service := service.NewKesselInventoryServiceV1beta2(inventory_controller)
 			inventory_service.SetV1beta2Controller(v1beta2_controller)
 			pbv1beta2.RegisterKesselInventoryServiceServer(server.GrpcServer, inventory_service)
 			pbv1beta2.RegisterKesselInventoryServiceHTTPServer(server.HttpServer, inventory_service)

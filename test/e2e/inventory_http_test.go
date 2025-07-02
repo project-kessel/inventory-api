@@ -16,7 +16,7 @@ import (
 	v1 "github.com/project-kessel/inventory-api/api/kessel/inventory/v1"
 	"github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/relationships"
 	"github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/resources"
-	"github.com/project-kessel/inventory-api/internal/biz/model"
+	v1beta2 "github.com/project-kessel/inventory-api/internal/biz/model"
 	"github.com/project-kessel/inventory-client-go/common"
 	"github.com/project-kessel/inventory-client-go/v1beta1"
 	"github.com/stretchr/testify/assert"
@@ -671,7 +671,7 @@ func TestInventoryAPIHTTP_NotificationsIntegrationLifecycle_ConsistencyToken(t *
 	_, err = client.NotificationIntegrationClient.CreateNotificationsIntegration(context.Background(), &createRequest, opts...)
 	assert.NoError(t, err, "Failed to create Notifications Integration")
 
-	var integration model.Resource
+	var integration v1beta2.Resource
 	err = db.Where("reporter_resource_id = ?", resourceId).First(&integration).Error
 	assert.NoError(t, err, "Failed to find Notifications Integration in DB")
 	assert.NotNil(t, integration, "Notifications Integration not found in DB")

@@ -1,4 +1,4 @@
-package resources_test
+package service_test
 
 import (
 	"context"
@@ -10,6 +10,8 @@ import (
 	krlog "github.com/go-kratos/kratos/v2/log"
 	"github.com/google/uuid"
 	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2"
+	"github.com/project-kessel/inventory-api/internal/biz/model"
+	usecase "github.com/project-kessel/inventory-api/internal/biz/usecase/v1beta1/resources"
 	relationsV1beta1 "github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
 	"google.golang.org/protobuf/types/known/structpb"
 
@@ -18,11 +20,9 @@ import (
 	"gorm.io/gorm"
 
 	authnapi "github.com/project-kessel/inventory-api/internal/authn/api"
-	"github.com/project-kessel/inventory-api/internal/biz/model"
-	usecase "github.com/project-kessel/inventory-api/internal/biz/usecase/resources"
 	"github.com/project-kessel/inventory-api/internal/middleware"
 	"github.com/project-kessel/inventory-api/internal/mocks"
-	svc "github.com/project-kessel/inventory-api/internal/service/resources"
+	svc "github.com/project-kessel/inventory-api/internal/service"
 )
 
 type MockRepo = mocks.MockedReporterResourceRepository

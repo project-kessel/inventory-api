@@ -3,13 +3,13 @@ package resources
 import (
 	"context"
 
-	"github.com/project-kessel/inventory-api/internal/biz/usecase/resources"
+	v1beta2 "github.com/project-kessel/inventory-api/internal/biz/model"
+	"github.com/project-kessel/inventory-api/internal/biz/usecase/v1beta1/resources"
 
 	"github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
 
 	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/authz"
 	authnapi "github.com/project-kessel/inventory-api/internal/authn/api"
-	"github.com/project-kessel/inventory-api/internal/biz/model"
 	"github.com/project-kessel/inventory-api/internal/middleware"
 )
 
@@ -82,8 +82,8 @@ func (s *KesselCheckServiceService) CheckForUpdate(ctx context.Context, req *pb.
 	}
 }
 
-func authzFromRequest(identity *authnapi.Identity, resource *pb.ObjectReference) (*model.ReporterResourceId, error) {
-	return &model.ReporterResourceId{
+func authzFromRequest(identity *authnapi.Identity, resource *pb.ObjectReference) (*v1beta2.ReporterResourceId, error) {
+	return &v1beta2.ReporterResourceId{
 		LocalResourceId: resource.Id,
 		ResourceType:    resource.Type.Name,
 		ReporterId:      identity.Principal,

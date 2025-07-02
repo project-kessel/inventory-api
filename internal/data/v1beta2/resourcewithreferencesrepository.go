@@ -5,9 +5,8 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
-	"gorm.io/gorm"
-
 	"github.com/project-kessel/inventory-api/internal/biz/model/v1beta2"
+	"gorm.io/gorm"
 )
 
 type ResourceWithReferencesRepository struct {

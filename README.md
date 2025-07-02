@@ -258,10 +258,10 @@ To add a notifications integration (useful for testing in stage)
 
 ```shell
 # create the integration (auth is required for stage -- see internal docs)
-curl -H "Content-Type: application/json" -H "Authorization: Bearer $TOKEN" -d @data/testdata/v1beta1/notifications-integrations.json localhost:8000/api/inventory/v1beta1/resources/notifications-integrations
+curl -H "Content-Type: application/json" -H "Authorization: Bearer $TOKEN" -d @data/testData/v1beta1/notifications-integrations.json localhost:8000/api/inventory/v1beta1/resources/notifications-integrations
 
 # delete the integration
-curl -X DELETE -H "Content-Type: application/json" -H "Authorization: Bearer $TOKEN" -d @data/testdata/v1beta1/notifications-integration-reporter.json localhost:8000/api/inventory/v1beta1/resources/notifications-integrations
+curl -X DELETE -H "Content-Type: application/json" -H "Authorization: Bearer $TOKEN" -d @data/testData/v1beta1/notifications-integration-reporter.json localhost:8000/api/inventory/v1beta1/resources/notifications-integrations
 
 ```
 ### Adding a new relationship (k8s-policy is propagated to k8s-cluster)

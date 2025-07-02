@@ -64,27 +64,12 @@ func ValidateReportResourceJSON(msg proto.Message) error {
 		return err
 	}
 
-	resourceType, err := ExtractStringField(reportResourceMap, "type")
+	resourceType, err := ExtractStringField(reportResourceMap, "type", ValidateFieldExists())
 	if err != nil {
 		return err
 	}
 
-	reporterType, err := ExtractStringField(reportResourceMap, "reporterType")
-	if err != nil {
-		return err
-	}
-
-	resourceRepresentation, err := ExtractMapField(reportResourceMap, "representations")
-	if err != nil {
-		return err
-	}
-
-	reporterRepresentation, err := ExtractMapField(resourceRepresentation, "reporter")
-	if err != nil {
-		return err
-	}
-
-	commonRepresentation, err := ExtractMapField(resourceRepresentation, "common")
+	reporterType, err := ExtractStringField(reportResourceMap, "reporterType", ValidateFieldExists())
 	if err != nil {
 		return err
 	}
@@ -94,8 +79,23 @@ func ValidateReportResourceJSON(msg proto.Message) error {
 		return err
 	}
 
+	representations, err := ExtractMapField(reportResourceMap, "representations", ValidateFieldExists())
+	if err != nil {
+		return err
+	}
+
+	reporterRepresentation, err := ExtractMapField(representations, "reporter")
+	if err != nil {
+		return err
+	}
+
 	// Validate reporter-specific data
 	if err := ValidateReporterRepresentation(resourceType, reporterType, reporterRepresentation); err != nil {
+		return err
+	}
+
+	commonRepresentation, err := ExtractMapField(representations, "common")
+	if err != nil {
 		return err
 	}
 

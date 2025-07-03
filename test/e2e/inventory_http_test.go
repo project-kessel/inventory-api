@@ -16,7 +16,6 @@ import (
 	v1 "github.com/project-kessel/inventory-api/api/kessel/inventory/v1"
 	"github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/relationships"
 	"github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/resources"
-	v1beta2 "github.com/project-kessel/inventory-api/internal/biz/model"
 	"github.com/project-kessel/inventory-client-go/common"
 	"github.com/project-kessel/inventory-client-go/v1beta1"
 	"github.com/stretchr/testify/assert"
@@ -174,74 +173,6 @@ func TestInventoryAPIHTTP_Metrics(t *testing.T) {
 	expectedStatusString := "200 OK"
 	assert.Equal(t, expectedStatusCode, resp.StatusCode)
 	assert.Equal(t, expectedStatusString, resp.Status)
-}
-
-func TestInventoryAPIHTTP_v1beta1_RHELHostLifecycle(t *testing.T) {
-	enableShortMode(t)
-	t.Parallel()
-	c := common.NewConfig(
-		common.WithHTTPUrl(inventoryapi_http_url),
-		common.WithTLSInsecure(insecure),
-		common.WithHTTPTLSConfig(tlsConfig),
-		common.WithTimeout(10*time.Second),
-	)
-	client, err := v1beta1.NewHttpClient(context.Background(), c)
-	if err != nil {
-		t.Error(err)
-	}
-	createRequest := resources.CreateRhelHostRequest{
-		RhelHost: &resources.RhelHost{
-			Metadata: &resources.Metadata{
-				ResourceType: "rhel_host",
-				WorkspaceId:  "workspace",
-				OrgId:        "",
-			},
-			ReporterData: &resources.ReporterData{
-				ReporterInstanceId: "user@example.com",
-				ReporterType:       resources.ReporterData_HBI,
-				ConsoleHref:        "www.example.com",
-				ApiHref:            "www.example.com",
-				LocalResourceId:    "0123",
-				ReporterVersion:    "0.1",
-			},
-		},
-	}
-	opts := getCallOptions()
-	_, err = client.RhelHostServiceClient.CreateRhelHost(context.Background(), &createRequest, opts...)
-	assert.NoError(t, err, "Failed to create RhelHost")
-
-	updateRequest := resources.UpdateRhelHostRequest{
-		RhelHost: &resources.RhelHost{
-			Metadata: &resources.Metadata{
-				ResourceType: "rhel_host",
-				WorkspaceId:  "workspace6",
-				OrgId:        "",
-			},
-			ReporterData: &resources.ReporterData{
-				ReporterInstanceId: "user@example.com",
-				ReporterType:       resources.ReporterData_HBI,
-				ConsoleHref:        "www.exampleConsole.com",
-				ApiHref:            "www.exampleAPI.com",
-				LocalResourceId:    "0123",
-				ReporterVersion:    "0.1",
-			},
-		},
-	}
-	_, err = client.RhelHostServiceClient.UpdateRhelHost(context.Background(), &updateRequest, opts...)
-	assert.NoError(t, err, "Failed to update RhelHost")
-
-	deleteRequest := resources.DeleteRhelHostRequest{
-		ReporterData: &resources.ReporterData{
-			ReporterInstanceId: "user@example.com",
-			ReporterType:       resources.ReporterData_HBI,
-			ConsoleHref:        "www.exampleConsole.com",
-			ApiHref:            "www.exampleAPI.com",
-			LocalResourceId:    "0123",
-			ReporterVersion:    "0.1",
-		},
-	}
-	_, err = client.RhelHostServiceClient.DeleteRhelHost(context.Background(), &deleteRequest, opts...)
-	assert.NoError(t, err, "Failed to delete RhelHost")
 }
 
 func TestInventoryAPIHTTP_v1beta1_K8SClusterLifecycle(t *testing.T) {
@@ -432,71 +363,6 @@ func TestInventoryAPIHTTP_v1beta1_K8SPolicyLifecycle(t *testing.T) {
 	assert.NoError(t, err, "Failed to delete K8sPolicy")
 }
 
-func TestInventoryAPIHTTP_v1beta1_NotificationsIntegrationLifecycle(t *testing.T) {
-	enableShortMode(t)
-	t.Parallel()
-
-	c := common.NewConfig(
-		common.WithHTTPUrl(inventoryapi_http_url),
-		common.WithTLSInsecure(insecure),
-		common.WithHTTPTLSConfig(tlsConfig),
-		common.WithTimeout(10*time.Second),
-	)
-	client, err := v1beta1.NewHttpClient(context.Background(), c)
-	if err != nil {
-		t.Fatal("Failed to create HTTP client: ", err)
-	}
-
-	createRequest := resources.CreateNotificationsIntegrationRequest{
-		Integration: &resources.NotificationsIntegration{
-			Metadata: &resources.Metadata{
-				ResourceType: "notifications/integration",
-				WorkspaceId:  "ws-456",
-			},
-			ReporterData: &resources.ReporterData{
-				ReporterType:    resources.ReporterData_NOTIFICATIONS,
-				ConsoleHref:     "https://console.notifications.example.com",
-				ApiHref:         "https://api.notifications.example.com",
-				LocalResourceId: "notifications-001",
-				ReporterVersion: "1.0",
-			},
-		},
-	}
-
-	opts := getCallOptions()
-	_, err = client.NotificationIntegrationClient.CreateNotificationsIntegration(context.Background(), &createRequest, opts...)
-	assert.NoError(t, err, "Failed to create Notifications Integration")
-
-	updateRequest := resources.UpdateNotificationsIntegrationRequest{
-		Integration: &resources.NotificationsIntegration{
-			Metadata: &resources.Metadata{
-				ResourceType: "notifications/integration",
-				WorkspaceId:  "ws-789",
-			},
-			ReporterData: &resources.ReporterData{
-				ReporterType:    resources.ReporterData_NOTIFICATIONS,
-				ConsoleHref:     "https://console.notifications.example.com",
-				ApiHref:         "https://api.notifications.example.com",
-				LocalResourceId: "notifications-001",
-				ReporterVersion: "1.1",
-			},
-		},
-	}
-
-	_, err = client.NotificationIntegrationClient.UpdateNotificationsIntegration(context.Background(), &updateRequest, opts...)
-	assert.NoError(t, err, "Failed to update Notifications Integration")
-
-	deleteRequest := resources.DeleteNotificationsIntegrationRequest{
-		ReporterData: &resources.ReporterData{
-			ReporterType:    resources.ReporterData_NOTIFICATIONS,
-			LocalResourceId: "notifications-001",
-		},
-	}
-
-	_, err = client.NotificationIntegrationClient.DeleteNotificationsIntegration(context.Background(), &deleteRequest, opts...)
-	assert.NoError(t, err, "Failed to delete Notifications Integration")
-}
-
 func TestInventoryAPIHTTP_v1beta1_K8SPolicy_is_propagated_to_K8sClusterLifecycle(t *testing.T) {
 	enableShortMode(t)
 	t.Parallel()
@@ -633,83 +499,6 @@ func TestInventoryAPIHTTP_v1beta1_K8SPolicy_is_propagated_to_K8sClusterLifecycle
 
 	_, err = client.K8SPolicyIsPropagatedToK8SClusterServiceHTTPClient.DeleteK8SPolicyIsPropagatedToK8SCluster(context.Background(), &deleteRequest, opts...)
 	assert.NoError(t, err, "Failed to delete relationship between K8sPolicy and K8sCluster")
-}
-
-func TestInventoryAPIHTTP_NotificationsIntegrationLifecycle_ConsistencyToken(t *testing.T) {
-	enableShortMode(t)
-	t.Parallel()
-	resourceId := "notifications-consistent-001"
-
-	c := common.NewConfig(
-		common.WithHTTPUrl(inventoryapi_http_url),
-		common.WithTLSInsecure(insecure),
-		common.WithHTTPTLSConfig(tlsConfig),
-		common.WithTimeout(10*time.Second),
-	)
-	client, err := v1beta1.NewHttpClient(context.Background(), c)
-	if err != nil {
-		t.Fatal("Failed to create HTTP client: ", err)
-	}
-
-	createRequest := resources.CreateNotificationsIntegrationRequest{
-		Integration: &resources.NotificationsIntegration{
-			Metadata: &resources.Metadata{
-				ResourceType: "notifications/integration",
-				WorkspaceId:  "workspace10",
-			},
-			ReporterData: &resources.ReporterData{
-				ReporterType:    resources.ReporterData_NOTIFICATIONS,
-				ConsoleHref:     "https://console.notifications.example.com",
-				ApiHref:         "https://api.notifications.example.com",
-				LocalResourceId: resourceId,
-				ReporterVersion: "1.0",
-			},
-		},
-	}
-
-	opts := getCallOptions()
-	_, err = client.NotificationIntegrationClient.CreateNotificationsIntegration(context.Background(), &createRequest, opts...)
-	assert.NoError(t, err, "Failed to create Notifications Integration")
-
-	var integration v1beta2.Resource
-	err = db.Where("reporter_resource_id = ?", resourceId).First(&integration).Error
-	assert.NoError(t, err, "Failed to find Notifications Integration in DB")
-	assert.NotNil(t, integration, "Notifications Integration not found in DB")
-	assert.NotEmpty(t, integration.ConsistencyToken, "Consistency token is empty")
-
-	updateRequest := resources.UpdateNotificationsIntegrationRequest{
-		Integration: &resources.NotificationsIntegration{
-			Metadata: &resources.Metadata{
-				ResourceType: "notifications/integration",
-				WorkspaceId:  "workspace11",
-			},
-			ReporterData: &resources.ReporterData{
-				ReporterType:    resources.ReporterData_NOTIFICATIONS,
-				ConsoleHref:     "https://console.notifications.example.com",
-				ApiHref:         "https://api.notifications.example.com",
-				LocalResourceId: resourceId,
-				ReporterVersion: "1.1",
-			},
-		},
-	}
-
-	_, err = client.NotificationIntegrationClient.UpdateNotificationsIntegration(context.Background(), &updateRequest, opts...)
-	assert.NoError(t, err, "Failed to update Notifications Integration")
-
-	err = db.Where("reporter_resource_id = ?", resourceId).First(&integration).Error
-	assert.NoError(t, err, "Failed to find Notifications Integration in DB")
-	assert.NotNil(t, integration, "Notifications Integration not found in DB")
-	assert.NotEmpty(t, integration.ConsistencyToken, "Consistency token is empty")
-
-	deleteRequest := resources.DeleteNotificationsIntegrationRequest{
-		ReporterData: &resources.ReporterData{
-			ReporterType:    resources.ReporterData_NOTIFICATIONS,
-			LocalResourceId: resourceId,
-		},
-	}
-
-	_, err = client.NotificationIntegrationClient.DeleteNotificationsIntegration(context.Background(), &deleteRequest, opts...)
-	assert.NoError(t, err, "Failed to delete Notifications Integration")
 }
 
 func getCallOptions() []http.CallOption {

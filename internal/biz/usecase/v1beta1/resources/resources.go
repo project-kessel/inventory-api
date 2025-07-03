@@ -132,9 +132,9 @@ func (uc *Usecase) Upsert(ctx context.Context, m *model.Resource, write_visibili
 		}
 
 		log.Info("Creating resource: ", m)
-		ret, err2 := createNewReporterResource(ctx, m, uc, txidStr)
-		if err2 != nil {
-			return ret, err2
+		ret, err = createNewReporterResource(ctx, m, uc, txidStr)
+		if err != nil {
+			return ret, err
 		}
 
 		if readAfterWriteEnabled && uc.Config.ConsumerEnabled {

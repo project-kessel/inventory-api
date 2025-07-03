@@ -1547,3 +1547,41 @@ func TestUpsert_WaitCircuitBreaker(t *testing.T) {
 	sub.AssertExpectations(t)
 	assert.Equal(t, gobreaker.StateClosed, cb.State()) // Circuit breaker should be closed
 }
+
+func TestUpsertCreatesNewResourceWithCorrectUUID(t *testing.T) {
+	// Create a resource with null UUID (as it would come from the client)
+	resource := resource1()
+	resource.ID = uuid.UUID{} // Explicitly set to null UUID
+
+	// Generate a UUID that the repository should return
+	expectedID, err := uuid.NewV7()
+	assert.Nil(t, err)
+
+	// Create the resource that the repository will return (with valid UUID)
+	returnedResource := *resource
+	returnedResource.ID = expectedID
+
+	repo := &mocks.MockedReporterResourceRepository{}
+	inventoryRepo := &mocks.MockedInventoryResourceRepository{}
+
+	// Mock that no existing resource is found
+	repo.On("FindByReporterResourceIdv1beta2", mock.Anything, mock.Anything).Return((*model.Resource)(nil), gorm.ErrRecordNotFound)
+	// Mock that Create returns a resource with a valid UUID
+	repo.On("Create", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&returnedResource, nil)
+
+	useCase := New(repo, inventoryRepo, nil, nil, "", log.DefaultLogger, nil, cb, defaultUseCaseConfig)
+	ctx := context.TODO()
+
+	// Call Upsert
+	result, err := useCase.Upsert(ctx, resource, v1beta2.WriteVisibility_WRITE_VISIBILITY_UNSPECIFIED)
+
+	// Verify that the operation succeeded
+	assert.Nil(t, err)
+	assert.NotNil(t, result)
+
+	// Verify that the returned resource has the correct UUID (not null UUID)
+	assert.Equal(t, expectedID, result.ID)
+	assert.NotEqual(t, uuid.UUID{}, result.ID) // Ensure it's not the null UUID
+
+	repo.AssertExpectations(t)
+}

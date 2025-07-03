@@ -16,10 +16,8 @@ import (
 	"github.com/project-kessel/inventory-api/internal/service"
 	relationshipssvc "github.com/project-kessel/inventory-api/internal/service/v1beta1/relationships/k8spolicy"
 	resourcesvc "github.com/project-kessel/inventory-api/internal/service/v1beta1/resources"
-	hostssvc "github.com/project-kessel/inventory-api/internal/service/v1beta1/resources/hosts"
 	k8sclusterssvc "github.com/project-kessel/inventory-api/internal/service/v1beta1/resources/k8sclusters"
 	k8spoliciessvc "github.com/project-kessel/inventory-api/internal/service/v1beta1/resources/k8spolicies"
-	notifssvc "github.com/project-kessel/inventory-api/internal/service/v1beta1/resources/notificationsintegrations"
 
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/project-kessel/inventory-api/internal/metricscollector"
@@ -29,20 +27,19 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/project-kessel/inventory-api/cmd/common"
+	"github.com/project-kessel/inventory-api/internal/authn"
+	"github.com/project-kessel/inventory-api/internal/authz"
 	"github.com/project-kessel/inventory-api/internal/consistency"
 	"github.com/project-kessel/inventory-api/internal/consumer"
 	inventoryResourcesRepo "github.com/project-kessel/inventory-api/internal/data/inventoryresources"
 	relationshipsrepo "github.com/project-kessel/inventory-api/internal/data/relationships"
 	resourcerepo "github.com/project-kessel/inventory-api/internal/data/resources"
 	datav1beta2 "github.com/project-kessel/inventory-api/internal/data/v1beta2"
-	"github.com/project-kessel/inventory-api/internal/pubsub"
-
-	"github.com/project-kessel/inventory-api/internal/authn"
-	"github.com/project-kessel/inventory-api/internal/authz"
 	"github.com/project-kessel/inventory-api/internal/errors"
 	"github.com/project-kessel/inventory-api/internal/eventing"
 	eventingapi "github.com/project-kessel/inventory-api/internal/eventing/api"
 	"github.com/project-kessel/inventory-api/internal/middleware"
+	"github.com/project-kessel/inventory-api/internal/pubsub"
 	"github.com/project-kessel/inventory-api/internal/server"
 	"github.com/project-kessel/inventory-api/internal/storage"
 
@@ -277,12 +274,6 @@ func NewCommand(
 			pbv1beta2.RegisterKesselInventoryServiceHTTPServer(server.HttpServer, inventory_service)
 
 			//v1beta1
-			// wire together notificationsintegrations handling
-			notifs_repo := resourcerepo.New(db, mc, storageConfig.Options.MaxSerializationRetries)
-			notifs_controller := resourcesctl.New(notifs_repo, inventoryresources_repo, authorizer, eventingManager, "notifications", log.With(logger, "subsystem", "notificationsintegrations_controller"), listenManager, waitForNotifCircuitBreaker, usecaseConfig)
-			notifs_service := notifssvc.NewKesselNotificationsIntegrationsServiceV1beta1(notifs_controller)
-			pb.RegisterKesselNotificationsIntegrationServiceServer(server.GrpcServer, notifs_service)
-			pb.RegisterKesselNotificationsIntegrationServiceHTTPServer(server.HttpServer, notifs_service)
 
 			// wire together authz handling
 			authz_repo := resourcerepo.New(db, mc, storageConfig.Options.MaxSerializationRetries)
@@ -290,13 +281,6 @@ func NewCommand(
 			authz_service := resourcesvc.NewKesselCheckServiceV1beta1(authz_controller)
 			authzv1beta1.RegisterKesselCheckServiceServer(server.GrpcServer, authz_service)
 			authzv1beta1.RegisterKesselCheckServiceHTTPServer(server.HttpServer, authz_service)
-
-			// wire together hosts handling
-			hosts_repo := resourcerepo.New(db, mc, storageConfig.Options.MaxSerializationRetries)
-			hosts_controller := resourcesctl.New(hosts_repo, inventoryresources_repo, authorizer, eventingManager, "hbi", log.With(logger, "subsystem", "hosts_controller"), listenManager, waitForNotifCircuitBreaker, usecaseConfig)
-			hosts_service := hostssvc.NewKesselRhelHostServiceV1beta1(hosts_controller)
-			pb.RegisterKesselRhelHostServiceServer(server.GrpcServer, hosts_service)
-			pb.RegisterKesselRhelHostServiceHTTPServer(server.HttpServer, hosts_service)
 
 			// wire together k8sclusters handling
 			k8sclusters_repo := resourcerepo.New(db, mc, storageConfig.Options.MaxSerializationRetries)

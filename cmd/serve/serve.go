@@ -9,6 +9,16 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/project-kessel/inventory-api/internal/biz/usecase"
+	relationshipsctl "github.com/project-kessel/inventory-api/internal/biz/usecase/v1beta1/relationships"
+	resourcesctl "github.com/project-kessel/inventory-api/internal/biz/usecase/v1beta1/resources"
+	"github.com/project-kessel/inventory-api/internal/data"
+	"github.com/project-kessel/inventory-api/internal/service"
+	relationshipssvc "github.com/project-kessel/inventory-api/internal/service/v1beta1/relationships/k8spolicy"
+	resourcesvc "github.com/project-kessel/inventory-api/internal/service/v1beta1/resources"
+	k8sclusterssvc "github.com/project-kessel/inventory-api/internal/service/v1beta1/resources/k8sclusters"
+	k8spoliciessvc "github.com/project-kessel/inventory-api/internal/service/v1beta1/resources/k8spolicies"
+
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/project-kessel/inventory-api/internal/metricscollector"
 	"github.com/sony/gobreaker"
@@ -17,27 +27,19 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/project-kessel/inventory-api/cmd/common"
-	relationshipsctl "github.com/project-kessel/inventory-api/internal/biz/usecase/relationships"
-	resourcesctl "github.com/project-kessel/inventory-api/internal/biz/usecase/resources"
+	"github.com/project-kessel/inventory-api/internal/authn"
+	"github.com/project-kessel/inventory-api/internal/authz"
 	"github.com/project-kessel/inventory-api/internal/consistency"
 	"github.com/project-kessel/inventory-api/internal/consumer"
 	inventoryResourcesRepo "github.com/project-kessel/inventory-api/internal/data/inventoryresources"
 	relationshipsrepo "github.com/project-kessel/inventory-api/internal/data/relationships"
 	resourcerepo "github.com/project-kessel/inventory-api/internal/data/resources"
-	"github.com/project-kessel/inventory-api/internal/pubsub"
-	relationshipssvc "github.com/project-kessel/inventory-api/internal/service/relationships/k8spolicy"
-	k8sclusterssvc "github.com/project-kessel/inventory-api/internal/service/resources/k8sclusters"
-	k8spoliciessvc "github.com/project-kessel/inventory-api/internal/service/resources/k8spolicies"
-
-	//v1beta2
-	resourcesvc "github.com/project-kessel/inventory-api/internal/service/resources"
-
-	"github.com/project-kessel/inventory-api/internal/authn"
-	"github.com/project-kessel/inventory-api/internal/authz"
+	datav1beta2 "github.com/project-kessel/inventory-api/internal/data/v1beta2"
 	"github.com/project-kessel/inventory-api/internal/errors"
 	"github.com/project-kessel/inventory-api/internal/eventing"
 	eventingapi "github.com/project-kessel/inventory-api/internal/eventing/api"
 	"github.com/project-kessel/inventory-api/internal/middleware"
+	"github.com/project-kessel/inventory-api/internal/pubsub"
 	"github.com/project-kessel/inventory-api/internal/server"
 	"github.com/project-kessel/inventory-api/internal/storage"
 
@@ -258,7 +260,16 @@ func NewCommand(
 			// wire together inventory service handling
 			resource_repo := resourcerepo.New(db, mc, storageConfig.Options.MaxSerializationRetries)
 			inventory_controller := resourcesctl.New(resource_repo, inventoryresources_repo, authorizer, eventingManager, "notifications", log.With(logger, "subsystem", "notificationsintegrations_controller"), listenManager, waitForNotifCircuitBreaker, usecaseConfig)
-			inventory_service := resourcesvc.NewKesselInventoryServiceV1beta2(inventory_controller)
+
+			// Create v1beta2 repositories and controller
+			v1beta2_common_repo := datav1beta2.NewCommonRepresentationRepository(db)
+			v1beta2_reporter_repo := datav1beta2.NewReporterRepresentationRepository(db)
+			v1beta2_resource_repo := datav1beta2.NewResourceWithReferencesRepository(db)
+			v1beta2_transaction_manager := data.NewTransactionManager(storageConfig.Options.MaxSerializationRetries)
+			v1beta2_controller := usecase.NewResourceUsecase(v1beta2_common_repo, v1beta2_reporter_repo, v1beta2_resource_repo, db, v1beta2_transaction_manager, mc, "notifications", log.With(logger, "subsystem", "v1beta2_controller"))
+
+			inventory_service := service.NewKesselInventoryServiceV1beta2(inventory_controller)
+			inventory_service.SetV1beta2Controller(v1beta2_controller)
 			pbv1beta2.RegisterKesselInventoryServiceServer(server.GrpcServer, inventory_service)
 			pbv1beta2.RegisterKesselInventoryServiceHTTPServer(server.HttpServer, inventory_service)
 

@@ -47,4 +47,11 @@ message ReportResourceRequest {
   // Use `IMMEDIATE` only if your use case requires strong consistency guarantees
   // (e.g., writing and immediately checking access to the resource).
   WriteVisibility write_visibility = 6 [(buf.validate.field).enum.defined_only = true];
+  // Controls whether to use the new v1beta2 upsert implementation or the legacy implementation.
+  //
+  // - `false` (default): Uses the legacy upsert implementation
+  // - `true`: Uses the new v1beta2 upsert implementation with serializable transactions
+  //
+  // This flag is intended for gradual migration and testing purposes.
+  bool new_path = 7;
 }

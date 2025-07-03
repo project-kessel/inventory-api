@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-
 	"github.com/project-kessel/inventory-api/internal/biz/model"
 )
 

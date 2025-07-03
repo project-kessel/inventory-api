@@ -1,4 +1,4 @@
-package resources
+package service
 
 import (
 	"context"
@@ -6,11 +6,13 @@ import (
 	"io"
 	"strings"
 
+	"github.com/project-kessel/inventory-api/internal/biz/model"
+	"github.com/project-kessel/inventory-api/internal/biz/usecase"
+	"github.com/project-kessel/inventory-api/internal/biz/usecase/v1beta1/resources"
+
 	"github.com/go-kratos/kratos/v2/log"
 	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2"
 	authnapi "github.com/project-kessel/inventory-api/internal/authn/api"
-	"github.com/project-kessel/inventory-api/internal/biz/model"
-	"github.com/project-kessel/inventory-api/internal/biz/usecase/resources"
 	"github.com/project-kessel/inventory-api/internal/middleware"
 	conv "github.com/project-kessel/inventory-api/internal/service/common"
 	pbv1beta1 "github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
@@ -18,31 +20,60 @@ import (
 
 type InventoryService struct {
 	pb.UnimplementedKesselInventoryServiceServer
-	Ctl *resources.Usecase
+	Ctl        *resources.Usecase
+	V1beta2Ctl *usecase.ResourceUsecase
 }
 
 func NewKesselInventoryServiceV1beta2(c *resources.Usecase) *InventoryService {
 	return &InventoryService{
 		Ctl: c,
+		// V1beta2Ctl will be set separately when needed
 	}
 }
 
+func (s *InventoryService) SetV1beta2Controller(v1beta2Ctl *usecase.ResourceUsecase) {
+	s.V1beta2Ctl = v1beta2Ctl
+}
+
 func (c *InventoryService) ReportResource(ctx context.Context, r *pb.ReportResourceRequest) (*pb.ReportResourceResponse, error) {
+	/*
+	 1. serialization
+	 2. metrics
+	 3. authn
+	 4. presentation validation
+	 5. error handling
+	*/
 	identity, err := middleware.GetIdentity(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	resource, err := RequestToResource(r, identity)
-	if err != nil {
-		return nil, err
+	// Check if new_path flag is set to use the new v1beta2 implementation
+	if r.GetNewPath() {
+		// Use new v1beta2 implementation
+		if c.V1beta2Ctl == nil {
+			return nil, fmt.Errorf("v1beta2 controller not available")
+		}
+
+		log.Info("Using new v1beta2 upsert implementation")
+		err = c.V1beta2Ctl.ReportResource(ctx, r)
+		if err != nil {
+			return nil, err
+		}
+		return ResponseFromResource(), nil
+	} else {
+		// Use legacy implementation
+		log.Info("Using legacy upsert implementation")
+		resource, err := RequestToResource(r, identity)
+		if err != nil {
+			return nil, err
+		}
+		_, err = c.Ctl.Upsert(ctx, resource, r.GetWriteVisibility())
+		if err != nil {
+			return nil, err
+		}
+		return ResponseFromResource(), nil
 	}
-	_, err = c.Ctl.Upsert(ctx, resource, r.GetWriteVisibility())
-	log.Info()
-	if err != nil {
-		return nil, err
-	}
-	return ResponseFromResource(), nil
 }
 
 func (c *InventoryService) DeleteResource(ctx context.Context, r *pb.DeleteResourceRequest) (*pb.DeleteResourceResponse, error) {

@@ -3,23 +3,30 @@ package data
 import (
 	"fmt"
 
+	"github.com/project-kessel/inventory-api/internal/biz/model/v1beta2"
 	"gorm.io/gorm"
 
-	"github.com/project-kessel/inventory-api/internal/biz/model"
-
 	"github.com/go-kratos/kratos/v2/log"
+	"github.com/project-kessel/inventory-api/internal/biz/model"
 )
 
 // Migrate the tables
 // See https://gorm.io/docs/migration.html
 func Migrate(db *gorm.DB, logger *log.Helper) error {
 	models := []interface{}{
+		// v1beta1 models
 		&model.ResourceHistory{},
 		&model.Resource{},
 		&model.Relationship{},
 		&model.RelationshipHistory{},
 		&model.LocalInventoryToResource{}, // Deprecated
 		&model.InventoryResource{},
+		// v1beta2 models
+		&v1beta2.Resource{},
+		&v1beta2.RepresentationReference{},
+		&v1beta2.CommonRepresentation{},
+		&v1beta2.ReporterRepresentation{},
+		//common models
 		&model.OutboxEvent{},
 	}
 

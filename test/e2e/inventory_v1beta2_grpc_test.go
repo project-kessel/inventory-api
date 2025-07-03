@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/project-kessel/inventory-api/internal/biz/model"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/grpc"
 	grpcinsecure "google.golang.org/grpc/credentials/insecure"
@@ -12,7 +13,6 @@ import (
 	"google.golang.org/protobuf/types/known/structpb"
 
 	pbv1beta2 "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2"
-	"github.com/project-kessel/inventory-api/internal/biz/model"
 )
 
 // bearerAuth implements grpc.PerRPCCredentials to inject Authorization

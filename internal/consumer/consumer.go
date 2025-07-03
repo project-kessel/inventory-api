@@ -27,7 +27,7 @@ import (
 
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
 	"github.com/go-kratos/kratos/v2/log"
-	v1beta1 "github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
+	"github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"gorm.io/gorm"

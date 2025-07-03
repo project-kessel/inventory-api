@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/project-kessel/inventory-api/internal/biz/model"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/spf13/viper"
@@ -17,7 +18,6 @@ import (
 	"google.golang.org/grpc"
 
 	authzapi "github.com/project-kessel/inventory-api/internal/authz/api"
-	"github.com/project-kessel/inventory-api/internal/biz/model"
 )
 
 type KesselAuthz struct {

@@ -1,13 +1,8 @@
-FROM registry.access.redhat.com/ubi9/ubi-minimal:9.6-1747218906 AS builder
+FROM registry.access.redhat.com/ubi9/ubi-minimal:9.6-1750782676 AS builder
 
 ARG TARGETARCH
 USER root
-RUN microdnf install -y tar gzip unzip
-
-# install platform specific go version
-RUN curl -O -J  https://dl.google.com/go/go1.23.6.linux-${TARGETARCH}.tar.gz
-RUN tar -C /usr/local -xzf go1.23.6.linux-${TARGETARCH}.tar.gz
-RUN ln -s /usr/local/go/bin/go /usr/local/bin/go
+RUN microdnf install -y tar gzip unzip go-toolset
 
 # Install protoc plugins
 # Latest versions as of 2024-08-08
@@ -20,8 +15,9 @@ RUN go install github.com/google/gnostic/cmd/protoc-gen-openapi@v0.7.0
 # Latest versions as of 2024-08-08
 RUN go install github.com/bufbuild/buf/cmd/buf@v1.36.0
 
-FROM registry.access.redhat.com/ubi9/ubi-minimal:9.6-1747218906
+FROM registry.access.redhat.com/ubi9/ubi-minimal:9.6-1750782676
 
+RUN microdnf install -y tar gzip unzip
 
 COPY --from=builder /root/go/bin/protoc-gen-go /usr/local/bin/protoc-gen-go
 COPY --from=builder /root/go/bin/protoc-gen-go-grpc /usr/local/bin/protoc-gen-go-grpc

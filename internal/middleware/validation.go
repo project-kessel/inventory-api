@@ -8,7 +8,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/bufbuild/protovalidate-go"
+	"buf.build/go/protovalidate"
 	"github.com/go-kratos/kratos/v2/errors"
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/go-kratos/kratos/v2/middleware"
@@ -43,7 +43,7 @@ func Validation(validator protovalidate.Validator) middleware.Middleware {
 
 				switch v.(type) {
 				case *pbv1beta2.ReportResourceRequest:
-					if err := validateReportResourceJSON(v); err != nil {
+					if err := ValidateReportResourceJSON(v); err != nil {
 						return nil, errors.BadRequest("REPORT_RESOURCE_JSON_VALIDATOR", err.Error()).WithCause(err)
 					}
 				}
@@ -53,7 +53,7 @@ func Validation(validator protovalidate.Validator) middleware.Middleware {
 	}
 }
 
-func validateReportResourceJSON(msg proto.Message) error {
+func ValidateReportResourceJSON(msg proto.Message) error {
 	data, err := MarshalProtoToJSON(msg)
 	if err != nil {
 		return err
@@ -64,27 +64,12 @@ func validateReportResourceJSON(msg proto.Message) error {
 		return err
 	}
 
-	resourceType, err := ExtractStringField(reportResourceMap, "type")
+	resourceType, err := ExtractStringField(reportResourceMap, "type", ValidateFieldExists())
 	if err != nil {
 		return err
 	}
 
-	reporterType, err := ExtractStringField(reportResourceMap, "reporterType")
-	if err != nil {
-		return err
-	}
-
-	resourceRepresentation, err := ExtractMapField(reportResourceMap, "representations")
-	if err != nil {
-		return err
-	}
-
-	reporterRepresentation, err := ExtractMapField(resourceRepresentation, "reporter")
-	if err != nil {
-		return err
-	}
-
-	commonRepresentation, err := ExtractMapField(resourceRepresentation, "common")
+	reporterType, err := ExtractStringField(reportResourceMap, "reporterType", ValidateFieldExists())
 	if err != nil {
 		return err
 	}
@@ -94,8 +79,23 @@ func validateReportResourceJSON(msg proto.Message) error {
 		return err
 	}
 
+	representations, err := ExtractMapField(reportResourceMap, "representations", ValidateFieldExists())
+	if err != nil {
+		return err
+	}
+
+	reporterRepresentation, err := ExtractMapField(representations, "reporter")
+	if err != nil {
+		return err
+	}
+
 	// Validate reporter-specific data
 	if err := ValidateReporterRepresentation(resourceType, reporterType, reporterRepresentation); err != nil {
+		return err
+	}
+
+	commonRepresentation, err := ExtractMapField(representations, "common")
+	if err != nil {
 		return err
 	}
 

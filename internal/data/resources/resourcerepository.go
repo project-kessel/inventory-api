@@ -7,6 +7,8 @@ import (
 
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/mattn/go-sqlite3"
 	"github.com/project-kessel/inventory-api/internal/metricscollector"
 	"gorm.io/gorm"
 
@@ -44,34 +46,40 @@ func copyHistory(m *model.Resource, id uuid.UUID, operationType model.OperationT
 }
 
 func (r *Repo) Create(ctx context.Context, m *model.Resource, namespace string, txid string) (*model.Resource, error) {
+	if m == nil {
+		return nil, fmt.Errorf("resource cannot be nil")
+	}
+
 	db := r.DB.Session(&gorm.Session{})
 	var result *model.Resource
 	err := r.handleSerializableTransaction(db, func(tx *gorm.DB) error {
+		// Copy the resource to avoid modifying the original, necessary for serialized transaction retries
+		resource := *m
 		updatedResources := []*model.Resource{}
 
-		if m.InventoryId == nil {
+		if resource.InventoryId == nil {
 			// New inventory resource
 			inventoryResource := model.InventoryResource{
-				ResourceType: m.ResourceType,
-				WorkspaceId:  m.WorkspaceId,
+				ResourceType: resource.ResourceType,
+				WorkspaceId:  resource.WorkspaceId,
 			}
 			// Create a new inventory resource
 			if err := tx.Create(&inventoryResource).Error; err != nil {
 				return fmt.Errorf("creating inventory resource: %w", err)
 			}
-			m.InventoryId = &inventoryResource.ID
+			resource.InventoryId = &inventoryResource.ID
 		}
 
-		if err := tx.Create(m).Error; err != nil {
+		if err := tx.Create(&resource).Error; err != nil {
 			return err
 		}
 
-		if err := tx.Create(copyHistory(m, m.ID, model.OperationTypeCreate)).Error; err != nil {
+		if err := tx.Create(copyHistory(&resource, resource.ID, model.OperationTypeCreate)).Error; err != nil {
 			return err
 		}
 
 		// Handle workspace updates for other resources with the same inventory ID
-		updatedResources, err := r.handleWorkspaceUpdates(tx, m, updatedResources)
+		updatedResources, err := r.handleWorkspaceUpdates(tx, &resource, updatedResources)
 		if err != nil {
 			return err
 		}
@@ -79,14 +87,14 @@ func (r *Repo) Create(ctx context.Context, m *model.Resource, namespace string, 
 		// Deprecated
 		// TODO: Remove this when all resources are created with inventory ID
 		if err := tx.Create(&model.LocalInventoryToResource{
-			ResourceId:         m.ID,
-			ReporterResourceId: model.ReporterResourceIdFromResource(m),
+			ResourceId:         resource.ID,
+			ReporterResourceId: model.ReporterResourceIdFromResource(&resource),
 		}).Error; err != nil {
 			return err
 		}
 
 		// Publish outbox events for primary resource
-		err = handleOutboxEvents(tx, *m, namespace, model.OperationTypeCreated, txid)
+		err = handleOutboxEvents(tx, resource, namespace, model.OperationTypeCreated, txid)
 		if err != nil {
 			return err
 		}
@@ -98,7 +106,7 @@ func (r *Repo) Create(ctx context.Context, m *model.Resource, namespace string, 
 				return err
 			}
 		}
-		result = m
+		result = &resource
 		return nil
 	})
 	if err != nil {
@@ -284,7 +292,7 @@ func (r *Repo) FindByInventoryIdAndReporter(ctx context.Context, inventoryId *uu
 	if err := r.DB.Session(&gorm.Session{}).Where(&model.Resource{
 		InventoryId:        inventoryId,
 		ReporterInstanceId: reporterInstanceId,
-		ResourceType:       reporterType,
+		ReporterType:       reporterType,
 	}).First(&resource).Error; err != nil {
 		return nil, err
 	}
@@ -376,17 +384,41 @@ func (r *Repo) handleSerializableTransaction(db *gorm.DB, txFunc func(tx *gorm.D
 		})
 		err = txFunc(tx)
 		if err != nil {
-			log.Debugf("transaction failed before commit (attempt %d/%d): %v", i+1, r.MaxSerializationRetries, err)
 			tx.Rollback()
-			continue
+			if isSerializationFailure(err, i, r.MaxSerializationRetries) {
+				continue
+			}
+			// Short-circuit if the error is not a serialization failure
+			return fmt.Errorf("transaction failed: %w", err)
 		}
 		err = tx.Commit().Error
 		if err != nil {
-			log.Debugf("error committing transaction (attempt %d/%d): %v", i+1, r.MaxSerializationRetries, err)
 			tx.Rollback()
-			continue
+			if isSerializationFailure(err, i, r.MaxSerializationRetries) {
+				continue
+			}
+			// Short-circuit if the error is not a serialization failure
+			return fmt.Errorf("committing transaction failed: %w", err)
 		}
 		return nil
 	}
+	log.Errorf("transaction failed after %d attempts: %v", r.MaxSerializationRetries, err)
 	return fmt.Errorf("transaction failed after %d attempts: %w", r.MaxSerializationRetries, err)
+}
+
+func isSerializationFailure(err error, attempt, maxRetries int) bool {
+	switch dbErr := err.(type) {
+	case *pgconn.PgError:
+		if dbErr.Code == "40001" {
+			log.Debugf("transaction serialization failure (attempt %d/%d): %v", attempt+1, maxRetries, err)
+			return true
+		}
+	case sqlite3.Error:
+		if dbErr.Code == sqlite3.ErrError {
+			// Isolation failures are captured under error code 1 (sqlite3.ErrError)
+			log.Debugf("transaction serialization failure (attempt %d/%d): %v", attempt+1, maxRetries, err)
+			return true
+		}
+	}
+	return false
 }

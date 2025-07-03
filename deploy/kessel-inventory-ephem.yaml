@@ -20,7 +20,6 @@ objects:
             enable-oidc-auth: false
         consumer:
           enabled: true
-          bootstrap-servers: inventory-kafka-kafka-bootstrap:9092
           topic: outbox.event.kessel.tuples
           retry-options:
             consumer-max-retries: -1
@@ -29,218 +28,25 @@ objects:
             max-backoff-seconds: 30
           auth:
             enabled: false
-            security-protocol: sasl_plaintext
-            sasl-mechanism: SCRAM-SHA-512
-            sasl-username: inventory-consumer
-            sasl-password: REPLACE_ME
         consistency:
           read-after-write-enabled: true # false == off for all service providers
           read-after-write-allowlist: ["*"] # specify ["*"] to allow any request to optionally r-a-w
         log:
-          level: "debug"
+          level: "info"
 
   - apiVersion: v1
     kind: ConfigMap
     metadata:
       name: resources-tarball
     binaryData:
-        resources.tar.gz: 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
-
-  - apiVersion: rbac.authorization.k8s.io/v1
-    kind: Role
-    metadata:
-      name: connector-configuration-role
-    rules:
-    - apiGroups: [""]
-      resources: ["secrets"]
-      verbs: ["get"]
-
-  - apiVersion: rbac.authorization.k8s.io/v1
-    kind: RoleBinding
-    metadata:
-      name: connector-configuration-rolebinding
-    subjects:
-    - kind: ServiceAccount
-      name: inventory-kafka-connect-connect
-    roleRef:
-      kind: Role
-      name: connector-configuration-role
-      apiGroup: rbac.authorization.k8s.io
-
-  - apiVersion: kafka.strimzi.io/v1beta2
-    kind: Kafka
-    metadata:
-      name: inventory-kafka
-    spec:
-      entityOperator:
-        template:
-          pod:
-            metadata:
-              labels:
-                service: strimziKafka
-          topicOperatorContainer:
-            env:
-            - name: STRIMZI_USE_FINALIZERS
-              value: "false"
-        tlsSidecar:
-          resources:
-            limits:
-              cpu: 100m
-              memory: 100Mi
-            requests:
-              cpu: 50m
-              memory: 50Mi
-        topicOperator:
-          resources:
-            limits:
-              cpu: 200m
-              memory: 500Mi
-            requests:
-              cpu: 50m
-              memory: 250Mi
-        userOperator:
-          resources:
-            limits:
-              cpu: 400m
-              memory: 500Mi
-            requests:
-              cpu: 50m
-              memory: 250Mi
-      kafka:
-        config:
-          offsets.topic.replication.factor: "1"
-        jvmOptions: {}
-        listeners:
-        - name: tcp
-          port: 9092
-          tls: false
-          type: internal
-        - name: secure
-          port: 9094
-          tls: false
-          type: internal
-          authentication:
-            type: scram-sha-512
-        replicas: 1
-        resources:
-          limits:
-            cpu: 500m
-            memory: 1Gi
-          requests:
-            cpu: 250m
-            memory: 600Mi
-        storage:
-          type: ephemeral
-        template:
-          perPodService:
-            metadata:
-              labels:
-                service: strimziKafka
-          pod:
-            metadata:
-              labels:
-                service: strimziKafka
-        version: 3.7.0
-      zookeeper:
-        replicas: 1
-        resources:
-          limits:
-            cpu: 350m
-            memory: 800Mi
-          requests:
-            cpu: 200m
-            memory: 400Mi
-        storage:
-          type: ephemeral
-        template:
-          nodesService:
-            metadata:
-              labels:
-                service: strimziKafka
-          pod:
-            metadata:
-              labels:
-                service: strimziKafka
-
-  - apiVersion: kafka.strimzi.io/v1beta2
-    kind: KafkaTopic
-    metadata:
-      name: "outbox.event.kessel.tuples"
-      labels:
-        strimzi.io/cluster: inventory-kafka
-    spec:
-      partitions: 1
-      replicas: 1
-      topicName: "outbox.event.kessel.tuples"
-
-  - apiVersion: kafka.strimzi.io/v1beta2
-    kind: KafkaTopic
-    metadata:
-      name: "outbox.event.kessel.resources"
-      labels:
-        strimzi.io/cluster: inventory-kafka
-    spec:
-      partitions: 1
-      replicas: 1
-      topicName: "outbox.event.kessel.resources"
-
-  - apiVersion: kafka.strimzi.io/v1beta2
-    kind: KafkaUser
-    metadata:
-      name: inventory-consumer
-      labels:
-        strimzi.io/cluster: inventory-kafka
-    spec:
-      authentication:
-        type: scram-sha-512
-
-  - apiVersion: kafka.strimzi.io/v1beta2
-    kind: KafkaConnect
-    metadata:
-      annotations:
-        strimzi.io/use-connector-resources: "true"
-      generation: 1
-      name: inventory-kafka-connect
-    spec:
-      bootstrapServers: inventory-kafka-kafka-bootstrap:9094
-      authentication:
-        type: scram-sha-512
-        username: inventory-consumer
-        passwordSecret:
-          secretName: inventory-consumer
-          password: password
-      config:
-        config.storage.replication.factor: "1"
-        config.storage.topic: connect-cluster-configs
-        connector.client.config.override.policy: All
-        group.id: connect-cluster
-        offset.storage.replication.factor: "1"
-        offset.storage.topic: connect-cluster-offsets
-        status.storage.replication.factor: "1"
-        status.storage.topic: connect-cluster-status
-        config.providers: secrets
-        config.providers.secrets.class: io.strimzi.kafka.KubernetesSecretConfigProvider
-      image: quay.io/cloudservices/kafka-connect:latest
-      replicas: 1
-      resources:
-        limits:
-          cpu: 500m
-          memory: 1Gi
-        requests:
-          cpu: 250m
-          memory: 512Mi
-      template:
-        pod:
-          imagePullSecrets:
-          - name: quay-cloudservices-pull
-      version: 3.7.0
+        resources.tar.gz: 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
 
   - apiVersion: kafka.strimzi.io/v1beta2
     kind: KafkaConnector
     metadata:
       name: kessel-inventory-source-connector
       labels:
-        strimzi.io/cluster: inventory-kafka-connect
+        strimzi.io/cluster: ${ENV_NAME}
     spec:
       class: io.debezium.connector.postgresql.PostgresConnector
       tasksMax: ${{MAX_TASKS}}
@@ -252,8 +58,7 @@ objects:
         database.user: ${secrets:kessel-inventory-db:db.user}
         database.password: ${secrets:kessel-inventory-db:db.password}
         topic.prefix: kessel-inventory
-        table.whitelist: public.outbox_events # Required for Debezium < v1.3.0 support
-        table.include.list: public.outbox_events # Required for Debezium > v1.3.0
+        table.include.list: public.outbox_events
         transforms: outbox
         transforms.outbox.type: io.debezium.transforms.outbox.EventRouter
         transforms.outbox.table.fields.additional.placement: operation:header, txid:header
@@ -274,6 +79,13 @@ objects:
       database:
         name: kessel-inventory
         version: 16
+      kafkaTopics:
+      - topicName: outbox.event.kessel.tuples
+        partitions: 1
+        replicas: 3
+      - topicName: outbox.event.kessel.resources
+        partitions: 1
+        replicas: 3
       optionalDependencies:
         - kessel-relations
       deployments:
@@ -282,7 +94,7 @@ objects:
           podSpec:
             initContainers:
             - name: copy-resources
-              image: busybox
+              image: registry.access.redhat.com/ubi9
               imagePullPolicy: Always
               command:
                 - /bin/sh
@@ -360,9 +172,6 @@ parameters:
   - description: Number of replicas
     name: REPLICAS
     value: "1"
-  - name: KAFKA_CONNECT_INSTANCE
-    value: inventory-kafka-connect
-    description: Name of the target Kafka Connect instance for Connector
   - name: MAX_TASKS
     value: "1"
     description: How many tasks the Kafka Connect instance can create to process this Connector's work

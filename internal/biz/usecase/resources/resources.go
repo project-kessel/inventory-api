@@ -63,13 +63,13 @@ type UsecaseConfig struct {
 }
 
 type Usecase struct {
-	reporterResourceRepository  ReporterResourceRepository
+	ReporterResourceRepository  ReporterResourceRepository
 	inventoryResourceRepository InventoryResourceRepository
 	waitForNotifBreaker         *gobreaker.CircuitBreaker
 	Authz                       authzapi.Authorizer
 	Eventer                     eventingapi.Manager
 	Namespace                   string
-	log                         *log.Helper
+	Log                         *log.Helper
 	Server                      server.Server
 	ListenManager               pubsub.ListenManagerImpl
 	Config                      *UsecaseConfig
@@ -79,13 +79,13 @@ func New(reporterResourceRepository ReporterResourceRepository, inventoryResourc
 	authz authzapi.Authorizer, eventer eventingapi.Manager, namespace string, logger log.Logger,
 	listenManager pubsub.ListenManagerImpl, waitForNotifBreaker *gobreaker.CircuitBreaker, usecaseConfig *UsecaseConfig) *Usecase {
 	return &Usecase{
-		reporterResourceRepository:  reporterResourceRepository,
+		ReporterResourceRepository:  reporterResourceRepository,
 		inventoryResourceRepository: inventoryResourceRepository,
 		waitForNotifBreaker:         waitForNotifBreaker,
 		Authz:                       authz,
 		Eventer:                     eventer,
 		Namespace:                   namespace,
-		log:                         log.NewHelper(logger),
+		Log:                         log.NewHelper(logger),
 		ListenManager:               listenManager,
 		Config:                      usecaseConfig,
 	}
@@ -99,7 +99,7 @@ func (uc *Usecase) Upsert(ctx context.Context, m *model.Resource, write_visibili
 
 	if !uc.Config.DisablePersistence {
 		// check if the resource already exists
-		existingResource, err := uc.reporterResourceRepository.FindByReporterResourceIdv1beta2(ctx, model.ReporterResourceIdv1beta2FromResource(m))
+		existingResource, err := uc.ReporterResourceRepository.FindByReporterResourceIdv1beta2(ctx, model.ReporterResourceIdv1beta2FromResource(m))
 
 		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, ErrDatabaseError
@@ -132,9 +132,9 @@ func (uc *Usecase) Upsert(ctx context.Context, m *model.Resource, write_visibili
 		}
 
 		log.Info("Creating resource: ", m)
-		ret, err2 := createNewReporterResource(ctx, m, uc, txidStr)
-		if err2 != nil {
-			return ret, err2
+		ret, err = createNewReporterResource(ctx, m, uc, txidStr)
+		if err != nil {
+			return ret, err
 		}
 
 		if readAfterWriteEnabled && uc.Config.ConsumerEnabled {
@@ -153,13 +153,13 @@ func (uc *Usecase) Upsert(ctx context.Context, m *model.Resource, write_visibili
 			if err != nil {
 				switch {
 				case errors.Is(err, pubsub.ErrWaitContextCancelled):
-					uc.log.WithContext(ctx).Debugf("Reached timeout waiting for notification from consumer")
+					uc.Log.WithContext(ctx).Debugf("Reached timeout waiting for notification from consumer")
 					return ret, nil
 				case errors.Is(err, gobreaker.ErrOpenState):
-					uc.log.WithContext(ctx).Debugf("Circuit breaker is open, skipped waiting for notification from consumer")
+					uc.Log.WithContext(ctx).Debugf("Circuit breaker is open, skipped waiting for notification from consumer")
 					return ret, nil
 				case errors.Is(err, gobreaker.ErrTooManyRequests):
-					uc.log.WithContext(ctx).Debugf("Circuit breaker is half-open, skipped waiting for notification from consumer")
+					uc.Log.WithContext(ctx).Debugf("Circuit breaker is half-open, skipped waiting for notification from consumer")
 					return ret, nil
 				default:
 					return nil, err
@@ -168,12 +168,12 @@ func (uc *Usecase) Upsert(ctx context.Context, m *model.Resource, write_visibili
 		}
 	}
 
-	uc.log.WithContext(ctx).Infof("Created Resource: %v(%v)", m.ID, m.ResourceType)
+	uc.Log.WithContext(ctx).Infof("Upserted Resource: %v(%v)", ret.ID, ret.ResourceType)
 	return ret, nil
 }
 
 func createNewReporterResource(ctx context.Context, m *model.Resource, uc *Usecase, txid string) (*model.Resource, error) {
-	ret, err := uc.reporterResourceRepository.Create(ctx, m, uc.Namespace, txid)
+	ret, err := uc.ReporterResourceRepository.Create(ctx, m, uc.Namespace, txid)
 
 	if err != nil {
 		return nil, err
@@ -184,13 +184,13 @@ func createNewReporterResource(ctx context.Context, m *model.Resource, uc *Useca
 
 func validateSameResourceFromMultipleReportersShareInventoryId(ctx context.Context, m *model.Resource, uc *Usecase) error {
 	// Multiple reporters should have same inventory id.
-	existingInventoryIdResource, err := uc.reporterResourceRepository.FindByInventoryIdAndResourceType(ctx, m.InventoryId, m.ResourceType)
+	existingInventoryIdResource, err := uc.ReporterResourceRepository.FindByInventoryIdAndResourceType(ctx, m.InventoryId, m.ResourceType)
 	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 		return ErrDatabaseError
 	}
 
 	if existingInventoryIdResource != nil {
-		existingResourceRepo, err := uc.reporterResourceRepository.FindByInventoryIdAndReporter(ctx, m.InventoryId, m.ReporterInstanceId, m.ReporterType)
+		existingResourceRepo, err := uc.ReporterResourceRepository.FindByInventoryIdAndReporter(ctx, m.InventoryId, m.ReporterInstanceId, m.ReporterType)
 		if existingResourceRepo != nil {
 			return ErrResourceAlreadyExists
 		}
@@ -207,12 +207,12 @@ func updateExistingReporterResource(ctx context.Context, m *model.Resource, exis
 		return nil, ErrInventoryIdMismatch
 	}
 	log.Info("Updating resource: ", m)
-	ret, err := uc.reporterResourceRepository.Update(ctx, m, existingResource.ID, uc.Namespace, txid)
+	ret, err := uc.ReporterResourceRepository.Update(ctx, m, existingResource.ID, uc.Namespace, txid)
 	if err != nil {
 		return nil, err
 	}
 
-	uc.log.WithContext(ctx).Infof("Updated Resource: %v(%v)", m.ID, m.ResourceType)
+	uc.Log.WithContext(ctx).Infof("Updated Resource: %v(%v)", m.ID, m.ResourceType)
 	return ret, nil
 }
 
@@ -221,7 +221,7 @@ func (uc *Usecase) LookupResources(ctx context.Context, request *kessel.LookupRe
 }
 
 func (uc *Usecase) Check(ctx context.Context, permission, namespace string, sub *kessel.SubjectReference, id model.ReporterResourceId) (bool, error) {
-	res, err := uc.reporterResourceRepository.FindByReporterResourceId(ctx, id)
+	res, err := uc.ReporterResourceRepository.FindByReporterResourceId(ctx, id)
 	if err != nil {
 		// If the resource doesn't exist in inventory (ie. no consistency token available)
 		// we send a check request with minimize latency
@@ -244,7 +244,7 @@ func (uc *Usecase) Check(ctx context.Context, permission, namespace string, sub 
 }
 
 func (uc *Usecase) CheckForUpdate(ctx context.Context, permission, namespace string, sub *kessel.SubjectReference, id model.ReporterResourceId) (bool, error) {
-	res, err := uc.reporterResourceRepository.FindByReporterResourceId(ctx, id)
+	res, err := uc.ReporterResourceRepository.FindByReporterResourceId(ctx, id)
 	recordToken := true
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -271,7 +271,7 @@ func (uc *Usecase) CheckForUpdate(ctx context.Context, permission, namespace str
 		// Only update consistency token if resource exists in DB.
 		if recordToken && consistency != nil {
 			res.ConsistencyToken = consistency.Token
-			_, err := uc.reporterResourceRepository.Update(ctx, res, res.ID, uc.Namespace, "")
+			_, err := uc.ReporterResourceRepository.Update(ctx, res, res.ID, uc.Namespace, "")
 			if err != nil {
 				return false, err // we're allowed, but failed to update consistency token
 			}
@@ -284,7 +284,7 @@ func (uc *Usecase) CheckForUpdate(ctx context.Context, permission, namespace str
 }
 
 func (uc *Usecase) ListResourcesInWorkspace(ctx context.Context, permission, namespace string, sub *kessel.SubjectReference, id string) (chan *model.Resource, chan error, error) {
-	resources, err := uc.reporterResourceRepository.FindByWorkspaceId(ctx, id)
+	resources, err := uc.ReporterResourceRepository.FindByWorkspaceId(ctx, id)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -344,10 +344,10 @@ func (uc *Usecase) Create(ctx context.Context, m *model.Resource) (*model.Resour
 
 	if !uc.Config.DisablePersistence {
 		// check if the resource already exists
-		existingResource, err := uc.reporterResourceRepository.FindByReporterData(ctx, m.ReporterId, m.ReporterResourceId)
+		existingResource, err := uc.ReporterResourceRepository.FindByReporterData(ctx, m.ReporterId, m.ReporterResourceId)
 		if err != nil && errors.Is(err, gorm.ErrRecordNotFound) {
 			// Deprecated: fallback case for backwards compatibility
-			existingResource, err = uc.reporterResourceRepository.FindByReporterResourceId(ctx, model.ReporterResourceIdFromResource(m))
+			existingResource, err = uc.ReporterResourceRepository.FindByReporterResourceId(ctx, model.ReporterResourceIdFromResource(m))
 		}
 
 		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
@@ -370,7 +370,7 @@ func (uc *Usecase) Create(ctx context.Context, m *model.Resource) (*model.Resour
 			defer subscription.Unsubscribe()
 		}
 
-		ret, err = uc.reporterResourceRepository.Create(ctx, m, uc.Namespace, txidStr)
+		ret, err = uc.ReporterResourceRepository.Create(ctx, m, uc.Namespace, txidStr)
 		if err != nil {
 			return nil, err
 		}
@@ -388,8 +388,7 @@ func (uc *Usecase) Create(ctx context.Context, m *model.Resource) (*model.Resour
 			}
 		}
 	}
-
-	uc.log.WithContext(ctx).Infof("Created Resource: %v(%v)", m.ID, m.ResourceType)
+	uc.Log.WithContext(ctx).Infof("Created Resource: %v(%v)", ret.ID, ret.ResourceType)
 	return ret, nil
 }
 
@@ -403,10 +402,10 @@ func (uc *Usecase) Update(ctx context.Context, m *model.Resource, id model.Repor
 
 	if !uc.Config.DisablePersistence {
 		// check if the resource exists
-		existingResource, err := uc.reporterResourceRepository.FindByReporterData(ctx, m.ReporterId, m.ReporterResourceId)
+		existingResource, err := uc.ReporterResourceRepository.FindByReporterData(ctx, m.ReporterId, m.ReporterResourceId)
 		if err != nil && errors.Is(err, gorm.ErrRecordNotFound) {
 			// Deprecated: fallback case for backwards compatibility
-			existingResource, err = uc.reporterResourceRepository.FindByReporterResourceId(ctx, model.ReporterResourceIdFromResource(m))
+			existingResource, err = uc.ReporterResourceRepository.FindByReporterResourceId(ctx, model.ReporterResourceIdFromResource(m))
 		}
 
 		if err != nil {
@@ -429,7 +428,7 @@ func (uc *Usecase) Update(ctx context.Context, m *model.Resource, id model.Repor
 			defer subscription.Unsubscribe()
 		}
 
-		ret, err = uc.reporterResourceRepository.Update(ctx, m, existingResource.ID, uc.Namespace, txidStr)
+		ret, err = uc.ReporterResourceRepository.Update(ctx, m, existingResource.ID, uc.Namespace, txidStr)
 		if err != nil {
 			return nil, err
 		}
@@ -448,7 +447,7 @@ func (uc *Usecase) Update(ctx context.Context, m *model.Resource, id model.Repor
 		}
 	}
 
-	uc.log.WithContext(ctx).Infof("Updated Resource: %v(%v)", m.ID, m.ResourceType)
+	uc.Log.WithContext(ctx).Infof("Updated Resource: %v(%v)", m.ID, m.ResourceType)
 	return ret, nil
 
 }
@@ -459,11 +458,11 @@ func (uc *Usecase) Delete(ctx context.Context, id model.ReporterResourceId) erro
 
 	if !uc.Config.DisablePersistence {
 		// check if the resource exists
-		existingResource, err := uc.reporterResourceRepository.FindByReporterData(ctx, id.ReporterId, id.LocalResourceId)
+		existingResource, err := uc.ReporterResourceRepository.FindByReporterData(ctx, id.ReporterId, id.LocalResourceId)
 
 		if err != nil && errors.Is(err, gorm.ErrRecordNotFound) {
 			// Deprecated: fallback case for backwards compatibility
-			existingResource, err = uc.reporterResourceRepository.FindByReporterResourceId(ctx, id)
+			existingResource, err = uc.ReporterResourceRepository.FindByReporterResourceId(ctx, id)
 		}
 
 		if err != nil {
@@ -474,13 +473,13 @@ func (uc *Usecase) Delete(ctx context.Context, id model.ReporterResourceId) erro
 			return ErrDatabaseError
 		}
 
-		m, err = uc.reporterResourceRepository.Delete(ctx, existingResource.ID, uc.Namespace)
+		m, err = uc.ReporterResourceRepository.Delete(ctx, existingResource.ID, uc.Namespace)
 		if err != nil {
 			return err
 		}
 	}
 
-	uc.log.WithContext(ctx).Infof("Deleted Resource: %v(%v)", m.ID, m.ResourceType)
+	uc.Log.WithContext(ctx).Infof("Deleted Resource: %v(%v)", m.ID, m.ResourceType)
 	return nil
 
 }

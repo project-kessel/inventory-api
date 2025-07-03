@@ -9,6 +9,7 @@ import (
 	"github.com/go-kratos/kratos/v2/middleware"
 	kgrpc "github.com/go-kratos/kratos/v2/transport/grpc"
 	khttp "github.com/go-kratos/kratos/v2/transport/http"
+	"github.com/project-kessel/inventory-api/internal/authn"
 
 	"github.com/project-kessel/inventory-api/internal/server/grpc"
 	"github.com/project-kessel/inventory-api/internal/server/http"
@@ -25,7 +26,7 @@ type Server struct {
 	Logger log.Logger
 }
 
-func New(c CompletedConfig, authn middleware.Middleware, logger log.Logger) (*Server, error) {
+func New(c CompletedConfig, authn middleware.Middleware, authnConfig authn.CompletedConfig, logger log.Logger) (*Server, error) {
 	s := &Server{
 		Id:     c.Options.Id,
 		Name:   c.Options.Name,
@@ -47,7 +48,7 @@ func New(c CompletedConfig, authn middleware.Middleware, logger log.Logger) (*Se
 		return nil, fmt.Errorf("init http server failed: %w", err)
 	}
 
-	grpcServer, err := grpc.New(c.GrpcConfig, authn, meter, logger)
+	grpcServer, err := grpc.New(c.GrpcConfig, authn, authnConfig, meter, logger)
 	if err != nil {
 		return nil, fmt.Errorf("init grpc server failed: %w", err)
 	}

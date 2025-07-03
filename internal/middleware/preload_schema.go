@@ -12,7 +12,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-var schemaCache sync.Map
+var SchemaCache sync.Map
 
 func PreloadAllSchemas(resourceDir string) error {
 	if viper.GetBool("resources.use_cache") {
@@ -49,10 +49,10 @@ func PreloadAllSchemasFromFilesystem(resourceDir string) error {
 		// Load and store common resource schema
 		commonResourceSchema, err := LoadCommonResourceDataSchema(resourceType, resourceDir)
 		if err == nil {
-			schemaCache.Store(fmt.Sprintf("common:%s", resourceType), commonResourceSchema)
+			SchemaCache.Store(fmt.Sprintf("common:%s", resourceType), commonResourceSchema)
 		}
 
-		_, err = loadConfigFile(resourceDir, resourceType)
+		_, err = LoadConfigFile(resourceDir, resourceType)
 		if err != nil {
 			log.Errorf("Failed to load config file for '%s': %v", resourceType, err)
 			return err
@@ -76,7 +76,7 @@ func PreloadAllSchemasFromFilesystem(resourceDir string) error {
 			reporterType := reporter.Name()
 			reporterSchema, isReporterSchemaExists, err := LoadResourceSchema(resourceType, reporterType, resourceDir)
 			if err == nil && isReporterSchemaExists {
-				schemaCache.Store(fmt.Sprintf("%s:%s", resourceType, reporterType), reporterSchema)
+				SchemaCache.Store(fmt.Sprintf("%s:%s", resourceType, reporterType), reporterSchema)
 			} else {
 				log.Warnf("No schema found for %s:%s", resourceType, reporterType)
 			}
@@ -100,7 +100,7 @@ func LoadSchemaCacheFromJSON(filePath string) error {
 	}
 
 	for key, value := range cacheMap {
-		schemaCache.Store(key, value)
+		SchemaCache.Store(key, value)
 	}
 
 	log.Infof("Schema cache successfully loaded from %s", filePath)
@@ -108,14 +108,14 @@ func LoadSchemaCacheFromJSON(filePath string) error {
 }
 
 // Retrieves schema from cache
-func getSchemaFromCache(cacheKey string) (string, error) {
-	if cachedSchema, ok := schemaCache.Load(cacheKey); ok {
+func GetSchemaFromCache(cacheKey string) (string, error) {
+	if cachedSchema, ok := SchemaCache.Load(cacheKey); ok {
 		return cachedSchema.(string), nil
 	}
 	return "", fmt.Errorf("schema not found for key '%s'", cacheKey)
 }
 
-func loadConfigFile(resourceDir string, resourceType string) (struct {
+func LoadConfigFile(resourceDir string, resourceType string) (struct {
 	ResourceType      string   `yaml:"resource_type"`
 	ResourceReporters []string `yaml:"resource_reporters"`
 }, error) {
@@ -135,6 +135,6 @@ func loadConfigFile(resourceDir string, resourceType string) (struct {
 		return config, fmt.Errorf("missing 'resource_reporters' field in config for '%s'", resourceType)
 	}
 	configResourceType := NormalizeResourceType(config.ResourceType)
-	schemaCache.Store(fmt.Sprintf("config:%s", configResourceType), configData)
+	SchemaCache.Store(fmt.Sprintf("config:%s", configResourceType), configData)
 	return config, nil
 }

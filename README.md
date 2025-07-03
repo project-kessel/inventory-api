@@ -4,6 +4,12 @@ This repository implements a common inventory system with eventing.
 
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
+## Codecov test coverage
+| main | v1beta2 |
+|------|---------|
+| [![codecov](https://codecov.io/gh/project-kessel/inventory-api/branch/main/graph/badge.svg?flag=main)](https://codecov.io/gh/project-kessel/inventory-api/branch/main) | [![codecov](https://codecov.io/gh/project-kessel/inventory-api/branch/Adam0Brien%3Astorage-tests/graph/badge.svg?flag=v1beta2)](https://codecov.io/gh/project-kessel/inventory-api) |
+
+
 ## Table of Contents
 - [Development Setup](#development-setup)
 - [Example Usage](#example-usage)
@@ -14,7 +20,7 @@ This repository implements a common inventory system with eventing.
 ## Development Setup
 
 ### Prerequisites
-- Go 1.23.6
+- Go 1.23.9
 - Make
 
 ### Debugging
@@ -130,9 +136,9 @@ See [Testing Inventory in Ephemeral](./docs/ephemeral-testing.md) for instructio
 
 ### API/Proto files Changes
 
-Once there is any change in the `proto` files (under (/api/kessel)[./api/kessel]) an update is required.
+Once there is any change in the `proto` files (under [/api/kessel](./api/kessel])) an update is required.
 
-This command will generate code and an (openapi)[./openapi.yaml] file from the `proto files`.
+This command will generate code and an [openapi](./openapi.yaml) file from the `proto files`.
 ```shell
 make api
 ```
@@ -141,6 +147,22 @@ We can run the following command to update if there are expected breaking change
 ```shell
 make api_breaking
 ```
+
+### Schema file changes
+
+Once there are any changes in the `schema` files under [/data/schema/resources](./data/schema/resources) an update is required.
+
+The schemas are loaded in as a tarball in a configmap, to generate the tarball execute:
+```shell
+make build-schemas
+```
+
+The command will output the `binaryData` for `resources.tar.gz`. 
+```shell
+binaryData:
+  resources.tar.gz: H4sIAEQ1L2gAA+2d3W7juBXHswWKoil62V4LaYG9mVEoUiTtAfbCmzg7xiRxNnZmd1ssDI2jJNqxpawkz05...
+```
+Copy this data to update the configmap `resources-tarball` in the [ephemeral deployment file](./deploy/kessel-inventory-ephem.yaml#L47) with the latest schema changes.
 
 ### Build Container Images
 
@@ -337,12 +359,3 @@ openssl list -providers | grep -A 3 fips
     version: 3.0.7-395c1a240fbfffd8
     status: active
 ```
-
-## Contributing
-
-Follow the steps below to contribute:
-
-- Fork the project
-- Create a new branch for your feature
-- Run tests and Pr check
-- Submit a pull request

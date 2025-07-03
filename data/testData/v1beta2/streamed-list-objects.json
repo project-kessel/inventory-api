@@ -1,0 +1,16 @@
+{
+  "objectType": {
+    "resourceType": "host",
+    "reporterType": "hbi"
+  },
+  "relation": "view",
+  "subject": {
+    "resource": {
+      "resourceType": "principal",
+      "resourceId": "sarah",
+      "reporter": {
+        "type": "rbac"
+      }
+    }
+  }
+}

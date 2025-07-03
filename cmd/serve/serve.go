@@ -224,7 +224,7 @@ func NewCommand(
 			}
 
 			// construct servers
-			server, err := server.New(serverConfig, middleware.Authentication(authenticator), logger)
+			server, err := server.New(serverConfig, middleware.Authentication(authenticator), authnConfig, logger)
 			if err != nil {
 				return err
 			}
@@ -359,6 +359,7 @@ func NewCommand(
 	authzOptions.AddFlags(cmd.Flags(), "authz")
 	eventingOptions.AddFlags(cmd.Flags(), "eventing")
 	consumerOptions.AddFlags(cmd.Flags(), "consumer")
+	consistencyOptions.AddFlags(cmd.Flags(), "consistency")
 
 	return cmd
 }

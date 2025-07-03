@@ -95,8 +95,8 @@ func ensureTopicExists(adminClient *kafka.AdminClient, topic string) error {
 
 	topicSpec := kafka.TopicSpecification{
 		Topic:             topic,
-		NumPartitions:     3,
-		ReplicationFactor: 3,
+		NumPartitions:     1,
+		ReplicationFactor: 1,
 	}
 
 	results, err := adminClient.CreateTopics(ctx, []kafka.TopicSpecification{topicSpec})

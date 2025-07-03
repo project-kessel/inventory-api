@@ -574,3 +574,91 @@ func TestSerializableCreateFails(t *testing.T) {
 	err = conflictTx.Commit().Error
 	assert.Nil(t, err)
 }
+
+func TestFindByReporterResourceIdv1beta2(t *testing.T) {
+	_, repo := setupTest(t)
+	ctx := context.TODO()
+
+	res := resource1()
+	res.ReporterInstanceId = "instance-123"
+	res.ResourceType = "host"
+	res.ReporterType = "hbi"
+	res.ReporterResourceId = "rres-456"
+	created, err := repo.Create(ctx, res, namespace, emptyTxId)
+	require.NoError(t, err)
+	require.NotNil(t, created)
+
+	idx := model.ReporterResourceUniqueIndex{
+		ResourceType:       "host",
+		ReporterType:       "hbi",
+		ReporterInstanceId: "instance-123",
+		ReporterResourceId: "rres-456",
+	}
+	found, err := repo.FindByReporterResourceIdv1beta2(ctx, idx)
+	assert.NoError(t, err)
+	assert.NotNil(t, found)
+	assert.Equal(t, created.ID, found.ID)
+
+	// test bad data
+	badIdx := model.ReporterResourceUniqueIndex{
+		ReporterInstanceId: "bad",
+		ReporterResourceId: "bad",
+		ResourceType:       "bad",
+		ReporterType:       "bad",
+	}
+	found, err = repo.FindByReporterResourceIdv1beta2(ctx, badIdx)
+	assert.Error(t, err)
+	assert.Nil(t, found)
+}
+
+func TestFindByInventoryIdAndResourceType(t *testing.T) {
+	_, repo := setupTest(t)
+	ctx := context.TODO()
+
+	res := resource1()
+	res.ResourceType = "host"
+	created, err := repo.Create(ctx, res, namespace, emptyTxId)
+	require.NoError(t, err)
+	require.NotNil(t, created)
+	require.NotNil(t, created.InventoryId)
+
+	found, err := repo.FindByInventoryIdAndResourceType(ctx, created.InventoryId, "host")
+	assert.NoError(t, err)
+	assert.NotNil(t, found)
+	assert.Equal(t, created.ID, found.ID)
+
+	// test for wrong inventory id
+	badId, _ := uuid.NewV7()
+	found, err = repo.FindByInventoryIdAndResourceType(ctx, &badId, "host")
+	assert.Error(t, err)
+	assert.Nil(t, found)
+}
+
+func TestFindByInventoryIdAndReporter(t *testing.T) {
+	_, repo := setupTest(t)
+	ctx := context.TODO()
+
+	res := resource1()
+	res.ReporterType = "hbi"
+	res.ReporterInstanceId = "instance-123"
+	created, err := repo.Create(ctx, res, namespace, emptyTxId)
+	require.NoError(t, err)
+	require.NotNil(t, created)
+	require.NotNil(t, created.InventoryId)
+
+	found, err := repo.FindByInventoryIdAndReporter(ctx, created.InventoryId, "instance-123", "hbi")
+	assert.NoError(t, err)
+	assert.NotNil(t, found)
+	assert.Equal(t, created.ID, found.ID)
+
+	// test for wrong inventory id
+	badId, _ := uuid.NewV7()
+	found, err = repo.FindByInventoryIdAndReporter(ctx, &badId, "instance-123", "hbi")
+	assert.Error(t, err)
+	assert.Nil(t, found)
+
+	// test for wrong reporter instance id
+	found, err = repo.FindByInventoryIdAndReporter(ctx, created.InventoryId, "does-not-exist", "hbi")
+	assert.Error(t, err)
+	assert.Nil(t, found)
+}

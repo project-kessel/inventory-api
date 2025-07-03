@@ -4,8 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/go-kratos/kratos/v2/log"
@@ -42,7 +40,7 @@ func NormalizeResourceType(resourceType string) string {
 func MarshalProtoToJSON(msg proto.Message) ([]byte, error) {
 	data, err := protojson.Marshal(msg)
 	if err != nil {
-		return nil, fmt.Errorf("ERROR: Failed to marshal message: %w", err)
+		return nil, fmt.Errorf("failed to marshal message: %w", err)
 	}
 	return data, nil
 }
@@ -50,31 +48,61 @@ func MarshalProtoToJSON(msg proto.Message) ([]byte, error) {
 func UnmarshalJSONToMap(data []byte) (map[string]interface{}, error) {
 	var resourceMap map[string]interface{}
 	if err := json.Unmarshal(data, &resourceMap); err != nil {
-		return nil, fmt.Errorf("ERROR: Failed to unmarshal JSON: %w", err)
+		return nil, fmt.Errorf("failed to unmarshal JSON: %w", err)
 	}
 	return resourceMap, nil
 }
 
+// ExtractOption configures extraction behavior
+type ExtractOption func(*extractConfig)
+
+type extractConfig struct {
+	validateFieldExists bool
+}
+
+// ValidateFieldExists makes the extraction fail if the field doesn't exist
+func ValidateFieldExists() ExtractOption {
+	return func(c *extractConfig) {
+		c.validateFieldExists = true
+	}
+}
+
 // Extracts a Map Field from another map
-func ExtractMapField(data map[string]interface{}, key string) (map[string]interface{}, error) {
+func ExtractMapField(data map[string]interface{}, key string, opts ...ExtractOption) (map[string]interface{}, error) {
+	config := &extractConfig{validateFieldExists: false}
+	for _, opt := range opts {
+		opt(config)
+	}
+
 	value, exists := data[key]
 	if !exists {
-		return nil, fmt.Errorf("ERROR: Missing '%s' field in payload", key)
+		if config.validateFieldExists {
+			return nil, fmt.Errorf("missing '%s' field in payload", key)
+		}
+		return nil, nil // Return nil without error when field doesn't exist and not required
 	}
 
 	mapValue, ok := value.(map[string]interface{})
 	if !ok {
-		return nil, fmt.Errorf("ERROR: '%s' is not a valid object", key)
+		return nil, fmt.Errorf("'%s' is not a valid object", key)
 	}
 
 	return mapValue, nil
 }
 
 // Extracts a String Field from a map
-func ExtractStringField(data map[string]interface{}, key string) (string, error) {
+func ExtractStringField(data map[string]interface{}, key string, opts ...ExtractOption) (string, error) {
+	config := &extractConfig{validateFieldExists: false}
+	for _, opt := range opts {
+		opt(config)
+	}
+
 	value, exists := data[key]
 	if !exists {
-		return "", fmt.Errorf("missing '%s' field in payload", key)
+		if config.validateFieldExists {
+			return "", fmt.Errorf("missing '%s' field in payload", key)
+		}
+		return "", nil // Return empty string without error when field doesn't exist and not required
 	}
 
 	strValue, ok := value.(string)
@@ -88,23 +116,57 @@ func ExtractStringField(data map[string]interface{}, key string) (string, error)
 // ValidateCommonRepresentation Validates the "common" field in ResourceRepresentations using a predefined schema.
 func ValidateCommonRepresentation(resourceType string, commonRepresentation map[string]interface{}) error {
 	commonSchemaKey := fmt.Sprintf("common:%s", strings.ToLower(resourceType))
-	commonSchema, err := getSchemaFromCache(commonSchemaKey)
+	commonSchema, err := GetSchemaFromCache(commonSchemaKey)
 	if err != nil {
 		return fmt.Errorf("failed to load common representation schema for '%s': %w", resourceType, err)
 	}
 
-	if err := ValidateJSONSchema(commonSchema, commonRepresentation); err != nil {
-		return fmt.Errorf("common representation validation failed for '%s': %w", resourceType, err)
+	// Check if schema has required fields to determine if commonRepresentation is required
+	hasRequiredFields, err := schemaHasRequiredFields(commonSchema)
+	if err != nil {
+		return fmt.Errorf("failed to analyze common schema for '%s': %w", resourceType, err)
+	}
+
+	// If schema has required fields but commonRepresentation is nil/empty, that's an error
+	if hasRequiredFields && len(commonRepresentation) == 0 {
+		return fmt.Errorf("missing 'common' field in payload - schema for '%s' has required fields", resourceType)
+	}
+
+	// Validate data if present
+	if len(commonRepresentation) > 0 {
+		if err := ValidateJSONSchema(commonSchema, commonRepresentation); err != nil {
+			return fmt.Errorf("common representation validation failed for '%s': %w", resourceType, err)
+		}
 	}
 
 	return nil
+}
+
+// schemaHasRequiredFields checks if a JSON schema has any required fields
+func schemaHasRequiredFields(schemaStr string) (bool, error) {
+	var schema map[string]interface{}
+	if err := json.Unmarshal([]byte(schemaStr), &schema); err != nil {
+		return false, fmt.Errorf("failed to parse schema: %w", err)
+	}
+
+	required, exists := schema["required"]
+	if !exists {
+		return false, nil
+	}
+
+	requiredArray, ok := required.([]interface{})
+	if !ok {
+		return false, nil
+	}
+
+	return len(requiredArray) > 0, nil
 }
 
 // Validates the reporter-specific representation against its schema based on resourceType and reporterType.
 func ValidateReporterRepresentation(resourceType string, reporterType string, reporterRepresentation map[string]interface{}) error {
 	// Construct the schema key using the format: resourceType:reporterType
 	schemaKey := fmt.Sprintf("%s:%s", strings.ToLower(resourceType), strings.ToLower(reporterType))
-	reporterRepresentationSchema, err := getSchemaFromCache(schemaKey)
+	reporterRepresentationSchema, err := GetSchemaFromCache(schemaKey)
 
 	// Case 1: No schema found for resourceType:reporterType
 	if err != nil {
@@ -115,7 +177,18 @@ func ValidateReporterRepresentation(resourceType string, reporterType string, re
 		return nil
 	}
 
-	// Case 2: Schema found, validate data (if present)
+	// Case 2: Schema found - check if it has required fields to determine if reporterRepresentation is required
+	hasRequiredFields, err := schemaHasRequiredFields(reporterRepresentationSchema)
+	if err != nil {
+		return fmt.Errorf("failed to analyze schema for '%s': %w", schemaKey, err)
+	}
+
+	// If schema has required fields but reporterRepresentation is nil/empty, that's an error
+	if hasRequiredFields && len(reporterRepresentation) == 0 {
+		return fmt.Errorf("missing 'reporter' field in payload - schema for '%s' has required fields", schemaKey)
+	}
+
+	// Case 3: Validate data if present
 	if len(reporterRepresentation) > 0 {
 		if err := ValidateJSONSchema(reporterRepresentationSchema, reporterRepresentation); err != nil {
 			return fmt.Errorf("reporter representation validation failed for '%s': %w", schemaKey, err)
@@ -141,25 +214,4 @@ func ValidateJSONSchema(schemaStr string, jsonData interface{}) error {
 		return fmt.Errorf("validation failed: %s", strings.Join(errMsgs, "; "))
 	}
 	return nil
-}
-
-func GetProjectRootPath() (string, error) {
-	cwd, err := os.Getwd()
-	if err != nil {
-		return "", fmt.Errorf("failed to get current working directory: %w", err)
-	}
-
-	for {
-		if _, err := os.Stat(filepath.Join(cwd, "go.mod")); err == nil {
-			return cwd, nil
-		}
-
-		parent := filepath.Dir(cwd)
-		if parent == cwd {
-			break
-		}
-		cwd = parent
-	}
-
-	return "", fmt.Errorf("project root not found")
 }

@@ -52,18 +52,18 @@ func TestUpsertResource_NoResourceExists_WithBothRepresentations(t *testing.T) {
 	request := testdata.HostReportResourceRequest()
 
 	// Set up fake dependencies
-	fakeCommonRepo := datav1beta2.NewFakeCommonRepresentationRepository()
-	fakeReporterRepo := datav1beta2.NewFakeReporterRepresentationRepository()
-	fakeResourceRepo := datav1beta2.NewFakeResourceWithReferencesRepository()
-	fakeTransactionManager := data.NewFakeTransactionManager()
+	commonRepo := datav1beta2.NewFakeCommonRepresentationRepository()
+	reporterRepo := datav1beta2.NewFakeReporterRepresentationRepository()
+	resourceRepo := datav1beta2.NewFakeResourceWithReferencesRepository()
+	transactionManager := data.NewFakeTransactionManager()
 
 	// Create ResourceUsecase with fake dependencies
 	usecase := NewResourceUsecase(
-		fakeCommonRepo,
-		fakeReporterRepo,
-		fakeResourceRepo,
+		commonRepo,
+		reporterRepo,
+		resourceRepo,
 		nil, // DB not needed with fake transaction manager
-		fakeTransactionManager,
+		transactionManager,
 		nil, // MetricsCollector not needed for this test
 		"test-namespace",
 		testLogger(),
@@ -77,7 +77,7 @@ func TestUpsertResource_NoResourceExists_WithBothRepresentations(t *testing.T) {
 
 	// Verify that repositories were called and data was stored
 	// Check that common representation was created
-	commonReps := fakeCommonRepo.GetAll()
+	commonReps := commonRepo.GetAll()
 	assert.Len(t, commonReps, 1, "Should have created one common representation")
 	if len(commonReps) > 0 {
 		assert.Equal(t, "inventory", commonReps[0].ReporterType)
@@ -87,7 +87,7 @@ func TestUpsertResource_NoResourceExists_WithBothRepresentations(t *testing.T) {
 	}
 
 	// Check that reporter representation was created
-	reporterReps := fakeReporterRepo.GetAll()
+	reporterReps := reporterRepo.GetAll()
 	assert.Len(t, reporterReps, 1, "Should have created one reporter representation")
 	if len(reporterReps) > 0 {
 		assert.Equal(t, "hbi", reporterReps[0].ReporterType)
@@ -99,7 +99,7 @@ func TestUpsertResource_NoResourceExists_WithBothRepresentations(t *testing.T) {
 	}
 
 	// Check that resource with references was created
-	resources := fakeResourceRepo.GetAllResources()
+	resources := resourceRepo.GetAllResources()
 	assert.Len(t, resources, 1, "Should have created one resource")
 	if len(resources) > 0 {
 		assert.Equal(t, "host", resources[0].Type)

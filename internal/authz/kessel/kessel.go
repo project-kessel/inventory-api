@@ -105,6 +105,23 @@ func (a *KesselAuthz) getCallOptions() ([]grpc.CallOption, error) {
 	return opts, nil
 }
 
+func (a *KesselAuthz) AcquireLock(ctx context.Context, r *kessel.AcquireLockRequest) (*kessel.AcquireLockResponse, error) {
+	opts, err := a.getCallOptions()
+	if err != nil {
+		a.incrFailureCounter("AcquireLock")
+		return nil, err
+	}
+
+	resp, err := a.TupleService.AcquireLock(ctx, r, opts...)
+	if err != nil {
+		a.incrFailureCounter("AcquireLock")
+		return nil, err
+	}
+
+	a.incrSuccessCounter("AcquireLock")
+	return resp, nil
+}
+
 func (a *KesselAuthz) CreateTuples(ctx context.Context, r *kessel.CreateTuplesRequest) (*kessel.CreateTuplesResponse, error) {
 	opts, err := a.getCallOptions()
 	if err != nil {

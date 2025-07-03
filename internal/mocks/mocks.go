@@ -80,6 +80,11 @@ func (m *MockAuthz) CheckForUpdate(ctx context.Context, namespace string, permis
 	return args.Get(0).(v1beta1.CheckForUpdateResponse_Allowed), args.Get(1).(*v1beta1.ConsistencyToken), args.Error(2)
 }
 
+func (m *MockAuthz) AcquireLock(ctx context.Context, req *v1beta1.AcquireLockRequest) (*v1beta1.AcquireLockResponse, error) {
+	args := m.Called(ctx, req)
+	return args.Get(0).(*v1beta1.AcquireLockResponse), args.Error(1)
+}
+
 func (m *MockAuthz) CreateTuples(ctx context.Context, req *v1beta1.CreateTuplesRequest) (*v1beta1.CreateTuplesResponse, error) {
 	args := m.Called(ctx, req)
 	return args.Get(0).(*v1beta1.CreateTuplesResponse), args.Error(1)

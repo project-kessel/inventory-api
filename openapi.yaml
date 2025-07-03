@@ -301,207 +301,6 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/google.rpc.Status'
-    /api/inventory/v1beta1/resources/notifications-integrations:
-        get:
-            tags:
-                - KesselNotificationsIntegrationService
-            operationId: KesselNotificationsIntegrationService_ListNotificationsIntegrations
-            parameters:
-                - name: resourceType.namespace
-                  in: query
-                  schema:
-                    type: string
-                - name: resourceType.name
-                  in: query
-                  schema:
-                    type: string
-                - name: relation
-                  in: query
-                  schema:
-                    type: string
-                - name: subject.relation
-                  in: query
-                  description: |-
-                    An optional relation which points to a set of Subjects instead of the single Subject.
-                     e.g. "members" or "owners" of a group identified in `subject`.
-                  schema:
-                    type: string
-                - name: subject.subject.type.namespace
-                  in: query
-                  schema:
-                    type: string
-                - name: subject.subject.type.name
-                  in: query
-                  schema:
-                    type: string
-                - name: subject.subject.id
-                  in: query
-                  schema:
-                    type: string
-                - name: parent.type.namespace
-                  in: query
-                  schema:
-                    type: string
-                - name: parent.type.name
-                  in: query
-                  schema:
-                    type: string
-                - name: parent.id
-                  in: query
-                  schema:
-                    type: string
-            responses:
-                "200":
-                    description: OK
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.ListNotificationsIntegrationsResponse'
-                default:
-                    description: Default error response
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/google.rpc.Status'
-        put:
-            tags:
-                - KesselNotificationsIntegrationService
-            operationId: KesselNotificationsIntegrationService_UpdateNotificationsIntegration
-            requestBody:
-                content:
-                    application/json:
-                        schema:
-                            $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.UpdateNotificationsIntegrationRequest'
-                required: true
-            responses:
-                "200":
-                    description: OK
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.UpdateNotificationsIntegrationResponse'
-                default:
-                    description: Default error response
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/google.rpc.Status'
-        post:
-            tags:
-                - KesselNotificationsIntegrationService
-            operationId: KesselNotificationsIntegrationService_CreateNotificationsIntegration
-            requestBody:
-                content:
-                    application/json:
-                        schema:
-                            $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.CreateNotificationsIntegrationRequest'
-                required: true
-            responses:
-                "200":
-                    description: OK
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.CreateNotificationsIntegrationResponse'
-                default:
-                    description: Default error response
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/google.rpc.Status'
-        delete:
-            tags:
-                - KesselNotificationsIntegrationService
-            operationId: KesselNotificationsIntegrationService_DeleteNotificationsIntegration
-            requestBody:
-                content:
-                    application/json:
-                        schema:
-                            $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.DeleteNotificationsIntegrationRequest'
-                required: true
-            responses:
-                "200":
-                    description: OK
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.DeleteNotificationsIntegrationResponse'
-                default:
-                    description: Default error response
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/google.rpc.Status'
-    /api/inventory/v1beta1/resources/rhel-hosts:
-        put:
-            tags:
-                - KesselRhelHostService
-            operationId: KesselRhelHostService_UpdateRhelHost
-            requestBody:
-                content:
-                    application/json:
-                        schema:
-                            $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.UpdateRhelHostRequest'
-                required: true
-            responses:
-                "200":
-                    description: OK
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.UpdateRhelHostResponse'
-                default:
-                    description: Default error response
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/google.rpc.Status'
-        post:
-            tags:
-                - KesselRhelHostService
-            operationId: KesselRhelHostService_CreateRhelHost
-            requestBody:
-                content:
-                    application/json:
-                        schema:
-                            $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.CreateRhelHostRequest'
-                required: true
-            responses:
-                "200":
-                    description: OK
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.CreateRhelHostResponse'
-                default:
-                    description: Default error response
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/google.rpc.Status'
-        delete:
-            tags:
-                - KesselRhelHostService
-            operationId: KesselRhelHostService_DeleteRhelHost
-            requestBody:
-                content:
-                    application/json:
-                        schema:
-                            $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.DeleteRhelHostRequest'
-                required: true
-            responses:
-                "200":
-                    description: OK
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.DeleteRhelHostResponse'
-                default:
-                    description: Default error response
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/google.rpc.Status'
     /api/inventory/v1beta2/check:
         post:
             tags:
@@ -925,26 +724,6 @@ components:
         kessel.inventory.v1beta1.resources.CreateK8sPolicyResponse:
             type: object
             properties: {}
-        kessel.inventory.v1beta1.resources.CreateNotificationsIntegrationRequest:
-            type: object
-            properties:
-                integration:
-                    allOf:
-                        - $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.NotificationsIntegration'
-                    description: The NotificationsIntegration to create in Kessel Asset Inventory
-        kessel.inventory.v1beta1.resources.CreateNotificationsIntegrationResponse:
-            type: object
-            properties: {}
-        kessel.inventory.v1beta1.resources.CreateRhelHostRequest:
-            type: object
-            properties:
-                rhel_host:
-                    allOf:
-                        - $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.RhelHost'
-                    description: The Rhel Host to create in Kessel Asset Inventory
-        kessel.inventory.v1beta1.resources.CreateRhelHostResponse:
-            type: object
-            properties: {}
         kessel.inventory.v1beta1.resources.DeleteK8sClusterRequest:
             type: object
             properties:
@@ -963,26 +742,6 @@ components:
                         - $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.ReporterData'
                     description: "The resource to be deleted will be defined by \n \\\"<reporter_data.reporter_type>:<reporter_instaance_id>:<reporter_data.local_resource_id>\\\"\n from the request body."
         kessel.inventory.v1beta1.resources.DeleteK8sPolicyResponse:
-            type: object
-            properties: {}
-        kessel.inventory.v1beta1.resources.DeleteNotificationsIntegrationRequest:
-            type: object
-            properties:
-                reporter_data:
-                    allOf:
-                        - $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.ReporterData'
-                    description: "The resource to be deleted will be defined by \n \\\"<reporter_data.reporter_type>:<reporter_instaance_id>:<reporter_data.local_resource_id>\\\"\n from the request body."
-        kessel.inventory.v1beta1.resources.DeleteNotificationsIntegrationResponse:
-            type: object
-            properties: {}
-        kessel.inventory.v1beta1.resources.DeleteRhelHostRequest:
-            type: object
-            properties:
-                reporter_data:
-                    allOf:
-                        - $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.ReporterData'
-                    description: "The resource to be updated will be defined by \n \\\"<reporter_data.reporter_type>:<reporter_instaance_id>:<reporter_data.local_resource_id>\\\"\n from the request body."
-        kessel.inventory.v1beta1.resources.DeleteRhelHostResponse:
             type: object
             properties: {}
         kessel.inventory.v1beta1.resources.K8sCluster:
@@ -1110,11 +869,6 @@ components:
                         - CRITICAL
                     type: string
                     format: enum
-        kessel.inventory.v1beta1.resources.ListNotificationsIntegrationsResponse:
-            type: object
-            properties:
-                integrations:
-                    $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.NotificationsIntegration'
         kessel.inventory.v1beta1.resources.Metadata:
             type: object
             properties:
@@ -1155,18 +909,6 @@ components:
                     type: array
                     items:
                         $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.ResourceLabel'
-        kessel.inventory.v1beta1.resources.NotificationsIntegration:
-            type: object
-            properties:
-                metadata:
-                    allOf:
-                        - $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.Metadata'
-                    description: Metadata about this resource
-                reporter_data:
-                    writeOnly: true
-                    allOf:
-                        - $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.ReporterData'
-                    description: Write only reporter specific data
         kessel.inventory.v1beta1.resources.ReporterData:
             type: object
             properties:
@@ -1210,18 +952,6 @@ components:
                     type: string
                 value:
                     type: string
-        kessel.inventory.v1beta1.resources.RhelHost:
-            type: object
-            properties:
-                metadata:
-                    allOf:
-                        - $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.Metadata'
-                    description: Metadata about this resource
-                reporter_data:
-                    writeOnly: true
-                    allOf:
-                        - $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.ReporterData'
-                    description: Write only reporter specific data
         kessel.inventory.v1beta1.resources.UpdateK8sClusterRequest:
             type: object
             properties:
@@ -1240,26 +970,6 @@ components:
                         - $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.K8sPolicy'
                     description: "The resource to be updated will be defined by \n \\\"<reporter_data.reporter_type>:<reporter_instaance_id>:<reporter_data.local_resource_id>\\\"\n from the request body."
         kessel.inventory.v1beta1.resources.UpdateK8sPolicyResponse:
-            type: object
-            properties: {}
-        kessel.inventory.v1beta1.resources.UpdateNotificationsIntegrationRequest:
-            type: object
-            properties:
-                integration:
-                    allOf:
-                        - $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.NotificationsIntegration'
-                    description: "The resource to be updated will be defined by \n \\\"<reporter_data.reporter_type>:<reporter_instaance_id>:<reporter_data.local_resource_id>\\\"\n from the request body."
-        kessel.inventory.v1beta1.resources.UpdateNotificationsIntegrationResponse:
-            type: object
-            properties: {}
-        kessel.inventory.v1beta1.resources.UpdateRhelHostRequest:
-            type: object
-            properties:
-                rhel_host:
-                    allOf:
-                        - $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.RhelHost'
-                    description: "The resource to be updated will be defined by \n \\\"<reporter_data.reporter_type>:<reporter_instaance_id>:<reporter_data.local_resource_id>\\\"\n from the request body."
-        kessel.inventory.v1beta1.resources.UpdateRhelHostResponse:
             type: object
             properties: {}
         kessel.inventory.v1beta2.CheckForUpdateRequest:
@@ -1435,5 +1145,3 @@ tags:
     - name: KesselK8SClusterService
     - name: KesselK8SPolicyIsPropagatedToK8SClusterService
     - name: KesselK8SPolicyService
-    - name: KesselNotificationsIntegrationService
-    - name: KesselRhelHostService

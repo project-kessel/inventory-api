@@ -349,8 +349,10 @@ github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 h1:Jamvg5psRI
 github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
 github.com/power-devops/perfstat v0.0.0-20221212215047-62379fc7944b h1:0LFwY6Q3gMACTjAbMZBjXAqTOzOwFaj2Ld6cjeQ7Rig=
 github.com/power-devops/perfstat v0.0.0-20221212215047-62379fc7944b/go.mod h1:OmDBASR4679mdNQnz2pUhc2G8CO2JrUAVFDRBDP/hJE=
-github.com/project-kessel/inventory-client-go v0.0.0-20250424151038-8425c8f4f969 h1:OGdQRUN1E96aY1XoaFar2b6QyUchTFrG6OXqb2JWERw=
-github.com/project-kessel/inventory-client-go v0.0.0-20250424151038-8425c8f4f969/go.mod h1:A2F4FxZ4tPJKYuS4T0ZGlJf0a1zK2dploXw6zPioUmE=
+github.com/project-kessel/inventory-client-go v0.0.0-20250507151904-9921f1bf1e8e h1:GShE4oppxRY7exeeS+SdSyhSmklncPga6mgmlS/4vDQ=
+github.com/project-kessel/inventory-client-go v0.0.0-20250507151904-9921f1bf1e8e/go.mod h1:UR1q6JJW3SVCQmn7es1qS5WsqyOMSXn2eh+v6EB+f7M=
+github.com/project-kessel/inventory-client-go v0.0.0-20250703155410-0ece2b1f2d03 h1:j6niKjfj0NmN/R30JJeX/1KwszvrlIklCQB0EDXvAgk=
+github.com/project-kessel/inventory-client-go v0.0.0-20250703155410-0ece2b1f2d03/go.mod h1:SyQfr20EDYld5nVQK/K2aLj2Uu9DETwvWzAZDCYB1yM=
 github.com/project-kessel/relations-api v0.0.0-20250408111129-d8b61a77bd9a h1:sYfr1u53pjGOzF1zWeR1kWRfxO+i0DJQTCgnyhUyNso=
 github.com/project-kessel/relations-api v0.0.0-20250408111129-d8b61a77bd9a/go.mod h1:95vCl70L9t65lj2cDmyU26Dj9y99UFd895TH8DwZEno=
 github.com/prometheus/client_golang v1.22.0 h1:rb93p9lokFEsctTys46VnV1kLCDpVZ0a/Y92Vm0Zc6Q=

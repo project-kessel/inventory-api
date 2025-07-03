@@ -5,9 +5,12 @@ import (
 	"testing"
 
 	"github.com/go-kratos/kratos/v2/log"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2"
+	"github.com/project-kessel/inventory-api/internal/biz/model/v1beta2"
 	"github.com/project-kessel/inventory-api/internal/biz/usecase/testdata"
 	"github.com/project-kessel/inventory-api/internal/data"
 	datav1beta2 "github.com/project-kessel/inventory-api/internal/data/v1beta2"
@@ -42,78 +45,166 @@ import (
 5. Resource exists, ReportResource with only common representation
 */
 
-// TestUpsertResource_NoResourceExists_WithBothRepresentations tests the scenario where:
-// - No ResourceWithReferences exists for the given ReporterRepresentationId
-// - UpsertResource is called with both CommonRepresentation and ReporterRepresentation
-// - Expected: Creates new Resource, CommonRepresentation, ReporterRepresentation, and RepresentationReferences
-func TestUpsertResource_NoResourceExists_WithBothRepresentations(t *testing.T) {
-	// Arrange
-	ctx := context.Background()
-	request := testdata.HostReportResourceRequest()
-
-	// Set up fake dependencies
-	commonRepo := datav1beta2.NewFakeCommonRepresentationRepository()
-	reporterRepo := datav1beta2.NewFakeReporterRepresentationRepository()
-	resourceRepo := datav1beta2.NewFakeResourceWithReferencesRepository()
-	transactionManager := data.NewFakeTransactionManager()
-
-	// Create ResourceUsecase with fake dependencies
-	usecase := NewResourceUsecase(
-		commonRepo,
-		reporterRepo,
-		resourceRepo,
-		nil, // DB not needed with fake transaction manager
-		transactionManager,
-		nil, // MetricsCollector not needed for this test
-		"test-namespace",
-		testLogger(),
-	)
-
-	// Act
-	err := usecase.UpsertResource(ctx, request)
-
-	// Assert
-	require.NoError(t, err, "UpsertResource should succeed")
-
-	// Verify that repositories were called and data was stored
-	// Check that common representation was created
-	commonReps := commonRepo.GetAll()
-	assert.Len(t, commonReps, 1, "Should have created one common representation")
-	if len(commonReps) > 0 {
-		assert.Equal(t, "inventory", commonReps[0].ReporterType)
-		assert.Equal(t, "host", commonReps[0].ResourceType)
-		assert.Equal(t, 1, commonReps[0].Version)
-		assert.NotNil(t, commonReps[0].Data)
+// TestUpsertResource_NoResourceExists tests scenarios where no resource exists
+func TestUpsertResource_NoResourceExists(t *testing.T) {
+	tests := []struct {
+		name                           string
+		request                        *pb.ReportResourceRequest
+		expectedResourceCount          int
+		expectedCommonRepCount         int
+		expectedReporterRepCount       int
+		expectedRepresentationRefCount int
+		expectedRefTypes               []string // Expected reporter types in representation references
+	}{
+		{
+			name:                           "WithBothRepresentations",
+			request:                        testdata.ReportResourceRequestBothRepresentations(),
+			expectedResourceCount:          1,
+			expectedCommonRepCount:         1,
+			expectedReporterRepCount:       1,
+			expectedRepresentationRefCount: 2,
+			expectedRefTypes:               []string{"inventory", "hbi"},
+		},
+		{
+			name:                           "WithOnlyReporterRepresentation",
+			request:                        testdata.ReportResourceRequestReporterOnly(),
+			expectedResourceCount:          1,
+			expectedCommonRepCount:         0, // Should NOT create common representation when not provided
+			expectedReporterRepCount:       1,
+			expectedRepresentationRefCount: 1, // Should only create reporter reference
+			expectedRefTypes:               []string{"hbi"},
+		},
 	}
 
-	// Check that reporter representation was created
-	reporterReps := reporterRepo.GetAll()
-	assert.Len(t, reporterReps, 1, "Should have created one reporter representation")
-	if len(reporterReps) > 0 {
-		assert.Equal(t, "hbi", reporterReps[0].ReporterType)
-		assert.Equal(t, "host", reporterReps[0].ResourceType)
-		assert.Equal(t, 1, reporterReps[0].Version)
-		assert.Equal(t, "3088be62-1c60-4884-b133-9200542d0b3f", reporterReps[0].ReporterInstanceID)
-		assert.Equal(t, "dd1b73b9-3e33-4264-968c-e3ce55b9afec", reporterReps[0].LocalResourceID)
-		assert.NotNil(t, reporterReps[0].Data)
-	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Arrange
+			ctx := context.Background()
 
-	// Check that resource with references was created
+			// Set up dependencies
+			commonRepo := datav1beta2.NewFakeCommonRepresentationRepository()
+			reporterRepo := datav1beta2.NewFakeReporterRepresentationRepository()
+			resourceRepo := datav1beta2.NewFakeResourceWithReferencesRepository()
+			transactionManager := data.NewFakeTransactionManager()
+
+			// Create ResourceUsecase with fake dependencies
+			usecase := NewResourceUsecase(
+				commonRepo,
+				reporterRepo,
+				resourceRepo,
+				nil, // DB not needed with fake transaction manager
+				transactionManager,
+				nil, // MetricsCollector not needed for this test
+				"test-namespace",
+				testLogger(),
+			)
+
+			// Act
+			err := usecase.ReportResource(ctx, tt.request)
+
+			// Assert
+			require.NoError(t, err, "ReportResource should succeed")
+
+			// Assert all entities were created correctly
+			assertResourceCreation(t, resourceRepo, tt.expectedResourceCount)
+			assertReporterRepresentationCreation(t, reporterRepo, tt.expectedReporterRepCount, tt.expectedCommonRepCount > 0)
+			assertCommonRepresentationCreation(t, commonRepo, tt.expectedCommonRepCount)
+			assertRepresentationReferencesCreation(t, resourceRepo, tt.expectedResourceCount, tt.expectedRepresentationRefCount, tt.expectedRefTypes)
+		})
+	}
+}
+
+// assertResourceCreation verifies that the expected number of resources were created with correct structure
+func assertResourceCreation(t *testing.T, resourceRepo *datav1beta2.FakeResourceWithReferencesRepository, expectedCount int) {
+	t.Helper()
+
 	resources := resourceRepo.GetAllResources()
-	assert.Len(t, resources, 1, "Should have created one resource")
-	if len(resources) > 0 {
-		assert.Equal(t, "host", resources[0].Type)
-		assert.NotEqual(t, "", resources[0].ID.String())
-	}
+	require.Len(t, resources, expectedCount, "Should have created expected number of resources")
 
-	// Verify test fixture data
-	assert.Equal(t, "host", request.Type)
-	assert.Equal(t, "hbi", request.ReporterType)
-	assert.Equal(t, "3088be62-1c60-4884-b133-9200542d0b3f", request.ReporterInstanceId)
-	assert.NotNil(t, request.Representations)
-	assert.NotNil(t, request.Representations.Common)
-	assert.NotNil(t, request.Representations.Reporter)
-	assert.NotNil(t, request.Representations.Metadata)
+	if expectedCount > 0 {
+		expectedResource := testdata.ExpectedResource(resources[0].ID)
+		assert.Equal(t, expectedResource, resources[0], "Resource should match expected structure")
+		assert.NotEqual(t, uuid.Nil, resources[0].ID, "Resource ID should be generated")
+	}
+}
+
+// assertReporterRepresentationCreation verifies that the expected number of reporter representations were created
+func assertReporterRepresentationCreation(t *testing.T, reporterRepo *datav1beta2.FakeReporterRepresentationRepository, expectedCount int, hasCommonRep bool) {
+	t.Helper()
+
+	reporterReps := reporterRepo.GetAll()
+	require.Len(t, reporterReps, expectedCount, "Should have created expected number of reporter representations")
+
+	if expectedCount > 0 {
+		var expectedReporterRep *v1beta2.ReporterRepresentation
+		if hasCommonRep {
+			expectedReporterRep = testdata.ExpectedReporterRepresentation(
+				reporterReps[0].Data,      // Use actual serialized data
+				reporterReps[0].CreatedAt, // Use actual timestamp
+				reporterReps[0].UpdatedAt, // Use actual timestamp
+			)
+		} else {
+			expectedReporterRep = testdata.ExpectedReporterRepresentationReporterOnly(
+				reporterReps[0].Data,      // Use actual serialized data
+				reporterReps[0].CreatedAt, // Use actual timestamp
+				reporterReps[0].UpdatedAt, // Use actual timestamp
+			)
+		}
+		assert.Equal(t, expectedReporterRep, reporterReps[0], "ReporterRepresentation should match expected structure")
+		assert.NotNil(t, reporterReps[0].Data, "ReporterRepresentation data should not be nil")
+	}
+}
+
+// assertCommonRepresentationCreation verifies that the expected number of common representations were created
+func assertCommonRepresentationCreation(t *testing.T, commonRepo *datav1beta2.FakeCommonRepresentationRepository, expectedCount int) {
+	t.Helper()
+
+	commonReps := commonRepo.GetAll()
+	require.Len(t, commonReps, expectedCount, "Should have created expected number of common representations")
+
+	if expectedCount > 0 {
+		expectedCommonRep := testdata.ExpectedCommonRepresentation(
+			commonReps[0].Data,            // Use actual serialized data
+			commonReps[0].CreatedAt,       // Use actual timestamp
+			commonReps[0].UpdatedAt,       // Use actual timestamp
+			commonReps[0].LocalResourceID, // Use actual generated ID
+			commonReps[0].ReportedBy,      // Use actual reportedBy format
+		)
+		assert.Equal(t, expectedCommonRep, commonReps[0], "CommonRepresentation should match expected structure")
+		assert.NotNil(t, commonReps[0].Data, "CommonRepresentation data should not be nil")
+	}
+}
+
+// assertRepresentationReferencesCreation verifies that the expected representation references were created
+func assertRepresentationReferencesCreation(t *testing.T, resourceRepo *datav1beta2.FakeResourceWithReferencesRepository, expectedResourceCount, expectedRefCount int, expectedRefTypes []string) {
+	t.Helper()
+
+	aggregates := resourceRepo.GetAllResourceAggregates()
+	require.Len(t, aggregates, expectedResourceCount, "Should have created expected number of aggregates")
+
+	if expectedResourceCount > 0 {
+		resourceID := aggregates[0].Resource.ID
+		refs := aggregates[0].RepresentationReferences
+		require.Len(t, refs, expectedRefCount, "Should have created expected number of representation references")
+
+		// Verify expected reference types
+		actualRefTypes := make([]string, len(refs))
+		for i, ref := range refs {
+			actualRefTypes[i] = ref.ReporterType
+		}
+		assert.ElementsMatch(t, expectedRefTypes, actualRefTypes, "Should have expected reporter types in references")
+
+		// Verify specific reference structures
+		for _, ref := range refs {
+			if ref.ReporterType == "inventory" {
+				expectedInventoryRef := testdata.ExpectedCommonRepresentationReference(resourceID, ref.LocalResourceID)
+				assert.Equal(t, expectedInventoryRef, ref, "Common representation reference should match expected structure")
+			} else if ref.ReporterType == "hbi" {
+				expectedReporterRef := testdata.ExpectedReporterRepresentationReference(resourceID)
+				assert.Equal(t, expectedReporterRef, ref, "Reporter representation reference should match expected structure")
+			}
+		}
+	}
 }
 
 // testLogger creates a test logger

@@ -50,8 +50,8 @@ func NewResourceUsecase(
 	}
 }
 
-// UpsertResource implements the v1beta2 upsert algorithm with a simplified approach
-func (usecase *ResourceUsecase) UpsertResource(ctx context.Context, request *v1beta2.ReportResourceRequest) error {
+// ReportResource implements the v1beta2 upsert algorithm with a simplified approach
+func (usecase *ResourceUsecase) ReportResource(ctx context.Context, request *v1beta2.ReportResourceRequest) error {
 	usecase.Log.WithContext(ctx).Info("Starting upsert for resource type: ", request.GetType())
 
 	// Use serializable transaction for consistency

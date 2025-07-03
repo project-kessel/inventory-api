@@ -36,6 +36,13 @@ func (s *InventoryService) SetV1beta2Controller(v1beta2Ctl *usecase.ResourceUsec
 }
 
 func (c *InventoryService) ReportResource(ctx context.Context, r *pb.ReportResourceRequest) (*pb.ReportResourceResponse, error) {
+	/*
+	 1. serialization
+	 2. metrics
+	 3. authn
+	 4. presentation validation
+	 5. error handling
+	*/
 	identity, err := middleware.GetIdentity(ctx)
 	if err != nil {
 		return nil, err
@@ -49,7 +56,7 @@ func (c *InventoryService) ReportResource(ctx context.Context, r *pb.ReportResou
 		}
 
 		log.Info("Using new v1beta2 upsert implementation")
-		err = c.V1beta2Ctl.UpsertResource(ctx, r)
+		err = c.V1beta2Ctl.ReportResource(ctx, r)
 		if err != nil {
 			return nil, err
 		}

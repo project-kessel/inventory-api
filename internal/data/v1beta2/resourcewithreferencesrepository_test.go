@@ -475,7 +475,7 @@ func TestFakeResourceWithReferencesRepositorySpecific(t *testing.T) {
 		assert.Equal(t, 3, repo.Count())
 	})
 
-	t.Run("GetAllAggregates functionality", func(t *testing.T) {
+	t.Run("GetAllResourceAggregates functionality", func(t *testing.T) {
 		repo.Reset()
 
 		// Create multiple aggregates with different numbers of references
@@ -493,7 +493,7 @@ func TestFakeResourceWithReferencesRepositorySpecific(t *testing.T) {
 		}
 
 		// Get all aggregates and verify
-		aggregates := repo.GetAllAggregates()
+		aggregates := repo.GetAllResourceAggregates()
 		assert.Len(t, aggregates, 2)
 
 		// Verify structure
@@ -859,7 +859,7 @@ func testUpdateRepresentationVersion(t *testing.T, repo v1beta2.ResourceWithRefe
 
 		// For fake repository, verify the updates
 		if fakeRepo, ok := repo.(*FakeResourceWithReferencesRepository); ok {
-			aggregates := fakeRepo.GetAllAggregates()
+			aggregates := fakeRepo.GetAllResourceAggregates()
 			found := false
 			for _, agg := range aggregates {
 				if agg.Resource.ID == resourceID {
@@ -1017,7 +1017,7 @@ func testUpdateRepresentationVersionHelperMethods(t *testing.T, repo v1beta2.Res
 
 		// For fake repository, verify selective update
 		if fakeRepo, ok := repo.(*FakeResourceWithReferencesRepository); ok {
-			aggregates := fakeRepo.GetAllAggregates()
+			aggregates := fakeRepo.GetAllResourceAggregates()
 			found := false
 			for _, agg := range aggregates {
 				if agg.Resource.ID == resourceID {

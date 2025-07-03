@@ -14,7 +14,7 @@ type FakeResourceWithReferencesRepository struct {
 	mu            sync.RWMutex
 	resources     map[uuid.UUID]*v1beta2.Resource
 	references    map[uuid.UUID][]*v1beta2.RepresentationReference // resourceID -> references
-	creationOrder []uuid.UUID                                      // Track creation order for consistent GetAllAggregates
+	creationOrder []uuid.UUID                                      // Track creation order for consistent GetAllResourceAggregates
 }
 
 // NewFakeResourceWithReferencesRepository creates a new fake repository
@@ -242,8 +242,8 @@ func (f *FakeResourceWithReferencesRepository) GetAllResources() []*v1beta2.Reso
 	return result
 }
 
-// GetAllAggregates returns all stored resource aggregates (useful for testing)
-func (f *FakeResourceWithReferencesRepository) GetAllAggregates() []*v1beta2.ResourceWithReferences {
+// GetAllResourceAggregates returns all stored resource aggregates (useful for testing)
+func (f *FakeResourceWithReferencesRepository) GetAllResourceAggregates() []*v1beta2.ResourceWithReferences {
 	f.mu.RLock()
 	defer f.mu.RUnlock()
 

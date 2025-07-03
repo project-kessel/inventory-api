@@ -69,6 +69,9 @@ type InventoryConsumer struct {
 	AuthOptions      *auth.Options
 	RetryOptions     *retry.Options
 	Notifier         pubsub.Notifier
+
+	lockToken string
+	lockId    string
 }
 
 // New instantiates a new InventoryConsumer
@@ -447,6 +450,10 @@ func (i *InventoryConsumer) CreateTuple(ctx context.Context, tuple *v1beta1.Rela
 
 	resp, err := i.Authorizer.CreateTuples(ctx, &v1beta1.CreateTuplesRequest{
 		Tuples: []*v1beta1.Relationship{tuple},
+		FencingCheck: &v1beta1.FencingCheck{
+			LockId:    i.lockId,
+			LockToken: i.lockToken,
+		},
 	})
 	if err != nil {
 		// If the tuple exists already, capture the token using Check to ensure idempotent updates to tokens in DB
@@ -476,6 +483,10 @@ func (i *InventoryConsumer) UpdateTuple(ctx context.Context, tuple *v1beta1.Rela
 	resp, err := i.Authorizer.CreateTuples(ctx, &v1beta1.CreateTuplesRequest{
 		Tuples: []*v1beta1.Relationship{tuple},
 		Upsert: true,
+		FencingCheck: &v1beta1.FencingCheck{
+			LockId:    i.lockId,
+			LockToken: i.lockToken,
+		},
 	})
 	// TODO: we should understand what kind of errors to look for here in case we need to commit in loop or not
 	if err != nil {
@@ -488,6 +499,10 @@ func (i *InventoryConsumer) UpdateTuple(ctx context.Context, tuple *v1beta1.Rela
 func (i *InventoryConsumer) DeleteTuple(ctx context.Context, filter *v1beta1.RelationTupleFilter) (string, error) {
 	resp, err := i.Authorizer.DeleteTuples(ctx, &v1beta1.DeleteTuplesRequest{
 		Filter: filter,
+		FencingCheck: &v1beta1.FencingCheck{
+			LockId:    i.lockId,
+			LockToken: i.lockToken,
+		},
 	})
 	if err != nil {
 		return "", fmt.Errorf("error deleting tuple: %v", err)
@@ -560,6 +575,29 @@ func (i *InventoryConsumer) RebalanceCallback(consumer *kafka.Consumer, event ka
 		i.Logger.Warnf("consumer rebalance event type: %d new partition(s) assigned: %v\n",
 			len(ev.Partitions), ev.Partitions)
 
+		if len(ev.Partitions) > 0 {
+			p := ev.Partitions[0] // there should only be one partition
+			i.lockId = fmt.Sprintf("%s/%d", i.Config.ConsumerGroupID, p.Partition)
+			i.Logger.Infof("Attempting to acquire lock for lockId: %s", i.lockId)
+
+			lockToken, err := i.Retry(func() (string, error) {
+				resp, err := i.Authorizer.AcquireLock(context.Background(), &v1beta1.AcquireLockRequest{
+					LockId: i.lockId,
+				})
+				if err != nil {
+					return "", err
+				}
+				return resp.GetLockToken(), nil
+			})
+			if err != nil {
+				i.Logger.Errorf("failed to acquire lock token for %s: %v", i.lockId, err)
+				i.lockToken = ""
+				return err
+			}
+			i.lockToken = lockToken
+			i.Logger.Infof("Successfully acquired lock token. Token: %s", i.lockToken)
+		}
+
 	case kafka.RevokedPartitions:
 		i.Logger.Warnf("consumer rebalance event: %d partition(s) revoked: %v\n",
 			len(ev.Partitions), ev.Partitions)
@@ -572,6 +610,9 @@ func (i *InventoryConsumer) RebalanceCallback(consumer *kafka.Consumer, event ka
 			i.Logger.Errorf("failed to commit offsets: %v", err)
 			return err
 		}
+		// clear the lock token
+		i.lockToken = ""
+		i.lockId = ""
 
 	default:
 		i.Logger.Error("Unexpected event type: %v", event)

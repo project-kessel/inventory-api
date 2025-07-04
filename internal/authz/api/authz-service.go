@@ -18,6 +18,7 @@ type Authorizer interface {
 	LookupResources(ctx context.Context, in *kessel.LookupResourcesRequest) (grpc.ServerStreamingClient[kessel.LookupResourcesResponse], error)
 	CreateTuples(context.Context, *kessel.CreateTuplesRequest) (*kessel.CreateTuplesResponse, error)
 	DeleteTuples(context.Context, *kessel.DeleteTuplesRequest) (*kessel.DeleteTuplesResponse, error)
+	AcquireLock(context.Context, *kessel.AcquireLockRequest) (*kessel.AcquireLockResponse, error)
 	UnsetWorkspace(context.Context, string, string, string) (*kessel.DeleteTuplesResponse, error)
 	SetWorkspace(context.Context, string, string, string, string, bool) (*kessel.CreateTuplesResponse, error)
 }

@@ -75,6 +75,10 @@ func (a *AllowAllAuthz) LookupResources(ctx context.Context, in *v1beta1.LookupR
 	return &mockLookupResourcesClient{ctx: ctx}, nil
 }
 
+func (a *AllowAllAuthz) AcquireLock(ctx context.Context, r *v1beta1.AcquireLockRequest) (*v1beta1.AcquireLockResponse, error) {
+	return &v1beta1.AcquireLockResponse{}, nil
+}
+
 func (a *AllowAllAuthz) CreateTuples(ctx context.Context, r *v1beta1.CreateTuplesRequest) (*v1beta1.CreateTuplesResponse, error) {
 	return &v1beta1.CreateTuplesResponse{}, nil
 }

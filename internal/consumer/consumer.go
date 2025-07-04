@@ -606,13 +606,14 @@ func (i *InventoryConsumer) RebalanceCallback(consumer *kafka.Consumer, event ka
 			i.Logger.Warn("Assignment lost involuntarily, commit may fail")
 		}
 		err := i.commitStoredOffsets()
+		// clear the lock token regardless of commit success/failure
+		// since we're losing the partition assignment
+		i.lockToken = ""
+		i.lockId = ""
 		if err != nil {
 			i.Logger.Errorf("failed to commit offsets: %v", err)
 			return err
 		}
-		// clear the lock token
-		i.lockToken = ""
-		i.lockId = ""
 
 	default:
 		i.Logger.Error("Unexpected event type: %v", event)

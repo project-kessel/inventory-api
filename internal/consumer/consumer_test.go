@@ -1,10 +1,13 @@
 package consumer
 
 import (
+	"context"
 	"errors"
 	"testing"
 
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
+	"github.com/project-kessel/inventory-api/internal/consumer/auth"
+	"github.com/project-kessel/inventory-api/internal/consumer/retry"
 	"github.com/project-kessel/inventory-api/internal/metricscollector"
 	"github.com/stretchr/testify/mock"
 
@@ -72,17 +75,42 @@ func (t *TestCase) TestSetup() []error {
 	authorizer.On("CreateTuples", mock.Anything, mock.Anything).Return(createTupleResponse, nil)
 	authorizer.On("DeleteTuples", mock.Anything, mock.Anything).Return(deleteTupleResponse, nil)
 
-	consumer := mocks.MockConsumer{}
-	t.inv, err = New(t.completedConfig, &gorm.DB{}, authz.CompletedConfig{}, authorizer, notifier, t.logger)
+	consumer := &mocks.MockConsumer{}
+	err = t.metrics.New(otel.Meter("github.com/project-kessel/inventory-api/blob/main/internal/server/otel"))
 	if err != nil {
 		errs = append(errs, err)
 	}
 
-	t.inv.Consumer = &consumer
+	authnOptions := &auth.Options{
+		Enabled:          cfg.AuthConfig.Enabled,
+		SecurityProtocol: cfg.AuthConfig.SecurityProtocol,
+		SASLMechanism:    cfg.AuthConfig.SASLMechanism,
+		SASLUsername:     cfg.AuthConfig.SASLUsername,
+		SASLPassword:     cfg.AuthConfig.SASLPassword,
+	}
 
-	err = t.metrics.New(otel.Meter("github.com/project-kessel/inventory-api/blob/main/internal/server/otel"))
-	if err != nil {
-		errs = append(errs, err)
+	retryOptions := &retry.Options{
+		ConsumerMaxRetries:  cfg.RetryConfig.ConsumerMaxRetries,
+		OperationMaxRetries: cfg.RetryConfig.OperationMaxRetries,
+		BackoffFactor:       cfg.RetryConfig.BackoffFactor,
+		MaxBackoffSeconds:   cfg.RetryConfig.MaxBackoffSeconds,
+	}
+
+	var errChan chan error
+
+	t.inv = InventoryConsumer{
+		Consumer:         consumer,
+		OffsetStorage:    make([]kafka.TopicPartition, 0),
+		Config:           cfg,
+		DB:               &gorm.DB{},
+		AuthzConfig:      authz.CompletedConfig{},
+		Authorizer:       authorizer,
+		Errors:           errChan,
+		MetricsCollector: &t.metrics,
+		Logger:           t.logger,
+		AuthOptions:      authnOptions,
+		RetryOptions:     retryOptions,
+		Notifier:         notifier,
 	}
 
 	return errs
@@ -505,4 +533,273 @@ func TestCommitStoredOffsets(t *testing.T) {
 			assert.Equal(t, tester.inv.OffsetStorage, test.remainingOffsets)
 		})
 	}
+}
+
+func TestRebalanceCallback_AssignedPartitions(t *testing.T) {
+	tests := []struct {
+		name                  string
+		partitions            []kafka.TopicPartition
+		lockResponse          *v1beta1.AcquireLockResponse
+		lockError             error
+		expectedLockId        string
+		expectedLockToken     string
+		expectedError         error
+		expectAcquireLockCall bool
+	}{
+		{
+			name: "successful lock acquisition",
+			partitions: []kafka.TopicPartition{
+				{Partition: 0, Topic: ToPointer("test-topic")},
+			},
+			lockResponse: &v1beta1.AcquireLockResponse{
+				LockToken: "test-lock-token-123",
+			},
+			lockError:             nil,
+			expectedLockId:        "inventory-consumer/0",
+			expectedLockToken:     "test-lock-token-123",
+			expectedError:         nil,
+			expectAcquireLockCall: true,
+		},
+		{
+			name: "lock acquisition fails",
+			partitions: []kafka.TopicPartition{
+				{Partition: 0, Topic: ToPointer("test-topic")},
+			},
+			lockResponse:          nil,
+			lockError:             errors.New("lock acquisition failed"),
+			expectedLockId:        "inventory-consumer/0",
+			expectedLockToken:     "",
+			expectedError:         ErrMaxRetries,
+			expectAcquireLockCall: true,
+		},
+		{
+			name:                  "no partitions assigned",
+			partitions:            []kafka.TopicPartition{},
+			lockResponse:          nil,
+			lockError:             nil,
+			expectedLockId:        "",
+			expectedLockToken:     "",
+			expectedError:         nil,
+			expectAcquireLockCall: false,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			tester := TestCase{}
+			errs := tester.TestSetup()
+			assert.Nil(t, errs)
+
+			authorizer := &mocks.MockAuthz{}
+			if test.expectAcquireLockCall {
+				authorizer.On("AcquireLock", mock.Anything, mock.MatchedBy(func(req *v1beta1.AcquireLockRequest) bool {
+					return req.LockId == test.expectedLockId
+				})).Return(test.lockResponse, test.lockError)
+			}
+			tester.inv.Authorizer = authorizer
+
+			event := kafka.AssignedPartitions{
+				Partitions: test.partitions,
+			}
+
+			err := tester.inv.RebalanceCallback(nil, event)
+
+			assert.Equal(t, test.expectedError, err)
+			assert.Equal(t, test.expectedLockId, tester.inv.lockId)
+			assert.Equal(t, test.expectedLockToken, tester.inv.lockToken)
+
+			if test.expectAcquireLockCall {
+				authorizer.AssertExpectations(t)
+			}
+		})
+	}
+}
+
+func TestRebalanceCallback_RevokedPartitions(t *testing.T) {
+	tests := []struct {
+		name              string
+		partitions        []kafka.TopicPartition
+		storedOffsets     []kafka.TopicPartition
+		commitResponse    []kafka.TopicPartition
+		commitError       error
+		assignmentLost    bool
+		expectedError     error
+		initialLockId     string
+		initialLockToken  string
+		expectedLockId    string
+		expectedLockToken string
+	}{
+		{
+			name: "successful partition revocation with offset commit",
+			partitions: []kafka.TopicPartition{
+				{Partition: 0, Topic: ToPointer("test-topic")},
+			},
+			storedOffsets: []kafka.TopicPartition{
+				{Offset: kafka.Offset(10), Partition: 0},
+			},
+			commitResponse: []kafka.TopicPartition{
+				{Offset: kafka.Offset(10), Partition: 0},
+			},
+			commitError:       nil,
+			assignmentLost:    false,
+			expectedError:     nil,
+			initialLockId:     "inventory-consumer/0",
+			initialLockToken:  "test-lock-token-123",
+			expectedLockId:    "",
+			expectedLockToken: "",
+		},
+		{
+			name: "partition revocation with assignment lost",
+			partitions: []kafka.TopicPartition{
+				{Partition: 0, Topic: ToPointer("test-topic")},
+			},
+			storedOffsets: []kafka.TopicPartition{
+				{Offset: kafka.Offset(5), Partition: 0},
+			},
+			commitResponse: []kafka.TopicPartition{
+				{Offset: kafka.Offset(5), Partition: 0},
+			},
+			commitError:       nil,
+			assignmentLost:    true,
+			expectedError:     nil,
+			initialLockId:     "inventory-consumer/0",
+			initialLockToken:  "test-lock-token-456",
+			expectedLockId:    "",
+			expectedLockToken: "",
+		},
+		{
+			name: "partition revocation with commit failure",
+			partitions: []kafka.TopicPartition{
+				{Partition: 1, Topic: ToPointer("test-topic")},
+			},
+			storedOffsets: []kafka.TopicPartition{
+				{Offset: kafka.Offset(20), Partition: 1},
+			},
+			commitResponse:    nil,
+			commitError:       errors.New("commit failed"),
+			assignmentLost:    false,
+			expectedError:     errors.New("commit failed"),
+			initialLockId:     "inventory-consumer/1",
+			initialLockToken:  "test-lock-token-789",
+			expectedLockId:    "",
+			expectedLockToken: "",
+		},
+		{
+			name:              "partition revocation with no stored offsets",
+			partitions:        []kafka.TopicPartition{{Partition: 0, Topic: ToPointer("test-topic")}},
+			storedOffsets:     []kafka.TopicPartition{},
+			commitResponse:    []kafka.TopicPartition{},
+			commitError:       nil,
+			assignmentLost:    false,
+			expectedError:     nil,
+			initialLockId:     "inventory-consumer/0",
+			initialLockToken:  "test-lock-token-empty",
+			expectedLockId:    "",
+			expectedLockToken: "",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			tester := TestCase{}
+			errs := tester.TestSetup()
+			assert.Nil(t, errs)
+
+			consumer := &mocks.MockConsumer{}
+			consumer.On("AssignmentLost").Return(test.assignmentLost)
+			consumer.On("CommitOffsets", test.storedOffsets).Return(test.commitResponse, test.commitError)
+			tester.inv.Consumer = consumer
+
+			tester.inv.OffsetStorage = test.storedOffsets
+			tester.inv.lockId = test.initialLockId
+			tester.inv.lockToken = test.initialLockToken
+
+			event := kafka.RevokedPartitions{
+				Partitions: test.partitions,
+			}
+
+			err := tester.inv.RebalanceCallback(nil, event)
+
+			assert.Equal(t, test.expectedError, err)
+			assert.Equal(t, test.expectedLockId, tester.inv.lockId)
+			assert.Equal(t, test.expectedLockToken, tester.inv.lockToken)
+
+			consumer.AssertExpectations(t)
+		})
+	}
+}
+
+func TestFencingToken_WritingAfterRebalance(t *testing.T) {
+	// Setup two consumers
+	testerA := TestCase{}
+	errsA := testerA.TestSetup()
+	assert.Nil(t, errsA)
+	testerA.inv.Config.ConsumerGroupID = "test-group"
+
+	testerB := TestCase{}
+	errsB := testerB.TestSetup()
+	assert.Nil(t, errsB)
+	testerB.inv.Config.ConsumerGroupID = "test-group"
+
+	authorizer := &mocks.MockAuthz{}
+	createSuccessResponse := &v1beta1.CreateTuplesResponse{ConsistencyToken: &v1beta1.ConsistencyToken{Token: "test-token"}}
+
+	consumerAToken := "token-A"
+	consumerBToken := "token-B"
+	lockCall1 := authorizer.On("AcquireLock", mock.Anything, mock.MatchedBy(func(req *v1beta1.AcquireLockRequest) bool {
+		return req.LockId == "test-group/0"
+	})).Return(&v1beta1.AcquireLockResponse{LockToken: consumerAToken}, nil).Once()
+
+	lockCall2 := authorizer.On("AcquireLock", mock.Anything, mock.MatchedBy(func(req *v1beta1.AcquireLockRequest) bool {
+		return req.LockId == "test-group/0"
+	})).Return(&v1beta1.AcquireLockResponse{LockToken: consumerBToken}, nil).Once()
+
+	// Ensure the calls happen in the right order
+	lockCall2.NotBefore(lockCall1)
+
+	// Mock the CreateTuples calls to only accept consumer B's token
+	authorizer.On("CreateTuples", mock.Anything, mock.MatchedBy(func(req *v1beta1.CreateTuplesRequest) bool {
+		return req.FencingCheck != nil && req.FencingCheck.LockToken == consumerBToken
+	})).Return(createSuccessResponse, nil)
+
+	authorizer.On("CreateTuples", mock.Anything, mock.MatchedBy(func(req *v1beta1.CreateTuplesRequest) bool {
+		return req.FencingCheck != nil && req.FencingCheck.LockToken == consumerAToken
+	})).Return((*v1beta1.CreateTuplesResponse)(nil), errors.New("fencing token is invalid or expired"))
+
+	testerA.inv.Authorizer = authorizer
+	testerB.inv.Authorizer = authorizer
+
+	assignedPartitions := kafka.AssignedPartitions{
+		Partitions: []kafka.TopicPartition{{Partition: 0, Topic: ToPointer("test-topic")}},
+	}
+
+	// Consumer A acquires the lock first
+	err := testerA.inv.RebalanceCallback(nil, assignedPartitions)
+	assert.Nil(t, err)
+	assert.Equal(t, "test-group/0", testerA.inv.lockId)
+	assert.Equal(t, "token-A", testerA.inv.lockToken)
+	staleToken := testerA.inv.lockToken
+
+	// Consumer B acquires the lock, invalidating A's token
+	err = testerB.inv.RebalanceCallback(nil, assignedPartitions)
+	assert.Nil(t, err)
+	assert.Equal(t, "test-group/0", testerB.inv.lockId)
+	assert.Equal(t, "token-B", testerB.inv.lockToken)
+	assert.NotEqual(t, staleToken, testerB.inv.lockToken)
+
+	// Simulate consumer A waking up with the stale token
+	testerA.inv.lockToken = staleToken
+
+	// Try to create a tuple with the stale token
+	tuple := makeTuple()
+	_, err = testerA.inv.CreateTuple(context.Background(), tuple)
+	assert.NotNil(t, err)
+	assert.Contains(t, err.Error(), "fencing token is invalid or expired")
+
+	// Consumer B should be able to create a tuple with the valid token
+	resp, err := testerB.inv.CreateTuple(context.Background(), tuple)
+	assert.Nil(t, err)
+	assert.Equal(t, "test-token", resp)
+
+	authorizer.AssertExpectations(t)
 }

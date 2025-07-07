@@ -102,3 +102,5 @@ require (
 	golang.org/x/time v0.12.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250603155806-513f23925822 // indirect
 )
+
+replace github.com/project-kessel/relations-api => github.com/lennysgarage/relations-api v0.0.0-20250702204013-7efea0ca06b0

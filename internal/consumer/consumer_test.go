@@ -6,10 +6,9 @@ import (
 	"testing"
 
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
-	"github.com/project-kessel/inventory-api/internal/consumer/auth"
-	"github.com/project-kessel/inventory-api/internal/consumer/retry"
 	"github.com/project-kessel/inventory-api/internal/metricscollector"
 	"github.com/stretchr/testify/mock"
+	"go.opentelemetry.io/otel"
 
 	"github.com/project-kessel/inventory-api/internal/biz/model"
 	"github.com/project-kessel/inventory-api/internal/mocks"
@@ -17,7 +16,6 @@ import (
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
 	"github.com/stretchr/testify/assert"
-	"go.opentelemetry.io/otel"
 	"gorm.io/gorm"
 
 	. "github.com/project-kessel/inventory-api/cmd/common"
@@ -77,42 +75,15 @@ func (t *TestCase) TestSetup() []error {
 	authorizer.On("CreateTuples", mock.Anything, mock.Anything).Return(createTupleResponse, nil)
 	authorizer.On("DeleteTuples", mock.Anything, mock.Anything).Return(deleteTupleResponse, nil)
 
-	consumer := &mocks.MockConsumer{}
-	err = t.metrics.New(otel.Meter("github.com/project-kessel/inventory-api/blob/main/internal/server/otel"))
+	consumer := mocks.MockConsumer{}
+	t.inv, err = New(cfg, &gorm.DB{}, authz.CompletedConfig{}, authorizer, notifier, t.logger)
 	if err != nil {
 		errs = append(errs, err)
 	}
-
-	authnOptions := &auth.Options{
-		Enabled:          cfg.AuthConfig.Enabled,
-		SecurityProtocol: cfg.AuthConfig.SecurityProtocol,
-		SASLMechanism:    cfg.AuthConfig.SASLMechanism,
-		SASLUsername:     cfg.AuthConfig.SASLUsername,
-		SASLPassword:     cfg.AuthConfig.SASLPassword,
-	}
-
-	retryOptions := &retry.Options{
-		ConsumerMaxRetries:  cfg.RetryConfig.ConsumerMaxRetries,
-		OperationMaxRetries: cfg.RetryConfig.OperationMaxRetries,
-		BackoffFactor:       cfg.RetryConfig.BackoffFactor,
-		MaxBackoffSeconds:   cfg.RetryConfig.MaxBackoffSeconds,
-	}
-
-	var errChan chan error
-
-	t.inv = InventoryConsumer{
-		Consumer:         consumer,
-		OffsetStorage:    make([]kafka.TopicPartition, 0),
-		Config:           cfg,
-		DB:               &gorm.DB{},
-		AuthzConfig:      authz.CompletedConfig{},
-		Authorizer:       authorizer,
-		Errors:           errChan,
-		MetricsCollector: &t.metrics,
-		Logger:           t.logger,
-		AuthOptions:      authnOptions,
-		RetryOptions:     retryOptions,
-		Notifier:         notifier,
+	t.inv.Consumer = &consumer
+	err = t.metrics.New(otel.Meter("github.com/project-kessel/inventory-api/blob/main/internal/server/otel"))
+	if err != nil {
+		errs = append(errs, err)
 	}
 
 	return errs

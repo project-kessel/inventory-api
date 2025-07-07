@@ -35,6 +35,7 @@ import (
 	"github.com/project-kessel/inventory-api/internal/authz"
 	"github.com/project-kessel/inventory-api/internal/authz/api"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
+	"go.opentelemetry.io/otel/metric"
 )
 
 // commitModulo is used to define the batch size of offsets based on the current offset being processed
@@ -288,7 +289,7 @@ func (i *InventoryConsumer) ProcessMessage(headers map[string]string, relationsE
 			}
 			resp, err := i.Retry(func() (string, error) {
 				return i.CreateTuple(context.Background(), tuple)
-			})
+			}, i.MetricsCollector.MsgProcessFailures)
 			if err != nil {
 				metricscollector.Incr(i.MetricsCollector.MsgProcessFailures, "CreateTuple", err)
 				i.Logger.Errorf("failed to create tuple: %v", err)
@@ -309,7 +310,7 @@ func (i *InventoryConsumer) ProcessMessage(headers map[string]string, relationsE
 			}
 			resp, err := i.Retry(func() (string, error) {
 				return i.UpdateTuple(context.Background(), tuple)
-			})
+			}, i.MetricsCollector.MsgProcessFailures)
 			if err != nil {
 				metricscollector.Incr(i.MetricsCollector.MsgProcessFailures, "UpdateTuple", err)
 				i.Logger.Errorf("failed to update tuple: %v", err)
@@ -329,7 +330,7 @@ func (i *InventoryConsumer) ProcessMessage(headers map[string]string, relationsE
 			}
 			_, err = i.Retry(func() (string, error) {
 				return i.DeleteTuple(context.Background(), filter)
-			})
+			}, i.MetricsCollector.MsgProcessFailures)
 			if err != nil {
 				metricscollector.Incr(i.MetricsCollector.MsgProcessFailures, "DeleteTuple", err)
 				i.Logger.Errorf("failed to delete tuple: %v", err)
@@ -457,8 +458,8 @@ func (i *InventoryConsumer) CreateTuple(ctx context.Context, tuple *v1beta1.Rela
 	})
 	if err != nil {
 		if status.Convert(err).Code() == codes.FailedPrecondition {
-			i.Logger.Info("invalid fencing token: %v", i.lockToken)
-			return "", fmt.Errorf("invalid fencing token: %v", err)
+			i.Logger.Errorf("invalid fencing token: %v", i.lockToken)
+			return "", fmt.Errorf("invalid fencing token: %w", err)
 		}
 
 		// If the tuple exists already, capture the token using Check to ensure idempotent updates to tokens in DB
@@ -474,11 +475,11 @@ func (i *InventoryConsumer) CreateTuple(ctx context.Context, tuple *v1beta1.Rela
 			}
 			_, token, err := i.Authorizer.Check(ctx, namespace, relation, resource, subject)
 			if err != nil {
-				return "", fmt.Errorf("failed to fetch consistency token: %v", err)
+				return "", fmt.Errorf("failed to fetch consistency token: %w", err)
 			}
 			return token.GetToken(), nil
 		}
-		return "", fmt.Errorf("error creating tuple: %v", err)
+		return "", fmt.Errorf("error creating tuple: %w", err)
 	}
 	return resp.GetConsistencyToken().GetToken(), nil
 }
@@ -496,10 +497,10 @@ func (i *InventoryConsumer) UpdateTuple(ctx context.Context, tuple *v1beta1.Rela
 	// TODO: we should understand what kind of errors to look for here in case we need to commit in loop or not
 	if err != nil {
 		if status.Convert(err).Code() == codes.FailedPrecondition {
-			i.Logger.Info("invalid fencing token: %v", i.lockToken)
-			return "", fmt.Errorf("invalid fencing token: %v", err)
+			i.Logger.Errorf("invalid fencing token: %v", i.lockToken)
+			return "", fmt.Errorf("invalid fencing token: %w", err)
 		}
-		return "", fmt.Errorf("error updating tuple: %v", err)
+		return "", fmt.Errorf("error updating tuple: %w", err)
 	}
 	return resp.GetConsistencyToken().Token, nil
 }
@@ -515,10 +516,10 @@ func (i *InventoryConsumer) DeleteTuple(ctx context.Context, filter *v1beta1.Rel
 	})
 	if err != nil {
 		if status.Convert(err).Code() == codes.FailedPrecondition {
-			i.Logger.Info("invalid fencing token: %v", i.lockToken)
-			return "", fmt.Errorf("invalid fencing token: %v", err)
+			i.Logger.Errorf("invalid fencing token: %v", i.lockToken)
+			return "", fmt.Errorf("invalid fencing token: %w", err)
 		}
-		return "", fmt.Errorf("error deleting tuple: %v", err)
+		return "", fmt.Errorf("error deleting tuple: %w", err)
 	}
 	return resp.GetConsistencyToken().Token, nil
 }
@@ -556,7 +557,7 @@ func (i *InventoryConsumer) Shutdown() error {
 }
 
 // Retry executes the given function and will retry on failure with backoff until max retries is reached
-func (i *InventoryConsumer) Retry(operation func() (string, error)) (string, error) {
+func (i *InventoryConsumer) Retry(operation func() (string, error), metricCounter metric.Int64Counter) (string, error) {
 	attempts := 0
 	var resp interface{}
 	var err error
@@ -564,7 +565,7 @@ func (i *InventoryConsumer) Retry(operation func() (string, error)) (string, err
 	for i.RetryOptions.OperationMaxRetries == -1 || attempts < i.RetryOptions.OperationMaxRetries {
 		resp, err = operation()
 		if err != nil {
-			metricscollector.Incr(i.MetricsCollector.MsgProcessFailures, "Retry", err)
+			metricscollector.Incr(metricCounter, "Retry", err)
 			i.Logger.Errorf("request failed: %v", err)
 			attempts++
 			if i.RetryOptions.OperationMaxRetries == -1 || attempts < i.RetryOptions.OperationMaxRetries {
@@ -601,7 +602,7 @@ func (i *InventoryConsumer) RebalanceCallback(consumer *kafka.Consumer, event ka
 					return "", err
 				}
 				return resp.GetLockToken(), nil
-			})
+			}, i.MetricsCollector.ConsumerErrors)
 			if err != nil {
 				i.Logger.Errorf("failed to acquire lock token for %s: %v", i.lockId, err)
 				i.lockToken = ""

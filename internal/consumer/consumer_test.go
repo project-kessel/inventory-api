@@ -318,7 +318,7 @@ func TestInventoryConsumer_Retry(t *testing.T) {
 			errs := tester.TestSetup()
 			assert.Nil(t, errs)
 
-			result, err := tester.inv.Retry(test.funcToExecute)
+			result, err := tester.inv.Retry(test.funcToExecute, tester.inv.MetricsCollector.MsgProcessFailures)
 			assert.Equal(t, test.exectedResult, result)
 			assert.Equal(t, test.expectedErr, err)
 		})

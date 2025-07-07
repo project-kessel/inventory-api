@@ -23,6 +23,8 @@ import (
 	. "github.com/project-kessel/inventory-api/cmd/common"
 	"github.com/project-kessel/inventory-api/internal/authz"
 	"github.com/project-kessel/inventory-api/internal/pubsub"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 const (
@@ -800,6 +802,69 @@ func TestFencingToken_WritingAfterRebalance(t *testing.T) {
 	resp, err := testerB.inv.CreateTuple(context.Background(), tuple)
 	assert.Nil(t, err)
 	assert.Equal(t, "test-token", resp)
+
+	authorizer.AssertExpectations(t)
+}
+
+func TestInventoryConsumer_CreateTuple_FailedPrecondition(t *testing.T) {
+	tester := TestCase{}
+	errs := tester.TestSetup()
+	assert.Nil(t, errs)
+
+	authorizer := &mocks.MockAuthz{}
+	authorizer.On("CreateTuples", mock.Anything, mock.Anything).Return((*v1beta1.CreateTuplesResponse)(nil), status.Error(codes.FailedPrecondition, "invalid fencing token"))
+
+	tester.inv.Authorizer = authorizer
+	tester.inv.lockToken = "test-token"
+
+	tuple := makeTuple()
+	resp, err := tester.inv.CreateTuple(context.Background(), tuple)
+
+	assert.NotNil(t, err)
+	assert.Equal(t, "", resp)
+	assert.Contains(t, err.Error(), "invalid fencing token")
+
+	authorizer.AssertExpectations(t)
+}
+
+func TestInventoryConsumer_UpdateTuple_FailedPrecondition(t *testing.T) {
+	tester := TestCase{}
+	errs := tester.TestSetup()
+	assert.Nil(t, errs)
+
+	authorizer := &mocks.MockAuthz{}
+	authorizer.On("CreateTuples", mock.Anything, mock.Anything).Return((*v1beta1.CreateTuplesResponse)(nil), status.Error(codes.FailedPrecondition, "invalid fencing token"))
+
+	tester.inv.Authorizer = authorizer
+	tester.inv.lockToken = "test-token"
+
+	tuple := makeTuple()
+	resp, err := tester.inv.UpdateTuple(context.Background(), tuple)
+
+	assert.NotNil(t, err)
+	assert.Equal(t, "", resp)
+	assert.Contains(t, err.Error(), "invalid fencing token")
+
+	authorizer.AssertExpectations(t)
+}
+
+func TestInventoryConsumer_DeleteTuple_FailedPrecondition(t *testing.T) {
+	tester := TestCase{}
+	errs := tester.TestSetup()
+	assert.Nil(t, errs)
+
+	authorizer := &mocks.MockAuthz{}
+	authorizer.On("DeleteTuples", mock.Anything, mock.Anything).Return((*v1beta1.DeleteTuplesResponse)(nil), status.Error(codes.FailedPrecondition, "invalid fencing token"))
+
+	tester.inv.Authorizer = authorizer
+	tester.inv.lockToken = "test-token"
+
+	filter := makeFilter()
+	resp, err := tester.inv.DeleteTuple(context.Background(), filter)
+
+	assert.NotNil(t, err)
+	assert.Equal(t, "", resp)
+	assert.Contains(t, err.Error(), "invalid fencing token")
 
 	authorizer.AssertExpectations(t)
 }

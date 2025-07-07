@@ -456,6 +456,11 @@ func (i *InventoryConsumer) CreateTuple(ctx context.Context, tuple *v1beta1.Rela
 		},
 	})
 	if err != nil {
+		if status.Convert(err).Code() == codes.FailedPrecondition {
+			i.Logger.Info("invalid fencing token: %v", i.lockToken)
+			return "", fmt.Errorf("invalid fencing token: %v", err)
+		}
+
 		// If the tuple exists already, capture the token using Check to ensure idempotent updates to tokens in DB
 		if status.Convert(err).Code() == codes.AlreadyExists {
 			i.Logger.Info("tuple already exists; fetching consistency token")
@@ -490,6 +495,10 @@ func (i *InventoryConsumer) UpdateTuple(ctx context.Context, tuple *v1beta1.Rela
 	})
 	// TODO: we should understand what kind of errors to look for here in case we need to commit in loop or not
 	if err != nil {
+		if status.Convert(err).Code() == codes.FailedPrecondition {
+			i.Logger.Info("invalid fencing token: %v", i.lockToken)
+			return "", fmt.Errorf("invalid fencing token: %v", err)
+		}
 		return "", fmt.Errorf("error updating tuple: %v", err)
 	}
 	return resp.GetConsistencyToken().Token, nil
@@ -505,6 +514,10 @@ func (i *InventoryConsumer) DeleteTuple(ctx context.Context, filter *v1beta1.Rel
 		},
 	})
 	if err != nil {
+		if status.Convert(err).Code() == codes.FailedPrecondition {
+			i.Logger.Info("invalid fencing token: %v", i.lockToken)
+			return "", fmt.Errorf("invalid fencing token: %v", err)
+		}
 		return "", fmt.Errorf("error deleting tuple: %v", err)
 	}
 	return resp.GetConsistencyToken().Token, nil

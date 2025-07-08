@@ -25,12 +25,1694 @@ data:
       "links": [],
       "panels": [
         {
-          "collapsed": false,
+          "collapsed": true,
           "gridPos": {
             "h": 1,
             "w": 24,
             "x": 0,
             "y": 0
+          },
+          "id": 25,
+          "panels": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "$datasource"
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "mappings": [
+                    {
+                      "options": {
+                        "match": "null",
+                        "result": {
+                          "index": 0,
+                          "text": "N/A"
+                        }
+                      },
+                      "type": "special"
+                    }
+                  ],
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "green"
+                      }
+                    ]
+                  },
+                  "unit": "short"
+                },
+                "overrides": []
+              },
+              "gridPos": {
+                "h": 5,
+                "w": 3,
+                "x": 0,
+                "y": 1
+              },
+              "id": 26,
+              "options": {
+                "colorMode": "value",
+                "graphMode": "area",
+                "justifyMode": "auto",
+                "orientation": "auto",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "",
+                  "values": false
+                },
+                "showPercentChange": false,
+                "textMode": "auto",
+                "wideLayout": true
+              },
+              "pluginVersion": "11.2.0",
+              "targets": [
+                {
+                  "datasource": {
+                    "type": "prometheus",
+                    "uid": "$datasource"
+                  },
+                  "editorMode": "code",
+                  "exemplar": true,
+                  "expr": "sum(rate(server_requests_seconds_bucket_seconds_count{job=\"kessel-inventory-api\"}[10m]))",
+                  "instant": false,
+                  "legendFormat": "RPS",
+                  "range": true,
+                  "refId": "A"
+                }
+              ],
+              "title": "RPS",
+              "type": "stat"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "$datasource"
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "mappings": [
+                    {
+                      "options": {
+                        "match": "null",
+                        "result": {
+                          "index": 0,
+                          "text": "N/A"
+                        }
+                      },
+                      "type": "special"
+                    }
+                  ],
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "green"
+                      }
+                    ]
+                  },
+                  "unit": "percentunit"
+                },
+                "overrides": []
+              },
+              "gridPos": {
+                "h": 5,
+                "w": 3,
+                "x": 3,
+                "y": 1
+              },
+              "id": 27,
+              "options": {
+                "colorMode": "value",
+                "graphMode": "area",
+                "justifyMode": "auto",
+                "orientation": "auto",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "",
+                  "values": false
+                },
+                "showPercentChange": false,
+                "textMode": "auto",
+                "wideLayout": true
+              },
+              "pluginVersion": "11.2.0",
+              "targets": [
+                {
+                  "datasource": {
+                    "type": "prometheus",
+                    "uid": "$datasource"
+                  },
+                  "editorMode": "code",
+                  "exemplar": true,
+                  "expr": "(\n    sum(rate(server_requests_code_total{job=\"kessel-inventory-api\", code=\"0\"}[10m]))\n+\n    sum(rate(server_requests_code_total{ job=\"kessel-inventory-api\", code=\"200\"}[10m]))\n)\n /\nsum(rate(server_requests_seconds_bucket_seconds_count{job=\"kessel-inventory-api\"}[10m]))",
+                  "instant": false,
+                  "legendFormat": "",
+                  "range": true,
+                  "refId": "A"
+                }
+              ],
+              "title": "Success",
+              "type": "stat"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "$datasource"
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "mappings": [
+                    {
+                      "options": {
+                        "match": "null",
+                        "result": {
+                          "index": 0,
+                          "text": "N/A"
+                        }
+                      },
+                      "type": "special"
+                    }
+                  ],
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "green"
+                      }
+                    ]
+                  },
+                  "unit": "s"
+                },
+                "overrides": []
+              },
+              "gridPos": {
+                "h": 5,
+                "w": 3,
+                "x": 6,
+                "y": 1
+              },
+              "id": 28,
+              "options": {
+                "colorMode": "value",
+                "graphMode": "area",
+                "justifyMode": "auto",
+                "orientation": "auto",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "",
+                  "values": false
+                },
+                "showPercentChange": false,
+                "textMode": "auto",
+                "wideLayout": true
+              },
+              "pluginVersion": "11.2.0",
+              "targets": [
+                {
+                  "datasource": {
+                    "type": "prometheus",
+                    "uid": "$datasource"
+                  },
+                  "editorMode": "code",
+                  "exemplar": true,
+                  "expr": "histogram_quantile(0.95, sum by(le) (rate(server_requests_seconds_bucket_seconds_bucket{job=\"kessel-inventory-api\"}[10m])))",
+                  "instant": false,
+                  "legendFormat": "95%",
+                  "range": true,
+                  "refId": "A"
+                }
+              ],
+              "title": "Latency P95",
+              "type": "stat"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "$datasource"
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "mappings": [
+                    {
+                      "options": {
+                        "match": "null",
+                        "result": {
+                          "index": 0,
+                          "text": "N/A"
+                        }
+                      },
+                      "type": "special"
+                    }
+                  ],
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "green"
+                      }
+                    ]
+                  },
+                  "unit": "s"
+                },
+                "overrides": []
+              },
+              "gridPos": {
+                "h": 5,
+                "w": 3,
+                "x": 0,
+                "y": 6
+              },
+              "id": 29,
+              "maxDataPoints": 100,
+              "options": {
+                "colorMode": "value",
+                "graphMode": "area",
+                "justifyMode": "auto",
+                "orientation": "auto",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "",
+                  "values": false
+                },
+                "showPercentChange": false,
+                "text": {},
+                "textMode": "auto",
+                "wideLayout": true
+              },
+              "pluginVersion": "11.2.0",
+              "targets": [
+                {
+                  "datasource": {
+                    "type": "prometheus",
+                    "uid": "$datasource"
+                  },
+                  "editorMode": "code",
+                  "exemplar": true,
+                  "expr": "histogram_quantile(0.50, \n  sum(rate(server_requests_seconds_bucket_seconds_bucket{job=\"kessel-inventory-api\",operation=~\".*Report.*\"}[10m])) by (le)\n)",
+                  "format": "time_series",
+                  "interval": "",
+                  "intervalFactor": 1,
+                  "legendFormat": "50%",
+                  "range": true,
+                  "refId": "A"
+                }
+              ],
+              "title": "Report Resource P50",
+              "type": "stat"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "$datasource"
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "mappings": [
+                    {
+                      "options": {
+                        "match": "null",
+                        "result": {
+                          "index": 0,
+                          "text": "N/A"
+                        }
+                      },
+                      "type": "special"
+                    }
+                  ],
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "green"
+                      }
+                    ]
+                  },
+                  "unit": "s"
+                },
+                "overrides": []
+              },
+              "gridPos": {
+                "h": 5,
+                "w": 3,
+                "x": 3,
+                "y": 6
+              },
+              "id": 30,
+              "maxDataPoints": 100,
+              "options": {
+                "colorMode": "value",
+                "graphMode": "area",
+                "justifyMode": "auto",
+                "orientation": "auto",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "",
+                  "values": false
+                },
+                "showPercentChange": false,
+                "text": {},
+                "textMode": "auto",
+                "wideLayout": true
+              },
+              "pluginVersion": "11.2.0",
+              "targets": [
+                {
+                  "datasource": {
+                    "type": "prometheus",
+                    "uid": "$datasource"
+                  },
+                  "editorMode": "code",
+                  "exemplar": true,
+                  "expr": "histogram_quantile(0.95, \n  sum(rate(server_requests_seconds_bucket_seconds_bucket{job=\"kessel-inventory-api\",operation=~\".*Report.*\"}[10m])) by (le)\n)",
+                  "format": "time_series",
+                  "interval": "",
+                  "intervalFactor": 1,
+                  "legendFormat": "95%",
+                  "range": true,
+                  "refId": "A"
+                }
+              ],
+              "title": "Report Resource P95",
+              "type": "stat"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "$datasource"
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "mappings": [
+                    {
+                      "options": {
+                        "match": "null",
+                        "result": {
+                          "index": 0,
+                          "text": "N/A"
+                        }
+                      },
+                      "type": "special"
+                    }
+                  ],
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "green"
+                      }
+                    ]
+                  },
+                  "unit": "s"
+                },
+                "overrides": []
+              },
+              "gridPos": {
+                "h": 5,
+                "w": 3,
+                "x": 6,
+                "y": 6
+              },
+              "id": 31,
+              "maxDataPoints": 100,
+              "options": {
+                "colorMode": "value",
+                "graphMode": "area",
+                "justifyMode": "auto",
+                "orientation": "auto",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "",
+                  "values": false
+                },
+                "showPercentChange": false,
+                "text": {},
+                "textMode": "auto",
+                "wideLayout": true
+              },
+              "pluginVersion": "11.2.0",
+              "targets": [
+                {
+                  "datasource": {
+                    "type": "prometheus",
+                    "uid": "$datasource"
+                  },
+                  "editorMode": "code",
+                  "exemplar": true,
+                  "expr": "histogram_quantile(0.99, \n  sum(rate(server_requests_seconds_bucket_seconds_bucket{job=\"kessel-inventory-api\",operation=~\".*Report.*\"}[10m])) by (le)\n)",
+                  "format": "time_series",
+                  "interval": "",
+                  "intervalFactor": 1,
+                  "legendFormat": "99%",
+                  "range": true,
+                  "refId": "A"
+                }
+              ],
+              "title": "Report Resource P99",
+              "type": "stat"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "$datasource"
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "mappings": [
+                    {
+                      "options": {
+                        "match": "null",
+                        "result": {
+                          "index": 0,
+                          "text": "N/A"
+                        }
+                      },
+                      "type": "special"
+                    }
+                  ],
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "green"
+                      }
+                    ]
+                  },
+                  "unit": "s"
+                },
+                "overrides": []
+              },
+              "gridPos": {
+                "h": 5,
+                "w": 3,
+                "x": 0,
+                "y": 11
+              },
+              "id": 32,
+              "maxDataPoints": 100,
+              "options": {
+                "colorMode": "value",
+                "graphMode": "area",
+                "justifyMode": "auto",
+                "orientation": "auto",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "",
+                  "values": false
+                },
+                "showPercentChange": false,
+                "text": {},
+                "textMode": "auto",
+                "wideLayout": true
+              },
+              "pluginVersion": "11.2.0",
+              "targets": [
+                {
+                  "datasource": {
+                    "type": "prometheus",
+                    "uid": "$datasource"
+                  },
+                  "editorMode": "code",
+                  "exemplar": true,
+                  "expr": "histogram_quantile(0.50, \n  sum(rate(server_requests_seconds_bucket_seconds_bucket{job=\"kessel-inventory-api\",operation=~\".*StreamedListObjects.*\"}[10m])) by (le)\n)",
+                  "format": "time_series",
+                  "interval": "",
+                  "intervalFactor": 1,
+                  "legendFormat": "50%",
+                  "range": true,
+                  "refId": "A"
+                }
+              ],
+              "title": "List Objects P50",
+              "type": "stat"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "$datasource"
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "mappings": [
+                    {
+                      "options": {
+                        "match": "null",
+                        "result": {
+                          "index": 0,
+                          "text": "N/A"
+                        }
+                      },
+                      "type": "special"
+                    }
+                  ],
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "green"
+                      }
+                    ]
+                  },
+                  "unit": "s"
+                },
+                "overrides": []
+              },
+              "gridPos": {
+                "h": 5,
+                "w": 3,
+                "x": 3,
+                "y": 11
+              },
+              "id": 33,
+              "maxDataPoints": 100,
+              "options": {
+                "colorMode": "value",
+                "graphMode": "area",
+                "justifyMode": "auto",
+                "orientation": "auto",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "",
+                  "values": false
+                },
+                "showPercentChange": false,
+                "text": {},
+                "textMode": "auto",
+                "wideLayout": true
+              },
+              "pluginVersion": "11.2.0",
+              "targets": [
+                {
+                  "datasource": {
+                    "type": "prometheus",
+                    "uid": "$datasource"
+                  },
+                  "editorMode": "code",
+                  "exemplar": true,
+                  "expr": "histogram_quantile(0.95, \n  sum(rate(server_requests_seconds_bucket_seconds_bucket{job=\"kessel-inventory-api\",operation=~\".*StreamedListObjects.*\"}[10m])) by (le)\n)",
+                  "format": "time_series",
+                  "interval": "",
+                  "intervalFactor": 1,
+                  "legendFormat": "95%",
+                  "range": true,
+                  "refId": "A"
+                }
+              ],
+              "title": "List Objects P95",
+              "type": "stat"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "$datasource"
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "mappings": [
+                    {
+                      "options": {
+                        "match": "null",
+                        "result": {
+                          "index": 0,
+                          "text": "N/A"
+                        }
+                      },
+                      "type": "special"
+                    }
+                  ],
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "green"
+                      }
+                    ]
+                  },
+                  "unit": "s"
+                },
+                "overrides": []
+              },
+              "gridPos": {
+                "h": 5,
+                "w": 3,
+                "x": 6,
+                "y": 11
+              },
+              "id": 34,
+              "maxDataPoints": 100,
+              "options": {
+                "colorMode": "value",
+                "graphMode": "area",
+                "justifyMode": "auto",
+                "orientation": "auto",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "",
+                  "values": false
+                },
+                "showPercentChange": false,
+                "text": {},
+                "textMode": "auto",
+                "wideLayout": true
+              },
+              "pluginVersion": "11.2.0",
+              "targets": [
+                {
+                  "datasource": {
+                    "type": "prometheus",
+                    "uid": "$datasource"
+                  },
+                  "editorMode": "code",
+                  "exemplar": true,
+                  "expr": "histogram_quantile(0.99, \n  sum(rate(server_requests_seconds_bucket_seconds_bucket{job=\"kessel-inventory-api\",operation=~\".*StreamedListObjects.*\"}[10m])) by (le)\n)",
+                  "format": "time_series",
+                  "interval": "",
+                  "intervalFactor": 1,
+                  "legendFormat": "99%",
+                  "range": true,
+                  "refId": "A"
+                }
+              ],
+              "title": "List Objects P99",
+              "type": "stat"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "$datasource"
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "mappings": [
+                    {
+                      "options": {
+                        "match": "null",
+                        "result": {
+                          "index": 0,
+                          "text": "N/A"
+                        }
+                      },
+                      "type": "special"
+                    }
+                  ],
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "green"
+                      }
+                    ]
+                  },
+                  "unit": "s"
+                },
+                "overrides": []
+              },
+              "gridPos": {
+                "h": 5,
+                "w": 3,
+                "x": 9,
+                "y": 1
+              },
+              "id": 35,
+              "maxDataPoints": 100,
+              "options": {
+                "colorMode": "value",
+                "graphMode": "area",
+                "justifyMode": "auto",
+                "orientation": "auto",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "",
+                  "values": false
+                },
+                "showPercentChange": false,
+                "text": {},
+                "textMode": "auto",
+                "wideLayout": true
+              },
+              "pluginVersion": "11.2.0",
+              "targets": [
+                {
+                  "datasource": {
+                    "type": "prometheus",
+                    "uid": "$datasource"
+                  },
+                  "editorMode": "code",
+                  "exemplar": true,
+                  "expr": "histogram_quantile(0.50, \n  sum(rate(server_requests_seconds_bucket_seconds_bucket{job=\"kessel-inventory-api\",operation=~\".*Check.*\"}[10m])) by (le)\n)",
+                  "format": "time_series",
+                  "interval": "",
+                  "intervalFactor": 1,
+                  "legendFormat": "50%",
+                  "range": true,
+                  "refId": "A"
+                }
+              ],
+              "title": "Check P50",
+              "type": "stat"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "$datasource"
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "mappings": [
+                    {
+                      "options": {
+                        "match": "null",
+                        "result": {
+                          "index": 0,
+                          "text": "N/A"
+                        }
+                      },
+                      "type": "special"
+                    }
+                  ],
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "green"
+                      }
+                    ]
+                  },
+                  "unit": "s"
+                },
+                "overrides": []
+              },
+              "gridPos": {
+                "h": 5,
+                "w": 3,
+                "x": 12,
+                "y": 1
+              },
+              "id": 36,
+              "maxDataPoints": 100,
+              "options": {
+                "colorMode": "value",
+                "graphMode": "area",
+                "justifyMode": "auto",
+                "orientation": "auto",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "",
+                  "values": false
+                },
+                "showPercentChange": false,
+                "text": {},
+                "textMode": "auto",
+                "wideLayout": true
+              },
+              "pluginVersion": "11.2.0",
+              "targets": [
+                {
+                  "datasource": {
+                    "type": "prometheus",
+                    "uid": "$datasource"
+                  },
+                  "editorMode": "code",
+                  "exemplar": true,
+                  "expr": "histogram_quantile(0.95, \n  sum(rate(server_requests_seconds_bucket_seconds_bucket{job=\"kessel-inventory-api\",operation=~\".*Check.*\"}[10m])) by (le)\n)",
+                  "format": "time_series",
+                  "interval": "",
+                  "intervalFactor": 1,
+                  "legendFormat": "95%",
+                  "range": true,
+                  "refId": "A"
+                }
+              ],
+              "title": "Check P95",
+              "type": "stat"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "$datasource"
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "mappings": [
+                    {
+                      "options": {
+                        "match": "null",
+                        "result": {
+                          "index": 0,
+                          "text": "N/A"
+                        }
+                      },
+                      "type": "special"
+                    }
+                  ],
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "green"
+                      }
+                    ]
+                  },
+                  "unit": "s"
+                },
+                "overrides": []
+              },
+              "gridPos": {
+                "h": 5,
+                "w": 3,
+                "x": 15,
+                "y": 1
+              },
+              "id": 37,
+              "maxDataPoints": 100,
+              "options": {
+                "colorMode": "value",
+                "graphMode": "area",
+                "justifyMode": "auto",
+                "orientation": "auto",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "",
+                  "values": false
+                },
+                "showPercentChange": false,
+                "text": {},
+                "textMode": "auto",
+                "wideLayout": true
+              },
+              "pluginVersion": "11.2.0",
+              "targets": [
+                {
+                  "datasource": {
+                    "type": "prometheus",
+                    "uid": "$datasource"
+                  },
+                  "editorMode": "code",
+                  "exemplar": true,
+                  "expr": "histogram_quantile(0.99, \n  sum(rate(server_requests_seconds_bucket_seconds_bucket{job=\"kessel-inventory-api\",operation=~\".*Check.*\"}[10m])) by (le)\n)",
+                  "format": "time_series",
+                  "interval": "",
+                  "intervalFactor": 1,
+                  "legendFormat": "99%",
+                  "range": true,
+                  "refId": "A"
+                }
+              ],
+              "title": "Check P99",
+              "type": "stat"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "$datasource"
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "mappings": [
+                    {
+                      "options": {
+                        "match": "null",
+                        "result": {
+                          "index": 0,
+                          "text": "N/A"
+                        }
+                      },
+                      "type": "special"
+                    }
+                  ],
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "green"
+                      }
+                    ]
+                  },
+                  "unit": "s"
+                },
+                "overrides": []
+              },
+              "gridPos": {
+                "h": 5,
+                "w": 3,
+                "x": 18,
+                "y": 1
+              },
+              "id": 38,
+              "maxDataPoints": 100,
+              "options": {
+                "colorMode": "value",
+                "graphMode": "area",
+                "justifyMode": "auto",
+                "orientation": "auto",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "",
+                  "values": false
+                },
+                "showPercentChange": false,
+                "text": {},
+                "textMode": "auto",
+                "wideLayout": true
+              },
+              "pluginVersion": "11.2.0",
+              "targets": [
+                {
+                  "datasource": {
+                    "type": "prometheus",
+                    "uid": "$datasource"
+                  },
+                  "editorMode": "code",
+                  "exemplar": true,
+                  "expr": "histogram_quantile(0.50, \n  sum(rate(server_requests_seconds_bucket_seconds_bucket{job=\"kessel-inventory-api\",operation=~\".*Delete.*\"}[10m])) by (le)\n)",
+                  "format": "time_series",
+                  "interval": "",
+                  "intervalFactor": 1,
+                  "legendFormat": "50%",
+                  "range": true,
+                  "refId": "A"
+                }
+              ],
+              "title": "Delete Resource P50",
+              "type": "stat"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "$datasource"
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "mappings": [
+                    {
+                      "options": {
+                        "match": "null",
+                        "result": {
+                          "index": 0,
+                          "text": "N/A"
+                        }
+                      },
+                      "type": "special"
+                    }
+                  ],
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "green"
+                      }
+                    ]
+                  },
+                  "unit": "s"
+                },
+                "overrides": []
+              },
+              "gridPos": {
+                "h": 5,
+                "w": 3,
+                "x": 21,
+                "y": 1
+              },
+              "id": 39,
+              "maxDataPoints": 100,
+              "options": {
+                "colorMode": "value",
+                "graphMode": "area",
+                "justifyMode": "auto",
+                "orientation": "auto",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "",
+                  "values": false
+                },
+                "showPercentChange": false,
+                "text": {},
+                "textMode": "auto",
+                "wideLayout": true
+              },
+              "pluginVersion": "11.2.0",
+              "targets": [
+                {
+                  "datasource": {
+                    "type": "prometheus",
+                    "uid": "$datasource"
+                  },
+                  "editorMode": "code",
+                  "exemplar": true,
+                  "expr": "histogram_quantile(0.95, \n  sum(rate(server_requests_seconds_bucket_seconds_bucket{job=\"kessel-inventory-api\",operation=~\".*Delete.*\"}[10m])) by (le)\n)",
+                  "format": "time_series",
+                  "interval": "",
+                  "intervalFactor": 1,
+                  "legendFormat": "95%",
+                  "range": true,
+                  "refId": "A"
+                }
+              ],
+              "title": "Delete Resource P95",
+              "type": "stat"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "$datasource"
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "mappings": [
+                    {
+                      "options": {
+                        "match": "null",
+                        "result": {
+                          "index": 0,
+                          "text": "N/A"
+                        }
+                      },
+                      "type": "special"
+                    }
+                  ],
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "green"
+                      }
+                    ]
+                  },
+                  "unit": "s"
+                },
+                "overrides": []
+              },
+              "gridPos": {
+                "h": 5,
+                "w": 3,
+                "x": 9,
+                "y": 6
+              },
+              "id": 40,
+              "maxDataPoints": 100,
+              "options": {
+                "colorMode": "value",
+                "graphMode": "area",
+                "justifyMode": "auto",
+                "orientation": "auto",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "",
+                  "values": false
+                },
+                "showPercentChange": false,
+                "text": {},
+                "textMode": "auto",
+                "wideLayout": true
+              },
+              "pluginVersion": "11.2.0",
+              "targets": [
+                {
+                  "datasource": {
+                    "type": "prometheus",
+                    "uid": "$datasource"
+                  },
+                  "editorMode": "code",
+                  "exemplar": true,
+                  "expr": "histogram_quantile(0.99, \n  sum(rate(server_requests_seconds_bucket_seconds_bucket{job=\"kessel-inventory-api\",operation=~\".*Delete.*\"}[10m])) by (le)\n)",
+                  "format": "time_series",
+                  "interval": "",
+                  "intervalFactor": 1,
+                  "legendFormat": "99%",
+                  "range": true,
+                  "refId": "A"
+                }
+              ],
+              "title": "Delete Resource P99",
+              "type": "stat"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "$datasource"
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "mappings": [
+                    {
+                      "options": {
+                        "match": "null",
+                        "result": {
+                          "index": 0,
+                          "text": "N/A"
+                        }
+                      },
+                      "type": "special"
+                    }
+                  ],
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "green"
+                      }
+                    ]
+                  },
+                  "unit": "s"
+                },
+                "overrides": []
+              },
+              "gridPos": {
+                "h": 5,
+                "w": 3,
+                "x": 12,
+                "y": 6
+              },
+              "id": 41,
+              "maxDataPoints": 100,
+              "options": {
+                "colorMode": "value",
+                "graphMode": "area",
+                "justifyMode": "auto",
+                "orientation": "auto",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "",
+                  "values": false
+                },
+                "showPercentChange": false,
+                "text": {},
+                "textMode": "auto",
+                "wideLayout": true
+              },
+              "pluginVersion": "11.2.0",
+              "targets": [
+                {
+                  "datasource": {
+                    "type": "prometheus",
+                    "uid": "$datasource"
+                  },
+                  "editorMode": "code",
+                  "exemplar": true,
+                  "expr": "histogram_quantile(0.50, \n  sum(rate(server_requests_seconds_bucket_seconds_bucket{job=\"kessel-inventory-api\",operation=~\".*CheckForUpdate.*\"}[10m])) by (le)\n)",
+                  "format": "time_series",
+                  "interval": "",
+                  "intervalFactor": 1,
+                  "legendFormat": "50%",
+                  "range": true,
+                  "refId": "A"
+                }
+              ],
+              "title": "CheckForUpdate P50",
+              "type": "stat"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "$datasource"
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "mappings": [
+                    {
+                      "options": {
+                        "match": "null",
+                        "result": {
+                          "index": 0,
+                          "text": "N/A"
+                        }
+                      },
+                      "type": "special"
+                    }
+                  ],
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "green"
+                      }
+                    ]
+                  },
+                  "unit": "s"
+                },
+                "overrides": []
+              },
+              "gridPos": {
+                "h": 5,
+                "w": 3,
+                "x": 15,
+                "y": 6
+              },
+              "id": 42,
+              "maxDataPoints": 100,
+              "options": {
+                "colorMode": "value",
+                "graphMode": "area",
+                "justifyMode": "auto",
+                "orientation": "auto",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "",
+                  "values": false
+                },
+                "showPercentChange": false,
+                "text": {},
+                "textMode": "auto",
+                "wideLayout": true
+              },
+              "pluginVersion": "11.2.0",
+              "targets": [
+                {
+                  "datasource": {
+                    "type": "prometheus",
+                    "uid": "$datasource"
+                  },
+                  "editorMode": "code",
+                  "exemplar": true,
+                  "expr": "histogram_quantile(0.95, \n  sum(rate(server_requests_seconds_bucket_seconds_bucket{job=\"kessel-inventory-api\",operation=~\".*CheckForUpdate.*\"}[10m])) by (le)\n)",
+                  "format": "time_series",
+                  "interval": "",
+                  "intervalFactor": 1,
+                  "legendFormat": "95%",
+                  "range": true,
+                  "refId": "A"
+                }
+              ],
+              "title": "CheckForUpdate P95",
+              "type": "stat"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "$datasource"
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "mappings": [
+                    {
+                      "options": {
+                        "match": "null",
+                        "result": {
+                          "index": 0,
+                          "text": "N/A"
+                        }
+                      },
+                      "type": "special"
+                    }
+                  ],
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "green"
+                      }
+                    ]
+                  },
+                  "unit": "s"
+                },
+                "overrides": []
+              },
+              "gridPos": {
+                "h": 5,
+                "w": 3,
+                "x": 18,
+                "y": 6
+              },
+              "id": 43,
+              "maxDataPoints": 100,
+              "options": {
+                "colorMode": "value",
+                "graphMode": "area",
+                "justifyMode": "auto",
+                "orientation": "auto",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "",
+                  "values": false
+                },
+                "showPercentChange": false,
+                "text": {},
+                "textMode": "auto",
+                "wideLayout": true
+              },
+              "pluginVersion": "11.2.0",
+              "targets": [
+                {
+                  "datasource": {
+                    "type": "prometheus",
+                    "uid": "$datasource"
+                  },
+                  "editorMode": "code",
+                  "exemplar": true,
+                  "expr": "histogram_quantile(0.99, \n  sum(rate(server_requests_seconds_bucket_seconds_bucket{job=\"kessel-inventory-api\",operation=~\".*CheckForUpdate.*\"}[10m])) by (le)\n)",
+                  "format": "time_series",
+                  "interval": "",
+                  "intervalFactor": 1,
+                  "legendFormat": "99%",
+                  "range": true,
+                  "refId": "A"
+                }
+              ],
+              "title": "CheckForUpdate P99",
+              "type": "stat"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "$datasource"
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "mappings": [
+                    {
+                      "options": {
+                        "match": "null",
+                        "result": {
+                          "index": 0,
+                          "text": "N/A"
+                        }
+                      },
+                      "type": "special"
+                    }
+                  ],
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "green"
+                      }
+                    ]
+                  },
+                  "unit": "s"
+                },
+                "overrides": []
+              },
+              "gridPos": {
+                "h": 5,
+                "w": 3,
+                "x": 21,
+                "y": 6
+              },
+              "id": 44,
+              "maxDataPoints": 100,
+              "options": {
+                "colorMode": "value",
+                "graphMode": "area",
+                "justifyMode": "auto",
+                "orientation": "auto",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "",
+                  "values": false
+                },
+                "showPercentChange": false,
+                "text": {},
+                "textMode": "auto",
+                "wideLayout": true
+              },
+              "pluginVersion": "11.2.0",
+              "targets": [
+                {
+                  "datasource": {
+                    "type": "prometheus",
+                    "uid": "$datasource"
+                  },
+                  "editorMode": "code",
+                  "exemplar": true,
+                  "expr": "histogram_quantile(0.50, \n  sum(rate(server_requests_seconds_bucket_seconds_bucket{job=\"kessel-inventory-api\",operation=~\".*(GetLivez|GetReadyz).*\"}[10m])) by (le)\n)",
+                  "format": "time_series",
+                  "interval": "",
+                  "intervalFactor": 1,
+                  "legendFormat": "50%",
+                  "range": true,
+                  "refId": "A"
+                }
+              ],
+              "title": "Health Checks P50",
+              "type": "stat"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "$datasource"
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "mappings": [
+                    {
+                      "options": {
+                        "match": "null",
+                        "result": {
+                          "index": 0,
+                          "text": "N/A"
+                        }
+                      },
+                      "type": "special"
+                    }
+                  ],
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "green"
+                      }
+                    ]
+                  },
+                  "unit": "s"
+                },
+                "overrides": []
+              },
+              "gridPos": {
+                "h": 5,
+                "w": 3,
+                "x": 9,
+                "y": 11
+              },
+              "id": 45,
+              "maxDataPoints": 100,
+              "options": {
+                "colorMode": "value",
+                "graphMode": "area",
+                "justifyMode": "auto",
+                "orientation": "auto",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "",
+                  "values": false
+                },
+                "showPercentChange": false,
+                "text": {},
+                "textMode": "auto",
+                "wideLayout": true
+              },
+              "pluginVersion": "11.2.0",
+              "targets": [
+                {
+                  "datasource": {
+                    "type": "prometheus",
+                    "uid": "$datasource"
+                  },
+                  "editorMode": "code",
+                  "exemplar": true,
+                  "expr": "histogram_quantile(0.95, \n  sum(rate(server_requests_seconds_bucket_seconds_bucket{job=\"kessel-inventory-api\",operation=~\".*(GetLivez|GetReadyz).*\"}[10m])) by (le)\n)",
+                  "format": "time_series",
+                  "interval": "",
+                  "intervalFactor": 1,
+                  "legendFormat": "95%",
+                  "range": true,
+                  "refId": "A"
+                }
+              ],
+              "title": "Health Checks P95",
+              "type": "stat"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "$datasource"
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "mappings": [
+                    {
+                      "options": {
+                        "match": "null",
+                        "result": {
+                          "index": 0,
+                          "text": "N/A"
+                        }
+                      },
+                      "type": "special"
+                    }
+                  ],
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "green"
+                      }
+                    ]
+                  },
+                  "unit": "s"
+                },
+                "overrides": []
+              },
+              "gridPos": {
+                "h": 5,
+                "w": 3,
+                "x": 12,
+                "y": 11
+              },
+              "id": 46,
+              "maxDataPoints": 100,
+              "options": {
+                "colorMode": "value",
+                "graphMode": "area",
+                "justifyMode": "auto",
+                "orientation": "auto",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "",
+                  "values": false
+                },
+                "showPercentChange": false,
+                "text": {},
+                "textMode": "auto",
+                "wideLayout": true
+              },
+              "pluginVersion": "11.2.0",
+              "targets": [
+                {
+                  "datasource": {
+                    "type": "prometheus",
+                    "uid": "$datasource"
+                  },
+                  "editorMode": "code",
+                  "exemplar": true,
+                  "expr": "histogram_quantile(0.99, \n  sum(rate(server_requests_seconds_bucket_seconds_bucket{job=\"kessel-inventory-api\",operation=~\".*(GetLivez|GetReadyz).*\"}[10m])) by (le)\n)",
+                  "format": "time_series",
+                  "interval": "",
+                  "intervalFactor": 1,
+                  "legendFormat": "99%",
+                  "range": true,
+                  "refId": "A"
+                }
+              ],
+              "title": "Health Checks P99",
+              "type": "stat"
+            }
+          ],
+          "title": "Detailed Summary",
+          "type": "row"
+        },
+        {
+          "collapsed": false,
+          "gridPos": {
+            "h": 1,
+            "w": 24,
+            "x": 0,
+            "y": 1
           },
           "id": 12,
           "panels": [],
@@ -87,7 +1769,7 @@ data:
             "h": 8,
             "w": 8,
             "x": 0,
-            "y": 1
+            "y": 2
           },
           "id": 1,
           "options": {
@@ -187,7 +1869,7 @@ data:
             "h": 8,
             "w": 8,
             "x": 8,
-            "y": 1
+            "y": 2
           },
           "id": 5,
           "options": {
@@ -301,7 +1983,7 @@ data:
             "h": 8,
             "w": 8,
             "x": 16,
-            "y": 1
+            "y": 2
           },
           "id": 6,
           "options": {
@@ -405,7 +2087,7 @@ data:
             "h": 8,
             "w": 8,
             "x": 0,
-            "y": 9
+            "y": 10
           },
           "id": 7,
           "options": {
@@ -511,7 +2193,7 @@ data:
             "h": 8,
             "w": 8,
             "x": 8,
-            "y": 9
+            "y": 10
           },
           "id": 3,
           "options": {
@@ -633,7 +2315,7 @@ data:
             "h": 8,
             "w": 8,
             "x": 16,
-            "y": 9
+            "y": 10
           },
           "id": 4,
           "options": {
@@ -675,7 +2357,7 @@ data:
             "h": 1,
             "w": 24,
             "x": 0,
-            "y": 17
+            "y": 18
           },
           "id": 11,
           "panels": [],
@@ -719,7 +2401,7 @@ data:
             "h": 4,
             "w": 8,
             "x": 0,
-            "y": 18
+            "y": 19
           },
           "id": 10,
           "options": {
@@ -793,7 +2475,7 @@ data:
             "h": 4,
             "w": 8,
             "x": 8,
-            "y": 18
+            "y": 19
           },
           "id": 14,
           "options": {
@@ -860,7 +2542,7 @@ data:
             "h": 4,
             "w": 8,
             "x": 16,
-            "y": 18
+            "y": 19
           },
           "id": 15,
           "options": {
@@ -962,7 +2644,7 @@ data:
             "h": 8,
             "w": 8,
             "x": 0,
-            "y": 22
+            "y": 23
           },
           "id": 8,
           "options": {
@@ -1082,7 +2764,7 @@ data:
             "h": 8,
             "w": 8,
             "x": 8,
-            "y": 22
+            "y": 23
           },
           "id": 9,
           "options": {
@@ -1209,7 +2891,7 @@ data:
             "h": 8,
             "w": 8,
             "x": 16,
-            "y": 22
+            "y": 23
           },
           "id": 16,
           "options": {
@@ -1307,7 +2989,7 @@ data:
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 30
+            "y": 31
           },
           "id": 18,
           "options": {
@@ -1398,7 +3080,7 @@ data:
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 30
+            "y": 31
           },
           "id": 17,
           "options": {
@@ -1491,7 +3173,7 @@ data:
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 38
+            "y": 39
           },
           "id": 20,
           "options": {
@@ -1560,7 +3242,7 @@ data:
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 38
+            "y": 39
           },
           "id": 19,
           "options": {
@@ -1632,7 +3314,7 @@ data:
             "h": 1,
             "w": 24,
             "x": 0,
-            "y": 46
+            "y": 47
           },
           "id": 21,
           "panels": [],
@@ -1668,7 +3350,7 @@ data:
             "h": 8,
             "w": 6,
             "x": 0,
-            "y": 47
+            "y": 48
           },
           "id": 22,
           "options": {
@@ -1734,7 +3416,7 @@ data:
             "h": 8,
             "w": 6,
             "x": 6,
-            "y": 47
+            "y": 48
           },
           "id": 23,
           "options": {
@@ -1837,7 +3519,7 @@ data:
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 47
+            "y": 48
           },
           "id": 24,
           "options": {
@@ -1935,7 +3617,7 @@ data:
       "timezone": "browser",
       "title": "Kessel - Inventory API",
       "uid": "ddxs3i6o0xpmof",
-      "version": 7,
+      "version": 8,
       "weekStart": ""
     }
 kind: ConfigMap

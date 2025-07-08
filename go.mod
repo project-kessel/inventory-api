@@ -19,7 +19,7 @@ require (
 	github.com/mattn/go-sqlite3 v1.14.28
 	github.com/patrickmn/go-cache v2.1.0+incompatible
 	github.com/project-kessel/inventory-client-go v0.0.0-20250703155410-0ece2b1f2d03
-	github.com/project-kessel/relations-api v0.0.0-20250703155438-b07b781b944e
+	github.com/project-kessel/relations-api v0.0.0-20250708175557-dad8175c7685
 	github.com/prometheus/client_golang v1.22.0
 	github.com/redhatinsights/app-common-go v1.6.8
 	github.com/sony/gobreaker v1.0.0
@@ -102,5 +102,3 @@ require (
 	golang.org/x/time v0.12.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250603155806-513f23925822 // indirect
 )
-
-replace github.com/project-kessel/relations-api => github.com/lennysgarage/relations-api v0.0.0-20250702204013-7efea0ca06b0

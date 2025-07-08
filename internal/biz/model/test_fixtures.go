@@ -34,22 +34,20 @@ func (e ValidationError) Error() string {
 
 // ValidCommonRepresentation returns a valid CommonRepresentation for testing
 func (f *TestFixture) ValidCommonRepresentation() *CommonRepresentation {
-	// Use a deterministic UUID for consistent test results
-	deterministicUUID := uuid.NewSHA1(uuid.NameSpaceOID, []byte("test-common-representation"))
+	// Use a deterministic UUID for consistent test results based on real-world data
+	deterministicUUID := uuid.NewSHA1(uuid.NameSpaceOID, []byte("dd1b73b9-3e33-4264-968c-e3ce55b9afec"))
 
 	return &CommonRepresentation{
 		BaseRepresentation: BaseRepresentation{
 			Data: JsonObject{
-				"name":        "test-resource",
-				"description": "Test resource description",
-				"status":      "active",
+				"workspace_id": "a64d17d0-aec3-410a-acd0-e0b85b22c076",
 			},
 		},
 		ID:                         deterministicUUID,
-		ResourceType:               "test-resource-type",
+		ResourceType:               "host",
 		Version:                    1,
-		ReportedByReporterType:     "test-reporter",
-		ReportedByReporterInstance: "test-instance",
+		ReportedByReporterType:     "hbi",
+		ReportedByReporterInstance: "3088be62-1c60-4884-b133-9200542d0b3f",
 	}
 }
 
@@ -123,13 +121,15 @@ func (f *TestFixture) CommonRepresentationWithNilData() *CommonRepresentation {
 func (f *TestFixture) MinimalCommonRepresentation() *CommonRepresentation {
 	return &CommonRepresentation{
 		BaseRepresentation: BaseRepresentation{
-			Data: JsonObject{},
+			Data: JsonObject{
+				"workspace_id": "1c0753fe-48c1-44d8-823c-95d04cff5f91",
+			},
 		},
-		ID:                         uuid.NewSHA1(uuid.NameSpaceOID, []byte("minimal-common-representation")),
-		ResourceType:               "minimal-type",
+		ID:                         uuid.NewSHA1(uuid.NameSpaceOID, []byte("cdcebe29-67fb-4ac6-ba03-703a22ff4bc0")),
+		ResourceType:               "k8s_policy",
 		Version:                    1,
-		ReportedByReporterType:     "minimal-reporter",
-		ReportedByReporterInstance: "minimal-instance",
+		ReportedByReporterType:     "ACM",
+		ReportedByReporterInstance: "57a317b1-4040-4c26-8d41-dd589ba1d2eb",
 	}
 }
 
@@ -138,20 +138,14 @@ func (f *TestFixture) MaximalCommonRepresentation() *CommonRepresentation {
 	return &CommonRepresentation{
 		BaseRepresentation: BaseRepresentation{
 			Data: JsonObject{
-				"very_long_key_name_for_testing": "very long value with lots of content to test JSON storage limits",
-				"nested_object": JsonObject{
-					"level1": JsonObject{
-						"level2": "deep nesting test",
-					},
-				},
-				"array_field": []interface{}{"item1", "item2", "item3"},
+				"workspace_id": "aee8f698-9d43-49a1-b458-680a7c9dc046",
 			},
 		},
-		ID:                         uuid.NewSHA1(uuid.NameSpaceOID, []byte("maximal-common-representation")),
-		ResourceType:               "very-long-resource-type-name-that-exceeds-normal-expectations-and-tests-size-constraints",
+		ID:                         uuid.NewSHA1(uuid.NameSpaceOID, []byte("ae5c7a82-cb3b-4591-9b10-3ae1506d4f3d")),
+		ResourceType:               "k8s_cluster",
 		Version:                    4294967295, // Max uint32
-		ReportedByReporterType:     "very-long-reporter-type-name-for-testing-maximum-length-constraints",
-		ReportedByReporterInstance: "very-long-reporter-instance-name-for-testing-maximum-length-constraints",
+		ReportedByReporterType:     "ACM",
+		ReportedByReporterInstance: "14c6b63e-49b2-4cc2-99de-5d914b657548",
 	}
 }
 
@@ -161,7 +155,10 @@ func (f *TestFixture) UnicodeCommonRepresentation() *CommonRepresentation {
 		BaseRepresentation: BaseRepresentation{
 			Data: JsonObject{
 				"unicode_field": "测试数据 🌟 emoji test",
-				"special_chars": "!@#$%^&*()_+-=[]{}|;':\",./<>?",
+				"japanese":      "こんにちは世界",
+				"arabic":        "مرحبا بالعالم",
+				"russian":       "Привет мир",
+				"emoji_data":    "🚀🌟💻🔥⚡",
 			},
 		},
 		ID:                         uuid.NewSHA1(uuid.NameSpaceOID, []byte("测试-id-🌟")),
@@ -177,14 +174,21 @@ func (f *TestFixture) SpecialCharsCommonRepresentation() *CommonRepresentation {
 	return &CommonRepresentation{
 		BaseRepresentation: BaseRepresentation{
 			Data: JsonObject{
-				"special_data": "Data with special characters: !@#$%^&*()_+-=[]{}|;':\",./<>?",
+				"special_data":   "Data with special characters: !@#$%^&*()_+-=[]{}|;':\",./<>?",
+				"symbols":        "™®©§¶†‡•…‰‹›",
+				"math_symbols":   "±×÷≤≥≠≈∞∑∏∆√∫",
+				"currency":       "$€£¥₹₽¢₩₪₨",
+				"arrows":         "←→↑↓↔↕⇄⇅⇆⇇⇈⇉⇊⇋⇌",
+				"punctuation":    "¡¿¨´`˜ˆ¸˛˚°",
+				"brackets_mixed": "([{<>}])",
+				"quotes_mixed":   "\"'`‹›«»",
 			},
 		},
 		ID:                         uuid.NewSHA1(uuid.NameSpaceOID, []byte("special-!@#$%^&*()-id")),
 		ResourceType:               "special-!@#$%^&*()-type",
 		Version:                    1,
-		ReportedByReporterType:     "special-reporter",
-		ReportedByReporterInstance: "special-instance",
+		ReportedByReporterType:     "special-†‡•-reporter",
+		ReportedByReporterInstance: "special-™®©-instance",
 	}
 }
 
@@ -195,22 +199,23 @@ func (f *TestFixture) ValidReporterRepresentation() *ReporterRepresentation {
 	return &ReporterRepresentation{
 		BaseRepresentation: BaseRepresentation{
 			Data: JsonObject{
-				"name":        "test-resource",
-				"description": "Test resource description",
-				"status":      "active",
+				"satellite_id":            "2c4196f1-0371-4f4c-8913-e113cfaa6e67",
+				"subscription_manager_id": "af94f92b-0b65-4cac-b449-6b77e665a08f",
+				"insights_inventory_id":   "05707922-7b0a-4fe6-982d-6adbc7695b8f",
+				"ansible_host":            "host-1",
 			},
 		},
-		LocalResourceID:    "local-123",
-		ReporterType:       "test-reporter",
-		ResourceType:       "test-resource-type",
+		LocalResourceID:    "dd1b73b9-3e33-4264-968c-e3ce55b9afec",
+		ReporterType:       "hbi",
+		ResourceType:       "host",
 		Version:            1,
-		ReporterInstanceID: "reporter-instance-123",
+		ReporterInstanceID: "3088be62-1c60-4884-b133-9200542d0b3f",
 		Generation:         1,
-		APIHref:            "https://api.example.com/resource/123",
-		ConsoleHref:        stringPtr("https://console.example.com/resource/123"),
+		APIHref:            "https://apiHref.com/",
+		ConsoleHref:        stringPtr("https://www.console.com/"),
 		CommonVersion:      1,
 		Tombstone:          false,
-		ReporterVersion:    stringPtr("1.0.0"),
+		ReporterVersion:    stringPtr("2.7.16"),
 	}
 }
 
@@ -223,8 +228,38 @@ func (f *TestFixture) ReporterRepresentationWithLocalResourceID(localResourceID 
 
 // ReporterRepresentationWithTombstone returns a ReporterRepresentation with tombstone flag
 func (f *TestFixture) ReporterRepresentationWithTombstone(tombstone bool) *ReporterRepresentation {
-	rr := f.ValidReporterRepresentation()
-	rr.Tombstone = tombstone
+	rr := &ReporterRepresentation{
+		BaseRepresentation: BaseRepresentation{
+			Data: JsonObject{
+				"external_cluster_id": "9414df93-aefe-4153-ba8a-8765373d39b9",
+				"cluster_status":      "READY",
+				"cluster_reason":      "reflect",
+				"kube_version":        "2.7.0",
+				"kube_vendor":         "KUBE_VENDOR_UNSPECIFIED",
+				"vendor_version":      "3.3.1",
+				"cloud_platform":      "BAREMETAL_IPI",
+				"nodes": []interface{}{
+					JsonObject{
+						"name":   "www.example.com",
+						"cpu":    "7500m",
+						"memory": "30973224Ki",
+					},
+				},
+			},
+		},
+		LocalResourceID:    "ae5c7a82-cb3b-4591-9b10-3ae1506d4f3d",
+		ReporterType:       "ACM",
+		ResourceType:       "k8s_cluster",
+		Version:            1,
+		ReporterInstanceID: "14c6b63e-49b2-4cc2-99de-5d914b657548",
+		Generation:         1,
+		APIHref:            "https://apiHref.com/",
+		ConsoleHref:        stringPtr("https://www.console.com/"),
+		CommonVersion:      1,
+		Tombstone:          tombstone,
+		ReporterVersion:    stringPtr("0.2.0"),
+	}
+
 	if tombstone {
 		rr.Data = JsonObject{
 			"deleted_at": "2023-01-01T00:00:00Z",
@@ -261,16 +296,49 @@ func (f *TestFixture) ReporterRepresentationWithReporterVersion(reporterVersion 
 
 // ReporterRepresentationWithNilReporterVersion returns a ReporterRepresentation with nil reporter version
 func (f *TestFixture) ReporterRepresentationWithNilReporterVersion() *ReporterRepresentation {
-	rr := f.ValidReporterRepresentation()
-	rr.ReporterVersion = nil
-	return rr
+	return &ReporterRepresentation{
+		BaseRepresentation: BaseRepresentation{
+			Data: JsonObject{
+				"disabled": true,
+				"severity": "CRITICAL",
+			},
+		},
+		LocalResourceID:    "cdcebe29-67fb-4ac6-ba03-703a22ff4bc0",
+		ReporterType:       "ACM",
+		ResourceType:       "k8s_policy",
+		Version:            1,
+		ReporterInstanceID: "57a317b1-4040-4c26-8d41-dd589ba1d2eb",
+		Generation:         1,
+		APIHref:            "https://apiHref.com/",
+		ConsoleHref:        stringPtr("https://www.console.com/"),
+		CommonVersion:      1,
+		Tombstone:          false,
+		ReporterVersion:    nil, // This is the key difference - nil reporter version
+	}
 }
 
 // ReporterRepresentationWithNilConsoleHref returns a ReporterRepresentation with nil console href
 func (f *TestFixture) ReporterRepresentationWithNilConsoleHref() *ReporterRepresentation {
-	rr := f.ValidReporterRepresentation()
-	rr.ConsoleHref = nil
-	return rr
+	return &ReporterRepresentation{
+		BaseRepresentation: BaseRepresentation{
+			Data: JsonObject{
+				"reporter_type":        "NOTIFICATIONS",
+				"reporter_instance_id": "f2e4e735-3936-4ee6-a881-b2e1f9326991",
+				"local_resource_id":    "cbc86170-e959-42d8-bd2a-964a5a558475",
+			},
+		},
+		LocalResourceID:    "03c923f9-6747-4177-ae35-d36493a1c88e",
+		ReporterType:       "NOTIFICATIONS",
+		ResourceType:       "notifications_integration",
+		Version:            1,
+		ReporterInstanceID: "cc38fb9e-251d-4abe-9eaf-b71607558b2a",
+		Generation:         1,
+		APIHref:            "https://www.campbell-butler.biz/",
+		ConsoleHref:        nil, // This is the key difference - nil console href
+		CommonVersion:      1,
+		Tombstone:          false,
+		ReporterVersion:    stringPtr("1.5.7"),
+	}
 }
 
 // Validation Functions

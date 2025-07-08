@@ -595,7 +595,7 @@ func TestReporterRepresentation_DataHandling(t *testing.T) {
 		}
 
 		// Test that data can be accessed
-		if _, ok := rr.Data["name"]; !ok {
+		if _, ok := rr.Data["satellite_id"]; !ok {
 			t.Error("Data should be accessible as JsonObject")
 		}
 	})

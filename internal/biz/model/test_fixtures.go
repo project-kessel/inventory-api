@@ -37,18 +37,20 @@ func (f *TestFixture) ValidCommonRepresentation() *CommonRepresentation {
 	// Use a deterministic UUID for consistent test results based on real-world data
 	deterministicUUID := uuid.NewSHA1(uuid.NameSpaceOID, []byte("dd1b73b9-3e33-4264-968c-e3ce55b9afec"))
 
-	return &CommonRepresentation{
-		BaseRepresentation: BaseRepresentation{
-			Data: JsonObject{
-				"workspace_id": "a64d17d0-aec3-410a-acd0-e0b85b22c076",
-			},
+	cr, err := newCommonRepresentationWithID(
+		deterministicUUID,
+		JsonObject{
+			"workspace_id": "a64d17d0-aec3-410a-acd0-e0b85b22c076",
 		},
-		ID:                         deterministicUUID,
-		ResourceType:               "host",
-		Version:                    1,
-		ReportedByReporterType:     "hbi",
-		ReportedByReporterInstance: "3088be62-1c60-4884-b133-9200542d0b3f",
+		"host",
+		1,
+		"hbi",
+		"3088be62-1c60-4884-b133-9200542d0b3f",
+	)
+	if err != nil {
+		f.t.Fatalf("Failed to create valid CommonRepresentation: %v", err)
 	}
+	return cr
 }
 
 // CommonRepresentationWithID returns a CommonRepresentation with specified ID
@@ -342,89 +344,6 @@ func (f *TestFixture) ReporterRepresentationWithNilConsoleHref() *ReporterRepres
 }
 
 // Validation Functions
-
-// ValidateCommonRepresentation validates a CommonRepresentation instance
-func ValidateCommonRepresentation(cr *CommonRepresentation) error {
-	if cr.ID == uuid.Nil {
-		return ValidationError{Field: "ID", Message: "cannot be empty"}
-	}
-	if cr.ResourceType == "" {
-		return ValidationError{Field: "ResourceType", Message: "cannot be empty"}
-	}
-	if cr.Version == 0 {
-		return ValidationError{Field: "Version", Message: "must be positive"}
-	}
-	if cr.ReportedByReporterType == "" {
-		return ValidationError{Field: "ReportedByReporterType", Message: "cannot be empty"}
-	}
-	if cr.ReportedByReporterInstance == "" {
-		return ValidationError{Field: "ReportedByReporterInstance", Message: "cannot be empty"}
-	}
-	if cr.Data == nil {
-		return ValidationError{Field: "Data", Message: "cannot be nil"}
-	}
-	return nil
-}
-
-// ValidateReporterRepresentation validates a ReporterRepresentation instance
-func ValidateReporterRepresentation(rr *ReporterRepresentation) error {
-	if rr.LocalResourceID == "" || strings.TrimSpace(rr.LocalResourceID) == "" {
-		return ValidationError{Field: "LocalResourceID", Message: "cannot be empty"}
-	}
-	if len(rr.LocalResourceID) > 128 {
-		return ValidationError{Field: "LocalResourceID", Message: "exceeds maximum length of 128 characters"}
-	}
-	if rr.ReporterType == "" || strings.TrimSpace(rr.ReporterType) == "" {
-		return ValidationError{Field: "ReporterType", Message: "cannot be empty"}
-	}
-	if len(rr.ReporterType) > 128 {
-		return ValidationError{Field: "ReporterType", Message: "exceeds maximum length of 128 characters"}
-	}
-	if rr.ResourceType == "" || strings.TrimSpace(rr.ResourceType) == "" {
-		return ValidationError{Field: "ResourceType", Message: "cannot be empty"}
-	}
-	if len(rr.ResourceType) > 128 {
-		return ValidationError{Field: "ResourceType", Message: "exceeds maximum length of 128 characters"}
-	}
-	if rr.Version == 0 {
-		return ValidationError{Field: "Version", Message: "must be positive"}
-	}
-	if rr.ReporterInstanceID == "" || strings.TrimSpace(rr.ReporterInstanceID) == "" {
-		return ValidationError{Field: "ReporterInstanceID", Message: "cannot be empty"}
-	}
-	if len(rr.ReporterInstanceID) > 128 {
-		return ValidationError{Field: "ReporterInstanceID", Message: "exceeds maximum length of 128 characters"}
-	}
-	if rr.Generation == 0 {
-		return ValidationError{Field: "Generation", Message: "must be positive"}
-	}
-	if rr.APIHref != "" {
-		if len(rr.APIHref) > 512 {
-			return ValidationError{Field: "APIHref", Message: "exceeds maximum length of 512 characters"}
-		}
-		if err := validateURL(rr.APIHref); err != nil {
-			return ValidationError{Field: "APIHref", Message: err.Error()}
-		}
-	}
-	if rr.ConsoleHref != nil && *rr.ConsoleHref != "" {
-		if len(*rr.ConsoleHref) > 512 {
-			return ValidationError{Field: "ConsoleHref", Message: "exceeds maximum length of 512 characters"}
-		}
-		if err := validateURL(*rr.ConsoleHref); err != nil {
-			return ValidationError{Field: "ConsoleHref", Message: err.Error()}
-		}
-	}
-	if rr.CommonVersion == 0 {
-		return ValidationError{Field: "CommonVersion", Message: "must be positive"}
-	}
-	if rr.ReporterVersion != nil && len(*rr.ReporterVersion) > 128 {
-		return ValidationError{Field: "ReporterVersion", Message: "exceeds maximum length of 128 characters"}
-	}
-	if rr.Data == nil {
-		return ValidationError{Field: "Data", Message: "cannot be nil"}
-	}
-	return nil
-}
 
 // validateURL validates that a URL has proper format with scheme and host
 func validateURL(urlStr string) error {

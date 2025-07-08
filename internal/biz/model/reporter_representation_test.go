@@ -714,6 +714,103 @@ func TestReporterRepresentation_Serialization(t *testing.T) {
 	})
 }
 
+func TestReporterRepresentation_FactoryMethods(t *testing.T) {
+	t.Run("should_create_valid_ReporterRepresentation_using_factory", func(t *testing.T) {
+		rr, err := NewReporterRepresentation(
+			JsonObject{"satellite_id": "test-satellite"},
+			"local-123",
+			"hbi",
+			"host",
+			1,
+			"reporter-instance-123",
+			1,
+			"https://api.example.com/resource/123",
+			stringPtr("https://console.example.com/resource/123"),
+			1,
+			false,
+			stringPtr("1.0.0"),
+		)
+
+		if err != nil {
+			t.Fatalf("Expected no error, got %v", err)
+		}
+
+		if rr.LocalResourceID != "local-123" {
+			t.Errorf("Expected LocalResourceID 'local-123', got '%s'", rr.LocalResourceID)
+		}
+
+		if rr.ReporterType != "hbi" {
+			t.Errorf("Expected ReporterType 'hbi', got '%s'", rr.ReporterType)
+		}
+
+		if rr.Tombstone != false {
+			t.Errorf("Expected Tombstone false, got %v", rr.Tombstone)
+		}
+	})
+
+	t.Run("should_enforce_validation_rules_in_factory", func(t *testing.T) {
+		// Test empty LocalResourceID
+		_, err := NewReporterRepresentation(
+			JsonObject{"satellite_id": "test-satellite"},
+			"", // empty LocalResourceID
+			"hbi",
+			"host",
+			1,
+			"reporter-instance-123",
+			1,
+			"https://api.example.com/resource/123",
+			stringPtr("https://console.example.com/resource/123"),
+			1,
+			false,
+			stringPtr("1.0.0"),
+		)
+
+		if err == nil {
+			t.Error("Expected validation error for empty LocalResourceID")
+		}
+
+		// Test zero Generation
+		_, err = NewReporterRepresentation(
+			JsonObject{"satellite_id": "test-satellite"},
+			"local-123",
+			"hbi",
+			"host",
+			1,
+			"reporter-instance-123",
+			0, // zero Generation
+			"https://api.example.com/resource/123",
+			stringPtr("https://console.example.com/resource/123"),
+			1,
+			false,
+			stringPtr("1.0.0"),
+		)
+
+		if err == nil {
+			t.Error("Expected validation error for zero Generation")
+		}
+
+		// Test invalid URL
+		_, err = NewReporterRepresentation(
+			JsonObject{"satellite_id": "test-satellite"},
+			"local-123",
+			"hbi",
+			"host",
+			1,
+			"reporter-instance-123",
+			1,
+			"invalid-url", // invalid URL
+			stringPtr("https://console.example.com/resource/123"),
+			1,
+			false,
+			stringPtr("1.0.0"),
+		)
+
+		if err == nil {
+			t.Error("Expected validation error for invalid URL")
+		}
+	})
+}
+
 // Helper function to check if two ReporterRepresentations are duplicates
 // based on their unique constraint fields
 func areReporterRepresentationsDuplicates(rr1, rr2 ReporterRepresentation) bool {

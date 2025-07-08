@@ -7,6 +7,10 @@ import (
 	"gorm.io/gorm"
 )
 
+// CommonRepresentation is an immutable value object representing common resource data.
+// It follows DDD principles where value objects are immutable and should be created
+// through factory methods that enforce validation rules.
+// Note: Fields are exported for GORM compatibility but should not be modified directly.
 type CommonRepresentation struct {
 	BaseRepresentation
 	ID                         uuid.UUID `gorm:"type:text;column:id;primary_key"`
@@ -18,6 +22,95 @@ type CommonRepresentation struct {
 
 func (CommonRepresentation) TableName() string {
 	return "common_representation"
+}
+
+// Factory method for creating a new CommonRepresentation
+// This enforces immutability by validating all inputs and creating a valid instance
+func NewCommonRepresentation(
+	data JsonObject,
+	resourceType string,
+	version uint,
+	reportedByReporterType string,
+	reportedByReporterInstance string,
+) (*CommonRepresentation, error) {
+	// Generate a new UUID for the instance
+	id, err := uuid.NewV7()
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate UUID: %w", err)
+	}
+
+	// Create instance with provided data
+	cr := &CommonRepresentation{
+		BaseRepresentation: BaseRepresentation{
+			Data: data,
+		},
+		ID:                         id,
+		ResourceType:               resourceType,
+		Version:                    version,
+		ReportedByReporterType:     reportedByReporterType,
+		ReportedByReporterInstance: reportedByReporterInstance,
+	}
+
+	// Validate the instance
+	if err := ValidateCommonRepresentation(cr); err != nil {
+		return nil, fmt.Errorf("invalid CommonRepresentation: %w", err)
+	}
+
+	return cr, nil
+}
+
+// newCommonRepresentationWithID creates a CommonRepresentation with a specific ID
+// This is useful for testing or when you need to recreate an existing representation
+// This function is unexported and only available to tests via export_test.go
+func newCommonRepresentationWithID(
+	id uuid.UUID,
+	data JsonObject,
+	resourceType string,
+	version uint,
+	reportedByReporterType string,
+	reportedByReporterInstance string,
+) (*CommonRepresentation, error) {
+	cr := &CommonRepresentation{
+		BaseRepresentation: BaseRepresentation{
+			Data: data,
+		},
+		ID:                         id,
+		ResourceType:               resourceType,
+		Version:                    version,
+		ReportedByReporterType:     reportedByReporterType,
+		ReportedByReporterInstance: reportedByReporterInstance,
+	}
+
+	// Validate the instance
+	if err := ValidateCommonRepresentation(cr); err != nil {
+		return nil, fmt.Errorf("invalid CommonRepresentation: %w", err)
+	}
+
+	return cr, nil
+}
+
+// ValidateCommonRepresentation validates a CommonRepresentation instance
+// This function is used by both factory methods and tests to ensure consistency
+func ValidateCommonRepresentation(cr *CommonRepresentation) error {
+	if cr.ID == uuid.Nil {
+		return ValidationError{Field: "ID", Message: "cannot be empty"}
+	}
+	if cr.ResourceType == "" {
+		return ValidationError{Field: "ResourceType", Message: "cannot be empty"}
+	}
+	if cr.Version == 0 {
+		return ValidationError{Field: "Version", Message: "must be positive"}
+	}
+	if cr.ReportedByReporterType == "" {
+		return ValidationError{Field: "ReportedByReporterType", Message: "cannot be empty"}
+	}
+	if cr.ReportedByReporterInstance == "" {
+		return ValidationError{Field: "ReportedByReporterInstance", Message: "cannot be empty"}
+	}
+	if cr.Data == nil {
+		return ValidationError{Field: "Data", Message: "cannot be nil"}
+	}
+	return nil
 }
 
 // BeforeCreate hook generates UUID programmatically for cross-database compatibility.

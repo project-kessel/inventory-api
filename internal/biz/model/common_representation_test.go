@@ -472,3 +472,92 @@ func TestCommonRepresentation_CompositePrimaryKey(t *testing.T) {
 		AssertNotEqual(t, v1.Version, v3.Version, "V1 and V3 should have different versions")
 	})
 }
+
+func TestCommonRepresentation_FactoryMethods(t *testing.T) {
+	t.Run("should_create_valid_CommonRepresentation_using_factory", func(t *testing.T) {
+		cr, err := NewCommonRepresentation(
+			JsonObject{"workspace_id": "test-workspace"},
+			"host",
+			1,
+			"hbi",
+			"test-instance",
+		)
+
+		if err != nil {
+			t.Fatalf("Expected no error, got %v", err)
+		}
+
+		if cr.ResourceType != "host" {
+			t.Errorf("Expected ResourceType 'host', got '%s'", cr.ResourceType)
+		}
+
+		if cr.Version != 1 {
+			t.Errorf("Expected Version 1, got %d", cr.Version)
+		}
+
+		if cr.ID == uuid.Nil {
+			t.Error("Expected ID to be generated, got nil UUID")
+		}
+	})
+
+	t.Run("should_create_valid_CommonRepresentation_with_specific_ID", func(t *testing.T) {
+		testID := uuid.New()
+		cr, err := newCommonRepresentationWithID(
+			testID,
+			JsonObject{"workspace_id": "test-workspace"},
+			"host",
+			1,
+			"hbi",
+			"test-instance",
+		)
+
+		if err != nil {
+			t.Fatalf("Expected no error, got %v", err)
+		}
+
+		if cr.ID != testID {
+			t.Errorf("Expected ID %s, got %s", testID, cr.ID)
+		}
+	})
+
+	t.Run("should_enforce_validation_rules_in_factory", func(t *testing.T) {
+		// Test empty ResourceType
+		_, err := NewCommonRepresentation(
+			JsonObject{"workspace_id": "test-workspace"},
+			"", // empty ResourceType
+			1,
+			"hbi",
+			"test-instance",
+		)
+
+		if err == nil {
+			t.Error("Expected validation error for empty ResourceType")
+		}
+
+		// Test zero Version
+		_, err = NewCommonRepresentation(
+			JsonObject{"workspace_id": "test-workspace"},
+			"host",
+			0, // zero Version
+			"hbi",
+			"test-instance",
+		)
+
+		if err == nil {
+			t.Error("Expected validation error for zero Version")
+		}
+
+		// Test nil Data
+		_, err = NewCommonRepresentation(
+			nil, // nil Data
+			"host",
+			1,
+			"hbi",
+			"test-instance",
+		)
+
+		if err == nil {
+			t.Error("Expected validation error for nil Data")
+		}
+	})
+}

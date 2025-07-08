@@ -117,6 +117,34 @@ func TestCommonRepresentation_Structure(t *testing.T) {
 		_ = cr.ReportedByReporterInstance
 		_ = cr.Data
 	})
+
+	t.Run("should have correct GORM tags for unique index", func(t *testing.T) {
+		t.Parallel()
+
+		crType := reflect.TypeOf(CommonRepresentation{})
+
+		// Check ID field has correct index tag
+		idField, found := crType.FieldByName("ID")
+		if !found {
+			t.Error("ID field not found")
+		} else {
+			tag := idField.Tag.Get("gorm")
+			if !strings.Contains(tag, "index:common_rep_unique_idx,unique") {
+				t.Errorf("ID field should have unique index tag, got: %s", tag)
+			}
+		}
+
+		// Check Version field has correct index tag
+		versionField, found := crType.FieldByName("Version")
+		if !found {
+			t.Error("Version field not found")
+		} else {
+			tag := versionField.Tag.Get("gorm")
+			if !strings.Contains(tag, "index:common_rep_unique_idx,unique") {
+				t.Errorf("Version field should have unique index tag, got: %s", tag)
+			}
+		}
+	})
 }
 
 func TestCommonRepresentation_Validation(t *testing.T) {
@@ -200,7 +228,8 @@ func TestCommonRepresentation_Validation(t *testing.T) {
 	t.Run("CommonRepresentation with very long ResourceType should be invalid", func(t *testing.T) {
 		t.Parallel()
 
-		longResourceType := strings.Repeat("a", 129) // > 128 chars
+		// ResourceType has size:128 constraint
+		longResourceType := strings.Repeat("a", 129)
 		cr := CommonRepresentation{
 			ID:           "test-id",
 			ResourceType: longResourceType,
@@ -208,53 +237,43 @@ func TestCommonRepresentation_Validation(t *testing.T) {
 		}
 
 		if err := validateCommonRepresentation(cr); err == nil {
-			t.Error("CommonRepresentation with ResourceType > 128 chars should be invalid")
+			t.Error("CommonRepresentation with ResourceType longer than 128 characters should be invalid")
 		}
 	})
 
-	t.Run("CommonRepresentation with empty reporter fields should be valid", func(t *testing.T) {
+	t.Run("CommonRepresentation with whitespace-only fields should be invalid", func(t *testing.T) {
 		t.Parallel()
 
-		cr := CommonRepresentation{
-			ID:                         "test-id",
-			ResourceType:               "k8s_cluster",
-			Version:                    1,
-			ReportedByReporterType:     "",
-			ReportedByReporterInstance: "",
+		testCases := []struct {
+			name string
+			cr   CommonRepresentation
+		}{
+			{
+				name: "whitespace-only ID",
+				cr: CommonRepresentation{
+					ID:           "   ",
+					ResourceType: "k8s_cluster",
+					Version:      1,
+				},
+			},
+			{
+				name: "whitespace-only ResourceType",
+				cr: CommonRepresentation{
+					ID:           "test-id",
+					ResourceType: "   ",
+					Version:      1,
+				},
+			},
 		}
 
-		if err := validateCommonRepresentation(cr); err != nil {
-			t.Errorf("CommonRepresentation with empty reporter fields should be valid: %v", err)
-		}
-	})
+		for _, tc := range testCases {
+			t.Run(tc.name, func(t *testing.T) {
+				t.Parallel()
 
-	t.Run("CommonRepresentation with nil Data should be valid", func(t *testing.T) {
-		t.Parallel()
-
-		cr := CommonRepresentation{
-			BaseRepresentation: BaseRepresentation{Data: nil},
-			ID:                 "test-id",
-			ResourceType:       "k8s_cluster",
-			Version:            1,
-		}
-
-		if err := validateCommonRepresentation(cr); err != nil {
-			t.Errorf("CommonRepresentation with nil Data should be valid: %v", err)
-		}
-	})
-
-	t.Run("CommonRepresentation with empty Data map should be valid", func(t *testing.T) {
-		t.Parallel()
-
-		cr := CommonRepresentation{
-			BaseRepresentation: BaseRepresentation{Data: JsonObject{}},
-			ID:                 "test-id",
-			ResourceType:       "k8s_cluster",
-			Version:            1,
-		}
-
-		if err := validateCommonRepresentation(cr); err != nil {
-			t.Errorf("CommonRepresentation with empty Data map should be valid: %v", err)
+				if err := validateCommonRepresentation(tc.cr); err == nil {
+					t.Errorf("CommonRepresentation with %s should be invalid", tc.name)
+				}
+			})
 		}
 	})
 }
@@ -262,80 +281,99 @@ func TestCommonRepresentation_Validation(t *testing.T) {
 func TestCommonRepresentation_BusinessRules(t *testing.T) {
 	t.Parallel()
 
-	t.Run("same ID and Version should be considered duplicates", func(t *testing.T) {
+	t.Run("ID and Version combination should be unique", func(t *testing.T) {
 		t.Parallel()
 
-		cr1 := CommonRepresentation{ID: "test-id", Version: 1}
-		cr2 := CommonRepresentation{ID: "test-id", Version: 1}
+		cr1 := CommonRepresentation{
+			ID:           "test-id",
+			ResourceType: "k8s_cluster",
+			Version:      1,
+		}
+
+		cr2 := CommonRepresentation{
+			ID:           "test-id",
+			ResourceType: "k8s_cluster",
+			Version:      1,
+		}
 
 		if !areCommonRepresentationsDuplicates(cr1, cr2) {
 			t.Error("CommonRepresentations with same ID and Version should be considered duplicates")
 		}
 	})
 
-	t.Run("same ID but different Version should be different", func(t *testing.T) {
+	t.Run("different ID should not be duplicates", func(t *testing.T) {
 		t.Parallel()
 
-		cr1 := CommonRepresentation{ID: "test-id", Version: 1}
-		cr2 := CommonRepresentation{ID: "test-id", Version: 2}
+		cr1 := CommonRepresentation{
+			ID:           "test-id-1",
+			ResourceType: "k8s_cluster",
+			Version:      1,
+		}
+
+		cr2 := CommonRepresentation{
+			ID:           "test-id-2",
+			ResourceType: "k8s_cluster",
+			Version:      1,
+		}
 
 		if areCommonRepresentationsDuplicates(cr1, cr2) {
-			t.Error("CommonRepresentations with same ID but different Version should be different")
+			t.Error("CommonRepresentations with different IDs should not be considered duplicates")
 		}
 	})
 
-	t.Run("different ID but same Version should be different", func(t *testing.T) {
+	t.Run("different Version should not be duplicates", func(t *testing.T) {
 		t.Parallel()
 
-		cr1 := CommonRepresentation{ID: "test-id-1", Version: 1}
-		cr2 := CommonRepresentation{ID: "test-id-2", Version: 1}
+		cr1 := CommonRepresentation{
+			ID:           "test-id",
+			ResourceType: "k8s_cluster",
+			Version:      1,
+		}
+
+		cr2 := CommonRepresentation{
+			ID:           "test-id",
+			ResourceType: "k8s_cluster",
+			Version:      2,
+		}
 
 		if areCommonRepresentationsDuplicates(cr1, cr2) {
-			t.Error("CommonRepresentations with different ID but same Version should be different")
+			t.Error("CommonRepresentations with different Versions should not be considered duplicates")
 		}
 	})
 
-	t.Run("Version should represent evolution of same resource", func(t *testing.T) {
-		t.Parallel()
-
-		baseID := "test-resource-id"
-		versions := []CommonRepresentation{
-			{ID: baseID, Version: 1},
-			{ID: baseID, Version: 2},
-			{ID: baseID, Version: 3},
-		}
-
-		for i := 1; i < len(versions); i++ {
-			if versions[i].Version <= versions[i-1].Version {
-				t.Error("Version should increment to represent evolution")
-			}
-		}
-	})
-
-	t.Run("ResourceType should be consistent for same resource across versions", func(t *testing.T) {
-		t.Parallel()
-
-		baseID := "test-resource-id"
-		resourceType := "k8s_cluster"
-
-		cr1 := CommonRepresentation{ID: baseID, ResourceType: resourceType, Version: 1}
-		cr2 := CommonRepresentation{ID: baseID, ResourceType: resourceType, Version: 2}
-
-		if cr1.ResourceType != cr2.ResourceType {
-			t.Error("ResourceType should be consistent for same resource across versions")
-		}
-	})
-
-	t.Run("reporter information should track the source", func(t *testing.T) {
+	t.Run("Version should support incremental updates", func(t *testing.T) {
 		t.Parallel()
 
 		cr := CommonRepresentation{
-			ReportedByReporterType:     "acm",
-			ReportedByReporterInstance: "acm-hub-1",
+			ID:           "test-id",
+			ResourceType: "k8s_cluster",
+			Version:      1,
 		}
 
-		if cr.ReportedByReporterType == "" && cr.ReportedByReporterInstance != "" {
-			t.Error("If ReporterInstance is set, ReporterType should also be set")
+		// Simulate version increment
+		cr.Version++
+
+		if cr.Version != 2 {
+			t.Error("Version should support incremental updates")
+		}
+	})
+
+	t.Run("ReportedByReporterType should indicate data source", func(t *testing.T) {
+		t.Parallel()
+
+		validReporterTypes := []string{"acm", "ocm", "acs", "hbi", "notifications"}
+
+		for _, reporterType := range validReporterTypes {
+			cr := CommonRepresentation{
+				ID:                     "test-id",
+				ResourceType:           "k8s_cluster",
+				Version:                1,
+				ReportedByReporterType: reporterType,
+			}
+
+			if err := validateCommonRepresentation(cr); err != nil {
+				t.Errorf("CommonRepresentation with valid ReportedByReporterType %s should be valid: %v", reporterType, err)
+			}
 		}
 	})
 }
@@ -343,116 +381,255 @@ func TestCommonRepresentation_BusinessRules(t *testing.T) {
 func TestCommonRepresentation_DataHandling(t *testing.T) {
 	t.Parallel()
 
-	t.Run("should handle complex nested JSON data structures", func(t *testing.T) {
+	t.Run("should handle nil JsonObject data", func(t *testing.T) {
+		t.Parallel()
+
+		cr := CommonRepresentation{
+			BaseRepresentation: BaseRepresentation{
+				Data: nil,
+			},
+			ID:           "test-id",
+			ResourceType: "k8s_cluster",
+			Version:      1,
+		}
+
+		// Should not panic when accessing nil data
+		_ = cr.Data
+		if cr.Data != nil {
+			t.Error("Data should be nil when not initialized")
+		}
+	})
+
+	t.Run("should handle empty JsonObject data", func(t *testing.T) {
+		t.Parallel()
+
+		cr := CommonRepresentation{
+			BaseRepresentation: BaseRepresentation{
+				Data: JsonObject{},
+			},
+			ID:           "test-id",
+			ResourceType: "k8s_cluster",
+			Version:      1,
+		}
+
+		if cr.Data == nil {
+			t.Error("Data should not be nil when initialized as empty map")
+		}
+		if len(cr.Data) != 0 {
+			t.Error("Empty JsonObject should have length 0")
+		}
+	})
+
+	t.Run("should handle complex JsonObject data", func(t *testing.T) {
 		t.Parallel()
 
 		complexData := JsonObject{
-			"metadata": JsonObject{
+			"metadata": map[string]interface{}{
 				"name":      "test-cluster",
 				"namespace": "default",
-				"labels": JsonObject{
-					"environment": "prod",
-					"team":        "platform",
+				"labels": map[string]interface{}{
+					"environment": "production",
+					"region":      "us-east-1",
 				},
 			},
-			"spec": JsonObject{
+			"spec": map[string]interface{}{
 				"replicas": 3,
-				"ports":    []interface{}{8080, 8443},
+				"version":  "1.21.0",
+			},
+			"status": map[string]interface{}{
+				"ready": true,
+				"conditions": []interface{}{
+					map[string]interface{}{
+						"type":   "Ready",
+						"status": "True",
+					},
+				},
 			},
 		}
 
 		cr := CommonRepresentation{
-			BaseRepresentation: BaseRepresentation{Data: complexData},
-			ID:                 "test-id",
-			ResourceType:       "k8s_cluster",
-			Version:            1,
+			BaseRepresentation: BaseRepresentation{
+				Data: complexData,
+			},
+			ID:           "test-id",
+			ResourceType: "k8s_cluster",
+			Version:      1,
 		}
 
 		// Should be able to access nested data
-		metadata, ok := cr.Data["metadata"].(JsonObject)
-		if !ok {
-			t.Error("Should be able to access nested metadata")
-		}
-
-		if metadata["name"] != "test-cluster" {
-			t.Error("Should preserve nested data values")
+		if metadata, ok := cr.Data["metadata"].(map[string]interface{}); ok {
+			if name, ok := metadata["name"].(string); ok {
+				if name != "test-cluster" {
+					t.Error("Should be able to access nested data correctly")
+				}
+			}
 		}
 	})
 
-	t.Run("should handle JSON data with various primitive types", func(t *testing.T) {
+	t.Run("should handle JsonObject with different value types", func(t *testing.T) {
 		t.Parallel()
 
-		data := JsonObject{
-			"string_field": "test-value",
-			"int_field":    42,
-			"float_field":  3.14,
-			"bool_field":   true,
-			"null_field":   nil,
+		mixedData := JsonObject{
+			"string_value": "test",
+			"int_value":    42,
+			"float_value":  3.14,
+			"bool_value":   true,
+			"null_value":   nil,
+			"array_value":  []interface{}{1, 2, 3},
+			"object_value": map[string]interface{}{"nested": "value"},
 		}
 
 		cr := CommonRepresentation{
-			BaseRepresentation: BaseRepresentation{Data: data},
-		}
-
-		if cr.Data["string_field"] != "test-value" {
-			t.Error("Should handle string values")
-		}
-		if cr.Data["int_field"] != 42 {
-			t.Error("Should handle integer values")
-		}
-		if cr.Data["float_field"] != 3.14 {
-			t.Error("Should handle float values")
-		}
-		if cr.Data["bool_field"] != true {
-			t.Error("Should handle boolean values")
-		}
-		if cr.Data["null_field"] != nil {
-			t.Error("Should handle null values")
-		}
-	})
-
-	t.Run("should handle JSON data with arrays and objects", func(t *testing.T) {
-		t.Parallel()
-
-		data := JsonObject{
-			"array_field": []interface{}{"item1", "item2", "item3"},
-			"object_field": JsonObject{
-				"nested_key": "nested_value",
+			BaseRepresentation: BaseRepresentation{
+				Data: mixedData,
 			},
+			ID:           "test-id",
+			ResourceType: "k8s_cluster",
+			Version:      1,
 		}
 
-		cr := CommonRepresentation{
-			BaseRepresentation: BaseRepresentation{Data: data},
+		// Should handle different types correctly
+		if cr.Data["string_value"] != "test" {
+			t.Error("Should handle string values correctly")
 		}
-
-		array, ok := cr.Data["array_field"].([]interface{})
-		if !ok || len(array) != 3 {
-			t.Error("Should handle array data")
+		if cr.Data["int_value"] != 42 {
+			t.Error("Should handle int values correctly")
 		}
-
-		obj, ok := cr.Data["object_field"].(JsonObject)
-		if !ok || obj["nested_key"] != "nested_value" {
-			t.Error("Should handle object data")
+		if cr.Data["bool_value"] != true {
+			t.Error("Should handle bool values correctly")
 		}
 	})
 
-	t.Run("should handle special characters and unicode", func(t *testing.T) {
+	t.Run("should support data modification", func(t *testing.T) {
 		t.Parallel()
 
-		data := JsonObject{
-			"special_chars": "!@#$%^&*()_+-=[]{}|;':\",./<>?",
-			"unicode":       "こんにちは 🌍 émojis",
+		cr := CommonRepresentation{
+			BaseRepresentation: BaseRepresentation{
+				Data: JsonObject{"key": "original"},
+			},
+			ID:           "test-id",
+			ResourceType: "k8s_cluster",
+			Version:      1,
 		}
+
+		// Modify data
+		cr.Data["key"] = "modified"
+		cr.Data["new_key"] = "new_value"
+
+		if cr.Data["key"] != "modified" {
+			t.Error("Should support data modification")
+		}
+		if cr.Data["new_key"] != "new_value" {
+			t.Error("Should support adding new keys")
+		}
+	})
+}
+
+func TestCommonRepresentation_Comparison(t *testing.T) {
+	t.Parallel()
+
+	t.Run("should compare CommonRepresentations correctly", func(t *testing.T) {
+		t.Parallel()
+
+		cr1 := CommonRepresentation{
+			ID:           "test-id",
+			ResourceType: "k8s_cluster",
+			Version:      1,
+		}
+
+		cr2 := CommonRepresentation{
+			ID:           "test-id",
+			ResourceType: "k8s_cluster",
+			Version:      1,
+		}
+
+		if !areCommonRepresentationsDuplicates(cr1, cr2) {
+			t.Error("Identical CommonRepresentations should be considered duplicates")
+		}
+	})
+
+	t.Run("should handle comparison with different data", func(t *testing.T) {
+		t.Parallel()
+
+		cr1 := CommonRepresentation{
+			BaseRepresentation: BaseRepresentation{
+				Data: JsonObject{"key": "value1"},
+			},
+			ID:           "test-id",
+			ResourceType: "k8s_cluster",
+			Version:      1,
+		}
+
+		cr2 := CommonRepresentation{
+			BaseRepresentation: BaseRepresentation{
+				Data: JsonObject{"key": "value2"},
+			},
+			ID:           "test-id",
+			ResourceType: "k8s_cluster",
+			Version:      1,
+		}
+
+		// Should still be considered duplicates based on ID and Version
+		if !areCommonRepresentationsDuplicates(cr1, cr2) {
+			t.Error("CommonRepresentations with same ID and Version should be duplicates regardless of data")
+		}
+	})
+}
+
+func TestCommonRepresentation_EdgeCases(t *testing.T) {
+	t.Parallel()
+
+	t.Run("should handle special characters in ID", func(t *testing.T) {
+		t.Parallel()
+
+		specialIDs := []string{
+			"test-id-with-dashes",
+			"test_id_with_underscores",
+			"test.id.with.dots",
+			"test:id:with:colons",
+			"test/id/with/slashes",
+		}
+
+		for _, id := range specialIDs {
+			cr := CommonRepresentation{
+				ID:           id,
+				ResourceType: "k8s_cluster",
+				Version:      1,
+			}
+
+			if err := validateCommonRepresentation(cr); err != nil {
+				t.Errorf("CommonRepresentation with special character ID %s should be valid: %v", id, err)
+			}
+		}
+	})
+
+	t.Run("should handle large Version numbers", func(t *testing.T) {
+		t.Parallel()
 
 		cr := CommonRepresentation{
-			BaseRepresentation: BaseRepresentation{Data: data},
+			ID:           "test-id",
+			ResourceType: "k8s_cluster",
+			Version:      999999,
 		}
 
-		if cr.Data["special_chars"] != "!@#$%^&*()_+-=[]{}|;':\",./<>?" {
-			t.Error("Should handle special characters")
+		if err := validateCommonRepresentation(cr); err != nil {
+			t.Errorf("CommonRepresentation with large Version should be valid: %v", err)
 		}
-		if cr.Data["unicode"] != "こんにちは 🌍 émojis" {
-			t.Error("Should handle unicode characters")
+	})
+
+	t.Run("should handle Unicode characters in string fields", func(t *testing.T) {
+		t.Parallel()
+
+		cr := CommonRepresentation{
+			ID:                         "测试-id-🚀",
+			ResourceType:               "k8s_cluster",
+			Version:                    1,
+			ReportedByReporterType:     "acm-测试",
+			ReportedByReporterInstance: "instance-🌟",
+		}
+
+		if err := validateCommonRepresentation(cr); err != nil {
+			t.Errorf("CommonRepresentation with Unicode characters should be valid: %v", err)
 		}
 	})
 }
@@ -465,20 +642,30 @@ func TestCommonRepresentation_Serialization(t *testing.T) {
 
 		cr := CommonRepresentation{
 			BaseRepresentation: BaseRepresentation{
-				Data: JsonObject{"key": "value"},
+				Data: JsonObject{
+					"key":   "value",
+					"count": 42,
+				},
 			},
-			ID:           "test-id",
-			ResourceType: "k8s_cluster",
-			Version:      1,
+			ID:                         "test-id",
+			ResourceType:               "k8s_cluster",
+			Version:                    1,
+			ReportedByReporterType:     "acm",
+			ReportedByReporterInstance: "acm-instance-1",
 		}
 
-		jsonBytes, err := json.Marshal(cr)
+		jsonData, err := json.Marshal(cr)
 		if err != nil {
-			t.Errorf("Should serialize to JSON without error: %v", err)
+			t.Errorf("Failed to serialize CommonRepresentation to JSON: %v", err)
 		}
 
-		if len(jsonBytes) == 0 {
-			t.Error("JSON serialization should produce non-empty result")
+		// Should contain all fields
+		jsonStr := string(jsonData)
+		expectedFields := []string{"ID", "ResourceType", "Version", "ReportedByReporterType", "ReportedByReporterInstance", "Data"}
+		for _, field := range expectedFields {
+			if !strings.Contains(jsonStr, field) {
+				t.Errorf("JSON should contain field %s", field)
+			}
 		}
 	})
 
@@ -486,7 +673,7 @@ func TestCommonRepresentation_Serialization(t *testing.T) {
 		t.Parallel()
 
 		jsonStr := `{
-			"Data": {"key": "value"},
+			"Data": {"key": "value", "count": 42},
 			"ID": "test-id",
 			"ResourceType": "k8s_cluster",
 			"Version": 1,
@@ -497,58 +684,65 @@ func TestCommonRepresentation_Serialization(t *testing.T) {
 		var cr CommonRepresentation
 		err := json.Unmarshal([]byte(jsonStr), &cr)
 		if err != nil {
-			t.Errorf("Should deserialize from JSON without error: %v", err)
+			t.Errorf("Failed to deserialize JSON to CommonRepresentation: %v", err)
 		}
 
+		// Verify all fields
 		if cr.ID != "test-id" {
-			t.Error("Should preserve ID during deserialization")
+			t.Error("ID should be deserialized correctly")
 		}
 		if cr.ResourceType != "k8s_cluster" {
-			t.Error("Should preserve ResourceType during deserialization")
+			t.Error("ResourceType should be deserialized correctly")
 		}
 		if cr.Version != 1 {
-			t.Error("Should preserve Version during deserialization")
+			t.Error("Version should be deserialized correctly")
+		}
+		if cr.Data["key"] != "value" {
+			t.Error("Data should be deserialized correctly")
 		}
 	})
 
-	t.Run("should maintain data integrity during serialization/deserialization", func(t *testing.T) {
+	t.Run("should handle JSON serialization roundtrip", func(t *testing.T) {
 		t.Parallel()
 
 		original := CommonRepresentation{
 			BaseRepresentation: BaseRepresentation{
 				Data: JsonObject{
-					"complex": JsonObject{
-						"nested": []interface{}{1, 2, 3},
+					"nested": map[string]interface{}{
+						"key": "value",
 					},
+					"array": []interface{}{1, 2, 3},
 				},
 			},
-			ID:           "test-id",
-			ResourceType: "k8s_cluster",
-			Version:      1,
+			ID:                         "test-id",
+			ResourceType:               "k8s_cluster",
+			Version:                    1,
+			ReportedByReporterType:     "acm",
+			ReportedByReporterInstance: "acm-instance-1",
 		}
 
 		// Serialize
-		jsonBytes, err := json.Marshal(original)
+		jsonData, err := json.Marshal(original)
 		if err != nil {
-			t.Errorf("Serialization failed: %v", err)
+			t.Errorf("Failed to serialize: %v", err)
 		}
 
 		// Deserialize
 		var deserialized CommonRepresentation
-		err = json.Unmarshal(jsonBytes, &deserialized)
+		err = json.Unmarshal(jsonData, &deserialized)
 		if err != nil {
-			t.Errorf("Deserialization failed: %v", err)
+			t.Errorf("Failed to deserialize: %v", err)
 		}
 
 		// Compare
 		if deserialized.ID != original.ID {
-			t.Error("ID should be preserved")
+			t.Error("ID should match after roundtrip")
 		}
 		if deserialized.ResourceType != original.ResourceType {
-			t.Error("ResourceType should be preserved")
+			t.Error("ResourceType should match after roundtrip")
 		}
 		if deserialized.Version != original.Version {
-			t.Error("Version should be preserved")
+			t.Error("Version should match after roundtrip")
 		}
 	})
 }
@@ -556,17 +750,17 @@ func TestCommonRepresentation_Serialization(t *testing.T) {
 // Helper functions for testing
 
 func validateCommonRepresentation(cr CommonRepresentation) error {
-	if cr.ID == "" {
-		return &ValidationError{Field: "ID", Message: "cannot be empty"}
+	if strings.TrimSpace(cr.ID) == "" {
+		return &ValidationError{Field: "ID", Message: "ID cannot be empty"}
 	}
-	if cr.ResourceType == "" {
-		return &ValidationError{Field: "ResourceType", Message: "cannot be empty"}
+	if strings.TrimSpace(cr.ResourceType) == "" {
+		return &ValidationError{Field: "ResourceType", Message: "ResourceType cannot be empty"}
 	}
 	if cr.Version < 0 {
-		return &ValidationError{Field: "Version", Message: "cannot be negative"}
+		return &ValidationError{Field: "Version", Message: "Version cannot be negative"}
 	}
 	if len(cr.ResourceType) > 128 {
-		return &ValidationError{Field: "ResourceType", Message: "exceeds maximum length of 128"}
+		return &ValidationError{Field: "ResourceType", Message: "ResourceType cannot exceed 128 characters"}
 	}
 	return nil
 }

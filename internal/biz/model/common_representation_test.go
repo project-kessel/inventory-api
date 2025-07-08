@@ -59,7 +59,7 @@ func TestCommonRepresentation_Structure(t *testing.T) {
 
 		AssertFieldType(t, cr, "ID", reflect.TypeOf(uuid.UUID{}))
 		AssertFieldType(t, cr, "ResourceType", reflect.TypeOf(""))
-		AssertFieldType(t, cr, "Version", reflect.TypeOf(0))
+		AssertFieldType(t, cr, "Version", reflect.TypeOf(uint(0)))
 		AssertFieldType(t, cr, "ReportedByReporterType", reflect.TypeOf(""))
 		AssertFieldType(t, cr, "ReportedByReporterInstance", reflect.TypeOf(""))
 	})
@@ -99,12 +99,6 @@ func TestCommonRepresentation_Validation(t *testing.T) {
 				cr := fixture.CommonRepresentationWithVersion(0)
 				err := ValidateCommonRepresentation(cr)
 				AssertValidationError(t, err, "Version", "Zero Version should fail validation")
-			},
-			"negative_version": func(t *testing.T) {
-				t.Parallel()
-				cr := fixture.CommonRepresentationWithVersion(-1)
-				err := ValidateCommonRepresentation(cr)
-				AssertValidationError(t, err, "Version", "Negative Version should fail validation")
 			},
 			"empty_reporter_type": func(t *testing.T) {
 				t.Parallel()
@@ -149,14 +143,6 @@ func TestCommonRepresentation_BusinessRules(t *testing.T) {
 
 		err := ValidateCommonRepresentation(cr)
 		AssertValidationError(t, err, "Version", "Zero version should be invalid")
-	})
-
-	t.Run("version_cannot_be_negative", func(t *testing.T) {
-		t.Parallel()
-		cr := fixture.CommonRepresentationWithVersion(-1)
-
-		err := ValidateCommonRepresentation(cr)
-		AssertValidationError(t, err, "Version", "Negative version should be invalid")
 	})
 
 	t.Run("required_fields_cannot_be_empty", func(t *testing.T) {
@@ -315,8 +301,8 @@ func TestCommonRepresentation_EdgeCases(t *testing.T) {
 		err := ValidateCommonRepresentation(cr)
 		AssertNoError(t, err, "Maximum length values should be valid")
 
-		if cr.Version != 2147483647 {
-			t.Errorf("Expected max int32 version 2147483647, got %d", cr.Version)
+		if cr.Version != 4294967295 {
+			t.Errorf("Expected max uint32 version 4294967295, got %d", cr.Version)
 		}
 	})
 
@@ -381,17 +367,17 @@ func TestCommonRepresentation_GORMTags(t *testing.T) {
 
 	t.Run("version_field_tags", func(t *testing.T) {
 		t.Parallel()
-		AssertGORMTag(t, cr, "Version", "column:version;primary_key")
+		AssertGORMTag(t, cr, "Version", "type:bigint;column:version;primary_key;check:version > 0")
 	})
 
 	t.Run("reported_by_reporter_type_field_tags", func(t *testing.T) {
 		t.Parallel()
-		AssertGORMTag(t, cr, "ReportedByReporterType", "column:reported_by_reporter_type")
+		AssertGORMTag(t, cr, "ReportedByReporterType", "size:128;column:reported_by_reporter_type")
 	})
 
 	t.Run("reported_by_reporter_instance_field_tags", func(t *testing.T) {
 		t.Parallel()
-		AssertGORMTag(t, cr, "ReportedByReporterInstance", "column:reported_by_reporter_instance")
+		AssertGORMTag(t, cr, "ReportedByReporterInstance", "size:128;column:reported_by_reporter_instance")
 	})
 }
 

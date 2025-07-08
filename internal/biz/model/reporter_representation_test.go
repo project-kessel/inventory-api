@@ -55,14 +55,14 @@ func TestReporterRepresentation_Structure(t *testing.T) {
 			"LocalResourceID":    reflect.TypeOf(""),
 			"ReporterType":       reflect.TypeOf(""),
 			"ResourceType":       reflect.TypeOf(""),
-			"Version":            reflect.TypeOf(0),
+			"Version":            reflect.TypeOf(uint(0)),
 			"ReporterInstanceID": reflect.TypeOf(""),
-			"Generation":         reflect.TypeOf(0),
+			"Generation":         reflect.TypeOf(uint(0)),
 			"APIHref":            reflect.TypeOf(""),
-			"ConsoleHref":        reflect.TypeOf(""),
-			"CommonVersion":      reflect.TypeOf(0),
+			"ConsoleHref":        reflect.TypeOf((*string)(nil)),
+			"CommonVersion":      reflect.TypeOf(uint(0)),
 			"Tombstone":          reflect.TypeOf(false),
-			"ReporterVersion":    reflect.TypeOf(""),
+			"ReporterVersion":    reflect.TypeOf((*string)(nil)),
 		}
 
 		for fieldName, expectedType := range expectedFields {
@@ -124,11 +124,13 @@ func TestReporterRepresentation_Structure(t *testing.T) {
 
 		// Check size constraints
 		sizeConstraints := map[string]string{
+			"LocalResourceID":    "size:128",
 			"ReporterType":       "size:128",
 			"ResourceType":       "size:128",
-			"ReporterInstanceID": "size:256",
-			"APIHref":            "size:256",
-			"ConsoleHref":        "size:256",
+			"ReporterInstanceID": "size:128",
+			"APIHref":            "size:512",
+			"ConsoleHref":        "size:512",
+			"ReporterVersion":    "size:128",
 		}
 
 		for fieldName, expectedSize := range sizeConstraints {
@@ -138,9 +140,9 @@ func TestReporterRepresentation_Structure(t *testing.T) {
 				continue
 			}
 
-			tag := field.Tag.Get("gorm")
-			if !strings.Contains(tag, expectedSize) {
-				t.Errorf("Field %s should have %s constraint, got: %s", fieldName, expectedSize, tag)
+			gormTag := field.Tag.Get("gorm")
+			if !strings.Contains(gormTag, expectedSize) {
+				t.Errorf("Field %s should have %s constraint, got: %s", fieldName, expectedSize, gormTag)
 			}
 		}
 	})
@@ -187,26 +189,6 @@ func TestReporterRepresentation_Validation(t *testing.T) {
 		AssertValidationError(t, ValidateReporterRepresentation(rr), "ResourceType", "ReporterRepresentation with empty ResourceType should be invalid")
 	})
 
-	t.Run("ReporterRepresentation with negative Version should be invalid", func(t *testing.T) {
-		t.Parallel()
-
-		fixture := NewTestFixture(t)
-		rr := fixture.ValidReporterRepresentation()
-		rr.Version = -1
-
-		AssertValidationError(t, ValidateReporterRepresentation(rr), "Version", "ReporterRepresentation with negative Version should be invalid")
-	})
-
-	t.Run("ReporterRepresentation with negative Generation should be invalid", func(t *testing.T) {
-		t.Parallel()
-
-		fixture := NewTestFixture(t)
-		rr := fixture.ValidReporterRepresentation()
-		rr.Generation = -1
-
-		AssertValidationError(t, ValidateReporterRepresentation(rr), "Generation", "ReporterRepresentation with negative Generation should be invalid")
-	})
-
 	t.Run("ReporterRepresentation with field length constraints", func(t *testing.T) {
 		t.Parallel()
 
@@ -218,25 +200,46 @@ func TestReporterRepresentation_Validation(t *testing.T) {
 			value string
 			limit int
 		}{
+			{"LocalResourceID too long", "LocalResourceID", strings.Repeat("a", 129), 128},
 			{"ReporterType too long", "ReporterType", strings.Repeat("a", 129), 128},
 			{"ResourceType too long", "ResourceType", strings.Repeat("a", 129), 128},
-			{"ReporterInstanceID too long", "ReporterInstanceID", strings.Repeat("a", 257), 256},
-			{"APIHref too long", "APIHref", strings.Repeat("a", 257), 256},
-			{"ConsoleHref too long", "ConsoleHref", strings.Repeat("a", 257), 256},
+			{"ReporterInstanceID too long", "ReporterInstanceID", strings.Repeat("a", 129), 128},
+			{"APIHref too long", "APIHref", strings.Repeat("a", 513), 512},
+			{"ConsoleHref too long", "ConsoleHref", strings.Repeat("a", 513), 512},
+			{"ReporterVersion too long", "ReporterVersion", strings.Repeat("a", 129), 128},
 		}
 
 		for _, tc := range testCases {
 			t.Run(tc.name, func(t *testing.T) {
+				t.Parallel()
+
 				rr := fixture.ValidReporterRepresentation()
 
 				// Use reflection to set the field value
-				rrValue := reflect.ValueOf(rr).Elem()
-				field := rrValue.FieldByName(tc.field)
-				if field.IsValid() && field.CanSet() {
+				rv := reflect.ValueOf(rr).Elem()
+				field := rv.FieldByName(tc.field)
+				if !field.IsValid() {
+					t.Fatalf("Field %s not found", tc.field)
+				}
+
+				// Handle pointer fields differently
+				if field.Kind() == reflect.Ptr {
+					// For pointer fields, create a new string value and set the pointer
+					stringValue := tc.value
+					field.Set(reflect.ValueOf(&stringValue))
+				} else {
 					field.SetString(tc.value)
 				}
 
-				AssertError(t, ValidateReporterRepresentation(rr), fmt.Sprintf("ReporterRepresentation with %s longer than %d characters should be invalid", tc.field, tc.limit))
+				err := ValidateReporterRepresentation(rr)
+				if err == nil {
+					t.Errorf("Expected validation error for %s exceeding %d characters", tc.field, tc.limit)
+				}
+
+				expectedMsg := fmt.Sprintf("exceeds maximum length of %d characters", tc.limit)
+				if !strings.Contains(err.Error(), expectedMsg) {
+					t.Errorf("Expected error message to contain '%s', got: %s", expectedMsg, err.Error())
+				}
 			})
 		}
 	})
@@ -349,10 +352,46 @@ func TestReporterRepresentation_BusinessRules(t *testing.T) {
 
 		for _, version := range validVersions {
 			rr := fixture.ValidReporterRepresentation()
-			rr.ReporterVersion = version
+			rr.ReporterVersion = &version
 
 			AssertNoError(t, ValidateReporterRepresentation(rr), "ReporterRepresentation with valid ReporterVersion "+version+" should be valid")
 		}
+	})
+
+	t.Run("ReporterVersion can be nil", func(t *testing.T) {
+		t.Parallel()
+
+		fixture := NewTestFixture(t)
+		rr := fixture.ReporterRepresentationWithNilReporterVersion()
+
+		AssertNoError(t, ValidateReporterRepresentation(rr), "ReporterRepresentation with nil ReporterVersion should be valid")
+
+		if rr.ReporterVersion != nil {
+			t.Error("ReporterVersion should be nil")
+		}
+	})
+
+	t.Run("ReporterVersion can be empty string", func(t *testing.T) {
+		t.Parallel()
+
+		fixture := NewTestFixture(t)
+		rr := fixture.ReporterRepresentationWithReporterVersion(stringPtr(""))
+
+		AssertNoError(t, ValidateReporterRepresentation(rr), "ReporterRepresentation with empty ReporterVersion should be valid")
+
+		if rr.ReporterVersion == nil || *rr.ReporterVersion != "" {
+			t.Error("ReporterVersion should be empty string")
+		}
+	})
+
+	t.Run("ReporterVersion exceeding length limit should be invalid", func(t *testing.T) {
+		t.Parallel()
+
+		fixture := NewTestFixture(t)
+		longVersion := strings.Repeat("a", 129) // 129 characters, exceeding the 128 limit
+		rr := fixture.ReporterRepresentationWithReporterVersion(stringPtr(longVersion))
+
+		AssertValidationError(t, ValidateReporterRepresentation(rr), "ReporterVersion", "ReporterRepresentation with ReporterVersion exceeding length limit should be invalid")
 	})
 }
 
@@ -499,9 +538,45 @@ func TestReporterRepresentation_HrefValidation(t *testing.T) {
 		fixture := NewTestFixture(t)
 		rr := fixture.ValidReporterRepresentation()
 		rr.APIHref = ""
-		rr.ConsoleHref = ""
+		rr.ConsoleHref = nil
 
 		AssertNoError(t, ValidateReporterRepresentation(rr), "ReporterRepresentation with empty href fields should be valid")
+	})
+
+	t.Run("ConsoleHref can be nil", func(t *testing.T) {
+		t.Parallel()
+
+		fixture := NewTestFixture(t)
+		rr := fixture.ReporterRepresentationWithNilConsoleHref()
+
+		AssertNoError(t, ValidateReporterRepresentation(rr), "ReporterRepresentation with nil ConsoleHref should be valid")
+
+		if rr.ConsoleHref != nil {
+			t.Error("ConsoleHref should be nil")
+		}
+	})
+
+	t.Run("ConsoleHref can be empty string", func(t *testing.T) {
+		t.Parallel()
+
+		fixture := NewTestFixture(t)
+		rr := fixture.ReporterRepresentationWithConsoleHref("")
+
+		AssertNoError(t, ValidateReporterRepresentation(rr), "ReporterRepresentation with empty ConsoleHref should be valid")
+
+		if rr.ConsoleHref != nil {
+			t.Error("ConsoleHref should be nil when empty string is provided")
+		}
+	})
+
+	t.Run("ConsoleHref exceeding length limit should be invalid", func(t *testing.T) {
+		t.Parallel()
+
+		fixture := NewTestFixture(t)
+		longHref := "https://example.com/" + strings.Repeat("a", 500) // Exceeding 512 characters
+		rr := fixture.ReporterRepresentationWithConsoleHref(longHref)
+
+		AssertValidationError(t, ValidateReporterRepresentation(rr), "ConsoleHref", "ReporterRepresentation with ConsoleHref exceeding length limit should be invalid")
 	})
 }
 
@@ -603,9 +678,9 @@ func TestReporterRepresentation_EdgeCases(t *testing.T) {
 
 		fixture := NewTestFixture(t)
 		rr := fixture.ValidReporterRepresentation()
-		rr.Version = 2147483647 // Max int32
-		rr.Generation = 2147483647
-		rr.CommonVersion = 2147483647
+		rr.Version = 4294967295 // Max uint32
+		rr.Generation = 4294967295
+		rr.CommonVersion = 4294967295
 
 		AssertNoError(t, ValidateReporterRepresentation(rr), "ReporterRepresentation with large integer values should be valid")
 	})

@@ -71,7 +71,7 @@ func (f *TestFixture) CommonRepresentationWithID(id string) *CommonRepresentatio
 }
 
 // CommonRepresentationWithVersion returns a CommonRepresentation with specified version
-func (f *TestFixture) CommonRepresentationWithVersion(version int) *CommonRepresentation {
+func (f *TestFixture) CommonRepresentationWithVersion(version uint) *CommonRepresentation {
 	cr := f.ValidCommonRepresentation()
 	cr.Version = version
 	return cr
@@ -149,7 +149,7 @@ func (f *TestFixture) MaximalCommonRepresentation() *CommonRepresentation {
 		},
 		ID:                         uuid.NewSHA1(uuid.NameSpaceOID, []byte("maximal-common-representation")),
 		ResourceType:               "very-long-resource-type-name-that-exceeds-normal-expectations-and-tests-size-constraints",
-		Version:                    2147483647, // Max int32
+		Version:                    4294967295, // Max uint32
 		ReportedByReporterType:     "very-long-reporter-type-name-for-testing-maximum-length-constraints",
 		ReportedByReporterInstance: "very-long-reporter-instance-name-for-testing-maximum-length-constraints",
 	}
@@ -207,10 +207,10 @@ func (f *TestFixture) ValidReporterRepresentation() *ReporterRepresentation {
 		ReporterInstanceID: "reporter-instance-123",
 		Generation:         1,
 		APIHref:            "https://api.example.com/resource/123",
-		ConsoleHref:        "https://console.example.com/resource/123",
+		ConsoleHref:        stringPtr("https://console.example.com/resource/123"),
 		CommonVersion:      1,
 		Tombstone:          false,
-		ReporterVersion:    "1.0.0",
+		ReporterVersion:    stringPtr("1.0.0"),
 	}
 }
 
@@ -244,7 +244,32 @@ func (f *TestFixture) ReporterRepresentationWithAPIHref(apiHref string) *Reporte
 // ReporterRepresentationWithConsoleHref returns a ReporterRepresentation with specified console href
 func (f *TestFixture) ReporterRepresentationWithConsoleHref(consoleHref string) *ReporterRepresentation {
 	rr := f.ValidReporterRepresentation()
-	rr.ConsoleHref = consoleHref
+	if consoleHref == "" {
+		rr.ConsoleHref = nil
+	} else {
+		rr.ConsoleHref = &consoleHref
+	}
+	return rr
+}
+
+// ReporterRepresentationWithReporterVersion returns a ReporterRepresentation with specified reporter version
+func (f *TestFixture) ReporterRepresentationWithReporterVersion(reporterVersion *string) *ReporterRepresentation {
+	rr := f.ValidReporterRepresentation()
+	rr.ReporterVersion = reporterVersion
+	return rr
+}
+
+// ReporterRepresentationWithNilReporterVersion returns a ReporterRepresentation with nil reporter version
+func (f *TestFixture) ReporterRepresentationWithNilReporterVersion() *ReporterRepresentation {
+	rr := f.ValidReporterRepresentation()
+	rr.ReporterVersion = nil
+	return rr
+}
+
+// ReporterRepresentationWithNilConsoleHref returns a ReporterRepresentation with nil console href
+func (f *TestFixture) ReporterRepresentationWithNilConsoleHref() *ReporterRepresentation {
+	rr := f.ValidReporterRepresentation()
+	rr.ConsoleHref = nil
 	return rr
 }
 
@@ -258,7 +283,7 @@ func ValidateCommonRepresentation(cr *CommonRepresentation) error {
 	if cr.ResourceType == "" {
 		return ValidationError{Field: "ResourceType", Message: "cannot be empty"}
 	}
-	if cr.Version <= 0 {
+	if cr.Version == 0 {
 		return ValidationError{Field: "Version", Message: "must be positive"}
 	}
 	if cr.ReportedByReporterType == "" {
@@ -278,6 +303,9 @@ func ValidateReporterRepresentation(rr *ReporterRepresentation) error {
 	if rr.LocalResourceID == "" || strings.TrimSpace(rr.LocalResourceID) == "" {
 		return ValidationError{Field: "LocalResourceID", Message: "cannot be empty"}
 	}
+	if len(rr.LocalResourceID) > 128 {
+		return ValidationError{Field: "LocalResourceID", Message: "exceeds maximum length of 128 characters"}
+	}
 	if rr.ReporterType == "" || strings.TrimSpace(rr.ReporterType) == "" {
 		return ValidationError{Field: "ReporterType", Message: "cannot be empty"}
 	}
@@ -290,39 +318,39 @@ func ValidateReporterRepresentation(rr *ReporterRepresentation) error {
 	if len(rr.ResourceType) > 128 {
 		return ValidationError{Field: "ResourceType", Message: "exceeds maximum length of 128 characters"}
 	}
-	if rr.Version <= 0 {
+	if rr.Version == 0 {
 		return ValidationError{Field: "Version", Message: "must be positive"}
 	}
 	if rr.ReporterInstanceID == "" || strings.TrimSpace(rr.ReporterInstanceID) == "" {
 		return ValidationError{Field: "ReporterInstanceID", Message: "cannot be empty"}
 	}
-	if len(rr.ReporterInstanceID) > 256 {
-		return ValidationError{Field: "ReporterInstanceID", Message: "exceeds maximum length of 256 characters"}
+	if len(rr.ReporterInstanceID) > 128 {
+		return ValidationError{Field: "ReporterInstanceID", Message: "exceeds maximum length of 128 characters"}
 	}
-	if rr.Generation <= 0 {
+	if rr.Generation == 0 {
 		return ValidationError{Field: "Generation", Message: "must be positive"}
 	}
 	if rr.APIHref != "" {
-		if len(rr.APIHref) > 256 {
-			return ValidationError{Field: "APIHref", Message: "exceeds maximum length of 256 characters"}
+		if len(rr.APIHref) > 512 {
+			return ValidationError{Field: "APIHref", Message: "exceeds maximum length of 512 characters"}
 		}
 		if err := validateURL(rr.APIHref); err != nil {
 			return ValidationError{Field: "APIHref", Message: err.Error()}
 		}
 	}
-	if rr.ConsoleHref != "" {
-		if len(rr.ConsoleHref) > 256 {
-			return ValidationError{Field: "ConsoleHref", Message: "exceeds maximum length of 256 characters"}
+	if rr.ConsoleHref != nil && *rr.ConsoleHref != "" {
+		if len(*rr.ConsoleHref) > 512 {
+			return ValidationError{Field: "ConsoleHref", Message: "exceeds maximum length of 512 characters"}
 		}
-		if err := validateURL(rr.ConsoleHref); err != nil {
+		if err := validateURL(*rr.ConsoleHref); err != nil {
 			return ValidationError{Field: "ConsoleHref", Message: err.Error()}
 		}
 	}
-	if rr.CommonVersion <= 0 {
+	if rr.CommonVersion == 0 {
 		return ValidationError{Field: "CommonVersion", Message: "must be positive"}
 	}
-	if rr.ReporterVersion == "" {
-		return ValidationError{Field: "ReporterVersion", Message: "cannot be empty"}
+	if rr.ReporterVersion != nil && len(*rr.ReporterVersion) > 128 {
+		return ValidationError{Field: "ReporterVersion", Message: "exceeds maximum length of 128 characters"}
 	}
 	if rr.Data == nil {
 		return ValidationError{Field: "Data", Message: "cannot be nil"}
@@ -488,4 +516,9 @@ func RunTableDrivenTest(t *testing.T, testCases map[string]func(*testing.T)) {
 // Contains checks if a string contains a substring
 func Contains(s, substr string) bool {
 	return strings.Contains(s, substr)
+}
+
+// stringPtr returns a pointer to the given string
+func stringPtr(s string) *string {
+	return &s
 }

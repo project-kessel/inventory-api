@@ -357,7 +357,7 @@ func TestCommonRepresentation_GORMTags(t *testing.T) {
 
 	t.Run("id_field_tags", func(t *testing.T) {
 		t.Parallel()
-		AssertGORMTag(t, cr, "ID", "type:uuid;column:id;primary_key;default:gen_random_uuid()")
+		AssertGORMTag(t, cr, "ID", "type:text;column:id;primary_key")
 	})
 
 	t.Run("resource_type_field_tags", func(t *testing.T) {

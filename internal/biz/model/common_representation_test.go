@@ -3,6 +3,8 @@ package model
 import (
 	"reflect"
 	"testing"
+
+	"github.com/google/uuid"
 )
 
 // Test scenarios for CommonRepresentation domain model
@@ -55,7 +57,7 @@ func TestCommonRepresentation_Structure(t *testing.T) {
 		t.Parallel()
 		cr := fixture.ValidCommonRepresentation()
 
-		AssertFieldType(t, cr, "ID", reflect.TypeOf(""))
+		AssertFieldType(t, cr, "ID", reflect.TypeOf(uuid.UUID{}))
 		AssertFieldType(t, cr, "ResourceType", reflect.TypeOf(""))
 		AssertFieldType(t, cr, "Version", reflect.TypeOf(0))
 		AssertFieldType(t, cr, "ReportedByReporterType", reflect.TypeOf(""))
@@ -287,8 +289,9 @@ func TestCommonRepresentation_EdgeCases(t *testing.T) {
 		err := ValidateCommonRepresentation(cr)
 		AssertNoError(t, err, "Unicode characters should be valid")
 
-		if cr.ID != "测试-id-🌟" {
-			t.Errorf("Expected unicode ID '测试-id-🌟', got '%s'", cr.ID)
+		// UUID should be valid (deterministic based on input)
+		if cr.ID == uuid.Nil {
+			t.Error("Unicode-based UUID should not be nil")
 		}
 	})
 
@@ -299,8 +302,9 @@ func TestCommonRepresentation_EdgeCases(t *testing.T) {
 		err := ValidateCommonRepresentation(cr)
 		AssertNoError(t, err, "Special characters should be valid")
 
-		if cr.ID != "special-!@#$%^&*()-id" {
-			t.Errorf("Expected special char ID 'special-!@#$%%^&*()-id', got '%s'", cr.ID)
+		// UUID should be valid (deterministic based on input)
+		if cr.ID == uuid.Nil {
+			t.Error("Special-chars-based UUID should not be nil")
 		}
 	})
 
@@ -367,7 +371,7 @@ func TestCommonRepresentation_GORMTags(t *testing.T) {
 
 	t.Run("id_field_tags", func(t *testing.T) {
 		t.Parallel()
-		AssertGORMTag(t, cr, "ID", "column:id;index:common_rep_unique_idx,unique")
+		AssertGORMTag(t, cr, "ID", "type:uuid;column:id;primary_key;default:gen_random_uuid()")
 	})
 
 	t.Run("resource_type_field_tags", func(t *testing.T) {
@@ -377,7 +381,7 @@ func TestCommonRepresentation_GORMTags(t *testing.T) {
 
 	t.Run("version_field_tags", func(t *testing.T) {
 		t.Parallel()
-		AssertGORMTag(t, cr, "Version", "column:version;index:common_rep_unique_idx,unique")
+		AssertGORMTag(t, cr, "Version", "column:version;primary_key")
 	})
 
 	t.Run("reported_by_reporter_type_field_tags", func(t *testing.T) {
@@ -391,27 +395,94 @@ func TestCommonRepresentation_GORMTags(t *testing.T) {
 	})
 }
 
-func TestCommonRepresentation_IndexNaming(t *testing.T) {
+func TestCommonRepresentation_CompositePrimaryKey(t *testing.T) {
 	t.Parallel()
 
 	fixture := NewTestFixture(t)
-	cr := fixture.ValidCommonRepresentation()
 
-	t.Run("unique_index_follows_naming_convention", func(t *testing.T) {
+	t.Run("same_id_different_versions_should_be_allowed", func(t *testing.T) {
 		t.Parallel()
-		// Check that the unique index follows the _unique_idx suffix convention
+		// Create two representations with the same ID but different versions
+		sharedUUID := uuid.NewSHA1(uuid.NameSpaceOID, []byte("shared-resource-id"))
+
+		cr1 := fixture.CommonRepresentationWithID(sharedUUID.String())
+		cr1.Version = 1
+
+		cr2 := fixture.CommonRepresentationWithID(sharedUUID.String())
+		cr2.Version = 2
+
+		// Both should be valid
+		err1 := ValidateCommonRepresentation(cr1)
+		AssertNoError(t, err1, "First version should be valid")
+
+		err2 := ValidateCommonRepresentation(cr2)
+		AssertNoError(t, err2, "Second version should be valid")
+
+		// They should have the same ID but different versions
+		AssertEqual(t, cr1.ID, cr2.ID, "Both representations should have the same ID")
+		AssertNotEqual(t, cr1.Version, cr2.Version, "Representations should have different versions")
+	})
+
+	t.Run("composite_primary_key_fields_both_have_primary_key_tag", func(t *testing.T) {
+		t.Parallel()
+		cr := fixture.ValidCommonRepresentation()
 		crType := reflect.TypeOf(*cr)
 
+		// Check that both ID and Version have primary_key in their GORM tags
 		idField, _ := crType.FieldByName("ID")
 		idTag := idField.Tag.Get("gorm")
-		if !Contains(idTag, "common_rep_unique_idx") {
-			t.Errorf("ID field should reference common_rep_unique_idx index, got: %s", idTag)
+		if !Contains(idTag, "primary_key") {
+			t.Errorf("ID field should have primary_key tag, got: %s", idTag)
 		}
 
 		versionField, _ := crType.FieldByName("Version")
 		versionTag := versionField.Tag.Get("gorm")
-		if !Contains(versionTag, "common_rep_unique_idx") {
-			t.Errorf("Version field should reference common_rep_unique_idx index, got: %s", versionTag)
+		if !Contains(versionTag, "primary_key") {
+			t.Errorf("Version field should have primary_key tag, got: %s", versionTag)
 		}
+	})
+
+	t.Run("versioned_resource_lifecycle", func(t *testing.T) {
+		t.Parallel()
+		// Simulate a resource lifecycle with multiple versions
+		resourceUUID := uuid.NewSHA1(uuid.NameSpaceOID, []byte("lifecycle-test-resource"))
+
+		// Version 1: Initial creation
+		v1 := fixture.CommonRepresentationWithID(resourceUUID.String())
+		v1.Version = 1
+		v1.Data = JsonObject{
+			"status": "created",
+			"name":   "test-resource",
+		}
+
+		// Version 2: Update
+		v2 := fixture.CommonRepresentationWithID(resourceUUID.String())
+		v2.Version = 2
+		v2.Data = JsonObject{
+			"status": "updated",
+			"name":   "test-resource-updated",
+		}
+
+		// Version 3: Final state
+		v3 := fixture.CommonRepresentationWithID(resourceUUID.String())
+		v3.Version = 3
+		v3.Data = JsonObject{
+			"status": "finalized",
+			"name":   "test-resource-final",
+		}
+
+		// All versions should be valid
+		AssertNoError(t, ValidateCommonRepresentation(v1), "Version 1 should be valid")
+		AssertNoError(t, ValidateCommonRepresentation(v2), "Version 2 should be valid")
+		AssertNoError(t, ValidateCommonRepresentation(v3), "Version 3 should be valid")
+
+		// All should have the same ID but different versions
+		AssertEqual(t, v1.ID, v2.ID, "V1 and V2 should have same ID")
+		AssertEqual(t, v2.ID, v3.ID, "V2 and V3 should have same ID")
+
+		// Versions should be different
+		AssertNotEqual(t, v1.Version, v2.Version, "V1 and V2 should have different versions")
+		AssertNotEqual(t, v2.Version, v3.Version, "V2 and V3 should have different versions")
+		AssertNotEqual(t, v1.Version, v3.Version, "V1 and V3 should have different versions")
 	})
 }

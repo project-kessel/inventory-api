@@ -6,6 +6,8 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/google/uuid"
 )
 
 // TestFixture provides a centralized way to create test data for domain models
@@ -18,7 +20,7 @@ func NewTestFixture(t *testing.T) *TestFixture {
 	return &TestFixture{t: t}
 }
 
-// ValidationError represents a validation error with field and message
+// ValidationError represents a domain validation error
 type ValidationError struct {
 	Field   string
 	Message string
@@ -32,6 +34,9 @@ func (e ValidationError) Error() string {
 
 // ValidCommonRepresentation returns a valid CommonRepresentation for testing
 func (f *TestFixture) ValidCommonRepresentation() *CommonRepresentation {
+	// Use a deterministic UUID for consistent test results
+	deterministicUUID := uuid.NewSHA1(uuid.NameSpaceOID, []byte("test-common-representation"))
+
 	return &CommonRepresentation{
 		BaseRepresentation: BaseRepresentation{
 			Data: JsonObject{
@@ -40,7 +45,7 @@ func (f *TestFixture) ValidCommonRepresentation() *CommonRepresentation {
 				"status":      "active",
 			},
 		},
-		ID:                         "test-id-123",
+		ID:                         deterministicUUID,
 		ResourceType:               "test-resource-type",
 		Version:                    1,
 		ReportedByReporterType:     "test-reporter",
@@ -51,7 +56,17 @@ func (f *TestFixture) ValidCommonRepresentation() *CommonRepresentation {
 // CommonRepresentationWithID returns a CommonRepresentation with specified ID
 func (f *TestFixture) CommonRepresentationWithID(id string) *CommonRepresentation {
 	cr := f.ValidCommonRepresentation()
-	cr.ID = id
+	if id == "" {
+		cr.ID = uuid.Nil
+	} else {
+		// Try to parse as UUID, if it fails, generate a deterministic one
+		if parsedUUID, err := uuid.Parse(id); err == nil {
+			cr.ID = parsedUUID
+		} else {
+			// For test cases that pass non-UUID strings, we'll use a deterministic UUID
+			cr.ID = uuid.NewSHA1(uuid.NameSpaceOID, []byte(id))
+		}
+	}
 	return cr
 }
 
@@ -110,7 +125,7 @@ func (f *TestFixture) MinimalCommonRepresentation() *CommonRepresentation {
 		BaseRepresentation: BaseRepresentation{
 			Data: JsonObject{},
 		},
-		ID:                         "minimal-id",
+		ID:                         uuid.NewSHA1(uuid.NameSpaceOID, []byte("minimal-common-representation")),
 		ResourceType:               "minimal-type",
 		Version:                    1,
 		ReportedByReporterType:     "minimal-reporter",
@@ -132,7 +147,7 @@ func (f *TestFixture) MaximalCommonRepresentation() *CommonRepresentation {
 				"array_field": []interface{}{"item1", "item2", "item3"},
 			},
 		},
-		ID:                         "very-long-id-that-tests-maximum-length-constraints-and-edge-cases-for-database-storage",
+		ID:                         uuid.NewSHA1(uuid.NameSpaceOID, []byte("maximal-common-representation")),
 		ResourceType:               "very-long-resource-type-name-that-exceeds-normal-expectations-and-tests-size-constraints",
 		Version:                    2147483647, // Max int32
 		ReportedByReporterType:     "very-long-reporter-type-name-for-testing-maximum-length-constraints",
@@ -149,7 +164,7 @@ func (f *TestFixture) UnicodeCommonRepresentation() *CommonRepresentation {
 				"special_chars": "!@#$%^&*()_+-=[]{}|;':\",./<>?",
 			},
 		},
-		ID:                         "测试-id-🌟",
+		ID:                         uuid.NewSHA1(uuid.NameSpaceOID, []byte("测试-id-🌟")),
 		ResourceType:               "测试-resource-type",
 		Version:                    1,
 		ReportedByReporterType:     "测试-reporter",
@@ -165,7 +180,7 @@ func (f *TestFixture) SpecialCharsCommonRepresentation() *CommonRepresentation {
 				"special_data": "Data with special characters: !@#$%^&*()_+-=[]{}|;':\",./<>?",
 			},
 		},
-		ID:                         "special-!@#$%^&*()-id",
+		ID:                         uuid.NewSHA1(uuid.NameSpaceOID, []byte("special-!@#$%^&*()-id")),
 		ResourceType:               "special-!@#$%^&*()-type",
 		Version:                    1,
 		ReportedByReporterType:     "special-reporter",
@@ -237,7 +252,7 @@ func (f *TestFixture) ReporterRepresentationWithConsoleHref(consoleHref string) 
 
 // ValidateCommonRepresentation validates a CommonRepresentation instance
 func ValidateCommonRepresentation(cr *CommonRepresentation) error {
-	if cr.ID == "" {
+	if cr.ID == uuid.Nil {
 		return ValidationError{Field: "ID", Message: "cannot be empty"}
 	}
 	if cr.ResourceType == "" {
@@ -460,16 +475,17 @@ func AssertFieldType(t *testing.T, model interface{}, fieldName string, expected
 	}
 }
 
-// RunTableDrivenTest runs a table-driven test with the provided test cases
+// RunTableDrivenTest runs a set of test cases in parallel
 func RunTableDrivenTest(t *testing.T, testCases map[string]func(*testing.T)) {
 	t.Helper()
-
-	for name, testFunc := range testCases {
-		t.Run(name, testFunc)
+	for name, testCase := range testCases {
+		t.Run(name, func(t *testing.T) {
+			testCase(t)
+		})
 	}
 }
 
-// Contains checks if a string contains a substring (used for GORM tag checking)
+// Contains checks if a string contains a substring
 func Contains(s, substr string) bool {
 	return strings.Contains(s, substr)
 }

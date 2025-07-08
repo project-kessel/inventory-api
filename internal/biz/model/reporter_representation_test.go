@@ -9,7 +9,6 @@ import (
 )
 
 // Test scenarios for ReporterRepresentation domain model
-//
 // These tests focus on domain logic, business rules, and model behavior
 // rather than database operations or infrastructure concerns.
 

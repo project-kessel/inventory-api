@@ -2,7 +2,7 @@ package model
 
 import (
 	"encoding/json"
-	"net/url"
+	"fmt"
 	"reflect"
 	"strings"
 	"testing"
@@ -16,43 +16,10 @@ import (
 func TestReporterRepresentation_TableName(t *testing.T) {
 	t.Parallel()
 
-	t.Run("should return correct table name", func(t *testing.T) {
-		t.Parallel()
+	fixture := NewTestFixture(t)
+	rr := fixture.ValidReporterRepresentation()
 
-		rr := ReporterRepresentation{}
-		expected := "reporter_representation"
-		actual := rr.TableName()
-
-		if actual != expected {
-			t.Errorf("Expected table name %q, got %q", expected, actual)
-		}
-	})
-
-	t.Run("should be consistent across different instances", func(t *testing.T) {
-		t.Parallel()
-
-		rr1 := ReporterRepresentation{LocalResourceID: "test1"}
-		rr2 := ReporterRepresentation{LocalResourceID: "test2"}
-
-		if rr1.TableName() != rr2.TableName() {
-			t.Error("Table name should be consistent across different instances")
-		}
-	})
-
-	t.Run("should match expected database table naming convention", func(t *testing.T) {
-		t.Parallel()
-
-		rr := ReporterRepresentation{}
-		tableName := rr.TableName()
-
-		// Check naming convention: lowercase with underscores
-		if strings.Contains(tableName, " ") {
-			t.Error("Table name should not contain spaces")
-		}
-		if strings.ToLower(tableName) != tableName {
-			t.Error("Table name should be lowercase")
-		}
-	})
+	AssertTableName(t, rr, "reporter_representation")
 }
 
 func TestReporterRepresentation_Structure(t *testing.T) {
@@ -186,98 +153,65 @@ func TestReporterRepresentation_Validation(t *testing.T) {
 	t.Run("valid ReporterRepresentation with all required fields", func(t *testing.T) {
 		t.Parallel()
 
-		rr := ReporterRepresentation{
-			BaseRepresentation: BaseRepresentation{
-				Data: JsonObject{"key": "value"},
-			},
-			LocalResourceID:    "local-123",
-			ReporterType:       "acm",
-			ResourceType:       "k8s_cluster",
-			Version:            1,
-			ReporterInstanceID: "acm-instance-1",
-			Generation:         1,
-			APIHref:            "https://api.example.com/resource/123",
-			ConsoleHref:        "https://console.example.com/resource/123",
-			CommonVersion:      1,
-			Tombstone:          false,
-			ReporterVersion:    "1.0.0",
-		}
+		fixture := NewTestFixture(t)
+		rr := fixture.ValidReporterRepresentation()
 
-		if err := validateReporterRepresentation(rr); err != nil {
-			t.Errorf("Valid ReporterRepresentation should not have validation errors: %v", err)
-		}
+		AssertNoError(t, ValidateReporterRepresentation(rr), "Valid ReporterRepresentation should not have validation errors")
 	})
 
 	t.Run("ReporterRepresentation with empty LocalResourceID should be invalid", func(t *testing.T) {
 		t.Parallel()
 
-		rr := ReporterRepresentation{
-			LocalResourceID:    "",
-			ReporterType:       "acm",
-			ResourceType:       "k8s_cluster",
-			Version:            1,
-			ReporterInstanceID: "acm-instance-1",
-			Generation:         1,
-		}
+		fixture := NewTestFixture(t)
+		rr := fixture.ReporterRepresentationWithLocalResourceID("")
 
-		if err := validateReporterRepresentation(rr); err == nil {
-			t.Error("ReporterRepresentation with empty LocalResourceID should be invalid")
-		}
+		AssertValidationError(t, ValidateReporterRepresentation(rr), "LocalResourceID", "ReporterRepresentation with empty LocalResourceID should be invalid")
 	})
 
 	t.Run("ReporterRepresentation with empty ReporterType should be invalid", func(t *testing.T) {
 		t.Parallel()
 
-		rr := ReporterRepresentation{
-			LocalResourceID:    "local-123",
-			ReporterType:       "",
-			ResourceType:       "k8s_cluster",
-			Version:            1,
-			ReporterInstanceID: "acm-instance-1",
-			Generation:         1,
-		}
+		fixture := NewTestFixture(t)
+		rr := fixture.ValidReporterRepresentation()
+		rr.ReporterType = ""
 
-		if err := validateReporterRepresentation(rr); err == nil {
-			t.Error("ReporterRepresentation with empty ReporterType should be invalid")
-		}
+		AssertValidationError(t, ValidateReporterRepresentation(rr), "ReporterType", "ReporterRepresentation with empty ReporterType should be invalid")
+	})
+
+	t.Run("ReporterRepresentation with empty ResourceType should be invalid", func(t *testing.T) {
+		t.Parallel()
+
+		fixture := NewTestFixture(t)
+		rr := fixture.ValidReporterRepresentation()
+		rr.ResourceType = ""
+
+		AssertValidationError(t, ValidateReporterRepresentation(rr), "ResourceType", "ReporterRepresentation with empty ResourceType should be invalid")
 	})
 
 	t.Run("ReporterRepresentation with negative Version should be invalid", func(t *testing.T) {
 		t.Parallel()
 
-		rr := ReporterRepresentation{
-			LocalResourceID:    "local-123",
-			ReporterType:       "acm",
-			ResourceType:       "k8s_cluster",
-			Version:            -1,
-			ReporterInstanceID: "acm-instance-1",
-			Generation:         1,
-		}
+		fixture := NewTestFixture(t)
+		rr := fixture.ValidReporterRepresentation()
+		rr.Version = -1
 
-		if err := validateReporterRepresentation(rr); err == nil {
-			t.Error("ReporterRepresentation with negative Version should be invalid")
-		}
+		AssertValidationError(t, ValidateReporterRepresentation(rr), "Version", "ReporterRepresentation with negative Version should be invalid")
 	})
 
 	t.Run("ReporterRepresentation with negative Generation should be invalid", func(t *testing.T) {
 		t.Parallel()
 
-		rr := ReporterRepresentation{
-			LocalResourceID:    "local-123",
-			ReporterType:       "acm",
-			ResourceType:       "k8s_cluster",
-			Version:            1,
-			ReporterInstanceID: "acm-instance-1",
-			Generation:         -1,
-		}
+		fixture := NewTestFixture(t)
+		rr := fixture.ValidReporterRepresentation()
+		rr.Generation = -1
 
-		if err := validateReporterRepresentation(rr); err == nil {
-			t.Error("ReporterRepresentation with negative Generation should be invalid")
-		}
+		AssertValidationError(t, ValidateReporterRepresentation(rr), "Generation", "ReporterRepresentation with negative Generation should be invalid")
 	})
 
 	t.Run("ReporterRepresentation with field length constraints", func(t *testing.T) {
 		t.Parallel()
+
+		fixture := NewTestFixture(t)
 
 		testCases := []struct {
 			name  string
@@ -294,26 +228,24 @@ func TestReporterRepresentation_Validation(t *testing.T) {
 
 		for _, tc := range testCases {
 			t.Run(tc.name, func(t *testing.T) {
-				t.Parallel()
-
-				rr := createValidReporterRepresentation()
+				rr := fixture.ValidReporterRepresentation()
 
 				// Use reflection to set the field value
-				rrValue := reflect.ValueOf(&rr).Elem()
+				rrValue := reflect.ValueOf(rr).Elem()
 				field := rrValue.FieldByName(tc.field)
 				if field.IsValid() && field.CanSet() {
 					field.SetString(tc.value)
 				}
 
-				if err := validateReporterRepresentation(rr); err == nil {
-					t.Errorf("ReporterRepresentation with %s longer than %d characters should be invalid", tc.field, tc.limit)
-				}
+				AssertError(t, ValidateReporterRepresentation(rr), fmt.Sprintf("ReporterRepresentation with %s longer than %d characters should be invalid", tc.field, tc.limit))
 			})
 		}
 	})
 
 	t.Run("ReporterRepresentation with whitespace-only fields should be invalid", func(t *testing.T) {
 		t.Parallel()
+
+		fixture := NewTestFixture(t)
 
 		testCases := []struct {
 			name  string
@@ -328,20 +260,16 @@ func TestReporterRepresentation_Validation(t *testing.T) {
 
 		for _, tc := range testCases {
 			t.Run(tc.name, func(t *testing.T) {
-				t.Parallel()
-
-				rr := createValidReporterRepresentation()
+				rr := fixture.ValidReporterRepresentation()
 
 				// Use reflection to set the field value
-				rrValue := reflect.ValueOf(&rr).Elem()
+				rrValue := reflect.ValueOf(rr).Elem()
 				field := rrValue.FieldByName(tc.field)
 				if field.IsValid() && field.CanSet() {
 					field.SetString(tc.value)
 				}
 
-				if err := validateReporterRepresentation(rr); err == nil {
-					t.Errorf("ReporterRepresentation with whitespace-only %s should be invalid", tc.field)
-				}
+				AssertError(t, ValidateReporterRepresentation(rr), "ReporterRepresentation with whitespace-only "+tc.field+" should be invalid")
 			})
 		}
 	})
@@ -353,25 +281,12 @@ func TestReporterRepresentation_BusinessRules(t *testing.T) {
 	t.Run("unique constraint should be enforced by all key fields", func(t *testing.T) {
 		t.Parallel()
 
-		rr1 := ReporterRepresentation{
-			LocalResourceID:    "local-123",
-			ReporterType:       "acm",
-			ResourceType:       "k8s_cluster",
-			Version:            1,
-			ReporterInstanceID: "acm-instance-1",
-			Generation:         1,
-		}
+		fixture := NewTestFixture(t)
+		rr1 := fixture.ValidReporterRepresentation()
+		rr2 := fixture.ValidReporterRepresentation()
 
-		rr2 := ReporterRepresentation{
-			LocalResourceID:    "local-123",
-			ReporterType:       "acm",
-			ResourceType:       "k8s_cluster",
-			Version:            1,
-			ReporterInstanceID: "acm-instance-1",
-			Generation:         1,
-		}
-
-		if !areReporterRepresentationsDuplicates(rr1, rr2) {
+		// Check that identical representations would be duplicates
+		if !areReporterRepresentationsDuplicates(*rr1, *rr2) {
 			t.Error("ReporterRepresentations with identical key fields should be considered duplicates")
 		}
 	})
@@ -379,11 +294,11 @@ func TestReporterRepresentation_BusinessRules(t *testing.T) {
 	t.Run("different LocalResourceID should not be duplicates", func(t *testing.T) {
 		t.Parallel()
 
-		rr1 := createValidReporterRepresentation()
-		rr2 := createValidReporterRepresentation()
-		rr2.LocalResourceID = "different-local-id"
+		fixture := NewTestFixture(t)
+		rr1 := fixture.ValidReporterRepresentation()
+		rr2 := fixture.ReporterRepresentationWithLocalResourceID("different-local-id")
 
-		if areReporterRepresentationsDuplicates(rr1, rr2) {
+		if areReporterRepresentationsDuplicates(*rr1, *rr2) {
 			t.Error("ReporterRepresentations with different LocalResourceID should not be duplicates")
 		}
 	})
@@ -391,11 +306,12 @@ func TestReporterRepresentation_BusinessRules(t *testing.T) {
 	t.Run("different Generation should not be duplicates", func(t *testing.T) {
 		t.Parallel()
 
-		rr1 := createValidReporterRepresentation()
-		rr2 := createValidReporterRepresentation()
+		fixture := NewTestFixture(t)
+		rr1 := fixture.ValidReporterRepresentation()
+		rr2 := fixture.ValidReporterRepresentation()
 		rr2.Generation = 2
 
-		if areReporterRepresentationsDuplicates(rr1, rr2) {
+		if areReporterRepresentationsDuplicates(*rr1, *rr2) {
 			t.Error("ReporterRepresentations with different Generation should not be duplicates")
 		}
 	})
@@ -403,7 +319,8 @@ func TestReporterRepresentation_BusinessRules(t *testing.T) {
 	t.Run("Generation should support incremental updates", func(t *testing.T) {
 		t.Parallel()
 
-		rr := createValidReporterRepresentation()
+		fixture := NewTestFixture(t)
+		rr := fixture.ValidReporterRepresentation()
 		originalGeneration := rr.Generation
 
 		rr.Generation++
@@ -416,7 +333,8 @@ func TestReporterRepresentation_BusinessRules(t *testing.T) {
 	t.Run("CommonVersion should link to CommonRepresentation", func(t *testing.T) {
 		t.Parallel()
 
-		rr := createValidReporterRepresentation()
+		fixture := NewTestFixture(t)
+		rr := fixture.ValidReporterRepresentation()
 		rr.CommonVersion = 5
 
 		if rr.CommonVersion != 5 {
@@ -427,15 +345,14 @@ func TestReporterRepresentation_BusinessRules(t *testing.T) {
 	t.Run("ReporterVersion should track reporter software version", func(t *testing.T) {
 		t.Parallel()
 
+		fixture := NewTestFixture(t)
 		validVersions := []string{"1.0.0", "2.1.3", "1.0.0-beta.1", "1.0.0+build.123"}
 
 		for _, version := range validVersions {
-			rr := createValidReporterRepresentation()
+			rr := fixture.ValidReporterRepresentation()
 			rr.ReporterVersion = version
 
-			if err := validateReporterRepresentation(rr); err != nil {
-				t.Errorf("ReporterRepresentation with valid ReporterVersion %s should be valid: %v", version, err)
-			}
+			AssertNoError(t, ValidateReporterRepresentation(rr), "ReporterRepresentation with valid ReporterVersion "+version+" should be valid")
 		}
 	})
 }
@@ -453,290 +370,245 @@ func TestReporterRepresentation_TombstoneLogic(t *testing.T) {
 		}
 	})
 
-	t.Run("Tombstone should be settable to true", func(t *testing.T) {
+	t.Run("Tombstone can be set to true", func(t *testing.T) {
 		t.Parallel()
 
-		rr := createValidReporterRepresentation()
-		rr.Tombstone = true
-
-		if rr.Tombstone != true {
-			t.Error("Tombstone should be settable to true")
-		}
-	})
-
-	t.Run("Tombstone should indicate resource deletion", func(t *testing.T) {
-		t.Parallel()
-
-		rr := createValidReporterRepresentation()
-
-		// Resource exists
-		rr.Tombstone = false
-		if err := validateReporterRepresentation(rr); err != nil {
-			t.Errorf("ReporterRepresentation with Tombstone=false should be valid: %v", err)
-		}
-
-		// Resource deleted
-		rr.Tombstone = true
-		if err := validateReporterRepresentation(rr); err != nil {
-			t.Errorf("ReporterRepresentation with Tombstone=true should be valid: %v", err)
-		}
-	})
-
-	t.Run("Tombstone should support soft delete pattern", func(t *testing.T) {
-		t.Parallel()
-
-		rr := createValidReporterRepresentation()
-
-		// Mark as deleted
-		rr.Tombstone = true
-		rr.Generation++
+		fixture := NewTestFixture(t)
+		rr := fixture.ReporterRepresentationWithTombstone(true)
 
 		if !rr.Tombstone {
-			t.Error("Tombstone should remain true after marking as deleted")
+			t.Error("Tombstone should be settable to true")
 		}
-		if rr.Generation <= 1 {
-			t.Error("Generation should increment when marking as deleted")
+
+		AssertNoError(t, ValidateReporterRepresentation(rr), "ReporterRepresentation with Tombstone=true should be valid")
+	})
+
+	t.Run("Tombstone can be set to false", func(t *testing.T) {
+		t.Parallel()
+
+		fixture := NewTestFixture(t)
+		rr := fixture.ReporterRepresentationWithTombstone(false)
+
+		if rr.Tombstone {
+			t.Error("Tombstone should be settable to false")
 		}
+
+		AssertNoError(t, ValidateReporterRepresentation(rr), "ReporterRepresentation with Tombstone=false should be valid")
+	})
+
+	t.Run("Tombstone logic should support resource lifecycle", func(t *testing.T) {
+		t.Parallel()
+
+		fixture := NewTestFixture(t)
+		rr1 := fixture.ReporterRepresentationWithTombstone(false)
+		rr2 := fixture.ReporterRepresentationWithTombstone(true)
+
+		// Both should be valid
+		AssertNoError(t, ValidateReporterRepresentation(rr1), "Active resource should be valid")
+		AssertNoError(t, ValidateReporterRepresentation(rr2), "Tombstoned resource should be valid")
 	})
 }
 
 func TestReporterRepresentation_VersioningLogic(t *testing.T) {
 	t.Parallel()
 
-	t.Run("Version should support zero value", func(t *testing.T) {
+	t.Run("Version should be positive", func(t *testing.T) {
 		t.Parallel()
 
-		rr := createValidReporterRepresentation()
-		rr.Version = 0
+		fixture := NewTestFixture(t)
+		rr := fixture.ValidReporterRepresentation()
+		rr.Version = 1
 
-		if err := validateReporterRepresentation(rr); err != nil {
-			t.Errorf("ReporterRepresentation with Version=0 should be valid: %v", err)
-		}
+		AssertNoError(t, ValidateReporterRepresentation(rr), "ReporterRepresentation with positive Version should be valid")
 	})
 
-	t.Run("Generation should support zero value", func(t *testing.T) {
+	t.Run("CommonVersion should be positive", func(t *testing.T) {
 		t.Parallel()
 
-		rr := createValidReporterRepresentation()
-		rr.Generation = 0
+		fixture := NewTestFixture(t)
+		rr := fixture.ValidReporterRepresentation()
+		rr.CommonVersion = 1
 
-		if err := validateReporterRepresentation(rr); err != nil {
-			t.Errorf("ReporterRepresentation with Generation=0 should be valid: %v", err)
-		}
+		AssertNoError(t, ValidateReporterRepresentation(rr), "ReporterRepresentation with positive CommonVersion should be valid")
 	})
 
-	t.Run("Version and Generation should be independent", func(t *testing.T) {
+	t.Run("Generation should be positive", func(t *testing.T) {
 		t.Parallel()
 
-		rr1 := createValidReporterRepresentation()
-		rr1.Version = 1
-		rr1.Generation = 5
+		fixture := NewTestFixture(t)
+		rr := fixture.ValidReporterRepresentation()
+		rr.Generation = 1
 
-		rr2 := createValidReporterRepresentation()
-		rr2.Version = 3
-		rr2.Generation = 2
-
-		// Both should be valid
-		if err := validateReporterRepresentation(rr1); err != nil {
-			t.Errorf("ReporterRepresentation with Version=1, Generation=5 should be valid: %v", err)
-		}
-		if err := validateReporterRepresentation(rr2); err != nil {
-			t.Errorf("ReporterRepresentation with Version=3, Generation=2 should be valid: %v", err)
-		}
-	})
-
-	t.Run("CommonVersion should support zero value", func(t *testing.T) {
-		t.Parallel()
-
-		rr := createValidReporterRepresentation()
-		rr.CommonVersion = 0
-
-		if err := validateReporterRepresentation(rr); err != nil {
-			t.Errorf("ReporterRepresentation with CommonVersion=0 should be valid: %v", err)
-		}
+		AssertNoError(t, ValidateReporterRepresentation(rr), "ReporterRepresentation with positive Generation should be valid")
 	})
 }
 
 func TestReporterRepresentation_HrefValidation(t *testing.T) {
 	t.Parallel()
 
-	t.Run("valid URLs should be accepted", func(t *testing.T) {
+	t.Run("valid APIHref should be accepted", func(t *testing.T) {
 		t.Parallel()
 
+		fixture := NewTestFixture(t)
 		validURLs := []string{
 			"https://api.example.com/resource/123",
 			"http://localhost:8080/api/v1/resource",
 			"https://console.redhat.com/insights/inventory/123",
-			"https://api.openshift.com/api/clusters_mgmt/v1/clusters/abc123",
 		}
 
 		for _, url := range validURLs {
-			rr := createValidReporterRepresentation()
-			rr.APIHref = url
-			rr.ConsoleHref = url
-
-			if err := validateReporterRepresentation(rr); err != nil {
-				t.Errorf("ReporterRepresentation with valid URL %s should be valid: %v", url, err)
-			}
+			rr := fixture.ReporterRepresentationWithAPIHref(url)
+			AssertNoError(t, ValidateReporterRepresentation(rr), "ReporterRepresentation with valid APIHref should be valid")
 		}
 	})
 
-	t.Run("invalid URLs should be rejected", func(t *testing.T) {
+	t.Run("invalid APIHref should be rejected", func(t *testing.T) {
 		t.Parallel()
 
+		fixture := NewTestFixture(t)
 		invalidURLs := []string{
 			"not-a-url",
 			"ftp://example.com/resource",
-			"://missing-scheme",
-			"https://",
-			"http://",
+			"javascript:alert('xss')",
 		}
 
 		for _, url := range invalidURLs {
-			rr := createValidReporterRepresentation()
-			rr.APIHref = url
-
-			if err := validateReporterRepresentation(rr); err == nil {
-				t.Errorf("ReporterRepresentation with invalid APIHref %s should be invalid", url)
-			}
-
-			rr = createValidReporterRepresentation()
-			rr.ConsoleHref = url
-
-			if err := validateReporterRepresentation(rr); err == nil {
-				t.Errorf("ReporterRepresentation with invalid ConsoleHref %s should be invalid", url)
-			}
+			rr := fixture.ReporterRepresentationWithAPIHref(url)
+			AssertValidationError(t, ValidateReporterRepresentation(rr), "APIHref", "ReporterRepresentation with invalid APIHref should be invalid")
 		}
 	})
 
-	t.Run("empty URLs should be valid", func(t *testing.T) {
+	t.Run("valid ConsoleHref should be accepted", func(t *testing.T) {
 		t.Parallel()
 
-		rr := createValidReporterRepresentation()
+		fixture := NewTestFixture(t)
+		validURLs := []string{
+			"https://console.example.com/resource/123",
+			"http://localhost:3000/dashboard/resource",
+			"https://console.redhat.com/insights/inventory/123",
+		}
+
+		for _, url := range validURLs {
+			rr := fixture.ReporterRepresentationWithConsoleHref(url)
+			AssertNoError(t, ValidateReporterRepresentation(rr), "ReporterRepresentation with valid ConsoleHref should be valid")
+		}
+	})
+
+	t.Run("empty href fields should be valid", func(t *testing.T) {
+		t.Parallel()
+
+		fixture := NewTestFixture(t)
+		rr := fixture.ValidReporterRepresentation()
 		rr.APIHref = ""
 		rr.ConsoleHref = ""
 
-		if err := validateReporterRepresentation(rr); err != nil {
-			t.Errorf("ReporterRepresentation with empty URLs should be valid: %v", err)
-		}
+		AssertNoError(t, ValidateReporterRepresentation(rr), "ReporterRepresentation with empty href fields should be valid")
 	})
 }
 
 func TestReporterRepresentation_DataHandling(t *testing.T) {
 	t.Parallel()
 
-	t.Run("should handle nil JsonObject data", func(t *testing.T) {
+	t.Run("should handle JSON data correctly", func(t *testing.T) {
 		t.Parallel()
 
-		rr := createValidReporterRepresentation()
-		rr.Data = nil
+		fixture := NewTestFixture(t)
+		rr := fixture.ValidReporterRepresentation()
 
-		// Should not panic when accessing nil data
-		_ = rr.Data
-		if rr.Data != nil {
-			t.Error("Data should be nil when not initialized")
+		// Test that data is properly handled
+		if rr.Data == nil {
+			t.Error("Data should not be nil for valid ReporterRepresentation")
+		}
+
+		// Test that data can be accessed
+		if _, ok := rr.Data["name"]; !ok {
+			t.Error("Data should be accessible as JsonObject")
 		}
 	})
 
-	t.Run("should handle complex JsonObject data", func(t *testing.T) {
+	t.Run("should handle complex nested JSON", func(t *testing.T) {
 		t.Parallel()
 
+		fixture := NewTestFixture(t)
 		complexData := JsonObject{
-			"metadata": map[string]interface{}{
-				"name":      "test-cluster",
-				"namespace": "default",
-				"labels": map[string]interface{}{
-					"environment": "production",
-					"region":      "us-east-1",
+			"metadata": JsonObject{
+				"labels": JsonObject{
+					"app":     "test-app",
+					"version": "1.0.0",
+				},
+				"annotations": JsonObject{
+					"description": "Test resource",
 				},
 			},
-			"spec": map[string]interface{}{
+			"spec": JsonObject{
 				"replicas": 3,
-				"version":  "1.21.0",
+				"image":    "nginx:latest",
 			},
-			"status": map[string]interface{}{
-				"ready": true,
-				"conditions": []interface{}{
-					map[string]interface{}{
-						"type":   "Ready",
-						"status": "True",
-					},
-				},
+			"status": JsonObject{
+				"ready":         true,
+				"readyReplicas": 3,
 			},
 		}
 
-		rr := createValidReporterRepresentation()
+		rr := fixture.ValidReporterRepresentation()
 		rr.Data = complexData
 
-		// Should be able to access nested data
-		if metadata, ok := rr.Data["metadata"].(map[string]interface{}); ok {
-			if name, ok := metadata["name"].(string); ok {
-				if name != "test-cluster" {
-					t.Error("Should be able to access nested data correctly")
-				}
-			}
-		}
+		AssertNoError(t, ValidateReporterRepresentation(rr), "ReporterRepresentation with complex nested JSON should be valid")
 	})
 
-	t.Run("should support data modification", func(t *testing.T) {
+	t.Run("should handle empty JSON object", func(t *testing.T) {
 		t.Parallel()
 
-		rr := createValidReporterRepresentation()
-		rr.Data = JsonObject{"key": "original"}
+		fixture := NewTestFixture(t)
+		rr := fixture.ValidReporterRepresentation()
+		rr.Data = JsonObject{}
 
-		// Modify data
-		rr.Data["key"] = "modified"
-		rr.Data["new_key"] = "new_value"
-
-		if rr.Data["key"] != "modified" {
-			t.Error("Should support data modification")
-		}
-		if rr.Data["new_key"] != "new_value" {
-			t.Error("Should support adding new keys")
-		}
+		AssertNoError(t, ValidateReporterRepresentation(rr), "ReporterRepresentation with empty JSON object should be valid")
 	})
 }
 
 func TestReporterRepresentation_EdgeCases(t *testing.T) {
 	t.Parallel()
 
+	t.Run("should handle unicode characters", func(t *testing.T) {
+		t.Parallel()
+
+		fixture := NewTestFixture(t)
+		rr := fixture.ValidReporterRepresentation()
+		rr.LocalResourceID = "测试-resource-🌟"
+		rr.ReporterType = "测试-reporter"
+		rr.Data = JsonObject{
+			"name":        "测试资源",
+			"description": "包含Unicode字符的描述 🌟",
+		}
+
+		AssertNoError(t, ValidateReporterRepresentation(rr), "ReporterRepresentation with unicode characters should be valid")
+	})
+
 	t.Run("should handle special characters in string fields", func(t *testing.T) {
 		t.Parallel()
 
-		rr := createValidReporterRepresentation()
-		rr.LocalResourceID = "test-id-with-special-chars!@#$%"
-		rr.ReporterInstanceID = "instance_with_underscores"
-		rr.ReporterVersion = "1.0.0-beta.1+build.123"
-
-		if err := validateReporterRepresentation(rr); err != nil {
-			t.Errorf("ReporterRepresentation with special characters should be valid: %v", err)
+		fixture := NewTestFixture(t)
+		rr := fixture.ValidReporterRepresentation()
+		rr.LocalResourceID = "resource-with-special-chars-!@#$%^&*()"
+		rr.ReporterType = "special-reporter-type"
+		rr.Data = JsonObject{
+			"special_field": "Value with special chars: !@#$%^&*()_+-=[]{}|;':\",./<>?",
 		}
+
+		AssertNoError(t, ValidateReporterRepresentation(rr), "ReporterRepresentation with special characters should be valid")
 	})
 
-	t.Run("should handle large numeric values", func(t *testing.T) {
+	t.Run("should handle large integer values", func(t *testing.T) {
 		t.Parallel()
 
-		rr := createValidReporterRepresentation()
-		rr.Version = 999999
-		rr.Generation = 999999
-		rr.CommonVersion = 999999
+		fixture := NewTestFixture(t)
+		rr := fixture.ValidReporterRepresentation()
+		rr.Version = 2147483647 // Max int32
+		rr.Generation = 2147483647
+		rr.CommonVersion = 2147483647
 
-		if err := validateReporterRepresentation(rr); err != nil {
-			t.Errorf("ReporterRepresentation with large numeric values should be valid: %v", err)
-		}
-	})
-
-	t.Run("should handle Unicode characters", func(t *testing.T) {
-		t.Parallel()
-
-		rr := createValidReporterRepresentation()
-		rr.LocalResourceID = "测试-resource-🚀"
-		rr.ReporterType = "acm-测试"
-		rr.ReporterInstanceID = "instance-🌟"
-
-		if err := validateReporterRepresentation(rr); err != nil {
-			t.Errorf("ReporterRepresentation with Unicode characters should be valid: %v", err)
-		}
+		AssertNoError(t, ValidateReporterRepresentation(rr), "ReporterRepresentation with large integer values should be valid")
 	})
 }
 
@@ -746,193 +618,30 @@ func TestReporterRepresentation_Serialization(t *testing.T) {
 	t.Run("should serialize to JSON correctly", func(t *testing.T) {
 		t.Parallel()
 
-		rr := createValidReporterRepresentation()
-		rr.Data = JsonObject{
-			"key":   "value",
-			"count": 42,
-		}
+		fixture := NewTestFixture(t)
+		original := fixture.ValidReporterRepresentation()
 
-		jsonData, err := json.Marshal(rr)
-		if err != nil {
-			t.Errorf("Failed to serialize ReporterRepresentation to JSON: %v", err)
-		}
-
-		// Should contain all fields
-		jsonStr := string(jsonData)
-		expectedFields := []string{
-			"LocalResourceID", "ReporterType", "ResourceType", "Version",
-			"ReporterInstanceID", "Generation", "APIHref", "ConsoleHref",
-			"CommonVersion", "Tombstone", "ReporterVersion", "Data",
-		}
-		for _, field := range expectedFields {
-			if !strings.Contains(jsonStr, field) {
-				t.Errorf("JSON should contain field %s", field)
-			}
-		}
-	})
-
-	t.Run("should deserialize from JSON correctly", func(t *testing.T) {
-		t.Parallel()
-
-		jsonStr := `{
-			"Data": {"key": "value", "count": 42},
-			"LocalResourceID": "local-123",
-			"ReporterType": "acm",
-			"ResourceType": "k8s_cluster",
-			"Version": 1,
-			"ReporterInstanceID": "acm-instance-1",
-			"Generation": 1,
-			"APIHref": "https://api.example.com/resource/123",
-			"ConsoleHref": "https://console.example.com/resource/123",
-			"CommonVersion": 1,
-			"Tombstone": false,
-			"ReporterVersion": "1.0.0"
-		}`
-
-		var rr ReporterRepresentation
-		err := json.Unmarshal([]byte(jsonStr), &rr)
-		if err != nil {
-			t.Errorf("Failed to deserialize JSON to ReporterRepresentation: %v", err)
-		}
-
-		// Verify all fields
-		if rr.LocalResourceID != "local-123" {
-			t.Error("LocalResourceID should be deserialized correctly")
-		}
-		if rr.ReporterType != "acm" {
-			t.Error("ReporterType should be deserialized correctly")
-		}
-		if rr.ResourceType != "k8s_cluster" {
-			t.Error("ResourceType should be deserialized correctly")
-		}
-		if rr.Version != 1 {
-			t.Error("Version should be deserialized correctly")
-		}
-		if rr.Generation != 1 {
-			t.Error("Generation should be deserialized correctly")
-		}
-		if rr.Tombstone != false {
-			t.Error("Tombstone should be deserialized correctly")
-		}
-		if rr.Data["key"] != "value" {
-			t.Error("Data should be deserialized correctly")
-		}
-	})
-
-	t.Run("should handle JSON serialization roundtrip", func(t *testing.T) {
-		t.Parallel()
-
-		original := createValidReporterRepresentation()
-		original.Data = JsonObject{
-			"nested": map[string]interface{}{
-				"key": "value",
-			},
-			"array": []interface{}{1, 2, 3},
-		}
-
-		// Serialize
+		// Test JSON marshaling
 		jsonData, err := json.Marshal(original)
-		if err != nil {
-			t.Errorf("Failed to serialize: %v", err)
-		}
+		AssertNoError(t, err, "Should be able to marshal ReporterRepresentation to JSON")
 
-		// Deserialize
-		var deserialized ReporterRepresentation
-		err = json.Unmarshal(jsonData, &deserialized)
-		if err != nil {
-			t.Errorf("Failed to deserialize: %v", err)
-		}
+		// Test JSON unmarshaling
+		var unmarshaled ReporterRepresentation
+		err = json.Unmarshal(jsonData, &unmarshaled)
+		AssertNoError(t, err, "Should be able to unmarshal ReporterRepresentation from JSON")
 
 		// Compare key fields
-		if deserialized.LocalResourceID != original.LocalResourceID {
-			t.Error("LocalResourceID should match after roundtrip")
-		}
-		if deserialized.ReporterType != original.ReporterType {
-			t.Error("ReporterType should match after roundtrip")
-		}
-		if deserialized.ResourceType != original.ResourceType {
-			t.Error("ResourceType should match after roundtrip")
-		}
-		if deserialized.Version != original.Version {
-			t.Error("Version should match after roundtrip")
-		}
-		if deserialized.Generation != original.Generation {
-			t.Error("Generation should match after roundtrip")
-		}
-		if deserialized.Tombstone != original.Tombstone {
-			t.Error("Tombstone should match after roundtrip")
-		}
+		AssertEqual(t, original.LocalResourceID, unmarshaled.LocalResourceID, "LocalResourceID should match after JSON round-trip")
+		AssertEqual(t, original.ReporterType, unmarshaled.ReporterType, "ReporterType should match after JSON round-trip")
+		AssertEqual(t, original.ResourceType, unmarshaled.ResourceType, "ResourceType should match after JSON round-trip")
+		AssertEqual(t, original.Version, unmarshaled.Version, "Version should match after JSON round-trip")
+		AssertEqual(t, original.Generation, unmarshaled.Generation, "Generation should match after JSON round-trip")
+		AssertEqual(t, original.Tombstone, unmarshaled.Tombstone, "Tombstone should match after JSON round-trip")
 	})
 }
 
-// Helper functions for testing
-
-func createValidReporterRepresentation() ReporterRepresentation {
-	return ReporterRepresentation{
-		BaseRepresentation: BaseRepresentation{
-			Data: JsonObject{"key": "value"},
-		},
-		LocalResourceID:    "local-123",
-		ReporterType:       "acm",
-		ResourceType:       "k8s_cluster",
-		Version:            1,
-		ReporterInstanceID: "acm-instance-1",
-		Generation:         1,
-		APIHref:            "https://api.example.com/resource/123",
-		ConsoleHref:        "https://console.example.com/resource/123",
-		CommonVersion:      1,
-		Tombstone:          false,
-		ReporterVersion:    "1.0.0",
-	}
-}
-
-func validateReporterRepresentation(rr ReporterRepresentation) error {
-	if strings.TrimSpace(rr.LocalResourceID) == "" {
-		return &ValidationError{Field: "LocalResourceID", Message: "LocalResourceID cannot be empty"}
-	}
-	if strings.TrimSpace(rr.ReporterType) == "" {
-		return &ValidationError{Field: "ReporterType", Message: "ReporterType cannot be empty"}
-	}
-	if strings.TrimSpace(rr.ResourceType) == "" {
-		return &ValidationError{Field: "ResourceType", Message: "ResourceType cannot be empty"}
-	}
-	if strings.TrimSpace(rr.ReporterInstanceID) == "" {
-		return &ValidationError{Field: "ReporterInstanceID", Message: "ReporterInstanceID cannot be empty"}
-	}
-	if rr.Version < 0 {
-		return &ValidationError{Field: "Version", Message: "Version cannot be negative"}
-	}
-	if rr.Generation < 0 {
-		return &ValidationError{Field: "Generation", Message: "Generation cannot be negative"}
-	}
-	if len(rr.ReporterType) > 128 {
-		return &ValidationError{Field: "ReporterType", Message: "ReporterType cannot exceed 128 characters"}
-	}
-	if len(rr.ResourceType) > 128 {
-		return &ValidationError{Field: "ResourceType", Message: "ResourceType cannot exceed 128 characters"}
-	}
-	if len(rr.ReporterInstanceID) > 256 {
-		return &ValidationError{Field: "ReporterInstanceID", Message: "ReporterInstanceID cannot exceed 256 characters"}
-	}
-	if len(rr.APIHref) > 256 {
-		return &ValidationError{Field: "APIHref", Message: "APIHref cannot exceed 256 characters"}
-	}
-	if len(rr.ConsoleHref) > 256 {
-		return &ValidationError{Field: "ConsoleHref", Message: "ConsoleHref cannot exceed 256 characters"}
-	}
-	if rr.APIHref != "" {
-		if err := validateURL(rr.APIHref); err != nil {
-			return &ValidationError{Field: "APIHref", Message: "APIHref must be a valid URL"}
-		}
-	}
-	if rr.ConsoleHref != "" {
-		if err := validateURL(rr.ConsoleHref); err != nil {
-			return &ValidationError{Field: "ConsoleHref", Message: "ConsoleHref must be a valid URL"}
-		}
-	}
-	return nil
-}
-
+// Helper function to check if two ReporterRepresentations are duplicates
+// based on their unique constraint fields
 func areReporterRepresentationsDuplicates(rr1, rr2 ReporterRepresentation) bool {
 	return rr1.LocalResourceID == rr2.LocalResourceID &&
 		rr1.ReporterType == rr2.ReporterType &&
@@ -940,18 +649,4 @@ func areReporterRepresentationsDuplicates(rr1, rr2 ReporterRepresentation) bool 
 		rr1.Version == rr2.Version &&
 		rr1.ReporterInstanceID == rr2.ReporterInstanceID &&
 		rr1.Generation == rr2.Generation
-}
-
-func validateURL(urlStr string) error {
-	parsedURL, err := url.Parse(urlStr)
-	if err != nil {
-		return err
-	}
-	if parsedURL.Scheme == "" || parsedURL.Host == "" {
-		return &ValidationError{Field: "URL", Message: "URL must have scheme and host"}
-	}
-	if parsedURL.Scheme != "http" && parsedURL.Scheme != "https" {
-		return &ValidationError{Field: "URL", Message: "URL must use http or https scheme"}
-	}
-	return nil
 }

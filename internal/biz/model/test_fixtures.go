@@ -20,16 +20,6 @@ func NewTestFixture(t *testing.T) *TestFixture {
 	return &TestFixture{t: t}
 }
 
-// ValidationError represents a domain validation error
-type ValidationError struct {
-	Field   string
-	Message string
-}
-
-func (e ValidationError) Error() string {
-	return fmt.Sprintf("%s: %s", e.Field, e.Message)
-}
-
 // Common Representation Fixtures
 
 // ValidCommonRepresentation returns a valid CommonRepresentation for testing

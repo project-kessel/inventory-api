@@ -474,10 +474,10 @@ func TestCommonRepresentation_CompositePrimaryKey(t *testing.T) {
 }
 
 func TestCommonRepresentation_FactoryMethods(t *testing.T) {
-	t.Run("should_create_valid_CommonRepresentation_with_specific_ID", func(t *testing.T) {
-		testID := uuid.New()
-		cr, err := NewCommonRepresentationWithID(
-			testID,
+	t.Run("should_create_valid_CommonRepresentation_with_specific_ResourceId", func(t *testing.T) {
+		testResourceId := uuid.New()
+		cr, err := NewCommonRepresentation(
+			testResourceId,
 			JsonObject{"workspace_id": "test-workspace"},
 			"host",
 			1,
@@ -489,8 +489,8 @@ func TestCommonRepresentation_FactoryMethods(t *testing.T) {
 			t.Fatalf("Expected no error, got %v", err)
 		}
 
-		if cr.ResourceId != testID {
-			t.Errorf("Expected ResourceId %s, got %s", testID, cr.ResourceId)
+		if cr.ResourceId != testResourceId {
+			t.Errorf("Expected ResourceId %s, got %s", testResourceId, cr.ResourceId)
 		}
 
 		if cr.ResourceType != "host" {
@@ -503,11 +503,11 @@ func TestCommonRepresentation_FactoryMethods(t *testing.T) {
 	})
 
 	t.Run("should_enforce_validation_rules_in_factory", func(t *testing.T) {
-		testID := uuid.New()
+		testResourceId := uuid.New()
 
 		// Test empty ResourceType
-		_, err := NewCommonRepresentationWithID(
-			testID,
+		_, err := NewCommonRepresentation(
+			testResourceId,
 			JsonObject{"workspace_id": "test-workspace"},
 			"", // empty ResourceType
 			1,
@@ -520,8 +520,8 @@ func TestCommonRepresentation_FactoryMethods(t *testing.T) {
 		}
 
 		// Test zero Version
-		_, err = NewCommonRepresentationWithID(
-			testID,
+		_, err = NewCommonRepresentation(
+			testResourceId,
 			JsonObject{"workspace_id": "test-workspace"},
 			"host",
 			0, // zero Version
@@ -534,8 +534,8 @@ func TestCommonRepresentation_FactoryMethods(t *testing.T) {
 		}
 
 		// Test nil Data
-		_, err = NewCommonRepresentationWithID(
-			testID,
+		_, err = NewCommonRepresentation(
+			testResourceId,
 			nil, // nil Data
 			"host",
 			1,
@@ -548,7 +548,7 @@ func TestCommonRepresentation_FactoryMethods(t *testing.T) {
 		}
 
 		// Test nil UUID
-		_, err = NewCommonRepresentationWithID(
+		_, err = NewCommonRepresentation(
 			uuid.Nil, // nil UUID
 			JsonObject{"workspace_id": "test-workspace"},
 			"host",

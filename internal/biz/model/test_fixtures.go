@@ -37,7 +37,7 @@ func (f *TestFixture) ValidCommonRepresentation() *CommonRepresentation {
 	// Use a deterministic UUID for consistent test results based on real-world data
 	deterministicUUID := uuid.NewSHA1(uuid.NameSpaceOID, []byte("dd1b73b9-3e33-4264-968c-e3ce55b9afec"))
 
-	cr, err := NewCommonRepresentationWithID(
+	cr, err := NewCommonRepresentation(
 		deterministicUUID,
 		JsonObject{
 			"workspace_id": "a64d17d0-aec3-410a-acd0-e0b85b22c076",

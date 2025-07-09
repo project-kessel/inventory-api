@@ -23,11 +23,9 @@ func (CommonRepresentation) TableName() string {
 	return "common_representation"
 }
 
-// NewCommonRepresentationWithID creates a CommonRepresentation with a specific ID
-// This is useful when you need to recreate an existing representation where the ResourceId
-// is not owned by the CommonRepresentation and is generated elsewhere
-func NewCommonRepresentationWithID(
-	id uuid.UUID,
+// NewCommonRepresentation creates a CommonRepresentation
+func NewCommonRepresentation(
+	resourceId uuid.UUID,
 	data JsonObject,
 	resourceType string,
 	version uint,
@@ -38,7 +36,7 @@ func NewCommonRepresentationWithID(
 		BaseRepresentation: BaseRepresentation{
 			Data: data,
 		},
-		ResourceId:                 id,
+		ResourceId:                 resourceId,
 		ResourceType:               resourceType,
 		Version:                    version,
 		ReportedByReporterType:     reportedByReporterType,

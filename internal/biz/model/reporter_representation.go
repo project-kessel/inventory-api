@@ -26,7 +26,7 @@ type ReporterRepresentation struct {
 }
 
 func (ReporterRepresentation) TableName() string {
-	return "reporter_representation"
+	return ReporterRepresentationTableName
 }
 
 // Factory method for creating a new ReporterRepresentation
@@ -70,63 +70,60 @@ func NewReporterRepresentation(
 	return rr, nil
 }
 
-// newReporterRepresentationForTest creates a ReporterRepresentation for testing with all parameters
-// This is unexported and only available to tests via export_test.go
-
 // ValidateReporterRepresentation validates a ReporterRepresentation instance
 // This function is used by both factory methods and tests to ensure consistency
 func ValidateReporterRepresentation(rr *ReporterRepresentation) error {
 	if rr.LocalResourceID == "" || strings.TrimSpace(rr.LocalResourceID) == "" {
 		return ValidationError{Field: "LocalResourceID", Message: "cannot be empty"}
 	}
-	if len(rr.LocalResourceID) > 128 {
-		return ValidationError{Field: "LocalResourceID", Message: "exceeds maximum length of 128 characters"}
+	if len(rr.LocalResourceID) > MaxLocalResourceIDLength {
+		return ValidationError{Field: "LocalResourceID", Message: fmt.Sprintf("exceeds maximum length of %d characters", MaxLocalResourceIDLength)}
 	}
 	if rr.ReporterType == "" || strings.TrimSpace(rr.ReporterType) == "" {
 		return ValidationError{Field: "ReporterType", Message: "cannot be empty"}
 	}
-	if len(rr.ReporterType) > 128 {
-		return ValidationError{Field: "ReporterType", Message: "exceeds maximum length of 128 characters"}
+	if len(rr.ReporterType) > MaxReporterTypeLength {
+		return ValidationError{Field: "ReporterType", Message: fmt.Sprintf("exceeds maximum length of %d characters", MaxReporterTypeLength)}
 	}
 	if rr.ResourceType == "" || strings.TrimSpace(rr.ResourceType) == "" {
 		return ValidationError{Field: "ResourceType", Message: "cannot be empty"}
 	}
-	if len(rr.ResourceType) > 128 {
-		return ValidationError{Field: "ResourceType", Message: "exceeds maximum length of 128 characters"}
+	if len(rr.ResourceType) > MaxResourceTypeLength {
+		return ValidationError{Field: "ResourceType", Message: fmt.Sprintf("exceeds maximum length of %d characters", MaxResourceTypeLength)}
 	}
-	if rr.Version == 0 {
-		return ValidationError{Field: "Version", Message: "must be a positive value"}
+	if rr.Version < MinVersionValue {
+		return ValidationError{Field: "Version", Message: fmt.Sprintf("must be >= %d", MinVersionValue)}
 	}
 	if rr.ReporterInstanceID == "" || strings.TrimSpace(rr.ReporterInstanceID) == "" {
 		return ValidationError{Field: "ReporterInstanceID", Message: "cannot be empty"}
 	}
-	if len(rr.ReporterInstanceID) > 128 {
-		return ValidationError{Field: "ReporterInstanceID", Message: "exceeds maximum length of 128 characters"}
+	if len(rr.ReporterInstanceID) > MaxReporterInstanceIDLength {
+		return ValidationError{Field: "ReporterInstanceID", Message: fmt.Sprintf("exceeds maximum length of %d characters", MaxReporterInstanceIDLength)}
 	}
-	if rr.Generation == 0 {
-		return ValidationError{Field: "Generation", Message: "must be a positive value"}
+	if rr.Generation < MinGenerationValue {
+		return ValidationError{Field: "Generation", Message: fmt.Sprintf("must be >= %d", MinGenerationValue)}
 	}
 	if rr.APIHref != "" {
-		if len(rr.APIHref) > 512 {
-			return ValidationError{Field: "APIHref", Message: "exceeds maximum length of 512 characters"}
+		if len(rr.APIHref) > MaxAPIHrefLength {
+			return ValidationError{Field: "APIHref", Message: fmt.Sprintf("exceeds maximum length of %d characters", MaxAPIHrefLength)}
 		}
 		if err := validateURL(rr.APIHref); err != nil {
 			return ValidationError{Field: "APIHref", Message: err.Error()}
 		}
 	}
 	if rr.ConsoleHref != nil && *rr.ConsoleHref != "" {
-		if len(*rr.ConsoleHref) > 512 {
-			return ValidationError{Field: "ConsoleHref", Message: "exceeds maximum length of 512 characters"}
+		if len(*rr.ConsoleHref) > MaxConsoleHrefLength {
+			return ValidationError{Field: "ConsoleHref", Message: fmt.Sprintf("exceeds maximum length of %d characters", MaxConsoleHrefLength)}
 		}
 		if err := validateURL(*rr.ConsoleHref); err != nil {
 			return ValidationError{Field: "ConsoleHref", Message: err.Error()}
 		}
 	}
-	if rr.CommonVersion == 0 {
-		return ValidationError{Field: "CommonVersion", Message: "must be positive"}
+	if rr.CommonVersion < MinCommonVersion {
+		return ValidationError{Field: "CommonVersion", Message: fmt.Sprintf("must be >= %d", MinCommonVersion)}
 	}
-	if rr.ReporterVersion != nil && len(*rr.ReporterVersion) > 128 {
-		return ValidationError{Field: "ReporterVersion", Message: "exceeds maximum length of 128 characters"}
+	if rr.ReporterVersion != nil && len(*rr.ReporterVersion) > MaxReporterVersionLength {
+		return ValidationError{Field: "ReporterVersion", Message: fmt.Sprintf("exceeds maximum length of %d characters", MaxReporterVersionLength)}
 	}
 	if rr.Data == nil {
 		return ValidationError{Field: "Data", Message: "cannot be nil"}

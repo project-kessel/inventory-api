@@ -20,7 +20,7 @@ type CommonRepresentation struct {
 }
 
 func (CommonRepresentation) TableName() string {
-	return "common_representation"
+	return CommonRepresentationTableName
 }
 
 // NewCommonRepresentation creates a CommonRepresentation
@@ -60,14 +60,23 @@ func ValidateCommonRepresentation(cr *CommonRepresentation) error {
 	if cr.ResourceType == "" {
 		return ValidationError{Field: "ResourceType", Message: "cannot be empty"}
 	}
-	if cr.Version == 0 {
-		return ValidationError{Field: "Version", Message: "must be positive"}
+	if len(cr.ResourceType) > MaxResourceTypeLength {
+		return ValidationError{Field: "ResourceType", Message: fmt.Sprintf("exceeds maximum length of %d characters", MaxResourceTypeLength)}
+	}
+	if cr.Version < MinVersionValue {
+		return ValidationError{Field: "Version", Message: fmt.Sprintf("must be >= %d", MinVersionValue)}
 	}
 	if cr.ReportedByReporterType == "" {
 		return ValidationError{Field: "ReportedByReporterType", Message: "cannot be empty"}
 	}
+	if len(cr.ReportedByReporterType) > MaxReporterTypeLength {
+		return ValidationError{Field: "ReportedByReporterType", Message: fmt.Sprintf("exceeds maximum length of %d characters", MaxReporterTypeLength)}
+	}
 	if cr.ReportedByReporterInstance == "" {
 		return ValidationError{Field: "ReportedByReporterInstance", Message: "cannot be empty"}
+	}
+	if len(cr.ReportedByReporterInstance) > MaxReporterInstanceIDLength {
+		return ValidationError{Field: "ReportedByReporterInstance", Message: fmt.Sprintf("exceeds maximum length of %d characters", MaxReporterInstanceIDLength)}
 	}
 	if cr.Data == nil {
 		return ValidationError{Field: "Data", Message: "cannot be nil"}

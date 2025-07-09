@@ -148,3 +148,29 @@ To stop use:
 ```shell
 make inventory-down
 ```
+
+## Monitoring Stack Only
+
+If you need just the monitoring stack for any other metrics related testing (such as monitoring other dependencies like the Kessel Inventory Consumer or Kessel Kafka Connect), this setup provides just Prometheus, Grafana, and Alertmanager. The Prometheus config includes extra scrape targets for capturing metrics from Kessel Inventory, Kessel Inventory Consumer, and Kessel Kafka Connect, when running locally through localhost or via port-forwarding when deployed in Ephemeral (See related [doc](https://github.com/project-kessel/inventory-consumer/blob/main/README.md#monitoring-in-ephemeral-using-podman-compose))  Grafana is also pre-loaded with the local prometheus data source and loads our current dashboards which were extracted from our [dashboards folder](../../dashboards/)
+
+To start Inventory and the monitoring stack:
+```shell
+make monitoring-only
+```
+
+To stop the monitoring stack:
+```shell
+make monitoring-down
+```
+
+> Note: If it's your first time spinning up Grafana, there is an initial login configured that you'll need to reset.
+> username: `admin`
+> password: `admin`.
+> You will be prompted to reset it afterwards.
+> The local running Prometheus is configured by default as a datasource so no other work is needed other than adding your own dashboards
+
+Grafana URL: http://localhost:3000
+
+Prometheus URL: http://localhost:9050
+
+Alertmanager URL: http://localhost:9093

@@ -71,6 +71,17 @@ services:
       - kessel
     restart: on-failure
 
+  monitoring-only:
+    image: bash:3.1-alpine3.21
+    command: ["echo", "starting monitoring-only"]
+    depends_on:
+    - prometheus
+    - grafana
+    - alertmanager
+    networks:
+      - kessel
+    restart: on-failure
+
 ### Individual services
   inventory-api:
     depends_on:

@@ -42,7 +42,7 @@ func TestCommonRepresentation_Structure(t *testing.T) {
 		t.Parallel()
 		cr := fixture.ValidCommonRepresentation()
 
-		requiredFields := []string{"ID", "ResourceType", "Version", "ReportedByReporterType", "ReportedByReporterInstance"}
+		requiredFields := []string{"ResourceId", "ResourceType", "Version", "ReportedByReporterType", "ReportedByReporterInstance"}
 		crType := reflect.TypeOf(*cr)
 
 		for _, fieldName := range requiredFields {
@@ -57,7 +57,7 @@ func TestCommonRepresentation_Structure(t *testing.T) {
 		t.Parallel()
 		cr := fixture.ValidCommonRepresentation()
 
-		AssertFieldType(t, cr, "ID", reflect.TypeOf(uuid.UUID{}))
+		AssertFieldType(t, cr, "ResourceId", reflect.TypeOf(uuid.UUID{}))
 		AssertFieldType(t, cr, "ResourceType", reflect.TypeOf(""))
 		AssertFieldType(t, cr, "Version", reflect.TypeOf(uint(0)))
 		AssertFieldType(t, cr, "ReportedByReporterType", reflect.TypeOf(""))
@@ -86,7 +86,7 @@ func TestCommonRepresentation_Validation(t *testing.T) {
 				t.Parallel()
 				cr := fixture.CommonRepresentationWithID("")
 				err := ValidateCommonRepresentation(cr)
-				AssertValidationError(t, err, "ID", "Empty ID should fail validation")
+				AssertValidationError(t, err, "ResourceId", "Empty ResourceId should fail validation")
 			},
 			"empty_resource_type": func(t *testing.T) {
 				t.Parallel()
@@ -153,7 +153,7 @@ func TestCommonRepresentation_BusinessRules(t *testing.T) {
 				t.Parallel()
 				cr := fixture.CommonRepresentationWithID("")
 				err := ValidateCommonRepresentation(cr)
-				AssertValidationError(t, err, "ID", "ID should be required")
+				AssertValidationError(t, err, "ResourceId", "ResourceId should be required")
 			},
 			"resource_type_required": func(t *testing.T) {
 				t.Parallel()
@@ -276,7 +276,7 @@ func TestCommonRepresentation_EdgeCases(t *testing.T) {
 		AssertNoError(t, err, "Unicode characters should be valid")
 
 		// UUID should be valid (deterministic based on input)
-		if cr.ID == uuid.Nil {
+		if cr.ResourceId == uuid.Nil {
 			t.Error("Unicode-based UUID should not be nil")
 		}
 	})
@@ -289,7 +289,7 @@ func TestCommonRepresentation_EdgeCases(t *testing.T) {
 		AssertNoError(t, err, "Special characters should be valid")
 
 		// UUID should be valid (deterministic based on input)
-		if cr.ID == uuid.Nil {
+		if cr.ResourceId == uuid.Nil {
 			t.Error("Special-chars-based UUID should not be nil")
 		}
 	})
@@ -355,9 +355,9 @@ func TestCommonRepresentation_GORMTags(t *testing.T) {
 	fixture := NewTestFixture(t)
 	cr := fixture.ValidCommonRepresentation()
 
-	t.Run("id_field_tags", func(t *testing.T) {
+	t.Run("resource_id_field_tags", func(t *testing.T) {
 		t.Parallel()
-		AssertGORMTag(t, cr, "ID", "type:text;column:id;primary_key")
+		AssertGORMTag(t, cr, "ResourceId", "type:text;column:id;primary_key")
 	})
 
 	t.Run("resource_type_field_tags", func(t *testing.T) {
@@ -404,8 +404,8 @@ func TestCommonRepresentation_CompositePrimaryKey(t *testing.T) {
 		err2 := ValidateCommonRepresentation(cr2)
 		AssertNoError(t, err2, "Second version should be valid")
 
-		// They should have the same ID but different versions
-		AssertEqual(t, cr1.ID, cr2.ID, "Both representations should have the same ID")
+		// They should have the same ResourceId but different versions
+		AssertEqual(t, cr1.ResourceId, cr2.ResourceId, "Both representations should have the same ResourceId")
 		AssertNotEqual(t, cr1.Version, cr2.Version, "Representations should have different versions")
 	})
 
@@ -414,11 +414,11 @@ func TestCommonRepresentation_CompositePrimaryKey(t *testing.T) {
 		cr := fixture.ValidCommonRepresentation()
 		crType := reflect.TypeOf(*cr)
 
-		// Check that both ID and Version have primary_key in their GORM tags
-		idField, _ := crType.FieldByName("ID")
-		idTag := idField.Tag.Get("gorm")
-		if !Contains(idTag, "primary_key") {
-			t.Errorf("ID field should have primary_key tag, got: %s", idTag)
+		// Check that both ResourceId and Version have primary_key in their GORM tags
+		resourceIdField, _ := crType.FieldByName("ResourceId")
+		resourceIdTag := resourceIdField.Tag.Get("gorm")
+		if !Contains(resourceIdTag, "primary_key") {
+			t.Errorf("ResourceId field should have primary_key tag, got: %s", resourceIdTag)
 		}
 
 		versionField, _ := crType.FieldByName("Version")
@@ -462,9 +462,9 @@ func TestCommonRepresentation_CompositePrimaryKey(t *testing.T) {
 		AssertNoError(t, ValidateCommonRepresentation(v2), "Version 2 should be valid")
 		AssertNoError(t, ValidateCommonRepresentation(v3), "Version 3 should be valid")
 
-		// All should have the same ID but different versions
-		AssertEqual(t, v1.ID, v2.ID, "V1 and V2 should have same ID")
-		AssertEqual(t, v2.ID, v3.ID, "V2 and V3 should have same ID")
+		// All should have the same ResourceId but different versions
+		AssertEqual(t, v1.ResourceId, v2.ResourceId, "V1 and V2 should have same ResourceId")
+		AssertEqual(t, v2.ResourceId, v3.ResourceId, "V2 and V3 should have same ResourceId")
 
 		// Versions should be different
 		AssertNotEqual(t, v1.Version, v2.Version, "V1 and V2 should have different versions")
@@ -474,35 +474,9 @@ func TestCommonRepresentation_CompositePrimaryKey(t *testing.T) {
 }
 
 func TestCommonRepresentation_FactoryMethods(t *testing.T) {
-	t.Run("should_create_valid_CommonRepresentation_using_factory", func(t *testing.T) {
-		cr, err := NewCommonRepresentation(
-			JsonObject{"workspace_id": "test-workspace"},
-			"host",
-			1,
-			"hbi",
-			"test-instance",
-		)
-
-		if err != nil {
-			t.Fatalf("Expected no error, got %v", err)
-		}
-
-		if cr.ResourceType != "host" {
-			t.Errorf("Expected ResourceType 'host', got '%s'", cr.ResourceType)
-		}
-
-		if cr.Version != 1 {
-			t.Errorf("Expected Version 1, got %d", cr.Version)
-		}
-
-		if cr.ID == uuid.Nil {
-			t.Error("Expected ID to be generated, got nil UUID")
-		}
-	})
-
 	t.Run("should_create_valid_CommonRepresentation_with_specific_ID", func(t *testing.T) {
 		testID := uuid.New()
-		cr, err := newCommonRepresentationWithID(
+		cr, err := NewCommonRepresentationWithID(
 			testID,
 			JsonObject{"workspace_id": "test-workspace"},
 			"host",
@@ -515,14 +489,25 @@ func TestCommonRepresentation_FactoryMethods(t *testing.T) {
 			t.Fatalf("Expected no error, got %v", err)
 		}
 
-		if cr.ID != testID {
-			t.Errorf("Expected ID %s, got %s", testID, cr.ID)
+		if cr.ResourceId != testID {
+			t.Errorf("Expected ResourceId %s, got %s", testID, cr.ResourceId)
+		}
+
+		if cr.ResourceType != "host" {
+			t.Errorf("Expected ResourceType 'host', got '%s'", cr.ResourceType)
+		}
+
+		if cr.Version != 1 {
+			t.Errorf("Expected Version 1, got %d", cr.Version)
 		}
 	})
 
 	t.Run("should_enforce_validation_rules_in_factory", func(t *testing.T) {
+		testID := uuid.New()
+
 		// Test empty ResourceType
-		_, err := NewCommonRepresentation(
+		_, err := NewCommonRepresentationWithID(
+			testID,
 			JsonObject{"workspace_id": "test-workspace"},
 			"", // empty ResourceType
 			1,
@@ -535,7 +520,8 @@ func TestCommonRepresentation_FactoryMethods(t *testing.T) {
 		}
 
 		// Test zero Version
-		_, err = NewCommonRepresentation(
+		_, err = NewCommonRepresentationWithID(
+			testID,
 			JsonObject{"workspace_id": "test-workspace"},
 			"host",
 			0, // zero Version
@@ -548,7 +534,8 @@ func TestCommonRepresentation_FactoryMethods(t *testing.T) {
 		}
 
 		// Test nil Data
-		_, err = NewCommonRepresentation(
+		_, err = NewCommonRepresentationWithID(
+			testID,
 			nil, // nil Data
 			"host",
 			1,
@@ -558,6 +545,20 @@ func TestCommonRepresentation_FactoryMethods(t *testing.T) {
 
 		if err == nil {
 			t.Error("Expected validation error for nil Data")
+		}
+
+		// Test nil UUID
+		_, err = NewCommonRepresentationWithID(
+			uuid.Nil, // nil UUID
+			JsonObject{"workspace_id": "test-workspace"},
+			"host",
+			1,
+			"hbi",
+			"test-instance",
+		)
+
+		if err == nil {
+			t.Error("Expected validation error for nil UUID")
 		}
 	})
 }

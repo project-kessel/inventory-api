@@ -37,7 +37,7 @@ func (f *TestFixture) ValidCommonRepresentation() *CommonRepresentation {
 	// Use a deterministic UUID for consistent test results based on real-world data
 	deterministicUUID := uuid.NewSHA1(uuid.NameSpaceOID, []byte("dd1b73b9-3e33-4264-968c-e3ce55b9afec"))
 
-	cr, err := newCommonRepresentationWithID(
+	cr, err := NewCommonRepresentationWithID(
 		deterministicUUID,
 		JsonObject{
 			"workspace_id": "a64d17d0-aec3-410a-acd0-e0b85b22c076",
@@ -57,14 +57,14 @@ func (f *TestFixture) ValidCommonRepresentation() *CommonRepresentation {
 func (f *TestFixture) CommonRepresentationWithID(id string) *CommonRepresentation {
 	cr := f.ValidCommonRepresentation()
 	if id == "" {
-		cr.ID = uuid.Nil
+		cr.ResourceId = uuid.Nil
 	} else {
 		// Try to parse as UUID, if it fails, generate a deterministic one
 		if parsedUUID, err := uuid.Parse(id); err == nil {
-			cr.ID = parsedUUID
+			cr.ResourceId = parsedUUID
 		} else {
 			// For test cases that pass non-UUID strings, we'll use a deterministic UUID
-			cr.ID = uuid.NewSHA1(uuid.NameSpaceOID, []byte(id))
+			cr.ResourceId = uuid.NewSHA1(uuid.NameSpaceOID, []byte(id))
 		}
 	}
 	return cr
@@ -127,7 +127,7 @@ func (f *TestFixture) MinimalCommonRepresentation() *CommonRepresentation {
 				"workspace_id": "1c0753fe-48c1-44d8-823c-95d04cff5f91",
 			},
 		},
-		ID:                         uuid.NewSHA1(uuid.NameSpaceOID, []byte("cdcebe29-67fb-4ac6-ba03-703a22ff4bc0")),
+		ResourceId:                 uuid.NewSHA1(uuid.NameSpaceOID, []byte("cdcebe29-67fb-4ac6-ba03-703a22ff4bc0")),
 		ResourceType:               "k8s_policy",
 		Version:                    1,
 		ReportedByReporterType:     "ACM",
@@ -143,7 +143,7 @@ func (f *TestFixture) MaximalCommonRepresentation() *CommonRepresentation {
 				"workspace_id": "aee8f698-9d43-49a1-b458-680a7c9dc046",
 			},
 		},
-		ID:                         uuid.NewSHA1(uuid.NameSpaceOID, []byte("ae5c7a82-cb3b-4591-9b10-3ae1506d4f3d")),
+		ResourceId:                 uuid.NewSHA1(uuid.NameSpaceOID, []byte("ae5c7a82-cb3b-4591-9b10-3ae1506d4f3d")),
 		ResourceType:               "k8s_cluster",
 		Version:                    4294967295, // Max uint32
 		ReportedByReporterType:     "ACM",
@@ -163,7 +163,7 @@ func (f *TestFixture) UnicodeCommonRepresentation() *CommonRepresentation {
 				"emoji_data":    "🚀🌟💻🔥⚡",
 			},
 		},
-		ID:                         uuid.NewSHA1(uuid.NameSpaceOID, []byte("测试-id-🌟")),
+		ResourceId:                 uuid.NewSHA1(uuid.NameSpaceOID, []byte("测试-id-🌟")),
 		ResourceType:               "测试-resource-type",
 		Version:                    1,
 		ReportedByReporterType:     "测试-reporter",
@@ -186,7 +186,7 @@ func (f *TestFixture) SpecialCharsCommonRepresentation() *CommonRepresentation {
 				"quotes_mixed":   "\"'`‹›«»",
 			},
 		},
-		ID:                         uuid.NewSHA1(uuid.NameSpaceOID, []byte("special-!@#$%^&*()-id")),
+		ResourceId:                 uuid.NewSHA1(uuid.NameSpaceOID, []byte("special-!@#$%^&*()-id")),
 		ResourceType:               "special-!@#$%^&*()-type",
 		Version:                    1,
 		ReportedByReporterType:     "special-†‡•-reporter",

@@ -357,7 +357,7 @@ func TestCommonRepresentation_GORMTags(t *testing.T) {
 
 	t.Run("resource_id_field_tags", func(t *testing.T) {
 		t.Parallel()
-		AssertGORMTag(t, cr, "ResourceId", "type:text;column:id;primary_key")
+		AssertGORMTag(t, cr, "ResourceId", "type:text;column:id;primaryKey")
 	})
 
 	t.Run("resource_type_field_tags", func(t *testing.T) {
@@ -367,7 +367,7 @@ func TestCommonRepresentation_GORMTags(t *testing.T) {
 
 	t.Run("version_field_tags", func(t *testing.T) {
 		t.Parallel()
-		AssertGORMTag(t, cr, "Version", "type:bigint;column:version;primary_key;check:version > 0")
+		AssertGORMTag(t, cr, "Version", "type:bigint;column:version;primaryKey;check:version > 0")
 	})
 
 	t.Run("reported_by_reporter_type_field_tags", func(t *testing.T) {
@@ -409,22 +409,22 @@ func TestCommonRepresentation_CompositePrimaryKey(t *testing.T) {
 		AssertNotEqual(t, cr1.Version, cr2.Version, "Representations should have different versions")
 	})
 
-	t.Run("composite_primary_key_fields_both_have_primary_key_tag", func(t *testing.T) {
+	t.Run("composite_primary_key_fields_both_have_primaryKey_tag", func(t *testing.T) {
 		t.Parallel()
 		cr := fixture.ValidCommonRepresentation()
 		crType := reflect.TypeOf(*cr)
 
-		// Check that both ResourceId and Version have primary_key in their GORM tags
+		// Check that both ResourceId and Version have primaryKey in their GORM tags
 		resourceIdField, _ := crType.FieldByName("ResourceId")
 		resourceIdTag := resourceIdField.Tag.Get("gorm")
-		if !Contains(resourceIdTag, "primary_key") {
-			t.Errorf("ResourceId field should have primary_key tag, got: %s", resourceIdTag)
+		if !Contains(resourceIdTag, "primaryKey") {
+			t.Errorf("ResourceId field should have primaryKey tag, got: %s", resourceIdTag)
 		}
 
 		versionField, _ := crType.FieldByName("Version")
 		versionTag := versionField.Tag.Get("gorm")
-		if !Contains(versionTag, "primary_key") {
-			t.Errorf("Version field should have primary_key tag, got: %s", versionTag)
+		if !Contains(versionTag, "primaryKey") {
+			t.Errorf("Version field should have primaryKey tag, got: %s", versionTag)
 		}
 	})
 

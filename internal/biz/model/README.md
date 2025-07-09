@@ -53,7 +53,7 @@ Fields are exported for GORM compatibility but with clear usage guidelines:
 ```go
 // Note: Fields are exported for GORM compatibility but should not be modified directly.
 type CommonRepresentation struct {
-    ResourceId uuid.UUID `gorm:"type:text;column:id;primary_key"`
+    ResourceId uuid.UUID `gorm:"type:text;column:id;primaryKey"`
     // ... other fields
 }
 ```
@@ -118,8 +118,8 @@ Models use composite primary keys for versioning and uniqueness:
 
 ```go
 // CommonRepresentation uses ResourceId + Version
-ResourceId uuid.UUID `gorm:"type:text;column:id;primary_key"`
-Version    uint      `gorm:"type:bigint;column:version;primary_key;check:version > 0"`
+ResourceId uuid.UUID `gorm:"type:text;column:id;primaryKey"`
+Version    uint      `gorm:"type:bigint;column:version;primaryKey;check:version > 0"`
 
 // ReporterRepresentation uses a 6-field composite unique index
 LocalResourceID    string `gorm:"size:128;column:local_resource_id;index:reporter_rep_unique_idx,unique"`
@@ -193,8 +193,8 @@ if rr.LocalResourceID == "" || strings.TrimSpace(rr.LocalResourceID) == "" {
 GORM tags designed for multiple database backends:
 
 ```go
-ResourceId uuid.UUID `gorm:"type:text;column:id;primary_key"`  // Works with PostgreSQL and SQLite
-Version    uint      `gorm:"type:bigint;column:version;primary_key;check:version > 0"`
+ResourceId uuid.UUID `gorm:"type:text;column:id;primaryKey"`  // Works with PostgreSQL and SQLite
+Version    uint      `gorm:"type:bigint;column:version;primaryKey;check:version > 0"`
 ```
 
 **Why cross-database compatibility:**

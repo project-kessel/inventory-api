@@ -43,7 +43,7 @@ func indexTag(name string, unique bool) string {
 
 // primaryKeyTag creates a primary key tag
 func primaryKeyTag() string {
-	return "primary_key"
+	return "primaryKey"
 }
 
 // Common GORM tag builders for frequently used combinations

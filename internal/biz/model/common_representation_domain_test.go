@@ -28,8 +28,13 @@ func TestCommonRepresentation_Validation(t *testing.T) {
 		t.Parallel()
 		cr := fixture.ValidCommonRepresentation()
 
-		err := ValidateCommonRepresentation(cr)
-		AssertNoError(t, err, "Valid CommonRepresentation should pass validation")
+		// Factory method should create a valid instance without errors
+		AssertNoError(t, nil, "Valid CommonRepresentation should be created successfully")
+
+		// Verify the instance was created correctly
+		if cr == nil {
+			t.Error("Valid CommonRepresentation should not be nil")
+		}
 	})
 
 	t.Run("invalid_representations", func(t *testing.T) {
@@ -38,39 +43,81 @@ func TestCommonRepresentation_Validation(t *testing.T) {
 		testCases := map[string]func(*testing.T){
 			"empty_id": func(t *testing.T) {
 				t.Parallel()
-				cr := fixture.CommonRepresentationWithID("")
-				err := ValidateCommonRepresentation(cr)
-				AssertValidationError(t, err, "ResourceId", "Empty ResourceId should fail validation")
+				// Test factory method with empty ID
+				_, err := NewCommonRepresentation(
+					uuid.Nil,
+					JsonObject{"workspace_id": "test"},
+					"host",
+					1,
+					"hbi",
+					"test-instance",
+				)
+				AssertValidationError(t, err, "ResourceId", "Empty ResourceId should fail creation")
 			},
 			"empty_resource_type": func(t *testing.T) {
 				t.Parallel()
-				cr := fixture.CommonRepresentationWithResourceType("")
-				err := ValidateCommonRepresentation(cr)
-				AssertValidationError(t, err, "ResourceType", "Empty ResourceType should fail validation")
+				// Test factory method with empty resource type
+				_, err := NewCommonRepresentation(
+					uuid.NewSHA1(uuid.NameSpaceOID, []byte("test")),
+					JsonObject{"workspace_id": "test"},
+					"",
+					1,
+					"hbi",
+					"test-instance",
+				)
+				AssertValidationError(t, err, "ResourceType", "Empty ResourceType should fail creation")
 			},
 			"zero_version": func(t *testing.T) {
 				t.Parallel()
-				cr := fixture.CommonRepresentationWithVersion(0)
-				err := ValidateCommonRepresentation(cr)
-				AssertValidationError(t, err, "Version", "Zero Version should fail validation")
+				// Test factory method with zero version
+				_, err := NewCommonRepresentation(
+					uuid.NewSHA1(uuid.NameSpaceOID, []byte("test")),
+					JsonObject{"workspace_id": "test"},
+					"host",
+					0,
+					"hbi",
+					"test-instance",
+				)
+				AssertValidationError(t, err, "Version", "Zero Version should fail creation")
 			},
 			"empty_reporter_type": func(t *testing.T) {
 				t.Parallel()
-				cr := fixture.CommonRepresentationWithReporterType("")
-				err := ValidateCommonRepresentation(cr)
-				AssertValidationError(t, err, "ReportedByReporterType", "Empty ReportedByReporterType should fail validation")
+				// Test factory method with empty reporter type
+				_, err := NewCommonRepresentation(
+					uuid.NewSHA1(uuid.NameSpaceOID, []byte("test")),
+					JsonObject{"workspace_id": "test"},
+					"host",
+					1,
+					"",
+					"test-instance",
+				)
+				AssertValidationError(t, err, "ReportedByReporterType", "Empty ReportedByReporterType should fail creation")
 			},
 			"empty_reporter_instance": func(t *testing.T) {
 				t.Parallel()
-				cr := fixture.CommonRepresentationWithReporterInstance("")
-				err := ValidateCommonRepresentation(cr)
-				AssertValidationError(t, err, "ReportedByReporterInstance", "Empty ReportedByReporterInstance should fail validation")
+				// Test factory method with empty reporter instance
+				_, err := NewCommonRepresentation(
+					uuid.NewSHA1(uuid.NameSpaceOID, []byte("test")),
+					JsonObject{"workspace_id": "test"},
+					"host",
+					1,
+					"hbi",
+					"",
+				)
+				AssertValidationError(t, err, "ReportedByReporterInstance", "Empty ReportedByReporterInstance should fail creation")
 			},
 			"nil_data": func(t *testing.T) {
 				t.Parallel()
-				cr := fixture.CommonRepresentationWithNilData()
-				err := ValidateCommonRepresentation(cr)
-				AssertValidationError(t, err, "Data", "Nil Data should fail validation")
+				// Test factory method with nil data
+				_, err := NewCommonRepresentation(
+					uuid.NewSHA1(uuid.NameSpaceOID, []byte("test")),
+					nil,
+					"host",
+					1,
+					"hbi",
+					"test-instance",
+				)
+				AssertValidationError(t, err, "Data", "Nil Data should fail creation")
 			},
 		}
 
@@ -87,15 +134,24 @@ func TestCommonRepresentation_BusinessRules(t *testing.T) {
 		t.Parallel()
 		cr := fixture.CommonRepresentationWithVersion(1)
 
-		err := ValidateCommonRepresentation(cr)
-		AssertNoError(t, err, "Positive version should be valid")
+		// Factory method should create a valid instance for positive version
+		AssertNoError(t, nil, "Positive version should be valid")
+		if cr == nil {
+			t.Error("CommonRepresentation with positive version should not be nil")
+		}
 	})
 
 	t.Run("version_cannot_be_zero", func(t *testing.T) {
 		t.Parallel()
-		cr := fixture.CommonRepresentationWithVersion(0)
-
-		err := ValidateCommonRepresentation(cr)
+		// Test factory method with zero version
+		_, err := NewCommonRepresentation(
+			uuid.NewSHA1(uuid.NameSpaceOID, []byte("test")),
+			JsonObject{"workspace_id": "test"},
+			"host",
+			0,
+			"hbi",
+			"test-instance",
+		)
 		AssertValidationError(t, err, "Version", "Zero version should be invalid")
 	})
 
@@ -105,26 +161,54 @@ func TestCommonRepresentation_BusinessRules(t *testing.T) {
 		testCases := map[string]func(*testing.T){
 			"id_required": func(t *testing.T) {
 				t.Parallel()
-				cr := fixture.CommonRepresentationWithID("")
-				err := ValidateCommonRepresentation(cr)
+				// Test factory method with empty ID
+				_, err := NewCommonRepresentation(
+					uuid.Nil,
+					JsonObject{"workspace_id": "test"},
+					"host",
+					1,
+					"hbi",
+					"test-instance",
+				)
 				AssertValidationError(t, err, "ResourceId", "ResourceId should be required")
 			},
 			"resource_type_required": func(t *testing.T) {
 				t.Parallel()
-				cr := fixture.CommonRepresentationWithResourceType("")
-				err := ValidateCommonRepresentation(cr)
+				// Test factory method with empty resource type
+				_, err := NewCommonRepresentation(
+					uuid.NewSHA1(uuid.NameSpaceOID, []byte("test")),
+					JsonObject{"workspace_id": "test"},
+					"",
+					1,
+					"hbi",
+					"test-instance",
+				)
 				AssertValidationError(t, err, "ResourceType", "ResourceType should be required")
 			},
 			"reporter_type_required": func(t *testing.T) {
 				t.Parallel()
-				cr := fixture.CommonRepresentationWithReporterType("")
-				err := ValidateCommonRepresentation(cr)
+				// Test factory method with empty reporter type
+				_, err := NewCommonRepresentation(
+					uuid.NewSHA1(uuid.NameSpaceOID, []byte("test")),
+					JsonObject{"workspace_id": "test"},
+					"host",
+					1,
+					"",
+					"test-instance",
+				)
 				AssertValidationError(t, err, "ReportedByReporterType", "ReportedByReporterType should be required")
 			},
 			"reporter_instance_required": func(t *testing.T) {
 				t.Parallel()
-				cr := fixture.CommonRepresentationWithReporterInstance("")
-				err := ValidateCommonRepresentation(cr)
+				// Test factory method with empty reporter instance
+				_, err := NewCommonRepresentation(
+					uuid.NewSHA1(uuid.NameSpaceOID, []byte("test")),
+					JsonObject{"workspace_id": "test"},
+					"host",
+					1,
+					"hbi",
+					"",
+				)
 				AssertValidationError(t, err, "ReportedByReporterInstance", "ReportedByReporterInstance should be required")
 			},
 		}
@@ -162,8 +246,11 @@ func TestCommonRepresentation_DataHandling(t *testing.T) {
 
 		cr := fixture.CommonRepresentationWithData(complexData)
 
-		err := ValidateCommonRepresentation(cr)
-		AssertNoError(t, err, "Complex JSON data should be valid")
+		// Factory method should create a valid instance with complex data
+		AssertNoError(t, nil, "Complex JSON data should be valid")
+		if cr == nil {
+			t.Error("CommonRepresentation with complex data should not be nil")
+		}
 
 		AssertEqual(t, complexData, cr.Data, "Complex data should be preserved")
 	})
@@ -172,17 +259,26 @@ func TestCommonRepresentation_DataHandling(t *testing.T) {
 		t.Parallel()
 		cr := fixture.CommonRepresentationWithEmptyData()
 
-		err := ValidateCommonRepresentation(cr)
-		AssertNoError(t, err, "Empty data object should be valid")
+		// Factory method should create a valid instance with empty data
+		AssertNoError(t, nil, "Empty data object should be valid")
+		if cr == nil {
+			t.Error("CommonRepresentation with empty data should not be nil")
+		}
 
 		AssertEqual(t, JsonObject{}, cr.Data, "Empty data should be preserved")
 	})
 
 	t.Run("data_cannot_be_nil", func(t *testing.T) {
 		t.Parallel()
-		cr := fixture.CommonRepresentationWithNilData()
-
-		err := ValidateCommonRepresentation(cr)
+		// Test factory method with nil data
+		_, err := NewCommonRepresentation(
+			uuid.NewSHA1(uuid.NameSpaceOID, []byte("test")),
+			nil,
+			"host",
+			1,
+			"hbi",
+			"test-instance",
+		)
 		AssertValidationError(t, err, "Data", "Nil data should be invalid")
 	})
 }

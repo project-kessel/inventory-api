@@ -63,16 +63,16 @@ func NewReporterRepresentation(
 	}
 
 	// Validate the instance
-	if err := ValidateReporterRepresentation(rr); err != nil {
+	if err := validateReporterRepresentation(rr); err != nil {
 		return nil, fmt.Errorf("invalid ReporterRepresentation: %w", err)
 	}
 
 	return rr, nil
 }
 
-// ValidateReporterRepresentation validates a ReporterRepresentation instance
-// This function is used by both factory methods and tests to ensure consistency
-func ValidateReporterRepresentation(rr *ReporterRepresentation) error {
+// validateReporterRepresentation validates a ReporterRepresentation instance
+// This function is used internally by factory methods to ensure consistency
+func validateReporterRepresentation(rr *ReporterRepresentation) error {
 	if rr.LocalResourceID == "" || strings.TrimSpace(rr.LocalResourceID) == "" {
 		return ValidationError{Field: "LocalResourceID", Message: "cannot be empty"}
 	}

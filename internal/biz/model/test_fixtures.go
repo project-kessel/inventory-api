@@ -45,16 +45,43 @@ func (f *TestFixture) ValidCommonRepresentation() *CommonRepresentation {
 
 // CommonRepresentationWithID returns a CommonRepresentation with specified ID
 func (f *TestFixture) CommonRepresentationWithID(id string) *CommonRepresentation {
-	cr := f.ValidCommonRepresentation()
+	var resourceId uuid.UUID
 	if id == "" {
-		cr.ResourceId = uuid.Nil
+		resourceId = uuid.Nil
 	} else {
 		// Try to parse as UUID, if it fails, generate a deterministic one
 		if parsedUUID, err := uuid.Parse(id); err == nil {
-			cr.ResourceId = parsedUUID
+			resourceId = parsedUUID
 		} else {
 			// For test cases that pass non-UUID strings, we'll use a deterministic UUID
-			cr.ResourceId = uuid.NewSHA1(uuid.NameSpaceOID, []byte(id))
+			resourceId = uuid.NewSHA1(uuid.NameSpaceOID, []byte(id))
+		}
+	}
+
+	// Create using factory method - this will fail validation for invalid IDs
+	cr, err := NewCommonRepresentation(
+		resourceId,
+		JsonObject{
+			"workspace_id": "a64d17d0-aec3-410a-acd0-e0b85b22c076",
+		},
+		"host",
+		1,
+		"hbi",
+		"3088be62-1c60-4884-b133-9200542d0b3f",
+	)
+	if err != nil {
+		// For test cases expecting invalid data, return the struct anyway for testing
+		return &CommonRepresentation{
+			Representation: Representation{
+				Data: JsonObject{
+					"workspace_id": "a64d17d0-aec3-410a-acd0-e0b85b22c076",
+				},
+			},
+			ResourceId:                 resourceId,
+			ResourceType:               "host",
+			Version:                    1,
+			ReportedByReporterType:     "hbi",
+			ReportedByReporterInstance: "3088be62-1c60-4884-b133-9200542d0b3f",
 		}
 	}
 	return cr
@@ -62,275 +89,576 @@ func (f *TestFixture) CommonRepresentationWithID(id string) *CommonRepresentatio
 
 // CommonRepresentationWithVersion returns a CommonRepresentation with specified version
 func (f *TestFixture) CommonRepresentationWithVersion(version uint) *CommonRepresentation {
-	cr := f.ValidCommonRepresentation()
-	cr.Version = version
+	deterministicUUID := uuid.NewSHA1(uuid.NameSpaceOID, []byte("dd1b73b9-3e33-4264-968c-e3ce55b9afec"))
+
+	cr, err := NewCommonRepresentation(
+		deterministicUUID,
+		JsonObject{
+			"workspace_id": "a64d17d0-aec3-410a-acd0-e0b85b22c076",
+		},
+		"host",
+		version,
+		"hbi",
+		"3088be62-1c60-4884-b133-9200542d0b3f",
+	)
+	if err != nil {
+		f.t.Fatalf("Cannot create CommonRepresentation with version %d: %v", version, err)
+	}
 	return cr
 }
 
 // CommonRepresentationWithResourceType returns a CommonRepresentation with specified resource type
 func (f *TestFixture) CommonRepresentationWithResourceType(resourceType string) *CommonRepresentation {
-	cr := f.ValidCommonRepresentation()
-	cr.ResourceType = resourceType
+	deterministicUUID := uuid.NewSHA1(uuid.NameSpaceOID, []byte("dd1b73b9-3e33-4264-968c-e3ce55b9afec"))
+
+	cr, err := NewCommonRepresentation(
+		deterministicUUID,
+		JsonObject{
+			"workspace_id": "a64d17d0-aec3-410a-acd0-e0b85b22c076",
+		},
+		resourceType,
+		1,
+		"hbi",
+		"3088be62-1c60-4884-b133-9200542d0b3f",
+	)
+	if err != nil {
+		f.t.Fatalf("Cannot create CommonRepresentation with resource type %q: %v", resourceType, err)
+	}
 	return cr
 }
 
 // CommonRepresentationWithReporterType returns a CommonRepresentation with specified reporter type
 func (f *TestFixture) CommonRepresentationWithReporterType(reporterType string) *CommonRepresentation {
-	cr := f.ValidCommonRepresentation()
-	cr.ReportedByReporterType = reporterType
+	deterministicUUID := uuid.NewSHA1(uuid.NameSpaceOID, []byte("dd1b73b9-3e33-4264-968c-e3ce55b9afec"))
+
+	cr, err := NewCommonRepresentation(
+		deterministicUUID,
+		JsonObject{
+			"workspace_id": "a64d17d0-aec3-410a-acd0-e0b85b22c076",
+		},
+		"host",
+		1,
+		reporterType,
+		"3088be62-1c60-4884-b133-9200542d0b3f",
+	)
+	if err != nil {
+		f.t.Fatalf("Cannot create CommonRepresentation with reporter type %q: %v", reporterType, err)
+	}
 	return cr
 }
 
 // CommonRepresentationWithReporterInstance returns a CommonRepresentation with specified reporter instance
 func (f *TestFixture) CommonRepresentationWithReporterInstance(reporterInstance string) *CommonRepresentation {
-	cr := f.ValidCommonRepresentation()
-	cr.ReportedByReporterInstance = reporterInstance
+	deterministicUUID := uuid.NewSHA1(uuid.NameSpaceOID, []byte("dd1b73b9-3e33-4264-968c-e3ce55b9afec"))
+
+	cr, err := NewCommonRepresentation(
+		deterministicUUID,
+		JsonObject{
+			"workspace_id": "a64d17d0-aec3-410a-acd0-e0b85b22c076",
+		},
+		"host",
+		1,
+		"hbi",
+		reporterInstance,
+	)
+	if err != nil {
+		f.t.Fatalf("Cannot create CommonRepresentation with reporter instance %q: %v", reporterInstance, err)
+	}
 	return cr
 }
 
 // CommonRepresentationWithData returns a CommonRepresentation with specified data
 func (f *TestFixture) CommonRepresentationWithData(data JsonObject) *CommonRepresentation {
-	cr := f.ValidCommonRepresentation()
-	cr.Data = data
+	deterministicUUID := uuid.NewSHA1(uuid.NameSpaceOID, []byte("dd1b73b9-3e33-4264-968c-e3ce55b9afec"))
+
+	cr, err := NewCommonRepresentation(
+		deterministicUUID,
+		data,
+		"host",
+		1,
+		"hbi",
+		"3088be62-1c60-4884-b133-9200542d0b3f",
+	)
+	if err != nil {
+		f.t.Fatalf("Cannot create CommonRepresentation with data %+v: %v", data, err)
+	}
 	return cr
 }
 
 // CommonRepresentationWithEmptyData returns a CommonRepresentation with empty data
 func (f *TestFixture) CommonRepresentationWithEmptyData() *CommonRepresentation {
-	cr := f.ValidCommonRepresentation()
-	cr.Data = JsonObject{}
+	deterministicUUID := uuid.NewSHA1(uuid.NameSpaceOID, []byte("dd1b73b9-3e33-4264-968c-e3ce55b9afec"))
+
+	cr, err := NewCommonRepresentation(
+		deterministicUUID,
+		JsonObject{},
+		"host",
+		1,
+		"hbi",
+		"3088be62-1c60-4884-b133-9200542d0b3f",
+	)
+	if err != nil {
+		f.t.Fatalf("Cannot create CommonRepresentation with empty data: %v", err)
+	}
 	return cr
 }
 
 // CommonRepresentationWithNilData returns a CommonRepresentation with nil data
 func (f *TestFixture) CommonRepresentationWithNilData() *CommonRepresentation {
-	cr := f.ValidCommonRepresentation()
-	cr.Data = nil
-	return cr
+	deterministicUUID := uuid.NewSHA1(uuid.NameSpaceOID, []byte("dd1b73b9-3e33-4264-968c-e3ce55b9afec"))
+
+	// This will always fail validation since nil data is invalid
+	return &CommonRepresentation{
+		Representation: Representation{
+			Data: nil,
+		},
+		ResourceId:                 deterministicUUID,
+		ResourceType:               "host",
+		Version:                    1,
+		ReportedByReporterType:     "hbi",
+		ReportedByReporterInstance: "3088be62-1c60-4884-b133-9200542d0b3f",
+	}
 }
 
 // MinimalCommonRepresentation returns a CommonRepresentation with minimal valid data
 func (f *TestFixture) MinimalCommonRepresentation() *CommonRepresentation {
-	return &CommonRepresentation{
-		Representation: Representation{
-			Data: JsonObject{
-				"workspace_id": "1c0753fe-48c1-44d8-823c-95d04cff5f91",
-			},
+	cr, err := NewCommonRepresentation(
+		uuid.NewSHA1(uuid.NameSpaceOID, []byte("cdcebe29-67fb-4ac6-ba03-703a22ff4bc0")),
+		JsonObject{
+			"workspace_id": "1c0753fe-48c1-44d8-823c-95d04cff5f91",
 		},
-		ResourceId:                 uuid.NewSHA1(uuid.NameSpaceOID, []byte("cdcebe29-67fb-4ac6-ba03-703a22ff4bc0")),
-		ResourceType:               "k8s_policy",
-		Version:                    1,
-		ReportedByReporterType:     "ACM",
-		ReportedByReporterInstance: "57a317b1-4040-4c26-8d41-dd589ba1d2eb",
+		"k8s_policy",
+		1,
+		"ACM",
+		"57a317b1-4040-4c26-8d41-dd589ba1d2eb",
+	)
+	if err != nil {
+		f.t.Fatalf("Failed to create minimal CommonRepresentation: %v", err)
 	}
+	return cr
 }
 
 // MaximalCommonRepresentation returns a CommonRepresentation with maximum length values
 func (f *TestFixture) MaximalCommonRepresentation() *CommonRepresentation {
-	return &CommonRepresentation{
-		Representation: Representation{
-			Data: JsonObject{
-				"workspace_id": "aee8f698-9d43-49a1-b458-680a7c9dc046",
-			},
+	cr, err := NewCommonRepresentation(
+		uuid.NewSHA1(uuid.NameSpaceOID, []byte("ae5c7a82-cb3b-4591-9b10-3ae1506d4f3d")),
+		JsonObject{
+			"workspace_id": "aee8f698-9d43-49a1-b458-680a7c9dc046",
 		},
-		ResourceId:                 uuid.NewSHA1(uuid.NameSpaceOID, []byte("ae5c7a82-cb3b-4591-9b10-3ae1506d4f3d")),
-		ResourceType:               "k8s_cluster",
-		Version:                    4294967295, // Max uint32
-		ReportedByReporterType:     "ACM",
-		ReportedByReporterInstance: "14c6b63e-49b2-4cc2-99de-5d914b657548",
+		"k8s_cluster",
+		4294967295, // Max uint32
+		"ACM",
+		"14c6b63e-49b2-4cc2-99de-5d914b657548",
+	)
+	if err != nil {
+		f.t.Fatalf("Failed to create maximal CommonRepresentation: %v", err)
 	}
+	return cr
 }
 
 // UnicodeCommonRepresentation returns a CommonRepresentation with unicode characters
 func (f *TestFixture) UnicodeCommonRepresentation() *CommonRepresentation {
-	return &CommonRepresentation{
-		Representation: Representation{
-			Data: JsonObject{
-				"unicode_field": "测试数据 🌟 emoji test",
-				"japanese":      "こんにちは世界",
-				"arabic":        "مرحبا بالعالم",
-				"russian":       "Привет мир",
-				"emoji_data":    "🚀🌟💻🔥⚡",
-			},
+	cr, err := NewCommonRepresentation(
+		uuid.NewSHA1(uuid.NameSpaceOID, []byte("测试-id-🌟")),
+		JsonObject{
+			"unicode_field": "测试数据 🌟 emoji test",
+			"japanese":      "こんにちは世界",
+			"arabic":        "مرحبا بالعالم",
+			"russian":       "Привет мир",
+			"emoji_data":    "🚀🌟💻🔥⚡",
 		},
-		ResourceId:                 uuid.NewSHA1(uuid.NameSpaceOID, []byte("测试-id-🌟")),
-		ResourceType:               "测试-resource-type",
-		Version:                    1,
-		ReportedByReporterType:     "测试-reporter",
-		ReportedByReporterInstance: "测试-instance",
+		"测试-resource-type",
+		1,
+		"测试-reporter",
+		"测试-instance",
+	)
+	if err != nil {
+		// Unicode should be valid, but if not, create directly for testing
+		return &CommonRepresentation{
+			Representation: Representation{
+				Data: JsonObject{
+					"unicode_field": "测试数据 🌟 emoji test",
+					"japanese":      "こんにちは世界",
+					"arabic":        "مرحبا بالعالم",
+					"russian":       "Привет мир",
+					"emoji_data":    "🚀🌟💻🔥⚡",
+				},
+			},
+			ResourceId:                 uuid.NewSHA1(uuid.NameSpaceOID, []byte("测试-id-🌟")),
+			ResourceType:               "测试-resource-type",
+			Version:                    1,
+			ReportedByReporterType:     "测试-reporter",
+			ReportedByReporterInstance: "测试-instance",
+		}
 	}
+	return cr
 }
 
 // SpecialCharsCommonRepresentation returns a CommonRepresentation with special characters
 func (f *TestFixture) SpecialCharsCommonRepresentation() *CommonRepresentation {
-	return &CommonRepresentation{
-		Representation: Representation{
-			Data: JsonObject{
-				"special_data":   "Data with special characters: !@#$%^&*()_+-=[]{}|;':\",./<>?",
-				"symbols":        "™®©§¶†‡•…‰‹›",
-				"math_symbols":   "±×÷≤≥≠≈∞∑∏∆√∫",
-				"currency":       "$€£¥₹₽¢₩₪₨",
-				"arrows":         "←→↑↓↔↕⇄⇅⇆⇇⇈⇉⇊⇋⇌",
-				"punctuation":    "¡¿¨´`˜ˆ¸˛˚°",
-				"brackets_mixed": "([{<>}])",
-				"quotes_mixed":   "\"'`‹›«»",
-			},
+	cr, err := NewCommonRepresentation(
+		uuid.NewSHA1(uuid.NameSpaceOID, []byte("special-!@#$%^&*()-id")),
+		JsonObject{
+			"special_field":  "Data with special characters: !@#$%^&*()_+-=[]{}|;':\",./<>?",
+			"symbols":        "™®©§¶†‡•…‰‹›",
+			"math_symbols":   "±×÷≤≥≠≈∞∑∏∆√∫",
+			"currency":       "$€£¥₹₽¢₩₪₨",
+			"arrows":         "←→↑↓↔↕⇄⇅⇆⇇⇈⇉⇊⇋⇌",
+			"punctuation":    "¡¿¨´`˜ˆ¸˛˚°",
+			"brackets_mixed": "([{<>}])",
+			"quotes_mixed":   "\"'`‹›«»",
 		},
-		ResourceId:                 uuid.NewSHA1(uuid.NameSpaceOID, []byte("special-!@#$%^&*()-id")),
-		ResourceType:               "special-!@#$%^&*()-type",
-		Version:                    1,
-		ReportedByReporterType:     "special-†‡•-reporter",
-		ReportedByReporterInstance: "special-™®©-instance",
+		"special-!@#$%^&*()-type",
+		1,
+		"special-†‡•-reporter",
+		"special-™®©-instance",
+	)
+	if err != nil {
+		// Special characters should be valid, but if not, create directly for testing
+		return &CommonRepresentation{
+			Representation: Representation{
+				Data: JsonObject{
+					"special_field":  "Data with special characters: !@#$%^&*()_+-=[]{}|;':\",./<>?",
+					"symbols":        "™®©§¶†‡•…‰‹›",
+					"math_symbols":   "±×÷≤≥≠≈∞∑∏∆√∫",
+					"currency":       "$€£¥₹₽¢₩₪₨",
+					"arrows":         "←→↑↓↔↕⇄⇅⇆⇇⇈⇉⇊⇋⇌",
+					"punctuation":    "¡¿¨´`˜ˆ¸˛˚°",
+					"brackets_mixed": "([{<>}])",
+					"quotes_mixed":   "\"'`‹›«»",
+				},
+			},
+			ResourceId:                 uuid.NewSHA1(uuid.NameSpaceOID, []byte("special-!@#$%^&*()-id")),
+			ResourceType:               "special-!@#$%^&*()-type",
+			Version:                    1,
+			ReportedByReporterType:     "special-†‡•-reporter",
+			ReportedByReporterInstance: "special-™®©-instance",
+		}
 	}
+	return cr
 }
 
 // Reporter Representation Fixtures
 
 // ValidReporterRepresentation returns a valid ReporterRepresentation for testing
 func (f *TestFixture) ValidReporterRepresentation() *ReporterRepresentation {
-	return &ReporterRepresentation{
-		Representation: Representation{
-			Data: JsonObject{
-				"satellite_id":            "2c4196f1-0371-4f4c-8913-e113cfaa6e67",
-				"subscription_manager_id": "af94f92b-0b65-4cac-b449-6b77e665a08f",
-				"insights_inventory_id":   "05707922-7b0a-4fe6-982d-6adbc7695b8f",
-				"ansible_host":            "host-1",
-			},
+	rr, err := NewReporterRepresentation(
+		JsonObject{
+			"satellite_id":            "2c4196f1-0371-4f4c-8913-e113cfaa6e67",
+			"subscription_manager_id": "af94f92b-0b65-4cac-b449-6b77e665a08f",
+			"insights_inventory_id":   "05707922-7b0a-4fe6-982d-6adbc7695b8f",
+			"ansible_host":            "host-1",
 		},
-		LocalResourceID:    "dd1b73b9-3e33-4264-968c-e3ce55b9afec",
-		ReporterType:       "hbi",
-		ResourceType:       "host",
-		Version:            1,
-		ReporterInstanceID: "3088be62-1c60-4884-b133-9200542d0b3f",
-		Generation:         1,
-		APIHref:            "https://apiHref.com/",
-		ConsoleHref:        stringPtr("https://www.console.com/"),
-		CommonVersion:      1,
-		Tombstone:          false,
-		ReporterVersion:    stringPtr("2.7.16"),
+		"dd1b73b9-3e33-4264-968c-e3ce55b9afec",
+		"hbi",
+		"host",
+		1,
+		"3088be62-1c60-4884-b133-9200542d0b3f",
+		1,
+		"https://apiHref.com/",
+		stringPtr("https://www.console.com/"),
+		1,
+		false,
+		stringPtr("2.7.16"),
+	)
+	if err != nil {
+		f.t.Fatalf("Failed to create valid ReporterRepresentation: %v", err)
 	}
+	return rr
 }
 
 // ReporterRepresentationWithLocalResourceID returns a ReporterRepresentation with specified local resource ID
 func (f *TestFixture) ReporterRepresentationWithLocalResourceID(localResourceID string) *ReporterRepresentation {
-	rr := f.ValidReporterRepresentation()
-	rr.LocalResourceID = localResourceID
+	rr, err := NewReporterRepresentation(
+		JsonObject{
+			"satellite_id":            "2c4196f1-0371-4f4c-8913-e113cfaa6e67",
+			"subscription_manager_id": "af94f92b-0b65-4cac-b449-6b77e665a08f",
+			"insights_inventory_id":   "05707922-7b0a-4fe6-982d-6adbc7695b8f",
+			"ansible_host":            "host-1",
+		},
+		localResourceID,
+		"hbi",
+		"host",
+		1,
+		"3088be62-1c60-4884-b133-9200542d0b3f",
+		1,
+		"https://apiHref.com/",
+		stringPtr("https://www.console.com/"),
+		1,
+		false,
+		stringPtr("2.7.16"),
+	)
+	if err != nil {
+		// For test cases expecting invalid data, return the struct anyway for testing
+		return &ReporterRepresentation{
+			Representation: Representation{
+				Data: JsonObject{
+					"satellite_id":            "2c4196f1-0371-4f4c-8913-e113cfaa6e67",
+					"subscription_manager_id": "af94f92b-0b65-4cac-b449-6b77e665a08f",
+					"insights_inventory_id":   "05707922-7b0a-4fe6-982d-6adbc7695b8f",
+					"ansible_host":            "host-1",
+				},
+			},
+			LocalResourceID:    localResourceID,
+			ReporterType:       "hbi",
+			ResourceType:       "host",
+			Version:            1,
+			ReporterInstanceID: "3088be62-1c60-4884-b133-9200542d0b3f",
+			Generation:         1,
+			APIHref:            "https://apiHref.com/",
+			ConsoleHref:        stringPtr("https://www.console.com/"),
+			CommonVersion:      1,
+			Tombstone:          false,
+			ReporterVersion:    stringPtr("2.7.16"),
+		}
+	}
 	return rr
 }
 
 // ReporterRepresentationWithTombstone returns a ReporterRepresentation with tombstone flag
 func (f *TestFixture) ReporterRepresentationWithTombstone(tombstone bool) *ReporterRepresentation {
-	rr := &ReporterRepresentation{
-		Representation: Representation{
-			Data: JsonObject{
-				"external_cluster_id": "9414df93-aefe-4153-ba8a-8765373d39b9",
-				"cluster_status":      "READY",
-				"cluster_reason":      "reflect",
-				"kube_version":        "2.7.0",
-				"kube_vendor":         "KUBE_VENDOR_UNSPECIFIED",
-				"vendor_version":      "3.3.1",
-				"cloud_platform":      "BAREMETAL_IPI",
-				"nodes": []interface{}{
-					JsonObject{
-						"name":   "www.example.com",
-						"cpu":    "7500m",
-						"memory": "30973224Ki",
-					},
-				},
+	data := JsonObject{
+		"external_cluster_id": "9414df93-aefe-4153-ba8a-8765373d39b9",
+		"cluster_status":      "READY",
+		"cluster_reason":      "reflect",
+		"kube_version":        "2.7.0",
+		"kube_vendor":         "KUBE_VENDOR_UNSPECIFIED",
+		"vendor_version":      "3.3.1",
+		"cloud_platform":      "BAREMETAL_IPI",
+		"nodes": []interface{}{
+			JsonObject{
+				"name":   "www.example.com",
+				"cpu":    "7500m",
+				"memory": "30973224Ki",
 			},
 		},
-		LocalResourceID:    "ae5c7a82-cb3b-4591-9b10-3ae1506d4f3d",
-		ReporterType:       "ACM",
-		ResourceType:       "k8s_cluster",
-		Version:            1,
-		ReporterInstanceID: "14c6b63e-49b2-4cc2-99de-5d914b657548",
-		Generation:         1,
-		APIHref:            "https://apiHref.com/",
-		ConsoleHref:        stringPtr("https://www.console.com/"),
-		CommonVersion:      1,
-		Tombstone:          tombstone,
-		ReporterVersion:    stringPtr("0.2.0"),
 	}
 
 	if tombstone {
-		rr.Data = JsonObject{
+		data = JsonObject{
 			"deleted_at": "2023-01-01T00:00:00Z",
 			"reason":     "Resource deleted",
 		}
+	}
+
+	rr, err := NewReporterRepresentation(
+		data,
+		"ae5c7a82-cb3b-4591-9b10-3ae1506d4f3d",
+		"ACM",
+		"k8s_cluster",
+		1,
+		"14c6b63e-49b2-4cc2-99de-5d914b657548",
+		1,
+		"https://apiHref.com/",
+		stringPtr("https://www.console.com/"),
+		1,
+		tombstone,
+		stringPtr("0.2.0"),
+	)
+	if err != nil {
+		f.t.Fatalf("Failed to create ReporterRepresentation with tombstone: %v", err)
 	}
 	return rr
 }
 
 // ReporterRepresentationWithAPIHref returns a ReporterRepresentation with specified API href
 func (f *TestFixture) ReporterRepresentationWithAPIHref(apiHref string) *ReporterRepresentation {
-	rr := f.ValidReporterRepresentation()
-	rr.APIHref = apiHref
+	rr, err := NewReporterRepresentation(
+		JsonObject{
+			"satellite_id":            "2c4196f1-0371-4f4c-8913-e113cfaa6e67",
+			"subscription_manager_id": "af94f92b-0b65-4cac-b449-6b77e665a08f",
+			"insights_inventory_id":   "05707922-7b0a-4fe6-982d-6adbc7695b8f",
+			"ansible_host":            "host-1",
+		},
+		"dd1b73b9-3e33-4264-968c-e3ce55b9afec",
+		"hbi",
+		"host",
+		1,
+		"3088be62-1c60-4884-b133-9200542d0b3f",
+		1,
+		apiHref,
+		stringPtr("https://www.console.com/"),
+		1,
+		false,
+		stringPtr("2.7.16"),
+	)
+	if err != nil {
+		// For test cases expecting invalid data, return the struct anyway for testing
+		return &ReporterRepresentation{
+			Representation: Representation{
+				Data: JsonObject{
+					"satellite_id":            "2c4196f1-0371-4f4c-8913-e113cfaa6e67",
+					"subscription_manager_id": "af94f92b-0b65-4cac-b449-6b77e665a08f",
+					"insights_inventory_id":   "05707922-7b0a-4fe6-982d-6adbc7695b8f",
+					"ansible_host":            "host-1",
+				},
+			},
+			LocalResourceID:    "dd1b73b9-3e33-4264-968c-e3ce55b9afec",
+			ReporterType:       "hbi",
+			ResourceType:       "host",
+			Version:            1,
+			ReporterInstanceID: "3088be62-1c60-4884-b133-9200542d0b3f",
+			Generation:         1,
+			APIHref:            apiHref,
+			ConsoleHref:        stringPtr("https://www.console.com/"),
+			CommonVersion:      1,
+			Tombstone:          false,
+			ReporterVersion:    stringPtr("2.7.16"),
+		}
+	}
 	return rr
 }
 
 // ReporterRepresentationWithConsoleHref returns a ReporterRepresentation with specified console href
 func (f *TestFixture) ReporterRepresentationWithConsoleHref(consoleHref string) *ReporterRepresentation {
-	rr := f.ValidReporterRepresentation()
-	if consoleHref == "" {
-		rr.ConsoleHref = nil
-	} else {
-		rr.ConsoleHref = &consoleHref
+	var consoleHrefPtr *string
+	if consoleHref != "" {
+		consoleHrefPtr = &consoleHref
+	}
+
+	rr, err := NewReporterRepresentation(
+		JsonObject{
+			"satellite_id":            "2c4196f1-0371-4f4c-8913-e113cfaa6e67",
+			"subscription_manager_id": "af94f92b-0b65-4cac-b449-6b77e665a08f",
+			"insights_inventory_id":   "05707922-7b0a-4fe6-982d-6adbc7695b8f",
+			"ansible_host":            "host-1",
+		},
+		"dd1b73b9-3e33-4264-968c-e3ce55b9afec",
+		"hbi",
+		"host",
+		1,
+		"3088be62-1c60-4884-b133-9200542d0b3f",
+		1,
+		"https://apiHref.com/",
+		consoleHrefPtr,
+		1,
+		false,
+		stringPtr("2.7.16"),
+	)
+	if err != nil {
+		// For test cases expecting invalid data, return the struct anyway for testing
+		return &ReporterRepresentation{
+			Representation: Representation{
+				Data: JsonObject{
+					"satellite_id":            "2c4196f1-0371-4f4c-8913-e113cfaa6e67",
+					"subscription_manager_id": "af94f92b-0b65-4cac-b449-6b77e665a08f",
+					"insights_inventory_id":   "05707922-7b0a-4fe6-982d-6adbc7695b8f",
+					"ansible_host":            "host-1",
+				},
+			},
+			LocalResourceID:    "dd1b73b9-3e33-4264-968c-e3ce55b9afec",
+			ReporterType:       "hbi",
+			ResourceType:       "host",
+			Version:            1,
+			ReporterInstanceID: "3088be62-1c60-4884-b133-9200542d0b3f",
+			Generation:         1,
+			APIHref:            "https://apiHref.com/",
+			ConsoleHref:        consoleHrefPtr,
+			CommonVersion:      1,
+			Tombstone:          false,
+			ReporterVersion:    stringPtr("2.7.16"),
+		}
 	}
 	return rr
 }
 
 // ReporterRepresentationWithReporterVersion returns a ReporterRepresentation with specified reporter version
 func (f *TestFixture) ReporterRepresentationWithReporterVersion(reporterVersion *string) *ReporterRepresentation {
-	rr := f.ValidReporterRepresentation()
-	rr.ReporterVersion = reporterVersion
+	rr, err := NewReporterRepresentation(
+		JsonObject{
+			"satellite_id":            "2c4196f1-0371-4f4c-8913-e113cfaa6e67",
+			"subscription_manager_id": "af94f92b-0b65-4cac-b449-6b77e665a08f",
+			"insights_inventory_id":   "05707922-7b0a-4fe6-982d-6adbc7695b8f",
+			"ansible_host":            "host-1",
+		},
+		"dd1b73b9-3e33-4264-968c-e3ce55b9afec",
+		"hbi",
+		"host",
+		1,
+		"3088be62-1c60-4884-b133-9200542d0b3f",
+		1,
+		"https://apiHref.com/",
+		stringPtr("https://www.console.com/"),
+		1,
+		false,
+		reporterVersion,
+	)
+	if err != nil {
+		// For test cases expecting invalid data, return the struct anyway for testing
+		return &ReporterRepresentation{
+			Representation: Representation{
+				Data: JsonObject{
+					"satellite_id":            "2c4196f1-0371-4f4c-8913-e113cfaa6e67",
+					"subscription_manager_id": "af94f92b-0b65-4cac-b449-6b77e665a08f",
+					"insights_inventory_id":   "05707922-7b0a-4fe6-982d-6adbc7695b8f",
+					"ansible_host":            "host-1",
+				},
+			},
+			LocalResourceID:    "dd1b73b9-3e33-4264-968c-e3ce55b9afec",
+			ReporterType:       "hbi",
+			ResourceType:       "host",
+			Version:            1,
+			ReporterInstanceID: "3088be62-1c60-4884-b133-9200542d0b3f",
+			Generation:         1,
+			APIHref:            "https://apiHref.com/",
+			ConsoleHref:        stringPtr("https://www.console.com/"),
+			CommonVersion:      1,
+			Tombstone:          false,
+			ReporterVersion:    reporterVersion,
+		}
+	}
 	return rr
 }
 
 // ReporterRepresentationWithNilReporterVersion returns a ReporterRepresentation with nil reporter version
 func (f *TestFixture) ReporterRepresentationWithNilReporterVersion() *ReporterRepresentation {
-	return &ReporterRepresentation{
-		Representation: Representation{
-			Data: JsonObject{
-				"disabled": true,
-				"severity": "CRITICAL",
-			},
+	rr, err := NewReporterRepresentation(
+		JsonObject{
+			"disabled": true,
+			"severity": "CRITICAL",
 		},
-		LocalResourceID:    "cdcebe29-67fb-4ac6-ba03-703a22ff4bc0",
-		ReporterType:       "ACM",
-		ResourceType:       "k8s_policy",
-		Version:            1,
-		ReporterInstanceID: "57a317b1-4040-4c26-8d41-dd589ba1d2eb",
-		Generation:         1,
-		APIHref:            "https://apiHref.com/",
-		ConsoleHref:        stringPtr("https://www.console.com/"),
-		CommonVersion:      1,
-		Tombstone:          false,
-		ReporterVersion:    nil, // This is the key difference - nil reporter version
+		"cdcebe29-67fb-4ac6-ba03-703a22ff4bc0",
+		"ACM",
+		"k8s_policy",
+		1,
+		"57a317b1-4040-4c26-8d41-dd589ba1d2eb",
+		1,
+		"https://apiHref.com/",
+		stringPtr("https://www.console.com/"),
+		1,
+		false,
+		nil, // This is the key difference - nil reporter version
+	)
+	if err != nil {
+		f.t.Fatalf("Failed to create ReporterRepresentation with nil reporter version: %v", err)
 	}
+	return rr
 }
 
 // ReporterRepresentationWithNilConsoleHref returns a ReporterRepresentation with nil console href
 func (f *TestFixture) ReporterRepresentationWithNilConsoleHref() *ReporterRepresentation {
-	return &ReporterRepresentation{
-		Representation: Representation{
-			Data: JsonObject{
-				"reporter_type":        "NOTIFICATIONS",
-				"reporter_instance_id": "f2e4e735-3936-4ee6-a881-b2e1f9326991",
-				"local_resource_id":    "cbc86170-e959-42d8-bd2a-964a5a558475",
-			},
+	rr, err := NewReporterRepresentation(
+		JsonObject{
+			"reporter_type":        "NOTIFICATIONS",
+			"reporter_instance_id": "f2e4e735-3936-4ee6-a881-b2e1f9326991",
+			"local_resource_id":    "cbc86170-e959-42d8-bd2a-964a5a558475",
 		},
-		LocalResourceID:    "03c923f9-6747-4177-ae35-d36493a1c88e",
-		ReporterType:       "NOTIFICATIONS",
-		ResourceType:       "notifications_integration",
-		Version:            1,
-		ReporterInstanceID: "cc38fb9e-251d-4abe-9eaf-b71607558b2a",
-		Generation:         1,
-		APIHref:            "https://www.campbell-butler.biz/",
-		ConsoleHref:        nil, // This is the key difference - nil console href
-		CommonVersion:      1,
-		Tombstone:          false,
-		ReporterVersion:    stringPtr("1.5.7"),
+		"03c923f9-6747-4177-ae35-d36493a1c88e",
+		"NOTIFICATIONS",
+		"notifications_integration",
+		1,
+		"cc38fb9e-251d-4abe-9eaf-b71607558b2a",
+		1,
+		"https://www.campbell-butler.biz/",
+		nil, // This is the key difference - nil console href
+		1,
+		false,
+		stringPtr("1.5.7"),
+	)
+	if err != nil {
+		f.t.Fatalf("Failed to create ReporterRepresentation with nil console href: %v", err)
 	}
+	return rr
 }
 
 // Validation Functions

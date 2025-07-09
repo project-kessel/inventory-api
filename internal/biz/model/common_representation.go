@@ -44,16 +44,16 @@ func NewCommonRepresentation(
 	}
 
 	// Validate the instance
-	if err := ValidateCommonRepresentation(cr); err != nil {
+	if err := validateCommonRepresentation(cr); err != nil {
 		return nil, fmt.Errorf("invalid CommonRepresentation: %w", err)
 	}
 
 	return cr, nil
 }
 
-// ValidateCommonRepresentation validates a CommonRepresentation instance
-// This function is used by both factory methods and tests to ensure consistency
-func ValidateCommonRepresentation(cr *CommonRepresentation) error {
+// validateCommonRepresentation validates a CommonRepresentation instance
+// This function is used internally by factory methods to ensure consistency
+func validateCommonRepresentation(cr *CommonRepresentation) error {
 	if cr.ResourceId == uuid.Nil {
 		return ValidationError{Field: "ResourceId", Message: "cannot be empty"}
 	}

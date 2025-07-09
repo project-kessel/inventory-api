@@ -122,7 +122,7 @@ func (f *TestFixture) CommonRepresentationWithNilData() *CommonRepresentation {
 // MinimalCommonRepresentation returns a CommonRepresentation with minimal valid data
 func (f *TestFixture) MinimalCommonRepresentation() *CommonRepresentation {
 	return &CommonRepresentation{
-		BaseRepresentation: BaseRepresentation{
+		Representation: Representation{
 			Data: JsonObject{
 				"workspace_id": "1c0753fe-48c1-44d8-823c-95d04cff5f91",
 			},
@@ -138,7 +138,7 @@ func (f *TestFixture) MinimalCommonRepresentation() *CommonRepresentation {
 // MaximalCommonRepresentation returns a CommonRepresentation with maximum length values
 func (f *TestFixture) MaximalCommonRepresentation() *CommonRepresentation {
 	return &CommonRepresentation{
-		BaseRepresentation: BaseRepresentation{
+		Representation: Representation{
 			Data: JsonObject{
 				"workspace_id": "aee8f698-9d43-49a1-b458-680a7c9dc046",
 			},
@@ -154,7 +154,7 @@ func (f *TestFixture) MaximalCommonRepresentation() *CommonRepresentation {
 // UnicodeCommonRepresentation returns a CommonRepresentation with unicode characters
 func (f *TestFixture) UnicodeCommonRepresentation() *CommonRepresentation {
 	return &CommonRepresentation{
-		BaseRepresentation: BaseRepresentation{
+		Representation: Representation{
 			Data: JsonObject{
 				"unicode_field": "测试数据 🌟 emoji test",
 				"japanese":      "こんにちは世界",
@@ -174,7 +174,7 @@ func (f *TestFixture) UnicodeCommonRepresentation() *CommonRepresentation {
 // SpecialCharsCommonRepresentation returns a CommonRepresentation with special characters
 func (f *TestFixture) SpecialCharsCommonRepresentation() *CommonRepresentation {
 	return &CommonRepresentation{
-		BaseRepresentation: BaseRepresentation{
+		Representation: Representation{
 			Data: JsonObject{
 				"special_data":   "Data with special characters: !@#$%^&*()_+-=[]{}|;':\",./<>?",
 				"symbols":        "™®©§¶†‡•…‰‹›",
@@ -199,7 +199,7 @@ func (f *TestFixture) SpecialCharsCommonRepresentation() *CommonRepresentation {
 // ValidReporterRepresentation returns a valid ReporterRepresentation for testing
 func (f *TestFixture) ValidReporterRepresentation() *ReporterRepresentation {
 	return &ReporterRepresentation{
-		BaseRepresentation: BaseRepresentation{
+		Representation: Representation{
 			Data: JsonObject{
 				"satellite_id":            "2c4196f1-0371-4f4c-8913-e113cfaa6e67",
 				"subscription_manager_id": "af94f92b-0b65-4cac-b449-6b77e665a08f",
@@ -231,7 +231,7 @@ func (f *TestFixture) ReporterRepresentationWithLocalResourceID(localResourceID 
 // ReporterRepresentationWithTombstone returns a ReporterRepresentation with tombstone flag
 func (f *TestFixture) ReporterRepresentationWithTombstone(tombstone bool) *ReporterRepresentation {
 	rr := &ReporterRepresentation{
-		BaseRepresentation: BaseRepresentation{
+		Representation: Representation{
 			Data: JsonObject{
 				"external_cluster_id": "9414df93-aefe-4153-ba8a-8765373d39b9",
 				"cluster_status":      "READY",
@@ -299,7 +299,7 @@ func (f *TestFixture) ReporterRepresentationWithReporterVersion(reporterVersion 
 // ReporterRepresentationWithNilReporterVersion returns a ReporterRepresentation with nil reporter version
 func (f *TestFixture) ReporterRepresentationWithNilReporterVersion() *ReporterRepresentation {
 	return &ReporterRepresentation{
-		BaseRepresentation: BaseRepresentation{
+		Representation: Representation{
 			Data: JsonObject{
 				"disabled": true,
 				"severity": "CRITICAL",
@@ -322,7 +322,7 @@ func (f *TestFixture) ReporterRepresentationWithNilReporterVersion() *ReporterRe
 // ReporterRepresentationWithNilConsoleHref returns a ReporterRepresentation with nil console href
 func (f *TestFixture) ReporterRepresentationWithNilConsoleHref() *ReporterRepresentation {
 	return &ReporterRepresentation{
-		BaseRepresentation: BaseRepresentation{
+		Representation: Representation{
 			Data: JsonObject{
 				"reporter_type":        "NOTIFICATIONS",
 				"reporter_instance_id": "f2e4e735-3936-4ee6-a881-b2e1f9326991",

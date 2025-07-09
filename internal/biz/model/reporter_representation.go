@@ -10,7 +10,7 @@ import (
 // through factory methods that enforce validation rules.
 // Note: Fields are exported for GORM compatibility but should not be modified directly.
 type ReporterRepresentation struct {
-	BaseRepresentation
+	Representation
 
 	LocalResourceID    string  `gorm:"size:128;column:local_resource_id;index:reporter_rep_unique_idx,unique"`
 	ReporterType       string  `gorm:"size:128;column:reporter_type;index:reporter_rep_unique_idx,unique"`
@@ -46,7 +46,7 @@ func NewReporterRepresentation(
 	reporterVersion *string,
 ) (*ReporterRepresentation, error) {
 	rr := &ReporterRepresentation{
-		BaseRepresentation: BaseRepresentation{
+		Representation: Representation{
 			Data: data,
 		},
 		LocalResourceID:    localResourceID,

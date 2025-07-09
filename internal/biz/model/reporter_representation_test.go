@@ -24,24 +24,24 @@ func TestReporterRepresentation_TableName(t *testing.T) {
 func TestReporterRepresentation_Structure(t *testing.T) {
 	t.Parallel()
 
-	t.Run("should properly embed BaseRepresentation", func(t *testing.T) {
+	t.Run("should properly embed Representation", func(t *testing.T) {
 		t.Parallel()
 
 		rr := ReporterRepresentation{}
 
-		// Check if BaseRepresentation is embedded
+		// Check if Representation is embedded
 		rrType := reflect.TypeOf(rr)
 		found := false
 		for i := 0; i < rrType.NumField(); i++ {
 			field := rrType.Field(i)
-			if field.Type == reflect.TypeOf(BaseRepresentation{}) && field.Anonymous {
+			if field.Type == reflect.TypeOf(Representation{}) && field.Anonymous {
 				found = true
 				break
 			}
 		}
 
 		if !found {
-			t.Error("ReporterRepresentation should embed BaseRepresentation")
+			t.Error("ReporterRepresentation should embed Representation")
 		}
 	})
 

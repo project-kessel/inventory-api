@@ -1,5 +1,5 @@
 package model
 
-type BaseRepresentation struct {
+type Representation struct {
 	Data JsonObject `gorm:"type:jsonb;column:data"`
 }

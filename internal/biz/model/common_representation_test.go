@@ -30,11 +30,11 @@ func TestCommonRepresentation_Structure(t *testing.T) {
 		t.Parallel()
 		cr := fixture.ValidCommonRepresentation()
 
-		// Check that BaseRepresentation is embedded
+		// Check that Representation is embedded
 		crType := reflect.TypeOf(*cr)
-		_, found := crType.FieldByName("BaseRepresentation")
+		_, found := crType.FieldByName("Representation")
 		if !found {
-			t.Error("CommonRepresentation should embed BaseRepresentation")
+			t.Error("CommonRepresentation should embed Representation")
 		}
 	})
 

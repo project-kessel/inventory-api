@@ -11,7 +11,7 @@ import (
 // through factory methods that enforce validation rules.
 // Note: Fields are exported for GORM compatibility but should not be modified directly.
 type CommonRepresentation struct {
-	BaseRepresentation
+	Representation
 	ResourceId                 uuid.UUID `gorm:"type:text;column:id;primary_key"`
 	ResourceType               string    `gorm:"size:128;column:resource_type"`
 	Version                    uint      `gorm:"type:bigint;column:version;primary_key;check:version > 0"`
@@ -33,7 +33,7 @@ func NewCommonRepresentation(
 	reportedByReporterInstance string,
 ) (*CommonRepresentation, error) {
 	cr := &CommonRepresentation{
-		BaseRepresentation: BaseRepresentation{
+		Representation: Representation{
 			Data: data,
 		},
 		ResourceId:                 resourceId,

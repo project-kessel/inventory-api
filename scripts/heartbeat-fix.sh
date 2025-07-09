@@ -4,6 +4,6 @@
 
 SSO_RESP=$(curl "${SSO_URL}" -H 'Content-Type: application/x-www-form-urlencoded' --data-urlencode 'grant_type=client_credentials' --data-urlencode "client_id=${SA_CLIENT_ID}" --data-urlencode "client_secret=${SA_CLIENT_SECRET}")
 TOKEN=$(echo $SSO_RESP | awk -F ':"' '{print $2}' | cut -d '"' -f 1);
-INVENTORY_URL="kessel-inventory-api:8000/api/inventory/v1beta1/resources/notifications-integrations";
-BODY='{"integration":{"metadata":{"workspace_id":"dbz-issue-workaround-RHCLOUD-40690","resource_type":"notifications/integration"},"reporter_data":{"reporter_instance_id":"service-account-1","reporter_type":"NOTIFICATIONS","local_resource_id":"dbz-issue-workaround-RHCLOUD-40690"}}}';
+INVENTORY_URL="kessel-inventory-api:8000/api/inventory/v1beta2/resources";
+BODY='{"type":"host","reporterType":"HBI","reporterInstanceId":"3088be62-1c60-4884-b133-9200542d0b3f","representations":{"metadata":{"localResourceId":"dd1b73b9-3e33-4264-968c-e3ce55b9afec","apiHref":"https://apiHref.com/","consoleHref":"https://www.console.com/","reporterVersion":"2.7.16"},"common":{"workspace_id":"a64d17d0-aec3-410a-acd0-e0b85b22c076"},"reporter":{"satellite_id":"2c4196f1-0371-4f4c-8913-e113cfaa6e67","sub_manager_id":"af94f92b-0b65-4cac-b449-6b77e665a08f","insights_inventory_id":"05707922-7b0a-4fe6-982d-6adbc7695b8f","ansible_host":"host-1"}}}';
 curl -X PUT -H "Content-Type: application/json" -H "Authorization: bearer $TOKEN" -d $BODY $INVENTORY_URL

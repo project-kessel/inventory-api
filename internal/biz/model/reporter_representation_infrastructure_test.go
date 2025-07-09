@@ -292,17 +292,22 @@ func TestReporterRepresentation_EdgeCases(t *testing.T) {
 			maxLen128 += "a"
 		}
 
-		maxLen512 := ""
-		for i := 0; i < 512; i++ {
-			maxLen512 += "b"
+		// Create valid URLs at maximum allowed length
+		// URLs need proper scheme and host, so we need to account for that
+		baseURL := "https://example.com/"
+		remainingChars := 512 - len(baseURL)
+		pathPart := ""
+		for i := 0; i < remainingChars; i++ {
+			pathPart += "b"
 		}
+		maxLen512URL := baseURL + pathPart
 
 		rr.LocalResourceID = maxLen128
 		rr.ReporterType = maxLen128
 		rr.ResourceType = maxLen128
 		rr.ReporterInstanceID = maxLen128
-		rr.APIHref = maxLen512
-		rr.ConsoleHref = &maxLen512
+		rr.APIHref = maxLen512URL
+		rr.ConsoleHref = &maxLen512URL
 		rr.ReporterVersion = &maxLen128
 
 		AssertNoError(t, ValidateReporterRepresentation(rr), "ReporterRepresentation with maximum length string values should be valid")

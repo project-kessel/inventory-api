@@ -103,13 +103,14 @@ func ValidateReporterRepresentation(rr *ReporterRepresentation) error {
 	if rr.Generation < MinGenerationValue {
 		return ValidationError{Field: "Generation", Message: fmt.Sprintf("must be >= %d", MinGenerationValue)}
 	}
-	if rr.APIHref != "" {
-		if len(rr.APIHref) > MaxAPIHrefLength {
-			return ValidationError{Field: "APIHref", Message: fmt.Sprintf("exceeds maximum length of %d characters", MaxAPIHrefLength)}
-		}
-		if err := validateURL(rr.APIHref); err != nil {
-			return ValidationError{Field: "APIHref", Message: err.Error()}
-		}
+	if rr.APIHref == "" || strings.TrimSpace(rr.APIHref) == "" {
+		return ValidationError{Field: "APIHref", Message: "cannot be empty"}
+	}
+	if len(rr.APIHref) > MaxAPIHrefLength {
+		return ValidationError{Field: "APIHref", Message: fmt.Sprintf("exceeds maximum length of %d characters", MaxAPIHrefLength)}
+	}
+	if err := validateURL(rr.APIHref); err != nil {
+		return ValidationError{Field: "APIHref", Message: err.Error()}
 	}
 	if rr.ConsoleHref != nil && *rr.ConsoleHref != "" {
 		if len(*rr.ConsoleHref) > MaxConsoleHrefLength {

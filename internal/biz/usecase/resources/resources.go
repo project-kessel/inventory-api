@@ -62,31 +62,31 @@ type UsecaseConfig struct {
 }
 
 type Usecase struct {
-	ReporterResourceRepository  ReporterResourceRepository
-	inventoryResourceRepository ResourceRepository
-	waitForNotifBreaker         *gobreaker.CircuitBreaker
-	Authz                       authzapi.Authorizer
-	Eventer                     eventingapi.Manager
-	Namespace                   string
-	Log                         *log.Helper
-	Server                      server.Server
-	ListenManager               pubsub.ListenManagerImpl
-	Config                      *UsecaseConfig
+	ReporterResourceRepository ReporterResourceRepository
+	resourceRepository         ResourceRepository
+	waitForNotifBreaker        *gobreaker.CircuitBreaker
+	Authz                      authzapi.Authorizer
+	Eventer                    eventingapi.Manager
+	Namespace                  string
+	Log                        *log.Helper
+	Server                     server.Server
+	ListenManager              pubsub.ListenManagerImpl
+	Config                     *UsecaseConfig
 }
 
-func New(reporterResourceRepository ReporterResourceRepository, inventoryResourceRepository ResourceRepository,
+func New(reporterResourceRepository ReporterResourceRepository, resourceRepository ResourceRepository,
 	authz authzapi.Authorizer, eventer eventingapi.Manager, namespace string, logger log.Logger,
 	listenManager pubsub.ListenManagerImpl, waitForNotifBreaker *gobreaker.CircuitBreaker, usecaseConfig *UsecaseConfig) *Usecase {
 	return &Usecase{
-		ReporterResourceRepository:  reporterResourceRepository,
-		inventoryResourceRepository: inventoryResourceRepository,
-		waitForNotifBreaker:         waitForNotifBreaker,
-		Authz:                       authz,
-		Eventer:                     eventer,
-		Namespace:                   namespace,
-		Log:                         log.NewHelper(logger),
-		ListenManager:               listenManager,
-		Config:                      usecaseConfig,
+		ReporterResourceRepository: reporterResourceRepository,
+		resourceRepository:         resourceRepository,
+		waitForNotifBreaker:        waitForNotifBreaker,
+		Authz:                      authz,
+		Eventer:                    eventer,
+		Namespace:                  namespace,
+		Log:                        log.NewHelper(logger),
+		ListenManager:              listenManager,
+		Config:                     usecaseConfig,
 	}
 }
 

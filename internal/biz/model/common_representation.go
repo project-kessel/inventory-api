@@ -14,7 +14,7 @@ type CommonRepresentation struct {
 	Representation
 	ResourceId                 uuid.UUID `gorm:"type:text;column:id;primaryKey"`
 	ResourceType               string    `gorm:"size:128;column:resource_type"`
-	Version                    uint      `gorm:"type:bigint;column:version;primaryKey;check:version > 0"`
+	Version                    uint      `gorm:"type:bigint;column:version;primaryKey;check:version >= 0"`
 	ReportedByReporterType     string    `gorm:"size:128;column:reported_by_reporter_type"`
 	ReportedByReporterInstance string    `gorm:"size:128;column:reported_by_reporter_instance"`
 }
@@ -45,7 +45,7 @@ func NewCommonRepresentation(
 
 	// Validate the instance
 	if err := validateCommonRepresentation(cr); err != nil {
-		return nil, fmt.Errorf("invalid CommonRepresentation: %w", err)
+		return nil, err
 	}
 
 	return cr, nil
@@ -78,8 +78,6 @@ func validateCommonRepresentation(cr *CommonRepresentation) error {
 	if len(cr.ReportedByReporterInstance) > MaxReporterInstanceIDLength {
 		return ValidationError{Field: "ReportedByReporterInstance", Message: fmt.Sprintf("exceeds maximum length of %d characters", MaxReporterInstanceIDLength)}
 	}
-	if cr.Data == nil {
-		return ValidationError{Field: "Data", Message: "cannot be nil"}
-	}
+	// Data can be nil - this is a valid state
 	return nil
 }

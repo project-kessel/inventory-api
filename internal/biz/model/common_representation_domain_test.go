@@ -69,8 +69,8 @@ func TestCommonRepresentation_Validation(t *testing.T) {
 			},
 			"zero_version": func(t *testing.T) {
 				t.Parallel()
-				// Test factory method with zero version
-				_, err := NewCommonRepresentation(
+				// Test factory method with zero version - should be valid
+				cr, err := NewCommonRepresentation(
 					uuid.NewSHA1(uuid.NameSpaceOID, []byte("test")),
 					JsonObject{"workspace_id": "test"},
 					"host",
@@ -78,7 +78,12 @@ func TestCommonRepresentation_Validation(t *testing.T) {
 					"hbi",
 					"test-instance",
 				)
-				AssertValidationError(t, err, "Version", "Zero Version should fail creation")
+				AssertNoError(t, err, "Zero Version should be valid")
+				if cr == nil {
+					t.Error("CommonRepresentation should not be nil")
+				} else if cr.Version != 0 {
+					t.Errorf("Expected Version to be 0, got %d", cr.Version)
+				}
 			},
 			"empty_reporter_type": func(t *testing.T) {
 				t.Parallel()
@@ -108,8 +113,8 @@ func TestCommonRepresentation_Validation(t *testing.T) {
 			},
 			"nil_data": func(t *testing.T) {
 				t.Parallel()
-				// Test factory method with nil data
-				_, err := NewCommonRepresentation(
+				// Test factory method with nil data - should be valid
+				cr, err := NewCommonRepresentation(
 					uuid.NewSHA1(uuid.NameSpaceOID, []byte("test")),
 					nil,
 					"host",
@@ -117,7 +122,12 @@ func TestCommonRepresentation_Validation(t *testing.T) {
 					"hbi",
 					"test-instance",
 				)
-				AssertValidationError(t, err, "Data", "Nil Data should fail creation")
+				AssertNoError(t, err, "Nil Data should be valid")
+				if cr == nil {
+					t.Error("CommonRepresentation should not be nil")
+				} else if cr.Data != nil {
+					t.Error("Expected Data to be nil")
+				}
 			},
 		}
 
@@ -141,10 +151,10 @@ func TestCommonRepresentation_BusinessRules(t *testing.T) {
 		}
 	})
 
-	t.Run("version_cannot_be_zero", func(t *testing.T) {
+	t.Run("version_can_be_zero", func(t *testing.T) {
 		t.Parallel()
-		// Test factory method with zero version
-		_, err := NewCommonRepresentation(
+		// Test factory method with zero version - should be valid
+		cr, err := NewCommonRepresentation(
 			uuid.NewSHA1(uuid.NameSpaceOID, []byte("test")),
 			JsonObject{"workspace_id": "test"},
 			"host",
@@ -152,7 +162,12 @@ func TestCommonRepresentation_BusinessRules(t *testing.T) {
 			"hbi",
 			"test-instance",
 		)
-		AssertValidationError(t, err, "Version", "Zero version should be invalid")
+		AssertNoError(t, err, "Zero version should be valid")
+		if cr == nil {
+			t.Error("CommonRepresentation should not be nil")
+		} else if cr.Version != 0 {
+			t.Errorf("Expected Version to be 0, got %d", cr.Version)
+		}
 	})
 
 	t.Run("required_fields_cannot_be_empty", func(t *testing.T) {
@@ -268,10 +283,10 @@ func TestCommonRepresentation_DataHandling(t *testing.T) {
 		AssertEqual(t, JsonObject{}, cr.Data, "Empty data should be preserved")
 	})
 
-	t.Run("data_cannot_be_nil", func(t *testing.T) {
+	t.Run("data_can_be_nil", func(t *testing.T) {
 		t.Parallel()
-		// Test factory method with nil data
-		_, err := NewCommonRepresentation(
+		// Test factory method with nil data - should be valid
+		cr, err := NewCommonRepresentation(
 			uuid.NewSHA1(uuid.NameSpaceOID, []byte("test")),
 			nil,
 			"host",
@@ -279,7 +294,12 @@ func TestCommonRepresentation_DataHandling(t *testing.T) {
 			"hbi",
 			"test-instance",
 		)
-		AssertValidationError(t, err, "Data", "Nil data should be invalid")
+		AssertNoError(t, err, "Nil data should be valid")
+		if cr == nil {
+			t.Error("CommonRepresentation should not be nil")
+		} else if cr.Data != nil {
+			t.Error("Expected Data to be nil")
+		}
 	})
 }
 
@@ -359,32 +379,42 @@ func TestCommonRepresentation_FactoryMethods(t *testing.T) {
 			t.Error("Expected validation error for empty ResourceType")
 		}
 
-		// Test zero Version
-		_, err = NewCommonRepresentation(
+		// Test zero Version - should be valid now
+		cr, err := NewCommonRepresentation(
 			testResourceId,
 			JsonObject{"workspace_id": "test-workspace"},
 			"host",
-			0, // zero Version
+			0, // zero Version should be valid
 			"hbi",
 			"test-instance",
 		)
 
-		if err == nil {
-			t.Error("Expected validation error for zero Version")
+		if err != nil {
+			t.Errorf("Expected zero Version to be valid, got error: %v", err)
+		}
+		if cr == nil {
+			t.Error("Expected valid CommonRepresentation, got nil")
+		} else if cr.Version != 0 {
+			t.Errorf("Expected Version to be 0, got %d", cr.Version)
 		}
 
-		// Test nil Data
-		_, err = NewCommonRepresentation(
+		// Test nil Data - should be valid now
+		cr, err = NewCommonRepresentation(
 			testResourceId,
-			nil, // nil Data
+			nil, // nil Data should be valid
 			"host",
 			1,
 			"hbi",
 			"test-instance",
 		)
 
-		if err == nil {
-			t.Error("Expected validation error for nil Data")
+		if err != nil {
+			t.Errorf("Expected nil Data to be valid, got error: %v", err)
+		}
+		if cr == nil {
+			t.Error("Expected valid CommonRepresentation, got nil")
+		} else if cr.Data != nil {
+			t.Error("Expected Data to be nil")
 		}
 
 		// Test nil UUID

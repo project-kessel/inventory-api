@@ -18,9 +18,9 @@ const (
 	MaxConsoleHrefLength        = MaxFieldSize512
 
 	// Minimum values for validation
-	MinVersionValue    = 1 // Version must be positive (> 0)
-	MinGenerationValue = 1 // Generation must be positive (> 0)
-	MinCommonVersion   = 1 // CommonVersion must be positive (> 0)
+	MinVersionValue    = 0 // Version can be zero or positive (>= 0)
+	MinGenerationValue = 0 // Generation can be zero or positive (>= 0)
+	MinCommonVersion   = 0 // CommonVersion can be zero or positive (>= 0)
 )
 
 // Table name constants

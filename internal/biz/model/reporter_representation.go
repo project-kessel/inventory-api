@@ -15,12 +15,12 @@ type ReporterRepresentation struct {
 	LocalResourceID    string  `gorm:"size:128;column:local_resource_id;index:reporter_rep_unique_idx,unique"`
 	ReporterType       string  `gorm:"size:128;column:reporter_type;index:reporter_rep_unique_idx,unique"`
 	ResourceType       string  `gorm:"size:128;column:resource_type;index:reporter_rep_unique_idx,unique"`
-	Version            uint    `gorm:"type:bigint;column:version;index:reporter_rep_unique_idx,unique;check:version > 0"`
+	Version            uint    `gorm:"type:bigint;column:version;index:reporter_rep_unique_idx,unique;check:version >= 0"`
 	ReporterInstanceID string  `gorm:"size:128;column:reporter_instance_id;index:reporter_rep_unique_idx,unique"`
-	Generation         uint    `gorm:"type:bigint;column:generation;index:reporter_rep_unique_idx,unique;check:generation > 0"`
+	Generation         uint    `gorm:"type:bigint;column:generation;index:reporter_rep_unique_idx,unique;check:generation >= 0"`
 	APIHref            string  `gorm:"size:512;column:api_href"`
 	ConsoleHref        *string `gorm:"size:512;column:console_href"`
-	CommonVersion      uint    `gorm:"type:bigint;column:common_version;check:common_version > 0"`
+	CommonVersion      uint    `gorm:"type:bigint;column:common_version;check:common_version >= 0"`
 	Tombstone          bool    `gorm:"column:tombstone"`
 	ReporterVersion    *string `gorm:"size:128;column:reporter_version"`
 }
@@ -64,7 +64,7 @@ func NewReporterRepresentation(
 
 	// Validate the instance
 	if err := validateReporterRepresentation(rr); err != nil {
-		return nil, fmt.Errorf("invalid ReporterRepresentation: %w", err)
+		return nil, err
 	}
 
 	return rr, nil
@@ -126,8 +126,6 @@ func validateReporterRepresentation(rr *ReporterRepresentation) error {
 	if rr.ReporterVersion != nil && len(*rr.ReporterVersion) > MaxReporterVersionLength {
 		return ValidationError{Field: "ReporterVersion", Message: fmt.Sprintf("exceeds maximum length of %d characters", MaxReporterVersionLength)}
 	}
-	if rr.Data == nil {
-		return ValidationError{Field: "Data", Message: "cannot be nil"}
-	}
+	// Data can be nil - this is a valid state
 	return nil
 }

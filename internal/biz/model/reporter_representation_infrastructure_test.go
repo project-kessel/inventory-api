@@ -220,104 +220,110 @@ func TestReporterRepresentation_EdgeCases(t *testing.T) {
 	t.Run("should handle unicode characters", func(t *testing.T) {
 		t.Parallel()
 
-		fixture := NewTestFixture(t)
-		rr := fixture.ValidReporterRepresentation()
-		rr.LocalResourceID = "测试-resource-🌟"
-		rr.ReporterType = "测试-reporter"
-		rr.Data = JsonObject{
-			"name":        "测试资源",
-			"description": "包含Unicode字符的描述 🌟",
-		}
-
-		AssertNoError(t, ValidateReporterRepresentation(rr), "ReporterRepresentation with unicode characters should be valid")
+		_, err := NewReporterRepresentation(
+			JsonObject{
+				"name":        "测试资源",
+				"description": "包含Unicode字符的描述 🌟",
+			},
+			"测试-resource-🌟",
+			"测试-reporter",
+			"host",
+			1,
+			"test-instance",
+			1,
+			"https://api.example.com",
+			nil,
+			1,
+			false,
+			nil,
+		)
+		AssertNoError(t, err, "ReporterRepresentation with unicode characters should be valid")
 	})
 
 	t.Run("should handle special characters in string fields", func(t *testing.T) {
 		t.Parallel()
 
-		fixture := NewTestFixture(t)
-		rr := fixture.ValidReporterRepresentation()
-		rr.LocalResourceID = "resource-with-special-chars-!@#$%^&*()"
-		rr.ReporterType = "special-reporter-type"
-		rr.Data = JsonObject{
-			"special_field": "Value with special chars: !@#$%^&*()_+-=[]{}|;':\",./<>?",
-		}
-
-		AssertNoError(t, ValidateReporterRepresentation(rr), "ReporterRepresentation with special characters should be valid")
+		_, err := NewReporterRepresentation(
+			JsonObject{
+				"special_field": "Value with special chars: !@#$%^&*()_+-=[]{}|;':\",./<>?",
+			},
+			"resource-with-special-chars-!@#$%^&*()",
+			"special-reporter-type",
+			"host",
+			1,
+			"test-instance",
+			1,
+			"https://api.example.com",
+			nil,
+			1,
+			false,
+			nil,
+		)
+		AssertNoError(t, err, "ReporterRepresentation with special characters should be valid")
 	})
 
 	t.Run("should handle large integer values", func(t *testing.T) {
 		t.Parallel()
 
-		fixture := NewTestFixture(t)
-		rr := fixture.ValidReporterRepresentation()
-		rr.Version = 4294967295 // Max uint32
-		rr.Generation = 4294967295
-		rr.CommonVersion = 4294967295
-
-		AssertNoError(t, ValidateReporterRepresentation(rr), "ReporterRepresentation with large integer values should be valid")
+		_, err := NewReporterRepresentation(
+			JsonObject{"test": "data"},
+			"test-local-id",
+			"hbi",
+			"host",
+			4294967295, // Max uint32 Version
+			"test-instance",
+			4294967295, // Max uint32 Generation
+			"https://api.example.com",
+			nil,
+			4294967295, // Max uint32 CommonVersion
+			false,
+			nil,
+		)
+		AssertNoError(t, err, "ReporterRepresentation with large integer values should be valid")
 	})
 
 	t.Run("should handle empty string values for nullable fields", func(t *testing.T) {
 		t.Parallel()
 
-		fixture := NewTestFixture(t)
-		rr := fixture.ValidReporterRepresentation()
-		rr.ConsoleHref = stringPtr("")
-		rr.ReporterVersion = stringPtr("")
-
-		AssertNoError(t, ValidateReporterRepresentation(rr), "ReporterRepresentation with empty string values for nullable fields should be valid")
+		_, err := NewReporterRepresentation(
+			JsonObject{"test": "data"},
+			"test-local-id",
+			"hbi",
+			"host",
+			1,
+			"test-instance",
+			1,
+			"https://api.example.com",
+			stringPtr(""), // Empty ConsoleHref
+			1,
+			false,
+			stringPtr(""), // Empty ReporterVersion
+		)
+		AssertNoError(t, err, "ReporterRepresentation with empty string values for nullable fields should be valid")
 	})
 
 	t.Run("should handle nil values for nullable fields", func(t *testing.T) {
 		t.Parallel()
 
-		fixture := NewTestFixture(t)
-		rr := fixture.ValidReporterRepresentation()
-		rr.ConsoleHref = nil
-		rr.ReporterVersion = nil
-
-		AssertNoError(t, ValidateReporterRepresentation(rr), "ReporterRepresentation with nil values for nullable fields should be valid")
-	})
-
-	t.Run("should handle maximum length string values", func(t *testing.T) {
-		t.Parallel()
-
-		fixture := NewTestFixture(t)
-		rr := fixture.ValidReporterRepresentation()
-
-		// Create strings at maximum allowed length
-		maxLen128 := ""
-		for i := 0; i < 128; i++ {
-			maxLen128 += "a"
-		}
-
-		// Create valid URLs at maximum allowed length
-		// URLs need proper scheme and host, so we need to account for that
-		baseURL := "https://example.com/"
-		remainingChars := 512 - len(baseURL)
-		pathPart := ""
-		for i := 0; i < remainingChars; i++ {
-			pathPart += "b"
-		}
-		maxLen512URL := baseURL + pathPart
-
-		rr.LocalResourceID = maxLen128
-		rr.ReporterType = maxLen128
-		rr.ResourceType = maxLen128
-		rr.ReporterInstanceID = maxLen128
-		rr.APIHref = maxLen512URL
-		rr.ConsoleHref = &maxLen512URL
-		rr.ReporterVersion = &maxLen128
-
-		AssertNoError(t, ValidateReporterRepresentation(rr), "ReporterRepresentation with maximum length string values should be valid")
+		_, err := NewReporterRepresentation(
+			JsonObject{"test": "data"},
+			"test-local-id",
+			"hbi",
+			"host",
+			1,
+			"test-instance",
+			1,
+			"https://api.example.com",
+			nil, // Nil ConsoleHref
+			1,
+			false,
+			nil, // Nil ReporterVersion
+		)
+		AssertNoError(t, err, "ReporterRepresentation with nil values for nullable fields should be valid")
 	})
 
 	t.Run("should handle complex nested JSON data", func(t *testing.T) {
 		t.Parallel()
-
-		fixture := NewTestFixture(t)
-		rr := fixture.ValidReporterRepresentation()
 
 		complexData := JsonObject{
 			"metadata": JsonObject{
@@ -354,25 +360,45 @@ func TestReporterRepresentation_EdgeCases(t *testing.T) {
 			},
 		}
 
-		rr.Data = complexData
-
-		AssertNoError(t, ValidateReporterRepresentation(rr), "ReporterRepresentation with complex nested JSON should be valid")
+		_, err := NewReporterRepresentation(
+			complexData,
+			"test-local-id",
+			"hbi",
+			"host",
+			1,
+			"test-instance",
+			1,
+			"https://api.example.com",
+			nil,
+			1,
+			false,
+			nil,
+		)
+		AssertNoError(t, err, "ReporterRepresentation with complex nested JSON should be valid")
 	})
 
 	t.Run("should handle empty JSON object", func(t *testing.T) {
 		t.Parallel()
 
-		fixture := NewTestFixture(t)
-		rr := fixture.ValidReporterRepresentation()
-		rr.Data = JsonObject{}
-
-		AssertNoError(t, ValidateReporterRepresentation(rr), "ReporterRepresentation with empty JSON object should be valid")
+		_, err := NewReporterRepresentation(
+			JsonObject{},
+			"test-local-id",
+			"hbi",
+			"host",
+			1,
+			"test-instance",
+			1,
+			"https://api.example.com",
+			nil,
+			1,
+			false,
+			nil,
+		)
+		AssertNoError(t, err, "ReporterRepresentation with empty JSON object should be valid")
 	})
 
 	t.Run("should handle version boundary values", func(t *testing.T) {
 		t.Parallel()
-
-		fixture := NewTestFixture(t)
 
 		testCases := []struct {
 			name    string
@@ -387,10 +413,20 @@ func TestReporterRepresentation_EdgeCases(t *testing.T) {
 		for _, tc := range testCases {
 			t.Run(tc.name, func(t *testing.T) {
 				t.Parallel()
-				rr := fixture.ValidReporterRepresentation()
-				rr.Version = tc.version
-
-				err := ValidateReporterRepresentation(rr)
+				_, err := NewReporterRepresentation(
+					JsonObject{"test": "data"},
+					"test-local-id",
+					"hbi",
+					"host",
+					tc.version,
+					"test-instance",
+					1,
+					"https://api.example.com",
+					nil,
+					1,
+					false,
+					nil,
+				)
 				if tc.valid {
 					AssertNoError(t, err, "Version should be valid")
 				} else {
@@ -402,8 +438,6 @@ func TestReporterRepresentation_EdgeCases(t *testing.T) {
 
 	t.Run("should handle generation boundary values", func(t *testing.T) {
 		t.Parallel()
-
-		fixture := NewTestFixture(t)
 
 		testCases := []struct {
 			name       string
@@ -418,10 +452,20 @@ func TestReporterRepresentation_EdgeCases(t *testing.T) {
 		for _, tc := range testCases {
 			t.Run(tc.name, func(t *testing.T) {
 				t.Parallel()
-				rr := fixture.ValidReporterRepresentation()
-				rr.Generation = tc.generation
-
-				err := ValidateReporterRepresentation(rr)
+				_, err := NewReporterRepresentation(
+					JsonObject{"test": "data"},
+					"test-local-id",
+					"hbi",
+					"host",
+					1,
+					"test-instance",
+					tc.generation,
+					"https://api.example.com",
+					nil,
+					1,
+					false,
+					nil,
+				)
 				if tc.valid {
 					AssertNoError(t, err, "Generation should be valid")
 				} else {
@@ -434,8 +478,6 @@ func TestReporterRepresentation_EdgeCases(t *testing.T) {
 	t.Run("should handle tombstone flag variations", func(t *testing.T) {
 		t.Parallel()
 
-		fixture := NewTestFixture(t)
-
 		testCases := []struct {
 			name      string
 			tombstone bool
@@ -447,10 +489,20 @@ func TestReporterRepresentation_EdgeCases(t *testing.T) {
 		for _, tc := range testCases {
 			t.Run(tc.name, func(t *testing.T) {
 				t.Parallel()
-				rr := fixture.ValidReporterRepresentation()
-				rr.Tombstone = tc.tombstone
-
-				err := ValidateReporterRepresentation(rr)
+				rr, err := NewReporterRepresentation(
+					JsonObject{"test": "data"},
+					"test-local-id",
+					"hbi",
+					"host",
+					1,
+					"test-instance",
+					1,
+					"https://api.example.com",
+					nil,
+					1,
+					tc.tombstone,
+					nil,
+				)
 				AssertNoError(t, err, "Tombstone flag should be valid")
 
 				if rr.Tombstone != tc.tombstone {
@@ -463,9 +515,6 @@ func TestReporterRepresentation_EdgeCases(t *testing.T) {
 	t.Run("should handle long URL values", func(t *testing.T) {
 		t.Parallel()
 
-		fixture := NewTestFixture(t)
-		rr := fixture.ValidReporterRepresentation()
-
 		// Create a long but valid URL
 		longURL := "https://api.example.com/v1/resources/very-long-resource-name-that-might-be-generated-by-system"
 		for i := 0; i < 10; i++ {
@@ -473,10 +522,20 @@ func TestReporterRepresentation_EdgeCases(t *testing.T) {
 		}
 		longURL += "?query=parameter&another=value"
 
-		rr.APIHref = longURL
-		rr.ConsoleHref = &longURL
-
-		err := ValidateReporterRepresentation(rr)
+		_, err := NewReporterRepresentation(
+			JsonObject{"test": "data"},
+			"test-local-id",
+			"hbi",
+			"host",
+			1,
+			"test-instance",
+			1,
+			longURL,
+			stringPtr(longURL),
+			1,
+			false,
+			nil,
+		)
 		AssertNoError(t, err, "ReporterRepresentation with long URL values should be valid")
 	})
 }

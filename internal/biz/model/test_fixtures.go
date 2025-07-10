@@ -368,7 +368,7 @@ func (f *TestFixture) ValidReporterRepresentation() *ReporterRepresentation {
 }
 
 // ReporterRepresentationWithLocalResourceID returns a ReporterRepresentation with specified local resource ID
-func (f *TestFixture) ReporterRepresentationWithLocalResourceID(localResourceID string) *ReporterRepresentation {
+func (f *TestFixture) ReporterRepresentationWithLocalResourceID(localResourceID string) (*ReporterRepresentation, error) {
 	rr, err := NewReporterRepresentation(
 		JsonObject{
 			"satellite_id":            "2c4196f1-0371-4f4c-8913-e113cfaa6e67",
@@ -389,30 +389,36 @@ func (f *TestFixture) ReporterRepresentationWithLocalResourceID(localResourceID 
 		stringPtr("2.7.16"),
 	)
 	if err != nil {
-		// For test cases expecting invalid data, return the struct anyway for testing
-		return &ReporterRepresentation{
-			Representation: Representation{
-				Data: JsonObject{
-					"satellite_id":            "2c4196f1-0371-4f4c-8913-e113cfaa6e67",
-					"subscription_manager_id": "af94f92b-0b65-4cac-b449-6b77e665a08f",
-					"insights_inventory_id":   "05707922-7b0a-4fe6-982d-6adbc7695b8f",
-					"ansible_host":            "host-1",
-				},
-			},
-			LocalResourceID:    localResourceID,
-			ReporterType:       "hbi",
-			ResourceType:       "host",
-			Version:            1,
-			ReporterInstanceID: "3088be62-1c60-4884-b133-9200542d0b3f",
-			Generation:         1,
-			APIHref:            "https://apiHref.com/",
-			ConsoleHref:        stringPtr("https://www.console.com/"),
-			CommonVersion:      1,
-			Tombstone:          false,
-			ReporterVersion:    stringPtr("2.7.16"),
-		}
+		return nil, err
 	}
-	return rr
+	return rr, nil
+}
+
+// ReporterRepresentationWithResourceType returns a ReporterRepresentation with specified local resource ID
+func (f *TestFixture) ReporterRepresentationWithResourceType(resourceType string) (*ReporterRepresentation, error) {
+	rr, err := NewReporterRepresentation(
+		JsonObject{
+			"satellite_id":            "2c4196f1-0371-4f4c-8913-e113cfaa6e67",
+			"subscription_manager_id": "af94f92b-0b65-4cac-b449-6b77e665a08f",
+			"insights_inventory_id":   "05707922-7b0a-4fe6-982d-6adbc7695b8f",
+			"ansible_host":            "host-1",
+		},
+		"dd1b73b9-3e33-4264-968c-e3ce55b9afec",
+		"hbi",
+		resourceType,
+		1,
+		"3088be62-1c60-4884-b133-9200542d0b3f",
+		1,
+		"https://apiHref.com/",
+		stringPtr("https://www.console.com/"),
+		1,
+		false,
+		stringPtr("2.7.16"),
+	)
+	if err != nil {
+		return nil, err
+	}
+	return rr, nil
 }
 
 // ReporterRepresentationWithTombstone returns a ReporterRepresentation with tombstone flag

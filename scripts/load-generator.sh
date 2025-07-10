@@ -13,6 +13,7 @@ help_me() {
     echo ""
     echo "OPTIONS:"
     echo "  -h Prints usage information"
+    echo "  -c: If set, generator performs create operations only, no updates or delete"
     echo ""
     echo "EXAMPLE:"
     echo "# Run 5 test loops with a 3 second break between tests"
@@ -28,11 +29,12 @@ livez_check() {
   fi
 }
 
-while getopts "n:i:p:h" flag; do
+while getopts "n:i:p:hc" flag; do
     case "${flag}" in
         n) NUM_RUNS=${OPTARG};;
         i) INTERVAL=${OPTARG};;
         p) PORT_NUM=${OPTARG};;
+        c) CREATE_ONLY=true;;
         h) help_me;;
     esac
 done
@@ -43,30 +45,42 @@ if [[  -z "${NUM_RUNS}" || -z "${INTERVAL}"  || -z "${PORT_NUM}" ]]; then
 fi
 
 LIVEZ_URL="localhost:${PORT_NUM}/api/inventory/v1/livez"
-INVENTORY_URL="localhost:${PORT_NUM}/api/inventory/v1beta1/resources/notifications-integrations"
+INVENTORY_URL="localhost:${PORT_NUM}/api/inventory/v1beta2/resources"
 
 for ((i = 0 ; i < ${NUM_RUNS} ; i++)); do
   livez_check
+  REPORTER_INSTANCE_ID=$(uuidgen)
   WORKSPACE_ID=$(uuidgen)
   LOCAL_RESOURCE_ID=$(uuidgen)
+  SATELLITE_ID=$(uuidgen)
+  SUB_MANAGER_ID=$(uuidgen)
+  INSIGHTS_INVENTORY_ID=$(uuidgen)
+  ANSIBLE_HOST="host-${i}"
 
   REQUEST=$(jq -c --null-input \
+    --arg reporter_instance_id "$REPORTER_INSTANCE_ID" \
     --arg workspace_id  "$WORKSPACE_ID" \
     --arg local_resource_id "$LOCAL_RESOURCE_ID" \
-    '{"integration":{"metadata":{"workspace_id":$workspace_id,"resource_type":"notifications/integration"},"reporter_data":{"reporter_instance_id":"service-account-1","reporter_type":"NOTIFICATIONS","local_resource_id":$local_resource_id}}}')
+    --arg satellite_id "$SATELLITE_ID" \
+    --arg sub_manager_id "$SUB_MANAGER_ID" \
+    --arg insights_inventory_id "$INSIGHTS_INVENTORY_ID" \
+    --arg ansible_host "$ANSIBLE_HOST" \
+    '{"type":"host","reporterType":"hbi","reporterInstanceId":$reporter_instance_id,"representations":{"metadata":{"localResourceId":$local_resource_id,"apiHref":"https://apiHref.com/","consoleHref":"https://www.console.com/","reporterVersion":"2.7.16"},"common":{"workspace_id":$workspace_id},"reporter":{"satellite_id":$satellite_id,"subscription_manager_id":$sub_manager_id,"insights_inventory_id":$insights_inventory_id,"ansible_host":$ansible_host}}}')
 
   DELETE_REQUEST=$(jq -c --null-input \
     --arg local_resource_id "$LOCAL_RESOURCE_ID" \
-    '{"reporter_data":{"reporter_type":"NOTIFICATIONS","local_resource_id":$local_resource_id}}')
+    '{"reference":{"resource_type":"host","resource_id":$local_resource_id,"reporter":{"type":"hbi"}}}')
 
   echo "Creating resource..."
-  curl -H "Content-Type: application/json" -H "Authorization: bearer $TOKEN"  -d $REQUEST $INVENTORY_URL
+  curl -H "Content-Type: application/json" -d $REQUEST $INVENTORY_URL
 
-  echo "Updating resource..."
-  curl -X PUT -H "Content-Type: application/json" -H "Authorization: bearer $TOKEN" -d $REQUEST $INVENTORY_URL
+  if [[ ! "$CREATE_ONLY" == "true" ]]; then
+    echo "Updating resource..."
+    curl -H "Content-Type: application/json" -d $REQUEST $INVENTORY_URL
 
-  echo "Deleting resource..."
-  curl -X DELETE -H "Content-Type: application/json" -H "Authorization: bearer $TOKEN" -d $DELETE_REQUEST $INVENTORY_URL
+    echo "Deleting resource..."
+    curl -X DELETE -H "Content-Type: application/json" -d $DELETE_REQUEST $INVENTORY_URL
+  fi
 
   sleep $INTERVAL
 done

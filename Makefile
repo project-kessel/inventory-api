@@ -198,6 +198,14 @@ inventory-up-sso:
 inventory-up-kind:
 	./scripts/start-inventory-kind.sh
 
+.PHONY: monitoring-only
+monitoring-only:
+	./scripts/start-inventory.sh monitoring-only 8000 9000
+
+.PHONY: monitoring-down
+monitoring-down:
+	./scripts/stop-inventory.sh
+
 .PHONY: get-token
 get-token:
 	./scripts/get-token.sh

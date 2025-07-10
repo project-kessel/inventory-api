@@ -500,3 +500,10 @@
     relation t_workspace: rbac/workspace
   }
 
+  definition kessel/lock {
+    permission version = t_version
+    relation t_version: kessel/lockversion
+  }
+
+  definition kessel/lockversion {}
+

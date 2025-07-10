@@ -4,11 +4,14 @@
 * TransactionLogDiskSpaceUsageHigh
 * ReplicationSlotLagOrUsageAnomaly
 
+>[!NOTE]
+> There is a known issue that whenever the Kafka Connect that facilitates Debezium is restarted, it triggers this WAL growth issue to occur when there is no active API traffic after the restart. This issue will go away as the service is utilized more, but in the interim, a CronJob has been deployed to update a resource every hour and prevent this issue. The CronJob is deployed with the [service](https://github.com/project-kessel/inventory-api/blob/441a0a0b7210b5c837bc4aa40414ea80f2d0ecc3/deploy/kessel-inventory.yaml#L102) and utilizes a [script](https://github.com/project-kessel/inventory-api/blob/main/scripts/heartbeat-fix.sh) in this repo. More details can be found in [RHCLOUD-40690](https://issues.redhat.com/browse/RHCLOUD-40690)
+
 ### Reason
 
 `TransactionLogDiskSpaceUsageHigh` and `ReplicationSlotLagOrUsageAnomaly` alerts are related to the use of logical replication slots for Debezium and would only fire if disk usage by WAL increased substantially over a period of time. Increases in disk usage by the WAL log are generally related to either a replication slot being lost/inactive or the replication slot being idle
 
-The Debezium connector is configured with a heartbeat query that exists to prevent these issues from occurring but there are scenarios where it has happened and monitoring is required to avoid full disk usage. The WAL growth is generally due to AWS heartbeat messages consuming disk space due to increase WAL files.
+The Debezium connector is configured with a heartbeat query that exists to prevent these issues from occurring but there are scenarios where it has happened and monitoring is required to avoid full disk usage. More specifically, we've seen this issue occur whenever the Kafka Connect pod leveraged by Debezium is restarted/redeployed and there is no traffic on the API. The WAL growth is generally due to AWS heartbeat messages consuming disk space due to an increase in number of WAL files.
 
 `ReplicationSlotLagOrUsageAnomaly` checks for growth in replication slot disk usage over the course of an hour. RDS periodically writes heartbeats into the rdsadmin database every 5 minutes. Each heartbeat equates to a 64MB WAL file. Over the course of an hour that is 0.75GB, this alert fires when the change in disk usage over an hour is greater than 0.7GB to detect the issue.
 

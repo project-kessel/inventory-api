@@ -19,7 +19,7 @@ import (
 	kessel "github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
 	"gorm.io/gorm"
 
-	common "github.com/project-kessel/inventory-api/cmd/common"
+	"github.com/project-kessel/inventory-api/cmd/common"
 	authzapi "github.com/project-kessel/inventory-api/internal/authz/api"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
 	eventingapi "github.com/project-kessel/inventory-api/internal/eventing/api"
@@ -40,8 +40,7 @@ type ReporterResourceRepository interface {
 	ListAll(context.Context) ([]*model.Resource, error)
 }
 
-type InventoryResourceRepository interface {
-	FindByID(context.Context, uuid.UUID) (*model.InventoryResource, error)
+type ResourceRepository interface {
 }
 
 var (
@@ -64,7 +63,7 @@ type UsecaseConfig struct {
 
 type Usecase struct {
 	ReporterResourceRepository  ReporterResourceRepository
-	inventoryResourceRepository InventoryResourceRepository
+	inventoryResourceRepository ResourceRepository
 	waitForNotifBreaker         *gobreaker.CircuitBreaker
 	Authz                       authzapi.Authorizer
 	Eventer                     eventingapi.Manager
@@ -75,7 +74,7 @@ type Usecase struct {
 	Config                      *UsecaseConfig
 }
 
-func New(reporterResourceRepository ReporterResourceRepository, inventoryResourceRepository InventoryResourceRepository,
+func New(reporterResourceRepository ReporterResourceRepository, inventoryResourceRepository ResourceRepository,
 	authz authzapi.Authorizer, eventer eventingapi.Manager, namespace string, logger log.Logger,
 	listenManager pubsub.ListenManagerImpl, waitForNotifBreaker *gobreaker.CircuitBreaker, usecaseConfig *UsecaseConfig) *Usecase {
 	return &Usecase{

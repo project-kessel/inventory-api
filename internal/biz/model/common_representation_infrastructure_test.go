@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
-	"github.com/project-kessel/inventory-api/internal/biz/model_legacy"
 )
 
 // Helper function to check if a CommonRepresentation is valid
@@ -70,7 +69,7 @@ func TestCommonRepresentation_Infrastructure_Structure(t *testing.T) {
 		AssertFieldType(t, cr, "ResourceType", reflect.TypeOf(""))
 		AssertFieldType(t, cr, "ReportedByReporterType", reflect.TypeOf(""))
 		AssertFieldType(t, cr, "ReportedByReporterInstance", reflect.TypeOf(""))
-		AssertFieldType(t, cr, "Data", reflect.TypeOf(model_legacy.JsonObject{}))
+		AssertFieldType(t, cr, "Data", reflect.TypeOf(JsonObject{}))
 	})
 
 	t.Run("should have correct GORM tags for primary key", func(t *testing.T) {
@@ -105,7 +104,7 @@ func TestCommonRepresentation_Infrastructure_Structure(t *testing.T) {
 		AssertFieldType(t, cr, "ResourceType", reflect.TypeOf(""))
 		AssertFieldType(t, cr, "ReportedByReporterType", reflect.TypeOf(""))
 		AssertFieldType(t, cr, "ReportedByReporterInstance", reflect.TypeOf(""))
-		AssertFieldType(t, cr, "Data", reflect.TypeOf(model_legacy.JsonObject{}))
+		AssertFieldType(t, cr, "Data", reflect.TypeOf(JsonObject{}))
 	})
 }
 
@@ -169,34 +168,34 @@ func TestCommonRepresentation_Infrastructure_EdgeCases(t *testing.T) {
 		fixture := NewTestFixture(t)
 		cr := fixture.ValidCommonRepresentation()
 
-		complexData := model_legacy.JsonObject{
-			"metadata": model_legacy.JsonObject{
-				"labels": model_legacy.JsonObject{
+		complexData := JsonObject{
+			"metadata": JsonObject{
+				"labels": JsonObject{
 					"app":         "test-app",
 					"environment": "staging",
 					"team":        "platform",
 				},
-				"annotations": model_legacy.JsonObject{
+				"annotations": JsonObject{
 					"deployment.kubernetes.io/revision":                "1",
 					"kubectl.kubernetes.io/last-applied-configuration": `{"apiVersion":"v1","kind":"Pod","metadata":{"name":"test"}}`,
 				},
 			},
-			"spec": model_legacy.JsonObject{
+			"spec": JsonObject{
 				"containers": []interface{}{
-					model_legacy.JsonObject{
+					JsonObject{
 						"name":  "app",
 						"image": "nginx:1.21",
 						"ports": []interface{}{
-							model_legacy.JsonObject{"containerPort": 80},
-							model_legacy.JsonObject{"containerPort": 443},
+							JsonObject{"containerPort": 80},
+							JsonObject{"containerPort": 443},
 						},
 					},
 				},
 			},
-			"status": model_legacy.JsonObject{
+			"status": JsonObject{
 				"phase": "Running",
 				"conditions": []interface{}{
-					model_legacy.JsonObject{
+					JsonObject{
 						"type":   "Ready",
 						"status": "True",
 					},
@@ -216,7 +215,7 @@ func TestCommonRepresentation_Infrastructure_EdgeCases(t *testing.T) {
 
 		fixture := NewTestFixture(t)
 		cr := fixture.ValidCommonRepresentation()
-		cr.Data = model_legacy.JsonObject{}
+		cr.Data = JsonObject{}
 
 		if !isValidCommonRepresentation(cr) {
 			t.Error("CommonRepresentation with empty JSON object should be valid")
@@ -324,7 +323,7 @@ func TestCommonRepresentation_Infrastructure_Serialization(t *testing.T) {
 
 		fixture := NewTestFixture(t)
 		cr := fixture.ValidCommonRepresentation()
-		cr.Data = model_legacy.JsonObject{"empty_field": ""}
+		cr.Data = JsonObject{"empty_field": ""}
 
 		jsonData, err := json.Marshal(cr)
 		AssertNoError(t, err, "Should be able to marshal CommonRepresentation with empty string values")
@@ -393,11 +392,11 @@ func TestCommonRepresentation_Infrastructure_Serialization(t *testing.T) {
 		fixture := NewTestFixture(t)
 		cr := fixture.ValidCommonRepresentation()
 
-		complexData := model_legacy.JsonObject{
-			"nested": model_legacy.JsonObject{
+		complexData := JsonObject{
+			"nested": JsonObject{
 				"array": []interface{}{
-					model_legacy.JsonObject{"key": "value1"},
-					model_legacy.JsonObject{"key": "value2"},
+					JsonObject{"key": "value1"},
+					JsonObject{"key": "value2"},
 				},
 				"number":  42,
 				"boolean": true,
@@ -428,7 +427,7 @@ func TestCommonRepresentation_Infrastructure_Serialization(t *testing.T) {
 
 		fixture := NewTestFixture(t)
 		cr := fixture.ValidCommonRepresentation()
-		cr.Data = model_legacy.JsonObject{}
+		cr.Data = JsonObject{}
 
 		jsonData, err := json.Marshal(cr)
 		AssertNoError(t, err, "Should be able to marshal CommonRepresentation with empty data object")

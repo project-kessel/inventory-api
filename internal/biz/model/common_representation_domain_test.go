@@ -32,9 +32,7 @@ func TestCommonRepresentation_Validation(t *testing.T) {
 		AssertNoError(t, nil, "Valid CommonRepresentation should be created successfully")
 
 		// Verify the instance was created correctly
-		if cr == nil {
-			t.Error("Valid CommonRepresentation should not be nil")
-		}
+		AssertEqual(t, "host", cr.ResourceType, "Resource type should be set correctly")
 	})
 
 	t.Run("invalid_representations", func(t *testing.T) {
@@ -146,9 +144,7 @@ func TestCommonRepresentation_BusinessRules(t *testing.T) {
 
 		// Factory method should create a valid instance for positive version
 		AssertNoError(t, nil, "Positive version should be valid")
-		if cr == nil {
-			t.Error("CommonRepresentation with positive version should not be nil")
-		}
+		AssertEqual(t, uint(1), cr.Version, "Version should be set correctly")
 	})
 
 	t.Run("version_can_be_zero", func(t *testing.T) {
@@ -263,10 +259,6 @@ func TestCommonRepresentation_DataHandling(t *testing.T) {
 
 		// Factory method should create a valid instance with complex data
 		AssertNoError(t, nil, "Complex JSON data should be valid")
-		if cr == nil {
-			t.Error("CommonRepresentation with complex data should not be nil")
-		}
-
 		AssertEqual(t, complexData, cr.Data, "Complex data should be preserved")
 	})
 
@@ -276,10 +268,6 @@ func TestCommonRepresentation_DataHandling(t *testing.T) {
 
 		// Factory method should create a valid instance with empty data
 		AssertNoError(t, nil, "Empty data object should be valid")
-		if cr == nil {
-			t.Error("CommonRepresentation with empty data should not be nil")
-		}
-
 		AssertEqual(t, JsonObject{}, cr.Data, "Empty data should be preserved")
 	})
 

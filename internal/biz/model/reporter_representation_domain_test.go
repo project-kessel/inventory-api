@@ -30,9 +30,7 @@ func TestReporterRepresentation_Validation(t *testing.T) {
 		rr := fixture.ValidReporterRepresentation()
 
 		// Factory method should create a valid instance without errors
-		if rr == nil {
-			t.Error("Valid ReporterRepresentation should not be nil")
-		}
+		AssertEqual(t, "hbi", rr.ReporterType, "Reporter type should be set correctly")
 	})
 
 	t.Run("ReporterRepresentation with empty LocalResourceID should be invalid", func(t *testing.T) {

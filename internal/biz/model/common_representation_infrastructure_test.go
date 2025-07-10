@@ -16,10 +16,6 @@ func isValidCommonRepresentation(cr *CommonRepresentation) bool {
 
 // Helper function to check if a ReporterRepresentation is valid
 // This is used in tests that need to verify existing objects
-func isValidReporterRepresentation(rr *ReporterRepresentation) bool {
-	return validateReporterRepresentation(rr) == nil
-}
-
 // Infrastructure tests for CommonRepresentation focus on:
 // - Database schema validation (table names, GORM tags)
 // - Field structure and types
@@ -122,9 +118,7 @@ func TestCommonRepresentation_Infrastructure_EdgeCases(t *testing.T) {
 		cr := fixture.UnicodeCommonRepresentation()
 
 		// Factory method should create a valid instance with unicode characters
-		if cr == nil {
-			t.Error("CommonRepresentation with unicode characters should not be nil")
-		}
+		AssertEqual(t, "测试-resource-type", cr.ResourceType, "Unicode resource type should be preserved")
 	})
 
 	t.Run("should handle special characters in string fields", func(t *testing.T) {
@@ -134,9 +128,7 @@ func TestCommonRepresentation_Infrastructure_EdgeCases(t *testing.T) {
 		cr := fixture.SpecialCharsCommonRepresentation()
 
 		// Factory method should create a valid instance with special characters
-		if cr == nil {
-			t.Error("CommonRepresentation with special characters should not be nil")
-		}
+		AssertEqual(t, "special-!@#$%^&*()-type", cr.ResourceType, "Special characters in resource type should be preserved")
 	})
 
 	t.Run("should handle large integer values", func(t *testing.T) {
@@ -146,9 +138,6 @@ func TestCommonRepresentation_Infrastructure_EdgeCases(t *testing.T) {
 		cr := fixture.MaximalCommonRepresentation()
 
 		// Factory method should create a valid instance with large integer values
-		if cr == nil {
-			t.Error("CommonRepresentation with large integer values should not be nil")
-		}
 		AssertEqual(t, uint(4294967295), cr.Version, "Large integer version should be preserved")
 	})
 

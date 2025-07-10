@@ -13,7 +13,7 @@ import (
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 
-	"github.com/project-kessel/inventory-api/internal/biz/model"
+	"github.com/project-kessel/inventory-api/internal/biz/model_legacy"
 	"github.com/project-kessel/inventory-api/internal/data"
 	"github.com/project-kessel/inventory-api/internal/data/resources"
 )
@@ -52,8 +52,8 @@ var (
 	emptyTxId              = ""
 )
 
-func resourceSubject() *model.Resource {
-	return &model.Resource{
+func resourceSubject() *model_legacy.Resource {
+	return &model_legacy.Resource{
 		ID:    uuid.UUID{},
 		OrgId: orgId,
 		ResourceData: map[string]any{
@@ -61,8 +61,8 @@ func resourceSubject() *model.Resource {
 		},
 		ResourceType: "software",
 		WorkspaceId:  workspace,
-		Reporter: model.ResourceReporter{
-			Reporter: model.Reporter{
+		Reporter: model_legacy.ResourceReporter{
+			Reporter: model_legacy.Reporter{
 				ReporterId:      reporterId,
 				ReporterType:    reporterType,
 				ReporterVersion: "1.0.2",
@@ -71,12 +71,12 @@ func resourceSubject() *model.Resource {
 		},
 		ConsoleHref: "/etc/console",
 		ApiHref:     "/etc/api",
-		Labels:      model.Labels{},
+		Labels:      model_legacy.Labels{},
 	}
 }
 
-func resourceObject() *model.Resource {
-	return &model.Resource{
+func resourceObject() *model_legacy.Resource {
+	return &model_legacy.Resource{
 		ID:    uuid.UUID{},
 		OrgId: orgId,
 		ResourceData: map[string]any{
@@ -97,8 +97,8 @@ func resourceObject() *model.Resource {
 		},
 		ResourceType: "bug",
 		WorkspaceId:  workspace,
-		Reporter: model.ResourceReporter{
-			Reporter: model.Reporter{
+		Reporter: model_legacy.ResourceReporter{
+			Reporter: model_legacy.Reporter{
 				ReporterId:      reporterId,
 				ReporterType:    reporterType,
 				ReporterVersion: "1.0.2",
@@ -107,20 +107,20 @@ func resourceObject() *model.Resource {
 		},
 		ConsoleHref: "/etc/console",
 		ApiHref:     "/etc/api",
-		Labels:      model.Labels{},
+		Labels:      model_legacy.Labels{},
 	}
 }
 
-func relationship1(subjectId, objectId uuid.UUID) *model.Relationship {
-	return &model.Relationship{
+func relationship1(subjectId, objectId uuid.UUID) *model_legacy.Relationship {
+	return &model_legacy.Relationship{
 		ID:               uuid.UUID{},
 		OrgId:            orgId,
 		RelationshipData: nil,
 		RelationshipType: "software_has-a-bug_bug",
 		SubjectId:        subjectId,
 		ObjectId:         objectId,
-		Reporter: model.RelationshipReporter{
-			Reporter: model.Reporter{
+		Reporter: model_legacy.RelationshipReporter{
+			Reporter: model_legacy.Reporter{
 				ReporterId:      reporterId,
 				ReporterType:    reporterType,
 				ReporterVersion: "3.14.159",
@@ -137,7 +137,7 @@ func relationship1(subjectId, objectId uuid.UUID) *model.Relationship {
 
 // Checks for resource equality
 // This is required as the time.Time are not exactly equal
-func assertEqualRelationship(t *testing.T, r1 *model.Relationship, r2 *model.Relationship) {
+func assertEqualRelationship(t *testing.T, r1 *model_legacy.Relationship, r2 *model_legacy.Relationship) {
 	assert.Equal(t, r1.CreatedAt.Unix(), r2.CreatedAt.Unix())
 	assert.Equal(t, r1.UpdatedAt.Unix(), r2.UpdatedAt.Unix())
 
@@ -152,8 +152,8 @@ func assertEqualRelationship(t *testing.T, r1 *model.Relationship, r2 *model.Rel
 	assert.Equal(t, r1b, r2b)
 }
 
-func assertEqualRelationshipHistory(t *testing.T, r *model.Relationship, rh *model.RelationshipHistory, operationType model.OperationType) {
-	rhExpected := &model.RelationshipHistory{
+func assertEqualRelationshipHistory(t *testing.T, r *model_legacy.Relationship, rh *model_legacy.RelationshipHistory, operationType model_legacy.OperationType) {
+	rhExpected := &model_legacy.RelationshipHistory{
 		ID:               rh.ID,
 		OrgId:            r.OrgId,
 		RelationshipData: r.RelationshipData,
@@ -170,18 +170,18 @@ func assertEqualRelationshipHistory(t *testing.T, r *model.Relationship, rh *mod
 	assert.Equal(t, rhExpected, rh)
 }
 
-//func assertEqualLocalHistoryToResource(t *testing.T, r *model.Relationship, litr *model.LocalInventoryToResource) {
-//	litrExpected := &model.LocalInventoryToResource{
+//func assertEqualLocalHistoryToResource(t *testing.T, r *model_legacy.Relationship, litr *model_legacy.LocalInventoryToResource) {
+//	litrExpected := &model_legacy.LocalInventoryToResource{
 //		ResourceId:         r.ID,
 //		CreatedAt:          litr.CreatedAt,
-//		ReporterResourceId: model.ReporterResourceIdFromResource(r),
+//		ReporterResourceId: model_legacy.ReporterResourceIdFromResource(r),
 //	}
 //
 //	assert.Equal(t, r.CreatedAt.Unix(), litr.CreatedAt.Unix())
 //	assert.Equal(t, litrExpected, litr)
 //}
 
-func createResource(t *testing.T, db *gorm.DB, mc *metricscollector.MetricsCollector, resource *model.Resource) uuid.UUID {
+func createResource(t *testing.T, db *gorm.DB, mc *metricscollector.MetricsCollector, resource *model_legacy.Resource) uuid.UUID {
 	maxSerializationRetries := 3
 	res, err := resources.New(db, mc, maxSerializationRetries).Create(context.TODO(), resource, "foobar-namespace", emptyTxId)
 	assert.Nil(t, err)
@@ -202,15 +202,15 @@ func TestCreateRelationship(t *testing.T) {
 	assert.Nil(t, err)
 
 	// The resource is now in the database and is equal to the return value from Save
-	relationship := model.Relationship{}
+	relationship := model_legacy.Relationship{}
 	assert.Nil(t, db.First(&relationship, r.ID).Error)
 	assertEqualRelationship(t, &relationship, r)
 
 	// One relationship_history entry is created
-	relationshipHistory := []model.RelationshipHistory{}
+	relationshipHistory := []model_legacy.RelationshipHistory{}
 	assert.Nil(t, db.Find(&relationshipHistory).Error)
 	assert.Len(t, relationshipHistory, 1)
-	assertEqualRelationshipHistory(t, &relationship, &relationshipHistory[0], model.OperationTypeCreate)
+	assertEqualRelationshipHistory(t, &relationship, &relationshipHistory[0], model_legacy.OperationTypeCreate)
 }
 
 func TestCreateRelationshipFailsIfEitherResourceIsNotFound(t *testing.T) {
@@ -247,7 +247,7 @@ func TestUpdateFailsIfRelationshipNotFound(t *testing.T) {
 	assert.Nil(t, err)
 
 	// Update fails if id is not found
-	_, err = repo.Update(ctx, &model.Relationship{}, id)
+	_, err = repo.Update(ctx, &model_legacy.Relationship{}, id)
 	assert.ErrorIs(t, err, gorm.ErrRecordNotFound)
 }
 
@@ -271,15 +271,15 @@ func TestUpdateResource(t *testing.T) {
 	assert.Equal(t, r.ID, r2.ID)
 
 	// The resource is now in the database and is equal to the return value from Update
-	relationship := model.Relationship{}
+	relationship := model_legacy.Relationship{}
 	assert.Nil(t, db.First(&relationship, r2.ID).Error)
 	assertEqualRelationship(t, &relationship, r2)
 
 	// Two resource_history entry are created
-	relationHistory := []model.RelationshipHistory{}
+	relationHistory := []model_legacy.RelationshipHistory{}
 	assert.Nil(t, db.Find(&relationHistory).Error)
 	assert.Len(t, relationHistory, 2)
-	assertEqualRelationshipHistory(t, &relationship, &relationHistory[1], model.OperationTypeUpdate)
+	assertEqualRelationshipHistory(t, &relationship, &relationHistory[1], model_legacy.OperationTypeUpdate)
 }
 
 func TestDeleteFailsIfResourceNotFound(t *testing.T) {
@@ -311,13 +311,13 @@ func TestDeleteAfterCreate(t *testing.T) {
 	assertEqualRelationship(t, r, r1del)
 
 	// resource not found
-	assert.ErrorIs(t, db.First(&model.Relationship{}, r1del.ID).Error, gorm.ErrRecordNotFound)
+	assert.ErrorIs(t, db.First(&model_legacy.Relationship{}, r1del.ID).Error, gorm.ErrRecordNotFound)
 
 	// two history, 1 create, 1 delete
-	relationHistory := []model.RelationshipHistory{}
+	relationHistory := []model_legacy.RelationshipHistory{}
 	assert.Nil(t, db.Find(&relationHistory).Error)
 	assert.Len(t, relationHistory, 2)
-	assertEqualRelationshipHistory(t, r, &relationHistory[1], model.OperationTypeDelete)
+	assertEqualRelationshipHistory(t, r, &relationHistory[1], model_legacy.OperationTypeDelete)
 }
 
 func TestDeleteAfterUpdate(t *testing.T) {
@@ -342,10 +342,10 @@ func TestDeleteAfterUpdate(t *testing.T) {
 	assert.Nil(t, err)
 
 	// 3 history entries, 1 create, 1 update, 1 delete
-	relationshipHistory := []model.RelationshipHistory{}
+	relationshipHistory := []model_legacy.RelationshipHistory{}
 	assert.Nil(t, db.Find(&relationshipHistory).Error)
 	assert.Len(t, relationshipHistory, 3)
-	assertEqualRelationshipHistory(t, r, &relationshipHistory[2], model.OperationTypeDelete)
+	assertEqualRelationshipHistory(t, r, &relationshipHistory[2], model_legacy.OperationTypeDelete)
 }
 
 func TestFindRelationship(t *testing.T) {

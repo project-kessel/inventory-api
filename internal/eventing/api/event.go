@@ -7,7 +7,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/project-kessel/inventory-api/internal/biz/model"
+	"github.com/project-kessel/inventory-api/internal/biz/model_legacy"
 )
 
 // Todo: get rid of this Event and have an Event (as event output) with all the assignments going on the New* functions
@@ -23,15 +23,15 @@ type Event struct {
 }
 
 type ResourceData struct {
-	Metadata     ResourceMetadata `json:"metadata"`
-	ReporterData ResourceReporter `json:"reporter_data"`
-	ResourceData model.JsonObject `json:"resource_data,omitempty"`
+	Metadata     ResourceMetadata        `json:"metadata"`
+	ReporterData ResourceReporter        `json:"reporter_data"`
+	ResourceData model_legacy.JsonObject `json:"resource_data,omitempty"`
 }
 
 type RelationshipData struct {
-	Metadata     RelationshipMetadata `json:"metadata"`
-	ReporterData RelationshipReporter `json:"reporter_data"`
-	ResourceData model.JsonObject     `json:"resource_data,omitempty"`
+	Metadata     RelationshipMetadata    `json:"metadata"`
+	ReporterData RelationshipReporter    `json:"reporter_data"`
+	ResourceData model_legacy.JsonObject `json:"resource_data,omitempty"`
 }
 
 type ResourceMetadata struct {
@@ -75,7 +75,7 @@ type RelationshipReporter struct {
 	ReporterInstanceId     string `json:"reporter_instance_id"`
 }
 
-func NewResourceEvent(operationType model.EventOperationType, resource *model.Resource, reportedTime time.Time) (*Event, error) {
+func NewResourceEvent(operationType model_legacy.EventOperationType, resource *model_legacy.Resource, reportedTime time.Time) (*Event, error) {
 	const eventType = "resources"
 
 	eventId, err := uuid.NewUUID() // Todo: we need to have an stable id if we implement some re-trying logic
@@ -96,11 +96,11 @@ func NewResourceEvent(operationType model.EventOperationType, resource *model.Re
 	var deletedAt *time.Time
 
 	switch operationType {
-	case model.OperationTypeCreated:
+	case model_legacy.OperationTypeCreated:
 		createdAt = &reportedTime
-	case model.OperationTypeUpdated:
+	case model_legacy.OperationTypeUpdated:
 		updatedAt = &reportedTime
-	case model.OperationTypeDeleted:
+	case model_legacy.OperationTypeDeleted:
 		deletedAt = &reportedTime
 	}
 
@@ -136,7 +136,7 @@ func NewResourceEvent(operationType model.EventOperationType, resource *model.Re
 	}, nil
 }
 
-func NewRelationshipEvent(operationType model.EventOperationType, relationship *model.Relationship, reportedTime time.Time) (*Event, error) {
+func NewRelationshipEvent(operationType model_legacy.EventOperationType, relationship *model_legacy.Relationship, reportedTime time.Time) (*Event, error) {
 	const eventType = "resources-relationship"
 
 	eventId, err := uuid.NewUUID() // Todo: we need to have an stable id if we implement some re-trying logic
@@ -149,11 +149,11 @@ func NewRelationshipEvent(operationType model.EventOperationType, relationship *
 	var deletedAt *time.Time
 
 	switch operationType {
-	case model.OperationTypeCreated:
+	case model_legacy.OperationTypeCreated:
 		createdAt = &reportedTime
-	case model.OperationTypeUpdated:
+	case model_legacy.OperationTypeUpdated:
 		updatedAt = &reportedTime
-	case model.OperationTypeDeleted:
+	case model_legacy.OperationTypeDeleted:
 		deletedAt = &reportedTime
 	}
 

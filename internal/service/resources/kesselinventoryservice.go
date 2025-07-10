@@ -9,7 +9,7 @@ import (
 	"github.com/go-kratos/kratos/v2/log"
 	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2"
 	authnapi "github.com/project-kessel/inventory-api/internal/authn/api"
-	"github.com/project-kessel/inventory-api/internal/biz/model"
+	"github.com/project-kessel/inventory-api/internal/biz/model_legacy"
 	"github.com/project-kessel/inventory-api/internal/biz/usecase/resources"
 	"github.com/project-kessel/inventory-api/internal/middleware"
 	conv "github.com/project-kessel/inventory-api/internal/service/common"
@@ -208,8 +208,8 @@ func ToLookupResourceResponse(response *pbv1beta1.LookupResourcesResponse) *pb.S
 	}
 }
 
-func authzFromRequestV1beta2(identity *authnapi.Identity, resource *pb.ResourceReference) (*model.ReporterResourceId, error) {
-	return &model.ReporterResourceId{
+func authzFromRequestV1beta2(identity *authnapi.Identity, resource *pb.ResourceReference) (*model_legacy.ReporterResourceId, error) {
+	return &model_legacy.ReporterResourceId{
 		LocalResourceId: resource.ResourceId,
 		ResourceType:    resource.ResourceType,
 		ReporterId:      identity.Principal,
@@ -233,7 +233,7 @@ func updateResponseFromAuthzRequestV1beta2(allowed bool) *pb.CheckForUpdateRespo
 	}
 }
 
-func RequestToResource(r *pb.ReportResourceRequest, identity *authnapi.Identity) (*model.Resource, error) {
+func RequestToResource(r *pb.ReportResourceRequest, identity *authnapi.Identity) (*model_legacy.Resource, error) {
 	log.Info("Report Resource Request: ", r)
 	var resourceType = r.GetType()
 	resourceData, err := conv.ToJsonObject(r)
@@ -265,24 +265,24 @@ func RequestToResource(r *pb.ReportResourceRequest, identity *authnapi.Identity)
 	return conv.ResourceFromPb(resourceType, reporterType, reporterInstanceId, identity.Principal, resourceData, workspaceId, r.Representations, inventoryId), nil
 }
 
-func RequestToDeleteResource(r *pb.DeleteResourceRequest, identity *authnapi.Identity) (model.ReporterResourceId, error) {
+func RequestToDeleteResource(r *pb.DeleteResourceRequest, identity *authnapi.Identity) (model_legacy.ReporterResourceId, error) {
 	log.Info("Delete Resource Request: ", r)
 
 	reference := r.GetReference()
 	if reference == nil {
-		return model.ReporterResourceId{}, fmt.Errorf("reference is required but was nil")
+		return model_legacy.ReporterResourceId{}, fmt.Errorf("reference is required but was nil")
 	}
 
 	reporter := reference.GetReporter()
 	if reporter == nil {
-		return model.ReporterResourceId{}, fmt.Errorf("reporter is required but was nil")
+		return model_legacy.ReporterResourceId{}, fmt.Errorf("reporter is required but was nil")
 	}
 
 	localResourceId := reference.GetResourceId()
 	reporterType := reporter.GetType()
 	resourceType := reference.GetResourceType()
 
-	reporterResourceId := model.ReporterResourceId{
+	reporterResourceId := model_legacy.ReporterResourceId{
 		LocalResourceId: localResourceId,
 		ReporterType:    reporterType,
 		ReporterId:      identity.Principal,

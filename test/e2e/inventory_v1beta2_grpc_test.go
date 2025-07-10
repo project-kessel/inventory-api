@@ -12,7 +12,7 @@ import (
 	"google.golang.org/protobuf/types/known/structpb"
 
 	pbv1beta2 "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2"
-	"github.com/project-kessel/inventory-api/internal/biz/model"
+	"github.com/project-kessel/inventory-api/internal/biz/model_legacy"
 )
 
 // bearerAuth implements grpc.PerRPCCredentials to inject Authorization
@@ -428,7 +428,7 @@ func TestInventoryAPIHTTP_v1beta2_Host_ConsistentWrite(t *testing.T) {
 	_, err = client.ReportResource(ctx, &req)
 	assert.NoError(t, err, "Failed to Report Resource")
 
-	var host model.Resource
+	var host model_legacy.Resource
 	err = db.Where("reporter_resource_id = ?", resourceId).First(&host).Error
 	assert.NoError(t, err, "Error fetching host from DB")
 	assert.NotNil(t, host, "Host not found in DB")

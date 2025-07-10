@@ -3,9 +3,10 @@ package data
 import (
 	"fmt"
 
+	"github.com/project-kessel/inventory-api/internal/biz/model"
 	"gorm.io/gorm"
 
-	"github.com/project-kessel/inventory-api/internal/biz/model"
+	"github.com/project-kessel/inventory-api/internal/biz/model_legacy"
 
 	"github.com/go-kratos/kratos/v2/log"
 )
@@ -14,13 +15,13 @@ import (
 // See https://gorm.io/docs/migration.html
 func Migrate(db *gorm.DB, logger *log.Helper) error {
 	models := []interface{}{
-		&model.ResourceHistory{},
-		&model.Resource{},
-		&model.Relationship{},
-		&model.RelationshipHistory{},
-		&model.LocalInventoryToResource{}, // Deprecated
-		&model.InventoryResource{},
-		&model.OutboxEvent{},
+		&model_legacy.ResourceHistory{},
+		&model_legacy.Resource{},
+		&model_legacy.Relationship{},
+		&model_legacy.RelationshipHistory{},
+		&model_legacy.LocalInventoryToResource{}, // Deprecated
+		&model_legacy.InventoryResource{},
+		&model_legacy.OutboxEvent{},
 		&model.ReporterRepresentation{},
 		&model.CommonRepresentation{},
 	}
@@ -38,7 +39,7 @@ func Migrate(db *gorm.DB, logger *log.Helper) error {
 	}
 
 	for _, m := range models {
-		if gormDbIndexStatement, ok := m.(model.GormDbAfterMigrationHook); ok {
+		if gormDbIndexStatement, ok := m.(model_legacy.GormDbAfterMigrationHook); ok {
 			statement := &gorm.Statement{DB: db}
 			err := statement.Parse(m)
 			if err != nil {

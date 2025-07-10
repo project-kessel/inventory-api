@@ -1,4 +1,4 @@
-package model
+package model_legacy
 
 import (
 	"encoding/json"

@@ -11,18 +11,18 @@ import (
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
-	"github.com/project-kessel/inventory-api/internal/biz/model"
+	"github.com/project-kessel/inventory-api/internal/biz/model_legacy"
 	eventingapi "github.com/project-kessel/inventory-api/internal/eventing/api"
 )
 
 type ResourceRepository interface {
-	Save(ctx context.Context, resource *model.Relationship) (*model.Relationship, error)
-	Update(context.Context, *model.Relationship, uuid.UUID) (*model.Relationship, error)
-	Delete(context.Context, uuid.UUID) (*model.Relationship, error)
-	FindByID(context.Context, uuid.UUID) (*model.Relationship, error)
-	FindRelationship(ctx context.Context, subjectId, objectId uuid.UUID, relationshipType string) (*model.Relationship, error)
-	FindResourceIdByReporterResourceId(ctx context.Context, id model.ReporterResourceId) (uuid.UUID, error)
-	ListAll(context.Context) ([]*model.Relationship, error)
+	Save(ctx context.Context, resource *model_legacy.Relationship) (*model_legacy.Relationship, error)
+	Update(context.Context, *model_legacy.Relationship, uuid.UUID) (*model_legacy.Relationship, error)
+	Delete(context.Context, uuid.UUID) (*model_legacy.Relationship, error)
+	FindByID(context.Context, uuid.UUID) (*model_legacy.Relationship, error)
+	FindRelationship(ctx context.Context, subjectId, objectId uuid.UUID, relationshipType string) (*model_legacy.Relationship, error)
+	FindResourceIdByReporterResourceId(ctx context.Context, id model_legacy.ReporterResourceId) (uuid.UUID, error)
+	ListAll(context.Context) ([]*model_legacy.Relationship, error)
 }
 
 type Usecase struct {
@@ -48,11 +48,11 @@ func New(repository ResourceRepository, eventer eventingapi.Manager, logger log.
 	}
 }
 
-func (uc *Usecase) Create(ctx context.Context, m *model.Relationship) (*model.Relationship, error) {
-	ret := m // Default to returning the input model in case persistence is disabled
+func (uc *Usecase) Create(ctx context.Context, m *model_legacy.Relationship) (*model_legacy.Relationship, error) {
+	ret := m // Default to returning the input model_legacy in case persistence is disabled
 
 	if !uc.DisablePersistence {
-		relationshipId := model.ReporterRelationshipIdFromRelationship(m)
+		relationshipId := model_legacy.ReporterRelationshipIdFromRelationship(m)
 
 		subjectId, err := uc.repository.FindResourceIdByReporterResourceId(ctx, relationshipId.SubjectId)
 		if err != nil {
@@ -86,7 +86,7 @@ func (uc *Usecase) Create(ctx context.Context, m *model.Relationship) (*model.Re
 	}
 
 	if uc.eventer != nil {
-		err := DefaultRelationshipSendEvent(ctx, m, uc.eventer, *m.CreatedAt, model.OperationTypeCreated)
+		err := DefaultRelationshipSendEvent(ctx, m, uc.eventer, *m.CreatedAt, model_legacy.OperationTypeCreated)
 
 		if err != nil {
 			return nil, err
@@ -97,8 +97,8 @@ func (uc *Usecase) Create(ctx context.Context, m *model.Relationship) (*model.Re
 	return ret, nil
 }
 
-func (uc *Usecase) Update(ctx context.Context, m *model.Relationship, id model.ReporterRelationshipId) (*model.Relationship, error) {
-	ret := m // Default to returning the input model in case persistence is disabled
+func (uc *Usecase) Update(ctx context.Context, m *model_legacy.Relationship, id model_legacy.ReporterRelationshipId) (*model_legacy.Relationship, error) {
+	ret := m // Default to returning the input model_legacy in case persistence is disabled
 
 	if !uc.DisablePersistence {
 		subjectId, err := uc.repository.FindResourceIdByReporterResourceId(ctx, id.SubjectId)
@@ -133,7 +133,7 @@ func (uc *Usecase) Update(ctx context.Context, m *model.Relationship, id model.R
 	}
 
 	if uc.eventer != nil {
-		err := DefaultRelationshipSendEvent(ctx, m, uc.eventer, *m.UpdatedAt, model.OperationTypeUpdated)
+		err := DefaultRelationshipSendEvent(ctx, m, uc.eventer, *m.UpdatedAt, model_legacy.OperationTypeUpdated)
 
 		if err != nil {
 			return nil, err
@@ -144,9 +144,9 @@ func (uc *Usecase) Update(ctx context.Context, m *model.Relationship, id model.R
 	return ret, nil
 }
 
-func (uc *Usecase) Delete(ctx context.Context, id model.ReporterRelationshipId) error {
-	m := &model.Relationship{
-		// TODO: Create model
+func (uc *Usecase) Delete(ctx context.Context, id model_legacy.ReporterRelationshipId) error {
+	m := &model_legacy.Relationship{
+		// TODO: Create model_legacy
 	}
 
 	if !uc.DisablePersistence {
@@ -174,7 +174,7 @@ func (uc *Usecase) Delete(ctx context.Context, id model.ReporterRelationshipId) 
 	}
 
 	if uc.eventer != nil {
-		err := DefaultRelationshipSendEvent(ctx, m, uc.eventer, time.Now(), model.OperationTypeDeleted)
+		err := DefaultRelationshipSendEvent(ctx, m, uc.eventer, time.Now(), model_legacy.OperationTypeDeleted)
 
 		if err != nil {
 			return err
@@ -187,7 +187,7 @@ func (uc *Usecase) Delete(ctx context.Context, id model.ReporterRelationshipId) 
 
 // Moved here from common.go since it's not used outside this file, so keeping it here avoids maintaining an unnecessary common.go.
 
-func DefaultRelationshipSendEvent(ctx context.Context, m *model.Relationship, eventer eventingapi.Manager, reportedTime time.Time, operationType model.EventOperationType) error {
+func DefaultRelationshipSendEvent(ctx context.Context, m *model_legacy.Relationship, eventer eventingapi.Manager, reportedTime time.Time, operationType model_legacy.EventOperationType) error {
 	identity, err := middleware.GetIdentity(ctx)
 	if err != nil {
 		return err

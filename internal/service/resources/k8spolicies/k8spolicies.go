@@ -7,7 +7,7 @@ import (
 
 	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/resources"
 	authnapi "github.com/project-kessel/inventory-api/internal/authn/api"
-	"github.com/project-kessel/inventory-api/internal/biz/model"
+	"github.com/project-kessel/inventory-api/internal/biz/model_legacy"
 	"github.com/project-kessel/inventory-api/internal/middleware"
 	conv "github.com/project-kessel/inventory-api/internal/service/common"
 )
@@ -56,7 +56,7 @@ func (c *K8sPolicyService) UpdateK8SPolicy(ctx context.Context, r *pb.UpdateK8SP
 
 	if h, err := k8sPolicyFromUpdateRequest(r, identity); err == nil {
 		// Todo: Update to use the right ID
-		if resp, err := c.Ctl.Update(ctx, h, model.ReporterResourceIdFromResource(h)); err == nil {
+		if resp, err := c.Ctl.Update(ctx, h, model_legacy.ReporterResourceIdFromResource(h)); err == nil {
 			return updateResponseFromK8sPolicy(resp), nil
 
 		} else {
@@ -84,7 +84,7 @@ func (c *K8sPolicyService) DeleteK8SPolicy(ctx context.Context, r *pb.DeleteK8SP
 	}
 }
 
-func k8sPolicyFromCreateRequest(r *pb.CreateK8SPolicyRequest, identity *authnapi.Identity) (*model.Resource, error) {
+func k8sPolicyFromCreateRequest(r *pb.CreateK8SPolicyRequest, identity *authnapi.Identity) (*model_legacy.Resource, error) {
 	resourceData, err := conv.ToJsonObject(r.K8SPolicy.ResourceData)
 	if err != nil {
 		return nil, err
@@ -93,11 +93,11 @@ func k8sPolicyFromCreateRequest(r *pb.CreateK8SPolicyRequest, identity *authnapi
 	return conv.ResourceFromPbv1beta1(ResourceType, identity.Principal, resourceData, r.K8SPolicy.Metadata, r.K8SPolicy.ReporterData), nil
 }
 
-func createResponseFromK8sPolicy(p *model.Resource) *pb.CreateK8SPolicyResponse {
+func createResponseFromK8sPolicy(p *model_legacy.Resource) *pb.CreateK8SPolicyResponse {
 	return &pb.CreateK8SPolicyResponse{}
 }
 
-func k8sPolicyFromUpdateRequest(r *pb.UpdateK8SPolicyRequest, identity *authnapi.Identity) (*model.Resource, error) {
+func k8sPolicyFromUpdateRequest(r *pb.UpdateK8SPolicyRequest, identity *authnapi.Identity) (*model_legacy.Resource, error) {
 	resourceData, err := conv.ToJsonObject(r.K8SPolicy.ResourceData)
 	if err != nil {
 		return nil, err
@@ -106,11 +106,11 @@ func k8sPolicyFromUpdateRequest(r *pb.UpdateK8SPolicyRequest, identity *authnapi
 	return conv.ResourceFromPbv1beta1(ResourceType, identity.Principal, resourceData, r.K8SPolicy.Metadata, r.K8SPolicy.ReporterData), nil
 }
 
-func updateResponseFromK8sPolicy(p *model.Resource) *pb.UpdateK8SPolicyResponse {
+func updateResponseFromK8sPolicy(p *model_legacy.Resource) *pb.UpdateK8SPolicyResponse {
 	return &pb.UpdateK8SPolicyResponse{}
 }
 
-func fromDeleteRequest(r *pb.DeleteK8SPolicyRequest, identity *authnapi.Identity) (model.ReporterResourceId, error) {
+func fromDeleteRequest(r *pb.DeleteK8SPolicyRequest, identity *authnapi.Identity) (model_legacy.ReporterResourceId, error) {
 	return conv.ReporterResourceIdFromPb(ResourceType, identity.Principal, r.ReporterData), nil
 }
 

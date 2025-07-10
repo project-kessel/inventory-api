@@ -21,27 +21,27 @@ import (
 
 	common "github.com/project-kessel/inventory-api/cmd/common"
 	authzapi "github.com/project-kessel/inventory-api/internal/authz/api"
-	"github.com/project-kessel/inventory-api/internal/biz/model"
+	"github.com/project-kessel/inventory-api/internal/biz/model_legacy"
 	eventingapi "github.com/project-kessel/inventory-api/internal/eventing/api"
 	"github.com/project-kessel/inventory-api/internal/server"
 )
 
 type ReporterResourceRepository interface {
-	Create(context.Context, *model.Resource, string, string) (*model.Resource, error)
-	Update(context.Context, *model.Resource, uuid.UUID, string, string) (*model.Resource, error)
-	Delete(context.Context, uuid.UUID, string) (*model.Resource, error)
-	FindByID(context.Context, uuid.UUID) (*model.Resource, error)
-	FindByWorkspaceId(context.Context, string) ([]*model.Resource, error)
-	FindByReporterResourceId(context.Context, model.ReporterResourceId) (*model.Resource, error)
-	FindByReporterResourceIdv1beta2(context.Context, model.ReporterResourceUniqueIndex) (*model.Resource, error)
-	FindByReporterData(context.Context, string, string) (*model.Resource, error)
-	FindByInventoryIdAndResourceType(ctx context.Context, inventoryId *uuid.UUID, resourceType string) (*model.Resource, error)
-	FindByInventoryIdAndReporter(ctx context.Context, inventoryId *uuid.UUID, reporterInstanceId string, reporterType string) (*model.Resource, error)
-	ListAll(context.Context) ([]*model.Resource, error)
+	Create(context.Context, *model_legacy.Resource, string, string) (*model_legacy.Resource, error)
+	Update(context.Context, *model_legacy.Resource, uuid.UUID, string, string) (*model_legacy.Resource, error)
+	Delete(context.Context, uuid.UUID, string) (*model_legacy.Resource, error)
+	FindByID(context.Context, uuid.UUID) (*model_legacy.Resource, error)
+	FindByWorkspaceId(context.Context, string) ([]*model_legacy.Resource, error)
+	FindByReporterResourceId(context.Context, model_legacy.ReporterResourceId) (*model_legacy.Resource, error)
+	FindByReporterResourceIdv1beta2(context.Context, model_legacy.ReporterResourceUniqueIndex) (*model_legacy.Resource, error)
+	FindByReporterData(context.Context, string, string) (*model_legacy.Resource, error)
+	FindByInventoryIdAndResourceType(ctx context.Context, inventoryId *uuid.UUID, resourceType string) (*model_legacy.Resource, error)
+	FindByInventoryIdAndReporter(ctx context.Context, inventoryId *uuid.UUID, reporterInstanceId string, reporterType string) (*model_legacy.Resource, error)
+	ListAll(context.Context) ([]*model_legacy.Resource, error)
 }
 
 type InventoryResourceRepository interface {
-	FindByID(context.Context, uuid.UUID) (*model.InventoryResource, error)
+	FindByID(context.Context, uuid.UUID) (*model_legacy.InventoryResource, error)
 }
 
 var (
@@ -91,15 +91,15 @@ func New(reporterResourceRepository ReporterResourceRepository, inventoryResourc
 	}
 }
 
-func (uc *Usecase) Upsert(ctx context.Context, m *model.Resource, write_visibility v1beta2.WriteVisibility) (*model.Resource, error) {
+func (uc *Usecase) Upsert(ctx context.Context, m *model_legacy.Resource, write_visibility v1beta2.WriteVisibility) (*model_legacy.Resource, error) {
 	log.Info("upserting resource: ", m)
-	ret := m // Default to returning the input model in case persistence is disabled
+	ret := m // Default to returning the input model_legacy in case persistence is disabled
 	var subscription pubsub.Subscription
 	var txidStr string
 
 	if !uc.Config.DisablePersistence {
 		// check if the resource already exists
-		existingResource, err := uc.ReporterResourceRepository.FindByReporterResourceIdv1beta2(ctx, model.ReporterResourceIdv1beta2FromResource(m))
+		existingResource, err := uc.ReporterResourceRepository.FindByReporterResourceIdv1beta2(ctx, model_legacy.ReporterResourceIdv1beta2FromResource(m))
 
 		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, ErrDatabaseError
@@ -172,7 +172,7 @@ func (uc *Usecase) Upsert(ctx context.Context, m *model.Resource, write_visibili
 	return ret, nil
 }
 
-func createNewReporterResource(ctx context.Context, m *model.Resource, uc *Usecase, txid string) (*model.Resource, error) {
+func createNewReporterResource(ctx context.Context, m *model_legacy.Resource, uc *Usecase, txid string) (*model_legacy.Resource, error) {
 	ret, err := uc.ReporterResourceRepository.Create(ctx, m, uc.Namespace, txid)
 
 	if err != nil {
@@ -182,7 +182,7 @@ func createNewReporterResource(ctx context.Context, m *model.Resource, uc *Useca
 	return ret, nil
 }
 
-func validateSameResourceFromMultipleReportersShareInventoryId(ctx context.Context, m *model.Resource, uc *Usecase) error {
+func validateSameResourceFromMultipleReportersShareInventoryId(ctx context.Context, m *model_legacy.Resource, uc *Usecase) error {
 	// Multiple reporters should have same inventory id.
 	existingInventoryIdResource, err := uc.ReporterResourceRepository.FindByInventoryIdAndResourceType(ctx, m.InventoryId, m.ResourceType)
 	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
@@ -201,7 +201,7 @@ func validateSameResourceFromMultipleReportersShareInventoryId(ctx context.Conte
 	return nil
 }
 
-func updateExistingReporterResource(ctx context.Context, m *model.Resource, existingResource *model.Resource, uc *Usecase, txid string) (*model.Resource, error) {
+func updateExistingReporterResource(ctx context.Context, m *model_legacy.Resource, existingResource *model_legacy.Resource, uc *Usecase, txid string) (*model_legacy.Resource, error) {
 
 	if m.InventoryId != nil && existingResource.InventoryId.String() != m.InventoryId.String() {
 		return nil, ErrInventoryIdMismatch
@@ -220,7 +220,7 @@ func (uc *Usecase) LookupResources(ctx context.Context, request *kessel.LookupRe
 	return uc.Authz.LookupResources(ctx, request)
 }
 
-func (uc *Usecase) Check(ctx context.Context, permission, namespace string, sub *kessel.SubjectReference, id model.ReporterResourceId) (bool, error) {
+func (uc *Usecase) Check(ctx context.Context, permission, namespace string, sub *kessel.SubjectReference, id model_legacy.ReporterResourceId) (bool, error) {
 	res, err := uc.ReporterResourceRepository.FindByReporterResourceId(ctx, id)
 	if err != nil {
 		// If the resource doesn't exist in inventory (ie. no consistency token available)
@@ -229,7 +229,7 @@ func (uc *Usecase) Check(ctx context.Context, permission, namespace string, sub 
 		if !errors.Is(err, gorm.ErrRecordNotFound) {
 			return false, err
 		}
-		res = &model.Resource{ResourceType: id.ResourceType, ReporterResourceId: id.LocalResourceId}
+		res = &model_legacy.Resource{ResourceType: id.ResourceType, ReporterResourceId: id.LocalResourceId}
 	}
 
 	allowed, _, err := uc.Authz.Check(ctx, namespace, permission, res, sub)
@@ -243,7 +243,7 @@ func (uc *Usecase) Check(ctx context.Context, permission, namespace string, sub 
 	return false, nil
 }
 
-func (uc *Usecase) CheckForUpdate(ctx context.Context, permission, namespace string, sub *kessel.SubjectReference, id model.ReporterResourceId) (bool, error) {
+func (uc *Usecase) CheckForUpdate(ctx context.Context, permission, namespace string, sub *kessel.SubjectReference, id model_legacy.ReporterResourceId) (bool, error) {
 	res, err := uc.ReporterResourceRepository.FindByReporterResourceId(ctx, id)
 	recordToken := true
 	if err != nil {
@@ -252,7 +252,7 @@ func (uc *Usecase) CheckForUpdate(ctx context.Context, permission, namespace str
 			// DONT write consistency token
 			// no actual resource exists in DB to update
 			recordToken = false
-			res = &model.Resource{ResourceType: id.ResourceType, ReporterResourceId: id.LocalResourceId}
+			res = &model_legacy.Resource{ResourceType: id.ResourceType, ReporterResourceId: id.LocalResourceId}
 		} else {
 			return false, err
 		}
@@ -283,7 +283,7 @@ func (uc *Usecase) CheckForUpdate(ctx context.Context, permission, namespace str
 	return false, nil
 }
 
-func (uc *Usecase) ListResourcesInWorkspace(ctx context.Context, permission, namespace string, sub *kessel.SubjectReference, id string) (chan *model.Resource, chan error, error) {
+func (uc *Usecase) ListResourcesInWorkspace(ctx context.Context, permission, namespace string, sub *kessel.SubjectReference, id string) (chan *model_legacy.Resource, chan error, error) {
 	resources, err := uc.ReporterResourceRepository.FindByWorkspaceId(ctx, id)
 	if err != nil {
 		return nil, nil, err
@@ -293,8 +293,8 @@ func (uc *Usecase) ListResourcesInWorkspace(ctx context.Context, permission, nam
 
 	const NUM_WORKERS = 100
 
-	resourceChan := make(chan *model.Resource, len(resources))
-	allowedChan := make(chan *model.Resource, len(resources))
+	resourceChan := make(chan *model_legacy.Resource, len(resources))
+	allowedChan := make(chan *model_legacy.Resource, len(resources))
 	errorChan := make(chan error, 1)
 	var wg sync.WaitGroup
 
@@ -321,7 +321,7 @@ func (uc *Usecase) ListResourcesInWorkspace(ctx context.Context, permission, nam
 	return allowedChan, errorChan, nil
 }
 
-func (uc *Usecase) checkWorker(ctx context.Context, permission, namespace string, sub *kessel.SubjectReference, resourceChan <-chan *model.Resource, allowedChan chan<- *model.Resource, errorChan chan<- error, wg *sync.WaitGroup) {
+func (uc *Usecase) checkWorker(ctx context.Context, permission, namespace string, sub *kessel.SubjectReference, resourceChan <-chan *model_legacy.Resource, allowedChan chan<- *model_legacy.Resource, errorChan chan<- error, wg *sync.WaitGroup) {
 	for resource := range resourceChan {
 		log.Debugf("ListResourcesInWorkspace: checkforview on %+v", resource)
 
@@ -337,8 +337,8 @@ func (uc *Usecase) checkWorker(ctx context.Context, permission, namespace string
 }
 
 // Deprecated. Remove after notifications and ACM migrates to v1beta2
-func (uc *Usecase) Create(ctx context.Context, m *model.Resource) (*model.Resource, error) {
-	ret := m // Default to returning the input model in case persistence is disabled
+func (uc *Usecase) Create(ctx context.Context, m *model_legacy.Resource) (*model_legacy.Resource, error) {
+	ret := m // Default to returning the input model_legacy in case persistence is disabled
 	var subscription pubsub.Subscription
 	var txidStr string
 
@@ -347,7 +347,7 @@ func (uc *Usecase) Create(ctx context.Context, m *model.Resource) (*model.Resour
 		existingResource, err := uc.ReporterResourceRepository.FindByReporterData(ctx, m.ReporterId, m.ReporterResourceId)
 		if err != nil && errors.Is(err, gorm.ErrRecordNotFound) {
 			// Deprecated: fallback case for backwards compatibility
-			existingResource, err = uc.ReporterResourceRepository.FindByReporterResourceId(ctx, model.ReporterResourceIdFromResource(m))
+			existingResource, err = uc.ReporterResourceRepository.FindByReporterResourceId(ctx, model_legacy.ReporterResourceIdFromResource(m))
 		}
 
 		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
@@ -394,9 +394,9 @@ func (uc *Usecase) Create(ctx context.Context, m *model.Resource) (*model.Resour
 
 //Deprecated. Remove after notifications and ACM migrates to v1beta2
 
-// Update updates a model in the database, updates related tuples in the relations-api, and issues an update event.
-func (uc *Usecase) Update(ctx context.Context, m *model.Resource, id model.ReporterResourceId) (*model.Resource, error) {
-	ret := m // Default to returning the input model in case persistence is disabled
+// Update updates a model_legacy in the database, updates related tuples in the relations-api, and issues an update event.
+func (uc *Usecase) Update(ctx context.Context, m *model_legacy.Resource, id model_legacy.ReporterResourceId) (*model_legacy.Resource, error) {
+	ret := m // Default to returning the input model_legacy in case persistence is disabled
 	var subscription pubsub.Subscription
 	var txidStr string
 
@@ -405,7 +405,7 @@ func (uc *Usecase) Update(ctx context.Context, m *model.Resource, id model.Repor
 		existingResource, err := uc.ReporterResourceRepository.FindByReporterData(ctx, m.ReporterId, m.ReporterResourceId)
 		if err != nil && errors.Is(err, gorm.ErrRecordNotFound) {
 			// Deprecated: fallback case for backwards compatibility
-			existingResource, err = uc.ReporterResourceRepository.FindByReporterResourceId(ctx, model.ReporterResourceIdFromResource(m))
+			existingResource, err = uc.ReporterResourceRepository.FindByReporterResourceId(ctx, model_legacy.ReporterResourceIdFromResource(m))
 		}
 
 		if err != nil {
@@ -452,9 +452,9 @@ func (uc *Usecase) Update(ctx context.Context, m *model.Resource, id model.Repor
 
 }
 
-// Delete deletes a model from the database, removes related tuples from the relations-api, and issues a delete event.
-func (uc *Usecase) Delete(ctx context.Context, id model.ReporterResourceId) error {
-	m := &model.Resource{}
+// Delete deletes a model_legacy from the database, removes related tuples from the relations-api, and issues a delete event.
+func (uc *Usecase) Delete(ctx context.Context, id model_legacy.ReporterResourceId) error {
+	m := &model_legacy.Resource{}
 
 	if !uc.Config.DisablePersistence {
 		// check if the resource exists
@@ -485,7 +485,7 @@ func (uc *Usecase) Delete(ctx context.Context, id model.ReporterResourceId) erro
 }
 
 // Check if request comes from SP in allowlist
-func isSPInAllowlist(m *model.Resource, allowlist []string) bool {
+func isSPInAllowlist(m *model_legacy.Resource, allowlist []string) bool {
 	for _, sp := range allowlist {
 		// either specific SP or everyone
 		if sp == m.ReporterId || sp == "*" {
@@ -496,7 +496,7 @@ func isSPInAllowlist(m *model.Resource, allowlist []string) bool {
 	return false
 }
 
-func computeReadAfterWrite(uc *Usecase, write_visibility v1beta2.WriteVisibility, m *model.Resource) bool {
+func computeReadAfterWrite(uc *Usecase, write_visibility v1beta2.WriteVisibility, m *model_legacy.Resource) bool {
 	// read after write functionality is enabled/disabled globally.
 	// And executed if request specifies and
 	// came from service provider in allowlist

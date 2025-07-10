@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"go.opentelemetry.io/otel"
 
-	"github.com/project-kessel/inventory-api/internal/biz/model"
+	"github.com/project-kessel/inventory-api/internal/biz/model_legacy"
 	"github.com/project-kessel/inventory-api/internal/mocks"
 
 	"github.com/go-kratos/kratos/v2/log"
@@ -177,11 +177,11 @@ func TestParseHeaders(t *testing.T) {
 	}{
 		{
 			name:              "Create Operation",
-			expectedOperation: string(model.OperationTypeCreated),
+			expectedOperation: string(model_legacy.OperationTypeCreated),
 			expectedTxid:      "123456",
 			msg: &kafka.Message{
 				Headers: []kafka.Header{
-					{Key: "operation", Value: []byte(string(model.OperationTypeCreated))},
+					{Key: "operation", Value: []byte(string(model_legacy.OperationTypeCreated))},
 					{Key: "txid", Value: []byte("123456")},
 				},
 			},
@@ -189,11 +189,11 @@ func TestParseHeaders(t *testing.T) {
 		},
 		{
 			name:              "Update Operation",
-			expectedOperation: string(model.OperationTypeUpdated),
+			expectedOperation: string(model_legacy.OperationTypeUpdated),
 			expectedTxid:      "123456",
 			msg: &kafka.Message{
 				Headers: []kafka.Header{
-					{Key: "operation", Value: []byte(string(model.OperationTypeUpdated))},
+					{Key: "operation", Value: []byte(string(model_legacy.OperationTypeUpdated))},
 					{Key: "txid", Value: []byte("123456")},
 				},
 			},
@@ -201,11 +201,11 @@ func TestParseHeaders(t *testing.T) {
 		},
 		{
 			name:              "Delete Operation",
-			expectedOperation: string(model.OperationTypeDeleted),
+			expectedOperation: string(model_legacy.OperationTypeDeleted),
 			expectedTxid:      "",
 			msg: &kafka.Message{
 				Headers: []kafka.Header{
-					{Key: "operation", Value: []byte(string(model.OperationTypeDeleted))},
+					{Key: "operation", Value: []byte(string(model_legacy.OperationTypeDeleted))},
 					{Key: "txid", Value: []byte{}},
 				},
 			},
@@ -259,11 +259,11 @@ func TestParseHeaders(t *testing.T) {
 		},
 		{
 			name:              "Extra Headers",
-			expectedOperation: string(model.OperationTypeCreated),
+			expectedOperation: string(model_legacy.OperationTypeCreated),
 			expectedTxid:      "123456",
 			msg: &kafka.Message{
 				Headers: []kafka.Header{
-					{Key: "operation", Value: []byte(string(model.OperationTypeCreated))},
+					{Key: "operation", Value: []byte(string(model_legacy.OperationTypeCreated))},
 					{Key: "txid", Value: []byte("123456")},
 					{Key: "unused-header", Value: []byte("unused-header-data")},
 				},
@@ -335,7 +335,7 @@ func TestInventoryConsumer_ProcessMessage(t *testing.T) {
 	}{
 		{
 			name:              "Create Operation",
-			expectedOperation: string(model.OperationTypeCreated),
+			expectedOperation: string(model_legacy.OperationTypeCreated),
 			expectedTxid:      "123456",
 			msg: &kafka.Message{
 				Key:   []byte(testMessageKey),
@@ -345,7 +345,7 @@ func TestInventoryConsumer_ProcessMessage(t *testing.T) {
 		},
 		{
 			name:              "Update Operation",
-			expectedOperation: string(model.OperationTypeUpdated),
+			expectedOperation: string(model_legacy.OperationTypeUpdated),
 			expectedTxid:      "123456",
 			msg: &kafka.Message{
 				Key:   []byte(testMessageKey),
@@ -355,7 +355,7 @@ func TestInventoryConsumer_ProcessMessage(t *testing.T) {
 		},
 		{
 			name:              "Delete Operation",
-			expectedOperation: string(model.OperationTypeDeleted),
+			expectedOperation: string(model_legacy.OperationTypeDeleted),
 			expectedTxid:      "",
 			msg: &kafka.Message{
 				Key:   []byte(testMessageKey),
@@ -372,7 +372,7 @@ func TestInventoryConsumer_ProcessMessage(t *testing.T) {
 		},
 		{
 			name:              "Created but relations disabled",
-			expectedOperation: string(model.OperationTypeCreated),
+			expectedOperation: string(model_legacy.OperationTypeCreated),
 			expectedTxid:      "123456",
 			msg:               &kafka.Message{},
 			relationsEnabled:  false,
@@ -395,7 +395,7 @@ func TestInventoryConsumer_ProcessMessage(t *testing.T) {
 			assert.Equal(t, parsedHeaders["operation"], test.expectedOperation)
 			assert.Equal(t, parsedHeaders["txid"], test.expectedTxid)
 
-			if (test.expectedOperation == string(model.OperationTypeCreated) || test.expectedOperation == string(model.OperationTypeUpdated)) && test.relationsEnabled {
+			if (test.expectedOperation == string(model_legacy.OperationTypeCreated) || test.expectedOperation == string(model_legacy.OperationTypeUpdated)) && test.relationsEnabled {
 				resp, err := tester.inv.ProcessMessage(parsedHeaders, test.relationsEnabled, test.msg)
 				assert.Nil(t, err)
 				assert.Equal(t, "test-token", resp)

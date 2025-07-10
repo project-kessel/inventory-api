@@ -14,7 +14,7 @@ import (
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 
-	"github.com/project-kessel/inventory-api/internal/biz/model"
+	"github.com/project-kessel/inventory-api/internal/biz/model_legacy"
 	"github.com/project-kessel/inventory-api/internal/data"
 )
 
@@ -49,8 +49,8 @@ func setupTest(t *testing.T) (*gorm.DB, *Repo) {
 	return db, repo
 }
 
-func resource1() *model.Resource {
-	return &model.Resource{
+func resource1() *model_legacy.Resource {
+	return &model_legacy.Resource{
 		ID:    uuid.UUID{},
 		OrgId: "my-org",
 		ResourceData: map[string]any{
@@ -58,8 +58,8 @@ func resource1() *model.Resource {
 		},
 		ResourceType: "my-resource",
 		WorkspaceId:  "my-workspace",
-		Reporter: model.ResourceReporter{
-			Reporter: model.Reporter{
+		Reporter: model_legacy.ResourceReporter{
+			Reporter: model_legacy.Reporter{
 				ReporterId:      "reporter_id",
 				ReporterType:    "reporter_type",
 				ReporterVersion: "1.0.2",
@@ -68,7 +68,7 @@ func resource1() *model.Resource {
 		},
 		ConsoleHref: "/etc/console",
 		ApiHref:     "/etc/api",
-		Labels: model.Labels{
+		Labels: model_legacy.Labels{
 			{
 				Key:   "label-1",
 				Value: "value-1",
@@ -87,7 +87,7 @@ func resource1() *model.Resource {
 
 // Checks for resource equality
 // This is required as the time.Time are not exactly equal
-func assertEqualResource(t *testing.T, r1 *model.Resource, r2 *model.Resource) {
+func assertEqualResource(t *testing.T, r1 *model_legacy.Resource, r2 *model_legacy.Resource) {
 	assert.Equal(t, r1.CreatedAt.Unix(), r2.CreatedAt.Unix())
 	assert.Equal(t, r1.UpdatedAt.Unix(), r2.UpdatedAt.Unix())
 
@@ -102,8 +102,8 @@ func assertEqualResource(t *testing.T, r1 *model.Resource, r2 *model.Resource) {
 	assert.Equal(t, r1b, r2b)
 }
 
-func assertEqualResourceHistory(t *testing.T, r *model.Resource, rh *model.ResourceHistory, operationType model.OperationType) {
-	rhExpected := &model.ResourceHistory{
+func assertEqualResourceHistory(t *testing.T, r *model_legacy.Resource, rh *model_legacy.ResourceHistory, operationType model_legacy.OperationType) {
+	rhExpected := &model_legacy.ResourceHistory{
 		ID:            rh.ID,
 		OrgId:         r.OrgId,
 		ResourceData:  r.ResourceData,
@@ -122,11 +122,11 @@ func assertEqualResourceHistory(t *testing.T, r *model.Resource, rh *model.Resou
 	assert.Equal(t, rhExpected, rh)
 }
 
-func assertEqualLocalHistoryToResource(t *testing.T, r *model.Resource, litr *model.LocalInventoryToResource) {
-	litrExpected := &model.LocalInventoryToResource{
+func assertEqualLocalHistoryToResource(t *testing.T, r *model_legacy.Resource, litr *model_legacy.LocalInventoryToResource) {
+	litrExpected := &model_legacy.LocalInventoryToResource{
 		ResourceId:         r.ID,
 		CreatedAt:          litr.CreatedAt,
-		ReporterResourceId: model.ReporterResourceIdFromResource(r),
+		ReporterResourceId: model_legacy.ReporterResourceIdFromResource(r),
 	}
 
 	assert.Equal(t, r.CreatedAt.Unix(), litr.CreatedAt.Unix())
@@ -143,30 +143,30 @@ func TestCreateResource(t *testing.T) {
 	assert.Nil(t, err)
 
 	// The resource is now in the database and is equal to the return value from Save
-	resource := model.Resource{}
+	resource := model_legacy.Resource{}
 	assert.Nil(t, db.First(&resource, r.ID).Error)
 	assertEqualResource(t, &resource, r)
 
 	// One resource_history entry is created
-	resourceHistory := []model.ResourceHistory{}
+	resourceHistory := []model_legacy.ResourceHistory{}
 	assert.Nil(t, db.Find(&resourceHistory).Error)
 	assert.Len(t, resourceHistory, 1)
-	assertEqualResourceHistory(t, &resource, &resourceHistory[0], model.OperationTypeCreate)
+	assertEqualResourceHistory(t, &resource, &resourceHistory[0], model_legacy.OperationTypeCreate)
 
 	// One LocalInventoryToResource mapping is also created
-	localInventoryToResource := []model.LocalInventoryToResource{}
+	localInventoryToResource := []model_legacy.LocalInventoryToResource{}
 	assert.Nil(t, db.Find(&localInventoryToResource).Error)
 	assert.Len(t, localInventoryToResource, 1)
 	assertEqualLocalHistoryToResource(t, &resource, &localInventoryToResource[0])
 
 	// One InventoryResource mapping is created
-	inventoryResource := []model.InventoryResource{}
+	inventoryResource := []model_legacy.InventoryResource{}
 	assert.Nil(t, db.Find(&inventoryResource).Error)
 	assert.Len(t, inventoryResource, 1)
 	assert.Equal(t, *resource.InventoryId, inventoryResource[0].ID)
 
 	// Nothing exists in the outbox (expected)
-	outboxEvents := []model.OutboxEvent{}
+	outboxEvents := []model_legacy.OutboxEvent{}
 	assert.Nil(t, db.Find(&outboxEvents).Error)
 	assert.Len(t, outboxEvents, 0)
 }
@@ -182,7 +182,7 @@ func TestCreateResourceWithInventoryId(t *testing.T) {
 	assert.NotNil(t, r)
 	assert.Nil(t, err)
 
-	resource1 := model.Resource{}
+	resource1 := model_legacy.Resource{}
 	assert.Nil(t, db.First(&resource1, r.ID).Error)
 	assertEqualResource(t, &resource1, r)
 
@@ -196,7 +196,7 @@ func TestCreateResourceWithInventoryId(t *testing.T) {
 	assert.NotNil(t, r2)
 	assert.Nil(t, err)
 
-	resource2 := model.Resource{}
+	resource2 := model_legacy.Resource{}
 	assert.Nil(t, db.First(&resource2, r2.ID).Error)
 	assertEqualResource(t, &resource2, r2)
 	assert.Nil(t, db.First(&resource1, r.ID).Error)
@@ -204,7 +204,7 @@ func TestCreateResourceWithInventoryId(t *testing.T) {
 	assert.Equal(t, resource2.WorkspaceId, resource1.WorkspaceId)
 
 	// Only one InventoryResource record still exists, and both records point to it
-	inventoryResource := []model.InventoryResource{}
+	inventoryResource := []model_legacy.InventoryResource{}
 	assert.Nil(t, db.Find(&inventoryResource).Error)
 	assert.Len(t, inventoryResource, 1)
 	assert.Equal(t, *resource1.InventoryId, inventoryResource[0].ID)
@@ -213,7 +213,7 @@ func TestCreateResourceWithInventoryId(t *testing.T) {
 	assert.Equal(t, resource2.WorkspaceId, inventoryResource[0].WorkspaceId)
 
 	// Nothing exists in the outbox (expected)
-	outboxEvents := []model.OutboxEvent{}
+	outboxEvents := []model_legacy.OutboxEvent{}
 	assert.Nil(t, db.Find(&outboxEvents).Error)
 	assert.Len(t, outboxEvents, 0)
 }
@@ -226,11 +226,11 @@ func TestUpdateFailsIfResourceNotFound(t *testing.T) {
 	assert.Nil(t, err)
 
 	// Update fails if id is not found
-	_, err = repo.Update(ctx, &model.Resource{}, id, namespace, emptyTxId)
+	_, err = repo.Update(ctx, &model_legacy.Resource{}, id, namespace, emptyTxId)
 	assert.ErrorIs(t, err, gorm.ErrRecordNotFound)
 
 	// Nothing exists in the outbox (expected)
-	outboxEvents := []model.OutboxEvent{}
+	outboxEvents := []model_legacy.OutboxEvent{}
 	assert.Nil(t, db.Find(&outboxEvents).Error)
 	assert.Len(t, outboxEvents, 0)
 }
@@ -255,24 +255,24 @@ func TestUpdateResource(t *testing.T) {
 	assert.Equal(t, createdAt.Unix(), r2.CreatedAt.Unix())
 
 	// The resource is now in the database and is equal to the return value from Update
-	resource := model.Resource{}
+	resource := model_legacy.Resource{}
 	assert.Nil(t, db.First(&resource, r2.ID).Error)
 	assertEqualResource(t, &resource, r2)
 
 	// Two resource_history entry are created
-	resourceHistory := []model.ResourceHistory{}
+	resourceHistory := []model_legacy.ResourceHistory{}
 	assert.Nil(t, db.Find(&resourceHistory).Error)
 	assert.Len(t, resourceHistory, 2)
-	assertEqualResourceHistory(t, &resource, &resourceHistory[1], model.OperationTypeUpdate)
+	assertEqualResourceHistory(t, &resource, &resourceHistory[1], model_legacy.OperationTypeUpdate)
 
-	inventoryResource := []model.InventoryResource{}
+	inventoryResource := []model_legacy.InventoryResource{}
 	assert.Nil(t, db.Find(&inventoryResource).Error)
 	assert.Len(t, inventoryResource, 1)
 	// Workspace for InventoryResource was updated to r2's workspace
 	assert.Equal(t, r2.WorkspaceId, inventoryResource[0].WorkspaceId)
 
 	// Nothing exists in the outbox (expected)
-	outboxEvents := []model.OutboxEvent{}
+	outboxEvents := []model_legacy.OutboxEvent{}
 	assert.Nil(t, db.Find(&outboxEvents).Error)
 	assert.Len(t, outboxEvents, 0)
 }
@@ -289,7 +289,7 @@ func TestDeleteFailsIfResourceNotFound(t *testing.T) {
 	assert.ErrorIs(t, err, gorm.ErrRecordNotFound)
 
 	// Nothing exists in the outbox (expected)
-	outboxEvents := []model.OutboxEvent{}
+	outboxEvents := []model_legacy.OutboxEvent{}
 	assert.Nil(t, db.Find(&outboxEvents).Error)
 	assert.Len(t, outboxEvents, 0)
 }
@@ -303,7 +303,7 @@ func TestDeleteAfterCreate(t *testing.T) {
 	assert.Nil(t, err)
 
 	// Ensure InventoryResource is created
-	inventoryResource := []model.InventoryResource{}
+	inventoryResource := []model_legacy.InventoryResource{}
 	var count int64
 	assert.Nil(t, db.Find(&inventoryResource).Count(&count).Error)
 	assert.Equal(t, int64(1), count)
@@ -313,20 +313,20 @@ func TestDeleteAfterCreate(t *testing.T) {
 	assertEqualResource(t, r, r1del)
 
 	// resource not found
-	assert.ErrorIs(t, db.First(&model.Resource{}, r1del.ID).Error, gorm.ErrRecordNotFound)
+	assert.ErrorIs(t, db.First(&model_legacy.Resource{}, r1del.ID).Error, gorm.ErrRecordNotFound)
 
 	// two history, 1 create, 1 delete
-	resourceHistory := []model.ResourceHistory{}
+	resourceHistory := []model_legacy.ResourceHistory{}
 	assert.Nil(t, db.Find(&resourceHistory).Error)
 	assert.Len(t, resourceHistory, 2)
-	assertEqualResourceHistory(t, r, &resourceHistory[1], model.OperationTypeDelete)
+	assertEqualResourceHistory(t, r, &resourceHistory[1], model_legacy.OperationTypeDelete)
 
 	// Ensure InventoryResource is cleaned up
 	assert.Nil(t, db.Find(&inventoryResource).Count(&count).Error)
 	assert.Equal(t, int64(0), count)
 
 	// Nothing exists in the outbox (expected)
-	outboxEvents := []model.OutboxEvent{}
+	outboxEvents := []model_legacy.OutboxEvent{}
 	assert.Nil(t, db.Find(&outboxEvents).Error)
 	assert.Len(t, outboxEvents, 0)
 }
@@ -349,13 +349,13 @@ func TestDeleteAfterUpdate(t *testing.T) {
 	assert.Nil(t, err)
 
 	// 3 history entries, 1 create, 1 update, 1 delete
-	resourceHistory := []model.ResourceHistory{}
+	resourceHistory := []model_legacy.ResourceHistory{}
 	assert.Nil(t, db.Find(&resourceHistory).Error)
 	assert.Len(t, resourceHistory, 3)
-	assertEqualResourceHistory(t, r, &resourceHistory[2], model.OperationTypeDelete)
+	assertEqualResourceHistory(t, r, &resourceHistory[2], model_legacy.OperationTypeDelete)
 
 	// Nothing exists in the outbox (expected)
-	outboxEvents := []model.OutboxEvent{}
+	outboxEvents := []model_legacy.OutboxEvent{}
 	assert.Nil(t, db.Find(&outboxEvents).Error)
 	assert.Len(t, outboxEvents, 0)
 }
@@ -370,14 +370,14 @@ func TestFindByReporterResourceId(t *testing.T) {
 	assert.Nil(t, err)
 
 	// use nil value ReporterResource Id to check negative case
-	reporterResourceId := model.ReporterResourceId{}
+	reporterResourceId := model_legacy.ReporterResourceId{}
 
 	resource, err := repo.FindByReporterResourceId(ctx, reporterResourceId)
 	assert.NotNil(t, err)
 	assert.Nil(t, resource)
 
 	// check that resource is retrievable via ReporterResourceID object
-	reporterResourceId = model.ReporterResourceIdFromResource(r)
+	reporterResourceId = model_legacy.ReporterResourceIdFromResource(r)
 
 	resource, err = repo.FindByReporterResourceId(ctx, reporterResourceId)
 	assert.Nil(t, err)
@@ -422,12 +422,12 @@ func TestFindByWorkspaceId(t *testing.T) {
 	// find resource we just created by workspace id
 	resources, err := repo.FindByWorkspaceId(ctx, "1234")
 	assert.Nil(t, err)
-	assert.NotEqual(t, []*model.Resource{}, resources)
+	assert.NotEqual(t, []*model_legacy.Resource{}, resources)
 
 	// find no resources with workspace id: random
 	resources, err = repo.FindByWorkspaceId(ctx, "random")
 	assert.Nil(t, err)
-	assert.Equal(t, []*model.Resource{}, resources)
+	assert.Equal(t, []*model_legacy.Resource{}, resources)
 }
 
 func TestListAll(t *testing.T) {
@@ -588,7 +588,7 @@ func TestFindByReporterResourceIdv1beta2(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, created)
 
-	idx := model.ReporterResourceUniqueIndex{
+	idx := model_legacy.ReporterResourceUniqueIndex{
 		ResourceType:       "host",
 		ReporterType:       "hbi",
 		ReporterInstanceId: "instance-123",
@@ -600,7 +600,7 @@ func TestFindByReporterResourceIdv1beta2(t *testing.T) {
 	assert.Equal(t, created.ID, found.ID)
 
 	// test bad data
-	badIdx := model.ReporterResourceUniqueIndex{
+	badIdx := model_legacy.ReporterResourceUniqueIndex{
 		ReporterInstanceId: "bad",
 		ReporterResourceId: "bad",
 		ResourceType:       "bad",

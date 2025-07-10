@@ -747,11 +747,11 @@ func AssertValidationError(t *testing.T, err error, expectedField string, messag
 	}
 }
 
-// AssertTableName checks if the model_legacy has the expected table name
+// AssertTableName checks if the model has the expected table name
 func AssertTableName(t *testing.T, model interface{}, expectedTableName string) {
 	t.Helper()
 
-	// Check if the model_legacy has a TableName method
+	// Check if the model has a TableName method
 	value := reflect.ValueOf(model)
 	method := value.MethodByName("TableName")
 	if !method.IsValid() {
@@ -783,7 +783,7 @@ func AssertGORMTag(t *testing.T, model interface{}, fieldName string, expectedTa
 
 	field, found := modelType.FieldByName(fieldName)
 	if !found {
-		t.Errorf("Field '%s' not found in model_legacy %T", fieldName, model)
+		t.Errorf("Field '%s' not found in model %T", fieldName, model)
 		return
 	}
 
@@ -804,7 +804,7 @@ func AssertFieldType(t *testing.T, model interface{}, fieldName string, expected
 
 	field, found := modelType.FieldByName(fieldName)
 	if !found {
-		t.Errorf("Field '%s' not found in model_legacy %T", fieldName, model)
+		t.Errorf("Field '%s' not found in model %T", fieldName, model)
 		return
 	}
 

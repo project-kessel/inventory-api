@@ -5,9 +5,9 @@ import (
 	"testing"
 )
 
-// Test scenarios for ReporterRepresentation domain model_legacy
+// Test scenarios for ReporterRepresentation domain model
 //
-// These tests focus on domain logic, business rules, and model_legacy behavior
+// These tests focus on domain logic, business rules, and model behavior
 // rather than database operations or infrastructure concerns.
 //
 // Domain tests validate:

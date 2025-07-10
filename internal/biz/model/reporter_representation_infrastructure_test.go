@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-// Infrastructure tests for ReporterRepresentation domain model_legacy
+// Infrastructure tests for ReporterRepresentation domain model
 // These tests focus on database schema, field structure validation, edge cases, and serialization
 
 func TestReporterRepresentation_TableName(t *testing.T) {

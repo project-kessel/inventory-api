@@ -2,11 +2,12 @@ package model
 
 import (
 	"fmt"
-	"github.com/google/uuid"
 	"net/url"
 	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/google/uuid"
 )
 
 // TestFixture provides a centralized way to create test data for domain models

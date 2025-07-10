@@ -7,7 +7,7 @@ import (
 
 	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/resources"
 	authnapi "github.com/project-kessel/inventory-api/internal/authn/api"
-	"github.com/project-kessel/inventory-api/internal/biz/model"
+	"github.com/project-kessel/inventory-api/internal/biz/model_legacy"
 	"github.com/project-kessel/inventory-api/internal/middleware"
 	conv "github.com/project-kessel/inventory-api/internal/service/common"
 )
@@ -55,7 +55,7 @@ func (c *K8sClustersService) UpdateK8SCluster(ctx context.Context, r *pb.UpdateK
 
 	if k, err := k8sClusterFromUpdateRequest(r, identity); err == nil {
 		// Todo: Update to use the right ID
-		if resp, err := c.Ctl.Update(ctx, k, model.ReporterResourceIdFromResource(k)); err == nil {
+		if resp, err := c.Ctl.Update(ctx, k, model_legacy.ReporterResourceIdFromResource(k)); err == nil {
 			return updateResponseFromK8sCluster(resp), nil
 		} else {
 			return nil, err
@@ -82,7 +82,7 @@ func (c *K8sClustersService) DeleteK8SCluster(ctx context.Context, r *pb.DeleteK
 	}
 }
 
-func k8sClusterFromCreateRequest(r *pb.CreateK8SClusterRequest, identity *authnapi.Identity) (*model.Resource, error) {
+func k8sClusterFromCreateRequest(r *pb.CreateK8SClusterRequest, identity *authnapi.Identity) (*model_legacy.Resource, error) {
 	resourceData, err := conv.ToJsonObject(r.K8SCluster.ResourceData)
 	if err != nil {
 		return nil, err
@@ -91,11 +91,11 @@ func k8sClusterFromCreateRequest(r *pb.CreateK8SClusterRequest, identity *authna
 	return conv.ResourceFromPbv1beta1(ResourceType, identity.Principal, resourceData, r.K8SCluster.Metadata, r.K8SCluster.ReporterData), nil
 }
 
-func createResponseFromK8sCluster(c *model.Resource) *pb.CreateK8SClusterResponse {
+func createResponseFromK8sCluster(c *model_legacy.Resource) *pb.CreateK8SClusterResponse {
 	return &pb.CreateK8SClusterResponse{}
 }
 
-func k8sClusterFromUpdateRequest(r *pb.UpdateK8SClusterRequest, identity *authnapi.Identity) (*model.Resource, error) {
+func k8sClusterFromUpdateRequest(r *pb.UpdateK8SClusterRequest, identity *authnapi.Identity) (*model_legacy.Resource, error) {
 	resourceData, err := conv.ToJsonObject(r.K8SCluster.ResourceData)
 	if err != nil {
 		return nil, err
@@ -104,11 +104,11 @@ func k8sClusterFromUpdateRequest(r *pb.UpdateK8SClusterRequest, identity *authna
 	return conv.ResourceFromPbv1beta1(ResourceType, identity.Principal, resourceData, r.K8SCluster.Metadata, r.K8SCluster.ReporterData), nil
 }
 
-func updateResponseFromK8sCluster(c *model.Resource) *pb.UpdateK8SClusterResponse {
+func updateResponseFromK8sCluster(c *model_legacy.Resource) *pb.UpdateK8SClusterResponse {
 	return &pb.UpdateK8SClusterResponse{}
 }
 
-func fromDeleteRequest(r *pb.DeleteK8SClusterRequest, identity *authnapi.Identity) (model.ReporterResourceId, error) {
+func fromDeleteRequest(r *pb.DeleteK8SClusterRequest, identity *authnapi.Identity) (model_legacy.ReporterResourceId, error) {
 	return conv.ReporterResourceIdFromPb(ResourceType, identity.Principal, r.ReporterData), nil
 }
 

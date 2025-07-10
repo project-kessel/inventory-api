@@ -4,7 +4,7 @@ import (
 	"context"
 
 	authnapi "github.com/project-kessel/inventory-api/internal/authn/api"
-	"github.com/project-kessel/inventory-api/internal/biz/model"
+	"github.com/project-kessel/inventory-api/internal/biz/model_legacy"
 	relationshipsctl "github.com/project-kessel/inventory-api/internal/biz/usecase/relationships"
 	"github.com/project-kessel/inventory-api/internal/middleware"
 	conv "github.com/project-kessel/inventory-api/internal/service/common"
@@ -53,7 +53,7 @@ func (c *K8SPolicyIsPropagatedToK8SClusterService) UpdateK8SPolicyIsPropagatedTo
 
 	if input, err := fromUpdateRequest(r, identity); err == nil {
 		// Todo: Update to use the ID - it probably requires a change in the ORM
-		if resp, err := c.Controller.Update(ctx, input, model.ReporterRelationshipIdFromRelationship(input)); err == nil {
+		if resp, err := c.Controller.Update(ctx, input, model_legacy.ReporterRelationshipIdFromRelationship(input)); err == nil {
 			return toUpdateResponse(resp), nil
 		} else {
 			return nil, err
@@ -80,7 +80,7 @@ func (c *K8SPolicyIsPropagatedToK8SClusterService) DeleteK8SPolicyIsPropagatedTo
 	}
 }
 
-func fromCreateRequest(r *pb.CreateK8SPolicyIsPropagatedToK8SClusterRequest, identity *authnapi.Identity) (*model.Relationship, error) {
+func fromCreateRequest(r *pb.CreateK8SPolicyIsPropagatedToK8SClusterRequest, identity *authnapi.Identity) (*model_legacy.Relationship, error) {
 	relationshipData, err := conv.ToJsonObject(r.K8SpolicyIspropagatedtoK8Scluster.RelationshipData)
 	if err != nil {
 		return nil, err
@@ -89,11 +89,11 @@ func fromCreateRequest(r *pb.CreateK8SPolicyIsPropagatedToK8SClusterRequest, ide
 	return conv.RelationshipFromPb(RelationType, identity.Principal, relationshipData, r.K8SpolicyIspropagatedtoK8Scluster.Metadata, r.K8SpolicyIspropagatedtoK8Scluster.ReporterData)
 }
 
-func toCreateResponse(relationship *model.Relationship) *pb.CreateK8SPolicyIsPropagatedToK8SClusterResponse {
+func toCreateResponse(relationship *model_legacy.Relationship) *pb.CreateK8SPolicyIsPropagatedToK8SClusterResponse {
 	return &pb.CreateK8SPolicyIsPropagatedToK8SClusterResponse{}
 }
 
-func fromUpdateRequest(r *pb.UpdateK8SPolicyIsPropagatedToK8SClusterRequest, identity *authnapi.Identity) (*model.Relationship, error) {
+func fromUpdateRequest(r *pb.UpdateK8SPolicyIsPropagatedToK8SClusterRequest, identity *authnapi.Identity) (*model_legacy.Relationship, error) {
 	relationshipData, err := conv.ToJsonObject(r.K8SpolicyIspropagatedtoK8Scluster.RelationshipData)
 	if err != nil {
 		return nil, err
@@ -102,11 +102,11 @@ func fromUpdateRequest(r *pb.UpdateK8SPolicyIsPropagatedToK8SClusterRequest, ide
 	return conv.RelationshipFromPb(RelationType, identity.Principal, relationshipData, r.K8SpolicyIspropagatedtoK8Scluster.Metadata, r.K8SpolicyIspropagatedtoK8Scluster.ReporterData)
 }
 
-func toUpdateResponse(relationship *model.Relationship) *pb.UpdateK8SPolicyIsPropagatedToK8SClusterResponse {
+func toUpdateResponse(relationship *model_legacy.Relationship) *pb.UpdateK8SPolicyIsPropagatedToK8SClusterResponse {
 	return &pb.UpdateK8SPolicyIsPropagatedToK8SClusterResponse{}
 }
 
-func fromDeleteRequest(r *pb.DeleteK8SPolicyIsPropagatedToK8SClusterRequest, identity *authnapi.Identity) (model.ReporterRelationshipId, error) {
+func fromDeleteRequest(r *pb.DeleteK8SPolicyIsPropagatedToK8SClusterRequest, identity *authnapi.Identity) (model_legacy.ReporterRelationshipId, error) {
 	return conv.ReporterRelationshipIdFromPb(RelationType, identity.Principal, r.ReporterData)
 }
 

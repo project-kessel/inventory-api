@@ -34,7 +34,7 @@ import (
 
 	"github.com/project-kessel/inventory-api/internal/authz"
 	"github.com/project-kessel/inventory-api/internal/authz/api"
-	"github.com/project-kessel/inventory-api/internal/biz/model"
+	"github.com/project-kessel/inventory-api/internal/biz/model_legacy"
 	"go.opentelemetry.io/otel/metric"
 )
 
@@ -196,7 +196,7 @@ func (i *InventoryConsumer) Consume() error {
 					continue
 				}
 
-				if operation != string(model.OperationTypeDeleted) {
+				if operation != string(model_legacy.OperationTypeDeleted) {
 					inventoryID, err := ParseMessageKey(e.Key)
 					if err != nil {
 						metricscollector.Incr(i.MetricsCollector.MsgProcessFailures, "ParseMessageKey", err)
@@ -277,7 +277,7 @@ func (i *InventoryConsumer) ProcessMessage(headers map[string]string, relationsE
 	txid := headers["txid"]
 
 	switch operation {
-	case string(model.OperationTypeCreated):
+	case string(model_legacy.OperationTypeCreated):
 		i.Logger.Infof("processing message: operation=%s, txid=%s", operation, txid)
 		i.Logger.Debugf("processed message tuple=%s", msg.Value)
 		if relationsEnabled {
@@ -298,7 +298,7 @@ func (i *InventoryConsumer) ProcessMessage(headers map[string]string, relationsE
 			return resp, nil
 		}
 
-	case string(model.OperationTypeUpdated):
+	case string(model_legacy.OperationTypeUpdated):
 		i.Logger.Infof("processing message: operation=%s, txid=%s", operation, txid)
 		i.Logger.Debugf("processed message tuple=%s", msg.Value)
 		if relationsEnabled {
@@ -318,7 +318,7 @@ func (i *InventoryConsumer) ProcessMessage(headers map[string]string, relationsE
 			}
 			return resp, nil
 		}
-	case string(model.OperationTypeDeleted):
+	case string(model_legacy.OperationTypeDeleted):
 		i.Logger.Infof("processing message: operation=%s, txid=%s", operation, txid)
 		i.Logger.Debugf("processed message tuple=%s", msg.Value)
 		if relationsEnabled {
@@ -469,7 +469,7 @@ func (i *InventoryConsumer) CreateTuple(ctx context.Context, tuple *v1beta1.Rela
 			namespace := tuple.GetResource().GetType().GetNamespace()
 			relation := tuple.GetRelation()
 			subject := tuple.GetSubject()
-			resource := &model.Resource{
+			resource := &model_legacy.Resource{
 				ResourceType:       tuple.GetResource().GetType().GetName(),
 				ReporterResourceId: tuple.GetResource().GetId(),
 			}
@@ -527,7 +527,7 @@ func (i *InventoryConsumer) DeleteTuple(ctx context.Context, filter *v1beta1.Rel
 // UpdateConsistencyToken updates the resource in the inventory DB to add the consistency token
 func (i *InventoryConsumer) UpdateConsistencyToken(inventoryID, token string) error {
 	// this will update all records for the same inventory_id with current consistency token
-	i.DB.Model(model.Resource{}).Where("inventory_id = ?", inventoryID).Update("consistency_token", token)
+	i.DB.Model(model_legacy.Resource{}).Where("inventory_id = ?", inventoryID).Update("consistency_token", token)
 	return nil
 }
 

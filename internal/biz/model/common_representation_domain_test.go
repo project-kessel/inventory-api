@@ -4,11 +4,12 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
+	"github.com/project-kessel/inventory-api/internal/biz/model_legacy"
 )
 
-// Test scenarios for CommonRepresentation domain model
+// Test scenarios for CommonRepresentation domain model_legacy
 //
-// These tests focus on domain logic, business rules, and model behavior
+// These tests focus on domain logic, business rules, and model_legacy behavior
 // rather than database operations or infrastructure concerns.
 //
 // Domain tests validate:
@@ -44,7 +45,7 @@ func TestCommonRepresentation_Validation(t *testing.T) {
 				// Test factory method with empty ID
 				_, err := NewCommonRepresentation(
 					uuid.Nil,
-					JsonObject{"workspace_id": "test"},
+					model_legacy.JsonObject{"workspace_id": "test"},
 					"host",
 					1,
 					"hbi",
@@ -57,7 +58,7 @@ func TestCommonRepresentation_Validation(t *testing.T) {
 				// Test factory method with empty resource type
 				_, err := NewCommonRepresentation(
 					uuid.NewSHA1(uuid.NameSpaceOID, []byte("test")),
-					JsonObject{"workspace_id": "test"},
+					model_legacy.JsonObject{"workspace_id": "test"},
 					"",
 					1,
 					"hbi",
@@ -70,7 +71,7 @@ func TestCommonRepresentation_Validation(t *testing.T) {
 				// Test factory method with zero version - should be valid
 				cr, err := NewCommonRepresentation(
 					uuid.NewSHA1(uuid.NameSpaceOID, []byte("test")),
-					JsonObject{"workspace_id": "test"},
+					model_legacy.JsonObject{"workspace_id": "test"},
 					"host",
 					0,
 					"hbi",
@@ -88,7 +89,7 @@ func TestCommonRepresentation_Validation(t *testing.T) {
 				// Test factory method with empty reporter type
 				_, err := NewCommonRepresentation(
 					uuid.NewSHA1(uuid.NameSpaceOID, []byte("test")),
-					JsonObject{"workspace_id": "test"},
+					model_legacy.JsonObject{"workspace_id": "test"},
 					"host",
 					1,
 					"",
@@ -101,7 +102,7 @@ func TestCommonRepresentation_Validation(t *testing.T) {
 				// Test factory method with empty reporter instance
 				_, err := NewCommonRepresentation(
 					uuid.NewSHA1(uuid.NameSpaceOID, []byte("test")),
-					JsonObject{"workspace_id": "test"},
+					model_legacy.JsonObject{"workspace_id": "test"},
 					"host",
 					1,
 					"hbi",
@@ -152,7 +153,7 @@ func TestCommonRepresentation_BusinessRules(t *testing.T) {
 		// Test factory method with zero version - should be valid
 		cr, err := NewCommonRepresentation(
 			uuid.NewSHA1(uuid.NameSpaceOID, []byte("test")),
-			JsonObject{"workspace_id": "test"},
+			model_legacy.JsonObject{"workspace_id": "test"},
 			"host",
 			0,
 			"hbi",
@@ -175,7 +176,7 @@ func TestCommonRepresentation_BusinessRules(t *testing.T) {
 				// Test factory method with empty ID
 				_, err := NewCommonRepresentation(
 					uuid.Nil,
-					JsonObject{"workspace_id": "test"},
+					model_legacy.JsonObject{"workspace_id": "test"},
 					"host",
 					1,
 					"hbi",
@@ -188,7 +189,7 @@ func TestCommonRepresentation_BusinessRules(t *testing.T) {
 				// Test factory method with empty resource type
 				_, err := NewCommonRepresentation(
 					uuid.NewSHA1(uuid.NameSpaceOID, []byte("test")),
-					JsonObject{"workspace_id": "test"},
+					model_legacy.JsonObject{"workspace_id": "test"},
 					"",
 					1,
 					"hbi",
@@ -201,7 +202,7 @@ func TestCommonRepresentation_BusinessRules(t *testing.T) {
 				// Test factory method with empty reporter type
 				_, err := NewCommonRepresentation(
 					uuid.NewSHA1(uuid.NameSpaceOID, []byte("test")),
-					JsonObject{"workspace_id": "test"},
+					model_legacy.JsonObject{"workspace_id": "test"},
 					"host",
 					1,
 					"",
@@ -214,7 +215,7 @@ func TestCommonRepresentation_BusinessRules(t *testing.T) {
 				// Test factory method with empty reporter instance
 				_, err := NewCommonRepresentation(
 					uuid.NewSHA1(uuid.NameSpaceOID, []byte("test")),
-					JsonObject{"workspace_id": "test"},
+					model_legacy.JsonObject{"workspace_id": "test"},
 					"host",
 					1,
 					"hbi",
@@ -235,11 +236,11 @@ func TestCommonRepresentation_DataHandling(t *testing.T) {
 
 	t.Run("data_can_be_complex_json", func(t *testing.T) {
 		t.Parallel()
-		complexData := JsonObject{
+		complexData := model_legacy.JsonObject{
 			"name":        "complex-resource",
 			"description": "A complex resource with nested data",
-			"metadata": JsonObject{
-				"labels": JsonObject{
+			"metadata": model_legacy.JsonObject{
+				"labels": model_legacy.JsonObject{
 					"environment": "test",
 					"team":        "platform",
 				},
@@ -248,7 +249,7 @@ func TestCommonRepresentation_DataHandling(t *testing.T) {
 					"annotation2",
 				},
 			},
-			"status": JsonObject{
+			"status": model_legacy.JsonObject{
 				"phase":    "running",
 				"ready":    true,
 				"replicas": 3,
@@ -268,7 +269,7 @@ func TestCommonRepresentation_DataHandling(t *testing.T) {
 
 		// Factory method should create a valid instance with empty data
 		AssertNoError(t, nil, "Empty data object should be valid")
-		AssertEqual(t, JsonObject{}, cr.Data, "Empty data should be preserved")
+		AssertEqual(t, model_legacy.JsonObject{}, cr.Data, "Empty data should be preserved")
 	})
 
 	t.Run("data_can_be_nil", func(t *testing.T) {
@@ -326,7 +327,7 @@ func TestCommonRepresentation_FactoryMethods(t *testing.T) {
 		testResourceId := uuid.New()
 		cr, err := NewCommonRepresentation(
 			testResourceId,
-			JsonObject{"workspace_id": "test-workspace"},
+			model_legacy.JsonObject{"workspace_id": "test-workspace"},
 			"host",
 			1,
 			"hbi",
@@ -356,7 +357,7 @@ func TestCommonRepresentation_FactoryMethods(t *testing.T) {
 		// Test empty ResourceType
 		_, err := NewCommonRepresentation(
 			testResourceId,
-			JsonObject{"workspace_id": "test-workspace"},
+			model_legacy.JsonObject{"workspace_id": "test-workspace"},
 			"", // empty ResourceType
 			1,
 			"hbi",
@@ -370,7 +371,7 @@ func TestCommonRepresentation_FactoryMethods(t *testing.T) {
 		// Test zero Version - should be valid now
 		cr, err := NewCommonRepresentation(
 			testResourceId,
-			JsonObject{"workspace_id": "test-workspace"},
+			model_legacy.JsonObject{"workspace_id": "test-workspace"},
 			"host",
 			0, // zero Version should be valid
 			"hbi",
@@ -408,7 +409,7 @@ func TestCommonRepresentation_FactoryMethods(t *testing.T) {
 		// Test nil UUID
 		_, err = NewCommonRepresentation(
 			uuid.Nil, // nil UUID
-			JsonObject{"workspace_id": "test-workspace"},
+			model_legacy.JsonObject{"workspace_id": "test-workspace"},
 			"host",
 			1,
 			"hbi",

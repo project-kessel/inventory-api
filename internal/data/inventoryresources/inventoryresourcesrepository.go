@@ -6,7 +6,7 @@ import (
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
-	"github.com/project-kessel/inventory-api/internal/biz/model"
+	"github.com/project-kessel/inventory-api/internal/biz/model_legacy"
 )
 
 type Repo struct {
@@ -19,8 +19,8 @@ func New(db *gorm.DB) *Repo {
 	}
 }
 
-func (r *Repo) FindByID(ctx context.Context, id uuid.UUID) (*model.InventoryResource, error) {
-	inventoryResource := model.InventoryResource{}
+func (r *Repo) FindByID(ctx context.Context, id uuid.UUID) (*model_legacy.InventoryResource, error) {
+	inventoryResource := model_legacy.InventoryResource{}
 	if err := r.DB.Session(&gorm.Session{}).First(&inventoryResource, id).Error; err != nil {
 		return nil, err
 	}

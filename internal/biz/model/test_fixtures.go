@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
+	"github.com/project-kessel/inventory-api/internal/biz/model_legacy"
 )
 
 // TestFixture provides a centralized way to create test data for domain models
@@ -29,7 +30,7 @@ func (f *TestFixture) ValidCommonRepresentation() *CommonRepresentation {
 
 	cr, err := NewCommonRepresentation(
 		deterministicUUID,
-		JsonObject{
+		model_legacy.JsonObject{
 			"workspace_id": "a64d17d0-aec3-410a-acd0-e0b85b22c076",
 		},
 		"host",
@@ -61,7 +62,7 @@ func (f *TestFixture) CommonRepresentationWithID(id string) *CommonRepresentatio
 	// Create using factory method - this will fail validation for invalid IDs
 	cr, err := NewCommonRepresentation(
 		resourceId,
-		JsonObject{
+		model_legacy.JsonObject{
 			"workspace_id": "a64d17d0-aec3-410a-acd0-e0b85b22c076",
 		},
 		"host",
@@ -73,7 +74,7 @@ func (f *TestFixture) CommonRepresentationWithID(id string) *CommonRepresentatio
 		// For test cases expecting invalid data, return the struct anyway for testing
 		return &CommonRepresentation{
 			Representation: Representation{
-				Data: JsonObject{
+				Data: model_legacy.JsonObject{
 					"workspace_id": "a64d17d0-aec3-410a-acd0-e0b85b22c076",
 				},
 			},
@@ -93,7 +94,7 @@ func (f *TestFixture) CommonRepresentationWithVersion(version uint) *CommonRepre
 
 	cr, err := NewCommonRepresentation(
 		deterministicUUID,
-		JsonObject{
+		model_legacy.JsonObject{
 			"workspace_id": "a64d17d0-aec3-410a-acd0-e0b85b22c076",
 		},
 		"host",
@@ -113,7 +114,7 @@ func (f *TestFixture) CommonRepresentationWithResourceType(resourceType string) 
 
 	cr, err := NewCommonRepresentation(
 		deterministicUUID,
-		JsonObject{
+		model_legacy.JsonObject{
 			"workspace_id": "a64d17d0-aec3-410a-acd0-e0b85b22c076",
 		},
 		resourceType,
@@ -133,7 +134,7 @@ func (f *TestFixture) CommonRepresentationWithReporterType(reporterType string) 
 
 	cr, err := NewCommonRepresentation(
 		deterministicUUID,
-		JsonObject{
+		model_legacy.JsonObject{
 			"workspace_id": "a64d17d0-aec3-410a-acd0-e0b85b22c076",
 		},
 		"host",
@@ -153,7 +154,7 @@ func (f *TestFixture) CommonRepresentationWithReporterInstance(reporterInstance 
 
 	cr, err := NewCommonRepresentation(
 		deterministicUUID,
-		JsonObject{
+		model_legacy.JsonObject{
 			"workspace_id": "a64d17d0-aec3-410a-acd0-e0b85b22c076",
 		},
 		"host",
@@ -168,7 +169,7 @@ func (f *TestFixture) CommonRepresentationWithReporterInstance(reporterInstance 
 }
 
 // CommonRepresentationWithData returns a CommonRepresentation with specified data
-func (f *TestFixture) CommonRepresentationWithData(data JsonObject) *CommonRepresentation {
+func (f *TestFixture) CommonRepresentationWithData(data model_legacy.JsonObject) *CommonRepresentation {
 	deterministicUUID := uuid.NewSHA1(uuid.NameSpaceOID, []byte("dd1b73b9-3e33-4264-968c-e3ce55b9afec"))
 
 	cr, err := NewCommonRepresentation(
@@ -191,7 +192,7 @@ func (f *TestFixture) CommonRepresentationWithEmptyData() *CommonRepresentation 
 
 	cr, err := NewCommonRepresentation(
 		deterministicUUID,
-		JsonObject{},
+		model_legacy.JsonObject{},
 		"host",
 		1,
 		"hbi",
@@ -224,7 +225,7 @@ func (f *TestFixture) CommonRepresentationWithNilData() *CommonRepresentation {
 func (f *TestFixture) MinimalCommonRepresentation() *CommonRepresentation {
 	cr, err := NewCommonRepresentation(
 		uuid.NewSHA1(uuid.NameSpaceOID, []byte("cdcebe29-67fb-4ac6-ba03-703a22ff4bc0")),
-		JsonObject{
+		model_legacy.JsonObject{
 			"workspace_id": "1c0753fe-48c1-44d8-823c-95d04cff5f91",
 		},
 		"k8s_policy",
@@ -242,7 +243,7 @@ func (f *TestFixture) MinimalCommonRepresentation() *CommonRepresentation {
 func (f *TestFixture) MaximalCommonRepresentation() *CommonRepresentation {
 	cr, err := NewCommonRepresentation(
 		uuid.NewSHA1(uuid.NameSpaceOID, []byte("ae5c7a82-cb3b-4591-9b10-3ae1506d4f3d")),
-		JsonObject{
+		model_legacy.JsonObject{
 			"workspace_id": "aee8f698-9d43-49a1-b458-680a7c9dc046",
 		},
 		"k8s_cluster",
@@ -260,7 +261,7 @@ func (f *TestFixture) MaximalCommonRepresentation() *CommonRepresentation {
 func (f *TestFixture) UnicodeCommonRepresentation() *CommonRepresentation {
 	cr, err := NewCommonRepresentation(
 		uuid.NewSHA1(uuid.NameSpaceOID, []byte("测试-id-🌟")),
-		JsonObject{
+		model_legacy.JsonObject{
 			"unicode_field": "测试数据 🌟 emoji test",
 			"japanese":      "こんにちは世界",
 			"arabic":        "مرحبا بالعالم",
@@ -276,7 +277,7 @@ func (f *TestFixture) UnicodeCommonRepresentation() *CommonRepresentation {
 		// Unicode should be valid, but if not, create directly for testing
 		return &CommonRepresentation{
 			Representation: Representation{
-				Data: JsonObject{
+				Data: model_legacy.JsonObject{
 					"unicode_field": "测试数据 🌟 emoji test",
 					"japanese":      "こんにちは世界",
 					"arabic":        "مرحبا بالعالم",
@@ -298,7 +299,7 @@ func (f *TestFixture) UnicodeCommonRepresentation() *CommonRepresentation {
 func (f *TestFixture) SpecialCharsCommonRepresentation() *CommonRepresentation {
 	cr, err := NewCommonRepresentation(
 		uuid.NewSHA1(uuid.NameSpaceOID, []byte("special-!@#$%^&*()-id")),
-		JsonObject{
+		model_legacy.JsonObject{
 			"special_field":  "Data with special characters: !@#$%^&*()_+-=[]{}|;':\",./<>?",
 			"symbols":        "™®©§¶†‡•…‰‹›",
 			"math_symbols":   "±×÷≤≥≠≈∞∑∏∆√∫",
@@ -317,7 +318,7 @@ func (f *TestFixture) SpecialCharsCommonRepresentation() *CommonRepresentation {
 		// Special characters should be valid, but if not, create directly for testing
 		return &CommonRepresentation{
 			Representation: Representation{
-				Data: JsonObject{
+				Data: model_legacy.JsonObject{
 					"special_field":  "Data with special characters: !@#$%^&*()_+-=[]{}|;':\",./<>?",
 					"symbols":        "™®©§¶†‡•…‰‹›",
 					"math_symbols":   "±×÷≤≥≠≈∞∑∏∆√∫",
@@ -343,7 +344,7 @@ func (f *TestFixture) SpecialCharsCommonRepresentation() *CommonRepresentation {
 // ValidReporterRepresentation returns a valid ReporterRepresentation for testing
 func (f *TestFixture) ValidReporterRepresentation() *ReporterRepresentation {
 	rr, err := NewReporterRepresentation(
-		JsonObject{
+		model_legacy.JsonObject{
 			"satellite_id":            "2c4196f1-0371-4f4c-8913-e113cfaa6e67",
 			"subscription_manager_id": "af94f92b-0b65-4cac-b449-6b77e665a08f",
 			"insights_inventory_id":   "05707922-7b0a-4fe6-982d-6adbc7695b8f",
@@ -370,7 +371,7 @@ func (f *TestFixture) ValidReporterRepresentation() *ReporterRepresentation {
 // ReporterRepresentationWithLocalResourceID returns a ReporterRepresentation with specified local resource ID
 func (f *TestFixture) ReporterRepresentationWithLocalResourceID(localResourceID string) (*ReporterRepresentation, error) {
 	rr, err := NewReporterRepresentation(
-		JsonObject{
+		model_legacy.JsonObject{
 			"satellite_id":            "2c4196f1-0371-4f4c-8913-e113cfaa6e67",
 			"subscription_manager_id": "af94f92b-0b65-4cac-b449-6b77e665a08f",
 			"insights_inventory_id":   "05707922-7b0a-4fe6-982d-6adbc7695b8f",
@@ -397,7 +398,7 @@ func (f *TestFixture) ReporterRepresentationWithLocalResourceID(localResourceID 
 // ReporterRepresentationWithResourceType returns a ReporterRepresentation with specified local resource ID
 func (f *TestFixture) ReporterRepresentationWithResourceType(resourceType string) (*ReporterRepresentation, error) {
 	rr, err := NewReporterRepresentation(
-		JsonObject{
+		model_legacy.JsonObject{
 			"satellite_id":            "2c4196f1-0371-4f4c-8913-e113cfaa6e67",
 			"subscription_manager_id": "af94f92b-0b65-4cac-b449-6b77e665a08f",
 			"insights_inventory_id":   "05707922-7b0a-4fe6-982d-6adbc7695b8f",
@@ -423,7 +424,7 @@ func (f *TestFixture) ReporterRepresentationWithResourceType(resourceType string
 
 // ReporterRepresentationWithTombstone returns a ReporterRepresentation with tombstone flag
 func (f *TestFixture) ReporterRepresentationWithTombstone(tombstone bool) *ReporterRepresentation {
-	data := JsonObject{
+	data := model_legacy.JsonObject{
 		"external_cluster_id": "9414df93-aefe-4153-ba8a-8765373d39b9",
 		"cluster_status":      "READY",
 		"cluster_reason":      "reflect",
@@ -432,7 +433,7 @@ func (f *TestFixture) ReporterRepresentationWithTombstone(tombstone bool) *Repor
 		"vendor_version":      "3.3.1",
 		"cloud_platform":      "BAREMETAL_IPI",
 		"nodes": []interface{}{
-			JsonObject{
+			model_legacy.JsonObject{
 				"name":   "www.example.com",
 				"cpu":    "7500m",
 				"memory": "30973224Ki",
@@ -441,7 +442,7 @@ func (f *TestFixture) ReporterRepresentationWithTombstone(tombstone bool) *Repor
 	}
 
 	if tombstone {
-		data = JsonObject{
+		data = model_legacy.JsonObject{
 			"deleted_at": "2023-01-01T00:00:00Z",
 			"reason":     "Resource deleted",
 		}
@@ -470,7 +471,7 @@ func (f *TestFixture) ReporterRepresentationWithTombstone(tombstone bool) *Repor
 // ReporterRepresentationWithAPIHref returns a ReporterRepresentation with specified API href
 func (f *TestFixture) ReporterRepresentationWithAPIHref(apiHref string) *ReporterRepresentation {
 	rr, err := NewReporterRepresentation(
-		JsonObject{
+		model_legacy.JsonObject{
 			"satellite_id":            "2c4196f1-0371-4f4c-8913-e113cfaa6e67",
 			"subscription_manager_id": "af94f92b-0b65-4cac-b449-6b77e665a08f",
 			"insights_inventory_id":   "05707922-7b0a-4fe6-982d-6adbc7695b8f",
@@ -492,7 +493,7 @@ func (f *TestFixture) ReporterRepresentationWithAPIHref(apiHref string) *Reporte
 		// For test cases expecting invalid data, return the struct anyway for testing
 		return &ReporterRepresentation{
 			Representation: Representation{
-				Data: JsonObject{
+				Data: model_legacy.JsonObject{
 					"satellite_id":            "2c4196f1-0371-4f4c-8913-e113cfaa6e67",
 					"subscription_manager_id": "af94f92b-0b65-4cac-b449-6b77e665a08f",
 					"insights_inventory_id":   "05707922-7b0a-4fe6-982d-6adbc7695b8f",
@@ -523,7 +524,7 @@ func (f *TestFixture) ReporterRepresentationWithConsoleHref(consoleHref string) 
 	}
 
 	rr, err := NewReporterRepresentation(
-		JsonObject{
+		model_legacy.JsonObject{
 			"satellite_id":            "2c4196f1-0371-4f4c-8913-e113cfaa6e67",
 			"subscription_manager_id": "af94f92b-0b65-4cac-b449-6b77e665a08f",
 			"insights_inventory_id":   "05707922-7b0a-4fe6-982d-6adbc7695b8f",
@@ -545,7 +546,7 @@ func (f *TestFixture) ReporterRepresentationWithConsoleHref(consoleHref string) 
 		// For test cases expecting invalid data, return the struct anyway for testing
 		return &ReporterRepresentation{
 			Representation: Representation{
-				Data: JsonObject{
+				Data: model_legacy.JsonObject{
 					"satellite_id":            "2c4196f1-0371-4f4c-8913-e113cfaa6e67",
 					"subscription_manager_id": "af94f92b-0b65-4cac-b449-6b77e665a08f",
 					"insights_inventory_id":   "05707922-7b0a-4fe6-982d-6adbc7695b8f",
@@ -571,7 +572,7 @@ func (f *TestFixture) ReporterRepresentationWithConsoleHref(consoleHref string) 
 // ReporterRepresentationWithReporterVersion returns a ReporterRepresentation with specified reporter version
 func (f *TestFixture) ReporterRepresentationWithReporterVersion(reporterVersion *string) *ReporterRepresentation {
 	rr, err := NewReporterRepresentation(
-		JsonObject{
+		model_legacy.JsonObject{
 			"satellite_id":            "2c4196f1-0371-4f4c-8913-e113cfaa6e67",
 			"subscription_manager_id": "af94f92b-0b65-4cac-b449-6b77e665a08f",
 			"insights_inventory_id":   "05707922-7b0a-4fe6-982d-6adbc7695b8f",
@@ -593,7 +594,7 @@ func (f *TestFixture) ReporterRepresentationWithReporterVersion(reporterVersion 
 		// For test cases expecting invalid data, return the struct anyway for testing
 		return &ReporterRepresentation{
 			Representation: Representation{
-				Data: JsonObject{
+				Data: model_legacy.JsonObject{
 					"satellite_id":            "2c4196f1-0371-4f4c-8913-e113cfaa6e67",
 					"subscription_manager_id": "af94f92b-0b65-4cac-b449-6b77e665a08f",
 					"insights_inventory_id":   "05707922-7b0a-4fe6-982d-6adbc7695b8f",
@@ -619,7 +620,7 @@ func (f *TestFixture) ReporterRepresentationWithReporterVersion(reporterVersion 
 // ReporterRepresentationWithNilReporterVersion returns a ReporterRepresentation with nil reporter version
 func (f *TestFixture) ReporterRepresentationWithNilReporterVersion() *ReporterRepresentation {
 	rr, err := NewReporterRepresentation(
-		JsonObject{
+		model_legacy.JsonObject{
 			"disabled": true,
 			"severity": "CRITICAL",
 		},
@@ -644,7 +645,7 @@ func (f *TestFixture) ReporterRepresentationWithNilReporterVersion() *ReporterRe
 // ReporterRepresentationWithNilConsoleHref returns a ReporterRepresentation with nil console href
 func (f *TestFixture) ReporterRepresentationWithNilConsoleHref() *ReporterRepresentation {
 	rr, err := NewReporterRepresentation(
-		JsonObject{
+		model_legacy.JsonObject{
 			"reporter_type":        "NOTIFICATIONS",
 			"reporter_instance_id": "f2e4e735-3936-4ee6-a881-b2e1f9326991",
 			"local_resource_id":    "cbc86170-e959-42d8-bd2a-964a5a558475",
@@ -737,7 +738,7 @@ func AssertValidationError(t *testing.T, err error, expectedField string, messag
 		return
 	}
 
-	validationErr, ok := err.(ValidationError)
+	validationErr, ok := err.(model_legacy.ValidationError)
 	if !ok {
 		t.Errorf("%s: expected ValidationError but got %T: %v", message, err, err)
 		return
@@ -748,11 +749,11 @@ func AssertValidationError(t *testing.T, err error, expectedField string, messag
 	}
 }
 
-// AssertTableName checks if the model has the expected table name
+// AssertTableName checks if the model_legacy has the expected table name
 func AssertTableName(t *testing.T, model interface{}, expectedTableName string) {
 	t.Helper()
 
-	// Check if the model has a TableName method
+	// Check if the model_legacy has a TableName method
 	value := reflect.ValueOf(model)
 	method := value.MethodByName("TableName")
 	if !method.IsValid() {
@@ -784,7 +785,7 @@ func AssertGORMTag(t *testing.T, model interface{}, fieldName string, expectedTa
 
 	field, found := modelType.FieldByName(fieldName)
 	if !found {
-		t.Errorf("Field '%s' not found in model %T", fieldName, model)
+		t.Errorf("Field '%s' not found in model_legacy %T", fieldName, model)
 		return
 	}
 
@@ -805,7 +806,7 @@ func AssertFieldType(t *testing.T, model interface{}, fieldName string, expected
 
 	field, found := modelType.FieldByName(fieldName)
 	if !found {
-		t.Errorf("Field '%s' not found in model %T", fieldName, model)
+		t.Errorf("Field '%s' not found in model_legacy %T", fieldName, model)
 		return
 	}
 

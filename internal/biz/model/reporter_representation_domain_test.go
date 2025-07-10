@@ -3,11 +3,13 @@ package model
 import (
 	"fmt"
 	"testing"
+
+	"github.com/project-kessel/inventory-api/internal/biz/model_legacy"
 )
 
-// Test scenarios for ReporterRepresentation domain model
+// Test scenarios for ReporterRepresentation domain model_legacy
 //
-// These tests focus on domain logic, business rules, and model behavior
+// These tests focus on domain logic, business rules, and model_legacy behavior
 // rather than database operations or infrastructure concerns.
 //
 // Domain tests validate:
@@ -47,7 +49,7 @@ func TestReporterRepresentation_Validation(t *testing.T) {
 
 		// Test validation through factory method (proper approach)
 		_, err := NewReporterRepresentation(
-			JsonObject{"test": "data"},
+			model_legacy.JsonObject{"test": "data"},
 			"test-local-id",
 			"", // empty ReporterType
 			"host",
@@ -110,7 +112,7 @@ func TestReporterRepresentation_Validation(t *testing.T) {
 
 				// Test validation through factory method (proper approach)
 				_, err := NewReporterRepresentation(
-					JsonObject{"test": "data"},
+					model_legacy.JsonObject{"test": "data"},
 					rr.LocalResourceID,
 					rr.ReporterType,
 					rr.ResourceType,
@@ -137,7 +139,7 @@ func TestReporterRepresentation_Validation(t *testing.T) {
 
 		// Test that zero Generation is valid
 		rr, err := NewReporterRepresentation(
-			JsonObject{"test": "data"},
+			model_legacy.JsonObject{"test": "data"},
 			"test-local-id",
 			"hbi",
 			"host",
@@ -163,7 +165,7 @@ func TestReporterRepresentation_Validation(t *testing.T) {
 
 		// Test that zero Version is valid
 		rr, err := NewReporterRepresentation(
-			JsonObject{"test": "data"},
+			model_legacy.JsonObject{"test": "data"},
 			"test-local-id",
 			"hbi",
 			"host",
@@ -189,7 +191,7 @@ func TestReporterRepresentation_Validation(t *testing.T) {
 
 		// Test that zero CommonVersion is valid
 		rr, err := NewReporterRepresentation(
-			JsonObject{"test": "data"},
+			model_legacy.JsonObject{"test": "data"},
 			"test-local-id",
 			"hbi",
 			"host",
@@ -215,7 +217,7 @@ func TestReporterRepresentation_Validation(t *testing.T) {
 
 		// Test validation through factory method (proper approach)
 		_, err := NewReporterRepresentation(
-			JsonObject{"test": "data"},
+			model_legacy.JsonObject{"test": "data"},
 			"test-local-id",
 			"hbi",
 			"host",
@@ -236,7 +238,7 @@ func TestReporterRepresentation_Validation(t *testing.T) {
 
 		// Test validation through factory method (proper approach)
 		_, err := NewReporterRepresentation(
-			JsonObject{"test": "data"},
+			model_legacy.JsonObject{"test": "data"},
 			"test-local-id",
 			"hbi",
 			"host",
@@ -287,7 +289,7 @@ func TestReporterRepresentation_BusinessRules(t *testing.T) {
 
 		// Create two identical ReporterRepresentations using factory method
 		rr1, err := NewReporterRepresentation(
-			JsonObject{"test": "data"},
+			model_legacy.JsonObject{"test": "data"},
 			"test-local-id",
 			"hbi",
 			"host",
@@ -303,7 +305,7 @@ func TestReporterRepresentation_BusinessRules(t *testing.T) {
 		AssertNoError(t, err, "First ReporterRepresentation should be valid")
 
 		rr2, err := NewReporterRepresentation(
-			JsonObject{"test": "data"},
+			model_legacy.JsonObject{"test": "data"},
 			"test-local-id", // same LocalResourceID
 			"hbi",           // same ReporterType
 			"host",          // same ResourceType
@@ -329,7 +331,7 @@ func TestReporterRepresentation_BusinessRules(t *testing.T) {
 
 		// Create two ReporterRepresentations with different Generation values
 		rr1, err := NewReporterRepresentation(
-			JsonObject{"test": "data"},
+			model_legacy.JsonObject{"test": "data"},
 			"test-local-id",
 			"hbi",
 			"host",
@@ -345,7 +347,7 @@ func TestReporterRepresentation_BusinessRules(t *testing.T) {
 		AssertNoError(t, err, "First ReporterRepresentation should be valid")
 
 		rr2, err := NewReporterRepresentation(
-			JsonObject{"test": "data"},
+			model_legacy.JsonObject{"test": "data"},
 			"test-local-id",
 			"hbi",
 			"host",
@@ -371,7 +373,7 @@ func TestReporterRepresentation_BusinessRules(t *testing.T) {
 
 		// Test Generation = 1 (positive)
 		_, err := NewReporterRepresentation(
-			JsonObject{"test": "data"},
+			model_legacy.JsonObject{"test": "data"},
 			"test-local-id",
 			"hbi",
 			"host",
@@ -388,7 +390,7 @@ func TestReporterRepresentation_BusinessRules(t *testing.T) {
 
 		// Test Version = 1 (positive)
 		_, err = NewReporterRepresentation(
-			JsonObject{"test": "data"},
+			model_legacy.JsonObject{"test": "data"},
 			"test-local-id",
 			"hbi",
 			"host",
@@ -405,7 +407,7 @@ func TestReporterRepresentation_BusinessRules(t *testing.T) {
 
 		// Test CommonVersion = 1 (positive)
 		_, err = NewReporterRepresentation(
-			JsonObject{"test": "data"},
+			model_legacy.JsonObject{"test": "data"},
 			"test-local-id",
 			"hbi",
 			"host",
@@ -428,7 +430,7 @@ func TestReporterRepresentation_BusinessRules(t *testing.T) {
 		t.Run("LocalResourceID_required", func(t *testing.T) {
 			t.Parallel()
 			_, err := NewReporterRepresentation(
-				JsonObject{"test": "data"},
+				model_legacy.JsonObject{"test": "data"},
 				"", // empty LocalResourceID
 				"hbi",
 				"host",
@@ -448,7 +450,7 @@ func TestReporterRepresentation_BusinessRules(t *testing.T) {
 		t.Run("ReporterType_required", func(t *testing.T) {
 			t.Parallel()
 			_, err := NewReporterRepresentation(
-				JsonObject{"test": "data"},
+				model_legacy.JsonObject{"test": "data"},
 				"test-local-id",
 				"", // empty ReporterType
 				"host",
@@ -468,7 +470,7 @@ func TestReporterRepresentation_BusinessRules(t *testing.T) {
 		t.Run("ResourceType_required", func(t *testing.T) {
 			t.Parallel()
 			_, err := NewReporterRepresentation(
-				JsonObject{"test": "data"},
+				model_legacy.JsonObject{"test": "data"},
 				"test-local-id",
 				"hbi",
 				"", // empty ResourceType
@@ -488,7 +490,7 @@ func TestReporterRepresentation_BusinessRules(t *testing.T) {
 		t.Run("ReporterInstanceID_required", func(t *testing.T) {
 			t.Parallel()
 			_, err := NewReporterRepresentation(
-				JsonObject{"test": "data"},
+				model_legacy.JsonObject{"test": "data"},
 				"test-local-id",
 				"hbi",
 				"host",
@@ -508,7 +510,7 @@ func TestReporterRepresentation_BusinessRules(t *testing.T) {
 		t.Run("APIHref_required", func(t *testing.T) {
 			t.Parallel()
 			_, err := NewReporterRepresentation(
-				JsonObject{"test": "data"},
+				model_legacy.JsonObject{"test": "data"},
 				"test-local-id",
 				"hbi",
 				"host",
@@ -534,7 +536,7 @@ func TestReporterRepresentation_TombstoneLogic(t *testing.T) {
 
 		// Test validation through factory method (proper approach)
 		rr, err := NewReporterRepresentation(
-			JsonObject{"test": "data"},
+			model_legacy.JsonObject{"test": "data"},
 			"test-local-id",
 			"hbi",
 			"host",
@@ -560,7 +562,7 @@ func TestReporterRepresentation_TombstoneLogic(t *testing.T) {
 
 		// Test validation through factory method (proper approach)
 		rr, err := NewReporterRepresentation(
-			JsonObject{"test": "data"},
+			model_legacy.JsonObject{"test": "data"},
 			"test-local-id",
 			"hbi",
 			"host",
@@ -586,7 +588,7 @@ func TestReporterRepresentation_TombstoneLogic(t *testing.T) {
 
 		// Test validation through factory method with default tombstone value (false)
 		rr, err := NewReporterRepresentation(
-			JsonObject{"test": "data"},
+			model_legacy.JsonObject{"test": "data"},
 			"test-local-id",
 			"hbi",
 			"host",
@@ -618,7 +620,7 @@ func TestReporterRepresentation_VersioningLogic(t *testing.T) {
 		versions := []uint{0, 1, 2, 10, 100, 1000}
 		for _, version := range versions {
 			_, err := NewReporterRepresentation(
-				JsonObject{"test": "data"},
+				model_legacy.JsonObject{"test": "data"},
 				"test-local-id",
 				"hbi",
 				"host",
@@ -642,7 +644,7 @@ func TestReporterRepresentation_VersioningLogic(t *testing.T) {
 		generations := []uint{0, 1, 2, 10, 100, 1000}
 		for _, generation := range generations {
 			_, err := NewReporterRepresentation(
-				JsonObject{"test": "data"},
+				model_legacy.JsonObject{"test": "data"},
 				"test-local-id",
 				"hbi",
 				"host",
@@ -666,7 +668,7 @@ func TestReporterRepresentation_VersioningLogic(t *testing.T) {
 		commonVersions := []uint{0, 1, 2, 10, 100, 1000}
 		for _, commonVersion := range commonVersions {
 			_, err := NewReporterRepresentation(
-				JsonObject{"test": "data"},
+				model_legacy.JsonObject{"test": "data"},
 				"test-local-id",
 				"hbi",
 				"host",
@@ -700,7 +702,7 @@ func TestReporterRepresentation_HrefValidation(t *testing.T) {
 			t.Run(fmt.Sprintf("valid_url_%s", url), func(t *testing.T) {
 				t.Parallel()
 				_, err := NewReporterRepresentation(
-					JsonObject{"test": "data"},
+					model_legacy.JsonObject{"test": "data"},
 					"test-local-id",
 					"hbi",
 					"host",
@@ -732,7 +734,7 @@ func TestReporterRepresentation_HrefValidation(t *testing.T) {
 			t.Run(fmt.Sprintf("invalid_url_%s", url), func(t *testing.T) {
 				t.Parallel()
 				_, err := NewReporterRepresentation(
-					JsonObject{"test": "data"},
+					model_legacy.JsonObject{"test": "data"},
 					"test-local-id",
 					"hbi",
 					"host",
@@ -762,7 +764,7 @@ func TestReporterRepresentation_HrefValidation(t *testing.T) {
 			t.Run(fmt.Sprintf("valid_console_url_%s", url), func(t *testing.T) {
 				t.Parallel()
 				_, err := NewReporterRepresentation(
-					JsonObject{"test": "data"},
+					model_legacy.JsonObject{"test": "data"},
 					"test-local-id",
 					"hbi",
 					"host",
@@ -770,7 +772,7 @@ func TestReporterRepresentation_HrefValidation(t *testing.T) {
 					"test-instance",
 					1,
 					"https://api.example.com",
-					stringPtr(url), // Test different valid console URLs
+					model_legacy.stringPtr(url), // Test different valid console URLs
 					1,
 					false,
 					nil,
@@ -784,7 +786,7 @@ func TestReporterRepresentation_HrefValidation(t *testing.T) {
 		t.Parallel()
 
 		rr, err := NewReporterRepresentation(
-			JsonObject{"test": "data"},
+			model_legacy.JsonObject{"test": "data"},
 			"test-local-id",
 			"hbi",
 			"host",
@@ -817,7 +819,7 @@ func TestReporterRepresentation_HrefValidation(t *testing.T) {
 			t.Run(fmt.Sprintf("invalid_console_url_%s", url), func(t *testing.T) {
 				t.Parallel()
 				_, err := NewReporterRepresentation(
-					JsonObject{"test": "data"},
+					model_legacy.JsonObject{"test": "data"},
 					"test-local-id",
 					"hbi",
 					"host",
@@ -825,7 +827,7 @@ func TestReporterRepresentation_HrefValidation(t *testing.T) {
 					"test-instance",
 					1,
 					"https://api.example.com",
-					stringPtr(url), // Test different invalid console URLs
+					model_legacy.stringPtr(url), // Test different invalid console URLs
 					1,
 					false,
 					nil,
@@ -843,12 +845,12 @@ func TestReporterRepresentation_DataHandling(t *testing.T) {
 		t.Parallel()
 
 		// Test with different types of JSON data
-		testData := JsonObject{
+		testData := model_legacy.JsonObject{
 			"string_field":  "test value",
 			"number_field":  42,
 			"boolean_field": true,
 			"array_field":   []interface{}{1, 2, 3},
-			"object_field": JsonObject{
+			"object_field": model_legacy.JsonObject{
 				"nested_string": "nested value",
 				"nested_number": 123,
 			},
@@ -874,34 +876,34 @@ func TestReporterRepresentation_DataHandling(t *testing.T) {
 	t.Run("should handle complex nested JSON", func(t *testing.T) {
 		t.Parallel()
 
-		complexData := JsonObject{
-			"metadata": JsonObject{
-				"labels": JsonObject{
+		complexData := model_legacy.JsonObject{
+			"metadata": model_legacy.JsonObject{
+				"labels": model_legacy.JsonObject{
 					"app":         "test-app",
 					"environment": "staging",
 					"team":        "platform",
 				},
-				"annotations": JsonObject{
+				"annotations": model_legacy.JsonObject{
 					"deployment.kubernetes.io/revision":                "1",
 					"kubectl.kubernetes.io/last-applied-configuration": `{"apiVersion":"v1","kind":"Pod","metadata":{"name":"test"}}`,
 				},
 			},
-			"spec": JsonObject{
+			"spec": model_legacy.JsonObject{
 				"containers": []interface{}{
-					JsonObject{
+					model_legacy.JsonObject{
 						"name":  "app",
 						"image": "nginx:1.21",
 						"ports": []interface{}{
-							JsonObject{"containerPort": 80},
-							JsonObject{"containerPort": 443},
+							model_legacy.JsonObject{"containerPort": 80},
+							model_legacy.JsonObject{"containerPort": 443},
 						},
 					},
 				},
 			},
-			"status": JsonObject{
+			"status": model_legacy.JsonObject{
 				"phase": "Running",
 				"conditions": []interface{}{
-					JsonObject{
+					model_legacy.JsonObject{
 						"type":   "Ready",
 						"status": "True",
 					},
@@ -930,7 +932,7 @@ func TestReporterRepresentation_DataHandling(t *testing.T) {
 		t.Parallel()
 
 		_, err := NewReporterRepresentation(
-			JsonObject{}, // Test with empty JSON object
+			model_legacy.JsonObject{}, // Test with empty JSON object
 			"test-local-id",
 			"hbi",
 			"host",
@@ -950,7 +952,7 @@ func TestReporterRepresentation_DataHandling(t *testing.T) {
 func TestReporterRepresentation_FactoryMethods(t *testing.T) {
 	t.Run("should_create_valid_ReporterRepresentation_using_factory", func(t *testing.T) {
 		rr, err := NewReporterRepresentation(
-			JsonObject{"satellite_id": "test-satellite"},
+			model_legacy.JsonObject{"satellite_id": "test-satellite"},
 			"local-123",
 			"hbi",
 			"host",
@@ -958,10 +960,10 @@ func TestReporterRepresentation_FactoryMethods(t *testing.T) {
 			"reporter-instance-123",
 			1,
 			"https://api.example.com/resource/123",
-			stringPtr("https://console.example.com/resource/123"),
+			model_legacy.stringPtr("https://console.example.com/resource/123"),
 			1,
 			false,
-			stringPtr("1.0.0"),
+			model_legacy.stringPtr("1.0.0"),
 		)
 
 		if err != nil {
@@ -984,7 +986,7 @@ func TestReporterRepresentation_FactoryMethods(t *testing.T) {
 	t.Run("should_enforce_validation_rules_in_factory", func(t *testing.T) {
 		// Test empty LocalResourceID
 		_, err := NewReporterRepresentation(
-			JsonObject{"satellite_id": "test-satellite"},
+			model_legacy.JsonObject{"satellite_id": "test-satellite"},
 			"", // empty LocalResourceID
 			"hbi",
 			"host",
@@ -992,10 +994,10 @@ func TestReporterRepresentation_FactoryMethods(t *testing.T) {
 			"reporter-instance-123",
 			1,
 			"https://api.example.com/resource/123",
-			stringPtr("https://console.example.com/resource/123"),
+			model_legacy.stringPtr("https://console.example.com/resource/123"),
 			1,
 			false,
-			stringPtr("1.0.0"),
+			model_legacy.stringPtr("1.0.0"),
 		)
 
 		if err == nil {
@@ -1004,7 +1006,7 @@ func TestReporterRepresentation_FactoryMethods(t *testing.T) {
 
 		// Test zero Generation - should be valid now
 		rr, err := NewReporterRepresentation(
-			JsonObject{"satellite_id": "test-satellite"},
+			model_legacy.JsonObject{"satellite_id": "test-satellite"},
 			"local-123",
 			"hbi",
 			"host",
@@ -1012,10 +1014,10 @@ func TestReporterRepresentation_FactoryMethods(t *testing.T) {
 			"reporter-instance-123",
 			0, // zero Generation should be valid
 			"https://api.example.com/resource/123",
-			stringPtr("https://console.example.com/resource/123"),
+			model_legacy.stringPtr("https://console.example.com/resource/123"),
 			1,
 			false,
-			stringPtr("1.0.0"),
+			model_legacy.stringPtr("1.0.0"),
 		)
 
 		if err != nil {
@@ -1029,7 +1031,7 @@ func TestReporterRepresentation_FactoryMethods(t *testing.T) {
 
 		// Test invalid URL
 		_, err = NewReporterRepresentation(
-			JsonObject{"satellite_id": "test-satellite"},
+			model_legacy.JsonObject{"satellite_id": "test-satellite"},
 			"local-123",
 			"hbi",
 			"host",
@@ -1037,10 +1039,10 @@ func TestReporterRepresentation_FactoryMethods(t *testing.T) {
 			"reporter-instance-123",
 			1,
 			"invalid-url", // invalid URL
-			stringPtr("https://console.example.com/resource/123"),
+			model_legacy.stringPtr("https://console.example.com/resource/123"),
 			1,
 			false,
-			stringPtr("1.0.0"),
+			model_legacy.stringPtr("1.0.0"),
 		)
 
 		if err == nil {

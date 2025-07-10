@@ -9,7 +9,7 @@ import (
 
 	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/authz"
 	authnapi "github.com/project-kessel/inventory-api/internal/authn/api"
-	"github.com/project-kessel/inventory-api/internal/biz/model"
+	"github.com/project-kessel/inventory-api/internal/biz/model_legacy"
 	"github.com/project-kessel/inventory-api/internal/middleware"
 )
 
@@ -82,8 +82,8 @@ func (s *KesselCheckServiceService) CheckForUpdate(ctx context.Context, req *pb.
 	}
 }
 
-func authzFromRequest(identity *authnapi.Identity, resource *pb.ObjectReference) (*model.ReporterResourceId, error) {
-	return &model.ReporterResourceId{
+func authzFromRequest(identity *authnapi.Identity, resource *pb.ObjectReference) (*model_legacy.ReporterResourceId, error) {
+	return &model_legacy.ReporterResourceId{
 		LocalResourceId: resource.Id,
 		ResourceType:    resource.Type.Name,
 		ReporterId:      identity.Principal,

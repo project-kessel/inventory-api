@@ -11,7 +11,7 @@ import (
 	kesselv1 "github.com/project-kessel/relations-api/api/kessel/relations/v1"
 	"github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
 
-	"github.com/project-kessel/inventory-api/internal/biz/model"
+	"github.com/project-kessel/inventory-api/internal/biz/model_legacy"
 )
 
 type AllowAllAuthz struct {
@@ -30,11 +30,11 @@ func (a *AllowAllAuthz) Health(ctx context.Context) (*kesselv1.GetReadyzResponse
 
 }
 
-func (a *AllowAllAuthz) Check(context.Context, string, string, *model.Resource, *v1beta1.SubjectReference) (v1beta1.CheckResponse_Allowed, *v1beta1.ConsistencyToken, error) {
+func (a *AllowAllAuthz) Check(context.Context, string, string, *model_legacy.Resource, *v1beta1.SubjectReference) (v1beta1.CheckResponse_Allowed, *v1beta1.ConsistencyToken, error) {
 	return v1beta1.CheckResponse_ALLOWED_TRUE, nil, nil
 }
 
-func (a *AllowAllAuthz) CheckForUpdate(context.Context, string, string, *model.Resource, *v1beta1.SubjectReference) (v1beta1.CheckForUpdateResponse_Allowed, *v1beta1.ConsistencyToken, error) {
+func (a *AllowAllAuthz) CheckForUpdate(context.Context, string, string, *model_legacy.Resource, *v1beta1.SubjectReference) (v1beta1.CheckForUpdateResponse_Allowed, *v1beta1.ConsistencyToken, error) {
 	return v1beta1.CheckForUpdateResponse_ALLOWED_TRUE, nil, nil
 }
 

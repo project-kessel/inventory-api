@@ -13,11 +13,11 @@ import (
 	pbrelation "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/relationships"
 	pbresource "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/resources"
 	pbresourcev1beta2 "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2"
-	"github.com/project-kessel/inventory-api/internal/biz/model"
+	"github.com/project-kessel/inventory-api/internal/biz/model_legacy"
 )
 
-func ReporterResourceIdFromPb(resourceType, reporterId string, reporter *pbresource.ReporterData) model.ReporterResourceId {
-	return model.ReporterResourceId{
+func ReporterResourceIdFromPb(resourceType, reporterId string, reporter *pbresource.ReporterData) model_legacy.ReporterResourceId {
+	return model_legacy.ReporterResourceId{
 		LocalResourceId: reporter.LocalResourceId,
 		ResourceType:    resourceType,
 		ReporterId:      reporterId,
@@ -25,8 +25,8 @@ func ReporterResourceIdFromPb(resourceType, reporterId string, reporter *pbresou
 	}
 }
 
-func ResourceFromPbv1beta1(resourceType, reporterId string, resourceData model.JsonObject, metadata *pbresource.Metadata, reporter *pbresource.ReporterData) *model.Resource {
-	return &model.Resource{
+func ResourceFromPbv1beta1(resourceType, reporterId string, resourceData model_legacy.JsonObject, metadata *pbresource.Metadata, reporter *pbresource.ReporterData) *model_legacy.Resource {
+	return &model_legacy.Resource{
 		ID:                 uuid.UUID{},
 		ResourceData:       resourceData,
 		ResourceType:       resourceType,
@@ -34,8 +34,8 @@ func ResourceFromPbv1beta1(resourceType, reporterId string, resourceData model.J
 		OrgId:              metadata.OrgId,
 		ReporterResourceId: reporter.LocalResourceId,
 		ReporterId:         reporter.ReporterType.String(),
-		Reporter: model.ResourceReporter{
-			Reporter: model.Reporter{
+		Reporter: model_legacy.ResourceReporter{
+			Reporter: model_legacy.Reporter{
 				ReporterId:      reporterId,
 				ReporterType:    reporter.ReporterType.String(),
 				ReporterVersion: reporter.ReporterVersion,
@@ -48,8 +48,8 @@ func ResourceFromPbv1beta1(resourceType, reporterId string, resourceData model.J
 	}
 }
 
-func ResourceFromPb(resourceType, reporterType string, reporterInstanceId string, reporterId string, resourceData model.JsonObject, workspaceId string, resourceRep *pbresourcev1beta2.ResourceRepresentations, inventoryId *uuid.UUID) *model.Resource {
-	return &model.Resource{
+func ResourceFromPb(resourceType, reporterType string, reporterInstanceId string, reporterId string, resourceData model_legacy.JsonObject, workspaceId string, resourceRep *pbresourcev1beta2.ResourceRepresentations, inventoryId *uuid.UUID) *model_legacy.Resource {
+	return &model_legacy.Resource{
 		ID:                 uuid.UUID{},
 		InventoryId:        inventoryId,
 		ResourceData:       resourceData,
@@ -65,7 +65,7 @@ func ResourceFromPb(resourceType, reporterType string, reporterInstanceId string
 	}
 }
 
-func ToJsonObject(in interface{}) (model.JsonObject, error) {
+func ToJsonObject(in interface{}) (model_legacy.JsonObject, error) {
 	if in == nil {
 		return nil, nil
 	}
@@ -75,7 +75,7 @@ func ToJsonObject(in interface{}) (model.JsonObject, error) {
 		return nil, err
 	}
 
-	resourceData := model.JsonObject{}
+	resourceData := model_legacy.JsonObject{}
 	err = json.Unmarshal(bytes, &resourceData)
 	if err != nil {
 		return nil, err
@@ -119,10 +119,10 @@ func ExtractReporterInstanceID(reporterInstanceId string) (string, error) {
 	return reporterInstanceId, nil
 }
 
-func labelsFromPb(pbLabels []*pbresource.ResourceLabel) model.Labels {
-	labels := model.Labels{}
+func labelsFromPb(pbLabels []*pbresource.ResourceLabel) model_legacy.Labels {
+	labels := model_legacy.Labels{}
 	for _, pbLabel := range pbLabels {
-		labels = append(labels, model.Label{
+		labels = append(labels, model_legacy.Label{
 			Key:   pbLabel.Key,
 			Value: pbLabel.Value,
 		})
@@ -130,27 +130,27 @@ func labelsFromPb(pbLabels []*pbresource.ResourceLabel) model.Labels {
 	return labels
 }
 
-func ReporterRelationshipIdFromPb(relationshipType, reporterId string, reporter *pbrelation.ReporterData) (model.ReporterRelationshipId, error) {
+func ReporterRelationshipIdFromPb(relationshipType, reporterId string, reporter *pbrelation.ReporterData) (model_legacy.ReporterRelationshipId, error) {
 	res := strings.Split(relationshipType, "_")
 
 	if len(res) != 3 {
-		return model.ReporterRelationshipId{}, errors.New("invalid relationship type, not in the expected format subject_relation_object ")
+		return model_legacy.ReporterRelationshipId{}, errors.New("invalid relationship type, not in the expected format subject_relation_object ")
 	}
 
 	subjectType := conform(res[0])
 	objectType := conform(res[2])
 
-	return model.ReporterRelationshipId{
+	return model_legacy.ReporterRelationshipId{
 		ReporterId:       reporterId,
 		ReporterType:     reporter.ReporterType.String(),
 		RelationshipType: relationshipType,
-		SubjectId: model.ReporterResourceId{
+		SubjectId: model_legacy.ReporterResourceId{
 			LocalResourceId: reporter.SubjectLocalResourceId,
 			ResourceType:    subjectType,
 			ReporterId:      reporterId,
 			ReporterType:    reporter.ReporterType.String(),
 		},
-		ObjectId: model.ReporterResourceId{
+		ObjectId: model_legacy.ReporterResourceId{
 			LocalResourceId: reporter.ObjectLocalResourceId,
 			ResourceType:    objectType,
 			ReporterId:      reporterId,
@@ -159,7 +159,7 @@ func ReporterRelationshipIdFromPb(relationshipType, reporterId string, reporter 
 	}, nil
 }
 
-func RelationshipFromPb(relationshipType, reporterId string, relationshipData model.JsonObject, metadata *pbrelation.Metadata, reporter *pbrelation.ReporterData) (*model.Relationship, error) {
+func RelationshipFromPb(relationshipType, reporterId string, relationshipData model_legacy.JsonObject, metadata *pbrelation.Metadata, reporter *pbrelation.ReporterData) (*model_legacy.Relationship, error) {
 	res := strings.Split(relationshipType, "_")
 
 	if len(res) != 3 {
@@ -169,15 +169,15 @@ func RelationshipFromPb(relationshipType, reporterId string, relationshipData mo
 	subjectType := conform(res[0])
 	objectType := conform(res[2])
 
-	return &model.Relationship{
+	return &model_legacy.Relationship{
 		ID:               uuid.UUID{},
 		RelationshipData: relationshipData,
 		RelationshipType: relationshipType,
 		SubjectId:        uuid.UUID{},
 		ObjectId:         uuid.UUID{},
 		OrgId:            metadata.OrgId,
-		Reporter: model.RelationshipReporter{
-			Reporter: model.Reporter{
+		Reporter: model_legacy.RelationshipReporter{
+			Reporter: model_legacy.Reporter{
 				ReporterId:      reporterId,
 				ReporterType:    reporter.ReporterType.String(),
 				ReporterVersion: reporter.ReporterVersion,

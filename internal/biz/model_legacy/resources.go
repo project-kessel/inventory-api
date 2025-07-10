@@ -1,4 +1,4 @@
-package model
+package model_legacy
 
 import (
 	"database/sql/driver"
@@ -12,29 +12,54 @@ import (
 )
 
 type Resource struct {
-	ID               uuid.UUID  `gorm:"type:uuid;primarykey"`
-	InventoryId      *uuid.UUID `gorm:"index"`
-	OrgId            string     `gorm:"index"`
-	ResourceData     JsonObject
+	ID               uuid.UUID `gorm:"type:uuid;primarykey"`
 	ResourceType     string
-	WorkspaceId      string
-	ConsoleHref      string
-	ApiHref          string
-	Labels           Labels
-	CreatedAt        *time.Time
-	UpdatedAt        *time.Time
 	ConsistencyToken string
-	// Reporter Fields
-	ReporterResourceId string `json:"reporter_resource_id"`
-	ReporterType       string `json:"reporter_type"`
-	ReporterInstanceId string `json:"reporter_instance_id"`
-	ReporterVersion    string `json:"reporter_version"`
-	//Unique Indexes
+
+	// Representation References
+
+	// Reporter Representation
+	/*Representation
+
+	LocalResourceID
+	ReporterType
+	ResourceType
+	Version
+	ReporterInstanceID
+	Generation
+	APIHref
+	ConsoleHref
+	CommonVersion
+	Tombstone
+	ReporterVersion */
+	ConsoleHref        string
+	ApiHref            string
+	ReporterResourceId string     `json:"reporter_resource_id"` // LocalResourceID in ReporterRepresentation
+	ReporterType       string     `json:"reporter_type"`
+	ReporterInstanceId string     `json:"reporter_instance_id"`
+	ReporterVersion    string     `json:"reporter_version"`
+	ResourceData       JsonObject // Already part of Reporter Representation
+
+	// Common Representation
+	/*Representation
+	ResourceId
+	ResourceType
+	Version
+	ReportedByReporterType
+	ReportedByReporterInstance*/
+	WorkspaceId string //Representation in Common Representation
+
+	// Metadata for operations
+	CreatedAt *time.Time
+	UpdatedAt *time.Time
+
+	// Can be removed
+	Labels Labels
 	ReporterResourceUniqueIndex
-	// Reporter Principal
-	ReporterId string `json:"reporter_id"`
-	// Deprecated: Use Reporter Fields instead(ReporterId, ReporterResourceId)
-	Reporter ResourceReporter
+	ReporterId  string `json:"reporter_id"`
+	Reporter    ResourceReporter
+	InventoryId *uuid.UUID `gorm:"index"`
+	OrgId       string     `gorm:"index"`
 }
 
 type ReporterResourceUniqueIndex struct {

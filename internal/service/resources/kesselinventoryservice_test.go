@@ -18,7 +18,7 @@ import (
 	"gorm.io/gorm"
 
 	authnapi "github.com/project-kessel/inventory-api/internal/authn/api"
-	"github.com/project-kessel/inventory-api/internal/biz/model"
+	"github.com/project-kessel/inventory-api/internal/biz/model_legacy"
 	usecase "github.com/project-kessel/inventory-api/internal/biz/usecase/resources"
 	"github.com/project-kessel/inventory-api/internal/middleware"
 	"github.com/project-kessel/inventory-api/internal/mocks"
@@ -279,7 +279,7 @@ func TestInventoryService_DeleteResource_Success(t *testing.T) {
 
 	mockRepo.
 		On("FindByReporterData", mock.Anything, "sarah", "abc123").
-		Return(&model.Resource{}, nil).
+		Return(&model_legacy.Resource{}, nil).
 		Once()
 
 	mockRepo.
@@ -288,7 +288,7 @@ func TestInventoryService_DeleteResource_Success(t *testing.T) {
 			mock.AnythingOfType("uuid.UUID"),
 			"rbac",
 		).
-		Return(&model.Resource{
+		Return(&model_legacy.Resource{
 			ID:           uuid.New(),
 			ResourceType: "host",
 		}, nil).
@@ -368,7 +368,7 @@ func TestInventoryService_Check_Allowed(t *testing.T) {
 	mockRepo := new(MockRepo)
 	mockRepo.
 		On("FindByReporterResourceId", mock.Anything, mock.Anything).
-		Return((*model.Resource)(nil), gorm.ErrRecordNotFound)
+		Return((*model_legacy.Resource)(nil), gorm.ErrRecordNotFound)
 
 	mockAuthz := new(mocks.MockAuthz)
 	mockAuthz.
@@ -376,7 +376,7 @@ func TestInventoryService_Check_Allowed(t *testing.T) {
 			mock.Anything,
 			"hbi",
 			"view",
-			mock.AnythingOfType("*model.Resource"),
+			mock.AnythingOfType("*model_legacy.Resource"),
 			mock.Anything,
 		).
 		Return(relationsV1beta1.CheckResponse_ALLOWED_TRUE, &relationsV1beta1.ConsistencyToken{}, nil).
@@ -426,7 +426,7 @@ func TestInventoryService_CheckForUpdate_Allowed(t *testing.T) {
 	mockRepo := new(MockRepo)
 	mockRepo.
 		On("FindByReporterResourceId", mock.Anything, mock.Anything).
-		Return((*model.Resource)(nil), gorm.ErrRecordNotFound)
+		Return((*model_legacy.Resource)(nil), gorm.ErrRecordNotFound)
 
 	mockAuthz := new(mocks.MockAuthz)
 	mockAuthz.
@@ -434,7 +434,7 @@ func TestInventoryService_CheckForUpdate_Allowed(t *testing.T) {
 			mock.Anything,
 			"hbi",
 			"view",
-			mock.AnythingOfType("*model.Resource"),
+			mock.AnythingOfType("*model_legacy.Resource"),
 			mock.Anything,
 		).
 		Return(relationsV1beta1.CheckForUpdateResponse_ALLOWED_TRUE, &relationsV1beta1.ConsistencyToken{}, nil).
@@ -484,7 +484,7 @@ func TestInventoryService_Check_Denied(t *testing.T) {
 	mockRepo := new(MockRepo)
 	mockRepo.
 		On("FindByReporterResourceId", mock.Anything, mock.Anything).
-		Return((*model.Resource)(nil), gorm.ErrRecordNotFound)
+		Return((*model_legacy.Resource)(nil), gorm.ErrRecordNotFound)
 
 	mockAuthz := new(mocks.MockAuthz)
 	mockAuthz.
@@ -492,7 +492,7 @@ func TestInventoryService_Check_Denied(t *testing.T) {
 			mock.Anything,
 			"hbi",
 			"view",
-			mock.AnythingOfType("*model.Resource"),
+			mock.AnythingOfType("*model_legacy.Resource"),
 			mock.Anything,
 		).
 		Return(relationsV1beta1.CheckResponse_ALLOWED_FALSE, &relationsV1beta1.ConsistencyToken{}, nil).
@@ -542,7 +542,7 @@ func TestInventoryService_CheckForUpdate_Denied(t *testing.T) {
 	mockRepo := new(MockRepo)
 	mockRepo.
 		On("FindByReporterResourceId", mock.Anything, mock.Anything).
-		Return((*model.Resource)(nil), gorm.ErrRecordNotFound)
+		Return((*model_legacy.Resource)(nil), gorm.ErrRecordNotFound)
 
 	mockAuthz := new(mocks.MockAuthz)
 	mockAuthz.
@@ -550,7 +550,7 @@ func TestInventoryService_CheckForUpdate_Denied(t *testing.T) {
 			mock.Anything,
 			"hbi",
 			"view",
-			mock.AnythingOfType("*model.Resource"),
+			mock.AnythingOfType("*model_legacy.Resource"),
 			mock.Anything,
 		).
 		Return(relationsV1beta1.CheckForUpdateResponse_ALLOWED_FALSE, &relationsV1beta1.ConsistencyToken{}, nil).

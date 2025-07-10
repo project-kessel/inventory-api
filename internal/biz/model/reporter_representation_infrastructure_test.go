@@ -5,9 +5,11 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/project-kessel/inventory-api/internal/biz/model_legacy"
 )
 
-// Infrastructure tests for ReporterRepresentation domain model
+// Infrastructure tests for ReporterRepresentation domain model_legacy
 // These tests focus on database schema, field structure validation, edge cases, and serialization
 
 func TestReporterRepresentation_TableName(t *testing.T) {
@@ -221,7 +223,7 @@ func TestReporterRepresentation_EdgeCases(t *testing.T) {
 		t.Parallel()
 
 		_, err := NewReporterRepresentation(
-			JsonObject{
+			model_legacy.JsonObject{
 				"name":        "测试资源",
 				"description": "包含Unicode字符的描述 🌟",
 			},
@@ -244,7 +246,7 @@ func TestReporterRepresentation_EdgeCases(t *testing.T) {
 		t.Parallel()
 
 		_, err := NewReporterRepresentation(
-			JsonObject{
+			model_legacy.JsonObject{
 				"special_field": "Value with special chars: !@#$%^&*()_+-=[]{}|;':\",./<>?",
 			},
 			"resource-with-special-chars-!@#$%^&*()",
@@ -266,7 +268,7 @@ func TestReporterRepresentation_EdgeCases(t *testing.T) {
 		t.Parallel()
 
 		_, err := NewReporterRepresentation(
-			JsonObject{"test": "data"},
+			model_legacy.JsonObject{"test": "data"},
 			"test-local-id",
 			"hbi",
 			"host",
@@ -286,7 +288,7 @@ func TestReporterRepresentation_EdgeCases(t *testing.T) {
 		t.Parallel()
 
 		_, err := NewReporterRepresentation(
-			JsonObject{"test": "data"},
+			model_legacy.JsonObject{"test": "data"},
 			"test-local-id",
 			"hbi",
 			"host",
@@ -294,10 +296,10 @@ func TestReporterRepresentation_EdgeCases(t *testing.T) {
 			"test-instance",
 			1,
 			"https://api.example.com",
-			stringPtr(""), // Empty ConsoleHref
+			model_legacy.stringPtr(""), // Empty ConsoleHref
 			1,
 			false,
-			stringPtr(""), // Empty ReporterVersion
+			model_legacy.stringPtr(""), // Empty ReporterVersion
 		)
 		AssertNoError(t, err, "ReporterRepresentation with empty string values for nullable fields should be valid")
 	})
@@ -306,7 +308,7 @@ func TestReporterRepresentation_EdgeCases(t *testing.T) {
 		t.Parallel()
 
 		_, err := NewReporterRepresentation(
-			JsonObject{"test": "data"},
+			model_legacy.JsonObject{"test": "data"},
 			"test-local-id",
 			"hbi",
 			"host",
@@ -325,34 +327,34 @@ func TestReporterRepresentation_EdgeCases(t *testing.T) {
 	t.Run("should handle complex nested JSON data", func(t *testing.T) {
 		t.Parallel()
 
-		complexData := JsonObject{
-			"metadata": JsonObject{
-				"labels": JsonObject{
+		complexData := model_legacy.JsonObject{
+			"metadata": model_legacy.JsonObject{
+				"labels": model_legacy.JsonObject{
 					"app":         "test-app",
 					"environment": "staging",
 					"team":        "platform",
 				},
-				"annotations": JsonObject{
+				"annotations": model_legacy.JsonObject{
 					"deployment.kubernetes.io/revision":                "1",
 					"kubectl.kubernetes.io/last-applied-configuration": `{"apiVersion":"v1","kind":"Pod","metadata":{"name":"test"}}`,
 				},
 			},
-			"spec": JsonObject{
+			"spec": model_legacy.JsonObject{
 				"containers": []interface{}{
-					JsonObject{
+					model_legacy.JsonObject{
 						"name":  "app",
 						"image": "nginx:1.21",
 						"ports": []interface{}{
-							JsonObject{"containerPort": 80},
-							JsonObject{"containerPort": 443},
+							model_legacy.JsonObject{"containerPort": 80},
+							model_legacy.JsonObject{"containerPort": 443},
 						},
 					},
 				},
 			},
-			"status": JsonObject{
+			"status": model_legacy.JsonObject{
 				"phase": "Running",
 				"conditions": []interface{}{
-					JsonObject{
+					model_legacy.JsonObject{
 						"type":   "Ready",
 						"status": "True",
 					},
@@ -381,7 +383,7 @@ func TestReporterRepresentation_EdgeCases(t *testing.T) {
 		t.Parallel()
 
 		_, err := NewReporterRepresentation(
-			JsonObject{},
+			model_legacy.JsonObject{},
 			"test-local-id",
 			"hbi",
 			"host",
@@ -414,7 +416,7 @@ func TestReporterRepresentation_EdgeCases(t *testing.T) {
 			t.Run(tc.name, func(t *testing.T) {
 				t.Parallel()
 				_, err := NewReporterRepresentation(
-					JsonObject{"test": "data"},
+					model_legacy.JsonObject{"test": "data"},
 					"test-local-id",
 					"hbi",
 					"host",
@@ -453,7 +455,7 @@ func TestReporterRepresentation_EdgeCases(t *testing.T) {
 			t.Run(tc.name, func(t *testing.T) {
 				t.Parallel()
 				_, err := NewReporterRepresentation(
-					JsonObject{"test": "data"},
+					model_legacy.JsonObject{"test": "data"},
 					"test-local-id",
 					"hbi",
 					"host",
@@ -490,7 +492,7 @@ func TestReporterRepresentation_EdgeCases(t *testing.T) {
 			t.Run(tc.name, func(t *testing.T) {
 				t.Parallel()
 				rr, err := NewReporterRepresentation(
-					JsonObject{"test": "data"},
+					model_legacy.JsonObject{"test": "data"},
 					"test-local-id",
 					"hbi",
 					"host",
@@ -523,7 +525,7 @@ func TestReporterRepresentation_EdgeCases(t *testing.T) {
 		longURL += "?query=parameter&another=value"
 
 		_, err := NewReporterRepresentation(
-			JsonObject{"test": "data"},
+			model_legacy.JsonObject{"test": "data"},
 			"test-local-id",
 			"hbi",
 			"host",
@@ -531,7 +533,7 @@ func TestReporterRepresentation_EdgeCases(t *testing.T) {
 			"test-instance",
 			1,
 			longURL,
-			stringPtr(longURL),
+			model_legacy.stringPtr(longURL),
 			1,
 			false,
 			nil,
@@ -627,7 +629,7 @@ func TestReporterRepresentation_Serialization(t *testing.T) {
 		rr := fixture.ValidReporterRepresentation()
 		rr.LocalResourceID = "测试-resource-🌟"
 		rr.ReporterType = "测试-reporter"
-		rr.Data = JsonObject{
+		rr.Data = model_legacy.JsonObject{
 			"name":        "测试资源",
 			"description": "包含Unicode字符的描述 🌟",
 		}
@@ -659,7 +661,7 @@ func TestReporterRepresentation_Serialization(t *testing.T) {
 		fixture := NewTestFixture(t)
 		rr := fixture.ValidReporterRepresentation()
 		rr.LocalResourceID = "resource-with-special-chars-!@#$%^&*()"
-		rr.Data = JsonObject{
+		rr.Data = model_legacy.JsonObject{
 			"special_field": "Value with special chars: !@#$%^&*()_+-=[]{}|;':\",./<>?",
 		}
 
@@ -690,24 +692,24 @@ func TestReporterRepresentation_Serialization(t *testing.T) {
 		fixture := NewTestFixture(t)
 		rr := fixture.ValidReporterRepresentation()
 
-		complexData := JsonObject{
-			"metadata": JsonObject{
-				"labels": JsonObject{
+		complexData := model_legacy.JsonObject{
+			"metadata": model_legacy.JsonObject{
+				"labels": model_legacy.JsonObject{
 					"app":         "test-app",
 					"environment": "staging",
 				},
-				"annotations": JsonObject{
+				"annotations": model_legacy.JsonObject{
 					"deployment.kubernetes.io/revision": "1",
 				},
 			},
-			"spec": JsonObject{
+			"spec": model_legacy.JsonObject{
 				"containers": []interface{}{
-					JsonObject{
+					model_legacy.JsonObject{
 						"name":  "app",
 						"image": "nginx:1.21",
 						"ports": []interface{}{
-							JsonObject{"containerPort": 80},
-							JsonObject{"containerPort": 443},
+							model_legacy.JsonObject{"containerPort": 80},
+							model_legacy.JsonObject{"containerPort": 443},
 						},
 					},
 				},
@@ -798,7 +800,7 @@ func TestReporterRepresentation_Serialization(t *testing.T) {
 
 		fixture := NewTestFixture(t)
 		rr := fixture.ValidReporterRepresentation()
-		rr.Data = JsonObject{}
+		rr.Data = model_legacy.JsonObject{}
 
 		// Test JSON marshaling with empty data object
 		jsonData, err := json.Marshal(rr)

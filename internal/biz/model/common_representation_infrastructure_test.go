@@ -23,15 +23,6 @@ func isValidCommonRepresentation(cr *CommonRepresentation) bool {
 // - Data serialization and deserialization
 // - Infrastructure-level constraints and validation
 
-func TestCommonRepresentation_Infrastructure_TableName(t *testing.T) {
-	t.Parallel()
-
-	cr := &CommonRepresentation{}
-	expectedTableName := CommonRepresentationTableName
-
-	AssertTableName(t, cr, expectedTableName)
-}
-
 func TestCommonRepresentation_Infrastructure_Structure(t *testing.T) {
 	t.Parallel()
 

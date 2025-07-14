@@ -5,6 +5,8 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/google/uuid"
 )
 
 // Infrastructure tests for ReporterRepresentation domain model
@@ -41,6 +43,7 @@ func TestReporterRepresentation_Structure(t *testing.T) {
 		rrType := reflect.TypeOf(rr)
 
 		expectedFields := map[string]reflect.Type{
+			"ID":              reflect.TypeOf(uuid.UUID{}),
 			"Metadata":        reflect.TypeOf((*ReporterRepresentationMetadata)(nil)),
 			"Version":         reflect.TypeOf(uint(0)),
 			"Generation":      reflect.TypeOf(uint(0)),
@@ -194,6 +197,23 @@ func TestReporterRepresentation_Structure(t *testing.T) {
 		gormTag := field.Tag.Get("gorm")
 		if gormTag != "-" {
 			t.Errorf("Metadata field should have gorm:\"-\" tag, got: %s", gormTag)
+		}
+	})
+
+	t.Run("should have ID field with correct GORM primary key tag", func(t *testing.T) {
+		t.Parallel()
+
+		rrType := reflect.TypeOf(ReporterRepresentation{})
+		field, found := rrType.FieldByName("ID")
+		if !found {
+			t.Error("ID field not found")
+			return
+		}
+
+		gormTag := field.Tag.Get("gorm")
+		expectedTag := "type:text;column:id;primaryKey"
+		if gormTag != expectedTag {
+			t.Errorf("ID field should have gorm:\"%s\" tag, got: %s", expectedTag, gormTag)
 		}
 	})
 }

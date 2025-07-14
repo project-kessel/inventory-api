@@ -23,12 +23,6 @@ const (
 	MinCommonVersion   = 0 // CommonVersion can be zero or positive (>= 0)
 )
 
-// Table name constants
-const (
-	CommonRepresentationTableName   = "common_representation"
-	ReporterRepresentationTableName = "reporter_representation"
-)
-
 // Column name constants
 const (
 	// CommonRepresentation columns
@@ -40,15 +34,19 @@ const (
 	ColumnData                       = "data"
 
 	// ReporterRepresentation columns
-	ColumnLocalResourceID    = "local_resource_id"
-	ColumnReporterType       = "reporter_type"
-	ColumnReporterInstanceID = "reporter_instance_id"
-	ColumnGeneration         = "generation"
-	ColumnAPIHref            = "api_href"
-	ColumnConsoleHref        = "console_href"
-	ColumnCommonVersion      = "common_version"
-	ColumnTombstone          = "tombstone"
-	ColumnReporterVersion    = "reporter_version"
+	ColumnReporterRepresentationID = "id"
+	ColumnLocalResourceID          = "local_resource_id"
+	ColumnReporterType             = "reporter_type"
+	ColumnReporterInstanceID       = "reporter_instance_id"
+	ColumnGeneration               = "generation"
+	ColumnAPIHref                  = "api_href"
+	ColumnConsoleHref              = "console_href"
+	ColumnCommonVersion            = "common_version"
+	ColumnTombstone                = "tombstone"
+	ColumnReporterVersion          = "reporter_version"
+
+	// ReporterRepresentationMetadata columns
+	ColumnReporterRepresentationIDFK = "reporter_representation_id"
 )
 
 // Index names

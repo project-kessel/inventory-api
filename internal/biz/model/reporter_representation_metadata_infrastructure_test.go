@@ -5,6 +5,8 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/google/uuid"
 )
 
 // Infrastructure tests for ReporterRepresentationMetadata
@@ -21,6 +23,7 @@ func TestReporterRepresentationMetadata_Structure(t *testing.T) {
 
 		expectedFields := map[string]reflect.Type{
 			"ReporterRepresentationKey": reflect.TypeOf(ReporterRepresentationKey{}),
+			"ReporterRepresentationID":  reflect.TypeOf(uuid.UUID{}),
 			"APIHref":                   reflect.TypeOf(""),
 			"ConsoleHref":               reflect.TypeOf((*string)(nil)),
 		}
@@ -122,8 +125,9 @@ func TestReporterRepresentationMetadata_Structure(t *testing.T) {
 		metadataType := reflect.TypeOf(ReporterRepresentationMetadata{})
 
 		columnMappings := map[string]string{
-			"APIHref":     "api_href",
-			"ConsoleHref": "console_href",
+			"ReporterRepresentationID": "reporter_representation_id",
+			"APIHref":                  "api_href",
+			"ConsoleHref":              "console_href",
 		}
 
 		for fieldName, expectedColumn := range columnMappings {
@@ -137,6 +141,25 @@ func TestReporterRepresentationMetadata_Structure(t *testing.T) {
 			expectedColumnTag := "column:" + expectedColumn
 			if !strings.Contains(gormTag, expectedColumnTag) {
 				t.Errorf("Field %s should have %s column tag, got: %s", fieldName, expectedColumnTag, gormTag)
+			}
+		}
+	})
+
+	t.Run("should have ReporterRepresentationID field with correct GORM tags", func(t *testing.T) {
+		t.Parallel()
+
+		metadataType := reflect.TypeOf(ReporterRepresentationMetadata{})
+		field, found := metadataType.FieldByName("ReporterRepresentationID")
+		if !found {
+			t.Error("ReporterRepresentationID field not found")
+			return
+		}
+
+		gormTag := field.Tag.Get("gorm")
+		expectedTags := []string{"type:text", "column:reporter_representation_id", "index"}
+		for _, expectedTag := range expectedTags {
+			if !strings.Contains(gormTag, expectedTag) {
+				t.Errorf("ReporterRepresentationID field should have %s tag, got: %s", expectedTag, gormTag)
 			}
 		}
 	})

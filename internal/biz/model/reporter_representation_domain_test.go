@@ -30,7 +30,7 @@ func TestReporterRepresentation_Validation(t *testing.T) {
 		rr := fixture.ValidReporterRepresentation()
 
 		// Factory method should create a valid instance without errors
-		AssertEqual(t, "hbi", rr.ReporterType, "Reporter type should be set correctly")
+		AssertEqual(t, "hbi", rr.Metadata.ReporterType, "Reporter type should be set correctly")
 	})
 
 	t.Run("ReporterRepresentation with empty LocalResourceID should be invalid", func(t *testing.T) {
@@ -97,28 +97,28 @@ func TestReporterRepresentation_Validation(t *testing.T) {
 
 				switch tc.field {
 				case "LocalResourceID":
-					rr.LocalResourceID = tc.value
+					rr.Metadata.LocalResourceID = tc.value
 				case "ReporterType":
-					rr.ReporterType = tc.value
+					rr.Metadata.ReporterType = tc.value
 				case "ResourceType":
-					rr.ResourceType = tc.value
+					rr.Metadata.ResourceType = tc.value
 				case "ReporterInstanceID":
-					rr.ReporterInstanceID = tc.value
+					rr.Metadata.ReporterInstanceID = tc.value
 				case "APIHref":
-					rr.APIHref = tc.value
+					rr.Metadata.APIHref = tc.value
 				}
 
 				// Test validation through factory method (proper approach)
 				_, err := NewReporterRepresentation(
 					JsonObject{"test": "data"},
-					rr.LocalResourceID,
-					rr.ReporterType,
-					rr.ResourceType,
+					rr.Metadata.LocalResourceID,
+					rr.Metadata.ReporterType,
+					rr.Metadata.ResourceType,
 					rr.Version,
-					rr.ReporterInstanceID,
+					rr.Metadata.ReporterInstanceID,
 					rr.Generation,
-					rr.APIHref,
-					rr.ConsoleHref,
+					rr.Metadata.APIHref,
+					rr.Metadata.ConsoleHref,
 					rr.CommonVersion,
 					rr.Tombstone,
 					rr.ReporterVersion,
@@ -799,7 +799,7 @@ func TestReporterRepresentation_HrefValidation(t *testing.T) {
 		)
 		AssertNoError(t, err, "Nil ConsoleHref should be valid")
 
-		if rr.ConsoleHref != nil {
+		if rr.Metadata.ConsoleHref != nil {
 			t.Error("ConsoleHref should be nil")
 		}
 	})
@@ -968,12 +968,12 @@ func TestReporterRepresentation_FactoryMethods(t *testing.T) {
 			t.Fatalf("Expected no error, got %v", err)
 		}
 
-		if rr.LocalResourceID != "local-123" {
-			t.Errorf("Expected LocalResourceID 'local-123', got '%s'", rr.LocalResourceID)
+		if rr.Metadata.LocalResourceID != "local-123" {
+			t.Errorf("Expected LocalResourceID 'local-123', got '%s'", rr.Metadata.LocalResourceID)
 		}
 
-		if rr.ReporterType != "hbi" {
-			t.Errorf("Expected ReporterType 'hbi', got '%s'", rr.ReporterType)
+		if rr.Metadata.ReporterType != "hbi" {
+			t.Errorf("Expected ReporterType 'hbi', got '%s'", rr.Metadata.ReporterType)
 		}
 
 		if rr.Tombstone != false {
@@ -1052,10 +1052,10 @@ func TestReporterRepresentation_FactoryMethods(t *testing.T) {
 // Helper function to check if two ReporterRepresentations are duplicates
 // based on their unique constraint fields
 func areReporterRepresentationsDuplicates(rr1, rr2 ReporterRepresentation) bool {
-	return rr1.LocalResourceID == rr2.LocalResourceID &&
-		rr1.ReporterType == rr2.ReporterType &&
-		rr1.ResourceType == rr2.ResourceType &&
+	return rr1.Metadata.LocalResourceID == rr2.Metadata.LocalResourceID &&
+		rr1.Metadata.ReporterType == rr2.Metadata.ReporterType &&
+		rr1.Metadata.ResourceType == rr2.Metadata.ResourceType &&
 		rr1.Version == rr2.Version &&
-		rr1.ReporterInstanceID == rr2.ReporterInstanceID &&
+		rr1.Metadata.ReporterInstanceID == rr2.Metadata.ReporterInstanceID &&
 		rr1.Generation == rr2.Generation
 }

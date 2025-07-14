@@ -10,23 +10,15 @@ import (
 // through factory methods that enforce validation rules.
 // Note: Fields are exported for GORM compatibility but should not be modified directly.
 type ReporterRepresentation struct {
+	// These are the versioned attributes
 	Representation
-
-	LocalResourceID    string  `gorm:"size:128;column:local_resource_id;index:reporter_rep_unique_idx,unique"`
-	ReporterType       string  `gorm:"size:128;column:reporter_type;index:reporter_rep_unique_idx,unique"`
-	ResourceType       string  `gorm:"size:128;column:resource_type;index:reporter_rep_unique_idx,unique"`
-	Version            uint    `gorm:"type:bigint;column:version;index:reporter_rep_unique_idx,unique;check:version >= 0"`
-	ReporterInstanceID string  `gorm:"size:128;column:reporter_instance_id;index:reporter_rep_unique_idx,unique"`
-	Generation         uint    `gorm:"type:bigint;column:generation;index:reporter_rep_unique_idx,unique;check:generation >= 0"`
-	APIHref            string  `gorm:"size:512;column:api_href"`
-	ConsoleHref        *string `gorm:"size:512;column:console_href"`
-	CommonVersion      uint    `gorm:"type:bigint;column:common_version;check:common_version >= 0"`
-	Tombstone          bool    `gorm:"column:tombstone"`
-	ReporterVersion    *string `gorm:"size:128;column:reporter_version"`
-}
-
-func (ReporterRepresentation) TableName() string {
-	return ReporterRepresentationTableName
+	// Reference to metadata table - managed at application level
+	Metadata        *ReporterRepresentationMetadata `gorm:"-"`
+	Version         uint                            `gorm:"type:bigint;column:version;index:reporter_rep_unique_idx,unique;check:version >= 0"`
+	Generation      uint                            `gorm:"type:bigint;column:generation;index:reporter_rep_unique_idx,unique;check:generation >= 0"`
+	CommonVersion   uint                            `gorm:"type:bigint;column:common_version;check:common_version >= 0"`
+	Tombstone       bool                            `gorm:"column:tombstone"`
+	ReporterVersion *string                         `gorm:"size:128;column:reporter_version"`
 }
 
 // NewReporterRepresentation Factory method for creating a new ReporterRepresentation
@@ -45,24 +37,35 @@ func NewReporterRepresentation(
 	tombstone bool,
 	reporterVersion *string,
 ) (*ReporterRepresentation, error) {
+	metadata := &ReporterRepresentationMetadata{
+		ReporterRepresentationKey: ReporterRepresentationKey{
+			RepresentationType: RepresentationType{
+				ResourceType: resourceType,
+				ReporterType: reporterType,
+			},
+			LocalResourceID:    localResourceID,
+			ReporterInstanceID: reporterInstanceID,
+		},
+		APIHref:     apiHref,
+		ConsoleHref: consoleHref,
+	}
+
 	rr := &ReporterRepresentation{
 		Representation: Representation{
 			Data: data,
+			RepresentationType: RepresentationType{
+				ResourceType: resourceType,
+				ReporterType: reporterType,
+			},
 		},
-		LocalResourceID:    localResourceID,
-		ReporterType:       reporterType,
-		ResourceType:       resourceType,
-		Version:            version,
-		ReporterInstanceID: reporterInstanceID,
-		Generation:         generation,
-		APIHref:            apiHref,
-		ConsoleHref:        consoleHref,
-		CommonVersion:      commonVersion,
-		Tombstone:          tombstone,
-		ReporterVersion:    reporterVersion,
+		Metadata:        metadata,
+		Version:         version,
+		Generation:      generation,
+		CommonVersion:   commonVersion,
+		Tombstone:       tombstone,
+		ReporterVersion: reporterVersion,
 	}
 
-	// Validate the instance
 	if err := validateReporterRepresentation(rr); err != nil {
 		return nil, err
 	}
@@ -73,50 +76,53 @@ func NewReporterRepresentation(
 // validateReporterRepresentation validates a ReporterRepresentation instance
 // This function is used internally by factory methods to ensure consistency
 func validateReporterRepresentation(rr *ReporterRepresentation) error {
-	if rr.LocalResourceID == "" || strings.TrimSpace(rr.LocalResourceID) == "" {
+	if rr.Metadata == nil {
+		return ValidationError{Field: "Metadata", Message: "cannot be nil"}
+	}
+	if rr.Metadata.LocalResourceID == "" || strings.TrimSpace(rr.Metadata.LocalResourceID) == "" {
 		return ValidationError{Field: "LocalResourceID", Message: "cannot be empty"}
 	}
-	if len(rr.LocalResourceID) > MaxLocalResourceIDLength {
+	if len(rr.Metadata.LocalResourceID) > MaxLocalResourceIDLength {
 		return ValidationError{Field: "LocalResourceID", Message: fmt.Sprintf("exceeds maximum length of %d characters", MaxLocalResourceIDLength)}
 	}
-	if rr.ReporterType == "" || strings.TrimSpace(rr.ReporterType) == "" {
+	if rr.Metadata.ReporterType == "" || strings.TrimSpace(rr.Metadata.ReporterType) == "" {
 		return ValidationError{Field: "ReporterType", Message: "cannot be empty"}
 	}
-	if len(rr.ReporterType) > MaxReporterTypeLength {
+	if len(rr.Metadata.ReporterType) > MaxReporterTypeLength {
 		return ValidationError{Field: "ReporterType", Message: fmt.Sprintf("exceeds maximum length of %d characters", MaxReporterTypeLength)}
 	}
-	if rr.ResourceType == "" || strings.TrimSpace(rr.ResourceType) == "" {
+	if rr.Metadata.ResourceType == "" || strings.TrimSpace(rr.Metadata.ResourceType) == "" {
 		return ValidationError{Field: "ResourceType", Message: "cannot be empty"}
 	}
-	if len(rr.ResourceType) > MaxResourceTypeLength {
+	if len(rr.Metadata.ResourceType) > MaxResourceTypeLength {
 		return ValidationError{Field: "ResourceType", Message: fmt.Sprintf("exceeds maximum length of %d characters", MaxResourceTypeLength)}
+	}
+	if rr.Metadata.ReporterInstanceID == "" || strings.TrimSpace(rr.Metadata.ReporterInstanceID) == "" {
+		return ValidationError{Field: "ReporterInstanceID", Message: "cannot be empty"}
+	}
+	if len(rr.Metadata.ReporterInstanceID) > MaxReporterInstanceIDLength {
+		return ValidationError{Field: "ReporterInstanceID", Message: fmt.Sprintf("exceeds maximum length of %d characters", MaxReporterInstanceIDLength)}
 	}
 	if rr.Version < MinVersionValue {
 		return ValidationError{Field: "Version", Message: fmt.Sprintf("must be >= %d", MinVersionValue)}
 	}
-	if rr.ReporterInstanceID == "" || strings.TrimSpace(rr.ReporterInstanceID) == "" {
-		return ValidationError{Field: "ReporterInstanceID", Message: "cannot be empty"}
-	}
-	if len(rr.ReporterInstanceID) > MaxReporterInstanceIDLength {
-		return ValidationError{Field: "ReporterInstanceID", Message: fmt.Sprintf("exceeds maximum length of %d characters", MaxReporterInstanceIDLength)}
-	}
 	if rr.Generation < MinGenerationValue {
 		return ValidationError{Field: "Generation", Message: fmt.Sprintf("must be >= %d", MinGenerationValue)}
 	}
-	if rr.APIHref == "" || strings.TrimSpace(rr.APIHref) == "" {
+	if rr.Metadata.APIHref == "" || strings.TrimSpace(rr.Metadata.APIHref) == "" {
 		return ValidationError{Field: "APIHref", Message: "cannot be empty"}
 	}
-	if len(rr.APIHref) > MaxAPIHrefLength {
+	if len(rr.Metadata.APIHref) > MaxAPIHrefLength {
 		return ValidationError{Field: "APIHref", Message: fmt.Sprintf("exceeds maximum length of %d characters", MaxAPIHrefLength)}
 	}
-	if err := validateURL(rr.APIHref); err != nil {
+	if err := validateURL(rr.Metadata.APIHref); err != nil {
 		return ValidationError{Field: "APIHref", Message: err.Error()}
 	}
-	if rr.ConsoleHref != nil && *rr.ConsoleHref != "" {
-		if len(*rr.ConsoleHref) > MaxConsoleHrefLength {
+	if rr.Metadata.ConsoleHref != nil && *rr.Metadata.ConsoleHref != "" {
+		if len(*rr.Metadata.ConsoleHref) > MaxConsoleHrefLength {
 			return ValidationError{Field: "ConsoleHref", Message: fmt.Sprintf("exceeds maximum length of %d characters", MaxConsoleHrefLength)}
 		}
-		if err := validateURL(*rr.ConsoleHref); err != nil {
+		if err := validateURL(*rr.Metadata.ConsoleHref); err != nil {
 			return ValidationError{Field: "ConsoleHref", Message: err.Error()}
 		}
 	}
@@ -126,6 +132,6 @@ func validateReporterRepresentation(rr *ReporterRepresentation) error {
 	if rr.ReporterVersion != nil && len(*rr.ReporterVersion) > MaxReporterVersionLength {
 		return ValidationError{Field: "ReporterVersion", Message: fmt.Sprintf("exceeds maximum length of %d characters", MaxReporterVersionLength)}
 	}
-	// Data can be nil - this is a valid state
+
 	return nil
 }

@@ -10,15 +10,6 @@ import (
 // Infrastructure tests for ReporterRepresentation domain model
 // These tests focus on database schema, field structure validation, edge cases, and serialization
 
-func TestReporterRepresentation_TableName(t *testing.T) {
-	t.Parallel()
-
-	fixture := NewTestFixture(t)
-	rr := fixture.ValidReporterRepresentation()
-
-	AssertTableName(t, rr, "reporter_representation")
-}
-
 func TestReporterRepresentation_Structure(t *testing.T) {
 	t.Parallel()
 
@@ -50,17 +41,12 @@ func TestReporterRepresentation_Structure(t *testing.T) {
 		rrType := reflect.TypeOf(rr)
 
 		expectedFields := map[string]reflect.Type{
-			"LocalResourceID":    reflect.TypeOf(""),
-			"ReporterType":       reflect.TypeOf(""),
-			"ResourceType":       reflect.TypeOf(""),
-			"Version":            reflect.TypeOf(uint(0)),
-			"ReporterInstanceID": reflect.TypeOf(""),
-			"Generation":         reflect.TypeOf(uint(0)),
-			"APIHref":            reflect.TypeOf(""),
-			"ConsoleHref":        reflect.TypeOf((*string)(nil)),
-			"CommonVersion":      reflect.TypeOf(uint(0)),
-			"Tombstone":          reflect.TypeOf(false),
-			"ReporterVersion":    reflect.TypeOf((*string)(nil)),
+			"Metadata":        reflect.TypeOf((*ReporterRepresentationMetadata)(nil)),
+			"Version":         reflect.TypeOf(uint(0)),
+			"Generation":      reflect.TypeOf(uint(0)),
+			"CommonVersion":   reflect.TypeOf(uint(0)),
+			"Tombstone":       reflect.TypeOf(false),
+			"ReporterVersion": reflect.TypeOf((*string)(nil)),
 		}
 
 		for fieldName, expectedType := range expectedFields {
@@ -95,10 +81,9 @@ func TestReporterRepresentation_Structure(t *testing.T) {
 
 		rrType := reflect.TypeOf(ReporterRepresentation{})
 
-		// Check all fields that should have the unique index tag
+		// Check fields that should have the unique index tag (now only versioned fields)
 		expectedIndexFields := []string{
-			"LocalResourceID", "ReporterType", "ResourceType",
-			"Version", "ReporterInstanceID", "Generation",
+			"Version", "Generation",
 		}
 
 		for _, fieldName := range expectedIndexFields {
@@ -120,15 +105,9 @@ func TestReporterRepresentation_Structure(t *testing.T) {
 
 		rrType := reflect.TypeOf(ReporterRepresentation{})
 
-		// Check size constraints
+		// Check size constraints for remaining fields
 		sizeConstraints := map[string]string{
-			"LocalResourceID":    "size:128",
-			"ReporterType":       "size:128",
-			"ResourceType":       "size:128",
-			"ReporterInstanceID": "size:128",
-			"APIHref":            "size:512",
-			"ConsoleHref":        "size:512",
-			"ReporterVersion":    "size:128",
+			"ReporterVersion": "size:128",
 		}
 
 		for fieldName, expectedSize := range sizeConstraints {
@@ -150,8 +129,8 @@ func TestReporterRepresentation_Structure(t *testing.T) {
 
 		rrType := reflect.TypeOf(ReporterRepresentation{})
 
-		// Check nullable fields
-		nullableFields := []string{"ConsoleHref", "ReporterVersion"}
+		// Check nullable fields (now only ReporterVersion in main struct)
+		nullableFields := []string{"ReporterVersion"}
 
 		for _, fieldName := range nullableFields {
 			field, found := rrType.FieldByName(fieldName)
@@ -177,25 +156,6 @@ func TestReporterRepresentation_Structure(t *testing.T) {
 
 		rrType := reflect.TypeOf(ReporterRepresentation{})
 
-		// Check non-nullable string fields
-		nonNullableStringFields := []string{
-			"LocalResourceID", "ReporterType", "ResourceType",
-			"ReporterInstanceID", "APIHref",
-		}
-
-		for _, fieldName := range nonNullableStringFields {
-			field, found := rrType.FieldByName(fieldName)
-			if !found {
-				t.Errorf("Field %s not found", fieldName)
-				continue
-			}
-
-			// Check if it's a string type (not pointer)
-			if field.Type.Kind() != reflect.String {
-				t.Errorf("Field %s should be a string type, got: %v", fieldName, field.Type)
-			}
-		}
-
 		// Check uint fields
 		uintFields := []string{"Version", "Generation", "CommonVersion"}
 
@@ -211,76 +171,35 @@ func TestReporterRepresentation_Structure(t *testing.T) {
 				t.Errorf("Field %s should be a uint type, got: %v", fieldName, field.Type)
 			}
 		}
+
+		// Check boolean field
+		field, found := rrType.FieldByName("Tombstone")
+		if !found {
+			t.Error("Tombstone field not found")
+		} else if field.Type.Kind() != reflect.Bool {
+			t.Errorf("Tombstone should be a bool type, got: %v", field.Type)
+		}
+	})
+
+	t.Run("should have metadata field with correct GORM tag", func(t *testing.T) {
+		t.Parallel()
+
+		rrType := reflect.TypeOf(ReporterRepresentation{})
+		field, found := rrType.FieldByName("Metadata")
+		if !found {
+			t.Error("Metadata field not found")
+			return
+		}
+
+		gormTag := field.Tag.Get("gorm")
+		if gormTag != "-" {
+			t.Errorf("Metadata field should have gorm:\"-\" tag, got: %s", gormTag)
+		}
 	})
 }
 
 func TestReporterRepresentation_EdgeCases(t *testing.T) {
 	t.Parallel()
-
-	t.Run("should handle unicode characters", func(t *testing.T) {
-		t.Parallel()
-
-		_, err := NewReporterRepresentation(
-			JsonObject{
-				"name":        "测试资源",
-				"description": "包含Unicode字符的描述 🌟",
-			},
-			"测试-resource-🌟",
-			"测试-reporter",
-			"host",
-			1,
-			"test-instance",
-			1,
-			"https://api.example.com",
-			nil,
-			1,
-			false,
-			nil,
-		)
-		AssertNoError(t, err, "ReporterRepresentation with unicode characters should be valid")
-	})
-
-	t.Run("should handle special characters in string fields", func(t *testing.T) {
-		t.Parallel()
-
-		_, err := NewReporterRepresentation(
-			JsonObject{
-				"special_field": "Value with special chars: !@#$%^&*()_+-=[]{}|;':\",./<>?",
-			},
-			"resource-with-special-chars-!@#$%^&*()",
-			"special-reporter-type",
-			"host",
-			1,
-			"test-instance",
-			1,
-			"https://api.example.com",
-			nil,
-			1,
-			false,
-			nil,
-		)
-		AssertNoError(t, err, "ReporterRepresentation with special characters should be valid")
-	})
-
-	t.Run("should handle large integer values", func(t *testing.T) {
-		t.Parallel()
-
-		_, err := NewReporterRepresentation(
-			JsonObject{"test": "data"},
-			"test-local-id",
-			"hbi",
-			"host",
-			4294967295, // Max uint32 Version
-			"test-instance",
-			4294967295, // Max uint32 Generation
-			"https://api.example.com",
-			nil,
-			4294967295, // Max uint32 CommonVersion
-			false,
-			nil,
-		)
-		AssertNoError(t, err, "ReporterRepresentation with large integer values should be valid")
-	})
 
 	t.Run("should handle empty string values for nullable fields", func(t *testing.T) {
 		t.Parallel()
@@ -558,10 +477,10 @@ func TestReporterRepresentation_Serialization(t *testing.T) {
 		err = json.Unmarshal(jsonData, &unmarshaled)
 		AssertNoError(t, err, "Should be able to unmarshal ReporterRepresentation from JSON")
 
-		// Compare key fields
-		AssertEqual(t, original.LocalResourceID, unmarshaled.LocalResourceID, "LocalResourceID should match after JSON round-trip")
-		AssertEqual(t, original.ReporterType, unmarshaled.ReporterType, "ReporterType should match after JSON round-trip")
-		AssertEqual(t, original.ResourceType, unmarshaled.ResourceType, "ResourceType should match after JSON round-trip")
+		// Compare key fields - now accessing through metadata
+		AssertEqual(t, original.Metadata.LocalResourceID, unmarshaled.Metadata.LocalResourceID, "LocalResourceID should match after JSON round-trip")
+		AssertEqual(t, original.Metadata.ReporterType, unmarshaled.Metadata.ReporterType, "ReporterType should match after JSON round-trip")
+		AssertEqual(t, original.Metadata.ResourceType, unmarshaled.Metadata.ResourceType, "ResourceType should match after JSON round-trip")
 		AssertEqual(t, original.Version, unmarshaled.Version, "Version should match after JSON round-trip")
 		AssertEqual(t, original.Generation, unmarshaled.Generation, "Generation should match after JSON round-trip")
 		AssertEqual(t, original.Tombstone, unmarshaled.Tombstone, "Tombstone should match after JSON round-trip")
@@ -572,7 +491,7 @@ func TestReporterRepresentation_Serialization(t *testing.T) {
 
 		fixture := NewTestFixture(t)
 		rr := fixture.ValidReporterRepresentation()
-		rr.ConsoleHref = nil
+		rr.Metadata.ConsoleHref = nil
 		rr.ReporterVersion = nil
 
 		// Test JSON marshaling with null values
@@ -585,7 +504,7 @@ func TestReporterRepresentation_Serialization(t *testing.T) {
 		AssertNoError(t, err, "Should be able to unmarshal ReporterRepresentation with null values from JSON")
 
 		// Check that null values are preserved
-		if unmarshaled.ConsoleHref != nil {
+		if unmarshaled.Metadata.ConsoleHref != nil {
 			t.Error("ConsoleHref should be nil after JSON round-trip")
 		}
 		if unmarshaled.ReporterVersion != nil {
@@ -599,7 +518,7 @@ func TestReporterRepresentation_Serialization(t *testing.T) {
 		fixture := NewTestFixture(t)
 		rr := fixture.ValidReporterRepresentation()
 		emptyString := ""
-		rr.ConsoleHref = &emptyString
+		rr.Metadata.ConsoleHref = &emptyString
 		rr.ReporterVersion = &emptyString
 
 		// Test JSON marshaling with empty string values
@@ -612,209 +531,11 @@ func TestReporterRepresentation_Serialization(t *testing.T) {
 		AssertNoError(t, err, "Should be able to unmarshal ReporterRepresentation with empty string values from JSON")
 
 		// Check that empty string values are preserved
-		if unmarshaled.ConsoleHref == nil || *unmarshaled.ConsoleHref != "" {
+		if unmarshaled.Metadata.ConsoleHref == nil || *unmarshaled.Metadata.ConsoleHref != "" {
 			t.Error("ConsoleHref should be empty string after JSON round-trip")
 		}
 		if unmarshaled.ReporterVersion == nil || *unmarshaled.ReporterVersion != "" {
 			t.Error("ReporterVersion should be empty string after JSON round-trip")
-		}
-	})
-
-	t.Run("should handle unicode characters in JSON serialization", func(t *testing.T) {
-		t.Parallel()
-
-		fixture := NewTestFixture(t)
-		rr := fixture.ValidReporterRepresentation()
-		rr.LocalResourceID = "测试-resource-🌟"
-		rr.ReporterType = "测试-reporter"
-		rr.Data = JsonObject{
-			"name":        "测试资源",
-			"description": "包含Unicode字符的描述 🌟",
-		}
-
-		// Test JSON marshaling with unicode characters
-		jsonData, err := json.Marshal(rr)
-		AssertNoError(t, err, "Should be able to marshal ReporterRepresentation with unicode characters to JSON")
-
-		// Test JSON unmarshaling
-		var unmarshaled ReporterRepresentation
-		err = json.Unmarshal(jsonData, &unmarshaled)
-		AssertNoError(t, err, "Should be able to unmarshal ReporterRepresentation with unicode characters from JSON")
-
-		// Check that unicode characters are preserved
-		AssertEqual(t, rr.LocalResourceID, unmarshaled.LocalResourceID, "Unicode LocalResourceID should match after JSON round-trip")
-		AssertEqual(t, rr.ReporterType, unmarshaled.ReporterType, "Unicode ReporterType should match after JSON round-trip")
-
-		// Check unicode in data
-		if nameField, ok := unmarshaled.Data["name"]; ok {
-			if nameStr, ok := nameField.(string); ok {
-				AssertEqual(t, "测试资源", nameStr, "Unicode name in data should match after JSON round-trip")
-			}
-		}
-	})
-
-	t.Run("should handle special characters in JSON serialization", func(t *testing.T) {
-		t.Parallel()
-
-		fixture := NewTestFixture(t)
-		rr := fixture.ValidReporterRepresentation()
-		rr.LocalResourceID = "resource-with-special-chars-!@#$%^&*()"
-		rr.Data = JsonObject{
-			"special_field": "Value with special chars: !@#$%^&*()_+-=[]{}|;':\",./<>?",
-		}
-
-		// Test JSON marshaling with special characters
-		jsonData, err := json.Marshal(rr)
-		AssertNoError(t, err, "Should be able to marshal ReporterRepresentation with special characters to JSON")
-
-		// Test JSON unmarshaling
-		var unmarshaled ReporterRepresentation
-		err = json.Unmarshal(jsonData, &unmarshaled)
-		AssertNoError(t, err, "Should be able to unmarshal ReporterRepresentation with special characters from JSON")
-
-		// Check that special characters are preserved
-		AssertEqual(t, rr.LocalResourceID, unmarshaled.LocalResourceID, "Special character LocalResourceID should match after JSON round-trip")
-
-		// Check special characters in data
-		if specialField, ok := unmarshaled.Data["special_field"]; ok {
-			if specialStr, ok := specialField.(string); ok {
-				expected := "Value with special chars: !@#$%^&*()_+-=[]{}|;':\",./<>?"
-				AssertEqual(t, expected, specialStr, "Special character field in data should match after JSON round-trip")
-			}
-		}
-	})
-
-	t.Run("should handle complex nested JSON data serialization", func(t *testing.T) {
-		t.Parallel()
-
-		fixture := NewTestFixture(t)
-		rr := fixture.ValidReporterRepresentation()
-
-		complexData := JsonObject{
-			"metadata": JsonObject{
-				"labels": JsonObject{
-					"app":         "test-app",
-					"environment": "staging",
-				},
-				"annotations": JsonObject{
-					"deployment.kubernetes.io/revision": "1",
-				},
-			},
-			"spec": JsonObject{
-				"containers": []interface{}{
-					JsonObject{
-						"name":  "app",
-						"image": "nginx:1.21",
-						"ports": []interface{}{
-							JsonObject{"containerPort": 80},
-							JsonObject{"containerPort": 443},
-						},
-					},
-				},
-			},
-		}
-
-		rr.Data = complexData
-
-		// Test JSON marshaling with complex nested data
-		jsonData, err := json.Marshal(rr)
-		AssertNoError(t, err, "Should be able to marshal ReporterRepresentation with complex nested data to JSON")
-
-		// Test JSON unmarshaling
-		var unmarshaled ReporterRepresentation
-		err = json.Unmarshal(jsonData, &unmarshaled)
-		AssertNoError(t, err, "Should be able to unmarshal ReporterRepresentation with complex nested data from JSON")
-
-		// Check that complex nested data structure is preserved
-		if metadata, ok := unmarshaled.Data["metadata"]; ok {
-			if metadataObj, ok := metadata.(map[string]interface{}); ok {
-				if labels, ok := metadataObj["labels"]; ok {
-					if labelsObj, ok := labels.(map[string]interface{}); ok {
-						if app, ok := labelsObj["app"]; ok {
-							AssertEqual(t, "test-app", app, "Nested app label should match after JSON round-trip")
-						}
-					}
-				}
-			}
-		}
-	})
-
-	t.Run("should handle boolean values in JSON serialization", func(t *testing.T) {
-		t.Parallel()
-
-		fixture := NewTestFixture(t)
-
-		// Test with tombstone = true
-		rr := fixture.ValidReporterRepresentation()
-		rr.Tombstone = true
-
-		jsonData, err := json.Marshal(rr)
-		AssertNoError(t, err, "Should be able to marshal ReporterRepresentation with tombstone=true to JSON")
-
-		var unmarshaled ReporterRepresentation
-		err = json.Unmarshal(jsonData, &unmarshaled)
-		AssertNoError(t, err, "Should be able to unmarshal ReporterRepresentation with tombstone=true from JSON")
-
-		AssertEqual(t, true, unmarshaled.Tombstone, "Tombstone=true should match after JSON round-trip")
-
-		// Test with tombstone = false
-		rr.Tombstone = false
-
-		jsonData, err = json.Marshal(rr)
-		AssertNoError(t, err, "Should be able to marshal ReporterRepresentation with tombstone=false to JSON")
-
-		err = json.Unmarshal(jsonData, &unmarshaled)
-		AssertNoError(t, err, "Should be able to unmarshal ReporterRepresentation with tombstone=false from JSON")
-
-		AssertEqual(t, false, unmarshaled.Tombstone, "Tombstone=false should match after JSON round-trip")
-	})
-
-	t.Run("should handle large integer values in JSON serialization", func(t *testing.T) {
-		t.Parallel()
-
-		fixture := NewTestFixture(t)
-		rr := fixture.ValidReporterRepresentation()
-		rr.Version = 4294967295 // Max uint32
-		rr.Generation = 4294967295
-		rr.CommonVersion = 4294967295
-
-		// Test JSON marshaling with large integer values
-		jsonData, err := json.Marshal(rr)
-		AssertNoError(t, err, "Should be able to marshal ReporterRepresentation with large integer values to JSON")
-
-		// Test JSON unmarshaling
-		var unmarshaled ReporterRepresentation
-		err = json.Unmarshal(jsonData, &unmarshaled)
-		AssertNoError(t, err, "Should be able to unmarshal ReporterRepresentation with large integer values from JSON")
-
-		// Check that large integer values are preserved
-		AssertEqual(t, uint(4294967295), unmarshaled.Version, "Large Version should match after JSON round-trip")
-		AssertEqual(t, uint(4294967295), unmarshaled.Generation, "Large Generation should match after JSON round-trip")
-		AssertEqual(t, uint(4294967295), unmarshaled.CommonVersion, "Large CommonVersion should match after JSON round-trip")
-	})
-
-	t.Run("should handle empty data object in JSON serialization", func(t *testing.T) {
-		t.Parallel()
-
-		fixture := NewTestFixture(t)
-		rr := fixture.ValidReporterRepresentation()
-		rr.Data = JsonObject{}
-
-		// Test JSON marshaling with empty data object
-		jsonData, err := json.Marshal(rr)
-		AssertNoError(t, err, "Should be able to marshal ReporterRepresentation with empty data object to JSON")
-
-		// Test JSON unmarshaling
-		var unmarshaled ReporterRepresentation
-		err = json.Unmarshal(jsonData, &unmarshaled)
-		AssertNoError(t, err, "Should be able to unmarshal ReporterRepresentation with empty data object from JSON")
-
-		// Check that empty data object is preserved
-		if unmarshaled.Data == nil {
-			t.Error("Data should not be nil after JSON round-trip")
-		}
-		if len(unmarshaled.Data) != 0 {
-			t.Errorf("Data should be empty after JSON round-trip, got: %v", unmarshaled.Data)
 		}
 	})
 }

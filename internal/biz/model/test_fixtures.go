@@ -32,7 +32,6 @@ func (f *TestFixture) ValidCommonRepresentation() *CommonRepresentation {
 		JsonObject{
 			"workspace_id": "a64d17d0-aec3-410a-acd0-e0b85b22c076",
 		},
-		"host",
 		1,
 		"hbi",
 		"3088be62-1c60-4884-b133-9200542d0b3f",
@@ -64,7 +63,6 @@ func (f *TestFixture) CommonRepresentationWithID(id string) *CommonRepresentatio
 		JsonObject{
 			"workspace_id": "a64d17d0-aec3-410a-acd0-e0b85b22c076",
 		},
-		"host",
 		1,
 		"hbi",
 		"3088be62-1c60-4884-b133-9200542d0b3f",
@@ -78,7 +76,6 @@ func (f *TestFixture) CommonRepresentationWithID(id string) *CommonRepresentatio
 				},
 			},
 			ResourceId:                 resourceId,
-			ResourceType:               "host",
 			Version:                    1,
 			ReportedByReporterType:     "hbi",
 			ReportedByReporterInstance: "3088be62-1c60-4884-b133-9200542d0b3f",
@@ -96,7 +93,6 @@ func (f *TestFixture) CommonRepresentationWithVersion(version uint) *CommonRepre
 		JsonObject{
 			"workspace_id": "a64d17d0-aec3-410a-acd0-e0b85b22c076",
 		},
-		"host",
 		version,
 		"hbi",
 		"3088be62-1c60-4884-b133-9200542d0b3f",
@@ -116,7 +112,6 @@ func (f *TestFixture) CommonRepresentationWithResourceType(resourceType string) 
 		JsonObject{
 			"workspace_id": "a64d17d0-aec3-410a-acd0-e0b85b22c076",
 		},
-		resourceType,
 		1,
 		"hbi",
 		"3088be62-1c60-4884-b133-9200542d0b3f",
@@ -136,7 +131,6 @@ func (f *TestFixture) CommonRepresentationWithReporterType(reporterType string) 
 		JsonObject{
 			"workspace_id": "a64d17d0-aec3-410a-acd0-e0b85b22c076",
 		},
-		"host",
 		1,
 		reporterType,
 		"3088be62-1c60-4884-b133-9200542d0b3f",
@@ -156,7 +150,6 @@ func (f *TestFixture) CommonRepresentationWithReporterInstance(reporterInstance 
 		JsonObject{
 			"workspace_id": "a64d17d0-aec3-410a-acd0-e0b85b22c076",
 		},
-		"host",
 		1,
 		"hbi",
 		reporterInstance,
@@ -174,7 +167,6 @@ func (f *TestFixture) CommonRepresentationWithData(data JsonObject) *CommonRepre
 	cr, err := NewCommonRepresentation(
 		deterministicUUID,
 		data,
-		"host",
 		1,
 		"hbi",
 		"3088be62-1c60-4884-b133-9200542d0b3f",
@@ -192,7 +184,6 @@ func (f *TestFixture) CommonRepresentationWithEmptyData() *CommonRepresentation 
 	cr, err := NewCommonRepresentation(
 		deterministicUUID,
 		JsonObject{},
-		"host",
 		1,
 		"hbi",
 		"3088be62-1c60-4884-b133-9200542d0b3f",
@@ -213,7 +204,6 @@ func (f *TestFixture) CommonRepresentationWithNilData() *CommonRepresentation {
 			Data: nil,
 		},
 		ResourceId:                 deterministicUUID,
-		ResourceType:               "host",
 		Version:                    1,
 		ReportedByReporterType:     "hbi",
 		ReportedByReporterInstance: "3088be62-1c60-4884-b133-9200542d0b3f",
@@ -227,7 +217,6 @@ func (f *TestFixture) MinimalCommonRepresentation() *CommonRepresentation {
 		JsonObject{
 			"workspace_id": "1c0753fe-48c1-44d8-823c-95d04cff5f91",
 		},
-		"k8s_policy",
 		1,
 		"ACM",
 		"57a317b1-4040-4c26-8d41-dd589ba1d2eb",
@@ -245,7 +234,6 @@ func (f *TestFixture) MaximalCommonRepresentation() *CommonRepresentation {
 		JsonObject{
 			"workspace_id": "aee8f698-9d43-49a1-b458-680a7c9dc046",
 		},
-		"k8s_cluster",
 		4294967295, // Max uint32
 		"ACM",
 		"14c6b63e-49b2-4cc2-99de-5d914b657548",
@@ -267,7 +255,6 @@ func (f *TestFixture) UnicodeCommonRepresentation() *CommonRepresentation {
 			"russian":       "Привет мир",
 			"emoji_data":    "🚀🌟💻🔥⚡",
 		},
-		"测试-resource-type",
 		1,
 		"测试-reporter",
 		"测试-instance",
@@ -285,7 +272,6 @@ func (f *TestFixture) UnicodeCommonRepresentation() *CommonRepresentation {
 				},
 			},
 			ResourceId:                 uuid.NewSHA1(uuid.NameSpaceOID, []byte("测试-id-🌟")),
-			ResourceType:               "测试-resource-type",
 			Version:                    1,
 			ReportedByReporterType:     "测试-reporter",
 			ReportedByReporterInstance: "测试-instance",
@@ -308,7 +294,6 @@ func (f *TestFixture) SpecialCharsCommonRepresentation() *CommonRepresentation {
 			"brackets_mixed": "([{<>}])",
 			"quotes_mixed":   "\"'`‹›«»",
 		},
-		"special-!@#$%^&*()-type",
 		1,
 		"special-†‡•-reporter",
 		"special-™®©-instance",
@@ -329,7 +314,6 @@ func (f *TestFixture) SpecialCharsCommonRepresentation() *CommonRepresentation {
 				},
 			},
 			ResourceId:                 uuid.NewSHA1(uuid.NameSpaceOID, []byte("special-!@#$%^&*()-id")),
-			ResourceType:               "special-!@#$%^&*()-type",
 			Version:                    1,
 			ReportedByReporterType:     "special-†‡•-reporter",
 			ReportedByReporterInstance: "special-™®©-instance",

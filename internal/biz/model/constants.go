@@ -27,7 +27,6 @@ const (
 const (
 	// CommonRepresentation columns
 	ColumnResourceID                 = "id"
-	ColumnResourceType               = "resource_type"
 	ColumnVersion                    = "version"
 	ColumnReportedByReporterType     = "reported_by_reporter_type"
 	ColumnReportedByReporterInstance = "reported_by_reporter_instance"

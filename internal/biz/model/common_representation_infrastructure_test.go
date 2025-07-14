@@ -11,7 +11,7 @@ import (
 // Helper function to check if a CommonRepresentation is valid
 // This is used in infrastructure tests that need to verify existing objects
 func isValidCommonRepresentation(cr *CommonRepresentation) bool {
-	return cr != nil && cr.ResourceId != uuid.Nil && cr.ResourceType != "" && cr.Version > 0 && cr.ReportedByReporterType != "" && cr.ReportedByReporterInstance != ""
+	return cr != nil && cr.ResourceId != uuid.Nil && cr.Version > 0 && cr.ReportedByReporterType != "" && cr.ReportedByReporterInstance != ""
 }
 
 // Helper function to check if a ReporterRepresentation is valid
@@ -57,7 +57,6 @@ func TestCommonRepresentation_Infrastructure_Structure(t *testing.T) {
 		// Test field types
 		AssertFieldType(t, cr, "ResourceId", reflect.TypeOf(uuid.UUID{}))
 		AssertFieldType(t, cr, "Version", reflect.TypeOf(uint(0)))
-		AssertFieldType(t, cr, "ResourceType", reflect.TypeOf(""))
 		AssertFieldType(t, cr, "ReportedByReporterType", reflect.TypeOf(""))
 		AssertFieldType(t, cr, "ReportedByReporterInstance", reflect.TypeOf(""))
 		AssertFieldType(t, cr, "Data", reflect.TypeOf(JsonObject{}))
@@ -79,7 +78,6 @@ func TestCommonRepresentation_Infrastructure_Structure(t *testing.T) {
 		cr := &CommonRepresentation{}
 
 		// Verify size constraints match constants
-		AssertGORMTag(t, cr, "ResourceType", "size:128;column:resource_type")
 		AssertGORMTag(t, cr, "ReportedByReporterType", "size:128;column:reported_by_reporter_type")
 		AssertGORMTag(t, cr, "ReportedByReporterInstance", "size:128;column:reported_by_reporter_instance")
 	})
@@ -92,7 +90,6 @@ func TestCommonRepresentation_Infrastructure_Structure(t *testing.T) {
 		// All fields in CommonRepresentation should be non-nullable
 		AssertFieldType(t, cr, "ResourceId", reflect.TypeOf(uuid.UUID{}))
 		AssertFieldType(t, cr, "Version", reflect.TypeOf(uint(0)))
-		AssertFieldType(t, cr, "ResourceType", reflect.TypeOf(""))
 		AssertFieldType(t, cr, "ReportedByReporterType", reflect.TypeOf(""))
 		AssertFieldType(t, cr, "ReportedByReporterInstance", reflect.TypeOf(""))
 		AssertFieldType(t, cr, "Data", reflect.TypeOf(JsonObject{}))
@@ -109,7 +106,10 @@ func TestCommonRepresentation_Infrastructure_EdgeCases(t *testing.T) {
 		cr := fixture.UnicodeCommonRepresentation()
 
 		// Factory method should create a valid instance with unicode characters
-		AssertEqual(t, "测试-resource-type", cr.ResourceType, "Unicode resource type should be preserved")
+		// ResourceType field has been removed
+		if cr == nil {
+			t.Error("CommonRepresentation should be created successfully")
+		}
 	})
 
 	t.Run("should handle special characters in string fields", func(t *testing.T) {
@@ -119,7 +119,7 @@ func TestCommonRepresentation_Infrastructure_EdgeCases(t *testing.T) {
 		cr := fixture.SpecialCharsCommonRepresentation()
 
 		// Factory method should create a valid instance with special characters
-		AssertEqual(t, "special-!@#$%^&*()-type", cr.ResourceType, "Special characters in resource type should be preserved")
+		AssertEqual(t, "special-†‡•-reporter", cr.ReportedByReporterType, "Special characters in reporter type should be preserved")
 	})
 
 	t.Run("should handle large integer values", func(t *testing.T) {
@@ -144,7 +144,6 @@ func TestCommonRepresentation_Infrastructure_EdgeCases(t *testing.T) {
 			maxLen128 += "a"
 		}
 
-		cr.ResourceType = maxLen128
 		cr.ReportedByReporterType = maxLen128
 		cr.ReportedByReporterInstance = maxLen128
 
@@ -304,7 +303,7 @@ func TestCommonRepresentation_Infrastructure_Serialization(t *testing.T) {
 		// Compare key fields
 		AssertEqual(t, original.ResourceId, unmarshaled.ResourceId, "ResourceId should match after JSON round-trip")
 		AssertEqual(t, original.Version, unmarshaled.Version, "Version should match after JSON round-trip")
-		AssertEqual(t, original.ResourceType, unmarshaled.ResourceType, "ResourceType should match after JSON round-trip")
+		AssertEqual(t, original.RepresentationType.ReporterType, unmarshaled.RepresentationType.ReporterType, "ReporterType should match after JSON round-trip")
 		AssertEqual(t, original.ReportedByReporterType, unmarshaled.ReportedByReporterType, "ReportedByReporterType should match after JSON round-trip")
 		AssertEqual(t, original.ReportedByReporterInstance, unmarshaled.ReportedByReporterInstance, "ReportedByReporterInstance should match after JSON round-trip")
 	})
@@ -439,7 +438,6 @@ func TestCommonRepresentation_Infrastructure_Serialization(t *testing.T) {
 		cr, err := NewCommonRepresentation(
 			uuid.NewSHA1(uuid.NameSpaceOID, []byte("test")),
 			nil, // nil Data should be valid
-			"host",
 			1,
 			"hbi",
 			"test-instance",

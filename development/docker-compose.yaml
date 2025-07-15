@@ -209,7 +209,7 @@ services:
       - zookeeper
       - kafka
       - invdatabase
-    image: quay.io/debezium/connect:2.5
+    image: quay.io/debezium/connect:2.7
     restart: "always"
     networks:
       - kessel

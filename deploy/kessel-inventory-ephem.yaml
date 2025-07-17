@@ -42,15 +42,50 @@ objects:
         resources.tar.gz: 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
 
   - apiVersion: kafka.strimzi.io/v1beta2
+    kind: KafkaConnect
+    metadata:
+      annotations:
+        strimzi.io/use-connector-resources: "true"
+      name: kessel-kafka-connect
+    spec:
+      bootstrapServers: ${ENV_NAME}-kafka-bootstrap:9092
+      config:
+        config.storage.replication.factor: ${CONFIG_STORAGE_REPLICATION_FACTOR}
+        config.storage.topic: kessel-kafka-connect-cluster-configs
+        connector.client.config.override.policy: All
+        group.id: kessel-kafka-connect-cluster
+        offset.storage.replication.factor: ${OFFSET_STORAGE_REPLICATION_FACTOR}
+        offset.storage.topic: kessel-kafka-connect-cluster-offsets
+        status.storage.replication.factor: ${STATUS_STORAGE_REPLICATION_FACTOR}
+        status.storage.topic: kessel-kafka-connect-cluster-status
+        config.providers: secrets
+        config.providers.secrets.class: io.strimzi.kafka.KubernetesSecretConfigProvider
+      image: ${KAFKA_CONNECT_IMAGE}
+      replicas: ${{CONNECT_REPLICAS}}
+      resources:
+        limits:
+          cpu: 500m
+          memory: 1Gi
+        requests:
+          cpu: 250m
+          memory: 512Mi
+      template:
+        pod:
+          imagePullSecrets:
+          - name: quay-cloudservices-pull
+      version: ${VERSION}
+
+  - apiVersion: kafka.strimzi.io/v1beta2
     kind: KafkaConnector
     metadata:
       name: kessel-inventory-source-connector
       labels:
-        strimzi.io/cluster: ${ENV_NAME}
+        strimzi.io/cluster: kessel-kafka-connect
     spec:
       class: io.debezium.connector.postgresql.PostgresConnector
       tasksMax: ${{MAX_TASKS}}
       config:
+        slot.name: kessel_inventory_debezium
         database.server.name: kessel-inventory-db
         database.dbname: ${secrets:kessel-inventory-db:db.name}
         database.hostname: ${secrets:kessel-inventory-db:db.host}
@@ -187,3 +222,21 @@ parameters:
   - name: DEBEZIUM_POLL_INTERVAL_MS
     value: "250"
     description: The interval for the Debezium batch processing
+  - name: CONFIG_STORAGE_REPLICATION_FACTOR
+    description: Replication factor for the topic where connector configurations are stored
+    value: "1"
+  - name: OFFSET_STORAGE_REPLICATION_FACTOR
+    description: Replication factor for the topic where source connector offsets are store
+    value: "1"
+  - name: STATUS_STORAGE_REPLICATION_FACTOR
+    description: Replication factor for the topic where connector and task status are stored
+    value: "1"
+  - name: KAFKA_CONNECT_IMAGE
+    value: quay.io/redhat-services-prod/project-kessel-tenant/kessel-kafka-connect:latest
+    description: Container image name for the connect cluster pods
+  - name: CONNECT_REPLICAS
+    description: Number of replicas in the connect cluster
+    value: "1"
+  - name: VERSION
+    description: Kafka Connect version to use (should match the Kafka version of cluster and connect base image)
+    value: "3.9.0"

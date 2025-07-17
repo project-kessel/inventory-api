@@ -196,7 +196,7 @@ func FromContext(ctx context.Context) (jwtv5.Claims, bool) {
 }
 
 func FetchJwks(authServerUrl string) (keyfunc.Keyfunc, error) {
-	jwksURL := fmt.Sprintf(authServerUrl + "/protocol/openid-connect/certs")
+	jwksURL := fmt.Sprint(authServerUrl, "/protocol/openid-connect/certs")
 	jwks, err := keyfunc.NewDefault([]string{jwksURL})
 	if err != nil {
 		log.Fatalf("Failed to create JWK Set from resource at the given URL: %s.\nError: %s", authServerUrl, err)

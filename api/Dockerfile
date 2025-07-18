@@ -1,4 +1,4 @@
-FROM registry.access.redhat.com/ubi9/ubi-minimal:9.6-1752069876 AS builder
+FROM registry.access.redhat.com/ubi9/ubi-minimal:9.6-1752587672 AS builder
 
 ARG TARGETARCH
 USER root
@@ -15,7 +15,7 @@ RUN go install github.com/google/gnostic/cmd/protoc-gen-openapi@v0.7.0
 # Latest versions as of 2024-08-08
 RUN go install github.com/bufbuild/buf/cmd/buf@v1.36.0
 
-FROM registry.access.redhat.com/ubi9/ubi-minimal:9.6-1752069876
+FROM registry.access.redhat.com/ubi9/ubi-minimal:9.6-1752587672
 
 RUN microdnf install -y tar gzip unzip
 

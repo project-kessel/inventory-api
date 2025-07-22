@@ -32,7 +32,6 @@ func (f *TestFixture) ValidCommonRepresentation() *CommonRepresentation {
 		JsonObject{
 			"workspace_id": "a64d17d0-aec3-410a-acd0-e0b85b22c076",
 		},
-		"host",
 		1,
 		"hbi",
 		"3088be62-1c60-4884-b133-9200542d0b3f",
@@ -64,7 +63,6 @@ func (f *TestFixture) CommonRepresentationWithID(id string) *CommonRepresentatio
 		JsonObject{
 			"workspace_id": "a64d17d0-aec3-410a-acd0-e0b85b22c076",
 		},
-		"host",
 		1,
 		"hbi",
 		"3088be62-1c60-4884-b133-9200542d0b3f",
@@ -78,7 +76,6 @@ func (f *TestFixture) CommonRepresentationWithID(id string) *CommonRepresentatio
 				},
 			},
 			ResourceId:                 resourceId,
-			ResourceType:               "host",
 			Version:                    1,
 			ReportedByReporterType:     "hbi",
 			ReportedByReporterInstance: "3088be62-1c60-4884-b133-9200542d0b3f",
@@ -96,7 +93,6 @@ func (f *TestFixture) CommonRepresentationWithVersion(version uint) *CommonRepre
 		JsonObject{
 			"workspace_id": "a64d17d0-aec3-410a-acd0-e0b85b22c076",
 		},
-		"host",
 		version,
 		"hbi",
 		"3088be62-1c60-4884-b133-9200542d0b3f",
@@ -116,7 +112,6 @@ func (f *TestFixture) CommonRepresentationWithResourceType(resourceType string) 
 		JsonObject{
 			"workspace_id": "a64d17d0-aec3-410a-acd0-e0b85b22c076",
 		},
-		resourceType,
 		1,
 		"hbi",
 		"3088be62-1c60-4884-b133-9200542d0b3f",
@@ -136,7 +131,6 @@ func (f *TestFixture) CommonRepresentationWithReporterType(reporterType string) 
 		JsonObject{
 			"workspace_id": "a64d17d0-aec3-410a-acd0-e0b85b22c076",
 		},
-		"host",
 		1,
 		reporterType,
 		"3088be62-1c60-4884-b133-9200542d0b3f",
@@ -156,7 +150,6 @@ func (f *TestFixture) CommonRepresentationWithReporterInstance(reporterInstance 
 		JsonObject{
 			"workspace_id": "a64d17d0-aec3-410a-acd0-e0b85b22c076",
 		},
-		"host",
 		1,
 		"hbi",
 		reporterInstance,
@@ -174,7 +167,6 @@ func (f *TestFixture) CommonRepresentationWithData(data JsonObject) *CommonRepre
 	cr, err := NewCommonRepresentation(
 		deterministicUUID,
 		data,
-		"host",
 		1,
 		"hbi",
 		"3088be62-1c60-4884-b133-9200542d0b3f",
@@ -192,7 +184,6 @@ func (f *TestFixture) CommonRepresentationWithEmptyData() *CommonRepresentation 
 	cr, err := NewCommonRepresentation(
 		deterministicUUID,
 		JsonObject{},
-		"host",
 		1,
 		"hbi",
 		"3088be62-1c60-4884-b133-9200542d0b3f",
@@ -213,7 +204,6 @@ func (f *TestFixture) CommonRepresentationWithNilData() *CommonRepresentation {
 			Data: nil,
 		},
 		ResourceId:                 deterministicUUID,
-		ResourceType:               "host",
 		Version:                    1,
 		ReportedByReporterType:     "hbi",
 		ReportedByReporterInstance: "3088be62-1c60-4884-b133-9200542d0b3f",
@@ -227,7 +217,6 @@ func (f *TestFixture) MinimalCommonRepresentation() *CommonRepresentation {
 		JsonObject{
 			"workspace_id": "1c0753fe-48c1-44d8-823c-95d04cff5f91",
 		},
-		"k8s_policy",
 		1,
 		"ACM",
 		"57a317b1-4040-4c26-8d41-dd589ba1d2eb",
@@ -245,7 +234,6 @@ func (f *TestFixture) MaximalCommonRepresentation() *CommonRepresentation {
 		JsonObject{
 			"workspace_id": "aee8f698-9d43-49a1-b458-680a7c9dc046",
 		},
-		"k8s_cluster",
 		4294967295, // Max uint32
 		"ACM",
 		"14c6b63e-49b2-4cc2-99de-5d914b657548",
@@ -267,7 +255,6 @@ func (f *TestFixture) UnicodeCommonRepresentation() *CommonRepresentation {
 			"russian":       "Привет мир",
 			"emoji_data":    "🚀🌟💻🔥⚡",
 		},
-		"测试-resource-type",
 		1,
 		"测试-reporter",
 		"测试-instance",
@@ -285,7 +272,6 @@ func (f *TestFixture) UnicodeCommonRepresentation() *CommonRepresentation {
 				},
 			},
 			ResourceId:                 uuid.NewSHA1(uuid.NameSpaceOID, []byte("测试-id-🌟")),
-			ResourceType:               "测试-resource-type",
 			Version:                    1,
 			ReportedByReporterType:     "测试-reporter",
 			ReportedByReporterInstance: "测试-instance",
@@ -308,7 +294,6 @@ func (f *TestFixture) SpecialCharsCommonRepresentation() *CommonRepresentation {
 			"brackets_mixed": "([{<>}])",
 			"quotes_mixed":   "\"'`‹›«»",
 		},
-		"special-!@#$%^&*()-type",
 		1,
 		"special-†‡•-reporter",
 		"special-™®©-instance",
@@ -329,7 +314,6 @@ func (f *TestFixture) SpecialCharsCommonRepresentation() *CommonRepresentation {
 				},
 			},
 			ResourceId:                 uuid.NewSHA1(uuid.NameSpaceOID, []byte("special-!@#$%^&*()-id")),
-			ResourceType:               "special-!@#$%^&*()-type",
 			Version:                    1,
 			ReportedByReporterType:     "special-†‡•-reporter",
 			ReportedByReporterInstance: "special-™®©-instance",
@@ -469,151 +453,107 @@ func (f *TestFixture) ReporterRepresentationWithTombstone(tombstone bool) *Repor
 
 // ReporterRepresentationWithAPIHref returns a ReporterRepresentation with specified API href
 func (f *TestFixture) ReporterRepresentationWithAPIHref(apiHref string) *ReporterRepresentation {
-	rr, err := NewReporterRepresentation(
-		JsonObject{
-			"satellite_id":            "2c4196f1-0371-4f4c-8913-e113cfaa6e67",
-			"subscription_manager_id": "af94f92b-0b65-4cac-b449-6b77e665a08f",
-			"insights_inventory_id":   "05707922-7b0a-4fe6-982d-6adbc7695b8f",
-			"ansible_host":            "host-1",
-		},
-		"dd1b73b9-3e33-4264-968c-e3ce55b9afec",
-		"hbi",
-		"host",
-		1,
-		"3088be62-1c60-4884-b133-9200542d0b3f",
-		1,
-		apiHref,
-		stringPtr("https://www.console.com/"),
-		1,
-		false,
-		stringPtr("2.7.16"),
-	)
-	if err != nil {
-		// For test cases expecting invalid data, return the struct anyway for testing
-		return &ReporterRepresentation{
-			Representation: Representation{
-				Data: JsonObject{
-					"satellite_id":            "2c4196f1-0371-4f4c-8913-e113cfaa6e67",
-					"subscription_manager_id": "af94f92b-0b65-4cac-b449-6b77e665a08f",
-					"insights_inventory_id":   "05707922-7b0a-4fe6-982d-6adbc7695b8f",
-					"ansible_host":            "host-1",
-				},
+	return &ReporterRepresentation{
+		Representation: Representation{
+			Data: JsonObject{
+				"insights_inventory_id": "05707922-7b0a-4fe6-982d-6adbc7695b8f",
+				"ansible_host":          "host-1",
 			},
-			LocalResourceID:    "dd1b73b9-3e33-4264-968c-e3ce55b9afec",
-			ReporterType:       "hbi",
-			ResourceType:       "host",
-			Version:            1,
-			ReporterInstanceID: "3088be62-1c60-4884-b133-9200542d0b3f",
-			Generation:         1,
-			APIHref:            apiHref,
-			ConsoleHref:        stringPtr("https://www.console.com/"),
-			CommonVersion:      1,
-			Tombstone:          false,
-			ReporterVersion:    stringPtr("2.7.16"),
-		}
+			RepresentationType: RepresentationType{
+				ResourceType: "host",
+				ReporterType: "hbi",
+			},
+		},
+		Metadata: &ReporterRepresentationMetadata{
+			ReporterRepresentationKey: ReporterRepresentationKey{
+				RepresentationType: RepresentationType{
+					ResourceType: "host",
+					ReporterType: "hbi",
+				},
+				LocalResourceID:    "dd1b73b9-3e33-4264-968c-e3ce55b9afec",
+				ReporterInstanceID: "3088be62-1c60-4884-b133-9200542d0b3f",
+			},
+			APIHref:     apiHref,
+			ConsoleHref: stringPtr("https://www.console.com/"),
+		},
+		Version:         1,
+		Generation:      1,
+		CommonVersion:   1,
+		Tombstone:       false,
+		ReporterVersion: stringPtr("2.7.16"),
 	}
-	return rr
 }
 
 // ReporterRepresentationWithConsoleHref returns a ReporterRepresentation with specified console href
 func (f *TestFixture) ReporterRepresentationWithConsoleHref(consoleHref string) *ReporterRepresentation {
-	var consoleHrefPtr *string
-	if consoleHref != "" {
-		consoleHrefPtr = &consoleHref
+	consoleHrefPtr := &consoleHref
+	if consoleHref == "" {
+		consoleHrefPtr = nil
 	}
-
-	rr, err := NewReporterRepresentation(
-		JsonObject{
-			"satellite_id":            "2c4196f1-0371-4f4c-8913-e113cfaa6e67",
-			"subscription_manager_id": "af94f92b-0b65-4cac-b449-6b77e665a08f",
-			"insights_inventory_id":   "05707922-7b0a-4fe6-982d-6adbc7695b8f",
-			"ansible_host":            "host-1",
-		},
-		"dd1b73b9-3e33-4264-968c-e3ce55b9afec",
-		"hbi",
-		"host",
-		1,
-		"3088be62-1c60-4884-b133-9200542d0b3f",
-		1,
-		"https://apiHref.com/",
-		consoleHrefPtr,
-		1,
-		false,
-		stringPtr("2.7.16"),
-	)
-	if err != nil {
-		// For test cases expecting invalid data, return the struct anyway for testing
-		return &ReporterRepresentation{
-			Representation: Representation{
-				Data: JsonObject{
-					"satellite_id":            "2c4196f1-0371-4f4c-8913-e113cfaa6e67",
-					"subscription_manager_id": "af94f92b-0b65-4cac-b449-6b77e665a08f",
-					"insights_inventory_id":   "05707922-7b0a-4fe6-982d-6adbc7695b8f",
-					"ansible_host":            "host-1",
-				},
+	return &ReporterRepresentation{
+		Representation: Representation{
+			Data: JsonObject{
+				"insights_inventory_id": "05707922-7b0a-4fe6-982d-6adbc7695b8f",
+				"ansible_host":          "host-1",
 			},
-			LocalResourceID:    "dd1b73b9-3e33-4264-968c-e3ce55b9afec",
-			ReporterType:       "hbi",
-			ResourceType:       "host",
-			Version:            1,
-			ReporterInstanceID: "3088be62-1c60-4884-b133-9200542d0b3f",
-			Generation:         1,
-			APIHref:            "https://apiHref.com/",
-			ConsoleHref:        consoleHrefPtr,
-			CommonVersion:      1,
-			Tombstone:          false,
-			ReporterVersion:    stringPtr("2.7.16"),
-		}
+			RepresentationType: RepresentationType{
+				ResourceType: "host",
+				ReporterType: "hbi",
+			},
+		},
+		Metadata: &ReporterRepresentationMetadata{
+			ReporterRepresentationKey: ReporterRepresentationKey{
+				RepresentationType: RepresentationType{
+					ResourceType: "host",
+					ReporterType: "hbi",
+				},
+				LocalResourceID:    "dd1b73b9-3e33-4264-968c-e3ce55b9afec",
+				ReporterInstanceID: "3088be62-1c60-4884-b133-9200542d0b3f",
+			},
+			APIHref:     "https://apiHref.com/",
+			ConsoleHref: consoleHrefPtr,
+		},
+		Version:         1,
+		Generation:      1,
+		CommonVersion:   1,
+		Tombstone:       false,
+		ReporterVersion: stringPtr("2.7.16"),
 	}
-	return rr
 }
 
 // ReporterRepresentationWithReporterVersion returns a ReporterRepresentation with specified reporter version
 func (f *TestFixture) ReporterRepresentationWithReporterVersion(reporterVersion *string) *ReporterRepresentation {
-	rr, err := NewReporterRepresentation(
-		JsonObject{
-			"satellite_id":            "2c4196f1-0371-4f4c-8913-e113cfaa6e67",
-			"subscription_manager_id": "af94f92b-0b65-4cac-b449-6b77e665a08f",
-			"insights_inventory_id":   "05707922-7b0a-4fe6-982d-6adbc7695b8f",
-			"ansible_host":            "host-1",
-		},
-		"dd1b73b9-3e33-4264-968c-e3ce55b9afec",
-		"hbi",
-		"host",
-		1,
-		"3088be62-1c60-4884-b133-9200542d0b3f",
-		1,
-		"https://apiHref.com/",
-		stringPtr("https://www.console.com/"),
-		1,
-		false,
-		reporterVersion,
-	)
-	if err != nil {
-		// For test cases expecting invalid data, return the struct anyway for testing
-		return &ReporterRepresentation{
-			Representation: Representation{
-				Data: JsonObject{
-					"satellite_id":            "2c4196f1-0371-4f4c-8913-e113cfaa6e67",
-					"subscription_manager_id": "af94f92b-0b65-4cac-b449-6b77e665a08f",
-					"insights_inventory_id":   "05707922-7b0a-4fe6-982d-6adbc7695b8f",
-					"ansible_host":            "host-1",
-				},
+	return &ReporterRepresentation{
+		// ID will be generated by BeforeCreate hook
+		Representation: Representation{
+			Data: JsonObject{
+				"insights_inventory_id": "05707922-7b0a-4fe6-982d-6adbc7695b8f",
+				"ansible_host":          "host-1",
 			},
-			LocalResourceID:    "dd1b73b9-3e33-4264-968c-e3ce55b9afec",
-			ReporterType:       "hbi",
-			ResourceType:       "host",
-			Version:            1,
-			ReporterInstanceID: "3088be62-1c60-4884-b133-9200542d0b3f",
-			Generation:         1,
-			APIHref:            "https://apiHref.com/",
-			ConsoleHref:        stringPtr("https://www.console.com/"),
-			CommonVersion:      1,
-			Tombstone:          false,
-			ReporterVersion:    reporterVersion,
-		}
+			RepresentationType: RepresentationType{
+				ResourceType: "host",
+				ReporterType: "hbi",
+			},
+		},
+		Metadata: &ReporterRepresentationMetadata{
+			ReporterRepresentationKey: ReporterRepresentationKey{
+				RepresentationType: RepresentationType{
+					ResourceType: "host",
+					ReporterType: "hbi",
+				},
+				LocalResourceID:    "dd1b73b9-3e33-4264-968c-e3ce55b9afec",
+				ReporterInstanceID: "3088be62-1c60-4884-b133-9200542d0b3f",
+			},
+			// ReporterRepresentationID will be set by BeforeCreate hook
+			APIHref:     "https://apiHref.com/",
+			ConsoleHref: stringPtr("https://www.console.com/"),
+		},
+		Version:         1,
+		Generation:      1,
+		CommonVersion:   1,
+		Tombstone:       false,
+		ReporterVersion: reporterVersion,
 	}
-	return rr
 }
 
 // ReporterRepresentationWithNilReporterVersion returns a ReporterRepresentation with nil reporter version
@@ -745,31 +685,6 @@ func AssertValidationError(t *testing.T, err error, expectedField string, messag
 
 	if validationErr.Field != expectedField {
 		t.Errorf("%s: expected ValidationError for field '%s' but got '%s'", message, expectedField, validationErr.Field)
-	}
-}
-
-// AssertTableName checks if the model has the expected table name
-func AssertTableName(t *testing.T, model interface{}, expectedTableName string) {
-	t.Helper()
-
-	// Check if the model has a TableName method
-	value := reflect.ValueOf(model)
-	method := value.MethodByName("TableName")
-	if !method.IsValid() {
-		t.Errorf("Model %T does not have a TableName method", model)
-		return
-	}
-
-	// Call the TableName method
-	results := method.Call(nil)
-	if len(results) != 1 {
-		t.Errorf("TableName method should return exactly one value")
-		return
-	}
-
-	actualTableName := results[0].String()
-	if actualTableName != expectedTableName {
-		t.Errorf("Expected table name '%s', got '%s'", expectedTableName, actualTableName)
 	}
 }
 

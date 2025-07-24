@@ -50,14 +50,9 @@ func TestReporterRepresentation_Structure(t *testing.T) {
 		rrType := reflect.TypeOf(rr)
 
 		expectedFields := map[string]reflect.Type{
-			"LocalResourceID":    reflect.TypeOf(""),
-			"ReporterType":       reflect.TypeOf(""),
-			"ResourceType":       reflect.TypeOf(""),
+			"ReporterResourceID": reflect.TypeOf(""),
 			"Version":            reflect.TypeOf(uint(0)),
-			"ReporterInstanceID": reflect.TypeOf(""),
 			"Generation":         reflect.TypeOf(uint(0)),
-			"APIHref":            reflect.TypeOf(""),
-			"ConsoleHref":        reflect.TypeOf((*string)(nil)),
 			"CommonVersion":      reflect.TypeOf(uint(0)),
 			"Tombstone":          reflect.TypeOf(false),
 			"ReporterVersion":    reflect.TypeOf((*string)(nil)),
@@ -90,18 +85,15 @@ func TestReporterRepresentation_Structure(t *testing.T) {
 		}
 	})
 
-	t.Run("should have correct GORM tags for unique index", func(t *testing.T) {
+	t.Run("should have correct GORM tags for primary key", func(t *testing.T) {
 		t.Parallel()
 
 		rrType := reflect.TypeOf(ReporterRepresentation{})
 
-		// Check all fields that should have the unique index tag
-		expectedIndexFields := []string{
-			"LocalResourceID", "ReporterType", "ResourceType",
-			"Version", "ReporterInstanceID", "Generation",
-		}
+		// Check primary key fields
+		primaryKeyFields := []string{"ReporterResourceID", "Version"}
 
-		for _, fieldName := range expectedIndexFields {
+		for _, fieldName := range primaryKeyFields {
 			field, found := rrType.FieldByName(fieldName)
 			if !found {
 				t.Errorf("Field %s not found", fieldName)
@@ -109,8 +101,8 @@ func TestReporterRepresentation_Structure(t *testing.T) {
 			}
 
 			tag := field.Tag.Get("gorm")
-			if !strings.Contains(tag, "index:reporter_rep_unique_idx,unique") {
-				t.Errorf("Field %s should have unique index tag, got: %s", fieldName, tag)
+			if !strings.Contains(tag, "primaryKey") {
+				t.Errorf("Field %s should have primaryKey tag, got: %s", fieldName, tag)
 			}
 		}
 	})
@@ -122,12 +114,7 @@ func TestReporterRepresentation_Structure(t *testing.T) {
 
 		// Check size constraints
 		sizeConstraints := map[string]string{
-			"LocalResourceID":    "size:128",
-			"ReporterType":       "size:128",
-			"ResourceType":       "size:128",
-			"ReporterInstanceID": "size:128",
-			"APIHref":            "size:512",
-			"ConsoleHref":        "size:512",
+			"ReporterResourceID": "size:128",
 			"ReporterVersion":    "size:128",
 		}
 
@@ -151,7 +138,7 @@ func TestReporterRepresentation_Structure(t *testing.T) {
 		rrType := reflect.TypeOf(ReporterRepresentation{})
 
 		// Check nullable fields
-		nullableFields := []string{"ConsoleHref", "ReporterVersion"}
+		nullableFields := []string{"ReporterVersion"}
 
 		for _, fieldName := range nullableFields {
 			field, found := rrType.FieldByName(fieldName)
@@ -178,10 +165,7 @@ func TestReporterRepresentation_Structure(t *testing.T) {
 		rrType := reflect.TypeOf(ReporterRepresentation{})
 
 		// Check non-nullable string fields
-		nonNullableStringFields := []string{
-			"LocalResourceID", "ReporterType", "ResourceType",
-			"ReporterInstanceID", "APIHref",
-		}
+		nonNullableStringFields := []string{"ReporterResourceID"}
 
 		for _, fieldName := range nonNullableStringFields {
 			field, found := rrType.FieldByName(fieldName)
@@ -225,14 +209,9 @@ func TestReporterRepresentation_EdgeCases(t *testing.T) {
 				"name":        "测试资源",
 				"description": "包含Unicode字符的描述 🌟",
 			},
-			"测试-resource-🌟",
-			"测试-reporter",
-			"host",
+			"测试-reporter-resource-🌟",
 			1,
-			"test-instance",
 			1,
-			"https://api.example.com",
-			nil,
 			1,
 			false,
 			nil,
@@ -247,14 +226,9 @@ func TestReporterRepresentation_EdgeCases(t *testing.T) {
 			JsonObject{
 				"special_field": "Value with special chars: !@#$%^&*()_+-=[]{}|;':\",./<>?",
 			},
-			"resource-with-special-chars-!@#$%^&*()",
-			"special-reporter-type",
-			"host",
+			"reporter-resource-with-special-chars-!@#$%^&*()",
 			1,
-			"test-instance",
 			1,
-			"https://api.example.com",
-			nil,
 			1,
 			false,
 			nil,
@@ -267,14 +241,9 @@ func TestReporterRepresentation_EdgeCases(t *testing.T) {
 
 		_, err := NewReporterRepresentation(
 			JsonObject{"test": "data"},
-			"test-local-id",
-			"hbi",
-			"host",
+			"test-reporter-resource-id",
 			4294967295, // Max uint32 Version
-			"test-instance",
 			4294967295, // Max uint32 Generation
-			"https://api.example.com",
-			nil,
 			4294967295, // Max uint32 CommonVersion
 			false,
 			nil,
@@ -287,14 +256,9 @@ func TestReporterRepresentation_EdgeCases(t *testing.T) {
 
 		_, err := NewReporterRepresentation(
 			JsonObject{"test": "data"},
-			"test-local-id",
-			"hbi",
-			"host",
+			"test-reporter-resource-id",
 			1,
-			"test-instance",
 			1,
-			"https://api.example.com",
-			stringPtr(""), // Empty ConsoleHref
 			1,
 			false,
 			stringPtr(""), // Empty ReporterVersion
@@ -307,14 +271,9 @@ func TestReporterRepresentation_EdgeCases(t *testing.T) {
 
 		_, err := NewReporterRepresentation(
 			JsonObject{"test": "data"},
-			"test-local-id",
-			"hbi",
-			"host",
+			"test-reporter-resource-id",
 			1,
-			"test-instance",
 			1,
-			"https://api.example.com",
-			nil, // Nil ConsoleHref
 			1,
 			false,
 			nil, // Nil ReporterVersion
@@ -362,14 +321,9 @@ func TestReporterRepresentation_EdgeCases(t *testing.T) {
 
 		_, err := NewReporterRepresentation(
 			complexData,
-			"test-local-id",
-			"hbi",
-			"host",
+			"test-reporter-resource-id",
 			1,
-			"test-instance",
 			1,
-			"https://api.example.com",
-			nil,
 			1,
 			false,
 			nil,
@@ -382,14 +336,9 @@ func TestReporterRepresentation_EdgeCases(t *testing.T) {
 
 		_, err := NewReporterRepresentation(
 			JsonObject{},
-			"test-local-id",
-			"hbi",
-			"host",
+			"test-reporter-resource-id",
 			1,
-			"test-instance",
 			1,
-			"https://api.example.com",
-			nil,
 			1,
 			false,
 			nil,
@@ -405,6 +354,7 @@ func TestReporterRepresentation_EdgeCases(t *testing.T) {
 			version uint
 			valid   bool
 		}{
+			{"version_0", 0, true},
 			{"version_1", 1, true},
 			{"version_max_uint32", 4294967295, true},
 			{"version_large", 1000000, true},
@@ -415,14 +365,9 @@ func TestReporterRepresentation_EdgeCases(t *testing.T) {
 				t.Parallel()
 				_, err := NewReporterRepresentation(
 					JsonObject{"test": "data"},
-					"test-local-id",
-					"hbi",
-					"host",
+					"test-reporter-resource-id",
 					tc.version,
-					"test-instance",
 					1,
-					"https://api.example.com",
-					nil,
 					1,
 					false,
 					nil,
@@ -444,6 +389,7 @@ func TestReporterRepresentation_EdgeCases(t *testing.T) {
 			generation uint
 			valid      bool
 		}{
+			{"generation_0", 0, true},
 			{"generation_1", 1, true},
 			{"generation_max_uint32", 4294967295, true},
 			{"generation_large", 1000000, true},
@@ -454,14 +400,9 @@ func TestReporterRepresentation_EdgeCases(t *testing.T) {
 				t.Parallel()
 				_, err := NewReporterRepresentation(
 					JsonObject{"test": "data"},
-					"test-local-id",
-					"hbi",
-					"host",
+					"test-reporter-resource-id",
 					1,
-					"test-instance",
 					tc.generation,
-					"https://api.example.com",
-					nil,
 					1,
 					false,
 					nil,
@@ -491,14 +432,9 @@ func TestReporterRepresentation_EdgeCases(t *testing.T) {
 				t.Parallel()
 				rr, err := NewReporterRepresentation(
 					JsonObject{"test": "data"},
-					"test-local-id",
-					"hbi",
-					"host",
+					"test-reporter-resource-id",
 					1,
-					"test-instance",
 					1,
-					"https://api.example.com",
-					nil,
 					1,
 					tc.tombstone,
 					nil,
@@ -510,33 +446,6 @@ func TestReporterRepresentation_EdgeCases(t *testing.T) {
 				}
 			})
 		}
-	})
-
-	t.Run("should handle long URL values", func(t *testing.T) {
-		t.Parallel()
-
-		// Create a long but valid URL
-		longURL := "https://api.example.com/v1/resources/very-long-resource-name-that-might-be-generated-by-system"
-		for i := 0; i < 10; i++ {
-			longURL += "/nested/path/segment"
-		}
-		longURL += "?query=parameter&another=value"
-
-		_, err := NewReporterRepresentation(
-			JsonObject{"test": "data"},
-			"test-local-id",
-			"hbi",
-			"host",
-			1,
-			"test-instance",
-			1,
-			longURL,
-			stringPtr(longURL),
-			1,
-			false,
-			nil,
-		)
-		AssertNoError(t, err, "ReporterRepresentation with long URL values should be valid")
 	})
 }
 
@@ -559,9 +468,7 @@ func TestReporterRepresentation_Serialization(t *testing.T) {
 		AssertNoError(t, err, "Should be able to unmarshal ReporterRepresentation from JSON")
 
 		// Compare key fields
-		AssertEqual(t, original.LocalResourceID, unmarshaled.LocalResourceID, "LocalResourceID should match after JSON round-trip")
-		AssertEqual(t, original.ReporterType, unmarshaled.ReporterType, "ReporterType should match after JSON round-trip")
-		AssertEqual(t, original.ResourceType, unmarshaled.ResourceType, "ResourceType should match after JSON round-trip")
+		AssertEqual(t, original.ReporterResourceID, unmarshaled.ReporterResourceID, "ReporterResourceID should match after JSON round-trip")
 		AssertEqual(t, original.Version, unmarshaled.Version, "Version should match after JSON round-trip")
 		AssertEqual(t, original.Generation, unmarshaled.Generation, "Generation should match after JSON round-trip")
 		AssertEqual(t, original.Tombstone, unmarshaled.Tombstone, "Tombstone should match after JSON round-trip")
@@ -572,7 +479,6 @@ func TestReporterRepresentation_Serialization(t *testing.T) {
 
 		fixture := NewTestFixture(t)
 		rr := fixture.ValidReporterRepresentation()
-		rr.ConsoleHref = nil
 		rr.ReporterVersion = nil
 
 		// Test JSON marshaling with null values
@@ -585,9 +491,6 @@ func TestReporterRepresentation_Serialization(t *testing.T) {
 		AssertNoError(t, err, "Should be able to unmarshal ReporterRepresentation with null values from JSON")
 
 		// Check that null values are preserved
-		if unmarshaled.ConsoleHref != nil {
-			t.Error("ConsoleHref should be nil after JSON round-trip")
-		}
 		if unmarshaled.ReporterVersion != nil {
 			t.Error("ReporterVersion should be nil after JSON round-trip")
 		}
@@ -599,7 +502,6 @@ func TestReporterRepresentation_Serialization(t *testing.T) {
 		fixture := NewTestFixture(t)
 		rr := fixture.ValidReporterRepresentation()
 		emptyString := ""
-		rr.ConsoleHref = &emptyString
 		rr.ReporterVersion = &emptyString
 
 		// Test JSON marshaling with empty string values
@@ -612,9 +514,6 @@ func TestReporterRepresentation_Serialization(t *testing.T) {
 		AssertNoError(t, err, "Should be able to unmarshal ReporterRepresentation with empty string values from JSON")
 
 		// Check that empty string values are preserved
-		if unmarshaled.ConsoleHref == nil || *unmarshaled.ConsoleHref != "" {
-			t.Error("ConsoleHref should be empty string after JSON round-trip")
-		}
 		if unmarshaled.ReporterVersion == nil || *unmarshaled.ReporterVersion != "" {
 			t.Error("ReporterVersion should be empty string after JSON round-trip")
 		}
@@ -625,8 +524,7 @@ func TestReporterRepresentation_Serialization(t *testing.T) {
 
 		fixture := NewTestFixture(t)
 		rr := fixture.ValidReporterRepresentation()
-		rr.LocalResourceID = "测试-resource-🌟"
-		rr.ReporterType = "测试-reporter"
+		rr.ReporterResourceID = "测试-reporter-resource-🌟"
 		rr.Data = JsonObject{
 			"name":        "测试资源",
 			"description": "包含Unicode字符的描述 🌟",
@@ -642,8 +540,7 @@ func TestReporterRepresentation_Serialization(t *testing.T) {
 		AssertNoError(t, err, "Should be able to unmarshal ReporterRepresentation with unicode characters from JSON")
 
 		// Check that unicode characters are preserved
-		AssertEqual(t, rr.LocalResourceID, unmarshaled.LocalResourceID, "Unicode LocalResourceID should match after JSON round-trip")
-		AssertEqual(t, rr.ReporterType, unmarshaled.ReporterType, "Unicode ReporterType should match after JSON round-trip")
+		AssertEqual(t, rr.ReporterResourceID, unmarshaled.ReporterResourceID, "Unicode ReporterResourceID should match after JSON round-trip")
 
 		// Check unicode in data
 		if nameField, ok := unmarshaled.Data["name"]; ok {
@@ -658,7 +555,7 @@ func TestReporterRepresentation_Serialization(t *testing.T) {
 
 		fixture := NewTestFixture(t)
 		rr := fixture.ValidReporterRepresentation()
-		rr.LocalResourceID = "resource-with-special-chars-!@#$%^&*()"
+		rr.ReporterResourceID = "reporter-resource-with-special-chars-!@#$%^&*()"
 		rr.Data = JsonObject{
 			"special_field": "Value with special chars: !@#$%^&*()_+-=[]{}|;':\",./<>?",
 		}
@@ -673,7 +570,7 @@ func TestReporterRepresentation_Serialization(t *testing.T) {
 		AssertNoError(t, err, "Should be able to unmarshal ReporterRepresentation with special characters from JSON")
 
 		// Check that special characters are preserved
-		AssertEqual(t, rr.LocalResourceID, unmarshaled.LocalResourceID, "Special character LocalResourceID should match after JSON round-trip")
+		AssertEqual(t, rr.ReporterResourceID, unmarshaled.ReporterResourceID, "Special character ReporterResourceID should match after JSON round-trip")
 
 		// Check special characters in data
 		if specialField, ok := unmarshaled.Data["special_field"]; ok {

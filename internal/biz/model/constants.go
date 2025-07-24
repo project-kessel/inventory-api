@@ -27,33 +27,46 @@ const (
 const (
 	CommonRepresentationTableName   = "common_representation"
 	ReporterRepresentationTableName = "reporter_representation"
+	ReporterResourceTableName       = "reporter_resource"
 )
 
 // Column name constants
 const (
 	// CommonRepresentation columns
 	ColumnResourceID                 = "id"
-	ColumnResourceType               = "resource_type"
 	ColumnVersion                    = "version"
 	ColumnReportedByReporterType     = "reported_by_reporter_type"
 	ColumnReportedByReporterInstance = "reported_by_reporter_instance"
 	ColumnData                       = "data"
 
-	// ReporterRepresentation columns
+	// ReporterResource columns (identifying)
+	ColumnReporterResourceID = "id"
 	ColumnLocalResourceID    = "local_resource_id"
+	ColumnRRResourceType     = "resource_type"
 	ColumnReporterType       = "reporter_type"
 	ColumnReporterInstanceID = "reporter_instance_id"
-	ColumnGeneration         = "generation"
-	ColumnAPIHref            = "api_href"
-	ColumnConsoleHref        = "console_href"
-	ColumnCommonVersion      = "common_version"
-	ColumnTombstone          = "tombstone"
-	ColumnReporterVersion    = "reporter_version"
+
+	// ReporterResource extra columns
+	ColumnRRAPIHref     = "api_href"
+	ColumnRRConsoleHref = "console_href"
+	ColumnRRGeneration  = "generation"
+	ColumnRRVersion     = "version"
+	ColumnRRTombstone   = "tombstone"
+	ColumnRRResourceFK  = "resource_id"
+
+	// ReporterRepresentation columns
+	ColumnRepReporterResourceID = "reporter_resource_id"
+	ColumnRepVersion            = "version"
+	ColumnRepGeneration         = "generation"
+	ColumnCommonVersion         = "common_version"
+	ColumnTombstone             = "tombstone"
+	ColumnReporterVersion       = "reporter_version"
 )
 
 // Index names
 const (
 	ReporterRepresentationUniqueIndex = "reporter_rep_unique_idx"
+	ReporterResourceIdentifierIdx     = "reporter_resource_identifier_idx"
 )
 
 // Database type constants

@@ -26,13 +26,10 @@ func TestCommonRepresentation_Validation(t *testing.T) {
 
 	t.Run("valid_representation", func(t *testing.T) {
 		t.Parallel()
-		cr := fixture.ValidCommonRepresentation()
+		_ = fixture.ValidCommonRepresentation()
 
 		// Factory method should create a valid instance without errors
 		AssertNoError(t, nil, "Valid CommonRepresentation should be created successfully")
-
-		// Verify the instance was created correctly
-		AssertEqual(t, "host", cr.ResourceType, "Resource type should be set correctly")
 	})
 
 	t.Run("invalid_representations", func(t *testing.T) {
@@ -45,25 +42,11 @@ func TestCommonRepresentation_Validation(t *testing.T) {
 				_, err := NewCommonRepresentation(
 					uuid.Nil,
 					JsonObject{"workspace_id": "test"},
-					"host",
 					1,
 					"hbi",
 					"test-instance",
 				)
 				AssertValidationError(t, err, "ResourceId", "Empty ResourceId should fail creation")
-			},
-			"empty_resource_type": func(t *testing.T) {
-				t.Parallel()
-				// Test factory method with empty resource type
-				_, err := NewCommonRepresentation(
-					uuid.NewSHA1(uuid.NameSpaceOID, []byte("test")),
-					JsonObject{"workspace_id": "test"},
-					"",
-					1,
-					"hbi",
-					"test-instance",
-				)
-				AssertValidationError(t, err, "ResourceType", "Empty ResourceType should fail creation")
 			},
 			"zero_version": func(t *testing.T) {
 				t.Parallel()
@@ -71,7 +54,6 @@ func TestCommonRepresentation_Validation(t *testing.T) {
 				cr, err := NewCommonRepresentation(
 					uuid.NewSHA1(uuid.NameSpaceOID, []byte("test")),
 					JsonObject{"workspace_id": "test"},
-					"host",
 					0,
 					"hbi",
 					"test-instance",
@@ -89,7 +71,6 @@ func TestCommonRepresentation_Validation(t *testing.T) {
 				_, err := NewCommonRepresentation(
 					uuid.NewSHA1(uuid.NameSpaceOID, []byte("test")),
 					JsonObject{"workspace_id": "test"},
-					"host",
 					1,
 					"",
 					"test-instance",
@@ -102,7 +83,6 @@ func TestCommonRepresentation_Validation(t *testing.T) {
 				_, err := NewCommonRepresentation(
 					uuid.NewSHA1(uuid.NameSpaceOID, []byte("test")),
 					JsonObject{"workspace_id": "test"},
-					"host",
 					1,
 					"hbi",
 					"",
@@ -115,7 +95,6 @@ func TestCommonRepresentation_Validation(t *testing.T) {
 				cr, err := NewCommonRepresentation(
 					uuid.NewSHA1(uuid.NameSpaceOID, []byte("test")),
 					nil,
-					"host",
 					1,
 					"hbi",
 					"test-instance",
@@ -153,7 +132,6 @@ func TestCommonRepresentation_BusinessRules(t *testing.T) {
 		cr, err := NewCommonRepresentation(
 			uuid.NewSHA1(uuid.NameSpaceOID, []byte("test")),
 			JsonObject{"workspace_id": "test"},
-			"host",
 			0,
 			"hbi",
 			"test-instance",
@@ -176,25 +154,11 @@ func TestCommonRepresentation_BusinessRules(t *testing.T) {
 				_, err := NewCommonRepresentation(
 					uuid.Nil,
 					JsonObject{"workspace_id": "test"},
-					"host",
 					1,
 					"hbi",
 					"test-instance",
 				)
 				AssertValidationError(t, err, "ResourceId", "ResourceId should be required")
-			},
-			"resource_type_required": func(t *testing.T) {
-				t.Parallel()
-				// Test factory method with empty resource type
-				_, err := NewCommonRepresentation(
-					uuid.NewSHA1(uuid.NameSpaceOID, []byte("test")),
-					JsonObject{"workspace_id": "test"},
-					"",
-					1,
-					"hbi",
-					"test-instance",
-				)
-				AssertValidationError(t, err, "ResourceType", "ResourceType should be required")
 			},
 			"reporter_type_required": func(t *testing.T) {
 				t.Parallel()
@@ -202,7 +166,6 @@ func TestCommonRepresentation_BusinessRules(t *testing.T) {
 				_, err := NewCommonRepresentation(
 					uuid.NewSHA1(uuid.NameSpaceOID, []byte("test")),
 					JsonObject{"workspace_id": "test"},
-					"host",
 					1,
 					"",
 					"test-instance",
@@ -215,7 +178,6 @@ func TestCommonRepresentation_BusinessRules(t *testing.T) {
 				_, err := NewCommonRepresentation(
 					uuid.NewSHA1(uuid.NameSpaceOID, []byte("test")),
 					JsonObject{"workspace_id": "test"},
-					"host",
 					1,
 					"hbi",
 					"",
@@ -277,7 +239,6 @@ func TestCommonRepresentation_DataHandling(t *testing.T) {
 		cr, err := NewCommonRepresentation(
 			uuid.NewSHA1(uuid.NameSpaceOID, []byte("test")),
 			nil,
-			"host",
 			1,
 			"hbi",
 			"test-instance",
@@ -327,7 +288,6 @@ func TestCommonRepresentation_FactoryMethods(t *testing.T) {
 		cr, err := NewCommonRepresentation(
 			testResourceId,
 			JsonObject{"workspace_id": "test-workspace"},
-			"host",
 			1,
 			"hbi",
 			"test-instance",
@@ -341,10 +301,6 @@ func TestCommonRepresentation_FactoryMethods(t *testing.T) {
 			t.Errorf("Expected ResourceId %s, got %s", testResourceId, cr.ResourceId)
 		}
 
-		if cr.ResourceType != "host" {
-			t.Errorf("Expected ResourceType 'host', got '%s'", cr.ResourceType)
-		}
-
 		if cr.Version != 1 {
 			t.Errorf("Expected Version 1, got %d", cr.Version)
 		}
@@ -353,25 +309,10 @@ func TestCommonRepresentation_FactoryMethods(t *testing.T) {
 	t.Run("should_enforce_validation_rules_in_factory", func(t *testing.T) {
 		testResourceId := uuid.New()
 
-		// Test empty ResourceType
-		_, err := NewCommonRepresentation(
-			testResourceId,
-			JsonObject{"workspace_id": "test-workspace"},
-			"", // empty ResourceType
-			1,
-			"hbi",
-			"test-instance",
-		)
-
-		if err == nil {
-			t.Error("Expected validation error for empty ResourceType")
-		}
-
 		// Test zero Version - should be valid now
 		cr, err := NewCommonRepresentation(
 			testResourceId,
 			JsonObject{"workspace_id": "test-workspace"},
-			"host",
 			0, // zero Version should be valid
 			"hbi",
 			"test-instance",
@@ -390,7 +331,6 @@ func TestCommonRepresentation_FactoryMethods(t *testing.T) {
 		cr, err = NewCommonRepresentation(
 			testResourceId,
 			nil, // nil Data should be valid
-			"host",
 			1,
 			"hbi",
 			"test-instance",
@@ -409,7 +349,6 @@ func TestCommonRepresentation_FactoryMethods(t *testing.T) {
 		_, err = NewCommonRepresentation(
 			uuid.Nil, // nil UUID
 			JsonObject{"workspace_id": "test-workspace"},
-			"host",
 			1,
 			"hbi",
 			"test-instance",

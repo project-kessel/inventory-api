@@ -13,7 +13,6 @@ import (
 type CommonRepresentation struct {
 	Representation
 	ResourceId                 uuid.UUID `gorm:"type:text;column:id;primaryKey"`
-	ResourceType               string    `gorm:"size:128;column:resource_type"`
 	Version                    uint      `gorm:"type:bigint;column:version;primaryKey;check:version >= 0"`
 	ReportedByReporterType     string    `gorm:"size:128;column:reported_by_reporter_type"`
 	ReportedByReporterInstance string    `gorm:"size:128;column:reported_by_reporter_instance"`
@@ -27,7 +26,6 @@ func (CommonRepresentation) TableName() string {
 func NewCommonRepresentation(
 	resourceId uuid.UUID,
 	data JsonObject,
-	resourceType string,
 	version uint,
 	reportedByReporterType string,
 	reportedByReporterInstance string,
@@ -37,7 +35,6 @@ func NewCommonRepresentation(
 			Data: data,
 		},
 		ResourceId:                 resourceId,
-		ResourceType:               resourceType,
 		Version:                    version,
 		ReportedByReporterType:     reportedByReporterType,
 		ReportedByReporterInstance: reportedByReporterInstance,
@@ -56,12 +53,6 @@ func NewCommonRepresentation(
 func validateCommonRepresentation(cr *CommonRepresentation) error {
 	if cr.ResourceId == uuid.Nil {
 		return ValidationError{Field: "ResourceId", Message: "cannot be empty"}
-	}
-	if cr.ResourceType == "" {
-		return ValidationError{Field: "ResourceType", Message: "cannot be empty"}
-	}
-	if len(cr.ResourceType) > MaxResourceTypeLength {
-		return ValidationError{Field: "ResourceType", Message: fmt.Sprintf("exceeds maximum length of %d characters", MaxResourceTypeLength)}
 	}
 	if cr.Version < MinVersionValue {
 		return ValidationError{Field: "Version", Message: fmt.Sprintf("must be >= %d", MinVersionValue)}

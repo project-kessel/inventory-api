@@ -16,7 +16,6 @@ import (
 // - Factory method behavior and validation
 // - Data handling and transformation logic
 // - Model comparison and equality semantics
-// - URL validation and href handling
 // - Tombstone logic and resource lifecycle
 // - Versioning and generation management
 
@@ -30,106 +29,23 @@ func TestReporterRepresentation_Validation(t *testing.T) {
 		rr := fixture.ValidReporterRepresentation()
 
 		// Factory method should create a valid instance without errors
-		AssertEqual(t, "hbi", rr.ReporterType, "Reporter type should be set correctly")
+		AssertEqual(t, "dd1b73b9-3e33-4264-968c-e3ce55b9afec", rr.ReporterResourceID, "Reporter resource ID should be set correctly")
 	})
 
-	t.Run("ReporterRepresentation with empty LocalResourceID should be invalid", func(t *testing.T) {
+	t.Run("ReporterRepresentation with empty ReporterResourceID should be invalid", func(t *testing.T) {
 		t.Parallel()
 
-		fixture := NewTestFixture(t)
-		_, err := fixture.ReporterRepresentationWithLocalResourceID("")
-
-		AssertValidationError(t, err, "LocalResourceID", "ReporterRepresentation with empty LocalResourceID should be invalid")
-	})
-
-	t.Run("ReporterRepresentation with empty ReporterType should be invalid", func(t *testing.T) {
-		t.Parallel()
-
-		// Test validation through factory method (proper approach)
+		// Test validation through factory method
 		_, err := NewReporterRepresentation(
 			JsonObject{"test": "data"},
-			"test-local-id",
-			"", // empty ReporterType
-			"host",
+			"", // empty ReporterResourceID
 			1,
-			"test-instance",
 			1,
-			"https://api.example.com",
-			nil,
 			1,
 			false,
 			nil,
 		)
-		AssertValidationError(t, err, "ReporterType", "ReporterRepresentation with empty ReporterType should be invalid")
-	})
-
-	t.Run("ReporterRepresentation with empty ResourceType should be invalid", func(t *testing.T) {
-		t.Parallel()
-
-		fixture := NewTestFixture(t)
-		_, err := fixture.ReporterRepresentationWithResourceType("")
-
-		AssertValidationError(t, err, "ResourceType", "ReporterRepresentation with empty ResourceType should be invalid")
-	})
-
-	t.Run("ReporterRepresentation with field length constraints", func(t *testing.T) {
-		t.Parallel()
-
-		fixture := NewTestFixture(t)
-
-		testCases := []struct {
-			name  string
-			field string
-			value string
-			valid bool
-		}{
-			{"LocalResourceID too long", "LocalResourceID", "a" + fmt.Sprintf("%0128s", ""), false},
-			{"ReporterType too long", "ReporterType", "a" + fmt.Sprintf("%0128s", ""), false},
-			{"ResourceType too long", "ResourceType", "a" + fmt.Sprintf("%0128s", ""), false},
-			{"ReporterInstanceID too long", "ReporterInstanceID", "a" + fmt.Sprintf("%0128s", ""), false},
-			{"APIHref too long", "APIHref", "https://example.com/" + fmt.Sprintf("%0500s", ""), false},
-		}
-
-		for _, tc := range testCases {
-			t.Run(tc.name, func(t *testing.T) {
-				t.Parallel()
-				rr := fixture.ValidReporterRepresentation()
-
-				switch tc.field {
-				case "LocalResourceID":
-					rr.LocalResourceID = tc.value
-				case "ReporterType":
-					rr.ReporterType = tc.value
-				case "ResourceType":
-					rr.ResourceType = tc.value
-				case "ReporterInstanceID":
-					rr.ReporterInstanceID = tc.value
-				case "APIHref":
-					rr.APIHref = tc.value
-				}
-
-				// Test validation through factory method (proper approach)
-				_, err := NewReporterRepresentation(
-					JsonObject{"test": "data"},
-					rr.LocalResourceID,
-					rr.ReporterType,
-					rr.ResourceType,
-					rr.Version,
-					rr.ReporterInstanceID,
-					rr.Generation,
-					rr.APIHref,
-					rr.ConsoleHref,
-					rr.CommonVersion,
-					rr.Tombstone,
-					rr.ReporterVersion,
-				)
-				if tc.valid {
-					AssertNoError(t, err, fmt.Sprintf("%s should be valid", tc.name))
-				} else {
-					AssertValidationError(t, err, tc.field, fmt.Sprintf("%s should be invalid", tc.name))
-				}
-			})
-		}
+		AssertValidationError(t, err, "ReporterResourceID", "ReporterRepresentation with empty ReporterResourceID should be invalid")
 	})
 
 	t.Run("ReporterRepresentation with zero Generation should be valid", func(t *testing.T) {
@@ -138,14 +54,9 @@ func TestReporterRepresentation_Validation(t *testing.T) {
 		// Test that zero Generation is valid
 		rr, err := NewReporterRepresentation(
 			JsonObject{"test": "data"},
-			"test-local-id",
-			"hbi",
-			"host",
+			"reporter-resource-123",
 			1,
-			"test-instance",
 			0, // zero Generation should be valid
-			"https://api.example.com",
-			nil,
 			1,
 			false,
 			nil,
@@ -164,14 +75,9 @@ func TestReporterRepresentation_Validation(t *testing.T) {
 		// Test that zero Version is valid
 		rr, err := NewReporterRepresentation(
 			JsonObject{"test": "data"},
-			"test-local-id",
-			"hbi",
-			"host",
+			"reporter-resource-123",
 			0, // zero Version should be valid
-			"test-instance",
 			1,
-			"https://api.example.com",
-			nil,
 			1,
 			false,
 			nil,
@@ -190,14 +96,9 @@ func TestReporterRepresentation_Validation(t *testing.T) {
 		// Test that zero CommonVersion is valid
 		rr, err := NewReporterRepresentation(
 			JsonObject{"test": "data"},
-			"test-local-id",
-			"hbi",
-			"host",
+			"reporter-resource-123",
 			1,
-			"test-instance",
 			1,
-			"https://api.example.com",
-			nil,
 			0, // zero CommonVersion should be valid
 			false,
 			nil,
@@ -210,62 +111,15 @@ func TestReporterRepresentation_Validation(t *testing.T) {
 		}
 	})
 
-	t.Run("ReporterRepresentation with empty APIHref should be invalid", func(t *testing.T) {
-		t.Parallel()
-
-		// Test validation through factory method (proper approach)
-		_, err := NewReporterRepresentation(
-			JsonObject{"test": "data"},
-			"test-local-id",
-			"hbi",
-			"host",
-			1,
-			"test-instance",
-			1,
-			"", // empty APIHref
-			nil,
-			1,
-			false,
-			nil,
-		)
-		AssertValidationError(t, err, "APIHref", "ReporterRepresentation with empty APIHref should be invalid")
-	})
-
-	t.Run("ReporterRepresentation with invalid APIHref should be invalid", func(t *testing.T) {
-		t.Parallel()
-
-		// Test validation through factory method (proper approach)
-		_, err := NewReporterRepresentation(
-			JsonObject{"test": "data"},
-			"test-local-id",
-			"hbi",
-			"host",
-			1,
-			"test-instance",
-			1,
-			"invalid-url", // invalid APIHref
-			nil,
-			1,
-			false,
-			nil,
-		)
-		AssertValidationError(t, err, "APIHref", "ReporterRepresentation with invalid APIHref should be invalid")
-	})
-
 	t.Run("ReporterRepresentation with nil Data should be valid", func(t *testing.T) {
 		t.Parallel()
 
 		// Test validation through factory method - nil data should be valid
 		rr, err := NewReporterRepresentation(
 			nil, // nil Data should be valid
-			"test-local-id",
-			"hbi",
-			"host",
+			"reporter-resource-123",
 			1,
-			"test-instance",
 			1,
-			"https://api.example.com",
-			nil,
 			1,
 			false,
 			nil,
@@ -282,20 +136,15 @@ func TestReporterRepresentation_Validation(t *testing.T) {
 func TestReporterRepresentation_BusinessRules(t *testing.T) {
 	t.Parallel()
 
-	t.Run("should enforce unique constraint across all key fields", func(t *testing.T) {
+	t.Run("should enforce unique constraint across primary key fields", func(t *testing.T) {
 		t.Parallel()
 
 		// Create two identical ReporterRepresentations using factory method
 		rr1, err := NewReporterRepresentation(
 			JsonObject{"test": "data"},
-			"test-local-id",
-			"hbi",
-			"host",
+			"reporter-resource-123",
 			1,
-			"test-instance",
 			1,
-			"https://api.example.com",
-			nil,
 			1,
 			false,
 			nil,
@@ -304,14 +153,9 @@ func TestReporterRepresentation_BusinessRules(t *testing.T) {
 
 		rr2, err := NewReporterRepresentation(
 			JsonObject{"test": "data"},
-			"test-local-id", // same LocalResourceID
-			"hbi",           // same ReporterType
-			"host",          // same ResourceType
-			1,               // same Version
-			"test-instance", // same ReporterInstanceID
-			1,               // same Generation
-			"https://api.example.com",
-			nil,
+			"reporter-resource-123", // same ReporterResourceID
+			1,                       // same Version
+			1,
 			1,
 			false,
 			nil,
@@ -320,24 +164,19 @@ func TestReporterRepresentation_BusinessRules(t *testing.T) {
 
 		// They should be considered duplicates
 		if !areReporterRepresentationsDuplicates(*rr1, *rr2) {
-			t.Error("ReporterRepresentations with identical unique constraint fields should be considered duplicates")
+			t.Error("ReporterRepresentations with identical primary key fields should be considered duplicates")
 		}
 	})
 
-	t.Run("should allow different representations when unique constraint fields differ", func(t *testing.T) {
+	t.Run("should allow different representations when primary key fields differ", func(t *testing.T) {
 		t.Parallel()
 
-		// Create two ReporterRepresentations with different Generation values
+		// Create two ReporterRepresentations with different Version values
 		rr1, err := NewReporterRepresentation(
 			JsonObject{"test": "data"},
-			"test-local-id",
-			"hbi",
-			"host",
+			"reporter-resource-123",
+			1, // Version = 1
 			1,
-			"test-instance",
-			1, // Generation = 1
-			"https://api.example.com",
-			nil,
 			1,
 			false,
 			nil,
@@ -346,14 +185,9 @@ func TestReporterRepresentation_BusinessRules(t *testing.T) {
 
 		rr2, err := NewReporterRepresentation(
 			JsonObject{"test": "data"},
-			"test-local-id",
-			"hbi",
-			"host",
+			"reporter-resource-123",
+			2, // Version = 2 (different)
 			1,
-			"test-instance",
-			2, // Generation = 2 (different)
-			"https://api.example.com",
-			nil,
 			1,
 			false,
 			nil,
@@ -362,7 +196,7 @@ func TestReporterRepresentation_BusinessRules(t *testing.T) {
 
 		// They should not be considered duplicates
 		if areReporterRepresentationsDuplicates(*rr1, *rr2) {
-			t.Error("ReporterRepresentations with different unique constraint fields should not be considered duplicates")
+			t.Error("ReporterRepresentations with different primary key fields should not be considered duplicates")
 		}
 	})
 
@@ -372,14 +206,9 @@ func TestReporterRepresentation_BusinessRules(t *testing.T) {
 		// Test Generation = 1 (positive)
 		_, err := NewReporterRepresentation(
 			JsonObject{"test": "data"},
-			"test-local-id",
-			"hbi",
-			"host",
+			"reporter-resource-123",
 			1,
-			"test-instance",
 			1, // Generation = 1
-			"https://api.example.com",
-			nil,
 			1,
 			false,
 			nil,
@@ -389,14 +218,9 @@ func TestReporterRepresentation_BusinessRules(t *testing.T) {
 		// Test Version = 1 (positive)
 		_, err = NewReporterRepresentation(
 			JsonObject{"test": "data"},
-			"test-local-id",
-			"hbi",
-			"host",
+			"reporter-resource-123",
 			1, // Version = 1
-			"test-instance",
 			1,
-			"https://api.example.com",
-			nil,
 			1,
 			false,
 			nil,
@@ -406,14 +230,9 @@ func TestReporterRepresentation_BusinessRules(t *testing.T) {
 		// Test CommonVersion = 1 (positive)
 		_, err = NewReporterRepresentation(
 			JsonObject{"test": "data"},
-			"test-local-id",
-			"hbi",
-			"host",
+			"reporter-resource-123",
 			1,
-			"test-instance",
 			1,
-			"https://api.example.com",
-			nil,
 			1, // CommonVersion = 1
 			false,
 			nil,
@@ -421,108 +240,20 @@ func TestReporterRepresentation_BusinessRules(t *testing.T) {
 		AssertNoError(t, err, "Positive CommonVersion should be valid")
 	})
 
-	t.Run("should require non-empty string fields", func(t *testing.T) {
+	t.Run("should require non-empty ReporterResourceID", func(t *testing.T) {
 		t.Parallel()
 
-		// Test LocalResourceID required
-		t.Run("LocalResourceID_required", func(t *testing.T) {
-			t.Parallel()
-			_, err := NewReporterRepresentation(
-				JsonObject{"test": "data"},
-				"", // empty LocalResourceID
-				"hbi",
-				"host",
-				1,
-				"test-instance",
-				1,
-				"https://api.example.com",
-				nil,
-				1,
-				false,
-				nil,
-			)
-			AssertValidationError(t, err, "LocalResourceID", "LocalResourceID should be required")
-		})
-
-		// Test ReporterType required
-		t.Run("ReporterType_required", func(t *testing.T) {
-			t.Parallel()
-			_, err := NewReporterRepresentation(
-				JsonObject{"test": "data"},
-				"test-local-id",
-				"", // empty ReporterType
-				"host",
-				1,
-				"test-instance",
-				1,
-				"https://api.example.com",
-				nil,
-				1,
-				false,
-				nil,
-			)
-			AssertValidationError(t, err, "ReporterType", "ReporterType should be required")
-		})
-
-		// Test ResourceType required
-		t.Run("ResourceType_required", func(t *testing.T) {
-			t.Parallel()
-			_, err := NewReporterRepresentation(
-				JsonObject{"test": "data"},
-				"test-local-id",
-				"hbi",
-				"", // empty ResourceType
-				1,
-				"test-instance",
-				1,
-				"https://api.example.com",
-				nil,
-				1,
-				false,
-				nil,
-			)
-			AssertValidationError(t, err, "ResourceType", "ResourceType should be required")
-		})
-
-		// Test ReporterInstanceID required
-		t.Run("ReporterInstanceID_required", func(t *testing.T) {
-			t.Parallel()
-			_, err := NewReporterRepresentation(
-				JsonObject{"test": "data"},
-				"test-local-id",
-				"hbi",
-				"host",
-				1,
-				"", // empty ReporterInstanceID
-				1,
-				"https://api.example.com",
-				nil,
-				1,
-				false,
-				nil,
-			)
-			AssertValidationError(t, err, "ReporterInstanceID", "ReporterInstanceID should be required")
-		})
-
-		// Test APIHref required
-		t.Run("APIHref_required", func(t *testing.T) {
-			t.Parallel()
-			_, err := NewReporterRepresentation(
-				JsonObject{"test": "data"},
-				"test-local-id",
-				"hbi",
-				"host",
-				1,
-				"test-instance",
-				1,
-				"", // empty APIHref
-				nil,
-				1,
-				false,
-				nil,
-			)
-			AssertValidationError(t, err, "APIHref", "APIHref should be required")
-		})
+		// Test ReporterResourceID required
+		_, err := NewReporterRepresentation(
+			JsonObject{"test": "data"},
+			"", // empty ReporterResourceID
+			1,
+			1,
+			1,
+			false,
+			nil,
+		)
+		AssertValidationError(t, err, "ReporterResourceID", "ReporterResourceID should be required")
 	})
 }
 
@@ -532,17 +263,12 @@ func TestReporterRepresentation_TombstoneLogic(t *testing.T) {
 	t.Run("should handle tombstone true", func(t *testing.T) {
 		t.Parallel()
 
-		// Test validation through factory method (proper approach)
+		// Test validation through factory method
 		rr, err := NewReporterRepresentation(
 			JsonObject{"test": "data"},
-			"test-local-id",
-			"hbi",
-			"host",
+			"reporter-resource-123",
 			1,
-			"test-instance",
 			1,
-			"https://api.example.com",
-			nil,
 			1,
 			true, // tombstone = true
 			nil,
@@ -558,17 +284,12 @@ func TestReporterRepresentation_TombstoneLogic(t *testing.T) {
 	t.Run("should handle tombstone false", func(t *testing.T) {
 		t.Parallel()
 
-		// Test validation through factory method (proper approach)
+		// Test validation through factory method
 		rr, err := NewReporterRepresentation(
 			JsonObject{"test": "data"},
-			"test-local-id",
-			"hbi",
-			"host",
+			"reporter-resource-123",
 			1,
-			"test-instance",
 			1,
-			"https://api.example.com",
-			nil,
 			1,
 			false, // tombstone = false
 			nil,
@@ -587,14 +308,9 @@ func TestReporterRepresentation_TombstoneLogic(t *testing.T) {
 		// Test validation through factory method with default tombstone value (false)
 		rr, err := NewReporterRepresentation(
 			JsonObject{"test": "data"},
-			"test-local-id",
-			"hbi",
-			"host",
+			"reporter-resource-123",
 			1,
-			"test-instance",
 			1,
-			"https://api.example.com",
-			nil,
 			1,
 			false, // tombstone = false (default)
 			nil,
@@ -619,14 +335,9 @@ func TestReporterRepresentation_VersioningLogic(t *testing.T) {
 		for _, version := range versions {
 			_, err := NewReporterRepresentation(
 				JsonObject{"test": "data"},
-				"test-local-id",
-				"hbi",
-				"host",
+				"reporter-resource-123",
 				version, // Test different version values
-				"test-instance",
 				1,
-				"https://api.example.com",
-				nil,
 				1,
 				false,
 				nil,
@@ -643,14 +354,9 @@ func TestReporterRepresentation_VersioningLogic(t *testing.T) {
 		for _, generation := range generations {
 			_, err := NewReporterRepresentation(
 				JsonObject{"test": "data"},
-				"test-local-id",
-				"hbi",
-				"host",
+				"reporter-resource-123",
 				1,
-				"test-instance",
 				generation, // Test different generation values
-				"https://api.example.com",
-				nil,
 				1,
 				false,
 				nil,
@@ -667,171 +373,14 @@ func TestReporterRepresentation_VersioningLogic(t *testing.T) {
 		for _, commonVersion := range commonVersions {
 			_, err := NewReporterRepresentation(
 				JsonObject{"test": "data"},
-				"test-local-id",
-				"hbi",
-				"host",
+				"reporter-resource-123",
 				1,
-				"test-instance",
 				1,
-				"https://api.example.com",
-				nil,
 				commonVersion, // Test different common version values
 				false,
 				nil,
 			)
 			AssertNoError(t, err, fmt.Sprintf("CommonVersion %d should be valid", commonVersion))
-		}
-	})
-}
-
-func TestReporterRepresentation_HrefValidation(t *testing.T) {
-	t.Parallel()
-
-	t.Run("should validate APIHref URL format", func(t *testing.T) {
-		t.Parallel()
-
-		validURLs := []string{
-			"https://api.example.com/resource/123",
-			"http://localhost:8080/api/v1/resource",
-			"https://api.redhat.com/api/inventory/v1/hosts/123",
-		}
-
-		for _, url := range validURLs {
-			t.Run(fmt.Sprintf("valid_url_%s", url), func(t *testing.T) {
-				t.Parallel()
-				_, err := NewReporterRepresentation(
-					JsonObject{"test": "data"},
-					"test-local-id",
-					"hbi",
-					"host",
-					1,
-					"test-instance",
-					1,
-					url, // Test different valid URLs
-					nil,
-					1,
-					false,
-					nil,
-				)
-				AssertNoError(t, err, fmt.Sprintf("URL %s should be valid", url))
-			})
-		}
-	})
-
-	t.Run("should reject invalid APIHref URLs", func(t *testing.T) {
-		t.Parallel()
-
-		invalidURLs := []string{
-			"not-a-url",
-			"ftp://example.com/resource",
-			"",
-			"://missing-scheme",
-		}
-
-		for _, url := range invalidURLs {
-			t.Run(fmt.Sprintf("invalid_url_%s", url), func(t *testing.T) {
-				t.Parallel()
-				_, err := NewReporterRepresentation(
-					JsonObject{"test": "data"},
-					"test-local-id",
-					"hbi",
-					"host",
-					1,
-					"test-instance",
-					1,
-					url, // Test different invalid URLs
-					nil,
-					1,
-					false,
-					nil,
-				)
-				AssertValidationError(t, err, "APIHref", fmt.Sprintf("URL %s should be invalid", url))
-			})
-		}
-	})
-
-	t.Run("should validate ConsoleHref when provided", func(t *testing.T) {
-		t.Parallel()
-
-		validURLs := []string{
-			"https://console.redhat.com/insights/inventory/123",
-			"https://console.example.com/resource/456",
-		}
-
-		for _, url := range validURLs {
-			t.Run(fmt.Sprintf("valid_console_url_%s", url), func(t *testing.T) {
-				t.Parallel()
-				_, err := NewReporterRepresentation(
-					JsonObject{"test": "data"},
-					"test-local-id",
-					"hbi",
-					"host",
-					1,
-					"test-instance",
-					1,
-					"https://api.example.com",
-					stringPtr(url), // Test different valid console URLs
-					1,
-					false,
-					nil,
-				)
-				AssertNoError(t, err, fmt.Sprintf("Console URL %s should be valid", url))
-			})
-		}
-	})
-
-	t.Run("should allow nil ConsoleHref", func(t *testing.T) {
-		t.Parallel()
-
-		rr, err := NewReporterRepresentation(
-			JsonObject{"test": "data"},
-			"test-local-id",
-			"hbi",
-			"host",
-			1,
-			"test-instance",
-			1,
-			"https://api.example.com",
-			nil, // Nil ConsoleHref
-			1,
-			false,
-			nil,
-		)
-		AssertNoError(t, err, "Nil ConsoleHref should be valid")
-
-		if rr.ConsoleHref != nil {
-			t.Error("ConsoleHref should be nil")
-		}
-	})
-
-	t.Run("should reject invalid ConsoleHref URLs", func(t *testing.T) {
-		t.Parallel()
-
-		invalidURLs := []string{
-			"not-a-url",
-			"ftp://example.com/resource",
-			"://missing-scheme",
-		}
-
-		for _, url := range invalidURLs {
-			t.Run(fmt.Sprintf("invalid_console_url_%s", url), func(t *testing.T) {
-				t.Parallel()
-				_, err := NewReporterRepresentation(
-					JsonObject{"test": "data"},
-					"test-local-id",
-					"hbi",
-					"host",
-					1,
-					"test-instance",
-					1,
-					"https://api.example.com",
-					stringPtr(url), // Test different invalid console URLs
-					1,
-					false,
-					nil,
-				)
-				AssertValidationError(t, err, "ConsoleHref", fmt.Sprintf("Console URL %s should be invalid", url))
-			})
 		}
 	})
 }
@@ -856,14 +405,9 @@ func TestReporterRepresentation_DataHandling(t *testing.T) {
 
 		_, err := NewReporterRepresentation(
 			testData, // Test with complex JSON data
-			"test-local-id",
-			"hbi",
-			"host",
+			"reporter-resource-123",
 			1,
-			"test-instance",
 			1,
-			"https://api.example.com",
-			nil,
 			1,
 			false,
 			nil,
@@ -911,14 +455,9 @@ func TestReporterRepresentation_DataHandling(t *testing.T) {
 
 		_, err := NewReporterRepresentation(
 			complexData, // Test with complex nested JSON
-			"test-local-id",
-			"hbi",
-			"host",
+			"reporter-resource-123",
 			1,
-			"test-instance",
 			1,
-			"https://api.example.com",
-			nil,
 			1,
 			false,
 			nil,
@@ -931,14 +470,9 @@ func TestReporterRepresentation_DataHandling(t *testing.T) {
 
 		_, err := NewReporterRepresentation(
 			JsonObject{}, // Test with empty JSON object
-			"test-local-id",
-			"hbi",
-			"host",
+			"reporter-resource-123",
 			1,
-			"test-instance",
 			1,
-			"https://api.example.com",
-			nil,
 			1,
 			false,
 			nil,
@@ -951,14 +485,9 @@ func TestReporterRepresentation_FactoryMethods(t *testing.T) {
 	t.Run("should_create_valid_ReporterRepresentation_using_factory", func(t *testing.T) {
 		rr, err := NewReporterRepresentation(
 			JsonObject{"satellite_id": "test-satellite"},
-			"local-123",
-			"hbi",
-			"host",
+			"reporter-resource-123",
 			1,
-			"reporter-instance-123",
 			1,
-			"https://api.example.com/resource/123",
-			stringPtr("https://console.example.com/resource/123"),
 			1,
 			false,
 			stringPtr("1.0.0"),
@@ -968,12 +497,8 @@ func TestReporterRepresentation_FactoryMethods(t *testing.T) {
 			t.Fatalf("Expected no error, got %v", err)
 		}
 
-		if rr.LocalResourceID != "local-123" {
-			t.Errorf("Expected LocalResourceID 'local-123', got '%s'", rr.LocalResourceID)
-		}
-
-		if rr.ReporterType != "hbi" {
-			t.Errorf("Expected ReporterType 'hbi', got '%s'", rr.ReporterType)
+		if rr.ReporterResourceID != "reporter-resource-123" {
+			t.Errorf("Expected ReporterResourceID 'reporter-resource-123', got '%s'", rr.ReporterResourceID)
 		}
 
 		if rr.Tombstone != false {
@@ -982,37 +507,27 @@ func TestReporterRepresentation_FactoryMethods(t *testing.T) {
 	})
 
 	t.Run("should_enforce_validation_rules_in_factory", func(t *testing.T) {
-		// Test empty LocalResourceID
+		// Test empty ReporterResourceID
 		_, err := NewReporterRepresentation(
 			JsonObject{"satellite_id": "test-satellite"},
-			"", // empty LocalResourceID
-			"hbi",
-			"host",
+			"", // empty ReporterResourceID
 			1,
-			"reporter-instance-123",
 			1,
-			"https://api.example.com/resource/123",
-			stringPtr("https://console.example.com/resource/123"),
 			1,
 			false,
 			stringPtr("1.0.0"),
 		)
 
 		if err == nil {
-			t.Error("Expected validation error for empty LocalResourceID")
+			t.Error("Expected validation error for empty ReporterResourceID")
 		}
 
 		// Test zero Generation - should be valid now
 		rr, err := NewReporterRepresentation(
 			JsonObject{"satellite_id": "test-satellite"},
-			"local-123",
-			"hbi",
-			"host",
+			"reporter-resource-123",
 			1,
-			"reporter-instance-123",
 			0, // zero Generation should be valid
-			"https://api.example.com/resource/123",
-			stringPtr("https://console.example.com/resource/123"),
 			1,
 			false,
 			stringPtr("1.0.0"),
@@ -1026,36 +541,12 @@ func TestReporterRepresentation_FactoryMethods(t *testing.T) {
 		} else if rr.Generation != 0 {
 			t.Errorf("Expected Generation to be 0, got %d", rr.Generation)
 		}
-
-		// Test invalid URL
-		_, err = NewReporterRepresentation(
-			JsonObject{"satellite_id": "test-satellite"},
-			"local-123",
-			"hbi",
-			"host",
-			1,
-			"reporter-instance-123",
-			1,
-			"invalid-url", // invalid URL
-			stringPtr("https://console.example.com/resource/123"),
-			1,
-			false,
-			stringPtr("1.0.0"),
-		)
-
-		if err == nil {
-			t.Error("Expected validation error for invalid URL")
-		}
 	})
 }
 
 // Helper function to check if two ReporterRepresentations are duplicates
-// based on their unique constraint fields
+// based on their primary key fields
 func areReporterRepresentationsDuplicates(rr1, rr2 ReporterRepresentation) bool {
-	return rr1.LocalResourceID == rr2.LocalResourceID &&
-		rr1.ReporterType == rr2.ReporterType &&
-		rr1.ResourceType == rr2.ResourceType &&
-		rr1.Version == rr2.Version &&
-		rr1.ReporterInstanceID == rr2.ReporterInstanceID &&
-		rr1.Generation == rr2.Generation
+	return rr1.ReporterResourceID == rr2.ReporterResourceID &&
+		rr1.Version == rr2.Version
 }

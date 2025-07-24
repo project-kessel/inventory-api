@@ -1,10 +1,7 @@
 package model
 
 import (
-	"fmt"
-	"net/url"
 	"reflect"
-	"strings"
 	"testing"
 
 	"github.com/google/uuid"
@@ -32,7 +29,6 @@ func (f *TestFixture) ValidCommonRepresentation() *CommonRepresentation {
 		JsonObject{
 			"workspace_id": "a64d17d0-aec3-410a-acd0-e0b85b22c076",
 		},
-		"host",
 		1,
 		"hbi",
 		"3088be62-1c60-4884-b133-9200542d0b3f",
@@ -64,7 +60,6 @@ func (f *TestFixture) CommonRepresentationWithID(id string) *CommonRepresentatio
 		JsonObject{
 			"workspace_id": "a64d17d0-aec3-410a-acd0-e0b85b22c076",
 		},
-		"host",
 		1,
 		"hbi",
 		"3088be62-1c60-4884-b133-9200542d0b3f",
@@ -78,7 +73,6 @@ func (f *TestFixture) CommonRepresentationWithID(id string) *CommonRepresentatio
 				},
 			},
 			ResourceId:                 resourceId,
-			ResourceType:               "host",
 			Version:                    1,
 			ReportedByReporterType:     "hbi",
 			ReportedByReporterInstance: "3088be62-1c60-4884-b133-9200542d0b3f",
@@ -96,7 +90,6 @@ func (f *TestFixture) CommonRepresentationWithVersion(version uint) *CommonRepre
 		JsonObject{
 			"workspace_id": "a64d17d0-aec3-410a-acd0-e0b85b22c076",
 		},
-		"host",
 		version,
 		"hbi",
 		"3088be62-1c60-4884-b133-9200542d0b3f",
@@ -116,7 +109,6 @@ func (f *TestFixture) CommonRepresentationWithResourceType(resourceType string) 
 		JsonObject{
 			"workspace_id": "a64d17d0-aec3-410a-acd0-e0b85b22c076",
 		},
-		resourceType,
 		1,
 		"hbi",
 		"3088be62-1c60-4884-b133-9200542d0b3f",
@@ -136,7 +128,6 @@ func (f *TestFixture) CommonRepresentationWithReporterType(reporterType string) 
 		JsonObject{
 			"workspace_id": "a64d17d0-aec3-410a-acd0-e0b85b22c076",
 		},
-		"host",
 		1,
 		reporterType,
 		"3088be62-1c60-4884-b133-9200542d0b3f",
@@ -156,7 +147,6 @@ func (f *TestFixture) CommonRepresentationWithReporterInstance(reporterInstance 
 		JsonObject{
 			"workspace_id": "a64d17d0-aec3-410a-acd0-e0b85b22c076",
 		},
-		"host",
 		1,
 		"hbi",
 		reporterInstance,
@@ -174,7 +164,6 @@ func (f *TestFixture) CommonRepresentationWithData(data JsonObject) *CommonRepre
 	cr, err := NewCommonRepresentation(
 		deterministicUUID,
 		data,
-		"host",
 		1,
 		"hbi",
 		"3088be62-1c60-4884-b133-9200542d0b3f",
@@ -192,7 +181,6 @@ func (f *TestFixture) CommonRepresentationWithEmptyData() *CommonRepresentation 
 	cr, err := NewCommonRepresentation(
 		deterministicUUID,
 		JsonObject{},
-		"host",
 		1,
 		"hbi",
 		"3088be62-1c60-4884-b133-9200542d0b3f",
@@ -213,7 +201,6 @@ func (f *TestFixture) CommonRepresentationWithNilData() *CommonRepresentation {
 			Data: nil,
 		},
 		ResourceId:                 deterministicUUID,
-		ResourceType:               "host",
 		Version:                    1,
 		ReportedByReporterType:     "hbi",
 		ReportedByReporterInstance: "3088be62-1c60-4884-b133-9200542d0b3f",
@@ -227,7 +214,6 @@ func (f *TestFixture) MinimalCommonRepresentation() *CommonRepresentation {
 		JsonObject{
 			"workspace_id": "1c0753fe-48c1-44d8-823c-95d04cff5f91",
 		},
-		"k8s_policy",
 		1,
 		"ACM",
 		"57a317b1-4040-4c26-8d41-dd589ba1d2eb",
@@ -245,7 +231,6 @@ func (f *TestFixture) MaximalCommonRepresentation() *CommonRepresentation {
 		JsonObject{
 			"workspace_id": "aee8f698-9d43-49a1-b458-680a7c9dc046",
 		},
-		"k8s_cluster",
 		4294967295, // Max uint32
 		"ACM",
 		"14c6b63e-49b2-4cc2-99de-5d914b657548",
@@ -267,7 +252,6 @@ func (f *TestFixture) UnicodeCommonRepresentation() *CommonRepresentation {
 			"russian":       "Привет мир",
 			"emoji_data":    "🚀🌟💻🔥⚡",
 		},
-		"测试-resource-type",
 		1,
 		"测试-reporter",
 		"测试-instance",
@@ -285,7 +269,6 @@ func (f *TestFixture) UnicodeCommonRepresentation() *CommonRepresentation {
 				},
 			},
 			ResourceId:                 uuid.NewSHA1(uuid.NameSpaceOID, []byte("测试-id-🌟")),
-			ResourceType:               "测试-resource-type",
 			Version:                    1,
 			ReportedByReporterType:     "测试-reporter",
 			ReportedByReporterInstance: "测试-instance",
@@ -308,7 +291,6 @@ func (f *TestFixture) SpecialCharsCommonRepresentation() *CommonRepresentation {
 			"brackets_mixed": "([{<>}])",
 			"quotes_mixed":   "\"'`‹›«»",
 		},
-		"special-!@#$%^&*()-type",
 		1,
 		"special-†‡•-reporter",
 		"special-™®©-instance",
@@ -329,7 +311,6 @@ func (f *TestFixture) SpecialCharsCommonRepresentation() *CommonRepresentation {
 				},
 			},
 			ResourceId:                 uuid.NewSHA1(uuid.NameSpaceOID, []byte("special-!@#$%^&*()-id")),
-			ResourceType:               "special-!@#$%^&*()-type",
 			Version:                    1,
 			ReportedByReporterType:     "special-†‡•-reporter",
 			ReportedByReporterInstance: "special-™®©-instance",
@@ -349,15 +330,10 @@ func (f *TestFixture) ValidReporterRepresentation() *ReporterRepresentation {
 			"insights_inventory_id":   "05707922-7b0a-4fe6-982d-6adbc7695b8f",
 			"ansible_host":            "host-1",
 		},
-		"dd1b73b9-3e33-4264-968c-e3ce55b9afec",
-		"hbi",
-		"host",
-		1,
-		"3088be62-1c60-4884-b133-9200542d0b3f",
-		1,
-		"https://apiHref.com/",
-		stringPtr("https://www.console.com/"),
-		1,
+		"dd1b73b9-3e33-4264-968c-e3ce55b9afec", // reporterResourceID
+		1,                                      // version
+		1,                                      // generation
+		1,                                      // commonVersion
 		false,
 		stringPtr("2.7.16"),
 	)
@@ -377,13 +353,8 @@ func (f *TestFixture) ReporterRepresentationWithLocalResourceID(localResourceID 
 			"ansible_host":            "host-1",
 		},
 		localResourceID,
-		"hbi",
-		"host",
 		1,
-		"3088be62-1c60-4884-b133-9200542d0b3f",
 		1,
-		"https://apiHref.com/",
-		stringPtr("https://www.console.com/"),
 		1,
 		false,
 		stringPtr("2.7.16"),
@@ -404,13 +375,8 @@ func (f *TestFixture) ReporterRepresentationWithResourceType(resourceType string
 			"ansible_host":            "host-1",
 		},
 		"dd1b73b9-3e33-4264-968c-e3ce55b9afec",
-		"hbi",
-		resourceType,
 		1,
-		"3088be62-1c60-4884-b133-9200542d0b3f",
 		1,
-		"https://apiHref.com/",
-		stringPtr("https://www.console.com/"),
 		1,
 		false,
 		stringPtr("2.7.16"),
@@ -449,17 +415,12 @@ func (f *TestFixture) ReporterRepresentationWithTombstone(tombstone bool) *Repor
 
 	rr, err := NewReporterRepresentation(
 		data,
-		"ae5c7a82-cb3b-4591-9b10-3ae1506d4f3d",
-		"ACM",
-		"k8s_cluster",
+		"test-res-id",
 		1,
-		"14c6b63e-49b2-4cc2-99de-5d914b657548",
 		1,
-		"https://apiHref.com/",
-		stringPtr("https://www.console.com/"),
 		1,
 		tombstone,
-		stringPtr("0.2.0"),
+		nil,
 	)
 	if err != nil {
 		f.t.Fatalf("Failed to create ReporterRepresentation with tombstone: %v", err)
@@ -467,151 +428,19 @@ func (f *TestFixture) ReporterRepresentationWithTombstone(tombstone bool) *Repor
 	return rr
 }
 
-// ReporterRepresentationWithAPIHref returns a ReporterRepresentation with specified API href
-func (f *TestFixture) ReporterRepresentationWithAPIHref(apiHref string) *ReporterRepresentation {
+// ReporterRepresentationWithReporterVersion returns a ReporterRepresentation with a custom reporterVersion
+func (f *TestFixture) ReporterRepresentationWithReporterVersion(ver *string) *ReporterRepresentation {
 	rr, err := NewReporterRepresentation(
-		JsonObject{
-			"satellite_id":            "2c4196f1-0371-4f4c-8913-e113cfaa6e67",
-			"subscription_manager_id": "af94f92b-0b65-4cac-b449-6b77e665a08f",
-			"insights_inventory_id":   "05707922-7b0a-4fe6-982d-6adbc7695b8f",
-			"ansible_host":            "host-1",
-		},
-		"dd1b73b9-3e33-4264-968c-e3ce55b9afec",
-		"hbi",
-		"host",
-		1,
-		"3088be62-1c60-4884-b133-9200542d0b3f",
-		1,
-		apiHref,
-		stringPtr("https://www.console.com/"),
+		JsonObject{"test": "data"},
+		"res-id",
+		2,
+		0,
 		1,
 		false,
-		stringPtr("2.7.16"),
+		ver,
 	)
 	if err != nil {
-		// For test cases expecting invalid data, return the struct anyway for testing
-		return &ReporterRepresentation{
-			Representation: Representation{
-				Data: JsonObject{
-					"satellite_id":            "2c4196f1-0371-4f4c-8913-e113cfaa6e67",
-					"subscription_manager_id": "af94f92b-0b65-4cac-b449-6b77e665a08f",
-					"insights_inventory_id":   "05707922-7b0a-4fe6-982d-6adbc7695b8f",
-					"ansible_host":            "host-1",
-				},
-			},
-			LocalResourceID:    "dd1b73b9-3e33-4264-968c-e3ce55b9afec",
-			ReporterType:       "hbi",
-			ResourceType:       "host",
-			Version:            1,
-			ReporterInstanceID: "3088be62-1c60-4884-b133-9200542d0b3f",
-			Generation:         1,
-			APIHref:            apiHref,
-			ConsoleHref:        stringPtr("https://www.console.com/"),
-			CommonVersion:      1,
-			Tombstone:          false,
-			ReporterVersion:    stringPtr("2.7.16"),
-		}
-	}
-	return rr
-}
-
-// ReporterRepresentationWithConsoleHref returns a ReporterRepresentation with specified console href
-func (f *TestFixture) ReporterRepresentationWithConsoleHref(consoleHref string) *ReporterRepresentation {
-	var consoleHrefPtr *string
-	if consoleHref != "" {
-		consoleHrefPtr = &consoleHref
-	}
-
-	rr, err := NewReporterRepresentation(
-		JsonObject{
-			"satellite_id":            "2c4196f1-0371-4f4c-8913-e113cfaa6e67",
-			"subscription_manager_id": "af94f92b-0b65-4cac-b449-6b77e665a08f",
-			"insights_inventory_id":   "05707922-7b0a-4fe6-982d-6adbc7695b8f",
-			"ansible_host":            "host-1",
-		},
-		"dd1b73b9-3e33-4264-968c-e3ce55b9afec",
-		"hbi",
-		"host",
-		1,
-		"3088be62-1c60-4884-b133-9200542d0b3f",
-		1,
-		"https://apiHref.com/",
-		consoleHrefPtr,
-		1,
-		false,
-		stringPtr("2.7.16"),
-	)
-	if err != nil {
-		// For test cases expecting invalid data, return the struct anyway for testing
-		return &ReporterRepresentation{
-			Representation: Representation{
-				Data: JsonObject{
-					"satellite_id":            "2c4196f1-0371-4f4c-8913-e113cfaa6e67",
-					"subscription_manager_id": "af94f92b-0b65-4cac-b449-6b77e665a08f",
-					"insights_inventory_id":   "05707922-7b0a-4fe6-982d-6adbc7695b8f",
-					"ansible_host":            "host-1",
-				},
-			},
-			LocalResourceID:    "dd1b73b9-3e33-4264-968c-e3ce55b9afec",
-			ReporterType:       "hbi",
-			ResourceType:       "host",
-			Version:            1,
-			ReporterInstanceID: "3088be62-1c60-4884-b133-9200542d0b3f",
-			Generation:         1,
-			APIHref:            "https://apiHref.com/",
-			ConsoleHref:        consoleHrefPtr,
-			CommonVersion:      1,
-			Tombstone:          false,
-			ReporterVersion:    stringPtr("2.7.16"),
-		}
-	}
-	return rr
-}
-
-// ReporterRepresentationWithReporterVersion returns a ReporterRepresentation with specified reporter version
-func (f *TestFixture) ReporterRepresentationWithReporterVersion(reporterVersion *string) *ReporterRepresentation {
-	rr, err := NewReporterRepresentation(
-		JsonObject{
-			"satellite_id":            "2c4196f1-0371-4f4c-8913-e113cfaa6e67",
-			"subscription_manager_id": "af94f92b-0b65-4cac-b449-6b77e665a08f",
-			"insights_inventory_id":   "05707922-7b0a-4fe6-982d-6adbc7695b8f",
-			"ansible_host":            "host-1",
-		},
-		"dd1b73b9-3e33-4264-968c-e3ce55b9afec",
-		"hbi",
-		"host",
-		1,
-		"3088be62-1c60-4884-b133-9200542d0b3f",
-		1,
-		"https://apiHref.com/",
-		stringPtr("https://www.console.com/"),
-		1,
-		false,
-		reporterVersion,
-	)
-	if err != nil {
-		// For test cases expecting invalid data, return the struct anyway for testing
-		return &ReporterRepresentation{
-			Representation: Representation{
-				Data: JsonObject{
-					"satellite_id":            "2c4196f1-0371-4f4c-8913-e113cfaa6e67",
-					"subscription_manager_id": "af94f92b-0b65-4cac-b449-6b77e665a08f",
-					"insights_inventory_id":   "05707922-7b0a-4fe6-982d-6adbc7695b8f",
-					"ansible_host":            "host-1",
-				},
-			},
-			LocalResourceID:    "dd1b73b9-3e33-4264-968c-e3ce55b9afec",
-			ReporterType:       "hbi",
-			ResourceType:       "host",
-			Version:            1,
-			ReporterInstanceID: "3088be62-1c60-4884-b133-9200542d0b3f",
-			Generation:         1,
-			APIHref:            "https://apiHref.com/",
-			ConsoleHref:        stringPtr("https://www.console.com/"),
-			CommonVersion:      1,
-			Tombstone:          false,
-			ReporterVersion:    reporterVersion,
-		}
+		f.t.Fatalf("Failed to create ReporterRepresentation with version: %v", err)
 	}
 	return rr
 }
@@ -619,80 +448,18 @@ func (f *TestFixture) ReporterRepresentationWithReporterVersion(reporterVersion 
 // ReporterRepresentationWithNilReporterVersion returns a ReporterRepresentation with nil reporter version
 func (f *TestFixture) ReporterRepresentationWithNilReporterVersion() *ReporterRepresentation {
 	rr, err := NewReporterRepresentation(
-		JsonObject{
-			"disabled": true,
-			"severity": "CRITICAL",
-		},
-		"cdcebe29-67fb-4ac6-ba03-703a22ff4bc0",
-		"ACM",
-		"k8s_policy",
+		JsonObject{"test": "data"},
+		"res-id",
 		1,
-		"57a317b1-4040-4c26-8d41-dd589ba1d2eb",
 		1,
-		"https://apiHref.com/",
-		stringPtr("https://www.console.com/"),
 		1,
 		false,
-		nil, // This is the key difference - nil reporter version
+		nil,
 	)
 	if err != nil {
 		f.t.Fatalf("Failed to create ReporterRepresentation with nil reporter version: %v", err)
 	}
 	return rr
-}
-
-// ReporterRepresentationWithNilConsoleHref returns a ReporterRepresentation with nil console href
-func (f *TestFixture) ReporterRepresentationWithNilConsoleHref() *ReporterRepresentation {
-	rr, err := NewReporterRepresentation(
-		JsonObject{
-			"reporter_type":        "NOTIFICATIONS",
-			"reporter_instance_id": "f2e4e735-3936-4ee6-a881-b2e1f9326991",
-			"local_resource_id":    "cbc86170-e959-42d8-bd2a-964a5a558475",
-		},
-		"03c923f9-6747-4177-ae35-d36493a1c88e",
-		"NOTIFICATIONS",
-		"notifications_integration",
-		1,
-		"cc38fb9e-251d-4abe-9eaf-b71607558b2a",
-		1,
-		"https://www.campbell-butler.biz/",
-		nil, // This is the key difference - nil console href
-		1,
-		false,
-		stringPtr("1.5.7"),
-	)
-	if err != nil {
-		f.t.Fatalf("Failed to create ReporterRepresentation with nil console href: %v", err)
-	}
-	return rr
-}
-
-// Validation Functions
-
-// validateURL validates that a URL has proper format with scheme and host
-func validateURL(urlStr string) error {
-	if urlStr == "" {
-		return fmt.Errorf("URL cannot be empty")
-	}
-
-	parsedURL, err := url.Parse(urlStr)
-	if err != nil {
-		return fmt.Errorf("invalid URL format: %v", err)
-	}
-
-	if parsedURL.Scheme == "" {
-		return fmt.Errorf("URL must have a scheme (http/https)")
-	}
-
-	if parsedURL.Scheme != "http" && parsedURL.Scheme != "https" {
-		return fmt.Errorf("URL scheme must be http or https")
-	}
-
-	if parsedURL.Host == "" {
-		return fmt.Errorf("URL must have a host")
-	}
-
-	return nil
 }
 
 // Test Helper Functions
@@ -822,11 +589,6 @@ func RunTableDrivenTest(t *testing.T, testCases map[string]func(*testing.T)) {
 			testCase(t)
 		})
 	}
-}
-
-// Contains checks if a string contains a substring
-func Contains(s, substr string) bool {
-	return strings.Contains(s, substr)
 }
 
 // stringPtr returns a pointer to the given string

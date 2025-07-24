@@ -14,10 +14,13 @@ type ReporterRepresentation struct {
 
 	ReporterResourceID string  `gorm:"size:128;column:reporter_resource_id;primaryKey"`
 	Version            uint    `gorm:"type:bigint;column:version;primaryKey;check:version >= 0"`
-	Generation         uint    `gorm:"type:bigint;column:generation;check:generation >= 0"`
+	Generation         uint    `gorm:"type:bigint;column:generation;primaryKey;check:generation >= 0"`
 	ReporterVersion    *string `gorm:"size:128;column:reporter_version"`
 	CommonVersion      uint    `gorm:"type:bigint;column:common_version;check:common_version >= 0"`
 	Tombstone          bool    `gorm:"column:tombstone"`
+
+	// Foreign key constraint to ensure ReporterResourceID exists in ReporterResource table
+	ReporterResource ReporterResource `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;foreignKey:ReporterResourceID;references:ID"`
 }
 
 // NewReporterRepresentation Factory method for creating a new ReporterRepresentation

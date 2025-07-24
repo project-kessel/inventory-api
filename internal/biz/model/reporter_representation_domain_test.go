@@ -548,5 +548,6 @@ func TestReporterRepresentation_FactoryMethods(t *testing.T) {
 // based on their primary key fields
 func areReporterRepresentationsDuplicates(rr1, rr2 ReporterRepresentation) bool {
 	return rr1.ReporterResourceID == rr2.ReporterResourceID &&
-		rr1.Version == rr2.Version
+		rr1.Version == rr2.Version &&
+		rr1.Generation == rr2.Generation
 }

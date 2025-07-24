@@ -1,21 +1,29 @@
 package model
 
+// Table name constants
+const (
+	CommonRepresentationTableName   = "common_representation"
+	ReporterRepresentationTableName = "reporter_representation"
+	ReporterResourceTableName       = "reporter_resource"
+)
+
 // Database field size constants
 // These constants define the maximum lengths for various database fields
 // to ensure consistency between GORM struct tags and validation logic.
 const (
 	// Standard field sizes
 	MaxFieldSize128 = 128 // For most string fields like IDs, types, etc.
+	MaxFieldSize256 = 256 // For longer fields like reporter instance IDs
 	MaxFieldSize512 = 512 // For URL fields like APIHref, ConsoleHref
 
 	// Specific field size constants for better readability
 	MaxLocalResourceIDLength    = MaxFieldSize128
 	MaxReporterTypeLength       = MaxFieldSize128
 	MaxResourceTypeLength       = MaxFieldSize128
-	MaxReporterInstanceIDLength = MaxFieldSize128
+	MaxReporterInstanceIDLength = MaxFieldSize256
 	MaxReporterVersionLength    = MaxFieldSize128
-	MaxAPIHrefLength            = MaxFieldSize512
-	MaxConsoleHrefLength        = MaxFieldSize512
+	MaxAPIHrefLength            = MaxFieldSize256
+	MaxConsoleHrefLength        = MaxFieldSize256
 
 	// Minimum values for validation
 	MinVersionValue    = 0 // Version can be zero or positive (>= 0)
@@ -58,8 +66,8 @@ const (
 
 // Index names
 const (
-	ReporterRepresentationUniqueIndex = "reporter_rep_unique_idx"
-	ReporterResourceIdentifierIdx     = "reporter_resource_identifier_idx"
+	ReporterResourceKeyIdx    = "reporter_resource_key_idx"
+	ReporterResourceSearchIdx = "reporter_resource_search_idx"
 )
 
 // Database type constants

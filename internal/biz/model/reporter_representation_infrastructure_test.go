@@ -82,7 +82,7 @@ func TestReporterRepresentation_Structure(t *testing.T) {
 		rrType := reflect.TypeOf(ReporterRepresentation{})
 
 		// Check primary key fields
-		primaryKeyFields := []string{"ReporterResourceID", "Version"}
+		primaryKeyFields := []string{"ReporterResourceID", "Version", "Generation"}
 
 		for _, fieldName := range primaryKeyFields {
 			field, found := rrType.FieldByName(fieldName)

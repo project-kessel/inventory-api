@@ -38,10 +38,6 @@ type ReporterResource struct {
 	ResourceID string `gorm:"size:128;column:resource_id;index"` // FK to resource table (uuid as text)
 }
 
-func (ReporterResource) TableName() string {
-	return ReporterResourceTableName
-}
-
 // NewReporterResource validates inputs and returns an immutable ReporterResource value.
 func NewReporterResource(
 	id string,

@@ -14,24 +14,6 @@ func isValidCommonRepresentation(cr *CommonRepresentation) bool {
 	return cr != nil && cr.ResourceId != uuid.Nil && cr.Version > 0 && cr.ReportedByReporterType != "" && cr.ReportedByReporterInstance != ""
 }
 
-// Helper function to check if a ReporterRepresentation is valid
-// This is used in tests that need to verify existing objects
-// Infrastructure tests for CommonRepresentation focus on:
-// - Database schema validation (table names, GORM tags)
-// - Field structure and types
-// - Edge cases and boundary conditions
-// - Data serialization and deserialization
-// - Infrastructure-level constraints and validation
-
-func TestCommonRepresentation_Infrastructure_TableName(t *testing.T) {
-	t.Parallel()
-
-	cr := &CommonRepresentation{}
-	expectedTableName := CommonRepresentationTableName
-
-	AssertTableName(t, cr, expectedTableName)
-}
-
 func TestCommonRepresentation_Infrastructure_Structure(t *testing.T) {
 	t.Parallel()
 

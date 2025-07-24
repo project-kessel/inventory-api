@@ -10,15 +10,6 @@ import (
 // Infrastructure tests for ReporterRepresentation domain model
 // These tests focus on database schema, field structure validation, edge cases, and serialization
 
-func TestReporterRepresentation_TableName(t *testing.T) {
-	t.Parallel()
-
-	fixture := NewTestFixture(t)
-	rr := fixture.ValidReporterRepresentation()
-
-	AssertTableName(t, rr, "reporter_representation")
-}
-
 func TestReporterRepresentation_Structure(t *testing.T) {
 	t.Parallel()
 

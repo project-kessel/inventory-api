@@ -18,10 +18,6 @@ type CommonRepresentation struct {
 	ReportedByReporterInstance string    `gorm:"size:128;column:reported_by_reporter_instance"`
 }
 
-func (CommonRepresentation) TableName() string {
-	return CommonRepresentationTableName
-}
-
 // NewCommonRepresentation creates a CommonRepresentation
 func NewCommonRepresentation(
 	resourceId uuid.UUID,

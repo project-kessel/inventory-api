@@ -20,10 +20,6 @@ type ReporterRepresentation struct {
 	Tombstone          bool    `gorm:"column:tombstone"`
 }
 
-func (ReporterRepresentation) TableName() string {
-	return ReporterRepresentationTableName
-}
-
 // NewReporterRepresentation Factory method for creating a new ReporterRepresentation
 // This enforces immutability by validating all inputs and creating a valid instance
 func NewReporterRepresentation(

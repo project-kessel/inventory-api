@@ -23,13 +23,6 @@ const (
 	MinCommonVersion   = 0 // CommonVersion can be zero or positive (>= 0)
 )
 
-// Table name constants
-const (
-	CommonRepresentationTableName   = "common_representation"
-	ReporterRepresentationTableName = "reporter_representation"
-	ReporterResourceTableName       = "reporter_resource"
-)
-
 // Column name constants
 const (
 	// CommonRepresentation columns

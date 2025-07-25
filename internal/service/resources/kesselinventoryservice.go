@@ -66,11 +66,11 @@ func (c *InventoryService) DeleteResource(ctx context.Context, r *pb.DeleteResou
 		log.Error("Failed to delete resource: ", err)
 
 		if errors.Is(err, resources.ErrResourceNotFound) {
-			return nil, status.Errorf(codes.NotFound, "resource not found: %v", err)
+			return nil, status.Errorf(codes.NotFound, "resource not found")
 		}
 
 		// Default to internal error for unknown errors
-		return nil, status.Errorf(codes.Internal, "failed to delete resource: %v", err)
+		return nil, status.Errorf(codes.Internal, "failed to delete resource due to an internal error")
 	}
 
 	return ResponseFromDeleteResource(), nil

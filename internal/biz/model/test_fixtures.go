@@ -590,8 +590,3 @@ func RunTableDrivenTest(t *testing.T, testCases map[string]func(*testing.T)) {
 		})
 	}
 }
-
-// stringPtr returns a pointer to the given string
-func stringPtr(s string) *string {
-	return &s
-}

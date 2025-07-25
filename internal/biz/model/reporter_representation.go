@@ -1,10 +1,5 @@
 package model
 
-import (
-	"fmt"
-	"strings"
-)
-
 // ReporterRepresentation is an immutable value object representing reporter-specific resource data.
 // It follows DDD principles where value objects are immutable and should be created
 // through factory methods that enforce validation rules.
@@ -57,21 +52,12 @@ func NewReporterRepresentation(
 // validateReporterRepresentation validates a ReporterRepresentation instance
 // This function is used internally by factory methods to ensure consistency
 func validateReporterRepresentation(rr *ReporterRepresentation) error {
-	if rr.ReporterResourceID == "" || strings.TrimSpace(rr.ReporterResourceID) == "" {
-		return ValidationError{Field: "ReporterResourceID", Message: "cannot be empty"}
-	}
-	if rr.Version < MinVersionValue {
-		return ValidationError{Field: "Version", Message: fmt.Sprintf("must be >= %d", MinVersionValue)}
-	}
-	if rr.Generation < MinGenerationValue {
-		return ValidationError{Field: "Generation", Message: fmt.Sprintf("must be >= %d", MinGenerationValue)}
-	}
-	if rr.CommonVersion < MinCommonVersion {
-		return ValidationError{Field: "CommonVersion", Message: fmt.Sprintf("must be >= %d", MinCommonVersion)}
-	}
-	if rr.ReporterVersion != nil && len(*rr.ReporterVersion) > MaxReporterVersionLength {
-		return ValidationError{Field: "ReporterVersion", Message: fmt.Sprintf("exceeds maximum length of %d characters", MaxReporterVersionLength)}
-	}
-	// Data can be nil - this is a valid state
-	return nil
+	return aggregateErrors(
+		validateStringRequired("ReporterResourceID", rr.ReporterResourceID),
+		validateMinValueUint("Version", rr.Version, MinVersionValue),
+		validateMinValueUint("Generation", rr.Generation, MinGenerationValue),
+		validateMinValueUint("CommonVersion", rr.CommonVersion, MinCommonVersion),
+		validateOptionalString("ReporterVersion", rr.ReporterVersion, MaxReporterVersionLength),
+		// Data can be nil - this is a valid state
+	)
 }

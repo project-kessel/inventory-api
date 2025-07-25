@@ -1,12 +1,5 @@
 package model
 
-// Table name constants
-const (
-	CommonRepresentationTableName   = "common_representation"
-	ReporterRepresentationTableName = "reporter_representation"
-	ReporterResourceTableName       = "reporter_resource"
-)
-
 // Database field size constants
 // These constants define the maximum lengths for various database fields
 // to ensure consistency between GORM struct tags and validation logic.
@@ -22,8 +15,8 @@ const (
 	MaxResourceTypeLength       = MaxFieldSize128
 	MaxReporterInstanceIDLength = MaxFieldSize256
 	MaxReporterVersionLength    = MaxFieldSize128
-	MaxAPIHrefLength            = MaxFieldSize256
-	MaxConsoleHrefLength        = MaxFieldSize256
+	MaxAPIHrefLength            = MaxFieldSize512
+	MaxConsoleHrefLength        = MaxFieldSize512
 
 	// Minimum values for validation
 	MinVersionValue    = 0 // Version can be zero or positive (>= 0)

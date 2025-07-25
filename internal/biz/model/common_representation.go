@@ -1,8 +1,6 @@
 package model
 
 import (
-	"fmt"
-
 	"github.com/google/uuid"
 )
 
@@ -47,24 +45,13 @@ func NewCommonRepresentation(
 // validateCommonRepresentation validates a CommonRepresentation instance
 // This function is used internally by factory methods to ensure consistency
 func validateCommonRepresentation(cr *CommonRepresentation) error {
-	if cr.ResourceId == uuid.Nil {
-		return ValidationError{Field: "ResourceId", Message: "cannot be empty"}
-	}
-	if cr.Version < MinVersionValue {
-		return ValidationError{Field: "Version", Message: fmt.Sprintf("must be >= %d", MinVersionValue)}
-	}
-	if cr.ReportedByReporterType == "" {
-		return ValidationError{Field: "ReportedByReporterType", Message: "cannot be empty"}
-	}
-	if len(cr.ReportedByReporterType) > MaxReporterTypeLength {
-		return ValidationError{Field: "ReportedByReporterType", Message: fmt.Sprintf("exceeds maximum length of %d characters", MaxReporterTypeLength)}
-	}
-	if cr.ReportedByReporterInstance == "" {
-		return ValidationError{Field: "ReportedByReporterInstance", Message: "cannot be empty"}
-	}
-	if len(cr.ReportedByReporterInstance) > MaxReporterInstanceIDLength {
-		return ValidationError{Field: "ReportedByReporterInstance", Message: fmt.Sprintf("exceeds maximum length of %d characters", MaxReporterInstanceIDLength)}
-	}
-	// Data can be nil - this is a valid state
-	return nil
+	return aggregateErrors(
+		validateUUIDRequired("ResourceId", cr.ResourceId),
+		validateMinValueUint("Version", cr.Version, MinVersionValue),
+		validateStringRequired("ReportedByReporterType", cr.ReportedByReporterType),
+		validateMaxLength("ReportedByReporterType", cr.ReportedByReporterType, MaxReporterTypeLength),
+		validateStringRequired("ReportedByReporterInstance", cr.ReportedByReporterInstance),
+		validateMaxLength("ReportedByReporterInstance", cr.ReportedByReporterInstance, MaxReporterInstanceIDLength),
+		// Data can be nil - this is a valid state
+	)
 }

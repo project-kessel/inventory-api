@@ -6,6 +6,7 @@ import (
 )
 
 // ValidationError represents a domain validation error
+// Deprecated: Use DomainValidationError instead for better error handling with sentinel errors
 type ValidationError struct {
 	Field   string
 	Message string

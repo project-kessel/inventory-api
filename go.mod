@@ -8,7 +8,7 @@ require (
 	buf.build/go/protovalidate v0.14.0
 	github.com/MicahParks/keyfunc/v3 v3.4.0
 	github.com/authzed/grpcutil v0.0.0-20250221190651-1985b19b35b8
-	github.com/cloudevents/sdk-go/protocol/kafka_confluent/v2 v2.0.0-20250714100115-d6abf9d145ab
+	github.com/cloudevents/sdk-go/protocol/kafka_confluent/v2 v2.0.0-20250721101952-1c64656a6859
 	github.com/cloudevents/sdk-go/v2 v2.16.1
 	github.com/confluentinc/confluent-kafka-go/v2 v2.11.0
 	github.com/coreos/go-oidc/v3 v3.14.1

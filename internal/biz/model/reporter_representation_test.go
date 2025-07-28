@@ -3,6 +3,9 @@ package model
 import (
 	"fmt"
 	"testing"
+
+	"github.com/project-kessel/inventory-api/internal"
+	"github.com/project-kessel/inventory-api/internal/data/model"
 )
 
 // Test scenarios for ReporterRepresentation domain model
@@ -25,19 +28,19 @@ func TestReporterRepresentation_Validation(t *testing.T) {
 	t.Run("valid ReporterRepresentation with all required fields", func(t *testing.T) {
 		t.Parallel()
 
-		fixture := NewTestFixture(t)
+		fixture := model.NewTestFixture(t)
 		rr := fixture.ValidReporterRepresentation()
 
 		// Factory method should create a valid instance without errors
-		AssertEqual(t, "dd1b73b9-3e33-4264-968c-e3ce55b9afec", rr.ReporterResourceID, "Reporter resource ID should be set correctly")
+		model.AssertEqual(t, "dd1b73b9-3e33-4264-968c-e3ce55b9afec", rr.ReporterResourceID, "Reporter resource ID should be set correctly")
 	})
 
 	t.Run("ReporterRepresentation with empty ReporterResourceID should be invalid", func(t *testing.T) {
 		t.Parallel()
 
 		// Test validation through factory method
-		_, err := NewReporterRepresentation(
-			JsonObject{"test": "data"},
+		_, err := model.NewReporterRepresentation(
+			internal.JsonObject{"test": "data"},
 			"", // empty ReporterResourceID
 			1,
 			1,
@@ -45,15 +48,15 @@ func TestReporterRepresentation_Validation(t *testing.T) {
 			false,
 			nil,
 		)
-		AssertValidationError(t, err, "ReporterResourceID", "ReporterRepresentation with empty ReporterResourceID should be invalid")
+		model.AssertValidationError(t, err, "ReporterResourceID", "ReporterRepresentation with empty ReporterResourceID should be invalid")
 	})
 
 	t.Run("ReporterRepresentation with zero Generation should be valid", func(t *testing.T) {
 		t.Parallel()
 
 		// Test that zero Generation is valid
-		rr, err := NewReporterRepresentation(
-			JsonObject{"test": "data"},
+		rr, err := model.NewReporterRepresentation(
+			internal.JsonObject{"test": "data"},
 			"reporter-resource-123",
 			1,
 			0, // zero Generation should be valid
@@ -61,7 +64,7 @@ func TestReporterRepresentation_Validation(t *testing.T) {
 			false,
 			nil,
 		)
-		AssertNoError(t, err, "ReporterRepresentation with zero Generation should be valid")
+		model.AssertNoError(t, err, "ReporterRepresentation with zero Generation should be valid")
 		if rr == nil {
 			t.Error("ReporterRepresentation should not be nil")
 		} else if rr.Generation != 0 {
@@ -73,8 +76,8 @@ func TestReporterRepresentation_Validation(t *testing.T) {
 		t.Parallel()
 
 		// Test that zero Version is valid
-		rr, err := NewReporterRepresentation(
-			JsonObject{"test": "data"},
+		rr, err := model.NewReporterRepresentation(
+			internal.JsonObject{"test": "data"},
 			"reporter-resource-123",
 			0, // zero Version should be valid
 			1,
@@ -82,7 +85,7 @@ func TestReporterRepresentation_Validation(t *testing.T) {
 			false,
 			nil,
 		)
-		AssertNoError(t, err, "ReporterRepresentation with zero Version should be valid")
+		model.AssertNoError(t, err, "ReporterRepresentation with zero Version should be valid")
 		if rr == nil {
 			t.Error("ReporterRepresentation should not be nil")
 		} else if rr.Version != 0 {
@@ -94,8 +97,8 @@ func TestReporterRepresentation_Validation(t *testing.T) {
 		t.Parallel()
 
 		// Test that zero CommonVersion is valid
-		rr, err := NewReporterRepresentation(
-			JsonObject{"test": "data"},
+		rr, err := model.NewReporterRepresentation(
+			internal.JsonObject{"test": "data"},
 			"reporter-resource-123",
 			1,
 			1,
@@ -103,7 +106,7 @@ func TestReporterRepresentation_Validation(t *testing.T) {
 			false,
 			nil,
 		)
-		AssertNoError(t, err, "ReporterRepresentation with zero CommonVersion should be valid")
+		model.AssertNoError(t, err, "ReporterRepresentation with zero CommonVersion should be valid")
 		if rr == nil {
 			t.Error("ReporterRepresentation should not be nil")
 		} else if rr.CommonVersion != 0 {
@@ -115,7 +118,7 @@ func TestReporterRepresentation_Validation(t *testing.T) {
 		t.Parallel()
 
 		// Test validation through factory method - nil data should be valid
-		rr, err := NewReporterRepresentation(
+		rr, err := model.NewReporterRepresentation(
 			nil, // nil Data should be valid
 			"reporter-resource-123",
 			1,
@@ -124,7 +127,7 @@ func TestReporterRepresentation_Validation(t *testing.T) {
 			false,
 			nil,
 		)
-		AssertNoError(t, err, "ReporterRepresentation with nil Data should be valid")
+		model.AssertNoError(t, err, "ReporterRepresentation with nil Data should be valid")
 		if rr == nil {
 			t.Error("ReporterRepresentation should not be nil")
 		} else if rr.Data != nil {
@@ -140,8 +143,8 @@ func TestReporterRepresentation_BusinessRules(t *testing.T) {
 		t.Parallel()
 
 		// Create two identical ReporterRepresentations using factory method
-		rr1, err := NewReporterRepresentation(
-			JsonObject{"test": "data"},
+		rr1, err := model.NewReporterRepresentation(
+			internal.JsonObject{"test": "data"},
 			"reporter-resource-123",
 			1,
 			1,
@@ -149,10 +152,10 @@ func TestReporterRepresentation_BusinessRules(t *testing.T) {
 			false,
 			nil,
 		)
-		AssertNoError(t, err, "First ReporterRepresentation should be valid")
+		model.AssertNoError(t, err, "First ReporterRepresentation should be valid")
 
-		rr2, err := NewReporterRepresentation(
-			JsonObject{"test": "data"},
+		rr2, err := model.NewReporterRepresentation(
+			internal.JsonObject{"test": "data"},
 			"reporter-resource-123", // same ReporterResourceID
 			1,                       // same Version
 			1,
@@ -160,7 +163,7 @@ func TestReporterRepresentation_BusinessRules(t *testing.T) {
 			false,
 			nil,
 		)
-		AssertNoError(t, err, "Second ReporterRepresentation should be valid")
+		model.AssertNoError(t, err, "Second ReporterRepresentation should be valid")
 
 		// They should be considered duplicates
 		if !areReporterRepresentationsDuplicates(*rr1, *rr2) {
@@ -172,8 +175,8 @@ func TestReporterRepresentation_BusinessRules(t *testing.T) {
 		t.Parallel()
 
 		// Create two ReporterRepresentations with different Version values
-		rr1, err := NewReporterRepresentation(
-			JsonObject{"test": "data"},
+		rr1, err := model.NewReporterRepresentation(
+			internal.JsonObject{"test": "data"},
 			"reporter-resource-123",
 			1, // Version = 1
 			1,
@@ -181,10 +184,10 @@ func TestReporterRepresentation_BusinessRules(t *testing.T) {
 			false,
 			nil,
 		)
-		AssertNoError(t, err, "First ReporterRepresentation should be valid")
+		model.AssertNoError(t, err, "First ReporterRepresentation should be valid")
 
-		rr2, err := NewReporterRepresentation(
-			JsonObject{"test": "data"},
+		rr2, err := model.NewReporterRepresentation(
+			internal.JsonObject{"test": "data"},
 			"reporter-resource-123",
 			2, // Version = 2 (different)
 			1,
@@ -192,7 +195,7 @@ func TestReporterRepresentation_BusinessRules(t *testing.T) {
 			false,
 			nil,
 		)
-		AssertNoError(t, err, "Second ReporterRepresentation should be valid")
+		model.AssertNoError(t, err, "Second ReporterRepresentation should be valid")
 
 		// They should not be considered duplicates
 		if areReporterRepresentationsDuplicates(*rr1, *rr2) {
@@ -204,8 +207,8 @@ func TestReporterRepresentation_BusinessRules(t *testing.T) {
 		t.Parallel()
 
 		// Test Generation = 1 (positive)
-		_, err := NewReporterRepresentation(
-			JsonObject{"test": "data"},
+		_, err := model.NewReporterRepresentation(
+			internal.JsonObject{"test": "data"},
 			"reporter-resource-123",
 			1,
 			1, // Generation = 1
@@ -213,11 +216,11 @@ func TestReporterRepresentation_BusinessRules(t *testing.T) {
 			false,
 			nil,
 		)
-		AssertNoError(t, err, "Positive Generation should be valid")
+		model.AssertNoError(t, err, "Positive Generation should be valid")
 
 		// Test Version = 1 (positive)
-		_, err = NewReporterRepresentation(
-			JsonObject{"test": "data"},
+		_, err = model.NewReporterRepresentation(
+			internal.JsonObject{"test": "data"},
 			"reporter-resource-123",
 			1, // Version = 1
 			1,
@@ -225,11 +228,11 @@ func TestReporterRepresentation_BusinessRules(t *testing.T) {
 			false,
 			nil,
 		)
-		AssertNoError(t, err, "Positive Version should be valid")
+		model.AssertNoError(t, err, "Positive Version should be valid")
 
 		// Test CommonVersion = 1 (positive)
-		_, err = NewReporterRepresentation(
-			JsonObject{"test": "data"},
+		_, err = model.NewReporterRepresentation(
+			internal.JsonObject{"test": "data"},
 			"reporter-resource-123",
 			1,
 			1,
@@ -237,15 +240,15 @@ func TestReporterRepresentation_BusinessRules(t *testing.T) {
 			false,
 			nil,
 		)
-		AssertNoError(t, err, "Positive CommonVersion should be valid")
+		model.AssertNoError(t, err, "Positive CommonVersion should be valid")
 	})
 
 	t.Run("should require non-empty ReporterResourceID", func(t *testing.T) {
 		t.Parallel()
 
 		// Test ReporterResourceID required
-		_, err := NewReporterRepresentation(
-			JsonObject{"test": "data"},
+		_, err := model.NewReporterRepresentation(
+			internal.JsonObject{"test": "data"},
 			"", // empty ReporterResourceID
 			1,
 			1,
@@ -253,7 +256,7 @@ func TestReporterRepresentation_BusinessRules(t *testing.T) {
 			false,
 			nil,
 		)
-		AssertValidationError(t, err, "ReporterResourceID", "ReporterResourceID should be required")
+		model.AssertValidationError(t, err, "ReporterResourceID", "ReporterResourceID should be required")
 	})
 }
 
@@ -264,8 +267,8 @@ func TestReporterRepresentation_TombstoneLogic(t *testing.T) {
 		t.Parallel()
 
 		// Test validation through factory method
-		rr, err := NewReporterRepresentation(
-			JsonObject{"test": "data"},
+		rr, err := model.NewReporterRepresentation(
+			internal.JsonObject{"test": "data"},
 			"reporter-resource-123",
 			1,
 			1,
@@ -273,7 +276,7 @@ func TestReporterRepresentation_TombstoneLogic(t *testing.T) {
 			true, // tombstone = true
 			nil,
 		)
-		AssertNoError(t, err, "ReporterRepresentation with tombstone=true should be valid")
+		model.AssertNoError(t, err, "ReporterRepresentation with tombstone=true should be valid")
 		if rr == nil {
 			t.Error("ReporterRepresentation should not be nil")
 		} else if !rr.Tombstone {
@@ -285,8 +288,8 @@ func TestReporterRepresentation_TombstoneLogic(t *testing.T) {
 		t.Parallel()
 
 		// Test validation through factory method
-		rr, err := NewReporterRepresentation(
-			JsonObject{"test": "data"},
+		rr, err := model.NewReporterRepresentation(
+			internal.JsonObject{"test": "data"},
 			"reporter-resource-123",
 			1,
 			1,
@@ -294,7 +297,7 @@ func TestReporterRepresentation_TombstoneLogic(t *testing.T) {
 			false, // tombstone = false
 			nil,
 		)
-		AssertNoError(t, err, "ReporterRepresentation with tombstone=false should be valid")
+		model.AssertNoError(t, err, "ReporterRepresentation with tombstone=false should be valid")
 		if rr == nil {
 			t.Error("ReporterRepresentation should not be nil")
 		} else if rr.Tombstone {
@@ -306,8 +309,8 @@ func TestReporterRepresentation_TombstoneLogic(t *testing.T) {
 		t.Parallel()
 
 		// Test validation through factory method with default tombstone value (false)
-		rr, err := NewReporterRepresentation(
-			JsonObject{"test": "data"},
+		rr, err := model.NewReporterRepresentation(
+			internal.JsonObject{"test": "data"},
 			"reporter-resource-123",
 			1,
 			1,
@@ -315,7 +318,7 @@ func TestReporterRepresentation_TombstoneLogic(t *testing.T) {
 			false, // tombstone = false (default)
 			nil,
 		)
-		AssertNoError(t, err, "ReporterRepresentation with default tombstone should be valid")
+		model.AssertNoError(t, err, "ReporterRepresentation with default tombstone should be valid")
 		if rr == nil {
 			t.Error("ReporterRepresentation should not be nil")
 		} else if rr.Tombstone {
@@ -333,8 +336,8 @@ func TestReporterRepresentation_VersioningLogic(t *testing.T) {
 		// Test different version values
 		versions := []uint{0, 1, 2, 10, 100, 1000}
 		for _, version := range versions {
-			_, err := NewReporterRepresentation(
-				JsonObject{"test": "data"},
+			_, err := model.NewReporterRepresentation(
+				internal.JsonObject{"test": "data"},
 				"reporter-resource-123",
 				version, // Test different version values
 				1,
@@ -342,7 +345,7 @@ func TestReporterRepresentation_VersioningLogic(t *testing.T) {
 				false,
 				nil,
 			)
-			AssertNoError(t, err, fmt.Sprintf("Version %d should be valid", version))
+			model.AssertNoError(t, err, fmt.Sprintf("Version %d should be valid", version))
 		}
 	})
 
@@ -352,8 +355,8 @@ func TestReporterRepresentation_VersioningLogic(t *testing.T) {
 		// Test different generation values
 		generations := []uint{0, 1, 2, 10, 100, 1000}
 		for _, generation := range generations {
-			_, err := NewReporterRepresentation(
-				JsonObject{"test": "data"},
+			_, err := model.NewReporterRepresentation(
+				internal.JsonObject{"test": "data"},
 				"reporter-resource-123",
 				1,
 				generation, // Test different generation values
@@ -361,7 +364,7 @@ func TestReporterRepresentation_VersioningLogic(t *testing.T) {
 				false,
 				nil,
 			)
-			AssertNoError(t, err, fmt.Sprintf("Generation %d should be valid", generation))
+			model.AssertNoError(t, err, fmt.Sprintf("Generation %d should be valid", generation))
 		}
 	})
 
@@ -371,8 +374,8 @@ func TestReporterRepresentation_VersioningLogic(t *testing.T) {
 		// Test different common version values
 		commonVersions := []uint{0, 1, 2, 10, 100, 1000}
 		for _, commonVersion := range commonVersions {
-			_, err := NewReporterRepresentation(
-				JsonObject{"test": "data"},
+			_, err := model.NewReporterRepresentation(
+				internal.JsonObject{"test": "data"},
 				"reporter-resource-123",
 				1,
 				1,
@@ -380,7 +383,7 @@ func TestReporterRepresentation_VersioningLogic(t *testing.T) {
 				false,
 				nil,
 			)
-			AssertNoError(t, err, fmt.Sprintf("CommonVersion %d should be valid", commonVersion))
+			model.AssertNoError(t, err, fmt.Sprintf("CommonVersion %d should be valid", commonVersion))
 		}
 	})
 }
@@ -392,18 +395,18 @@ func TestReporterRepresentation_DataHandling(t *testing.T) {
 		t.Parallel()
 
 		// Test with different types of JSON data
-		testData := JsonObject{
+		testData := internal.JsonObject{
 			"string_field":  "test value",
 			"number_field":  42,
 			"boolean_field": true,
 			"array_field":   []interface{}{1, 2, 3},
-			"object_field": JsonObject{
+			"object_field": internal.JsonObject{
 				"nested_string": "nested value",
 				"nested_number": 123,
 			},
 		}
 
-		_, err := NewReporterRepresentation(
+		_, err := model.NewReporterRepresentation(
 			testData, // Test with complex JSON data
 			"reporter-resource-123",
 			1,
@@ -412,40 +415,40 @@ func TestReporterRepresentation_DataHandling(t *testing.T) {
 			false,
 			nil,
 		)
-		AssertNoError(t, err, "ReporterRepresentation with valid JSON data should be valid")
+		model.AssertNoError(t, err, "ReporterRepresentation with valid JSON data should be valid")
 	})
 
 	t.Run("should handle complex nested JSON", func(t *testing.T) {
 		t.Parallel()
 
-		complexData := JsonObject{
-			"metadata": JsonObject{
-				"labels": JsonObject{
+		complexData := internal.JsonObject{
+			"metadata": internal.JsonObject{
+				"labels": internal.JsonObject{
 					"app":         "test-app",
 					"environment": "staging",
 					"team":        "platform",
 				},
-				"annotations": JsonObject{
+				"annotations": internal.JsonObject{
 					"deployment.kubernetes.io/revision":                "1",
 					"kubectl.kubernetes.io/last-applied-configuration": `{"apiVersion":"v1","kind":"Pod","metadata":{"name":"test"}}`,
 				},
 			},
-			"spec": JsonObject{
+			"spec": internal.JsonObject{
 				"containers": []interface{}{
-					JsonObject{
+					internal.JsonObject{
 						"name":  "app",
 						"image": "nginx:1.21",
 						"ports": []interface{}{
-							JsonObject{"containerPort": 80},
-							JsonObject{"containerPort": 443},
+							internal.JsonObject{"containerPort": 80},
+							internal.JsonObject{"containerPort": 443},
 						},
 					},
 				},
 			},
-			"status": JsonObject{
+			"status": internal.JsonObject{
 				"phase": "Running",
 				"conditions": []interface{}{
-					JsonObject{
+					internal.JsonObject{
 						"type":   "Ready",
 						"status": "True",
 					},
@@ -453,7 +456,7 @@ func TestReporterRepresentation_DataHandling(t *testing.T) {
 			},
 		}
 
-		_, err := NewReporterRepresentation(
+		_, err := model.NewReporterRepresentation(
 			complexData, // Test with complex nested JSON
 			"reporter-resource-123",
 			1,
@@ -462,14 +465,14 @@ func TestReporterRepresentation_DataHandling(t *testing.T) {
 			false,
 			nil,
 		)
-		AssertNoError(t, err, "ReporterRepresentation with complex nested JSON should be valid")
+		model.AssertNoError(t, err, "ReporterRepresentation with complex nested JSON should be valid")
 	})
 
 	t.Run("should handle empty JSON object", func(t *testing.T) {
 		t.Parallel()
 
-		_, err := NewReporterRepresentation(
-			JsonObject{}, // Test with empty JSON object
+		_, err := model.NewReporterRepresentation(
+			internal.JsonObject{}, // Test with empty JSON object
 			"reporter-resource-123",
 			1,
 			1,
@@ -477,20 +480,20 @@ func TestReporterRepresentation_DataHandling(t *testing.T) {
 			false,
 			nil,
 		)
-		AssertNoError(t, err, "ReporterRepresentation with empty JSON object should be valid")
+		model.AssertNoError(t, err, "ReporterRepresentation with empty JSON object should be valid")
 	})
 }
 
 func TestReporterRepresentation_FactoryMethods(t *testing.T) {
 	t.Run("should_create_valid_ReporterRepresentation_using_factory", func(t *testing.T) {
-		rr, err := NewReporterRepresentation(
-			JsonObject{"satellite_id": "test-satellite"},
+		rr, err := model.NewReporterRepresentation(
+			internal.JsonObject{"satellite_id": "test-satellite"},
 			"reporter-resource-123",
 			1,
 			1,
 			1,
 			false,
-			stringPtr("1.0.0"),
+			internal.StringPtr("1.0.0"),
 		)
 
 		if err != nil {
@@ -508,14 +511,14 @@ func TestReporterRepresentation_FactoryMethods(t *testing.T) {
 
 	t.Run("should_enforce_validation_rules_in_factory", func(t *testing.T) {
 		// Test empty ReporterResourceID
-		_, err := NewReporterRepresentation(
-			JsonObject{"satellite_id": "test-satellite"},
+		_, err := model.NewReporterRepresentation(
+			internal.JsonObject{"satellite_id": "test-satellite"},
 			"", // empty ReporterResourceID
 			1,
 			1,
 			1,
 			false,
-			stringPtr("1.0.0"),
+			internal.StringPtr("1.0.0"),
 		)
 
 		if err == nil {
@@ -523,14 +526,14 @@ func TestReporterRepresentation_FactoryMethods(t *testing.T) {
 		}
 
 		// Test zero Generation - should be valid now
-		rr, err := NewReporterRepresentation(
-			JsonObject{"satellite_id": "test-satellite"},
+		rr, err := model.NewReporterRepresentation(
+			internal.JsonObject{"satellite_id": "test-satellite"},
 			"reporter-resource-123",
 			1,
 			0, // zero Generation should be valid
 			1,
 			false,
-			stringPtr("1.0.0"),
+			internal.StringPtr("1.0.0"),
 		)
 
 		if err != nil {
@@ -546,7 +549,7 @@ func TestReporterRepresentation_FactoryMethods(t *testing.T) {
 
 // Helper function to check if two ReporterRepresentations are duplicates
 // based on their primary key fields
-func areReporterRepresentationsDuplicates(rr1, rr2 ReporterRepresentation) bool {
+func areReporterRepresentationsDuplicates(rr1, rr2 model.ReporterRepresentation) bool {
 	return rr1.ReporterResourceID == rr2.ReporterResourceID &&
 		rr1.Version == rr2.Version &&
 		rr1.Generation == rr2.Generation

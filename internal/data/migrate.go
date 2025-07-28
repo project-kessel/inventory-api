@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/project-kessel/inventory-api/internal/biz/model"
+	model2 "github.com/project-kessel/inventory-api/internal/data/model"
 	"gorm.io/gorm"
 
 	"github.com/project-kessel/inventory-api/internal/biz/model_legacy"
@@ -22,7 +23,7 @@ func Migrate(db *gorm.DB, logger *log.Helper) error {
 		&model_legacy.LocalInventoryToResource{}, // Deprecated
 		&model_legacy.InventoryResource{},
 		&model_legacy.OutboxEvent{},
-		&model.ReporterRepresentation{},
+		&model2.ReporterRepresentation{},
 		&model.CommonRepresentation{},
 	}
 

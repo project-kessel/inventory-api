@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
+	model2 "github.com/project-kessel/inventory-api/internal/data/model"
 )
 
 func TestReporterResource_NewReporterResource(t *testing.T) {
@@ -11,7 +12,7 @@ func TestReporterResource_NewReporterResource(t *testing.T) {
 		id := uuid.New()
 		resourceID := uuid.New()
 
-		rr, err := NewReporterResource(
+		rr, err := model2.NewReporterResource(
 			id,
 			"local-123",
 			"hbi",
@@ -144,7 +145,7 @@ func TestReporterResource_NewReporterResource(t *testing.T) {
 
 		for _, tc := range testCases {
 			t.Run(tc.name, func(t *testing.T) {
-				_, err := NewReporterResource(
+				_, err := model2.NewReporterResource(
 					tc.id,
 					tc.localResourceID,
 					tc.reporterType,

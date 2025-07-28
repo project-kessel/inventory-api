@@ -23,8 +23,6 @@ func (e ValidationError) Error() string {
 	return fmt.Sprintf("%s: %s", e.Field, e.Message)
 }
 
-type JsonObject map[string]interface{}
-
 // =============================================================================
 // Constants - Database Field Sizes
 // =============================================================================
@@ -163,7 +161,7 @@ func validateMaxLength(field, value string, maxLength int) error {
 }
 
 // validateMinValue checks if an integer meets minimum value requirement
-func validateMinValue(field string, value, minValue int) error {
+func validateMinValue(field string, value, minValue uint) error {
 	if value >= minValue {
 		return nil
 	}
@@ -235,15 +233,6 @@ func aggregateErrors(errs ...error) error {
 
 	// For multiple errors, we can use the existing errors package
 	return errors.Join(validationErrs...)
-}
-
-// =============================================================================
-// Utility Helper Functions
-// =============================================================================
-
-// stringPtr returns a pointer to the given string
-func stringPtr(s string) *string {
-	return &s
 }
 
 // =============================================================================

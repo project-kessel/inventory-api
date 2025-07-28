@@ -4,6 +4,8 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
+	"github.com/project-kessel/inventory-api/internal"
+	"github.com/project-kessel/inventory-api/internal/data/model"
 )
 
 // Test scenarios for CommonRepresentation domain model
@@ -22,14 +24,14 @@ import (
 func TestCommonRepresentation_Validation(t *testing.T) {
 	t.Parallel()
 
-	fixture := NewTestFixture(t)
+	fixture := model.NewTestFixture(t)
 
 	t.Run("valid_representation", func(t *testing.T) {
 		t.Parallel()
 		_ = fixture.ValidCommonRepresentation()
 
 		// Factory method should create a valid instance without errors
-		AssertNoError(t, nil, "Valid CommonRepresentation should be created successfully")
+		model.AssertNoError(t, nil, "Valid CommonRepresentation should be created successfully")
 	})
 
 	t.Run("invalid_representations", func(t *testing.T) {
@@ -41,24 +43,24 @@ func TestCommonRepresentation_Validation(t *testing.T) {
 				// Test factory method with empty ID
 				_, err := NewCommonRepresentation(
 					uuid.Nil,
-					JsonObject{"workspace_id": "test"},
+					internal.JsonObject{"workspace_id": "test"},
 					1,
 					"hbi",
 					"test-instance",
 				)
-				AssertValidationError(t, err, "ResourceId", "Empty ResourceId should fail creation")
+				model.AssertValidationError(t, err, "ResourceId", "Empty ResourceId should fail creation")
 			},
 			"zero_version": func(t *testing.T) {
 				t.Parallel()
 				// Test factory method with zero version - should be valid
 				cr, err := NewCommonRepresentation(
 					uuid.NewSHA1(uuid.NameSpaceOID, []byte("test")),
-					JsonObject{"workspace_id": "test"},
+					internal.JsonObject{"workspace_id": "test"},
 					0,
 					"hbi",
 					"test-instance",
 				)
-				AssertNoError(t, err, "Zero Version should be valid")
+				model.AssertNoError(t, err, "Zero Version should be valid")
 				if cr == nil {
 					t.Error("CommonRepresentation should not be nil")
 				} else if cr.Version != 0 {
@@ -70,24 +72,24 @@ func TestCommonRepresentation_Validation(t *testing.T) {
 				// Test factory method with empty reporter type
 				_, err := NewCommonRepresentation(
 					uuid.NewSHA1(uuid.NameSpaceOID, []byte("test")),
-					JsonObject{"workspace_id": "test"},
+					internal.JsonObject{"workspace_id": "test"},
 					1,
 					"",
 					"test-instance",
 				)
-				AssertValidationError(t, err, "ReportedByReporterType", "Empty ReportedByReporterType should fail creation")
+				model.AssertValidationError(t, err, "ReportedByReporterType", "Empty ReportedByReporterType should fail creation")
 			},
 			"empty_reporter_instance": func(t *testing.T) {
 				t.Parallel()
 				// Test factory method with empty reporter instance
 				_, err := NewCommonRepresentation(
 					uuid.NewSHA1(uuid.NameSpaceOID, []byte("test")),
-					JsonObject{"workspace_id": "test"},
+					internal.JsonObject{"workspace_id": "test"},
 					1,
 					"hbi",
 					"",
 				)
-				AssertValidationError(t, err, "ReportedByReporterInstance", "Empty ReportedByReporterInstance should fail creation")
+				model.AssertValidationError(t, err, "ReportedByReporterInstance", "Empty ReportedByReporterInstance should fail creation")
 			},
 			"nil_data": func(t *testing.T) {
 				t.Parallel()
@@ -99,7 +101,7 @@ func TestCommonRepresentation_Validation(t *testing.T) {
 					"hbi",
 					"test-instance",
 				)
-				AssertNoError(t, err, "Nil Data should be valid")
+				model.AssertNoError(t, err, "Nil Data should be valid")
 				if cr == nil {
 					t.Error("CommonRepresentation should not be nil")
 				} else if cr.Data != nil {
@@ -108,22 +110,22 @@ func TestCommonRepresentation_Validation(t *testing.T) {
 			},
 		}
 
-		RunTableDrivenTest(t, testCases)
+		model.RunTableDrivenTest(t, testCases)
 	})
 }
 
 func TestCommonRepresentation_BusinessRules(t *testing.T) {
 	t.Parallel()
 
-	fixture := NewTestFixture(t)
+	fixture := model.NewTestFixture(t)
 
 	t.Run("version_must_be_positive", func(t *testing.T) {
 		t.Parallel()
 		cr := fixture.CommonRepresentationWithVersion(1)
 
 		// Factory method should create a valid instance for positive version
-		AssertNoError(t, nil, "Positive version should be valid")
-		AssertEqual(t, uint(1), cr.Version, "Version should be set correctly")
+		model.AssertNoError(t, nil, "Positive version should be valid")
+		model.AssertEqual(t, uint(1), cr.Version, "Version should be set correctly")
 	})
 
 	t.Run("version_can_be_zero", func(t *testing.T) {
@@ -131,12 +133,12 @@ func TestCommonRepresentation_BusinessRules(t *testing.T) {
 		// Test factory method with zero version - should be valid
 		cr, err := NewCommonRepresentation(
 			uuid.NewSHA1(uuid.NameSpaceOID, []byte("test")),
-			JsonObject{"workspace_id": "test"},
+			internal.JsonObject{"workspace_id": "test"},
 			0,
 			"hbi",
 			"test-instance",
 		)
-		AssertNoError(t, err, "Zero version should be valid")
+		model.AssertNoError(t, err, "Zero version should be valid")
 		if cr == nil {
 			t.Error("CommonRepresentation should not be nil")
 		} else if cr.Version != 0 {
@@ -153,55 +155,55 @@ func TestCommonRepresentation_BusinessRules(t *testing.T) {
 				// Test factory method with empty ID
 				_, err := NewCommonRepresentation(
 					uuid.Nil,
-					JsonObject{"workspace_id": "test"},
+					internal.JsonObject{"workspace_id": "test"},
 					1,
 					"hbi",
 					"test-instance",
 				)
-				AssertValidationError(t, err, "ResourceId", "ResourceId should be required")
+				model.AssertValidationError(t, err, "ResourceId", "ResourceId should be required")
 			},
 			"reporter_type_required": func(t *testing.T) {
 				t.Parallel()
 				// Test factory method with empty reporter type
 				_, err := NewCommonRepresentation(
 					uuid.NewSHA1(uuid.NameSpaceOID, []byte("test")),
-					JsonObject{"workspace_id": "test"},
+					internal.JsonObject{"workspace_id": "test"},
 					1,
 					"",
 					"test-instance",
 				)
-				AssertValidationError(t, err, "ReportedByReporterType", "ReportedByReporterType should be required")
+				model.AssertValidationError(t, err, "ReportedByReporterType", "ReportedByReporterType should be required")
 			},
 			"reporter_instance_required": func(t *testing.T) {
 				t.Parallel()
 				// Test factory method with empty reporter instance
 				_, err := NewCommonRepresentation(
 					uuid.NewSHA1(uuid.NameSpaceOID, []byte("test")),
-					JsonObject{"workspace_id": "test"},
+					internal.JsonObject{"workspace_id": "test"},
 					1,
 					"hbi",
 					"",
 				)
-				AssertValidationError(t, err, "ReportedByReporterInstance", "ReportedByReporterInstance should be required")
+				model.AssertValidationError(t, err, "ReportedByReporterInstance", "ReportedByReporterInstance should be required")
 			},
 		}
 
-		RunTableDrivenTest(t, testCases)
+		model.RunTableDrivenTest(t, testCases)
 	})
 }
 
 func TestCommonRepresentation_DataHandling(t *testing.T) {
 	t.Parallel()
 
-	fixture := NewTestFixture(t)
+	fixture := model.NewTestFixture(t)
 
 	t.Run("data_can_be_complex_json", func(t *testing.T) {
 		t.Parallel()
-		complexData := JsonObject{
+		complexData := internal.JsonObject{
 			"name":        "complex-resource",
 			"description": "A complex resource with nested data",
-			"metadata": JsonObject{
-				"labels": JsonObject{
+			"metadata": internal.JsonObject{
+				"labels": internal.JsonObject{
 					"environment": "test",
 					"team":        "platform",
 				},
@@ -210,7 +212,7 @@ func TestCommonRepresentation_DataHandling(t *testing.T) {
 					"annotation2",
 				},
 			},
-			"status": JsonObject{
+			"status": internal.JsonObject{
 				"phase":    "running",
 				"ready":    true,
 				"replicas": 3,
@@ -220,8 +222,8 @@ func TestCommonRepresentation_DataHandling(t *testing.T) {
 		cr := fixture.CommonRepresentationWithData(complexData)
 
 		// Factory method should create a valid instance with complex data
-		AssertNoError(t, nil, "Complex JSON data should be valid")
-		AssertEqual(t, complexData, cr.Data, "Complex data should be preserved")
+		model.AssertNoError(t, nil, "Complex JSON data should be valid")
+		model.AssertEqual(t, complexData, cr.Data, "Complex data should be preserved")
 	})
 
 	t.Run("data_can_be_empty_object", func(t *testing.T) {
@@ -229,8 +231,8 @@ func TestCommonRepresentation_DataHandling(t *testing.T) {
 		cr := fixture.CommonRepresentationWithEmptyData()
 
 		// Factory method should create a valid instance with empty data
-		AssertNoError(t, nil, "Empty data object should be valid")
-		AssertEqual(t, JsonObject{}, cr.Data, "Empty data should be preserved")
+		model.AssertNoError(t, nil, "Empty data object should be valid")
+		model.AssertEqual(t, internal.JsonObject{}, cr.Data, "Empty data should be preserved")
 	})
 
 	t.Run("data_can_be_nil", func(t *testing.T) {
@@ -243,7 +245,7 @@ func TestCommonRepresentation_DataHandling(t *testing.T) {
 			"hbi",
 			"test-instance",
 		)
-		AssertNoError(t, err, "Nil data should be valid")
+		model.AssertNoError(t, err, "Nil data should be valid")
 		if cr == nil {
 			t.Error("CommonRepresentation should not be nil")
 		} else if cr.Data != nil {
@@ -255,14 +257,14 @@ func TestCommonRepresentation_DataHandling(t *testing.T) {
 func TestCommonRepresentation_Comparison(t *testing.T) {
 	t.Parallel()
 
-	fixture := NewTestFixture(t)
+	fixture := model.NewTestFixture(t)
 
 	t.Run("identical_representations_are_equal", func(t *testing.T) {
 		t.Parallel()
 		cr1 := fixture.ValidCommonRepresentation()
 		cr2 := fixture.ValidCommonRepresentation()
 
-		AssertEqual(t, cr1, cr2, "Identical representations should be equal")
+		model.AssertEqual(t, cr1, cr2, "Identical representations should be equal")
 	})
 
 	t.Run("different_ids_make_representations_different", func(t *testing.T) {
@@ -270,7 +272,7 @@ func TestCommonRepresentation_Comparison(t *testing.T) {
 		cr1 := fixture.CommonRepresentationWithID("id1")
 		cr2 := fixture.CommonRepresentationWithID("id2")
 
-		AssertNotEqual(t, cr1, cr2, "Different IDs should make representations different")
+		model.AssertNotEqual(t, cr1, cr2, "Different IDs should make representations different")
 	})
 
 	t.Run("different_versions_make_representations_different", func(t *testing.T) {
@@ -278,7 +280,7 @@ func TestCommonRepresentation_Comparison(t *testing.T) {
 		cr1 := fixture.CommonRepresentationWithVersion(1)
 		cr2 := fixture.CommonRepresentationWithVersion(2)
 
-		AssertNotEqual(t, cr1, cr2, "Different versions should make representations different")
+		model.AssertNotEqual(t, cr1, cr2, "Different versions should make representations different")
 	})
 }
 
@@ -287,7 +289,7 @@ func TestCommonRepresentation_FactoryMethods(t *testing.T) {
 		testResourceId := uuid.New()
 		cr, err := NewCommonRepresentation(
 			testResourceId,
-			JsonObject{"workspace_id": "test-workspace"},
+			internal.JsonObject{"workspace_id": "test-workspace"},
 			1,
 			"hbi",
 			"test-instance",
@@ -312,7 +314,7 @@ func TestCommonRepresentation_FactoryMethods(t *testing.T) {
 		// Test zero Version - should be valid now
 		cr, err := NewCommonRepresentation(
 			testResourceId,
-			JsonObject{"workspace_id": "test-workspace"},
+			internal.JsonObject{"workspace_id": "test-workspace"},
 			0, // zero Version should be valid
 			"hbi",
 			"test-instance",
@@ -348,7 +350,7 @@ func TestCommonRepresentation_FactoryMethods(t *testing.T) {
 		// Test nil UUID
 		_, err = NewCommonRepresentation(
 			uuid.Nil, // nil UUID
-			JsonObject{"workspace_id": "test-workspace"},
+			internal.JsonObject{"workspace_id": "test-workspace"},
 			1,
 			"hbi",
 			"test-instance",

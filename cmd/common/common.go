@@ -11,17 +11,20 @@ import (
 	"github.com/spf13/viper"
 )
 
+// LoggerOptions contains configuration options for logger initialization.
 type LoggerOptions struct {
 	ServiceName    string
 	ServiceVersion string
 }
 
+// GetLogLevel retrieves the log level from configuration and prints it to stdout.
 func GetLogLevel() string {
 	logLevel := viper.GetString("log.level")
 	fmt.Printf("Log Level is set to: %s\n", logLevel)
 	return logLevel
 }
 
+// ToPointer returns a pointer to the provided value of type T.
 func ToPointer[T any](v T) *T {
 	return &v
 }

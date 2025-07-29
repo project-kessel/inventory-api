@@ -26,5 +26,5 @@ func (a Aggregate) Error() string {
 // HttpError represents an HTTP error with status code and message.
 type HttpError struct {
 	Status  int    `json:"status"`
-	Message string `json:"messgae"`
+	Message string `json:"message"`
 }

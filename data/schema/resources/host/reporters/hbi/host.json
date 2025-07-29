@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "type": "object",
   "properties": {
-    "satellite_id": { "type": "string", "format": "uuid" },
+    "satellite_id": { "type": "string" },
     "subscription_manager_id": { "type": "string", "format": "uuid" },
     "insights_inventory_id": { "type": "string", "format": "uuid" },
     "ansible_host": { "type": "string", "maxLength": 255 }

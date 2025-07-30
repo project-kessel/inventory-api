@@ -7,10 +7,9 @@ import (
 	"github.com/project-kessel/inventory-api/internal"
 )
 
-// CommonRepresentation is an immutable value object representing common resource
-// It follows DDD principles where value objects are immutable and should be created
-// through factory methods that enforce validation rules.
-// Note: Fields are exported for GORM compatibility but should not be modified directly.
+// CommonRepresentation stores the *authoritative canonical state* for a resource across all reporters.  It
+// tracks which reporter most recently supplied the data (`ReportedByReporterType/Instance`) alongside the
+// shared `Version` counter used for optimistic concurrency.
 type CommonRepresentation struct {
 	Representation
 	ResourceId                 uuid.UUID `gorm:"type:text;primaryKey"`
@@ -20,7 +19,8 @@ type CommonRepresentation struct {
 	CreatedAt                  time.Time
 }
 
-// NewCommonRepresentation creates a CommonRepresentation
+// NewCommonRepresentation creates a fully-validated instance. Any field-level issues are returned as a
+// single aggregated `ValidationError`.
 func NewCommonRepresentation(
 	resourceId uuid.UUID,
 	data internal.JsonObject,
@@ -38,7 +38,7 @@ func NewCommonRepresentation(
 		ReportedByReporterInstance: reportedByReporterInstance,
 	}
 
-	// Validate the instance
+	// Validate inputs
 	if err := validateCommonRepresentation(cr); err != nil {
 		return nil, err
 	}
@@ -46,8 +46,6 @@ func NewCommonRepresentation(
 	return cr, nil
 }
 
-// validateCommonRepresentation validates a CommonRepresentation instance
-// This function is used internally by factory methods to ensure consistency
 func validateCommonRepresentation(cr *CommonRepresentation) error {
 	return aggregateErrors(
 		validateUUIDRequired("ResourceId", cr.ResourceId),

@@ -15,7 +15,7 @@ type Resource struct {
 	UpdatedAt        time.Time
 }
 
-// TableName overrides the default `reporter_representations`.
+// TableName gives GORM the exact table name to use.Doing this for now until we can decouple from legacy_model.Resource and can reclaim the "resources" table name
 func (Resource) TableName() string {
-	return "resource" // or "inventory.reporter_representation" for a schema-qualified name
+	return "resource"
 }

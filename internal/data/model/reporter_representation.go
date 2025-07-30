@@ -6,10 +6,9 @@ import (
 	"github.com/project-kessel/inventory-api/internal"
 )
 
-// ReporterRepresentation is an immutable value object representing reporter-specific resource
-// It follows DDD principles where value objects are immutable and should be created
-// through factory methods that enforce validation rules.
-// Note: Fields are exported for GORM compatibility but should not be modified directly.
+// ReporterRepresentation captures the **reporter-specific view** of a resource.  Each reporter maintains
+// its own version & generation counters which evolve independently of the `CommonRepresentation`.  The
+// struct purposefully embeds `Representation` so the JSON `Data` blob remains first-class.
 type ReporterRepresentation struct {
 	Representation
 
@@ -21,12 +20,12 @@ type ReporterRepresentation struct {
 	Tombstone          bool    `gorm:"not null"`
 	CreatedAt          time.Time
 
-	// Foreign key constraint to ensure ReporterResourceID exists in ReporterResource table
 	ReporterResource ReporterResource `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;foreignKey:ReporterResourceID;references:ID"`
 }
 
-// NewReporterRepresentation Factory method for creating a new ReporterRepresentation
-// This enforces immutability by validating all inputs and creating a valid instance
+// NewReporterRepresentation is the ONLY factory for creating a ReporterRepresentation. It guarantees that
+// every instance is fully validated (IDs present, counters non-negative, optional fields length-checked)
+// before it enters the system.
 func NewReporterRepresentation(
 	data internal.JsonObject,
 	reporterResourceID string,
@@ -48,7 +47,7 @@ func NewReporterRepresentation(
 		ReporterVersion:    reporterVersion,
 	}
 
-	// Validate the instance
+	// Validate inputs
 	if err := validateReporterRepresentation(rr); err != nil {
 		return nil, err
 	}
@@ -56,8 +55,6 @@ func NewReporterRepresentation(
 	return rr, nil
 }
 
-// validateReporterRepresentation validates a ReporterRepresentation instance
-// This function is used internally by factory methods to ensure consistency
 func validateReporterRepresentation(rr *ReporterRepresentation) error {
 	return aggregateErrors(
 		validateStringRequired("ReporterResourceID", rr.ReporterResourceID),

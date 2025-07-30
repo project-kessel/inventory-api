@@ -11,7 +11,7 @@ import (
 // Helper function to check if a Resource is valid
 // This is used in infrastructure tests that need to verify existing objects
 func isValidResource(r *Resource) bool {
-	return r != nil && r.ID != uuid.Nil && r.Type != "" && r.CommonVersion >= 0
+	return r != nil && r.ID != uuid.Nil && r.Type != ""
 }
 
 func TestResource_Infrastructure_Structure(t *testing.T) {

@@ -6,8 +6,10 @@ import (
 	"github.com/google/uuid"
 )
 
-// ReporterResourceKey represents the natural key that identifies a resource as reported by a specific reporter.
-// This tuple must be unique across the table.
+// ReporterResourceKey represents the natural key that identifies **a single resource** as reported by a
+// particular reporter instance. The combination of these four attributes must be unique. Keeping this as
+// a dedicated embedded struct makes the composite-key explicit and reusable in both the database layer and
+// higher-level domain/validation code.
 type ReporterResourceKey struct {
 	LocalResourceID    string `gorm:"size:256;index:reporter_resource_key_idx,unique;index:reporter_resource_search_idx,priority:1;not null"`
 	ReporterType       string `gorm:"size:128;index:reporter_resource_key_idx,unique;index:reporter_resource_search_idx,priority:2;not null"`
@@ -15,20 +17,19 @@ type ReporterResourceKey struct {
 	ReporterInstanceID string `gorm:"size:256;index:reporter_resource_key_idx,unique;index:reporter_resource_search_idx,priority:4;not null"`
 }
 
-// ReporterResource represents the metadata that identifies a resource as reported by a specific reporter.
-// It combines a surrogate UUID primary key with the natural composite key and latest state information.
+// ReporterResource is the *latest-state row* for a resource coming from a reporter. It combines an opaque
+// surrogate UUID (`ID`) with the natural composite key (`ReporterResourceKey`).  Non-versioned fields
+// (APIHref, ConsoleHref, Generation, Tombstone, …) always reflect the reporter’s most recent view. The
+// struct is treated as an immutable value from a domain perspective – updates happen by inserting a new row
+// via GORM where required, not by mutating an existing instance in-place.
 type ReporterResource struct {
-	// Surrogate Id for ReporterResourceKey
 	ID uuid.UUID `gorm:"type:uuid;primaryKey"`
-	// Actual Id
 	ReporterResourceKey
 
-	// Fields that do not need versioning, only latest state matters
 	ResourceID  uuid.UUID `gorm:"type:uuid;not null"`
 	APIHref     string    `gorm:"size:512;not null"`
 	ConsoleHref string    `gorm:"size:512"`
 
-	// Normalized Latest values
 	RepresentationVersion uint `gorm:"index:reporter_resource_key_idx,unique;not null"`
 	Generation            uint `gorm:"index:reporter_resource_key_idx,unique;not null"`
 	Tombstone             bool `gorm:"not null"`
@@ -37,7 +38,10 @@ type ReporterResource struct {
 	UpdatedAt time.Time
 }
 
-// NewReporterResource validates inputs and returns an immutable ReporterResource value.
+// NewReporterResource is the single constructor used across the code-base. It validates inputs, returning
+// either a fully-populated *ReporterResource or a `ValidationError` aggregating all problems discovered in
+// one pass.  This encourages call-sites to handle validation uniformly and avoids partially-initialised
+// objects leaking into the domain.
 func NewReporterResource(
 	id uuid.UUID,
 	localResourceID string,

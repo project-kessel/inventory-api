@@ -22,7 +22,7 @@ func (r ReporterRepresentation) Data() JsonObject {
 	if r.tombstone.Bool() {
 		return nil
 	}
-	return r.Representation.data
+	return r.data
 }
 
 func (r ReporterRepresentation) IsTombstone() bool {

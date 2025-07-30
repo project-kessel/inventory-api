@@ -7,18 +7,34 @@ import (
 const initialCommonVersion = 0
 
 type Resource struct {
-	id                uuid.UUID
-	resourceType      string
-	commonVersion     uint
-	consistencyToken  string
+	id                ResourceId
+	resourceType      ResourceType
+	commonVersion     Version
+	consistencyToken  ConsistencyToken
 	reporterResources []ReporterResource
 }
 
-func NewReporterResource(id uuid.UUID, resourceType string, reporterResource ReporterResource) (Resource, error) {
+func NewResource(id uuid.UUID, resourceType string, reporterResource ReporterResource) (Resource, error) {
+	resourceTypeObj, err := NewResourceType(resourceType)
+	if err != nil {
+		return Resource{}, err
+	}
+
+	resourceId, err := NewResourceId(id)
+	if err != nil {
+		return Resource{}, err
+	}
+
+	defaultToken, err := NewConsistencyToken("initial")
+	if err != nil {
+		return Resource{}, err
+	}
+
 	resource := Resource{
-		id:                id,
-		resourceType:      resourceType,
+		id:                resourceId,
+		resourceType:      resourceTypeObj,
 		commonVersion:     initialCommonVersion,
+		consistencyToken:  defaultToken,
 		reporterResources: []ReporterResource{reporterResource},
 	}
 	return resource, nil

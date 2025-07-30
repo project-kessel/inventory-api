@@ -13,10 +13,10 @@ import (
 // Note: Fields are exported for GORM compatibility but should not be modified directly.
 type CommonRepresentation struct {
 	Representation
-	ResourceId                 uuid.UUID `gorm:"type:text;column:id;primaryKey"`
-	Version                    uint      `gorm:"type:bigint;column:version;primaryKey;check:version >= 0"`
-	ReportedByReporterType     string    `gorm:"size:128;column:reported_by_reporter_type"`
-	ReportedByReporterInstance string    `gorm:"size:128;column:reported_by_reporter_instance"`
+	ResourceId                 uuid.UUID `gorm:"type:text;primaryKey"`
+	Version                    uint      `gorm:"type:bigint;primaryKey;check:version >= 0"`
+	ReportedByReporterType     string    `gorm:"size:128"`
+	ReportedByReporterInstance string    `gorm:"size:128"`
 	CreatedAt                  time.Time
 }
 

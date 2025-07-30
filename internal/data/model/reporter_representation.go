@@ -13,12 +13,12 @@ import (
 type ReporterRepresentation struct {
 	Representation
 
-	ReporterResourceID string  `gorm:"size:128;column:reporter_resource_id;primaryKey"`
-	Version            uint    `gorm:"type:bigint;column:version;primaryKey;check:version >= 0"`
-	Generation         uint    `gorm:"type:bigint;column:generation;primaryKey;check:generation >= 0"`
-	ReporterVersion    *string `gorm:"size:128;column:reporter_version"`
-	CommonVersion      uint    `gorm:"type:bigint;column:common_version;check:common_version >= 0"`
-	Tombstone          bool    `gorm:"column:tombstone"`
+	ReporterResourceID string  `gorm:"size:128;primaryKey"`
+	Version            uint    `gorm:"type:bigint;primaryKey;check:version >= 0"`
+	Generation         uint    `gorm:"type:bigint;primaryKey;check:generation >= 0"`
+	ReporterVersion    *string `gorm:"size:128"`
+	CommonVersion      uint    `gorm:"type:bigint;check:common_version >= 0"`
+	Tombstone          bool    `gorm:"not null"`
 	CreatedAt          time.Time
 
 	// Foreign key constraint to ensure ReporterResourceID exists in ReporterResource table

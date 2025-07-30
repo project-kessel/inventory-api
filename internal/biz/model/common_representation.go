@@ -2,31 +2,40 @@ package model
 
 import (
 	"github.com/google/uuid"
-	"github.com/project-kessel/inventory-api/internal"
 )
 
 type CommonRepresentation struct {
 	Representation
-	resourceId                 uuid.UUID
-	version                    uint
-	reportedByReporterType     string
-	reportedByReporterInstance string
+	resourceId ResourceId
+	version    Version
+	reporter   Reporter
 }
 
 func NewCommonRepresentation(
 	resourceId uuid.UUID,
-	data internal.JsonObject,
+	data JsonObject,
 	version uint,
 	reportedByReporterType string,
 	reportedByReporterInstance string,
-) (CommonRepresentation, error) {
-	return CommonRepresentation{
+) (*CommonRepresentation, error) {
+	resourceIdType, err := NewResourceId(resourceId)
+	if err != nil {
+		return nil, err
+	}
+
+	reporterObj, err := NewReporter(reportedByReporterType, reportedByReporterInstance)
+	if err != nil {
+		return nil, err
+	}
+
+	versionType := NewVersion(version)
+
+	return &CommonRepresentation{
 		Representation: Representation{
 			data: data,
 		},
-		resourceId:                 resourceId,
-		version:                    version,
-		reportedByReporterType:     reportedByReporterType,
-		reportedByReporterInstance: reportedByReporterInstance,
+		resourceId: resourceIdType,
+		version:    versionType,
+		reporter:   reporterObj,
 	}, nil
 }

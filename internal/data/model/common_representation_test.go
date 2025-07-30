@@ -61,8 +61,8 @@ func TestCommonRepresentation_Infrastructure_Structure(t *testing.T) {
 		cr := &CommonRepresentation{}
 
 		// Check primary key fields have correct GORM tags
-		AssertGORMTag(t, cr, "ResourceId", "type:text;column:id;primaryKey")
-		AssertGORMTag(t, cr, "Version", "type:bigint;column:version;primaryKey;check:version >= 0")
+		AssertGORMTag(t, cr, "ResourceId", "type:text;primaryKey")
+		AssertGORMTag(t, cr, "Version", "type:bigint;primaryKey;check:version >= 0")
 	})
 
 	t.Run("should have correct GORM size constraints", func(t *testing.T) {
@@ -71,8 +71,8 @@ func TestCommonRepresentation_Infrastructure_Structure(t *testing.T) {
 		cr := &CommonRepresentation{}
 
 		// Verify size constraints match constants
-		AssertGORMTag(t, cr, "ReportedByReporterType", "size:128;column:reported_by_reporter_type")
-		AssertGORMTag(t, cr, "ReportedByReporterInstance", "size:128;column:reported_by_reporter_instance")
+		AssertGORMTag(t, cr, "ReportedByReporterType", "size:128")
+		AssertGORMTag(t, cr, "ReportedByReporterInstance", "size:128")
 	})
 
 	t.Run("should have correct non-nullable field types", func(t *testing.T) {

@@ -94,3 +94,7 @@ func (r *Resource) BeforeCreate(db *gorm.DB) error {
 	}
 	return nil
 }
+
+func (Resource) TableName() string {
+	return "legacy_resources"
+}

@@ -1,57 +1,63 @@
 package model
 
-import "github.com/project-kessel/inventory-api/internal"
-
 type ReporterRepresentation struct {
 	Representation
-	reporterResourceID string
-	version            uint
-	generation         uint
-	reporterVersion    *string
-	commonVersion      uint
-	tombstone          bool
+	reporterResourceID ReporterResourceId
+	version            Version
+	generation         Generation
+	reporterVersion    *ReporterVersion
+	commonVersion      Version
+	tombstone          Tombstone
 }
 
 type ReporterDataRepresentation interface {
-	Data() internal.JsonObject
+	Data() JsonObject
 	IsTombstone() bool
 }
 
 type ReporterDeleteRepresentation interface {
-	IsTombstone() bool
-	Data() internal.JsonObject
 }
 
-func (r ReporterRepresentation) Data() internal.JsonObject {
-	if r.tombstone {
+func (r ReporterRepresentation) Data() JsonObject {
+	if r.tombstone.Bool() {
 		return nil
 	}
 	return r.Representation.data
 }
 
 func (r ReporterRepresentation) IsTombstone() bool {
-	return r.tombstone
+	return r.tombstone.Bool()
 }
 
 func NewReporterDataRepresentation(
-	data internal.JsonObject,
+	data JsonObject,
 	reporterResourceID string,
 	version uint,
 	generation uint,
 	commonVersion uint,
 	reporterVersion *string,
-) ReporterDataRepresentation {
+) (ReporterDataRepresentation, error) {
+	reporterResourceIDObj, err := NewReporterResourceIdFromString(reporterResourceID)
+	if err != nil {
+		return nil, err
+	}
+
+	reporterVersionObj, err := NewReporterVersionPtr(reporterVersion)
+	if err != nil {
+		return nil, err
+	}
+
 	return ReporterRepresentation{
 		Representation: Representation{
 			data: data,
 		},
-		reporterResourceID: reporterResourceID,
-		version:            version,
-		generation:         generation,
-		commonVersion:      commonVersion,
-		reporterVersion:    reporterVersion,
-		tombstone:          false,
-	}
+		reporterResourceID: reporterResourceIDObj,
+		version:            NewVersion(version),
+		generation:         NewGeneration(generation),
+		commonVersion:      NewVersion(commonVersion),
+		reporterVersion:    reporterVersionObj,
+		tombstone:          NewTombstone(false),
+	}, nil
 }
 
 func NewReporterDeleteRepresentation(
@@ -60,16 +66,26 @@ func NewReporterDeleteRepresentation(
 	generation uint,
 	commonVersion uint,
 	reporterVersion *string,
-) ReporterDeleteRepresentation {
+) (ReporterDeleteRepresentation, error) {
+	reporterResourceIDObj, err := NewReporterResourceIdFromString(reporterResourceID)
+	if err != nil {
+		return nil, err
+	}
+
+	reporterVersionObj, err := NewReporterVersionPtr(reporterVersion)
+	if err != nil {
+		return nil, err
+	}
+
 	return ReporterRepresentation{
 		Representation: Representation{
 			data: nil,
 		},
-		reporterResourceID: reporterResourceID,
-		version:            version,
-		generation:         generation,
-		commonVersion:      commonVersion,
-		reporterVersion:    reporterVersion,
-		tombstone:          true,
-	}
+		reporterResourceID: reporterResourceIDObj,
+		version:            NewVersion(version),
+		generation:         NewGeneration(generation),
+		commonVersion:      NewVersion(commonVersion),
+		reporterVersion:    reporterVersionObj,
+		tombstone:          NewTombstone(true),
+	}, nil
 }

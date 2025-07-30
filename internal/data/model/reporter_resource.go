@@ -9,10 +9,10 @@ import (
 // ReporterResourceKey represents the natural key that identifies a resource as reported by a specific reporter.
 // This tuple must be unique across the table.
 type ReporterResourceKey struct {
-	LocalResourceID    string `gorm:"size:256;index:reporter_resource_key_idx,unique;index:reporter_resource_search_idx,priority:1;not null;"`
-	ReporterType       string `gorm:"size:128;index:reporter_resource_key_idx,unique;index:reporter_resource_search_idx,priority:2;not null;"`
-	ResourceType       string `gorm:"size:128;index:reporter_resource_key_idx,unique;index:reporter_resource_search_idx,priority:3;not null;"`
-	ReporterInstanceID string `gorm:"size:256;index:reporter_resource_key_idx,unique;index:reporter_resource_search_idx,priority:4;not null;"`
+	LocalResourceID    string `gorm:"size:256;index:reporter_resource_key_idx,unique;index:reporter_resource_search_idx,priority:1;not null"`
+	ReporterType       string `gorm:"size:128;index:reporter_resource_key_idx,unique;index:reporter_resource_search_idx,priority:2;not null"`
+	ResourceType       string `gorm:"size:128;index:reporter_resource_key_idx,unique;index:reporter_resource_search_idx,priority:3;not null"`
+	ReporterInstanceID string `gorm:"size:256;index:reporter_resource_key_idx,unique;index:reporter_resource_search_idx,priority:4;not null"`
 }
 
 // ReporterResource represents the metadata that identifies a resource as reported by a specific reporter.
@@ -24,14 +24,14 @@ type ReporterResource struct {
 	ReporterResourceKey
 
 	// Fields that do not need versioning, only latest state matters
-	ResourceID  uuid.UUID `gorm:"type:uuid;column:resource_id;not null;"`
-	APIHref     string    `gorm:"size:512;column:api_href"`
-	ConsoleHref string    `gorm:"size:512;column:console_href"`
+	ResourceID  uuid.UUID `gorm:"type:uuid;not null"`
+	APIHref     string    `gorm:"size:512;not null"`
+	ConsoleHref string    `gorm:"size:512"`
 
 	// Normalized Latest values
-	RepresentationVersion uint `gorm:"column:representation_version;index:reporter_resource_key_idx,unique;not null;"`
-	Generation            uint `gorm:"column:generation;index:reporter_resource_key_idx,unique;not null;"`
-	Tombstone             bool `gorm:"column:tombstone;not null;"`
+	RepresentationVersion uint `gorm:"index:reporter_resource_key_idx,unique;not null"`
+	Generation            uint `gorm:"index:reporter_resource_key_idx,unique;not null"`
+	Tombstone             bool `gorm:"not null"`
 
 	CreatedAt time.Time
 	UpdatedAt time.Time

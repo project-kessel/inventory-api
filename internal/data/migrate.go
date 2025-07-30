@@ -3,11 +3,9 @@ package data
 import (
 	"fmt"
 
-	"github.com/project-kessel/inventory-api/internal/biz/model"
-	model2 "github.com/project-kessel/inventory-api/internal/data/model"
-	"gorm.io/gorm"
-
 	"github.com/project-kessel/inventory-api/internal/biz/model_legacy"
+	"github.com/project-kessel/inventory-api/internal/data/model"
+	"gorm.io/gorm"
 
 	"github.com/go-kratos/kratos/v2/log"
 )
@@ -23,8 +21,10 @@ func Migrate(db *gorm.DB, logger *log.Helper) error {
 		&model_legacy.LocalInventoryToResource{}, // Deprecated
 		&model_legacy.InventoryResource{},
 		&model_legacy.OutboxEvent{},
-		&model2.ReporterRepresentation{},
+		&model.ReporterRepresentation{},
 		&model.CommonRepresentation{},
+		&model.ReporterResource{},
+		&model.Resource{},
 	}
 
 	if err := db.AutoMigrate(models...); err != nil {

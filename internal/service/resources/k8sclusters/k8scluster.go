@@ -37,7 +37,7 @@ func (c *K8sClustersService) CreateK8SCluster(ctx context.Context, r *pb.CreateK
 	}
 
 	if k, err := k8sClusterFromCreateRequest(r, identity); err == nil {
-		if resp, err := c.Ctl.Create(ctx, k); err == nil {
+		if resp, err := c.Ctl.Create(ctx, k); err == nil { //nolint:staticcheck
 			return createResponseFromK8sCluster(resp), nil
 		} else {
 			return nil, err
@@ -55,7 +55,7 @@ func (c *K8sClustersService) UpdateK8SCluster(ctx context.Context, r *pb.UpdateK
 
 	if k, err := k8sClusterFromUpdateRequest(r, identity); err == nil {
 		// Todo: Update to use the right ID
-		if resp, err := c.Ctl.Update(ctx, k, model_legacy.ReporterResourceIdFromResource(k)); err == nil {
+		if resp, err := c.Ctl.Update(ctx, k, model_legacy.ReporterResourceIdFromResource(k)); err == nil { //nolint:staticcheck
 			return updateResponseFromK8sCluster(resp), nil
 		} else {
 			return nil, err

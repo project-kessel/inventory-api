@@ -11,6 +11,8 @@ import (
 	"github.com/project-kessel/inventory-api/internal/biz/model_legacy"
 )
 
+// Authorizer defines the interface for authorization and access control operations.
+// It provides methods for checking permissions, managing relationships, and health checks.
 type Authorizer interface {
 	Health(ctx context.Context) (*kesselv1.GetReadyzResponse, error)
 	Check(context.Context, string, string, *model_legacy.Resource, *kessel.SubjectReference) (kessel.CheckResponse_Allowed, *kessel.ConsistencyToken, error)

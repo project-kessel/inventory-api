@@ -10,6 +10,8 @@ import (
 	"github.com/project-kessel/inventory-api/internal/storage"
 )
 
+// NewCommand creates a new cobra command for database migration.
+// It creates or migrates the database tables using the provided storage options.
 func NewCommand(options *storage.Options, loggerOptions common.LoggerOptions) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "migrate",

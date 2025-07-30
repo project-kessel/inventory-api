@@ -16,7 +16,7 @@ require (
 	github.com/golang-jwt/jwt/v5 v5.2.3
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.7.5
-	github.com/mattn/go-sqlite3 v1.14.28
+	github.com/mattn/go-sqlite3 v1.14.30
 	github.com/patrickmn/go-cache v2.1.0+incompatible
 	github.com/project-kessel/inventory-client-go v0.0.0-20250703155410-0ece2b1f2d03
 	github.com/project-kessel/relations-api v0.0.0-20250708175557-dad8175c7685

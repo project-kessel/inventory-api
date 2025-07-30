@@ -13,7 +13,7 @@ require (
 	github.com/confluentinc/confluent-kafka-go/v2 v2.11.0
 	github.com/coreos/go-oidc/v3 v3.14.1
 	github.com/go-kratos/kratos/v2 v2.8.4
-	github.com/golang-jwt/jwt/v5 v5.2.3
+	github.com/golang-jwt/jwt/v5 v5.3.0
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.7.5
 	github.com/mattn/go-sqlite3 v1.14.28

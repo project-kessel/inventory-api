@@ -19,24 +19,24 @@ func NewCommonRepresentation(
 	versionVal uint,
 	reportedByReporterType string,
 	reportedByReporterInstance string,
-) (*CommonRepresentation, error) {
+) (CommonRepresentation, error) {
 	if len(data) == 0 {
-		return nil, fmt.Errorf("CommonRepresentation requires non-empty data")
+		return CommonRepresentation{}, fmt.Errorf("CommonRepresentation requires non-empty data")
 	}
 
 	resourceId, err := NewResourceId(resourceIdVal)
 	if err != nil {
-		return nil, fmt.Errorf("CommonRepresentation invalid resource ID: %w", err)
+		return CommonRepresentation{}, fmt.Errorf("CommonRepresentation invalid resource ID: %w", err)
 	}
 
 	reporter, err := NewReporter(reportedByReporterType, reportedByReporterInstance)
 	if err != nil {
-		return nil, fmt.Errorf("CommonRepresentation invalid reporter: %w", err)
+		return CommonRepresentation{}, fmt.Errorf("CommonRepresentation invalid reporter: %w", err)
 	}
 
 	version := NewVersion(versionVal)
 
-	return &CommonRepresentation{
+	return CommonRepresentation{
 		Representation: Representation{
 			data: data,
 		},

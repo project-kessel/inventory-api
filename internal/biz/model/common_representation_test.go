@@ -5,23 +5,17 @@ import (
 	"testing"
 )
 
-func assertValidCommonRepresentation(t *testing.T, commonRep *CommonRepresentation, err error, testCase string) {
+func assertValidCommonRepresentation(t *testing.T, commonRep CommonRepresentation, err error, testCase string) {
 	t.Helper()
 	if err != nil {
 		t.Errorf("Expected no error for %s, got %v", testCase, err)
 	}
-	if commonRep == nil {
-		t.Errorf("Expected valid CommonRepresentation for %s, got nil", testCase)
-	}
 }
 
-func assertInvalidCommonRepresentation(t *testing.T, commonRep *CommonRepresentation, err error, expectedErrorSubstring string) {
+func assertInvalidCommonRepresentation(t *testing.T, commonRep CommonRepresentation, err error, expectedErrorSubstring string) {
 	t.Helper()
 	if err == nil {
 		t.Error("Expected error, got none")
-	}
-	if commonRep != nil {
-		t.Error("Expected nil CommonRepresentation for invalid input, got non-nil")
 	}
 	if !strings.Contains(err.Error(), expectedErrorSubstring) {
 		t.Errorf("Expected error about %s, got %v", expectedErrorSubstring, err)

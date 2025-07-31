@@ -38,7 +38,6 @@ func NewCommonRepresentation(
 		ReportedByReporterInstance: reportedByReporterInstance,
 	}
 
-	// Validate inputs
 	if err := validateCommonRepresentation(cr); err != nil {
 		return nil, err
 	}
@@ -54,6 +53,5 @@ func validateCommonRepresentation(cr *CommonRepresentation) error {
 		validateMaxLength("ReportedByReporterType", cr.ReportedByReporterType, MaxReporterTypeLength),
 		validateStringRequired("ReportedByReporterInstance", cr.ReportedByReporterInstance),
 		validateMaxLength("ReportedByReporterInstance", cr.ReportedByReporterInstance, MaxReporterInstanceIDLength),
-		// Data can be nil - this is a valid state
 	)
 }

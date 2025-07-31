@@ -47,7 +47,6 @@ func NewReporterRepresentation(
 		ReporterVersion:    reporterVersion,
 	}
 
-	// Validate inputs
 	if err := validateReporterRepresentation(rr); err != nil {
 		return nil, err
 	}
@@ -62,6 +61,5 @@ func validateReporterRepresentation(rr *ReporterRepresentation) error {
 		validateMinValueUint("Generation", rr.Generation, MinGenerationValue),
 		validateMinValueUint("CommonVersion", rr.CommonVersion, MinCommonVersion),
 		validateOptionalString("ReporterVersion", rr.ReporterVersion, MaxReporterVersionLength),
-		// Data can be nil - this is a valid state
 	)
 }

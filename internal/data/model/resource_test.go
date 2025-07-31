@@ -38,7 +38,7 @@ func TestResource_Infrastructure_Structure(t *testing.T) {
 
 		// Check primary key fields have correct GORM tags
 		AssertGORMTag(t, r, "ID", "type:uuid;primaryKey")
-		AssertGORMTag(t, r, "CommonVersion", "type:bigint;primaryKey;check:common_version >= 0")
+		AssertGORMTag(t, r, "CommonVersion", "type:bigint;check:common_version >= 0")
 	})
 
 	t.Run("should have correct GORM size constraints", func(t *testing.T) {

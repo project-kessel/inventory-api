@@ -215,3 +215,32 @@ func ValidateJSONSchema(schemaStr string, jsonData interface{}) error {
 	}
 	return nil
 }
+
+// RemoveNulls recursively creates a new map with keys removed where the value is null.
+// This function is safe for concurrent use as it does not modify the input map.
+func RemoveNulls(m map[string]interface{}) map[string]interface{} {
+	result := make(map[string]interface{}, len(m))
+	for key, val := range m {
+		if val == nil {
+			continue
+		}
+
+		switch v := val.(type) {
+		case string:
+			// Treat the literal string "null" (case-insensitive) as an unset value
+			if strings.EqualFold(v, "null") {
+				continue
+			}
+			result[key] = v
+		case map[string]interface{}:
+			// Recursively clean nested maps
+			cleaned := RemoveNulls(v)
+			if len(cleaned) > 0 {
+				result[key] = cleaned
+			}
+		default:
+			result[key] = val
+		}
+	}
+	return result
+}

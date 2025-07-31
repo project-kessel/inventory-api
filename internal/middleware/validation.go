@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/spf13/viper"
 
@@ -13,6 +14,7 @@ import (
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/go-kratos/kratos/v2/middleware"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/structpb"
 
 	pbv1beta2 "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2"
 )
@@ -89,8 +91,25 @@ func ValidateReportResourceJSON(msg proto.Message) error {
 		return err
 	}
 
-	// Validate reporter-specific data
-	if err := ValidateReporterRepresentation(resourceType, reporterType, reporterRepresentation); err != nil {
+	// Remove any fields with null values before validation.
+	var sanitizedReporterRepresentation map[string]interface{}
+	if reporterRepresentation != nil {
+		sanitizedReporterRepresentation = RemoveNulls(reporterRepresentation)
+	} else {
+		sanitizedReporterRepresentation = nil
+	}
+
+	// Overwrite the proto's reporter struct with the sanitized version so downstream layers don't see nulls.
+	if rr, ok := msg.(*pbv1beta2.ReportResourceRequest); ok && sanitizedReporterRepresentation != nil {
+		sanitizedStruct, err2 := structpb.NewStruct(sanitizedReporterRepresentation)
+		if err2 != nil {
+			return fmt.Errorf("failed to rebuild reporter struct: %w", err2)
+		}
+		rr.Representations.Reporter = sanitizedStruct
+	}
+
+	// Validate reporter-specific data using the sanitized map
+	if err := ValidateReporterRepresentation(resourceType, reporterType, sanitizedReporterRepresentation); err != nil {
 		return err
 	}
 

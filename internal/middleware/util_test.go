@@ -647,3 +647,76 @@ func TestValidateCommonRepresentation(t *testing.T) {
 		})
 	}
 }
+
+func TestRemoveNulls(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    map[string]interface{}
+		expected map[string]interface{}
+	}{
+		{
+			name: "HBI host with all fields",
+			input: map[string]interface{}{
+				"insights_inventory_id": "b5c36330-79cf-426e-a950-df2e972c3ef4",
+				"satellite_id":          "some-satellite-id",
+				"ansible_host":          "my-ansible-host.example.com",
+			},
+			expected: map[string]interface{}{
+				"insights_inventory_id": "b5c36330-79cf-426e-a950-df2e972c3ef4",
+				"satellite_id":          "some-satellite-id",
+				"ansible_host":          "my-ansible-host.example.com",
+			},
+		},
+		{
+			name: "HBI host with null ansible_host",
+			input: map[string]interface{}{
+				"insights_inventory_id": "b5c36330-79cf-426e-a950-df2e972c3ef4",
+				"satellite_id":          "some-satellite-id",
+				"ansible_host":          nil,
+			},
+			expected: map[string]interface{}{
+				"insights_inventory_id": "b5c36330-79cf-426e-a950-df2e972c3ef4",
+				"satellite_id":          "some-satellite-id",
+			},
+		},
+		{
+			name: "HBI host with multiple nulls",
+			input: map[string]interface{}{
+				"insights_inventory_id": "b5c36330-79cf-426e-a950-df2e972c3ef4",
+				"satellite_id":          nil,
+				"ansible_host":          "null",
+			},
+			expected: map[string]interface{}{
+				"insights_inventory_id": "b5c36330-79cf-426e-a950-df2e972c3ef4",
+			},
+		},
+		{
+			name: "nested nulls in a generic structure",
+			input: map[string]interface{}{
+				"metadata": map[string]interface{}{
+					"source": "some-source",
+					"notes":  nil,
+				},
+				"data": "some-data",
+			},
+			expected: map[string]interface{}{
+				"metadata": map[string]interface{}{
+					"source": "some-source",
+				},
+				"data": "some-data",
+			},
+		},
+		{
+			name:     "empty map",
+			input:    map[string]interface{}{},
+			expected: map[string]interface{}{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := middleware.RemoveNulls(tt.input)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}

@@ -20,7 +20,7 @@ require (
 	github.com/patrickmn/go-cache v2.1.0+incompatible
 	github.com/project-kessel/inventory-client-go v0.0.0-20250703155410-0ece2b1f2d03
 	github.com/project-kessel/relations-api v0.0.0-20250722143839-19682eaba8fc
-	github.com/prometheus/client_golang v1.22.0
+	github.com/prometheus/client_golang v1.23.0
 	github.com/redhatinsights/app-common-go v1.6.8
 	github.com/sony/gobreaker v1.0.0
 	github.com/spf13/cobra v1.9.1

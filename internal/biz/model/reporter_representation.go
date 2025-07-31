@@ -1,63 +1,105 @@
 package model
 
-// ReporterRepresentation is an immutable value object representing reporter-specific resource data.
-// It follows DDD principles where value objects are immutable and should be created
-// through factory methods that enforce validation rules.
-// Note: Fields are exported for GORM compatibility but should not be modified directly.
+import "fmt"
+
 type ReporterRepresentation struct {
 	Representation
-
-	ReporterResourceID string  `gorm:"size:128;column:reporter_resource_id;primaryKey"`
-	Version            uint    `gorm:"type:bigint;column:version;primaryKey;check:version >= 0"`
-	Generation         uint    `gorm:"type:bigint;column:generation;primaryKey;check:generation >= 0"`
-	ReporterVersion    *string `gorm:"size:128;column:reporter_version"`
-	CommonVersion      uint    `gorm:"type:bigint;column:common_version;check:common_version >= 0"`
-	Tombstone          bool    `gorm:"column:tombstone"`
-
-	// Foreign key constraint to ensure ReporterResourceID exists in ReporterResource table
-	ReporterResource ReporterResource `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;foreignKey:ReporterResourceID;references:ID"`
+	reporterResourceID ReporterResourceId
+	version            Version
+	generation         Generation
+	reporterVersion    *ReporterVersion
+	commonVersion      Version
+	tombstone          Tombstone
 }
 
-// NewReporterRepresentation Factory method for creating a new ReporterRepresentation
-// This enforces immutability by validating all inputs and creating a valid instance
-func NewReporterRepresentation(
+type ReporterDataRepresentation interface {
+	Data() JsonObject
+	IsTombstone() bool
+}
+
+type ReporterDeleteRepresentation interface {
+}
+
+func (r ReporterRepresentation) Data() JsonObject {
+	if r.tombstone.Bool() {
+		return nil
+	}
+	return r.data
+}
+
+func (r ReporterRepresentation) IsTombstone() bool {
+	return r.tombstone.Bool()
+}
+
+func NewReporterDataRepresentation(
 	data JsonObject,
-	reporterResourceID string,
+	reporterResourceIDVal string,
 	version uint,
 	generation uint,
 	commonVersion uint,
-	tombstone bool,
-	reporterVersion *string,
-) (*ReporterRepresentation, error) {
-	rr := &ReporterRepresentation{
-		Representation: Representation{
-			Data: data,
-		},
-		ReporterResourceID: reporterResourceID,
-		Version:            version,
-		Generation:         generation,
-		CommonVersion:      commonVersion,
-		Tombstone:          tombstone,
-		ReporterVersion:    reporterVersion,
+	reporterVersionVal *string,
+) (ReporterDataRepresentation, error) {
+	if len(data) == 0 {
+		return nil, fmt.Errorf("ReporterDataRepresentation requires non-empty data")
 	}
 
-	// Validate the instance
-	if err := validateReporterRepresentation(rr); err != nil {
+	reporterResourceID, err := NewReporterResourceIdFromString(reporterResourceIDVal)
+	if err != nil {
 		return nil, err
 	}
 
-	return rr, nil
+	var reporterVersion *ReporterVersion
+	if reporterVersionVal != nil {
+		rv, err := NewReporterVersion(*reporterVersionVal)
+		if err != nil {
+			return nil, err
+		}
+		reporterVersion = &rv
+	}
+
+	return ReporterRepresentation{
+		Representation: Representation{
+			data: data,
+		},
+		reporterResourceID: reporterResourceID,
+		version:            NewVersion(version),
+		generation:         NewGeneration(generation),
+		commonVersion:      NewVersion(commonVersion),
+		reporterVersion:    reporterVersion,
+		tombstone:          NewTombstone(false),
+	}, nil
 }
 
-// validateReporterRepresentation validates a ReporterRepresentation instance
-// This function is used internally by factory methods to ensure consistency
-func validateReporterRepresentation(rr *ReporterRepresentation) error {
-	return aggregateErrors(
-		validateStringRequired("ReporterResourceID", rr.ReporterResourceID),
-		validateMinValueUint("Version", rr.Version, MinVersionValue),
-		validateMinValueUint("Generation", rr.Generation, MinGenerationValue),
-		validateMinValueUint("CommonVersion", rr.CommonVersion, MinCommonVersion),
-		validateOptionalString("ReporterVersion", rr.ReporterVersion, MaxReporterVersionLength),
-		// Data can be nil - this is a valid state
-	)
+func NewReporterDeleteRepresentation(
+	reporterResourceIDVal string,
+	version uint,
+	generation uint,
+	commonVersion uint,
+	reporterVersionVal *string,
+) (ReporterDeleteRepresentation, error) {
+	reporterResourceID, err := NewReporterResourceIdFromString(reporterResourceIDVal)
+	if err != nil {
+		return nil, err
+	}
+
+	var reporterVersion *ReporterVersion
+	if reporterVersionVal != nil {
+		rv, err := NewReporterVersion(*reporterVersionVal)
+		if err != nil {
+			return nil, err
+		}
+		reporterVersion = &rv
+	}
+
+	return ReporterRepresentation{
+		Representation: Representation{
+			data: nil,
+		},
+		reporterResourceID: reporterResourceID,
+		version:            NewVersion(version),
+		generation:         NewGeneration(generation),
+		commonVersion:      NewVersion(commonVersion),
+		reporterVersion:    reporterVersion,
+		tombstone:          NewTombstone(true),
+	}, nil
 }

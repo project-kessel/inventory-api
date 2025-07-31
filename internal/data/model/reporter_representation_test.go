@@ -5,6 +5,8 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/project-kessel/inventory-api/internal"
 )
 
 // Infrastructure tests for ReporterRepresentation domain model
@@ -196,7 +198,7 @@ func TestReporterRepresentation_EdgeCases(t *testing.T) {
 		t.Parallel()
 
 		_, err := NewReporterRepresentation(
-			JsonObject{
+			internal.JsonObject{
 				"name":        "测试资源",
 				"description": "包含Unicode字符的描述 🌟",
 			},
@@ -214,7 +216,7 @@ func TestReporterRepresentation_EdgeCases(t *testing.T) {
 		t.Parallel()
 
 		_, err := NewReporterRepresentation(
-			JsonObject{
+			internal.JsonObject{
 				"special_field": "Value with special chars: !@#$%^&*()_+-=[]{}|;':\",./<>?",
 			},
 			"reporter-resource-with-special-chars-!@#$%^&*()",
@@ -231,7 +233,7 @@ func TestReporterRepresentation_EdgeCases(t *testing.T) {
 		t.Parallel()
 
 		_, err := NewReporterRepresentation(
-			JsonObject{"test": "data"},
+			internal.JsonObject{"test": "data"},
 			"test-reporter-resource-id",
 			4294967295, // Max uint32 Version
 			4294967295, // Max uint32 Generation
@@ -246,13 +248,13 @@ func TestReporterRepresentation_EdgeCases(t *testing.T) {
 		t.Parallel()
 
 		_, err := NewReporterRepresentation(
-			JsonObject{"test": "data"},
+			internal.JsonObject{"test": "data"},
 			"test-reporter-resource-id",
 			1,
 			1,
 			1,
 			false,
-			stringPtr(""), // Empty ReporterVersion
+			internal.StringPtr(""), // Empty ReporterVersion
 		)
 		AssertNoError(t, err, "ReporterRepresentation with empty string values for nullable fields should be valid")
 	})
@@ -261,7 +263,7 @@ func TestReporterRepresentation_EdgeCases(t *testing.T) {
 		t.Parallel()
 
 		_, err := NewReporterRepresentation(
-			JsonObject{"test": "data"},
+			internal.JsonObject{"test": "data"},
 			"test-reporter-resource-id",
 			1,
 			1,
@@ -275,34 +277,34 @@ func TestReporterRepresentation_EdgeCases(t *testing.T) {
 	t.Run("should handle complex nested JSON data", func(t *testing.T) {
 		t.Parallel()
 
-		complexData := JsonObject{
-			"metadata": JsonObject{
-				"labels": JsonObject{
+		complexData := internal.JsonObject{
+			"metadata": internal.JsonObject{
+				"labels": internal.JsonObject{
 					"app":         "test-app",
 					"environment": "staging",
 					"team":        "platform",
 				},
-				"annotations": JsonObject{
+				"annotations": internal.JsonObject{
 					"deployment.kubernetes.io/revision":                "1",
 					"kubectl.kubernetes.io/last-applied-configuration": `{"apiVersion":"v1","kind":"Pod","metadata":{"name":"test"}}`,
 				},
 			},
-			"spec": JsonObject{
+			"spec": internal.JsonObject{
 				"containers": []interface{}{
-					JsonObject{
+					internal.JsonObject{
 						"name":  "app",
 						"image": "nginx:1.21",
 						"ports": []interface{}{
-							JsonObject{"containerPort": 80},
-							JsonObject{"containerPort": 443},
+							internal.JsonObject{"containerPort": 80},
+							internal.JsonObject{"containerPort": 443},
 						},
 					},
 				},
 			},
-			"status": JsonObject{
+			"status": internal.JsonObject{
 				"phase": "Running",
 				"conditions": []interface{}{
-					JsonObject{
+					internal.JsonObject{
 						"type":   "Ready",
 						"status": "True",
 					},
@@ -326,7 +328,7 @@ func TestReporterRepresentation_EdgeCases(t *testing.T) {
 		t.Parallel()
 
 		_, err := NewReporterRepresentation(
-			JsonObject{},
+			internal.JsonObject{},
 			"test-reporter-resource-id",
 			1,
 			1,
@@ -355,7 +357,7 @@ func TestReporterRepresentation_EdgeCases(t *testing.T) {
 			t.Run(tc.name, func(t *testing.T) {
 				t.Parallel()
 				_, err := NewReporterRepresentation(
-					JsonObject{"test": "data"},
+					internal.JsonObject{"test": "data"},
 					"test-reporter-resource-id",
 					tc.version,
 					1,
@@ -390,7 +392,7 @@ func TestReporterRepresentation_EdgeCases(t *testing.T) {
 			t.Run(tc.name, func(t *testing.T) {
 				t.Parallel()
 				_, err := NewReporterRepresentation(
-					JsonObject{"test": "data"},
+					internal.JsonObject{"test": "data"},
 					"test-reporter-resource-id",
 					1,
 					tc.generation,
@@ -422,7 +424,7 @@ func TestReporterRepresentation_EdgeCases(t *testing.T) {
 			t.Run(tc.name, func(t *testing.T) {
 				t.Parallel()
 				rr, err := NewReporterRepresentation(
-					JsonObject{"test": "data"},
+					internal.JsonObject{"test": "data"},
 					"test-reporter-resource-id",
 					1,
 					1,
@@ -516,7 +518,7 @@ func TestReporterRepresentation_Serialization(t *testing.T) {
 		fixture := NewTestFixture(t)
 		rr := fixture.ValidReporterRepresentation()
 		rr.ReporterResourceID = "测试-reporter-resource-🌟"
-		rr.Data = JsonObject{
+		rr.Data = internal.JsonObject{
 			"name":        "测试资源",
 			"description": "包含Unicode字符的描述 🌟",
 		}
@@ -547,7 +549,7 @@ func TestReporterRepresentation_Serialization(t *testing.T) {
 		fixture := NewTestFixture(t)
 		rr := fixture.ValidReporterRepresentation()
 		rr.ReporterResourceID = "reporter-resource-with-special-chars-!@#$%^&*()"
-		rr.Data = JsonObject{
+		rr.Data = internal.JsonObject{
 			"special_field": "Value with special chars: !@#$%^&*()_+-=[]{}|;':\",./<>?",
 		}
 
@@ -578,24 +580,24 @@ func TestReporterRepresentation_Serialization(t *testing.T) {
 		fixture := NewTestFixture(t)
 		rr := fixture.ValidReporterRepresentation()
 
-		complexData := JsonObject{
-			"metadata": JsonObject{
-				"labels": JsonObject{
+		complexData := internal.JsonObject{
+			"metadata": internal.JsonObject{
+				"labels": internal.JsonObject{
 					"app":         "test-app",
 					"environment": "staging",
 				},
-				"annotations": JsonObject{
+				"annotations": internal.JsonObject{
 					"deployment.kubernetes.io/revision": "1",
 				},
 			},
-			"spec": JsonObject{
+			"spec": internal.JsonObject{
 				"containers": []interface{}{
-					JsonObject{
+					internal.JsonObject{
 						"name":  "app",
 						"image": "nginx:1.21",
 						"ports": []interface{}{
-							JsonObject{"containerPort": 80},
-							JsonObject{"containerPort": 443},
+							internal.JsonObject{"containerPort": 80},
+							internal.JsonObject{"containerPort": 443},
 						},
 					},
 				},
@@ -686,7 +688,7 @@ func TestReporterRepresentation_Serialization(t *testing.T) {
 
 		fixture := NewTestFixture(t)
 		rr := fixture.ValidReporterRepresentation()
-		rr.Data = JsonObject{}
+		rr.Data = internal.JsonObject{}
 
 		// Test JSON marshaling with empty data object
 		jsonData, err := json.Marshal(rr)

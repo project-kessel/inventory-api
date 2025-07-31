@@ -1,190 +1,306 @@
 package model
 
 import (
+	"strings"
 	"testing"
-
-	"github.com/google/uuid"
 )
 
-func TestReporterResource_NewReporterResource(t *testing.T) {
-	t.Run("should create valid ReporterResource", func(t *testing.T) {
-		id := uuid.New()
-		resourceID := uuid.New()
+func assertValidReporterResource(t *testing.T, reporterResource ReporterResource, err error, testCase string) {
+	t.Helper()
+	if err != nil {
+		t.Errorf("Expected no error for %s, got %v", testCase, err)
+	}
+	if reporterResource == (ReporterResource{}) {
+		t.Errorf("Expected valid ReporterResource for %s, got empty struct", testCase)
+	}
+}
 
-		rr, err := NewReporterResource(
-			id,
-			"local-123",
-			"hbi",
-			"host",
-			"instance-456",
-			resourceID,
-			"https://api.example.com",
-			"https://console.example.com",
-			1,
-			2,
-			false,
+func assertInvalidReporterResource(t *testing.T, reporterResource ReporterResource, err error, expectedErrorSubstring string) {
+	t.Helper()
+	if err == nil {
+		t.Error("Expected error, got none")
+	}
+	if reporterResource != (ReporterResource{}) {
+		t.Error("Expected empty ReporterResource for invalid input, got non-empty")
+	}
+	if !strings.Contains(err.Error(), expectedErrorSubstring) {
+		t.Errorf("Expected error about %s, got %v", expectedErrorSubstring, err)
+	}
+}
+
+func TestReporterResource_Initialization(t *testing.T) {
+	t.Parallel()
+	fixture := NewReporterResourceTestFixture()
+
+	t.Run("should create reporter resource with valid inputs", func(t *testing.T) {
+		t.Parallel()
+
+		reporterResource, err := NewReporterResource(
+			fixture.ValidId,
+			fixture.ValidLocalResourceId,
+			fixture.ValidResourceType,
+			fixture.ValidReporterType,
+			fixture.ValidReporterInstanceId,
+			fixture.ValidResourceId,
+			fixture.ValidApiHref,
+			fixture.ValidConsoleHref,
 		)
 
-		if err != nil {
-			t.Errorf("Expected no error, got: %v", err)
-		}
-
-		if rr.ID != id {
-			t.Errorf("Expected ID %v, got %v", id, rr.ID)
-		}
-
-		if rr.LocalResourceID != "local-123" {
-			t.Errorf("Expected LocalResourceID 'local-123', got '%s'", rr.LocalResourceID)
-		}
-
-		if rr.ReporterType != "hbi" {
-			t.Errorf("Expected ReporterType 'hbi', got '%s'", rr.ReporterType)
-		}
-
-		if rr.ResourceType != "host" {
-			t.Errorf("Expected ResourceType 'host', got '%s'", rr.ResourceType)
-		}
-
-		if rr.ReporterInstanceID != "instance-456" {
-			t.Errorf("Expected ReporterInstanceID 'instance-456', got '%s'", rr.ReporterInstanceID)
-		}
-
-		if rr.ResourceID != resourceID {
-			t.Errorf("Expected ResourceID %v, got %v", resourceID, rr.ResourceID)
-		}
-
-		if rr.RepresentationVersion != 1 {
-			t.Errorf("Expected RepresentationVersion 1, got %d", rr.RepresentationVersion)
-		}
-
-		if rr.Generation != 2 {
-			t.Errorf("Expected Generation 2, got %d", rr.Generation)
-		}
-
-		if rr.Tombstone != false {
-			t.Errorf("Expected Tombstone false, got %t", rr.Tombstone)
-		}
+		assertValidReporterResource(t, reporterResource, err, "valid inputs")
 	})
 
-	t.Run("should validate required fields", func(t *testing.T) {
-		validID := uuid.New()
-		validResourceID := uuid.New()
+	t.Run("should create reporter resource with empty console href", func(t *testing.T) {
+		t.Parallel()
 
-		testCases := []struct {
-			name               string
-			id                 uuid.UUID
-			localResourceID    string
-			reporterType       string
-			resourceType       string
-			reporterInstanceID string
-			resourceID         uuid.UUID
-			expectedError      string
-		}{
-			{
-				name:               "empty ID",
-				id:                 uuid.Nil,
-				localResourceID:    "valid",
-				reporterType:       "valid",
-				resourceType:       "valid",
-				reporterInstanceID: "valid",
-				resourceID:         validResourceID,
-				expectedError:      "ID",
-			},
-			{
-				name:               "empty LocalResourceID",
-				id:                 validID,
-				localResourceID:    "",
-				reporterType:       "valid",
-				resourceType:       "valid",
-				reporterInstanceID: "valid",
-				resourceID:         validResourceID,
-				expectedError:      "LocalResourceID",
-			},
-			{
-				name:               "empty ReporterType",
-				id:                 validID,
-				localResourceID:    "valid",
-				reporterType:       "",
-				resourceType:       "valid",
-				reporterInstanceID: "valid",
-				resourceID:         validResourceID,
-				expectedError:      "ReporterType",
-			},
-			{
-				name:               "empty ResourceType",
-				id:                 validID,
-				localResourceID:    "valid",
-				reporterType:       "valid",
-				resourceType:       "",
-				reporterInstanceID: "valid",
-				resourceID:         validResourceID,
-				expectedError:      "ResourceType",
-			},
-			{
-				name:               "empty ReporterInstanceID",
-				id:                 validID,
-				localResourceID:    "valid",
-				reporterType:       "valid",
-				resourceType:       "valid",
-				reporterInstanceID: "",
-				resourceID:         validResourceID,
-				expectedError:      "ReporterInstanceID",
-			},
-			{
-				name:               "empty ResourceID",
-				id:                 validID,
-				localResourceID:    "valid",
-				reporterType:       "valid",
-				resourceType:       "valid",
-				reporterInstanceID: "valid",
-				resourceID:         uuid.Nil,
-				expectedError:      "ResourceID",
-			},
-		}
+		reporterResource, err := NewReporterResource(
+			fixture.ValidId,
+			fixture.ValidLocalResourceId,
+			fixture.ValidResourceType,
+			fixture.ValidReporterType,
+			fixture.ValidReporterInstanceId,
+			fixture.ValidResourceId,
+			fixture.ValidApiHref,
+			fixture.EmptyConsoleHref,
+		)
 
-		for _, tc := range testCases {
-			t.Run(tc.name, func(t *testing.T) {
-				_, err := NewReporterResource(
-					tc.id,
-					tc.localResourceID,
-					tc.reporterType,
-					tc.resourceType,
-					tc.reporterInstanceID,
-					tc.resourceID,
-					"https://api.example.com",
-					"https://console.example.com",
-					1,
-					1,
-					false,
-				)
-
-				if err == nil {
-					t.Errorf("Expected validation error for %s", tc.name)
-				}
-
-				if err != nil && !contains(err.Error(), tc.expectedError) {
-					t.Errorf("Expected error to contain '%s', got: %v", tc.expectedError, err)
-				}
-			})
-		}
+		assertValidReporterResource(t, reporterResource, err, "empty console href")
 	})
-}
 
-// Helper function to check if a string contains another string
-func contains(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr || (len(s) > len(substr) &&
-		(s[:len(substr)] == substr || s[len(s)-len(substr):] == substr ||
-			containsSubstring(s, substr))))
-}
+	t.Run("should reject nil ID", func(t *testing.T) {
+		t.Parallel()
 
-func containsSubstring(s, substr string) bool {
-	if len(substr) > len(s) {
-		return false
-	}
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return true
-		}
-	}
-	return false
+		reporterResource, err := NewReporterResource(
+			fixture.NilId,
+			fixture.ValidLocalResourceId,
+			fixture.ValidResourceType,
+			fixture.ValidReporterType,
+			fixture.ValidReporterInstanceId,
+			fixture.ValidResourceId,
+			fixture.ValidApiHref,
+			fixture.ValidConsoleHref,
+		)
+
+		assertInvalidReporterResource(t, reporterResource, err, "ReporterResource invalid ID")
+	})
+
+	t.Run("should reject empty local resource ID", func(t *testing.T) {
+		t.Parallel()
+
+		reporterResource, err := NewReporterResource(
+			fixture.ValidId,
+			fixture.EmptyLocalResourceId,
+			fixture.ValidResourceType,
+			fixture.ValidReporterType,
+			fixture.ValidReporterInstanceId,
+			fixture.ValidResourceId,
+			fixture.ValidApiHref,
+			fixture.ValidConsoleHref,
+		)
+
+		assertInvalidReporterResource(t, reporterResource, err, "ReporterResource invalid key")
+	})
+
+	t.Run("should reject whitespace-only local resource ID", func(t *testing.T) {
+		t.Parallel()
+
+		reporterResource, err := NewReporterResource(
+			fixture.ValidId,
+			fixture.WhitespaceLocalResourceId,
+			fixture.ValidResourceType,
+			fixture.ValidReporterType,
+			fixture.ValidReporterInstanceId,
+			fixture.ValidResourceId,
+			fixture.ValidApiHref,
+			fixture.ValidConsoleHref,
+		)
+
+		assertInvalidReporterResource(t, reporterResource, err, "LocalResourceId cannot be empty")
+	})
+
+	t.Run("should reject empty resource type", func(t *testing.T) {
+		t.Parallel()
+
+		reporterResource, err := NewReporterResource(
+			fixture.ValidId,
+			fixture.ValidLocalResourceId,
+			fixture.EmptyResourceType,
+			fixture.ValidReporterType,
+			fixture.ValidReporterInstanceId,
+			fixture.ValidResourceId,
+			fixture.ValidApiHref,
+			fixture.ValidConsoleHref,
+		)
+
+		assertInvalidReporterResource(t, reporterResource, err, "ResourceType cannot be empty")
+	})
+
+	t.Run("should reject whitespace-only resource type", func(t *testing.T) {
+		t.Parallel()
+
+		reporterResource, err := NewReporterResource(
+			fixture.ValidId,
+			fixture.ValidLocalResourceId,
+			fixture.WhitespaceResourceType,
+			fixture.ValidReporterType,
+			fixture.ValidReporterInstanceId,
+			fixture.ValidResourceId,
+			fixture.ValidApiHref,
+			fixture.ValidConsoleHref,
+		)
+
+		assertInvalidReporterResource(t, reporterResource, err, "ResourceType cannot be empty")
+	})
+
+	t.Run("should reject empty reporter type", func(t *testing.T) {
+		t.Parallel()
+
+		reporterResource, err := NewReporterResource(
+			fixture.ValidId,
+			fixture.ValidLocalResourceId,
+			fixture.ValidResourceType,
+			fixture.EmptyReporterType,
+			fixture.ValidReporterInstanceId,
+			fixture.ValidResourceId,
+			fixture.ValidApiHref,
+			fixture.ValidConsoleHref,
+		)
+
+		assertInvalidReporterResource(t, reporterResource, err, "ReportedByReporterType cannot be empty")
+	})
+
+	t.Run("should reject whitespace-only reporter type", func(t *testing.T) {
+		t.Parallel()
+
+		reporterResource, err := NewReporterResource(
+			fixture.ValidId,
+			fixture.ValidLocalResourceId,
+			fixture.ValidResourceType,
+			fixture.WhitespaceReporterType,
+			fixture.ValidReporterInstanceId,
+			fixture.ValidResourceId,
+			fixture.ValidApiHref,
+			fixture.ValidConsoleHref,
+		)
+
+		assertInvalidReporterResource(t, reporterResource, err, "ReportedByReporterType cannot be empty")
+	})
+
+	t.Run("should reject empty reporter instance ID", func(t *testing.T) {
+		t.Parallel()
+
+		reporterResource, err := NewReporterResource(
+			fixture.ValidId,
+			fixture.ValidLocalResourceId,
+			fixture.ValidResourceType,
+			fixture.ValidReporterType,
+			fixture.EmptyReporterInstanceId,
+			fixture.ValidResourceId,
+			fixture.ValidApiHref,
+			fixture.ValidConsoleHref,
+		)
+
+		assertInvalidReporterResource(t, reporterResource, err, "ReporterInstanceId cannot be empty")
+	})
+
+	t.Run("should reject whitespace-only reporter instance ID", func(t *testing.T) {
+		t.Parallel()
+
+		reporterResource, err := NewReporterResource(
+			fixture.ValidId,
+			fixture.ValidLocalResourceId,
+			fixture.ValidResourceType,
+			fixture.ValidReporterType,
+			fixture.WhitespaceReporterInstanceId,
+			fixture.ValidResourceId,
+			fixture.ValidApiHref,
+			fixture.ValidConsoleHref,
+		)
+
+		assertInvalidReporterResource(t, reporterResource, err, "ReporterInstanceId cannot be empty")
+	})
+
+	t.Run("should reject nil resource ID", func(t *testing.T) {
+		t.Parallel()
+
+		reporterResource, err := NewReporterResource(
+			fixture.ValidId,
+			fixture.ValidLocalResourceId,
+			fixture.ValidResourceType,
+			fixture.ValidReporterType,
+			fixture.ValidReporterInstanceId,
+			fixture.NilResourceId,
+			fixture.ValidApiHref,
+			fixture.ValidConsoleHref,
+		)
+
+		assertInvalidReporterResource(t, reporterResource, err, "ResourceId cannot be empty")
+	})
+
+	t.Run("should reject empty API href", func(t *testing.T) {
+		t.Parallel()
+
+		reporterResource, err := NewReporterResource(
+			fixture.ValidId,
+			fixture.ValidLocalResourceId,
+			fixture.ValidResourceType,
+			fixture.ValidReporterType,
+			fixture.ValidReporterInstanceId,
+			fixture.ValidResourceId,
+			fixture.EmptyApiHref,
+			fixture.ValidConsoleHref,
+		)
+
+		assertInvalidReporterResource(t, reporterResource, err, "ApiHref cannot be empty")
+	})
+
+	t.Run("should reject whitespace-only API href", func(t *testing.T) {
+		t.Parallel()
+
+		reporterResource, err := NewReporterResource(
+			fixture.ValidId,
+			fixture.ValidLocalResourceId,
+			fixture.ValidResourceType,
+			fixture.ValidReporterType,
+			fixture.ValidReporterInstanceId,
+			fixture.ValidResourceId,
+			fixture.WhitespaceApiHref,
+			fixture.ValidConsoleHref,
+		)
+
+		assertInvalidReporterResource(t, reporterResource, err, "ApiHref cannot be empty")
+	})
+
+	t.Run("should accept local resource ID in UUID format", func(t *testing.T) {
+		t.Parallel()
+
+		reporterResource, err := NewReporterResource(
+			fixture.ValidId,
+			fixture.ValidLocalResourceIdUUID,
+			fixture.ValidResourceType,
+			fixture.ValidReporterType,
+			fixture.ValidReporterInstanceId,
+			fixture.ValidResourceId,
+			fixture.ValidApiHref,
+			fixture.ValidConsoleHref,
+		)
+
+		assertValidReporterResource(t, reporterResource, err, "UUID format local resource ID")
+	})
+
+	t.Run("should accept local resource ID in string format", func(t *testing.T) {
+		t.Parallel()
+
+		reporterResource, err := NewReporterResource(
+			fixture.ValidId,
+			fixture.ValidLocalResourceIdString,
+			fixture.ValidResourceType,
+			fixture.ValidReporterType,
+			fixture.ValidReporterInstanceId,
+			fixture.ValidResourceId,
+			fixture.ValidApiHref,
+			fixture.ValidConsoleHref,
+		)
+
+		assertValidReporterResource(t, reporterResource, err, "string format local resource ID")
+	})
 }

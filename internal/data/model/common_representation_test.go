@@ -2,10 +2,12 @@ package model
 
 import (
 	"encoding/json"
-	"reflect"
-	"testing"
 
 	"github.com/google/uuid"
+	"github.com/project-kessel/inventory-api/internal"
+
+	"reflect"
+	"testing"
 )
 
 // Helper function to check if a CommonRepresentation is valid
@@ -50,7 +52,7 @@ func TestCommonRepresentation_Infrastructure_Structure(t *testing.T) {
 		AssertFieldType(t, cr, "Version", reflect.TypeOf(uint(0)))
 		AssertFieldType(t, cr, "ReportedByReporterType", reflect.TypeOf(""))
 		AssertFieldType(t, cr, "ReportedByReporterInstance", reflect.TypeOf(""))
-		AssertFieldType(t, cr, "Data", reflect.TypeOf(JsonObject{}))
+		AssertFieldType(t, cr, "Data", reflect.TypeOf(internal.JsonObject{}))
 	})
 
 	t.Run("should have correct GORM tags for primary key", func(t *testing.T) {
@@ -59,8 +61,8 @@ func TestCommonRepresentation_Infrastructure_Structure(t *testing.T) {
 		cr := &CommonRepresentation{}
 
 		// Check primary key fields have correct GORM tags
-		AssertGORMTag(t, cr, "ResourceId", "type:text;column:id;primaryKey")
-		AssertGORMTag(t, cr, "Version", "type:bigint;column:version;primaryKey;check:version >= 0")
+		AssertGORMTag(t, cr, "ResourceId", "type:text;primaryKey")
+		AssertGORMTag(t, cr, "Version", "type:bigint;primaryKey;check:version >= 0")
 	})
 
 	t.Run("should have correct GORM size constraints", func(t *testing.T) {
@@ -69,8 +71,8 @@ func TestCommonRepresentation_Infrastructure_Structure(t *testing.T) {
 		cr := &CommonRepresentation{}
 
 		// Verify size constraints match constants
-		AssertGORMTag(t, cr, "ReportedByReporterType", "size:128;column:reported_by_reporter_type")
-		AssertGORMTag(t, cr, "ReportedByReporterInstance", "size:128;column:reported_by_reporter_instance")
+		AssertGORMTag(t, cr, "ReportedByReporterType", "size:128")
+		AssertGORMTag(t, cr, "ReportedByReporterInstance", "size:128")
 	})
 
 	t.Run("should have correct non-nullable field types", func(t *testing.T) {
@@ -83,7 +85,7 @@ func TestCommonRepresentation_Infrastructure_Structure(t *testing.T) {
 		AssertFieldType(t, cr, "Version", reflect.TypeOf(uint(0)))
 		AssertFieldType(t, cr, "ReportedByReporterType", reflect.TypeOf(""))
 		AssertFieldType(t, cr, "ReportedByReporterInstance", reflect.TypeOf(""))
-		AssertFieldType(t, cr, "Data", reflect.TypeOf(JsonObject{}))
+		AssertFieldType(t, cr, "Data", reflect.TypeOf(internal.JsonObject{}))
 	})
 }
 
@@ -146,34 +148,34 @@ func TestCommonRepresentation_Infrastructure_EdgeCases(t *testing.T) {
 		fixture := NewTestFixture(t)
 		cr := fixture.ValidCommonRepresentation()
 
-		complexData := JsonObject{
-			"metadata": JsonObject{
-				"labels": JsonObject{
+		complexData := internal.JsonObject{
+			"metadata": internal.JsonObject{
+				"labels": internal.JsonObject{
 					"app":         "test-app",
 					"environment": "staging",
 					"team":        "platform",
 				},
-				"annotations": JsonObject{
+				"annotations": internal.JsonObject{
 					"deployment.kubernetes.io/revision":                "1",
 					"kubectl.kubernetes.io/last-applied-configuration": `{"apiVersion":"v1","kind":"Pod","metadata":{"name":"test"}}`,
 				},
 			},
-			"spec": JsonObject{
+			"spec": internal.JsonObject{
 				"containers": []interface{}{
-					JsonObject{
+					internal.JsonObject{
 						"name":  "app",
 						"image": "nginx:1.21",
 						"ports": []interface{}{
-							JsonObject{"containerPort": 80},
-							JsonObject{"containerPort": 443},
+							internal.JsonObject{"containerPort": 80},
+							internal.JsonObject{"containerPort": 443},
 						},
 					},
 				},
 			},
-			"status": JsonObject{
+			"status": internal.JsonObject{
 				"phase": "Running",
 				"conditions": []interface{}{
-					JsonObject{
+					internal.JsonObject{
 						"type":   "Ready",
 						"status": "True",
 					},
@@ -193,7 +195,7 @@ func TestCommonRepresentation_Infrastructure_EdgeCases(t *testing.T) {
 
 		fixture := NewTestFixture(t)
 		cr := fixture.ValidCommonRepresentation()
-		cr.Data = JsonObject{}
+		cr.Data = internal.JsonObject{}
 
 		if !isValidCommonRepresentation(cr) {
 			t.Error("CommonRepresentation with empty JSON object should be valid")
@@ -300,7 +302,7 @@ func TestCommonRepresentation_Infrastructure_Serialization(t *testing.T) {
 
 		fixture := NewTestFixture(t)
 		cr := fixture.ValidCommonRepresentation()
-		cr.Data = JsonObject{"empty_field": ""}
+		cr.Data = internal.JsonObject{"empty_field": ""}
 
 		jsonData, err := json.Marshal(cr)
 		AssertNoError(t, err, "Should be able to marshal CommonRepresentation with empty string values")
@@ -369,11 +371,11 @@ func TestCommonRepresentation_Infrastructure_Serialization(t *testing.T) {
 		fixture := NewTestFixture(t)
 		cr := fixture.ValidCommonRepresentation()
 
-		complexData := JsonObject{
-			"nested": JsonObject{
+		complexData := internal.JsonObject{
+			"nested": internal.JsonObject{
 				"array": []interface{}{
-					JsonObject{"key": "value1"},
-					JsonObject{"key": "value2"},
+					internal.JsonObject{"key": "value1"},
+					internal.JsonObject{"key": "value2"},
 				},
 				"number":  42,
 				"boolean": true,
@@ -404,7 +406,7 @@ func TestCommonRepresentation_Infrastructure_Serialization(t *testing.T) {
 
 		fixture := NewTestFixture(t)
 		cr := fixture.ValidCommonRepresentation()
-		cr.Data = JsonObject{}
+		cr.Data = internal.JsonObject{}
 
 		jsonData, err := json.Marshal(cr)
 		AssertNoError(t, err, "Should be able to marshal CommonRepresentation with empty data object")

@@ -20,7 +20,7 @@ func NewCommonRepresentation(
 	reportedByReporterType string,
 	reportedByReporterInstance string,
 ) (*CommonRepresentation, error) {
-	if data == nil || len(data) == 0 {
+	if len(data) == 0 {
 		return nil, fmt.Errorf("CommonRepresentation requires non-empty data")
 	}
 

@@ -511,6 +511,7 @@ func TestReporterVersion_Initialization(t *testing.T) {
 		}
 		if reporterVersionPtr == nil {
 			t.Error("Expected non-nil pointer, got nil")
+			return
 		}
 		if reporterVersionPtr.String() != *fixture.ValidPointer {
 			t.Errorf("Expected reporter version %s, got %s", *fixture.ValidPointer, reporterVersionPtr.String())

@@ -42,9 +42,12 @@ func NewReporterResource(idVal uuid.UUID, localResourceIdVal string, resourceTyp
 		return ReporterResource{}, err
 	}
 
-	consoleHref, err := NewConsoleHref(consoleHrefVal)
-	if err != nil {
-		return ReporterResource{}, err
+	var consoleHref ConsoleHref
+	if consoleHrefVal != "" {
+		consoleHref, err = NewConsoleHref(consoleHrefVal)
+		if err != nil {
+			return ReporterResource{}, err
+		}
 	}
 
 	resource := ReporterResource{

@@ -1,6 +1,8 @@
 package model
 
 import (
+	"fmt"
+
 	"github.com/google/uuid"
 )
 
@@ -12,30 +14,34 @@ type CommonRepresentation struct {
 }
 
 func NewCommonRepresentation(
-	resourceId uuid.UUID,
+	resourceIdVal uuid.UUID,
 	data JsonObject,
-	version uint,
+	versionVal uint,
 	reportedByReporterType string,
 	reportedByReporterInstance string,
 ) (*CommonRepresentation, error) {
-	resourceIdType, err := NewResourceId(resourceId)
+	if data == nil || len(data) == 0 {
+		return nil, fmt.Errorf("CommonRepresentation requires non-empty data")
+	}
+
+	resourceId, err := NewResourceId(resourceIdVal)
 	if err != nil {
 		return nil, err
 	}
 
-	reporterObj, err := NewReporter(reportedByReporterType, reportedByReporterInstance)
+	reporter, err := NewReporter(reportedByReporterType, reportedByReporterInstance)
 	if err != nil {
 		return nil, err
 	}
 
-	versionType := NewVersion(version)
+	version := NewVersion(versionVal)
 
 	return &CommonRepresentation{
 		Representation: Representation{
 			data: data,
 		},
-		resourceId: resourceIdType,
-		version:    versionType,
-		reporter:   reporterObj,
+		resourceId: resourceId,
+		version:    version,
+		reporter:   reporter,
 	}, nil
 }

@@ -212,3 +212,123 @@ func NewLocalResourceIdTestFixture() LocalResourceIdTestFixture {
 		WhitespaceString: "  \t\n  ",
 	}
 }
+
+type JsonObjectTestFixture struct {
+	ValidData   JsonObject
+	AnotherData JsonObject
+	EmptyData   JsonObject
+	NilData     JsonObject
+}
+
+func NewJsonObjectTestFixture() JsonObjectTestFixture {
+	return JsonObjectTestFixture{
+		ValidData: JsonObject{
+			"name":      "test-cluster",
+			"status":    "active",
+			"nodeCount": 3,
+			"region":    "us-east-1",
+			"labels":    map[string]interface{}{"env": "prod", "team": "platform"},
+		},
+		AnotherData: JsonObject{
+			"hostname": "test-host",
+			"os":       "linux",
+			"memory":   "16GB",
+			"cpu":      "4 cores",
+			"uptime":   "30 days",
+		},
+		EmptyData: JsonObject{},
+		NilData:   nil,
+	}
+}
+
+type CommonRepresentationTestFixture struct {
+	ValidResourceId                 uuid.UUID
+	ValidData                       JsonObject
+	ValidVersion                    uint
+	ValidReportedByReporterType     string
+	ValidReportedByReporterInstance string
+	NilResourceId                   uuid.UUID
+	EmptyData                       JsonObject
+	NilData                         JsonObject
+	ZeroVersion                     uint
+	EmptyReporterType               string
+	WhitespaceReporterType          string
+	EmptyReporterInstance           string
+	WhitespaceReporterInstance      string
+}
+
+func NewCommonRepresentationTestFixture() CommonRepresentationTestFixture {
+	return CommonRepresentationTestFixture{
+		ValidResourceId: uuid.MustParse("550e8400-e29b-41d4-a716-446655440123"),
+		ValidData: JsonObject{
+			"name":        "test-resource",
+			"description": "A test resource for CommonRepresentation",
+			"metadata":    map[string]interface{}{"version": "1.0", "type": "test"},
+		},
+		ValidVersion:                    1,
+		ValidReportedByReporterType:     "test-reporter",
+		ValidReportedByReporterInstance: "test-instance-001",
+		NilResourceId:                   uuid.Nil,
+		EmptyData:                       JsonObject{},
+		NilData:                         nil,
+		ZeroVersion:                     0,
+		EmptyReporterType:               "",
+		WhitespaceReporterType:          "  \t\n  ",
+		EmptyReporterInstance:           "",
+		WhitespaceReporterInstance:      "  \t\n  ",
+	}
+}
+
+type ReporterResourceTestFixture struct {
+	ValidId                      uuid.UUID
+	ValidLocalResourceId         string
+	ValidLocalResourceIdUUID     string
+	ValidLocalResourceIdString   string
+	ValidResourceType            string
+	ValidReporterType            string
+	ValidReporterInstanceId      string
+	ValidResourceId              uuid.UUID
+	ValidApiHref                 string
+	ValidConsoleHref             string
+	EmptyConsoleHref             string
+	NilId                        uuid.UUID
+	EmptyLocalResourceId         string
+	WhitespaceLocalResourceId    string
+	EmptyResourceType            string
+	WhitespaceResourceType       string
+	EmptyReporterType            string
+	WhitespaceReporterType       string
+	EmptyReporterInstanceId      string
+	WhitespaceReporterInstanceId string
+	NilResourceId                uuid.UUID
+	EmptyApiHref                 string
+	WhitespaceApiHref            string
+}
+
+func NewReporterResourceTestFixture() ReporterResourceTestFixture {
+	return ReporterResourceTestFixture{
+		ValidId:                      uuid.MustParse("550e8400-e29b-41d4-a716-446655440200"),
+		ValidLocalResourceId:         "local-resource-123",
+		ValidLocalResourceIdUUID:     "550e8400-e29b-41d4-a716-446655440300",
+		ValidLocalResourceIdString:   "my-cluster-name-prod",
+		ValidResourceType:            "k8s_cluster",
+		ValidReporterType:            "acm",
+		ValidReporterInstanceId:      "acm-instance-001",
+		ValidResourceId:              uuid.MustParse("550e8400-e29b-41d4-a716-446655440201"),
+		ValidApiHref:                 "/api/v1/resources/123",
+		ValidConsoleHref:             "/console/resources/123",
+		EmptyConsoleHref:             "",
+		NilId:                        uuid.Nil,
+		EmptyLocalResourceId:         "",
+		WhitespaceLocalResourceId:    "  \t\n  ",
+		EmptyResourceType:            "",
+		WhitespaceResourceType:       "  \t\n  ",
+		EmptyReporterType:            "",
+		WhitespaceReporterType:       "  \t\n  ",
+		EmptyReporterInstanceId:      "",
+		WhitespaceReporterInstanceId: "  \t\n  ",
+		NilResourceId:                uuid.Nil,
+		EmptyApiHref:                 "",
+		WhitespaceApiHref:            "  \t\n  ",
+	}
+}

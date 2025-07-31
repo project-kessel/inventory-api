@@ -1,6 +1,7 @@
 package model
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -501,36 +502,29 @@ func TestReporterVersion_Initialization(t *testing.T) {
 		}
 	})
 
-	t.Run("should create reporter version pointer with valid pointer", func(t *testing.T) {
+	t.Run("should create reporter version with valid string", func(t *testing.T) {
 		t.Parallel()
 
-		reporterVersionPtr, err := NewReporterVersionPtr(fixture.ValidPointer)
+		reporterVersion, err := NewReporterVersion(*fixture.ValidPointer)
 
 		if err != nil {
 			t.Errorf("Expected no error, got %v", err)
 		}
-		if reporterVersionPtr == nil {
-			t.Error("Expected non-nil pointer, got nil")
-			return
-		}
-		if reporterVersionPtr.String() != *fixture.ValidPointer {
-			t.Errorf("Expected reporter version %s, got %s", *fixture.ValidPointer, reporterVersionPtr.String())
-		}
-		if *reporterVersionPtr.StringPtr() != *fixture.ValidPointer {
-			t.Errorf("Expected reporter version pointer %s, got %s", *fixture.ValidPointer, *reporterVersionPtr.StringPtr())
+		if reporterVersion.String() != *fixture.ValidPointer {
+			t.Errorf("Expected reporter version %s, got %s", *fixture.ValidPointer, reporterVersion.String())
 		}
 	})
 
-	t.Run("should handle nil pointer", func(t *testing.T) {
+	t.Run("should enforce non-null values in tiny types", func(t *testing.T) {
 		t.Parallel()
 
-		reporterVersionPtr, err := NewReporterVersionPtr(fixture.NilPointer)
+		_, err := NewReporterVersion("")
 
-		if err != nil {
-			t.Errorf("Expected no error, got %v", err)
+		if err == nil {
+			t.Error("Expected error for empty string, got none")
 		}
-		if reporterVersionPtr != nil {
-			t.Error("Expected nil pointer, got non-nil")
+		if !strings.Contains(err.Error(), "ReporterVersion cannot be empty") {
+			t.Errorf("Expected error about empty ReporterVersion, got %v", err)
 		}
 	})
 }

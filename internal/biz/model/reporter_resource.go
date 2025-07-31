@@ -1,6 +1,10 @@
 package model
 
-import "github.com/google/uuid"
+import (
+	"fmt"
+
+	"github.com/google/uuid"
+)
 
 type ReporterResource struct {
 	id ReporterResourceId
@@ -24,29 +28,29 @@ type ReporterResourceKey struct {
 func NewReporterResource(idVal uuid.UUID, localResourceIdVal string, resourceTypeVal string, reporterTypeVal string, reporterInstanceIdVal string, resourceIdVal uuid.UUID, apiHrefVal string, consoleHrefVal string) (ReporterResource, error) {
 	reporterResourceId, err := NewReporterResourceId(idVal)
 	if err != nil {
-		return ReporterResource{}, err
+		return ReporterResource{}, fmt.Errorf("ReporterResource invalid ID: %w", err)
 	}
 
 	reporterResourceKey, err := NewReporterResourceKey(localResourceIdVal, resourceTypeVal, reporterTypeVal, reporterInstanceIdVal)
 	if err != nil {
-		return ReporterResource{}, err
+		return ReporterResource{}, fmt.Errorf("ReporterResource invalid key: %w", err)
 	}
 
 	resourceId, err := NewResourceId(resourceIdVal)
 	if err != nil {
-		return ReporterResource{}, err
+		return ReporterResource{}, fmt.Errorf("ReporterResource invalid resource ID: %w", err)
 	}
 
 	apiHref, err := NewApiHref(apiHrefVal)
 	if err != nil {
-		return ReporterResource{}, err
+		return ReporterResource{}, fmt.Errorf("ReporterResource invalid API href: %w", err)
 	}
 
 	var consoleHref ConsoleHref
 	if consoleHrefVal != "" {
 		consoleHref, err = NewConsoleHref(consoleHrefVal)
 		if err != nil {
-			return ReporterResource{}, err
+			return ReporterResource{}, fmt.Errorf("ReporterResource invalid console href: %w", err)
 		}
 	}
 
@@ -71,17 +75,17 @@ func NewReporterResourceKey(
 ) (ReporterResourceKey, error) {
 	localResourceID, err := NewLocalResourceId(localResourceIDVal)
 	if err != nil {
-		return ReporterResourceKey{}, err
+		return ReporterResourceKey{}, fmt.Errorf("ReporterResourceKey invalid local resource ID: %w", err)
 	}
 
 	resourceType, err := NewResourceType(resourceTypeVal)
 	if err != nil {
-		return ReporterResourceKey{}, err
+		return ReporterResourceKey{}, fmt.Errorf("ReporterResourceKey invalid resource type: %w", err)
 	}
 
 	reporter, err := NewReporter(reporterTypeVal, reporterInstanceIdVal)
 	if err != nil {
-		return ReporterResourceKey{}, err
+		return ReporterResourceKey{}, fmt.Errorf("ReporterResourceKey invalid reporter: %w", err)
 	}
 
 	return ReporterResourceKey{

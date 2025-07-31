@@ -1,5 +1,7 @@
 package model
 
+import "fmt"
+
 type ReporterRepresentation struct {
 	Representation
 	reporterResourceID ReporterResourceId
@@ -31,61 +33,73 @@ func (r ReporterRepresentation) IsTombstone() bool {
 
 func NewReporterDataRepresentation(
 	data JsonObject,
-	reporterResourceID string,
+	reporterResourceIDVal string,
 	version uint,
 	generation uint,
 	commonVersion uint,
-	reporterVersion *string,
+	reporterVersionVal *string,
 ) (ReporterDataRepresentation, error) {
-	reporterResourceIDObj, err := NewReporterResourceIdFromString(reporterResourceID)
+	if len(data) == 0 {
+		return nil, fmt.Errorf("ReporterDataRepresentation requires non-empty data")
+	}
+
+	reporterResourceID, err := NewReporterResourceIdFromString(reporterResourceIDVal)
 	if err != nil {
 		return nil, err
 	}
 
-	reporterVersionObj, err := NewReporterVersionPtr(reporterVersion)
-	if err != nil {
-		return nil, err
+	var reporterVersion *ReporterVersion
+	if reporterVersionVal != nil {
+		rv, err := NewReporterVersion(*reporterVersionVal)
+		if err != nil {
+			return nil, err
+		}
+		reporterVersion = &rv
 	}
 
 	return ReporterRepresentation{
 		Representation: Representation{
 			data: data,
 		},
-		reporterResourceID: reporterResourceIDObj,
+		reporterResourceID: reporterResourceID,
 		version:            NewVersion(version),
 		generation:         NewGeneration(generation),
 		commonVersion:      NewVersion(commonVersion),
-		reporterVersion:    reporterVersionObj,
+		reporterVersion:    reporterVersion,
 		tombstone:          NewTombstone(false),
 	}, nil
 }
 
 func NewReporterDeleteRepresentation(
-	reporterResourceID string,
+	reporterResourceIDVal string,
 	version uint,
 	generation uint,
 	commonVersion uint,
-	reporterVersion *string,
+	reporterVersionVal *string,
 ) (ReporterDeleteRepresentation, error) {
-	reporterResourceIDObj, err := NewReporterResourceIdFromString(reporterResourceID)
+	reporterResourceID, err := NewReporterResourceIdFromString(reporterResourceIDVal)
 	if err != nil {
 		return nil, err
 	}
 
-	reporterVersionObj, err := NewReporterVersionPtr(reporterVersion)
-	if err != nil {
-		return nil, err
+	var reporterVersion *ReporterVersion
+	if reporterVersionVal != nil {
+		rv, err := NewReporterVersion(*reporterVersionVal)
+		if err != nil {
+			return nil, err
+		}
+		reporterVersion = &rv
 	}
 
 	return ReporterRepresentation{
 		Representation: Representation{
 			data: nil,
 		},
-		reporterResourceID: reporterResourceIDObj,
+		reporterResourceID: reporterResourceID,
 		version:            NewVersion(version),
 		generation:         NewGeneration(generation),
 		commonVersion:      NewVersion(commonVersion),
-		reporterVersion:    reporterVersionObj,
+		reporterVersion:    reporterVersion,
 		tombstone:          NewTombstone(true),
 	}, nil
 }

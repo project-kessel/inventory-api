@@ -80,7 +80,7 @@ func TestReporterResource_Initialization(t *testing.T) {
 			fixture.ValidConsoleHref,
 		)
 
-		assertInvalidReporterResource(t, reporterResource, err, "ReporterResourceId cannot be empty")
+		assertInvalidReporterResource(t, reporterResource, err, "ReporterResource invalid ID")
 	})
 
 	t.Run("should reject empty local resource ID", func(t *testing.T) {
@@ -97,7 +97,7 @@ func TestReporterResource_Initialization(t *testing.T) {
 			fixture.ValidConsoleHref,
 		)
 
-		assertInvalidReporterResource(t, reporterResource, err, "LocalResourceId cannot be empty")
+		assertInvalidReporterResource(t, reporterResource, err, "ReporterResource invalid key")
 	})
 
 	t.Run("should reject whitespace-only local resource ID", func(t *testing.T) {
@@ -199,7 +199,7 @@ func TestReporterResource_Initialization(t *testing.T) {
 			fixture.ValidConsoleHref,
 		)
 
-		assertInvalidReporterResource(t, reporterResource, err, "ReportedByReporterInstance cannot be empty")
+		assertInvalidReporterResource(t, reporterResource, err, "ReporterInstanceId cannot be empty")
 	})
 
 	t.Run("should reject whitespace-only reporter instance ID", func(t *testing.T) {
@@ -216,7 +216,7 @@ func TestReporterResource_Initialization(t *testing.T) {
 			fixture.ValidConsoleHref,
 		)
 
-		assertInvalidReporterResource(t, reporterResource, err, "ReportedByReporterInstance cannot be empty")
+		assertInvalidReporterResource(t, reporterResource, err, "ReporterInstanceId cannot be empty")
 	})
 
 	t.Run("should reject nil resource ID", func(t *testing.T) {

@@ -128,6 +128,26 @@ func NewReporterInstanceIdTestFixture() ReporterInstanceIdTestFixture {
 	}
 }
 
+type ReporterTestFixture struct {
+	ValidReporterType         string
+	ValidReporterInstanceId   string
+	AnotherReporterType       string
+	AnotherReporterInstanceId string
+	EmptyString               string
+	WhitespaceString          string
+}
+
+func NewReporterTestFixture() ReporterTestFixture {
+	return ReporterTestFixture{
+		ValidReporterType:         "acm",
+		ValidReporterInstanceId:   "instance-123",
+		AnotherReporterType:       "ocm",
+		AnotherReporterInstanceId: "instance-456",
+		EmptyString:               "",
+		WhitespaceString:          "  \t\n  ",
+	}
+}
+
 type ConsistencyTokenTestFixture struct {
 	ValidToken       string
 	AnotherToken     string
@@ -330,5 +350,92 @@ func NewReporterResourceTestFixture() ReporterResourceTestFixture {
 		NilResourceId:                uuid.Nil,
 		EmptyApiHref:                 "",
 		WhitespaceApiHref:            "  \t\n  ",
+	}
+}
+
+type ReporterRepresentationTestFixture struct {
+	ValidData                    JsonObject
+	ValidReporterResourceId      string
+	ValidVersion                 uint
+	ValidGeneration              uint
+	ValidCommonVersion           uint
+	ValidReporterVersion         *string
+	NilReporterVersion           *string
+	EmptyData                    JsonObject
+	NilData                      JsonObject
+	EmptyReporterResourceId      string
+	WhitespaceReporterResourceId string
+	InvalidReporterResourceId    string
+}
+
+func NewReporterRepresentationTestFixture() ReporterRepresentationTestFixture {
+	validReporterVersion := "v1.2.3"
+	return ReporterRepresentationTestFixture{
+		ValidData: JsonObject{
+			"name":        "test-reporter-resource",
+			"description": "A test resource for ReporterRepresentation",
+			"metadata":    map[string]interface{}{"version": "2.0", "type": "reporter"},
+		},
+		ValidReporterResourceId:      "550e8400-e29b-41d4-a716-446655440400",
+		ValidVersion:                 1,
+		ValidGeneration:              2,
+		ValidCommonVersion:           3,
+		ValidReporterVersion:         &validReporterVersion,
+		NilReporterVersion:           nil,
+		EmptyData:                    JsonObject{},
+		NilData:                      nil,
+		EmptyReporterResourceId:      "",
+		WhitespaceReporterResourceId: "  \t\n  ",
+		InvalidReporterResourceId:    "invalid-uuid-format",
+	}
+}
+
+type ResourceTestFixture struct {
+	ValidId                   uuid.UUID
+	ValidResourceType         string
+	AnotherResourceType       string
+	ValidReporterResource     ReporterResource
+	AnotherReporterResource   ReporterResource
+	MultipleReporterResources []ReporterResource
+	EmptyReporterResources    []ReporterResource
+	NilId                     uuid.UUID
+	EmptyResourceType         string
+	WhitespaceResourceType    string
+}
+
+func NewResourceTestFixture() ResourceTestFixture {
+	validReporterResource, _ := NewReporterResource(
+		uuid.MustParse("550e8400-e29b-41d4-a716-446655440400"),
+		"local-resource-123",
+		"k8s_cluster",
+		"acm",
+		"acm-instance-001",
+		uuid.MustParse("550e8400-e29b-41d4-a716-446655440401"),
+		"/api/v1/resources/123",
+		"/console/resources/123",
+	)
+
+	anotherReporterResource, _ := NewReporterResource(
+		uuid.MustParse("550e8400-e29b-41d4-a716-446655440500"),
+		"local-resource-456",
+		"host",
+		"ocm",
+		"ocm-instance-001",
+		uuid.MustParse("550e8400-e29b-41d4-a716-446655440501"),
+		"/api/v1/resources/456",
+		"",
+	)
+
+	return ResourceTestFixture{
+		ValidId:                   uuid.MustParse("550e8400-e29b-41d4-a716-446655440600"),
+		ValidResourceType:         "k8s_cluster",
+		AnotherResourceType:       "host",
+		ValidReporterResource:     validReporterResource,
+		AnotherReporterResource:   anotherReporterResource,
+		MultipleReporterResources: []ReporterResource{validReporterResource, anotherReporterResource},
+		EmptyReporterResources:    []ReporterResource{},
+		NilId:                     uuid.Nil,
+		EmptyResourceType:         "",
+		WhitespaceResourceType:    "  \t\n  ",
 	}
 }

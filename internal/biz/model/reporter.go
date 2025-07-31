@@ -1,23 +1,25 @@
 package model
 
+import "fmt"
+
 type Reporter struct {
 	reporterType       ReporterType
 	reporterInstanceId ReporterInstanceId
 }
 
-func NewReporter(reporterType, reporterInstanceId string) (Reporter, error) {
-	reporterTypeObj, err := NewReporterType(reporterType)
+func NewReporter(reporterTypeVal, reporterInstanceIdVal string) (Reporter, error) {
+	reporterType, err := NewReporterType(reporterTypeVal)
 	if err != nil {
-		return Reporter{}, err
+		return Reporter{}, fmt.Errorf("Reporter invalid type: %w", err)
 	}
 
-	reporterInstanceIdObj, err := NewReporterInstanceId(reporterInstanceId)
+	reporterInstanceId, err := NewReporterInstanceId(reporterInstanceIdVal)
 	if err != nil {
-		return Reporter{}, err
+		return Reporter{}, fmt.Errorf("Reporter invalid instance ID: %w", err)
 	}
 
 	return Reporter{
-		reporterType:       reporterTypeObj,
-		reporterInstanceId: reporterInstanceIdObj,
+		reporterType:       reporterType,
+		reporterInstanceId: reporterInstanceId,
 	}, nil
 }

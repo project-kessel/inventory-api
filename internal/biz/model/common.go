@@ -102,7 +102,7 @@ type ReporterInstanceId string
 func NewReporterInstanceId(reporterInstanceId string) (ReporterInstanceId, error) {
 	reporterInstanceId = strings.TrimSpace(reporterInstanceId)
 	if reporterInstanceId == "" {
-		return ReporterInstanceId(""), fmt.Errorf("ReportedByReporterInstance cannot be empty")
+		return ReporterInstanceId(""), fmt.Errorf("ReporterInstanceId cannot be empty")
 	}
 	return ReporterInstanceId(reporterInstanceId), nil
 }
@@ -145,27 +145,8 @@ func NewReporterVersion(version string) (ReporterVersion, error) {
 	return ReporterVersion(version), nil
 }
 
-func NewReporterVersionPtr(version *string) (*ReporterVersion, error) {
-	if version == nil {
-		return nil, nil
-	}
-	rv, err := NewReporterVersion(*version)
-	if err != nil {
-		return nil, err
-	}
-	return &rv, nil
-}
-
 func (rv ReporterVersion) String() string {
 	return string(rv)
-}
-
-func (rv *ReporterVersion) StringPtr() *string {
-	if rv == nil {
-		return nil
-	}
-	s := rv.String()
-	return &s
 }
 
 type Tombstone bool

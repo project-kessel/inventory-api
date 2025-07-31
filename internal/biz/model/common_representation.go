@@ -26,12 +26,12 @@ func NewCommonRepresentation(
 
 	resourceId, err := NewResourceId(resourceIdVal)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("CommonRepresentation invalid resource ID: %w", err)
 	}
 
 	reporter, err := NewReporter(reportedByReporterType, reportedByReporterInstance)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("CommonRepresentation invalid reporter: %w", err)
 	}
 
 	version := NewVersion(versionVal)

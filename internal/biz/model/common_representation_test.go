@@ -71,7 +71,7 @@ func TestCommonRepresentation_Initialization(t *testing.T) {
 			fixture.ValidReportedByReporterInstance,
 		)
 
-		assertInvalidCommonRepresentation(t, commonRep, err, "ResourceId cannot be empty")
+		assertInvalidCommonRepresentation(t, commonRep, err, "CommonRepresentation invalid resource ID")
 	})
 
 	t.Run("should reject nil data", func(t *testing.T) {
@@ -113,7 +113,7 @@ func TestCommonRepresentation_Initialization(t *testing.T) {
 			fixture.ValidReportedByReporterInstance,
 		)
 
-		assertInvalidCommonRepresentation(t, commonRep, err, "ReportedByReporterType cannot be empty")
+		assertInvalidCommonRepresentation(t, commonRep, err, "CommonRepresentation invalid reporter")
 	})
 
 	t.Run("should reject whitespace-only reporter type", func(t *testing.T) {
@@ -127,7 +127,7 @@ func TestCommonRepresentation_Initialization(t *testing.T) {
 			fixture.ValidReportedByReporterInstance,
 		)
 
-		assertInvalidCommonRepresentation(t, commonRep, err, "ReportedByReporterType cannot be empty")
+		assertInvalidCommonRepresentation(t, commonRep, err, "CommonRepresentation invalid reporter")
 	})
 
 	t.Run("should reject empty reporter instance", func(t *testing.T) {
@@ -141,7 +141,7 @@ func TestCommonRepresentation_Initialization(t *testing.T) {
 			fixture.EmptyReporterInstance,
 		)
 
-		assertInvalidCommonRepresentation(t, commonRep, err, "ReportedByReporterInstance cannot be empty")
+		assertInvalidCommonRepresentation(t, commonRep, err, "CommonRepresentation invalid reporter")
 	})
 
 	t.Run("should reject whitespace-only reporter instance", func(t *testing.T) {
@@ -155,6 +155,6 @@ func TestCommonRepresentation_Initialization(t *testing.T) {
 			fixture.WhitespaceReporterInstance,
 		)
 
-		assertInvalidCommonRepresentation(t, commonRep, err, "ReportedByReporterInstance cannot be empty")
+		assertInvalidCommonRepresentation(t, commonRep, err, "CommonRepresentation invalid reporter")
 	})
 }

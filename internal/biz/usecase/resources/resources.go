@@ -26,6 +26,8 @@ import (
 	"github.com/project-kessel/inventory-api/internal/server"
 )
 
+// ReporterResourceRepository defines the interface for managing resources in the inventory system.
+// It provides CRUD operations and various query methods for resources.
 type ReporterResourceRepository interface {
 	Create(context.Context, *model_legacy.Resource, string, string) (*model_legacy.Resource, error)
 	Update(context.Context, *model_legacy.Resource, uuid.UUID, string, string) (*model_legacy.Resource, error)
@@ -40,21 +42,26 @@ type ReporterResourceRepository interface {
 	ListAll(context.Context) ([]*model_legacy.Resource, error)
 }
 
+// InventoryResourceRepository defines the interface for accessing inventory resource data.
 type InventoryResourceRepository interface {
 	FindByID(context.Context, uuid.UUID) (*model_legacy.InventoryResource, error)
 }
 
 var (
-	ErrResourceNotFound      = errors.New("resource not found")
-	ErrDatabaseError         = errors.New("db error while querying for resource")
+	// ErrResourceNotFound indicates that the requested resource could not be found in the database.
+	ErrResourceNotFound = errors.New("resource not found")
+	// ErrDatabaseError indicates a generic database error occurred while querying for resources.
+	ErrDatabaseError = errors.New("db error while querying for resource")
+	// ErrResourceAlreadyExists indicates that a resource with the same identifier already exists.
 	ErrResourceAlreadyExists = errors.New("resource already exists")
-	ErrInventoryIdMismatch   = errors.New("resource inventory id mismatch")
+	// ErrInventoryIdMismatch indicates that the inventory ID in the request doesn't match the existing resource.
+	ErrInventoryIdMismatch = errors.New("resource inventory id mismatch")
 )
 
 const listenTimeout = 10 * time.Second
 
-// Flags that control the behavior of the usecase operations
-// and should be the same between all handlers
+// UsecaseConfig contains configuration flags that control the behavior of usecase operations.
+// These flags should be consistent across all handlers.
 type UsecaseConfig struct {
 	DisablePersistence      bool
 	ReadAfterWriteEnabled   bool
@@ -62,6 +69,8 @@ type UsecaseConfig struct {
 	ConsumerEnabled         bool
 }
 
+// Usecase provides business logic operations for resource management in the inventory system.
+// It coordinates between repositories, authorization, eventing, and other system components.
 type Usecase struct {
 	ReporterResourceRepository  ReporterResourceRepository
 	inventoryResourceRepository InventoryResourceRepository
@@ -75,6 +84,7 @@ type Usecase struct {
 	Config                      *UsecaseConfig
 }
 
+// New creates a new Usecase instance with the provided dependencies and configuration.
 func New(reporterResourceRepository ReporterResourceRepository, inventoryResourceRepository InventoryResourceRepository,
 	authz authzapi.Authorizer, eventer eventingapi.Manager, namespace string, logger log.Logger,
 	listenManager pubsub.ListenManagerImpl, waitForNotifBreaker *gobreaker.CircuitBreaker, usecaseConfig *UsecaseConfig) *Usecase {
@@ -91,6 +101,8 @@ func New(reporterResourceRepository ReporterResourceRepository, inventoryResourc
 	}
 }
 
+// Upsert creates a new resource or updates an existing one based on the reporter resource ID.
+// It supports read-after-write consistency when enabled and handles notification waiting.
 func (uc *Usecase) Upsert(ctx context.Context, m *model_legacy.Resource, write_visibility v1beta2.WriteVisibility) (*model_legacy.Resource, error) {
 	log.Info("upserting resource: ", m)
 	ret := m // Default to returning the input model_legacy in case persistence is disabled
@@ -216,10 +228,12 @@ func updateExistingReporterResource(ctx context.Context, m *model_legacy.Resourc
 	return ret, nil
 }
 
+// LookupResources delegates resource lookup to the authorization service.
 func (uc *Usecase) LookupResources(ctx context.Context, request *kessel.LookupResourcesRequest) (grpc.ServerStreamingClient[kessel.LookupResourcesResponse], error) {
 	return uc.Authz.LookupResources(ctx, request)
 }
 
+// Check verifies if a subject has the specified permission on a resource identified by the reporter resource ID.
 func (uc *Usecase) Check(ctx context.Context, permission, namespace string, sub *kessel.SubjectReference, id model_legacy.ReporterResourceId) (bool, error) {
 	res, err := uc.ReporterResourceRepository.FindByReporterResourceId(ctx, id)
 	if err != nil {
@@ -243,6 +257,8 @@ func (uc *Usecase) Check(ctx context.Context, permission, namespace string, sub 
 	return false, nil
 }
 
+// CheckForUpdate verifies if a subject has the specified permission to update a resource,
+// and records the consistency token if the check passes and the resource exists.
 func (uc *Usecase) CheckForUpdate(ctx context.Context, permission, namespace string, sub *kessel.SubjectReference, id model_legacy.ReporterResourceId) (bool, error) {
 	res, err := uc.ReporterResourceRepository.FindByReporterResourceId(ctx, id)
 	recordToken := true
@@ -283,6 +299,8 @@ func (uc *Usecase) CheckForUpdate(ctx context.Context, permission, namespace str
 	return false, nil
 }
 
+// ListResourcesInWorkspace retrieves all resources in a workspace and filters them based on authorization.
+// It uses worker goroutines to perform authorization checks concurrently and returns channels for results and errors.
 func (uc *Usecase) ListResourcesInWorkspace(ctx context.Context, permission, namespace string, sub *kessel.SubjectReference, id string) (chan *model_legacy.Resource, chan error, error) {
 	resources, err := uc.ReporterResourceRepository.FindByWorkspaceId(ctx, id)
 	if err != nil {
@@ -336,7 +354,9 @@ func (uc *Usecase) checkWorker(ctx context.Context, permission, namespace string
 	}
 }
 
-// Deprecated. Remove after notifications and ACM migrates to v1beta2
+// Create creates a new resource in the database and waits for consumer notification if configured.
+//
+// Deprecated: Remove after notifications and ACM migrates to v1beta2.
 func (uc *Usecase) Create(ctx context.Context, m *model_legacy.Resource) (*model_legacy.Resource, error) {
 	ret := m // Default to returning the input model_legacy in case persistence is disabled
 	var subscription pubsub.Subscription
@@ -392,9 +412,10 @@ func (uc *Usecase) Create(ctx context.Context, m *model_legacy.Resource) (*model
 	return ret, nil
 }
 
-//Deprecated. Remove after notifications and ACM migrates to v1beta2
-
-// Update updates a model_legacy in the database, updates related tuples in the relations-api, and issues an update event.
+// Update updates an existing resource in the database, or creates it if it doesn't exist.
+// It waits for consumer notification if configured.
+//
+// Deprecated: Remove after notifications and ACM migrates to v1beta2.
 func (uc *Usecase) Update(ctx context.Context, m *model_legacy.Resource, id model_legacy.ReporterResourceId) (*model_legacy.Resource, error) {
 	ret := m // Default to returning the input model_legacy in case persistence is disabled
 	var subscription pubsub.Subscription
@@ -452,7 +473,7 @@ func (uc *Usecase) Update(ctx context.Context, m *model_legacy.Resource, id mode
 
 }
 
-// Delete deletes a model_legacy from the database, removes related tuples from the relations-api, and issues a delete event.
+// Delete removes a resource from the database identified by the reporter resource ID.
 func (uc *Usecase) Delete(ctx context.Context, id model_legacy.ReporterResourceId) error {
 	m := &model_legacy.Resource{}
 

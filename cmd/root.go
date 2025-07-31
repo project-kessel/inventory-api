@@ -18,7 +18,9 @@ import (
 
 // go build -ldflags "-X cmd.Version=x.y.z"
 var (
+	// Version is the application version, can be set at build time using ldflags.
 	Version = "0.1.0"
+	// Name is the application name used for configuration and commands.
 	Name    = "inventory-api"
 	cfgFile string
 
@@ -42,6 +44,7 @@ func Execute() {
 	}
 }
 
+// Initialize sets up configuration and logging for the application.
 func Initialize() {
 	initConfig()
 

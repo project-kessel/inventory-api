@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
+	"github.com/project-kessel/inventory-api/internal"
 )
 
 const initialReporterRepresentationVersion = 0
@@ -74,7 +75,7 @@ type ResourceType string
 func NewResourceType(resourceType string) (ResourceType, error) {
 	resourceType = strings.TrimSpace(resourceType)
 	if resourceType == "" {
-		return ResourceType(""), fmt.Errorf("ResourceType cannot be empty")
+		return "", fmt.Errorf("ResourceType cannot be empty")
 	}
 	return ResourceType(resourceType), nil
 }
@@ -88,7 +89,7 @@ type ReporterType string
 func NewReporterType(reporterType string) (ReporterType, error) {
 	reporterType = strings.TrimSpace(reporterType)
 	if reporterType == "" {
-		return ReporterType(""), fmt.Errorf("ReportedByReporterType cannot be empty")
+		return "", fmt.Errorf("ReportedByReporterType cannot be empty")
 	}
 	return ReporterType(reporterType), nil
 }
@@ -102,7 +103,7 @@ type ReporterInstanceId string
 func NewReporterInstanceId(reporterInstanceId string) (ReporterInstanceId, error) {
 	reporterInstanceId = strings.TrimSpace(reporterInstanceId)
 	if reporterInstanceId == "" {
-		return ReporterInstanceId(""), fmt.Errorf("ReporterInstanceId cannot be empty")
+		return "", fmt.Errorf("ReporterInstanceId cannot be empty")
 	}
 	return ReporterInstanceId(reporterInstanceId), nil
 }
@@ -116,7 +117,7 @@ type ConsistencyToken string
 func NewConsistencyToken(token string) (ConsistencyToken, error) {
 	token = strings.TrimSpace(token)
 	if token == "" {
-		return ConsistencyToken(""), fmt.Errorf("ConsistencyToken cannot be empty")
+		return "", fmt.Errorf("ConsistencyToken cannot be empty")
 	}
 	return ConsistencyToken(token), nil
 }
@@ -140,7 +141,7 @@ type ReporterVersion string
 func NewReporterVersion(version string) (ReporterVersion, error) {
 	version = strings.TrimSpace(version)
 	if version == "" {
-		return ReporterVersion(""), fmt.Errorf("ReporterVersion cannot be empty")
+		return "", fmt.Errorf("ReporterVersion cannot be empty")
 	}
 	return ReporterVersion(version), nil
 }
@@ -164,7 +165,7 @@ type ApiHref string
 func NewApiHref(href string) (ApiHref, error) {
 	href = strings.TrimSpace(href)
 	if href == "" {
-		return ApiHref(""), fmt.Errorf("ApiHref cannot be empty")
+		return "", fmt.Errorf("ApiHref cannot be empty")
 	}
 	return ApiHref(href), nil
 }
@@ -178,7 +179,7 @@ type ConsoleHref string
 func NewConsoleHref(href string) (ConsoleHref, error) {
 	href = strings.TrimSpace(href)
 	if href == "" {
-		return ConsoleHref(""), fmt.Errorf("ConsoleHref cannot be empty")
+		return "", fmt.Errorf("ConsoleHref cannot be empty")
 	}
 	return ConsoleHref(href), nil
 }
@@ -192,7 +193,7 @@ type LocalResourceId string
 func NewLocalResourceId(id string) (LocalResourceId, error) {
 	id = strings.TrimSpace(id)
 	if id == "" {
-		return LocalResourceId(""), fmt.Errorf("LocalResourceId cannot be empty")
+		return "", fmt.Errorf("LocalResourceId cannot be empty")
 	}
 	return LocalResourceId(id), nil
 }
@@ -201,8 +202,6 @@ func (lr LocalResourceId) String() string {
 	return string(lr)
 }
 
-type JsonObject map[string]interface{}
-
 type Representation struct {
-	data JsonObject
+	data internal.JsonObject
 }

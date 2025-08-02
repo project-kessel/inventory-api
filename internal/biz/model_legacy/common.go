@@ -36,23 +36,10 @@ type Label struct {
 }
 
 type Labels []Label
-type JsonObject map[string]interface{}
 type Reporter struct {
 	ReporterId      string `json:"reporter_id"`
 	ReporterType    string `json:"reporter_type"`
 	ReporterVersion string `json:"reporter_version"`
-}
-
-func (JsonObject) GormDBDataType(db *gorm.DB, field *schema.Field) string {
-	return GormDBDataType(db, field)
-}
-
-func (data JsonObject) Value() (driver.Value, error) {
-	return json.Marshal(data)
-}
-
-func (data *JsonObject) Scan(value interface{}) error {
-	return Scan(value, data)
 }
 
 func (Labels) GormDBDataType(db *gorm.DB, field *schema.Field) string {

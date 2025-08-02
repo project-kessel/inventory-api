@@ -2,23 +2,23 @@ package model
 
 import "fmt"
 
-type Reporter struct {
+type ReporterId struct {
 	reporterType       ReporterType
 	reporterInstanceId ReporterInstanceId
 }
 
-func NewReporter(reporterTypeVal, reporterInstanceIdVal string) (Reporter, error) {
+func NewReporter(reporterTypeVal, reporterInstanceIdVal string) (ReporterId, error) {
 	reporterType, err := NewReporterType(reporterTypeVal)
 	if err != nil {
-		return Reporter{}, fmt.Errorf("Reporter invalid type: %w", err)
+		return ReporterId{}, fmt.Errorf("ReporterId invalid type: %w", err)
 	}
 
 	reporterInstanceId, err := NewReporterInstanceId(reporterInstanceIdVal)
 	if err != nil {
-		return Reporter{}, fmt.Errorf("Reporter invalid instance ID: %w", err)
+		return ReporterId{}, fmt.Errorf("ReporterId invalid instance ID: %w", err)
 	}
 
-	return Reporter{
+	return ReporterId{
 		reporterType:       reporterType,
 		reporterInstanceId: reporterInstanceId,
 	}, nil

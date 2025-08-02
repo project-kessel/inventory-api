@@ -5,25 +5,23 @@ import (
 	"errors"
 	"time"
 
-	"google.golang.org/grpc"
-
-	"sync"
-
-	"github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2"
-	"github.com/project-kessel/inventory-api/internal/pubsub"
-	"github.com/sony/gobreaker"
-
-	"github.com/google/uuid"
-
 	"github.com/go-kratos/kratos/v2/log"
+	"github.com/google/uuid"
+	"github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2"
+	"github.com/project-kessel/inventory-api/cmd/common"
+	authzapi "github.com/project-kessel/inventory-api/internal/authz/api"
+	"github.com/project-kessel/inventory-api/internal/biz/model"
+	"github.com/project-kessel/inventory-api/internal/biz/model_legacy"
+	"github.com/project-kessel/inventory-api/internal/data"
+	eventingapi "github.com/project-kessel/inventory-api/internal/eventing/api"
+	"github.com/project-kessel/inventory-api/internal/pubsub"
+	"github.com/project-kessel/inventory-api/internal/server"
 	kessel "github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
+	"github.com/sony/gobreaker"
+	"google.golang.org/grpc"
 	"gorm.io/gorm"
 
-	common "github.com/project-kessel/inventory-api/cmd/common"
-	authzapi "github.com/project-kessel/inventory-api/internal/authz/api"
-	"github.com/project-kessel/inventory-api/internal/biz/model_legacy"
-	eventingapi "github.com/project-kessel/inventory-api/internal/eventing/api"
-	"github.com/project-kessel/inventory-api/internal/server"
+	"sync"
 )
 
 type ReporterResourceRepository interface {
@@ -63,32 +61,81 @@ type UsecaseConfig struct {
 }
 
 type Usecase struct {
-	ReporterResourceRepository  ReporterResourceRepository
-	inventoryResourceRepository InventoryResourceRepository
-	waitForNotifBreaker         *gobreaker.CircuitBreaker
-	Authz                       authzapi.Authorizer
-	Eventer                     eventingapi.Manager
-	Namespace                   string
-	Log                         *log.Helper
-	Server                      server.Server
-	ListenManager               pubsub.ListenManagerImpl
-	Config                      *UsecaseConfig
+	resourceRepository               data.ResourceRepository
+	LegacyReporterResourceRepository ReporterResourceRepository
+	inventoryResourceRepository      InventoryResourceRepository
+	waitForNotifBreaker              *gobreaker.CircuitBreaker
+	Authz                            authzapi.Authorizer
+	Eventer                          eventingapi.Manager
+	Namespace                        string
+	Log                              *log.Helper
+	Server                           server.Server
+	ListenManager                    pubsub.ListenManagerImpl
+	Config                           *UsecaseConfig
 }
 
-func New(reporterResourceRepository ReporterResourceRepository, inventoryResourceRepository InventoryResourceRepository,
+func New(resourceRepository data.ResourceRepository, reporterResourceRepository ReporterResourceRepository, inventoryResourceRepository InventoryResourceRepository,
 	authz authzapi.Authorizer, eventer eventingapi.Manager, namespace string, logger log.Logger,
 	listenManager pubsub.ListenManagerImpl, waitForNotifBreaker *gobreaker.CircuitBreaker, usecaseConfig *UsecaseConfig) *Usecase {
 	return &Usecase{
-		ReporterResourceRepository:  reporterResourceRepository,
-		inventoryResourceRepository: inventoryResourceRepository,
-		waitForNotifBreaker:         waitForNotifBreaker,
-		Authz:                       authz,
-		Eventer:                     eventer,
-		Namespace:                   namespace,
-		Log:                         log.NewHelper(logger),
-		ListenManager:               listenManager,
-		Config:                      usecaseConfig,
+		resourceRepository:               resourceRepository,
+		LegacyReporterResourceRepository: reporterResourceRepository,
+		inventoryResourceRepository:      inventoryResourceRepository,
+		waitForNotifBreaker:              waitForNotifBreaker,
+		Authz:                            authz,
+		Eventer:                          eventer,
+		Namespace:                        namespace,
+		Log:                              log.NewHelper(logger),
+		ListenManager:                    listenManager,
+		Config:                           usecaseConfig,
 	}
+}
+
+func (uc *Usecase) ReportResource(ctx context.Context, request *v1beta2.ReportResourceRequest, write_visibility v1beta2.WriteVisibility, reporterPrincipal string) error {
+
+	log.Info("Reporting resource request: ", request)
+	var subscription pubsub.Subscription
+	txid, err := uuid.NewV7()
+	if err != nil {
+		return err
+	}
+	txidStr := txid.String()
+
+	readAfterWriteEnabled := computeReadAfterWrite(uc, write_visibility, reporterPrincipal)
+	if readAfterWriteEnabled && uc.Config.ConsumerEnabled {
+		// TODO: Replace this when inventory api has proper api-level transaction ids
+		subscription = uc.ListenManager.Subscribe(txidStr)
+		defer subscription.Unsubscribe()
+	}
+
+	resourceId, err := uc.resourceRepository.NextResourceId()
+	if err != nil {
+		return err
+	}
+
+	reporterResourceId, err := uc.resourceRepository.NextReporterResourceId()
+	if err != nil {
+		return err
+	}
+	resource, err := model.NewResource(
+		resourceId.UUID(),
+		request.GetRepresentations().GetMetadata().GetLocalResourceId(),
+		request.GetType(),
+		request.GetReporterType(),
+		request.GetReporterInstanceId(),
+		reporterResourceId.UUID(),
+		request.GetRepresentations().GetMetadata().GetApiHref(),
+		request.GetRepresentations().GetMetadata().GetConsoleHref(),
+		request.GetRepresentations().GetReporter().AsMap(),
+		request.GetRepresentations().GetCommon().AsMap())
+	if err != nil {
+		return err
+	}
+	err = uc.resourceRepository.Save(nil, resource, model_legacy.OperationTypeCreated, txidStr)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func (uc *Usecase) Upsert(ctx context.Context, m *model_legacy.Resource, write_visibility v1beta2.WriteVisibility) (*model_legacy.Resource, error) {
@@ -99,13 +146,13 @@ func (uc *Usecase) Upsert(ctx context.Context, m *model_legacy.Resource, write_v
 
 	if !uc.Config.DisablePersistence {
 		// check if the resource already exists
-		existingResource, err := uc.ReporterResourceRepository.FindByReporterResourceIdv1beta2(ctx, model_legacy.ReporterResourceIdv1beta2FromResource(m))
+		existingResource, err := uc.LegacyReporterResourceRepository.FindByReporterResourceIdv1beta2(ctx, model_legacy.ReporterResourceIdv1beta2FromResource(m))
 
 		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, ErrDatabaseError
 		}
 
-		readAfterWriteEnabled := computeReadAfterWrite(uc, write_visibility, m)
+		readAfterWriteEnabled := computeReadAfterWriteLegacy(uc, write_visibility, m)
 		if readAfterWriteEnabled && uc.Config.ConsumerEnabled {
 			// Generate txid for data layer
 			// TODO: Replace this when inventory api has proper api-level transaction ids
@@ -173,7 +220,7 @@ func (uc *Usecase) Upsert(ctx context.Context, m *model_legacy.Resource, write_v
 }
 
 func createNewReporterResource(ctx context.Context, m *model_legacy.Resource, uc *Usecase, txid string) (*model_legacy.Resource, error) {
-	ret, err := uc.ReporterResourceRepository.Create(ctx, m, uc.Namespace, txid)
+	ret, err := uc.LegacyReporterResourceRepository.Create(ctx, m, uc.Namespace, txid)
 
 	if err != nil {
 		return nil, err
@@ -184,13 +231,13 @@ func createNewReporterResource(ctx context.Context, m *model_legacy.Resource, uc
 
 func validateSameResourceFromMultipleReportersShareInventoryId(ctx context.Context, m *model_legacy.Resource, uc *Usecase) error {
 	// Multiple reporters should have same inventory id.
-	existingInventoryIdResource, err := uc.ReporterResourceRepository.FindByInventoryIdAndResourceType(ctx, m.InventoryId, m.ResourceType)
+	existingInventoryIdResource, err := uc.LegacyReporterResourceRepository.FindByInventoryIdAndResourceType(ctx, m.InventoryId, m.ResourceType)
 	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 		return ErrDatabaseError
 	}
 
 	if existingInventoryIdResource != nil {
-		existingResourceRepo, err := uc.ReporterResourceRepository.FindByInventoryIdAndReporter(ctx, m.InventoryId, m.ReporterInstanceId, m.ReporterType)
+		existingResourceRepo, err := uc.LegacyReporterResourceRepository.FindByInventoryIdAndReporter(ctx, m.InventoryId, m.ReporterInstanceId, m.ReporterType)
 		if existingResourceRepo != nil {
 			return ErrResourceAlreadyExists
 		}
@@ -207,7 +254,7 @@ func updateExistingReporterResource(ctx context.Context, m *model_legacy.Resourc
 		return nil, ErrInventoryIdMismatch
 	}
 	log.Info("Updating resource: ", m)
-	ret, err := uc.ReporterResourceRepository.Update(ctx, m, existingResource.ID, uc.Namespace, txid)
+	ret, err := uc.LegacyReporterResourceRepository.Update(ctx, m, existingResource.ID, uc.Namespace, txid)
 	if err != nil {
 		return nil, err
 	}
@@ -221,7 +268,7 @@ func (uc *Usecase) LookupResources(ctx context.Context, request *kessel.LookupRe
 }
 
 func (uc *Usecase) Check(ctx context.Context, permission, namespace string, sub *kessel.SubjectReference, id model_legacy.ReporterResourceId) (bool, error) {
-	res, err := uc.ReporterResourceRepository.FindByReporterResourceId(ctx, id)
+	res, err := uc.LegacyReporterResourceRepository.FindByReporterResourceId(ctx, id)
 	if err != nil {
 		// If the resource doesn't exist in inventory (ie. no consistency token available)
 		// we send a check request with minimize latency
@@ -244,7 +291,7 @@ func (uc *Usecase) Check(ctx context.Context, permission, namespace string, sub 
 }
 
 func (uc *Usecase) CheckForUpdate(ctx context.Context, permission, namespace string, sub *kessel.SubjectReference, id model_legacy.ReporterResourceId) (bool, error) {
-	res, err := uc.ReporterResourceRepository.FindByReporterResourceId(ctx, id)
+	res, err := uc.LegacyReporterResourceRepository.FindByReporterResourceId(ctx, id)
 	recordToken := true
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -271,7 +318,7 @@ func (uc *Usecase) CheckForUpdate(ctx context.Context, permission, namespace str
 		// Only update consistency token if resource exists in DB.
 		if recordToken && consistency != nil {
 			res.ConsistencyToken = consistency.Token
-			_, err := uc.ReporterResourceRepository.Update(ctx, res, res.ID, uc.Namespace, "")
+			_, err := uc.LegacyReporterResourceRepository.Update(ctx, res, res.ID, uc.Namespace, "")
 			if err != nil {
 				return false, err // we're allowed, but failed to update consistency token
 			}
@@ -284,7 +331,7 @@ func (uc *Usecase) CheckForUpdate(ctx context.Context, permission, namespace str
 }
 
 func (uc *Usecase) ListResourcesInWorkspace(ctx context.Context, permission, namespace string, sub *kessel.SubjectReference, id string) (chan *model_legacy.Resource, chan error, error) {
-	resources, err := uc.ReporterResourceRepository.FindByWorkspaceId(ctx, id)
+	resources, err := uc.LegacyReporterResourceRepository.FindByWorkspaceId(ctx, id)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -344,10 +391,10 @@ func (uc *Usecase) Create(ctx context.Context, m *model_legacy.Resource) (*model
 
 	if !uc.Config.DisablePersistence {
 		// check if the resource already exists
-		existingResource, err := uc.ReporterResourceRepository.FindByReporterData(ctx, m.ReporterId, m.ReporterResourceId)
+		existingResource, err := uc.LegacyReporterResourceRepository.FindByReporterData(ctx, m.ReporterId, m.ReporterResourceId)
 		if err != nil && errors.Is(err, gorm.ErrRecordNotFound) {
 			// Deprecated: fallback case for backwards compatibility
-			existingResource, err = uc.ReporterResourceRepository.FindByReporterResourceId(ctx, model_legacy.ReporterResourceIdFromResource(m))
+			existingResource, err = uc.LegacyReporterResourceRepository.FindByReporterResourceId(ctx, model_legacy.ReporterResourceIdFromResource(m))
 		}
 
 		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
@@ -370,7 +417,7 @@ func (uc *Usecase) Create(ctx context.Context, m *model_legacy.Resource) (*model
 			defer subscription.Unsubscribe()
 		}
 
-		ret, err = uc.ReporterResourceRepository.Create(ctx, m, uc.Namespace, txidStr)
+		ret, err = uc.LegacyReporterResourceRepository.Create(ctx, m, uc.Namespace, txidStr)
 		if err != nil {
 			return nil, err
 		}
@@ -402,10 +449,10 @@ func (uc *Usecase) Update(ctx context.Context, m *model_legacy.Resource, id mode
 
 	if !uc.Config.DisablePersistence {
 		// check if the resource exists
-		existingResource, err := uc.ReporterResourceRepository.FindByReporterData(ctx, m.ReporterId, m.ReporterResourceId)
+		existingResource, err := uc.LegacyReporterResourceRepository.FindByReporterData(ctx, m.ReporterId, m.ReporterResourceId)
 		if err != nil && errors.Is(err, gorm.ErrRecordNotFound) {
 			// Deprecated: fallback case for backwards compatibility
-			existingResource, err = uc.ReporterResourceRepository.FindByReporterResourceId(ctx, model_legacy.ReporterResourceIdFromResource(m))
+			existingResource, err = uc.LegacyReporterResourceRepository.FindByReporterResourceId(ctx, model_legacy.ReporterResourceIdFromResource(m))
 		}
 
 		if err != nil {
@@ -428,7 +475,7 @@ func (uc *Usecase) Update(ctx context.Context, m *model_legacy.Resource, id mode
 			defer subscription.Unsubscribe()
 		}
 
-		ret, err = uc.ReporterResourceRepository.Update(ctx, m, existingResource.ID, uc.Namespace, txidStr)
+		ret, err = uc.LegacyReporterResourceRepository.Update(ctx, m, existingResource.ID, uc.Namespace, txidStr)
 		if err != nil {
 			return nil, err
 		}
@@ -458,11 +505,11 @@ func (uc *Usecase) Delete(ctx context.Context, id model_legacy.ReporterResourceI
 
 	if !uc.Config.DisablePersistence {
 		// check if the resource exists
-		existingResource, err := uc.ReporterResourceRepository.FindByReporterData(ctx, id.ReporterId, id.LocalResourceId)
+		existingResource, err := uc.LegacyReporterResourceRepository.FindByReporterData(ctx, id.ReporterId, id.LocalResourceId)
 
 		if err != nil && errors.Is(err, gorm.ErrRecordNotFound) {
 			// Deprecated: fallback case for backwards compatibility
-			existingResource, err = uc.ReporterResourceRepository.FindByReporterResourceId(ctx, id)
+			existingResource, err = uc.LegacyReporterResourceRepository.FindByReporterResourceId(ctx, id)
 		}
 
 		if err != nil {
@@ -473,7 +520,7 @@ func (uc *Usecase) Delete(ctx context.Context, id model_legacy.ReporterResourceI
 			return ErrDatabaseError
 		}
 
-		m, err = uc.ReporterResourceRepository.Delete(ctx, existingResource.ID, uc.Namespace)
+		m, err = uc.LegacyReporterResourceRepository.Delete(ctx, existingResource.ID, uc.Namespace)
 		if err != nil {
 			return err
 		}
@@ -485,7 +532,7 @@ func (uc *Usecase) Delete(ctx context.Context, id model_legacy.ReporterResourceI
 }
 
 // Check if request comes from SP in allowlist
-func isSPInAllowlist(m *model_legacy.Resource, allowlist []string) bool {
+func isSPInAllowlistLegacy(m *model_legacy.Resource, allowlist []string) bool {
 	for _, sp := range allowlist {
 		// either specific SP or everyone
 		if sp == m.ReporterId || sp == "*" {
@@ -496,12 +543,34 @@ func isSPInAllowlist(m *model_legacy.Resource, allowlist []string) bool {
 	return false
 }
 
-func computeReadAfterWrite(uc *Usecase, write_visibility v1beta2.WriteVisibility, m *model_legacy.Resource) bool {
+func computeReadAfterWriteLegacy(uc *Usecase, write_visibility v1beta2.WriteVisibility, m *model_legacy.Resource) bool {
 	// read after write functionality is enabled/disabled globally.
 	// And executed if request specifies and
 	// came from service provider in allowlist
 	if write_visibility == v1beta2.WriteVisibility_WRITE_VISIBILITY_UNSPECIFIED || write_visibility == v1beta2.WriteVisibility_MINIMIZE_LATENCY {
 		return false
 	}
-	return !common.IsNil(uc.ListenManager) && uc.Config.ReadAfterWriteEnabled && isSPInAllowlist(m, uc.Config.ReadAfterWriteAllowlist)
+	return !common.IsNil(uc.ListenManager) && uc.Config.ReadAfterWriteEnabled && isSPInAllowlistLegacy(m, uc.Config.ReadAfterWriteAllowlist)
+}
+
+// Check if request comes from SP in allowlist
+func isSPInAllowlist(reporterPrincipal string, allowlist []string) bool {
+	for _, sp := range allowlist {
+		// either specific SP or everyone
+		if sp == reporterPrincipal || sp == "*" {
+			return true
+		}
+	}
+
+	return false
+}
+
+func computeReadAfterWrite(uc *Usecase, write_visibility v1beta2.WriteVisibility, reporterPrincipal string) bool {
+	// read after write functionality is enabled/disabled globally.
+	// And executed if request specifies and
+	// came from service provider in allowlist
+	if write_visibility == v1beta2.WriteVisibility_WRITE_VISIBILITY_UNSPECIFIED || write_visibility == v1beta2.WriteVisibility_MINIMIZE_LATENCY {
+		return false
+	}
+	return !common.IsNil(uc.ListenManager) && uc.Config.ReadAfterWriteEnabled && isSPInAllowlist(reporterPrincipal, uc.Config.ReadAfterWriteAllowlist)
 }

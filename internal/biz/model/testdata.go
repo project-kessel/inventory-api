@@ -2,6 +2,7 @@ package model
 
 import (
 	"github.com/google/uuid"
+	"github.com/project-kessel/inventory-api/internal"
 )
 
 type VersionTestFixture struct {
@@ -234,42 +235,42 @@ func NewLocalResourceIdTestFixture() LocalResourceIdTestFixture {
 }
 
 type JsonObjectTestFixture struct {
-	ValidData   JsonObject
-	AnotherData JsonObject
-	EmptyData   JsonObject
-	NilData     JsonObject
+	ValidData   internal.JsonObject
+	AnotherData internal.JsonObject
+	EmptyData   internal.JsonObject
+	NilData     internal.JsonObject
 }
 
 func NewJsonObjectTestFixture() JsonObjectTestFixture {
 	return JsonObjectTestFixture{
-		ValidData: JsonObject{
+		ValidData: internal.JsonObject{
 			"name":      "test-cluster",
 			"status":    "active",
 			"nodeCount": 3,
 			"region":    "us-east-1",
 			"labels":    map[string]interface{}{"env": "prod", "team": "platform"},
 		},
-		AnotherData: JsonObject{
+		AnotherData: internal.JsonObject{
 			"hostname": "test-host",
 			"os":       "linux",
 			"memory":   "16GB",
 			"cpu":      "4 cores",
 			"uptime":   "30 days",
 		},
-		EmptyData: JsonObject{},
+		EmptyData: internal.JsonObject{},
 		NilData:   nil,
 	}
 }
 
 type CommonRepresentationTestFixture struct {
 	ValidResourceId                 uuid.UUID
-	ValidData                       JsonObject
+	ValidData                       internal.JsonObject
 	ValidVersion                    uint
 	ValidReportedByReporterType     string
 	ValidReportedByReporterInstance string
 	NilResourceId                   uuid.UUID
-	EmptyData                       JsonObject
-	NilData                         JsonObject
+	EmptyData                       internal.JsonObject
+	NilData                         internal.JsonObject
 	ZeroVersion                     uint
 	EmptyReporterType               string
 	WhitespaceReporterType          string
@@ -280,7 +281,7 @@ type CommonRepresentationTestFixture struct {
 func NewCommonRepresentationTestFixture() CommonRepresentationTestFixture {
 	return CommonRepresentationTestFixture{
 		ValidResourceId: uuid.MustParse("550e8400-e29b-41d4-a716-446655440123"),
-		ValidData: JsonObject{
+		ValidData: internal.JsonObject{
 			"name":        "test-resource",
 			"description": "A test resource for CommonRepresentation",
 			"metadata":    map[string]interface{}{"version": "1.0", "type": "test"},
@@ -289,7 +290,7 @@ func NewCommonRepresentationTestFixture() CommonRepresentationTestFixture {
 		ValidReportedByReporterType:     "test-reporter",
 		ValidReportedByReporterInstance: "test-instance-001",
 		NilResourceId:                   uuid.Nil,
-		EmptyData:                       JsonObject{},
+		EmptyData:                       internal.JsonObject{},
 		NilData:                         nil,
 		ZeroVersion:                     0,
 		EmptyReporterType:               "",
@@ -354,15 +355,15 @@ func NewReporterResourceTestFixture() ReporterResourceTestFixture {
 }
 
 type ReporterRepresentationTestFixture struct {
-	ValidData                    JsonObject
+	ValidData                    internal.JsonObject
 	ValidReporterResourceId      string
 	ValidVersion                 uint
 	ValidGeneration              uint
 	ValidCommonVersion           uint
 	ValidReporterVersion         *string
 	NilReporterVersion           *string
-	EmptyData                    JsonObject
-	NilData                      JsonObject
+	EmptyData                    internal.JsonObject
+	NilData                      internal.JsonObject
 	EmptyReporterResourceId      string
 	WhitespaceReporterResourceId string
 	InvalidReporterResourceId    string
@@ -371,7 +372,7 @@ type ReporterRepresentationTestFixture struct {
 func NewReporterRepresentationTestFixture() ReporterRepresentationTestFixture {
 	validReporterVersion := "v1.2.3"
 	return ReporterRepresentationTestFixture{
-		ValidData: JsonObject{
+		ValidData: internal.JsonObject{
 			"name":        "test-reporter-resource",
 			"description": "A test resource for ReporterRepresentation",
 			"metadata":    map[string]interface{}{"version": "2.0", "type": "reporter"},
@@ -382,7 +383,7 @@ func NewReporterRepresentationTestFixture() ReporterRepresentationTestFixture {
 		ValidCommonVersion:           3,
 		ValidReporterVersion:         &validReporterVersion,
 		NilReporterVersion:           nil,
-		EmptyData:                    JsonObject{},
+		EmptyData:                    internal.JsonObject{},
 		NilData:                      nil,
 		EmptyReporterResourceId:      "",
 		WhitespaceReporterResourceId: "  \t\n  ",
@@ -401,6 +402,36 @@ type ResourceTestFixture struct {
 	NilId                     uuid.UUID
 	EmptyResourceType         string
 	WhitespaceResourceType    string
+
+	// Individual values for NewResource function
+	ValidLocalResourceId            string
+	ValidReporterType               string
+	ValidReporterInstanceId         string
+	ValidResourceId                 uuid.UUID
+	ValidApiHref                    string
+	ValidConsoleHref                string
+	ValidReporterRepresentationData internal.JsonObject
+	ValidCommonRepresentationData   internal.JsonObject
+
+	AnotherLocalResourceId            string
+	AnotherReporterType               string
+	AnotherReporterInstanceId         string
+	AnotherResourceId                 uuid.UUID
+	AnotherApiHref                    string
+	EmptyConsoleHref                  string
+	AnotherReporterRepresentationData internal.JsonObject
+	AnotherCommonRepresentationData   internal.JsonObject
+
+	EmptyLocalResourceId            string
+	EmptyReporterType               string
+	EmptyReporterInstanceId         string
+	EmptyApiHref                    string
+	WhitespaceLocalResourceId       string
+	WhitespaceReporterType          string
+	WhitespaceReporterInstanceId    string
+	WhitespaceApiHref               string
+	EmptyReporterRepresentationData internal.JsonObject
+	EmptyCommonRepresentationData   internal.JsonObject
 }
 
 func NewResourceTestFixture() ResourceTestFixture {
@@ -437,5 +468,97 @@ func NewResourceTestFixture() ResourceTestFixture {
 		NilId:                     uuid.Nil,
 		EmptyResourceType:         "",
 		WhitespaceResourceType:    "  \t\n  ",
+
+		// Individual values for NewResource function
+		ValidLocalResourceId:            "local-resource-123",
+		ValidReporterType:               "acm",
+		ValidReporterInstanceId:         "acm-instance-001",
+		ValidResourceId:                 uuid.MustParse("550e8400-e29b-41d4-a716-446655440401"),
+		ValidApiHref:                    "/api/v1/resources/123",
+		ValidConsoleHref:                "/console/resources/123",
+		ValidReporterRepresentationData: internal.JsonObject{"name": "test-reporter-resource", "description": "A test resource for ReporterRepresentation", "metadata": map[string]interface{}{"version": "2.0", "type": "reporter"}},
+		ValidCommonRepresentationData:   internal.JsonObject{"id": "550e8400-e29b-41d4-a716-446655440400", "type": "reporter", "version": 1, "generation": 2, "commonVersion": 3},
+
+		AnotherLocalResourceId:            "local-resource-456",
+		AnotherReporterType:               "ocm",
+		AnotherReporterInstanceId:         "ocm-instance-001",
+		AnotherResourceId:                 uuid.MustParse("550e8400-e29b-41d4-a716-446655440501"),
+		AnotherApiHref:                    "/api/v1/resources/456",
+		EmptyConsoleHref:                  "",
+		AnotherReporterRepresentationData: internal.JsonObject{"name": "test-reporter-resource", "description": "A test resource for ReporterRepresentation", "metadata": map[string]interface{}{"version": "2.0", "type": "reporter"}},
+		AnotherCommonRepresentationData:   internal.JsonObject{"id": "550e8400-e29b-41d4-a716-446655440500", "type": "reporter", "version": 1, "generation": 2, "commonVersion": 3},
+
+		EmptyLocalResourceId:            "",
+		EmptyReporterType:               "",
+		EmptyReporterInstanceId:         "",
+		EmptyApiHref:                    "",
+		WhitespaceLocalResourceId:       "  \t\n  ",
+		WhitespaceReporterType:          "  \t\n  ",
+		WhitespaceReporterInstanceId:    "  \t\n  ",
+		WhitespaceApiHref:               "  \t\n  ",
+		EmptyReporterRepresentationData: internal.JsonObject{},
+		EmptyCommonRepresentationData:   internal.JsonObject{},
+	}
+}
+
+type ResourceEventTestFixture struct {
+	ValidResourceId         uuid.UUID
+	ValidResourceType       string
+	ValidReporterType       string
+	ValidReporterInstanceId string
+	ValidReporterData       internal.JsonObject
+	ValidReporterResourceID string
+	ValidReporterVersion    uint
+	ValidReporterGeneration uint
+	ValidCommonData         internal.JsonObject
+	ValidCommonVersion      uint
+	ValidReporterVersionStr *string
+
+	AnotherResourceId     uuid.UUID
+	AnotherResourceType   string
+	AnotherReporterData   internal.JsonObject
+	AnotherCommonData     internal.JsonObject
+	NilReporterVersionStr *string
+
+	InvalidResourceId       uuid.UUID
+	EmptyResourceType       string
+	EmptyReporterType       string
+	EmptyReporterInstanceId string
+	EmptyReporterData       internal.JsonObject
+	EmptyReporterResourceID string
+	EmptyCommonData         internal.JsonObject
+	WhitespaceResourceType  string
+}
+
+func NewResourceEventTestFixture() ResourceEventTestFixture {
+	validVersionStr := "1.2.3"
+
+	return ResourceEventTestFixture{
+		ValidResourceId:         uuid.MustParse("550e8400-e29b-41d4-a716-446655440700"),
+		ValidResourceType:       "k8s_cluster",
+		ValidReporterType:       "acm",
+		ValidReporterInstanceId: "acm-instance-001",
+		ValidReporterData:       internal.JsonObject{"name": "test-cluster", "status": "active"},
+		ValidReporterResourceID: "550e8400-e29b-41d4-a716-446655440701",
+		ValidReporterVersion:    1,
+		ValidReporterGeneration: 0,
+		ValidCommonData:         internal.JsonObject{"id": "test-id", "type": "cluster"},
+		ValidCommonVersion:      1,
+		ValidReporterVersionStr: &validVersionStr,
+
+		AnotherResourceId:     uuid.MustParse("550e8400-e29b-41d4-a716-446655440800"),
+		AnotherResourceType:   "host",
+		AnotherReporterData:   internal.JsonObject{"hostname": "test-host", "os": "linux"},
+		AnotherCommonData:     internal.JsonObject{"id": "host-id", "type": "host"},
+		NilReporterVersionStr: nil,
+
+		InvalidResourceId:       uuid.Nil,
+		EmptyResourceType:       "",
+		EmptyReporterType:       "",
+		EmptyReporterInstanceId: "",
+		EmptyReporterData:       internal.JsonObject{},
+		EmptyReporterResourceID: "",
+		EmptyCommonData:         internal.JsonObject{},
+		WhitespaceResourceType:  "  \t\n  ",
 	}
 }

@@ -14,7 +14,7 @@ func assertValidReporterDataRepresentation(t *testing.T, dataRep ReporterDataRep
 		t.Errorf("Expected valid ReporterDataRepresentation for %s, got nil", testCase)
 		return
 	}
-	if dataRep.IsTombstone() {
+	if dataRep.(ReporterRepresentation).IsTombstone() {
 		t.Errorf("Expected ReporterDataRepresentation tombstone to be false for %s, got true", testCase)
 	}
 	if dataRep.Data() == nil {
@@ -75,10 +75,10 @@ func TestReporterDataRepresentation_Initialization(t *testing.T) {
 		t.Parallel()
 
 		dataRep, err := NewReporterDataRepresentation(
-			fixture.ValidData,
 			fixture.ValidReporterResourceId,
 			fixture.ValidVersion,
 			fixture.ValidGeneration,
+			fixture.ValidData,
 			fixture.ValidCommonVersion,
 			fixture.ValidReporterVersion,
 		)
@@ -90,10 +90,10 @@ func TestReporterDataRepresentation_Initialization(t *testing.T) {
 		t.Parallel()
 
 		dataRep, err := NewReporterDataRepresentation(
-			fixture.ValidData,
 			fixture.ValidReporterResourceId,
 			fixture.ValidVersion,
 			fixture.ValidGeneration,
+			fixture.ValidData,
 			fixture.ValidCommonVersion,
 			fixture.NilReporterVersion,
 		)
@@ -105,10 +105,10 @@ func TestReporterDataRepresentation_Initialization(t *testing.T) {
 		t.Parallel()
 
 		dataRep, err := NewReporterDataRepresentation(
-			fixture.NilData,
 			fixture.ValidReporterResourceId,
 			fixture.ValidVersion,
 			fixture.ValidGeneration,
+			fixture.NilData,
 			fixture.ValidCommonVersion,
 			fixture.ValidReporterVersion,
 		)
@@ -120,10 +120,10 @@ func TestReporterDataRepresentation_Initialization(t *testing.T) {
 		t.Parallel()
 
 		dataRep, err := NewReporterDataRepresentation(
-			fixture.EmptyData,
 			fixture.ValidReporterResourceId,
 			fixture.ValidVersion,
 			fixture.ValidGeneration,
+			fixture.EmptyData,
 			fixture.ValidCommonVersion,
 			fixture.ValidReporterVersion,
 		)
@@ -135,10 +135,10 @@ func TestReporterDataRepresentation_Initialization(t *testing.T) {
 		t.Parallel()
 
 		dataRep, err := NewReporterDataRepresentation(
-			fixture.ValidData,
 			fixture.EmptyReporterResourceId,
 			fixture.ValidVersion,
 			fixture.ValidGeneration,
+			fixture.ValidData,
 			fixture.ValidCommonVersion,
 			fixture.ValidReporterVersion,
 		)
@@ -150,10 +150,10 @@ func TestReporterDataRepresentation_Initialization(t *testing.T) {
 		t.Parallel()
 
 		dataRep, err := NewReporterDataRepresentation(
-			fixture.ValidData,
 			fixture.WhitespaceReporterResourceId,
 			fixture.ValidVersion,
 			fixture.ValidGeneration,
+			fixture.ValidData,
 			fixture.ValidCommonVersion,
 			fixture.ValidReporterVersion,
 		)
@@ -165,10 +165,10 @@ func TestReporterDataRepresentation_Initialization(t *testing.T) {
 		t.Parallel()
 
 		dataRep, err := NewReporterDataRepresentation(
-			fixture.ValidData,
 			fixture.InvalidReporterResourceId,
 			fixture.ValidVersion,
 			fixture.ValidGeneration,
+			fixture.ValidData,
 			fixture.ValidCommonVersion,
 			fixture.ValidReporterVersion,
 		)
@@ -260,10 +260,10 @@ func TestReporterRepresentation_BusinessRules(t *testing.T) {
 		t.Parallel()
 
 		dataRep, err := NewReporterDataRepresentation(
-			fixture.ValidData,
 			fixture.ValidReporterResourceId,
 			fixture.ValidVersion,
 			fixture.ValidGeneration,
+			fixture.ValidData,
 			fixture.ValidCommonVersion,
 			fixture.ValidReporterVersion,
 		)
@@ -271,7 +271,7 @@ func TestReporterRepresentation_BusinessRules(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Expected no error, got %v", err)
 		}
-		if dataRep.IsTombstone() {
+		if dataRep.(ReporterRepresentation).IsTombstone() {
 			t.Error("Expected ReporterDataRepresentation to have tombstone=false, got true")
 		}
 	})
@@ -328,10 +328,10 @@ func TestReporterRepresentation_BusinessRules(t *testing.T) {
 		t.Parallel()
 
 		dataRep, err := NewReporterDataRepresentation(
-			fixture.ValidData,
 			fixture.ValidReporterResourceId,
 			fixture.ValidVersion,
 			fixture.ValidGeneration,
+			fixture.ValidData,
 			fixture.ValidCommonVersion,
 			fixture.ValidReporterVersion,
 		)
@@ -351,10 +351,10 @@ func TestReporterRepresentation_BusinessRules(t *testing.T) {
 		t.Parallel()
 
 		dataRep, err := NewReporterDataRepresentation(
-			fixture.ValidData,
 			fixture.ValidReporterResourceId,
 			0, // zero version
 			0, // zero generation
+			fixture.ValidData,
 			0, // zero common version
 			fixture.ValidReporterVersion,
 		)

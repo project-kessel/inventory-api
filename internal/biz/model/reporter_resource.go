@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
+	datamodel "github.com/project-kessel/inventory-api/internal/data/model"
 )
 
 type ReporterResource struct {
@@ -22,7 +23,7 @@ type ReporterResource struct {
 type ReporterResourceKey struct {
 	localResourceID LocalResourceId
 	resourceType    ResourceType
-	reporter        Reporter
+	reporter        ReporterId
 }
 
 func NewReporterResource(idVal uuid.UUID, localResourceIdVal string, resourceTypeVal string, reporterTypeVal string, reporterInstanceIdVal string, resourceIdVal uuid.UUID, apiHrefVal string, consoleHrefVal string) (ReporterResource, error) {
@@ -93,4 +94,20 @@ func NewReporterResourceKey(
 		resourceType:    resourceType,
 		reporter:        reporter,
 	}, nil
+}
+
+func (rr ReporterResource) Serialize() (*datamodel.ReporterResource, error) {
+	return datamodel.NewReporterResource(
+		uuid.UUID(rr.id),
+		rr.localResourceID.String(),
+		rr.reporter.reporterType.String(),
+		rr.resourceType.String(),
+		rr.reporter.reporterInstanceId.String(),
+		uuid.UUID(rr.resourceID),
+		rr.apiHref.String(),
+		rr.consoleHref.String(),
+		uint(rr.representationVersion),
+		uint(rr.generation),
+		rr.tombstone.Bool(),
+	)
 }

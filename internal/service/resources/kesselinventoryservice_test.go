@@ -296,10 +296,10 @@ func TestInventoryService_DeleteResource_Success(t *testing.T) {
 
 	cfg := &usecase.UsecaseConfig{}
 	uc := &usecase.Usecase{
-		ReporterResourceRepository: mockRepo,
-		Config:                     cfg,
-		Namespace:                  "rbac",
-		Log:                        krlog.NewHelper(krlog.NewStdLogger(io.Discard)),
+		LegacyReporterResourceRepository: mockRepo,
+		Config:                           cfg,
+		Namespace:                        "rbac",
+		Log:                              krlog.NewHelper(krlog.NewStdLogger(io.Discard)),
 	}
 
 	service := svc.NewKesselInventoryServiceV1beta2(uc)
@@ -384,10 +384,10 @@ func TestInventoryService_Check_Allowed(t *testing.T) {
 
 	cfg := &usecase.UsecaseConfig{DisablePersistence: true}
 	uc := &usecase.Usecase{
-		Authz:                      mockAuthz,
-		ReporterResourceRepository: mockRepo,
-		Namespace:                  "rbac",
-		Config:                     cfg,
+		Authz:                            mockAuthz,
+		LegacyReporterResourceRepository: mockRepo,
+		Namespace:                        "rbac",
+		Config:                           cfg,
 	}
 
 	service := svc.NewKesselInventoryServiceV1beta2(uc)
@@ -442,10 +442,10 @@ func TestInventoryService_CheckForUpdate_Allowed(t *testing.T) {
 
 	cfg := &usecase.UsecaseConfig{DisablePersistence: true}
 	uc := &usecase.Usecase{
-		Authz:                      mockAuthz,
-		ReporterResourceRepository: mockRepo,
-		Namespace:                  "rbac",
-		Config:                     cfg,
+		Authz:                            mockAuthz,
+		LegacyReporterResourceRepository: mockRepo,
+		Namespace:                        "rbac",
+		Config:                           cfg,
 	}
 
 	service := svc.NewKesselInventoryServiceV1beta2(uc)
@@ -500,10 +500,10 @@ func TestInventoryService_Check_Denied(t *testing.T) {
 
 	cfg := &usecase.UsecaseConfig{DisablePersistence: true}
 	uc := &usecase.Usecase{
-		Authz:                      mockAuthz,
-		ReporterResourceRepository: mockRepo,
-		Namespace:                  "rbac",
-		Config:                     cfg,
+		Authz:                            mockAuthz,
+		LegacyReporterResourceRepository: mockRepo,
+		Namespace:                        "rbac",
+		Config:                           cfg,
 	}
 
 	service := svc.NewKesselInventoryServiceV1beta2(uc)
@@ -558,10 +558,10 @@ func TestInventoryService_CheckForUpdate_Denied(t *testing.T) {
 
 	cfg := &usecase.UsecaseConfig{DisablePersistence: true}
 	uc := &usecase.Usecase{
-		Authz:                      mockAuthz,
-		ReporterResourceRepository: mockRepo,
-		Namespace:                  "rbac",
-		Config:                     cfg,
+		Authz:                            mockAuthz,
+		LegacyReporterResourceRepository: mockRepo,
+		Namespace:                        "rbac",
+		Config:                           cfg,
 	}
 
 	service := svc.NewKesselInventoryServiceV1beta2(uc)

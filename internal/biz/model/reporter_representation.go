@@ -1,6 +1,11 @@
 package model
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/project-kessel/inventory-api/internal"
+	datamodel "github.com/project-kessel/inventory-api/internal/data/model"
+)
 
 type ReporterRepresentation struct {
 	Representation
@@ -13,17 +18,14 @@ type ReporterRepresentation struct {
 }
 
 type ReporterDataRepresentation interface {
-	Data() JsonObject
-	IsTombstone() bool
+	Data() internal.JsonObject
 }
 
 type ReporterDeleteRepresentation interface {
+	// ReporterDeleteRepresentation should not have data
 }
 
-func (r ReporterRepresentation) Data() JsonObject {
-	if r.tombstone.Bool() {
-		return nil
-	}
+func (r ReporterRepresentation) Data() internal.JsonObject {
 	return r.data
 }
 
@@ -32,10 +34,10 @@ func (r ReporterRepresentation) IsTombstone() bool {
 }
 
 func NewReporterDataRepresentation(
-	data JsonObject,
-	reporterResourceIDVal string,
+	reporterResourceIdVal string,
 	version uint,
 	generation uint,
+	data internal.JsonObject,
 	commonVersion uint,
 	reporterVersionVal *string,
 ) (ReporterDataRepresentation, error) {
@@ -43,7 +45,7 @@ func NewReporterDataRepresentation(
 		return nil, fmt.Errorf("ReporterDataRepresentation requires non-empty data")
 	}
 
-	reporterResourceID, err := NewReporterResourceIdFromString(reporterResourceIDVal)
+	reporterResourceID, err := NewReporterResourceIdFromString(reporterResourceIdVal)
 	if err != nil {
 		return nil, err
 	}
@@ -102,4 +104,22 @@ func NewReporterDeleteRepresentation(
 		reporterVersion:    reporterVersion,
 		tombstone:          NewTombstone(true),
 	}, nil
+}
+
+func (rr ReporterRepresentation) Serialize() (*datamodel.ReporterRepresentation, error) {
+	var reporterVersionStr *string
+	if rr.reporterVersion != nil {
+		versionStr := rr.reporterVersion.String()
+		reporterVersionStr = &versionStr
+	}
+
+	return datamodel.NewReporterRepresentation(
+		internal.JsonObject(rr.data),
+		rr.reporterResourceID.String(),
+		uint(rr.version),
+		uint(rr.generation),
+		uint(rr.commonVersion),
+		rr.tombstone.Bool(),
+		reporterVersionStr,
+	)
 }

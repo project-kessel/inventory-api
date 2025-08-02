@@ -32,7 +32,7 @@ func TestReporter_Initialization(t *testing.T) {
 
 		_, err := NewReporter(fixture.EmptyString, fixture.ValidReporterInstanceId)
 
-		assertInvalidReporter(t, err, "Reporter invalid type")
+		assertInvalidReporter(t, err, "ReporterId invalid type")
 	})
 
 	t.Run("should reject whitespace-only reporter type", func(t *testing.T) {
@@ -40,7 +40,7 @@ func TestReporter_Initialization(t *testing.T) {
 
 		_, err := NewReporter(fixture.WhitespaceString, fixture.ValidReporterInstanceId)
 
-		assertInvalidReporter(t, err, "Reporter invalid type")
+		assertInvalidReporter(t, err, "ReporterId invalid type")
 	})
 
 	t.Run("should reject empty reporter instance id", func(t *testing.T) {
@@ -48,7 +48,7 @@ func TestReporter_Initialization(t *testing.T) {
 
 		_, err := NewReporter(fixture.ValidReporterType, fixture.EmptyString)
 
-		assertInvalidReporter(t, err, "Reporter invalid instance ID")
+		assertInvalidReporter(t, err, "ReporterId invalid instance ID")
 	})
 
 	t.Run("should reject whitespace-only reporter instance id", func(t *testing.T) {
@@ -56,7 +56,7 @@ func TestReporter_Initialization(t *testing.T) {
 
 		_, err := NewReporter(fixture.ValidReporterType, fixture.WhitespaceString)
 
-		assertInvalidReporter(t, err, "Reporter invalid instance ID")
+		assertInvalidReporter(t, err, "ReporterId invalid instance ID")
 	})
 
 	t.Run("should reject both empty inputs", func(t *testing.T) {
@@ -64,7 +64,7 @@ func TestReporter_Initialization(t *testing.T) {
 
 		_, err := NewReporter(fixture.EmptyString, fixture.EmptyString)
 
-		assertInvalidReporter(t, err, "Reporter invalid type")
+		assertInvalidReporter(t, err, "ReporterId invalid type")
 	})
 
 	t.Run("should reject both whitespace inputs", func(t *testing.T) {
@@ -72,11 +72,11 @@ func TestReporter_Initialization(t *testing.T) {
 
 		_, err := NewReporter(fixture.WhitespaceString, fixture.WhitespaceString)
 
-		assertInvalidReporter(t, err, "Reporter invalid type")
+		assertInvalidReporter(t, err, "ReporterId invalid type")
 	})
 }
 
-func assertValidReporter(t *testing.T, reporter Reporter, err error, expectedType, expectedInstanceId string) {
+func assertValidReporter(t *testing.T, reporter ReporterId, err error, expectedType, expectedInstanceId string) {
 	t.Helper()
 	if err != nil {
 		t.Errorf("Expected no error, got %v", err)

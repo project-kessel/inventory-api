@@ -24,11 +24,11 @@ func NewCommonRepresentation(
 	reporterInstanceIdVal string,
 ) (CommonRepresentation, error) {
 	if len(data) == 0 {
-		return CommonRepresentation{}, fmt.Errorf("CommonRepresentation invalid empty data")
+		return CommonRepresentation{}, fmt.Errorf("CommonRepresentation requires non-empty data")
 	}
 
 	if data == nil {
-		return CommonRepresentation{}, fmt.Errorf("CommonRepresentation invalid nil data")
+		return CommonRepresentation{}, fmt.Errorf("CommonRepresentation requires non-empty data")
 	}
 
 	resourceId, err := NewResourceId(resourceIdVal)

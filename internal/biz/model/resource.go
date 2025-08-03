@@ -125,3 +125,59 @@ func (r Resource) Serialize() (*datamodel.Resource, *datamodel.ReporterResource,
 func (r Resource) ResourceEvents() []ResourceEvent {
 	return r.resourceEvents
 }
+
+func (r Resource) ReporterResources() []ReporterResource {
+	return r.reporterResources
+}
+
+func Deserialize(
+	resourceID uuid.UUID,
+	resourceType string,
+	commonVersion uint,
+	reporterResourceID uuid.UUID,
+	localResourceID string,
+	reporterType string,
+	reporterInstanceID string,
+	representationVersion uint,
+	generation uint,
+	tombstone bool,
+	apiHref string,
+	consoleHref string,
+) (*Resource, error) {
+	domainResourceId, err := NewResourceId(resourceID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create ResourceId: %w", err)
+	}
+
+	domainResourceType, err := NewResourceType(resourceType)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create ResourceType: %w", err)
+	}
+
+	reporterResource, err := DeserializeReporterResource(
+		reporterResourceID,
+		localResourceID,
+		reporterType,
+		resourceType,
+		reporterInstanceID,
+		resourceID,
+		apiHref,
+		consoleHref,
+		representationVersion,
+		generation,
+		tombstone,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create ReporterResource: %w", err)
+	}
+
+	resource := &Resource{
+		id:                domainResourceId,
+		resourceType:      domainResourceType,
+		commonVersion:     NewVersion(commonVersion),
+		reporterResources: []ReporterResource{*reporterResource},
+		resourceEvents:    []ResourceEvent{},
+	}
+
+	return resource, nil
+}

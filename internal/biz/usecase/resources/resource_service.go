@@ -3,6 +3,7 @@ package resources
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/go-kratos/kratos/v2/log"
@@ -91,23 +92,46 @@ func New(resourceRepository data.ResourceRepository, reporterResourceRepository 
 	}
 }
 
-func (uc *Usecase) ReportResource(ctx context.Context, request *v1beta2.ReportResourceRequest, write_visibility v1beta2.WriteVisibility, reporterPrincipal string) error {
-
+func (uc *Usecase) ReportResource(request *v1beta2.ReportResourceRequest, write_visibility v1beta2.WriteVisibility, reporterPrincipal string) error {
 	log.Info("Reporting resource request: ", request)
+
 	var subscription pubsub.Subscription
-	txid, err := uuid.NewV7()
+	txidStr, err := uc.resourceRepository.GetNextTransactionID()
 	if err != nil {
 		return err
 	}
-	txidStr := txid.String()
 
-	readAfterWriteEnabled := computeReadAfterWrite(uc, write_visibility, reporterPrincipal)
-	if readAfterWriteEnabled && uc.Config.ConsumerEnabled {
-		// TODO: Replace this when inventory api has proper api-level transaction ids
+	if readAfterWriteEnabled := computeReadAfterWrite(uc, write_visibility, reporterPrincipal); readAfterWriteEnabled && uc.Config.ConsumerEnabled {
 		subscription = uc.ListenManager.Subscribe(txidStr)
 		defer subscription.Unsubscribe()
 	}
 
+	// Check if resource already exists
+	reporterResourceKey, err := model.NewReporterResourceKey(
+		request.GetRepresentations().GetMetadata().GetLocalResourceId(),
+		request.GetType(),
+		request.GetReporterType(),
+		request.GetReporterInstanceId(),
+	)
+	if err != nil {
+		return fmt.Errorf("failed to create reporter resource key: %w", err)
+	}
+
+	existingResource, err := uc.resourceRepository.FindResourceByKeys(nil, reporterResourceKey)
+	if err != nil {
+		return fmt.Errorf("failed to lookup existing resource: %w", err)
+	}
+
+	if existingResource != nil {
+		log.Info("Resource already exists, updating: ", existingResource)
+		return uc.updateResource(request, existingResource, txidStr)
+	} else {
+		log.Info("Creating new resource")
+		return uc.createResource(request, txidStr)
+	}
+}
+
+func (uc *Usecase) createResource(request *v1beta2.ReportResourceRequest, txidStr string) error {
 	resourceId, err := uc.resourceRepository.NextResourceId()
 	if err != nil {
 		return err
@@ -117,6 +141,7 @@ func (uc *Usecase) ReportResource(ctx context.Context, request *v1beta2.ReportRe
 	if err != nil {
 		return err
 	}
+
 	resource, err := model.NewResource(
 		resourceId.UUID(),
 		request.GetRepresentations().GetMetadata().GetLocalResourceId(),
@@ -131,10 +156,17 @@ func (uc *Usecase) ReportResource(ctx context.Context, request *v1beta2.ReportRe
 	if err != nil {
 		return err
 	}
-	err = uc.resourceRepository.Save(nil, resource, model_legacy.OperationTypeCreated, txidStr)
+
+	err = uc.resourceRepository.SaveWithTransaction(resource, model_legacy.OperationTypeCreated, txidStr)
 	if err != nil {
 		return err
 	}
+	return nil
+}
+
+func (uc *Usecase) updateResource(request *v1beta2.ReportResourceRequest, existingResource *model.Resource, txidStr string) error {
+	// TODO: Implement resource update logic
+	log.Info("Update resource logic not yet implemented for resource: ", existingResource)
 	return nil
 }
 

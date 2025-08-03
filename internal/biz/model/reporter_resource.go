@@ -96,6 +96,26 @@ func NewReporterResourceKey(
 	}, nil
 }
 
+func (rrk ReporterResourceKey) LocalResourceId() string {
+	return rrk.localResourceID.String()
+}
+
+func (rrk ReporterResourceKey) ResourceType() string {
+	return rrk.resourceType.String()
+}
+
+func (rrk ReporterResourceKey) ReporterType() string {
+	return rrk.reporter.reporterType.String()
+}
+
+func (rrk ReporterResourceKey) ReporterInstanceId() string {
+	return rrk.reporter.reporterInstanceId.String()
+}
+
+func (rr ReporterResource) LocalResourceId() string {
+	return rr.localResourceID.String()
+}
+
 func (rr ReporterResource) Serialize() (*datamodel.ReporterResource, error) {
 	return datamodel.NewReporterResource(
 		uuid.UUID(rr.id),
@@ -110,4 +130,64 @@ func (rr ReporterResource) Serialize() (*datamodel.ReporterResource, error) {
 		uint(rr.generation),
 		rr.tombstone.Bool(),
 	)
+}
+
+func DeserializeReporterResource(
+	id uuid.UUID,
+	localResourceID string,
+	reporterType string,
+	resourceType string,
+	reporterInstanceID string,
+	resourceID uuid.UUID,
+	apiHref string,
+	consoleHref string,
+	representationVersion uint,
+	generation uint,
+	tombstone bool,
+) (*ReporterResource, error) {
+	reporterResourceId, err := NewReporterResourceId(id)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create ReporterResourceId: %w", err)
+	}
+
+	reporterResourceKey, err := NewReporterResourceKey(
+		localResourceID,
+		resourceType,
+		reporterType,
+		reporterInstanceID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create ReporterResourceKey: %w", err)
+	}
+
+	domainResourceId, err := NewResourceId(resourceID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create ResourceId: %w", err)
+	}
+
+	domainApiHref, err := NewApiHref(apiHref)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create ApiHref: %w", err)
+	}
+
+	var domainConsoleHref ConsoleHref
+	if consoleHref != "" {
+		domainConsoleHref, err = NewConsoleHref(consoleHref)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create ConsoleHref: %w", err)
+		}
+	}
+
+	reporterResource := &ReporterResource{
+		id:                    reporterResourceId,
+		ReporterResourceKey:   reporterResourceKey,
+		resourceID:            domainResourceId,
+		apiHref:               domainApiHref,
+		consoleHref:           domainConsoleHref,
+		representationVersion: NewVersion(representationVersion),
+		generation:            NewGeneration(generation),
+		tombstone:             NewTombstone(tombstone),
+	}
+
+	return reporterResource, nil
 }

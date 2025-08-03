@@ -45,7 +45,8 @@ func setupTest(t *testing.T) (*gorm.DB, *Repo) {
 	maxSerializationRetries := 3
 	db := setupGorm(t)
 	mc := setupMetricsCollector(t)
-	repo := New(db, mc, maxSerializationRetries)
+	transactionManager := data.NewGormTransactionManager(maxSerializationRetries)
+	repo := New(db, mc, transactionManager)
 	return db, repo
 }
 

@@ -8,20 +8,43 @@ import (
 
 	bizmodel "github.com/project-kessel/inventory-api/internal/biz/model"
 	"github.com/project-kessel/inventory-api/internal/biz/model_legacy"
+	"github.com/project-kessel/inventory-api/internal/biz/usecase"
 )
+
+type FindResourceByKeysResult struct {
+	ReporterResourceID    uuid.UUID `gorm:"column:reporter_resource_id"`
+	RepresentationVersion uint      `gorm:"column:representation_version"`
+	Generation            uint      `gorm:"column:generation"`
+	Tombstone             bool      `gorm:"column:tombstone"`
+	CommonVersion         uint      `gorm:"column:common_version"`
+	ResourceID            uuid.UUID `gorm:"column:resource_id"`
+	ResourceType          string    `gorm:"column:resource_type"`
+	LocalResourceID       string    `gorm:"column:local_resource_id"`
+	ReporterType          string    `gorm:"column:reporter_type"`
+	ReporterInstanceID    string    `gorm:"column:reporter_instance_id"`
+}
 
 type ResourceRepository interface {
 	NextResourceId() (bizmodel.ResourceId, error)
 	NextReporterResourceId() (bizmodel.ReporterResourceId, error)
 	Save(tx *gorm.DB, resource bizmodel.Resource, operationType model_legacy.EventOperationType, txid string) error
+	SaveWithAutoTxID(tx *gorm.DB, resource bizmodel.Resource, operationType model_legacy.EventOperationType) error
+	SaveWithTransaction(resource bizmodel.Resource, operationType model_legacy.EventOperationType, txid string) error
+	FindResourceByKeys(tx *gorm.DB, key bizmodel.ReporterResourceKey) (*bizmodel.Resource, error)
+	GetNextTransactionID() (string, error)
+	MustGetNextTransactionID() string
 }
 
 type resourceRepository struct {
-	db *gorm.DB
+	db                 *gorm.DB
+	transactionManager usecase.TransactionManager
 }
 
-func NewResourceRepository(db *gorm.DB) ResourceRepository {
-	return &resourceRepository{db: db}
+func NewResourceRepository(db *gorm.DB, transactionManager usecase.TransactionManager) ResourceRepository {
+	return &resourceRepository{
+		db:                 db,
+		transactionManager: transactionManager,
+	}
 }
 
 func (r *resourceRepository) NextResourceId() (bizmodel.ResourceId, error) {
@@ -40,6 +63,36 @@ func (r *resourceRepository) NextReporterResourceId() (bizmodel.ReporterResource
 	}
 
 	return bizmodel.NewReporterResourceId(uuidV7)
+}
+
+func (r *resourceRepository) GetNextTransactionID() (string, error) {
+	txid, err := uuid.NewV7()
+	if err != nil {
+		return "", err
+	}
+	return txid.String(), nil
+}
+
+func (r *resourceRepository) MustGetNextTransactionID() string {
+	txid, err := r.GetNextTransactionID()
+	if err != nil {
+		panic(err)
+	}
+	return txid
+}
+
+func (r *resourceRepository) SaveWithAutoTxID(tx *gorm.DB, resource bizmodel.Resource, operationType model_legacy.EventOperationType) error {
+	txid, err := r.GetNextTransactionID()
+	if err != nil {
+		return err
+	}
+	return r.Save(tx, resource, operationType, txid)
+}
+
+func (r *resourceRepository) SaveWithTransaction(resource bizmodel.Resource, operationType model_legacy.EventOperationType, txid string) error {
+	return r.transactionManager.HandleSerializableTransaction(r.db, func(tx *gorm.DB) error {
+		return r.Save(tx, resource, operationType, txid)
+	})
 }
 
 func (r *resourceRepository) Save(tx *gorm.DB, resource bizmodel.Resource, operationType model_legacy.EventOperationType, txid string) error {
@@ -93,4 +146,57 @@ func (r *resourceRepository) handleOutboxEvents(tx *gorm.DB, resourceEvent bizmo
 	}
 
 	return nil
+}
+
+func (r *resourceRepository) FindResourceByKeys(tx *gorm.DB, key bizmodel.ReporterResourceKey) (*bizmodel.Resource, error) {
+	var result FindResourceByKeysResult
+
+	err := tx.Table("reporter_resources AS rr").
+		Select(`
+			rr.id AS reporter_resource_id,
+			rr.representation_version,
+			rr.generation,
+			rr.tombstone,
+			res.common_version,
+			res.id AS resource_id,
+			rr.resource_type,
+			rr.local_resource_id,
+			rr.reporter_type,
+			rr.reporter_instance_id
+		`).
+		Joins("JOIN resource AS res ON res.id = rr.resource_id").
+		Where(`
+			rr.local_resource_id = ? AND
+			rr.resource_type = ? AND
+			rr.reporter_type = ? AND
+			rr.reporter_instance_id = ?`,
+			key.LocalResourceId(), key.ResourceType(), key.ReporterType(), key.ReporterInstanceId()).
+		Take(&result).Error
+
+	if err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("failed to find resource by keys: %w", err)
+	}
+
+	resource, err := bizmodel.Deserialize(
+		result.ResourceID,
+		result.ResourceType,
+		result.CommonVersion,
+		result.ReporterResourceID,
+		result.LocalResourceID,
+		result.ReporterType,
+		result.ReporterInstanceID,
+		result.RepresentationVersion,
+		result.Generation,
+		result.Tombstone,
+		"redhat.com",
+		"",
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to deserialize resource: %w", err)
+	}
+
+	return resource, nil
 }

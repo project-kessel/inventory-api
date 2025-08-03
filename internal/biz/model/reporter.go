@@ -23,3 +23,11 @@ func NewReporter(reporterTypeVal, reporterInstanceIdVal string) (ReporterId, err
 		reporterInstanceId: reporterInstanceId,
 	}, nil
 }
+
+func (r ReporterId) ReporterType() string {
+	return r.reporterType.String()
+}
+
+func (r ReporterId) ReporterInstanceId() string {
+	return r.reporterInstanceId.String()
+}

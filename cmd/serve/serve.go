@@ -17,7 +17,6 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/project-kessel/inventory-api/cmd/common"
-	"github.com/project-kessel/inventory-api/internal/biz/usecase"
 	relationshipsctl "github.com/project-kessel/inventory-api/internal/biz/usecase/relationships"
 	resourcesctl "github.com/project-kessel/inventory-api/internal/biz/usecase/resources"
 	"github.com/project-kessel/inventory-api/internal/consistency"
@@ -259,7 +258,7 @@ func NewCommand(
 			//v1beta2
 			// wire together inventory service handling
 
-			transactionManager := usecase.NewTransactionManager(storageConfig.Options.MaxSerializationRetries)
+			transactionManager := data.NewGormTransactionManager(storageConfig.Options.MaxSerializationRetries)
 			resourceRepo := data.NewResourceRepository(db, transactionManager)
 			legacy_resource_repo := legacyresourcerepo.New(db, mc, transactionManager)
 			inventory_controller := resourcesctl.New(resourceRepo, legacy_resource_repo, inventoryresources_repo, authorizer, eventingManager, "notifications", log.With(logger, "subsystem", "notificationsintegrations_controller"), listenManager, waitForNotifCircuitBreaker, usecaseConfig)

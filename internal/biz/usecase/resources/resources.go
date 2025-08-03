@@ -11,7 +11,7 @@ import (
 
 	"github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2"
 	"github.com/project-kessel/inventory-api/internal/pubsub"
-	"github.com/sony/gobreaker"
+	"github.com/sony/gobreaker/v2"
 
 	"github.com/google/uuid"
 

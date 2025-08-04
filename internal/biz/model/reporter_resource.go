@@ -1,88 +1,96 @@
 package model
 
 import (
+	"fmt"
+
 	"github.com/google/uuid"
 )
 
-// ReporterResourceKey represents the natural key that identifies a resource as reported by a specific reporter.
-// This tuple must be unique across the table.
-type ReporterResourceKey struct {
-	LocalResourceID    string `gorm:"column:local_resource_id;index:reporter_resource_key_idx,unique;index:reporter_resource_search_idx,priority:1;not null;"`
-	ReporterType       string `gorm:"size:128;column:reporter_type;index:reporter_resource_key_idx,unique;index:reporter_resource_search_idx,priority:2;not null;"`
-	ResourceType       string `gorm:"size:128;column:resource_type;index:reporter_resource_key_idx,unique;index:reporter_resource_search_idx,priority:3;not null;"`
-	ReporterInstanceID string `gorm:"size:256;column:reporter_instance_id;index:reporter_resource_key_idx,unique;index:reporter_resource_search_idx,priority:4;not null;"`
-}
-
-// ReporterResource represents the metadata that identifies a resource as reported by a specific reporter.
-// It combines a surrogate UUID primary key with the natural composite key and latest state information.
 type ReporterResource struct {
-	// Surrogate Id for ReporterResourceKey
-	ID uuid.UUID `gorm:"type:uuid;primaryKey"`
-	// Actual Id
+	id ReporterResourceId
 	ReporterResourceKey
 
-	// Fields that do not need versioning, only latest state matters
-	ResourceID  uuid.UUID `gorm:"type:uuid;column:resource_id;not null;"`
-	APIHref     string    `gorm:"size:512;column:api_href"`
-	ConsoleHref string    `gorm:"size:512;column:console_href"`
+	resourceID  ResourceId
+	apiHref     ApiHref
+	consoleHref ConsoleHref
 
-	// Normalized Latest values
-	RepresentationVersion int  `gorm:"column:representation_version;index:reporter_resource_key_idx,unique;not null;"`
-	Generation            int  `gorm:"column:generation;index:reporter_resource_key_idx,unique;not null;"`
-	Tombstone             bool `gorm:"column:tombstone;not null;"`
+	representationVersion Version
+	generation            Generation
+	tombstone             Tombstone
 }
 
-// NewReporterResource validates inputs and returns an immutable ReporterResource value.
-func NewReporterResource(
-	id uuid.UUID,
-	localResourceID string,
-	reporterType string,
-	resourceType string,
-	reporterInstanceID string,
-	resourceID uuid.UUID,
-	apiHref string,
-	consoleHref string,
-	representationVersion int,
-	generation int,
-	tombstone bool,
-) (*ReporterResource, error) {
-	rr := &ReporterResource{
-		ID: id,
-		ReporterResourceKey: ReporterResourceKey{
-			LocalResourceID:    localResourceID,
-			ReporterType:       reporterType,
-			ResourceType:       resourceType,
-			ReporterInstanceID: reporterInstanceID,
-		},
-		ResourceID:            resourceID,
-		APIHref:               apiHref,
-		ConsoleHref:           consoleHref,
-		RepresentationVersion: representationVersion,
-		Generation:            generation,
-		Tombstone:             tombstone,
-	}
-
-	if err := validateReporterResource(rr); err != nil {
-		return nil, err
-	}
-	return rr, nil
+type ReporterResourceKey struct {
+	localResourceID LocalResourceId
+	resourceType    ResourceType
+	reporter        Reporter
 }
 
-func validateReporterResource(r *ReporterResource) error {
-	return aggregateErrors(
-		validateUUIDRequired("ID", r.ID),
-		validateStringRequired("LocalResourceID", r.LocalResourceID),
-		validateMaxLength("LocalResourceID", r.LocalResourceID, MaxLocalResourceIDLength),
-		validateStringRequired("ReporterType", r.ReporterType),
-		validateMaxLength("ReporterType", r.ReporterType, MaxReporterTypeLength),
-		validateStringRequired("ResourceType", r.ResourceType),
-		validateMaxLength("ResourceType", r.ResourceType, MaxResourceTypeLength),
-		validateStringRequired("ReporterInstanceID", r.ReporterInstanceID),
-		validateMaxLength("ReporterInstanceID", r.ReporterInstanceID, MaxReporterInstanceIDLength),
-		validateUUIDRequired("ResourceID", r.ResourceID),
-		validateMinValue("Generation", r.Generation, MinGenerationValue),
-		validateMinValue("RepresentationVersion", r.RepresentationVersion, 0),
-		validateOptionalURL("APIHref", r.APIHref, MaxAPIHrefLength),
-		validateOptionalURL("ConsoleHref", r.ConsoleHref, MaxConsoleHrefLength),
-	)
+func NewReporterResource(idVal uuid.UUID, localResourceIdVal string, resourceTypeVal string, reporterTypeVal string, reporterInstanceIdVal string, resourceIdVal uuid.UUID, apiHrefVal string, consoleHrefVal string) (ReporterResource, error) {
+	reporterResourceId, err := NewReporterResourceId(idVal)
+	if err != nil {
+		return ReporterResource{}, fmt.Errorf("ReporterResource invalid ID: %w", err)
+	}
+
+	reporterResourceKey, err := NewReporterResourceKey(localResourceIdVal, resourceTypeVal, reporterTypeVal, reporterInstanceIdVal)
+	if err != nil {
+		return ReporterResource{}, fmt.Errorf("ReporterResource invalid key: %w", err)
+	}
+
+	resourceId, err := NewResourceId(resourceIdVal)
+	if err != nil {
+		return ReporterResource{}, fmt.Errorf("ReporterResource invalid resource ID: %w", err)
+	}
+
+	apiHref, err := NewApiHref(apiHrefVal)
+	if err != nil {
+		return ReporterResource{}, fmt.Errorf("ReporterResource invalid API href: %w", err)
+	}
+
+	var consoleHref ConsoleHref
+	if consoleHrefVal != "" {
+		consoleHref, err = NewConsoleHref(consoleHrefVal)
+		if err != nil {
+			return ReporterResource{}, fmt.Errorf("ReporterResource invalid console href: %w", err)
+		}
+	}
+
+	resource := ReporterResource{
+		id:                    reporterResourceId,
+		ReporterResourceKey:   reporterResourceKey,
+		resourceID:            resourceId,
+		apiHref:               apiHref,
+		consoleHref:           consoleHref,
+		representationVersion: NewVersion(initialReporterRepresentationVersion),
+		generation:            NewGeneration(initialGeneration),
+		tombstone:             NewTombstone(initialTombstone),
+	}
+	return resource, nil
+}
+
+func NewReporterResourceKey(
+	localResourceIDVal string,
+	resourceTypeVal string,
+	reporterTypeVal string,
+	reporterInstanceIdVal string,
+) (ReporterResourceKey, error) {
+	localResourceID, err := NewLocalResourceId(localResourceIDVal)
+	if err != nil {
+		return ReporterResourceKey{}, fmt.Errorf("ReporterResourceKey invalid local resource ID: %w", err)
+	}
+
+	resourceType, err := NewResourceType(resourceTypeVal)
+	if err != nil {
+		return ReporterResourceKey{}, fmt.Errorf("ReporterResourceKey invalid resource type: %w", err)
+	}
+
+	reporter, err := NewReporter(reporterTypeVal, reporterInstanceIdVal)
+	if err != nil {
+		return ReporterResourceKey{}, fmt.Errorf("ReporterResourceKey invalid reporter: %w", err)
+	}
+
+	return ReporterResourceKey{
+		localResourceID: localResourceID,
+		resourceType:    resourceType,
+		reporter:        reporter,
+	}, nil
 }

@@ -64,7 +64,7 @@ func (r *resourceRepository) NextReporterResourceId() (bizmodel.ReporterResource
 }
 
 func (r *resourceRepository) Save(tx *gorm.DB, resource bizmodel.Resource, operationType model_legacy.EventOperationType, txid string) error {
-	dataResource, dataReporterResource, _, _, err := resource.Serialize()
+	dataResource, dataReporterResource, dataReporterRepresentation, dataCommonRepresentation, err := resource.Serialize()
 	if err != nil {
 		return fmt.Errorf("failed to serialize resource: %w", err)
 	}
@@ -75,6 +75,14 @@ func (r *resourceRepository) Save(tx *gorm.DB, resource bizmodel.Resource, opera
 
 	if err := tx.Save(dataReporterResource).Error; err != nil {
 		return fmt.Errorf("failed to save reporter resource: %w", err)
+	}
+
+	if err := tx.Create(dataReporterRepresentation).Error; err != nil {
+		return fmt.Errorf("failed to save reporter representation: %w", err)
+	}
+
+	if err := tx.Create(dataCommonRepresentation).Error; err != nil {
+		return fmt.Errorf("failed to save common representation: %w", err)
 	}
 
 	if err := r.handleOutboxEvents(tx, resource.ResourceEvents()[0], operationType, txid); err != nil {

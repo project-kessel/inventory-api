@@ -58,10 +58,14 @@ func (f *fakeResourceRepository) Save(tx *gorm.DB, resource bizmodel.Resource, o
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
-	dataResource, dataReporterResource, _, _, err := resource.Serialize()
+	dataResource, dataReporterResource, dataReporterRepresentation, dataCommonRepresentation, err := resource.Serialize()
 	if err != nil {
 		return fmt.Errorf("failed to serialize resource: %w", err)
 	}
+
+	// In fake implementation, we don't actually store representations but we should acknowledge them
+	_ = dataReporterRepresentation
+	_ = dataCommonRepresentation
 
 	key := f.makeKey(
 		dataReporterResource.LocalResourceID,

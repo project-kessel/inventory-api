@@ -190,10 +190,6 @@ func (uc *Usecase) createResource(tx *gorm.DB, request *v1beta2.ReportResourceRe
 		return err
 	}
 
-	if err := uc.reportRepresentations(tx, resource); err != nil {
-		return err
-	}
-
 	return uc.resourceRepository.Save(tx, resource, model_legacy.OperationTypeCreated, txidStr)
 }
 
@@ -242,10 +238,6 @@ func (uc *Usecase) updateResource(tx *gorm.DB, request *v1beta2.ReportResourceRe
 	)
 	if err != nil {
 		return fmt.Errorf("failed to update resource: %w", err)
-	}
-
-	if err := uc.reportRepresentations(tx, *existingResource); err != nil {
-		return err
 	}
 
 	// Save the updated resource to the repository
@@ -299,23 +291,6 @@ func extractUpdateDataFromRequest(request *v1beta2.ReportResourceRequest) (
 	}
 
 	return reporterResourceKey, apiHref, consoleHref, reporterVersion, commonRepresentation, reporterRepresentation, nil
-}
-
-func (uc *Usecase) reportRepresentations(tx *gorm.DB, resource model.Resource) error {
-	_, _, dataReporterRepresentation, dataCommonRepresentation, err := resource.Serialize()
-	if err != nil {
-		return fmt.Errorf("failed to serialize resource: %w", err)
-	}
-
-	if err := tx.Create(dataReporterRepresentation).Error; err != nil {
-		return fmt.Errorf("failed to save reporter representation: %w", err)
-	}
-
-	if err := tx.Create(dataCommonRepresentation).Error; err != nil {
-		return fmt.Errorf("failed to save common representation: %w", err)
-	}
-
-	return nil
 }
 
 func getNextTransactionID() (string, error) {

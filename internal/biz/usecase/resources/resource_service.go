@@ -92,7 +92,7 @@ func New(resourceRepository data.ResourceRepository, reporterResourceRepository 
 	}
 }
 
-func (uc *Usecase) ReportResource(request *v1beta2.ReportResourceRequest, write_visibility v1beta2.WriteVisibility, reporterPrincipal string) error {
+func (uc *Usecase) ReportResource(request *v1beta2.ReportResourceRequest, reporterPrincipal string) error {
 	log.Info("Reporting resource request: ", request)
 
 	var subscription pubsub.Subscription
@@ -101,18 +101,13 @@ func (uc *Usecase) ReportResource(request *v1beta2.ReportResourceRequest, write_
 		return err
 	}
 
-	if readAfterWriteEnabled := computeReadAfterWrite(uc, write_visibility, reporterPrincipal); readAfterWriteEnabled && uc.Config.ConsumerEnabled {
+	if readAfterWriteEnabled := computeReadAfterWrite(uc, request.WriteVisibility, reporterPrincipal); readAfterWriteEnabled && uc.Config.ConsumerEnabled {
 		subscription = uc.ListenManager.Subscribe(txidStr)
 		defer subscription.Unsubscribe()
 	}
 
 	// Create reporter resource key for lookup
-	reporterResourceKey, err := model.NewReporterResourceKey(
-		request.GetRepresentations().GetMetadata().GetLocalResourceId(),
-		request.GetType(),
-		request.GetReporterType(),
-		request.GetReporterInstanceId(),
-	)
+	reporterResourceKey, err := getReporterResourceKeyFromRequest(request)
 	if err != nil {
 		return fmt.Errorf("failed to create reporter resource key: %w", err)
 	}
@@ -162,11 +157,70 @@ func (uc *Usecase) createResource(tx *gorm.DB, request *v1beta2.ReportResourceRe
 	return uc.resourceRepository.Save(tx, resource, model_legacy.OperationTypeCreated, txidStr)
 }
 
+func getReporterResourceKeyFromRequest(request *v1beta2.ReportResourceRequest) (model.ReporterResourceKey, error) {
+	return model.NewReporterResourceKey(
+		request.GetRepresentations().GetMetadata().GetLocalResourceId(),
+		request.GetType(),
+		request.GetReporterType(),
+		request.GetReporterInstanceId(),
+	)
+}
+
 func (uc *Usecase) updateResource(tx *gorm.DB, request *v1beta2.ReportResourceRequest, existingResource *model.Resource, txidStr string) error {
-	// we already know Resource exists here, so we need to update Resource and ReporterResource to increment the current versions by 1,
-	// so get current common version and update it, get current representation version and increment it and save
-	log.Info("Update resource logic not yet implemented for resource: ", existingResource)
-	return nil
+	reporterResourceKey, apiHref, consoleHref, reporterVersion, commonData, reporterData, err := extractUpdateDataFromRequest(request)
+	if err != nil {
+		return err
+	}
+
+	updatedResource, err := existingResource.Update(
+		reporterResourceKey,
+		apiHref,
+		consoleHref,
+		reporterVersion,
+		commonData,
+		reporterData,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to update resource: %w", err)
+	}
+
+	// Save the updated resource to the repository
+	return uc.resourceRepository.Save(tx, updatedResource, model_legacy.OperationTypeUpdated, txidStr)
+}
+
+func extractUpdateDataFromRequest(request *v1beta2.ReportResourceRequest) (
+	model.ReporterResourceKey,
+	string,
+	string,
+	*string,
+	map[string]interface{},
+	map[string]interface{},
+	error,
+) {
+	reporterResourceKey, err := getReporterResourceKeyFromRequest(request)
+	if err != nil {
+		return model.ReporterResourceKey{}, "", "", nil, nil, nil, fmt.Errorf("failed to create reporter resource key: %w", err)
+	}
+
+	apiHref := request.GetRepresentations().GetMetadata().GetApiHref()
+	consoleHref := request.GetRepresentations().GetMetadata().GetConsoleHref()
+
+	var reporterVersion *string
+	if reporterVersionValue := request.GetRepresentations().GetMetadata().GetReporterVersion(); reporterVersionValue != "" {
+		reporterVersion = &reporterVersionValue
+	}
+
+	var commonData map[string]interface{}
+	if request.GetRepresentations().GetCommon() != nil {
+		commonData = request.GetRepresentations().GetCommon().AsMap()
+	}
+
+	var reporterData map[string]interface{}
+	if request.GetRepresentations().GetReporter() != nil {
+		reporterData = request.GetRepresentations().GetReporter().AsMap()
+	}
+
+	return reporterResourceKey, apiHref, consoleHref, reporterVersion, commonData, reporterData, nil
 }
 
 func (uc *Usecase) Upsert(ctx context.Context, m *model_legacy.Resource, write_visibility v1beta2.WriteVisibility) (*model_legacy.Resource, error) {

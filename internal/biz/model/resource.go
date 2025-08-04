@@ -99,6 +99,7 @@ func (r Resource) Serialize() (*datamodel.Resource, *datamodel.ReporterResource,
 		return nil, nil, nil, nil, fmt.Errorf("resource has no reporter resources to serialize")
 	}
 
+	//TODO: This should serialize all the ReporterResources?
 	reporterResource, err := r.reporterResources[0].Serialize()
 	if err != nil {
 		return nil, nil, nil, nil, fmt.Errorf("failed to serialize reporter resource: %w", err)
@@ -109,6 +110,7 @@ func (r Resource) Serialize() (*datamodel.Resource, *datamodel.ReporterResource,
 		return nil, nil, nil, nil, fmt.Errorf("resource has no resource events to serialize")
 	}
 
+	//TODO: This should serialize all the Representations? We need to consider the read vs the write models here
 	reporterRepresentation, err := r.resourceEvents[0].SerializeReporterRepresentation()
 	if err != nil {
 		return nil, nil, nil, nil, fmt.Errorf("failed to serialize reporter representation: %w", err)
@@ -182,17 +184,22 @@ func Deserialize(
 	return resource, nil
 }
 
-func (r Resource) findReporterResourceById(reporterResourceId uuid.UUID) (ReporterResource, error) {
+func (r Resource) findReporterResourceByKey(key ReporterResourceKey) (ReporterResource, error) {
 	for _, reporterResource := range r.reporterResources {
-		if reporterResource.Id().UUID() == reporterResourceId {
+		reporterKey := reporterResource.Key()
+		if reporterKey.LocalResourceId() == key.LocalResourceId() &&
+			reporterKey.ResourceType() == key.ResourceType() &&
+			reporterKey.ReporterType() == key.ReporterType() &&
+			reporterKey.ReporterInstanceId() == key.ReporterInstanceId() {
 			return reporterResource, nil
 		}
 	}
-	return ReporterResource{}, fmt.Errorf("reporter resource with ID %s not found in resource", reporterResourceId)
+	return ReporterResource{}, fmt.Errorf("reporter resource with key (localResourceId=%s, resourceType=%s, reporterType=%s, reporterInstanceId=%s) not found in resource",
+		key.LocalResourceId(), key.ResourceType(), key.ReporterType(), key.ReporterInstanceId())
 }
 
 func (r Resource) Update(
-	reporterResourceId uuid.UUID,
+	key ReporterResourceKey,
 	apiHref string,
 	consoleHref string,
 	reporterVersion *string,
@@ -201,13 +208,11 @@ func (r Resource) Update(
 ) (Resource, error) {
 	newCommonVersion := r.commonVersion.Increment()
 
-	existingReporterResource, err := r.findReporterResourceById(reporterResourceId)
+	reporterResourceToUpdate, err := r.findReporterResourceByKey(key)
 	if err != nil {
 		return Resource{}, err
 	}
-
-	key := existingReporterResource.Key()
-	updatedReporterResource, err := existingReporterResource.Update(
+	updatedReporterResource, err := reporterResourceToUpdate.Update(
 		apiHref,
 		consoleHref,
 	)
@@ -216,14 +221,14 @@ func (r Resource) Update(
 	}
 
 	resourceEvent, err := NewResourceEvent(
-		reporterResourceId,
+		reporterResourceToUpdate.Id().UUID(),
 		key.ResourceType(),
 		key.ReporterType(),
 		key.ReporterInstanceId(),
 		reporterData,
 		r.id.String(),
 		updatedReporterResource.representationVersion.Uint(),
-		existingReporterResource.generation.Uint(),
+		reporterResourceToUpdate.generation.Uint(),
 		commonData,
 		newCommonVersion.Uint(),
 		reporterVersion,
@@ -238,6 +243,6 @@ func (r Resource) Update(
 		commonVersion:     newCommonVersion,
 		consistencyToken:  r.consistencyToken, // TODO: Issue here is that this is not reported in ReportResourceRequest, so we may need to return it from select.
 		reporterResources: []ReporterResource{updatedReporterResource},
-		resourceEvents:    append(r.resourceEvents, resourceEvent),
+		resourceEvents:    append(r.resourceEvents, resourceEvent), //TODO: Appending here makes sense semantically, but when we do the save in repo, we need to make sure it is not storing duplicate representations
 	}, nil
 }

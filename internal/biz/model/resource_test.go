@@ -7,6 +7,8 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
+
+	"github.com/project-kessel/inventory-api/internal"
 )
 
 func TestResource_Initialization(t *testing.T) {
@@ -296,8 +298,8 @@ func TestResource_AggregateRootBehavior(t *testing.T) {
 			resourceIdVal              uuid.UUID
 			apiHrefVal                 string
 			consoleHrefVal             string
-			reporterRepresentationData JsonObject
-			commonRepresentationData   JsonObject
+			reporterRepresentationData internal.JsonObject
+			commonRepresentationData   internal.JsonObject
 			expectedError              string
 		}{
 			{
@@ -442,4 +444,293 @@ func assertInitialResourceState(t *testing.T, resource Resource) {
 	if resource.consistencyToken != ConsistencyToken("") {
 		t.Errorf("Expected consistency token to be zero value when first created, got %s", resource.consistencyToken.String())
 	}
+}
+
+func TestResource_Update(t *testing.T) {
+	t.Parallel()
+	fixture := NewResourceTestFixture()
+
+	t.Run("should update resource successfully", func(t *testing.T) {
+		t.Parallel()
+
+		// Create initial resource
+		original, err := NewResource(
+			fixture.ValidId,
+			fixture.ValidLocalResourceId,
+			fixture.ValidResourceType,
+			fixture.ValidReporterType,
+			fixture.ValidReporterInstanceId,
+			fixture.ValidResourceId,
+			fixture.ValidApiHref,
+			fixture.ValidConsoleHref,
+			fixture.ValidReporterRepresentationData,
+			fixture.ValidCommonRepresentationData,
+		)
+
+		if err != nil {
+			t.Fatalf("Expected no error creating Resource, got %v", err)
+		}
+
+		// Get the reporter resource key from the created resource
+		reporterResourceKey := original.ReporterResources()[0].Key()
+
+		// Update data
+		newApiHref := "https://api.example.com/updated"
+		newConsoleHref := "https://console.example.com/updated"
+		newReporterData := internal.JsonObject{
+			"name":      "updated-cluster",
+			"namespace": "updated-namespace",
+		}
+		newCommonData := internal.JsonObject{
+			"workspace_id": "updated-workspace",
+			"labels":       internal.JsonObject{"env": "production"},
+		}
+		reporterVersion := "2.0.0"
+
+		updated, err := original.Update(
+			reporterResourceKey,
+			newApiHref,
+			newConsoleHref,
+			&reporterVersion,
+			newCommonData,
+			newReporterData,
+		)
+
+		if err != nil {
+			t.Fatalf("Expected no error updating Resource, got %v", err)
+		}
+
+		// Verify common version was incremented
+		expectedCommonVersion := original.commonVersion.Uint() + 1
+		if updated.commonVersion.Uint() != expectedCommonVersion {
+			t.Errorf("Expected common version %d, got %d", expectedCommonVersion, updated.commonVersion.Uint())
+		}
+
+		// Verify reporter resource was updated
+		updatedReporterResources := updated.ReporterResources()
+		if len(updatedReporterResources) != 1 {
+			t.Fatalf("Expected 1 reporter resource, got %d", len(updatedReporterResources))
+		}
+
+		updatedReporterResource := updatedReporterResources[0]
+		if updatedReporterResource.apiHref.String() != newApiHref {
+			t.Errorf("Expected apiHref %s, got %s", newApiHref, updatedReporterResource.apiHref.String())
+		}
+		if updatedReporterResource.consoleHref.String() != newConsoleHref {
+			t.Errorf("Expected consoleHref %s, got %s", newConsoleHref, updatedReporterResource.consoleHref.String())
+		}
+
+		// Verify resource event was created
+		resourceEvents := updated.ResourceEvents()
+		if len(resourceEvents) != 2 { // Original + updated
+			t.Fatalf("Expected 2 resource events, got %d", len(resourceEvents))
+		}
+	})
+
+	t.Run("should return error for non-existent reporter resource key", func(t *testing.T) {
+		t.Parallel()
+
+		original, err := NewResource(
+			fixture.ValidId,
+			fixture.ValidLocalResourceId,
+			fixture.ValidResourceType,
+			fixture.ValidReporterType,
+			fixture.ValidReporterInstanceId,
+			fixture.ValidResourceId,
+			fixture.ValidApiHref,
+			fixture.ValidConsoleHref,
+			fixture.ValidReporterRepresentationData,
+			fixture.ValidCommonRepresentationData,
+		)
+
+		if err != nil {
+			t.Fatalf("Expected no error creating Resource, got %v", err)
+		}
+
+		nonExistentKey, err := NewReporterResourceKey("non-existent", "unknown", "test", "instance1")
+		if err != nil {
+			t.Fatalf("Expected no error creating non-existent key, got %v", err)
+		}
+
+		_, err = original.Update(
+			nonExistentKey,
+			"https://api.example.com/updated",
+			"https://console.example.com/updated",
+			nil,
+			internal.JsonObject{"test": "data"},
+			internal.JsonObject{"test": "data"},
+		)
+
+		if err == nil {
+			t.Error("Expected error for non-existent reporter resource key, got none")
+		}
+		if !strings.Contains(err.Error(), "not found") {
+			t.Errorf("Expected error about not found, got %v", err)
+		}
+	})
+
+	t.Run("should preserve other resource fields", func(t *testing.T) {
+		t.Parallel()
+
+		original, err := NewResource(
+			fixture.ValidId,
+			fixture.ValidLocalResourceId,
+			fixture.ValidResourceType,
+			fixture.ValidReporterType,
+			fixture.ValidReporterInstanceId,
+			fixture.ValidResourceId,
+			fixture.ValidApiHref,
+			fixture.ValidConsoleHref,
+			fixture.ValidReporterRepresentationData,
+			fixture.ValidCommonRepresentationData,
+		)
+
+		if err != nil {
+			t.Fatalf("Expected no error creating Resource, got %v", err)
+		}
+
+		reporterResourceKey := original.ReporterResources()[0].Key()
+
+		updated, err := original.Update(
+			reporterResourceKey,
+			"https://api.example.com/updated",
+			"https://console.example.com/updated",
+			nil,
+			internal.JsonObject{"test": "data"},
+			internal.JsonObject{"test": "data"},
+		)
+
+		if err != nil {
+			t.Fatalf("Expected no error updating Resource, got %v", err)
+		}
+
+		// Verify unchanged fields
+		if updated.id != original.id {
+			t.Errorf("Expected ID to remain unchanged")
+		}
+		if updated.resourceType != original.resourceType {
+			t.Errorf("Expected resourceType to remain unchanged")
+		}
+		if updated.consistencyToken != original.consistencyToken {
+			t.Errorf("Expected consistencyToken to remain unchanged")
+		}
+	})
+
+	t.Run("should handle empty console href", func(t *testing.T) {
+		t.Parallel()
+
+		original, err := NewResource(
+			fixture.ValidId,
+			fixture.ValidLocalResourceId,
+			fixture.ValidResourceType,
+			fixture.ValidReporterType,
+			fixture.ValidReporterInstanceId,
+			fixture.ValidResourceId,
+			fixture.ValidApiHref,
+			fixture.ValidConsoleHref,
+			fixture.ValidReporterRepresentationData,
+			fixture.ValidCommonRepresentationData,
+		)
+
+		if err != nil {
+			t.Fatalf("Expected no error creating Resource, got %v", err)
+		}
+
+		reporterResourceKey := original.ReporterResources()[0].Key()
+
+		updated, err := original.Update(
+			reporterResourceKey,
+			"https://api.example.com/updated",
+			"", // Empty console href
+			nil,
+			internal.JsonObject{"test": "data"},
+			internal.JsonObject{"test": "data"},
+		)
+
+		if err != nil {
+			t.Fatalf("Expected no error updating Resource with empty console href, got %v", err)
+		}
+
+		updatedReporterResource := updated.ReporterResources()[0]
+		if updatedReporterResource.consoleHref.String() != "" {
+			t.Errorf("Expected empty consoleHref, got %s", updatedReporterResource.consoleHref.String())
+		}
+	})
+
+	t.Run("should return error for invalid apiHref", func(t *testing.T) {
+		t.Parallel()
+
+		original, err := NewResource(
+			fixture.ValidId,
+			fixture.ValidLocalResourceId,
+			fixture.ValidResourceType,
+			fixture.ValidReporterType,
+			fixture.ValidReporterInstanceId,
+			fixture.ValidResourceId,
+			fixture.ValidApiHref,
+			fixture.ValidConsoleHref,
+			fixture.ValidReporterRepresentationData,
+			fixture.ValidCommonRepresentationData,
+		)
+
+		if err != nil {
+			t.Fatalf("Expected no error creating Resource, got %v", err)
+		}
+
+		reporterResourceKey := original.ReporterResources()[0].Key()
+
+		_, err = original.Update(
+			reporterResourceKey,
+			"", // Invalid empty apiHref
+			"https://console.example.com/updated",
+			nil,
+			internal.JsonObject{"test": "data"},
+			internal.JsonObject{"test": "data"},
+		)
+
+		if err == nil {
+			t.Error("Expected error for invalid apiHref, got none")
+		}
+	})
+
+	t.Run("should handle nil reporter version", func(t *testing.T) {
+		t.Parallel()
+
+		original, err := NewResource(
+			fixture.ValidId,
+			fixture.ValidLocalResourceId,
+			fixture.ValidResourceType,
+			fixture.ValidReporterType,
+			fixture.ValidReporterInstanceId,
+			fixture.ValidResourceId,
+			fixture.ValidApiHref,
+			fixture.ValidConsoleHref,
+			fixture.ValidReporterRepresentationData,
+			fixture.ValidCommonRepresentationData,
+		)
+
+		if err != nil {
+			t.Fatalf("Expected no error creating Resource, got %v", err)
+		}
+
+		reporterResourceKey := original.ReporterResources()[0].Key()
+
+		updated, err := original.Update(
+			reporterResourceKey,
+			"https://api.example.com/updated",
+			"https://console.example.com/updated",
+			nil, // nil reporter version
+			internal.JsonObject{"test": "data"},
+			internal.JsonObject{"test": "data"},
+		)
+
+		if err != nil {
+			t.Fatalf("Expected no error updating Resource with nil reporter version, got %v", err)
+		}
+
+		// Should succeed without error
+		if len(updated.ResourceEvents()) != 2 {
+			t.Errorf("Expected 2 resource events, got %d", len(updated.ResourceEvents()))
+		}
+	})
 }

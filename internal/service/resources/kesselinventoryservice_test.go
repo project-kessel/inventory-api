@@ -13,6 +13,8 @@ import (
 	relationsV1beta1 "github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
 	"google.golang.org/protobuf/types/known/structpb"
 
+	"github.com/project-kessel/inventory-api/internal/data"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"gorm.io/gorm"
@@ -141,9 +143,18 @@ func TestInventoryService_ReportResource_MissingReporterType(t *testing.T) {
 		},
 	}
 
-	uc := &usecase.Usecase{
-		Log: krlog.NewHelper(krlog.NewStdLogger(io.Discard)),
-	}
+	uc := usecase.New(
+		data.NewFakeResourceRepository(),
+		nil, // LegacyReporterResourceRepository
+		nil, // inventoryResourceRepository
+		nil, // Authz
+		nil, // Eventer
+		"",  // Namespace
+		krlog.NewStdLogger(io.Discard),
+		nil, // ListenManager
+		nil, // waitForNotifBreaker
+		nil, // Config
+	)
 	service := svc.NewKesselInventoryServiceV1beta2(uc)
 
 	resp, err := service.ReportResource(ctx, req)
@@ -173,16 +184,25 @@ func TestInventoryService_ReportResource_MissingReporterInstanceId(t *testing.T)
 		},
 	}
 
-	uc := &usecase.Usecase{
-		Log: krlog.NewHelper(krlog.NewStdLogger(io.Discard)),
-	}
+	uc := usecase.New(
+		data.NewFakeResourceRepository(),
+		nil, // LegacyReporterResourceRepository
+		nil, // inventoryResourceRepository
+		nil, // Authz
+		nil, // Eventer
+		"",  // Namespace
+		krlog.NewStdLogger(io.Discard),
+		nil, // ListenManager
+		nil, // waitForNotifBreaker
+		nil, // Config
+	)
 	service := svc.NewKesselInventoryServiceV1beta2(uc)
 
 	resp, err := service.ReportResource(ctx, req)
 
 	assert.Error(t, err)
 	assert.Nil(t, resp)
-	assert.Contains(t, err.Error(), "reporterInstanceId")
+	assert.Contains(t, err.Error(), "ReporterInstanceId cannot be empty")
 }
 
 func TestInventoryService_ReportResource_InvalidJsonObject(t *testing.T) {
@@ -208,9 +228,18 @@ func TestInventoryService_ReportResource_InvalidJsonObject(t *testing.T) {
 		},
 	}
 
-	uc := &usecase.Usecase{
-		Log: krlog.NewHelper(krlog.NewStdLogger(io.Discard)),
-	}
+	uc := usecase.New(
+		data.NewFakeResourceRepository(),
+		nil, // LegacyReporterResourceRepository
+		nil, // inventoryResourceRepository
+		nil, // Authz
+		nil, // Eventer
+		"",  // Namespace
+		krlog.NewStdLogger(io.Discard),
+		nil, // ListenManager
+		nil, // waitForNotifBreaker
+		nil, // Config
+	)
 
 	service := svc.NewKesselInventoryServiceV1beta2(uc)
 
@@ -243,16 +272,25 @@ func TestInventoryService_ReportResource_InvalidInventoryId(t *testing.T) {
 		},
 	}
 
-	uc := &usecase.Usecase{
-		Log: krlog.NewHelper(krlog.NewStdLogger(io.Discard)),
-	}
+	uc := usecase.New(
+		data.NewFakeResourceRepository(),
+		nil, // LegacyReporterResourceRepository
+		nil, // inventoryResourceRepository
+		nil, // Authz
+		nil, // Eventer
+		"",  // Namespace
+		krlog.NewStdLogger(io.Discard),
+		nil, // ListenManager
+		nil, // waitForNotifBreaker
+		nil, // Config
+	)
 	service := svc.NewKesselInventoryServiceV1beta2(uc)
 
 	resp, err := service.ReportResource(ctx, req)
 
 	assert.Error(t, err)
 	assert.Nil(t, resp)
-	assert.Contains(t, err.Error(), "invalid inventory ID")
+	assert.Contains(t, err.Error(), "ApiHref cannot be empty")
 }
 
 func TestResponseFromResource(t *testing.T) {

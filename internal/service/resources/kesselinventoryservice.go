@@ -33,16 +33,24 @@ func (c *InventoryService) ReportResource(ctx context.Context, r *pb.ReportResou
 		return nil, err
 	}
 
-	resource, err := RequestToResource(r, identity)
-	if err != nil {
-		return nil, err
-	}
-	_, err = c.Ctl.Upsert(ctx, resource, r.GetWriteVisibility())
-	log.Info()
-	if err != nil {
-		return nil, err
+	if r.GetUseLegacy() {
+		resource, err := RequestToResource(r, identity)
+		if err != nil {
+			return nil, err
+		}
+		_, err = c.Ctl.Upsert(ctx, resource, r.GetWriteVisibility())
+		if err != nil {
+			return nil, err
+		}
+
+	} else {
+		err := c.Ctl.ReportResource(r, identity.Principal)
+		if err != nil {
+			return nil, err
+		}
 	}
 	return ResponseFromResource(), nil
+
 }
 
 func (c *InventoryService) DeleteResource(ctx context.Context, r *pb.DeleteResourceRequest) (*pb.DeleteResourceResponse, error) {

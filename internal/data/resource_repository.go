@@ -28,6 +28,7 @@ type ResourceRepository interface {
 	NextResourceId() (bizmodel.ResourceId, error)
 	NextReporterResourceId() (bizmodel.ReporterResourceId, error)
 	Save(tx *gorm.DB, resource bizmodel.Resource, operationType model_legacy.EventOperationType, txid string) error
+	ReportRepresentations(tx *gorm.DB, reporterRepresentation interface{}, commonRepresentation interface{}) error
 	FindResourceByKeys(tx *gorm.DB, key bizmodel.ReporterResourceKey) (*bizmodel.Resource, error)
 	GetNextTransactionID() (string, error)
 	GetDB() *gorm.DB
@@ -72,6 +73,18 @@ func (r *resourceRepository) GetNextTransactionID() (string, error) {
 	return txid.String(), nil
 }
 
+func (r *resourceRepository) ReportRepresentations(tx *gorm.DB, reporterRepresentation interface{}, commonRepresentation interface{}) error {
+	if err := tx.Create(reporterRepresentation).Error; err != nil {
+		return fmt.Errorf("failed to save reporter representation: %w", err)
+	}
+
+	if err := tx.Create(commonRepresentation).Error; err != nil {
+		return fmt.Errorf("failed to save common representation: %w", err)
+	}
+
+	return nil
+}
+
 func (r *resourceRepository) Save(tx *gorm.DB, resource bizmodel.Resource, operationType model_legacy.EventOperationType, txid string) error {
 	dataResource, dataReporterResource, dataReporterRepresentation, dataCommonRepresentation, err := resource.Serialize()
 	if err != nil {
@@ -86,16 +99,11 @@ func (r *resourceRepository) Save(tx *gorm.DB, resource bizmodel.Resource, opera
 		return fmt.Errorf("failed to save reporter resource: %w", err)
 	}
 
-	if err := tx.Create(dataReporterRepresentation).Error; err != nil {
-		return fmt.Errorf("failed to save reporter representation: %w", err)
+	if err := r.handleOutboxEvents(tx, resource.ResourceEvents()[0], operationType, txid); err != nil {
+		return err
 	}
 
-	if err := tx.Create(dataCommonRepresentation).Error; err != nil {
-		return fmt.Errorf("failed to save common representation: %w", err)
-	}
-
-	err = r.handleOutboxEvents(tx, resource.ResourceEvents()[0], operationType, txid)
-	if err != nil {
+	if err := r.ReportRepresentations(tx, dataReporterRepresentation, dataCommonRepresentation); err != nil {
 		return err
 	}
 

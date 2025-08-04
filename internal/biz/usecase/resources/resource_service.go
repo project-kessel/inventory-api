@@ -163,7 +163,8 @@ func (uc *Usecase) createResource(tx *gorm.DB, request *v1beta2.ReportResourceRe
 }
 
 func (uc *Usecase) updateResource(tx *gorm.DB, request *v1beta2.ReportResourceRequest, existingResource *model.Resource, txidStr string) error {
-	// TODO: Implement resource update logic within transaction
+	// we already know Resource exists here, so we need to update Resource and ReporterResource to increment the current versions by 1,
+	// so get current common version and update it, get current representation version and increment it and save
 	log.Info("Update resource logic not yet implemented for resource: ", existingResource)
 	return nil
 }

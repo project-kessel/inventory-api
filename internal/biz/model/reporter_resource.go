@@ -116,6 +116,43 @@ func (rr ReporterResource) LocalResourceId() string {
 	return rr.localResourceID.String()
 }
 
+func (rr ReporterResource) Id() ReporterResourceId {
+	return rr.id
+}
+
+func (rr ReporterResource) Key() ReporterResourceKey {
+	return rr.ReporterResourceKey
+}
+
+func (rr ReporterResource) Update(
+	apiHrefVal string,
+	consoleHrefVal string,
+) (ReporterResource, error) {
+	apiHref, err := NewApiHref(apiHrefVal)
+	if err != nil {
+		return ReporterResource{}, fmt.Errorf("failed to create API href: %w", err)
+	}
+
+	var consoleHref ConsoleHref
+	if consoleHrefVal != "" {
+		consoleHref, err = NewConsoleHref(consoleHrefVal)
+		if err != nil {
+			return ReporterResource{}, fmt.Errorf("failed to create console href: %w", err)
+		}
+	}
+
+	return ReporterResource{
+		id:                    rr.id,
+		ReporterResourceKey:   rr.ReporterResourceKey,
+		resourceID:            rr.resourceID,
+		apiHref:               apiHref,
+		consoleHref:           consoleHref,
+		representationVersion: rr.representationVersion.Increment(),
+		generation:            rr.generation,
+		tombstone:             rr.tombstone,
+	}, nil
+}
+
 func (rr ReporterResource) Serialize() (*datamodel.ReporterResource, error) {
 	return datamodel.NewReporterResource(
 		uuid.UUID(rr.id),

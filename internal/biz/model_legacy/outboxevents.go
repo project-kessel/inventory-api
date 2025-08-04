@@ -156,7 +156,7 @@ func newResourceEvent(operationType EventOperationType, resourceEvent *bizmodel.
 				LocalResourceId:    resourceEvent.LocalResourceId(),
 				ReporterVersion:    *resourceEvent.ReporterVersion(), //nolint:staticcheck
 			},
-			ResourceData: internal.JsonObject(resourceEvent.Data()),
+			ResourceData: resourceEvent.Data(),
 		},
 	}, nil
 }

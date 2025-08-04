@@ -181,3 +181,63 @@ func Deserialize(
 
 	return resource, nil
 }
+
+func (r Resource) findReporterResourceById(reporterResourceId uuid.UUID) (ReporterResource, error) {
+	for _, reporterResource := range r.reporterResources {
+		if reporterResource.Id().UUID() == reporterResourceId {
+			return reporterResource, nil
+		}
+	}
+	return ReporterResource{}, fmt.Errorf("reporter resource with ID %s not found in resource", reporterResourceId)
+}
+
+func (r Resource) Update(
+	reporterResourceId uuid.UUID,
+	apiHref string,
+	consoleHref string,
+	reporterVersion *string,
+	commonData internal.JsonObject,
+	reporterData internal.JsonObject,
+) (Resource, error) {
+	newCommonVersion := r.commonVersion.Increment()
+
+	existingReporterResource, err := r.findReporterResourceById(reporterResourceId)
+	if err != nil {
+		return Resource{}, err
+	}
+
+	key := existingReporterResource.Key()
+	updatedReporterResource, err := existingReporterResource.Update(
+		apiHref,
+		consoleHref,
+	)
+	if err != nil {
+		return Resource{}, fmt.Errorf("failed to update ReporterResource: %w", err)
+	}
+
+	resourceEvent, err := NewResourceEvent(
+		reporterResourceId,
+		key.ResourceType(),
+		key.ReporterType(),
+		key.ReporterInstanceId(),
+		reporterData,
+		r.id.String(),
+		updatedReporterResource.representationVersion.Uint(),
+		existingReporterResource.generation.Uint(),
+		commonData,
+		newCommonVersion.Uint(),
+		reporterVersion,
+	)
+	if err != nil {
+		return Resource{}, fmt.Errorf("failed to create updated ResourceEvent: %w", err)
+	}
+
+	return Resource{
+		id:                r.id,
+		resourceType:      r.resourceType,
+		commonVersion:     newCommonVersion,
+		consistencyToken:  r.consistencyToken, // TODO: Issue here is that this is not reported in ReportResourceRequest, so we may need to return it from select.
+		reporterResources: []ReporterResource{updatedReporterResource},
+		resourceEvents:    append(r.resourceEvents, resourceEvent),
+	}, nil
+}

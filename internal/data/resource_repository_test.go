@@ -188,6 +188,7 @@ func testRepositoryContract(t *testing.T, repo ResourceRepository, db *gorm.DB) 
 	})
 }
 
+// nolint:unused // Keep for when outbox event handling is fixed
 func setupInMemoryDB(t *testing.T) *gorm.DB {
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	require.NoError(t, err)

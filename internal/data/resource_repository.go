@@ -91,11 +91,11 @@ func (r *resourceRepository) Save(tx *gorm.DB, resource bizmodel.Resource, opera
 		return fmt.Errorf("failed to serialize resource: %w", err)
 	}
 
-	if err := tx.Create(dataResource).Error; err != nil {
+	if err := tx.Save(dataResource).Error; err != nil {
 		return fmt.Errorf("failed to save resource: %w", err)
 	}
 
-	if err := tx.Create(dataReporterResource).Error; err != nil {
+	if err := tx.Save(dataReporterResource).Error; err != nil {
 		return fmt.Errorf("failed to save reporter resource: %w", err)
 	}
 
@@ -172,7 +172,7 @@ func (r *resourceRepository) FindResourceByKeys(tx *gorm.DB, key bizmodel.Report
 		result.RepresentationVersion,
 		result.Generation,
 		result.Tombstone,
-		"redhat.com",
+		"redhat.com", //TODO: We need to add this default since the domain rule conflicts here
 		"",
 	)
 	if err != nil {

@@ -161,7 +161,7 @@ func (re ResourceEvent) SerializeReporterRepresentation() (*datamodel.ReporterRe
 	}
 
 	return datamodel.NewReporterRepresentation(
-		internal.JsonObject(re.reporterRepresentation.data),
+		re.reporterRepresentation.data,
 		re.reporterRepresentation.reporterResourceID.String(),
 		uint(re.reporterRepresentation.version),
 		uint(re.reporterRepresentation.generation),
@@ -174,7 +174,7 @@ func (re ResourceEvent) SerializeReporterRepresentation() (*datamodel.ReporterRe
 func (re ResourceEvent) SerializeCommonRepresentation() (*datamodel.CommonRepresentation, error) {
 	return datamodel.NewCommonRepresentation(
 		uuid.UUID(re.id),
-		internal.JsonObject(re.commonRepresentation.data),
+		re.commonRepresentation.data,
 		uint(re.commonRepresentation.version),
 		re.reporterId.reporterType.String(),
 		re.reporterId.reporterInstanceId.String(),

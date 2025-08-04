@@ -22,6 +22,10 @@ func (v Version) Uint() uint {
 	return uint(v)
 }
 
+func (v Version) Increment() Version {
+	return Version(uint(v) + 1)
+}
+
 type ResourceId uuid.UUID
 
 func NewResourceId(id uuid.UUID) (ResourceId, error) {

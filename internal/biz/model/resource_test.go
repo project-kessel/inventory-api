@@ -19,16 +19,16 @@ func TestResource_Initialization(t *testing.T) {
 		t.Parallel()
 
 		resource, err := NewResource(
-			fixture.ValidId,
-			fixture.ValidLocalResourceId,
-			fixture.ValidResourceType,
-			fixture.ValidReporterType,
-			fixture.ValidReporterInstanceId,
-			fixture.ValidResourceId,
-			fixture.ValidApiHref,
-			fixture.ValidConsoleHref,
-			fixture.ValidReporterRepresentationData,
-			fixture.ValidCommonRepresentationData,
+			fixture.ValidResourceIdType(),
+			fixture.ValidLocalResourceIdType(),
+			fixture.ValidResourceTypeType(),
+			fixture.ValidReporterTypeType(),
+			fixture.ValidReporterInstanceIdType(),
+			fixture.ValidReporterResourceIdType(),
+			fixture.ValidApiHrefType(),
+			fixture.ValidConsoleHrefType(),
+			fixture.ValidReporterRepresentationType(),
+			fixture.ValidCommonRepresentationType(),
 		)
 
 		assertValidResource(t, resource, err, "single reporter resource")
@@ -42,16 +42,16 @@ func TestResource_Initialization(t *testing.T) {
 		// Note: The new signature creates only one ReporterResource
 		// This test now validates that we can create another resource with different values
 		resource, err := NewResource(
-			fixture.ValidId,
-			fixture.AnotherLocalResourceId,
-			fixture.AnotherResourceType,
-			fixture.AnotherReporterType,
-			fixture.AnotherReporterInstanceId,
-			fixture.AnotherResourceId,
-			fixture.AnotherApiHref,
-			fixture.EmptyConsoleHref,
-			fixture.AnotherReporterRepresentationData,
-			fixture.AnotherCommonRepresentationData,
+			fixture.ValidResourceIdType(),
+			fixture.AnotherLocalResourceIdType(),
+			fixture.AnotherResourceTypeType(),
+			fixture.AnotherReporterTypeType(),
+			fixture.AnotherReporterInstanceIdType(),
+			fixture.AnotherReporterResourceIdType(),
+			fixture.AnotherApiHrefType(),
+			fixture.EmptyConsoleHrefType(),
+			fixture.AnotherReporterRepresentationType(),
+			fixture.AnotherCommonRepresentationType(),
 		)
 
 		assertValidResource(t, resource, err, "different reporter resource")
@@ -66,16 +66,16 @@ func TestResource_Initialization(t *testing.T) {
 		t.Parallel()
 
 		resource, err := NewResource(
-			fixture.ValidId,
-			fixture.AnotherLocalResourceId,
-			fixture.AnotherResourceType,
-			fixture.AnotherReporterType,
-			fixture.AnotherReporterInstanceId,
-			fixture.AnotherResourceId,
-			fixture.AnotherApiHref,
-			fixture.EmptyConsoleHref,
-			fixture.AnotherReporterRepresentationData,
-			fixture.AnotherCommonRepresentationData,
+			fixture.ValidResourceIdType(),
+			fixture.AnotherLocalResourceIdType(),
+			fixture.AnotherResourceTypeType(),
+			fixture.AnotherReporterTypeType(),
+			fixture.AnotherReporterInstanceIdType(),
+			fixture.AnotherReporterResourceIdType(),
+			fixture.AnotherApiHrefType(),
+			fixture.EmptyConsoleHrefType(),
+			fixture.AnotherReporterRepresentationType(),
+			fixture.AnotherCommonRepresentationType(),
 		)
 
 		assertValidResource(t, resource, err, "different resource type")
@@ -95,8 +95,8 @@ func TestResource_Initialization(t *testing.T) {
 			fixture.ValidResourceId,
 			fixture.ValidApiHref,
 			fixture.ValidConsoleHref,
-			fixture.ValidReporterRepresentationData,
-			fixture.ValidCommonRepresentationData,
+			fixture.ValidReporterRepresentationType(),
+			fixture.ValidCommonRepresentationType(),
 		)
 
 		assertInvalidResource(t, err, "resource invalid ReporterResource")
@@ -106,7 +106,7 @@ func TestResource_Initialization(t *testing.T) {
 		t.Parallel()
 
 		_, err := NewResource(
-			fixture.ValidId,
+			fixture.ValidResourceIdType(),
 			fixture.ValidLocalResourceId,
 			fixture.EmptyResourceType,
 			fixture.ValidReporterType,
@@ -114,8 +114,8 @@ func TestResource_Initialization(t *testing.T) {
 			fixture.ValidResourceId,
 			fixture.ValidApiHref,
 			fixture.ValidConsoleHref,
-			fixture.ValidReporterRepresentationData,
-			fixture.ValidCommonRepresentationData,
+			fixture.ValidReporterRepresentationType(),
+			fixture.ValidCommonRepresentationType(),
 		)
 
 		assertInvalidResource(t, err, "resource invalid ReporterResource")
@@ -125,7 +125,7 @@ func TestResource_Initialization(t *testing.T) {
 		t.Parallel()
 
 		_, err := NewResource(
-			fixture.ValidId,
+			fixture.ValidResourceIdType(),
 			fixture.ValidLocalResourceId,
 			fixture.WhitespaceResourceType,
 			fixture.ValidReporterType,
@@ -133,8 +133,8 @@ func TestResource_Initialization(t *testing.T) {
 			fixture.ValidResourceId,
 			fixture.ValidApiHref,
 			fixture.ValidConsoleHref,
-			fixture.ValidReporterRepresentationData,
-			fixture.ValidCommonRepresentationData,
+			fixture.ValidReporterRepresentationType(),
+			fixture.ValidCommonRepresentationType(),
 		)
 
 		assertInvalidResource(t, err, "resource invalid ReporterResource")
@@ -144,7 +144,7 @@ func TestResource_Initialization(t *testing.T) {
 		t.Parallel()
 
 		_, err := NewResource(
-			fixture.ValidId,
+			fixture.ValidResourceIdType(),
 			fixture.EmptyLocalResourceId,
 			fixture.ValidResourceType,
 			fixture.ValidReporterType,
@@ -152,8 +152,8 @@ func TestResource_Initialization(t *testing.T) {
 			fixture.ValidResourceId,
 			fixture.ValidApiHref,
 			fixture.ValidConsoleHref,
-			fixture.ValidReporterRepresentationData,
-			fixture.ValidCommonRepresentationData,
+			fixture.ValidReporterRepresentationType(),
+			fixture.ValidCommonRepresentationType(),
 		)
 
 		assertInvalidResource(t, err, "resource invalid ReporterResource")
@@ -163,7 +163,7 @@ func TestResource_Initialization(t *testing.T) {
 		t.Parallel()
 
 		_, err := NewResource(
-			fixture.ValidId,
+			fixture.ValidResourceIdType(),
 			fixture.ValidLocalResourceId,
 			fixture.ValidResourceType,
 			fixture.EmptyReporterType,
@@ -171,8 +171,8 @@ func TestResource_Initialization(t *testing.T) {
 			fixture.ValidResourceId,
 			fixture.ValidApiHref,
 			fixture.ValidConsoleHref,
-			fixture.ValidReporterRepresentationData,
-			fixture.ValidCommonRepresentationData,
+			fixture.ValidReporterRepresentationType(),
+			fixture.ValidCommonRepresentationType(),
 		)
 
 		assertInvalidResource(t, err, "resource invalid ReporterResource")
@@ -182,7 +182,7 @@ func TestResource_Initialization(t *testing.T) {
 		t.Parallel()
 
 		_, err := NewResource(
-			fixture.ValidId,
+			fixture.ValidResourceIdType(),
 			fixture.ValidLocalResourceId,
 			fixture.ValidResourceType,
 			fixture.ValidReporterType,
@@ -190,8 +190,8 @@ func TestResource_Initialization(t *testing.T) {
 			fixture.ValidResourceId,
 			fixture.ValidApiHref,
 			fixture.ValidConsoleHref,
-			fixture.ValidReporterRepresentationData,
-			fixture.ValidCommonRepresentationData,
+			fixture.ValidReporterRepresentationType(),
+			fixture.ValidCommonRepresentationType(),
 		)
 
 		assertInvalidResource(t, err, "resource invalid ReporterResource")
@@ -201,7 +201,7 @@ func TestResource_Initialization(t *testing.T) {
 		t.Parallel()
 
 		_, err := NewResource(
-			fixture.ValidId,
+			fixture.ValidResourceIdType(),
 			fixture.ValidLocalResourceId,
 			fixture.ValidResourceType,
 			fixture.ValidReporterType,
@@ -209,8 +209,8 @@ func TestResource_Initialization(t *testing.T) {
 			fixture.ValidResourceId,
 			fixture.EmptyApiHref,
 			fixture.ValidConsoleHref,
-			fixture.ValidReporterRepresentationData,
-			fixture.ValidCommonRepresentationData,
+			fixture.ValidReporterRepresentationType(),
+			fixture.ValidCommonRepresentationType(),
 		)
 
 		assertInvalidResource(t, err, "resource invalid ReporterResource")
@@ -220,7 +220,7 @@ func TestResource_Initialization(t *testing.T) {
 		t.Parallel()
 
 		_, err := NewResource(
-			fixture.ValidId,
+			fixture.ValidResourceIdType(),
 			fixture.ValidLocalResourceId,
 			fixture.ValidResourceType,
 			fixture.ValidReporterType,
@@ -228,8 +228,8 @@ func TestResource_Initialization(t *testing.T) {
 			fixture.ValidResourceId,
 			fixture.ValidApiHref,
 			fixture.ValidConsoleHref,
-			fixture.EmptyReporterRepresentationData,
-			fixture.ValidCommonRepresentationData,
+			fixture.EmptyRepresentationType(),
+			fixture.ValidCommonRepresentationType(),
 		)
 
 		assertInvalidResource(t, err, "Resource invalid ResourceEvent")
@@ -239,7 +239,7 @@ func TestResource_Initialization(t *testing.T) {
 		t.Parallel()
 
 		_, err := NewResource(
-			fixture.ValidId,
+			fixture.ValidResourceIdType(),
 			fixture.ValidLocalResourceId,
 			fixture.ValidResourceType,
 			fixture.ValidReporterType,
@@ -247,8 +247,8 @@ func TestResource_Initialization(t *testing.T) {
 			fixture.ValidResourceId,
 			fixture.ValidApiHref,
 			fixture.ValidConsoleHref,
-			fixture.ValidReporterRepresentationData,
-			fixture.EmptyCommonRepresentationData,
+			fixture.ValidReporterRepresentationType(),
+			fixture.EmptyRepresentationType(),
 		)
 
 		assertInvalidResource(t, err, "Resource invalid ResourceEvent")
@@ -263,7 +263,7 @@ func TestResource_AggregateRootBehavior(t *testing.T) {
 		t.Parallel()
 
 		resource, err := NewResource(
-			fixture.ValidId,
+			fixture.ValidResourceIdType(),
 			fixture.ValidLocalResourceId,
 			fixture.ValidResourceType,
 			fixture.ValidReporterType,
@@ -271,8 +271,8 @@ func TestResource_AggregateRootBehavior(t *testing.T) {
 			fixture.ValidResourceId,
 			fixture.ValidApiHref,
 			fixture.ValidConsoleHref,
-			fixture.ValidReporterRepresentationData,
-			fixture.ValidCommonRepresentationData,
+			fixture.ValidReporterRepresentationType(),
+			fixture.ValidCommonRepresentationType(),
 		)
 
 		if err != nil {
@@ -312,13 +312,13 @@ func TestResource_AggregateRootBehavior(t *testing.T) {
 				resourceIdVal:              fixture.ValidResourceId,
 				apiHrefVal:                 fixture.ValidApiHref,
 				consoleHrefVal:             fixture.ValidConsoleHref,
-				reporterRepresentationData: fixture.ValidReporterRepresentationData,
-				commonRepresentationData:   fixture.ValidCommonRepresentationData,
+				reporterRepresentationData: fixture.ValidReporterRepresentationType(),
+				commonRepresentationData:   fixture.ValidCommonRepresentationType(),
 				expectedError:              "resource invalid ReporterResource",
 			},
 			{
 				name:                       "empty resource type",
-				idVal:                      fixture.ValidId,
+				idVal:                      fixture.ValidResourceIdType(),
 				localResourceIdVal:         fixture.ValidLocalResourceId,
 				resourceTypeVal:            fixture.EmptyResourceType,
 				reporterTypeVal:            fixture.ValidReporterType,
@@ -326,13 +326,13 @@ func TestResource_AggregateRootBehavior(t *testing.T) {
 				resourceIdVal:              fixture.ValidResourceId,
 				apiHrefVal:                 fixture.ValidApiHref,
 				consoleHrefVal:             fixture.ValidConsoleHref,
-				reporterRepresentationData: fixture.ValidReporterRepresentationData,
-				commonRepresentationData:   fixture.ValidCommonRepresentationData,
+				reporterRepresentationData: fixture.ValidReporterRepresentationType(),
+				commonRepresentationData:   fixture.ValidCommonRepresentationType(),
 				expectedError:              "resource invalid ReporterResource",
 			},
 			{
 				name:                       "empty local resource id",
-				idVal:                      fixture.ValidId,
+				idVal:                      fixture.ValidResourceIdType(),
 				localResourceIdVal:         fixture.EmptyLocalResourceId,
 				resourceTypeVal:            fixture.ValidResourceType,
 				reporterTypeVal:            fixture.ValidReporterType,
@@ -340,13 +340,13 @@ func TestResource_AggregateRootBehavior(t *testing.T) {
 				resourceIdVal:              fixture.ValidResourceId,
 				apiHrefVal:                 fixture.ValidApiHref,
 				consoleHrefVal:             fixture.ValidConsoleHref,
-				reporterRepresentationData: fixture.ValidReporterRepresentationData,
-				commonRepresentationData:   fixture.ValidCommonRepresentationData,
+				reporterRepresentationData: fixture.ValidReporterRepresentationType(),
+				commonRepresentationData:   fixture.ValidCommonRepresentationType(),
 				expectedError:              "resource invalid ReporterResource",
 			},
 			{
 				name:                       "empty reporter type",
-				idVal:                      fixture.ValidId,
+				idVal:                      fixture.ValidResourceIdType(),
 				localResourceIdVal:         fixture.ValidLocalResourceId,
 				resourceTypeVal:            fixture.ValidResourceType,
 				reporterTypeVal:            fixture.EmptyReporterType,
@@ -354,13 +354,13 @@ func TestResource_AggregateRootBehavior(t *testing.T) {
 				resourceIdVal:              fixture.ValidResourceId,
 				apiHrefVal:                 fixture.ValidApiHref,
 				consoleHrefVal:             fixture.ValidConsoleHref,
-				reporterRepresentationData: fixture.ValidReporterRepresentationData,
-				commonRepresentationData:   fixture.ValidCommonRepresentationData,
+				reporterRepresentationData: fixture.ValidReporterRepresentationType(),
+				commonRepresentationData:   fixture.ValidCommonRepresentationType(),
 				expectedError:              "resource invalid ReporterResource",
 			},
 			{
 				name:                       "empty api href",
-				idVal:                      fixture.ValidId,
+				idVal:                      fixture.ValidResourceIdType(),
 				localResourceIdVal:         fixture.ValidLocalResourceId,
 				resourceTypeVal:            fixture.ValidResourceType,
 				reporterTypeVal:            fixture.ValidReporterType,
@@ -368,8 +368,8 @@ func TestResource_AggregateRootBehavior(t *testing.T) {
 				resourceIdVal:              fixture.ValidResourceId,
 				apiHrefVal:                 fixture.EmptyApiHref,
 				consoleHrefVal:             fixture.ValidConsoleHref,
-				reporterRepresentationData: fixture.ValidReporterRepresentationData,
-				commonRepresentationData:   fixture.ValidCommonRepresentationData,
+				reporterRepresentationData: fixture.ValidReporterRepresentationType(),
+				commonRepresentationData:   fixture.ValidCommonRepresentationType(),
 				expectedError:              "resource invalid ReporterResource",
 			},
 		}
@@ -455,7 +455,7 @@ func TestResource_Update(t *testing.T) {
 
 		// Create initial resource
 		original, err := NewResource(
-			fixture.ValidId,
+			fixture.ValidResourceIdType(),
 			fixture.ValidLocalResourceId,
 			fixture.ValidResourceType,
 			fixture.ValidReporterType,
@@ -463,8 +463,8 @@ func TestResource_Update(t *testing.T) {
 			fixture.ValidResourceId,
 			fixture.ValidApiHref,
 			fixture.ValidConsoleHref,
-			fixture.ValidReporterRepresentationData,
-			fixture.ValidCommonRepresentationData,
+			fixture.ValidReporterRepresentationType(),
+			fixture.ValidCommonRepresentationType(),
 		)
 
 		if err != nil {
@@ -531,7 +531,7 @@ func TestResource_Update(t *testing.T) {
 		t.Parallel()
 
 		original, err := NewResource(
-			fixture.ValidId,
+			fixture.ValidResourceIdType(),
 			fixture.ValidLocalResourceId,
 			fixture.ValidResourceType,
 			fixture.ValidReporterType,
@@ -539,15 +539,20 @@ func TestResource_Update(t *testing.T) {
 			fixture.ValidResourceId,
 			fixture.ValidApiHref,
 			fixture.ValidConsoleHref,
-			fixture.ValidReporterRepresentationData,
-			fixture.ValidCommonRepresentationData,
+			fixture.ValidReporterRepresentationType(),
+			fixture.ValidCommonRepresentationType(),
 		)
 
 		if err != nil {
 			t.Fatalf("Expected no error creating Resource, got %v", err)
 		}
 
-		nonExistentKey, err := NewReporterResourceKey("non-existent", "unknown", "test", "instance1")
+		localResourceId, _ := NewLocalResourceId("non-existent")
+		resourceType, _ := NewResourceType("unknown")
+		reporterType, _ := NewReporterType("test")
+		reporterInstanceId, _ := NewReporterInstanceId("instance1")
+
+		nonExistentKey, err := NewReporterResourceKey(localResourceId, resourceType, reporterType, reporterInstanceId)
 		if err != nil {
 			t.Fatalf("Expected no error creating non-existent key, got %v", err)
 		}
@@ -573,7 +578,7 @@ func TestResource_Update(t *testing.T) {
 		t.Parallel()
 
 		original, err := NewResource(
-			fixture.ValidId,
+			fixture.ValidResourceIdType(),
 			fixture.ValidLocalResourceId,
 			fixture.ValidResourceType,
 			fixture.ValidReporterType,
@@ -581,8 +586,8 @@ func TestResource_Update(t *testing.T) {
 			fixture.ValidResourceId,
 			fixture.ValidApiHref,
 			fixture.ValidConsoleHref,
-			fixture.ValidReporterRepresentationData,
-			fixture.ValidCommonRepresentationData,
+			fixture.ValidReporterRepresentationType(),
+			fixture.ValidCommonRepresentationType(),
 		)
 
 		if err != nil {
@@ -620,7 +625,7 @@ func TestResource_Update(t *testing.T) {
 		t.Parallel()
 
 		original, err := NewResource(
-			fixture.ValidId,
+			fixture.ValidResourceIdType(),
 			fixture.ValidLocalResourceId,
 			fixture.ValidResourceType,
 			fixture.ValidReporterType,
@@ -628,8 +633,8 @@ func TestResource_Update(t *testing.T) {
 			fixture.ValidResourceId,
 			fixture.ValidApiHref,
 			fixture.ValidConsoleHref,
-			fixture.ValidReporterRepresentationData,
-			fixture.ValidCommonRepresentationData,
+			fixture.ValidReporterRepresentationType(),
+			fixture.ValidCommonRepresentationType(),
 		)
 
 		if err != nil {
@@ -661,7 +666,7 @@ func TestResource_Update(t *testing.T) {
 		t.Parallel()
 
 		original, err := NewResource(
-			fixture.ValidId,
+			fixture.ValidResourceIdType(),
 			fixture.ValidLocalResourceId,
 			fixture.ValidResourceType,
 			fixture.ValidReporterType,
@@ -669,8 +674,8 @@ func TestResource_Update(t *testing.T) {
 			fixture.ValidResourceId,
 			fixture.ValidApiHref,
 			fixture.ValidConsoleHref,
-			fixture.ValidReporterRepresentationData,
-			fixture.ValidCommonRepresentationData,
+			fixture.ValidReporterRepresentationType(),
+			fixture.ValidCommonRepresentationType(),
 		)
 
 		if err != nil {
@@ -697,7 +702,7 @@ func TestResource_Update(t *testing.T) {
 		t.Parallel()
 
 		original, err := NewResource(
-			fixture.ValidId,
+			fixture.ValidResourceIdType(),
 			fixture.ValidLocalResourceId,
 			fixture.ValidResourceType,
 			fixture.ValidReporterType,
@@ -705,8 +710,8 @@ func TestResource_Update(t *testing.T) {
 			fixture.ValidResourceId,
 			fixture.ValidApiHref,
 			fixture.ValidConsoleHref,
-			fixture.ValidReporterRepresentationData,
-			fixture.ValidCommonRepresentationData,
+			fixture.ValidReporterRepresentationType(),
+			fixture.ValidCommonRepresentationType(),
 		)
 
 		if err != nil {

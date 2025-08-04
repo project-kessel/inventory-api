@@ -354,6 +354,110 @@ func NewReporterResourceTestFixture() ReporterResourceTestFixture {
 	}
 }
 
+// Helper methods to create tiny types from primitive values for NewReporterResource
+func (f ReporterResourceTestFixture) ValidIdType() ReporterResourceId {
+	id, _ := NewReporterResourceId(f.ValidId)
+	return id
+}
+
+func (f ReporterResourceTestFixture) ValidLocalResourceIdType() LocalResourceId {
+	id, _ := NewLocalResourceId(f.ValidLocalResourceId)
+	return id
+}
+
+func (f ReporterResourceTestFixture) ValidResourceTypeType() ResourceType {
+	rt, _ := NewResourceType(f.ValidResourceType)
+	return rt
+}
+
+func (f ReporterResourceTestFixture) ValidReporterTypeType() ReporterType {
+	rt, _ := NewReporterType(f.ValidReporterType)
+	return rt
+}
+
+func (f ReporterResourceTestFixture) ValidReporterInstanceIdType() ReporterInstanceId {
+	ri, _ := NewReporterInstanceId(f.ValidReporterInstanceId)
+	return ri
+}
+
+func (f ReporterResourceTestFixture) ValidResourceIdType() ResourceId {
+	id, _ := NewResourceId(f.ValidResourceId)
+	return id
+}
+
+func (f ReporterResourceTestFixture) ValidApiHrefType() ApiHref {
+	ah, _ := NewApiHref(f.ValidApiHref)
+	return ah
+}
+
+func (f ReporterResourceTestFixture) ValidConsoleHrefType() ConsoleHref {
+	ch, _ := NewConsoleHref(f.ValidConsoleHref)
+	return ch
+}
+
+func (f ReporterResourceTestFixture) EmptyConsoleHrefType() ConsoleHref {
+	return ConsoleHref("")
+}
+
+// Helper methods for invalid values (using deserialize to bypass validation)
+func (f ReporterResourceTestFixture) NilIdType() ReporterResourceId {
+	return DeserializeReporterResourceId(f.NilId)
+}
+
+func (f ReporterResourceTestFixture) EmptyLocalResourceIdType() LocalResourceId {
+	return DeserializeLocalResourceId(f.EmptyLocalResourceId)
+}
+
+func (f ReporterResourceTestFixture) WhitespaceLocalResourceIdType() LocalResourceId {
+	return DeserializeLocalResourceId(f.WhitespaceLocalResourceId)
+}
+
+func (f ReporterResourceTestFixture) EmptyResourceTypeType() ResourceType {
+	return DeserializeResourceType(f.EmptyResourceType)
+}
+
+func (f ReporterResourceTestFixture) WhitespaceResourceTypeType() ResourceType {
+	return DeserializeResourceType(f.WhitespaceResourceType)
+}
+
+func (f ReporterResourceTestFixture) EmptyReporterTypeType() ReporterType {
+	return DeserializeReporterType(f.EmptyReporterType)
+}
+
+func (f ReporterResourceTestFixture) WhitespaceReporterTypeType() ReporterType {
+	return DeserializeReporterType(f.WhitespaceReporterType)
+}
+
+func (f ReporterResourceTestFixture) EmptyReporterInstanceIdType() ReporterInstanceId {
+	return DeserializeReporterInstanceId(f.EmptyReporterInstanceId)
+}
+
+func (f ReporterResourceTestFixture) WhitespaceReporterInstanceIdType() ReporterInstanceId {
+	return DeserializeReporterInstanceId(f.WhitespaceReporterInstanceId)
+}
+
+func (f ReporterResourceTestFixture) NilResourceIdType() ResourceId {
+	return DeserializeResourceId(f.NilResourceId)
+}
+
+func (f ReporterResourceTestFixture) EmptyApiHrefType() ApiHref {
+	return DeserializeApiHref(f.EmptyApiHref)
+}
+
+func (f ReporterResourceTestFixture) WhitespaceApiHrefType() ApiHref {
+	return DeserializeApiHref(f.WhitespaceApiHref)
+}
+
+func (f ReporterResourceTestFixture) ValidLocalResourceIdUUIDType() LocalResourceId {
+	id, _ := NewLocalResourceId(f.ValidLocalResourceIdUUID)
+	return id
+}
+
+func (f ReporterResourceTestFixture) ValidLocalResourceIdStringType() LocalResourceId {
+	id, _ := NewLocalResourceId(f.ValidLocalResourceIdString)
+	return id
+}
+
 type ReporterRepresentationTestFixture struct {
 	ValidData                    internal.JsonObject
 	ValidReporterResourceId      string
@@ -435,26 +539,44 @@ type ResourceTestFixture struct {
 }
 
 func NewResourceTestFixture() ResourceTestFixture {
+	reporterResourceId1, _ := NewReporterResourceId(uuid.MustParse("550e8400-e29b-41d4-a716-446655440400"))
+	localResourceId1, _ := NewLocalResourceId("local-resource-123")
+	resourceType1, _ := NewResourceType("k8s_cluster")
+	reporterType1, _ := NewReporterType("acm")
+	reporterInstanceId1, _ := NewReporterInstanceId("acm-instance-001")
+	resourceId1, _ := NewResourceId(uuid.MustParse("550e8400-e29b-41d4-a716-446655440401"))
+	apiHref1, _ := NewApiHref("/api/v1/resources/123")
+	consoleHref1, _ := NewConsoleHref("/console/resources/123")
+
 	validReporterResource, _ := NewReporterResource(
-		uuid.MustParse("550e8400-e29b-41d4-a716-446655440400"),
-		"local-resource-123",
-		"k8s_cluster",
-		"acm",
-		"acm-instance-001",
-		uuid.MustParse("550e8400-e29b-41d4-a716-446655440401"),
-		"/api/v1/resources/123",
-		"/console/resources/123",
+		reporterResourceId1,
+		localResourceId1,
+		resourceType1,
+		reporterType1,
+		reporterInstanceId1,
+		resourceId1,
+		apiHref1,
+		consoleHref1,
 	)
 
+	reporterResourceId2, _ := NewReporterResourceId(uuid.MustParse("550e8400-e29b-41d4-a716-446655440500"))
+	localResourceId2, _ := NewLocalResourceId("local-resource-456")
+	resourceType2, _ := NewResourceType("host")
+	reporterType2, _ := NewReporterType("ocm")
+	reporterInstanceId2, _ := NewReporterInstanceId("ocm-instance-001")
+	resourceId2, _ := NewResourceId(uuid.MustParse("550e8400-e29b-41d4-a716-446655440501"))
+	apiHref2, _ := NewApiHref("/api/v1/resources/456")
+	consoleHref2 := ConsoleHref("")
+
 	anotherReporterResource, _ := NewReporterResource(
-		uuid.MustParse("550e8400-e29b-41d4-a716-446655440500"),
-		"local-resource-456",
-		"host",
-		"ocm",
-		"ocm-instance-001",
-		uuid.MustParse("550e8400-e29b-41d4-a716-446655440501"),
-		"/api/v1/resources/456",
-		"",
+		reporterResourceId2,
+		localResourceId2,
+		resourceType2,
+		reporterType2,
+		reporterInstanceId2,
+		resourceId2,
+		apiHref2,
+		consoleHref2,
 	)
 
 	return ResourceTestFixture{
@@ -499,6 +621,106 @@ func NewResourceTestFixture() ResourceTestFixture {
 		EmptyReporterRepresentationData: internal.JsonObject{},
 		EmptyCommonRepresentationData:   internal.JsonObject{},
 	}
+}
+
+// Helper methods to create tiny types from primitive values for NewResource
+func (f ResourceTestFixture) ValidResourceIdType() ResourceId {
+	id, _ := NewResourceId(f.ValidId)
+	return id
+}
+
+func (f ResourceTestFixture) ValidLocalResourceIdType() LocalResourceId {
+	id, _ := NewLocalResourceId(f.ValidLocalResourceId)
+	return id
+}
+
+func (f ResourceTestFixture) ValidResourceTypeType() ResourceType {
+	rt, _ := NewResourceType(f.ValidResourceType)
+	return rt
+}
+
+func (f ResourceTestFixture) ValidReporterTypeType() ReporterType {
+	rt, _ := NewReporterType(f.ValidReporterType)
+	return rt
+}
+
+func (f ResourceTestFixture) ValidReporterInstanceIdType() ReporterInstanceId {
+	ri, _ := NewReporterInstanceId(f.ValidReporterInstanceId)
+	return ri
+}
+
+func (f ResourceTestFixture) ValidReporterResourceIdType() ReporterResourceId {
+	id, _ := NewReporterResourceId(f.ValidResourceId)
+	return id
+}
+
+func (f ResourceTestFixture) ValidApiHrefType() ApiHref {
+	ah, _ := NewApiHref(f.ValidApiHref)
+	return ah
+}
+
+func (f ResourceTestFixture) ValidConsoleHrefType() ConsoleHref {
+	ch, _ := NewConsoleHref(f.ValidConsoleHref)
+	return ch
+}
+
+// Helper methods for "another" values
+func (f ResourceTestFixture) AnotherResourceTypeType() ResourceType {
+	rt, _ := NewResourceType(f.AnotherResourceType)
+	return rt
+}
+
+func (f ResourceTestFixture) AnotherLocalResourceIdType() LocalResourceId {
+	id, _ := NewLocalResourceId(f.AnotherLocalResourceId)
+	return id
+}
+
+func (f ResourceTestFixture) AnotherReporterTypeType() ReporterType {
+	rt, _ := NewReporterType(f.AnotherReporterType)
+	return rt
+}
+
+func (f ResourceTestFixture) AnotherReporterInstanceIdType() ReporterInstanceId {
+	ri, _ := NewReporterInstanceId(f.AnotherReporterInstanceId)
+	return ri
+}
+
+func (f ResourceTestFixture) AnotherReporterResourceIdType() ReporterResourceId {
+	id, _ := NewReporterResourceId(f.AnotherResourceId)
+	return id
+}
+
+func (f ResourceTestFixture) AnotherApiHrefType() ApiHref {
+	ah, _ := NewApiHref(f.AnotherApiHref)
+	return ah
+}
+
+func (f ResourceTestFixture) EmptyConsoleHrefType() ConsoleHref {
+	return ConsoleHref("")
+}
+
+func (f ResourceTestFixture) ValidReporterRepresentationType() Representation {
+	rep, _ := NewRepresentation(f.ValidReporterRepresentationData)
+	return rep
+}
+
+func (f ResourceTestFixture) ValidCommonRepresentationType() Representation {
+	rep, _ := NewRepresentation(f.ValidCommonRepresentationData)
+	return rep
+}
+
+func (f ResourceTestFixture) AnotherReporterRepresentationType() Representation {
+	rep, _ := NewRepresentation(f.AnotherReporterRepresentationData)
+	return rep
+}
+
+func (f ResourceTestFixture) AnotherCommonRepresentationType() Representation {
+	rep, _ := NewRepresentation(f.AnotherCommonRepresentationData)
+	return rep
+}
+
+func (f ResourceTestFixture) EmptyRepresentationType() Representation {
+	return DeserializeRepresentation(f.EmptyReporterRepresentationData)
 }
 
 type ResourceEventTestFixture struct {

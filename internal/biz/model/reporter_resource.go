@@ -26,37 +26,28 @@ type ReporterResourceKey struct {
 	reporter        ReporterId
 }
 
-func NewReporterResource(idVal uuid.UUID, localResourceIdVal string, resourceTypeVal string, reporterTypeVal string, reporterInstanceIdVal string, resourceIdVal uuid.UUID, apiHrefVal string, consoleHrefVal string) (ReporterResource, error) {
-	reporterResourceId, err := NewReporterResourceId(idVal)
-	if err != nil {
-		return ReporterResource{}, fmt.Errorf("ReporterResource invalid ID: %w", err)
-	}
-
-	reporterResourceKey, err := NewReporterResourceKey(localResourceIdVal, resourceTypeVal, reporterTypeVal, reporterInstanceIdVal)
+func NewReporterResource(
+	id ReporterResourceId,
+	localResourceId LocalResourceId,
+	resourceType ResourceType,
+	reporterType ReporterType,
+	reporterInstanceId ReporterInstanceId,
+	resourceId ResourceId,
+	apiHref ApiHref,
+	consoleHref ConsoleHref,
+) (ReporterResource, error) {
+	reporterResourceKey, err := NewReporterResourceKey(
+		localResourceId,
+		resourceType,
+		reporterType,
+		reporterInstanceId,
+	)
 	if err != nil {
 		return ReporterResource{}, fmt.Errorf("ReporterResource invalid key: %w", err)
 	}
 
-	resourceId, err := NewResourceId(resourceIdVal)
-	if err != nil {
-		return ReporterResource{}, fmt.Errorf("ReporterResource invalid resource ID: %w", err)
-	}
-
-	apiHref, err := NewApiHref(apiHrefVal)
-	if err != nil {
-		return ReporterResource{}, fmt.Errorf("ReporterResource invalid API href: %w", err)
-	}
-
-	var consoleHref ConsoleHref
-	if consoleHrefVal != "" {
-		consoleHref, err = NewConsoleHref(consoleHrefVal)
-		if err != nil {
-			return ReporterResource{}, fmt.Errorf("ReporterResource invalid console href: %w", err)
-		}
-	}
-
 	resource := ReporterResource{
-		id:                    reporterResourceId,
+		id:                    id,
 		ReporterResourceKey:   reporterResourceKey,
 		resourceID:            resourceId,
 		apiHref:               apiHref,
@@ -69,31 +60,27 @@ func NewReporterResource(idVal uuid.UUID, localResourceIdVal string, resourceTyp
 }
 
 func NewReporterResourceKey(
-	localResourceIDVal string,
-	resourceTypeVal string,
-	reporterTypeVal string,
-	reporterInstanceIdVal string,
+	localResourceID LocalResourceId,
+	resourceType ResourceType,
+	reporterType ReporterType,
+	reporterInstanceId ReporterInstanceId,
 ) (ReporterResourceKey, error) {
-	localResourceID, err := NewLocalResourceId(localResourceIDVal)
-	if err != nil {
-		return ReporterResourceKey{}, fmt.Errorf("ReporterResourceKey invalid local resource ID: %w", err)
-	}
-
-	resourceType, err := NewResourceType(resourceTypeVal)
-	if err != nil {
-		return ReporterResourceKey{}, fmt.Errorf("ReporterResourceKey invalid resource type: %w", err)
-	}
-
-	reporter, err := NewReporter(reporterTypeVal, reporterInstanceIdVal)
-	if err != nil {
-		return ReporterResourceKey{}, fmt.Errorf("ReporterResourceKey invalid reporter: %w", err)
-	}
+	reporterId := NewReporterId(reporterType, reporterInstanceId)
 
 	return ReporterResourceKey{
 		localResourceID: localResourceID,
 		resourceType:    resourceType,
-		reporter:        reporter,
+		reporter:        reporterId,
 	}, nil
+}
+
+func (rr *ReporterResource) Update(
+	apiHref ApiHref,
+	consoleHref ConsoleHref,
+) {
+	rr.apiHref = apiHref
+	rr.consoleHref = consoleHref
+	rr.representationVersion = rr.representationVersion.Increment()
 }
 
 func (rrk ReporterResourceKey) LocalResourceId() string {
@@ -112,6 +99,19 @@ func (rrk ReporterResourceKey) ReporterInstanceId() string {
 	return rrk.reporter.reporterInstanceId.String()
 }
 
+func (rrk ReporterResourceKey) Serialize() (string, string, string, string) {
+	reporterType, reporterInstanceId := rrk.reporter.Serialize()
+	return rrk.localResourceID.Serialize(), rrk.resourceType.Serialize(), reporterType, reporterInstanceId
+}
+
+func DeserializeReporterResourceKey(localResourceId, resourceType, reporterType, reporterInstanceId string) ReporterResourceKey {
+	return ReporterResourceKey{
+		localResourceID: DeserializeLocalResourceId(localResourceId),
+		resourceType:    DeserializeResourceType(resourceType),
+		reporter:        DeserializeReporterId(reporterType, reporterInstanceId),
+	}
+}
+
 func (rr ReporterResource) LocalResourceId() string {
 	return rr.localResourceID.String()
 }
@@ -122,35 +122,6 @@ func (rr ReporterResource) Id() ReporterResourceId {
 
 func (rr ReporterResource) Key() ReporterResourceKey {
 	return rr.ReporterResourceKey
-}
-
-func (rr ReporterResource) Update(
-	apiHrefVal string,
-	consoleHrefVal string,
-) (ReporterResource, error) {
-	apiHref, err := NewApiHref(apiHrefVal)
-	if err != nil {
-		return ReporterResource{}, fmt.Errorf("failed to create API href: %w", err)
-	}
-
-	var consoleHref ConsoleHref
-	if consoleHrefVal != "" {
-		consoleHref, err = NewConsoleHref(consoleHrefVal)
-		if err != nil {
-			return ReporterResource{}, fmt.Errorf("failed to create console href: %w", err)
-		}
-	}
-
-	return ReporterResource{
-		id:                    rr.id,
-		ReporterResourceKey:   rr.ReporterResourceKey,
-		resourceID:            rr.resourceID,
-		apiHref:               apiHref,
-		consoleHref:           consoleHref,
-		representationVersion: rr.representationVersion.Increment(),
-		generation:            rr.generation,
-		tombstone:             rr.tombstone,
-	}, nil
 }
 
 func (rr ReporterResource) Serialize() (*datamodel.ReporterResource, error) {
@@ -182,38 +153,11 @@ func DeserializeReporterResource(
 	generation uint,
 	tombstone bool,
 ) (*ReporterResource, error) {
-	reporterResourceId, err := NewReporterResourceId(id)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create ReporterResourceId: %w", err)
-	}
-
-	reporterResourceKey, err := NewReporterResourceKey(
-		localResourceID,
-		resourceType,
-		reporterType,
-		reporterInstanceID,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create ReporterResourceKey: %w", err)
-	}
-
-	domainResourceId, err := NewResourceId(resourceID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create ResourceId: %w", err)
-	}
-
-	domainApiHref, err := NewApiHref(apiHref)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create ApiHref: %w", err)
-	}
-
-	var domainConsoleHref ConsoleHref
-	if consoleHref != "" {
-		domainConsoleHref, err = NewConsoleHref(consoleHref)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create ConsoleHref: %w", err)
-		}
-	}
+	reporterResourceId := DeserializeReporterResourceId(id)
+	reporterResourceKey := DeserializeReporterResourceKey(localResourceID, resourceType, reporterType, reporterInstanceID)
+	domainResourceId := DeserializeResourceId(resourceID)
+	domainApiHref := DeserializeApiHref(apiHref)
+	domainConsoleHref := DeserializeConsoleHref(consoleHref)
 
 	reporterResource := &ReporterResource{
 		id:                    reporterResourceId,
@@ -221,9 +165,9 @@ func DeserializeReporterResource(
 		resourceID:            domainResourceId,
 		apiHref:               domainApiHref,
 		consoleHref:           domainConsoleHref,
-		representationVersion: NewVersion(representationVersion),
-		generation:            NewGeneration(generation),
-		tombstone:             NewTombstone(tombstone),
+		representationVersion: DeserializeVersion(representationVersion),
+		generation:            DeserializeGeneration(generation),
+		tombstone:             DeserializeTombstone(tombstone),
 	}
 
 	return reporterResource, nil

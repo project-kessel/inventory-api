@@ -3,6 +3,7 @@ package model
 import (
 	"fmt"
 
+	"github.com/google/uuid"
 	"github.com/project-kessel/inventory-api/internal"
 	datamodel "github.com/project-kessel/inventory-api/internal/data/model"
 )
@@ -26,7 +27,7 @@ type ReporterDeleteRepresentation interface {
 }
 
 func (r ReporterRepresentation) Data() internal.JsonObject {
-	return r.data
+	return r.Representation.Data()
 }
 
 func (r ReporterRepresentation) IsTombstone() bool {
@@ -60,9 +61,7 @@ func NewReporterDataRepresentation(
 	}
 
 	return ReporterRepresentation{
-		Representation: Representation{
-			data: data,
-		},
+		Representation:     Representation(data),
 		reporterResourceID: reporterResourceID,
 		version:            NewVersion(version),
 		generation:         NewGeneration(generation),
@@ -94,9 +93,7 @@ func NewReporterDeleteRepresentation(
 	}
 
 	return ReporterRepresentation{
-		Representation: Representation{
-			data: nil,
-		},
+		Representation:     Representation(nil),
 		reporterResourceID: reporterResourceID,
 		version:            NewVersion(version),
 		generation:         NewGeneration(generation),
@@ -109,17 +106,66 @@ func NewReporterDeleteRepresentation(
 func (rr ReporterRepresentation) Serialize() (*datamodel.ReporterRepresentation, error) {
 	var reporterVersionStr *string
 	if rr.reporterVersion != nil {
-		versionStr := rr.reporterVersion.String()
+		versionStr := rr.reporterVersion.Serialize()
 		reporterVersionStr = &versionStr
 	}
 
 	return datamodel.NewReporterRepresentation(
-		internal.JsonObject(rr.data),
+		rr.Representation.Serialize(),
 		rr.reporterResourceID.String(),
-		uint(rr.version),
-		uint(rr.generation),
-		uint(rr.commonVersion),
-		rr.tombstone.Bool(),
+		rr.version.Serialize(),
+		rr.generation.Serialize(),
+		rr.commonVersion.Serialize(),
+		rr.tombstone.Serialize(),
 		reporterVersionStr,
 	)
+}
+
+func DeserializeReporterDataRepresentation(
+	reporterResourceIdVal string,
+	version uint,
+	generation uint,
+	data internal.JsonObject,
+	commonVersion uint,
+	reporterVersionVal *string,
+) ReporterRepresentation {
+	var reporterVersion *ReporterVersion
+	if reporterVersionVal != nil {
+		rv := DeserializeReporterVersion(*reporterVersionVal)
+		reporterVersion = &rv
+	}
+
+	return ReporterRepresentation{
+		Representation:     DeserializeRepresentation(data),
+		reporterResourceID: DeserializeReporterResourceId(uuid.MustParse(reporterResourceIdVal)),
+		version:            DeserializeVersion(version),
+		generation:         DeserializeGeneration(generation),
+		commonVersion:      DeserializeVersion(commonVersion),
+		reporterVersion:    reporterVersion,
+		tombstone:          DeserializeTombstone(false),
+	}
+}
+
+func DeserializeReporterDeleteRepresentation(
+	reporterResourceIDVal string,
+	version uint,
+	generation uint,
+	commonVersion uint,
+	reporterVersionVal *string,
+) ReporterRepresentation {
+	var reporterVersion *ReporterVersion
+	if reporterVersionVal != nil {
+		rv := DeserializeReporterVersion(*reporterVersionVal)
+		reporterVersion = &rv
+	}
+
+	return ReporterRepresentation{
+		Representation:     DeserializeRepresentation(nil),
+		reporterResourceID: DeserializeReporterResourceId(uuid.MustParse(reporterResourceIDVal)),
+		version:            DeserializeVersion(version),
+		generation:         DeserializeGeneration(generation),
+		commonVersion:      DeserializeVersion(commonVersion),
+		reporterVersion:    reporterVersion,
+		tombstone:          DeserializeTombstone(true),
+	}
 }

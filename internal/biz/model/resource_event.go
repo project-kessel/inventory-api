@@ -47,10 +47,17 @@ func NewResourceEvent(
 	}
 
 	// Create ReporterId
-	reporterId, err := NewReporter(reporterTypeVal, reporterInstanceIdVal)
+	reporterType, err := NewReporterType(reporterTypeVal)
 	if err != nil {
-		return ResourceEvent{}, fmt.Errorf("ResourceEvent invalid reporter: %w", err)
+		return ResourceEvent{}, fmt.Errorf("ResourceEvent invalid reporter type: %w", err)
 	}
+
+	reporterInstanceId, err := NewReporterInstanceId(reporterInstanceIdVal)
+	if err != nil {
+		return ResourceEvent{}, fmt.Errorf("ResourceEvent invalid reporter instance ID: %w", err)
+	}
+
+	reporterId := NewReporterId(reporterType, reporterInstanceId)
 
 	// Create ReporterRepresentation
 	reporterRep, err := NewReporterDataRepresentation(
@@ -141,11 +148,11 @@ func (re ResourceEvent) ApiHref() string {
 }
 
 func (re ResourceEvent) Data() internal.JsonObject {
-	return re.reporterRepresentation.data
+	return re.reporterRepresentation.Data()
 }
 
 func (re ResourceEvent) WorkspaceId() string {
-	if workspaceId, ok := re.commonRepresentation.data["workspace_id"]; ok {
+	if workspaceId, ok := re.commonRepresentation.Data()["workspace_id"]; ok {
 		if workspaceIdStr, ok := workspaceId.(string); ok {
 			return workspaceIdStr
 		}
@@ -161,7 +168,7 @@ func (re ResourceEvent) SerializeReporterRepresentation() (*datamodel.ReporterRe
 	}
 
 	return datamodel.NewReporterRepresentation(
-		re.reporterRepresentation.data,
+		re.reporterRepresentation.Data(),
 		re.reporterRepresentation.reporterResourceID.String(),
 		uint(re.reporterRepresentation.version),
 		uint(re.reporterRepresentation.generation),
@@ -174,7 +181,7 @@ func (re ResourceEvent) SerializeReporterRepresentation() (*datamodel.ReporterRe
 func (re ResourceEvent) SerializeCommonRepresentation() (*datamodel.CommonRepresentation, error) {
 	return datamodel.NewCommonRepresentation(
 		uuid.UUID(re.id),
-		re.commonRepresentation.data,
+		re.commonRepresentation.Data(),
 		uint(re.commonRepresentation.version),
 		re.reporterId.reporterType.String(),
 		re.reporterId.reporterInstanceId.String(),

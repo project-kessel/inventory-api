@@ -14,65 +14,85 @@ func TestReporter_Initialization(t *testing.T) {
 	t.Run("should create reporter with valid inputs", func(t *testing.T) {
 		t.Parallel()
 
-		reporter, err := NewReporter(fixture.ValidReporterType, fixture.ValidReporterInstanceId)
+		reporterType, err := NewReporterType(fixture.ValidReporterType)
+		if err != nil {
+			t.Fatalf("Expected no error creating ReporterType, got %v", err)
+		}
 
-		assertValidReporter(t, reporter, err, fixture.ValidReporterType, fixture.ValidReporterInstanceId)
+		reporterInstanceId, err := NewReporterInstanceId(fixture.ValidReporterInstanceId)
+		if err != nil {
+			t.Fatalf("Expected no error creating ReporterInstanceId, got %v", err)
+		}
+
+		reporter := NewReporterId(reporterType, reporterInstanceId)
+
+		assertValidReporter(t, reporter, nil, fixture.ValidReporterType, fixture.ValidReporterInstanceId)
 	})
 
 	t.Run("should create reporter with another valid set of inputs", func(t *testing.T) {
 		t.Parallel()
 
-		reporter, err := NewReporter(fixture.AnotherReporterType, fixture.AnotherReporterInstanceId)
+		reporterType, err := NewReporterType(fixture.AnotherReporterType)
+		if err != nil {
+			t.Fatalf("Expected no error creating ReporterType, got %v", err)
+		}
 
-		assertValidReporter(t, reporter, err, fixture.AnotherReporterType, fixture.AnotherReporterInstanceId)
+		reporterInstanceId, err := NewReporterInstanceId(fixture.AnotherReporterInstanceId)
+		if err != nil {
+			t.Fatalf("Expected no error creating ReporterInstanceId, got %v", err)
+		}
+
+		reporter := NewReporterId(reporterType, reporterInstanceId)
+
+		assertValidReporter(t, reporter, nil, fixture.AnotherReporterType, fixture.AnotherReporterInstanceId)
 	})
 
 	t.Run("should reject empty reporter type", func(t *testing.T) {
 		t.Parallel()
 
-		_, err := NewReporter(fixture.EmptyString, fixture.ValidReporterInstanceId)
+		_, err := NewReporterType(fixture.EmptyString)
 
-		assertInvalidReporter(t, err, "ReporterId invalid type")
+		assertInvalidReporter(t, err, "ReporterType cannot be empty")
 	})
 
 	t.Run("should reject whitespace-only reporter type", func(t *testing.T) {
 		t.Parallel()
 
-		_, err := NewReporter(fixture.WhitespaceString, fixture.ValidReporterInstanceId)
+		_, err := NewReporterType(fixture.WhitespaceString)
 
-		assertInvalidReporter(t, err, "ReporterId invalid type")
+		assertInvalidReporter(t, err, "ReporterType cannot be empty")
 	})
 
 	t.Run("should reject empty reporter instance id", func(t *testing.T) {
 		t.Parallel()
 
-		_, err := NewReporter(fixture.ValidReporterType, fixture.EmptyString)
+		_, err := NewReporterInstanceId(fixture.EmptyString)
 
-		assertInvalidReporter(t, err, "ReporterId invalid instance ID")
+		assertInvalidReporter(t, err, "ReporterInstanceId cannot be empty")
 	})
 
 	t.Run("should reject whitespace-only reporter instance id", func(t *testing.T) {
 		t.Parallel()
 
-		_, err := NewReporter(fixture.ValidReporterType, fixture.WhitespaceString)
+		_, err := NewReporterInstanceId(fixture.WhitespaceString)
 
-		assertInvalidReporter(t, err, "ReporterId invalid instance ID")
+		assertInvalidReporter(t, err, "ReporterInstanceId cannot be empty")
 	})
 
 	t.Run("should reject both empty inputs", func(t *testing.T) {
 		t.Parallel()
 
-		_, err := NewReporter(fixture.EmptyString, fixture.EmptyString)
+		_, err := NewReporterType(fixture.EmptyString)
 
-		assertInvalidReporter(t, err, "ReporterId invalid type")
+		assertInvalidReporter(t, err, "ReporterType cannot be empty")
 	})
 
 	t.Run("should reject both whitespace inputs", func(t *testing.T) {
 		t.Parallel()
 
-		_, err := NewReporter(fixture.WhitespaceString, fixture.WhitespaceString)
+		_, err := NewReporterType(fixture.WhitespaceString)
 
-		assertInvalidReporter(t, err, "ReporterId invalid type")
+		assertInvalidReporter(t, err, "ReporterType cannot be empty")
 	})
 }
 

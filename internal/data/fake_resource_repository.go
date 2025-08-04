@@ -62,24 +62,13 @@ func (f *fakeResourceRepository) GetNextTransactionID() (string, error) {
 	return txid.String(), nil
 }
 
-func (f *fakeResourceRepository) ReportRepresentations(tx *gorm.DB, reporterRepresentation interface{}, commonRepresentation interface{}) error {
-	// For fake repository, we don't need to actually store representations
-	// Just return nil to indicate success
-	return nil
-}
-
 func (f *fakeResourceRepository) Save(tx *gorm.DB, resource bizmodel.Resource, operationType model_legacy.EventOperationType, txid string) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
-	dataResource, dataReporterResource, dataReporterRepresentation, dataCommonRepresentation, err := resource.Serialize()
+	dataResource, dataReporterResource, _, _, err := resource.Serialize()
 	if err != nil {
 		return fmt.Errorf("failed to serialize resource: %w", err)
-	}
-
-	// Use the new ReportRepresentations method
-	if err := f.ReportRepresentations(tx, dataReporterRepresentation, dataCommonRepresentation); err != nil {
-		return err
 	}
 
 	key := f.makeKey(

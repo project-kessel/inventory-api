@@ -28,7 +28,6 @@ type ResourceRepository interface {
 	NextResourceId() (bizmodel.ResourceId, error)
 	NextReporterResourceId() (bizmodel.ReporterResourceId, error)
 	Save(tx *gorm.DB, resource bizmodel.Resource, operationType model_legacy.EventOperationType, txid string) error
-	ReportRepresentations(tx *gorm.DB, reporterRepresentation interface{}, commonRepresentation interface{}) error
 	FindResourceByKeys(tx *gorm.DB, key bizmodel.ReporterResourceKey) (*bizmodel.Resource, error)
 	GetNextTransactionID() (string, error)
 	GetDB() *gorm.DB
@@ -73,20 +72,8 @@ func (r *resourceRepository) GetNextTransactionID() (string, error) {
 	return txid.String(), nil
 }
 
-func (r *resourceRepository) ReportRepresentations(tx *gorm.DB, reporterRepresentation interface{}, commonRepresentation interface{}) error {
-	if err := tx.Create(reporterRepresentation).Error; err != nil {
-		return fmt.Errorf("failed to save reporter representation: %w", err)
-	}
-
-	if err := tx.Create(commonRepresentation).Error; err != nil {
-		return fmt.Errorf("failed to save common representation: %w", err)
-	}
-
-	return nil
-}
-
 func (r *resourceRepository) Save(tx *gorm.DB, resource bizmodel.Resource, operationType model_legacy.EventOperationType, txid string) error {
-	dataResource, dataReporterResource, dataReporterRepresentation, dataCommonRepresentation, err := resource.Serialize()
+	dataResource, dataReporterResource, _, _, err := resource.Serialize()
 	if err != nil {
 		return fmt.Errorf("failed to serialize resource: %w", err)
 	}
@@ -100,10 +87,6 @@ func (r *resourceRepository) Save(tx *gorm.DB, resource bizmodel.Resource, opera
 	}
 
 	if err := r.handleOutboxEvents(tx, resource.ResourceEvents()[0], operationType, txid); err != nil {
-		return err
-	}
-
-	if err := r.ReportRepresentations(tx, dataReporterRepresentation, dataCommonRepresentation); err != nil {
 		return err
 	}
 
@@ -132,6 +115,7 @@ func (r *resourceRepository) handleOutboxEvents(tx *gorm.DB, resourceEvent bizmo
 func (r *resourceRepository) FindResourceByKeys(tx *gorm.DB, key bizmodel.ReporterResourceKey) (*bizmodel.Resource, error) {
 	var result FindResourceByKeysResult
 
+	//TODO: Fix query to do a self join on reporter_resource and return all reporter_resources with the given resource_id
 	err := tx.Table("reporter_resources AS rr").
 		Select(`
 			rr.id AS reporter_resource_id,
@@ -172,7 +156,7 @@ func (r *resourceRepository) FindResourceByKeys(tx *gorm.DB, key bizmodel.Report
 		result.RepresentationVersion,
 		result.Generation,
 		result.Tombstone,
-		"redhat.com", //TODO: We need to add this default since the domain rule conflicts here
+		"redhat.com",
 		"",
 	)
 	if err != nil {

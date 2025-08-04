@@ -1,27 +1,18 @@
 package model
 
-import "fmt"
-
 type ReporterId struct {
 	reporterType       ReporterType
 	reporterInstanceId ReporterInstanceId
 }
 
-func NewReporter(reporterTypeVal, reporterInstanceIdVal string) (ReporterId, error) {
-	reporterType, err := NewReporterType(reporterTypeVal)
-	if err != nil {
-		return ReporterId{}, fmt.Errorf("ReporterId invalid type: %w", err)
-	}
-
-	reporterInstanceId, err := NewReporterInstanceId(reporterInstanceIdVal)
-	if err != nil {
-		return ReporterId{}, fmt.Errorf("ReporterId invalid instance ID: %w", err)
-	}
-
+func NewReporterId(
+	reporterType ReporterType,
+	reporterInstanceId ReporterInstanceId,
+) ReporterId {
 	return ReporterId{
 		reporterType:       reporterType,
 		reporterInstanceId: reporterInstanceId,
-	}, nil
+	}
 }
 
 func (r ReporterId) ReporterType() string {
@@ -30,4 +21,15 @@ func (r ReporterId) ReporterType() string {
 
 func (r ReporterId) ReporterInstanceId() string {
 	return r.reporterInstanceId.String()
+}
+
+func (r ReporterId) Serialize() (string, string) {
+	return r.reporterType.Serialize(), r.reporterInstanceId.Serialize()
+}
+
+func DeserializeReporterId(reporterType, reporterInstanceId string) ReporterId {
+	return ReporterId{
+		reporterType:       DeserializeReporterType(reporterType),
+		reporterInstanceId: DeserializeReporterInstanceId(reporterInstanceId),
+	}
 }

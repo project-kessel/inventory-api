@@ -218,17 +218,47 @@ func createTestResourceWithLocalId(t *testing.T, localResourceId string) bizmode
 		"labels":       map[string]interface{}{"env": "test"},
 	}
 
+	localResourceIdType, err := bizmodel.NewLocalResourceId(localResourceId)
+	require.NoError(t, err)
+
+	resourceType, err := bizmodel.NewResourceType("k8s_cluster")
+	require.NoError(t, err)
+
+	reporterType, err := bizmodel.NewReporterType("ocm")
+	require.NoError(t, err)
+
+	reporterInstanceId, err := bizmodel.NewReporterInstanceId("ocm-instance-1")
+	require.NoError(t, err)
+
+	apiHref, err := bizmodel.NewApiHref("https://api.example.com/resource/123")
+	require.NoError(t, err)
+
+	consoleHref, err := bizmodel.NewConsoleHref("https://console.example.com/resource/123")
+	require.NoError(t, err)
+
+	reporterRepresentation, err := bizmodel.NewRepresentation(reporterData)
+	require.NoError(t, err)
+
+	commonRepresentation, err := bizmodel.NewRepresentation(commonData)
+	require.NoError(t, err)
+
+	resourceIdType, err := bizmodel.NewResourceId(resourceId)
+	require.NoError(t, err)
+
+	reporterResourceIdType, err := bizmodel.NewReporterResourceId(reporterResourceId)
+	require.NoError(t, err)
+
 	resource, err := bizmodel.NewResource(
-		resourceId,
-		localResourceId,
-		"k8s_cluster",
-		"ocm",
-		"ocm-instance-1",
-		reporterResourceId,
-		"https://api.example.com/resource/123",
-		"https://console.example.com/resource/123",
-		reporterData,
-		commonData,
+		resourceIdType,
+		localResourceIdType,
+		resourceType,
+		reporterType,
+		reporterInstanceId,
+		reporterResourceIdType,
+		apiHref,
+		consoleHref,
+		reporterRepresentation,
+		commonRepresentation,
 	)
 	require.NoError(t, err)
 

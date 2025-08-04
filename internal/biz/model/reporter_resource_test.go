@@ -36,14 +36,14 @@ func TestReporterResource_Initialization(t *testing.T) {
 		t.Parallel()
 
 		reporterResource, err := NewReporterResource(
-			fixture.ValidId,
-			fixture.ValidLocalResourceId,
-			fixture.ValidResourceType,
-			fixture.ValidReporterType,
-			fixture.ValidReporterInstanceId,
-			fixture.ValidResourceId,
-			fixture.ValidApiHref,
-			fixture.ValidConsoleHref,
+			fixture.ValidIdType(),
+			fixture.ValidLocalResourceIdType(),
+			fixture.ValidResourceTypeType(),
+			fixture.ValidReporterTypeType(),
+			fixture.ValidReporterInstanceIdType(),
+			fixture.ValidResourceIdType(),
+			fixture.ValidApiHrefType(),
+			fixture.ValidConsoleHrefType(),
 		)
 
 		assertValidReporterResource(t, reporterResource, err, "valid inputs")
@@ -53,14 +53,14 @@ func TestReporterResource_Initialization(t *testing.T) {
 		t.Parallel()
 
 		reporterResource, err := NewReporterResource(
-			fixture.ValidId,
-			fixture.ValidLocalResourceId,
-			fixture.ValidResourceType,
-			fixture.ValidReporterType,
-			fixture.ValidReporterInstanceId,
-			fixture.ValidResourceId,
-			fixture.ValidApiHref,
-			fixture.EmptyConsoleHref,
+			fixture.ValidIdType(),
+			fixture.ValidLocalResourceIdType(),
+			fixture.ValidResourceTypeType(),
+			fixture.ValidReporterTypeType(),
+			fixture.ValidReporterInstanceIdType(),
+			fixture.ValidResourceIdType(),
+			fixture.ValidApiHrefType(),
+			fixture.EmptyConsoleHrefType(),
 		)
 
 		assertValidReporterResource(t, reporterResource, err, "empty console href")
@@ -70,14 +70,14 @@ func TestReporterResource_Initialization(t *testing.T) {
 		t.Parallel()
 
 		reporterResource, err := NewReporterResource(
-			fixture.NilId,
-			fixture.ValidLocalResourceId,
-			fixture.ValidResourceType,
-			fixture.ValidReporterType,
-			fixture.ValidReporterInstanceId,
-			fixture.ValidResourceId,
-			fixture.ValidApiHref,
-			fixture.ValidConsoleHref,
+			fixture.NilIdType(),
+			fixture.ValidLocalResourceIdType(),
+			fixture.ValidResourceTypeType(),
+			fixture.ValidReporterTypeType(),
+			fixture.ValidReporterInstanceIdType(),
+			fixture.ValidResourceIdType(),
+			fixture.ValidApiHrefType(),
+			fixture.ValidConsoleHrefType(),
 		)
 
 		assertInvalidReporterResource(t, reporterResource, err, "ReporterResource invalid ID")
@@ -87,14 +87,14 @@ func TestReporterResource_Initialization(t *testing.T) {
 		t.Parallel()
 
 		reporterResource, err := NewReporterResource(
-			fixture.ValidId,
-			fixture.EmptyLocalResourceId,
-			fixture.ValidResourceType,
-			fixture.ValidReporterType,
-			fixture.ValidReporterInstanceId,
-			fixture.ValidResourceId,
-			fixture.ValidApiHref,
-			fixture.ValidConsoleHref,
+			fixture.ValidIdType(),
+			fixture.EmptyLocalResourceIdType(),
+			fixture.ValidResourceTypeType(),
+			fixture.ValidReporterTypeType(),
+			fixture.ValidReporterInstanceIdType(),
+			fixture.ValidResourceIdType(),
+			fixture.ValidApiHrefType(),
+			fixture.ValidConsoleHrefType(),
 		)
 
 		assertInvalidReporterResource(t, reporterResource, err, "ReporterResource invalid key")
@@ -104,14 +104,14 @@ func TestReporterResource_Initialization(t *testing.T) {
 		t.Parallel()
 
 		reporterResource, err := NewReporterResource(
-			fixture.ValidId,
-			fixture.WhitespaceLocalResourceId,
-			fixture.ValidResourceType,
-			fixture.ValidReporterType,
-			fixture.ValidReporterInstanceId,
-			fixture.ValidResourceId,
-			fixture.ValidApiHref,
-			fixture.ValidConsoleHref,
+			fixture.ValidIdType(),
+			fixture.WhitespaceLocalResourceIdType(),
+			fixture.ValidResourceTypeType(),
+			fixture.ValidReporterTypeType(),
+			fixture.ValidReporterInstanceIdType(),
+			fixture.ValidResourceIdType(),
+			fixture.ValidApiHrefType(),
+			fixture.ValidConsoleHrefType(),
 		)
 
 		assertInvalidReporterResource(t, reporterResource, err, "LocalResourceId cannot be empty")
@@ -121,14 +121,14 @@ func TestReporterResource_Initialization(t *testing.T) {
 		t.Parallel()
 
 		reporterResource, err := NewReporterResource(
-			fixture.ValidId,
-			fixture.ValidLocalResourceId,
-			fixture.EmptyResourceType,
-			fixture.ValidReporterType,
-			fixture.ValidReporterInstanceId,
-			fixture.ValidResourceId,
-			fixture.ValidApiHref,
-			fixture.ValidConsoleHref,
+			fixture.ValidIdType(),
+			fixture.ValidLocalResourceIdType(),
+			fixture.EmptyResourceTypeType(),
+			fixture.ValidReporterTypeType(),
+			fixture.ValidReporterInstanceIdType(),
+			fixture.ValidResourceIdType(),
+			fixture.ValidApiHrefType(),
+			fixture.ValidConsoleHrefType(),
 		)
 
 		assertInvalidReporterResource(t, reporterResource, err, "ResourceType cannot be empty")
@@ -138,14 +138,14 @@ func TestReporterResource_Initialization(t *testing.T) {
 		t.Parallel()
 
 		reporterResource, err := NewReporterResource(
-			fixture.ValidId,
-			fixture.ValidLocalResourceId,
-			fixture.WhitespaceResourceType,
-			fixture.ValidReporterType,
-			fixture.ValidReporterInstanceId,
-			fixture.ValidResourceId,
-			fixture.ValidApiHref,
-			fixture.ValidConsoleHref,
+			fixture.ValidIdType(),
+			fixture.ValidLocalResourceIdType(),
+			fixture.WhitespaceResourceTypeType(),
+			fixture.ValidReporterTypeType(),
+			fixture.ValidReporterInstanceIdType(),
+			fixture.ValidResourceIdType(),
+			fixture.ValidApiHrefType(),
+			fixture.ValidConsoleHrefType(),
 		)
 
 		assertInvalidReporterResource(t, reporterResource, err, "ResourceType cannot be empty")
@@ -155,14 +155,14 @@ func TestReporterResource_Initialization(t *testing.T) {
 		t.Parallel()
 
 		reporterResource, err := NewReporterResource(
-			fixture.ValidId,
-			fixture.ValidLocalResourceId,
-			fixture.ValidResourceType,
-			fixture.EmptyReporterType,
-			fixture.ValidReporterInstanceId,
-			fixture.ValidResourceId,
-			fixture.ValidApiHref,
-			fixture.ValidConsoleHref,
+			fixture.ValidIdType(),
+			fixture.ValidLocalResourceIdType(),
+			fixture.ValidResourceTypeType(),
+			fixture.EmptyReporterTypeType(),
+			fixture.ValidReporterInstanceIdType(),
+			fixture.ValidResourceIdType(),
+			fixture.ValidApiHrefType(),
+			fixture.ValidConsoleHrefType(),
 		)
 
 		assertInvalidReporterResource(t, reporterResource, err, "ReportedByReporterType cannot be empty")
@@ -172,14 +172,14 @@ func TestReporterResource_Initialization(t *testing.T) {
 		t.Parallel()
 
 		reporterResource, err := NewReporterResource(
-			fixture.ValidId,
-			fixture.ValidLocalResourceId,
-			fixture.ValidResourceType,
-			fixture.WhitespaceReporterType,
-			fixture.ValidReporterInstanceId,
-			fixture.ValidResourceId,
-			fixture.ValidApiHref,
-			fixture.ValidConsoleHref,
+			fixture.ValidIdType(),
+			fixture.ValidLocalResourceIdType(),
+			fixture.ValidResourceTypeType(),
+			fixture.WhitespaceReporterTypeType(),
+			fixture.ValidReporterInstanceIdType(),
+			fixture.ValidResourceIdType(),
+			fixture.ValidApiHrefType(),
+			fixture.ValidConsoleHrefType(),
 		)
 
 		assertInvalidReporterResource(t, reporterResource, err, "ReportedByReporterType cannot be empty")
@@ -189,14 +189,14 @@ func TestReporterResource_Initialization(t *testing.T) {
 		t.Parallel()
 
 		reporterResource, err := NewReporterResource(
-			fixture.ValidId,
-			fixture.ValidLocalResourceId,
-			fixture.ValidResourceType,
-			fixture.ValidReporterType,
-			fixture.EmptyReporterInstanceId,
-			fixture.ValidResourceId,
-			fixture.ValidApiHref,
-			fixture.ValidConsoleHref,
+			fixture.ValidIdType(),
+			fixture.ValidLocalResourceIdType(),
+			fixture.ValidResourceTypeType(),
+			fixture.ValidReporterTypeType(),
+			fixture.EmptyReporterInstanceIdType(),
+			fixture.ValidResourceIdType(),
+			fixture.ValidApiHrefType(),
+			fixture.ValidConsoleHrefType(),
 		)
 
 		assertInvalidReporterResource(t, reporterResource, err, "ReporterInstanceId cannot be empty")
@@ -206,14 +206,14 @@ func TestReporterResource_Initialization(t *testing.T) {
 		t.Parallel()
 
 		reporterResource, err := NewReporterResource(
-			fixture.ValidId,
-			fixture.ValidLocalResourceId,
-			fixture.ValidResourceType,
-			fixture.ValidReporterType,
-			fixture.WhitespaceReporterInstanceId,
-			fixture.ValidResourceId,
-			fixture.ValidApiHref,
-			fixture.ValidConsoleHref,
+			fixture.ValidIdType(),
+			fixture.ValidLocalResourceIdType(),
+			fixture.ValidResourceTypeType(),
+			fixture.ValidReporterTypeType(),
+			fixture.WhitespaceReporterInstanceIdType(),
+			fixture.ValidResourceIdType(),
+			fixture.ValidApiHrefType(),
+			fixture.ValidConsoleHrefType(),
 		)
 
 		assertInvalidReporterResource(t, reporterResource, err, "ReporterInstanceId cannot be empty")
@@ -223,14 +223,14 @@ func TestReporterResource_Initialization(t *testing.T) {
 		t.Parallel()
 
 		reporterResource, err := NewReporterResource(
-			fixture.ValidId,
-			fixture.ValidLocalResourceId,
-			fixture.ValidResourceType,
-			fixture.ValidReporterType,
-			fixture.ValidReporterInstanceId,
-			fixture.NilResourceId,
-			fixture.ValidApiHref,
-			fixture.ValidConsoleHref,
+			fixture.ValidIdType(),
+			fixture.ValidLocalResourceIdType(),
+			fixture.ValidResourceTypeType(),
+			fixture.ValidReporterTypeType(),
+			fixture.ValidReporterInstanceIdType(),
+			fixture.NilResourceIdType(),
+			fixture.ValidApiHrefType(),
+			fixture.ValidConsoleHrefType(),
 		)
 
 		assertInvalidReporterResource(t, reporterResource, err, "ResourceId cannot be empty")
@@ -240,14 +240,14 @@ func TestReporterResource_Initialization(t *testing.T) {
 		t.Parallel()
 
 		reporterResource, err := NewReporterResource(
-			fixture.ValidId,
-			fixture.ValidLocalResourceId,
-			fixture.ValidResourceType,
-			fixture.ValidReporterType,
-			fixture.ValidReporterInstanceId,
-			fixture.ValidResourceId,
-			fixture.EmptyApiHref,
-			fixture.ValidConsoleHref,
+			fixture.ValidIdType(),
+			fixture.ValidLocalResourceIdType(),
+			fixture.ValidResourceTypeType(),
+			fixture.ValidReporterTypeType(),
+			fixture.ValidReporterInstanceIdType(),
+			fixture.ValidResourceIdType(),
+			fixture.EmptyApiHrefType(),
+			fixture.ValidConsoleHrefType(),
 		)
 
 		assertInvalidReporterResource(t, reporterResource, err, "ApiHref cannot be empty")
@@ -257,14 +257,14 @@ func TestReporterResource_Initialization(t *testing.T) {
 		t.Parallel()
 
 		reporterResource, err := NewReporterResource(
-			fixture.ValidId,
-			fixture.ValidLocalResourceId,
-			fixture.ValidResourceType,
-			fixture.ValidReporterType,
-			fixture.ValidReporterInstanceId,
-			fixture.ValidResourceId,
-			fixture.WhitespaceApiHref,
-			fixture.ValidConsoleHref,
+			fixture.ValidIdType(),
+			fixture.ValidLocalResourceIdType(),
+			fixture.ValidResourceTypeType(),
+			fixture.ValidReporterTypeType(),
+			fixture.ValidReporterInstanceIdType(),
+			fixture.ValidResourceIdType(),
+			fixture.WhitespaceApiHrefType(),
+			fixture.ValidConsoleHrefType(),
 		)
 
 		assertInvalidReporterResource(t, reporterResource, err, "ApiHref cannot be empty")
@@ -274,14 +274,14 @@ func TestReporterResource_Initialization(t *testing.T) {
 		t.Parallel()
 
 		reporterResource, err := NewReporterResource(
-			fixture.ValidId,
-			fixture.ValidLocalResourceIdUUID,
-			fixture.ValidResourceType,
-			fixture.ValidReporterType,
-			fixture.ValidReporterInstanceId,
-			fixture.ValidResourceId,
-			fixture.ValidApiHref,
-			fixture.ValidConsoleHref,
+			fixture.ValidIdType(),
+			fixture.ValidLocalResourceIdUUIDType(),
+			fixture.ValidResourceTypeType(),
+			fixture.ValidReporterTypeType(),
+			fixture.ValidReporterInstanceIdType(),
+			fixture.ValidResourceIdType(),
+			fixture.ValidApiHrefType(),
+			fixture.ValidConsoleHrefType(),
 		)
 
 		assertValidReporterResource(t, reporterResource, err, "UUID format local resource ID")
@@ -291,14 +291,14 @@ func TestReporterResource_Initialization(t *testing.T) {
 		t.Parallel()
 
 		reporterResource, err := NewReporterResource(
-			fixture.ValidId,
-			fixture.ValidLocalResourceIdString,
-			fixture.ValidResourceType,
-			fixture.ValidReporterType,
-			fixture.ValidReporterInstanceId,
-			fixture.ValidResourceId,
-			fixture.ValidApiHref,
-			fixture.ValidConsoleHref,
+			fixture.ValidIdType(),
+			fixture.ValidLocalResourceIdStringType(),
+			fixture.ValidResourceTypeType(),
+			fixture.ValidReporterTypeType(),
+			fixture.ValidReporterInstanceIdType(),
+			fixture.ValidResourceIdType(),
+			fixture.ValidApiHrefType(),
+			fixture.ValidConsoleHrefType(),
 		)
 
 		assertValidReporterResource(t, reporterResource, err, "string format local resource ID")
@@ -313,14 +313,14 @@ func TestReporterResource_Id(t *testing.T) {
 		t.Parallel()
 
 		reporterResource, err := NewReporterResource(
-			fixture.ValidId,
-			fixture.ValidLocalResourceId,
-			fixture.ValidResourceType,
-			fixture.ValidReporterType,
-			fixture.ValidReporterInstanceId,
-			fixture.ValidResourceId,
-			fixture.ValidApiHref,
-			fixture.ValidConsoleHref,
+			fixture.ValidIdType(),
+			fixture.ValidLocalResourceIdType(),
+			fixture.ValidResourceTypeType(),
+			fixture.ValidReporterTypeType(),
+			fixture.ValidReporterInstanceIdType(),
+			fixture.ValidResourceIdType(),
+			fixture.ValidApiHrefType(),
+			fixture.ValidConsoleHrefType(),
 		)
 
 		if err != nil {
@@ -329,7 +329,7 @@ func TestReporterResource_Id(t *testing.T) {
 
 		id := reporterResource.Id()
 		if id.UUID() != fixture.ValidId {
-			t.Errorf("Expected ID %v, got %v", fixture.ValidId, id.UUID())
+			t.Errorf("Expected ID %v, got %v", fixture.ValidIdType(), id.UUID())
 		}
 	})
 }
@@ -342,14 +342,14 @@ func TestReporterResource_Key(t *testing.T) {
 		t.Parallel()
 
 		reporterResource, err := NewReporterResource(
-			fixture.ValidId,
-			fixture.ValidLocalResourceId,
-			fixture.ValidResourceType,
-			fixture.ValidReporterType,
-			fixture.ValidReporterInstanceId,
-			fixture.ValidResourceId,
-			fixture.ValidApiHref,
-			fixture.ValidConsoleHref,
+			fixture.ValidIdType(),
+			fixture.ValidLocalResourceIdType(),
+			fixture.ValidResourceTypeType(),
+			fixture.ValidReporterTypeType(),
+			fixture.ValidReporterInstanceIdType(),
+			fixture.ValidResourceIdType(),
+			fixture.ValidApiHrefType(),
+			fixture.ValidConsoleHrefType(),
 		)
 
 		if err != nil {
@@ -358,16 +358,16 @@ func TestReporterResource_Key(t *testing.T) {
 
 		key := reporterResource.Key()
 		if key.LocalResourceId() != fixture.ValidLocalResourceId {
-			t.Errorf("Expected LocalResourceId %s, got %s", fixture.ValidLocalResourceId, key.LocalResourceId())
+			t.Errorf("Expected LocalResourceId %s, got %s", fixture.ValidLocalResourceIdType(), key.LocalResourceId())
 		}
 		if key.ResourceType() != fixture.ValidResourceType {
-			t.Errorf("Expected ResourceType %s, got %s", fixture.ValidResourceType, key.ResourceType())
+			t.Errorf("Expected ResourceType %s, got %s", fixture.ValidResourceTypeType(), key.ResourceType())
 		}
 		if key.ReporterType() != fixture.ValidReporterType {
-			t.Errorf("Expected ReporterType %s, got %s", fixture.ValidReporterType, key.ReporterType())
+			t.Errorf("Expected ReporterType %s, got %s", fixture.ValidReporterTypeType(), key.ReporterType())
 		}
 		if key.ReporterInstanceId() != fixture.ValidReporterInstanceId {
-			t.Errorf("Expected ReporterInstanceId %s, got %s", fixture.ValidReporterInstanceId, key.ReporterInstanceId())
+			t.Errorf("Expected ReporterInstanceId %s, got %s", fixture.ValidReporterInstanceIdType(), key.ReporterInstanceId())
 		}
 	})
 }
@@ -380,34 +380,36 @@ func TestReporterResource_Update(t *testing.T) {
 		t.Parallel()
 
 		original, err := NewReporterResource(
-			fixture.ValidId,
-			fixture.ValidLocalResourceId,
-			fixture.ValidResourceType,
-			fixture.ValidReporterType,
-			fixture.ValidReporterInstanceId,
-			fixture.ValidResourceId,
-			fixture.ValidApiHref,
-			fixture.ValidConsoleHref,
+			fixture.ValidIdType(),
+			fixture.ValidLocalResourceIdType(),
+			fixture.ValidResourceTypeType(),
+			fixture.ValidReporterTypeType(),
+			fixture.ValidReporterInstanceIdType(),
+			fixture.ValidResourceIdType(),
+			fixture.ValidApiHrefType(),
+			fixture.ValidConsoleHrefType(),
 		)
 
 		if err != nil {
 			t.Fatalf("Expected no error creating ReporterResource, got %v", err)
 		}
 
-		newApiHref := "https://api.example.com/updated"
-		newConsoleHref := "https://console.example.com/updated"
-
-		updated, err := original.Update(newApiHref, newConsoleHref)
-
+		newApiHref, err := NewApiHref("https://api.example.com/updated")
 		if err != nil {
-			t.Fatalf("Expected no error updating ReporterResource, got %v", err)
+			t.Fatalf("Failed to create API href: %v", err)
+		}
+		newConsoleHref, err := NewConsoleHref("https://console.example.com/updated")
+		if err != nil {
+			t.Fatalf("Failed to create console href: %v", err)
 		}
 
-		if updated.apiHref.String() != newApiHref {
-			t.Errorf("Expected updated apiHref %s, got %s", newApiHref, updated.apiHref.String())
+		original.Update(newApiHref, newConsoleHref)
+
+		if original.apiHref.String() != newApiHref.String() {
+			t.Errorf("Expected updated apiHref %s, got %s", newApiHref.String(), original.apiHref.String())
 		}
-		if updated.consoleHref.String() != newConsoleHref {
-			t.Errorf("Expected updated consoleHref %s, got %s", newConsoleHref, updated.consoleHref.String())
+		if original.consoleHref.String() != newConsoleHref.String() {
+			t.Errorf("Expected updated consoleHref %s, got %s", newConsoleHref.String(), original.consoleHref.String())
 		}
 	})
 
@@ -415,14 +417,14 @@ func TestReporterResource_Update(t *testing.T) {
 		t.Parallel()
 
 		original, err := NewReporterResource(
-			fixture.ValidId,
-			fixture.ValidLocalResourceId,
-			fixture.ValidResourceType,
-			fixture.ValidReporterType,
-			fixture.ValidReporterInstanceId,
-			fixture.ValidResourceId,
-			fixture.ValidApiHref,
-			fixture.ValidConsoleHref,
+			fixture.ValidIdType(),
+			fixture.ValidLocalResourceIdType(),
+			fixture.ValidResourceTypeType(),
+			fixture.ValidReporterTypeType(),
+			fixture.ValidReporterInstanceIdType(),
+			fixture.ValidResourceIdType(),
+			fixture.ValidApiHrefType(),
+			fixture.ValidConsoleHrefType(),
 		)
 
 		if err != nil {
@@ -431,15 +433,20 @@ func TestReporterResource_Update(t *testing.T) {
 
 		originalVersion := original.representationVersion.Uint()
 
-		updated, err := original.Update("https://api.example.com/updated", "https://console.example.com/updated")
-
+		newApiHref, err := NewApiHref("https://api.example.com/updated")
 		if err != nil {
-			t.Fatalf("Expected no error updating ReporterResource, got %v", err)
+			t.Fatalf("Failed to create API href: %v", err)
+		}
+		newConsoleHref, err := NewConsoleHref("https://console.example.com/updated")
+		if err != nil {
+			t.Fatalf("Failed to create console href: %v", err)
 		}
 
+		original.Update(newApiHref, newConsoleHref)
+
 		expectedVersion := originalVersion + 1
-		if updated.representationVersion.Uint() != expectedVersion {
-			t.Errorf("Expected representation version %d, got %d", expectedVersion, updated.representationVersion.Uint())
+		if original.representationVersion.Uint() != expectedVersion {
+			t.Errorf("Expected representation version %d, got %d", expectedVersion, original.representationVersion.Uint())
 		}
 	})
 
@@ -447,39 +454,51 @@ func TestReporterResource_Update(t *testing.T) {
 		t.Parallel()
 
 		original, err := NewReporterResource(
-			fixture.ValidId,
-			fixture.ValidLocalResourceId,
-			fixture.ValidResourceType,
-			fixture.ValidReporterType,
-			fixture.ValidReporterInstanceId,
-			fixture.ValidResourceId,
-			fixture.ValidApiHref,
-			fixture.ValidConsoleHref,
+			fixture.ValidIdType(),
+			fixture.ValidLocalResourceIdType(),
+			fixture.ValidResourceTypeType(),
+			fixture.ValidReporterTypeType(),
+			fixture.ValidReporterInstanceIdType(),
+			fixture.ValidResourceIdType(),
+			fixture.ValidApiHrefType(),
+			fixture.ValidConsoleHrefType(),
 		)
 
 		if err != nil {
 			t.Fatalf("Expected no error creating ReporterResource, got %v", err)
 		}
 
-		updated, err := original.Update("https://api.example.com/updated", "https://console.example.com/updated")
+		// Store original values to check they remain unchanged
+		originalId := original.id
+		originalKey := original.ReporterResourceKey
+		originalResourceId := original.resourceID
+		originalGeneration := original.generation
+		originalTombstone := original.tombstone
 
+		newApiHref, err := NewApiHref("https://api.example.com/updated")
 		if err != nil {
-			t.Fatalf("Expected no error updating ReporterResource, got %v", err)
+			t.Fatalf("Failed to create API href: %v", err)
+		}
+		newConsoleHref, err := NewConsoleHref("https://console.example.com/updated")
+		if err != nil {
+			t.Fatalf("Failed to create console href: %v", err)
 		}
 
-		if updated.id != original.id {
+		original.Update(newApiHref, newConsoleHref)
+
+		if original.id != originalId {
 			t.Errorf("Expected ID to remain unchanged")
 		}
-		if updated.ReporterResourceKey != original.ReporterResourceKey {
+		if original.ReporterResourceKey != originalKey {
 			t.Errorf("Expected ReporterResourceKey to remain unchanged")
 		}
-		if updated.resourceID != original.resourceID {
+		if original.resourceID != originalResourceId {
 			t.Errorf("Expected resourceID to remain unchanged")
 		}
-		if updated.generation != original.generation {
+		if original.generation != originalGeneration {
 			t.Errorf("Expected generation to remain unchanged")
 		}
-		if updated.tombstone != original.tombstone {
+		if original.tombstone != originalTombstone {
 			t.Errorf("Expected tombstone to remain unchanged")
 		}
 	})
@@ -488,94 +507,66 @@ func TestReporterResource_Update(t *testing.T) {
 		t.Parallel()
 
 		original, err := NewReporterResource(
-			fixture.ValidId,
-			fixture.ValidLocalResourceId,
-			fixture.ValidResourceType,
-			fixture.ValidReporterType,
-			fixture.ValidReporterInstanceId,
-			fixture.ValidResourceId,
-			fixture.ValidApiHref,
-			fixture.ValidConsoleHref,
+			fixture.ValidIdType(),
+			fixture.ValidLocalResourceIdType(),
+			fixture.ValidResourceTypeType(),
+			fixture.ValidReporterTypeType(),
+			fixture.ValidReporterInstanceIdType(),
+			fixture.ValidResourceIdType(),
+			fixture.ValidApiHrefType(),
+			fixture.ValidConsoleHrefType(),
 		)
 
 		if err != nil {
 			t.Fatalf("Expected no error creating ReporterResource, got %v", err)
 		}
 
-		newApiHref := "https://api.example.com/updated"
-		emptyConsoleHref := ""
-
-		updated, err := original.Update(newApiHref, emptyConsoleHref)
-
+		newApiHref, err := NewApiHref("https://api.example.com/updated")
 		if err != nil {
-			t.Fatalf("Expected no error updating ReporterResource, got %v", err)
+			t.Fatalf("Failed to create API href: %v", err)
+		}
+		emptyConsoleHref, err := NewConsoleHref("")
+		if err != nil {
+			t.Fatalf("Failed to create console href: %v", err)
 		}
 
-		if updated.apiHref.String() != newApiHref {
-			t.Errorf("Expected updated apiHref %s, got %s", newApiHref, updated.apiHref.String())
+		original.Update(newApiHref, emptyConsoleHref)
+
+		if original.apiHref.String() != newApiHref.String() {
+			t.Errorf("Expected updated apiHref %s, got %s", newApiHref.String(), original.apiHref.String())
 		}
-		if updated.consoleHref.String() != "" {
-			t.Errorf("Expected empty consoleHref, got %s", updated.consoleHref.String())
+		if original.consoleHref.String() != "" {
+			t.Errorf("Expected empty consoleHref, got %s", original.consoleHref.String())
 		}
 	})
 
-	t.Run("should return error for invalid apiHref", func(t *testing.T) {
+	t.Run("should validate apiHref before update", func(t *testing.T) {
 		t.Parallel()
-
-		original, err := NewReporterResource(
-			fixture.ValidId,
-			fixture.ValidLocalResourceId,
-			fixture.ValidResourceType,
-			fixture.ValidReporterType,
-			fixture.ValidReporterInstanceId,
-			fixture.ValidResourceId,
-			fixture.ValidApiHref,
-			fixture.ValidConsoleHref,
-		)
-
-		if err != nil {
-			t.Fatalf("Expected no error creating ReporterResource, got %v", err)
-		}
 
 		invalidApiHref := ""
 
-		_, err = original.Update(invalidApiHref, "https://console.example.com/updated")
+		_, err := NewApiHref(invalidApiHref)
 
 		if err == nil {
 			t.Error("Expected error for invalid apiHref, got none")
 		}
-		if !strings.Contains(err.Error(), "API href") {
-			t.Errorf("Expected error about API href, got %v", err)
+		if !strings.Contains(err.Error(), "ApiHref") {
+			t.Errorf("Expected error about ApiHref, got %v", err)
 		}
 	})
 
-	t.Run("should return error for invalid consoleHref", func(t *testing.T) {
+	t.Run("should accept all consoleHref values", func(t *testing.T) {
 		t.Parallel()
 
-		original, err := NewReporterResource(
-			fixture.ValidId,
-			fixture.ValidLocalResourceId,
-			fixture.ValidResourceType,
-			fixture.ValidReporterType,
-			fixture.ValidReporterInstanceId,
-			fixture.ValidResourceId,
-			fixture.ValidApiHref,
-			fixture.ValidConsoleHref,
-		)
+		whitespaceConsoleHref := "   "
+
+		consoleHref, err := NewConsoleHref(whitespaceConsoleHref)
 
 		if err != nil {
-			t.Fatalf("Expected no error creating ReporterResource, got %v", err)
+			t.Errorf("Expected no error for whitespace consoleHref, got %v", err)
 		}
-
-		invalidConsoleHref := "   "
-
-		_, err = original.Update("https://api.example.com/updated", invalidConsoleHref)
-
-		if err == nil {
-			t.Error("Expected error for invalid consoleHref, got none")
-		}
-		if !strings.Contains(err.Error(), "console href") {
-			t.Errorf("Expected error about console href, got %v", err)
+		if consoleHref.String() != "" {
+			t.Errorf("Expected trimmed empty string, got %s", consoleHref.String())
 		}
 	})
 }

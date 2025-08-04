@@ -36,15 +36,22 @@ func NewCommonRepresentation(
 		return CommonRepresentation{}, fmt.Errorf("CommonRepresentation invalid resource ID: %w", err)
 	}
 
-	reporter, err := NewReporter(reporterTypeVal, reporterInstanceIdVal)
+	reporterType, err := NewReporterType(reporterTypeVal)
 	if err != nil {
-		return CommonRepresentation{}, fmt.Errorf("CommonRepresentation invalid reporter: %w", err)
+		return CommonRepresentation{}, fmt.Errorf("CommonRepresentation invalid reporter type: %w", err)
 	}
+
+	reporterInstanceId, err := NewReporterInstanceId(reporterInstanceIdVal)
+	if err != nil {
+		return CommonRepresentation{}, fmt.Errorf("CommonRepresentation invalid reporter instance ID: %w", err)
+	}
+
+	reporter := NewReporterId(reporterType, reporterInstanceId)
 
 	version := NewVersion(versionVal)
 
 	return CommonRepresentation{
-		Representation: Representation{data: data},
+		Representation: Representation(data),
 		resourceId:     resourceId,
 		version:        version,
 		reporter:       reporter,
@@ -52,11 +59,27 @@ func NewCommonRepresentation(
 }
 
 func (cr CommonRepresentation) Serialize() (*datamodel.CommonRepresentation, error) {
+	reporterType, reporterInstanceId := cr.reporter.Serialize()
 	return datamodel.NewCommonRepresentation(
-		uuid.UUID(cr.resourceId),
-		internal.JsonObject(cr.data),
-		uint(cr.version),
-		cr.reporter.reporterType.String(),
-		cr.reporter.reporterInstanceId.String(),
+		cr.resourceId.Serialize(),
+		cr.Representation.Serialize(),
+		cr.version.Serialize(),
+		reporterType,
+		reporterInstanceId,
 	)
+}
+
+func DeserializeCommonRepresentation(
+	resourceIdVal uuid.UUID,
+	data internal.JsonObject,
+	versionVal uint,
+	reporterTypeVal string,
+	reporterInstanceIdVal string,
+) CommonRepresentation {
+	return CommonRepresentation{
+		Representation: DeserializeRepresentation(data),
+		resourceId:     DeserializeResourceId(resourceIdVal),
+		version:        DeserializeVersion(versionVal),
+		reporter:       DeserializeReporterId(reporterTypeVal, reporterInstanceIdVal),
+	}
 }

@@ -139,18 +139,65 @@ func (uc *Usecase) createResource(tx *gorm.DB, request *v1beta2.ReportResourceRe
 		return err
 	}
 
-	resource, err := model.NewResource(
-		resourceId.UUID(),
-		request.GetRepresentations().GetMetadata().GetLocalResourceId(),
-		request.GetType(),
-		request.GetReporterType(),
-		request.GetReporterInstanceId(),
-		reporterResourceId.UUID(),
-		request.GetRepresentations().GetMetadata().GetApiHref(),
-		request.GetRepresentations().GetMetadata().GetConsoleHref(),
-		request.GetRepresentations().GetReporter().AsMap(),
-		request.GetRepresentations().GetCommon().AsMap())
+	localResourceId, err := model.NewLocalResourceId(request.GetRepresentations().GetMetadata().GetLocalResourceId())
 	if err != nil {
+		return fmt.Errorf("invalid local resource ID: %w", err)
+	}
+
+	resourceType, err := model.NewResourceType(request.GetType())
+	if err != nil {
+		return fmt.Errorf("invalid resource type: %w", err)
+	}
+
+	reporterType, err := model.NewReporterType(request.GetReporterType())
+	if err != nil {
+		return fmt.Errorf("invalid reporter type: %w", err)
+	}
+
+	reporterInstanceId, err := model.NewReporterInstanceId(request.GetReporterInstanceId())
+	if err != nil {
+		return fmt.Errorf("invalid reporter instance ID: %w", err)
+	}
+
+	apiHref, err := model.NewApiHref(request.GetRepresentations().GetMetadata().GetApiHref())
+	if err != nil {
+		return fmt.Errorf("invalid API href: %w", err)
+	}
+
+	var consoleHref model.ConsoleHref
+	if consoleHrefVal := request.GetRepresentations().GetMetadata().GetConsoleHref(); consoleHrefVal != "" {
+		consoleHref, err = model.NewConsoleHref(consoleHrefVal)
+		if err != nil {
+			return fmt.Errorf("invalid console href: %w", err)
+		}
+	}
+
+	reporterRepresentation, err := model.NewRepresentation(request.GetRepresentations().GetReporter().AsMap())
+	if err != nil {
+		return fmt.Errorf("invalid reporter representation: %w", err)
+	}
+
+	commonRepresentation, err := model.NewRepresentation(request.GetRepresentations().GetCommon().AsMap())
+	if err != nil {
+		return fmt.Errorf("invalid common representation: %w", err)
+	}
+
+	resource, err := model.NewResource(
+		resourceId,
+		localResourceId,
+		resourceType,
+		reporterType,
+		reporterInstanceId,
+		reporterResourceId,
+		apiHref,
+		consoleHref,
+		reporterRepresentation,
+		commonRepresentation)
+	if err != nil {
+		return err
+	}
+
+	if err := uc.reportRepresentations(tx, resource); err != nil {
 		return err
 	}
 
@@ -158,11 +205,31 @@ func (uc *Usecase) createResource(tx *gorm.DB, request *v1beta2.ReportResourceRe
 }
 
 func getReporterResourceKeyFromRequest(request *v1beta2.ReportResourceRequest) (model.ReporterResourceKey, error) {
+	localResourceId, err := model.NewLocalResourceId(request.GetRepresentations().GetMetadata().GetLocalResourceId())
+	if err != nil {
+		return model.ReporterResourceKey{}, fmt.Errorf("invalid local resource ID: %w", err)
+	}
+
+	resourceType, err := model.NewResourceType(request.GetType())
+	if err != nil {
+		return model.ReporterResourceKey{}, fmt.Errorf("invalid resource type: %w", err)
+	}
+
+	reporterType, err := model.NewReporterType(request.GetReporterType())
+	if err != nil {
+		return model.ReporterResourceKey{}, fmt.Errorf("invalid reporter type: %w", err)
+	}
+
+	reporterInstanceId, err := model.NewReporterInstanceId(request.GetReporterInstanceId())
+	if err != nil {
+		return model.ReporterResourceKey{}, fmt.Errorf("invalid reporter instance ID: %w", err)
+	}
+
 	return model.NewReporterResourceKey(
-		request.GetRepresentations().GetMetadata().GetLocalResourceId(),
-		request.GetType(),
-		request.GetReporterType(),
-		request.GetReporterInstanceId(),
+		localResourceId,
+		resourceType,
+		reporterType,
+		reporterInstanceId,
 	)
 }
 
@@ -172,7 +239,7 @@ func (uc *Usecase) updateResource(tx *gorm.DB, request *v1beta2.ReportResourceRe
 		return err
 	}
 
-	updatedResource, err := existingResource.Update(
+	err = existingResource.Update(
 		reporterResourceKey,
 		apiHref,
 		consoleHref,
@@ -184,43 +251,78 @@ func (uc *Usecase) updateResource(tx *gorm.DB, request *v1beta2.ReportResourceRe
 		return fmt.Errorf("failed to update resource: %w", err)
 	}
 
+	if err := uc.reportRepresentations(tx, *existingResource); err != nil {
+		return err
+	}
+
 	// Save the updated resource to the repository
-	return uc.resourceRepository.Save(tx, updatedResource, model_legacy.OperationTypeUpdated, txidStr)
+	return uc.resourceRepository.Save(tx, *existingResource, model_legacy.OperationTypeUpdated, txidStr)
 }
 
 func extractUpdateDataFromRequest(request *v1beta2.ReportResourceRequest) (
 	model.ReporterResourceKey,
-	string,
-	string,
-	*string,
-	map[string]interface{},
-	map[string]interface{},
+	model.ApiHref,
+	model.ConsoleHref,
+	*model.ReporterVersion,
+	model.Representation,
+	model.Representation,
 	error,
 ) {
 	reporterResourceKey, err := getReporterResourceKeyFromRequest(request)
 	if err != nil {
-		return model.ReporterResourceKey{}, "", "", nil, nil, nil, fmt.Errorf("failed to create reporter resource key: %w", err)
+		return model.ReporterResourceKey{}, "", "", nil, model.Representation(nil), model.Representation(nil), fmt.Errorf("failed to create reporter resource key: %w", err)
 	}
 
-	apiHref := request.GetRepresentations().GetMetadata().GetApiHref()
-	consoleHref := request.GetRepresentations().GetMetadata().GetConsoleHref()
+	apiHref, err := model.NewApiHref(request.GetRepresentations().GetMetadata().GetApiHref())
+	if err != nil {
+		return model.ReporterResourceKey{}, "", "", nil, model.Representation(nil), model.Representation(nil), fmt.Errorf("invalid API href: %w", err)
+	}
 
-	var reporterVersion *string
+	var consoleHref model.ConsoleHref
+	if consoleHrefVal := request.GetRepresentations().GetMetadata().GetConsoleHref(); consoleHrefVal != "" {
+		consoleHref, err = model.NewConsoleHref(consoleHrefVal)
+		if err != nil {
+			return model.ReporterResourceKey{}, "", "", nil, model.Representation(nil), model.Representation(nil), fmt.Errorf("invalid console href: %w", err)
+		}
+	}
+
+	var reporterVersion *model.ReporterVersion
 	if reporterVersionValue := request.GetRepresentations().GetMetadata().GetReporterVersion(); reporterVersionValue != "" {
-		reporterVersion = &reporterVersionValue
+		rv, err := model.NewReporterVersion(reporterVersionValue)
+		if err != nil {
+			return model.ReporterResourceKey{}, "", "", nil, model.Representation(nil), model.Representation(nil), fmt.Errorf("invalid reporter version: %w", err)
+		}
+		reporterVersion = &rv
 	}
 
-	var commonData map[string]interface{}
-	if request.GetRepresentations().GetCommon() != nil {
-		commonData = request.GetRepresentations().GetCommon().AsMap()
+	commonRepresentation, err := model.NewRepresentation(request.GetRepresentations().GetCommon().AsMap())
+	if err != nil {
+		return model.ReporterResourceKey{}, "", "", nil, model.Representation(nil), model.Representation(nil), fmt.Errorf("invalid common data: %w", err)
 	}
 
-	var reporterData map[string]interface{}
-	if request.GetRepresentations().GetReporter() != nil {
-		reporterData = request.GetRepresentations().GetReporter().AsMap()
+	reporterRepresentation, err := model.NewRepresentation(request.GetRepresentations().GetReporter().AsMap())
+	if err != nil {
+		return model.ReporterResourceKey{}, "", "", nil, model.Representation(nil), model.Representation(nil), fmt.Errorf("invalid reporter data: %w", err)
 	}
 
-	return reporterResourceKey, apiHref, consoleHref, reporterVersion, commonData, reporterData, nil
+	return reporterResourceKey, apiHref, consoleHref, reporterVersion, commonRepresentation, reporterRepresentation, nil
+}
+
+func (uc *Usecase) reportRepresentations(tx *gorm.DB, resource model.Resource) error {
+	_, _, dataReporterRepresentation, dataCommonRepresentation, err := resource.Serialize()
+	if err != nil {
+		return fmt.Errorf("failed to serialize resource: %w", err)
+	}
+
+	if err := tx.Create(dataReporterRepresentation).Error; err != nil {
+		return fmt.Errorf("failed to save reporter representation: %w", err)
+	}
+
+	if err := tx.Create(dataCommonRepresentation).Error; err != nil {
+		return fmt.Errorf("failed to save common representation: %w", err)
+	}
+
+	return nil
 }
 
 func (uc *Usecase) Upsert(ctx context.Context, m *model_legacy.Resource, write_visibility v1beta2.WriteVisibility) (*model_legacy.Resource, error) {

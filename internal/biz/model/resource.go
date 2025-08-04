@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
-	"github.com/project-kessel/inventory-api/internal"
 	datamodel "github.com/project-kessel/inventory-api/internal/data/model"
 )
 
@@ -20,52 +19,42 @@ type Resource struct {
 }
 
 func NewResource(
-	idVal uuid.UUID,
-	localResourceIdVal string,
-	resourceTypeVal string,
-	reporterTypeVal string,
-	reporterInstanceIdVal string,
-	resourceIdVal uuid.UUID,
-	apiHrefVal string,
-	consoleHrefVal string,
-	reporterRepresentationData internal.JsonObject,
-	commonRepresentationData internal.JsonObject,
+	id ResourceId,
+	localResourceId LocalResourceId,
+	resourceType ResourceType,
+	reporterType ReporterType,
+	reporterInstanceId ReporterInstanceId,
+	reporterResourceId ReporterResourceId,
+	apiHref ApiHref,
+	consoleHref ConsoleHref,
+	reporterRepresentationData Representation,
+	commonRepresentationData Representation,
 ) (Resource, error) {
 
 	reporterResource, err := NewReporterResource(
-		resourceIdVal,
-		localResourceIdVal,
-		resourceTypeVal,
-		reporterTypeVal,
-		reporterInstanceIdVal,
-		idVal,
-		apiHrefVal,
-		consoleHrefVal,
+		reporterResourceId,
+		localResourceId,
+		resourceType,
+		reporterType,
+		reporterInstanceId,
+		id,
+		apiHref,
+		consoleHref,
 	)
 	if err != nil {
 		return Resource{}, fmt.Errorf("resource invalid ReporterResource: %w", err)
 	}
 
-	resourceTypeObj, err := NewResourceType(resourceTypeVal)
-	if err != nil {
-		return Resource{}, fmt.Errorf("resource invalid type: %w", err)
-	}
-
-	resourceId, err := NewResourceId(idVal)
-	if err != nil {
-		return Resource{}, fmt.Errorf("resource invalid ID: %w", err)
-	}
-
 	resourceEvent, err := NewResourceEvent(
-		idVal,
-		resourceTypeVal,
-		reporterTypeVal,
-		reporterInstanceIdVal,
-		reporterRepresentationData,
-		resourceIdVal.String(),
+		id.UUID(),
+		resourceType.String(),
+		reporterType.String(),
+		reporterInstanceId.String(),
+		reporterRepresentationData.Serialize(),
+		reporterResourceId.String(),
 		0,
 		0,
-		commonRepresentationData,
+		commonRepresentationData.Serialize(),
 		initialCommonVersion,
 		nil,
 	)
@@ -74,8 +63,8 @@ func NewResource(
 	}
 
 	resource := Resource{
-		id:                resourceId,
-		resourceType:      resourceTypeObj,
+		id:                id,
+		resourceType:      resourceType,
 		commonVersion:     NewVersion(initialCommonVersion),
 		reporterResources: []ReporterResource{reporterResource},
 		resourceEvents:    []ResourceEvent{resourceEvent},
@@ -146,16 +135,10 @@ func Deserialize(
 	apiHref string,
 	consoleHref string,
 ) (*Resource, error) {
-	domainResourceId, err := NewResourceId(resourceID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create ResourceId: %w", err)
-	}
+	domainResourceId := DeserializeResourceId(resourceID)
+	domainResourceType := DeserializeResourceType(resourceType)
 
-	domainResourceType, err := NewResourceType(resourceType)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create ResourceType: %w", err)
-	}
-
+	//TODO: Deserialize all ReporterResources
 	reporterResource, err := DeserializeReporterResource(
 		reporterResourceID,
 		localResourceID,
@@ -176,7 +159,7 @@ func Deserialize(
 	resource := &Resource{
 		id:                domainResourceId,
 		resourceType:      domainResourceType,
-		commonVersion:     NewVersion(commonVersion),
+		commonVersion:     DeserializeVersion(commonVersion),
 		reporterResources: []ReporterResource{*reporterResource},
 		resourceEvents:    []ResourceEvent{},
 	}
@@ -198,26 +181,35 @@ func (r Resource) findReporterResourceByKey(key ReporterResourceKey) (ReporterRe
 		key.LocalResourceId(), key.ResourceType(), key.ReporterType(), key.ReporterInstanceId())
 }
 
-func (r Resource) Update(
+func (r *Resource) Update(
 	key ReporterResourceKey,
-	apiHref string,
-	consoleHref string,
-	reporterVersion *string,
-	commonData internal.JsonObject,
-	reporterData internal.JsonObject,
-) (Resource, error) {
-	newCommonVersion := r.commonVersion.Increment()
+	apiHref ApiHref,
+	consoleHref ConsoleHref,
+	reporterVersion *ReporterVersion,
+	commonData Representation,
+	reporterData Representation,
+) error {
+	r.commonVersion = r.commonVersion.Increment()
 
-	reporterResourceToUpdate, err := r.findReporterResourceByKey(key)
-	if err != nil {
-		return Resource{}, err
+	// Find the index of the reporter resource to update
+	var reporterResourceToUpdate *ReporterResource
+	for i := range r.reporterResources {
+		if r.reporterResources[i].Key() == key {
+			r.reporterResources[i].Update(apiHref, consoleHref)
+			reporterResourceToUpdate = &r.reporterResources[i]
+			break
+		}
 	}
-	updatedReporterResource, err := reporterResourceToUpdate.Update(
-		apiHref,
-		consoleHref,
-	)
-	if err != nil {
-		return Resource{}, fmt.Errorf("failed to update ReporterResource: %w", err)
+
+	if reporterResourceToUpdate == nil {
+		return fmt.Errorf("reporter resource with key (localResourceId=%s, resourceType=%s, reporterType=%s, reporterInstanceId=%s) not found in resource",
+			key.LocalResourceId(), key.ResourceType(), key.ReporterType(), key.ReporterInstanceId())
+	}
+
+	var reporterVersionStr *string
+	if reporterVersion != nil {
+		versionStr := reporterVersion.String()
+		reporterVersionStr = &versionStr
 	}
 
 	resourceEvent, err := NewResourceEvent(
@@ -225,24 +217,18 @@ func (r Resource) Update(
 		key.ResourceType(),
 		key.ReporterType(),
 		key.ReporterInstanceId(),
-		reporterData,
+		reporterData.Serialize(),
 		r.id.String(),
-		updatedReporterResource.representationVersion.Uint(),
+		reporterResourceToUpdate.representationVersion.Uint(),
 		reporterResourceToUpdate.generation.Uint(),
-		commonData,
-		newCommonVersion.Uint(),
-		reporterVersion,
+		commonData.Serialize(),
+		r.commonVersion.Uint(),
+		reporterVersionStr,
 	)
 	if err != nil {
-		return Resource{}, fmt.Errorf("failed to create updated ResourceEvent: %w", err)
+		return fmt.Errorf("failed to create updated ResourceEvent: %w", err)
 	}
 
-	return Resource{
-		id:                r.id,
-		resourceType:      r.resourceType,
-		commonVersion:     newCommonVersion,
-		consistencyToken:  r.consistencyToken, // TODO: Issue here is that this is not reported in ReportResourceRequest, so we may need to return it from select.
-		reporterResources: []ReporterResource{updatedReporterResource},
-		resourceEvents:    append(r.resourceEvents, resourceEvent), //TODO: Appending here makes sense semantically, but when we do the save in repo, we need to make sure it is not storing duplicate representations
-	}, nil
+	r.resourceEvents = append(r.resourceEvents, resourceEvent)
+	return nil
 }

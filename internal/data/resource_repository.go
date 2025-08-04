@@ -28,11 +28,10 @@ type ResourceRepository interface {
 	NextResourceId() (bizmodel.ResourceId, error)
 	NextReporterResourceId() (bizmodel.ReporterResourceId, error)
 	Save(tx *gorm.DB, resource bizmodel.Resource, operationType model_legacy.EventOperationType, txid string) error
-	SaveWithAutoTxID(tx *gorm.DB, resource bizmodel.Resource, operationType model_legacy.EventOperationType) error
-	SaveWithTransaction(resource bizmodel.Resource, operationType model_legacy.EventOperationType, txid string) error
 	FindResourceByKeys(tx *gorm.DB, key bizmodel.ReporterResourceKey) (*bizmodel.Resource, error)
 	GetNextTransactionID() (string, error)
-	MustGetNextTransactionID() string
+	GetDB() *gorm.DB
+	GetTransactionManager() usecase.TransactionManager
 }
 
 type resourceRepository struct {
@@ -73,50 +72,24 @@ func (r *resourceRepository) GetNextTransactionID() (string, error) {
 	return txid.String(), nil
 }
 
-func (r *resourceRepository) MustGetNextTransactionID() string {
-	txid, err := r.GetNextTransactionID()
-	if err != nil {
-		panic(err)
-	}
-	return txid
-}
-
-func (r *resourceRepository) SaveWithAutoTxID(tx *gorm.DB, resource bizmodel.Resource, operationType model_legacy.EventOperationType) error {
-	txid, err := r.GetNextTransactionID()
-	if err != nil {
-		return err
-	}
-	return r.Save(tx, resource, operationType, txid)
-}
-
-func (r *resourceRepository) SaveWithTransaction(resource bizmodel.Resource, operationType model_legacy.EventOperationType, txid string) error {
-	return r.transactionManager.HandleSerializableTransaction(r.db, func(tx *gorm.DB) error {
-		return r.Save(tx, resource, operationType, txid)
-	})
-}
-
 func (r *resourceRepository) Save(tx *gorm.DB, resource bizmodel.Resource, operationType model_legacy.EventOperationType, txid string) error {
 	dataResource, dataReporterResource, dataReporterRepresentation, dataCommonRepresentation, err := resource.Serialize()
 	if err != nil {
 		return fmt.Errorf("failed to serialize resource: %w", err)
 	}
 
-	// Save the main resource
 	if err := tx.Create(dataResource).Error; err != nil {
 		return fmt.Errorf("failed to save resource: %w", err)
 	}
 
-	// Save the reporter resource
 	if err := tx.Create(dataReporterResource).Error; err != nil {
 		return fmt.Errorf("failed to save reporter resource: %w", err)
 	}
 
-	// Save the reporter representation
 	if err := tx.Create(dataReporterRepresentation).Error; err != nil {
 		return fmt.Errorf("failed to save reporter representation: %w", err)
 	}
 
-	// Save the common representation
 	if err := tx.Create(dataCommonRepresentation).Error; err != nil {
 		return fmt.Errorf("failed to save common representation: %w", err)
 	}
@@ -199,4 +172,12 @@ func (r *resourceRepository) FindResourceByKeys(tx *gorm.DB, key bizmodel.Report
 	}
 
 	return resource, nil
+}
+
+func (r *resourceRepository) GetDB() *gorm.DB {
+	return r.db
+}
+
+func (r *resourceRepository) GetTransactionManager() usecase.TransactionManager {
+	return r.transactionManager
 }

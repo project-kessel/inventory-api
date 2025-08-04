@@ -9,6 +9,7 @@ import (
 
 	bizmodel "github.com/project-kessel/inventory-api/internal/biz/model"
 	"github.com/project-kessel/inventory-api/internal/biz/model_legacy"
+	"github.com/project-kessel/inventory-api/internal/biz/usecase"
 )
 
 type fakeResourceRepository struct {
@@ -59,28 +60,6 @@ func (f *fakeResourceRepository) GetNextTransactionID() (string, error) {
 		return "", err
 	}
 	return txid.String(), nil
-}
-
-func (f *fakeResourceRepository) MustGetNextTransactionID() string {
-	txid, err := f.GetNextTransactionID()
-	if err != nil {
-		panic(err)
-	}
-	return txid
-}
-
-func (f *fakeResourceRepository) SaveWithAutoTxID(tx *gorm.DB, resource bizmodel.Resource, operationType model_legacy.EventOperationType) error {
-	txid, err := f.GetNextTransactionID()
-	if err != nil {
-		return err
-	}
-	return f.Save(tx, resource, operationType, txid)
-}
-
-func (f *fakeResourceRepository) SaveWithTransaction(resource bizmodel.Resource, operationType model_legacy.EventOperationType, txid string) error {
-	// For the fake repository, we don't need actual transaction management
-	// Just call Save with nil transaction since the fake implementation doesn't use it
-	return f.Save(nil, resource, operationType, txid)
 }
 
 func (f *fakeResourceRepository) Save(tx *gorm.DB, resource bizmodel.Resource, operationType model_legacy.EventOperationType, txid string) error {
@@ -151,6 +130,16 @@ func (f *fakeResourceRepository) FindResourceByKeys(tx *gorm.DB, key bizmodel.Re
 	}
 
 	return resource, nil
+}
+
+func (f *fakeResourceRepository) GetDB() *gorm.DB {
+	// Fake repository doesn't use a real database
+	return nil
+}
+
+func (f *fakeResourceRepository) GetTransactionManager() usecase.TransactionManager {
+	// Return a fake transaction manager for testing
+	return NewFakeTransactionManager()
 }
 
 func (f *fakeResourceRepository) makeKey(localResourceID, resourceType, reporterType, reporterInstanceID string) string {

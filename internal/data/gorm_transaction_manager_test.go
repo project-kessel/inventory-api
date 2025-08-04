@@ -15,14 +15,14 @@ import (
 func TestNewGormTransactionManager(t *testing.T) {
 	maxRetries := 5
 	tm := NewGormTransactionManager(maxRetries)
-	
+
 	assert.NotNil(t, tm)
 	assert.Equal(t, maxRetries, tm.maxSerializationRetries)
 }
 
 func TestGormTransactionManager_isSerializationFailure_PostgreSQL(t *testing.T) {
 	tm := NewGormTransactionManager(3)
-	
+
 	tests := []struct {
 		name     string
 		err      error
@@ -44,7 +44,7 @@ func TestGormTransactionManager_isSerializationFailure_PostgreSQL(t *testing.T) 
 			expected: false,
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := tm.isSerializationFailure(tt.err, 0)
@@ -55,7 +55,7 @@ func TestGormTransactionManager_isSerializationFailure_PostgreSQL(t *testing.T) 
 
 func TestGormTransactionManager_isSerializationFailure_SQLite(t *testing.T) {
 	tm := NewGormTransactionManager(3)
-	
+
 	tests := []struct {
 		name     string
 		err      error
@@ -77,7 +77,7 @@ func TestGormTransactionManager_isSerializationFailure_SQLite(t *testing.T) {
 			expected: false,
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := tm.isSerializationFailure(tt.err, 0)
@@ -88,20 +88,20 @@ func TestGormTransactionManager_isSerializationFailure_SQLite(t *testing.T) {
 
 func TestGormTransactionManager_HandleSerializableTransaction_ErrorDetection(t *testing.T) {
 	tm := NewGormTransactionManager(3)
-	
+
 	// Test that commit failures are handled
 	commitErr := &pgconn.PgError{Code: "40001"}
 	assert.True(t, tm.isSerializationFailure(commitErr, 0))
-	
+
 	// Test non-serialization commit error
 	otherCommitErr := errors.New("disk full")
 	assert.False(t, tm.isSerializationFailure(otherCommitErr, 0))
-	
+
 	// Test that serialization errors are properly detected
 	pgError := &pgconn.PgError{Code: "40001"} // PostgreSQL serialization failure
 	assert.True(t, tm.isSerializationFailure(pgError, 0))
 	assert.True(t, tm.isSerializationFailure(pgError, 1))
-	
+
 	// Test that non-serialization errors are not retried
 	nonSerializationErr := errors.New("other error")
 	assert.False(t, tm.isSerializationFailure(nonSerializationErr, 0))
@@ -109,10 +109,10 @@ func TestGormTransactionManager_HandleSerializableTransaction_ErrorDetection(t *
 
 func TestGormTransactionManager_RetryCountTracking(t *testing.T) {
 	tm := NewGormTransactionManager(3)
-	
+
 	// Test that attempt counter is passed correctly
 	pgError := &pgconn.PgError{Code: "40001"}
-	
+
 	for attempt := 0; attempt < 5; attempt++ {
 		// The function should return true for serialization failures regardless of attempt
 		result := tm.isSerializationFailure(pgError, attempt)
@@ -122,7 +122,7 @@ func TestGormTransactionManager_RetryCountTracking(t *testing.T) {
 
 func TestGormTransactionManager_ErrorWrapping(t *testing.T) {
 	tm := NewGormTransactionManager(1)
-	
+
 	// Test different error scenarios to ensure proper error wrapping
 	testCases := []struct {
 		name        string
@@ -135,7 +135,7 @@ func TestGormTransactionManager_ErrorWrapping(t *testing.T) {
 			shouldRetry: true,
 		},
 		{
-			name:        "SQLite serialization error", 
+			name:        "SQLite serialization error",
 			inputError:  sqlite3.Error{Code: sqlite3.ErrError},
 			shouldRetry: true,
 		},
@@ -150,7 +150,7 @@ func TestGormTransactionManager_ErrorWrapping(t *testing.T) {
 			shouldRetry: false,
 		},
 	}
-	
+
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			result := tm.isSerializationFailure(tc.inputError, 0)
@@ -169,15 +169,15 @@ func setupTestDB(t *testing.T) *gorm.DB {
 func TestGormTransactionManager_HandleSerializableTransaction_Success(t *testing.T) {
 	tm := NewGormTransactionManager(3)
 	db := setupTestDB(t)
-	
+
 	callCount := 0
 	txFunc := func(tx *gorm.DB) error {
 		callCount++
 		return nil // Success on first try
 	}
-	
+
 	err := tm.HandleSerializableTransaction(db, txFunc)
-	
+
 	assert.NoError(t, err)
 	assert.Equal(t, 1, callCount, "Should succeed on first attempt")
 }
@@ -185,16 +185,16 @@ func TestGormTransactionManager_HandleSerializableTransaction_Success(t *testing
 func TestGormTransactionManager_HandleSerializableTransaction_NonSerializationError(t *testing.T) {
 	tm := NewGormTransactionManager(3)
 	db := setupTestDB(t)
-	
+
 	callCount := 0
 	expectedErr := errors.New("some other error")
 	txFunc := func(tx *gorm.DB) error {
 		callCount++
 		return expectedErr
 	}
-	
+
 	err := tm.HandleSerializableTransaction(db, txFunc)
-	
+
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "transaction failed")
 	assert.Contains(t, err.Error(), expectedErr.Error())
@@ -204,23 +204,23 @@ func TestGormTransactionManager_HandleSerializableTransaction_NonSerializationEr
 func TestGormTransactionManager_HandleSerializableTransaction_TransactionIsolation(t *testing.T) {
 	tm := NewGormTransactionManager(3)
 	db := setupTestDB(t)
-	
+
 	// Create a test table
 	err := db.Exec("CREATE TABLE test_table (id INTEGER PRIMARY KEY, value TEXT)").Error
 	require.NoError(t, err)
-	
+
 	callCount := 0
 	txFunc := func(tx *gorm.DB) error {
 		callCount++
 		// Insert a test record
 		return tx.Exec("INSERT INTO test_table (value) VALUES (?)", "test_value").Error
 	}
-	
+
 	err = tm.HandleSerializableTransaction(db, txFunc)
-	
+
 	assert.NoError(t, err)
 	assert.Equal(t, 1, callCount, "Should succeed on first attempt")
-	
+
 	// Verify the record was inserted
 	var count int64
 	err = db.Model(&struct{}{}).Table("test_table").Count(&count).Error
@@ -238,7 +238,7 @@ func TestGormTransactionManager_MaxRetriesConfiguration(t *testing.T) {
 		{"Five retries", 5},
 		{"Ten retries", 10},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tm := NewGormTransactionManager(tt.maxRetries)

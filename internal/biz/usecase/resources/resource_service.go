@@ -106,7 +106,7 @@ func (uc *Usecase) ReportResource(request *v1beta2.ReportResourceRequest, write_
 		defer subscription.Unsubscribe()
 	}
 
-	// Check if resource already exists
+	// Create reporter resource key for lookup
 	reporterResourceKey, err := model.NewReporterResourceKey(
 		request.GetRepresentations().GetMetadata().GetLocalResourceId(),
 		request.GetType(),
@@ -117,21 +117,23 @@ func (uc *Usecase) ReportResource(request *v1beta2.ReportResourceRequest, write_
 		return fmt.Errorf("failed to create reporter resource key: %w", err)
 	}
 
-	existingResource, err := uc.resourceRepository.FindResourceByKeys(nil, reporterResourceKey)
-	if err != nil {
-		return fmt.Errorf("failed to lookup existing resource: %w", err)
-	}
+	return uc.resourceRepository.GetTransactionManager().HandleSerializableTransaction(uc.resourceRepository.GetDB(), func(tx *gorm.DB) error {
+		existingResource, err := uc.resourceRepository.FindResourceByKeys(tx, reporterResourceKey)
+		if err != nil {
+			return fmt.Errorf("failed to lookup existing resource: %w", err)
+		}
 
-	if existingResource != nil {
-		log.Info("Resource already exists, updating: ", existingResource)
-		return uc.updateResource(request, existingResource, txidStr)
-	} else {
-		log.Info("Creating new resource")
-		return uc.createResource(request, txidStr)
-	}
+		if existingResource != nil {
+			log.Info("Resource already exists, updating: ", existingResource)
+			return uc.updateResource(tx, request, existingResource, txidStr)
+		} else {
+			log.Info("Creating new resource")
+			return uc.createResource(tx, request, txidStr)
+		}
+	})
 }
 
-func (uc *Usecase) createResource(request *v1beta2.ReportResourceRequest, txidStr string) error {
+func (uc *Usecase) createResource(tx *gorm.DB, request *v1beta2.ReportResourceRequest, txidStr string) error {
 	resourceId, err := uc.resourceRepository.NextResourceId()
 	if err != nil {
 		return err
@@ -157,15 +159,11 @@ func (uc *Usecase) createResource(request *v1beta2.ReportResourceRequest, txidSt
 		return err
 	}
 
-	err = uc.resourceRepository.SaveWithTransaction(resource, model_legacy.OperationTypeCreated, txidStr)
-	if err != nil {
-		return err
-	}
-	return nil
+	return uc.resourceRepository.Save(tx, resource, model_legacy.OperationTypeCreated, txidStr)
 }
 
-func (uc *Usecase) updateResource(request *v1beta2.ReportResourceRequest, existingResource *model.Resource, txidStr string) error {
-	// TODO: Implement resource update logic
+func (uc *Usecase) updateResource(tx *gorm.DB, request *v1beta2.ReportResourceRequest, existingResource *model.Resource, txidStr string) error {
+	// TODO: Implement resource update logic within transaction
 	log.Info("Update resource logic not yet implemented for resource: ", existingResource)
 	return nil
 }

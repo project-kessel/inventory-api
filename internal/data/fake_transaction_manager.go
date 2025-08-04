@@ -37,11 +37,11 @@ func NewFakeTransactionManager() *FakeTransactionManager {
 // For testing purposes, it simply calls the transaction function with the provided DB.
 func (f *FakeTransactionManager) HandleSerializableTransaction(db *gorm.DB, txFunc func(tx *gorm.DB) error) error {
 	f.CallCount++
-	
+
 	// Simulate retry behavior if configured
 	for attempt := 0; attempt <= f.RetryCount; attempt++ {
 		f.RetryAttempts++
-		
+
 		// Check if we should fail on this attempt
 		if f.ShouldFail && attempt == f.RetryCount {
 			if f.FailureError != nil {
@@ -49,16 +49,16 @@ func (f *FakeTransactionManager) HandleSerializableTransaction(db *gorm.DB, txFu
 			}
 			return fmt.Errorf("fake transaction manager simulated failure")
 		}
-		
+
 		// If not the final attempt and we're simulating retries, continue
 		if f.RetryCount > 0 && attempt < f.RetryCount {
 			continue
 		}
-		
+
 		// Execute the transaction function
 		return txFunc(db)
 	}
-	
+
 	return nil
 }
 

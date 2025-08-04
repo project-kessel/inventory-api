@@ -54,14 +54,6 @@ func (f *fakeResourceRepository) NextReporterResourceId() (bizmodel.ReporterReso
 	return bizmodel.NewReporterResourceId(uuidV7)
 }
 
-func (f *fakeResourceRepository) GetNextTransactionID() (string, error) {
-	txid, err := uuid.NewV7()
-	if err != nil {
-		return "", err
-	}
-	return txid.String(), nil
-}
-
 func (f *fakeResourceRepository) Save(tx *gorm.DB, resource bizmodel.Resource, operationType model_legacy.EventOperationType, txid string) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()

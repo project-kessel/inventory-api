@@ -18,12 +18,12 @@ type ReporterRepresentation struct {
 	tombstone          Tombstone
 }
 
-type ReporterDataRepresentation interface {
-	Data() internal.JsonObject
+type ReporterDataRepresentation struct {
+	ReporterRepresentation
 }
 
-type ReporterDeleteRepresentation interface {
-	// ReporterDeleteRepresentation should not have data
+type ReporterDeleteRepresentation struct {
+	ReporterRepresentation
 }
 
 func (r ReporterRepresentation) Data() internal.JsonObject {
@@ -43,21 +43,23 @@ func NewReporterDataRepresentation(
 	reporterVersion *ReporterVersion,
 ) (ReporterDataRepresentation, error) {
 	if reporterResourceID.UUID() == uuid.Nil {
-		return nil, fmt.Errorf("ReporterResourceId cannot be empty")
+		return ReporterDataRepresentation{}, fmt.Errorf("ReporterResourceId cannot be empty")
 	}
 
 	if len(data.Data()) == 0 {
-		return nil, fmt.Errorf("ReporterDataRepresentation requires non-empty data")
+		return ReporterDataRepresentation{}, fmt.Errorf("ReporterDataRepresentation requires non-empty data")
 	}
 
-	return ReporterRepresentation{
-		Representation:     data,
-		reporterResourceID: reporterResourceID,
-		version:            version,
-		generation:         generation,
-		commonVersion:      commonVersion,
-		reporterVersion:    reporterVersion,
-		tombstone:          NewTombstone(false),
+	return ReporterDataRepresentation{
+		ReporterRepresentation: ReporterRepresentation{
+			Representation:     data,
+			reporterResourceID: reporterResourceID,
+			version:            version,
+			generation:         generation,
+			commonVersion:      commonVersion,
+			reporterVersion:    reporterVersion,
+			tombstone:          NewTombstone(false),
+		},
 	}, nil
 }
 
@@ -69,17 +71,19 @@ func NewReporterDeleteRepresentation(
 	reporterVersion *ReporterVersion,
 ) (ReporterDeleteRepresentation, error) {
 	if reporterResourceID.UUID() == uuid.Nil {
-		return nil, fmt.Errorf("ReporterResourceId cannot be empty")
+		return ReporterDeleteRepresentation{}, fmt.Errorf("ReporterResourceId cannot be empty")
 	}
 
-	return ReporterRepresentation{
-		Representation:     Representation(nil),
-		reporterResourceID: reporterResourceID,
-		version:            version,
-		generation:         generation,
-		commonVersion:      commonVersion,
-		reporterVersion:    reporterVersion,
-		tombstone:          NewTombstone(true),
+	return ReporterDeleteRepresentation{
+		ReporterRepresentation: ReporterRepresentation{
+			Representation:     Representation(nil),
+			reporterResourceID: reporterResourceID,
+			version:            version,
+			generation:         generation,
+			commonVersion:      commonVersion,
+			reporterVersion:    reporterVersion,
+			tombstone:          NewTombstone(true),
+		},
 	}, nil
 }
 
@@ -108,21 +112,23 @@ func DeserializeReporterDataRepresentation(
 	data internal.JsonObject,
 	commonVersion uint,
 	reporterVersionVal *string,
-) ReporterRepresentation {
+) ReporterDataRepresentation {
 	var reporterVersion *ReporterVersion
 	if reporterVersionVal != nil {
 		rv := DeserializeReporterVersion(*reporterVersionVal)
 		reporterVersion = &rv
 	}
 
-	return ReporterRepresentation{
-		Representation:     DeserializeRepresentation(data),
-		reporterResourceID: DeserializeReporterResourceId(uuid.MustParse(reporterResourceIdVal)),
-		version:            DeserializeVersion(version),
-		generation:         DeserializeGeneration(generation),
-		commonVersion:      DeserializeVersion(commonVersion),
-		reporterVersion:    reporterVersion,
-		tombstone:          DeserializeTombstone(false),
+	return ReporterDataRepresentation{
+		ReporterRepresentation: ReporterRepresentation{
+			Representation:     DeserializeRepresentation(data),
+			reporterResourceID: DeserializeReporterResourceId(uuid.MustParse(reporterResourceIdVal)),
+			version:            DeserializeVersion(version),
+			generation:         DeserializeGeneration(generation),
+			commonVersion:      DeserializeVersion(commonVersion),
+			reporterVersion:    reporterVersion,
+			tombstone:          DeserializeTombstone(false),
+		},
 	}
 }
 
@@ -132,20 +138,22 @@ func DeserializeReporterDeleteRepresentation(
 	generation uint,
 	commonVersion uint,
 	reporterVersionVal *string,
-) ReporterRepresentation {
+) ReporterDeleteRepresentation {
 	var reporterVersion *ReporterVersion
 	if reporterVersionVal != nil {
 		rv := DeserializeReporterVersion(*reporterVersionVal)
 		reporterVersion = &rv
 	}
 
-	return ReporterRepresentation{
-		Representation:     DeserializeRepresentation(nil),
-		reporterResourceID: DeserializeReporterResourceId(uuid.MustParse(reporterResourceIDVal)),
-		version:            DeserializeVersion(version),
-		generation:         DeserializeGeneration(generation),
-		commonVersion:      DeserializeVersion(commonVersion),
-		reporterVersion:    reporterVersion,
-		tombstone:          DeserializeTombstone(true),
+	return ReporterDeleteRepresentation{
+		ReporterRepresentation: ReporterRepresentation{
+			Representation:     DeserializeRepresentation(nil),
+			reporterResourceID: DeserializeReporterResourceId(uuid.MustParse(reporterResourceIDVal)),
+			version:            DeserializeVersion(version),
+			generation:         DeserializeGeneration(generation),
+			commonVersion:      DeserializeVersion(commonVersion),
+			reporterVersion:    reporterVersion,
+			tombstone:          DeserializeTombstone(true),
+		},
 	}
 }

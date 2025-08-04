@@ -85,21 +85,6 @@ func testRepositoryContract(t *testing.T, repo ResourceRepository, db *gorm.DB) 
 		assert.NotEqual(t, id1.UUID(), id2.UUID())
 	})
 
-	t.Run("GetNextTransactionID generates valid transaction IDs", func(t *testing.T) {
-		txid1, err := repo.GetNextTransactionID()
-		require.NoError(t, err)
-		assert.NotEmpty(t, txid1)
-
-		txid2, err := repo.GetNextTransactionID()
-		require.NoError(t, err)
-		assert.NotEmpty(t, txid2)
-		assert.NotEqual(t, txid1, txid2)
-
-		// Should be valid UUID format
-		_, err = uuid.Parse(txid1)
-		assert.NoError(t, err, "transaction ID should be valid UUID")
-	})
-
 	t.Run("Save and FindResourceByKeys workflow", func(t *testing.T) {
 		resource := createTestResource(t)
 

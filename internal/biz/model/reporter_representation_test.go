@@ -10,15 +10,13 @@ func assertValidReporterDataRepresentation(t *testing.T, dataRep ReporterDataRep
 	if err != nil {
 		t.Errorf("Expected no error for %s, got %v", testCase, err)
 	}
-	if dataRep == nil {
-		t.Errorf("Expected valid ReporterDataRepresentation for %s, got nil", testCase)
+	// Check if the struct is valid by checking if it has valid data
+	if dataRep.Data() == nil {
+		t.Errorf("Expected valid ReporterDataRepresentation for %s, got struct with nil data", testCase)
 		return
 	}
-	if dataRep.(ReporterRepresentation).IsTombstone() {
+	if dataRep.ReporterRepresentation.IsTombstone() {
 		t.Errorf("Expected ReporterDataRepresentation tombstone to be false for %s, got true", testCase)
-	}
-	if dataRep.Data() == nil {
-		t.Errorf("Expected ReporterDataRepresentation to have data for %s, got nil", testCase)
 	}
 }
 
@@ -27,17 +25,13 @@ func assertValidReporterDeleteRepresentation(t *testing.T, deleteRep ReporterDel
 	if err != nil {
 		t.Errorf("Expected no error for %s, got %v", testCase, err)
 	}
-	if deleteRep == nil {
-		t.Errorf("Expected valid ReporterDeleteRepresentation for %s, got nil", testCase)
+	// Check if the struct is valid by checking if it has the correct tombstone state
+	if !deleteRep.ReporterRepresentation.IsTombstone() {
+		t.Errorf("Expected ReporterDeleteRepresentation tombstone to be true for %s, got false", testCase)
 		return
 	}
-	if rep, ok := deleteRep.(ReporterRepresentation); ok {
-		if !rep.IsTombstone() {
-			t.Errorf("Expected ReporterDeleteRepresentation tombstone to be true for %s, got false", testCase)
-		}
-		if rep.Data() != nil {
-			t.Errorf("Expected ReporterDeleteRepresentation to have nil data for %s, got non-nil", testCase)
-		}
+	if deleteRep.ReporterRepresentation.Data() != nil {
+		t.Errorf("Expected ReporterDeleteRepresentation to have nil data for %s, got non-nil", testCase)
 	}
 }
 
@@ -46,8 +40,9 @@ func assertInvalidReporterDataRepresentation(t *testing.T, dataRep ReporterDataR
 	if err == nil {
 		t.Error("Expected error, got none")
 	}
-	if dataRep != nil {
-		t.Error("Expected nil ReporterDataRepresentation for invalid input, got non-nil")
+	// For invalid input, the constructor should return an empty struct with nil data
+	if dataRep.Data() != nil {
+		t.Error("Expected ReporterDataRepresentation with nil data for invalid input, got non-nil data")
 	}
 	if !strings.Contains(err.Error(), expectedErrorSubstring) {
 		t.Errorf("Expected error about %s, got %v", expectedErrorSubstring, err)
@@ -59,8 +54,9 @@ func assertInvalidReporterDeleteRepresentation(t *testing.T, deleteRep ReporterD
 	if err == nil {
 		t.Error("Expected error, got none")
 	}
-	if deleteRep != nil {
-		t.Error("Expected nil ReporterDeleteRepresentation for invalid input, got non-nil")
+	// For invalid input, the constructor should return an empty struct with nil data
+	if deleteRep.ReporterRepresentation.Data() != nil {
+		t.Error("Expected ReporterDeleteRepresentation with nil data for invalid input, got non-nil data")
 	}
 	if !strings.Contains(err.Error(), expectedErrorSubstring) {
 		t.Errorf("Expected error about %s, got %v", expectedErrorSubstring, err)
@@ -271,7 +267,7 @@ func TestReporterRepresentation_BusinessRules(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Expected no error, got %v", err)
 		}
-		if dataRep.(ReporterRepresentation).IsTombstone() {
+		if dataRep.ReporterRepresentation.IsTombstone() {
 			t.Error("Expected ReporterDataRepresentation to have tombstone=false, got true")
 		}
 	})
@@ -291,12 +287,8 @@ func TestReporterRepresentation_BusinessRules(t *testing.T) {
 			t.Fatalf("Expected no error, got %v", err)
 		}
 
-		if rep, ok := deleteRep.(ReporterRepresentation); ok {
-			if !rep.IsTombstone() {
-				t.Error("Expected ReporterDeleteRepresentation to have tombstone=true, got false")
-			}
-		} else {
-			t.Error("Expected ReporterDeleteRepresentation to be castable to ReporterRepresentation")
+		if !deleteRep.ReporterRepresentation.IsTombstone() {
+			t.Error("Expected ReporterDeleteRepresentation to have tombstone=true, got false")
 		}
 	})
 
@@ -315,12 +307,8 @@ func TestReporterRepresentation_BusinessRules(t *testing.T) {
 			t.Fatalf("Expected no error, got %v", err)
 		}
 
-		if rep, ok := deleteRep.(ReporterRepresentation); ok {
-			if rep.Data() != nil {
-				t.Error("Expected ReporterDeleteRepresentation to have nil data, got non-nil")
-			}
-		} else {
-			t.Error("Expected ReporterDeleteRepresentation to be castable to ReporterRepresentation")
+		if deleteRep.ReporterRepresentation.Data() != nil {
+			t.Error("Expected ReporterDeleteRepresentation to have nil data, got non-nil")
 		}
 	})
 
@@ -362,8 +350,8 @@ func TestReporterRepresentation_BusinessRules(t *testing.T) {
 		if err != nil {
 			t.Errorf("Expected no error with zero values, got %v", err)
 		}
-		if dataRep == nil {
-			t.Error("Expected valid ReporterDataRepresentation with zero values, got nil")
+		if dataRep.Data() == nil {
+			t.Error("Expected valid ReporterDataRepresentation with zero values, got struct with nil data")
 		}
 	})
 }

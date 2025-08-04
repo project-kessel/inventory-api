@@ -95,18 +95,11 @@ func New(resourceRepository data.ResourceRepository, reporterResourceRepository 
 func (uc *Usecase) ReportResource(request *v1beta2.ReportResourceRequest, reporterPrincipal string) error {
 	log.Info("Reporting resource request: ", request)
 
-	var subscription pubsub.Subscription
-	txidStr, err := uc.resourceRepository.GetNextTransactionID()
+	txidStr, err := getNextTransactionID()
 	if err != nil {
 		return err
 	}
 
-	if readAfterWriteEnabled := computeReadAfterWrite(uc, request.WriteVisibility, reporterPrincipal); readAfterWriteEnabled && uc.Config.ConsumerEnabled {
-		subscription = uc.ListenManager.Subscribe(txidStr)
-		defer subscription.Unsubscribe()
-	}
-
-	// Create reporter resource key for lookup
 	reporterResourceKey, err := getReporterResourceKeyFromRequest(request)
 	if err != nil {
 		return fmt.Errorf("failed to create reporter resource key: %w", err)
@@ -323,6 +316,14 @@ func (uc *Usecase) reportRepresentations(tx *gorm.DB, resource model.Resource) e
 	}
 
 	return nil
+}
+
+func getNextTransactionID() (string, error) {
+	txid, err := uuid.NewV7()
+	if err != nil {
+		return "", err
+	}
+	return txid.String(), nil
 }
 
 func (uc *Usecase) Upsert(ctx context.Context, m *model_legacy.Resource, write_visibility v1beta2.WriteVisibility) (*model_legacy.Resource, error) {

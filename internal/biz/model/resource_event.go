@@ -49,11 +49,8 @@ func NewResourceEvent(
 		return ResourceEvent{}, fmt.Errorf("ResourceEvent invalid reporter representation: %w", err)
 	}
 
-	// Convert interface to concrete type
-	reporterRepresentation, ok := reporterRep.(ReporterRepresentation)
-	if !ok {
-		return ResourceEvent{}, fmt.Errorf("ResourceEvent: failed to convert reporter representation to expected type")
-	}
+	// Access the embedded ReporterRepresentation
+	reporterRepresentation := reporterRep.ReporterRepresentation
 
 	// Create CommonRepresentation
 	commonRepresentation, err := NewCommonRepresentation(

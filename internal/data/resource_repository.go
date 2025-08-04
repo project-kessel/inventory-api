@@ -29,7 +29,6 @@ type ResourceRepository interface {
 	NextReporterResourceId() (bizmodel.ReporterResourceId, error)
 	Save(tx *gorm.DB, resource bizmodel.Resource, operationType model_legacy.EventOperationType, txid string) error
 	FindResourceByKeys(tx *gorm.DB, key bizmodel.ReporterResourceKey) (*bizmodel.Resource, error)
-	GetNextTransactionID() (string, error)
 	GetDB() *gorm.DB
 	GetTransactionManager() usecase.TransactionManager
 }
@@ -62,14 +61,6 @@ func (r *resourceRepository) NextReporterResourceId() (bizmodel.ReporterResource
 	}
 
 	return bizmodel.NewReporterResourceId(uuidV7)
-}
-
-func (r *resourceRepository) GetNextTransactionID() (string, error) {
-	txid, err := uuid.NewV7()
-	if err != nil {
-		return "", err
-	}
-	return txid.String(), nil
 }
 
 func (r *resourceRepository) Save(tx *gorm.DB, resource bizmodel.Resource, operationType model_legacy.EventOperationType, txid string) error {

@@ -94,10 +94,15 @@ func New(resourceRepository data.ResourceRepository, reporterResourceRepository 
 
 func (uc *Usecase) ReportResource(request *v1beta2.ReportResourceRequest, reporterPrincipal string) error {
 	log.Info("Reporting resource request: ", request)
-
+	var subscription pubsub.Subscription
 	txidStr, err := getNextTransactionID()
 	if err != nil {
 		return err
+	}
+	readAfterWriteEnabled := computeReadAfterWrite(uc, request.WriteVisibility, reporterPrincipal)
+	if readAfterWriteEnabled && uc.Config.ConsumerEnabled {
+		subscription = uc.ListenManager.Subscribe(txidStr)
+		defer subscription.Unsubscribe()
 	}
 
 	reporterResourceKey, err := getReporterResourceKeyFromRequest(request)

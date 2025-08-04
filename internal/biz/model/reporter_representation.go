@@ -35,69 +35,49 @@ func (r ReporterRepresentation) IsTombstone() bool {
 }
 
 func NewReporterDataRepresentation(
-	reporterResourceIdVal string,
-	version uint,
-	generation uint,
-	data internal.JsonObject,
-	commonVersion uint,
-	reporterVersionVal *string,
+	reporterResourceID ReporterResourceId,
+	version Version,
+	generation Generation,
+	data Representation,
+	commonVersion Version,
+	reporterVersion *ReporterVersion,
 ) (ReporterDataRepresentation, error) {
-	if len(data) == 0 {
+	if reporterResourceID.UUID() == uuid.Nil {
+		return nil, fmt.Errorf("ReporterResourceId cannot be empty")
+	}
+
+	if len(data.Data()) == 0 {
 		return nil, fmt.Errorf("ReporterDataRepresentation requires non-empty data")
 	}
 
-	reporterResourceID, err := NewReporterResourceIdFromString(reporterResourceIdVal)
-	if err != nil {
-		return nil, err
-	}
-
-	var reporterVersion *ReporterVersion
-	if reporterVersionVal != nil {
-		rv, err := NewReporterVersion(*reporterVersionVal)
-		if err != nil {
-			return nil, err
-		}
-		reporterVersion = &rv
-	}
-
 	return ReporterRepresentation{
-		Representation:     Representation(data),
+		Representation:     data,
 		reporterResourceID: reporterResourceID,
-		version:            NewVersion(version),
-		generation:         NewGeneration(generation),
-		commonVersion:      NewVersion(commonVersion),
+		version:            version,
+		generation:         generation,
+		commonVersion:      commonVersion,
 		reporterVersion:    reporterVersion,
 		tombstone:          NewTombstone(false),
 	}, nil
 }
 
 func NewReporterDeleteRepresentation(
-	reporterResourceIDVal string,
-	version uint,
-	generation uint,
-	commonVersion uint,
-	reporterVersionVal *string,
+	reporterResourceID ReporterResourceId,
+	version Version,
+	generation Generation,
+	commonVersion Version,
+	reporterVersion *ReporterVersion,
 ) (ReporterDeleteRepresentation, error) {
-	reporterResourceID, err := NewReporterResourceIdFromString(reporterResourceIDVal)
-	if err != nil {
-		return nil, err
-	}
-
-	var reporterVersion *ReporterVersion
-	if reporterVersionVal != nil {
-		rv, err := NewReporterVersion(*reporterVersionVal)
-		if err != nil {
-			return nil, err
-		}
-		reporterVersion = &rv
+	if reporterResourceID.UUID() == uuid.Nil {
+		return nil, fmt.Errorf("ReporterResourceId cannot be empty")
 	}
 
 	return ReporterRepresentation{
 		Representation:     Representation(nil),
 		reporterResourceID: reporterResourceID,
-		version:            NewVersion(version),
-		generation:         NewGeneration(generation),
-		commonVersion:      NewVersion(commonVersion),
+		version:            version,
+		generation:         generation,
+		commonVersion:      commonVersion,
 		reporterVersion:    reporterVersion,
 		tombstone:          NewTombstone(true),
 	}, nil

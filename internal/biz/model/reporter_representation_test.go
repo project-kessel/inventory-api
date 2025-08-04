@@ -75,12 +75,12 @@ func TestReporterDataRepresentation_Initialization(t *testing.T) {
 		t.Parallel()
 
 		dataRep, err := NewReporterDataRepresentation(
-			fixture.ValidReporterResourceId,
-			fixture.ValidVersion,
-			fixture.ValidGeneration,
-			fixture.ValidData,
-			fixture.ValidCommonVersion,
-			fixture.ValidReporterVersion,
+			fixture.ValidReporterResourceIdType(),
+			fixture.ValidVersionType(),
+			fixture.ValidGenerationType(),
+			fixture.ValidRepresentationType(),
+			fixture.ValidCommonVersionType(),
+			fixture.ValidReporterVersionType(),
 		)
 
 		assertValidReporterDataRepresentation(t, dataRep, err, "valid inputs")
@@ -90,12 +90,12 @@ func TestReporterDataRepresentation_Initialization(t *testing.T) {
 		t.Parallel()
 
 		dataRep, err := NewReporterDataRepresentation(
-			fixture.ValidReporterResourceId,
-			fixture.ValidVersion,
-			fixture.ValidGeneration,
-			fixture.ValidData,
-			fixture.ValidCommonVersion,
-			fixture.NilReporterVersion,
+			fixture.ValidReporterResourceIdType(),
+			fixture.ValidVersionType(),
+			fixture.ValidGenerationType(),
+			fixture.ValidRepresentationType(),
+			fixture.ValidCommonVersionType(),
+			fixture.NilReporterVersionType(),
 		)
 
 		assertValidReporterDataRepresentation(t, dataRep, err, "nil reporter version")
@@ -105,12 +105,12 @@ func TestReporterDataRepresentation_Initialization(t *testing.T) {
 		t.Parallel()
 
 		dataRep, err := NewReporterDataRepresentation(
-			fixture.ValidReporterResourceId,
-			fixture.ValidVersion,
-			fixture.ValidGeneration,
-			fixture.NilData,
-			fixture.ValidCommonVersion,
-			fixture.ValidReporterVersion,
+			fixture.ValidReporterResourceIdType(),
+			fixture.ValidVersionType(),
+			fixture.ValidGenerationType(),
+			fixture.NilRepresentationType(),
+			fixture.ValidCommonVersionType(),
+			fixture.ValidReporterVersionType(),
 		)
 
 		assertInvalidReporterDataRepresentation(t, dataRep, err, "ReporterDataRepresentation requires non-empty data")
@@ -120,12 +120,12 @@ func TestReporterDataRepresentation_Initialization(t *testing.T) {
 		t.Parallel()
 
 		dataRep, err := NewReporterDataRepresentation(
-			fixture.ValidReporterResourceId,
-			fixture.ValidVersion,
-			fixture.ValidGeneration,
-			fixture.EmptyData,
-			fixture.ValidCommonVersion,
-			fixture.ValidReporterVersion,
+			fixture.ValidReporterResourceIdType(),
+			fixture.ValidVersionType(),
+			fixture.ValidGenerationType(),
+			fixture.EmptyRepresentationType(),
+			fixture.ValidCommonVersionType(),
+			fixture.ValidReporterVersionType(),
 		)
 
 		assertInvalidReporterDataRepresentation(t, dataRep, err, "ReporterDataRepresentation requires non-empty data")
@@ -135,12 +135,12 @@ func TestReporterDataRepresentation_Initialization(t *testing.T) {
 		t.Parallel()
 
 		dataRep, err := NewReporterDataRepresentation(
-			fixture.EmptyReporterResourceId,
-			fixture.ValidVersion,
-			fixture.ValidGeneration,
-			fixture.ValidData,
-			fixture.ValidCommonVersion,
-			fixture.ValidReporterVersion,
+			fixture.EmptyReporterResourceIdType(),
+			fixture.ValidVersionType(),
+			fixture.ValidGenerationType(),
+			fixture.ValidRepresentationType(),
+			fixture.ValidCommonVersionType(),
+			fixture.ValidReporterVersionType(),
 		)
 
 		assertInvalidReporterDataRepresentation(t, dataRep, err, "ReporterResourceId cannot be empty")
@@ -150,12 +150,12 @@ func TestReporterDataRepresentation_Initialization(t *testing.T) {
 		t.Parallel()
 
 		dataRep, err := NewReporterDataRepresentation(
-			fixture.WhitespaceReporterResourceId,
-			fixture.ValidVersion,
-			fixture.ValidGeneration,
-			fixture.ValidData,
-			fixture.ValidCommonVersion,
-			fixture.ValidReporterVersion,
+			fixture.WhitespaceReporterResourceIdType(),
+			fixture.ValidVersionType(),
+			fixture.ValidGenerationType(),
+			fixture.ValidRepresentationType(),
+			fixture.ValidCommonVersionType(),
+			fixture.ValidReporterVersionType(),
 		)
 
 		assertInvalidReporterDataRepresentation(t, dataRep, err, "ReporterResourceId cannot be empty")
@@ -165,15 +165,15 @@ func TestReporterDataRepresentation_Initialization(t *testing.T) {
 		t.Parallel()
 
 		dataRep, err := NewReporterDataRepresentation(
-			fixture.InvalidReporterResourceId,
-			fixture.ValidVersion,
-			fixture.ValidGeneration,
-			fixture.ValidData,
-			fixture.ValidCommonVersion,
-			fixture.ValidReporterVersion,
+			fixture.InvalidReporterResourceIdType(),
+			fixture.ValidVersionType(),
+			fixture.ValidGenerationType(),
+			fixture.ValidRepresentationType(),
+			fixture.ValidCommonVersionType(),
+			fixture.ValidReporterVersionType(),
 		)
 
-		assertInvalidReporterDataRepresentation(t, dataRep, err, "invalid UUID")
+		assertInvalidReporterDataRepresentation(t, dataRep, err, "ReporterResourceId cannot be empty")
 	})
 }
 
@@ -185,11 +185,11 @@ func TestReporterDeleteRepresentation_Initialization(t *testing.T) {
 		t.Parallel()
 
 		deleteRep, err := NewReporterDeleteRepresentation(
-			fixture.ValidReporterResourceId,
-			fixture.ValidVersion,
-			fixture.ValidGeneration,
-			fixture.ValidCommonVersion,
-			fixture.ValidReporterVersion,
+			fixture.ValidReporterResourceIdType(),
+			fixture.ValidVersionType(),
+			fixture.ValidGenerationType(),
+			fixture.ValidCommonVersionType(),
+			fixture.ValidReporterVersionType(),
 		)
 
 		assertValidReporterDeleteRepresentation(t, deleteRep, err, "valid inputs")
@@ -199,11 +199,11 @@ func TestReporterDeleteRepresentation_Initialization(t *testing.T) {
 		t.Parallel()
 
 		deleteRep, err := NewReporterDeleteRepresentation(
-			fixture.ValidReporterResourceId,
-			fixture.ValidVersion,
-			fixture.ValidGeneration,
-			fixture.ValidCommonVersion,
-			fixture.NilReporterVersion,
+			fixture.ValidReporterResourceIdType(),
+			fixture.ValidVersionType(),
+			fixture.ValidGenerationType(),
+			fixture.ValidCommonVersionType(),
+			fixture.NilReporterVersionType(),
 		)
 
 		assertValidReporterDeleteRepresentation(t, deleteRep, err, "nil reporter version")
@@ -213,11 +213,11 @@ func TestReporterDeleteRepresentation_Initialization(t *testing.T) {
 		t.Parallel()
 
 		deleteRep, err := NewReporterDeleteRepresentation(
-			fixture.EmptyReporterResourceId,
-			fixture.ValidVersion,
-			fixture.ValidGeneration,
-			fixture.ValidCommonVersion,
-			fixture.ValidReporterVersion,
+			fixture.EmptyReporterResourceIdType(),
+			fixture.ValidVersionType(),
+			fixture.ValidGenerationType(),
+			fixture.ValidCommonVersionType(),
+			fixture.ValidReporterVersionType(),
 		)
 
 		assertInvalidReporterDeleteRepresentation(t, deleteRep, err, "ReporterResourceId cannot be empty")
@@ -227,11 +227,11 @@ func TestReporterDeleteRepresentation_Initialization(t *testing.T) {
 		t.Parallel()
 
 		deleteRep, err := NewReporterDeleteRepresentation(
-			fixture.WhitespaceReporterResourceId,
-			fixture.ValidVersion,
-			fixture.ValidGeneration,
-			fixture.ValidCommonVersion,
-			fixture.ValidReporterVersion,
+			fixture.WhitespaceReporterResourceIdType(),
+			fixture.ValidVersionType(),
+			fixture.ValidGenerationType(),
+			fixture.ValidCommonVersionType(),
+			fixture.ValidReporterVersionType(),
 		)
 
 		assertInvalidReporterDeleteRepresentation(t, deleteRep, err, "ReporterResourceId cannot be empty")
@@ -241,14 +241,14 @@ func TestReporterDeleteRepresentation_Initialization(t *testing.T) {
 		t.Parallel()
 
 		deleteRep, err := NewReporterDeleteRepresentation(
-			fixture.InvalidReporterResourceId,
-			fixture.ValidVersion,
-			fixture.ValidGeneration,
-			fixture.ValidCommonVersion,
-			fixture.ValidReporterVersion,
+			fixture.InvalidReporterResourceIdType(),
+			fixture.ValidVersionType(),
+			fixture.ValidGenerationType(),
+			fixture.ValidCommonVersionType(),
+			fixture.ValidReporterVersionType(),
 		)
 
-		assertInvalidReporterDeleteRepresentation(t, deleteRep, err, "invalid UUID")
+		assertInvalidReporterDeleteRepresentation(t, deleteRep, err, "ReporterResourceId cannot be empty")
 	})
 }
 
@@ -260,12 +260,12 @@ func TestReporterRepresentation_BusinessRules(t *testing.T) {
 		t.Parallel()
 
 		dataRep, err := NewReporterDataRepresentation(
-			fixture.ValidReporterResourceId,
-			fixture.ValidVersion,
-			fixture.ValidGeneration,
-			fixture.ValidData,
-			fixture.ValidCommonVersion,
-			fixture.ValidReporterVersion,
+			fixture.ValidReporterResourceIdType(),
+			fixture.ValidVersionType(),
+			fixture.ValidGenerationType(),
+			fixture.ValidRepresentationType(),
+			fixture.ValidCommonVersionType(),
+			fixture.ValidReporterVersionType(),
 		)
 
 		if err != nil {
@@ -280,11 +280,11 @@ func TestReporterRepresentation_BusinessRules(t *testing.T) {
 		t.Parallel()
 
 		deleteRep, err := NewReporterDeleteRepresentation(
-			fixture.ValidReporterResourceId,
-			fixture.ValidVersion,
-			fixture.ValidGeneration,
-			fixture.ValidCommonVersion,
-			fixture.ValidReporterVersion,
+			fixture.ValidReporterResourceIdType(),
+			fixture.ValidVersionType(),
+			fixture.ValidGenerationType(),
+			fixture.ValidCommonVersionType(),
+			fixture.ValidReporterVersionType(),
 		)
 
 		if err != nil {
@@ -304,11 +304,11 @@ func TestReporterRepresentation_BusinessRules(t *testing.T) {
 		t.Parallel()
 
 		deleteRep, err := NewReporterDeleteRepresentation(
-			fixture.ValidReporterResourceId,
-			fixture.ValidVersion,
-			fixture.ValidGeneration,
-			fixture.ValidCommonVersion,
-			fixture.ValidReporterVersion,
+			fixture.ValidReporterResourceIdType(),
+			fixture.ValidVersionType(),
+			fixture.ValidGenerationType(),
+			fixture.ValidCommonVersionType(),
+			fixture.ValidReporterVersionType(),
 		)
 
 		if err != nil {
@@ -328,12 +328,12 @@ func TestReporterRepresentation_BusinessRules(t *testing.T) {
 		t.Parallel()
 
 		dataRep, err := NewReporterDataRepresentation(
-			fixture.ValidReporterResourceId,
-			fixture.ValidVersion,
-			fixture.ValidGeneration,
-			fixture.ValidData,
-			fixture.ValidCommonVersion,
-			fixture.ValidReporterVersion,
+			fixture.ValidReporterResourceIdType(),
+			fixture.ValidVersionType(),
+			fixture.ValidGenerationType(),
+			fixture.ValidRepresentationType(),
+			fixture.ValidCommonVersionType(),
+			fixture.ValidReporterVersionType(),
 		)
 
 		if err != nil {
@@ -351,12 +351,12 @@ func TestReporterRepresentation_BusinessRules(t *testing.T) {
 		t.Parallel()
 
 		dataRep, err := NewReporterDataRepresentation(
-			fixture.ValidReporterResourceId,
+			fixture.ValidReporterResourceIdType(),
 			0, // zero version
 			0, // zero generation
-			fixture.ValidData,
+			fixture.ValidRepresentationType(),
 			0, // zero common version
-			fixture.ValidReporterVersion,
+			fixture.ValidReporterVersionType(),
 		)
 
 		if err != nil {

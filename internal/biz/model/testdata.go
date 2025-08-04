@@ -300,6 +300,63 @@ func NewCommonRepresentationTestFixture() CommonRepresentationTestFixture {
 	}
 }
 
+// Helper methods for creating domain types from test fixture
+func (f CommonRepresentationTestFixture) ValidResourceIdType() ResourceId {
+	resourceId, _ := NewResourceId(f.ValidResourceId)
+	return resourceId
+}
+
+func (f CommonRepresentationTestFixture) ValidRepresentationType() Representation {
+	representation, _ := NewRepresentation(f.ValidData)
+	return representation
+}
+
+func (f CommonRepresentationTestFixture) ValidVersionType() Version {
+	return NewVersion(f.ValidVersion)
+}
+
+func (f CommonRepresentationTestFixture) ZeroVersionType() Version {
+	return NewVersion(f.ZeroVersion)
+}
+
+func (f CommonRepresentationTestFixture) ValidReporterTypeType() ReporterType {
+	reporterType, _ := NewReporterType(f.ValidReportedByReporterType)
+	return reporterType
+}
+
+func (f CommonRepresentationTestFixture) ValidReporterInstanceIdType() ReporterInstanceId {
+	reporterInstanceId, _ := NewReporterInstanceId(f.ValidReportedByReporterInstance)
+	return reporterInstanceId
+}
+
+func (f CommonRepresentationTestFixture) NilResourceIdType() ResourceId {
+	return DeserializeResourceId(f.NilResourceId)
+}
+
+func (f CommonRepresentationTestFixture) EmptyRepresentationType() Representation {
+	return DeserializeRepresentation(f.EmptyData)
+}
+
+func (f CommonRepresentationTestFixture) NilRepresentationType() Representation {
+	return DeserializeRepresentation(f.NilData)
+}
+
+func (f CommonRepresentationTestFixture) EmptyReporterTypeType() ReporterType {
+	return DeserializeReporterType(f.EmptyReporterType)
+}
+
+func (f CommonRepresentationTestFixture) WhitespaceReporterTypeType() ReporterType {
+	return DeserializeReporterType(f.WhitespaceReporterType)
+}
+
+func (f CommonRepresentationTestFixture) EmptyReporterInstanceIdType() ReporterInstanceId {
+	return DeserializeReporterInstanceId(f.EmptyReporterInstance)
+}
+
+func (f CommonRepresentationTestFixture) WhitespaceReporterInstanceIdType() ReporterInstanceId {
+	return DeserializeReporterInstanceId(f.WhitespaceReporterInstance)
+}
+
 type ReporterResourceTestFixture struct {
 	ValidId                      uuid.UUID
 	ValidLocalResourceId         string
@@ -493,6 +550,64 @@ func NewReporterRepresentationTestFixture() ReporterRepresentationTestFixture {
 		WhitespaceReporterResourceId: "  \t\n  ",
 		InvalidReporterResourceId:    "invalid-uuid-format",
 	}
+}
+
+// Helper methods for creating domain types from test fixture
+func (f ReporterRepresentationTestFixture) ValidRepresentationType() Representation {
+	representation, _ := NewRepresentation(f.ValidData)
+	return representation
+}
+
+func (f ReporterRepresentationTestFixture) ValidReporterResourceIdType() ReporterResourceId {
+	reporterResourceId, _ := NewReporterResourceIdFromString(f.ValidReporterResourceId)
+	return reporterResourceId
+}
+
+func (f ReporterRepresentationTestFixture) ValidVersionType() Version {
+	return NewVersion(f.ValidVersion)
+}
+
+func (f ReporterRepresentationTestFixture) ValidGenerationType() Generation {
+	return NewGeneration(f.ValidGeneration)
+}
+
+func (f ReporterRepresentationTestFixture) ValidCommonVersionType() Version {
+	return NewVersion(f.ValidCommonVersion)
+}
+
+func (f ReporterRepresentationTestFixture) ValidReporterVersionType() *ReporterVersion {
+	if f.ValidReporterVersion == nil {
+		return nil
+	}
+	reporterVersion, _ := NewReporterVersion(*f.ValidReporterVersion)
+	return &reporterVersion
+}
+
+func (f ReporterRepresentationTestFixture) NilReporterVersionType() *ReporterVersion {
+	return nil
+}
+
+func (f ReporterRepresentationTestFixture) EmptyRepresentationType() Representation {
+	return DeserializeRepresentation(f.EmptyData)
+}
+
+func (f ReporterRepresentationTestFixture) NilRepresentationType() Representation {
+	return DeserializeRepresentation(f.NilData)
+}
+
+func (f ReporterRepresentationTestFixture) EmptyReporterResourceIdType() ReporterResourceId {
+	// For empty string, use nil UUID since that's what we'd get from parsing empty string
+	return DeserializeReporterResourceId(uuid.Nil)
+}
+
+func (f ReporterRepresentationTestFixture) WhitespaceReporterResourceIdType() ReporterResourceId {
+	// For whitespace string, use nil UUID since that's what we'd get from parsing whitespace
+	return DeserializeReporterResourceId(uuid.Nil)
+}
+
+func (f ReporterRepresentationTestFixture) InvalidReporterResourceIdType() ReporterResourceId {
+	// For invalid string, use nil UUID since parsing would fail
+	return DeserializeReporterResourceId(uuid.Nil)
 }
 
 type ResourceTestFixture struct {
@@ -723,6 +838,46 @@ func (f ResourceTestFixture) EmptyRepresentationType() Representation {
 	return DeserializeRepresentation(f.EmptyReporterRepresentationData)
 }
 
+func (f ResourceTestFixture) NilIdType() ResourceId {
+	return DeserializeResourceId(f.NilId)
+}
+
+func (f ResourceTestFixture) EmptyLocalResourceIdType() LocalResourceId {
+	return DeserializeLocalResourceId(f.EmptyLocalResourceId)
+}
+
+func (f ResourceTestFixture) EmptyResourceTypeType() ResourceType {
+	return DeserializeResourceType(f.EmptyResourceType)
+}
+
+func (f ResourceTestFixture) EmptyReporterTypeType() ReporterType {
+	return DeserializeReporterType(f.EmptyReporterType)
+}
+
+func (f ResourceTestFixture) EmptyReporterInstanceIdType() ReporterInstanceId {
+	return DeserializeReporterInstanceId(f.EmptyReporterInstanceId)
+}
+
+func (f ResourceTestFixture) EmptyApiHrefType() ApiHref {
+	return DeserializeApiHref(f.EmptyApiHref)
+}
+
+func (f ResourceTestFixture) WhitespaceResourceTypeType() ResourceType {
+	return DeserializeResourceType(f.WhitespaceResourceType)
+}
+
+func (f ResourceTestFixture) WhitespaceReporterTypeType() ReporterType {
+	return DeserializeReporterType(f.WhitespaceReporterType)
+}
+
+func (f ResourceTestFixture) WhitespaceReporterInstanceIdType() ReporterInstanceId {
+	return DeserializeReporterInstanceId(f.WhitespaceReporterInstanceId)
+}
+
+func (f ResourceTestFixture) WhitespaceLocalResourceIdType() LocalResourceId {
+	return DeserializeLocalResourceId(f.WhitespaceLocalResourceId)
+}
+
 type ResourceEventTestFixture struct {
 	ValidResourceId         uuid.UUID
 	ValidResourceType       string
@@ -783,4 +938,116 @@ func NewResourceEventTestFixture() ResourceEventTestFixture {
 		EmptyCommonData:         internal.JsonObject{},
 		WhitespaceResourceType:  "  \t\n  ",
 	}
+}
+
+// Helper methods for creating domain types from test fixture
+func (f ResourceEventTestFixture) ValidResourceIdType() ResourceId {
+	resourceId, _ := NewResourceId(f.ValidResourceId)
+	return resourceId
+}
+
+func (f ResourceEventTestFixture) ValidResourceTypeType() ResourceType {
+	resourceType, _ := NewResourceType(f.ValidResourceType)
+	return resourceType
+}
+
+func (f ResourceEventTestFixture) ValidReporterTypeType() ReporterType {
+	reporterType, _ := NewReporterType(f.ValidReporterType)
+	return reporterType
+}
+
+func (f ResourceEventTestFixture) ValidReporterInstanceIdType() ReporterInstanceId {
+	reporterInstanceId, _ := NewReporterInstanceId(f.ValidReporterInstanceId)
+	return reporterInstanceId
+}
+
+func (f ResourceEventTestFixture) ValidReporterDataType() Representation {
+	representation, _ := NewRepresentation(f.ValidReporterData)
+	return representation
+}
+
+func (f ResourceEventTestFixture) ValidReporterResourceIdType() ReporterResourceId {
+	reporterResourceId, _ := NewReporterResourceIdFromString(f.ValidReporterResourceID)
+	return reporterResourceId
+}
+
+func (f ResourceEventTestFixture) ValidReporterVersionType() Version {
+	return NewVersion(f.ValidReporterVersion)
+}
+
+func (f ResourceEventTestFixture) ValidReporterGenerationType() Generation {
+	return NewGeneration(f.ValidReporterGeneration)
+}
+
+func (f ResourceEventTestFixture) ValidCommonDataType() Representation {
+	representation, _ := NewRepresentation(f.ValidCommonData)
+	return representation
+}
+
+func (f ResourceEventTestFixture) ValidCommonVersionType() Version {
+	return NewVersion(f.ValidCommonVersion)
+}
+
+func (f ResourceEventTestFixture) ValidReporterVersionStrType() *ReporterVersion {
+	if f.ValidReporterVersionStr == nil {
+		return nil
+	}
+	reporterVersion, _ := NewReporterVersion(*f.ValidReporterVersionStr)
+	return &reporterVersion
+}
+
+func (f ResourceEventTestFixture) NilReporterVersionStrType() *ReporterVersion {
+	return nil
+}
+
+func (f ResourceEventTestFixture) AnotherResourceIdType() ResourceId {
+	resourceId, _ := NewResourceId(f.AnotherResourceId)
+	return resourceId
+}
+
+func (f ResourceEventTestFixture) AnotherResourceTypeType() ResourceType {
+	resourceType, _ := NewResourceType(f.AnotherResourceType)
+	return resourceType
+}
+
+func (f ResourceEventTestFixture) AnotherReporterDataType() Representation {
+	representation, _ := NewRepresentation(f.AnotherReporterData)
+	return representation
+}
+
+func (f ResourceEventTestFixture) AnotherCommonDataType() Representation {
+	representation, _ := NewRepresentation(f.AnotherCommonData)
+	return representation
+}
+
+func (f ResourceEventTestFixture) InvalidResourceIdType() ResourceId {
+	return DeserializeResourceId(f.InvalidResourceId)
+}
+
+func (f ResourceEventTestFixture) EmptyResourceTypeType() ResourceType {
+	return DeserializeResourceType(f.EmptyResourceType)
+}
+
+func (f ResourceEventTestFixture) WhitespaceResourceTypeType() ResourceType {
+	return DeserializeResourceType(f.WhitespaceResourceType)
+}
+
+func (f ResourceEventTestFixture) EmptyReporterTypeType() ReporterType {
+	return DeserializeReporterType(f.EmptyReporterType)
+}
+
+func (f ResourceEventTestFixture) EmptyReporterInstanceIdType() ReporterInstanceId {
+	return DeserializeReporterInstanceId(f.EmptyReporterInstanceId)
+}
+
+func (f ResourceEventTestFixture) EmptyReporterDataType() Representation {
+	return DeserializeRepresentation(f.EmptyReporterData)
+}
+
+func (f ResourceEventTestFixture) EmptyReporterResourceIdType() ReporterResourceId {
+	return DeserializeReporterResourceId(uuid.Nil)
+}
+
+func (f ResourceEventTestFixture) EmptyCommonDataType() Representation {
+	return DeserializeRepresentation(f.EmptyCommonData)
 }

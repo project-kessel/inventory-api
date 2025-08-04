@@ -22,51 +22,28 @@ type ResourceEvent struct {
 }
 
 func NewResourceEvent(
-	resourceIdVal uuid.UUID,
-	resourceTypeVal string,
-	reporterTypeVal string,
-	reporterInstanceIdVal string,
-	reporterData internal.JsonObject,
-	reporterResourceIDVal string,
-	reporterVersion uint,
-	reporterGeneration uint,
-	commonData internal.JsonObject,
-	commonVersion uint,
-	reporterVersionStr *string,
+	resourceId ResourceId,
+	resourceType ResourceType,
+	reporterType ReporterType,
+	reporterInstanceId ReporterInstanceId,
+	reporterData Representation,
+	reporterResourceID ReporterResourceId,
+	reporterVersion Version,
+	reporterGeneration Generation,
+	commonData Representation,
+	commonVersion Version,
+	reporterVersionVal *ReporterVersion,
 ) (ResourceEvent, error) {
-	// Create ResourceId
-	resourceId, err := NewResourceId(resourceIdVal)
-	if err != nil {
-		return ResourceEvent{}, fmt.Errorf("ResourceEvent invalid resource ID: %w", err)
-	}
-
-	// Create ResourceType
-	resourceType, err := NewResourceType(resourceTypeVal)
-	if err != nil {
-		return ResourceEvent{}, fmt.Errorf("ResourceEvent invalid resource type: %w", err)
-	}
-
-	// Create ReporterId
-	reporterType, err := NewReporterType(reporterTypeVal)
-	if err != nil {
-		return ResourceEvent{}, fmt.Errorf("ResourceEvent invalid reporter type: %w", err)
-	}
-
-	reporterInstanceId, err := NewReporterInstanceId(reporterInstanceIdVal)
-	if err != nil {
-		return ResourceEvent{}, fmt.Errorf("ResourceEvent invalid reporter instance ID: %w", err)
-	}
-
 	reporterId := NewReporterId(reporterType, reporterInstanceId)
 
 	// Create ReporterRepresentation
 	reporterRep, err := NewReporterDataRepresentation(
-		reporterResourceIDVal,
+		reporterResourceID,
 		reporterVersion,
 		reporterGeneration,
 		reporterData,
 		commonVersion,
-		reporterVersionStr,
+		reporterVersionVal,
 	)
 	if err != nil {
 		return ResourceEvent{}, fmt.Errorf("ResourceEvent invalid reporter representation: %w", err)
@@ -80,11 +57,11 @@ func NewResourceEvent(
 
 	// Create CommonRepresentation
 	commonRepresentation, err := NewCommonRepresentation(
-		resourceIdVal,
+		resourceId,
 		commonData,
 		commonVersion,
-		reporterTypeVal,
-		reporterInstanceIdVal,
+		reporterType,
+		reporterInstanceId,
 	)
 	if err != nil {
 		return ResourceEvent{}, fmt.Errorf("ResourceEvent invalid common representation: %w", err)

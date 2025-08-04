@@ -46,16 +46,16 @@ func NewResource(
 	}
 
 	resourceEvent, err := NewResourceEvent(
-		id.UUID(),
-		resourceType.String(),
-		reporterType.String(),
-		reporterInstanceId.String(),
-		reporterRepresentationData.Serialize(),
-		reporterResourceId.String(),
-		0,
-		0,
-		commonRepresentationData.Serialize(),
-		initialCommonVersion,
+		id,
+		resourceType,
+		reporterType,
+		reporterInstanceId,
+		reporterRepresentationData,
+		reporterResourceId,
+		reporterResource.representationVersion,
+		reporterResource.generation,
+		commonRepresentationData,
+		NewVersion(initialCommonVersion),
 		nil,
 	)
 	if err != nil {
@@ -206,24 +206,32 @@ func (r *Resource) Update(
 			key.LocalResourceId(), key.ResourceType(), key.ReporterType(), key.ReporterInstanceId())
 	}
 
-	var reporterVersionStr *string
-	if reporterVersion != nil {
-		versionStr := reporterVersion.String()
-		reporterVersionStr = &versionStr
+	// Extract domain types from key
+	keyResourceType, err := NewResourceType(key.ResourceType())
+	if err != nil {
+		return fmt.Errorf("invalid resource type from key: %w", err)
+	}
+	keyReporterType, err := NewReporterType(key.ReporterType())
+	if err != nil {
+		return fmt.Errorf("invalid reporter type from key: %w", err)
+	}
+	keyReporterInstanceId, err := NewReporterInstanceId(key.ReporterInstanceId())
+	if err != nil {
+		return fmt.Errorf("invalid reporter instance ID from key: %w", err)
 	}
 
 	resourceEvent, err := NewResourceEvent(
-		reporterResourceToUpdate.Id().UUID(),
-		key.ResourceType(),
-		key.ReporterType(),
-		key.ReporterInstanceId(),
-		reporterData.Serialize(),
-		r.id.String(),
-		reporterResourceToUpdate.representationVersion.Uint(),
-		reporterResourceToUpdate.generation.Uint(),
-		commonData.Serialize(),
-		r.commonVersion.Uint(),
-		reporterVersionStr,
+		r.id,
+		keyResourceType,
+		keyReporterType,
+		keyReporterInstanceId,
+		reporterData,
+		reporterResourceToUpdate.Id(),
+		reporterResourceToUpdate.representationVersion,
+		reporterResourceToUpdate.generation,
+		commonData,
+		r.commonVersion,
+		reporterVersion,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create updated ResourceEvent: %w", err)

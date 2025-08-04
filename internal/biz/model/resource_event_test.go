@@ -15,17 +15,17 @@ func TestResourceEvent_Initialization(t *testing.T) {
 		t.Parallel()
 
 		event, err := NewResourceEvent(
-			fixture.ValidResourceId,
-			fixture.ValidResourceType,
-			fixture.ValidReporterType,
-			fixture.ValidReporterInstanceId,
-			fixture.ValidReporterData,
-			fixture.ValidReporterResourceID,
-			fixture.ValidReporterVersion,
-			fixture.ValidReporterGeneration,
-			fixture.ValidCommonData,
-			fixture.ValidCommonVersion,
-			fixture.ValidReporterVersionStr,
+			fixture.ValidResourceIdType(),
+			fixture.ValidResourceTypeType(),
+			fixture.ValidReporterTypeType(),
+			fixture.ValidReporterInstanceIdType(),
+			fixture.ValidReporterDataType(),
+			fixture.ValidReporterResourceIdType(),
+			fixture.ValidReporterVersionType(),
+			fixture.ValidReporterGenerationType(),
+			fixture.ValidCommonDataType(),
+			fixture.ValidCommonVersionType(),
+			fixture.ValidReporterVersionStrType(),
 		)
 
 		assertValidResourceEvent(t, event, err, "valid inputs")
@@ -35,17 +35,17 @@ func TestResourceEvent_Initialization(t *testing.T) {
 		t.Parallel()
 
 		event, err := NewResourceEvent(
-			fixture.ValidResourceId,
-			fixture.ValidResourceType,
-			fixture.ValidReporterType,
-			fixture.ValidReporterInstanceId,
-			fixture.ValidReporterData,
-			fixture.ValidReporterResourceID,
-			fixture.ValidReporterVersion,
-			fixture.ValidReporterGeneration,
-			fixture.ValidCommonData,
-			fixture.ValidCommonVersion,
-			fixture.NilReporterVersionStr,
+			fixture.ValidResourceIdType(),
+			fixture.ValidResourceTypeType(),
+			fixture.ValidReporterTypeType(),
+			fixture.ValidReporterInstanceIdType(),
+			fixture.ValidReporterDataType(),
+			fixture.ValidReporterResourceIdType(),
+			fixture.ValidReporterVersionType(),
+			fixture.ValidReporterGenerationType(),
+			fixture.ValidCommonDataType(),
+			fixture.ValidCommonVersionType(),
+			fixture.NilReporterVersionStrType(),
 		)
 
 		assertValidResourceEvent(t, event, err, "nil reporter version")
@@ -55,181 +55,24 @@ func TestResourceEvent_Initialization(t *testing.T) {
 		t.Parallel()
 
 		event, err := NewResourceEvent(
-			fixture.AnotherResourceId,
-			fixture.AnotherResourceType,
-			fixture.ValidReporterType,
-			fixture.ValidReporterInstanceId,
-			fixture.AnotherReporterData,
-			fixture.ValidReporterResourceID,
-			fixture.ValidReporterVersion,
-			fixture.ValidReporterGeneration,
-			fixture.AnotherCommonData,
-			fixture.ValidCommonVersion,
-			fixture.NilReporterVersionStr,
+			fixture.AnotherResourceIdType(),
+			fixture.AnotherResourceTypeType(),
+			fixture.ValidReporterTypeType(),
+			fixture.ValidReporterInstanceIdType(),
+			fixture.AnotherReporterDataType(),
+			fixture.ValidReporterResourceIdType(),
+			fixture.ValidReporterVersionType(),
+			fixture.ValidReporterGenerationType(),
+			fixture.AnotherCommonDataType(),
+			fixture.ValidCommonVersionType(),
+			fixture.NilReporterVersionStrType(),
 		)
 
 		assertValidResourceEvent(t, event, err, "different values")
 	})
 
-	t.Run("should reject invalid resource id", func(t *testing.T) {
-		t.Parallel()
-
-		_, err := NewResourceEvent(
-			fixture.InvalidResourceId,
-			fixture.ValidResourceType,
-			fixture.ValidReporterType,
-			fixture.ValidReporterInstanceId,
-			fixture.ValidReporterData,
-			fixture.ValidReporterResourceID,
-			fixture.ValidReporterVersion,
-			fixture.ValidReporterGeneration,
-			fixture.ValidCommonData,
-			fixture.ValidCommonVersion,
-			fixture.ValidReporterVersionStr,
-		)
-
-		assertInvalidResourceEvent(t, err, "ResourceEvent invalid resource ID")
-	})
-
-	t.Run("should reject empty resource type", func(t *testing.T) {
-		t.Parallel()
-
-		_, err := NewResourceEvent(
-			fixture.ValidResourceId,
-			fixture.EmptyResourceType,
-			fixture.ValidReporterType,
-			fixture.ValidReporterInstanceId,
-			fixture.ValidReporterData,
-			fixture.ValidReporterResourceID,
-			fixture.ValidReporterVersion,
-			fixture.ValidReporterGeneration,
-			fixture.ValidCommonData,
-			fixture.ValidCommonVersion,
-			fixture.ValidReporterVersionStr,
-		)
-
-		assertInvalidResourceEvent(t, err, "ResourceEvent invalid resource type")
-	})
-
-	t.Run("should reject whitespace-only resource type", func(t *testing.T) {
-		t.Parallel()
-
-		_, err := NewResourceEvent(
-			fixture.ValidResourceId,
-			fixture.WhitespaceResourceType,
-			fixture.ValidReporterType,
-			fixture.ValidReporterInstanceId,
-			fixture.ValidReporterData,
-			fixture.ValidReporterResourceID,
-			fixture.ValidReporterVersion,
-			fixture.ValidReporterGeneration,
-			fixture.ValidCommonData,
-			fixture.ValidCommonVersion,
-			fixture.ValidReporterVersionStr,
-		)
-
-		assertInvalidResourceEvent(t, err, "ResourceEvent invalid resource type")
-	})
-
-	t.Run("should reject empty reporter type", func(t *testing.T) {
-		t.Parallel()
-
-		_, err := NewResourceEvent(
-			fixture.ValidResourceId,
-			fixture.ValidResourceType,
-			fixture.EmptyReporterType,
-			fixture.ValidReporterInstanceId,
-			fixture.ValidReporterData,
-			fixture.ValidReporterResourceID,
-			fixture.ValidReporterVersion,
-			fixture.ValidReporterGeneration,
-			fixture.ValidCommonData,
-			fixture.ValidCommonVersion,
-			fixture.ValidReporterVersionStr,
-		)
-
-		assertInvalidResourceEvent(t, err, "ResourceEvent invalid reporter")
-	})
-
-	t.Run("should reject empty reporter instance id", func(t *testing.T) {
-		t.Parallel()
-
-		_, err := NewResourceEvent(
-			fixture.ValidResourceId,
-			fixture.ValidResourceType,
-			fixture.ValidReporterType,
-			fixture.EmptyReporterInstanceId,
-			fixture.ValidReporterData,
-			fixture.ValidReporterResourceID,
-			fixture.ValidReporterVersion,
-			fixture.ValidReporterGeneration,
-			fixture.ValidCommonData,
-			fixture.ValidCommonVersion,
-			fixture.ValidReporterVersionStr,
-		)
-
-		assertInvalidResourceEvent(t, err, "ResourceEvent invalid reporter")
-	})
-
-	t.Run("should reject empty reporter data", func(t *testing.T) {
-		t.Parallel()
-
-		_, err := NewResourceEvent(
-			fixture.ValidResourceId,
-			fixture.ValidResourceType,
-			fixture.ValidReporterType,
-			fixture.ValidReporterInstanceId,
-			fixture.EmptyReporterData,
-			fixture.ValidReporterResourceID,
-			fixture.ValidReporterVersion,
-			fixture.ValidReporterGeneration,
-			fixture.ValidCommonData,
-			fixture.ValidCommonVersion,
-			fixture.ValidReporterVersionStr,
-		)
-
-		assertInvalidResourceEvent(t, err, "ResourceEvent invalid reporter representation")
-	})
-
-	t.Run("should reject empty reporter resource id", func(t *testing.T) {
-		t.Parallel()
-
-		_, err := NewResourceEvent(
-			fixture.ValidResourceId,
-			fixture.ValidResourceType,
-			fixture.ValidReporterType,
-			fixture.ValidReporterInstanceId,
-			fixture.ValidReporterData,
-			fixture.EmptyReporterResourceID,
-			fixture.ValidReporterVersion,
-			fixture.ValidReporterGeneration,
-			fixture.ValidCommonData,
-			fixture.ValidCommonVersion,
-			fixture.ValidReporterVersionStr,
-		)
-
-		assertInvalidResourceEvent(t, err, "ResourceEvent invalid reporter representation")
-	})
-
-	t.Run("should reject empty common data", func(t *testing.T) {
-		t.Parallel()
-
-		_, err := NewResourceEvent(
-			fixture.ValidResourceId,
-			fixture.ValidResourceType,
-			fixture.ValidReporterType,
-			fixture.ValidReporterInstanceId,
-			fixture.ValidReporterData,
-			fixture.ValidReporterResourceID,
-			fixture.ValidReporterVersion,
-			fixture.ValidReporterGeneration,
-			fixture.EmptyCommonData,
-			fixture.ValidCommonVersion,
-			fixture.ValidReporterVersionStr,
-		)
-
-		assertInvalidResourceEvent(t, err, "ResourceEvent invalid common representation")
-	})
+	// All tiny type validation tests have been moved to common_test.go where they belong.
+	// ResourceEvent tests should only test business logic with valid tiny types.
 }
 
 func assertValidResourceEvent(t *testing.T, event ResourceEvent, err error, context string) {

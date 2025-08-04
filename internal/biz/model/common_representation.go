@@ -2,6 +2,7 @@ package model
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/project-kessel/inventory-api/internal"
 
@@ -17,41 +18,36 @@ type CommonRepresentation struct {
 }
 
 func NewCommonRepresentation(
-	resourceIdVal uuid.UUID,
-	data internal.JsonObject,
-	versionVal uint,
-	reporterTypeVal string,
-	reporterInstanceIdVal string,
+	resourceId ResourceId,
+	data Representation,
+	version Version,
+	reporterType ReporterType,
+	reporterInstanceId ReporterInstanceId,
 ) (CommonRepresentation, error) {
-	if len(data) == 0 {
+	if resourceId.UUID() == uuid.Nil {
+		return CommonRepresentation{}, fmt.Errorf("CommonRepresentation invalid resource ID: ResourceId cannot be nil")
+	}
+
+	if strings.TrimSpace(string(reporterType)) == "" {
+		return CommonRepresentation{}, fmt.Errorf("CommonRepresentation invalid reporter type: ReporterType cannot be empty")
+	}
+
+	if strings.TrimSpace(string(reporterInstanceId)) == "" {
+		return CommonRepresentation{}, fmt.Errorf("CommonRepresentation invalid reporter instance ID: ReporterInstanceId cannot be empty")
+	}
+
+	if len(data.Data()) == 0 {
 		return CommonRepresentation{}, fmt.Errorf("CommonRepresentation requires non-empty data")
 	}
 
-	if data == nil {
+	if data.Data() == nil {
 		return CommonRepresentation{}, fmt.Errorf("CommonRepresentation requires non-empty data")
-	}
-
-	resourceId, err := NewResourceId(resourceIdVal)
-	if err != nil {
-		return CommonRepresentation{}, fmt.Errorf("CommonRepresentation invalid resource ID: %w", err)
-	}
-
-	reporterType, err := NewReporterType(reporterTypeVal)
-	if err != nil {
-		return CommonRepresentation{}, fmt.Errorf("CommonRepresentation invalid reporter type: %w", err)
-	}
-
-	reporterInstanceId, err := NewReporterInstanceId(reporterInstanceIdVal)
-	if err != nil {
-		return CommonRepresentation{}, fmt.Errorf("CommonRepresentation invalid reporter instance ID: %w", err)
 	}
 
 	reporter := NewReporterId(reporterType, reporterInstanceId)
 
-	version := NewVersion(versionVal)
-
 	return CommonRepresentation{
-		Representation: Representation(data),
+		Representation: data,
 		resourceId:     resourceId,
 		version:        version,
 		reporter:       reporter,

@@ -68,6 +68,8 @@ objects:
             volumeMounts:
                 - name: config-volume
                   mountPath: "/inventory"
+                - name: kafka-ca-certs
+                  mountPath: "/kafka-ca-certs"
                 - name: resource-volume
                   mountPath: "/data/schema/resources"
                 - name: resources-tarball
@@ -76,6 +78,10 @@ objects:
               - name: config-volume
                 secret:
                   secretName: ${INVENTORY_API_CONFIG_SECRET}
+              - name: kafka-ca-certs
+                secret:
+                  secretName: ${CA_CERT_SECRET}
+                  optional: true
               - name: resource-volume
                 emptyDir: { }
               - name: resources-tarball
@@ -162,3 +168,5 @@ parameters:
   - description: Name of the Inventory API Config K8s secret
     name: INVENTORY_API_CONFIG_SECRET
     value: inventory-api-config
+  - description: path to Kafka clusters' CA Cert in the pod
+    name: CA_CERT_SECRET

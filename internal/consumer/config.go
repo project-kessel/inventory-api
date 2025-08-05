@@ -63,6 +63,7 @@ func (c *Config) Complete() (CompletedConfig, []error) {
 				"sasl.mechanism":    c.AuthConfig.SASLMechanism,
 				"sasl.username":     c.AuthConfig.SASLUsername,
 				"sasl.password":     c.AuthConfig.SASLPassword,
+				"ssl.ca.location":   c.AuthConfig.CACertLocation,
 			}
 			for key, value := range authSettings {
 				if err := config.SetKey(key, value); err != nil {

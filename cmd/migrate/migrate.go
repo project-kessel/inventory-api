@@ -20,11 +20,6 @@ func NewCommand(options *storage.Options, loggerOptions common.LoggerOptions) *c
 			_, logger := common.InitLogger(common.GetLogLevel(), loggerOptions)
 			logHelper := log.NewHelper(log.With(logger, "group", "storage"))
 
-			if options.DisablePersistence {
-				logHelper.Info("Persistence disabled, skipping database migration...")
-				return nil
-			}
-
 			if errs := options.Complete(); errs != nil {
 				return errors.NewAggregate(errs)
 			}

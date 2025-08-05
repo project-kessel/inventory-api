@@ -10,7 +10,6 @@ objects:
     data:
       inventory-api-config.yaml: |
         storage:
-          disable-persistence: false
           max-serialization-retries: 10
         authn:
           allow-unauthenticated: true

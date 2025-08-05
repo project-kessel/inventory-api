@@ -101,7 +101,7 @@ func TestCreateRelationshipAlreadyExists(t *testing.T) {
 	repo.On("FindResourceIdByReporterResourceId", mock.Anything, mock.Anything).Return(oid, nil).Once()
 	repo.On("FindRelationship", mock.Anything, sid, oid, mock.Anything).Return(&model_legacy.Relationship{}, nil)
 
-	useCase := New(repo, nil, log.DefaultLogger, false)
+	useCase := New(repo, nil, log.DefaultLogger)
 	ctx := context.TODO()
 
 	_, err = useCase.Create(ctx, r)
@@ -127,7 +127,7 @@ func TestCreateSubjectNotFound(t *testing.T) {
 		ReporterType:    reporterType,
 	}).Return(uuid.Nil, gorm.ErrRecordNotFound).Once()
 
-	useCase := New(repo, nil, log.DefaultLogger, false)
+	useCase := New(repo, nil, log.DefaultLogger)
 	ctx := context.TODO()
 
 	_, err = useCase.Create(ctx, r)
@@ -158,7 +158,7 @@ func TestCreateObjectNotFound(t *testing.T) {
 		ReporterType:    reporterType,
 	}).Return(uuid.Nil, gorm.ErrRecordNotFound)
 
-	useCase := New(repo, nil, log.DefaultLogger, false)
+	useCase := New(repo, nil, log.DefaultLogger)
 	ctx := context.TODO()
 
 	_, err = useCase.Create(ctx, r)
@@ -187,7 +187,7 @@ func TestCreateNewRelationship(t *testing.T) {
 	repo.On("FindRelationship", mock.Anything, sid, oid, mock.Anything).Return((*model_legacy.Relationship)(nil), gorm.ErrRecordNotFound)
 	repo.On("Save", mock.Anything, mock.Anything).Return(&returnedRelationship, nil)
 
-	useCase := New(repo, nil, log.DefaultLogger, false)
+	useCase := New(repo, nil, log.DefaultLogger)
 	ctx := context.TODO()
 
 	rCreated, err := useCase.Create(ctx, r)
@@ -224,7 +224,7 @@ func TestUpdateNewRelationshipCreatesIt(t *testing.T) {
 	repo.On("FindRelationship", mock.Anything, sid, oid, mock.Anything).Return((*model_legacy.Relationship)(nil), gorm.ErrRecordNotFound)
 	repo.On("Save", mock.Anything, mock.Anything).Return(&returnedRelationship, nil)
 
-	useCase := New(repo, nil, log.DefaultLogger, false)
+	useCase := New(repo, nil, log.DefaultLogger)
 	ctx := context.TODO()
 
 	rCreated, err := useCase.Update(ctx, r, model_legacy.ReporterRelationshipId{})
@@ -260,7 +260,7 @@ func TestUpdateExistingRelationship(t *testing.T) {
 	repo.On("FindRelationship", mock.Anything, sid, oid, mock.Anything).Return(r, nil)
 	repo.On("Update", mock.Anything, mock.Anything, mock.Anything).Return(&returnRelationship, nil)
 
-	useCase := New(repo, nil, log.DefaultLogger, false)
+	useCase := New(repo, nil, log.DefaultLogger)
 	ctx := context.TODO()
 
 	rUpdated, err := useCase.Update(ctx, r, model_legacy.ReporterRelationshipId{})
@@ -280,7 +280,7 @@ func TestDeleteNonexistentRelationship(t *testing.T) {
 	repo.On("FindResourceIdByReporterResourceId", mock.Anything, mock.Anything).Return(uuid.Nil, nil).Once()
 	repo.On("FindRelationship", mock.Anything, uuid.Nil, uuid.Nil, mock.Anything).Return((*model_legacy.Relationship)(nil), gorm.ErrRecordNotFound)
 
-	useCase := New(repo, nil, log.DefaultLogger, false)
+	useCase := New(repo, nil, log.DefaultLogger)
 	ctx := context.TODO()
 
 	err := useCase.Delete(ctx, model_legacy.ReporterRelationshipId{})
@@ -303,111 +303,10 @@ func TestDeleteRelationship(t *testing.T) {
 	}, nil)
 	repo.On("Delete", mock.Anything, rid).Return(&model_legacy.Relationship{}, nil)
 
-	useCase := New(repo, nil, log.DefaultLogger, false)
+	useCase := New(repo, nil, log.DefaultLogger)
 
 	err = useCase.Delete(ctx, model_legacy.ReporterRelationshipId{})
 	assert.Nil(t, err)
 
 	repo.AssertExpectations(t)
-}
-
-func TestCreateRelationship_PersistenceDisabled(t *testing.T) {
-	ctx := context.TODO()
-
-	sid, err := uuid.NewV7()
-	assert.Nil(t, err)
-	oid, err := uuid.NewV7()
-	assert.Nil(t, err)
-
-	r := relationship1(sid, oid)
-	repo := &MockedRelationshipRepository{}
-
-	// Mock as if persistence is not disabled, for assurance
-	repo.On("FindResourceIdByReporterResourceId", mock.Anything, mock.Anything).Return(sid, nil).Once()
-	repo.On("FindResourceIdByReporterResourceId", mock.Anything, mock.Anything).Return(oid, nil).Once()
-	repo.On("FindRelationship", mock.Anything, sid, oid, mock.Anything).Return((*model_legacy.Relationship)(nil), gorm.ErrRecordNotFound)
-	repo.On("Save", mock.Anything, mock.Anything).Return(&r, nil)
-
-	disablePersistence := true
-	useCase := New(repo, nil, log.DefaultLogger, disablePersistence)
-
-	rCreated, err := useCase.Create(ctx, r)
-	assert.Nil(t, err)
-	assert.Equal(t, sid, r.SubjectId)
-	assert.Equal(t, oid, r.ObjectId)
-	assert.Equal(t, r, rCreated)
-
-	// Assert that the repository methods were not called since persistence is disabled
-	repo.AssertNotCalled(t, "FindResourceIdByReporterResourceId")
-	repo.AssertNotCalled(t, "FindRelationship")
-	repo.AssertNotCalled(t, "Save")
-}
-
-func TestUpdateRelationship_PersistenceDisabled(t *testing.T) {
-	ctx := context.TODO()
-
-	sid, err := uuid.NewV7()
-	assert.Nil(t, err)
-	oid, err := uuid.NewV7()
-	assert.Nil(t, err)
-	rid, err := uuid.NewV7()
-	assert.Nil(t, err)
-
-	r := relationship1(sid, oid)
-	repo := &MockedRelationshipRepository{}
-
-	// Mock as if persistence is not disabled, for assurance
-	repo.On("FindResourceIdByReporterResourceId", mock.Anything, mock.Anything).Return(oid, nil)
-	repo.On("FindResourceIdByReporterResourceId", mock.Anything, mock.Anything).Return(sid, nil)
-	repo.On("FindRelationship", mock.Anything, oid, sid, mock.Anything).Return(&model_legacy.Relationship{
-		ID: rid,
-	}, nil)
-	repo.On("Update", mock.Anything, mock.Anything, mock.Anything).Return(r, nil)
-	repo.On("Save", mock.Anything, mock.Anything, mock.Anything).Return(r, nil)
-
-	disablePersistence := true
-	useCase := New(repo, nil, log.DefaultLogger, disablePersistence)
-
-	rUpdated, err := useCase.Update(ctx, r, model_legacy.ReporterRelationshipId{})
-	assert.Nil(t, err)
-	assert.Equal(t, sid, r.SubjectId)
-	assert.Equal(t, oid, r.ObjectId)
-	assert.Equal(t, r, rUpdated)
-
-	// Assert that the repository methods were not called since persistence is disabled
-	repo.AssertNotCalled(t, "FindResourceIdByReporterResourceId")
-	repo.AssertNotCalled(t, "FindRelationship")
-	repo.AssertNotCalled(t, "Update")
-	repo.AssertNotCalled(t, "Save")
-}
-
-func TestDeleteRelationship_PersistenceDisabled(t *testing.T) {
-	ctx := context.TODO()
-
-	sid, err := uuid.NewV7()
-	assert.Nil(t, err)
-	oid, err := uuid.NewV7()
-	assert.Nil(t, err)
-	rid, err := uuid.NewV7()
-	assert.Nil(t, err)
-
-	repo := &MockedRelationshipRepository{}
-
-	// Mock as if persistence is not disabled, for assurance
-	repo.On("FindResourceIdByReporterResourceId", mock.Anything, mock.Anything).Return(sid, nil)
-	repo.On("FindRelationship", mock.Anything, sid, oid, mock.Anything).Return(&model_legacy.Relationship{
-		ID: rid,
-	}, nil)
-	repo.On("Delete", mock.Anything, rid).Return(&model_legacy.Relationship{}, nil)
-
-	disablePersistence := true
-	useCase := New(repo, nil, log.DefaultLogger, disablePersistence)
-
-	err = useCase.Delete(ctx, model_legacy.ReporterRelationshipId{})
-	assert.Nil(t, err)
-
-	// Assert that the repository methods were not called since persistence is disabled
-	repo.AssertNotCalled(t, "FindResourceIdByReporterResourceId")
-	repo.AssertNotCalled(t, "FindRelationship")
-	repo.AssertNotCalled(t, "Delete")
 }

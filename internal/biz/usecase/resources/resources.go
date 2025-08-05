@@ -63,7 +63,6 @@ const listenTimeout = 10 * time.Second
 // UsecaseConfig contains configuration flags that control the behavior of usecase operations.
 // These flags should be consistent across all handlers.
 type UsecaseConfig struct {
-	DisablePersistence      bool
 	ReadAfterWriteEnabled   bool
 	ReadAfterWriteAllowlist []string
 	ConsumerEnabled         bool
@@ -105,77 +104,75 @@ func New(reporterResourceRepository ReporterResourceRepository, inventoryResourc
 // It supports read-after-write consistency when enabled and handles notification waiting.
 func (uc *Usecase) Upsert(ctx context.Context, m *model_legacy.Resource, write_visibility v1beta2.WriteVisibility) (*model_legacy.Resource, error) {
 	log.Info("upserting resource: ", m)
-	ret := m // Default to returning the input model_legacy in case persistence is disabled
+	var ret *model_legacy.Resource
 	var subscription pubsub.Subscription
 	var txidStr string
 
-	if !uc.Config.DisablePersistence {
-		// check if the resource already exists
-		existingResource, err := uc.ReporterResourceRepository.FindByReporterResourceIdv1beta2(ctx, model_legacy.ReporterResourceIdv1beta2FromResource(m))
+	// check if the resource already exists
+	existingResource, err := uc.ReporterResourceRepository.FindByReporterResourceIdv1beta2(ctx, model_legacy.ReporterResourceIdv1beta2FromResource(m))
 
-		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, ErrDatabaseError
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, ErrDatabaseError
+	}
+
+	readAfterWriteEnabled := computeReadAfterWrite(uc, write_visibility, m)
+	if readAfterWriteEnabled && uc.Config.ConsumerEnabled {
+		// Generate txid for data layer
+		// TODO: Replace this when inventory api has proper api-level transaction ids
+		txid, err := uuid.NewV7()
+		if err != nil {
+			return nil, err
 		}
+		txidStr = txid.String()
+		subscription = uc.ListenManager.Subscribe(txidStr)
+		defer subscription.Unsubscribe()
+	}
 
-		readAfterWriteEnabled := computeReadAfterWrite(uc, write_visibility, m)
-		if readAfterWriteEnabled && uc.Config.ConsumerEnabled {
-			// Generate txid for data layer
-			// TODO: Replace this when inventory api has proper api-level transaction ids
-			txid, err := uuid.NewV7()
+	log.Info("found existing resource: ", existingResource)
+	if existingResource != nil {
+		return updateExistingReporterResource(ctx, m, existingResource, uc, txidStr)
+	}
+
+	//TODO: Bug here that needs to be fixed : https://issues.redhat.com/browse/RHCLOUD-39044
+	if m.InventoryId != nil {
+		err2 := validateSameResourceFromMultipleReportersShareInventoryId(ctx, m, uc)
+		if err2 != nil {
+			return nil, err2
+		}
+	}
+
+	log.Info("Creating resource: ", m)
+	ret, err = createNewReporterResource(ctx, m, uc, txidStr)
+	if err != nil {
+		return ret, err
+	}
+
+	if readAfterWriteEnabled && uc.Config.ConsumerEnabled {
+		timeoutCtx, cancel := context.WithTimeout(ctx, listenTimeout)
+		defer cancel()
+
+		_, err := uc.waitForNotifBreaker.Execute(func() (interface{}, error) {
+			err = subscription.BlockForNotification(timeoutCtx)
 			if err != nil {
+				// Return error for circuit breaker
 				return nil, err
 			}
-			txidStr = txid.String()
-			subscription = uc.ListenManager.Subscribe(txidStr)
-			defer subscription.Unsubscribe()
-		}
+			return nil, nil
+		})
 
-		log.Info("found existing resource: ", existingResource)
-		if existingResource != nil {
-			return updateExistingReporterResource(ctx, m, existingResource, uc, txidStr)
-		}
-
-		//TODO: Bug here that needs to be fixed : https://issues.redhat.com/browse/RHCLOUD-39044
-		if m.InventoryId != nil {
-			err2 := validateSameResourceFromMultipleReportersShareInventoryId(ctx, m, uc)
-			if err2 != nil {
-				return nil, err2
-			}
-		}
-
-		log.Info("Creating resource: ", m)
-		ret, err = createNewReporterResource(ctx, m, uc, txidStr)
 		if err != nil {
-			return ret, err
-		}
-
-		if readAfterWriteEnabled && uc.Config.ConsumerEnabled {
-			timeoutCtx, cancel := context.WithTimeout(ctx, listenTimeout)
-			defer cancel()
-
-			_, err := uc.waitForNotifBreaker.Execute(func() (interface{}, error) {
-				err = subscription.BlockForNotification(timeoutCtx)
-				if err != nil {
-					// Return error for circuit breaker
-					return nil, err
-				}
-				return nil, nil
-			})
-
-			if err != nil {
-				switch {
-				case errors.Is(err, pubsub.ErrWaitContextCancelled):
-					uc.Log.WithContext(ctx).Debugf("Reached timeout waiting for notification from consumer")
-					return ret, nil
-				case errors.Is(err, gobreaker.ErrOpenState):
-					uc.Log.WithContext(ctx).Debugf("Circuit breaker is open, skipped waiting for notification from consumer")
-					return ret, nil
-				case errors.Is(err, gobreaker.ErrTooManyRequests):
-					uc.Log.WithContext(ctx).Debugf("Circuit breaker is half-open, skipped waiting for notification from consumer")
-					return ret, nil
-				default:
-					return nil, err
-				}
+			switch {
+			case errors.Is(err, pubsub.ErrWaitContextCancelled):
+				uc.Log.WithContext(ctx).Debugf("Reached timeout waiting for notification from consumer")
+				return ret, nil
+			case errors.Is(err, gobreaker.ErrOpenState):
+				uc.Log.WithContext(ctx).Debugf("Circuit breaker is open, skipped waiting for notification from consumer")
+				return ret, nil
+			case errors.Is(err, gobreaker.ErrTooManyRequests):
+				uc.Log.WithContext(ctx).Debugf("Circuit breaker is half-open, skipped waiting for notification from consumer")
+				return ret, nil
+			default:
+				return nil, err
 			}
 		}
 	}
@@ -358,56 +355,55 @@ func (uc *Usecase) checkWorker(ctx context.Context, permission, namespace string
 //
 // Deprecated: Remove after notifications and ACM migrates to v1beta2.
 func (uc *Usecase) Create(ctx context.Context, m *model_legacy.Resource) (*model_legacy.Resource, error) {
-	ret := m // Default to returning the input model_legacy in case persistence is disabled
+	var ret *model_legacy.Resource
 	var subscription pubsub.Subscription
 	var txidStr string
 
-	if !uc.Config.DisablePersistence {
-		// check if the resource already exists
-		existingResource, err := uc.ReporterResourceRepository.FindByReporterData(ctx, m.ReporterId, m.ReporterResourceId)
-		if err != nil && errors.Is(err, gorm.ErrRecordNotFound) {
-			// Deprecated: fallback case for backwards compatibility
-			existingResource, err = uc.ReporterResourceRepository.FindByReporterResourceId(ctx, model_legacy.ReporterResourceIdFromResource(m))
-		}
+	// check if the resource already exists
+	existingResource, err := uc.ReporterResourceRepository.FindByReporterData(ctx, m.ReporterId, m.ReporterResourceId)
+	if err != nil && errors.Is(err, gorm.ErrRecordNotFound) {
+		// Deprecated: fallback case for backwards compatibility
+		existingResource, err = uc.ReporterResourceRepository.FindByReporterResourceId(ctx, model_legacy.ReporterResourceIdFromResource(m))
+	}
 
-		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, ErrDatabaseError
-		}
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, ErrDatabaseError
+	}
 
-		if existingResource != nil {
-			return nil, ErrResourceAlreadyExists
-		}
+	if existingResource != nil {
+		return nil, ErrResourceAlreadyExists
+	}
 
-		if !common.IsNil(uc.ListenManager) && uc.Config.ConsumerEnabled {
-			// Generate txid for data layer
-			// TODO: Replace this when inventory api has proper api-level transaction ids
-			txid, err := uuid.NewV7()
-			if err != nil {
-				return nil, err
-			}
-			txidStr = txid.String()
-			subscription = uc.ListenManager.Subscribe(txidStr)
-			defer subscription.Unsubscribe()
-		}
-
-		ret, err = uc.ReporterResourceRepository.Create(ctx, m, uc.Namespace, txidStr)
+	if !common.IsNil(uc.ListenManager) && uc.Config.ConsumerEnabled {
+		// Generate txid for data layer
+		// TODO: Replace this when inventory api has proper api-level transaction ids
+		txid, err := uuid.NewV7()
 		if err != nil {
 			return nil, err
 		}
+		txidStr = txid.String()
+		subscription = uc.ListenManager.Subscribe(txidStr)
+		defer subscription.Unsubscribe()
+	}
 
-		if !common.IsNil(uc.ListenManager) && uc.Config.ConsumerEnabled {
-			timeoutCtx, cancel := context.WithTimeout(ctx, listenTimeout)
-			defer cancel()
+	ret, err = uc.ReporterResourceRepository.Create(ctx, m, uc.Namespace, txidStr)
+	if err != nil {
+		return nil, err
+	}
 
-			err = subscription.BlockForNotification(timeoutCtx)
-			if err != nil {
-				if errors.Is(err, pubsub.ErrWaitContextCancelled) {
-					return ret, nil
-				}
-				return nil, err
+	if !common.IsNil(uc.ListenManager) && uc.Config.ConsumerEnabled {
+		timeoutCtx, cancel := context.WithTimeout(ctx, listenTimeout)
+		defer cancel()
+
+		err = subscription.BlockForNotification(timeoutCtx)
+		if err != nil {
+			if errors.Is(err, pubsub.ErrWaitContextCancelled) {
+				return ret, nil
 			}
+			return nil, err
 		}
 	}
+
 	uc.Log.WithContext(ctx).Infof("Created Resource: %v(%v)", ret.ID, ret.ResourceType)
 	return ret, nil
 }
@@ -417,54 +413,52 @@ func (uc *Usecase) Create(ctx context.Context, m *model_legacy.Resource) (*model
 //
 // Deprecated: Remove after notifications and ACM migrates to v1beta2.
 func (uc *Usecase) Update(ctx context.Context, m *model_legacy.Resource, id model_legacy.ReporterResourceId) (*model_legacy.Resource, error) {
-	ret := m // Default to returning the input model_legacy in case persistence is disabled
+	var ret *model_legacy.Resource
 	var subscription pubsub.Subscription
 	var txidStr string
 
-	if !uc.Config.DisablePersistence {
-		// check if the resource exists
-		existingResource, err := uc.ReporterResourceRepository.FindByReporterData(ctx, m.ReporterId, m.ReporterResourceId)
-		if err != nil && errors.Is(err, gorm.ErrRecordNotFound) {
-			// Deprecated: fallback case for backwards compatibility
-			existingResource, err = uc.ReporterResourceRepository.FindByReporterResourceId(ctx, model_legacy.ReporterResourceIdFromResource(m))
+	// check if the resource exists
+	existingResource, err := uc.ReporterResourceRepository.FindByReporterData(ctx, m.ReporterId, m.ReporterResourceId)
+	if err != nil && errors.Is(err, gorm.ErrRecordNotFound) {
+		// Deprecated: fallback case for backwards compatibility
+		existingResource, err = uc.ReporterResourceRepository.FindByReporterResourceId(ctx, model_legacy.ReporterResourceIdFromResource(m))
+	}
+
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return uc.Create(ctx, m)
 		}
 
-		if err != nil {
-			if errors.Is(err, gorm.ErrRecordNotFound) {
-				return uc.Create(ctx, m)
-			}
+		return nil, ErrDatabaseError
+	}
 
-			return nil, ErrDatabaseError
-		}
-
-		if !common.IsNil(uc.ListenManager) && uc.Config.ConsumerEnabled {
-			// Generate txid for data layer
-			// TODO: Replace this when inventory api has proper api-level transaction ids
-			txid, err := uuid.NewV7()
-			if err != nil {
-				return nil, err
-			}
-			txidStr = txid.String()
-			subscription = uc.ListenManager.Subscribe(txidStr)
-			defer subscription.Unsubscribe()
-		}
-
-		ret, err = uc.ReporterResourceRepository.Update(ctx, m, existingResource.ID, uc.Namespace, txidStr)
+	if !common.IsNil(uc.ListenManager) && uc.Config.ConsumerEnabled {
+		// Generate txid for data layer
+		// TODO: Replace this when inventory api has proper api-level transaction ids
+		txid, err := uuid.NewV7()
 		if err != nil {
 			return nil, err
 		}
+		txidStr = txid.String()
+		subscription = uc.ListenManager.Subscribe(txidStr)
+		defer subscription.Unsubscribe()
+	}
 
-		if !common.IsNil(uc.ListenManager) && uc.Config.ConsumerEnabled {
-			timeoutCtx, cancel := context.WithTimeout(ctx, listenTimeout)
-			defer cancel()
+	ret, err = uc.ReporterResourceRepository.Update(ctx, m, existingResource.ID, uc.Namespace, txidStr)
+	if err != nil {
+		return nil, err
+	}
 
-			err = subscription.BlockForNotification(timeoutCtx)
-			if err != nil {
-				if errors.Is(err, pubsub.ErrWaitContextCancelled) {
-					return ret, nil
-				}
-				return nil, err
+	if !common.IsNil(uc.ListenManager) && uc.Config.ConsumerEnabled {
+		timeoutCtx, cancel := context.WithTimeout(ctx, listenTimeout)
+		defer cancel()
+
+		err = subscription.BlockForNotification(timeoutCtx)
+		if err != nil {
+			if errors.Is(err, pubsub.ErrWaitContextCancelled) {
+				return ret, nil
 			}
+			return nil, err
 		}
 	}
 
@@ -477,27 +471,25 @@ func (uc *Usecase) Update(ctx context.Context, m *model_legacy.Resource, id mode
 func (uc *Usecase) Delete(ctx context.Context, id model_legacy.ReporterResourceId) error {
 	m := &model_legacy.Resource{}
 
-	if !uc.Config.DisablePersistence {
-		// check if the resource exists
-		existingResource, err := uc.ReporterResourceRepository.FindByReporterData(ctx, id.ReporterId, id.LocalResourceId)
+	// check if the resource exists
+	existingResource, err := uc.ReporterResourceRepository.FindByReporterData(ctx, id.ReporterId, id.LocalResourceId)
 
-		if err != nil && errors.Is(err, gorm.ErrRecordNotFound) {
-			// Deprecated: fallback case for backwards compatibility
-			existingResource, err = uc.ReporterResourceRepository.FindByReporterResourceId(ctx, id)
+	if err != nil && errors.Is(err, gorm.ErrRecordNotFound) {
+		// Deprecated: fallback case for backwards compatibility
+		existingResource, err = uc.ReporterResourceRepository.FindByReporterResourceId(ctx, id)
+	}
+
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return ErrResourceNotFound
 		}
 
-		if err != nil {
-			if errors.Is(err, gorm.ErrRecordNotFound) {
-				return ErrResourceNotFound
-			}
+		return ErrDatabaseError
+	}
 
-			return ErrDatabaseError
-		}
-
-		m, err = uc.ReporterResourceRepository.Delete(ctx, existingResource.ID, uc.Namespace)
-		if err != nil {
-			return err
-		}
+	m, err = uc.ReporterResourceRepository.Delete(ctx, existingResource.ID, uc.Namespace)
+	if err != nil {
+		return err
 	}
 
 	uc.Log.WithContext(ctx).Infof("Deleted Resource: %v(%v)", m.ID, m.ResourceType)

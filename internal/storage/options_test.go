@@ -20,7 +20,6 @@ func TestNewOptions(t *testing.T) {
 			Postgres:                postgres.NewOptions(),
 			SqlLite3:                sqlite3.NewOptions(),
 			Database:                "sqlite3",
-			DisablePersistence:      false,
 			MaxSerializationRetries: 10,
 		},
 	}

@@ -196,7 +196,6 @@ stringData:
       read-after-write-enabled: true
       read-after-write-allowlist: ["*"]
     storage:
-      disable-persistence: false
       max-serialization-retries: 10
       database: postgres
       sqlite3:

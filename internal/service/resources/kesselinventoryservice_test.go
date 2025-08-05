@@ -443,7 +443,7 @@ func TestInventoryService_Check_Allowed(t *testing.T) {
 		Return(relationsV1beta1.CheckResponse_ALLOWED_TRUE, &relationsV1beta1.ConsistencyToken{}, nil).
 		Once()
 
-	cfg := &usecase.UsecaseConfig{DisablePersistence: true}
+	cfg := &usecase.UsecaseConfig{}
 	uc := &usecase.Usecase{
 		Authz:                      mockAuthz,
 		ReporterResourceRepository: mockRepo,
@@ -501,7 +501,7 @@ func TestInventoryService_CheckForUpdate_Allowed(t *testing.T) {
 		Return(relationsV1beta1.CheckForUpdateResponse_ALLOWED_TRUE, &relationsV1beta1.ConsistencyToken{}, nil).
 		Once()
 
-	cfg := &usecase.UsecaseConfig{DisablePersistence: true}
+	cfg := &usecase.UsecaseConfig{}
 	uc := &usecase.Usecase{
 		Authz:                      mockAuthz,
 		ReporterResourceRepository: mockRepo,
@@ -559,7 +559,7 @@ func TestInventoryService_Check_Denied(t *testing.T) {
 		Return(relationsV1beta1.CheckResponse_ALLOWED_FALSE, &relationsV1beta1.ConsistencyToken{}, nil).
 		Once()
 
-	cfg := &usecase.UsecaseConfig{DisablePersistence: true}
+	cfg := &usecase.UsecaseConfig{}
 	uc := &usecase.Usecase{
 		Authz:                      mockAuthz,
 		ReporterResourceRepository: mockRepo,
@@ -617,7 +617,7 @@ func TestInventoryService_CheckForUpdate_Denied(t *testing.T) {
 		Return(relationsV1beta1.CheckForUpdateResponse_ALLOWED_FALSE, &relationsV1beta1.ConsistencyToken{}, nil).
 		Once()
 
-	cfg := &usecase.UsecaseConfig{DisablePersistence: true}
+	cfg := &usecase.UsecaseConfig{}
 	uc := &usecase.Usecase{
 		Authz:                      mockAuthz,
 		ReporterResourceRepository: mockRepo,

@@ -12,17 +12,6 @@ func testLogger() *log.Helper {
 	return log.NewHelper(log.NewStdLogger(io.Discard))
 }
 
-func TestNew_DisabledPersistence(t *testing.T) {
-	cfg := CompletedConfig{
-		&completedConfig{
-			Options: &Options{DisablePersistence: true},
-		},
-	}
-	db, err := New(cfg, testLogger())
-	assert.NoError(t, err)
-	assert.Nil(t, db)
-}
-
 func TestNew_UnknownDatabase(t *testing.T) {
 	cfg := CompletedConfig{
 		&completedConfig{

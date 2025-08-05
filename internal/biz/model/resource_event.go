@@ -7,7 +7,6 @@ import (
 	"github.com/project-kessel/inventory-api/internal"
 
 	"github.com/google/uuid"
-	datamodel "github.com/project-kessel/inventory-api/internal/data/model"
 )
 
 type ResourceEvent struct {
@@ -131,30 +130,46 @@ func (re ResourceEvent) WorkspaceId() string {
 	return ""
 }
 
-func (re ResourceEvent) SerializeReporterRepresentation() (*datamodel.ReporterRepresentation, error) {
-	var reporterVersionStr *string
-	if re.reporterRepresentation.reporterVersion != nil {
-		versionStr := re.reporterRepresentation.reporterVersion.String()
-		reporterVersionStr = &versionStr
-	}
-
-	return datamodel.NewReporterRepresentation(
-		re.reporterRepresentation.Data(),
-		re.reporterRepresentation.reporterResourceID.String(),
-		uint(re.reporterRepresentation.version),
-		uint(re.reporterRepresentation.generation),
-		uint(re.reporterRepresentation.commonVersion),
-		re.reporterRepresentation.tombstone.Bool(),
-		reporterVersionStr,
-	)
+func (re ResourceEvent) SerializeReporterRepresentation() ReporterRepresentationSnapshot {
+	return re.reporterRepresentation.Serialize()
 }
 
-func (re ResourceEvent) SerializeCommonRepresentation() (*datamodel.CommonRepresentation, error) {
-	return datamodel.NewCommonRepresentation(
-		uuid.UUID(re.id),
-		re.commonRepresentation.Data(),
-		uint(re.commonRepresentation.version),
-		re.reporterId.reporterType.String(),
-		re.reporterId.reporterInstanceId.String(),
-	)
+func (re ResourceEvent) SerializeCommonRepresentation() CommonRepresentationSnapshot {
+	return re.commonRepresentation.Serialize()
+}
+
+// DeserializeResourceEvent creates a ResourceEvent from representation snapshots - direct initialization without validation
+func DeserializeResourceEvent(
+	reporterRepresentationSnapshot ReporterRepresentationSnapshot,
+	commonRepresentationSnapshot CommonRepresentationSnapshot,
+) ResourceEvent {
+	// Create domain tiny types directly from snapshot values
+	resourceId := ResourceId(commonRepresentationSnapshot.ResourceId)
+	resourceType := ResourceType(commonRepresentationSnapshot.ReportedByReporterType) // TODO: This might need adjustment
+	reporterType := ReporterType(commonRepresentationSnapshot.ReportedByReporterType)
+	reporterInstanceId := ReporterInstanceId(commonRepresentationSnapshot.ReportedByReporterInstance)
+
+	// Create reporter ID
+	reporterId := ReporterId{
+		reporterType:       reporterType,
+		reporterInstanceId: reporterInstanceId,
+	}
+
+	// Deserialize representations
+	reporterRepresentation := DeserializeReporterRepresentation(reporterRepresentationSnapshot)
+	commonRepresentation := DeserializeCommonRepresentation(commonRepresentationSnapshot)
+
+	// Create a placeholder ReporterResource since it's needed for the event
+	reporterResource := ReporterResource{} // TODO: This might need proper initialization
+
+	return ResourceEvent{
+		id:                     resourceId,
+		resourceType:           resourceType,
+		reporterId:             reporterId,
+		reporterResource:       reporterResource,
+		reporterRepresentation: reporterRepresentation,
+		commonRepresentation:   commonRepresentation,
+		createdAt:              commonRepresentationSnapshot.CreatedAt,
+		updatedAt:              commonRepresentationSnapshot.CreatedAt, // TODO: Add UpdatedAt to snapshots if needed
+	}
 }

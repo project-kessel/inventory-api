@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/project-kessel/inventory-api/internal"
+	bizmodel "github.com/project-kessel/inventory-api/internal/biz/model"
 )
 
 // ReporterRepresentation captures the **reporter-specific view** of a resource.  Each reporter maintains
@@ -62,4 +63,39 @@ func validateReporterRepresentation(rr *ReporterRepresentation) error {
 		validateMinValueUint("CommonVersion", rr.CommonVersion, MinCommonVersion),
 		validateOptionalString("ReporterVersion", rr.ReporterVersion, MaxReporterVersionLength),
 	)
+}
+
+// SerializeToSnapshot converts GORM ReporterRepresentation to snapshot type - direct initialization without validation
+func (rr ReporterRepresentation) SerializeToSnapshot() bizmodel.ReporterRepresentationSnapshot {
+	// Create representation snapshot
+	representationSnapshot := bizmodel.RepresentationSnapshot{
+		Data: rr.Data,
+	}
+
+	return bizmodel.ReporterRepresentationSnapshot{
+		Representation:     representationSnapshot,
+		ReporterResourceID: rr.ReporterResourceID,
+		Version:            rr.Version,
+		Generation:         rr.Generation,
+		ReporterVersion:    rr.ReporterVersion,
+		CommonVersion:      rr.CommonVersion,
+		Tombstone:          rr.Tombstone,
+		CreatedAt:          rr.CreatedAt,
+	}
+}
+
+// DeserializeFromSnapshot creates GORM ReporterRepresentation from snapshot - direct initialization without validation
+func DeserializeReporterRepresentationFromSnapshot(snapshot bizmodel.ReporterRepresentationSnapshot) ReporterRepresentation {
+	return ReporterRepresentation{
+		Representation: Representation{
+			Data: snapshot.Representation.Data,
+		},
+		ReporterResourceID: snapshot.ReporterResourceID,
+		Version:            snapshot.Version,
+		Generation:         snapshot.Generation,
+		ReporterVersion:    snapshot.ReporterVersion,
+		CommonVersion:      snapshot.CommonVersion,
+		Tombstone:          snapshot.Tombstone,
+		CreatedAt:          snapshot.CreatedAt,
+	}
 }

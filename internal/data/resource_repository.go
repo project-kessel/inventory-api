@@ -2,6 +2,7 @@ package data
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
@@ -144,25 +145,67 @@ func (r *resourceRepository) FindResourceByKeys(tx *gorm.DB, key bizmodel.Report
 		return nil, fmt.Errorf("failed to find resource by keys: %w", err)
 	}
 
-	resource, err := bizmodel.Deserialize(
-		result.ResourceID,
-		result.ResourceType,
-		result.CommonVersion,
-		result.ReporterResourceID,
-		result.LocalResourceID,
-		result.ReporterType,
-		result.ReporterInstanceID,
-		result.RepresentationVersion,
-		result.Generation,
-		result.Tombstone,
-		"redhat.com",
-		"",
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to deserialize resource: %w", err)
+	// Create snapshots from query result
+	resourceSnapshot := bizmodel.ResourceSnapshot{
+		ID:               result.ResourceID,
+		Type:             result.ResourceType,
+		CommonVersion:    result.CommonVersion,
+		ConsistencyToken: "",
+		CreatedAt:        time.Now(), // Placeholder - would need proper timestamps from DB
+		UpdatedAt:        time.Now(), // Placeholder
 	}
 
-	return resource, nil
+	reporterResourceSnapshot := bizmodel.ReporterResourceSnapshot{
+		ID: result.ReporterResourceID,
+		ReporterResourceKey: bizmodel.ReporterResourceKeySnapshot{
+			LocalResourceID:    result.LocalResourceID,
+			ReporterType:       result.ReporterType,
+			ResourceType:       result.ResourceType,
+			ReporterInstanceID: result.ReporterInstanceID,
+		},
+		ResourceID:            result.ResourceID,
+		APIHref:               "redhat.com", // Placeholder - would come from DB
+		ConsoleHref:           "",           // Placeholder
+		RepresentationVersion: result.RepresentationVersion,
+		Generation:            result.Generation,
+		Tombstone:             result.Tombstone,
+		CreatedAt:             time.Now(), // Placeholder
+		UpdatedAt:             time.Now(), // Placeholder
+	}
+
+	// Create placeholder representation snapshots - in real implementation these would come from separate queries
+	reporterRepresentationSnapshot := bizmodel.ReporterRepresentationSnapshot{
+		Representation: bizmodel.RepresentationSnapshot{
+			Data: map[string]interface{}{}, // Would come from separate query
+		},
+		ReporterResourceID: result.ReporterResourceID.String(),
+		Version:            result.RepresentationVersion,
+		Generation:         result.Generation,
+		CommonVersion:      result.CommonVersion,
+		Tombstone:          result.Tombstone,
+		CreatedAt:          time.Now(),
+	}
+
+	commonRepresentationSnapshot := bizmodel.CommonRepresentationSnapshot{
+		Representation: bizmodel.RepresentationSnapshot{
+			Data: map[string]interface{}{}, // Would come from separate query
+		},
+		ResourceId:                 result.ResourceID,
+		Version:                    result.CommonVersion,
+		ReportedByReporterType:     result.ReporterType,
+		ReportedByReporterInstance: result.ReporterInstanceID,
+		CreatedAt:                  time.Now(),
+	}
+
+	// Deserialize using snapshot-based approach
+	resource := bizmodel.DeserializeResource(
+		resourceSnapshot,
+		reporterResourceSnapshot,
+		reporterRepresentationSnapshot,
+		commonRepresentationSnapshot,
+	)
+
+	return &resource, nil
 }
 
 func (r *resourceRepository) GetDB() *gorm.DB {

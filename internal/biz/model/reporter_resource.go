@@ -2,9 +2,7 @@ package model
 
 import (
 	"fmt"
-
-	"github.com/google/uuid"
-	datamodel "github.com/project-kessel/inventory-api/internal/data/model"
+	"time"
 )
 
 type ReporterResource struct {
@@ -85,12 +83,7 @@ func (rr *ReporterResource) Update(
 
 // CreateSnapshot creates a snapshot of the ReporterResource
 func (rr ReporterResource) CreateSnapshot() (ReporterResourceSnapshot, error) {
-	dataReporterResource, err := rr.Serialize()
-	if err != nil {
-		return ReporterResourceSnapshot{}, err
-	}
-
-	return NewReporterResourceSnapshot(dataReporterResource), nil
+	return rr.Serialize(), nil
 }
 
 func (rrk ReporterResourceKey) LocalResourceId() string {
@@ -134,51 +127,62 @@ func (rr ReporterResource) Key() ReporterResourceKey {
 	return rr.ReporterResourceKey
 }
 
-func (rr ReporterResource) Serialize() (*datamodel.ReporterResource, error) {
-	return datamodel.NewReporterResource(
-		uuid.UUID(rr.id),
-		rr.localResourceID.String(),
-		rr.reporter.reporterType.String(),
-		rr.resourceType.String(),
-		rr.reporter.reporterInstanceId.String(),
-		uuid.UUID(rr.resourceID),
-		rr.apiHref.String(),
-		rr.consoleHref.String(),
-		uint(rr.representationVersion),
-		uint(rr.generation),
-		rr.tombstone.Bool(),
-	)
+func (rr ReporterResource) Serialize() ReporterResourceSnapshot {
+	// Create ReporterResourceKey snapshot
+	keySnapshot := ReporterResourceKeySnapshot{
+		LocalResourceID:    rr.localResourceID.String(),
+		ReporterType:       rr.reporter.reporterType.String(),
+		ResourceType:       rr.resourceType.String(),
+		ReporterInstanceID: rr.reporter.reporterInstanceId.String(),
+	}
+
+	// Create ReporterResource snapshot - direct initialization without validation
+	return ReporterResourceSnapshot{
+		ID:                    rr.id.UUID(),
+		ReporterResourceKey:   keySnapshot,
+		ResourceID:            rr.resourceID.UUID(),
+		APIHref:               rr.apiHref.String(),
+		ConsoleHref:           rr.consoleHref.String(),
+		RepresentationVersion: rr.representationVersion.Serialize(),
+		Generation:            rr.generation.Serialize(),
+		Tombstone:             rr.tombstone.Bool(),
+		CreatedAt:             time.Now(), // TODO: Add proper timestamp from domain entity if available
+		UpdatedAt:             time.Now(), // TODO: Add proper timestamp from domain entity if available
+	}
 }
 
-func DeserializeReporterResource(
-	id uuid.UUID,
-	localResourceID string,
-	reporterType string,
-	resourceType string,
-	reporterInstanceID string,
-	resourceID uuid.UUID,
-	apiHref string,
-	consoleHref string,
-	representationVersion uint,
-	generation uint,
-	tombstone bool,
-) (*ReporterResource, error) {
-	reporterResourceId := DeserializeReporterResourceId(id)
-	reporterResourceKey := DeserializeReporterResourceKey(localResourceID, resourceType, reporterType, reporterInstanceID)
-	domainResourceId := DeserializeResourceId(resourceID)
-	domainApiHref := DeserializeApiHref(apiHref)
-	domainConsoleHref := DeserializeConsoleHref(consoleHref)
+func DeserializeReporterResource(snapshot ReporterResourceSnapshot) ReporterResource {
+	// Create domain tiny types directly from snapshot values - no validation
+	reporterResourceId := ReporterResourceId(snapshot.ID)
+	domainResourceId := ResourceId(snapshot.ResourceID)
+	localResourceID := LocalResourceId(snapshot.ReporterResourceKey.LocalResourceID)
+	resourceType := ResourceType(snapshot.ReporterResourceKey.ResourceType)
+	reporterType := ReporterType(snapshot.ReporterResourceKey.ReporterType)
+	reporterInstanceId := ReporterInstanceId(snapshot.ReporterResourceKey.ReporterInstanceID)
+	apiHref := ApiHref(snapshot.APIHref)
+	consoleHref := ConsoleHref(snapshot.ConsoleHref)
 
-	reporterResource := &ReporterResource{
+	// Create reporter ID
+	reporterId := ReporterId{
+		reporterType:       reporterType,
+		reporterInstanceId: reporterInstanceId,
+	}
+
+	// Create reporter resource key
+	reporterResourceKey := ReporterResourceKey{
+		localResourceID: localResourceID,
+		resourceType:    resourceType,
+		reporter:        reporterId,
+	}
+
+	return ReporterResource{
 		id:                    reporterResourceId,
 		ReporterResourceKey:   reporterResourceKey,
 		resourceID:            domainResourceId,
-		apiHref:               domainApiHref,
-		consoleHref:           domainConsoleHref,
-		representationVersion: DeserializeVersion(representationVersion),
-		generation:            DeserializeGeneration(generation),
-		tombstone:             DeserializeTombstone(tombstone),
+		apiHref:               apiHref,
+		consoleHref:           consoleHref,
+		representationVersion: DeserializeVersion(snapshot.RepresentationVersion),
+		generation:            DeserializeGeneration(snapshot.Generation),
+		tombstone:             DeserializeTombstone(snapshot.Tombstone),
 	}
-
-	return reporterResource, nil
 }

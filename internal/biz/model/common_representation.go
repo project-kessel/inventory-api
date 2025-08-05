@@ -3,11 +3,9 @@ package model
 import (
 	"fmt"
 	"strings"
-
-	"github.com/project-kessel/inventory-api/internal"
+	"time"
 
 	"github.com/google/uuid"
-	datamodel "github.com/project-kessel/inventory-api/internal/data/model"
 )
 
 type CommonRepresentation struct {
@@ -54,38 +52,48 @@ func NewCommonRepresentation(
 	}, nil
 }
 
-func (cr CommonRepresentation) Serialize() (*datamodel.CommonRepresentation, error) {
+func (cr CommonRepresentation) Serialize() CommonRepresentationSnapshot {
 	reporterType, reporterInstanceId := cr.reporter.Serialize()
-	return datamodel.NewCommonRepresentation(
-		cr.resourceId.Serialize(),
-		cr.Representation.Serialize(),
-		cr.version.Serialize(),
-		reporterType,
-		reporterInstanceId,
-	)
+
+	// Create representation snapshot
+	representationSnapshot := RepresentationSnapshot{
+		Data: cr.Representation.Data(),
+	}
+
+	// Create CommonRepresentation snapshot - direct initialization without validation
+	return CommonRepresentationSnapshot{
+		Representation:             representationSnapshot,
+		ResourceId:                 cr.resourceId.UUID(),
+		Version:                    cr.version.Serialize(),
+		ReportedByReporterType:     reporterType,
+		ReportedByReporterInstance: reporterInstanceId,
+		CreatedAt:                  time.Now(), // TODO: Add proper timestamp from domain entity if available
+	}
 }
 
-func DeserializeCommonRepresentation(
-	resourceIdVal uuid.UUID,
-	data internal.JsonObject,
-	versionVal uint,
-	reporterTypeVal string,
-	reporterInstanceIdVal string,
-) CommonRepresentation {
+func DeserializeCommonRepresentation(snapshot CommonRepresentationSnapshot) CommonRepresentation {
+	// Create domain tiny types directly from snapshot values - no validation
+	resourceId := ResourceId(snapshot.ResourceId)
+	representation := Representation(snapshot.Representation.Data)
+	version := DeserializeVersion(snapshot.Version)
+	reporterType := ReporterType(snapshot.ReportedByReporterType)
+	reporterInstanceId := ReporterInstanceId(snapshot.ReportedByReporterInstance)
+
+	// Create reporter ID
+	reporterId := ReporterId{
+		reporterType:       reporterType,
+		reporterInstanceId: reporterInstanceId,
+	}
+
 	return CommonRepresentation{
-		Representation: DeserializeRepresentation(data),
-		resourceId:     DeserializeResourceId(resourceIdVal),
-		version:        DeserializeVersion(versionVal),
-		reporter:       DeserializeReporterId(reporterTypeVal, reporterInstanceIdVal),
+		Representation: representation,
+		resourceId:     resourceId,
+		version:        version,
+		reporter:       reporterId,
 	}
 }
 
 // CreateSnapshot creates a snapshot of the CommonRepresentation
 func (cr CommonRepresentation) CreateSnapshot() (CommonRepresentationSnapshot, error) {
-	dataCommonRepresentation, err := cr.Serialize()
-	if err != nil {
-		return CommonRepresentationSnapshot{}, err
-	}
-
-	return NewCommonRepresentationSnapshot(dataCommonRepresentation), nil
+	return cr.Serialize(), nil
 }

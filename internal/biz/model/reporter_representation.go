@@ -2,10 +2,10 @@ package model
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/project-kessel/inventory-api/internal"
-	datamodel "github.com/project-kessel/inventory-api/internal/data/model"
 )
 
 type ReporterRepresentation struct {
@@ -87,22 +87,29 @@ func NewReporterDeleteRepresentation(
 	}, nil
 }
 
-func (rr ReporterRepresentation) Serialize() (*datamodel.ReporterRepresentation, error) {
+func (rr ReporterRepresentation) Serialize() ReporterRepresentationSnapshot {
 	var reporterVersionStr *string
 	if rr.reporterVersion != nil {
 		versionStr := rr.reporterVersion.Serialize()
 		reporterVersionStr = &versionStr
 	}
 
-	return datamodel.NewReporterRepresentation(
-		rr.Representation.Serialize(),
-		rr.reporterResourceID.String(),
-		rr.version.Serialize(),
-		rr.generation.Serialize(),
-		rr.commonVersion.Serialize(),
-		rr.tombstone.Serialize(),
-		reporterVersionStr,
-	)
+	// Create representation snapshot
+	representationSnapshot := RepresentationSnapshot{
+		Data: rr.Representation.Data(),
+	}
+
+	// Create ReporterRepresentation snapshot - direct initialization without validation
+	return ReporterRepresentationSnapshot{
+		Representation:     representationSnapshot,
+		ReporterResourceID: rr.reporterResourceID.String(),
+		Version:            rr.version.Serialize(),
+		Generation:         rr.generation.Serialize(),
+		ReporterVersion:    reporterVersionStr,
+		CommonVersion:      rr.commonVersion.Serialize(),
+		Tombstone:          rr.tombstone.Bool(),
+		CreatedAt:          time.Now(), // TODO: Add proper timestamp from domain entity if available
+	}
 }
 
 func DeserializeReporterDataRepresentation(
@@ -160,12 +167,34 @@ func DeserializeReporterDeleteRepresentation(
 
 // CreateSnapshot creates a snapshot of the ReporterRepresentation
 func (rr ReporterRepresentation) CreateSnapshot() (ReporterRepresentationSnapshot, error) {
-	dataReporterRepresentation, err := rr.Serialize()
-	if err != nil {
-		return ReporterRepresentationSnapshot{}, err
+	return rr.Serialize(), nil
+}
+
+// DeserializeReporterRepresentation creates a ReporterRepresentation from snapshot - direct initialization without validation
+func DeserializeReporterRepresentation(snapshot ReporterRepresentationSnapshot) ReporterRepresentation {
+	// Create domain tiny types directly from snapshot values
+	reporterResourceId := ReporterResourceId(uuid.MustParse(snapshot.ReporterResourceID))
+	representation := Representation(snapshot.Representation.Data)
+	version := DeserializeVersion(snapshot.Version)
+	generation := DeserializeGeneration(snapshot.Generation)
+	commonVersion := DeserializeVersion(snapshot.CommonVersion)
+	tombstone := DeserializeTombstone(snapshot.Tombstone)
+
+	var reporterVersion *ReporterVersion
+	if snapshot.ReporterVersion != nil {
+		rv := DeserializeReporterVersion(*snapshot.ReporterVersion)
+		reporterVersion = &rv
 	}
 
-	return NewReporterRepresentationSnapshot(dataReporterRepresentation), nil
+	return ReporterRepresentation{
+		Representation:     representation,
+		reporterResourceID: reporterResourceId,
+		version:            version,
+		generation:         generation,
+		commonVersion:      commonVersion,
+		reporterVersion:    reporterVersion,
+		tombstone:          tombstone,
+	}
 }
 
 // CreateSnapshot creates a snapshot of the ReporterDataRepresentation

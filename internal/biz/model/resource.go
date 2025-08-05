@@ -2,9 +2,7 @@ package model
 
 import (
 	"fmt"
-
-	"github.com/google/uuid"
-	datamodel "github.com/project-kessel/inventory-api/internal/data/model"
+	"time"
 )
 
 const initialCommonVersion = 0
@@ -72,45 +70,65 @@ func NewResource(
 	return resource, nil
 }
 
-func (r Resource) Serialize() (*datamodel.Resource, *datamodel.ReporterResource, *datamodel.ReporterRepresentation, *datamodel.CommonRepresentation, error) {
-	// Serialize the main Resource
-	resource, err := datamodel.NewResource(
-		uuid.UUID(r.id),
-		r.resourceType.String(),
-		uint(r.commonVersion),
-	)
-	if err != nil {
-		return nil, nil, nil, nil, fmt.Errorf("failed to serialize resource: %w", err)
+func (r Resource) Serialize() (ResourceSnapshot, ReporterResourceSnapshot, ReporterRepresentationSnapshot, CommonRepresentationSnapshot, error) {
+	// Create Resource snapshot - serialize current state as-is
+	var createdAt, updatedAt time.Time
+	if len(r.resourceEvents) > 0 {
+		createdAt = r.resourceEvents[0].createdAt
+		updatedAt = r.resourceEvents[0].updatedAt
 	}
 
-	// Serialize the first ReporterResource (assuming there's at least one)
-	if len(r.reporterResources) == 0 {
-		return nil, nil, nil, nil, fmt.Errorf("resource has no reporter resources to serialize")
+	resourceSnapshot := ResourceSnapshot{
+		ID:               r.id.UUID(),
+		Type:             r.resourceType.String(),
+		CommonVersion:    r.commonVersion.Serialize(),
+		ConsistencyToken: r.consistencyToken.Serialize(),
+		CreatedAt:        createdAt,
+		UpdatedAt:        updatedAt,
 	}
 
-	//TODO: This should serialize all the ReporterResources?
-	reporterResource, err := r.reporterResources[0].Serialize()
-	if err != nil {
-		return nil, nil, nil, nil, fmt.Errorf("failed to serialize reporter resource: %w", err)
+	// Create ReporterResource snapshot - use first one if available, empty otherwise
+	var reporterResourceSnapshot ReporterResourceSnapshot
+	if len(r.reporterResources) > 0 {
+		reporterResourceSnapshot = r.reporterResources[0].Serialize()
 	}
 
-	// Serialize the first ResourceEvent (assuming there's at least one)
-	if len(r.resourceEvents) == 0 {
-		return nil, nil, nil, nil, fmt.Errorf("resource has no resource events to serialize")
+	// Create representation snapshots - use first event if available, empty otherwise
+	var reporterRepresentationSnapshot ReporterRepresentationSnapshot
+	var commonRepresentationSnapshot CommonRepresentationSnapshot
+	if len(r.resourceEvents) > 0 {
+		reporterRepresentationSnapshot = r.resourceEvents[0].SerializeReporterRepresentation()
+		commonRepresentationSnapshot = r.resourceEvents[0].SerializeCommonRepresentation()
 	}
 
-	//TODO: This should serialize all the Representations? We need to consider the read vs the write models here
-	reporterRepresentation, err := r.resourceEvents[0].SerializeReporterRepresentation()
-	if err != nil {
-		return nil, nil, nil, nil, fmt.Errorf("failed to serialize reporter representation: %w", err)
-	}
+	return resourceSnapshot, reporterResourceSnapshot, reporterRepresentationSnapshot, commonRepresentationSnapshot, nil
+}
 
-	commonRepresentation, err := r.resourceEvents[0].SerializeCommonRepresentation()
-	if err != nil {
-		return nil, nil, nil, nil, fmt.Errorf("failed to serialize common representation: %w", err)
-	}
+// DeserializeResource creates a Resource from snapshots - direct initialization without validation
+func DeserializeResource(
+	resourceSnapshot ResourceSnapshot,
+	reporterResourceSnapshot ReporterResourceSnapshot,
+	reporterRepresentationSnapshot ReporterRepresentationSnapshot,
+	commonRepresentationSnapshot CommonRepresentationSnapshot,
+) Resource {
 
-	return resource, reporterResource, reporterRepresentation, commonRepresentation, nil
+	resourceId := ResourceId(resourceSnapshot.ID)
+	resourceType := ResourceType(resourceSnapshot.Type)
+	commonVersion := DeserializeVersion(resourceSnapshot.CommonVersion)
+
+	// Create reporter resource
+	reporterResource := DeserializeReporterResource(reporterResourceSnapshot)
+
+	// Create resource event from representations
+	resourceEvent := DeserializeResourceEvent(reporterRepresentationSnapshot, commonRepresentationSnapshot)
+
+	return Resource{
+		id:                resourceId,
+		resourceType:      resourceType,
+		commonVersion:     commonVersion,
+		reporterResources: []ReporterResource{reporterResource},
+		resourceEvents:    []ResourceEvent{resourceEvent},
+	}
 }
 
 func (r Resource) ResourceEvents() []ResourceEvent {
@@ -119,67 +137,12 @@ func (r Resource) ResourceEvents() []ResourceEvent {
 
 // CreateSnapshot creates a complete snapshot of the Resource and all its related entities
 func (r Resource) CreateSnapshot() (ResourceSnapshot, ReporterResourceSnapshot, CommonRepresentationSnapshot, ReporterRepresentationSnapshot, error) {
-	dataResource, dataReporterResource, dataReporterRepresentation, dataCommonRepresentation, err := r.Serialize()
-	if err != nil {
-		return ResourceSnapshot{}, ReporterResourceSnapshot{}, CommonRepresentationSnapshot{}, ReporterRepresentationSnapshot{}, err
-	}
-
-	resourceSnapshot := NewResourceSnapshot(dataResource)
-	reporterResourceSnapshot := NewReporterResourceSnapshot(dataReporterResource)
-	commonRepresentationSnapshot := NewCommonRepresentationSnapshot(dataCommonRepresentation)
-	reporterRepresentationSnapshot := NewReporterRepresentationSnapshot(dataReporterRepresentation)
-
-	return resourceSnapshot, reporterResourceSnapshot, commonRepresentationSnapshot, reporterRepresentationSnapshot, nil
+	resourceSnapshot, reporterResourceSnapshot, reporterRepresentationSnapshot, commonRepresentationSnapshot, err := r.Serialize()
+	return resourceSnapshot, reporterResourceSnapshot, commonRepresentationSnapshot, reporterRepresentationSnapshot, err
 }
 
 func (r Resource) ReporterResources() []ReporterResource {
 	return r.reporterResources
-}
-
-func Deserialize(
-	resourceID uuid.UUID,
-	resourceType string,
-	commonVersion uint,
-	reporterResourceID uuid.UUID,
-	localResourceID string,
-	reporterType string,
-	reporterInstanceID string,
-	representationVersion uint,
-	generation uint,
-	tombstone bool,
-	apiHref string,
-	consoleHref string,
-) (*Resource, error) {
-	domainResourceId := DeserializeResourceId(resourceID)
-	domainResourceType := DeserializeResourceType(resourceType)
-
-	//TODO: Deserialize all ReporterResources
-	reporterResource, err := DeserializeReporterResource(
-		reporterResourceID,
-		localResourceID,
-		reporterType,
-		resourceType,
-		reporterInstanceID,
-		resourceID,
-		apiHref,
-		consoleHref,
-		representationVersion,
-		generation,
-		tombstone,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create ReporterResource: %w", err)
-	}
-
-	resource := &Resource{
-		id:                domainResourceId,
-		resourceType:      domainResourceType,
-		commonVersion:     DeserializeVersion(commonVersion),
-		reporterResources: []ReporterResource{*reporterResource},
-		resourceEvents:    []ResourceEvent{},
-	}
-
-	return resource, nil
 }
 
 func (r Resource) findReporterResourceByKey(key ReporterResourceKey) (ReporterResource, error) {

@@ -2,31 +2,29 @@ package resources
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgconn"
-	"github.com/mattn/go-sqlite3"
 	"github.com/project-kessel/inventory-api/internal/metricscollector"
 	"gorm.io/gorm"
 
 	"github.com/project-kessel/inventory-api/internal/biz/model_legacy"
+	"github.com/project-kessel/inventory-api/internal/biz/usecase"
 	"github.com/project-kessel/inventory-api/internal/data"
 )
 
 type Repo struct {
-	DB                      *gorm.DB
-	MetricsCollector        *metricscollector.MetricsCollector
-	MaxSerializationRetries int
+	DB                 *gorm.DB
+	MetricsCollector   *metricscollector.MetricsCollector
+	TransactionManager usecase.TransactionManager
 }
 
-func New(db *gorm.DB, mc *metricscollector.MetricsCollector, maxSerializationRetries int) *Repo {
+func New(db *gorm.DB, mc *metricscollector.MetricsCollector, transactionManager usecase.TransactionManager) *Repo {
 	return &Repo{
-		DB:                      db,
-		MetricsCollector:        mc,
-		MaxSerializationRetries: maxSerializationRetries,
+		DB:                 db,
+		MetricsCollector:   mc,
+		TransactionManager: transactionManager,
 	}
 }
 
@@ -52,7 +50,7 @@ func (r *Repo) Create(ctx context.Context, m *model_legacy.Resource, namespace s
 
 	db := r.DB.Session(&gorm.Session{})
 	var result *model_legacy.Resource
-	err := r.handleSerializableTransaction(db, func(tx *gorm.DB) error {
+	err := r.TransactionManager.HandleSerializableTransaction(db, func(tx *gorm.DB) error {
 		// Copy the resource to avoid modifying the original, necessary for serialized transaction retries
 		resource := *m
 		updatedResources := []*model_legacy.Resource{}
@@ -119,7 +117,7 @@ func (r *Repo) Create(ctx context.Context, m *model_legacy.Resource, namespace s
 func (r *Repo) Update(ctx context.Context, m *model_legacy.Resource, id uuid.UUID, namespace string, txid string) (*model_legacy.Resource, error) {
 	db := r.DB.Session(&gorm.Session{})
 	var result *model_legacy.Resource
-	err := r.handleSerializableTransaction(db, func(tx *gorm.DB) error {
+	err := r.TransactionManager.HandleSerializableTransaction(db, func(tx *gorm.DB) error {
 		updatedResources := []*model_legacy.Resource{}
 		resource, err := r.FindByIDWithTx(ctx, tx, id)
 		if err != nil {
@@ -170,7 +168,7 @@ func (r *Repo) Update(ctx context.Context, m *model_legacy.Resource, id uuid.UUI
 func (r *Repo) Delete(ctx context.Context, id uuid.UUID, namespace string) (*model_legacy.Resource, error) {
 	db := r.DB.Session(&gorm.Session{})
 	var result *model_legacy.Resource
-	err := r.handleSerializableTransaction(db, func(tx *gorm.DB) error {
+	err := r.TransactionManager.HandleSerializableTransaction(db, func(tx *gorm.DB) error {
 		resource, err := r.FindByIDWithTx(ctx, tx, id)
 		if err != nil {
 			return err
@@ -372,53 +370,4 @@ func handleOutboxEvents(tx *gorm.DB, resource model_legacy.Resource, namespace s
 	}
 
 	return nil
-}
-
-// Handles serializable transaction rollbacks, commits, and retries in case of failures.
-// It retries the transaction up to maxRetries times before returning an error.
-func (r *Repo) handleSerializableTransaction(db *gorm.DB, txFunc func(tx *gorm.DB) error) error {
-	var err error
-	for i := 0; i < r.MaxSerializationRetries; i++ {
-		tx := db.Begin(&sql.TxOptions{
-			Isolation: sql.LevelSerializable,
-		})
-		err = txFunc(tx)
-		if err != nil {
-			tx.Rollback()
-			if isSerializationFailure(err, i, r.MaxSerializationRetries) {
-				continue
-			}
-			// Short-circuit if the error is not a serialization failure
-			return fmt.Errorf("transaction failed: %w", err)
-		}
-		err = tx.Commit().Error
-		if err != nil {
-			tx.Rollback()
-			if isSerializationFailure(err, i, r.MaxSerializationRetries) {
-				continue
-			}
-			// Short-circuit if the error is not a serialization failure
-			return fmt.Errorf("committing transaction failed: %w", err)
-		}
-		return nil
-	}
-	log.Errorf("transaction failed after %d attempts: %v", r.MaxSerializationRetries, err)
-	return fmt.Errorf("transaction failed after %d attempts: %w", r.MaxSerializationRetries, err)
-}
-
-func isSerializationFailure(err error, attempt, maxRetries int) bool {
-	switch dbErr := err.(type) {
-	case *pgconn.PgError:
-		if dbErr.Code == "40001" {
-			log.Debugf("transaction serialization failure (attempt %d/%d): %v", attempt+1, maxRetries, err)
-			return true
-		}
-	case sqlite3.Error:
-		if dbErr.Code == sqlite3.ErrError {
-			// Isolation failures are captured under error code 1 (sqlite3.ErrError)
-			log.Debugf("transaction serialization failure (attempt %d/%d): %v", attempt+1, maxRetries, err)
-			return true
-		}
-	}
-	return false
 }

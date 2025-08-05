@@ -245,7 +245,6 @@ func (uc *Usecase) updateResource(tx *gorm.DB, request *v1beta2.ReportResourceRe
 		return fmt.Errorf("failed to update resource: %w", err)
 	}
 
-	// Save the updated resource to the repository
 	return uc.resourceRepository.Save(tx, *existingResource, model_legacy.OperationTypeUpdated, txidStr)
 }
 

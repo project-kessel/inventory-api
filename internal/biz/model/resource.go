@@ -71,7 +71,6 @@ func NewResource(
 }
 
 func (r Resource) Serialize() (ResourceSnapshot, ReporterResourceSnapshot, ReporterRepresentationSnapshot, CommonRepresentationSnapshot, error) {
-	// Create Resource snapshot - serialize current state as-is
 	var createdAt, updatedAt time.Time
 	if len(r.resourceEvents) > 0 {
 		createdAt = r.resourceEvents[0].createdAt
@@ -87,13 +86,11 @@ func (r Resource) Serialize() (ResourceSnapshot, ReporterResourceSnapshot, Repor
 		UpdatedAt:        updatedAt,
 	}
 
-	// Create ReporterResource snapshot - use first one if available, empty otherwise
 	var reporterResourceSnapshot ReporterResourceSnapshot
 	if len(r.reporterResources) > 0 {
 		reporterResourceSnapshot = r.reporterResources[0].Serialize()
 	}
 
-	// Create representation snapshots - use first event if available, empty otherwise
 	var reporterRepresentationSnapshot ReporterRepresentationSnapshot
 	var commonRepresentationSnapshot CommonRepresentationSnapshot
 	if len(r.resourceEvents) > 0 {
@@ -104,7 +101,6 @@ func (r Resource) Serialize() (ResourceSnapshot, ReporterResourceSnapshot, Repor
 	return resourceSnapshot, reporterResourceSnapshot, reporterRepresentationSnapshot, commonRepresentationSnapshot, nil
 }
 
-// DeserializeResource creates a Resource from snapshots - direct initialization without validation
 func DeserializeResource(
 	resourceSnapshot ResourceSnapshot,
 	reporterResourceSnapshot ReporterResourceSnapshot,
@@ -159,6 +155,16 @@ func (r Resource) findReporterResourceByKey(key ReporterResourceKey) (ReporterRe
 		key.LocalResourceId(), key.ResourceType(), key.ReporterType(), key.ReporterInstanceId())
 }
 
+func (r *Resource) findReporterResource(key ReporterResourceKey) (*ReporterResource, error) {
+	for i := range r.reporterResources {
+		if r.reporterResources[i].Key() == key {
+			return &r.reporterResources[i], nil
+		}
+	}
+	return nil, fmt.Errorf("reporter resource with key (localResourceId=%s, resourceType=%s, reporterType=%s, reporterInstanceId=%s) not found in resource",
+		key.LocalResourceId(), key.ResourceType(), key.ReporterType(), key.ReporterInstanceId())
+}
+
 func (r *Resource) Update(
 	key ReporterResourceKey,
 	apiHref ApiHref,
@@ -169,20 +175,12 @@ func (r *Resource) Update(
 ) error {
 	r.commonVersion = r.commonVersion.Increment()
 
-	// Find the index of the reporter resource to update
-	var reporterResourceToUpdate *ReporterResource
-	for i := range r.reporterResources {
-		if r.reporterResources[i].Key() == key {
-			r.reporterResources[i].Update(apiHref, consoleHref)
-			reporterResourceToUpdate = &r.reporterResources[i]
-			break
-		}
+	reporterResource, err := r.findReporterResource(key)
+	if err != nil {
+		return err
 	}
 
-	if reporterResourceToUpdate == nil {
-		return fmt.Errorf("reporter resource with key (localResourceId=%s, resourceType=%s, reporterType=%s, reporterInstanceId=%s) not found in resource",
-			key.LocalResourceId(), key.ResourceType(), key.ReporterType(), key.ReporterInstanceId())
-	}
+	reporterResource.Update(apiHref, consoleHref)
 
 	// Extract domain types from key
 	keyResourceType, err := NewResourceType(key.ResourceType())
@@ -204,9 +202,9 @@ func (r *Resource) Update(
 		keyReporterType,
 		keyReporterInstanceId,
 		reporterData,
-		reporterResourceToUpdate.Id(),
-		reporterResourceToUpdate.representationVersion,
-		reporterResourceToUpdate.generation,
+		reporterResource.Id(),
+		reporterResource.representationVersion,
+		reporterResource.generation,
 		commonData,
 		r.commonVersion,
 		reporterVersion,

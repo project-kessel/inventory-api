@@ -3,7 +3,6 @@ package data
 import (
 	"fmt"
 	"sync"
-	"time"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
@@ -59,33 +58,33 @@ func (f *fakeResourceRepository) Save(tx *gorm.DB, resource bizmodel.Resource, o
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
-	dataResource, dataReporterResource, dataReporterRepresentation, dataCommonRepresentation, err := resource.Serialize()
+	resourceSnapshot, reporterResourceSnapshot, reporterRepresentationSnapshot, commonRepresentationSnapshot, err := resource.Serialize()
 	if err != nil {
 		return fmt.Errorf("failed to serialize resource: %w", err)
 	}
 
 	// In fake implementation, we don't actually store representations but we should acknowledge them
-	_ = dataReporterRepresentation
-	_ = dataCommonRepresentation
+	_ = reporterRepresentationSnapshot
+	_ = commonRepresentationSnapshot
 
 	key := f.makeKey(
-		dataReporterResource.ReporterResourceKey.LocalResourceID,
-		dataReporterResource.ReporterResourceKey.ResourceType,
-		dataReporterResource.ReporterResourceKey.ReporterType,
-		dataReporterResource.ReporterResourceKey.ReporterInstanceID,
+		reporterResourceSnapshot.ReporterResourceKey.LocalResourceID,
+		reporterResourceSnapshot.ReporterResourceKey.ResourceType,
+		reporterResourceSnapshot.ReporterResourceKey.ReporterType,
+		reporterResourceSnapshot.ReporterResourceKey.ReporterInstanceID,
 	)
 
 	stored := &storedResource{
-		resourceID:            dataResource.ID,
-		resourceType:          dataResource.Type,
-		commonVersion:         dataResource.CommonVersion,
-		reporterResourceID:    dataReporterResource.ID,
-		localResourceID:       dataReporterResource.ReporterResourceKey.LocalResourceID,
-		reporterType:          dataReporterResource.ReporterResourceKey.ReporterType,
-		reporterInstanceID:    dataReporterResource.ReporterResourceKey.ReporterInstanceID,
-		representationVersion: dataReporterResource.RepresentationVersion,
-		generation:            dataReporterResource.Generation,
-		tombstone:             dataReporterResource.Tombstone,
+		resourceID:            resourceSnapshot.ID,
+		resourceType:          resourceSnapshot.Type,
+		commonVersion:         resourceSnapshot.CommonVersion,
+		reporterResourceID:    reporterResourceSnapshot.ID,
+		localResourceID:       reporterResourceSnapshot.ReporterResourceKey.LocalResourceID,
+		reporterType:          reporterResourceSnapshot.ReporterResourceKey.ReporterType,
+		reporterInstanceID:    reporterResourceSnapshot.ReporterResourceKey.ReporterInstanceID,
+		representationVersion: reporterResourceSnapshot.RepresentationVersion,
+		generation:            reporterResourceSnapshot.Generation,
+		tombstone:             reporterResourceSnapshot.Tombstone,
 	}
 
 	f.resources[key] = stored
@@ -108,65 +107,22 @@ func (f *fakeResourceRepository) FindResourceByKeys(tx *gorm.DB, key bizmodel.Re
 		return nil, nil
 	}
 
-	// Create snapshots from stored data
-	resourceSnapshot := bizmodel.ResourceSnapshot{
-		ID:               stored.resourceID,
-		Type:             stored.resourceType,
-		CommonVersion:    stored.commonVersion,
-		ConsistencyToken: "",
-		CreatedAt:        time.Now(), // Placeholder
-		UpdatedAt:        time.Now(), // Placeholder
-	}
-
-	reporterResourceSnapshot := bizmodel.ReporterResourceSnapshot{
-		ID: stored.reporterResourceID,
-		ReporterResourceKey: bizmodel.ReporterResourceKeySnapshot{
-			LocalResourceID:    stored.localResourceID,
-			ReporterType:       stored.reporterType,
-			ResourceType:       stored.resourceType,
-			ReporterInstanceID: stored.reporterInstanceID,
-		},
-		ResourceID:            stored.resourceID,
-		APIHref:               "redhat.com", // Placeholder
-		ConsoleHref:           "",           // Placeholder
-		RepresentationVersion: stored.representationVersion,
-		Generation:            stored.generation,
-		Tombstone:             stored.tombstone,
-		CreatedAt:             time.Now(), // Placeholder
-		UpdatedAt:             time.Now(), // Placeholder
-	}
-
-	// Create placeholder representation snapshots
-	reporterRepresentationSnapshot := bizmodel.ReporterRepresentationSnapshot{
-		Representation: bizmodel.RepresentationSnapshot{
-			Data: map[string]interface{}{}, // Placeholder
-		},
-		ReporterResourceID: stored.reporterResourceID.String(),
-		Version:            stored.representationVersion,
-		Generation:         stored.generation,
-		CommonVersion:      stored.commonVersion,
-		Tombstone:          stored.tombstone,
-		CreatedAt:          time.Now(), // Placeholder
-	}
-
-	commonRepresentationSnapshot := bizmodel.CommonRepresentationSnapshot{
-		Representation: bizmodel.RepresentationSnapshot{
-			Data: map[string]interface{}{}, // Placeholder
-		},
-		ResourceId:                 stored.resourceID,
-		Version:                    stored.commonVersion,
-		ReportedByReporterType:     stored.reporterType,
-		ReportedByReporterInstance: stored.reporterInstanceID,
-		CreatedAt:                  time.Now(), // Placeholder
-	}
-
-	// Deserialize using the new snapshot-based approach
-	resource := bizmodel.DeserializeResource(
-		resourceSnapshot,
-		reporterResourceSnapshot,
-		reporterRepresentationSnapshot,
-		commonRepresentationSnapshot,
+	placeholderData := map[string]interface{}{"_placeholder": true}
+	resource, err := bizmodel.NewResource(
+		bizmodel.ResourceId(stored.resourceID),
+		bizmodel.LocalResourceId(stored.localResourceID),
+		bizmodel.ResourceType(stored.resourceType),
+		bizmodel.ReporterType(stored.reporterType),
+		bizmodel.ReporterInstanceId(stored.reporterInstanceID),
+		bizmodel.ReporterResourceId(stored.reporterResourceID),
+		bizmodel.ApiHref(""),
+		bizmodel.ConsoleHref(""),
+		bizmodel.Representation(placeholderData),
+		bizmodel.Representation(placeholderData),
 	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create resource: %w", err)
+	}
 
 	return &resource, nil
 }

@@ -2,7 +2,6 @@ package data
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
@@ -10,6 +9,7 @@ import (
 	bizmodel "github.com/project-kessel/inventory-api/internal/biz/model"
 	"github.com/project-kessel/inventory-api/internal/biz/model_legacy"
 	"github.com/project-kessel/inventory-api/internal/biz/usecase"
+	datamodel "github.com/project-kessel/inventory-api/internal/data/model"
 )
 
 type FindResourceByKeysResult struct {
@@ -65,24 +65,29 @@ func (r *resourceRepository) NextReporterResourceId() (bizmodel.ReporterResource
 }
 
 func (r *resourceRepository) Save(tx *gorm.DB, resource bizmodel.Resource, operationType model_legacy.EventOperationType, txid string) error {
-	dataResource, dataReporterResource, dataReporterRepresentation, dataCommonRepresentation, err := resource.Serialize()
+	resourceSnapshot, reporterResourceSnapshot, reporterRepresentationSnapshot, commonRepresentationSnapshot, err := resource.Serialize()
 	if err != nil {
 		return fmt.Errorf("failed to serialize resource: %w", err)
 	}
 
-	if err := tx.Save(dataResource).Error; err != nil {
+	dataResource := datamodel.DeserializeResourceFromSnapshot(resourceSnapshot)
+	dataReporterResource := datamodel.DeserializeReporterResourceFromSnapshot(reporterResourceSnapshot)
+	dataReporterRepresentation := datamodel.DeserializeReporterRepresentationFromSnapshot(reporterRepresentationSnapshot)
+	dataCommonRepresentation := datamodel.DeserializeCommonRepresentationFromSnapshot(commonRepresentationSnapshot)
+
+	if err := tx.Save(&dataResource).Error; err != nil {
 		return fmt.Errorf("failed to save resource: %w", err)
 	}
 
-	if err := tx.Save(dataReporterResource).Error; err != nil {
+	if err := tx.Save(&dataReporterResource).Error; err != nil {
 		return fmt.Errorf("failed to save reporter resource: %w", err)
 	}
 
-	if err := tx.Create(dataReporterRepresentation).Error; err != nil {
+	if err := tx.Create(&dataReporterRepresentation).Error; err != nil {
 		return fmt.Errorf("failed to save reporter representation: %w", err)
 	}
 
-	if err := tx.Create(dataCommonRepresentation).Error; err != nil {
+	if err := tx.Create(&dataCommonRepresentation).Error; err != nil {
 		return fmt.Errorf("failed to save common representation: %w", err)
 	}
 
@@ -145,65 +150,22 @@ func (r *resourceRepository) FindResourceByKeys(tx *gorm.DB, key bizmodel.Report
 		return nil, fmt.Errorf("failed to find resource by keys: %w", err)
 	}
 
-	// Create snapshots from query result
-	resourceSnapshot := bizmodel.ResourceSnapshot{
-		ID:               result.ResourceID,
-		Type:             result.ResourceType,
-		CommonVersion:    result.CommonVersion,
-		ConsistencyToken: "",
-		CreatedAt:        time.Now(), // Placeholder - would need proper timestamps from DB
-		UpdatedAt:        time.Now(), // Placeholder
-	}
-
-	reporterResourceSnapshot := bizmodel.ReporterResourceSnapshot{
-		ID: result.ReporterResourceID,
-		ReporterResourceKey: bizmodel.ReporterResourceKeySnapshot{
-			LocalResourceID:    result.LocalResourceID,
-			ReporterType:       result.ReporterType,
-			ResourceType:       result.ResourceType,
-			ReporterInstanceID: result.ReporterInstanceID,
-		},
-		ResourceID:            result.ResourceID,
-		APIHref:               "redhat.com", // Placeholder - would come from DB
-		ConsoleHref:           "",           // Placeholder
-		RepresentationVersion: result.RepresentationVersion,
-		Generation:            result.Generation,
-		Tombstone:             result.Tombstone,
-		CreatedAt:             time.Now(), // Placeholder
-		UpdatedAt:             time.Now(), // Placeholder
-	}
-
-	// Create placeholder representation snapshots - in real implementation these would come from separate queries
-	reporterRepresentationSnapshot := bizmodel.ReporterRepresentationSnapshot{
-		Representation: bizmodel.RepresentationSnapshot{
-			Data: map[string]interface{}{}, // Would come from separate query
-		},
-		ReporterResourceID: result.ReporterResourceID.String(),
-		Version:            result.RepresentationVersion,
-		Generation:         result.Generation,
-		CommonVersion:      result.CommonVersion,
-		Tombstone:          result.Tombstone,
-		CreatedAt:          time.Now(),
-	}
-
-	commonRepresentationSnapshot := bizmodel.CommonRepresentationSnapshot{
-		Representation: bizmodel.RepresentationSnapshot{
-			Data: map[string]interface{}{}, // Would come from separate query
-		},
-		ResourceId:                 result.ResourceID,
-		Version:                    result.CommonVersion,
-		ReportedByReporterType:     result.ReporterType,
-		ReportedByReporterInstance: result.ReporterInstanceID,
-		CreatedAt:                  time.Now(),
-	}
-
-	// Deserialize using snapshot-based approach
-	resource := bizmodel.DeserializeResource(
-		resourceSnapshot,
-		reporterResourceSnapshot,
-		reporterRepresentationSnapshot,
-		commonRepresentationSnapshot,
+	placeholderData := map[string]interface{}{"": true}
+	resource, err := bizmodel.NewResource(
+		bizmodel.ResourceId(result.ResourceID),
+		bizmodel.LocalResourceId(result.LocalResourceID),
+		bizmodel.ResourceType(result.ResourceType),
+		bizmodel.ReporterType(result.ReporterType),
+		bizmodel.ReporterInstanceId(result.ReporterInstanceID),
+		bizmodel.ReporterResourceId(result.ReporterResourceID),
+		"",
+		"",
+		placeholderData,
+		placeholderData,
 	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create resource: %w", err)
+	}
 
 	return &resource, nil
 }

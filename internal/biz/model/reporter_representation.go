@@ -157,3 +157,23 @@ func DeserializeReporterDeleteRepresentation(
 		},
 	}
 }
+
+// CreateSnapshot creates a snapshot of the ReporterRepresentation
+func (rr ReporterRepresentation) CreateSnapshot() (ReporterRepresentationSnapshot, error) {
+	dataReporterRepresentation, err := rr.Serialize()
+	if err != nil {
+		return ReporterRepresentationSnapshot{}, err
+	}
+
+	return NewReporterRepresentationSnapshot(dataReporterRepresentation), nil
+}
+
+// CreateSnapshot creates a snapshot of the ReporterDataRepresentation
+func (rdr ReporterDataRepresentation) CreateSnapshot() (ReporterRepresentationSnapshot, error) {
+	return rdr.ReporterRepresentation.CreateSnapshot()
+}
+
+// CreateSnapshot creates a snapshot of the ReporterDeleteRepresentation
+func (rdr ReporterDeleteRepresentation) CreateSnapshot() (ReporterRepresentationSnapshot, error) {
+	return rdr.ReporterRepresentation.CreateSnapshot()
+}

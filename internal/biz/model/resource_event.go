@@ -36,7 +36,6 @@ func NewResourceEvent(
 ) (ResourceEvent, error) {
 	reporterId := NewReporterId(reporterType, reporterInstanceId)
 
-	// Create ReporterRepresentation
 	reporterRep, err := NewReporterDataRepresentation(
 		reporterResourceID,
 		reporterVersion,
@@ -49,10 +48,8 @@ func NewResourceEvent(
 		return ResourceEvent{}, fmt.Errorf("ResourceEvent invalid reporter representation: %w", err)
 	}
 
-	// Access the embedded ReporterRepresentation
 	reporterRepresentation := reporterRep.ReporterRepresentation
 
-	// Create CommonRepresentation
 	commonRepresentation, err := NewCommonRepresentation(
 		resourceId,
 		commonData,

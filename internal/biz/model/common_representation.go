@@ -79,3 +79,13 @@ func DeserializeCommonRepresentation(
 		reporter:       DeserializeReporterId(reporterTypeVal, reporterInstanceIdVal),
 	}
 }
+
+// CreateSnapshot creates a snapshot of the CommonRepresentation
+func (cr CommonRepresentation) CreateSnapshot() (CommonRepresentationSnapshot, error) {
+	dataCommonRepresentation, err := cr.Serialize()
+	if err != nil {
+		return CommonRepresentationSnapshot{}, err
+	}
+
+	return NewCommonRepresentationSnapshot(dataCommonRepresentation), nil
+}

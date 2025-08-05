@@ -83,6 +83,16 @@ func (rr *ReporterResource) Update(
 	rr.representationVersion = rr.representationVersion.Increment()
 }
 
+// CreateSnapshot creates a snapshot of the ReporterResource
+func (rr ReporterResource) CreateSnapshot() (ReporterResourceSnapshot, error) {
+	dataReporterResource, err := rr.Serialize()
+	if err != nil {
+		return ReporterResourceSnapshot{}, err
+	}
+
+	return NewReporterResourceSnapshot(dataReporterResource), nil
+}
+
 func (rrk ReporterResourceKey) LocalResourceId() string {
 	return rrk.localResourceID.String()
 }

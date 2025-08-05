@@ -117,6 +117,21 @@ func (r Resource) ResourceEvents() []ResourceEvent {
 	return r.resourceEvents
 }
 
+// CreateSnapshot creates a complete snapshot of the Resource and all its related entities
+func (r Resource) CreateSnapshot() (ResourceSnapshot, ReporterResourceSnapshot, CommonRepresentationSnapshot, ReporterRepresentationSnapshot, error) {
+	dataResource, dataReporterResource, dataReporterRepresentation, dataCommonRepresentation, err := r.Serialize()
+	if err != nil {
+		return ResourceSnapshot{}, ReporterResourceSnapshot{}, CommonRepresentationSnapshot{}, ReporterRepresentationSnapshot{}, err
+	}
+
+	resourceSnapshot := NewResourceSnapshot(dataResource)
+	reporterResourceSnapshot := NewReporterResourceSnapshot(dataReporterResource)
+	commonRepresentationSnapshot := NewCommonRepresentationSnapshot(dataCommonRepresentation)
+	reporterRepresentationSnapshot := NewReporterRepresentationSnapshot(dataReporterRepresentation)
+
+	return resourceSnapshot, reporterResourceSnapshot, commonRepresentationSnapshot, reporterRepresentationSnapshot, nil
+}
+
 func (r Resource) ReporterResources() []ReporterResource {
 	return r.reporterResources
 }

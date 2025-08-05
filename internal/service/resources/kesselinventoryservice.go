@@ -2,6 +2,7 @@ package resources
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -14,6 +15,8 @@ import (
 	"github.com/project-kessel/inventory-api/internal/middleware"
 	conv "github.com/project-kessel/inventory-api/internal/service/common"
 	pbv1beta1 "github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 type InventoryService struct {
@@ -57,19 +60,25 @@ func (c *InventoryService) DeleteResource(ctx context.Context, r *pb.DeleteResou
 
 	identity, err := middleware.GetIdentity(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get identity: %w", err)
+		return nil, status.Errorf(codes.Unauthenticated, "failed to get identity: %v", err)
 	}
 
 	reporterResource, err := RequestToDeleteResource(r, identity)
 	if err != nil {
 		log.Error("Failed to build reporter resource ID: ", err)
-		return nil, fmt.Errorf("failed to build reporter resource ID: %w", err)
+		return nil, status.Errorf(codes.InvalidArgument, "failed to build reporter resource ID: %v", err)
 	}
 
 	err = c.Ctl.Delete(ctx, reporterResource)
 	if err != nil {
 		log.Error("Failed to delete resource: ", err)
-		return nil, fmt.Errorf("failed to delete resource: %w", err)
+
+		if errors.Is(err, resources.ErrResourceNotFound) {
+			return nil, status.Errorf(codes.NotFound, "resource not found")
+		}
+
+		// Default to internal error for unknown errors
+		return nil, status.Errorf(codes.Internal, "failed to delete resource due to an internal error")
 	}
 
 	return ResponseFromDeleteResource(), nil

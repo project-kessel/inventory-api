@@ -25,6 +25,8 @@ import (
 	"github.com/project-kessel/inventory-api/internal/middleware"
 	"github.com/project-kessel/inventory-api/internal/mocks"
 	svc "github.com/project-kessel/inventory-api/internal/service/resources"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 type MockRepo = mocks.MockedReporterResourceRepository
@@ -363,6 +365,11 @@ func TestInventoryService_DeleteResource_NoIdentity(t *testing.T) {
 	assert.Error(t, err)
 	assert.Nil(t, resp)
 	assert.Contains(t, err.Error(), "failed to get identity")
+
+	// Check that it returns the correct gRPC status code
+	grpcStatus, ok := status.FromError(err)
+	assert.True(t, ok)
+	assert.Equal(t, codes.Unauthenticated, grpcStatus.Code())
 }
 
 func TestInventoryService_DeleteResource_InvalidRequest(t *testing.T) {
@@ -381,6 +388,60 @@ func TestInventoryService_DeleteResource_InvalidRequest(t *testing.T) {
 	assert.Error(t, err)
 	assert.Nil(t, resp)
 	assert.Contains(t, err.Error(), "failed to build reporter resource ID")
+
+	// Check that it returns the correct gRPC status code
+	grpcStatus, ok := status.FromError(err)
+	assert.True(t, ok)
+	assert.Equal(t, codes.InvalidArgument, grpcStatus.Code())
+}
+
+func TestInventoryService_DeleteResource_ResourceNotFound(t *testing.T) {
+	id := &authnapi.Identity{Principal: "sarah", Type: "rbac"}
+	ctx := context.WithValue(context.Background(), middleware.IdentityRequestKey, id)
+
+	req := &pb.DeleteResourceRequest{
+		Reference: &pb.ResourceReference{
+			ResourceId:   "nonexistent-resource",
+			ResourceType: "host",
+			Reporter:     &pb.ReporterReference{Type: "hbi"},
+		},
+	}
+
+	mockRepo := new(MockRepo)
+
+	// Mock the repository to return ErrResourceNotFound
+	mockRepo.
+		On("FindByReporterData", mock.Anything, "sarah", "nonexistent-resource").
+		Return((*model_legacy.Resource)(nil), gorm.ErrRecordNotFound).
+		Once()
+
+	mockRepo.
+		On("FindByReporterResourceId", mock.Anything, mock.Anything).
+		Return((*model_legacy.Resource)(nil), gorm.ErrRecordNotFound).
+		Once()
+
+	cfg := &usecase.UsecaseConfig{}
+	uc := &usecase.Usecase{
+		LegacyReporterResourceRepository: mockRepo,
+		Config:                           cfg,
+		Namespace:                        "rbac",
+		Log:                              krlog.NewHelper(krlog.NewStdLogger(io.Discard)),
+	}
+
+	service := svc.NewKesselInventoryServiceV1beta2(uc)
+
+	resp, err := service.DeleteResource(ctx, req)
+
+	assert.Error(t, err)
+	assert.Nil(t, resp)
+	assert.Contains(t, err.Error(), "resource not found")
+
+	// Check that it returns the correct gRPC status code
+	grpcStatus, ok := status.FromError(err)
+	assert.True(t, ok)
+	assert.Equal(t, codes.NotFound, grpcStatus.Code())
+
+	mockRepo.AssertExpectations(t)
 }
 
 func TestInventoryService_Check_Allowed(t *testing.T) {

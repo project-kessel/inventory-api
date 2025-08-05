@@ -11,6 +11,7 @@ import (
 	"github.com/project-kessel/inventory-api/internal/biz/model_legacy"
 )
 
+// Event represents a CloudEvent structure used for inventory system events.
 // Todo: get rid of this Event and have an Event (as event output) with all the assignments going on the New* functions
 type Event struct {
 	Specversion     string      `json:"specversion"`
@@ -23,18 +24,21 @@ type Event struct {
 	Data            interface{} `json:"data"`
 }
 
+// ResourceData contains the data payload for resource-related events.
 type ResourceData struct {
 	Metadata     ResourceMetadata    `json:"metadata"`
 	ReporterData ResourceReporter    `json:"reporter_data"`
 	ResourceData internal.JsonObject `json:"resource_data,omitempty"`
 }
 
+// RelationshipData contains the data payload for relationship-related events.
 type RelationshipData struct {
 	Metadata     RelationshipMetadata `json:"metadata"`
 	ReporterData RelationshipReporter `json:"reporter_data"`
 	ResourceData internal.JsonObject  `json:"resource_data,omitempty"`
 }
 
+// ResourceMetadata contains metadata information for inventory resources.
 type ResourceMetadata struct {
 	Id           string          `json:"id"`
 	ResourceType string          `json:"resource_type"`
@@ -46,11 +50,13 @@ type ResourceMetadata struct {
 	Labels       []ResourceLabel `json:"labels,omitempty"`
 }
 
+// ResourceLabel represents a key-value label associated with a resource.
 type ResourceLabel struct {
 	Key   string `json:"key"`
 	Value string `json:"value"`
 }
 
+// ResourceReporter contains information about the system that reported the resource.
 type ResourceReporter struct {
 	ReporterInstanceId string `json:"reporter_instance_id"`
 	ReporterType       string `json:"reporter_type"`
@@ -60,6 +66,7 @@ type ResourceReporter struct {
 	ReporterVersion    string `json:"reporter_version"`
 }
 
+// RelationshipMetadata contains metadata information for inventory relationships.
 type RelationshipMetadata struct {
 	Id               string     `json:"id"`
 	RelationshipType string     `json:"relationship_type"`
@@ -68,6 +75,7 @@ type RelationshipMetadata struct {
 	DeletedAt        *time.Time `json:"deleted_at,omitempty"`
 }
 
+// RelationshipReporter contains information about the system that reported the relationship.
 type RelationshipReporter struct {
 	ReporterType           string `json:"reporter_type"`
 	SubjectLocalResourceId string `json:"subject_local_resource_id"`
@@ -76,6 +84,7 @@ type RelationshipReporter struct {
 	ReporterInstanceId     string `json:"reporter_instance_id"`
 }
 
+// NewResourceEvent creates a new Event for resource operations.
 func NewResourceEvent(operationType model_legacy.EventOperationType, resource *model_legacy.Resource, reportedTime time.Time) (*Event, error) {
 	const eventType = "resources"
 
@@ -137,6 +146,7 @@ func NewResourceEvent(operationType model_legacy.EventOperationType, resource *m
 	}, nil
 }
 
+// NewRelationshipEvent creates a new Event for relationship operations.
 func NewRelationshipEvent(operationType model_legacy.EventOperationType, relationship *model_legacy.Relationship, reportedTime time.Time) (*Event, error) {
 	const eventType = "resources-relationship"
 

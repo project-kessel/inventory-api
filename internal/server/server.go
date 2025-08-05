@@ -15,6 +15,7 @@ import (
 	"github.com/project-kessel/inventory-api/internal/server/http"
 )
 
+// Server represents the main application server containing both HTTP and gRPC servers.
 type Server struct {
 	Id   string
 	Name string
@@ -26,6 +27,8 @@ type Server struct {
 	Logger log.Logger
 }
 
+// New creates a new Server instance with the provided configuration and middleware.
+// It initializes both HTTP and gRPC servers with the given authentication middleware.
 func New(c CompletedConfig, authn middleware.Middleware, authnConfig authn.CompletedConfig, logger log.Logger) (*Server, error) {
 	s := &Server{
 		Id:     c.Options.Id,
@@ -59,6 +62,7 @@ func New(c CompletedConfig, authn middleware.Middleware, authnConfig authn.Compl
 	return s, nil
 }
 
+// Run starts the server and blocks until the context is cancelled or an error occurs.
 func (s *Server) Run(ctx context.Context) error {
 	s.App = kratos.New(
 		kratos.ID(s.Id),
@@ -71,6 +75,7 @@ func (s *Server) Run(ctx context.Context) error {
 	return s.App.Run()
 }
 
+// Shutdown gracefully shuts down the server.
 func (s *Server) Shutdown(ctx context.Context) error {
 	return s.App.Stop()
 }

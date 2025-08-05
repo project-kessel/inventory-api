@@ -14,10 +14,13 @@ import (
 	semconv "go.opentelemetry.io/otel/semconv/v1.24.0"
 )
 
+// NewMeter creates a new OpenTelemetry meter for the inventory-api service.
 func NewMeter(provider metric.MeterProvider) (metric.Meter, error) {
 	return provider.Meter("inventory-api"), nil
 }
 
+// NewMeterProvider creates a new OpenTelemetry meter provider with Prometheus exporter
+// and default metrics configuration for the given server.
 func NewMeterProvider(s *Server) (metric.MeterProvider, error) {
 	exporter, err := prometheus.New()
 	if err != nil {

@@ -8,23 +8,28 @@ import (
 	"gorm.io/gorm"
 )
 
-type PagedReponseMetadata struct {
+// PagedResponseMetadata contains metadata for paginated responses including page number, size, and total count.
+type PagedResponseMetadata struct {
 	Page  int   `json:"page"`
 	Size  int   `json:"size"`
 	Total int64 `json:"total"`
 }
 
+// PagedResponse represents a paginated response containing items and metadata.
 type PagedResponse[R any] struct {
-	PagedReponseMetadata
+	PagedResponseMetadata
 	Items []R `json:"items"`
 }
 
+// PaginationRequest contains the parameters needed for paginating database queries.
 type PaginationRequest struct {
 	Page    int
 	MaxSize int
 	Filter  func(*gorm.DB) *gorm.DB
 }
 
+// Pagination is HTTP middleware that extracts pagination parameters from query string
+// and makes them available in the request context.
 func Pagination(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		pageStr := r.URL.Query().Get("page")

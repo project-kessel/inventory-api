@@ -52,6 +52,9 @@ import (
 	healthssvc "github.com/project-kessel/inventory-api/internal/service/health"
 )
 
+// NewCommand creates a new cobra command for starting the inventory server.
+// It configures and wires together all the necessary components including storage, authentication,
+// authorization, eventing, and consumer services.
 func NewCommand(
 	serverOptions *server.Options,
 	storageOptions *storage.Options,
@@ -367,6 +370,8 @@ func NewCommand(
 	return cmd
 }
 
+// shutdown returns a shutdown function that gracefully closes all server components
+// including the HTTP server, eventing manager, consumer, and database connections.
 func shutdown(db *gorm.DB, srv *server.Server, em eventingapi.Manager, cm *consumer.InventoryConsumer, logger *log.Helper) func(reason interface{}) {
 	return func(reason interface{}) {
 		log.Info(fmt.Sprintf("Server Shutdown: %s", reason))

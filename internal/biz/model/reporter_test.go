@@ -57,7 +57,6 @@ func TestReporter_Initialization(t *testing.T) {
 
 	t.Run("should reject whitespace-only reporter type", func(t *testing.T) {
 		t.Parallel()
-
 		_, err := NewReporterType(fixture.WhitespaceString)
 
 		assertInvalidReporter(t, err, "ReporterType cannot be empty")
@@ -97,6 +96,7 @@ func TestReporter_Initialization(t *testing.T) {
 }
 
 func assertValidReporter(t *testing.T, reporter ReporterId, err error, expectedType, expectedInstanceId string) {
+
 	t.Helper()
 	if err != nil {
 		t.Errorf("Expected no error, got %v", err)

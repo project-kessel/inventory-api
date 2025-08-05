@@ -705,7 +705,6 @@ func NewResourceTestFixture() ResourceTestFixture {
 		NilId:                     uuid.Nil,
 		EmptyResourceType:         "",
 		WhitespaceResourceType:    "  \t\n  ",
-
 		// Individual values for NewResource function
 		ValidLocalResourceId:            "local-resource-123",
 		ValidReporterType:               "acm",

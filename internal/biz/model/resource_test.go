@@ -114,9 +114,6 @@ func TestResource_AggregateRootBehavior(t *testing.T) {
 			t.Error("Resource aggregate must contain ReporterResources")
 		}
 	})
-
-	// All tiny type validation tests have been moved to common_test.go where they belong.
-	// Resource aggregate tests should only test business logic with valid tiny types.
 }
 
 func assertResourceEvent(t *testing.T, resource Resource, context string) {

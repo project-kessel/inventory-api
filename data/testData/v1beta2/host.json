@@ -13,7 +13,7 @@
         "workspace_id": "a64d17d0-aec3-410a-acd0-e0b85b22c076"
       },
       "reporter": {
-        "satellite_id": "2c4196f1-0371-4f4c-8913-e113cfaa6e67",
+        "satellite_id": null,
         "subscription_manager_id": "af94f92b-0b65-4cac-b449-6b77e665a08f",
         "insights_inventory_id": "05707922-7b0a-4fe6-982d-6adbc7695b8f",
         "ansible_host": "host-1"

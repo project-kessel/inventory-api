@@ -5,6 +5,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/stretchr/testify/assert"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
@@ -140,6 +141,60 @@ func TestGormTransactionManager_MaxRetries(t *testing.T) {
 
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "transaction failed")
+}
+
+func TestGormTransactionManager_SerializationFailureRetries(t *testing.T) {
+	db := setupTestDB(t)
+	maxRetries := 3
+	tm := NewGormTransactionManager(maxRetries)
+
+	// Create a mock PostgreSQL serialization failure error
+	serializationError := &pgconn.PgError{
+		Code:    "40001", // PostgreSQL serialization failure code
+		Message: "could not serialize access due to concurrent update",
+	}
+
+	callCount := 0
+	err := tm.HandleSerializableTransaction(db, func(tx *gorm.DB) error {
+		callCount++
+		return serializationError
+	})
+
+	// Should call the function maxRetries times (initial attempt + retries)
+	assert.Equal(t, maxRetries, callCount)
+
+	// Should return an error indicating all retries were exhausted
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "transaction failed after 3 attempts")
+	assert.Contains(t, err.Error(), "could not serialize access due to concurrent update")
+}
+
+func TestGormTransactionManager_SerializationFailureRecovery(t *testing.T) {
+	db := setupTestDB(t)
+	maxRetries := 5
+	tm := NewGormTransactionManager(maxRetries)
+
+	// Create a mock PostgreSQL serialization failure error
+	serializationError := &pgconn.PgError{
+		Code:    "40001", // PostgreSQL serialization failure code
+		Message: "could not serialize access due to concurrent update",
+	}
+
+	callCount := 0
+	err := tm.HandleSerializableTransaction(db, func(tx *gorm.DB) error {
+		callCount++
+		// Fail for the first 2 attempts, then succeed
+		if callCount <= 2 {
+			return serializationError
+		}
+		return nil
+	})
+
+	// Should call the function 3 times (2 failures + 1 success)
+	assert.Equal(t, 3, callCount)
+
+	// Should succeed after retries
+	assert.NoError(t, err)
 }
 
 // =============================================================================

@@ -127,6 +127,9 @@ func (v Version) Uint() uint {
 	return uint(v)
 }
 
+// Increment returns a new Version with the value incremented by 1.
+// Note: This will rollover to 0 if the maximum uint value is reached
+// (18,446,744,073,709,551,615 on 64-bit systems or 4,294,967,295 on 32-bit systems).
 func (v Version) Increment() Version {
 	return Version(uint(v) + 1)
 }

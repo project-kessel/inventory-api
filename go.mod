@@ -6,7 +6,7 @@ go 1.24.4
 require (
 	buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go v1.36.6-20250717185734-6c6e0d3c608e.1
 	buf.build/go/protovalidate v0.14.0
-	github.com/MicahParks/keyfunc/v3 v3.4.0
+	github.com/MicahParks/keyfunc/v3 v3.6.1
 	github.com/authzed/grpcutil v0.0.0-20250221190651-1985b19b35b8
 	github.com/cloudevents/sdk-go/protocol/kafka_confluent/v2 v2.0.0-20250721101952-1c64656a6859
 	github.com/cloudevents/sdk-go/v2 v2.16.1

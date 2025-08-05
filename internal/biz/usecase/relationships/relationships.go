@@ -26,10 +26,9 @@ type ResourceRepository interface {
 }
 
 type Usecase struct {
-	repository         ResourceRepository
-	eventer            eventingapi.Manager
-	log                *log.Helper
-	DisablePersistence bool
+	repository ResourceRepository
+	eventer    eventingapi.Manager
+	log        *log.Helper
 }
 
 var (
@@ -39,50 +38,41 @@ var (
 	ErrRelationshipNotFound = errors.New("relationship not found")
 )
 
-func New(repository ResourceRepository, eventer eventingapi.Manager, logger log.Logger, disablePersistence bool) *Usecase {
+func New(repository ResourceRepository, eventer eventingapi.Manager, logger log.Logger) *Usecase {
 	return &Usecase{
-		repository:         repository,
-		eventer:            eventer,
-		log:                log.NewHelper(logger),
-		DisablePersistence: disablePersistence,
+		repository: repository,
+		eventer:    eventer,
+		log:        log.NewHelper(logger),
 	}
 }
 
 func (uc *Usecase) Create(ctx context.Context, m *model_legacy.Relationship) (*model_legacy.Relationship, error) {
-	ret := m // Default to returning the input model_legacy in case persistence is disabled
+	var ret *model_legacy.Relationship
+	relationshipId := model_legacy.ReporterRelationshipIdFromRelationship(m)
 
-	if !uc.DisablePersistence {
-		relationshipId := model_legacy.ReporterRelationshipIdFromRelationship(m)
+	subjectId, err := uc.repository.FindResourceIdByReporterResourceId(ctx, relationshipId.SubjectId)
+	if err != nil {
+		return nil, ErrSubjectNotFound
+	}
 
-		subjectId, err := uc.repository.FindResourceIdByReporterResourceId(ctx, relationshipId.SubjectId)
-		if err != nil {
-			return nil, ErrSubjectNotFound
-		}
+	objectId, err := uc.repository.FindResourceIdByReporterResourceId(ctx, relationshipId.ObjectId)
+	if err != nil {
+		return nil, ErrObjectNotFound
+	}
 
-		objectId, err := uc.repository.FindResourceIdByReporterResourceId(ctx, relationshipId.ObjectId)
-		if err != nil {
-			return nil, ErrObjectNotFound
-		}
+	// check if the relationship already exists
+	_, err = uc.repository.FindRelationship(ctx, subjectId, objectId, relationshipId.RelationshipType)
 
-		// check if the relationship already exists
-		_, err = uc.repository.FindRelationship(ctx, subjectId, objectId, relationshipId.RelationshipType)
+	if err == nil || !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, ErrRelationshipExists
+	}
 
-		if err == nil || !errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, ErrRelationshipExists
-		}
+	m.SubjectId = subjectId
+	m.ObjectId = objectId
 
-		m.SubjectId = subjectId
-		m.ObjectId = objectId
-
-		ret, err = uc.repository.Save(ctx, m)
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		// mock the created at time for eventing
-		// TODO: remove this when persistence is always enabled
-		now := time.Now()
-		m.CreatedAt = &now
+	ret, err = uc.repository.Save(ctx, m)
+	if err != nil {
+		return nil, err
 	}
 
 	if uc.eventer != nil {
@@ -98,38 +88,30 @@ func (uc *Usecase) Create(ctx context.Context, m *model_legacy.Relationship) (*m
 }
 
 func (uc *Usecase) Update(ctx context.Context, m *model_legacy.Relationship, id model_legacy.ReporterRelationshipId) (*model_legacy.Relationship, error) {
-	ret := m // Default to returning the input model_legacy in case persistence is disabled
+	var ret *model_legacy.Relationship
+	subjectId, err := uc.repository.FindResourceIdByReporterResourceId(ctx, id.SubjectId)
+	if err != nil {
+		return nil, ErrSubjectNotFound
+	}
 
-	if !uc.DisablePersistence {
-		subjectId, err := uc.repository.FindResourceIdByReporterResourceId(ctx, id.SubjectId)
-		if err != nil {
-			return nil, ErrSubjectNotFound
-		}
+	objectId, err := uc.repository.FindResourceIdByReporterResourceId(ctx, id.ObjectId)
+	if err != nil {
+		return nil, ErrObjectNotFound
+	}
 
-		objectId, err := uc.repository.FindResourceIdByReporterResourceId(ctx, id.ObjectId)
-		if err != nil {
-			return nil, ErrObjectNotFound
-		}
+	// check if the relationship already exists
+	existingResource, err := uc.repository.FindRelationship(ctx, subjectId, objectId, id.RelationshipType)
 
-		// check if the relationship already exists
-		existingResource, err := uc.repository.FindRelationship(ctx, subjectId, objectId, id.RelationshipType)
+	if err != nil && errors.Is(err, gorm.ErrRecordNotFound) {
+		return uc.Create(ctx, m)
+	}
 
-		if err != nil && errors.Is(err, gorm.ErrRecordNotFound) {
-			return uc.Create(ctx, m)
-		}
+	m.SubjectId = subjectId
+	m.ObjectId = objectId
 
-		m.SubjectId = subjectId
-		m.ObjectId = objectId
-
-		ret, err = uc.repository.Update(ctx, m, existingResource.ID)
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		// mock the updated at time for eventing
-		// TODO: remove this when persistence is always enabled
-		now := time.Now()
-		m.UpdatedAt = &now
+	ret, err = uc.repository.Update(ctx, m, existingResource.ID)
+	if err != nil {
+		return nil, err
 	}
 
 	if uc.eventer != nil {
@@ -145,32 +127,28 @@ func (uc *Usecase) Update(ctx context.Context, m *model_legacy.Relationship, id 
 }
 
 func (uc *Usecase) Delete(ctx context.Context, id model_legacy.ReporterRelationshipId) error {
-	m := &model_legacy.Relationship{
-		// TODO: Create model_legacy
+	var m *model_legacy.Relationship
+
+	subjectId, err := uc.repository.FindResourceIdByReporterResourceId(ctx, id.SubjectId)
+	if err != nil {
+		return ErrSubjectNotFound
 	}
 
-	if !uc.DisablePersistence {
-		subjectId, err := uc.repository.FindResourceIdByReporterResourceId(ctx, id.SubjectId)
-		if err != nil {
-			return ErrSubjectNotFound
-		}
+	objectId, err := uc.repository.FindResourceIdByReporterResourceId(ctx, id.ObjectId)
+	if err != nil {
+		return ErrObjectNotFound
+	}
 
-		objectId, err := uc.repository.FindResourceIdByReporterResourceId(ctx, id.ObjectId)
-		if err != nil {
-			return ErrObjectNotFound
-		}
+	// check if the relationship already exists
+	existingResource, err := uc.repository.FindRelationship(ctx, subjectId, objectId, id.RelationshipType)
 
-		// check if the relationship already exists
-		existingResource, err := uc.repository.FindRelationship(ctx, subjectId, objectId, id.RelationshipType)
+	if err != nil && errors.Is(err, gorm.ErrRecordNotFound) {
+		return ErrRelationshipNotFound
+	}
 
-		if err != nil && errors.Is(err, gorm.ErrRecordNotFound) {
-			return ErrRelationshipNotFound
-		}
-
-		m, err = uc.repository.Delete(ctx, existingResource.ID)
-		if err != nil {
-			return err
-		}
+	m, err = uc.repository.Delete(ctx, existingResource.ID)
+	if err != nil {
+		return err
 	}
 
 	if uc.eventer != nil {

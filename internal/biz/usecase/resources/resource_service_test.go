@@ -80,7 +80,6 @@ func TestLookupResources_Success(t *testing.T) {
 	authz.On("LookupResources", ctx, req).Return(mockStream, nil)
 
 	usecaseConfig := &UsecaseConfig{
-		DisablePersistence:      false,
 		ReadAfterWriteEnabled:   true,
 		ReadAfterWriteAllowlist: []string{},
 		ConsumerEnabled:         true,
@@ -215,7 +214,6 @@ func resource3() *model_legacy.Resource {
 }
 
 var defaultUseCaseConfig = &UsecaseConfig{
-	DisablePersistence:      false,
 	ReadAfterWriteEnabled:   false,
 	ReadAfterWriteAllowlist: []string{},
 	ConsumerEnabled:         true,
@@ -353,7 +351,6 @@ func TestCreateNewResource_ConsumerDisabled(t *testing.T) {
 	sub.On("BlockForNotification", mock.Anything).Return(nil)
 
 	usecaseConfig := &UsecaseConfig{
-		DisablePersistence:      false,
 		ReadAfterWriteEnabled:   false,
 		ReadAfterWriteAllowlist: []string{},
 		ConsumerEnabled:         false,
@@ -397,7 +394,6 @@ func TestCreateNewResource_ConsistencyToken(t *testing.T) {
 	sub.On("BlockForNotification", mock.Anything).Return(nil)
 
 	usecaseConfig := &UsecaseConfig{
-		DisablePersistence:      false,
 		ReadAfterWriteEnabled:   true,
 		ReadAfterWriteAllowlist: []string{"reporter_id"},
 		ConsumerEnabled:         true,
@@ -645,72 +641,6 @@ func TestDeleteResourceBackwardsCompatible(t *testing.T) {
 	repo.AssertExpectations(t)
 }
 
-func TestCreateResource_PersistenceDisabled(t *testing.T) {
-	ctx := context.TODO()
-	resource := resource1()
-	repo := &mocks.MockedReporterResourceRepository{}
-	inventoryRepo := &mocks.MockedInventoryResourceRepository{}
-
-	// Mock as if persistence is not disabled, for assurance
-	repo.On("FindByReporterData", mock.Anything, mock.Anything, mock.Anything).Return(&model_legacy.Resource{}, nil)
-	repo.On("FindByReporterResourceId", mock.Anything, mock.Anything).Return(&model_legacy.Resource{}, nil)
-	repo.On("Create", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, nil)
-
-	usecaseConfig := &UsecaseConfig{
-		DisablePersistence:      true,
-		ReadAfterWriteEnabled:   false,
-		ReadAfterWriteAllowlist: []string{},
-		ConsumerEnabled:         true,
-	}
-	useCase := New(nil, repo, inventoryRepo, nil, nil, "", log.DefaultLogger, nil, cb, usecaseConfig)
-
-	// Create the resource
-	r, err := useCase.Create(ctx, resource)
-	assert.Nil(t, err)
-	assert.Equal(t, resource, r)
-
-	// Create the same resource again, should not return an error since persistence is disabled
-	r, err = useCase.Create(ctx, resource)
-	assert.Nil(t, err)
-	assert.Equal(t, resource, r)
-
-	// Assert that the repository methods were not called since persistence is disabled
-	repo.AssertNotCalled(t, "FindByReporterData")
-	repo.AssertNotCalled(t, "FindByReporterResourceId")
-	repo.AssertNotCalled(t, "Create")
-}
-
-func TestUpdateResource_PersistenceDisabled(t *testing.T) {
-	ctx := context.TODO()
-	resource := resource1()
-	repo := &mocks.MockedReporterResourceRepository{}
-	inventoryRepo := &mocks.MockedInventoryResourceRepository{}
-
-	// Mock as if persistence is not disabled, for assurance
-	repo.On("FindByReporterData", mock.Anything, mock.Anything, mock.Anything).Return(&model_legacy.Resource{}, nil)
-	repo.On("FindByReporterResourceId", mock.Anything, mock.Anything).Return(&model_legacy.Resource{}, nil)
-	repo.On("Update", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, nil)
-	repo.On("Create", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, nil)
-
-	usecaseConfig := &UsecaseConfig{
-		DisablePersistence:      true,
-		ReadAfterWriteEnabled:   false,
-		ReadAfterWriteAllowlist: []string{},
-		ConsumerEnabled:         true,
-	}
-	useCase := New(nil, repo, inventoryRepo, nil, nil, "", log.DefaultLogger, nil, cb, usecaseConfig)
-
-	r, err := useCase.Update(ctx, resource, model_legacy.ReporterResourceId{})
-	assert.Nil(t, err)
-	assert.Equal(t, resource, r)
-
-	// Assert that the repository methods were not called since persistence is disabled
-	repo.AssertNotCalled(t, "FindByReporterData")
-	repo.AssertNotCalled(t, "FindByReporterResourceId")
-	repo.AssertNotCalled(t, "Update")
-	repo.AssertNotCalled(t, "Create")
-}
-
 func TestUpdate_ReadAfterWrite(t *testing.T) {
 	resource := resource1()
 	id, err := uuid.NewV7()
@@ -735,7 +665,6 @@ func TestUpdate_ReadAfterWrite(t *testing.T) {
 	sub.On("BlockForNotification", mock.Anything).Return(nil)
 
 	usecaseConfig := &UsecaseConfig{
-		DisablePersistence:      false,
 		ReadAfterWriteEnabled:   true,
 		ReadAfterWriteAllowlist: []string{"reporter_id"},
 		ConsumerEnabled:         true,
@@ -776,7 +705,6 @@ func TestUpdate_ConsumerDisabled(t *testing.T) {
 	sub.On("BlockForNotification", mock.Anything).Return(nil)
 
 	usecaseConfig := &UsecaseConfig{
-		DisablePersistence:      false,
 		ReadAfterWriteEnabled:   true,
 		ReadAfterWriteAllowlist: []string{"reporter_id"},
 		ConsumerEnabled:         false,
@@ -792,37 +720,6 @@ func TestUpdate_ConsumerDisabled(t *testing.T) {
 	listenMan.AssertNotCalled(t, "Subscribe")
 	sub.AssertNotCalled(t, "Unsubscribe")
 	sub.AssertNotCalled(t, "BlockForNotification")
-}
-
-func TestDeleteResource_PersistenceDisabled(t *testing.T) {
-	ctx := context.TODO()
-
-	id, err := uuid.NewV7()
-	assert.Nil(t, err)
-
-	repo := &mocks.MockedReporterResourceRepository{}
-	inventoryRepo := &mocks.MockedInventoryResourceRepository{}
-
-	// Mock as if persistence is not disabled, for assurance
-	repo.On("FindByReporterResourceId", mock.Anything, mock.Anything).Return(&model_legacy.Resource{
-		ID: id,
-	}, nil)
-	repo.On("Delete", mock.Anything, (uint64)(33)).Return(&model_legacy.Resource{}, nil)
-
-	usecaseConfig := &UsecaseConfig{
-		DisablePersistence:      true,
-		ReadAfterWriteEnabled:   false,
-		ReadAfterWriteAllowlist: []string{},
-		ConsumerEnabled:         true,
-	}
-	useCase := New(nil, repo, inventoryRepo, nil, nil, "", log.DefaultLogger, nil, cb, usecaseConfig)
-
-	err = useCase.Delete(ctx, model_legacy.ReporterResourceId{})
-	assert.Nil(t, err)
-
-	// Assert that the repository methods were not called since persistence is disabled
-	repo.AssertNotCalled(t, "FindByReporterResourceId")
-	repo.AssertNotCalled(t, "Delete")
 }
 
 func TestCheck_MissingResource(t *testing.T) {
@@ -1348,7 +1245,6 @@ func TestComputeReadAfterWrite(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			usecaseConfig := &UsecaseConfig{
-				DisablePersistence:      false,
 				ReadAfterWriteEnabled:   tt.ReadAfterWriteEnabled,
 				ReadAfterWriteAllowlist: tt.ReadAfterWriteAllowlist,
 				ConsumerEnabled:         true,
@@ -1420,7 +1316,6 @@ func TestUpsert_ReadAfterWrite(t *testing.T) {
 	sub.On("BlockForNotification", mock.Anything).Return(nil)
 
 	usecaseConfig := &UsecaseConfig{
-		DisablePersistence:      false,
 		ReadAfterWriteEnabled:   true,
 		ReadAfterWriteAllowlist: []string{"reporter_id"},
 		ConsumerEnabled:         true,
@@ -1456,7 +1351,6 @@ func TestUpsert_ConsumerDisabled(t *testing.T) {
 	sub.On("BlockForNotification", mock.Anything).Return(nil)
 
 	usecaseConfig := &UsecaseConfig{
-		DisablePersistence:      false,
 		ReadAfterWriteEnabled:   true,
 		ReadAfterWriteAllowlist: []string{"reporter_id"},
 		ConsumerEnabled:         false,
@@ -1493,7 +1387,6 @@ func TestUpsert_WaitCircuitBreaker(t *testing.T) {
 	blockForNotifCall := sub.On("BlockForNotification", mock.Anything).Return(pubsub.ErrWaitContextCancelled)
 
 	usecaseConfig := &UsecaseConfig{
-		DisablePersistence:      false,
 		ReadAfterWriteEnabled:   true,
 		ReadAfterWriteAllowlist: []string{"reporter_id"},
 		ConsumerEnabled:         true,

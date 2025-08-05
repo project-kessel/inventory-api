@@ -121,18 +121,16 @@ func NewCommand(
 			}
 
 			// configure inventoryConsumer
-			if !storageOptions.DisablePersistence {
-				if errs := consumerOptions.Complete(); errs != nil {
+			if errs := consumerOptions.Complete(); errs != nil {
+				return errors.NewAggregate(errs)
+			}
+			if errs := consumerOptions.Validate(); errs != nil {
+				return errors.NewAggregate(errs)
+			}
+			if consumerOptions.Enabled {
+				consumerConfig, errs = consumer.NewConfig(consumerOptions).Complete()
+				if errs != nil {
 					return errors.NewAggregate(errs)
-				}
-				if errs := consumerOptions.Validate(); errs != nil {
-					return errors.NewAggregate(errs)
-				}
-				if consumerOptions.Enabled {
-					consumerConfig, errs = consumer.NewConfig(consumerOptions).Complete()
-					if errs != nil {
-						return errors.NewAggregate(errs)
-					}
 				}
 			}
 
@@ -236,7 +234,6 @@ func NewCommand(
 			inventoryresources_repo := inventoryResourcesRepo.New(db)
 
 			usecaseConfig := &resourcesctl.UsecaseConfig{
-				DisablePersistence:      storageConfig.Options.DisablePersistence,
 				ReadAfterWriteEnabled:   consistencyConfig.ReadAfterWriteEnabled,
 				ReadAfterWriteAllowlist: consistencyConfig.ReadAfterWriteAllowlist,
 				ConsumerEnabled:         consumerOptions.Enabled,
@@ -293,13 +290,13 @@ func NewCommand(
 
 			// wire together relationships handling
 			relationships_repo := relationshipsrepo.New(db)
-			relationships_controller := relationshipsctl.New(relationships_repo, eventingManager, log.With(logger, "subsystem", "relationships_controller"), storageConfig.Options.DisablePersistence)
+			relationships_controller := relationshipsctl.New(relationships_repo, eventingManager, log.With(logger, "subsystem", "relationships_controller"))
 			relationships_service := relationshipssvc.NewKesselK8SPolicyIsPropagatedToK8SClusterServiceV1beta1(relationships_controller)
 			rel.RegisterKesselK8SPolicyIsPropagatedToK8SClusterServiceServer(server.GrpcServer, relationships_service)
 			rel.RegisterKesselK8SPolicyIsPropagatedToK8SClusterServiceHTTPServer(server.HttpServer, relationships_service)
 
 			health_repo := healthrepo.New(db, authorizer, authzConfig)
-			health_controller := healthctl.New(health_repo, log.With(logger, "subsystem", "health_controller"), storageConfig.Options.DisablePersistence)
+			health_controller := healthctl.New(health_repo, log.With(logger, "subsystem", "health_controller"))
 			health_service := healthssvc.New(health_controller)
 			hb.RegisterKesselInventoryHealthServiceServer(server.GrpcServer, health_service)
 			hb.RegisterKesselInventoryHealthServiceHTTPServer(server.HttpServer, health_service)
@@ -311,7 +308,7 @@ func NewCommand(
 
 			shutdown := shutdown(db, server, eventingManager, &inventoryConsumer, log.NewHelper(logger))
 
-			if !storageOptions.DisablePersistence && consumerOptions.Enabled {
+			if consumerOptions.Enabled {
 				go func() {
 					retries := 0
 					for consumerOptions.RetryOptions.ConsumerMaxRetries == -1 || retries < consumerOptions.RetryOptions.ConsumerMaxRetries {

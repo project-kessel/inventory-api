@@ -13,13 +13,14 @@ import (
 // Utility Helper Functions
 // =============================================================================
 
-// stringPtr returns a pointer to the given string
+// StringPtr returns a pointer to the given string
 func StringPtr(s string) *string {
 	return &s
 }
 
 type JsonObject map[string]interface{}
 
+// GORM interface methods for JsonObject
 func (JsonObject) GormDBDataType(db *gorm.DB, field *schema.Field) string {
 	switch db.Name() {
 	case "sqlite":
@@ -40,8 +41,4 @@ func (data *JsonObject) Scan(value interface{}) error {
 		return errors.New("failed to parse JsonObject from database")
 	}
 	return json.Unmarshal(b, data)
-}
-
-func IsClusterPolicyRelation(relationshipType string) bool {
-	return relationshipType == "ispropagatedto"
 }

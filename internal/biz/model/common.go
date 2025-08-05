@@ -2,10 +2,9 @@ package model
 
 import (
 	"fmt"
-	"strings"
-
 	"github.com/google/uuid"
 	"github.com/project-kessel/inventory-api/internal"
+	"strings"
 )
 
 const initialReporterRepresentationVersion = 0

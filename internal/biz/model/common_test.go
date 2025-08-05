@@ -3,6 +3,8 @@ package model
 import (
 	"strings"
 	"testing"
+
+	"github.com/google/uuid"
 )
 
 func TestVersion_Initialization(t *testing.T) {
@@ -747,6 +749,257 @@ func TestLocalResourceId_Initialization(t *testing.T) {
 
 		if err == nil {
 			t.Error("Expected error for whitespace string, got none")
+		}
+	})
+}
+
+func TestSerializationRoundtrip(t *testing.T) {
+	t.Parallel()
+
+	t.Run("Version roundtrip", func(t *testing.T) {
+		t.Parallel()
+
+		testCases := []uint{0, 1, 42, 1000, ^uint(0)} // zero, small, medium, large, max
+		for _, original := range testCases {
+			version := NewVersion(original)
+			serialized := version.Serialize()
+			deserialized := DeserializeVersion(serialized)
+
+			if deserialized.Uint() != original {
+				t.Errorf("Version roundtrip failed: %d -> %d -> %d", original, serialized, deserialized.Uint())
+			}
+		}
+	})
+
+	t.Run("ResourceId roundtrip", func(t *testing.T) {
+		t.Parallel()
+
+		testCases := []uuid.UUID{
+			uuid.New(),
+			uuid.MustParse("123e4567-e89b-12d3-a456-426614174000"),
+			uuid.MustParse("00000000-0000-0000-0000-000000000000"),
+		}
+		for _, original := range testCases {
+			resourceId, err := NewResourceId(original)
+			if err != nil {
+				if original == uuid.Nil {
+					continue // Skip nil UUID as it's invalid
+				}
+				t.Fatalf("Failed to create ResourceId: %v", err)
+			}
+			serialized := resourceId.Serialize()
+			deserialized := DeserializeResourceId(serialized)
+
+			if deserialized.UUID() != original {
+				t.Errorf("ResourceId roundtrip failed: %s -> %s -> %s", original, serialized, deserialized.UUID())
+			}
+		}
+	})
+
+	t.Run("ReporterResourceId roundtrip", func(t *testing.T) {
+		t.Parallel()
+
+		testCases := []uuid.UUID{
+			uuid.New(),
+			uuid.MustParse("987fcdeb-51a2-43d8-b123-456789abcdef"),
+		}
+		for _, original := range testCases {
+			reporterResourceId, err := NewReporterResourceId(original)
+			if err != nil {
+				t.Fatalf("Failed to create ReporterResourceId: %v", err)
+			}
+			serialized := reporterResourceId.Serialize()
+			deserialized := DeserializeReporterResourceId(serialized)
+
+			if deserialized.UUID() != original {
+				t.Errorf("ReporterResourceId roundtrip failed: %s -> %s -> %s", original, serialized, deserialized.UUID())
+			}
+		}
+	})
+
+	t.Run("ResourceType roundtrip", func(t *testing.T) {
+		t.Parallel()
+
+		testCases := []string{"rhel-host", "k8s-cluster", "notifications-integration", "test-type"}
+		for _, original := range testCases {
+			resourceType, err := NewResourceType(original)
+			if err != nil {
+				t.Fatalf("Failed to create ResourceType: %v", err)
+			}
+			serialized := resourceType.Serialize()
+			deserialized := DeserializeResourceType(serialized)
+
+			if deserialized.String() != original {
+				t.Errorf("ResourceType roundtrip failed: %s -> %s -> %s", original, serialized, deserialized.String())
+			}
+		}
+	})
+
+	t.Run("ReporterType roundtrip", func(t *testing.T) {
+		t.Parallel()
+
+		testCases := []string{"hbi", "acm", "acs", "ocm"}
+		for _, original := range testCases {
+			reporterType, err := NewReporterType(original)
+			if err != nil {
+				t.Fatalf("Failed to create ReporterType: %v", err)
+			}
+			serialized := reporterType.Serialize()
+			deserialized := DeserializeReporterType(serialized)
+
+			if deserialized.String() != original {
+				t.Errorf("ReporterType roundtrip failed: %s -> %s -> %s", original, serialized, deserialized.String())
+			}
+		}
+	})
+
+	t.Run("ReporterInstanceId roundtrip", func(t *testing.T) {
+		t.Parallel()
+
+		testCases := []string{"instance-1", "test-instance", "reporter-instance-123"}
+		for _, original := range testCases {
+			reporterInstanceId, err := NewReporterInstanceId(original)
+			if err != nil {
+				t.Fatalf("Failed to create ReporterInstanceId: %v", err)
+			}
+			serialized := reporterInstanceId.Serialize()
+			deserialized := DeserializeReporterInstanceId(serialized)
+
+			if deserialized.String() != original {
+				t.Errorf("ReporterInstanceId roundtrip failed: %s -> %s -> %s", original, serialized, deserialized.String())
+			}
+		}
+	})
+
+	t.Run("ConsistencyToken roundtrip", func(t *testing.T) {
+		t.Parallel()
+
+		testCases := []string{"token-123", "consistency-token", "abcd-efgh-ijkl"}
+		for _, original := range testCases {
+			consistencyToken, err := NewConsistencyToken(original)
+			if err != nil {
+				t.Fatalf("Failed to create ConsistencyToken: %v", err)
+			}
+			serialized := consistencyToken.Serialize()
+			deserialized := DeserializeConsistencyToken(serialized)
+
+			if deserialized.String() != original {
+				t.Errorf("ConsistencyToken roundtrip failed: %s -> %s -> %s", original, serialized, deserialized.String())
+			}
+		}
+	})
+
+	t.Run("Generation roundtrip", func(t *testing.T) {
+		t.Parallel()
+
+		testCases := []uint{0, 1, 100, 9999, ^uint(0)} // zero, small, medium, large, max
+		for _, original := range testCases {
+			generation := NewGeneration(original)
+			serialized := generation.Serialize()
+			deserialized := DeserializeGeneration(serialized)
+
+			if deserialized.Uint() != original {
+				t.Errorf("Generation roundtrip failed: %d -> %d -> %d", original, serialized, deserialized.Uint())
+			}
+		}
+	})
+
+	t.Run("ReporterVersion roundtrip", func(t *testing.T) {
+		t.Parallel()
+
+		testCases := []string{"1.0.0", "v2.1.3", "latest", "snapshot-123"}
+		for _, original := range testCases {
+			reporterVersion, err := NewReporterVersion(original)
+			if err != nil {
+				t.Fatalf("Failed to create ReporterVersion: %v", err)
+			}
+			serialized := reporterVersion.Serialize()
+			deserialized := DeserializeReporterVersion(serialized)
+
+			if deserialized.String() != original {
+				t.Errorf("ReporterVersion roundtrip failed: %s -> %s -> %s", original, serialized, deserialized.String())
+			}
+		}
+	})
+
+	t.Run("Tombstone roundtrip", func(t *testing.T) {
+		t.Parallel()
+
+		testCases := []bool{true, false}
+		for _, original := range testCases {
+			tombstone := NewTombstone(original)
+			serialized := tombstone.Serialize()
+			deserialized := DeserializeTombstone(serialized)
+
+			if deserialized.Bool() != original {
+				t.Errorf("Tombstone roundtrip failed: %t -> %t -> %t", original, serialized, deserialized.Bool())
+			}
+		}
+	})
+
+	t.Run("ApiHref roundtrip", func(t *testing.T) {
+		t.Parallel()
+
+		testCases := []string{
+			"https://api.example.com/resource/123",
+			"http://localhost:8080/api/v1/resource",
+			"/api/resource/456",
+		}
+		for _, original := range testCases {
+			apiHref, err := NewApiHref(original)
+			if err != nil {
+				t.Fatalf("Failed to create ApiHref: %v", err)
+			}
+			serialized := apiHref.Serialize()
+			deserialized := DeserializeApiHref(serialized)
+
+			if deserialized.String() != original {
+				t.Errorf("ApiHref roundtrip failed: %s -> %s -> %s", original, serialized, deserialized.String())
+			}
+		}
+	})
+
+	t.Run("ConsoleHref roundtrip", func(t *testing.T) {
+		t.Parallel()
+
+		testCases := []string{
+			"https://console.example.com/resource/123",
+			"http://localhost:3000/console/resource",
+			"/console/resource/789",
+		}
+		for _, original := range testCases {
+			consoleHref, err := NewConsoleHref(original)
+			if err != nil {
+				t.Fatalf("Failed to create ConsoleHref: %v", err)
+			}
+			serialized := consoleHref.Serialize()
+			deserialized := DeserializeConsoleHref(serialized)
+
+			if deserialized.String() != original {
+				t.Errorf("ConsoleHref roundtrip failed: %s -> %s -> %s", original, serialized, deserialized.String())
+			}
+		}
+	})
+
+	t.Run("LocalResourceId roundtrip", func(t *testing.T) {
+		t.Parallel()
+
+		testCases := []string{
+			"local-resource-123",
+			"cluster-abcd-efgh",
+			uuid.New().String(),
+		}
+		for _, original := range testCases {
+			localResourceId, err := NewLocalResourceId(original)
+			if err != nil {
+				t.Fatalf("Failed to create LocalResourceId: %v", err)
+			}
+			serialized := localResourceId.Serialize()
+			deserialized := DeserializeLocalResourceId(serialized)
+
+			if deserialized.String() != original {
+				t.Errorf("LocalResourceId roundtrip failed: %s -> %s -> %s", original, serialized, deserialized.String())
+			}
 		}
 	})
 }

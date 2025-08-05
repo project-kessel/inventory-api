@@ -1,0 +1,230 @@
+
+@docs/books/AW.Implementing.Domain-Driven.Design.0321834577.pdf
+alwaysApply: true
+---
+
+Cursor AI Rules: Implementing Domain-Driven Design (Vaughn Vernon) - Comprehensive
+
+This document provides a comprehensive set of rules and guidelines for Cursor, based on the strategic and tactical patterns in Vaughn Vernon's "Implementing Domain-Driven Design." Its purpose is to assist engineers in writing and reviewing code that is robust, scalable, and accurately models the business domain.
+
+## Part 1: Strategic Design
+
+Strategic design is about the big picture: defining the boundaries of our models and how they interact. Getting this right is critical for avoiding a "Big Ball of Mud."
+
+### 1. Bounded Contexts
+
+A Bounded Context is an explicit boundary within which a domain model exists. Inside the boundary, all terms and concepts of the Ubiquitous Language have a specific, unambiguous meaning.
+
+**Why it's important:** Bounded Contexts are the most effective pattern for managing complexity in a large system. They allow different teams to work on different models without stepping on each other's toes and prevent the corruption of a model by mixing in concepts from other domains. (Chapter 2)
+
+**Code Generation Prompt:**
+
+> "What is the Bounded Context for this new feature? Let's ensure all the concepts, language, and logic used here are consistent within that single context. If we need information from another context, how will we obtain it (e.g., via an Anticorruption Layer)?"
+
+**Code Review Prompt:**
+
+> "This code appears to mix concepts from different domains (e.g., [ConceptA] from Sales and [ConceptB] from Support). This violates the Bounded Context boundary. This should be refactored. Can we use a Domain Event or an Anticorruption Layer to communicate between these contexts instead of creating a direct dependency?"
+
+### 2. Context Maps
+
+A Context Map is a diagram and document that describes the relationships between Bounded Contexts. It makes integrations explicit.
+
+**Why it's important:** Context Maps make inter-team relationships and technical integrations explicit, preventing misunderstandings and political issues. They are the blueprint for system integration. (Chapter 3)
+
+**Code Review Prompt (Guideline):**
+
+> "The integration between [ContextA] and [ContextB] seems ad-hoc. According to our Context Map, this should be a [Customer-Supplier | Anticorruption Layer | etc.] relationship. Let's refactor the integration code to explicitly follow this pattern. For example, if it's an Anticorruption Layer, we should see a dedicated service that translates the foreign model into our local model's concepts."
+
+## Part 2: Tactical Design
+
+Tactical design is about the building blocks we use to craft a single, high-quality domain model within a Bounded Context.
+
+### 3. The Ubiquitous Language
+
+The foundation of DDD is a shared, rigorous language between developers and domain experts, reflected directly in the code.
+
+**Why it's important:** A Ubiquitous Language eliminates ambiguity and translation. The code becomes a direct, readable expression of the business domain. (Chapters 1, 2)
+
+**Code Generation Prompt:**
+
+> "When naming this class, method, or variable, what term from the Ubiquitous Language does it represent? Let's ensure the name is explicit and would be immediately understandable to a domain expert."
+
+**Code Review Prompt:**
+
+> "The name [class/method/variable name] appears to be a technical term or an abbreviation. Is there a more descriptive term from the Ubiquitous Language that would better express its business purpose? Let's refactor for clarity."
+
+### 4. Aggregates: The Consistency Boundary
+
+Aggregates are clusters of domain objects treated as a single unit for data changes. The Aggregate Root is the single entry point.
+
+#### Rule 4.1: Model True Invariants
+
+**Why it's important:** An Aggregate's primary job is to enforce business rules (invariants) that must be 100% consistent within a single transaction. The boundary defines what must be consistent. (Chapter 10)
+
+**Code Generation Prompt:**
+
+> "As we design this operation, what are the absolute business rules that must be enforced? Let's ensure all objects required to validate these rules are encapsulated within this Aggregate, and that the Aggregate Root is the only entry point for this change."
+
+**Code Review Prompt:**
+
+> "This code modifies multiple Aggregates ([Aggregate1], [Aggregate2]) within a single transaction. This suggests the consistency boundary might be incorrect. Is there a true business invariant that spans these Aggregates? If not, this operation should be refactored to modify only one Aggregate and use eventual consistency (e.g., via a Domain Event) to update the others."
+
+#### Rule 4.2: Design Small Aggregates
+
+**Why it's important:** Large aggregates lead to performance bottlenecks, frequent optimistic locking failures, and poor scalability. (Chapter 10)
+
+**Code Generation Prompt:**
+
+> "To keep this Aggregate small, we will only include the absolute minimum needed to enforce its invariants. We will reference all other Aggregates by their identity."
+
+**Code Review Prompt:**
+
+> "This Aggregate ([AggregateName]) appears large. It contains direct references to [Object1] and a large collection of [Object2]. This will likely cause performance and concurrency problems. Can we refactor this to be smaller by referencing other Aggregates via their IDs?"
+
+#### Rule 4.3: Reference Other Aggregates by Identity
+
+**Why it's important:** Holding direct object references between Aggregates creates a large, deeply nested object graph that performs poorly. Referencing by ID enforces a clean separation. (Chapter 10)
+
+**Code Generation Prompt:**
+
+> "Instead of adding a [OtherAggregate] property, let's add a [OtherAggregate]Id property. The Application Service will resolve this ID if the object is needed."
+
+**Code Review Prompt:**
+
+> "This Aggregate holds a direct object reference to the [OtherAggregate] Aggregate Root. Please refactor this to store only the [OtherAggregate]Id. This makes the boundary explicit."
+
+#### Rule 4.4: Use Eventual Consistency Outside the Boundary
+
+**Why it's important:** If a business rule does not need to be immediately consistent, eventual consistency allows for highly scalable and decoupled systems. (Chapters 8, 10)
+
+**Code Generation Prompt:**
+
+> "After this operation on [Aggregate1] completes, it will publish a [DomainEventName] event. A separate subscriber will listen for this event and update [Aggregate2] in a separate transaction."
+
+**Code Review Prompt:**
+
+> "This method updates [Aggregate1] and then immediately updates [Aggregate2]. Is immediate consistency a strict business requirement? If not, this is a prime candidate for eventual consistency via a Domain Event."
+
+### 5. Entities and Value Objects
+
+A clear distinction between Entities and Value Objects is crucial for a simple and correct model.
+
+#### Rule 5.1: Distinguish by Identity vs. Attributes
+
+**Why it's important:** Entities have a unique identity. Value Objects are defined by their attributes. Overusing Entities adds unnecessary complexity. (Chapters 5, 6)
+
+**Code Generation Prompt:**
+
+> "Does [ConceptName] have a continuous identity (Entity)? Or is it a descriptive concept defined by its attributes, like a monetary amount or a date range (Value Object)?"
+
+**Code Review Prompt:**
+
+> "The class [ClassName] is an Entity, but it seems to be defined by its attributes ([attr1], [attr2]). Should this be an immutable Value Object?"
+
+#### Rule 5.2: Prioritize Immutability for Value Objects
+
+**Why it's important:** Immutable objects are thread-safe and dramatically reduce bugs. (Chapter 6)
+
+**Code Generation Prompt:**
+
+> "The [ValueObjectName] Value Object will be immutable. Properties are final and set only in the constructor. A `with…()` method will return a new instance for modifications."
+
+**Code Review Prompt:**
+
+> "This class [ClassName] is a Value Object but has public setters (`set…()`). This violates immutability. Please refactor to remove setters and initialize state only in the constructor."
+
+#### Rule 5.3: Enforce Domain Invariants at Object Creation
+
+**Why it's important:** No domain object should ever be allowed to exist in a state that violates domain rules. Object creation is the critical control point where all invariants must be validated. This prevents invalid objects from propagating through the system and causing downstream errors or business rule violations. (Chapters 5, 6, 11)
+
+**Code Generation Prompt:**
+
+> "This [ObjectType] constructor must validate all domain invariants before creating the object. What business rules must always be true for this object? Let's ensure these rules are checked and return an error if any are violated, rather than creating an invalid object."
+
+**Code Review Prompt:**
+
+> "This constructor for [ClassName] allows creation with [InvalidState]. This violates domain invariants and should return an error instead of creating an invalid object. For example, tiny types should never accept null/empty values, and Aggregates should never be created in an inconsistent state."
+
+**Examples:**
+- Value Objects: `NewReporterVersion("")` should return an error, not create an empty version
+- Tiny Types: `NewResourceId(uuid.Nil)` should return an error, not create an invalid ID  
+- Aggregates: `NewReporterDataRepresentation(nil, ...)` should return an error, not create a representation without data
+- Entities: Constructor should validate required fields and business rules before object creation
+
+### 6. Domain Events
+
+Model important business occurrences as facts of the domain.
+
+**Why it's important:** Domain Events decouple Aggregates and Bounded Contexts, enabling eventual consistency and creating a rich audit trail of what happened in the domain. (Chapter 8)
+
+**Code Generation Prompt:**
+
+> "A significant state change just occurred in the [AggregateName] Aggregate. Let's model this by creating and publishing a [EventName] Domain Event. What information would subscribers need to react to this event?"
+
+**Code Review Prompt:**
+
+> "After this state change in [AggregateName], the code directly calls a method on [OtherAggregate]. This creates tight coupling. Could this be better modeled by publishing a Domain Event from [AggregateName] and having [OtherAggregate] (or a service) subscribe to it?"
+
+### 7. Services: Application and Domain
+
+Properly layering services is key to preventing an anemic domain model.
+
+#### Rule 7.1: Keep Application Services Thin
+
+**Why it's important:** Application Services are thin coordinators for transaction management and security. They contain NO domain logic. (Chapters 7, 14)
+
+**Code Generation Prompt:**
+
+> "This operation involves a business rule that doesn't belong to a single Entity. Let's create a stateless Domain Service to encapsulate this logic. The Application Service will then simply call it."
+
+**Code Review Prompt:**
+
+> "This Application Service method contains complex business logic ([describe the logic]). This logic should be moved into the domain model, either on an Aggregate or in a new Domain Service."
+
+### 8. Factories
+
+Factories encapsulate complex object creation logic.
+
+**Why it's important:** A Factory ensures an object is always created in a valid, consistent state, hiding complexity from the client. (Chapter 11)
+
+**Code Generation Prompt:**
+
+> "The creation of this [AggregateName] is non-trivial. Let's create a Factory Method on [ParentAggregate] (or a standalone Factory) to handle the instantiation."
+
+**Code Review Prompt:**
+
+> "This code creates a [ClassName] using `new()` and then calls setters. This can leave the object in an invalid state. Consider refactoring into a Factory for atomic, valid creation. Remember Rule 5.3: all domain invariants must be validated at object creation time."
+
+### 9. Repositories
+
+Repositories provide the illusion of an in-memory collection for persisting and retrieving Aggregates.
+
+**Why it's important:** The Repository interface hides the underlying persistence technology from the domain model, which should be persistence-ignorant. (Chapter 12)
+
+**Code Generation Prompt:**
+
+> "Let's create a Repository for the [AggregateName] Aggregate. The interface will be simple, like a collection (`add`, `remove`, `findById`). The interface will live in the domain model, and its implementation (e.g., `Hibernate[AggregateName]Repository`) will live in the infrastructure layer."
+
+**Code Review Prompt:**
+
+> "This Repository interface exposes persistence-specific methods like `saveOrUpdate()` or `flush()`. It should abstract away persistence details. Let's refactor the interface to be simpler, like a collection. Also, it should only return full, consistent Aggregates."
+
+### 10. Modules
+
+Modules organize the domain model into cohesive, understandable parts.
+
+**Why it's important:** Modules should tell a story about the domain, grouping concepts together. Mechanical layering (e.g., `/entities`, `/valueobjects`) is an anti-pattern that hides the domain model's structure. (Chapter 9)
+
+**Code Generation Prompt:**
+
+> "Let's organize these new domain objects. What high-level domain concept do they belong to? We'll create a module named after that concept (e.g., `…/domain/model/collaboration` or `…/domain/model/identity`)."
+
+**Code Review Prompt:**
+
+> "The module structure is organized by technical type (`/entities`, `/services`). DDD recommends organizing modules by domain concepts to better reflect the Ubiquitous Language. Can we refactor this to group by concepts like `identity`, `collaboration`, or `product`?"
+
+---
+
+@docs/books/AW.Implementing.Domain-Driven.Design.0321834577.pdf
+alwaysApply: true
+---

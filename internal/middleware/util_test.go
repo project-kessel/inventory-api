@@ -711,6 +711,61 @@ func TestRemoveNulls(t *testing.T) {
 			input:    map[string]interface{}{},
 			expected: map[string]interface{}{},
 		},
+		{
+			name: "nested string 'null' value",
+			input: map[string]interface{}{
+				"details": map[string]interface{}{
+					"comment": "NULL",
+					"user":    "alice",
+				},
+			},
+			expected: map[string]interface{}{
+				"details": map[string]interface{}{
+					"user": "alice",
+				},
+			},
+		},
+		{
+			name: "nested string 'null' value case insensitive",
+			input: map[string]interface{}{
+				"details": map[string]interface{}{
+					"comment": "null",
+					"user":    "alice",
+				},
+			},
+			expected: map[string]interface{}{
+				"details": map[string]interface{}{
+					"user": "alice",
+				},
+			},
+		},
+		{
+			name: "nested map becomes empty",
+			input: map[string]interface{}{
+				"meta": map[string]interface{}{
+					"comment": nil,
+				},
+			},
+			expected: map[string]interface{}{},
+		},
+		{
+			name: "deeply nested null values",
+			input: map[string]interface{}{
+				"a": map[string]interface{}{
+					"b": map[string]interface{}{
+						"c": nil,
+						"d": "valid",
+					},
+				},
+			},
+			expected: map[string]interface{}{
+				"a": map[string]interface{}{
+					"b": map[string]interface{}{
+						"d": "valid",
+					},
+				},
+			},
+		},
 	}
 
 	for _, tt := range tests {

@@ -55,6 +55,69 @@ func TestVersion_Initialization(t *testing.T) {
 	})
 }
 
+func TestVersion_Increment(t *testing.T) {
+	t.Parallel()
+
+	t.Run("should increment zero version to one", func(t *testing.T) {
+		t.Parallel()
+
+		version := NewVersion(0)
+		incremented := version.Increment()
+
+		if incremented.Uint() != 1 {
+			t.Errorf("Expected incremented version to be 1, got %d", incremented.Uint())
+		}
+	})
+
+	t.Run("should increment positive version by one", func(t *testing.T) {
+		t.Parallel()
+
+		version := NewVersion(5)
+		incremented := version.Increment()
+
+		if incremented.Uint() != 6 {
+			t.Errorf("Expected incremented version to be 6, got %d", incremented.Uint())
+		}
+	})
+
+	t.Run("should increment large version by one", func(t *testing.T) {
+		t.Parallel()
+
+		version := NewVersion(1000)
+		incremented := version.Increment()
+
+		if incremented.Uint() != 1001 {
+			t.Errorf("Expected incremented version to be 1001, got %d", incremented.Uint())
+		}
+	})
+
+	t.Run("should not modify original version", func(t *testing.T) {
+		t.Parallel()
+
+		original := NewVersion(10)
+		incremented := original.Increment()
+
+		if original.Uint() != 10 {
+			t.Errorf("Expected original version to remain 10, got %d", original.Uint())
+		}
+		if incremented.Uint() != 11 {
+			t.Errorf("Expected incremented version to be 11, got %d", incremented.Uint())
+		}
+	})
+
+	t.Run("should handle maximum value gracefully", func(t *testing.T) {
+		t.Parallel()
+
+		maxUint := ^uint(0)
+		version := NewVersion(maxUint)
+		incremented := version.Increment()
+
+		if incremented.Uint() != 0 {
+			t.Errorf("Expected incremented max version to wrap to 0, got %d", incremented.Uint())
+		}
+	})
+}
+
 func TestGeneration_Initialization(t *testing.T) {
 	t.Parallel()
 	fixture := NewGenerationTestFixture()

@@ -34,14 +34,14 @@ func TestGormTransactionManager_Interface(t *testing.T) {
 	tm := NewGormTransactionManager(3)
 
 	// Verify it implements the interface
-	var _ usecase.TransactionManager = tm
+	var _ = usecase.TransactionManager(tm)
 }
 
 func TestFakeTransactionManager_Interface(t *testing.T) {
 	tm := NewFakeTransactionManager(3)
 
 	// Verify it implements the interface
-	var _ usecase.TransactionManager = tm
+	var _ = usecase.TransactionManager(tm)
 }
 
 // =============================================================================
@@ -121,7 +121,7 @@ func TestGormTransactionManager_TransactionIsolation(t *testing.T) {
 		// This is a basic test - in a real scenario, we'd test actual isolation behavior
 		row := tx.Raw("PRAGMA read_uncommitted").Row()
 		var result interface{}
-		row.Scan(&result)
+		_ = row.Scan(&result)
 		txLevel = sql.LevelSerializable // We know this is what we set
 		return nil
 	})
@@ -324,15 +324,15 @@ func TestFakeTransactionManager_GetTransactionCallCount(t *testing.T) {
 	assert.Equal(t, 0, tm.GetTransactionCallCount())
 
 	// Execute multiple transactions
-	tm.HandleSerializableTransaction(db, func(tx *gorm.DB) error { return nil })
+	_ = tm.HandleSerializableTransaction(db, func(tx *gorm.DB) error { return nil })
 	assert.Equal(t, 1, tm.GetTransactionCallCount())
 
-	tm.HandleSerializableTransaction(db, func(tx *gorm.DB) error { return nil })
+	_ = tm.HandleSerializableTransaction(db, func(tx *gorm.DB) error { return nil })
 	assert.Equal(t, 2, tm.GetTransactionCallCount())
 
 	// Even failed transactions should increment count
 	tm.SetShouldFailTransaction(true)
-	tm.HandleSerializableTransaction(db, func(tx *gorm.DB) error { return nil })
+	_ = tm.HandleSerializableTransaction(db, func(tx *gorm.DB) error { return nil })
 	assert.Equal(t, 3, tm.GetTransactionCallCount())
 }
 
@@ -343,7 +343,7 @@ func TestFakeTransactionManager_Reset(t *testing.T) {
 	// Set up some state
 	tm.SetShouldFailTransaction(true)
 	tm.SetShouldFailCommit(true)
-	tm.HandleSerializableTransaction(db, func(tx *gorm.DB) error { return nil })
+	_ = tm.HandleSerializableTransaction(db, func(tx *gorm.DB) error { return nil })
 
 	assert.Equal(t, 1, tm.GetTransactionCallCount())
 
@@ -377,13 +377,13 @@ func TestFakeTransactionManager_ConcurrentSafety(t *testing.T) {
 
 	go func() {
 		tm.SetShouldFailTransaction(true)
-		tm.HandleSerializableTransaction(db, func(tx *gorm.DB) error { return nil })
+		_ = tm.HandleSerializableTransaction(db, func(tx *gorm.DB) error { return nil })
 		done <- true
 	}()
 
 	go func() {
 		tm.SetShouldFailCommit(true)
-		tm.HandleSerializableTransaction(db, func(tx *gorm.DB) error { return nil })
+		_ = tm.HandleSerializableTransaction(db, func(tx *gorm.DB) error { return nil })
 		done <- true
 	}()
 

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/project-kessel/inventory-api/internal"
 
 	"github.com/project-kessel/inventory-api/internal/biz/model_legacy"
 )
@@ -25,16 +26,16 @@ type Event struct {
 
 // ResourceData contains the data payload for resource-related events.
 type ResourceData struct {
-	Metadata     ResourceMetadata        `json:"metadata"`
-	ReporterData ResourceReporter        `json:"reporter_data"`
-	ResourceData model_legacy.JsonObject `json:"resource_data,omitempty"`
+	Metadata     ResourceMetadata    `json:"metadata"`
+	ReporterData ResourceReporter    `json:"reporter_data"`
+	ResourceData internal.JsonObject `json:"resource_data,omitempty"`
 }
 
 // RelationshipData contains the data payload for relationship-related events.
 type RelationshipData struct {
-	Metadata     RelationshipMetadata    `json:"metadata"`
-	ReporterData RelationshipReporter    `json:"reporter_data"`
-	ResourceData model_legacy.JsonObject `json:"resource_data,omitempty"`
+	Metadata     RelationshipMetadata `json:"metadata"`
+	ReporterData RelationshipReporter `json:"reporter_data"`
+	ResourceData internal.JsonObject  `json:"resource_data,omitempty"`
 }
 
 // ResourceMetadata contains metadata information for inventory resources.

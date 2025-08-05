@@ -7,6 +7,8 @@ import (
 
 	"gorm.io/gorm"
 	"gorm.io/gorm/schema"
+
+	"github.com/project-kessel/inventory-api/internal"
 )
 
 type GormDbAfterMigrationHook interface {
@@ -36,27 +38,24 @@ type Label struct {
 }
 
 type Labels []Label
-type JsonObject map[string]interface{}
+
+// JsonObject is an alias to internal.JsonObject for backward compatibility
+type JsonObject = internal.JsonObject
+
 type Reporter struct {
 	ReporterId      string `json:"reporter_id"`
 	ReporterType    string `json:"reporter_type"`
 	ReporterVersion string `json:"reporter_version"`
 }
 
-func (JsonObject) GormDBDataType(db *gorm.DB, field *schema.Field) string {
-	return GormDBDataType(db, field)
-}
-
-func (data JsonObject) Value() (driver.Value, error) {
-	return json.Marshal(data)
-}
-
-func (data *JsonObject) Scan(value interface{}) error {
-	return Scan(value, data)
-}
-
 func (Labels) GormDBDataType(db *gorm.DB, field *schema.Field) string {
-	return GormDBDataType(db, field)
+	switch db.Name() {
+	case "sqlite":
+		return "JSON"
+	case "postgres":
+		return "JSONB"
+	}
+	return ""
 }
 
 func (data Labels) Value() (driver.Value, error) {
@@ -64,9 +63,14 @@ func (data Labels) Value() (driver.Value, error) {
 }
 
 func (data *Labels) Scan(value interface{}) error {
-	return Scan(value, data)
+	b, ok := value.([]byte)
+	if !ok {
+		return errors.New("failed to parse Labels from database")
+	}
+	return json.Unmarshal(b, data)
 }
 
+// Helper functions for GORM database integration
 func GormDBDataType(db *gorm.DB, field *schema.Field) string {
 	switch db.Name() {
 	case "sqlite":
@@ -80,7 +84,7 @@ func GormDBDataType(db *gorm.DB, field *schema.Field) string {
 func Scan(value interface{}, data interface{}) error {
 	b, ok := value.([]byte)
 	if !ok {
-		return errors.New("failed to parse JsonObject from database")
+		return errors.New("failed to parse data from database")
 	}
 	return json.Unmarshal(b, data)
 }

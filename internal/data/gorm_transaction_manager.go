@@ -8,24 +8,24 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/mattn/go-sqlite3"
 	"gorm.io/gorm"
+
+	"github.com/project-kessel/inventory-api/internal/biz/usecase"
 )
 
-// GormTransactionManager provides GORM-based transaction management with retry logic
-// for serialization failures in PostgreSQL and SQLite databases.
-type GormTransactionManager struct {
+type gormTransactionManager struct {
 	maxSerializationRetries int
 }
 
-// NewGormTransactionManager creates a new GORM-based transaction manager.
-func NewGormTransactionManager(maxSerializationRetries int) *GormTransactionManager {
-	return &GormTransactionManager{
+// NewGormTransactionManager creates a new GORM-based transaction manager
+func NewGormTransactionManager(maxSerializationRetries int) usecase.TransactionManager {
+	return &gormTransactionManager{
 		maxSerializationRetries: maxSerializationRetries,
 	}
 }
 
-// HandleSerializableTransaction handles serializable transaction rollbacks, commits, and retries in case of failures.
-// It retries the transaction up to maxRetries times before returning an error.
-func (tm *GormTransactionManager) HandleSerializableTransaction(db *gorm.DB, txFunc func(tx *gorm.DB) error) error {
+// HandleSerializableTransaction executes the provided function within a serializable transaction
+// It automatically handles retries in case of serialization failures
+func (tm *gormTransactionManager) HandleSerializableTransaction(db *gorm.DB, txFunc func(tx *gorm.DB) error) error {
 	var err error
 	for i := 0; i < tm.maxSerializationRetries; i++ {
 		tx := db.Begin(&sql.TxOptions{
@@ -34,19 +34,17 @@ func (tm *GormTransactionManager) HandleSerializableTransaction(db *gorm.DB, txF
 		err = txFunc(tx)
 		if err != nil {
 			tx.Rollback()
-			if tm.isSerializationFailure(err, i) {
+			if tm.isSerializationFailure(err, i, tm.maxSerializationRetries) {
 				continue
 			}
-			// Short-circuit if the error is not a serialization failure
 			return fmt.Errorf("transaction failed: %w", err)
 		}
 		err = tx.Commit().Error
 		if err != nil {
 			tx.Rollback()
-			if tm.isSerializationFailure(err, i) {
+			if tm.isSerializationFailure(err, i, tm.maxSerializationRetries) {
 				continue
 			}
-			// Short-circuit if the error is not a serialization failure
 			return fmt.Errorf("committing transaction failed: %w", err)
 		}
 		return nil
@@ -55,17 +53,16 @@ func (tm *GormTransactionManager) HandleSerializableTransaction(db *gorm.DB, txF
 	return fmt.Errorf("transaction failed after %d attempts: %w", tm.maxSerializationRetries, err)
 }
 
-func (tm *GormTransactionManager) isSerializationFailure(err error, attempt int) bool {
+func (tm *gormTransactionManager) isSerializationFailure(err error, attempt, maxRetries int) bool {
 	switch dbErr := err.(type) {
 	case *pgconn.PgError:
 		if dbErr.Code == "40001" {
-			log.Debugf("transaction serialization failure (attempt %d/%d): %v", attempt+1, tm.maxSerializationRetries, err)
+			log.Debugf("transaction serialization failure (attempt %d/%d): %v", attempt+1, maxRetries, err)
 			return true
 		}
 	case sqlite3.Error:
 		if dbErr.Code == sqlite3.ErrError {
-			// Isolation failures are captured under error code 1 (sqlite3.ErrError)
-			log.Debugf("transaction serialization failure (attempt %d/%d): %v", attempt+1, tm.maxSerializationRetries, err)
+			log.Debugf("transaction serialization failure (attempt %d/%d): %v", attempt+1, maxRetries, err)
 			return true
 		}
 	}

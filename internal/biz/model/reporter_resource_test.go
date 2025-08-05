@@ -15,19 +15,6 @@ func assertValidReporterResource(t *testing.T, reporterResource ReporterResource
 	}
 }
 
-func assertInvalidReporterResource(t *testing.T, reporterResource ReporterResource, err error, expectedErrorSubstring string) {
-	t.Helper()
-	if err == nil {
-		t.Error("Expected error, got none")
-	}
-	if reporterResource != (ReporterResource{}) {
-		t.Error("Expected empty ReporterResource for invalid input, got non-empty")
-	}
-	if !strings.Contains(err.Error(), expectedErrorSubstring) {
-		t.Errorf("Expected error about %s, got %v", expectedErrorSubstring, err)
-	}
-}
-
 func TestReporterResource_Initialization(t *testing.T) {
 	t.Parallel()
 	fixture := NewReporterResourceTestFixture()

@@ -134,7 +134,7 @@ func (f *fakeResourceRepository) GetDB() *gorm.DB {
 
 func (f *fakeResourceRepository) GetTransactionManager() usecase.TransactionManager {
 	// Return a fake transaction manager for testing
-	return NewFakeTransactionManager()
+	return NewFakeTransactionManager(3) // Default retry count
 }
 
 func (f *fakeResourceRepository) makeKey(localResourceID, resourceType, reporterType, reporterInstanceID string) string {

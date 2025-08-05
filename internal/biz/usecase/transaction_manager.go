@@ -2,10 +2,10 @@ package usecase
 
 import "gorm.io/gorm"
 
-// TransactionManager defines the interface for handling serializable transactions
-// with retry logic for serialization failures.
+// TransactionManager provides an abstraction for handling database transactions
+// with proper isolation levels and retry mechanisms
 type TransactionManager interface {
-	// HandleSerializableTransaction handles serializable transaction rollbacks, commits, and retries in case of failures.
-	// It retries the transaction up to the configured max retries before returning an error.
+	// HandleSerializableTransaction executes the provided function within a serializable transaction
+	// It automatically handles retries in case of serialization failures
 	HandleSerializableTransaction(db *gorm.DB, txFunc func(tx *gorm.DB) error) error
 }

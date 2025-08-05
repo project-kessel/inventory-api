@@ -1,83 +1,85 @@
 package data
 
 import (
-	"fmt"
+	"errors"
+	"sync"
 
 	"gorm.io/gorm"
+
+	"github.com/project-kessel/inventory-api/internal/biz/usecase"
 )
 
-// FakeTransactionManager is a test implementation of TransactionManager
-// that executes operations without actual transaction management.
-// Useful for unit testing and in-memory testing scenarios.
-type FakeTransactionManager struct {
-	// CallCount tracks how many times HandleSerializableTransaction was called
-	CallCount int
-	// ShouldFail can be set to make the transaction manager simulate failures
-	ShouldFail bool
-	// FailureError is the error to return when ShouldFail is true
-	FailureError error
-	// RetryCount can be set to simulate retry behavior
-	RetryCount int
-	// RetryAttempts tracks the number of retry attempts made
-	RetryAttempts int
+// fakeTransactionManager is a test implementation of TransactionManager
+// that simulates transaction behavior without actual database transactions
+type fakeTransactionManager struct {
+	mu                      sync.Mutex
+	shouldFailTransaction   bool
+	shouldFailCommit        bool
+	transactionCallCount    int
+	maxSerializationRetries int
 }
 
-// NewFakeTransactionManager creates a new fake transaction manager for testing.
-func NewFakeTransactionManager() *FakeTransactionManager {
-	return &FakeTransactionManager{
-		CallCount:     0,
-		ShouldFail:    false,
-		FailureError:  nil,
-		RetryCount:    0,
-		RetryAttempts: 0,
+// NewFakeTransactionManager creates a new fake transaction manager for testing
+func NewFakeTransactionManager(maxSerializationRetries int) *fakeTransactionManager {
+	return &fakeTransactionManager{
+		maxSerializationRetries: maxSerializationRetries,
 	}
 }
 
-// HandleSerializableTransaction simulates transaction handling without actual database transactions.
-// For testing purposes, it simply calls the transaction function with the provided DB.
-func (f *FakeTransactionManager) HandleSerializableTransaction(db *gorm.DB, txFunc func(tx *gorm.DB) error) error {
-	f.CallCount++
+// SetShouldFailTransaction configures the fake to fail during transaction execution
+func (ftm *fakeTransactionManager) SetShouldFailTransaction(shouldFail bool) {
+	ftm.mu.Lock()
+	defer ftm.mu.Unlock()
+	ftm.shouldFailTransaction = shouldFail
+}
 
-	// Simulate retry behavior if configured
-	for attempt := 0; attempt <= f.RetryCount; attempt++ {
-		f.RetryAttempts++
+// SetShouldFailCommit configures the fake to fail during commit
+func (ftm *fakeTransactionManager) SetShouldFailCommit(shouldFail bool) {
+	ftm.mu.Lock()
+	defer ftm.mu.Unlock()
+	ftm.shouldFailCommit = shouldFail
+}
 
-		// Check if we should fail on this attempt
-		if f.ShouldFail && attempt == f.RetryCount {
-			if f.FailureError != nil {
-				return f.FailureError
-			}
-			return fmt.Errorf("fake transaction manager simulated failure")
-		}
+// GetTransactionCallCount returns the number of times HandleSerializableTransaction was called
+func (ftm *fakeTransactionManager) GetTransactionCallCount() int {
+	ftm.mu.Lock()
+	defer ftm.mu.Unlock()
+	return ftm.transactionCallCount
+}
 
-		// If not the final attempt and we're simulating retries, continue
-		if f.RetryCount > 0 && attempt < f.RetryCount {
-			continue
-		}
+// Reset resets the fake transaction manager state
+func (ftm *fakeTransactionManager) Reset() {
+	ftm.mu.Lock()
+	defer ftm.mu.Unlock()
+	ftm.shouldFailTransaction = false
+	ftm.shouldFailCommit = false
+	ftm.transactionCallCount = 0
+}
 
-		// Execute the transaction function
-		return txFunc(db)
+// HandleSerializableTransaction simulates serializable transaction behavior
+func (ftm *fakeTransactionManager) HandleSerializableTransaction(db *gorm.DB, txFunc func(tx *gorm.DB) error) error {
+	ftm.mu.Lock()
+	ftm.transactionCallCount++
+	shouldFailTx := ftm.shouldFailTransaction
+	shouldFailCommit := ftm.shouldFailCommit
+	ftm.mu.Unlock()
+
+	if shouldFailTx {
+		return errors.New("simulated transaction failure")
+	}
+
+	// Execute the transaction function with the same db (no actual transaction in fake)
+	err := txFunc(db)
+	if err != nil {
+		return err
+	}
+
+	if shouldFailCommit {
+		return errors.New("simulated commit failure")
 	}
 
 	return nil
 }
 
-// Reset resets the fake transaction manager's state for reuse in tests.
-func (f *FakeTransactionManager) Reset() {
-	f.CallCount = 0
-	f.ShouldFail = false
-	f.FailureError = nil
-	f.RetryCount = 0
-	f.RetryAttempts = 0
-}
-
-// SimulateFailure configures the fake to simulate a transaction failure.
-func (f *FakeTransactionManager) SimulateFailure(err error) {
-	f.ShouldFail = true
-	f.FailureError = err
-}
-
-// SimulateRetries configures the fake to simulate retry behavior.
-func (f *FakeTransactionManager) SimulateRetries(retryCount int) {
-	f.RetryCount = retryCount
-}
+// Ensure fakeTransactionManager implements TransactionManager interface
+var _ usecase.TransactionManager = (*fakeTransactionManager)(nil)

@@ -57,7 +57,7 @@ func (cr CommonRepresentation) Serialize() CommonRepresentationSnapshot {
 
 	// Create representation snapshot
 	representationSnapshot := RepresentationSnapshot{
-		Data: cr.Representation.Data(),
+		Data: cr.Data(),
 	}
 
 	// Create CommonRepresentation snapshot - direct initialization without validation

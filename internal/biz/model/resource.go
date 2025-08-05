@@ -141,20 +141,6 @@ func (r Resource) ReporterResources() []ReporterResource {
 	return r.reporterResources
 }
 
-func (r Resource) findReporterResourceByKey(key ReporterResourceKey) (ReporterResource, error) {
-	for _, reporterResource := range r.reporterResources {
-		reporterKey := reporterResource.Key()
-		if reporterKey.LocalResourceId() == key.LocalResourceId() &&
-			reporterKey.ResourceType() == key.ResourceType() &&
-			reporterKey.ReporterType() == key.ReporterType() &&
-			reporterKey.ReporterInstanceId() == key.ReporterInstanceId() {
-			return reporterResource, nil
-		}
-	}
-	return ReporterResource{}, fmt.Errorf("reporter resource with key (localResourceId=%s, resourceType=%s, reporterType=%s, reporterInstanceId=%s) not found in resource",
-		key.LocalResourceId(), key.ResourceType(), key.ReporterType(), key.ReporterInstanceId())
-}
-
 func (r *Resource) findReporterResource(key ReporterResourceKey) (*ReporterResource, error) {
 	for i := range r.reporterResources {
 		if r.reporterResources[i].Key() == key {

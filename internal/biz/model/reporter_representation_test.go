@@ -15,7 +15,7 @@ func assertValidReporterDataRepresentation(t *testing.T, dataRep ReporterDataRep
 		t.Errorf("Expected valid ReporterDataRepresentation for %s, got struct with nil data", testCase)
 		return
 	}
-	if dataRep.ReporterRepresentation.IsTombstone() {
+	if dataRep.IsTombstone() {
 		t.Errorf("Expected ReporterDataRepresentation tombstone to be false for %s, got true", testCase)
 	}
 }
@@ -26,11 +26,11 @@ func assertValidReporterDeleteRepresentation(t *testing.T, deleteRep ReporterDel
 		t.Errorf("Expected no error for %s, got %v", testCase, err)
 	}
 	// Check if the struct is valid by checking if it has the correct tombstone state
-	if !deleteRep.ReporterRepresentation.IsTombstone() {
+	if !deleteRep.IsTombstone() {
 		t.Errorf("Expected ReporterDeleteRepresentation tombstone to be true for %s, got false", testCase)
 		return
 	}
-	if deleteRep.ReporterRepresentation.Data() != nil {
+	if deleteRep.Data() != nil {
 		t.Errorf("Expected ReporterDeleteRepresentation to have nil data for %s, got non-nil", testCase)
 	}
 }
@@ -55,7 +55,7 @@ func assertInvalidReporterDeleteRepresentation(t *testing.T, deleteRep ReporterD
 		t.Error("Expected error, got none")
 	}
 	// For invalid input, the constructor should return an empty struct with nil data
-	if deleteRep.ReporterRepresentation.Data() != nil {
+	if deleteRep.Data() != nil {
 		t.Error("Expected ReporterDeleteRepresentation with nil data for invalid input, got non-nil data")
 	}
 	if !strings.Contains(err.Error(), expectedErrorSubstring) {
@@ -267,7 +267,7 @@ func TestReporterRepresentation_BusinessRules(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Expected no error, got %v", err)
 		}
-		if dataRep.ReporterRepresentation.IsTombstone() {
+		if dataRep.IsTombstone() {
 			t.Error("Expected ReporterDataRepresentation to have tombstone=false, got true")
 		}
 	})
@@ -287,7 +287,7 @@ func TestReporterRepresentation_BusinessRules(t *testing.T) {
 			t.Fatalf("Expected no error, got %v", err)
 		}
 
-		if !deleteRep.ReporterRepresentation.IsTombstone() {
+		if !deleteRep.IsTombstone() {
 			t.Error("Expected ReporterDeleteRepresentation to have tombstone=true, got false")
 		}
 	})
@@ -307,7 +307,7 @@ func TestReporterRepresentation_BusinessRules(t *testing.T) {
 			t.Fatalf("Expected no error, got %v", err)
 		}
 
-		if deleteRep.ReporterRepresentation.Data() != nil {
+		if deleteRep.Data() != nil {
 			t.Error("Expected ReporterDeleteRepresentation to have nil data, got non-nil")
 		}
 	})

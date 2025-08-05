@@ -255,13 +255,15 @@ func NewCommand(
 				},
 			})
 
+			// Create transaction manager for all repositories
+			transactionManager := data.NewGormTransactionManager(storageConfig.Options.MaxSerializationRetries)
+
 			//v1beta2
 			// wire together inventory service handling
-
-			transactionManager := data.NewGormTransactionManager(storageConfig.Options.MaxSerializationRetries)
 			resourceRepo := data.NewResourceRepository(db, transactionManager)
 			legacy_resource_repo := legacyresourcerepo.New(db, mc, transactionManager)
 			inventory_controller := resourcesctl.New(resourceRepo, legacy_resource_repo, inventoryresources_repo, authorizer, eventingManager, "notifications", log.With(logger, "subsystem", "notificationsintegrations_controller"), listenManager, waitForNotifCircuitBreaker, usecaseConfig)
+
 			inventory_service := resourcesvc.NewKesselInventoryServiceV1beta2(inventory_controller)
 			pbv1beta2.RegisterKesselInventoryServiceServer(server.GrpcServer, inventory_service)
 			pbv1beta2.RegisterKesselInventoryServiceHTTPServer(server.HttpServer, inventory_service)

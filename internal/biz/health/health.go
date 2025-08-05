@@ -15,19 +15,15 @@ type HealthRepo interface {
 
 // HealthUsecase is a Health usecase.
 type HealthUsecase struct {
-	repo               HealthRepo
-	log                *log.Helper
-	disablePersistence bool
+	repo HealthRepo
+	log  *log.Helper
 }
 
 // New creates a new a Health usecase.
-func New(repo HealthRepo, logger log.Logger, disablePersistence bool) *HealthUsecase {
-	return &HealthUsecase{repo: repo, log: log.NewHelper(logger), disablePersistence: disablePersistence}
+func New(repo HealthRepo, logger log.Logger) *HealthUsecase {
+	return &HealthUsecase{repo: repo, log: log.NewHelper(logger)}
 }
 
 func (rc *HealthUsecase) IsBackendAvailable(ctx context.Context) (*pb.GetReadyzResponse, error) {
-	if rc.disablePersistence {
-		return rc.repo.IsRelationsAvailable(ctx)
-	}
 	return rc.repo.IsBackendAvailable(ctx)
 }

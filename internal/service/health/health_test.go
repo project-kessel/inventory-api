@@ -39,7 +39,7 @@ func TestHealthService_GetReadyz(t *testing.T) {
 	expectedResp := &pb.GetReadyzResponse{Status: "MOCK_OK", Code: 200}
 	mockRepo.On("IsBackendAvailable", ctx).Return(expectedResp, nil)
 
-	uc := biz.New(mockRepo, log.DefaultLogger, false)
+	uc := biz.New(mockRepo, log.DefaultLogger)
 	service := svc.New(uc)
 
 	resp, err := service.GetReadyz(ctx, &pb.GetReadyzRequest{})

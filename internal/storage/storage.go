@@ -15,14 +15,6 @@ func New(c CompletedConfig, logger *log.Helper) (*gorm.DB, error) {
 	var opener func(string) gorm.Dialector
 	var db *gorm.DB
 
-	logger.Info("Persistence disabled: ", c.Options.DisablePersistence)
-
-	if c.Options.DisablePersistence {
-		logger.Info("Persistence disabled, skipping database connection...")
-		// Return nil database connection
-		return nil, nil
-	}
-
 	switch c.Options.Database {
 	case "postgres":
 		opener = postgres.Open
@@ -42,9 +34,8 @@ func New(c CompletedConfig, logger *log.Helper) (*gorm.DB, error) {
 }
 func NewPgx(c CompletedConfig, logger *log.Helper) (*pgxpool.Pool, error) {
 	ctx := context.Background()
-	logger.Info("Persistence disabled: ", c.Options.DisablePersistence)
 
-	if c.Options.DisablePersistence || c.Options.Database != "postgres" {
+	if c.Options.Database != "postgres" {
 		logger.Info("Skipping database connection for PGX...")
 		return nil, nil
 	}

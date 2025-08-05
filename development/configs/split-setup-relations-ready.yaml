@@ -16,7 +16,6 @@ eventing:
   eventer: stdout
   kafka:
 storage:
-  disable-persistence: false
   max-serialization-retries: 10
   database: postgres
   postgres:

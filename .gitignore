@@ -50,4 +50,13 @@ kafka-connect.tar
 multicluster-global-hub/
 scripts/kubeconfig-global-hub
 
+# Cursor AI files
+.cursor/
+
+# Documentation drafts and PDFs
+docs/ddrs/*.pdf
+
+# Built binaries
+inventory-api
+
 

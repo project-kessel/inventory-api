@@ -9,7 +9,6 @@ import (
 	"google.golang.org/protobuf/types/known/structpb"
 
 	"github.com/google/uuid"
-	"github.com/project-kessel/inventory-api/internal"
 
 	pbrelation "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/relationships"
 	pbresource "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/resources"
@@ -26,7 +25,7 @@ func ReporterResourceIdFromPb(resourceType, reporterId string, reporter *pbresou
 	}
 }
 
-func ResourceFromPbv1beta1(resourceType, reporterId string, resourceData internal.JsonObject, metadata *pbresource.Metadata, reporter *pbresource.ReporterData) *model_legacy.Resource {
+func ResourceFromPbv1beta1(resourceType, reporterId string, resourceData model_legacy.JsonObject, metadata *pbresource.Metadata, reporter *pbresource.ReporterData) *model_legacy.Resource {
 	return &model_legacy.Resource{
 		ID:                 uuid.UUID{},
 		ResourceData:       resourceData,
@@ -49,7 +48,7 @@ func ResourceFromPbv1beta1(resourceType, reporterId string, resourceData interna
 	}
 }
 
-func ResourceFromPb(resourceType, reporterType string, reporterInstanceId string, reporterId string, resourceData internal.JsonObject, workspaceId string, resourceRep *pbresourcev1beta2.ResourceRepresentations, inventoryId *uuid.UUID) *model_legacy.Resource {
+func ResourceFromPb(resourceType, reporterType string, reporterInstanceId string, reporterId string, resourceData model_legacy.JsonObject, workspaceId string, resourceRep *pbresourcev1beta2.ResourceRepresentations, inventoryId *uuid.UUID) *model_legacy.Resource {
 	return &model_legacy.Resource{
 		ID:                 uuid.UUID{},
 		InventoryId:        inventoryId,
@@ -66,7 +65,7 @@ func ResourceFromPb(resourceType, reporterType string, reporterInstanceId string
 	}
 }
 
-func ToJsonObject(in interface{}) (internal.JsonObject, error) {
+func ToJsonObject(in interface{}) (model_legacy.JsonObject, error) {
 	if in == nil {
 		return nil, nil
 	}
@@ -76,7 +75,7 @@ func ToJsonObject(in interface{}) (internal.JsonObject, error) {
 		return nil, err
 	}
 
-	resourceData := internal.JsonObject{}
+	resourceData := model_legacy.JsonObject{}
 	err = json.Unmarshal(bytes, &resourceData)
 	if err != nil {
 		return nil, err
@@ -160,7 +159,7 @@ func ReporterRelationshipIdFromPb(relationshipType, reporterId string, reporter 
 	}, nil
 }
 
-func RelationshipFromPb(relationshipType, reporterId string, relationshipData internal.JsonObject, metadata *pbrelation.Metadata, reporter *pbrelation.ReporterData) (*model_legacy.Relationship, error) {
+func RelationshipFromPb(relationshipType, reporterId string, relationshipData model_legacy.JsonObject, metadata *pbrelation.Metadata, reporter *pbrelation.ReporterData) (*model_legacy.Relationship, error) {
 	res := strings.Split(relationshipType, "_")
 
 	if len(res) != 3 {

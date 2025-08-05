@@ -5,8 +5,6 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
-
-	"github.com/project-kessel/inventory-api/internal"
 )
 
 const initialReporterRepresentationVersion = 0
@@ -203,8 +201,7 @@ func (lr LocalResourceId) String() string {
 	return string(lr)
 }
 
-// JsonObject is an alias to internal.JsonObject for consistency
-type JsonObject = internal.JsonObject
+type JsonObject map[string]interface{}
 
 type Representation struct {
 	data JsonObject

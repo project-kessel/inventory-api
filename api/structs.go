@@ -2,13 +2,11 @@ package api
 
 import (
 	"time"
-
-	"github.com/project-kessel/inventory-api/internal"
 )
 
 // JsonObject represents a generic JSON object as a map of string keys to interface{} values.
-// This is an alias to internal.JsonObject for consistency across the codebase.
-type JsonObject = internal.JsonObject
+// Type taken from: https://github.com/project-kessel/inventory-api/blob/main/internal/biz/model/common.go
+type JsonObject map[string]interface{}
 
 // Event represents a CloudEvent structure for inventory system events.
 // Type taken from: https://github.com/project-kessel/inventory-api/blob/main/internal/eventing/api/event.go

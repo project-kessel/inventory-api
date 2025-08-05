@@ -42,7 +42,7 @@ func TestResourceSnapshot_FromDomainEntity(t *testing.T) {
 	}
 
 	// Test snapshot creation
-	resourceSnapshot, reporterResourceSnapshot, commonRepSnapshot, reporterRepSnapshot, err := resource.CreateSnapshot()
+	resourceSnapshot, reporterResourceSnapshot, commonRepSnapshot, reporterRepSnapshot, err := resource.createSnapshot()
 	if err != nil {
 		t.Fatalf("Failed to create snapshot: %v", err)
 	}

@@ -136,7 +136,7 @@ func (r Resource) ResourceEvents() []ResourceEvent {
 }
 
 // CreateSnapshot creates a complete snapshot of the Resource and all its related entities
-func (r Resource) CreateSnapshot() (ResourceSnapshot, ReporterResourceSnapshot, CommonRepresentationSnapshot, ReporterRepresentationSnapshot, error) {
+func (r Resource) createSnapshot() (ResourceSnapshot, ReporterResourceSnapshot, CommonRepresentationSnapshot, ReporterRepresentationSnapshot, error) {
 	resourceSnapshot, reporterResourceSnapshot, reporterRepresentationSnapshot, commonRepresentationSnapshot, err := r.Serialize()
 	return resourceSnapshot, reporterResourceSnapshot, commonRepresentationSnapshot, reporterRepresentationSnapshot, err
 }

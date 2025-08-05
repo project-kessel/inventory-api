@@ -2,9 +2,10 @@ package model
 
 import (
 	"fmt"
+	"strings"
+
 	"github.com/google/uuid"
 	"github.com/project-kessel/inventory-api/internal"
-	"strings"
 )
 
 const initialReporterRepresentationVersion = 0
@@ -315,7 +316,7 @@ type ApiHref string
 func NewApiHref(href string) (ApiHref, error) {
 	href = strings.TrimSpace(href)
 	if href == "" {
-		return "", fmt.Errorf("ApiHref cannot be empty")
+		return ApiHref(""), fmt.Errorf("ApiHref cannot be empty")
 	}
 	return ApiHref(href), nil
 }

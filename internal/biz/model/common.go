@@ -23,8 +23,22 @@ type TinyType[T any] interface {
 }
 
 // Generic serialization implementations
-func Serialize[T any, U TinyType[T]](tinyType U) T {
-	return tinyType.Serialize()
+func SerializeString[U ~string](tinyType U) string {
+	return string(tinyType)
+}
+
+func SerializeUint[U ~uint](tinyType U) uint {
+	return uint(tinyType)
+}
+
+func SerializeUUID[U interface {
+	~[16]byte
+}](tinyType U) uuid.UUID {
+	return uuid.UUID(tinyType)
+}
+
+func SerializeBool[U ~bool](tinyType U) bool {
+	return bool(tinyType)
 }
 
 func Deserialize[U ~string](value string) U {
@@ -43,6 +57,59 @@ func DeserializeUUID[U interface {
 
 func DeserializeBool[U ~bool](value bool) U {
 	return U(value)
+}
+
+// Type-specific deserialize functions for idiomatic usage
+func DeserializeVersion(value uint) Version {
+	return DeserializeUint[Version](value)
+}
+
+func DeserializeResourceId(value uuid.UUID) ResourceId {
+	return DeserializeUUID[ResourceId](value)
+}
+
+func DeserializeReporterResourceId(value uuid.UUID) ReporterResourceId {
+	return DeserializeUUID[ReporterResourceId](value)
+}
+
+func DeserializeResourceType(value string) ResourceType {
+	return Deserialize[ResourceType](value)
+}
+
+func DeserializeReporterType(value string) ReporterType {
+	return Deserialize[ReporterType](value)
+}
+
+func DeserializeReporterInstanceId(value string) ReporterInstanceId {
+	return Deserialize[ReporterInstanceId](value)
+}
+
+func DeserializeConsistencyToken(value string) ConsistencyToken {
+	return Deserialize[ConsistencyToken](value)
+}
+
+func DeserializeGeneration(value uint) Generation {
+	return DeserializeUint[Generation](value)
+}
+
+func DeserializeReporterVersion(value string) ReporterVersion {
+	return Deserialize[ReporterVersion](value)
+}
+
+func DeserializeTombstone(value bool) Tombstone {
+	return DeserializeBool[Tombstone](value)
+}
+
+func DeserializeApiHref(value string) ApiHref {
+	return Deserialize[ApiHref](value)
+}
+
+func DeserializeConsoleHref(value string) ConsoleHref {
+	return Deserialize[ConsoleHref](value)
+}
+
+func DeserializeLocalResourceId(value string) LocalResourceId {
+	return Deserialize[LocalResourceId](value)
 }
 
 // Helper for types that need special increment behavior
@@ -64,6 +131,10 @@ func (v Version) Increment() Version {
 	return Version(uint(v) + 1)
 }
 
+func (v Version) Serialize() uint {
+	return SerializeUint(v)
+}
+
 type ResourceId uuid.UUID
 
 func NewResourceId(id uuid.UUID) (ResourceId, error) {
@@ -79,6 +150,10 @@ func (r ResourceId) UUID() uuid.UUID {
 
 func (r ResourceId) String() string {
 	return uuid.UUID(r).String()
+}
+
+func (r ResourceId) Serialize() uuid.UUID {
+	return SerializeUUID(r)
 }
 
 type ReporterResourceId uuid.UUID
@@ -112,6 +187,10 @@ func (rr ReporterResourceId) String() string {
 	return uuid.UUID(rr).String()
 }
 
+func (rr ReporterResourceId) Serialize() uuid.UUID {
+	return SerializeUUID(rr)
+}
+
 type ResourceType string
 
 func NewResourceType(resourceType string) (ResourceType, error) {
@@ -124,6 +203,10 @@ func NewResourceType(resourceType string) (ResourceType, error) {
 
 func (rt ResourceType) String() string {
 	return string(rt)
+}
+
+func (rt ResourceType) Serialize() string {
+	return SerializeString(rt)
 }
 
 type ReporterType string
@@ -140,6 +223,10 @@ func (rt ReporterType) String() string {
 	return string(rt)
 }
 
+func (rt ReporterType) Serialize() string {
+	return SerializeString(rt)
+}
+
 type ReporterInstanceId string
 
 func NewReporterInstanceId(reporterInstanceId string) (ReporterInstanceId, error) {
@@ -152,6 +239,10 @@ func NewReporterInstanceId(reporterInstanceId string) (ReporterInstanceId, error
 
 func (ri ReporterInstanceId) String() string {
 	return string(ri)
+}
+
+func (ri ReporterInstanceId) Serialize() string {
+	return SerializeString(ri)
 }
 
 type ConsistencyToken string
@@ -168,6 +259,10 @@ func (ct ConsistencyToken) String() string {
 	return string(ct)
 }
 
+func (ct ConsistencyToken) Serialize() string {
+	return SerializeString(ct)
+}
+
 type Generation uint
 
 func NewGeneration(generation uint) Generation {
@@ -176,6 +271,10 @@ func NewGeneration(generation uint) Generation {
 
 func (g Generation) Uint() uint {
 	return uint(g)
+}
+
+func (g Generation) Serialize() uint {
+	return SerializeUint(g)
 }
 
 type ReporterVersion string
@@ -192,6 +291,10 @@ func (rv ReporterVersion) String() string {
 	return string(rv)
 }
 
+func (rv ReporterVersion) Serialize() string {
+	return SerializeString(rv)
+}
+
 type Tombstone bool
 
 func NewTombstone(tombstone bool) Tombstone {
@@ -200,6 +303,10 @@ func NewTombstone(tombstone bool) Tombstone {
 
 func (t Tombstone) Bool() bool {
 	return bool(t)
+}
+
+func (t Tombstone) Serialize() bool {
+	return SerializeBool(t)
 }
 
 type ApiHref string
@@ -216,6 +323,10 @@ func (ah ApiHref) String() string {
 	return string(ah)
 }
 
+func (ah ApiHref) Serialize() string {
+	return SerializeString(ah)
+}
+
 type ConsoleHref string
 
 func NewConsoleHref(href string) (ConsoleHref, error) {
@@ -230,6 +341,10 @@ func (ch ConsoleHref) String() string {
 	return string(ch)
 }
 
+func (ch ConsoleHref) Serialize() string {
+	return SerializeString(ch)
+}
+
 type LocalResourceId string
 
 func NewLocalResourceId(id string) (LocalResourceId, error) {
@@ -242,6 +357,10 @@ func NewLocalResourceId(id string) (LocalResourceId, error) {
 
 func (lr LocalResourceId) String() string {
 	return string(lr)
+}
+
+func (lr LocalResourceId) Serialize() string {
+	return SerializeString(lr)
 }
 
 // JsonObject is an alias to internal.JsonObject for consistency

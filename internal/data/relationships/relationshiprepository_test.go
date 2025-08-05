@@ -183,7 +183,8 @@ func assertEqualRelationshipHistory(t *testing.T, r *model_legacy.Relationship, 
 
 func createResource(t *testing.T, db *gorm.DB, mc *metricscollector.MetricsCollector, resource *model_legacy.Resource) uuid.UUID {
 	maxSerializationRetries := 3
-	res, err := resources.New(db, mc, maxSerializationRetries).Create(context.TODO(), resource, "foobar-namespace", emptyTxId)
+	tm := data.NewGormTransactionManager(maxSerializationRetries)
+	res, err := resources.New(db, mc, tm).Create(context.TODO(), resource, "foobar-namespace", emptyTxId)
 	assert.Nil(t, err)
 	return res.ID
 }

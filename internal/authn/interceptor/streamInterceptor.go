@@ -8,10 +8,9 @@ import (
 
 	"github.com/project-kessel/inventory-api/internal/middleware"
 
-	"github.com/MicahParks/keyfunc/v3"
+	coreosoidc "github.com/coreos/go-oidc/v3/oidc"
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/go-kratos/kratos/v2/middleware/auth/jwt"
-	jwtv5 "github.com/golang-jwt/jwt/v5"
 	"github.com/project-kessel/inventory-api/internal/authn"
 	"github.com/project-kessel/inventory-api/internal/authn/api"
 	"google.golang.org/grpc"
@@ -30,35 +29,15 @@ const (
 
 type StreamAuthConfig struct {
 	authn.CompletedConfig
-	signingMethod jwtv5.SigningMethod
-	claims        func() jwtv5.Claims
-	tokenHeader   map[string]interface{}
-	jwks          keyfunc.Keyfunc
+	clientContext context.Context
+	verifier      *coreosoidc.IDTokenVerifier
 }
+
 type StreamAuthOption func(*StreamAuthConfig)
-
-func WithClaims(claimsFunc func() jwtv5.Claims) StreamAuthOption {
-	return func(o *StreamAuthConfig) {
-		o.claims = claimsFunc
-	}
-}
-
-func WithTokenHeader(header map[string]interface{}) StreamAuthOption {
-	return func(o *StreamAuthConfig) {
-		o.tokenHeader = header
-	}
-}
-
-func WithSigningMethod(signingMethod jwtv5.SigningMethod) StreamAuthOption {
-	return func(o *StreamAuthConfig) {
-		o.signingMethod = signingMethod
-	}
-}
 
 func NewStreamAuthInterceptor(config authn.CompletedConfig, opts ...StreamAuthOption) (*StreamAuthInterceptor, error) {
 	cfg := &StreamAuthConfig{
 		CompletedConfig: config,
-		signingMethod:   jwtv5.SigningMethodRS256,
 	}
 
 	if config.Oidc.PrincipalUserDomain == "" {
@@ -70,11 +49,21 @@ func NewStreamAuthInterceptor(config authn.CompletedConfig, opts ...StreamAuthOp
 	}
 
 	if config.Oidc != nil {
-		jwks, err := FetchJwks(config.Oidc.AuthorizationServerURL)
+		// Use the same OIDC provider setup as the OIDC authenticator
+		ctx := coreosoidc.ClientContext(context.Background(), config.Oidc.Client)
+		provider, err := coreosoidc.NewProvider(ctx, config.Oidc.AuthorizationServerURL)
 		if err != nil {
-			return nil, fmt.Errorf("failed to fetch JWKS: %w", err)
+			return nil, fmt.Errorf("failed to create OIDC provider: %w", err)
 		}
-		cfg.jwks = jwks
+
+		oidcConfig := &coreosoidc.Config{
+			ClientID:          config.Oidc.ClientId,
+			SkipClientIDCheck: config.Oidc.SkipClientIDCheck,
+			SkipIssuerCheck:   config.Oidc.SkipIssuerCheck,
+		}
+
+		cfg.clientContext = ctx
+		cfg.verifier = provider.Verifier(oidcConfig)
 	}
 
 	return &StreamAuthInterceptor{cfg: cfg}, nil
@@ -87,7 +76,7 @@ type StreamAuthInterceptor struct {
 func (i *StreamAuthInterceptor) Interceptor() grpc.StreamServerInterceptor {
 	return func(srv interface{}, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
 
-		if i.cfg.jwks == nil {
+		if i.cfg.verifier == nil {
 			return jwt.ErrMissingKeyFunc
 		}
 
@@ -108,60 +97,38 @@ func (i *StreamAuthInterceptor) Interceptor() grpc.StreamServerInterceptor {
 		}
 
 		jwtToken := auths[1]
-		var (
-			tokenInfo *jwtv5.Token
-			err       error
-		)
 
-		if i.cfg.claims != nil {
-			tokenInfo, err = jwtv5.ParseWithClaims(jwtToken, i.cfg.claims(), i.cfg.jwks.Keyfunc)
-		} else {
-			tokenInfo, err = jwtv5.Parse(jwtToken, i.cfg.jwks.Keyfunc)
-		}
-
+		// Use OIDC verification like the OIDC authenticator
+		idToken, err := i.cfg.verifier.Verify(i.cfg.clientContext, jwtToken)
 		if err != nil {
-			if errors.Is(err, jwtv5.ErrTokenMalformed) || errors.Is(err, jwtv5.ErrTokenUnverifiable) {
-				return jwt.ErrTokenInvalid
-			}
-			if errors.Is(err, jwtv5.ErrTokenNotValidYet) || errors.Is(err, jwtv5.ErrTokenExpired) {
-				return jwt.ErrTokenExpired
-			}
-			return jwt.ErrTokenParseFail
-		}
-
-		if !tokenInfo.Valid {
+			log.Errorf("failed to verify the access token: %v", err)
 			return jwt.ErrTokenInvalid
 		}
 
-		if tokenInfo.Method != i.cfg.signingMethod {
-			return jwt.ErrUnSupportSigningMethod
-		}
-
-		newCtx = NewContext(newCtx, tokenInfo.Claims)
-		sub, err := tokenInfo.Claims.GetSubject()
+		// Extract claims using the same structure as OIDC authenticator
+		claims := &Claims{}
+		err = idToken.Claims(claims)
 		if err != nil {
-			return err
+			log.Errorf("failed to extract claims: %v", err)
+			return jwt.ErrTokenInvalid
 		}
 
-		audience, err := tokenInfo.Claims.GetAudience()
-		if err != nil {
-			return err
-		}
-		if len(audience) == 0 {
-			return errors.New("no audience claim found")
-		}
-
+		// Audience check matching OIDC authenticator
 		if i.cfg.Oidc.EnforceAudCheck {
-			if audience[0] != i.cfg.Oidc.ClientId {
+			if claims.Audience != i.cfg.Oidc.ClientId {
 				log.Debugf("aud does not match the requesting client-id -- decision DENY")
 				return errors.New("audience mismatch")
 			}
 		}
 
-		if sub != "" && i.cfg.Oidc.PrincipalUserDomain != "" {
-			principal := fmt.Sprintf("%s/%s", i.cfg.Oidc.PrincipalUserDomain, sub)
+		// Create identity matching OIDC authenticator
+		if claims.Subject != "" && i.cfg.Oidc.PrincipalUserDomain != "" {
+			principal := fmt.Sprintf("%s/%s", i.cfg.Oidc.PrincipalUserDomain, claims.Subject)
 			newCtx = NewContextIdentity(newCtx, api.Identity{Principal: principal})
 		}
+
+		// Store the ID token in context for compatibility
+		newCtx = NewContext(newCtx, idToken)
 
 		wrappedStream := &authServerStream{ServerStream: ss, ctx: newCtx}
 		return handler(srv, wrappedStream)
@@ -177,8 +144,16 @@ func (a *authServerStream) Context() context.Context {
 	return a.ctx
 }
 
-func NewContext(ctx context.Context, info jwtv5.Claims) context.Context {
-	return context.WithValue(ctx, authKey{}, info)
+// Claims holds the values we want to extract from the JWT - matching OIDC authenticator
+type Claims struct {
+	Audience          string `json:"aud"`
+	Issuer            string `json:"iss"`
+	Subject           string `json:"sub"`
+	PreferredUsername string `json:"preferred_username"`
+}
+
+func NewContext(ctx context.Context, token *coreosoidc.IDToken) context.Context {
+	return context.WithValue(ctx, authKey{}, token)
 }
 
 func NewContextIdentity(ctx context.Context, identity api.Identity) context.Context {
@@ -190,17 +165,7 @@ func FromContextIdentity(ctx context.Context) (api.Identity, bool) {
 	return identity, ok
 }
 
-func FromContext(ctx context.Context) (jwtv5.Claims, bool) {
-	claims, ok := ctx.Value(authKey{}).(jwtv5.Claims)
-	return claims, ok
-}
-
-func FetchJwks(authServerUrl string) (keyfunc.Keyfunc, error) {
-	jwksURL := fmt.Sprint(authServerUrl, "/protocol/openid-connect/certs")
-	jwks, err := keyfunc.NewDefault([]string{jwksURL})
-	if err != nil {
-		log.Fatalf("Failed to create JWK Set from resource at the given URL: %s.\nError: %s", authServerUrl, err)
-		return nil, err
-	}
-	return jwks, nil
+func FromContext(ctx context.Context) (*coreosoidc.IDToken, bool) {
+	token, ok := ctx.Value(authKey{}).(*coreosoidc.IDToken)
+	return token, ok
 }

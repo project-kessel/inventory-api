@@ -168,5 +168,6 @@ parameters:
   - description: Name of the Inventory API Config K8s secret
     name: INVENTORY_API_CONFIG_SECRET
     value: inventory-api-config
-  - description: path to Kafka clusters' CA Cert in the pod
+  - description: Name of Secret that contains the Kafka clusters' CA Cert (if required)
     name: CA_CERT_SECRET
+    value: kessel-kafka-connect-config

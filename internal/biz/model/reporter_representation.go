@@ -24,7 +24,7 @@ func (r ReporterRepresentation) Data() JsonObject {
 	if r.tombstone.Bool() {
 		return nil
 	}
-	return r.data
+	return r.JsonObject()
 }
 
 func (r ReporterRepresentation) IsTombstone() bool {
@@ -57,10 +57,13 @@ func NewReporterDataRepresentation(
 		reporterVersion = &rv
 	}
 
+	representation, err := NewRepresentation(data)
+	if err != nil {
+		return nil, fmt.Errorf("ReporterDataRepresentation invalid representation: %w", err)
+	}
+
 	return ReporterRepresentation{
-		Representation: Representation{
-			data: data,
-		},
+		Representation:     representation,
 		reporterResourceID: reporterResourceID,
 		version:            NewVersion(version),
 		generation:         NewGeneration(generation),
@@ -91,10 +94,13 @@ func NewReporterDeleteRepresentation(
 		reporterVersion = &rv
 	}
 
+	representation, err := NewRepresentation(make(JsonObject))
+	if err != nil {
+		return nil, fmt.Errorf("ReporterDeleteRepresentation invalid representation: %w", err)
+	}
+
 	return ReporterRepresentation{
-		Representation: Representation{
-			data: nil,
-		},
+		Representation:     representation,
 		reporterResourceID: reporterResourceID,
 		version:            NewVersion(version),
 		generation:         NewGeneration(generation),

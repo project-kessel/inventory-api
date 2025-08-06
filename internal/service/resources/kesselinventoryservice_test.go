@@ -100,7 +100,7 @@ func TestRequestToResource_Error_MissingReporterType(t *testing.T) {
 
 	assert.Error(t, err)
 	assert.Nil(t, resource)
-	assert.Contains(t, err.Error(), "reporterType")
+	assert.Contains(t, err.Error(), "cannot be empty: ReporterType")
 }
 
 func TestRequestToResource_Error_MissingReporterInstanceId(t *testing.T) {
@@ -121,7 +121,7 @@ func TestRequestToResource_Error_MissingReporterInstanceId(t *testing.T) {
 
 	assert.Error(t, err)
 	assert.Nil(t, resource)
-	assert.Contains(t, err.Error(), "reporterInstanceId")
+	assert.Contains(t, err.Error(), "cannot be empty: ReporterInstanceId")
 }
 
 func TestInventoryService_ReportResource_MissingReporterType(t *testing.T) {
@@ -292,7 +292,7 @@ func TestInventoryService_ReportResource_InvalidInventoryId(t *testing.T) {
 
 	assert.Error(t, err)
 	assert.Nil(t, resp)
-	assert.Contains(t, err.Error(), "cannot be empty: ApiHref")
+	assert.Contains(t, err.Error(), "invalid inventory ID")
 }
 
 func TestResponseFromResource(t *testing.T) {

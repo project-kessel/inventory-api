@@ -99,6 +99,7 @@ func New(config CompletedConfig, db *gorm.DB, authz authz.CompletedConfig, autho
 		SASLMechanism:    config.AuthConfig.SASLMechanism,
 		SASLUsername:     config.AuthConfig.SASLUsername,
 		SASLPassword:     config.AuthConfig.SASLPassword,
+		CACertLocation:   config.AuthConfig.CACertLocation,
 	}
 
 	retryOptions := &retry.Options{

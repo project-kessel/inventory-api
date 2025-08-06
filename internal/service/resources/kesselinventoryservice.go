@@ -36,18 +36,18 @@ func (c *InventoryService) ReportResource(ctx context.Context, r *pb.ReportResou
 		return nil, err
 	}
 
-	if r.GetUseLegacy() {
-		resource, err := RequestToResource(r, identity)
-		if err != nil {
-			return nil, err
-		}
-		_, err = c.Ctl.Upsert(ctx, resource, r.GetWriteVisibility())
+	if r.GetUseNew() {
+		err := c.Ctl.ReportResource(r, identity.Principal)
 		if err != nil {
 			return nil, err
 		}
 
 	} else {
-		err := c.Ctl.ReportResource(r, identity.Principal)
+		resource, err := RequestToResource(r, identity)
+		if err != nil {
+			return nil, err
+		}
+		_, err = c.Ctl.Upsert(ctx, resource, r.GetWriteVisibility())
 		if err != nil {
 			return nil, err
 		}

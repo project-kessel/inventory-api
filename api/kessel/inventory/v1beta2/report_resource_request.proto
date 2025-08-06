@@ -48,5 +48,5 @@ message ReportResourceRequest {
   // (e.g., writing and immediately checking access to the resource).
   WriteVisibility write_visibility = 6 [(buf.validate.field).enum.defined_only = true];
   //Temporary flag for easy testing
-  bool use_legacy = 7;
+  bool use_new = 7;
 }

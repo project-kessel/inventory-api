@@ -198,7 +198,7 @@ type ResourceType string
 func NewResourceType(resourceType string) (ResourceType, error) {
 	resourceType = strings.TrimSpace(resourceType)
 	if resourceType == "" {
-		return "", fmt.Errorf("ResourceType cannot be empty")
+		return ResourceType(""), fmt.Errorf("ResourceType cannot be empty")
 	}
 	return ResourceType(resourceType), nil
 }
@@ -216,7 +216,7 @@ type ReporterType string
 func NewReporterType(reporterType string) (ReporterType, error) {
 	reporterType = strings.TrimSpace(reporterType)
 	if reporterType == "" {
-		return "", fmt.Errorf("ReportedByReporterType cannot be empty")
+		return ReporterType(""), fmt.Errorf("ReportedByReporterType cannot be empty")
 	}
 	return ReporterType(reporterType), nil
 }
@@ -234,7 +234,7 @@ type ReporterInstanceId string
 func NewReporterInstanceId(reporterInstanceId string) (ReporterInstanceId, error) {
 	reporterInstanceId = strings.TrimSpace(reporterInstanceId)
 	if reporterInstanceId == "" {
-		return "", fmt.Errorf("ReporterInstanceId cannot be empty")
+		return ReporterInstanceId(""), fmt.Errorf("ReporterInstanceId cannot be empty")
 	}
 	return ReporterInstanceId(reporterInstanceId), nil
 }
@@ -252,7 +252,7 @@ type ConsistencyToken string
 func NewConsistencyToken(token string) (ConsistencyToken, error) {
 	token = strings.TrimSpace(token)
 	if token == "" {
-		return "", fmt.Errorf("ConsistencyToken cannot be empty")
+		return ConsistencyToken(""), fmt.Errorf("ConsistencyToken cannot be empty")
 	}
 	return ConsistencyToken(token), nil
 }
@@ -284,7 +284,7 @@ type ReporterVersion string
 func NewReporterVersion(version string) (ReporterVersion, error) {
 	version = strings.TrimSpace(version)
 	if version == "" {
-		return "", fmt.Errorf("ReporterVersion cannot be empty")
+		return ReporterVersion(""), fmt.Errorf("ReporterVersion cannot be empty")
 	}
 	return ReporterVersion(version), nil
 }
@@ -350,7 +350,7 @@ type LocalResourceId string
 func NewLocalResourceId(id string) (LocalResourceId, error) {
 	id = strings.TrimSpace(id)
 	if id == "" {
-		return "", fmt.Errorf("LocalResourceId cannot be empty")
+		return LocalResourceId(""), fmt.Errorf("LocalResourceId cannot be empty")
 	}
 	return LocalResourceId(id), nil
 }

@@ -1,6 +1,7 @@
 package model
 
 import (
+	"reflect"
 	"strings"
 	"testing"
 
@@ -994,6 +995,102 @@ func TestSerializationRoundtrip(t *testing.T) {
 			if deserialized.String() != original {
 				t.Errorf("LocalResourceId roundtrip failed: %s -> %s -> %s", original, serialized, deserialized.String())
 			}
+		}
+	})
+
+	t.Run("Representation roundtrip", func(t *testing.T) {
+		t.Parallel()
+
+		testCases := []JsonObject{
+			{"key": "value"},
+			{"name": "test", "value": 123, "active": true},
+			{"nested": map[string]interface{}{"inner": "data"}},
+			{"array": []interface{}{1, 2, 3}},
+			{"complex": map[string]interface{}{"users": []interface{}{map[string]interface{}{"id": 1, "name": "Alice"}}}},
+		}
+		for i, original := range testCases {
+			representation, err := NewRepresentation(original)
+			if err != nil {
+				t.Fatalf("Failed to create Representation for test case %d: %v", i, err)
+			}
+			serialized := representation.Serialize()
+			deserialized := DeserializeRepresentation(serialized)
+
+			originalJson := JsonObject(original)
+			deserializedJson := deserialized.JsonObject()
+
+			if !reflect.DeepEqual(originalJson, deserializedJson) {
+				t.Errorf("Representation roundtrip failed for test case %d: %v -> %v -> %v", i, original, serialized, deserializedJson)
+			}
+		}
+	})
+}
+func TestRepresentation_Initialization(t *testing.T) {
+	t.Parallel()
+
+	t.Run("should create representation with valid data", func(t *testing.T) {
+		t.Parallel()
+
+		validData := JsonObject{"key": "value", "number": 42}
+		representation, err := NewRepresentation(validData)
+		if err != nil {
+			t.Errorf("Expected no error for valid data, got: %v", err)
+		}
+
+		if !reflect.DeepEqual(representation.JsonObject(), validData) {
+			t.Errorf("Expected %v, got %v", validData, representation.JsonObject())
+		}
+	})
+
+	t.Run("should create representation with empty data", func(t *testing.T) {
+		t.Parallel()
+
+		emptyData := JsonObject{}
+		representation, err := NewRepresentation(emptyData)
+		if err != nil {
+			t.Errorf("Expected no error for empty data, got: %v", err)
+		}
+
+		if !reflect.DeepEqual(representation.JsonObject(), emptyData) {
+			t.Errorf("Expected %v, got %v", emptyData, representation.JsonObject())
+		}
+	})
+
+	t.Run("should reject nil data", func(t *testing.T) {
+		t.Parallel()
+
+		_, err := NewRepresentation(nil)
+		if err == nil {
+			t.Error("Expected error for nil data, got none")
+		}
+
+		expectedMessage := "Representation cannot be nil"
+		if !strings.Contains(err.Error(), expectedMessage) {
+			t.Errorf("Expected error message to contain '%s', got: %v", expectedMessage, err.Error())
+		}
+	})
+
+	t.Run("should handle complex nested data", func(t *testing.T) {
+		t.Parallel()
+
+		complexData := JsonObject{
+			"users": []interface{}{
+				map[string]interface{}{"id": 1, "name": "Alice"},
+				map[string]interface{}{"id": 2, "name": "Bob"},
+			},
+			"config": map[string]interface{}{
+				"enabled": true,
+				"timeout": 30,
+			},
+		}
+
+		representation, err := NewRepresentation(complexData)
+		if err != nil {
+			t.Errorf("Expected no error for complex data, got: %v", err)
+		}
+
+		if !reflect.DeepEqual(representation.JsonObject(), complexData) {
+			t.Errorf("Expected %v, got %v", complexData, representation.JsonObject())
 		}
 	})
 }

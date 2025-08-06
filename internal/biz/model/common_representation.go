@@ -36,12 +36,15 @@ func NewCommonRepresentation(
 
 	version := NewVersion(versionVal)
 
+	representation, err := NewRepresentation(data)
+	if err != nil {
+		return CommonRepresentation{}, fmt.Errorf("CommonRepresentation invalid representation: %w", err)
+	}
+
 	return CommonRepresentation{
-		Representation: Representation{
-			data: data,
-		},
-		resourceId: resourceId,
-		version:    version,
-		reporter:   reporter,
+		Representation: representation,
+		resourceId:     resourceId,
+		version:        version,
+		reporter:       reporter,
 	}, nil
 }

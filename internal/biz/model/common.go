@@ -112,6 +112,10 @@ func DeserializeLocalResourceId(value string) LocalResourceId {
 	return Deserialize[LocalResourceId](value)
 }
 
+func DeserializeRepresentation(value JsonObject) Representation {
+	return Representation(value)
+}
+
 // Helper for types that need special increment behavior
 type Incrementable interface {
 	Increment() Incrementable
@@ -369,6 +373,19 @@ func (lr LocalResourceId) Serialize() string {
 // JsonObject is an alias to internal.JsonObject for consistency
 type JsonObject = internal.JsonObject
 
-type Representation struct {
-	data JsonObject
+type Representation JsonObject
+
+func NewRepresentation(data JsonObject) (Representation, error) {
+	if data == nil {
+		return Representation(nil), fmt.Errorf("Representation cannot be nil")
+	}
+	return Representation(data), nil
+}
+
+func (r Representation) JsonObject() JsonObject {
+	return JsonObject(r)
+}
+
+func (r Representation) Serialize() JsonObject {
+	return JsonObject(r)
 }

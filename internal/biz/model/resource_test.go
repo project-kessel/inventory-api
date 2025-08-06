@@ -9,6 +9,18 @@ import (
 	"github.com/google/uuid"
 )
 
+func createResourceWithFixture(fixture ResourceTestFixture, id uuid.UUID, resourceType string, reporterResources []ReporterResource) (Resource, error) {
+	resourceId, err := NewResourceId(id)
+	if err != nil {
+		return Resource{}, err
+	}
+	resourceTypeObj, err := NewResourceType(resourceType)
+	if err != nil {
+		return Resource{}, err
+	}
+	return NewResource(resourceId, resourceTypeObj, reporterResources)
+}
+
 func TestResource_Initialization(t *testing.T) {
 	t.Parallel()
 	fixture := NewResourceTestFixture()
@@ -16,9 +28,12 @@ func TestResource_Initialization(t *testing.T) {
 	t.Run("should create resource with single reporter resource", func(t *testing.T) {
 		t.Parallel()
 
+		resourceId, _ := NewResourceId(fixture.ValidId)
+		resourceType, _ := NewResourceType(fixture.ValidResourceType)
+
 		resource, err := NewResource(
-			fixture.ValidId,
-			fixture.ValidResourceType,
+			resourceId,
+			resourceType,
 			[]ReporterResource{fixture.ValidReporterResource},
 		)
 
@@ -29,9 +44,12 @@ func TestResource_Initialization(t *testing.T) {
 	t.Run("should create resource with multiple reporter resources", func(t *testing.T) {
 		t.Parallel()
 
+		resourceId, _ := NewResourceId(fixture.ValidId)
+		resourceType, _ := NewResourceType(fixture.ValidResourceType)
+
 		resource, err := NewResource(
-			fixture.ValidId,
-			fixture.ValidResourceType,
+			resourceId,
+			resourceType,
 			fixture.MultipleReporterResources,
 		)
 

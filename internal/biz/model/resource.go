@@ -18,7 +18,7 @@ type Resource struct {
 
 func NewResource(id uuid.UUID, resourceType string, reporterResources []ReporterResource) (Resource, error) {
 	if len(reporterResources) == 0 {
-		return Resource{}, fmt.Errorf("Resource must have at least one ReporterResource")
+		return Resource{}, fmt.Errorf("%w: Resource", ErrEmptyReporterList)
 	}
 
 	resourceTypeObj, err := NewResourceType(resourceType)

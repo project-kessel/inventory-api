@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/project-kessel/inventory-api/internal"
+	bizmodel "github.com/project-kessel/inventory-api/internal/biz/model"
 )
 
 // TestFixture provides a centralized way to create test data for domain models
@@ -505,7 +506,7 @@ func AssertValidationError(t *testing.T, err error, expectedField string, messag
 		return
 	}
 
-	validationErr, ok := err.(ValidationError)
+	validationErr, ok := err.(bizmodel.ValidationError)
 	if !ok {
 		t.Errorf("%s: expected ValidationError but got %T: %v", message, err, err)
 		return

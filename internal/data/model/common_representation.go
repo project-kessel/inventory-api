@@ -5,6 +5,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/project-kessel/inventory-api/internal"
+	bizmodel "github.com/project-kessel/inventory-api/internal/biz/model"
 )
 
 // CommonRepresentation stores the *authoritative canonical state* for a resource across all reporters.  It
@@ -46,12 +47,12 @@ func NewCommonRepresentation(
 }
 
 func validateCommonRepresentation(cr *CommonRepresentation) error {
-	return aggregateErrors(
-		validateUUIDRequired("ResourceId", cr.ResourceId),
-		validateMinValueUint("Version", cr.Version, MinVersionValue),
-		validateStringRequired("ReportedByReporterType", cr.ReportedByReporterType),
-		validateMaxLength("ReportedByReporterType", cr.ReportedByReporterType, MaxReporterTypeLength),
-		validateStringRequired("ReportedByReporterInstance", cr.ReportedByReporterInstance),
-		validateMaxLength("ReportedByReporterInstance", cr.ReportedByReporterInstance, MaxReporterInstanceIDLength),
+	return bizmodel.AggregateErrors(
+		bizmodel.ValidateUUIDRequired("ResourceId", cr.ResourceId),
+		bizmodel.ValidateMinValueUint("Version", cr.Version, MinVersionValue),
+		bizmodel.ValidateStringRequired("ReportedByReporterType", cr.ReportedByReporterType),
+		bizmodel.ValidateMaxLength("ReportedByReporterType", cr.ReportedByReporterType, MaxReporterTypeLength),
+		bizmodel.ValidateStringRequired("ReportedByReporterInstance", cr.ReportedByReporterInstance),
+		bizmodel.ValidateMaxLength("ReportedByReporterInstance", cr.ReportedByReporterInstance, MaxReporterInstanceIDLength),
 	)
 }

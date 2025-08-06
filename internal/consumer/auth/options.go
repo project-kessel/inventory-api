@@ -8,6 +8,7 @@ type Options struct {
 	SASLMechanism    string `mapstructure:"sasl-mechanism"`
 	SASLUsername     string `mapstructure:"sasl-username"`
 	SASLPassword     string `mapstructure:"sasl-password"`
+	CACertLocation   string `mapstructure:"ca-cert-location"`
 }
 
 func NewOptions() *Options {
@@ -25,4 +26,5 @@ func (o *Options) AddFlags(fs *pflag.FlagSet, prefix string) {
 	fs.StringVar(&o.SASLMechanism, prefix+"sasl-mechanism", o.SASLMechanism, "sets the SASL mechanism")
 	fs.StringVar(&o.SASLUsername, prefix+"sasl-username", o.SASLUsername, "sets the username to use for authentication")
 	fs.StringVar(&o.SASLPassword, prefix+"sasl-password", o.SASLPassword, "sets the password to use for authentication")
+	fs.StringVar(&o.CACertLocation, prefix+"ca-cert-location", o.CACertLocation, "sets the location of the Kafka clusters' CA certificate")
 }

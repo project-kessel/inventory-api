@@ -1,10 +1,11 @@
 package model
 
 import (
-	"strings"
 	"testing"
 
 	"github.com/google/uuid"
+
+	"github.com/project-kessel/inventory-api/internal/errors"
 )
 
 func TestVersion_Initialization(t *testing.T) {
@@ -588,9 +589,7 @@ func TestReporterVersion_Initialization(t *testing.T) {
 		if err == nil {
 			t.Error("Expected error for empty string, got none")
 		}
-		if !strings.Contains(err.Error(), "ReporterVersion cannot be empty") {
-			t.Errorf("Expected error about empty ReporterVersion, got %v", err)
-		}
+		errors.AssertIs(t, err, ErrEmpty)
 	})
 }
 

@@ -35,11 +35,11 @@ func NewResource(
 }
 
 func validateResource(r *Resource) error {
-	return aggregateErrors(
-		validateUUIDRequired("ID", r.ID),
-		validateStringRequired("Type", r.Type),
-		validateMaxLength("Type", r.Type, MaxResourceTypeLength),
-		validateMinValueUint("CommonVersion", r.CommonVersion, 0),
+	return bizmodel.AggregateErrors(
+		bizmodel.ValidateUUIDRequired("ID", r.ID),
+		bizmodel.ValidateStringRequired("Type", r.Type),
+		bizmodel.ValidateMaxLength("Type", r.Type, MaxResourceTypeLength),
+		bizmodel.ValidateMinValueUint("CommonVersion", r.CommonVersion, 0),
 	)
 }
 

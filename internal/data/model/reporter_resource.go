@@ -79,21 +79,21 @@ func NewReporterResource(
 }
 
 func validateReporterResource(r *ReporterResource) error {
-	return aggregateErrors(
-		validateUUIDRequired("ID", r.ID),
-		validateStringRequired("LocalResourceID", r.LocalResourceID),
-		validateMaxLength("LocalResourceID", r.LocalResourceID, MaxLocalResourceIDLength),
-		validateStringRequired("ReporterType", r.ReporterType),
-		validateMaxLength("ReporterType", r.ReporterType, MaxReporterTypeLength),
-		validateStringRequired("ResourceType", r.ResourceType),
-		validateMaxLength("ResourceType", r.ResourceType, MaxResourceTypeLength),
-		validateStringRequired("ReporterInstanceID", r.ReporterInstanceID),
-		validateMaxLength("ReporterInstanceID", r.ReporterInstanceID, MaxReporterInstanceIDLength),
-		validateUUIDRequired("ResourceID", r.ResourceID),
-		validateMinValue("Generation", r.Generation, MinGenerationValue),
-		validateMinValue("RepresentationVersion", r.RepresentationVersion, 0),
-		validateOptionalURL("APIHref", r.APIHref, MaxAPIHrefLength),
-		validateOptionalURL("ConsoleHref", r.ConsoleHref, MaxConsoleHrefLength),
+	return bizmodel.AggregateErrors(
+		bizmodel.ValidateUUIDRequired("ID", r.ID),
+		bizmodel.ValidateStringRequired("LocalResourceID", r.LocalResourceID),
+		bizmodel.ValidateMaxLength("LocalResourceID", r.LocalResourceID, MaxLocalResourceIDLength),
+		bizmodel.ValidateStringRequired("ReporterType", r.ReporterType),
+		bizmodel.ValidateMaxLength("ReporterType", r.ReporterType, MaxReporterTypeLength),
+		bizmodel.ValidateStringRequired("ResourceType", r.ResourceType),
+		bizmodel.ValidateMaxLength("ResourceType", r.ResourceType, MaxResourceTypeLength),
+		bizmodel.ValidateStringRequired("ReporterInstanceID", r.ReporterInstanceID),
+		bizmodel.ValidateMaxLength("ReporterInstanceID", r.ReporterInstanceID, MaxReporterInstanceIDLength),
+		bizmodel.ValidateUUIDRequired("ResourceID", r.ResourceID),
+		bizmodel.ValidateMinValue("Generation", r.Generation, MinGenerationValue),
+		bizmodel.ValidateMinValue("RepresentationVersion", r.RepresentationVersion, 0),
+		bizmodel.ValidateOptionalURL("APIHref", r.APIHref, MaxAPIHrefLength),
+		bizmodel.ValidateOptionalURL("ConsoleHref", r.ConsoleHref, MaxConsoleHrefLength),
 	)
 }
 

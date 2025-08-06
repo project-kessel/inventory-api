@@ -204,7 +204,7 @@ func TestInventoryService_ReportResource_MissingReporterInstanceId(t *testing.T)
 
 	assert.Error(t, err)
 	assert.Nil(t, resp)
-	assert.Contains(t, err.Error(), "ReporterInstanceId cannot be empty")
+	assert.Contains(t, err.Error(), "cannot be empty: ReporterInstanceId")
 }
 
 func TestInventoryService_ReportResource_InvalidJsonObject(t *testing.T) {
@@ -292,7 +292,7 @@ func TestInventoryService_ReportResource_InvalidInventoryId(t *testing.T) {
 
 	assert.Error(t, err)
 	assert.Nil(t, resp)
-	assert.Contains(t, err.Error(), "ApiHref cannot be empty")
+	assert.Contains(t, err.Error(), "cannot be empty: ApiHref")
 }
 
 func TestResponseFromResource(t *testing.T) {

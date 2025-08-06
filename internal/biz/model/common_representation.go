@@ -23,19 +23,18 @@ func NewCommonRepresentation(
 	reporterInstanceId ReporterInstanceId,
 ) (CommonRepresentation, error) {
 	if resourceId.UUID() == uuid.Nil {
-		return CommonRepresentation{}, fmt.Errorf("CommonRepresentation invalid resource ID: ResourceId cannot be nil")
+		return CommonRepresentation{}, fmt.Errorf("%w: ResourceId", ErrInvalidUUID)
 	}
 
 	if strings.TrimSpace(string(reporterType)) == "" {
-		return CommonRepresentation{}, fmt.Errorf("CommonRepresentation invalid reporter type: ReporterType cannot be empty")
+		return CommonRepresentation{}, fmt.Errorf("%w: ReporterType", ErrEmpty)
 	}
 
 	if strings.TrimSpace(string(reporterInstanceId)) == "" {
-		return CommonRepresentation{}, fmt.Errorf("CommonRepresentation invalid reporter instance ID: ReporterInstanceId cannot be empty")
+		return CommonRepresentation{}, fmt.Errorf("%w: ReporterInstanceId", ErrEmpty)
 	}
-
-	if len(data.Data()) == 0 {
-		return CommonRepresentation{}, fmt.Errorf("CommonRepresentation requires non-empty data")
+	if len(data) == 0 {
+		return CommonRepresentation{}, fmt.Errorf("%w: CommonRepresentation data", ErrInvalidData)
 	}
 
 	if data.Data() == nil {

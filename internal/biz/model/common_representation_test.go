@@ -1,26 +1,10 @@
 package model
 
 import (
-	"strings"
 	"testing"
+
+	"github.com/project-kessel/inventory-api/internal/errors"
 )
-
-func assertValidCommonRepresentation(t *testing.T, commonRep CommonRepresentation, err error, testCase string) {
-	t.Helper()
-	if err != nil {
-		t.Errorf("Expected no error for %s, got %v", testCase, err)
-	}
-}
-
-func assertInvalidCommonRepresentation(t *testing.T, commonRep CommonRepresentation, err error, expectedErrorSubstring string) {
-	t.Helper()
-	if err == nil {
-		t.Error("Expected error, got none")
-	}
-	if !strings.Contains(err.Error(), expectedErrorSubstring) {
-		t.Errorf("Expected error about %s, got %v", expectedErrorSubstring, err)
-	}
-}
 
 func TestCommonRepresentation_Initialization(t *testing.T) {
 	t.Parallel()
@@ -29,7 +13,7 @@ func TestCommonRepresentation_Initialization(t *testing.T) {
 	t.Run("should create common representation with valid inputs", func(t *testing.T) {
 		t.Parallel()
 
-		commonRep, err := NewCommonRepresentation(
+		_, err := NewCommonRepresentation(
 			fixture.ValidResourceIdType(),
 			fixture.ValidRepresentationType(),
 			fixture.ValidVersionType(),
@@ -37,13 +21,15 @@ func TestCommonRepresentation_Initialization(t *testing.T) {
 			fixture.ValidReporterInstanceIdType(),
 		)
 
-		assertValidCommonRepresentation(t, commonRep, err, "valid inputs")
+		if err != nil {
+			t.Errorf("Expected no error for valid inputs, got %v", err)
+		}
 	})
 
 	t.Run("should accept zero version", func(t *testing.T) {
 		t.Parallel()
 
-		commonRep, err := NewCommonRepresentation(
+		_, err := NewCommonRepresentation(
 			fixture.ValidResourceIdType(),
 			fixture.ValidRepresentationType(),
 			fixture.ZeroVersionType(),
@@ -51,13 +37,15 @@ func TestCommonRepresentation_Initialization(t *testing.T) {
 			fixture.ValidReporterInstanceIdType(),
 		)
 
-		assertValidCommonRepresentation(t, commonRep, err, "zero version")
+		if err != nil {
+			t.Errorf("Expected no error for zero version, got %v", err)
+		}
 	})
 
 	t.Run("should reject nil resource ID", func(t *testing.T) {
 		t.Parallel()
 
-		commonRep, err := NewCommonRepresentation(
+		_, err := NewCommonRepresentation(
 			fixture.NilResourceIdType(),
 			fixture.ValidRepresentationType(),
 			fixture.ValidVersionType(),
@@ -65,13 +53,13 @@ func TestCommonRepresentation_Initialization(t *testing.T) {
 			fixture.ValidReporterInstanceIdType(),
 		)
 
-		assertInvalidCommonRepresentation(t, commonRep, err, "CommonRepresentation invalid resource ID")
+		errors.AssertIs(t, err, ErrInvalidUUID)
 	})
 
 	t.Run("should reject nil data", func(t *testing.T) {
 		t.Parallel()
 
-		commonRep, err := NewCommonRepresentation(
+		_, err := NewCommonRepresentation(
 			fixture.ValidResourceIdType(),
 			fixture.NilRepresentationType(),
 			fixture.ValidVersionType(),
@@ -79,13 +67,13 @@ func TestCommonRepresentation_Initialization(t *testing.T) {
 			fixture.ValidReporterInstanceIdType(),
 		)
 
-		assertInvalidCommonRepresentation(t, commonRep, err, "CommonRepresentation requires non-empty data")
+		errors.AssertIs(t, err, ErrInvalidData)
 	})
 
 	t.Run("should reject empty data object", func(t *testing.T) {
 		t.Parallel()
 
-		commonRep, err := NewCommonRepresentation(
+		_, err := NewCommonRepresentation(
 			fixture.ValidResourceIdType(),
 			fixture.EmptyRepresentationType(),
 			fixture.ValidVersionType(),
@@ -93,13 +81,13 @@ func TestCommonRepresentation_Initialization(t *testing.T) {
 			fixture.ValidReporterInstanceIdType(),
 		)
 
-		assertInvalidCommonRepresentation(t, commonRep, err, "CommonRepresentation requires non-empty data")
+		errors.AssertIs(t, err, ErrInvalidData)
 	})
 
 	t.Run("should reject empty reporter type", func(t *testing.T) {
 		t.Parallel()
 
-		commonRep, err := NewCommonRepresentation(
+		_, err := NewCommonRepresentation(
 			fixture.ValidResourceIdType(),
 			fixture.ValidRepresentationType(),
 			fixture.ValidVersionType(),
@@ -107,13 +95,13 @@ func TestCommonRepresentation_Initialization(t *testing.T) {
 			fixture.ValidReporterInstanceIdType(),
 		)
 
-		assertInvalidCommonRepresentation(t, commonRep, err, "CommonRepresentation invalid reporter")
+		errors.AssertIs(t, err, ErrEmpty)
 	})
 
 	t.Run("should reject whitespace-only reporter type", func(t *testing.T) {
 		t.Parallel()
 
-		commonRep, err := NewCommonRepresentation(
+		_, err := NewCommonRepresentation(
 			fixture.ValidResourceIdType(),
 			fixture.ValidRepresentationType(),
 			fixture.ValidVersionType(),
@@ -121,13 +109,13 @@ func TestCommonRepresentation_Initialization(t *testing.T) {
 			fixture.ValidReporterInstanceIdType(),
 		)
 
-		assertInvalidCommonRepresentation(t, commonRep, err, "CommonRepresentation invalid reporter")
+		errors.AssertIs(t, err, ErrEmpty)
 	})
 
 	t.Run("should reject empty reporter instance", func(t *testing.T) {
 		t.Parallel()
 
-		commonRep, err := NewCommonRepresentation(
+		_, err := NewCommonRepresentation(
 			fixture.ValidResourceIdType(),
 			fixture.ValidRepresentationType(),
 			fixture.ValidVersionType(),
@@ -135,13 +123,13 @@ func TestCommonRepresentation_Initialization(t *testing.T) {
 			fixture.EmptyReporterInstanceIdType(),
 		)
 
-		assertInvalidCommonRepresentation(t, commonRep, err, "CommonRepresentation invalid reporter")
+		errors.AssertIs(t, err, ErrEmpty)
 	})
 
 	t.Run("should reject whitespace-only reporter instance", func(t *testing.T) {
 		t.Parallel()
 
-		commonRep, err := NewCommonRepresentation(
+		_, err := NewCommonRepresentation(
 			fixture.ValidResourceIdType(),
 			fixture.ValidRepresentationType(),
 			fixture.ValidVersionType(),
@@ -149,6 +137,6 @@ func TestCommonRepresentation_Initialization(t *testing.T) {
 			fixture.WhitespaceReporterInstanceIdType(),
 		)
 
-		assertInvalidCommonRepresentation(t, commonRep, err, "CommonRepresentation invalid reporter")
+		errors.AssertIs(t, err, ErrEmpty)
 	})
 }

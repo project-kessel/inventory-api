@@ -42,12 +42,13 @@ func NewReporterDataRepresentation(
 	commonVersion Version,
 	reporterVersion *ReporterVersion,
 ) (ReporterDataRepresentation, error) {
+
 	if reporterResourceID.UUID() == uuid.Nil {
-		return ReporterDataRepresentation{}, fmt.Errorf("ReporterResourceId cannot be empty")
+		return ReporterDataRepresentation{}, fmt.Errorf("%w: ReporterResourceId", ErrInvalidUUID)
 	}
 
-	if len(data.Data()) == 0 {
-		return ReporterDataRepresentation{}, fmt.Errorf("ReporterDataRepresentation requires non-empty data")
+	if len(data) == 0 {
+		return ReporterDataRepresentation{}, fmt.Errorf("%w: ReporterDataRepresentation data", ErrInvalidData)
 	}
 
 	return ReporterDataRepresentation{
@@ -71,7 +72,7 @@ func NewReporterDeleteRepresentation(
 	reporterVersion *ReporterVersion,
 ) (ReporterDeleteRepresentation, error) {
 	if reporterResourceID.UUID() == uuid.Nil {
-		return ReporterDeleteRepresentation{}, fmt.Errorf("ReporterResourceId cannot be empty")
+		return ReporterDeleteRepresentation{}, fmt.Errorf("%w: ReporterResourceId", ErrInvalidUUID)
 	}
 
 	return ReporterDeleteRepresentation{

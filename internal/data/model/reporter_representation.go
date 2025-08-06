@@ -56,12 +56,12 @@ func NewReporterRepresentation(
 }
 
 func validateReporterRepresentation(rr *ReporterRepresentation) error {
-	return aggregateErrors(
-		validateStringRequired("ReporterResourceID", rr.ReporterResourceID),
-		validateMinValueUint("Version", rr.Version, MinVersionValue),
-		validateMinValueUint("Generation", rr.Generation, MinGenerationValue),
-		validateMinValueUint("CommonVersion", rr.CommonVersion, MinCommonVersion),
-		validateOptionalString("ReporterVersion", rr.ReporterVersion, MaxReporterVersionLength),
+	return bizmodel.AggregateErrors(
+		bizmodel.ValidateStringRequired("ReporterResourceID", rr.ReporterResourceID),
+		bizmodel.ValidateMinValueUint("Version", rr.Version, MinVersionValue),
+		bizmodel.ValidateMinValueUint("Generation", rr.Generation, MinGenerationValue),
+		bizmodel.ValidateMinValueUint("CommonVersion", rr.CommonVersion, MinCommonVersion),
+		bizmodel.ValidateOptionalString("ReporterVersion", rr.ReporterVersion, MaxReporterVersionLength),
 	)
 }
 

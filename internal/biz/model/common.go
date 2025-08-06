@@ -141,7 +141,7 @@ type ResourceId uuid.UUID
 
 func NewResourceId(id uuid.UUID) (ResourceId, error) {
 	if id == uuid.Nil {
-		return ResourceId(uuid.Nil), fmt.Errorf("ResourceId cannot be empty")
+		return ResourceId(uuid.Nil), fmt.Errorf("%w: ResourceId", ErrInvalidUUID)
 	}
 	return ResourceId(id), nil
 }
@@ -162,7 +162,7 @@ type ReporterResourceId uuid.UUID
 
 func NewReporterResourceId(id uuid.UUID) (ReporterResourceId, error) {
 	if id == uuid.Nil {
-		return ReporterResourceId(uuid.Nil), fmt.Errorf("ReporterResourceId cannot be empty")
+		return ReporterResourceId(uuid.Nil), fmt.Errorf("%w: ReporterResourceId", ErrInvalidUUID)
 	}
 	return ReporterResourceId(id), nil
 }
@@ -170,12 +170,12 @@ func NewReporterResourceId(id uuid.UUID) (ReporterResourceId, error) {
 func NewReporterResourceIdFromString(id string) (ReporterResourceId, error) {
 	id = strings.TrimSpace(id)
 	if id == "" {
-		return ReporterResourceId(uuid.Nil), fmt.Errorf("ReporterResourceId cannot be empty")
+		return ReporterResourceId(uuid.Nil), fmt.Errorf("%w: ReporterResourceId", ErrEmpty)
 	}
 
 	parsedUUID, err := uuid.Parse(id)
 	if err != nil {
-		return ReporterResourceId(uuid.Nil), fmt.Errorf("invalid ReporterResourceId format: %w", err)
+		return ReporterResourceId(uuid.Nil), fmt.Errorf("%w: ReporterResourceId (%v)", ErrInvalidUUID, err)
 	}
 
 	return NewReporterResourceId(parsedUUID)
@@ -198,7 +198,7 @@ type ResourceType string
 func NewResourceType(resourceType string) (ResourceType, error) {
 	resourceType = strings.TrimSpace(resourceType)
 	if resourceType == "" {
-		return ResourceType(""), fmt.Errorf("ResourceType cannot be empty")
+		return ResourceType(""), fmt.Errorf("%w: ResourceType", ErrEmpty)
 	}
 	return ResourceType(resourceType), nil
 }
@@ -216,7 +216,7 @@ type ReporterType string
 func NewReporterType(reporterType string) (ReporterType, error) {
 	reporterType = strings.TrimSpace(reporterType)
 	if reporterType == "" {
-		return ReporterType(""), fmt.Errorf("ReportedByReporterType cannot be empty")
+		return ReporterType(""), fmt.Errorf("%w: ReporterType", ErrEmpty)
 	}
 	return ReporterType(reporterType), nil
 }
@@ -234,7 +234,7 @@ type ReporterInstanceId string
 func NewReporterInstanceId(reporterInstanceId string) (ReporterInstanceId, error) {
 	reporterInstanceId = strings.TrimSpace(reporterInstanceId)
 	if reporterInstanceId == "" {
-		return ReporterInstanceId(""), fmt.Errorf("ReporterInstanceId cannot be empty")
+		return ReporterInstanceId(""), fmt.Errorf("%w: ReporterInstanceId", ErrEmpty)
 	}
 	return ReporterInstanceId(reporterInstanceId), nil
 }
@@ -252,7 +252,7 @@ type ConsistencyToken string
 func NewConsistencyToken(token string) (ConsistencyToken, error) {
 	token = strings.TrimSpace(token)
 	if token == "" {
-		return ConsistencyToken(""), fmt.Errorf("ConsistencyToken cannot be empty")
+		return ConsistencyToken(""), fmt.Errorf("%w: ConsistencyToken", ErrEmpty)
 	}
 	return ConsistencyToken(token), nil
 }
@@ -284,7 +284,7 @@ type ReporterVersion string
 func NewReporterVersion(version string) (ReporterVersion, error) {
 	version = strings.TrimSpace(version)
 	if version == "" {
-		return ReporterVersion(""), fmt.Errorf("ReporterVersion cannot be empty")
+		return ReporterVersion(""), fmt.Errorf("%w: ReporterVersion", ErrEmpty)
 	}
 	return ReporterVersion(version), nil
 }
@@ -316,7 +316,7 @@ type ApiHref string
 func NewApiHref(href string) (ApiHref, error) {
 	href = strings.TrimSpace(href)
 	if href == "" {
-		return ApiHref(""), fmt.Errorf("ApiHref cannot be empty")
+		return ApiHref(""), fmt.Errorf("%w: ApiHref", ErrEmpty)
 	}
 	return ApiHref(href), nil
 }
@@ -350,7 +350,7 @@ type LocalResourceId string
 func NewLocalResourceId(id string) (LocalResourceId, error) {
 	id = strings.TrimSpace(id)
 	if id == "" {
-		return LocalResourceId(""), fmt.Errorf("LocalResourceId cannot be empty")
+		return LocalResourceId(""), fmt.Errorf("%w: LocalResourceId", ErrEmpty)
 	}
 	return LocalResourceId(id), nil
 }

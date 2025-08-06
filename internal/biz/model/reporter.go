@@ -5,10 +5,7 @@ type ReporterId struct {
 	reporterInstanceId ReporterInstanceId
 }
 
-func NewReporterId(
-	reporterType ReporterType,
-	reporterInstanceId ReporterInstanceId,
-) ReporterId {
+func NewReporterId(reporterType ReporterType, reporterInstanceId ReporterInstanceId) ReporterId {
 	return ReporterId{
 		reporterType:       reporterType,
 		reporterInstanceId: reporterInstanceId,

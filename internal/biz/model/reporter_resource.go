@@ -63,8 +63,8 @@ func NewReporterResourceKey(
 	reporterType ReporterType,
 	reporterInstanceId ReporterInstanceId,
 ) (ReporterResourceKey, error) {
-	reporterId := NewReporterId(reporterType, reporterInstanceId)
 
+	reporterId := NewReporterId(reporterType, reporterInstanceId)
 	return ReporterResourceKey{
 		localResourceID: localResourceID,
 		resourceType:    resourceType,

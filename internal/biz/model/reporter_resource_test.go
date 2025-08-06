@@ -53,11 +53,6 @@ func TestReporterResource_Initialization(t *testing.T) {
 		assertValidReporterResource(t, reporterResource, err, "empty console href")
 	})
 
-	// Note: Tiny type validation (nil ID, empty strings, etc.) is tested in common_test.go
-	// Aggregate tests should only test business logic with valid tiny types
-
-	// All tiny type validation tests have been moved to common_test.go where they belong
-
 	t.Run("should accept local resource ID in UUID format", func(t *testing.T) {
 		t.Parallel()
 

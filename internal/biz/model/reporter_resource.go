@@ -22,7 +22,7 @@ type ReporterResource struct {
 type ReporterResourceKey struct {
 	localResourceID LocalResourceId
 	resourceType    ResourceType
-	reporter        Reporter
+	reporter        ReporterId
 }
 
 func NewReporterResource(idVal uuid.UUID, localResourceIdVal string, resourceTypeVal string, reporterTypeVal string, reporterInstanceIdVal string, resourceIdVal uuid.UUID, apiHrefVal string, consoleHrefVal string) (ReporterResource, error) {
@@ -83,7 +83,7 @@ func NewReporterResourceKey(
 		return ReporterResourceKey{}, fmt.Errorf("ReporterResourceKey invalid resource type: %w", err)
 	}
 
-	reporter, err := NewReporter(reporterTypeVal, reporterInstanceIdVal)
+	reporter, err := NewReporterId(reporterTypeVal, reporterInstanceIdVal)
 	if err != nil {
 		return ReporterResourceKey{}, fmt.Errorf("ReporterResourceKey invalid reporter: %w", err)
 	}

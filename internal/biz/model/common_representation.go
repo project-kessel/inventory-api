@@ -10,7 +10,7 @@ type CommonRepresentation struct {
 	Representation
 	resourceId ResourceId
 	version    Version
-	reporter   Reporter
+	reporter   ReporterId
 }
 
 func NewCommonRepresentation(
@@ -29,7 +29,7 @@ func NewCommonRepresentation(
 		return CommonRepresentation{}, fmt.Errorf("CommonRepresentation invalid resource ID: %w", err)
 	}
 
-	reporter, err := NewReporter(reportedByReporterType, reportedByReporterInstance)
+	reporter, err := NewReporterId(reportedByReporterType, reportedByReporterInstance)
 	if err != nil {
 		return CommonRepresentation{}, fmt.Errorf("CommonRepresentation invalid reporter: %w", err)
 	}

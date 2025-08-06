@@ -21,7 +21,7 @@ func NewCommonRepresentation(
 	reportedByReporterInstance string,
 ) (CommonRepresentation, error) {
 	if len(data) == 0 {
-		return CommonRepresentation{}, fmt.Errorf("CommonRepresentation requires non-empty data")
+		return CommonRepresentation{}, fmt.Errorf("%w: CommonRepresentation data", ErrInvalidData)
 	}
 
 	resourceId, err := NewResourceId(resourceIdVal)

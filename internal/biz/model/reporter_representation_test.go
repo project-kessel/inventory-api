@@ -1,8 +1,9 @@
 package model
 
 import (
-	"strings"
 	"testing"
+
+	"github.com/project-kessel/inventory-api/internal/errors"
 )
 
 func assertValidReporterDataRepresentation(t *testing.T, dataRep ReporterDataRepresentation, err error, testCase string) {
@@ -41,30 +42,28 @@ func assertValidReporterDeleteRepresentation(t *testing.T, deleteRep ReporterDel
 	}
 }
 
-func assertInvalidReporterDataRepresentation(t *testing.T, dataRep ReporterDataRepresentation, err error, expectedErrorSubstring string) {
+func assertInvalidReporterDataRepresentation(t *testing.T, dataRep ReporterDataRepresentation, err error, expectedSentinel error) {
 	t.Helper()
 	if err == nil {
 		t.Error("Expected error, got none")
+		return
 	}
 	if dataRep != nil {
 		t.Error("Expected nil ReporterDataRepresentation for invalid input, got non-nil")
 	}
-	if !strings.Contains(err.Error(), expectedErrorSubstring) {
-		t.Errorf("Expected error about %s, got %v", expectedErrorSubstring, err)
-	}
+	errors.AssertIs(t, err, expectedSentinel)
 }
 
-func assertInvalidReporterDeleteRepresentation(t *testing.T, deleteRep ReporterDeleteRepresentation, err error, expectedErrorSubstring string) {
+func assertInvalidReporterDeleteRepresentation(t *testing.T, deleteRep ReporterDeleteRepresentation, err error, expectedSentinel error) {
 	t.Helper()
 	if err == nil {
 		t.Error("Expected error, got none")
+		return
 	}
 	if deleteRep != nil {
 		t.Error("Expected nil ReporterDeleteRepresentation for invalid input, got non-nil")
 	}
-	if !strings.Contains(err.Error(), expectedErrorSubstring) {
-		t.Errorf("Expected error about %s, got %v", expectedErrorSubstring, err)
-	}
+	errors.AssertIs(t, err, expectedSentinel)
 }
 
 func TestReporterDataRepresentation_Initialization(t *testing.T) {
@@ -113,7 +112,7 @@ func TestReporterDataRepresentation_Initialization(t *testing.T) {
 			fixture.ValidReporterVersion,
 		)
 
-		assertInvalidReporterDataRepresentation(t, dataRep, err, "ReporterDataRepresentation requires non-empty data")
+		assertInvalidReporterDataRepresentation(t, dataRep, err, ErrInvalidData)
 	})
 
 	t.Run("should reject data representation with empty data", func(t *testing.T) {
@@ -128,7 +127,7 @@ func TestReporterDataRepresentation_Initialization(t *testing.T) {
 			fixture.ValidReporterVersion,
 		)
 
-		assertInvalidReporterDataRepresentation(t, dataRep, err, "ReporterDataRepresentation requires non-empty data")
+		assertInvalidReporterDataRepresentation(t, dataRep, err, ErrInvalidData)
 	})
 
 	t.Run("should reject data representation with empty reporter resource ID", func(t *testing.T) {
@@ -143,7 +142,7 @@ func TestReporterDataRepresentation_Initialization(t *testing.T) {
 			fixture.ValidReporterVersion,
 		)
 
-		assertInvalidReporterDataRepresentation(t, dataRep, err, "ReporterResourceId cannot be empty")
+		assertInvalidReporterDataRepresentation(t, dataRep, err, ErrEmpty)
 	})
 
 	t.Run("should reject data representation with whitespace-only reporter resource ID", func(t *testing.T) {
@@ -158,7 +157,7 @@ func TestReporterDataRepresentation_Initialization(t *testing.T) {
 			fixture.ValidReporterVersion,
 		)
 
-		assertInvalidReporterDataRepresentation(t, dataRep, err, "ReporterResourceId cannot be empty")
+		assertInvalidReporterDataRepresentation(t, dataRep, err, ErrEmpty)
 	})
 
 	t.Run("should reject data representation with invalid reporter resource ID format", func(t *testing.T) {
@@ -173,7 +172,7 @@ func TestReporterDataRepresentation_Initialization(t *testing.T) {
 			fixture.ValidReporterVersion,
 		)
 
-		assertInvalidReporterDataRepresentation(t, dataRep, err, "invalid UUID")
+		assertInvalidReporterDataRepresentation(t, dataRep, err, ErrInvalidUUID)
 	})
 }
 
@@ -220,7 +219,7 @@ func TestReporterDeleteRepresentation_Initialization(t *testing.T) {
 			fixture.ValidReporterVersion,
 		)
 
-		assertInvalidReporterDeleteRepresentation(t, deleteRep, err, "ReporterResourceId cannot be empty")
+		assertInvalidReporterDeleteRepresentation(t, deleteRep, err, ErrEmpty)
 	})
 
 	t.Run("should reject delete representation with whitespace-only reporter resource ID", func(t *testing.T) {
@@ -234,7 +233,7 @@ func TestReporterDeleteRepresentation_Initialization(t *testing.T) {
 			fixture.ValidReporterVersion,
 		)
 
-		assertInvalidReporterDeleteRepresentation(t, deleteRep, err, "ReporterResourceId cannot be empty")
+		assertInvalidReporterDeleteRepresentation(t, deleteRep, err, ErrEmpty)
 	})
 
 	t.Run("should reject delete representation with invalid reporter resource ID format", func(t *testing.T) {
@@ -248,7 +247,7 @@ func TestReporterDeleteRepresentation_Initialization(t *testing.T) {
 			fixture.ValidReporterVersion,
 		)
 
-		assertInvalidReporterDeleteRepresentation(t, deleteRep, err, "invalid UUID")
+		assertInvalidReporterDeleteRepresentation(t, deleteRep, err, ErrInvalidUUID)
 	})
 }
 

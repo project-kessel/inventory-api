@@ -1,6 +1,8 @@
 package model
 
-import "fmt"
+import (
+	"fmt"
+)
 
 type ReporterRepresentation struct {
 	Representation
@@ -40,7 +42,7 @@ func NewReporterDataRepresentation(
 	reporterVersionVal *string,
 ) (ReporterDataRepresentation, error) {
 	if len(data) == 0 {
-		return nil, fmt.Errorf("ReporterDataRepresentation requires non-empty data")
+		return nil, fmt.Errorf("%w: ReporterDataRepresentation data", ErrInvalidData)
 	}
 
 	reporterResourceID, err := NewReporterResourceIdFromString(reporterResourceIDVal)

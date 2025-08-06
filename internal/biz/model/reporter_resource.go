@@ -83,7 +83,17 @@ func NewReporterResourceKey(
 		return ReporterResourceKey{}, fmt.Errorf("ReporterResourceKey invalid resource type: %w", err)
 	}
 
-	reporter, err := NewReporterId(reporterTypeVal, reporterInstanceIdVal)
+	reporterType, err := NewReporterType(reporterTypeVal)
+	if err != nil {
+		return ReporterResourceKey{}, fmt.Errorf("ReporterResourceKey invalid reporter type: %w", err)
+	}
+
+	reporterInstanceId, err := NewReporterInstanceId(reporterInstanceIdVal)
+	if err != nil {
+		return ReporterResourceKey{}, fmt.Errorf("ReporterResourceKey invalid reporter instance: %w", err)
+	}
+
+	reporter, err := NewReporterId(reporterType, reporterInstanceId)
 	if err != nil {
 		return ReporterResourceKey{}, fmt.Errorf("ReporterResourceKey invalid reporter: %w", err)
 	}

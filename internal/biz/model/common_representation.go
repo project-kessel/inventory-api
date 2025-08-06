@@ -29,7 +29,17 @@ func NewCommonRepresentation(
 		return CommonRepresentation{}, fmt.Errorf("CommonRepresentation invalid resource ID: %w", err)
 	}
 
-	reporter, err := NewReporterId(reportedByReporterType, reportedByReporterInstance)
+	reporterType, err := NewReporterType(reportedByReporterType)
+	if err != nil {
+		return CommonRepresentation{}, fmt.Errorf("CommonRepresentation invalid reporter type: %w", err)
+	}
+
+	reporterInstanceId, err := NewReporterInstanceId(reportedByReporterInstance)
+	if err != nil {
+		return CommonRepresentation{}, fmt.Errorf("CommonRepresentation invalid reporter instance: %w", err)
+	}
+
+	reporter, err := NewReporterId(reporterType, reporterInstanceId)
 	if err != nil {
 		return CommonRepresentation{}, fmt.Errorf("CommonRepresentation invalid reporter: %w", err)
 	}

@@ -2,9 +2,8 @@ package model
 
 import (
 	"fmt"
+	"log"
 	"time"
-
-	"github.com/go-kratos/kratos/v2/log"
 )
 
 const initialCommonVersion = 0
@@ -82,7 +81,8 @@ func (r *Resource) Update(
 
 	reporterResource.Update(apiHref, consoleHref)
 
-	log.Infof("Reporter Resource: %+v", reporterResource.representationVersion)
+	log.Printf("--------------------------------")
+	log.Printf("Reporter Resource: %+v", reporterResource.representationVersion)
 
 	resourceEvent, err := resourceEventAndRepresentations(
 		reporterResource.resourceID,
@@ -100,7 +100,10 @@ func (r *Resource) Update(
 		return fmt.Errorf("failed to create updated ResourceReportEvent: %w", err)
 	}
 
-	r.resourceReportEvents = append(r.resourceReportEvents, resourceEvent)
+	r.resourceReportEvents = []ResourceReportEvent{resourceEvent}
+	log.Printf("----------------------")
+	log.Printf("After update length: %d", len(r.ResourceEvents()))
+	log.Printf("After update: %+v", r.ResourceEvents()[0])
 	return nil
 }
 
@@ -117,6 +120,9 @@ func resourceEventAndRepresentations(
 	generation Generation,
 	commonVersion Version,
 ) (ResourceReportEvent, error) {
+
+	log.Printf("Data to set on event: %+v, %+v", reporterData, commonData)
+
 	reporterRepresentation, err := NewReporterDataRepresentation(
 		reporterResourceId,
 		representationVersion,
@@ -140,6 +146,7 @@ func resourceEventAndRepresentations(
 		return ResourceReportEvent{}, fmt.Errorf("invalid CommonRepresentation: %w", err)
 	}
 
+	log.Printf("Representation before setting on event: %+v, %+v", reporterRepresentation, commonRepresentation)
 	resourceEvent, err := NewResourceReportEvent(
 		resourceId,
 		resourceType,
@@ -210,11 +217,15 @@ func (r Resource) Serialize() (ResourceSnapshot, ReporterResourceSnapshot, Repor
 
 // TODO: When a Resource is deserialized, does it get a list of events?
 func DeserializeResource(
-	resourceSnapshot ResourceSnapshot,
+	resourceSnapshot *ResourceSnapshot,
 	reporterResourceSnapshots []ReporterResourceSnapshot,
 	reporterRepresentationSnapshot *ReporterRepresentationSnapshot,
 	commonRepresentationSnapshot *CommonRepresentationSnapshot,
-) Resource {
+) *Resource {
+
+	if resourceSnapshot == nil {
+		return nil
+	}
 
 	var reporterResources []ReporterResource
 	for _, reporterResourceSnapshot := range reporterResourceSnapshots {
@@ -223,7 +234,7 @@ func DeserializeResource(
 
 	resourceEvent := DeserializeResourceEvent(reporterRepresentationSnapshot, commonRepresentationSnapshot)
 
-	return Resource{
+	return &Resource{
 		id:                   DeserializeResourceId(resourceSnapshot.ID),
 		resourceType:         DeserializeResourceType(resourceSnapshot.Type),
 		commonVersion:        DeserializeVersion(resourceSnapshot.CommonVersion),

@@ -3,7 +3,6 @@ package data
 import (
 	"errors"
 	"fmt"
-	"log"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
@@ -27,9 +26,9 @@ type FindResourceByKeysResult struct {
 	ReporterInstanceID    string    `gorm:"column:reporter_instance_id"`
 }
 
-func ToSnapshotsFromResults(results []FindResourceByKeysResult) (bizmodel.ResourceSnapshot, []bizmodel.ReporterResourceSnapshot) {
+func ToSnapshotsFromResults(results []FindResourceByKeysResult) (*bizmodel.ResourceSnapshot, []bizmodel.ReporterResourceSnapshot) {
 	if len(results) == 0 {
-		return bizmodel.ResourceSnapshot{}, nil
+		return nil, nil
 	}
 
 	var reporterSnapshots []bizmodel.ReporterResourceSnapshot
@@ -44,7 +43,7 @@ func ToSnapshotsFromResults(results []FindResourceByKeysResult) (bizmodel.Resour
 		reporterSnapshots = append(reporterSnapshots, repSnap)
 	}
 
-	return resourceSnapshot, reporterSnapshots
+	return &resourceSnapshot, reporterSnapshots
 }
 
 func (result FindResourceByKeysResult) ToSnapshots() (bizmodel.ResourceSnapshot, bizmodel.ReporterResourceSnapshot) {
@@ -116,15 +115,11 @@ func (r *resourceRepository) NextReporterResourceId() (bizmodel.ReporterResource
 }
 
 func (r *resourceRepository) Save(tx *gorm.DB, resource bizmodel.Resource, operationType model_legacy.EventOperationType, txid string) error {
-	log.Printf("--------------------------")
-	log.Printf("Resource : %+v", resource)
 	resourceSnapshot, reporterResourceSnapshot, reporterRepresentationSnapshot, commonRepresentationSnapshot, err := resource.Serialize()
 	if err != nil {
 		return fmt.Errorf("failed to serialize resource: %w", err)
 	}
 
-	log.Printf("--------------------------")
-	log.Printf("Reporter Representation Snapshot : %+v", reporterRepresentationSnapshot)
 	dataResource := datamodel.DeserializeResourceFromSnapshot(resourceSnapshot)
 	dataReporterResource := datamodel.DeserializeReporterResourceFromSnapshot(reporterResourceSnapshot)
 	dataReporterRepresentation := datamodel.DeserializeReporterRepresentationFromSnapshot(reporterRepresentationSnapshot)
@@ -138,8 +133,6 @@ func (r *resourceRepository) Save(tx *gorm.DB, resource bizmodel.Resource, opera
 		return fmt.Errorf("failed to save reporter resource: %w", err)
 	}
 
-	log.Printf("--------------------------")
-	log.Printf("Data Reporter Representation : %+v", dataReporterRepresentation)
 	if err := tx.Create(&dataReporterRepresentation).Error; err != nil {
 		return fmt.Errorf("failed to save reporter representation: %w", err)
 	}
@@ -218,7 +211,7 @@ func (r *resourceRepository) FindResourceByKeys(tx *gorm.DB, key bizmodel.Report
 	resourceSnapshot, reporterResourceSnapshots := ToSnapshotsFromResults(results)
 	resource := bizmodel.DeserializeResource(resourceSnapshot, reporterResourceSnapshots, nil, nil)
 
-	return &resource, nil
+	return resource, nil
 }
 
 func (r *resourceRepository) GetDB() *gorm.DB {

@@ -37,7 +37,7 @@ func (c *InventoryService) ReportResource(ctx context.Context, r *pb.ReportResou
 	}
 
 	if r.GetUseNew() {
-		err := c.Ctl.ReportResource(r, identity.Principal)
+		err := c.Ctl.ReportResource(ctx, r, identity.Principal)
 		if err != nil {
 			return nil, err
 		}

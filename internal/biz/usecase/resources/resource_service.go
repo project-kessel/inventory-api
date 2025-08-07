@@ -100,7 +100,7 @@ func New(resourceRepository data.ResourceRepository, reporterResourceRepository 
 	}
 }
 
-func (uc *Usecase) ReportResource(request *v1beta2.ReportResourceRequest, reporterPrincipal string) error {
+func (uc *Usecase) ReportResource(ctx context.Context, request *v1beta2.ReportResourceRequest, reporterPrincipal string) error {
 	log.Info("Reporting resource request: ", request)
 	var subscription pubsub.Subscription
 	txidStr, err := getNextTransactionID()
@@ -118,21 +118,55 @@ func (uc *Usecase) ReportResource(request *v1beta2.ReportResourceRequest, report
 		return fmt.Errorf("failed to create reporter resource key: %w", err)
 	}
 
-	return uc.resourceRepository.GetTransactionManager().HandleSerializableTransaction(uc.resourceRepository.GetDB(), func(tx *gorm.DB) error {
+	err = uc.resourceRepository.GetTransactionManager().HandleSerializableTransaction(uc.resourceRepository.GetDB(), func(tx *gorm.DB) error {
 		existingResource, err := uc.resourceRepository.FindResourceByKeys(tx, reporterResourceKey)
 		if err != nil {
 			return fmt.Errorf("failed to lookup existing resource: %w", err)
 		}
 
 		if existingResource != nil {
-			log.Info("----------------------")
-			log.Info("Resource already exists, updating: ", len(existingResource.ResourceEvents()))
-			return uc.updateResource(tx, request, existingResource, txidStr)
+			log.Info("Resource already exists, updating: ")
+			err = uc.updateResource(tx, request, existingResource, txidStr)
 		} else {
 			log.Info("Creating new resource")
-			return uc.createResource(tx, request, txidStr)
+			err = uc.createResource(tx, request, txidStr)
 		}
+		return err
 	})
+
+	if readAfterWriteEnabled && uc.Config.ConsumerEnabled {
+		timeoutCtx, cancel := context.WithTimeout(ctx, listenTimeout)
+		defer cancel()
+
+		_, err := uc.waitForNotifBreaker.Execute(func() (interface{}, error) {
+			err = subscription.BlockForNotification(timeoutCtx)
+			if err != nil {
+				// Return error for circuit breaker
+				return nil, err
+			}
+			return nil, nil
+		})
+
+		if err != nil {
+			switch {
+			case errors.Is(err, pubsub.ErrWaitContextCancelled):
+				uc.Log.WithContext(ctx).Debugf("Reached timeout waiting for notification from consumer")
+				return nil
+			case errors.Is(err, gobreaker.ErrOpenState):
+				uc.Log.WithContext(ctx).Debugf("Circuit breaker is open, skipped waiting for notification from consumer")
+				return nil
+			case errors.Is(err, gobreaker.ErrTooManyRequests):
+				uc.Log.WithContext(ctx).Debugf("Circuit breaker is half-open, skipped waiting for notification from consumer")
+				return nil
+			default:
+				return err
+			}
+		}
+	}
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func (uc *Usecase) createResource(tx *gorm.DB, request *v1beta2.ReportResourceRequest, txidStr string) error {
@@ -237,11 +271,9 @@ func (uc *Usecase) updateResource(tx *gorm.DB, request *v1beta2.ReportResourceRe
 		apiHref,
 		consoleHref,
 		reporterVersion,
-		commonData,
 		reporterData,
+		commonData,
 	)
-	log.Info("----------------------")
-	log.Info("After update: ", len(existingResource.ResourceEvents()))
 	if err != nil {
 		return fmt.Errorf("failed to update resource: %w", err)
 	}

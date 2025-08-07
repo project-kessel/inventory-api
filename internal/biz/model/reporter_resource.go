@@ -2,6 +2,7 @@ package model
 
 import (
 	"fmt"
+	"log"
 	"time"
 )
 
@@ -138,6 +139,8 @@ func (rr ReporterResource) Serialize() ReporterResourceSnapshot {
 
 func DeserializeReporterResource(snapshot ReporterResourceSnapshot) ReporterResource {
 
+	log.Printf("----------------------------------")
+	log.Printf("ReporterResourceSnapshot : %+v, ", snapshot)
 	return ReporterResource{
 		id:                    DeserializeReporterResourceId(snapshot.ID),
 		ReporterResourceKey:   DeserializeReporterResourceKey(snapshot.ReporterResourceKey.LocalResourceID, snapshot.ReporterResourceKey.ResourceType, snapshot.ReporterResourceKey.ReporterType, snapshot.ReporterResourceKey.ReporterInstanceID),

@@ -104,33 +104,15 @@ func DeserializeResourceEvent(
 	reporterRepresentationSnapshot *ReporterRepresentationSnapshot,
 	commonRepresentationSnapshot *CommonRepresentationSnapshot,
 ) ResourceReportEvent {
-	// Create domain tiny types directly from snapshot values
-	resourceId := ResourceId(commonRepresentationSnapshot.ResourceId)
-	resourceType := ResourceType(commonRepresentationSnapshot.ReportedByReporterType) // TODO: This might need adjustment
-	reporterType := ReporterType(commonRepresentationSnapshot.ReportedByReporterType)
-	reporterInstanceId := ReporterInstanceId(commonRepresentationSnapshot.ReportedByReporterInstance)
+	var event ResourceReportEvent
 
-	// Create reporter ID
-	reporterId := ReporterId{
-		reporterType:       reporterType,
-		reporterInstanceId: reporterInstanceId,
+	if commonRepresentationSnapshot != nil {
+		event.commonRepresentation = DeserializeCommonRepresentation(commonRepresentationSnapshot)
 	}
 
-	// Deserialize representations
-	reporterRepresentation := DeserializeReporterDataRepresentation(reporterRepresentationSnapshot)
-	commonRepresentation := DeserializeCommonRepresentation(commonRepresentationSnapshot)
-
-	// Create a placeholder ReporterResource since it's needed for the event
-	reporterResource := ReporterResource{} // TODO: This might need proper initialization
-
-	return ResourceReportEvent{
-		id:                     resourceId,
-		resourceType:           resourceType,
-		reporterId:             reporterId,
-		reporterResource:       reporterResource,
-		reporterRepresentation: *reporterRepresentation,
-		commonRepresentation:   commonRepresentation,
-		createdAt:              commonRepresentationSnapshot.CreatedAt,
-		updatedAt:              commonRepresentationSnapshot.CreatedAt, // TODO: Add UpdatedAt to snapshots if needed
+	if reporterRepresentationSnapshot != nil {
+		event.reporterRepresentation = *DeserializeReporterDataRepresentation(reporterRepresentationSnapshot)
 	}
+
+	return event
 }

@@ -16,18 +16,7 @@ func TestResource_Initialization(t *testing.T) {
 	t.Run("should create resource with single reporter resource", func(t *testing.T) {
 		t.Parallel()
 
-		resource, err := NewResource(
-			fixture.ValidResourceIdType(),
-			fixture.ValidLocalResourceIdType(),
-			fixture.ValidResourceTypeType(),
-			fixture.ValidReporterTypeType(),
-			fixture.ValidReporterInstanceIdType(),
-			fixture.ValidReporterResourceIdType(),
-			fixture.ValidApiHrefType(),
-			fixture.ValidConsoleHrefType(),
-			fixture.ValidReporterRepresentationType(),
-			fixture.ValidCommonRepresentationType(),
-		)
+		resource, err := NewResource(fixture.ValidResourceIdType(), fixture.ValidLocalResourceIdType(), fixture.ValidResourceTypeType(), fixture.ValidReporterTypeType(), fixture.ValidReporterInstanceIdType(), fixture.ValidReporterResourceIdType(), fixture.ValidApiHrefType(), fixture.ValidConsoleHrefType(), fixture.ValidReporterRepresentationType(), fixture.ValidCommonRepresentationType(), nil)
 
 		assertValidResource(t, resource, err, "single reporter resource")
 		assertInitialResourceState(t, resource)
@@ -39,18 +28,7 @@ func TestResource_Initialization(t *testing.T) {
 
 		// Note: The new signature creates only one ReporterResource
 		// This test now validates that we can create another resource with different values
-		resource, err := NewResource(
-			fixture.ValidResourceIdType(),
-			fixture.AnotherLocalResourceIdType(),
-			fixture.AnotherResourceTypeType(),
-			fixture.AnotherReporterTypeType(),
-			fixture.AnotherReporterInstanceIdType(),
-			fixture.AnotherReporterResourceIdType(),
-			fixture.AnotherApiHrefType(),
-			fixture.EmptyConsoleHrefType(),
-			fixture.AnotherReporterRepresentationType(),
-			fixture.AnotherCommonRepresentationType(),
-		)
+		resource, err := NewResource(fixture.ValidResourceIdType(), fixture.AnotherLocalResourceIdType(), fixture.AnotherResourceTypeType(), fixture.AnotherReporterTypeType(), fixture.AnotherReporterInstanceIdType(), fixture.AnotherReporterResourceIdType(), fixture.AnotherApiHrefType(), fixture.EmptyConsoleHrefType(), fixture.AnotherReporterRepresentationType(), fixture.AnotherCommonRepresentationType(), nil)
 
 		assertValidResource(t, resource, err, "different reporter resource")
 		assertInitialResourceState(t, resource)
@@ -63,18 +41,7 @@ func TestResource_Initialization(t *testing.T) {
 	t.Run("should create resource with different resource type", func(t *testing.T) {
 		t.Parallel()
 
-		resource, err := NewResource(
-			fixture.ValidResourceIdType(),
-			fixture.AnotherLocalResourceIdType(),
-			fixture.AnotherResourceTypeType(),
-			fixture.AnotherReporterTypeType(),
-			fixture.AnotherReporterInstanceIdType(),
-			fixture.AnotherReporterResourceIdType(),
-			fixture.AnotherApiHrefType(),
-			fixture.EmptyConsoleHrefType(),
-			fixture.AnotherReporterRepresentationType(),
-			fixture.AnotherCommonRepresentationType(),
-		)
+		resource, err := NewResource(fixture.ValidResourceIdType(), fixture.AnotherLocalResourceIdType(), fixture.AnotherResourceTypeType(), fixture.AnotherReporterTypeType(), fixture.AnotherReporterInstanceIdType(), fixture.AnotherReporterResourceIdType(), fixture.AnotherApiHrefType(), fixture.EmptyConsoleHrefType(), fixture.AnotherReporterRepresentationType(), fixture.AnotherCommonRepresentationType(), nil)
 
 		assertValidResource(t, resource, err, "different resource type")
 		assertInitialResourceState(t, resource)
@@ -92,18 +59,7 @@ func TestResource_AggregateRootBehavior(t *testing.T) {
 	t.Run("should enforce initial state invariants", func(t *testing.T) {
 		t.Parallel()
 
-		resource, err := NewResource(
-			fixture.ValidResourceIdType(),
-			fixture.ValidLocalResourceIdType(),
-			fixture.ValidResourceTypeType(),
-			fixture.ValidReporterTypeType(),
-			fixture.ValidReporterInstanceIdType(),
-			fixture.ValidReporterResourceIdType(),
-			fixture.ValidApiHrefType(),
-			fixture.ValidConsoleHrefType(),
-			fixture.ValidReporterRepresentationType(),
-			fixture.ValidCommonRepresentationType(),
-		)
+		resource, err := NewResource(fixture.ValidResourceIdType(), fixture.ValidLocalResourceIdType(), fixture.ValidResourceTypeType(), fixture.ValidReporterTypeType(), fixture.ValidReporterInstanceIdType(), fixture.ValidReporterResourceIdType(), fixture.ValidApiHrefType(), fixture.ValidConsoleHrefType(), fixture.ValidReporterRepresentationType(), fixture.ValidCommonRepresentationType(), nil)
 
 		if err != nil {
 			t.Errorf("Expected no error, got %v", err)
@@ -118,16 +74,16 @@ func TestResource_AggregateRootBehavior(t *testing.T) {
 
 func assertResourceEvent(t *testing.T, resource Resource, context string) {
 	t.Helper()
-	if len(resource.resourceEvents) == 0 {
-		t.Errorf("Expected resource to have at least one ResourceEvent for %s", context)
+	if len(resource.resourceReportEvents) == 0 {
+		t.Errorf("Expected resource to have at least one ResourceReportEvent for %s", context)
 		return
 	}
-	event := resource.resourceEvents[0]
+	event := resource.resourceReportEvents[0]
 	if event.id.String() == "" {
-		t.Errorf("Expected ResourceEvent to have valid resource ID for %s", context)
+		t.Errorf("Expected ResourceReportEvent to have valid resource ID for %s", context)
 	}
 	if event.resourceType.String() == "" {
-		t.Errorf("Expected ResourceEvent to have valid resource type for %s", context)
+		t.Errorf("Expected ResourceReportEvent to have valid resource type for %s", context)
 	}
 }
 
@@ -173,18 +129,7 @@ func TestResource_Update(t *testing.T) {
 		t.Parallel()
 
 		// Create initial resource
-		original, err := NewResource(
-			fixture.ValidResourceIdType(),
-			fixture.ValidLocalResourceIdType(),
-			fixture.ValidResourceTypeType(),
-			fixture.ValidReporterTypeType(),
-			fixture.ValidReporterInstanceIdType(),
-			fixture.ValidReporterResourceIdType(),
-			fixture.ValidApiHrefType(),
-			fixture.ValidConsoleHrefType(),
-			fixture.ValidReporterRepresentationType(),
-			fixture.ValidCommonRepresentationType(),
-		)
+		original, err := NewResource(fixture.ValidResourceIdType(), fixture.ValidLocalResourceIdType(), fixture.ValidResourceTypeType(), fixture.ValidReporterTypeType(), fixture.ValidReporterInstanceIdType(), fixture.ValidReporterResourceIdType(), fixture.ValidApiHrefType(), fixture.ValidConsoleHrefType(), fixture.ValidReporterRepresentationType(), fixture.ValidCommonRepresentationType(), nil)
 
 		if err != nil {
 			t.Fatalf("Expected no error creating Resource, got %v", err)
@@ -256,18 +201,7 @@ func TestResource_Update(t *testing.T) {
 	t.Run("should return error for non-existent reporter resource key", func(t *testing.T) {
 		t.Parallel()
 
-		original, err := NewResource(
-			fixture.ValidResourceIdType(),
-			fixture.ValidLocalResourceIdType(),
-			fixture.ValidResourceTypeType(),
-			fixture.ValidReporterTypeType(),
-			fixture.ValidReporterInstanceIdType(),
-			fixture.ValidReporterResourceIdType(),
-			fixture.ValidApiHrefType(),
-			fixture.ValidConsoleHrefType(),
-			fixture.ValidReporterRepresentationType(),
-			fixture.ValidCommonRepresentationType(),
-		)
+		original, err := NewResource(fixture.ValidResourceIdType(), fixture.ValidLocalResourceIdType(), fixture.ValidResourceTypeType(), fixture.ValidReporterTypeType(), fixture.ValidReporterInstanceIdType(), fixture.ValidReporterResourceIdType(), fixture.ValidApiHrefType(), fixture.ValidConsoleHrefType(), fixture.ValidReporterRepresentationType(), fixture.ValidCommonRepresentationType(), nil)
 
 		if err != nil {
 			t.Fatalf("Expected no error creating Resource, got %v", err)
@@ -309,18 +243,7 @@ func TestResource_Update(t *testing.T) {
 	t.Run("should preserve other resource fields", func(t *testing.T) {
 		t.Parallel()
 
-		original, err := NewResource(
-			fixture.ValidResourceIdType(),
-			fixture.ValidLocalResourceIdType(),
-			fixture.ValidResourceTypeType(),
-			fixture.ValidReporterTypeType(),
-			fixture.ValidReporterInstanceIdType(),
-			fixture.ValidReporterResourceIdType(),
-			fixture.ValidApiHrefType(),
-			fixture.ValidConsoleHrefType(),
-			fixture.ValidReporterRepresentationType(),
-			fixture.ValidCommonRepresentationType(),
-		)
+		original, err := NewResource(fixture.ValidResourceIdType(), fixture.ValidLocalResourceIdType(), fixture.ValidResourceTypeType(), fixture.ValidReporterTypeType(), fixture.ValidReporterInstanceIdType(), fixture.ValidReporterResourceIdType(), fixture.ValidApiHrefType(), fixture.ValidConsoleHrefType(), fixture.ValidReporterRepresentationType(), fixture.ValidCommonRepresentationType(), nil)
 
 		if err != nil {
 			t.Fatalf("Expected no error creating Resource, got %v", err)
@@ -362,18 +285,7 @@ func TestResource_Update(t *testing.T) {
 	t.Run("should handle empty console href", func(t *testing.T) {
 		t.Parallel()
 
-		original, err := NewResource(
-			fixture.ValidResourceIdType(),
-			fixture.ValidLocalResourceIdType(),
-			fixture.ValidResourceTypeType(),
-			fixture.ValidReporterTypeType(),
-			fixture.ValidReporterInstanceIdType(),
-			fixture.ValidReporterResourceIdType(),
-			fixture.ValidApiHrefType(),
-			fixture.ValidConsoleHrefType(),
-			fixture.ValidReporterRepresentationType(),
-			fixture.ValidCommonRepresentationType(),
-		)
+		original, err := NewResource(fixture.ValidResourceIdType(), fixture.ValidLocalResourceIdType(), fixture.ValidResourceTypeType(), fixture.ValidReporterTypeType(), fixture.ValidReporterInstanceIdType(), fixture.ValidReporterResourceIdType(), fixture.ValidApiHrefType(), fixture.ValidConsoleHrefType(), fixture.ValidReporterRepresentationType(), fixture.ValidCommonRepresentationType(), nil)
 
 		if err != nil {
 			t.Fatalf("Expected no error creating Resource, got %v", err)
@@ -409,18 +321,7 @@ func TestResource_Update(t *testing.T) {
 	t.Run("should return error for invalid apiHref", func(t *testing.T) {
 		t.Parallel()
 
-		_, err := NewResource(
-			fixture.ValidResourceIdType(),
-			fixture.ValidLocalResourceIdType(),
-			fixture.ValidResourceTypeType(),
-			fixture.ValidReporterTypeType(),
-			fixture.ValidReporterInstanceIdType(),
-			fixture.ValidReporterResourceIdType(),
-			fixture.ValidApiHrefType(),
-			fixture.ValidConsoleHrefType(),
-			fixture.ValidReporterRepresentationType(),
-			fixture.ValidCommonRepresentationType(),
-		)
+		_, err := NewResource(fixture.ValidResourceIdType(), fixture.ValidLocalResourceIdType(), fixture.ValidResourceTypeType(), fixture.ValidReporterTypeType(), fixture.ValidReporterInstanceIdType(), fixture.ValidReporterResourceIdType(), fixture.ValidApiHrefType(), fixture.ValidConsoleHrefType(), fixture.ValidReporterRepresentationType(), fixture.ValidCommonRepresentationType(), nil)
 
 		if err != nil {
 			t.Fatalf("Expected no error creating Resource, got %v", err)
@@ -441,18 +342,7 @@ func TestResource_Update(t *testing.T) {
 	t.Run("should handle nil reporter version", func(t *testing.T) {
 		t.Parallel()
 
-		original, err := NewResource(
-			fixture.ValidResourceIdType(),
-			fixture.ValidLocalResourceIdType(),
-			fixture.ValidResourceTypeType(),
-			fixture.ValidReporterTypeType(),
-			fixture.ValidReporterInstanceIdType(),
-			fixture.ValidReporterResourceIdType(),
-			fixture.ValidApiHrefType(),
-			fixture.ValidConsoleHrefType(),
-			fixture.ValidReporterRepresentationType(),
-			fixture.ValidCommonRepresentationType(),
-		)
+		original, err := NewResource(fixture.ValidResourceIdType(), fixture.ValidLocalResourceIdType(), fixture.ValidResourceTypeType(), fixture.ValidReporterTypeType(), fixture.ValidReporterInstanceIdType(), fixture.ValidReporterResourceIdType(), fixture.ValidApiHrefType(), fixture.ValidConsoleHrefType(), fixture.ValidReporterRepresentationType(), fixture.ValidCommonRepresentationType(), nil)
 
 		if err != nil {
 			t.Fatalf("Expected no error creating Resource, got %v", err)

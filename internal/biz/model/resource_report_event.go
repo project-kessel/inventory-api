@@ -1,98 +1,64 @@
 package model
 
 import (
-	"fmt"
 	"time"
 
-	"github.com/go-kratos/kratos/v2/log"
 	"github.com/project-kessel/inventory-api/internal"
 
 	"github.com/google/uuid"
 )
 
-type ResourceEvent struct {
+type ResourceReportEvent struct {
 	id                     ResourceId
 	resourceType           ResourceType
 	reporterId             ReporterId
 	reporterResource       ReporterResource
-	reporterRepresentation ReporterRepresentation
+	reporterRepresentation ReporterDataRepresentation
 	commonRepresentation   CommonRepresentation
 	createdAt              time.Time
 	updatedAt              time.Time
 }
 
-func NewResourceEvent(
+func NewResourceReportEvent(
 	resourceId ResourceId,
 	resourceType ResourceType,
 	reporterType ReporterType,
 	reporterInstanceId ReporterInstanceId,
-	reporterData Representation,
-	reporterResourceID ReporterResourceId,
-	representationVersion Version,
-	reporterGeneration Generation,
-	commonData Representation,
-	commonVersion Version,
-	reporterVersion *ReporterVersion,
-) (ResourceEvent, error) {
+	reporterDataRepresentation ReporterDataRepresentation,
+	commonRepresentation CommonRepresentation,
+) (ResourceReportEvent, error) {
 	reporterId := NewReporterId(reporterType, reporterInstanceId)
 
-	reporterRep, err := NewReporterDataRepresentation(
-		reporterResourceID,
-		representationVersion,
-		reporterGeneration,
-		reporterData,
-		commonVersion,
-		reporterVersion,
-	)
-	if err != nil {
-		return ResourceEvent{}, fmt.Errorf("ResourceEvent invalid reporter representation: %w", err)
-	}
-
-	reporterRepresentation := reporterRep.ReporterRepresentation
-
-	log.Infof("Reporter Representation : %+v", reporterRepresentation)
-
-	commonRepresentation, err := NewCommonRepresentation(
-		resourceId,
-		commonData,
-		commonVersion,
-		reporterType,
-		reporterInstanceId,
-	)
-	if err != nil {
-		return ResourceEvent{}, fmt.Errorf("ResourceEvent invalid common representation: %w", err)
-	}
-
-	return ResourceEvent{
+	return ResourceReportEvent{
 		id:                     resourceId,
 		resourceType:           resourceType,
 		reporterId:             reporterId,
-		reporterRepresentation: reporterRepresentation,
+		reporterRepresentation: reporterDataRepresentation,
 		commonRepresentation:   commonRepresentation,
 	}, nil
 }
 
-func (re ResourceEvent) CreatedAt() *time.Time {
+func (re ResourceReportEvent) CreatedAt() *time.Time {
 	return &re.createdAt
 }
 
-func (re ResourceEvent) UpdatedAt() *time.Time {
+func (re ResourceReportEvent) UpdatedAt() *time.Time {
 	return &re.updatedAt
 }
 
-func (re ResourceEvent) ResourceType() string {
+func (re ResourceReportEvent) ResourceType() string {
 	return re.resourceType.String()
 }
 
-func (re ResourceEvent) ReporterType() string {
+func (re ResourceReportEvent) ReporterType() string {
 	return re.reporterId.reporterType.String()
 }
 
-func (re ResourceEvent) ReporterInstanceId() string {
+func (re ResourceReportEvent) ReporterInstanceId() string {
 	return re.reporterId.reporterInstanceId.String()
 }
 
-func (re ResourceEvent) ReporterVersion() *string {
+func (re ResourceReportEvent) ReporterVersion() *string {
 	if re.reporterRepresentation.reporterVersion == nil {
 		return nil
 	}
@@ -100,31 +66,31 @@ func (re ResourceEvent) ReporterVersion() *string {
 	return &versionStr
 }
 
-func (re ResourceEvent) Id() ResourceId {
+func (re ResourceReportEvent) Id() ResourceId {
 	return re.id
 }
 
-func (re ResourceEvent) LocalResourceId() string {
+func (re ResourceReportEvent) LocalResourceId() string {
 	return re.reporterResource.localResourceID.String()
 }
 
-func (re ResourceEvent) ResourceId() uuid.UUID {
+func (re ResourceReportEvent) ResourceId() uuid.UUID {
 	return uuid.UUID(re.id)
 }
 
-func (re ResourceEvent) ConsoleHref() string {
+func (re ResourceReportEvent) ConsoleHref() string {
 	return re.reporterResource.consoleHref.String()
 }
 
-func (re ResourceEvent) ApiHref() string {
+func (re ResourceReportEvent) ApiHref() string {
 	return re.reporterResource.apiHref.String()
 }
 
-func (re ResourceEvent) Data() internal.JsonObject {
+func (re ResourceReportEvent) Data() internal.JsonObject {
 	return re.reporterRepresentation.Data()
 }
 
-func (re ResourceEvent) WorkspaceId() string {
+func (re ResourceReportEvent) WorkspaceId() string {
 	if workspaceId, ok := re.commonRepresentation.Data()["workspace_id"]; ok {
 		if workspaceIdStr, ok := workspaceId.(string); ok {
 			return workspaceIdStr
@@ -133,11 +99,11 @@ func (re ResourceEvent) WorkspaceId() string {
 	return ""
 }
 
-// DeserializeResourceEvent creates a ResourceEvent from representation snapshots - direct initialization without validation
+// DeserializeResourceEvent creates a ResourceReportEvent from representation snapshots - direct initialization without validation
 func DeserializeResourceEvent(
 	reporterRepresentationSnapshot *ReporterRepresentationSnapshot,
 	commonRepresentationSnapshot *CommonRepresentationSnapshot,
-) ResourceEvent {
+) ResourceReportEvent {
 	// Create domain tiny types directly from snapshot values
 	resourceId := ResourceId(commonRepresentationSnapshot.ResourceId)
 	resourceType := ResourceType(commonRepresentationSnapshot.ReportedByReporterType) // TODO: This might need adjustment
@@ -151,13 +117,13 @@ func DeserializeResourceEvent(
 	}
 
 	// Deserialize representations
-	reporterRepresentation := DeserializeReporterRepresentation(reporterRepresentationSnapshot)
+	reporterRepresentation := DeserializeReporterDataRepresentation(reporterRepresentationSnapshot)
 	commonRepresentation := DeserializeCommonRepresentation(commonRepresentationSnapshot)
 
 	// Create a placeholder ReporterResource since it's needed for the event
 	reporterResource := ReporterResource{} // TODO: This might need proper initialization
 
-	return ResourceEvent{
+	return ResourceReportEvent{
 		id:                     resourceId,
 		resourceType:           resourceType,
 		reporterId:             reporterId,

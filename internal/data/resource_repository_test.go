@@ -233,18 +233,7 @@ func createTestResourceWithLocalId(t *testing.T, localResourceId string) bizmode
 	reporterResourceIdType, err := bizmodel.NewReporterResourceId(reporterResourceId)
 	require.NoError(t, err)
 
-	resource, err := bizmodel.NewResource(
-		resourceIdType,
-		localResourceIdType,
-		resourceType,
-		reporterType,
-		reporterInstanceId,
-		reporterResourceIdType,
-		apiHref,
-		consoleHref,
-		reporterRepresentation,
-		commonRepresentation,
-	)
+	resource, err := bizmodel.NewResource(resourceIdType, localResourceIdType, resourceType, reporterType, reporterInstanceId, reporterResourceIdType, apiHref, consoleHref, reporterRepresentation, commonRepresentation, nil)
 	require.NoError(t, err)
 
 	return resource

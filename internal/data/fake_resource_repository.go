@@ -96,10 +96,10 @@ func (f *fakeResourceRepository) FindResourceByKeys(tx *gorm.DB, key bizmodel.Re
 	defer f.mu.RUnlock()
 
 	searchKey := f.makeKey(
-		key.LocalResourceId(),
-		key.ResourceType(),
-		key.ReporterType(),
-		key.ReporterInstanceId(),
+		key.LocalResourceId().Serialize(),
+		key.ResourceType().Serialize(),
+		key.ReporterType().Serialize(),
+		key.ReporterInstanceId().Serialize(),
 	)
 
 	stored, exists := f.resources[searchKey]
@@ -108,18 +108,7 @@ func (f *fakeResourceRepository) FindResourceByKeys(tx *gorm.DB, key bizmodel.Re
 	}
 
 	placeholderData := map[string]interface{}{"_placeholder": true}
-	resource, err := bizmodel.NewResource(
-		bizmodel.ResourceId(stored.resourceID),
-		bizmodel.LocalResourceId(stored.localResourceID),
-		bizmodel.ResourceType(stored.resourceType),
-		bizmodel.ReporterType(stored.reporterType),
-		bizmodel.ReporterInstanceId(stored.reporterInstanceID),
-		bizmodel.ReporterResourceId(stored.reporterResourceID),
-		bizmodel.ApiHref(""),
-		bizmodel.ConsoleHref(""),
-		bizmodel.Representation(placeholderData),
-		bizmodel.Representation(placeholderData),
-	)
+	resource, err := bizmodel.NewResource(bizmodel.ResourceId(stored.resourceID), bizmodel.LocalResourceId(stored.localResourceID), bizmodel.ResourceType(stored.resourceType), bizmodel.ReporterType(stored.reporterType), bizmodel.ReporterInstanceId(stored.reporterInstanceID), bizmodel.ReporterResourceId(stored.reporterResourceID), bizmodel.ApiHref(""), bizmodel.ConsoleHref(""), bizmodel.Representation(placeholderData), bizmodel.Representation(placeholderData), nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create resource: %w", err)
 	}

@@ -3,6 +3,7 @@ package model
 import (
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/project-kessel/inventory-api/internal"
 	bizmodel "github.com/project-kessel/inventory-api/internal/biz/model"
 )
@@ -13,12 +14,12 @@ import (
 type ReporterRepresentation struct {
 	Representation
 
-	ReporterResourceID string  `gorm:"size:128;primaryKey"`
-	Version            uint    `gorm:"type:bigint;primaryKey;check:version >= 0"`
-	Generation         uint    `gorm:"type:bigint;primaryKey;check:generation >= 0"`
-	ReporterVersion    *string `gorm:"size:128"`
-	CommonVersion      uint    `gorm:"type:bigint;check:common_version >= 0"`
-	Tombstone          bool    `gorm:"not null"`
+	ReporterResourceID uuid.UUID `gorm:"size:128;primaryKey"`
+	Version            uint      `gorm:"type:bigint;primaryKey;check:version >= 0"`
+	Generation         uint      `gorm:"type:bigint;primaryKey;check:generation >= 0"`
+	ReporterVersion    *string   `gorm:"size:128"`
+	CommonVersion      uint      `gorm:"type:bigint;check:common_version >= 0"`
+	Tombstone          bool      `gorm:"not null"`
 	CreatedAt          time.Time
 
 	ReporterResource ReporterResource `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;foreignKey:ReporterResourceID;references:ID"`
@@ -29,7 +30,7 @@ type ReporterRepresentation struct {
 // before it enters the system.
 func NewReporterRepresentation(
 	data internal.JsonObject,
-	reporterResourceID string,
+	reporterResourceID uuid.UUID,
 	version uint,
 	generation uint,
 	commonVersion uint,
@@ -57,7 +58,7 @@ func NewReporterRepresentation(
 
 func validateReporterRepresentation(rr *ReporterRepresentation) error {
 	return bizmodel.AggregateErrors(
-		bizmodel.ValidateStringRequired("ReporterResourceID", rr.ReporterResourceID),
+		bizmodel.ValidateUUIDRequired("ReporterResourceID", rr.ReporterResourceID),
 		bizmodel.ValidateMinValueUint("Version", rr.Version, MinVersionValue),
 		bizmodel.ValidateMinValueUint("Generation", rr.Generation, MinGenerationValue),
 		bizmodel.ValidateMinValueUint("CommonVersion", rr.CommonVersion, MinCommonVersion),

@@ -140,16 +140,16 @@ func TestReporterResource_Key(t *testing.T) {
 		}
 
 		key := reporterResource.Key()
-		if key.LocalResourceId() != fixture.ValidLocalResourceId {
+		if key.LocalResourceId().String() != fixture.ValidLocalResourceId {
 			t.Errorf("Expected LocalResourceId %s, got %s", fixture.ValidLocalResourceIdType(), key.LocalResourceId())
 		}
-		if key.ResourceType() != fixture.ValidResourceType {
+		if key.ResourceType().String() != fixture.ValidResourceType {
 			t.Errorf("Expected ResourceType %s, got %s", fixture.ValidResourceTypeType(), key.ResourceType())
 		}
-		if key.ReporterType() != fixture.ValidReporterType {
+		if key.ReporterType().String() != fixture.ValidReporterType {
 			t.Errorf("Expected ReporterType %s, got %s", fixture.ValidReporterTypeType(), key.ReporterType())
 		}
-		if key.ReporterInstanceId() != fixture.ValidReporterInstanceId {
+		if key.ReporterInstanceId().String() != fixture.ValidReporterInstanceId {
 			t.Errorf("Expected ReporterInstanceId %s, got %s", fixture.ValidReporterInstanceIdType(), key.ReporterInstanceId())
 		}
 	})

@@ -14,7 +14,7 @@ func TestResourceEvent_Initialization(t *testing.T) {
 	t.Run("should create resource event with valid inputs", func(t *testing.T) {
 		t.Parallel()
 
-		event, err := NewResourceEvent(
+		event, err := NewResourceReportEvent(
 			fixture.ValidResourceIdType(),
 			fixture.ValidResourceTypeType(),
 			fixture.ValidReporterTypeType(),
@@ -34,7 +34,7 @@ func TestResourceEvent_Initialization(t *testing.T) {
 	t.Run("should create resource event with nil reporter version", func(t *testing.T) {
 		t.Parallel()
 
-		event, err := NewResourceEvent(
+		event, err := NewResourceReportEvent(
 			fixture.ValidResourceIdType(),
 			fixture.ValidResourceTypeType(),
 			fixture.ValidReporterTypeType(),
@@ -54,7 +54,7 @@ func TestResourceEvent_Initialization(t *testing.T) {
 	t.Run("should create resource event with different values", func(t *testing.T) {
 		t.Parallel()
 
-		event, err := NewResourceEvent(
+		event, err := NewResourceReportEvent(
 			fixture.AnotherResourceIdType(),
 			fixture.AnotherResourceTypeType(),
 			fixture.ValidReporterTypeType(),
@@ -72,10 +72,10 @@ func TestResourceEvent_Initialization(t *testing.T) {
 	})
 
 	// All tiny type validation tests have been moved to common_test.go where they belong.
-	// ResourceEvent tests should only test business logic with valid tiny types.
+	// ResourceReportEvent tests should only test business logic with valid tiny types.
 }
 
-func assertValidResourceEvent(t *testing.T, event ResourceEvent, err error, context string) {
+func assertValidResourceEvent(t *testing.T, event ResourceReportEvent, err error, context string) {
 	t.Helper()
 	if err != nil {
 		t.Errorf("Expected no error for %s, got %v", context, err)

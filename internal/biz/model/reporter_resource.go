@@ -85,20 +85,20 @@ func (rr *ReporterResource) Update(
 }
 
 // Add getters only where needed
-func (rrk ReporterResourceKey) LocalResourceId() string {
-	return rrk.localResourceID.String()
+func (rrk ReporterResourceKey) LocalResourceId() LocalResourceId {
+	return rrk.localResourceID
 }
 
-func (rrk ReporterResourceKey) ResourceType() string {
-	return rrk.resourceType.String()
+func (rrk ReporterResourceKey) ResourceType() ResourceType {
+	return rrk.resourceType
 }
 
-func (rrk ReporterResourceKey) ReporterType() string {
-	return rrk.reporter.reporterType.String()
+func (rrk ReporterResourceKey) ReporterType() ReporterType {
+	return rrk.reporter.reporterType
 }
 
-func (rrk ReporterResourceKey) ReporterInstanceId() string {
-	return rrk.reporter.reporterInstanceId.String()
+func (rrk ReporterResourceKey) ReporterInstanceId() ReporterInstanceId {
+	return rrk.reporter.reporterInstanceId
 }
 
 func (rr ReporterResource) LocalResourceId() string {
@@ -113,7 +113,7 @@ func (rr ReporterResource) Key() ReporterResourceKey {
 	return rr.ReporterResourceKey
 }
 
-// Serialization + Deserialization functions, direct initialization without validation
+// Serialization + Deserialization functions, direct initialization without validation, convert to snapshots so we can bypass New validation
 func (rr ReporterResource) Serialize() ReporterResourceSnapshot {
 	keySnapshot := ReporterResourceKeySnapshot{
 		LocalResourceID:    rr.localResourceID.Serialize(),

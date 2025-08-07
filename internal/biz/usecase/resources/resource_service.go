@@ -189,17 +189,7 @@ func (uc *Usecase) createResource(tx *gorm.DB, request *v1beta2.ReportResourceRe
 		return fmt.Errorf("invalid common representation: %w", err)
 	}
 
-	resource, err := model.NewResource(
-		resourceId,
-		localResourceId,
-		resourceType,
-		reporterType,
-		reporterInstanceId,
-		reporterResourceId,
-		apiHref,
-		consoleHref,
-		reporterRepresentation,
-		commonRepresentation)
+	resource, err := model.NewResource(resourceId, localResourceId, resourceType, reporterType, reporterInstanceId, reporterResourceId, apiHref, consoleHref, reporterRepresentation, commonRepresentation, nil)
 	if err != nil {
 		return err
 	}

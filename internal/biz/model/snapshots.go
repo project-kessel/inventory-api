@@ -57,7 +57,7 @@ type CommonRepresentationSnapshot struct {
 // ReporterRepresentationSnapshot is a DTO that mirrors the GORM ReporterRepresentation model structure
 type ReporterRepresentationSnapshot struct {
 	Representation     RepresentationSnapshot `json:"representation"`
-	ReporterResourceID string                 `json:"reporter_resource_id"`
+	ReporterResourceID uuid.UUID              `json:"reporter_resource_id"`
 	Version            uint                   `json:"version"`
 	Generation         uint                   `json:"generation"`
 	ReporterVersion    *string                `json:"reporter_version"`

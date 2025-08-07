@@ -156,7 +156,7 @@ func (r *resourceRepository) Save(tx *gorm.DB, resource bizmodel.Resource, opera
 }
 
 //nolint:unused // This function will be used once outbox event handling is implemented
-func (r *resourceRepository) handleOutboxEvents(tx *gorm.DB, resourceEvent bizmodel.ResourceEvent, operationType model_legacy.EventOperationType, txid string) error {
+func (r *resourceRepository) handleOutboxEvents(tx *gorm.DB, resourceEvent bizmodel.ResourceReportEvent, operationType model_legacy.EventOperationType, txid string) error {
 	resourceMessage, tupleMessage, err := model_legacy.NewOutboxEventsFromResourceEvent(resourceEvent, operationType, txid)
 	if err != nil {
 		return err
@@ -201,10 +201,10 @@ func (r *resourceRepository) FindResourceByKeys(tx *gorm.DB, key bizmodel.Report
 		rr.reporter_type = ? AND
 		rr.reporter_instance_id = ?
 	`,
-			key.LocalResourceId(),
-			key.ResourceType(),
-			key.ReporterType(),
-			key.ReporterInstanceId(),
+			key.LocalResourceId().Serialize(),
+			key.ResourceType().Serialize(),
+			key.ReporterType().Serialize(),
+			key.ReporterInstanceId().Serialize(),
 		).
 		Find(&results).Error // Use Find since it returns multiple rows
 

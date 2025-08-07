@@ -26,14 +26,6 @@ type ReporterDeleteRepresentation struct {
 	ReporterRepresentation
 }
 
-func (r ReporterRepresentation) Data() internal.JsonObject {
-	return r.Representation.Data()
-}
-
-func (r ReporterRepresentation) IsTombstone() bool {
-	return r.tombstone.Bool()
-}
-
 func NewReporterDataRepresentation(
 	reporterResourceID ReporterResourceId,
 	version Version,
@@ -88,6 +80,14 @@ func NewReporterDeleteRepresentation(
 	}, nil
 }
 
+func (r ReporterRepresentation) Data() internal.JsonObject {
+	return r.Representation.Data()
+}
+
+func (r ReporterRepresentation) IsTombstone() bool {
+	return r.tombstone.Bool()
+}
+
 func (rr ReporterRepresentation) Serialize() ReporterRepresentationSnapshot {
 	var reporterVersionStr *string
 	if rr.reporterVersion != nil {
@@ -97,30 +97,30 @@ func (rr ReporterRepresentation) Serialize() ReporterRepresentationSnapshot {
 
 	// Create representation snapshot
 	representationSnapshot := RepresentationSnapshot{
-		Data: rr.Representation.Data(),
+		Data: rr.Representation.Serialize(),
 	}
 
 	// Create ReporterRepresentation snapshot - direct initialization without validation
 	return ReporterRepresentationSnapshot{
 		Representation:     representationSnapshot,
-		ReporterResourceID: rr.reporterResourceID.String(),
+		ReporterResourceID: rr.reporterResourceID.Serialize(),
 		Version:            rr.version.Serialize(),
 		Generation:         rr.generation.Serialize(),
 		ReporterVersion:    reporterVersionStr,
 		CommonVersion:      rr.commonVersion.Serialize(),
-		Tombstone:          rr.tombstone.Bool(),
+		Tombstone:          rr.tombstone.Serialize(),
 		CreatedAt:          time.Now(), // TODO: Add proper timestamp from domain entity if available
 	}
 }
 
-// DeserializeReporterRepresentation creates a ReporterRepresentation from snapshot - direct initialization without validation
-func DeserializeReporterRepresentation(snapshot *ReporterRepresentationSnapshot) *ReporterRepresentation {
+// DeserializeReporterDataRepresentation creates a ReporterRepresentation from snapshot - direct initialization without validation
+func DeserializeReporterDataRepresentation(snapshot *ReporterRepresentationSnapshot) *ReporterDataRepresentation {
 	if snapshot == nil {
 		return nil
 	}
 	// Create domain tiny types directly from snapshot values
-	reporterResourceId := ReporterResourceId(uuid.MustParse(snapshot.ReporterResourceID))
-	representation := Representation(snapshot.Representation.Data)
+	reporterResourceId := DeserializeReporterResourceId(snapshot.ReporterResourceID)
+	representation := DeserializeRepresentation(snapshot.Representation.Data)
 	version := DeserializeVersion(snapshot.Version)
 	generation := DeserializeGeneration(snapshot.Generation)
 	commonVersion := DeserializeVersion(snapshot.CommonVersion)
@@ -132,13 +132,15 @@ func DeserializeReporterRepresentation(snapshot *ReporterRepresentationSnapshot)
 		reporterVersion = &rv
 	}
 
-	return &ReporterRepresentation{
-		Representation:     representation,
-		reporterResourceID: reporterResourceId,
-		version:            version,
-		generation:         generation,
-		commonVersion:      commonVersion,
-		reporterVersion:    reporterVersion,
-		tombstone:          tombstone,
+	return &ReporterDataRepresentation{
+		ReporterRepresentation{
+			Representation:     representation,
+			reporterResourceID: reporterResourceId,
+			version:            version,
+			generation:         generation,
+			commonVersion:      commonVersion,
+			reporterVersion:    reporterVersion,
+			tombstone:          tombstone,
+		},
 	}
 }

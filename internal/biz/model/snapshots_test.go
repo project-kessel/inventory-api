@@ -25,18 +25,7 @@ func TestResourceSnapshot_FromDomainEntity(t *testing.T) {
 	reporterData := fixture.ValidReporterRepresentationType()
 
 	// Create domain Resource
-	resource, err := NewResource(
-		resourceId,
-		localResourceId,
-		resourceType,
-		reporterType,
-		reporterInstanceId,
-		reporterResourceId,
-		apiHref,
-		consoleHref,
-		reporterData,
-		commonData,
-	)
+	resource, err := NewResource(resourceId, localResourceId, resourceType, reporterType, reporterInstanceId, reporterResourceId, apiHref, consoleHref, reporterData, commonData, nil)
 	if err != nil {
 		t.Fatalf("Failed to create test resource: %v", err)
 	}
@@ -94,7 +83,7 @@ func TestResourceSnapshot_FromDomainEntity(t *testing.T) {
 	}
 
 	// Verify ReporterRepresentationSnapshot
-	if reporterRepSnapshot.ReporterResourceID == "" {
+	if reporterRepSnapshot.ReporterResourceID == uuid.Nil {
 		t.Error("ReporterRepresentationSnapshot should have a valid ReporterResourceID")
 	}
 	if reporterRepSnapshot.Representation.Data == nil {
@@ -144,10 +133,7 @@ func TestIndividualSnapshotMethods(t *testing.T) {
 		t.Fatalf("Failed to create CommonRepresentation: %v", err)
 	}
 
-	crSnapshot, err := commonRep.CreateSnapshot()
-	if err != nil {
-		t.Fatalf("Failed to create CommonRepresentation snapshot: %v", err)
-	}
+	crSnapshot := commonRep.Serialize()
 
 	if crSnapshot.ResourceId == uuid.Nil {
 		t.Error("CommonRepresentation snapshot should have valid ResourceId")
@@ -172,7 +158,7 @@ func TestIndividualSnapshotMethods(t *testing.T) {
 
 	dataSnapshot := dataRep.Serialize()
 
-	if dataSnapshot.ReporterResourceID == "" {
+	if dataSnapshot.ReporterResourceID == uuid.Nil {
 		t.Error("ReporterDataRepresentation snapshot should have valid ReporterResourceID")
 	}
 
@@ -182,7 +168,7 @@ func TestIndividualSnapshotMethods(t *testing.T) {
 		versionOne,
 		genOne,
 		versionOne,
-		nil, // No reporter version for this test
+		nil, // reporterVersion
 	)
 	if err != nil {
 		t.Fatalf("Failed to create ReporterDeleteRepresentation: %v", err)
@@ -190,7 +176,7 @@ func TestIndividualSnapshotMethods(t *testing.T) {
 
 	deleteSnapshot := deleteRep.Serialize()
 
-	if deleteSnapshot.ReporterResourceID == "" {
+	if deleteSnapshot.ReporterResourceID == uuid.Nil {
 		t.Error("ReporterDeleteRepresentation snapshot should have valid ReporterResourceID")
 	}
 	if !deleteSnapshot.Tombstone {

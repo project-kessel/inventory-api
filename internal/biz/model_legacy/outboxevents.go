@@ -105,7 +105,7 @@ type EventRelationshipReporter struct {
 	ReporterInstanceId     string `json:"reporter_instance_id"`
 }
 
-func newResourceEvent(operationType EventOperationType, resourceEvent *bizmodel.ResourceEvent) (*ResourceEvent, error) {
+func newResourceEvent(operationType EventOperationType, resourceEvent *bizmodel.ResourceReportEvent) (*ResourceEvent, error) {
 	const eventType = "resources"
 	now := time.Now()
 
@@ -161,7 +161,7 @@ func newResourceEvent(operationType EventOperationType, resourceEvent *bizmodel.
 	}, nil
 }
 
-func convertResourceToResourceEvent(resourceEvent bizmodel.ResourceEvent, operationType EventOperationType) (internal.JsonObject, error) {
+func convertResourceToResourceEvent(resourceEvent bizmodel.ResourceReportEvent, operationType EventOperationType) (internal.JsonObject, error) {
 	payload := internal.JsonObject{}
 
 	resourceEvent1, err := newResourceEvent(operationType, &resourceEvent)
@@ -182,7 +182,7 @@ func convertResourceToResourceEvent(resourceEvent bizmodel.ResourceEvent, operat
 	return payload, nil
 }
 
-func convertResourceToSetTupleEvent(resourceEvent bizmodel.ResourceEvent) (internal.JsonObject, error) {
+func convertResourceToSetTupleEvent(resourceEvent bizmodel.ResourceReportEvent) (internal.JsonObject, error) {
 	payload := internal.JsonObject{}
 	namespace := strings.ToLower(resourceEvent.ReporterType())
 
@@ -218,7 +218,7 @@ func convertResourceToSetTupleEvent(resourceEvent bizmodel.ResourceEvent) (inter
 	return payload, nil
 }
 
-func convertResourceToUnsetTupleEvent(resourceEvent bizmodel.ResourceEvent) (internal.JsonObject, error) {
+func convertResourceToUnsetTupleEvent(resourceEvent bizmodel.ResourceReportEvent) (internal.JsonObject, error) {
 	payload := internal.JsonObject{}
 	namespace := strings.ToLower(resourceEvent.ReporterType())
 
@@ -241,7 +241,7 @@ func convertResourceToUnsetTupleEvent(resourceEvent bizmodel.ResourceEvent) (int
 	return payload, nil
 }
 
-func NewOutboxEventsFromResourceEvent(domainResourceEvent bizmodel.ResourceEvent, operationType EventOperationType, txid string) (*OutboxEvent, *OutboxEvent, error) {
+func NewOutboxEventsFromResourceEvent(domainResourceEvent bizmodel.ResourceReportEvent, operationType EventOperationType, txid string) (*OutboxEvent, *OutboxEvent, error) {
 	var tuplePayload internal.JsonObject
 	var tupleEvent *OutboxEvent
 

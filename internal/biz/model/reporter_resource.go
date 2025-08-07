@@ -5,6 +5,7 @@ import (
 	"time"
 )
 
+// Create Entities with unexported fields for encapsulation
 type ReporterResource struct {
 	id ReporterResourceId
 	ReporterResourceKey
@@ -24,6 +25,7 @@ type ReporterResourceKey struct {
 	reporter        ReporterId
 }
 
+// Factory methods
 func NewReporterResource(
 	id ReporterResourceId,
 	localResourceId LocalResourceId,
@@ -72,6 +74,7 @@ func NewReporterResourceKey(
 	}, nil
 }
 
+// Model Behavior
 func (rr *ReporterResource) Update(
 	apiHref ApiHref,
 	consoleHref ConsoleHref,
@@ -81,11 +84,7 @@ func (rr *ReporterResource) Update(
 	rr.representationVersion = rr.representationVersion.Increment()
 }
 
-// CreateSnapshot creates a snapshot of the ReporterResource
-func (rr ReporterResource) CreateSnapshot() (ReporterResourceSnapshot, error) {
-	return rr.Serialize(), nil
-}
-
+// Add getters only where needed
 func (rrk ReporterResourceKey) LocalResourceId() string {
 	return rrk.localResourceID.String()
 }
@@ -102,19 +101,6 @@ func (rrk ReporterResourceKey) ReporterInstanceId() string {
 	return rrk.reporter.reporterInstanceId.String()
 }
 
-func (rrk ReporterResourceKey) Serialize() (string, string, string, string) {
-	reporterType, reporterInstanceId := rrk.reporter.Serialize()
-	return rrk.localResourceID.Serialize(), rrk.resourceType.Serialize(), reporterType, reporterInstanceId
-}
-
-func DeserializeReporterResourceKey(localResourceId, resourceType, reporterType, reporterInstanceId string) ReporterResourceKey {
-	return ReporterResourceKey{
-		localResourceID: DeserializeLocalResourceId(localResourceId),
-		resourceType:    DeserializeResourceType(resourceType),
-		reporter:        DeserializeReporterId(reporterType, reporterInstanceId),
-	}
-}
-
 func (rr ReporterResource) LocalResourceId() string {
 	return rr.localResourceID.String()
 }
@@ -127,62 +113,52 @@ func (rr ReporterResource) Key() ReporterResourceKey {
 	return rr.ReporterResourceKey
 }
 
+// Serialization + Deserialization functions, direct initialization without validation
 func (rr ReporterResource) Serialize() ReporterResourceSnapshot {
-	// Create ReporterResourceKey snapshot
 	keySnapshot := ReporterResourceKeySnapshot{
-		LocalResourceID:    rr.localResourceID.String(),
-		ReporterType:       rr.reporter.reporterType.String(),
-		ResourceType:       rr.resourceType.String(),
-		ReporterInstanceID: rr.reporter.reporterInstanceId.String(),
+		LocalResourceID:    rr.localResourceID.Serialize(),
+		ReporterType:       rr.reporter.reporterType.Serialize(),
+		ResourceType:       rr.resourceType.Serialize(),
+		ReporterInstanceID: rr.reporter.reporterInstanceId.Serialize(),
 	}
 
-	// Create ReporterResource snapshot - direct initialization without validation
 	return ReporterResourceSnapshot{
-		ID:                    rr.id.UUID(),
+		ID:                    rr.Id().Serialize(),
 		ReporterResourceKey:   keySnapshot,
-		ResourceID:            rr.resourceID.UUID(),
-		APIHref:               rr.apiHref.String(),
-		ConsoleHref:           rr.consoleHref.String(),
+		ResourceID:            rr.resourceID.Serialize(),
+		APIHref:               rr.apiHref.Serialize(),
+		ConsoleHref:           rr.consoleHref.Serialize(),
 		RepresentationVersion: rr.representationVersion.Serialize(),
 		Generation:            rr.generation.Serialize(),
-		Tombstone:             rr.tombstone.Bool(),
+		Tombstone:             rr.tombstone.Serialize(),
 		CreatedAt:             time.Now(), // TODO: Add proper timestamp from domain entity if available
 		UpdatedAt:             time.Now(), // TODO: Add proper timestamp from domain entity if available
 	}
 }
 
 func DeserializeReporterResource(snapshot ReporterResourceSnapshot) ReporterResource {
-	// Create domain tiny types directly from snapshot values - no validation
-	reporterResourceId := ReporterResourceId(snapshot.ID)
-	domainResourceId := ResourceId(snapshot.ResourceID)
-	localResourceID := LocalResourceId(snapshot.ReporterResourceKey.LocalResourceID)
-	resourceType := ResourceType(snapshot.ReporterResourceKey.ResourceType)
-	reporterType := ReporterType(snapshot.ReporterResourceKey.ReporterType)
-	reporterInstanceId := ReporterInstanceId(snapshot.ReporterResourceKey.ReporterInstanceID)
-	apiHref := ApiHref(snapshot.APIHref)
-	consoleHref := ConsoleHref(snapshot.ConsoleHref)
-
-	// Create reporter ID
-	reporterId := ReporterId{
-		reporterType:       reporterType,
-		reporterInstanceId: reporterInstanceId,
-	}
-
-	// Create reporter resource key
-	reporterResourceKey := ReporterResourceKey{
-		localResourceID: localResourceID,
-		resourceType:    resourceType,
-		reporter:        reporterId,
-	}
 
 	return ReporterResource{
-		id:                    reporterResourceId,
-		ReporterResourceKey:   reporterResourceKey,
-		resourceID:            domainResourceId,
-		apiHref:               apiHref,
-		consoleHref:           consoleHref,
+		id:                    DeserializeReporterResourceId(snapshot.ID),
+		ReporterResourceKey:   DeserializeReporterResourceKey(snapshot.ReporterResourceKey.LocalResourceID, snapshot.ReporterResourceKey.ResourceType, snapshot.ReporterResourceKey.ReporterType, snapshot.ReporterResourceKey.ReporterInstanceID),
+		resourceID:            DeserializeResourceId(snapshot.ResourceID),
+		apiHref:               DeserializeApiHref(snapshot.APIHref),
+		consoleHref:           DeserializeConsoleHref(snapshot.ConsoleHref),
 		representationVersion: DeserializeVersion(snapshot.RepresentationVersion),
 		generation:            DeserializeGeneration(snapshot.Generation),
 		tombstone:             DeserializeTombstone(snapshot.Tombstone),
+	}
+}
+
+func (rrk ReporterResourceKey) Serialize() (string, string, string, string) {
+	reporterType, reporterInstanceId := rrk.reporter.Serialize()
+	return rrk.localResourceID.Serialize(), rrk.resourceType.Serialize(), reporterType, reporterInstanceId
+}
+
+func DeserializeReporterResourceKey(localResourceId, resourceType, reporterType, reporterInstanceId string) ReporterResourceKey {
+	return ReporterResourceKey{
+		localResourceID: DeserializeLocalResourceId(localResourceId),
+		resourceType:    DeserializeResourceType(resourceType),
+		reporter:        DeserializeReporterId(reporterType, reporterInstanceId),
 	}
 }

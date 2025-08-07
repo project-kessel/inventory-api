@@ -113,66 +113,11 @@ func (rr ReporterRepresentation) Serialize() ReporterRepresentationSnapshot {
 	}
 }
 
-func DeserializeReporterDataRepresentation(
-	reporterResourceIdVal string,
-	version uint,
-	generation uint,
-	data internal.JsonObject,
-	commonVersion uint,
-	reporterVersionVal *string,
-) ReporterDataRepresentation {
-	var reporterVersion *ReporterVersion
-	if reporterVersionVal != nil {
-		rv := DeserializeReporterVersion(*reporterVersionVal)
-		reporterVersion = &rv
-	}
-
-	return ReporterDataRepresentation{
-		ReporterRepresentation: ReporterRepresentation{
-			Representation:     DeserializeRepresentation(data),
-			reporterResourceID: DeserializeReporterResourceId(uuid.MustParse(reporterResourceIdVal)),
-			version:            DeserializeVersion(version),
-			generation:         DeserializeGeneration(generation),
-			commonVersion:      DeserializeVersion(commonVersion),
-			reporterVersion:    reporterVersion,
-			tombstone:          DeserializeTombstone(false),
-		},
-	}
-}
-
-func DeserializeReporterDeleteRepresentation(
-	reporterResourceIDVal string,
-	version uint,
-	generation uint,
-	commonVersion uint,
-	reporterVersionVal *string,
-) ReporterDeleteRepresentation {
-	var reporterVersion *ReporterVersion
-	if reporterVersionVal != nil {
-		rv := DeserializeReporterVersion(*reporterVersionVal)
-		reporterVersion = &rv
-	}
-
-	return ReporterDeleteRepresentation{
-		ReporterRepresentation: ReporterRepresentation{
-			Representation:     DeserializeRepresentation(nil),
-			reporterResourceID: DeserializeReporterResourceId(uuid.MustParse(reporterResourceIDVal)),
-			version:            DeserializeVersion(version),
-			generation:         DeserializeGeneration(generation),
-			commonVersion:      DeserializeVersion(commonVersion),
-			reporterVersion:    reporterVersion,
-			tombstone:          DeserializeTombstone(true),
-		},
-	}
-}
-
-// CreateSnapshot creates a snapshot of the ReporterRepresentation
-func (rr ReporterRepresentation) CreateSnapshot() (ReporterRepresentationSnapshot, error) {
-	return rr.Serialize(), nil
-}
-
 // DeserializeReporterRepresentation creates a ReporterRepresentation from snapshot - direct initialization without validation
-func DeserializeReporterRepresentation(snapshot ReporterRepresentationSnapshot) ReporterRepresentation {
+func DeserializeReporterRepresentation(snapshot *ReporterRepresentationSnapshot) *ReporterRepresentation {
+	if snapshot == nil {
+		return nil
+	}
 	// Create domain tiny types directly from snapshot values
 	reporterResourceId := ReporterResourceId(uuid.MustParse(snapshot.ReporterResourceID))
 	representation := Representation(snapshot.Representation.Data)
@@ -187,7 +132,7 @@ func DeserializeReporterRepresentation(snapshot ReporterRepresentationSnapshot) 
 		reporterVersion = &rv
 	}
 
-	return ReporterRepresentation{
+	return &ReporterRepresentation{
 		Representation:     representation,
 		reporterResourceID: reporterResourceId,
 		version:            version,
@@ -196,14 +141,4 @@ func DeserializeReporterRepresentation(snapshot ReporterRepresentationSnapshot) 
 		reporterVersion:    reporterVersion,
 		tombstone:          tombstone,
 	}
-}
-
-// CreateSnapshot creates a snapshot of the ReporterDataRepresentation
-func (rdr ReporterDataRepresentation) CreateSnapshot() (ReporterRepresentationSnapshot, error) {
-	return rdr.ReporterRepresentation.CreateSnapshot()
-}
-
-// CreateSnapshot creates a snapshot of the ReporterDeleteRepresentation
-func (rdr ReporterDeleteRepresentation) CreateSnapshot() (ReporterRepresentationSnapshot, error) {
-	return rdr.ReporterRepresentation.CreateSnapshot()
 }

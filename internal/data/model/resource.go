@@ -16,33 +16,6 @@ type Resource struct {
 	UpdatedAt        time.Time
 }
 
-func NewResource(
-	id uuid.UUID,
-	resourceType string,
-	commonVersion uint,
-) (*Resource, error) {
-	r := &Resource{
-		ID:            id,
-		Type:          resourceType,
-		CommonVersion: commonVersion,
-	}
-
-	if err := validateResource(r); err != nil {
-		return nil, err
-	}
-
-	return r, nil
-}
-
-func validateResource(r *Resource) error {
-	return bizmodel.AggregateErrors(
-		bizmodel.ValidateUUIDRequired("ID", r.ID),
-		bizmodel.ValidateStringRequired("Type", r.Type),
-		bizmodel.ValidateMaxLength("Type", r.Type, MaxResourceTypeLength),
-		bizmodel.ValidateMinValueUint("CommonVersion", r.CommonVersion, 0),
-	)
-}
-
 func (Resource) TableName() string {
 	return "resource"
 }

@@ -65,6 +65,3 @@ type ReporterRepresentationSnapshot struct {
 	Tombstone          bool                   `json:"tombstone"`
 	CreatedAt          time.Time              `json:"created_at"`
 }
-
-// Note: Conversion functions from GORM models to snapshots are now implemented
-// directly in the GORM models (data/model package) to avoid circular imports.

@@ -1,7 +1,9 @@
 package data
 
 import (
+	"errors"
 	"fmt"
+	"log"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
@@ -23,6 +25,55 @@ type FindResourceByKeysResult struct {
 	LocalResourceID       string    `gorm:"column:local_resource_id"`
 	ReporterType          string    `gorm:"column:reporter_type"`
 	ReporterInstanceID    string    `gorm:"column:reporter_instance_id"`
+}
+
+func ToSnapshotsFromResults(results []FindResourceByKeysResult) (bizmodel.ResourceSnapshot, []bizmodel.ReporterResourceSnapshot) {
+	if len(results) == 0 {
+		return bizmodel.ResourceSnapshot{}, nil
+	}
+
+	var reporterSnapshots []bizmodel.ReporterResourceSnapshot
+	var resourceSnapshot bizmodel.ResourceSnapshot
+
+	for i, result := range results {
+		resSnap, repSnap := result.ToSnapshots()
+
+		if i == 0 {
+			resourceSnapshot = resSnap
+		}
+		reporterSnapshots = append(reporterSnapshots, repSnap)
+	}
+
+	return resourceSnapshot, reporterSnapshots
+}
+
+func (result FindResourceByKeysResult) ToSnapshots() (bizmodel.ResourceSnapshot, bizmodel.ReporterResourceSnapshot) {
+	// Create ResourceSnapshot
+	resourceSnapshot := bizmodel.ResourceSnapshot{
+		ID:            result.ResourceID,
+		Type:          result.ResourceType,
+		CommonVersion: result.CommonVersion,
+	}
+
+	// Create ReporterResourceKeySnapshot
+	keySnapshot := bizmodel.ReporterResourceKeySnapshot{
+		LocalResourceID:    result.LocalResourceID,
+		ReporterType:       result.ReporterType,
+		ResourceType:       result.ResourceType,
+		ReporterInstanceID: result.ReporterInstanceID,
+	}
+
+	// Create ReporterResourceSnapshot
+	reporterResourceSnapshot := bizmodel.ReporterResourceSnapshot{
+		ID:                    result.ReporterResourceID,
+		ReporterResourceKey:   keySnapshot,
+		ResourceID:            result.ResourceID,
+		RepresentationVersion: result.RepresentationVersion,
+		Generation:            result.Generation,
+		Tombstone:             result.Tombstone,
+	}
+
+	return resourceSnapshot, reporterResourceSnapshot
 }
 
 type ResourceRepository interface {
@@ -65,11 +116,15 @@ func (r *resourceRepository) NextReporterResourceId() (bizmodel.ReporterResource
 }
 
 func (r *resourceRepository) Save(tx *gorm.DB, resource bizmodel.Resource, operationType model_legacy.EventOperationType, txid string) error {
+	log.Printf("--------------------------")
+	log.Printf("Resource : %+v", resource)
 	resourceSnapshot, reporterResourceSnapshot, reporterRepresentationSnapshot, commonRepresentationSnapshot, err := resource.Serialize()
 	if err != nil {
 		return fmt.Errorf("failed to serialize resource: %w", err)
 	}
 
+	log.Printf("--------------------------")
+	log.Printf("Reporter Representation Snapshot : %+v", reporterRepresentationSnapshot)
 	dataResource := datamodel.DeserializeResourceFromSnapshot(resourceSnapshot)
 	dataReporterResource := datamodel.DeserializeReporterResourceFromSnapshot(reporterResourceSnapshot)
 	dataReporterRepresentation := datamodel.DeserializeReporterRepresentationFromSnapshot(reporterRepresentationSnapshot)
@@ -83,6 +138,8 @@ func (r *resourceRepository) Save(tx *gorm.DB, resource bizmodel.Resource, opera
 		return fmt.Errorf("failed to save reporter resource: %w", err)
 	}
 
+	log.Printf("--------------------------")
+	log.Printf("Data Reporter Representation : %+v", dataReporterRepresentation)
 	if err := tx.Create(&dataReporterRepresentation).Error; err != nil {
 		return fmt.Errorf("failed to save reporter representation: %w", err)
 	}
@@ -91,13 +148,14 @@ func (r *resourceRepository) Save(tx *gorm.DB, resource bizmodel.Resource, opera
 		return fmt.Errorf("failed to save common representation: %w", err)
 	}
 
-	if err := r.handleOutboxEvents(tx, resource.ResourceEvents()[0], operationType, txid); err != nil {
+	/*if err := r.handleOutboxEvents(tx, resource.ResourceEvents()[0], operationType, txid); err != nil {
 		return err
-	}
+	}*/
 
 	return nil
 }
 
+//nolint:unused // This function will be used once outbox event handling is implemented
 func (r *resourceRepository) handleOutboxEvents(tx *gorm.DB, resourceEvent bizmodel.ResourceEvent, operationType model_legacy.EventOperationType, txid string) error {
 	resourceMessage, tupleMessage, err := model_legacy.NewOutboxEventsFromResourceEvent(resourceEvent, operationType, txid)
 	if err != nil {
@@ -118,54 +176,47 @@ func (r *resourceRepository) handleOutboxEvents(tx *gorm.DB, resourceEvent bizmo
 }
 
 func (r *resourceRepository) FindResourceByKeys(tx *gorm.DB, key bizmodel.ReporterResourceKey) (*bizmodel.Resource, error) {
-	var result FindResourceByKeysResult
+	var results []FindResourceByKeysResult
 
-	//TODO: Fix query to do a self join on reporter_resource and return all reporter_resources with the given resource_id
 	err := tx.Table("reporter_resources AS rr").
 		Select(`
-			rr.id AS reporter_resource_id,
-			rr.representation_version,
-			rr.generation,
-			rr.tombstone,
-			res.common_version,
-			res.id AS resource_id,
-			rr.resource_type,
-			rr.local_resource_id,
-			rr.reporter_type,
-			rr.reporter_instance_id
-		`).
-		Joins("JOIN resource AS res ON res.id = rr.resource_id").
+		rr2.id AS reporter_resource_id,
+		rr2.representation_version,
+		rr2.generation,
+		rr2.tombstone,
+		res.common_version,
+		res.id AS resource_id,
+		rr2.resource_type,
+		rr2.local_resource_id,
+		rr2.reporter_type,
+		rr2.reporter_instance_id
+	`).
+		Joins(`
+		JOIN reporter_resources AS rr2 ON rr2.resource_id = rr.resource_id
+		JOIN resource AS res ON res.id = rr2.resource_id
+	`).
 		Where(`
-			rr.local_resource_id = ? AND
-			rr.resource_type = ? AND
-			rr.reporter_type = ? AND
-			rr.reporter_instance_id = ?`,
-			key.LocalResourceId(), key.ResourceType(), key.ReporterType(), key.ReporterInstanceId()).
-		Take(&result).Error
+		rr.local_resource_id = ? AND
+		rr.resource_type = ? AND
+		rr.reporter_type = ? AND
+		rr.reporter_instance_id = ?
+	`,
+			key.LocalResourceId(),
+			key.ResourceType(),
+			key.ReporterType(),
+			key.ReporterInstanceId(),
+		).
+		Find(&results).Error // Use Find since it returns multiple rows
 
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, nil
 		}
 		return nil, fmt.Errorf("failed to find resource by keys: %w", err)
 	}
 
-	placeholderData := map[string]interface{}{"": true}
-	resource, err := bizmodel.NewResource(
-		bizmodel.ResourceId(result.ResourceID),
-		bizmodel.LocalResourceId(result.LocalResourceID),
-		bizmodel.ResourceType(result.ResourceType),
-		bizmodel.ReporterType(result.ReporterType),
-		bizmodel.ReporterInstanceId(result.ReporterInstanceID),
-		bizmodel.ReporterResourceId(result.ReporterResourceID),
-		"",
-		"",
-		placeholderData,
-		placeholderData,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create resource: %w", err)
-	}
+	resourceSnapshot, reporterResourceSnapshots := ToSnapshotsFromResults(results)
+	resource := bizmodel.DeserializeResource(resourceSnapshot, reporterResourceSnapshots, nil, nil)
 
 	return &resource, nil
 }

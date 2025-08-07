@@ -125,7 +125,8 @@ func (uc *Usecase) ReportResource(request *v1beta2.ReportResourceRequest, report
 		}
 
 		if existingResource != nil {
-			log.Info("Resource already exists, updating: ", existingResource)
+			log.Info("----------------------")
+			log.Info("Resource already exists, updating: ", len(existingResource.ResourceEvents()))
 			return uc.updateResource(tx, request, existingResource, txidStr)
 		} else {
 			log.Info("Creating new resource")
@@ -249,6 +250,8 @@ func (uc *Usecase) updateResource(tx *gorm.DB, request *v1beta2.ReportResourceRe
 		commonData,
 		reporterData,
 	)
+	log.Info("----------------------")
+	log.Info("After update: ", len(existingResource.ResourceEvents()))
 	if err != nil {
 		return fmt.Errorf("failed to update resource: %w", err)
 	}

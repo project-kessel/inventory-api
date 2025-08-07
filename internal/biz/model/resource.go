@@ -3,10 +3,13 @@ package model
 import (
 	"fmt"
 	"time"
+
+	"github.com/go-kratos/kratos/v2/log"
 )
 
 const initialCommonVersion = 0
 
+// Create Entities with unexported fields for encapsulation
 type Resource struct {
 	id                ResourceId
 	resourceType      ResourceType
@@ -16,6 +19,7 @@ type Resource struct {
 	resourceEvents    []ResourceEvent
 }
 
+// Factory methods
 func NewResource(
 	id ResourceId,
 	localResourceId LocalResourceId,
@@ -70,87 +74,7 @@ func NewResource(
 	return resource, nil
 }
 
-func (r Resource) Serialize() (ResourceSnapshot, ReporterResourceSnapshot, ReporterRepresentationSnapshot, CommonRepresentationSnapshot, error) {
-	var createdAt, updatedAt time.Time
-	if len(r.resourceEvents) > 0 {
-		createdAt = r.resourceEvents[0].createdAt
-		updatedAt = r.resourceEvents[0].updatedAt
-	}
-
-	resourceSnapshot := ResourceSnapshot{
-		ID:               r.id.UUID(),
-		Type:             r.resourceType.String(),
-		CommonVersion:    r.commonVersion.Serialize(),
-		ConsistencyToken: r.consistencyToken.Serialize(),
-		CreatedAt:        createdAt,
-		UpdatedAt:        updatedAt,
-	}
-
-	var reporterResourceSnapshot ReporterResourceSnapshot
-	if len(r.reporterResources) > 0 {
-		reporterResourceSnapshot = r.reporterResources[0].Serialize()
-	}
-
-	var reporterRepresentationSnapshot ReporterRepresentationSnapshot
-	var commonRepresentationSnapshot CommonRepresentationSnapshot
-	if len(r.resourceEvents) > 0 {
-		reporterRepresentationSnapshot = r.resourceEvents[0].SerializeReporterRepresentation()
-		commonRepresentationSnapshot = r.resourceEvents[0].SerializeCommonRepresentation()
-	}
-
-	return resourceSnapshot, reporterResourceSnapshot, reporterRepresentationSnapshot, commonRepresentationSnapshot, nil
-}
-
-func DeserializeResource(
-	resourceSnapshot ResourceSnapshot,
-	reporterResourceSnapshot ReporterResourceSnapshot,
-	reporterRepresentationSnapshot ReporterRepresentationSnapshot,
-	commonRepresentationSnapshot CommonRepresentationSnapshot,
-) Resource {
-
-	resourceId := ResourceId(resourceSnapshot.ID)
-	resourceType := ResourceType(resourceSnapshot.Type)
-	commonVersion := DeserializeVersion(resourceSnapshot.CommonVersion)
-
-	// Create reporter resource
-	reporterResource := DeserializeReporterResource(reporterResourceSnapshot)
-
-	// Create resource event from representations
-	resourceEvent := DeserializeResourceEvent(reporterRepresentationSnapshot, commonRepresentationSnapshot)
-
-	return Resource{
-		id:                resourceId,
-		resourceType:      resourceType,
-		commonVersion:     commonVersion,
-		reporterResources: []ReporterResource{reporterResource},
-		resourceEvents:    []ResourceEvent{resourceEvent},
-	}
-}
-
-func (r Resource) ResourceEvents() []ResourceEvent {
-	return r.resourceEvents
-}
-
-// CreateSnapshot creates a complete snapshot of the Resource and all its related entities
-func (r Resource) createSnapshot() (ResourceSnapshot, ReporterResourceSnapshot, CommonRepresentationSnapshot, ReporterRepresentationSnapshot, error) {
-	resourceSnapshot, reporterResourceSnapshot, reporterRepresentationSnapshot, commonRepresentationSnapshot, err := r.Serialize()
-	return resourceSnapshot, reporterResourceSnapshot, commonRepresentationSnapshot, reporterRepresentationSnapshot, err
-}
-
-func (r Resource) ReporterResources() []ReporterResource {
-	return r.reporterResources
-}
-
-func (r *Resource) findReporterResource(key ReporterResourceKey) (*ReporterResource, error) {
-	for i := range r.reporterResources {
-		if r.reporterResources[i].Key() == key {
-			return &r.reporterResources[i], nil
-		}
-	}
-	return nil, fmt.Errorf("reporter resource with key (localResourceId=%s, resourceType=%s, reporterType=%s, reporterInstanceId=%s) not found in resource",
-		key.LocalResourceId(), key.ResourceType(), key.ReporterType(), key.ReporterInstanceId())
-}
-
+// Model Behavior
 func (r *Resource) Update(
 	key ReporterResourceKey,
 	apiHref ApiHref,
@@ -161,7 +85,7 @@ func (r *Resource) Update(
 ) error {
 	r.commonVersion = r.commonVersion.Increment()
 
-	reporterResource, err := r.findReporterResource(key)
+	reporterResource, err := r.findReporterResourceToUpdateByKey(key)
 	if err != nil {
 		return err
 	}
@@ -182,6 +106,7 @@ func (r *Resource) Update(
 		return fmt.Errorf("invalid reporter instance ID from key: %w", err)
 	}
 
+	log.Infof("Reporter Resource: %+v", reporterResource.representationVersion)
 	resourceEvent, err := NewResourceEvent(
 		r.id,
 		keyResourceType,
@@ -201,4 +126,82 @@ func (r *Resource) Update(
 
 	r.resourceEvents = append(r.resourceEvents, resourceEvent)
 	return nil
+}
+
+func (r *Resource) findReporterResourceToUpdateByKey(key ReporterResourceKey) (*ReporterResource, error) {
+	for i := range r.reporterResources {
+		if r.reporterResources[i].Key() == key {
+			return &r.reporterResources[i], nil
+		}
+	}
+	return nil, fmt.Errorf("reporter resource with key (localResourceId=%s, resourceType=%s, reporterType=%s, reporterInstanceId=%s) not found in resource",
+		key.LocalResourceId(), key.ResourceType(), key.ReporterType(), key.ReporterInstanceId())
+}
+
+// Add getters only where needed
+func (r Resource) ResourceEvents() []ResourceEvent {
+	return r.resourceEvents
+}
+
+func (r Resource) ReporterResources() []ReporterResource {
+	return r.reporterResources
+}
+
+// Serialization + Deserialization functions, direct initialization without validation
+func (r Resource) Serialize() (ResourceSnapshot, ReporterResourceSnapshot, ReporterRepresentationSnapshot, CommonRepresentationSnapshot, error) {
+	var createdAt, updatedAt time.Time
+	if len(r.resourceEvents) > 0 {
+		createdAt = r.resourceEvents[0].createdAt
+		updatedAt = r.resourceEvents[0].updatedAt
+	}
+
+	resourceSnapshot := ResourceSnapshot{
+		ID:               r.id.Serialize(),
+		Type:             r.resourceType.Serialize(),
+		CommonVersion:    r.commonVersion.Serialize(),
+		ConsistencyToken: r.consistencyToken.Serialize(),
+		CreatedAt:        createdAt,
+		UpdatedAt:        updatedAt,
+	}
+
+	var reporterResourceSnapshot ReporterResourceSnapshot
+	if len(r.reporterResources) > 0 {
+		//TODO: Fix this to serialize all ReporterResources
+		reporterResourceSnapshot = r.reporterResources[0].Serialize()
+	}
+
+	var reporterRepresentationSnapshot ReporterRepresentationSnapshot
+	var commonRepresentationSnapshot CommonRepresentationSnapshot
+	if len(r.resourceEvents) > 0 {
+		//TODO: Fix this to serialize all ResourceEvents
+		reporterRepresentationSnapshot = r.resourceEvents[0].reporterRepresentation.Serialize()
+		commonRepresentationSnapshot = r.resourceEvents[0].commonRepresentation.Serialize()
+	}
+
+	return resourceSnapshot, reporterResourceSnapshot, reporterRepresentationSnapshot, commonRepresentationSnapshot, nil
+}
+
+// TODO: When a Resource is deserialized, does it get a list of events?
+func DeserializeResource(
+	resourceSnapshot ResourceSnapshot,
+	reporterResourceSnapshots []ReporterResourceSnapshot,
+	reporterRepresentationSnapshot *ReporterRepresentationSnapshot,
+	commonRepresentationSnapshot *CommonRepresentationSnapshot,
+) Resource {
+
+	var reporterResources []ReporterResource
+	for _, reporterResourceSnapshot := range reporterResourceSnapshots {
+		reporterResources = append(reporterResources, DeserializeReporterResource(reporterResourceSnapshot))
+	}
+
+	resourceEvent := DeserializeResourceEvent(reporterRepresentationSnapshot, commonRepresentationSnapshot)
+
+	return Resource{
+		id:                DeserializeResourceId(resourceSnapshot.ID),
+		resourceType:      DeserializeResourceType(resourceSnapshot.Type),
+		commonVersion:     DeserializeVersion(resourceSnapshot.CommonVersion),
+		consistencyToken:  DeserializeConsistencyToken(resourceSnapshot.ConsistencyToken),
+		reporterResources: reporterResources,
+		resourceEvents:    []ResourceEvent{resourceEvent},
+	}
 }

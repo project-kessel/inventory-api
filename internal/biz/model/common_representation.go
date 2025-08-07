@@ -70,7 +70,7 @@ func (cr CommonRepresentation) Serialize() CommonRepresentationSnapshot {
 	}
 }
 
-func DeserializeCommonRepresentation(snapshot CommonRepresentationSnapshot) CommonRepresentation {
+func DeserializeCommonRepresentation(snapshot *CommonRepresentationSnapshot) CommonRepresentation {
 	// Create domain tiny types directly from snapshot values - no validation
 	resourceId := ResourceId(snapshot.ResourceId)
 	representation := Representation(snapshot.Representation.Data)

@@ -42,7 +42,7 @@ func TestResourceSnapshot_FromDomainEntity(t *testing.T) {
 	}
 
 	// Test snapshot creation
-	resourceSnapshot, reporterResourceSnapshot, commonRepSnapshot, reporterRepSnapshot, err := resource.createSnapshot()
+	resourceSnapshot, reporterResourceSnapshot, reporterRepSnapshot, commonRepSnapshot, err := resource.Serialize()
 	if err != nil {
 		t.Fatalf("Failed to create snapshot: %v", err)
 	}
@@ -125,10 +125,7 @@ func TestIndividualSnapshotMethods(t *testing.T) {
 		t.Fatalf("Failed to create ReporterResource: %v", err)
 	}
 
-	rrSnapshot, err := reporterResource.CreateSnapshot()
-	if err != nil {
-		t.Fatalf("Failed to create ReporterResource snapshot: %v", err)
-	}
+	rrSnapshot := reporterResource.Serialize()
 
 	if rrSnapshot.ID == uuid.Nil {
 		t.Error("ReporterResource snapshot should have valid ID")
@@ -173,10 +170,7 @@ func TestIndividualSnapshotMethods(t *testing.T) {
 		t.Fatalf("Failed to create ReporterDataRepresentation: %v", err)
 	}
 
-	dataSnapshot, err := dataRep.CreateSnapshot()
-	if err != nil {
-		t.Fatalf("Failed to create ReporterDataRepresentation snapshot: %v", err)
-	}
+	dataSnapshot := dataRep.Serialize()
 
 	if dataSnapshot.ReporterResourceID == "" {
 		t.Error("ReporterDataRepresentation snapshot should have valid ReporterResourceID")
@@ -194,10 +188,7 @@ func TestIndividualSnapshotMethods(t *testing.T) {
 		t.Fatalf("Failed to create ReporterDeleteRepresentation: %v", err)
 	}
 
-	deleteSnapshot, err := deleteRep.CreateSnapshot()
-	if err != nil {
-		t.Fatalf("Failed to create ReporterDeleteRepresentation snapshot: %v", err)
-	}
+	deleteSnapshot := deleteRep.Serialize()
 
 	if deleteSnapshot.ReporterResourceID == "" {
 		t.Error("ReporterDeleteRepresentation snapshot should have valid ReporterResourceID")

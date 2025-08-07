@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/go-kratos/kratos/v2/log"
 	"github.com/project-kessel/inventory-api/internal"
 
 	"github.com/google/uuid"
@@ -27,27 +28,29 @@ func NewResourceEvent(
 	reporterInstanceId ReporterInstanceId,
 	reporterData Representation,
 	reporterResourceID ReporterResourceId,
-	reporterVersion Version,
+	representationVersion Version,
 	reporterGeneration Generation,
 	commonData Representation,
 	commonVersion Version,
-	reporterVersionVal *ReporterVersion,
+	reporterVersion *ReporterVersion,
 ) (ResourceEvent, error) {
 	reporterId := NewReporterId(reporterType, reporterInstanceId)
 
 	reporterRep, err := NewReporterDataRepresentation(
 		reporterResourceID,
-		reporterVersion,
+		representationVersion,
 		reporterGeneration,
 		reporterData,
 		commonVersion,
-		reporterVersionVal,
+		reporterVersion,
 	)
 	if err != nil {
 		return ResourceEvent{}, fmt.Errorf("ResourceEvent invalid reporter representation: %w", err)
 	}
 
 	reporterRepresentation := reporterRep.ReporterRepresentation
+
+	log.Infof("Reporter Representation : %+v", reporterRepresentation)
 
 	commonRepresentation, err := NewCommonRepresentation(
 		resourceId,
@@ -130,18 +133,10 @@ func (re ResourceEvent) WorkspaceId() string {
 	return ""
 }
 
-func (re ResourceEvent) SerializeReporterRepresentation() ReporterRepresentationSnapshot {
-	return re.reporterRepresentation.Serialize()
-}
-
-func (re ResourceEvent) SerializeCommonRepresentation() CommonRepresentationSnapshot {
-	return re.commonRepresentation.Serialize()
-}
-
 // DeserializeResourceEvent creates a ResourceEvent from representation snapshots - direct initialization without validation
 func DeserializeResourceEvent(
-	reporterRepresentationSnapshot ReporterRepresentationSnapshot,
-	commonRepresentationSnapshot CommonRepresentationSnapshot,
+	reporterRepresentationSnapshot *ReporterRepresentationSnapshot,
+	commonRepresentationSnapshot *CommonRepresentationSnapshot,
 ) ResourceEvent {
 	// Create domain tiny types directly from snapshot values
 	resourceId := ResourceId(commonRepresentationSnapshot.ResourceId)
@@ -167,7 +162,7 @@ func DeserializeResourceEvent(
 		resourceType:           resourceType,
 		reporterId:             reporterId,
 		reporterResource:       reporterResource,
-		reporterRepresentation: reporterRepresentation,
+		reporterRepresentation: *reporterRepresentation,
 		commonRepresentation:   commonRepresentation,
 		createdAt:              commonRepresentationSnapshot.CreatedAt,
 		updatedAt:              commonRepresentationSnapshot.CreatedAt, // TODO: Add UpdatedAt to snapshots if needed

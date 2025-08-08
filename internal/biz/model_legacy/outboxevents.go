@@ -81,12 +81,12 @@ type EventResourceLabel struct {
 }
 
 type EventResourceReporter struct {
-	ReporterInstanceId string `json:"reporter_instance_id"`
-	ReporterType       string `json:"reporter_type"`
-	ConsoleHref        string `json:"console_href"`
-	ApiHref            string `json:"api_href"`
-	LocalResourceId    string `json:"local_resource_id"`
-	ReporterVersion    string `json:"reporter_version"`
+	ReporterInstanceId string  `json:"reporter_instance_id"`
+	ReporterType       string  `json:"reporter_type"`
+	ConsoleHref        string  `json:"console_href"`
+	ApiHref            string  `json:"api_href"`
+	LocalResourceId    string  `json:"local_resource_id"`
+	ReporterVersion    *string `json:"reporter_version"`
 }
 
 type EventRelationshipMetadata struct {
@@ -150,11 +150,11 @@ func newResourceEvent(operationType EventOperationType, resourceEvent *bizmodel.
 			},
 			ReporterData: EventResourceReporter{
 				ReporterInstanceId: resourceEvent.ReporterInstanceId(),
-				ReporterType:       resourceEvent.ReporterType(), //nolint:staticcheck
+				ReporterType:       resourceEvent.ReporterType(),
 				ConsoleHref:        resourceEvent.ConsoleHref(),
 				ApiHref:            resourceEvent.ApiHref(),
 				LocalResourceId:    resourceEvent.LocalResourceId(),
-				ReporterVersion:    "", //*resourceEvent.ReporterVersion(), //nolint:staticcheck
+				ReporterVersion:    resourceEvent.ReporterVersion(), //nolint:staticcheck
 			},
 			ResourceData: resourceEvent.Data(),
 		},
@@ -338,7 +338,7 @@ func newResourceEventLegacy(operationType EventOperationType, resource *Resource
 				ConsoleHref:        resource.ConsoleHref,
 				ApiHref:            resource.ApiHref,
 				LocalResourceId:    resource.ReporterResourceId,
-				ReporterVersion:    resource.Reporter.ReporterVersion, //nolint:staticcheck
+				ReporterVersion:    &resource.Reporter.ReporterVersion, //nolint:staticcheck
 			},
 			ResourceData: resource.ResourceData,
 		},

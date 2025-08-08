@@ -5,13 +5,14 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/project-kessel/inventory-api/internal"
 	"gorm.io/gorm"
 )
 
 type RelationshipHistory struct {
 	ID               uuid.UUID `gorm:"type:uuid;primarykey"`
 	OrgId            string    `gorm:"index"`
-	RelationshipData JsonObject
+	RelationshipData internal.JsonObject
 	RelationshipType string
 	SubjectId        uuid.UUID `gorm:"type:uuid;index"`
 	ObjectId         uuid.UUID `gorm:"type:uuid;index"`

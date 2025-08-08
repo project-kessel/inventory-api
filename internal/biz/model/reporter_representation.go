@@ -2,6 +2,10 @@ package model
 
 import (
 	"fmt"
+	"time"
+
+	"github.com/google/uuid"
+	"github.com/project-kessel/inventory-api/internal"
 )
 
 type ReporterRepresentation struct {
@@ -14,94 +18,129 @@ type ReporterRepresentation struct {
 	tombstone          Tombstone
 }
 
-type ReporterDataRepresentation interface {
-	Data() JsonObject
-	IsTombstone() bool
+type ReporterDataRepresentation struct {
+	ReporterRepresentation
 }
 
-type ReporterDeleteRepresentation interface {
+type ReporterDeleteRepresentation struct {
+	ReporterRepresentation
 }
 
-func (r ReporterRepresentation) Data() JsonObject {
-	if r.tombstone.Bool() {
-		return nil
+func NewReporterDataRepresentation(
+	reporterResourceID ReporterResourceId,
+	version Version,
+	generation Generation,
+	data Representation,
+	commonVersion Version,
+	reporterVersion *ReporterVersion,
+) (ReporterDataRepresentation, error) {
+
+	if reporterResourceID.UUID() == uuid.Nil {
+		return ReporterDataRepresentation{}, fmt.Errorf("%w: ReporterResourceId", ErrInvalidUUID)
 	}
-	return r.data
+
+	if len(data) == 0 {
+		return ReporterDataRepresentation{}, fmt.Errorf("%w: ReporterDataRepresentation data", ErrInvalidData)
+	}
+
+	return ReporterDataRepresentation{
+		ReporterRepresentation: ReporterRepresentation{
+			Representation:     data,
+			reporterResourceID: reporterResourceID,
+			version:            version,
+			generation:         generation,
+			commonVersion:      commonVersion,
+			reporterVersion:    reporterVersion,
+			tombstone:          NewTombstone(false),
+		},
+	}, nil
+}
+
+func NewReporterDeleteRepresentation(
+	reporterResourceID ReporterResourceId,
+	version Version,
+	generation Generation,
+	commonVersion Version,
+	reporterVersion *ReporterVersion,
+) (ReporterDeleteRepresentation, error) {
+	if reporterResourceID.UUID() == uuid.Nil {
+		return ReporterDeleteRepresentation{}, fmt.Errorf("%w: ReporterResourceId", ErrInvalidUUID)
+	}
+
+	return ReporterDeleteRepresentation{
+		ReporterRepresentation: ReporterRepresentation{
+			Representation:     Representation(nil),
+			reporterResourceID: reporterResourceID,
+			version:            version,
+			generation:         generation,
+			commonVersion:      commonVersion,
+			reporterVersion:    reporterVersion,
+			tombstone:          NewTombstone(true),
+		},
+	}, nil
+}
+
+func (r ReporterRepresentation) Data() internal.JsonObject {
+	return r.Representation.Data()
 }
 
 func (r ReporterRepresentation) IsTombstone() bool {
 	return r.tombstone.Bool()
 }
 
-func NewReporterDataRepresentation(
-	data JsonObject,
-	reporterResourceIDVal string,
-	version uint,
-	generation uint,
-	commonVersion uint,
-	reporterVersionVal *string,
-) (ReporterDataRepresentation, error) {
-	if len(data) == 0 {
-		return nil, fmt.Errorf("%w: ReporterDataRepresentation data", ErrInvalidData)
+func (rr ReporterRepresentation) Serialize() ReporterRepresentationSnapshot {
+	var reporterVersionStr *string
+	if rr.reporterVersion != nil {
+		versionStr := rr.reporterVersion.Serialize()
+		reporterVersionStr = &versionStr
 	}
 
-	reporterResourceID, err := NewReporterResourceIdFromString(reporterResourceIDVal)
-	if err != nil {
-		return nil, err
+	// Create representation snapshot
+	representationSnapshot := RepresentationSnapshot{
+		Data: rr.Representation.Serialize(),
 	}
 
-	var reporterVersion *ReporterVersion
-	if reporterVersionVal != nil {
-		rv, err := NewReporterVersion(*reporterVersionVal)
-		if err != nil {
-			return nil, err
-		}
-		reporterVersion = &rv
+	// Create ReporterRepresentation snapshot - direct initialization without validation
+	return ReporterRepresentationSnapshot{
+		Representation:     representationSnapshot,
+		ReporterResourceID: rr.reporterResourceID.Serialize(),
+		Version:            rr.version.Serialize(),
+		Generation:         rr.generation.Serialize(),
+		ReporterVersion:    reporterVersionStr,
+		CommonVersion:      rr.commonVersion.Serialize(),
+		Tombstone:          rr.tombstone.Serialize(),
+		CreatedAt:          time.Now(), // TODO: Add proper timestamp from domain entity if available
 	}
-
-	return ReporterRepresentation{
-		Representation: Representation{
-			data: data,
-		},
-		reporterResourceID: reporterResourceID,
-		version:            NewVersion(version),
-		generation:         NewGeneration(generation),
-		commonVersion:      NewVersion(commonVersion),
-		reporterVersion:    reporterVersion,
-		tombstone:          NewTombstone(false),
-	}, nil
 }
 
-func NewReporterDeleteRepresentation(
-	reporterResourceIDVal string,
-	version uint,
-	generation uint,
-	commonVersion uint,
-	reporterVersionVal *string,
-) (ReporterDeleteRepresentation, error) {
-	reporterResourceID, err := NewReporterResourceIdFromString(reporterResourceIDVal)
-	if err != nil {
-		return nil, err
+// DeserializeReporterDataRepresentation creates a ReporterRepresentation from snapshot - direct initialization without validation
+func DeserializeReporterDataRepresentation(snapshot *ReporterRepresentationSnapshot) *ReporterDataRepresentation {
+	if snapshot == nil {
+		return nil
 	}
+	// Create domain tiny types directly from snapshot values
+	reporterResourceId := DeserializeReporterResourceId(snapshot.ReporterResourceID)
+	representation := DeserializeRepresentation(snapshot.Representation.Data)
+	version := DeserializeVersion(snapshot.Version)
+	generation := DeserializeGeneration(snapshot.Generation)
+	commonVersion := DeserializeVersion(snapshot.CommonVersion)
+	tombstone := DeserializeTombstone(snapshot.Tombstone)
 
 	var reporterVersion *ReporterVersion
-	if reporterVersionVal != nil {
-		rv, err := NewReporterVersion(*reporterVersionVal)
-		if err != nil {
-			return nil, err
-		}
+	if snapshot.ReporterVersion != nil {
+		rv := DeserializeReporterVersion(*snapshot.ReporterVersion)
 		reporterVersion = &rv
 	}
 
-	return ReporterRepresentation{
-		Representation: Representation{
-			data: nil,
+	return &ReporterDataRepresentation{
+		ReporterRepresentation{
+			Representation:     representation,
+			reporterResourceID: reporterResourceId,
+			version:            version,
+			generation:         generation,
+			commonVersion:      commonVersion,
+			reporterVersion:    reporterVersion,
+			tombstone:          tombstone,
 		},
-		reporterResourceID: reporterResourceID,
-		version:            NewVersion(version),
-		generation:         NewGeneration(generation),
-		commonVersion:      NewVersion(commonVersion),
-		reporterVersion:    reporterVersion,
-		tombstone:          NewTombstone(true),
-	}, nil
+	}
 }

@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/project-kessel/inventory-api/internal"
 )
 
@@ -43,7 +44,7 @@ func TestReporterRepresentation_Structure(t *testing.T) {
 		rrType := reflect.TypeOf(rr)
 
 		expectedFields := map[string]reflect.Type{
-			"ReporterResourceID": reflect.TypeOf(""),
+			"ReporterResourceID": reflect.TypeOf(uuid.UUID{}),
 			"Version":            reflect.TypeOf(uint(0)),
 			"Generation":         reflect.TypeOf(uint(0)),
 			"CommonVersion":      reflect.TypeOf(uint(0)),
@@ -157,19 +158,19 @@ func TestReporterRepresentation_Structure(t *testing.T) {
 
 		rrType := reflect.TypeOf(ReporterRepresentation{})
 
-		// Check non-nullable string fields
-		nonNullableStringFields := []string{"ReporterResourceID"}
+		// Check UUID fields
+		uuidFields := []string{"ReporterResourceID"}
 
-		for _, fieldName := range nonNullableStringFields {
+		for _, fieldName := range uuidFields {
 			field, found := rrType.FieldByName(fieldName)
 			if !found {
 				t.Errorf("Field %s not found", fieldName)
 				continue
 			}
 
-			// Check if it's a string type (not pointer)
-			if field.Type.Kind() != reflect.String {
-				t.Errorf("Field %s should be a string type, got: %v", fieldName, field.Type)
+			// Check if it's a UUID type
+			if field.Type != reflect.TypeOf(uuid.UUID{}) {
+				t.Errorf("Field %s should be a UUID type, got: %v", fieldName, field.Type)
 			}
 		}
 
@@ -202,7 +203,7 @@ func TestReporterRepresentation_EdgeCases(t *testing.T) {
 				"name":        "测试资源",
 				"description": "包含Unicode字符的描述 🌟",
 			},
-			"测试-reporter-resource-🌟",
+			uuid.MustParse("550e8400-e29b-41d4-a716-446655440010"),
 			1,
 			1,
 			1,
@@ -219,7 +220,7 @@ func TestReporterRepresentation_EdgeCases(t *testing.T) {
 			internal.JsonObject{
 				"special_field": "Value with special chars: !@#$%^&*()_+-=[]{}|;':\",./<>?",
 			},
-			"reporter-resource-with-special-chars-!@#$%^&*()",
+			uuid.MustParse("550e8400-e29b-41d4-a716-446655440011"),
 			1,
 			1,
 			1,
@@ -234,7 +235,7 @@ func TestReporterRepresentation_EdgeCases(t *testing.T) {
 
 		_, err := NewReporterRepresentation(
 			internal.JsonObject{"test": "data"},
-			"test-reporter-resource-id",
+			uuid.MustParse("550e8400-e29b-41d4-a716-446655440012"),
 			4294967295, // Max uint32 Version
 			4294967295, // Max uint32 Generation
 			4294967295, // Max uint32 CommonVersion
@@ -249,7 +250,7 @@ func TestReporterRepresentation_EdgeCases(t *testing.T) {
 
 		_, err := NewReporterRepresentation(
 			internal.JsonObject{"test": "data"},
-			"test-reporter-resource-id",
+			uuid.MustParse("550e8400-e29b-41d4-a716-446655440012"),
 			1,
 			1,
 			1,
@@ -264,7 +265,7 @@ func TestReporterRepresentation_EdgeCases(t *testing.T) {
 
 		_, err := NewReporterRepresentation(
 			internal.JsonObject{"test": "data"},
-			"test-reporter-resource-id",
+			uuid.MustParse("550e8400-e29b-41d4-a716-446655440012"),
 			1,
 			1,
 			1,
@@ -314,7 +315,7 @@ func TestReporterRepresentation_EdgeCases(t *testing.T) {
 
 		_, err := NewReporterRepresentation(
 			complexData,
-			"test-reporter-resource-id",
+			uuid.MustParse("550e8400-e29b-41d4-a716-446655440012"),
 			1,
 			1,
 			1,
@@ -329,7 +330,7 @@ func TestReporterRepresentation_EdgeCases(t *testing.T) {
 
 		_, err := NewReporterRepresentation(
 			internal.JsonObject{},
-			"test-reporter-resource-id",
+			uuid.MustParse("550e8400-e29b-41d4-a716-446655440012"),
 			1,
 			1,
 			1,
@@ -358,7 +359,7 @@ func TestReporterRepresentation_EdgeCases(t *testing.T) {
 				t.Parallel()
 				_, err := NewReporterRepresentation(
 					internal.JsonObject{"test": "data"},
-					"test-reporter-resource-id",
+					uuid.MustParse("550e8400-e29b-41d4-a716-446655440012"),
 					tc.version,
 					1,
 					1,
@@ -393,7 +394,7 @@ func TestReporterRepresentation_EdgeCases(t *testing.T) {
 				t.Parallel()
 				_, err := NewReporterRepresentation(
 					internal.JsonObject{"test": "data"},
-					"test-reporter-resource-id",
+					uuid.MustParse("550e8400-e29b-41d4-a716-446655440012"),
 					1,
 					tc.generation,
 					1,
@@ -425,7 +426,7 @@ func TestReporterRepresentation_EdgeCases(t *testing.T) {
 				t.Parallel()
 				rr, err := NewReporterRepresentation(
 					internal.JsonObject{"test": "data"},
-					"test-reporter-resource-id",
+					uuid.MustParse("550e8400-e29b-41d4-a716-446655440012"),
 					1,
 					1,
 					1,
@@ -517,7 +518,7 @@ func TestReporterRepresentation_Serialization(t *testing.T) {
 
 		fixture := NewTestFixture(t)
 		rr := fixture.ValidReporterRepresentation()
-		rr.ReporterResourceID = "测试-reporter-resource-🌟"
+		rr.ReporterResourceID = uuid.MustParse("550e8400-e29b-41d4-a716-446655440020")
 		rr.Data = internal.JsonObject{
 			"name":        "测试资源",
 			"description": "包含Unicode字符的描述 🌟",
@@ -548,7 +549,7 @@ func TestReporterRepresentation_Serialization(t *testing.T) {
 
 		fixture := NewTestFixture(t)
 		rr := fixture.ValidReporterRepresentation()
-		rr.ReporterResourceID = "reporter-resource-with-special-chars-!@#$%^&*()"
+		rr.ReporterResourceID = uuid.MustParse("550e8400-e29b-41d4-a716-446655440021")
 		rr.Data = internal.JsonObject{
 			"special_field": "Value with special chars: !@#$%^&*()_+-=[]{}|;':\",./<>?",
 		}

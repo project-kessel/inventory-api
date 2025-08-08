@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
-
 	"github.com/project-kessel/inventory-api/internal"
 )
 
@@ -334,9 +333,7 @@ type ConsoleHref string
 
 func NewConsoleHref(href string) (ConsoleHref, error) {
 	href = strings.TrimSpace(href)
-	if href == "" {
-		return ConsoleHref(""), fmt.Errorf("%w: ConsoleHref", ErrEmpty)
-	}
+	// ConsoleHref can be empty (optional field)
 	return ConsoleHref(href), nil
 }
 
@@ -366,9 +363,26 @@ func (lr LocalResourceId) Serialize() string {
 	return SerializeString(lr)
 }
 
-// JsonObject is an alias to internal.JsonObject for consistency
-type JsonObject = internal.JsonObject
+type Representation internal.JsonObject
 
-type Representation struct {
-	data JsonObject
+func NewRepresentation(data internal.JsonObject) (Representation, error) {
+	if data == nil {
+		return nil, fmt.Errorf("representation data cannot be nil")
+	}
+	if len(data) == 0 {
+		return nil, fmt.Errorf("representation data cannot be empty")
+	}
+	return Representation(data), nil
+}
+
+func (r Representation) Data() internal.JsonObject {
+	return internal.JsonObject(r)
+}
+
+func (r Representation) Serialize() internal.JsonObject {
+	return internal.JsonObject(r)
+}
+
+func DeserializeRepresentation(data internal.JsonObject) Representation {
+	return Representation(data)
 }

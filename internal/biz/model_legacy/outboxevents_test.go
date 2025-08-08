@@ -198,7 +198,11 @@ func assertResourceEvent(t *testing.T, operation eventOperationType, resource *R
 	assert.Equal(t, resource.ConsoleHref, data.ReporterData.ConsoleHref)
 	assert.Equal(t, resource.ApiHref, data.ReporterData.ApiHref)
 	assert.Equal(t, resource.ReporterResourceId, data.ReporterData.LocalResourceId)
-	assert.Equal(t, resource.Reporter.ReporterVersion, data.ReporterData.ReporterVersion)
+	if data.ReporterData.ReporterVersion != nil {
+		assert.Equal(t, resource.Reporter.ReporterVersion, *data.ReporterData.ReporterVersion)
+	} else {
+		assert.Equal(t, "", resource.Reporter.ReporterVersion)
+	}
 	assert.Equal(t, resource.ResourceData, data.ResourceData)
 
 }

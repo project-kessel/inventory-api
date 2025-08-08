@@ -332,10 +332,10 @@ func (f *TestFixture) ValidReporterRepresentation() *ReporterRepresentation {
 			"insights_inventory_id":   "05707922-7b0a-4fe6-982d-6adbc7695b8f",
 			"ansible_host":            "host-1",
 		},
-		"dd1b73b9-3e33-4264-968c-e3ce55b9afec", // reporterResourceID
-		1,                                      // version
-		1,                                      // generation
-		1,                                      // commonVersion
+		uuid.MustParse("dd1b73b9-3e33-4264-968c-e3ce55b9afec"), // reporterResourceID
+		1, // version
+		1, // generation
+		1, // commonVersion
 		false,
 		internal.StringPtr("2.7.16"),
 	)
@@ -347,6 +347,10 @@ func (f *TestFixture) ValidReporterRepresentation() *ReporterRepresentation {
 
 // ReporterRepresentationWithLocalResourceID returns a ReporterRepresentation with specified local resource ID
 func (f *TestFixture) ReporterRepresentationWithLocalResourceID(localResourceID string) (*ReporterRepresentation, error) {
+	reporterResourceUUID, err := uuid.Parse(localResourceID)
+	if err != nil {
+		return nil, err
+	}
 	rr, err := NewReporterRepresentation(
 		internal.JsonObject{
 			"satellite_id":            "2c4196f1-0371-4f4c-8913-e113cfaa6e67",
@@ -354,7 +358,7 @@ func (f *TestFixture) ReporterRepresentationWithLocalResourceID(localResourceID 
 			"insights_inventory_id":   "05707922-7b0a-4fe6-982d-6adbc7695b8f",
 			"ansible_host":            "host-1",
 		},
-		localResourceID,
+		reporterResourceUUID,
 		1,
 		1,
 		1,
@@ -376,7 +380,7 @@ func (f *TestFixture) ReporterRepresentationWithResourceType(resourceType string
 			"insights_inventory_id":   "05707922-7b0a-4fe6-982d-6adbc7695b8f",
 			"ansible_host":            "host-1",
 		},
-		"dd1b73b9-3e33-4264-968c-e3ce55b9afec",
+		uuid.MustParse("dd1b73b9-3e33-4264-968c-e3ce55b9afec"),
 		1,
 		1,
 		1,
@@ -417,7 +421,7 @@ func (f *TestFixture) ReporterRepresentationWithTombstone(tombstone bool) *Repor
 
 	rr, err := NewReporterRepresentation(
 		data,
-		"test-res-id",
+		uuid.MustParse("550e8400-e29b-41d4-a716-446655440001"),
 		1,
 		1,
 		1,
@@ -434,7 +438,7 @@ func (f *TestFixture) ReporterRepresentationWithTombstone(tombstone bool) *Repor
 func (f *TestFixture) ReporterRepresentationWithReporterVersion(ver *string) *ReporterRepresentation {
 	rr, err := NewReporterRepresentation(
 		internal.JsonObject{"test": "data"},
-		"res-id",
+		uuid.MustParse("550e8400-e29b-41d4-a716-446655440002"),
 		2,
 		0,
 		1,
@@ -451,7 +455,7 @@ func (f *TestFixture) ReporterRepresentationWithReporterVersion(ver *string) *Re
 func (f *TestFixture) ReporterRepresentationWithNilReporterVersion() *ReporterRepresentation {
 	rr, err := NewReporterRepresentation(
 		internal.JsonObject{"test": "data"},
-		"res-id",
+		uuid.MustParse("550e8400-e29b-41d4-a716-446655440003"),
 		1,
 		1,
 		1,

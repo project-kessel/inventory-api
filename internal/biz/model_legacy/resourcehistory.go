@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/project-kessel/inventory-api/internal"
 	"gorm.io/gorm"
 	"gorm.io/gorm/schema"
 )
@@ -12,7 +13,7 @@ import (
 type ResourceHistory struct {
 	ID           uuid.UUID `gorm:"type:uuid;primarykey"`
 	OrgId        string    `gorm:"index"`
-	ResourceData JsonObject
+	ResourceData internal.JsonObject
 	ResourceType string
 	WorkspaceId  string
 	Reporter     ResourceReporter

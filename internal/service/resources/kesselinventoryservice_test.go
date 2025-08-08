@@ -13,6 +13,8 @@ import (
 	relationsV1beta1 "github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
 	"google.golang.org/protobuf/types/known/structpb"
 
+	"github.com/project-kessel/inventory-api/internal/data"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"gorm.io/gorm"
@@ -98,7 +100,7 @@ func TestRequestToResource_Error_MissingReporterType(t *testing.T) {
 
 	assert.Error(t, err)
 	assert.Nil(t, resource)
-	assert.Contains(t, err.Error(), "reporterType")
+	assert.Contains(t, err.Error(), "cannot be empty: ReporterType")
 }
 
 func TestRequestToResource_Error_MissingReporterInstanceId(t *testing.T) {
@@ -119,7 +121,7 @@ func TestRequestToResource_Error_MissingReporterInstanceId(t *testing.T) {
 
 	assert.Error(t, err)
 	assert.Nil(t, resource)
-	assert.Contains(t, err.Error(), "reporterInstanceId")
+	assert.Contains(t, err.Error(), "cannot be empty: ReporterInstanceId")
 }
 
 func TestInventoryService_ReportResource_MissingReporterType(t *testing.T) {
@@ -143,9 +145,18 @@ func TestInventoryService_ReportResource_MissingReporterType(t *testing.T) {
 		},
 	}
 
-	uc := &usecase.Usecase{
-		Log: krlog.NewHelper(krlog.NewStdLogger(io.Discard)),
-	}
+	uc := usecase.New(
+		data.NewFakeResourceRepository(),
+		nil, // LegacyReporterResourceRepository
+		nil, // inventoryResourceRepository
+		nil, // Authz
+		nil, // Eventer
+		"",  // Namespace
+		krlog.NewStdLogger(io.Discard),
+		nil, // ListenManager
+		nil, // waitForNotifBreaker
+		nil, // Config
+	)
 	service := svc.NewKesselInventoryServiceV1beta2(uc)
 
 	resp, err := service.ReportResource(ctx, req)
@@ -175,16 +186,25 @@ func TestInventoryService_ReportResource_MissingReporterInstanceId(t *testing.T)
 		},
 	}
 
-	uc := &usecase.Usecase{
-		Log: krlog.NewHelper(krlog.NewStdLogger(io.Discard)),
-	}
+	uc := usecase.New(
+		data.NewFakeResourceRepository(),
+		nil, // LegacyReporterResourceRepository
+		nil, // inventoryResourceRepository
+		nil, // Authz
+		nil, // Eventer
+		"",  // Namespace
+		krlog.NewStdLogger(io.Discard),
+		nil, // ListenManager
+		nil, // waitForNotifBreaker
+		nil, // Config
+	)
 	service := svc.NewKesselInventoryServiceV1beta2(uc)
 
 	resp, err := service.ReportResource(ctx, req)
 
 	assert.Error(t, err)
 	assert.Nil(t, resp)
-	assert.Contains(t, err.Error(), "reporterInstanceId")
+	assert.Contains(t, err.Error(), "cannot be empty: ReporterInstanceId")
 }
 
 func TestInventoryService_ReportResource_InvalidJsonObject(t *testing.T) {
@@ -210,9 +230,18 @@ func TestInventoryService_ReportResource_InvalidJsonObject(t *testing.T) {
 		},
 	}
 
-	uc := &usecase.Usecase{
-		Log: krlog.NewHelper(krlog.NewStdLogger(io.Discard)),
-	}
+	uc := usecase.New(
+		data.NewFakeResourceRepository(),
+		nil, // LegacyReporterResourceRepository
+		nil, // inventoryResourceRepository
+		nil, // Authz
+		nil, // Eventer
+		"",  // Namespace
+		krlog.NewStdLogger(io.Discard),
+		nil, // ListenManager
+		nil, // waitForNotifBreaker
+		nil, // Config
+	)
 
 	service := svc.NewKesselInventoryServiceV1beta2(uc)
 
@@ -245,9 +274,18 @@ func TestInventoryService_ReportResource_InvalidInventoryId(t *testing.T) {
 		},
 	}
 
-	uc := &usecase.Usecase{
-		Log: krlog.NewHelper(krlog.NewStdLogger(io.Discard)),
-	}
+	uc := usecase.New(
+		data.NewFakeResourceRepository(),
+		nil, // LegacyReporterResourceRepository
+		nil, // inventoryResourceRepository
+		nil, // Authz
+		nil, // Eventer
+		"",  // Namespace
+		krlog.NewStdLogger(io.Discard),
+		nil, // ListenManager
+		nil, // waitForNotifBreaker
+		nil, // Config
+	)
 	service := svc.NewKesselInventoryServiceV1beta2(uc)
 
 	resp, err := service.ReportResource(ctx, req)
@@ -298,10 +336,10 @@ func TestInventoryService_DeleteResource_Success(t *testing.T) {
 
 	cfg := &usecase.UsecaseConfig{}
 	uc := &usecase.Usecase{
-		ReporterResourceRepository: mockRepo,
-		Config:                     cfg,
-		Namespace:                  "rbac",
-		Log:                        krlog.NewHelper(krlog.NewStdLogger(io.Discard)),
+		LegacyReporterResourceRepository: mockRepo,
+		Config:                           cfg,
+		Namespace:                        "rbac",
+		Log:                              krlog.NewHelper(krlog.NewStdLogger(io.Discard)),
 	}
 
 	service := svc.NewKesselInventoryServiceV1beta2(uc)
@@ -384,10 +422,10 @@ func TestInventoryService_DeleteResource_ResourceNotFound(t *testing.T) {
 
 	cfg := &usecase.UsecaseConfig{}
 	uc := &usecase.Usecase{
-		ReporterResourceRepository: mockRepo,
-		Config:                     cfg,
-		Namespace:                  "rbac",
-		Log:                        krlog.NewHelper(krlog.NewStdLogger(io.Discard)),
+		LegacyReporterResourceRepository: mockRepo,
+		Config:                           cfg,
+		Namespace:                        "rbac",
+		Log:                              krlog.NewHelper(krlog.NewStdLogger(io.Discard)),
 	}
 
 	service := svc.NewKesselInventoryServiceV1beta2(uc)
@@ -445,10 +483,10 @@ func TestInventoryService_Check_Allowed(t *testing.T) {
 
 	cfg := &usecase.UsecaseConfig{}
 	uc := &usecase.Usecase{
-		Authz:                      mockAuthz,
-		ReporterResourceRepository: mockRepo,
-		Namespace:                  "rbac",
-		Config:                     cfg,
+		Authz:                            mockAuthz,
+		LegacyReporterResourceRepository: mockRepo,
+		Namespace:                        "rbac",
+		Config:                           cfg,
 	}
 
 	service := svc.NewKesselInventoryServiceV1beta2(uc)
@@ -503,10 +541,10 @@ func TestInventoryService_CheckForUpdate_Allowed(t *testing.T) {
 
 	cfg := &usecase.UsecaseConfig{}
 	uc := &usecase.Usecase{
-		Authz:                      mockAuthz,
-		ReporterResourceRepository: mockRepo,
-		Namespace:                  "rbac",
-		Config:                     cfg,
+		Authz:                            mockAuthz,
+		LegacyReporterResourceRepository: mockRepo,
+		Namespace:                        "rbac",
+		Config:                           cfg,
 	}
 
 	service := svc.NewKesselInventoryServiceV1beta2(uc)
@@ -561,10 +599,10 @@ func TestInventoryService_Check_Denied(t *testing.T) {
 
 	cfg := &usecase.UsecaseConfig{}
 	uc := &usecase.Usecase{
-		Authz:                      mockAuthz,
-		ReporterResourceRepository: mockRepo,
-		Namespace:                  "rbac",
-		Config:                     cfg,
+		Authz:                            mockAuthz,
+		LegacyReporterResourceRepository: mockRepo,
+		Namespace:                        "rbac",
+		Config:                           cfg,
 	}
 
 	service := svc.NewKesselInventoryServiceV1beta2(uc)
@@ -619,10 +657,10 @@ func TestInventoryService_CheckForUpdate_Denied(t *testing.T) {
 
 	cfg := &usecase.UsecaseConfig{}
 	uc := &usecase.Usecase{
-		Authz:                      mockAuthz,
-		ReporterResourceRepository: mockRepo,
-		Namespace:                  "rbac",
-		Config:                     cfg,
+		Authz:                            mockAuthz,
+		LegacyReporterResourceRepository: mockRepo,
+		Namespace:                        "rbac",
+		Config:                           cfg,
 	}
 
 	service := svc.NewKesselInventoryServiceV1beta2(uc)

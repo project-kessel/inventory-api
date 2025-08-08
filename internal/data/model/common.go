@@ -2,9 +2,10 @@ package model
 
 // Field size constraints for GORM models
 const (
-	MaxFieldSize128 = 128
-	MaxFieldSize256 = 256
-	MaxFieldSize512 = 512
+	MaxFieldSize128  = 128
+	MaxFieldSize256  = 256
+	MaxFieldSize512  = 512
+	MaxFieldSize1024 = 1024
 
 	MaxLocalResourceIDLength    = MaxFieldSize128
 	MaxReporterTypeLength       = MaxFieldSize128
@@ -13,6 +14,7 @@ const (
 	MaxReporterVersionLength    = MaxFieldSize128
 	MaxAPIHrefLength            = MaxFieldSize512
 	MaxConsoleHrefLength        = MaxFieldSize512
+	MaxConsistencyTokenLength   = MaxFieldSize1024
 
 	MinVersionValue    = 0
 	MinGenerationValue = 0

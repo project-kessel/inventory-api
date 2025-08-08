@@ -107,6 +107,7 @@ func (uc *Usecase) ReportResource(ctx context.Context, request *v1beta2.ReportRe
 	if err != nil {
 		return err
 	}
+
 	readAfterWriteEnabled := computeReadAfterWrite(uc, request.WriteVisibility, reporterPrincipal)
 	if readAfterWriteEnabled && uc.Config.ConsumerEnabled {
 		subscription = uc.ListenManager.Subscribe(txidStr)

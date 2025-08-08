@@ -154,22 +154,22 @@ func newResourceEvent(operationType EventOperationType, resourceEvent *bizmodel.
 				ConsoleHref:        resourceEvent.ConsoleHref(),
 				ApiHref:            resourceEvent.ApiHref(),
 				LocalResourceId:    resourceEvent.LocalResourceId(),
-				ReporterVersion:    *resourceEvent.ReporterVersion(), //nolint:staticcheck
+				ReporterVersion:    "", //*resourceEvent.ReporterVersion(), //nolint:staticcheck
 			},
 			ResourceData: resourceEvent.Data(),
 		},
 	}, nil
 }
 
-func convertResourceToResourceEvent(resourceEvent bizmodel.ResourceReportEvent, operationType EventOperationType) (internal.JsonObject, error) {
+func convertResourceToResourceEvent(resourceReportEvent bizmodel.ResourceReportEvent, operationType EventOperationType) (internal.JsonObject, error) {
 	payload := internal.JsonObject{}
 
-	resourceEvent1, err := newResourceEvent(operationType, &resourceEvent)
+	resourceEvent, err := newResourceEvent(operationType, &resourceReportEvent)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create resource event: %w", err)
 	}
 
-	marshalledJson, err := json.Marshal(resourceEvent1)
+	marshalledJson, err := json.Marshal(resourceEvent)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal resource to json: %w", err)
 	}

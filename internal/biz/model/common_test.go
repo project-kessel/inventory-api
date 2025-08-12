@@ -593,41 +593,34 @@ func TestReporterVersion_Initialization(t *testing.T) {
 	})
 }
 
-func TestApiHref_Initialization(t *testing.T) {
+func TestURI_Initialization(t *testing.T) {
 	t.Parallel()
-	fixture := NewApiHrefTestFixture()
 
-	t.Run("should create api href with valid href", func(t *testing.T) {
+	t.Run("should create URI with valid values", func(t *testing.T) {
 		t.Parallel()
 
-		apiHref, err := NewApiHref(fixture.ValidHref)
-
-		if err != nil {
-			t.Errorf("Expected no error, got %v", err)
+		testCases := []string{
+			"/api/v1/resources/123",
+			"/console/resources/456",
+			"https://api.example.com/resource/123",
+			"https://console.example.com/resource/456",
 		}
-		if apiHref.String() != fixture.ValidHref {
-			t.Errorf("Expected api href %s, got %s", fixture.ValidHref, apiHref.String())
-		}
-	})
 
-	t.Run("should create api href with another valid href", func(t *testing.T) {
-		t.Parallel()
-
-		apiHref, err := NewApiHref(fixture.AnotherHref)
-
-		if err != nil {
-			t.Errorf("Expected no error, got %v", err)
-		}
-		if apiHref.String() != fixture.AnotherHref {
-			t.Errorf("Expected api href %s, got %s", fixture.AnotherHref, apiHref.String())
+		for _, validURI := range testCases {
+			uri, err := NewURI(validURI)
+			if err != nil {
+				t.Errorf("Expected no error for %s, got %v", validURI, err)
+			}
+			if uri.String() != validURI {
+				t.Errorf("Expected URI %s, got %s", validURI, uri.String())
+			}
 		}
 	})
 
 	t.Run("should reject empty string", func(t *testing.T) {
 		t.Parallel()
 
-		_, err := NewApiHref(fixture.EmptyString)
-
+		_, err := NewURI("")
 		if err == nil {
 			t.Error("Expected error for empty string, got none")
 		}
@@ -636,61 +629,53 @@ func TestApiHref_Initialization(t *testing.T) {
 	t.Run("should reject whitespace string", func(t *testing.T) {
 		t.Parallel()
 
-		_, err := NewApiHref(fixture.WhitespaceString)
-
+		_, err := NewURI("  \t\n  ")
 		if err == nil {
 			t.Error("Expected error for whitespace string, got none")
 		}
 	})
 }
 
-func TestConsoleHref_Initialization(t *testing.T) {
+func TestApiHref_Initialization(t *testing.T) {
 	t.Parallel()
-	fixture := NewConsoleHrefTestFixture()
 
-	t.Run("should create console href with valid href", func(t *testing.T) {
+	t.Run("should work as URI type alias", func(t *testing.T) {
 		t.Parallel()
 
-		consoleHref, err := NewConsoleHref(fixture.ValidHref)
-
+		apiHref, err := NewApiHref("/api/v1/resources/123")
 		if err != nil {
 			t.Errorf("Expected no error, got %v", err)
 		}
-		if consoleHref.String() != fixture.ValidHref {
-			t.Errorf("Expected console href %s, got %s", fixture.ValidHref, consoleHref.String())
+		if apiHref.String() != "/api/v1/resources/123" {
+			t.Errorf("Expected /api/v1/resources/123, got %s", apiHref.String())
 		}
-	})
 
-	t.Run("should create console href with another valid href", func(t *testing.T) {
-		t.Parallel()
-
-		consoleHref, err := NewConsoleHref(fixture.AnotherHref)
-
-		if err != nil {
-			t.Errorf("Expected no error, got %v", err)
-		}
-		if consoleHref.String() != fixture.AnotherHref {
-			t.Errorf("Expected console href %s, got %s", fixture.AnotherHref, consoleHref.String())
-		}
-	})
-
-	t.Run("should reject empty string", func(t *testing.T) {
-		t.Parallel()
-
-		_, err := NewConsoleHref(fixture.EmptyString)
-
+		// Verify it rejects empty strings
+		_, err = NewApiHref("")
 		if err == nil {
 			t.Error("Expected error for empty string, got none")
 		}
 	})
+}
 
-	t.Run("should reject whitespace string", func(t *testing.T) {
+func TestConsoleHref_Initialization(t *testing.T) {
+	t.Parallel()
+
+	t.Run("should work as URI type alias", func(t *testing.T) {
 		t.Parallel()
 
-		_, err := NewConsoleHref(fixture.WhitespaceString)
+		consoleHref, err := NewConsoleHref("/console/resources/456")
+		if err != nil {
+			t.Errorf("Expected no error, got %v", err)
+		}
+		if consoleHref.String() != "/console/resources/456" {
+			t.Errorf("Expected /console/resources/456, got %s", consoleHref.String())
+		}
 
+		// Verify it rejects empty strings
+		_, err = NewConsoleHref("")
 		if err == nil {
-			t.Error("Expected error for whitespace string, got none")
+			t.Error("Expected error for empty string, got none")
 		}
 	})
 }
@@ -930,47 +915,60 @@ func TestSerializationRoundtrip(t *testing.T) {
 		}
 	})
 
-	t.Run("ApiHref roundtrip", func(t *testing.T) {
+	t.Run("URI roundtrip", func(t *testing.T) {
 		t.Parallel()
 
 		testCases := []string{
 			"https://api.example.com/resource/123",
+			"https://console.example.com/resource/456",
 			"http://localhost:8080/api/v1/resource",
+			"http://localhost:3000/console/resource",
 			"/api/resource/456",
+			"/console/resource/789",
 		}
 		for _, original := range testCases {
-			apiHref, err := NewApiHref(original)
+			uri, err := NewURI(original)
 			if err != nil {
-				t.Fatalf("Failed to create ApiHref: %v", err)
+				t.Fatalf("Failed to create URI: %v", err)
 			}
-			serialized := apiHref.Serialize()
-			deserialized := DeserializeApiHref(serialized)
+			serialized := uri.Serialize()
+			deserialized := DeserializeURI(serialized)
 
 			if deserialized.String() != original {
-				t.Errorf("ApiHref roundtrip failed: %s -> %s -> %s", original, serialized, deserialized.String())
+				t.Errorf("URI roundtrip failed: %s -> %s -> %s", original, serialized, deserialized.String())
 			}
 		}
 	})
 
-	t.Run("ConsoleHref roundtrip", func(t *testing.T) {
+	t.Run("ApiHref roundtrip (type alias)", func(t *testing.T) {
 		t.Parallel()
 
-		testCases := []string{
-			"https://console.example.com/resource/123",
-			"http://localhost:3000/console/resource",
-			"/console/resource/789",
+		original := "https://api.example.com/resource/123"
+		apiHref, err := NewApiHref(original)
+		if err != nil {
+			t.Fatalf("Failed to create ApiHref: %v", err)
 		}
-		for _, original := range testCases {
-			consoleHref, err := NewConsoleHref(original)
-			if err != nil {
-				t.Fatalf("Failed to create ConsoleHref: %v", err)
-			}
-			serialized := consoleHref.Serialize()
-			deserialized := DeserializeConsoleHref(serialized)
+		serialized := apiHref.Serialize()
+		deserialized := DeserializeApiHref(serialized)
 
-			if deserialized.String() != original {
-				t.Errorf("ConsoleHref roundtrip failed: %s -> %s -> %s", original, serialized, deserialized.String())
-			}
+		if deserialized.String() != original {
+			t.Errorf("ApiHref roundtrip failed: %s -> %s -> %s", original, serialized, deserialized.String())
+		}
+	})
+
+	t.Run("ConsoleHref roundtrip (type alias)", func(t *testing.T) {
+		t.Parallel()
+
+		original := "https://console.example.com/resource/123"
+		consoleHref, err := NewConsoleHref(original)
+		if err != nil {
+			t.Fatalf("Failed to create ConsoleHref: %v", err)
+		}
+		serialized := consoleHref.Serialize()
+		deserialized := DeserializeConsoleHref(serialized)
+
+		if deserialized.String() != original {
+			t.Errorf("ConsoleHref roundtrip failed: %s -> %s -> %s", original, serialized, deserialized.String())
 		}
 	})
 

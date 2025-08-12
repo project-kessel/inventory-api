@@ -186,36 +186,36 @@ func NewReporterVersionTestFixture() ReporterVersionTestFixture {
 	}
 }
 
-type ApiHrefTestFixture struct {
-	ValidHref        string
-	AnotherHref      string
-	EmptyString      string
-	WhitespaceString string
+type URITestFixture struct {
+	ValidApiHref       string
+	ValidConsoleHref   string
+	AnotherApiHref     string
+	AnotherConsoleHref string
+	EmptyString        string
+	WhitespaceString   string
 }
 
-func NewApiHrefTestFixture() ApiHrefTestFixture {
-	return ApiHrefTestFixture{
-		ValidHref:        "/api/v1/resources/123",
-		AnotherHref:      "/api/v1/resources/456",
-		EmptyString:      "",
-		WhitespaceString: "  \t\n  ",
+func NewURITestFixture() URITestFixture {
+	return URITestFixture{
+		ValidApiHref:       "/api/v1/resources/123",
+		ValidConsoleHref:   "/console/resources/123",
+		AnotherApiHref:     "/api/v1/resources/456",
+		AnotherConsoleHref: "/console/resources/456",
+		EmptyString:        "",
+		WhitespaceString:   "  \t\n  ",
 	}
 }
 
-type ConsoleHrefTestFixture struct {
-	ValidHref        string
-	AnotherHref      string
-	EmptyString      string
-	WhitespaceString string
+// Legacy fixtures for backward compatibility (now using URI fixture)
+type ApiHrefTestFixture = URITestFixture
+type ConsoleHrefTestFixture = URITestFixture
+
+func NewApiHrefTestFixture() ApiHrefTestFixture {
+	return NewURITestFixture()
 }
 
 func NewConsoleHrefTestFixture() ConsoleHrefTestFixture {
-	return ConsoleHrefTestFixture{
-		ValidHref:        "/console/resources/123",
-		AnotherHref:      "/console/resources/456",
-		EmptyString:      "",
-		WhitespaceString: "  \t\n  ",
-	}
+	return NewURITestFixture()
 }
 
 type LocalResourceIdTestFixture struct {

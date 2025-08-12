@@ -333,7 +333,9 @@ type ConsoleHref string
 
 func NewConsoleHref(href string) (ConsoleHref, error) {
 	href = strings.TrimSpace(href)
-	// ConsoleHref can be empty (optional field)
+	if href == "" {
+		return ConsoleHref(""), fmt.Errorf("%w: ConsoleHref", ErrEmpty)
+	}
 	return ConsoleHref(href), nil
 }
 

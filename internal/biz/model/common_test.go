@@ -674,29 +674,23 @@ func TestConsoleHref_Initialization(t *testing.T) {
 		}
 	})
 
-	t.Run("should accept empty string", func(t *testing.T) {
+	t.Run("should reject empty string", func(t *testing.T) {
 		t.Parallel()
 
-		consoleHref, err := NewConsoleHref(fixture.EmptyString)
+		_, err := NewConsoleHref(fixture.EmptyString)
 
-		if err != nil {
-			t.Errorf("Expected no error for empty string, got %v", err)
-		}
-		if consoleHref.String() != "" {
-			t.Errorf("Expected empty string, got %s", consoleHref.String())
+		if err == nil {
+			t.Error("Expected error for empty string, got none")
 		}
 	})
 
-	t.Run("should trim whitespace to empty string", func(t *testing.T) {
+	t.Run("should reject whitespace string", func(t *testing.T) {
 		t.Parallel()
 
-		consoleHref, err := NewConsoleHref(fixture.WhitespaceString)
+		_, err := NewConsoleHref(fixture.WhitespaceString)
 
-		if err != nil {
-			t.Errorf("Expected no error for whitespace string, got %v", err)
-		}
-		if consoleHref.String() != "" {
-			t.Errorf("Expected trimmed empty string, got %s", consoleHref.String())
+		if err == nil {
+			t.Error("Expected error for whitespace string, got none")
 		}
 	})
 }

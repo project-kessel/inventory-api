@@ -286,40 +286,13 @@ func TestReporterResource_Update(t *testing.T) {
 		}
 	})
 
-	t.Run("should handle empty consoleHref", func(t *testing.T) {
+	t.Run("should reject empty consoleHref", func(t *testing.T) {
 		t.Parallel()
 
-		original, err := NewReporterResource(
-			fixture.ValidIdType(),
-			fixture.ValidLocalResourceIdType(),
-			fixture.ValidResourceTypeType(),
-			fixture.ValidReporterTypeType(),
-			fixture.ValidReporterInstanceIdType(),
-			fixture.ValidResourceIdType(),
-			fixture.ValidApiHrefType(),
-			fixture.ValidConsoleHrefType(),
-		)
+		_, err := NewConsoleHref("")
 
-		if err != nil {
-			t.Fatalf("Expected no error creating ReporterResource, got %v", err)
-		}
-
-		newApiHref, err := NewApiHref("https://api.example.com/updated")
-		if err != nil {
-			t.Fatalf("Failed to create API href: %v", err)
-		}
-		emptyConsoleHref, err := NewConsoleHref("")
-		if err != nil {
-			t.Fatalf("Failed to create console href: %v", err)
-		}
-
-		original.Update(newApiHref, emptyConsoleHref)
-
-		if original.apiHref.String() != newApiHref.String() {
-			t.Errorf("Expected updated apiHref %s, got %s", newApiHref.String(), original.apiHref.String())
-		}
-		if original.consoleHref.String() != "" {
-			t.Errorf("Expected empty consoleHref, got %s", original.consoleHref.String())
+		if err == nil {
+			t.Error("Expected error for empty consoleHref, got none")
 		}
 	})
 
@@ -338,18 +311,15 @@ func TestReporterResource_Update(t *testing.T) {
 		}
 	})
 
-	t.Run("should accept all consoleHref values", func(t *testing.T) {
+	t.Run("should reject whitespace consoleHref", func(t *testing.T) {
 		t.Parallel()
 
 		whitespaceConsoleHref := "   "
 
-		consoleHref, err := NewConsoleHref(whitespaceConsoleHref)
+		_, err := NewConsoleHref(whitespaceConsoleHref)
 
-		if err != nil {
-			t.Errorf("Expected no error for whitespace consoleHref, got %v", err)
-		}
-		if consoleHref.String() != "" {
-			t.Errorf("Expected trimmed empty string, got %s", consoleHref.String())
+		if err == nil {
+			t.Error("Expected error for whitespace consoleHref, got none")
 		}
 	})
 }

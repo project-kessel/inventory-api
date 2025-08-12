@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"testing"
 
-	datamodel "github.com/project-kessel/inventory-api/internal/data/model"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/grpc"
 	grpcinsecure "google.golang.org/grpc/credentials/insecure"
@@ -13,6 +12,7 @@ import (
 	"google.golang.org/protobuf/types/known/structpb"
 
 	pbv1beta2 "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2"
+	"github.com/project-kessel/inventory-api/internal/biz/model_legacy"
 )
 
 // bearerAuth implements grpc.PerRPCCredentials to inject Authorization
@@ -372,7 +372,7 @@ func TestInventoryAPIHTTP_v1beta2_Host_ConsistentWrite(t *testing.T) {
 	enableShortMode(t)
 	t.Parallel()
 
-	localResourceId := "wait-for-sync-host-abc-123"
+	resourceId := "wait-for-sync-host-abc-123"
 
 	ctx := context.Background()
 
@@ -411,7 +411,7 @@ func TestInventoryAPIHTTP_v1beta2_Host_ConsistentWrite(t *testing.T) {
 		ReporterInstanceId: "testuser@example.com",
 		Representations: &pbv1beta2.ResourceRepresentations{
 			Metadata: &pbv1beta2.RepresentationMetadata{
-				LocalResourceId: localResourceId,
+				LocalResourceId: resourceId,
 				ApiHref:         "https://example.com/api",
 				ConsoleHref:     proto.String("https://example.com/console"),
 				ReporterVersion: proto.String("0.1"),
@@ -428,8 +428,8 @@ func TestInventoryAPIHTTP_v1beta2_Host_ConsistentWrite(t *testing.T) {
 	_, err = client.ReportResource(ctx, &req)
 	assert.NoError(t, err, "Failed to Report Resource")
 
-	var host datamodel.Resource
-	err = db.First(&host).Error
+	var host model_legacy.Resource
+	err = db.Where("reporter_resource_id = ?", resourceId).First(&host).Error
 	assert.NoError(t, err, "Error fetching host from DB")
 	assert.NotNil(t, host, "Host not found in DB")
 	assert.NotEmpty(t, host.ConsistencyToken, "Consistency token is empty")
@@ -437,7 +437,7 @@ func TestInventoryAPIHTTP_v1beta2_Host_ConsistentWrite(t *testing.T) {
 	delReq := pbv1beta2.DeleteResourceRequest{
 		Reference: &pbv1beta2.ResourceReference{
 			ResourceType: "hbi",
-			ResourceId:   localResourceId,
+			ResourceId:   resourceId,
 			Reporter: &pbv1beta2.ReporterReference{
 				Type: "ACM",
 			},

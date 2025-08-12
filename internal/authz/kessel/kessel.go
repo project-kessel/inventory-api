@@ -123,6 +123,7 @@ func (a *KesselAuthz) AcquireLock(ctx context.Context, r *kessel.AcquireLockRequ
 }
 
 func (a *KesselAuthz) CreateTuples(ctx context.Context, r *kessel.CreateTuplesRequest) (*kessel.CreateTuplesResponse, error) {
+	log.Infof("Creating tuples : %s", r)
 	opts, err := a.getCallOptions()
 	if err != nil {
 		a.incrFailureCounter("CreateTuples")

@@ -12,7 +12,9 @@ type ResourceReportEvent struct {
 	id                     ResourceId
 	resourceType           ResourceType
 	reporterId             ReporterId
-	reporterResource       ReporterResource
+	localResourceId        LocalResourceId
+	apiHref                ApiHref
+	consoleHref            ConsoleHref
 	reporterRepresentation ReporterDataRepresentation
 	commonRepresentation   CommonRepresentation
 	createdAt              time.Time
@@ -24,6 +26,9 @@ func NewResourceReportEvent(
 	resourceType ResourceType,
 	reporterType ReporterType,
 	reporterInstanceId ReporterInstanceId,
+	localResourceId LocalResourceId,
+	apiHref ApiHref,
+	consoleHref ConsoleHref,
 	reporterDataRepresentation ReporterDataRepresentation,
 	commonRepresentation CommonRepresentation,
 ) (ResourceReportEvent, error) {
@@ -33,6 +38,9 @@ func NewResourceReportEvent(
 		id:                     resourceId,
 		resourceType:           resourceType,
 		reporterId:             reporterId,
+		localResourceId:        localResourceId,
+		apiHref:                apiHref,
+		consoleHref:            consoleHref,
 		reporterRepresentation: reporterDataRepresentation,
 		commonRepresentation:   commonRepresentation,
 	}, nil
@@ -71,7 +79,7 @@ func (re ResourceReportEvent) Id() ResourceId {
 }
 
 func (re ResourceReportEvent) LocalResourceId() string {
-	return re.reporterResource.localResourceID.String()
+	return re.localResourceId.String()
 }
 
 func (re ResourceReportEvent) ResourceId() uuid.UUID {
@@ -79,11 +87,11 @@ func (re ResourceReportEvent) ResourceId() uuid.UUID {
 }
 
 func (re ResourceReportEvent) ConsoleHref() string {
-	return re.reporterResource.consoleHref.String()
+	return re.consoleHref.String()
 }
 
 func (re ResourceReportEvent) ApiHref() string {
-	return re.reporterResource.apiHref.String()
+	return re.apiHref.String()
 }
 
 func (re ResourceReportEvent) Data() internal.JsonObject {

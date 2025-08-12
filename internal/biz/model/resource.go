@@ -2,7 +2,6 @@ package model
 
 import (
 	"fmt"
-	"log"
 	"time"
 )
 
@@ -42,7 +41,10 @@ func NewResource(id ResourceId, localResourceId LocalResourceId, resourceType Re
 		resourceType,
 		reporterType,
 		reporterInstanceId,
+		localResourceId,
 		reporterResource.Id(),
+		apiHref,
+		consoleHref,
 		reporterRepresentationData,
 		commonRepresentationData,
 		reporterVersion,
@@ -81,15 +83,15 @@ func (r *Resource) Update(
 
 	reporterResource.Update(apiHref, consoleHref)
 
-	log.Printf("--------------------------------")
-	log.Printf("Reporter Resource: %+v", reporterResource.representationVersion)
-
 	resourceEvent, err := resourceEventAndRepresentations(
 		reporterResource.resourceID,
 		key.ResourceType(),
 		key.ReporterType(),
 		key.ReporterInstanceId(),
+		key.LocalResourceId(),
 		reporterResource.Id(),
+		apiHref,
+		consoleHref,
 		reporterRepresentationData,
 		commonRepresentationData,
 		reporterVersion,
@@ -101,9 +103,6 @@ func (r *Resource) Update(
 	}
 
 	r.resourceReportEvents = []ResourceReportEvent{resourceEvent}
-	log.Printf("----------------------")
-	log.Printf("After update length: %d", len(r.ResourceEvents()))
-	log.Printf("After update: %+v", r.ResourceEvents()[0])
 	return nil
 }
 
@@ -112,7 +111,10 @@ func resourceEventAndRepresentations(
 	resourceType ResourceType,
 	reporterType ReporterType,
 	reporterInstanceId ReporterInstanceId,
+	localResourceId LocalResourceId,
 	reporterResourceId ReporterResourceId,
+	apiHref ApiHref,
+	consoleHref ConsoleHref,
 	reporterData Representation,
 	commonData Representation,
 	reporterVersion *ReporterVersion,
@@ -120,8 +122,6 @@ func resourceEventAndRepresentations(
 	generation Generation,
 	commonVersion Version,
 ) (ResourceReportEvent, error) {
-
-	log.Printf("Data to set on event: %+v, %+v", reporterData, commonData)
 
 	reporterRepresentation, err := NewReporterDataRepresentation(
 		reporterResourceId,
@@ -145,13 +145,14 @@ func resourceEventAndRepresentations(
 	if err != nil {
 		return ResourceReportEvent{}, fmt.Errorf("invalid CommonRepresentation: %w", err)
 	}
-
-	log.Printf("Representation before setting on event: %+v, %+v", reporterRepresentation, commonRepresentation)
 	resourceEvent, err := NewResourceReportEvent(
 		resourceId,
 		resourceType,
 		reporterType,
 		reporterInstanceId,
+		localResourceId,
+		apiHref,
+		consoleHref,
 		reporterRepresentation,
 		commonRepresentation,
 	)

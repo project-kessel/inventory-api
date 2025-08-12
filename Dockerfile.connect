@@ -2,16 +2,16 @@ FROM quay.io/strimzi/kafka:0.45.0-kafka-3.9.0
 USER root:root
 
 # Notes on ENV settings and variables
-# DEBEZIUM_MAVEN_VERSION = Maven Package Version (x.x.x.FINAL - https://mvnrepository.com/artifact/io.debezium/debezium-connector-postgres)
-# DEBEZIUM_RELEASE_VERSION = x.y release version
-# DEBEZIUM_TARBALL_MD5 = md5 value of tar.gz file from Maven
-# DEBEZIUM_SCRIPTING_TARBALL_MD5 = md5 value from tar.gz file from Maven
+# DEBEZIUM_MAVEN_VERSION = Maven Package Version (x.x.x.FINAL) - https://mvnrepository.com/artifact/io.debezium/debezium-connector-postgres)
+# DEBEZIUM_RELEASE_VERSION = x.y release version (matches x.y of Maven Package Version)
+# DEBEZIUM_TARBALL_MD5 = md5 value of tar.gz file from Maven (set by script)
+# DEBEZIUM_SCRIPTING_TARBALL_MD5 = md5 value from tar.gz file from Maven (set by script)
+
+# Update the debezium maven and release versions to update Debezium and related plugins
 ENV KAFKA_CONNECT_PLUGINS_DIR=/opt/kafka/plugins \
     EXTERNAL_LIBS_DIR=/opt/kafka/libs \
-    DEBEZIUM_MAVEN_VERSION=2.7.3.Final \
-    DEBEZIUM_RELEASE_VERSION=2.7 \
-    DEBEZIUM_TARBALL_MD5=9bb46566fa18541be206f0bd0f77c4de \
-    DEBEZIUM_SCRIPTING_TARBALL_MD5=e8c6825ada56c4f028b67fe634f7d4d6
+    DEBEZIUM_MAVEN_VERSION=3.1.3.Final \
+    DEBEZIUM_RELEASE_VERSION=3.1
 
 RUN rm -rf /opt/kafka-exporter
 

@@ -12,8 +12,9 @@ type Resource struct {
 	id                   ResourceId
 	resourceType         ResourceType
 	commonVersion        Version
-	consistencyToken     ConsistencyToken //nolint:unused
+	consistencyToken     ConsistencyToken
 	reporterResources    []ReporterResource
+	reporterResourcesMap map[ReporterResourceKey]*ReporterResource // Map for O(1) access to slice elements
 	resourceReportEvents []ResourceReportEvent
 }
 
@@ -55,11 +56,17 @@ func NewResource(id ResourceId, localResourceId LocalResourceId, resourceType Re
 		return Resource{}, fmt.Errorf("resource invalid ResourceReportEvent: %w", err)
 	}
 
+	reporterResources := []ReporterResource{reporterResource}
+	// Creating a map pointing to slice elements for O(1) access
+	reporterResourcesMap := make(map[ReporterResourceKey]*ReporterResource)
+	reporterResourcesMap[reporterResource.Key()] = &reporterResources[0]
+
 	resource := Resource{
 		id:                   id,
 		resourceType:         resourceType,
 		commonVersion:        commonVersion,
-		reporterResources:    []ReporterResource{reporterResource},
+		reporterResources:    reporterResources,
+		reporterResourcesMap: reporterResourcesMap,
 		resourceReportEvents: []ResourceReportEvent{resourceEvent},
 	}
 	return resource, nil
@@ -164,10 +171,8 @@ func resourceEventAndRepresentations(
 }
 
 func (r *Resource) findReporterResourceToUpdateByKey(key ReporterResourceKey) (*ReporterResource, error) {
-	for i := range r.reporterResources {
-		if r.reporterResources[i].Key() == key {
-			return &r.reporterResources[i], nil
-		}
+	if reporter, exists := r.reporterResourcesMap[key]; exists {
+		return reporter, nil
 	}
 	return nil, fmt.Errorf("reporter resource with key (localResourceId=%s, resourceType=%s, reporterType=%s, reporterInstanceId=%s) not found in resource",
 		key.LocalResourceId(), key.ResourceType(), key.ReporterType(), key.ReporterInstanceId())
@@ -229,8 +234,12 @@ func DeserializeResource(
 	}
 
 	var reporterResources []ReporterResource
+	reporterResourcesMap := make(map[ReporterResourceKey]*ReporterResource)
 	for _, reporterResourceSnapshot := range reporterResourceSnapshots {
-		reporterResources = append(reporterResources, DeserializeReporterResource(reporterResourceSnapshot))
+		reporterResource := DeserializeReporterResource(reporterResourceSnapshot)
+		reporterResources = append(reporterResources, reporterResource)
+		// Point to the slice element for O(1) access
+		reporterResourcesMap[reporterResource.Key()] = &reporterResources[len(reporterResources)-1]
 	}
 
 	resourceEvent := DeserializeResourceEvent(reporterRepresentationSnapshot, commonRepresentationSnapshot)
@@ -241,6 +250,7 @@ func DeserializeResource(
 		commonVersion:        DeserializeVersion(resourceSnapshot.CommonVersion),
 		consistencyToken:     DeserializeConsistencyToken(resourceSnapshot.ConsistencyToken),
 		reporterResources:    reporterResources,
+		reporterResourcesMap: reporterResourcesMap,
 		resourceReportEvents: []ResourceReportEvent{resourceEvent},
 	}
 }

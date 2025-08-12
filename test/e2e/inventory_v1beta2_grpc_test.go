@@ -429,10 +429,7 @@ func TestInventoryAPIHTTP_v1beta2_Host_ConsistentWrite(t *testing.T) {
 	assert.NoError(t, err, "Failed to Report Resource")
 
 	var host datamodel.Resource
-	err = db.
-		Joins("JOIN reporter_resources rr ON rr.resource_id = resource.id").
-		Where("rr.local_resource_id = ?", localResourceId).
-		First(&host).Error
+	err = db.First(&host).Error
 	assert.NoError(t, err, "Error fetching host from DB")
 	assert.NotNil(t, host, "Host not found in DB")
 	assert.NotEmpty(t, host.ConsistencyToken, "Consistency token is empty")

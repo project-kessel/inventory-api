@@ -26,7 +26,14 @@ func TestReporter_Initialization(t *testing.T) {
 
 		reporter, err := NewReporterId(reporterType, reporterInstanceId)
 
-		assertValidReporter(t, reporter, err, fixture.ValidReporterType, fixture.ValidReporterInstanceId)
+		reporterInstanceId, err := NewReporterInstanceId(fixture.ValidReporterInstanceId)
+		if err != nil {
+			t.Fatalf("Expected no error creating ReporterInstanceId, got %v", err)
+		}
+
+		reporter := NewReporterId(reporterType, reporterInstanceId)
+
+		assertValidReporter(t, reporter, nil, fixture.ValidReporterType, fixture.ValidReporterInstanceId)
 	})
 
 	t.Run("should create reporter with another valid set of inputs", func(t *testing.T) {
@@ -44,13 +51,21 @@ func TestReporter_Initialization(t *testing.T) {
 
 		reporter, err := NewReporterId(reporterType, reporterInstanceId)
 
-		assertValidReporter(t, reporter, err, fixture.AnotherReporterType, fixture.AnotherReporterInstanceId)
+		reporterInstanceId, err := NewReporterInstanceId(fixture.AnotherReporterInstanceId)
+		if err != nil {
+			t.Fatalf("Expected no error creating ReporterInstanceId, got %v", err)
+		}
+
+		reporter := NewReporterId(reporterType, reporterInstanceId)
+
+		assertValidReporter(t, reporter, nil, fixture.AnotherReporterType, fixture.AnotherReporterInstanceId)
 	})
 
 	t.Run("should reject empty reporter type", func(t *testing.T) {
 		t.Parallel()
 
 		_, err := NewReporterType(fixture.EmptyString)
+
 		if err == nil {
 			t.Error("Expected error for empty reporter type, got none")
 		}
@@ -61,6 +76,7 @@ func TestReporter_Initialization(t *testing.T) {
 
 	t.Run("should reject whitespace-only reporter type", func(t *testing.T) {
 		t.Parallel()
+		_, err := NewReporterType(fixture.WhitespaceString)
 
 		_, err := NewReporterType(fixture.WhitespaceString)
 		if err == nil {
@@ -75,6 +91,7 @@ func TestReporter_Initialization(t *testing.T) {
 		t.Parallel()
 
 		_, err := NewReporterInstanceId(fixture.EmptyString)
+
 		if err == nil {
 			t.Error("Expected error for empty reporter instance id, got none")
 		}
@@ -119,6 +136,7 @@ func TestReporter_Initialization(t *testing.T) {
 		t.Parallel()
 
 		_, err := NewReporterType(fixture.WhitespaceString)
+
 		if err == nil {
 			t.Error("Expected error for whitespace-only reporter type, got none")
 		}

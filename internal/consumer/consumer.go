@@ -16,6 +16,7 @@ import (
 	"github.com/project-kessel/inventory-api/cmd/common"
 	"github.com/project-kessel/inventory-api/internal/consumer/auth"
 	"github.com/project-kessel/inventory-api/internal/consumer/retry"
+	datamodel "github.com/project-kessel/inventory-api/internal/data/model"
 	"github.com/project-kessel/inventory-api/internal/metricscollector"
 
 	"github.com/project-kessel/inventory-api/internal/authz/allow"
@@ -27,7 +28,7 @@ import (
 
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
 	"github.com/go-kratos/kratos/v2/log"
-	v1beta1 "github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
+	"github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"gorm.io/gorm"
@@ -526,9 +527,11 @@ func (i *InventoryConsumer) DeleteTuple(ctx context.Context, filter *v1beta1.Rel
 }
 
 // UpdateConsistencyToken updates the resource in the inventory DB to add the consistency token
-func (i *InventoryConsumer) UpdateConsistencyToken(inventoryID, token string) error {
+func (i *InventoryConsumer) UpdateConsistencyToken(resourceId, token string) error {
 	// this will update all records for the same inventory_id with current consistency token
-	i.DB.Model(model_legacy.Resource{}).Where("inventory_id = ?", inventoryID).Update("consistency_token", token)
+	//TODO: Doing both updates for now to keep backward compatibility
+	i.DB.Model(model_legacy.Resource{}).Where("inventory_id = ?", resourceId).Update("consistency_token", token)
+	i.DB.Model(datamodel.Resource{}).Where("id = ?", resourceId).Update("ktn", token)
 	return nil
 }
 

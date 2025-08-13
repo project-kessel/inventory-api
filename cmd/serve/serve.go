@@ -24,7 +24,7 @@ import (
 	"github.com/project-kessel/inventory-api/internal/data"
 	inventoryResourcesRepo "github.com/project-kessel/inventory-api/internal/data/inventoryresources"
 	relationshipsrepo "github.com/project-kessel/inventory-api/internal/data/relationships"
-	resourcerepo "github.com/project-kessel/inventory-api/internal/data/resources"
+	legacyresourcerepo "github.com/project-kessel/inventory-api/internal/data/resources"
 	"github.com/project-kessel/inventory-api/internal/pubsub"
 	relationshipssvc "github.com/project-kessel/inventory-api/internal/service/relationships/k8spolicy"
 	k8sclusterssvc "github.com/project-kessel/inventory-api/internal/service/resources/k8sclusters"
@@ -260,8 +260,10 @@ func NewCommand(
 
 			//v1beta2
 			// wire together inventory service handling
-			resource_repo := resourcerepo.New(db, mc, transactionManager)
-			inventory_controller := resourcesctl.New(resource_repo, inventoryresources_repo, authorizer, eventingManager, "notifications", log.With(logger, "subsystem", "notificationsintegrations_controller"), listenManager, waitForNotifCircuitBreaker, usecaseConfig)
+			resourceRepo := data.NewResourceRepository(db, transactionManager)
+			legacy_resource_repo := legacyresourcerepo.New(db, mc, transactionManager)
+			inventory_controller := resourcesctl.New(resourceRepo, legacy_resource_repo, inventoryresources_repo, authorizer, eventingManager, "notifications", log.With(logger, "subsystem", "notificationsintegrations_controller"), listenManager, waitForNotifCircuitBreaker, usecaseConfig)
+
 			inventory_service := resourcesvc.NewKesselInventoryServiceV1beta2(inventory_controller)
 			pbv1beta2.RegisterKesselInventoryServiceServer(server.GrpcServer, inventory_service)
 			pbv1beta2.RegisterKesselInventoryServiceHTTPServer(server.HttpServer, inventory_service)
@@ -269,22 +271,21 @@ func NewCommand(
 			//v1beta1
 
 			// wire together authz handling
-			authz_repo := resourcerepo.New(db, mc, transactionManager)
-			authz_controller := resourcesctl.New(authz_repo, inventoryresources_repo, authorizer, eventingManager, "authz", log.With(logger, "subsystem", "authz_controller"), listenManager, waitForNotifCircuitBreaker, usecaseConfig)
+			authz_controller := resourcesctl.New(resourceRepo, legacy_resource_repo, inventoryresources_repo, authorizer, eventingManager, "authz", log.With(logger, "subsystem", "authz_controller"), listenManager, waitForNotifCircuitBreaker, usecaseConfig)
 			authz_service := resourcesvc.NewKesselCheckServiceV1beta1(authz_controller)
 			authzv1beta1.RegisterKesselCheckServiceServer(server.GrpcServer, authz_service)
 			authzv1beta1.RegisterKesselCheckServiceHTTPServer(server.HttpServer, authz_service)
 
 			// wire together k8sclusters handling
-			k8sclusters_repo := resourcerepo.New(db, mc, transactionManager)
-			k8sclusters_controller := resourcesctl.New(k8sclusters_repo, inventoryresources_repo, authorizer, eventingManager, "acm", log.With(logger, "subsystem", "k8sclusters_controller"), listenManager, waitForNotifCircuitBreaker, usecaseConfig)
+			k8sclusters_repo := legacyresourcerepo.New(db, mc, transactionManager)
+			k8sclusters_controller := resourcesctl.New(resourceRepo, k8sclusters_repo, inventoryresources_repo, authorizer, eventingManager, "acm", log.With(logger, "subsystem", "k8sclusters_controller"), listenManager, waitForNotifCircuitBreaker, usecaseConfig)
 			k8sclusters_service := k8sclusterssvc.NewKesselK8SClusterServiceV1beta1(k8sclusters_controller)
 			pb.RegisterKesselK8SClusterServiceServer(server.GrpcServer, k8sclusters_service)
 			pb.RegisterKesselK8SClusterServiceHTTPServer(server.HttpServer, k8sclusters_service)
 
 			// wire together k8spolicies handling
-			k8spolicies_repo := resourcerepo.New(db, mc, transactionManager)
-			k8spolicies_controller := resourcesctl.New(k8spolicies_repo, inventoryresources_repo, authorizer, eventingManager, "acm", log.With(logger, "subsystem", "k8spolicies_controller"), listenManager, waitForNotifCircuitBreaker, usecaseConfig)
+			k8spolicies_repo := legacyresourcerepo.New(db, mc, transactionManager)
+			k8spolicies_controller := resourcesctl.New(resourceRepo, k8spolicies_repo, inventoryresources_repo, authorizer, eventingManager, "acm", log.With(logger, "subsystem", "k8spolicies_controller"), listenManager, waitForNotifCircuitBreaker, usecaseConfig)
 			k8spolicies_service := k8spoliciessvc.NewKesselK8SPolicyServiceV1beta1(k8spolicies_controller)
 			pb.RegisterKesselK8SPolicyServiceServer(server.GrpcServer, k8spolicies_service)
 			pb.RegisterKesselK8SPolicyServiceHTTPServer(server.HttpServer, k8spolicies_service)

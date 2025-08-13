@@ -96,3 +96,48 @@ func validateReporterResource(r *ReporterResource) error {
 		bizmodel.ValidateOptionalURL("ConsoleHref", r.ConsoleHref, MaxConsoleHrefLength),
 	)
 }
+
+// SerializeToSnapshot converts GORM ReporterResource to snapshot type - direct initialization without validation
+func (rr ReporterResource) SerializeToSnapshot() bizmodel.ReporterResourceSnapshot {
+	// Create ReporterResourceKey snapshot
+	keySnapshot := bizmodel.ReporterResourceKeySnapshot{
+		LocalResourceID:    rr.LocalResourceID,
+		ReporterType:       rr.ReporterType,
+		ResourceType:       rr.ResourceType,
+		ReporterInstanceID: rr.ReporterInstanceID,
+	}
+
+	return bizmodel.ReporterResourceSnapshot{
+		ID:                    rr.ID,
+		ReporterResourceKey:   keySnapshot,
+		ResourceID:            rr.ResourceID,
+		APIHref:               rr.APIHref,
+		ConsoleHref:           rr.ConsoleHref,
+		RepresentationVersion: rr.RepresentationVersion,
+		Generation:            rr.Generation,
+		Tombstone:             rr.Tombstone,
+		CreatedAt:             rr.CreatedAt,
+		UpdatedAt:             rr.UpdatedAt,
+	}
+}
+
+// DeserializeFromSnapshot creates GORM ReporterResource from snapshot - direct initialization without validation
+func DeserializeReporterResourceFromSnapshot(snapshot bizmodel.ReporterResourceSnapshot) ReporterResource {
+	return ReporterResource{
+		ID: snapshot.ID,
+		ReporterResourceKey: ReporterResourceKey{
+			LocalResourceID:    snapshot.ReporterResourceKey.LocalResourceID,
+			ReporterType:       snapshot.ReporterResourceKey.ReporterType,
+			ResourceType:       snapshot.ReporterResourceKey.ResourceType,
+			ReporterInstanceID: snapshot.ReporterResourceKey.ReporterInstanceID,
+		},
+		ResourceID:            snapshot.ResourceID,
+		APIHref:               snapshot.APIHref,
+		ConsoleHref:           snapshot.ConsoleHref,
+		RepresentationVersion: snapshot.RepresentationVersion,
+		Generation:            snapshot.Generation,
+		Tombstone:             snapshot.Tombstone,
+		CreatedAt:             snapshot.CreatedAt,
+		UpdatedAt:             snapshot.UpdatedAt,
+	}
+}

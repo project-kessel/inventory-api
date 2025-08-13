@@ -2,6 +2,7 @@ package model
 
 import (
 	"github.com/google/uuid"
+	"github.com/project-kessel/inventory-api/internal"
 )
 
 type VersionTestFixture struct {
@@ -185,36 +186,36 @@ func NewReporterVersionTestFixture() ReporterVersionTestFixture {
 	}
 }
 
-type ApiHrefTestFixture struct {
-	ValidHref        string
-	AnotherHref      string
-	EmptyString      string
-	WhitespaceString string
+type URITestFixture struct {
+	ValidApiHref       string
+	ValidConsoleHref   string
+	AnotherApiHref     string
+	AnotherConsoleHref string
+	EmptyString        string
+	WhitespaceString   string
 }
 
-func NewApiHrefTestFixture() ApiHrefTestFixture {
-	return ApiHrefTestFixture{
-		ValidHref:        "/api/v1/resources/123",
-		AnotherHref:      "/api/v1/resources/456",
-		EmptyString:      "",
-		WhitespaceString: "  \t\n  ",
+func NewURITestFixture() URITestFixture {
+	return URITestFixture{
+		ValidApiHref:       "/api/v1/resources/123",
+		ValidConsoleHref:   "/console/resources/123",
+		AnotherApiHref:     "/api/v1/resources/456",
+		AnotherConsoleHref: "/console/resources/456",
+		EmptyString:        "",
+		WhitespaceString:   "  \t\n  ",
 	}
 }
 
-type ConsoleHrefTestFixture struct {
-	ValidHref        string
-	AnotherHref      string
-	EmptyString      string
-	WhitespaceString string
+// Legacy fixtures for backward compatibility (now using URI fixture)
+type ApiHrefTestFixture = URITestFixture
+type ConsoleHrefTestFixture = URITestFixture
+
+func NewApiHrefTestFixture() ApiHrefTestFixture {
+	return NewURITestFixture()
 }
 
 func NewConsoleHrefTestFixture() ConsoleHrefTestFixture {
-	return ConsoleHrefTestFixture{
-		ValidHref:        "/console/resources/123",
-		AnotherHref:      "/console/resources/456",
-		EmptyString:      "",
-		WhitespaceString: "  \t\n  ",
-	}
+	return NewURITestFixture()
 }
 
 type LocalResourceIdTestFixture struct {
@@ -234,42 +235,42 @@ func NewLocalResourceIdTestFixture() LocalResourceIdTestFixture {
 }
 
 type JsonObjectTestFixture struct {
-	ValidData   JsonObject
-	AnotherData JsonObject
-	EmptyData   JsonObject
-	NilData     JsonObject
+	ValidData   internal.JsonObject
+	AnotherData internal.JsonObject
+	EmptyData   internal.JsonObject
+	NilData     internal.JsonObject
 }
 
 func NewJsonObjectTestFixture() JsonObjectTestFixture {
 	return JsonObjectTestFixture{
-		ValidData: JsonObject{
+		ValidData: internal.JsonObject{
 			"name":      "test-cluster",
 			"status":    "active",
 			"nodeCount": 3,
 			"region":    "us-east-1",
 			"labels":    map[string]interface{}{"env": "prod", "team": "platform"},
 		},
-		AnotherData: JsonObject{
+		AnotherData: internal.JsonObject{
 			"hostname": "test-host",
 			"os":       "linux",
 			"memory":   "16GB",
 			"cpu":      "4 cores",
 			"uptime":   "30 days",
 		},
-		EmptyData: JsonObject{},
+		EmptyData: internal.JsonObject{},
 		NilData:   nil,
 	}
 }
 
 type CommonRepresentationTestFixture struct {
 	ValidResourceId                 uuid.UUID
-	ValidData                       JsonObject
+	ValidData                       internal.JsonObject
 	ValidVersion                    uint
 	ValidReportedByReporterType     string
 	ValidReportedByReporterInstance string
 	NilResourceId                   uuid.UUID
-	EmptyData                       JsonObject
-	NilData                         JsonObject
+	EmptyData                       internal.JsonObject
+	NilData                         internal.JsonObject
 	ZeroVersion                     uint
 	EmptyReporterType               string
 	WhitespaceReporterType          string
@@ -280,7 +281,7 @@ type CommonRepresentationTestFixture struct {
 func NewCommonRepresentationTestFixture() CommonRepresentationTestFixture {
 	return CommonRepresentationTestFixture{
 		ValidResourceId: uuid.MustParse("550e8400-e29b-41d4-a716-446655440123"),
-		ValidData: JsonObject{
+		ValidData: internal.JsonObject{
 			"name":        "test-resource",
 			"description": "A test resource for CommonRepresentation",
 			"metadata":    map[string]interface{}{"version": "1.0", "type": "test"},
@@ -289,7 +290,7 @@ func NewCommonRepresentationTestFixture() CommonRepresentationTestFixture {
 		ValidReportedByReporterType:     "test-reporter",
 		ValidReportedByReporterInstance: "test-instance-001",
 		NilResourceId:                   uuid.Nil,
-		EmptyData:                       JsonObject{},
+		EmptyData:                       internal.JsonObject{},
 		NilData:                         nil,
 		ZeroVersion:                     0,
 		EmptyReporterType:               "",
@@ -297,6 +298,63 @@ func NewCommonRepresentationTestFixture() CommonRepresentationTestFixture {
 		EmptyReporterInstance:           "",
 		WhitespaceReporterInstance:      "  \t\n  ",
 	}
+}
+
+// Helper methods for creating domain types from test fixture
+func (f CommonRepresentationTestFixture) ValidResourceIdType() ResourceId {
+	resourceId, _ := NewResourceId(f.ValidResourceId)
+	return resourceId
+}
+
+func (f CommonRepresentationTestFixture) ValidRepresentationType() Representation {
+	representation, _ := NewRepresentation(f.ValidData)
+	return representation
+}
+
+func (f CommonRepresentationTestFixture) ValidVersionType() Version {
+	return NewVersion(f.ValidVersion)
+}
+
+func (f CommonRepresentationTestFixture) ZeroVersionType() Version {
+	return NewVersion(f.ZeroVersion)
+}
+
+func (f CommonRepresentationTestFixture) ValidReporterTypeType() ReporterType {
+	reporterType, _ := NewReporterType(f.ValidReportedByReporterType)
+	return reporterType
+}
+
+func (f CommonRepresentationTestFixture) ValidReporterInstanceIdType() ReporterInstanceId {
+	reporterInstanceId, _ := NewReporterInstanceId(f.ValidReportedByReporterInstance)
+	return reporterInstanceId
+}
+
+func (f CommonRepresentationTestFixture) NilResourceIdType() ResourceId {
+	return DeserializeResourceId(f.NilResourceId)
+}
+
+func (f CommonRepresentationTestFixture) EmptyRepresentationType() Representation {
+	return DeserializeRepresentation(f.EmptyData)
+}
+
+func (f CommonRepresentationTestFixture) NilRepresentationType() Representation {
+	return DeserializeRepresentation(f.NilData)
+}
+
+func (f CommonRepresentationTestFixture) EmptyReporterTypeType() ReporterType {
+	return DeserializeReporterType(f.EmptyReporterType)
+}
+
+func (f CommonRepresentationTestFixture) WhitespaceReporterTypeType() ReporterType {
+	return DeserializeReporterType(f.WhitespaceReporterType)
+}
+
+func (f CommonRepresentationTestFixture) EmptyReporterInstanceIdType() ReporterInstanceId {
+	return DeserializeReporterInstanceId(f.EmptyReporterInstance)
+}
+
+func (f CommonRepresentationTestFixture) WhitespaceReporterInstanceIdType() ReporterInstanceId {
+	return DeserializeReporterInstanceId(f.WhitespaceReporterInstance)
 }
 
 type ReporterResourceTestFixture struct {
@@ -353,16 +411,120 @@ func NewReporterResourceTestFixture() ReporterResourceTestFixture {
 	}
 }
 
+// Helper methods to create tiny types from primitive values for NewReporterResource
+func (f ReporterResourceTestFixture) ValidIdType() ReporterResourceId {
+	id, _ := NewReporterResourceId(f.ValidId)
+	return id
+}
+
+func (f ReporterResourceTestFixture) ValidLocalResourceIdType() LocalResourceId {
+	id, _ := NewLocalResourceId(f.ValidLocalResourceId)
+	return id
+}
+
+func (f ReporterResourceTestFixture) ValidResourceTypeType() ResourceType {
+	rt, _ := NewResourceType(f.ValidResourceType)
+	return rt
+}
+
+func (f ReporterResourceTestFixture) ValidReporterTypeType() ReporterType {
+	rt, _ := NewReporterType(f.ValidReporterType)
+	return rt
+}
+
+func (f ReporterResourceTestFixture) ValidReporterInstanceIdType() ReporterInstanceId {
+	ri, _ := NewReporterInstanceId(f.ValidReporterInstanceId)
+	return ri
+}
+
+func (f ReporterResourceTestFixture) ValidResourceIdType() ResourceId {
+	id, _ := NewResourceId(f.ValidResourceId)
+	return id
+}
+
+func (f ReporterResourceTestFixture) ValidApiHrefType() ApiHref {
+	ah, _ := NewApiHref(f.ValidApiHref)
+	return ah
+}
+
+func (f ReporterResourceTestFixture) ValidConsoleHrefType() ConsoleHref {
+	ch, _ := NewConsoleHref(f.ValidConsoleHref)
+	return ch
+}
+
+func (f ReporterResourceTestFixture) EmptyConsoleHrefType() ConsoleHref {
+	return ConsoleHref("")
+}
+
+// Helper methods for invalid values (using deserialize to bypass validation)
+func (f ReporterResourceTestFixture) NilIdType() ReporterResourceId {
+	return DeserializeReporterResourceId(f.NilId)
+}
+
+func (f ReporterResourceTestFixture) EmptyLocalResourceIdType() LocalResourceId {
+	return DeserializeLocalResourceId(f.EmptyLocalResourceId)
+}
+
+func (f ReporterResourceTestFixture) WhitespaceLocalResourceIdType() LocalResourceId {
+	return DeserializeLocalResourceId(f.WhitespaceLocalResourceId)
+}
+
+func (f ReporterResourceTestFixture) EmptyResourceTypeType() ResourceType {
+	return DeserializeResourceType(f.EmptyResourceType)
+}
+
+func (f ReporterResourceTestFixture) WhitespaceResourceTypeType() ResourceType {
+	return DeserializeResourceType(f.WhitespaceResourceType)
+}
+
+func (f ReporterResourceTestFixture) EmptyReporterTypeType() ReporterType {
+	return DeserializeReporterType(f.EmptyReporterType)
+}
+
+func (f ReporterResourceTestFixture) WhitespaceReporterTypeType() ReporterType {
+	return DeserializeReporterType(f.WhitespaceReporterType)
+}
+
+func (f ReporterResourceTestFixture) EmptyReporterInstanceIdType() ReporterInstanceId {
+	return DeserializeReporterInstanceId(f.EmptyReporterInstanceId)
+}
+
+func (f ReporterResourceTestFixture) WhitespaceReporterInstanceIdType() ReporterInstanceId {
+	return DeserializeReporterInstanceId(f.WhitespaceReporterInstanceId)
+}
+
+func (f ReporterResourceTestFixture) NilResourceIdType() ResourceId {
+	return DeserializeResourceId(f.NilResourceId)
+}
+
+func (f ReporterResourceTestFixture) EmptyApiHrefType() ApiHref {
+	return DeserializeApiHref(f.EmptyApiHref)
+}
+
+func (f ReporterResourceTestFixture) WhitespaceApiHrefType() ApiHref {
+	return DeserializeApiHref(f.WhitespaceApiHref)
+}
+
+func (f ReporterResourceTestFixture) ValidLocalResourceIdUUIDType() LocalResourceId {
+	id, _ := NewLocalResourceId(f.ValidLocalResourceIdUUID)
+	return id
+}
+
+func (f ReporterResourceTestFixture) ValidLocalResourceIdStringType() LocalResourceId {
+	id, _ := NewLocalResourceId(f.ValidLocalResourceIdString)
+	return id
+}
+
 type ReporterRepresentationTestFixture struct {
-	ValidData                    JsonObject
+	ValidData                    internal.JsonObject
 	ValidReporterResourceId      string
 	ValidVersion                 uint
 	ValidGeneration              uint
 	ValidCommonVersion           uint
 	ValidReporterVersion         *string
 	NilReporterVersion           *string
-	EmptyData                    JsonObject
-	NilData                      JsonObject
+	EmptyData                    internal.JsonObject
+	NilData                      internal.JsonObject
 	EmptyReporterResourceId      string
 	WhitespaceReporterResourceId string
 	InvalidReporterResourceId    string
@@ -371,7 +533,7 @@ type ReporterRepresentationTestFixture struct {
 func NewReporterRepresentationTestFixture() ReporterRepresentationTestFixture {
 	validReporterVersion := "v1.2.3"
 	return ReporterRepresentationTestFixture{
-		ValidData: JsonObject{
+		ValidData: internal.JsonObject{
 			"name":        "test-reporter-resource",
 			"description": "A test resource for ReporterRepresentation",
 			"metadata":    map[string]interface{}{"version": "2.0", "type": "reporter"},
@@ -382,12 +544,70 @@ func NewReporterRepresentationTestFixture() ReporterRepresentationTestFixture {
 		ValidCommonVersion:           3,
 		ValidReporterVersion:         &validReporterVersion,
 		NilReporterVersion:           nil,
-		EmptyData:                    JsonObject{},
+		EmptyData:                    internal.JsonObject{},
 		NilData:                      nil,
 		EmptyReporterResourceId:      "",
 		WhitespaceReporterResourceId: "  \t\n  ",
 		InvalidReporterResourceId:    "invalid-uuid-format",
 	}
+}
+
+// Helper methods for creating domain types from test fixture
+func (f ReporterRepresentationTestFixture) ValidRepresentationType() Representation {
+	representation, _ := NewRepresentation(f.ValidData)
+	return representation
+}
+
+func (f ReporterRepresentationTestFixture) ValidReporterResourceIdType() ReporterResourceId {
+	reporterResourceId, _ := NewReporterResourceIdFromString(f.ValidReporterResourceId)
+	return reporterResourceId
+}
+
+func (f ReporterRepresentationTestFixture) ValidVersionType() Version {
+	return NewVersion(f.ValidVersion)
+}
+
+func (f ReporterRepresentationTestFixture) ValidGenerationType() Generation {
+	return NewGeneration(f.ValidGeneration)
+}
+
+func (f ReporterRepresentationTestFixture) ValidCommonVersionType() Version {
+	return NewVersion(f.ValidCommonVersion)
+}
+
+func (f ReporterRepresentationTestFixture) ValidReporterVersionType() *ReporterVersion {
+	if f.ValidReporterVersion == nil {
+		return nil
+	}
+	reporterVersion, _ := NewReporterVersion(*f.ValidReporterVersion)
+	return &reporterVersion
+}
+
+func (f ReporterRepresentationTestFixture) NilReporterVersionType() *ReporterVersion {
+	return nil
+}
+
+func (f ReporterRepresentationTestFixture) EmptyRepresentationType() Representation {
+	return DeserializeRepresentation(f.EmptyData)
+}
+
+func (f ReporterRepresentationTestFixture) NilRepresentationType() Representation {
+	return DeserializeRepresentation(f.NilData)
+}
+
+func (f ReporterRepresentationTestFixture) EmptyReporterResourceIdType() ReporterResourceId {
+	// For empty string, use nil UUID since that's what we'd get from parsing empty string
+	return DeserializeReporterResourceId(uuid.Nil)
+}
+
+func (f ReporterRepresentationTestFixture) WhitespaceReporterResourceIdType() ReporterResourceId {
+	// For whitespace string, use nil UUID since that's what we'd get from parsing whitespace
+	return DeserializeReporterResourceId(uuid.Nil)
+}
+
+func (f ReporterRepresentationTestFixture) InvalidReporterResourceIdType() ReporterResourceId {
+	// For invalid string, use nil UUID since parsing would fail
+	return DeserializeReporterResourceId(uuid.Nil)
 }
 
 type ResourceTestFixture struct {
@@ -401,29 +621,77 @@ type ResourceTestFixture struct {
 	NilId                     uuid.UUID
 	EmptyResourceType         string
 	WhitespaceResourceType    string
+
+	// Individual values for NewResource function
+	ValidLocalResourceId            string
+	ValidReporterType               string
+	ValidReporterInstanceId         string
+	ValidResourceId                 uuid.UUID
+	ValidApiHref                    string
+	ValidConsoleHref                string
+	ValidReporterRepresentationData internal.JsonObject
+	ValidCommonRepresentationData   internal.JsonObject
+
+	AnotherLocalResourceId            string
+	AnotherReporterType               string
+	AnotherReporterInstanceId         string
+	AnotherResourceId                 uuid.UUID
+	AnotherApiHref                    string
+	EmptyConsoleHref                  string
+	AnotherReporterRepresentationData internal.JsonObject
+	AnotherCommonRepresentationData   internal.JsonObject
+
+	EmptyLocalResourceId            string
+	EmptyReporterType               string
+	EmptyReporterInstanceId         string
+	EmptyApiHref                    string
+	WhitespaceLocalResourceId       string
+	WhitespaceReporterType          string
+	WhitespaceReporterInstanceId    string
+	WhitespaceApiHref               string
+	EmptyReporterRepresentationData internal.JsonObject
+	EmptyCommonRepresentationData   internal.JsonObject
 }
 
 func NewResourceTestFixture() ResourceTestFixture {
+	reporterResourceId1, _ := NewReporterResourceId(uuid.MustParse("550e8400-e29b-41d4-a716-446655440400"))
+	localResourceId1, _ := NewLocalResourceId("local-resource-123")
+	resourceType1, _ := NewResourceType("k8s_cluster")
+	reporterType1, _ := NewReporterType("acm")
+	reporterInstanceId1, _ := NewReporterInstanceId("acm-instance-001")
+	resourceId1, _ := NewResourceId(uuid.MustParse("550e8400-e29b-41d4-a716-446655440401"))
+	apiHref1, _ := NewApiHref("/api/v1/resources/123")
+	consoleHref1, _ := NewConsoleHref("/console/resources/123")
+
 	validReporterResource, _ := NewReporterResource(
-		uuid.MustParse("550e8400-e29b-41d4-a716-446655440400"),
-		"local-resource-123",
-		"k8s_cluster",
-		"acm",
-		"acm-instance-001",
-		uuid.MustParse("550e8400-e29b-41d4-a716-446655440401"),
-		"/api/v1/resources/123",
-		"/console/resources/123",
+		reporterResourceId1,
+		localResourceId1,
+		resourceType1,
+		reporterType1,
+		reporterInstanceId1,
+		resourceId1,
+		apiHref1,
+		consoleHref1,
 	)
 
+	reporterResourceId2, _ := NewReporterResourceId(uuid.MustParse("550e8400-e29b-41d4-a716-446655440500"))
+	localResourceId2, _ := NewLocalResourceId("local-resource-456")
+	resourceType2, _ := NewResourceType("host")
+	reporterType2, _ := NewReporterType("ocm")
+	reporterInstanceId2, _ := NewReporterInstanceId("ocm-instance-001")
+	resourceId2, _ := NewResourceId(uuid.MustParse("550e8400-e29b-41d4-a716-446655440501"))
+	apiHref2, _ := NewApiHref("/api/v1/resources/456")
+	consoleHref2 := ConsoleHref("")
+
 	anotherReporterResource, _ := NewReporterResource(
-		uuid.MustParse("550e8400-e29b-41d4-a716-446655440500"),
-		"local-resource-456",
-		"host",
-		"ocm",
-		"ocm-instance-001",
-		uuid.MustParse("550e8400-e29b-41d4-a716-446655440501"),
-		"/api/v1/resources/456",
-		"",
+		reporterResourceId2,
+		localResourceId2,
+		resourceType2,
+		reporterType2,
+		reporterInstanceId2,
+		resourceId2,
+		apiHref2,
+		consoleHref2,
 	)
 
 	return ResourceTestFixture{
@@ -437,5 +705,348 @@ func NewResourceTestFixture() ResourceTestFixture {
 		NilId:                     uuid.Nil,
 		EmptyResourceType:         "",
 		WhitespaceResourceType:    "  \t\n  ",
+		// Individual values for NewResource function
+		ValidLocalResourceId:            "local-resource-123",
+		ValidReporterType:               "acm",
+		ValidReporterInstanceId:         "acm-instance-001",
+		ValidResourceId:                 uuid.MustParse("550e8400-e29b-41d4-a716-446655440401"),
+		ValidApiHref:                    "/api/v1/resources/123",
+		ValidConsoleHref:                "/console/resources/123",
+		ValidReporterRepresentationData: internal.JsonObject{"name": "test-reporter-resource", "description": "A test resource for ReporterRepresentation", "metadata": map[string]interface{}{"version": "2.0", "type": "reporter"}},
+		ValidCommonRepresentationData:   internal.JsonObject{"id": "550e8400-e29b-41d4-a716-446655440400", "type": "reporter", "version": 1, "generation": 2, "commonVersion": 3},
+
+		AnotherLocalResourceId:            "local-resource-456",
+		AnotherReporterType:               "ocm",
+		AnotherReporterInstanceId:         "ocm-instance-001",
+		AnotherResourceId:                 uuid.MustParse("550e8400-e29b-41d4-a716-446655440501"),
+		AnotherApiHref:                    "/api/v1/resources/456",
+		EmptyConsoleHref:                  "",
+		AnotherReporterRepresentationData: internal.JsonObject{"name": "test-reporter-resource", "description": "A test resource for ReporterRepresentation", "metadata": map[string]interface{}{"version": "2.0", "type": "reporter"}},
+		AnotherCommonRepresentationData:   internal.JsonObject{"id": "550e8400-e29b-41d4-a716-446655440500", "type": "reporter", "version": 1, "generation": 2, "commonVersion": 3},
+
+		EmptyLocalResourceId:            "",
+		EmptyReporterType:               "",
+		EmptyReporterInstanceId:         "",
+		EmptyApiHref:                    "",
+		WhitespaceLocalResourceId:       "  \t\n  ",
+		WhitespaceReporterType:          "  \t\n  ",
+		WhitespaceReporterInstanceId:    "  \t\n  ",
+		WhitespaceApiHref:               "  \t\n  ",
+		EmptyReporterRepresentationData: internal.JsonObject{},
+		EmptyCommonRepresentationData:   internal.JsonObject{},
 	}
+}
+
+// Helper methods to create tiny types from primitive values for NewResource
+func (f ResourceTestFixture) ValidResourceIdType() ResourceId {
+	id, _ := NewResourceId(f.ValidId)
+	return id
+}
+
+func (f ResourceTestFixture) ValidLocalResourceIdType() LocalResourceId {
+	id, _ := NewLocalResourceId(f.ValidLocalResourceId)
+	return id
+}
+
+func (f ResourceTestFixture) ValidResourceTypeType() ResourceType {
+	rt, _ := NewResourceType(f.ValidResourceType)
+	return rt
+}
+
+func (f ResourceTestFixture) ValidReporterTypeType() ReporterType {
+	rt, _ := NewReporterType(f.ValidReporterType)
+	return rt
+}
+
+func (f ResourceTestFixture) ValidReporterInstanceIdType() ReporterInstanceId {
+	ri, _ := NewReporterInstanceId(f.ValidReporterInstanceId)
+	return ri
+}
+
+func (f ResourceTestFixture) ValidReporterResourceIdType() ReporterResourceId {
+	id, _ := NewReporterResourceId(f.ValidResourceId)
+	return id
+}
+
+func (f ResourceTestFixture) ValidApiHrefType() ApiHref {
+	ah, _ := NewApiHref(f.ValidApiHref)
+	return ah
+}
+
+func (f ResourceTestFixture) ValidConsoleHrefType() ConsoleHref {
+	ch, _ := NewConsoleHref(f.ValidConsoleHref)
+	return ch
+}
+
+// Helper methods for "another" values
+func (f ResourceTestFixture) AnotherResourceTypeType() ResourceType {
+	rt, _ := NewResourceType(f.AnotherResourceType)
+	return rt
+}
+
+func (f ResourceTestFixture) AnotherLocalResourceIdType() LocalResourceId {
+	id, _ := NewLocalResourceId(f.AnotherLocalResourceId)
+	return id
+}
+
+func (f ResourceTestFixture) AnotherReporterTypeType() ReporterType {
+	rt, _ := NewReporterType(f.AnotherReporterType)
+	return rt
+}
+
+func (f ResourceTestFixture) AnotherReporterInstanceIdType() ReporterInstanceId {
+	ri, _ := NewReporterInstanceId(f.AnotherReporterInstanceId)
+	return ri
+}
+
+func (f ResourceTestFixture) AnotherReporterResourceIdType() ReporterResourceId {
+	id, _ := NewReporterResourceId(f.AnotherResourceId)
+	return id
+}
+
+func (f ResourceTestFixture) AnotherApiHrefType() ApiHref {
+	ah, _ := NewApiHref(f.AnotherApiHref)
+	return ah
+}
+
+func (f ResourceTestFixture) EmptyConsoleHrefType() ConsoleHref {
+	return ConsoleHref("")
+}
+
+func (f ResourceTestFixture) ValidReporterRepresentationType() Representation {
+	rep, _ := NewRepresentation(f.ValidReporterRepresentationData)
+	return rep
+}
+
+func (f ResourceTestFixture) ValidCommonRepresentationType() Representation {
+	rep, _ := NewRepresentation(f.ValidCommonRepresentationData)
+	return rep
+}
+
+func (f ResourceTestFixture) AnotherReporterRepresentationType() Representation {
+	rep, _ := NewRepresentation(f.AnotherReporterRepresentationData)
+	return rep
+}
+
+func (f ResourceTestFixture) AnotherCommonRepresentationType() Representation {
+	rep, _ := NewRepresentation(f.AnotherCommonRepresentationData)
+	return rep
+}
+
+func (f ResourceTestFixture) EmptyRepresentationType() Representation {
+	return DeserializeRepresentation(f.EmptyReporterRepresentationData)
+}
+
+func (f ResourceTestFixture) NilIdType() ResourceId {
+	return DeserializeResourceId(f.NilId)
+}
+
+func (f ResourceTestFixture) EmptyLocalResourceIdType() LocalResourceId {
+	return DeserializeLocalResourceId(f.EmptyLocalResourceId)
+}
+
+func (f ResourceTestFixture) EmptyResourceTypeType() ResourceType {
+	return DeserializeResourceType(f.EmptyResourceType)
+}
+
+func (f ResourceTestFixture) EmptyReporterTypeType() ReporterType {
+	return DeserializeReporterType(f.EmptyReporterType)
+}
+
+func (f ResourceTestFixture) EmptyReporterInstanceIdType() ReporterInstanceId {
+	return DeserializeReporterInstanceId(f.EmptyReporterInstanceId)
+}
+
+func (f ResourceTestFixture) EmptyApiHrefType() ApiHref {
+	return DeserializeApiHref(f.EmptyApiHref)
+}
+
+func (f ResourceTestFixture) WhitespaceResourceTypeType() ResourceType {
+	return DeserializeResourceType(f.WhitespaceResourceType)
+}
+
+func (f ResourceTestFixture) WhitespaceReporterTypeType() ReporterType {
+	return DeserializeReporterType(f.WhitespaceReporterType)
+}
+
+func (f ResourceTestFixture) WhitespaceReporterInstanceIdType() ReporterInstanceId {
+	return DeserializeReporterInstanceId(f.WhitespaceReporterInstanceId)
+}
+
+func (f ResourceTestFixture) WhitespaceLocalResourceIdType() LocalResourceId {
+	return DeserializeLocalResourceId(f.WhitespaceLocalResourceId)
+}
+
+type ResourceEventTestFixture struct {
+	ValidResourceId         uuid.UUID
+	ValidResourceType       string
+	ValidReporterType       string
+	ValidReporterInstanceId string
+	ValidReporterData       internal.JsonObject
+	ValidReporterResourceID string
+	ValidReporterVersion    uint
+	ValidReporterGeneration uint
+	ValidCommonData         internal.JsonObject
+	ValidCommonVersion      uint
+	ValidReporterVersionStr *string
+
+	AnotherResourceId     uuid.UUID
+	AnotherResourceType   string
+	AnotherReporterData   internal.JsonObject
+	AnotherCommonData     internal.JsonObject
+	NilReporterVersionStr *string
+
+	InvalidResourceId       uuid.UUID
+	EmptyResourceType       string
+	EmptyReporterType       string
+	EmptyReporterInstanceId string
+	EmptyReporterData       internal.JsonObject
+	EmptyReporterResourceID string
+	EmptyCommonData         internal.JsonObject
+	WhitespaceResourceType  string
+}
+
+func NewResourceEventTestFixture() ResourceEventTestFixture {
+	validVersionStr := "1.2.3"
+
+	return ResourceEventTestFixture{
+		ValidResourceId:         uuid.MustParse("550e8400-e29b-41d4-a716-446655440700"),
+		ValidResourceType:       "k8s_cluster",
+		ValidReporterType:       "acm",
+		ValidReporterInstanceId: "acm-instance-001",
+		ValidReporterData:       internal.JsonObject{"name": "test-cluster", "status": "active"},
+		ValidReporterResourceID: "550e8400-e29b-41d4-a716-446655440701",
+		ValidReporterVersion:    1,
+		ValidReporterGeneration: 0,
+		ValidCommonData:         internal.JsonObject{"id": "test-id", "type": "cluster"},
+		ValidCommonVersion:      1,
+		ValidReporterVersionStr: &validVersionStr,
+
+		AnotherResourceId:     uuid.MustParse("550e8400-e29b-41d4-a716-446655440800"),
+		AnotherResourceType:   "host",
+		AnotherReporterData:   internal.JsonObject{"hostname": "test-host", "os": "linux"},
+		AnotherCommonData:     internal.JsonObject{"id": "host-id", "type": "host"},
+		NilReporterVersionStr: nil,
+
+		InvalidResourceId:       uuid.Nil,
+		EmptyResourceType:       "",
+		EmptyReporterType:       "",
+		EmptyReporterInstanceId: "",
+		EmptyReporterData:       internal.JsonObject{},
+		EmptyReporterResourceID: "",
+		EmptyCommonData:         internal.JsonObject{},
+		WhitespaceResourceType:  "  \t\n  ",
+	}
+}
+
+// Helper methods for creating domain types from test fixture
+func (f ResourceEventTestFixture) ValidResourceIdType() ResourceId {
+	resourceId, _ := NewResourceId(f.ValidResourceId)
+	return resourceId
+}
+
+func (f ResourceEventTestFixture) ValidResourceTypeType() ResourceType {
+	resourceType, _ := NewResourceType(f.ValidResourceType)
+	return resourceType
+}
+
+func (f ResourceEventTestFixture) ValidReporterTypeType() ReporterType {
+	reporterType, _ := NewReporterType(f.ValidReporterType)
+	return reporterType
+}
+
+func (f ResourceEventTestFixture) ValidReporterInstanceIdType() ReporterInstanceId {
+	reporterInstanceId, _ := NewReporterInstanceId(f.ValidReporterInstanceId)
+	return reporterInstanceId
+}
+
+func (f ResourceEventTestFixture) ValidReporterDataType() Representation {
+	representation, _ := NewRepresentation(f.ValidReporterData)
+	return representation
+}
+
+func (f ResourceEventTestFixture) ValidReporterResourceIdType() ReporterResourceId {
+	reporterResourceId, _ := NewReporterResourceIdFromString(f.ValidReporterResourceID)
+	return reporterResourceId
+}
+
+func (f ResourceEventTestFixture) ValidReporterVersionType() Version {
+	return NewVersion(f.ValidReporterVersion)
+}
+
+func (f ResourceEventTestFixture) ValidReporterGenerationType() Generation {
+	return NewGeneration(f.ValidReporterGeneration)
+}
+
+func (f ResourceEventTestFixture) ValidCommonDataType() Representation {
+	representation, _ := NewRepresentation(f.ValidCommonData)
+	return representation
+}
+
+func (f ResourceEventTestFixture) ValidCommonVersionType() Version {
+	return NewVersion(f.ValidCommonVersion)
+}
+
+func (f ResourceEventTestFixture) ValidReporterVersionStrType() *ReporterVersion {
+	if f.ValidReporterVersionStr == nil {
+		return nil
+	}
+	reporterVersion, _ := NewReporterVersion(*f.ValidReporterVersionStr)
+	return &reporterVersion
+}
+
+func (f ResourceEventTestFixture) NilReporterVersionStrType() *ReporterVersion {
+	return nil
+}
+
+func (f ResourceEventTestFixture) AnotherResourceIdType() ResourceId {
+	resourceId, _ := NewResourceId(f.AnotherResourceId)
+	return resourceId
+}
+
+func (f ResourceEventTestFixture) AnotherResourceTypeType() ResourceType {
+	resourceType, _ := NewResourceType(f.AnotherResourceType)
+	return resourceType
+}
+
+func (f ResourceEventTestFixture) AnotherReporterDataType() Representation {
+	representation, _ := NewRepresentation(f.AnotherReporterData)
+	return representation
+}
+
+func (f ResourceEventTestFixture) AnotherCommonDataType() Representation {
+	representation, _ := NewRepresentation(f.AnotherCommonData)
+	return representation
+}
+
+func (f ResourceEventTestFixture) InvalidResourceIdType() ResourceId {
+	return DeserializeResourceId(f.InvalidResourceId)
+}
+
+func (f ResourceEventTestFixture) EmptyResourceTypeType() ResourceType {
+	return DeserializeResourceType(f.EmptyResourceType)
+}
+
+func (f ResourceEventTestFixture) WhitespaceResourceTypeType() ResourceType {
+	return DeserializeResourceType(f.WhitespaceResourceType)
+}
+
+func (f ResourceEventTestFixture) EmptyReporterTypeType() ReporterType {
+	return DeserializeReporterType(f.EmptyReporterType)
+}
+
+func (f ResourceEventTestFixture) EmptyReporterInstanceIdType() ReporterInstanceId {
+	return DeserializeReporterInstanceId(f.EmptyReporterInstanceId)
+}
+
+func (f ResourceEventTestFixture) EmptyReporterDataType() Representation {
+	return DeserializeRepresentation(f.EmptyReporterData)
+}
+
+func (f ResourceEventTestFixture) EmptyReporterResourceIdType() ReporterResourceId {
+	return DeserializeReporterResourceId(uuid.Nil)
+}
+
+func (f ResourceEventTestFixture) EmptyCommonDataType() Representation {
+	return DeserializeRepresentation(f.EmptyCommonData)
 }

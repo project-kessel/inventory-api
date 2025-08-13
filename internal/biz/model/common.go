@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
-
 	"github.com/project-kessel/inventory-api/internal"
 )
 
@@ -100,12 +99,16 @@ func DeserializeTombstone(value bool) Tombstone {
 	return DeserializeBool[Tombstone](value)
 }
 
+func DeserializeURI(value string) URI {
+	return Deserialize[URI](value)
+}
+
 func DeserializeApiHref(value string) ApiHref {
-	return Deserialize[ApiHref](value)
+	return ApiHref(DeserializeURI(value))
 }
 
 func DeserializeConsoleHref(value string) ConsoleHref {
-	return Deserialize[ConsoleHref](value)
+	return ConsoleHref(DeserializeURI(value))
 }
 
 func DeserializeLocalResourceId(value string) LocalResourceId {
@@ -312,40 +315,42 @@ func (t Tombstone) Serialize() bool {
 	return SerializeBool(t)
 }
 
-type ApiHref string
+type URI string
+
+func NewURI(uri string) (URI, error) {
+	uri = strings.TrimSpace(uri)
+	if uri == "" {
+		return URI(""), fmt.Errorf("%w: URI", ErrEmpty)
+	}
+	return URI(uri), nil
+}
+
+func (u URI) String() string {
+	return string(u)
+}
+
+func (u URI) Serialize() string {
+	return SerializeString(u)
+}
+
+// Type aliases for backward compatibility and semantic clarity
+type ApiHref = URI
+type ConsoleHref = URI
 
 func NewApiHref(href string) (ApiHref, error) {
-	href = strings.TrimSpace(href)
-	if href == "" {
+	uri, err := NewURI(href)
+	if err != nil {
 		return ApiHref(""), fmt.Errorf("%w: ApiHref", ErrEmpty)
 	}
-	return ApiHref(href), nil
+	return ApiHref(uri), nil
 }
-
-func (ah ApiHref) String() string {
-	return string(ah)
-}
-
-func (ah ApiHref) Serialize() string {
-	return SerializeString(ah)
-}
-
-type ConsoleHref string
 
 func NewConsoleHref(href string) (ConsoleHref, error) {
-	href = strings.TrimSpace(href)
-	if href == "" {
+	uri, err := NewURI(href)
+	if err != nil {
 		return ConsoleHref(""), fmt.Errorf("%w: ConsoleHref", ErrEmpty)
 	}
-	return ConsoleHref(href), nil
-}
-
-func (ch ConsoleHref) String() string {
-	return string(ch)
-}
-
-func (ch ConsoleHref) Serialize() string {
-	return SerializeString(ch)
+	return ConsoleHref(uri), nil
 }
 
 type LocalResourceId string
@@ -366,9 +371,26 @@ func (lr LocalResourceId) Serialize() string {
 	return SerializeString(lr)
 }
 
-// JsonObject is an alias to internal.JsonObject for consistency
-type JsonObject = internal.JsonObject
+type Representation internal.JsonObject
 
-type Representation struct {
-	data JsonObject
+func NewRepresentation(data internal.JsonObject) (Representation, error) {
+	if data == nil {
+		return nil, fmt.Errorf("representation data cannot be nil")
+	}
+	if len(data) == 0 {
+		return nil, fmt.Errorf("representation data cannot be empty")
+	}
+	return Representation(data), nil
+}
+
+func (r Representation) Data() internal.JsonObject {
+	return internal.JsonObject(r)
+}
+
+func (r Representation) Serialize() internal.JsonObject {
+	return internal.JsonObject(r)
+}
+
+func DeserializeRepresentation(data internal.JsonObject) Representation {
+	return Representation(data)
 }

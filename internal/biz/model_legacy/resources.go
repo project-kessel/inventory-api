@@ -9,15 +9,17 @@ import (
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 	"gorm.io/gorm/schema"
+
+	"github.com/project-kessel/inventory-api/internal"
 )
 
 type Resource struct {
-	ID               uuid.UUID  `gorm:"type:uuid;primarykey"`
-	InventoryId      *uuid.UUID `gorm:"index"`
-	OrgId            string     `gorm:"index"`
-	ResourceData     JsonObject
-	ResourceType     string
-	WorkspaceId      string
+	ID               uuid.UUID           `gorm:"type:uuid;primarykey"`
+	InventoryId      *uuid.UUID          `gorm:"index"`
+	OrgId            string              `gorm:"index"`
+	ResourceData     internal.JsonObject `json:"resource_data" gorm:"type:jsonb"`
+	ResourceType     string              `json:"resource_type" gorm:"type:text;index:resource_type_id_index"`
+	WorkspaceId      string              `json:"workspace_id" gorm:"type:text;index:workspace_id_resource_type_index,priority:2"`
 	ConsoleHref      string
 	ApiHref          string
 	Labels           Labels

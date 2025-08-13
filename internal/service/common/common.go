@@ -6,10 +6,11 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/project-kessel/inventory-api/internal"
+	bizmodel "github.com/project-kessel/inventory-api/internal/biz/model"
 	"google.golang.org/protobuf/types/known/structpb"
 
 	"github.com/google/uuid"
-	"github.com/project-kessel/inventory-api/internal"
 
 	pbrelation "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/relationships"
 	pbresource "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/resources"
@@ -108,14 +109,14 @@ func ExtractInventoryId(inventoryIDStr string) (*uuid.UUID, error) {
 
 func ExtractReporterType(reporterType string) (string, error) {
 	if reporterType == "" {
-		return "", fmt.Errorf("reporterType is required but was empty")
+		return "", fmt.Errorf("%w: ReporterType", bizmodel.ErrEmpty)
 	}
 	return reporterType, nil
 }
 
 func ExtractReporterInstanceID(reporterInstanceId string) (string, error) {
 	if reporterInstanceId == "" {
-		return "", fmt.Errorf("reporterInstanceId is required but was empty")
+		return "", fmt.Errorf("%w: ReporterInstanceId", bizmodel.ErrEmpty)
 	}
 	return reporterInstanceId, nil
 }

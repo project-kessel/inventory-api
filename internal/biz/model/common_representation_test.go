@@ -14,11 +14,11 @@ func TestCommonRepresentation_Initialization(t *testing.T) {
 		t.Parallel()
 
 		_, err := NewCommonRepresentation(
-			fixture.ValidResourceId,
-			fixture.ValidData,
-			fixture.ValidVersion,
-			fixture.ValidReportedByReporterType,
-			fixture.ValidReportedByReporterInstance,
+			fixture.ValidResourceIdType(),
+			fixture.ValidRepresentationType(),
+			fixture.ValidVersionType(),
+			fixture.ValidReporterTypeType(),
+			fixture.ValidReporterInstanceIdType(),
 		)
 
 		if err != nil {
@@ -30,11 +30,11 @@ func TestCommonRepresentation_Initialization(t *testing.T) {
 		t.Parallel()
 
 		_, err := NewCommonRepresentation(
-			fixture.ValidResourceId,
-			fixture.ValidData,
-			fixture.ZeroVersion,
-			fixture.ValidReportedByReporterType,
-			fixture.ValidReportedByReporterInstance,
+			fixture.ValidResourceIdType(),
+			fixture.ValidRepresentationType(),
+			fixture.ZeroVersionType(),
+			fixture.ValidReporterTypeType(),
+			fixture.ValidReporterInstanceIdType(),
 		)
 
 		if err != nil {
@@ -46,11 +46,11 @@ func TestCommonRepresentation_Initialization(t *testing.T) {
 		t.Parallel()
 
 		_, err := NewCommonRepresentation(
-			fixture.NilResourceId,
-			fixture.ValidData,
-			fixture.ValidVersion,
-			fixture.ValidReportedByReporterType,
-			fixture.ValidReportedByReporterInstance,
+			fixture.NilResourceIdType(),
+			fixture.ValidRepresentationType(),
+			fixture.ValidVersionType(),
+			fixture.ValidReporterTypeType(),
+			fixture.ValidReporterInstanceIdType(),
 		)
 
 		errors.AssertIs(t, err, ErrInvalidUUID)
@@ -60,11 +60,11 @@ func TestCommonRepresentation_Initialization(t *testing.T) {
 		t.Parallel()
 
 		_, err := NewCommonRepresentation(
-			fixture.ValidResourceId,
-			fixture.NilData,
-			fixture.ValidVersion,
-			fixture.ValidReportedByReporterType,
-			fixture.ValidReportedByReporterInstance,
+			fixture.ValidResourceIdType(),
+			fixture.NilRepresentationType(),
+			fixture.ValidVersionType(),
+			fixture.ValidReporterTypeType(),
+			fixture.ValidReporterInstanceIdType(),
 		)
 
 		errors.AssertIs(t, err, ErrInvalidData)
@@ -74,11 +74,11 @@ func TestCommonRepresentation_Initialization(t *testing.T) {
 		t.Parallel()
 
 		_, err := NewCommonRepresentation(
-			fixture.ValidResourceId,
-			fixture.EmptyData,
-			fixture.ValidVersion,
-			fixture.ValidReportedByReporterType,
-			fixture.ValidReportedByReporterInstance,
+			fixture.ValidResourceIdType(),
+			fixture.EmptyRepresentationType(),
+			fixture.ValidVersionType(),
+			fixture.ValidReporterTypeType(),
+			fixture.ValidReporterInstanceIdType(),
 		)
 
 		errors.AssertIs(t, err, ErrInvalidData)
@@ -88,11 +88,11 @@ func TestCommonRepresentation_Initialization(t *testing.T) {
 		t.Parallel()
 
 		_, err := NewCommonRepresentation(
-			fixture.ValidResourceId,
-			fixture.ValidData,
-			fixture.ValidVersion,
-			fixture.EmptyReporterType,
-			fixture.ValidReportedByReporterInstance,
+			fixture.ValidResourceIdType(),
+			fixture.ValidRepresentationType(),
+			fixture.ValidVersionType(),
+			fixture.EmptyReporterTypeType(),
+			fixture.ValidReporterInstanceIdType(),
 		)
 
 		errors.AssertIs(t, err, ErrEmpty)
@@ -102,11 +102,11 @@ func TestCommonRepresentation_Initialization(t *testing.T) {
 		t.Parallel()
 
 		_, err := NewCommonRepresentation(
-			fixture.ValidResourceId,
-			fixture.ValidData,
-			fixture.ValidVersion,
-			fixture.WhitespaceReporterType,
-			fixture.ValidReportedByReporterInstance,
+			fixture.ValidResourceIdType(),
+			fixture.ValidRepresentationType(),
+			fixture.ValidVersionType(),
+			fixture.WhitespaceReporterTypeType(),
+			fixture.ValidReporterInstanceIdType(),
 		)
 
 		errors.AssertIs(t, err, ErrEmpty)
@@ -116,11 +116,11 @@ func TestCommonRepresentation_Initialization(t *testing.T) {
 		t.Parallel()
 
 		_, err := NewCommonRepresentation(
-			fixture.ValidResourceId,
-			fixture.ValidData,
-			fixture.ValidVersion,
-			fixture.ValidReportedByReporterType,
-			fixture.EmptyReporterInstance,
+			fixture.ValidResourceIdType(),
+			fixture.ValidRepresentationType(),
+			fixture.ValidVersionType(),
+			fixture.ValidReporterTypeType(),
+			fixture.EmptyReporterInstanceIdType(),
 		)
 
 		errors.AssertIs(t, err, ErrEmpty)
@@ -130,11 +130,11 @@ func TestCommonRepresentation_Initialization(t *testing.T) {
 		t.Parallel()
 
 		_, err := NewCommonRepresentation(
-			fixture.ValidResourceId,
-			fixture.ValidData,
-			fixture.ValidVersion,
-			fixture.ValidReportedByReporterType,
-			fixture.WhitespaceReporterInstance,
+			fixture.ValidResourceIdType(),
+			fixture.ValidRepresentationType(),
+			fixture.ValidVersionType(),
+			fixture.ValidReporterTypeType(),
+			fixture.WhitespaceReporterInstanceIdType(),
 		)
 
 		errors.AssertIs(t, err, ErrEmpty)

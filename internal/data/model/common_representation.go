@@ -56,3 +56,34 @@ func validateCommonRepresentation(cr *CommonRepresentation) error {
 		bizmodel.ValidateMaxLength("ReportedByReporterInstance", cr.ReportedByReporterInstance, MaxReporterInstanceIDLength),
 	)
 }
+
+// SerializeToSnapshot converts GORM CommonRepresentation to snapshot type - direct initialization without validation
+func (cr CommonRepresentation) SerializeToSnapshot() bizmodel.CommonRepresentationSnapshot {
+	// Create representation snapshot
+	representationSnapshot := bizmodel.RepresentationSnapshot{
+		Data: cr.Data,
+	}
+
+	return bizmodel.CommonRepresentationSnapshot{
+		Representation:             representationSnapshot,
+		ResourceId:                 cr.ResourceId,
+		Version:                    cr.Version,
+		ReportedByReporterType:     cr.ReportedByReporterType,
+		ReportedByReporterInstance: cr.ReportedByReporterInstance,
+		CreatedAt:                  cr.CreatedAt,
+	}
+}
+
+// DeserializeFromSnapshot creates GORM CommonRepresentation from snapshot - direct initialization without validation
+func DeserializeCommonRepresentationFromSnapshot(snapshot bizmodel.CommonRepresentationSnapshot) CommonRepresentation {
+	return CommonRepresentation{
+		Representation: Representation{
+			Data: snapshot.Representation.Data,
+		},
+		ResourceId:                 snapshot.ResourceId,
+		Version:                    snapshot.Version,
+		ReportedByReporterType:     snapshot.ReportedByReporterType,
+		ReportedByReporterInstance: snapshot.ReportedByReporterInstance,
+		CreatedAt:                  snapshot.CreatedAt,
+	}
+}

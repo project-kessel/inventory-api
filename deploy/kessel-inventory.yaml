@@ -56,6 +56,13 @@ objects:
               httpGet:
                 path: /api/inventory/v1/readyz
                 port: 8000
+            resources:
+              requests:
+                memory: ${INVENTORY_REQUESTS_MEMORY}
+                cpu: ${INVENTORY_REQUESTS_CPU}
+              limits:
+                memory: ${INVENTORY_LIMITS_MEMORY}
+                cpu: ${INVENTORY_LIMITS_CPU}
             env:
             - name: CLOWDER_ENABLED
               value: "true"
@@ -171,3 +178,15 @@ parameters:
   - description: Name of Secret that contains the Kafka clusters' CA Cert (if required)
     name: CA_CERT_SECRET
     value: kessel-kafka-connect-config
+  - description: Memory request for Inventory service
+    name: INVENTORY_REQUESTS_MEMORY
+    value: '512Mi'
+  - description: CPU request for Inventory service
+    name: INVENTORY_REQUESTS_CPU
+    value: '150m'
+  - description: Memory limit for Inventory service
+    name: INVENTORY_LIMITS_MEMORY
+    value: '1Gi'
+  - description: CPU limit for Inventory service
+    name: INVENTORY_LIMITS_CPU
+    value: '300m'

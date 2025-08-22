@@ -28,6 +28,8 @@ consumer:
     backoff-factor: 5
   auth:
     enabled: false
+service:
+  use_new: true
 resources:
   schemaPath: "data/schema/resources"
   use_cache: true

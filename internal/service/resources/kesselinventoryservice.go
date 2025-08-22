@@ -15,6 +15,7 @@ import (
 	"github.com/project-kessel/inventory-api/internal/middleware"
 	conv "github.com/project-kessel/inventory-api/internal/service/common"
 	pbv1beta1 "github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
+	"github.com/spf13/viper"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -30,19 +31,24 @@ func NewKesselInventoryServiceV1beta2(c *resources.Usecase) *InventoryService {
 	}
 }
 
+func (c *InventoryService) useNew() bool {
+	return viper.GetBool("service.use_new")
+}
+
 func (c *InventoryService) ReportResource(ctx context.Context, r *pb.ReportResourceRequest) (*pb.ReportResourceResponse, error) {
 	identity, err := middleware.GetIdentity(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	if r.GetUseNew() {
+	if c.useNew() {
+		log.Info("New Report Resource")
 		err := c.Ctl.ReportResource(ctx, r, identity.Principal)
 		if err != nil {
 			return nil, err
 		}
-
 	} else {
+		log.Info("Old Report Resource")
 		resource, err := RequestToResource(r, identity)
 		if err != nil {
 			return nil, err

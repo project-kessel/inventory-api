@@ -11,6 +11,7 @@ import (
 
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/project-kessel/inventory-api/internal/metricscollector"
+	"github.com/project-kessel/inventory-api/internal/service"
 	"github.com/sony/gobreaker"
 	"github.com/spf13/cobra"
 	"go.opentelemetry.io/otel"
@@ -63,6 +64,7 @@ func NewCommand(
 	eventingOptions *eventing.Options,
 	consumerOptions *consumer.Options,
 	consistencyOptions *consistency.Options,
+	serviceOptions *service.Options,
 	loggerOptions common.LoggerOptions,
 ) *cobra.Command {
 	cmd := &cobra.Command{
@@ -365,6 +367,7 @@ func NewCommand(
 	eventingOptions.AddFlags(cmd.Flags(), "eventing")
 	consumerOptions.AddFlags(cmd.Flags(), "consumer")
 	consistencyOptions.AddFlags(cmd.Flags(), "consistency")
+	serviceOptions.AddFlags(cmd.Flags(), "service")
 
 	return cmd
 }

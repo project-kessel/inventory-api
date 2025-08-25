@@ -30,6 +30,8 @@ objects:
         consistency:
           read-after-write-enabled: true # false == off for all service providers
           read-after-write-allowlist: ["*"] # specify ["*"] to allow any request to optionally r-a-w
+        service:
+          use_v1beta2_db: true
         log:
           level: "info"
 

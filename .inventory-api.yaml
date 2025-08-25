@@ -16,7 +16,7 @@ storage:
   sqlite3:
     dsn: inventory.db
 service:
-  use_new: true
+  use_v1beta2_db: true
 resources:
   schemaPath: "data/schema/resources"
   use_cache: true

@@ -31,8 +31,8 @@ func NewKesselInventoryServiceV1beta2(c *resources.Usecase) *InventoryService {
 	}
 }
 
-func (c *InventoryService) useNew() bool {
-	return viper.GetBool("service.use_new")
+func (c *InventoryService) useV1beta2Db() bool {
+	return viper.GetBool("service.use_v1beta2_db")
 }
 
 func (c *InventoryService) ReportResource(ctx context.Context, r *pb.ReportResourceRequest) (*pb.ReportResourceResponse, error) {
@@ -41,7 +41,7 @@ func (c *InventoryService) ReportResource(ctx context.Context, r *pb.ReportResou
 		return nil, err
 	}
 
-	if c.useNew() {
+	if c.useV1beta2Db() {
 		log.Info("New Report Resource")
 		err := c.Ctl.ReportResource(ctx, r, identity.Principal)
 		if err != nil {

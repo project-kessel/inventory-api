@@ -5,12 +5,12 @@ import (
 )
 
 type Options struct {
-	UseNew bool `mapstructure:"use_new"`
+	UseV1beta2Db bool `mapstructure:"use_v1beta2_db"`
 }
 
 func NewOptions() *Options {
 	return &Options{
-		UseNew: false,
+		UseV1beta2Db: false,
 	}
 }
 
@@ -18,7 +18,7 @@ func (o *Options) AddFlags(fs *pflag.FlagSet, prefix string) {
 	if prefix != "" {
 		prefix = prefix + "."
 	}
-	fs.BoolVar(&o.UseNew, prefix+"use_new", o.UseNew, "Toggle for using new resource reporting flow (default: false)")
+	fs.BoolVar(&o.UseV1beta2Db, prefix+"use_v1beta2_db", o.UseV1beta2Db, "Toggle for using v1beta2 database operations (default: false)")
 }
 
 func (o *Options) Validate() []error {

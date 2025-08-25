@@ -27,7 +27,7 @@ storage:
 consumer:
   enabled: false
 service:
-  use_new: false
+  use_v1beta2_db: false
 resources:
   schemaPath: "data/schema/resources"
   use_cache: true

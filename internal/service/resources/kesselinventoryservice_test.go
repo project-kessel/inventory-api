@@ -475,7 +475,9 @@ func TestInventoryService_Check_Allowed(t *testing.T) {
 			mock.Anything,
 			"hbi",
 			"view",
-			mock.AnythingOfType("*model_legacy.Resource"),
+			mock.Anything,
+			mock.Anything,
+			mock.Anything,
 			mock.Anything,
 		).
 		Return(relationsV1beta1.CheckResponse_ALLOWED_TRUE, &relationsV1beta1.ConsistencyToken{}, nil).
@@ -491,7 +493,7 @@ func TestInventoryService_Check_Allowed(t *testing.T) {
 
 	service := svc.NewKesselInventoryServiceV1beta2(uc)
 
-	resp, err := service.CheckLegacy(ctx, req)
+	resp, err := service.Check(ctx, req)
 
 	assert.NoError(t, err)
 	if assert.NotNil(t, resp) {
@@ -591,7 +593,9 @@ func TestInventoryService_Check_Denied(t *testing.T) {
 			mock.Anything,
 			"hbi",
 			"view",
-			mock.AnythingOfType("*model_legacy.Resource"),
+			mock.Anything,
+			mock.Anything,
+			mock.Anything,
 			mock.Anything,
 		).
 		Return(relationsV1beta1.CheckResponse_ALLOWED_FALSE, &relationsV1beta1.ConsistencyToken{}, nil).
@@ -607,7 +611,7 @@ func TestInventoryService_Check_Denied(t *testing.T) {
 
 	service := svc.NewKesselInventoryServiceV1beta2(uc)
 
-	resp, err := service.CheckLegacy(ctx, req)
+	resp, err := service.Check(ctx, req)
 
 	assert.NoError(t, err)
 	if assert.NotNil(t, resp) {

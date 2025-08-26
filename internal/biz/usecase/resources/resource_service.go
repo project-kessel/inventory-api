@@ -173,6 +173,7 @@ func (uc *Usecase) ReportResource(ctx context.Context, request *v1beta2.ReportRe
 // Check verifies if a subject has the specified permission on a resource identified by the reporter resource ID.
 func (uc *Usecase) Check(ctx context.Context, permission, namespace string, sub *kessel.SubjectReference, reporterResourceKey model.ReporterResourceKey) (bool, error) {
 	res, err := uc.resourceRepository.FindResourceByKeys(nil, reporterResourceKey)
+	var consistencyToken string
 	if err != nil {
 		// If the resource doesn't exist in inventory (ie. no consistency token available)
 		// we send a check request with minimize latency
@@ -180,9 +181,12 @@ func (uc *Usecase) Check(ctx context.Context, permission, namespace string, sub 
 		if !errors.Is(err, gorm.ErrRecordNotFound) {
 			return false, err
 		}
+		consistencyToken = ""
+	} else {
+		consistencyToken = res.ConsistencyToken().Serialize()
 	}
 
-	allowed, _, err := uc.Authz.Check(ctx, namespace, permission, res.ConsistencyToken().Serialize(), reporterResourceKey.ResourceType().Serialize(), reporterResourceKey.LocalResourceId().Serialize(), sub)
+	allowed, _, err := uc.Authz.Check(ctx, namespace, permission, consistencyToken, reporterResourceKey.ResourceType().Serialize(), reporterResourceKey.LocalResourceId().Serialize(), sub)
 	if err != nil {
 		return false, err
 	}

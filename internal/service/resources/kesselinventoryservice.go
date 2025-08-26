@@ -98,6 +98,7 @@ func (s *InventoryService) Check(ctx context.Context, req *pb.CheckRequest) (*pb
 	}
 
 	if s.useV1beta2Db() {
+		log.Info("New Check")
 		if reporterResourceKey, err := reporterKeyFromResourceReference(req.Object); err == nil {
 			if resp, err := s.Ctl.Check(ctx, req.GetRelation(), req.Object.Reporter.GetType(), subjectReferenceFromSubject(req.GetSubject()), reporterResourceKey); err == nil {
 				return viewResponseFromAuthzRequestV1beta2(resp), nil
@@ -108,6 +109,7 @@ func (s *InventoryService) Check(ctx context.Context, req *pb.CheckRequest) (*pb
 			return nil, err
 		}
 	} else {
+		log.Info("Old Check")
 		if resource, err := authzFromRequestV1beta2(identity, req.Object); err == nil {
 			if resp, err := s.Ctl.CheckLegacy(ctx, req.GetRelation(), req.Object.Reporter.GetType(), subjectReferenceFromSubject(req.GetSubject()), *resource); err == nil {
 				return viewResponseFromAuthzRequestV1beta2(resp), nil

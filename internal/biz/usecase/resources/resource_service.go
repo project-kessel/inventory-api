@@ -469,8 +469,8 @@ func (uc *Usecase) LookupResources(ctx context.Context, request *kessel.LookupRe
 	return uc.Authz.LookupResources(ctx, request)
 }
 
-// Check verifies if a subject has the specified permission on a resource identified by the reporter resource ID.
-func (uc *Usecase) Check(ctx context.Context, permission, namespace string, sub *kessel.SubjectReference, id model_legacy.ReporterResourceId) (bool, error) {
+// CheckLegacy verifies if a subject has the specified permission on a resource identified by the reporter resource ID.
+func (uc *Usecase) CheckLegacy(ctx context.Context, permission, namespace string, sub *kessel.SubjectReference, id model_legacy.ReporterResourceId) (bool, error) {
 	res, err := uc.LegacyReporterResourceRepository.FindByReporterResourceId(ctx, id)
 	if err != nil {
 		// If the resource doesn't exist in inventory (ie. no consistency token available)

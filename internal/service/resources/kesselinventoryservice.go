@@ -97,7 +97,7 @@ func (s *InventoryService) Check(ctx context.Context, req *pb.CheckRequest) (*pb
 	}
 
 	if resource, err := authzFromRequestV1beta2(identity, req.Object); err == nil {
-		if resp, err := s.Ctl.Check(ctx, req.GetRelation(), req.Object.Reporter.GetType(), &pbv1beta1.SubjectReference{
+		if resp, err := s.Ctl.CheckLegacy(ctx, req.GetRelation(), req.Object.Reporter.GetType(), &pbv1beta1.SubjectReference{
 			Relation: req.GetSubject().Relation,
 			Subject: &pbv1beta1.ObjectReference{
 				Type: &pbv1beta1.ObjectType{

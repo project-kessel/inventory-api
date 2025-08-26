@@ -491,7 +491,7 @@ func TestInventoryService_Check_Allowed(t *testing.T) {
 
 	service := svc.NewKesselInventoryServiceV1beta2(uc)
 
-	resp, err := service.Check(ctx, req)
+	resp, err := service.CheckLegacy(ctx, req)
 
 	assert.NoError(t, err)
 	if assert.NotNil(t, resp) {
@@ -607,7 +607,7 @@ func TestInventoryService_Check_Denied(t *testing.T) {
 
 	service := svc.NewKesselInventoryServiceV1beta2(uc)
 
-	resp, err := service.Check(ctx, req)
+	resp, err := service.CheckLegacy(ctx, req)
 
 	assert.NoError(t, err)
 	if assert.NotNil(t, resp) {

@@ -37,7 +37,7 @@ func (s *KesselCheckServiceService) Check(ctx context.Context, req *pb.CheckRequ
 	}
 
 	if resource, err := authzFromRequest(identity, req.Parent); err == nil {
-		if resp, err := s.Ctl.Check(ctx, req.GetRelation(), req.Parent.GetType().GetNamespace(), &v1beta1.SubjectReference{
+		if resp, err := s.Ctl.CheckLegacy(ctx, req.GetRelation(), req.Parent.GetType().GetNamespace(), &v1beta1.SubjectReference{
 			Relation: req.GetSubject().Relation,
 			Subject: &v1beta1.ObjectReference{
 				Type: &v1beta1.ObjectType{

@@ -8,33 +8,33 @@ import (
 )
 
 func TestReporterReference_BasicFields(t *testing.T) {
-	instID := "hbi"
+	instID := "3c4e2382-26c1-11f0-8e5c-ce0194e9e144"
 	r := &v1beta2.ReporterReference{
-		Type:       "host",
+		Type:       "hbi",
 		InstanceId: &instID,
 	}
 
-	assert.Equal(t, "host", r.GetType())
-	assert.Equal(t, "hbi", r.GetInstanceId())
+	assert.Equal(t, "hbi", r.GetType())
+	assert.Equal(t, "3c4e2382-26c1-11f0-8e5c-ce0194e9e144", r.GetInstanceId())
 }
 
 func TestReporterReference_NilInstanceId(t *testing.T) {
 	r := &v1beta2.ReporterReference{
-		Type: "k8s_policy",
+		Type: "hbi",
 	}
-	assert.Equal(t, "k8s_policy", r.GetType())
+	assert.Equal(t, "hbi", r.GetType())
 	assert.Equal(t, "", r.GetInstanceId())
 }
 
 func TestReporterReference_ResetAndFields(t *testing.T) {
-	instID := "hello"
+	instID := "3c4e2382-26c1-11f0-8e5c-ce0194e9e144"
 	r := &v1beta2.ReporterReference{
-		Type:       "test",
+		Type:       "hbi",
 		InstanceId: &instID,
 	}
 
-	assert.Equal(t, "test", r.GetType())
-	assert.Equal(t, "hello", r.GetInstanceId())
+	assert.Equal(t, "hbi", r.GetType())
+	assert.Equal(t, "3c4e2382-26c1-11f0-8e5c-ce0194e9e144", r.GetInstanceId())
 
 	r.Reset()
 	assert.Equal(t, "", r.Type)
@@ -42,15 +42,15 @@ func TestReporterReference_ResetAndFields(t *testing.T) {
 }
 
 func TestReporterReference_Methods(t *testing.T) {
-	instID := "xyz"
+	instID := "3c4e2382-26c1-11f0-8e5c-ce0194e9e144"
 	r := &v1beta2.ReporterReference{
-		Type:       "reporter",
+		Type:       "hbi",
 		InstanceId: &instID,
 	}
 
 	// String method
 	s := r.String()
-	assert.Contains(t, s, "reporter")
+	assert.Contains(t, s, "hbi")
 
 	// ProtoMessage, ProtoReflect, Descriptor: just call them for coverage
 	r.ProtoMessage()

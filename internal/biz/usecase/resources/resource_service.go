@@ -482,7 +482,7 @@ func (uc *Usecase) CheckLegacy(ctx context.Context, permission, namespace string
 		res = &model_legacy.Resource{ResourceType: id.ResourceType, ReporterResourceId: id.LocalResourceId}
 	}
 
-	allowed, _, err := uc.Authz.Check(ctx, namespace, permission, res, sub)
+	allowed, _, err := uc.Authz.Check(ctx, namespace, permission, res.ConsistencyToken, res.ResourceType, res.ReporterResourceId, sub)
 	if err != nil {
 		return false, err
 	}
@@ -579,7 +579,7 @@ func (uc *Usecase) checkWorker(ctx context.Context, permission, namespace string
 	for resource := range resourceChan {
 		log.Debugf("ListResourcesInWorkspace: checkforview on %+v", resource)
 
-		if allowed, _, err := uc.Authz.Check(ctx, namespace, permission, resource, sub); err == nil && allowed == kessel.CheckResponse_ALLOWED_TRUE {
+		if allowed, _, err := uc.Authz.Check(ctx, namespace, permission, resource.ConsistencyToken, resource.ResourceType, resource.ReporterResourceId, sub); err == nil && allowed == kessel.CheckResponse_ALLOWED_TRUE {
 			allowedChan <- resource
 		} else if err != nil {
 			errorChan <- err

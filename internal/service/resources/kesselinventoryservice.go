@@ -10,6 +10,7 @@ import (
 	"github.com/go-kratos/kratos/v2/log"
 	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2"
 	authnapi "github.com/project-kessel/inventory-api/internal/authn/api"
+	"github.com/project-kessel/inventory-api/internal/biz/model"
 	"github.com/project-kessel/inventory-api/internal/biz/model_legacy"
 	"github.com/project-kessel/inventory-api/internal/biz/usecase/resources"
 	"github.com/project-kessel/inventory-api/internal/middleware"
@@ -93,26 +94,29 @@ func (c *InventoryService) DeleteResource(ctx context.Context, r *pb.DeleteResou
 func (s *InventoryService) Check(ctx context.Context, req *pb.CheckRequest) (*pb.CheckResponse, error) {
 	identity, err := middleware.GetIdentity(ctx)
 	if err != nil {
-		return nil, err
+		return nil, status.Errorf(codes.Unauthenticated, "failed to get identity: %v", err)
 	}
 
-	if resource, err := authzFromRequestV1beta2(identity, req.Object); err == nil {
-		if resp, err := s.Ctl.CheckLegacy(ctx, req.GetRelation(), req.Object.Reporter.GetType(), &pbv1beta1.SubjectReference{
-			Relation: req.GetSubject().Relation,
-			Subject: &pbv1beta1.ObjectReference{
-				Type: &pbv1beta1.ObjectType{
-					Namespace: req.GetSubject().Resource.GetReporter().GetType(),
-					Name:      req.GetSubject().Resource.GetResourceType(),
-				},
-				Id: req.GetSubject().Resource.GetResourceId(),
-			},
-		}, *resource); err == nil {
-			return viewResponseFromAuthzRequestV1beta2(resp), nil
+	if s.useV1beta2Db() {
+		if reporterResourceKey, err := reporterKeyFromResourceReference(req.Object); err == nil {
+			if resp, err := s.Ctl.Check(ctx, req.GetRelation(), req.Object.Reporter.GetType(), subjectReferenceFromSubject(req.GetSubject()), reporterResourceKey); err == nil {
+				return viewResponseFromAuthzRequestV1beta2(resp), nil
+			} else {
+				return nil, err
+			}
 		} else {
 			return nil, err
 		}
 	} else {
-		return nil, err
+		if resource, err := authzFromRequestV1beta2(identity, req.Object); err == nil {
+			if resp, err := s.Ctl.CheckLegacy(ctx, req.GetRelation(), req.Object.Reporter.GetType(), subjectReferenceFromSubject(req.GetSubject()), *resource); err == nil {
+				return viewResponseFromAuthzRequestV1beta2(resp), nil
+			} else {
+				return nil, err
+			}
+		} else {
+			return nil, err
+		}
 	}
 }
 
@@ -123,22 +127,26 @@ func (s *InventoryService) CheckForUpdate(ctx context.Context, req *pb.CheckForU
 	}
 
 	if resource, err := authzFromRequestV1beta2(identity, req.Object); err == nil {
-		if resp, err := s.Ctl.CheckForUpdate(ctx, req.GetRelation(), req.Object.Reporter.GetType(), &pbv1beta1.SubjectReference{
-			Relation: req.GetSubject().Relation,
-			Subject: &pbv1beta1.ObjectReference{
-				Type: &pbv1beta1.ObjectType{
-					Namespace: req.GetSubject().Resource.GetReporter().GetType(),
-					Name:      req.GetSubject().Resource.GetResourceType(),
-				},
-				Id: req.GetSubject().Resource.GetResourceId(),
-			},
-		}, *resource); err == nil {
+		if resp, err := s.Ctl.CheckForUpdate(ctx, req.GetRelation(), req.Object.Reporter.GetType(), subjectReferenceFromSubject(req.GetSubject()), *resource); err == nil {
 			return updateResponseFromAuthzRequestV1beta2(resp), nil
 		} else {
 			return nil, err
 		}
 	} else {
 		return nil, err
+	}
+}
+
+func subjectReferenceFromSubject(subject *pb.SubjectReference) *pbv1beta1.SubjectReference {
+	return &pbv1beta1.SubjectReference{
+		Relation: subject.Relation,
+		Subject: &pbv1beta1.ObjectReference{
+			Type: &pbv1beta1.ObjectType{
+				Namespace: subject.Resource.GetReporter().GetType(),
+				Name:      subject.Resource.GetResourceType(),
+			},
+			Id: subject.Resource.GetResourceId(),
+		},
 	}
 }
 
@@ -238,6 +246,26 @@ func authzFromRequestV1beta2(identity *authnapi.Identity, resource *pb.ResourceR
 		ReporterId:      identity.Principal,
 		ReporterType:    identity.Type,
 	}, nil
+}
+
+func reporterKeyFromResourceReference(resource *pb.ResourceReference) (model.ReporterResourceKey, error) {
+	localResourceId, err := model.NewLocalResourceId(resource.GetResourceId())
+	if err != nil {
+		return model.ReporterResourceKey{}, err
+	}
+	resourceType, err := model.NewResourceType(resource.GetResourceType())
+	if err != nil {
+		return model.ReporterResourceKey{}, err
+	}
+	reporterType, err := model.NewReporterType(resource.GetReporter().GetType())
+	if err != nil {
+		return model.ReporterResourceKey{}, err
+	}
+	reporterInstanceId, err := model.NewReporterInstanceId(resource.GetReporter().GetInstanceId())
+	if err != nil {
+		return model.ReporterResourceKey{}, err
+	}
+	return model.NewReporterResourceKey(localResourceId, resourceType, reporterType, reporterInstanceId)
 }
 
 func viewResponseFromAuthzRequestV1beta2(allowed bool) *pb.CheckResponse {

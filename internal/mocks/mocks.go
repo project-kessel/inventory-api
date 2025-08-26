@@ -70,8 +70,8 @@ func (m *MockHealthRepo) IsRelationsAvailable(ctx context.Context) (*pb.GetReady
 
 }
 
-func (m *MockAuthz) Check(ctx context.Context, namespace string, permission string, res *model_legacy.Resource, sub *v1beta1.SubjectReference) (v1beta1.CheckResponse_Allowed, *v1beta1.ConsistencyToken, error) {
-	args := m.Called(ctx, namespace, permission, res, sub)
+func (m *MockAuthz) Check(ctx context.Context, namespace string, permission string, consistencyToken string, resourceType string, localResourceId string, sub *v1beta1.SubjectReference) (v1beta1.CheckResponse_Allowed, *v1beta1.ConsistencyToken, error) {
+	args := m.Called(ctx, namespace, permission, consistencyToken, resourceType, localResourceId, sub)
 	return args.Get(0).(v1beta1.CheckResponse_Allowed), args.Get(1).(*v1beta1.ConsistencyToken), args.Error(2)
 }
 

@@ -730,7 +730,7 @@ func TestCheck_MissingResource(t *testing.T) {
 	m := &mocks.MockAuthz{}
 
 	repo.On("FindByReporterResourceId", mock.Anything, mock.Anything).Return(&model_legacy.Resource{}, gorm.ErrRecordNotFound)
-	m.On("Check", mock.Anything, mock.Anything, "notifications_integration_view", mock.Anything, mock.Anything).Return(v1beta1.CheckResponse_ALLOWED_TRUE, &v1beta1.ConsistencyToken{}, nil)
+	m.On("Check", mock.Anything, mock.Anything, "notifications_integration_view", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(v1beta1.CheckResponse_ALLOWED_TRUE, &v1beta1.ConsistencyToken{}, nil)
 
 	useCase := New(nil, repo, inventoryRepo, m, nil, "", log.DefaultLogger, nil, cb, defaultUseCaseConfig)
 	allowed, err := useCase.CheckLegacy(ctx, "notifications_integration_view", "rbac", &v1beta1.SubjectReference{}, model_legacy.ReporterResourceId{})
@@ -739,7 +739,7 @@ func TestCheck_MissingResource(t *testing.T) {
 	assert.True(t, allowed)
 
 	// check negative case
-	m.On("Check", mock.Anything, mock.Anything, "notifications_integration_write", mock.Anything, mock.Anything).Return(v1beta1.CheckResponse_ALLOWED_FALSE, &v1beta1.ConsistencyToken{}, nil)
+	m.On("Check", mock.Anything, mock.Anything, "notifications_integration_write", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(v1beta1.CheckResponse_ALLOWED_FALSE, &v1beta1.ConsistencyToken{}, nil)
 	allowed, err = useCase.CheckLegacy(ctx, "notifications_integration_write", "rbac", &v1beta1.SubjectReference{}, model_legacy.ReporterResourceId{})
 
 	assert.Nil(t, err)
@@ -774,7 +774,7 @@ func TestCheck_ErrorWithKessel(t *testing.T) {
 	m := &mocks.MockAuthz{}
 
 	repo.On("FindByReporterResourceId", mock.Anything, mock.Anything).Return(&model_legacy.Resource{}, nil)
-	m.On("Check", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(v1beta1.CheckResponse_ALLOWED_FALSE, &v1beta1.ConsistencyToken{}, errors.New("failed during call to relations"))
+	m.On("Check", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(v1beta1.CheckResponse_ALLOWED_FALSE, &v1beta1.ConsistencyToken{}, errors.New("failed during call to relations"))
 
 	useCase := New(nil, repo, inventoryRepo, m, nil, "", log.DefaultLogger, nil, cb, defaultUseCaseConfig)
 	allowed, err := useCase.CheckLegacy(ctx, "notifications_integration_view", "rbac", &v1beta1.SubjectReference{}, model_legacy.ReporterResourceId{})
@@ -794,7 +794,7 @@ func TestCheck_Allowed(t *testing.T) {
 	m := &mocks.MockAuthz{}
 
 	repo.On("FindByReporterResourceId", mock.Anything, mock.Anything).Return(resource, nil)
-	m.On("Check", mock.Anything, mock.Anything, "notifications_integration_write", mock.Anything, mock.Anything).Return(v1beta1.CheckResponse_ALLOWED_TRUE, &v1beta1.ConsistencyToken{}, nil)
+	m.On("Check", mock.Anything, mock.Anything, "notifications_integration_write", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(v1beta1.CheckResponse_ALLOWED_TRUE, &v1beta1.ConsistencyToken{}, nil)
 
 	useCase := New(nil, repo, inventoryRepo, m, nil, "", log.DefaultLogger, nil, cb, defaultUseCaseConfig)
 	allowed, err := useCase.CheckLegacy(ctx, "notifications_integration_write", "rbac", &v1beta1.SubjectReference{}, model_legacy.ReporterResourceId{})
@@ -803,7 +803,7 @@ func TestCheck_Allowed(t *testing.T) {
 	assert.True(t, allowed)
 
 	// check negative case
-	m.On("Check", mock.Anything, mock.Anything, "notifications_integration_view", mock.Anything, mock.Anything).Return(v1beta1.CheckResponse_ALLOWED_FALSE, &v1beta1.ConsistencyToken{}, nil)
+	m.On("Check", mock.Anything, mock.Anything, "notifications_integration_view", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(v1beta1.CheckResponse_ALLOWED_FALSE, &v1beta1.ConsistencyToken{}, nil)
 	allowed, err = useCase.CheckLegacy(ctx, "notifications_integration_view", "rbac", &v1beta1.SubjectReference{}, model_legacy.ReporterResourceId{})
 
 	assert.Nil(t, err)
@@ -972,7 +972,7 @@ func TestListResourcesInWorkspace_ResourcesAllowedTrue(t *testing.T) {
 	resource := resource1()
 
 	repo.On("FindByWorkspaceId", mock.Anything, mock.Anything).Return([]*model_legacy.Resource{resource}, nil)
-	m.On("Check", mock.Anything, mock.Anything, "notifications_integration_write", mock.Anything, mock.Anything).Return(v1beta1.CheckResponse_ALLOWED_TRUE, &v1beta1.ConsistencyToken{}, nil)
+	m.On("Check", mock.Anything, mock.Anything, "notifications_integration_write", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(v1beta1.CheckResponse_ALLOWED_TRUE, &v1beta1.ConsistencyToken{}, nil)
 
 	useCase := New(nil, repo, inventoryRepo, m, nil, "", log.DefaultLogger, nil, cb, defaultUseCaseConfig)
 	resource_chan, err_chan, err := useCase.ListResourcesInWorkspace(ctx, "notifications_integration_write", "rbac", &v1beta1.SubjectReference{}, "foo-id")
@@ -990,7 +990,7 @@ func TestListResourcesInWorkspace_ResourcesAllowedTrue(t *testing.T) {
 	assert.Empty(t, err_chan) // dont want any errors.
 
 	// check negative case (not allowed)
-	m.On("Check", mock.Anything, mock.Anything, "notifications_integration_view", mock.Anything, mock.Anything).Return(v1beta1.CheckResponse_ALLOWED_FALSE, &v1beta1.ConsistencyToken{}, nil)
+	m.On("Check", mock.Anything, mock.Anything, "notifications_integration_view", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(v1beta1.CheckResponse_ALLOWED_FALSE, &v1beta1.ConsistencyToken{}, nil)
 	resource_chan, err_chan, err = useCase.ListResourcesInWorkspace(ctx, "notifications_integration_view", "rbac", &v1beta1.SubjectReference{}, "foo-id")
 
 	assert.Nil(t, err)
@@ -1015,7 +1015,7 @@ func TestListResourcesInWorkspace_MultipleResourcesAllowedTrue(t *testing.T) {
 	resource3 := resource3()
 
 	repo.On("FindByWorkspaceId", mock.Anything, mock.Anything).Return([]*model_legacy.Resource{resource, resource2, resource3}, nil)
-	m.On("Check", mock.Anything, mock.Anything, "notifications_integration_write", mock.Anything, mock.Anything).Return(v1beta1.CheckResponse_ALLOWED_TRUE, &v1beta1.ConsistencyToken{}, nil)
+	m.On("Check", mock.Anything, mock.Anything, "notifications_integration_write", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(v1beta1.CheckResponse_ALLOWED_TRUE, &v1beta1.ConsistencyToken{}, nil)
 
 	useCase := New(nil, repo, inventoryRepo, m, nil, "", log.DefaultLogger, nil, cb, defaultUseCaseConfig)
 	resource_chan, err_chan, err := useCase.ListResourcesInWorkspace(ctx, "notifications_integration_write", "rbac", &v1beta1.SubjectReference{}, "foo-id")
@@ -1054,9 +1054,9 @@ func TestListResourcesInWorkspace_MultipleResourcesOneFalseTwoTrueLastError(t *t
 	theError := errors.New("failed calling relations")
 
 	repo.On("FindByWorkspaceId", mock.Anything, mock.Anything).Return([]*model_legacy.Resource{resource, resource2, resource3}, nil)
-	m.On("Check", mock.Anything, mock.Anything, "notifications_integration_write", resource, mock.Anything).Return(v1beta1.CheckResponse_ALLOWED_FALSE, &v1beta1.ConsistencyToken{}, nil)
-	m.On("Check", mock.Anything, mock.Anything, "notifications_integration_write", resource2, mock.Anything).Return(v1beta1.CheckResponse_ALLOWED_TRUE, &v1beta1.ConsistencyToken{}, nil)
-	m.On("Check", mock.Anything, mock.Anything, "notifications_integration_write", resource3, mock.Anything).Return(v1beta1.CheckResponse_ALLOWED_UNSPECIFIED, &v1beta1.ConsistencyToken{}, theError)
+	m.On("Check", mock.Anything, mock.Anything, "notifications_integration_write", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(v1beta1.CheckResponse_ALLOWED_FALSE, &v1beta1.ConsistencyToken{}, nil)
+	m.On("Check", mock.Anything, mock.Anything, "notifications_integration_write", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(v1beta1.CheckResponse_ALLOWED_TRUE, &v1beta1.ConsistencyToken{}, nil)
+	m.On("Check", mock.Anything, mock.Anything, "notifications_integration_write", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(v1beta1.CheckResponse_ALLOWED_UNSPECIFIED, &v1beta1.ConsistencyToken{}, theError)
 
 	useCase := New(nil, repo, inventoryRepo, m, nil, "", log.DefaultLogger, nil, cb, defaultUseCaseConfig)
 	resource_chan, err_chan, err := useCase.ListResourcesInWorkspace(ctx, "notifications_integration_write", "rbac", &v1beta1.SubjectReference{}, "foo-id")
@@ -1090,7 +1090,7 @@ func TestListResourcesInWorkspace_ResourcesAllowedError(t *testing.T) {
 	resource := resource1()
 
 	repo.On("FindByWorkspaceId", mock.Anything, mock.Anything).Return([]*model_legacy.Resource{resource}, nil)
-	m.On("Check", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(v1beta1.CheckResponse_ALLOWED_TRUE, &v1beta1.ConsistencyToken{}, errors.New("failed calling relations"))
+	m.On("Check", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(v1beta1.CheckResponse_ALLOWED_TRUE, &v1beta1.ConsistencyToken{}, errors.New("failed calling relations"))
 
 	useCase := New(nil, repo, inventoryRepo, m, nil, "", log.DefaultLogger, nil, cb, defaultUseCaseConfig)
 	resource_chan, err_chan, err := useCase.ListResourcesInWorkspace(ctx, "notifications_integration_view", "rbac", &v1beta1.SubjectReference{}, "foo-id")

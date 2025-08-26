@@ -170,7 +170,13 @@ func (r *resourceRepository) handleOutboxEvents(tx *gorm.DB, resourceEvent bizmo
 func (r *resourceRepository) FindResourceByKeys(tx *gorm.DB, key bizmodel.ReporterResourceKey) (*bizmodel.Resource, error) {
 	var results []FindResourceByKeysResult
 
-	err := tx.Table("reporter_resources AS rr").
+	// Use provided transaction or fall back to regular DB session
+	db := tx
+	if db == nil {
+		db = r.db.Session(&gorm.Session{})
+	}
+
+	err := db.Table("reporter_resources AS rr").
 		Select(`
 		rr2.id AS reporter_resource_id,
 		rr2.representation_version,

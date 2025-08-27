@@ -30,7 +30,7 @@ func (a *AllowAllAuthz) Health(ctx context.Context) (*kesselv1.GetReadyzResponse
 
 }
 
-func (a *AllowAllAuthz) Check(context.Context, string, string, *model_legacy.Resource, *v1beta1.SubjectReference) (v1beta1.CheckResponse_Allowed, *v1beta1.ConsistencyToken, error) {
+func (a *AllowAllAuthz) Check(context.Context, string, string, string, string, string, *v1beta1.SubjectReference) (v1beta1.CheckResponse_Allowed, *v1beta1.ConsistencyToken, error) {
 	return v1beta1.CheckResponse_ALLOWED_TRUE, nil, nil
 }
 

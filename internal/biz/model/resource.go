@@ -187,6 +187,10 @@ func (r Resource) ReporterResources() []ReporterResource {
 	return r.reporterResources
 }
 
+func (r Resource) ConsistencyToken() ConsistencyToken {
+	return r.consistencyToken
+}
+
 // Serialization + Deserialization functions, direct initialization without validation
 func (r Resource) Serialize() (ResourceSnapshot, ReporterResourceSnapshot, ReporterRepresentationSnapshot, CommonRepresentationSnapshot, error) {
 	var createdAt, updatedAt time.Time

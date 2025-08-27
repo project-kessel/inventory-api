@@ -184,8 +184,8 @@ func (a *KesselAuthz) UnsetWorkspace(ctx context.Context, local_resource_id, nam
 	})
 }
 
-func (a *KesselAuthz) Check(ctx context.Context, namespace string, viewPermission string, resource *model_legacy.Resource, sub *kessel.SubjectReference) (kessel.CheckResponse_Allowed, *kessel.ConsistencyToken, error) {
-	log.Infof("Check: on %+v", resource)
+func (a *KesselAuthz) Check(ctx context.Context, namespace string, viewPermission string, consistencyToken string, resourceType string, localResourceId string, sub *kessel.SubjectReference) (kessel.CheckResponse_Allowed, *kessel.ConsistencyToken, error) {
+	log.Infof("Check: on resourceType=%s, localResourceId=%s", resourceType, localResourceId)
 
 	opts, err := a.getCallOptions()
 	if err != nil {
@@ -197,10 +197,10 @@ func (a *KesselAuthz) Check(ctx context.Context, namespace string, viewPermissio
 	// default send a minimize_latency check request
 	consistency := &kessel.Consistency{Requirement: &kessel.Consistency_MinimizeLatency{MinimizeLatency: true}}
 
-	if resource.ConsistencyToken != "" {
+	if consistencyToken != "" {
 		consistency = &kessel.Consistency{
 			Requirement: &kessel.Consistency_AtLeastAsFresh{
-				AtLeastAsFresh: &kessel.ConsistencyToken{Token: resource.ConsistencyToken},
+				AtLeastAsFresh: &kessel.ConsistencyToken{Token: consistencyToken},
 			},
 		}
 	}
@@ -209,9 +209,9 @@ func (a *KesselAuthz) Check(ctx context.Context, namespace string, viewPermissio
 		Resource: &kessel.ObjectReference{
 			Type: &kessel.ObjectType{
 				Namespace: namespace,
-				Name:      resource.ResourceType,
+				Name:      resourceType,
 			},
-			Id: resource.ReporterResourceId,
+			Id: localResourceId,
 		},
 		Relation:    viewPermission,
 		Subject:     sub,

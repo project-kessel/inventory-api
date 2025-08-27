@@ -170,6 +170,33 @@ func (uc *Usecase) ReportResource(ctx context.Context, request *v1beta2.ReportRe
 	return nil
 }
 
+// Check verifies if a subject has the specified permission on a resource identified by the reporter resource ID.
+func (uc *Usecase) Check(ctx context.Context, permission, namespace string, sub *kessel.SubjectReference, reporterResourceKey model.ReporterResourceKey) (bool, error) {
+	res, err := uc.resourceRepository.FindResourceByKeys(nil, reporterResourceKey)
+	var consistencyToken string
+	if err != nil {
+		// If the resource doesn't exist in inventory (ie. no consistency token available)
+		// we send a check request with minimize latency
+		// err otherwise.
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return false, err
+		}
+		consistencyToken = ""
+	} else {
+		consistencyToken = res.ConsistencyToken().Serialize()
+	}
+
+	allowed, _, err := uc.Authz.Check(ctx, namespace, permission, consistencyToken, reporterResourceKey.ResourceType().Serialize(), reporterResourceKey.LocalResourceId().Serialize(), sub)
+	if err != nil {
+		return false, err
+	}
+
+	if allowed == kessel.CheckResponse_ALLOWED_TRUE {
+		return true, nil
+	}
+	return false, nil
+}
+
 func (uc *Usecase) createResource(tx *gorm.DB, request *v1beta2.ReportResourceRequest, txidStr string) error {
 	resourceId, err := uc.resourceRepository.NextResourceId()
 	if err != nil {
@@ -469,8 +496,8 @@ func (uc *Usecase) LookupResources(ctx context.Context, request *kessel.LookupRe
 	return uc.Authz.LookupResources(ctx, request)
 }
 
-// Check verifies if a subject has the specified permission on a resource identified by the reporter resource ID.
-func (uc *Usecase) Check(ctx context.Context, permission, namespace string, sub *kessel.SubjectReference, id model_legacy.ReporterResourceId) (bool, error) {
+// CheckLegacy verifies if a subject has the specified permission on a resource identified by the reporter resource ID.
+func (uc *Usecase) CheckLegacy(ctx context.Context, permission, namespace string, sub *kessel.SubjectReference, id model_legacy.ReporterResourceId) (bool, error) {
 	res, err := uc.LegacyReporterResourceRepository.FindByReporterResourceId(ctx, id)
 	if err != nil {
 		// If the resource doesn't exist in inventory (ie. no consistency token available)
@@ -482,7 +509,7 @@ func (uc *Usecase) Check(ctx context.Context, permission, namespace string, sub 
 		res = &model_legacy.Resource{ResourceType: id.ResourceType, ReporterResourceId: id.LocalResourceId}
 	}
 
-	allowed, _, err := uc.Authz.Check(ctx, namespace, permission, res, sub)
+	allowed, _, err := uc.Authz.Check(ctx, namespace, permission, res.ConsistencyToken, res.ResourceType, res.ReporterResourceId, sub)
 	if err != nil {
 		return false, err
 	}
@@ -579,7 +606,7 @@ func (uc *Usecase) checkWorker(ctx context.Context, permission, namespace string
 	for resource := range resourceChan {
 		log.Debugf("ListResourcesInWorkspace: checkforview on %+v", resource)
 
-		if allowed, _, err := uc.Authz.Check(ctx, namespace, permission, resource, sub); err == nil && allowed == kessel.CheckResponse_ALLOWED_TRUE {
+		if allowed, _, err := uc.Authz.Check(ctx, namespace, permission, resource.ConsistencyToken, resource.ResourceType, resource.ReporterResourceId, sub); err == nil && allowed == kessel.CheckResponse_ALLOWED_TRUE {
 			allowedChan <- resource
 		} else if err != nil {
 			errorChan <- err

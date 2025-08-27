@@ -475,7 +475,7 @@ func (i *InventoryConsumer) CreateTuple(ctx context.Context, tuple *v1beta1.Rela
 				ResourceType:       tuple.GetResource().GetType().GetName(),
 				ReporterResourceId: tuple.GetResource().GetId(),
 			}
-			_, token, err := i.Authorizer.Check(ctx, namespace, relation, resource, subject)
+			_, token, err := i.Authorizer.Check(ctx, namespace, relation, "", resource.ResourceType, resource.ReporterResourceId, subject)
 			if err != nil {
 				return "", fmt.Errorf("failed to fetch consistency token: %w", err)
 			}

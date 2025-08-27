@@ -475,7 +475,9 @@ func TestInventoryService_Check_Allowed(t *testing.T) {
 			mock.Anything,
 			"hbi",
 			"view",
-			mock.AnythingOfType("*model_legacy.Resource"),
+			mock.Anything,
+			mock.Anything,
+			mock.Anything,
 			mock.Anything,
 		).
 		Return(relationsV1beta1.CheckResponse_ALLOWED_TRUE, &relationsV1beta1.ConsistencyToken{}, nil).
@@ -591,7 +593,9 @@ func TestInventoryService_Check_Denied(t *testing.T) {
 			mock.Anything,
 			"hbi",
 			"view",
-			mock.AnythingOfType("*model_legacy.Resource"),
+			mock.Anything,
+			mock.Anything,
+			mock.Anything,
 			mock.Anything,
 		).
 		Return(relationsV1beta1.CheckResponse_ALLOWED_FALSE, &relationsV1beta1.ConsistencyToken{}, nil).

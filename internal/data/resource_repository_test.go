@@ -171,6 +171,44 @@ func testRepositoryContract(t *testing.T, repo ResourceRepository, db *gorm.DB) 
 
 		assert.Len(t, foundResource.ReporterResources(), 1, "should have one reporter resource")
 	})
+
+	t.Run("FindResourceByKeys works with nil transaction", func(t *testing.T) {
+		resource := createTestResource(t)
+
+		// First save the resource using a transaction
+		err := repo.Save(db, resource, model_legacy.OperationTypeCreated, "test-tx-1")
+		require.NoError(t, err)
+
+		key, err := bizmodel.NewReporterResourceKey(
+			"test-resource-123", // Known local resource ID from createTestResource
+			"k8s_cluster",
+			"ocm",
+			"ocm-instance-1",
+		)
+		require.NoError(t, err)
+
+		// Now test that FindResourceByKeys works with nil transaction
+		foundResource, err := repo.FindResourceByKeys(nil, key)
+		require.NoError(t, err)
+		require.NotNil(t, foundResource)
+
+		assert.Len(t, foundResource.ReporterResources(), 1, "should have one reporter resource")
+	})
+
+	t.Run("FindResourceByKeys with nil transaction returns nil for non-existent resource", func(t *testing.T) {
+		key, err := bizmodel.NewReporterResourceKey(
+			"non-existent-nil-tx",
+			"k8s_cluster",
+			"ocm",
+			"ocm-instance-1",
+		)
+		require.NoError(t, err)
+
+		// Test with nil transaction
+		foundResource, err := repo.FindResourceByKeys(nil, key)
+		require.NoError(t, err)
+		assert.Nil(t, foundResource)
+	})
 }
 
 // nolint:unused // Keep for when outbox event handling is fixed

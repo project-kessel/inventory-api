@@ -24,6 +24,7 @@ type FindResourceByKeysResult struct {
 	LocalResourceID       string    `gorm:"column:local_resource_id"`
 	ReporterType          string    `gorm:"column:reporter_type"`
 	ReporterInstanceID    string    `gorm:"column:reporter_instance_id"`
+	ConsistencyToken      string    `gorm:"column:consistency_token"`
 }
 
 func ToSnapshotsFromResults(results []FindResourceByKeysResult) (*bizmodel.ResourceSnapshot, []bizmodel.ReporterResourceSnapshot) {
@@ -49,9 +50,10 @@ func ToSnapshotsFromResults(results []FindResourceByKeysResult) (*bizmodel.Resou
 func (result FindResourceByKeysResult) ToSnapshots() (bizmodel.ResourceSnapshot, bizmodel.ReporterResourceSnapshot) {
 	// Create ResourceSnapshot
 	resourceSnapshot := bizmodel.ResourceSnapshot{
-		ID:            result.ResourceID,
-		Type:          result.ResourceType,
-		CommonVersion: result.CommonVersion,
+		ID:               result.ResourceID,
+		Type:             result.ResourceType,
+		CommonVersion:    result.CommonVersion,
+		ConsistencyToken: result.ConsistencyToken,
 	}
 
 	// Create ReporterResourceKeySnapshot
@@ -170,7 +172,13 @@ func (r *resourceRepository) handleOutboxEvents(tx *gorm.DB, resourceEvent bizmo
 func (r *resourceRepository) FindResourceByKeys(tx *gorm.DB, key bizmodel.ReporterResourceKey) (*bizmodel.Resource, error) {
 	var results []FindResourceByKeysResult
 
-	err := tx.Table("reporter_resources AS rr").
+	// Use provided transaction or fall back to regular DB session
+	db := tx
+	if db == nil {
+		db = r.db.Session(&gorm.Session{})
+	}
+
+	err := db.Table("reporter_resources AS rr").
 		Select(`
 		rr2.id AS reporter_resource_id,
 		rr2.representation_version,
@@ -178,6 +186,7 @@ func (r *resourceRepository) FindResourceByKeys(tx *gorm.DB, key bizmodel.Report
 		rr2.tombstone,
 		res.common_version,
 		res.id AS resource_id,
+		res.ktn AS consistency_token,
 		rr2.resource_type,
 		rr2.local_resource_id,
 		rr2.reporter_type,

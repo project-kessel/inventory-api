@@ -95,6 +95,11 @@ func (f *fakeResourceRepository) FindResourceByKeys(tx *gorm.DB, key bizmodel.Re
 	f.mu.RLock()
 	defer f.mu.RUnlock()
 
+	// Note: This fake implementation doesn't use the transaction parameter,
+	// but we acknowledge it for consistency with the real implementation.
+	// In a real scenario, tx would be used for database operations.
+	_ = tx // Explicitly acknowledge the transaction parameter
+
 	searchKey := f.makeKey(
 		key.LocalResourceId().Serialize(),
 		key.ResourceType().Serialize(),

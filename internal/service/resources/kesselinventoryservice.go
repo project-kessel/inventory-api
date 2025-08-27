@@ -98,7 +98,7 @@ func (s *InventoryService) Check(ctx context.Context, req *pb.CheckRequest) (*pb
 	}
 
 	if s.useV1beta2Db() {
-		log.Info("New Check")
+		log.Info("Check using v1beta2 db")
 		if reporterResourceKey, err := reporterKeyFromResourceReference(req.Object); err == nil {
 			if resp, err := s.Ctl.Check(ctx, req.GetRelation(), req.Object.Reporter.GetType(), subjectReferenceFromSubject(req.GetSubject()), reporterResourceKey); err == nil {
 				return viewResponseFromAuthzRequestV1beta2(resp), nil
@@ -109,7 +109,7 @@ func (s *InventoryService) Check(ctx context.Context, req *pb.CheckRequest) (*pb
 			return nil, err
 		}
 	} else {
-		log.Info("Old Check")
+		log.Info("Check using v1beta1 db")
 		if resource, err := authzFromRequestV1beta2(identity, req.Object); err == nil {
 			if resp, err := s.Ctl.CheckLegacy(ctx, req.GetRelation(), req.Object.Reporter.GetType(), subjectReferenceFromSubject(req.GetSubject()), *resource); err == nil {
 				return viewResponseFromAuthzRequestV1beta2(resp), nil
@@ -125,17 +125,31 @@ func (s *InventoryService) Check(ctx context.Context, req *pb.CheckRequest) (*pb
 func (s *InventoryService) CheckForUpdate(ctx context.Context, req *pb.CheckForUpdateRequest) (*pb.CheckForUpdateResponse, error) {
 	identity, err := middleware.GetIdentity(ctx)
 	if err != nil {
-		return nil, err
+		return nil, status.Errorf(codes.Unauthenticated, "failed to get identity: %v", err)
 	}
 
-	if resource, err := authzFromRequestV1beta2(identity, req.Object); err == nil {
-		if resp, err := s.Ctl.CheckForUpdateLegacy(ctx, req.GetRelation(), req.Object.Reporter.GetType(), subjectReferenceFromSubject(req.GetSubject()), *resource); err == nil {
-			return updateResponseFromAuthzRequestV1beta2(resp), nil
+	if s.useV1beta2Db() {
+		log.Info("CheckForUpdate using v1beta2 db")
+		if reporterResourceKey, err := reporterKeyFromResourceReference(req.Object); err == nil {
+			if resp, err := s.Ctl.CheckForUpdate(ctx, req.GetRelation(), req.Object.Reporter.GetType(), subjectReferenceFromSubject(req.GetSubject()), reporterResourceKey); err == nil {
+				return updateResponseFromAuthzRequestV1beta2(resp), nil
+			} else {
+				return nil, err
+			}
 		} else {
 			return nil, err
 		}
 	} else {
-		return nil, err
+		log.Info("CheckForUpdate using v1beta1 db")
+		if resource, err := authzFromRequestV1beta2(identity, req.Object); err == nil {
+			if resp, err := s.Ctl.CheckForUpdateLegacy(ctx, req.GetRelation(), req.Object.Reporter.GetType(), subjectReferenceFromSubject(req.GetSubject()), *resource); err == nil {
+				return updateResponseFromAuthzRequestV1beta2(resp), nil
+			} else {
+				return nil, err
+			}
+		} else {
+			return nil, err
+		}
 	}
 }
 

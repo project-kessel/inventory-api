@@ -17,7 +17,6 @@ import (
 	"google.golang.org/grpc"
 
 	authzapi "github.com/project-kessel/inventory-api/internal/authz/api"
-	"github.com/project-kessel/inventory-api/internal/biz/model_legacy"
 )
 
 type KesselAuthz struct {
@@ -198,6 +197,7 @@ func (a *KesselAuthz) Check(ctx context.Context, namespace string, viewPermissio
 	consistency := &kessel.Consistency{Requirement: &kessel.Consistency_MinimizeLatency{MinimizeLatency: true}}
 
 	if consistencyToken != "" {
+		log.Infof("Check: with Consistency_AtLeastAsFresh as consistencyToken=%s", consistencyToken)
 		consistency = &kessel.Consistency{
 			Requirement: &kessel.Consistency_AtLeastAsFresh{
 				AtLeastAsFresh: &kessel.ConsistencyToken{Token: consistencyToken},
@@ -229,7 +229,7 @@ func (a *KesselAuthz) Check(ctx context.Context, namespace string, viewPermissio
 	return resp.GetAllowed(), resp.GetConsistencyToken(), nil
 }
 
-func (a *KesselAuthz) CheckForUpdate(ctx context.Context, namespace string, updatePermission string, resource *model_legacy.Resource, sub *kessel.SubjectReference) (kessel.CheckForUpdateResponse_Allowed, *kessel.ConsistencyToken, error) {
+func (a *KesselAuthz) CheckForUpdate(ctx context.Context, namespace string, updatePermission string, resourceType string, localResourceId string, sub *kessel.SubjectReference) (kessel.CheckForUpdateResponse_Allowed, *kessel.ConsistencyToken, error) {
 	opts, err := a.getCallOptions()
 	if err != nil {
 		a.incrFailureCounter("CheckForUpdate")
@@ -240,9 +240,9 @@ func (a *KesselAuthz) CheckForUpdate(ctx context.Context, namespace string, upda
 		Resource: &kessel.ObjectReference{
 			Type: &kessel.ObjectType{
 				Namespace: namespace,
-				Name:      resource.ResourceType,
+				Name:      resourceType,
 			},
-			Id: resource.ReporterResourceId,
+			Id: localResourceId,
 		},
 		Relation: updatePermission,
 		Subject:  sub,

@@ -537,7 +537,7 @@ func (uc *Usecase) CheckForUpdate(ctx context.Context, permission, namespace str
 		}
 	}
 
-	allowed, consistency, err := uc.Authz.CheckForUpdate(ctx, namespace, permission, res, sub)
+	allowed, consistency, err := uc.Authz.CheckForUpdate(ctx, namespace, permission, res.ResourceType, res.ReporterResourceId, sub)
 	if err != nil {
 		return false, err
 	}

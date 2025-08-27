@@ -95,6 +95,7 @@ func TestReporterReference_InvalidInstanceIdUUID_SingleDigit(t *testing.T) {
 	err = validator.Validate(r)
 	assert.Error(t, err)
 }
+
 func TestReporterReference_InvalidInstanceIdUUID_MultipleDigits(t *testing.T) {
 	instID := "3-3-3-3-3"
 	r := &v1beta2.ReporterReference{
@@ -107,6 +108,29 @@ func TestReporterReference_InvalidInstanceIdUUID_MultipleDigits(t *testing.T) {
 	assert.Error(t, err)
 }
 
+func TestReporterReference_InvalidInstanceIdUUID_TooLong(t *testing.T) {
+	instID := "3c4e2382-26c1-11f0-8e5c-ce0194e9e144-11212"
+	r := &v1beta2.ReporterReference{
+		Type:       "hbi",
+		InstanceId: &instID,
+	}
+	validator, err := protovalidate.New()
+	require.NoError(t, err)
+	err = validator.Validate(r)
+	assert.Error(t, err)
+}
+
+func TestReporterReference_InvalidInstanceIdUUID_TooShort(t *testing.T) {
+	instID := "3c4e2382-26c1-11f0-8e5c-ce01944"
+	r := &v1beta2.ReporterReference{
+		Type:       "hbi",
+		InstanceId: &instID,
+	}
+	validator, err := protovalidate.New()
+	require.NoError(t, err)
+	err = validator.Validate(r)
+	assert.Error(t, err)
+}
 
 func TestReporterReference_ResetAndFields(t *testing.T) {
 	instID := "3c4e2382-26c1-11f0-8e5c-ce0194e9e144"

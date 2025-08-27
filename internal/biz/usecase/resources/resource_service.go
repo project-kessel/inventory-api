@@ -520,9 +520,9 @@ func (uc *Usecase) CheckLegacy(ctx context.Context, permission, namespace string
 	return false, nil
 }
 
-// CheckForUpdate verifies if a subject has the specified permission to update a resource,
+// CheckForUpdateLegacy verifies if a subject has the specified permission to update a resource,
 // and records the consistency token if the check passes and the resource exists.
-func (uc *Usecase) CheckForUpdate(ctx context.Context, permission, namespace string, sub *kessel.SubjectReference, id model_legacy.ReporterResourceId) (bool, error) {
+func (uc *Usecase) CheckForUpdateLegacy(ctx context.Context, permission, namespace string, sub *kessel.SubjectReference, id model_legacy.ReporterResourceId) (bool, error) {
 	res, err := uc.LegacyReporterResourceRepository.FindByReporterResourceId(ctx, id)
 	recordToken := true
 	if err != nil {

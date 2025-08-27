@@ -129,7 +129,7 @@ func (s *InventoryService) CheckForUpdate(ctx context.Context, req *pb.CheckForU
 	}
 
 	if resource, err := authzFromRequestV1beta2(identity, req.Object); err == nil {
-		if resp, err := s.Ctl.CheckForUpdate(ctx, req.GetRelation(), req.Object.Reporter.GetType(), subjectReferenceFromSubject(req.GetSubject()), *resource); err == nil {
+		if resp, err := s.Ctl.CheckForUpdateLegacy(ctx, req.GetRelation(), req.Object.Reporter.GetType(), subjectReferenceFromSubject(req.GetSubject()), *resource); err == nil {
 			return updateResponseFromAuthzRequestV1beta2(resp), nil
 		} else {
 			return nil, err

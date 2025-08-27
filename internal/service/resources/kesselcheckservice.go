@@ -63,7 +63,7 @@ func (s *KesselCheckServiceService) CheckForUpdate(ctx context.Context, req *pb.
 	}
 
 	if resource, err := authzFromRequest(identity, req.Parent); err == nil {
-		if resp, err := s.Ctl.CheckForUpdate(ctx, req.GetRelation(), req.Parent.Type.GetNamespace(), &v1beta1.SubjectReference{
+		if resp, err := s.Ctl.CheckForUpdateLegacy(ctx, req.GetRelation(), req.Parent.Type.GetNamespace(), &v1beta1.SubjectReference{
 			Relation: req.GetSubject().Relation,
 			Subject: &v1beta1.ObjectReference{
 				Type: &v1beta1.ObjectType{

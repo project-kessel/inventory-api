@@ -182,7 +182,7 @@ func (uc *Usecase) Check(ctx context.Context, permission, namespace string, sub 
 			return false, err
 		}
 		consistencyToken = ""
-	} else {
+	} else if res != nil {
 		consistencyToken = res.ConsistencyToken().Serialize()
 	}
 

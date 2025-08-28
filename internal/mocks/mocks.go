@@ -75,8 +75,8 @@ func (m *MockAuthz) Check(ctx context.Context, namespace string, permission stri
 	return args.Get(0).(v1beta1.CheckResponse_Allowed), args.Get(1).(*v1beta1.ConsistencyToken), args.Error(2)
 }
 
-func (m *MockAuthz) CheckForUpdate(ctx context.Context, namespace string, permission string, res *model_legacy.Resource, sub *v1beta1.SubjectReference) (v1beta1.CheckForUpdateResponse_Allowed, *v1beta1.ConsistencyToken, error) {
-	args := m.Called(ctx, namespace, permission, res, sub)
+func (m *MockAuthz) CheckForUpdate(ctx context.Context, namespace string, permission string, resourceType string, localResourceId string, sub *v1beta1.SubjectReference) (v1beta1.CheckForUpdateResponse_Allowed, *v1beta1.ConsistencyToken, error) {
+	args := m.Called(ctx, namespace, permission, resourceType, localResourceId, sub)
 	return args.Get(0).(v1beta1.CheckForUpdateResponse_Allowed), args.Get(1).(*v1beta1.ConsistencyToken), args.Error(2)
 }
 

@@ -197,6 +197,19 @@ func (uc *Usecase) Check(ctx context.Context, permission, namespace string, sub 
 	return false, nil
 }
 
+// CheckForUpdate forwards the request to Relations CheckForUpdate
+func (uc *Usecase) CheckForUpdate(ctx context.Context, permission, namespace string, sub *kessel.SubjectReference, reporterResourceKey model.ReporterResourceKey) (bool, error) {
+	allowed, _, err := uc.Authz.CheckForUpdate(ctx, namespace, permission, reporterResourceKey.ResourceType().Serialize(), reporterResourceKey.LocalResourceId().Serialize(), sub)
+	if err != nil {
+		return false, err
+	}
+
+	if allowed == kessel.CheckForUpdateResponse_ALLOWED_TRUE {
+		return true, nil
+	}
+	return false, nil
+}
+
 func (uc *Usecase) createResource(tx *gorm.DB, request *v1beta2.ReportResourceRequest, txidStr string) error {
 	resourceId, err := uc.resourceRepository.NextResourceId()
 	if err != nil {
@@ -520,9 +533,9 @@ func (uc *Usecase) CheckLegacy(ctx context.Context, permission, namespace string
 	return false, nil
 }
 
-// CheckForUpdate verifies if a subject has the specified permission to update a resource,
+// CheckForUpdateLegacy verifies if a subject has the specified permission to update a resource,
 // and records the consistency token if the check passes and the resource exists.
-func (uc *Usecase) CheckForUpdate(ctx context.Context, permission, namespace string, sub *kessel.SubjectReference, id model_legacy.ReporterResourceId) (bool, error) {
+func (uc *Usecase) CheckForUpdateLegacy(ctx context.Context, permission, namespace string, sub *kessel.SubjectReference, id model_legacy.ReporterResourceId) (bool, error) {
 	res, err := uc.LegacyReporterResourceRepository.FindByReporterResourceId(ctx, id)
 	recordToken := true
 	if err != nil {
@@ -537,7 +550,7 @@ func (uc *Usecase) CheckForUpdate(ctx context.Context, permission, namespace str
 		}
 	}
 
-	allowed, consistency, err := uc.Authz.CheckForUpdate(ctx, namespace, permission, res, sub)
+	allowed, consistency, err := uc.Authz.CheckForUpdate(ctx, namespace, permission, res.ResourceType, res.ReporterResourceId, sub)
 	if err != nil {
 		return false, err
 	}

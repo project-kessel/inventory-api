@@ -178,7 +178,7 @@ func (r *resourceRepository) FindResourceByKeys(tx *gorm.DB, key bizmodel.Report
 		db = r.db.Session(&gorm.Session{})
 	}
 
-	err := db.Table("reporter_resources AS rr").
+	query := db.Table("reporter_resources AS rr").
 		Select(`
 		rr2.id AS reporter_resource_id,
 		rr2.representation_version,
@@ -195,19 +195,19 @@ func (r *resourceRepository) FindResourceByKeys(tx *gorm.DB, key bizmodel.Report
 		Joins(`
 		JOIN reporter_resources AS rr2 ON rr2.resource_id = rr.resource_id
 		JOIN resource AS res ON res.id = rr2.resource_id
-	`).
-		Where(`
-		rr.local_resource_id = ? AND
-		rr.resource_type = ? AND
-		rr.reporter_type = ? AND
-		rr.reporter_instance_id = ?
-	`,
-			key.LocalResourceId().Serialize(),
-			key.ResourceType().Serialize(),
-			key.ReporterType().Serialize(),
-			key.ReporterInstanceId().Serialize(),
-		).
-		Find(&results).Error // Use Find since it returns multiple rows
+	`)
+
+	// Build WHERE conditions dynamically based on present values
+	query = query.Where("rr.local_resource_id = ?", key.LocalResourceId().Serialize())
+	query = query.Where("rr.resource_type = ?", key.ResourceType().Serialize())
+	query = query.Where("rr.reporter_type = ?", key.ReporterType().Serialize())
+
+	// Only add reporter_instance_id condition if it's not empty
+	if reporterInstanceId := key.ReporterInstanceId().Serialize(); reporterInstanceId != "" {
+		query = query.Where("rr.reporter_instance_id = ?", reporterInstanceId)
+	}
+
+	err := query.Find(&results).Error // Use Find since it returns multiple rows
 
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {

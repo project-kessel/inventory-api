@@ -277,10 +277,19 @@ func reporterKeyFromResourceReference(resource *pb.ResourceReference) (model.Rep
 	if err != nil {
 		return model.ReporterResourceKey{}, err
 	}
-	reporterInstanceId, err := model.NewReporterInstanceId(resource.GetReporter().GetInstanceId())
-	if err != nil {
-		return model.ReporterResourceKey{}, err
+
+	// Handle reporterInstanceId being absent/empty
+	var reporterInstanceId model.ReporterInstanceId
+	if instanceId := resource.GetReporter().GetInstanceId(); instanceId != "" {
+		reporterInstanceId, err = model.NewReporterInstanceId(instanceId)
+		if err != nil {
+			return model.ReporterResourceKey{}, err
+		}
+	} else {
+		// Use zero value for empty/absent reporterInstanceId
+		reporterInstanceId = model.ReporterInstanceId("")
 	}
+
 	return model.NewReporterResourceKey(localResourceId, resourceType, reporterType, reporterInstanceId)
 }
 

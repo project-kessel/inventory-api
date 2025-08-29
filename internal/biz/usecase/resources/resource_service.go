@@ -122,7 +122,11 @@ func (uc *Usecase) ReportResource(ctx context.Context, request *v1beta2.ReportRe
 	err = uc.resourceRepository.GetTransactionManager().HandleSerializableTransaction(uc.resourceRepository.GetDB(), func(tx *gorm.DB) error {
 		existingResource, err := uc.resourceRepository.FindResourceByKeys(tx, reporterResourceKey)
 		if err != nil {
-			return fmt.Errorf("failed to lookup existing resource: %w", err)
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				existingResource = nil // Explicitly mark as not found
+			} else {
+				return fmt.Errorf("failed to lookup existing resource: %w", err)
+			}
 		}
 
 		if existingResource != nil {
@@ -182,7 +186,7 @@ func (uc *Usecase) Check(ctx context.Context, permission, namespace string, sub 
 			return false, err
 		}
 		consistencyToken = ""
-	} else {
+	} else if res != nil {
 		consistencyToken = res.ConsistencyToken().Serialize()
 	}
 

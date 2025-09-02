@@ -184,7 +184,7 @@ func (a *KesselAuthz) UnsetWorkspace(ctx context.Context, local_resource_id, nam
 }
 
 func (a *KesselAuthz) Check(ctx context.Context, namespace string, viewPermission string, consistencyToken string, resourceType string, localResourceId string, sub *kessel.SubjectReference) (kessel.CheckResponse_Allowed, *kessel.ConsistencyToken, error) {
-	log.Infof("Check: on resourceType=%s, localResourceId=%s", resourceType, localResourceId)
+	log.Infof("Check: on resourceType=%s, localResourceId=%s, consistencyToken=%s", resourceType, localResourceId, consistencyToken)
 
 	opts, err := a.getCallOptions()
 	if err != nil {

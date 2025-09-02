@@ -116,7 +116,7 @@ func testRepositoryContract(t *testing.T, repo ResourceRepository, db *gorm.DB) 
 		require.NoError(t, err)
 
 		foundResource, err := repo.FindResourceByKeys(db, key)
-		require.NoError(t, err)
+		require.ErrorIs(t, err, gorm.ErrRecordNotFound)
 		assert.Nil(t, foundResource)
 	})
 
@@ -206,7 +206,7 @@ func testRepositoryContract(t *testing.T, repo ResourceRepository, db *gorm.DB) 
 
 		// Test with nil transaction
 		foundResource, err := repo.FindResourceByKeys(nil, key)
-		require.NoError(t, err)
+		require.ErrorIs(t, err, gorm.ErrRecordNotFound)
 		assert.Nil(t, foundResource)
 	})
 }

@@ -119,26 +119,23 @@ func (uc *Usecase) ReportResource(ctx context.Context, request *v1beta2.ReportRe
 		return fmt.Errorf("failed to create reporter resource key: %w", err)
 	}
 
-	err = uc.resourceRepository.GetTransactionManager().HandleSerializableTransaction(uc.resourceRepository.GetDB(), func(tx *gorm.DB) error {
-		existingResource, err := uc.resourceRepository.FindResourceByKeys(tx, reporterResourceKey)
-		if err != nil {
-			if errors.Is(err, gorm.ErrRecordNotFound) {
-				// Not found: proceed to create path
-				existingResource = nil
-			} else {
+	err = uc.resourceRepository.GetTransactionManager().HandleSerializableTransaction(
+		uc.resourceRepository.GetDB(),
+		func(tx *gorm.DB) error {
+			res, err := uc.resourceRepository.FindResourceByKeys(tx, reporterResourceKey)
+			if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 				return fmt.Errorf("failed to lookup existing resource: %w", err)
 			}
-		}
 
-		if existingResource != nil {
-			log.Info("Resource already exists, updating: ")
-			err = uc.updateResource(tx, request, existingResource, txidStr)
-		} else {
+			if err == nil && res != nil {
+				log.Info("Resource already exists, updating: ")
+				return uc.updateResource(tx, request, res, txidStr)
+			}
+
 			log.Info("Creating new resource")
-			err = uc.createResource(tx, request, txidStr)
-		}
-		return err
-	})
+			return uc.createResource(tx, request, txidStr)
+		},
+	)
 
 	if readAfterWriteEnabled && uc.Config.ConsumerEnabled {
 		timeoutCtx, cancel := context.WithTimeout(ctx, listenTimeout)

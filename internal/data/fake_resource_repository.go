@@ -109,7 +109,7 @@ func (f *fakeResourceRepository) FindResourceByKeys(tx *gorm.DB, key bizmodel.Re
 
 	stored, exists := f.resources[searchKey]
 	if !exists {
-		return nil, nil
+		return nil, gorm.ErrRecordNotFound
 	}
 
 	placeholderData := map[string]interface{}{"_placeholder": true}

@@ -1,7 +1,6 @@
 package data
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/google/uuid"
@@ -210,10 +209,11 @@ func (r *resourceRepository) FindResourceByKeys(tx *gorm.DB, key bizmodel.Report
 	err := query.Find(&results).Error // Use Find since it returns multiple rows
 
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, nil
-		}
 		return nil, fmt.Errorf("failed to find resource by keys: %w", err)
+	}
+
+	if len(results) == 0 {
+		return nil, gorm.ErrRecordNotFound
 	}
 
 	resourceSnapshot, reporterResourceSnapshots := ToSnapshotsFromResults(results)

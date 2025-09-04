@@ -48,11 +48,11 @@ func New(c CompletedConfig, authn middleware.Middleware, authnConfig authn.Compl
 		kgrpc.Middleware(
 			recovery.Recovery(),
 			logging.Server(logger),
-			m.Validation(validator),
 			metrics.Server(
 				metrics.WithRequests(requests),
 				metrics.WithSeconds(seconds),
 			),
+			m.Validation(validator),
 			selector.Server(
 				authn,
 			).Match(NewWhiteListMatcher).Build(),

@@ -7,9 +7,9 @@ require (
 	buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go v1.36.8-20250717185734-6c6e0d3c608e.1
 	buf.build/go/protovalidate v0.14.0
 	github.com/authzed/grpcutil v0.0.0-20250221190651-1985b19b35b8
-	github.com/cloudevents/sdk-go/protocol/kafka_confluent/v2 v2.0.0-20250721101952-1c64656a6859
+	github.com/cloudevents/sdk-go/protocol/kafka_confluent/v2 v2.0.0-20250904143103-af3e8599b331
 	github.com/cloudevents/sdk-go/v2 v2.16.1
-	github.com/confluentinc/confluent-kafka-go/v2 v2.11.0
+	github.com/confluentinc/confluent-kafka-go/v2 v2.11.1
 	github.com/coreos/go-oidc/v3 v3.14.1
 	github.com/go-kratos/kratos/v2 v2.8.4
 	github.com/golang-jwt/jwt/v5 v5.3.0
@@ -25,7 +25,7 @@ require (
 	github.com/spf13/cobra v1.9.1
 	github.com/spf13/pflag v1.0.7
 	github.com/spf13/viper v1.20.1
-	github.com/stretchr/testify v1.10.0
+	github.com/stretchr/testify v1.11.0
 	github.com/xeipuuv/gojsonschema v1.2.0
 	go.opentelemetry.io/otel v1.37.0
 	go.opentelemetry.io/otel/exporters/prometheus v0.59.1

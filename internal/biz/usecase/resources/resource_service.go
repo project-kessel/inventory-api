@@ -750,7 +750,7 @@ func (uc *Usecase) Update(ctx context.Context, m *model_legacy.Resource, id mode
 }
 
 // Delete removes a resource from the database identified by the reporter resource ID.
-func (uc *Usecase) Delete(ctx context.Context, id model_legacy.ReporterResourceId) error {
+func (uc *Usecase) DeleteLegacy(ctx context.Context, id model_legacy.ReporterResourceId) error {
 	m := &model_legacy.Resource{}
 
 	// check if the resource exists

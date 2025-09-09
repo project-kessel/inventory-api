@@ -76,7 +76,7 @@ func (c *InventoryService) DeleteResource(ctx context.Context, r *pb.DeleteResou
 		return nil, status.Errorf(codes.InvalidArgument, "failed to build reporter resource ID: %v", err)
 	}
 
-	err = c.Ctl.Delete(ctx, reporterResource)
+	err = c.Ctl.DeleteLegacy(ctx, reporterResource)
 	if err != nil {
 		log.Error("Failed to delete resource: ", err)
 

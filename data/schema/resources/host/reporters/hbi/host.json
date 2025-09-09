@@ -5,7 +5,8 @@
     "satellite_id": {
       "oneOf": [
         { "type": "string", "format": "uuid" },
-        { "type": "string", "pattern": "^\\d{10}$" }
+        { "type": "string", "pattern": "^\\d{10}$" },
+        { "type": "null" }
       ]
     },
     "subscription_manager_id": { "type": "string", "format": "uuid" },

@@ -183,8 +183,6 @@ func TestReporterDeleteRepresentation_Initialization(t *testing.T) {
 			fixture.ValidReporterResourceIdType(),
 			fixture.ValidVersionType(),
 			fixture.ValidGenerationType(),
-			fixture.ValidCommonVersionType(),
-			fixture.ValidReporterVersionType(),
 		)
 
 		assertValidReporterDeleteRepresentation(t, deleteRep, err, "valid inputs")
@@ -197,8 +195,6 @@ func TestReporterDeleteRepresentation_Initialization(t *testing.T) {
 			fixture.ValidReporterResourceIdType(),
 			fixture.ValidVersionType(),
 			fixture.ValidGenerationType(),
-			fixture.ValidCommonVersionType(),
-			fixture.NilReporterVersionType(),
 		)
 
 		assertValidReporterDeleteRepresentation(t, deleteRep, err, "nil reporter version")
@@ -211,8 +207,6 @@ func TestReporterDeleteRepresentation_Initialization(t *testing.T) {
 			fixture.EmptyReporterResourceIdType(),
 			fixture.ValidVersionType(),
 			fixture.ValidGenerationType(),
-			fixture.ValidCommonVersionType(),
-			fixture.ValidReporterVersionType(),
 		)
 
 		assertInvalidReporterDeleteRepresentation(t, deleteRep, err, ErrInvalidUUID)
@@ -225,8 +219,6 @@ func TestReporterDeleteRepresentation_Initialization(t *testing.T) {
 			fixture.WhitespaceReporterResourceIdType(),
 			fixture.ValidVersionType(),
 			fixture.ValidGenerationType(),
-			fixture.ValidCommonVersionType(),
-			fixture.ValidReporterVersionType(),
 		)
 
 		assertInvalidReporterDeleteRepresentation(t, deleteRep, err, ErrInvalidUUID)
@@ -239,8 +231,6 @@ func TestReporterDeleteRepresentation_Initialization(t *testing.T) {
 			fixture.InvalidReporterResourceIdType(),
 			fixture.ValidVersionType(),
 			fixture.ValidGenerationType(),
-			fixture.ValidCommonVersionType(),
-			fixture.ValidReporterVersionType(),
 		)
 
 		assertInvalidReporterDeleteRepresentation(t, deleteRep, err, ErrInvalidUUID)
@@ -278,8 +268,6 @@ func TestReporterRepresentation_BusinessRules(t *testing.T) {
 			fixture.ValidReporterResourceIdType(),
 			fixture.ValidVersionType(),
 			fixture.ValidGenerationType(),
-			fixture.ValidCommonVersionType(),
-			fixture.ValidReporterVersionType(),
 		)
 
 		if err != nil {
@@ -298,8 +286,6 @@ func TestReporterRepresentation_BusinessRules(t *testing.T) {
 			fixture.ValidReporterResourceIdType(),
 			fixture.ValidVersionType(),
 			fixture.ValidGenerationType(),
-			fixture.ValidCommonVersionType(),
-			fixture.ValidReporterVersionType(),
 		)
 
 		if err != nil {

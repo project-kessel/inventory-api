@@ -43,13 +43,13 @@ func (c *InventoryService) ReportResource(ctx context.Context, r *pb.ReportResou
 	}
 
 	if c.useV1beta2Db() {
-		log.Info("New Report Resource")
+		log.Info("Report Resource using v1beta2db")
 		err := c.Ctl.ReportResource(ctx, r, identity.Principal)
 		if err != nil {
 			return nil, err
 		}
 	} else {
-		log.Info("Old Report Resource")
+		log.Info("Report Resource NOT using v1beta2db")
 		resource, err := RequestToResource(r, identity)
 		if err != nil {
 			return nil, err
@@ -70,24 +70,37 @@ func (c *InventoryService) DeleteResource(ctx context.Context, r *pb.DeleteResou
 		return nil, status.Errorf(codes.Unauthenticated, "failed to get identity: %v", err)
 	}
 
-	reporterResource, err := RequestToDeleteResource(r, identity)
-	if err != nil {
-		log.Error("Failed to build reporter resource ID: ", err)
-		return nil, status.Errorf(codes.InvalidArgument, "failed to build reporter resource ID: %v", err)
-	}
-
-	err = c.Ctl.DeleteLegacy(ctx, reporterResource)
-	if err != nil {
-		log.Error("Failed to delete resource: ", err)
-
-		if errors.Is(err, resources.ErrResourceNotFound) {
-			return nil, status.Errorf(codes.NotFound, "resource not found")
+	if c.useV1beta2Db() {
+		log.Info("Delete Resource using v1beta2db")
+		if reporterResourceKey, err := reporterKeyFromResourceReference(r.GetReference()); err == nil {
+			if err = c.Ctl.Delete(reporterResourceKey); err == nil {
+				return ResponseFromDeleteResource(), nil
+			} else {
+				return nil, err
+			}
+		} else {
+			return nil, err
+		}
+	} else {
+		log.Info("Delete Resource NOT using v1beta2db")
+		reporterResource, err := RequestToDeleteResource(r, identity)
+		if err != nil {
+			log.Error("Failed to build reporter resource ID: ", err)
+			return nil, status.Errorf(codes.InvalidArgument, "failed to build reporter resource ID: %v", err)
 		}
 
-		// Default to internal error for unknown errors
-		return nil, status.Errorf(codes.Internal, "failed to delete resource due to an internal error")
-	}
+		err = c.Ctl.DeleteLegacy(ctx, reporterResource)
+		if err != nil {
+			log.Error("Failed to delete resource: ", err)
 
+			if errors.Is(err, resources.ErrResourceNotFound) {
+				return nil, status.Errorf(codes.NotFound, "resource not found")
+			}
+
+			// Default to internal error for unknown errors
+			return nil, status.Errorf(codes.Internal, "failed to delete resource due to an internal error")
+		}
+	}
 	return ResponseFromDeleteResource(), nil
 }
 

@@ -172,6 +172,31 @@ func (uc *Usecase) ReportResource(ctx context.Context, request *v1beta2.ReportRe
 	return nil
 }
 
+func (uc *Usecase) Delete(reporterResourceKey model.ReporterResourceKey) error {
+	txidStr, err := getNextTransactionID()
+	if err != nil {
+		return err
+	}
+	err = uc.resourceRepository.GetTransactionManager().HandleSerializableTransaction(
+		uc.resourceRepository.GetDB(),
+		func(tx *gorm.DB) error {
+			res, err := uc.resourceRepository.FindResourceByKeys(tx, reporterResourceKey)
+
+			if err == nil && res != nil {
+				log.Info("Found Resource, deleting: ")
+				err := res.Delete(reporterResourceKey)
+				if err != nil {
+					return fmt.Errorf("failed to delete resource: %w", err)
+				}
+				return uc.resourceRepository.Save(tx, *res, model_legacy.OperationTypeUpdated, txidStr)
+			} else {
+				return err
+			}
+		},
+	)
+	return err
+}
+
 // Check verifies if a subject has the specified permission on a resource identified by the reporter resource ID.
 func (uc *Usecase) Check(ctx context.Context, permission, namespace string, sub *kessel.SubjectReference, reporterResourceKey model.ReporterResourceKey) (bool, error) {
 	res, err := uc.resourceRepository.FindResourceByKeys(nil, reporterResourceKey)

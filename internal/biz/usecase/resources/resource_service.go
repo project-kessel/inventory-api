@@ -188,7 +188,7 @@ func (uc *Usecase) Delete(reporterResourceKey model.ReporterResourceKey) error {
 				if err != nil {
 					return fmt.Errorf("failed to delete resource: %w", err)
 				}
-				return uc.resourceRepository.Save(tx, *res, model_legacy.OperationTypeUpdated, txidStr)
+				return uc.resourceRepository.Save(tx, *res, model_legacy.OperationTypeDeleted, txidStr)
 			} else {
 				return err
 			}

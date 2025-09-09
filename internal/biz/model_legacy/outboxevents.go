@@ -218,6 +218,20 @@ func convertResourceToSetTupleEvent(resourceEvent bizmodel.ResourceReportEvent) 
 	return payload, nil
 }
 
+func convertToJsonObject(resourceEvent bizmodel.ResourceDeleteEvent) (internal.JsonObject, error) {
+	payload := internal.JsonObject{}
+	marshalledJson, err := json.Marshal(resourceEvent)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal resource to json: %w", err)
+	}
+	err = json.Unmarshal(marshalledJson, &payload)
+	if err != nil {
+		return nil, fmt.Errorf("failed to unmarshal json to payload: %w", err)
+	}
+
+	return payload, nil
+}
+
 func convertResourceToUnsetTupleEvent(resourceEvent bizmodel.ResourceReportEvent) (internal.JsonObject, error) {
 	payload := internal.JsonObject{}
 	namespace := strings.ToLower(resourceEvent.ReporterType())

@@ -34,14 +34,12 @@ objects:
           use_v1beta2_db: true
         log:
           level: "info"
-
   - apiVersion: v1
     kind: ConfigMap
     metadata:
       name: resources-tarball
     binaryData:
-        resources.tar.gz: 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
-
+      resources.tar.gz: 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
   - apiVersion: kafka.strimzi.io/v1beta2
     kind: KafkaConnect
     metadata:
@@ -73,9 +71,8 @@ objects:
       template:
         pod:
           imagePullSecrets:
-          - name: quay-cloudservices-pull
+            - name: quay-cloudservices-pull
       version: ${VERSION}
-
   - apiVersion: kafka.strimzi.io/v1beta2
     kind: KafkaConnector
     metadata:
@@ -105,7 +102,6 @@ objects:
         heartbeat.action.query: ${DEBEZIUM_ACTION_QUERY}
         topic.heartbeat.prefix: ${TOPIC_HEARTBEAT_PREFIX}
         poll.interval.ms: ${DEBEZIUM_POLL_INTERVAL_MS}
-
   - apiVersion: cloud.redhat.com/v1alpha1
     kind: ClowdApp
     metadata:
@@ -116,12 +112,12 @@ objects:
         name: kessel-inventory
         version: 16
       kafkaTopics:
-      - topicName: outbox.event.kessel.tuples
-        partitions: 1
-        replicas: 3
-      - topicName: outbox.event.kessel.resources
-        partitions: 1
-        replicas: 3
+        - topicName: outbox.event.kessel.tuples
+          partitions: 1
+          replicas: 3
+        - topicName: outbox.event.kessel.resources
+          partitions: 1
+          replicas: 3
       optionalDependencies:
         - kessel-relations
       deployments:
@@ -129,27 +125,27 @@ objects:
           replicas: ${{REPLICAS}}
           podSpec:
             initContainers:
-            - name: copy-resources
-              image: registry.access.redhat.com/ubi9
-              imagePullPolicy: Always
-              command:
-                - /bin/sh
-                - "-c"
-                - |
-                  echo "Extracting resources from tarball..."
-                  tar -xzf /mnt/resources/resources.tar.gz -C /data/schema/resources
-                  echo "Extraction complete!"
-              volumeMounts:
-                - name: resources-tarball
-                  mountPath: "/mnt/resources"
-                - name: resource-volume
-                  mountPath: "/data/schema/resources"
-            - name: migration
-              image: ${INVENTORY_IMAGE}:${IMAGE_TAG}
-              imagePullPolicy: Always
-              command: ["inventory-api"]
-              args: ["migrate"]
-              inheritEnv: true
+              - name: copy-resources
+                image: registry.access.redhat.com/ubi9
+                imagePullPolicy: Always
+                command:
+                  - /bin/sh
+                  - "-c"
+                  - |
+                    echo "Extracting resources from tarball..."
+                    tar -xzf /mnt/resources/resources.tar.gz -C /data/schema/resources
+                    echo "Extraction complete!"
+                volumeMounts:
+                  - name: resources-tarball
+                    mountPath: "/mnt/resources"
+                  - name: resource-volume
+                    mountPath: "/data/schema/resources"
+              - name: migration
+                image: ${INVENTORY_IMAGE}:${IMAGE_TAG}
+                imagePullPolicy: Always
+                command: ["inventory-api"]
+                args: ["migrate"]
+                inheritEnv: true
             image: ${INVENTORY_IMAGE}:${IMAGE_TAG}
             imagePullPolicy: Always
             command: ["inventory-api"]
@@ -163,27 +159,27 @@ objects:
                 path: /api/inventory/v1/readyz
                 port: 8000
             env:
-            - name: CLOWDER_ENABLED
-              value: "true"
-            - name: INVENTORY_API_CONFIG
-              value: "/inventory/inventory-api-config.yaml"
-            - name: PGDATA
-              value: /temp/data
-            - name: RESOURCE_DIR
-              value: "/data/schema/resources"
+              - name: CLOWDER_ENABLED
+                value: "true"
+              - name: INVENTORY_API_CONFIG
+                value: "/inventory/inventory-api-config.yaml"
+              - name: PGDATA
+                value: /temp/data
+              - name: RESOURCE_DIR
+                value: "/data/schema/resources"
             volumeMounts:
-                - name: config-volume
-                  mountPath: "/inventory"
-                - name: resource-volume
-                  mountPath: "/data/schema/resources"
-                - name: resources-tarball
-                  mountPath: "/mnt/resources"
+              - name: config-volume
+                mountPath: "/inventory"
+              - name: resource-volume
+                mountPath: "/data/schema/resources"
+              - name: resources-tarball
+                mountPath: "/mnt/resources"
             volumes:
               - name: config-volume
                 configMap:
                   name: inventory-api-config
               - name: resource-volume
-                emptyDir: { }
+                emptyDir: {}
               - name: resources-tarball
                 configMap:
                   name: resources-tarball
@@ -193,7 +189,6 @@ objects:
               apiPath: inventory
       testing:
         iqePlugin: kessel-inventory
-
 parameters:
   - description: ClowdEnvironment name (ephemeral, stage, prod)
     name: ENV_NAME

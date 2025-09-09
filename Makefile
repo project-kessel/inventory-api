@@ -91,6 +91,7 @@ build-schemas:
 	@echo "====== resources-tarball configmap ======"
 	kubectl create configmap resources-tarball --dry-run=client --from-file=resources.tar.gz -o yaml
 	@echo "====== resources-tarball configmap ======"
+	./scripts/update-ephem-schema-config.sh || { echo "Error: update-ephem-schema-config.sh failed"; exit 1; }
 
 .PHONY: build
 # build

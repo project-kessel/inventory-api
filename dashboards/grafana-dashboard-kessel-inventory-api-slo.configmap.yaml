@@ -223,7 +223,7 @@ data:
                 "sum"
               ],
               "show": false
-            },
+            }, 
             "showHeader": true
           },
           "pluginVersion": "11.6.3",
@@ -232,7 +232,7 @@ data:
               "datasource": {
                 "uid": "$datasource"
               },
-              "expr": "(\n  sum by (operation) (\n    increase(server_requests_code_total_total{namespace=\"$namespace\",service=~\"kessel-inventory-api\",operation!~\".*[Ll]ive[Zz].*|.*[Rr]eady[Zz].*\",code!~\"5..|0\"}[$slo_period])\n  )\n  /\n  sum by (operation) (\n    increase(server_requests_code_total_total{namespace=\"$namespace\",service=~\"kessel-inventory-api\",operation!~\".*[Ll]ive[Zz].*|.*[Rr]eady[Zz].*\"}[$slo_period])\n  )\n)",
+              "expr": "(\n  sum by (operation) (\n    increase(server_requests_code_total_total{namespace=\"$namespace\",service=~\"kessel-inventory-api\",operation!~\".*[Ll]ive[Zz].*|.*[Rr]eady[Zz].*\",code!~\"5..|14\"}[$slo_period])\n  )\n  /\n  sum by (operation) (\n    increase(server_requests_code_total_total{namespace=\"$namespace\",service=~\"kessel-inventory-api\",operation!~\".*[Ll]ive[Zz].*|.*[Rr]eady[Zz].*\"}[$slo_period])\n  )\n)",
               "format": "table",
               "instant": true,
               "legendFormat": "{{operation}}",
@@ -242,7 +242,7 @@ data:
               "datasource": {
                 "uid": "$datasource"
               },
-              "expr": "(\n  sum by (operation) (\n    increase(server_requests_seconds_bucket_seconds_bucket{namespace=\"$namespace\",service=~\"kessel-inventory-api\",operation!~\".*[Ll]ive[Zz].*|.*[Rr]eady[Zz].*\",code!~\"5..|0\",le=\"$latency_slo_target\"}[$slo_period])\n  )\n  /\n  sum by (operation) (\n    increase(server_requests_seconds_bucket_seconds_count{namespace=\"$namespace\",service=~\"kessel-inventory-api\",operation!~\".*[Ll]ive[Zz].*|.*[Rr]eady[Zz].*\",code!~\"5..|0\"}[$slo_period])\n  )\n)",
+              "expr": "(\n  sum by (operation) (\n    increase(server_requests_seconds_bucket_seconds_bucket{namespace=\"$namespace\",service=~\"kessel-inventory-api\",operation!~\".*[Ll]ive[Zz].*|.*[Rr]eady[Zz].*\",code!~\"5..|14\",le=\"$latency_slo_target\"}[$slo_period])\n  )\n  /\n  sum by (operation) (\n    increase(server_requests_seconds_bucket_seconds_count{namespace=\"$namespace\",service=~\"kessel-inventory-api\",operation!~\".*[Ll]ive[Zz].*|.*[Rr]eady[Zz].*\",code!~\"5..|14\"}[$slo_period])\n  )\n)",
               "format": "table",
               "instant": true,
               "legendFormat": "{{operation}}",
@@ -262,7 +262,7 @@ data:
               "datasource": {
                 "uid": "$datasource"
               },
-              "expr": "(\n  1 - (\n    sum by (operation) (\n      increase(server_requests_code_total_total{namespace=\"$namespace\",service=~\"kessel-inventory-api\",operation!~\".*[Ll]ive[Zz].*|.*[Rr]eady[Zz].*\",code!~\"5..|0\"}[$slo_period])\n    )\n    /\n    sum by (operation) (\n      increase(server_requests_code_total_total{namespace=\"$namespace\",service=~\"kessel-inventory-api\",operation!~\".*[Ll]ive[Zz].*|.*[Rr]eady[Zz].*\"}[$slo_period])\n    )\n  )\n)",
+              "expr": "(\n  1 - (\n    sum by (operation) (\n      increase(server_requests_code_total_total{namespace=\"$namespace\",service=~\"kessel-inventory-api\",operation!~\".*[Ll]ive[Zz].*|.*[Rr]eady[Zz].*\",code!~\"5..|14\"}[$slo_period])\n    )\n    /\n    sum by (operation) (\n      increase(server_requests_code_total_total{namespace=\"$namespace\",service=~\"kessel-inventory-api\",operation!~\".*[Ll]ive[Zz].*|.*[Rr]eady[Zz].*\"}[$slo_period])\n    )\n  )\n)",
               "format": "table",
               "instant": true,
               "legendFormat": "{{operation}}",
@@ -389,7 +389,7 @@ data:
                   "datasource": {
                     "uid": "$datasource"
                   },
-                  "expr": "sum(increase(server_requests_code_total_total{namespace=\"$namespace\",service=~\"kessel-inventory-api\",operation=\"${route:raw}\",code!~\"5..|0\"}[$slo_period]))\n/\nsum(increase(server_requests_code_total_total{namespace=\"$namespace\",service=~\"kessel-inventory-api\",operation=\"${route:raw}\"}[$slo_period]))",
+                  "expr": "sum(increase(server_requests_code_total_total{namespace=\"$namespace\",service=~\"kessel-inventory-api\",operation=\"${route:raw}\",code!~\"5..|14\"}[$slo_period]))\n/\nsum(increase(server_requests_code_total_total{namespace=\"$namespace\",service=~\"kessel-inventory-api\",operation=\"${route:raw}\"}[$slo_period]))",
                   "refId": "A"
                 }
               ],
@@ -454,7 +454,7 @@ data:
                   "datasource": {
                     "uid": "$datasource"
                   },
-                  "expr": "(\n  1 - (\n    sum(rate(server_requests_code_total_total{namespace=\"$namespace\",service=~\"kessel-inventory-api\",operation=\"${route:raw}\",code!~\"5..|0\"}[1h]))\n    /\n    sum(rate(server_requests_code_total_total{namespace=\"$namespace\",service=~\"kessel-inventory-api\",operation=\"${route:raw}\"}[1h]))\n  )\n) * 1000",
+                  "expr": "(\n  1 - (\n    sum(rate(server_requests_code_total_total{namespace=\"$namespace\",service=~\"kessel-inventory-api\",operation=\"${route:raw}\",code!~\"5..|14\"}[1h]))\n    /\n    sum(rate(server_requests_code_total_total{namespace=\"$namespace\",service=~\"kessel-inventory-api\",operation=\"${route:raw}\"}[1h]))\n  )\n) * 1000",
                   "refId": "A"
                 }
               ],
@@ -521,7 +521,7 @@ data:
                   "datasource": {
                     "uid": "$datasource"
                   },
-                  "expr": "1 - clamp_min(\n  (\n    (1 - $availability_slo_target) - (\n      1 - (\n        sum(increase(server_requests_code_total_total{namespace=\"$namespace\",service=~\"kessel-inventory-api\",operation=\"${route:raw}\",code!~\"5..|0\"}[1d]))\n        /\n        sum(increase(server_requests_code_total_total{namespace=\"$namespace\",service=~\"kessel-inventory-api\",operation=\"${route:raw}\"}[1d]))\n      )\n    )\n  ) / (1 - $availability_slo_target),\n  0\n)",
+                  "expr": "1 - clamp_min(\n  (\n    (1 - $availability_slo_target) - (\n      1 - (\n        sum(increase(server_requests_code_total_total{namespace=\"$namespace\",service=~\"kessel-inventory-api\",operation=\"${route:raw}\",code!~\"5..|14\"}[1d]))\n        /\n        sum(increase(server_requests_code_total_total{namespace=\"$namespace\",service=~\"kessel-inventory-api\",operation=\"${route:raw}\"}[1d]))\n      )\n    )\n  ) / (1 - $availability_slo_target),\n  0\n)",
                   "refId": "A"
                 }
               ],
@@ -646,7 +646,7 @@ data:
                   "datasource": {
                     "uid": "$datasource"
                   },
-                  "expr": "(\n  sum(\n    increase(server_requests_code_total_total{namespace=\"$namespace\",service=~\"kessel-inventory-api\",operation=\"${route:raw}\",code!~\"5..|0\"}[1d])\n  )\n  /\n  sum(\n    increase(server_requests_code_total_total{namespace=\"$namespace\",service=~\"kessel-inventory-api\",operation=\"${route:raw}\"}[1d])\n  )\n)",
+                  "expr": "(\n  sum(\n    increase(server_requests_code_total_total{namespace=\"$namespace\",service=~\"kessel-inventory-api\",operation=\"${route:raw}\",code!~\"5..|14\"}[1d])\n  )\n  /\n  sum(\n    increase(server_requests_code_total_total{namespace=\"$namespace\",service=~\"kessel-inventory-api\",operation=\"${route:raw}\"}[1d])\n  )\n)",
                   "interval": "1d",
                   "legendFormat": "Availability",
                   "refId": "A"
@@ -739,7 +739,7 @@ data:
                   "datasource": {
                     "uid": "$datasource"
                   },
-                  "expr": "sum(increase(server_requests_seconds_bucket_seconds_bucket{namespace=\"$namespace\",service=~\"kessel-inventory-api\",operation=\"${route:raw}\",code!~\"5..|0\",le=\"$latency_slo_target\"}[$slo_period]))\n/\nsum(increase(server_requests_seconds_bucket_seconds_count{namespace=\"$namespace\",service=~\"kessel-inventory-api\",operation=\"${route:raw}\",code!~\"5..|0\"}[$slo_period]))",
+                  "expr": "sum(increase(server_requests_seconds_bucket_seconds_bucket{namespace=\"$namespace\",service=~\"kessel-inventory-api\",operation=\"${route:raw}\",code!~\"5..|14\",le=\"$latency_slo_target\"}[$slo_period]))\n/\nsum(increase(server_requests_seconds_bucket_seconds_count{namespace=\"$namespace\",service=~\"kessel-inventory-api\",operation=\"${route:raw}\",code!~\"5..|14\"}[$slo_period]))",
                   "refId": "A"
                 }
               ],
@@ -804,7 +804,7 @@ data:
                   "datasource": {
                     "uid": "$datasource"
                   },
-                  "expr": "(\n  1 - (\n    sum(rate(server_requests_seconds_bucket_seconds_bucket{namespace=\"$namespace\",service=~\"kessel-inventory-api\",operation=\"${route:raw}\",code!~\"5..|0\",le=\"$latency_slo_target\"}[1h]))\n    /\n    sum(rate(server_requests_seconds_bucket_seconds_count{namespace=\"$namespace\",service=~\"kessel-inventory-api\",operation=\"${route:raw}\",code!~\"5..|0\"}[1h]))\n  )\n) * 20",
+                  "expr": "(\n  1 - (\n    sum(rate(server_requests_seconds_bucket_seconds_bucket{namespace=\"$namespace\",service=~\"kessel-inventory-api\",operation=\"${route:raw}\",code!~\"5..|14\",le=\"$latency_slo_target\"}[1h]))\n    /\n    sum(rate(server_requests_seconds_bucket_seconds_count{namespace=\"$namespace\",service=~\"kessel-inventory-api\",operation=\"${route:raw}\",code!~\"5..|14\"}[1h]))\n  )\n) * 20",
                   "refId": "A"
                 }
               ],
@@ -871,7 +871,7 @@ data:
                   "datasource": {
                     "uid": "$datasource"
                   },
-                  "expr": "1 - clamp_min(\n  (\n    0.05 - (\n      1 - (\n        sum(increase(server_requests_seconds_bucket_seconds_bucket{namespace=\"$namespace\",service=~\"kessel-inventory-api\",operation=\"${route:raw}\",code!~\"5..|0\",le=\"$latency_slo_target\"}[1d]))\n        /\n        sum(increase(server_requests_seconds_bucket_seconds_count{namespace=\"$namespace\",service=~\"kessel-inventory-api\",operation=\"${route:raw}\",code!~\"5..|0\"}[1d]))\n      )\n    )\n  ) / 0.05,\n  0\n)",
+                  "expr": "1 - clamp_min(\n  (\n    0.05 - (\n      1 - (\n        sum(increase(server_requests_seconds_bucket_seconds_bucket{namespace=\"$namespace\",service=~\"kessel-inventory-api\",operation=\"${route:raw}\",code!~\"5..|14\",le=\"$latency_slo_target\"}[1d]))\n        /\n        sum(increase(server_requests_seconds_bucket_seconds_count{namespace=\"$namespace\",service=~\"kessel-inventory-api\",operation=\"${route:raw}\",code!~\"5..|14\"}[1d]))\n      )\n    )\n  ) / 0.05,\n  0\n)",
                   "refId": "A"
                 }
               ],
@@ -1048,7 +1048,7 @@ data:
                   "datasource": {
                     "uid": "$datasource"
                   },
-                  "expr": "histogram_quantile(0.95,\n  sum by (le) (\n    rate(server_requests_seconds_bucket_seconds_bucket{namespace=\"$namespace\",service=~\"kessel-inventory-api\",operation=\"${route:raw}\",code!~\"5..|0\"}[1d])\n  )\n)",
+                  "expr": "histogram_quantile(0.95,\n  sum by (le) (\n    rate(server_requests_seconds_bucket_seconds_bucket{namespace=\"$namespace\",service=~\"kessel-inventory-api\",operation=\"${route:raw}\",code!~\"5..|14\"}[1d])\n  )\n)",
                   "interval": "1d",
                   "legendFormat": "P95 Latency",
                   "refId": "A"
@@ -1057,7 +1057,7 @@ data:
                   "datasource": {
                     "uid": "$datasource"
                   },
-                  "expr": "(\n  sum(\n    increase(server_requests_seconds_bucket_seconds_bucket{namespace=\"$namespace\",service=~\"kessel-inventory-api\",operation=\"${route:raw}\",code!~\"5..|0\",le=\"$latency_slo_target\"}[1d])\n  )\n  /\n  sum(\n    increase(server_requests_seconds_bucket_seconds_count{namespace=\"$namespace\",service=~\"kessel-inventory-api\",operation=\"${route:raw}\",code!~\"5..|0\"}[1d])\n  )\n)",
+                  "expr": "(\n  sum(\n    increase(server_requests_seconds_bucket_seconds_bucket{namespace=\"$namespace\",service=~\"kessel-inventory-api\",operation=\"${route:raw}\",code!~\"5..|14\",le=\"$latency_slo_target\"}[1d])\n  )\n  /\n  sum(\n    increase(server_requests_seconds_bucket_seconds_count{namespace=\"$namespace\",service=~\"kessel-inventory-api\",operation=\"${route:raw}\",code!~\"5..|14\"}[1d])\n  )\n)",
                   "interval": "1d",
                   "legendFormat": "SLO Compliance",
                   "refId": "B"

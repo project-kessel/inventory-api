@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/project-kessel/inventory-api/cmd/common"
+	usecase_resources "github.com/project-kessel/inventory-api/internal/biz/usecase/resources"
 	"github.com/project-kessel/inventory-api/internal/consumer/auth"
 	"github.com/project-kessel/inventory-api/internal/consumer/retry"
 	datamodel "github.com/project-kessel/inventory-api/internal/data/model"
@@ -310,6 +311,29 @@ func (i *InventoryConsumer) ProcessMessage(headers map[string]string, relationsE
 				i.Logger.Errorf("failed to parse message for tuple: %v", err)
 				return "", err
 			}
+
+			// 1) delete of previous subject tuples first
+			i.Logger.Infof("delete old tuples filter: %v", usecase_resources.CalculateTuples(tuple))
+			_, delErr := i.Retry(func() (string, error) {
+				return i.DeleteTuple(context.Background(), usecase_resources.CalculateTuples(tuple))
+			}, i.MetricsCollector.MsgProcessFailures)
+			if delErr != nil {
+				// log and continue; the next write or periodic reconciliation can clean up
+				i.Logger.Errorf("failed to delete previous subject tuples (non-fatal): %v", delErr)
+			}
+
+			// 2) Upsert the new tuple
+			// Log upsert tuple details
+			i.Logger.Infof(
+				"upsert tuple: resource={ns=%s type=%s id=%s} relation=%s subject={ns=%s type=%s id=%s}",
+				tuple.GetResource().GetType().GetNamespace(),
+				tuple.GetResource().GetType().GetName(),
+				tuple.GetResource().GetId(),
+				tuple.GetRelation(),
+				tuple.GetSubject().GetSubject().GetType().GetNamespace(),
+				tuple.GetSubject().GetSubject().GetType().GetName(),
+				tuple.GetSubject().GetSubject().GetId(),
+			)
 			resp, err := i.Retry(func() (string, error) {
 				return i.UpdateTuple(context.Background(), tuple)
 			}, i.MetricsCollector.MsgProcessFailures)

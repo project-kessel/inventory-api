@@ -312,17 +312,7 @@ func (i *InventoryConsumer) ProcessMessage(headers map[string]string, relationsE
 				return "", err
 			}
 
-			// 1) delete of previous subject tuples first
-			i.Logger.Infof("delete old tuples filter: %v", usecase_resources.CalculateTuples(tuple))
-			_, delErr := i.Retry(func() (string, error) {
-				return i.DeleteTuple(context.Background(), usecase_resources.CalculateTuples(tuple))
-			}, i.MetricsCollector.MsgProcessFailures)
-			if delErr != nil {
-				// log and continue; the next write or periodic reconciliation can clean up
-				i.Logger.Errorf("failed to delete previous subject tuples (non-fatal): %v", delErr)
-			}
-
-			// 2) Upsert the new tuple
+			// 1) Upsert the new tuple
 			// Log upsert tuple details
 			i.Logger.Infof(
 				"upsert tuple: resource={ns=%s type=%s id=%s} relation=%s subject={ns=%s type=%s id=%s}",
@@ -342,6 +332,16 @@ func (i *InventoryConsumer) ProcessMessage(headers map[string]string, relationsE
 				i.Logger.Errorf("failed to update tuple: %v", err)
 				return "", err
 			}
+
+			// 2) delete of previous subject tuples first
+			i.Logger.Infof("delete old tuples filter: %v", usecase_resources.CalculateTuples(tuple))
+			_, delErr := i.Retry(func() (string, error) {
+				return i.DeleteTuple(context.Background(), usecase_resources.CalculateTuples(tuple))
+			}, i.MetricsCollector.MsgProcessFailures)
+			if delErr != nil {
+				i.Logger.Errorf("failed to delete previous subject tuples (non-fatal): %v", delErr)
+			}
+
 			return resp, nil
 		}
 	case string(model_legacy.OperationTypeDeleted):

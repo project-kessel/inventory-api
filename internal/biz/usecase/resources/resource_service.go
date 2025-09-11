@@ -20,6 +20,7 @@ import (
 	kessel "github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
 	"github.com/sony/gobreaker"
 	"google.golang.org/grpc"
+	"google.golang.org/protobuf/proto"
 	"gorm.io/gorm"
 
 	"sync"
@@ -821,4 +822,26 @@ func computeReadAfterWrite(uc *Usecase, write_visibility v1beta2.WriteVisibility
 		return false
 	}
 	return !common.IsNil(uc.ListenManager) && uc.Config.ReadAfterWriteEnabled && isSPInAllowlist(reporterPrincipal, uc.Config.ReadAfterWriteAllowlist)
+}
+
+// CalculateTuples builds a delete filter targeting previous
+// subject tuples of the same kind as the provided relationship tuple.
+func CalculateTuples(tuple *kessel.Relationship) *kessel.RelationTupleFilter {
+	// Defensive checks to avoid panics on malformed tuples; return an empty filter in that case.
+	if tuple == nil || tuple.GetResource() == nil || tuple.GetSubject() == nil ||
+		tuple.GetResource().GetType() == nil || tuple.GetSubject().GetSubject() == nil ||
+		tuple.GetSubject().GetSubject().GetType() == nil {
+		return &kessel.RelationTupleFilter{}
+	}
+
+	return &kessel.RelationTupleFilter{
+		ResourceNamespace: proto.String(tuple.GetResource().GetType().GetNamespace()),
+		ResourceType:      proto.String(tuple.GetResource().GetType().GetName()),
+		ResourceId:        proto.String(tuple.GetResource().GetId()),
+		Relation:          proto.String(tuple.GetRelation()),
+		SubjectFilter: &kessel.SubjectFilter{
+			SubjectNamespace: proto.String(tuple.GetSubject().GetSubject().GetType().GetNamespace()),
+			SubjectType:      proto.String(tuple.GetSubject().GetSubject().GetType().GetName()),
+		},
+	}
 }

@@ -66,3 +66,7 @@ func (re ResourceDeleteEvent) LocalResourceId() string {
 func (re ResourceDeleteEvent) ResourceId() uuid.UUID {
 	return uuid.UUID(re.id)
 }
+
+func (re ResourceDeleteEvent) WorkspaceId() string {
+	return ""
+}

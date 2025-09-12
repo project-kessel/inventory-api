@@ -3,6 +3,8 @@ package model
 import (
 	"fmt"
 	"time"
+
+	"github.com/go-kratos/kratos/v2/log"
 )
 
 const initialCommonVersion = 0
@@ -118,12 +120,16 @@ func (r *Resource) Delete(
 	key ReporterResourceKey,
 ) error {
 
+	log.Info("Key", key)
 	reporterResource, err := r.findReporterResourceToUpdateByKey(key)
+	log.Info("ReporterResource before calling delete", reporterResource)
 	if err != nil {
 		return err
 	}
 
 	reporterResource.Delete()
+	log.Info("ReporterResource after calling delete", reporterResource)
+
 	resourceDeleteEvent, err := deleteEventAndRepresentations(
 		reporterResource.resourceID,
 		key.ResourceType(),
@@ -134,6 +140,7 @@ func (r *Resource) Delete(
 		reporterResource.representationVersion,
 		reporterResource.generation)
 
+	log.Infof("ResourceDeleteEvent: %+v", resourceDeleteEvent)
 	if err != nil {
 		return fmt.Errorf("failed to create ResourceDeleteEvent: %w", err)
 	}
@@ -217,12 +224,16 @@ func deleteEventAndRepresentations(resourceId ResourceId,
 		return ResourceDeleteEvent{}, fmt.Errorf("invalid ReporterRepresentation: %w", err)
 	}
 
+	log.Infof("ReporterDeleteRepresentation: %+v", reporterDeleteRepresentation)
+
 	resourceDeleteEvent, err := NewResourceDeleteEvent(
 		resourceId,
 		resourceType,
 		reporterType,
 		reporterInstanceId,
-		localResourceId, reporterDeleteRepresentation)
+		localResourceId,
+		reporterDeleteRepresentation)
+
 	if err != nil {
 		return ResourceDeleteEvent{}, fmt.Errorf("invalid ResourceReportEvent: %w", err)
 	}
@@ -239,8 +250,12 @@ func (r *Resource) findReporterResourceToUpdateByKey(key ReporterResourceKey) (*
 }
 
 // Add getters only where needed
-func (r Resource) ResourceEvents() []ResourceReportEvent {
+func (r Resource) ResourceReportEvents() []ResourceReportEvent {
 	return r.resourceReportEvents
+}
+
+func (r Resource) ResourceDeleteEvents() []ResourceDeleteEvent {
+	return r.resourceDeleteEvents
 }
 
 func (r Resource) ReporterResources() []ReporterResource {
@@ -280,6 +295,10 @@ func (r Resource) Serialize() (ResourceSnapshot, ReporterResourceSnapshot, Repor
 		//TODO: Fix this to serialize all ResourceEvents
 		reporterRepresentationSnapshot = r.resourceReportEvents[0].reporterRepresentation.Serialize()
 		commonRepresentationSnapshot = r.resourceReportEvents[0].commonRepresentation.Serialize()
+	}
+	if len(r.resourceDeleteEvents) > 0 {
+		//TODO: Fix this to serialize all ResourceEvents
+		reporterRepresentationSnapshot = r.resourceDeleteEvents[0].reporterRepresentation.Serialize()
 	}
 
 	return resourceSnapshot, reporterResourceSnapshot, reporterRepresentationSnapshot, commonRepresentationSnapshot, nil

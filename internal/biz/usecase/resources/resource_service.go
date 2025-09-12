@@ -183,8 +183,9 @@ func (uc *Usecase) Delete(reporterResourceKey model.ReporterResourceKey) error {
 			res, err := uc.resourceRepository.FindResourceByKeys(tx, reporterResourceKey)
 
 			if err == nil && res != nil {
-				log.Info("Found Resource, deleting: ")
+				log.Info("Found Resource, deleting: ", res)
 				err := res.Delete(reporterResourceKey)
+				log.Infof("Deleted Resource to save : %+v", res)
 				if err != nil {
 					return fmt.Errorf("failed to delete resource: %w", err)
 				}

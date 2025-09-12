@@ -13,8 +13,8 @@ func PublishOutboxEvent(tx *gorm.DB, event *model_legacy.OutboxEvent) error {
 	if err := tx.Create(event).Error; err != nil {
 		return err
 	}
-	if err := tx.Delete(event).Error; err != nil {
+	/*if err := tx.Delete(event).Error; err != nil {
 		return err
-	}
+	}*/
 	return nil
 }

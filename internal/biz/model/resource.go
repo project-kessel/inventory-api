@@ -3,8 +3,6 @@ package model
 import (
 	"fmt"
 	"time"
-
-	"github.com/go-kratos/kratos/v2/log"
 )
 
 const initialCommonVersion = 0
@@ -119,17 +117,12 @@ func (r *Resource) Update(
 func (r *Resource) Delete(
 	key ReporterResourceKey,
 ) error {
-
-	log.Info("Key", key)
 	reporterResource, err := r.findReporterResourceToUpdateByKey(key)
-	log.Info("ReporterResource before calling delete", reporterResource)
 	if err != nil {
 		return err
 	}
 
 	reporterResource.Delete()
-	log.Info("ReporterResource after calling delete", reporterResource)
-
 	resourceDeleteEvent, err := deleteEventAndRepresentations(
 		reporterResource.resourceID,
 		key.ResourceType(),
@@ -140,7 +133,6 @@ func (r *Resource) Delete(
 		reporterResource.representationVersion,
 		reporterResource.generation)
 
-	log.Infof("ResourceDeleteEvent: %+v", resourceDeleteEvent)
 	if err != nil {
 		return fmt.Errorf("failed to create ResourceDeleteEvent: %w", err)
 	}
@@ -223,8 +215,6 @@ func deleteEventAndRepresentations(resourceId ResourceId,
 	if err != nil {
 		return ResourceDeleteEvent{}, fmt.Errorf("invalid ReporterRepresentation: %w", err)
 	}
-
-	log.Infof("ReporterDeleteRepresentation: %+v", reporterDeleteRepresentation)
 
 	resourceDeleteEvent, err := NewResourceDeleteEvent(
 		resourceId,

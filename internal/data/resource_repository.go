@@ -3,7 +3,6 @@ package data
 import (
 	"fmt"
 
-	"github.com/go-kratos/kratos/v2/log"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
@@ -162,10 +161,7 @@ func (r *resourceRepository) handleOutboxEvents(tx *gorm.DB, resourceEvent bizmo
 	if err != nil {
 		return err
 	}
-
-	log.Info("Resource Message", resourceMessage)
-	log.Info("Tuple Message", tupleMessage)
-
+	
 	err = PublishOutboxEvent(tx, resourceMessage)
 	if err != nil {
 		return err

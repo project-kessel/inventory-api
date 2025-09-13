@@ -60,8 +60,6 @@ func NewReporterDeleteRepresentation(
 	reporterResourceID ReporterResourceId,
 	version Version,
 	generation Generation,
-	commonVersion Version,
-	reporterVersion *ReporterVersion,
 ) (ReporterDeleteRepresentation, error) {
 	if reporterResourceID.UUID() == uuid.Nil {
 		return ReporterDeleteRepresentation{}, fmt.Errorf("%w: ReporterResourceId", ErrInvalidUUID)
@@ -73,8 +71,6 @@ func NewReporterDeleteRepresentation(
 			reporterResourceID: reporterResourceID,
 			version:            version,
 			generation:         generation,
-			commonVersion:      commonVersion,
-			reporterVersion:    reporterVersion,
 			tombstone:          NewTombstone(true),
 		},
 	}, nil

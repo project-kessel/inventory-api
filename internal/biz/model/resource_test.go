@@ -192,7 +192,7 @@ func TestResource_Update(t *testing.T) {
 		}
 
 		// Verify resource event was created
-		resourceEvents := original.ResourceEvents()
+		resourceEvents := original.ResourceReportEvents()
 		if len(resourceEvents) != 2 { // Original + updated
 			t.Fatalf("Expected 2 resource events, got %d", len(resourceEvents))
 		}
@@ -370,8 +370,8 @@ func TestResource_Update(t *testing.T) {
 		}
 
 		// Should succeed without error
-		if len(original.ResourceEvents()) != 2 {
-			t.Errorf("Expected 2 resource events, got %d", len(original.ResourceEvents()))
+		if len(original.ResourceReportEvents()) != 2 {
+			t.Errorf("Expected 2 resource events, got %d", len(original.ResourceReportEvents()))
 		}
 	})
 }

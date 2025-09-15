@@ -861,8 +861,8 @@ func (uc *Usecase) CalculateTuples(tuple *kessel.Relationship, currentCommonVers
 
 	// Get the actual current version from the resource instead of using the passed parameter
 	// We need to determine the current version by counting the resource events or getting it from the database
-	actualCurrentVersion := uint(len(resourceEvents)) // Version starts from 0, so length gives us the next version
-	uc.Log.Infof("Actual current version determined: %d (passed version was: %d)", actualCurrentVersion, currentCommonVersion.Uint())
+	actualCurrentVersion := currentCommonVersion.Uint()
+	uc.Log.Infof("Using passed version: %d", actualCurrentVersion)
 
 	// Extract configuration from the tuple
 	relation := tuple.GetRelation()
@@ -1018,4 +1018,30 @@ func (uc *Usecase) ResourceKeyFromTuple(tuple *kessel.Relationship) (model.Repor
 	}
 	uc.Log.Infof("ResourceKeyFromTuple success: %+v", key)
 	return key, nil
+}
+
+// GetCurrentVersion queries the database to get the actual current version for a resource
+func (uc *Usecase) GetCurrentVersion(key model.ReporterResourceKey) (model.Version, error) {
+	uc.Log.Infof("GetCurrentVersion called for key: %+v", key)
+
+	// Query the database to get the current version from reporter_representations
+	var result struct {
+		Version uint `gorm:"column:version"`
+	}
+
+	err := uc.resourceRepository.GetDB().
+		Table("reporter_representations rr").
+		Select("rr.version").
+		Where("rr.reporter_resource_id = (SELECT id FROM reporter_resources WHERE local_resource_id = ? AND resource_type = ? AND reporter_type = ? AND reporter_instance_id = ?)",
+			key.LocalResourceId().Serialize(), key.ResourceType().Serialize(), key.ReporterType().Serialize(), key.ReporterInstanceId().Serialize()).
+		Order("rr.version DESC").
+		First(&result).Error
+
+	if err != nil {
+		uc.Log.Errorf("Failed to get current version: %v", err)
+		return model.Version(0), err
+	}
+
+	uc.Log.Infof("Found current version: %d", result.Version)
+	return model.Version(result.Version), nil
 }

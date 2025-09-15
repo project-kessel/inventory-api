@@ -14,7 +14,6 @@ import (
 	"time"
 
 	"github.com/project-kessel/inventory-api/cmd/common"
-	"github.com/project-kessel/inventory-api/internal/biz/model"
 	usecase_resources "github.com/project-kessel/inventory-api/internal/biz/usecase/resources"
 	"github.com/project-kessel/inventory-api/internal/consumer/auth"
 	"github.com/project-kessel/inventory-api/internal/consumer/retry"
@@ -327,7 +326,11 @@ func (i *InventoryConsumer) ProcessMessage(headers map[string]string, relationsE
 
 			// Get the current version from the resource
 			// The version should be the current representation version from the database
-			version := model.Version(1) // Default to 1, but we'll get the actual version from CalculateTuples
+			version, err := i.ResourceService.GetCurrentVersion(key) // Default to 1, but we'll get the actual version from CalculateTuples
+			if err != nil {
+				i.Logger.Errorf("Failed to get current version: %v", err)
+				return "", err
+			}
 
 			// Calculate tuples for create and delete
 			createFilter, deleteFilter := i.ResourceService.CalculateTuples(tuple, version, key)

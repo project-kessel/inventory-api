@@ -157,17 +157,17 @@ func (r *resourceRepository) Save(tx *gorm.DB, resource bizmodel.Resource, opera
 }
 
 func (r *resourceRepository) handleOutboxEvents(tx *gorm.DB, resourceEvent bizmodel.ResourceEvent, operationType model_legacy.EventOperationType, txid string) error {
-	resourceMessage, tupleMessage, err := model_legacy.NewOutboxEventsFromResourceEvent(resourceEvent, operationType, txid)
+	resourceMessage, _, tupleMessagev2, err := model_legacy.NewOutboxEventsFromResourceEvent(resourceEvent, operationType, txid)
 	if err != nil {
 		return err
 	}
-	
+
 	err = PublishOutboxEvent(tx, resourceMessage)
 	if err != nil {
 		return err
 	}
 
-	err = PublishOutboxEvent(tx, tupleMessage)
+	err = PublishOutboxEvent(tx, tupleMessagev2)
 	if err != nil {
 		return err
 	}

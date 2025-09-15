@@ -182,6 +182,28 @@ func convertResourceToResourceEvent(resourceReportEvent bizmodel.ResourceReportE
 	return payload, nil
 }
 
+func convertResourceToTupleEvent(resourceEvent bizmodel.ResourceEvent) (internal.JsonObject, error) {
+	payload := internal.JsonObject{}
+	reporterResourceKey, err := resourceEvent.ReporterResourceKey()
+
+	if err != nil {
+		return nil, err
+	}
+
+	tupleEvent, err := bizmodel.NewTupleEvent(resourceEvent.CommonVersion(), reporterResourceKey)
+
+	marshalledJson, err := json.Marshal(tupleEvent)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal resource to json: %w", err)
+	}
+	err = json.Unmarshal(marshalledJson, &payload)
+	if err != nil {
+		return nil, fmt.Errorf("failed to unmarshal json to payload: %w", err)
+	}
+
+	return payload, nil
+}
+
 func convertResourceToSetTupleEvent(resourceEvent bizmodel.ResourceReportEvent) (internal.JsonObject, error) {
 	payload := internal.JsonObject{}
 	namespace := strings.ToLower(resourceEvent.ReporterType())
@@ -241,9 +263,10 @@ func convertResourceToUnsetTupleEvent(resourceEvent bizmodel.ResourceDeleteEvent
 	return payload, nil
 }
 
-func NewOutboxEventsFromResourceEvent(domainResourceEvent bizmodel.ResourceEvent, operationType EventOperationType, txid string) (*OutboxEvent, *OutboxEvent, error) {
+func NewOutboxEventsFromResourceEvent(domainResourceEvent bizmodel.ResourceEvent, operationType EventOperationType, txid string) (*OutboxEvent, *OutboxEvent, *OutboxEvent, error) {
 	var payload internal.JsonObject
 	var tuplePayload internal.JsonObject
+	var tuplePayloadv2 internal.JsonObject
 	var err error
 
 	switch operationType.OperationType() {
@@ -253,7 +276,7 @@ func NewOutboxEventsFromResourceEvent(domainResourceEvent bizmodel.ResourceEvent
 		if deleteEvent, ok := domainResourceEvent.(bizmodel.ResourceDeleteEvent); ok {
 			tuplePayload, err = convertResourceToUnsetTupleEvent(deleteEvent)
 		} else {
-			return nil, nil, fmt.Errorf("expected ResourceDeleteEvent for delete operation, got %T", domainResourceEvent)
+			return nil, nil, nil, fmt.Errorf("expected ResourceDeleteEvent for delete operation, got %T", domainResourceEvent)
 		}
 	default:
 		if reportEvent, ok := domainResourceEvent.(bizmodel.ResourceReportEvent); ok {
@@ -261,17 +284,20 @@ func NewOutboxEventsFromResourceEvent(domainResourceEvent bizmodel.ResourceEvent
 			if err == nil {
 				tuplePayload, err = convertResourceToSetTupleEvent(reportEvent)
 			}
+			if err == nil {
+				tuplePayloadv2, err = convertResourceToTupleEvent(reportEvent)
+			}
 		} else {
-			return nil, nil, fmt.Errorf("expected ResourceReportEvent for create/update operation, got %T", domainResourceEvent)
+			return nil, nil, nil, fmt.Errorf("expected ResourceReportEvent for create/update operation, got %T", domainResourceEvent)
 		}
 	}
 
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to convert resource to payload: %w", err)
+		return nil, nil, nil, fmt.Errorf("failed to convert resource to payload: %w", err)
 	}
 
 	resourceEvent := &OutboxEvent{
-		Operation:     operationType,
+		Operation:     operationType.OperationType(),
 		AggregateType: ResourceAggregateType,
 		AggregateID:   domainResourceEvent.Id().String(),
 		TxId:          "",
@@ -279,14 +305,22 @@ func NewOutboxEventsFromResourceEvent(domainResourceEvent bizmodel.ResourceEvent
 	}
 
 	tupleEvent := &OutboxEvent{
-		Operation:     operationType,
+		Operation:     operationType.OperationType(),
 		AggregateType: TupleAggregateType,
 		AggregateID:   domainResourceEvent.Id().String(),
 		TxId:          txid,
 		Payload:       tuplePayload,
 	}
 
-	return resourceEvent, tupleEvent, nil
+	tupleEventV2 := &OutboxEvent{
+		Operation:     operationType.OperationType(),
+		AggregateType: TupleAggregateType,
+		AggregateID:   domainResourceEvent.Id().String(),
+		TxId:          txid,
+		Payload:       tuplePayloadv2,
+	}
+
+	return resourceEvent, tupleEvent, tupleEventV2, nil
 }
 
 func newResourceEventLegacy(operationType EventOperationType, resource *Resource) (*ResourceEvent, error) {

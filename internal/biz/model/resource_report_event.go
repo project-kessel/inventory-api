@@ -107,6 +107,34 @@ func (re ResourceReportEvent) WorkspaceId() string {
 	return ""
 }
 
+func (re ResourceReportEvent) CommonVersion() Version {
+	return re.commonRepresentation.Version()
+}
+
+func (re ResourceReportEvent) ReporterResourceKey() (ReporterResourceKey, error) {
+	localResourceId, err := NewLocalResourceId(re.LocalResourceId())
+	if err != nil {
+		return ReporterResourceKey{}, err
+	}
+
+	resourceType, err := NewResourceType(re.ResourceType())
+	if err != nil {
+		return ReporterResourceKey{}, err
+	}
+
+	reporterType, err := NewReporterType(re.ReporterType())
+	if err != nil {
+		return ReporterResourceKey{}, err
+	}
+
+	reporterInstanceId, err := NewReporterInstanceId(re.ReporterInstanceId())
+	if err != nil {
+		return ReporterResourceKey{}, err
+	}
+
+	return NewReporterResourceKey(localResourceId, resourceType, reporterType, reporterInstanceId)
+}
+
 // DeserializeResourceEvent creates a ResourceReportEvent from representation snapshots - direct initialization without validation
 func DeserializeResourceEvent(
 	reporterRepresentationSnapshot *ReporterRepresentationSnapshot,

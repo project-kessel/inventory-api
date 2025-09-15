@@ -67,6 +67,35 @@ func (re ResourceDeleteEvent) ResourceId() uuid.UUID {
 	return uuid.UUID(re.id)
 }
 
+// TODO: These fields do not really belong on the delete event, need to figure out a better way to model these
 func (re ResourceDeleteEvent) WorkspaceId() string {
 	return ""
+}
+
+func (re ResourceDeleteEvent) CommonVersion() Version {
+	return re.reporterRepresentation.CommonVersion()
+}
+
+func (re ResourceDeleteEvent) ReporterResourceKey() (ReporterResourceKey, error) {
+	localResourceId, err := NewLocalResourceId(re.LocalResourceId())
+	if err != nil {
+		return ReporterResourceKey{}, err
+	}
+
+	resourceType, err := NewResourceType(re.ResourceType())
+	if err != nil {
+		return ReporterResourceKey{}, err
+	}
+
+	reporterType, err := NewReporterType(re.ReporterType())
+	if err != nil {
+		return ReporterResourceKey{}, err
+	}
+
+	reporterInstanceId, err := NewReporterInstanceId(re.ReporterInstanceId())
+	if err != nil {
+		return ReporterResourceKey{}, err
+	}
+
+	return NewReporterResourceKey(localResourceId, resourceType, reporterType, reporterInstanceId)
 }

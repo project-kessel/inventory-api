@@ -92,6 +92,10 @@ func DeserializeCommonRepresentation(snapshot *CommonRepresentationSnapshot) Com
 	}
 }
 
+func (cr CommonRepresentation) Version() Version {
+	return cr.version
+}
+
 // CreateSnapshot creates a snapshot of the CommonRepresentation
 func (cr CommonRepresentation) CreateSnapshot() (CommonRepresentationSnapshot, error) {
 	return cr.Serialize(), nil

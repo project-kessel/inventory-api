@@ -7,4 +7,6 @@ type ResourceEvent interface {
 	ReporterInstanceId() string
 	LocalResourceId() string
 	WorkspaceId() string
+	CommonVersion() Version
+	ReporterResourceKey() (ReporterResourceKey, error)
 }

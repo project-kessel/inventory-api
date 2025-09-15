@@ -140,3 +140,7 @@ func DeserializeReporterDataRepresentation(snapshot *ReporterRepresentationSnaps
 		},
 	}
 }
+
+func (rr ReporterRepresentation) CommonVersion() Version {
+	return rr.commonVersion
+}

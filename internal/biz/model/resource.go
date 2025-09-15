@@ -235,6 +235,19 @@ func (r *Resource) findReporterResourceToUpdateByKey(key ReporterResourceKey) (*
 	if reporter, exists := r.reporterResourcesMap[key]; exists {
 		return reporter, nil
 	}
+
+	// If exact match fails and reporterInstanceId is empty, try partial matching
+	// TODO: Doing this temporarily, the actual fix is to update ReporterResourceKey to make ReporterInstanceId optional
+	if key.ReporterInstanceId().Serialize() == "" {
+		for storedKey, reporter := range r.reporterResourcesMap {
+			if storedKey.LocalResourceId().Serialize() == key.LocalResourceId().Serialize() &&
+				storedKey.ResourceType().Serialize() == key.ResourceType().Serialize() &&
+				storedKey.ReporterType().Serialize() == key.ReporterType().Serialize() {
+				return reporter, nil
+			}
+		}
+	}
+
 	return nil, fmt.Errorf("reporter resource with key (localResourceId=%s, resourceType=%s, reporterType=%s, reporterInstanceId=%s) not found in resource",
 		key.LocalResourceId(), key.ResourceType(), key.ReporterType(), key.ReporterInstanceId())
 }

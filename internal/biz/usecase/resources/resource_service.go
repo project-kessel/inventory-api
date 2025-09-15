@@ -177,6 +177,8 @@ func (uc *Usecase) Delete(reporterResourceKey model.ReporterResourceKey) error {
 	if err != nil {
 		return err
 	}
+
+	log.Info("Reporter Resource Key to delete ", reporterResourceKey)
 	err = uc.resourceRepository.GetTransactionManager().HandleSerializableTransaction(
 		uc.resourceRepository.GetDB(),
 		func(tx *gorm.DB) error {

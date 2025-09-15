@@ -161,7 +161,7 @@ func (r *resourceRepository) handleOutboxEvents(tx *gorm.DB, resourceEvent bizmo
 	if err != nil {
 		return err
 	}
-	
+
 	err = PublishOutboxEvent(tx, resourceMessage)
 	if err != nil {
 		return err

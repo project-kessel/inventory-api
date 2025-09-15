@@ -209,6 +209,27 @@ func testRepositoryContract(t *testing.T, repo ResourceRepository, db *gorm.DB) 
 		require.ErrorIs(t, err, gorm.ErrRecordNotFound)
 		assert.Nil(t, foundResource)
 	})
+
+	t.Run("FindResourceByKeys works when reporterInstanceId is not provided in search key", func(t *testing.T) {
+		resource := createTestResourceWithLocalId(t, "test-resource-no-instance-lookup")
+
+		err := repo.Save(db, resource, model_legacy.OperationTypeCreated, "test-tx-no-instance")
+		require.NoError(t, err)
+
+		key, err := bizmodel.NewReporterResourceKey(
+			"test-resource-no-instance-lookup",
+			"k8s_cluster",
+			"ocm",
+			"",
+		)
+		require.NoError(t, err)
+
+		foundResource, err := repo.FindResourceByKeys(db, key)
+		require.NoError(t, err)
+		require.NotNil(t, foundResource)
+
+		assert.Len(t, foundResource.ReporterResources(), 1, "should have one reporter resource")
+	})
 }
 
 // nolint:unused // Keep for when outbox event handling is fixed

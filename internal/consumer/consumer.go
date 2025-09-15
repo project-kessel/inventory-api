@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/project-kessel/inventory-api/cmd/common"
+	"github.com/project-kessel/inventory-api/internal/biz/model"
 	usecase_resources "github.com/project-kessel/inventory-api/internal/biz/usecase/resources"
 	"github.com/project-kessel/inventory-api/internal/consumer/auth"
 	"github.com/project-kessel/inventory-api/internal/consumer/retry"
@@ -72,6 +73,7 @@ type InventoryConsumer struct {
 	AuthOptions      *auth.Options
 	RetryOptions     *retry.Options
 	Notifier         pubsub.Notifier
+	ResourceService  *usecase_resources.Usecase
 
 	lockToken string
 	lockId    string
@@ -113,6 +115,9 @@ func New(config CompletedConfig, db *gorm.DB, authz authz.CompletedConfig, autho
 
 	var errChan chan error
 
+	// Initialize ResourceService for tuple processing
+	resourceService := usecase_resources.NewUsecase(db, logger)
+
 	return InventoryConsumer{
 		Consumer:         consumer,
 		OffsetStorage:    make([]kafka.TopicPartition, 0),
@@ -126,6 +131,7 @@ func New(config CompletedConfig, db *gorm.DB, authz authz.CompletedConfig, autho
 		AuthOptions:      authnOptions,
 		RetryOptions:     retryOptions,
 		Notifier:         notifier,
+		ResourceService:  resourceService,
 	}, nil
 }
 
@@ -312,37 +318,46 @@ func (i *InventoryConsumer) ProcessMessage(headers map[string]string, relationsE
 				return "", err
 			}
 
-			// 1) Upsert the new tuple
-			// Log upsert tuple details
-			i.Logger.Infof(
-				"upsert tuple: resource={ns=%s type=%s id=%s} relation=%s subject={ns=%s type=%s id=%s}",
-				tuple.GetResource().GetType().GetNamespace(),
-				tuple.GetResource().GetType().GetName(),
-				tuple.GetResource().GetId(),
-				tuple.GetRelation(),
-				tuple.GetSubject().GetSubject().GetType().GetNamespace(),
-				tuple.GetSubject().GetSubject().GetType().GetName(),
-				tuple.GetSubject().GetSubject().GetId(),
-			)
-			resp, err := i.Retry(func() (string, error) {
-				return i.UpdateTuple(context.Background(), tuple)
-			}, i.MetricsCollector.MsgProcessFailures)
+			// Extract resource key from tuple
+			key, err := i.ResourceService.ResourceKeyFromTuple(tuple)
 			if err != nil {
-				metricscollector.Incr(i.MetricsCollector.MsgProcessFailures, "UpdateTuple", err)
-				i.Logger.Errorf("failed to update tuple: %v", err)
+				i.Logger.Errorf("Failed to extract resource key from tuple: %v", err)
 				return "", err
 			}
 
-			// 2) delete of previous subject tuples first
-			i.Logger.Infof("delete old tuples filter: %v", usecase_resources.CalculateTuples(tuple))
-			_, delErr := i.Retry(func() (string, error) {
-				return i.DeleteTuple(context.Background(), usecase_resources.CalculateTuples(tuple))
-			}, i.MetricsCollector.MsgProcessFailures)
-			if delErr != nil {
-				i.Logger.Errorf("failed to delete previous subject tuples (non-fatal): %v", delErr)
+			// Get the current version from the resource
+			// The version should be the current representation version from the database
+			version := model.Version(1) // Default to 1, but we'll get the actual version from CalculateTuples
+
+			// Calculate tuples for create and delete
+			createFilter, deleteFilter := i.ResourceService.CalculateTuples(tuple, version, key)
+
+			// 1) Delete old tuples first
+			if deleteFilter != nil {
+				i.Logger.Infof("deleting old tuples filter: %v", deleteFilter)
+				_, delErr := i.Retry(func() (string, error) {
+					return i.DeleteTuple(context.Background(), deleteFilter)
+				}, i.MetricsCollector.MsgProcessFailures)
+				if delErr != nil {
+					i.Logger.Errorf("failed to delete previous subject tuples (non-fatal): %v", delErr)
+				}
 			}
 
-			return resp, nil
+			// 2) Create new tuple using the original tuple
+			if createFilter != nil {
+				i.Logger.Infof("creating new tuple: %v", tuple)
+				resp, err := i.Retry(func() (string, error) {
+					return i.UpdateTuple(context.Background(), tuple)
+				}, i.MetricsCollector.MsgProcessFailures)
+				if err != nil {
+					metricscollector.Incr(i.MetricsCollector.MsgProcessFailures, "UpdateTuple", err)
+					i.Logger.Errorf("failed to update tuple: %v", err)
+					return "", err
+				}
+				return resp, nil
+			}
+
+			return "", nil
 		}
 	case string(model_legacy.OperationTypeDeleted):
 		i.Logger.Infof("processing message: operation=%s, txid=%s", operation, txid)

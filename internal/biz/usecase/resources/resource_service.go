@@ -14,13 +14,14 @@ import (
 	"github.com/project-kessel/inventory-api/internal/biz/model"
 	"github.com/project-kessel/inventory-api/internal/biz/model_legacy"
 	"github.com/project-kessel/inventory-api/internal/data"
+	datamodel "github.com/project-kessel/inventory-api/internal/data/model"
 	eventingapi "github.com/project-kessel/inventory-api/internal/eventing/api"
 	"github.com/project-kessel/inventory-api/internal/pubsub"
 	"github.com/project-kessel/inventory-api/internal/server"
 	kessel "github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
 	"github.com/sony/gobreaker"
 	"google.golang.org/grpc"
-	"google.golang.org/protobuf/proto"
+	proto "google.golang.org/protobuf/proto"
 	"gorm.io/gorm"
 
 	"sync"
@@ -82,6 +83,17 @@ type Usecase struct {
 	Server                           server.Server
 	ListenManager                    pubsub.ListenManagerImpl
 	Config                           *UsecaseConfig
+}
+
+// NewUsecase creates a new Usecase with minimal required dependencies for consumer usage
+func NewUsecase(db *gorm.DB, logger *log.Helper) *Usecase {
+	transactionManager := data.NewGormTransactionManager(3) // Default retry count
+	resourceRepo := data.NewResourceRepository(db, transactionManager)
+
+	return &Usecase{
+		resourceRepository: resourceRepo,
+		Log:                logger,
+	}
 }
 
 func New(resourceRepository data.ResourceRepository, reporterResourceRepository ReporterResourceRepository, inventoryResourceRepository InventoryResourceRepository,
@@ -824,24 +836,186 @@ func computeReadAfterWrite(uc *Usecase, write_visibility v1beta2.WriteVisibility
 	return !common.IsNil(uc.ListenManager) && uc.Config.ReadAfterWriteEnabled && isSPInAllowlist(reporterPrincipal, uc.Config.ReadAfterWriteAllowlist)
 }
 
-// CalculateTuples builds a delete filter targeting previous
-// subject tuples of the same kind as the provided relationship tuple.
-func CalculateTuples(tuple *kessel.Relationship) *kessel.RelationTupleFilter {
-	// Defensive checks to avoid panics on malformed tuples; return an empty filter in that case.
-	if tuple == nil || tuple.GetResource() == nil || tuple.GetSubject() == nil ||
-		tuple.GetResource().GetType() == nil || tuple.GetSubject().GetSubject() == nil ||
-		tuple.GetSubject().GetSubject().GetType() == nil {
-		return &kessel.RelationTupleFilter{}
+func (uc *Usecase) CalculateTuples(tuple *kessel.Relationship, currentCommonVersion model.Version, key model.ReporterResourceKey) (*kessel.RelationTupleFilter, *kessel.RelationTupleFilter) {
+	uc.Log.Infof("CalculateTuples called - tuple: %+v, version: %d, key: %+v", tuple, currentCommonVersion.Uint(), key)
+
+	// Get the current resource data using FindResourceByKeys
+	resource, err := uc.resourceRepository.FindResourceByKeys(nil, key)
+	if err != nil {
+		uc.Log.Errorf("Failed to find resource by keys: %v", err)
+		return nil, nil
+	}
+	uc.Log.Infof("Successfully found resource")
+
+	// Extract common representation data
+	resourceEvents := resource.ResourceEvents()
+	if len(resourceEvents) == 0 {
+		uc.Log.Warn("No resource events found")
+		return nil, nil
+	}
+	uc.Log.Infof("Found %d resource events", len(resourceEvents))
+
+	// Get current event (latest version)
+	currentEvent := resourceEvents[len(resourceEvents)-1]
+	uc.Log.Infof("Using current event with ID: %s", currentEvent.Id().String())
+
+	// Get the actual current version from the resource instead of using the passed parameter
+	// We need to determine the current version by counting the resource events or getting it from the database
+	actualCurrentVersion := uint(len(resourceEvents)) // Version starts from 0, so length gives us the next version
+	uc.Log.Infof("Actual current version determined: %d (passed version was: %d)", actualCurrentVersion, currentCommonVersion.Uint())
+
+	// Extract configuration from the tuple
+	relation := tuple.GetRelation()
+	subjectType := tuple.GetSubject().GetSubject().GetType().GetName()
+	subjectNamespace := tuple.GetSubject().GetSubject().GetType().GetNamespace()
+	resourceNamespace := tuple.GetResource().GetType().GetNamespace()
+
+	// Extract workspace_id from the incoming tuple (the new one from the message)
+	workspaceId := tuple.GetSubject().GetSubject().GetId()
+	uc.Log.Infof("Using workspace_id from tuple: '%s', version: %d", workspaceId, currentCommonVersion.Uint())
+
+	// Create tuple based on current data
+	if workspaceId != "" {
+		uc.Log.Infof("Workspace ID found, proceeding with tuple creation")
+		// Extract resource information from the tuple (not the event)
+		resourceId := tuple.GetResource().GetId()
+		resourceType := tuple.GetResource().GetType().GetName()
+		uc.Log.Infof("Creating tuple for resource - ID: %s, Type: %s", resourceId, resourceType)
+
+		// Create the current relationship tuple filter
+		currentTupleFilter := &kessel.RelationTupleFilter{
+			ResourceNamespace: proto.String(resourceNamespace),
+			ResourceType:      proto.String(resourceType),
+			ResourceId:        proto.String(resourceId),
+			Relation:          proto.String(relation),
+			SubjectFilter: &kessel.SubjectFilter{
+				SubjectNamespace: proto.String(subjectNamespace),
+				SubjectType:      proto.String(subjectType),
+				SubjectId:        proto.String(workspaceId),
+			},
+		}
+		uc.Log.Infof("Created current tuple filter - Resource: %s/%s/%s, Relation: %s, Subject: %s/%s/%s",
+			resourceNamespace, resourceType, resourceId, relation, subjectNamespace, subjectType, workspaceId)
+
+		// Determine if this is create, update, or delete based on actual current version
+		if actualCurrentVersion == 0 {
+			// Create scenario - only create tuple
+			uc.Log.Infof("CREATE scenario - version 0, returning current tuple only")
+			return currentTupleFilter, nil
+		} else if actualCurrentVersion > 0 {
+			// Update scenario - create new tuple and delete old one
+			previousVersion := actualCurrentVersion - 1
+			uc.Log.Infof("UPDATE scenario - version %d, looking for previous version %d to delete", actualCurrentVersion, previousVersion)
+
+			// Query the database directly for the previous workspace ID
+			// We need to find the previous common representation with a different workspace ID
+			var previousWorkspaceId string
+
+			// Query common_representations table for the previous version
+			// We need to get the internal resource ID by joining with reporter_resources table
+			// since currentEvent.Id().UUID() returns null UUID
+			var commonRep datamodel.CommonRepresentation
+			err := uc.resourceRepository.GetDB().
+				Table("common_representations cr").
+				Joins("JOIN reporter_resources rr ON cr.resource_id::uuid = rr.resource_id").
+				Where("rr.local_resource_id = ? AND rr.resource_type = ? AND rr.reporter_type = ? AND rr.reporter_instance_id = ? AND cr.version = ?",
+					key.LocalResourceId().Serialize(), key.ResourceType().Serialize(), key.ReporterType().Serialize(), key.ReporterInstanceId().Serialize(), previousVersion).
+				Select("cr.*").
+				First(&commonRep).Error
+
+			if err == nil && len(commonRep.Data) > 0 {
+				// Extract workspace_id directly from the JsonObject
+				if workspaceIdVal, ok := commonRep.Data["workspace_id"].(string); ok {
+					previousWorkspaceId = workspaceIdVal
+					uc.Log.Infof("Found previous workspace ID from database: '%s'", previousWorkspaceId)
+				}
+			}
+
+			if previousWorkspaceId != "" {
+				// Create the previous version's tuple for deletion
+				previousTupleFilter := &kessel.RelationTupleFilter{
+					ResourceNamespace: proto.String(resourceNamespace),
+					ResourceType:      proto.String(resourceType),
+					ResourceId:        proto.String(resourceId),
+					Relation:          proto.String(relation),
+					SubjectFilter: &kessel.SubjectFilter{
+						SubjectNamespace: proto.String(subjectNamespace),
+						SubjectType:      proto.String(subjectType),
+						SubjectId:        proto.String(previousWorkspaceId),
+					},
+				}
+				uc.Log.Infof("Found previous version - returning both create and delete tuples")
+				uc.Log.Infof("Delete tuple - Resource: %s/%s/%s, Subject: %s/%s/%s",
+					resourceNamespace, resourceType, resourceId,
+					subjectNamespace, subjectType, previousWorkspaceId)
+				return currentTupleFilter, previousTupleFilter
+			}
+			// If no previous version found, just return current tuple
+			uc.Log.Warnf("No previous version %d found with workspace ID, returning current tuple only", previousVersion)
+			return currentTupleFilter, nil
+		}
+	} else {
+		uc.Log.Warnf("No workspace ID found in current event, skipping tuple creation")
 	}
 
-	return &kessel.RelationTupleFilter{
-		ResourceNamespace: proto.String(tuple.GetResource().GetType().GetNamespace()),
-		ResourceType:      proto.String(tuple.GetResource().GetType().GetName()),
-		ResourceId:        proto.String(tuple.GetResource().GetId()),
-		Relation:          proto.String(tuple.GetRelation()),
-		SubjectFilter: &kessel.SubjectFilter{
-			SubjectNamespace: proto.String(tuple.GetSubject().GetSubject().GetType().GetNamespace()),
-			SubjectType:      proto.String(tuple.GetSubject().GetSubject().GetType().GetName()),
-		},
+	// Log why we're returning nil, nil
+	uc.Log.Warnf("CalculateTuples returning nil, nil - workspaceId: '%s', version: %d", workspaceId, actualCurrentVersion)
+	return nil, nil
+}
+
+// ResourceKeyFromTuple extracts a ReporterResourceKey from a kessel.Relationship tuple
+func (uc *Usecase) ResourceKeyFromTuple(tuple *kessel.Relationship) (model.ReporterResourceKey, error) {
+	uc.Log.Infof("ResourceKeyFromTuple called with tuple: %+v", tuple)
+
+	// Extract resource information from tuple
+	resourceIdStr := tuple.GetResource().GetId()
+	resourceTypeStr := tuple.GetResource().GetType().GetName()
+	uc.Log.Infof("Extracted from tuple - resourceId: %s, resourceType: %s", resourceIdStr, resourceTypeStr)
+
+	// Log the full tuple structure to see what's available
+	uc.Log.Infof("Full tuple structure: %+v", tuple)
+	uc.Log.Infof("Resource: %+v", tuple.GetResource())
+	uc.Log.Infof("Subject: %+v", tuple.GetSubject())
+
+	// Convert string to UUID for ResourceId
+	resourceId, err := uuid.Parse(resourceIdStr)
+	if err != nil {
+		return model.ReporterResourceKey{}, fmt.Errorf("failed to parse resource ID '%s' as UUID: %w", resourceIdStr, err)
 	}
+
+	// First, let's see what's actually in the database
+	var allResources []datamodel.ReporterResource
+	err = uc.resourceRepository.GetDB().Find(&allResources).Error
+	if err != nil {
+		uc.Log.Errorf("Failed to query all resources: %v", err)
+	} else {
+		uc.Log.Infof("Found %d total resources in database", len(allResources))
+		for i, res := range allResources {
+			uc.Log.Infof("Resource %d: local_resource_id=%s, resource_type=%s, reporter_type=%s, reporter_instance_id=%s",
+				i, res.LocalResourceID, res.ResourceType, res.ReporterType, res.ReporterInstanceID)
+		}
+	}
+
+	// Query the database to find the reporter resource that matches this resource ID and type
+	var reporterResource datamodel.ReporterResource
+	uc.Log.Infof("Querying database for local_resource_id = %s AND resource_type = %s", resourceId, resourceTypeStr)
+	err = uc.resourceRepository.GetDB().Where("local_resource_id = ? AND resource_type = ?", resourceId, resourceTypeStr).First(&reporterResource).Error
+	if err != nil {
+		uc.Log.Errorf("Database query failed: %v", err)
+		return model.ReporterResourceKey{}, fmt.Errorf("failed to find reporter resource in database: %w", err)
+	}
+	uc.Log.Infof("Found reporter resource: %+v", reporterResource)
+
+	// Construct ReporterResourceKey from the database result
+	key, err := model.NewReporterResourceKey(
+		model.LocalResourceId(reporterResource.LocalResourceID),
+		model.ResourceType(reporterResource.ResourceType),
+		model.ReporterType(reporterResource.ReporterType),
+		model.ReporterInstanceId(reporterResource.ReporterInstanceID),
+	)
+	if err != nil {
+		return model.ReporterResourceKey{}, fmt.Errorf("failed to create ReporterResourceKey: %w", err)
+	}
+	uc.Log.Infof("ResourceKeyFromTuple success: %+v", key)
+	return key, nil
 }

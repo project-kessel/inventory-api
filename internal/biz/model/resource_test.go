@@ -446,4 +446,27 @@ func TestResource_FindReporterResourceToUpdateByKey(t *testing.T) {
 			t.Error("Expected nil when no match found")
 		}
 	})
+
+	t.Run("delete returns error when reporter resource not found", func(t *testing.T) {
+		t.Parallel()
+
+		resource, err := NewResource(fixture.ValidResourceIdType(), fixture.ValidLocalResourceIdType(), fixture.ValidResourceTypeType(), fixture.ValidReporterTypeType(), fixture.ValidReporterInstanceIdType(), fixture.ValidReporterResourceIdType(), fixture.ValidApiHrefType(), fixture.ValidConsoleHrefType(), fixture.ValidReporterRepresentationType(), fixture.ValidCommonRepresentationType(), nil)
+		if err != nil {
+			t.Fatalf("Failed to create resource: %v", err)
+		}
+
+		differentLocalId, _ := NewLocalResourceId("non-existent-resource")
+		nonExistentKey, err := NewReporterResourceKey(differentLocalId, fixture.ValidResourceTypeType(), fixture.ValidReporterTypeType(), fixture.ValidReporterInstanceIdType())
+		if err != nil {
+			t.Fatalf("Failed to create key: %v", err)
+		}
+
+		err = resource.Delete(nonExistentKey)
+		if err == nil {
+			t.Error("Expected error when deleting non-existent reporter resource")
+		}
+		if !strings.Contains(err.Error(), "not found") {
+			t.Errorf("Expected 'not found' error, got: %v", err)
+		}
+	})
 }

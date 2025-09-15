@@ -109,7 +109,7 @@ func TestReportResourceThenDelete(t *testing.T) {
 			deleteReporterInstanceId: "delete-test-instance",
 			expectError:              false,
 		},
-		/*{
+		{
 			name:                     "deletes resource without reporterInstanceId",
 			resourceType:             "host",
 			reporterType:             "hbi",
@@ -118,7 +118,7 @@ func TestReportResourceThenDelete(t *testing.T) {
 			workspaceId:              "delete-test-workspace-2",
 			deleteReporterInstanceId: "",
 			expectError:              false,
-		},*/
+		},
 	}
 
 	for _, tt := range tests {
@@ -155,8 +155,13 @@ func TestReportResourceThenDelete(t *testing.T) {
 			require.NoError(t, err)
 			require.NotNil(t, foundResource)
 
-			deleteReporterInstanceId, err := model.NewReporterInstanceId(tt.deleteReporterInstanceId)
-			require.NoError(t, err)
+			var deleteReporterInstanceId model.ReporterInstanceId
+			if tt.deleteReporterInstanceId != "" {
+				deleteReporterInstanceId, err = model.NewReporterInstanceId(tt.deleteReporterInstanceId)
+				require.NoError(t, err)
+			} else {
+				deleteReporterInstanceId = model.ReporterInstanceId("")
+			}
 
 			deleteKey, err := model.NewReporterResourceKey(localResourceId, resourceType, reporterType, deleteReporterInstanceId)
 			require.NoError(t, err)
@@ -196,4 +201,32 @@ func createTestReportRequest(t *testing.T, resourceType, reporterType, reporterI
 		},
 		WriteVisibility: v1beta2.WriteVisibility_MINIMIZE_LATENCY,
 	}
+}
+
+func TestDelete_ResourceNotFound(t *testing.T) {
+	logger := log.DefaultLogger
+
+	resourceRepo := data.NewFakeResourceRepository()
+	authorizer := &allow.AllowAllAuthz{}
+	usecaseConfig := &UsecaseConfig{
+		ReadAfterWriteEnabled: false,
+		ConsumerEnabled:       false,
+	}
+
+	usecase := New(resourceRepo, nil, nil, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig)
+
+	localResourceId, err := model.NewLocalResourceId("non-existent-resource")
+	require.NoError(t, err)
+	resourceType, err := model.NewResourceType("k8s_cluster")
+	require.NoError(t, err)
+	reporterType, err := model.NewReporterType("ocm")
+	require.NoError(t, err)
+	reporterInstanceId, err := model.NewReporterInstanceId("test-instance")
+	require.NoError(t, err)
+
+	key, err := model.NewReporterResourceKey(localResourceId, resourceType, reporterType, reporterInstanceId)
+	require.NoError(t, err)
+
+	err = usecase.Delete(key)
+	require.Error(t, err)
 }

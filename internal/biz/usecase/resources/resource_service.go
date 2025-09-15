@@ -187,13 +187,15 @@ func (uc *Usecase) Delete(reporterResourceKey model.ReporterResourceKey) error {
 			if err == nil && res != nil {
 				log.Info("Found Resource, deleting: ", res)
 				err := res.Delete(reporterResourceKey)
-				log.Infof("Deleted Resource to save : %+v", res)
 				if err != nil {
 					return fmt.Errorf("failed to delete resource: %w", err)
 				}
 				return uc.resourceRepository.Save(tx, *res, model_legacy.OperationTypeDeleted, txidStr)
 			} else {
-				return err
+				if errors.Is(err, gorm.ErrRecordNotFound) {
+					return ErrResourceNotFound
+				}
+				return ErrDatabaseError
 			}
 		},
 	)

@@ -99,12 +99,7 @@ func (re ResourceReportEvent) Data() internal.JsonObject {
 }
 
 func (re ResourceReportEvent) WorkspaceId() string {
-	if workspaceId, ok := re.commonRepresentation.Data()["workspace_id"]; ok {
-		if workspaceIdStr, ok := workspaceId.(string); ok {
-			return workspaceIdStr
-		}
-	}
-	return ""
+	return re.commonRepresentation.GetField("workspace_id")
 }
 
 // DeserializeResourceEvent creates a ResourceReportEvent from representation snapshots - direct initialization without validation

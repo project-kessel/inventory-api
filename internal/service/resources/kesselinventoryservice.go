@@ -76,10 +76,17 @@ func (c *InventoryService) DeleteResource(ctx context.Context, r *pb.DeleteResou
 			if err = c.Ctl.Delete(reporterResourceKey); err == nil {
 				return ResponseFromDeleteResource(), nil
 			} else {
-				return nil, err
+				log.Error("Failed to delete resource: ", err)
+
+				if errors.Is(err, resources.ErrResourceNotFound) {
+					return nil, status.Errorf(codes.NotFound, "resource not found")
+				}
+				// Default to internal error for unknown errors
+				return nil, status.Errorf(codes.Internal, "failed to delete resource due to an internal error")
 			}
 		} else {
-			return nil, err
+			log.Error("Failed to build reporter resource key: ", err)
+			return nil, status.Errorf(codes.InvalidArgument, "failed to build reporter resource key: %v", err)
 		}
 	} else {
 		log.Info("Delete Resource NOT using v1beta2db")

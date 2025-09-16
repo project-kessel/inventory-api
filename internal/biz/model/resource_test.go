@@ -451,7 +451,6 @@ func TestResource_FindReporterResourceToUpdateByKey(t *testing.T) {
 		t.Parallel()
 		fixture := NewResourceTestFixture()
 
-		// Create resource with mixed case values
 		localResourceId, _ := NewLocalResourceId("Test-Case-Resource")
 		resourceType, _ := NewResourceType("K8S_Cluster")
 		reporterType, _ := NewReporterType("OCM")

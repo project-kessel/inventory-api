@@ -99,7 +99,6 @@ func TestFindResourceByKeys(t *testing.T) {
 				if impl.name == "Fake Repository" {
 					return impl.repo(), impl.db()
 				}
-				// For real repositories, ensure repo and db share the same database instance
 				db := setupInMemoryDB(t)
 				tm := NewGormTransactionManager(3)
 				repo := NewResourceRepository(db, tm)
@@ -360,7 +359,6 @@ func TestSave(t *testing.T) {
 				if impl.name == "Fake Repository" {
 					return impl.repo(), impl.db()
 				}
-				// For real repositories, ensure repo and db share the same database instance
 				db := setupInMemoryDB(t)
 				tm := NewGormTransactionManager(3)
 				repo := NewResourceRepository(db, tm)
@@ -370,12 +368,10 @@ func TestSave(t *testing.T) {
 			t.Run("Save handles duplicate calls gracefully", func(t *testing.T) {
 				repo, db := getFreshInstances()
 
-				// Create and save initial resource
 				resource := createTestResourceWithLocalId(t, "update-test")
 				err := repo.Save(db, resource, model_legacy.OperationTypeCreated, "test-tx-1")
 				require.NoError(t, err)
 
-				// Update the resource to increment version (mimicking real-world use case)
 				key, err := bizmodel.NewReporterResourceKey("update-test", "k8s_cluster", "ocm", "ocm-instance-1")
 				require.NoError(t, err)
 
@@ -400,11 +396,9 @@ func TestSave(t *testing.T) {
 				err = resource.Update(key, apiHref, consoleHref, nil, updatedReporterData, updatedCommonData)
 				require.NoError(t, err)
 
-				// Save the updated resource (should create new version in representations)
 				err = repo.Save(db, resource, model_legacy.OperationTypeUpdated, "test-tx-2")
 				require.NoError(t, err)
 
-				// Verify the resource can still be found
 				foundResource, err := repo.FindResourceByKeys(db, key)
 				require.NoError(t, err)
 				require.NotNil(t, foundResource)
@@ -419,7 +413,6 @@ func TestSave(t *testing.T) {
 				err := repo.Save(db, resource, model_legacy.OperationTypeCreated, "test-tx-save")
 				require.NoError(t, err)
 
-				// Verify the resource was saved by finding it
 				key, err := bizmodel.NewReporterResourceKey("save-new-test", "k8s_cluster", "ocm", "ocm-instance-1")
 				require.NoError(t, err)
 
@@ -512,7 +505,6 @@ func createTestResourceWithMixedCase(t *testing.T) bizmodel.Resource {
 		"labels":       map[string]interface{}{"env": "test"},
 	}
 
-	// Use mixed case values to test case-insensitive matching
 	localResourceIdType, err := bizmodel.NewLocalResourceId("Test-Mixed-Case-Resource")
 	require.NoError(t, err)
 

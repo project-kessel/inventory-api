@@ -203,7 +203,7 @@ func (r *resourceRepository) FindResourceByKeys(tx *gorm.DB, key bizmodel.Report
 		JOIN resource AS res ON res.id = rr2.resource_id
 	`)
 
-	// Build WHERE conditions dynamically based on present values (case-insensitive)
+	// Build WHERE conditions dynamically based on present values
 	query = query.Where("LOWER(rr.local_resource_id) = LOWER(?)", key.LocalResourceId().Serialize())
 	query = query.Where("LOWER(rr.resource_type) = LOWER(?)", key.ResourceType().Serialize())
 	query = query.Where("LOWER(rr.reporter_type) = LOWER(?)", key.ReporterType().Serialize())

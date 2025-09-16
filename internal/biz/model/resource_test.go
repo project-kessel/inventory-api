@@ -447,6 +447,75 @@ func TestResource_FindReporterResourceToUpdateByKey(t *testing.T) {
 		}
 	})
 
+	t.Run("finds reporter resource with case-insensitive matching", func(t *testing.T) {
+		t.Parallel()
+		fixture := NewResourceTestFixture()
+
+		// Create resource with mixed case values
+		localResourceId, _ := NewLocalResourceId("Test-Case-Resource")
+		resourceType, _ := NewResourceType("K8S_Cluster")
+		reporterType, _ := NewReporterType("OCM")
+		reporterInstanceId, _ := NewReporterInstanceId("Mixed-Instance")
+
+		resource, err := NewResource(fixture.ValidResourceIdType(), localResourceId, resourceType, reporterType, reporterInstanceId, fixture.ValidReporterResourceIdType(), fixture.ValidApiHrefType(), fixture.ValidConsoleHrefType(), fixture.ValidReporterRepresentationType(), fixture.ValidCommonRepresentationType(), nil)
+		if err != nil {
+			t.Fatalf("Failed to create resource: %v", err)
+		}
+
+		testCases := []struct {
+			name               string
+			localResourceId    string
+			resourceType       string
+			reporterType       string
+			reporterInstanceId string
+			shouldFind         bool
+		}{
+			{"all lowercase", "test-case-resource", "k8s_cluster", "ocm", "mixed-instance", true},
+			{"all uppercase", "TEST-CASE-RESOURCE", "K8S_CLUSTER", "OCM", "MIXED-INSTANCE", true},
+			{"mixed case different", "test-CASE-resource", "k8s_CLUSTER", "ocm", "mixed-INSTANCE", true},
+			{"different resource", "different-resource", "k8s_cluster", "ocm", "mixed-instance", false},
+			{"empty reporterInstanceId", "test-case-resource", "k8s_cluster", "ocm", "", true},
+		}
+
+		for _, tc := range testCases {
+			t.Run(tc.name, func(t *testing.T) {
+				localId, _ := NewLocalResourceId(tc.localResourceId)
+				resType, _ := NewResourceType(tc.resourceType)
+				repType, _ := NewReporterType(tc.reporterType)
+
+				var repInstanceId ReporterInstanceId
+				if tc.reporterInstanceId != "" {
+					repInstanceId, _ = NewReporterInstanceId(tc.reporterInstanceId)
+				} else {
+					repInstanceId = ReporterInstanceId("")
+				}
+
+				searchKey, err := NewReporterResourceKey(localId, resType, repType, repInstanceId)
+				if err != nil {
+					t.Fatalf("Failed to create search key: %v", err)
+				}
+
+				found, err := resource.findReporterResourceToUpdateByKey(searchKey)
+
+				if tc.shouldFind {
+					if err != nil {
+						t.Errorf("Expected to find reporter resource but got error: %v", err)
+					}
+					if found == nil {
+						t.Error("Expected to find reporter resource but got nil")
+					}
+				} else {
+					if err == nil {
+						t.Error("Expected error when resource should not be found")
+					}
+					if found != nil {
+						t.Error("Expected nil when resource should not be found")
+					}
+				}
+			})
+		}
+	})
+
 	t.Run("delete returns error when reporter resource not found", func(t *testing.T) {
 		t.Parallel()
 

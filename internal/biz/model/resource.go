@@ -2,6 +2,7 @@ package model
 
 import (
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -14,7 +15,6 @@ type Resource struct {
 	commonVersion        Version
 	consistencyToken     ConsistencyToken
 	reporterResources    []ReporterResource
-	reporterResourcesMap map[ReporterResourceKey]*ReporterResource // Map for O(1) access to slice elements
 	resourceReportEvents []ResourceReportEvent
 	resourceDeleteEvents []ResourceDeleteEvent
 }
@@ -58,16 +58,12 @@ func NewResource(id ResourceId, localResourceId LocalResourceId, resourceType Re
 	}
 
 	reporterResources := []ReporterResource{reporterResource}
-	// Creating a map pointing to slice elements for O(1) access
-	reporterResourcesMap := make(map[ReporterResourceKey]*ReporterResource)
-	reporterResourcesMap[reporterResource.Key()] = &reporterResources[0]
 
 	resource := Resource{
 		id:                   id,
 		resourceType:         resourceType,
 		commonVersion:        commonVersion,
 		reporterResources:    reporterResources,
-		reporterResourcesMap: reporterResourcesMap,
 		resourceReportEvents: []ResourceReportEvent{resourceEvent},
 	}
 	return resource, nil
@@ -230,17 +226,18 @@ func deleteEventAndRepresentations(resourceId ResourceId,
 }
 
 func (r *Resource) findReporterResourceToUpdateByKey(key ReporterResourceKey) (*ReporterResource, error) {
-	if reporter, exists := r.reporterResourcesMap[key]; exists {
-		return reporter, nil
-	}
+	for i := range r.reporterResources {
+		reporter := &r.reporterResources[i]
+		storedKey := reporter.Key()
 
-	// If exact match fails and reporterInstanceId is empty, try partial matching
-	// TODO: Doing this temporarily, the actual fix is to update ReporterResourceKey to make ReporterInstanceId optional
-	if key.ReporterInstanceId().Serialize() == "" {
-		for storedKey, reporter := range r.reporterResourcesMap {
-			if storedKey.LocalResourceId().Serialize() == key.LocalResourceId().Serialize() &&
-				storedKey.ResourceType().Serialize() == key.ResourceType().Serialize() &&
-				storedKey.ReporterType().Serialize() == key.ReporterType().Serialize() {
+		if strings.EqualFold(storedKey.LocalResourceId().Serialize(), key.LocalResourceId().Serialize()) &&
+			strings.EqualFold(storedKey.ResourceType().Serialize(), key.ResourceType().Serialize()) &&
+			strings.EqualFold(storedKey.ReporterType().Serialize(), key.ReporterType().Serialize()) {
+
+			searchReporterInstanceId := key.ReporterInstanceId().Serialize()
+			storedReporterInstanceId := storedKey.ReporterInstanceId().Serialize()
+
+			if searchReporterInstanceId == "" || strings.EqualFold(storedReporterInstanceId, searchReporterInstanceId) {
 				return reporter, nil
 			}
 		}
@@ -318,12 +315,9 @@ func DeserializeResource(
 	}
 
 	var reporterResources []ReporterResource
-	reporterResourcesMap := make(map[ReporterResourceKey]*ReporterResource)
 	for _, reporterResourceSnapshot := range reporterResourceSnapshots {
 		reporterResource := DeserializeReporterResource(reporterResourceSnapshot)
 		reporterResources = append(reporterResources, reporterResource)
-		// Point to the slice element for O(1) access
-		reporterResourcesMap[reporterResource.Key()] = &reporterResources[len(reporterResources)-1]
 	}
 
 	resourceEvent := DeserializeResourceEvent(reporterRepresentationSnapshot, commonRepresentationSnapshot)
@@ -334,7 +328,6 @@ func DeserializeResource(
 		commonVersion:        DeserializeVersion(resourceSnapshot.CommonVersion),
 		consistencyToken:     DeserializeConsistencyToken(resourceSnapshot.ConsistencyToken),
 		reporterResources:    reporterResources,
-		reporterResourcesMap: reporterResourcesMap,
 		resourceReportEvents: []ResourceReportEvent{resourceEvent},
 	}
 }

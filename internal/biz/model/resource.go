@@ -114,9 +114,7 @@ func (r *Resource) Update(
 	return nil
 }
 
-func (r *Resource) Delete(
-	key ReporterResourceKey,
-) error {
+func (r *Resource) Delete(key ReporterResourceKey) error {
 	reporterResource, err := r.findReporterResourceToUpdateByKey(key)
 	if err != nil {
 		return err

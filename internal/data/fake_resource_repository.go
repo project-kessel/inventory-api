@@ -108,7 +108,8 @@ func (f *fakeResourceRepository) FindResourceByKeys(tx *gorm.DB, key bizmodel.Re
 	for _, stored := range f.resources {
 		if strings.EqualFold(stored.localResourceID, key.LocalResourceId().Serialize()) &&
 			strings.EqualFold(stored.resourceType, key.ResourceType().Serialize()) &&
-			strings.EqualFold(stored.reporterType, key.ReporterType().Serialize()) {
+			strings.EqualFold(stored.reporterType, key.ReporterType().Serialize()) &&
+			!stored.tombstone {
 
 			// If search key has empty reporterInstanceId, match any stored resource
 			// If search key has reporterInstanceId, it must match exactly

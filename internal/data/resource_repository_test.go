@@ -324,6 +324,77 @@ func TestFindResourceByKeys(t *testing.T) {
 	}
 }
 
+func TestFindResourceByKeys_TombstoneFilter(t *testing.T) {
+	implementations := []struct {
+		name string
+		repo func() ResourceRepository
+		db   func() *gorm.DB
+	}{
+		{
+			name: "Real Repository with GormTransactionManager",
+			repo: func() ResourceRepository {
+				db := setupInMemoryDB(t)
+				tm := NewGormTransactionManager(3)
+				return NewResourceRepository(db, tm)
+			},
+			db: func() *gorm.DB {
+				return setupInMemoryDB(t)
+			},
+		},
+		{
+			name: "Fake Repository",
+			repo: func() ResourceRepository {
+				return NewFakeResourceRepository()
+			},
+			db: func() *gorm.DB {
+				return nil
+			},
+		},
+	}
+
+	for _, impl := range implementations {
+		t.Run(impl.name, func(t *testing.T) {
+			getFreshInstances := func() (ResourceRepository, *gorm.DB) {
+				if impl.name == "Fake Repository" {
+					return impl.repo(), impl.db()
+				}
+				db := setupInMemoryDB(t)
+				tm := NewGormTransactionManager(3)
+				repo := NewResourceRepository(db, tm)
+				return repo, db
+			}
+
+			repo, db := getFreshInstances()
+
+			resource := createTestResourceWithLocalId(t, "tombstoned-resource")
+			err := repo.Save(db, resource, model_legacy.OperationTypeCreated, "test-tx-tombstone")
+			require.NoError(t, err)
+
+			key, err := bizmodel.NewReporterResourceKey(
+				"tombstoned-resource",
+				"k8s_cluster",
+				"ocm",
+				"ocm-instance-1",
+			)
+			require.NoError(t, err)
+
+			foundResource, err := repo.FindResourceByKeys(db, key)
+			require.NoError(t, err)
+			require.NotNil(t, foundResource)
+
+			err = foundResource.Delete(key)
+			require.NoError(t, err)
+
+			err = repo.Save(db, *foundResource, model_legacy.OperationTypeDeleted, "test-tx-delete")
+			require.NoError(t, err)
+
+			foundResource, err = repo.FindResourceByKeys(db, key)
+			require.ErrorIs(t, err, gorm.ErrRecordNotFound)
+			assert.Nil(t, foundResource)
+		})
+	}
+}
+
 func TestSave(t *testing.T) {
 	implementations := []struct {
 		name string

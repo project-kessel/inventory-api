@@ -5,8 +5,10 @@ import (
 	"testing"
 
 	"github.com/go-kratos/kratos/v2/log"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/types/known/structpb"
+	"gorm.io/gorm"
 
 	"github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2"
 	"github.com/project-kessel/inventory-api/internal"
@@ -229,4 +231,45 @@ func TestDelete_ResourceNotFound(t *testing.T) {
 
 	err = usecase.Delete(key)
 	require.Error(t, err)
+}
+
+func TestReportFindDeleteFind_TombstoneLifecycle(t *testing.T) {
+	ctx := context.Background()
+	logger := log.DefaultLogger
+
+	resourceRepo := data.NewFakeResourceRepository()
+	authorizer := &allow.AllowAllAuthz{}
+	usecaseConfig := &UsecaseConfig{
+		ReadAfterWriteEnabled: false,
+		ConsumerEnabled:       false,
+	}
+
+	usecase := New(resourceRepo, nil, nil, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig)
+
+	reportRequest := createTestReportRequest(t, "k8s_cluster", "ocm", "lifecycle-instance", "lifecycle-resource", "lifecycle-workspace")
+	err := usecase.ReportResource(ctx, reportRequest, "test-reporter")
+	require.NoError(t, err)
+
+	localResourceId, err := model.NewLocalResourceId("lifecycle-resource")
+	require.NoError(t, err)
+	resourceType, err := model.NewResourceType("k8s_cluster")
+	require.NoError(t, err)
+	reporterType, err := model.NewReporterType("ocm")
+	require.NoError(t, err)
+	reporterInstanceId, err := model.NewReporterInstanceId("lifecycle-instance")
+	require.NoError(t, err)
+
+	key, err := model.NewReporterResourceKey(localResourceId, resourceType, reporterType, reporterInstanceId)
+	require.NoError(t, err)
+
+	foundResource, err := resourceRepo.FindResourceByKeys(nil, key)
+	require.NoError(t, err)
+	require.NotNil(t, foundResource)
+
+	err = usecase.Delete(key)
+	require.NoError(t, err)
+
+	foundResource, err = resourceRepo.FindResourceByKeys(nil, key)
+	require.ErrorIs(t, err, gorm.ErrRecordNotFound)
+	assert.Nil(t, foundResource)
 }

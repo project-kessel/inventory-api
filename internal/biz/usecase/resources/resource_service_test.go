@@ -273,3 +273,107 @@ func TestReportFindDeleteFind_TombstoneLifecycle(t *testing.T) {
 	require.ErrorIs(t, err, gorm.ErrRecordNotFound)
 	assert.Nil(t, foundResource)
 }
+
+func TestMultipleHostsLifecycle(t *testing.T) {
+	ctx := context.Background()
+	logger := log.DefaultLogger
+
+	resourceRepo := data.NewFakeResourceRepository()
+	authorizer := &allow.AllowAllAuthz{}
+	usecaseConfig := &UsecaseConfig{
+		ReadAfterWriteEnabled: false,
+		ConsumerEnabled:       false,
+	}
+
+	usecase := New(resourceRepo, nil, nil, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig)
+
+	// Create 2 hosts
+	host1Request := createTestReportRequest(t, "host", "hbi", "hbi-instance-1", "host-1", "workspace-1")
+	err := usecase.ReportResource(ctx, host1Request, "test-reporter")
+	require.NoError(t, err, "Should create host1")
+
+	host2Request := createTestReportRequest(t, "host", "hbi", "hbi-instance-1", "host-2", "workspace-1")
+	err = usecase.ReportResource(ctx, host2Request, "test-reporter")
+	require.NoError(t, err, "Should create host2")
+
+	// Verify both hosts can be found
+	key1, err := model.NewReporterResourceKey("host-1", "host", "hbi", "hbi-instance-1")
+	require.NoError(t, err)
+	key2, err := model.NewReporterResourceKey("host-2", "host", "hbi", "hbi-instance-1")
+	require.NoError(t, err)
+
+	foundHost1, err := resourceRepo.FindResourceByKeys(nil, key1)
+	require.NoError(t, err, "Should find host1 after creation")
+	require.NotNil(t, foundHost1)
+
+	foundHost2, err := resourceRepo.FindResourceByKeys(nil, key2)
+	require.NoError(t, err, "Should find host2 after creation")
+	require.NotNil(t, foundHost2)
+
+	// Update both hosts by reporting them again with updated data
+	host1UpdateRequest := createTestReportRequestWithUpdatedData(t, "host", "hbi", "hbi-instance-1", "host-1", "workspace-1")
+	err = usecase.ReportResource(ctx, host1UpdateRequest, "test-reporter")
+	require.NoError(t, err, "Should update host1")
+
+	host2UpdateRequest := createTestReportRequestWithUpdatedData(t, "host", "hbi", "hbi-instance-1", "host-2", "workspace-1")
+	err = usecase.ReportResource(ctx, host2UpdateRequest, "test-reporter")
+	require.NoError(t, err, "Should update host2")
+
+	// Verify both updated hosts can still be found
+	updatedHost1, err := resourceRepo.FindResourceByKeys(nil, key1)
+	require.NoError(t, err, "Should find host1 after update")
+	require.NotNil(t, updatedHost1)
+
+	updatedHost2, err := resourceRepo.FindResourceByKeys(nil, key2)
+	require.NoError(t, err, "Should find host2 after update")
+	require.NotNil(t, updatedHost2)
+
+	// Delete both hosts
+	err = usecase.Delete(key1)
+	require.NoError(t, err, "Should delete host1")
+
+	err = usecase.Delete(key2)
+	require.NoError(t, err, "Should delete host2")
+
+	// Verify both hosts are no longer found (tombstoned)
+	foundHost1, err = resourceRepo.FindResourceByKeys(nil, key1)
+	require.ErrorIs(t, err, gorm.ErrRecordNotFound, "Should not find deleted host1")
+	assert.Nil(t, foundHost1)
+
+	foundHost2, err = resourceRepo.FindResourceByKeys(nil, key2)
+	require.ErrorIs(t, err, gorm.ErrRecordNotFound, "Should not find deleted host2")
+	assert.Nil(t, foundHost2)
+}
+
+func createTestReportRequestWithUpdatedData(t *testing.T, resourceType, reporterType, reporterInstance, localResourceId, workspaceId string) *v1beta2.ReportResourceRequest {
+	reporterData, _ := structpb.NewStruct(map[string]interface{}{
+		"local_resource_id": localResourceId,
+		"api_href":          "https://api.example.com/updated/123",
+		"console_href":      "https://console.example.com/updated/123",
+		"hostname":          "updated-hostname",
+		"status":            "running",
+	})
+
+	commonData, _ := structpb.NewStruct(map[string]interface{}{
+		"workspace_id": workspaceId,
+		"name":         "updated-host",
+		"environment":  "production",
+		"tags":         map[string]interface{}{"env": "prod", "updated": "true"},
+	})
+
+	return &v1beta2.ReportResourceRequest{
+		Type:               resourceType,
+		ReporterType:       reporterType,
+		ReporterInstanceId: reporterInstance,
+		Representations: &v1beta2.ResourceRepresentations{
+			Metadata: &v1beta2.RepresentationMetadata{
+				LocalResourceId: localResourceId,
+				ApiHref:         "https://api.example.com/updated/123",
+				ConsoleHref:     internal.StringPtr("https://console.example.com/updated/123"),
+			},
+			Reporter: reporterData,
+			Common:   commonData,
+		},
+		WriteVisibility: v1beta2.WriteVisibility_MINIMIZE_LATENCY,
+	}
+}

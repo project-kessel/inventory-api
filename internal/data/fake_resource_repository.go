@@ -2,6 +2,7 @@ package data
 
 import (
 	"fmt"
+	"strings"
 	"sync"
 
 	"github.com/google/uuid"
@@ -105,13 +106,13 @@ func (f *fakeResourceRepository) FindResourceByKeys(tx *gorm.DB, key bizmodel.Re
 	searchReporterInstanceId := key.ReporterInstanceId().Serialize()
 
 	for _, stored := range f.resources {
-		if stored.localResourceID == key.LocalResourceId().Serialize() &&
-			stored.resourceType == key.ResourceType().Serialize() &&
-			stored.reporterType == key.ReporterType().Serialize() {
+		if strings.EqualFold(stored.localResourceID, key.LocalResourceId().Serialize()) &&
+			strings.EqualFold(stored.resourceType, key.ResourceType().Serialize()) &&
+			strings.EqualFold(stored.reporterType, key.ReporterType().Serialize()) {
 
 			// If search key has empty reporterInstanceId, match any stored resource
-			// If search key has reporterInstanceId, it must match exactly
-			if searchReporterInstanceId == "" || stored.reporterInstanceID == searchReporterInstanceId {
+			// If search key has reporterInstanceId, it must match exactly (case-insensitive)
+			if searchReporterInstanceId == "" || strings.EqualFold(stored.reporterInstanceID, searchReporterInstanceId) {
 				placeholderData := map[string]interface{}{"_placeholder": true}
 				resource, err := bizmodel.NewResource(bizmodel.ResourceId(stored.resourceID), bizmodel.LocalResourceId(stored.localResourceID), bizmodel.ResourceType(stored.resourceType), bizmodel.ReporterType(stored.reporterType), bizmodel.ReporterInstanceId(stored.reporterInstanceID), bizmodel.ReporterResourceId(stored.reporterResourceID), bizmodel.ApiHref(""), bizmodel.ConsoleHref(""), bizmodel.Representation(placeholderData), bizmodel.Representation(placeholderData), nil)
 				if err != nil {

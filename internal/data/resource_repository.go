@@ -134,12 +134,16 @@ func (r *resourceRepository) Save(tx *gorm.DB, resource bizmodel.Resource, opera
 		return fmt.Errorf("failed to save reporter resource: %w", err)
 	}
 
-	if err := tx.Create(&dataReporterRepresentation).Error; err != nil {
-		return fmt.Errorf("failed to save reporter representation: %w", err)
+	if dataReporterRepresentation.ReporterResourceID != uuid.Nil {
+		if err := tx.Create(&dataReporterRepresentation).Error; err != nil {
+			return fmt.Errorf("failed to save reporter representation: %w", err)
+		}
 	}
 
-	if err := tx.Create(&dataCommonRepresentation).Error; err != nil {
-		return fmt.Errorf("failed to save common representation: %w", err)
+	if dataCommonRepresentation.ResourceId != uuid.Nil {
+		if err := tx.Create(&dataCommonRepresentation).Error; err != nil {
+			return fmt.Errorf("failed to save common representation: %w", err)
+		}
 	}
 
 	var resourceEvent bizmodel.ResourceEvent

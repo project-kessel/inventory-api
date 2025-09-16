@@ -492,6 +492,153 @@ func TestSave(t *testing.T) {
 				require.NotNil(t, foundResource)
 				assert.Len(t, foundResource.ReporterResources(), 1, "should have one reporter resource")
 			})
+
+			t.Run("Save skips representations with zero value primary keys", func(t *testing.T) {
+				if impl.name == "Fake Repository" {
+					t.Skip("This test is specific to real repository database operations")
+				}
+
+				repo, db := getFreshInstances()
+
+				resource := createTestResourceWithLocalId(t, "zero-pk-test")
+				err := repo.Save(db, resource, model_legacy.OperationTypeCreated, "test-tx-zero-pk")
+				require.NoError(t, err, "Save should succeed and skip representations with zero value primary keys")
+
+				key, err := bizmodel.NewReporterResourceKey("zero-pk-test", "k8s_cluster", "ocm", "ocm-instance-1")
+				require.NoError(t, err)
+
+				foundResource, err := repo.FindResourceByKeys(db, key)
+				require.NoError(t, err, "Resource should be found even if representations were skipped")
+				require.NotNil(t, foundResource)
+			})
+		})
+	}
+}
+
+func TestResourceRepository_MultipleHostsLifecycle(t *testing.T) {
+	implementations := []struct {
+		name string
+		repo func() ResourceRepository
+		db   func() *gorm.DB
+	}{
+		{
+			name: "Real Repository with GormTransactionManager",
+			repo: func() ResourceRepository {
+				db := setupInMemoryDB(t)
+				tm := NewGormTransactionManager(3)
+				return NewResourceRepository(db, tm)
+			},
+			db: func() *gorm.DB {
+				return setupInMemoryDB(t)
+			},
+		},
+		{
+			name: "Fake Repository",
+			repo: func() ResourceRepository {
+				return NewFakeResourceRepository()
+			},
+			db: func() *gorm.DB {
+				return nil
+			},
+		},
+	}
+
+	for _, impl := range implementations {
+		t.Run(impl.name, func(t *testing.T) {
+			getFreshInstances := func() (ResourceRepository, *gorm.DB) {
+				if impl.name == "Fake Repository" {
+					return impl.repo(), impl.db()
+				}
+				db := setupInMemoryDB(t)
+				tm := NewGormTransactionManager(3)
+				repo := NewResourceRepository(db, tm)
+				return repo, db
+			}
+
+			repo, db := getFreshInstances()
+
+			// Create 2 hosts
+			host1 := createTestResourceWithLocalIdAndType(t, "host-1", "host")
+			host2 := createTestResourceWithLocalIdAndType(t, "host-2", "host")
+
+			err := repo.Save(db, host1, model_legacy.OperationTypeCreated, "tx-create-host1")
+			require.NoError(t, err, "Should create host1")
+
+			err = repo.Save(db, host2, model_legacy.OperationTypeCreated, "tx-create-host2")
+			require.NoError(t, err, "Should create host2")
+
+			// Verify both hosts can be found
+			key1, err := bizmodel.NewReporterResourceKey("host-1", "host", "hbi", "hbi-instance-1")
+			require.NoError(t, err)
+			key2, err := bizmodel.NewReporterResourceKey("host-2", "host", "hbi", "hbi-instance-1")
+			require.NoError(t, err)
+
+			foundHost1, err := repo.FindResourceByKeys(db, key1)
+			require.NoError(t, err, "Should find host1 after creation")
+			require.NotNil(t, foundHost1)
+
+			foundHost2, err := repo.FindResourceByKeys(db, key2)
+			require.NoError(t, err, "Should find host2 after creation")
+			require.NotNil(t, foundHost2)
+
+			// Update both hosts
+			apiHref, err := bizmodel.NewApiHref("https://api.example.com/updated")
+			require.NoError(t, err)
+			consoleHref, err := bizmodel.NewConsoleHref("https://console.example.com/updated")
+			require.NoError(t, err)
+			updatedReporterData, err := bizmodel.NewRepresentation(map[string]interface{}{
+				"hostname": "updated-host",
+				"status":   "running",
+			})
+			require.NoError(t, err)
+			updatedCommonData, err := bizmodel.NewRepresentation(map[string]interface{}{
+				"workspace_id": "updated-workspace",
+				"tags":         map[string]interface{}{"env": "prod"},
+			})
+			require.NoError(t, err)
+
+			err = foundHost1.Update(key1, apiHref, consoleHref, nil, updatedReporterData, updatedCommonData)
+			require.NoError(t, err, "Should update host1")
+
+			err = foundHost2.Update(key2, apiHref, consoleHref, nil, updatedReporterData, updatedCommonData)
+			require.NoError(t, err, "Should update host2")
+
+			err = repo.Save(db, *foundHost1, model_legacy.OperationTypeUpdated, "tx-update-host1")
+			require.NoError(t, err, "Should save updated host1")
+
+			err = repo.Save(db, *foundHost2, model_legacy.OperationTypeUpdated, "tx-update-host2")
+			require.NoError(t, err, "Should save updated host2")
+
+			// Verify both updated hosts can still be found
+			updatedHost1, err := repo.FindResourceByKeys(db, key1)
+			require.NoError(t, err, "Should find host1 after update")
+			require.NotNil(t, updatedHost1)
+
+			updatedHost2, err := repo.FindResourceByKeys(db, key2)
+			require.NoError(t, err, "Should find host2 after update")
+			require.NotNil(t, updatedHost2)
+
+			// Delete both hosts
+			err = updatedHost1.Delete(key1)
+			require.NoError(t, err, "Should delete host1")
+
+			err = updatedHost2.Delete(key2)
+			require.NoError(t, err, "Should delete host2")
+
+			err = repo.Save(db, *updatedHost1, model_legacy.OperationTypeDeleted, "tx-delete-host1")
+			require.NoError(t, err, "Should save deleted host1")
+
+			err = repo.Save(db, *updatedHost2, model_legacy.OperationTypeDeleted, "tx-delete-host2")
+			require.NoError(t, err, "Should save deleted host2")
+
+			// Verify both hosts are no longer found (tombstoned)
+			foundHost1, err = repo.FindResourceByKeys(db, key1)
+			require.ErrorIs(t, err, gorm.ErrRecordNotFound, "Should not find deleted host1")
+			assert.Nil(t, foundHost1)
+
+			foundHost2, err = repo.FindResourceByKeys(db, key2)
+			require.ErrorIs(t, err, gorm.ErrRecordNotFound, "Should not find deleted host2")
+			assert.Nil(t, foundHost2)
 		})
 	}
 }
@@ -557,6 +704,71 @@ func createTestResourceWithLocalId(t *testing.T, localResourceId string) bizmode
 	require.NoError(t, err)
 
 	resource, err := bizmodel.NewResource(resourceIdType, localResourceIdType, resourceType, reporterType, reporterInstanceId, reporterResourceIdType, apiHref, consoleHref, reporterRepresentation, commonRepresentation, nil)
+	require.NoError(t, err)
+
+	return resource
+}
+
+func createTestResourceWithLocalIdAndType(t *testing.T, localResourceId, resourceType string) bizmodel.Resource {
+	resourceId := uuid.New()
+	reporterResourceId := uuid.New()
+
+	var reporterData internal.JsonObject
+	var reporterType string
+	var reporterInstanceId string
+
+	if resourceType == "host" {
+		reporterData = internal.JsonObject{
+			"hostname": "test-host",
+			"status":   "active",
+		}
+		reporterType = "hbi"
+		reporterInstanceId = "hbi-instance-1"
+	} else {
+		reporterData = internal.JsonObject{
+			"name":      "test-cluster",
+			"namespace": "default",
+		}
+		reporterType = "ocm"
+		reporterInstanceId = "ocm-instance-1"
+	}
+
+	commonData := internal.JsonObject{
+		"workspace_id": "test-workspace",
+		"labels":       map[string]interface{}{"env": "test"},
+	}
+
+	localResourceIdType, err := bizmodel.NewLocalResourceId(localResourceId)
+	require.NoError(t, err)
+
+	resourceTypeType, err := bizmodel.NewResourceType(resourceType)
+	require.NoError(t, err)
+
+	reporterTypeType, err := bizmodel.NewReporterType(reporterType)
+	require.NoError(t, err)
+
+	reporterInstanceIdType, err := bizmodel.NewReporterInstanceId(reporterInstanceId)
+	require.NoError(t, err)
+
+	resourceIdType, err := bizmodel.NewResourceId(resourceId)
+	require.NoError(t, err)
+
+	reporterResourceIdType, err := bizmodel.NewReporterResourceId(reporterResourceId)
+	require.NoError(t, err)
+
+	apiHref, err := bizmodel.NewApiHref("https://api.example.com/resource/123")
+	require.NoError(t, err)
+
+	consoleHref, err := bizmodel.NewConsoleHref("https://console.example.com/resource/123")
+	require.NoError(t, err)
+
+	reporterRepresentation, err := bizmodel.NewRepresentation(reporterData)
+	require.NoError(t, err)
+
+	commonRepresentation, err := bizmodel.NewRepresentation(commonData)
+	require.NoError(t, err)
+
+	resource, err := bizmodel.NewResource(resourceIdType, localResourceIdType, resourceTypeType, reporterTypeType, reporterInstanceIdType, reporterResourceIdType, apiHref, consoleHref, reporterRepresentation, commonRepresentation, nil)
 	require.NoError(t, err)
 
 	return resource

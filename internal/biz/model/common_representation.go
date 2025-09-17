@@ -96,13 +96,3 @@ func DeserializeCommonRepresentation(snapshot *CommonRepresentationSnapshot) Com
 func (cr CommonRepresentation) CreateSnapshot() (CommonRepresentationSnapshot, error) {
 	return cr.Serialize(), nil
 }
-
-// GetField extracts a field from the common representation data
-func (cr CommonRepresentation) GetField(fieldName string) string {
-	if fieldValue, ok := cr.Data()[fieldName]; ok {
-		if fieldValueStr, ok := fieldValue.(string); ok {
-			return fieldValueStr
-		}
-	}
-	return ""
-}

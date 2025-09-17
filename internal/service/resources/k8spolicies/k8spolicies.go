@@ -74,7 +74,7 @@ func (c *K8sPolicyService) DeleteK8SPolicy(ctx context.Context, r *pb.DeleteK8SP
 	}
 
 	if resourceId, err := fromDeleteRequest(r, identity); err == nil {
-		if err := c.Ctl.Delete(ctx, resourceId); err == nil {
+		if err := c.Ctl.DeleteLegacy(ctx, resourceId); err == nil {
 			return toDeleteResponse(), nil
 		} else {
 			return nil, err

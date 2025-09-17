@@ -16,6 +16,7 @@ type Resource struct {
 	reporterResources    []ReporterResource
 	reporterResourcesMap map[ReporterResourceKey]*ReporterResource // Map for O(1) access to slice elements
 	resourceReportEvents []ResourceReportEvent
+	resourceDeleteEvents []ResourceDeleteEvent
 }
 
 // Factory methods
@@ -113,6 +114,33 @@ func (r *Resource) Update(
 	return nil
 }
 
+func (r *Resource) Delete(
+	key ReporterResourceKey,
+) error {
+	reporterResource, err := r.findReporterResourceToUpdateByKey(key)
+	if err != nil {
+		return err
+	}
+
+	reporterResource.Delete()
+	resourceDeleteEvent, err := deleteEventAndRepresentations(
+		reporterResource.resourceID,
+		key.ResourceType(),
+		key.ReporterType(),
+		key.ReporterInstanceId(),
+		key.LocalResourceId(),
+		reporterResource.Id(),
+		reporterResource.representationVersion,
+		reporterResource.generation)
+
+	if err != nil {
+		return fmt.Errorf("failed to create ResourceDeleteEvent: %w", err)
+	}
+
+	r.resourceDeleteEvents = []ResourceDeleteEvent{resourceDeleteEvent}
+	return nil
+}
+
 func resourceEventAndRepresentations(
 	resourceId ResourceId,
 	resourceType ResourceType,
@@ -170,6 +198,39 @@ func resourceEventAndRepresentations(
 	return resourceEvent, nil
 }
 
+func deleteEventAndRepresentations(resourceId ResourceId,
+	resourceType ResourceType,
+	reporterType ReporterType,
+	reporterInstanceId ReporterInstanceId,
+	localResourceId LocalResourceId,
+	reporterResourceId ReporterResourceId,
+	representationVersion Version,
+	generation Generation) (ResourceDeleteEvent, error) {
+
+	reporterDeleteRepresentation, err := NewReporterDeleteRepresentation(
+		reporterResourceId,
+		representationVersion,
+		generation,
+	)
+	if err != nil {
+		return ResourceDeleteEvent{}, fmt.Errorf("invalid ReporterRepresentation: %w", err)
+	}
+
+	resourceDeleteEvent, err := NewResourceDeleteEvent(
+		resourceId,
+		resourceType,
+		reporterType,
+		reporterInstanceId,
+		localResourceId,
+		reporterDeleteRepresentation)
+
+	if err != nil {
+		return ResourceDeleteEvent{}, fmt.Errorf("invalid ResourceReportEvent: %w", err)
+	}
+
+	return resourceDeleteEvent, nil
+}
+
 func (r *Resource) findReporterResourceToUpdateByKey(key ReporterResourceKey) (*ReporterResource, error) {
 	if reporter, exists := r.reporterResourcesMap[key]; exists {
 		return reporter, nil
@@ -179,8 +240,12 @@ func (r *Resource) findReporterResourceToUpdateByKey(key ReporterResourceKey) (*
 }
 
 // Add getters only where needed
-func (r Resource) ResourceEvents() []ResourceReportEvent {
+func (r Resource) ResourceReportEvents() []ResourceReportEvent {
 	return r.resourceReportEvents
+}
+
+func (r Resource) ResourceDeleteEvents() []ResourceDeleteEvent {
+	return r.resourceDeleteEvents
 }
 
 func (r Resource) ReporterResources() []ReporterResource {
@@ -220,6 +285,10 @@ func (r Resource) Serialize() (ResourceSnapshot, ReporterResourceSnapshot, Repor
 		//TODO: Fix this to serialize all ResourceEvents
 		reporterRepresentationSnapshot = r.resourceReportEvents[0].reporterRepresentation.Serialize()
 		commonRepresentationSnapshot = r.resourceReportEvents[0].commonRepresentation.Serialize()
+	}
+	if len(r.resourceDeleteEvents) > 0 {
+		//TODO: Fix this to serialize all ResourceEvents
+		reporterRepresentationSnapshot = r.resourceDeleteEvents[0].reporterRepresentation.Serialize()
 	}
 
 	return resourceSnapshot, reporterResourceSnapshot, reporterRepresentationSnapshot, commonRepresentationSnapshot, nil

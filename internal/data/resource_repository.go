@@ -142,15 +142,22 @@ func (r *resourceRepository) Save(tx *gorm.DB, resource bizmodel.Resource, opera
 		return fmt.Errorf("failed to save common representation: %w", err)
 	}
 
-	if err := r.handleOutboxEvents(tx, resource.ResourceEvents()[0], operationType, txid); err != nil {
+	var resourceEvent bizmodel.ResourceEvent
+	switch operationType {
+	case model_legacy.OperationTypeDeleted:
+		resourceEvent = resource.ResourceDeleteEvents()[0]
+	default:
+		resourceEvent = resource.ResourceReportEvents()[0]
+	}
+	if err := r.handleOutboxEvents(tx, resourceEvent, operationType, txid); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func (r *resourceRepository) handleOutboxEvents(tx *gorm.DB, resourceEvent bizmodel.ResourceReportEvent, operationType model_legacy.EventOperationType, txid string) error {
-	resourceMessage, tupleMessage, err := model_legacy.NewOutboxEventsFromResourceEvent(resourceEvent, operationType, txid)
+func (r *resourceRepository) handleOutboxEvents(tx *gorm.DB, resourceEvent bizmodel.ResourceEvent, operationType model_legacy.EventOperationType, txid string) error {
+	resourceMessage, _, tupleMessagev2, err := model_legacy.NewOutboxEventsFromResourceEvent(resourceEvent, operationType, txid)
 	if err != nil {
 		return err
 	}
@@ -160,7 +167,7 @@ func (r *resourceRepository) handleOutboxEvents(tx *gorm.DB, resourceEvent bizmo
 		return err
 	}
 
-	err = PublishOutboxEvent(tx, tupleMessage)
+	err = PublishOutboxEvent(tx, tupleMessagev2)
 	if err != nil {
 		return err
 	}

@@ -85,6 +85,11 @@ func (rr *ReporterResource) Update(
 	rr.representationVersion = rr.representationVersion.Increment()
 }
 
+func (rr *ReporterResource) Delete() {
+	rr.representationVersion = rr.representationVersion.Increment()
+	rr.tombstone = true
+}
+
 // Add getters only where needed
 func (rrk ReporterResourceKey) LocalResourceId() LocalResourceId {
 	return rrk.localResourceID

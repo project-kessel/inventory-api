@@ -72,7 +72,7 @@ func (c *K8sClustersService) DeleteK8SCluster(ctx context.Context, r *pb.DeleteK
 	}
 
 	if resourceId, err := fromDeleteRequest(r, identity); err == nil {
-		if err := c.Ctl.Delete(ctx, resourceId); err == nil {
+		if err := c.Ctl.DeleteLegacy(ctx, resourceId); err == nil {
 			return toDeleteResponse(), nil
 		} else {
 			return nil, err

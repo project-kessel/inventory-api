@@ -317,18 +317,10 @@ func (i *InventoryConsumer) ProcessMessage(headers map[string]string, relationsE
 				return "", err
 			}
 
-			// Extract resource key from tuple
-			key, err := i.ResourceService.ResourceKeyFromTuple(tuple)
+			// Extract resource key and current version in a single DB call
+			key, version, err := i.ResourceService.ResourceKeyAndCurrentVersionFromTuple(tuple)
 			if err != nil {
-				i.Logger.Errorf("Failed to extract resource key from tuple: %v", err)
-				return "", err
-			}
-
-			// Get the current version from the resource
-			// The version should be the current representation version from the database
-			version, err := i.ResourceService.GetCurrentVersion(key) // Default to 1, but we'll get the actual version from CalculateTuples
-			if err != nil {
-				i.Logger.Errorf("Failed to get current version: %v", err)
+				i.Logger.Errorf("Failed to fetch resource key and version: %v", err)
 				return "", err
 			}
 

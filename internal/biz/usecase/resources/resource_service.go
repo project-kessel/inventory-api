@@ -864,6 +864,12 @@ func computeReadAfterWrite(uc *Usecase, write_visibility v1beta2.WriteVisibility
 	return !common.IsNil(uc.ListenManager) && uc.Config.ReadAfterWriteEnabled && isSPInAllowlist(reporterPrincipal, uc.Config.ReadAfterWriteAllowlist)
 }
 
+func (uc *Usecase) CalculateTuplesv2(tupleEvent model.TupleEvent) (model.TuplesToReplicate, error) {
+
+	//1. Join between reporterResources and commonRepresentations table to get 2 representations back, one with common version supplied in the TupleEvent,and one with commonVersion-1
+	//2. Once you get the query right, add it to the resource_repository file. Add tests.
+}
+
 func (uc *Usecase) CalculateTuples(tuple *kessel.Relationship, currentCommonVersion model.Version, key model.ReporterResourceKey) (*kessel.RelationTupleFilter, *kessel.RelationTupleFilter) {
 	uc.Log.Infof("CalculateTuples called - tuple: %+v, version: %d, key: %+v", tuple, currentCommonVersion.Uint(), key)
 

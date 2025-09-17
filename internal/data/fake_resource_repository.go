@@ -2,6 +2,7 @@ package data
 
 import (
 	"fmt"
+	"strings"
 	"sync"
 
 	"github.com/google/uuid"
@@ -100,25 +101,30 @@ func (f *fakeResourceRepository) FindResourceByKeys(tx *gorm.DB, key bizmodel.Re
 	// In a real scenario, tx would be used for database operations.
 	_ = tx // Explicitly acknowledge the transaction parameter
 
-	searchKey := f.makeKey(
-		key.LocalResourceId().Serialize(),
-		key.ResourceType().Serialize(),
-		key.ReporterType().Serialize(),
-		key.ReporterInstanceId().Serialize(),
-	)
+	// Match the real repository's behavior: if reporterInstanceId is empty,
+	// find any resource that matches the other key components
+	searchReporterInstanceId := key.ReporterInstanceId().Serialize()
 
-	stored, exists := f.resources[searchKey]
-	if !exists {
-		return nil, gorm.ErrRecordNotFound
+	for _, stored := range f.resources {
+		if strings.EqualFold(stored.localResourceID, key.LocalResourceId().Serialize()) &&
+			strings.EqualFold(stored.resourceType, key.ResourceType().Serialize()) &&
+			strings.EqualFold(stored.reporterType, key.ReporterType().Serialize()) &&
+			!stored.tombstone {
+
+			// If search key has empty reporterInstanceId, match any stored resource
+			// If search key has reporterInstanceId, it must match exactly
+			if searchReporterInstanceId == "" || strings.EqualFold(stored.reporterInstanceID, searchReporterInstanceId) {
+				placeholderData := map[string]interface{}{"_placeholder": true}
+				resource, err := bizmodel.NewResource(bizmodel.ResourceId(stored.resourceID), bizmodel.LocalResourceId(stored.localResourceID), bizmodel.ResourceType(stored.resourceType), bizmodel.ReporterType(stored.reporterType), bizmodel.ReporterInstanceId(stored.reporterInstanceID), bizmodel.ReporterResourceId(stored.reporterResourceID), bizmodel.ApiHref(""), bizmodel.ConsoleHref(""), bizmodel.Representation(placeholderData), bizmodel.Representation(placeholderData), nil)
+				if err != nil {
+					return nil, fmt.Errorf("failed to create resource: %w", err)
+				}
+				return &resource, nil
+			}
+		}
 	}
 
-	placeholderData := map[string]interface{}{"_placeholder": true}
-	resource, err := bizmodel.NewResource(bizmodel.ResourceId(stored.resourceID), bizmodel.LocalResourceId(stored.localResourceID), bizmodel.ResourceType(stored.resourceType), bizmodel.ReporterType(stored.reporterType), bizmodel.ReporterInstanceId(stored.reporterInstanceID), bizmodel.ReporterResourceId(stored.reporterResourceID), bizmodel.ApiHref(""), bizmodel.ConsoleHref(""), bizmodel.Representation(placeholderData), bizmodel.Representation(placeholderData), nil)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create resource: %w", err)
-	}
-
-	return &resource, nil
+	return nil, gorm.ErrRecordNotFound
 }
 
 func (f *fakeResourceRepository) GetDB() *gorm.DB {

@@ -10,7 +10,7 @@ import (
 
 const initialReporterRepresentationVersion = 0
 const initialGeneration = 0
-const initialTombstone = true
+const initialTombstone = false
 
 // Generic serialization interfaces
 type Serializable[T any] interface {

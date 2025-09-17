@@ -192,7 +192,7 @@ func TestResource_Update(t *testing.T) {
 		}
 
 		// Verify resource event was created
-		resourceEvents := original.ResourceEvents()
+		resourceEvents := original.ResourceReportEvents()
 		if len(resourceEvents) != 2 { // Original + updated
 			t.Fatalf("Expected 2 resource events, got %d", len(resourceEvents))
 		}
@@ -370,8 +370,171 @@ func TestResource_Update(t *testing.T) {
 		}
 
 		// Should succeed without error
-		if len(original.ResourceEvents()) != 2 {
-			t.Errorf("Expected 2 resource events, got %d", len(original.ResourceEvents()))
+		if len(original.ResourceReportEvents()) != 2 {
+			t.Errorf("Expected 2 resource events, got %d", len(original.ResourceReportEvents()))
+		}
+	})
+}
+
+func TestResource_FindReporterResourceToUpdateByKey(t *testing.T) {
+	t.Parallel()
+	fixture := NewResourceTestFixture()
+
+	t.Run("finds reporter resource with exact key match", func(t *testing.T) {
+		t.Parallel()
+
+		resource, err := NewResource(fixture.ValidResourceIdType(), fixture.ValidLocalResourceIdType(), fixture.ValidResourceTypeType(), fixture.ValidReporterTypeType(), fixture.ValidReporterInstanceIdType(), fixture.ValidReporterResourceIdType(), fixture.ValidApiHrefType(), fixture.ValidConsoleHrefType(), fixture.ValidReporterRepresentationType(), fixture.ValidCommonRepresentationType(), nil)
+		if err != nil {
+			t.Fatalf("Failed to create resource: %v", err)
+		}
+
+		key, err := NewReporterResourceKey(fixture.ValidLocalResourceIdType(), fixture.ValidResourceTypeType(), fixture.ValidReporterTypeType(), fixture.ValidReporterInstanceIdType())
+		if err != nil {
+			t.Fatalf("Failed to create key: %v", err)
+		}
+
+		found, err := resource.findReporterResourceToUpdateByKey(key)
+		if err != nil {
+			t.Errorf("Expected to find reporter resource, got error: %v", err)
+		}
+		if found == nil {
+			t.Error("Expected to find reporter resource, got nil")
+		}
+	})
+
+	t.Run("finds reporter resource with empty reporterInstanceId in search key", func(t *testing.T) {
+		t.Parallel()
+
+		resource, err := NewResource(fixture.ValidResourceIdType(), fixture.ValidLocalResourceIdType(), fixture.ValidResourceTypeType(), fixture.ValidReporterTypeType(), fixture.ValidReporterInstanceIdType(), fixture.ValidReporterResourceIdType(), fixture.ValidApiHrefType(), fixture.ValidConsoleHrefType(), fixture.ValidReporterRepresentationType(), fixture.ValidCommonRepresentationType(), nil)
+		if err != nil {
+			t.Fatalf("Failed to create resource: %v", err)
+		}
+
+		key, err := NewReporterResourceKey(fixture.ValidLocalResourceIdType(), fixture.ValidResourceTypeType(), fixture.ValidReporterTypeType(), ReporterInstanceId(""))
+		if err != nil {
+			t.Fatalf("Failed to create key: %v", err)
+		}
+
+		found, err := resource.findReporterResourceToUpdateByKey(key)
+		if err != nil {
+			t.Errorf("Expected to find reporter resource with partial match, got error: %v", err)
+		}
+		if found == nil {
+			t.Error("Expected to find reporter resource with partial match, got nil")
+		}
+	})
+
+	t.Run("returns error when no match found", func(t *testing.T) {
+		t.Parallel()
+
+		resource, err := NewResource(fixture.ValidResourceIdType(), fixture.ValidLocalResourceIdType(), fixture.ValidResourceTypeType(), fixture.ValidReporterTypeType(), fixture.ValidReporterInstanceIdType(), fixture.ValidReporterResourceIdType(), fixture.ValidApiHrefType(), fixture.ValidConsoleHrefType(), fixture.ValidReporterRepresentationType(), fixture.ValidCommonRepresentationType(), nil)
+		if err != nil {
+			t.Fatalf("Failed to create resource: %v", err)
+		}
+
+		differentLocalId, _ := NewLocalResourceId("different-resource")
+		key, err := NewReporterResourceKey(differentLocalId, fixture.ValidResourceTypeType(), fixture.ValidReporterTypeType(), fixture.ValidReporterInstanceIdType())
+		if err != nil {
+			t.Fatalf("Failed to create key: %v", err)
+		}
+
+		found, err := resource.findReporterResourceToUpdateByKey(key)
+		if err == nil {
+			t.Error("Expected error when no match found")
+		}
+		if found != nil {
+			t.Error("Expected nil when no match found")
+		}
+	})
+
+	t.Run("finds reporter resource with case-insensitive matching", func(t *testing.T) {
+		t.Parallel()
+		fixture := NewResourceTestFixture()
+
+		localResourceId, _ := NewLocalResourceId("Test-Case-Resource")
+		resourceType, _ := NewResourceType("K8S_Cluster")
+		reporterType, _ := NewReporterType("OCM")
+		reporterInstanceId, _ := NewReporterInstanceId("Mixed-Instance")
+
+		resource, err := NewResource(fixture.ValidResourceIdType(), localResourceId, resourceType, reporterType, reporterInstanceId, fixture.ValidReporterResourceIdType(), fixture.ValidApiHrefType(), fixture.ValidConsoleHrefType(), fixture.ValidReporterRepresentationType(), fixture.ValidCommonRepresentationType(), nil)
+		if err != nil {
+			t.Fatalf("Failed to create resource: %v", err)
+		}
+
+		testCases := []struct {
+			name               string
+			localResourceId    string
+			resourceType       string
+			reporterType       string
+			reporterInstanceId string
+			shouldFind         bool
+		}{
+			{"all lowercase", "test-case-resource", "k8s_cluster", "ocm", "mixed-instance", true},
+			{"all uppercase", "TEST-CASE-RESOURCE", "K8S_CLUSTER", "OCM", "MIXED-INSTANCE", true},
+			{"mixed case different", "test-CASE-resource", "k8s_CLUSTER", "ocm", "mixed-INSTANCE", true},
+			{"different resource", "different-resource", "k8s_cluster", "ocm", "mixed-instance", false},
+			{"empty reporterInstanceId", "test-case-resource", "k8s_cluster", "ocm", "", true},
+		}
+
+		for _, tc := range testCases {
+			t.Run(tc.name, func(t *testing.T) {
+				localId, _ := NewLocalResourceId(tc.localResourceId)
+				resType, _ := NewResourceType(tc.resourceType)
+				repType, _ := NewReporterType(tc.reporterType)
+
+				var repInstanceId ReporterInstanceId
+				if tc.reporterInstanceId != "" {
+					repInstanceId, _ = NewReporterInstanceId(tc.reporterInstanceId)
+				} else {
+					repInstanceId = ReporterInstanceId("")
+				}
+
+				searchKey, err := NewReporterResourceKey(localId, resType, repType, repInstanceId)
+				if err != nil {
+					t.Fatalf("Failed to create search key: %v", err)
+				}
+
+				found, err := resource.findReporterResourceToUpdateByKey(searchKey)
+
+				if tc.shouldFind {
+					if err != nil {
+						t.Errorf("Expected to find reporter resource but got error: %v", err)
+					}
+					if found == nil {
+						t.Error("Expected to find reporter resource but got nil")
+					}
+				} else {
+					if err == nil {
+						t.Error("Expected error when resource should not be found")
+					}
+					if found != nil {
+						t.Error("Expected nil when resource should not be found")
+					}
+				}
+			})
+		}
+	})
+
+	t.Run("delete returns error when reporter resource not found", func(t *testing.T) {
+		t.Parallel()
+
+		resource, err := NewResource(fixture.ValidResourceIdType(), fixture.ValidLocalResourceIdType(), fixture.ValidResourceTypeType(), fixture.ValidReporterTypeType(), fixture.ValidReporterInstanceIdType(), fixture.ValidReporterResourceIdType(), fixture.ValidApiHrefType(), fixture.ValidConsoleHrefType(), fixture.ValidReporterRepresentationType(), fixture.ValidCommonRepresentationType(), nil)
+		if err != nil {
+			t.Fatalf("Failed to create resource: %v", err)
+		}
+
+		differentLocalId, _ := NewLocalResourceId("non-existent-resource")
+		nonExistentKey, err := NewReporterResourceKey(differentLocalId, fixture.ValidResourceTypeType(), fixture.ValidReporterTypeType(), fixture.ValidReporterInstanceIdType())
+		if err != nil {
+			t.Fatalf("Failed to create key: %v", err)
+		}
+
+		err = resource.Delete(nonExistentKey)
+		if err == nil {
+			t.Error("Expected error when deleting non-existent reporter resource")
+		}
+		if !strings.Contains(err.Error(), "not found") {
+			t.Errorf("Expected 'not found' error, got: %v", err)
 		}
 	})
 }

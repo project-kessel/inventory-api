@@ -134,22 +134,33 @@ func (r *resourceRepository) Save(tx *gorm.DB, resource bizmodel.Resource, opera
 		return fmt.Errorf("failed to save reporter resource: %w", err)
 	}
 
-	if err := tx.Create(&dataReporterRepresentation).Error; err != nil {
-		return fmt.Errorf("failed to save reporter representation: %w", err)
+	if dataReporterRepresentation.ReporterResourceID != uuid.Nil {
+		if err := tx.Create(&dataReporterRepresentation).Error; err != nil {
+			return fmt.Errorf("failed to save reporter representation: %w", err)
+		}
 	}
 
-	if err := tx.Create(&dataCommonRepresentation).Error; err != nil {
-		return fmt.Errorf("failed to save common representation: %w", err)
+	if dataCommonRepresentation.ResourceId != uuid.Nil {
+		if err := tx.Create(&dataCommonRepresentation).Error; err != nil {
+			return fmt.Errorf("failed to save common representation: %w", err)
+		}
 	}
 
-	if err := r.handleOutboxEvents(tx, resource.ResourceEvents()[0], operationType, txid); err != nil {
+	var resourceEvent bizmodel.ResourceEvent
+	switch operationType {
+	case model_legacy.OperationTypeDeleted:
+		resourceEvent = resource.ResourceDeleteEvents()[0]
+	default:
+		resourceEvent = resource.ResourceReportEvents()[0]
+	}
+	if err := r.handleOutboxEvents(tx, resourceEvent, operationType, txid); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func (r *resourceRepository) handleOutboxEvents(tx *gorm.DB, resourceEvent bizmodel.ResourceReportEvent, operationType model_legacy.EventOperationType, txid string) error {
+func (r *resourceRepository) handleOutboxEvents(tx *gorm.DB, resourceEvent bizmodel.ResourceEvent, operationType model_legacy.EventOperationType, txid string) error {
 	resourceMessage, tupleMessage, err := model_legacy.NewOutboxEventsFromResourceEvent(resourceEvent, operationType, txid)
 	if err != nil {
 		return err
@@ -197,13 +208,14 @@ func (r *resourceRepository) FindResourceByKeys(tx *gorm.DB, key bizmodel.Report
 	`)
 
 	// Build WHERE conditions dynamically based on present values
-	query = query.Where("rr.local_resource_id = ?", key.LocalResourceId().Serialize())
-	query = query.Where("rr.resource_type = ?", key.ResourceType().Serialize())
-	query = query.Where("rr.reporter_type = ?", key.ReporterType().Serialize())
+	query = query.Where("LOWER(rr.local_resource_id) = LOWER(?)", key.LocalResourceId().Serialize())
+	query = query.Where("LOWER(rr.resource_type) = LOWER(?)", key.ResourceType().Serialize())
+	query = query.Where("LOWER(rr.reporter_type) = LOWER(?)", key.ReporterType().Serialize())
+	query = query.Where("rr.tombstone = ?", false)
 
 	// Only add reporter_instance_id condition if it's not empty
 	if reporterInstanceId := key.ReporterInstanceId().Serialize(); reporterInstanceId != "" {
-		query = query.Where("rr.reporter_instance_id = ?", reporterInstanceId)
+		query = query.Where("LOWER(rr.reporter_instance_id) = LOWER(?)", reporterInstanceId)
 	}
 
 	err := query.Find(&results).Error // Use Find since it returns multiple rows

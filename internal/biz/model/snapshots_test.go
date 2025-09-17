@@ -166,10 +166,7 @@ func TestIndividualSnapshotMethods(t *testing.T) {
 	deleteRep, err := NewReporterDeleteRepresentation(
 		resourceFixture.ValidReporterResourceIdType(),
 		versionOne,
-		genOne,
-		versionOne,
-		nil, // reporterVersion
-	)
+		genOne)
 	if err != nil {
 		t.Fatalf("Failed to create ReporterDeleteRepresentation: %v", err)
 	}

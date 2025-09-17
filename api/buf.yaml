@@ -2,7 +2,7 @@ version: v2
 name: buf.build/project-kessel/inventory-api
 lint:
   use:
-    - DEFAULT
+    - STANDARD
   except:
    - ENUM_VALUE_PREFIX
    - PACKAGE_VERSION_SUFFIX

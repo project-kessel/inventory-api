@@ -10,8 +10,10 @@ import (
 
 const (
 	outboxTopic = "outbox.event.kessel.tuples"
-	// consumerPrefix should be used for all consumer-related metrics
-	consumerPrefix = "kessel_inventory_consumer_"
+	// statsPrefix should be used for all consumer stat-based metrics
+	statsPrefix = "consumer_stats_"
+	// consumerPrefix should be used for all other consumer-related metrics
+	consumerPrefix = "consumer_"
 	// prefix should be used for all other metrics unrelated to the consumer
 	prefix = "kessel_inventory_"
 )
@@ -104,50 +106,50 @@ func (m *MetricsCollector) New(meter metric.Meter) error {
 	var err error
 
 	// create top-level metrics
-	if m.replyq, err = meter.Int64Gauge(consumerPrefix + "replyq"); err != nil {
+	if m.replyq, err = meter.Int64Gauge(statsPrefix + "replyq"); err != nil {
 		return err
 	}
 
 	// create topic.partitions metrics
-	if m.fetchqCnt, err = meter.Int64Gauge(consumerPrefix + "fetchq_cnt"); err != nil {
+	if m.fetchqCnt, err = meter.Int64Gauge(statsPrefix + "fetchq_cnt"); err != nil {
 		return err
 	}
-	if m.fetchqSize, err = meter.Int64Gauge(consumerPrefix + "fetchq_size"); err != nil {
+	if m.fetchqSize, err = meter.Int64Gauge(statsPrefix + "fetchq_size"); err != nil {
 		return err
 	}
-	if m.fetchState, err = meter.Int64Gauge(consumerPrefix + "fetchq_state"); err != nil {
+	if m.fetchState, err = meter.Int64Gauge(statsPrefix + "fetchq_state"); err != nil {
 		return err
 	}
-	if m.loOffset, err = meter.Int64Gauge(consumerPrefix + "lo_offset"); err != nil {
+	if m.loOffset, err = meter.Int64Gauge(statsPrefix + "lo_offset"); err != nil {
 		return err
 	}
-	if m.hiOffset, err = meter.Int64Gauge(consumerPrefix + "hi_offset"); err != nil {
+	if m.hiOffset, err = meter.Int64Gauge(statsPrefix + "hi_offset"); err != nil {
 		return err
 	}
-	if m.lsOffset, err = meter.Int64Gauge(consumerPrefix + "ls_offset"); err != nil {
+	if m.lsOffset, err = meter.Int64Gauge(statsPrefix + "ls_offset"); err != nil {
 		return err
 	}
-	if m.consumerLag, err = meter.Int64Gauge(consumerPrefix + "consumer_lag"); err != nil {
+	if m.consumerLag, err = meter.Int64Gauge(statsPrefix + "consumer_lag"); err != nil {
 		return err
 	}
-	if m.consumerLagStored, err = meter.Int64Gauge(consumerPrefix + "consumer_lag_stored"); err != nil {
+	if m.consumerLagStored, err = meter.Int64Gauge(statsPrefix + "consumer_lag_stored"); err != nil {
 		return err
 	}
 
 	// create cgrp metrics
-	if m.state, err = meter.Int64Gauge(consumerPrefix + "state"); err != nil {
+	if m.state, err = meter.Int64Gauge(statsPrefix + "state"); err != nil {
 		return err
 	}
-	if m.stateAge, err = meter.Int64Gauge(consumerPrefix + "stateage"); err != nil {
+	if m.stateAge, err = meter.Int64Gauge(statsPrefix + "stateage"); err != nil {
 		return err
 	}
-	if m.rebalanceAge, err = meter.Int64Gauge(consumerPrefix + "rebalance_age"); err != nil {
+	if m.rebalanceAge, err = meter.Int64Gauge(statsPrefix + "rebalance_age"); err != nil {
 		return err
 	}
-	if m.rebalanceCnt, err = meter.Int64Counter(consumerPrefix + "rebalance_cnt"); err != nil {
+	if m.rebalanceCnt, err = meter.Int64Counter(statsPrefix + "rebalance_cnt"); err != nil {
 		return err
 	}
-	if m.assignmentSize, err = meter.Int64Gauge(consumerPrefix + "assignment_size"); err != nil {
+	if m.assignmentSize, err = meter.Int64Gauge(statsPrefix + "assignment_size"); err != nil {
 		return err
 	}
 

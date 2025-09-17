@@ -15,7 +15,7 @@ option java_outer_classname = "K8SPolicyIsPropagatedToK8SClusterProto";
 message K8SPolicyIsPropagatedToK8SCluster {
 
   // Metadata about this resource
-  Metadata metadata = 1 [ (buf.validate.field) = {required: false, ignore: IGNORE_ALWAYS} ];
+  Metadata metadata = 1 [ (buf.validate.field) = {ignore: IGNORE_ALWAYS} ];
 
   // Write only reporter specific data
   ReporterData reporter_data = 245278793 [ json_name = "reporter_data", (buf.validate.field).required = true ];

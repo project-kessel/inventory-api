@@ -56,6 +56,8 @@ api:
 	@echo "Generating api protos"
 	@$(DOCKER) build -t custom-protoc ./api
 	@$(DOCKER) run -t --rm -v $(PWD)/api:/api:rw,z -v $(PWD)/openapi.yaml:/openapi.yaml:rw,z \
+	-w=/api/ custom-protoc sh -c "buf dep update"
+	@$(DOCKER) run -t --rm -v $(PWD)/api:/api:rw,z -v $(PWD)/openapi.yaml:/openapi.yaml:rw,z \
 	-w=/api/ custom-protoc sh -c "buf generate && \
 		buf lint && \
 		buf breaking --against 'buf.build/project-kessel/inventory-api' "
@@ -65,6 +67,8 @@ api:
 api_breaking:
 	@echo "Generating api protos, allowing breaking changes"
 	@$(DOCKER) build -t custom-protoc ./api
+	@$(DOCKER) run -t --rm -v $(PWD)/api:/api:rw,z -v $(PWD)/openapi.yaml:/openapi.yaml:rw,z \
+	-w=/api/ custom-protoc sh -c "buf dep update"
 	@$(DOCKER) run -t --rm -v $(PWD)/api:/api:rw,z -v $(PWD)/openapi.yaml:/openapi.yaml:rw,z \
 	-w=/api/ custom-protoc sh -c "buf generate && \
 		buf lint"
@@ -91,6 +95,7 @@ build-schemas:
 	@echo "====== resources-tarball configmap ======"
 	kubectl create configmap resources-tarball --dry-run=client --from-file=resources.tar.gz -o yaml
 	@echo "====== resources-tarball configmap ======"
+	./scripts/update-ephem-schema-config.sh || { echo "Error: update-ephem-schema-config.sh failed"; exit 1; }
 
 .PHONY: build
 # build
@@ -192,7 +197,7 @@ inventory-up-split-relations-ready:
 
 .PHONY: inventory-up-sso
 inventory-up-sso:
-	./scripts/start-inventory-kc.sh full-setup-w-sso 8081 9081
+	./scripts/start-inventory.sh full-setup-w-sso 8081 9081
 
 .PHONY: inventory-up-kind
 inventory-up-kind:

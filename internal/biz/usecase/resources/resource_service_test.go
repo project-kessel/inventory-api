@@ -15,6 +15,7 @@ import (
 	"github.com/project-kessel/inventory-api/internal/authz/allow"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
 	"github.com/project-kessel/inventory-api/internal/data"
+	"github.com/project-kessel/inventory-api/internal/mocks"
 )
 
 func TestReportResource(t *testing.T) {
@@ -375,5 +376,118 @@ func createTestReportRequestWithUpdatedData(t *testing.T, resourceType, reporter
 			Common:   commonData,
 		},
 		WriteVisibility: v1beta2.WriteVisibility_MINIMIZE_LATENCY,
+	}
+}
+
+func TestCalculateTuplesV2(t *testing.T) {
+	tests := []struct {
+		name                   string
+		version                uint
+		currentWorkspaceID     string
+		previousWorkspaceID    string
+		expectTuplesToCreate   bool
+		expectTuplesToDelete   bool
+		expectedCreateResource string
+		expectedDeleteResource string
+		expectedCreateSubject  string
+		expectedDeleteSubject  string
+	}{
+		{
+			name:                   "version 0 creates initial tuple",
+			version:                0,
+			currentWorkspaceID:     "workspace-initial",
+			previousWorkspaceID:    "",
+			expectTuplesToCreate:   true,
+			expectTuplesToDelete:   false,
+			expectedCreateResource: "host:test-resource",
+			expectedCreateSubject:  "rbac:workspace:workspace-initial",
+		},
+		{
+			name:                   "workspace change creates and deletes tuples",
+			version:                2,
+			currentWorkspaceID:     "workspace-new",
+			previousWorkspaceID:    "workspace-old",
+			expectTuplesToCreate:   true,
+			expectTuplesToDelete:   true,
+			expectedCreateResource: "host:test-resource",
+			expectedDeleteResource: "host:test-resource",
+			expectedCreateSubject:  "rbac:workspace:workspace-new",
+			expectedDeleteSubject:  "rbac:workspace:workspace-old",
+		},
+		{
+			name:                   "same workspace creates only",
+			version:                2,
+			currentWorkspaceID:     "workspace-same",
+			previousWorkspaceID:    "workspace-same",
+			expectTuplesToCreate:   true,
+			expectTuplesToDelete:   false,
+			expectedCreateResource: "host:test-resource",
+			expectedCreateSubject:  "rbac:workspace:workspace-same",
+		},
+		{
+			name:                   "new workspace with no previous",
+			version:                1,
+			currentWorkspaceID:     "workspace-new",
+			previousWorkspaceID:    "",
+			expectTuplesToCreate:   true,
+			expectTuplesToDelete:   false,
+			expectedCreateResource: "host:test-resource",
+			expectedCreateSubject:  "rbac:workspace:workspace-new",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create a mock repository with custom FindCommonRepresentationsByVersion
+			repo := &mocks.MockResourceRepository{
+				CurrentWorkspaceID:  tt.currentWorkspaceID,
+				PreviousWorkspaceID: tt.previousWorkspaceID,
+			}
+
+			// Create usecase with mock repo
+			uc := &Usecase{
+				resourceRepository: repo,
+				Log:                log.NewHelper(log.DefaultLogger),
+			}
+
+			// Create test key
+			key, err := model.NewReporterResourceKey(
+				model.LocalResourceId("test-resource"),
+				model.ResourceType("host"),
+				model.ReporterType("HBI"),
+				model.ReporterInstanceId("test-instance"),
+			)
+			require.NoError(t, err)
+
+			// Create TupleEvent
+			tupleEvent, err := model.NewTupleEvent(model.Version(tt.version), key)
+			require.NoError(t, err)
+
+			// Call CalculateTuplesv2
+			result, err := uc.CalculateTuplesv2(tupleEvent)
+			require.NoError(t, err)
+
+			// Verify expectations
+			assert.Equal(t, tt.expectTuplesToCreate, result.HasTuplesToCreate())
+			assert.Equal(t, tt.expectTuplesToDelete, result.HasTuplesToDelete())
+
+			if tt.expectTuplesToCreate {
+				require.NotNil(t, result.TuplesToCreate())
+				require.Len(t, *result.TuplesToCreate(), 1)
+				createTuple := (*result.TuplesToCreate())[0]
+				assert.Equal(t, tt.expectedCreateResource, createTuple.Resource())
+				assert.Equal(t, "workspace", createTuple.Relation())
+				assert.Equal(t, tt.expectedCreateSubject, createTuple.Subject())
+			}
+
+			if tt.expectTuplesToDelete {
+				require.NotNil(t, result.TuplesToDelete())
+				require.Len(t, *result.TuplesToDelete(), 1)
+				deleteTuple := (*result.TuplesToDelete())[0]
+				assert.Equal(t, tt.expectedDeleteResource, deleteTuple.Resource())
+				assert.Equal(t, "workspace", deleteTuple.Relation())
+				assert.Equal(t, tt.expectedDeleteSubject, deleteTuple.Subject())
+			}
+		})
 	}
 }

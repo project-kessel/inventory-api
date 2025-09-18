@@ -127,6 +127,54 @@ func (f *fakeResourceRepository) FindResourceByKeys(tx *gorm.DB, key bizmodel.Re
 	return nil, gorm.ErrRecordNotFound
 }
 
+func (f *fakeResourceRepository) FindCommonRepresentationsByVersion(tx *gorm.DB, key bizmodel.ReporterResourceKey, currentVersion, previousVersion uint) ([]CommonRepresentationsByVersion, error) {
+	// This is a fake implementation for testing
+	// In a real test, you would mock this based on your test data needs
+	var results []CommonRepresentationsByVersion
+
+	// For testing purposes, we'll return mock data based on the version
+	// In a real implementation, this would query the database for common_representations
+
+	// Mock data for testing - you can customize this based on your test needs
+	if currentVersion == 0 {
+		// Version 0 - initial creation
+		results = append(results, CommonRepresentationsByVersion{
+			Data: map[string]interface{}{
+				"workspace_id": "test-workspace-initial",
+			},
+			Version: currentVersion,
+		})
+	} else if currentVersion == 1 {
+		// Version 1 - first update
+		results = append(results, CommonRepresentationsByVersion{
+			Data: map[string]interface{}{
+				"workspace_id": "test-workspace-v1",
+			},
+			Version: currentVersion,
+		})
+	} else if currentVersion == 2 {
+		// Version 2 - workspace change scenario
+		results = append(results, CommonRepresentationsByVersion{
+			Data: map[string]interface{}{
+				"workspace_id": "test-workspace-v2",
+			},
+			Version: currentVersion,
+		})
+
+		// Add previous version if requested
+		if previousVersion > 0 {
+			results = append(results, CommonRepresentationsByVersion{
+				Data: map[string]interface{}{
+					"workspace_id": "test-workspace-previous",
+				},
+				Version: previousVersion,
+			})
+		}
+	}
+
+	return results, nil
+}
+
 func (f *fakeResourceRepository) GetDB() *gorm.DB {
 	// Fake repository doesn't use a real database
 	return nil

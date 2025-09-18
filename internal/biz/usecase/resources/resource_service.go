@@ -865,9 +865,93 @@ func computeReadAfterWrite(uc *Usecase, write_visibility v1beta2.WriteVisibility
 }
 
 func (uc *Usecase) CalculateTuplesv2(tupleEvent model.TupleEvent) (model.TuplesToReplicate, error) {
+	currentVersion := tupleEvent.Version().Uint()
+	key := tupleEvent.ReporterResourceKey()
 
-	//1. Join between reporterResources and commonRepresentations table to get 2 representations back, one with common version supplied in the TupleEvent,and one with commonVersion-1
-	//2. Once you get the query right, add it to the resource_repository file. Add tests.
+	uc.Log.Infof("CalculateTuplesv2 called - version: %d, key: %+v", currentVersion, key)
+
+	var currentWorkspaceID, previousWorkspaceID string
+
+	// Handle create scenario (version 0)
+	if currentVersion == 0 {
+		uc.Log.Infof("CREATE scenario - version 0, processing initial tuple")
+
+		// For version 0, we only need the current version data
+		representations, err := uc.resourceRepository.FindCommonRepresentationsByVersion(
+			nil, key, currentVersion, 0, // previousVersion is 0 for version 0
+		)
+		if err != nil {
+			return model.TuplesToReplicate{}, fmt.Errorf("failed to find common representations: %w", err)
+		}
+
+		// Extract workspace_id from current version only
+		for _, repr := range representations {
+			if workspaceID, exists := repr.Data["workspace_id"].(string); exists && workspaceID != "" {
+				if repr.Version == currentVersion {
+					currentWorkspaceID = workspaceID
+				}
+			}
+		}
+
+		uc.Log.Infof("Found workspace ID for version 0 - current: '%s'", currentWorkspaceID)
+	} else {
+		// For updates, we need both current and previous versions
+		previousVersion := currentVersion - 1
+
+		// Get common representations for both versions
+		representations, err := uc.resourceRepository.FindCommonRepresentationsByVersion(
+			nil, key, currentVersion, previousVersion,
+		)
+		if err != nil {
+			return model.TuplesToReplicate{}, fmt.Errorf("failed to find common representations: %w", err)
+		}
+
+		// Extract workspace_ids from the representations
+		for _, repr := range representations {
+			if workspaceID, exists := repr.Data["workspace_id"].(string); exists && workspaceID != "" {
+				if repr.Version == currentVersion {
+					currentWorkspaceID = workspaceID
+				} else if repr.Version == previousVersion {
+					previousWorkspaceID = workspaceID
+				}
+			}
+		}
+
+		uc.Log.Infof("Found workspace IDs - current: '%s', previous: '%s'", currentWorkspaceID, previousWorkspaceID)
+	}
+
+	// Build tuples based on workspace ID changes
+	var tuplesToCreate, tuplesToDelete *[]model.RelationsTuple
+
+	// Always create tuple for current workspace if it exists
+	if currentWorkspaceID != "" {
+		resourceStr := fmt.Sprintf("%s:%s", key.ResourceType().Serialize(), key.LocalResourceId().Serialize())
+		subjectStr := fmt.Sprintf("rbac:workspace:%s", currentWorkspaceID)
+
+		createTuple := model.NewRelationsTuple(resourceStr, "workspace", subjectStr)
+		tuplesToCreate = &[]model.RelationsTuple{createTuple}
+
+		uc.Log.Infof("Created tuple to create: %s#workspace@%s", resourceStr, subjectStr)
+	}
+
+	// Delete previous tuple if workspace ID changed and previous exists
+	if previousWorkspaceID != "" && previousWorkspaceID != currentWorkspaceID {
+		resourceStr := fmt.Sprintf("%s:%s", key.ResourceType().Serialize(), key.LocalResourceId().Serialize())
+		subjectStr := fmt.Sprintf("rbac:workspace:%s", previousWorkspaceID)
+
+		deleteTuple := model.NewRelationsTuple(resourceStr, "workspace", subjectStr)
+		tuplesToDelete = &[]model.RelationsTuple{deleteTuple}
+
+		uc.Log.Infof("Created tuple to delete: %s#workspace@%s", resourceStr, subjectStr)
+	}
+
+	// Return empty result if no tuples to process
+	if tuplesToCreate == nil && tuplesToDelete == nil {
+		uc.Log.Infof("No workspace ID changes detected, no tuples to process")
+		return model.TuplesToReplicate{}, nil
+	}
+
+	return model.NewTuplesToReplicate(tuplesToCreate, tuplesToDelete)
 }
 
 func (uc *Usecase) CalculateTuples(tuple *kessel.Relationship, currentCommonVersion model.Version, key model.ReporterResourceKey) (*kessel.RelationTupleFilter, *kessel.RelationTupleFilter) {

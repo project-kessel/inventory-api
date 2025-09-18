@@ -39,10 +39,6 @@ type Resource struct {
 	Reporter ResourceReporter
 }
 
-func (Resource) TableName() string {
-	return "resource"
-}
-
 type ReporterResourceUniqueIndex struct {
 	ResourceType       string `gorm:"uniqueIndex:reporter_resource_unique_index"`
 	ReporterResourceId string `gorm:"uniqueIndex:reporter_resource_unique_index"`

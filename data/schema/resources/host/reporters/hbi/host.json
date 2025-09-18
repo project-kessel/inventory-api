@@ -9,9 +9,24 @@
         { "type": "null" }
       ]
     },
-    "subscription_manager_id": { "type": "string", "format": "uuid" },
-    "insights_inventory_id": { "type": "string", "format": "uuid" },
-    "ansible_host": { "type": "string", "maxLength": 255 }
+    "subscription_manager_id": { 
+      "oneOf": [
+        { "type": "string", "format": "uuid" },
+        { "type": "null" }
+      ]
+    },
+    "insights_inventory_id": { 
+      "oneOf": [
+        { "type": "string", "format": "uuid" },
+        { "type": "null" }
+      ]
+    },
+    "ansible_host": {
+      "oneOf": [
+        { "type": "string", "maxLength": 255 },
+        { "type": "null" }
+      ]
+    }
   },
   "required": []
 }

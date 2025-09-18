@@ -83,6 +83,17 @@ type Usecase struct {
 	Config                           *UsecaseConfig
 }
 
+// NewUsecase creates a new Usecase with minimal required dependencies for consumer usage
+func NewUsecase(db *gorm.DB, logger *log.Helper) *Usecase {
+	transactionManager := data.NewGormTransactionManager(3) // Default retry count
+	resourceRepo := data.NewResourceRepository(db, transactionManager)
+
+	return &Usecase{
+		resourceRepository: resourceRepo,
+		Log:                logger,
+	}
+}
+
 func New(resourceRepository data.ResourceRepository, reporterResourceRepository ReporterResourceRepository, inventoryResourceRepository InventoryResourceRepository,
 	authz authzapi.Authorizer, eventer eventingapi.Manager, namespace string, logger log.Logger,
 	listenManager pubsub.ListenManagerImpl, waitForNotifBreaker *gobreaker.CircuitBreaker, usecaseConfig *UsecaseConfig) *Usecase {
@@ -851,4 +862,174 @@ func computeReadAfterWrite(uc *Usecase, write_visibility v1beta2.WriteVisibility
 		return false
 	}
 	return !common.IsNil(uc.ListenManager) && uc.Config.ReadAfterWriteEnabled && isSPInAllowlist(reporterPrincipal, uc.Config.ReadAfterWriteAllowlist)
+}
+
+/*func (uc *Usecase) CalculateTuplesv2(tupleEvent model.TupleEvent) (model.TuplesToReplicate, error) {
+
+	//1. Join between reporterResources and commonRepresentations table to get 2 representations back, one with common version supplied in the TupleEvent,and one with commonVersion-1
+	//2. Once you get the query right, add it to the resource_repository file. Add tests.
+}*/
+
+func (uc *Usecase) CalculateTuples(tuple *kessel.Relationship, currentCommonVersion model.Version, key model.ReporterResourceKey) (*kessel.RelationTupleFilter, *kessel.RelationTupleFilter) {
+	uc.Log.Infof("CalculateTuples called - tuple: %+v, version: %d, key: %+v", tuple, currentCommonVersion.Uint(), key)
+
+	// Use the version passed from GetCurrentVersion instead of recalculating
+	actualCurrentVersion := currentCommonVersion.Uint()
+	uc.Log.Infof("Using passed version: %d", actualCurrentVersion)
+
+	// Extract configuration from the tuple (cache nested lookups)
+	relation := tuple.GetRelation()
+	res := tuple.GetResource()
+	sub := tuple.GetSubject().GetSubject()
+	subType := sub.GetType()
+	resType := res.GetType()
+	subjectType := subType.GetName()
+	subjectNamespace := subType.GetNamespace()
+	resourceNamespace := resType.GetNamespace()
+
+	// Extract workspace_id from the incoming tuple (the new one from the message)
+	workspaceId := sub.GetId()
+	uc.Log.Infof("Using workspace_id from tuple: '%s', version: %d", workspaceId, currentCommonVersion.Uint())
+
+	// Create tuple based on current data
+	if workspaceId != "" {
+		uc.Log.Infof("Workspace ID found, proceeding with tuple creation")
+		// Extract resource information from the tuple (not the event)
+		resourceId := res.GetId()
+		resourceType := resType.GetName()
+		uc.Log.Infof("Creating tuple for resource - ID: %s, Type: %s", resourceId, resourceType)
+
+		// Create the current relationship tuple filter (avoid extra allocations)
+		rn, rt, rid := resourceNamespace, resourceType, resourceId
+		rel := relation
+		sn, st, sid := subjectNamespace, subjectType, workspaceId
+		currentTupleFilter := &kessel.RelationTupleFilter{
+			ResourceNamespace: &rn,
+			ResourceType:      &rt,
+			ResourceId:        &rid,
+			Relation:          &rel,
+			SubjectFilter: &kessel.SubjectFilter{
+				SubjectNamespace: &sn,
+				SubjectType:      &st,
+				SubjectId:        &sid,
+			},
+		}
+		uc.Log.Infof("Created current tuple filter - Resource: %s/%s/%s, Relation: %s, Subject: %s/%s/%s",
+			resourceNamespace, resourceType, resourceId, relation, subjectNamespace, subjectType, workspaceId)
+
+		// Determine if this is create, update, or delete based on actual current version
+		if actualCurrentVersion == 0 {
+			// Create scenario - only create tuple
+			uc.Log.Infof("CREATE scenario - version 0, returning current tuple only")
+			return currentTupleFilter, nil
+		} else if actualCurrentVersion > 0 {
+			// Update scenario - create new tuple and delete old one
+			previousVersion := actualCurrentVersion - 1
+			uc.Log.Infof("UPDATE scenario - version %d, looking for previous version %d to delete", actualCurrentVersion, previousVersion)
+
+			// Query the database directly for the previous workspace ID
+			var previousWorkspaceId string
+
+			// Query only the previous workspace_id from common_representations
+			var row struct {
+				WorkspaceID *string `gorm:"column:workspace_id"`
+			}
+			err := uc.resourceRepository.GetDB().
+				Table("common_representations cr").
+				Joins("JOIN reporter_resources rr ON cr.resource_id::uuid = rr.resource_id").
+				Where("rr.local_resource_id = ? AND rr.resource_type = ? AND rr.reporter_type = ? AND rr.reporter_instance_id = ? AND cr.version = ?",
+					key.LocalResourceId().Serialize(), key.ResourceType().Serialize(), key.ReporterType().Serialize(), key.ReporterInstanceId().Serialize(), previousVersion).
+				Select("cr.data->>'workspace_id' AS workspace_id").
+				Take(&row).Error
+
+			if err == nil && row.WorkspaceID != nil {
+				previousWorkspaceId = *row.WorkspaceID
+				uc.Log.Infof("Found previous workspace ID from database: '%s'", previousWorkspaceId)
+			}
+
+			if previousWorkspaceId != "" {
+				// If previous is same as current, no delete needed
+				if previousWorkspaceId == workspaceId {
+					uc.Log.Infof("Previous workspace equals current; no delete tuple needed")
+					return currentTupleFilter, nil
+				}
+				// Create the previous version's tuple for deletion
+				prevSN, prevST, prevSID := subjectNamespace, subjectType, previousWorkspaceId
+				previousTupleFilter := &kessel.RelationTupleFilter{
+					ResourceNamespace: &rn,
+					ResourceType:      &rt,
+					ResourceId:        &rid,
+					Relation:          &rel,
+					SubjectFilter: &kessel.SubjectFilter{
+						SubjectNamespace: &prevSN,
+						SubjectType:      &prevST,
+						SubjectId:        &prevSID,
+					},
+				}
+				uc.Log.Infof("Found previous version - returning both create and delete tuples")
+				uc.Log.Infof("Delete tuple - Resource: %s/%s/%s, Subject: %s/%s/%s",
+					resourceNamespace, resourceType, resourceId,
+					subjectNamespace, subjectType, previousWorkspaceId)
+				return currentTupleFilter, previousTupleFilter
+			}
+			// If no previous version found, just return current tuple
+			uc.Log.Warnf("No previous version %d found with workspace ID, returning current tuple only", previousVersion)
+			return currentTupleFilter, nil
+		}
+	} else {
+		uc.Log.Warnf("No workspace ID found in current event, skipping tuple creation")
+	}
+
+	uc.Log.Warnf("CalculateTuples returning nil, nil - workspaceId: '%s', version: %d", workspaceId, actualCurrentVersion)
+	return nil, nil
+}
+
+// ResourceKeyAndCurrentVersionFromTuple combines fetching the reporter resource key and
+// the latest version in a single DB round trip using a scalar subselect.
+func (uc *Usecase) ResourceKeyAndCurrentVersionFromTuple(tuple *kessel.Relationship) (model.ReporterResourceKey, model.Version, error) {
+	uc.Log.Infof("ResourceKeyAndCurrentVersionFromTuple called with tuple: %+v", tuple)
+
+	// Extract resource information from tuple
+	resourceIdStr := tuple.GetResource().GetId()
+	resourceTypeStr := tuple.GetResource().GetType().GetName()
+
+	// Convert string to UUID for ResourceId
+	resourceId, err := uuid.Parse(resourceIdStr)
+	if err != nil {
+		return model.ReporterResourceKey{}, 0, fmt.Errorf("failed to parse resource ID '%s' as UUID: %w", resourceIdStr, err)
+	}
+
+	// Single query to get reporter resource identity and its latest version
+	var row struct {
+		LocalResourceID    string `gorm:"column:local_resource_id"`
+		ResourceType       string `gorm:"column:resource_type"`
+		ReporterType       string `gorm:"column:reporter_type"`
+		ReporterInstanceID string `gorm:"column:reporter_instance_id"`
+		Version            uint   `gorm:"column:version"`
+	}
+
+	err = uc.resourceRepository.GetDB().
+		Table("reporter_resources rr").
+		Select(`rr.local_resource_id, rr.resource_type, rr.reporter_type, rr.reporter_instance_id,
+            (SELECT rr2.version FROM reporter_representations rr2
+             WHERE rr2.reporter_resource_id = rr.id
+             ORDER BY rr2.version DESC LIMIT 1) AS version`).
+		Where("rr.local_resource_id = ? AND rr.resource_type = ?", resourceId, resourceTypeStr).
+		Take(&row).Error
+	if err != nil {
+		uc.Log.Errorf("failed to fetch reporter resource and version: %v", err)
+		return model.ReporterResourceKey{}, 0, fmt.Errorf("failed to fetch reporter resource and version: %w", err)
+	}
+
+	key, err := model.NewReporterResourceKey(
+		model.LocalResourceId(row.LocalResourceID),
+		model.ResourceType(row.ResourceType),
+		model.ReporterType(row.ReporterType),
+		model.ReporterInstanceId(row.ReporterInstanceID),
+	)
+	if err != nil {
+		return model.ReporterResourceKey{}, 0, fmt.Errorf("failed to create ReporterResourceKey: %w", err)
+	}
+
+	return key, model.Version(row.Version), nil
 }

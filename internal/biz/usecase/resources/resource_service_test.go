@@ -377,3 +377,166 @@ func createTestReportRequestWithUpdatedData(t *testing.T, resourceType, reporter
 		WriteVisibility: v1beta2.WriteVisibility_MINIMIZE_LATENCY,
 	}
 }
+
+func TestPartialDataScenarios(t *testing.T) {
+	ctx := context.Background()
+	logger := log.DefaultLogger
+
+	resourceRepo := data.NewFakeResourceRepository()
+	authorizer := &allow.AllowAllAuthz{}
+	usecaseConfig := &UsecaseConfig{
+		ReadAfterWriteEnabled: false,
+		ConsumerEnabled:       false,
+	}
+
+	usecase := New(resourceRepo, nil, nil, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig)
+
+	t.Run("Report resource with rich reporter data and minimal common data", func(t *testing.T) {
+		request := createTestReportRequestWithReporterDataOnly(t, "k8s_cluster", "ocm", "ocm-instance-1", "reporter-rich-resource", "minimal-workspace")
+		err := usecase.ReportResource(ctx, request, "test-reporter")
+		require.NoError(t, err, "Should create resource with rich reporter data")
+
+		key, err := model.NewReporterResourceKey("reporter-rich-resource", "k8s_cluster", "ocm", "ocm-instance-1")
+		require.NoError(t, err)
+
+		foundResource, err := resourceRepo.FindResourceByKeys(nil, key)
+		require.NoError(t, err, "Should find resource with rich reporter data")
+		require.NotNil(t, foundResource)
+	})
+
+	t.Run("Report resource with minimal reporter data and rich common data", func(t *testing.T) {
+		request := createTestReportRequestWithCommonDataOnly(t, "k8s_cluster", "ocm", "ocm-instance-1", "common-rich-resource", "rich-workspace")
+		err := usecase.ReportResource(ctx, request, "test-reporter")
+		require.NoError(t, err, "Should create resource with rich common data")
+
+		key, err := model.NewReporterResourceKey("common-rich-resource", "k8s_cluster", "ocm", "ocm-instance-1")
+		require.NoError(t, err)
+
+		foundResource, err := resourceRepo.FindResourceByKeys(nil, key)
+		require.NoError(t, err, "Should find resource with rich common data")
+		require.NotNil(t, foundResource)
+	})
+
+	t.Run("Report resource with both data, then reporter-focused update, then common-focused update", func(t *testing.T) {
+		// 1. Initial report with both reporter and common data
+		initialRequest := createTestReportRequest(t, "k8s_cluster", "ocm", "ocm-instance-1", "progressive-resource", "initial-workspace")
+		err := usecase.ReportResource(ctx, initialRequest, "test-reporter")
+		require.NoError(t, err, "Should create resource with both data types")
+
+		key, err := model.NewReporterResourceKey("progressive-resource", "k8s_cluster", "ocm", "ocm-instance-1")
+		require.NoError(t, err)
+
+		foundResource, err := resourceRepo.FindResourceByKeys(nil, key)
+		require.NoError(t, err, "Should find resource after initial creation")
+		require.NotNil(t, foundResource)
+
+		// 2. Reporter-focused update
+		reporterFocusedRequest := createTestReportRequestWithReporterDataOnly(t, "k8s_cluster", "ocm", "ocm-instance-1", "progressive-resource", "initial-workspace")
+		err = usecase.ReportResource(ctx, reporterFocusedRequest, "test-reporter")
+		require.NoError(t, err, "Should update resource with reporter-focused data")
+
+		foundResource, err = resourceRepo.FindResourceByKeys(nil, key)
+		require.NoError(t, err, "Should find resource after reporter-focused update")
+		require.NotNil(t, foundResource)
+
+		// 3. Common-focused update
+		commonFocusedRequest := createTestReportRequestWithCommonDataOnly(t, "k8s_cluster", "ocm", "ocm-instance-1", "progressive-resource", "updated-workspace")
+		err = usecase.ReportResource(ctx, commonFocusedRequest, "test-reporter")
+		require.NoError(t, err, "Should update resource with common-focused data")
+
+		finalResource, err := resourceRepo.FindResourceByKeys(nil, key)
+		require.NoError(t, err, "Should find resource after all updates")
+		require.NotNil(t, finalResource)
+	})
+}
+
+func createTestReportRequestWithReporterDataOnly(t *testing.T, resourceType, reporterType, reporterInstance, localResourceId, workspaceId string) *v1beta2.ReportResourceRequest {
+	// Rich reporter data
+	reporterData, _ := structpb.NewStruct(map[string]interface{}{
+		"local_resource_id":  localResourceId,
+		"api_href":           "https://api.example.com/reporter-rich",
+		"console_href":       "https://console.example.com/reporter-rich",
+		"cluster_name":       "reporter-focused-cluster",
+		"cluster_version":    "1.28.0",
+		"node_count":         10,
+		"cpu_total":          "40 cores",
+		"memory_total":       "160Gi",
+		"storage_total":      "1Ti",
+		"network_plugin":     "calico",
+		"ingress_controller": "nginx",
+	})
+
+	// Minimal common data
+	commonData, _ := structpb.NewStruct(map[string]interface{}{
+		"workspace_id": workspaceId,
+	})
+
+	return &v1beta2.ReportResourceRequest{
+		Type:               resourceType,
+		ReporterType:       reporterType,
+		ReporterInstanceId: reporterInstance,
+		Representations: &v1beta2.ResourceRepresentations{
+			Metadata: &v1beta2.RepresentationMetadata{
+				LocalResourceId: localResourceId,
+				ApiHref:         "https://api.example.com/reporter-rich",
+				ConsoleHref:     internal.StringPtr("https://console.example.com/reporter-rich"),
+			},
+			Reporter: reporterData,
+			Common:   commonData,
+		},
+		WriteVisibility: v1beta2.WriteVisibility_MINIMIZE_LATENCY,
+	}
+}
+
+func createTestReportRequestWithCommonDataOnly(t *testing.T, resourceType, reporterType, reporterInstance, localResourceId, workspaceId string) *v1beta2.ReportResourceRequest {
+	// Minimal reporter data
+	reporterData, _ := structpb.NewStruct(map[string]interface{}{
+		"local_resource_id": localResourceId,
+		"api_href":          "https://api.example.com/common-rich",
+		"console_href":      "https://console.example.com/common-rich",
+		"name":              "minimal-cluster",
+	})
+
+	// Rich common data
+	commonData, _ := structpb.NewStruct(map[string]interface{}{
+		"workspace_id": workspaceId,
+		"environment":  "production",
+		"region":       "us-east-1",
+		"cost_center":  "engineering",
+		"owner":        "platform-team",
+		"project":      "inventory-system",
+		"labels": map[string]interface{}{
+			"env":        "prod",
+			"team":       "platform",
+			"monitoring": "enabled",
+			"backup":     "daily",
+			"tier":       "critical",
+		},
+		"compliance": map[string]interface{}{
+			"sox":   "required",
+			"hipaa": "not-applicable",
+			"gdpr":  "compliant",
+		},
+		"security": map[string]interface{}{
+			"encryption": "enabled",
+			"scanning":   "continuous",
+			"access":     "restricted",
+		},
+	})
+
+	return &v1beta2.ReportResourceRequest{
+		Type:               resourceType,
+		ReporterType:       reporterType,
+		ReporterInstanceId: reporterInstance,
+		Representations: &v1beta2.ResourceRepresentations{
+			Metadata: &v1beta2.RepresentationMetadata{
+				LocalResourceId: localResourceId,
+				ApiHref:         "https://api.example.com/common-rich",
+				ConsoleHref:     internal.StringPtr("https://console.example.com/common-rich"),
+			},
+			Reporter: reporterData,
+			Common:   commonData,
+		},
+		WriteVisibility: v1beta2.WriteVisibility_MINIMIZE_LATENCY,
+	}
+}

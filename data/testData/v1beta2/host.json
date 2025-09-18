@@ -15,7 +15,7 @@
       "reporter": {
         "satellite_id": null,
         "subscription_manager_id": "af94f92b-0b65-4cac-b449-6b77e665a08f",
-        "insights_inventory_id": "05707922-7b0a-4fe6-982d-6adbc7695b8f",
+        "insights_id": "05707922-7b0a-4fe6-982d-6adbc7695b8f",
         "ansible_host": "host-1"
       }
     }

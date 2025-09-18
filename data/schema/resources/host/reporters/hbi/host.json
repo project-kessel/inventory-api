@@ -15,7 +15,7 @@
         { "type": "null" }
       ]
     },
-    "insights_inventory_id": { 
+    "insights_id": { 
       "oneOf": [
         { "type": "string", "format": "uuid" },
         { "type": "null" }

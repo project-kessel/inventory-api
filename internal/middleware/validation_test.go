@@ -24,7 +24,7 @@ func TestValidateReportResourceJSON_Success(t *testing.T) {
 	reporterStruct, err := structpb.NewStruct(map[string]interface{}{
 		"satellite_id":            "2c4196f1-0371-4f4c-8913-e113cfaa6e67",
 		"subscription_manager_id": "af94f92b-0b65-4cac-b449-6b77e665a08f",
-		"insights_inventory_id":   "05707922-7b0a-4fe6-982d-6adbc7695b8f",
+		"insights_id":             "05707922-7b0a-4fe6-982d-6adbc7695b8f",
 		"ansible_host":            "host-1",
 	})
 	assert.NoError(t, err)
@@ -57,7 +57,7 @@ func TestValidateReportResourceJSON_Success(t *testing.T) {
 	  "properties": {
 		"satellite_id": { "type": "string", "format": "uuid" },
 		"subscription_manager_id": { "type": "string", "format": "uuid" },
-		"insights_inventory_id": { "type": "string", "format": "uuid" },
+		"insights_id": { "type": "string", "format": "uuid" },
 		"ansible_host": { "type": "string", "maxLength": 255 }
 	  },
 	  "required": []
@@ -92,7 +92,7 @@ func TestValidateReportResourceJSON_FieldExtractionErrors(t *testing.T) {
 			Reporter: AsStruct(t, map[string]interface{}{
 				"satellite_id":            "2c4196f1-0371-4f4c-8913-e113cfaa6e67",
 				"subscription_manager_id": "af94f92b-0b65-4cac-b449-6b77e665a08f",
-				"insights_inventory_id":   "05707922-7b0a-4fe6-982d-6adbc7695b8f",
+				"insights_id":             "05707922-7b0a-4fe6-982d-6adbc7695b8f",
 				"ansible_host":            "host-1",
 			}),
 			Common: AsStruct(t, map[string]interface{}{
@@ -112,7 +112,7 @@ func TestValidateReportResourceJSON_FieldExtractionErrors(t *testing.T) {
 	  "properties": {
 		"satellite_id": { "type": "string", "format": "uuid" },
 		"subscription_manager_id": { "type": "string", "format": "uuid" },
-		"insights_inventory_id": { "type": "string", "format": "uuid" },
+		"insights_id": { "type": "string", "format": "uuid" },
 		"ansible_host": { "type": "string", "maxLength": 255 }
 	  },
 	  "required": [

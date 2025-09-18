@@ -54,7 +54,7 @@ for ((i = 0 ; i < ${NUM_RUNS} ; i++)); do
   LOCAL_RESOURCE_ID=$(uuidgen)
   SATELLITE_ID=$(uuidgen)
   SUB_MANAGER_ID=$(uuidgen)
-  INSIGHTS_INVENTORY_ID=$(uuidgen)
+  INSIGHTS_ID=$(uuidgen)
   ANSIBLE_HOST="host-${i}"
 
   REQUEST=$(jq -c --null-input \
@@ -63,9 +63,9 @@ for ((i = 0 ; i < ${NUM_RUNS} ; i++)); do
     --arg local_resource_id "$LOCAL_RESOURCE_ID" \
     --arg satellite_id "$SATELLITE_ID" \
     --arg sub_manager_id "$SUB_MANAGER_ID" \
-    --arg insights_inventory_id "$INSIGHTS_INVENTORY_ID" \
+    --arg insights_id "$INSIGHTS_ID" \
     --arg ansible_host "$ANSIBLE_HOST" \
-    '{"type":"host","reporterType":"hbi","reporterInstanceId":$reporter_instance_id,"representations":{"metadata":{"localResourceId":$local_resource_id,"apiHref":"https://apiHref.com/","consoleHref":"https://www.console.com/","reporterVersion":"2.7.16"},"common":{"workspace_id":$workspace_id},"reporter":{"satellite_id":$satellite_id,"subscription_manager_id":$sub_manager_id,"insights_inventory_id":$insights_inventory_id,"ansible_host":$ansible_host}}}')
+    '{"type":"host","reporterType":"hbi","reporterInstanceId":$reporter_instance_id,"representations":{"metadata":{"localResourceId":$local_resource_id,"apiHref":"https://apiHref.com/","consoleHref":"https://www.console.com/","reporterVersion":"2.7.16"},"common":{"workspace_id":$workspace_id},"reporter":{"satellite_id":$satellite_id,"subscription_manager_id":$sub_manager_id,"insights_id":$insights_id,"ansible_host":$ansible_host}}}')
 
   DELETE_REQUEST=$(jq -c --null-input \
     --arg local_resource_id "$LOCAL_RESOURCE_ID" \

@@ -329,7 +329,7 @@ func (f *TestFixture) ValidReporterRepresentation() *ReporterRepresentation {
 		internal.JsonObject{
 			"satellite_id":            "2c4196f1-0371-4f4c-8913-e113cfaa6e67",
 			"subscription_manager_id": "af94f92b-0b65-4cac-b449-6b77e665a08f",
-			"insights_inventory_id":   "05707922-7b0a-4fe6-982d-6adbc7695b8f",
+			"insights_id":             "05707922-7b0a-4fe6-982d-6adbc7695b8f",
 			"ansible_host":            "host-1",
 		},
 		uuid.MustParse("dd1b73b9-3e33-4264-968c-e3ce55b9afec"), // reporterResourceID
@@ -355,7 +355,7 @@ func (f *TestFixture) ReporterRepresentationWithLocalResourceID(localResourceID 
 		internal.JsonObject{
 			"satellite_id":            "2c4196f1-0371-4f4c-8913-e113cfaa6e67",
 			"subscription_manager_id": "af94f92b-0b65-4cac-b449-6b77e665a08f",
-			"insights_inventory_id":   "05707922-7b0a-4fe6-982d-6adbc7695b8f",
+			"insights_id":             "05707922-7b0a-4fe6-982d-6adbc7695b8f",
 			"ansible_host":            "host-1",
 		},
 		reporterResourceUUID,
@@ -377,7 +377,7 @@ func (f *TestFixture) ReporterRepresentationWithResourceType(resourceType string
 		internal.JsonObject{
 			"satellite_id":            "2c4196f1-0371-4f4c-8913-e113cfaa6e67",
 			"subscription_manager_id": "af94f92b-0b65-4cac-b449-6b77e665a08f",
-			"insights_inventory_id":   "05707922-7b0a-4fe6-982d-6adbc7695b8f",
+			"insights_id":             "05707922-7b0a-4fe6-982d-6adbc7695b8f",
 			"ansible_host":            "host-1",
 		},
 		uuid.MustParse("dd1b73b9-3e33-4264-968c-e3ce55b9afec"),

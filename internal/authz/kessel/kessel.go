@@ -60,8 +60,11 @@ func New(ctx context.Context, config CompletedConfig, logger *log.Helper) (*Kess
 	}, nil
 }
 
-func (a *KesselAuthz) incrFailureCounter(method string) {
-	a.failureCounter.Add(context.Background(), 1, metric.WithAttributes(attribute.String("method", method)))
+func (a *KesselAuthz) incrFailureCounter(method string, reason error) {
+	a.failureCounter.Add(context.Background(), 1, metric.WithAttributes(
+		attribute.String("method", method),
+		attribute.String("reason", reason.Error()),
+	))
 }
 
 func (a *KesselAuthz) incrSuccessCounter(method string) {
@@ -71,7 +74,7 @@ func (a *KesselAuthz) incrSuccessCounter(method string) {
 func (a *KesselAuthz) Health(ctx context.Context) (*kesselv1.GetReadyzResponse, error) {
 	opts, err := a.getCallOptions()
 	if err != nil {
-		a.incrFailureCounter("Health")
+		a.incrFailureCounter("Health", err)
 		return nil, err
 	}
 	if viper.GetBool("log.readyz") {
@@ -79,7 +82,7 @@ func (a *KesselAuthz) Health(ctx context.Context) (*kesselv1.GetReadyzResponse, 
 	}
 	resp, err := a.HealthService.GetReadyz(ctx, &kesselv1.GetReadyzRequest{}, opts...)
 	if err != nil {
-		a.incrFailureCounter("Health")
+		a.incrFailureCounter("Health", err)
 		return nil, err
 	}
 
@@ -107,13 +110,13 @@ func (a *KesselAuthz) getCallOptions() ([]grpc.CallOption, error) {
 func (a *KesselAuthz) AcquireLock(ctx context.Context, r *kessel.AcquireLockRequest) (*kessel.AcquireLockResponse, error) {
 	opts, err := a.getCallOptions()
 	if err != nil {
-		a.incrFailureCounter("AcquireLock")
+		a.incrFailureCounter("AcquireLock", err)
 		return nil, err
 	}
 
 	resp, err := a.TupleService.AcquireLock(ctx, r, opts...)
 	if err != nil {
-		a.incrFailureCounter("AcquireLock")
+		a.incrFailureCounter("AcquireLock", err)
 		return nil, err
 	}
 
@@ -125,13 +128,13 @@ func (a *KesselAuthz) CreateTuples(ctx context.Context, r *kessel.CreateTuplesRe
 	log.Infof("Creating tuples : %s", r)
 	opts, err := a.getCallOptions()
 	if err != nil {
-		a.incrFailureCounter("CreateTuples")
+		a.incrFailureCounter("CreateTuples", err)
 		return nil, err
 	}
 
 	resp, err := a.TupleService.CreateTuples(ctx, r, opts...)
 	if err != nil {
-		a.incrFailureCounter("CreateTuples")
+		a.incrFailureCounter("CreateTuples", err)
 		return nil, err
 	}
 
@@ -142,13 +145,13 @@ func (a *KesselAuthz) CreateTuples(ctx context.Context, r *kessel.CreateTuplesRe
 func (a *KesselAuthz) DeleteTuples(ctx context.Context, r *kessel.DeleteTuplesRequest) (*kessel.DeleteTuplesResponse, error) {
 	opts, err := a.getCallOptions()
 	if err != nil {
-		a.incrFailureCounter("DeleteTuples")
+		a.incrFailureCounter("DeleteTuples", err)
 		return nil, err
 	}
 
 	resp, err := a.TupleService.DeleteTuples(ctx, r, opts...)
 	if err != nil {
-		a.incrFailureCounter("DeleteTuples")
+		a.incrFailureCounter("DeleteTuples", err)
 		return nil, err
 	}
 
@@ -159,12 +162,12 @@ func (a *KesselAuthz) DeleteTuples(ctx context.Context, r *kessel.DeleteTuplesRe
 func (a *KesselAuthz) LookupResources(ctx context.Context, in *kessel.LookupResourcesRequest) (grpc.ServerStreamingClient[kessel.LookupResourcesResponse], error) {
 	opts, err := a.getCallOptions()
 	if err != nil {
-		a.incrFailureCounter("LookupResources")
+		a.incrFailureCounter("LookupResources", err)
 		return nil, err
 	}
 	resp, err := a.LookupService.LookupResources(ctx, in, opts...)
 	if err != nil {
-		a.incrFailureCounter("LookupResources")
+		a.incrFailureCounter("LookupResources", err)
 		return nil, err
 	}
 	return resp, nil
@@ -188,7 +191,7 @@ func (a *KesselAuthz) Check(ctx context.Context, namespace string, viewPermissio
 
 	opts, err := a.getCallOptions()
 	if err != nil {
-		a.incrFailureCounter("Check")
+		a.incrFailureCounter("Check", err)
 		return kessel.CheckResponse_ALLOWED_UNSPECIFIED, nil, err
 	}
 
@@ -221,7 +224,7 @@ func (a *KesselAuthz) Check(ctx context.Context, namespace string, viewPermissio
 	log.Infof("CheckForView resp: %v err: %v", resp, err)
 
 	if err != nil {
-		a.incrFailureCounter("Check")
+		a.incrFailureCounter("Check", err)
 		return kessel.CheckResponse_ALLOWED_UNSPECIFIED, nil, err
 	}
 
@@ -232,7 +235,7 @@ func (a *KesselAuthz) Check(ctx context.Context, namespace string, viewPermissio
 func (a *KesselAuthz) CheckForUpdate(ctx context.Context, namespace string, updatePermission string, resourceType string, localResourceId string, sub *kessel.SubjectReference) (kessel.CheckForUpdateResponse_Allowed, *kessel.ConsistencyToken, error) {
 	opts, err := a.getCallOptions()
 	if err != nil {
-		a.incrFailureCounter("CheckForUpdate")
+		a.incrFailureCounter("CheckForUpdate", err)
 		return kessel.CheckForUpdateResponse_ALLOWED_UNSPECIFIED, nil, err
 	}
 
@@ -249,7 +252,7 @@ func (a *KesselAuthz) CheckForUpdate(ctx context.Context, namespace string, upda
 	}, opts...)
 
 	if err != nil {
-		a.incrFailureCounter("CheckForUpdate")
+		a.incrFailureCounter("CheckForUpdate", err)
 		return kessel.CheckForUpdateResponse_ALLOWED_UNSPECIFIED, nil, err
 	}
 
@@ -260,8 +263,9 @@ func (a *KesselAuthz) CheckForUpdate(ctx context.Context, namespace string, upda
 // SetWorkspace upsert inserts the relationship in relations if it doesn't exist and otherwise does nothing
 func (a *KesselAuthz) SetWorkspace(ctx context.Context, local_resource_id, workspace, namespace, name string, upsert bool) (*kessel.CreateTuplesResponse, error) {
 	if workspace == "" {
-		a.incrFailureCounter("SetWorkspace")
-		return nil, fmt.Errorf("workspace_id is required")
+		err := fmt.Errorf("workspace_id is required")
+		a.incrFailureCounter("SetWorkspace", err)
+		return nil, err
 	}
 	// TODO: remove previous tuple for workspace
 	rels := []*kessel.Relationship{{

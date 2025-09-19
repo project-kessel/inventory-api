@@ -11,6 +11,13 @@ objects:
       envName: ${ENV_NAME}
       database:
         name: kessel-inventory
+      kafkaTopics:
+      - topicName: outbox.event.kessel.tuples
+        partitions: 1
+        replicas: 3
+      - topicName: outbox.event.kessel.resources
+        partitions: 1
+        replicas: 3
       optionalDependencies:
         - kessel-relations
       deployments:
@@ -32,6 +39,21 @@ objects:
                   do psql -c "DROP TABLE $i";
                   done;
               inheritEnv: true
+            - name: copy-resources
+              image: registry.access.redhat.com/ubi9
+              imagePullPolicy: Always
+              command:
+                - /bin/sh
+                - "-c"
+                - |
+                  echo "Extracting resources from tarball..."
+                  tar -xzf /mnt/resources/resources.tar.gz -C /data/schema/resources
+                  echo "Extraction complete!"
+              volumeMounts:
+                - name: resources-tarball
+                  mountPath: "/mnt/resources"
+                - name: resource-volume
+                  mountPath: "/data/schema/resources"
             - name: migration
               image: ${INVENTORY_IMAGE}:${IMAGE_TAG}
               command: ["inventory-api"]
@@ -48,6 +70,13 @@ objects:
               httpGet:
                 path: /api/inventory/v1/readyz
                 port: 8000
+            resources:
+              requests:
+                memory: ${INVENTORY_REQUESTS_MEMORY}
+                cpu: ${INVENTORY_REQUESTS_CPU}
+              limits:
+                memory: ${INVENTORY_LIMITS_MEMORY}
+                cpu: ${INVENTORY_LIMITS_CPU}
             env:
             - name: CLOWDER_ENABLED
               value: "true"
@@ -55,13 +84,30 @@ objects:
               value: "/inventory/inventory-api-config.yaml"
             - name: PGDATA
               value: /temp/data
+            - name: RESOURCE_DIR
+              value: "/data/schema/resources"
             volumeMounts:
                 - name: config-volume
                   mountPath: "/inventory"
+                - name: kafka-ca-certs
+                  mountPath: "/kafka-ca-certs"
+                - name: resource-volume
+                  mountPath: "/data/schema/resources"
+                - name: resources-tarball
+                  mountPath: "/mnt/resources"
             volumes:
               - name: config-volume
                 secret:
-                  secretName: inventory-api-config
+                  secretName: ${INVENTORY_API_CONFIG_SECRET}
+              - name: kafka-ca-certs
+                secret:
+                  secretName: ${CA_CERT_SECRET}
+                  optional: true
+              - name: resource-volume
+                emptyDir: { }
+              - name: resources-tarball
+                configMap:
+                  name: resources-tarball
           webServices:
             public:
               enabled: true
@@ -89,3 +135,21 @@ parameters:
   - description: Number of replicas
     name: REPLICAS
     value: "1"
+  - description: Name of the Inventory API Config K8s secret
+    name: INVENTORY_API_CONFIG_SECRET
+    value: inventory-api-config-v1beta2
+  - description: Name of Secret that contains the Kafka clusters' CA Cert (if required)
+    name: CA_CERT_SECRET
+    value: kessel-kafka-connect-config
+  - description: Memory request for Inventory service
+    name: INVENTORY_REQUESTS_MEMORY
+    value: '512Mi'
+  - description: CPU request for Inventory service
+    name: INVENTORY_REQUESTS_CPU
+    value: '150m'
+  - description: Memory limit for Inventory service
+    name: INVENTORY_LIMITS_MEMORY
+    value: '1Gi'
+  - description: CPU limit for Inventory service
+    name: INVENTORY_LIMITS_CPU
+    value: '300m'

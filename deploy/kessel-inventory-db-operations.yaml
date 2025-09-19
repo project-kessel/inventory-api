@@ -28,7 +28,7 @@ objects:
                   export PGUSER=$(cat /cdapp/cdappconfig.json | ./jq -r '.database.username');
                   export PGDATABASE=$(cat /cdapp/cdappconfig.json | ./jq -r '.database.name');
                   export PGPASSWORD=$(cat /cdapp/cdappconfig.json | ./jq -r '.database.password');
-                  for i in local_inventory_to_resources relationship_history relationships resource_history resources;
+                  for i in local_inventory_to_resources inventory_resources relationship_history relationships resource_history resources relationship_metadata metadata notifications_integrations hosts relationship_reporters reporters labels k8_s_policy_is_propagated_to_k8_s_clusters k8_s_clusters k8s_policies common_representation reporter_representation;
                   do psql -c "DROP TABLE $i";
                   done;
               inheritEnv: true

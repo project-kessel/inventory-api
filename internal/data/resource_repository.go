@@ -204,7 +204,7 @@ func (r *resourceRepository) FindResourceByKeys(tx *gorm.DB, key bizmodel.Report
 	`).
 		Joins(`
 		JOIN reporter_resources AS rr2 ON rr2.resource_id = rr.resource_id
-		JOIN resources AS res ON res.id = rr2.resource_id
+		JOIN resource AS res ON res.id = rr2.resource_id
 	`)
 
 	// Build WHERE conditions dynamically based on present values

@@ -14,6 +14,12 @@ import (
 // See https://gorm.io/docs/migration.html
 func Migrate(db *gorm.DB, logger *log.Helper) error {
 	models := []interface{}{
+		&model_legacy.ResourceHistory{},
+		&model_legacy.Resource{},
+		&model_legacy.Relationship{},
+		&model_legacy.RelationshipHistory{},
+		&model_legacy.LocalInventoryToResource{}, // Deprecated
+		&model_legacy.InventoryResource{},
 		&model_legacy.OutboxEvent{},
 		&model.ReporterRepresentation{},
 		&model.CommonRepresentation{},

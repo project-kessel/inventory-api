@@ -1,5 +1,3 @@
-//go:build enable_resource_repository_tests
-
 package resources
 
 import (

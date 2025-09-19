@@ -16,6 +16,10 @@ type Resource struct {
 	UpdatedAt        time.Time
 }
 
+func (Resource) TableName() string {
+	return "resource"
+}
+
 // SerializeToSnapshot converts GORM Resource to snapshot type - direct initialization without validation
 func (r Resource) SerializeToSnapshot() bizmodel.ResourceSnapshot {
 	return bizmodel.ResourceSnapshot{

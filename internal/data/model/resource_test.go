@@ -62,6 +62,12 @@ func TestResource_Infrastructure_Structure(t *testing.T) {
 		AssertFieldType(t, r, "CommonVersion", reflect.TypeOf(uint(0)))
 	})
 
+	t.Run("should have correct table name", func(t *testing.T) {
+		t.Parallel()
+
+		r := &Resource{}
+		AssertTableName(t, r, "resource")
+	})
 }
 
 func TestResource_Infrastructure_EdgeCases(t *testing.T) {

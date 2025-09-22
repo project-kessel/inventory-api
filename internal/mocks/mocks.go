@@ -300,7 +300,7 @@ func (m *MockResourceRepository) FindResourceByKeys(tx *gorm.DB, key model.Repor
 	return args.Get(0).(*model.Resource), args.Error(1)
 }
 
-func (m *MockResourceRepository) FindCommonRepresentationsByVersion(tx *gorm.DB, key model.ReporterResourceKey, currentVersion, previousVersion uint) ([]data.CommonRepresentationsByVersion, error) {
+func (m *MockResourceRepository) FindCommonRepresentationsByVersion(tx *gorm.DB, key model.ReporterResourceKey, currentVersion uint) ([]data.CommonRepresentationsByVersion, error) {
 	var results []data.CommonRepresentationsByVersion
 
 	// Add current version if workspace ID exists
@@ -314,14 +314,14 @@ func (m *MockResourceRepository) FindCommonRepresentationsByVersion(tx *gorm.DB,
 		})
 	}
 
-	// Add previous version if workspace ID exists
-	if m.PreviousWorkspaceID != "" {
+	// Add previous (current-1) version if workspace ID exists and currentVersion > 0
+	if m.PreviousWorkspaceID != "" && currentVersion > 0 {
 		previousData := map[string]interface{}{
 			"workspace_id": m.PreviousWorkspaceID,
 		}
 		results = append(results, data.CommonRepresentationsByVersion{
 			Data:    previousData,
-			Version: previousVersion,
+			Version: currentVersion - 1,
 		})
 	}
 

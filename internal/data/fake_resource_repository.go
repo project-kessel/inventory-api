@@ -127,7 +127,7 @@ func (f *fakeResourceRepository) FindResourceByKeys(tx *gorm.DB, key bizmodel.Re
 	return nil, gorm.ErrRecordNotFound
 }
 
-func (f *fakeResourceRepository) FindCommonRepresentationsByVersion(tx *gorm.DB, key bizmodel.ReporterResourceKey, currentVersion, previousVersion uint) ([]CommonRepresentationsByVersion, error) {
+func (f *fakeResourceRepository) FindCommonRepresentationsByVersion(tx *gorm.DB, key bizmodel.ReporterResourceKey, currentVersion uint) ([]CommonRepresentationsByVersion, error) {
 	// This is a fake implementation for testing
 	// In a real test, you would mock this based on your test data needs
 	var results []CommonRepresentationsByVersion
@@ -161,13 +161,13 @@ func (f *fakeResourceRepository) FindCommonRepresentationsByVersion(tx *gorm.DB,
 			Version: currentVersion,
 		})
 
-		// Add previous version if requested
-		if previousVersion > 0 {
+		// Add previous (current-1) version if requested
+		if currentVersion > 0 {
 			results = append(results, CommonRepresentationsByVersion{
 				Data: map[string]interface{}{
 					"workspace_id": "test-workspace-previous",
 				},
-				Version: previousVersion,
+				Version: currentVersion - 1,
 			})
 		}
 	}

@@ -307,53 +307,53 @@ func (i *InventoryConsumer) ProcessMessage(headers map[string]string, relationsE
 		}
 
 	case string(model_legacy.OperationTypeUpdated):
-		i.Logger.Infof("processing message: operation=%s, txid=%s", operation, txid)
-		i.Logger.Debugf("processed message tuple=%s", msg.Value)
-		if relationsEnabled {
-			tuple, err := ParseCreateOrUpdateMessage(msg.Value)
-			if err != nil {
-				metricscollector.Incr(i.MetricsCollector.MsgProcessFailures, "ParseCreateOrUpdateMessage", err)
-				i.Logger.Errorf("failed to parse message for tuple: %v", err)
-				return "", err
-			}
+		// i.Logger.Infof("processing message: operation=%s, txid=%s", operation, txid)
+		// i.Logger.Debugf("processed message tuple=%s", msg.Value)
+		// if relationsEnabled {
+		// 	tuple, err := ParseCreateOrUpdateMessage(msg.Value)
+		// 	if err != nil {
+		// 		metricscollector.Incr(i.MetricsCollector.MsgProcessFailures, "ParseCreateOrUpdateMessage", err)
+		// 		i.Logger.Errorf("failed to parse message for tuple: %v", err)
+		// 		return "", err
+		// 	}
 
-			// Extract resource key and current version in a single DB call
-			key, version, err := i.ResourceService.ResourceKeyAndCurrentVersionFromTuple(tuple)
-			if err != nil {
-				i.Logger.Errorf("Failed to fetch resource key and version: %v", err)
-				return "", err
-			}
+		// 	// Extract resource key and current version in a single DB call
+		// 	key, version, err := i.ResourceService.ResourceKeyAndCurrentVersionFromTuple(tuple)
+		// 	if err != nil {
+		// 		i.Logger.Errorf("Failed to fetch resource key and version: %v", err)
+		// 		return "", err
+		// 	}
 
-			// Calculate tuples for create and delete
-			createFilter, deleteFilter := i.ResourceService.CalculateTuples(tuple, version, key)
+		// 	// Calculate tuples for create and delete
+		// 	createFilter, deleteFilter := i.ResourceService.CalculateTuples(tuple, version, key)
 
-			// 1) Delete old tuples first
-			if deleteFilter != nil {
-				i.Logger.Infof("deleting old tuples filter: %v", deleteFilter)
-				_, delErr := i.Retry(func() (string, error) {
-					return i.DeleteTuple(context.Background(), deleteFilter)
-				}, i.MetricsCollector.MsgProcessFailures)
-				if delErr != nil {
-					i.Logger.Errorf("failed to delete previous subject tuples (non-fatal): %v", delErr)
-				}
-			}
+		// 	// 1) Delete old tuples first
+		// 	if deleteFilter != nil {
+		// 		i.Logger.Infof("deleting old tuples filter: %v", deleteFilter)
+		// 		_, delErr := i.Retry(func() (string, error) {
+		// 			return i.DeleteTuple(context.Background(), deleteFilter)
+		// 		}, i.MetricsCollector.MsgProcessFailures)
+		// 		if delErr != nil {
+		// 			i.Logger.Errorf("failed to delete previous subject tuples (non-fatal): %v", delErr)
+		// 		}
+		// 	}
 
-			// 2) Create new tuple using the original tuple
-			if createFilter != nil {
-				i.Logger.Infof("creating new tuple: %v", tuple)
-				resp, err := i.Retry(func() (string, error) {
-					return i.UpdateTuple(context.Background(), tuple)
-				}, i.MetricsCollector.MsgProcessFailures)
-				if err != nil {
-					metricscollector.Incr(i.MetricsCollector.MsgProcessFailures, "UpdateTuple", err)
-					i.Logger.Errorf("failed to update tuple: %v", err)
-					return "", err
-				}
-				return resp, nil
-			}
+		// 	// 2) Create new tuple using the original tuple
+		// 	if createFilter != nil {
+		// 		i.Logger.Infof("creating new tuple: %v", tuple)
+		// 		resp, err := i.Retry(func() (string, error) {
+		// 			return i.UpdateTuple(context.Background(), tuple)
+		// 		}, i.MetricsCollector.MsgProcessFailures)
+		// 		if err != nil {
+		// 			metricscollector.Incr(i.MetricsCollector.MsgProcessFailures, "UpdateTuple", err)
+		// 			i.Logger.Errorf("failed to update tuple: %v", err)
+		// 			return "", err
+		// 		}
+		// 		return resp, nil
+		// 	}
 
-			return "", nil
-		}
+		// 	return "", nil
+		// }
 	case string(model_legacy.OperationTypeDeleted):
 		i.Logger.Infof("processing message: operation=%s, txid=%s", operation, txid)
 		i.Logger.Debugf("processed message tuple=%s", msg.Value)

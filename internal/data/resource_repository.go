@@ -6,11 +6,11 @@ import (
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
+	"github.com/project-kessel/inventory-api/internal"
 	bizmodel "github.com/project-kessel/inventory-api/internal/biz/model"
 	"github.com/project-kessel/inventory-api/internal/biz/model_legacy"
 	"github.com/project-kessel/inventory-api/internal/biz/usecase"
 	datamodel "github.com/project-kessel/inventory-api/internal/data/model"
-	"github.com/project-kessel/inventory-api/internal"
 )
 
 type FindResourceByKeysResult struct {
@@ -87,7 +87,7 @@ type ResourceRepository interface {
 	NextReporterResourceId() (bizmodel.ReporterResourceId, error)
 	Save(tx *gorm.DB, resource bizmodel.Resource, operationType model_legacy.EventOperationType, txid string) error
 	FindResourceByKeys(tx *gorm.DB, key bizmodel.ReporterResourceKey) (*bizmodel.Resource, error)
-	FindCommonRepresentationsByVersion(tx *gorm.DB, key bizmodel.ReporterResourceKey, currentVersion, previousVersion uint) ([]CommonRepresentationsByVersion, error)
+	FindCommonRepresentationsByVersion(tx *gorm.DB, key bizmodel.ReporterResourceKey, currentVersion uint) ([]CommonRepresentationsByVersion, error)
 	GetDB() *gorm.DB
 	GetTransactionManager() usecase.TransactionManager
 }
@@ -241,7 +241,15 @@ func (r *resourceRepository) FindResourceByKeys(tx *gorm.DB, key bizmodel.Report
 	return resource, nil
 }
 
-func (r *resourceRepository) FindCommonRepresentationsByVersion(tx *gorm.DB, key bizmodel.ReporterResourceKey, currentVersion, previousVersion uint) ([]CommonRepresentationsByVersion, error) {
+func (r *resourceRepository) GetDB() *gorm.DB {
+	return r.db
+}
+
+func (r *resourceRepository) GetTransactionManager() usecase.TransactionManager {
+	return r.transactionManager
+}
+
+func (r *resourceRepository) FindCommonRepresentationsByVersion(tx *gorm.DB, key bizmodel.ReporterResourceKey, currentVersion uint) ([]CommonRepresentationsByVersion, error) {
 	var results []CommonRepresentationsByVersion
 
 	// Use provided transaction or fall back to regular DB session
@@ -257,7 +265,7 @@ func (r *resourceRepository) FindCommonRepresentationsByVersion(tx *gorm.DB, key
 		Where("LOWER(rr.resource_type) = LOWER(?)", key.ResourceType().Serialize()).
 		Where("LOWER(rr.reporter_type) = LOWER(?)", key.ReporterType().Serialize()).
 		Where("rr.tombstone = ?", false).
-		Where("(cr.version = ? OR cr.version = ?)", currentVersion, previousVersion)
+		Where("(cr.version = ? OR cr.version = ?)", currentVersion, currentVersion-1)
 
 	// Only add reporter_instance_id condition if it's not empty
 	if reporterInstanceId := key.ReporterInstanceId().Serialize(); reporterInstanceId != "" {
@@ -272,10 +280,53 @@ func (r *resourceRepository) FindCommonRepresentationsByVersion(tx *gorm.DB, key
 	return results, nil
 }
 
-func (r *resourceRepository) GetDB() *gorm.DB {
-	return r.db
-}
+// ResourceKeyAndCurrentVersionFromTuple combines fetching the reporter resource key and
+// the latest version in a single DB round trip using a scalar subselect.
+func (r *resourceRepository) ResourceKeyAndCurrentVersionFromTuple(tx *gorm.DB, tuple *bizmodel.TupleEvent) (bizmodel.ReporterResourceKey, bizmodel.Version, error) {
 
-func (r *resourceRepository) GetTransactionManager() usecase.TransactionManager {
-	return r.transactionManager
+	db := tx
+	if db == nil {
+		db = r.db.Session(&gorm.Session{})
+	}
+	// Extract resource information from tuple
+	resourceIdStr := tuple.ReporterResourceKey().LocalResourceId().String()
+	resourceTypeStr := tuple.ReporterResourceKey().ResourceType()
+
+	// Convert string to UUID for ResourceId
+	resourceId, err := uuid.Parse(resourceIdStr)
+	if err != nil {
+		return bizmodel.ReporterResourceKey{}, 0, fmt.Errorf("failed to parse resource ID '%s' as UUID: %w", resourceIdStr, err)
+	}
+
+	// Single query to get reporter resource identity and its latest version
+	var row struct {
+		LocalResourceID    string `gorm:"column:local_resource_id"`
+		ResourceType       string `gorm:"column:resource_type"`
+		ReporterType       string `gorm:"column:reporter_type"`
+		ReporterInstanceID string `gorm:"column:reporter_instance_id"`
+		Version            uint   `gorm:"column:version"`
+	}
+
+	err = db.Table("reporter_resources rr").
+		Select(`rr.local_resource_id, rr.resource_type, rr.reporter_type, rr.reporter_instance_id,
+				(SELECT rr2.version FROM reporter_representations rr2
+				WHERE rr2.reporter_resource_id = rr.id
+				ORDER BY rr2.version DESC LIMIT 1) AS version`).
+		Where("rr.local_resource_id = ? AND rr.resource_type = ?", resourceId, resourceTypeStr).
+		Take(&row).Error
+	if err != nil {
+		return bizmodel.ReporterResourceKey{}, 0, fmt.Errorf("failed to fetch reporter resource and version: %w", err)
+	}
+
+	key, err := bizmodel.NewReporterResourceKey(
+		bizmodel.LocalResourceId(row.LocalResourceID),
+		bizmodel.ResourceType(row.ResourceType),
+		bizmodel.ReporterType(row.ReporterType),
+		bizmodel.ReporterInstanceId(row.ReporterInstanceID),
+	)
+	if err != nil {
+		return bizmodel.ReporterResourceKey{}, 0, fmt.Errorf("failed to create ReporterResourceKey: %w", err)
+	}
+
+	return key, bizmodel.Version(row.Version), nil
 }

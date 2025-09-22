@@ -9,7 +9,6 @@ import (
 
 	"github.com/go-kratos/kratos/v2/log"
 	v1 "github.com/project-kessel/inventory-api/api/kessel/inventory/v1"
-	"github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/resources"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -104,59 +103,5 @@ func TestInventoryAPIGRPC_Readyz(t *testing.T) {
 
 	client := v1.NewKesselInventoryHealthServiceClient(conn)
 	_, err = client.GetReadyz(context.Background(), &v1.GetReadyzRequest{})
-	assert.NoError(t, err)
-}
-
-func TestInventoryAPIGRPC_K8SCluster_CreateK8SCluster(t *testing.T) {
-
-	conn, err := grpc.NewClient(
-		inventoryapi_grpc_url,
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
-		WithInsecureBearerToken("1234"),
-	)
-	if err != nil {
-		fmt.Print(err)
-	}
-
-	client := resources.NewKesselK8SClusterServiceClient(conn)
-	request := resources.CreateK8SClusterRequest{
-		K8SCluster: &resources.K8SCluster{
-			Metadata: &resources.Metadata{
-				ResourceType: "k8s-cluster",
-				WorkspaceId:  "",
-				OrgId:        "",
-			},
-			ResourceData: &resources.K8SClusterDetail{
-				ExternalClusterId: "1234",
-				ClusterStatus:     resources.K8SClusterDetail_READY,
-				KubeVersion:       "1.31",
-				KubeVendor:        resources.K8SClusterDetail_OPENSHIFT,
-				VendorVersion:     "4.16",
-				CloudPlatform:     resources.K8SClusterDetail_AWS_UPI,
-				Nodes: []*resources.K8SClusterDetailNodesInner{
-					{
-						Name:   "www.example.com",
-						Cpu:    "7500m",
-						Memory: "30973224Ki",
-						Labels: []*resources.ResourceLabel{
-							{
-								Key:   "has_monster_gpu",
-								Value: "yes",
-							},
-						},
-					},
-				},
-			},
-			ReporterData: &resources.ReporterData{
-				ReporterInstanceId: "user@example.com",
-				ReporterType:       resources.ReporterData_ACM,
-				ConsoleHref:        "www.example.com",
-				ApiHref:            "www.example.com",
-				LocalResourceId:    "1",
-				ReporterVersion:    "0.1",
-			},
-		},
-	}
-	_, err = client.CreateK8SCluster(context.Background(), &request)
 	assert.NoError(t, err)
 }

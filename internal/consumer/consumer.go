@@ -529,8 +529,6 @@ func (i *InventoryConsumer) DeleteTuple(ctx context.Context, filter *v1beta1.Rel
 // UpdateConsistencyToken updates the resource in the inventory DB to add the consistency token
 func (i *InventoryConsumer) UpdateConsistencyToken(resourceId, token string) error {
 	// this will update all records for the same inventory_id with current consistency token
-	//TODO: Doing both updates for now to keep backward compatibility
-	i.DB.Model(model_legacy.Resource{}).Where("inventory_id = ?", resourceId).Update("consistency_token", token)
 	i.DB.Model(datamodel.Resource{}).Where("id = ?", resourceId).Update("ktn", token)
 	return nil
 }

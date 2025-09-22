@@ -868,7 +868,7 @@ func (uc *Usecase) CalculateTuples(tupleEvent model.TupleEvent) (model.TuplesToR
 	currentVersion := tupleEvent.Version().Uint()
 	key := tupleEvent.ReporterResourceKey()
 
-	uc.Log.Infof("CalculateTuplesv2 called - version: %d, key: %+v", currentVersion, key)
+	uc.Log.Infof("CalculateTuples called - version: %d, key: %+v", currentVersion, key)
 
 	var currentWorkspaceID, previousWorkspaceID string
 

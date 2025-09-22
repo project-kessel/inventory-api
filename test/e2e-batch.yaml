@@ -23,6 +23,8 @@ spec:
               value: "5433"
             - name: POSTGRES_DB
               value: "spicedb"
+            - name: KAFKA_BOOTSTRAP_SERVERS
+              value: "my-cluster-kafka-bootstrap.default.svc.cluster.local:9092"
             - name: GOMAXPROCS
               value: "1"
       restartPolicy: Never

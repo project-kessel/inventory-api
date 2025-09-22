@@ -23,7 +23,7 @@ require (
 	github.com/redhatinsights/app-common-go v1.6.8
 	github.com/sony/gobreaker v1.0.0
 	github.com/spf13/cobra v1.10.1
-	github.com/spf13/pflag v1.0.9
+	github.com/spf13/pflag v1.0.10
 	github.com/spf13/viper v1.20.1
 	github.com/stretchr/testify v1.11.1
 	github.com/xeipuuv/gojsonschema v1.2.0

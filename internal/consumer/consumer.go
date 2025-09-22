@@ -10,6 +10,7 @@ import (
 	"os/signal"
 	"slices"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -71,24 +72,35 @@ type InventoryConsumer struct {
 	AuthOptions      *auth.Options
 	RetryOptions     *retry.Options
 	Notifier         pubsub.Notifier
+	// offsetMutex protects OffsetStorage and coordinates offset commit operations
+	// to prevent race conditions between shutdown and rebalance callbacks
+	offsetMutex sync.Mutex
+	// shutdownInProgress indicates if shutdown is currently in progress
+	// to coordinate with rebalance callback
+	shutdownInProgress bool
 
 	lockToken string
 	lockId    string
 }
 
 // New instantiates a new InventoryConsumer
-func New(config CompletedConfig, db *gorm.DB, authz authz.CompletedConfig, authorizer api.Authorizer, notifier pubsub.Notifier, logger *log.Helper) (InventoryConsumer, error) {
-	logger.Info("Setting up kafka consumer")
-	logger.Debugf("completed kafka config: %+v", config.KafkaConfig)
-	consumer, err := kafka.NewConsumer(config.KafkaConfig)
-	if err != nil {
-		logger.Errorf("error creating kafka consumer: %v", err)
-		return InventoryConsumer{}, err
+func New(config CompletedConfig, db *gorm.DB, authz authz.CompletedConfig, authorizer api.Authorizer, notifier pubsub.Notifier, logger *log.Helper, consumer Consumer) (InventoryConsumer, error) {
+	if consumer == nil {
+		logger.Info("Setting up kafka consumer")
+		logger.Debugf("completed kafka config: %+v", config.KafkaConfig)
+		kafkaConsumer, err := kafka.NewConsumer(config.KafkaConfig)
+		if err != nil {
+			logger.Errorf("error creating kafka consumer: %v", err)
+			return InventoryConsumer{}, err
+		}
+		consumer = kafkaConsumer
+	} else {
+		logger.Info("Setting up kafka consumer with provided consumer")
 	}
 
 	var mc metricscollector.MetricsCollector
 	meter := otel.Meter("github.com/project-kessel/inventory-api/blob/main/internal/server/otel")
-	err = mc.New(meter)
+	err := mc.New(meter)
 	if err != nil {
 		logger.Errorf("error creating metrics collector: %v", err)
 		return InventoryConsumer{}, err
@@ -113,18 +125,20 @@ func New(config CompletedConfig, db *gorm.DB, authz authz.CompletedConfig, autho
 	var errChan chan error
 
 	return InventoryConsumer{
-		Consumer:         consumer,
-		OffsetStorage:    make([]kafka.TopicPartition, 0),
-		Config:           config,
-		DB:               db,
-		AuthzConfig:      authz,
-		Authorizer:       authorizer,
-		Errors:           errChan,
-		MetricsCollector: &mc,
-		Logger:           logger,
-		AuthOptions:      authnOptions,
-		RetryOptions:     retryOptions,
-		Notifier:         notifier,
+		Consumer:           consumer,
+		OffsetStorage:      make([]kafka.TopicPartition, 0),
+		Config:             config,
+		DB:                 db,
+		AuthzConfig:        authz,
+		Authorizer:         authorizer,
+		Errors:             errChan,
+		MetricsCollector:   &mc,
+		Logger:             logger,
+		AuthOptions:        authnOptions,
+		RetryOptions:       retryOptions,
+		Notifier:           notifier,
+		offsetMutex:        sync.Mutex{},
+		shutdownInProgress: false,
 	}, nil
 }
 
@@ -227,8 +241,11 @@ func (i *InventoryConsumer) Consume() error {
 				}
 
 				// store the current offset to be later batch committed
+				i.offsetMutex.Lock()
 				i.OffsetStorage = append(i.OffsetStorage, e.TopicPartition)
-				if checkIfCommit(e.TopicPartition) {
+				shouldCommit := checkIfCommit(e.TopicPartition)
+				i.offsetMutex.Unlock()
+				if shouldCommit {
 					err := i.commitStoredOffsets()
 					if err != nil {
 						metricscollector.Incr(i.MetricsCollector.ConsumerErrors, "commitStoredOffsets", err)
@@ -438,13 +455,39 @@ func formatOffsets(offsets []kafka.TopicPartition) string {
 
 // commitStoredOffsets commits offsets for all processed messages since last offset commit
 func (i *InventoryConsumer) commitStoredOffsets() error {
-	committed, err := i.Consumer.CommitOffsets(i.OffsetStorage)
-	if err != nil {
-		return err
+	i.offsetMutex.Lock()
+
+	// If there are no offsets to commit, return early
+	if len(i.OffsetStorage) == 0 {
+		i.offsetMutex.Unlock()
+		return nil
 	}
 
-	i.Logger.Infof("offsets committed ([partition:offset]): %s", formatOffsets(committed))
+	// Create a copy of offsets to commit to avoid holding the lock during the commit operation
+	offsetsToCommit := make([]kafka.TopicPartition, len(i.OffsetStorage))
+	copy(offsetsToCommit, i.OffsetStorage)
+
+	// Clear the storage before releasing the lock to prevent double commits
 	i.OffsetStorage = nil
+
+	// Release the lock before the potentially blocking commit operation
+	i.offsetMutex.Unlock()
+
+	committed, err := i.Consumer.CommitOffsets(offsetsToCommit)
+	if err != nil {
+		// Re-acquire lock to restore offsets on failure
+		i.offsetMutex.Lock()
+		// Only restore if storage is still empty (no new offsets added during commit)
+		if len(i.OffsetStorage) == 0 {
+			i.OffsetStorage = offsetsToCommit
+		} else {
+			// Merge the failed offsets back with any new ones
+			i.OffsetStorage = append(offsetsToCommit, i.OffsetStorage...)
+		}
+		i.offsetMutex.Unlock()
+		return err
+	}
+	i.Logger.Infof("offsets committed ([partition:offset]): %s", formatOffsets(committed))
 	return nil
 }
 
@@ -544,7 +587,15 @@ func (i *InventoryConsumer) Errs() <-chan error {
 func (i *InventoryConsumer) Shutdown() error {
 	if !i.Consumer.IsClosed() {
 		i.Logger.Info("shutting down consumer...")
-		if len(i.OffsetStorage) > 0 {
+
+		// Set shutdown flag to coordinate with rebalance callback
+		i.offsetMutex.Lock()
+		i.shutdownInProgress = true
+		hasOffsets := len(i.OffsetStorage) > 0
+		i.offsetMutex.Unlock()
+
+		// Commit any remaining offsets before closing
+		if hasOffsets {
 			err := i.commitStoredOffsets()
 			if err != nil {
 				i.Logger.Errorf("failed to commit offsets before shutting down: %v", err)
@@ -620,6 +671,26 @@ func (i *InventoryConsumer) RebalanceCallback(consumer *kafka.Consumer, event ka
 		i.Logger.Warnf("consumer rebalance event: %d partition(s) revoked: %v\n",
 			len(ev.Partitions), ev.Partitions)
 
+		// Check if shutdown is already in progress to avoid double commits
+		i.offsetMutex.Lock()
+		shutdownInProgress := i.shutdownInProgress
+		hasOffsets := len(i.OffsetStorage) > 0
+		i.offsetMutex.Unlock()
+
+		if shutdownInProgress {
+			i.Logger.Info("shutdown in progress, skipping rebalance offset commit")
+			i.lockToken = ""
+			i.lockId = ""
+			return nil
+		}
+
+		if !hasOffsets {
+			i.Logger.Debug("no offsets to commit during rebalance")
+			i.lockToken = ""
+			i.lockId = ""
+			return nil
+		}
+
 		if i.Consumer.AssignmentLost() {
 			i.Logger.Warn("Assignment lost involuntarily, commit may fail")
 		}
@@ -629,7 +700,7 @@ func (i *InventoryConsumer) RebalanceCallback(consumer *kafka.Consumer, event ka
 		i.lockToken = ""
 		i.lockId = ""
 		if err != nil {
-			i.Logger.Errorf("failed to commit offsets: %v", err)
+			i.Logger.Errorf("failed to commit offsets during rebalance: %v", err)
 			return err
 		}
 

@@ -10,10 +10,22 @@ spec:
           image: localhost/inventory-e2e-tests:latest
           env:
             - name: INV_HTTP_URL
-              value: "inventory.multicluster-global-hub.svc.cluster.local:8081"
+              value: "kessel-inventory-service.default.svc.cluster.local:8081"
             - name: INV_GRPC_URL
-              value: "inventory.multicluster-global-hub.svc.cluster.local:9081"
+              value: "kessel-inventory-service.default.svc.cluster.local:9081"
+            - name: POSTGRES_USER
+              value: "postgres"
+            - name: POSTGRES_PASSWORD
+              value: "yPsw5e6ab4bvAGe5H"
+            - name: POSTGRES_HOST
+              value: "invdatabase.default.svc.cluster.local"
+            - name: POSTGRES_PORT
+              value: "5433"
+            - name: POSTGRES_DB
+              value: "spicedb"
             - name: KAFKA_BOOTSTRAP_SERVERS
-              value: "kafka-kafka-bootstrap.multicluster-global-hub:9092"
+              value: "my-cluster-kafka-bootstrap.default.svc.cluster.local:9092"
+            - name: GOMAXPROCS
+              value: "1"
       restartPolicy: Never
   backoffLimit: 1

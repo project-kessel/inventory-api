@@ -28,4 +28,4 @@ COPY --from=builder /workspace/e2e-inventory-tests /usr/local/bin/
 USER 1001
 ENV PATH="$PATH:/usr/local/bin"
  # Run the e2e tests
-CMD ["./usr/local/bin/e2e-inventory-tests", "-test.v"]
+CMD ["./usr/local/bin/e2e-inventory-tests", "-test.v", "-test.parallel=1"]

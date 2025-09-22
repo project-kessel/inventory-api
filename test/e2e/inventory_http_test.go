@@ -107,14 +107,24 @@ func TestMain(m *testing.M) {
 	db, err = gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	if err != nil {
 		log.Errorf("failed to connect to database: %v", err)
+	} else {
+		// Clean up test data before running tests
+		cleanupTestData()
 	}
 
 	result := m.Run()
 	os.Exit(result)
 }
+
+func cleanupTestData() {
+	if db != nil {
+		// Clean up test data to avoid conflicts
+		db.Exec("TRUNCATE TABLE reporter_representations, common_representations, reporter_resources, resource, outbox_events CASCADE")
+	}
+}
+
 func TestInventoryAPIHTTP_Livez(t *testing.T) {
 	enableShortMode(t)
-	t.Parallel()
 	httpClient, err := http.NewClient(
 		context.Background(),
 		http.WithEndpoint(inventoryapi_http_url),
@@ -133,7 +143,6 @@ func TestInventoryAPIHTTP_Livez(t *testing.T) {
 }
 func TestInventoryAPIHTTP_Readyz(t *testing.T) {
 	enableShortMode(t)
-	t.Parallel()
 	httpClient, err := http.NewClient(
 		context.Background(),
 		http.WithEndpoint(inventoryapi_http_url),

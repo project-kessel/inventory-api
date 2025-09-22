@@ -80,7 +80,6 @@ func waitForServiceToBeReady() error {
 }
 
 func TestInventoryAPIGRPC_livez(t *testing.T) {
-	t.Parallel()
 	conn, err := grpc.NewClient(
 		inventoryapi_grpc_url,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
@@ -95,7 +94,6 @@ func TestInventoryAPIGRPC_livez(t *testing.T) {
 }
 
 func TestInventoryAPIGRPC_Readyz(t *testing.T) {
-	t.Parallel()
 	conn, err := grpc.NewClient(
 		inventoryapi_grpc_url,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
@@ -110,7 +108,6 @@ func TestInventoryAPIGRPC_Readyz(t *testing.T) {
 }
 
 func TestInventoryAPIGRPC_K8SCluster_CreateK8SCluster(t *testing.T) {
-	t.Parallel()
 
 	conn, err := grpc.NewClient(
 		inventoryapi_grpc_url,

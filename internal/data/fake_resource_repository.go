@@ -16,6 +16,9 @@ import (
 type fakeResourceRepository struct {
 	mu        sync.RWMutex
 	resources map[string]*storedResource
+	// Optional test overrides for workspace IDs returned by FindCommonRepresentationsByVersion
+	overrideCurrent  string
+	overridePrevious string
 }
 
 type storedResource struct {
@@ -34,6 +37,16 @@ type storedResource struct {
 func NewFakeResourceRepository() ResourceRepository {
 	return &fakeResourceRepository{
 		resources: make(map[string]*storedResource),
+	}
+}
+
+// NewFakeResourceRepositoryWithWorkspaceOverrides allows tests to control the
+// workspace IDs returned for current and previous versions.
+func NewFakeResourceRepositoryWithWorkspaceOverrides(current, previous string) ResourceRepository {
+	return &fakeResourceRepository{
+		resources:        make(map[string]*storedResource),
+		overrideCurrent:  current,
+		overridePrevious: previous,
 	}
 }
 
@@ -131,6 +144,21 @@ func (f *fakeResourceRepository) FindCommonRepresentationsByVersion(tx *gorm.DB,
 	// This is a fake implementation for testing
 	// In a real test, you would mock this based on your test data needs
 	var results []CommonRepresentationsByVersion
+
+	// Prefer explicit overrides when provided by tests
+	if f.overrideCurrent != "" {
+		results = append(results, CommonRepresentationsByVersion{
+			Data:    map[string]interface{}{"workspace_id": f.overrideCurrent},
+			Version: currentVersion,
+		})
+		if f.overridePrevious != "" && currentVersion > 0 {
+			results = append(results, CommonRepresentationsByVersion{
+				Data:    map[string]interface{}{"workspace_id": f.overridePrevious},
+				Version: currentVersion - 1,
+			})
+		}
+		return results, nil
+	}
 
 	// For testing purposes, we'll return mock data based on the version
 	// In a real implementation, this would query the database for common_representations

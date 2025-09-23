@@ -15,7 +15,6 @@ import (
 	"github.com/project-kessel/inventory-api/internal/authz/allow"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
 	"github.com/project-kessel/inventory-api/internal/data"
-	"github.com/project-kessel/inventory-api/internal/mocks"
 )
 
 func TestReportResource(t *testing.T) {
@@ -379,7 +378,7 @@ func createTestReportRequestWithUpdatedData(t *testing.T, resourceType, reporter
 	}
 }
 
-func TestCalculateTuplesV2(t *testing.T) {
+func TestCalculateTuples(t *testing.T) {
 	tests := []struct {
 		name                   string
 		version                uint
@@ -415,6 +414,19 @@ func TestCalculateTuplesV2(t *testing.T) {
 			expectedDeleteSubject:  "rbac:workspace:workspace-old",
 		},
 		{
+			name:                   "workspace change creates and deletes tuples version 1",
+			version:                1,
+			currentWorkspaceID:     "workspace-new",
+			previousWorkspaceID:    "workspace-old",
+			expectTuplesToCreate:   true,
+			expectTuplesToDelete:   true,
+			expectedCreateResource: "host:test-resource",
+			expectedDeleteResource: "host:test-resource",
+			expectedCreateSubject:  "rbac:workspace:workspace-new",
+			expectedDeleteSubject:  "rbac:workspace:workspace-old",
+		},
+
+		{
 			name:                   "same workspace creates only",
 			version:                2,
 			currentWorkspaceID:     "workspace-same",
@@ -424,25 +436,16 @@ func TestCalculateTuplesV2(t *testing.T) {
 			expectedCreateResource: "host:test-resource",
 			expectedCreateSubject:  "rbac:workspace:workspace-same",
 		},
-		{
-			name:                   "new workspace with no previous",
-			version:                1,
-			currentWorkspaceID:     "workspace-new",
-			previousWorkspaceID:    "",
-			expectTuplesToCreate:   true,
-			expectTuplesToDelete:   false,
-			expectedCreateResource: "host:test-resource",
-			expectedCreateSubject:  "rbac:workspace:workspace-new",
-		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Create a mock repository with custom FindCommonRepresentationsByVersion
-			repo := &mocks.MockResourceRepository{
-				CurrentWorkspaceID:  tt.currentWorkspaceID,
-				PreviousWorkspaceID: tt.previousWorkspaceID,
-			}
+			// Use a fake repository with workspace overrides aligned to test case expectations
+			repo := data.NewFakeResourceRepositoryWithWorkspaceOverrides(tt.currentWorkspaceID, tt.previousWorkspaceID)
+			// Seed fake repo behavior for workspace IDs via current version and previous version
+			// The CalculateTuples tests rely on FindCommonRepresentationsByVersion returning
+			// entries for current and (optionally) previous. The fake repo synthesizes data based
+			// on version values, so we don't need to wire specific state here beyond calling the usecase.
 
 			// Create usecase with mock repo
 			uc := &Usecase{
@@ -464,7 +467,7 @@ func TestCalculateTuplesV2(t *testing.T) {
 			require.NoError(t, err)
 
 			// Call CalculateTuplesv2
-			result, err := uc.CalculateTuplesv2(tupleEvent)
+			result, err := uc.CalculateTuples(tupleEvent)
 			require.NoError(t, err)
 
 			// Verify expectations

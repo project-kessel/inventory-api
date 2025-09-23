@@ -32,6 +32,23 @@ type CommonRepresentationsByVersion struct {
 	Version uint                `gorm:"column:version"`
 }
 
+// RepresentationKind classifies the origin of a versioned representation.
+// Today we only materialize common representations here, but this type keeps
+// the data model future-proof if reporter representations are added later.
+type RepresentationKind string
+
+const (
+	RepresentationKindCommon   RepresentationKind = "common"
+	RepresentationKindReporter RepresentationKind = "reporter"
+)
+
+// VersionedRepresentation captures representation data along with its version and origin kind.
+type VersionedRepresentation struct {
+	Data    internal.JsonObject `gorm:"column:data"`
+	Version uint                `gorm:"column:version"`
+	Kind    RepresentationKind  `gorm:"-"`
+}
+
 func ToSnapshotsFromResults(results []FindResourceByKeysResult) (*bizmodel.ResourceSnapshot, []bizmodel.ReporterResourceSnapshot) {
 	if len(results) == 0 {
 		return nil, nil
@@ -87,7 +104,7 @@ type ResourceRepository interface {
 	NextReporterResourceId() (bizmodel.ReporterResourceId, error)
 	Save(tx *gorm.DB, resource bizmodel.Resource, operationType model_legacy.EventOperationType, txid string) error
 	FindResourceByKeys(tx *gorm.DB, key bizmodel.ReporterResourceKey) (*bizmodel.Resource, error)
-	FindCommonRepresentationsByVersion(tx *gorm.DB, key bizmodel.ReporterResourceKey, currentVersion uint) ([]CommonRepresentationsByVersion, error)
+	FindVersionedRepresentationsByVersion(tx *gorm.DB, key bizmodel.ReporterResourceKey, currentVersion uint) ([]VersionedRepresentation, error)
 	GetDB() *gorm.DB
 	GetTransactionManager() usecase.TransactionManager
 }
@@ -249,8 +266,8 @@ func (r *resourceRepository) GetTransactionManager() usecase.TransactionManager 
 	return r.transactionManager
 }
 
-func (r *resourceRepository) FindCommonRepresentationsByVersion(tx *gorm.DB, key bizmodel.ReporterResourceKey, currentVersion uint) ([]CommonRepresentationsByVersion, error) {
-	var results []CommonRepresentationsByVersion
+func (r *resourceRepository) FindVersionedRepresentationsByVersion(tx *gorm.DB, key bizmodel.ReporterResourceKey, currentVersion uint) ([]VersionedRepresentation, error) {
+	var results []VersionedRepresentation
 
 	// Use provided transaction or fall back to regular DB session
 	db := tx

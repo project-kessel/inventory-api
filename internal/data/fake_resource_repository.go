@@ -140,22 +140,16 @@ func (f *fakeResourceRepository) FindResourceByKeys(tx *gorm.DB, key bizmodel.Re
 	return nil, gorm.ErrRecordNotFound
 }
 
-func (f *fakeResourceRepository) FindCommonRepresentationsByVersion(tx *gorm.DB, key bizmodel.ReporterResourceKey, currentVersion uint) ([]CommonRepresentationsByVersion, error) {
+func (f *fakeResourceRepository) FindVersionedRepresentationsByVersion(tx *gorm.DB, key bizmodel.ReporterResourceKey, currentVersion uint) ([]VersionedRepresentation, error) {
 	// This is a fake implementation for testing
 	// In a real test, you would mock this based on your test data needs
-	var results []CommonRepresentationsByVersion
+	var results []VersionedRepresentation
 
 	// Prefer explicit overrides when provided by tests
 	if f.overrideCurrent != "" {
-		results = append(results, CommonRepresentationsByVersion{
-			Data:    map[string]interface{}{"workspace_id": f.overrideCurrent},
-			Version: currentVersion,
-		})
+		results = append(results, VersionedRepresentation{Data: map[string]interface{}{"workspace_id": f.overrideCurrent}, Version: currentVersion, Kind: RepresentationKindCommon})
 		if f.overridePrevious != "" && currentVersion > 0 {
-			results = append(results, CommonRepresentationsByVersion{
-				Data:    map[string]interface{}{"workspace_id": f.overridePrevious},
-				Version: currentVersion - 1,
-			})
+			results = append(results, VersionedRepresentation{Data: map[string]interface{}{"workspace_id": f.overridePrevious}, Version: currentVersion - 1, Kind: RepresentationKindCommon})
 		}
 		return results, nil
 	}
@@ -166,44 +160,19 @@ func (f *fakeResourceRepository) FindCommonRepresentationsByVersion(tx *gorm.DB,
 	// Mock data for testing - you can customize this based on your test needs
 	if currentVersion == 0 {
 		// Version 0 - initial creation
-		results = append(results, CommonRepresentationsByVersion{
-			Data: map[string]interface{}{
-				"workspace_id": "test-workspace-initial",
-			},
-			Version: currentVersion,
-		})
+		results = append(results, VersionedRepresentation{Data: map[string]interface{}{"workspace_id": "test-workspace-initial"}, Version: currentVersion, Kind: RepresentationKindCommon})
 	} else if currentVersion == 1 {
 		// Version 1 - first update
-		results = append(results, CommonRepresentationsByVersion{
-			Data: map[string]interface{}{
-				"workspace_id": "test-workspace-v1",
-			},
-			Version: currentVersion,
-		})
+		results = append(results, VersionedRepresentation{Data: map[string]interface{}{"workspace_id": "test-workspace-v1"}, Version: currentVersion, Kind: RepresentationKindCommon})
 		// Also include previous (version 0) for contract parity with real repo
-		results = append(results, CommonRepresentationsByVersion{
-			Data: map[string]interface{}{
-				"workspace_id": "test-workspace-previous",
-			},
-			Version: 0,
-		})
+		results = append(results, VersionedRepresentation{Data: map[string]interface{}{"workspace_id": "test-workspace-previous"}, Version: 0, Kind: RepresentationKindCommon})
 	} else if currentVersion == 2 {
 		// Version 2 - workspace change scenario
-		results = append(results, CommonRepresentationsByVersion{
-			Data: map[string]interface{}{
-				"workspace_id": "test-workspace-v2",
-			},
-			Version: currentVersion,
-		})
+		results = append(results, VersionedRepresentation{Data: map[string]interface{}{"workspace_id": "test-workspace-v2"}, Version: currentVersion, Kind: RepresentationKindCommon})
 
 		// Add previous (current-1) version if requested
 		if currentVersion > 0 {
-			results = append(results, CommonRepresentationsByVersion{
-				Data: map[string]interface{}{
-					"workspace_id": "test-workspace-previous",
-				},
-				Version: currentVersion - 1,
-			})
+			results = append(results, VersionedRepresentation{Data: map[string]interface{}{"workspace_id": "test-workspace-previous"}, Version: currentVersion - 1, Kind: RepresentationKindCommon})
 		}
 	}
 

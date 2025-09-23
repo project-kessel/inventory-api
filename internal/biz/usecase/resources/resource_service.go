@@ -877,7 +877,7 @@ func (uc *Usecase) CalculateTuples(tupleEvent model.TupleEvent) (model.TuplesToR
 		uc.Log.Infof("CREATE scenario - version 0, processing initial tuple")
 
 		// For version 0, we only need the current version data
-		representations, err := uc.resourceRepository.FindCommonRepresentationsByVersion(
+		representations, err := uc.resourceRepository.FindVersionedRepresentationsByVersion(
 			nil, key, currentVersion,
 		)
 		if err != nil {
@@ -896,7 +896,7 @@ func (uc *Usecase) CalculateTuples(tupleEvent model.TupleEvent) (model.TuplesToR
 		uc.Log.Infof("Found workspace ID for version 0 - current: '%s'", currentWorkspaceID)
 	} else {
 		// Get common representations for both versions
-		representations, err := uc.resourceRepository.FindCommonRepresentationsByVersion(
+		representations, err := uc.resourceRepository.FindVersionedRepresentationsByVersion(
 			nil, key, currentVersion,
 		)
 		if err != nil {

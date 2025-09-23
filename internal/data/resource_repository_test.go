@@ -643,9 +643,9 @@ func TestResourceRepository_MultipleHostsLifecycle(t *testing.T) {
 	}
 }
 
-// Contract test for FindCommonRepresentationsByVersion following the same
+// Contract test for FindVersionedRepresentationsByVersion following the same
 // implementations pattern used elsewhere in this file.
-func TestFindCommonRepresentationsByVersion(t *testing.T) {
+func TestFindVersionedRepresentationsByVersion(t *testing.T) {
 	implementations := []struct {
 		name string
 		repo func() ResourceRepository
@@ -702,7 +702,7 @@ func TestFindCommonRepresentationsByVersion(t *testing.T) {
 			// Act: query for current (1) and previous (0)
 			key, err := bizmodel.NewReporterResourceKey("localResourceId-1", "host", "hbi", "hbi-instance-1")
 			require.NoError(t, err)
-			results, err := repo.FindCommonRepresentationsByVersion(db, key, 1)
+			results, err := repo.FindVersionedRepresentationsByVersion(db, key, 1)
 			require.NoError(t, err)
 
 			require.Len(t, results, 2)
@@ -907,10 +907,10 @@ func createTestResourceWithMixedCase(t *testing.T) bizmodel.Resource {
 	return resource
 }
 
-// Test FindCommonRepresentationsByVersion against the real repository.
+// Test FindVersionedRepresentationsByVersion against the real repository.
 // Seeds a resource, performs an update to bump common version, then queries
 // for current (v1) and previous (v0) versions in a single call.
-func TestFindCommonRepresentationsByVersion_RealRepo(t *testing.T) {
+func TestFindVersionedRepresentationsByVersion_RealRepo(t *testing.T) {
 	db := setupInMemoryDB(t)
 	tm := NewGormTransactionManager(3)
 	repo := NewResourceRepository(db, tm)
@@ -932,7 +932,7 @@ func TestFindCommonRepresentationsByVersion_RealRepo(t *testing.T) {
 	require.NoError(t, repo.Save(db, res, model_legacy.OperationTypeUpdated, "tx2"))
 
 	// Query for current v1 and previous v0
-	results, err := repo.FindCommonRepresentationsByVersion(db, key, 1)
+	results, err := repo.FindVersionedRepresentationsByVersion(db, key, 1)
 	require.NoError(t, err)
 	require.Len(t, results, 2)
 
@@ -954,7 +954,7 @@ func TestFindCommonRepresentationsByVersion_RealRepo(t *testing.T) {
 
 // When currentVersion is very large (no such versions exist), expect empty results.
 // Large version: with the fake repo, ensure the method treats N and N-1 (e.g., 9000 and 8999).
-func TestFindCommonRepresentationsByVersion_LargeVersion_UsesPreviousVersion(t *testing.T) {
+func TestFindVersionedRepresentationsByVersion_LargeVersion_UsesPreviousVersion(t *testing.T) {
 	repo := NewFakeResourceRepositoryWithWorkspaceOverrides("workspace2", "workspace1")
 	var db *gorm.DB // fake ignores db
 
@@ -962,7 +962,7 @@ func TestFindCommonRepresentationsByVersion_LargeVersion_UsesPreviousVersion(t *
 	require.NoError(t, err)
 
 	current := uint(9000)
-	results, qerr := repo.FindCommonRepresentationsByVersion(db, key, current)
+	results, qerr := repo.FindVersionedRepresentationsByVersion(db, key, current)
 	require.NoError(t, qerr)
 
 	// Expect two entries: current and previous
@@ -983,7 +983,7 @@ func TestFindCommonRepresentationsByVersion_LargeVersion_UsesPreviousVersion(t *
 }
 
 // Sad path: simulate a repository error by dropping a required table and running the query.
-func TestFindCommonRepresentationsByVersion_ErrorPath(t *testing.T) {
+func TestFindVersionedRepresentationsByVersion_ErrorPath(t *testing.T) {
 	db := setupInMemoryDB(t)
 	tm := NewGormTransactionManager(3)
 	repo := NewResourceRepository(db, tm)
@@ -998,12 +998,12 @@ func TestFindCommonRepresentationsByVersion_ErrorPath(t *testing.T) {
 	err = db.Migrator().DropTable(&datamodel.CommonRepresentation{})
 	require.NoError(t, err)
 
-	_, qerr := repo.FindCommonRepresentationsByVersion(db, key, 1)
+	_, qerr := repo.FindVersionedRepresentationsByVersion(db, key, 1)
 	require.Error(t, qerr)
 }
 
 // Version 0: expect only the current (v0) common representation and no previous.
-func TestFindCommonRepresentationsByVersion_VersionZero(t *testing.T) {
+func TestFindVersionedRepresentationsByVersion_VersionZero(t *testing.T) {
 	implementations := []struct {
 		name string
 		repo func() ResourceRepository
@@ -1049,7 +1049,7 @@ func TestFindCommonRepresentationsByVersion_VersionZero(t *testing.T) {
 			key, err := bizmodel.NewReporterResourceKey("localResourceId-1", "host", "hbi", "hbi-instance-1")
 			require.NoError(t, err)
 
-			results, qerr := repo.FindCommonRepresentationsByVersion(db, key, 0)
+			results, qerr := repo.FindVersionedRepresentationsByVersion(db, key, 0)
 			require.NoError(t, qerr)
 			require.Len(t, results, 1)
 			assert.Equal(t, uint(0), results[0].Version)

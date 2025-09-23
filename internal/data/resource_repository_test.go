@@ -643,9 +643,7 @@ func TestResourceRepository_MultipleHostsLifecycle(t *testing.T) {
 	}
 }
 
-// Contract test for FindVersionedRepresentationsByVersion following the same
-// implementations pattern used elsewhere in this file.
-func TestFindVersionedRepresentationsByVersion(t *testing.T) {
+func TestResourceRepository_PartialDataScenarios(t *testing.T) {
 	implementations := []struct {
 		name string
 		repo func() ResourceRepository
@@ -658,70 +656,124 @@ func TestFindVersionedRepresentationsByVersion(t *testing.T) {
 				tm := NewGormTransactionManager(3)
 				return NewResourceRepository(db, tm)
 			},
-			db: func() *gorm.DB { return setupInMemoryDB(t) },
+			db: func() *gorm.DB {
+				return setupInMemoryDB(t)
+			},
 		},
 		{
 			name: "Fake Repository",
-			repo: func() ResourceRepository { return NewFakeResourceRepository() },
-			db:   func() *gorm.DB { return nil },
+			repo: func() ResourceRepository {
+				return NewFakeResourceRepository()
+			},
+			db: func() *gorm.DB {
+				return nil
+			},
 		},
 	}
 
 	for _, impl := range implementations {
 		t.Run(impl.name, func(t *testing.T) {
-			// Helper to get fresh instances
-			getFresh := func() (ResourceRepository, *gorm.DB) {
+			getFreshInstances := func() (ResourceRepository, *gorm.DB) {
 				if impl.name == "Fake Repository" {
 					return impl.repo(), impl.db()
 				}
 				db := setupInMemoryDB(t)
 				tm := NewGormTransactionManager(3)
-				return NewResourceRepository(db, tm), db
+				repo := NewResourceRepository(db, tm)
+				return repo, db
 			}
 
-			repo, db := getFresh()
+			t.Run("Report resource with just reporter data and no common data", func(t *testing.T) {
+				repo, db := getFreshInstances()
 
-			// Seed: create resource (v0)
-			res := createTestResourceWithLocalIdAndType(t, "localResourceId-1", "host")
-			_ = db // fake ignores db
-			if impl.name != "Fake Repository" {
-				require.NoError(t, repo.Save(db, res, model_legacy.OperationTypeCreated, "tx1"))
+				resource := createTestResourceWithReporterDataOnly(t, "reporter-only-resource")
+				err := repo.Save(db, resource, model_legacy.OperationTypeCreated, "tx-reporter-only")
+				require.NoError(t, err, "Should save resource with only reporter data")
 
-				// Update to bump common version to v1 with workspace_id workspace2
-				key, err := bizmodel.NewReporterResourceKey("localResourceId-1", "host", "hbi", "hbi-instance-1")
+				key, err := bizmodel.NewReporterResourceKey("reporter-only-resource", "k8s_cluster", "ocm", "ocm-instance-1")
 				require.NoError(t, err)
-				updatedCommon, err := bizmodel.NewRepresentation(map[string]interface{}{"workspace_id": "workspace2"})
-				require.NoError(t, err)
-				updatedReporter, err := bizmodel.NewRepresentation(map[string]interface{}{"hostname": "h"})
-				require.NoError(t, err)
-				err = res.Update(key, "", "", nil, updatedReporter, updatedCommon)
-				require.NoError(t, err)
-				require.NoError(t, repo.Save(db, res, model_legacy.OperationTypeUpdated, "tx2"))
-			}
 
-			// Act: query for current (1) and previous (0)
-			key, err := bizmodel.NewReporterResourceKey("localResourceId-1", "host", "hbi", "hbi-instance-1")
-			require.NoError(t, err)
-			results, err := repo.FindVersionedRepresentationsByVersion(db, key, 1)
-			require.NoError(t, err)
+				foundResource, err := repo.FindResourceByKeys(db, key)
+				require.NoError(t, err, "Should find resource with only reporter data")
+				require.NotNil(t, foundResource)
+			})
 
-			require.Len(t, results, 2)
-			hasCur, hasPrev := false, false
-			for _, r := range results {
-				if r.Version == 1 {
-					hasCur = true
-					if impl.name != "Fake Repository" {
-						assert.Equal(t, "workspace2", r.Data["workspace_id"])
-					}
-				}
-				if r.Version == 0 {
-					hasPrev = true
-				}
-				_, ok := r.Data["workspace_id"]
-				assert.True(t, ok)
-			}
-			assert.True(t, hasCur)
-			assert.True(t, hasPrev)
+			t.Run("Report resource with no reporter data but has common data", func(t *testing.T) {
+				repo, db := getFreshInstances()
+
+				resource := createTestResourceWithCommonDataOnly(t, "common-only-resource")
+				err := repo.Save(db, resource, model_legacy.OperationTypeCreated, "tx-common-only")
+				require.NoError(t, err, "Should save resource with only common data")
+
+				key, err := bizmodel.NewReporterResourceKey("common-only-resource", "k8s_cluster", "ocm", "ocm-instance-1")
+				require.NoError(t, err)
+
+				foundResource, err := repo.FindResourceByKeys(db, key)
+				require.NoError(t, err, "Should find resource with only common data")
+				require.NotNil(t, foundResource)
+			})
+
+			t.Run("Report resource with both data, then just reporter data, then just common data", func(t *testing.T) {
+				repo, db := getFreshInstances()
+
+				// 1. Report with both reporter and common data
+				resourceBoth := createTestResourceWithLocalId(t, "progressive-resource")
+				err := repo.Save(db, resourceBoth, model_legacy.OperationTypeCreated, "tx-both")
+				require.NoError(t, err, "Should save resource with both data types")
+
+				key, err := bizmodel.NewReporterResourceKey("progressive-resource", "k8s_cluster", "ocm", "ocm-instance-1")
+				require.NoError(t, err)
+
+				foundResource, err := repo.FindResourceByKeys(db, key)
+				require.NoError(t, err, "Should find resource after initial save")
+				require.NotNil(t, foundResource)
+
+				// 2. Update with just reporter data
+				apiHref, err := bizmodel.NewApiHref("https://api.example.com/reporter-update")
+				require.NoError(t, err)
+				consoleHref, err := bizmodel.NewConsoleHref("https://console.example.com/reporter-update")
+				require.NoError(t, err)
+				reporterOnlyData, err := bizmodel.NewRepresentation(map[string]interface{}{
+					"name":      "reporter-updated-cluster",
+					"namespace": "reporter-updated",
+				})
+				require.NoError(t, err)
+				emptyCommonData, err := bizmodel.NewRepresentation(map[string]interface{}{
+					"workspace_id": "minimal-workspace",
+				})
+				require.NoError(t, err)
+
+				err = foundResource.Update(key, apiHref, consoleHref, nil, reporterOnlyData, emptyCommonData)
+				require.NoError(t, err, "Should update with reporter data only")
+
+				err = repo.Save(db, *foundResource, model_legacy.OperationTypeUpdated, "tx-reporter-update")
+				require.NoError(t, err, "Should save resource with reporter-only update")
+
+				// 3. Update with just common data
+				foundResource, err = repo.FindResourceByKeys(db, key)
+				require.NoError(t, err, "Should find resource after reporter-only update")
+
+				emptyReporterData, err := bizmodel.NewRepresentation(map[string]interface{}{
+					"name": "minimal-cluster",
+				})
+				require.NoError(t, err)
+				commonOnlyData, err := bizmodel.NewRepresentation(map[string]interface{}{
+					"workspace_id": "common-updated-workspace",
+					"environment":  "common-updated",
+				})
+				require.NoError(t, err)
+
+				err = foundResource.Update(key, apiHref, consoleHref, nil, emptyReporterData, commonOnlyData)
+				require.NoError(t, err, "Should update with common data only")
+
+				err = repo.Save(db, *foundResource, model_legacy.OperationTypeUpdated, "tx-common-update")
+				require.NoError(t, err, "Should save resource with common-only update")
+
+				// Verify final resource can still be found
+				finalResource, err := repo.FindResourceByKeys(db, key)
+				require.NoError(t, err, "Should find resource after all updates")
+				require.NotNil(t, finalResource)
+			})
 		})
 	}
 }
@@ -857,6 +909,110 @@ func createTestResourceWithLocalIdAndType(t *testing.T, localResourceId, resourc
 	return resource
 }
 
+func createTestResourceWithReporterDataOnly(t *testing.T, localResourceId string) bizmodel.Resource {
+	resourceId := uuid.New()
+	reporterResourceId := uuid.New()
+
+	reporterData := internal.JsonObject{
+		"name":      "test-cluster-reporter-only",
+		"namespace": "reporter-namespace",
+		"cpu":       "4",
+		"memory":    "8Gi",
+	}
+
+	// Minimal common data (required for validation)
+	commonData := internal.JsonObject{
+		"workspace_id": "minimal-workspace",
+	}
+
+	localResourceIdType, err := bizmodel.NewLocalResourceId(localResourceId)
+	require.NoError(t, err)
+
+	resourceType, err := bizmodel.NewResourceType("k8s_cluster")
+	require.NoError(t, err)
+
+	reporterType, err := bizmodel.NewReporterType("ocm")
+	require.NoError(t, err)
+
+	reporterInstanceId, err := bizmodel.NewReporterInstanceId("ocm-instance-1")
+	require.NoError(t, err)
+
+	resourceIdType, err := bizmodel.NewResourceId(resourceId)
+	require.NoError(t, err)
+
+	reporterResourceIdType, err := bizmodel.NewReporterResourceId(reporterResourceId)
+	require.NoError(t, err)
+
+	apiHref, err := bizmodel.NewApiHref("https://api.example.com/reporter-only")
+	require.NoError(t, err)
+
+	consoleHref, err := bizmodel.NewConsoleHref("https://console.example.com/reporter-only")
+	require.NoError(t, err)
+
+	reporterRepresentation, err := bizmodel.NewRepresentation(reporterData)
+	require.NoError(t, err)
+
+	commonRepresentation, err := bizmodel.NewRepresentation(commonData)
+	require.NoError(t, err)
+
+	resource, err := bizmodel.NewResource(resourceIdType, localResourceIdType, resourceType, reporterType, reporterInstanceId, reporterResourceIdType, apiHref, consoleHref, reporterRepresentation, commonRepresentation, nil)
+	require.NoError(t, err)
+
+	return resource
+}
+
+func createTestResourceWithCommonDataOnly(t *testing.T, localResourceId string) bizmodel.Resource {
+	resourceId := uuid.New()
+	reporterResourceId := uuid.New()
+
+	// Minimal reporter data (required for validation)
+	reporterData := internal.JsonObject{
+		"name": "minimal-cluster",
+	}
+
+	commonData := internal.JsonObject{
+		"workspace_id": "test-workspace-common-only",
+		"labels":       map[string]interface{}{"env": "test", "type": "common-only"},
+		"owner":        "test-team",
+		"region":       "us-east-1",
+	}
+
+	localResourceIdType, err := bizmodel.NewLocalResourceId(localResourceId)
+	require.NoError(t, err)
+
+	resourceType, err := bizmodel.NewResourceType("k8s_cluster")
+	require.NoError(t, err)
+
+	reporterType, err := bizmodel.NewReporterType("ocm")
+	require.NoError(t, err)
+
+	reporterInstanceId, err := bizmodel.NewReporterInstanceId("ocm-instance-1")
+	require.NoError(t, err)
+
+	resourceIdType, err := bizmodel.NewResourceId(resourceId)
+	require.NoError(t, err)
+
+	reporterResourceIdType, err := bizmodel.NewReporterResourceId(reporterResourceId)
+	require.NoError(t, err)
+
+	apiHref, err := bizmodel.NewApiHref("https://api.example.com/common-only")
+	require.NoError(t, err)
+
+	consoleHref, err := bizmodel.NewConsoleHref("https://console.example.com/common-only")
+	require.NoError(t, err)
+
+	reporterRepresentation, err := bizmodel.NewRepresentation(reporterData)
+	require.NoError(t, err)
+
+	commonRepresentation, err := bizmodel.NewRepresentation(commonData)
+	require.NoError(t, err)
+
+	resource, err := bizmodel.NewResource(resourceIdType, localResourceIdType, resourceType, reporterType, reporterInstanceId, reporterResourceIdType, apiHref, consoleHref, reporterRepresentation, commonRepresentation, nil)
+	require.NoError(t, err)
+
+	return resource
+}
+
 func createTestResourceWithMixedCase(t *testing.T) bizmodel.Resource {
 	resourceId := uuid.New()
 	reporterResourceId := uuid.New()
@@ -905,6 +1061,89 @@ func createTestResourceWithMixedCase(t *testing.T) bizmodel.Resource {
 	require.NoError(t, err)
 
 	return resource
+}
+
+// Contract test for FindVersionedRepresentationsByVersion following the same
+// implementations pattern used elsewhere in this file.
+func TestFindVersionedRepresentationsByVersion(t *testing.T) {
+	implementations := []struct {
+		name string
+		repo func() ResourceRepository
+		db   func() *gorm.DB
+	}{
+		{
+			name: "Real Repository with GormTransactionManager",
+			repo: func() ResourceRepository {
+				db := setupInMemoryDB(t)
+				tm := NewGormTransactionManager(3)
+				return NewResourceRepository(db, tm)
+			},
+			db: func() *gorm.DB { return setupInMemoryDB(t) },
+		},
+		{
+			name: "Fake Repository",
+			repo: func() ResourceRepository { return NewFakeResourceRepository() },
+			db:   func() *gorm.DB { return nil },
+		},
+	}
+
+	for _, impl := range implementations {
+		t.Run(impl.name, func(t *testing.T) {
+			// Helper to get fresh instances
+			getFresh := func() (ResourceRepository, *gorm.DB) {
+				if impl.name == "Fake Repository" {
+					return impl.repo(), impl.db()
+				}
+				db := setupInMemoryDB(t)
+				tm := NewGormTransactionManager(3)
+				return NewResourceRepository(db, tm), db
+			}
+
+			repo, db := getFresh()
+
+			// Seed: create resource (v0)
+			res := createTestResourceWithLocalIdAndType(t, "localResourceId-1", "host")
+			_ = db // fake ignores db
+			if impl.name != "Fake Repository" {
+				require.NoError(t, repo.Save(db, res, model_legacy.OperationTypeCreated, "tx1"))
+
+				// Update to bump common version to v1 with workspace_id workspace2
+				key, err := bizmodel.NewReporterResourceKey("localResourceId-1", "host", "hbi", "hbi-instance-1")
+				require.NoError(t, err)
+				updatedCommon, err := bizmodel.NewRepresentation(map[string]interface{}{"workspace_id": "workspace2"})
+				require.NoError(t, err)
+				updatedReporter, err := bizmodel.NewRepresentation(map[string]interface{}{"hostname": "h"})
+				require.NoError(t, err)
+				err = res.Update(key, "", "", nil, updatedReporter, updatedCommon)
+				require.NoError(t, err)
+				require.NoError(t, repo.Save(db, res, model_legacy.OperationTypeUpdated, "tx2"))
+			}
+
+			// Act: query for current (1) and previous (0)
+			key, err := bizmodel.NewReporterResourceKey("localResourceId-1", "host", "hbi", "hbi-instance-1")
+			require.NoError(t, err)
+			results, err := repo.FindVersionedRepresentationsByVersion(db, key, 1)
+			require.NoError(t, err)
+
+			require.Len(t, results, 2)
+			hasCur, hasPrev := false, false
+			for _, r := range results {
+				if r.Version == 1 {
+					hasCur = true
+					if impl.name != "Fake Repository" {
+						assert.Equal(t, "workspace2", r.Data["workspace_id"])
+					}
+				}
+				if r.Version == 0 {
+					hasPrev = true
+				}
+				_, ok := r.Data["workspace_id"]
+				assert.True(t, ok)
+			}
+			assert.True(t, hasCur)
+			assert.True(t, hasPrev)
+		})
+	}
 }
 
 // Test FindVersionedRepresentationsByVersion against the real repository.

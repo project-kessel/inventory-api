@@ -492,6 +492,8 @@ func TestCalculateTuples(t *testing.T) {
 				assert.Equal(t, tt.expectedDeleteSubject, deleteTuple.Subject())
 			}
 		})
+	}
+}
 
 func TestPartialDataScenarios(t *testing.T) {
 	ctx := context.Background()

@@ -643,6 +643,89 @@ func TestResourceRepository_MultipleHostsLifecycle(t *testing.T) {
 	}
 }
 
+// Contract test for FindCommonRepresentationsByVersion following the same
+// implementations pattern used elsewhere in this file.
+func TestFindCommonRepresentationsByVersion(t *testing.T) {
+	implementations := []struct {
+		name string
+		repo func() ResourceRepository
+		db   func() *gorm.DB
+	}{
+		{
+			name: "Real Repository with GormTransactionManager",
+			repo: func() ResourceRepository {
+				db := setupInMemoryDB(t)
+				tm := NewGormTransactionManager(3)
+				return NewResourceRepository(db, tm)
+			},
+			db: func() *gorm.DB { return setupInMemoryDB(t) },
+		},
+		{
+			name: "Fake Repository",
+			repo: func() ResourceRepository { return NewFakeResourceRepository() },
+			db:   func() *gorm.DB { return nil },
+		},
+	}
+
+	for _, impl := range implementations {
+		t.Run(impl.name, func(t *testing.T) {
+			// Helper to get fresh instances
+			getFresh := func() (ResourceRepository, *gorm.DB) {
+				if impl.name == "Fake Repository" {
+					return impl.repo(), impl.db()
+				}
+				db := setupInMemoryDB(t)
+				tm := NewGormTransactionManager(3)
+				return NewResourceRepository(db, tm), db
+			}
+
+			repo, db := getFresh()
+
+			// Seed: create resource (v0)
+			res := createTestResourceWithLocalIdAndType(t, "localResourceId-1", "host")
+			_ = db // fake ignores db
+			if impl.name != "Fake Repository" {
+				require.NoError(t, repo.Save(db, res, model_legacy.OperationTypeCreated, "tx1"))
+
+				// Update to bump common version to v1 with workspace_id workspace2
+				key, err := bizmodel.NewReporterResourceKey("localResourceId-1", "host", "hbi", "hbi-instance-1")
+				require.NoError(t, err)
+				updatedCommon, err := bizmodel.NewRepresentation(map[string]interface{}{"workspace_id": "workspace2"})
+				require.NoError(t, err)
+				updatedReporter, err := bizmodel.NewRepresentation(map[string]interface{}{"hostname": "h"})
+				require.NoError(t, err)
+				err = res.Update(key, "", "", nil, updatedReporter, updatedCommon)
+				require.NoError(t, err)
+				require.NoError(t, repo.Save(db, res, model_legacy.OperationTypeUpdated, "tx2"))
+			}
+
+			// Act: query for current (1) and previous (0)
+			key, err := bizmodel.NewReporterResourceKey("localResourceId-1", "host", "hbi", "hbi-instance-1")
+			require.NoError(t, err)
+			results, err := repo.FindCommonRepresentationsByVersion(db, key, 1)
+			require.NoError(t, err)
+
+			require.Len(t, results, 2)
+			hasCur, hasPrev := false, false
+			for _, r := range results {
+				if r.Version == 1 {
+					hasCur = true
+					if impl.name != "Fake Repository" {
+						assert.Equal(t, "workspace2", r.Data["workspace_id"])
+					}
+				}
+				if r.Version == 0 {
+					hasPrev = true
+				}
+				_, ok := r.Data["workspace_id"]
+				assert.True(t, ok)
+			}
+			assert.True(t, hasCur)
+			assert.True(t, hasPrev)
+		})
+	}
+}
+
 func setupInMemoryDB(t *testing.T) *gorm.DB {
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	require.NoError(t, err)
@@ -822,4 +905,161 @@ func createTestResourceWithMixedCase(t *testing.T) bizmodel.Resource {
 	require.NoError(t, err)
 
 	return resource
+}
+
+// Test FindCommonRepresentationsByVersion against the real repository.
+// Seeds a resource, performs an update to bump common version, then queries
+// for current (v1) and previous (v0) versions in a single call.
+func TestFindCommonRepresentationsByVersion_RealRepo(t *testing.T) {
+	db := setupInMemoryDB(t)
+	tm := NewGormTransactionManager(3)
+	repo := NewResourceRepository(db, tm)
+
+	// Create initial resource (common version v0)
+	res := createTestResourceWithLocalIdAndType(t, "crv-test", "host")
+	require.NoError(t, repo.Save(db, res, model_legacy.OperationTypeCreated, "tx1"))
+
+	// Update common representation to bump to v1
+	key, err := bizmodel.NewReporterResourceKey("crv-test", "host", "hbi", "hbi-instance-1")
+	require.NoError(t, err)
+
+	updatedCommon, err := bizmodel.NewRepresentation(map[string]interface{}{"workspace_id": "ws-cur"})
+	require.NoError(t, err)
+	updatedReporter, err := bizmodel.NewRepresentation(map[string]interface{}{"hostname": "h"})
+	require.NoError(t, err)
+	err = res.Update(key, "", "", nil, updatedReporter, updatedCommon)
+	require.NoError(t, err)
+	require.NoError(t, repo.Save(db, res, model_legacy.OperationTypeUpdated, "tx2"))
+
+	// Query for current v1 and previous v0
+	results, err := repo.FindCommonRepresentationsByVersion(db, key, 1)
+	require.NoError(t, err)
+	require.Len(t, results, 2)
+
+	hasCur, hasPrev := false, false
+	for _, r := range results {
+		if r.Version == 1 {
+			hasCur = true
+			assert.Equal(t, "ws-cur", r.Data["workspace_id"])
+		}
+		if r.Version == 0 {
+			hasPrev = true
+			_, ok := r.Data["workspace_id"]
+			assert.True(t, ok)
+		}
+	}
+	assert.True(t, hasCur)
+	assert.True(t, hasPrev)
+}
+
+// When currentVersion is very large (no such versions exist), expect empty results.
+// Large version: with the fake repo, ensure the method treats N and N-1 (e.g., 9000 and 8999).
+func TestFindCommonRepresentationsByVersion_LargeVersion_UsesPreviousVersion(t *testing.T) {
+	repo := NewFakeResourceRepositoryWithWorkspaceOverrides("workspace2", "workspace1")
+	var db *gorm.DB // fake ignores db
+
+	key, err := bizmodel.NewReporterResourceKey("localResourceId-1", "host", "hbi", "hbi-instance-1")
+	require.NoError(t, err)
+
+	current := uint(9000)
+	results, qerr := repo.FindCommonRepresentationsByVersion(db, key, current)
+	require.NoError(t, qerr)
+
+	// Expect two entries: current and previous
+	require.Len(t, results, 2)
+	seen := map[uint]string{}
+	for _, r := range results {
+		v := r.Version
+		ws := ""
+		if x, ok := r.Data["workspace_id"]; ok {
+			if s, ok2 := x.(string); ok2 {
+				ws = s
+			}
+		}
+		seen[v] = ws
+	}
+	assert.Equal(t, "workspace2", seen[current])
+	assert.Equal(t, "workspace1", seen[current-1])
+}
+
+// Sad path: simulate a repository error by dropping a required table and running the query.
+func TestFindCommonRepresentationsByVersion_ErrorPath(t *testing.T) {
+	db := setupInMemoryDB(t)
+	tm := NewGormTransactionManager(3)
+	repo := NewResourceRepository(db, tm)
+
+	// Seed a normal resource
+	res := createTestResourceWithLocalIdAndType(t, "localResourceId-1", "host")
+	require.NoError(t, repo.Save(db, res, model_legacy.OperationTypeCreated, "tx1"))
+	key, err := bizmodel.NewReporterResourceKey("localResourceId-1", "host", "hbi", "hbi-instance-1")
+	require.NoError(t, err)
+
+	// Force an error by dropping the common_representations table before the query
+	err = db.Migrator().DropTable(&datamodel.CommonRepresentation{})
+	require.NoError(t, err)
+
+	_, qerr := repo.FindCommonRepresentationsByVersion(db, key, 1)
+	require.Error(t, qerr)
+}
+
+// Version 0: expect only the current (v0) common representation and no previous.
+func TestFindCommonRepresentationsByVersion_VersionZero(t *testing.T) {
+	implementations := []struct {
+		name string
+		repo func() ResourceRepository
+		db   func() *gorm.DB
+	}{
+		{
+			name: "Real Repository with GormTransactionManager",
+			repo: func() ResourceRepository {
+				db := setupInMemoryDB(t)
+				tm := NewGormTransactionManager(3)
+				return NewResourceRepository(db, tm)
+			},
+			db: func() *gorm.DB { return setupInMemoryDB(t) },
+		},
+		{
+			name: "Fake Repository",
+			repo: func() ResourceRepository { return NewFakeResourceRepository() },
+			db:  func() *gorm.DB { return nil },
+		},
+	}
+
+	for _, impl := range implementations {
+		t.Run(impl.name, func(t *testing.T) {
+			var (
+				repo ResourceRepository
+				db   *gorm.DB
+			)
+
+			if impl.name == "Fake Repository" {
+				repo, db = impl.repo(), impl.db()
+			} else {
+				db = setupInMemoryDB(t)
+				tm := NewGormTransactionManager(3)
+				repo = NewResourceRepository(db, tm)
+			}
+
+			// Seed only creation (v0) for real repo
+			res := createTestResourceWithLocalIdAndType(t, "localResourceId-1", "host")
+			if impl.name != "Fake Repository" {
+				require.NoError(t, repo.Save(db, res, model_legacy.OperationTypeCreated, "tx1"))
+			}
+
+			key, err := bizmodel.NewReporterResourceKey("localResourceId-1", "host", "hbi", "hbi-instance-1")
+			require.NoError(t, err)
+
+			results, qerr := repo.FindCommonRepresentationsByVersion(db, key, 0)
+			require.NoError(t, qerr)
+			require.Len(t, results, 1)
+			assert.Equal(t, uint(0), results[0].Version)
+
+			// Validate workspace_id presence and expected value when known
+			wsVal, ok := results[0].Data["workspace_id"]
+			assert.True(t, ok)
+			if impl.name != "Fake Repository" {
+				assert.Equal(t, "test-workspace", wsVal)
+			}
+		})
+	}
 }

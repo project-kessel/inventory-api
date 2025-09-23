@@ -180,6 +180,13 @@ func (f *fakeResourceRepository) FindCommonRepresentationsByVersion(tx *gorm.DB,
 			},
 			Version: currentVersion,
 		})
+		// Also include previous (version 0) for contract parity with real repo
+		results = append(results, CommonRepresentationsByVersion{
+			Data: map[string]interface{}{
+				"workspace_id": "test-workspace-previous",
+			},
+			Version: 0,
+		})
 	} else if currentVersion == 2 {
 		// Version 2 - workspace change scenario
 		results = append(results, CommonRepresentationsByVersion{

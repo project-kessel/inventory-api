@@ -1021,7 +1021,7 @@ func TestFindVersionedRepresentationsByVersion_VersionZero(t *testing.T) {
 		{
 			name: "Fake Repository",
 			repo: func() ResourceRepository { return NewFakeResourceRepository() },
-			db:  func() *gorm.DB { return nil },
+			db:   func() *gorm.DB { return nil },
 		},
 	}
 

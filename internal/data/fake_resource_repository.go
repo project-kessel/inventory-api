@@ -158,15 +158,16 @@ func (f *fakeResourceRepository) FindVersionedRepresentationsByVersion(tx *gorm.
 	// In a real implementation, this would query the database for common_representations
 
 	// Mock data for testing - you can customize this based on your test needs
-	if currentVersion == 0 {
+	switch currentVersion {
+	case 0:
 		// Version 0 - initial creation
 		results = append(results, VersionedRepresentation{Data: map[string]interface{}{"workspace_id": "test-workspace-initial"}, Version: currentVersion, Kind: RepresentationKindCommon})
-	} else if currentVersion == 1 {
+	case 1:
 		// Version 1 - first update
 		results = append(results, VersionedRepresentation{Data: map[string]interface{}{"workspace_id": "test-workspace-v1"}, Version: currentVersion, Kind: RepresentationKindCommon})
 		// Also include previous (version 0) for contract parity with real repo
 		results = append(results, VersionedRepresentation{Data: map[string]interface{}{"workspace_id": "test-workspace-previous"}, Version: 0, Kind: RepresentationKindCommon})
-	} else if currentVersion == 2 {
+	case 2:
 		// Version 2 - workspace change scenario
 		results = append(results, VersionedRepresentation{Data: map[string]interface{}{"workspace_id": "test-workspace-v2"}, Version: currentVersion, Kind: RepresentationKindCommon})
 

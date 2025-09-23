@@ -906,9 +906,10 @@ func (uc *Usecase) CalculateTuples(tupleEvent model.TupleEvent) (model.TuplesToR
 		// Extract workspace_ids from the representations
 		for _, repr := range representations {
 			if workspaceID, exists := repr.Data["workspace_id"].(string); exists && workspaceID != "" {
-				if repr.Version == currentVersion {
+				switch repr.Version {
+				case currentVersion:
 					currentWorkspaceID = workspaceID
-				} else if repr.Version == currentVersion-1 {
+				case currentVersion - 1:
 					previousWorkspaceID = workspaceID
 				}
 			}

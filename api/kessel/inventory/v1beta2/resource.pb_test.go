@@ -116,7 +116,7 @@ func TestResourceValidation(t *testing.T) {
 						Fields: map[string]*structpb.Value{
 							"satellite_id":            structpb.NewStringValue("f47ac10b-58cc-4372-a567-0e02b2c3d479"),
 							"subscription_manager_id": structpb.NewStringValue("6fa459ea-ee8a-3ca4-894e-db77e160355e"),
-							"insights_inventory_id":   structpb.NewStringValue("1c6fb7dc-34dd-4ea5-a3a6-073acc33107b"),
+							"insights_id":             structpb.NewStringValue("1c6fb7dc-34dd-4ea5-a3a6-073acc33107b"),
 							"ansible_host":            structpb.NewStringValue("host.example.com"),
 						},
 					},

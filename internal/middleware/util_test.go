@@ -42,7 +42,7 @@ func createHostHBISchema(hasRequiredFields bool) string {
 		"properties": {
 			"satellite_id": { "type": "string", "format": "uuid" },
 			"subscription_manager_id": { "type": "string", "format": "uuid" },
-			"insights_inventory_id": { "type": "string", "format": "uuid" },
+			"insights_id": { "type": "string", "format": "uuid" },
 			"ansible_host": { "type": "string", "maxLength": 255 }
 		},
 		%s
@@ -105,7 +105,7 @@ func createHostReporterData() map[string]interface{} {
 	return map[string]interface{}{
 		"satellite_id":            "2c4196f1-0371-4f4c-8913-e113cfaa6e67",
 		"subscription_manager_id": "af94f92b-0b65-4cac-b449-6b77e665a08f",
-		"insights_inventory_id":   "05707922-7b0a-4fe6-982d-6adbc7695b8f",
+		"insights_id":             "05707922-7b0a-4fe6-982d-6adbc7695b8f",
 		"ansible_host":            "host-1",
 	}
 }
@@ -657,37 +657,37 @@ func TestRemoveNulls(t *testing.T) {
 		{
 			name: "HBI host with all fields",
 			input: map[string]interface{}{
-				"insights_inventory_id": "b5c36330-79cf-426e-a950-df2e972c3ef4",
-				"satellite_id":          "some-satellite-id",
-				"ansible_host":          "my-ansible-host.example.com",
+				"insights_id":  "b5c36330-79cf-426e-a950-df2e972c3ef4",
+				"satellite_id": "some-satellite-id",
+				"ansible_host": "my-ansible-host.example.com",
 			},
 			expected: map[string]interface{}{
-				"insights_inventory_id": "b5c36330-79cf-426e-a950-df2e972c3ef4",
-				"satellite_id":          "some-satellite-id",
-				"ansible_host":          "my-ansible-host.example.com",
+				"insights_id":  "b5c36330-79cf-426e-a950-df2e972c3ef4",
+				"satellite_id": "some-satellite-id",
+				"ansible_host": "my-ansible-host.example.com",
 			},
 		},
 		{
 			name: "HBI host with null ansible_host",
 			input: map[string]interface{}{
-				"insights_inventory_id": "b5c36330-79cf-426e-a950-df2e972c3ef4",
-				"satellite_id":          "some-satellite-id",
-				"ansible_host":          nil,
+				"insights_id":  "b5c36330-79cf-426e-a950-df2e972c3ef4",
+				"satellite_id": "some-satellite-id",
+				"ansible_host": nil,
 			},
 			expected: map[string]interface{}{
-				"insights_inventory_id": "b5c36330-79cf-426e-a950-df2e972c3ef4",
-				"satellite_id":          "some-satellite-id",
+				"insights_id":  "b5c36330-79cf-426e-a950-df2e972c3ef4",
+				"satellite_id": "some-satellite-id",
 			},
 		},
 		{
 			name: "HBI host with multiple nulls",
 			input: map[string]interface{}{
-				"insights_inventory_id": "b5c36330-79cf-426e-a950-df2e972c3ef4",
-				"satellite_id":          nil,
-				"ansible_host":          "null",
+				"insights_id":  "b5c36330-79cf-426e-a950-df2e972c3ef4",
+				"satellite_id": nil,
+				"ansible_host": "null",
 			},
 			expected: map[string]interface{}{
-				"insights_inventory_id": "b5c36330-79cf-426e-a950-df2e972c3ef4",
+				"insights_id": "b5c36330-79cf-426e-a950-df2e972c3ef4",
 			},
 		},
 		{

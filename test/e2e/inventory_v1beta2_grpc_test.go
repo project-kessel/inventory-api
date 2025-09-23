@@ -57,7 +57,7 @@ func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_Host(t *testing.T) {
 	reporterStruct, err := structpb.NewStruct(map[string]interface{}{
 		"satellite_id":            "550e8400-e29b-41d4-a716-446655440000",
 		"subscription_manager_id": "550e8400-e29b-41d4-a716-446655440000",
-		"insights_inventory_id":   "550e8400-e29b-41d4-a716-446655440000",
+		"insights_id":             "550e8400-e29b-41d4-a716-446655440000",
 		"ansible_host":            "abc",
 	})
 	assert.NoError(t, err, "Failed to create structpb for host reporter")

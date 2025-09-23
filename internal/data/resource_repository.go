@@ -294,5 +294,13 @@ func (r *resourceRepository) FindVersionedRepresentationsByVersion(tx *gorm.DB, 
 		return nil, fmt.Errorf("failed to find common representations by version: %w", err)
 	}
 
+	// Explicitly mark all results as common representations since we queried common_representations table
+	for i := range results {
+		if results[i].Kind != "" && results[i].Kind != RepresentationKindCommon {
+			return nil, fmt.Errorf("unexpected representation kind: %s, expected common", results[i].Kind)
+		}
+		results[i].Kind = RepresentationKindCommon
+	}
+
 	return results, nil
 }

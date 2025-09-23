@@ -1279,10 +1279,21 @@ func TestFindVersionedRepresentationsByVersion_VersionZero(t *testing.T) {
 				repo = NewResourceRepository(db, tm)
 			}
 
-			// Seed only creation (v0) for real repo
+			// Seed: create resource (v0) then update (v1) for real repo
 			res := createTestResourceWithLocalIdAndType(t, "localResourceId-1", "host")
 			if impl.name != "Fake Repository" {
 				require.NoError(t, repo.Save(db, res, model_legacy.OperationTypeCreated, "tx1"))
+
+				// Update to create v1 (so we have both v0 and v1)
+				key, err := bizmodel.NewReporterResourceKey("localResourceId-1", "host", "hbi", "hbi-instance-1")
+				require.NoError(t, err)
+				updatedCommon, err := bizmodel.NewRepresentation(map[string]interface{}{"workspace_id": "test-workspace-v1"})
+				require.NoError(t, err)
+				updatedReporter, err := bizmodel.NewRepresentation(map[string]interface{}{"hostname": "updated-host"})
+				require.NoError(t, err)
+				err = res.Update(key, "", "", nil, updatedReporter, updatedCommon)
+				require.NoError(t, err)
+				require.NoError(t, repo.Save(db, res, model_legacy.OperationTypeUpdated, "tx2"))
 			}
 
 			key, err := bizmodel.NewReporterResourceKey("localResourceId-1", "host", "hbi", "hbi-instance-1")

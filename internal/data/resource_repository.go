@@ -267,6 +267,10 @@ func (r *resourceRepository) GetTransactionManager() usecase.TransactionManager 
 }
 
 func (r *resourceRepository) FindVersionedRepresentationsByVersion(tx *gorm.DB, key bizmodel.ReporterResourceKey, currentVersion uint) ([]VersionedRepresentation, error) {
+	// Prevent querying for a negative version
+	if currentVersion == 0 {
+		return []VersionedRepresentation{}, nil
+	}
 	var results []VersionedRepresentation
 
 	// Use provided transaction or fall back to regular DB session

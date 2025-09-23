@@ -7,7 +7,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/project-kessel/inventory-api/internal/pubsub"
 	"google.golang.org/grpc/metadata"
-	"gorm.io/gorm"
 
 	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1"
 
@@ -18,10 +17,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"google.golang.org/grpc"
 
-	"github.com/project-kessel/inventory-api/internal/biz/model"
 	"github.com/project-kessel/inventory-api/internal/biz/model_legacy"
-	"github.com/project-kessel/inventory-api/internal/biz/usecase"
-	"github.com/project-kessel/inventory-api/internal/data"
 )
 
 type MockHealthRepo struct {
@@ -50,12 +46,6 @@ type MockedListenManager struct {
 
 type MockedSubscription struct {
 	mock.Mock
-}
-
-type MockResourceRepository struct {
-	mock.Mock
-	CurrentWorkspaceID  string
-	PreviousWorkspaceID string
 }
 
 type MockLookupResourcesStream struct {
@@ -277,63 +267,4 @@ func (m *MockedSubscription) Unsubscribe() {
 func (m *MockedSubscription) BlockForNotification(ctx context.Context) error {
 	args := m.Called(ctx)
 	return args.Error(0)
-}
-
-// MockResourceRepository methods
-func (m *MockResourceRepository) NextResourceId() (model.ResourceId, error) {
-	args := m.Called()
-	return args.Get(0).(model.ResourceId), args.Error(1)
-}
-
-func (m *MockResourceRepository) NextReporterResourceId() (model.ReporterResourceId, error) {
-	args := m.Called()
-	return args.Get(0).(model.ReporterResourceId), args.Error(1)
-}
-
-func (m *MockResourceRepository) Save(tx *gorm.DB, resource model.Resource, operationType model_legacy.EventOperationType, txid string) error {
-	args := m.Called(tx, resource, operationType, txid)
-	return args.Error(0)
-}
-
-func (m *MockResourceRepository) FindResourceByKeys(tx *gorm.DB, key model.ReporterResourceKey) (*model.Resource, error) {
-	args := m.Called(tx, key)
-	return args.Get(0).(*model.Resource), args.Error(1)
-}
-
-func (m *MockResourceRepository) FindCommonRepresentationsByVersion(tx *gorm.DB, key model.ReporterResourceKey, currentVersion uint) ([]data.CommonRepresentationsByVersion, error) {
-	var results []data.CommonRepresentationsByVersion
-
-	// Add current version if workspace ID exists
-	if m.CurrentWorkspaceID != "" {
-		currentData := map[string]interface{}{
-			"workspace_id": m.CurrentWorkspaceID,
-		}
-		results = append(results, data.CommonRepresentationsByVersion{
-			Data:    currentData,
-			Version: currentVersion,
-		})
-	}
-
-	// Add previous (current-1) version if workspace ID exists and currentVersion > 0
-	if m.PreviousWorkspaceID != "" && currentVersion > 0 {
-		previousData := map[string]interface{}{
-			"workspace_id": m.PreviousWorkspaceID,
-		}
-		results = append(results, data.CommonRepresentationsByVersion{
-			Data:    previousData,
-			Version: currentVersion - 1,
-		})
-	}
-
-	return results, nil
-}
-
-func (m *MockResourceRepository) GetDB() *gorm.DB {
-	args := m.Called()
-	return args.Get(0).(*gorm.DB)
-}
-
-func (m *MockResourceRepository) GetTransactionManager() usecase.TransactionManager {
-	args := m.Called()
-	return args.Get(0).(usecase.TransactionManager)
 }

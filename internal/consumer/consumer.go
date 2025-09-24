@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/project-kessel/inventory-api/cmd/common"
+	"github.com/project-kessel/inventory-api/internal/biz/model"
 	usecase_resources "github.com/project-kessel/inventory-api/internal/biz/usecase/resources"
 	"github.com/project-kessel/inventory-api/internal/consumer/auth"
 	"github.com/project-kessel/inventory-api/internal/consumer/retry"
@@ -36,6 +37,7 @@ import (
 
 	"github.com/project-kessel/inventory-api/internal/authz"
 	"github.com/project-kessel/inventory-api/internal/authz/api"
+	"github.com/project-kessel/inventory-api/internal/biz"
 	"github.com/project-kessel/inventory-api/internal/biz/model_legacy"
 	"go.opentelemetry.io/otel/metric"
 )
@@ -204,7 +206,7 @@ func (i *InventoryConsumer) Consume() error {
 					continue
 				}
 
-				if operation != string(model_legacy.OperationTypeDeleted) {
+				if operation != string(biz.OperationTypeDeleted) {
 					inventoryID, err := ParseMessageKey(e.Key)
 					if err != nil {
 						metricscollector.Incr(i.MetricsCollector.MsgProcessFailures, "ParseMessageKey", err)
@@ -285,18 +287,22 @@ func (i *InventoryConsumer) ProcessMessage(headers map[string]string, relationsE
 	txid := headers["txid"]
 
 	switch operation {
-	case string(model_legacy.OperationTypeCreated):
+	case string(biz.OperationTypeCreated):
 		i.Logger.Infof("processing message: operation=%s, txid=%s", operation, txid)
 		i.Logger.Debugf("processed message tuple=%s", msg.Value)
 		if relationsEnabled {
-			tuple, err := ParseCreateOrUpdateMessage(msg.Value)
+			tupleEvent, err := ParseMessage(msg.Value)
 			if err != nil {
 				metricscollector.Incr(i.MetricsCollector.MsgProcessFailures, "ParseCreateOrUpdateMessage", err)
 				i.Logger.Errorf("failed to parse message for tuple: %v", err)
 				return "", err
 			}
 			resp, err := i.Retry(func() (string, error) {
-				return i.CreateTuple(context.Background(), tuple)
+				tuples, err := i.ResourceService.CalculateTuples(*tupleEvent)
+				if err != nil {
+					return "", err
+				}
+				return i.CreateTuple(context.Background(), tuples.TuplesToCreate())
 			}, i.MetricsCollector.MsgProcessFailures)
 			if err != nil {
 				metricscollector.Incr(i.MetricsCollector.MsgProcessFailures, "CreateTuple", err)
@@ -306,11 +312,11 @@ func (i *InventoryConsumer) ProcessMessage(headers map[string]string, relationsE
 			return resp, nil
 		}
 
-	case string(model_legacy.OperationTypeUpdated):
+	case string(biz.OperationTypeUpdated):
 		i.Logger.Infof("processing message: operation=%s, txid=%s", operation, txid)
 		i.Logger.Debugf("processed message tuple=%s", msg.Value)
 		if relationsEnabled {
-			tuple, err := ParseCreateOrUpdateMessage(msg.Value)
+			tuple, err := ParseMessage(msg.Value)
 			if err != nil {
 				metricscollector.Incr(i.MetricsCollector.MsgProcessFailures, "ParseCreateOrUpdateMessage", err)
 				i.Logger.Errorf("failed to parse message for tuple: %v", err)
@@ -326,11 +332,11 @@ func (i *InventoryConsumer) ProcessMessage(headers map[string]string, relationsE
 			}
 			return resp, nil
 		}
-	case string(model_legacy.OperationTypeDeleted):
+	case string(biz.OperationTypeDeleted):
 		i.Logger.Infof("processing message: operation=%s, txid=%s", operation, txid)
 		i.Logger.Debugf("processed message tuple=%s", msg.Value)
 		if relationsEnabled {
-			filter, err := ParseDeleteMessage(msg.Value)
+			filter, err := ParseMessage(msg.Value)
 			if err != nil {
 				metricscollector.Incr(i.MetricsCollector.MsgProcessFailures, "ParseDeleteMessage", err)
 				i.Logger.Errorf("failed to parse message for filter: %v", err)
@@ -371,6 +377,28 @@ func ParseHeaders(msg *kafka.Message) (map[string]string, error) {
 		return nil, fmt.Errorf("required headers are missing which would result in message processing failures: %+v", headers)
 	}
 	return headers, nil
+}
+
+func ParseMessage(msg []byte) (*model.TupleEvent, error) {
+	var msgPayload *MessagePayload
+	var tuple *model.TupleEvent
+
+	// msg value is expected to be a valid JSON body for a single relation
+	err := json.Unmarshal(msg, &msgPayload)
+	if err != nil {
+		return nil, fmt.Errorf("error unmarshaling msgPayload: %v", err)
+	}
+
+	payloadJson, err := json.Marshal(msgPayload.RelationsRequest)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling tuple payload: %v", err)
+	}
+
+	err = json.Unmarshal(payloadJson, &tuple)
+	if err != nil {
+		return nil, fmt.Errorf("error unmarshaling tuple payload: %v", err)
+	}
+	return tuple, nil
 }
 
 func ParseCreateOrUpdateMessage(msg []byte) (*v1beta1.Relationship, error) {

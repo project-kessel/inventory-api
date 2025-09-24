@@ -1,4 +1,4 @@
-package model_legacy
+package biz
 
 type EventOperationType interface {
 	OperationType() eventOperationType

@@ -70,3 +70,23 @@ func (re ResourceDeleteEvent) ResourceId() uuid.UUID {
 func (re ResourceDeleteEvent) WorkspaceId() string {
 	return ""
 }
+
+// CurrentCommonVersion returns nil for delete events since common version is not applicable
+// Delete events do not have a CommonRepresentation, only a ReporterDeleteRepresentation
+func (re ResourceDeleteEvent) CurrentCommonVersion() *Version {
+	return nil
+}
+
+// CurrentReporterRepresentationVersion returns the version from the ReporterRepresentation
+func (re ResourceDeleteEvent) CurrentReporterRepresentationVersion() *Version {
+	return &re.reporterRepresentation.version
+}
+
+// ReporterResourceKey constructs and returns the ReporterResourceKey from the event fields
+func (re ResourceDeleteEvent) ReporterResourceKey() ReporterResourceKey {
+	return ReporterResourceKey{
+		localResourceID: re.localResourceId,
+		resourceType:    re.resourceType,
+		reporter:        re.reporterId,
+	}
+}

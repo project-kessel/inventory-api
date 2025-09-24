@@ -14,7 +14,6 @@ import (
 	"time"
 
 	"github.com/project-kessel/inventory-api/cmd/common"
-	usecase_resources "github.com/project-kessel/inventory-api/internal/biz/usecase/resources"
 	"github.com/project-kessel/inventory-api/internal/consumer/auth"
 	"github.com/project-kessel/inventory-api/internal/consumer/retry"
 	datamodel "github.com/project-kessel/inventory-api/internal/data/model"
@@ -72,7 +71,6 @@ type InventoryConsumer struct {
 	AuthOptions      *auth.Options
 	RetryOptions     *retry.Options
 	Notifier         pubsub.Notifier
-	ResourceService  *usecase_resources.Usecase
 
 	lockToken string
 	lockId    string
@@ -114,9 +112,6 @@ func New(config CompletedConfig, db *gorm.DB, authz authz.CompletedConfig, autho
 
 	var errChan chan error
 
-	// Initialize ResourceService for tuple processing
-	resourceService := usecase_resources.NewUsecase(db, logger)
-
 	return InventoryConsumer{
 		Consumer:         consumer,
 		OffsetStorage:    make([]kafka.TopicPartition, 0),
@@ -130,7 +125,6 @@ func New(config CompletedConfig, db *gorm.DB, authz authz.CompletedConfig, autho
 		AuthOptions:      authnOptions,
 		RetryOptions:     retryOptions,
 		Notifier:         notifier,
-		ResourceService:  resourceService,
 	}, nil
 }
 

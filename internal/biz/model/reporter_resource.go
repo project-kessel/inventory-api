@@ -95,7 +95,7 @@ func startNewGeneration(rr *ReporterResource) {
 }
 
 func tombstoned(rr *ReporterResource) bool {
-	return rr.tombstone.Serialize() == true
+	return rr.tombstone.Serialize()
 }
 
 func (rr *ReporterResource) Delete() {

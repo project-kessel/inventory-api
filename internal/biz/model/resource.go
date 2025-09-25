@@ -88,7 +88,7 @@ func (r *Resource) Update(
 	}
 	log.Info("Reporter Resource to update ", reporterResource)
 
-	reporterResource.Update(apiHref, consoleHref, reporterResource.tombstone)
+	reporterResource.Update(apiHref, consoleHref)
 
 	resourceEvent, err := resourceEventAndRepresentations(
 		reporterResource.resourceID,

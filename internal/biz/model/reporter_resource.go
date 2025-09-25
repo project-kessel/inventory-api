@@ -2,6 +2,7 @@ package model
 
 import (
 	"fmt"
+	"log"
 	"time"
 )
 
@@ -78,12 +79,11 @@ func NewReporterResourceKey(
 func (rr *ReporterResource) Update(
 	apiHref ApiHref,
 	consoleHref ConsoleHref,
-	currentTombstone Tombstone,
 ) {
 	rr.apiHref = apiHref
 	rr.consoleHref = consoleHref
 	rr.representationVersion = rr.representationVersion.Increment()
-	if currentTombstone.Serialize() == true {
+	if rr.tombstone.Serialize() == true {
 		rr.tombstone = false
 		rr.generation = rr.generation.Increment()
 		rr.representationVersion = initialReporterRepresentationVersion
@@ -148,6 +148,9 @@ func (rr ReporterResource) Serialize() ReporterResourceSnapshot {
 }
 
 func DeserializeReporterResource(snapshot ReporterResourceSnapshot) ReporterResource {
+
+	log.Printf("----------------------------------")
+	log.Printf("ReporterResourceSnapshot : %+v, ", snapshot)
 	return ReporterResource{
 		id:                    DeserializeReporterResourceId(snapshot.ID),
 		ReporterResourceKey:   DeserializeReporterResourceKey(snapshot.ReporterResourceKey.LocalResourceID, snapshot.ReporterResourceKey.ResourceType, snapshot.ReporterResourceKey.ReporterType, snapshot.ReporterResourceKey.ReporterInstanceID),

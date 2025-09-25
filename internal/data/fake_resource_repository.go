@@ -14,8 +14,9 @@ import (
 )
 
 type fakeResourceRepository struct {
-	mu        sync.RWMutex
-	resources map[string]*storedResource
+	mu                      sync.RWMutex
+	resourcesByPrimaryKey   map[uuid.UUID]*storedResource // keyed by primary key (ResourceID) - simulates database primary storage
+	resourcesByCompositeKey map[string]uuid.UUID          // composite key -> primary key mapping for unique constraint
 }
 
 type storedResource struct {
@@ -33,7 +34,8 @@ type storedResource struct {
 
 func NewFakeResourceRepository() ResourceRepository {
 	return &fakeResourceRepository{
-		resources: make(map[string]*storedResource),
+		resourcesByPrimaryKey:   make(map[uuid.UUID]*storedResource),
+		resourcesByCompositeKey: make(map[string]uuid.UUID),
 	}
 }
 
@@ -68,12 +70,38 @@ func (f *fakeResourceRepository) Save(tx *gorm.DB, resource bizmodel.Resource, o
 	_ = reporterRepresentationSnapshot
 	_ = commonRepresentationSnapshot
 
-	key := f.makeKey(
+	// Create the composite key that matches the unique constraint:
+	// (LocalResourceID, ReporterType, ResourceType, ReporterInstanceID, RepresentationVersion, Generation)
+	compositeKey := f.makeCompositeKey(
 		reporterResourceSnapshot.ReporterResourceKey.LocalResourceID,
-		reporterResourceSnapshot.ReporterResourceKey.ResourceType,
 		reporterResourceSnapshot.ReporterResourceKey.ReporterType,
+		reporterResourceSnapshot.ReporterResourceKey.ResourceType,
 		reporterResourceSnapshot.ReporterResourceKey.ReporterInstanceID,
+		reporterResourceSnapshot.RepresentationVersion,
+		reporterResourceSnapshot.Generation,
 	)
+
+	// Simulate database Save() behavior: upsert by primary key (ReporterResourceID)
+	reporterResourcePrimaryKey := reporterResourceSnapshot.ID
+
+	// Check if this is an update to existing resource (same primary key)
+	if existingResource, exists := f.resourcesByPrimaryKey[reporterResourcePrimaryKey]; exists {
+		// This is an update - remove old composite key mapping
+		oldCompositeKey := f.makeCompositeKey(
+			existingResource.localResourceID,
+			existingResource.reporterType,
+			existingResource.resourceType,
+			existingResource.reporterInstanceID,
+			existingResource.representationVersion,
+			existingResource.generation,
+		)
+		delete(f.resourcesByCompositeKey, oldCompositeKey)
+	} else {
+		// This is a new resource - check for unique constraint violation
+		if existingPrimaryKey, exists := f.resourcesByCompositeKey[compositeKey]; exists {
+			return fmt.Errorf("duplicate key violation: reporter_resource_key_idx unique constraint failed for key: %s (conflicts with existing resource: %s)", compositeKey, existingPrimaryKey)
+		}
+	}
 
 	stored := &storedResource{
 		resourceID:            resourceSnapshot.ID,
@@ -88,7 +116,10 @@ func (f *fakeResourceRepository) Save(tx *gorm.DB, resource bizmodel.Resource, o
 		tombstone:             reporterResourceSnapshot.Tombstone,
 	}
 
-	f.resources[key] = stored
+	// Store by primary key (simulates database primary storage)
+	f.resourcesByPrimaryKey[reporterResourcePrimaryKey] = stored
+	// Store composite key mapping (simulates unique constraint)
+	f.resourcesByCompositeKey[compositeKey] = reporterResourcePrimaryKey
 	return nil
 }
 
@@ -105,23 +136,57 @@ func (f *fakeResourceRepository) FindResourceByKeys(tx *gorm.DB, key bizmodel.Re
 	// find any resource that matches the other key components
 	searchReporterInstanceId := key.ReporterInstanceId().Serialize()
 
-	for _, stored := range f.resources {
+	// Find the latest version for the given natural key
+	var latestResource *storedResource
+	for _, stored := range f.resourcesByPrimaryKey {
 		if strings.EqualFold(stored.localResourceID, key.LocalResourceId().Serialize()) &&
 			strings.EqualFold(stored.resourceType, key.ResourceType().Serialize()) &&
-			strings.EqualFold(stored.reporterType, key.ReporterType().Serialize()) &&
-			!stored.tombstone {
+			strings.EqualFold(stored.reporterType, key.ReporterType().Serialize()) {
 
 			// If search key has empty reporterInstanceId, match any stored resource
 			// If search key has reporterInstanceId, it must match exactly
 			if searchReporterInstanceId == "" || strings.EqualFold(stored.reporterInstanceID, searchReporterInstanceId) {
-				placeholderData := map[string]interface{}{"_placeholder": true}
-				resource, err := bizmodel.NewResource(bizmodel.ResourceId(stored.resourceID), bizmodel.LocalResourceId(stored.localResourceID), bizmodel.ResourceType(stored.resourceType), bizmodel.ReporterType(stored.reporterType), bizmodel.ReporterInstanceId(stored.reporterInstanceID), bizmodel.ReporterResourceId(stored.reporterResourceID), bizmodel.ApiHref(""), bizmodel.ConsoleHref(""), bizmodel.Representation(placeholderData), bizmodel.Representation(placeholderData), nil)
-				if err != nil {
-					return nil, fmt.Errorf("failed to create resource: %w", err)
+				// Keep track of the resource with the highest representation version + generation
+				if latestResource == nil ||
+					stored.representationVersion > latestResource.representationVersion ||
+					(stored.representationVersion == latestResource.representationVersion && stored.generation > latestResource.generation) {
+					latestResource = stored
 				}
-				return &resource, nil
 			}
 		}
+	}
+
+	if latestResource != nil {
+		// Create snapshots that reflect the actual stored state
+		resourceSnapshot := bizmodel.ResourceSnapshot{
+			ID:               latestResource.resourceID,
+			Type:             latestResource.resourceType,
+			CommonVersion:    latestResource.commonVersion,
+			ConsistencyToken: "",
+		}
+
+		reporterResourceSnapshot := bizmodel.ReporterResourceSnapshot{
+			ID: latestResource.reporterResourceID,
+			ReporterResourceKey: bizmodel.ReporterResourceKeySnapshot{
+				LocalResourceID:    latestResource.localResourceID,
+				ReporterType:       latestResource.reporterType,
+				ResourceType:       latestResource.resourceType,
+				ReporterInstanceID: latestResource.reporterInstanceID,
+			},
+			ResourceID:            latestResource.resourceID,
+			APIHref:               "",
+			ConsoleHref:           "",
+			RepresentationVersion: latestResource.representationVersion,
+			Generation:            latestResource.generation,
+			Tombstone:             latestResource.tombstone,
+		}
+
+		// Use DeserializeResource to create a Resource that reflects the actual stored state
+		resource := bizmodel.DeserializeResource(&resourceSnapshot, []bizmodel.ReporterResourceSnapshot{reporterResourceSnapshot}, nil, nil)
+		if resource == nil {
+			return nil, fmt.Errorf("failed to deserialize resource")
+		}
+		return resource, nil
 	}
 
 	return nil, gorm.ErrRecordNotFound
@@ -139,4 +204,8 @@ func (f *fakeResourceRepository) GetTransactionManager() usecase.TransactionMana
 
 func (f *fakeResourceRepository) makeKey(localResourceID, resourceType, reporterType, reporterInstanceID string) string {
 	return fmt.Sprintf("%s|%s|%s|%s", localResourceID, resourceType, reporterType, reporterInstanceID)
+}
+
+func (f *fakeResourceRepository) makeCompositeKey(localResourceID, reporterType, resourceType, reporterInstanceID string, representationVersion, generation uint) string {
+	return fmt.Sprintf("%s|%s|%s|%s|%d|%d", localResourceID, reporterType, resourceType, reporterInstanceID, representationVersion, generation)
 }

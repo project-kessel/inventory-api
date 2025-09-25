@@ -186,7 +186,8 @@ func TestReporterResource_Update(t *testing.T) {
 			t.Fatalf("Failed to create console href: %v", err)
 		}
 
-		original.Update(newApiHref, newConsoleHref)
+		currentTombstone := NewTombstone(false) // Assume not tombstoned for test
+		original.Update(newApiHref, newConsoleHref, currentTombstone)
 
 		if original.apiHref.String() != newApiHref.String() {
 			t.Errorf("Expected updated apiHref %s, got %s", newApiHref.String(), original.apiHref.String())
@@ -225,7 +226,8 @@ func TestReporterResource_Update(t *testing.T) {
 			t.Fatalf("Failed to create console href: %v", err)
 		}
 
-		original.Update(newApiHref, newConsoleHref)
+		currentTombstone := NewTombstone(false) // Assume not tombstoned for test
+		original.Update(newApiHref, newConsoleHref, currentTombstone)
 
 		expectedVersion := originalVersion + 1
 		if original.representationVersion.Uint() != expectedVersion {
@@ -267,7 +269,8 @@ func TestReporterResource_Update(t *testing.T) {
 			t.Fatalf("Failed to create console href: %v", err)
 		}
 
-		original.Update(newApiHref, newConsoleHref)
+		currentTombstone := NewTombstone(false) // Assume not tombstoned for test
+		original.Update(newApiHref, newConsoleHref, currentTombstone)
 
 		if original.id != originalId {
 			t.Errorf("Expected ID to remain unchanged")

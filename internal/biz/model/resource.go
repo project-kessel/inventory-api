@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"strings"
 	"time"
-
-	"github.com/go-kratos/kratos/v2/log"
 )
 
 const initialCommonVersion = 0
@@ -86,7 +84,6 @@ func (r *Resource) Update(
 	if err != nil {
 		return err
 	}
-	log.Info("Reporter Resource to update ", reporterResource)
 
 	reporterResource.Update(apiHref, consoleHref)
 

@@ -16,6 +16,9 @@ import (
 type fakeResourceRepository struct {
 	mu        sync.RWMutex
 	resources map[string]*storedResource
+	// Optional test overrides for workspace IDs returned by FindCommonRepresentationsByVersion
+	overrideCurrent  string
+	overridePrevious string
 }
 
 type storedResource struct {
@@ -34,6 +37,16 @@ type storedResource struct {
 func NewFakeResourceRepository() ResourceRepository {
 	return &fakeResourceRepository{
 		resources: make(map[string]*storedResource),
+	}
+}
+
+// NewFakeResourceRepositoryWithWorkspaceOverrides allows tests to control the
+// workspace IDs returned for current and previous versions.
+func NewFakeResourceRepositoryWithWorkspaceOverrides(current, previous string) ResourceRepository {
+	return &fakeResourceRepository{
+		resources:        make(map[string]*storedResource),
+		overrideCurrent:  current,
+		overridePrevious: previous,
 	}
 }
 
@@ -125,6 +138,46 @@ func (f *fakeResourceRepository) FindResourceByKeys(tx *gorm.DB, key bizmodel.Re
 	}
 
 	return nil, gorm.ErrRecordNotFound
+}
+
+func (f *fakeResourceRepository) FindVersionedRepresentationsByVersion(tx *gorm.DB, key bizmodel.ReporterResourceKey, currentVersion uint) ([]VersionedRepresentation, error) {
+	// This is a fake implementation for testing
+	// In a real test, you would mock this based on your test data needs
+	var results []VersionedRepresentation
+
+	// Prefer explicit overrides when provided by tests
+	if f.overrideCurrent != "" {
+		results = append(results, VersionedRepresentation{Data: map[string]interface{}{"workspace_id": f.overrideCurrent}, Version: currentVersion, Kind: RepresentationKindCommon})
+		if f.overridePrevious != "" && currentVersion > 0 {
+			results = append(results, VersionedRepresentation{Data: map[string]interface{}{"workspace_id": f.overridePrevious}, Version: currentVersion - 1, Kind: RepresentationKindCommon})
+		}
+		return results, nil
+	}
+
+	// For testing purposes, we'll return mock data based on the version
+	// In a real implementation, this would query the database for common_representations
+
+	// Mock data for testing - you can customize this based on your test needs
+	switch currentVersion {
+	case 0:
+		// Version 0 - initial creation
+		results = append(results, VersionedRepresentation{Data: map[string]interface{}{"workspace_id": "test-workspace-initial"}, Version: currentVersion, Kind: RepresentationKindCommon})
+	case 1:
+		// Version 1 - first update
+		results = append(results, VersionedRepresentation{Data: map[string]interface{}{"workspace_id": "test-workspace-v1"}, Version: currentVersion, Kind: RepresentationKindCommon})
+		// Also include previous (version 0) for contract parity with real repo
+		results = append(results, VersionedRepresentation{Data: map[string]interface{}{"workspace_id": "test-workspace-previous"}, Version: 0, Kind: RepresentationKindCommon})
+	case 2:
+		// Version 2 - workspace change scenario
+		results = append(results, VersionedRepresentation{Data: map[string]interface{}{"workspace_id": "test-workspace-v2"}, Version: currentVersion, Kind: RepresentationKindCommon})
+
+		// Add previous (current-1) version if requested
+		if currentVersion > 0 {
+			results = append(results, VersionedRepresentation{Data: map[string]interface{}{"workspace_id": "test-workspace-previous"}, Version: currentVersion - 1, Kind: RepresentationKindCommon})
+		}
+	}
+
+	return results, nil
 }
 
 func (f *fakeResourceRepository) GetDB() *gorm.DB {

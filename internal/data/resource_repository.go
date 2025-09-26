@@ -6,6 +6,7 @@ import (
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
+	"github.com/project-kessel/inventory-api/internal"
 	bizmodel "github.com/project-kessel/inventory-api/internal/biz/model"
 	"github.com/project-kessel/inventory-api/internal/biz/model_legacy"
 	"github.com/project-kessel/inventory-api/internal/biz/usecase"
@@ -24,6 +25,28 @@ type FindResourceByKeysResult struct {
 	ReporterType          string    `gorm:"column:reporter_type"`
 	ReporterInstanceID    string    `gorm:"column:reporter_instance_id"`
 	ConsistencyToken      string    `gorm:"column:consistency_token"`
+}
+
+type CommonRepresentationsByVersion struct {
+	Data    internal.JsonObject `gorm:"column:data"`
+	Version uint                `gorm:"column:version"`
+}
+
+// RepresentationKind classifies the origin of a versioned representation.
+// Today we only materialize common representations here, but this type keeps
+// the data model future-proof if reporter representations are added later.
+type RepresentationKind string
+
+const (
+	RepresentationKindCommon   RepresentationKind = "common"
+	RepresentationKindReporter RepresentationKind = "reporter"
+)
+
+// VersionedRepresentation captures representation data along with its version and origin kind.
+type VersionedRepresentation struct {
+	Data    internal.JsonObject `gorm:"column:data"`
+	Version uint                `gorm:"column:version"`
+	Kind    RepresentationKind  `gorm:"-"`
 }
 
 func ToSnapshotsFromResults(results []FindResourceByKeysResult) (*bizmodel.ResourceSnapshot, []bizmodel.ReporterResourceSnapshot) {
@@ -81,6 +104,7 @@ type ResourceRepository interface {
 	NextReporterResourceId() (bizmodel.ReporterResourceId, error)
 	Save(tx *gorm.DB, resource bizmodel.Resource, operationType model_legacy.EventOperationType, txid string) error
 	FindResourceByKeys(tx *gorm.DB, key bizmodel.ReporterResourceKey) (*bizmodel.Resource, error)
+	FindVersionedRepresentationsByVersion(tx *gorm.DB, key bizmodel.ReporterResourceKey, currentVersion uint) ([]VersionedRepresentation, error)
 	GetDB() *gorm.DB
 	GetTransactionManager() usecase.TransactionManager
 }
@@ -240,4 +264,35 @@ func (r *resourceRepository) GetDB() *gorm.DB {
 
 func (r *resourceRepository) GetTransactionManager() usecase.TransactionManager {
 	return r.transactionManager
+}
+
+func (r *resourceRepository) FindVersionedRepresentationsByVersion(tx *gorm.DB, key bizmodel.ReporterResourceKey, currentVersion uint) ([]VersionedRepresentation, error) {
+	var results []VersionedRepresentation
+
+	// Use provided transaction or fall back to regular DB session
+	db := tx
+	if db == nil {
+		db = r.db.Session(&gorm.Session{})
+	}
+
+	query := db.Table("reporter_resources rr").
+		Select("cr.data, cr.version").
+		Joins("JOIN common_representations cr ON rr.resource_id = cr.resource_id").
+		Where("LOWER(rr.local_resource_id) = LOWER(?)", key.LocalResourceId().Serialize()).
+		Where("LOWER(rr.resource_type) = LOWER(?)", key.ResourceType().Serialize()).
+		Where("LOWER(rr.reporter_type) = LOWER(?)", key.ReporterType().Serialize()).
+		Where("rr.tombstone = ?", false).
+		Where("(cr.version = ? OR cr.version = ?)", currentVersion, currentVersion-1)
+
+	// Only add reporter_instance_id condition if it's not empty
+	if reporterInstanceId := key.ReporterInstanceId().Serialize(); reporterInstanceId != "" {
+		query = query.Where("LOWER(rr.reporter_instance_id) = LOWER(?)", reporterInstanceId)
+	}
+
+	err := query.Find(&results).Error
+	if err != nil {
+		return nil, fmt.Errorf("failed to find common representations by version: %w", err)
+	}
+
+	return results, nil
 }

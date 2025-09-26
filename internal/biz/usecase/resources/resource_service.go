@@ -859,6 +859,12 @@ func (uc *Usecase) CalculateTuples(tupleEvent model.TupleEvent) (model.TuplesToR
 
 	uc.Log.Infof("CalculateTuples called - version: %d, key: %+v", currentVersion, key)
 
+	versionedRepresentations, err := uc.getWorkspaceVersions(key, currentVersion)
+	if err != nil {
+		return model.TuplesToReplicate{}, err
+	}
+	uc.determineTupleOperations()
+
 	var currentWorkspaceID, previousWorkspaceID string
 
 	// Handle create scenario (version 0)
@@ -936,6 +942,35 @@ func (uc *Usecase) CalculateTuples(tupleEvent model.TupleEvent) (model.TuplesToR
 	if tuplesToCreate == nil && tuplesToDelete == nil {
 		uc.Log.Infof("No workspace ID changes detected, no tuples to process")
 		return model.TuplesToReplicate{}, nil
+	}
+
+	return model.NewTuplesToReplicate(tuplesToCreate, tuplesToDelete)
+}
+
+func (uc *Usecase) getWorkspaceVersions(key model.ReporterResourceKey, currentVersion uint) ([]data.VersionedRepresentation, error) {
+	representations, err := uc.resourceRepository.FindVersionedRepresentationsByVersion(
+		nil, key, currentVersion,
+	)
+	if err != nil {
+		return []data.VersionedRepresentation{}, fmt.Errorf("failed to find common representations: %w", err)
+	}
+	return representations, nil
+}
+
+func (uc *Usecase) determineTupleOperations(versionedRepresentations []data.VersionedRepresentation, currentVersion uint, localResourceId model.LocalResourceId) (model.TuplesToReplicate, error) {
+	// Extract workspace_ids from the representations
+	var tuplesToCreate, tuplesToDelete []model.RelationsTuple
+
+	for _, repr := range versionedRepresentations {
+		if workspaceID, exists := repr.Data["workspace_id"].(string); exists && workspaceID != "" {
+			relationsTuple := model.NewRelationsTuple(localResourceId.Serialize(), "workspace", workspaceID)
+			switch repr.Version {
+			case currentVersion:
+				tuplesToCreate = append(tuplesToCreate, relationsTuple)
+			case currentVersion - 1:
+				tuplesToDelete = append(tuplesToDelete, relationsTuple)
+			}
+		}
 	}
 
 	return model.NewTuplesToReplicate(tuplesToCreate, tuplesToDelete)

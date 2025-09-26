@@ -281,14 +281,8 @@ func (r *resourceRepository) FindVersionedRepresentationsByVersion(tx *gorm.DB, 
 		Where("LOWER(rr.local_resource_id) = LOWER(?)", key.LocalResourceId().Serialize()).
 		Where("LOWER(rr.resource_type) = LOWER(?)", key.ResourceType().Serialize()).
 		Where("LOWER(rr.reporter_type) = LOWER(?)", key.ReporterType().Serialize()).
-		Where("rr.tombstone = ?", false)
-
-	// Handle version 0 as special case (no previous version exists)
-	if currentVersion == 0 {
-		query = query.Where("cr.version = ?", currentVersion)
-	} else {
-		query = query.Where("(cr.version = ? OR cr.version = ?)", currentVersion, currentVersion-1)
-	}
+		Where("rr.tombstone = ?", false).
+		Where("(cr.version = ? OR cr.version = ?)", currentVersion, currentVersion-1)
 
 	// Only add reporter_instance_id condition if it's not empty
 	if reporterInstanceId := key.ReporterInstanceId().Serialize(); reporterInstanceId != "" {
@@ -298,14 +292,6 @@ func (r *resourceRepository) FindVersionedRepresentationsByVersion(tx *gorm.DB, 
 	err := query.Find(&results).Error
 	if err != nil {
 		return nil, fmt.Errorf("failed to find common representations by version: %w", err)
-	}
-
-	// Explicitly mark all results as common representations since we queried common_representations table
-	for i := range results {
-		if results[i].Kind != "" && results[i].Kind != RepresentationKindCommon {
-			return nil, fmt.Errorf("unexpected representation kind: %s, expected common", results[i].Kind)
-		}
-		results[i].Kind = RepresentationKindCommon
 	}
 
 	return results, nil

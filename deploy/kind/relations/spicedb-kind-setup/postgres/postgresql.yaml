@@ -28,7 +28,7 @@ spec:
         app: postgres
     spec:
       containers:
-      - image: postgres:latest
+      - image: postgres:16.8
         name: postgres
         envFrom:
           - secretRef:

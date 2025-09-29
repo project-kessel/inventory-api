@@ -924,24 +924,38 @@ func (uc *Usecase) CalculateTuples(tupleEvent model.TupleEvent) (model.TuplesToR
 
 	// Always create tuple for current workspace if it exists
 	if currentWorkspaceID != "" {
-		resourceStr := fmt.Sprintf("%s:%s", key.ResourceType().Serialize(), key.LocalResourceId().Serialize())
-		subjectStr := fmt.Sprintf("rbac:workspace:%s", currentWorkspaceID)
+		// Create typed resource
+		resourceType := model.NewRelationsObjectType(key.ResourceType().Serialize(), key.ResourceType().Serialize())
+		resource := model.NewRelationsResource(key.LocalResourceId(), resourceType)
 
-		createTuple := model.NewRelationsTuple(resourceStr, "workspace", subjectStr)
+		// Create typed subject
+		subjectType := model.NewRelationsObjectType("workspace", "rbac")
+		workspaceId, _ := model.NewLocalResourceId(currentWorkspaceID)
+		subjectResource := model.NewRelationsResource(workspaceId, subjectType)
+		subject := model.NewRelationsSubject(subjectResource)
+
+		createTuple := model.NewRelationsTuple(resource, "workspace", subject)
 		tuplesToCreate = &[]model.RelationsTuple{createTuple}
 
-		uc.Log.Infof("Created tuple to create: %s#workspace@%s", resourceStr, subjectStr)
+		uc.Log.Infof("Created tuple to create: %s:%s#workspace@rbac:workspace:%s", key.ResourceType().Serialize(), key.LocalResourceId().Serialize(), currentWorkspaceID)
 	}
 
 	// Delete previous tuple if workspace ID changed and previous exists
 	if previousWorkspaceID != "" && previousWorkspaceID != currentWorkspaceID {
-		resourceStr := fmt.Sprintf("%s:%s", key.ResourceType().Serialize(), key.LocalResourceId().Serialize())
-		subjectStr := fmt.Sprintf("rbac:workspace:%s", previousWorkspaceID)
+		// Create typed resource (same as create)
+		resourceType := model.NewRelationsObjectType(key.ResourceType().Serialize(), key.ResourceType().Serialize())
+		resource := model.NewRelationsResource(key.LocalResourceId(), resourceType)
 
-		deleteTuple := model.NewRelationsTuple(resourceStr, "workspace", subjectStr)
+		// Create typed subject for previous workspace
+		subjectType := model.NewRelationsObjectType("workspace", "rbac")
+		previousWorkspaceId, _ := model.NewLocalResourceId(previousWorkspaceID)
+		subjectResource := model.NewRelationsResource(previousWorkspaceId, subjectType)
+		subject := model.NewRelationsSubject(subjectResource)
+
+		deleteTuple := model.NewRelationsTuple(resource, "workspace", subject)
 		tuplesToDelete = &[]model.RelationsTuple{deleteTuple}
 
-		uc.Log.Infof("Created tuple to delete: %s#workspace@%s", resourceStr, subjectStr)
+		uc.Log.Infof("Created tuple to delete: %s:%s#workspace@rbac:workspace:%s", key.ResourceType().Serialize(), key.LocalResourceId().Serialize(), previousWorkspaceID)
 	}
 
 	// Return empty result if no tuples to process

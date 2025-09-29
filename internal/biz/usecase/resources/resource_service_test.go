@@ -463,7 +463,8 @@ func TestCalculateTuples(t *testing.T) {
 			require.NoError(t, err)
 
 			// Create TupleEvent
-			tupleEvent, err := model.NewTupleEvent(model.Version(tt.version), key)
+			version := model.Version(tt.version)
+			tupleEvent, err := model.NewTupleEvent(key, biz.OperationTypeCreated, &version, nil)
 			require.NoError(t, err)
 
 			// Call CalculateTuplesv2

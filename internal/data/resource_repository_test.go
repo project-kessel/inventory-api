@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
+	"github.com/project-kessel/inventory-api/internal/biz"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gorm.io/driver/sqlite"
@@ -109,7 +110,7 @@ func TestFindResourceByKeys(t *testing.T) {
 				repo, db := getFreshInstances()
 
 				resource := createTestResource(t)
-				err := repo.Save(db, resource, model_legacy.OperationTypeCreated, "test-tx-123")
+				err := repo.Save(db, resource, biz.OperationTypeCreated, "test-tx-123")
 				require.NoError(t, err)
 
 				key, err := bizmodel.NewReporterResourceKey(
@@ -148,9 +149,9 @@ func TestFindResourceByKeys(t *testing.T) {
 
 				repo, db := getFreshInstances()
 
-				err := repo.Save(db, resource1, model_legacy.OperationTypeCreated, "test-tx-1")
+				err := repo.Save(db, resource1, biz.OperationTypeCreated, "test-tx-1")
 				require.NoError(t, err)
-				err = repo.Save(db, resource2, model_legacy.OperationTypeCreated, "test-tx-2")
+				err = repo.Save(db, resource2, biz.OperationTypeCreated, "test-tx-2")
 				require.NoError(t, err)
 
 				key1, err := bizmodel.NewReporterResourceKey("resource-1", "k8s_cluster", "ocm", "ocm-instance-1")
@@ -178,7 +179,7 @@ func TestFindResourceByKeys(t *testing.T) {
 				repo, db := getFreshInstances()
 
 				resource := createTestResource(t)
-				err := repo.Save(db, resource, model_legacy.OperationTypeCreated, "test-tx-1")
+				err := repo.Save(db, resource, biz.OperationTypeCreated, "test-tx-1")
 				require.NoError(t, err)
 
 				key, err := bizmodel.NewReporterResourceKey(
@@ -215,7 +216,7 @@ func TestFindResourceByKeys(t *testing.T) {
 				repo, db := getFreshInstances()
 
 				resource := createTestResourceWithLocalId(t, "test-resource-no-instance-lookup")
-				err := repo.Save(db, resource, model_legacy.OperationTypeCreated, "test-tx-no-instance")
+				err := repo.Save(db, resource, biz.OperationTypeCreated, "test-tx-no-instance")
 				require.NoError(t, err)
 
 				key, err := bizmodel.NewReporterResourceKey(
@@ -238,7 +239,7 @@ func TestFindResourceByKeys(t *testing.T) {
 
 				// Create a resource with mixed case values
 				resource := createTestResourceWithMixedCase(t)
-				err := repo.Save(db, resource, model_legacy.OperationTypeCreated, "test-tx-case")
+				err := repo.Save(db, resource, biz.OperationTypeCreated, "test-tx-case")
 				require.NoError(t, err)
 
 				testCases := []struct {
@@ -367,7 +368,7 @@ func TestFindResourceByKeys_TombstoneFilter(t *testing.T) {
 			repo, db := getFreshInstances()
 
 			resource := createTestResourceWithLocalId(t, "tombstoned-resource")
-			err := repo.Save(db, resource, model_legacy.OperationTypeCreated, "test-tx-tombstone")
+			err := repo.Save(db, resource, biz.OperationTypeCreated, "test-tx-tombstone")
 			require.NoError(t, err)
 
 			key, err := bizmodel.NewReporterResourceKey(
@@ -385,7 +386,7 @@ func TestFindResourceByKeys_TombstoneFilter(t *testing.T) {
 			err = foundResource.Delete(key)
 			require.NoError(t, err)
 
-			err = repo.Save(db, *foundResource, model_legacy.OperationTypeDeleted, "test-tx-delete")
+			err = repo.Save(db, *foundResource, biz.OperationTypeDeleted, "test-tx-delete")
 			require.NoError(t, err)
 
 			foundResource, err = repo.FindResourceByKeys(db, key)
@@ -440,7 +441,7 @@ func TestSave(t *testing.T) {
 				repo, db := getFreshInstances()
 
 				resource := createTestResourceWithLocalId(t, "update-test")
-				err := repo.Save(db, resource, model_legacy.OperationTypeCreated, "test-tx-1")
+				err := repo.Save(db, resource, biz.OperationTypeCreated, "test-tx-1")
 				require.NoError(t, err)
 
 				key, err := bizmodel.NewReporterResourceKey("update-test", "k8s_cluster", "ocm", "ocm-instance-1")
@@ -467,7 +468,7 @@ func TestSave(t *testing.T) {
 				err = resource.Update(key, apiHref, consoleHref, nil, updatedReporterData, updatedCommonData)
 				require.NoError(t, err)
 
-				err = repo.Save(db, resource, model_legacy.OperationTypeUpdated, "test-tx-2")
+				err = repo.Save(db, resource, biz.OperationTypeUpdated, "test-tx-2")
 				require.NoError(t, err)
 
 				foundResource, err := repo.FindResourceByKeys(db, key)
@@ -481,7 +482,7 @@ func TestSave(t *testing.T) {
 
 				resource := createTestResourceWithLocalId(t, "save-new-test")
 
-				err := repo.Save(db, resource, model_legacy.OperationTypeCreated, "test-tx-save")
+				err := repo.Save(db, resource, biz.OperationTypeCreated, "test-tx-save")
 				require.NoError(t, err)
 
 				key, err := bizmodel.NewReporterResourceKey("save-new-test", "k8s_cluster", "ocm", "ocm-instance-1")
@@ -501,7 +502,7 @@ func TestSave(t *testing.T) {
 				repo, db := getFreshInstances()
 
 				resource := createTestResourceWithLocalId(t, "zero-pk-test")
-				err := repo.Save(db, resource, model_legacy.OperationTypeCreated, "test-tx-zero-pk")
+				err := repo.Save(db, resource, biz.OperationTypeCreated, "test-tx-zero-pk")
 				require.NoError(t, err, "Save should succeed and skip representations with zero value primary keys")
 
 				key, err := bizmodel.NewReporterResourceKey("zero-pk-test", "k8s_cluster", "ocm", "ocm-instance-1")
@@ -561,10 +562,10 @@ func TestResourceRepository_MultipleHostsLifecycle(t *testing.T) {
 			host1 := createTestResourceWithLocalIdAndType(t, "host-1", "host")
 			host2 := createTestResourceWithLocalIdAndType(t, "host-2", "host")
 
-			err := repo.Save(db, host1, model_legacy.OperationTypeCreated, "tx-create-host1")
+			err := repo.Save(db, host1, biz.OperationTypeCreated, "tx-create-host1")
 			require.NoError(t, err, "Should create host1")
 
-			err = repo.Save(db, host2, model_legacy.OperationTypeCreated, "tx-create-host2")
+			err = repo.Save(db, host2, biz.OperationTypeCreated, "tx-create-host2")
 			require.NoError(t, err, "Should create host2")
 
 			// Verify both hosts can be found
@@ -603,10 +604,10 @@ func TestResourceRepository_MultipleHostsLifecycle(t *testing.T) {
 			err = foundHost2.Update(key2, apiHref, consoleHref, nil, updatedReporterData, updatedCommonData)
 			require.NoError(t, err, "Should update host2")
 
-			err = repo.Save(db, *foundHost1, model_legacy.OperationTypeUpdated, "tx-update-host1")
+			err = repo.Save(db, *foundHost1, biz.OperationTypeUpdated, "tx-update-host1")
 			require.NoError(t, err, "Should save updated host1")
 
-			err = repo.Save(db, *foundHost2, model_legacy.OperationTypeUpdated, "tx-update-host2")
+			err = repo.Save(db, *foundHost2, biz.OperationTypeUpdated, "tx-update-host2")
 			require.NoError(t, err, "Should save updated host2")
 
 			// Verify both updated hosts can still be found
@@ -625,10 +626,10 @@ func TestResourceRepository_MultipleHostsLifecycle(t *testing.T) {
 			err = updatedHost2.Delete(key2)
 			require.NoError(t, err, "Should delete host2")
 
-			err = repo.Save(db, *updatedHost1, model_legacy.OperationTypeDeleted, "tx-delete-host1")
+			err = repo.Save(db, *updatedHost1, biz.OperationTypeDeleted, "tx-delete-host1")
 			require.NoError(t, err, "Should save deleted host1")
 
-			err = repo.Save(db, *updatedHost2, model_legacy.OperationTypeDeleted, "tx-delete-host2")
+			err = repo.Save(db, *updatedHost2, biz.OperationTypeDeleted, "tx-delete-host2")
 			require.NoError(t, err, "Should save deleted host2")
 
 			// Verify both hosts are no longer found (tombstoned)
@@ -687,7 +688,7 @@ func TestResourceRepository_PartialDataScenarios(t *testing.T) {
 				repo, db := getFreshInstances()
 
 				resource := createTestResourceWithReporterDataOnly(t, "reporter-only-resource")
-				err := repo.Save(db, resource, model_legacy.OperationTypeCreated, "tx-reporter-only")
+				err := repo.Save(db, resource, biz.OperationTypeCreated, "tx-reporter-only")
 				require.NoError(t, err, "Should save resource with only reporter data")
 
 				key, err := bizmodel.NewReporterResourceKey("reporter-only-resource", "k8s_cluster", "ocm", "ocm-instance-1")
@@ -702,7 +703,7 @@ func TestResourceRepository_PartialDataScenarios(t *testing.T) {
 				repo, db := getFreshInstances()
 
 				resource := createTestResourceWithCommonDataOnly(t, "common-only-resource")
-				err := repo.Save(db, resource, model_legacy.OperationTypeCreated, "tx-common-only")
+				err := repo.Save(db, resource, biz.OperationTypeCreated, "tx-common-only")
 				require.NoError(t, err, "Should save resource with only common data")
 
 				key, err := bizmodel.NewReporterResourceKey("common-only-resource", "k8s_cluster", "ocm", "ocm-instance-1")
@@ -718,7 +719,7 @@ func TestResourceRepository_PartialDataScenarios(t *testing.T) {
 
 				// 1. Report with both reporter and common data
 				resourceBoth := createTestResourceWithLocalId(t, "progressive-resource")
-				err := repo.Save(db, resourceBoth, model_legacy.OperationTypeCreated, "tx-both")
+				err := repo.Save(db, resourceBoth, biz.OperationTypeCreated, "tx-both")
 				require.NoError(t, err, "Should save resource with both data types")
 
 				key, err := bizmodel.NewReporterResourceKey("progressive-resource", "k8s_cluster", "ocm", "ocm-instance-1")
@@ -746,7 +747,7 @@ func TestResourceRepository_PartialDataScenarios(t *testing.T) {
 				err = foundResource.Update(key, apiHref, consoleHref, nil, reporterOnlyData, emptyCommonData)
 				require.NoError(t, err, "Should update with reporter data only")
 
-				err = repo.Save(db, *foundResource, model_legacy.OperationTypeUpdated, "tx-reporter-update")
+				err = repo.Save(db, *foundResource, biz.OperationTypeUpdated, "tx-reporter-update")
 				require.NoError(t, err, "Should save resource with reporter-only update")
 
 				// 3. Update with just common data
@@ -766,7 +767,7 @@ func TestResourceRepository_PartialDataScenarios(t *testing.T) {
 				err = foundResource.Update(key, apiHref, consoleHref, nil, emptyReporterData, commonOnlyData)
 				require.NoError(t, err, "Should update with common data only")
 
-				err = repo.Save(db, *foundResource, model_legacy.OperationTypeUpdated, "tx-common-update")
+				err = repo.Save(db, *foundResource, biz.OperationTypeUpdated, "tx-common-update")
 				require.NoError(t, err, "Should save resource with common-only update")
 
 				// Verify final resource can still be found
@@ -1105,7 +1106,7 @@ func TestFindVersionedRepresentationsByVersion(t *testing.T) {
 			res := createTestResourceWithLocalIdAndType(t, "localResourceId-1", "host")
 			_ = db // fake ignores db
 			if impl.name != "Fake Repository" {
-				require.NoError(t, repo.Save(db, res, model_legacy.OperationTypeCreated, "tx1"))
+				require.NoError(t, repo.Save(db, res, biz.OperationTypeCreated, "tx1"))
 
 				// Update to bump common version to v1 with workspace_id workspace2
 				key, err := bizmodel.NewReporterResourceKey("localResourceId-1", "host", "hbi", "hbi-instance-1")
@@ -1116,7 +1117,7 @@ func TestFindVersionedRepresentationsByVersion(t *testing.T) {
 				require.NoError(t, err)
 				err = res.Update(key, "", "", nil, updatedReporter, updatedCommon)
 				require.NoError(t, err)
-				require.NoError(t, repo.Save(db, res, model_legacy.OperationTypeUpdated, "tx2"))
+				require.NoError(t, repo.Save(db, res, biz.OperationTypeUpdated, "tx2"))
 			}
 
 			// Act: query for current (1) and previous (0)
@@ -1156,7 +1157,7 @@ func TestFindVersionedRepresentationsByVersion_RealRepo(t *testing.T) {
 
 	// Create initial resource (common version v0)
 	res := createTestResourceWithLocalIdAndType(t, "crv-test", "host")
-	require.NoError(t, repo.Save(db, res, model_legacy.OperationTypeCreated, "tx1"))
+	require.NoError(t, repo.Save(db, res, biz.OperationTypeCreated, "tx1"))
 
 	// Update common representation to bump to v1
 	key, err := bizmodel.NewReporterResourceKey("crv-test", "host", "hbi", "hbi-instance-1")
@@ -1168,7 +1169,7 @@ func TestFindVersionedRepresentationsByVersion_RealRepo(t *testing.T) {
 	require.NoError(t, err)
 	err = res.Update(key, "", "", nil, updatedReporter, updatedCommon)
 	require.NoError(t, err)
-	require.NoError(t, repo.Save(db, res, model_legacy.OperationTypeUpdated, "tx2"))
+	require.NoError(t, repo.Save(db, res, biz.OperationTypeUpdated, "tx2"))
 
 	// Query for current v1 and previous v0
 	results, err := repo.FindVersionedRepresentationsByVersion(db, key, 1)
@@ -1229,7 +1230,7 @@ func TestFindVersionedRepresentationsByVersion_ErrorPath(t *testing.T) {
 
 	// Seed a normal resource
 	res := createTestResourceWithLocalIdAndType(t, "localResourceId-1", "host")
-	require.NoError(t, repo.Save(db, res, model_legacy.OperationTypeCreated, "tx1"))
+	require.NoError(t, repo.Save(db, res, biz.OperationTypeCreated, "tx1"))
 	key, err := bizmodel.NewReporterResourceKey("localResourceId-1", "host", "hbi", "hbi-instance-1")
 	require.NoError(t, err)
 
@@ -1282,7 +1283,7 @@ func TestFindVersionedRepresentationsByVersion_VersionZero(t *testing.T) {
 			// Seed: create resource (v0) then update (v1) for real repo
 			res := createTestResourceWithLocalIdAndType(t, "localResourceId-1", "host")
 			if impl.name != "Fake Repository" {
-				require.NoError(t, repo.Save(db, res, model_legacy.OperationTypeCreated, "tx1"))
+				require.NoError(t, repo.Save(db, res, biz.OperationTypeCreated, "tx1"))
 
 				// Update to create v1 (so we have both v0 and v1)
 				key, err := bizmodel.NewReporterResourceKey("localResourceId-1", "host", "hbi", "hbi-instance-1")
@@ -1293,7 +1294,7 @@ func TestFindVersionedRepresentationsByVersion_VersionZero(t *testing.T) {
 				require.NoError(t, err)
 				err = res.Update(key, "", "", nil, updatedReporter, updatedCommon)
 				require.NoError(t, err)
-				require.NoError(t, repo.Save(db, res, model_legacy.OperationTypeUpdated, "tx2"))
+				require.NoError(t, repo.Save(db, res, biz.OperationTypeUpdated, "tx2"))
 			}
 
 			key, err := bizmodel.NewReporterResourceKey("localResourceId-1", "host", "hbi", "hbi-instance-1")

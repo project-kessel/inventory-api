@@ -694,15 +694,15 @@ func TestGetWorkspaceVersions(t *testing.T) {
 }
 func TestExtractWorkspaceIDs(t *testing.T) {
 	tests := []struct {
-		name                     string
-		versionedRepresentations []data.VersionedRepresentation
-		currentVersion           uint
-		expectedCurrent          string
-		expectedPrevious         string
+		name                  string
+		representationVersion []data.RepresentationsByVersion
+		currentVersion        uint
+		expectedCurrent       string
+		expectedPrevious      string
 	}{
 		{
 			name: "extract current and previous workspace IDs",
-			versionedRepresentations: []data.VersionedRepresentation{
+			representationVersion: []data.RepresentationsByVersion{
 				{
 					Version: 2,
 					Data: map[string]interface{}{
@@ -722,7 +722,7 @@ func TestExtractWorkspaceIDs(t *testing.T) {
 		},
 		{
 			name: "extract only current workspace ID",
-			versionedRepresentations: []data.VersionedRepresentation{
+			representationVersion: []data.RepresentationsByVersion{
 				{
 					Version: 0,
 					Data: map[string]interface{}{
@@ -736,7 +736,7 @@ func TestExtractWorkspaceIDs(t *testing.T) {
 		},
 		{
 			name: "no workspace IDs found",
-			versionedRepresentations: []data.VersionedRepresentation{
+			representationVersion: []data.RepresentationsByVersion{
 				{
 					Version: 1,
 					Data: map[string]interface{}{
@@ -750,7 +750,7 @@ func TestExtractWorkspaceIDs(t *testing.T) {
 		},
 		{
 			name: "empty workspace ID ignored",
-			versionedRepresentations: []data.VersionedRepresentation{
+			representationVersion: []data.RepresentationsByVersion{
 				{
 					Version: 1,
 					Data: map[string]interface{}{
@@ -764,7 +764,7 @@ func TestExtractWorkspaceIDs(t *testing.T) {
 		},
 		{
 			name: "workspace ID with special characters",
-			versionedRepresentations: []data.VersionedRepresentation{
+			representationVersion: []data.RepresentationsByVersion{
 				{
 					Version: 1,
 					Data: map[string]interface{}{
@@ -781,7 +781,7 @@ func TestExtractWorkspaceIDs(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			uc := &Usecase{}
-			current, previous := uc.extractWorkspaceIDs(tt.versionedRepresentations, tt.currentVersion)
+			current, previous := uc.extractWorkspaceIDs(tt.representationVersion, tt.currentVersion)
 
 			assert.Equal(t, tt.expectedCurrent, current)
 			assert.Equal(t, tt.expectedPrevious, previous)
@@ -839,17 +839,17 @@ func TestCreateWorkspaceTuple(t *testing.T) {
 
 func TestDetermineTupleOperations(t *testing.T) {
 	tests := []struct {
-		name                     string
-		versionedRepresentations []data.VersionedRepresentation
-		currentVersion           uint
-		expectedCreateCount      int
-		expectedDeleteCount      int
-		expectedCreateSubject    string
-		expectedDeleteSubject    string
+		name                  string
+		representationVersion []data.RepresentationsByVersion
+		currentVersion        uint
+		expectedCreateCount   int
+		expectedDeleteCount   int
+		expectedCreateSubject string
+		expectedDeleteSubject string
 	}{
 		{
 			name: "workspace change creates and deletes tuples",
-			versionedRepresentations: []data.VersionedRepresentation{
+			representationVersion: []data.RepresentationsByVersion{
 				{
 					Version: 2,
 					Data: map[string]interface{}{
@@ -871,7 +871,7 @@ func TestDetermineTupleOperations(t *testing.T) {
 		},
 		{
 			name: "same workspace creates only",
-			versionedRepresentations: []data.VersionedRepresentation{
+			representationVersion: []data.RepresentationsByVersion{
 				{
 					Version: 2,
 					Data: map[string]interface{}{
@@ -892,7 +892,7 @@ func TestDetermineTupleOperations(t *testing.T) {
 		},
 		{
 			name: "version 0 creates initial tuple",
-			versionedRepresentations: []data.VersionedRepresentation{
+			representationVersion: []data.RepresentationsByVersion{
 				{
 					Version: 0,
 					Data: map[string]interface{}{
@@ -919,7 +919,7 @@ func TestDetermineTupleOperations(t *testing.T) {
 			)
 			require.NoError(t, err)
 
-			result, err := uc.determineTupleOperations(tt.versionedRepresentations, tt.currentVersion, key)
+			result, err := uc.determineTupleOperations(tt.representationVersion, tt.currentVersion, key)
 			require.NoError(t, err)
 
 			if tt.expectedCreateCount > 0 {

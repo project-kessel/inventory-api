@@ -873,8 +873,8 @@ func (uc *Usecase) createWorkspaceTuple(workspaceID string, key model.ReporterRe
 	return model.NewRelationsTuple(resourceStr, "workspace", subjectStr)
 }
 
-func (uc *Usecase) determineTupleOperations(versionedRepresentations []data.VersionedRepresentation, currentVersion uint, key model.ReporterResourceKey) (model.TuplesToReplicate, error) {
-	currentWorkspaceID, previousWorkspaceID := uc.extractWorkspaceIDs(versionedRepresentations, currentVersion)
+func (uc *Usecase) determineTupleOperations(representationVersion []data.RepresentationsByVersion, currentVersion uint, key model.ReporterResourceKey) (model.TuplesToReplicate, error) {
+	currentWorkspaceID, previousWorkspaceID := uc.extractWorkspaceIDs(representationVersion, currentVersion)
 
 	var tuplesToCreate, tuplesToDelete []model.RelationsTuple
 
@@ -900,17 +900,17 @@ func (uc *Usecase) determineTupleOperations(versionedRepresentations []data.Vers
 	return model.NewTuplesToReplicate(createPtr, deletePtr)
 }
 
-func (uc *Usecase) getWorkspaceVersions(key model.ReporterResourceKey, currentVersion uint) ([]data.VersionedRepresentation, error) {
+func (uc *Usecase) getWorkspaceVersions(key model.ReporterResourceKey, currentVersion uint) ([]data.RepresentationsByVersion, error) {
 	representations, err := uc.resourceRepository.FindVersionedRepresentationsByVersion(
 		nil, key, currentVersion,
 	)
 	if err != nil {
-		return []data.VersionedRepresentation{}, fmt.Errorf("failed to find common representations: %w", err)
+		return []data.RepresentationsByVersion{}, fmt.Errorf("failed to find common representations: %w", err)
 	}
 	return representations, nil
 }
 
-func (uc *Usecase) extractWorkspaceIDs(versionedRepresentations []data.VersionedRepresentation, currentVersion uint) (currentWorkspaceID, previousWorkspaceID string) {
+func (uc *Usecase) extractWorkspaceIDs(versionedRepresentations []data.RepresentationsByVersion, currentVersion uint) (currentWorkspaceID, previousWorkspaceID string) {
 	for _, repr := range versionedRepresentations {
 		if workspaceID, exists := repr.Data["workspace_id"].(string); exists && workspaceID != "" {
 			switch repr.Version {

@@ -863,88 +863,41 @@ func (uc *Usecase) CalculateTuples(tupleEvent model.TupleEvent) (model.TuplesToR
 	if err != nil {
 		return model.TuplesToReplicate{}, err
 	}
-	uc.determineTupleOperations()
+	return uc.determineTupleOperations(versionedRepresentations, currentVersion, key)
 
-	var currentWorkspaceID, previousWorkspaceID string
+}
 
-	// Handle create scenario (version 0)
-	if currentVersion == 0 {
-		uc.Log.Infof("CREATE scenario - version 0, processing initial tuple")
+func (uc *Usecase) createWorkspaceTuple(workspaceID string, key model.ReporterResourceKey) model.RelationsTuple {
+	resourceStr := fmt.Sprintf("%s:%s", key.ResourceType().Serialize(), key.LocalResourceId().Serialize())
+	subjectStr := fmt.Sprintf("rbac:workspace:%s", workspaceID)
+	return model.NewRelationsTuple(resourceStr, "workspace", subjectStr)
+}
 
-		// For version 0, we only need the current version data
-		representations, err := uc.resourceRepository.FindVersionedRepresentationsByVersion(
-			nil, key, currentVersion,
-		)
-		if err != nil {
-			return model.TuplesToReplicate{}, fmt.Errorf("failed to find common representations: %w", err)
-		}
+func (uc *Usecase) determineTupleOperations(versionedRepresentations []data.VersionedRepresentation, currentVersion uint, key model.ReporterResourceKey) (model.TuplesToReplicate, error) {
+	currentWorkspaceID, previousWorkspaceID := uc.extractWorkspaceIDs(versionedRepresentations, currentVersion)
 
-		// Extract workspace_id from current version only
-		for _, repr := range representations {
-			if workspaceID, exists := repr.Data["workspace_id"].(string); exists && workspaceID != "" {
-				if repr.Version == currentVersion {
-					currentWorkspaceID = workspaceID
-				}
-			}
-		}
-
-		uc.Log.Infof("Found workspace ID for version 0 - current: '%s'", currentWorkspaceID)
-	} else {
-		// Get common representations for both versions
-		representations, err := uc.resourceRepository.FindVersionedRepresentationsByVersion(
-			nil, key, currentVersion,
-		)
-		if err != nil {
-			return model.TuplesToReplicate{}, fmt.Errorf("failed to find common representations: %w", err)
-		}
-
-		// Extract workspace_ids from the representations
-		for _, repr := range representations {
-			if workspaceID, exists := repr.Data["workspace_id"].(string); exists && workspaceID != "" {
-				switch repr.Version {
-				case currentVersion:
-					currentWorkspaceID = workspaceID
-				case currentVersion - 1:
-					previousWorkspaceID = workspaceID
-				}
-			}
-		}
-
-		uc.Log.Infof("Found workspace IDs - current: '%s', previous: '%s'", currentWorkspaceID, previousWorkspaceID)
-	}
-
-	// Build tuples based on workspace ID changes
-	var tuplesToCreate, tuplesToDelete *[]model.RelationsTuple
+	var tuplesToCreate, tuplesToDelete []model.RelationsTuple
 
 	// Always create tuple for current workspace if it exists
 	if currentWorkspaceID != "" {
-		resourceStr := fmt.Sprintf("%s:%s", key.ResourceType().Serialize(), key.LocalResourceId().Serialize())
-		subjectStr := fmt.Sprintf("rbac:workspace:%s", currentWorkspaceID)
-
-		createTuple := model.NewRelationsTuple(resourceStr, "workspace", subjectStr)
-		tuplesToCreate = &[]model.RelationsTuple{createTuple}
-
-		uc.Log.Infof("Created tuple to create: %s#workspace@%s", resourceStr, subjectStr)
+		tuplesToCreate = append(tuplesToCreate, uc.createWorkspaceTuple(currentWorkspaceID, key))
 	}
 
-	// Delete previous tuple if workspace ID changed and previous exists
+	// Delete previous tuple ONLY if workspace ID changed and previous exists
 	if previousWorkspaceID != "" && previousWorkspaceID != currentWorkspaceID {
-		resourceStr := fmt.Sprintf("%s:%s", key.ResourceType().Serialize(), key.LocalResourceId().Serialize())
-		subjectStr := fmt.Sprintf("rbac:workspace:%s", previousWorkspaceID)
-
-		deleteTuple := model.NewRelationsTuple(resourceStr, "workspace", subjectStr)
-		tuplesToDelete = &[]model.RelationsTuple{deleteTuple}
-
-		uc.Log.Infof("Created tuple to delete: %s#workspace@%s", resourceStr, subjectStr)
+		tuplesToDelete = append(tuplesToDelete, uc.createWorkspaceTuple(previousWorkspaceID, key))
 	}
 
-	// Return empty result if no tuples to process
-	if tuplesToCreate == nil && tuplesToDelete == nil {
-		uc.Log.Infof("No workspace ID changes detected, no tuples to process")
-		return model.TuplesToReplicate{}, nil
+	// Return pointers only if slices are not empty
+	var createPtr, deletePtr *[]model.RelationsTuple
+	if len(tuplesToCreate) > 0 {
+		createPtr = &tuplesToCreate
+	}
+	if len(tuplesToDelete) > 0 {
+		deletePtr = &tuplesToDelete
 	}
 
-	return model.NewTuplesToReplicate(tuplesToCreate, tuplesToDelete)
+	return model.NewTuplesToReplicate(createPtr, deletePtr)
 }
 
 func (uc *Usecase) getWorkspaceVersions(key model.ReporterResourceKey, currentVersion uint) ([]data.VersionedRepresentation, error) {
@@ -957,21 +910,16 @@ func (uc *Usecase) getWorkspaceVersions(key model.ReporterResourceKey, currentVe
 	return representations, nil
 }
 
-func (uc *Usecase) determineTupleOperations(versionedRepresentations []data.VersionedRepresentation, currentVersion uint, localResourceId model.LocalResourceId) (model.TuplesToReplicate, error) {
-	// Extract workspace_ids from the representations
-	var tuplesToCreate, tuplesToDelete []model.RelationsTuple
-
+func (uc *Usecase) extractWorkspaceIDs(versionedRepresentations []data.VersionedRepresentation, currentVersion uint) (currentWorkspaceID, previousWorkspaceID string) {
 	for _, repr := range versionedRepresentations {
 		if workspaceID, exists := repr.Data["workspace_id"].(string); exists && workspaceID != "" {
-			relationsTuple := model.NewRelationsTuple(localResourceId.Serialize(), "workspace", workspaceID)
 			switch repr.Version {
 			case currentVersion:
-				tuplesToCreate = append(tuplesToCreate, relationsTuple)
+				currentWorkspaceID = workspaceID
 			case currentVersion - 1:
-				tuplesToDelete = append(tuplesToDelete, relationsTuple)
+				previousWorkspaceID = workspaceID
 			}
 		}
 	}
-
-	return model.NewTuplesToReplicate(tuplesToCreate, tuplesToDelete)
+	return currentWorkspaceID, previousWorkspaceID
 }

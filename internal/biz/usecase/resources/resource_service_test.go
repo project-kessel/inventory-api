@@ -657,3 +657,288 @@ func createTestReportRequestWithCommonDataOnly(t *testing.T, resourceType, repor
 		WriteVisibility: v1beta2.WriteVisibility_MINIMIZE_LATENCY,
 	}
 }
+
+func TestGetWorkspaceVersions(t *testing.T) {
+	tests := []struct {
+		name          string
+		version       uint
+		expectedCount int
+	}{
+		{
+			name:          "successful retrieval",
+			version:       2,
+			expectedCount: 2, // Mock returns 2 representations
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			repo := data.NewFakeResourceRepositoryWithWorkspaceOverrides("", "")
+			uc := &Usecase{
+				resourceRepository: repo,
+			}
+
+			key, err := model.NewReporterResourceKey(
+				model.LocalResourceId("test-resource"),
+				model.ResourceType("host"),
+				model.ReporterType("HBI"),
+				model.ReporterInstanceId("test-instance"),
+			)
+			require.NoError(t, err)
+
+			result, err := uc.getWorkspaceVersions(key, tt.version)
+			require.NoError(t, err)
+			assert.Len(t, result, tt.expectedCount)
+		})
+	}
+}
+func TestExtractWorkspaceIDs(t *testing.T) {
+	tests := []struct {
+		name                     string
+		versionedRepresentations []data.VersionedRepresentation
+		currentVersion           uint
+		expectedCurrent          string
+		expectedPrevious         string
+	}{
+		{
+			name: "extract current and previous workspace IDs",
+			versionedRepresentations: []data.VersionedRepresentation{
+				{
+					Version: 2,
+					Data: map[string]interface{}{
+						"workspace_id": "workspace-new",
+					},
+				},
+				{
+					Version: 1,
+					Data: map[string]interface{}{
+						"workspace_id": "workspace-old",
+					},
+				},
+			},
+			currentVersion:   2,
+			expectedCurrent:  "workspace-new",
+			expectedPrevious: "workspace-old",
+		},
+		{
+			name: "extract only current workspace ID",
+			versionedRepresentations: []data.VersionedRepresentation{
+				{
+					Version: 0,
+					Data: map[string]interface{}{
+						"workspace_id": "workspace-initial",
+					},
+				},
+			},
+			currentVersion:   0,
+			expectedCurrent:  "workspace-initial",
+			expectedPrevious: "",
+		},
+		{
+			name: "no workspace IDs found",
+			versionedRepresentations: []data.VersionedRepresentation{
+				{
+					Version: 1,
+					Data: map[string]interface{}{
+						"other_field": "value",
+					},
+				},
+			},
+			currentVersion:   1,
+			expectedCurrent:  "",
+			expectedPrevious: "",
+		},
+		{
+			name: "empty workspace ID ignored",
+			versionedRepresentations: []data.VersionedRepresentation{
+				{
+					Version: 1,
+					Data: map[string]interface{}{
+						"workspace_id": "",
+					},
+				},
+			},
+			currentVersion:   1,
+			expectedCurrent:  "",
+			expectedPrevious: "",
+		},
+		{
+			name: "workspace ID with special characters",
+			versionedRepresentations: []data.VersionedRepresentation{
+				{
+					Version: 1,
+					Data: map[string]interface{}{
+						"workspace_id": "workspace-with-dashes_and_underscores",
+					},
+				},
+			},
+			currentVersion:   1,
+			expectedCurrent:  "workspace-with-dashes_and_underscores",
+			expectedPrevious: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			uc := &Usecase{}
+			current, previous := uc.extractWorkspaceIDs(tt.versionedRepresentations, tt.currentVersion)
+
+			assert.Equal(t, tt.expectedCurrent, current)
+			assert.Equal(t, tt.expectedPrevious, previous)
+		})
+	}
+}
+
+func TestCreateWorkspaceTuple(t *testing.T) {
+	uc := &Usecase{}
+
+	key, err := model.NewReporterResourceKey(
+		model.LocalResourceId("test-resource"),
+		model.ResourceType("host"),
+		model.ReporterType("HBI"),
+		model.ReporterInstanceId("test-instance"),
+	)
+	require.NoError(t, err)
+
+	tests := []struct {
+		name             string
+		workspaceID      string
+		expectedResource string
+		expectedSubject  string
+	}{
+		{
+			name:             "normal workspace ID",
+			workspaceID:      "workspace-123",
+			expectedResource: "host:test-resource",
+			expectedSubject:  "rbac:workspace:workspace-123",
+		},
+		{
+			name:             "workspace ID with special characters",
+			workspaceID:      "workspace-with-dashes_and_underscores",
+			expectedResource: "host:test-resource",
+			expectedSubject:  "rbac:workspace:workspace-with-dashes_and_underscores",
+		},
+		{
+			name:             "empty workspace ID",
+			workspaceID:      "",
+			expectedResource: "host:test-resource",
+			expectedSubject:  "rbac:workspace:",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tuple := uc.createWorkspaceTuple(tt.workspaceID, key)
+
+			assert.Equal(t, tt.expectedResource, tuple.Resource())
+			assert.Equal(t, "workspace", tuple.Relation())
+			assert.Equal(t, tt.expectedSubject, tuple.Subject())
+		})
+	}
+}
+
+func TestDetermineTupleOperations(t *testing.T) {
+	tests := []struct {
+		name                     string
+		versionedRepresentations []data.VersionedRepresentation
+		currentVersion           uint
+		expectedCreateCount      int
+		expectedDeleteCount      int
+		expectedCreateSubject    string
+		expectedDeleteSubject    string
+	}{
+		{
+			name: "workspace change creates and deletes tuples",
+			versionedRepresentations: []data.VersionedRepresentation{
+				{
+					Version: 2,
+					Data: map[string]interface{}{
+						"workspace_id": "workspace-new",
+					},
+				},
+				{
+					Version: 1,
+					Data: map[string]interface{}{
+						"workspace_id": "workspace-old",
+					},
+				},
+			},
+			currentVersion:        2,
+			expectedCreateCount:   1,
+			expectedDeleteCount:   1,
+			expectedCreateSubject: "rbac:workspace:workspace-new",
+			expectedDeleteSubject: "rbac:workspace:workspace-old",
+		},
+		{
+			name: "same workspace creates only",
+			versionedRepresentations: []data.VersionedRepresentation{
+				{
+					Version: 2,
+					Data: map[string]interface{}{
+						"workspace_id": "workspace-same",
+					},
+				},
+				{
+					Version: 1,
+					Data: map[string]interface{}{
+						"workspace_id": "workspace-same",
+					},
+				},
+			},
+			currentVersion:        2,
+			expectedCreateCount:   1,
+			expectedDeleteCount:   0,
+			expectedCreateSubject: "rbac:workspace:workspace-same",
+		},
+		{
+			name: "version 0 creates initial tuple",
+			versionedRepresentations: []data.VersionedRepresentation{
+				{
+					Version: 0,
+					Data: map[string]interface{}{
+						"workspace_id": "workspace-initial",
+					},
+				},
+			},
+			currentVersion:        0,
+			expectedCreateCount:   1,
+			expectedDeleteCount:   0,
+			expectedCreateSubject: "rbac:workspace:workspace-initial",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			uc := &Usecase{}
+
+			key, err := model.NewReporterResourceKey(
+				model.LocalResourceId("test-resource"),
+				model.ResourceType("host"),
+				model.ReporterType("HBI"),
+				model.ReporterInstanceId("test-instance"),
+			)
+			require.NoError(t, err)
+
+			result, err := uc.determineTupleOperations(tt.versionedRepresentations, tt.currentVersion, key)
+			require.NoError(t, err)
+
+			if tt.expectedCreateCount > 0 {
+				require.NotNil(t, result.TuplesToCreate())
+				assert.Len(t, *result.TuplesToCreate(), tt.expectedCreateCount)
+				createTuple := (*result.TuplesToCreate())[0]
+				assert.Equal(t, tt.expectedCreateSubject, createTuple.Subject())
+			} else {
+				assert.Nil(t, result.TuplesToCreate())
+			}
+
+			if tt.expectedDeleteCount > 0 {
+				require.NotNil(t, result.TuplesToDelete())
+				assert.Len(t, *result.TuplesToDelete(), tt.expectedDeleteCount)
+				deleteTuple := (*result.TuplesToDelete())[0]
+				assert.Equal(t, tt.expectedDeleteSubject, deleteTuple.Subject())
+			} else {
+				assert.Nil(t, result.TuplesToDelete())
+			}
+		})
+	}
+}

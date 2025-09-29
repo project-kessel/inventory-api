@@ -75,12 +75,11 @@ func (t *TestCase) TestSetup() []error {
 	authorizer.On("CreateTuples", mock.Anything, mock.Anything).Return(createTupleResponse, nil)
 	authorizer.On("DeleteTuples", mock.Anything, mock.Anything).Return(deleteTupleResponse, nil)
 
-	consumer := mocks.MockConsumer{}
-	t.inv, err = New(cfg, &gorm.DB{}, authz.CompletedConfig{}, authorizer, notifier, t.logger)
+	consumer := &mocks.MockConsumer{}
+	t.inv, err = New(cfg, &gorm.DB{}, authz.CompletedConfig{}, authorizer, notifier, t.logger, consumer)
 	if err != nil {
 		errs = append(errs, err)
 	}
-	t.inv.Consumer = &consumer
 	err = t.metrics.New(otel.Meter("github.com/project-kessel/inventory-api/blob/main/internal/server/otel"))
 	if err != nil {
 		errs = append(errs, err)
@@ -679,9 +678,13 @@ func TestRebalanceCallback_RevokedPartitions(t *testing.T) {
 			assert.Nil(t, errs)
 
 			consumer := &mocks.MockConsumer{}
-			consumer.On("AssignmentLost").Return(test.assignmentLost)
-			consumer.On("CommitOffsets", test.storedOffsets).Return(test.commitResponse, test.commitError)
-			tester.inv.Consumer = consumer
+
+			hasOffsets := len(test.storedOffsets) > 0
+			if hasOffsets {
+				consumer.On("AssignmentLost").Return(test.assignmentLost)
+				consumer.On("CommitOffsets", test.storedOffsets).Return(test.commitResponse, test.commitError)
+				tester.inv.Consumer = consumer
+			}
 
 			tester.inv.OffsetStorage = test.storedOffsets
 			tester.inv.lockId = test.initialLockId

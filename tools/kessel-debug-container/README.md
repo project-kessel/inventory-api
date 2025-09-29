@@ -37,7 +37,7 @@ oc process --local -f tools/kessel-debug-container/kessel-debug-deploy.yaml
 **To Access**:
 
 ```shell
-oc rsh $(oc get pod -l app=kessel-debug -o name)
+oc rsh kessel-debug
 ```
 
 If needed, Kafka connection information can be setup after accessing the pod by sourcing the `env-setup.sh` script available. This will export the Kafka bootstrap server address(es) to the `BOOTSTRAP_SERVERS` variable, as well as create a JAAS auth config file and set the path to it under the `KAFKA_AUTH_CONFIG` variable:

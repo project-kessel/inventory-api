@@ -249,6 +249,8 @@ func (r *resourceRepository) GetTransactionManager() usecase.TransactionManager 
 	return r.transactionManager
 }
 
+// TODO this needs to be expanded to include the reporter representations
+// FindVersionedRepresentationsByVersion finds the common representations by version
 func (r *resourceRepository) FindVersionedRepresentationsByVersion(tx *gorm.DB, key bizmodel.ReporterResourceKey, currentVersion uint) ([]RepresentationsByVersion, error) {
 	var results []RepresentationsByVersion
 
@@ -264,7 +266,6 @@ func (r *resourceRepository) FindVersionedRepresentationsByVersion(tx *gorm.DB, 
 		Where("LOWER(rr.local_resource_id) = LOWER(?)", key.LocalResourceId().Serialize()).
 		Where("LOWER(rr.resource_type) = LOWER(?)", key.ResourceType().Serialize()).
 		Where("LOWER(rr.reporter_type) = LOWER(?)", key.ReporterType().Serialize()).
-		Where("rr.tombstone = ?", false).
 		Where("(cr.version = ? OR cr.version = ?)", currentVersion, currentVersion-1)
 
 	// Only add reporter_instance_id condition if it's not empty

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/go-kratos/kratos/v2/log"
@@ -867,10 +868,29 @@ func (uc *Usecase) CalculateTuples(tupleEvent model.TupleEvent) (model.TuplesToR
 
 }
 
+// Constants for workspace tuple creation
+const (
+	WorkspaceRelation   = "workspace"
+	RBACWorkspacePrefix = "rbac:workspace"
+)
+
 func (uc *Usecase) createWorkspaceTuple(workspaceID string, key model.ReporterResourceKey) model.RelationsTuple {
-	resourceStr := fmt.Sprintf("%s:%s", key.ResourceType().Serialize(), key.LocalResourceId().Serialize())
-	subjectStr := fmt.Sprintf("rbac:workspace:%s", workspaceID)
-	return model.NewRelationsTuple(resourceStr, "workspace", subjectStr)
+	// Create RelationsResource for the main resource
+	resourceId := key.LocalResourceId()
+	resourceType := key.ResourceType()
+	resourceObjectType := model.NewRelationsObjectType(
+		strings.ToLower(resourceType.String()),
+		"", // Default namespace for resource types
+	)
+	resource := model.NewRelationsResource(resourceId, resourceObjectType)
+
+	// Create RelationsResource for the workspace subject
+	workspaceSubjectId, _ := model.NewLocalResourceId(fmt.Sprintf("%s:%s", RBACWorkspacePrefix, workspaceID))
+	workspaceObjectType := model.NewRelationsObjectType("workspace", "rbac")
+	workspaceSubject := model.NewRelationsResource(workspaceSubjectId, workspaceObjectType)
+	subject := model.NewRelationsSubject(workspaceSubject)
+
+	return model.NewRelationsTuple(resource, WorkspaceRelation, subject)
 }
 
 func (uc *Usecase) determineTupleOperations(representationVersion []data.RepresentationsByVersion, currentVersion uint, key model.ReporterResourceKey) (model.TuplesToReplicate, error) {

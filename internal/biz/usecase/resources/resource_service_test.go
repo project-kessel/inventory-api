@@ -478,18 +478,38 @@ func TestCalculateTuples(t *testing.T) {
 				require.NotNil(t, result.TuplesToCreate())
 				require.Len(t, *result.TuplesToCreate(), 1)
 				createTuple := (*result.TuplesToCreate())[0]
-				assert.Equal(t, tt.expectedCreateResource, createTuple.Resource())
+				
+				// Test resource
+				createResource := createTuple.Resource()
+				assert.Equal(t, "test-resource", createResource.Id().String())
+				assert.Equal(t, "host", createResource.Type().Name())
+				
+				// Test relation
 				assert.Equal(t, "workspace", createTuple.Relation())
-				assert.Equal(t, tt.expectedCreateSubject, createTuple.Subject())
+				
+				// Test subject
+				createSubject := createTuple.Subject()
+				createSubjectResource := createSubject.Subject()
+				assert.Equal(t, tt.expectedCreateSubject, createSubjectResource.Id().String())
 			}
 
 			if tt.expectTuplesToDelete {
 				require.NotNil(t, result.TuplesToDelete())
 				require.Len(t, *result.TuplesToDelete(), 1)
 				deleteTuple := (*result.TuplesToDelete())[0]
-				assert.Equal(t, tt.expectedDeleteResource, deleteTuple.Resource())
+				
+				// Test resource
+				deleteResource := deleteTuple.Resource()
+				assert.Equal(t, "test-resource", deleteResource.Id().String())
+				assert.Equal(t, "host", deleteResource.Type().Name())
+				
+				// Test relation
 				assert.Equal(t, "workspace", deleteTuple.Relation())
-				assert.Equal(t, tt.expectedDeleteSubject, deleteTuple.Subject())
+				
+				// Test subject
+				deleteSubject := deleteTuple.Subject()
+				deleteSubjectResource := deleteSubject.Subject()
+				assert.Equal(t, tt.expectedDeleteSubject, deleteSubjectResource.Id().String())
 			}
 		})
 	}
@@ -801,38 +821,64 @@ func TestCreateWorkspaceTuple(t *testing.T) {
 	require.NoError(t, err)
 
 	tests := []struct {
-		name             string
-		workspaceID      string
-		expectedResource string
-		expectedSubject  string
+		name        string
+		workspaceID string
+		validate    func(t *testing.T, tuple model.RelationsTuple)
 	}{
 		{
-			name:             "normal workspace ID",
-			workspaceID:      "workspace-123",
-			expectedResource: "host:test-resource",
-			expectedSubject:  "rbac:workspace:workspace-123",
+			name:        "normal workspace ID",
+			workspaceID: "workspace-123",
+			validate: func(t *testing.T, tuple model.RelationsTuple) {
+				// Test that we're using the new RelationsTuple type
+				assert.IsType(t, model.RelationsTuple{}, tuple)
+				
+				// Test resource structure
+				resource := tuple.Resource()
+				assert.Equal(t, "test-resource", resource.Id().String())
+				assert.Equal(t, "host", resource.Type().Name())
+				assert.Equal(t, "", resource.Type().Namespace()) // Default namespace
+				
+				// Test relation constant usage
+				assert.Equal(t, "workspace", tuple.Relation())
+				
+				// Test subject structure
+				subject := tuple.Subject()
+				subjectResource := subject.Subject()
+				assert.Equal(t, "rbac:workspace:workspace-123", subjectResource.Id().String())
+				assert.Equal(t, "workspace", subjectResource.Type().Name())
+				assert.Equal(t, "rbac", subjectResource.Type().Namespace())
+			},
 		},
 		{
-			name:             "workspace ID with special characters",
-			workspaceID:      "workspace-with-dashes_and_underscores",
-			expectedResource: "host:test-resource",
-			expectedSubject:  "rbac:workspace:workspace-with-dashes_and_underscores",
+			name:        "workspace ID with special characters",
+			workspaceID: "workspace-with-dashes_and_underscores",
+			validate: func(t *testing.T, tuple model.RelationsTuple) {
+				// Test that special characters are handled correctly
+				subject := tuple.Subject()
+				subjectResource := subject.Subject()
+				assert.Equal(t, "rbac:workspace:workspace-with-dashes_and_underscores", subjectResource.Id().String())
+				assert.Equal(t, "workspace", subjectResource.Type().Name())
+				assert.Equal(t, "rbac", subjectResource.Type().Namespace())
+			},
 		},
 		{
-			name:             "empty workspace ID",
-			workspaceID:      "",
-			expectedResource: "host:test-resource",
-			expectedSubject:  "rbac:workspace:",
+			name:        "empty workspace ID",
+			workspaceID: "",
+			validate: func(t *testing.T, tuple model.RelationsTuple) {
+				// Test that empty workspace ID is handled
+				subject := tuple.Subject()
+				subjectResource := subject.Subject()
+				assert.Equal(t, "rbac:workspace:", subjectResource.Id().String())
+				assert.Equal(t, "workspace", subjectResource.Type().Name())
+				assert.Equal(t, "rbac", subjectResource.Type().Namespace())
+			},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tuple := uc.createWorkspaceTuple(tt.workspaceID, key)
-
-			assert.Equal(t, tt.expectedResource, tuple.Resource())
-			assert.Equal(t, "workspace", tuple.Relation())
-			assert.Equal(t, tt.expectedSubject, tuple.Subject())
+			tt.validate(t, tuple)
 		})
 	}
 }
@@ -926,7 +972,9 @@ func TestDetermineTupleOperations(t *testing.T) {
 				require.NotNil(t, result.TuplesToCreate())
 				assert.Len(t, *result.TuplesToCreate(), tt.expectedCreateCount)
 				createTuple := (*result.TuplesToCreate())[0]
-				assert.Equal(t, tt.expectedCreateSubject, createTuple.Subject())
+				createSubject := createTuple.Subject()
+				createSubjectResource := createSubject.Subject()
+				assert.Equal(t, tt.expectedCreateSubject, createSubjectResource.Id().String())
 			} else {
 				assert.Nil(t, result.TuplesToCreate())
 			}
@@ -935,7 +983,9 @@ func TestDetermineTupleOperations(t *testing.T) {
 				require.NotNil(t, result.TuplesToDelete())
 				assert.Len(t, *result.TuplesToDelete(), tt.expectedDeleteCount)
 				deleteTuple := (*result.TuplesToDelete())[0]
-				assert.Equal(t, tt.expectedDeleteSubject, deleteTuple.Subject())
+				deleteSubject := deleteTuple.Subject()
+				deleteSubjectResource := deleteSubject.Subject()
+				assert.Equal(t, tt.expectedDeleteSubject, deleteSubjectResource.Id().String())
 			} else {
 				assert.Nil(t, result.TuplesToDelete())
 			}

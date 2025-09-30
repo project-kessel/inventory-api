@@ -212,7 +212,8 @@ func (rt ResourceType) String() string {
 }
 
 func (rt ResourceType) Serialize() string {
-	return SerializeString(rt)
+	str := SerializeString(rt)
+	return strings.ToLower(str)
 }
 
 type ReporterType string
@@ -230,7 +231,8 @@ func (rt ReporterType) String() string {
 }
 
 func (rt ReporterType) Serialize() string {
-	return SerializeString(rt)
+	str := SerializeString(rt)
+	return strings.ToLower(str)
 }
 
 type ReporterInstanceId string
@@ -248,7 +250,8 @@ func (ri ReporterInstanceId) String() string {
 }
 
 func (ri ReporterInstanceId) Serialize() string {
-	return SerializeString(ri)
+	str := SerializeString(ri)
+	return strings.ToLower(str)
 }
 
 type ConsistencyToken string

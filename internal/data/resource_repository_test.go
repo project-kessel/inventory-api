@@ -1146,7 +1146,6 @@ func TestFindVersionedRepresentationsByVersion(t *testing.T) {
 	}
 }
 
-
 // Test GetCurrentAndPreviousWorkspaceID function with both real and fake repositories
 func TestGetCurrentAndPreviousWorkspaceID_Integration(t *testing.T) {
 	implementations := []struct {

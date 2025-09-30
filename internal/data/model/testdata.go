@@ -347,9 +347,10 @@ func (f *TestFixture) ValidReporterRepresentation() *ReporterRepresentation {
 			"ansible_host":            "host-1",
 		},
 		uuid.MustParse("dd1b73b9-3e33-4264-968c-e3ce55b9afec"), // reporterResourceID
-		1,                                                      // version
-		1,                                                      // generation
-		1,                                                      // commonVersion
+		1, // version
+		1, // generation
+		1, // commonVersion
+		"test-transaction-id",
 		false,
 		internal.StringPtr("2.7.16"),
 	)
@@ -376,6 +377,7 @@ func (f *TestFixture) ReporterRepresentationWithLocalResourceID(localResourceID 
 		1,
 		1,
 		1,
+		"test-transaction-id",
 		false,
 		internal.StringPtr("2.7.16"),
 	)
@@ -398,6 +400,7 @@ func (f *TestFixture) ReporterRepresentationWithResourceType(resourceType string
 		1,
 		1,
 		1,
+		"test-transaction-id",
 		false,
 		internal.StringPtr("2.7.16"),
 	)
@@ -439,6 +442,7 @@ func (f *TestFixture) ReporterRepresentationWithTombstone(tombstone bool) *Repor
 		1,
 		1,
 		1,
+		"test-transaction-id",
 		tombstone,
 		nil,
 	)
@@ -456,6 +460,7 @@ func (f *TestFixture) ReporterRepresentationWithReporterVersion(ver *string) *Re
 		2,
 		0,
 		1,
+		"test-transaction-id",
 		false,
 		ver,
 	)
@@ -473,6 +478,7 @@ func (f *TestFixture) ReporterRepresentationWithNilReporterVersion() *ReporterRe
 		1,
 		1,
 		1,
+		"test-transaction-id",
 		false,
 		nil,
 	)

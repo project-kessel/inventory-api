@@ -427,14 +427,12 @@ func TestCalculateTuples(t *testing.T) {
 		},
 
 		{
-			name:                   "same workspace creates only",
-			version:                2,
-			currentWorkspaceID:     "workspace-same",
-			previousWorkspaceID:    "workspace-same",
-			expectTuplesToCreate:   true,
-			expectTuplesToDelete:   false,
-			expectedCreateResource: "host:test-resource",
-			expectedCreateSubject:  "rbac:workspace:workspace-same",
+			name:                 "same workspace does not create or delete tuples",
+			version:              2,
+			currentWorkspaceID:   "workspace-same",
+			previousWorkspaceID:  "workspace-same",
+			expectTuplesToCreate: false,
+			expectTuplesToDelete: false,
 		},
 	}
 

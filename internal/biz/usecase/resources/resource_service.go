@@ -898,7 +898,8 @@ func (uc *Usecase) determineTupleOperations(representationVersion []data.Represe
 
 	// If workspace ID hasn't changed, no operations needed
 	if previousWorkspaceID != "" && previousWorkspaceID == currentWorkspaceID {
-		return model.TuplesToReplicate{}, fmt.Errorf("no tuple operations needed when workspace ID unchanged")
+		// Return empty TuplesToReplicate with nil pointers (no create/delete operations)
+		return model.TuplesToReplicate{}, nil
 	}
 
 	var tuplesToCreate, tuplesToDelete []model.RelationsTuple

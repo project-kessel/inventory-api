@@ -478,15 +478,15 @@ func TestCalculateTuples(t *testing.T) {
 				require.NotNil(t, result.TuplesToCreate())
 				require.Len(t, *result.TuplesToCreate(), 1)
 				createTuple := (*result.TuplesToCreate())[0]
-				
+
 				// Test resource
 				createResource := createTuple.Resource()
 				assert.Equal(t, "test-resource", createResource.Id().String())
 				assert.Equal(t, "host", createResource.Type().Name())
-				
+
 				// Test relation
 				assert.Equal(t, "workspace", createTuple.Relation())
-				
+
 				// Test subject
 				createSubject := createTuple.Subject()
 				createSubjectResource := createSubject.Subject()
@@ -497,15 +497,15 @@ func TestCalculateTuples(t *testing.T) {
 				require.NotNil(t, result.TuplesToDelete())
 				require.Len(t, *result.TuplesToDelete(), 1)
 				deleteTuple := (*result.TuplesToDelete())[0]
-				
+
 				// Test resource
 				deleteResource := deleteTuple.Resource()
 				assert.Equal(t, "test-resource", deleteResource.Id().String())
 				assert.Equal(t, "host", deleteResource.Type().Name())
-				
+
 				// Test relation
 				assert.Equal(t, "workspace", deleteTuple.Relation())
-				
+
 				// Test subject
 				deleteSubject := deleteTuple.Subject()
 				deleteSubjectResource := deleteSubject.Subject()
@@ -831,16 +831,16 @@ func TestCreateWorkspaceTuple(t *testing.T) {
 			validate: func(t *testing.T, tuple model.RelationsTuple) {
 				// Test that we're using the new RelationsTuple type
 				assert.IsType(t, model.RelationsTuple{}, tuple)
-				
+
 				// Test resource structure
 				resource := tuple.Resource()
 				assert.Equal(t, "test-resource", resource.Id().String())
 				assert.Equal(t, "host", resource.Type().Name())
 				assert.Equal(t, "", resource.Type().Namespace()) // Default namespace
-				
+
 				// Test relation constant usage
 				assert.Equal(t, "workspace", tuple.Relation())
-				
+
 				// Test subject structure
 				subject := tuple.Subject()
 				subjectResource := subject.Subject()

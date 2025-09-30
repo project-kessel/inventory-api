@@ -10,9 +10,10 @@ import (
 
 type CommonRepresentation struct {
 	Representation
-	resourceId ResourceId
-	version    Version
-	reporter   ReporterId
+	resourceId    ResourceId
+	version       Version
+	reporter      ReporterId
+	transactionId TransactionId
 }
 
 func NewCommonRepresentation(
@@ -21,6 +22,7 @@ func NewCommonRepresentation(
 	version Version,
 	reporterType ReporterType,
 	reporterInstanceId ReporterInstanceId,
+	transactionId TransactionId,
 ) (CommonRepresentation, error) {
 	if resourceId.UUID() == uuid.Nil {
 		return CommonRepresentation{}, fmt.Errorf("%w: ResourceId", ErrInvalidUUID)
@@ -48,6 +50,7 @@ func NewCommonRepresentation(
 		resourceId:     resourceId,
 		version:        version,
 		reporter:       reporter,
+		transactionId:  transactionId,
 	}, nil
 }
 
@@ -66,6 +69,7 @@ func (cr CommonRepresentation) Serialize() CommonRepresentationSnapshot {
 		Version:                    cr.version.Serialize(),
 		ReportedByReporterType:     reporterType,
 		ReportedByReporterInstance: reporterInstanceId,
+		TransactionId:              cr.transactionId.Serialize(),
 		CreatedAt:                  time.Now(), // TODO: Add proper timestamp from domain entity if available
 	}
 }

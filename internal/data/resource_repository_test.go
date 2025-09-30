@@ -1068,7 +1068,9 @@ func TestSave(t *testing.T) {
 				})
 				require.NoError(t, err)
 
-				err = resource.Update(key, apiHref, consoleHref, nil, updatedReporterData, updatedCommonData)
+				updatedTransactionId := bizmodel.NewTransactionId("updated-transaction-id")
+
+				err = resource.Update(key, apiHref, consoleHref, nil, updatedReporterData, updatedCommonData, updatedTransactionId)
 				require.NoError(t, err)
 
 				err = repo.Save(db, resource, model_legacy.OperationTypeUpdated, "test-tx-2")
@@ -1201,10 +1203,12 @@ func TestResourceRepository_MultipleHostsLifecycle(t *testing.T) {
 			})
 			require.NoError(t, err)
 
-			err = foundHost1.Update(key1, apiHref, consoleHref, nil, updatedReporterData, updatedCommonData)
+			updatedTransactionId := bizmodel.NewTransactionId("updated-transaction-id")
+
+			err = foundHost1.Update(key1, apiHref, consoleHref, nil, updatedReporterData, updatedCommonData, updatedTransactionId)
 			require.NoError(t, err, "Should update host1")
 
-			err = foundHost2.Update(key2, apiHref, consoleHref, nil, updatedReporterData, updatedCommonData)
+			err = foundHost2.Update(key2, apiHref, consoleHref, nil, updatedReporterData, updatedCommonData, updatedTransactionId)
 			require.NoError(t, err, "Should update host2")
 
 			err = repo.Save(db, *foundHost1, model_legacy.OperationTypeUpdated, "tx-update-host1")
@@ -1349,7 +1353,9 @@ func TestResourceRepository_PartialDataScenarios(t *testing.T) {
 				})
 				require.NoError(t, err)
 
-				err = foundResource.Update(key, apiHref, consoleHref, nil, reporterOnlyData, emptyCommonData)
+				updatedTransactionId := bizmodel.NewTransactionId("updated-transaction-id")
+
+				err = foundResource.Update(key, apiHref, consoleHref, nil, reporterOnlyData, emptyCommonData, updatedTransactionId)
 				require.NoError(t, err, "Should update with reporter data only")
 
 				err = repo.Save(db, *foundResource, model_legacy.OperationTypeUpdated, "tx-reporter-update")
@@ -1369,7 +1375,7 @@ func TestResourceRepository_PartialDataScenarios(t *testing.T) {
 				})
 				require.NoError(t, err)
 
-				err = foundResource.Update(key, apiHref, consoleHref, nil, emptyReporterData, commonOnlyData)
+				err = foundResource.Update(key, apiHref, consoleHref, nil, emptyReporterData, commonOnlyData, updatedTransactionId)
 				require.NoError(t, err, "Should update with common data only")
 
 				err = repo.Save(db, *foundResource, model_legacy.OperationTypeUpdated, "tx-common-update")
@@ -1444,7 +1450,9 @@ func createTestResourceWithLocalId(t *testing.T, localResourceId string) bizmode
 	reporterResourceIdType, err := bizmodel.NewReporterResourceId(reporterResourceId)
 	require.NoError(t, err)
 
-	resource, err := bizmodel.NewResource(resourceIdType, localResourceIdType, resourceType, reporterType, reporterInstanceId, reporterResourceIdType, apiHref, consoleHref, reporterRepresentation, commonRepresentation, nil)
+	commonTransactionId := bizmodel.NewTransactionId("common-transaction-id")
+
+	resource, err := bizmodel.NewResource(resourceIdType, localResourceIdType, resourceType, reporterType, reporterInstanceId, commonTransactionId, reporterResourceIdType, apiHref, consoleHref, reporterRepresentation, commonRepresentation, nil)
 	require.NoError(t, err)
 
 	return resource
@@ -1509,7 +1517,9 @@ func createTestResourceWithLocalIdAndType(t *testing.T, localResourceId, resourc
 	commonRepresentation, err := bizmodel.NewRepresentation(commonData)
 	require.NoError(t, err)
 
-	resource, err := bizmodel.NewResource(resourceIdType, localResourceIdType, resourceTypeType, reporterTypeType, reporterInstanceIdType, reporterResourceIdType, apiHref, consoleHref, reporterRepresentation, commonRepresentation, nil)
+	commonTransactionId := bizmodel.NewTransactionId("common-transaction-id")
+
+	resource, err := bizmodel.NewResource(resourceIdType, localResourceIdType, resourceTypeType, reporterTypeType, reporterInstanceIdType, commonTransactionId, reporterResourceIdType, apiHref, consoleHref, reporterRepresentation, commonRepresentation, nil)
 	require.NoError(t, err)
 
 	return resource
@@ -1561,7 +1571,9 @@ func createTestResourceWithReporterDataOnly(t *testing.T, localResourceId string
 	commonRepresentation, err := bizmodel.NewRepresentation(commonData)
 	require.NoError(t, err)
 
-	resource, err := bizmodel.NewResource(resourceIdType, localResourceIdType, resourceType, reporterType, reporterInstanceId, reporterResourceIdType, apiHref, consoleHref, reporterRepresentation, commonRepresentation, nil)
+	commonTransactionId := bizmodel.NewTransactionId("common-transaction-id")
+
+	resource, err := bizmodel.NewResource(resourceIdType, localResourceIdType, resourceType, reporterType, reporterInstanceId, commonTransactionId, reporterResourceIdType, apiHref, consoleHref, reporterRepresentation, commonRepresentation, nil)
 	require.NoError(t, err)
 
 	return resource
@@ -1613,7 +1625,9 @@ func createTestResourceWithCommonDataOnly(t *testing.T, localResourceId string) 
 	commonRepresentation, err := bizmodel.NewRepresentation(commonData)
 	require.NoError(t, err)
 
-	resource, err := bizmodel.NewResource(resourceIdType, localResourceIdType, resourceType, reporterType, reporterInstanceId, reporterResourceIdType, apiHref, consoleHref, reporterRepresentation, commonRepresentation, nil)
+	commonTransactionId := bizmodel.NewTransactionId("common-transaction-id")
+
+	resource, err := bizmodel.NewResource(resourceIdType, localResourceIdType, resourceType, reporterType, reporterInstanceId, commonTransactionId, reporterResourceIdType, apiHref, consoleHref, reporterRepresentation, commonRepresentation, nil)
 	require.NoError(t, err)
 
 	return resource
@@ -1663,7 +1677,9 @@ func createTestResourceWithMixedCase(t *testing.T) bizmodel.Resource {
 	commonRepresentation, err := bizmodel.NewRepresentation(commonData)
 	require.NoError(t, err)
 
-	resource, err := bizmodel.NewResource(resourceIdType, localResourceIdType, resourceType, reporterType, reporterInstanceId, reporterResourceIdType, apiHref, consoleHref, reporterRepresentation, commonRepresentation, nil)
+	commonTransactionId := bizmodel.NewTransactionId("common-transaction-id")
+
+	resource, err := bizmodel.NewResource(resourceIdType, localResourceIdType, resourceType, reporterType, reporterInstanceId, commonTransactionId, reporterResourceIdType, apiHref, consoleHref, reporterRepresentation, commonRepresentation, nil)
 	require.NoError(t, err)
 
 	return resource

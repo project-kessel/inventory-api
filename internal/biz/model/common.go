@@ -401,3 +401,17 @@ func (r Representation) Serialize() internal.JsonObject {
 func DeserializeRepresentation(data internal.JsonObject) Representation {
 	return Representation(data)
 }
+
+type TransactionId string
+
+func (t TransactionId) String() string {
+	return string(t)
+}
+
+func (t TransactionId) Serialize() string {
+	return SerializeString(t)
+}
+
+func NewTransactionId(transactionId string) TransactionId {
+	return TransactionId(transactionId)
+}

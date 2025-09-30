@@ -268,6 +268,7 @@ type CommonRepresentationTestFixture struct {
 	ValidVersion                    uint
 	ValidReportedByReporterType     string
 	ValidReportedByReporterInstance string
+	ValidTransactionId              string
 	NilResourceId                   uuid.UUID
 	EmptyData                       internal.JsonObject
 	NilData                         internal.JsonObject
@@ -289,6 +290,7 @@ func NewCommonRepresentationTestFixture() CommonRepresentationTestFixture {
 		ValidVersion:                    1,
 		ValidReportedByReporterType:     "test-reporter",
 		ValidReportedByReporterInstance: "test-instance-001",
+		ValidTransactionId:              "test-transaction-id",
 		NilResourceId:                   uuid.Nil,
 		EmptyData:                       internal.JsonObject{},
 		NilData:                         nil,
@@ -327,6 +329,10 @@ func (f CommonRepresentationTestFixture) ValidReporterTypeType() ReporterType {
 func (f CommonRepresentationTestFixture) ValidReporterInstanceIdType() ReporterInstanceId {
 	reporterInstanceId, _ := NewReporterInstanceId(f.ValidReportedByReporterInstance)
 	return reporterInstanceId
+}
+
+func (f CommonRepresentationTestFixture) ValidTransactionIdType() TransactionId {
+	return NewTransactionId(f.ValidTransactionId)
 }
 
 func (f CommonRepresentationTestFixture) NilResourceIdType() ResourceId {
@@ -626,6 +632,7 @@ type ResourceTestFixture struct {
 	ValidLocalResourceId            string
 	ValidReporterType               string
 	ValidReporterInstanceId         string
+	ValidTransactionId              string
 	ValidResourceId                 uuid.UUID
 	ValidApiHref                    string
 	ValidConsoleHref                string
@@ -763,6 +770,10 @@ func (f ResourceTestFixture) ValidReporterInstanceIdType() ReporterInstanceId {
 	return ri
 }
 
+func (f ResourceTestFixture) ValidTransactionIdType() TransactionId {
+	return NewTransactionId(f.ValidTransactionId)
+}
+
 func (f ResourceTestFixture) ValidReporterResourceIdType() ReporterResourceId {
 	id, _ := NewReporterResourceId(f.ValidResourceId)
 	return id
@@ -882,6 +893,7 @@ type ResourceEventTestFixture struct {
 	ValidResourceType       string
 	ValidReporterType       string
 	ValidReporterInstanceId string
+	ValidTransactionId      string
 	ValidReporterData       internal.JsonObject
 	ValidReporterResourceID string
 	ValidReporterVersion    uint
@@ -1049,4 +1061,7 @@ func (f ResourceEventTestFixture) EmptyReporterResourceIdType() ReporterResource
 
 func (f ResourceEventTestFixture) EmptyCommonDataType() Representation {
 	return DeserializeRepresentation(f.EmptyCommonData)
+}
+func (f ResourceEventTestFixture) ValidTransactionIdType() TransactionId {
+	return NewTransactionId(f.ValidTransactionId)
 }

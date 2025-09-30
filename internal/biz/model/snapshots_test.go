@@ -19,13 +19,14 @@ func TestResourceSnapshot_FromDomainEntity(t *testing.T) {
 	resourceType := fixture.ValidResourceTypeType()
 	reporterType := fixture.ValidReporterTypeType()
 	reporterInstanceId := fixture.ValidReporterInstanceIdType()
+	commonTransactionId := fixture.ValidTransactionIdType()
 	apiHref := fixture.ValidApiHrefType()
 	consoleHref := fixture.ValidConsoleHrefType()
 	commonData := fixture.ValidCommonRepresentationType()
 	reporterData := fixture.ValidReporterRepresentationType()
 
 	// Create domain Resource
-	resource, err := NewResource(resourceId, localResourceId, resourceType, reporterType, reporterInstanceId, reporterResourceId, apiHref, consoleHref, reporterData, commonData, nil)
+	resource, err := NewResource(resourceId, localResourceId, resourceType, reporterType, reporterInstanceId, commonTransactionId, reporterResourceId, apiHref, consoleHref, reporterData, commonData, nil)
 	if err != nil {
 		t.Fatalf("Failed to create test resource: %v", err)
 	}
@@ -128,6 +129,7 @@ func TestIndividualSnapshotMethods(t *testing.T) {
 		commonRepFixture.ValidVersionType(),
 		commonRepFixture.ValidReporterTypeType(),
 		commonRepFixture.ValidReporterInstanceIdType(),
+		commonRepFixture.ValidTransactionIdType(),
 	)
 	if err != nil {
 		t.Fatalf("Failed to create CommonRepresentation: %v", err)

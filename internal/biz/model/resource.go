@@ -20,7 +20,7 @@ type Resource struct {
 }
 
 // Factory methods
-func NewResource(id ResourceId, localResourceId LocalResourceId, resourceType ResourceType, reporterType ReporterType, reporterInstanceId ReporterInstanceId, reporterResourceId ReporterResourceId, apiHref ApiHref, consoleHref ConsoleHref, reporterRepresentationData Representation, commonRepresentationData Representation, reporterVersion *ReporterVersion) (Resource, error) {
+func NewResource(id ResourceId, localResourceId LocalResourceId, resourceType ResourceType, reporterType ReporterType, reporterInstanceId ReporterInstanceId, commonTransactionId TransactionId, reporterResourceId ReporterResourceId, apiHref ApiHref, consoleHref ConsoleHref, reporterRepresentationData Representation, commonRepresentationData Representation, reporterVersion *ReporterVersion) (Resource, error) {
 
 	commonVersion := NewVersion(initialCommonVersion)
 
@@ -43,6 +43,7 @@ func NewResource(id ResourceId, localResourceId LocalResourceId, resourceType Re
 		resourceType,
 		reporterType,
 		reporterInstanceId,
+		commonTransactionId,
 		localResourceId,
 		reporterResource.Id(),
 		apiHref,
@@ -77,6 +78,7 @@ func (r *Resource) Update(
 	reporterVersion *ReporterVersion,
 	reporterRepresentationData Representation,
 	commonRepresentationData Representation,
+	commonTransactionId TransactionId,
 ) error {
 	r.commonVersion = r.commonVersion.Increment()
 
@@ -92,6 +94,7 @@ func (r *Resource) Update(
 		key.ResourceType(),
 		key.ReporterType(),
 		key.ReporterInstanceId(),
+		commonTransactionId,
 		key.LocalResourceId(),
 		reporterResource.Id(),
 		apiHref,
@@ -140,6 +143,7 @@ func resourceEventAndRepresentations(
 	resourceType ResourceType,
 	reporterType ReporterType,
 	reporterInstanceId ReporterInstanceId,
+	commonTransactionId TransactionId,
 	localResourceId LocalResourceId,
 	reporterResourceId ReporterResourceId,
 	apiHref ApiHref,
@@ -170,6 +174,7 @@ func resourceEventAndRepresentations(
 		commonVersion,
 		reporterType,
 		reporterInstanceId,
+		commonTransactionId,
 	)
 	if err != nil {
 		return ResourceReportEvent{}, fmt.Errorf("invalid CommonRepresentation: %w", err)

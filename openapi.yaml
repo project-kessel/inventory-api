@@ -1106,6 +1106,8 @@ components:
                     type: string
                 reporterVersion:
                     type: string
+                transactionId:
+                    type: string
         kessel.inventory.v1beta2.ResourceReference:
             type: object
             properties:

@@ -430,6 +430,7 @@ func TestCommonRepresentation_Infrastructure_Serialization(t *testing.T) {
 			1,
 			"hbi",
 			"test-instance",
+			"test-transaction-id",
 		)
 		AssertNoError(t, err, "Should be able to create CommonRepresentation with nil data")
 

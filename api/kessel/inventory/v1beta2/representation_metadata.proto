@@ -12,5 +12,8 @@ message RepresentationMetadata {
   string api_href = 2 [(buf.validate.field).string = {min_len: 1}];
   optional string console_href = 3 ;
   optional string reporter_version = 4;
+  oneof idempotency_key {
+    string transaction_id = 5;
+  }
 }
 

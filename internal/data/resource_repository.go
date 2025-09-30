@@ -32,6 +32,21 @@ type RepresentationsByVersion struct {
 	Version uint                `gorm:"column:version"`
 }
 
+// GetCurrentAndPreviousWorkspaceID extracts current and previous workspace IDs from a slice of RepresentationsByVersion
+func GetCurrentAndPreviousWorkspaceID(representations []RepresentationsByVersion, currentVersion uint) (currentWorkspaceID, previousWorkspaceID string) {
+	for _, repr := range representations {
+		if workspaceID, exists := repr.Data["workspace_id"].(string); exists && workspaceID != "" {
+			switch repr.Version {
+			case currentVersion:
+				currentWorkspaceID = workspaceID
+			case currentVersion - 1:
+				previousWorkspaceID = workspaceID
+			}
+		}
+	}
+	return currentWorkspaceID, previousWorkspaceID
+}
+
 func ToSnapshotsFromResults(results []FindResourceByKeysResult) (*bizmodel.ResourceSnapshot, []bizmodel.ReporterResourceSnapshot) {
 	if len(results) == 0 {
 		return nil, nil

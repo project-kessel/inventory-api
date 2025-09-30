@@ -868,10 +868,10 @@ func (uc *Usecase) CalculateTuples(tupleEvent model.TupleEvent) (model.TuplesToR
 
 }
 
-// Constants for workspace tuple creation
 const (
-	WorkspaceRelation   = "workspace"
-	RBACWorkspacePrefix = "rbac:workspace"
+	workspaceRelation = "workspace"
+	rbacNamespace     = "rbac"
+	rbacPrefix        = rbacNamespace + ":" + workspaceRelation
 )
 
 func (uc *Usecase) createWorkspaceTuple(workspaceID string, key model.ReporterResourceKey) model.RelationsTuple {
@@ -885,16 +885,16 @@ func (uc *Usecase) createWorkspaceTuple(workspaceID string, key model.ReporterRe
 	resource := model.NewRelationsResource(resourceId, resourceObjectType)
 
 	// Create RelationsResource for the workspace subject
-	workspaceSubjectId, _ := model.NewLocalResourceId(fmt.Sprintf("%s:%s", RBACWorkspacePrefix, workspaceID))
-	workspaceObjectType := model.NewRelationsObjectType("workspace", "rbac")
+	workspaceSubjectId, _ := model.NewLocalResourceId(fmt.Sprintf("%s:%s", rbacPrefix, workspaceID))
+	workspaceObjectType := model.NewRelationsObjectType(workspaceRelation, rbacNamespace)
 	workspaceSubject := model.NewRelationsResource(workspaceSubjectId, workspaceObjectType)
 	subject := model.NewRelationsSubject(workspaceSubject)
 
-	return model.NewRelationsTuple(resource, WorkspaceRelation, subject)
+	return model.NewRelationsTuple(resource, workspaceRelation, subject)
 }
 
 func (uc *Usecase) determineTupleOperations(representationVersion []data.RepresentationsByVersion, currentVersion uint, key model.ReporterResourceKey) (model.TuplesToReplicate, error) {
-	currentWorkspaceID, previousWorkspaceID := uc.extractWorkspaceIDs(representationVersion, currentVersion)
+	currentWorkspaceID, previousWorkspaceID := data.GetCurrentAndPreviousWorkspaceID(representationVersion, currentVersion)
 
 	var tuplesToCreate, tuplesToDelete []model.RelationsTuple
 
@@ -928,18 +928,4 @@ func (uc *Usecase) getWorkspaceVersions(key model.ReporterResourceKey, currentVe
 		return []data.RepresentationsByVersion{}, fmt.Errorf("failed to find common representations: %w", err)
 	}
 	return representations, nil
-}
-
-func (uc *Usecase) extractWorkspaceIDs(versionedRepresentations []data.RepresentationsByVersion, currentVersion uint) (currentWorkspaceID, previousWorkspaceID string) {
-	for _, repr := range versionedRepresentations {
-		if workspaceID, exists := repr.Data["workspace_id"].(string); exists && workspaceID != "" {
-			switch repr.Version {
-			case currentVersion:
-				currentWorkspaceID = workspaceID
-			case currentVersion - 1:
-				previousWorkspaceID = workspaceID
-			}
-		}
-	}
-	return currentWorkspaceID, previousWorkspaceID
 }

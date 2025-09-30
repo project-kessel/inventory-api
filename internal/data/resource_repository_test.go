@@ -1,6 +1,7 @@
 package data
 
 import (
+	"database/sql"
 	"testing"
 
 	"github.com/google/uuid"
@@ -250,12 +251,12 @@ func TestFindResourceByKeys(t *testing.T) {
 					description        string
 				}{
 					{
-						name:               "lowercase local_resource_id",
-						localResourceId:    "test-mixed-case-resource",
+						name:               "local_resource_id",
+						localResourceId:    "Test-Mixed-Case-Resource",
 						resourceType:       "K8S_Cluster",
 						reporterType:       "OCM",
 						reporterInstanceId: "Mixed-Instance-123",
-						description:        "should find resource when local_resource_id is lowercase",
+						description:        "should find resource by local_resource_id",
 					},
 					{
 						name:               "lowercase resource_type",
@@ -283,7 +284,7 @@ func TestFindResourceByKeys(t *testing.T) {
 					},
 					{
 						name:               "all lowercase",
-						localResourceId:    "test-mixed-case-resource",
+						localResourceId:    "Test-Mixed-Case-Resource",
 						resourceType:       "k8s_cluster",
 						reporterType:       "ocm",
 						reporterInstanceId: "mixed-instance-123",

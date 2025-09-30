@@ -19,14 +19,14 @@ func TestResourceSnapshot_FromDomainEntity(t *testing.T) {
 	resourceType := fixture.ValidResourceTypeType()
 	reporterType := fixture.ValidReporterTypeType()
 	reporterInstanceId := fixture.ValidReporterInstanceIdType()
-	commonTransactionId := fixture.ValidTransactionIdType()
+	transactionId := fixture.ValidTransactionIdType()
 	apiHref := fixture.ValidApiHrefType()
 	consoleHref := fixture.ValidConsoleHrefType()
 	commonData := fixture.ValidCommonRepresentationType()
 	reporterData := fixture.ValidReporterRepresentationType()
 
 	// Create domain Resource
-	resource, err := NewResource(resourceId, localResourceId, resourceType, reporterType, reporterInstanceId, commonTransactionId, reporterResourceId, apiHref, consoleHref, reporterData, commonData, nil)
+	resource, err := NewResource(resourceId, localResourceId, resourceType, reporterType, reporterInstanceId, transactionId, reporterResourceId, apiHref, consoleHref, reporterData, commonData, nil)
 	if err != nil {
 		t.Fatalf("Failed to create test resource: %v", err)
 	}
@@ -145,6 +145,7 @@ func TestIndividualSnapshotMethods(t *testing.T) {
 	versionOne := NewVersion(1)
 	genOne := NewGeneration(1)
 	testData := Representation(map[string]interface{}{"test": "data"})
+	transactionId := NewTransactionId("test-transaction-id")
 
 	dataRep, err := NewReporterDataRepresentation(
 		resourceFixture.ValidReporterResourceIdType(),
@@ -153,6 +154,7 @@ func TestIndividualSnapshotMethods(t *testing.T) {
 		testData,
 		versionOne,
 		nil, // No reporter version for this test
+		transactionId,
 	)
 	if err != nil {
 		t.Fatalf("Failed to create ReporterDataRepresentation: %v", err)

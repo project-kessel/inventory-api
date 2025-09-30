@@ -20,7 +20,7 @@ type Resource struct {
 }
 
 // Factory methods
-func NewResource(id ResourceId, localResourceId LocalResourceId, resourceType ResourceType, reporterType ReporterType, reporterInstanceId ReporterInstanceId, commonTransactionId TransactionId, reporterResourceId ReporterResourceId, apiHref ApiHref, consoleHref ConsoleHref, reporterRepresentationData Representation, commonRepresentationData Representation, reporterVersion *ReporterVersion) (Resource, error) {
+func NewResource(id ResourceId, localResourceId LocalResourceId, resourceType ResourceType, reporterType ReporterType, reporterInstanceId ReporterInstanceId, transactionId TransactionId, reporterResourceId ReporterResourceId, apiHref ApiHref, consoleHref ConsoleHref, reporterRepresentationData Representation, commonRepresentationData Representation, reporterVersion *ReporterVersion) (Resource, error) {
 
 	commonVersion := NewVersion(initialCommonVersion)
 
@@ -43,7 +43,7 @@ func NewResource(id ResourceId, localResourceId LocalResourceId, resourceType Re
 		resourceType,
 		reporterType,
 		reporterInstanceId,
-		commonTransactionId,
+		transactionId,
 		localResourceId,
 		reporterResource.Id(),
 		apiHref,
@@ -78,7 +78,7 @@ func (r *Resource) Update(
 	reporterVersion *ReporterVersion,
 	reporterRepresentationData Representation,
 	commonRepresentationData Representation,
-	commonTransactionId TransactionId,
+	transactionId TransactionId,
 ) error {
 	r.commonVersion = r.commonVersion.Increment()
 
@@ -94,7 +94,7 @@ func (r *Resource) Update(
 		key.ResourceType(),
 		key.ReporterType(),
 		key.ReporterInstanceId(),
-		commonTransactionId,
+		transactionId,
 		key.LocalResourceId(),
 		reporterResource.Id(),
 		apiHref,
@@ -143,7 +143,7 @@ func resourceEventAndRepresentations(
 	resourceType ResourceType,
 	reporterType ReporterType,
 	reporterInstanceId ReporterInstanceId,
-	commonTransactionId TransactionId,
+	transactionId TransactionId,
 	localResourceId LocalResourceId,
 	reporterResourceId ReporterResourceId,
 	apiHref ApiHref,
@@ -163,6 +163,7 @@ func resourceEventAndRepresentations(
 		reporterData,
 		commonVersion,
 		reporterVersion,
+		transactionId,
 	)
 	if err != nil {
 		return ResourceReportEvent{}, fmt.Errorf("invalid ReporterRepresentation: %w", err)
@@ -174,7 +175,7 @@ func resourceEventAndRepresentations(
 		commonVersion,
 		reporterType,
 		reporterInstanceId,
-		commonTransactionId,
+		transactionId,
 	)
 	if err != nil {
 		return ResourceReportEvent{}, fmt.Errorf("invalid CommonRepresentation: %w", err)

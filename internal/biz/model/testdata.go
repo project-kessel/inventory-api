@@ -534,6 +534,7 @@ type ReporterRepresentationTestFixture struct {
 	EmptyReporterResourceId      string
 	WhitespaceReporterResourceId string
 	InvalidReporterResourceId    string
+	ValidTransactionId           string
 }
 
 func NewReporterRepresentationTestFixture() ReporterRepresentationTestFixture {
@@ -587,6 +588,10 @@ func (f ReporterRepresentationTestFixture) ValidReporterVersionType() *ReporterV
 	}
 	reporterVersion, _ := NewReporterVersion(*f.ValidReporterVersion)
 	return &reporterVersion
+}
+
+func (f ReporterRepresentationTestFixture) ValidTransactionIdType() TransactionId {
+	return NewTransactionId(f.ValidTransactionId)
 }
 
 func (f ReporterRepresentationTestFixture) NilReporterVersionType() *ReporterVersion {

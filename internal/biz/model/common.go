@@ -83,6 +83,10 @@ func DeserializeReporterInstanceId(value string) ReporterInstanceId {
 	return Deserialize[ReporterInstanceId](value)
 }
 
+func DeserializeTransactionId(value string) TransactionId {
+	return Deserialize[TransactionId](value)
+}
+
 func DeserializeConsistencyToken(value string) ConsistencyToken {
 	return Deserialize[ConsistencyToken](value)
 }

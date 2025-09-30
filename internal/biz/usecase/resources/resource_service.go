@@ -297,9 +297,9 @@ func (uc *Usecase) createResource(tx *gorm.DB, request *v1beta2.ReportResourceRe
 		return fmt.Errorf("invalid common representation: %w", err)
 	}
 
-	commonTransactionId := model.NewTransactionId(request.GetRepresentations().GetMetadata().GetTransactionId())
+	transactionId := model.NewTransactionId(request.GetRepresentations().GetMetadata().GetTransactionId())
 
-	resource, err := model.NewResource(resourceId, localResourceId, resourceType, reporterType, reporterInstanceId, commonTransactionId, reporterResourceId, apiHref, consoleHref, reporterRepresentation, commonRepresentation, nil)
+	resource, err := model.NewResource(resourceId, localResourceId, resourceType, reporterType, reporterInstanceId, transactionId, reporterResourceId, apiHref, consoleHref, reporterRepresentation, commonRepresentation, nil)
 	if err != nil {
 		return err
 	}
@@ -337,7 +337,7 @@ func getReporterResourceKeyFromRequest(request *v1beta2.ReportResourceRequest) (
 }
 
 func (uc *Usecase) updateResource(tx *gorm.DB, request *v1beta2.ReportResourceRequest, existingResource *model.Resource, txidStr string) error {
-	reporterResourceKey, apiHref, consoleHref, reporterVersion, commonData, reporterData, commonTransactionId, err := extractUpdateDataFromRequest(request)
+	reporterResourceKey, apiHref, consoleHref, reporterVersion, commonData, reporterData, transactionId, err := extractUpdateDataFromRequest(request)
 	if err != nil {
 		return err
 	}
@@ -349,7 +349,7 @@ func (uc *Usecase) updateResource(tx *gorm.DB, request *v1beta2.ReportResourceRe
 		reporterVersion,
 		reporterData,
 		commonData,
-		commonTransactionId,
+		transactionId,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to update resource: %w", err)
@@ -405,9 +405,9 @@ func extractUpdateDataFromRequest(request *v1beta2.ReportResourceRequest) (
 		return model.ReporterResourceKey{}, "", "", nil, model.Representation(nil), model.Representation(nil), "", fmt.Errorf("invalid reporter data: %w", err)
 	}
 
-	commonTransactionId := model.NewTransactionId(request.GetRepresentations().GetMetadata().GetTransactionId())
+	transactionId := model.NewTransactionId(request.GetRepresentations().GetMetadata().GetTransactionId())
 
-	return reporterResourceKey, apiHref, consoleHref, reporterVersion, commonRepresentation, reporterRepresentation, commonTransactionId, nil
+	return reporterResourceKey, apiHref, consoleHref, reporterVersion, commonRepresentation, reporterRepresentation, transactionId, nil
 }
 
 func getNextTransactionID() (string, error) {

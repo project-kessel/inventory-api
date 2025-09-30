@@ -81,6 +81,7 @@ func DeserializeCommonRepresentation(snapshot *CommonRepresentationSnapshot) Com
 	version := DeserializeVersion(snapshot.Version)
 	reporterType := ReporterType(snapshot.ReportedByReporterType)
 	reporterInstanceId := ReporterInstanceId(snapshot.ReportedByReporterInstance)
+	transactionId := TransactionId(snapshot.TransactionId)
 
 	// Create reporter ID
 	reporterId := ReporterId{
@@ -93,6 +94,7 @@ func DeserializeCommonRepresentation(snapshot *CommonRepresentationSnapshot) Com
 		resourceId:     resourceId,
 		version:        version,
 		reporter:       reporterId,
+		transactionId:  transactionId,
 	}
 }
 

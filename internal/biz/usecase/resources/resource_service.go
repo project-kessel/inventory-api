@@ -896,6 +896,11 @@ func (uc *Usecase) createWorkspaceTuple(workspaceID string, key model.ReporterRe
 func (uc *Usecase) determineTupleOperations(representationVersion []data.RepresentationsByVersion, currentVersion uint, key model.ReporterResourceKey) (model.TuplesToReplicate, error) {
 	currentWorkspaceID, previousWorkspaceID := data.GetCurrentAndPreviousWorkspaceID(representationVersion, currentVersion)
 
+	// If workspace ID hasn't changed, no operations needed
+	if previousWorkspaceID != "" && previousWorkspaceID == currentWorkspaceID {
+		return model.TuplesToReplicate{}, fmt.Errorf("no tuple operations needed when workspace ID unchanged")
+	}
+
 	var tuplesToCreate, tuplesToDelete []model.RelationsTuple
 
 	// Always create tuple for current workspace if it exists
@@ -903,8 +908,8 @@ func (uc *Usecase) determineTupleOperations(representationVersion []data.Represe
 		tuplesToCreate = append(tuplesToCreate, uc.createWorkspaceTuple(currentWorkspaceID, key))
 	}
 
-	// Delete previous tuple ONLY if workspace ID changed and previous exists
-	if previousWorkspaceID != "" && previousWorkspaceID != currentWorkspaceID {
+	// Delete previous tuple if it exists and is different from current
+	if previousWorkspaceID != "" {
 		tuplesToDelete = append(tuplesToDelete, uc.createWorkspaceTuple(previousWorkspaceID, key))
 	}
 

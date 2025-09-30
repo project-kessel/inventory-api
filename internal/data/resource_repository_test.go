@@ -779,6 +779,120 @@ func TestResourceRepository_PartialDataScenarios(t *testing.T) {
 	}
 }
 
+func TestSerializableCreateFails(t *testing.T) {
+	implementations := []struct {
+		name string
+		repo func() ResourceRepository
+		db   func() *gorm.DB
+	}{
+		{
+			name: "Real Repository with GormTransactionManager",
+			repo: func() ResourceRepository {
+				db := setupInMemoryDB(t)
+				tm := NewGormTransactionManager(3)
+				return NewResourceRepository(db, tm)
+			},
+			db: func() *gorm.DB {
+				return setupInMemoryDB(t)
+			},
+		},
+	}
+
+	for _, impl := range implementations {
+		t.Run(impl.name, func(t *testing.T) {
+			// Fresh instances
+			db := setupInMemoryDB(t)
+			tm := NewGormTransactionManager(3)
+			repo := NewResourceRepository(db, tm)
+
+			resource := createTestResourceWithLocalId(t, "serializable-create-conflict")
+
+			// Begin a conflicting serializable transaction and create the same resource
+			conflictTx := db.Begin(&sql.TxOptions{Isolation: sql.LevelSerializable})
+			// Do a read to simulate how a service would before creating
+			foundResource, err := repo.FindResourceByKeys(conflictTx, resource.ReporterResources()[0].ReporterResourceKey)
+			assert.NotNil(t, err)
+			assert.Nil(t, foundResource)
+			assert.NoError(t, repo.Save(conflictTx, resource, model_legacy.OperationTypeCreated, "tx-conflict"))
+			// Do NOT commit yet to hold locks
+
+			// Attempt to create the same resource via a separate serializable transaction managed by TM
+			err = tm.HandleSerializableTransaction(db, func(tx *gorm.DB) error {
+				foundResource, err := repo.FindResourceByKeys(tx, resource.ReporterResources()[0].ReporterResourceKey)
+				assert.NotNil(t, err)
+				assert.Nil(t, foundResource)
+				return repo.Save(tx, resource, model_legacy.OperationTypeCreated, "tx-create")
+			})
+			assert.Error(t, err)
+			assert.ErrorContains(t, err, "transaction failed")
+
+			// Cleanup
+			assert.NoError(t, conflictTx.Commit().Error)
+		})
+	}
+}
+
+func TestSerializableUpdateFails(t *testing.T) {
+	implementations := []struct {
+		name string
+		repo func() ResourceRepository
+		db   func() *gorm.DB
+	}{
+		{
+			name: "Real Repository with GormTransactionManager",
+			repo: func() ResourceRepository {
+				db := setupInMemoryDB(t)
+				tm := NewGormTransactionManager(3)
+				return NewResourceRepository(db, tm)
+			},
+			db: func() *gorm.DB {
+				return setupInMemoryDB(t)
+			},
+		},
+	}
+
+	for _, impl := range implementations {
+		t.Run(impl.name, func(t *testing.T) {
+			// Fresh instances
+			db := setupInMemoryDB(t)
+			tm := NewGormTransactionManager(3)
+			repo := NewResourceRepository(db, tm)
+
+			// Create initial resource (committed)
+			resource := createTestResourceWithLocalId(t, "serializable-update-conflict")
+			assert.NoError(t, repo.Save(db, resource, model_legacy.OperationTypeCreated, "tx-initial"))
+
+			// Prepare an updated version
+			key, err := bizmodel.NewReporterResourceKey("serializable-update-conflict", "k8s_cluster", "ocm", "ocm-instance-1")
+			assert.NoError(t, err)
+			apiHref, _ := bizmodel.NewApiHref("https://api.example.com/updated")
+			consoleHref, _ := bizmodel.NewConsoleHref("https://console.example.com/updated")
+			repData, _ := bizmodel.NewRepresentation(map[string]interface{}{"name": "updated"})
+			comData, _ := bizmodel.NewRepresentation(map[string]interface{}{"workspace_id": "ws-serial"})
+			assert.NoError(t, resource.Update(key, apiHref, consoleHref, nil, repData, comData))
+
+			// Begin a conflicting serializable transaction and update the same resource
+			conflictTx := db.Begin(&sql.TxOptions{Isolation: sql.LevelSerializable})
+			// Do a read to simulate how a service would before saving
+			foundResource, err := repo.FindResourceByKeys(conflictTx, resource.ReporterResources()[0].ReporterResourceKey)
+			assert.Nil(t, err)
+			assert.NotNil(t, foundResource)
+			assert.NoError(t, repo.Save(conflictTx, resource, model_legacy.OperationTypeUpdated, "tx-conflict"))
+			// Do NOT commit yet to hold locks
+
+			// Attempt to update the same resource via TM-managed serializable transaction
+			err = tm.HandleSerializableTransaction(db, func(tx *gorm.DB) error {
+				return repo.Save(tx, resource, model_legacy.OperationTypeUpdated, "tx-update")
+			})
+			assert.Error(t, err)
+			assert.ErrorContains(t, err, "transaction failed")
+
+			// Cleanup
+			assert.NoError(t, conflictTx.Commit().Error)
+		})
+	}
+}
+
 func setupInMemoryDB(t *testing.T) *gorm.DB {
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	require.NoError(t, err)

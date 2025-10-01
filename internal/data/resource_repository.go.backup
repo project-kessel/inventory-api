@@ -1,14 +1,12 @@
 package data
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
-	"github.com/project-kessel/inventory-api/internal"
 	bizmodel "github.com/project-kessel/inventory-api/internal/biz/model"
 	"github.com/project-kessel/inventory-api/internal/biz/model_legacy"
 	"github.com/project-kessel/inventory-api/internal/biz/usecase"
@@ -27,26 +25,6 @@ type FindResourceByKeysResult struct {
 	ReporterType          string    `gorm:"column:reporter_type"`
 	ReporterInstanceID    string    `gorm:"column:reporter_instance_id"`
 	ConsistencyToken      string    `gorm:"column:consistency_token"`
-}
-
-type RepresentationsByVersion struct {
-	Data    internal.JsonObject `gorm:"column:data"`
-	Version uint                `gorm:"column:version"`
-}
-
-// GetCurrentAndPreviousWorkspaceID extracts current and previous workspace IDs from a slice of RepresentationsByVersion
-func GetCurrentAndPreviousWorkspaceID(representations []RepresentationsByVersion, currentVersion uint) (currentWorkspaceID, previousWorkspaceID string) {
-	for _, repr := range representations {
-		if workspaceID, exists := repr.Data["workspace_id"].(string); exists && workspaceID != "" {
-			switch repr.Version {
-			case currentVersion:
-				currentWorkspaceID = workspaceID
-			case currentVersion - 1:
-				previousWorkspaceID = workspaceID
-			}
-		}
-	}
-	return currentWorkspaceID, previousWorkspaceID
 }
 
 func ToSnapshotsFromResults(results []FindResourceByKeysResult) (*bizmodel.ResourceSnapshot, []bizmodel.ReporterResourceSnapshot) {
@@ -104,10 +82,11 @@ type ResourceRepository interface {
 	NextReporterResourceId() (bizmodel.ReporterResourceId, error)
 	Save(tx *gorm.DB, resource bizmodel.Resource, operationType model_legacy.EventOperationType, txid string) error
 	FindResourceByKeys(tx *gorm.DB, key bizmodel.ReporterResourceKey) (*bizmodel.Resource, error)
-	FindVersionedRepresentationsByVersion(tx *gorm.DB, key bizmodel.ReporterResourceKey, currentVersion uint) ([]RepresentationsByVersion, error)
 	GetDB() *gorm.DB
 	GetTransactionManager() usecase.TransactionManager
 	HasTransactionIdBeenProcessed(tx *gorm.DB, transactionId string, reporterResourceId uuid.UUID, resourceId uuid.UUID) (bool, error)
+	GetLatestReporterRepresentation(tx *gorm.DB, reporterResourceId uuid.UUID) (*datamodel.ReporterRepresentation, error)
+	GetLatestCommonRepresentation(tx *gorm.DB, resourceId uuid.UUID) (*datamodel.CommonRepresentation, error)
 }
 
 type resourceRepository struct {
@@ -159,44 +138,15 @@ func (r *resourceRepository) Save(tx *gorm.DB, resource bizmodel.Resource, opera
 		return fmt.Errorf("failed to save reporter resource: %w", err)
 	}
 
-	// Only create new representation records if the data has changed
-	// Check if we need to create a new reporter representation
 	if dataReporterRepresentation.ReporterResourceID != uuid.Nil {
-		latestReporterRep, err := getLatestReporterRepresentation(tx, dataReporterRepresentation.ReporterResourceID)
-		if err != nil {
-			return fmt.Errorf("failed to get latest reporter representation: %w", err)
-		}
-
-		shouldCreateReporterRep := true
-		if latestReporterRep != nil {
-			// Compare the data content to see if it has changed
-			shouldCreateReporterRep = !compareReporterRepresentationData(latestReporterRep, &dataReporterRepresentation)
-		}
-
-		if shouldCreateReporterRep {
-			if err := tx.Create(&dataReporterRepresentation).Error; err != nil {
-				return fmt.Errorf("failed to save reporter representation: %w", err)
-			}
+		if err := tx.Create(&dataReporterRepresentation).Error; err != nil {
+			return fmt.Errorf("failed to save reporter representation: %w", err)
 		}
 	}
 
-	// Check if we need to create a new common representation
 	if dataCommonRepresentation.ResourceId != uuid.Nil {
-		latestCommonRep, err := getLatestCommonRepresentation(tx, dataCommonRepresentation.ResourceId)
-		if err != nil {
-			return fmt.Errorf("failed to get latest common representation: %w", err)
-		}
-
-		shouldCreateCommonRep := true
-		if latestCommonRep != nil {
-			// Compare the data content to see if it has changed
-			shouldCreateCommonRep = !compareCommonRepresentationData(latestCommonRep, &dataCommonRepresentation)
-		}
-
-		if shouldCreateCommonRep {
-			if err := tx.Create(&dataCommonRepresentation).Error; err != nil {
-				return fmt.Errorf("failed to save common representation: %w", err)
-			}
+		if err := tx.Create(&dataCommonRepresentation).Error; err != nil {
+			return fmt.Errorf("failed to save common representation: %w", err)
 		}
 	}
 
@@ -295,38 +245,6 @@ func (r *resourceRepository) GetTransactionManager() usecase.TransactionManager 
 	return r.transactionManager
 }
 
-// TODO this needs to be expanded to include the reporter representations
-// FindVersionedRepresentationsByVersion finds the common representations by version
-func (r *resourceRepository) FindVersionedRepresentationsByVersion(tx *gorm.DB, key bizmodel.ReporterResourceKey, currentVersion uint) ([]RepresentationsByVersion, error) {
-	var results []RepresentationsByVersion
-
-	// Use provided transaction or fall back to regular DB session
-	db := tx
-	if db == nil {
-		db = r.db.Session(&gorm.Session{})
-	}
-
-	query := db.Table("reporter_resources rr").
-		Select("cr.data, cr.version").
-		Joins("JOIN common_representations cr ON rr.resource_id = cr.resource_id").
-		Where("LOWER(rr.local_resource_id) = LOWER(?)", key.LocalResourceId().Serialize()).
-		Where("LOWER(rr.resource_type) = LOWER(?)", key.ResourceType().Serialize()).
-		Where("LOWER(rr.reporter_type) = LOWER(?)", key.ReporterType().Serialize()).
-		Where("(cr.version = ? OR cr.version = ?)", currentVersion, currentVersion-1)
-
-	// Only add reporter_instance_id condition if it's not empty
-	if reporterInstanceId := key.ReporterInstanceId().Serialize(); reporterInstanceId != "" {
-		query = query.Where("LOWER(rr.reporter_instance_id) = LOWER(?)", reporterInstanceId)
-	}
-
-	err := query.Find(&results).Error
-	if err != nil {
-		return nil, fmt.Errorf("failed to find common representations by version: %w", err)
-	}
-
-	return results, nil
-}
-
 // HasTransactionIdBeenProcessed checks if a transaction ID exists in either the
 // reporter_representations or common_representations tables.
 // Returns true if the transaction has already been processed, false otherwise.
@@ -339,7 +257,7 @@ func (r *resourceRepository) HasTransactionIdBeenProcessed(tx *gorm.DB, transact
 	var reporterExists bool
 	err := tx.Raw(`
 		SELECT EXISTS(
-			SELECT 1 FROM reporter_representations
+			SELECT 1 FROM reporter_representations 
 			WHERE transaction_id = ? AND reporter_resource_id = ?
 		)
 	`, transactionId, reporterResourceId).Scan(&reporterExists).Error
@@ -354,7 +272,7 @@ func (r *resourceRepository) HasTransactionIdBeenProcessed(tx *gorm.DB, transact
 	var commonExists bool
 	err = tx.Raw(`
 		SELECT EXISTS(
-			SELECT 1 FROM common_representations
+			SELECT 1 FROM common_representations 
 			WHERE transaction_id = ? AND resource_id = ?
 		)
 	`, transactionId, resourceId).Scan(&commonExists).Error
@@ -365,8 +283,8 @@ func (r *resourceRepository) HasTransactionIdBeenProcessed(tx *gorm.DB, transact
 	return commonExists, nil
 }
 
-// getLatestReporterRepresentation retrieves the most recent reporter representation for a given reporter resource ID
-func getLatestReporterRepresentation(tx *gorm.DB, reporterResourceId uuid.UUID) (*datamodel.ReporterRepresentation, error) {
+// GetLatestReporterRepresentation retrieves the most recent reporter representation for a given reporter resource ID
+func (r *resourceRepository) GetLatestReporterRepresentation(tx *gorm.DB, reporterResourceId uuid.UUID) (*datamodel.ReporterRepresentation, error) {
 	var representation datamodel.ReporterRepresentation
 	err := tx.Where("reporter_resource_id = ?", reporterResourceId).
 		Order("version DESC, generation DESC").
@@ -380,8 +298,8 @@ func getLatestReporterRepresentation(tx *gorm.DB, reporterResourceId uuid.UUID) 
 	return &representation, nil
 }
 
-// getLatestCommonRepresentation retrieves the most recent common representation for a given resource ID
-func getLatestCommonRepresentation(tx *gorm.DB, resourceId uuid.UUID) (*datamodel.CommonRepresentation, error) {
+// GetLatestCommonRepresentation retrieves the most recent common representation for a given resource ID
+func (r *resourceRepository) GetLatestCommonRepresentation(tx *gorm.DB, resourceId uuid.UUID) (*datamodel.CommonRepresentation, error) {
 	var representation datamodel.CommonRepresentation
 	err := tx.Where("resource_id = ?", resourceId).
 		Order("version DESC").
@@ -393,34 +311,4 @@ func getLatestCommonRepresentation(tx *gorm.DB, resourceId uuid.UUID) (*datamode
 		return nil, fmt.Errorf("failed to get latest common representation: %w", err)
 	}
 	return &representation, nil
-}
-
-// compareReporterRepresentationData compares the data content of two reporter representations
-// Returns true if the data is the same, false if different
-func compareReporterRepresentationData(existing, new *datamodel.ReporterRepresentation) bool {
-	// Compare the JSON data content by marshaling both to JSON and comparing strings
-	existingJSON, err1 := json.Marshal(existing.Data)
-	newJSON, err2 := json.Marshal(new.Data)
-
-	// If either marshaling fails, consider them different
-	if err1 != nil || err2 != nil {
-		return false
-	}
-
-	return string(existingJSON) == string(newJSON)
-}
-
-// compareCommonRepresentationData compares the data content of two common representations
-// Returns true if the data is the same, false if different
-func compareCommonRepresentationData(existing, new *datamodel.CommonRepresentation) bool {
-	// Compare the JSON data content by marshaling both to JSON and comparing strings
-	existingJSON, err1 := json.Marshal(existing.Data)
-	newJSON, err2 := json.Marshal(new.Data)
-
-	// If either marshaling fails, consider them different
-	if err1 != nil || err2 != nil {
-		return false
-	}
-
-	return string(existingJSON) == string(newJSON)
 }

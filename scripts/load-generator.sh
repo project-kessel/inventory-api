@@ -65,7 +65,7 @@ for ((i = 0 ; i < ${NUM_RUNS} ; i++)); do
     --arg sub_manager_id "$SUB_MANAGER_ID" \
     --arg insights_id "$INSIGHTS_ID" \
     --arg ansible_host "$ANSIBLE_HOST" \
-    '{"type":"host","reporterType":"hbi","reporterInstanceId":$reporter_instance_id,"representations":{"metadata":{"localResourceId":$local_resource_id,"apiHref":"https://apiHref.com/","consoleHref":"https://www.console.com/","reporterVersion":"2.7.16"},"common":{"workspace_id":$workspace_id},"reporter":{"satellite_id":$satellite_id,"subscription_manager_id":$sub_manager_id,"insights_id":$insights_id,"ansible_host":$ansible_host}}}')
+    '{"type":"host","reporterType":"hbi","reporterInstanceId":$reporter_instance_id,"representations":{"metadata":{"localResourceId":$local_resource_id,"apiHref":"https://apiHref.com/","consoleHref":"https://www.console.com/","reporterVersion":"2.7.16","transaction_id":"12345"},"common":{"workspace_id":$workspace_id},"reporter":{"satellite_id":$satellite_id,"subscription_manager_id":$sub_manager_id,"insights_id":$insights_id,"ansible_host":$ansible_host}}}')
 
   DELETE_REQUEST=$(jq -c --null-input \
     --arg local_resource_id "$LOCAL_RESOURCE_ID" \

@@ -263,3 +263,10 @@ func (f *fakeResourceRepository) GetTransactionManager() usecase.TransactionMana
 func (f *fakeResourceRepository) makeCompositeKey(localResourceID, reporterType, resourceType, reporterInstanceID string, representationVersion, generation uint) string {
 	return fmt.Sprintf("%s|%s|%s|%s|%d|%d", localResourceID, reporterType, resourceType, reporterInstanceID, representationVersion, generation)
 }
+
+// HasTransactionIdBeenProcessed is a fake implementation that always returns false
+// (transaction not processed) for testing purposes
+func (f *fakeResourceRepository) HasTransactionIdBeenProcessed(tx *gorm.DB, transactionId string, reporterResourceId uuid.UUID, resourceId uuid.UUID) (bool, error) {
+	// Fake implementation - always return false (not processed)
+	return false, nil
+}

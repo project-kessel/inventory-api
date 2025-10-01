@@ -1113,7 +1113,6 @@ func createTestReportRequestWithCycleData(t *testing.T, resourceType, reporterTy
 
 }
 
-
 func TestGetWorkspaceVersions(t *testing.T) {
 	// Test with fake repository only since we don't have access to the data package test utilities
 	repo := data.NewFakeResourceRepository()
@@ -1341,3 +1340,4 @@ func TestDetermineTupleOperations(t *testing.T) {
 
 	// Verify we get tuples from fake repository
 	assert.True(t, result.HasTuplesToCreate() || result.HasTuplesToDelete())
+}

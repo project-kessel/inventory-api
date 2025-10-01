@@ -233,7 +233,6 @@ func (r *resourceRepository) FindResourceByKeys(tx *gorm.DB, key bizmodel.Report
 	query = query.Where("LOWER(rr.local_resource_id) = LOWER(?)", key.LocalResourceId().Serialize())
 	query = query.Where("LOWER(rr.resource_type) = LOWER(?)", key.ResourceType().Serialize())
 	query = query.Where("LOWER(rr.reporter_type) = LOWER(?)", key.ReporterType().Serialize())
-	query = query.Where("rr.tombstone = ?", false)
 
 	// Only add reporter_instance_id condition if it's not empty
 	if reporterInstanceId := key.ReporterInstanceId().Serialize(); reporterInstanceId != "" {

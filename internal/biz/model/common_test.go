@@ -171,6 +171,69 @@ func TestGeneration_Initialization(t *testing.T) {
 	})
 }
 
+func TestGeneration_Increment(t *testing.T) {
+	t.Parallel()
+
+	t.Run("should increment zero generation to one", func(t *testing.T) {
+		t.Parallel()
+
+		generation := NewGeneration(0)
+		incremented := generation.Increment()
+
+		if incremented.Uint() != 1 {
+			t.Errorf("Expected incremented generation to be 1, got %d", incremented.Uint())
+		}
+	})
+
+	t.Run("should increment positive generation by one", func(t *testing.T) {
+		t.Parallel()
+
+		generation := NewGeneration(5)
+		incremented := generation.Increment()
+
+		if incremented.Uint() != 6 {
+			t.Errorf("Expected incremented generation to be 6, got %d", incremented.Uint())
+		}
+	})
+
+	t.Run("should increment large generation by one", func(t *testing.T) {
+		t.Parallel()
+
+		generation := NewGeneration(1000)
+		incremented := generation.Increment()
+
+		if incremented.Uint() != 1001 {
+			t.Errorf("Expected incremented generation to be 1001, got %d", incremented.Uint())
+		}
+	})
+
+	t.Run("should not modify original generation", func(t *testing.T) {
+		t.Parallel()
+
+		original := NewGeneration(10)
+		incremented := original.Increment()
+
+		if original.Uint() != 10 {
+			t.Errorf("Expected original generation to remain 10, got %d", original.Uint())
+		}
+		if incremented.Uint() != 11 {
+			t.Errorf("Expected incremented generation to be 11, got %d", incremented.Uint())
+		}
+	})
+
+	t.Run("should handle maximum value gracefully", func(t *testing.T) {
+		t.Parallel()
+
+		maxUint := ^uint(0)
+		generation := NewGeneration(maxUint)
+		incremented := generation.Increment()
+
+		if incremented.Uint() != 0 {
+			t.Errorf("Expected incremented max generation to wrap to 0, got %d", incremented.Uint())
+		}
+	})
+}
+
 func TestTombstone_Initialization(t *testing.T) {
 	t.Parallel()
 	fixture := NewTombstoneTestFixture()

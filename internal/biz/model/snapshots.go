@@ -51,6 +51,7 @@ type CommonRepresentationSnapshot struct {
 	Version                    uint                   `json:"version"`
 	ReportedByReporterType     string                 `json:"reported_by_reporter_type"`
 	ReportedByReporterInstance string                 `json:"reported_by_reporter_instance"`
+	TransactionId              string                 `json:"transaction_id"`
 	CreatedAt                  time.Time              `json:"created_at"`
 }
 
@@ -62,6 +63,7 @@ type ReporterRepresentationSnapshot struct {
 	Generation         uint                   `json:"generation"`
 	ReporterVersion    *string                `json:"reporter_version"`
 	CommonVersion      uint                   `json:"common_version"`
+	TransactionId      string                 `json:"transaction_id"`
 	Tombstone          bool                   `json:"tombstone"`
 	CreatedAt          time.Time              `json:"created_at"`
 }

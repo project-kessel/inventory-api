@@ -17,6 +17,9 @@ type fakeResourceRepository struct {
 	mu                      sync.RWMutex
 	resourcesByPrimaryKey   map[uuid.UUID]*storedResource // keyed by primary key (ResourceID) - simulates database primary storage
 	resourcesByCompositeKey map[string]uuid.UUID          // composite key -> primary key mapping for unique constraint
+	resources               map[string]*storedResource    // legacy field for backward compatibility
+	overrideCurrent         string                        // test override for current workspace ID
+	overridePrevious        string                        // test override for previous workspace ID
 }
 
 type storedResource struct {
@@ -36,6 +39,9 @@ func NewFakeResourceRepository() ResourceRepository {
 	return &fakeResourceRepository{
 		resourcesByPrimaryKey:   make(map[uuid.UUID]*storedResource),
 		resourcesByCompositeKey: make(map[string]uuid.UUID),
+		resources:               make(map[string]*storedResource),
+		overrideCurrent:         "",
+		overridePrevious:        "",
 	}
 }
 
@@ -43,9 +49,11 @@ func NewFakeResourceRepository() ResourceRepository {
 // workspace IDs returned for current and previous versions.
 func NewFakeResourceRepositoryWithWorkspaceOverrides(current, previous string) ResourceRepository {
 	return &fakeResourceRepository{
-		resources:        make(map[string]*storedResource),
-		overrideCurrent:  current,
-		overridePrevious: previous,
+		resourcesByPrimaryKey:   make(map[uuid.UUID]*storedResource),
+		resourcesByCompositeKey: make(map[string]uuid.UUID),
+		resources:               make(map[string]*storedResource),
+		overrideCurrent:         current,
+		overridePrevious:        previous,
 	}
 }
 

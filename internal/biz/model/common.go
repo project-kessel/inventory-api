@@ -83,6 +83,10 @@ func DeserializeReporterInstanceId(value string) ReporterInstanceId {
 	return Deserialize[ReporterInstanceId](value)
 }
 
+func DeserializeTransactionId(value string) TransactionId {
+	return Deserialize[TransactionId](value)
+}
+
 func DeserializeConsistencyToken(value string) ConsistencyToken {
 	return Deserialize[ConsistencyToken](value)
 }
@@ -400,4 +404,18 @@ func (r Representation) Serialize() internal.JsonObject {
 
 func DeserializeRepresentation(data internal.JsonObject) Representation {
 	return Representation(data)
+}
+
+type TransactionId string
+
+func (t TransactionId) String() string {
+	return string(t)
+}
+
+func (t TransactionId) Serialize() string {
+	return SerializeString(t)
+}
+
+func NewTransactionId(transactionId string) TransactionId {
+	return TransactionId(transactionId)
 }

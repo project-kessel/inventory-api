@@ -83,6 +83,10 @@ func DeserializeReporterInstanceId(value string) ReporterInstanceId {
 	return Deserialize[ReporterInstanceId](value)
 }
 
+func DeserializeTransactionId(value string) TransactionId {
+	return Deserialize[TransactionId](value)
+}
+
 func DeserializeConsistencyToken(value string) ConsistencyToken {
 	return Deserialize[ConsistencyToken](value)
 }
@@ -282,6 +286,13 @@ func (g Generation) Uint() uint {
 	return uint(g)
 }
 
+// Increment returns a new Generation with the value incremented by 1.
+// Note: This will rollover to 0 if the maximum uint value is reached
+// (18,446,744,073,709,551,615 on 64-bit systems or 4,294,967,295 on 32-bit systems).
+func (g Generation) Increment() Generation {
+	return Generation(uint(g) + 1)
+}
+
 func (g Generation) Serialize() uint {
 	return SerializeUint(g)
 }
@@ -396,4 +407,18 @@ func (r Representation) Serialize() internal.JsonObject {
 
 func DeserializeRepresentation(data internal.JsonObject) Representation {
 	return Representation(data)
+}
+
+type TransactionId string
+
+func (t TransactionId) String() string {
+	return string(t)
+}
+
+func (t TransactionId) Serialize() string {
+	return SerializeString(t)
+}
+
+func NewTransactionId(transactionId string) TransactionId {
+	return TransactionId(transactionId)
 }

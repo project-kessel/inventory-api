@@ -15,71 +15,62 @@ objects:
     RELATIONS_API_HTTP_ENDPOINT: "kessel-relations-api.kessel-${ENV}.svc:8000"
     INVENTORY_API_GRPC_ENDPOINT: "kessel-inventory-api.kessel-${ENV}.svc:9000"
     INVENTORY_API_HTTP_ENDPOINT: "kessel-inventory-api.kessel-${ENV}.svc:8000"
-- apiVersion: apps/v1
-  kind: Deployment
+- apiVersion: v1
+  kind: Pod
   metadata:
     labels:
       app: kessel-debug
     name: kessel-debug
   spec:
-    replicas: 1
-    selector:
-      matchLabels:
-        app: kessel-debug
-    template:
-      metadata:
-        labels:
-          app: kessel-debug
-      spec:
-        containers:
-        - image: ${DEBUG_IMAGE}:${IMAGE_TAG}
-          name: kessel-debug
-          imagePullPolicy: Always
-          envFrom:
-          - configMapRef:
-              name: kessel-debug-config
-          env:
-          - name: ZED_TOKEN
-            valueFrom:
-              secretKeyRef:
-                name: spicedb-config
-                key: preshared_key
-          - name: INVENTORY_SSO_CLIENT_ID
-            valueFrom:
-              secretKeyRef:
-                name: kessel-sso-sa
-                key: client-id
-          - name: INVENTORY_SSO_CLIENT_SECRET
-            valueFrom:
-              secretKeyRef:
-                name: kessel-sso-sa
-                key: client-secret
-          - name: INVENTORY_SSO_ENDPOINT
-            valueFrom:
-              secretKeyRef:
-                name: kessel-sso-sa
-                key: url
-          volumeMounts:
-            - name: config-secret
-              mountPath: /cdapp/
-            - name: kafka-ca-certs
-              mountPath: "/kafka-ca-certs"
-        volumes:
-          - name: config-secret
-            secret:
-              secretName: kessel-inventory  # leverages inventory secret as it includes kafka info
-              defaultMode: 420
-          - name: kafka-ca-certs
-            secret:
-              secretName: ${CA_CERT_SECRET}
-              optional: true
+    containers:
+    - image: ${DEBUG_IMAGE}:${IMAGE_TAG}
+      name: kessel-debug
+      imagePullPolicy: Always
+      envFrom:
+      - configMapRef:
+          name: kessel-debug-config
+      env:
+      - name: ZED_TOKEN
+        valueFrom:
+          secretKeyRef:
+            name: spicedb-config
+            key: preshared_key
+      - name: INVENTORY_SSO_CLIENT_ID
+        valueFrom:
+          secretKeyRef:
+            name: kessel-sso-sa
+            key: client-id
+      - name: INVENTORY_SSO_CLIENT_SECRET
+        valueFrom:
+          secretKeyRef:
+            name: kessel-sso-sa
+            key: client-secret
+      - name: INVENTORY_SSO_ENDPOINT
+        valueFrom:
+          secretKeyRef:
+            name: kessel-sso-sa
+            key: url
+      volumeMounts:
+        - name: config-secret
+          mountPath: /cdapp/
+        - name: kafka-ca-certs
+          mountPath: "/kafka-ca-certs"
+    volumes:
+      - name: config-secret
+        secret:
+          secretName: kessel-inventory  # leverages inventory secret as it includes kafka info
+          defaultMode: 420
+      - name: kafka-ca-certs
+        secret:
+          secretName: ${CA_CERT_SECRET}
+          optional: true
 parameters:
   - name: ENV
     description: Target environment of the deployment (int, stage, or prod only)
     required: true
   - name: DEBUG_IMAGE
     description: Quay image name for the debug container
-    value: quay.io/redhat-services-prod/project-kessel-tenant/kessel-inventory/kessel-debug
+    value: quay.io/redhat-services-prod/project-kessel-tenant/kessel-debug
   - name: IMAGE_TAG
     description: Image tag for the debug container
     value: latest

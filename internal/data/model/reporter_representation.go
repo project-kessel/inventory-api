@@ -19,6 +19,7 @@ type ReporterRepresentation struct {
 	Generation         uint      `gorm:"type:bigint;primaryKey;check:generation >= 0"`
 	ReporterVersion    *string   `gorm:"size:128"`
 	CommonVersion      uint      `gorm:"type:bigint;check:common_version >= 0"`
+	TransactionId      string    `gorm:"size:128"`
 	Tombstone          bool      `gorm:"not null"`
 	CreatedAt          time.Time
 
@@ -34,6 +35,7 @@ func NewReporterRepresentation(
 	version uint,
 	generation uint,
 	commonVersion uint,
+	transactionId string,
 	tombstone bool,
 	reporterVersion *string,
 ) (*ReporterRepresentation, error) {
@@ -45,6 +47,7 @@ func NewReporterRepresentation(
 		Version:            version,
 		Generation:         generation,
 		CommonVersion:      commonVersion,
+		TransactionId:      transactionId,
 		Tombstone:          tombstone,
 		ReporterVersion:    reporterVersion,
 	}
@@ -62,6 +65,7 @@ func validateReporterRepresentation(rr *ReporterRepresentation) error {
 		bizmodel.ValidateMinValueUint("Version", rr.Version, MinVersionValue),
 		bizmodel.ValidateMinValueUint("Generation", rr.Generation, MinGenerationValue),
 		bizmodel.ValidateMinValueUint("CommonVersion", rr.CommonVersion, MinCommonVersion),
+		bizmodel.ValidateMaxLength("TransactionId", rr.TransactionId, MaxTransactionIdLength),
 		bizmodel.ValidateOptionalString("ReporterVersion", rr.ReporterVersion, MaxReporterVersionLength),
 	)
 }
@@ -80,12 +84,13 @@ func (rr ReporterRepresentation) SerializeToSnapshot() bizmodel.ReporterRepresen
 		Generation:         rr.Generation,
 		ReporterVersion:    rr.ReporterVersion,
 		CommonVersion:      rr.CommonVersion,
+		TransactionId:      rr.TransactionId,
 		Tombstone:          rr.Tombstone,
 		CreatedAt:          rr.CreatedAt,
 	}
 }
 
-// DeserializeFromSnapshot creates GORM ReporterRepresentation from snapshot - direct initialization without validation
+// DeserializeReporterRepresentationFromSnapshot creates GORM ReporterRepresentation from snapshot - direct initialization without validation
 func DeserializeReporterRepresentationFromSnapshot(snapshot bizmodel.ReporterRepresentationSnapshot) ReporterRepresentation {
 	return ReporterRepresentation{
 		Representation: Representation{
@@ -96,6 +101,7 @@ func DeserializeReporterRepresentationFromSnapshot(snapshot bizmodel.ReporterRep
 		Generation:         snapshot.Generation,
 		ReporterVersion:    snapshot.ReporterVersion,
 		CommonVersion:      snapshot.CommonVersion,
+		TransactionId:      snapshot.TransactionId,
 		Tombstone:          snapshot.Tombstone,
 		CreatedAt:          snapshot.CreatedAt,
 	}

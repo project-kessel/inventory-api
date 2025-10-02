@@ -16,6 +16,7 @@ type ReporterRepresentation struct {
 	reporterVersion    *ReporterVersion
 	commonVersion      Version
 	tombstone          Tombstone
+	transactionId      TransactionId
 }
 
 type ReporterDataRepresentation struct {
@@ -33,6 +34,7 @@ func NewReporterDataRepresentation(
 	data Representation,
 	commonVersion Version,
 	reporterVersion *ReporterVersion,
+	transactionId TransactionId,
 ) (ReporterDataRepresentation, error) {
 
 	if reporterResourceID.UUID() == uuid.Nil {
@@ -52,6 +54,7 @@ func NewReporterDataRepresentation(
 			commonVersion:      commonVersion,
 			reporterVersion:    reporterVersion,
 			tombstone:          NewTombstone(false),
+			transactionId:      transactionId,
 		},
 	}, nil
 }
@@ -105,6 +108,7 @@ func (rr ReporterRepresentation) Serialize() ReporterRepresentationSnapshot {
 		ReporterVersion:    reporterVersionStr,
 		CommonVersion:      rr.commonVersion.Serialize(),
 		Tombstone:          rr.tombstone.Serialize(),
+		TransactionId:      rr.transactionId.Serialize(),
 		CreatedAt:          time.Now(), // TODO: Add proper timestamp from domain entity if available
 	}
 }
@@ -121,6 +125,7 @@ func DeserializeReporterDataRepresentation(snapshot *ReporterRepresentationSnaps
 	generation := DeserializeGeneration(snapshot.Generation)
 	commonVersion := DeserializeVersion(snapshot.CommonVersion)
 	tombstone := DeserializeTombstone(snapshot.Tombstone)
+	transactionId := DeserializeTransactionId(snapshot.TransactionId)
 
 	var reporterVersion *ReporterVersion
 	if snapshot.ReporterVersion != nil {
@@ -137,6 +142,7 @@ func DeserializeReporterDataRepresentation(snapshot *ReporterRepresentationSnaps
 			commonVersion:      commonVersion,
 			reporterVersion:    reporterVersion,
 			tombstone:          tombstone,
+			transactionId:      transactionId,
 		},
 	}
 }

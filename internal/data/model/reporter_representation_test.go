@@ -207,6 +207,7 @@ func TestReporterRepresentation_EdgeCases(t *testing.T) {
 			1,
 			1,
 			1,
+			"test-transaction-id",
 			false,
 			nil,
 		)
@@ -224,6 +225,7 @@ func TestReporterRepresentation_EdgeCases(t *testing.T) {
 			1,
 			1,
 			1,
+			"test-transaction-id",
 			false,
 			nil,
 		)
@@ -239,6 +241,7 @@ func TestReporterRepresentation_EdgeCases(t *testing.T) {
 			4294967295, // Max uint32 Version
 			4294967295, // Max uint32 Generation
 			4294967295, // Max uint32 CommonVersion
+			"test-transaction-id",
 			false,
 			nil,
 		)
@@ -254,6 +257,7 @@ func TestReporterRepresentation_EdgeCases(t *testing.T) {
 			1,
 			1,
 			1,
+			"test-transaction-id",
 			false,
 			internal.StringPtr(""), // Empty ReporterVersion
 		)
@@ -269,6 +273,7 @@ func TestReporterRepresentation_EdgeCases(t *testing.T) {
 			1,
 			1,
 			1,
+			"test-transaction-id",
 			false,
 			nil, // Nil ReporterVersion
 		)
@@ -319,6 +324,7 @@ func TestReporterRepresentation_EdgeCases(t *testing.T) {
 			1,
 			1,
 			1,
+			"test-transaction-id",
 			false,
 			nil,
 		)
@@ -334,6 +340,7 @@ func TestReporterRepresentation_EdgeCases(t *testing.T) {
 			1,
 			1,
 			1,
+			"test-transaction-id",
 			false,
 			nil,
 		)
@@ -363,6 +370,7 @@ func TestReporterRepresentation_EdgeCases(t *testing.T) {
 					tc.version,
 					1,
 					1,
+					"test-transaction-id",
 					false,
 					nil,
 				)
@@ -398,6 +406,7 @@ func TestReporterRepresentation_EdgeCases(t *testing.T) {
 					1,
 					tc.generation,
 					1,
+					"test-transaction-id",
 					false,
 					nil,
 				)
@@ -430,6 +439,7 @@ func TestReporterRepresentation_EdgeCases(t *testing.T) {
 					1,
 					1,
 					1,
+					"test-transaction-id",
 					tc.tombstone,
 					nil,
 				)

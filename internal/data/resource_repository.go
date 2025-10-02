@@ -207,11 +207,10 @@ func (r *resourceRepository) FindResourceByKeys(tx *gorm.DB, key bizmodel.Report
 		JOIN resource AS res ON res.id = rr2.resource_id
 	`)
 
-	// Build WHERE conditions using normalized lowercase columns for indexable case-insensitive matching
+	// Build WHERE conditions using case-insensitive matching to match fake repository behavior
 	query = query.Where("rr.local_resource_id = ?", key.LocalResourceId().Serialize())
-	query = query.Where("rr.resource_type = ?", key.ResourceType().Serialize())
-	query = query.Where("rr.reporter_type = ?", key.ReporterType().Serialize())
-	query = query.Where("rr.tombstone = ?", false)
+	query = query.Where("LOWER(rr.resource_type) = LOWER(?)", key.ResourceType().Serialize())
+	query = query.Where("LOWER(rr.reporter_type) = LOWER(?)", key.ReporterType().Serialize())
 
 	// Only add reporter_instance_id condition if it's not empty
 	if reporterInstanceId := key.ReporterInstanceId().Serialize(); reporterInstanceId != "" {

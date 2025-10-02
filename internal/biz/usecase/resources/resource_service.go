@@ -297,7 +297,9 @@ func (uc *Usecase) createResource(tx *gorm.DB, request *v1beta2.ReportResourceRe
 		return fmt.Errorf("invalid common representation: %w", err)
 	}
 
-	resource, err := model.NewResource(resourceId, localResourceId, resourceType, reporterType, reporterInstanceId, reporterResourceId, apiHref, consoleHref, reporterRepresentation, commonRepresentation, nil)
+	transactionId := model.NewTransactionId(request.GetRepresentations().GetMetadata().GetTransactionId())
+
+	resource, err := model.NewResource(resourceId, localResourceId, resourceType, reporterType, reporterInstanceId, transactionId, reporterResourceId, apiHref, consoleHref, reporterRepresentation, commonRepresentation, nil)
 	if err != nil {
 		return err
 	}
@@ -335,7 +337,7 @@ func getReporterResourceKeyFromRequest(request *v1beta2.ReportResourceRequest) (
 }
 
 func (uc *Usecase) updateResource(tx *gorm.DB, request *v1beta2.ReportResourceRequest, existingResource *model.Resource, txidStr string) error {
-	reporterResourceKey, apiHref, consoleHref, reporterVersion, commonData, reporterData, err := extractUpdateDataFromRequest(request)
+	reporterResourceKey, apiHref, consoleHref, reporterVersion, commonData, reporterData, transactionId, err := extractUpdateDataFromRequest(request)
 	if err != nil {
 		return err
 	}
@@ -347,6 +349,7 @@ func (uc *Usecase) updateResource(tx *gorm.DB, request *v1beta2.ReportResourceRe
 		reporterVersion,
 		reporterData,
 		commonData,
+		transactionId,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to update resource: %w", err)
@@ -362,23 +365,24 @@ func extractUpdateDataFromRequest(request *v1beta2.ReportResourceRequest) (
 	*model.ReporterVersion,
 	model.Representation,
 	model.Representation,
+	model.TransactionId,
 	error,
 ) {
 	reporterResourceKey, err := getReporterResourceKeyFromRequest(request)
 	if err != nil {
-		return model.ReporterResourceKey{}, "", "", nil, model.Representation(nil), model.Representation(nil), fmt.Errorf("failed to create reporter resource key: %w", err)
+		return model.ReporterResourceKey{}, "", "", nil, model.Representation(nil), model.Representation(nil), "", fmt.Errorf("failed to create reporter resource key: %w", err)
 	}
 
 	apiHref, err := model.NewApiHref(request.GetRepresentations().GetMetadata().GetApiHref())
 	if err != nil {
-		return model.ReporterResourceKey{}, "", "", nil, model.Representation(nil), model.Representation(nil), fmt.Errorf("invalid API href: %w", err)
+		return model.ReporterResourceKey{}, "", "", nil, model.Representation(nil), model.Representation(nil), "", fmt.Errorf("invalid API href: %w", err)
 	}
 
 	var consoleHref model.ConsoleHref
 	if consoleHrefVal := request.GetRepresentations().GetMetadata().GetConsoleHref(); consoleHrefVal != "" {
 		consoleHref, err = model.NewConsoleHref(consoleHrefVal)
 		if err != nil {
-			return model.ReporterResourceKey{}, "", "", nil, model.Representation(nil), model.Representation(nil), fmt.Errorf("invalid console href: %w", err)
+			return model.ReporterResourceKey{}, "", "", nil, model.Representation(nil), model.Representation(nil), "", fmt.Errorf("invalid console href: %w", err)
 		}
 	}
 
@@ -386,22 +390,24 @@ func extractUpdateDataFromRequest(request *v1beta2.ReportResourceRequest) (
 	if reporterVersionValue := request.GetRepresentations().GetMetadata().GetReporterVersion(); reporterVersionValue != "" {
 		rv, err := model.NewReporterVersion(reporterVersionValue)
 		if err != nil {
-			return model.ReporterResourceKey{}, "", "", nil, model.Representation(nil), model.Representation(nil), fmt.Errorf("invalid reporter version: %w", err)
+			return model.ReporterResourceKey{}, "", "", nil, model.Representation(nil), model.Representation(nil), "", fmt.Errorf("invalid reporter version: %w", err)
 		}
 		reporterVersion = &rv
 	}
 
 	commonRepresentation, err := model.NewRepresentation(request.GetRepresentations().GetCommon().AsMap())
 	if err != nil {
-		return model.ReporterResourceKey{}, "", "", nil, model.Representation(nil), model.Representation(nil), fmt.Errorf("invalid common data: %w", err)
+		return model.ReporterResourceKey{}, "", "", nil, model.Representation(nil), model.Representation(nil), "", fmt.Errorf("invalid common data: %w", err)
 	}
 
 	reporterRepresentation, err := model.NewRepresentation(request.GetRepresentations().GetReporter().AsMap())
 	if err != nil {
-		return model.ReporterResourceKey{}, "", "", nil, model.Representation(nil), model.Representation(nil), fmt.Errorf("invalid reporter data: %w", err)
+		return model.ReporterResourceKey{}, "", "", nil, model.Representation(nil), model.Representation(nil), "", fmt.Errorf("invalid reporter data: %w", err)
 	}
 
-	return reporterResourceKey, apiHref, consoleHref, reporterVersion, commonRepresentation, reporterRepresentation, nil
+	transactionId := model.NewTransactionId(request.GetRepresentations().GetMetadata().GetTransactionId())
+
+	return reporterResourceKey, apiHref, consoleHref, reporterVersion, commonRepresentation, reporterRepresentation, transactionId, nil
 }
 
 func getNextTransactionID() (string, error) {

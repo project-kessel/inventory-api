@@ -83,6 +83,19 @@ func (rr *ReporterResource) Update(
 	rr.apiHref = apiHref
 	rr.consoleHref = consoleHref
 	rr.representationVersion = rr.representationVersion.Increment()
+	if tombstoned(rr) {
+		startNewGeneration(rr)
+	}
+}
+
+func startNewGeneration(rr *ReporterResource) {
+	rr.tombstone = false
+	rr.generation = rr.generation.Increment()
+	rr.representationVersion = initialReporterRepresentationVersion
+}
+
+func tombstoned(rr *ReporterResource) bool {
+	return rr.tombstone.Serialize()
 }
 
 func (rr *ReporterResource) Delete() {

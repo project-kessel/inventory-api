@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"testing"
 
+	datamodel "github.com/project-kessel/inventory-api/internal/data/model"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/grpc"
 	grpcinsecure "google.golang.org/grpc/credentials/insecure"
@@ -12,7 +13,6 @@ import (
 	"google.golang.org/protobuf/types/known/structpb"
 
 	pbv1beta2 "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2"
-	"github.com/project-kessel/inventory-api/internal/biz/model_legacy"
 )
 
 // bearerAuth implements grpc.PerRPCCredentials to inject Authorization
@@ -33,7 +33,6 @@ func (b *bearerAuth) RequireTransportSecurity() bool {
 // V1Beta2
 func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_Host(t *testing.T) {
 	enableShortMode(t)
-	t.Parallel()
 
 	ctx := context.Background()
 
@@ -66,7 +65,7 @@ func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_Host(t *testing.T) {
 		WriteVisibility:    pbv1beta2.WriteVisibility_MINIMIZE_LATENCY,
 		Type:               "host",
 		ReporterType:       "hbi",
-		ReporterInstanceId: "testuser@example.com",
+		ReporterInstanceId: "testuser-example-com",
 		Representations: &pbv1beta2.ResourceRepresentations{
 			Metadata: &pbv1beta2.RepresentationMetadata{
 				LocalResourceId: "host-abc-123",
@@ -102,7 +101,6 @@ func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_Host(t *testing.T) {
 
 func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_Notifications(t *testing.T) {
 	enableShortMode(t)
-	t.Parallel()
 
 	ctx := context.Background()
 
@@ -126,7 +124,7 @@ func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_Notifications(t *testing.T) 
 	// will likely change the notifications json schema, this is here to satisfy validation
 	reporterStruct, err := structpb.NewStruct(map[string]interface{}{
 		"reporter_type":        "NOTIFICATIONS",
-		"reporter_instance_id": "testuser@example.com",
+		"reporter_instance_id": "testuser-example-com",
 		"local_resource_id":    "notification-abc-123",
 	})
 	assert.NoError(t, err, "Failed to create structpb for reporter")
@@ -135,7 +133,7 @@ func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_Notifications(t *testing.T) 
 
 		Type:               "notifications_integration",
 		ReporterType:       "NOTIFICATIONS",
-		ReporterInstanceId: "testuser@example.com",
+		ReporterInstanceId: "testuser-example-com",
 		Representations: &pbv1beta2.ResourceRepresentations{
 			Metadata: &pbv1beta2.RepresentationMetadata{
 				LocalResourceId: "notification-abc-123",
@@ -157,10 +155,11 @@ func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_Notifications(t *testing.T) 
 
 	delReq := pbv1beta2.DeleteResourceRequest{
 		Reference: &pbv1beta2.ResourceReference{
-			ResourceType: "integrations",
+			ResourceType: "notifications_integration",
 			ResourceId:   "notification-abc-123",
 			Reporter: &pbv1beta2.ReporterReference{
-				Type: "NOTIFICATIONS",
+				Type:       "NOTIFICATIONS",
+				InstanceId: proto.String("testuser-example-com"),
 			},
 		},
 	}
@@ -172,7 +171,6 @@ func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_Notifications(t *testing.T) 
 
 func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_K8S_Cluster(t *testing.T) {
 	enableShortMode(t)
-	t.Parallel()
 
 	ctx := context.Background()
 
@@ -208,10 +206,10 @@ func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_K8S_Cluster(t *testing.T) {
 
 		Type:               "k8s_cluster",
 		ReporterType:       "ACM",
-		ReporterInstanceId: "testuser@example.com",
+		ReporterInstanceId: "testuser-example-com",
 		Representations: &pbv1beta2.ResourceRepresentations{
 			Metadata: &pbv1beta2.RepresentationMetadata{
-				LocalResourceId: "k8s_cluster-abc-123",
+				LocalResourceId: "k8s_cluster-abc-123-unique",
 				ApiHref:         "https://example.com/api",
 				ConsoleHref:     proto.String("https://example.com/console"),
 				ReporterVersion: proto.String("0.1"),
@@ -231,9 +229,10 @@ func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_K8S_Cluster(t *testing.T) {
 	delReq := pbv1beta2.DeleteResourceRequest{
 		Reference: &pbv1beta2.ResourceReference{
 			ResourceType: "k8s_cluster",
-			ResourceId:   "k8s_cluster-abc-123",
+			ResourceId:   "k8s_cluster-abc-123-unique",
 			Reporter: &pbv1beta2.ReporterReference{
-				Type: "ACM",
+				Type:       "ACM",
+				InstanceId: proto.String("testuser-example-com"),
 			},
 		},
 	}
@@ -245,7 +244,6 @@ func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_K8S_Cluster(t *testing.T) {
 
 func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_K8S_Policy(t *testing.T) {
 	enableShortMode(t)
-	t.Parallel()
 
 	ctx := context.Background()
 
@@ -276,7 +274,7 @@ func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_K8S_Policy(t *testing.T) {
 
 		Type:               "k8s_policy",
 		ReporterType:       "ACM",
-		ReporterInstanceId: "testuser@example.com",
+		ReporterInstanceId: "testuser-example-com",
 		Representations: &pbv1beta2.ResourceRepresentations{
 			Metadata: &pbv1beta2.RepresentationMetadata{
 				LocalResourceId: "k8s_policy-abc-123",
@@ -312,8 +310,7 @@ func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_K8S_Policy(t *testing.T) {
 }
 
 //func TestInventoryAPIHTTP_v1beta2_AuthzLifecycle(t *testing.T) {
-//	t.Parallel()
-//
+////
 //	c := common.NewConfig(
 //		common.WithHTTPUrl(inventoryapi_http_url),
 //		common.WithTLSInsecure(insecure),
@@ -370,7 +367,6 @@ func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_K8S_Policy(t *testing.T) {
 
 func TestInventoryAPIHTTP_v1beta2_Host_ConsistentWrite(t *testing.T) {
 	enableShortMode(t)
-	t.Parallel()
 
 	resourceId := "wait-for-sync-host-abc-123"
 
@@ -408,7 +404,7 @@ func TestInventoryAPIHTTP_v1beta2_Host_ConsistentWrite(t *testing.T) {
 		WriteVisibility:    pbv1beta2.WriteVisibility_IMMEDIATE,
 		Type:               "host",
 		ReporterType:       "hbi",
-		ReporterInstanceId: "testuser@example.com",
+		ReporterInstanceId: "testuser-example-com",
 		Representations: &pbv1beta2.ResourceRepresentations{
 			Metadata: &pbv1beta2.RepresentationMetadata{
 				LocalResourceId: resourceId,
@@ -428,18 +424,22 @@ func TestInventoryAPIHTTP_v1beta2_Host_ConsistentWrite(t *testing.T) {
 	_, err = client.ReportResource(ctx, &req)
 	assert.NoError(t, err, "Failed to Report Resource")
 
-	var host model_legacy.Resource
-	err = db.Where("reporter_resource_id = ?", resourceId).First(&host).Error
+	var host datamodel.Resource
+	err = db.Table("resource r").
+		Select("r.*").
+		Joins("JOIN reporter_resources rr ON r.id = rr.resource_id").
+		Where("rr.local_resource_id = ?", resourceId).
+		First(&host).Error
 	assert.NoError(t, err, "Error fetching host from DB")
 	assert.NotNil(t, host, "Host not found in DB")
 	assert.NotEmpty(t, host.ConsistencyToken, "Consistency token is empty")
 
 	delReq := pbv1beta2.DeleteResourceRequest{
 		Reference: &pbv1beta2.ResourceReference{
-			ResourceType: "hbi",
+			ResourceType: "host",
 			ResourceId:   resourceId,
 			Reporter: &pbv1beta2.ReporterReference{
-				Type: "ACM",
+				Type: "hbi",
 			},
 		},
 	}

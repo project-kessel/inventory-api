@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/go-kratos/kratos/v2/log"
@@ -309,7 +310,9 @@ func (uc *Usecase) createResource(tx *gorm.DB, request *v1beta2.ReportResourceRe
 		return fmt.Errorf("invalid common representation: %w", err)
 	}
 
-	resource, err := model.NewResource(resourceId, localResourceId, resourceType, reporterType, reporterInstanceId, reporterResourceId, apiHref, consoleHref, reporterRepresentation, commonRepresentation, nil)
+	transactionId := model.NewTransactionId(request.GetRepresentations().GetMetadata().GetTransactionId())
+
+	resource, err := model.NewResource(resourceId, localResourceId, resourceType, reporterType, reporterInstanceId, transactionId, reporterResourceId, apiHref, consoleHref, reporterRepresentation, commonRepresentation, nil)
 	if err != nil {
 		return err
 	}
@@ -347,7 +350,7 @@ func getReporterResourceKeyFromRequest(request *v1beta2.ReportResourceRequest) (
 }
 
 func (uc *Usecase) updateResource(tx *gorm.DB, request *v1beta2.ReportResourceRequest, existingResource *model.Resource, txidStr string) error {
-	reporterResourceKey, apiHref, consoleHref, reporterVersion, commonData, reporterData, err := extractUpdateDataFromRequest(request)
+	reporterResourceKey, apiHref, consoleHref, reporterVersion, commonData, reporterData, transactionId, err := extractUpdateDataFromRequest(request)
 	if err != nil {
 		return err
 	}
@@ -359,6 +362,7 @@ func (uc *Usecase) updateResource(tx *gorm.DB, request *v1beta2.ReportResourceRe
 		reporterVersion,
 		reporterData,
 		commonData,
+		transactionId,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to update resource: %w", err)
@@ -374,23 +378,24 @@ func extractUpdateDataFromRequest(request *v1beta2.ReportResourceRequest) (
 	*model.ReporterVersion,
 	model.Representation,
 	model.Representation,
+	model.TransactionId,
 	error,
 ) {
 	reporterResourceKey, err := getReporterResourceKeyFromRequest(request)
 	if err != nil {
-		return model.ReporterResourceKey{}, "", "", nil, model.Representation(nil), model.Representation(nil), fmt.Errorf("failed to create reporter resource key: %w", err)
+		return model.ReporterResourceKey{}, "", "", nil, model.Representation(nil), model.Representation(nil), "", fmt.Errorf("failed to create reporter resource key: %w", err)
 	}
 
 	apiHref, err := model.NewApiHref(request.GetRepresentations().GetMetadata().GetApiHref())
 	if err != nil {
-		return model.ReporterResourceKey{}, "", "", nil, model.Representation(nil), model.Representation(nil), fmt.Errorf("invalid API href: %w", err)
+		return model.ReporterResourceKey{}, "", "", nil, model.Representation(nil), model.Representation(nil), "", fmt.Errorf("invalid API href: %w", err)
 	}
 
 	var consoleHref model.ConsoleHref
 	if consoleHrefVal := request.GetRepresentations().GetMetadata().GetConsoleHref(); consoleHrefVal != "" {
 		consoleHref, err = model.NewConsoleHref(consoleHrefVal)
 		if err != nil {
-			return model.ReporterResourceKey{}, "", "", nil, model.Representation(nil), model.Representation(nil), fmt.Errorf("invalid console href: %w", err)
+			return model.ReporterResourceKey{}, "", "", nil, model.Representation(nil), model.Representation(nil), "", fmt.Errorf("invalid console href: %w", err)
 		}
 	}
 
@@ -398,22 +403,24 @@ func extractUpdateDataFromRequest(request *v1beta2.ReportResourceRequest) (
 	if reporterVersionValue := request.GetRepresentations().GetMetadata().GetReporterVersion(); reporterVersionValue != "" {
 		rv, err := model.NewReporterVersion(reporterVersionValue)
 		if err != nil {
-			return model.ReporterResourceKey{}, "", "", nil, model.Representation(nil), model.Representation(nil), fmt.Errorf("invalid reporter version: %w", err)
+			return model.ReporterResourceKey{}, "", "", nil, model.Representation(nil), model.Representation(nil), "", fmt.Errorf("invalid reporter version: %w", err)
 		}
 		reporterVersion = &rv
 	}
 
 	commonRepresentation, err := model.NewRepresentation(request.GetRepresentations().GetCommon().AsMap())
 	if err != nil {
-		return model.ReporterResourceKey{}, "", "", nil, model.Representation(nil), model.Representation(nil), fmt.Errorf("invalid common data: %w", err)
+		return model.ReporterResourceKey{}, "", "", nil, model.Representation(nil), model.Representation(nil), "", fmt.Errorf("invalid common data: %w", err)
 	}
 
 	reporterRepresentation, err := model.NewRepresentation(request.GetRepresentations().GetReporter().AsMap())
 	if err != nil {
-		return model.ReporterResourceKey{}, "", "", nil, model.Representation(nil), model.Representation(nil), fmt.Errorf("invalid reporter data: %w", err)
+		return model.ReporterResourceKey{}, "", "", nil, model.Representation(nil), model.Representation(nil), "", fmt.Errorf("invalid reporter data: %w", err)
 	}
 
-	return reporterResourceKey, apiHref, consoleHref, reporterVersion, commonRepresentation, reporterRepresentation, nil
+	transactionId := model.NewTransactionId(request.GetRepresentations().GetMetadata().GetTransactionId())
+
+	return reporterResourceKey, apiHref, consoleHref, reporterVersion, commonRepresentation, reporterRepresentation, transactionId, nil
 }
 
 func getNextTransactionID() (string, error) {
@@ -871,98 +878,78 @@ func (uc *Usecase) CalculateTuples(tupleEvent model.TupleEvent) (model.TuplesToR
 
 	uc.Log.Infof("CalculateTuples called - version: %d, key: %+v", currentVersion, key)
 
-	var currentWorkspaceID, previousWorkspaceID string
-
-	// Handle create scenario (version 0)
-	if currentVersion == 0 {
-		uc.Log.Infof("CREATE scenario - version 0, processing initial tuple")
-
-		// For version 0, we only need the current version data
-		representations, err := uc.resourceRepository.FindVersionedRepresentationsByVersion(
-			nil, key, currentVersion,
-		)
-		if err != nil {
-			return model.TuplesToReplicate{}, fmt.Errorf("failed to find common representations: %w", err)
-		}
-
-		// Extract workspace_id from current version only
-		for _, repr := range representations {
-			if workspaceID, exists := repr.Data["workspace_id"].(string); exists && workspaceID != "" {
-				if repr.Version == currentVersion {
-					currentWorkspaceID = workspaceID
-				}
-			}
-		}
-
-		uc.Log.Infof("Found workspace ID for version 0 - current: '%s'", currentWorkspaceID)
-	} else {
-		// Get common representations for both versions
-		representations, err := uc.resourceRepository.FindVersionedRepresentationsByVersion(
-			nil, key, currentVersion,
-		)
-		if err != nil {
-			return model.TuplesToReplicate{}, fmt.Errorf("failed to find common representations: %w", err)
-		}
-
-		// Extract workspace_ids from the representations
-		for _, repr := range representations {
-			if workspaceID, exists := repr.Data["workspace_id"].(string); exists && workspaceID != "" {
-				switch repr.Version {
-				case currentVersion:
-					currentWorkspaceID = workspaceID
-				case currentVersion - 1:
-					previousWorkspaceID = workspaceID
-				}
-			}
-		}
-
-		uc.Log.Infof("Found workspace IDs - current: '%s', previous: '%s'", currentWorkspaceID, previousWorkspaceID)
+	versionedRepresentations, err := uc.getWorkspaceVersions(key, currentVersion)
+	if err != nil {
+		return model.TuplesToReplicate{}, err
 	}
+	return uc.determineTupleOperations(versionedRepresentations, currentVersion, key)
 
-	// Build tuples based on workspace ID changes
-	var tuplesToCreate, tuplesToDelete *[]model.RelationsTuple
+}
 
-	// Always create tuple for current workspace if it exists
-	if currentWorkspaceID != "" {
-		// Create typed resource
-		resourceType := model.NewRelationsObjectType(key.ResourceType().Serialize(), key.ResourceType().Serialize())
-		resource := model.NewRelationsResource(key.LocalResourceId(), resourceType)
+const (
+	workspaceRelation = "workspace"
+	rbacNamespace     = "rbac"
+	rbacPrefix        = rbacNamespace + ":" + workspaceRelation
+)
 
-		// Create typed subject
-		subjectType := model.NewRelationsObjectType("workspace", "rbac")
-		workspaceId, _ := model.NewLocalResourceId(currentWorkspaceID)
-		subjectResource := model.NewRelationsResource(workspaceId, subjectType)
-		subject := model.NewRelationsSubject(subjectResource)
+func (uc *Usecase) createWorkspaceTuple(workspaceID string, key model.ReporterResourceKey) model.RelationsTuple {
+	// Create RelationsResource for the main resource
+	resourceId := key.LocalResourceId()
+	resourceType := key.ResourceType()
+	resourceObjectType := model.NewRelationsObjectType(
+		strings.ToLower(resourceType.String()),
+		"", // Default namespace for resource types
+	)
+	resource := model.NewRelationsResource(resourceId, resourceObjectType)
 
-		createTuple := model.NewRelationsTuple(resource, "workspace", subject)
-		tuplesToCreate = &[]model.RelationsTuple{createTuple}
+	// Create RelationsResource for the workspace subject
+	workspaceSubjectId, _ := model.NewLocalResourceId(fmt.Sprintf("%s:%s", rbacPrefix, workspaceID))
+	workspaceObjectType := model.NewRelationsObjectType(workspaceRelation, rbacNamespace)
+	workspaceSubject := model.NewRelationsResource(workspaceSubjectId, workspaceObjectType)
+	subject := model.NewRelationsSubject(workspaceSubject)
 
-		uc.Log.Infof("Created tuple to create: %s:%s#workspace@rbac:workspace:%s", key.ResourceType().Serialize(), key.LocalResourceId().Serialize(), currentWorkspaceID)
-	}
+	return model.NewRelationsTuple(resource, workspaceRelation, subject)
+}
 
-	// Delete previous tuple if workspace ID changed and previous exists
-	if previousWorkspaceID != "" && previousWorkspaceID != currentWorkspaceID {
-		// Create typed resource (same as create)
-		resourceType := model.NewRelationsObjectType(key.ResourceType().Serialize(), key.ResourceType().Serialize())
-		resource := model.NewRelationsResource(key.LocalResourceId(), resourceType)
+func (uc *Usecase) determineTupleOperations(representationVersion []data.RepresentationsByVersion, currentVersion uint, key model.ReporterResourceKey) (model.TuplesToReplicate, error) {
+	currentWorkspaceID, previousWorkspaceID := data.GetCurrentAndPreviousWorkspaceID(representationVersion, currentVersion)
 
-		// Create typed subject for previous workspace
-		subjectType := model.NewRelationsObjectType("workspace", "rbac")
-		previousWorkspaceId, _ := model.NewLocalResourceId(previousWorkspaceID)
-		subjectResource := model.NewRelationsResource(previousWorkspaceId, subjectType)
-		subject := model.NewRelationsSubject(subjectResource)
-
-		deleteTuple := model.NewRelationsTuple(resource, "workspace", subject)
-		tuplesToDelete = &[]model.RelationsTuple{deleteTuple}
-
-		uc.Log.Infof("Created tuple to delete: %s:%s#workspace@rbac:workspace:%s", key.ResourceType().Serialize(), key.LocalResourceId().Serialize(), previousWorkspaceID)
-	}
-
-	// Return empty result if no tuples to process
-	if tuplesToCreate == nil && tuplesToDelete == nil {
-		uc.Log.Infof("No workspace ID changes detected, no tuples to process")
+	// If workspace ID hasn't changed, no operations needed
+	if previousWorkspaceID != "" && previousWorkspaceID == currentWorkspaceID {
+		// Return empty TuplesToReplicate with nil pointers (no create/delete operations)
 		return model.TuplesToReplicate{}, nil
 	}
 
-	return model.NewTuplesToReplicate(tuplesToCreate, tuplesToDelete)
+	var tuplesToCreate, tuplesToDelete []model.RelationsTuple
+
+	// Always create tuple for current workspace if it exists
+	if currentWorkspaceID != "" {
+		tuplesToCreate = append(tuplesToCreate, uc.createWorkspaceTuple(currentWorkspaceID, key))
+	}
+
+	// Delete previous tuple if it exists and is different from current
+	if previousWorkspaceID != "" {
+		tuplesToDelete = append(tuplesToDelete, uc.createWorkspaceTuple(previousWorkspaceID, key))
+	}
+
+	// Return pointers only if slices are not empty
+	var createPtr, deletePtr *[]model.RelationsTuple
+	if len(tuplesToCreate) > 0 {
+		createPtr = &tuplesToCreate
+	}
+	if len(tuplesToDelete) > 0 {
+		deletePtr = &tuplesToDelete
+	}
+
+	return model.NewTuplesToReplicate(createPtr, deletePtr)
+}
+
+func (uc *Usecase) getWorkspaceVersions(key model.ReporterResourceKey, currentVersion uint) ([]data.RepresentationsByVersion, error) {
+	representations, err := uc.resourceRepository.FindVersionedRepresentationsByVersion(
+		nil, key, currentVersion,
+	)
+	if err != nil {
+		return []data.RepresentationsByVersion{}, fmt.Errorf("failed to find common representations: %w", err)
+	}
+	return representations, nil
 }

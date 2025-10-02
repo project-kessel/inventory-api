@@ -19,6 +19,7 @@ func TestCommonRepresentation_Initialization(t *testing.T) {
 			fixture.ValidVersionType(),
 			fixture.ValidReporterTypeType(),
 			fixture.ValidReporterInstanceIdType(),
+			fixture.ValidTransactionIdType(),
 		)
 
 		if err != nil {
@@ -35,6 +36,7 @@ func TestCommonRepresentation_Initialization(t *testing.T) {
 			fixture.ZeroVersionType(),
 			fixture.ValidReporterTypeType(),
 			fixture.ValidReporterInstanceIdType(),
+			fixture.ValidTransactionIdType(),
 		)
 
 		if err != nil {
@@ -51,6 +53,7 @@ func TestCommonRepresentation_Initialization(t *testing.T) {
 			fixture.ValidVersionType(),
 			fixture.ValidReporterTypeType(),
 			fixture.ValidReporterInstanceIdType(),
+			fixture.ValidTransactionIdType(),
 		)
 
 		errors.AssertIs(t, err, ErrInvalidUUID)
@@ -65,6 +68,7 @@ func TestCommonRepresentation_Initialization(t *testing.T) {
 			fixture.ValidVersionType(),
 			fixture.ValidReporterTypeType(),
 			fixture.ValidReporterInstanceIdType(),
+			fixture.ValidTransactionIdType(),
 		)
 
 		errors.AssertIs(t, err, ErrInvalidData)
@@ -79,6 +83,7 @@ func TestCommonRepresentation_Initialization(t *testing.T) {
 			fixture.ValidVersionType(),
 			fixture.ValidReporterTypeType(),
 			fixture.ValidReporterInstanceIdType(),
+			fixture.ValidTransactionIdType(),
 		)
 
 		errors.AssertIs(t, err, ErrInvalidData)
@@ -93,6 +98,7 @@ func TestCommonRepresentation_Initialization(t *testing.T) {
 			fixture.ValidVersionType(),
 			fixture.EmptyReporterTypeType(),
 			fixture.ValidReporterInstanceIdType(),
+			fixture.ValidTransactionIdType(),
 		)
 
 		errors.AssertIs(t, err, ErrEmpty)
@@ -107,6 +113,7 @@ func TestCommonRepresentation_Initialization(t *testing.T) {
 			fixture.ValidVersionType(),
 			fixture.WhitespaceReporterTypeType(),
 			fixture.ValidReporterInstanceIdType(),
+			fixture.ValidTransactionIdType(),
 		)
 
 		errors.AssertIs(t, err, ErrEmpty)
@@ -121,6 +128,7 @@ func TestCommonRepresentation_Initialization(t *testing.T) {
 			fixture.ValidVersionType(),
 			fixture.ValidReporterTypeType(),
 			fixture.EmptyReporterInstanceIdType(),
+			fixture.ValidTransactionIdType(),
 		)
 
 		errors.AssertIs(t, err, ErrEmpty)
@@ -135,6 +143,7 @@ func TestCommonRepresentation_Initialization(t *testing.T) {
 			fixture.ValidVersionType(),
 			fixture.ValidReporterTypeType(),
 			fixture.WhitespaceReporterInstanceIdType(),
+			fixture.ValidTransactionIdType(),
 		)
 
 		errors.AssertIs(t, err, ErrEmpty)

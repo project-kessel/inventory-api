@@ -76,6 +76,7 @@ func TestReporterDataRepresentation_Initialization(t *testing.T) {
 			fixture.ValidRepresentationType(),
 			fixture.ValidCommonVersionType(),
 			fixture.ValidReporterVersionType(),
+			fixture.ValidTransactionIdType(),
 		)
 
 		assertValidReporterDataRepresentation(t, dataRep, err, "valid inputs")
@@ -91,6 +92,7 @@ func TestReporterDataRepresentation_Initialization(t *testing.T) {
 			fixture.ValidRepresentationType(),
 			fixture.ValidCommonVersionType(),
 			fixture.NilReporterVersionType(),
+			fixture.ValidTransactionIdType(),
 		)
 
 		assertValidReporterDataRepresentation(t, dataRep, err, "nil reporter version")
@@ -106,6 +108,7 @@ func TestReporterDataRepresentation_Initialization(t *testing.T) {
 			fixture.NilRepresentationType(),
 			fixture.ValidCommonVersionType(),
 			fixture.ValidReporterVersionType(),
+			fixture.ValidTransactionIdType(),
 		)
 
 		assertInvalidReporterDataRepresentation(t, dataRep, err, ErrInvalidData)
@@ -121,6 +124,7 @@ func TestReporterDataRepresentation_Initialization(t *testing.T) {
 			fixture.EmptyRepresentationType(),
 			fixture.ValidCommonVersionType(),
 			fixture.ValidReporterVersionType(),
+			fixture.ValidTransactionIdType(),
 		)
 
 		assertInvalidReporterDataRepresentation(t, dataRep, err, ErrInvalidData)
@@ -136,6 +140,7 @@ func TestReporterDataRepresentation_Initialization(t *testing.T) {
 			fixture.ValidRepresentationType(),
 			fixture.ValidCommonVersionType(),
 			fixture.ValidReporterVersionType(),
+			fixture.ValidTransactionIdType(),
 		)
 
 		assertInvalidReporterDataRepresentation(t, dataRep, err, ErrInvalidUUID)
@@ -151,6 +156,7 @@ func TestReporterDataRepresentation_Initialization(t *testing.T) {
 			fixture.ValidRepresentationType(),
 			fixture.ValidCommonVersionType(),
 			fixture.ValidReporterVersionType(),
+			fixture.ValidTransactionIdType(),
 		)
 
 		assertInvalidReporterDataRepresentation(t, dataRep, err, ErrInvalidUUID)
@@ -166,6 +172,7 @@ func TestReporterDataRepresentation_Initialization(t *testing.T) {
 			fixture.ValidRepresentationType(),
 			fixture.ValidCommonVersionType(),
 			fixture.ValidReporterVersionType(),
+			fixture.ValidTransactionIdType(),
 		)
 
 		assertInvalidReporterDataRepresentation(t, dataRep, err, ErrInvalidUUID)
@@ -251,6 +258,7 @@ func TestReporterRepresentation_BusinessRules(t *testing.T) {
 			fixture.ValidRepresentationType(),
 			fixture.ValidCommonVersionType(),
 			fixture.ValidReporterVersionType(),
+			fixture.ValidTransactionIdType(),
 		)
 
 		if err != nil {
@@ -307,6 +315,7 @@ func TestReporterRepresentation_BusinessRules(t *testing.T) {
 			fixture.ValidRepresentationType(),
 			fixture.ValidCommonVersionType(),
 			fixture.ValidReporterVersionType(),
+			fixture.ValidTransactionIdType(),
 		)
 
 		if err != nil {
@@ -330,6 +339,7 @@ func TestReporterRepresentation_BusinessRules(t *testing.T) {
 			fixture.ValidRepresentationType(),
 			0, // zero common version
 			fixture.ValidReporterVersionType(),
+			fixture.ValidTransactionIdType(),
 		)
 
 		if err != nil {

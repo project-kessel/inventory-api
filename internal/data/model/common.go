@@ -15,6 +15,7 @@ const (
 	MaxAPIHrefLength            = MaxFieldSize512
 	MaxConsoleHrefLength        = MaxFieldSize512
 	MaxConsistencyTokenLength   = MaxFieldSize1024
+	MaxTransactionIdLength      = MaxFieldSize128
 
 	MinVersionValue    = 0
 	MinGenerationValue = 0

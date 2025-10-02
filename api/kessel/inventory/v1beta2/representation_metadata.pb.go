@@ -28,8 +28,12 @@ type RepresentationMetadata struct {
 	ApiHref         string                 `protobuf:"bytes,2,opt,name=api_href,json=apiHref,proto3" json:"api_href,omitempty"`
 	ConsoleHref     *string                `protobuf:"bytes,3,opt,name=console_href,json=consoleHref,proto3,oneof" json:"console_href,omitempty"`
 	ReporterVersion *string                `protobuf:"bytes,4,opt,name=reporter_version,json=reporterVersion,proto3,oneof" json:"reporter_version,omitempty"`
-	unknownFields   protoimpl.UnknownFields
-	sizeCache       protoimpl.SizeCache
+	// Types that are valid to be assigned to IdempotencyKey:
+	//
+	//	*RepresentationMetadata_TransactionId
+	IdempotencyKey isRepresentationMetadata_IdempotencyKey `protobuf_oneof:"idempotency_key"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *RepresentationMetadata) Reset() {
@@ -90,16 +94,44 @@ func (x *RepresentationMetadata) GetReporterVersion() string {
 	return ""
 }
 
+func (x *RepresentationMetadata) GetIdempotencyKey() isRepresentationMetadata_IdempotencyKey {
+	if x != nil {
+		return x.IdempotencyKey
+	}
+	return nil
+}
+
+func (x *RepresentationMetadata) GetTransactionId() string {
+	if x != nil {
+		if x, ok := x.IdempotencyKey.(*RepresentationMetadata_TransactionId); ok {
+			return x.TransactionId
+		}
+	}
+	return ""
+}
+
+type isRepresentationMetadata_IdempotencyKey interface {
+	isRepresentationMetadata_IdempotencyKey()
+}
+
+type RepresentationMetadata_TransactionId struct {
+	TransactionId string `protobuf:"bytes,5,opt,name=transaction_id,json=transactionId,proto3,oneof"`
+}
+
+func (*RepresentationMetadata_TransactionId) isRepresentationMetadata_IdempotencyKey() {}
+
 var File_kessel_inventory_v1beta2_representation_metadata_proto protoreflect.FileDescriptor
 
 const file_kessel_inventory_v1beta2_representation_metadata_proto_rawDesc = "" +
 	"\n" +
-	"6kessel/inventory/v1beta2/representation_metadata.proto\x12\x18kessel.inventory.v1beta2\x1a\x1bbuf/validate/validate.proto\"\xef\x01\n" +
+	"6kessel/inventory/v1beta2/representation_metadata.proto\x12\x18kessel.inventory.v1beta2\x1a\x1bbuf/validate/validate.proto\"\xab\x02\n" +
 	"\x16RepresentationMetadata\x123\n" +
 	"\x11local_resource_id\x18\x01 \x01(\tB\a\xbaH\x04r\x02\x10\x01R\x0flocalResourceId\x12\"\n" +
 	"\bapi_href\x18\x02 \x01(\tB\a\xbaH\x04r\x02\x10\x01R\aapiHref\x12&\n" +
-	"\fconsole_href\x18\x03 \x01(\tH\x00R\vconsoleHref\x88\x01\x01\x12.\n" +
-	"\x10reporter_version\x18\x04 \x01(\tH\x01R\x0freporterVersion\x88\x01\x01B\x0f\n" +
+	"\fconsole_href\x18\x03 \x01(\tH\x01R\vconsoleHref\x88\x01\x01\x12.\n" +
+	"\x10reporter_version\x18\x04 \x01(\tH\x02R\x0freporterVersion\x88\x01\x01\x12'\n" +
+	"\x0etransaction_id\x18\x05 \x01(\tH\x00R\rtransactionIdB\x11\n" +
+	"\x0fidempotency_keyB\x0f\n" +
 	"\r_console_hrefB\x13\n" +
 	"\x11_reporter_versionBr\n" +
 	"(org.project_kessel.api.inventory.v1beta2P\x01ZDgithub.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2b\x06proto3"
@@ -133,7 +165,9 @@ func file_kessel_inventory_v1beta2_representation_metadata_proto_init() {
 	if File_kessel_inventory_v1beta2_representation_metadata_proto != nil {
 		return
 	}
-	file_kessel_inventory_v1beta2_representation_metadata_proto_msgTypes[0].OneofWrappers = []any{}
+	file_kessel_inventory_v1beta2_representation_metadata_proto_msgTypes[0].OneofWrappers = []any{
+		(*RepresentationMetadata_TransactionId)(nil),
+	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{

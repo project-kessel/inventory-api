@@ -1,8 +1,6 @@
 package data
 
 import (
-	"encoding/json"
-	"errors"
 	"fmt"
 
 	"github.com/google/uuid"
@@ -158,45 +156,15 @@ func (r *resourceRepository) Save(tx *gorm.DB, resource bizmodel.Resource, opera
 	if err := tx.Save(&dataReporterResource).Error; err != nil {
 		return fmt.Errorf("failed to save reporter resource: %w", err)
 	}
-
-	// Only create new representation records if the data has changed
-	// Check if we need to create a new reporter representation
 	if dataReporterRepresentation.ReporterResourceID != uuid.Nil {
-		latestReporterRep, err := getLatestReporterRepresentation(tx, dataReporterRepresentation.ReporterResourceID)
-		if err != nil {
-			return fmt.Errorf("failed to get latest reporter representation: %w", err)
-		}
-
-		shouldCreateReporterRep := true
-		if latestReporterRep != nil {
-			// Compare the data content to see if it has changed
-			shouldCreateReporterRep = !compareReporterRepresentationData(latestReporterRep, &dataReporterRepresentation)
-		}
-
-		if shouldCreateReporterRep {
-			if err := tx.Create(&dataReporterRepresentation).Error; err != nil {
-				return fmt.Errorf("failed to save reporter representation: %w", err)
-			}
+		if err := tx.Create(&dataReporterRepresentation).Error; err != nil {
+			return fmt.Errorf("failed to save reporter representation: %w", err)
 		}
 	}
 
-	// Check if we need to create a new common representation
 	if dataCommonRepresentation.ResourceId != uuid.Nil {
-		latestCommonRep, err := getLatestCommonRepresentation(tx, dataCommonRepresentation.ResourceId)
-		if err != nil {
-			return fmt.Errorf("failed to get latest common representation: %w", err)
-		}
-
-		shouldCreateCommonRep := true
-		if latestCommonRep != nil {
-			// Compare the data content to see if it has changed
-			shouldCreateCommonRep = !compareCommonRepresentationData(latestCommonRep, &dataCommonRepresentation)
-		}
-
-		if shouldCreateCommonRep {
-			if err := tx.Create(&dataCommonRepresentation).Error; err != nil {
-				return fmt.Errorf("failed to save common representation: %w", err)
-			}
+		if err := tx.Create(&dataCommonRepresentation).Error; err != nil {
+			return fmt.Errorf("failed to save common representation: %w", err)
 		}
 	}
 
@@ -363,64 +331,4 @@ func (r *resourceRepository) HasTransactionIdBeenProcessed(tx *gorm.DB, transact
 	}
 
 	return commonExists, nil
-}
-
-// getLatestReporterRepresentation retrieves the most recent reporter representation for a given reporter resource ID
-func getLatestReporterRepresentation(tx *gorm.DB, reporterResourceId uuid.UUID) (*datamodel.ReporterRepresentation, error) {
-	var representation datamodel.ReporterRepresentation
-	err := tx.Where("reporter_resource_id = ?", reporterResourceId).
-		Order("version DESC, generation DESC").
-		First(&representation).Error
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, nil // No existing representation found
-		}
-		return nil, fmt.Errorf("failed to get latest reporter representation: %w", err)
-	}
-	return &representation, nil
-}
-
-// getLatestCommonRepresentation retrieves the most recent common representation for a given resource ID
-func getLatestCommonRepresentation(tx *gorm.DB, resourceId uuid.UUID) (*datamodel.CommonRepresentation, error) {
-	var representation datamodel.CommonRepresentation
-	err := tx.Where("resource_id = ?", resourceId).
-		Order("version DESC").
-		First(&representation).Error
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, nil // No existing representation found
-		}
-		return nil, fmt.Errorf("failed to get latest common representation: %w", err)
-	}
-	return &representation, nil
-}
-
-// compareReporterRepresentationData compares the data content of two reporter representations
-// Returns true if the data is the same, false if different
-func compareReporterRepresentationData(existing, new *datamodel.ReporterRepresentation) bool {
-	// Compare the JSON data content by marshaling both to JSON and comparing strings
-	existingJSON, err1 := json.Marshal(existing.Data)
-	newJSON, err2 := json.Marshal(new.Data)
-
-	// If either marshaling fails, consider them different
-	if err1 != nil || err2 != nil {
-		return false
-	}
-
-	return string(existingJSON) == string(newJSON)
-}
-
-// compareCommonRepresentationData compares the data content of two common representations
-// Returns true if the data is the same, false if different
-func compareCommonRepresentationData(existing, new *datamodel.CommonRepresentation) bool {
-	// Compare the JSON data content by marshaling both to JSON and comparing strings
-	existingJSON, err1 := json.Marshal(existing.Data)
-	newJSON, err2 := json.Marshal(new.Data)
-
-	// If either marshaling fails, consider them different
-	if err1 != nil || err2 != nil {
-		return false
-	}
-
-	return string(existingJSON) == string(newJSON)
 }

@@ -869,8 +869,8 @@ func TestResourceRepository_IdempotentOperations(t *testing.T) {
 						require.NoError(t, err, "Should find resource after duplicate delete")
 						require.NotNil(t, afterDelete2)
 						deleteState2 := afterDelete2.ReporterResources()[0].Serialize()
-						// RepresentationVersion should increment even for duplicate operations
-						assert.Greater(t, deleteState2.RepresentationVersion, uint(1), "RepresentationVersion should increment with duplicate delete")
+						// RepresentationVersion should NOT increment for duplicate deletes on already tombstoned resources
+						assert.Equal(t, uint(1), deleteState2.RepresentationVersion, "RepresentationVersion should remain unchanged for duplicate delete on tombstoned resource")
 						assert.True(t, deleteState2.Tombstone, "Resource should still be tombstoned")
 					}
 				}

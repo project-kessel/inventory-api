@@ -105,7 +105,7 @@ type ResourceRepository interface {
 	FindVersionedRepresentationsByVersion(tx *gorm.DB, key bizmodel.ReporterResourceKey, currentVersion uint) ([]RepresentationsByVersion, error)
 	GetDB() *gorm.DB
 	GetTransactionManager() usecase.TransactionManager
-	HasTransactionIdBeenProcessed(tx *gorm.DB, transactionId string, reporterResourceId uuid.UUID, resourceId uuid.UUID) (bool, error)
+	HasTransactionIdBeenProcessed(tx *gorm.DB, transactionId string) (bool, error)
 }
 
 type resourceRepository struct {
@@ -298,37 +298,26 @@ func (r *resourceRepository) FindVersionedRepresentationsByVersion(tx *gorm.DB, 
 // HasTransactionIdBeenProcessed checks if a transaction ID exists in either the
 // reporter_representations or common_representations tables.
 // Returns true if the transaction has already been processed, false otherwise.
-func (r *resourceRepository) HasTransactionIdBeenProcessed(tx *gorm.DB, transactionId string, reporterResourceId uuid.UUID, resourceId uuid.UUID) (bool, error) {
+func (r *resourceRepository) HasTransactionIdBeenProcessed(tx *gorm.DB, transactionId string) (bool, error) {
 	if transactionId == "" {
 		return false, nil
 	}
-
-	// Check reporter_representations table using lightweight EXISTS query
-	var reporterExists bool
+	// Check representations tables using lightweight EXISTS query
+	var exists bool
 	err := tx.Raw(`
-		SELECT EXISTS(
-			SELECT 1 FROM reporter_representations
-			WHERE transaction_id = ? AND reporter_resource_id = ?
-		)
-	`, transactionId, reporterResourceId).Scan(&reporterExists).Error
+	SELECT EXISTS (
+		SELECT 1 FROM reporter_representations WHERE transaction_id = ?
+	)
+	OR EXISTS (
+		SELECT 1 FROM common_representations  WHERE transaction_id = ?
+	)
+	`, transactionId, transactionId).Scan(&exists).Error
+
 	if err != nil {
-		return false, fmt.Errorf("failed to check reporter_representations: %w", err)
+		return false, fmt.Errorf("failed to check representations for the transaction_id: %w", err)
 	}
-	if reporterExists {
+	if exists {
 		return true, nil
 	}
-
-	// Check common_representations table using lightweight EXISTS query
-	var commonExists bool
-	err = tx.Raw(`
-		SELECT EXISTS(
-			SELECT 1 FROM common_representations
-			WHERE transaction_id = ? AND resource_id = ?
-		)
-	`, transactionId, resourceId).Scan(&commonExists).Error
-	if err != nil {
-		return false, fmt.Errorf("failed to check common_representations: %w", err)
-	}
-
-	return commonExists, nil
+	return false, nil
 }

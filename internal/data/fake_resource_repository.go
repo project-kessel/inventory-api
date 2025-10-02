@@ -287,7 +287,7 @@ func (f *fakeResourceRepository) markTransactionIdAsProcessed(transactionId stri
 
 // HasTransactionIdBeenProcessed checks if a transaction ID has been processed before
 // Returns true if the transaction has already been processed, false otherwise
-func (f *fakeResourceRepository) HasTransactionIdBeenProcessed(tx *gorm.DB, transactionId string, reporterResourceId uuid.UUID, resourceId uuid.UUID) (bool, error) {
+func (f *fakeResourceRepository) HasTransactionIdBeenProcessed(tx *gorm.DB, transactionId string) (bool, error) {
 	if transactionId == "" {
 		return false, nil
 	}

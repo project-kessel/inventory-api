@@ -73,6 +73,7 @@ func TestCommonRepresentation_Infrastructure_Structure(t *testing.T) {
 		// Verify size constraints match constants
 		AssertGORMTag(t, cr, "ReportedByReporterType", "size:128")
 		AssertGORMTag(t, cr, "ReportedByReporterInstance", "size:128")
+		AssertGORMTag(t, cr, "TransactionId", "size:128")
 	})
 
 	t.Run("should have correct non-nullable field types", func(t *testing.T) {
@@ -136,6 +137,7 @@ func TestCommonRepresentation_Infrastructure_EdgeCases(t *testing.T) {
 
 		cr.ReportedByReporterType = maxLen128
 		cr.ReportedByReporterInstance = maxLen128
+		cr.TransactionId = maxLen128
 
 		if !isValidCommonRepresentation(cr) {
 			t.Error("CommonRepresentation with maximum length string values should be valid")
@@ -295,6 +297,7 @@ func TestCommonRepresentation_Infrastructure_Serialization(t *testing.T) {
 		AssertEqual(t, original.Version, unmarshaled.Version, "Version should match after JSON round-trip")
 		AssertEqual(t, original.ReportedByReporterType, unmarshaled.ReportedByReporterType, "ReportedByReporterType should match after JSON round-trip")
 		AssertEqual(t, original.ReportedByReporterInstance, unmarshaled.ReportedByReporterInstance, "ReportedByReporterInstance should match after JSON round-trip")
+		AssertEqual(t, original.TransactionId, unmarshaled.TransactionId, "TransactionId should match after JSON round-trip")
 	})
 
 	t.Run("should handle empty string values in JSON serialization", func(t *testing.T) {

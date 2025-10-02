@@ -1806,7 +1806,8 @@ func TestFindVersionedRepresentationsByVersion(t *testing.T) {
 				require.NoError(t, err)
 				updatedReporter, err := bizmodel.NewRepresentation(map[string]interface{}{"hostname": "h"})
 				require.NoError(t, err)
-				err = res.Update(key, "", "", nil, updatedReporter, updatedCommon)
+				transactionId := bizmodel.NewTransactionId("test-transaction-id")
+				err = res.Update(key, "", "", nil, updatedReporter, updatedCommon, transactionId)
 				require.NoError(t, err)
 				require.NoError(t, repo.Save(db, res, model_legacy.OperationTypeUpdated, "tx2"))
 			}
@@ -1897,7 +1898,8 @@ func TestGetCurrentAndPreviousWorkspaceID_Integration(t *testing.T) {
 					updatedReporter, err := bizmodel.NewRepresentation(map[string]interface{}{"hostname": "updated-host"})
 					require.NoError(t, err)
 
-					err = resource.Update(key, "", "", nil, updatedReporter, updatedCommon)
+					transactionId := bizmodel.NewTransactionId("test-transaction-id")
+					err = resource.Update(key, "", "", nil, updatedReporter, updatedCommon, transactionId)
 					require.NoError(t, err)
 					require.NoError(t, repo.Save(db, resource, model_legacy.OperationTypeUpdated, "tx-ws-update"))
 

@@ -1689,6 +1689,7 @@ func createTestResourceWithMixedCase(t *testing.T) bizmodel.Resource {
 
 	return resource
 }
+
 func createTestResourceWithReporter(t *testing.T, localResourceId, reporterType, reporterInstanceId string) bizmodel.Resource {
 	resourceId := uuid.New()
 	reporterResourceId := uuid.New()
@@ -1754,4 +1755,224 @@ func createContractReporterResourceKey(t *testing.T, localResourceId, resourceTy
 	key, err := bizmodel.NewReporterResourceKey(localResourceIdType, resourceTypeType, reporterTypeType, reporterInstanceIdType)
 	require.NoError(t, err)
 	return key
+}
+
+func TestFindVersionedRepresentationsByVersion(t *testing.T) {
+	implementations := []struct {
+		name string
+		repo func() ResourceRepository
+		db   func() *gorm.DB
+	}{
+		{
+			name: "Real Repository with GormTransactionManager",
+			repo: func() ResourceRepository {
+				db := setupInMemoryDB(t)
+				tm := NewGormTransactionManager(3)
+				return NewResourceRepository(db, tm)
+			},
+			db: func() *gorm.DB { return setupInMemoryDB(t) },
+		},
+		{
+			name: "Fake Repository",
+			repo: func() ResourceRepository { return NewFakeResourceRepository() },
+			db:   func() *gorm.DB { return nil },
+		},
+	}
+
+	for _, impl := range implementations {
+		t.Run(impl.name, func(t *testing.T) {
+			// Helper to get fresh instances
+			getFresh := func() (ResourceRepository, *gorm.DB) {
+				if impl.name == "Fake Repository" {
+					return impl.repo(), impl.db()
+				}
+				db := setupInMemoryDB(t)
+				tm := NewGormTransactionManager(3)
+				return NewResourceRepository(db, tm), db
+			}
+
+			repo, db := getFresh()
+
+			// Seed: create resource (v0)
+			res := createTestResourceWithLocalIdAndType(t, "localResourceId-1", "host")
+			_ = db // fake ignores db
+			if impl.name != "Fake Repository" {
+				require.NoError(t, repo.Save(db, res, model_legacy.OperationTypeCreated, "tx1"))
+
+				// Update to bump common version to v1 with workspace_id workspace2
+				key, err := bizmodel.NewReporterResourceKey("localResourceId-1", "host", "hbi", "hbi-instance-1")
+				require.NoError(t, err)
+				updatedCommon, err := bizmodel.NewRepresentation(map[string]interface{}{"workspace_id": "workspace2"})
+				require.NoError(t, err)
+				updatedReporter, err := bizmodel.NewRepresentation(map[string]interface{}{"hostname": "h"})
+				require.NoError(t, err)
+				transactionId := bizmodel.NewTransactionId("test-transaction-id")
+				err = res.Update(key, "", "", nil, updatedReporter, updatedCommon, transactionId)
+				require.NoError(t, err)
+				require.NoError(t, repo.Save(db, res, model_legacy.OperationTypeUpdated, "tx2"))
+			}
+
+			// Act: query for current (1) and previous (0)
+			key, err := bizmodel.NewReporterResourceKey("localResourceId-1", "host", "hbi", "hbi-instance-1")
+			require.NoError(t, err)
+			results, err := repo.FindVersionedRepresentationsByVersion(db, key, 1)
+			require.NoError(t, err)
+
+			require.Len(t, results, 2)
+			hasCur, hasPrev := false, false
+			for _, r := range results {
+				if r.Version == 1 {
+					hasCur = true
+					if impl.name != "Fake Repository" {
+						assert.Equal(t, "workspace2", r.Data["workspace_id"])
+					}
+				}
+				if r.Version == 0 {
+					hasPrev = true
+				}
+				_, ok := r.Data["workspace_id"]
+				assert.True(t, ok)
+			}
+			assert.True(t, hasCur)
+			assert.True(t, hasPrev)
+		})
+	}
+}
+
+// Test GetCurrentAndPreviousWorkspaceID function with both real and fake repositories
+func TestGetCurrentAndPreviousWorkspaceID_Integration(t *testing.T) {
+	implementations := []struct {
+		name string
+		repo func() ResourceRepository
+		db   func() *gorm.DB
+	}{
+		{
+			name: "Real Repository with GormTransactionManager",
+			repo: func() ResourceRepository {
+				db := setupInMemoryDB(t)
+				tm := NewGormTransactionManager(3)
+				return NewResourceRepository(db, tm)
+			},
+			db: func() *gorm.DB {
+				return setupInMemoryDB(t)
+			},
+		},
+		{
+			name: "Fake Repository",
+			repo: func() ResourceRepository {
+				return NewFakeResourceRepository()
+			},
+			db: func() *gorm.DB {
+				return nil
+			},
+		},
+	}
+
+	for _, impl := range implementations {
+		t.Run(impl.name, func(t *testing.T) {
+			getFreshInstances := func() (ResourceRepository, *gorm.DB) {
+				if impl.name == "Fake Repository" {
+					return impl.repo(), impl.db()
+				}
+				db := setupInMemoryDB(t)
+				tm := NewGormTransactionManager(3)
+				repo := NewResourceRepository(db, tm)
+				return repo, db
+			}
+
+			t.Run("GetCurrentAndPreviousWorkspaceID extracts workspace IDs correctly", func(t *testing.T) {
+				repo, db := getFreshInstances()
+
+				if impl.name != "Fake Repository" {
+					// For real repository, create and update a resource to have versioned representations
+					resource := createTestResourceWithLocalIdAndType(t, "workspace-test-resource", "host")
+					err := repo.Save(db, resource, model_legacy.OperationTypeCreated, "tx-ws-test")
+					require.NoError(t, err)
+
+					// Update to create version 1
+					key, err := bizmodel.NewReporterResourceKey("workspace-test-resource", "host", "hbi", "hbi-instance-1")
+					require.NoError(t, err)
+
+					updatedCommon, err := bizmodel.NewRepresentation(map[string]interface{}{"workspace_id": "workspace-v1"})
+					require.NoError(t, err)
+					updatedReporter, err := bizmodel.NewRepresentation(map[string]interface{}{"hostname": "updated-host"})
+					require.NoError(t, err)
+
+					transactionId := bizmodel.NewTransactionId("test-transaction-id")
+					err = resource.Update(key, "", "", nil, updatedReporter, updatedCommon, transactionId)
+					require.NoError(t, err)
+					require.NoError(t, repo.Save(db, resource, model_legacy.OperationTypeUpdated, "tx-ws-update"))
+
+					// Get the versioned representations
+					representations, err := repo.FindVersionedRepresentationsByVersion(db, key, 1)
+					require.NoError(t, err)
+
+					// Test the GetCurrentAndPreviousWorkspaceID function
+					currentWS, previousWS := GetCurrentAndPreviousWorkspaceID(representations, 1)
+					assert.Equal(t, "workspace-v1", currentWS)
+					assert.Equal(t, "test-workspace", previousWS) // From initial creation
+				} else {
+					// For fake repository, test with mock data
+					key, err := bizmodel.NewReporterResourceKey("test-resource", "host", "hbi", "hbi-instance-1")
+					require.NoError(t, err)
+
+					// Test version 1 scenario (should return current and previous)
+					representations, err := repo.FindVersionedRepresentationsByVersion(db, key, 1)
+					require.NoError(t, err)
+
+					currentWS, previousWS := GetCurrentAndPreviousWorkspaceID(representations, 1)
+					assert.Equal(t, "test-workspace-v1", currentWS)
+					assert.Equal(t, "test-workspace-previous", previousWS)
+				}
+			})
+
+			t.Run("GetCurrentAndPreviousWorkspaceID handles version 0", func(t *testing.T) {
+				repo, db := getFreshInstances()
+
+				key, err := bizmodel.NewReporterResourceKey("test-resource-v0", "host", "hbi", "hbi-instance-1")
+				require.NoError(t, err)
+
+				if impl.name != "Fake Repository" {
+					// For real repository, create a resource without updates (version 0)
+					resource := createTestResourceWithLocalIdAndType(t, "test-resource-v0", "host")
+					err := repo.Save(db, resource, model_legacy.OperationTypeCreated, "tx-v0-test")
+					require.NoError(t, err)
+				}
+
+				// Get version 0 representations
+				representations, err := repo.FindVersionedRepresentationsByVersion(db, key, 0)
+				require.NoError(t, err)
+
+				currentWS, previousWS := GetCurrentAndPreviousWorkspaceID(representations, 0)
+
+				if impl.name != "Fake Repository" {
+					assert.Equal(t, "test-workspace", currentWS)
+				} else {
+					assert.Equal(t, "test-workspace-initial", currentWS)
+				}
+				assert.Equal(t, "", previousWS) // No previous version for version 0
+			})
+
+			t.Run("GetCurrentAndPreviousWorkspaceID handles empty representations", func(t *testing.T) {
+				// Test the function directly with empty data
+				representations := []RepresentationsByVersion{}
+				currentWS, previousWS := GetCurrentAndPreviousWorkspaceID(representations, 1)
+				assert.Equal(t, "", currentWS)
+				assert.Equal(t, "", previousWS)
+			})
+
+			t.Run("GetCurrentAndPreviousWorkspaceID handles invalid workspace_id types", func(t *testing.T) {
+				// Test the function directly with invalid data
+				representations := []RepresentationsByVersion{
+					{Data: map[string]interface{}{"workspace_id": 123}, Version: 1},    // non-string
+					{Data: map[string]interface{}{"workspace_id": ""}, Version: 0},     // empty string
+					{Data: map[string]interface{}{"other_field": "value"}, Version: 2}, // missing workspace_id
+				}
+				currentWS, previousWS := GetCurrentAndPreviousWorkspaceID(representations, 1)
+				assert.Equal(t, "", currentWS)
+				assert.Equal(t, "", previousWS)
+			})
+		})
+	}
+
 }

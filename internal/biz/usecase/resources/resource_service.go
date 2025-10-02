@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/go-kratos/kratos/v2/log"
@@ -857,4 +858,86 @@ func computeReadAfterWrite(uc *Usecase, write_visibility v1beta2.WriteVisibility
 		return false
 	}
 	return !common.IsNil(uc.ListenManager) && uc.Config.ReadAfterWriteEnabled && isSPInAllowlist(reporterPrincipal, uc.Config.ReadAfterWriteAllowlist)
+}
+
+func (uc *Usecase) CalculateTuples(tupleEvent model.TupleEvent) (model.TuplesToReplicate, error) {
+	currentVersion := tupleEvent.Version().Uint()
+	key := tupleEvent.ReporterResourceKey()
+
+	uc.Log.Infof("CalculateTuples called - version: %d, key: %+v", currentVersion, key)
+
+	versionedRepresentations, err := uc.getWorkspaceVersions(key, currentVersion)
+	if err != nil {
+		return model.TuplesToReplicate{}, err
+	}
+	return uc.determineTupleOperations(versionedRepresentations, currentVersion, key)
+
+}
+
+const (
+	workspaceRelation = "workspace"
+	rbacNamespace     = "rbac"
+	rbacPrefix        = rbacNamespace + ":" + workspaceRelation
+)
+
+func (uc *Usecase) createWorkspaceTuple(workspaceID string, key model.ReporterResourceKey) model.RelationsTuple {
+	// Create RelationsResource for the main resource
+	resourceId := key.LocalResourceId()
+	resourceType := key.ResourceType()
+	resourceObjectType := model.NewRelationsObjectType(
+		strings.ToLower(resourceType.String()),
+		"", // Default namespace for resource types
+	)
+	resource := model.NewRelationsResource(resourceId, resourceObjectType)
+
+	// Create RelationsResource for the workspace subject
+	workspaceSubjectId, _ := model.NewLocalResourceId(fmt.Sprintf("%s:%s", rbacPrefix, workspaceID))
+	workspaceObjectType := model.NewRelationsObjectType(workspaceRelation, rbacNamespace)
+	workspaceSubject := model.NewRelationsResource(workspaceSubjectId, workspaceObjectType)
+	subject := model.NewRelationsSubject(workspaceSubject)
+
+	return model.NewRelationsTuple(resource, workspaceRelation, subject)
+}
+
+func (uc *Usecase) determineTupleOperations(representationVersion []data.RepresentationsByVersion, currentVersion uint, key model.ReporterResourceKey) (model.TuplesToReplicate, error) {
+	currentWorkspaceID, previousWorkspaceID := data.GetCurrentAndPreviousWorkspaceID(representationVersion, currentVersion)
+
+	// If workspace ID hasn't changed, no operations needed
+	if previousWorkspaceID != "" && previousWorkspaceID == currentWorkspaceID {
+		// Return empty TuplesToReplicate with nil pointers (no create/delete operations)
+		return model.TuplesToReplicate{}, nil
+	}
+
+	var tuplesToCreate, tuplesToDelete []model.RelationsTuple
+
+	// Always create tuple for current workspace if it exists
+	if currentWorkspaceID != "" {
+		tuplesToCreate = append(tuplesToCreate, uc.createWorkspaceTuple(currentWorkspaceID, key))
+	}
+
+	// Delete previous tuple if it exists and is different from current
+	if previousWorkspaceID != "" {
+		tuplesToDelete = append(tuplesToDelete, uc.createWorkspaceTuple(previousWorkspaceID, key))
+	}
+
+	// Return pointers only if slices are not empty
+	var createPtr, deletePtr *[]model.RelationsTuple
+	if len(tuplesToCreate) > 0 {
+		createPtr = &tuplesToCreate
+	}
+	if len(tuplesToDelete) > 0 {
+		deletePtr = &tuplesToDelete
+	}
+
+	return model.NewTuplesToReplicate(createPtr, deletePtr)
+}
+
+func (uc *Usecase) getWorkspaceVersions(key model.ReporterResourceKey, currentVersion uint) ([]data.RepresentationsByVersion, error) {
+	representations, err := uc.resourceRepository.FindVersionedRepresentationsByVersion(
+		nil, key, currentVersion,
+	)
+	if err != nil {
+		return []data.RepresentationsByVersion{}, fmt.Errorf("failed to find common representations: %w", err)
+	}
+	return representations, nil
 }

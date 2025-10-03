@@ -129,6 +129,20 @@ func (uc *Usecase) ReportResource(ctx context.Context, request *v1beta2.ReportRe
 			}
 
 			if err == nil && res != nil {
+				transactionId := request.GetRepresentations().GetMetadata().GetTransactionId()
+
+				// Check if this transaction has already been processed (idempotency)
+				if transactionId != "" && len(res.ReporterResources()) > 0 {
+					alreadyProcessed, err := uc.resourceRepository.HasTransactionIdBeenProcessed(tx, transactionId)
+					if err != nil {
+						return fmt.Errorf("failed to check transaction ID: %w", err)
+					}
+					if alreadyProcessed {
+						log.Info("Transaction already processed, skipping update")
+						return nil
+					}
+				}
+
 				log.Info("Resource already exists, updating: ")
 				return uc.updateResource(tx, request, res, txidStr)
 			}

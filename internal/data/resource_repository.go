@@ -105,6 +105,7 @@ type ResourceRepository interface {
 	FindVersionedRepresentationsByVersion(tx *gorm.DB, key bizmodel.ReporterResourceKey, currentVersion uint) ([]RepresentationsByVersion, error)
 	GetDB() *gorm.DB
 	GetTransactionManager() usecase.TransactionManager
+	HasTransactionIdBeenProcessed(tx *gorm.DB, transactionId string) (bool, error)
 }
 
 type resourceRepository struct {
@@ -155,7 +156,6 @@ func (r *resourceRepository) Save(tx *gorm.DB, resource bizmodel.Resource, opera
 	if err := tx.Save(&dataReporterResource).Error; err != nil {
 		return fmt.Errorf("failed to save reporter resource: %w", err)
 	}
-
 	if dataReporterRepresentation.ReporterResourceID != uuid.Nil {
 		if err := tx.Create(&dataReporterRepresentation).Error; err != nil {
 			return fmt.Errorf("failed to save reporter representation: %w", err)
@@ -293,4 +293,31 @@ func (r *resourceRepository) FindVersionedRepresentationsByVersion(tx *gorm.DB, 
 	}
 
 	return results, nil
+}
+
+// HasTransactionIdBeenProcessed checks if a transaction ID exists in either the
+// reporter_representations or common_representations tables.
+// Returns true if the transaction has already been processed, false otherwise.
+func (r *resourceRepository) HasTransactionIdBeenProcessed(tx *gorm.DB, transactionId string) (bool, error) {
+	if transactionId == "" {
+		return false, nil
+	}
+	// Check representations tables using lightweight EXISTS query
+	var exists bool
+	err := tx.Raw(`
+	SELECT EXISTS (
+		SELECT 1 FROM reporter_representations WHERE transaction_id = ?
+	)
+	OR EXISTS (
+		SELECT 1 FROM common_representations  WHERE transaction_id = ?
+	)
+	`, transactionId, transactionId).Scan(&exists).Error
+
+	if err != nil {
+		return false, fmt.Errorf("failed to check representations for the transaction_id: %w", err)
+	}
+	if exists {
+		return true, nil
+	}
+	return false, nil
 }

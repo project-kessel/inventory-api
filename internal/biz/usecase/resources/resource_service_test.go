@@ -1341,3 +1341,274 @@ func TestDetermineTupleOperations(t *testing.T) {
 	// Verify we get tuples from fake repository
 	assert.True(t, result.HasTuplesToCreate() || result.HasTuplesToDelete())
 }
+
+func TestTransactionIdIdempotency(t *testing.T) {
+	ctx := context.Background()
+	logger := log.DefaultLogger
+
+	resourceRepo := data.NewFakeResourceRepository()
+	authorizer := &allow.AllowAllAuthz{}
+	usecaseConfig := &UsecaseConfig{
+		ReadAfterWriteEnabled: false,
+		ConsumerEnabled:       false,
+	}
+
+	usecase := New(resourceRepo, nil, nil, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig)
+
+	t.Run("Same transaction ID should be idempotent - no changes to representation tables", func(t *testing.T) {
+		resourceType := "host"
+		reporterType := "hbi"
+		reporterInstance := "test-instance"
+		localResourceId := "test-resource"
+		workspaceId := "test-workspace"
+		transactionId := "test-transaction-123"
+
+		// 1. First report with transaction ID
+		request1 := createTestReportRequestWithTransactionId(t, resourceType, reporterType, reporterInstance, localResourceId, workspaceId, transactionId)
+		err := usecase.ReportResource(ctx, request1, "test-reporter")
+		require.NoError(t, err, "First report should succeed")
+
+		// Get the resource key for verification
+		key := createReporterResourceKey(t, localResourceId, resourceType, reporterType, reporterInstance)
+
+		// Verify initial state
+		afterFirst, err := resourceRepo.FindResourceByKeys(nil, key)
+		require.NoError(t, err, "Should find resource after first report")
+		require.NotNil(t, afterFirst)
+		firstState := afterFirst.ReporterResources()[0].Serialize()
+		initialRepVersion := firstState.RepresentationVersion
+		initialGeneration := firstState.Generation
+
+		// 2. Second report with SAME transaction ID - should be idempotent
+		request2 := createTestReportRequestWithTransactionId(t, resourceType, reporterType, reporterInstance, localResourceId, workspaceId, transactionId)
+		err = usecase.ReportResource(ctx, request2, "test-reporter")
+		require.NoError(t, err, "Second report with same transaction ID should succeed (idempotent)")
+
+		// Verify no changes were made to representation tables
+		afterSecond, err := resourceRepo.FindResourceByKeys(nil, key)
+		require.NoError(t, err, "Should find resource after second report")
+		require.NotNil(t, afterSecond)
+		secondState := afterSecond.ReporterResources()[0].Serialize()
+
+		assert.Equal(t, initialRepVersion, secondState.RepresentationVersion, "RepresentationVersion should not change for idempotent request")
+		assert.Equal(t, initialGeneration, secondState.Generation, "Generation should not change for idempotent request")
+	})
+
+	t.Run("Different transaction ID should update representations", func(t *testing.T) {
+		resourceType := "host"
+		reporterType := "hbi"
+		reporterInstance := "test-instance-2"
+		localResourceId := "test-resource-2"
+		workspaceId := "test-workspace-2"
+		transactionId1 := "test-transaction-456"
+		transactionId2 := "test-transaction-789"
+
+		// 1. First report with transaction ID
+		request1 := createTestReportRequestWithTransactionId(t, resourceType, reporterType, reporterInstance, localResourceId, workspaceId, transactionId1)
+		err := usecase.ReportResource(ctx, request1, "test-reporter")
+		require.NoError(t, err, "First report should succeed")
+
+		// Get the resource key for verification
+		key := createReporterResourceKey(t, localResourceId, resourceType, reporterType, reporterInstance)
+
+		// Verify initial state
+		afterFirst, err := resourceRepo.FindResourceByKeys(nil, key)
+		require.NoError(t, err, "Should find resource after first report")
+		require.NotNil(t, afterFirst)
+		firstState := afterFirst.ReporterResources()[0].Serialize()
+		initialRepVersion := firstState.RepresentationVersion
+		initialGeneration := firstState.Generation
+
+		// 2. Second report with DIFFERENT transaction ID - should update representations
+		request2 := createTestReportRequestWithUpdatedDataAndTransactionId(t, resourceType, reporterType, reporterInstance, localResourceId, workspaceId, transactionId2)
+		err = usecase.ReportResource(ctx, request2, "test-reporter")
+		require.NoError(t, err, "Second report with different transaction ID should succeed")
+
+		// Verify representations were updated
+		afterSecond, err := resourceRepo.FindResourceByKeys(nil, key)
+		require.NoError(t, err, "Should find resource after second report")
+		require.NotNil(t, afterSecond)
+		secondState := afterSecond.ReporterResources()[0].Serialize()
+
+		assert.Equal(t, initialRepVersion+1, secondState.RepresentationVersion, "RepresentationVersion should increment for different transaction ID")
+		assert.Equal(t, initialGeneration, secondState.Generation, "Generation should remain the same for update")
+	})
+
+	t.Run("Report with transaction ID -> Update with new transaction ID -> Delete should update representations", func(t *testing.T) {
+		resourceType := "host"
+		reporterType := "hbi"
+		reporterInstance := "test-instance-3"
+		localResourceId := "test-resource-3"
+		workspaceId := "test-workspace-3"
+		transactionId1 := "test-transaction-111"
+		transactionId2 := "test-transaction-222"
+
+		// 1. First report with transaction ID
+		request1 := createTestReportRequestWithTransactionId(t, resourceType, reporterType, reporterInstance, localResourceId, workspaceId, transactionId1)
+		err := usecase.ReportResource(ctx, request1, "test-reporter")
+		require.NoError(t, err, "First report should succeed")
+
+		// Get the resource key for verification
+		key := createReporterResourceKey(t, localResourceId, resourceType, reporterType, reporterInstance)
+
+		// Verify initial state
+		afterFirst, err := resourceRepo.FindResourceByKeys(nil, key)
+		require.NoError(t, err, "Should find resource after first report")
+		require.NotNil(t, afterFirst)
+		firstState := afterFirst.ReporterResources()[0].Serialize()
+		initialRepVersion := firstState.RepresentationVersion
+		initialGeneration := firstState.Generation
+		assert.Equal(t, uint(0), initialRepVersion, "Initial representationVersion should be 0")
+		assert.Equal(t, uint(0), initialGeneration, "Initial generation should be 0")
+		assert.False(t, firstState.Tombstone, "Initial tombstone should be false")
+
+		// 2. Update with DIFFERENT transaction ID - should update representations
+		request2 := createTestReportRequestWithUpdatedDataAndTransactionId(t, resourceType, reporterType, reporterInstance, localResourceId, workspaceId, transactionId2)
+		err = usecase.ReportResource(ctx, request2, "test-reporter")
+		require.NoError(t, err, "Update with different transaction ID should succeed")
+
+		// Verify state after update
+		afterUpdate, err := resourceRepo.FindResourceByKeys(nil, key)
+		require.NoError(t, err, "Should find resource after update")
+		require.NotNil(t, afterUpdate)
+		updateState := afterUpdate.ReporterResources()[0].Serialize()
+		assert.Equal(t, initialRepVersion+1, updateState.RepresentationVersion, "RepresentationVersion should increment after update")
+		assert.Equal(t, initialGeneration, updateState.Generation, "Generation should remain the same after update")
+		assert.False(t, updateState.Tombstone, "Resource should remain active after update")
+
+		// 3. Delete resource (no transaction ID) - should update representations
+		err = usecase.Delete(key)
+		require.NoError(t, err, "Delete should succeed")
+
+		// Verify state after delete
+		afterDelete, err := resourceRepo.FindResourceByKeys(nil, key)
+		require.NoError(t, err, "Should find tombstoned resource after delete")
+		require.NotNil(t, afterDelete)
+		deleteState := afterDelete.ReporterResources()[0].Serialize()
+		assert.Equal(t, updateState.RepresentationVersion+1, deleteState.RepresentationVersion, "RepresentationVersion should increment after delete")
+		assert.Equal(t, updateState.Generation, deleteState.Generation, "Generation should remain the same after delete")
+		assert.True(t, deleteState.Tombstone, "Resource should be tombstoned after delete")
+	})
+
+	t.Run("Report with transaction ID -> Report with same transaction ID -> Delete should update representations", func(t *testing.T) {
+		resourceType := "host"
+		reporterType := "hbi"
+		reporterInstance := "test-instance-4"
+		localResourceId := "test-resource-4"
+		workspaceId := "test-workspace-4"
+		transactionId := "test-transaction-333"
+
+		// 1. First report with transaction ID
+		request1 := createTestReportRequestWithTransactionId(t, resourceType, reporterType, reporterInstance, localResourceId, workspaceId, transactionId)
+		err := usecase.ReportResource(ctx, request1, "test-reporter")
+		require.NoError(t, err, "First report should succeed")
+
+		// Get the resource key for verification
+		key := createReporterResourceKey(t, localResourceId, resourceType, reporterType, reporterInstance)
+
+		// Verify initial state
+		afterFirst, err := resourceRepo.FindResourceByKeys(nil, key)
+		require.NoError(t, err, "Should find resource after first report")
+		require.NotNil(t, afterFirst)
+		firstState := afterFirst.ReporterResources()[0].Serialize()
+		initialRepVersion := firstState.RepresentationVersion
+		initialGeneration := firstState.Generation
+		assert.Equal(t, uint(0), initialRepVersion, "Initial representationVersion should be 0")
+		assert.Equal(t, uint(0), initialGeneration, "Initial generation should be 0")
+		assert.False(t, firstState.Tombstone, "Initial tombstone should be false")
+
+		// 2. Second report with SAME transaction ID - should be idempotent
+		request2 := createTestReportRequestWithTransactionId(t, resourceType, reporterType, reporterInstance, localResourceId, workspaceId, transactionId)
+		err = usecase.ReportResource(ctx, request2, "test-reporter")
+		require.NoError(t, err, "Second report with same transaction ID should succeed (idempotent)")
+
+		// Verify state hasn't changed (idempotent)
+		afterSecond, err := resourceRepo.FindResourceByKeys(nil, key)
+		require.NoError(t, err, "Should find resource after second report")
+		require.NotNil(t, afterSecond)
+		secondState := afterSecond.ReporterResources()[0].Serialize()
+		assert.Equal(t, initialRepVersion, secondState.RepresentationVersion, "RepresentationVersion should not change for idempotent request")
+		assert.Equal(t, initialGeneration, secondState.Generation, "Generation should not change for idempotent request")
+		assert.False(t, secondState.Tombstone, "Resource should remain active")
+
+		// 3. Delete resource (no transaction ID) - should update representations
+		err = usecase.Delete(key)
+		require.NoError(t, err, "Delete should succeed")
+
+		// Verify state after delete
+		afterDelete, err := resourceRepo.FindResourceByKeys(nil, key)
+		require.NoError(t, err, "Should find tombstoned resource after delete")
+		require.NotNil(t, afterDelete)
+		deleteState := afterDelete.ReporterResources()[0].Serialize()
+		assert.Equal(t, secondState.RepresentationVersion+1, deleteState.RepresentationVersion, "RepresentationVersion should increment after delete")
+		assert.Equal(t, secondState.Generation, deleteState.Generation, "Generation should remain the same after delete")
+		assert.True(t, deleteState.Tombstone, "Resource should be tombstoned after delete")
+	})
+}
+
+// Helper function to create a test request with transaction ID
+func createTestReportRequestWithTransactionId(t *testing.T, resourceType, reporterType, reporterInstance, localResourceId, workspaceId, transactionId string) *v1beta2.ReportResourceRequest {
+	reporterData, _ := structpb.NewStruct(map[string]interface{}{
+		"local_resource_id": localResourceId,
+		"api_href":          "https://api.example.com/resource/123",
+		"console_href":      "https://console.example.com/resource/123",
+	})
+
+	commonData, _ := structpb.NewStruct(map[string]interface{}{
+		"workspace_id": workspaceId,
+		"name":         "test-cluster",
+		"namespace":    "default",
+	})
+
+	return &v1beta2.ReportResourceRequest{
+		Type:               resourceType,
+		ReporterType:       reporterType,
+		ReporterInstanceId: reporterInstance,
+		Representations: &v1beta2.ResourceRepresentations{
+			Metadata: &v1beta2.RepresentationMetadata{
+				LocalResourceId: localResourceId,
+				ApiHref:         "https://api.example.com/resource/123",
+				ConsoleHref:     internal.StringPtr("https://console.example.com/resource/123"),
+				IdempotencyKey:  &v1beta2.RepresentationMetadata_TransactionId{TransactionId: transactionId},
+			},
+			Reporter: reporterData,
+			Common:   commonData,
+		},
+		WriteVisibility: v1beta2.WriteVisibility_MINIMIZE_LATENCY,
+	}
+}
+
+// Helper function to create a test request with updated data and transaction ID
+func createTestReportRequestWithUpdatedDataAndTransactionId(t *testing.T, resourceType, reporterType, reporterInstance, localResourceId, workspaceId, transactionId string) *v1beta2.ReportResourceRequest {
+	reporterData, _ := structpb.NewStruct(map[string]interface{}{
+		"local_resource_id": localResourceId,
+		"api_href":          "https://api.example.com/updated/123",
+		"console_href":      "https://console.example.com/updated/123",
+		"hostname":          "updated-hostname",
+		"status":            "running",
+	})
+
+	commonData, _ := structpb.NewStruct(map[string]interface{}{
+		"workspace_id": workspaceId,
+		"name":         "updated-host",
+		"environment":  "production",
+		"tags":         map[string]interface{}{"env": "prod", "updated": "true"},
+	})
+
+	return &v1beta2.ReportResourceRequest{
+		Type:               resourceType,
+		ReporterType:       reporterType,
+		ReporterInstanceId: reporterInstance,
+		Representations: &v1beta2.ResourceRepresentations{
+			Metadata: &v1beta2.RepresentationMetadata{
+				LocalResourceId: localResourceId,
+				ApiHref:         "https://api.example.com/updated/123",
+				ConsoleHref:     internal.StringPtr("https://console.example.com/updated/123"),
+				IdempotencyKey:  &v1beta2.RepresentationMetadata_TransactionId{TransactionId: transactionId},
+			},
+			Reporter: reporterData,
+			Common:   commonData,
+		},
+		WriteVisibility: v1beta2.WriteVisibility_MINIMIZE_LATENCY,
+	}
+}

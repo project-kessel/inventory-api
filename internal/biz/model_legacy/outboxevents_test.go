@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/project-kessel/inventory-api/internal/biz"
 	kessel "github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
 	"github.com/stretchr/testify/assert"
 )
@@ -73,44 +74,44 @@ func createTestResource(isv1beta2 bool) *Resource {
 func TestNewOutboxEventsFromResourceCreated(t *testing.T) {
 	resource := createTestResource(false)
 	namespace := "foobar-namespace"
-	resourceEvent, tupleEvent, err := NewOutboxEventsFromResource(*resource, namespace, OperationTypeCreated, txid)
+	resourceEvent, tupleEvent, err := NewOutboxEventsFromResource(*resource, namespace, biz.OperationTypeCreated, txid)
 	assert.Nil(t, err)
 	assert.NotNil(t, resourceEvent)
 	assert.NotNil(t, tupleEvent)
-	assertResourceEvent(t, OperationTypeCreated, resource, resourceEvent)
+	assertResourceEvent(t, biz.OperationTypeCreated, resource, resourceEvent)
 	assertSetTupleEvent(t, resource, tupleEvent, resource.Reporter.ReporterType)
 }
 
 func TestNewOutboxEventsFromResourceUpdated(t *testing.T) {
 	resource := createTestResource(false)
 	namespace := "foobar-namespace"
-	resourceEvent, tupleEvent, err := NewOutboxEventsFromResource(*resource, namespace, OperationTypeUpdated, txid)
+	resourceEvent, tupleEvent, err := NewOutboxEventsFromResource(*resource, namespace, biz.OperationTypeUpdated, txid)
 	assert.Nil(t, err)
 	assert.NotNil(t, resourceEvent)
 	assert.NotNil(t, tupleEvent)
-	assertResourceEvent(t, OperationTypeUpdated, resource, resourceEvent)
+	assertResourceEvent(t, biz.OperationTypeUpdated, resource, resourceEvent)
 	assertSetTupleEvent(t, resource, tupleEvent, resource.Reporter.ReporterType)
 }
 
 func TestNewOutboxEventsFromResourceDeleted(t *testing.T) {
 	resource := createTestResource(false)
 	namespace := "foobar-namespace"
-	resourceEvent, tupleEvent, err := NewOutboxEventsFromResource(*resource, namespace, OperationTypeDeleted, txid)
+	resourceEvent, tupleEvent, err := NewOutboxEventsFromResource(*resource, namespace, biz.OperationTypeDeleted, txid)
 	assert.Nil(t, err)
 	assert.NotNil(t, resourceEvent)
 	assert.NotNil(t, tupleEvent)
-	assertResourceEvent(t, OperationTypeDeleted, resource, resourceEvent)
+	assertResourceEvent(t, biz.OperationTypeDeleted, resource, resourceEvent)
 	assertUnsetTupleEvent(t, resource, tupleEvent, resource.Reporter.ReporterType)
 }
 
 func TestNewOutboxEventsFromResourceCreated_v1beta2(t *testing.T) {
 	resource := createTestResource(true)
 	namespace := "foobar-namespace"
-	resourceEvent, tupleEvent, err := NewOutboxEventsFromResource(*resource, namespace, OperationTypeCreated, txid)
+	resourceEvent, tupleEvent, err := NewOutboxEventsFromResource(*resource, namespace, biz.OperationTypeCreated, txid)
 	assert.Nil(t, err)
 	assert.NotNil(t, resourceEvent)
 	assert.NotNil(t, tupleEvent)
-	assertResourceEvent(t, OperationTypeCreated, resource, resourceEvent)
+	assertResourceEvent(t, biz.OperationTypeCreated, resource, resourceEvent)
 	assertSetTupleEvent(t, resource, tupleEvent, resource.ReporterType) // Use reporter type as namespace for v1beta2
 }
 
@@ -146,7 +147,7 @@ func assertUnsetTupleEvent(t *testing.T, resource *Resource, event *OutboxEvent,
 	assert.Equal(t, "workspace", *tupleEvent.Relation)
 }
 
-func assertResourceEvent(t *testing.T, operation eventOperationType, resource *Resource, event *OutboxEvent) {
+func assertResourceEvent(t *testing.T, operation biz.EventOperationType, resource *Resource, event *OutboxEvent) {
 	assert.NotNil(t, event)
 	payloadJson, err := json.Marshal(event.Payload)
 	assert.Nil(t, err)
@@ -155,16 +156,16 @@ func assertResourceEvent(t *testing.T, operation eventOperationType, resource *R
 	assert.Nil(t, err)
 
 	assert.Equal(t, "1.0", resourceEvent.Specversion)
-	assert.Contains(t, resourceEvent.Type, string(operation))
+	assert.Contains(t, resourceEvent.Type, string(operation.OperationType()))
 	assert.Empty(t, resourceEvent.Source)
 	assert.NotEmpty(t, resourceEvent.Id)
 	assert.Equal(t, resourceEvent.Subject, fmt.Sprintf("/resources/%s/%s", resource.ResourceType, resource.ID))
 	switch operation {
-	case OperationTypeCreated:
+	case biz.OperationTypeCreated:
 		assert.Equal(t, resource.CreatedAt.Format(time.UnixDate), resourceEvent.Time.Format(time.UnixDate))
-	case OperationTypeUpdated:
+	case biz.OperationTypeUpdated:
 		assert.Equal(t, resource.UpdatedAt.Format(time.UnixDate), resourceEvent.Time.Format(time.UnixDate))
-	case OperationTypeDeleted:
+	case biz.OperationTypeDeleted:
 		assert.NotNil(t, resourceEvent.Time)
 	}
 	assert.Equal(t, "application/json", resourceEvent.DataContentType)
@@ -180,11 +181,11 @@ func assertResourceEvent(t *testing.T, operation eventOperationType, resource *R
 	assert.Equal(t, resource.OrgId, data.Metadata.OrgId)
 	assert.Equal(t, resource.ResourceType, data.Metadata.ResourceType)
 	switch operation {
-	case OperationTypeCreated:
+	case biz.OperationTypeCreated:
 		assert.Equal(t, resource.CreatedAt.Format(time.UnixDate), data.Metadata.CreatedAt.Format(time.UnixDate))
-	case OperationTypeUpdated:
+	case biz.OperationTypeUpdated:
 		assert.Equal(t, resource.UpdatedAt.Format(time.UnixDate), data.Metadata.UpdatedAt.Format(time.UnixDate))
-	case OperationTypeDeleted:
+	case biz.OperationTypeDeleted:
 		assert.NotNil(t, data.Metadata.DeletedAt)
 	}
 	assert.Equal(t, resource.WorkspaceId, data.Metadata.WorkspaceId)

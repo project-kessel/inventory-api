@@ -7,4 +7,7 @@ type ResourceEvent interface {
 	ReporterInstanceId() string
 	LocalResourceId() string
 	WorkspaceId() string
+	CurrentCommonVersion() *Version
+	CurrentReporterRepresentationVersion() *Version
+	ReporterResourceKey() ReporterResourceKey
 }

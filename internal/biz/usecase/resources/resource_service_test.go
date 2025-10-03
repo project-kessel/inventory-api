@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/go-kratos/kratos/v2/log"
+	"github.com/project-kessel/inventory-api/internal/biz"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/types/known/structpb"
@@ -466,7 +467,8 @@ func TestCalculateTuples(t *testing.T) {
 			require.NoError(t, err)
 
 			// Create TupleEvent
-			tupleEvent, err := model.NewTupleEvent(model.Version(tt.version), key)
+			version := model.Version(tt.version)
+			tupleEvent, err := model.NewTupleEvent(key, biz.OperationTypeCreated, &version, nil)
 			require.NoError(t, err)
 
 			// Call CalculateTuplesv2

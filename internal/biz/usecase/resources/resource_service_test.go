@@ -383,6 +383,141 @@ func createTestReportRequestWithUpdatedData(t *testing.T, resourceType, reporter
 	}
 }
 
+func TestCalculateTuples(t *testing.T) {
+	tests := []struct {
+		name                   string
+		version                uint
+		currentWorkspaceID     string
+		previousWorkspaceID    string
+		expectTuplesToCreate   bool
+		expectTuplesToDelete   bool
+		expectedCreateResource string
+		expectedDeleteResource string
+		expectedCreateSubject  string
+		expectedDeleteSubject  string
+	}{
+		{
+			name:                   "version 0 creates initial tuple",
+			version:                0,
+			currentWorkspaceID:     "workspace-initial",
+			previousWorkspaceID:    "",
+			expectTuplesToCreate:   true,
+			expectTuplesToDelete:   false,
+			expectedCreateResource: "host:test-resource",
+			expectedCreateSubject:  "rbac:workspace:workspace-initial",
+		},
+		{
+			name:                   "workspace change creates and deletes tuples",
+			version:                2,
+			currentWorkspaceID:     "workspace-new",
+			previousWorkspaceID:    "workspace-old",
+			expectTuplesToCreate:   true,
+			expectTuplesToDelete:   true,
+			expectedCreateResource: "host:test-resource",
+			expectedDeleteResource: "host:test-resource",
+			expectedCreateSubject:  "rbac:workspace:workspace-new",
+			expectedDeleteSubject:  "rbac:workspace:workspace-old",
+		},
+		{
+			name:                   "workspace change creates and deletes tuples version 1",
+			version:                1,
+			currentWorkspaceID:     "workspace-new",
+			previousWorkspaceID:    "workspace-old",
+			expectTuplesToCreate:   true,
+			expectTuplesToDelete:   true,
+			expectedCreateResource: "host:test-resource",
+			expectedDeleteResource: "host:test-resource",
+			expectedCreateSubject:  "rbac:workspace:workspace-new",
+			expectedDeleteSubject:  "rbac:workspace:workspace-old",
+		},
+
+		{
+			name:                 "same workspace does not create or delete tuples",
+			version:              2,
+			currentWorkspaceID:   "workspace-same",
+			previousWorkspaceID:  "workspace-same",
+			expectTuplesToCreate: false,
+			expectTuplesToDelete: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Use a fake repository with workspace overrides aligned to test case expectations
+			repo := data.NewFakeResourceRepositoryWithWorkspaceOverrides(tt.currentWorkspaceID, tt.previousWorkspaceID)
+			// Seed fake repo behavior for workspace IDs via current version and previous version
+			// The CalculateTuples tests rely on FindCommonRepresentationsByVersion returning
+			// entries for current and (optionally) previous. The fake repo synthesizes data based
+			// on version values, so we don't need to wire specific state here beyond calling the usecase.
+
+			// Create usecase with mock repo
+			uc := &Usecase{
+				resourceRepository: repo,
+				Log:                log.NewHelper(log.DefaultLogger),
+			}
+
+			// Create test key
+			key, err := model.NewReporterResourceKey(
+				model.LocalResourceId("test-resource"),
+				model.ResourceType("host"),
+				model.ReporterType("HBI"),
+				model.ReporterInstanceId("test-instance"),
+			)
+			require.NoError(t, err)
+
+			// Create TupleEvent
+			tupleEvent, err := model.NewTupleEvent(model.Version(tt.version), key)
+			require.NoError(t, err)
+
+			// Call CalculateTuplesv2
+			result, err := uc.CalculateTuples(tupleEvent)
+			require.NoError(t, err)
+
+			// Verify expectations
+			assert.Equal(t, tt.expectTuplesToCreate, result.HasTuplesToCreate())
+			assert.Equal(t, tt.expectTuplesToDelete, result.HasTuplesToDelete())
+
+			if tt.expectTuplesToCreate {
+				require.NotNil(t, result.TuplesToCreate())
+				require.Len(t, *result.TuplesToCreate(), 1)
+				createTuple := (*result.TuplesToCreate())[0]
+
+				// Test resource
+				createResource := createTuple.Resource()
+				assert.Equal(t, "test-resource", createResource.Id().String())
+				assert.Equal(t, "host", createResource.Type().Name())
+
+				// Test relation
+				assert.Equal(t, "workspace", createTuple.Relation())
+
+				// Test subject
+				createSubject := createTuple.Subject()
+				createSubjectResource := createSubject.Subject()
+				assert.Equal(t, tt.expectedCreateSubject, createSubjectResource.Id().String())
+			}
+
+			if tt.expectTuplesToDelete {
+				require.NotNil(t, result.TuplesToDelete())
+				require.Len(t, *result.TuplesToDelete(), 1)
+				deleteTuple := (*result.TuplesToDelete())[0]
+
+				// Test resource
+				deleteResource := deleteTuple.Resource()
+				assert.Equal(t, "test-resource", deleteResource.Id().String())
+				assert.Equal(t, "host", deleteResource.Type().Name())
+
+				// Test relation
+				assert.Equal(t, "workspace", deleteTuple.Relation())
+
+				// Test subject
+				deleteSubject := deleteTuple.Subject()
+				deleteSubjectResource := deleteSubject.Subject()
+				assert.Equal(t, tt.expectedDeleteSubject, deleteSubjectResource.Id().String())
+			}
+		})
+	}
+}
+
 func TestPartialDataScenarios(t *testing.T) {
 	ctx := context.Background()
 	logger := log.DefaultLogger
@@ -545,6 +680,7 @@ func createTestReportRequestWithCommonDataOnly(t *testing.T, resourceType, repor
 		WriteVisibility: v1beta2.WriteVisibility_MINIMIZE_LATENCY,
 	}
 }
+
 func TestResourceLifecycle_ReportUpdateDeleteReport(t *testing.T) {
 	t.Run("report new -> update -> delete -> report new", func(t *testing.T) {
 		ctx := context.Background()
@@ -968,6 +1104,507 @@ func createTestReportRequestWithCycleData(t *testing.T, resourceType, reporterTy
 				LocalResourceId: localResourceId,
 				ApiHref:         fmt.Sprintf("https://api.example.com/cycle-%d", cycle),
 				ConsoleHref:     internal.StringPtr(fmt.Sprintf("https://console.example.com/cycle-%d", cycle)),
+			},
+			Reporter: reporterData,
+			Common:   commonData,
+		},
+		WriteVisibility: v1beta2.WriteVisibility_MINIMIZE_LATENCY,
+	}
+
+}
+
+func TestGetWorkspaceVersions(t *testing.T) {
+	// Test with fake repository only since we don't have access to the data package test utilities
+	repo := data.NewFakeResourceRepository()
+	uc := &Usecase{
+		resourceRepository: repo,
+	}
+
+	key, err := model.NewReporterResourceKey(
+		model.LocalResourceId("test-resource"),
+		model.ResourceType("host"),
+		model.ReporterType("HBI"),
+		model.ReporterInstanceId("test-instance"),
+	)
+	require.NoError(t, err)
+
+	result, err := uc.getWorkspaceVersions(key, 1)
+	require.NoError(t, err)
+	// Verify we get representations from fake repository
+	assert.NotEmpty(t, result)
+}
+func TestGetCurrentAndPreviousWorkspaceID(t *testing.T) {
+	// Test the GetCurrentAndPreviousWorkspaceID function with test data
+	tests := []struct {
+		name                  string
+		representationVersion []data.RepresentationsByVersion
+		currentVersion        uint
+		expectedCurrent       string
+		expectedPrevious      string
+	}{
+		{
+			name: "extract current and previous workspace IDs",
+			representationVersion: []data.RepresentationsByVersion{
+				{
+					Version: 2,
+					Data: map[string]interface{}{
+						"workspace_id": "workspace-new",
+					},
+				},
+				{
+					Version: 1,
+					Data: map[string]interface{}{
+						"workspace_id": "workspace-old",
+					},
+				},
+			},
+			currentVersion:   2,
+			expectedCurrent:  "workspace-new",
+			expectedPrevious: "workspace-old",
+		},
+		{
+			name: "extract only current workspace ID",
+			representationVersion: []data.RepresentationsByVersion{
+				{
+					Version: 0,
+					Data: map[string]interface{}{
+						"workspace_id": "workspace-initial",
+					},
+				},
+			},
+			currentVersion:   0,
+			expectedCurrent:  "workspace-initial",
+			expectedPrevious: "",
+		},
+		{
+			name: "no workspace IDs found",
+			representationVersion: []data.RepresentationsByVersion{
+				{
+					Version: 1,
+					Data: map[string]interface{}{
+						"other_field": "value",
+					},
+				},
+			},
+			currentVersion:   1,
+			expectedCurrent:  "",
+			expectedPrevious: "",
+		},
+		{
+			name: "empty workspace ID ignored",
+			representationVersion: []data.RepresentationsByVersion{
+				{
+					Version: 1,
+					Data: map[string]interface{}{
+						"workspace_id": "",
+					},
+				},
+			},
+			currentVersion:   1,
+			expectedCurrent:  "",
+			expectedPrevious: "",
+		},
+		{
+			name: "workspace ID with special characters",
+			representationVersion: []data.RepresentationsByVersion{
+				{
+					Version: 1,
+					Data: map[string]interface{}{
+						"workspace_id": "workspace-with-dashes_and_underscores",
+					},
+				},
+			},
+			currentVersion:   1,
+			expectedCurrent:  "workspace-with-dashes_and_underscores",
+			expectedPrevious: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			current, previous := data.GetCurrentAndPreviousWorkspaceID(tt.representationVersion, tt.currentVersion)
+
+			assert.Equal(t, tt.expectedCurrent, current)
+			assert.Equal(t, tt.expectedPrevious, previous)
+		})
+	}
+}
+
+func TestCreateWorkspaceTuple(t *testing.T) {
+	uc := &Usecase{}
+
+	key, err := model.NewReporterResourceKey(
+		model.LocalResourceId("test-resource"),
+		model.ResourceType("host"),
+		model.ReporterType("HBI"),
+		model.ReporterInstanceId("test-instance"),
+	)
+	require.NoError(t, err)
+
+	tests := []struct {
+		name        string
+		workspaceID string
+		validate    func(t *testing.T, tuple model.RelationsTuple)
+	}{
+		{
+			name:        "normal workspace ID",
+			workspaceID: "workspace-123",
+			validate: func(t *testing.T, tuple model.RelationsTuple) {
+				// Test that we're using the new RelationsTuple type
+				assert.IsType(t, model.RelationsTuple{}, tuple)
+
+				// Test resource structure
+				resource := tuple.Resource()
+				assert.Equal(t, "test-resource", resource.Id().String())
+				assert.Equal(t, "host", resource.Type().Name())
+				assert.Equal(t, "", resource.Type().Namespace()) // Default namespace
+
+				// Test relation constant usage
+				assert.Equal(t, "workspace", tuple.Relation())
+
+				// Test subject structure
+				subject := tuple.Subject()
+				subjectResource := subject.Subject()
+				assert.Equal(t, "rbac:workspace:workspace-123", subjectResource.Id().String())
+				assert.Equal(t, "workspace", subjectResource.Type().Name())
+				assert.Equal(t, "rbac", subjectResource.Type().Namespace())
+			},
+		},
+		{
+			name:        "workspace ID with special characters",
+			workspaceID: "workspace-with-dashes_and_underscores",
+			validate: func(t *testing.T, tuple model.RelationsTuple) {
+				// Test that special characters are handled correctly
+				subject := tuple.Subject()
+				subjectResource := subject.Subject()
+				assert.Equal(t, "rbac:workspace:workspace-with-dashes_and_underscores", subjectResource.Id().String())
+				assert.Equal(t, "workspace", subjectResource.Type().Name())
+				assert.Equal(t, "rbac", subjectResource.Type().Namespace())
+			},
+		},
+		{
+			name:        "empty workspace ID",
+			workspaceID: "",
+			validate: func(t *testing.T, tuple model.RelationsTuple) {
+				// Test that empty workspace ID is handled
+				subject := tuple.Subject()
+				subjectResource := subject.Subject()
+				assert.Equal(t, "rbac:workspace:", subjectResource.Id().String())
+				assert.Equal(t, "workspace", subjectResource.Type().Name())
+				assert.Equal(t, "rbac", subjectResource.Type().Namespace())
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tuple := uc.createWorkspaceTuple(tt.workspaceID, key)
+			tt.validate(t, tuple)
+		})
+	}
+}
+
+func TestDetermineTupleOperations(t *testing.T) {
+	// Test with fake repository only since we don't have access to the data package test utilities
+	repo := data.NewFakeResourceRepository()
+	uc := &Usecase{
+		resourceRepository: repo,
+	}
+
+	key, err := model.NewReporterResourceKey(
+		model.LocalResourceId("test-resource"),
+		model.ResourceType("host"),
+		model.ReporterType("HBI"),
+		model.ReporterInstanceId("test-instance"),
+	)
+	require.NoError(t, err)
+
+	// Test with fake data
+	representationVersion := []data.RepresentationsByVersion{
+		{
+			Version: 2,
+			Data: map[string]interface{}{
+				"workspace_id": "workspace-new",
+			},
+		},
+		{
+			Version: 1,
+			Data: map[string]interface{}{
+				"workspace_id": "workspace-old",
+			},
+		},
+	}
+
+	result, err := uc.determineTupleOperations(representationVersion, 2, key)
+	require.NoError(t, err)
+
+	// Verify we get tuples from fake repository
+	assert.True(t, result.HasTuplesToCreate() || result.HasTuplesToDelete())
+}
+
+func TestTransactionIdIdempotency(t *testing.T) {
+	ctx := context.Background()
+	logger := log.DefaultLogger
+
+	resourceRepo := data.NewFakeResourceRepository()
+	authorizer := &allow.AllowAllAuthz{}
+	usecaseConfig := &UsecaseConfig{
+		ReadAfterWriteEnabled: false,
+		ConsumerEnabled:       false,
+	}
+
+	usecase := New(resourceRepo, nil, nil, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig)
+
+	t.Run("Same transaction ID should be idempotent - no changes to representation tables", func(t *testing.T) {
+		resourceType := "host"
+		reporterType := "hbi"
+		reporterInstance := "test-instance"
+		localResourceId := "test-resource"
+		workspaceId := "test-workspace"
+		transactionId := "test-transaction-123"
+
+		// 1. First report with transaction ID
+		request1 := createTestReportRequestWithTransactionId(t, resourceType, reporterType, reporterInstance, localResourceId, workspaceId, transactionId)
+		err := usecase.ReportResource(ctx, request1, "test-reporter")
+		require.NoError(t, err, "First report should succeed")
+
+		// Get the resource key for verification
+		key := createReporterResourceKey(t, localResourceId, resourceType, reporterType, reporterInstance)
+
+		// Verify initial state
+		afterFirst, err := resourceRepo.FindResourceByKeys(nil, key)
+		require.NoError(t, err, "Should find resource after first report")
+		require.NotNil(t, afterFirst)
+		firstState := afterFirst.ReporterResources()[0].Serialize()
+		initialRepVersion := firstState.RepresentationVersion
+		initialGeneration := firstState.Generation
+
+		// 2. Second report with SAME transaction ID - should be idempotent
+		request2 := createTestReportRequestWithTransactionId(t, resourceType, reporterType, reporterInstance, localResourceId, workspaceId, transactionId)
+		err = usecase.ReportResource(ctx, request2, "test-reporter")
+		require.NoError(t, err, "Second report with same transaction ID should succeed (idempotent)")
+
+		// Verify no changes were made to representation tables
+		afterSecond, err := resourceRepo.FindResourceByKeys(nil, key)
+		require.NoError(t, err, "Should find resource after second report")
+		require.NotNil(t, afterSecond)
+		secondState := afterSecond.ReporterResources()[0].Serialize()
+
+		assert.Equal(t, initialRepVersion, secondState.RepresentationVersion, "RepresentationVersion should not change for idempotent request")
+		assert.Equal(t, initialGeneration, secondState.Generation, "Generation should not change for idempotent request")
+	})
+
+	t.Run("Different transaction ID should update representations", func(t *testing.T) {
+		resourceType := "host"
+		reporterType := "hbi"
+		reporterInstance := "test-instance-2"
+		localResourceId := "test-resource-2"
+		workspaceId := "test-workspace-2"
+		transactionId1 := "test-transaction-456"
+		transactionId2 := "test-transaction-789"
+
+		// 1. First report with transaction ID
+		request1 := createTestReportRequestWithTransactionId(t, resourceType, reporterType, reporterInstance, localResourceId, workspaceId, transactionId1)
+		err := usecase.ReportResource(ctx, request1, "test-reporter")
+		require.NoError(t, err, "First report should succeed")
+
+		// Get the resource key for verification
+		key := createReporterResourceKey(t, localResourceId, resourceType, reporterType, reporterInstance)
+
+		// Verify initial state
+		afterFirst, err := resourceRepo.FindResourceByKeys(nil, key)
+		require.NoError(t, err, "Should find resource after first report")
+		require.NotNil(t, afterFirst)
+		firstState := afterFirst.ReporterResources()[0].Serialize()
+		initialRepVersion := firstState.RepresentationVersion
+		initialGeneration := firstState.Generation
+
+		// 2. Second report with DIFFERENT transaction ID - should update representations
+		request2 := createTestReportRequestWithUpdatedDataAndTransactionId(t, resourceType, reporterType, reporterInstance, localResourceId, workspaceId, transactionId2)
+		err = usecase.ReportResource(ctx, request2, "test-reporter")
+		require.NoError(t, err, "Second report with different transaction ID should succeed")
+
+		// Verify representations were updated
+		afterSecond, err := resourceRepo.FindResourceByKeys(nil, key)
+		require.NoError(t, err, "Should find resource after second report")
+		require.NotNil(t, afterSecond)
+		secondState := afterSecond.ReporterResources()[0].Serialize()
+
+		assert.Equal(t, initialRepVersion+1, secondState.RepresentationVersion, "RepresentationVersion should increment for different transaction ID")
+		assert.Equal(t, initialGeneration, secondState.Generation, "Generation should remain the same for update")
+	})
+
+	t.Run("Report with transaction ID -> Update with new transaction ID -> Delete should update representations", func(t *testing.T) {
+		resourceType := "host"
+		reporterType := "hbi"
+		reporterInstance := "test-instance-3"
+		localResourceId := "test-resource-3"
+		workspaceId := "test-workspace-3"
+		transactionId1 := "test-transaction-111"
+		transactionId2 := "test-transaction-222"
+
+		// 1. First report with transaction ID
+		request1 := createTestReportRequestWithTransactionId(t, resourceType, reporterType, reporterInstance, localResourceId, workspaceId, transactionId1)
+		err := usecase.ReportResource(ctx, request1, "test-reporter")
+		require.NoError(t, err, "First report should succeed")
+
+		// Get the resource key for verification
+		key := createReporterResourceKey(t, localResourceId, resourceType, reporterType, reporterInstance)
+
+		// Verify initial state
+		afterFirst, err := resourceRepo.FindResourceByKeys(nil, key)
+		require.NoError(t, err, "Should find resource after first report")
+		require.NotNil(t, afterFirst)
+		firstState := afterFirst.ReporterResources()[0].Serialize()
+		initialRepVersion := firstState.RepresentationVersion
+		initialGeneration := firstState.Generation
+		assert.Equal(t, uint(0), initialRepVersion, "Initial representationVersion should be 0")
+		assert.Equal(t, uint(0), initialGeneration, "Initial generation should be 0")
+		assert.False(t, firstState.Tombstone, "Initial tombstone should be false")
+
+		// 2. Update with DIFFERENT transaction ID - should update representations
+		request2 := createTestReportRequestWithUpdatedDataAndTransactionId(t, resourceType, reporterType, reporterInstance, localResourceId, workspaceId, transactionId2)
+		err = usecase.ReportResource(ctx, request2, "test-reporter")
+		require.NoError(t, err, "Update with different transaction ID should succeed")
+
+		// Verify state after update
+		afterUpdate, err := resourceRepo.FindResourceByKeys(nil, key)
+		require.NoError(t, err, "Should find resource after update")
+		require.NotNil(t, afterUpdate)
+		updateState := afterUpdate.ReporterResources()[0].Serialize()
+		assert.Equal(t, initialRepVersion+1, updateState.RepresentationVersion, "RepresentationVersion should increment after update")
+		assert.Equal(t, initialGeneration, updateState.Generation, "Generation should remain the same after update")
+		assert.False(t, updateState.Tombstone, "Resource should remain active after update")
+
+		// 3. Delete resource (no transaction ID) - should update representations
+		err = usecase.Delete(key)
+		require.NoError(t, err, "Delete should succeed")
+
+		// Verify state after delete
+		afterDelete, err := resourceRepo.FindResourceByKeys(nil, key)
+		require.NoError(t, err, "Should find tombstoned resource after delete")
+		require.NotNil(t, afterDelete)
+		deleteState := afterDelete.ReporterResources()[0].Serialize()
+		assert.Equal(t, updateState.RepresentationVersion+1, deleteState.RepresentationVersion, "RepresentationVersion should increment after delete")
+		assert.Equal(t, updateState.Generation, deleteState.Generation, "Generation should remain the same after delete")
+		assert.True(t, deleteState.Tombstone, "Resource should be tombstoned after delete")
+	})
+
+	t.Run("Report with transaction ID -> Report with same transaction ID -> Delete should update representations", func(t *testing.T) {
+		resourceType := "host"
+		reporterType := "hbi"
+		reporterInstance := "test-instance-4"
+		localResourceId := "test-resource-4"
+		workspaceId := "test-workspace-4"
+		transactionId := "test-transaction-333"
+
+		// 1. First report with transaction ID
+		request1 := createTestReportRequestWithTransactionId(t, resourceType, reporterType, reporterInstance, localResourceId, workspaceId, transactionId)
+		err := usecase.ReportResource(ctx, request1, "test-reporter")
+		require.NoError(t, err, "First report should succeed")
+
+		// Get the resource key for verification
+		key := createReporterResourceKey(t, localResourceId, resourceType, reporterType, reporterInstance)
+
+		// Verify initial state
+		afterFirst, err := resourceRepo.FindResourceByKeys(nil, key)
+		require.NoError(t, err, "Should find resource after first report")
+		require.NotNil(t, afterFirst)
+		firstState := afterFirst.ReporterResources()[0].Serialize()
+		initialRepVersion := firstState.RepresentationVersion
+		initialGeneration := firstState.Generation
+		assert.Equal(t, uint(0), initialRepVersion, "Initial representationVersion should be 0")
+		assert.Equal(t, uint(0), initialGeneration, "Initial generation should be 0")
+		assert.False(t, firstState.Tombstone, "Initial tombstone should be false")
+
+		// 2. Second report with SAME transaction ID - should be idempotent
+		request2 := createTestReportRequestWithTransactionId(t, resourceType, reporterType, reporterInstance, localResourceId, workspaceId, transactionId)
+		err = usecase.ReportResource(ctx, request2, "test-reporter")
+		require.NoError(t, err, "Second report with same transaction ID should succeed (idempotent)")
+
+		// Verify state hasn't changed (idempotent)
+		afterSecond, err := resourceRepo.FindResourceByKeys(nil, key)
+		require.NoError(t, err, "Should find resource after second report")
+		require.NotNil(t, afterSecond)
+		secondState := afterSecond.ReporterResources()[0].Serialize()
+		assert.Equal(t, initialRepVersion, secondState.RepresentationVersion, "RepresentationVersion should not change for idempotent request")
+		assert.Equal(t, initialGeneration, secondState.Generation, "Generation should not change for idempotent request")
+		assert.False(t, secondState.Tombstone, "Resource should remain active")
+
+		// 3. Delete resource (no transaction ID) - should update representations
+		err = usecase.Delete(key)
+		require.NoError(t, err, "Delete should succeed")
+
+		// Verify state after delete
+		afterDelete, err := resourceRepo.FindResourceByKeys(nil, key)
+		require.NoError(t, err, "Should find tombstoned resource after delete")
+		require.NotNil(t, afterDelete)
+		deleteState := afterDelete.ReporterResources()[0].Serialize()
+		assert.Equal(t, secondState.RepresentationVersion+1, deleteState.RepresentationVersion, "RepresentationVersion should increment after delete")
+		assert.Equal(t, secondState.Generation, deleteState.Generation, "Generation should remain the same after delete")
+		assert.True(t, deleteState.Tombstone, "Resource should be tombstoned after delete")
+	})
+}
+
+// Helper function to create a test request with transaction ID
+func createTestReportRequestWithTransactionId(t *testing.T, resourceType, reporterType, reporterInstance, localResourceId, workspaceId, transactionId string) *v1beta2.ReportResourceRequest {
+	reporterData, _ := structpb.NewStruct(map[string]interface{}{
+		"local_resource_id": localResourceId,
+		"api_href":          "https://api.example.com/resource/123",
+		"console_href":      "https://console.example.com/resource/123",
+	})
+
+	commonData, _ := structpb.NewStruct(map[string]interface{}{
+		"workspace_id": workspaceId,
+		"name":         "test-cluster",
+		"namespace":    "default",
+	})
+
+	return &v1beta2.ReportResourceRequest{
+		Type:               resourceType,
+		ReporterType:       reporterType,
+		ReporterInstanceId: reporterInstance,
+		Representations: &v1beta2.ResourceRepresentations{
+			Metadata: &v1beta2.RepresentationMetadata{
+				LocalResourceId: localResourceId,
+				ApiHref:         "https://api.example.com/resource/123",
+				ConsoleHref:     internal.StringPtr("https://console.example.com/resource/123"),
+				IdempotencyKey:  &v1beta2.RepresentationMetadata_TransactionId{TransactionId: transactionId},
+			},
+			Reporter: reporterData,
+			Common:   commonData,
+		},
+		WriteVisibility: v1beta2.WriteVisibility_MINIMIZE_LATENCY,
+	}
+}
+
+// Helper function to create a test request with updated data and transaction ID
+func createTestReportRequestWithUpdatedDataAndTransactionId(t *testing.T, resourceType, reporterType, reporterInstance, localResourceId, workspaceId, transactionId string) *v1beta2.ReportResourceRequest {
+	reporterData, _ := structpb.NewStruct(map[string]interface{}{
+		"local_resource_id": localResourceId,
+		"api_href":          "https://api.example.com/updated/123",
+		"console_href":      "https://console.example.com/updated/123",
+		"hostname":          "updated-hostname",
+		"status":            "running",
+	})
+
+	commonData, _ := structpb.NewStruct(map[string]interface{}{
+		"workspace_id": workspaceId,
+		"name":         "updated-host",
+		"environment":  "production",
+		"tags":         map[string]interface{}{"env": "prod", "updated": "true"},
+	})
+
+	return &v1beta2.ReportResourceRequest{
+		Type:               resourceType,
+		ReporterType:       reporterType,
+		ReporterInstanceId: reporterInstance,
+		Representations: &v1beta2.ResourceRepresentations{
+			Metadata: &v1beta2.RepresentationMetadata{
+				LocalResourceId: localResourceId,
+				ApiHref:         "https://api.example.com/updated/123",
+				ConsoleHref:     internal.StringPtr("https://console.example.com/updated/123"),
+				IdempotencyKey:  &v1beta2.RepresentationMetadata_TransactionId{TransactionId: transactionId},
 			},
 			Reporter: reporterData,
 			Common:   commonData,

@@ -217,13 +217,13 @@ To add a rhel-host to the inventory:
 To hit the REST endpoint use the following `curl` command
 
 ```shell
-curl -H "Content-Type: application/json" --data "@data/testData/v1beta1/host.json" http://localhost:8000/api/inventory/v1beta1/resources/rhel-hosts
+curl -X POST -H "Content-Type: application/json" --data "@data/testData/v1beta2/host.json" http://localhost:8000/api/inventory/v1beta2/resources
 ```
 
 To hit the gRPC endpoint use the following `grpcurl` command
 
 ```
-grpcurl -plaintext -d @ localhost:9000 kessel.inventory.v1beta1.resources.KesselRhelHostService.CreateRhelHost < data/testData/v1beta1/host.json
+grpcurl -plaintext -d @ localhost:9000 kessel.inventory.v1beta2.KesselInventoryService.ReportResource < data/testData/v1beta2/host.json
 ```
 
 To update it:
@@ -231,13 +231,13 @@ To update it:
 To hit the REST endpoint
 
 ```shell
-curl -XPUT -H "Content-Type: application/json" --data "@data/testData/v1beta1/host.json" http://localhost:8000/api/inventory/v1beta1/resources/rhel-hosts
+curl -X POST -H "Content-Type: application/json" --data "@data/testData/v1beta2/host.json" http://localhost:8000/api/inventory/v1beta2/resources
 ```
 
 To hit the gRPC endpoint
 
 ```
-grpcurl -plaintext -d @ localhost:9000 kessel.inventory.v1beta1.resources.KesselRhelHostService.UpdateRhelHost < data/testData/v1beta1/host.json
+grpcurl -plaintext -d @ localhost:9000 kessel.inventory.v1beta2.KesselInventoryService.ReportResource < data/testData/v1beta2/host.json
 ```
 
 
@@ -246,22 +246,22 @@ and finally, to delete it, note that we use a different file, as the only requir
 To hit the REST endpoint
 
 ```shell
-curl -XDELETE -H "Content-Type: application/json" --data "@data/testData/v1beta1/host-reporter.json" http://localhost:8000/api/inventory/v1beta1/resources/rhel-hosts
+curl -XDELETE -H "Content-Type: application/json" --data "@data/testData/v1beta2/delete-host.json" http://localhost:8000/api/inventory/v1beta2/resources
 ```
 
 To hit the gRPC endpoint
 
 ```
-grpcurl -plaintext -d @ localhost:9000 kessel.inventory.v1beta1.resources.KesselRhelHostService.DeleteRhelHost < data/testData/v1beta1/host-reporter.json
+grpcurl -plaintext -d @ localhost:9000 kessel.inventory.v1beta2.KesselInventoryService.DeleteResource < data/testData/v1beta2/delete-host.json
 ```
 To add a notifications integration (useful for testing in stage)
 
 ```shell
 # create the integration (auth is required for stage -- see internal docs)
-curl -H "Content-Type: application/json" -H "Authorization: Bearer $TOKEN" -d @data/testData/v1beta1/notifications-integrations.json localhost:8000/api/inventory/v1beta1/resources/notifications-integrations
+curl -X POST -H "Content-Type: application/json" -H "Authorization: Bearer $TOKEN" -d @data/testData/v1beta2/notifications-integrations.json localhost:8000/api/inventory/v1beta2/resources
 
 # delete the integration
-curl -X DELETE -H "Content-Type: application/json" -H "Authorization: Bearer $TOKEN" -d @data/testData/v1beta1/notifications-integration-reporter.json localhost:8000/api/inventory/v1beta1/resources/notifications-integrations
+curl -X DELETE -H "Content-Type: application/json" -H "Authorization: Bearer $TOKEN" -d @data/testData/v1beta2/delete-notifications-integration.json localhost:8000/api/inventory/v1beta2/resources
 
 ```
 ### Adding a new relationship (k8s-policy is propagated to k8s-cluster)

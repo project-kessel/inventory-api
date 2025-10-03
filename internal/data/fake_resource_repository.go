@@ -17,6 +17,10 @@ type fakeResourceRepository struct {
 	mu                      sync.RWMutex
 	resourcesByPrimaryKey   map[uuid.UUID]*storedResource // keyed by primary key (ResourceID) - simulates database primary storage
 	resourcesByCompositeKey map[string]uuid.UUID          // composite key -> primary key mapping for unique constraint
+	resources               map[string]*storedResource    // legacy field for backward compatibility
+	overrideCurrent         string                        // test override for current workspace ID
+	overridePrevious        string                        // test override for previous workspace ID
+	processedTransactionIds map[string]bool               // track processed transaction IDs for idempotency testing
 }
 
 type storedResource struct {
@@ -36,6 +40,22 @@ func NewFakeResourceRepository() ResourceRepository {
 	return &fakeResourceRepository{
 		resourcesByPrimaryKey:   make(map[uuid.UUID]*storedResource),
 		resourcesByCompositeKey: make(map[string]uuid.UUID),
+		resources:               make(map[string]*storedResource),
+		overrideCurrent:         "",
+		overridePrevious:        "",
+		processedTransactionIds: make(map[string]bool),
+	}
+}
+
+// NewFakeResourceRepositoryWithWorkspaceOverrides allows tests to control the
+// workspace IDs returned for current and previous versions.
+func NewFakeResourceRepositoryWithWorkspaceOverrides(current, previous string) ResourceRepository {
+	return &fakeResourceRepository{
+		resourcesByPrimaryKey:   make(map[uuid.UUID]*storedResource),
+		resourcesByCompositeKey: make(map[string]uuid.UUID),
+		resources:               make(map[string]*storedResource),
+		overrideCurrent:         current,
+		overridePrevious:        previous,
 	}
 }
 
@@ -120,6 +140,14 @@ func (f *fakeResourceRepository) Save(tx *gorm.DB, resource bizmodel.Resource, o
 	f.resourcesByPrimaryKey[reporterResourcePrimaryKey] = stored
 	// Store composite key mapping (simulates unique constraint)
 	f.resourcesByCompositeKey[compositeKey] = reporterResourcePrimaryKey
+	// Mark transaction IDs as processed for idempotency testing
+	if reporterRepresentationSnapshot.TransactionId != "" {
+		f.markTransactionIdAsProcessed(reporterRepresentationSnapshot.TransactionId)
+	}
+	if commonRepresentationSnapshot.TransactionId != "" {
+		f.markTransactionIdAsProcessed(commonRepresentationSnapshot.TransactionId)
+	}
+
 	return nil
 }
 
@@ -192,6 +220,46 @@ func (f *fakeResourceRepository) FindResourceByKeys(tx *gorm.DB, key bizmodel.Re
 	return nil, gorm.ErrRecordNotFound
 }
 
+func (f *fakeResourceRepository) FindVersionedRepresentationsByVersion(tx *gorm.DB, key bizmodel.ReporterResourceKey, currentVersion uint) ([]RepresentationsByVersion, error) {
+	// This is a fake implementation for testing
+	// In a real test, you would mock this based on your test data needs
+	var results []RepresentationsByVersion
+
+	// Prefer explicit overrides when provided by tests
+	if f.overrideCurrent != "" {
+		results = append(results, RepresentationsByVersion{Data: map[string]interface{}{"workspace_id": f.overrideCurrent}, Version: currentVersion})
+		if f.overridePrevious != "" && currentVersion > 0 {
+			results = append(results, RepresentationsByVersion{Data: map[string]interface{}{"workspace_id": f.overridePrevious}, Version: currentVersion - 1})
+		}
+		return results, nil
+	}
+
+	// For testing purposes, we'll return mock data based on the version
+	// In a real implementation, this would query the database for common_representations
+
+	// Mock data for testing - you can customize this based on your test needs
+	switch currentVersion {
+	case 0:
+		// Version 0 - initial creation
+		results = append(results, RepresentationsByVersion{Data: map[string]interface{}{"workspace_id": "test-workspace-initial"}, Version: currentVersion})
+	case 1:
+		// Version 1 - first update
+		results = append(results, RepresentationsByVersion{Data: map[string]interface{}{"workspace_id": "test-workspace-v1"}, Version: currentVersion})
+		// Also include previous (version 0) for contract parity with real repo
+		results = append(results, RepresentationsByVersion{Data: map[string]interface{}{"workspace_id": "test-workspace-previous"}, Version: 0})
+	case 2:
+		// Version 2 - workspace change scenario
+		results = append(results, RepresentationsByVersion{Data: map[string]interface{}{"workspace_id": "test-workspace-v2"}, Version: currentVersion})
+
+		// Add previous (current-1) version if requested
+		if currentVersion > 0 {
+			results = append(results, RepresentationsByVersion{Data: map[string]interface{}{"workspace_id": "test-workspace-previous"}, Version: currentVersion - 1})
+		}
+	}
+
+	return results, nil
+}
+
 func (f *fakeResourceRepository) GetDB() *gorm.DB {
 	// Fake repository doesn't use a real database
 	return nil
@@ -204,4 +272,30 @@ func (f *fakeResourceRepository) GetTransactionManager() usecase.TransactionMana
 
 func (f *fakeResourceRepository) makeCompositeKey(localResourceID, reporterType, resourceType, reporterInstanceID string, representationVersion, generation uint) string {
 	return fmt.Sprintf("%s|%s|%s|%s|%d|%d", localResourceID, reporterType, resourceType, reporterInstanceID, representationVersion, generation)
+}
+
+// markTransactionIdAsProcessed marks a transaction ID as processed for idempotency testing
+// Note: This method assumes the caller already holds the appropriate lock
+func (f *fakeResourceRepository) markTransactionIdAsProcessed(transactionId string) {
+	if transactionId == "" {
+		return
+	}
+
+	// Don't acquire lock here since Save method already holds it
+	f.processedTransactionIds[transactionId] = true
+}
+
+// HasTransactionIdBeenProcessed checks if a transaction ID has been processed before
+// Returns true if the transaction has already been processed, false otherwise
+func (f *fakeResourceRepository) HasTransactionIdBeenProcessed(tx *gorm.DB, transactionId string) (bool, error) {
+	if transactionId == "" {
+		return false, nil
+	}
+
+	f.mu.RLock()
+	defer f.mu.RUnlock()
+
+	// Check if this transaction ID has been processed before
+	_, exists := f.processedTransactionIds[transactionId]
+	return exists, nil
 }

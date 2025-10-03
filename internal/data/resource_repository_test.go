@@ -1807,7 +1807,6 @@ func TestFindVersionedRepresentationsByVersion(t *testing.T) {
 				require.NoError(t, err)
 				updatedReporter, err := bizmodel.NewRepresentation(map[string]interface{}{"hostname": "h"})
 				require.NoError(t, err)
-
 				transactionId := bizmodel.NewTransactionId("test-transaction-id")
 				err = res.Update(key, "", "", nil, updatedReporter, updatedCommon, transactionId)
 				require.NoError(t, err)
@@ -1872,7 +1871,6 @@ func TestGetCurrentAndPreviousWorkspaceID_Integration(t *testing.T) {
 
 	for _, impl := range implementations {
 		t.Run(impl.name, func(t *testing.T) {
-
 			getFreshInstances := func() (ResourceRepository, *gorm.DB) {
 				if impl.name == "Fake Repository" {
 					return impl.repo(), impl.db()
@@ -1977,4 +1975,5 @@ func TestGetCurrentAndPreviousWorkspaceID_Integration(t *testing.T) {
 			})
 		})
 	}
+
 }

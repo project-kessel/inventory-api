@@ -268,6 +268,10 @@ func NewOutboxEventsFromResourceEvent(domainResourceEvent bizmodel.ResourceEvent
 	var err error
 
 	tuplePayload, err = convertResourceToTupleEvent(domainResourceEvent.ReporterResourceKey(), operationType, domainResourceEvent.CurrentCommonVersion(), domainResourceEvent.CurrentReporterRepresentationVersion())
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to convert resource to tuple event: %w", err)
+	}
+
 	switch operationType.OperationType() {
 	case biz.OperationTypeDeleted:
 		//TODO: Not publishing anything for resource event right now so we can decide what to publish correctly

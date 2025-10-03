@@ -1,6 +1,7 @@
 package model
 
 import (
+	"encoding/json"
 	"fmt"
 
 	"github.com/project-kessel/inventory-api/internal/biz"
@@ -64,4 +65,43 @@ func (te TupleEvent) CommonVersion() *Version {
 
 func (te TupleEvent) ReporterRepresentationVersion() *Version {
 	return te.reporterRepresentationVersion
+}
+
+// MarshalJSON implements json.Marshaler interface
+func (te TupleEvent) MarshalJSON() ([]byte, error) {
+	type tupleEventJSON struct {
+		ReporterResourceKey           ReporterResourceKey    `json:"reporter_resource_key"`
+		OperationType                 biz.EventOperationType `json:"operation_type"`
+		CommonVersion                 *Version               `json:"common_version,omitempty"`
+		ReporterRepresentationVersion *Version               `json:"reporter_representation_version,omitempty"`
+	}
+
+	return json.Marshal(tupleEventJSON{
+		ReporterResourceKey:           te.reporterResourceKey,
+		OperationType:                 te.operationType,
+		CommonVersion:                 te.commonVersion,
+		ReporterRepresentationVersion: te.reporterRepresentationVersion,
+	})
+}
+
+// UnmarshalJSON implements json.Unmarshaler interface
+func (te *TupleEvent) UnmarshalJSON(data []byte) error {
+	type tupleEventJSON struct {
+		ReporterResourceKey           ReporterResourceKey    `json:"reporter_resource_key"`
+		OperationType                 biz.EventOperationType `json:"operation_type"`
+		CommonVersion                 *Version               `json:"common_version,omitempty"`
+		ReporterRepresentationVersion *Version               `json:"reporter_representation_version,omitempty"`
+	}
+
+	var temp tupleEventJSON
+	if err := json.Unmarshal(data, &temp); err != nil {
+		return err
+	}
+
+	te.reporterResourceKey = temp.ReporterResourceKey
+	te.operationType = temp.OperationType
+	te.commonVersion = temp.CommonVersion
+	te.reporterRepresentationVersion = temp.ReporterRepresentationVersion
+
+	return nil
 }

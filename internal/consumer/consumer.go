@@ -808,25 +808,27 @@ func (i *InventoryConsumer) convertTupleToFilter(tuple model.RelationsTuple) (*v
 	}, nil
 }
 
-// convertFilterToTuple converts a v1beta1.RelationTupleFilter to model.RelationsTuple
-func (i *InventoryConsumer) convertFilterToTuple(filter *v1beta1.RelationTupleFilter) (model.RelationsTuple, error) {
-	// Extract resource information
-	resourceId, err := model.NewLocalResourceId(*filter.ResourceId)
-	if err != nil {
-		return model.RelationsTuple{}, fmt.Errorf("failed to create resource ID: %w", err)
-	}
-	resourceType := model.NewRelationsObjectType(*filter.ResourceType, *filter.ResourceNamespace)
-	resource := model.NewRelationsResource(resourceId, resourceType)
+//Unused at the moment but can be used to convert a v1beta1.RelationTupleFilter to model.RelationsTuple
 
-	// Extract subject information
-	subjectId, err := model.NewLocalResourceId(*filter.SubjectFilter.SubjectId)
-	if err != nil {
-		return model.RelationsTuple{}, fmt.Errorf("failed to create subject ID: %w", err)
-	}
-	subjectType := model.NewRelationsObjectType(*filter.SubjectFilter.SubjectType, *filter.SubjectFilter.SubjectNamespace)
-	subjectResource := model.NewRelationsResource(subjectId, subjectType)
-	subject := model.NewRelationsSubject(subjectResource)
+// // convertFilterToTuple converts a v1beta1.RelationTupleFilter to model.RelationsTuple
+// func (i *InventoryConsumer) convertFilterToTuple(filter *v1beta1.RelationTupleFilter) (model.RelationsTuple, error) {
+// 	// Extract resource information
+// 	resourceId, err := model.NewLocalResourceId(*filter.ResourceId)
+// 	if err != nil {
+// 		return model.RelationsTuple{}, fmt.Errorf("failed to create resource ID: %w", err)
+// 	}
+// 	resourceType := model.NewRelationsObjectType(*filter.ResourceType, *filter.ResourceNamespace)
+// 	resource := model.NewRelationsResource(resourceId, resourceType)
 
-	// Create the tuple
-	return model.NewRelationsTuple(resource, *filter.Relation, subject), nil
-}
+// 	// Extract subject information
+// 	subjectId, err := model.NewLocalResourceId(*filter.SubjectFilter.SubjectId)
+// 	if err != nil {
+// 		return model.RelationsTuple{}, fmt.Errorf("failed to create subject ID: %w", err)
+// 	}
+// 	subjectType := model.NewRelationsObjectType(*filter.SubjectFilter.SubjectType, *filter.SubjectFilter.SubjectNamespace)
+// 	subjectResource := model.NewRelationsResource(subjectId, subjectType)
+// 	subject := model.NewRelationsSubject(subjectResource)
+
+// 	// Create the tuple
+// 	return model.NewRelationsTuple(resource, *filter.Relation, subject), nil
+// }

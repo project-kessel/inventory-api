@@ -6,18 +6,24 @@ import (
 	"testing"
 
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
+	"github.com/project-kessel/inventory-api/internal/data"
 	"github.com/project-kessel/inventory-api/internal/metricscollector"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/otel"
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
 
 	"github.com/project-kessel/inventory-api/internal/biz"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
+	"github.com/project-kessel/inventory-api/internal/biz/model_legacy"
+	usecase_resources "github.com/project-kessel/inventory-api/internal/biz/usecase/resources"
+	datamodel "github.com/project-kessel/inventory-api/internal/data/model"
 	"github.com/project-kessel/inventory-api/internal/mocks"
 
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
 	"github.com/stretchr/testify/assert"
-	"gorm.io/gorm"
 
 	. "github.com/project-kessel/inventory-api/cmd/common"
 	"github.com/project-kessel/inventory-api/internal/authz"
@@ -32,6 +38,20 @@ const (
 	testDeleteMessage         = `{"schema":{"type":"string","optional":false,"name":"io.debezium.data.Json","version":1},"payload":{"resource_id":"4321","resource_type":"integration","resource_namespace":"notifications","relation":"t_workspace","subject_filter":{"subject_type":"workspace","subject_namespace":"rbac","subject_id":"1234"}}}`
 )
 
+func setupInMemoryDB(t *testing.T) *gorm.DB {
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	require.NoError(t, err)
+
+	err = db.AutoMigrate(&datamodel.Resource{}, &datamodel.ReporterResource{},
+		&datamodel.ReporterRepresentation{}, &datamodel.CommonRepresentation{},
+		&model_legacy.OutboxEvent{})
+	require.NoError(t, err)
+
+	// Remove test data - we'll use a different approach
+
+	return db
+}
+
 type TestCase struct {
 	name            string
 	description     string
@@ -44,7 +64,7 @@ type TestCase struct {
 }
 
 // TestSetup creates a test struct that calls most of the initial constructor methods we intend to test in unit tests.
-func (t *TestCase) TestSetup() []error {
+func (t *TestCase) TestSetup(testingT *testing.T) []error {
 	t.options = NewOptions()
 	t.options.BootstrapServers = []string{"localhost:9092"}
 	t.config = NewConfig(t.options)
@@ -77,10 +97,23 @@ func (t *TestCase) TestSetup() []error {
 	authorizer.On("DeleteTuples", mock.Anything, mock.Anything).Return(deleteTupleResponse, nil)
 
 	consumer := &mocks.MockConsumer{}
-	t.inv, err = New(cfg, &gorm.DB{}, authz.CompletedConfig{}, authorizer, notifier, t.logger, consumer)
+	db := setupInMemoryDB(testingT)
+
+	// Create consumer with real database first
+	t.inv, err = New(cfg, db, authz.CompletedConfig{}, authorizer, notifier, t.logger, consumer)
 	if err != nil {
 		errs = append(errs, err)
+		return errs
 	}
+
+	// Override ResourceService with fake repository for testing
+	fakeRepo := data.NewFakeResourceRepositoryWithWorkspaceOverrides("test-workspace-123", "")
+	usecaseConfig := &usecase_resources.UsecaseConfig{
+		ReadAfterWriteEnabled: false,
+		ConsumerEnabled:       false,
+	}
+	t.inv.ResourceService = usecase_resources.New(fakeRepo, nil, nil, nil, nil, "test-topic", t.logger.Logger(), nil, nil, usecaseConfig)
+
 	err = t.metrics.New(otel.Meter("github.com/project-kessel/inventory-api/blob/main/internal/server/otel"))
 	if err != nil {
 		errs = append(errs, err)
@@ -89,48 +122,12 @@ func (t *TestCase) TestSetup() []error {
 	return errs
 }
 
-func makeTuple() *v1beta1.Relationship {
-	return &v1beta1.Relationship{
-		Resource: &v1beta1.ObjectReference{
-			Type: &v1beta1.ObjectType{
-				Namespace: "notifications",
-				Name:      "integration",
-			},
-			Id: "4321",
-		},
-		Relation: "t_workspace",
-		Subject: &v1beta1.SubjectReference{
-			Subject: &v1beta1.ObjectReference{
-				Type: &v1beta1.ObjectType{
-					Namespace: "rbac",
-					Name:      "workspace",
-				},
-				Id: "1234",
-			},
-		},
-	}
-}
-
-func makeFilter() *v1beta1.RelationTupleFilter {
-	return &v1beta1.RelationTupleFilter{
-		ResourceNamespace: ToPointer("notifications"),
-		ResourceType:      ToPointer("integration"),
-		ResourceId:        ToPointer("4321"),
-		Relation:          ToPointer("t_workspace"),
-		SubjectFilter: &v1beta1.SubjectFilter{
-			SubjectNamespace: ToPointer("rbac"),
-			SubjectType:      ToPointer("workspace"),
-			SubjectId:        ToPointer("1234"),
-		},
-	}
-}
-
 func TestNewConsumerSetup(t *testing.T) {
 	test := TestCase{
 		name:        "TestNewConsumerSetup",
 		description: "ensures setting up a new consumer, including options and configs functions",
 	}
-	errs := test.TestSetup()
+	errs := test.TestSetup(t)
 	assert.Nil(t, errs)
 }
 
@@ -289,7 +286,7 @@ func TestInventoryConsumer_Retry(t *testing.T) {
 				name:        "TestInventoryConsumer-Retry",
 				description: test.description,
 			}
-			errs := tester.TestSetup()
+			errs := tester.TestSetup(t)
 			assert.Nil(t, errs)
 
 			result, err := tester.inv.Retry(test.funcToExecute, tester.inv.MetricsCollector.MsgProcessFailures)
@@ -356,7 +353,7 @@ func TestInventoryConsumer_ProcessMessage(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			tester := TestCase{}
-			errs := tester.TestSetup()
+			errs := tester.TestSetup(t)
 			assert.Nil(t, errs)
 
 			headers := []kafka.Header{
@@ -466,7 +463,7 @@ func TestCommitStoredOffsets(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			tester := TestCase{}
-			errs := tester.TestSetup()
+			errs := tester.TestSetup(t)
 			assert.Nil(t, errs)
 
 			c := &mocks.MockConsumer{}
@@ -534,7 +531,7 @@ func TestRebalanceCallback_AssignedPartitions(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			tester := TestCase{}
-			errs := tester.TestSetup()
+			errs := tester.TestSetup(t)
 			assert.Nil(t, errs)
 
 			authorizer := &mocks.MockAuthz{}
@@ -649,7 +646,7 @@ func TestRebalanceCallback_RevokedPartitions(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			tester := TestCase{}
-			errs := tester.TestSetup()
+			errs := tester.TestSetup(t)
 			assert.Nil(t, errs)
 
 			consumer := &mocks.MockConsumer{}
@@ -683,12 +680,12 @@ func TestRebalanceCallback_RevokedPartitions(t *testing.T) {
 func TestFencingToken_WritingAfterRebalance(t *testing.T) {
 	// Setup two consumers
 	testerA := TestCase{}
-	errsA := testerA.TestSetup()
+	errsA := testerA.TestSetup(t)
 	assert.Nil(t, errsA)
 	testerA.inv.Config.ConsumerGroupID = "test-group"
 
 	testerB := TestCase{}
-	errsB := testerB.TestSetup()
+	errsB := testerB.TestSetup(t)
 	assert.Nil(t, errsB)
 	testerB.inv.Config.ConsumerGroupID = "test-group"
 
@@ -771,7 +768,7 @@ func TestFencingToken_WritingAfterRebalance(t *testing.T) {
 
 func TestInventoryConsumer_CreateTuple_FailedPrecondition(t *testing.T) {
 	tester := TestCase{}
-	errs := tester.TestSetup()
+	errs := tester.TestSetup(t)
 	assert.Nil(t, errs)
 
 	authorizer := &mocks.MockAuthz{}
@@ -806,7 +803,7 @@ func TestInventoryConsumer_CreateTuple_FailedPrecondition(t *testing.T) {
 
 func TestInventoryConsumer_UpdateTuple_FailedPrecondition(t *testing.T) {
 	tester := TestCase{}
-	errs := tester.TestSetup()
+	errs := tester.TestSetup(t)
 	assert.Nil(t, errs)
 
 	authorizer := &mocks.MockAuthz{}
@@ -841,7 +838,7 @@ func TestInventoryConsumer_UpdateTuple_FailedPrecondition(t *testing.T) {
 
 func TestInventoryConsumer_DeleteTuple_FailedPrecondition(t *testing.T) {
 	tester := TestCase{}
-	errs := tester.TestSetup()
+	errs := tester.TestSetup(t)
 	assert.Nil(t, errs)
 
 	authorizer := &mocks.MockAuthz{}

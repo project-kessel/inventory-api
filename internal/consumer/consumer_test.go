@@ -6,17 +6,20 @@ import (
 	"testing"
 
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
+	"github.com/google/uuid"
 	"github.com/project-kessel/inventory-api/internal/metricscollector"
 	"github.com/stretchr/testify/mock"
 	"go.opentelemetry.io/otel"
 
 	"github.com/project-kessel/inventory-api/internal/biz"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
+	datamodel "github.com/project-kessel/inventory-api/internal/data/model"
 	"github.com/project-kessel/inventory-api/internal/mocks"
 
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
 	"github.com/stretchr/testify/assert"
+	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 
 	. "github.com/project-kessel/inventory-api/cmd/common"
@@ -28,8 +31,8 @@ import (
 
 const (
 	testMessageKey            = `{"schema":{"type":"string","optional":false},"payload":"00000000-0000-0000-0000-000000000000"}`
-	testCreateOrUpdateMessage = `{"schema":{"type":"string","optional":false,"name":"io.debezium.data.Json","version":1},"payload":{"subject":{"subject":{"id":"1234", "type":{"name":"workspace","namespace":"rbac"}}},"relation":"t_workspace","resource":{"id":"4321","type":{"name":"integration","namespace":"notifications"}}}}`
-	testDeleteMessage         = `{"schema":{"type":"string","optional":false,"name":"io.debezium.data.Json","version":1},"payload":{"resource_id":"4321","resource_type":"integration","resource_namespace":"notifications","relation":"t_workspace","subject_filter":{"subject_type":"workspace","subject_namespace":"rbac","subject_id":"1234"}}}`
+	testCreateOrUpdateMessage = `{"schema":{"type":"string","optional":false,"name":"io.debezium.data.Json","version":1},"payload":{"reporterResourceKey":{"localResourceID":"test-resource","resourceType":"integration","reporter":{"reporterType":"notifications","reporterInstanceId":"test-instance"}},"operationType":"created","commonVersion":1,"reporterRepresentationVersion":null}}`
+	testDeleteMessage         = `{"schema":{"type":"string","optional":false,"name":"io.debezium.data.Json","version":1},"payload":{"reporterResourceKey":{"localResourceID":"test-resource","resourceType":"integration","reporter":{"reporterType":"notifications","reporterInstanceId":"test-instance"}},"operationType":"deleted","commonVersion":1,"reporterRepresentationVersion":null}}`
 )
 
 type TestCase struct {
@@ -76,8 +79,59 @@ func (t *TestCase) TestSetup() []error {
 	authorizer.On("CreateTuples", mock.Anything, mock.Anything).Return(createTupleResponse, nil)
 	authorizer.On("DeleteTuples", mock.Anything, mock.Anything).Return(deleteTupleResponse, nil)
 
+	// Set up in-memory SQLite database for testing
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	if err != nil {
+		errs = append(errs, err)
+		return errs
+	}
+
+	// Auto-migrate the tables needed for the tests
+	err = db.AutoMigrate(&datamodel.Resource{}, &datamodel.ReporterResource{}, &datamodel.CommonRepresentation{})
+	if err != nil {
+		errs = append(errs, err)
+		return errs
+	}
+
+	// Create test data that matches the test messages
+	testResourceId := uuid.MustParse("00000000-0000-0000-0000-000000000000")
+	testReporterResourceId := uuid.New()
+
+	// Create test reporter resource
+	reporterResource := datamodel.ReporterResource{
+		ID: testReporterResourceId,
+		ReporterResourceKey: datamodel.ReporterResourceKey{
+			LocalResourceID:    "test-resource",
+			ResourceType:       "integration",
+			ReporterType:       "notifications",
+			ReporterInstanceID: "test-instance",
+		},
+		ResourceID: testResourceId,
+	}
+
+	// Create test common representation with workspace_id
+	commonRep := datamodel.CommonRepresentation{
+		ResourceId: testResourceId,
+		Version:    1,
+		Representation: datamodel.Representation{
+			Data: map[string]interface{}{
+				"workspace_id": "test-workspace-123",
+			},
+		},
+	}
+
+	// Save test data
+	if err := db.Create(&reporterResource).Error; err != nil {
+		errs = append(errs, err)
+		return errs
+	}
+	if err := db.Create(&commonRep).Error; err != nil {
+		errs = append(errs, err)
+		return errs
+	}
+
 	consumer := &mocks.MockConsumer{}
-	t.inv, err = New(cfg, &gorm.DB{}, authz.CompletedConfig{}, authorizer, notifier, t.logger, consumer)
+	t.inv, err = New(cfg, db, authz.CompletedConfig{}, authorizer, notifier, t.logger, consumer)
 	if err != nil {
 		errs = append(errs, err)
 	}

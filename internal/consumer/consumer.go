@@ -128,6 +128,9 @@ func New(config CompletedConfig, db *gorm.DB, authz authz.CompletedConfig, autho
 
 	var errChan chan error
 
+	// Initialize ResourceService for tuple processing
+	resourceService := usecase_resources.NewUsecase(db, logger)
+
 	return InventoryConsumer{
 		Consumer:           consumer,
 		OffsetStorage:      make([]kafka.TopicPartition, 0),

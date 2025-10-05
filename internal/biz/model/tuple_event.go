@@ -87,10 +87,10 @@ func (te TupleEvent) MarshalJSON() ([]byte, error) {
 // UnmarshalJSON implements json.Unmarshaler interface
 func (te *TupleEvent) UnmarshalJSON(data []byte) error {
 	type tupleEventJSON struct {
-		ReporterResourceKey           ReporterResourceKey    `json:"reporter_resource_key"`
-		OperationType                 biz.EventOperationType `json:"operation_type"`
-		CommonVersion                 *Version               `json:"common_version,omitempty"`
-		ReporterRepresentationVersion *Version               `json:"reporter_representation_version,omitempty"`
+		ReporterResourceKey           ReporterResourceKey `json:"reporter_resource_key"`
+		OperationType                 string              `json:"operation_type"`
+		CommonVersion                 *Version            `json:"common_version,omitempty"`
+		ReporterRepresentationVersion *Version            `json:"reporter_representation_version,omitempty"`
 	}
 
 	var temp tupleEventJSON
@@ -98,8 +98,19 @@ func (te *TupleEvent) UnmarshalJSON(data []byte) error {
 		return err
 	}
 
+	// Convert string to concrete EventOperationType
+	switch temp.OperationType {
+	case "created":
+		te.operationType = biz.NewOperationTypeCreated()
+	case "updated":
+		te.operationType = biz.NewOperationTypeUpdated()
+	case "deleted":
+		te.operationType = biz.NewOperationTypeDeleted()
+	default:
+		return fmt.Errorf("invalid operation type: %s", temp.OperationType)
+	}
+
 	te.reporterResourceKey = temp.ReporterResourceKey
-	te.operationType = temp.OperationType
 	te.commonVersion = temp.CommonVersion
 	te.reporterRepresentationVersion = temp.ReporterRepresentationVersion
 

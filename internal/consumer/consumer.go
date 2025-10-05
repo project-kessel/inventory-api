@@ -308,7 +308,7 @@ func (i *InventoryConsumer) ProcessMessage(headers map[string]string, relationsE
 		i.Logger.Infof("processing message: operation=%s, txid=%s", operation, txid)
 		i.Logger.Debugf("processed message tuple=%s", msg.Value)
 		if relationsEnabled {
-			tupleEvent, err := ParseMessage(msg.Value)
+			tupleEvent, err := ParseMessage(msg.Value, operation)
 			if err != nil {
 				metricscollector.Incr(i.MetricsCollector.MsgProcessFailures, "ParseMessage", err)
 				i.Logger.Errorf("failed to parse message for tuple: %v", err)
@@ -333,7 +333,7 @@ func (i *InventoryConsumer) ProcessMessage(headers map[string]string, relationsE
 		i.Logger.Infof("processing message: operation=%s, txid=%s", operation, txid)
 		i.Logger.Debugf("processed message tuple=%s", msg.Value)
 		if relationsEnabled {
-			tupleEvent, err := ParseMessage(msg.Value)
+			tupleEvent, err := ParseMessage(msg.Value, operation)
 			if err != nil {
 				metricscollector.Incr(i.MetricsCollector.MsgProcessFailures, "ParseMessage", err)
 				i.Logger.Errorf("failed to parse message for tuple: %v", err)
@@ -357,7 +357,7 @@ func (i *InventoryConsumer) ProcessMessage(headers map[string]string, relationsE
 		i.Logger.Infof("processing message: operation=%s, txid=%s", operation, txid)
 		i.Logger.Debugf("processed message tuple=%s", msg.Value)
 		if relationsEnabled {
-			tupleEvent, err := ParseMessage(msg.Value)
+			tupleEvent, err := ParseMessage(msg.Value, operation)
 			if err != nil {
 				metricscollector.Incr(i.MetricsCollector.MsgProcessFailures, "ParseMessage", err)
 				i.Logger.Errorf("failed to parse message for tuple: %v", err)
@@ -409,9 +409,8 @@ func ParseHeaders(msg *kafka.Message) (map[string]string, error) {
 	return headers, nil
 }
 
-func ParseMessage(msg []byte) (*model.TupleEvent, error) {
+func ParseMessage(msg []byte, operationType string) (*model.TupleEvent, error) {
 	var msgPayload *MessagePayload
-	var tuple *model.TupleEvent
 
 	// msg value is expected to be a valid JSON body for a single relation
 	err := json.Unmarshal(msg, &msgPayload)
@@ -424,7 +423,25 @@ func ParseMessage(msg []byte) (*model.TupleEvent, error) {
 		return nil, fmt.Errorf("error marshaling tuple payload: %v", err)
 	}
 
-	err = json.Unmarshal(payloadJson, &tuple)
+	// Parse the payload into a map first, then inject the operation_type
+	var payloadMap map[string]interface{}
+	err = json.Unmarshal(payloadJson, &payloadMap)
+	if err != nil {
+		return nil, fmt.Errorf("error unmarshaling tuple payload to map: %v", err)
+	}
+
+	// Inject the operation_type from headers
+	payloadMap["operation_type"] = operationType
+
+	// Marshal back to JSON with the operation_type included
+	enrichedPayloadJson, err := json.Marshal(payloadMap)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling enriched tuple payload: %v", err)
+	}
+
+	// Now unmarshal into TupleEvent
+	var tuple *model.TupleEvent
+	err = json.Unmarshal(enrichedPayloadJson, &tuple)
 	if err != nil {
 		return nil, fmt.Errorf("error unmarshaling tuple payload: %v", err)
 	}

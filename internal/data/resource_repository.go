@@ -280,8 +280,14 @@ func (r *resourceRepository) FindVersionedRepresentationsByVersion(tx *gorm.DB, 
 		Joins("JOIN common_representations cr ON rr.resource_id = cr.resource_id").
 		Where("rr.local_resource_id = ?", key.LocalResourceId().Serialize()).
 		Where("LOWER(rr.resource_type) = LOWER(?)", key.ResourceType().Serialize()).
-		Where("LOWER(rr.reporter_type) = LOWER(?)", key.ReporterType().Serialize()).
-		Where("(cr.version = ? OR cr.version = ?)", currentVersion, currentVersion-1)
+		Where("LOWER(rr.reporter_type) = LOWER(?)", key.ReporterType().Serialize())
+
+	// Handle version conditions to avoid uint underflow
+	if currentVersion == 0 {
+		query = query.Where("cr.version = ?", currentVersion)
+	} else {
+		query = query.Where("(cr.version = ? OR cr.version = ?)", currentVersion, currentVersion-1)
+	}
 
 	// Only add reporter_instance_id condition if it's not empty
 	if reporterInstanceId := key.ReporterInstanceId().Serialize(); reporterInstanceId != "" {

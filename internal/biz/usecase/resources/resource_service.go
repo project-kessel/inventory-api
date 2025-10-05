@@ -949,7 +949,7 @@ func (uc *Usecase) getWorkspaceVersions(key model.ReporterResourceKey, currentVe
 		nil, key, currentVersion,
 	)
 	if err != nil {
-		return []data.RepresentationsByVersion{}, fmt.Errorf("failed to find common representations: %w", err)
+		return []data.RepresentationsByVersion{}, fmt.Errorf("failed to find representations: %w", err)
 	}
 	return representations, nil
 }

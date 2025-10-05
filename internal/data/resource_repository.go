@@ -278,14 +278,14 @@ func (r *resourceRepository) FindVersionedRepresentationsByVersion(tx *gorm.DB, 
 	query := db.Table("reporter_resources rr").
 		Select("cr.data, cr.version").
 		Joins("JOIN common_representations cr ON rr.resource_id = cr.resource_id").
-		Where("LOWER(rr.local_resource_id) = LOWER(?)", key.LocalResourceId().Serialize()).
+		Where("rr.local_resource_id = ?", key.LocalResourceId().Serialize()).
 		Where("LOWER(rr.resource_type) = LOWER(?)", key.ResourceType().Serialize()).
 		Where("LOWER(rr.reporter_type) = LOWER(?)", key.ReporterType().Serialize()).
 		Where("(cr.version = ? OR cr.version = ?)", currentVersion, currentVersion-1)
 
 	// Only add reporter_instance_id condition if it's not empty
 	if reporterInstanceId := key.ReporterInstanceId().Serialize(); reporterInstanceId != "" {
-		query = query.Where("LOWER(rr.reporter_instance_id) = LOWER(?)", reporterInstanceId)
+		query = query.Where("rr.reporter_instance_id = ?", reporterInstanceId)
 	}
 
 	err := query.Find(&results).Error

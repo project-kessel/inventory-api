@@ -896,14 +896,20 @@ func (uc *Usecase) createWorkspaceTuple(workspaceID string, key model.ReporterRe
 	// Create RelationsResource for the main resource
 	resourceId := key.LocalResourceId()
 	resourceType := key.ResourceType()
+	reporterType := key.ReporterType()
+
+	// Use reporter type as namespace (lowercase)
+	namespace := strings.ToLower(reporterType.String())
+
 	resourceObjectType := model.NewRelationsObjectType(
 		strings.ToLower(resourceType.String()),
-		"", // Default namespace for resource types
+		namespace,
 	)
 	resource := model.NewRelationsResource(resourceId, resourceObjectType)
 
 	// Create RelationsResource for the workspace subject
-	workspaceSubjectId, _ := model.NewLocalResourceId(fmt.Sprintf("%s:%s", rbacPrefix, workspaceID))
+	// The subject ID should just be the workspace ID without the prefix
+	workspaceSubjectId, _ := model.NewLocalResourceId(workspaceID)
 	workspaceObjectType := model.NewRelationsObjectType(workspaceRelation, rbacNamespace)
 	workspaceSubject := model.NewRelationsResource(workspaceSubjectId, workspaceObjectType)
 	subject := model.NewRelationsSubject(workspaceSubject)

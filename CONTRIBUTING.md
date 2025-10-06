@@ -29,3 +29,34 @@ For vscode users, you can set up your editor to use `goimports` for auto-formatt
 ```
 
 For jetbrains users see https://www.jetbrains.com/help/go/integration-with-go-tools.html#goimports
+
+## Schema Changes
+
+When making changes to schema configuration files in `data/schema/`, you **must** rebuild and commit the resources tarball. This ensures that schema changes are properly captured and consumable in deployments.
+
+### Required Steps for Schema Changes
+
+1. Make your changes to files in `data/schema/resources/`
+2. Rebuild the tarball and update deployment configs:
+   ```bash
+   make build-schemas
+   ```
+3. Stage and commit both the schema changes and generated files:
+   ```bash
+   git add data/schema/ resources.tar.gz deploy/kessel-inventory-ephem.yaml
+   git commit -m "Update schema: <description of changes>"
+   ```
+
+### Verification
+
+Before pushing your PR, you can verify that your schema changes are properly synchronized:
+
+```bash
+./scripts/verify-schema-tarball.sh
+```
+
+This check is also enforced automatically in CI. PRs that modify schema files without updating the tarball will fail the `Verify Schema Tarball` check.
+
+### Why This Matters
+
+The `resources.tar.gz` file is used in production deployments as a ConfigMap. If schema changes aren't reflected in the tarball, those changes won't be available to running services, potentially causing deployment failures or runtime errors.

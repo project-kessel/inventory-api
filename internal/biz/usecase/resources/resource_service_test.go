@@ -405,7 +405,7 @@ func TestCalculateTuples(t *testing.T) {
 			expectTuplesToCreate:   true,
 			expectTuplesToDelete:   false,
 			expectedCreateResource: "host:test-resource",
-			expectedCreateSubject:  "rbac:workspace:workspace-initial",
+			expectedCreateSubject:  "workspace-initial",
 		},
 		{
 			name:                   "workspace change creates and deletes tuples",
@@ -416,8 +416,8 @@ func TestCalculateTuples(t *testing.T) {
 			expectTuplesToDelete:   true,
 			expectedCreateResource: "host:test-resource",
 			expectedDeleteResource: "host:test-resource",
-			expectedCreateSubject:  "rbac:workspace:workspace-new",
-			expectedDeleteSubject:  "rbac:workspace:workspace-old",
+			expectedCreateSubject:  "workspace-new",
+			expectedDeleteSubject:  "workspace-old",
 		},
 		{
 			name:                   "workspace change creates and deletes tuples version 1",
@@ -428,10 +428,9 @@ func TestCalculateTuples(t *testing.T) {
 			expectTuplesToDelete:   true,
 			expectedCreateResource: "host:test-resource",
 			expectedDeleteResource: "host:test-resource",
-			expectedCreateSubject:  "rbac:workspace:workspace-new",
-			expectedDeleteSubject:  "rbac:workspace:workspace-old",
+			expectedCreateSubject:  "workspace-new",
+			expectedDeleteSubject:  "workspace-old",
 		},
-
 		{
 			name:                 "same workspace does not create or delete tuples",
 			version:              2,

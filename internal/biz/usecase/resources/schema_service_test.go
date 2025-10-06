@@ -84,7 +84,7 @@ func TestCalculateTuples(t *testing.T) {
 			tupleEvent, err := model.NewTupleEvent(key, biz.OperationTypeCreated, &version, nil)
 			require.NoError(t, err)
 
-			result, err := sc.CalculateTuples(tupleEvent)
+			result, err := sc.CalculateTuples(tupleEvent, biz.OperationTypeCreated)
 			require.NoError(t, err)
 			assert.Equal(t, tt.expectTuplesToCreate, result.HasTuplesToCreate())
 			assert.Equal(t, tt.expectTuplesToDelete, result.HasTuplesToDelete())
@@ -136,9 +136,10 @@ func TestGetWorkspaceVersions(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	result, err := sc.getWorkspaceVersions(key, 1)
+	version := uint(1)
+	representations, err := sc.resourceRepository.FindCurrentAndPreviousVersionedRepresentations(nil, key, &version, biz.OperationTypeUpdated)
 	require.NoError(t, err)
-	assert.NotEmpty(t, result)
+	assert.NotEmpty(t, representations)
 }
 
 func TestCreateWorkspaceTuple(t *testing.T) {
@@ -234,7 +235,8 @@ func TestDetermineTupleOperations(t *testing.T) {
 		},
 	}
 
-	result, err := sc.determineTupleOperations(representationVersion, 2, key)
+	currentWorkspaceID, previousWorkspaceID := data.GetCurrentAndPreviousWorkspaceID(representationVersion, 2)
+	result, err := sc.buildTuplesToReplicate(currentWorkspaceID, previousWorkspaceID, key)
 	require.NoError(t, err)
 
 	assert.True(t, result.HasTuplesToCreate() || result.HasTuplesToDelete())

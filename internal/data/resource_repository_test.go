@@ -1932,7 +1932,8 @@ func TestFindVersionedRepresentationsByVersion(t *testing.T) {
 			// Act: query for current (1) and previous (0)
 			key, err := bizmodel.NewReporterResourceKey("localResourceId-1", "host", "hbi", "hbi-instance-1")
 			require.NoError(t, err)
-			results, err := repo.FindVersionedRepresentationsByVersion(db, key, 1)
+			version := uint(1)
+			results, err := repo.FindCurrentAndPreviousVersionedRepresentations(db, key, &version, biz.OperationTypeUpdated)
 			require.NoError(t, err)
 
 			require.Len(t, results, 2)
@@ -2022,7 +2023,8 @@ func TestGetCurrentAndPreviousWorkspaceID_Integration(t *testing.T) {
 					require.NoError(t, repo.Save(db, resource, biz.OperationTypeUpdated, "tx-ws-update"))
 
 					// Get the versioned representations
-					representations, err := repo.FindVersionedRepresentationsByVersion(db, key, 1)
+					version := uint(1)
+					representations, err := repo.FindCurrentAndPreviousVersionedRepresentations(db, key, &version, biz.OperationTypeUpdated)
 					require.NoError(t, err)
 
 					// Test the GetCurrentAndPreviousWorkspaceID function
@@ -2035,7 +2037,8 @@ func TestGetCurrentAndPreviousWorkspaceID_Integration(t *testing.T) {
 					require.NoError(t, err)
 
 					// Test version 1 scenario (should return current and previous)
-					representations, err := repo.FindVersionedRepresentationsByVersion(db, key, 1)
+					version := uint(1)
+					representations, err := repo.FindCurrentAndPreviousVersionedRepresentations(db, key, &version, biz.OperationTypeUpdated)
 					require.NoError(t, err)
 
 					currentWS, previousWS := GetCurrentAndPreviousWorkspaceID(representations, 1)
@@ -2058,7 +2061,8 @@ func TestGetCurrentAndPreviousWorkspaceID_Integration(t *testing.T) {
 				}
 
 				// Get version 0 representations
-				representations, err := repo.FindVersionedRepresentationsByVersion(db, key, 0)
+				version := uint(0)
+				representations, err := repo.FindCurrentAndPreviousVersionedRepresentations(db, key, &version, biz.OperationTypeCreated)
 				require.NoError(t, err)
 
 				currentWS, previousWS := GetCurrentAndPreviousWorkspaceID(representations, 0)

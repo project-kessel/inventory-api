@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/go-kratos/kratos/v2/log"
+	"github.com/project-kessel/inventory-api/internal/biz"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
 	"github.com/project-kessel/inventory-api/internal/data"
 )
@@ -20,23 +21,52 @@ func NewSchemaUsecase(resourceRepository data.ResourceRepository, logger *log.He
 	}
 }
 
-func (sc *SchemaUsecase) CalculateTuples(tupleEvent model.TupleEvent) (model.TuplesToReplicate, error) {
+func (sc *SchemaUsecase) CalculateTuples(tupleEvent model.TupleEvent, operationType biz.EventOperationType) (model.TuplesToReplicate, error) {
 
-	currentVersion := tupleEvent.CommonVersion().Uint()
-	key := tupleEvent.ReporterResourceKey()
+	sc.Log.Infof("Calculating Tuples for operationType and event: %d, key: %+v", operationType, tupleEvent)
 
-	sc.Log.Infof("CalculateTuples called - version: %d, key: %+v", currentVersion, key)
-
-	versionedRepresentations, err := sc.getWorkspaceVersions(key, currentVersion)
-	if err != nil {
-		return model.TuplesToReplicate{}, err
+	switch operationType.OperationType() {
+	case biz.OperationTypeDeleted:
+		return sc.processDeleteTupleEvent(tupleEvent)
+	default:
+		return sc.processReportTupleEvent(tupleEvent)
 	}
-	return sc.determineTupleOperations(versionedRepresentations, currentVersion, key)
 }
 
-func (sc *SchemaUsecase) determineTupleOperations(representationsByVersion []data.RepresentationsByVersion, currentVersion uint, key model.ReporterResourceKey) (model.TuplesToReplicate, error) {
-	currentWorkspaceID, previousWorkspaceID := data.GetCurrentAndPreviousWorkspaceID(representationsByVersion, currentVersion)
+func (sc *SchemaUsecase) processReportTupleEvent(tupleEvent model.TupleEvent) (model.TuplesToReplicate, error) {
+	key := tupleEvent.ReporterResourceKey()
 
+	if tupleEvent.CommonVersion() == nil {
+		return model.TuplesToReplicate{}, nil
+	}
+
+	version := tupleEvent.CommonVersion().Uint()
+	currentVersion := &version
+
+	representations, err := sc.resourceRepository.FindCurrentAndPreviousVersionedRepresentations(
+		nil, key, currentVersion, biz.OperationTypeUpdated,
+	)
+	if err != nil {
+		return model.TuplesToReplicate{}, fmt.Errorf("failed to find representations: %w", err)
+	}
+
+	currentWorkspaceID, previousWorkspaceID := data.GetCurrentAndPreviousWorkspaceID(representations, version)
+	return sc.buildTuplesToReplicate(currentWorkspaceID, previousWorkspaceID, key)
+}
+
+func (sc *SchemaUsecase) processDeleteTupleEvent(tupleEvent model.TupleEvent) (model.TuplesToReplicate, error) {
+	key := tupleEvent.ReporterResourceKey()
+
+	representation, err := sc.resourceRepository.FindLatestRepresentations(nil, key)
+	if err != nil {
+		return model.TuplesToReplicate{}, fmt.Errorf("failed to find representations: %w", err)
+	}
+
+	currentWorkspaceID := data.ExtractWorkspaceID(representation)
+	return sc.buildTuplesToReplicate("", currentWorkspaceID, key)
+}
+
+func (sc *SchemaUsecase) buildTuplesToReplicate(currentWorkspaceID, previousWorkspaceID string, key model.ReporterResourceKey) (model.TuplesToReplicate, error) {
 	if previousWorkspaceID != "" && previousWorkspaceID == currentWorkspaceID {
 		return model.TuplesToReplicate{}, nil
 	}
@@ -51,23 +81,5 @@ func (sc *SchemaUsecase) determineTupleOperations(representationsByVersion []dat
 		tuplesToDelete = append(tuplesToDelete, model.NewWorkspaceRelationsTuple(previousWorkspaceID, key))
 	}
 
-	var createPtr, deletePtr *[]model.RelationsTuple
-	if len(tuplesToCreate) > 0 {
-		createPtr = &tuplesToCreate
-	}
-	if len(tuplesToDelete) > 0 {
-		deletePtr = &tuplesToDelete
-	}
-
-	return model.NewTuplesToReplicate(createPtr, deletePtr)
-}
-
-func (sc *SchemaUsecase) getWorkspaceVersions(key model.ReporterResourceKey, currentVersion uint) ([]data.RepresentationsByVersion, error) {
-	representations, err := sc.resourceRepository.FindVersionedRepresentationsByVersion(
-		nil, key, currentVersion,
-	)
-	if err != nil {
-		return []data.RepresentationsByVersion{}, fmt.Errorf("failed to find representations: %w", err)
-	}
-	return representations, nil
+	return model.NewTuplesToReplicate(tuplesToCreate, tuplesToDelete)
 }

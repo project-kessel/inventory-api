@@ -317,7 +317,7 @@ func (i *InventoryConsumer) ProcessMessage(headers map[string]string, relationsE
 				return "", err
 			}
 			resp, err := i.Retry(func() (string, error) {
-				tuplesToReplicate, err := i.SchemaService.CalculateTuples(*tupleEvent)
+				tuplesToReplicate, err := i.SchemaService.CalculateTuples(*tupleEvent, biz.OperationTypeCreated)
 				if err != nil {
 					return "", err
 				}
@@ -342,7 +342,7 @@ func (i *InventoryConsumer) ProcessMessage(headers map[string]string, relationsE
 				return "", err
 			}
 			resp, err := i.Retry(func() (string, error) {
-				tuplesToReplicate, err := i.SchemaService.CalculateTuples(*tupleEvent)
+				tuplesToReplicate, err := i.SchemaService.CalculateTuples(*tupleEvent, biz.OperationTypeUpdated)
 				if err != nil {
 					return "", err
 				}
@@ -367,7 +367,7 @@ func (i *InventoryConsumer) ProcessMessage(headers map[string]string, relationsE
 			}
 
 			_, err = i.Retry(func() (string, error) {
-				tuplesToReplicate, err := i.SchemaService.CalculateTuples(*tupleEvent)
+				tuplesToReplicate, err := i.SchemaService.CalculateTuples(*tupleEvent, biz.OperationTypeDeleted)
 				if err != nil {
 					return "", err
 				}

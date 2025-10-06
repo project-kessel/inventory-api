@@ -35,9 +35,17 @@ type RepresentationsByVersion struct {
 }
 
 // GetCurrentAndPreviousWorkspaceID extracts current and previous workspace IDs from a slice of RepresentationsByVersion
+func ExtractWorkspaceID(repr RepresentationsByVersion) string {
+	if workspaceID, exists := repr.Data["workspace_id"].(string); exists && workspaceID != "" {
+		return workspaceID
+	}
+	return ""
+}
+
 func GetCurrentAndPreviousWorkspaceID(representations []RepresentationsByVersion, currentVersion uint) (currentWorkspaceID, previousWorkspaceID string) {
 	for _, repr := range representations {
-		if workspaceID, exists := repr.Data["workspace_id"].(string); exists && workspaceID != "" {
+		workspaceID := ExtractWorkspaceID(repr)
+		if workspaceID != "" {
 			switch repr.Version {
 			case currentVersion:
 				currentWorkspaceID = workspaceID
@@ -104,7 +112,8 @@ type ResourceRepository interface {
 	NextReporterResourceId() (bizmodel.ReporterResourceId, error)
 	Save(tx *gorm.DB, resource bizmodel.Resource, operationType biz.EventOperationType, txid string) error
 	FindResourceByKeys(tx *gorm.DB, key bizmodel.ReporterResourceKey) (*bizmodel.Resource, error)
-	FindVersionedRepresentationsByVersion(tx *gorm.DB, key bizmodel.ReporterResourceKey, currentVersion uint) ([]RepresentationsByVersion, error)
+	FindCurrentAndPreviousVersionedRepresentations(tx *gorm.DB, key bizmodel.ReporterResourceKey, currentVersion *uint, operationType biz.EventOperationType) ([]RepresentationsByVersion, error)
+	FindLatestRepresentations(tx *gorm.DB, key bizmodel.ReporterResourceKey) (RepresentationsByVersion, error)
 	GetDB() *gorm.DB
 	GetTransactionManager() usecase.TransactionManager
 	HasTransactionIdBeenProcessed(tx *gorm.DB, transactionId string) (bool, error)
@@ -176,7 +185,7 @@ func (r *resourceRepository) Save(tx *gorm.DB, resource bizmodel.Resource, opera
 	switch operationType {
 	case biz.OperationTypeDeleted:
 		deleteEvents := resource.ResourceDeleteEvents()
-		log.Info("DeleteEvents to publish to outbox : %+v", deleteEvents)
+		log.Infof("DeleteEvents to publish to outbox : %+v", deleteEvents)
 		if len(deleteEvents) == 0 {
 			// No delete events to process (e.g., resource was already tombstoned)
 			return nil
@@ -279,9 +288,11 @@ func (r *resourceRepository) GetTransactionManager() usecase.TransactionManager 
 	return r.transactionManager
 }
 
-// TODO this needs to be expanded to include the reporter representations
-// FindVersionedRepresentationsByVersion finds the common representations by version
-func (r *resourceRepository) FindVersionedRepresentationsByVersion(tx *gorm.DB, key bizmodel.ReporterResourceKey, currentVersion uint) ([]RepresentationsByVersion, error) {
+func (r *resourceRepository) FindCurrentAndPreviousVersionedRepresentations(tx *gorm.DB, key bizmodel.ReporterResourceKey, currentCommonVersion *uint, operationType biz.EventOperationType) ([]RepresentationsByVersion, error) {
+	if currentCommonVersion == nil {
+		return []RepresentationsByVersion{}, nil
+	}
+
 	var results []RepresentationsByVersion
 
 	db := r.getDBSession(tx)
@@ -292,10 +303,11 @@ func (r *resourceRepository) FindVersionedRepresentationsByVersion(tx *gorm.DB, 
 
 	query = r.buildReporterResourceKeyQuery(query, key)
 
-	if currentVersion == 0 {
-		query = query.Where("cr.version = ?", currentVersion)
+	if operationType.OperationType() == biz.OperationTypeCreated {
+		query = query.Where("cr.version = ?", *currentCommonVersion)
 	} else {
-		query = query.Where("(cr.version = ? OR cr.version = ?)", currentVersion, currentVersion-1)
+		query = query.Where("(cr.version = ? OR cr.version = ?)", *currentCommonVersion, *currentCommonVersion-1)
+
 	}
 
 	err := query.Find(&results).Error
@@ -303,6 +315,26 @@ func (r *resourceRepository) FindVersionedRepresentationsByVersion(tx *gorm.DB, 
 		return nil, fmt.Errorf("failed to find common representations by version: %w", err)
 	}
 	return results, nil
+}
+
+func (r *resourceRepository) FindLatestRepresentations(tx *gorm.DB, key bizmodel.ReporterResourceKey) (RepresentationsByVersion, error) {
+	var result RepresentationsByVersion
+
+	db := r.getDBSession(tx)
+
+	query := db.Table("reporter_resources rr").
+		Select("cr.data, cr.version").
+		Joins("JOIN common_representations cr ON rr.resource_id = cr.resource_id")
+
+	query = r.buildReporterResourceKeyQuery(query, key)
+
+	query = query.Order("cr.version DESC").Limit(1)
+
+	err := query.First(&result).Error
+	if err != nil {
+		return RepresentationsByVersion{}, fmt.Errorf("failed to find latest representations: %w", err)
+	}
+	return result, nil
 }
 
 // HasTransactionIdBeenProcessed checks if a transaction ID exists in either the

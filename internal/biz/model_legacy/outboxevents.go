@@ -245,7 +245,7 @@ func NewOutboxEventsFromResourceEvent(domainResourceEvent bizmodel.ResourceEvent
 		Payload:       tuplePayload,
 	}
 
-	log.Info("Tuple event to write to outbox : %+v", tupleEvent)
+	log.Infof("Tuple event to write to outbox : %+v", tupleEvent)
 	return resourceEvent, tupleEvent, nil
 }
 

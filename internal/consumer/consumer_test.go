@@ -34,8 +34,8 @@ import (
 
 const (
 	testMessageKey            = `{"schema":{"type":"string","optional":false},"payload":"00000000-0000-0000-0000-000000000000"}`
-	testCreateOrUpdateMessage = `{"schema":{"type":"string","optional":false,"name":"io.debezium.data.Json","version":1},"payload":{"subject":{"subject":{"id":"1234", "type":{"name":"workspace","namespace":"rbac"}}},"relation":"t_workspace","resource":{"id":"4321","type":{"name":"integration","namespace":"notifications"}}}}`
-	testDeleteMessage         = `{"schema":{"type":"string","optional":false,"name":"io.debezium.data.Json","version":1},"payload":{"resource_id":"4321","resource_type":"integration","resource_namespace":"notifications","relation":"t_workspace","subject_filter":{"subject_type":"workspace","subject_namespace":"rbac","subject_id":"1234"}}}`
+	testCreateOrUpdateMessage = `{"schema":{"type":"string","optional":false,"name":"io.debezium.data.Json","version":1},"payload":{"reporter_resource_key":{"local_resource_id":"test-resource-4321","resource_type":"integration","reporter":{"reporter_type":"notifications","reporter_instance_id":"test-instance-1"}},"common_version":1}}`
+	testDeleteMessage         = `{"schema":{"type":"string","optional":false,"name":"io.debezium.data.Json","version":1},"payload":{"reporter_resource_key":{"local_resource_id":"test-resource-4321","resource_type":"integration","reporter":{"reporter_type":"notifications","reporter_instance_id":"test-instance-1"}},"common_version":1}}`
 )
 
 func setupInMemoryDB(t *testing.T) *gorm.DB {
@@ -46,8 +46,6 @@ func setupInMemoryDB(t *testing.T) *gorm.DB {
 		&datamodel.ReporterRepresentation{}, &datamodel.CommonRepresentation{},
 		&model_legacy.OutboxEvent{})
 	require.NoError(t, err)
-
-	// Remove test data - we'll use a different approach
 
 	return db
 }
@@ -106,13 +104,13 @@ func (t *TestCase) TestSetup(testingT *testing.T) []error {
 		return errs
 	}
 
-	// Override ResourceService with fake repository for testing
 	fakeRepo := data.NewFakeResourceRepositoryWithWorkspaceOverrides("test-workspace-123", "")
 	usecaseConfig := &usecase_resources.UsecaseConfig{
 		ReadAfterWriteEnabled: false,
 		ConsumerEnabled:       false,
 	}
 	t.inv.ResourceService = usecase_resources.New(fakeRepo, nil, nil, nil, nil, "test-topic", t.logger.Logger(), nil, nil, usecaseConfig)
+	t.inv.SchemaService = usecase_resources.NewSchemaUsecase(fakeRepo, t.logger)
 
 	err = t.metrics.New(otel.Meter("github.com/project-kessel/inventory-api/blob/main/internal/server/otel"))
 	if err != nil {

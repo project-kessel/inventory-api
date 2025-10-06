@@ -174,7 +174,12 @@ func (r *resourceRepository) Save(tx *gorm.DB, resource bizmodel.Resource, opera
 	var resourceEvent bizmodel.ResourceEvent
 	switch operationType {
 	case biz.OperationTypeDeleted:
-		resourceEvent = resource.ResourceDeleteEvents()[0]
+		deleteEvents := resource.ResourceDeleteEvents()
+		if len(deleteEvents) == 0 {
+			// No delete events to process (e.g., resource was already tombstoned)
+			return nil
+		}
+		resourceEvent = deleteEvents[0]
 	default:
 		resourceEvent = resource.ResourceReportEvents()[0]
 	}

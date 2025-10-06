@@ -115,7 +115,7 @@ func testRepositoryContract(t *testing.T, repo ResourceRepository, db *gorm.DB) 
 		consoleHref, _ := bizmodel.NewConsoleHref("https://console.example.com/updated")
 		reporterData, _ := bizmodel.NewRepresentation(map[string]interface{}{"updated": true})
 		commonData, _ := bizmodel.NewRepresentation(map[string]interface{}{"workspace_id": "updated-workspace"})
-		transactionId := bizmodel.NewTransactionId("test-transaction-id")
+		transactionId := bizmodel.NewTransactionId(fmt.Sprintf("test-transaction-id-update-contract-%s", uuid.New().String()))
 
 		err = foundResource.Update(key, apiHref, consoleHref, nil, reporterData, commonData, transactionId)
 		require.NoError(t, err, "Update should succeed")
@@ -237,7 +237,7 @@ func testRepositoryContract(t *testing.T, repo ResourceRepository, db *gorm.DB) 
 		consoleHref, _ := bizmodel.NewConsoleHref("https://console.example.com/contract-updated")
 		reporterData, _ := bizmodel.NewRepresentation(map[string]interface{}{"contract": "updated"})
 		commonData, _ := bizmodel.NewRepresentation(map[string]interface{}{"workspace_id": "contract-workspace"})
-		transactionId := bizmodel.NewTransactionId("test-transaction-id")
+		transactionId := bizmodel.NewTransactionId(fmt.Sprintf("test-transaction-id-lifecycle-contract-%s", uuid.New().String()))
 
 		err = foundResource.Update(key, apiHref, consoleHref, nil, reporterData, commonData, transactionId)
 		require.NoError(t, err, "Update should succeed")
@@ -707,7 +707,7 @@ func TestUniqueConstraint_ReporterResourceCompositeKey(t *testing.T) {
 				consoleHref, _ := bizmodel.NewConsoleHref("https://console.example.com/updated")
 				reporterData, _ := bizmodel.NewRepresentation(map[string]interface{}{"update": "1"})
 				commonData, _ := bizmodel.NewRepresentation(map[string]interface{}{"update": "1"})
-				transactionId := bizmodel.NewTransactionId("test-transaction-id")
+				transactionId := bizmodel.NewTransactionId(fmt.Sprintf("test-transaction-id-version-unique-%s", uuid.New().String()))
 
 				err = resource.Update(key, apiHref, consoleHref, nil, reporterData, commonData, transactionId)
 				require.NoError(t, err, "Update should succeed")
@@ -898,7 +898,7 @@ func TestResourceRepository_IdempotentOperations(t *testing.T) {
 				consoleHref, _ := bizmodel.NewConsoleHref("https://console.example.com/duplicate")
 				reporterData, _ := bizmodel.NewRepresentation(map[string]interface{}{"duplicate": "report"})
 				commonData, _ := bizmodel.NewRepresentation(map[string]interface{}{"workspace_id": "duplicate-workspace"})
-				transactionId := bizmodel.NewTransactionId("test-transaction-id")
+				transactionId := bizmodel.NewTransactionId(fmt.Sprintf("test-transaction-id-duplicate-idempotent-%s", uuid.New().String()))
 
 				err = foundResource1.Update(key, apiHref, consoleHref, nil, reporterData, commonData, transactionId)
 				require.NoError(t, err, "Update should succeed")
@@ -963,7 +963,7 @@ func TestResourceRepository_IdempotentOperations(t *testing.T) {
 						consoleHref, _ := bizmodel.NewConsoleHref(fmt.Sprintf("https://console.example.com/cycle-%d", cycle))
 						reporterData, _ := bizmodel.NewRepresentation(map[string]interface{}{"cycle": cycle})
 						commonData, _ := bizmodel.NewRepresentation(map[string]interface{}{"workspace_id": fmt.Sprintf("cycle-%d-workspace", cycle)})
-						transactionId := bizmodel.NewTransactionId("test-transaction-id")
+						transactionId := bizmodel.NewTransactionId(fmt.Sprintf("test-transaction-id-cycle-%d-idempotent-%s", cycle, uuid.New().String()))
 
 						err = foundResource.Update(key, apiHref, consoleHref, nil, reporterData, commonData, transactionId)
 						require.NoError(t, err, "Update should succeed in cycle %d", cycle)
@@ -1074,7 +1074,7 @@ func TestSave(t *testing.T) {
 				})
 				require.NoError(t, err)
 
-				updatedTransactionId := bizmodel.NewTransactionId("updated-transaction-id")
+				updatedTransactionId := bizmodel.NewTransactionId(fmt.Sprintf("updated-transaction-id-save-test-unique-%s", uuid.New().String()))
 
 				err = resource.Update(key, apiHref, consoleHref, nil, updatedReporterData, updatedCommonData, updatedTransactionId)
 				require.NoError(t, err)
@@ -1209,12 +1209,13 @@ func TestResourceRepository_MultipleHostsLifecycle(t *testing.T) {
 			})
 			require.NoError(t, err)
 
-			updatedTransactionId := bizmodel.NewTransactionId("updated-transaction-id")
+			updatedTransactionId1 := bizmodel.NewTransactionId(fmt.Sprintf("updated-transaction-id-multiple-hosts-unique-host1-%s", uuid.New().String()))
+			updatedTransactionId2 := bizmodel.NewTransactionId(fmt.Sprintf("updated-transaction-id-multiple-hosts-unique-host2-%s", uuid.New().String()))
 
-			err = foundHost1.Update(key1, apiHref, consoleHref, nil, updatedReporterData, updatedCommonData, updatedTransactionId)
+			err = foundHost1.Update(key1, apiHref, consoleHref, nil, updatedReporterData, updatedCommonData, updatedTransactionId1)
 			require.NoError(t, err, "Should update host1")
 
-			err = foundHost2.Update(key2, apiHref, consoleHref, nil, updatedReporterData, updatedCommonData, updatedTransactionId)
+			err = foundHost2.Update(key2, apiHref, consoleHref, nil, updatedReporterData, updatedCommonData, updatedTransactionId2)
 			require.NoError(t, err, "Should update host2")
 
 			err = repo.Save(db, *foundHost1, model_legacy.OperationTypeUpdated, "tx-update-host1")
@@ -1359,9 +1360,9 @@ func TestResourceRepository_PartialDataScenarios(t *testing.T) {
 				})
 				require.NoError(t, err)
 
-				updatedTransactionId := bizmodel.NewTransactionId("updated-transaction-id")
+				updatedTransactionId1 := bizmodel.NewTransactionId(fmt.Sprintf("updated-transaction-id-partial-data-unique-reporter-%s", uuid.New().String()))
 
-				err = foundResource.Update(key, apiHref, consoleHref, nil, reporterOnlyData, emptyCommonData, updatedTransactionId)
+				err = foundResource.Update(key, apiHref, consoleHref, nil, reporterOnlyData, emptyCommonData, updatedTransactionId1)
 				require.NoError(t, err, "Should update with reporter data only")
 
 				err = repo.Save(db, *foundResource, model_legacy.OperationTypeUpdated, "tx-reporter-update")
@@ -1381,7 +1382,9 @@ func TestResourceRepository_PartialDataScenarios(t *testing.T) {
 				})
 				require.NoError(t, err)
 
-				err = foundResource.Update(key, apiHref, consoleHref, nil, emptyReporterData, commonOnlyData, updatedTransactionId)
+				updatedTransactionId2 := bizmodel.NewTransactionId(fmt.Sprintf("updated-transaction-id-partial-data-unique-common-%s", uuid.New().String()))
+
+				err = foundResource.Update(key, apiHref, consoleHref, nil, emptyReporterData, commonOnlyData, updatedTransactionId2)
 				require.NoError(t, err, "Should update with common data only")
 
 				err = repo.Save(db, *foundResource, model_legacy.OperationTypeUpdated, "tx-common-update")
@@ -1486,7 +1489,7 @@ func TestSerializableUpdateFails(t *testing.T) {
 			consoleHref, _ := bizmodel.NewConsoleHref("https://console.example.com/updated")
 			repData, _ := bizmodel.NewRepresentation(map[string]interface{}{"name": "updated"})
 			comData, _ := bizmodel.NewRepresentation(map[string]interface{}{"workspace_id": "ws-serial"})
-			assert.NoError(t, resource.Update(key, apiHref, consoleHref, nil, repData, comData, "transaction-id-1"))
+			assert.NoError(t, resource.Update(key, apiHref, consoleHref, nil, repData, comData, "transaction-id-serializable-update"))
 
 			// Begin a conflicting serializable transaction and update the same resource
 			conflictTx := db.Begin(&sql.TxOptions{Isolation: sql.LevelSerializable})
@@ -1570,7 +1573,7 @@ func createTestResourceWithLocalId(t *testing.T, localResourceId string) bizmode
 	reporterResourceIdType, err := bizmodel.NewReporterResourceId(reporterResourceId)
 	require.NoError(t, err)
 
-	transactionId := bizmodel.NewTransactionId("test-transaction-id")
+	transactionId := bizmodel.NewTransactionId(fmt.Sprintf("test-transaction-id-basic-%s-%s", localResourceId, uuid.New().String()))
 
 	resource, err := bizmodel.NewResource(resourceIdType, localResourceIdType, resourceType, reporterType, reporterInstanceId, transactionId, reporterResourceIdType, apiHref, consoleHref, reporterRepresentation, commonRepresentation, nil)
 	require.NoError(t, err)
@@ -1637,7 +1640,7 @@ func createTestResourceWithLocalIdAndType(t *testing.T, localResourceId, resourc
 	commonRepresentation, err := bizmodel.NewRepresentation(commonData)
 	require.NoError(t, err)
 
-	transactionId := bizmodel.NewTransactionId("test-transaction-id")
+	transactionId := bizmodel.NewTransactionId(fmt.Sprintf("test-transaction-id-with-type-%s-%s-%s", localResourceId, resourceType, uuid.New().String()))
 
 	resource, err := bizmodel.NewResource(resourceIdType, localResourceIdType, resourceTypeType, reporterTypeType, reporterInstanceIdType, transactionId, reporterResourceIdType, apiHref, consoleHref, reporterRepresentation, commonRepresentation, nil)
 	require.NoError(t, err)
@@ -1691,7 +1694,7 @@ func createTestResourceWithReporterDataOnly(t *testing.T, localResourceId string
 	commonRepresentation, err := bizmodel.NewRepresentation(commonData)
 	require.NoError(t, err)
 
-	transactionId := bizmodel.NewTransactionId("test-transaction-id")
+	transactionId := bizmodel.NewTransactionId(fmt.Sprintf("test-transaction-id-reporter-only-%s-%s", localResourceId, uuid.New().String()))
 
 	resource, err := bizmodel.NewResource(resourceIdType, localResourceIdType, resourceType, reporterType, reporterInstanceId, transactionId, reporterResourceIdType, apiHref, consoleHref, reporterRepresentation, commonRepresentation, nil)
 	require.NoError(t, err)
@@ -1745,7 +1748,7 @@ func createTestResourceWithCommonDataOnly(t *testing.T, localResourceId string) 
 	commonRepresentation, err := bizmodel.NewRepresentation(commonData)
 	require.NoError(t, err)
 
-	transactionId := bizmodel.NewTransactionId("test-transaction-id")
+	transactionId := bizmodel.NewTransactionId(fmt.Sprintf("test-transaction-id-common-only-%s-%s", localResourceId, uuid.New().String()))
 
 	resource, err := bizmodel.NewResource(resourceIdType, localResourceIdType, resourceType, reporterType, reporterInstanceId, transactionId, reporterResourceIdType, apiHref, consoleHref, reporterRepresentation, commonRepresentation, nil)
 	require.NoError(t, err)
@@ -1797,7 +1800,7 @@ func createTestResourceWithMixedCase(t *testing.T) bizmodel.Resource {
 	commonRepresentation, err := bizmodel.NewRepresentation(commonData)
 	require.NoError(t, err)
 
-	transactionId := bizmodel.NewTransactionId("test-transaction-id")
+	transactionId := bizmodel.NewTransactionId(fmt.Sprintf("test-transaction-id-mixed-case-unique-%s", uuid.New().String()))
 
 	resource, err := bizmodel.NewResource(resourceIdType, localResourceIdType, resourceType, reporterType, reporterInstanceId, transactionId, reporterResourceIdType, apiHref, consoleHref, reporterRepresentation, commonRepresentation, nil)
 	require.NoError(t, err)
@@ -1849,7 +1852,7 @@ func createTestResourceWithReporter(t *testing.T, localResourceId, reporterType,
 	commonRepresentation, err := bizmodel.NewRepresentation(commonData)
 	require.NoError(t, err)
 
-	transactionId := bizmodel.NewTransactionId("test-transaction-id")
+	transactionId := bizmodel.NewTransactionId(fmt.Sprintf("test-transaction-id-with-reporter-%s-%s-%s", localResourceId, reporterType, uuid.New().String()))
 
 	resource, err := bizmodel.NewResource(resourceIdType, localResourceIdType, resourceType, reporterTypeType, reporterInstanceIdType, transactionId, reporterResourceIdType, apiHref, consoleHref, reporterRepresentation, commonRepresentation, nil)
 	require.NoError(t, err)
@@ -1921,7 +1924,7 @@ func TestFindVersionedRepresentationsByVersion(t *testing.T) {
 				require.NoError(t, err)
 				updatedReporter, err := bizmodel.NewRepresentation(map[string]interface{}{"hostname": "h"})
 				require.NoError(t, err)
-				transactionId := bizmodel.NewTransactionId("test-transaction-id")
+				transactionId := bizmodel.NewTransactionId(fmt.Sprintf("test-transaction-id-versioned-unique-%s", uuid.New().String()))
 				err = res.Update(key, "", "", nil, updatedReporter, updatedCommon, transactionId)
 				require.NoError(t, err)
 				require.NoError(t, repo.Save(db, res, model_legacy.OperationTypeUpdated, "tx2"))
@@ -2013,7 +2016,7 @@ func TestGetCurrentAndPreviousWorkspaceID_Integration(t *testing.T) {
 					updatedReporter, err := bizmodel.NewRepresentation(map[string]interface{}{"hostname": "updated-host"})
 					require.NoError(t, err)
 
-					transactionId := bizmodel.NewTransactionId("test-transaction-id")
+					transactionId := bizmodel.NewTransactionId(fmt.Sprintf("test-transaction-id-workspace-unique-%s", uuid.New().String()))
 					err = resource.Update(key, "", "", nil, updatedReporter, updatedCommon, transactionId)
 					require.NoError(t, err)
 					require.NoError(t, repo.Save(db, resource, model_legacy.OperationTypeUpdated, "tx-ws-update"))

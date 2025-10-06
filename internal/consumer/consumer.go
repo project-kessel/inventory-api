@@ -76,6 +76,7 @@ type InventoryConsumer struct {
 	RetryOptions     *retry.Options
 	Notifier         pubsub.Notifier
 	ResourceService  *usecase_resources.Usecase
+	SchemaService    *usecase_resources.SchemaUsecase
 	// offsetMutex protects OffsetStorage and coordinates offset commit operations
 	// to prevent race conditions between shutdown and rebalance callbacks
 	offsetMutex sync.Mutex
@@ -128,8 +129,8 @@ func New(config CompletedConfig, db *gorm.DB, authz authz.CompletedConfig, autho
 
 	var errChan chan error
 
-	// Initialize ResourceService for tuple processing
 	resourceService := usecase_resources.NewUsecase(db, logger)
+	schemaService := usecase_resources.NewSchemaUsecase(resourceService.GetResourceRepository(), logger)
 
 	return InventoryConsumer{
 		Consumer:           consumer,
@@ -145,6 +146,7 @@ func New(config CompletedConfig, db *gorm.DB, authz authz.CompletedConfig, autho
 		RetryOptions:       retryOptions,
 		Notifier:           notifier,
 		ResourceService:    resourceService,
+		SchemaService:      schemaService,
 		offsetMutex:        sync.Mutex{},
 		shutdownInProgress: false,
 	}, nil
@@ -315,7 +317,7 @@ func (i *InventoryConsumer) ProcessMessage(headers map[string]string, relationsE
 				return "", err
 			}
 			resp, err := i.Retry(func() (string, error) {
-				tuplesToReplicate, err := i.ResourceService.CalculateTuples(*tupleEvent)
+				tuplesToReplicate, err := i.SchemaService.CalculateTuples(*tupleEvent)
 				if err != nil {
 					return "", err
 				}
@@ -340,7 +342,7 @@ func (i *InventoryConsumer) ProcessMessage(headers map[string]string, relationsE
 				return "", err
 			}
 			resp, err := i.Retry(func() (string, error) {
-				tuplesToReplicate, err := i.ResourceService.CalculateTuples(*tupleEvent)
+				tuplesToReplicate, err := i.SchemaService.CalculateTuples(*tupleEvent)
 				if err != nil {
 					return "", err
 				}
@@ -365,7 +367,7 @@ func (i *InventoryConsumer) ProcessMessage(headers map[string]string, relationsE
 			}
 
 			_, err = i.Retry(func() (string, error) {
-				tuplesToReplicate, err := i.ResourceService.CalculateTuples(*tupleEvent)
+				tuplesToReplicate, err := i.SchemaService.CalculateTuples(*tupleEvent)
 				if err != nil {
 					return "", err
 				}

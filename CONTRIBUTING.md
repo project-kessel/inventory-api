@@ -32,7 +32,7 @@ For jetbrains users see https://www.jetbrains.com/help/go/integration-with-go-to
 
 ## Schema Changes
 
-When making changes to schema configuration files in `data/schema/`, you **must** rebuild and commit the resources tarball. This ensures that schema changes are properly captured and consumable in deployments.
+When making changes to schema configuration files in `data/schema/`, you **must** rebuild and commit both the resources tarball and schema cache. This ensures that schema changes are properly captured and consumable in deployments.
 
 ### Required Steps for Schema Changes
 
@@ -41,9 +41,13 @@ When making changes to schema configuration files in `data/schema/`, you **must*
    ```bash
    make build-schemas
    ```
-3. Stage and commit both the schema changes and generated files:
+3. Regenerate the schema cache:
    ```bash
-   git add data/schema/ resources.tar.gz deploy/kessel-inventory-ephem.yaml
+   go run main.go preload-schema
+   ```
+4. Stage and commit all schema changes and generated files:
+   ```bash
+   git add data/schema/ resources.tar.gz schema_cache.json deploy/kessel-inventory-ephem.yaml
    git commit -m "Update schema: <description of changes>"
    ```
 
@@ -55,8 +59,11 @@ Before pushing your PR, you can verify that your schema changes are properly syn
 ./scripts/verify-schema-tarball.sh
 ```
 
-This check is also enforced automatically in CI. PRs that modify schema files without updating the tarball will fail the `Verify Schema Tarball` check.
+This check is also enforced automatically in CI. PRs that modify schema files without updating the generated files will fail the `Verify Schema Tarball` check.
 
 ### Why This Matters
 
-The `resources.tar.gz` file is used in production deployments as a ConfigMap. If schema changes aren't reflected in the tarball, those changes won't be available to running services, potentially causing deployment failures or runtime errors.
+- **`resources.tar.gz`**: Used in production deployments as a ConfigMap. Schema changes must be reflected in the tarball to be available to running services.
+- **`schema_cache.json`**: A preloaded cache file for faster schema loading at runtime. Keeping it in sync prevents validation failures and performance issues.
+
+If these files aren't updated, deployments may fail or exhibit runtime errors due to schema mismatches.

@@ -6,6 +6,7 @@ on:
     paths:
       - 'data/schema/**'
       - 'resources.tar.gz'
+      - 'schema_cache.json'
 
 permissions:
   contents: read
@@ -35,25 +36,49 @@ jobs:
           TARBALL_CHANGED=$(git diff --name-only origin/${{ github.base_ref }}...HEAD | grep -c '^resources\.tar\.gz$' || true)
           echo "tarball_changed=${TARBALL_CHANGED}" >> $GITHUB_OUTPUT
           
+          # Check if schema cache changed
+          CACHE_CHANGED=$(git diff --name-only origin/${{ github.base_ref }}...HEAD | grep -c '^schema_cache\.json$' || true)
+          echo "cache_changed=${CACHE_CHANGED}" >> $GITHUB_OUTPUT
+          
           echo "Schema files changed: ${SCHEMA_CHANGED}"
           echo "Tarball changed: ${TARBALL_CHANGED}"
+          echo "Schema cache changed: ${CACHE_CHANGED}"
 
-      - name: Verify tarball updated when schema changes
+      - name: Verify tarball and cache updated when schema changes
         id: verify
         run: |
           SCHEMA_CHANGED=${{ steps.changed-files.outputs.schema_changed }}
           TARBALL_CHANGED=${{ steps.changed-files.outputs.tarball_changed }}
+          CACHE_CHANGED=${{ steps.changed-files.outputs.cache_changed }}
           
-          if [ "${SCHEMA_CHANGED}" -gt 0 ] && [ "${TARBALL_CHANGED}" -eq 0 ]; then
-            echo "::error::Schema files in data/schema/ were modified but resources.tar.gz was not updated!"
-            echo "::error::Please run 'make build-schemas' to regenerate the tarball."
-            echo "status=failed" >> $GITHUB_OUTPUT
-            exit 1
-          elif [ "${SCHEMA_CHANGED}" -eq 0 ] && [ "${TARBALL_CHANGED}" -gt 0 ]; then
-            echo "::warning::resources.tar.gz was modified but no schema files changed. This may be intentional, but please verify."
+          ERRORS=""
+          
+          if [ "${SCHEMA_CHANGED}" -gt 0 ]; then
+            if [ "${TARBALL_CHANGED}" -eq 0 ]; then
+              echo "::error::Schema files in data/schema/ were modified but resources.tar.gz was not updated!"
+              ERRORS="${ERRORS}- resources.tar.gz not updated\n"
+            fi
+            
+            if [ "${CACHE_CHANGED}" -eq 0 ]; then
+              echo "::error::Schema files in data/schema/ were modified but schema_cache.json was not updated!"
+              ERRORS="${ERRORS}- schema_cache.json not updated\n"
+            fi
+            
+            if [ -n "${ERRORS}" ]; then
+              echo "::error::Please run 'make build-schemas' and 'go run main.go preload-schema' to regenerate the required files."
+              echo "status=failed" >> $GITHUB_OUTPUT
+              exit 1
+            fi
+          elif [ "${TARBALL_CHANGED}" -gt 0 ] || [ "${CACHE_CHANGED}" -gt 0 ]; then
+            echo "::warning::Generated files (tarball/cache) were modified but no schema files changed. This may be intentional, but please verify."
             echo "status=warning" >> $GITHUB_OUTPUT
           else
-            echo "✅ Schema and tarball changes are in sync."
+            echo "✅ No schema or tarball changes detected."
+            echo "status=success" >> $GITHUB_OUTPUT
+          fi
+          
+          if [ -z "${ERRORS}" ]; then
+            echo "✅ Schema, tarball, and cache changes are in sync."
             echo "status=success" >> $GITHUB_OUTPUT
           fi
 
@@ -67,12 +92,19 @@ jobs:
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: '## ⚠️ Schema Tarball Not Updated\n\n' +
-                    'Changes were detected in `data/schema/` but the `resources.tar.gz` file was not updated.\n\n' +
+              body: '## ⚠️ Schema Files Not Updated\n\n' +
+                    'Changes were detected in `data/schema/` but the generated files were not updated.\n\n' +
                     '### How to fix:\n' +
                     '1. Run `make build-schemas` to regenerate the tarball\n' +
-                    '2. Commit the updated `resources.tar.gz` and `deploy/kessel-inventory-ephem.yaml` files\n' +
-                    '3. Push the changes to your PR\n\n' +
+                    '2. Run `go run main.go preload-schema` to regenerate the schema cache\n' +
+                    '3. Commit the updated files:\n' +
+                    '   - `resources.tar.gz`\n' +
+                    '   - `schema_cache.json`\n' +
+                    '   - `deploy/kessel-inventory-ephem.yaml`\n' +
+                    '4. Push the changes to your PR\n\n' +
                     '### Why this is required:\n' +
-                    'The tarball must be rebuilt whenever schema configs change to ensure the changes are captured and consumable in deployments.'
+                    'These generated files must be rebuilt whenever schema configs change to ensure:\n' +
+                    '- The tarball contains the latest schemas for deployments\n' +
+                    '- The cache file has up-to-date schema data for runtime\n' +
+                    '- Changes are properly captured and consumable in production'
             })

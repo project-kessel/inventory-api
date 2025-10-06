@@ -1259,7 +1259,7 @@ func TestCreateWorkspaceTuple(t *testing.T) {
 				resource := tuple.Resource()
 				assert.Equal(t, "test-resource", resource.Id().String())
 				assert.Equal(t, "host", resource.Type().Name())
-				assert.Equal(t, "", resource.Type().Namespace()) // Default namespace
+				assert.Equal(t, "hbi", resource.Type().Namespace()) // Namespace is reporter type (lowercase)
 
 				// Test relation constant usage
 				assert.Equal(t, "workspace", tuple.Relation())
@@ -1267,7 +1267,7 @@ func TestCreateWorkspaceTuple(t *testing.T) {
 				// Test subject structure
 				subject := tuple.Subject()
 				subjectResource := subject.Subject()
-				assert.Equal(t, "rbac:workspace:workspace-123", subjectResource.Id().String())
+				assert.Equal(t, "workspace-123", subjectResource.Id().String()) // Subject ID is just the workspace ID
 				assert.Equal(t, "workspace", subjectResource.Type().Name())
 				assert.Equal(t, "rbac", subjectResource.Type().Namespace())
 			},
@@ -1279,7 +1279,7 @@ func TestCreateWorkspaceTuple(t *testing.T) {
 				// Test that special characters are handled correctly
 				subject := tuple.Subject()
 				subjectResource := subject.Subject()
-				assert.Equal(t, "rbac:workspace:workspace-with-dashes_and_underscores", subjectResource.Id().String())
+				assert.Equal(t, "workspace-with-dashes_and_underscores", subjectResource.Id().String()) // Subject ID is just the workspace ID
 				assert.Equal(t, "workspace", subjectResource.Type().Name())
 				assert.Equal(t, "rbac", subjectResource.Type().Namespace())
 			},
@@ -1291,7 +1291,7 @@ func TestCreateWorkspaceTuple(t *testing.T) {
 				// Test that empty workspace ID is handled
 				subject := tuple.Subject()
 				subjectResource := subject.Subject()
-				assert.Equal(t, "rbac:workspace:", subjectResource.Id().String())
+				assert.Equal(t, "", subjectResource.Id().String()) // Subject ID is empty when workspace ID is empty
 				assert.Equal(t, "workspace", subjectResource.Type().Name())
 				assert.Equal(t, "rbac", subjectResource.Type().Namespace())
 			},

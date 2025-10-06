@@ -328,9 +328,7 @@ func (r *resourceRepository) FindLatestRepresentations(tx *gorm.DB, key bizmodel
 
 	query = r.buildReporterResourceKeyQuery(query, key)
 
-	query = query.Order("cr.version DESC").Limit(1)
-
-	err := query.First(&result).Error
+	err := query.Order("cr.version DESC").Limit(1).Scan(&result).Error
 	if err != nil {
 		return RepresentationsByVersion{}, fmt.Errorf("failed to find latest representations: %w", err)
 	}

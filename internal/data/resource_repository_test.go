@@ -1,6 +1,7 @@
 package data
 
 import (
+	"database/sql"
 	"fmt"
 	"strings"
 	"testing"
@@ -177,14 +178,14 @@ func testRepositoryContract(t *testing.T, repo ResourceRepository, db *gorm.DB) 
 		assert.True(t, constraintViolation, "Error should mention constraint violation, got: %s", errorMsg)
 	})
 
-	t.Run("Case insensitive key matching", func(t *testing.T) {
+	t.Run("Case insensitive key matching for non ID fields", func(t *testing.T) {
 		// Create resource with mixed case
 		resource := createTestResourceWithReporter(t, "Contract-Case-Test", "OCM", "Instance-1")
 		err := repo.Save(db, resource, model_legacy.OperationTypeCreated, "contract-case-tx")
 		require.NoError(t, err, "Save should succeed")
 
 		// Find with different casing
-		key := createContractReporterResourceKey(t, "contract-case-test", "k8s_cluster", "ocm", "instance-1")
+		key := createContractReporterResourceKey(t, "Contract-Case-Test", "k8s_cluster", "ocm", "Instance-1")
 
 		foundResource, err := repo.FindResourceByKeys(db, key)
 		require.NoError(t, err, "Case insensitive find should succeed")
@@ -469,12 +470,12 @@ func TestFindResourceByKeys(t *testing.T) {
 					description        string
 				}{
 					{
-						name:               "lowercase local_resource_id",
-						localResourceId:    "test-mixed-case-resource",
+						name:               "local_resource_id",
+						localResourceId:    "Test-Mixed-Case-Resource",
 						resourceType:       "K8S_Cluster",
 						reporterType:       "OCM",
 						reporterInstanceId: "Mixed-Instance-123",
-						description:        "should find resource when local_resource_id is lowercase",
+						description:        "should find resource by local_resource_id",
 					},
 					{
 						name:               "lowercase resource_type",
@@ -502,7 +503,7 @@ func TestFindResourceByKeys(t *testing.T) {
 					},
 					{
 						name:               "all lowercase",
-						localResourceId:    "test-mixed-case-resource",
+						localResourceId:    "Test-Mixed-Case-Resource",
 						resourceType:       "k8s_cluster",
 						reporterType:       "ocm",
 						reporterInstanceId: "mixed-instance-123",
@@ -1391,6 +1392,120 @@ func TestResourceRepository_PartialDataScenarios(t *testing.T) {
 				require.NoError(t, err, "Should find resource after all updates")
 				require.NotNil(t, finalResource)
 			})
+		})
+	}
+}
+
+func TestSerializableCreateFails(t *testing.T) {
+	implementations := []struct {
+		name string
+		repo func() ResourceRepository
+		db   func() *gorm.DB
+	}{
+		{
+			name: "Real Repository with GormTransactionManager",
+			repo: func() ResourceRepository {
+				db := setupInMemoryDB(t)
+				tm := NewGormTransactionManager(3)
+				return NewResourceRepository(db, tm)
+			},
+			db: func() *gorm.DB {
+				return setupInMemoryDB(t)
+			},
+		},
+	}
+
+	for _, impl := range implementations {
+		t.Run(impl.name, func(t *testing.T) {
+			// Fresh instances
+			db := setupInMemoryDB(t)
+			tm := NewGormTransactionManager(3)
+			repo := NewResourceRepository(db, tm)
+
+			resource := createTestResourceWithLocalId(t, "serializable-create-conflict")
+
+			// Begin a conflicting serializable transaction and create the same resource
+			conflictTx := db.Begin(&sql.TxOptions{Isolation: sql.LevelSerializable})
+			// Do a read to simulate how a service would before creating
+			foundResource, err := repo.FindResourceByKeys(conflictTx, resource.ReporterResources()[0].ReporterResourceKey)
+			assert.NotNil(t, err)
+			assert.Nil(t, foundResource)
+			assert.NoError(t, repo.Save(conflictTx, resource, model_legacy.OperationTypeCreated, "tx-conflict"))
+			// Do NOT commit yet to hold locks
+
+			// Attempt to create the same resource via a separate serializable transaction managed by TM
+			err = tm.HandleSerializableTransaction(db, func(tx *gorm.DB) error {
+				foundResource, err := repo.FindResourceByKeys(tx, resource.ReporterResources()[0].ReporterResourceKey)
+				assert.NotNil(t, err)
+				assert.Nil(t, foundResource)
+				return repo.Save(tx, resource, model_legacy.OperationTypeCreated, "tx-create")
+			})
+			assert.Error(t, err)
+			assert.ErrorContains(t, err, "transaction failed")
+
+			// Cleanup
+			assert.NoError(t, conflictTx.Commit().Error)
+		})
+	}
+}
+
+func TestSerializableUpdateFails(t *testing.T) {
+	implementations := []struct {
+		name string
+		repo func() ResourceRepository
+		db   func() *gorm.DB
+	}{
+		{
+			name: "Real Repository with GormTransactionManager",
+			repo: func() ResourceRepository {
+				db := setupInMemoryDB(t)
+				tm := NewGormTransactionManager(3)
+				return NewResourceRepository(db, tm)
+			},
+			db: func() *gorm.DB {
+				return setupInMemoryDB(t)
+			},
+		},
+	}
+
+	for _, impl := range implementations {
+		t.Run(impl.name, func(t *testing.T) {
+			// Fresh instances
+			db := setupInMemoryDB(t)
+			tm := NewGormTransactionManager(3)
+			repo := NewResourceRepository(db, tm)
+
+			// Create initial resource (committed)
+			resource := createTestResourceWithLocalId(t, "serializable-update-conflict")
+			assert.NoError(t, repo.Save(db, resource, model_legacy.OperationTypeCreated, "tx-initial"))
+
+			// Prepare an updated version
+			key, err := bizmodel.NewReporterResourceKey("serializable-update-conflict", "k8s_cluster", "ocm", "ocm-instance-1")
+			assert.NoError(t, err)
+			apiHref, _ := bizmodel.NewApiHref("https://api.example.com/updated")
+			consoleHref, _ := bizmodel.NewConsoleHref("https://console.example.com/updated")
+			repData, _ := bizmodel.NewRepresentation(map[string]interface{}{"name": "updated"})
+			comData, _ := bizmodel.NewRepresentation(map[string]interface{}{"workspace_id": "ws-serial"})
+			assert.NoError(t, resource.Update(key, apiHref, consoleHref, nil, repData, comData, "transaction-id-1"))
+
+			// Begin a conflicting serializable transaction and update the same resource
+			conflictTx := db.Begin(&sql.TxOptions{Isolation: sql.LevelSerializable})
+			// Do a read to simulate how a service would before saving
+			foundResource, err := repo.FindResourceByKeys(conflictTx, resource.ReporterResources()[0].ReporterResourceKey)
+			assert.Nil(t, err)
+			assert.NotNil(t, foundResource)
+			assert.NoError(t, repo.Save(conflictTx, resource, model_legacy.OperationTypeUpdated, "tx-conflict"))
+			// Do NOT commit yet to hold locks
+
+			// Attempt to update the same resource via TM-managed serializable transaction
+			err = tm.HandleSerializableTransaction(db, func(tx *gorm.DB) error {
+				return repo.Save(tx, resource, model_legacy.OperationTypeUpdated, "tx-update")
+			})
+			assert.Error(t, err)
+			assert.ErrorContains(t, err, "transaction failed")
+
+			// Cleanup
+			assert.NoError(t, conflictTx.Commit().Error)
 		})
 	}
 }

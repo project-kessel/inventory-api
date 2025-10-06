@@ -236,14 +236,14 @@ func (r *resourceRepository) FindResourceByKeys(tx *gorm.DB, key bizmodel.Report
 		JOIN resource AS res ON res.id = rr2.resource_id
 	`)
 
-	// Build WHERE conditions dynamically based on present values
-	query = query.Where("LOWER(rr.local_resource_id) = LOWER(?)", key.LocalResourceId().Serialize())
-	query = query.Where("LOWER(rr.resource_type) = LOWER(?)", key.ResourceType().Serialize())
-	query = query.Where("LOWER(rr.reporter_type) = LOWER(?)", key.ReporterType().Serialize())
+	// Build WHERE conditions using case-insensitive matching to match fake repository behavior
+	query = query.Where("rr.local_resource_id = ?", key.LocalResourceId().Serialize())
+	query = query.Where("rr.resource_type = ?", key.ResourceType().Serialize())
+	query = query.Where("rr.reporter_type = ?", key.ReporterType().Serialize())
 
 	// Only add reporter_instance_id condition if it's not empty
 	if reporterInstanceId := key.ReporterInstanceId().Serialize(); reporterInstanceId != "" {
-		query = query.Where("LOWER(rr.reporter_instance_id) = LOWER(?)", reporterInstanceId)
+		query = query.Where("rr.reporter_instance_id = ?", reporterInstanceId)
 	}
 
 	err := query.Find(&results).Error // Use Find since it returns multiple rows

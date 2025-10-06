@@ -20,6 +20,7 @@ type fakeResourceRepository struct {
 	resources               map[string]*storedResource    // legacy field for backward compatibility
 	overrideCurrent         string                        // test override for current workspace ID
 	overridePrevious        string                        // test override for previous workspace ID
+	processedTransactionIds map[string]bool               // track processed transaction IDs for idempotency testing
 }
 
 type storedResource struct {
@@ -42,6 +43,7 @@ func NewFakeResourceRepository() ResourceRepository {
 		resources:               make(map[string]*storedResource),
 		overrideCurrent:         "",
 		overridePrevious:        "",
+		processedTransactionIds: make(map[string]bool),
 	}
 }
 
@@ -138,6 +140,14 @@ func (f *fakeResourceRepository) Save(tx *gorm.DB, resource bizmodel.Resource, o
 	f.resourcesByPrimaryKey[reporterResourcePrimaryKey] = stored
 	// Store composite key mapping (simulates unique constraint)
 	f.resourcesByCompositeKey[compositeKey] = reporterResourcePrimaryKey
+	// Mark transaction IDs as processed for idempotency testing
+	if reporterRepresentationSnapshot.TransactionId != "" {
+		f.markTransactionIdAsProcessed(reporterRepresentationSnapshot.TransactionId)
+	}
+	if commonRepresentationSnapshot.TransactionId != "" {
+		f.markTransactionIdAsProcessed(commonRepresentationSnapshot.TransactionId)
+	}
+
 	return nil
 }
 
@@ -262,4 +272,30 @@ func (f *fakeResourceRepository) GetTransactionManager() usecase.TransactionMana
 
 func (f *fakeResourceRepository) makeCompositeKey(localResourceID, reporterType, resourceType, reporterInstanceID string, representationVersion, generation uint) string {
 	return fmt.Sprintf("%s|%s|%s|%s|%d|%d", localResourceID, reporterType, resourceType, reporterInstanceID, representationVersion, generation)
+}
+
+// markTransactionIdAsProcessed marks a transaction ID as processed for idempotency testing
+// Note: This method assumes the caller already holds the appropriate lock
+func (f *fakeResourceRepository) markTransactionIdAsProcessed(transactionId string) {
+	if transactionId == "" {
+		return
+	}
+
+	// Don't acquire lock here since Save method already holds it
+	f.processedTransactionIds[transactionId] = true
+}
+
+// HasTransactionIdBeenProcessed checks if a transaction ID has been processed before
+// Returns true if the transaction has already been processed, false otherwise
+func (f *fakeResourceRepository) HasTransactionIdBeenProcessed(tx *gorm.DB, transactionId string) (bool, error) {
+	if transactionId == "" {
+		return false, nil
+	}
+
+	f.mu.RLock()
+	defer f.mu.RUnlock()
+
+	// Check if this transaction ID has been processed before
+	_, exists := f.processedTransactionIds[transactionId]
+	return exists, nil
 }

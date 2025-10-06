@@ -119,7 +119,14 @@ func (r *Resource) Delete(key ReporterResourceKey) error {
 		return err
 	}
 
+	// If the reporter resource is already tombstoned, drop the delete operation entirely
+	if reporterResource.tombstone.Serialize() {
+		return nil
+	}
+
+	// Only process delete for non-tombstoned resources
 	reporterResource.Delete()
+
 	resourceDeleteEvent, err := deleteEventAndRepresentations(
 		reporterResource.resourceID,
 		key.ResourceType(),

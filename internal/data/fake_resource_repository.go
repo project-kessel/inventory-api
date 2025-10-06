@@ -230,7 +230,7 @@ func (f *fakeResourceRepository) FindCurrentAndPreviousVersionedRepresentations(
 	if f.overrideCurrent != "" {
 		if currentVersion != nil {
 			results = append(results, RepresentationsByVersion{Data: map[string]interface{}{"workspace_id": f.overrideCurrent}, Version: *currentVersion})
-			if f.overridePrevious != "" && operationType.OperationType() != biz.OperationTypeCreated {
+			if f.overridePrevious != "" {
 				if *currentVersion > 0 {
 					results = append(results, RepresentationsByVersion{Data: map[string]interface{}{"workspace_id": f.overridePrevious}, Version: *currentVersion - 1})
 				}
@@ -245,12 +245,10 @@ func (f *fakeResourceRepository) FindCurrentAndPreviousVersionedRepresentations(
 			results = append(results, RepresentationsByVersion{Data: map[string]interface{}{"workspace_id": "test-workspace-initial"}, Version: *currentVersion})
 		case 1:
 			results = append(results, RepresentationsByVersion{Data: map[string]interface{}{"workspace_id": "test-workspace-v1"}, Version: *currentVersion})
-			if operationType.OperationType() != biz.OperationTypeCreated {
-				results = append(results, RepresentationsByVersion{Data: map[string]interface{}{"workspace_id": "test-workspace-previous"}, Version: 0})
-			}
+			results = append(results, RepresentationsByVersion{Data: map[string]interface{}{"workspace_id": "test-workspace-previous"}, Version: 0})
 		case 2:
 			results = append(results, RepresentationsByVersion{Data: map[string]interface{}{"workspace_id": "test-workspace-v2"}, Version: *currentVersion})
-			if operationType.OperationType() != biz.OperationTypeCreated && *currentVersion > 0 {
+			if *currentVersion > 0 {
 				results = append(results, RepresentationsByVersion{Data: map[string]interface{}{"workspace_id": "test-workspace-previous"}, Version: *currentVersion - 1})
 			}
 		}

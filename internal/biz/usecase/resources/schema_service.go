@@ -21,6 +21,7 @@ func NewSchemaUsecase(resourceRepository data.ResourceRepository, logger *log.He
 	}
 }
 
+// CalculateTuples : For now we are determining ReportTupleEvent vs DeleteTupleEvent based on Operation Type, but the eventual goal is for input to be ReportResourceEvent and DeleteResourceEvent
 func (sc *SchemaUsecase) CalculateTuples(tupleEvent model.TupleEvent, operationType biz.EventOperationType) (model.TuplesToReplicate, error) {
 
 	sc.Log.Infof("Calculating Tuples for operationType and event: %d, key: %+v", operationType, tupleEvent)
@@ -29,11 +30,11 @@ func (sc *SchemaUsecase) CalculateTuples(tupleEvent model.TupleEvent, operationT
 	case biz.OperationTypeDeleted:
 		return sc.processDeleteTupleEvent(tupleEvent)
 	default:
-		return sc.processReportTupleEvent(tupleEvent)
+		return sc.processReportTupleEvent(tupleEvent, operationType)
 	}
 }
 
-func (sc *SchemaUsecase) processReportTupleEvent(tupleEvent model.TupleEvent) (model.TuplesToReplicate, error) {
+func (sc *SchemaUsecase) processReportTupleEvent(tupleEvent model.TupleEvent, operationType biz.EventOperationType) (model.TuplesToReplicate, error) {
 	key := tupleEvent.ReporterResourceKey()
 
 	if tupleEvent.CommonVersion() == nil {
@@ -44,7 +45,7 @@ func (sc *SchemaUsecase) processReportTupleEvent(tupleEvent model.TupleEvent) (m
 	currentVersion := &version
 
 	representations, err := sc.resourceRepository.FindCurrentAndPreviousVersionedRepresentations(
-		nil, key, currentVersion, biz.OperationTypeUpdated,
+		nil, key, currentVersion, operationType,
 	)
 	if err != nil {
 		return model.TuplesToReplicate{}, fmt.Errorf("failed to find representations: %w", err)

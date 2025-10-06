@@ -21,7 +21,8 @@ func NewSchemaUsecase(resourceRepository data.ResourceRepository, logger *log.He
 }
 
 func (sc *SchemaUsecase) CalculateTuples(tupleEvent model.TupleEvent) (model.TuplesToReplicate, error) {
-	currentVersion := tupleEvent.Version().Uint()
+
+	currentVersion := tupleEvent.CommonVersion().Uint()
 	key := tupleEvent.ReporterResourceKey()
 
 	sc.Log.Infof("CalculateTuples called - version: %d, key: %+v", currentVersion, key)
@@ -33,8 +34,8 @@ func (sc *SchemaUsecase) CalculateTuples(tupleEvent model.TupleEvent) (model.Tup
 	return sc.determineTupleOperations(versionedRepresentations, currentVersion, key)
 }
 
-func (sc *SchemaUsecase) determineTupleOperations(representationVersion []data.RepresentationsByVersion, currentVersion uint, key model.ReporterResourceKey) (model.TuplesToReplicate, error) {
-	currentWorkspaceID, previousWorkspaceID := data.GetCurrentAndPreviousWorkspaceID(representationVersion, currentVersion)
+func (sc *SchemaUsecase) determineTupleOperations(representationsByVersion []data.RepresentationsByVersion, currentVersion uint, key model.ReporterResourceKey) (model.TuplesToReplicate, error) {
+	currentWorkspaceID, previousWorkspaceID := data.GetCurrentAndPreviousWorkspaceID(representationsByVersion, currentVersion)
 
 	if previousWorkspaceID != "" && previousWorkspaceID == currentWorkspaceID {
 		return model.TuplesToReplicate{}, nil

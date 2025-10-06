@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/go-kratos/kratos/v2/log"
 	"github.com/google/uuid"
 	"github.com/project-kessel/inventory-api/internal"
 	"github.com/project-kessel/inventory-api/internal/biz"
@@ -202,68 +203,8 @@ func convertResourceToTupleEvent(reporterResourceKey bizmodel.ReporterResourceKe
 	return payload, nil
 }
 
-func convertResourceToSetTupleEvent(resourceEvent bizmodel.ResourceReportEvent) (internal.JsonObject, error) {
-	payload := internal.JsonObject{}
-	namespace := strings.ToLower(resourceEvent.ReporterType())
-
-	relationship := &kessel.Relationship{
-		Resource: &kessel.ObjectReference{
-			Type: &kessel.ObjectType{
-				Name:      resourceEvent.ResourceType(),
-				Namespace: namespace,
-			},
-			Id: resourceEvent.LocalResourceId(),
-		},
-		Relation: "workspace",
-		Subject: &kessel.SubjectReference{
-			Subject: &kessel.ObjectReference{
-				Type: &kessel.ObjectType{
-					Name:      "workspace",
-					Namespace: "rbac",
-				},
-				Id: resourceEvent.WorkspaceId(),
-			},
-		},
-	}
-
-	marshalledJson, err := json.Marshal(relationship)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal resource to json: %w", err)
-	}
-	err = json.Unmarshal(marshalledJson, &payload)
-	if err != nil {
-		return nil, fmt.Errorf("failed to unmarshal json to payload: %w", err)
-	}
-
-	return payload, nil
-}
-
-func convertResourceToUnsetTupleEvent(resourceEvent bizmodel.ResourceDeleteEvent) (internal.JsonObject, error) {
-	payload := internal.JsonObject{}
-	namespace := strings.ToLower(resourceEvent.ReporterType())
-
-	tuple := &kessel.RelationTupleFilter{
-		ResourceNamespace: proto.String(namespace),
-		ResourceType:      proto.String(resourceEvent.ResourceType()),
-		ResourceId:        proto.String(resourceEvent.LocalResourceId()),
-		Relation:          proto.String("workspace"),
-	}
-
-	marshalledJson, err := json.Marshal(tuple)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal resource to json: %w", err)
-	}
-	err = json.Unmarshal(marshalledJson, &payload)
-	if err != nil {
-		return nil, fmt.Errorf("failed to unmarshal json to payload: %w", err)
-	}
-
-	return payload, nil
-}
-
 func NewOutboxEventsFromResourceEvent(domainResourceEvent bizmodel.ResourceEvent, operationType biz.EventOperationType, txid string) (*OutboxEvent, *OutboxEvent, error) {
 	var payload internal.JsonObject
-	var _ internal.JsonObject
 	var tuplePayload internal.JsonObject
 	var err error
 
@@ -276,17 +217,9 @@ func NewOutboxEventsFromResourceEvent(domainResourceEvent bizmodel.ResourceEvent
 	case biz.OperationTypeDeleted:
 		//TODO: Not publishing anything for resource event right now so we can decide what to publish correctly
 		payload = internal.JsonObject{}
-		if deleteEvent, ok := domainResourceEvent.(bizmodel.ResourceDeleteEvent); ok {
-			_, err = convertResourceToUnsetTupleEvent(deleteEvent)
-		} else {
-			return nil, nil, fmt.Errorf("expected ResourceDeleteEvent for delete operation, got %T", domainResourceEvent)
-		}
 	default:
 		if reportEvent, ok := domainResourceEvent.(bizmodel.ResourceReportEvent); ok {
 			payload, err = convertResourceToResourceEvent(reportEvent, operationType)
-			if err == nil {
-				_, err = convertResourceToSetTupleEvent(reportEvent)
-			}
 		} else {
 			return nil, nil, fmt.Errorf("expected ResourceReportEvent for create/update operation, got %T", domainResourceEvent)
 		}
@@ -304,14 +237,6 @@ func NewOutboxEventsFromResourceEvent(domainResourceEvent bizmodel.ResourceEvent
 		Payload:       payload,
 	}
 
-	/*tupleEventLegacy := &OutboxEvent{
-		Operation:     operationType,
-		AggregateType: TupleAggregateType,
-		AggregateID:   domainResourceEvent.Id().String(),
-		TxId:          txid,
-		Payload:       tuplePayloadLegacy,
-	}*/
-
 	tupleEvent := &OutboxEvent{
 		Operation:     operationType,
 		AggregateType: TupleAggregateType,
@@ -320,6 +245,7 @@ func NewOutboxEventsFromResourceEvent(domainResourceEvent bizmodel.ResourceEvent
 		Payload:       tuplePayload,
 	}
 
+	log.Info("Tuple event to write to outbox : %+v", tupleEvent)
 	return resourceEvent, tupleEvent, nil
 }
 

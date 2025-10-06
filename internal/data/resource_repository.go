@@ -3,6 +3,7 @@ package data
 import (
 	"fmt"
 
+	"github.com/go-kratos/kratos/v2/log"
 	"github.com/google/uuid"
 	"github.com/project-kessel/inventory-api/internal/biz"
 	"gorm.io/gorm"
@@ -175,6 +176,7 @@ func (r *resourceRepository) Save(tx *gorm.DB, resource bizmodel.Resource, opera
 	switch operationType {
 	case biz.OperationTypeDeleted:
 		deleteEvents := resource.ResourceDeleteEvents()
+		log.Info("DeleteEvents to publish to outbox : %+v", deleteEvents)
 		if len(deleteEvents) == 0 {
 			// No delete events to process (e.g., resource was already tombstoned)
 			return nil

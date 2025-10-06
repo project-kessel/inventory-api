@@ -1431,7 +1431,7 @@ func TestSerializableCreateFails(t *testing.T) {
 			foundResource, err := repo.FindResourceByKeys(conflictTx, resource.ReporterResources()[0].ReporterResourceKey)
 			assert.NotNil(t, err)
 			assert.Nil(t, foundResource)
-			assert.NoError(t, repo.Save(conflictTx, resource, model_legacy.OperationTypeCreated, "tx-conflict"))
+			assert.NoError(t, repo.Save(conflictTx, resource, biz.OperationTypeCreated, "tx-conflict"))
 			// Do NOT commit yet to hold locks
 
 			// Attempt to create the same resource via a separate serializable transaction managed by TM
@@ -1439,7 +1439,7 @@ func TestSerializableCreateFails(t *testing.T) {
 				foundResource, err := repo.FindResourceByKeys(tx, resource.ReporterResources()[0].ReporterResourceKey)
 				assert.NotNil(t, err)
 				assert.Nil(t, foundResource)
-				return repo.Save(tx, resource, model_legacy.OperationTypeCreated, "tx-create")
+				return repo.Save(tx, resource, biz.OperationTypeCreated, "tx-create")
 			})
 			assert.Error(t, err)
 			assert.ErrorContains(t, err, "transaction failed")
@@ -1478,7 +1478,7 @@ func TestSerializableUpdateFails(t *testing.T) {
 
 			// Create initial resource (committed)
 			resource := createTestResourceWithLocalId(t, "serializable-update-conflict")
-			assert.NoError(t, repo.Save(db, resource, model_legacy.OperationTypeCreated, "tx-initial"))
+			assert.NoError(t, repo.Save(db, resource, biz.OperationTypeCreated, "tx-initial"))
 
 			// Prepare an updated version
 			key, err := bizmodel.NewReporterResourceKey("serializable-update-conflict", "k8s_cluster", "ocm", "ocm-instance-1")
@@ -1495,12 +1495,12 @@ func TestSerializableUpdateFails(t *testing.T) {
 			foundResource, err := repo.FindResourceByKeys(conflictTx, resource.ReporterResources()[0].ReporterResourceKey)
 			assert.Nil(t, err)
 			assert.NotNil(t, foundResource)
-			assert.NoError(t, repo.Save(conflictTx, resource, model_legacy.OperationTypeUpdated, "tx-conflict"))
+			assert.NoError(t, repo.Save(conflictTx, resource, biz.OperationTypeUpdated, "tx-conflict"))
 			// Do NOT commit yet to hold locks
 
 			// Attempt to update the same resource via TM-managed serializable transaction
 			err = tm.HandleSerializableTransaction(db, func(tx *gorm.DB) error {
-				return repo.Save(tx, resource, model_legacy.OperationTypeUpdated, "tx-update")
+				return repo.Save(tx, resource, biz.OperationTypeUpdated, "tx-update")
 			})
 			assert.Error(t, err)
 			assert.ErrorContains(t, err, "transaction failed")

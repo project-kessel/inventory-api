@@ -174,7 +174,7 @@ func testRepositoryContract(t *testing.T, repo ResourceRepository, db *gorm.DB) 
 
 		// Error should indicate constraint violation
 		errorMsg := err.Error()
-		constraintViolation := strings.Contains(errorMsg, "duplicate") || strings.Contains(errorMsg, "UNIQUE constraint failed")
+		constraintViolation := strings.Contains(errorMsg, "duplicate") || strings.Contains(errorMsg, "NON-UNIQUE TRANSACTION ID")
 		assert.True(t, constraintViolation, "Error should mention constraint violation, got: %s", errorMsg)
 	})
 
@@ -681,8 +681,8 @@ func TestUniqueConstraint_ReporterResourceCompositeKey(t *testing.T) {
 
 				// Error should indicate a constraint violation
 				errorMsg := err.Error()
-				// Both "duplicate" (fake repo) and "UNIQUE constraint failed" (real DB) are acceptable
-				constraintViolation := strings.Contains(errorMsg, "duplicate") || strings.Contains(errorMsg, "UNIQUE constraint failed")
+				// Both "duplicate" (fake repo) and "NON-UNIQUE TRANSACTION ID" (real DB) are acceptable
+				constraintViolation := strings.Contains(errorMsg, "duplicate") || strings.Contains(errorMsg, "NON-UNIQUE TRANSACTION ID")
 				assert.True(t, constraintViolation, "Error should mention constraint violation, got: %s", errorMsg)
 			})
 
@@ -1514,7 +1514,7 @@ func TestSerializableUpdateFails(t *testing.T) {
 }
 
 func setupInMemoryDB(t *testing.T) *gorm.DB {
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{TranslateError: true})
 	require.NoError(t, err)
 
 	err = db.AutoMigrate(&datamodel.Resource{}, &datamodel.ReporterResource{},
@@ -2328,7 +2328,7 @@ func testTransactionIDUniqueConstraint(t *testing.T, repo ResourceRepository, db
 		// This should fail due to unique constraint violation
 		err = repo.Save(db, resource2, model_legacy.OperationTypeCreated, "tx-duplicate-2")
 		require.Error(t, err, "Second save should fail due to duplicate TransactionID")
-		assert.Contains(t, err.Error(), "UNIQUE constraint failed: reporter_representations.transaction_id")
+		assert.Contains(t, err.Error(), "NON-UNIQUE TRANSACTION ID")
 	})
 
 	t.Run("should enforce unique TransactionID constraint on CommonRepresentation", func(t *testing.T) {
@@ -2362,7 +2362,7 @@ func testTransactionIDUniqueConstraint(t *testing.T, repo ResourceRepository, db
 		// Try to save second CommonRepresentation with same TransactionID
 		err = db.Create(&commonRep2).Error
 		require.Error(t, err, "Second CommonRepresentation should fail due to duplicate TransactionID")
-		assert.Contains(t, err.Error(), "UNIQUE constraint failed: common_representations.transaction_id")
+		assert.Contains(t, err.Error(), "duplicated key not allowed")
 	})
 
 	t.Run("should enforce unique TransactionID constraint on ReporterRepresentation", func(t *testing.T) {
@@ -2401,7 +2401,7 @@ func testTransactionIDUniqueConstraint(t *testing.T, repo ResourceRepository, db
 		// Try to save second ReporterRepresentation with same TransactionID
 		err = db.Create(&reporterRep2).Error
 		require.Error(t, err, "Second ReporterRepresentation should fail due to duplicate TransactionID")
-		assert.Contains(t, err.Error(), "UNIQUE constraint failed: reporter_representations.transaction_id")
+		assert.Contains(t, err.Error(), "duplicated key not allowed")
 	})
 
 	t.Run("should allow multiple empty TransactionIDs", func(t *testing.T) {

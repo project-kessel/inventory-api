@@ -84,17 +84,6 @@ type Usecase struct {
 	Config                           *UsecaseConfig
 }
 
-// NewUsecase creates a new Usecase with minimal required dependencies for consumer usage
-func NewUsecase(db *gorm.DB, logger *log.Helper) *Usecase {
-	transactionManager := data.NewGormTransactionManager(3) // Default retry count
-	resourceRepo := data.NewResourceRepository(db, transactionManager)
-
-	return &Usecase{
-		resourceRepository: resourceRepo,
-		Log:                logger,
-	}
-}
-
 func New(resourceRepository data.ResourceRepository, reporterResourceRepository ReporterResourceRepository, inventoryResourceRepository InventoryResourceRepository,
 	authz authzapi.Authorizer, eventer eventingapi.Manager, namespace string, logger log.Logger,
 	listenManager pubsub.ListenManagerImpl, waitForNotifBreaker *gobreaker.CircuitBreaker, usecaseConfig *UsecaseConfig) *Usecase {

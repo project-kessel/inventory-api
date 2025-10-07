@@ -81,7 +81,7 @@ func TestCalculateTuples(t *testing.T) {
 			require.NoError(t, err)
 
 			version := model.Version(tt.version)
-			tupleEvent, err := model.NewTupleEvent(key, biz.OperationTypeCreated, &version, nil)
+			tupleEvent, err := model.NewTupleEvent(key, &version, nil)
 			require.NoError(t, err)
 
 			result, err := sc.CalculateTuples(tupleEvent, biz.OperationTypeCreated)

@@ -425,25 +425,9 @@ func ParseMessage(msg []byte, operationType string) (*model.TupleEvent, error) {
 		return nil, fmt.Errorf("error marshaling tuple payload: %v", err)
 	}
 
-	// Parse the payload into a map first, then inject the operation_type
-	var payloadMap map[string]interface{}
-	err = json.Unmarshal(payloadJson, &payloadMap)
-	if err != nil {
-		return nil, fmt.Errorf("error unmarshaling tuple payload to map: %v", err)
-	}
-
-	// Inject the operation_type from headers
-	payloadMap["operation_type"] = operationType
-
-	// Marshal back to JSON with the operation_type included
-	enrichedPayloadJson, err := json.Marshal(payloadMap)
-	if err != nil {
-		return nil, fmt.Errorf("error marshaling enriched tuple payload: %v", err)
-	}
-
-	// Now unmarshal into TupleEvent
+	// Now unmarshal into TupleEvent directly (operation type comes from headers)
 	var tuple *model.TupleEvent
-	err = json.Unmarshal(enrichedPayloadJson, &tuple)
+	err = json.Unmarshal(payloadJson, &tuple)
 	if err != nil {
 		return nil, fmt.Errorf("error unmarshaling tuple payload: %v", err)
 	}

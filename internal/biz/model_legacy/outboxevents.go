@@ -187,7 +187,7 @@ func convertResourceToResourceEvent(resourceReportEvent bizmodel.ResourceReportE
 func convertResourceToTupleEvent(reporterResourceKey bizmodel.ReporterResourceKey, operationType biz.EventOperationType, currentCommonVersion *bizmodel.Version, currentReporterRepresentationVersion *bizmodel.Version) (internal.JsonObject, error) {
 	payload := internal.JsonObject{}
 
-	tuple, err := bizmodel.NewTupleEvent(reporterResourceKey, operationType, currentCommonVersion, currentReporterRepresentationVersion)
+	tuple, err := bizmodel.NewTupleEvent(reporterResourceKey, currentCommonVersion, currentReporterRepresentationVersion)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Tuple Event: %w", err)
 	}

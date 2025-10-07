@@ -105,11 +105,6 @@ func (t *TestCase) TestSetup(testingT *testing.T) []error {
 	}
 
 	fakeRepo := data.NewFakeResourceRepositoryWithWorkspaceOverrides("test-workspace-123", "")
-	usecaseConfig := &usecase_resources.UsecaseConfig{
-		ReadAfterWriteEnabled: false,
-		ConsumerEnabled:       false,
-	}
-	t.inv.ResourceService = usecase_resources.New(fakeRepo, nil, nil, nil, nil, "test-topic", t.logger.Logger(), nil, nil, usecaseConfig)
 	t.inv.SchemaService = usecase_resources.NewSchemaUsecase(fakeRepo, t.logger)
 
 	err = t.metrics.New(otel.Meter("github.com/project-kessel/inventory-api/blob/main/internal/server/otel"))

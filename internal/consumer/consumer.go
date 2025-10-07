@@ -19,6 +19,7 @@ import (
 	usecase_resources "github.com/project-kessel/inventory-api/internal/biz/usecase/resources"
 	"github.com/project-kessel/inventory-api/internal/consumer/auth"
 	"github.com/project-kessel/inventory-api/internal/consumer/retry"
+	"github.com/project-kessel/inventory-api/internal/data"
 	datamodel "github.com/project-kessel/inventory-api/internal/data/model"
 	"github.com/project-kessel/inventory-api/internal/metricscollector"
 
@@ -75,7 +76,6 @@ type InventoryConsumer struct {
 	AuthOptions      *auth.Options
 	RetryOptions     *retry.Options
 	Notifier         pubsub.Notifier
-	ResourceService  *usecase_resources.Usecase
 	SchemaService    *usecase_resources.SchemaUsecase
 	// offsetMutex protects OffsetStorage and coordinates offset commit operations
 	// to prevent race conditions between shutdown and rebalance callbacks
@@ -129,8 +129,8 @@ func New(config CompletedConfig, db *gorm.DB, authz authz.CompletedConfig, autho
 
 	var errChan chan error
 
-	resourceService := usecase_resources.NewUsecase(db, logger)
-	schemaService := usecase_resources.NewSchemaUsecase(resourceService.GetResourceRepository(), logger)
+	resourceRepository := data.NewResourceRepository(db, data.NewGormTransactionManager(3))
+	schemaService := usecase_resources.NewSchemaUsecase(resourceRepository, logger)
 
 	return InventoryConsumer{
 		Consumer:           consumer,
@@ -145,7 +145,6 @@ func New(config CompletedConfig, db *gorm.DB, authz authz.CompletedConfig, autho
 		AuthOptions:        authnOptions,
 		RetryOptions:       retryOptions,
 		Notifier:           notifier,
-		ResourceService:    resourceService,
 		SchemaService:      schemaService,
 		offsetMutex:        sync.Mutex{},
 		shutdownInProgress: false,

@@ -20,7 +20,6 @@ import (
 	"github.com/project-kessel/inventory-api/internal/server"
 	kessel "github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
 	"github.com/sony/gobreaker"
-	"github.com/spf13/viper"
 	"google.golang.org/grpc"
 	"gorm.io/gorm"
 
@@ -83,21 +82,6 @@ type Usecase struct {
 	Server                           server.Server
 	ListenManager                    pubsub.ListenManagerImpl
 	Config                           *UsecaseConfig
-}
-
-// NewUsecase creates a new Usecase with minimal required dependencies for consumer usage
-func NewUsecase(db *gorm.DB, logger *log.Helper) *Usecase {
-	maxRetries := viper.GetInt("storage.max-serialization-retries")
-	if maxRetries == 0 {
-		maxRetries = 10 // Default value if not set
-	}
-	transactionManager := data.NewGormTransactionManager(maxRetries)
-	resourceRepo := data.NewResourceRepository(db, transactionManager)
-
-	return &Usecase{
-		resourceRepository: resourceRepo,
-		Log:                logger,
-	}
 }
 
 func New(resourceRepository data.ResourceRepository, reporterResourceRepository ReporterResourceRepository, inventoryResourceRepository InventoryResourceRepository,

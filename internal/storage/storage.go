@@ -25,7 +25,7 @@ func New(c CompletedConfig, logger *log.Helper) (*gorm.DB, error) {
 	}
 
 	logger.Infof("Using backing storage: %s", c.Options.Database)
-	db, err := gorm.Open(opener(c.DSN), &gorm.Config{})
+	db, err := gorm.Open(opener(c.DSN), &gorm.Config{TranslateError: true})
 	if err != nil {
 		return nil, fmt.Errorf("error opening database: %s", err.Error())
 	}

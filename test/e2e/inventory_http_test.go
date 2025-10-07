@@ -104,7 +104,7 @@ func TestMain(m *testing.M) {
 	}
 
 	dsn := "host=" + dbHost + " user=" + dbUser + " password=" + dbPassword + " port=" + dbPort + " dbname=" + dbName
-	db, err = gorm.Open(postgres.Open(dsn), &gorm.Config{})
+	db, err = gorm.Open(postgres.Open(dsn), &gorm.Config{TranslateError: true})
 	if err != nil {
 		log.Errorf("failed to connect to database: %v", err)
 	} else {

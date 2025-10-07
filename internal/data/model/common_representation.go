@@ -17,7 +17,7 @@ type CommonRepresentation struct {
 	Version                    uint      `gorm:"type:bigint;primaryKey;check:version >= 0"`
 	ReportedByReporterType     string    `gorm:"size:128"`
 	ReportedByReporterInstance string    `gorm:"size:128"`
-	TransactionId              string    `gorm:"size:128"`
+	TransactionId              string    `gorm:"size:128;index:ux_common_reps_txid_nn,where:transaction_id IS NOT NULL AND transaction_id != '',unique"`
 	CreatedAt                  time.Time
 }
 

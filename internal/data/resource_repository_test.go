@@ -1880,6 +1880,15 @@ func TestFindLatestRepresentations(t *testing.T) {
 		db   func() *gorm.DB
 	}{
 		{
+			name: "Real Repository with GormTransactionManager",
+			repo: func() ResourceRepository {
+				db := setupInMemoryDB(t)
+				tm := NewGormTransactionManager(3)
+				return NewResourceRepository(db, tm)
+			},
+			db: func() *gorm.DB { return setupInMemoryDB(t) },
+		},
+		{
 			name: "Fake Repository",
 			repo: func() ResourceRepository { return NewFakeResourceRepository() },
 			db:   func() *gorm.DB { return nil },
@@ -1894,13 +1903,67 @@ func TestFindLatestRepresentations(t *testing.T) {
 			key, err := bizmodel.NewReporterResourceKey("localResourceId-latest", "host", "hbi", "hbi-instance-1")
 			require.NoError(t, err)
 
+			if impl.name != "Fake Repository" {
+				// For real repository, set up test data with multiple versions
+				resource := createTestResourceWithLocalIdAndType(t, "localResourceId-latest", "host")
+
+				// Save initial version (version 0)
+				err = repo.Save(db, resource, biz.OperationTypeCreated, "tx-latest-v0")
+				require.NoError(t, err)
+
+				// Update to version 1
+				updatedCommon1, err := bizmodel.NewRepresentation(map[string]interface{}{
+					"workspace_id": "workspace-v1",
+					"region":       "us-west-1",
+				})
+				require.NoError(t, err)
+				updatedReporter1, err := bizmodel.NewRepresentation(map[string]interface{}{
+					"hostname": "host-v1",
+				})
+				require.NoError(t, err)
+
+				transactionId1 := bizmodel.NewTransactionId("test-transaction-id-v1")
+				err = resource.Update(key, "", "", nil, updatedReporter1, updatedCommon1, transactionId1)
+				require.NoError(t, err)
+				err = repo.Save(db, resource, biz.OperationTypeUpdated, "tx-latest-v1")
+				require.NoError(t, err)
+
+				// Update to version 2 (this should be the latest)
+				updatedCommon2, err := bizmodel.NewRepresentation(map[string]interface{}{
+					"workspace_id": "workspace-v2-latest",
+					"region":       "us-east-1",
+					"environment":  "production",
+				})
+				require.NoError(t, err)
+				updatedReporter2, err := bizmodel.NewRepresentation(map[string]interface{}{
+					"hostname": "host-v2-latest",
+				})
+				require.NoError(t, err)
+
+				transactionId2 := bizmodel.NewTransactionId("test-transaction-id-v2")
+				err = resource.Update(key, "", "", nil, updatedReporter2, updatedCommon2, transactionId2)
+				require.NoError(t, err)
+				err = repo.Save(db, resource, biz.OperationTypeUpdated, "tx-latest-v2")
+				require.NoError(t, err)
+			}
+
 			// Test FindLatestRepresentations
 			result, err := repo.FindLatestRepresentations(db, key)
 			require.NoError(t, err)
 
-			// For fake repository, check default behavior
-			assert.Equal(t, "test-workspace-latest", ExtractWorkspaceID(result))
-			assert.Equal(t, uint(1), result.Version)
+			if impl.name == "Fake Repository" {
+				// For fake repository, check default behavior
+				assert.Equal(t, "test-workspace-latest", ExtractWorkspaceID(result))
+				assert.Equal(t, uint(1), result.Version)
+			} else {
+				// For real repository, should return the latest version (version 2)
+				assert.Equal(t, "workspace-v2-latest", ExtractWorkspaceID(result))
+				assert.Equal(t, uint(2), result.Version)
+
+				// Verify it contains the latest data
+				assert.Equal(t, "production", result.Data["environment"])
+				assert.Equal(t, "us-east-1", result.Data["region"])
+			}
 		})
 	}
 }

@@ -19,7 +19,7 @@ type ReporterRepresentation struct {
 	Generation         uint      `gorm:"type:bigint;primaryKey;check:generation >= 0"`
 	ReporterVersion    *string   `gorm:"size:128"`
 	CommonVersion      uint      `gorm:"type:bigint;check:common_version >= 0"`
-	TransactionId      string    `gorm:"size:128"`
+	TransactionId      string    `gorm:"size:128;index:ux_reporter_reps_txid_nn,where:transaction_id IS NOT NULL AND transaction_id != '',unique"`
 	Tombstone          bool      `gorm:"not null"`
 	CreatedAt          time.Time
 

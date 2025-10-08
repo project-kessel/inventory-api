@@ -73,7 +73,7 @@ func TestCommonRepresentation_Infrastructure_Structure(t *testing.T) {
 		// Verify size constraints match constants
 		AssertGORMTag(t, cr, "ReportedByReporterType", "size:128")
 		AssertGORMTag(t, cr, "ReportedByReporterInstance", "size:128")
-		AssertGORMTag(t, cr, "TransactionId", "size:128")
+		AssertGORMTag(t, cr, "TransactionId", "size:128;index:ux_common_reps_txid_nn,where:transaction_id IS NOT NULL AND transaction_id != '',unique")
 	})
 
 	t.Run("should have correct non-nullable field types", func(t *testing.T) {
@@ -433,7 +433,7 @@ func TestCommonRepresentation_Infrastructure_Serialization(t *testing.T) {
 			1,
 			"hbi",
 			"test-instance",
-			"test-transaction-id",
+			"test-transaction-id-nil-data",
 		)
 		AssertNoError(t, err, "Should be able to create CommonRepresentation with nil data")
 
@@ -468,5 +468,23 @@ func TestCommonRepresentation_Infrastructure_Serialization(t *testing.T) {
 		AssertNoError(t, err, "Should be able to unmarshal CommonRepresentation with UUID")
 
 		AssertEqual(t, originalUUID, unmarshaled.ResourceId, "UUID should be preserved during JSON round-trip")
+	})
+
+	t.Run("should enforce unique TransactionID constraint", func(t *testing.T) {
+		t.Parallel()
+
+		// Test that different CommonRepresentations can have different TransactionIDs
+		fixture := NewTestFixture(t)
+
+		// Create first representation
+		cr1 := fixture.ValidCommonRepresentation()
+		AssertEqual(t, "test-transaction-id-valid-common", cr1.TransactionId, "First representation should have correct TransactionID")
+
+		// Create second representation with different TransactionID
+		cr2 := fixture.CommonRepresentationWithVersion(2)
+		AssertEqual(t, "test-transaction-id-with-version", cr2.TransactionId, "Second representation should have different TransactionID")
+
+		// Verify they have different TransactionIDs
+		AssertNotEqual(t, cr1.TransactionId, cr2.TransactionId, "Representations should have different TransactionIDs")
 	})
 }

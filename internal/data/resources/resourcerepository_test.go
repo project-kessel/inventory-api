@@ -26,7 +26,7 @@ const (
 )
 
 func setupGorm(t *testing.T) *gorm.DB {
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{TranslateError: true})
 	require.Nil(t, err)
 
 	err = data.Migrate(db, log.NewHelper(log.DefaultLogger))

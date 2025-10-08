@@ -7,6 +7,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/project-kessel/inventory-api/internal/biz"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 
 	"github.com/go-kratos/kratos/v2/errors"
 	"github.com/project-kessel/inventory-api/internal"
@@ -161,6 +162,30 @@ func (r *resourceRepository) Save(tx *gorm.DB, resource bizmodel.Resource, opera
 	dataReporterRepresentation := datamodel.DeserializeReporterRepresentationFromSnapshot(reporterRepresentationSnapshot)
 	dataCommonRepresentation := datamodel.DeserializeCommonRepresentationFromSnapshot(commonRepresentationSnapshot)
 
+	// Best-effort parent row locking to reduce SSI conflicts (Postgres only). No-ops on SQLite.
+	if tx != nil && tx.Dialector != nil && tx.Dialector.Name() == "postgres" {
+		// Lock resource row if it already exists
+		if dataResource.ID != uuid.Nil {
+			var _lockRes datamodel.Resource
+			_ = tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ?", dataResource.ID).Take(&_lockRes).Error
+		}
+		// Lock reporter_resource row if it already exists (by id or by natural key)
+		if dataReporterResource.ID != uuid.Nil {
+			var _lockRR datamodel.ReporterResource
+			_ = tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ?", dataReporterResource.ID).Take(&_lockRR).Error
+		} else if dataReporterResource.LocalResourceID != "" && dataReporterResource.ResourceType != "" && dataReporterResource.ReporterType != "" && dataReporterResource.ReporterInstanceID != "" {
+			var _lockRRByKey datamodel.ReporterResource
+			_ = tx.Table("reporter_resources").Clauses(clause.Locking{Strength: "UPDATE"}).
+				Where("local_resource_id = ? AND resource_type = ? AND reporter_type = ? AND reporter_instance_id = ?",
+					dataReporterResource.LocalResourceID,
+					dataReporterResource.ResourceType,
+					dataReporterResource.ReporterType,
+					dataReporterResource.ReporterInstanceID,
+				).
+				Take(&_lockRRByKey).Error
+		}
+	}
+
 	if err := tx.Save(&dataResource).Error; err != nil {
 		return fmt.Errorf("failed to save resource: %w", err)
 	}
@@ -171,7 +196,7 @@ func (r *resourceRepository) Save(tx *gorm.DB, resource bizmodel.Resource, opera
 
 	//TODO: make these checks better, the zero value checks right now are to avoid saving zero value rows in the representation tables and causing unique constraint failures
 	if dataReporterRepresentation.ReporterResourceID != uuid.Nil {
-		if err := tx.Create(&dataReporterRepresentation).Error; err != nil {
+		if err := tx.Clauses(clause.OnConflict{Columns: []clause.Column{{Name: "reporter_resource_id"}, {Name: "version"}, {Name: "generation"}}, DoNothing: true}).Create(&dataReporterRepresentation).Error; err != nil {
 			if errors.Is(err, gorm.ErrDuplicatedKey) {
 				return errors.BadRequest("NON-UNIQUE TRANSACTION ID", err.Error()).WithCause(err)
 			}
@@ -180,7 +205,7 @@ func (r *resourceRepository) Save(tx *gorm.DB, resource bizmodel.Resource, opera
 	}
 
 	if dataCommonRepresentation.ResourceId != uuid.Nil {
-		if err := tx.Create(&dataCommonRepresentation).Error; err != nil {
+		if err := tx.Clauses(clause.OnConflict{Columns: []clause.Column{{Name: "resource_id"}, {Name: "version"}}, DoNothing: true}).Create(&dataCommonRepresentation).Error; err != nil {
 			if errors.Is(err, gorm.ErrDuplicatedKey) {
 				return errors.BadRequest("NON-UNIQUE TRANSACTION ID", err.Error()).WithCause(err)
 			}

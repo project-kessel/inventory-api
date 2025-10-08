@@ -38,7 +38,7 @@ type RepresentationsByVersion struct {
 
 // GetCurrentAndPreviousWorkspaceID extracts current and previous workspace IDs from a slice of RepresentationsByVersion
 func ExtractWorkspaceID(repr RepresentationsByVersion) string {
-	if workspaceID, exists := repr.Data["workspace_id"].(string); exists && workspaceID != "" {
+	if workspaceID, exists := repr.Data["workspace_id"].(string); exists {
 		return workspaceID
 	}
 	return ""

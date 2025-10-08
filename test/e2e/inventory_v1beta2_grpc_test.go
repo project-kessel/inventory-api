@@ -644,6 +644,160 @@ func TestInventoryAPIHTTP_v1beta2_workspace_movement_tests(t *testing.T) {
 	assert.NoError(t, err, "Failed to Delete Resource during cleanup")
 }
 
+func TestInventoryAPIHTTP_v1beta2_create_check_delete_check_resource(t *testing.T) {
+	enableShortMode(t)
+	ctx := context.Background()
+
+	// Test configuration
+	resourceId := "00000000-0000-0000-0000-000000000001"
+	reporterType := "hbi"
+	reporterInstanceId := "testuser-example-com"
+	workspace := "workspace-123"
+
+	conn, err := grpc.NewClient(
+		inventoryapi_grpc_url,
+		grpc.WithTransportCredentials(grpcinsecure.NewCredentials()),
+		grpc.WithPerRPCCredentials(&bearerAuth{token: "1234"}),
+	)
+	assert.NoError(t, err, "Failed to create gRPC client")
+	defer func() {
+		if connErr := conn.Close(); connErr != nil {
+			t.Logf("Failed to close gRPC connection: %v", connErr)
+		}
+	}()
+
+	conn.Connect()
+	assert.NoError(t, err, "Failed to connect gRPC client")
+
+	client := pbv1beta2.NewKesselInventoryServiceClient(conn)
+
+	// ------- Create -------
+	reporterStruct, err := structpb.NewStruct(map[string]interface{}{
+		"ansible_host": "test-host.example.com",
+	})
+	assert.NoError(t, err, "Failed to create structpb for reporter")
+
+	req := &pbv1beta2.ReportResourceRequest{
+		WriteVisibility:    pbv1beta2.WriteVisibility_MINIMIZE_LATENCY,
+		Type:               "host",
+		ReporterType:       reporterType,
+		ReporterInstanceId: reporterInstanceId,
+		Representations: &pbv1beta2.ResourceRepresentations{
+			Metadata: &pbv1beta2.RepresentationMetadata{
+				LocalResourceId: resourceId,
+				ApiHref:         "https://api.example.com/hosts/test-host-123",
+				ConsoleHref:     proto.String("https://console.example.com/hosts/test-host-123"),
+			},
+			Common: &structpb.Struct{
+				Fields: map[string]*structpb.Value{
+					"workspace_id": structpb.NewStringValue(workspace),
+				},
+			},
+			Reporter: reporterStruct,
+		},
+	}
+	_, err = client.ReportResource(ctx, req)
+	assert.NoError(t, err, "Failed to Report Resource")
+
+	// ------- Check (expect TRUE) -------
+	checkAfterCreate := &pbv1beta2.CheckRequest{
+		Object: &pbv1beta2.ResourceReference{
+			ResourceType: "host",
+			ResourceId:   resourceId,
+			Reporter: &pbv1beta2.ReporterReference{
+				Type:       reporterType,
+				InstanceId: proto.String(reporterInstanceId),
+			},
+		},
+		Relation: "workspace",
+		Subject: &pbv1beta2.SubjectReference{
+			Resource: &pbv1beta2.ResourceReference{
+				ResourceType: "workspace",
+				ResourceId:   workspace,
+				Reporter: &pbv1beta2.ReporterReference{
+					Type: "rbac",
+				},
+			},
+		},
+	}
+
+	allowedTrueObserved := false
+	for i := 0; i < 10; i++ {
+		checkResp, err := client.Check(ctx, checkAfterCreate)
+		if err == nil && checkResp.GetAllowed() == pbv1beta2.Allowed_ALLOWED_TRUE {
+			t.Logf("✓ Create-check returned ALLOWED_TRUE (attempt %d)", i+1)
+			allowedTrueObserved = true
+			break
+		}
+		if err != nil {
+			t.Logf("Check request failed (attempt %d): %v", i+1, err)
+		} else {
+			t.Logf("Create-check returned %v (attempt %d), expected ALLOWED_TRUE", checkResp.GetAllowed(), i+1)
+		}
+		if i < 9 {
+			t.Log("Waiting 1s before retry...")
+			time.Sleep(1 * time.Second)
+		}
+	}
+	assert.True(t, allowedTrueObserved, "Authorization check after create did not return ALLOWED_TRUE within timeout")
+
+	// ------- Delete -------
+	delReq := &pbv1beta2.DeleteResourceRequest{
+		Reference: &pbv1beta2.ResourceReference{
+			ResourceType: "host",
+			ResourceId:   resourceId,
+			Reporter: &pbv1beta2.ReporterReference{
+				Type:       reporterType,
+				InstanceId: proto.String(reporterInstanceId),
+			},
+		},
+	}
+	_, err = client.DeleteResource(ctx, delReq)
+	assert.NoError(t, err, "Failed to Delete Resource")
+
+	// ------- Check (expect FALSE) -------
+	checkAfterDelete := &pbv1beta2.CheckRequest{
+		Object: &pbv1beta2.ResourceReference{
+			ResourceType: "host",
+			ResourceId:   resourceId,
+			Reporter: &pbv1beta2.ReporterReference{
+				Type:       reporterType,
+				InstanceId: proto.String(reporterInstanceId),
+			},
+		},
+		Relation: "workspace",
+		Subject: &pbv1beta2.SubjectReference{
+			Resource: &pbv1beta2.ResourceReference{
+				ResourceType: "workspace",
+				ResourceId:   workspace,
+				Reporter: &pbv1beta2.ReporterReference{
+					Type: "rbac",
+				},
+			},
+		},
+	}
+
+	allowedFalseObserved := false
+	for i := 0; i < 10; i++ {
+		checkResp, err := client.Check(ctx, checkAfterDelete)
+		if err == nil && checkResp.GetAllowed() == pbv1beta2.Allowed_ALLOWED_FALSE {
+			t.Logf("✓ Delete-check returned ALLOWED_FALSE (attempt %d)", i+1)
+			allowedFalseObserved = true
+			break
+		}
+		if err != nil {
+			t.Logf("Check request failed (attempt %d): %v", i+1, err)
+		} else {
+			t.Logf("Delete-check returned %v (attempt %d), expected ALLOWED_FALSE", checkResp.GetAllowed(), i+1)
+		}
+		if i < 9 {
+			t.Log("Waiting 1s before retry...")
+			time.Sleep(1 * time.Second)
+		}
+	}
+	assert.True(t, allowedFalseObserved, "Authorization check after delete did not return ALLOWED_FALSE within timeout")
+}
+
 func enableShortMode(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping long-running test in short mode")

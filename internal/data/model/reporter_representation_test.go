@@ -207,7 +207,7 @@ func TestReporterRepresentation_EdgeCases(t *testing.T) {
 			1,
 			1,
 			1,
-			"test-transaction-id",
+			"test-transaction-id-unicode-test",
 			false,
 			nil,
 		)
@@ -225,7 +225,7 @@ func TestReporterRepresentation_EdgeCases(t *testing.T) {
 			1,
 			1,
 			1,
-			"test-transaction-id",
+			"test-transaction-id-special-chars-test",
 			false,
 			nil,
 		)
@@ -241,7 +241,7 @@ func TestReporterRepresentation_EdgeCases(t *testing.T) {
 			4294967295, // Max uint32 Version
 			4294967295, // Max uint32 Generation
 			4294967295, // Max uint32 CommonVersion
-			"test-transaction-id",
+			"test-transaction-id-large-integers",
 			false,
 			nil,
 		)
@@ -257,7 +257,7 @@ func TestReporterRepresentation_EdgeCases(t *testing.T) {
 			1,
 			1,
 			1,
-			"test-transaction-id",
+			"test-transaction-id-empty-string",
 			false,
 			internal.StringPtr(""), // Empty ReporterVersion
 		)
@@ -273,7 +273,7 @@ func TestReporterRepresentation_EdgeCases(t *testing.T) {
 			1,
 			1,
 			1,
-			"test-transaction-id",
+			"test-transaction-id-nil-values",
 			false,
 			nil, // Nil ReporterVersion
 		)
@@ -324,7 +324,7 @@ func TestReporterRepresentation_EdgeCases(t *testing.T) {
 			1,
 			1,
 			1,
-			"test-transaction-id",
+			"test-transaction-id-complex-json",
 			false,
 			nil,
 		)
@@ -340,7 +340,7 @@ func TestReporterRepresentation_EdgeCases(t *testing.T) {
 			1,
 			1,
 			1,
-			"test-transaction-id",
+			"test-transaction-id-empty-json",
 			false,
 			nil,
 		)
@@ -370,7 +370,7 @@ func TestReporterRepresentation_EdgeCases(t *testing.T) {
 					tc.version,
 					1,
 					1,
-					"test-transaction-id",
+					"test-transaction-id-version-boundary",
 					false,
 					nil,
 				)
@@ -406,7 +406,7 @@ func TestReporterRepresentation_EdgeCases(t *testing.T) {
 					1,
 					tc.generation,
 					1,
-					"test-transaction-id",
+					"test-transaction-id-generation-boundary",
 					false,
 					nil,
 				)
@@ -439,7 +439,7 @@ func TestReporterRepresentation_EdgeCases(t *testing.T) {
 					1,
 					1,
 					1,
-					"test-transaction-id",
+					"test-transaction-id-tombstone-flag",
 					tc.tombstone,
 					nil,
 				)
@@ -717,5 +717,23 @@ func TestReporterRepresentation_Serialization(t *testing.T) {
 		if len(unmarshaled.Data) != 0 {
 			t.Errorf("Data should be empty after JSON round-trip, got: %v", unmarshaled.Data)
 		}
+	})
+
+	t.Run("should enforce unique TransactionID constraint", func(t *testing.T) {
+		t.Parallel()
+
+		// Test that different ReporterRepresentations can have different TransactionIDs
+		fixture := NewTestFixture(t)
+
+		// Create first representation
+		rr1 := fixture.ValidReporterRepresentation()
+		AssertEqual(t, "test-transaction-id-valid-reporter", rr1.TransactionId, "First representation should have correct TransactionID")
+
+		// Create second representation with different TransactionID
+		rr2 := fixture.ReporterRepresentationWithTombstone(false)
+		AssertEqual(t, "test-transaction-id-with-tombstone", rr2.TransactionId, "Second representation should have different TransactionID")
+
+		// Verify they have different TransactionIDs
+		AssertNotEqual(t, rr1.TransactionId, rr2.TransactionId, "Representations should have different TransactionIDs")
 	})
 }

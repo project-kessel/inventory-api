@@ -8,6 +8,7 @@ import (
 	"github.com/project-kessel/inventory-api/internal/biz"
 	"gorm.io/gorm"
 
+	"github.com/go-kratos/kratos/v2/errors"
 	"github.com/project-kessel/inventory-api/internal"
 	bizmodel "github.com/project-kessel/inventory-api/internal/biz/model"
 	"github.com/project-kessel/inventory-api/internal/biz/model_legacy"
@@ -171,12 +172,18 @@ func (r *resourceRepository) Save(tx *gorm.DB, resource bizmodel.Resource, opera
 	//TODO: make these checks better, the zero value checks right now are to avoid saving zero value rows in the representation tables and causing unique constraint failures
 	if dataReporterRepresentation.ReporterResourceID != uuid.Nil {
 		if err := tx.Create(&dataReporterRepresentation).Error; err != nil {
+			if errors.Is(err, gorm.ErrDuplicatedKey) {
+				return errors.BadRequest("NON-UNIQUE TRANSACTION ID", err.Error()).WithCause(err)
+			}
 			return fmt.Errorf("failed to save reporter representation: %w", err)
 		}
 	}
 
 	if dataCommonRepresentation.ResourceId != uuid.Nil {
 		if err := tx.Create(&dataCommonRepresentation).Error; err != nil {
+			if errors.Is(err, gorm.ErrDuplicatedKey) {
+				return errors.BadRequest("NON-UNIQUE TRANSACTION ID", err.Error()).WithCause(err)
+			}
 			return fmt.Errorf("failed to save common representation: %w", err)
 		}
 	}

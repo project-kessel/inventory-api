@@ -163,7 +163,7 @@ func (r *resourceRepository) Save(tx *gorm.DB, resource bizmodel.Resource, opera
 	dataCommonRepresentation := datamodel.DeserializeCommonRepresentationFromSnapshot(commonRepresentationSnapshot)
 
 	// Best-effort parent row locking to reduce SSI conflicts (Postgres only). No-ops on SQLite.
-	if tx != nil && tx.Name() == "postgres" {
+	if tx != nil && tx.Dialector != nil && tx.Dialector.Name() == "postgres" {
 		// Lock resource row if it already exists
 		if dataResource.ID != uuid.Nil {
 			var _lockRes datamodel.Resource

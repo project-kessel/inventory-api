@@ -2,6 +2,7 @@ package data
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 
 	"github.com/go-kratos/kratos/v2/log"
@@ -54,15 +55,18 @@ func (tm *gormTransactionManager) HandleSerializableTransaction(db *gorm.DB, txF
 }
 
 func (tm *gormTransactionManager) isSerializationFailure(err error, attempt, maxRetries int) bool {
-	switch dbErr := err.(type) {
-	case *pgconn.PgError:
-		if dbErr.Code == "40001" {
-			log.Debugf("transaction serialization failure (attempt %d/%d): %v", attempt+1, maxRetries, err)
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) {
+		if pgErr.Code == "40001" {
+			log.Errorf("transaction serialization failure (attempt %d/%d): %v", attempt+1, maxRetries, err)
 			return true
 		}
-	case sqlite3.Error:
-		if dbErr.Code == sqlite3.ErrError {
-			log.Debugf("transaction serialization failure (attempt %d/%d): %v", attempt+1, maxRetries, err)
+	}
+
+	var sqliteErr sqlite3.Error
+	if errors.As(err, &sqliteErr) {
+		if sqliteErr.Code == sqlite3.ErrError {
+			log.Errorf("transaction serialization failure (attempt %d/%d): %v", attempt+1, maxRetries, err)
 			return true
 		}
 	}

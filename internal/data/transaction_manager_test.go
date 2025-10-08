@@ -3,6 +3,7 @@ package data
 import (
 	"database/sql"
 	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/jackc/pgx/v5/pgconn"
@@ -194,6 +195,36 @@ func TestGormTransactionManager_SerializationFailureRecovery(t *testing.T) {
 	assert.Equal(t, 3, callCount)
 
 	// Should succeed after retries
+	assert.NoError(t, err)
+}
+
+func TestGormTransactionManager_DeeplyWrappedSerializationError(t *testing.T) {
+	db := setupTestDB(t)
+	maxRetries := 2
+	tm := NewGormTransactionManager(maxRetries)
+
+	// Create a serialization error wrapped multiple layers deep
+	baseError := &pgconn.PgError{
+		Code:    "40001",
+		Message: "could not serialize access due to read/write dependencies among transactions",
+	}
+
+	// Wrap it multiple times to simulate complex error handling chains
+	layer1Error := fmt.Errorf("database error: %w", baseError)
+	layer2Error := fmt.Errorf("repository operation failed: %w", layer1Error)
+	layer3Error := fmt.Errorf("service layer error: %w", layer2Error)
+
+	callCount := 0
+	err := tm.HandleSerializableTransaction(db, func(tx *gorm.DB) error {
+		callCount++
+		if callCount == 1 {
+			return layer3Error
+		}
+		return nil
+	})
+
+	// Should retry even with deeply wrapped errors
+	assert.Equal(t, 2, callCount)
 	assert.NoError(t, err)
 }
 

@@ -98,6 +98,7 @@ objects:
             public:
               enabled: true
               apiPath: inventory
+              tls: true
 
       testing:
         iqePlugin: kessel-inventory

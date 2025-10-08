@@ -27,6 +27,7 @@ import (
 	"github.com/project-kessel/inventory-api/internal/authz/kessel"
 	"github.com/project-kessel/inventory-api/internal/pubsub"
 
+	"github.com/spf13/viper"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 
@@ -129,7 +130,8 @@ func New(config CompletedConfig, db *gorm.DB, authz authz.CompletedConfig, autho
 
 	var errChan chan error
 
-	resourceRepository := data.NewResourceRepository(db, data.NewGormTransactionManager(3))
+	maxSerializationRetries := viper.GetInt("storage.max-serialization-retries")
+	resourceRepository := data.NewResourceRepository(db, data.NewGormTransactionManager(maxSerializationRetries))
 	schemaService := usecase_resources.NewSchemaUsecase(resourceRepository, logger)
 
 	return InventoryConsumer{

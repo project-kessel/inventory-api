@@ -27,7 +27,7 @@ type ReporterResource struct {
 	ID uuid.UUID `gorm:"type:uuid;primaryKey"`
 	ReporterResourceKey
 
-	ResourceID  uuid.UUID `gorm:"type:uuid;not null"`
+	ResourceID  uuid.UUID `gorm:"index:reporter_resource_resource_id_idx;type:uuid;not null"`
 	APIHref     string    `gorm:"size:512;not null"`
 	ConsoleHref string    `gorm:"size:512"`
 

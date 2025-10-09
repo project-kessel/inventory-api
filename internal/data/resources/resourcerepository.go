@@ -50,7 +50,7 @@ func (r *Repo) Create(ctx context.Context, m *model_legacy.Resource, namespace s
 
 	db := r.DB.Session(&gorm.Session{})
 	var result *model_legacy.Resource
-	err := r.TransactionManager.HandleSerializableTransaction(db, func(tx *gorm.DB) error {
+	err := r.TransactionManager.HandleSerializableTransaction("LegacyCreateResource", db, func(tx *gorm.DB) error {
 		// Copy the resource to avoid modifying the original, necessary for serialized transaction retries
 		resource := *m
 		updatedResources := []*model_legacy.Resource{}
@@ -117,7 +117,7 @@ func (r *Repo) Create(ctx context.Context, m *model_legacy.Resource, namespace s
 func (r *Repo) Update(ctx context.Context, m *model_legacy.Resource, id uuid.UUID, namespace string, txid string) (*model_legacy.Resource, error) {
 	db := r.DB.Session(&gorm.Session{})
 	var result *model_legacy.Resource
-	err := r.TransactionManager.HandleSerializableTransaction(db, func(tx *gorm.DB) error {
+	err := r.TransactionManager.HandleSerializableTransaction("LegacyUpdateResource", db, func(tx *gorm.DB) error {
 		updatedResources := []*model_legacy.Resource{}
 		resource, err := r.FindByIDWithTx(ctx, tx, id)
 		if err != nil {
@@ -168,7 +168,7 @@ func (r *Repo) Update(ctx context.Context, m *model_legacy.Resource, id uuid.UUI
 func (r *Repo) Delete(ctx context.Context, id uuid.UUID, namespace string) (*model_legacy.Resource, error) {
 	db := r.DB.Session(&gorm.Session{})
 	var result *model_legacy.Resource
-	err := r.TransactionManager.HandleSerializableTransaction(db, func(tx *gorm.DB) error {
+	err := r.TransactionManager.HandleSerializableTransaction("LegacyDeleteResource", db, func(tx *gorm.DB) error {
 		resource, err := r.FindByIDWithTx(ctx, tx, id)
 		if err != nil {
 			return err

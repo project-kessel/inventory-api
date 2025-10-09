@@ -94,11 +94,13 @@ type MetricsCollector struct {
 	assignmentSize metric.Int64Gauge
 
 	// App Specific Metrics
-	MsgsProcessed      metric.Int64Counter
-	MsgProcessFailures metric.Int64Counter
-	ConsumerErrors     metric.Int64Counter
-	KafkaErrorEvents   metric.Int64Counter
-	OutboxEventWrites  metric.Int64Counter
+	MsgsProcessed            metric.Int64Counter
+	MsgProcessFailures       metric.Int64Counter
+	ConsumerErrors           metric.Int64Counter
+	KafkaErrorEvents         metric.Int64Counter
+	OutboxEventWrites        metric.Int64Counter
+	SerializationFailures    metric.Int64Counter
+	SerializationExhaustions metric.Int64Counter
 }
 
 // New instantiates a new MetricsCollector
@@ -169,6 +171,13 @@ func (m *MetricsCollector) New(meter metric.Meter) error {
 
 	// create all other custom app metrics
 	if m.OutboxEventWrites, err = meter.Int64Counter(prefix + "outbox_event_writes"); err != nil {
+		return err
+	}
+
+	if m.SerializationFailures, err = meter.Int64Counter(prefix + "serialization_failures"); err != nil {
+		return err
+	}
+	if m.SerializationExhaustions, err = meter.Int64Counter(prefix + "serialization_exhaustions"); err != nil {
 		return err
 	}
 	return nil

@@ -121,6 +121,7 @@ func (uc *Usecase) ReportResource(ctx context.Context, request *v1beta2.ReportRe
 	}
 
 	err = uc.resourceRepository.GetTransactionManager().HandleSerializableTransaction(
+		"ReportResource",
 		uc.resourceRepository.GetDB(),
 		func(tx *gorm.DB) error {
 			// Check for duplicate transaction ID's before we find the resource for quicker returns if it fails
@@ -194,6 +195,7 @@ func (uc *Usecase) Delete(reporterResourceKey model.ReporterResourceKey) error {
 
 	log.Info("Reporter Resource Key to delete ", reporterResourceKey)
 	err = uc.resourceRepository.GetTransactionManager().HandleSerializableTransaction(
+		"DeleteResource",
 		uc.resourceRepository.GetDB(),
 		func(tx *gorm.DB) error {
 			res, err := uc.resourceRepository.FindResourceByKeys(tx, reporterResourceKey)

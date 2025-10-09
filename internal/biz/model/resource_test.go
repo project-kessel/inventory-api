@@ -48,6 +48,34 @@ func TestResource_Initialization(t *testing.T) {
 		assertResourceEvent(t, resource, "different resource type")
 	})
 
+	t.Run("should generate transaction ID when empty transactionId provided to NewResource", func(t *testing.T) {
+		t.Parallel()
+
+		// Use empty transaction ID
+		emptyTransactionId := TransactionId("")
+
+		resource, err := NewResource(fixture.ValidResourceIdType(), fixture.ValidLocalResourceIdType(), fixture.ValidResourceTypeType(), fixture.ValidReporterTypeType(), fixture.ValidReporterInstanceIdType(), emptyTransactionId, fixture.ValidReporterResourceIdType(), fixture.ValidApiHrefType(), fixture.ValidConsoleHrefType(), fixture.ValidReporterRepresentationType(), fixture.ValidCommonRepresentationType(), nil)
+
+		assertValidResource(t, resource, err, "empty transaction ID")
+		assertInitialResourceState(t, resource)
+		assertResourceEvent(t, resource, "empty transaction ID")
+
+		// Verify that a transaction ID was generated and used
+		resourceEvents := resource.ResourceReportEvents()
+		if len(resourceEvents) != 1 {
+			t.Fatalf("Expected 1 resource event, got %d", len(resourceEvents))
+		}
+
+		// Check that the event has a non-empty transaction ID
+		event := resourceEvents[0]
+		if event.reporterRepresentation.transactionId.String() == "" {
+			t.Error("Expected generated transaction ID to be non-empty in reporter representation")
+		}
+		if event.commonRepresentation.transactionId.String() == "" {
+			t.Error("Expected generated transaction ID to be non-empty in common representation")
+		}
+	})
+
 	// All tiny type validation tests have been moved to common_test.go where they belong.
 	// Resource aggregate tests should only test business logic with valid tiny types.
 }
@@ -372,6 +400,56 @@ func TestResource_Update(t *testing.T) {
 		// Should succeed without error
 		if len(original.ResourceReportEvents()) != 2 {
 			t.Errorf("Expected 2 resource events, got %d", len(original.ResourceReportEvents()))
+		}
+	})
+
+	t.Run("should generate transaction ID when empty transactionId provided to Update", func(t *testing.T) {
+		t.Parallel()
+
+		original, err := NewResource(fixture.ValidResourceIdType(), fixture.ValidLocalResourceIdType(), fixture.ValidResourceTypeType(), fixture.ValidReporterTypeType(), fixture.ValidReporterInstanceIdType(), fixture.ValidReporterResourceIdType(), fixture.ValidApiHrefType(), fixture.ValidConsoleHrefType(), fixture.ValidReporterRepresentationType(), fixture.ValidCommonRepresentationType(), nil)
+
+		if err != nil {
+			t.Fatalf("Expected no error creating Resource, got %v", err)
+		}
+
+		reporterResourceKey := original.ReporterResources()[0].Key()
+
+		// Convert primitives to domain types
+		apiHref, _ := NewApiHref("https://api.example.com/updated")
+		consoleHref, _ := NewConsoleHref("https://console.example.com/updated")
+		commonData, _ := NewRepresentation(internal.JsonObject{"test": "data"})
+		reporterData, _ := NewRepresentation(internal.JsonObject{"test": "data"})
+
+		// Use empty transaction ID
+		emptyTransactionId := TransactionId("")
+
+		err = original.Update(
+			reporterResourceKey,
+			apiHref,
+			consoleHref,
+			nil,
+			commonData,
+			reporterData,
+			emptyTransactionId,
+		)
+
+		if err != nil {
+			t.Fatalf("Expected no error updating Resource with empty transaction ID, got %v", err)
+		}
+
+		// Verify that a transaction ID was generated and used
+		resourceEvents := original.ResourceReportEvents()
+		if len(resourceEvents) != 2 {
+			t.Fatalf("Expected 2 resource events, got %d", len(resourceEvents))
+		}
+
+		// Check that the latest event has a non-empty transaction ID
+		latestEvent := resourceEvents[1]
+		if latestEvent.reporterRepresentation.transactionId.String() == "" {
+			t.Error("Expected generated transaction ID to be non-empty in reporter representation")
+		}
+		if latestEvent.commonRepresentation.transactionId.String() == "" {
+			t.Error("Expected generated transaction ID to be non-empty in common representation")
 		}
 	})
 }

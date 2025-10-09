@@ -21,6 +21,14 @@ type Resource struct {
 
 // Factory methods
 func NewResource(id ResourceId, localResourceId LocalResourceId, resourceType ResourceType, reporterType ReporterType, reporterInstanceId ReporterInstanceId, transactionId TransactionId, reporterResourceId ReporterResourceId, apiHref ApiHref, consoleHref ConsoleHref, reporterRepresentationData Representation, commonRepresentationData Representation, reporterVersion *ReporterVersion) (Resource, error) {
+	var err error
+	if transactionId == "" {
+		// generate transaction IDs when not provided
+		transactionId, err = GenerateTransactionId()
+		if err != nil {
+			return Resource{}, err
+		}
+	}
 
 	commonVersion := NewVersion(initialCommonVersion)
 
@@ -88,6 +96,14 @@ func (r *Resource) Update(
 	}
 
 	reporterResource.Update(apiHref, consoleHref)
+
+	if transactionId == "" {
+		// generate transaction IDs when not provided
+		transactionId, err = GenerateTransactionId()
+		if err != nil {
+			return err
+		}
+	}
 
 	resourceEvent, err := resourceEventAndRepresentations(
 		reporterResource.resourceID,

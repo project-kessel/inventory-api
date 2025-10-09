@@ -123,26 +123,25 @@ func (uc *Usecase) ReportResource(ctx context.Context, request *v1beta2.ReportRe
 	err = uc.resourceRepository.GetTransactionManager().HandleSerializableTransaction(
 		uc.resourceRepository.GetDB(),
 		func(tx *gorm.DB) error {
+			// Check for duplicate transaction ID's before we find the resource for quicker returns if it fails
+			transactionId := request.GetRepresentations().GetMetadata().GetTransactionId()
+			if transactionId != "" {
+				alreadyProcessed, err := uc.resourceRepository.HasTransactionIdBeenProcessed(tx, transactionId)
+				if err != nil {
+					return fmt.Errorf("failed to check transaction ID: %w", err)
+				}
+				if alreadyProcessed {
+					log.Info("Transaction already processed, skipping update")
+					return nil
+				}
+			}
+
 			res, err := uc.resourceRepository.FindResourceByKeys(tx, reporterResourceKey)
 			if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 				return fmt.Errorf("failed to lookup existing resource: %w", err)
 			}
 
 			if err == nil && res != nil {
-				transactionId := request.GetRepresentations().GetMetadata().GetTransactionId()
-
-				// Check if this transaction has already been processed (idempotency)
-				if transactionId != "" && len(res.ReporterResources()) > 0 {
-					alreadyProcessed, err := uc.resourceRepository.HasTransactionIdBeenProcessed(tx, transactionId)
-					if err != nil {
-						return fmt.Errorf("failed to check transaction ID: %w", err)
-					}
-					if alreadyProcessed {
-						log.Info("Transaction already processed, skipping update")
-						return nil
-					}
-				}
-
 				log.Info("Resource already exists, updating: ")
 				return uc.updateResource(tx, request, res, txidStr)
 			}

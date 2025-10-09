@@ -422,3 +422,12 @@ func (t TransactionId) Serialize() string {
 func NewTransactionId(transactionId string) TransactionId {
 	return TransactionId(transactionId)
 }
+
+func GenerateTransactionId() (TransactionId, error) {
+	id, err := uuid.NewV7()
+	if err != nil {
+		return "", err
+	}
+
+	return NewTransactionId(id.String()), nil
+}

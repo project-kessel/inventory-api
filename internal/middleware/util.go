@@ -127,6 +127,7 @@ func ValidateCommonRepresentation(resourceType string, commonRepresentation map[
 		return fmt.Errorf("failed to analyze common schema for '%s': %w", resourceType, err)
 	}
 
+	// TODO: Ask - why didn't we let the validation handle this case?
 	// If schema has required fields but commonRepresentation is nil/empty, that's an error
 	if hasRequiredFields && len(commonRepresentation) == 0 {
 		return fmt.Errorf("missing 'common' field in payload - schema for '%s' has required fields", resourceType)

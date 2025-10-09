@@ -6,6 +6,10 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/project-kessel/inventory-api/internal/biz/schema"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/structpb"
+
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/google/uuid"
 	"github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2"
@@ -80,6 +84,7 @@ type Usecase struct {
 	resourceRepository               data.ResourceRepository
 	LegacyReporterResourceRepository ReporterResourceRepository
 	inventoryResourceRepository      InventoryResourceRepository
+	schemaUsecase                    *SchemaUsecase
 	waitForNotifBreaker              *gobreaker.CircuitBreaker
 	Authz                            authzapi.Authorizer
 	Eventer                          eventingapi.Manager
@@ -92,12 +97,13 @@ type Usecase struct {
 }
 
 func New(resourceRepository data.ResourceRepository, reporterResourceRepository ReporterResourceRepository, inventoryResourceRepository InventoryResourceRepository,
-	authz authzapi.Authorizer, eventer eventingapi.Manager, namespace string, logger log.Logger,
+	schemaRepository schema.Repository, authz authzapi.Authorizer, eventer eventingapi.Manager, namespace string, logger log.Logger,
 	listenManager pubsub.ListenManagerImpl, waitForNotifBreaker *gobreaker.CircuitBreaker, usecaseConfig *UsecaseConfig, metricsCollector *metricscollector.MetricsCollector) *Usecase {
 	return &Usecase{
 		resourceRepository:               resourceRepository,
 		LegacyReporterResourceRepository: reporterResourceRepository,
 		inventoryResourceRepository:      inventoryResourceRepository,
+		schemaUsecase:                    NewSchemaUsecase(schemaRepository, log.NewHelper(logger)),
 		waitForNotifBreaker:              waitForNotifBreaker,
 		Authz:                            authz,
 		Eventer:                          eventer,
@@ -113,6 +119,11 @@ func (uc *Usecase) ReportResource(ctx context.Context, request *v1beta2.ReportRe
 	log.Info("Reporting resource request: ", request)
 	var subscription pubsub.Subscription
 	txidStr, err := getNextTransactionID()
+	if err != nil {
+		return err
+	}
+
+	err = validateReportResource(ctx, request, uc.schemaUsecase)
 	if err != nil {
 		return err
 	}
@@ -902,4 +913,79 @@ func computeReadAfterWrite(uc *Usecase, write_visibility v1beta2.WriteVisibility
 
 func (uc *Usecase) GetResourceRepository() data.ResourceRepository {
 	return uc.resourceRepository
+}
+
+func validateReportResource(ctx context.Context, msg proto.Message, schemaUseCase *SchemaUsecase) error {
+	data, err := marshalProtoToJSON(msg)
+	if err != nil {
+		return err
+	}
+
+	reportResourceMap, err := unmarshalJSONToMap(data)
+	if err != nil {
+		return err
+	}
+
+	resourceType, err := extractStringField(reportResourceMap, "type", validateFieldExists())
+	if err != nil {
+		return err
+	}
+
+	reporterType, err := extractStringField(reportResourceMap, "reporterType", validateFieldExists())
+	if err != nil {
+		return err
+	}
+
+	// Validate the combination of resource_type and reporter_type e.g. k8s_cluster & ACM
+	if isReporter, err := schemaUseCase.IsReporterForResource(ctx, resourceType, reporterType); !isReporter {
+		if err != nil {
+			return err
+		}
+
+		return fmt.Errorf("reporter %s does not report resource types: %s", reporterType, resourceType)
+	}
+
+	representations, err := extractMapField(reportResourceMap, "representations", validateFieldExists())
+	if err != nil {
+		return err
+	}
+
+	reporterRepresentation, err := extractMapField(representations, "reporter")
+	if err != nil {
+		return err
+	}
+
+	// Remove any fields with null values before validation.
+	var sanitizedReporterRepresentation map[string]interface{}
+	if reporterRepresentation != nil {
+		sanitizedReporterRepresentation = removeNulls(reporterRepresentation)
+	} else {
+		sanitizedReporterRepresentation = nil
+	}
+
+	// Overwrite the proto's reporter struct with the sanitized version so downstream layers don't see nulls.
+	if rr, ok := msg.(*v1beta2.ReportResourceRequest); ok && sanitizedReporterRepresentation != nil {
+		sanitizedStruct, err2 := structpb.NewStruct(sanitizedReporterRepresentation)
+		if err2 != nil {
+			return fmt.Errorf("failed to rebuild reporter struct: %w", err2)
+		}
+		rr.Representations.Reporter = sanitizedStruct
+	}
+
+	// Validate reporter-specific data using the sanitized map
+	if err := schemaUseCase.ReporterShallowValidate(ctx, resourceType, reporterType, sanitizedReporterRepresentation); err != nil {
+		return err
+	}
+
+	commonRepresentation, err := extractMapField(representations, "common")
+	if err != nil {
+		return err
+	}
+
+	// Validate common data
+	if err := schemaUseCase.CommonShallowValidate(ctx, resourceType, commonRepresentation); err != nil {
+		return err
+	}
+
+	return nil
 }

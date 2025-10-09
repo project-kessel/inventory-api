@@ -14,6 +14,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/project-kessel/inventory-api/internal/biz/schema"
+
 	"github.com/project-kessel/inventory-api/cmd/common"
 	"github.com/project-kessel/inventory-api/internal"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
@@ -89,7 +91,7 @@ type InventoryConsumer struct {
 }
 
 // New instantiates a new InventoryConsumer
-func New(config CompletedConfig, db *gorm.DB, authz authz.CompletedConfig, authorizer api.Authorizer, notifier pubsub.Notifier, logger *log.Helper, consumer Consumer) (InventoryConsumer, error) {
+func New(config CompletedConfig, db *gorm.DB, schemaRepository schema.Repository, authz authz.CompletedConfig, authorizer api.Authorizer, notifier pubsub.Notifier, logger *log.Helper, consumer Consumer) (InventoryConsumer, error) {
 	if consumer == nil {
 		logger.Info("Setting up kafka consumer")
 		logger.Debugf("completed kafka config: %+v", config.KafkaConfig)
@@ -131,7 +133,7 @@ func New(config CompletedConfig, db *gorm.DB, authz authz.CompletedConfig, autho
 
 	maxSerializationRetries := viper.GetInt("storage.max-serialization-retries")
 	resourceRepository := data.NewResourceRepository(db, data.NewGormTransactionManager(&mc, maxSerializationRetries))
-	schemaService := usecase_resources.NewSchemaUsecase(logger)
+	schemaService := usecase_resources.NewSchemaUsecase(schemaRepository, logger)
 
 	return InventoryConsumer{
 		Consumer:           consumer,

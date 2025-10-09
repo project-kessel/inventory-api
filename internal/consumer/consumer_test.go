@@ -3,6 +3,7 @@ package consumer
 import (
 	"context"
 	"errors"
+	"github.com/project-kessel/inventory-api/internal/data"
 	"testing"
 
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
@@ -96,15 +97,16 @@ func (t *TestCase) TestSetup(testingT *testing.T) []error {
 
 	consumer := &mocks.MockConsumer{}
 	db := setupInMemoryDB(testingT)
+	schemaRepository := data.NewInMemorySchemaRepository()
 
 	// Create consumer with real database first
-	t.inv, err = New(cfg, db, authz.CompletedConfig{}, authorizer, notifier, t.logger, consumer)
+	t.inv, err = New(cfg, db, schemaRepository, authz.CompletedConfig{}, authorizer, notifier, t.logger, consumer)
 	if err != nil {
 		errs = append(errs, err)
 		return errs
 	}
 
-	t.inv.SchemaService = usecase_resources.NewSchemaUsecase(t.logger)
+	t.inv.SchemaService = usecase_resources.NewSchemaUsecase(data.NewInMemorySchemaRepository(), t.logger)
 
 	err = t.metrics.New(otel.Meter("github.com/project-kessel/inventory-api/blob/main/internal/server/otel"))
 	if err != nil {
@@ -938,7 +940,7 @@ func TestInventoryConsumer_UpdateWithSameWorkspace_NoOp(t *testing.T) {
 	assert.Nil(t, errs)
 
 	// Configure fake repo: same workspace for current and previous (simulates no change)
-	tester.inv.SchemaService = usecase_resources.NewSchemaUsecase(tester.logger)
+	tester.inv.SchemaService = usecase_resources.NewSchemaUsecase(data.NewInMemorySchemaRepository(), tester.logger)
 
 	// Mock authorizer: should NOT be called (no tuples to create/delete)
 	authorizer := &mocks.MockAuthz{}

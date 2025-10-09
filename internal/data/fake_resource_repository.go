@@ -8,8 +8,8 @@ import (
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
+	"github.com/project-kessel/inventory-api/internal/biz"
 	bizmodel "github.com/project-kessel/inventory-api/internal/biz/model"
-	"github.com/project-kessel/inventory-api/internal/biz/model_legacy"
 	"github.com/project-kessel/inventory-api/internal/biz/usecase"
 )
 
@@ -77,7 +77,7 @@ func (f *fakeResourceRepository) NextReporterResourceId() (bizmodel.ReporterReso
 	return bizmodel.NewReporterResourceId(uuidV7)
 }
 
-func (f *fakeResourceRepository) Save(tx *gorm.DB, resource bizmodel.Resource, operationType model_legacy.EventOperationType, txid string) error {
+func (f *fakeResourceRepository) Save(tx *gorm.DB, resource bizmodel.Resource, operationType biz.EventOperationType, txid string) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
@@ -220,44 +220,53 @@ func (f *fakeResourceRepository) FindResourceByKeys(tx *gorm.DB, key bizmodel.Re
 	return nil, gorm.ErrRecordNotFound
 }
 
-func (f *fakeResourceRepository) FindVersionedRepresentationsByVersion(tx *gorm.DB, key bizmodel.ReporterResourceKey, currentVersion uint) ([]RepresentationsByVersion, error) {
-	// This is a fake implementation for testing
-	// In a real test, you would mock this based on your test data needs
+func (f *fakeResourceRepository) FindCurrentAndPreviousVersionedRepresentations(tx *gorm.DB, key bizmodel.ReporterResourceKey, currentVersion *uint, operationType biz.EventOperationType) ([]RepresentationsByVersion, error) {
+	if currentVersion == nil {
+		return []RepresentationsByVersion{}, nil
+	}
+
 	var results []RepresentationsByVersion
 
-	// Prefer explicit overrides when provided by tests
 	if f.overrideCurrent != "" {
-		results = append(results, RepresentationsByVersion{Data: map[string]interface{}{"workspace_id": f.overrideCurrent}, Version: currentVersion})
-		if f.overridePrevious != "" && currentVersion > 0 {
-			results = append(results, RepresentationsByVersion{Data: map[string]interface{}{"workspace_id": f.overridePrevious}, Version: currentVersion - 1})
+		if currentVersion != nil {
+			results = append(results, RepresentationsByVersion{Data: map[string]interface{}{"workspace_id": f.overrideCurrent}, Version: *currentVersion})
+			if f.overridePrevious != "" {
+				if *currentVersion > 0 {
+					results = append(results, RepresentationsByVersion{Data: map[string]interface{}{"workspace_id": f.overridePrevious}, Version: *currentVersion - 1})
+				}
+			}
 		}
 		return results, nil
 	}
 
-	// For testing purposes, we'll return mock data based on the version
-	// In a real implementation, this would query the database for common_representations
-
-	// Mock data for testing - you can customize this based on your test needs
-	switch currentVersion {
-	case 0:
-		// Version 0 - initial creation
-		results = append(results, RepresentationsByVersion{Data: map[string]interface{}{"workspace_id": "test-workspace-initial"}, Version: currentVersion})
-	case 1:
-		// Version 1 - first update
-		results = append(results, RepresentationsByVersion{Data: map[string]interface{}{"workspace_id": "test-workspace-v1"}, Version: currentVersion})
-		// Also include previous (version 0) for contract parity with real repo
-		results = append(results, RepresentationsByVersion{Data: map[string]interface{}{"workspace_id": "test-workspace-previous"}, Version: 0})
-	case 2:
-		// Version 2 - workspace change scenario
-		results = append(results, RepresentationsByVersion{Data: map[string]interface{}{"workspace_id": "test-workspace-v2"}, Version: currentVersion})
-
-		// Add previous (current-1) version if requested
-		if currentVersion > 0 {
-			results = append(results, RepresentationsByVersion{Data: map[string]interface{}{"workspace_id": "test-workspace-previous"}, Version: currentVersion - 1})
+	if currentVersion != nil {
+		switch *currentVersion {
+		case 0:
+			results = append(results, RepresentationsByVersion{Data: map[string]interface{}{"workspace_id": "test-workspace-initial"}, Version: *currentVersion})
+		case 1:
+			results = append(results, RepresentationsByVersion{Data: map[string]interface{}{"workspace_id": "test-workspace-v1"}, Version: *currentVersion})
+			results = append(results, RepresentationsByVersion{Data: map[string]interface{}{"workspace_id": "test-workspace-previous"}, Version: 0})
+		case 2:
+			results = append(results, RepresentationsByVersion{Data: map[string]interface{}{"workspace_id": "test-workspace-v2"}, Version: *currentVersion})
+			if *currentVersion > 0 {
+				results = append(results, RepresentationsByVersion{Data: map[string]interface{}{"workspace_id": "test-workspace-previous"}, Version: *currentVersion - 1})
+			}
 		}
 	}
 
 	return results, nil
+}
+
+func (f *fakeResourceRepository) FindLatestRepresentations(tx *gorm.DB, key bizmodel.ReporterResourceKey) (RepresentationsByVersion, error) {
+	if f.overrideCurrent != "" {
+		return RepresentationsByVersion{
+			Data: map[string]interface{}{"workspace_id": f.overrideCurrent}, Version: 1,
+		}, nil
+	}
+
+	return RepresentationsByVersion{
+		Data: map[string]interface{}{"workspace_id": "test-workspace-latest"}, Version: 1,
+	}, nil
 }
 
 func (f *fakeResourceRepository) GetDB() *gorm.DB {

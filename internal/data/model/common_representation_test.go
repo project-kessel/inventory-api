@@ -61,7 +61,7 @@ func TestCommonRepresentation_Infrastructure_Structure(t *testing.T) {
 		cr := &CommonRepresentation{}
 
 		// Check primary key fields have correct GORM tags
-		AssertGORMTag(t, cr, "ResourceId", "type:text;primaryKey")
+		AssertGORMTag(t, cr, "ResourceId", "type:uuid;primaryKey")
 		AssertGORMTag(t, cr, "Version", "type:bigint;primaryKey;check:version >= 0")
 	})
 

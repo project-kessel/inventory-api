@@ -9,24 +9,24 @@ type TuplesToReplicate struct {
 	tuplesToDelete *[]RelationsTuple
 }
 
-func NewTuplesToReplicate(tuplesToCreate, tuplesToDelete *[]RelationsTuple) (TuplesToReplicate, error) {
-	// Validate that at least one attribute is provided
-	if tuplesToCreate == nil && tuplesToDelete == nil {
+func NewTuplesToReplicate(tuplesToCreate, tuplesToDelete []RelationsTuple) (TuplesToReplicate, error) {
+	// Validate that at least one slice has content
+	if len(tuplesToCreate) == 0 && len(tuplesToDelete) == 0 {
 		return TuplesToReplicate{}, fmt.Errorf("at least one of tuplesToCreate or tuplesToDelete must be provided")
 	}
 
-	// Validate that if an attribute is not null, it is not empty
-	if tuplesToCreate != nil && len(*tuplesToCreate) == 0 {
-		return TuplesToReplicate{}, fmt.Errorf("tuplesToCreate cannot be empty when provided")
-	}
+	var createPtr, deletePtr *[]RelationsTuple
 
-	if tuplesToDelete != nil && len(*tuplesToDelete) == 0 {
-		return TuplesToReplicate{}, fmt.Errorf("tuplesToDelete cannot be empty when provided")
+	if len(tuplesToCreate) > 0 {
+		createPtr = &tuplesToCreate
+	}
+	if len(tuplesToDelete) > 0 {
+		deletePtr = &tuplesToDelete
 	}
 
 	return TuplesToReplicate{
-		tuplesToCreate: tuplesToCreate,
-		tuplesToDelete: tuplesToDelete,
+		tuplesToCreate: createPtr,
+		tuplesToDelete: deletePtr,
 	}, nil
 }
 

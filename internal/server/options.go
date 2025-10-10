@@ -7,6 +7,7 @@ import (
 
 	"github.com/project-kessel/inventory-api/internal/server/grpc"
 	"github.com/project-kessel/inventory-api/internal/server/http"
+	"github.com/project-kessel/inventory-api/internal/server/pprof"
 )
 
 type Options struct {
@@ -14,8 +15,9 @@ type Options struct {
 	Name      string `mapstructure:"name"`
 	PublicUrl string `mapstructure:"public_url"`
 
-	GrpcOptions *grpc.Options `mapstructure:"grpc"`
-	HttpOptions *http.Options `mapstructure:"http"`
+	GrpcOptions  *grpc.Options  `mapstructure:"grpc"`
+	HttpOptions  *http.Options  `mapstructure:"http"`
+	PprofOptions *pprof.Options `mapstructure:"pprof"`
 }
 
 func NewOptions() *Options {
@@ -25,8 +27,9 @@ func NewOptions() *Options {
 		Name:      "kessel-inventory-api",
 		PublicUrl: "http://localhost:8000",
 
-		GrpcOptions: grpc.NewOptions(),
-		HttpOptions: http.NewOptions(),
+		GrpcOptions:  grpc.NewOptions(),
+		HttpOptions:  http.NewOptions(),
+		PprofOptions: pprof.NewOptions(),
 	}
 }
 
@@ -41,6 +44,7 @@ func (o *Options) AddFlags(fs *pflag.FlagSet, prefix string) {
 
 	o.GrpcOptions.AddFlags(fs, prefix+"grpc")
 	o.HttpOptions.AddFlags(fs, prefix+"http")
+	o.PprofOptions.AddFlags(fs, prefix+"pprof")
 }
 
 func (o *Options) Complete() []error {
@@ -48,6 +52,7 @@ func (o *Options) Complete() []error {
 
 	errors = append(errors, o.GrpcOptions.Complete()...)
 	errors = append(errors, o.HttpOptions.Complete()...)
+	errors = append(errors, o.PprofOptions.Complete()...)
 
 	return errors
 }
@@ -57,6 +62,7 @@ func (o *Options) Validate() []error {
 
 	errors = append(errors, o.GrpcOptions.Validate()...)
 	errors = append(errors, o.HttpOptions.Validate()...)
+	errors = append(errors, o.PprofOptions.Validate()...)
 
 	return errors
 }

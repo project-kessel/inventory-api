@@ -41,6 +41,7 @@ import (
 	eventingapi "github.com/project-kessel/inventory-api/internal/eventing/api"
 	"github.com/project-kessel/inventory-api/internal/middleware"
 	"github.com/project-kessel/inventory-api/internal/server"
+	"github.com/project-kessel/inventory-api/internal/server/pprof"
 	"github.com/project-kessel/inventory-api/internal/storage"
 
 	hb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1"
@@ -233,6 +234,12 @@ func NewCommand(
 				return err
 			}
 
+			// construct pprof server
+			pprofServer, err := pprof.New(serverConfig.Options.PprofOptions, logger)
+			if err != nil {
+				return err
+			}
+
 			inventoryresources_repo := inventoryResourcesRepo.New(db)
 
 			usecaseConfig := &resourcesctl.UsecaseConfig{
@@ -310,7 +317,14 @@ func NewCommand(
 				srvErrs <- server.Run(ctx)
 			}()
 
-			shutdown := shutdown(db, server, eventingManager, &inventoryConsumer, log.NewHelper(logger))
+			pprofErrs := make(chan error)
+			if pprofServer != nil {
+				go func() {
+					pprofErrs <- pprofServer.Start()
+				}()
+			}
+
+			shutdown := shutdown(db, server, pprofServer, eventingManager, &inventoryConsumer, log.NewHelper(logger))
 
 			if consumerOptions.Enabled {
 				go func() {
@@ -348,6 +362,8 @@ func NewCommand(
 			select {
 			case err := <-srvErrs:
 				shutdown(err)
+			case pprofErr := <-pprofErrs:
+				shutdown(pprofErr)
 			case lmErr := <-listenManagerErr:
 				shutdown(lmErr)
 			case sig := <-quit:
@@ -373,8 +389,8 @@ func NewCommand(
 }
 
 // shutdown returns a shutdown function that gracefully closes all server components
-// including the HTTP server, eventing manager, consumer, and database connections.
-func shutdown(db *gorm.DB, srv *server.Server, em eventingapi.Manager, cm *consumer.InventoryConsumer, logger *log.Helper) func(reason interface{}) {
+// including the HTTP server, pprof server, eventing manager, consumer, and database connections.
+func shutdown(db *gorm.DB, srv *server.Server, pprofSrv *pprof.Server, em eventingapi.Manager, cm *consumer.InventoryConsumer, logger *log.Helper) func(reason interface{}) {
 	return func(reason interface{}) {
 		log.Info(fmt.Sprintf("Server Shutdown: %s", reason))
 
@@ -383,6 +399,14 @@ func shutdown(db *gorm.DB, srv *server.Server, em eventingapi.Manager, cm *consu
 		defer cancel()
 		if err := srv.Shutdown(ctx); err != nil {
 			logger.Error(fmt.Sprintf("Error Gracefully Shutting Down API: %v", err))
+		}
+
+		if pprofSrv != nil {
+			ctx, cancel = context.WithTimeout(context.Background(), timeout)
+			defer cancel()
+			if err := pprofSrv.Shutdown(ctx); err != nil {
+				logger.Error(fmt.Sprintf("Error Gracefully Shutting Down pprof: %v", err))
+			}
 		}
 
 		ctx, cancel = context.WithTimeout(context.Background(), timeout)

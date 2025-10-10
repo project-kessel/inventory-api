@@ -7,5 +7,5 @@ import "gorm.io/gorm"
 type TransactionManager interface {
 	// HandleSerializableTransaction executes the provided function within a serializable transaction
 	// It automatically handles retries in case of serialization failures
-	HandleSerializableTransaction(db *gorm.DB, txFunc func(tx *gorm.DB) error) error
+	HandleSerializableTransaction(operationName string, db *gorm.DB, txFunc func(tx *gorm.DB) error) error
 }

@@ -258,7 +258,7 @@ func NewCommand(
 			})
 
 			// Create transaction manager for all repositories
-			transactionManager := data.NewGormTransactionManager(storageConfig.Options.MaxSerializationRetries)
+			transactionManager := data.NewGormTransactionManager(mc, storageConfig.Options.MaxSerializationRetries)
 
 			//v1beta2
 			// wire together inventory service handling

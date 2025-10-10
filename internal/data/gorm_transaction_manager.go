@@ -11,22 +11,25 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/project-kessel/inventory-api/internal/biz/usecase"
+	"github.com/project-kessel/inventory-api/internal/metricscollector"
 )
 
 type gormTransactionManager struct {
+	metricsCollector        *metricscollector.MetricsCollector
 	maxSerializationRetries int
 }
 
 // NewGormTransactionManager creates a new GORM-based transaction manager
-func NewGormTransactionManager(maxSerializationRetries int) usecase.TransactionManager {
+func NewGormTransactionManager(mc *metricscollector.MetricsCollector, maxSerializationRetries int) usecase.TransactionManager {
 	return &gormTransactionManager{
+		metricsCollector:        mc,
 		maxSerializationRetries: maxSerializationRetries,
 	}
 }
 
 // HandleSerializableTransaction executes the provided function within a serializable transaction
 // It automatically handles retries in case of serialization failures
-func (tm *gormTransactionManager) HandleSerializableTransaction(db *gorm.DB, txFunc func(tx *gorm.DB) error) error {
+func (tm *gormTransactionManager) HandleSerializableTransaction(operationName string, db *gorm.DB, txFunc func(tx *gorm.DB) error) error {
 	var err error
 	for i := 0; i < tm.maxSerializationRetries; i++ {
 		tx := db.Begin(&sql.TxOptions{
@@ -36,6 +39,7 @@ func (tm *gormTransactionManager) HandleSerializableTransaction(db *gorm.DB, txF
 		if err != nil {
 			tx.Rollback()
 			if tm.isSerializationFailure(err, i, tm.maxSerializationRetries) {
+				metricscollector.Incr(tm.metricsCollector.SerializationFailures, operationName, nil)
 				continue
 			}
 			return fmt.Errorf("transaction failed: %w", err)
@@ -44,12 +48,14 @@ func (tm *gormTransactionManager) HandleSerializableTransaction(db *gorm.DB, txF
 		if err != nil {
 			tx.Rollback()
 			if tm.isSerializationFailure(err, i, tm.maxSerializationRetries) {
+				metricscollector.Incr(tm.metricsCollector.SerializationFailures, operationName, nil)
 				continue
 			}
 			return fmt.Errorf("committing transaction failed: %w", err)
 		}
 		return nil
 	}
+	metricscollector.Incr(tm.metricsCollector.SerializationExhaustions, operationName, nil)
 	log.Errorf("transaction failed after %d attempts: %v", tm.maxSerializationRetries, err)
 	return fmt.Errorf("transaction failed after %d attempts: %w", tm.maxSerializationRetries, err)
 }

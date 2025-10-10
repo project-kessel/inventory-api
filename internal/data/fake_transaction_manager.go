@@ -57,7 +57,7 @@ func (ftm *fakeTransactionManager) Reset() {
 }
 
 // HandleSerializableTransaction simulates serializable transaction behavior
-func (ftm *fakeTransactionManager) HandleSerializableTransaction(db *gorm.DB, txFunc func(tx *gorm.DB) error) error {
+func (ftm *fakeTransactionManager) HandleSerializableTransaction(operationName string, db *gorm.DB, txFunc func(tx *gorm.DB) error) error {
 	ftm.mu.Lock()
 	ftm.transactionCallCount++
 	shouldFailTx := ftm.shouldFailTransaction

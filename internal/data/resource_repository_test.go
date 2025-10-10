@@ -16,6 +16,7 @@ import (
 	bizmodel "github.com/project-kessel/inventory-api/internal/biz/model"
 	"github.com/project-kessel/inventory-api/internal/biz/model_legacy"
 	datamodel "github.com/project-kessel/inventory-api/internal/data/model"
+	"github.com/project-kessel/inventory-api/internal/metricscollector"
 )
 
 func TestResourceRepositoryContract(t *testing.T) {
@@ -28,7 +29,8 @@ func TestResourceRepositoryContract(t *testing.T) {
 			name: "Real Repository with GormTransactionManager",
 			repo: func() ResourceRepository {
 				db := setupInMemoryDB(t)
-				tm := NewGormTransactionManager(3)
+				mc := metricscollector.NewFakeMetricsCollector()
+				tm := NewGormTransactionManager(mc, 3)
 				return NewResourceRepository(db, tm)
 			},
 			db: func() *gorm.DB {
@@ -294,7 +296,8 @@ func TestFindResourceByKeys(t *testing.T) {
 			name: "Real Repository with GormTransactionManager",
 			repo: func() ResourceRepository {
 				db := setupInMemoryDB(t)
-				tm := NewGormTransactionManager(3)
+				mc := metricscollector.NewFakeMetricsCollector()
+				tm := NewGormTransactionManager(mc, 3)
 				return NewResourceRepository(db, tm)
 			},
 			db: func() *gorm.DB {
@@ -320,7 +323,8 @@ func TestFindResourceByKeys(t *testing.T) {
 					return impl.repo(), impl.db()
 				}
 				db := setupInMemoryDB(t)
-				tm := NewGormTransactionManager(3)
+				mc := metricscollector.NewFakeMetricsCollector()
+				tm := NewGormTransactionManager(mc, 3)
 				repo := NewResourceRepository(db, tm)
 				return repo, db
 			}
@@ -554,7 +558,8 @@ func TestFindResourceByKeys_TombstoneFilter(t *testing.T) {
 			name: "Real Repository with GormTransactionManager",
 			repo: func() ResourceRepository {
 				db := setupInMemoryDB(t)
-				tm := NewGormTransactionManager(3)
+				mc := metricscollector.NewFakeMetricsCollector()
+				tm := NewGormTransactionManager(mc, 3)
 				return NewResourceRepository(db, tm)
 			},
 			db: func() *gorm.DB {
@@ -579,7 +584,8 @@ func TestFindResourceByKeys_TombstoneFilter(t *testing.T) {
 					return impl.repo(), impl.db()
 				}
 				db := setupInMemoryDB(t)
-				tm := NewGormTransactionManager(3)
+				mc := metricscollector.NewFakeMetricsCollector()
+				tm := NewGormTransactionManager(mc, 3)
 				repo := NewResourceRepository(db, tm)
 				return repo, db
 			}
@@ -633,7 +639,8 @@ func TestUniqueConstraint_ReporterResourceCompositeKey(t *testing.T) {
 			name: "Real Repository with GormTransactionManager",
 			repo: func() ResourceRepository {
 				db := setupInMemoryDB(t)
-				tm := NewGormTransactionManager(3)
+				mc := metricscollector.NewFakeMetricsCollector()
+				tm := NewGormTransactionManager(mc, 3)
 				return NewResourceRepository(db, tm)
 			},
 			db: func() *gorm.DB {
@@ -658,7 +665,8 @@ func TestUniqueConstraint_ReporterResourceCompositeKey(t *testing.T) {
 					return impl.repo(), impl.db()
 				}
 				db := setupInMemoryDB(t)
-				tm := NewGormTransactionManager(3)
+				mc := metricscollector.NewFakeMetricsCollector()
+				tm := NewGormTransactionManager(mc, 3)
 				repo := NewResourceRepository(db, tm)
 				return repo, db
 			}
@@ -772,7 +780,8 @@ func TestResourceRepository_IdempotentOperations(t *testing.T) {
 			name: "Real Repository with GormTransactionManager",
 			repo: func() ResourceRepository {
 				db := setupInMemoryDB(t)
-				tm := NewGormTransactionManager(3)
+				mc := metricscollector.NewFakeMetricsCollector()
+				tm := NewGormTransactionManager(mc, 3)
 				return NewResourceRepository(db, tm)
 			},
 			db: func() *gorm.DB {
@@ -797,7 +806,8 @@ func TestResourceRepository_IdempotentOperations(t *testing.T) {
 					return impl.repo(), impl.db()
 				}
 				db := setupInMemoryDB(t)
-				tm := NewGormTransactionManager(3)
+				mc := metricscollector.NewFakeMetricsCollector()
+				tm := NewGormTransactionManager(mc, 3)
 				repo := NewResourceRepository(db, tm)
 				return repo, db
 			}
@@ -1015,7 +1025,8 @@ func TestSave(t *testing.T) {
 			name: "Real Repository with GormTransactionManager",
 			repo: func() ResourceRepository {
 				db := setupInMemoryDB(t)
-				tm := NewGormTransactionManager(3)
+				mc := metricscollector.NewFakeMetricsCollector()
+				tm := NewGormTransactionManager(mc, 3)
 				return NewResourceRepository(db, tm)
 			},
 			db: func() *gorm.DB {
@@ -1041,7 +1052,8 @@ func TestSave(t *testing.T) {
 					return impl.repo(), impl.db()
 				}
 				db := setupInMemoryDB(t)
-				tm := NewGormTransactionManager(3)
+				mc := metricscollector.NewFakeMetricsCollector()
+				tm := NewGormTransactionManager(mc, 3)
 				repo := NewResourceRepository(db, tm)
 				return repo, db
 			}
@@ -1137,7 +1149,8 @@ func TestResourceRepository_MultipleHostsLifecycle(t *testing.T) {
 			name: "Real Repository with GormTransactionManager",
 			repo: func() ResourceRepository {
 				db := setupInMemoryDB(t)
-				tm := NewGormTransactionManager(3)
+				mc := metricscollector.NewFakeMetricsCollector()
+				tm := NewGormTransactionManager(mc, 3)
 				return NewResourceRepository(db, tm)
 			},
 			db: func() *gorm.DB {
@@ -1162,7 +1175,8 @@ func TestResourceRepository_MultipleHostsLifecycle(t *testing.T) {
 					return impl.repo(), impl.db()
 				}
 				db := setupInMemoryDB(t)
-				tm := NewGormTransactionManager(3)
+				mc := metricscollector.NewFakeMetricsCollector()
+				tm := NewGormTransactionManager(mc, 3)
 				repo := NewResourceRepository(db, tm)
 				return repo, db
 			}
@@ -1270,7 +1284,8 @@ func TestResourceRepository_PartialDataScenarios(t *testing.T) {
 			name: "Real Repository with GormTransactionManager",
 			repo: func() ResourceRepository {
 				db := setupInMemoryDB(t)
-				tm := NewGormTransactionManager(3)
+				mc := metricscollector.NewFakeMetricsCollector()
+				tm := NewGormTransactionManager(mc, 3)
 				return NewResourceRepository(db, tm)
 			},
 			db: func() *gorm.DB {
@@ -1295,7 +1310,8 @@ func TestResourceRepository_PartialDataScenarios(t *testing.T) {
 					return impl.repo(), impl.db()
 				}
 				db := setupInMemoryDB(t)
-				tm := NewGormTransactionManager(3)
+				mc := metricscollector.NewFakeMetricsCollector()
+				tm := NewGormTransactionManager(mc, 3)
 				repo := NewResourceRepository(db, tm)
 				return repo, db
 			}
@@ -1409,7 +1425,8 @@ func TestSerializableCreateFails(t *testing.T) {
 			name: "Real Repository with GormTransactionManager",
 			repo: func() ResourceRepository {
 				db := setupInMemoryDB(t)
-				tm := NewGormTransactionManager(3)
+				mc := metricscollector.NewFakeMetricsCollector()
+				tm := NewGormTransactionManager(mc, 3)
 				return NewResourceRepository(db, tm)
 			},
 			db: func() *gorm.DB {
@@ -1422,7 +1439,8 @@ func TestSerializableCreateFails(t *testing.T) {
 		t.Run(impl.name, func(t *testing.T) {
 			// Fresh instances
 			db := setupInMemoryDB(t)
-			tm := NewGormTransactionManager(3)
+			mc := metricscollector.NewFakeMetricsCollector()
+			tm := NewGormTransactionManager(mc, 3)
 			repo := NewResourceRepository(db, tm)
 
 			resource := createTestResourceWithLocalId(t, "serializable-create-conflict")
@@ -1437,7 +1455,7 @@ func TestSerializableCreateFails(t *testing.T) {
 			// Do NOT commit yet to hold locks
 
 			// Attempt to create the same resource via a separate serializable transaction managed by TM
-			err = tm.HandleSerializableTransaction(db, func(tx *gorm.DB) error {
+			err = tm.HandleSerializableTransaction("test_create_resource", db, func(tx *gorm.DB) error {
 				foundResource, err := repo.FindResourceByKeys(tx, resource.ReporterResources()[0].ReporterResourceKey)
 				assert.NotNil(t, err)
 				assert.Nil(t, foundResource)
@@ -1462,7 +1480,8 @@ func TestSerializableUpdateFails(t *testing.T) {
 			name: "Real Repository with GormTransactionManager",
 			repo: func() ResourceRepository {
 				db := setupInMemoryDB(t)
-				tm := NewGormTransactionManager(3)
+				mc := metricscollector.NewFakeMetricsCollector()
+				tm := NewGormTransactionManager(mc, 3)
 				return NewResourceRepository(db, tm)
 			},
 			db: func() *gorm.DB {
@@ -1475,7 +1494,8 @@ func TestSerializableUpdateFails(t *testing.T) {
 		t.Run(impl.name, func(t *testing.T) {
 			// Fresh instances
 			db := setupInMemoryDB(t)
-			tm := NewGormTransactionManager(3)
+			mc := metricscollector.NewFakeMetricsCollector()
+			tm := NewGormTransactionManager(mc, 3)
 			repo := NewResourceRepository(db, tm)
 
 			// Create initial resource (committed)
@@ -1501,7 +1521,7 @@ func TestSerializableUpdateFails(t *testing.T) {
 			// Do NOT commit yet to hold locks
 
 			// Attempt to update the same resource via TM-managed serializable transaction
-			err = tm.HandleSerializableTransaction(db, func(tx *gorm.DB) error {
+			err = tm.HandleSerializableTransaction("test_update_resource", db, func(tx *gorm.DB) error {
 				return repo.Save(tx, resource, model_legacy.OperationTypeUpdated, "tx-update")
 			})
 			assert.Error(t, err)
@@ -1890,7 +1910,8 @@ func TestFindVersionedRepresentationsByVersion(t *testing.T) {
 			name: "Real Repository with GormTransactionManager",
 			repo: func() ResourceRepository {
 				db := setupInMemoryDB(t)
-				tm := NewGormTransactionManager(3)
+				mc := metricscollector.NewFakeMetricsCollector()
+				tm := NewGormTransactionManager(mc, 3)
 				return NewResourceRepository(db, tm)
 			},
 			db: func() *gorm.DB { return setupInMemoryDB(t) },
@@ -1910,7 +1931,8 @@ func TestFindVersionedRepresentationsByVersion(t *testing.T) {
 					return impl.repo(), impl.db()
 				}
 				db := setupInMemoryDB(t)
-				tm := NewGormTransactionManager(3)
+				mc := metricscollector.NewFakeMetricsCollector()
+				tm := NewGormTransactionManager(mc, 3)
 				return NewResourceRepository(db, tm), db
 			}
 
@@ -1973,7 +1995,8 @@ func TestGetCurrentAndPreviousWorkspaceID_Integration(t *testing.T) {
 			name: "Real Repository with GormTransactionManager",
 			repo: func() ResourceRepository {
 				db := setupInMemoryDB(t)
-				tm := NewGormTransactionManager(3)
+				mc := metricscollector.NewFakeMetricsCollector()
+				tm := NewGormTransactionManager(mc, 3)
 				return NewResourceRepository(db, tm)
 			},
 			db: func() *gorm.DB {
@@ -1998,7 +2021,8 @@ func TestGetCurrentAndPreviousWorkspaceID_Integration(t *testing.T) {
 					return impl.repo(), impl.db()
 				}
 				db := setupInMemoryDB(t)
-				tm := NewGormTransactionManager(3)
+				mc := metricscollector.NewFakeMetricsCollector()
+				tm := NewGormTransactionManager(mc, 3)
 				repo := NewResourceRepository(db, tm)
 				return repo, db
 			}
@@ -2110,7 +2134,8 @@ func TestHasTransactionIdBeenProcessed(t *testing.T) {
 			name: "Real Repository with GormTransactionManager",
 			repo: func() ResourceRepository {
 				db := setupInMemoryDB(t)
-				tm := NewGormTransactionManager(3)
+				mc := metricscollector.NewFakeMetricsCollector()
+				tm := NewGormTransactionManager(mc, 3)
 				return NewResourceRepository(db, tm)
 			},
 			db: func() *gorm.DB {
@@ -2283,7 +2308,8 @@ func TestTransactionIDUniqueConstraint(t *testing.T) {
 			name: "Real Repository with GormTransactionManager",
 			repo: func() ResourceRepository {
 				db := setupInMemoryDB(t)
-				tm := NewGormTransactionManager(3)
+				mc := metricscollector.NewFakeMetricsCollector()
+				tm := NewGormTransactionManager(mc, 3)
 				return NewResourceRepository(db, tm)
 			},
 			db: func() *gorm.DB {

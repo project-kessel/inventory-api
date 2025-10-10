@@ -7,6 +7,7 @@ import (
 	"github.com/project-kessel/inventory-api/internal/helpers"
 	"github.com/project-kessel/inventory-api/internal/server/grpc"
 	"github.com/project-kessel/inventory-api/internal/server/http"
+	"github.com/project-kessel/inventory-api/internal/server/pprof"
 	"github.com/spf13/pflag"
 	"github.com/stretchr/testify/assert"
 )
@@ -23,8 +24,9 @@ func TestNewOptions(t *testing.T) {
 			Name:      "kessel-inventory-api",
 			PublicUrl: "http://localhost:8000",
 
-			GrpcOptions: grpc.NewOptions(),
-			HttpOptions: http.NewOptions(),
+			GrpcOptions:  grpc.NewOptions(),
+			HttpOptions:  http.NewOptions(),
+			PprofOptions: pprof.NewOptions(),
 		},
 	}
 	assert.Equal(t, test.expectedOptions, NewOptions())
@@ -43,7 +45,7 @@ func TestOptions_AddFlags(t *testing.T) {
 	// the below logic ensures that every possible option defined in the Options type
 	// has a defined flag for that option; grpc and http are skipped in favor of testing
 	// in their own package
-	helpers.AllOptionsHaveFlags(t, prefix, fs, *test.options, []string{"grpc", "http"})
+	helpers.AllOptionsHaveFlags(t, prefix, fs, *test.options, []string{"grpc", "http", "pprof"})
 }
 
 func TestOptions_Validate(t *testing.T) {
@@ -55,8 +57,9 @@ func TestOptions_Validate(t *testing.T) {
 		{
 			name: "valid options",
 			options: &Options{
-				GrpcOptions: grpc.NewOptions(),
-				HttpOptions: http.NewOptions(),
+				GrpcOptions:  grpc.NewOptions(),
+				HttpOptions:  http.NewOptions(),
+				PprofOptions: pprof.NewOptions(),
 			},
 			expectError: false,
 		},
@@ -66,7 +69,8 @@ func TestOptions_Validate(t *testing.T) {
 				GrpcOptions: &grpc.Options{
 					Timeout: -1,
 				},
-				HttpOptions: http.NewOptions(),
+				HttpOptions:  http.NewOptions(),
+				PprofOptions: pprof.NewOptions(),
 			},
 			expectError: true,
 		},
@@ -77,6 +81,7 @@ func TestOptions_Validate(t *testing.T) {
 				HttpOptions: &http.Options{
 					Timeout: -1,
 				},
+				PprofOptions: pprof.NewOptions(),
 			},
 			expectError: true,
 		},

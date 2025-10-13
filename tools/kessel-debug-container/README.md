@@ -8,6 +8,7 @@ The Kessel Debug Container is a useful tool for investigating Kessel service iss
 * Zed CLI to interact with SpiceDB
 * Kafka command-line tools (available under `/opt/kafka/bin`)
 * Helper scripts for basic tasks as part of our runbooks
+* Kcat CLI for more advanced Kafka operations (allows setting headers when needed)
 
 ### Environment Configuration
 
@@ -28,7 +29,7 @@ Everything needed for the debug container is either encompassed in the deploymen
 **To Run**:
 
 ```shell
-oc process --local -f tools/kessel-debug-container/kessel-debug-deploy.yaml
+oc process --local -f tools/kessel-debug-container/kessel-debug-deploy.yaml \
     -p ENV=<target-environment (int, stage, or prod)> | oc apply -f -
 ```
 
@@ -55,6 +56,6 @@ Its critical to always remove the debug container when finished.
 To destroy the container:
 
 ```shell
-oc process --local -f tools/kessel-debug-container/kessel-debug-deploy.yaml
+oc process --local -f tools/kessel-debug-container/kessel-debug-deploy.yaml \
     -p ENV=<target-environment (int, stage, or prod)> | oc delete -f -
 ```

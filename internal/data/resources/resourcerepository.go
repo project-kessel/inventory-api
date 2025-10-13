@@ -111,7 +111,7 @@ func (r *Repo) Create(ctx context.Context, m *model_legacy.Resource, namespace s
 	if err != nil {
 		return nil, err
 	}
-	metricscollector.Incr(r.MetricsCollector.OutboxEventWrites, string(biz.OperationTypeCreated), nil)
+	metricscollector.Incr(r.MetricsCollector.OutboxEventWrites, string(biz.OperationTypeCreated))
 	return result, nil
 }
 
@@ -162,7 +162,7 @@ func (r *Repo) Update(ctx context.Context, m *model_legacy.Resource, id uuid.UUI
 	if err != nil {
 		return nil, err
 	}
-	metricscollector.Incr(r.MetricsCollector.OutboxEventWrites, string(biz.OperationTypeUpdated), nil)
+	metricscollector.Incr(r.MetricsCollector.OutboxEventWrites, string(biz.OperationTypeUpdated))
 	return result, nil
 }
 
@@ -213,7 +213,7 @@ func (r *Repo) Delete(ctx context.Context, id uuid.UUID, namespace string) (*mod
 	if err != nil {
 		return nil, err
 	}
-	metricscollector.Incr(r.MetricsCollector.OutboxEventWrites, string(biz.OperationTypeDeleted), nil)
+	metricscollector.Incr(r.MetricsCollector.OutboxEventWrites, string(biz.OperationTypeDeleted))
 	return result, nil
 }
 

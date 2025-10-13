@@ -2,7 +2,6 @@ package metricscollector
 
 import (
 	"context"
-	"fmt"
 
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
@@ -231,13 +230,10 @@ func (m *MetricsCollector) Collect(stats StatsData) {
 }
 
 // Incr increments a non-stats message based counter
-func Incr(counter metric.Int64Counter, operation string, errReason error, extraAttrs ...attribute.KeyValue) {
+func Incr(counter metric.Int64Counter, operation string, extraAttrs ...attribute.KeyValue) {
 	ctx := context.Background()
 	attrs := []attribute.KeyValue{
 		attribute.String("operation", operation),
-	}
-	if errReason != nil {
-		attrs = append(attrs, attribute.String("reason", fmt.Sprint(errReason)))
 	}
 	attrs = append(attrs, extraAttrs...)
 	counter.Add(ctx, 1, metric.WithAttributes(attrs...))

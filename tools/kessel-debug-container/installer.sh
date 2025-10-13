@@ -7,9 +7,11 @@ curl -Lo /tmp/grpcurl.rpm https://github.com/fullstorydev/grpcurl/releases/downl
 curl -Lo /tmp/zed.rpm https://github.com/authzed/zed/releases/download/v${ZED_VERSION}/zed_${ZED_VERSION}_linux_amd64.rpm
 curl -Lo /tmp/kafka.tgz https://dlcdn.apache.org/kafka/${KAFKA_VERSION}/kafka_${SCALA_VERSION}-${KAFKA_VERSION}.tgz
 
+echo "Setting up EPEL..."
+rpm -ivh https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.noarch.rpm
 
 echo "Installing packages..."
-microdnf install -y tar gzip wget bind-utils jq nmap-ncat openssl vim java-17-openjdk
+microdnf install -y tar gzip wget bind-utils jq nmap-ncat openssl vim java-17-openjdk kcat
 rpm -iv /tmp/grpcurl.rpm /tmp/zed.rpm
 
 mkdir -pv /opt/kafka

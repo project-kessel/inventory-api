@@ -39,7 +39,7 @@ func (tm *gormTransactionManager) HandleSerializableTransaction(operationName st
 		if err != nil {
 			tx.Rollback()
 			if tm.isSerializationFailure(err, i, tm.maxSerializationRetries) {
-				metricscollector.Incr(tm.metricsCollector.SerializationFailures, operationName, nil)
+				metricscollector.Incr(tm.metricsCollector.SerializationFailures, operationName)
 				continue
 			}
 			return fmt.Errorf("transaction failed: %w", err)
@@ -48,14 +48,14 @@ func (tm *gormTransactionManager) HandleSerializableTransaction(operationName st
 		if err != nil {
 			tx.Rollback()
 			if tm.isSerializationFailure(err, i, tm.maxSerializationRetries) {
-				metricscollector.Incr(tm.metricsCollector.SerializationFailures, operationName, nil)
+				metricscollector.Incr(tm.metricsCollector.SerializationFailures, operationName)
 				continue
 			}
 			return fmt.Errorf("committing transaction failed: %w", err)
 		}
 		return nil
 	}
-	metricscollector.Incr(tm.metricsCollector.SerializationExhaustions, operationName, nil)
+	metricscollector.Incr(tm.metricsCollector.SerializationExhaustions, operationName)
 	log.Errorf("transaction failed after %d attempts: %v", tm.maxSerializationRetries, err)
 	return fmt.Errorf("transaction failed after %d attempts: %w", tm.maxSerializationRetries, err)
 }

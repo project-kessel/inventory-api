@@ -158,7 +158,7 @@ type MessagePayload struct {
 func (i *InventoryConsumer) Consume() error {
 	err := i.Consumer.SubscribeTopics([]string{i.Config.Topic}, i.RebalanceCallback)
 	if err != nil {
-		metricscollector.Incr(i.MetricsCollector.ConsumerErrors, "SubscribeTopics", err)
+		metricscollector.Incr(i.MetricsCollector.ConsumerErrors, "SubscribeTopics")
 		i.Logger.Errorf("failed to subscribe to topic: %v", err)
 		i.Errors <- err
 		return err
@@ -193,7 +193,7 @@ func (i *InventoryConsumer) Consume() error {
 			case *kafka.Message:
 				headers, err := ParseHeaders(e)
 				if err != nil {
-					metricscollector.Incr(i.MetricsCollector.MsgProcessFailures, "ParseHeaders", fmt.Errorf("missing headers"))
+					metricscollector.Incr(i.MetricsCollector.MsgProcessFailures, "ParseHeaders")
 					i.Logger.Errorf("failed to parse message headers: %v", err)
 					run = false
 					continue
@@ -215,13 +215,13 @@ func (i *InventoryConsumer) Consume() error {
 				if operation != string(model_legacy.OperationTypeDeleted) {
 					inventoryID, err := ParseMessageKey(e.Key)
 					if err != nil {
-						metricscollector.Incr(i.MetricsCollector.MsgProcessFailures, "ParseMessageKey", err)
+						metricscollector.Incr(i.MetricsCollector.MsgProcessFailures, "ParseMessageKey")
 						i.Logger.Errorf("failed to parse message key for for ID: %v", err)
 					}
 					err = i.UpdateConsistencyToken(inventoryID, fmt.Sprint(resp))
 					if err != nil {
-						metricscollector.Incr(i.MetricsCollector.ConsumerErrors, "UpdateConsistencyToken", err)
-						i.Logger.Errorf("failed to update consistency token: %v", err)
+						metricscollector.Incr(i.MetricsCollector.ConsumerErrors, "UpdateConsistencyToken")
+						i.Logger.Errorf("failed to update consistency token: %v")
 						continue
 					}
 				}
@@ -230,7 +230,7 @@ func (i *InventoryConsumer) Consume() error {
 				if !common.IsNil(i.Notifier) && txid != "" {
 					err := i.Notifier.Notify(context.Background(), txid)
 					if err != nil {
-						metricscollector.Incr(i.MetricsCollector.ConsumerErrors, "Notify", err)
+						metricscollector.Incr(i.MetricsCollector.ConsumerErrors, "Notify")
 						i.Logger.Errorf("failed to notify producer: %v", err)
 						// Do not continue here, we should still commit the offset
 					} else {
@@ -248,20 +248,19 @@ func (i *InventoryConsumer) Consume() error {
 				if shouldCommit {
 					err := i.commitStoredOffsets()
 					if err != nil {
-						metricscollector.Incr(i.MetricsCollector.ConsumerErrors, "commitStoredOffsets", err)
+						metricscollector.Incr(i.MetricsCollector.ConsumerErrors, "commitStoredOffsets")
 						i.Logger.Errorf("failed to commit offsets: %v", err)
 						continue
 					}
 				}
-				metricscollector.Incr(i.MetricsCollector.MsgsProcessed, operation, nil)
+				metricscollector.Incr(i.MetricsCollector.MsgsProcessed, operation)
 				i.Logger.Infof("consumed event from topic %s, partition %d at offset %s",
 					*e.TopicPartition.Topic, e.TopicPartition.Partition, e.TopicPartition.Offset)
 				i.Logger.Debugf("consumed event data: key = %-10s value = %s", string(e.Key), string(e.Value))
 
 			case kafka.Error:
-				metricscollector.Incr(i.MetricsCollector.KafkaErrorEvents, "kafka", nil,
-					attribute.String("code", e.Code().String()),
-					attribute.String("error", e.Error()))
+				metricscollector.Incr(i.MetricsCollector.KafkaErrorEvents, "kafka",
+					attribute.String("code", e.Code().String()))
 				if e.IsFatal() {
 					run = false
 					i.Errors <- e
@@ -274,7 +273,7 @@ func (i *InventoryConsumer) Consume() error {
 				var stats metricscollector.StatsData
 				err = json.Unmarshal([]byte(e.String()), &stats)
 				if err != nil {
-					metricscollector.Incr(i.MetricsCollector.MsgProcessFailures, "StatsCollection", err)
+					metricscollector.Incr(i.MetricsCollector.MsgProcessFailures, "StatsCollection")
 					i.Logger.Errorf("error unmarshalling stats: %v", err)
 					continue
 				}
@@ -302,7 +301,7 @@ func (i *InventoryConsumer) ProcessMessage(headers map[string]string, relationsE
 		if relationsEnabled {
 			tuple, err := ParseCreateOrUpdateMessage(msg.Value)
 			if err != nil {
-				metricscollector.Incr(i.MetricsCollector.MsgProcessFailures, "ParseCreateOrUpdateMessage", err)
+				metricscollector.Incr(i.MetricsCollector.MsgProcessFailures, "ParseCreateOrUpdateMessage")
 				i.Logger.Errorf("failed to parse message for tuple: %v", err)
 				return "", err
 			}
@@ -310,7 +309,7 @@ func (i *InventoryConsumer) ProcessMessage(headers map[string]string, relationsE
 				return i.CreateTuple(context.Background(), tuple)
 			}, i.MetricsCollector.MsgProcessFailures)
 			if err != nil {
-				metricscollector.Incr(i.MetricsCollector.MsgProcessFailures, "CreateTuple", err)
+				metricscollector.Incr(i.MetricsCollector.MsgProcessFailures, "CreateTuple")
 				i.Logger.Errorf("failed to create tuple: %v", err)
 				return "", err
 			}
@@ -323,7 +322,7 @@ func (i *InventoryConsumer) ProcessMessage(headers map[string]string, relationsE
 		if relationsEnabled {
 			tuple, err := ParseCreateOrUpdateMessage(msg.Value)
 			if err != nil {
-				metricscollector.Incr(i.MetricsCollector.MsgProcessFailures, "ParseCreateOrUpdateMessage", err)
+				metricscollector.Incr(i.MetricsCollector.MsgProcessFailures, "ParseCreateOrUpdateMessage")
 				i.Logger.Errorf("failed to parse message for tuple: %v", err)
 				return "", err
 			}
@@ -331,7 +330,7 @@ func (i *InventoryConsumer) ProcessMessage(headers map[string]string, relationsE
 				return i.UpdateTuple(context.Background(), tuple)
 			}, i.MetricsCollector.MsgProcessFailures)
 			if err != nil {
-				metricscollector.Incr(i.MetricsCollector.MsgProcessFailures, "UpdateTuple", err)
+				metricscollector.Incr(i.MetricsCollector.MsgProcessFailures, "UpdateTuple")
 				i.Logger.Errorf("failed to update tuple: %v", err)
 				return "", err
 			}
@@ -343,7 +342,7 @@ func (i *InventoryConsumer) ProcessMessage(headers map[string]string, relationsE
 		if relationsEnabled {
 			filter, err := ParseDeleteMessage(msg.Value)
 			if err != nil {
-				metricscollector.Incr(i.MetricsCollector.MsgProcessFailures, "ParseDeleteMessage", err)
+				metricscollector.Incr(i.MetricsCollector.MsgProcessFailures, "ParseDeleteMessage")
 				i.Logger.Errorf("failed to parse message for filter: %v", err)
 				return "", err
 			}
@@ -351,14 +350,14 @@ func (i *InventoryConsumer) ProcessMessage(headers map[string]string, relationsE
 				return i.DeleteTuple(context.Background(), filter)
 			}, i.MetricsCollector.MsgProcessFailures)
 			if err != nil {
-				metricscollector.Incr(i.MetricsCollector.MsgProcessFailures, "DeleteTuple", err)
+				metricscollector.Incr(i.MetricsCollector.MsgProcessFailures, "DeleteTuple")
 				i.Logger.Errorf("failed to delete tuple: %v", err)
 				return "", err
 			}
 			return "", nil
 		}
 	default:
-		metricscollector.Incr(i.MetricsCollector.MsgProcessFailures, "unknown-operation-type", nil)
+		metricscollector.Incr(i.MetricsCollector.MsgProcessFailures, "unknown-operation-type")
 		i.Logger.Errorf("unknown operation type, message cannot be processed and will be dropped: offset=%s operation=%s msg=%s",
 			msg.TopicPartition.Offset.String(), operation, msg.Value)
 	}
@@ -618,7 +617,7 @@ func (i *InventoryConsumer) Retry(operation func() (string, error), metricCounte
 	for i.RetryOptions.OperationMaxRetries == -1 || attempts < i.RetryOptions.OperationMaxRetries {
 		resp, err = operation()
 		if err != nil {
-			metricscollector.Incr(metricCounter, "Retry", err)
+			metricscollector.Incr(metricCounter, "Retry")
 			i.Logger.Errorf("request failed: %v", err)
 			attempts++
 			if i.RetryOptions.OperationMaxRetries == -1 || attempts < i.RetryOptions.OperationMaxRetries {

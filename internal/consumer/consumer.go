@@ -131,7 +131,7 @@ func New(config CompletedConfig, db *gorm.DB, authz authz.CompletedConfig, autho
 	var errChan chan error
 
 	maxSerializationRetries := viper.GetInt("storage.max-serialization-retries")
-	resourceRepository := data.NewResourceRepository(db, data.NewGormTransactionManager(maxSerializationRetries))
+	resourceRepository := data.NewResourceRepository(db, data.NewGormTransactionManager(&mc, maxSerializationRetries))
 	schemaService := usecase_resources.NewSchemaUsecase(resourceRepository, logger)
 
 	return InventoryConsumer{

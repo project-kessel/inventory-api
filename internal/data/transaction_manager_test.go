@@ -1,8 +1,11 @@
 package data
 
+//TODO
+
 import (
 	"database/sql"
 	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/jackc/pgx/v5/pgconn"
@@ -12,6 +15,7 @@ import (
 	"gorm.io/gorm/logger"
 
 	"github.com/project-kessel/inventory-api/internal/biz/usecase"
+	"github.com/project-kessel/inventory-api/internal/metricscollector"
 )
 
 func setupTestDB(t *testing.T) *gorm.DB {
@@ -31,7 +35,8 @@ func setupTestDB(t *testing.T) *gorm.DB {
 // =============================================================================
 
 func TestGormTransactionManager_Interface(t *testing.T) {
-	tm := NewGormTransactionManager(3)
+	mc := metricscollector.NewFakeMetricsCollector()
+	tm := NewGormTransactionManager(mc, 3)
 
 	// Verify it implements the interface
 	var _ = usecase.TransactionManager(tm)
@@ -50,7 +55,8 @@ func TestFakeTransactionManager_Interface(t *testing.T) {
 
 func TestNewGormTransactionManager(t *testing.T) {
 	maxRetries := 5
-	tm := NewGormTransactionManager(maxRetries)
+	mc := metricscollector.NewFakeMetricsCollector()
+	tm := NewGormTransactionManager(mc, maxRetries)
 
 	assert.NotNil(t, tm)
 
@@ -58,16 +64,18 @@ func TestNewGormTransactionManager(t *testing.T) {
 	gormTm, ok := tm.(*gormTransactionManager)
 	assert.True(t, ok)
 	assert.Equal(t, maxRetries, gormTm.maxSerializationRetries)
+	assert.NotNil(t, gormTm.metricsCollector)
 }
 
 func TestGormTransactionManager_Success(t *testing.T) {
 	db := setupTestDB(t)
-	tm := NewGormTransactionManager(3)
+	mc := metricscollector.NewFakeMetricsCollector()
+	tm := NewGormTransactionManager(mc, 3)
 
 	var capturedTx *gorm.DB
 	executed := false
 
-	err := tm.HandleSerializableTransaction(db, func(tx *gorm.DB) error {
+	err := tm.HandleSerializableTransaction("test_operation", db, func(tx *gorm.DB) error {
 		capturedTx = tx
 		executed = true
 		return nil
@@ -81,10 +89,11 @@ func TestGormTransactionManager_Success(t *testing.T) {
 
 func TestGormTransactionManager_TransactionFailure(t *testing.T) {
 	db := setupTestDB(t)
-	tm := NewGormTransactionManager(3)
+	mc := metricscollector.NewFakeMetricsCollector()
+	tm := NewGormTransactionManager(mc, 3)
 
 	expectedError := errors.New("business logic error")
-	err := tm.HandleSerializableTransaction(db, func(tx *gorm.DB) error {
+	err := tm.HandleSerializableTransaction("test_operation", db, func(tx *gorm.DB) error {
 		return expectedError
 	})
 
@@ -95,10 +104,11 @@ func TestGormTransactionManager_TransactionFailure(t *testing.T) {
 
 func TestGormTransactionManager_MultipleRetries(t *testing.T) {
 	db := setupTestDB(t)
-	tm := NewGormTransactionManager(3)
+	mc := metricscollector.NewFakeMetricsCollector()
+	tm := NewGormTransactionManager(mc, 3)
 
 	callCount := 0
-	err := tm.HandleSerializableTransaction(db, func(tx *gorm.DB) error {
+	err := tm.HandleSerializableTransaction("test_operation", db, func(tx *gorm.DB) error {
 		callCount++
 		return errors.New("some error")
 	})
@@ -110,13 +120,14 @@ func TestGormTransactionManager_MultipleRetries(t *testing.T) {
 
 func TestGormTransactionManager_TransactionIsolation(t *testing.T) {
 	db := setupTestDB(t)
-	tm := NewGormTransactionManager(3)
+	mc := metricscollector.NewFakeMetricsCollector()
+	tm := NewGormTransactionManager(mc, 3)
 
 	// Create a simple table for testing
 	db.Exec("CREATE TABLE test_table (id INTEGER PRIMARY KEY, value TEXT)")
 
 	var txLevel sql.IsolationLevel
-	err := tm.HandleSerializableTransaction(db, func(tx *gorm.DB) error {
+	err := tm.HandleSerializableTransaction("test_operation", db, func(tx *gorm.DB) error {
 		// Check the isolation level by attempting to read it
 		// This is a basic test - in a real scenario, we'd test actual isolation behavior
 		row := tx.Raw("PRAGMA read_uncommitted").Row()
@@ -133,9 +144,10 @@ func TestGormTransactionManager_TransactionIsolation(t *testing.T) {
 func TestGormTransactionManager_MaxRetries(t *testing.T) {
 	db := setupTestDB(t)
 	// Test with 0 retries to ensure it fails immediately
-	tm := NewGormTransactionManager(0)
+	mc := metricscollector.NewFakeMetricsCollector()
+	tm := NewGormTransactionManager(mc, 0)
 
-	err := tm.HandleSerializableTransaction(db, func(tx *gorm.DB) error {
+	err := tm.HandleSerializableTransaction("test_operation", db, func(tx *gorm.DB) error {
 		return errors.New("test error")
 	})
 
@@ -146,7 +158,8 @@ func TestGormTransactionManager_MaxRetries(t *testing.T) {
 func TestGormTransactionManager_SerializationFailureRetries(t *testing.T) {
 	db := setupTestDB(t)
 	maxRetries := 3
-	tm := NewGormTransactionManager(maxRetries)
+	mc := metricscollector.NewFakeMetricsCollector()
+	tm := NewGormTransactionManager(mc, maxRetries)
 
 	// Create a mock PostgreSQL serialization failure error
 	serializationError := &pgconn.PgError{
@@ -155,7 +168,7 @@ func TestGormTransactionManager_SerializationFailureRetries(t *testing.T) {
 	}
 
 	callCount := 0
-	err := tm.HandleSerializableTransaction(db, func(tx *gorm.DB) error {
+	err := tm.HandleSerializableTransaction("test_operation", db, func(tx *gorm.DB) error {
 		callCount++
 		return serializationError
 	})
@@ -167,12 +180,17 @@ func TestGormTransactionManager_SerializationFailureRetries(t *testing.T) {
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "transaction failed after 3 attempts")
 	assert.Contains(t, err.Error(), "could not serialize access due to concurrent update")
+
+	// Check that metrics were recorded
+	assert.Equal(t, maxRetries, metricscollector.GetSerializationFailureCount())
+	assert.Equal(t, 1, metricscollector.GetSerializationExhaustionCount())
 }
 
 func TestGormTransactionManager_SerializationFailureRecovery(t *testing.T) {
 	db := setupTestDB(t)
 	maxRetries := 5
-	tm := NewGormTransactionManager(maxRetries)
+	mc := metricscollector.NewFakeMetricsCollector()
+	tm := NewGormTransactionManager(mc, maxRetries)
 
 	// Create a mock PostgreSQL serialization failure error
 	serializationError := &pgconn.PgError{
@@ -181,7 +199,7 @@ func TestGormTransactionManager_SerializationFailureRecovery(t *testing.T) {
 	}
 
 	callCount := 0
-	err := tm.HandleSerializableTransaction(db, func(tx *gorm.DB) error {
+	err := tm.HandleSerializableTransaction("test_operation", db, func(tx *gorm.DB) error {
 		callCount++
 		// Fail for the first 2 attempts, then succeed
 		if callCount <= 2 {
@@ -195,6 +213,45 @@ func TestGormTransactionManager_SerializationFailureRecovery(t *testing.T) {
 
 	// Should succeed after retries
 	assert.NoError(t, err)
+
+	// Check that serialization failures were recorded but not exhaustion
+	assert.Equal(t, 2, metricscollector.GetSerializationFailureCount())
+	assert.Equal(t, 0, metricscollector.GetSerializationExhaustionCount())
+}
+
+func TestGormTransactionManager_DeeplyWrappedSerializationError(t *testing.T) {
+	db := setupTestDB(t)
+	maxRetries := 2
+	mc := metricscollector.NewFakeMetricsCollector()
+	tm := NewGormTransactionManager(mc, maxRetries)
+
+	// Create a serialization error wrapped multiple layers deep
+	baseError := &pgconn.PgError{
+		Code:    "40001",
+		Message: "could not serialize access due to read/write dependencies among transactions",
+	}
+
+	// Wrap it multiple times to simulate complex error handling chains
+	layer1Error := fmt.Errorf("database error: %w", baseError)
+	layer2Error := fmt.Errorf("repository operation failed: %w", layer1Error)
+	layer3Error := fmt.Errorf("service layer error: %w", layer2Error)
+
+	callCount := 0
+	err := tm.HandleSerializableTransaction("test_operation", db, func(tx *gorm.DB) error {
+		callCount++
+		if callCount == 1 {
+			return layer3Error
+		}
+		return nil
+	})
+
+	// Should retry even with deeply wrapped errors
+	assert.Equal(t, 2, callCount)
+	assert.NoError(t, err)
+
+	// Check that the serialization failure was detected and recorded
+	assert.Equal(t, 1, metricscollector.GetSerializationFailureCount())
+	assert.Equal(t, 0, metricscollector.GetSerializationExhaustionCount())
 }
 
 // =============================================================================
@@ -219,7 +276,7 @@ func TestFakeTransactionManager_Success(t *testing.T) {
 	var capturedTx *gorm.DB
 	executed := false
 
-	err := tm.HandleSerializableTransaction(db, func(tx *gorm.DB) error {
+	err := tm.HandleSerializableTransaction("test_operation", db, func(tx *gorm.DB) error {
 		capturedTx = tx
 		executed = true
 		return nil
@@ -236,7 +293,7 @@ func TestFakeTransactionManager_TransactionFailure(t *testing.T) {
 	tm := NewFakeTransactionManager(3)
 	tm.SetShouldFailTransaction(true)
 
-	err := tm.HandleSerializableTransaction(db, func(tx *gorm.DB) error {
+	err := tm.HandleSerializableTransaction("test_operation", db, func(tx *gorm.DB) error {
 		assert.Fail(t, "Transaction function should not be called when set to fail")
 		return nil
 	})
@@ -252,7 +309,7 @@ func TestFakeTransactionManager_CommitFailure(t *testing.T) {
 	tm.SetShouldFailCommit(true)
 
 	executed := false
-	err := tm.HandleSerializableTransaction(db, func(tx *gorm.DB) error {
+	err := tm.HandleSerializableTransaction("test_operation", db, func(tx *gorm.DB) error {
 		executed = true
 		return nil
 	})
@@ -268,7 +325,7 @@ func TestFakeTransactionManager_FunctionError(t *testing.T) {
 	tm := NewFakeTransactionManager(3)
 
 	expectedError := errors.New("business logic error")
-	err := tm.HandleSerializableTransaction(db, func(tx *gorm.DB) error {
+	err := tm.HandleSerializableTransaction("test_operation", db, func(tx *gorm.DB) error {
 		return expectedError
 	})
 
@@ -282,14 +339,14 @@ func TestFakeTransactionManager_SetShouldFailTransaction(t *testing.T) {
 	tm := NewFakeTransactionManager(3)
 
 	// Initially should succeed
-	err := tm.HandleSerializableTransaction(db, func(tx *gorm.DB) error {
+	err := tm.HandleSerializableTransaction("test_operation", db, func(tx *gorm.DB) error {
 		return nil
 	})
 	assert.NoError(t, err)
 
 	// Set to fail
 	tm.SetShouldFailTransaction(true)
-	err = tm.HandleSerializableTransaction(db, func(tx *gorm.DB) error {
+	err = tm.HandleSerializableTransaction("test_operation", db, func(tx *gorm.DB) error {
 		assert.Fail(t, "Transaction function should not be called when set to fail")
 		return nil
 	})
@@ -306,7 +363,7 @@ func TestFakeTransactionManager_SetShouldFailCommit(t *testing.T) {
 	tm.SetShouldFailCommit(true)
 
 	executed := false
-	err := tm.HandleSerializableTransaction(db, func(tx *gorm.DB) error {
+	err := tm.HandleSerializableTransaction("test_operation", db, func(tx *gorm.DB) error {
 		executed = true
 		return nil
 	})
@@ -324,15 +381,15 @@ func TestFakeTransactionManager_GetTransactionCallCount(t *testing.T) {
 	assert.Equal(t, 0, tm.GetTransactionCallCount())
 
 	// Execute multiple transactions
-	_ = tm.HandleSerializableTransaction(db, func(tx *gorm.DB) error { return nil })
+	_ = tm.HandleSerializableTransaction("test_operation", db, func(tx *gorm.DB) error { return nil })
 	assert.Equal(t, 1, tm.GetTransactionCallCount())
 
-	_ = tm.HandleSerializableTransaction(db, func(tx *gorm.DB) error { return nil })
+	_ = tm.HandleSerializableTransaction("test_operation", db, func(tx *gorm.DB) error { return nil })
 	assert.Equal(t, 2, tm.GetTransactionCallCount())
 
 	// Even failed transactions should increment count
 	tm.SetShouldFailTransaction(true)
-	_ = tm.HandleSerializableTransaction(db, func(tx *gorm.DB) error { return nil })
+	_ = tm.HandleSerializableTransaction("test_operation", db, func(tx *gorm.DB) error { return nil })
 	assert.Equal(t, 3, tm.GetTransactionCallCount())
 }
 
@@ -343,7 +400,7 @@ func TestFakeTransactionManager_Reset(t *testing.T) {
 	// Set up some state
 	tm.SetShouldFailTransaction(true)
 	tm.SetShouldFailCommit(true)
-	_ = tm.HandleSerializableTransaction(db, func(tx *gorm.DB) error { return nil })
+	_ = tm.HandleSerializableTransaction("test_operation", db, func(tx *gorm.DB) error { return nil })
 
 	assert.Equal(t, 1, tm.GetTransactionCallCount())
 
@@ -357,7 +414,7 @@ func TestFakeTransactionManager_Reset(t *testing.T) {
 
 	// Should work normally after reset
 	executed := false
-	err := tm.HandleSerializableTransaction(db, func(tx *gorm.DB) error {
+	err := tm.HandleSerializableTransaction("test_operation", db, func(tx *gorm.DB) error {
 		executed = true
 		return nil
 	})
@@ -377,13 +434,13 @@ func TestFakeTransactionManager_ConcurrentSafety(t *testing.T) {
 
 	go func() {
 		tm.SetShouldFailTransaction(true)
-		_ = tm.HandleSerializableTransaction(db, func(tx *gorm.DB) error { return nil })
+		_ = tm.HandleSerializableTransaction("test_operation", db, func(tx *gorm.DB) error { return nil })
 		done <- true
 	}()
 
 	go func() {
 		tm.SetShouldFailCommit(true)
-		_ = tm.HandleSerializableTransaction(db, func(tx *gorm.DB) error { return nil })
+		_ = tm.HandleSerializableTransaction("test_operation", db, func(tx *gorm.DB) error { return nil })
 		done <- true
 	}()
 

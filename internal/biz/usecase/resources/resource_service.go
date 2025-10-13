@@ -47,6 +47,11 @@ type InventoryResourceRepository interface {
 	FindByID(context.Context, uuid.UUID) (*model_legacy.InventoryResource, error)
 }
 
+const (
+	DeleteResourceOperationName = "DeleteResource"
+	ReportResourceOperationName = "ReportResource"
+)
+
 var (
 	// ErrResourceNotFound indicates that the requested resource could not be found in the database.
 	ErrResourceNotFound = errors.New("resource not found")
@@ -121,28 +126,28 @@ func (uc *Usecase) ReportResource(ctx context.Context, request *v1beta2.ReportRe
 	}
 
 	err = uc.resourceRepository.GetTransactionManager().HandleSerializableTransaction(
+		ReportResourceOperationName,
 		uc.resourceRepository.GetDB(),
 		func(tx *gorm.DB) error {
+			// Check for duplicate transaction ID's before we find the resource for quicker returns if it fails
+			transactionId := request.GetRepresentations().GetMetadata().GetTransactionId()
+			if transactionId != "" {
+				alreadyProcessed, err := uc.resourceRepository.HasTransactionIdBeenProcessed(tx, transactionId)
+				if err != nil {
+					return fmt.Errorf("failed to check transaction ID: %w", err)
+				}
+				if alreadyProcessed {
+					log.Info("Transaction already processed, skipping update")
+					return nil
+				}
+			}
+
 			res, err := uc.resourceRepository.FindResourceByKeys(tx, reporterResourceKey)
 			if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 				return fmt.Errorf("failed to lookup existing resource: %w", err)
 			}
 
 			if err == nil && res != nil {
-				transactionId := request.GetRepresentations().GetMetadata().GetTransactionId()
-
-				// Check if this transaction has already been processed (idempotency)
-				if transactionId != "" && len(res.ReporterResources()) > 0 {
-					alreadyProcessed, err := uc.resourceRepository.HasTransactionIdBeenProcessed(tx, transactionId)
-					if err != nil {
-						return fmt.Errorf("failed to check transaction ID: %w", err)
-					}
-					if alreadyProcessed {
-						log.Info("Transaction already processed, skipping update")
-						return nil
-					}
-				}
-
 				log.Info("Resource already exists, updating: ")
 				return uc.updateResource(tx, request, res, txidStr)
 			}
@@ -195,6 +200,7 @@ func (uc *Usecase) Delete(reporterResourceKey model.ReporterResourceKey) error {
 
 	log.Info("Reporter Resource Key to delete ", reporterResourceKey)
 	err = uc.resourceRepository.GetTransactionManager().HandleSerializableTransaction(
+		DeleteResourceOperationName,
 		uc.resourceRepository.GetDB(),
 		func(tx *gorm.DB) error {
 			res, err := uc.resourceRepository.FindResourceByKeys(tx, reporterResourceKey)

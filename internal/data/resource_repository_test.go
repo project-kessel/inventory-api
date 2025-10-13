@@ -17,6 +17,7 @@ import (
 	bizmodel "github.com/project-kessel/inventory-api/internal/biz/model"
 	"github.com/project-kessel/inventory-api/internal/biz/model_legacy"
 	datamodel "github.com/project-kessel/inventory-api/internal/data/model"
+	"github.com/project-kessel/inventory-api/internal/metricscollector"
 )
 
 func TestResourceRepositoryContract(t *testing.T) {
@@ -29,7 +30,8 @@ func TestResourceRepositoryContract(t *testing.T) {
 			name: "Real Repository with GormTransactionManager",
 			repo: func() ResourceRepository {
 				db := setupInMemoryDB(t)
-				tm := NewGormTransactionManager(3)
+				mc := metricscollector.NewFakeMetricsCollector()
+				tm := NewGormTransactionManager(mc, 3)
 				return NewResourceRepository(db, tm)
 			},
 			db: func() *gorm.DB {
@@ -295,7 +297,8 @@ func TestFindResourceByKeys(t *testing.T) {
 			name: "Real Repository with GormTransactionManager",
 			repo: func() ResourceRepository {
 				db := setupInMemoryDB(t)
-				tm := NewGormTransactionManager(3)
+				mc := metricscollector.NewFakeMetricsCollector()
+				tm := NewGormTransactionManager(mc, 3)
 				return NewResourceRepository(db, tm)
 			},
 			db: func() *gorm.DB {
@@ -321,7 +324,8 @@ func TestFindResourceByKeys(t *testing.T) {
 					return impl.repo(), impl.db()
 				}
 				db := setupInMemoryDB(t)
-				tm := NewGormTransactionManager(3)
+				mc := metricscollector.NewFakeMetricsCollector()
+				tm := NewGormTransactionManager(mc, 3)
 				repo := NewResourceRepository(db, tm)
 				return repo, db
 			}
@@ -555,7 +559,8 @@ func TestFindResourceByKeys_TombstoneFilter(t *testing.T) {
 			name: "Real Repository with GormTransactionManager",
 			repo: func() ResourceRepository {
 				db := setupInMemoryDB(t)
-				tm := NewGormTransactionManager(3)
+				mc := metricscollector.NewFakeMetricsCollector()
+				tm := NewGormTransactionManager(mc, 3)
 				return NewResourceRepository(db, tm)
 			},
 			db: func() *gorm.DB {
@@ -580,7 +585,8 @@ func TestFindResourceByKeys_TombstoneFilter(t *testing.T) {
 					return impl.repo(), impl.db()
 				}
 				db := setupInMemoryDB(t)
-				tm := NewGormTransactionManager(3)
+				mc := metricscollector.NewFakeMetricsCollector()
+				tm := NewGormTransactionManager(mc, 3)
 				repo := NewResourceRepository(db, tm)
 				return repo, db
 			}
@@ -634,7 +640,8 @@ func TestUniqueConstraint_ReporterResourceCompositeKey(t *testing.T) {
 			name: "Real Repository with GormTransactionManager",
 			repo: func() ResourceRepository {
 				db := setupInMemoryDB(t)
-				tm := NewGormTransactionManager(3)
+				mc := metricscollector.NewFakeMetricsCollector()
+				tm := NewGormTransactionManager(mc, 3)
 				return NewResourceRepository(db, tm)
 			},
 			db: func() *gorm.DB {
@@ -659,7 +666,8 @@ func TestUniqueConstraint_ReporterResourceCompositeKey(t *testing.T) {
 					return impl.repo(), impl.db()
 				}
 				db := setupInMemoryDB(t)
-				tm := NewGormTransactionManager(3)
+				mc := metricscollector.NewFakeMetricsCollector()
+				tm := NewGormTransactionManager(mc, 3)
 				repo := NewResourceRepository(db, tm)
 				return repo, db
 			}
@@ -773,7 +781,8 @@ func TestResourceRepository_IdempotentOperations(t *testing.T) {
 			name: "Real Repository with GormTransactionManager",
 			repo: func() ResourceRepository {
 				db := setupInMemoryDB(t)
-				tm := NewGormTransactionManager(3)
+				mc := metricscollector.NewFakeMetricsCollector()
+				tm := NewGormTransactionManager(mc, 3)
 				return NewResourceRepository(db, tm)
 			},
 			db: func() *gorm.DB {
@@ -798,7 +807,8 @@ func TestResourceRepository_IdempotentOperations(t *testing.T) {
 					return impl.repo(), impl.db()
 				}
 				db := setupInMemoryDB(t)
-				tm := NewGormTransactionManager(3)
+				mc := metricscollector.NewFakeMetricsCollector()
+				tm := NewGormTransactionManager(mc, 3)
 				repo := NewResourceRepository(db, tm)
 				return repo, db
 			}
@@ -1016,7 +1026,8 @@ func TestSave(t *testing.T) {
 			name: "Real Repository with GormTransactionManager",
 			repo: func() ResourceRepository {
 				db := setupInMemoryDB(t)
-				tm := NewGormTransactionManager(3)
+				mc := metricscollector.NewFakeMetricsCollector()
+				tm := NewGormTransactionManager(mc, 3)
 				return NewResourceRepository(db, tm)
 			},
 			db: func() *gorm.DB {
@@ -1042,7 +1053,8 @@ func TestSave(t *testing.T) {
 					return impl.repo(), impl.db()
 				}
 				db := setupInMemoryDB(t)
-				tm := NewGormTransactionManager(3)
+				mc := metricscollector.NewFakeMetricsCollector()
+				tm := NewGormTransactionManager(mc, 3)
 				repo := NewResourceRepository(db, tm)
 				return repo, db
 			}
@@ -1138,7 +1150,8 @@ func TestResourceRepository_MultipleHostsLifecycle(t *testing.T) {
 			name: "Real Repository with GormTransactionManager",
 			repo: func() ResourceRepository {
 				db := setupInMemoryDB(t)
-				tm := NewGormTransactionManager(3)
+				mc := metricscollector.NewFakeMetricsCollector()
+				tm := NewGormTransactionManager(mc, 3)
 				return NewResourceRepository(db, tm)
 			},
 			db: func() *gorm.DB {
@@ -1163,7 +1176,8 @@ func TestResourceRepository_MultipleHostsLifecycle(t *testing.T) {
 					return impl.repo(), impl.db()
 				}
 				db := setupInMemoryDB(t)
-				tm := NewGormTransactionManager(3)
+				mc := metricscollector.NewFakeMetricsCollector()
+				tm := NewGormTransactionManager(mc, 3)
 				repo := NewResourceRepository(db, tm)
 				return repo, db
 			}
@@ -1271,7 +1285,8 @@ func TestResourceRepository_PartialDataScenarios(t *testing.T) {
 			name: "Real Repository with GormTransactionManager",
 			repo: func() ResourceRepository {
 				db := setupInMemoryDB(t)
-				tm := NewGormTransactionManager(3)
+				mc := metricscollector.NewFakeMetricsCollector()
+				tm := NewGormTransactionManager(mc, 3)
 				return NewResourceRepository(db, tm)
 			},
 			db: func() *gorm.DB {
@@ -1296,7 +1311,8 @@ func TestResourceRepository_PartialDataScenarios(t *testing.T) {
 					return impl.repo(), impl.db()
 				}
 				db := setupInMemoryDB(t)
-				tm := NewGormTransactionManager(3)
+				mc := metricscollector.NewFakeMetricsCollector()
+				tm := NewGormTransactionManager(mc, 3)
 				repo := NewResourceRepository(db, tm)
 				return repo, db
 			}
@@ -1410,7 +1426,8 @@ func TestSerializableCreateFails(t *testing.T) {
 			name: "Real Repository with GormTransactionManager",
 			repo: func() ResourceRepository {
 				db := setupInMemoryDB(t)
-				tm := NewGormTransactionManager(3)
+				mc := metricscollector.NewFakeMetricsCollector()
+				tm := NewGormTransactionManager(mc, 3)
 				return NewResourceRepository(db, tm)
 			},
 			db: func() *gorm.DB {
@@ -1423,7 +1440,8 @@ func TestSerializableCreateFails(t *testing.T) {
 		t.Run(impl.name, func(t *testing.T) {
 			// Fresh instances
 			db := setupInMemoryDB(t)
-			tm := NewGormTransactionManager(3)
+			mc := metricscollector.NewFakeMetricsCollector()
+			tm := NewGormTransactionManager(mc, 3)
 			repo := NewResourceRepository(db, tm)
 
 			resource := createTestResourceWithLocalId(t, "serializable-create-conflict")
@@ -1438,7 +1456,7 @@ func TestSerializableCreateFails(t *testing.T) {
 			// Do NOT commit yet to hold locks
 
 			// Attempt to create the same resource via a separate serializable transaction managed by TM
-			err = tm.HandleSerializableTransaction(db, func(tx *gorm.DB) error {
+			err = tm.HandleSerializableTransaction("test_create_resource", db, func(tx *gorm.DB) error {
 				foundResource, err := repo.FindResourceByKeys(tx, resource.ReporterResources()[0].ReporterResourceKey)
 				assert.NotNil(t, err)
 				assert.Nil(t, foundResource)
@@ -1463,7 +1481,8 @@ func TestSerializableUpdateFails(t *testing.T) {
 			name: "Real Repository with GormTransactionManager",
 			repo: func() ResourceRepository {
 				db := setupInMemoryDB(t)
-				tm := NewGormTransactionManager(3)
+				mc := metricscollector.NewFakeMetricsCollector()
+				tm := NewGormTransactionManager(mc, 3)
 				return NewResourceRepository(db, tm)
 			},
 			db: func() *gorm.DB {
@@ -1476,7 +1495,8 @@ func TestSerializableUpdateFails(t *testing.T) {
 		t.Run(impl.name, func(t *testing.T) {
 			// Fresh instances
 			db := setupInMemoryDB(t)
-			tm := NewGormTransactionManager(3)
+			mc := metricscollector.NewFakeMetricsCollector()
+			tm := NewGormTransactionManager(mc, 3)
 			repo := NewResourceRepository(db, tm)
 
 			// Create initial resource (committed)
@@ -1502,7 +1522,7 @@ func TestSerializableUpdateFails(t *testing.T) {
 			// Do NOT commit yet to hold locks
 
 			// Attempt to update the same resource via TM-managed serializable transaction
-			err = tm.HandleSerializableTransaction(db, func(tx *gorm.DB) error {
+			err = tm.HandleSerializableTransaction("test_update_resource", db, func(tx *gorm.DB) error {
 				return repo.Save(tx, resource, biz.OperationTypeUpdated, "tx-update")
 			})
 			assert.Error(t, err)
@@ -1891,7 +1911,8 @@ func TestFindLatestRepresentations(t *testing.T) {
 			name: "Real Repository with GormTransactionManager",
 			repo: func() ResourceRepository {
 				db := setupInMemoryDB(t)
-				tm := NewGormTransactionManager(3)
+				mc := metricscollector.NewFakeMetricsCollector()
+				tm := NewGormTransactionManager(mc, 3)
 				return NewResourceRepository(db, tm)
 			},
 			db: func() *gorm.DB { return setupInMemoryDB(t) },
@@ -1905,8 +1926,18 @@ func TestFindLatestRepresentations(t *testing.T) {
 
 	for _, impl := range implementations {
 		t.Run(impl.name, func(t *testing.T) {
-			repo := impl.repo()
-			db := impl.db()
+			// Helper to get fresh instances
+			getFresh := func() (ResourceRepository, *gorm.DB) {
+				if impl.name == "Fake Repository" {
+					return impl.repo(), impl.db()
+				}
+				db := setupInMemoryDB(t)
+				mc := metricscollector.NewFakeMetricsCollector()
+				tm := NewGormTransactionManager(mc, 3)
+				return NewResourceRepository(db, tm), db
+			}
+
+			repo, db := getFresh()
 
 			key, err := bizmodel.NewReporterResourceKey("localResourceId-latest", "host", "hbi", "hbi-instance-1")
 			require.NoError(t, err)
@@ -1986,7 +2017,8 @@ func TestFindCurrentAndPreviousVersionedRepresentations(t *testing.T) {
 			name: "Real Repository with GormTransactionManager",
 			repo: func() ResourceRepository {
 				db := setupInMemoryDB(t)
-				tm := NewGormTransactionManager(3)
+				mc := metricscollector.NewFakeMetricsCollector()
+				tm := NewGormTransactionManager(mc, 3)
 				return NewResourceRepository(db, tm)
 			},
 			db: func() *gorm.DB { return setupInMemoryDB(t) },
@@ -2000,139 +2032,21 @@ func TestFindCurrentAndPreviousVersionedRepresentations(t *testing.T) {
 		},
 	}
 
-	testCases := []struct {
-		name          string
-		version       uint
-		operationType biz.EventOperationType
-		expectCurrent bool
-		expectPrev    bool
-	}{
-		{
-			name:          "Version 0 CREATE operation",
-			version:       0,
-			operationType: biz.OperationTypeCreated,
-			expectCurrent: true,
-			expectPrev:    false,
-		},
-		{
-			name:          "Version 1 CREATE operation",
-			version:       1,
-			operationType: biz.OperationTypeCreated,
-			expectCurrent: true,
-			expectPrev:    false, // Real repository only returns current for CREATE
-		},
-		{
-			name:          "Version 1 UPDATE operation",
-			version:       1,
-			operationType: biz.OperationTypeUpdated,
-			expectCurrent: true,
-			expectPrev:    true,
-		},
-		{
-			name:          "Version 2 UPDATE operation",
-			version:       2,
-			operationType: biz.OperationTypeUpdated,
-			expectCurrent: true,
-			expectPrev:    true,
-		},
-	}
-
 	for _, impl := range implementations {
 		t.Run(impl.name, func(t *testing.T) {
-			for _, tc := range testCases {
-				t.Run(tc.name, func(t *testing.T) {
-					repo := impl.repo()
-					db := impl.db()
-
-					key, err := bizmodel.NewReporterResourceKey("localResourceId-versioned", "host", "hbi", "hbi-instance-1")
-					require.NoError(t, err)
-
-					if impl.name != "Fake Repository" {
-						// For real repository, create test resource and save multiple versions
-						res := createTestResourceWithLocalIdAndType(t, "localResourceId-versioned", "host")
-						require.NoError(t, repo.Save(db, res, biz.OperationTypeCreated, "tx1"))
-
-						if tc.version >= 1 {
-							// Update to version 1
-							updatedCommon, err := bizmodel.NewRepresentation(map[string]interface{}{"workspace_id": "workspace-v1"})
-							require.NoError(t, err)
-							updatedReporter, err := bizmodel.NewRepresentation(map[string]interface{}{"hostname": "h1"})
-							require.NoError(t, err)
-
-							transactionId := bizmodel.NewTransactionId("test-transaction-id-v1")
-							err = res.Update(key, "", "", nil, updatedReporter, updatedCommon, transactionId)
-							require.NoError(t, err)
-							require.NoError(t, repo.Save(db, res, biz.OperationTypeUpdated, "tx2"))
-						}
-
-						if tc.version >= 2 {
-							// Update to version 2
-							updatedCommon2, err := bizmodel.NewRepresentation(map[string]interface{}{"workspace_id": "workspace-v2"})
-							require.NoError(t, err)
-							updatedReporter2, err := bizmodel.NewRepresentation(map[string]interface{}{"hostname": "h2"})
-							require.NoError(t, err)
-
-							transactionId2 := bizmodel.NewTransactionId("test-transaction-id-v2")
-							err = res.Update(key, "", "", nil, updatedReporter2, updatedCommon2, transactionId2)
-							require.NoError(t, err)
-							require.NoError(t, repo.Save(db, res, biz.OperationTypeUpdated, "tx3"))
-						}
-					}
-
-					// Test FindCurrentAndPreviousVersionedRepresentations
-					version := tc.version
-					results, err := repo.FindCurrentAndPreviousVersionedRepresentations(db, key, &version, tc.operationType)
-					require.NoError(t, err)
-
-					// Check results based on expectations
-					currentWS, previousWS := GetCurrentAndPreviousWorkspaceID(results, tc.version)
-
-					if tc.expectCurrent {
-						assert.NotEmpty(t, currentWS, "Expected current workspace to be found")
-					} else {
-						assert.Empty(t, currentWS, "Expected no current workspace")
-					}
-
-					// Adjust expectations based on repository type and operation
-					expectedPrev := tc.expectPrev
-					if tc.operationType.OperationType() == biz.OperationTypeCreated {
-						if impl.name != "Fake Repository" {
-							expectedPrev = false // Real repository doesn't return previous for CREATE
-						} else {
-							expectedPrev = tc.version > 0 // Fake repository returns previous for CREATE if version > 0
-						}
-					}
-
-					if expectedPrev {
-						assert.NotEmpty(t, previousWS, "Expected previous workspace to be found")
-					} else {
-						assert.Empty(t, previousWS, "Expected no previous workspace")
-					}
-
-					// Verify version numbers in results
-					foundCurrent := false
-					foundPrevious := false
-					for _, result := range results {
-						if result.Version == tc.version {
-							foundCurrent = true
-						}
-						if tc.version > 0 && result.Version == tc.version-1 {
-							foundPrevious = true
-						}
-					}
-
-					if tc.expectCurrent {
-						assert.True(t, foundCurrent, "Expected to find current version %d in results", tc.version)
-					}
-					if expectedPrev && tc.version > 0 {
-						assert.True(t, foundPrevious, "Expected to find previous version %d in results", tc.version-1)
-					}
-				})
+			getFreshInstances := func() (ResourceRepository, *gorm.DB) {
+				if impl.name == "Fake Repository" {
+					return impl.repo(), impl.db()
+				}
+				db := setupInMemoryDB(t)
+				mc := metricscollector.NewFakeMetricsCollector()
+				tm := NewGormTransactionManager(mc, 3)
+				repo := NewResourceRepository(db, tm)
+				return repo, db
 			}
 
 			t.Run("GetCurrentAndPreviousWorkspaceID extracts workspace IDs correctly", func(t *testing.T) {
-				repo := impl.repo()
-				db := impl.db()
+				repo, db := getFreshInstances()
 
 				if impl.name != "Fake Repository" {
 					// For real repository, create and update a resource to have versioned representations
@@ -2180,8 +2094,7 @@ func TestFindCurrentAndPreviousVersionedRepresentations(t *testing.T) {
 			})
 
 			t.Run("GetCurrentAndPreviousWorkspaceID handles version 0", func(t *testing.T) {
-				repo := impl.repo()
-				db := impl.db()
+				repo, db := getFreshInstances()
 
 				key, err := bizmodel.NewReporterResourceKey("test-resource-v0", "host", "hbi", "hbi-instance-1")
 				require.NoError(t, err)
@@ -2241,7 +2154,8 @@ func TestHasTransactionIdBeenProcessed(t *testing.T) {
 			name: "Real Repository with GormTransactionManager",
 			repo: func() ResourceRepository {
 				db := setupInMemoryDB(t)
-				tm := NewGormTransactionManager(3)
+				mc := metricscollector.NewFakeMetricsCollector()
+				tm := NewGormTransactionManager(mc, 3)
 				return NewResourceRepository(db, tm)
 			},
 			db: func() *gorm.DB {
@@ -2414,7 +2328,8 @@ func TestTransactionIDUniqueConstraint(t *testing.T) {
 			name: "Real Repository with GormTransactionManager",
 			repo: func() ResourceRepository {
 				db := setupInMemoryDB(t)
-				tm := NewGormTransactionManager(3)
+				mc := metricscollector.NewFakeMetricsCollector()
+				tm := NewGormTransactionManager(mc, 3)
 				return NewResourceRepository(db, tm)
 			},
 			db: func() *gorm.DB {

@@ -4,6 +4,8 @@ server:
     address: localhost:8000
   grpc:
     address: localhost:9000
+  pprof:
+    enabled: true
 authn:
    allow-unauthenticated: true
 authz:

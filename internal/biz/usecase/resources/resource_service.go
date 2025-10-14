@@ -128,7 +128,7 @@ func (uc *Usecase) ReportResource(ctx context.Context, request *v1beta2.ReportRe
 		return fmt.Errorf("failed to create reporter resource key: %w", err)
 	}
 
-	var operationType biz.EventOperationType
+	var operationType model_legacy.EventOperationType
 	err = uc.resourceRepository.GetTransactionManager().HandleSerializableTransaction(
 		ReportResourceOperationName,
 		uc.resourceRepository.GetDB(),
@@ -153,12 +153,12 @@ func (uc *Usecase) ReportResource(ctx context.Context, request *v1beta2.ReportRe
 
 			if err == nil && res != nil {
 				log.Info("Resource already exists, updating: ")
-				operationType = biz.OperationTypeUpdated
+				operationType = model_legacy.OperationTypeUpdated
 				return uc.updateResource(tx, request, res, txidStr)
 			}
 
 			log.Info("Creating new resource")
-			operationType = biz.OperationTypeCreated
+			operationType = model_legacy.OperationTypeCreated
 			return uc.createResource(tx, request, txidStr)
 		},
 	)
@@ -239,7 +239,7 @@ func (uc *Usecase) Delete(reporterResourceKey model.ReporterResourceKey) error {
 	}
 
 	// Increment outbox metrics only after successful transaction commit
-	metricscollector.Incr(uc.MetricsCollector.OutboxEventWrites, string(biz.OperationTypeDeleted.OperationType()))
+	metricscollector.Incr(uc.MetricsCollector.OutboxEventWrites, string(model_legacy.OperationTypeDeleted.OperationType()))
 	return nil
 }
 

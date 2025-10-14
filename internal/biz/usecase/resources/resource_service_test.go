@@ -16,6 +16,7 @@ import (
 	"github.com/project-kessel/inventory-api/internal/authz/allow"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
 	"github.com/project-kessel/inventory-api/internal/data"
+	"github.com/project-kessel/inventory-api/internal/metricscollector"
 )
 
 func TestReportResource(t *testing.T) {
@@ -59,8 +60,8 @@ func TestReportResource(t *testing.T) {
 				ReadAfterWriteEnabled: false,
 				ConsumerEnabled:       false,
 			}
-
-			usecase := New(resourceRepo, nil, nil, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig)
+			mc := metricscollector.NewFakeMetricsCollector()
+			usecase := New(resourceRepo, nil, nil, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig, mc)
 
 			reportRequest := createTestReportRequest(t, tt.resourceType, tt.reporterType, tt.reporterInstance, tt.localResourceId, tt.workspaceId)
 			err := usecase.ReportResource(ctx, reportRequest, "test-reporter")
@@ -87,6 +88,9 @@ func TestReportResource(t *testing.T) {
 			foundResource, err := resourceRepo.FindResourceByKeys(nil, key)
 			require.NoError(t, err)
 			require.NotNil(t, foundResource)
+
+			// Report should trigger a single outbox event write
+			assert.Equal(t, 1, metricscollector.GetOutboxEventWriteCount())
 		})
 	}
 }
@@ -135,8 +139,8 @@ func TestReportResourceThenDelete(t *testing.T) {
 				ReadAfterWriteEnabled: false,
 				ConsumerEnabled:       false,
 			}
-
-			usecase := New(resourceRepo, nil, nil, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig)
+			mc := metricscollector.NewFakeMetricsCollector()
+			usecase := New(resourceRepo, nil, nil, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig, mc)
 
 			reportRequest := createTestReportRequest(t, tt.resourceType, tt.reporterType, tt.reporterInstanceId, tt.localResourceId, tt.workspaceId)
 			err := usecase.ReportResource(ctx, reportRequest, "test-reporter")
@@ -158,6 +162,9 @@ func TestReportResourceThenDelete(t *testing.T) {
 			require.NoError(t, err)
 			require.NotNil(t, foundResource)
 
+			// Report should trigger a single outbox event write
+			assert.Equal(t, 1, metricscollector.GetOutboxEventWriteCount())
+
 			var deleteReporterInstanceId model.ReporterInstanceId
 			if tt.deleteReporterInstanceId != "" {
 				deleteReporterInstanceId, err = model.NewReporterInstanceId(tt.deleteReporterInstanceId)
@@ -172,6 +179,12 @@ func TestReportResourceThenDelete(t *testing.T) {
 			deleteFoundResource, err := resourceRepo.FindResourceByKeys(nil, deleteKey)
 			require.NoError(t, err)
 			require.NotNil(t, deleteFoundResource)
+
+			err = usecase.Delete(key)
+			require.NoError(t, err)
+
+			// Delete should trigger another outbox event write
+			assert.Equal(t, 2, metricscollector.GetOutboxEventWriteCount())
 		})
 	}
 }
@@ -216,7 +229,8 @@ func TestDelete_ResourceNotFound(t *testing.T) {
 		ConsumerEnabled:       false,
 	}
 
-	usecase := New(resourceRepo, nil, nil, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig)
+	mc := metricscollector.NewFakeMetricsCollector()
+	usecase := New(resourceRepo, nil, nil, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig, mc)
 
 	localResourceId, err := model.NewLocalResourceId("non-existent-resource")
 	require.NoError(t, err)
@@ -245,7 +259,8 @@ func TestReportFindDeleteFind_TombstoneLifecycle(t *testing.T) {
 		ConsumerEnabled:       false,
 	}
 
-	usecase := New(resourceRepo, nil, nil, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig)
+	mc := metricscollector.NewFakeMetricsCollector()
+	usecase := New(resourceRepo, nil, nil, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig, mc)
 
 	reportRequest := createTestReportRequest(t, "k8s_cluster", "ocm", "lifecycle-instance", "lifecycle-resource", "lifecycle-workspace")
 	err := usecase.ReportResource(ctx, reportRequest, "test-reporter")
@@ -288,7 +303,8 @@ func TestMultipleHostsLifecycle(t *testing.T) {
 		ConsumerEnabled:       false,
 	}
 
-	usecase := New(resourceRepo, nil, nil, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig)
+	mc := metricscollector.NewFakeMetricsCollector()
+	usecase := New(resourceRepo, nil, nil, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig, mc)
 
 	// Create 2 hosts
 	host1Request := createTestReportRequest(t, "host", "hbi", "hbi-instance-1", "host-1", "workspace-1")
@@ -394,7 +410,8 @@ func TestPartialDataScenarios(t *testing.T) {
 		ConsumerEnabled:       false,
 	}
 
-	usecase := New(resourceRepo, nil, nil, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig)
+	mc := metricscollector.NewFakeMetricsCollector()
+	usecase := New(resourceRepo, nil, nil, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig, mc)
 
 	t.Run("Report resource with rich reporter data and minimal common data", func(t *testing.T) {
 		request := createTestReportRequestWithReporterDataOnly(t, "k8s_cluster", "ocm", "ocm-instance-1", "reporter-rich-resource", "minimal-workspace")
@@ -558,7 +575,8 @@ func TestResourceLifecycle_ReportUpdateDeleteReport(t *testing.T) {
 			ConsumerEnabled:       false,
 		}
 
-		usecase := New(resourceRepo, nil, nil, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig)
+		mc := metricscollector.NewFakeMetricsCollector()
+		usecase := New(resourceRepo, nil, nil, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig, mc)
 
 		resourceType := "host"
 		reporterType := "hbi"
@@ -649,7 +667,8 @@ func TestResourceLifecycle_ReportUpdateDeleteReportDelete(t *testing.T) {
 			ConsumerEnabled:       false,
 		}
 
-		usecase := New(resourceRepo, nil, nil, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig)
+		mc := metricscollector.NewFakeMetricsCollector()
+		usecase := New(resourceRepo, nil, nil, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig, mc)
 
 		resourceType := "k8s_cluster"
 		reporterType := "ocm"
@@ -721,7 +740,8 @@ func TestResourceLifecycle_ReportDeleteResubmitDelete(t *testing.T) {
 			ConsumerEnabled:       false,
 		}
 
-		usecase := New(resourceRepo, nil, nil, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig)
+		mc := metricscollector.NewFakeMetricsCollector()
+		usecase := New(resourceRepo, nil, nil, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig, mc)
 
 		resourceType := "k8s_cluster"
 		reporterType := "ocm"
@@ -789,7 +809,8 @@ func TestResourceLifecycle_ReportResubmitDeleteResubmit(t *testing.T) {
 			ConsumerEnabled:       false,
 		}
 
-		usecase := New(resourceRepo, nil, nil, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig)
+		mc := metricscollector.NewFakeMetricsCollector()
+		usecase := New(resourceRepo, nil, nil, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig, mc)
 
 		resourceType := "host"
 		reporterType := "hbi"
@@ -871,7 +892,8 @@ func TestResourceLifecycle_ComplexIdempotency(t *testing.T) {
 			ConsumerEnabled:       false,
 		}
 
-		usecase := New(resourceRepo, nil, nil, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig)
+		mc := metricscollector.NewFakeMetricsCollector()
+		usecase := New(resourceRepo, nil, nil, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig, mc)
 
 		resourceType := "k8s_cluster"
 		reporterType := "ocm"
@@ -1086,7 +1108,8 @@ func TestTransactionIdIdempotency(t *testing.T) {
 		ConsumerEnabled:       false,
 	}
 
-	usecase := New(resourceRepo, nil, nil, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig)
+	mc := metricscollector.NewFakeMetricsCollector()
+	usecase := New(resourceRepo, nil, nil, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig, mc)
 
 	t.Run("Same transaction ID should be idempotent - no changes to representation tables", func(t *testing.T) {
 		resourceType := "host"

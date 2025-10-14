@@ -267,7 +267,8 @@ func ToLookupResourceResponse(response *pbv1beta1.LookupResourcesResponse) *pb.S
 			Reporter: &pb.ReporterReference{
 				Type: response.Resource.Type.Namespace,
 			},
-			ResourceId: response.Resource.Id,
+			ResourceId:   response.Resource.Id,
+			ResourceType: response.Resource.Type.Name,
 		},
 		Pagination: &pb.ResponsePagination{
 			ContinuationToken: response.Pagination.ContinuationToken,

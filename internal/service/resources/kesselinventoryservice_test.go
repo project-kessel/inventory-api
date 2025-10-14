@@ -772,7 +772,8 @@ func TestToLookupResourceResponse(t *testing.T) {
 			Reporter: &pb.ReporterReference{
 				Type: "reporter-x",
 			},
-			ResourceId: "abc123",
+			ResourceId:   "abc123",
+			ResourceType: "type-y",
 		},
 		Pagination: &pb.ResponsePagination{
 			ContinuationToken: "next-page-token",

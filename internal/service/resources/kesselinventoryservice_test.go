@@ -14,6 +14,7 @@ import (
 	"google.golang.org/protobuf/types/known/structpb"
 
 	"github.com/project-kessel/inventory-api/internal/data"
+	"github.com/project-kessel/inventory-api/internal/metricscollector"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -156,6 +157,7 @@ func TestInventoryService_ReportResource_MissingReporterType(t *testing.T) {
 		nil, // ListenManager
 		nil, // waitForNotifBreaker
 		nil, // Config
+		metricscollector.NewFakeMetricsCollector(),
 	)
 	service := svc.NewKesselInventoryServiceV1beta2(uc)
 
@@ -197,6 +199,7 @@ func TestInventoryService_ReportResource_MissingReporterInstanceId(t *testing.T)
 		nil, // ListenManager
 		nil, // waitForNotifBreaker
 		nil, // Config
+		metricscollector.NewFakeMetricsCollector(),
 	)
 	service := svc.NewKesselInventoryServiceV1beta2(uc)
 
@@ -241,6 +244,7 @@ func TestInventoryService_ReportResource_InvalidJsonObject(t *testing.T) {
 		nil, // ListenManager
 		nil, // waitForNotifBreaker
 		nil, // Config
+		metricscollector.NewFakeMetricsCollector(),
 	)
 
 	service := svc.NewKesselInventoryServiceV1beta2(uc)
@@ -285,6 +289,7 @@ func TestInventoryService_ReportResource_InvalidInventoryId(t *testing.T) {
 		nil, // ListenManager
 		nil, // waitForNotifBreaker
 		nil, // Config
+		metricscollector.NewFakeMetricsCollector(),
 	)
 	service := svc.NewKesselInventoryServiceV1beta2(uc)
 
@@ -340,6 +345,7 @@ func TestInventoryService_DeleteResource_Success(t *testing.T) {
 		Config:                           cfg,
 		Namespace:                        "rbac",
 		Log:                              krlog.NewHelper(krlog.NewStdLogger(io.Discard)),
+		MetricsCollector:                 metricscollector.NewFakeMetricsCollector(),
 	}
 
 	service := svc.NewKesselInventoryServiceV1beta2(uc)
@@ -426,6 +432,7 @@ func TestInventoryService_DeleteResource_ResourceNotFound(t *testing.T) {
 		Config:                           cfg,
 		Namespace:                        "rbac",
 		Log:                              krlog.NewHelper(krlog.NewStdLogger(io.Discard)),
+		MetricsCollector:                 metricscollector.NewFakeMetricsCollector(),
 	}
 
 	service := svc.NewKesselInventoryServiceV1beta2(uc)
@@ -489,6 +496,7 @@ func TestInventoryService_Check_Allowed(t *testing.T) {
 		LegacyReporterResourceRepository: mockRepo,
 		Namespace:                        "rbac",
 		Config:                           cfg,
+		MetricsCollector:                 metricscollector.NewFakeMetricsCollector(),
 	}
 
 	service := svc.NewKesselInventoryServiceV1beta2(uc)
@@ -548,6 +556,7 @@ func TestInventoryService_CheckForUpdate_Allowed(t *testing.T) {
 		LegacyReporterResourceRepository: mockRepo,
 		Namespace:                        "rbac",
 		Config:                           cfg,
+		MetricsCollector:                 metricscollector.NewFakeMetricsCollector(),
 	}
 
 	service := svc.NewKesselInventoryServiceV1beta2(uc)
@@ -608,6 +617,7 @@ func TestInventoryService_Check_Denied(t *testing.T) {
 		LegacyReporterResourceRepository: mockRepo,
 		Namespace:                        "rbac",
 		Config:                           cfg,
+		MetricsCollector:                 metricscollector.NewFakeMetricsCollector(),
 	}
 
 	service := svc.NewKesselInventoryServiceV1beta2(uc)
@@ -667,6 +677,7 @@ func TestInventoryService_CheckForUpdate_Denied(t *testing.T) {
 		LegacyReporterResourceRepository: mockRepo,
 		Namespace:                        "rbac",
 		Config:                           cfg,
+		MetricsCollector:                 metricscollector.NewFakeMetricsCollector(),
 	}
 
 	service := svc.NewKesselInventoryServiceV1beta2(uc)

@@ -16,6 +16,7 @@ import (
 	"github.com/project-kessel/inventory-api/internal/biz/model_legacy"
 	"github.com/project-kessel/inventory-api/internal/data"
 	eventingapi "github.com/project-kessel/inventory-api/internal/eventing/api"
+	"github.com/project-kessel/inventory-api/internal/metricscollector"
 	"github.com/project-kessel/inventory-api/internal/pubsub"
 	"github.com/project-kessel/inventory-api/internal/server"
 	kessel "github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
@@ -87,11 +88,12 @@ type Usecase struct {
 	Server                           server.Server
 	ListenManager                    pubsub.ListenManagerImpl
 	Config                           *UsecaseConfig
+	MetricsCollector                 *metricscollector.MetricsCollector
 }
 
 func New(resourceRepository data.ResourceRepository, reporterResourceRepository ReporterResourceRepository, inventoryResourceRepository InventoryResourceRepository,
 	authz authzapi.Authorizer, eventer eventingapi.Manager, namespace string, logger log.Logger,
-	listenManager pubsub.ListenManagerImpl, waitForNotifBreaker *gobreaker.CircuitBreaker, usecaseConfig *UsecaseConfig) *Usecase {
+	listenManager pubsub.ListenManagerImpl, waitForNotifBreaker *gobreaker.CircuitBreaker, usecaseConfig *UsecaseConfig, metricsCollector *metricscollector.MetricsCollector) *Usecase {
 	return &Usecase{
 		resourceRepository:               resourceRepository,
 		LegacyReporterResourceRepository: reporterResourceRepository,
@@ -103,6 +105,7 @@ func New(resourceRepository data.ResourceRepository, reporterResourceRepository 
 		Log:                              log.NewHelper(logger),
 		ListenManager:                    listenManager,
 		Config:                           usecaseConfig,
+		MetricsCollector:                 metricsCollector,
 	}
 }
 
@@ -125,6 +128,7 @@ func (uc *Usecase) ReportResource(ctx context.Context, request *v1beta2.ReportRe
 		return fmt.Errorf("failed to create reporter resource key: %w", err)
 	}
 
+	var operationType biz.EventOperationType
 	err = uc.resourceRepository.GetTransactionManager().HandleSerializableTransaction(
 		ReportResourceOperationName,
 		uc.resourceRepository.GetDB(),
@@ -149,13 +153,24 @@ func (uc *Usecase) ReportResource(ctx context.Context, request *v1beta2.ReportRe
 
 			if err == nil && res != nil {
 				log.Info("Resource already exists, updating: ")
+				operationType = biz.OperationTypeUpdated
 				return uc.updateResource(tx, request, res, txidStr)
 			}
 
 			log.Info("Creating new resource")
+			operationType = biz.OperationTypeCreated
 			return uc.createResource(tx, request, txidStr)
 		},
 	)
+
+	if err != nil {
+		return err
+	}
+
+	// Increment outbox metrics only after successful transaction commit
+	if operationType != nil {
+		metricscollector.Incr(uc.MetricsCollector.OutboxEventWrites, string(operationType.OperationType()))
+	}
 
 	if readAfterWriteEnabled && uc.Config.ConsumerEnabled {
 		timeoutCtx, cancel := context.WithTimeout(ctx, listenTimeout)
@@ -186,9 +201,7 @@ func (uc *Usecase) ReportResource(ctx context.Context, request *v1beta2.ReportRe
 			}
 		}
 	}
-	if err != nil {
-		return err
-	}
+
 	return nil
 }
 
@@ -220,7 +233,14 @@ func (uc *Usecase) Delete(reporterResourceKey model.ReporterResourceKey) error {
 			}
 		},
 	)
-	return err
+
+	if err != nil {
+		return err
+	}
+
+	// Increment outbox metrics only after successful transaction commit
+	metricscollector.Incr(uc.MetricsCollector.OutboxEventWrites, string(biz.OperationTypeDeleted.OperationType()))
+	return nil
 }
 
 // Check verifies if a subject has the specified permission on a resource identified by the reporter resource ID.

@@ -7,7 +7,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/project-kessel/inventory-api/internal"
-	"github.com/project-kessel/inventory-api/internal/biz"
 
 	"github.com/project-kessel/inventory-api/internal/biz/model_legacy"
 )
@@ -86,7 +85,7 @@ type RelationshipReporter struct {
 }
 
 // NewResourceEvent creates a new Event for resource operations.
-func NewResourceEvent(operationType biz.EventOperationType, resource *model_legacy.Resource, reportedTime time.Time) (*Event, error) {
+func NewResourceEvent(operationType model_legacy.EventOperationType, resource *model_legacy.Resource, reportedTime time.Time) (*Event, error) {
 	const eventType = "resources"
 
 	eventId, err := uuid.NewUUID() // Todo: we need to have an stable id if we implement some re-trying logic
@@ -107,11 +106,11 @@ func NewResourceEvent(operationType biz.EventOperationType, resource *model_lega
 	var deletedAt *time.Time
 
 	switch operationType {
-	case biz.OperationTypeCreated:
+	case model_legacy.OperationTypeCreated:
 		createdAt = &reportedTime
-	case biz.OperationTypeUpdated:
+	case model_legacy.OperationTypeUpdated:
 		updatedAt = &reportedTime
-	case biz.OperationTypeDeleted:
+	case model_legacy.OperationTypeDeleted:
 		deletedAt = &reportedTime
 	}
 
@@ -148,7 +147,7 @@ func NewResourceEvent(operationType biz.EventOperationType, resource *model_lega
 }
 
 // NewRelationshipEvent creates a new Event for relationship operations.
-func NewRelationshipEvent(operationType biz.EventOperationType, relationship *model_legacy.Relationship, reportedTime time.Time) (*Event, error) {
+func NewRelationshipEvent(operationType model_legacy.EventOperationType, relationship *model_legacy.Relationship, reportedTime time.Time) (*Event, error) {
 	const eventType = "resources-relationship"
 
 	eventId, err := uuid.NewUUID() // Todo: we need to have an stable id if we implement some re-trying logic
@@ -161,11 +160,11 @@ func NewRelationshipEvent(operationType biz.EventOperationType, relationship *mo
 	var deletedAt *time.Time
 
 	switch operationType {
-	case biz.OperationTypeCreated:
+	case model_legacy.OperationTypeCreated:
 		createdAt = &reportedTime
-	case biz.OperationTypeUpdated:
+	case model_legacy.OperationTypeUpdated:
 		updatedAt = &reportedTime
-	case biz.OperationTypeDeleted:
+	case model_legacy.OperationTypeDeleted:
 		deletedAt = &reportedTime
 	}
 

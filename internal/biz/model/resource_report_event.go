@@ -74,16 +74,6 @@ func (re ResourceReportEvent) ReporterVersion() *string {
 	return &versionStr
 }
 
-// CurrentCommonVersion returns the version from the CommonRepresentation
-func (re ResourceReportEvent) CurrentCommonVersion() *Version {
-	return &re.commonRepresentation.version
-}
-
-// CurrentReporterRepresentationVersion returns the version from the ReporterRepresentation
-func (re ResourceReportEvent) CurrentReporterRepresentationVersion() *Version {
-	return &re.reporterRepresentation.version
-}
-
 func (re ResourceReportEvent) Id() ResourceId {
 	return re.id
 }
@@ -115,15 +105,6 @@ func (re ResourceReportEvent) WorkspaceId() string {
 		}
 	}
 	return ""
-}
-
-// ReporterResourceKey constructs and returns the ReporterResourceKey from the event fields
-func (re ResourceReportEvent) ReporterResourceKey() ReporterResourceKey {
-	return ReporterResourceKey{
-		localResourceID: re.localResourceId,
-		resourceType:    re.resourceType,
-		reporter:        re.reporterId,
-	}
 }
 
 // DeserializeResourceEvent creates a ResourceReportEvent from representation snapshots - direct initialization without validation

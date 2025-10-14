@@ -6,24 +6,17 @@ import (
 	"testing"
 
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
-	"github.com/project-kessel/inventory-api/internal/data"
 	"github.com/project-kessel/inventory-api/internal/metricscollector"
 	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/otel"
-	"gorm.io/driver/sqlite"
-	"gorm.io/gorm"
 
-	"github.com/project-kessel/inventory-api/internal/biz"
-	"github.com/project-kessel/inventory-api/internal/biz/model"
 	"github.com/project-kessel/inventory-api/internal/biz/model_legacy"
-	usecase_resources "github.com/project-kessel/inventory-api/internal/biz/usecase/resources"
-	datamodel "github.com/project-kessel/inventory-api/internal/data/model"
 	"github.com/project-kessel/inventory-api/internal/mocks"
 
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
 	"github.com/stretchr/testify/assert"
+	"gorm.io/gorm"
 
 	. "github.com/project-kessel/inventory-api/cmd/common"
 	"github.com/project-kessel/inventory-api/internal/authz"
@@ -34,21 +27,9 @@ import (
 
 const (
 	testMessageKey            = `{"schema":{"type":"string","optional":false},"payload":"00000000-0000-0000-0000-000000000000"}`
-	testCreateOrUpdateMessage = `{"schema":{"type":"string","optional":false,"name":"io.debezium.data.Json","version":1},"payload":{"reporter_resource_key":{"local_resource_id":"test-resource-4321","resource_type":"integration","reporter":{"reporter_type":"notifications","reporter_instance_id":"test-instance-1"}},"common_version":1}}`
-	testDeleteMessage         = `{"schema":{"type":"string","optional":false,"name":"io.debezium.data.Json","version":1},"payload":{"reporter_resource_key":{"local_resource_id":"test-resource-4321","resource_type":"integration","reporter":{"reporter_type":"notifications","reporter_instance_id":"test-instance-1"}},"common_version":1}}`
+	testCreateOrUpdateMessage = `{"schema":{"type":"string","optional":false,"name":"io.debezium.data.Json","version":1},"payload":{"subject":{"subject":{"id":"1234", "type":{"name":"workspace","namespace":"rbac"}}},"relation":"t_workspace","resource":{"id":"4321","type":{"name":"integration","namespace":"notifications"}}}}`
+	testDeleteMessage         = `{"schema":{"type":"string","optional":false,"name":"io.debezium.data.Json","version":1},"payload":{"resource_id":"4321","resource_type":"integration","resource_namespace":"notifications","relation":"t_workspace","subject_filter":{"subject_type":"workspace","subject_namespace":"rbac","subject_id":"1234"}}}`
 )
-
-func setupInMemoryDB(t *testing.T) *gorm.DB {
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
-	require.NoError(t, err)
-
-	err = db.AutoMigrate(&datamodel.Resource{}, &datamodel.ReporterResource{},
-		&datamodel.ReporterRepresentation{}, &datamodel.CommonRepresentation{},
-		&model_legacy.OutboxEvent{})
-	require.NoError(t, err)
-
-	return db
-}
 
 type TestCase struct {
 	name            string
@@ -62,7 +43,7 @@ type TestCase struct {
 }
 
 // TestSetup creates a test struct that calls most of the initial constructor methods we intend to test in unit tests.
-func (t *TestCase) TestSetup(testingT *testing.T) []error {
+func (t *TestCase) TestSetup() []error {
 	t.options = NewOptions()
 	t.options.BootstrapServers = []string{"localhost:9092"}
 	t.config = NewConfig(t.options)
@@ -95,18 +76,10 @@ func (t *TestCase) TestSetup(testingT *testing.T) []error {
 	authorizer.On("DeleteTuples", mock.Anything, mock.Anything).Return(deleteTupleResponse, nil)
 
 	consumer := &mocks.MockConsumer{}
-	db := setupInMemoryDB(testingT)
-
-	// Create consumer with real database first
-	t.inv, err = New(cfg, db, authz.CompletedConfig{}, authorizer, notifier, t.logger, consumer)
+	t.inv, err = New(cfg, &gorm.DB{}, authz.CompletedConfig{}, authorizer, notifier, t.logger, consumer)
 	if err != nil {
 		errs = append(errs, err)
-		return errs
 	}
-
-	fakeRepo := data.NewFakeResourceRepositoryWithWorkspaceOverrides("test-workspace-123", "")
-	t.inv.SchemaService = usecase_resources.NewSchemaUsecase(fakeRepo, t.logger)
-
 	err = t.metrics.New(otel.Meter("github.com/project-kessel/inventory-api/blob/main/internal/server/otel"))
 	if err != nil {
 		errs = append(errs, err)
@@ -115,13 +88,75 @@ func (t *TestCase) TestSetup(testingT *testing.T) []error {
 	return errs
 }
 
+func makeTuple() *v1beta1.Relationship {
+	return &v1beta1.Relationship{
+		Resource: &v1beta1.ObjectReference{
+			Type: &v1beta1.ObjectType{
+				Namespace: "notifications",
+				Name:      "integration",
+			},
+			Id: "4321",
+		},
+		Relation: "t_workspace",
+		Subject: &v1beta1.SubjectReference{
+			Subject: &v1beta1.ObjectReference{
+				Type: &v1beta1.ObjectType{
+					Namespace: "rbac",
+					Name:      "workspace",
+				},
+				Id: "1234",
+			},
+		},
+	}
+}
+
+func makeFilter() *v1beta1.RelationTupleFilter {
+	return &v1beta1.RelationTupleFilter{
+		ResourceNamespace: ToPointer("notifications"),
+		ResourceType:      ToPointer("integration"),
+		ResourceId:        ToPointer("4321"),
+		Relation:          ToPointer("t_workspace"),
+		SubjectFilter: &v1beta1.SubjectFilter{
+			SubjectNamespace: ToPointer("rbac"),
+			SubjectType:      ToPointer("workspace"),
+			SubjectId:        ToPointer("1234"),
+		},
+	}
+}
+
 func TestNewConsumerSetup(t *testing.T) {
 	test := TestCase{
 		name:        "TestNewConsumerSetup",
 		description: "ensures setting up a new consumer, including options and configs functions",
 	}
-	errs := test.TestSetup(t)
+	errs := test.TestSetup()
 	assert.Nil(t, errs)
+}
+
+func TestParseCreateOrUpdateMessage(t *testing.T) {
+	expected := makeTuple()
+	tuple, err := ParseCreateOrUpdateMessage([]byte(testCreateOrUpdateMessage))
+	assert.Nil(t, err)
+	assert.Equal(t, tuple.Subject.Subject.Id, expected.Subject.Subject.Id)
+	assert.Equal(t, tuple.Subject.Subject.Type.Name, expected.Subject.Subject.Type.Name)
+	assert.Equal(t, tuple.Subject.Subject.Type.Namespace, expected.Subject.Subject.Type.Namespace)
+	assert.Equal(t, tuple.Relation, expected.Relation)
+	assert.Equal(t, tuple.Resource.Id, expected.Resource.Id)
+	assert.Equal(t, tuple.Resource.Type.Name, expected.Resource.Type.Name)
+	assert.Equal(t, tuple.Resource.Type.Namespace, expected.Resource.Type.Namespace)
+}
+
+func TestParseDeleteMessage(t *testing.T) {
+	expected := makeFilter()
+	filter, err := ParseDeleteMessage([]byte(testDeleteMessage))
+	assert.Nil(t, err)
+	assert.Equal(t, filter.ResourceId, expected.ResourceId)
+	assert.Equal(t, filter.ResourceType, expected.ResourceType)
+	assert.Equal(t, filter.ResourceNamespace, expected.ResourceNamespace)
+	assert.Equal(t, filter.Relation, expected.Relation)
+	assert.Equal(t, *filter.SubjectFilter.SubjectId, *expected.SubjectFilter.SubjectId)
+	assert.Equal(t, *filter.SubjectFilter.SubjectType, *expected.SubjectFilter.SubjectType)
+	assert.Equal(t, *filter.SubjectFilter.SubjectNamespace, *expected.SubjectFilter.SubjectNamespace)
 }
 
 func TestParseMessageKey(t *testing.T) {
@@ -141,11 +176,11 @@ func TestParseHeaders(t *testing.T) {
 	}{
 		{
 			name:              "Create Operation",
-			expectedOperation: string(biz.OperationTypeCreated),
+			expectedOperation: string(model_legacy.OperationTypeCreated),
 			expectedTxid:      "123456",
 			msg: &kafka.Message{
 				Headers: []kafka.Header{
-					{Key: "operation", Value: []byte(string(biz.OperationTypeCreated))},
+					{Key: "operation", Value: []byte(string(model_legacy.OperationTypeCreated))},
 					{Key: "txid", Value: []byte("123456")},
 				},
 			},
@@ -153,11 +188,11 @@ func TestParseHeaders(t *testing.T) {
 		},
 		{
 			name:              "Update Operation",
-			expectedOperation: string(biz.OperationTypeUpdated),
+			expectedOperation: string(model_legacy.OperationTypeUpdated),
 			expectedTxid:      "123456",
 			msg: &kafka.Message{
 				Headers: []kafka.Header{
-					{Key: "operation", Value: []byte(string(biz.OperationTypeUpdated))},
+					{Key: "operation", Value: []byte(string(model_legacy.OperationTypeUpdated))},
 					{Key: "txid", Value: []byte("123456")},
 				},
 			},
@@ -165,11 +200,11 @@ func TestParseHeaders(t *testing.T) {
 		},
 		{
 			name:              "Delete Operation",
-			expectedOperation: string(biz.OperationTypeDeleted),
+			expectedOperation: string(model_legacy.OperationTypeDeleted),
 			expectedTxid:      "",
 			msg: &kafka.Message{
 				Headers: []kafka.Header{
-					{Key: "operation", Value: []byte(string(biz.OperationTypeDeleted))},
+					{Key: "operation", Value: []byte(string(model_legacy.OperationTypeDeleted))},
 					{Key: "txid", Value: []byte{}},
 				},
 			},
@@ -223,11 +258,11 @@ func TestParseHeaders(t *testing.T) {
 		},
 		{
 			name:              "Extra Headers",
-			expectedOperation: string(biz.OperationTypeCreated),
+			expectedOperation: string(model_legacy.OperationTypeCreated),
 			expectedTxid:      "123456",
 			msg: &kafka.Message{
 				Headers: []kafka.Header{
-					{Key: "operation", Value: []byte(string(biz.OperationTypeCreated))},
+					{Key: "operation", Value: []byte(string(model_legacy.OperationTypeCreated))},
 					{Key: "txid", Value: []byte("123456")},
 					{Key: "unused-header", Value: []byte("unused-header-data")},
 				},
@@ -279,7 +314,7 @@ func TestInventoryConsumer_Retry(t *testing.T) {
 				name:        "TestInventoryConsumer-Retry",
 				description: test.description,
 			}
-			errs := tester.TestSetup(t)
+			errs := tester.TestSetup()
 			assert.Nil(t, errs)
 
 			result, err := tester.inv.Retry(test.funcToExecute, tester.inv.MetricsCollector.MsgProcessFailures)
@@ -299,7 +334,7 @@ func TestInventoryConsumer_ProcessMessage(t *testing.T) {
 	}{
 		{
 			name:              "Create Operation",
-			expectedOperation: string(biz.OperationTypeCreated),
+			expectedOperation: string(model_legacy.OperationTypeCreated),
 			expectedTxid:      "123456",
 			msg: &kafka.Message{
 				Key:   []byte(testMessageKey),
@@ -309,7 +344,7 @@ func TestInventoryConsumer_ProcessMessage(t *testing.T) {
 		},
 		{
 			name:              "Update Operation",
-			expectedOperation: string(biz.OperationTypeUpdated),
+			expectedOperation: string(model_legacy.OperationTypeUpdated),
 			expectedTxid:      "123456",
 			msg: &kafka.Message{
 				Key:   []byte(testMessageKey),
@@ -319,7 +354,7 @@ func TestInventoryConsumer_ProcessMessage(t *testing.T) {
 		},
 		{
 			name:              "Delete Operation",
-			expectedOperation: string(biz.OperationTypeDeleted),
+			expectedOperation: string(model_legacy.OperationTypeDeleted),
 			expectedTxid:      "",
 			msg: &kafka.Message{
 				Key:   []byte(testMessageKey),
@@ -336,7 +371,7 @@ func TestInventoryConsumer_ProcessMessage(t *testing.T) {
 		},
 		{
 			name:              "Created but relations disabled",
-			expectedOperation: string(biz.OperationTypeCreated),
+			expectedOperation: string(model_legacy.OperationTypeCreated),
 			expectedTxid:      "123456",
 			msg:               &kafka.Message{},
 			relationsEnabled:  false,
@@ -346,7 +381,7 @@ func TestInventoryConsumer_ProcessMessage(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			tester := TestCase{}
-			errs := tester.TestSetup(t)
+			errs := tester.TestSetup()
 			assert.Nil(t, errs)
 
 			headers := []kafka.Header{
@@ -359,7 +394,7 @@ func TestInventoryConsumer_ProcessMessage(t *testing.T) {
 			assert.Equal(t, parsedHeaders["operation"], test.expectedOperation)
 			assert.Equal(t, parsedHeaders["txid"], test.expectedTxid)
 
-			if (test.expectedOperation == string(biz.OperationTypeCreated) || test.expectedOperation == string(biz.OperationTypeUpdated)) && test.relationsEnabled {
+			if (test.expectedOperation == string(model_legacy.OperationTypeCreated) || test.expectedOperation == string(model_legacy.OperationTypeUpdated)) && test.relationsEnabled {
 				resp, err := tester.inv.ProcessMessage(parsedHeaders, test.relationsEnabled, test.msg)
 				assert.Nil(t, err)
 				assert.Equal(t, "test-token", resp)
@@ -456,7 +491,7 @@ func TestCommitStoredOffsets(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			tester := TestCase{}
-			errs := tester.TestSetup(t)
+			errs := tester.TestSetup()
 			assert.Nil(t, errs)
 
 			c := &mocks.MockConsumer{}
@@ -524,7 +559,7 @@ func TestRebalanceCallback_AssignedPartitions(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			tester := TestCase{}
-			errs := tester.TestSetup(t)
+			errs := tester.TestSetup()
 			assert.Nil(t, errs)
 
 			authorizer := &mocks.MockAuthz{}
@@ -639,7 +674,7 @@ func TestRebalanceCallback_RevokedPartitions(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			tester := TestCase{}
-			errs := tester.TestSetup(t)
+			errs := tester.TestSetup()
 			assert.Nil(t, errs)
 
 			consumer := &mocks.MockConsumer{}
@@ -673,12 +708,12 @@ func TestRebalanceCallback_RevokedPartitions(t *testing.T) {
 func TestFencingToken_WritingAfterRebalance(t *testing.T) {
 	// Setup two consumers
 	testerA := TestCase{}
-	errsA := testerA.TestSetup(t)
+	errsA := testerA.TestSetup()
 	assert.Nil(t, errsA)
 	testerA.inv.Config.ConsumerGroupID = "test-group"
 
 	testerB := TestCase{}
-	errsB := testerB.TestSetup(t)
+	errsB := testerB.TestSetup()
 	assert.Nil(t, errsB)
 	testerB.inv.Config.ConsumerGroupID = "test-group"
 
@@ -731,28 +766,14 @@ func TestFencingToken_WritingAfterRebalance(t *testing.T) {
 	// Simulate consumer A waking up with the stale token
 	testerA.inv.lockToken = staleToken
 
-	// Create a domain tuple directly
-	resourceId, err := model.NewLocalResourceId("4321")
-	assert.Nil(t, err)
-	resourceType := model.NewRelationsObjectType("integration", "notifications")
-	resource := model.NewRelationsResource(resourceId, resourceType)
-
-	subjectId, err := model.NewLocalResourceId("1234")
-	assert.Nil(t, err)
-	subjectType := model.NewRelationsObjectType("workspace", "rbac")
-	subjectResource := model.NewRelationsResource(subjectId, subjectType)
-	subject := model.NewRelationsSubject(subjectResource)
-
-	domainTuple := model.NewRelationsTuple(resource, "t_workspace", subject)
-	tuples := &[]model.RelationsTuple{domainTuple}
-
 	// Try to create a tuple with the stale token
-	_, err = testerA.inv.CreateTuple(context.Background(), tuples)
+	tuple := makeTuple()
+	_, err = testerA.inv.CreateTuple(context.Background(), tuple)
 	assert.NotNil(t, err)
 	assert.Contains(t, err.Error(), "fencing token is invalid or expired")
 
 	// Consumer B should be able to create a tuple with the valid token
-	resp, err := testerB.inv.CreateTuple(context.Background(), tuples)
+	resp, err := testerB.inv.CreateTuple(context.Background(), tuple)
 	assert.Nil(t, err)
 	assert.Equal(t, "test-token", resp)
 
@@ -761,7 +782,7 @@ func TestFencingToken_WritingAfterRebalance(t *testing.T) {
 
 func TestInventoryConsumer_CreateTuple_FailedPrecondition(t *testing.T) {
 	tester := TestCase{}
-	errs := tester.TestSetup(t)
+	errs := tester.TestSetup()
 	assert.Nil(t, errs)
 
 	authorizer := &mocks.MockAuthz{}
@@ -770,22 +791,8 @@ func TestInventoryConsumer_CreateTuple_FailedPrecondition(t *testing.T) {
 	tester.inv.Authorizer = authorizer
 	tester.inv.lockToken = "test-token"
 
-	// Create a domain tuple directly
-	resourceId, err := model.NewLocalResourceId("4321")
-	assert.Nil(t, err)
-	resourceType := model.NewRelationsObjectType("integration", "notifications")
-	resource := model.NewRelationsResource(resourceId, resourceType)
-
-	subjectId, err := model.NewLocalResourceId("1234")
-	assert.Nil(t, err)
-	subjectType := model.NewRelationsObjectType("workspace", "rbac")
-	subjectResource := model.NewRelationsResource(subjectId, subjectType)
-	subject := model.NewRelationsSubject(subjectResource)
-
-	domainTuple := model.NewRelationsTuple(resource, "t_workspace", subject)
-	tuples := &[]model.RelationsTuple{domainTuple}
-
-	resp, err := tester.inv.CreateTuple(context.Background(), tuples)
+	tuple := makeTuple()
+	resp, err := tester.inv.CreateTuple(context.Background(), tuple)
 
 	assert.NotNil(t, err)
 	assert.Equal(t, "", resp)
@@ -796,7 +803,7 @@ func TestInventoryConsumer_CreateTuple_FailedPrecondition(t *testing.T) {
 
 func TestInventoryConsumer_UpdateTuple_FailedPrecondition(t *testing.T) {
 	tester := TestCase{}
-	errs := tester.TestSetup(t)
+	errs := tester.TestSetup()
 	assert.Nil(t, errs)
 
 	authorizer := &mocks.MockAuthz{}
@@ -805,22 +812,8 @@ func TestInventoryConsumer_UpdateTuple_FailedPrecondition(t *testing.T) {
 	tester.inv.Authorizer = authorizer
 	tester.inv.lockToken = "test-token"
 
-	// Create a domain tuple directly
-	resourceId, err := model.NewLocalResourceId("4321")
-	assert.Nil(t, err)
-	resourceType := model.NewRelationsObjectType("integration", "notifications")
-	resource := model.NewRelationsResource(resourceId, resourceType)
-
-	subjectId, err := model.NewLocalResourceId("1234")
-	assert.Nil(t, err)
-	subjectType := model.NewRelationsObjectType("workspace", "rbac")
-	subjectResource := model.NewRelationsResource(subjectId, subjectType)
-	subject := model.NewRelationsSubject(subjectResource)
-
-	domainTuple := model.NewRelationsTuple(resource, "t_workspace", subject)
-	tuples := &[]model.RelationsTuple{domainTuple}
-
-	resp, err := tester.inv.UpdateTuple(context.Background(), tuples, nil)
+	tuple := makeTuple()
+	resp, err := tester.inv.UpdateTuple(context.Background(), tuple)
 
 	assert.NotNil(t, err)
 	assert.Equal(t, "", resp)
@@ -831,7 +824,7 @@ func TestInventoryConsumer_UpdateTuple_FailedPrecondition(t *testing.T) {
 
 func TestInventoryConsumer_DeleteTuple_FailedPrecondition(t *testing.T) {
 	tester := TestCase{}
-	errs := tester.TestSetup(t)
+	errs := tester.TestSetup()
 	assert.Nil(t, errs)
 
 	authorizer := &mocks.MockAuthz{}
@@ -840,22 +833,8 @@ func TestInventoryConsumer_DeleteTuple_FailedPrecondition(t *testing.T) {
 	tester.inv.Authorizer = authorizer
 	tester.inv.lockToken = "test-token"
 
-	// Create a domain tuple directly
-	resourceId, err := model.NewLocalResourceId("4321")
-	assert.Nil(t, err)
-	resourceType := model.NewRelationsObjectType("integration", "notifications")
-	resource := model.NewRelationsResource(resourceId, resourceType)
-
-	subjectId, err := model.NewLocalResourceId("1234")
-	assert.Nil(t, err)
-	subjectType := model.NewRelationsObjectType("workspace", "rbac")
-	subjectResource := model.NewRelationsResource(subjectId, subjectType)
-	subject := model.NewRelationsSubject(subjectResource)
-
-	domainTuple := model.NewRelationsTuple(resource, "t_workspace", subject)
-	tuples := []model.RelationsTuple{domainTuple}
-
-	resp, err := tester.inv.DeleteTuple(context.Background(), tuples)
+	filter := makeFilter()
+	resp, err := tester.inv.DeleteTuple(context.Background(), filter)
 
 	assert.NotNil(t, err)
 	assert.Equal(t, "", resp)

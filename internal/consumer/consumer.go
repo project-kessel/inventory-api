@@ -15,8 +15,11 @@ import (
 	"time"
 
 	"github.com/project-kessel/inventory-api/cmd/common"
+	"github.com/project-kessel/inventory-api/internal/biz/model"
+	usecase_resources "github.com/project-kessel/inventory-api/internal/biz/usecase/resources"
 	"github.com/project-kessel/inventory-api/internal/consumer/auth"
 	"github.com/project-kessel/inventory-api/internal/consumer/retry"
+	"github.com/project-kessel/inventory-api/internal/data"
 	datamodel "github.com/project-kessel/inventory-api/internal/data/model"
 	"github.com/project-kessel/inventory-api/internal/metricscollector"
 
@@ -24,6 +27,7 @@ import (
 	"github.com/project-kessel/inventory-api/internal/authz/kessel"
 	"github.com/project-kessel/inventory-api/internal/pubsub"
 
+	"github.com/spf13/viper"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 
@@ -36,6 +40,7 @@ import (
 
 	"github.com/project-kessel/inventory-api/internal/authz"
 	"github.com/project-kessel/inventory-api/internal/authz/api"
+	"github.com/project-kessel/inventory-api/internal/biz"
 	"github.com/project-kessel/inventory-api/internal/biz/model_legacy"
 	"go.opentelemetry.io/otel/metric"
 )
@@ -72,6 +77,7 @@ type InventoryConsumer struct {
 	AuthOptions      *auth.Options
 	RetryOptions     *retry.Options
 	Notifier         pubsub.Notifier
+	SchemaService    *usecase_resources.SchemaUsecase
 	// offsetMutex protects OffsetStorage and coordinates offset commit operations
 	// to prevent race conditions between shutdown and rebalance callbacks
 	offsetMutex sync.Mutex
@@ -124,6 +130,10 @@ func New(config CompletedConfig, db *gorm.DB, authz authz.CompletedConfig, autho
 
 	var errChan chan error
 
+	maxSerializationRetries := viper.GetInt("storage.max-serialization-retries")
+	resourceRepository := data.NewResourceRepository(db, data.NewGormTransactionManager(&mc, maxSerializationRetries))
+	schemaService := usecase_resources.NewSchemaUsecase(resourceRepository, logger)
+
 	return InventoryConsumer{
 		Consumer:           consumer,
 		OffsetStorage:      make([]kafka.TopicPartition, 0),
@@ -137,6 +147,7 @@ func New(config CompletedConfig, db *gorm.DB, authz authz.CompletedConfig, autho
 		AuthOptions:        authnOptions,
 		RetryOptions:       retryOptions,
 		Notifier:           notifier,
+		SchemaService:      schemaService,
 		offsetMutex:        sync.Mutex{},
 		shutdownInProgress: false,
 	}, nil
@@ -212,7 +223,7 @@ func (i *InventoryConsumer) Consume() error {
 					continue
 				}
 
-				if operation != string(model_legacy.OperationTypeDeleted) {
+				if operation != string(biz.OperationTypeDeleted) {
 					inventoryID, err := ParseMessageKey(e.Key)
 					if err != nil {
 						metricscollector.Incr(i.MetricsCollector.MsgProcessFailures, "ParseMessageKey")
@@ -295,18 +306,22 @@ func (i *InventoryConsumer) ProcessMessage(headers map[string]string, relationsE
 	txid := headers["txid"]
 
 	switch operation {
-	case string(model_legacy.OperationTypeCreated):
+	case string(biz.OperationTypeCreated):
 		i.Logger.Infof("processing message: operation=%s, txid=%s", operation, txid)
 		i.Logger.Debugf("processed message tuple=%s", msg.Value)
 		if relationsEnabled {
-			tuple, err := ParseCreateOrUpdateMessage(msg.Value)
+			tupleEvent, err := ParseMessage(msg.Value, operation)
 			if err != nil {
 				metricscollector.Incr(i.MetricsCollector.MsgProcessFailures, "ParseCreateOrUpdateMessage")
 				i.Logger.Errorf("failed to parse message for tuple: %v", err)
 				return "", err
 			}
 			resp, err := i.Retry(func() (string, error) {
-				return i.CreateTuple(context.Background(), tuple)
+				tuplesToReplicate, err := i.SchemaService.CalculateTuples(*tupleEvent, biz.OperationTypeCreated)
+				if err != nil {
+					return "", err
+				}
+				return i.CreateTuple(context.Background(), tuplesToReplicate.TuplesToCreate())
 			}, i.MetricsCollector.MsgProcessFailures)
 			if err != nil {
 				metricscollector.Incr(i.MetricsCollector.MsgProcessFailures, "CreateTuple")
@@ -316,18 +331,22 @@ func (i *InventoryConsumer) ProcessMessage(headers map[string]string, relationsE
 			return resp, nil
 		}
 
-	case string(model_legacy.OperationTypeUpdated):
+	case string(biz.OperationTypeUpdated):
 		i.Logger.Infof("processing message: operation=%s, txid=%s", operation, txid)
 		i.Logger.Debugf("processed message tuple=%s", msg.Value)
 		if relationsEnabled {
-			tuple, err := ParseCreateOrUpdateMessage(msg.Value)
+			tupleEvent, err := ParseMessage(msg.Value, operation)
 			if err != nil {
 				metricscollector.Incr(i.MetricsCollector.MsgProcessFailures, "ParseCreateOrUpdateMessage")
 				i.Logger.Errorf("failed to parse message for tuple: %v", err)
 				return "", err
 			}
 			resp, err := i.Retry(func() (string, error) {
-				return i.UpdateTuple(context.Background(), tuple)
+				tuplesToReplicate, err := i.SchemaService.CalculateTuples(*tupleEvent, biz.OperationTypeUpdated)
+				if err != nil {
+					return "", err
+				}
+				return i.UpdateTuple(context.Background(), tuplesToReplicate.TuplesToCreate(), tuplesToReplicate.TuplesToDelete())
 			}, i.MetricsCollector.MsgProcessFailures)
 			if err != nil {
 				metricscollector.Incr(i.MetricsCollector.MsgProcessFailures, "UpdateTuple")
@@ -336,18 +355,27 @@ func (i *InventoryConsumer) ProcessMessage(headers map[string]string, relationsE
 			}
 			return resp, nil
 		}
-	case string(model_legacy.OperationTypeDeleted):
+	case string(biz.OperationTypeDeleted):
 		i.Logger.Infof("processing message: operation=%s, txid=%s", operation, txid)
 		i.Logger.Debugf("processed message tuple=%s", msg.Value)
 		if relationsEnabled {
-			filter, err := ParseDeleteMessage(msg.Value)
+			tupleEvent, err := ParseMessage(msg.Value, operation)
 			if err != nil {
 				metricscollector.Incr(i.MetricsCollector.MsgProcessFailures, "ParseDeleteMessage")
 				i.Logger.Errorf("failed to parse message for filter: %v", err)
 				return "", err
 			}
+
 			_, err = i.Retry(func() (string, error) {
-				return i.DeleteTuple(context.Background(), filter)
+				tuplesToReplicate, err := i.SchemaService.CalculateTuples(*tupleEvent, biz.OperationTypeDeleted)
+				if err != nil {
+					return "", err
+				}
+				// For delete operations, we only delete tuples (no creation)
+				if tuplesToReplicate.TuplesToDelete() != nil {
+					return i.DeleteTuple(context.Background(), *tuplesToReplicate.TuplesToDelete())
+				}
+				return "", nil
 			}, i.MetricsCollector.MsgProcessFailures)
 			if err != nil {
 				metricscollector.Incr(i.MetricsCollector.MsgProcessFailures, "DeleteTuple")
@@ -383,9 +411,8 @@ func ParseHeaders(msg *kafka.Message) (map[string]string, error) {
 	return headers, nil
 }
 
-func ParseCreateOrUpdateMessage(msg []byte) (*v1beta1.Relationship, error) {
+func ParseMessage(msg []byte, operationType string) (*model.TupleEvent, error) {
 	var msgPayload *MessagePayload
-	var tuple *v1beta1.Relationship
 
 	// msg value is expected to be a valid JSON body for a single relation
 	err := json.Unmarshal(msg, &msgPayload)
@@ -398,33 +425,13 @@ func ParseCreateOrUpdateMessage(msg []byte) (*v1beta1.Relationship, error) {
 		return nil, fmt.Errorf("error marshaling tuple payload: %v", err)
 	}
 
+	// Now unmarshal into TupleEvent directly (operation type comes from headers)
+	var tuple *model.TupleEvent
 	err = json.Unmarshal(payloadJson, &tuple)
 	if err != nil {
 		return nil, fmt.Errorf("error unmarshaling tuple payload: %v", err)
 	}
 	return tuple, nil
-}
-
-func ParseDeleteMessage(msg []byte) (*v1beta1.RelationTupleFilter, error) {
-	var msgPayload *MessagePayload
-	var filter *v1beta1.RelationTupleFilter
-
-	// msg value is expected to be a valid JSON body for a single relation
-	err := json.Unmarshal(msg, &msgPayload)
-	if err != nil {
-		return nil, fmt.Errorf("error unmarshaling msgPayload: %v", err)
-	}
-
-	payloadJson, err := json.Marshal(msgPayload.RelationsRequest)
-	if err != nil {
-		return nil, fmt.Errorf("error marshaling tuple payload: %v", err)
-	}
-
-	err = json.Unmarshal(payloadJson, &filter)
-	if err != nil {
-		return nil, fmt.Errorf("error unmarshaling tuple payload: %v", err)
-	}
-	return filter, nil
 }
 
 func ParseMessageKey(msg []byte) (string, error) {
@@ -491,10 +498,19 @@ func (i *InventoryConsumer) commitStoredOffsets() error {
 }
 
 // CreateTuple calls the Relations API to create a tuple from the message payload received and returns the consistency token
-func (i *InventoryConsumer) CreateTuple(ctx context.Context, tuple *v1beta1.Relationship) (string, error) {
+func (i *InventoryConsumer) CreateTuple(ctx context.Context, tuples *[]model.RelationsTuple) (string, error) {
+	if tuples == nil || len(*tuples) == 0 {
+		return "", fmt.Errorf("no tuples provided")
+	}
+
+	relationships, err := i.convertTuplesToRelationships(*tuples)
+	if err != nil {
+		return "", fmt.Errorf("failed to convert tuples to relationships: %w", err)
+	}
 
 	resp, err := i.Authorizer.CreateTuples(ctx, &v1beta1.CreateTuplesRequest{
-		Tuples: []*v1beta1.Relationship{tuple},
+		Upsert: true,
+		Tuples: relationships,
 		FencingCheck: &v1beta1.FencingCheck{
 			LockId:    i.lockId,
 			LockToken: i.lockToken,
@@ -510,12 +526,14 @@ func (i *InventoryConsumer) CreateTuple(ctx context.Context, tuple *v1beta1.Rela
 		if status.Convert(err).Code() == codes.AlreadyExists {
 			i.Logger.Info("tuple already exists; fetching consistency token")
 
-			namespace := tuple.GetResource().GetType().GetNamespace()
-			relation := tuple.GetRelation()
-			subject := tuple.GetSubject()
+			// Use the first relationship for token fetching
+			firstRelationship := relationships[0]
+			namespace := firstRelationship.GetResource().GetType().GetNamespace()
+			relation := firstRelationship.GetRelation()
+			subject := firstRelationship.GetSubject()
 			resource := &model_legacy.Resource{
-				ResourceType:       tuple.GetResource().GetType().GetName(),
-				ReporterResourceId: tuple.GetResource().GetId(),
+				ResourceType:       firstRelationship.GetResource().GetType().GetName(),
+				ReporterResourceId: firstRelationship.GetResource().GetId(),
 			}
 			_, token, err := i.Authorizer.Check(ctx, namespace, relation, "", resource.ResourceType, resource.ReporterResourceId, subject)
 			if err != nil {
@@ -528,44 +546,67 @@ func (i *InventoryConsumer) CreateTuple(ctx context.Context, tuple *v1beta1.Rela
 	return resp.GetConsistencyToken().GetToken(), nil
 }
 
-// UpdateTuple calls the Relations API to create a tuple from the message payload received and returns the consistency token
-func (i *InventoryConsumer) UpdateTuple(ctx context.Context, tuple *v1beta1.Relationship) (string, error) {
-	resp, err := i.Authorizer.CreateTuples(ctx, &v1beta1.CreateTuplesRequest{
-		Tuples: []*v1beta1.Relationship{tuple},
-		Upsert: true,
-		FencingCheck: &v1beta1.FencingCheck{
-			LockId:    i.lockId,
-			LockToken: i.lockToken,
-		},
-	})
-	// TODO: we should understand what kind of errors to look for here in case we need to commit in loop or not
-	if err != nil {
-		if status.Convert(err).Code() == codes.FailedPrecondition {
-			i.Logger.Errorf("invalid fencing token: %v", i.lockToken)
-			return "", fmt.Errorf("invalid fencing token: %w", err)
+// UpdateTuple calls the Relations API to create and delete tuples from the message payload received and returns the consistency token
+func (i *InventoryConsumer) UpdateTuple(ctx context.Context, tuplesToCreate *[]model.RelationsTuple, tuplesToDelete *[]model.RelationsTuple) (string, error) {
+	var token string
+
+	// Create new tuples if any
+	if tuplesToCreate != nil && len(*tuplesToCreate) > 0 {
+		createToken, err := i.CreateTuple(ctx, tuplesToCreate)
+		if err != nil {
+			return "", fmt.Errorf("failed to create tuples: %w", err)
 		}
-		return "", fmt.Errorf("error updating tuple: %w", err)
+		token = createToken
 	}
-	return resp.GetConsistencyToken().Token, nil
+
+	// Delete old tuples if any
+	if tuplesToDelete != nil && len(*tuplesToDelete) > 0 {
+		deleteToken, err := i.DeleteTuple(ctx, *tuplesToDelete)
+		if err != nil {
+			return "", fmt.Errorf("failed to delete tuples: %w", err)
+		}
+		if token == "" {
+			token = deleteToken
+		}
+	}
+
+	return token, nil
 }
 
-// DeleteTuple calls the Relations API to create a tuple from the message payload received and returns the consistency token
-func (i *InventoryConsumer) DeleteTuple(ctx context.Context, filter *v1beta1.RelationTupleFilter) (string, error) {
-	resp, err := i.Authorizer.DeleteTuples(ctx, &v1beta1.DeleteTuplesRequest{
-		Filter: filter,
-		FencingCheck: &v1beta1.FencingCheck{
-			LockId:    i.lockId,
-			LockToken: i.lockToken,
-		},
-	})
-	if err != nil {
-		if status.Convert(err).Code() == codes.FailedPrecondition {
-			i.Logger.Errorf("invalid fencing token: %v", i.lockToken)
-			return "", fmt.Errorf("invalid fencing token: %w", err)
+// DeleteTuple calls the Relations API to delete tuples from the RelationsTuple slice and returns the consistency token
+func (i *InventoryConsumer) DeleteTuple(ctx context.Context, tuples []model.RelationsTuple) (string, error) {
+	var token string
+
+	// Delete each tuple
+	for _, tuple := range tuples {
+		// Convert RelationsTuple to RelationTupleFilter
+		filter, err := i.convertTupleToFilter(tuple)
+		if err != nil {
+			return "", fmt.Errorf("failed to convert tuple to filter: %w", err)
 		}
-		return "", fmt.Errorf("error deleting tuple: %w", err)
+
+		resp, err := i.Authorizer.DeleteTuples(ctx, &v1beta1.DeleteTuplesRequest{
+			Filter: filter,
+			FencingCheck: &v1beta1.FencingCheck{
+				LockId:    i.lockId,
+				LockToken: i.lockToken,
+			},
+		})
+		if err != nil {
+			if status.Convert(err).Code() == codes.FailedPrecondition {
+				i.Logger.Errorf("invalid fencing token: %v", i.lockToken)
+				return "", fmt.Errorf("invalid fencing token: %w", err)
+			}
+			return "", fmt.Errorf("error deleting tuple: %w", err)
+		}
+
+		// Use the latest token
+		if token == "" {
+			token = resp.GetConsistencyToken().Token
+		}
 	}
-	return resp.GetConsistencyToken().Token, nil
+
+	return token, nil
 }
 
 // UpdateConsistencyToken updates the resource in the inventory DB to add the consistency token
@@ -706,3 +747,91 @@ func (i *InventoryConsumer) RebalanceCallback(consumer *kafka.Consumer, event ka
 	}
 	return nil
 }
+
+// convertTuplesToRelationships converts a slice of RelationsTuple to v1beta1.Relationship protobuf messages
+func (i *InventoryConsumer) convertTuplesToRelationships(tuples []model.RelationsTuple) ([]*v1beta1.Relationship, error) {
+	var relationships []*v1beta1.Relationship
+
+	for _, tuple := range tuples {
+		relationship, err := i.convertTupleToRelationship(tuple)
+		if err != nil {
+			return nil, fmt.Errorf("failed to convert tuple %+v: %w", tuple, err)
+		}
+		relationships = append(relationships, relationship)
+	}
+
+	return relationships, nil
+}
+
+// convertTupleToRelationship converts a single RelationsTuple to v1beta1.Relationship
+func (i *InventoryConsumer) convertTupleToRelationship(tuple model.RelationsTuple) (*v1beta1.Relationship, error) {
+
+	return &v1beta1.Relationship{
+		Resource: &v1beta1.ObjectReference{
+			Type: &v1beta1.ObjectType{
+				Name:      tuple.Resource().Type().Name(),
+				Namespace: tuple.Resource().Type().Namespace(), // Use resource type as namespace
+			},
+			Id: tuple.Resource().Id().Serialize(),
+		},
+		Relation: tuple.Relation(),
+		Subject: &v1beta1.SubjectReference{
+			Subject: &v1beta1.ObjectReference{
+				Type: &v1beta1.ObjectType{
+					Name:      tuple.Subject().Subject().Type().Name(),
+					Namespace: tuple.Subject().Subject().Type().Namespace(),
+				},
+				Id: tuple.Subject().Subject().Id().Serialize(),
+			},
+		},
+	}, nil
+}
+
+// convertTupleToFilter converts a model.RelationsTuple to v1beta1.RelationTupleFilter
+func (i *InventoryConsumer) convertTupleToFilter(tuple model.RelationsTuple) (*v1beta1.RelationTupleFilter, error) {
+	// Store values in variables to take their addresses
+	resourceNamespace := tuple.Resource().Type().Namespace()
+	resourceType := tuple.Resource().Type().Name()
+	resourceId := tuple.Resource().Id().Serialize()
+	relation := tuple.Relation()
+	subjectNamespace := tuple.Subject().Subject().Type().Namespace()
+	subjectType := tuple.Subject().Subject().Type().Name()
+	subjectId := tuple.Subject().Subject().Id().Serialize()
+
+	return &v1beta1.RelationTupleFilter{
+		ResourceNamespace: &resourceNamespace,
+		ResourceType:      &resourceType,
+		ResourceId:        &resourceId,
+		Relation:          &relation,
+		SubjectFilter: &v1beta1.SubjectFilter{
+			SubjectNamespace: &subjectNamespace,
+			SubjectType:      &subjectType,
+			SubjectId:        &subjectId,
+		},
+	}, nil
+}
+
+//Unused at the moment but can be used to convert a v1beta1.RelationTupleFilter to model.RelationsTuple
+
+// // convertFilterToTuple converts a v1beta1.RelationTupleFilter to model.RelationsTuple
+// func (i *InventoryConsumer) convertFilterToTuple(filter *v1beta1.RelationTupleFilter) (model.RelationsTuple, error) {
+// 	// Extract resource information
+// 	resourceId, err := model.NewLocalResourceId(*filter.ResourceId)
+// 	if err != nil {
+// 		return model.RelationsTuple{}, fmt.Errorf("failed to create resource ID: %w", err)
+// 	}
+// 	resourceType := model.NewRelationsObjectType(*filter.ResourceType, *filter.ResourceNamespace)
+// 	resource := model.NewRelationsResource(resourceId, resourceType)
+
+// 	// Extract subject information
+// 	subjectId, err := model.NewLocalResourceId(*filter.SubjectFilter.SubjectId)
+// 	if err != nil {
+// 		return model.RelationsTuple{}, fmt.Errorf("failed to create subject ID: %w", err)
+// 	}
+// 	subjectType := model.NewRelationsObjectType(*filter.SubjectFilter.SubjectType, *filter.SubjectFilter.SubjectNamespace)
+// 	subjectResource := model.NewRelationsResource(subjectId, subjectType)
+// 	subject := model.NewRelationsSubject(subjectResource)
+
+// 	// Create the tuple
+// 	return model.NewRelationsTuple(resource, *filter.Relation, subject), nil
+// }

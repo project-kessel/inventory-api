@@ -6,8 +6,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/go-kratos/kratos/v2/log"
 	"github.com/google/uuid"
 	"github.com/project-kessel/inventory-api/internal"
+	"github.com/project-kessel/inventory-api/internal/biz"
 	bizmodel "github.com/project-kessel/inventory-api/internal/biz/model"
 	kessel "github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
 	"google.golang.org/protobuf/proto"
@@ -22,11 +24,11 @@ const (
 )
 
 type OutboxEvent struct {
-	ID            uuid.UUID          `gorm:"type:uuid;primarykey;not null"`
-	AggregateType AggregateType      `gorm:"column:aggregatetype;type:varchar(255);not null"`
-	AggregateID   string             `gorm:"column:aggregateid;type:varchar(255);not null"`
-	Operation     EventOperationType `gorm:"type:varchar(255);not null"`
-	TxId          string             `gorm:"column:txid;type:varchar(255)"`
+	ID            uuid.UUID              `gorm:"type:uuid;primarykey;not null"`
+	AggregateType AggregateType          `gorm:"column:aggregatetype;type:varchar(255);not null"`
+	AggregateID   string                 `gorm:"column:aggregateid;type:varchar(255);not null"`
+	Operation     biz.EventOperationType `gorm:"type:varchar(255);not null"`
+	TxId          string                 `gorm:"column:txid;type:varchar(255)"`
 	Payload       internal.JsonObject
 }
 
@@ -105,7 +107,7 @@ type EventRelationshipReporter struct {
 	ReporterInstanceId     string `json:"reporter_instance_id"`
 }
 
-func newResourceEvent(operationType EventOperationType, resourceEvent *bizmodel.ResourceReportEvent) (*ResourceEvent, error) {
+func newResourceEvent(operationType biz.EventOperationType, resourceEvent *bizmodel.ResourceReportEvent) (*ResourceEvent, error) {
 	const eventType = "resources"
 	now := time.Now()
 
@@ -120,13 +122,13 @@ func newResourceEvent(operationType EventOperationType, resourceEvent *bizmodel.
 	var deletedAt *time.Time
 
 	switch operationType {
-	case OperationTypeCreated:
+	case biz.OperationTypeCreated:
 		createdAt = resourceEvent.CreatedAt()
 		reportedTime = *createdAt
-	case OperationTypeUpdated:
+	case biz.OperationTypeUpdated:
 		updatedAt = resourceEvent.UpdatedAt()
 		reportedTime = *updatedAt
-	case OperationTypeDeleted:
+	case biz.OperationTypeDeleted:
 		deletedAt = &now
 		reportedTime = *deletedAt
 	}
@@ -161,7 +163,7 @@ func newResourceEvent(operationType EventOperationType, resourceEvent *bizmodel.
 	}, nil
 }
 
-func convertResourceToResourceEvent(resourceReportEvent bizmodel.ResourceReportEvent, operationType EventOperationType) (internal.JsonObject, error) {
+func convertResourceToResourceEvent(resourceReportEvent bizmodel.ResourceReportEvent, operationType biz.EventOperationType) (internal.JsonObject, error) {
 	payload := internal.JsonObject{}
 
 	resourceEvent, err := newResourceEvent(operationType, &resourceReportEvent)
@@ -182,53 +184,13 @@ func convertResourceToResourceEvent(resourceReportEvent bizmodel.ResourceReportE
 	return payload, nil
 }
 
-func convertResourceToSetTupleEvent(resourceEvent bizmodel.ResourceReportEvent) (internal.JsonObject, error) {
+func convertResourceToTupleEvent(reporterResourceKey bizmodel.ReporterResourceKey, operationType biz.EventOperationType, currentCommonVersion *bizmodel.Version, currentReporterRepresentationVersion *bizmodel.Version) (internal.JsonObject, error) {
 	payload := internal.JsonObject{}
-	namespace := strings.ToLower(resourceEvent.ReporterType())
 
-	relationship := &kessel.Relationship{
-		Resource: &kessel.ObjectReference{
-			Type: &kessel.ObjectType{
-				Name:      resourceEvent.ResourceType(),
-				Namespace: namespace,
-			},
-			Id: resourceEvent.LocalResourceId(),
-		},
-		Relation: "workspace",
-		Subject: &kessel.SubjectReference{
-			Subject: &kessel.ObjectReference{
-				Type: &kessel.ObjectType{
-					Name:      "workspace",
-					Namespace: "rbac",
-				},
-				Id: resourceEvent.WorkspaceId(),
-			},
-		},
-	}
-
-	marshalledJson, err := json.Marshal(relationship)
+	tuple, err := bizmodel.NewTupleEvent(reporterResourceKey, currentCommonVersion, currentReporterRepresentationVersion)
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal resource to json: %w", err)
+		return nil, fmt.Errorf("failed to create Tuple Event: %w", err)
 	}
-	err = json.Unmarshal(marshalledJson, &payload)
-	if err != nil {
-		return nil, fmt.Errorf("failed to unmarshal json to payload: %w", err)
-	}
-
-	return payload, nil
-}
-
-func convertResourceToUnsetTupleEvent(resourceEvent bizmodel.ResourceDeleteEvent) (internal.JsonObject, error) {
-	payload := internal.JsonObject{}
-	namespace := strings.ToLower(resourceEvent.ReporterType())
-
-	tuple := &kessel.RelationTupleFilter{
-		ResourceNamespace: proto.String(namespace),
-		ResourceType:      proto.String(resourceEvent.ResourceType()),
-		ResourceId:        proto.String(resourceEvent.LocalResourceId()),
-		Relation:          proto.String("workspace"),
-	}
-
 	marshalledJson, err := json.Marshal(tuple)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal resource to json: %w", err)
@@ -241,26 +203,23 @@ func convertResourceToUnsetTupleEvent(resourceEvent bizmodel.ResourceDeleteEvent
 	return payload, nil
 }
 
-func NewOutboxEventsFromResourceEvent(domainResourceEvent bizmodel.ResourceEvent, operationType EventOperationType, txid string) (*OutboxEvent, *OutboxEvent, error) {
+func NewOutboxEventsFromResourceEvent(domainResourceEvent bizmodel.ResourceEvent, operationType biz.EventOperationType, txid string) (*OutboxEvent, *OutboxEvent, error) {
 	var payload internal.JsonObject
 	var tuplePayload internal.JsonObject
 	var err error
 
+	tuplePayload, err = convertResourceToTupleEvent(domainResourceEvent.ReporterResourceKey(), operationType, domainResourceEvent.CurrentCommonVersion(), domainResourceEvent.CurrentReporterRepresentationVersion())
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to convert resource to tuple event: %w", err)
+	}
+
 	switch operationType.OperationType() {
-	case OperationTypeDeleted:
+	case biz.OperationTypeDeleted:
 		//TODO: Not publishing anything for resource event right now so we can decide what to publish correctly
 		payload = internal.JsonObject{}
-		if deleteEvent, ok := domainResourceEvent.(bizmodel.ResourceDeleteEvent); ok {
-			tuplePayload, err = convertResourceToUnsetTupleEvent(deleteEvent)
-		} else {
-			return nil, nil, fmt.Errorf("expected ResourceDeleteEvent for delete operation, got %T", domainResourceEvent)
-		}
 	default:
 		if reportEvent, ok := domainResourceEvent.(bizmodel.ResourceReportEvent); ok {
 			payload, err = convertResourceToResourceEvent(reportEvent, operationType)
-			if err == nil {
-				tuplePayload, err = convertResourceToSetTupleEvent(reportEvent)
-			}
 		} else {
 			return nil, nil, fmt.Errorf("expected ResourceReportEvent for create/update operation, got %T", domainResourceEvent)
 		}
@@ -286,10 +245,11 @@ func NewOutboxEventsFromResourceEvent(domainResourceEvent bizmodel.ResourceEvent
 		Payload:       tuplePayload,
 	}
 
+	log.Infof("Tuple event to write to outbox : %+v", tupleEvent)
 	return resourceEvent, tupleEvent, nil
 }
 
-func newResourceEventLegacy(operationType EventOperationType, resource *Resource) (*ResourceEvent, error) {
+func newResourceEventLegacy(operationType biz.EventOperationType, resource *Resource) (*ResourceEvent, error) {
 	const eventType = "resources"
 	now := time.Now()
 
@@ -309,13 +269,13 @@ func newResourceEventLegacy(operationType EventOperationType, resource *Resource
 	var deletedAt *time.Time
 
 	switch operationType {
-	case OperationTypeCreated:
+	case biz.OperationTypeCreated:
 		createdAt = resource.CreatedAt
 		reportedTime = *createdAt
-	case OperationTypeUpdated:
+	case biz.OperationTypeUpdated:
 		updatedAt = resource.UpdatedAt
 		reportedTime = *updatedAt
-	case OperationTypeDeleted:
+	case biz.OperationTypeDeleted:
 		deletedAt = &now
 		reportedTime = *deletedAt
 	}
@@ -352,7 +312,7 @@ func newResourceEventLegacy(operationType EventOperationType, resource *Resource
 	}, nil
 }
 
-func convertResourceToResourceEventLegacy(resource Resource, operationType EventOperationType) (internal.JsonObject, error) {
+func convertResourceToResourceEventLegacy(resource Resource, operationType biz.EventOperationType) (internal.JsonObject, error) {
 	payload := internal.JsonObject{}
 
 	resourceEvent, err := newResourceEventLegacy(operationType, &resource)
@@ -444,7 +404,7 @@ func convertResourceToUnsetTupleEventLegacy(resource Resource, namespace string)
 	return payload, nil
 }
 
-func NewOutboxEventsFromResource(resource Resource, namespace string, operationType EventOperationType, txid string) (*OutboxEvent, *OutboxEvent, error) {
+func NewOutboxEventsFromResource(resource Resource, namespace string, operationType biz.EventOperationType, txid string) (*OutboxEvent, *OutboxEvent, error) {
 	var tuplePayload internal.JsonObject
 	var tupleEvent *OutboxEvent
 
@@ -464,7 +424,7 @@ func NewOutboxEventsFromResource(resource Resource, namespace string, operationT
 
 	// Build tuple event
 	switch operationType.OperationType() {
-	case OperationTypeDeleted:
+	case biz.OperationTypeDeleted:
 		tuplePayload, err = convertResourceToUnsetTupleEventLegacy(resource, namespace)
 	default:
 		tuplePayload, err = convertResourceToSetTupleEventLegacy(resource, namespace)

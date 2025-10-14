@@ -97,3 +97,29 @@ func NewRelationsSubject(subject RelationsResource) RelationsSubject {
 func (rs RelationsSubject) Subject() RelationsResource {
 	return rs.subject
 }
+
+const (
+	WorkspaceRelation = "workspace"
+	RbacNamespace     = "rbac"
+)
+
+func NewWorkspaceRelationsTuple(workspaceID string, key ReporterResourceKey) RelationsTuple {
+	resourceId := key.LocalResourceId()
+	resourceType := key.ResourceType()
+	reporterType := key.ReporterType()
+
+	namespace := strings.ToLower(reporterType.String())
+
+	resourceObjectType := NewRelationsObjectType(
+		strings.ToLower(resourceType.String()),
+		namespace,
+	)
+	resource := NewRelationsResource(resourceId, resourceObjectType)
+
+	workspaceSubjectId, _ := NewLocalResourceId(workspaceID)
+	workspaceObjectType := NewRelationsObjectType(WorkspaceRelation, RbacNamespace)
+	workspaceSubject := NewRelationsResource(workspaceSubjectId, workspaceObjectType)
+	subject := NewRelationsSubject(workspaceSubject)
+
+	return NewRelationsTuple(resource, WorkspaceRelation, subject)
+}

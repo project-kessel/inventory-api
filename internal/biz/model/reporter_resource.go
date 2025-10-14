@@ -1,6 +1,7 @@
 package model
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"time"
@@ -182,4 +183,54 @@ func DeserializeReporterResourceKey(localResourceId, resourceType, reporterType,
 		resourceType:    DeserializeResourceType(resourceType),
 		reporter:        DeserializeReporterId(reporterType, reporterInstanceId),
 	}
+}
+
+// MarshalJSON implements json.Marshaler interface for ReporterResourceKey
+func (rrk ReporterResourceKey) MarshalJSON() ([]byte, error) {
+	type reporterJSON struct {
+		ReporterType       string `json:"reporter_type"`
+		ReporterInstanceID string `json:"reporter_instance_id"`
+	}
+
+	type reporterResourceKeyJSON struct {
+		LocalResourceID string       `json:"local_resource_id"`
+		ResourceType    string       `json:"resource_type"`
+		Reporter        reporterJSON `json:"reporter"`
+	}
+
+	reporterType, reporterInstanceID := rrk.reporter.Serialize()
+
+	return json.Marshal(reporterResourceKeyJSON{
+		LocalResourceID: rrk.localResourceID.Serialize(),
+		ResourceType:    rrk.resourceType.Serialize(),
+		Reporter: reporterJSON{
+			ReporterType:       reporterType,
+			ReporterInstanceID: reporterInstanceID,
+		},
+	})
+}
+
+// UnmarshalJSON implements json.Unmarshaler interface for ReporterResourceKey
+func (rrk *ReporterResourceKey) UnmarshalJSON(data []byte) error {
+	type reporterJSON struct {
+		ReporterType       string `json:"reporter_type"`
+		ReporterInstanceID string `json:"reporter_instance_id"`
+	}
+
+	type reporterResourceKeyJSON struct {
+		LocalResourceID string       `json:"local_resource_id"`
+		ResourceType    string       `json:"resource_type"`
+		Reporter        reporterJSON `json:"reporter"`
+	}
+
+	var temp reporterResourceKeyJSON
+	if err := json.Unmarshal(data, &temp); err != nil {
+		return fmt.Errorf("failed to unmarshal ReporterResourceKey: %w", err)
+	}
+
+	rrk.localResourceID = DeserializeLocalResourceId(temp.LocalResourceID)
+	rrk.resourceType = DeserializeResourceType(temp.ResourceType)
+	rrk.reporter = DeserializeReporterId(temp.Reporter.ReporterType, temp.Reporter.ReporterInstanceID)
+
+	return nil
 }

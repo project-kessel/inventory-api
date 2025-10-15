@@ -83,7 +83,6 @@ objects:
                   mountPath: "/mnt/resources"
                 - name: serving-certs
                   mountPath: "/serving-certs"
-                  readOnly: true
             volumes:
               - name: config-volume
                 secret:

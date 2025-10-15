@@ -81,6 +81,8 @@ objects:
                   mountPath: "/data/schema/resources"
                 - name: resources-tarball
                   mountPath: "/mnt/resources"
+                - name: serving-certs
+                  mountPath: "/serving-certs"
             volumes:
               - name: config-volume
                 secret:
@@ -94,6 +96,9 @@ objects:
               - name: resources-tarball
                 configMap:
                   name: resources-tarball
+              - name: serving-certs
+                secret:
+                  secretName: kessel-inventory-api-serving-cert
           webServices:
             public:
               enabled: true

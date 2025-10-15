@@ -16,6 +16,7 @@ rpm -iv /tmp/grpcurl.rpm /tmp/zed.rpm
 
 mkdir -pv /opt/kafka
 tar -xvf /tmp/kafka.tgz -C /opt/kafka --strip-components=1
+ln -s /opt/kafka/bin/* ./bin
 
 # setup zed wrapper by renaming base zed cli
 mv /usr/bin/zed /usr/bin/zed.original

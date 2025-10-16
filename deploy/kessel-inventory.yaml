@@ -160,10 +160,6 @@ objects:
                   - name: serving-certs
                     mountPath: "/serving-certs"
                     readOnly: true
-                volumes:
-                  - name: serving-certs
-                    secret:
-                      secretName: kessel-inventory-api-serving-cert
                 image: registry.access.redhat.com/ubi9/ubi-minimal
                 resources:
                   limits:
@@ -172,6 +168,10 @@ objects:
                   requests:
                     cpu: 100m
                     memory: 384Mi
+              volumes:
+                - name: serving-certs
+                  secret:
+                    secretName: kessel-inventory-api-serving-cert
               restartPolicy: Never
       schedule: '@hourly'
 

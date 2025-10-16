@@ -334,7 +334,7 @@ func TestNewFromDir_InvalidDirectory(t *testing.T) {
 	service, err := NewFromDir(ctx, "/tmp/wrong/dir")
 	assert.Error(t, err)
 	assert.Nil(t, service)
-	assert.Contains(t, err.Error(), "no directories inside schema directory")
+	assert.Contains(t, err.Error(), "failed to read schema directory \"/tmp/wrong/dir\"")
 }
 
 func TestNewFromDir_ValidDirectory(t *testing.T) {

@@ -35,7 +35,7 @@ func (c *Config) Complete() (CompletedConfig, []error) {
 
 	if c.Repository == InMemoryRepository {
 		if inMemory, err := c.InMemory.Complete(); err != nil {
-			return CompletedConfig{}, nil
+			return CompletedConfig{}, []error{err}
 		} else {
 			cfg.InMemory = inMemory
 		}

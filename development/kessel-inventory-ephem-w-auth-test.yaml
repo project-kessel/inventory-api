@@ -13,9 +13,6 @@ objects:
           grpc:
             certfile: /serving-certs/tls.crt
             keyfile: /serving-certs/tls.key
-          http:
-            certfile: /serving-certs/tls.crt
-            keyfile: /serving-certs/tls.key
         storage:
           max-serialization-retries: 10
         authn:
@@ -165,12 +162,10 @@ objects:
               httpGet:
                 path: /api/inventory/v1/livez
                 port: 8000
-                scheme: HTTPS
             readinessProbe:
               httpGet:
                 path: /api/inventory/v1/readyz
                 port: 8000
-                scheme: HTTPS
             env:
               - name: CLOWDER_ENABLED
                 value: "true"

@@ -2,6 +2,7 @@ package schemas
 
 import (
 	"fmt"
+
 	"github.com/project-kessel/inventory-api/internal/schemas/in_memory"
 	"github.com/spf13/pflag"
 )

@@ -38,6 +38,6 @@ func loadCommonResourceDataSchema(resourceType string, baseSchemaDir string) (st
 	return string(data), nil
 }
 
-func normalizeResourceType(resourceType string) string {
+func NormalizeResourceType(resourceType string) string {
 	return strings.ReplaceAll(resourceType, "/", "_")
 }

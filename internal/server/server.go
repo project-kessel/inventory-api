@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"fmt"
+
 	schemas "github.com/project-kessel/inventory-api/internal/schemas/api"
 
 	"github.com/go-kratos/kratos/v2"

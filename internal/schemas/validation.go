@@ -2,8 +2,9 @@ package schemas
 
 import (
 	"fmt"
-	"github.com/xeipuuv/gojsonschema"
 	"strings"
+
+	"github.com/xeipuuv/gojsonschema"
 )
 
 func validateJSONSchema(schemaStr string, jsonData interface{}) error {

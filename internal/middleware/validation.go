@@ -3,6 +3,7 @@ package middleware
 import (
 	"context"
 	"fmt"
+
 	"github.com/project-kessel/inventory-api/internal/schemas/api"
 
 	"buf.build/go/protovalidate"

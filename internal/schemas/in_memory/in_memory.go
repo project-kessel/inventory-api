@@ -4,11 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/go-kratos/kratos/v2/log"
-	"github.com/project-kessel/inventory-api/internal/schemas/api"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/go-kratos/kratos/v2/log"
+	"github.com/project-kessel/inventory-api/internal/schemas/api"
 )
 
 type InMemorySchemaRepository struct {
@@ -180,7 +181,7 @@ func NewFromDir(ctx context.Context, resourceDir string) (*InMemorySchemaReposit
 		if !dir.IsDir() {
 			continue
 		}
-		resourceType := normalizeResourceType(dir.Name())
+		resourceType := NormalizeResourceType(dir.Name())
 
 		// Load and store common resource schema
 		commonResourceSchema, err := loadCommonResourceDataSchema(resourceType, resourceDir)

@@ -2,6 +2,7 @@ package in_memory
 
 import (
 	"fmt"
+
 	"github.com/spf13/pflag"
 )
 

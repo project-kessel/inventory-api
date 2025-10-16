@@ -104,26 +104,6 @@ func createCommonData() map[string]interface{} {
 	}
 }
 
-// Helper functions
-func TestNormalizeResourceTypeCase(t *testing.T) {
-	tests := []struct {
-		input    string
-		expected string
-	}{
-		{"K8s_CLUSTER", "K8s_CLUSTER"},
-		{"rhel/host", "rhel_host"},
-		{"TEST/RESOURCE", "TEST_RESOURCE"},
-		{"resource", "resource"},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.input, func(t *testing.T) {
-			result := middleware.NormalizeResourceType(tt.input)
-			assert.Equal(t, tt.expected, result, "Normalized resource type doesn't match")
-		})
-	}
-}
-
 func TestExtractFields(t *testing.T) {
 	tests := []struct {
 		name      string

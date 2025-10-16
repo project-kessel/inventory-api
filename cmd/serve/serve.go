@@ -4,11 +4,12 @@ import (
 	"context"
 	e "errors"
 	"fmt"
-	"github.com/project-kessel/inventory-api/internal/schemas"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
+
+	"github.com/project-kessel/inventory-api/internal/schemas"
 
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/project-kessel/inventory-api/internal/metricscollector"

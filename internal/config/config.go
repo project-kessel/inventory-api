@@ -2,8 +2,9 @@ package config
 
 import (
 	"fmt"
-	"github.com/project-kessel/inventory-api/internal/schemas"
 	"strconv"
+
+	"github.com/project-kessel/inventory-api/internal/schemas"
 
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/project-kessel/inventory-api/cmd/common"

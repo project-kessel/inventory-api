@@ -3,6 +3,7 @@ package schemas
 import (
 	"context"
 	"fmt"
+
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/project-kessel/inventory-api/internal/schemas/api"
 )

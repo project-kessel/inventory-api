@@ -2,10 +2,11 @@ package middleware_test
 
 import (
 	"context"
+	"testing"
+
 	"github.com/project-kessel/inventory-api/internal/schemas"
 	"github.com/project-kessel/inventory-api/internal/schemas/api"
 	"github.com/project-kessel/inventory-api/internal/schemas/in_memory"
-	"testing"
 
 	"google.golang.org/protobuf/types/known/structpb"
 

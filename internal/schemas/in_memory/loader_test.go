@@ -184,7 +184,7 @@ func TestNormalizeResourceType(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := normalizeResourceType(tt.input)
+			result := NormalizeResourceType(tt.input)
 			assert.Equal(t, tt.expected, result)
 		})
 	}
@@ -266,4 +266,23 @@ func TestLoadCommonResourceDataSchema_ComplexScenarios(t *testing.T) {
 			assert.Equal(t, expectedSchema, schema)
 		}
 	})
+}
+
+func TestNormalizeResourceTypeCase(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{"K8s_CLUSTER", "K8s_CLUSTER"},
+		{"rhel/host", "rhel_host"},
+		{"TEST/RESOURCE", "TEST_RESOURCE"},
+		{"resource", "resource"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			result := NormalizeResourceType(tt.input)
+			assert.Equal(t, tt.expected, result, "Normalized resource type doesn't match")
+		})
+	}
 }

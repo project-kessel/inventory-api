@@ -1,9 +1,11 @@
 package middleware_test
 
 import (
+	"context"
+	"github.com/project-kessel/inventory-api/internal/schemas"
+	"github.com/project-kessel/inventory-api/internal/schemas/api"
+	"github.com/project-kessel/inventory-api/internal/schemas/in_memory"
 	"testing"
-
-	"github.com/spf13/viper"
 
 	"google.golang.org/protobuf/types/known/structpb"
 
@@ -46,34 +48,42 @@ func TestValidateReportResourceJSON_Success(t *testing.T) {
 		},
 	}
 
-	viper.Set("resources.use_cache", true)
-	middleware.SchemaCache.Store("config:host", map[string]interface{}{
-		"resource_reporters": []string{"hbi"},
+	ctx := context.Background()
+	schemaRepository := in_memory.New(ctx)
+
+	err = schemaRepository.CreateResource(ctx, api.Resource{
+		ResourceType: "host",
+		CommonSchema: `{
+		  "$schema": "http://json-schema.org/draft-07/schema#",
+		  "type": "object",
+		  "properties": {
+			"workspace_id": { "type": "string" }
+		  },
+		  "required": [
+			"workspace_id"
+		  ]
+		}`,
 	})
+	assert.NoError(t, err)
 
-	middleware.SchemaCache.Store("host:hbi", `{
-	  "$schema": "http://json-schema.org/draft-07/schema#",
-	  "type": "object",
-	  "properties": {
-		"satellite_id": { "type": "string", "format": "uuid" },
-		"subscription_manager_id": { "type": "string", "format": "uuid" },
-		"insights_id": { "type": "string", "format": "uuid" },
-		"ansible_host": { "type": "string", "maxLength": 255 }
-	  },
-	  "required": []
-	}`)
+	err = schemaRepository.CreateResourceReporter(ctx, api.ResourceReporter{
+		ResourceType: "host",
+		ReporterType: "hbi",
+		ReporterSchema: `{
+		  "$schema": "http://json-schema.org/draft-07/schema#",
+		  "type": "object",
+		  "properties": {
+			"satellite_id": { "type": "string", "format": "uuid" },
+			"subscription_manager_id": { "type": "string", "format": "uuid" },
+			"insights_id": { "type": "string", "format": "uuid" },
+			"ansible_host": { "type": "string", "maxLength": 255 }
+		  },
+		  "required": []
+		}`,
+	})
+	assert.NoError(t, err)
 
-	middleware.SchemaCache.Store("common:host", `{
-	  "$schema": "http://json-schema.org/draft-07/schema#",
-	  "type": "object",
-	  "properties": {
-		"workspace_id": { "type": "string" }
-	  },
-	  "required": [
-		"workspace_id"
-	  ]
-	}`)
-	err = middleware.ValidateReportResourceJSON(msg)
+	err = middleware.ValidateReportResourceJSON(ctx, msg, schemas.NewSchemaService(schemaRepository))
 	assert.NoError(t, err)
 }
 
@@ -101,35 +111,42 @@ func TestValidateReportResourceJSON_FieldExtractionErrors(t *testing.T) {
 		},
 	}
 
-	viper.Set("resources.use_cache", true)
-	middleware.SchemaCache.Store("config:host", map[string]interface{}{
-		"resource_reporters": []string{"hbi"},
+	ctx := context.Background()
+	schemaRepository := in_memory.New(ctx)
+
+	err := schemaRepository.CreateResource(ctx, api.Resource{
+		ResourceType: "host",
+		CommonSchema: `{
+		  "$schema": "http://json-schema.org/draft-07/schema#",
+		  "type": "object",
+		  "properties": {
+			"workspace_id": { "type": "string" }
+		  },
+		  "required": [
+			"workspace_id"
+		  ]
+		}`,
 	})
+	assert.NoError(t, err)
 
-	middleware.SchemaCache.Store("host:hbi", `{
-	  "$schema": "http://json-schema.org/draft-07/schema#",
-	  "type": "object",
-	  "properties": {
-		"satellite_id": { "type": "string", "format": "uuid" },
-		"subscription_manager_id": { "type": "string", "format": "uuid" },
-		"insights_id": { "type": "string", "format": "uuid" },
-		"ansible_host": { "type": "string", "maxLength": 255 }
-	  },
-	  "required": [
-		"subscription_manager_id"
-		]
-	}`)
-
-	middleware.SchemaCache.Store("common:host", `{
-	  "$schema": "http://json-schema.org/draft-07/schema#",
-	  "type": "object",
-	  "properties": {
-		"workspace_id": { "type": "string" }
-	  },
-	  "required": [
-		"workspace_id"
-	  ]
-	}`)
+	err = schemaRepository.CreateResourceReporter(ctx, api.ResourceReporter{
+		ResourceType: "host",
+		ReporterType: "hbi",
+		ReporterSchema: `{
+		  "$schema": "http://json-schema.org/draft-07/schema#",
+		  "type": "object",
+		  "properties": {
+			"satellite_id": { "type": "string", "format": "uuid" },
+			"subscription_manager_id": { "type": "string", "format": "uuid" },
+			"insights_id": { "type": "string", "format": "uuid" },
+			"ansible_host": { "type": "string", "maxLength": 255 }
+		  },
+		  "required": [
+			"subscription_manager_id"
+			]
+		}`,
+	})
+	assert.NoError(t, err)
 
 	tests := []struct {
 		name   string
@@ -204,7 +221,7 @@ func TestValidateReportResourceJSON_FieldExtractionErrors(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			err := middleware.ValidateReportResourceJSON(tc.msg)
+			err := middleware.ValidateReportResourceJSON(ctx, tc.msg, schemas.NewSchemaService(schemaRepository))
 			assert.Error(t, err)
 			assert.Contains(t, err.Error(), tc.expect)
 		})
@@ -212,13 +229,6 @@ func TestValidateReportResourceJSON_FieldExtractionErrors(t *testing.T) {
 }
 
 func TestValidateReportResourceJSON_SchemaBasedValidation(t *testing.T) {
-	viper.Set("resources.use_cache", true)
-
-	// Setup config for k8s_policy with acm reporter
-	middleware.SchemaCache.Store("config:k8s_policy", map[string]interface{}{
-		"resource_reporters": []string{"acm"},
-	})
-
 	tests := []struct {
 		name           string
 		msg            *pbv1beta2.ReportResourceRequest
@@ -409,11 +419,31 @@ func TestValidateReportResourceJSON_SchemaBasedValidation(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			// Setup schemas in cache
-			middleware.SchemaCache.Store("k8s_policy:acm", tc.reporterSchema)
-			middleware.SchemaCache.Store("common:k8s_policy", tc.commonSchema)
+			ctx := context.Background()
+			schemaRepository := in_memory.New(ctx)
+
+			// Setup config for k8s_policy with acm reporter
+			err := schemaRepository.CreateResource(ctx, api.Resource{
+				ResourceType: "k8s_policy",
+				CommonSchema: tc.commonSchema,
+			})
+			assert.NoError(t, err)
+
+			err = schemaRepository.CreateResourceReporter(
+				ctx,
+				api.ResourceReporter{
+					ResourceType:   "k8s_policy",
+					ReporterType:   "acm",
+					ReporterSchema: tc.reporterSchema,
+				},
+			)
+			assert.NoError(t, err)
 
 			// Test the function
-			err := middleware.ValidateReportResourceJSON(tc.msg)
+			err = middleware.ValidateReportResourceJSON(ctx, tc.msg, schemas.NewSchemaService(schemaRepository))
+			if tc.expectError {
+				assert.Error(t, err)
+			}
 
 			if tc.expectError {
 				assert.Error(t, err)
@@ -423,10 +453,6 @@ func TestValidateReportResourceJSON_SchemaBasedValidation(t *testing.T) {
 			} else {
 				assert.NoError(t, err)
 			}
-
-			// Cleanup
-			middleware.SchemaCache.Delete("k8s_policy:acm")
-			middleware.SchemaCache.Delete("common:k8s_policy")
 		})
 	}
 }

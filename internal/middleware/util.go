@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/go-kratos/kratos/v2/log"
-	"github.com/xeipuuv/gojsonschema"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 )
@@ -113,6 +111,7 @@ func ExtractStringField(data map[string]interface{}, key string, opts ...Extract
 	return strValue, nil
 }
 
+/*
 // ValidateCommonRepresentation Validates the "common" field in ResourceRepresentations using a predefined schema.
 func ValidateCommonRepresentation(resourceType string, commonRepresentation map[string]interface{}) error {
 	commonSchemaKey := fmt.Sprintf("common:%s", strings.ToLower(resourceType))
@@ -142,6 +141,7 @@ func ValidateCommonRepresentation(resourceType string, commonRepresentation map[
 
 	return nil
 }
+*/
 
 // schemaHasRequiredFields checks if a JSON schema has any required fields
 func schemaHasRequiredFields(schemaStr string) (bool, error) {
@@ -163,6 +163,7 @@ func schemaHasRequiredFields(schemaStr string) (bool, error) {
 	return len(requiredArray) > 0, nil
 }
 
+/*
 // Validates the reporter-specific representation against its schema based on resourceType and reporterType.
 func ValidateReporterRepresentation(resourceType string, reporterType string, reporterRepresentation map[string]interface{}) error {
 	// Construct the schema key using the format: resourceType:reporterType
@@ -198,7 +199,8 @@ func ValidateReporterRepresentation(resourceType string, reporterType string, re
 
 	return nil
 }
-
+*/
+/*
 func ValidateJSONSchema(schemaStr string, jsonData interface{}) error {
 	schemaLoader := gojsonschema.NewStringLoader(schemaStr)
 	dataLoader := gojsonschema.NewGoLoader(jsonData)
@@ -216,6 +218,7 @@ func ValidateJSONSchema(schemaStr string, jsonData interface{}) error {
 	}
 	return nil
 }
+*/
 
 // RemoveNulls recursively creates a new map with keys removed where the value is null.
 // This function is safe for concurrent use as it does not modify the input map.

@@ -4,6 +4,7 @@ import (
 	"context"
 	e "errors"
 	"fmt"
+	"github.com/project-kessel/inventory-api/internal/schemas"
 	"os"
 	"os/signal"
 	"syscall"
@@ -67,6 +68,7 @@ func NewCommand(
 	consistencyOptions *consistency.Options,
 	serviceOptions *service.Options,
 	loggerOptions common.LoggerOptions,
+	schemaOptions *schemas.Options,
 ) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "serve",
@@ -145,6 +147,18 @@ func NewCommand(
 				return errors.NewAggregate(errs)
 			}
 			consistencyConfig, errs := consistency.NewConfig(consistencyOptions).Complete()
+			if errs != nil {
+				return errors.NewAggregate(errs)
+			}
+
+			// configure schemaService service
+			if errs := schemaOptions.Complete(); errs != nil {
+				return errors.NewAggregate(errs)
+			}
+			if errs := schemaOptions.Validate(); errs != nil {
+				return errors.NewAggregate(errs)
+			}
+			schemaConfig, errs := schemas.NewConfig(schemaOptions).Complete()
 			if errs != nil {
 				return errors.NewAggregate(errs)
 			}
@@ -228,8 +242,14 @@ func NewCommand(
 				return err
 			}
 
+			// constructs schemaService service
+			schemaService, err := schemas.New(ctx, schemaConfig, log.NewHelper(log.With(logger, "subsystem", "schemaService")))
+			if err != nil {
+				return err
+			}
+
 			// construct servers
-			server, err := server.New(serverConfig, middleware.Authentication(authenticator), authnConfig, logger)
+			server, err := server.New(serverConfig, schemaService, middleware.Authentication(authenticator), authnConfig, logger)
 			if err != nil {
 				return err
 			}

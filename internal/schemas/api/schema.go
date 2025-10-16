@@ -19,9 +19,6 @@ type SchemaService interface {
 	ValidateReporterForResource(ctx context.Context, resourceType string, reporterType string) error
 	CommonShallowValidate(ctx context.Context, resourceType string, commonRepresentation map[string]interface{}) error
 	ReporterShallowValidate(ctx context.Context, resourceType string, reporterType string, reporterRepresentation map[string]interface{}) error
-
-	// CalculateTuples(context.Context, string, CommonRepresentation, ReporterRepresentation) ([]model.TuplesToReplicate, error)
-	// TODO: Add full validation
 }
 
 type SchemaRepository interface {

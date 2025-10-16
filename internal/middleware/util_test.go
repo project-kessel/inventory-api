@@ -1,108 +1,12 @@
 package middleware_test
 
 import (
-	"fmt"
 	"testing"
 
 	pbv1beta2 "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2"
 	"github.com/project-kessel/inventory-api/internal/middleware"
 	"github.com/stretchr/testify/assert"
 )
-
-// createHostHBISchema returns a standard host HBI schema for testing
-func createHostHBISchema(hasRequiredFields bool) string {
-	required := `"required": []`
-	if hasRequiredFields {
-		required = `"required": ["subscription_manager_id"]`
-	}
-	return fmt.Sprintf(`{
-		"$schema": "http://json-schema.org/draft-07/schema#",
-		"type": "object",
-		"properties": {
-			"satellite_id": { "type": "string", "format": "uuid" },
-			"subscription_manager_id": { "type": "string", "format": "uuid" },
-			"insights_id": { "type": "string", "format": "uuid" },
-			"ansible_host": { "type": "string", "maxLength": 255 }
-		},
-		%s
-	}`, required)
-}
-
-// createK8sClusterACMSchema returns a standard k8s_cluster ACM schema for testing
-func createK8sClusterACMSchema(hasRequiredFields bool) string {
-	required := `"required": []`
-	if hasRequiredFields {
-		required = `"required": ["cluster_id"]`
-	}
-	return fmt.Sprintf(`{
-		"$schema": "http://json-schema.org/draft-07/schema#",
-		"type": "object",
-		"properties": {
-			"cluster_id": { "type": "string" },
-			"cluster_name": { "type": "string" }
-		},
-		%s
-	}`, required)
-}
-
-// createK8sPolicyACMSchema returns a standard k8s_policy ACM schema for testing
-func createK8sPolicyACMSchema(hasRequiredFields bool) string {
-	required := `"required": []`
-	if hasRequiredFields {
-		required = `"required": ["policy_id"]`
-	}
-	return fmt.Sprintf(`{
-		"$schema": "http://json-schema.org/draft-07/schema#",
-		"type": "object",
-		"properties": {
-			"policy_id": { "type": "string" },
-			"policy_name": { "type": "string" }
-		},
-		%s
-	}`, required)
-}
-
-// createCommonSchema returns a standard common schema for testing
-func createCommonSchema(hasRequiredFields bool) string {
-	required := `"required": []`
-	if hasRequiredFields {
-		required = `"required": ["workspace_id"]`
-	}
-	return fmt.Sprintf(`{
-		"$schema": "http://json-schema.org/draft-07/schema#",
-		"type": "object",
-		"properties": {
-			"workspace_id": { "type": "string" },
-			"organization_id": { "type": "string" }
-		},
-		%s
-	}`, required)
-}
-
-// createHostReporterData returns sample host reporter data for testing
-func createHostReporterData() map[string]interface{} {
-	return map[string]interface{}{
-		"satellite_id":            "2c4196f1-0371-4f4c-8913-e113cfaa6e67",
-		"subscription_manager_id": "af94f92b-0b65-4cac-b449-6b77e665a08f",
-		"insights_id":             "05707922-7b0a-4fe6-982d-6adbc7695b8f",
-		"ansible_host":            "host-1",
-	}
-}
-
-// createK8sClusterReporterData returns sample k8s_cluster reporter data for testing
-func createK8sClusterReporterData() map[string]interface{} {
-	return map[string]interface{}{
-		"cluster_id":   "cluster-abc123",
-		"cluster_name": "production-cluster",
-	}
-}
-
-// createCommonData returns sample common data for testing
-func createCommonData() map[string]interface{} {
-	return map[string]interface{}{
-		"workspace_id": "ws-a64d17d0-aec3-410a-acd0-e0b85b22c076",
-	}
-}
 
 func TestExtractFields(t *testing.T) {
 	tests := []struct {

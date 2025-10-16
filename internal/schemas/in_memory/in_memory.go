@@ -170,7 +170,7 @@ func New(ctx context.Context) *InMemorySchemaRepository {
 func NewFromDir(ctx context.Context, resourceDir string) (*InMemorySchemaRepository, error) {
 	resourceDirs, err := os.ReadDir(resourceDir)
 	if err != nil {
-		return nil, fmt.Errorf("no directories inside schema directory")
+		return nil, fmt.Errorf("failed to read schema directory %q: %w", resourceDir, err)
 	}
 
 	repository := InMemorySchemaRepository{

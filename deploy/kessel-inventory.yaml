@@ -52,10 +52,12 @@ objects:
               httpGet:
                 path: /api/inventory/v1/livez
                 port: 8000
+                scheme: HTTPS
             readinessProbe:
               httpGet:
                 path: /api/inventory/v1/readyz
                 port: 8000
+                scheme: HTTPS
             resources:
               requests:
                 memory: ${INVENTORY_REQUESTS_MEMORY}
@@ -81,6 +83,9 @@ objects:
                   mountPath: "/data/schema/resources"
                 - name: resources-tarball
                   mountPath: "/mnt/resources"
+                - name: serving-certs
+                  mountPath: "/serving-certs"
+                  readOnly: true
             volumes:
               - name: config-volume
                 secret:
@@ -94,6 +99,9 @@ objects:
               - name: resources-tarball
                 configMap:
                   name: resources-tarball
+              - name: serving-certs
+                secret:
+                  secretName: kessel-inventory-api-serving-cert
           webServices:
             public:
               enabled: true
@@ -148,6 +156,14 @@ objects:
                     secretKeyRef:
                       name: kessel-sso-sa
                       key: url
+                volumeMounts:
+                  - name: serving-certs
+                    mountPath: "/serving-certs"
+                    readOnly: true
+                volumes:
+                  - name: serving-certs
+                    secret:
+                      secretName: kessel-inventory-api-serving-cert
                 image: registry.access.redhat.com/ubi9/ubi-minimal
                 resources:
                   limits:

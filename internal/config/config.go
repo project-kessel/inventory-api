@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/project-kessel/inventory-api/internal/schemas"
+	"github.com/project-kessel/inventory-api/internal/schema"
 
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/project-kessel/inventory-api/cmd/common"
@@ -30,7 +30,7 @@ type OptionsConfig struct {
 	Server      *server.Options
 	Consistency *consistency.Options
 	Service     *service.Options
-	Schema      *schemas.Options
+	Schema      *schema.Options
 }
 
 // NewOptionsConfig returns a new OptionsConfig with default options set
@@ -44,7 +44,7 @@ func NewOptionsConfig() *OptionsConfig {
 		server.NewOptions(),
 		consistency.NewOptions(),
 		service.NewOptions(),
-		schemas.NewOptions(),
+		schema.NewOptions(),
 	}
 }
 

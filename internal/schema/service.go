@@ -1,11 +1,11 @@
-package schemas
+package schema
 
 import (
 	"context"
 	"fmt"
 
 	"github.com/go-kratos/kratos/v2/log"
-	"github.com/project-kessel/inventory-api/internal/schemas/api"
+	"github.com/project-kessel/inventory-api/internal/schema/api"
 )
 
 type SchemaServiceImpl struct {

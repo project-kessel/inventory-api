@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/project-kessel/inventory-api/internal/schemas/api"
+	"github.com/project-kessel/inventory-api/internal/schema/api"
 
 	"buf.build/go/protovalidate"
 	"github.com/go-kratos/kratos/v2/errors"

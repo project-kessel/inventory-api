@@ -4,9 +4,9 @@ import (
 	"context"
 	"testing"
 
-	"github.com/project-kessel/inventory-api/internal/schemas"
-	"github.com/project-kessel/inventory-api/internal/schemas/api"
-	"github.com/project-kessel/inventory-api/internal/schemas/in_memory"
+	"github.com/project-kessel/inventory-api/internal/schema"
+	"github.com/project-kessel/inventory-api/internal/schema/api"
+	"github.com/project-kessel/inventory-api/internal/schema/in_memory"
 
 	"google.golang.org/protobuf/types/known/structpb"
 
@@ -84,7 +84,7 @@ func TestValidateReportResourceJSON_Success(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
-	err = middleware.ValidateReportResourceJSON(ctx, msg, schemas.NewSchemaService(schemaRepository))
+	err = middleware.ValidateReportResourceJSON(ctx, msg, schema.NewSchemaService(schemaRepository))
 	assert.NoError(t, err)
 }
 
@@ -222,7 +222,7 @@ func TestValidateReportResourceJSON_FieldExtractionErrors(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			err := middleware.ValidateReportResourceJSON(ctx, tc.msg, schemas.NewSchemaService(schemaRepository))
+			err := middleware.ValidateReportResourceJSON(ctx, tc.msg, schema.NewSchemaService(schemaRepository))
 			assert.Error(t, err)
 			assert.Contains(t, err.Error(), tc.expect)
 		})
@@ -441,7 +441,7 @@ func TestValidateReportResourceJSON_SchemaBasedValidation(t *testing.T) {
 			assert.NoError(t, err)
 
 			// Test the function
-			err = middleware.ValidateReportResourceJSON(ctx, tc.msg, schemas.NewSchemaService(schemaRepository))
+			err = middleware.ValidateReportResourceJSON(ctx, tc.msg, schema.NewSchemaService(schemaRepository))
 			if tc.expectError {
 				assert.Error(t, err)
 			}

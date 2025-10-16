@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/project-kessel/inventory-api/internal/schemas/api"
+	"github.com/project-kessel/inventory-api/internal/schema/api"
 	"github.com/stretchr/testify/assert"
 )
 

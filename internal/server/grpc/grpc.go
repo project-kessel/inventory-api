@@ -14,7 +14,7 @@ import (
 	"github.com/project-kessel/inventory-api/internal/authn"
 	"github.com/project-kessel/inventory-api/internal/authn/interceptor"
 	m "github.com/project-kessel/inventory-api/internal/middleware"
-	schema "github.com/project-kessel/inventory-api/internal/schemas/api"
+	schema "github.com/project-kessel/inventory-api/internal/schema/api"
 	"go.opentelemetry.io/otel/metric"
 	"google.golang.org/grpc"
 )

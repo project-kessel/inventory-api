@@ -1,12 +1,12 @@
-package schemas
+package schema
 
 import (
 	"context"
 	"fmt"
 
 	"github.com/go-kratos/kratos/v2/log"
-	"github.com/project-kessel/inventory-api/internal/schemas/api"
-	"github.com/project-kessel/inventory-api/internal/schemas/in_memory"
+	"github.com/project-kessel/inventory-api/internal/schema/api"
+	"github.com/project-kessel/inventory-api/internal/schema/in_memory"
 )
 
 func New(ctx context.Context, c CompletedConfig, logger *log.Helper) (api.SchemaService, error) {

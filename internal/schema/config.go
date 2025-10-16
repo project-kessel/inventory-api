@@ -1,6 +1,6 @@
-package schemas
+package schema
 
-import "github.com/project-kessel/inventory-api/internal/schemas/in_memory"
+import "github.com/project-kessel/inventory-api/internal/schema/in_memory"
 
 type Config struct {
 	Repository string

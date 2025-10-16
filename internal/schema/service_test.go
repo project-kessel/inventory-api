@@ -1,11 +1,11 @@
-package schemas
+package schema
 
 import (
 	"context"
 	"fmt"
 	"testing"
 
-	"github.com/project-kessel/inventory-api/internal/schemas/api"
+	"github.com/project-kessel/inventory-api/internal/schema/api"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )

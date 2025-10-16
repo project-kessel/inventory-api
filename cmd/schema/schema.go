@@ -7,7 +7,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/project-kessel/inventory-api/internal/schemas/in_memory"
+	"github.com/project-kessel/inventory-api/internal/schema/in_memory"
 
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/project-kessel/inventory-api/cmd/common"

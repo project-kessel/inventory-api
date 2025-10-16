@@ -14,12 +14,13 @@ import (
 	"github.com/project-kessel/inventory-api/internal/authn"
 	"github.com/project-kessel/inventory-api/internal/authn/interceptor"
 	m "github.com/project-kessel/inventory-api/internal/middleware"
+	schema "github.com/project-kessel/inventory-api/internal/schema/api"
 	"go.opentelemetry.io/otel/metric"
 	"google.golang.org/grpc"
 )
 
 // New creates a new a gRPC server.
-func New(c CompletedConfig, authn middleware.Middleware, authnConfig authn.CompletedConfig, meter metric.Meter, logger log.Logger) (*kgrpc.Server, error) {
+func New(c CompletedConfig, schemaService schema.SchemaService, authn middleware.Middleware, authnConfig authn.CompletedConfig, meter metric.Meter, logger log.Logger) (*kgrpc.Server, error) {
 	requests, err := metrics.DefaultRequestsCounter(meter, metrics.DefaultServerRequestsCounterName)
 	if err != nil {
 		return nil, err
@@ -52,7 +53,7 @@ func New(c CompletedConfig, authn middleware.Middleware, authnConfig authn.Compl
 				metrics.WithRequests(requests),
 				metrics.WithSeconds(seconds),
 			),
-			m.Validation(validator),
+			m.Validation(validator, schemaService),
 			selector.Server(
 				authn,
 			).Match(NewWhiteListMatcher).Build(),

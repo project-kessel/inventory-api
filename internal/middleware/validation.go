@@ -4,14 +4,10 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/spf13/viper"
-
-	"os"
-	"path/filepath"
+	"github.com/project-kessel/inventory-api/internal/schema/api"
 
 	"buf.build/go/protovalidate"
 	"github.com/go-kratos/kratos/v2/errors"
-	"github.com/go-kratos/kratos/v2/log"
 	"github.com/go-kratos/kratos/v2/middleware"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/structpb"
@@ -19,23 +15,7 @@ import (
 	pbv1beta2 "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2"
 )
 
-var (
-	resourceDir = viper.GetString("resources.schemaPath")
-)
-
-func Validation(validator protovalidate.Validator) middleware.Middleware {
-	if resourceDirFilePath, exists := os.LookupEnv("RESOURCE_DIR"); exists {
-		absPath, err := filepath.Abs(resourceDirFilePath)
-		if err != nil {
-			log.Errorf("failed to resolve absolute path for RESOURCE_DIR file: %v", err)
-		}
-		resourceDir = absPath
-	}
-
-	if err := PreloadAllSchemas(resourceDir); err != nil {
-		log.Warnf("Failed to preload schemas: %v", err)
-	}
-
+func Validation(validator protovalidate.Validator, schemaService api.SchemaService) middleware.Middleware {
 	return func(handler middleware.Handler) middleware.Handler {
 		return func(ctx context.Context, req interface{}) (interface{}, error) {
 			if v, ok := req.(proto.Message); ok {
@@ -45,7 +25,7 @@ func Validation(validator protovalidate.Validator) middleware.Middleware {
 
 				switch v.(type) {
 				case *pbv1beta2.ReportResourceRequest:
-					if err := ValidateReportResourceJSON(v); err != nil {
+					if err := ValidateReportResourceJSON(ctx, v, schemaService); err != nil {
 						return nil, errors.BadRequest("REPORT_RESOURCE_JSON_VALIDATOR", err.Error()).WithCause(err)
 					}
 				}
@@ -55,7 +35,7 @@ func Validation(validator protovalidate.Validator) middleware.Middleware {
 	}
 }
 
-func ValidateReportResourceJSON(msg proto.Message) error {
+func ValidateReportResourceJSON(ctx context.Context, msg proto.Message, schemaService api.SchemaService) error {
 	data, err := MarshalProtoToJSON(msg)
 	if err != nil {
 		return err
@@ -77,7 +57,7 @@ func ValidateReportResourceJSON(msg proto.Message) error {
 	}
 
 	// Validate the combination of resource_type and reporter_type e.g. k8s_cluster & ACM
-	if err := ValidateResourceReporterCombination(resourceType, reporterType); err != nil {
+	if err := schemaService.ValidateReporterForResource(ctx, resourceType, reporterType); err != nil {
 		return err
 	}
 
@@ -109,7 +89,7 @@ func ValidateReportResourceJSON(msg proto.Message) error {
 	}
 
 	// Validate reporter-specific data using the sanitized map
-	if err := ValidateReporterRepresentation(resourceType, reporterType, sanitizedReporterRepresentation); err != nil {
+	if err := schemaService.ReporterShallowValidate(ctx, resourceType, reporterType, sanitizedReporterRepresentation); err != nil {
 		return err
 	}
 
@@ -119,7 +99,7 @@ func ValidateReportResourceJSON(msg proto.Message) error {
 	}
 
 	// Validate common data
-	if err := ValidateCommonRepresentation(resourceType, commonRepresentation); err != nil {
+	if err := schemaService.CommonShallowValidate(ctx, resourceType, commonRepresentation); err != nil {
 		return err
 	}
 

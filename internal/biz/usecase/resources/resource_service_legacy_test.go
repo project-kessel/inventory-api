@@ -11,7 +11,7 @@ import (
 	"github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2"
 	"github.com/project-kessel/inventory-api/internal/metricscollector"
 	"github.com/project-kessel/inventory-api/internal/mocks"
-	"github.com/sony/gobreaker"
+	"github.com/sony/gobreaker/v2"
 
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/google/uuid"

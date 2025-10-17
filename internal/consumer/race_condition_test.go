@@ -15,7 +15,7 @@ import (
 func TestConcurrentOffsetCommits(t *testing.T) {
 	t.Run("concurrent shutdown and rebalance offset commits", func(t *testing.T) {
 		tester := TestCase{}
-		errs := tester.TestSetup(t)
+		errs := tester.TestSetup()
 		assert.Nil(t, errs)
 
 		// Mock the consumer methods
@@ -83,7 +83,7 @@ func TestConcurrentOffsetCommits(t *testing.T) {
 func TestThreadSafeOffsetStorage(t *testing.T) {
 	t.Run("concurrent access to offset storage is thread-safe", func(t *testing.T) {
 		tester := TestCase{}
-		errs := tester.TestSetup(t)
+		errs := tester.TestSetup()
 		assert.Nil(t, errs)
 
 		mockConsumer := &mocks.MockConsumer{}
@@ -178,7 +178,7 @@ func TestCommitStoredOffsetsEdgeCases(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			tester := TestCase{}
-			errs := tester.TestSetup(t)
+			errs := tester.TestSetup()
 			assert.Nil(t, errs)
 
 			mockConsumer := &mocks.MockConsumer{}
@@ -257,7 +257,7 @@ func TestRebalanceCallbackShutdownCoordination(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			tester := TestCase{}
-			errs := tester.TestSetup(t)
+			errs := tester.TestSetup()
 			assert.Nil(t, errs)
 
 			mockConsumer := &mocks.MockConsumer{}

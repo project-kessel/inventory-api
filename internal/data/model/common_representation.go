@@ -13,7 +13,7 @@ import (
 // shared `Version` counter used for optimistic concurrency.
 type CommonRepresentation struct {
 	Representation
-	ResourceId                 uuid.UUID `gorm:"type:uuid;primaryKey"`
+	ResourceId                 uuid.UUID `gorm:"type:text;primaryKey"`
 	Version                    uint      `gorm:"type:bigint;primaryKey;check:version >= 0"`
 	ReportedByReporterType     string    `gorm:"size:128"`
 	ReportedByReporterInstance string    `gorm:"size:128"`

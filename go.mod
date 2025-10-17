@@ -4,7 +4,7 @@ module github.com/project-kessel/inventory-api
 go 1.24.4
 
 require (
-	buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go v1.36.9-20250912141014-52f32327d4b0.1
+	buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go v1.36.10-20250912141014-52f32327d4b0.1
 	buf.build/go/protovalidate v0.14.0
 	github.com/authzed/grpcutil v0.0.0-20250221190651-1985b19b35b8
 	github.com/cloudevents/sdk-go/protocol/kafka_confluent/v2 v2.0.0-20250721101952-1c64656a6859
@@ -17,7 +17,6 @@ require (
 	github.com/jackc/pgx/v5 v5.7.6
 	github.com/mattn/go-sqlite3 v1.14.32
 	github.com/patrickmn/go-cache v2.1.0+incompatible
-	github.com/project-kessel/inventory-client-go v0.0.0-20250703155410-0ece2b1f2d03
 	github.com/project-kessel/relations-api v0.0.0-20250722143839-19682eaba8fc
 	github.com/prometheus/client_golang v1.23.2
 	github.com/redhatinsights/app-common-go v1.6.8
@@ -34,7 +33,7 @@ require (
 	go.opentelemetry.io/otel/sdk/metric v1.38.0
 	google.golang.org/genproto/googleapis/api v0.0.0-20250908214217-97024824d090
 	google.golang.org/grpc v1.75.1
-	google.golang.org/protobuf v1.36.9
+	google.golang.org/protobuf v1.36.10
 	gopkg.in/yaml.v3 v3.0.1
 	gorm.io/driver/postgres v1.6.0
 	gorm.io/driver/sqlite v1.6.0

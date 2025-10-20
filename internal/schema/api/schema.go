@@ -4,33 +4,27 @@ import (
 	"context"
 )
 
-type Resource struct {
-	ResourceType string
-	CommonSchema string
+type ResourceSchema struct {
+	ResourceType               string
+	CommonRepresentationSchema string
 }
 
-type ResourceReporter struct {
-	ResourceType   string
-	ReporterType   string
-	ReporterSchema string
-}
-
-type SchemaService interface {
-	ValidateReporterForResource(ctx context.Context, resourceType string, reporterType string) error
-	CommonShallowValidate(ctx context.Context, resourceType string, commonRepresentation map[string]interface{}) error
-	ReporterShallowValidate(ctx context.Context, resourceType string, reporterType string, reporterRepresentation map[string]interface{}) error
+type ReporterSchema struct {
+	ResourceType                 string
+	ReporterType                 string
+	ReporterRepresentationSchema string
 }
 
 type SchemaRepository interface {
 	GetResources(ctx context.Context) ([]string, error)
-	CreateResource(ctx context.Context, resource Resource) error
-	GetResource(ctx context.Context, resourceType string) (Resource, error)
-	UpdateResource(ctx context.Context, resource Resource) error
+	CreateResource(ctx context.Context, resource ResourceSchema) error
+	GetResource(ctx context.Context, resourceType string) (ResourceSchema, error)
+	UpdateResource(ctx context.Context, resource ResourceSchema) error
 	DeleteResource(ctx context.Context, resourceType string) error
 
-	GetResourceReporters(ctx context.Context, resourceType string) ([]string, error)
-	CreateResourceReporter(ctx context.Context, resourceReporter ResourceReporter) error
-	GetResourceReporter(ctx context.Context, resourceType string, reporterType string) (ResourceReporter, error)
-	UpdateResourceReporter(ctx context.Context, resourceReporter ResourceReporter) error
-	DeleteResourceReporter(ctx context.Context, resourceType string, reporterType string) error
+	GetReporters(ctx context.Context, resourceType string) ([]string, error)
+	CreateReporter(ctx context.Context, resourceReporter ReporterSchema) error
+	GetReporter(ctx context.Context, resourceType string, reporterType string) (ReporterSchema, error)
+	UpdateReporter(ctx context.Context, resourceReporter ReporterSchema) error
+	DeleteReporter(ctx context.Context, resourceType string, reporterType string) error
 }

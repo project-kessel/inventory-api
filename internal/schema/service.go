@@ -8,29 +8,31 @@ import (
 	"github.com/project-kessel/inventory-api/internal/schema/api"
 )
 
-type SchemaServiceImpl struct {
+type SchemaService struct {
 	repository api.SchemaRepository
 }
 
-func NewSchemaService(repository api.SchemaRepository) api.SchemaService {
-	return &SchemaServiceImpl{repository: repository}
+func NewSchemaService(repository api.SchemaRepository) *SchemaService {
+	return &SchemaService{repository: repository}
 }
 
-func (s *SchemaServiceImpl) ValidateReporterForResource(ctx context.Context, resourceType string, reporterType string) error {
-	if _, err := s.repository.GetResourceReporter(ctx, resourceType, reporterType); err != nil {
+// ValidateReporterForResource validates the resourceType and reporterType combination is valid. i.e. that there is a reporter that reports said resource.
+func (s *SchemaService) ValidateReporterForResource(ctx context.Context, resourceType string, reporterType string) error {
+	if _, err := s.repository.GetReporter(ctx, resourceType, reporterType); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func (s *SchemaServiceImpl) CommonShallowValidate(ctx context.Context, resourceType string, commonRepresentation map[string]interface{}) error {
+// CommonShallowValidate validates the common representation for a given resourceType.
+func (s *SchemaService) CommonShallowValidate(ctx context.Context, resourceType string, commonRepresentation map[string]interface{}) error {
 	resource, err := s.repository.GetResource(ctx, resourceType)
 	if err != nil {
 		return fmt.Errorf("failed to load common representation schema for '%s': %w", resourceType, err)
 	}
 
-	if resource.CommonSchema == "" {
+	if resource.CommonRepresentationSchema == "" {
 		return fmt.Errorf("no schema found for '%s'", resourceType)
 	}
 
@@ -39,7 +41,7 @@ func (s *SchemaServiceImpl) CommonShallowValidate(ctx context.Context, resourceT
 		commonRepresentation = map[string]interface{}{}
 	}
 
-	err = validateJSONSchema(resource.CommonSchema, commonRepresentation)
+	err = validateJSONSchema(resource.CommonRepresentationSchema, commonRepresentation)
 	if err != nil {
 		if hasCommonRepresentationData {
 			return err
@@ -50,14 +52,15 @@ func (s *SchemaServiceImpl) CommonShallowValidate(ctx context.Context, resourceT
 	return nil
 }
 
-func (s *SchemaServiceImpl) ReporterShallowValidate(ctx context.Context, resourceType string, reporterType string, reporterRepresentation map[string]interface{}) error {
-	reporter, err := s.repository.GetResourceReporter(ctx, resourceType, reporterType)
+// ReporterShallowValidate validates the specific reporter representation for a given resourceType/reporterType.
+func (s *SchemaService) ReporterShallowValidate(ctx context.Context, resourceType string, reporterType string, reporterRepresentation map[string]interface{}) error {
+	reporter, err := s.repository.GetReporter(ctx, resourceType, reporterType)
 	if err != nil {
 		return err
 	}
 
 	// Case 1: No schema found for resourceType:reporterType
-	if reporter.ReporterSchema == "" {
+	if reporter.ReporterRepresentationSchema == "" {
 		if len(reporterRepresentation) > 0 {
 			return fmt.Errorf("no schema found for '%s:%s', but reporter representation was provided. Submission is not allowed", resourceType, reporterType)
 		}
@@ -70,7 +73,7 @@ func (s *SchemaServiceImpl) ReporterShallowValidate(ctx context.Context, resourc
 		reporterRepresentation = map[string]interface{}{}
 	}
 
-	err = validateJSONSchema(reporter.ReporterSchema, reporterRepresentation)
+	err = validateJSONSchema(reporter.ReporterRepresentationSchema, reporterRepresentation)
 	if err != nil {
 		if hasReporterRepresentationData {
 			return err

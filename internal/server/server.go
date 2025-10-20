@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	schemas "github.com/project-kessel/inventory-api/internal/schema/api"
+	"github.com/project-kessel/inventory-api/internal/schema"
 
 	"github.com/go-kratos/kratos/v2"
 	"github.com/go-kratos/kratos/v2/log"
@@ -31,7 +31,7 @@ type Server struct {
 
 // New creates a new Server instance with the provided configuration and middleware.
 // It initializes both HTTP and gRPC servers with the given authentication middleware.
-func New(c CompletedConfig, schemaService schemas.SchemaService, authn middleware.Middleware, authnConfig authn.CompletedConfig, logger log.Logger) (*Server, error) {
+func New(c CompletedConfig, schemaService *schema.SchemaService, authn middleware.Middleware, authnConfig authn.CompletedConfig, logger log.Logger) (*Server, error) {
 	s := &Server{
 		Id:     c.Options.Id,
 		Name:   c.Options.Name,

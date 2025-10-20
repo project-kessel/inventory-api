@@ -14,7 +14,7 @@ const (
 
 type Options struct {
 	Type string `mapstructure:"type"`
-	Path string `mapstructure:"Path"`
+	Path string `mapstructure:"path"`
 }
 
 func NewOptions() *Options {
@@ -29,7 +29,7 @@ func (o *Options) AddFlags(fs *pflag.FlagSet, prefix string) {
 		prefix = prefix + "."
 	}
 
-	fs.StringVar(&o.Path, prefix+"Type", o.Path, "Type of loading the repository from: empty, json or dir.")
+	fs.StringVar(&o.Type, prefix+"Type", o.Type, "Type of loading the repository from: empty, json or dir.")
 	fs.StringVar(&o.Path, prefix+"Path", o.Path, "The Path to the schema data.")
 }
 

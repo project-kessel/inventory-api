@@ -9,7 +9,7 @@ import (
 	"github.com/project-kessel/inventory-api/internal/schema/in_memory"
 )
 
-func New(ctx context.Context, c CompletedConfig, logger *log.Helper) (api.SchemaService, error) {
+func New(ctx context.Context, c CompletedConfig, logger *log.Helper) (*SchemaService, error) {
 	repository, err := newRepository(ctx, c, logger)
 	if err != nil {
 		return nil, err
@@ -23,7 +23,7 @@ func newRepository(ctx context.Context, c CompletedConfig, logger *log.Helper) (
 	case InMemoryRepository:
 		switch c.InMemory.Type {
 		case in_memory.EmptyRepository:
-			return in_memory.New(ctx), nil
+			return in_memory.New(), nil
 		case in_memory.JSONRepository:
 			return in_memory.NewFromJsonFile(ctx, c.InMemory.Path)
 		case in_memory.DirRepository:

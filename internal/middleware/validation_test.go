@@ -50,11 +50,11 @@ func TestValidateReportResourceJSON_Success(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	schemaRepository := in_memory.New(ctx)
+	schemaRepository := in_memory.New()
 
-	err = schemaRepository.CreateResource(ctx, api.Resource{
+	err = schemaRepository.CreateResource(ctx, api.ResourceSchema{
 		ResourceType: "host",
-		CommonSchema: `{
+		CommonRepresentationSchema: `{
 		  "$schema": "http://json-schema.org/draft-07/schema#",
 		  "type": "object",
 		  "properties": {
@@ -67,10 +67,10 @@ func TestValidateReportResourceJSON_Success(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
-	err = schemaRepository.CreateResourceReporter(ctx, api.ResourceReporter{
+	err = schemaRepository.CreateReporter(ctx, api.ReporterSchema{
 		ResourceType: "host",
 		ReporterType: "hbi",
-		ReporterSchema: `{
+		ReporterRepresentationSchema: `{
 		  "$schema": "http://json-schema.org/draft-07/schema#",
 		  "type": "object",
 		  "properties": {
@@ -113,11 +113,11 @@ func TestValidateReportResourceJSON_FieldExtractionErrors(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	schemaRepository := in_memory.New(ctx)
+	schemaRepository := in_memory.New()
 
-	err := schemaRepository.CreateResource(ctx, api.Resource{
+	err := schemaRepository.CreateResource(ctx, api.ResourceSchema{
 		ResourceType: "host",
-		CommonSchema: `{
+		CommonRepresentationSchema: `{
 		  "$schema": "http://json-schema.org/draft-07/schema#",
 		  "type": "object",
 		  "properties": {
@@ -130,10 +130,10 @@ func TestValidateReportResourceJSON_FieldExtractionErrors(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
-	err = schemaRepository.CreateResourceReporter(ctx, api.ResourceReporter{
+	err = schemaRepository.CreateReporter(ctx, api.ReporterSchema{
 		ResourceType: "host",
 		ReporterType: "hbi",
-		ReporterSchema: `{
+		ReporterRepresentationSchema: `{
 		  "$schema": "http://json-schema.org/draft-07/schema#",
 		  "type": "object",
 		  "properties": {
@@ -421,21 +421,21 @@ func TestValidateReportResourceJSON_SchemaBasedValidation(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			// Setup schemas in cache
 			ctx := context.Background()
-			schemaRepository := in_memory.New(ctx)
+			schemaRepository := in_memory.New()
 
 			// Setup config for k8s_policy with acm reporter
-			err := schemaRepository.CreateResource(ctx, api.Resource{
-				ResourceType: "k8s_policy",
-				CommonSchema: tc.commonSchema,
+			err := schemaRepository.CreateResource(ctx, api.ResourceSchema{
+				ResourceType:               "k8s_policy",
+				CommonRepresentationSchema: tc.commonSchema,
 			})
 			assert.NoError(t, err)
 
-			err = schemaRepository.CreateResourceReporter(
+			err = schemaRepository.CreateReporter(
 				ctx,
-				api.ResourceReporter{
-					ResourceType:   "k8s_policy",
-					ReporterType:   "acm",
-					ReporterSchema: tc.reporterSchema,
+				api.ReporterSchema{
+					ResourceType:                 "k8s_policy",
+					ReporterType:                 "acm",
+					ReporterRepresentationSchema: tc.reporterSchema,
 				},
 			)
 			assert.NoError(t, err)

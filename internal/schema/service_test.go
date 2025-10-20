@@ -2,88 +2,41 @@ package schema
 
 import (
 	"context"
-	"fmt"
 	"testing"
+
+	"github.com/project-kessel/inventory-api/internal/schema/in_memory"
 
 	"github.com/project-kessel/inventory-api/internal/schema/api"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 )
-
-// MockSchemaRepository is a mock implementation of api.SchemaRepository
-type MockSchemaRepository struct {
-	mock.Mock
-}
-
-func (m *MockSchemaRepository) GetResources(ctx context.Context) ([]string, error) {
-	args := m.Called(ctx)
-	return args.Get(0).([]string), args.Error(1)
-}
-
-func (m *MockSchemaRepository) CreateResource(ctx context.Context, resource api.Resource) error {
-	args := m.Called(ctx, resource)
-	return args.Error(0)
-}
-
-func (m *MockSchemaRepository) GetResource(ctx context.Context, resourceType string) (api.Resource, error) {
-	args := m.Called(ctx, resourceType)
-	return args.Get(0).(api.Resource), args.Error(1)
-}
-
-func (m *MockSchemaRepository) UpdateResource(ctx context.Context, resource api.Resource) error {
-	args := m.Called(ctx, resource)
-	return args.Error(0)
-}
-
-func (m *MockSchemaRepository) DeleteResource(ctx context.Context, resourceType string) error {
-	args := m.Called(ctx, resourceType)
-	return args.Error(0)
-}
-
-func (m *MockSchemaRepository) GetResourceReporters(ctx context.Context, resourceType string) ([]string, error) {
-	args := m.Called(ctx, resourceType)
-	return args.Get(0).([]string), args.Error(1)
-}
-
-func (m *MockSchemaRepository) CreateResourceReporter(ctx context.Context, resourceReporter api.ResourceReporter) error {
-	args := m.Called(ctx, resourceReporter)
-	return args.Error(0)
-}
-
-func (m *MockSchemaRepository) GetResourceReporter(ctx context.Context, resourceType string, reporterType string) (api.ResourceReporter, error) {
-	args := m.Called(ctx, resourceType, reporterType)
-	return args.Get(0).(api.ResourceReporter), args.Error(1)
-}
-
-func (m *MockSchemaRepository) UpdateResourceReporter(ctx context.Context, resourceReporter api.ResourceReporter) error {
-	args := m.Called(ctx, resourceReporter)
-	return args.Error(0)
-}
-
-func (m *MockSchemaRepository) DeleteResourceReporter(ctx context.Context, resourceType string, reporterType string) error {
-	args := m.Called(ctx, resourceType, reporterType)
-	return args.Error(0)
-}
 
 func TestSchemaServiceImpl_ValidateReporterForResource(t *testing.T) {
 	tests := []struct {
-		name          string
-		resourceType  string
-		reporterType  string
-		setupMock     func(*MockSchemaRepository)
-		expectErr     bool
-		expectedError string
+		name            string
+		resourceType    string
+		reporterType    string
+		setupRepository func(repository api.SchemaRepository)
+		expectErr       bool
+		expectedError   string
 	}{
 		{
 			name:         "Valid resource and reporter combination",
 			resourceType: "host",
 			reporterType: "hbi",
-			setupMock: func(m *MockSchemaRepository) {
-				m.On("GetResourceReporter", mock.Anything, "host", "hbi").Return(api.ResourceReporter{
-					ResourceType:   "host",
-					ReporterType:   "hbi",
-					ReporterSchema: `{"type": "object"}`,
-				}, nil)
+			setupRepository: func(repository api.SchemaRepository) {
+				err := repository.CreateResource(context.Background(), api.ResourceSchema{
+					ResourceType:               "host",
+					CommonRepresentationSchema: `{"type": "object"}`,
+				})
+
+				assert.NoError(t, err)
+
+				err = repository.CreateReporter(context.Background(), api.ReporterSchema{
+					ResourceType:                 "host",
+					ReporterType:                 "hbi",
+					ReporterRepresentationSchema: `{"type": "object"}`,
+				})
+				assert.NoError(t, err)
 			},
 			expectErr: false,
 		},
@@ -91,18 +44,22 @@ func TestSchemaServiceImpl_ValidateReporterForResource(t *testing.T) {
 			name:         "Invalid resource and reporter combination",
 			resourceType: "host",
 			reporterType: "invalid_reporter",
-			setupMock: func(m *MockSchemaRepository) {
-				m.On("GetResourceReporter", mock.Anything, "host", "invalid_reporter").Return(api.ResourceReporter{}, fmt.Errorf("reporter invalid_reporter does not exist"))
+			setupRepository: func(repository api.SchemaRepository) {
+				err := repository.CreateResource(context.Background(), api.ResourceSchema{
+					ResourceType:               "host",
+					CommonRepresentationSchema: `{"type": "object"}`,
+				})
+				assert.NoError(t, err)
 			},
 			expectErr:     true,
-			expectedError: "reporter invalid_reporter does not exist",
+			expectedError: "invalid reporter_type: invalid_reporter for resource_type: host",
 		},
 		{
 			name:         "Resource type does not exist",
 			resourceType: "invalid_resource",
 			reporterType: "hbi",
-			setupMock: func(m *MockSchemaRepository) {
-				m.On("GetResourceReporter", mock.Anything, "invalid_resource", "hbi").Return(api.ResourceReporter{}, fmt.Errorf("resource type invalid_resource does not exist"))
+			setupRepository: func(repository api.SchemaRepository) {
+				// nothing here
 			},
 			expectErr:     true,
 			expectedError: "resource type invalid_resource does not exist",
@@ -111,10 +68,9 @@ func TestSchemaServiceImpl_ValidateReporterForResource(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockRepo := new(MockSchemaRepository)
-			tt.setupMock(mockRepo)
-
-			service := NewSchemaService(mockRepo)
+			fakeRepo := in_memory.New()
+			tt.setupRepository(fakeRepo)
+			service := NewSchemaService(fakeRepo)
 			ctx := context.Background()
 
 			err := service.ValidateReporterForResource(ctx, tt.resourceType, tt.reporterType)
@@ -125,8 +81,6 @@ func TestSchemaServiceImpl_ValidateReporterForResource(t *testing.T) {
 			} else {
 				assert.NoError(t, err)
 			}
-
-			mockRepo.AssertExpectations(t)
 		})
 	}
 }
@@ -145,7 +99,7 @@ func TestSchemaServiceImpl_CommonShallowValidate(t *testing.T) {
 		name                 string
 		resourceType         string
 		commonRepresentation map[string]interface{}
-		setupMock            func(*MockSchemaRepository)
+		setupRepository      func(repository api.SchemaRepository)
 		expectErr            bool
 		expectedError        string
 	}{
@@ -155,11 +109,12 @@ func TestSchemaServiceImpl_CommonShallowValidate(t *testing.T) {
 			commonRepresentation: map[string]interface{}{
 				"workspace_id": "ws-123",
 			},
-			setupMock: func(m *MockSchemaRepository) {
-				m.On("GetResource", mock.Anything, "host").Return(api.Resource{
-					ResourceType: "host",
-					CommonSchema: validCommonSchema,
-				}, nil)
+			setupRepository: func(repository api.SchemaRepository) {
+				err := repository.CreateResource(context.Background(), api.ResourceSchema{
+					ResourceType:               "host",
+					CommonRepresentationSchema: validCommonSchema,
+				})
+				assert.NoError(t, err)
 			},
 			expectErr: false,
 		},
@@ -167,11 +122,12 @@ func TestSchemaServiceImpl_CommonShallowValidate(t *testing.T) {
 			name:                 "No common schema for host",
 			resourceType:         "host",
 			commonRepresentation: map[string]interface{}{"workspace_id": "ws-123"},
-			setupMock: func(m *MockSchemaRepository) {
-				m.On("GetResource", mock.Anything, "host").Return(api.Resource{
-					ResourceType: "host",
-					CommonSchema: "",
-				}, nil)
+			setupRepository: func(repository api.SchemaRepository) {
+				err := repository.CreateResource(context.Background(), api.ResourceSchema{
+					ResourceType:               "host",
+					CommonRepresentationSchema: "",
+				})
+				assert.NoError(t, err)
 			},
 			expectErr:     true,
 			expectedError: "no schema found for 'host'",
@@ -180,11 +136,12 @@ func TestSchemaServiceImpl_CommonShallowValidate(t *testing.T) {
 			name:                 "Empty common representation with schema",
 			resourceType:         "host",
 			commonRepresentation: map[string]interface{}{},
-			setupMock: func(m *MockSchemaRepository) {
-				m.On("GetResource", mock.Anything, "host").Return(api.Resource{
-					ResourceType: "host",
-					CommonSchema: validCommonSchema,
-				}, nil)
+			setupRepository: func(repository api.SchemaRepository) {
+				err := repository.CreateResource(context.Background(), api.ResourceSchema{
+					ResourceType:               "host",
+					CommonRepresentationSchema: validCommonSchema,
+				})
+				assert.NoError(t, err)
 			},
 			expectErr:     true,
 			expectedError: "validation failed",
@@ -195,11 +152,12 @@ func TestSchemaServiceImpl_CommonShallowValidate(t *testing.T) {
 			commonRepresentation: map[string]interface{}{
 				"workspace_id": 12345, // Should be string
 			},
-			setupMock: func(m *MockSchemaRepository) {
-				m.On("GetResource", mock.Anything, "host").Return(api.Resource{
-					ResourceType: "host",
-					CommonSchema: validCommonSchema,
-				}, nil)
+			setupRepository: func(repository api.SchemaRepository) {
+				err := repository.CreateResource(context.Background(), api.ResourceSchema{
+					ResourceType:               "host",
+					CommonRepresentationSchema: validCommonSchema,
+				})
+				assert.NoError(t, err)
 			},
 			expectErr:     true,
 			expectedError: "validation failed",
@@ -208,8 +166,8 @@ func TestSchemaServiceImpl_CommonShallowValidate(t *testing.T) {
 			name:                 "Resource does not exist",
 			resourceType:         "invalid_resource",
 			commonRepresentation: map[string]interface{}{"workspace_id": "ws-123"},
-			setupMock: func(m *MockSchemaRepository) {
-				m.On("GetResource", mock.Anything, "invalid_resource").Return(api.Resource{}, fmt.Errorf("resource invalid_resource does not exist"))
+			setupRepository: func(repository api.SchemaRepository) {
+				// empty
 			},
 			expectErr:     true,
 			expectedError: "resource invalid_resource does not exist",
@@ -218,10 +176,10 @@ func TestSchemaServiceImpl_CommonShallowValidate(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockRepo := new(MockSchemaRepository)
-			tt.setupMock(mockRepo)
+			fakeRepo := in_memory.New()
+			tt.setupRepository(fakeRepo)
 
-			service := NewSchemaService(mockRepo)
+			service := NewSchemaService(fakeRepo)
 			ctx := context.Background()
 
 			err := service.CommonShallowValidate(ctx, tt.resourceType, tt.commonRepresentation)
@@ -232,8 +190,6 @@ func TestSchemaServiceImpl_CommonShallowValidate(t *testing.T) {
 			} else {
 				assert.NoError(t, err)
 			}
-
-			mockRepo.AssertExpectations(t)
 		})
 	}
 }
@@ -253,7 +209,7 @@ func TestSchemaServiceImpl_ReporterShallowValidate(t *testing.T) {
 		resourceType           string
 		reporterType           string
 		reporterRepresentation map[string]interface{}
-		setupMock              func(*MockSchemaRepository)
+		setupRepository        func(repository api.SchemaRepository)
 		expectErr              bool
 		expectedError          string
 	}{
@@ -264,12 +220,19 @@ func TestSchemaServiceImpl_ReporterShallowValidate(t *testing.T) {
 			reporterRepresentation: map[string]interface{}{
 				"satellite_id": "sat-123",
 			},
-			setupMock: func(m *MockSchemaRepository) {
-				m.On("GetResourceReporter", mock.Anything, "host", "hbi").Return(api.ResourceReporter{
-					ResourceType:   "host",
-					ReporterType:   "hbi",
-					ReporterSchema: validReporterSchema,
-				}, nil)
+			setupRepository: func(repository api.SchemaRepository) {
+				err := repository.CreateResource(context.Background(), api.ResourceSchema{
+					ResourceType:               "host",
+					CommonRepresentationSchema: "",
+				})
+				assert.NoError(t, err)
+
+				err = repository.CreateReporter(context.Background(), api.ReporterSchema{
+					ResourceType:                 "host",
+					ReporterType:                 "hbi",
+					ReporterRepresentationSchema: validReporterSchema,
+				})
+				assert.NoError(t, err)
 			},
 			expectErr: false,
 		},
@@ -278,12 +241,19 @@ func TestSchemaServiceImpl_ReporterShallowValidate(t *testing.T) {
 			resourceType:           "host",
 			reporterType:           "hbi",
 			reporterRepresentation: map[string]interface{}{"satellite_id": "sat-123"},
-			setupMock: func(m *MockSchemaRepository) {
-				m.On("GetResourceReporter", mock.Anything, "host", "hbi").Return(api.ResourceReporter{
-					ResourceType:   "host",
-					ReporterType:   "hbi",
-					ReporterSchema: "",
-				}, nil)
+			setupRepository: func(repository api.SchemaRepository) {
+				err := repository.CreateResource(context.Background(), api.ResourceSchema{
+					ResourceType:               "host",
+					CommonRepresentationSchema: "",
+				})
+				assert.NoError(t, err)
+
+				err = repository.CreateReporter(context.Background(), api.ReporterSchema{
+					ResourceType:                 "host",
+					ReporterType:                 "hbi",
+					ReporterRepresentationSchema: "",
+				})
+				assert.NoError(t, err)
 			},
 			expectErr:     true,
 			expectedError: "no schema found for 'host:hbi', but reporter representation was provided",
@@ -293,12 +263,19 @@ func TestSchemaServiceImpl_ReporterShallowValidate(t *testing.T) {
 			resourceType:           "host",
 			reporterType:           "hbi",
 			reporterRepresentation: map[string]interface{}{},
-			setupMock: func(m *MockSchemaRepository) {
-				m.On("GetResourceReporter", mock.Anything, "host", "hbi").Return(api.ResourceReporter{
-					ResourceType:   "host",
-					ReporterType:   "hbi",
-					ReporterSchema: validReporterSchema,
-				}, nil)
+			setupRepository: func(repository api.SchemaRepository) {
+				err := repository.CreateResource(context.Background(), api.ResourceSchema{
+					ResourceType:               "host",
+					CommonRepresentationSchema: "",
+				})
+				assert.NoError(t, err)
+
+				err = repository.CreateReporter(context.Background(), api.ReporterSchema{
+					ResourceType:                 "host",
+					ReporterType:                 "hbi",
+					ReporterRepresentationSchema: validReporterSchema,
+				})
+				assert.NoError(t, err)
 			},
 			expectErr:     true,
 			expectedError: "validation failed",
@@ -310,12 +287,19 @@ func TestSchemaServiceImpl_ReporterShallowValidate(t *testing.T) {
 			reporterRepresentation: map[string]interface{}{
 				"satellite_id": 12345, // Should be string
 			},
-			setupMock: func(m *MockSchemaRepository) {
-				m.On("GetResourceReporter", mock.Anything, "host", "hbi").Return(api.ResourceReporter{
-					ResourceType:   "host",
-					ReporterType:   "hbi",
-					ReporterSchema: validReporterSchema,
-				}, nil)
+			setupRepository: func(repository api.SchemaRepository) {
+				err := repository.CreateResource(context.Background(), api.ResourceSchema{
+					ResourceType:               "host",
+					CommonRepresentationSchema: "",
+				})
+				assert.NoError(t, err)
+
+				err = repository.CreateReporter(context.Background(), api.ReporterSchema{
+					ResourceType:                 "host",
+					ReporterType:                 "hbi",
+					ReporterRepresentationSchema: validReporterSchema,
+				})
+				assert.NoError(t, err)
 			},
 			expectErr:     true,
 			expectedError: "validation failed",
@@ -325,20 +309,35 @@ func TestSchemaServiceImpl_ReporterShallowValidate(t *testing.T) {
 			resourceType:           "host",
 			reporterType:           "invalid_reporter",
 			reporterRepresentation: map[string]interface{}{"satellite_id": "sat-123"},
-			setupMock: func(m *MockSchemaRepository) {
-				m.On("GetResourceReporter", mock.Anything, "host", "invalid_reporter").Return(api.ResourceReporter{}, fmt.Errorf("reporter invalid_reporter does not exist"))
+			setupRepository: func(repository api.SchemaRepository) {
+				err := repository.CreateResource(context.Background(), api.ResourceSchema{
+					ResourceType:               "host",
+					CommonRepresentationSchema: "",
+				})
+				assert.NoError(t, err)
 			},
 			expectErr:     true,
-			expectedError: "reporter invalid_reporter does not exist",
+			expectedError: "invalid reporter_type: invalid_reporter for resource_type: host",
+		},
+		{
+			name:                   "Resource does not exist",
+			resourceType:           "some-resource",
+			reporterType:           "some-reporter",
+			reporterRepresentation: map[string]interface{}{"satellite_id": "sat-123"},
+			setupRepository: func(repository api.SchemaRepository) {
+				// empty
+			},
+			expectErr:     true,
+			expectedError: "resource type some-resource does not exist",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockRepo := new(MockSchemaRepository)
-			tt.setupMock(mockRepo)
+			fakeRepo := in_memory.New()
+			tt.setupRepository(fakeRepo)
 
-			service := NewSchemaService(mockRepo)
+			service := NewSchemaService(fakeRepo)
 			ctx := context.Background()
 
 			err := service.ReporterShallowValidate(ctx, tt.resourceType, tt.reporterType, tt.reporterRepresentation)
@@ -349,8 +348,6 @@ func TestSchemaServiceImpl_ReporterShallowValidate(t *testing.T) {
 			} else {
 				assert.NoError(t, err)
 			}
-
-			mockRepo.AssertExpectations(t)
 		})
 	}
 }

@@ -3,6 +3,7 @@ package schema
 import (
 	"context"
 	"fmt"
+	"github.com/go-kratos/kratos/v2/errors"
 
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/project-kessel/inventory-api/internal/schema/api"
@@ -16,18 +17,22 @@ func NewSchemaService(repository api.SchemaRepository) *SchemaService {
 	return &SchemaService{repository: repository}
 }
 
-// ValidateReporterForResource validates the resourceType and reporterType combination is valid. i.e. that there is a reporter that reports said resource.
-func (s *SchemaService) ValidateReporterForResource(ctx context.Context, resourceType string, reporterType string) error {
-	if _, err := s.repository.GetReporter(ctx, resourceType, reporterType); err != nil {
-		return err
+// IsReporterForResource validates the resourceType and reporterType combination is valid. i.e. that there is a reporter that reports said resource.
+func (s *SchemaService) IsReporterForResource(ctx context.Context, resourceType string, reporterType string) (bool, error) {
+	if _, err := s.repository.GetReporterSchema(ctx, resourceType, reporterType); err != nil {
+		if errors.Is(err, api.ResourceSchemaNotFound) || errors.Is(err, api.ReporterSchemaNotfound) {
+			return false, nil
+		}
+
+		return false, err
 	}
 
-	return nil
+	return true, nil
 }
 
 // CommonShallowValidate validates the common representation for a given resourceType.
 func (s *SchemaService) CommonShallowValidate(ctx context.Context, resourceType string, commonRepresentation map[string]interface{}) error {
-	resource, err := s.repository.GetResource(ctx, resourceType)
+	resource, err := s.repository.GetResourceSchema(ctx, resourceType)
 	if err != nil {
 		return fmt.Errorf("failed to load common representation schema for '%s': %w", resourceType, err)
 	}
@@ -54,7 +59,7 @@ func (s *SchemaService) CommonShallowValidate(ctx context.Context, resourceType 
 
 // ReporterShallowValidate validates the specific reporter representation for a given resourceType/reporterType.
 func (s *SchemaService) ReporterShallowValidate(ctx context.Context, resourceType string, reporterType string, reporterRepresentation map[string]interface{}) error {
-	reporter, err := s.repository.GetReporter(ctx, resourceType, reporterType)
+	reporter, err := s.repository.GetReporterSchema(ctx, resourceType, reporterType)
 	if err != nil {
 		return err
 	}

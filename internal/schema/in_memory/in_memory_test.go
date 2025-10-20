@@ -21,11 +21,11 @@ func TestInMemorySchemaRepository_CreateResource(t *testing.T) {
 		CommonRepresentationSchema: `{"type": "object"}`,
 	}
 
-	err := repo.CreateResource(ctx, resource)
+	err := repo.CreateResourceSchema(ctx, resource)
 	assert.NoError(t, err)
 
 	// Verify resource was created
-	retrieved, err := repo.GetResource(ctx, "host")
+	retrieved, err := repo.GetResourceSchema(ctx, "host")
 	assert.NoError(t, err)
 	assert.Equal(t, "host", retrieved.ResourceType)
 	assert.Equal(t, `{"type": "object"}`, retrieved.CommonRepresentationSchema)
@@ -42,11 +42,11 @@ func TestInMemorySchemaRepository_CreateResource_AlreadyExists(t *testing.T) {
 		CommonRepresentationSchema: `{"type": "object"}`,
 	}
 
-	err := repo.CreateResource(ctx, resource)
+	err := repo.CreateResourceSchema(ctx, resource)
 	assert.NoError(t, err)
 
 	// Try to create the same resource again
-	err = repo.CreateResource(ctx, resource)
+	err = repo.CreateResourceSchema(ctx, resource)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "resource host already exists")
 }
@@ -62,10 +62,10 @@ func TestInMemorySchemaRepository_GetResource(t *testing.T) {
 		CommonRepresentationSchema: `{"type": "object"}`,
 	}
 
-	err := repo.CreateResource(ctx, resource)
+	err := repo.CreateResourceSchema(ctx, resource)
 	assert.NoError(t, err)
 
-	retrieved, err := repo.GetResource(ctx, "k8s_cluster")
+	retrieved, err := repo.GetResourceSchema(ctx, "k8s_cluster")
 	assert.NoError(t, err)
 	assert.Equal(t, "k8s_cluster", retrieved.ResourceType)
 }
@@ -76,9 +76,8 @@ func TestInMemorySchemaRepository_GetResource_NotFound(t *testing.T) {
 	}
 	ctx := context.Background()
 
-	_, err := repo.GetResource(ctx, "nonexistent")
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "resource nonexistent does not exist")
+	_, err := repo.GetResourceSchema(ctx, "nonexistent")
+	assert.ErrorIs(t, err, api.ResourceSchemaNotFound)
 }
 
 func TestInMemorySchemaRepository_UpdateResource(t *testing.T) {
@@ -92,7 +91,7 @@ func TestInMemorySchemaRepository_UpdateResource(t *testing.T) {
 		CommonRepresentationSchema: `{"type": "object"}`,
 	}
 
-	err := repo.CreateResource(ctx, resource)
+	err := repo.CreateResourceSchema(ctx, resource)
 	assert.NoError(t, err)
 
 	// Update the resource
@@ -101,11 +100,11 @@ func TestInMemorySchemaRepository_UpdateResource(t *testing.T) {
 		CommonRepresentationSchema: `{"type": "object", "properties": {"name": {"type": "string"}}}`,
 	}
 
-	err = repo.UpdateResource(ctx, updatedResource)
+	err = repo.UpdateResourceSchema(ctx, updatedResource)
 	assert.NoError(t, err)
 
 	// Verify update
-	retrieved, err := repo.GetResource(ctx, "host")
+	retrieved, err := repo.GetResourceSchema(ctx, "host")
 	assert.NoError(t, err)
 	assert.Equal(t, updatedResource.CommonRepresentationSchema, retrieved.CommonRepresentationSchema)
 }
@@ -121,9 +120,8 @@ func TestInMemorySchemaRepository_UpdateResource_NotFound(t *testing.T) {
 		CommonRepresentationSchema: `{"type": "object"}`,
 	}
 
-	err := repo.UpdateResource(ctx, resource)
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "resource nonexistent does not exist")
+	err := repo.UpdateResourceSchema(ctx, resource)
+	assert.ErrorIs(t, err, api.ResourceSchemaNotFound)
 }
 
 func TestInMemorySchemaRepository_DeleteResource(t *testing.T) {
@@ -137,16 +135,15 @@ func TestInMemorySchemaRepository_DeleteResource(t *testing.T) {
 		CommonRepresentationSchema: `{"type": "object"}`,
 	}
 
-	err := repo.CreateResource(ctx, resource)
+	err := repo.CreateResourceSchema(ctx, resource)
 	assert.NoError(t, err)
 
-	err = repo.DeleteResource(ctx, "host")
+	err = repo.DeleteResourceSchema(ctx, "host")
 	assert.NoError(t, err)
 
 	// Verify deletion
-	_, err = repo.GetResource(ctx, "host")
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "resource host does not exist")
+	_, err = repo.GetResourceSchema(ctx, "host")
+	assert.ErrorIs(t, err, api.ResourceSchemaNotFound)
 }
 
 func TestInMemorySchemaRepository_GetResources(t *testing.T) {
@@ -162,11 +159,11 @@ func TestInMemorySchemaRepository_GetResources(t *testing.T) {
 	}
 
 	for _, r := range resources {
-		err := repo.CreateResource(ctx, r)
+		err := repo.CreateResourceSchema(ctx, r)
 		assert.NoError(t, err)
 	}
 
-	retrieved, err := repo.GetResources(ctx)
+	retrieved, err := repo.GetResourceSchemas(ctx)
 	assert.NoError(t, err)
 	assert.Len(t, retrieved, 3)
 	assert.Contains(t, retrieved, "host")
@@ -185,7 +182,7 @@ func TestInMemorySchemaRepository_CreateResourceReporter(t *testing.T) {
 		ResourceType:               "host",
 		CommonRepresentationSchema: `{"type": "object"}`,
 	}
-	err := repo.CreateResource(ctx, resource)
+	err := repo.CreateResourceSchema(ctx, resource)
 	assert.NoError(t, err)
 
 	// Create reporter
@@ -195,11 +192,11 @@ func TestInMemorySchemaRepository_CreateResourceReporter(t *testing.T) {
 		ReporterRepresentationSchema: `{"type": "object", "properties": {"satellite_id": {"type": "string"}}}`,
 	}
 
-	err = repo.CreateReporter(ctx, reporter)
+	err = repo.CreateReporterSchema(ctx, reporter)
 	assert.NoError(t, err)
 
 	// Verify reporter was created
-	retrieved, err := repo.GetReporter(ctx, "host", "hbi")
+	retrieved, err := repo.GetReporterSchema(ctx, "host", "hbi")
 	assert.NoError(t, err)
 	assert.Equal(t, "host", retrieved.ResourceType)
 	assert.Equal(t, "hbi", retrieved.ReporterType)
@@ -216,13 +213,12 @@ func TestInMemorySchemaRepository_GetResourceReporter_NotFound(t *testing.T) {
 		ResourceType:               "host",
 		CommonRepresentationSchema: `{"type": "object"}`,
 	}
-	err := repo.CreateResource(ctx, resource)
+	err := repo.CreateResourceSchema(ctx, resource)
 	assert.NoError(t, err)
 
 	// Try to get non-existent reporter
-	_, err = repo.GetReporter(ctx, "host", "nonexistent")
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "invalid reporter_type: nonexistent for resource_type: host")
+	_, err = repo.GetReporterSchema(ctx, "host", "nonexistent")
+	assert.ErrorIs(t, err, api.ReporterSchemaNotfound)
 }
 
 func TestInMemorySchemaRepository_UpdateResourceReporter(t *testing.T) {
@@ -236,7 +232,7 @@ func TestInMemorySchemaRepository_UpdateResourceReporter(t *testing.T) {
 		ResourceType:               "host",
 		CommonRepresentationSchema: `{"type": "object"}`,
 	}
-	err := repo.CreateResource(ctx, resource)
+	err := repo.CreateResourceSchema(ctx, resource)
 	assert.NoError(t, err)
 
 	reporter := api.ReporterSchema{
@@ -244,7 +240,7 @@ func TestInMemorySchemaRepository_UpdateResourceReporter(t *testing.T) {
 		ReporterType:                 "hbi",
 		ReporterRepresentationSchema: `{"type": "object"}`,
 	}
-	err = repo.CreateReporter(ctx, reporter)
+	err = repo.CreateReporterSchema(ctx, reporter)
 	assert.NoError(t, err)
 
 	// Update reporter
@@ -253,11 +249,11 @@ func TestInMemorySchemaRepository_UpdateResourceReporter(t *testing.T) {
 		ReporterType:                 "hbi",
 		ReporterRepresentationSchema: `{"type": "object", "properties": {"satellite_id": {"type": "string"}}}`,
 	}
-	err = repo.UpdateReporter(ctx, updatedReporter)
+	err = repo.UpdateReporterSchema(ctx, updatedReporter)
 	assert.NoError(t, err)
 
 	// Verify update
-	retrieved, err := repo.GetReporter(ctx, "host", "hbi")
+	retrieved, err := repo.GetReporterSchema(ctx, "host", "hbi")
 	assert.NoError(t, err)
 	assert.Equal(t, updatedReporter.ReporterRepresentationSchema, retrieved.ReporterRepresentationSchema)
 }
@@ -273,7 +269,7 @@ func TestInMemorySchemaRepository_DeleteResourceReporter(t *testing.T) {
 		ResourceType:               "host",
 		CommonRepresentationSchema: `{"type": "object"}`,
 	}
-	err := repo.CreateResource(ctx, resource)
+	err := repo.CreateResourceSchema(ctx, resource)
 	assert.NoError(t, err)
 
 	reporter := api.ReporterSchema{
@@ -281,17 +277,16 @@ func TestInMemorySchemaRepository_DeleteResourceReporter(t *testing.T) {
 		ReporterType:                 "hbi",
 		ReporterRepresentationSchema: `{"type": "object"}`,
 	}
-	err = repo.CreateReporter(ctx, reporter)
+	err = repo.CreateReporterSchema(ctx, reporter)
 	assert.NoError(t, err)
 
 	// Delete reporter
-	err = repo.DeleteReporter(ctx, "host", "hbi")
+	err = repo.DeleteReporterSchema(ctx, "host", "hbi")
 	assert.NoError(t, err)
 
 	// Verify deletion
-	_, err = repo.GetReporter(ctx, "host", "hbi")
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "invalid reporter_type: hbi for resource_type: host")
+	_, err = repo.GetReporterSchema(ctx, "host", "hbi")
+	assert.ErrorIs(t, err, api.ReporterSchemaNotfound)
 }
 
 func TestInMemorySchemaRepository_GetResourceReporters(t *testing.T) {
@@ -305,7 +300,7 @@ func TestInMemorySchemaRepository_GetResourceReporters(t *testing.T) {
 		ResourceType:               "host",
 		CommonRepresentationSchema: `{"type": "object"}`,
 	}
-	err := repo.CreateResource(ctx, resource)
+	err := repo.CreateResourceSchema(ctx, resource)
 	assert.NoError(t, err)
 
 	// Create multiple reporters
@@ -316,12 +311,12 @@ func TestInMemorySchemaRepository_GetResourceReporters(t *testing.T) {
 	}
 
 	for _, r := range reporters {
-		err := repo.CreateReporter(ctx, r)
+		err := repo.CreateReporterSchema(ctx, r)
 		assert.NoError(t, err)
 	}
 
 	// Get all reporters for resource
-	retrieved, err := repo.GetReporters(ctx, "host")
+	retrieved, err := repo.GetReporterSchemas(ctx, "host")
 	assert.NoError(t, err)
 	assert.Len(t, retrieved, 3)
 	assert.Contains(t, retrieved, "hbi")
@@ -364,13 +359,13 @@ func TestNewFromDir_ValidDirectory(t *testing.T) {
 	assert.NotNil(t, repo)
 
 	// Verify resource was loaded
-	resource, err := repo.GetResource(ctx, "host")
+	resource, err := repo.GetResourceSchema(ctx, "host")
 	assert.NoError(t, err)
 	assert.Equal(t, "host", resource.ResourceType)
 	assert.Equal(t, commonSchema, resource.CommonRepresentationSchema)
 
 	// Verify reporter was loaded
-	reporter, err := repo.GetReporter(ctx, "host", "hbi")
+	reporter, err := repo.GetReporterSchema(ctx, "host", "hbi")
 	assert.NoError(t, err)
 	assert.Equal(t, "host", reporter.ResourceType)
 	assert.Equal(t, "hbi", reporter.ReporterType)
@@ -404,12 +399,12 @@ func TestNewFromJsonFile_ValidFile(t *testing.T) {
 	assert.NotNil(t, repo)
 
 	// Verify resource was loaded
-	resource, err := repo.GetResource(ctx, "host")
+	resource, err := repo.GetResourceSchema(ctx, "host")
 	assert.NoError(t, err)
 	assert.Equal(t, "host", resource.ResourceType)
 
 	// Verify reporter was loaded
-	reporter, err := repo.GetReporter(ctx, "host", "hbi")
+	reporter, err := repo.GetReporterSchema(ctx, "host", "hbi")
 	assert.NoError(t, err)
 	assert.Equal(t, "host", reporter.ResourceType)
 	assert.Equal(t, "hbi", reporter.ReporterType)
@@ -430,18 +425,18 @@ func TestNewFromJsonBytes_ValidJSON(t *testing.T) {
 	assert.NotNil(t, repo)
 
 	// Verify resources were loaded
-	resources, err := repo.GetResources(ctx)
+	resources, err := repo.GetResourceSchemas(ctx)
 	assert.NoError(t, err)
 	assert.Contains(t, resources, "host")
 	assert.Contains(t, resources, "k8s_cluster")
 
 	// Verify reporters were loaded
-	hostReporter, err := repo.GetReporter(ctx, "host", "hbi")
+	hostReporter, err := repo.GetReporterSchema(ctx, "host", "hbi")
 	assert.NoError(t, err)
 	assert.Equal(t, "host", hostReporter.ResourceType)
 	assert.Equal(t, "hbi", hostReporter.ReporterType)
 
-	k8sReporter, err := repo.GetReporter(ctx, "k8s_cluster", "acm")
+	k8sReporter, err := repo.GetReporterSchema(ctx, "k8s_cluster", "acm")
 	assert.NoError(t, err)
 	assert.Equal(t, "k8s_cluster", k8sReporter.ResourceType)
 	assert.Equal(t, "acm", k8sReporter.ReporterType)
@@ -471,14 +466,14 @@ func TestNewFromJsonBytes_OnlyCommonSchemas(t *testing.T) {
 	assert.NotNil(t, repo)
 
 	// Verify resources were loaded
-	resources, err := repo.GetResources(ctx)
+	resources, err := repo.GetResourceSchemas(ctx)
 	assert.NoError(t, err)
 	assert.Len(t, resources, 2)
 	assert.Contains(t, resources, "host")
 	assert.Contains(t, resources, "k8s_cluster")
 
 	// Verify no reporters exist
-	reporters, err := repo.GetReporters(ctx, "host")
+	reporters, err := repo.GetReporterSchemas(ctx, "host")
 	assert.NoError(t, err)
 	assert.Empty(t, reporters)
 }

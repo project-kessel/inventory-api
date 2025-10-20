@@ -16,6 +16,7 @@ func TestSchemaServiceImpl_ValidateReporterForResource(t *testing.T) {
 		resourceType    string
 		reporterType    string
 		setupRepository func(repository api.SchemaRepository)
+		isReporter      bool
 		expectErr       bool
 		expectedError   string
 	}{
@@ -24,34 +25,36 @@ func TestSchemaServiceImpl_ValidateReporterForResource(t *testing.T) {
 			resourceType: "host",
 			reporterType: "hbi",
 			setupRepository: func(repository api.SchemaRepository) {
-				err := repository.CreateResource(context.Background(), api.ResourceSchema{
+				err := repository.CreateResourceSchema(context.Background(), api.ResourceSchema{
 					ResourceType:               "host",
 					CommonRepresentationSchema: `{"type": "object"}`,
 				})
 
 				assert.NoError(t, err)
 
-				err = repository.CreateReporter(context.Background(), api.ReporterSchema{
+				err = repository.CreateReporterSchema(context.Background(), api.ReporterSchema{
 					ResourceType:                 "host",
 					ReporterType:                 "hbi",
 					ReporterRepresentationSchema: `{"type": "object"}`,
 				})
 				assert.NoError(t, err)
 			},
-			expectErr: false,
+			isReporter: true,
+			expectErr:  false,
 		},
 		{
 			name:         "Invalid resource and reporter combination",
 			resourceType: "host",
 			reporterType: "invalid_reporter",
 			setupRepository: func(repository api.SchemaRepository) {
-				err := repository.CreateResource(context.Background(), api.ResourceSchema{
+				err := repository.CreateResourceSchema(context.Background(), api.ResourceSchema{
 					ResourceType:               "host",
 					CommonRepresentationSchema: `{"type": "object"}`,
 				})
 				assert.NoError(t, err)
 			},
-			expectErr:     true,
+			isReporter:    false,
+			expectErr:     false,
 			expectedError: "invalid reporter_type: invalid_reporter for resource_type: host",
 		},
 		{
@@ -61,6 +64,7 @@ func TestSchemaServiceImpl_ValidateReporterForResource(t *testing.T) {
 			setupRepository: func(repository api.SchemaRepository) {
 				// nothing here
 			},
+			isReporter:    false,
 			expectErr:     true,
 			expectedError: "resource type invalid_resource does not exist",
 		},
@@ -73,7 +77,9 @@ func TestSchemaServiceImpl_ValidateReporterForResource(t *testing.T) {
 			service := NewSchemaService(fakeRepo)
 			ctx := context.Background()
 
-			err := service.ValidateReporterForResource(ctx, tt.resourceType, tt.reporterType)
+			isReporter, err := service.IsReporterForResource(ctx, tt.resourceType, tt.reporterType)
+
+			assert.Equal(t, tt.isReporter, isReporter)
 
 			if tt.expectErr {
 				assert.Error(t, err)
@@ -110,7 +116,7 @@ func TestSchemaServiceImpl_CommonShallowValidate(t *testing.T) {
 				"workspace_id": "ws-123",
 			},
 			setupRepository: func(repository api.SchemaRepository) {
-				err := repository.CreateResource(context.Background(), api.ResourceSchema{
+				err := repository.CreateResourceSchema(context.Background(), api.ResourceSchema{
 					ResourceType:               "host",
 					CommonRepresentationSchema: validCommonSchema,
 				})
@@ -123,7 +129,7 @@ func TestSchemaServiceImpl_CommonShallowValidate(t *testing.T) {
 			resourceType:         "host",
 			commonRepresentation: map[string]interface{}{"workspace_id": "ws-123"},
 			setupRepository: func(repository api.SchemaRepository) {
-				err := repository.CreateResource(context.Background(), api.ResourceSchema{
+				err := repository.CreateResourceSchema(context.Background(), api.ResourceSchema{
 					ResourceType:               "host",
 					CommonRepresentationSchema: "",
 				})
@@ -137,7 +143,7 @@ func TestSchemaServiceImpl_CommonShallowValidate(t *testing.T) {
 			resourceType:         "host",
 			commonRepresentation: map[string]interface{}{},
 			setupRepository: func(repository api.SchemaRepository) {
-				err := repository.CreateResource(context.Background(), api.ResourceSchema{
+				err := repository.CreateResourceSchema(context.Background(), api.ResourceSchema{
 					ResourceType:               "host",
 					CommonRepresentationSchema: validCommonSchema,
 				})
@@ -153,7 +159,7 @@ func TestSchemaServiceImpl_CommonShallowValidate(t *testing.T) {
 				"workspace_id": 12345, // Should be string
 			},
 			setupRepository: func(repository api.SchemaRepository) {
-				err := repository.CreateResource(context.Background(), api.ResourceSchema{
+				err := repository.CreateResourceSchema(context.Background(), api.ResourceSchema{
 					ResourceType:               "host",
 					CommonRepresentationSchema: validCommonSchema,
 				})
@@ -170,7 +176,7 @@ func TestSchemaServiceImpl_CommonShallowValidate(t *testing.T) {
 				// empty
 			},
 			expectErr:     true,
-			expectedError: "resource invalid_resource does not exist",
+			expectedError: api.ResourceSchemaNotFound.Error(),
 		},
 	}
 
@@ -221,13 +227,13 @@ func TestSchemaServiceImpl_ReporterShallowValidate(t *testing.T) {
 				"satellite_id": "sat-123",
 			},
 			setupRepository: func(repository api.SchemaRepository) {
-				err := repository.CreateResource(context.Background(), api.ResourceSchema{
+				err := repository.CreateResourceSchema(context.Background(), api.ResourceSchema{
 					ResourceType:               "host",
 					CommonRepresentationSchema: "",
 				})
 				assert.NoError(t, err)
 
-				err = repository.CreateReporter(context.Background(), api.ReporterSchema{
+				err = repository.CreateReporterSchema(context.Background(), api.ReporterSchema{
 					ResourceType:                 "host",
 					ReporterType:                 "hbi",
 					ReporterRepresentationSchema: validReporterSchema,
@@ -242,13 +248,13 @@ func TestSchemaServiceImpl_ReporterShallowValidate(t *testing.T) {
 			reporterType:           "hbi",
 			reporterRepresentation: map[string]interface{}{"satellite_id": "sat-123"},
 			setupRepository: func(repository api.SchemaRepository) {
-				err := repository.CreateResource(context.Background(), api.ResourceSchema{
+				err := repository.CreateResourceSchema(context.Background(), api.ResourceSchema{
 					ResourceType:               "host",
 					CommonRepresentationSchema: "",
 				})
 				assert.NoError(t, err)
 
-				err = repository.CreateReporter(context.Background(), api.ReporterSchema{
+				err = repository.CreateReporterSchema(context.Background(), api.ReporterSchema{
 					ResourceType:                 "host",
 					ReporterType:                 "hbi",
 					ReporterRepresentationSchema: "",
@@ -264,13 +270,13 @@ func TestSchemaServiceImpl_ReporterShallowValidate(t *testing.T) {
 			reporterType:           "hbi",
 			reporterRepresentation: map[string]interface{}{},
 			setupRepository: func(repository api.SchemaRepository) {
-				err := repository.CreateResource(context.Background(), api.ResourceSchema{
+				err := repository.CreateResourceSchema(context.Background(), api.ResourceSchema{
 					ResourceType:               "host",
 					CommonRepresentationSchema: "",
 				})
 				assert.NoError(t, err)
 
-				err = repository.CreateReporter(context.Background(), api.ReporterSchema{
+				err = repository.CreateReporterSchema(context.Background(), api.ReporterSchema{
 					ResourceType:                 "host",
 					ReporterType:                 "hbi",
 					ReporterRepresentationSchema: validReporterSchema,
@@ -288,13 +294,13 @@ func TestSchemaServiceImpl_ReporterShallowValidate(t *testing.T) {
 				"satellite_id": 12345, // Should be string
 			},
 			setupRepository: func(repository api.SchemaRepository) {
-				err := repository.CreateResource(context.Background(), api.ResourceSchema{
+				err := repository.CreateResourceSchema(context.Background(), api.ResourceSchema{
 					ResourceType:               "host",
 					CommonRepresentationSchema: "",
 				})
 				assert.NoError(t, err)
 
-				err = repository.CreateReporter(context.Background(), api.ReporterSchema{
+				err = repository.CreateReporterSchema(context.Background(), api.ReporterSchema{
 					ResourceType:                 "host",
 					ReporterType:                 "hbi",
 					ReporterRepresentationSchema: validReporterSchema,
@@ -310,14 +316,14 @@ func TestSchemaServiceImpl_ReporterShallowValidate(t *testing.T) {
 			reporterType:           "invalid_reporter",
 			reporterRepresentation: map[string]interface{}{"satellite_id": "sat-123"},
 			setupRepository: func(repository api.SchemaRepository) {
-				err := repository.CreateResource(context.Background(), api.ResourceSchema{
+				err := repository.CreateResourceSchema(context.Background(), api.ResourceSchema{
 					ResourceType:               "host",
 					CommonRepresentationSchema: "",
 				})
 				assert.NoError(t, err)
 			},
 			expectErr:     true,
-			expectedError: "invalid reporter_type: invalid_reporter for resource_type: host",
+			expectedError: api.ReporterSchemaNotfound.Error(),
 		},
 		{
 			name:                   "Resource does not exist",

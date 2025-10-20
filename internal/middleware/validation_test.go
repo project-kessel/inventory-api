@@ -52,7 +52,7 @@ func TestValidateReportResourceJSON_Success(t *testing.T) {
 	ctx := context.Background()
 	schemaRepository := in_memory.New()
 
-	err = schemaRepository.CreateResource(ctx, api.ResourceSchema{
+	err = schemaRepository.CreateResourceSchema(ctx, api.ResourceSchema{
 		ResourceType: "host",
 		CommonRepresentationSchema: `{
 		  "$schema": "http://json-schema.org/draft-07/schema#",
@@ -67,7 +67,7 @@ func TestValidateReportResourceJSON_Success(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
-	err = schemaRepository.CreateReporter(ctx, api.ReporterSchema{
+	err = schemaRepository.CreateReporterSchema(ctx, api.ReporterSchema{
 		ResourceType: "host",
 		ReporterType: "hbi",
 		ReporterRepresentationSchema: `{
@@ -115,7 +115,7 @@ func TestValidateReportResourceJSON_FieldExtractionErrors(t *testing.T) {
 	ctx := context.Background()
 	schemaRepository := in_memory.New()
 
-	err := schemaRepository.CreateResource(ctx, api.ResourceSchema{
+	err := schemaRepository.CreateResourceSchema(ctx, api.ResourceSchema{
 		ResourceType: "host",
 		CommonRepresentationSchema: `{
 		  "$schema": "http://json-schema.org/draft-07/schema#",
@@ -130,7 +130,7 @@ func TestValidateReportResourceJSON_FieldExtractionErrors(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
-	err = schemaRepository.CreateReporter(ctx, api.ReporterSchema{
+	err = schemaRepository.CreateReporterSchema(ctx, api.ReporterSchema{
 		ResourceType: "host",
 		ReporterType: "hbi",
 		ReporterRepresentationSchema: `{
@@ -216,7 +216,7 @@ func TestValidateReportResourceJSON_FieldExtractionErrors(t *testing.T) {
 					Common:   baseMsg.Representations.Common,
 				},
 			},
-			expect: "invalid reporter_type: bar for resource_type: host",
+			expect: "reporter bar does not report resource types: host",
 		},
 	}
 
@@ -424,13 +424,13 @@ func TestValidateReportResourceJSON_SchemaBasedValidation(t *testing.T) {
 			schemaRepository := in_memory.New()
 
 			// Setup config for k8s_policy with acm reporter
-			err := schemaRepository.CreateResource(ctx, api.ResourceSchema{
+			err := schemaRepository.CreateResourceSchema(ctx, api.ResourceSchema{
 				ResourceType:               "k8s_policy",
 				CommonRepresentationSchema: tc.commonSchema,
 			})
 			assert.NoError(t, err)
 
-			err = schemaRepository.CreateReporter(
+			err = schemaRepository.CreateReporterSchema(
 				ctx,
 				api.ReporterSchema{
 					ResourceType:                 "k8s_policy",

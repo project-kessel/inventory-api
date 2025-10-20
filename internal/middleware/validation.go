@@ -57,8 +57,12 @@ func ValidateReportResourceJSON(ctx context.Context, msg proto.Message, schemaSe
 	}
 
 	// Validate the combination of resource_type and reporter_type e.g. k8s_cluster & ACM
-	if err := schemaService.ValidateReporterForResource(ctx, resourceType, reporterType); err != nil {
-		return err
+	if isReporter, err := schemaService.IsReporterForResource(ctx, resourceType, reporterType); !isReporter {
+		if err != nil {
+			return err
+		}
+
+		return fmt.Errorf("reporter %s does not report resource types: %s", reporterType, resourceType)
 	}
 
 	representations, err := ExtractMapField(reportResourceMap, "representations", ValidateFieldExists())

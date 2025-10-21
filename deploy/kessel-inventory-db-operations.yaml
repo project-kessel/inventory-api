@@ -35,9 +35,9 @@ objects:
                   export PGUSER=$(cat /cdapp/cdappconfig.json | ./jq -r '.database.username');
                   export PGDATABASE=$(cat /cdapp/cdappconfig.json | ./jq -r '.database.name');
                   export PGPASSWORD=$(cat /cdapp/cdappconfig.json | ./jq -r '.database.password');
-                  for i in relationship_metadata metadata;
+                  for i in relationship_metadata metadata reporter_resources;
                   do psql -c "DROP TABLE IF EXISTS $i CASCADE"; done;
-                  for i in local_inventory_to_resources inventory_resources relationship_history relationships resource_history resources resource reporter_resources notifications_integrations hosts relationship_reporters reporters labels k8_s_policy_is_propagated_to_k8_s_clusters k8_s_clusters k8s_policies common_representation reporter_representation common_representations reporter_representations;
+                  for i in local_inventory_to_resources inventory_resources relationship_history relationships resource_history resources resource notifications_integrations hosts relationship_reporters reporters labels k8_s_policy_is_propagated_to_k8_s_clusters k8_s_clusters k8s_policies common_representation reporter_representation common_representations reporter_representations;
                   do psql -c "DROP TABLE IF EXISTS $i";
                   done;
               inheritEnv: true

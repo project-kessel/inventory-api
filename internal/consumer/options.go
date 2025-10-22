@@ -77,6 +77,10 @@ func (o *Options) Validate() []error {
 	if len(o.BootstrapServers) == 0 && o.Enabled {
 		errs = append(errs, fmt.Errorf("bootstrap servers can not be empty"))
 	}
+
+	if o.CommitModulo <= 0 {
+		errs = append(errs, fmt.Errorf("commit modulo must be a positive, non-zero integer value"))
+	}
 	return errs
 }
 

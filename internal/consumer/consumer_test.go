@@ -374,28 +374,31 @@ func TestInventoryConsumer_ProcessMessage(t *testing.T) {
 
 func TestCheckIfCommit(t *testing.T) {
 	tests := []struct {
-		name      string
-		partition kafka.TopicPartition
-		expected  bool
+		name         string
+		partition    kafka.TopicPartition
+		commitModulo int
+		expected     bool
 	}{
 		{
 			name: "modulus of the partition offset equates to true",
 			partition: kafka.TopicPartition{
 				Offset: kafka.Offset(10),
 			},
-			expected: true,
+			commitModulo: 10,
+			expected:     true,
 		},
 		{
 			name: "modulus of the partition offset does not equate to true",
 			partition: kafka.TopicPartition{
 				Offset: kafka.Offset(1),
 			},
-			expected: false,
+			commitModulo: 10,
+			expected:     false,
 		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			actual := checkIfCommit(test.partition)
+			actual := checkIfCommit(test.partition, test.commitModulo)
 			assert.Equal(t, test.expected, actual)
 		})
 	}

@@ -45,9 +45,6 @@ import (
 	"go.opentelemetry.io/otel/metric"
 )
 
-// commitModulo is used to define the batch size of offsets based on the current offset being processed
-const commitModulo = 10
-
 // defines all required headers for message processing
 var requiredHeaders = []string{"operation", "txid"}
 
@@ -254,7 +251,7 @@ func (i *InventoryConsumer) Consume() error {
 				// store the current offset to be later batch committed
 				i.offsetMutex.Lock()
 				i.OffsetStorage = append(i.OffsetStorage, e.TopicPartition)
-				shouldCommit := checkIfCommit(e.TopicPartition)
+				shouldCommit := checkIfCommit(e.TopicPartition, i.Config.CommitModulo)
 				i.offsetMutex.Unlock()
 				if shouldCommit {
 					err := i.commitStoredOffsets()
@@ -446,8 +443,8 @@ func ParseMessageKey(msg []byte) (string, error) {
 }
 
 // checkIfCommit returns true whenever the condition to commit a batch of offsets is met
-func checkIfCommit(partition kafka.TopicPartition) bool {
-	return partition.Offset%commitModulo == 0
+func checkIfCommit(partition kafka.TopicPartition, commitModulo int) bool {
+	return int(partition.Offset)%commitModulo == 0
 }
 
 // formatOffsets converts a slice of partitions with offset data into a more readable shorthand-coded string to capture what partitions and offsets were comitted

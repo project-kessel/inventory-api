@@ -124,6 +124,7 @@ objects:
           name: rhcloud-40690-heartbeat-fix
         spec:
           successfulJobsHistoryLimit: 1
+          failedJobsHistoryLimit: 3
           template:
             spec:
               containers:

@@ -14,6 +14,7 @@ type Options struct {
 	BootstrapServers        []string       `mapstructure:"bootstrap-servers"`
 	ConsumerGroupID         string         `mapstructure:"consumer-group-id"`
 	Topic                   string         `mapstructure:"topic"`
+	CommitModulo            int            `mapstructure:"commit-modulo"`
 	SessionTimeout          string         `mapstructure:"session-timeout"`
 	HeartbeatInterval       string         `mapstructure:"heartbeat-interval"`
 	MaxPollInterval         string         `mapstructure:"max-poll-interval"`
@@ -32,6 +33,7 @@ func NewOptions() *Options {
 		Enabled:                 true,
 		ConsumerGroupID:         "inventory-consumer",
 		Topic:                   "outbox.event.kessel.tuples",
+		CommitModulo:            10,
 		SessionTimeout:          "45000",
 		HeartbeatInterval:       "3000",
 		MaxPollInterval:         "300000",
@@ -54,6 +56,7 @@ func (o *Options) AddFlags(fs *pflag.FlagSet, prefix string) {
 	fs.StringSliceVar(&o.BootstrapServers, prefix+"bootstrap-servers", o.BootstrapServers, "sets the bootstrap server address and port for Kafka")
 	fs.StringVar(&o.ConsumerGroupID, prefix+"consumer-group-id", o.ConsumerGroupID, "sets the Kafka consumer group name (default: inventory-consumer)")
 	fs.StringVar(&o.Topic, prefix+"topic", o.Topic, "Kafka topic to monitor for events")
+	fs.IntVar(&o.CommitModulo, prefix+"commit-modulo", o.CommitModulo, "defines the modulo used to calculate when to commit offsets (default: 10")
 	fs.BoolVar(&o.ReadAfterWriteEnabled, prefix+"read-after-write-enabled", o.ReadAfterWriteEnabled, "Toggle for enabling or disabling the read after write consistency workflow (default: true)")
 	fs.StringArrayVar(&o.ReadAfterWriteAllowlist, prefix+"read-after-write-allowlist", o.ReadAfterWriteAllowlist, "List of services that require all requests to be read-after-write enabled (default: [])")
 	fs.StringVar(&o.SessionTimeout, prefix+"session-timeout", o.SessionTimeout, "time a consumer can live without sending heartbeat (default: 45000ms)")
@@ -73,6 +76,10 @@ func (o *Options) Validate() []error {
 
 	if len(o.BootstrapServers) == 0 && o.Enabled {
 		errs = append(errs, fmt.Errorf("bootstrap servers can not be empty"))
+	}
+
+	if o.CommitModulo <= 0 {
+		errs = append(errs, fmt.Errorf("commit modulo must be a positive, non-zero integer value"))
 	}
 	return errs
 }

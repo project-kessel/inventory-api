@@ -20,6 +20,7 @@ func TestNewOptions(t *testing.T) {
 			Enabled:                 true,
 			ConsumerGroupID:         "inventory-consumer",
 			Topic:                   "outbox.event.kessel.tuples",
+			CommitModulo:            10,
 			SessionTimeout:          "45000",
 			HeartbeatInterval:       "3000",
 			MaxPollInterval:         "300000",
@@ -64,7 +65,9 @@ func TestOptions_Validate(t *testing.T) {
 				Enabled: true,
 				BootstrapServers: []string{
 					"test-server:9092",
-				}},
+				},
+				CommitModulo: 10,
+			},
 			expectError: false,
 		},
 		{
@@ -72,6 +75,7 @@ func TestOptions_Validate(t *testing.T) {
 			options: &Options{
 				Enabled:          true,
 				BootstrapServers: []string{},
+				CommitModulo:     10,
 			},
 			expectError: true,
 		},
@@ -80,6 +84,7 @@ func TestOptions_Validate(t *testing.T) {
 			options: &Options{
 				Enabled:          false,
 				BootstrapServers: []string{},
+				CommitModulo:     10,
 			},
 			expectError: false,
 		},
@@ -89,8 +94,43 @@ func TestOptions_Validate(t *testing.T) {
 				Enabled: false,
 				BootstrapServers: []string{
 					"test-server:9092",
-				}},
+				},
+				CommitModulo: 10,
+			},
 			expectError: false,
+		},
+		{
+			name: "commit modulo is set to a positive number",
+			options: &Options{
+				Enabled: true,
+				BootstrapServers: []string{
+					"test-server:9092",
+				},
+				CommitModulo: 1,
+			},
+			expectError: false,
+		},
+		{
+			name: "commit modulo is set to a negative number and fails",
+			options: &Options{
+				Enabled: true,
+				BootstrapServers: []string{
+					"test-server:9092",
+				},
+				CommitModulo: -1,
+			},
+			expectError: true,
+		},
+		{
+			name: "commit modulo is set to zero and fails",
+			options: &Options{
+				Enabled: true,
+				BootstrapServers: []string{
+					"test-server:9092",
+				},
+				CommitModulo: 0,
+			},
+			expectError: true,
 		},
 	}
 

@@ -20,6 +20,7 @@ func TestNewOptions(t *testing.T) {
 			Enabled:                 true,
 			ConsumerGroupID:         "inventory-consumer",
 			Topic:                   "outbox.event.kessel.tuples",
+			CommitModulo:            10,
 			SessionTimeout:          "45000",
 			HeartbeatInterval:       "3000",
 			MaxPollInterval:         "300000",

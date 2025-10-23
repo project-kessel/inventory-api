@@ -57,6 +57,14 @@ func New(c CompletedConfig, authn middleware.Middleware, authnConfig authn.Compl
 				authn,
 			).Match(NewWhiteListMatcher).Build(),
 		),
+		kgrpc.StreamMiddleware(
+			recovery.Recovery(),
+			logging.Server(logger),
+			metrics.Server(
+				metrics.WithRequests(requests),
+				metrics.WithSeconds(seconds),
+			),
+		),
 		kgrpc.Options(grpc.ChainStreamInterceptor(
 			streamingInterceptor...,
 		)),

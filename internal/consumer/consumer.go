@@ -317,6 +317,11 @@ func (i *InventoryConsumer) ProcessMessage(headers map[string]string, relationsE
 				if err != nil {
 					return "", err
 				}
+				// Check if there are tuples to create - if not, it's a no-op
+				if tuplesToReplicate.TuplesToCreate() == nil || len(*tuplesToReplicate.TuplesToCreate()) == 0 {
+					i.Logger.Infof("no tuples to create for operation=%s, txid=%s - treating as no-op", operation, txid)
+					return "", nil
+				}
 				return i.CreateTuple(context.Background(), tuplesToReplicate.TuplesToCreate())
 			}, i.MetricsCollector.MsgProcessFailures)
 			if err != nil {
@@ -341,6 +346,13 @@ func (i *InventoryConsumer) ProcessMessage(headers map[string]string, relationsE
 				tuplesToReplicate, err := i.SchemaService.CalculateTuples(*tupleEvent, biz.OperationTypeUpdated)
 				if err != nil {
 					return "", err
+				}
+				// Check if there are any tuples to create or delete - if not, it's a no-op
+				hasCreate := tuplesToReplicate.TuplesToCreate() != nil && len(*tuplesToReplicate.TuplesToCreate()) > 0
+				hasDelete := tuplesToReplicate.TuplesToDelete() != nil && len(*tuplesToReplicate.TuplesToDelete()) > 0
+				if !hasCreate && !hasDelete {
+					i.Logger.Infof("no tuples to update for operation=%s, txid=%s - treating as no-op", operation, txid)
+					return "", nil
 				}
 				return i.UpdateTuple(context.Background(), tuplesToReplicate.TuplesToCreate(), tuplesToReplicate.TuplesToDelete())
 			}, i.MetricsCollector.MsgProcessFailures)
@@ -368,9 +380,11 @@ func (i *InventoryConsumer) ProcessMessage(headers map[string]string, relationsE
 					return "", err
 				}
 				// For delete operations, we only delete tuples (no creation)
-				if tuplesToReplicate.TuplesToDelete() != nil {
+				if tuplesToReplicate.TuplesToDelete() != nil && len(*tuplesToReplicate.TuplesToDelete()) > 0 {
 					return i.DeleteTuple(context.Background(), *tuplesToReplicate.TuplesToDelete())
 				}
+				// No tuples to delete - this is a no-op
+				i.Logger.Infof("no tuples to delete for operation=%s, txid=%s - treating as no-op", operation, txid)
 				return "", nil
 			}, i.MetricsCollector.MsgProcessFailures)
 			if err != nil {

@@ -1,20 +1,12 @@
 package model
 
-import (
-	"fmt"
-)
-
 type TuplesToReplicate struct {
 	tuplesToCreate *[]RelationsTuple
 	tuplesToDelete *[]RelationsTuple
 }
 
 func NewTuplesToReplicate(tuplesToCreate, tuplesToDelete []RelationsTuple) (TuplesToReplicate, error) {
-	// Validate that at least one slice has content
-	if len(tuplesToCreate) == 0 && len(tuplesToDelete) == 0 {
-		return TuplesToReplicate{}, fmt.Errorf("at least one of tuplesToCreate or tuplesToDelete must be provided")
-	}
-
+	// Allow empty tuples - this represents a no-op scenario
 	var createPtr, deletePtr *[]RelationsTuple
 
 	if len(tuplesToCreate) > 0 {

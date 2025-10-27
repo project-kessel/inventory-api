@@ -7,9 +7,9 @@ require (
 	buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go v1.36.9-20250912141014-52f32327d4b0.1
 	buf.build/go/protovalidate v0.14.0
 	github.com/authzed/grpcutil v0.0.0-20250221190651-1985b19b35b8
-	github.com/cloudevents/sdk-go/protocol/kafka_confluent/v2 v2.0.0-20250721101952-1c64656a6859
-	github.com/cloudevents/sdk-go/v2 v2.16.1
-	github.com/confluentinc/confluent-kafka-go/v2 v2.11.1
+	github.com/cloudevents/sdk-go/protocol/kafka_confluent/v2 v2.0.0-20251027075632-8361f5689126
+	github.com/cloudevents/sdk-go/v2 v2.16.2
+	github.com/confluentinc/confluent-kafka-go/v2 v2.12.0
 	github.com/coreos/go-oidc/v3 v3.14.1
 	github.com/go-kratos/kratos/v2 v2.8.4
 	github.com/golang-jwt/jwt/v5 v5.3.0
@@ -17,7 +17,6 @@ require (
 	github.com/jackc/pgx/v5 v5.7.6
 	github.com/mattn/go-sqlite3 v1.14.32
 	github.com/patrickmn/go-cache v2.1.0+incompatible
-	github.com/project-kessel/inventory-client-go v0.0.0-20250703155410-0ece2b1f2d03
 	github.com/project-kessel/relations-api v0.0.0-20250722143839-19682eaba8fc
 	github.com/prometheus/client_golang v1.23.2
 	github.com/redhatinsights/app-common-go v1.6.8

@@ -52,6 +52,11 @@ func (sc *SchemaUsecase) processReportTupleEvent(tupleEvent model.TupleEvent, op
 	}
 
 	currentWorkspaceID, previousWorkspaceID := data.GetCurrentAndPreviousWorkspaceID(representations, version)
+	// Detailed log for tuple calculation across generation boundaries
+	{
+		localId, resType, repType, repInst := key.LocalResourceId().Serialize(), key.ResourceType().Serialize(), key.ReporterType().Serialize(), key.ReporterInstanceId().Serialize()
+		sc.Log.Infof("TuplesToReplicate[report]: op=%s localResourceId=%s resourceType=%s reporterType=%s reporterInstanceId=%s currentCommonVersion=%d currentWorkspace=%q previousWorkspace=%q", operationType.OperationType(), localId, resType, repType, repInst, version, currentWorkspaceID, previousWorkspaceID)
+	}
 	return sc.buildTuplesToReplicate(currentWorkspaceID, previousWorkspaceID, key)
 }
 
@@ -64,6 +69,10 @@ func (sc *SchemaUsecase) processDeleteTupleEvent(tupleEvent model.TupleEvent) (m
 	}
 
 	currentWorkspaceID := data.ExtractWorkspaceID(representation)
+	{
+		localId, resType, repType, repInst := key.LocalResourceId().Serialize(), key.ResourceType().Serialize(), key.ReporterType().Serialize(), key.ReporterInstanceId().Serialize()
+		sc.Log.Infof("TuplesToReplicate[delete]: localResourceId=%s resourceType=%s reporterType=%s reporterInstanceId=%s latestCommonVersion=%d workspaceToDelete=%q", localId, resType, repType, repInst, representation.Version, currentWorkspaceID)
+	}
 	return sc.buildTuplesToReplicate("", currentWorkspaceID, key)
 }
 
@@ -82,5 +91,13 @@ func (sc *SchemaUsecase) buildTuplesToReplicate(currentWorkspaceID, previousWork
 		tuplesToDelete = append(tuplesToDelete, model.NewWorkspaceRelationsTuple(previousWorkspaceID, key))
 	}
 
-	return model.NewTuplesToReplicate(tuplesToCreate, tuplesToDelete)
+	tuples, err := model.NewTuplesToReplicate(tuplesToCreate, tuplesToDelete)
+	if err != nil {
+		return model.TuplesToReplicate{}, err
+	}
+	{
+		localId, resType, repType, repInst := key.LocalResourceId().Serialize(), key.ResourceType().Serialize(), key.ReporterType().Serialize(), key.ReporterInstanceId().Serialize()
+		sc.Log.Infof("TuplesToReplicate[result]: localResourceId=%s resourceType=%s reporterType=%s reporterInstanceId=%s create=%d delete=%d", localId, resType, repType, repInst, len(tuplesToCreate), len(tuplesToDelete))
+	}
+	return tuples, nil
 }

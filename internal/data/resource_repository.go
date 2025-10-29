@@ -295,6 +295,33 @@ func (r *resourceRepository) GetTransactionManager() usecase.TransactionManager 
 	return r.transactionManager
 }
 
+// shouldIncludeAllGenerations checks if we need to look across all generations
+// to find previous workspace_id. Returns true when current generation > 0,
+// indicating the resource has been resurrected from a tombstone.
+func (r *resourceRepository) shouldIncludeAllGenerations(tx *gorm.DB, key bizmodel.ReporterResourceKey) (bool, error) {
+	var generation uint
+	db := r.getDBSession(tx)
+
+	query := db.Table("reporter_resources rr").
+		Select("rr.generation")
+
+	query = r.buildReporterResourceKeyQuery(query, key)
+
+	row := query.Limit(1).Row()
+	if err := row.Scan(&generation); err != nil {
+		return false, fmt.Errorf("failed to get current generation: %w", err)
+	}
+
+	// If generation > 0, we've had a resurrection and need to look at previous generations
+	includeAll := generation > 0
+	// Detailed trace for generation boundary handling
+	{
+		localId, resType, repType, repInst := key.LocalResourceId().Serialize(), key.ResourceType().Serialize(), key.ReporterType().Serialize(), key.ReporterInstanceId().Serialize()
+		log.Infof("shouldIncludeAllGenerations: localResourceId=%s resourceType=%s reporterType=%s reporterInstanceId=%s generation=%d includeAllGenerations=%t", localId, resType, repType, repInst, generation, includeAll)
+	}
+	return includeAll, nil
+}
+
 func (r *resourceRepository) FindCurrentAndPreviousVersionedRepresentations(tx *gorm.DB, key bizmodel.ReporterResourceKey, currentCommonVersion *uint, operationType biz.EventOperationType) ([]RepresentationsByVersion, error) {
 	if currentCommonVersion == nil {
 		return []RepresentationsByVersion{}, nil
@@ -304,9 +331,19 @@ func (r *resourceRepository) FindCurrentAndPreviousVersionedRepresentations(tx *
 
 	db := r.getDBSession(tx)
 
+	includeAllGenerations, err := r.shouldIncludeAllGenerations(tx, key)
+	if err != nil {
+		return nil, err
+	}
+
 	query := db.Table("reporter_resources rr").
 		Select("cr.data, cr.version").
 		Joins("JOIN common_representations cr ON rr.resource_id = cr.resource_id")
+
+	// Only filter by current generation if we haven't had a resurrection
+	if !includeAllGenerations {
+		query = query.Joins("JOIN reporter_representations rrep ON rrep.reporter_resource_id = rr.id AND rrep.generation = rr.generation")
+	}
 
 	query = r.buildReporterResourceKeyQuery(query, key)
 
@@ -317,9 +354,28 @@ func (r *resourceRepository) FindCurrentAndPreviousVersionedRepresentations(tx *
 
 	}
 
-	err := query.Find(&results).Error
+	// Log the query intent before execution
+	{
+		localId, resType, repType, repInst := key.LocalResourceId().Serialize(), key.ResourceType().Serialize(), key.ReporterType().Serialize(), key.ReporterInstanceId().Serialize()
+		var cv uint = *currentCommonVersion
+		log.Infof("FindCurrentAndPreviousVersionedRepresentations: localResourceId=%s resourceType=%s reporterType=%s reporterInstanceId=%s op=%s currentCommonVersion=%d includeAllGenerations=%t", localId, resType, repType, repInst, operationType.OperationType(), cv, includeAllGenerations)
+	}
+
+	err = query.Find(&results).Error
 	if err != nil {
 		return nil, fmt.Errorf("failed to find common representations by version: %w", err)
+	}
+	// Log the versions returned to aid debugging generation boundaries
+	{
+		if len(results) == 0 {
+			log.Infof("FindCurrentAndPreviousVersionedRepresentations: returned 0 rows")
+		} else {
+			versions := make([]uint, 0, len(results))
+			for _, r := range results {
+				versions = append(versions, r.Version)
+			}
+			log.Infof("FindCurrentAndPreviousVersionedRepresentations: returned versions=%v", versions)
+		}
 	}
 	return results, nil
 }

@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
+	"github.com/google/uuid"
 	"github.com/project-kessel/inventory-api/internal/data"
 	"github.com/project-kessel/inventory-api/internal/metricscollector"
 	"github.com/stretchr/testify/mock"
@@ -865,4 +866,70 @@ func TestInventoryConsumer_DeleteTuple_FailedPrecondition(t *testing.T) {
 	assert.Contains(t, err.Error(), "invalid fencing token")
 
 	authorizer.AssertExpectations(t)
+}
+
+func TestUpdateConsistencyTokenIfPresent(t *testing.T) {
+	const (
+		testResourceID   = "00000000-0000-0000-0000-000000000000"
+		initialToken     = "initial-consistency-token-123"
+		updatedToken     = "updated-consistency-token-456"
+		emptyToken       = ""
+		testResourceType = "integration"
+	)
+
+	tests := []struct {
+		name          string
+		tokenToUpdate string
+		expectedToken string
+		description   string
+	}{
+		{
+			name:          "non-empty token updates consistency token",
+			tokenToUpdate: updatedToken,
+			expectedToken: updatedToken,
+			description:   "When a non-empty token is provided, it should update the database",
+		},
+		{
+			name:          "empty token preserves existing consistency token",
+			tokenToUpdate: emptyToken,
+			expectedToken: initialToken,
+			description:   "When an empty token is provided, the existing token should be preserved",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			tester := TestCase{}
+			errs := tester.TestSetup(t)
+			require.Nil(t, errs)
+
+			// Create a resource with an initial consistency token
+			resourceUUID, err := uuid.Parse(testResourceID)
+			require.Nil(t, err)
+
+			initialResource := datamodel.Resource{
+				ID:               resourceUUID,
+				Type:             testResourceType,
+				CommonVersion:    1,
+				ConsistencyToken: initialToken,
+			}
+
+			result := tester.inv.DB.Create(&initialResource)
+			require.Nil(t, result.Error)
+
+			// Verify initial token is set
+			var dbResource datamodel.Resource
+			result = tester.inv.DB.Where("id = ?", resourceUUID).First(&dbResource)
+			require.Nil(t, result.Error)
+			assert.Equal(t, initialToken, dbResource.ConsistencyToken)
+
+			err = tester.inv.UpdateConsistencyTokenIfPresent(testResourceID, test.tokenToUpdate)
+			require.Nil(t, err)
+
+			// Verify the token in the database matches expectations
+			result = tester.inv.DB.Where("id = ?", resourceUUID).First(&dbResource)
+			require.Nil(t, result.Error)
+			assert.Equal(t, test.expectedToken, dbResource.ConsistencyToken, test.description)
+		})
+	}
 }

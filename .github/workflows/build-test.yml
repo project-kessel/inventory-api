@@ -46,12 +46,12 @@ jobs:
             ./api/kessel/inventory/v1beta2/... ./internal/...
         shell: bash
       - name: Archive code coverage results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: code-coverage
           path: coverage.txt
       - name: Archive v1beta2 coverage
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: v1beta2-code-coverage
           path: v1beta2-coverage.out

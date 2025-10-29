@@ -226,10 +226,9 @@ func (i *InventoryConsumer) Consume() error {
 						metricscollector.Incr(i.MetricsCollector.MsgProcessFailures, "ParseMessageKey")
 						i.Logger.Errorf("failed to parse message key for for ID: %v", err)
 					}
-					err = i.UpdateConsistencyToken(inventoryID, fmt.Sprint(resp))
+					err = i.UpdateConsistencyTokenIfPresent(inventoryID, fmt.Sprint(resp))
 					if err != nil {
-						metricscollector.Incr(i.MetricsCollector.ConsumerErrors, "UpdateConsistencyToken")
-						i.Logger.Errorf("failed to update consistency token: %v")
+						i.Logger.Errorf("failed to update consistency token: %v", err)
 						continue
 					}
 				}
@@ -606,10 +605,25 @@ func (i *InventoryConsumer) DeleteTuple(ctx context.Context, tuples []model.Rela
 	return token, nil
 }
 
+// updateConsistencyTokenIfPresent updates the consistency token in the DB only if the token is non-empty.
+// This prevents clearing existing tokens when operations don't generate new tokens (e.g., when there are no tuples to create or delete).
+func (i *InventoryConsumer) UpdateConsistencyTokenIfPresent(resourceId, token string) error {
+	if token == "" {
+		i.Logger.Debugf("skipping consistency token update for resource %s: no token returned", resourceId)
+		return nil
+	}
+
+	return i.UpdateConsistencyToken(resourceId, token)
+}
+
 // UpdateConsistencyToken updates the resource in the inventory DB to add the consistency token
 func (i *InventoryConsumer) UpdateConsistencyToken(resourceId, token string) error {
 	// this will update all records for the same inventory_id with current consistency token
-	i.DB.Model(datamodel.Resource{}).Where("id = ?", resourceId).Update("ktn", token)
+	result := i.DB.Model(datamodel.Resource{}).Where("id = ?", resourceId).Update("ktn", token)
+	if result.Error != nil {
+		metricscollector.Incr(i.MetricsCollector.ConsumerErrors, "UpdateConsistencyToken")
+		return result.Error
+	}
 	return nil
 }
 

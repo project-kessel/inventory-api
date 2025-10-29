@@ -38,7 +38,7 @@ func (s *SchemaService) CommonShallowValidate(ctx context.Context, resourceType 
 		return fmt.Errorf("failed to load common representation schema for '%s': %w", resourceType, err)
 	}
 
-	if resource.CommonRepresentationSchema == "" {
+	if resource.ValidationSchema == nil {
 		return fmt.Errorf("no schema found for '%s'", resourceType)
 	}
 
@@ -47,7 +47,7 @@ func (s *SchemaService) CommonShallowValidate(ctx context.Context, resourceType 
 		commonRepresentation = map[string]interface{}{}
 	}
 
-	err = validateJSONSchema(resource.CommonRepresentationSchema, commonRepresentation)
+	_, err = resource.ValidationSchema.Validate(commonRepresentation)
 	if err != nil {
 		if hasCommonRepresentationData {
 			return err
@@ -66,7 +66,7 @@ func (s *SchemaService) ReporterShallowValidate(ctx context.Context, resourceTyp
 	}
 
 	// Case 1: No schema found for resourceType:reporterType
-	if reporter.ReporterRepresentationSchema == "" {
+	if reporter.ValidationSchema == nil {
 		if len(reporterRepresentation) > 0 {
 			return fmt.Errorf("no schema found for '%s:%s', but reporter representation was provided. Submission is not allowed", resourceType, reporterType)
 		}
@@ -79,7 +79,7 @@ func (s *SchemaService) ReporterShallowValidate(ctx context.Context, resourceTyp
 		reporterRepresentation = map[string]interface{}{}
 	}
 
-	err = validateJSONSchema(reporter.ReporterRepresentationSchema, reporterRepresentation)
+	_, err = reporter.ValidationSchema.Validate(reporterRepresentation)
 	if err != nil {
 		if hasReporterRepresentationData {
 			return err

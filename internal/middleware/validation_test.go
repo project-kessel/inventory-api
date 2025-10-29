@@ -4,6 +4,8 @@ import (
 	"context"
 	"testing"
 
+	"github.com/project-kessel/inventory-api/internal/schema/validation"
+
 	"github.com/project-kessel/inventory-api/internal/schema"
 	"github.com/project-kessel/inventory-api/internal/schema/api"
 	"github.com/project-kessel/inventory-api/internal/schema/in_memory"
@@ -52,9 +54,9 @@ func TestValidateReportResourceJSON_Success(t *testing.T) {
 	ctx := context.Background()
 	schemaRepository := in_memory.New()
 
-	err = schemaRepository.CreateResourceSchema(ctx, api.ResourceSchema{
+	err = schemaRepository.CreateResourceSchema(ctx, api.ResourceRepresentation{
 		ResourceType: "host",
-		CommonRepresentationSchema: `{
+		ValidationSchema: validation.NewJsonSchemaValidatorFromString(`{
 		  "$schema": "http://json-schema.org/draft-07/schema#",
 		  "type": "object",
 		  "properties": {
@@ -63,14 +65,14 @@ func TestValidateReportResourceJSON_Success(t *testing.T) {
 		  "required": [
 			"workspace_id"
 		  ]
-		}`,
+		}`),
 	})
 	assert.NoError(t, err)
 
-	err = schemaRepository.CreateReporterSchema(ctx, api.ReporterSchema{
+	err = schemaRepository.CreateReporterSchema(ctx, api.ReporterRepresentation{
 		ResourceType: "host",
 		ReporterType: "hbi",
-		ReporterRepresentationSchema: `{
+		ValidationSchema: validation.NewJsonSchemaValidatorFromString(`{
 		  "$schema": "http://json-schema.org/draft-07/schema#",
 		  "type": "object",
 		  "properties": {
@@ -80,7 +82,7 @@ func TestValidateReportResourceJSON_Success(t *testing.T) {
 			"ansible_host": { "type": "string", "maxLength": 255 }
 		  },
 		  "required": []
-		}`,
+		}`),
 	})
 	assert.NoError(t, err)
 
@@ -115,9 +117,9 @@ func TestValidateReportResourceJSON_FieldExtractionErrors(t *testing.T) {
 	ctx := context.Background()
 	schemaRepository := in_memory.New()
 
-	err := schemaRepository.CreateResourceSchema(ctx, api.ResourceSchema{
+	err := schemaRepository.CreateResourceSchema(ctx, api.ResourceRepresentation{
 		ResourceType: "host",
-		CommonRepresentationSchema: `{
+		ValidationSchema: validation.NewJsonSchemaValidatorFromString(`{
 		  "$schema": "http://json-schema.org/draft-07/schema#",
 		  "type": "object",
 		  "properties": {
@@ -126,14 +128,14 @@ func TestValidateReportResourceJSON_FieldExtractionErrors(t *testing.T) {
 		  "required": [
 			"workspace_id"
 		  ]
-		}`,
+		}`),
 	})
 	assert.NoError(t, err)
 
-	err = schemaRepository.CreateReporterSchema(ctx, api.ReporterSchema{
+	err = schemaRepository.CreateReporterSchema(ctx, api.ReporterRepresentation{
 		ResourceType: "host",
 		ReporterType: "hbi",
-		ReporterRepresentationSchema: `{
+		ValidationSchema: validation.NewJsonSchemaValidatorFromString(`{
 		  "$schema": "http://json-schema.org/draft-07/schema#",
 		  "type": "object",
 		  "properties": {
@@ -145,7 +147,7 @@ func TestValidateReportResourceJSON_FieldExtractionErrors(t *testing.T) {
 		  "required": [
 			"subscription_manager_id"
 			]
-		}`,
+		}`),
 	})
 	assert.NoError(t, err)
 
@@ -424,18 +426,18 @@ func TestValidateReportResourceJSON_SchemaBasedValidation(t *testing.T) {
 			schemaRepository := in_memory.New()
 
 			// Setup config for k8s_policy with acm reporter
-			err := schemaRepository.CreateResourceSchema(ctx, api.ResourceSchema{
-				ResourceType:               "k8s_policy",
-				CommonRepresentationSchema: tc.commonSchema,
+			err := schemaRepository.CreateResourceSchema(ctx, api.ResourceRepresentation{
+				ResourceType:     "k8s_policy",
+				ValidationSchema: validation.NewJsonSchemaValidatorFromString(tc.commonSchema),
 			})
 			assert.NoError(t, err)
 
 			err = schemaRepository.CreateReporterSchema(
 				ctx,
-				api.ReporterSchema{
-					ResourceType:                 "k8s_policy",
-					ReporterType:                 "acm",
-					ReporterRepresentationSchema: tc.reporterSchema,
+				api.ReporterRepresentation{
+					ResourceType:     "k8s_policy",
+					ReporterType:     "acm",
+					ValidationSchema: validation.NewJsonSchemaValidatorFromString(tc.reporterSchema),
 				},
 			)
 			assert.NoError(t, err)

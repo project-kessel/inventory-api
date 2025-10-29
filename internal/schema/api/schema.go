@@ -15,37 +15,41 @@ const (
 	ReporterSchemaNotfound = schemaRepositoryError("reporter not found")
 )
 
-type ResourceSchema struct {
-	ResourceType               string
-	CommonRepresentationSchema string
+type ResourceRepresentation struct {
+	ResourceType     string
+	ValidationSchema ValidationSchema
 }
 
-type ReporterSchema struct {
-	ResourceType                 string
-	ReporterType                 string
-	ReporterRepresentationSchema string
+type ReporterRepresentation struct {
+	ResourceType     string
+	ReporterType     string
+	ValidationSchema ValidationSchema
+}
+
+type ValidationSchema interface {
+	Validate(data interface{}) (bool, error)
 }
 
 type SchemaRepository interface {
-	// GetResourceSchemas returns all the resourceTypes that have a ResourceSchema.
+	// GetResourceSchemas returns all the resourceTypes that have a ResourceRepresentation.
 	GetResourceSchemas(ctx context.Context) ([]string, error)
-	// CreateResourceSchema adds the ResourceSchema into the repository.
-	CreateResourceSchema(ctx context.Context, resource ResourceSchema) error
+	// CreateResourceSchema adds the ResourceRepresentation into the repository.
+	CreateResourceSchema(ctx context.Context, resource ResourceRepresentation) error
 	// GetResourceSchema returns the resource schema for the resourceType. Returns ResourceSchemaNotFound if the resource schema does not exist.
-	GetResourceSchema(ctx context.Context, resourceType string) (ResourceSchema, error)
-	// UpdateResourceSchema updates the ResourceSchema for the resourceType. Returns ResourceSchemaNotFound if the resource schema does not exist.
-	UpdateResourceSchema(ctx context.Context, resource ResourceSchema) error
-	// DeleteResourceSchema deletes the ResourceSchema for the resourceType. Returns ResourceSchemaNotFound if the resource schema does not exist.
+	GetResourceSchema(ctx context.Context, resourceType string) (ResourceRepresentation, error)
+	// UpdateResourceSchema updates the ResourceRepresentation for the resourceType. Returns ResourceSchemaNotFound if the resource schema does not exist.
+	UpdateResourceSchema(ctx context.Context, resource ResourceRepresentation) error
+	// DeleteResourceSchema deletes the ResourceRepresentation for the resourceType. Returns ResourceSchemaNotFound if the resource schema does not exist.
 	DeleteResourceSchema(ctx context.Context, resourceType string) error
 
 	// GetReporterSchemas returns all the reporterTypes for resourceType. Returns ResourceSchemaNotFound if the resourceType does not exist.
 	GetReporterSchemas(ctx context.Context, resourceType string) ([]string, error)
-	// CreateReporterSchema adds the ReporterSchema into the repository. Returns ResourceSchemaNotFound if the resourceType does not exist.
-	CreateReporterSchema(ctx context.Context, resourceReporter ReporterSchema) error
-	// GetReporterSchema returns the ReporterSchema for the resourceType and reporterType. Returns ResourceSchemaNotFound if the resource schema does not exist and ReporterSchemaNotfound if the reporter schema does not exist for that resource.
-	GetReporterSchema(ctx context.Context, resourceType string, reporterType string) (ReporterSchema, error)
-	// UpdateReporterSchema updates the ReporterSchema for the resourceType and reporterType. Returns ResourceSchemaNotFound if the resource schema does not exist and ReporterSchemaNotfound if the reporter schema does not exist for that resource.
-	UpdateReporterSchema(ctx context.Context, resourceReporter ReporterSchema) error
-	// DeleteReporterSchema deletes the ReporterSchema for the resourceType and reporterType. Returns ResourceSchemaNotFound if the resource schema does not exist and ReporterSchemaNotfound if the reporter schema does not exist for that resource.
+	// CreateReporterSchema adds the ReporterRepresentation into the repository. Returns ResourceSchemaNotFound if the resourceType does not exist.
+	CreateReporterSchema(ctx context.Context, resourceReporter ReporterRepresentation) error
+	// GetReporterSchema returns the ReporterRepresentation for the resourceType and reporterType. Returns ResourceSchemaNotFound if the resource schema does not exist and ReporterSchemaNotfound if the reporter schema does not exist for that resource.
+	GetReporterSchema(ctx context.Context, resourceType string, reporterType string) (ReporterRepresentation, error)
+	// UpdateReporterSchema updates the ReporterRepresentation for the resourceType and reporterType. Returns ResourceSchemaNotFound if the resource schema does not exist and ReporterSchemaNotfound if the reporter schema does not exist for that resource.
+	UpdateReporterSchema(ctx context.Context, resourceReporter ReporterRepresentation) error
+	// DeleteReporterSchema deletes the ReporterRepresentation for the resourceType and reporterType. Returns ResourceSchemaNotFound if the resource schema does not exist and ReporterSchemaNotfound if the reporter schema does not exist for that resource.
 	DeleteReporterSchema(ctx context.Context, resourceType string, reporterType string) error
 }

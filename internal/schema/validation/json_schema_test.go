@@ -1,4 +1,4 @@
-package schema
+package validation
 
 import (
 	"testing"
@@ -43,7 +43,9 @@ func TestValidateJSONSchema(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := validateJSONSchema(schema, tt.jsonInput)
+			validationSchema := NewJsonSchemaValidatorFromString(schema)
+			isValid, err := validationSchema.Validate(tt.jsonInput)
+			assert.NotEqual(t, tt.expectErr, isValid)
 			if tt.expectErr {
 				assert.Error(t, err, "Expected error but got nil")
 				assert.Contains(t, err.Error(), tt.expectedError, "Error message mismatch")

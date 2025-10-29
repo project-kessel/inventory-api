@@ -185,10 +185,10 @@ parameters:
     value: '512Mi'
   - description: CPU request for Inventory service
     name: INVENTORY_REQUESTS_CPU
-    value: '150m'
+    value: '250m'
   - description: Memory limit for Inventory service
     name: INVENTORY_LIMITS_MEMORY
     value: '1Gi'
   - description: CPU limit for Inventory service
     name: INVENTORY_LIMITS_CPU
-    value: '300m'
+    value: '500m'

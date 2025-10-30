@@ -336,8 +336,11 @@ func (r *resourceRepository) FindCurrentAndPreviousVersionedRepresentations(tx *
 		return nil, err
 	}
 
+	// DISTINCT is required when includeAllGenerations=true because multiple reporter_resources
+	// rows (different generations) can share the same resource_id and join to the same
+	// common_representations rows, producing duplicate (data, version) pairs.
 	query := db.Table("reporter_resources rr").
-		Select("cr.data, cr.version").
+		Select("DISTINCT cr.data, cr.version").
 		Joins("JOIN common_representations cr ON rr.resource_id = cr.resource_id")
 
 	// Only filter by current generation if we haven't had a resurrection

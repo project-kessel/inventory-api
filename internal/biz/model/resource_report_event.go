@@ -126,10 +126,18 @@ func (re ResourceReportEvent) ReporterResourceKey() ReporterResourceKey {
 	}
 }
 
+// SetTimestamps sets the createdAt and updatedAt timestamps on the event
+func (re *ResourceReportEvent) SetTimestamps(createdAt time.Time, updatedAt time.Time) {
+	re.createdAt = createdAt
+	re.updatedAt = updatedAt
+}
+
 // DeserializeResourceEvent creates a ResourceReportEvent from representation snapshots - direct initialization without validation
 func DeserializeResourceEvent(
 	reporterRepresentationSnapshot *ReporterRepresentationSnapshot,
 	commonRepresentationSnapshot *CommonRepresentationSnapshot,
+	createdAt time.Time,
+	updatedAt time.Time,
 ) ResourceReportEvent {
 	var event ResourceReportEvent
 
@@ -140,6 +148,9 @@ func DeserializeResourceEvent(
 	if reporterRepresentationSnapshot != nil {
 		event.reporterRepresentation = *DeserializeReporterDataRepresentation(reporterRepresentationSnapshot)
 	}
+
+	event.createdAt = createdAt
+	event.updatedAt = updatedAt
 
 	return event
 }

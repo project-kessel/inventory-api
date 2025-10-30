@@ -132,7 +132,7 @@ objects:
                 command:
                 - /bin/sh
                 - -c
-                - curl -o /tmp/heartbeat-fix.sh https://raw.githubusercontent.com/project-kessel/inventory-api/refs/heads/main/scripts/heartbeat-fix.sh && chmod +x /tmp/heartbeat-fix.sh && /tmp/heartbeat-fix.sh
+                - curl -o /tmp/heartbeat-fix.sh https://raw.githubusercontent.com/project-kessel/inventory-api/${COMMIT_REF}/scripts/heartbeat-fix.sh && chmod +x /tmp/heartbeat-fix.sh && /tmp/heartbeat-fix.sh
                 env:
                 - name: SA_CLIENT_ID
                   valueFrom:
@@ -192,3 +192,6 @@ parameters:
   - description: CPU limit for Inventory service
     name: INVENTORY_LIMITS_CPU
     value: '500m'
+  - name: COMMIT_REF
+    description: Git commit ref to specify the git commit version to use for pulling down the heartbeat-fix script
+    required: true

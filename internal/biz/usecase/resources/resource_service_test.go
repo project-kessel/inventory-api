@@ -921,9 +921,10 @@ func TestResourceLifecycle_ReportUpdateDeleteReport(t *testing.T) {
 		afterCreate, err := resourceRepo.FindResourceByKeys(nil, key)
 		require.NoError(t, err, "Should find resource after creation")
 		require.NotNil(t, afterCreate)
-		initialGeneration := afterCreate.ReporterResources()[0].Serialize().Generation
-		initialRepVersion := afterCreate.ReporterResources()[0].Serialize().RepresentationVersion
-		initialTombstone := afterCreate.ReporterResources()[0].Serialize().Tombstone
+		initialSnapshot := afterCreate.ReporterResources()[0].Serialize()
+		initialGeneration := initialSnapshot.Generation
+		initialRepVersion := initialSnapshot.RepresentationVersion
+		initialTombstone := initialSnapshot.Tombstone
 		assert.Equal(t, uint(0), initialGeneration, "Initial generation should be 0")
 		assert.Equal(t, uint(0), initialRepVersion, "Initial representationVersion should be 0")
 		assert.False(t, initialTombstone, "Initial tombstone should be false")
@@ -938,9 +939,10 @@ func TestResourceLifecycle_ReportUpdateDeleteReport(t *testing.T) {
 		afterUpdate, err := resourceRepo.FindResourceByKeys(nil, key)
 		require.NoError(t, err, "Should find resource after update")
 		require.NotNil(t, afterUpdate)
-		updateGeneration := afterUpdate.ReporterResources()[0].Serialize().Generation
-		updateRepVersion := afterUpdate.ReporterResources()[0].Serialize().RepresentationVersion
-		updateTombstone := afterUpdate.ReporterResources()[0].Serialize().Tombstone
+		updateSnapshot := afterUpdate.ReporterResources()[0].Serialize()
+		updateGeneration := updateSnapshot.Generation
+		updateRepVersion := updateSnapshot.RepresentationVersion
+		updateTombstone := updateSnapshot.Tombstone
 		assert.Equal(t, uint(0), updateGeneration, "Generation should remain 0 after update (tombstone=false)")
 		assert.Equal(t, uint(1), updateRepVersion, "RepresentationVersion should increment to 1 after update")
 		assert.False(t, updateTombstone, "Tombstone should remain false after update")
@@ -954,9 +956,10 @@ func TestResourceLifecycle_ReportUpdateDeleteReport(t *testing.T) {
 		afterDelete, err := resourceRepo.FindResourceByKeys(nil, key)
 		require.NoError(t, err, "Should find tombstoned resource after delete")
 		require.NotNil(t, afterDelete)
-		deleteGeneration := afterDelete.ReporterResources()[0].Serialize().Generation
-		deleteRepVersion := afterDelete.ReporterResources()[0].Serialize().RepresentationVersion
-		deleteTombstone := afterDelete.ReporterResources()[0].Serialize().Tombstone
+		deleteSnapshot := afterDelete.ReporterResources()[0].Serialize()
+		deleteGeneration := deleteSnapshot.Generation
+		deleteRepVersion := deleteSnapshot.RepresentationVersion
+		deleteTombstone := deleteSnapshot.Tombstone
 		assert.Equal(t, uint(0), deleteGeneration, "Generation should remain 0 after delete")
 		assert.Equal(t, uint(2), deleteRepVersion, "RepresentationVersion should increment to 2 after delete")
 		assert.True(t, deleteTombstone, "Resource should be tombstoned after delete")
@@ -971,9 +974,10 @@ func TestResourceLifecycle_ReportUpdateDeleteReport(t *testing.T) {
 		afterRevive, err := resourceRepo.FindResourceByKeys(nil, key)
 		require.NoError(t, err, "Should find resource after revival")
 		require.NotNil(t, afterRevive)
-		reviveGeneration := afterRevive.ReporterResources()[0].Serialize().Generation
-		reviveRepVersion := afterRevive.ReporterResources()[0].Serialize().RepresentationVersion
-		reviveTombstone := afterRevive.ReporterResources()[0].Serialize().Tombstone
+		reviveSnapshot := afterRevive.ReporterResources()[0].Serialize()
+		reviveGeneration := reviveSnapshot.Generation
+		reviveRepVersion := reviveSnapshot.RepresentationVersion
+		reviveTombstone := reviveSnapshot.Tombstone
 		assert.Equal(t, uint(1), reviveGeneration, "Generation should increment to 1 after update on tombstoned resource")
 		assert.Equal(t, uint(0), reviveRepVersion, "RepresentationVersion should start fresh at 0 for revival (new generation)")
 		assert.False(t, reviveTombstone, "Resource should no longer be tombstoned after revival update")

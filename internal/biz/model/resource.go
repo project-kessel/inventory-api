@@ -66,6 +66,10 @@ func NewResource(id ResourceId, localResourceId LocalResourceId, resourceType Re
 		return Resource{}, fmt.Errorf("resource invalid ResourceReportEvent: %w", err)
 	}
 
+	// Set timestamps for new resource
+	now := time.Now()
+	resourceEvent.SetTimestamps(now, now)
+
 	reporterResources := []ReporterResource{reporterResource}
 
 	resource := Resource{
@@ -124,6 +128,10 @@ func (r *Resource) Update(
 	if err != nil {
 		return fmt.Errorf("failed to create updated ResourceReportEvent: %w", err)
 	}
+
+	// Preserve the original created_at and set updated_at to current time
+	existingCreatedAt := r.resourceReportEvents[0].createdAt
+	resourceEvent.SetTimestamps(existingCreatedAt, time.Now())
 
 	r.resourceReportEvents = []ResourceReportEvent{resourceEvent}
 	return nil
@@ -349,7 +357,7 @@ func DeserializeResource(
 		reporterResources = append(reporterResources, reporterResource)
 	}
 
-	resourceEvent := DeserializeResourceEvent(reporterRepresentationSnapshot, commonRepresentationSnapshot)
+	resourceEvent := DeserializeResourceEvent(reporterRepresentationSnapshot, commonRepresentationSnapshot, resourceSnapshot.CreatedAt, resourceSnapshot.UpdatedAt)
 
 	return &Resource{
 		id:                   DeserializeResourceId(resourceSnapshot.ID),

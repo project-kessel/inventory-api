@@ -5,8 +5,11 @@ package model
 import (
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/project-kessel/inventory-api/internal"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestResource_Initialization(t *testing.T) {
@@ -401,6 +404,38 @@ func TestResource_Update(t *testing.T) {
 		if len(original.ResourceReportEvents()) != 2 {
 			t.Errorf("Expected 2 resource events, got %d", len(original.ResourceReportEvents()))
 		}
+	})
+
+	t.Run("should preserve created_at and update updated_at when updating resource", func(t *testing.T) {
+		t.Parallel()
+
+		resource, err := NewResource(fixture.ValidResourceIdType(), fixture.ValidLocalResourceIdType(), fixture.ValidResourceTypeType(), fixture.ValidReporterTypeType(), fixture.ValidReporterInstanceIdType(), fixture.ValidReporterResourceIdType(), fixture.ValidApiHrefType(), fixture.ValidConsoleHrefType(), fixture.ValidReporterRepresentationType(), fixture.ValidCommonRepresentationType(), nil)
+		require.NoError(t, err)
+
+		// includes created_at and updated_at
+		initialSnapshot, _, _, _, err := resource.Serialize()
+		require.NoError(t, err)
+		initialCreatedAt := initialSnapshot.CreatedAt
+		initialUpdatedAt := initialSnapshot.UpdatedAt
+
+		require.False(t, initialCreatedAt.IsZero(), "created_at should be set")
+		require.False(t, initialUpdatedAt.IsZero(), "updated_at should be set")
+
+		time.Sleep(10 * time.Millisecond)
+
+		apiHref, _ := NewApiHref("https://api.example.com/updated")
+		consoleHref, _ := NewConsoleHref("https://console.example.com/updated")
+		commonData, _ := NewRepresentation(internal.JsonObject{"workspace_id": "updated-workspace"})
+		reporterData, _ := NewRepresentation(internal.JsonObject{"updated": true})
+
+		err = resource.Update(resource.ReporterResources()[0].Key(), apiHref, consoleHref, nil, commonData, reporterData, NewTransactionId(""))
+		require.NoError(t, err)
+
+		updatedSnapshot, _, _, _, err := resource.Serialize()
+		require.NoError(t, err)
+
+		assert.Equal(t, initialCreatedAt, updatedSnapshot.CreatedAt, "created_at should be preserved")
+		assert.True(t, updatedSnapshot.UpdatedAt.After(initialUpdatedAt), "updated_at should be updated")
 	})
 
 	t.Run("should generate transaction ID when empty transactionId provided to Update", func(t *testing.T) {

@@ -933,3 +933,34 @@ func TestUpdateConsistencyTokenIfPresent(t *testing.T) {
 		})
 	}
 }
+
+func TestInventoryConsumer_UpdateWithSameWorkspace_NoOp(t *testing.T) {
+	tester := TestCase{}
+	errs := tester.TestSetup(t)
+	assert.Nil(t, errs)
+
+	// Configure fake repo: same workspace for current and previous (simulates no change)
+	fakeRepo := data.NewFakeResourceRepositoryWithWorkspaceOverrides("ws-unchanged", "ws-unchanged")
+	tester.inv.SchemaService = usecase_resources.NewSchemaUsecase(fakeRepo, tester.logger)
+
+	// Mock authorizer: should NOT be called (no tuples to create/delete)
+	authorizer := &mocks.MockAuthz{}
+	tester.inv.Authorizer = authorizer
+
+	// Process UPDATE message where workspace didn't change
+	msg := &kafka.Message{
+		Key:   []byte(testMessageKey),
+		Value: []byte(testCreateOrUpdateMessage),
+		Headers: []kafka.Header{
+			{Key: "operation", Value: []byte(string(biz.OperationTypeUpdated))},
+			{Key: "txid", Value: []byte("txid-noop")},
+		},
+	}
+	parsedHeaders, _ := ParseHeaders(msg)
+	resp, err := tester.inv.ProcessMessage(parsedHeaders, true, msg)
+
+	assert.Nil(t, err)
+	assert.Equal(t, "", resp) // No token for no-op
+	authorizer.AssertNumberOfCalls(t, "CreateTuples", 0)
+	authorizer.AssertNumberOfCalls(t, "DeleteTuples", 0)
+}

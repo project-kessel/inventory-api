@@ -312,11 +312,23 @@ func (i *InventoryConsumer) ProcessMessage(headers map[string]string, relationsE
 				i.Logger.Errorf("failed to parse message for tuple: %v", err)
 				return "", err
 			}
+
+			// Calculate tuples outside retry to check for no-op early
+			tuplesToReplicate, err := i.SchemaService.CalculateTuples(*tupleEvent, biz.OperationTypeCreated)
+			if err != nil {
+				metricscollector.Incr(i.MetricsCollector.MsgProcessFailures, "CalculateTuples")
+				i.Logger.Errorf("failed to calculate tuples: %v", err)
+				return "", err
+			}
+
+			// Check for no-op before entering retry logic
+			if tuplesToReplicate.IsEmpty() {
+				i.Logger.Infof("no-op for operation=%s, txid=%s", operation, txid)
+				return "", nil
+			}
+
+			// Only retry the actual SpiceDB call
 			resp, err := i.Retry(func() (string, error) {
-				tuplesToReplicate, err := i.SchemaService.CalculateTuples(*tupleEvent, biz.OperationTypeCreated)
-				if err != nil {
-					return "", err
-				}
 				return i.CreateTuple(context.Background(), tuplesToReplicate.TuplesToCreate())
 			}, i.MetricsCollector.MsgProcessFailures)
 			if err != nil {
@@ -337,11 +349,23 @@ func (i *InventoryConsumer) ProcessMessage(headers map[string]string, relationsE
 				i.Logger.Errorf("failed to parse message for tuple: %v", err)
 				return "", err
 			}
+
+			// Calculate tuples outside retry to check for no-op early
+			tuplesToReplicate, err := i.SchemaService.CalculateTuples(*tupleEvent, biz.OperationTypeUpdated)
+			if err != nil {
+				metricscollector.Incr(i.MetricsCollector.MsgProcessFailures, "CalculateTuples")
+				i.Logger.Errorf("failed to calculate tuples: %v", err)
+				return "", err
+			}
+
+			// Check for no-op before entering retry logic
+			if tuplesToReplicate.IsEmpty() {
+				i.Logger.Infof("no-op for operation=%s, txid=%s", operation, txid)
+				return "", nil
+			}
+
+			// Only retry the actual SpiceDB call
 			resp, err := i.Retry(func() (string, error) {
-				tuplesToReplicate, err := i.SchemaService.CalculateTuples(*tupleEvent, biz.OperationTypeUpdated)
-				if err != nil {
-					return "", err
-				}
 				return i.UpdateTuple(context.Background(), tuplesToReplicate.TuplesToCreate(), tuplesToReplicate.TuplesToDelete())
 			}, i.MetricsCollector.MsgProcessFailures)
 			if err != nil {
@@ -362,16 +386,23 @@ func (i *InventoryConsumer) ProcessMessage(headers map[string]string, relationsE
 				return "", err
 			}
 
-			_, err = i.Retry(func() (string, error) {
-				tuplesToReplicate, err := i.SchemaService.CalculateTuples(*tupleEvent, biz.OperationTypeDeleted)
-				if err != nil {
-					return "", err
-				}
-				// For delete operations, we only delete tuples (no creation)
-				if tuplesToReplicate.TuplesToDelete() != nil {
-					return i.DeleteTuple(context.Background(), *tuplesToReplicate.TuplesToDelete())
-				}
+			// Calculate tuples outside retry to check for no-op early
+			tuplesToReplicate, err := i.SchemaService.CalculateTuples(*tupleEvent, biz.OperationTypeDeleted)
+			if err != nil {
+				metricscollector.Incr(i.MetricsCollector.MsgProcessFailures, "CalculateTuples")
+				i.Logger.Errorf("failed to calculate tuples: %v", err)
+				return "", err
+			}
+
+			// Check for no-op before entering retry logic
+			if tuplesToReplicate.IsEmpty() {
+				i.Logger.Infof("no-op for operation=%s, txid=%s", operation, txid)
 				return "", nil
+			}
+
+			// Only retry the actual SpiceDB call
+			_, err = i.Retry(func() (string, error) {
+				return i.DeleteTuple(context.Background(), *tuplesToReplicate.TuplesToDelete())
 			}, i.MetricsCollector.MsgProcessFailures)
 			if err != nil {
 				metricscollector.Incr(i.MetricsCollector.MsgProcessFailures, "DeleteTuple")

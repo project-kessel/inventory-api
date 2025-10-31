@@ -12,4 +12,7 @@ COPY ./scripts/* /usr/local/bin/
 
 RUN /tmp/installer.sh
 
-CMD ["sleep", "infinity"]
+# starts in Kafka Home for shorter command paths
+WORKDIR /opt/kafka
+
+CMD ["sleep", "7200"]

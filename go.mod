@@ -54,7 +54,7 @@ require (
 	github.com/go-kratos/aegis v0.2.0 // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
-	github.com/go-playground/form/v4 v4.2.1 // indirect
+	github.com/go-playground/form/v4 v4.3.0 // indirect
 	github.com/go-viper/mapstructure/v2 v2.4.0 // indirect
 	github.com/google/cel-go v0.26.1 // indirect
 	github.com/gorilla/mux v1.8.1 // indirect

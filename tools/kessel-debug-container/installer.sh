@@ -11,11 +11,8 @@ curl -Lo /tmp/kafka.tgz https://dlcdn.apache.org/kafka/${KAFKA_VERSION}/kafka_${
 echo "Setting up EPEL Repository..."
 rpm -ivh https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.noarch.rpm
 
-echo "Setting up Postgresql Repository..."
-rpm -ivh https://download.postgresql.org/pub/repos/yum/reporpms/EL-9-x86_64/pgdg-redhat-repo-latest.noarch.rpm
-
 echo "Installing packages..."
-microdnf install -y tar gzip wget bind-utils jq nmap-ncat openssl vim java-17-openjdk kcat postgresql${POSTGRESQL_VERSION}
+microdnf install -y tar gzip wget bind-utils jq nmap-ncat openssl vim java-17-openjdk kcat postgresql util-linux less
 rpm -iv /tmp/grpcurl.rpm /tmp/zed.rpm
 
 mkdir -pv /opt/kafka

@@ -5,7 +5,8 @@ USER root
 ENV GRPCURL_VERSION=1.9.3 \
     ZED_VERSION=0.31.0 \
     SCALA_VERSION=2.13 \
-    KAFKA_VERSION=3.9.0
+    KAFKA_VERSION=3.9.0 \
+    POSTGRESQL_VERSION=16
 
 COPY ./installer.sh /tmp
 COPY ./scripts/* /usr/local/bin/

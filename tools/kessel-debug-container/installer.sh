@@ -7,16 +7,19 @@ curl -Lo /tmp/grpcurl.rpm https://github.com/fullstorydev/grpcurl/releases/downl
 curl -Lo /tmp/zed.rpm https://github.com/authzed/zed/releases/download/v${ZED_VERSION}/zed_${ZED_VERSION}_linux_amd64.rpm
 curl -Lo /tmp/kafka.tgz https://dlcdn.apache.org/kafka/${KAFKA_VERSION}/kafka_${SCALA_VERSION}-${KAFKA_VERSION}.tgz
 
-echo "Setting up EPEL..."
+
+echo "Setting up EPEL Repository..."
 rpm -ivh https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.noarch.rpm
 
+echo "Setting up Postgresql Repository..."
+rpm -ivh https://download.postgresql.org/pub/repos/yum/reporpms/EL-9-x86_64/pgdg-redhat-repo-latest.noarch.rpm
+
 echo "Installing packages..."
-microdnf install -y tar gzip wget bind-utils jq nmap-ncat openssl vim java-17-openjdk kcat
+microdnf install -y tar gzip wget bind-utils jq nmap-ncat openssl vim java-17-openjdk kcat postgresql${POSTGRESQL_VERSION}
 rpm -iv /tmp/grpcurl.rpm /tmp/zed.rpm
 
 mkdir -pv /opt/kafka
 tar -xvf /tmp/kafka.tgz -C /opt/kafka --strip-components=1
-ln -s /opt/kafka/bin/* ./bin
 
 # setup zed wrapper by renaming base zed cli
 mv /usr/bin/zed /usr/bin/zed.original

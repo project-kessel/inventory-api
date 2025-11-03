@@ -314,11 +314,7 @@ func (r *resourceRepository) shouldIncludeAllGenerations(tx *gorm.DB, key bizmod
 
 	// If generation > 0, we've had a resurrection and need to look at previous generations
 	includeAll := generation > 0
-	// Detailed trace for generation boundary handling
-	{
-		localId, resType, repType, repInst := key.LocalResourceId().Serialize(), key.ResourceType().Serialize(), key.ReporterType().Serialize(), key.ReporterInstanceId().Serialize()
-		log.Infof("shouldIncludeAllGenerations: localResourceId=%s resourceType=%s reporterType=%s reporterInstanceId=%s generation=%d includeAllGenerations=%t", localId, resType, repType, repInst, generation, includeAll)
-	}
+
 	return includeAll, nil
 }
 

@@ -1,6 +1,7 @@
 FROM registry.access.redhat.com/ubi9/ubi-minimal:9.6-1760515502 AS builder
 
 ARG TARGETARCH
+ARG GO_VERSION=1.24.8
 USER root
 RUN microdnf install -y tar gzip make which gcc gcc-c++ cyrus-sasl-lib findutils git go-toolset
 

@@ -52,7 +52,6 @@ func (sc *SchemaUsecase) processReportTupleEvent(tupleEvent model.TupleEvent, op
 	}
 
 	currentWorkspaceID, previousWorkspaceID := data.GetCurrentAndPreviousWorkspaceID(representations, version)
-
 	return sc.buildTuplesToReplicate(currentWorkspaceID, previousWorkspaceID, key)
 }
 

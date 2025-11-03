@@ -295,10 +295,10 @@ func (r *resourceRepository) GetTransactionManager() usecase.TransactionManager 
 	return r.transactionManager
 }
 
-// shouldIncludeAllGenerations checks if we need to look across all generations
+// includeAllGenerations checks if we need to look across all generations
 // to find previous workspace_id. Returns true when current generation > 0,
 // indicating the resource has been resurrected from a tombstone.
-func (r *resourceRepository) shouldIncludeAllGenerations(tx *gorm.DB, key bizmodel.ReporterResourceKey) (bool, error) {
+func (r *resourceRepository) includeAllGenerations(tx *gorm.DB, key bizmodel.ReporterResourceKey) (bool, error) {
 	var generation uint
 	db := r.getDBSession(tx)
 
@@ -327,7 +327,7 @@ func (r *resourceRepository) FindCurrentAndPreviousVersionedRepresentations(tx *
 
 	db := r.getDBSession(tx)
 
-	includeAllGenerations, err := r.shouldIncludeAllGenerations(tx, key)
+	includeAllGenerations, err := r.includeAllGenerations(tx, key)
 	if err != nil {
 		return nil, err
 	}

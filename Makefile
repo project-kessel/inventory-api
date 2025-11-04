@@ -37,6 +37,13 @@ VERSION:=$(shell git describe --tags --always)
 endif
 INVENTORY_SCHEMA_VERSION=0.11.0
 
+# Postgres configuration
+DB_PORT ?= 5435
+DB_NAME ?= inventory
+DB_USER ?= inventory_api
+DB_PASSWORD ?= postgres
+PG_VERSION ?= 16.8
+
 .PHONY: init
 # init env
 init:
@@ -239,6 +246,24 @@ run-help: local-build
 # run database migrations
 migrate: local-build
 	./bin/inventory-api migrate --config .inventory-api.yaml
+
+.PHONY: db/setup
+db/setup:
+	$(DOCKER) run --name psql-inventory \
+		-e POSTGRES_DB=$(DB_NAME) \
+		-e POSTGRES_USER=$(DB_USER) \
+		-e POSTGRES_PASSWORD=$(DB_PASSWORD) \
+		-v $(PWD)/local_pg_setup.sql:/docker-entrypoint-initdb.d/init.sql:ro,z \
+		-p $(DB_PORT):5432 \
+		-d postgres:$(PG_VERSION)
+	@echo "Waiting for PostgreSQL to be ready..."
+	@sleep 3
+	@echo "PostgreSQL container 'psql-inventory' is running on port $(DB_PORT)"
+
+.PHONY: db/teardown
+db/teardown:
+	$(DOCKER) stop psql-inventory
+	$(DOCKER) rm psql-inventory
 
 .PHONY: update-schema
 # fetch the latest schema from github.com/RedHatInsights/kessel-config

@@ -1,0 +1,3 @@
+GRANT ALL PRIVILEGES ON DATABASE inventory TO inventory_api;
+ALTER USER inventory_api WITH SUPERUSER;
+ALTER USER inventory_api CREATEDB;

@@ -33,12 +33,14 @@ When running locally, the [default settings](./.inventory-api.yaml) file is used
 - Exposes the inventory API in `localhost` and using port `8000` for http and port `9000` for grpc.
 - Sets authentication mechanism to `allow-unauthenticated`, allowing users to be authenticated with their user-agent value.
 - Sets authorization mechanism to `allow-all`.
-- Sets database implementation to sqlite3 and the database file to `inventory.db`
+- Sets database implementation to Postgres (localhost:5435, database: `inventory`, user: `inventory_api`)
 - Sets the Inventory Consumer service to disabled
 - Configures log level to `INFO`.
 
 NOTE: You can update the [default settings](./.inventory-api.yaml) file as required to test different scenarios. Refer to the command line help (`make run-help`) or leverage one of the many pre-defined Docker Compose Test Setups
 for information on the different parameters.
+
+#### Quick Start with Postgres
 
 1. Clone the repository and navigate to the directory.
 2. Install the required dependencies
@@ -52,12 +54,17 @@ for information on the different parameters.
     make local-build
     ```
 
-4. Run the database migration
+4. Setup and start the local Postgres database
+    ```shell
+    make db/setup
+    ```
+
+5. Run migrations
     ```shell
     make migrate
     ```
 
-5. Start the development server
+6. Start the development server
     ```shell
     make run
     ```

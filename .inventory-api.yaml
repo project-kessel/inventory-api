@@ -14,7 +14,13 @@ eventing:
   eventer: stdout
 storage:
   max-serialization-retries: 10
-  database: sqlite3
+  database: postgres
+  postgres:
+    host: localhost
+    port: 5435
+    user: inventory_api
+    password: postgres
+    dbname: inventory
   sqlite3:
     dsn: inventory.db
 service:

@@ -39,6 +39,1007 @@ data:
             "x": 0,
             "y": 0
           },
+          "id": 247,
+          "panels": [],
+          "title": "Debezium - Streaming",
+          "type": "row"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "$datasource"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "decimals": 0,
+              "mappings": [
+                {
+                  "options": {
+                    "match": "null",
+                    "result": {
+                      "text": "N/A"
+                    }
+                  },
+                  "type": "special"
+                }
+              ],
+              "max": 100,
+              "min": 0,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "#299c46"
+                  },
+                  {
+                    "color": "rgba(237, 129, 40, 0.89)",
+                    "value": 10000
+                  },
+                  {
+                    "color": "#d44a3a",
+                    "value": 60000
+                  }
+                ]
+              },
+              "unit": "s"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 5,
+            "w": 3,
+            "x": 0,
+            "y": 1
+          },
+          "id": 244,
+          "maxDataPoints": 100,
+          "options": {
+            "colorMode": "value",
+            "graphMode": "none",
+            "justifyMode": "auto",
+            "orientation": "horizontal",
+            "percentChangeColorMode": "standard",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "showPercentChange": false,
+            "textMode": "auto",
+            "wideLayout": true
+          },
+          "pluginVersion": "11.6.3",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "$datasource"
+              },
+              "editorMode": "code",
+              "expr": "(debezium_metrics_millisecondssincelastevent{plugin=\"$connector_type\",name=\"$connector_name\",context=~\"(binlog|streaming)\"}) / 1000",
+              "format": "time_series",
+              "intervalFactor": 1,
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "title": "Time since last event",
+          "type": "stat"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "$datasource"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "mappings": [
+                {
+                  "options": {
+                    "match": "null",
+                    "result": {
+                      "text": "N/A"
+                    }
+                  },
+                  "type": "special"
+                },
+                {
+                  "options": {
+                    "0": {
+                      "text": "No"
+                    }
+                  },
+                  "type": "value"
+                },
+                {
+                  "options": {
+                    "1": {
+                      "text": "Yes"
+                    }
+                  },
+                  "type": "value"
+                }
+              ],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "#d44a3a"
+                  },
+                  {
+                    "color": "rgba(237, 129, 40, 0.89)",
+                    "value": 0
+                  },
+                  {
+                    "color": "#299c46",
+                    "value": 1
+                  }
+                ]
+              },
+              "unit": "none"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 5,
+            "w": 3,
+            "x": 3,
+            "y": 1
+          },
+          "id": 245,
+          "maxDataPoints": 100,
+          "options": {
+            "colorMode": "value",
+            "graphMode": "none",
+            "justifyMode": "auto",
+            "orientation": "horizontal",
+            "percentChangeColorMode": "standard",
+            "reduceOptions": {
+              "calcs": [
+                "mean"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "showPercentChange": false,
+            "textMode": "auto",
+            "wideLayout": true
+          },
+          "pluginVersion": "11.6.3",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "$datasource"
+              },
+              "editorMode": "code",
+              "expr": "debezium_metrics_connected{plugin=\"$connector_type\",name=\"$connector_name\",context=~\"(binlog|streaming)\"}",
+              "format": "time_series",
+              "intervalFactor": 1,
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "title": "Connected",
+          "type": "stat"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "$datasource"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisBorderShow": false,
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "barWidthFactor": 0.6,
+                "drawStyle": "line",
+                "fillOpacity": 10,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "insertNulls": false,
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "never",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  },
+                  {
+                    "color": "red",
+                    "value": 80
+                  }
+                ]
+              },
+              "unit": "short"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 5,
+            "w": 18,
+            "x": 6,
+            "y": 1
+          },
+          "id": 246,
+          "options": {
+            "legend": {
+              "calcs": [],
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "hideZeros": false,
+              "mode": "multi",
+              "sort": "none"
+            }
+          },
+          "pluginVersion": "11.6.3",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "$datasource"
+              },
+              "editorMode": "code",
+              "expr": "debezium_metrics_totalnumberofeventsseen{plugin=\"$connector_type\",name=\"$connector_name\",context=~\"(binlog|streaming)\"}",
+              "format": "time_series",
+              "interval": "",
+              "intervalFactor": 1,
+              "legendFormat": "Total events received",
+              "range": true,
+              "refId": "A"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "$datasource"
+              },
+              "editorMode": "code",
+              "expr": "debezium_metrics_numberofeventsskipped{plugin=\"$connector_type\",name=\"$connector_name\",context=~\"(binlog|streaming)\"}",
+              "format": "time_series",
+              "intervalFactor": 1,
+              "legendFormat": "Events skipped",
+              "range": true,
+              "refId": "B"
+            }
+          ],
+          "title": "Event count",
+          "type": "timeseries"
+        },
+        {
+          "collapsed": false,
+          "gridPos": {
+            "h": 1,
+            "w": 24,
+            "x": 0,
+            "y": 6
+          },
+          "id": 242,
+          "panels": [],
+          "title": "Debezium - Snapshot",
+          "type": "row"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "$datasource"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "mappings": [
+                {
+                  "options": {
+                    "match": "null",
+                    "result": {
+                      "text": "N/A"
+                    }
+                  },
+                  "type": "special"
+                }
+              ],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  },
+                  {
+                    "color": "red",
+                    "value": 80
+                  }
+                ]
+              },
+              "unit": "none"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 4,
+            "w": 5,
+            "x": 0,
+            "y": 7
+          },
+          "id": 248,
+          "maxDataPoints": 100,
+          "options": {
+            "colorMode": "none",
+            "graphMode": "none",
+            "justifyMode": "auto",
+            "orientation": "horizontal",
+            "percentChangeColorMode": "standard",
+            "reduceOptions": {
+              "calcs": [
+                "mean"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "showPercentChange": false,
+            "textMode": "auto",
+            "wideLayout": true
+          },
+          "pluginVersion": "11.6.3",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "$datasource"
+              },
+              "editorMode": "code",
+              "expr": "debezium_metrics_totaltablecount{plugin=\"$connector_type\",name=\"$connector_name\",context=\"snapshot\"}",
+              "format": "time_series",
+              "intervalFactor": 1,
+              "legendFormat": "Total",
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "title": "Table count",
+          "type": "stat"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "$datasource"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "mappings": [
+                {
+                  "options": {
+                    "match": "null",
+                    "result": {
+                      "text": "N/A"
+                    }
+                  },
+                  "type": "special"
+                }
+              ],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  },
+                  {
+                    "color": "red",
+                    "value": 80
+                  }
+                ]
+              },
+              "unit": "none"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 4,
+            "w": 5,
+            "x": 5,
+            "y": 7
+          },
+          "id": 249,
+          "maxDataPoints": 100,
+          "options": {
+            "colorMode": "none",
+            "graphMode": "none",
+            "justifyMode": "auto",
+            "orientation": "horizontal",
+            "percentChangeColorMode": "standard",
+            "reduceOptions": {
+              "calcs": [
+                "mean"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "showPercentChange": false,
+            "textMode": "auto",
+            "wideLayout": true
+          },
+          "pluginVersion": "11.6.3",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "$datasource"
+              },
+              "editorMode": "code",
+              "expr": "debezium_metrics_remainingtablecount{plugin=\"$connector_type\",name=\"$connector_name\",context=\"snapshot\"}",
+              "format": "time_series",
+              "intervalFactor": 1,
+              "legendFormat": "Remaining",
+              "range": true,
+              "refId": "B"
+            }
+          ],
+          "title": "Remaining tables",
+          "type": "stat"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "$datasource"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "mappings": [
+                {
+                  "options": {
+                    "match": "null",
+                    "result": {
+                      "text": "N/A"
+                    }
+                  },
+                  "type": "special"
+                },
+                {
+                  "options": {
+                    "0": {
+                      "text": "No"
+                    }
+                  },
+                  "type": "value"
+                },
+                {
+                  "options": {
+                    "1": {
+                      "text": "Yes"
+                    }
+                  },
+                  "type": "value"
+                }
+              ],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  },
+                  {
+                    "color": "red",
+                    "value": 80
+                  }
+                ]
+              },
+              "unit": "none"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 4,
+            "w": 5,
+            "x": 10,
+            "y": 7
+          },
+          "id": 250,
+          "maxDataPoints": 100,
+          "options": {
+            "colorMode": "none",
+            "graphMode": "none",
+            "justifyMode": "auto",
+            "orientation": "horizontal",
+            "percentChangeColorMode": "standard",
+            "reduceOptions": {
+              "calcs": [
+                "mean"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "showPercentChange": false,
+            "textMode": "auto",
+            "wideLayout": true
+          },
+          "pluginVersion": "11.6.3",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "$datasource"
+              },
+              "editorMode": "code",
+              "expr": "debezium_metrics_snapshotrunning{plugin=\"$connector_type\",name=\"$connector_name\",context=\"snapshot\"}",
+              "format": "time_series",
+              "intervalFactor": 1,
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "title": "Running",
+          "type": "stat"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "$datasource"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "mappings": [
+                {
+                  "options": {
+                    "match": "null",
+                    "result": {
+                      "text": "N/A"
+                    }
+                  },
+                  "type": "special"
+                },
+                {
+                  "options": {
+                    "0": {
+                      "text": "No"
+                    }
+                  },
+                  "type": "value"
+                },
+                {
+                  "options": {
+                    "1": {
+                      "text": "Yes"
+                    }
+                  },
+                  "type": "value"
+                }
+              ],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  },
+                  {
+                    "color": "red",
+                    "value": 80
+                  }
+                ]
+              },
+              "unit": "none"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 4,
+            "w": 5,
+            "x": 15,
+            "y": 7
+          },
+          "id": 251,
+          "maxDataPoints": 100,
+          "options": {
+            "colorMode": "none",
+            "graphMode": "none",
+            "justifyMode": "auto",
+            "orientation": "horizontal",
+            "percentChangeColorMode": "standard",
+            "reduceOptions": {
+              "calcs": [
+                "mean"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "showPercentChange": false,
+            "textMode": "auto",
+            "wideLayout": true
+          },
+          "pluginVersion": "11.6.3",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "$datasource"
+              },
+              "editorMode": "code",
+              "expr": "debezium_metrics_snapshotcompleted{plugin=\"$connector_type\",name=\"$connector_name\",context=\"snapshot\"}",
+              "format": "time_series",
+              "intervalFactor": 1,
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "title": "Completed",
+          "type": "stat"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "$datasource"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "mappings": [
+                {
+                  "options": {
+                    "match": "null",
+                    "result": {
+                      "text": "N/A"
+                    }
+                  },
+                  "type": "special"
+                },
+                {
+                  "options": {
+                    "0": {
+                      "text": "No"
+                    }
+                  },
+                  "type": "value"
+                },
+                {
+                  "options": {
+                    "1": {
+                      "text": "Yes"
+                    }
+                  },
+                  "type": "value"
+                }
+              ],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  },
+                  {
+                    "color": "red",
+                    "value": 80
+                  }
+                ]
+              },
+              "unit": "none"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 4,
+            "w": 4,
+            "x": 20,
+            "y": 7
+          },
+          "id": 252,
+          "maxDataPoints": 100,
+          "options": {
+            "colorMode": "none",
+            "graphMode": "none",
+            "justifyMode": "auto",
+            "orientation": "horizontal",
+            "percentChangeColorMode": "standard",
+            "reduceOptions": {
+              "calcs": [
+                "mean"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "showPercentChange": false,
+            "textMode": "auto",
+            "wideLayout": true
+          },
+          "pluginVersion": "11.6.3",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "$datasource"
+              },
+              "editorMode": "code",
+              "expr": "debezium_metrics_snapshotaborted{plugin=\"$connector_type\",name=\"$connector_name\",context=\"snapshot\"}",
+              "format": "time_series",
+              "intervalFactor": 1,
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "title": "Aborted",
+          "type": "stat"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "$datasource"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisBorderShow": false,
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "barWidthFactor": 0.6,
+                "drawStyle": "line",
+                "fillOpacity": 10,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "insertNulls": false,
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "never",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  },
+                  {
+                    "color": "red",
+                    "value": 80
+                  }
+                ]
+              },
+              "unit": "short"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 11
+          },
+          "id": 253,
+          "options": {
+            "legend": {
+              "calcs": [],
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "hideZeros": false,
+              "mode": "multi",
+              "sort": "none"
+            }
+          },
+          "pluginVersion": "11.6.3",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "$datasource"
+              },
+              "editorMode": "code",
+              "expr": "debezium_metrics_totalnumberofeventsseen{plugin=\"$connector_type\",name=\"$connector_name\",context=\"snapshot\"}",
+              "format": "time_series",
+              "interval": "",
+              "intervalFactor": 1,
+              "legendFormat": "Total events received",
+              "range": true,
+              "refId": "A"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "$datasource"
+              },
+              "editorMode": "code",
+              "expr": "debezium_metrics_numberofeventsskipped{plugin=\"$connector_type\",name=\"$connector_name\",context=\"snapshot\"}",
+              "format": "time_series",
+              "intervalFactor": 1,
+              "legendFormat": "Events skipped",
+              "range": true,
+              "refId": "B"
+            }
+          ],
+          "title": "Event count",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "$datasource"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "custom": {
+                "align": "auto",
+                "cellOptions": {
+                  "type": "auto"
+                },
+                "inspect": false
+              },
+              "decimals": 2,
+              "displayName": "",
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  },
+                  {
+                    "color": "red",
+                    "value": 80
+                  }
+                ]
+              },
+              "unit": "short"
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Time"
+                },
+                "properties": [
+                  {
+                    "id": "displayName",
+                    "value": "Time"
+                  },
+                  {
+                    "id": "unit",
+                    "value": "time: YYYY-MM-DD HH:mm:ss"
+                  },
+                  {
+                    "id": "custom.align"
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "table"
+                },
+                "properties": [
+                  {
+                    "id": "displayName",
+                    "value": "Table"
+                  },
+                  {
+                    "id": "unit",
+                    "value": "short"
+                  },
+                  {
+                    "id": "decimals",
+                    "value": 2
+                  },
+                  {
+                    "id": "custom.align"
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Value"
+                },
+                "properties": [
+                  {
+                    "id": "displayName",
+                    "value": "Rows"
+                  },
+                  {
+                    "id": "unit",
+                    "value": "short"
+                  },
+                  {
+                    "id": "custom.align"
+                  }
+                ]
+              }
+            ]
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 11
+          },
+          "id": 254,
+          "options": {
+            "cellHeight": "sm",
+            "footer": {
+              "countRows": false,
+              "fields": "",
+              "reducer": [
+                "sum"
+              ],
+              "show": false
+            },
+            "showHeader": true
+          },
+          "pluginVersion": "11.6.3",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "$datasource"
+              },
+              "editorMode": "code",
+              "expr": "debezium_metrics_rowsscanned{plugin=\"$connector_type\",name=\"$connector_name\"}",
+              "format": "table",
+              "hide": false,
+              "intervalFactor": 1,
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "title": "Rows scanned",
+          "type": "table"
+        },
+        {
+          "collapsed": false,
+          "gridPos": {
+            "h": 1,
+            "w": 24,
+            "x": 0,
+            "y": 19
+          },
           "id": 199,
           "panels": [],
           "title": "General",
@@ -69,7 +1070,7 @@ data:
             "h": 3,
             "w": 4,
             "x": 0,
-            "y": 1
+            "y": 20
           },
           "id": 212,
           "options": {
@@ -98,7 +1099,7 @@ data:
                 "uid": "$datasource"
               },
               "editorMode": "code",
-              "expr": "sum(kafka_connect_worker_connector_total_task_count{job=\"$job\",connector=\"$connector\"})",
+              "expr": "sum(kafka_connect_worker_connector_total_task_count{job=\"$job\",connector=\"$kafka_connector\"})",
               "instant": true,
               "interval": "",
               "legendFormat": "",
@@ -133,7 +1134,7 @@ data:
             "h": 3,
             "w": 4,
             "x": 4,
-            "y": 1
+            "y": 20
           },
           "id": 213,
           "options": {
@@ -162,7 +1163,7 @@ data:
                 "uid": "$datasource"
               },
               "editorMode": "code",
-              "expr": "sum(kafka_connect_worker_connector_running_task_count{job=\"$job\",connector=\"$connector\"})",
+              "expr": "sum(kafka_connect_worker_connector_running_task_count{job=\"$job\",connector=\"$kafka_connector\"})",
               "instant": true,
               "interval": "",
               "legendFormat": "",
@@ -201,7 +1202,7 @@ data:
             "h": 3,
             "w": 4,
             "x": 8,
-            "y": 1
+            "y": 20
           },
           "id": 215,
           "options": {
@@ -230,7 +1231,7 @@ data:
                 "uid": "$datasource"
               },
               "editorMode": "code",
-              "expr": "sum(kafka_connect_worker_connector_paused_task_count{job=\"$job\",connector=\"$connector\"})",
+              "expr": "sum(kafka_connect_worker_connector_paused_task_count{job=\"$job\",connector=\"$kafka_connector\"})",
               "instant": true,
               "interval": "",
               "legendFormat": "",
@@ -269,7 +1270,7 @@ data:
             "h": 3,
             "w": 4,
             "x": 12,
-            "y": 1
+            "y": 20
           },
           "id": 214,
           "options": {
@@ -298,7 +1299,7 @@ data:
                 "uid": "$datasource"
               },
               "editorMode": "code",
-              "expr": "sum(kafka_connect_worker_connector_failed_task_count{job=\"$job\",connector=\"$connector\"})",
+              "expr": "sum(kafka_connect_worker_connector_failed_task_count{job=\"$job\",connector=\"$kafka_connector\"})",
               "instant": true,
               "interval": "",
               "legendFormat": "",
@@ -337,7 +1338,7 @@ data:
             "h": 3,
             "w": 4,
             "x": 16,
-            "y": 1
+            "y": 20
           },
           "id": 216,
           "options": {
@@ -366,7 +1367,7 @@ data:
                 "uid": "$datasource"
               },
               "editorMode": "code",
-              "expr": "sum(kafka_connect_worker_connector_unassigned_task_count{job=\"$job\",connector=\"$connector\"})",
+              "expr": "sum(kafka_connect_worker_connector_unassigned_task_count{job=\"$job\",connector=\"$kafka_connector\"})",
               "instant": true,
               "interval": "",
               "legendFormat": "",
@@ -405,7 +1406,7 @@ data:
             "h": 3,
             "w": 4,
             "x": 20,
-            "y": 1
+            "y": 20
           },
           "id": 217,
           "options": {
@@ -434,7 +1435,7 @@ data:
                 "uid": "$datasource"
               },
               "editorMode": "code",
-              "expr": "sum(kafka_connect_worker_connector_destroyed_task_count{job=\"$job\",connector=\"$connector\"})",
+              "expr": "sum(kafka_connect_worker_connector_destroyed_task_count{job=\"$job\",connector=\"$kafka_connector\"})",
               "instant": true,
               "interval": "",
               "legendFormat": "",
@@ -503,7 +1504,7 @@ data:
             "h": 7,
             "w": 12,
             "x": 0,
-            "y": 4
+            "y": 23
           },
           "id": 227,
           "maxDataPoints": 1,
@@ -540,7 +1541,7 @@ data:
                 "uid": "$datasource"
               },
               "editorMode": "code",
-              "expr": "sum (kafka_connect_connector_status{job=\"$job\",connector=\"$connector\",status=\"running\"})",
+              "expr": "sum (kafka_connect_connector_status{job=\"$job\",connector=\"$kafka_connector\",status=\"running\"})",
               "instant": true,
               "interval": "",
               "legendFormat": "running",
@@ -552,7 +1553,7 @@ data:
                 "uid": "$datasource"
               },
               "editorMode": "code",
-              "expr": "sum (kafka_connect_connector_status{job=\"$job\",connector=\"$connector\",status=\"stopped\"})",
+              "expr": "sum (kafka_connect_connector_status{job=\"$job\",connector=\"$kafka_connector\",status=\"stopped\"})",
               "instant": true,
               "interval": "",
               "legendFormat": "stopped",
@@ -564,7 +1565,7 @@ data:
                 "uid": "$datasource"
               },
               "editorMode": "code",
-              "expr": "sum (kafka_connect_connector_status{job=\"$job\",connector=\"$connector\",status=\"paused\"})",
+              "expr": "sum (kafka_connect_connector_status{job=\"$job\",connector=\"$kafka_connector\",status=\"paused\"})",
               "instant": true,
               "interval": "",
               "legendFormat": "paused",
@@ -663,7 +1664,7 @@ data:
             "h": 7,
             "w": 12,
             "x": 12,
-            "y": 4
+            "y": 23
           },
           "id": 219,
           "maxDataPoints": 1,
@@ -700,7 +1701,7 @@ data:
                 "uid": "$datasource"
               },
               "editorMode": "code",
-              "expr": "sum(kafka_connect_worker_connector_running_task_count{job=\"$job\",connector=\"$connector\"})",
+              "expr": "sum(kafka_connect_worker_connector_running_task_count{job=\"$job\",connector=\"$kafka_connector\"})",
               "instant": true,
               "interval": "",
               "legendFormat": "running",
@@ -712,7 +1713,7 @@ data:
                 "uid": "$datasource"
               },
               "editorMode": "code",
-              "expr": "sum(kafka_connect_worker_connector_failed_task_count{job=\"$job\",connector=\"$connector\"})",
+              "expr": "sum(kafka_connect_worker_connector_failed_task_count{job=\"$job\",connector=\"$kafka_connector\"})",
               "instant": true,
               "interval": "",
               "legendFormat": "failed",
@@ -724,7 +1725,7 @@ data:
                 "uid": "$datasource"
               },
               "editorMode": "code",
-              "expr": "sum(kafka_connect_worker_connector_paused_task_count{job=\"$job\",connector=\"$connector\"})",
+              "expr": "sum(kafka_connect_worker_connector_paused_task_count{job=\"$job\",connector=\"$kafka_connector\"})",
               "instant": true,
               "interval": "",
               "legendFormat": "paused",
@@ -736,7 +1737,7 @@ data:
                 "uid": "$datasource"
               },
               "editorMode": "code",
-              "expr": "sum(kafka_connect_worker_connector_unassigned_task_count{job=\"$job\",connector=\"$connector\"})",
+              "expr": "sum(kafka_connect_worker_connector_unassigned_task_count{job=\"$job\",connector=\"$kafka_connector\"})",
               "instant": true,
               "interval": "",
               "legendFormat": "unassigned",
@@ -748,7 +1749,7 @@ data:
                 "uid": "$datasource"
               },
               "editorMode": "code",
-              "expr": "sum(kafka_connect_worker_connector_destroyed_task_count{job=\"$job\",connector=\"$connector\"})",
+              "expr": "sum(kafka_connect_worker_connector_destroyed_task_count{job=\"$job\",connector=\"$kafka_connector\"})",
               "instant": true,
               "interval": "",
               "legendFormat": "destroyed",
@@ -887,7 +1888,7 @@ data:
             "h": 6,
             "w": 12,
             "x": 0,
-            "y": 11
+            "y": 30
           },
           "id": 228,
           "options": {
@@ -913,7 +1914,7 @@ data:
                 "uid": "$datasource"
               },
               "editorMode": "code",
-              "expr": "sum (kafka_connect_connector_status{job=\"$job\",connector=\"$connector\",status!=\"\"}) by (status) ",
+              "expr": "sum (kafka_connect_connector_status{job=\"$job\",connector=\"$kafka_connector\",status!=\"\"}) by (status) ",
               "format": "time_series",
               "hide": false,
               "instant": false,
@@ -1070,7 +2071,7 @@ data:
             "h": 6,
             "w": 12,
             "x": 12,
-            "y": 11
+            "y": 30
           },
           "id": 226,
           "options": {
@@ -1096,7 +2097,7 @@ data:
                 "uid": "$datasource"
               },
               "editorMode": "code",
-              "expr": "sum(kafka_connect_worker_connector_running_task_count{job=\"$job\",connector=\"$connector\"})",
+              "expr": "sum(kafka_connect_worker_connector_running_task_count{job=\"$job\",connector=\"$kafka_connector\"})",
               "format": "time_series",
               "hide": false,
               "instant": false,
@@ -1111,7 +2112,7 @@ data:
                 "uid": "$datasource"
               },
               "editorMode": "code",
-              "expr": "sum(kafka_connect_worker_connector_failed_task_count{job=\"$job\",connector=\"$connector\"})",
+              "expr": "sum(kafka_connect_worker_connector_failed_task_count{job=\"$job\",connector=\"$kafka_connector\"})",
               "format": "time_series",
               "hide": false,
               "instant": false,
@@ -1126,7 +2127,7 @@ data:
                 "uid": "$datasource"
               },
               "editorMode": "code",
-              "expr": "sum(kafka_connect_worker_connector_paused_task_count{job=\"$job\",connector=\"$connector\"})",
+              "expr": "sum(kafka_connect_worker_connector_paused_task_count{job=\"$job\",connector=\"$kafka_connector\"})",
               "format": "time_series",
               "hide": false,
               "instant": false,
@@ -1141,7 +2142,7 @@ data:
                 "uid": "$datasource"
               },
               "editorMode": "code",
-              "expr": "sum(kafka_connect_worker_connector_destroyed_task_count{job=\"$job\",connector=\"$connector\"})",
+              "expr": "sum(kafka_connect_worker_connector_destroyed_task_count{job=\"$job\",connector=\"$kafka_connector\"})",
               "format": "time_series",
               "hide": false,
               "instant": false,
@@ -1156,7 +2157,7 @@ data:
                 "uid": "$datasource"
               },
               "editorMode": "code",
-              "expr": "sum(kafka_connect_worker_connector_unassigned_task_count{job=\"$job\",connector=\"$connector\"})",
+              "expr": "sum(kafka_connect_worker_connector_unassigned_task_count{job=\"$job\",connector=\"$kafka_connector\"})",
               "format": "time_series",
               "hide": false,
               "instant": false,
@@ -1175,7 +2176,7 @@ data:
             "h": 1,
             "w": 24,
             "x": 0,
-            "y": 17
+            "y": 36
           },
           "id": 221,
           "panels": [],
@@ -1247,7 +2248,7 @@ data:
             "h": 8,
             "w": 8,
             "x": 0,
-            "y": 18
+            "y": 37
           },
           "id": 223,
           "options": {
@@ -1351,7 +2352,7 @@ data:
             "h": 8,
             "w": 8,
             "x": 8,
-            "y": 18
+            "y": 37
           },
           "id": 224,
           "options": {
@@ -1468,7 +2469,7 @@ data:
             "h": 8,
             "w": 8,
             "x": 16,
-            "y": 18
+            "y": 37
           },
           "id": 225,
           "options": {
@@ -1507,12 +2508,363 @@ data:
           "type": "timeseries"
         },
         {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "$datasource"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisBorderShow": false,
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "barWidthFactor": 0.6,
+                "drawStyle": "line",
+                "fillOpacity": 10,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "insertNulls": false,
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "never",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  },
+                  {
+                    "color": "red",
+                    "value": 80
+                  }
+                ]
+              },
+              "unit": "short"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 8,
+            "x": 0,
+            "y": 45
+          },
+          "id": 255,
+          "options": {
+            "legend": {
+              "calcs": [],
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "hideZeros": false,
+              "mode": "multi",
+              "sort": "none"
+            }
+          },
+          "pluginVersion": "11.6.3",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "$datasource"
+              },
+              "editorMode": "code",
+              "expr": "kafka_connect_node_incoming_byte_rate{container=\"kessel-kafka-connect-connect\"}",
+              "format": "time_series",
+              "intervalFactor": 1,
+              "legendFormat": "Incoming({{client}})",
+              "range": true,
+              "refId": "A"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "$datasource"
+              },
+              "editorMode": "code",
+              "expr": "kafka_connect_node_outgoing_byte_rate{container=\"kessel-kafka-connect-connect\"}",
+              "format": "time_series",
+              "intervalFactor": 1,
+              "legendFormat": "Outgoing({{client}})",
+              "range": true,
+              "refId": "B"
+            }
+          ],
+          "title": "Network traffic rate",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "$datasource"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisBorderShow": false,
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "barWidthFactor": 0.6,
+                "drawStyle": "line",
+                "fillOpacity": 10,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "insertNulls": false,
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "never",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  },
+                  {
+                    "color": "red",
+                    "value": 80
+                  }
+                ]
+              },
+              "unit": "short"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 8,
+            "x": 8,
+            "y": 45
+          },
+          "id": 256,
+          "options": {
+            "legend": {
+              "calcs": [],
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "hideZeros": false,
+              "mode": "multi",
+              "sort": "none"
+            }
+          },
+          "pluginVersion": "11.6.3",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "$datasource"
+              },
+              "editorMode": "code",
+              "expr": "jvm_memory_used_bytes{area='heap',container=\"kessel-kafka-connect-connect\"}",
+              "format": "time_series",
+              "intervalFactor": 1,
+              "legendFormat": "Used",
+              "range": true,
+              "refId": "A"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "$datasource"
+              },
+              "editorMode": "code",
+              "expr": "jvm_memory_max_bytes{area='heap',container=\"kessel-kafka-connect-connect\"}",
+              "format": "time_series",
+              "hide": false,
+              "interval": "",
+              "intervalFactor": 1,
+              "legendFormat": "Maximum",
+              "range": true,
+              "refId": "B"
+            }
+          ],
+          "title": "Heap Memory",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "$datasource"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisBorderShow": false,
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "barWidthFactor": 0.6,
+                "drawStyle": "line",
+                "fillOpacity": 10,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "insertNulls": false,
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "never",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  },
+                  {
+                    "color": "red",
+                    "value": 80
+                  }
+                ]
+              },
+              "unit": "short"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 8,
+            "x": 16,
+            "y": 45
+          },
+          "id": 257,
+          "options": {
+            "legend": {
+              "calcs": [],
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "hideZeros": false,
+              "mode": "multi",
+              "sort": "none"
+            }
+          },
+          "pluginVersion": "11.6.3",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "$datasource"
+              },
+              "editorMode": "code",
+              "expr": "jvm_threads_current{container=\"kessel-kafka-connect-connect\"}",
+              "format": "time_series",
+              "intervalFactor": 1,
+              "legendFormat": "Running",
+              "range": true,
+              "refId": "A"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "$datasource"
+              },
+              "editorMode": "code",
+              "expr": "jvm_threads_peak{container=\"kessel-kafka-connect-connect\"}",
+              "format": "time_series",
+              "intervalFactor": 1,
+              "legendFormat": "Maximum",
+              "range": true,
+              "refId": "B"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "$datasource"
+              },
+              "editorMode": "code",
+              "expr": "jvm_threads_started_total{container=\"kessel-kafka-connect-connect\"}",
+              "format": "time_series",
+              "intervalFactor": 1,
+              "legendFormat": "Started in total",
+              "range": true,
+              "refId": "C"
+            }
+          ],
+          "title": "Threads",
+          "type": "timeseries"
+        },
+        {
           "collapsed": false,
           "gridPos": {
             "h": 1,
             "w": 24,
             "x": 0,
-            "y": 26
+            "y": 53
           },
           "id": 139,
           "panels": [],
@@ -1585,7 +2937,7 @@ data:
             "h": 7,
             "w": 8,
             "x": 0,
-            "y": 27
+            "y": 54
           },
           "id": 143,
           "options": {
@@ -1614,7 +2966,7 @@ data:
               },
               "editorMode": "code",
               "exemplar": true,
-              "expr": "kafka_connect_source_task_source_record_write_rate{job=\"$job\",connector=\"$connector\",task!=\"\"}",
+              "expr": "kafka_connect_source_task_source_record_write_rate{job=\"$job\",connector=\"$kafka_connector\",task!=\"\"}",
               "format": "time_series",
               "instant": false,
               "interval": "",
@@ -1692,7 +3044,7 @@ data:
             "h": 7,
             "w": 8,
             "x": 8,
-            "y": 27
+            "y": 54
           },
           "id": 144,
           "options": {
@@ -1721,7 +3073,7 @@ data:
               },
               "editorMode": "code",
               "exemplar": true,
-              "expr": "kafka_connect_source_task_source_record_poll_rate{job=\"$job\",connector=\"$connector\",task!=\"\"}",
+              "expr": "kafka_connect_source_task_source_record_poll_rate{job=\"$job\",connector=\"$kafka_connector\",task!=\"\"}",
               "format": "time_series",
               "instant": false,
               "interval": "",
@@ -1799,7 +3151,7 @@ data:
             "h": 7,
             "w": 8,
             "x": 16,
-            "y": 27
+            "y": 54
           },
           "id": 142,
           "options": {
@@ -1827,7 +3179,7 @@ data:
                 "uid": "$datasource"
               },
               "editorMode": "code",
-              "expr": "avg(kafka_connect_source_task_source_record_active_count{job=\"$job\",connector=\"$connector\",task!=\"\"})",
+              "expr": "avg(kafka_connect_source_task_source_record_active_count{job=\"$job\",connector=\"$kafka_connector\",task!=\"\"})",
               "format": "time_series",
               "instant": false,
               "interval": "",
@@ -1905,7 +3257,7 @@ data:
             "h": 7,
             "w": 8,
             "x": 0,
-            "y": 34
+            "y": 61
           },
           "id": 145,
           "options": {
@@ -1933,7 +3285,7 @@ data:
                 "uid": "$datasource"
               },
               "editorMode": "code",
-              "expr": "max(kafka_connect_source_task_source_record_active_count{job=\"$job\",connector=\"$connector\",task!=\"\"})",
+              "expr": "max(kafka_connect_source_task_source_record_active_count{job=\"$job\",connector=\"$kafka_connector\",task!=\"\"})",
               "format": "time_series",
               "instant": false,
               "interval": "",
@@ -2011,7 +3363,7 @@ data:
             "h": 7,
             "w": 8,
             "x": 8,
-            "y": 34
+            "y": 61
           },
           "id": 140,
           "options": {
@@ -2039,7 +3391,7 @@ data:
                 "uid": "$datasource"
               },
               "editorMode": "code",
-              "expr": "kafka_connect_source_task_poll_batch_avg_time_ms{job=\"$job\",connector=\"$connector\",task!=\"\"}",
+              "expr": "kafka_connect_source_task_poll_batch_avg_time_ms{job=\"$job\",connector=\"$kafka_connector\",task!=\"\"}",
               "format": "time_series",
               "instant": false,
               "interval": "",
@@ -2117,7 +3469,7 @@ data:
             "h": 7,
             "w": 8,
             "x": 16,
-            "y": 34
+            "y": 61
           },
           "id": 141,
           "options": {
@@ -2145,7 +3497,7 @@ data:
                 "uid": "$datasource"
               },
               "editorMode": "code",
-              "expr": "kafka_connect_source_task_poll_batch_max_time_ms{job=\"$job\",connector=\"$connector\",task!=\"\"}",
+              "expr": "kafka_connect_source_task_poll_batch_max_time_ms{job=\"$job\",connector=\"$kafka_connector\",task!=\"\"}",
               "format": "time_series",
               "hide": false,
               "instant": false,
@@ -2164,7 +3516,7 @@ data:
             "h": 1,
             "w": 24,
             "x": 0,
-            "y": 41
+            "y": 68
           },
           "id": 234,
           "panels": [],
@@ -2207,7 +3559,7 @@ data:
             "h": 5,
             "w": 24,
             "x": 0,
-            "y": 42
+            "y": 69
           },
           "id": 241,
           "maxDataPoints": 100,
@@ -2291,7 +3643,7 @@ data:
             "h": 5,
             "w": 24,
             "x": 0,
-            "y": 47
+            "y": 74
           },
           "id": 230,
           "maxDataPoints": 100,
@@ -2406,7 +3758,7 @@ data:
             "h": 8,
             "w": 24,
             "x": 0,
-            "y": 52
+            "y": 79
           },
           "id": 209,
           "options": {
@@ -2453,553 +3805,7 @@ data:
             "h": 1,
             "w": 24,
             "x": 0,
-            "y": 60
-          },
-          "id": 112,
-          "panels": [],
-          "title": "Task metrics",
-          "type": "row"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "$datasource"
-          },
-          "description": "Average size of the batches processed by the connector",
-          "fieldConfig": {
-            "defaults": {
-              "color": {
-                "mode": "palette-classic"
-              },
-              "custom": {
-                "axisBorderShow": false,
-                "axisCenteredZero": false,
-                "axisColorMode": "text",
-                "axisLabel": "",
-                "axisPlacement": "auto",
-                "barAlignment": 0,
-                "barWidthFactor": 0.6,
-                "drawStyle": "line",
-                "fillOpacity": 10,
-                "gradientMode": "none",
-                "hideFrom": {
-                  "legend": false,
-                  "tooltip": false,
-                  "viz": false
-                },
-                "insertNulls": false,
-                "lineInterpolation": "linear",
-                "lineWidth": 1,
-                "pointSize": 5,
-                "scaleDistribution": {
-                  "type": "linear"
-                },
-                "showPoints": "never",
-                "spanNulls": true,
-                "stacking": {
-                  "group": "A",
-                  "mode": "none"
-                },
-                "thresholdsStyle": {
-                  "mode": "off"
-                }
-              },
-              "links": [],
-              "mappings": [],
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  {
-                    "color": "green"
-                  },
-                  {
-                    "color": "red",
-                    "value": 80
-                  }
-                ]
-              },
-              "unit": "decbytes"
-            },
-            "overrides": []
-          },
-          "gridPos": {
-            "h": 7,
-            "w": 12,
-            "x": 0,
-            "y": 61
-          },
-          "id": 113,
-          "options": {
-            "legend": {
-              "calcs": [
-                "mean",
-                "lastNotNull",
-                "max"
-              ],
-              "displayMode": "list",
-              "placement": "bottom",
-              "showLegend": true
-            },
-            "tooltip": {
-              "hideZeros": false,
-              "mode": "single",
-              "sort": "none"
-            }
-          },
-          "pluginVersion": "11.6.3",
-          "targets": [
-            {
-              "datasource": {
-                "type": "prometheus",
-                "uid": "$datasource"
-              },
-              "editorMode": "code",
-              "expr": "kafka_connect_connector_task_metrics_batch_size_avg{job=\"$job\",connector=\"$connector\"}",
-              "format": "time_series",
-              "interval": "",
-              "intervalFactor": 1,
-              "legendFormat": "{{connector}}-{{task}}",
-              "range": true,
-              "refId": "A"
-            }
-          ],
-          "title": "Batch Size Average",
-          "type": "timeseries"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "$datasource"
-          },
-          "description": "Maximum size of the batches processed by the connector",
-          "fieldConfig": {
-            "defaults": {
-              "color": {
-                "mode": "palette-classic"
-              },
-              "custom": {
-                "axisBorderShow": false,
-                "axisCenteredZero": false,
-                "axisColorMode": "text",
-                "axisLabel": "",
-                "axisPlacement": "auto",
-                "barAlignment": 0,
-                "barWidthFactor": 0.6,
-                "drawStyle": "line",
-                "fillOpacity": 10,
-                "gradientMode": "none",
-                "hideFrom": {
-                  "legend": false,
-                  "tooltip": false,
-                  "viz": false
-                },
-                "insertNulls": false,
-                "lineInterpolation": "linear",
-                "lineWidth": 1,
-                "pointSize": 5,
-                "scaleDistribution": {
-                  "type": "linear"
-                },
-                "showPoints": "never",
-                "spanNulls": true,
-                "stacking": {
-                  "group": "A",
-                  "mode": "none"
-                },
-                "thresholdsStyle": {
-                  "mode": "off"
-                }
-              },
-              "links": [],
-              "mappings": [],
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  {
-                    "color": "green"
-                  },
-                  {
-                    "color": "red",
-                    "value": 80
-                  }
-                ]
-              },
-              "unit": "decbytes"
-            },
-            "overrides": []
-          },
-          "gridPos": {
-            "h": 7,
-            "w": 12,
-            "x": 12,
-            "y": 61
-          },
-          "id": 114,
-          "options": {
-            "legend": {
-              "calcs": [
-                "mean",
-                "lastNotNull",
-                "max"
-              ],
-              "displayMode": "list",
-              "placement": "bottom",
-              "showLegend": true
-            },
-            "tooltip": {
-              "hideZeros": false,
-              "mode": "single",
-              "sort": "none"
-            }
-          },
-          "pluginVersion": "11.6.3",
-          "targets": [
-            {
-              "datasource": {
-                "type": "prometheus",
-                "uid": "$datasource"
-              },
-              "editorMode": "code",
-              "expr": "kafka_connect_connector_task_metrics_batch_size_max{job=\"$job\",connector=\"$connector\"}",
-              "format": "time_series",
-              "interval": "",
-              "intervalFactor": 1,
-              "legendFormat": "{{connector}}-{{task}}",
-              "range": true,
-              "refId": "A"
-            }
-          ],
-          "title": "Batch Size Max",
-          "type": "timeseries"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "$datasource"
-          },
-          "description": "Average percentage of the task’s offset commit attempts that succeeded",
-          "fieldConfig": {
-            "defaults": {
-              "color": {
-                "mode": "palette-classic"
-              },
-              "custom": {
-                "axisBorderShow": false,
-                "axisCenteredZero": false,
-                "axisColorMode": "text",
-                "axisLabel": "",
-                "axisPlacement": "auto",
-                "barAlignment": 0,
-                "barWidthFactor": 0.6,
-                "drawStyle": "line",
-                "fillOpacity": 10,
-                "gradientMode": "none",
-                "hideFrom": {
-                  "legend": false,
-                  "tooltip": false,
-                  "viz": false
-                },
-                "insertNulls": false,
-                "lineInterpolation": "linear",
-                "lineWidth": 1,
-                "pointSize": 5,
-                "scaleDistribution": {
-                  "type": "linear"
-                },
-                "showPoints": "never",
-                "spanNulls": true,
-                "stacking": {
-                  "group": "A",
-                  "mode": "none"
-                },
-                "thresholdsStyle": {
-                  "mode": "off"
-                }
-              },
-              "links": [],
-              "mappings": [],
-              "max": 1,
-              "min": 0,
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  {
-                    "color": "green"
-                  },
-                  {
-                    "color": "red",
-                    "value": 80
-                  }
-                ]
-              },
-              "unit": "percentunit"
-            },
-            "overrides": []
-          },
-          "gridPos": {
-            "h": 7,
-            "w": 8,
-            "x": 0,
-            "y": 68
-          },
-          "id": 115,
-          "options": {
-            "legend": {
-              "calcs": [
-                "mean",
-                "lastNotNull",
-                "max"
-              ],
-              "displayMode": "list",
-              "placement": "bottom",
-              "showLegend": true
-            },
-            "tooltip": {
-              "hideZeros": false,
-              "mode": "single",
-              "sort": "none"
-            }
-          },
-          "pluginVersion": "11.6.3",
-          "targets": [
-            {
-              "datasource": {
-                "type": "prometheus",
-                "uid": "$datasource"
-              },
-              "editorMode": "code",
-              "expr": "kafka_connect_connector_task_metrics_offset_commit_success_percentage{job=\"$job\",connector=\"$connector\"}",
-              "format": "time_series",
-              "interval": "",
-              "intervalFactor": 1,
-              "legendFormat": "{{connector}}-{{task}}",
-              "range": true,
-              "refId": "A"
-            }
-          ],
-          "title": "Offset commit success percentage",
-          "type": "timeseries"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "$datasource"
-          },
-          "description": "The average time in milliseconds taken by this task to commit offsets",
-          "fieldConfig": {
-            "defaults": {
-              "color": {
-                "mode": "palette-classic"
-              },
-              "custom": {
-                "axisBorderShow": false,
-                "axisCenteredZero": false,
-                "axisColorMode": "text",
-                "axisLabel": "",
-                "axisPlacement": "auto",
-                "barAlignment": 0,
-                "barWidthFactor": 0.6,
-                "drawStyle": "line",
-                "fillOpacity": 10,
-                "gradientMode": "none",
-                "hideFrom": {
-                  "legend": false,
-                  "tooltip": false,
-                  "viz": false
-                },
-                "insertNulls": false,
-                "lineInterpolation": "linear",
-                "lineWidth": 1,
-                "pointSize": 5,
-                "scaleDistribution": {
-                  "type": "linear"
-                },
-                "showPoints": "never",
-                "spanNulls": true,
-                "stacking": {
-                  "group": "A",
-                  "mode": "none"
-                },
-                "thresholdsStyle": {
-                  "mode": "off"
-                }
-              },
-              "links": [],
-              "mappings": [],
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  {
-                    "color": "green"
-                  },
-                  {
-                    "color": "red",
-                    "value": 80
-                  }
-                ]
-              },
-              "unit": "ms"
-            },
-            "overrides": []
-          },
-          "gridPos": {
-            "h": 7,
-            "w": 8,
-            "x": 8,
-            "y": 68
-          },
-          "id": 116,
-          "options": {
-            "legend": {
-              "calcs": [
-                "mean",
-                "lastNotNull",
-                "max"
-              ],
-              "displayMode": "list",
-              "placement": "bottom",
-              "showLegend": true
-            },
-            "tooltip": {
-              "hideZeros": false,
-              "mode": "single",
-              "sort": "none"
-            }
-          },
-          "pluginVersion": "11.6.3",
-          "targets": [
-            {
-              "datasource": {
-                "type": "prometheus",
-                "uid": "$datasource"
-              },
-              "expr": "kafka_connect_connector_task_metrics_offset_commit_avg_time_ms{job=\"kafka-connect\", env=\"$env\",instance=~\"$instance\",kafka_connect_cluster_id=~\"$kafka_connect_cluster_id\",connector=~\"$connector\"}",
-              "format": "time_series",
-              "interval": "",
-              "intervalFactor": 1,
-              "legendFormat": "{{connector}}-{{task}}",
-              "refId": "A"
-            }
-          ],
-          "title": "Offset commit Average Time",
-          "type": "timeseries"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "$datasource"
-          },
-          "description": "The fraction of time this task has spent in the running state.",
-          "fieldConfig": {
-            "defaults": {
-              "color": {
-                "mode": "palette-classic"
-              },
-              "custom": {
-                "axisBorderShow": false,
-                "axisCenteredZero": false,
-                "axisColorMode": "text",
-                "axisLabel": "",
-                "axisPlacement": "auto",
-                "barAlignment": 0,
-                "barWidthFactor": 0.6,
-                "drawStyle": "line",
-                "fillOpacity": 10,
-                "gradientMode": "none",
-                "hideFrom": {
-                  "legend": false,
-                  "tooltip": false,
-                  "viz": false
-                },
-                "insertNulls": false,
-                "lineInterpolation": "linear",
-                "lineWidth": 1,
-                "pointSize": 5,
-                "scaleDistribution": {
-                  "type": "linear"
-                },
-                "showPoints": "never",
-                "spanNulls": true,
-                "stacking": {
-                  "group": "A",
-                  "mode": "none"
-                },
-                "thresholdsStyle": {
-                  "mode": "off"
-                }
-              },
-              "links": [],
-              "mappings": [],
-              "max": 1,
-              "min": 0,
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  {
-                    "color": "green"
-                  },
-                  {
-                    "color": "red",
-                    "value": 80
-                  }
-                ]
-              },
-              "unit": "percentunit"
-            },
-            "overrides": []
-          },
-          "gridPos": {
-            "h": 7,
-            "w": 8,
-            "x": 16,
-            "y": 68
-          },
-          "id": 117,
-          "options": {
-            "legend": {
-              "calcs": [
-                "mean",
-                "lastNotNull",
-                "max"
-              ],
-              "displayMode": "list",
-              "placement": "bottom",
-              "showLegend": true
-            },
-            "tooltip": {
-              "hideZeros": false,
-              "mode": "single",
-              "sort": "none"
-            }
-          },
-          "pluginVersion": "11.6.3",
-          "targets": [
-            {
-              "datasource": {
-                "type": "prometheus",
-                "uid": "$datasource"
-              },
-              "editorMode": "code",
-              "expr": "kafka_connect_connector_task_metrics_running_ratio{job=\"$job\",connector=\"$connector\"}",
-              "format": "time_series",
-              "hide": false,
-              "interval": "",
-              "intervalFactor": 1,
-              "legendFormat": "{{connector}}-{{task}}",
-              "range": true,
-              "refId": "A"
-            }
-          ],
-          "title": "Running ratio",
-          "type": "timeseries"
-        },
-        {
-          "collapsed": false,
-          "gridPos": {
-            "h": 1,
-            "w": 24,
-            "x": 0,
-            "y": 75
+            "y": 87
           },
           "id": 201,
           "panels": [],
@@ -3074,7 +3880,7 @@ data:
             "h": 7,
             "w": 8,
             "x": 0,
-            "y": 76
+            "y": 88
           },
           "id": 203,
           "options": {
@@ -3102,7 +3908,7 @@ data:
                 "uid": "$datasource"
               },
               "editorMode": "code",
-              "expr": "kafka_connect_task_error_total_record_failures{job=\"$job\",connector=\"$connector\"}",
+              "expr": "kafka_connect_task_error_total_record_failures{job=\"$job\",connector=\"$kafka_connector\"}",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 1,
@@ -3182,7 +3988,7 @@ data:
             "h": 7,
             "w": 8,
             "x": 8,
-            "y": 76
+            "y": 88
           },
           "id": 205,
           "options": {
@@ -3210,7 +4016,7 @@ data:
                 "uid": "$datasource"
               },
               "editorMode": "code",
-              "expr": "kafka_connect_task_error_total_record_errors{job=\"$job\",connector=\"$connector\"}",
+              "expr": "kafka_connect_task_error_total_record_errors{job=\"$job\",connector=\"$kafka_connector\"}",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 1,
@@ -3290,7 +4096,7 @@ data:
             "h": 7,
             "w": 8,
             "x": 16,
-            "y": 76
+            "y": 88
           },
           "id": 206,
           "options": {
@@ -3318,7 +4124,7 @@ data:
                 "uid": "$datasource"
               },
               "editorMode": "code",
-              "expr": "kafka_connect_task_error_total_records_skipped{job=\"$job\",connector=\"$connector\"}",
+              "expr": "kafka_connect_task_error_total_records_skipped{job=\"$job\",connector=\"$kafka_connector\"}",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 1,
@@ -3398,7 +4204,7 @@ data:
             "h": 7,
             "w": 12,
             "x": 0,
-            "y": 83
+            "y": 95
           },
           "id": 208,
           "options": {
@@ -3426,7 +4232,7 @@ data:
                 "uid": "$datasource"
               },
               "editorMode": "code",
-              "expr": "kafka_connect_task_error_total_errors_logged{job=\"$job\",connector=\"$connector\"}",
+              "expr": "kafka_connect_task_error_total_errors_logged{job=\"$job\",connector=\"$kafka_connector\"}",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 1,
@@ -3506,7 +4312,7 @@ data:
             "h": 7,
             "w": 12,
             "x": 12,
-            "y": 83
+            "y": 95
           },
           "id": 207,
           "options": {
@@ -3534,7 +4340,7 @@ data:
                 "uid": "$datasource"
               },
               "editorMode": "code",
-              "expr": "kafka_connect_task_error_total_retries{job=\"$job\",connector=\"$connector\"}",
+              "expr": "kafka_connect_task_error_total_retries{job=\"$job\",connector=\"$kafka_connector\"}",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 1,
@@ -3614,7 +4420,7 @@ data:
             "h": 7,
             "w": 12,
             "x": 0,
-            "y": 90
+            "y": 102
           },
           "id": 202,
           "options": {
@@ -3643,7 +4449,7 @@ data:
               },
               "editorMode": "code",
               "exemplar": true,
-              "expr": "kafka_connect_task_error_deadletterqueue_produce_requests{job=\"$job\",connector=\"$connector\"}",
+              "expr": "kafka_connect_task_error_deadletterqueue_produce_requests{job=\"$job\",connector=\"$kafka_connector\"}",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 1,
@@ -3723,7 +4529,7 @@ data:
             "h": 7,
             "w": 12,
             "x": 12,
-            "y": 90
+            "y": 102
           },
           "id": 204,
           "options": {
@@ -3752,7 +4558,7 @@ data:
               },
               "editorMode": "code",
               "exemplar": true,
-              "expr": "kafka_connect_task_error_deadletterqueue_produce_failures{job=\"$job\",connector=\"$connector\"}",
+              "expr": "kafka_connect_task_error_deadletterqueue_produce_failures{job=\"$job\",connector=\"$kafka_connector\"}",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 1,
@@ -3773,15 +4579,17 @@ data:
         "list": [
           {
             "current": {
-              "text": "kessel-inventory-api-connector",
-              "value": "kessel-inventory-api-connector"
+              "text": "crcs02ue1-prometheus",
+              "value": "PDD8BE47D10408F45"
             },
-            "hide": 2,
-            "label": "Connector name",
-            "name": "connector",
-            "query": "kessel-inventory-api-connector",
-            "skipUrlSync": true,
-            "type": "constant"
+            "includeAll": false,
+            "label": "Datasource",
+            "name": "datasource",
+            "options": [],
+            "query": "prometheus",
+            "refresh": 1,
+            "regex": "/(crcp01ue1-prometheus)|(crcfrp01ugw1-prometheus)|(crcs02ue1-prometheus)|(crcfrs01ugw1-prometheus)/",
+            "type": "datasource"
           },
           {
             "current": {
@@ -3797,17 +4605,71 @@ data:
           },
           {
             "current": {
-              "text": "crcs02ue1-prometheus",
-              "value": "PDD8BE47D10408F45"
+              "text": "kessel-inventory-api-connector",
+              "value": "kessel-inventory-api-connector"
             },
-            "includeAll": false,
-            "label": "Datasource",
-            "name": "datasource",
+            "datasource": {
+              "type": "prometheus",
+              "uid": "${datasource}"
+            },
+            "definition": "label_values(kafka_connect_connector_status{job=\"$job\"},connector)",
+            "label": "KafkaConnector",
+            "name": "kafka_connector",
             "options": [],
-            "query": "prometheus",
+            "query": {
+              "qryType": 1,
+              "query": "label_values(kafka_connect_connector_status{job=\"$job\"},connector)",
+              "refId": "PrometheusVariableQueryEditor-VariableQuery"
+            },
             "refresh": 1,
-            "regex": "/(crcp01ue1-prometheus)|(crcfrp01ugw1-prometheus)|(crcs02ue1-prometheus)|(crcfrs01ugw1-prometheus)/",
-            "type": "datasource"
+            "regex": "",
+            "type": "query"
+          },
+          {
+            "allowCustomValue": true,
+            "current": {
+              "text": "",
+              "value": ""
+            },
+            "datasource": {
+              "type": "prometheus",
+              "uid": "${datasource}"
+            },
+            "definition": "debezium_metrics_totalnumberofeventsseen{plugin=\"$connector_type\"}",
+            "includeAll": false,
+            "label": "Connector Name",
+            "name": "connector_name",
+            "options": [],
+            "query": {
+              "qryType": 4,
+              "query": "debezium_metrics_totalnumberofeventsseen{plugin=\"$connector_type\"}",
+              "refId": "PrometheusVariableQueryEditor-VariableQuery"
+            },
+            "refresh": 1,
+            "regex": "/.*[,\\(]name=\"([^\"]+)\".*/",
+            "type": "query"
+          },
+          {
+            "current": {
+              "text": "",
+              "value": ""
+            },
+            "datasource": {
+              "type": "prometheus",
+              "uid": "${datasource}"
+            },
+            "definition": "debezium_metrics_totalnumberofeventsseen",
+            "label": "Connector Type",
+            "name": "connector_type",
+            "options": [],
+            "query": {
+              "qryType": 4,
+              "query": "debezium_metrics_totalnumberofeventsseen",
+              "refId": "PrometheusVariableQueryEditor-VariableQuery"
+            },
+            "refresh": 1,
+            "regex": "/.*plugin=\"([^\"]+)\".*/",
+            "type": "query"
           }
         ]
       },
@@ -3831,7 +4693,7 @@ data:
       "timezone": "",
       "title": "Kessel Inventory - Kafka Connect",
       "uid": "AEaSQ97mq",
-      "version": 2
+      "version": 3
     }
 kind: ConfigMap
 metadata:

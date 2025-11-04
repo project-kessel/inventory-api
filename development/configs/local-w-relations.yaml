@@ -21,9 +21,13 @@ eventing:
   kafka:
 storage:
   max-serialization-retries: 10
-  database: sqlite3
-  sqlite3:
-    dsn: inventory.db
+  database: postgres
+  postgres:
+    host: localhost
+    port: 5435
+    user: inventory_api
+    password: postgres
+    dbname: inventory
 consumer:
   enabled: false
 service:

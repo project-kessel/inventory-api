@@ -306,17 +306,18 @@ func (i *InventoryConsumer) ProcessMessage(headers map[string]string, relationsE
 		i.Logger.Infof("processing message: operation=%s, txid=%s", operation, txid)
 		i.Logger.Debugf("processed message tuple=%s", msg.Value)
 		if relationsEnabled {
-			tupleEvent, err := ParseMessage(msg.Value, operation)
+			tuplesToReplicate, err := i.calculateTuplesOrNoOp(msg.Value, operation, biz.OperationTypeCreated, txid)
 			if err != nil {
-				metricscollector.Incr(i.MetricsCollector.MsgProcessFailures, "ParseCreateOrUpdateMessage")
-				i.Logger.Errorf("failed to parse message for tuple: %v", err)
 				return "", err
 			}
+
+			// Skip SpiceDB call if no tuples to replicate
+			if tuplesToReplicate.IsEmpty() {
+				return "", nil
+			}
+
+			// Only retry the actual SpiceDB call
 			resp, err := i.Retry(func() (string, error) {
-				tuplesToReplicate, err := i.SchemaService.CalculateTuples(*tupleEvent, biz.OperationTypeCreated)
-				if err != nil {
-					return "", err
-				}
 				return i.CreateTuple(context.Background(), tuplesToReplicate.TuplesToCreate())
 			}, i.MetricsCollector.MsgProcessFailures)
 			if err != nil {
@@ -331,17 +332,18 @@ func (i *InventoryConsumer) ProcessMessage(headers map[string]string, relationsE
 		i.Logger.Infof("processing message: operation=%s, txid=%s", operation, txid)
 		i.Logger.Debugf("processed message tuple=%s", msg.Value)
 		if relationsEnabled {
-			tupleEvent, err := ParseMessage(msg.Value, operation)
+			tuplesToReplicate, err := i.calculateTuplesOrNoOp(msg.Value, operation, biz.OperationTypeUpdated, txid)
 			if err != nil {
-				metricscollector.Incr(i.MetricsCollector.MsgProcessFailures, "ParseCreateOrUpdateMessage")
-				i.Logger.Errorf("failed to parse message for tuple: %v", err)
 				return "", err
 			}
+
+			// Skip SpiceDB call if no tuples to replicate
+			if tuplesToReplicate.IsEmpty() {
+				return "", nil
+			}
+
+			// Only retry the actual SpiceDB call
 			resp, err := i.Retry(func() (string, error) {
-				tuplesToReplicate, err := i.SchemaService.CalculateTuples(*tupleEvent, biz.OperationTypeUpdated)
-				if err != nil {
-					return "", err
-				}
 				return i.UpdateTuple(context.Background(), tuplesToReplicate.TuplesToCreate(), tuplesToReplicate.TuplesToDelete())
 			}, i.MetricsCollector.MsgProcessFailures)
 			if err != nil {
@@ -355,23 +357,19 @@ func (i *InventoryConsumer) ProcessMessage(headers map[string]string, relationsE
 		i.Logger.Infof("processing message: operation=%s, txid=%s", operation, txid)
 		i.Logger.Debugf("processed message tuple=%s", msg.Value)
 		if relationsEnabled {
-			tupleEvent, err := ParseMessage(msg.Value, operation)
+			tuplesToReplicate, err := i.calculateTuplesOrNoOp(msg.Value, operation, biz.OperationTypeDeleted, txid)
 			if err != nil {
-				metricscollector.Incr(i.MetricsCollector.MsgProcessFailures, "ParseDeleteMessage")
-				i.Logger.Errorf("failed to parse message for filter: %v", err)
 				return "", err
 			}
 
-			_, err = i.Retry(func() (string, error) {
-				tuplesToReplicate, err := i.SchemaService.CalculateTuples(*tupleEvent, biz.OperationTypeDeleted)
-				if err != nil {
-					return "", err
-				}
-				// For delete operations, we only delete tuples (no creation)
-				if tuplesToReplicate.TuplesToDelete() != nil {
-					return i.DeleteTuple(context.Background(), *tuplesToReplicate.TuplesToDelete())
-				}
+			// Skip SpiceDB call if no tuples to replicate
+			if tuplesToReplicate.IsEmpty() {
 				return "", nil
+			}
+
+			// Only retry the actual SpiceDB call
+			_, err = i.Retry(func() (string, error) {
+				return i.DeleteTuple(context.Background(), *tuplesToReplicate.TuplesToDelete())
 			}, i.MetricsCollector.MsgProcessFailures)
 			if err != nil {
 				metricscollector.Incr(i.MetricsCollector.MsgProcessFailures, "DeleteTuple")
@@ -386,6 +384,30 @@ func (i *InventoryConsumer) ProcessMessage(headers map[string]string, relationsE
 			msg.TopicPartition.Offset.String(), operation, msg.Value)
 	}
 	return "", nil
+}
+
+// calculateTuplesOrNoOp parses the message, calculates tuples, and checks if it's a no-op.
+// Returns the tuples, a boolean indicating if it's a no-op (empty), and an error.
+func (i *InventoryConsumer) calculateTuplesOrNoOp(msgValue []byte, operation string, operationType biz.EventOperationType, txid string) (model.TuplesToReplicate, error) {
+	tupleEvent, err := ParseMessage(msgValue, operation)
+	if err != nil {
+		metricscollector.Incr(i.MetricsCollector.MsgProcessFailures, "ParseMessage")
+		i.Logger.Errorf("failed to parse message for tuple: %v", err)
+		return model.TuplesToReplicate{}, err
+	}
+
+	tuplesToReplicate, err := i.SchemaService.CalculateTuples(*tupleEvent, operationType)
+	if err != nil {
+		metricscollector.Incr(i.MetricsCollector.MsgProcessFailures, "CalculateTuples")
+		i.Logger.Errorf("failed to calculate tuples: %v", err)
+		return model.TuplesToReplicate{}, err
+	}
+
+	if tuplesToReplicate.IsEmpty() {
+		i.Logger.Infof("no-op for operation=%s, txid=%s", operation, txid)
+	}
+
+	return tuplesToReplicate, nil
 }
 
 func ParseHeaders(msg *kafka.Message) (map[string]string, error) {

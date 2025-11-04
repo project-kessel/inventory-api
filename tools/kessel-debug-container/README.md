@@ -19,6 +19,7 @@ The debug container is configured with environment variables consisting of Kesse
 * Inventory API Endpoints: (via `INVENTORY_API_GRPC_ENDPOINT` and `INVENTORY_API_HTTP_ENDPOINT` variables)
 * Relations API Endpoints: (via `RELATIONS_API_GRPC_ENDPOINT` and `RELATIONS_API_HTTP_ENDPOINT` variables)
 * Kafka Endpoints and auth info (configured by running `source /usr/local/bin/env-setup.sh` if needed)
+* Inventory API DB Endpoints and auth info (configured by running `source /usr/local/bin/env-setup.sh` if needed)
 * Clowder cdappconfig for Inventory API mounted to `/cdapp`
 
 
@@ -41,13 +42,39 @@ oc process --local -f tools/kessel-debug-container/kessel-debug-deploy.yaml \
 oc rsh kessel-debug
 ```
 
-If needed, Kafka connection information can be setup after accessing the pod by sourcing the `env-setup.sh` script available. This will export the Kafka bootstrap server address(es) to the `BOOTSTRAP_SERVERS` variable, as well as create a JAAS auth config file and set the path to it under the `KAFKA_AUTH_CONFIG` variable:
+If needed, Kafka and Inventory API DB connection information can be setup after accessing the pod by sourcing the `env-setup.sh` script available:
 
 ```shell
 source /usr/local/bin/env-setup.sh
 ```
 
-When leveraging any Kafka command-line tools, the `KAFKA_AUTH_CONFIG` can be provided to most commands using the `--command-config` flag to ensure authentication is used and avoid errors. Some commands have different names for this flag, see their respective `--help` commands for details.
+Sourcing the script configures some extra environment variables to simplify access to Kafka and Postgres, including setting up a JAAS auth config file required to authenticate to Kafka brokers when auth is configured for the environment
+
+#### Accessing SpiceDB with Zed
+
+SpiceDB connection details are set during deploy using the `ZED_ENDPOINT`, `ZED_TOKEN`, and `ZED_INSECURE` environment variables. No extra work is needed, and basic zed commands can be run with no extra flags or context setting.
+
+For example:
+* `zed schema read` to read the current schema
+* `zed relationship read hbi/host` to read all relationships for resource type `hbi/host`
+
+Note: using contexts with zed requires permissions to write to a config file which are denied in a rootless container. Environment variables prevent the need to use contexts and should be used in place of them.
+
+#### Accessing Kafka
+
+All Kafka CLI tools shipped with Kafka have been installed to `/opt/kafka/bin`, the pod starts in the `/opt/kafka` directory to shorten the path to run those tools. When leveraging any Kafka command-line tool in this path, at minimum the `--bootstrap-server` and `--command-config` flags will need to be set. The `BOOTSTRAP_SERVERS` env var can be used for `--bootstrap-server` value, and the `KAFKA_AUTH_CONFIG` env var can be used for the `--command-config` value. Note some commands have different names for the auth config flag (for example, `kafka-console-consumer` uses `--consumer.config`). Check the commands `--help` flag for details on what flag to use.
+
+#### Accessing Inventory API DB
+
+Postgres connection details are set using standard supported [Postgres environment variables](https://www.postgresql.org/docs/16/libpq-envars.html). To connect to Inventory API DB and execute queries, simply run `psql` to be dropped into a shell where you can execute queries against the DB.
+
+#### Authenticating with kcat
+
+`kcat` is a useful tool for both consuming events from topics and producing events to them, especially where headers must be defined, as the built-in Kafka tools do not support setting headers. We leverage `kcat` for pushing an event to a topic for replication fixes or for trigging ad-hoc snapshots with Debeizum.
+
+Similar to using the Kafka CLI tools, any `kcat` commands will require the bootstrap server address(es) and authentication information. The following can be affixed to any kcat commands to ensure proper connection and authentication:
+
+`-b $BOOTSTRAP_SERVERS -X security.protocol=sasl_ssl -X sasl.mechanisms=SCRAM-SHA-512 -X sasl.username=$KAFKA_USERNAME -X sasl.password=$KAFKA_PW`
 
 ### Removing the Debug Container
 

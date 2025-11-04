@@ -356,7 +356,7 @@ func (r *resourceRepository) FindCurrentAndPreviousVersionedRepresentations(tx *
 	// Log the query intent before execution
 	{
 		localId, resType, repType, repInst := key.LocalResourceId().Serialize(), key.ResourceType().Serialize(), key.ReporterType().Serialize(), key.ReporterInstanceId().Serialize()
-		var cv uint = *currentCommonVersion
+		cv := *currentCommonVersion
 		log.Infof("FindCurrentAndPreviousVersionedRepresentations: localResourceId=%s resourceType=%s reporterType=%s reporterInstanceId=%s op=%s currentCommonVersion=%d includeAllGenerations=%t", localId, resType, repType, repInst, operationType.OperationType(), cv, includeAllGenerations)
 	}
 

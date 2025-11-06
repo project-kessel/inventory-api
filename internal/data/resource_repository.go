@@ -295,29 +295,6 @@ func (r *resourceRepository) GetTransactionManager() usecase.TransactionManager 
 	return r.transactionManager
 }
 
-// includeAllGenerations checks if we need to look across all generations
-// to find previous workspace_id. Returns true when current generation > 0,
-// indicating the resource has been resurrected from a tombstone.
-func (r *resourceRepository) includeAllGenerations(tx *gorm.DB, key bizmodel.ReporterResourceKey) (bool, error) {
-	var generation uint
-	db := r.getDBSession(tx)
-
-	query := db.Table("reporter_resources rr").
-		Select("rr.generation")
-
-	query = r.buildReporterResourceKeyQuery(query, key)
-
-	row := query.Limit(1).Row()
-	if err := row.Scan(&generation); err != nil {
-		return false, fmt.Errorf("failed to get current generation: %w", err)
-	}
-
-	// If generation > 0, we've had a resurrection and need to look at previous generations
-	includeAll := generation > 0
-
-	return includeAll, nil
-}
-
 func (r *resourceRepository) FindCurrentAndPreviousVersionedRepresentations(tx *gorm.DB, key bizmodel.ReporterResourceKey, currentCommonVersion *uint, operationType biz.EventOperationType) ([]RepresentationsByVersion, error) {
 	if currentCommonVersion == nil {
 		return []RepresentationsByVersion{}, nil
@@ -327,22 +304,9 @@ func (r *resourceRepository) FindCurrentAndPreviousVersionedRepresentations(tx *
 
 	db := r.getDBSession(tx)
 
-	includeAllGenerations, err := r.includeAllGenerations(tx, key)
-	if err != nil {
-		return nil, err
-	}
-
-	// DISTINCT is required when includeAllGenerations=true because multiple reporter_resources
-	// rows (different generations) can share the same resource_id and join to the same
-	// common_representations rows, producing duplicate (data, version) pairs.
 	query := db.Table("reporter_resources rr").
-		Select("DISTINCT cr.data, cr.version").
-		Joins("JOIN common_representations cr ON rr.resource_id = cr.resource_id")
-
-	// Only filter by current generation if we haven't had a resurrection
-	if !includeAllGenerations {
-		query = query.Joins("JOIN reporter_representations rrep ON rrep.reporter_resource_id = rr.id AND rrep.generation = rr.generation")
-	}
+		Select("cr.data, cr.version").
+		Joins("JOIN common_representations cr ON cr.resource_id = rr.resource_id")
 
 	query = r.buildReporterResourceKeyQuery(query, key)
 
@@ -350,31 +314,11 @@ func (r *resourceRepository) FindCurrentAndPreviousVersionedRepresentations(tx *
 		query = query.Where("cr.version = ?", *currentCommonVersion)
 	} else {
 		query = query.Where("(cr.version = ? OR cr.version = ?)", *currentCommonVersion, *currentCommonVersion-1)
-
 	}
 
-	// Log the query intent before execution
-	{
-		localId, resType, repType, repInst := key.LocalResourceId().Serialize(), key.ResourceType().Serialize(), key.ReporterType().Serialize(), key.ReporterInstanceId().Serialize()
-		cv := *currentCommonVersion
-		log.Infof("FindCurrentAndPreviousVersionedRepresentations: localResourceId=%s resourceType=%s reporterType=%s reporterInstanceId=%s op=%s currentCommonVersion=%d includeAllGenerations=%t", localId, resType, repType, repInst, operationType.OperationType(), cv, includeAllGenerations)
-	}
-
-	err = query.Find(&results).Error
+	err := query.Find(&results).Error
 	if err != nil {
 		return nil, fmt.Errorf("failed to find common representations by version: %w", err)
-	}
-	// Log the versions returned to aid debugging generation boundaries
-	{
-		if len(results) == 0 {
-			log.Infof("FindCurrentAndPreviousVersionedRepresentations: returned 0 rows")
-		} else {
-			versions := make([]uint, 0, len(results))
-			for _, r := range results {
-				versions = append(versions, r.Version)
-			}
-			log.Infof("FindCurrentAndPreviousVersionedRepresentations: returned versions=%v", versions)
-		}
 	}
 	return results, nil
 }

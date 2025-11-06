@@ -2480,3 +2480,312 @@ func testTransactionIDUniqueConstraint(t *testing.T, repo ResourceRepository, db
 		require.NoError(t, err, "Second CommonRepresentation with empty TransactionID should save successfully")
 	})
 }
+
+func createTestResourceWithWorkspace(t *testing.T, localResourceId, resourceType, workspaceId string) bizmodel.Resource {
+	resourceId := uuid.New()
+	reporterResourceId := uuid.New()
+
+	var reporterData internal.JsonObject
+	var reporterType string
+	var reporterInstanceId string
+
+	if resourceType == "host" {
+		reporterData = internal.JsonObject{
+			"hostname": "test-host",
+			"status":   "active",
+		}
+		reporterType = "hbi"
+		reporterInstanceId = "hbi-instance-1"
+	} else {
+		reporterData = internal.JsonObject{
+			"name":      "test-cluster",
+			"namespace": "default",
+		}
+		reporterType = "ocm"
+		reporterInstanceId = "ocm-instance-1"
+	}
+
+	commonData := internal.JsonObject{
+		"workspace_id": workspaceId,
+		"labels":       map[string]interface{}{"env": "test"},
+	}
+
+	localResourceIdType, err := bizmodel.NewLocalResourceId(localResourceId)
+	require.NoError(t, err)
+
+	resourceTypeType, err := bizmodel.NewResourceType(resourceType)
+	require.NoError(t, err)
+
+	reporterTypeType, err := bizmodel.NewReporterType(reporterType)
+	require.NoError(t, err)
+
+	reporterInstanceIdType, err := bizmodel.NewReporterInstanceId(reporterInstanceId)
+	require.NoError(t, err)
+
+	resourceIdType, err := bizmodel.NewResourceId(resourceId)
+	require.NoError(t, err)
+
+	reporterResourceIdType, err := bizmodel.NewReporterResourceId(reporterResourceId)
+	require.NoError(t, err)
+
+	apiHref, err := bizmodel.NewApiHref("https://api.example.com/resource/123")
+	require.NoError(t, err)
+
+	consoleHref, err := bizmodel.NewConsoleHref("https://console.example.com/resource/123")
+	require.NoError(t, err)
+
+	reporterRepresentation, err := bizmodel.NewRepresentation(reporterData)
+	require.NoError(t, err)
+
+	commonRepresentation, err := bizmodel.NewRepresentation(commonData)
+	require.NoError(t, err)
+
+	transactionId := newUniqueTxID(fmt.Sprintf("test-transaction-id-with-workspace-%s-%s-%s", localResourceId, resourceType, workspaceId))
+
+	resource, err := bizmodel.NewResource(resourceIdType, localResourceIdType, resourceTypeType, reporterTypeType, reporterInstanceIdType, transactionId, reporterResourceIdType, apiHref, consoleHref, reporterRepresentation, commonRepresentation, nil)
+	require.NoError(t, err)
+
+	return resource
+}
+
+func TestFindCurrentAndPreviousVersionedRepresentations_GenerationBoundary(t *testing.T) {
+	// This test verifies that FindCurrentAndPreviousVersionedRepresentations
+	// correctly retrieves workspace_id across generation boundaries.
+	// This is critical for tuple replication when resources are resurrected.
+	//
+	// Scenario (mirrors test_gen_scenario.sh):
+	// 1. Create resource with workspace_1 (generation 0, version 0)
+	// 2. Delete resource (tombstone=true, generation 0)
+	// 3. Resurrect with workspace_2 (generation 1, version 1) ← CRITICAL: must find workspace_1
+	// 4. Update to workspace_3 (generation 1, version 2)
+	// 5. Update to workspace_4 (generation 1, version 3)
+	// 6. Delete resource (tombstone=true, generation 1)
+	// 7. Resurrect with workspace_5 (generation 2, version 4) ← CRITICAL: must find workspace_4
+	// 8. Update to workspace_6 (generation 2, version 5)
+
+	db := setupInMemoryDB(t)
+	mc := metricscollector.NewFakeMetricsCollector()
+	tm := NewGormTransactionManager(mc, 3)
+	repo := NewResourceRepository(db, tm)
+
+	// Step 1: Create resource with workspace_1 (generation 0, version 0)
+	t.Log("Step 1: Create resource with workspace_1 (generation 0)")
+	resource := createTestResourceWithWorkspace(t, "gen-boundary-test", "host", "workspace_1")
+	err := repo.Save(db, resource, biz.OperationTypeCreated, "tx-gen-1")
+	require.NoError(t, err)
+
+	key, err := bizmodel.NewReporterResourceKey("gen-boundary-test", "host", "hbi", "hbi-instance-1")
+	require.NoError(t, err)
+
+	// Verify generation 0
+	var gen uint
+	err = db.Raw(`
+		SELECT generation FROM reporter_resources 
+		WHERE local_resource_id = ? AND reporter_type = ?
+	`, "gen-boundary-test", "hbi").Scan(&gen).Error
+	require.NoError(t, err)
+	assert.Equal(t, uint(0), gen, "Should be at generation 0")
+
+	// Step 2: Delete resource (tombstone=true, generation 0)
+	t.Log("Step 2: Delete resource (tombstone=true)")
+	foundResource, err := repo.FindResourceByKeys(db, key)
+	require.NoError(t, err)
+	err = foundResource.Delete(key)
+	require.NoError(t, err)
+	err = repo.Save(db, *foundResource, biz.OperationTypeDeleted, "tx-gen-2")
+	require.NoError(t, err)
+
+	// Verify still generation 0, but tombstoned
+	var tombstone bool
+	err = db.Raw(`
+		SELECT tombstone FROM reporter_resources 
+		WHERE local_resource_id = ? AND reporter_type = ?
+	`, "gen-boundary-test", "hbi").Scan(&tombstone).Error
+	require.NoError(t, err)
+	assert.True(t, tombstone, "Should be tombstoned")
+
+	// Step 3: Resurrect with workspace_2 (generation 1, version 1)
+	t.Log("Step 3: Resurrect with workspace_2 (generation 1) - CRITICAL TEST #1")
+
+	// Re-fetch to get fresh state
+	foundResource, err = repo.FindResourceByKeys(db, key)
+	require.NoError(t, err)
+
+	updatedCommon, err := bizmodel.NewRepresentation(map[string]interface{}{"workspace_id": "workspace_2"})
+	require.NoError(t, err)
+	updatedReporter, err := bizmodel.NewRepresentation(map[string]interface{}{"hostname": "resurrected"})
+	require.NoError(t, err)
+
+	err = foundResource.Update(key, "", "", nil, updatedReporter, updatedCommon, newUniqueTxID("tx-gen-3"))
+	require.NoError(t, err)
+	err = repo.Save(db, *foundResource, biz.OperationTypeUpdated, "tx-gen-3")
+	require.NoError(t, err)
+
+	// Verify generation incremented to 1
+	err = db.Raw(`
+		SELECT generation FROM reporter_resources 
+		WHERE local_resource_id = ? AND reporter_type = ?
+	`, "gen-boundary-test", "hbi").Scan(&gen).Error
+	require.NoError(t, err)
+	assert.Equal(t, uint(1), gen, "Should be at generation 1 after resurrection")
+
+	// CRITICAL TEST: Query should find both workspace_2 (current) and workspace_1 (previous from gen 0)
+	version := uint(1)
+	representations, err := repo.FindCurrentAndPreviousVersionedRepresentations(db, key, &version, biz.OperationTypeUpdated)
+	require.NoError(t, err)
+
+	currentWS, previousWS := GetCurrentAndPreviousWorkspaceID(representations, version)
+	assert.Equal(t, "workspace_2", currentWS, "Current workspace should be workspace_2")
+	assert.Equal(t, "workspace_1", previousWS, "Previous workspace should be workspace_1 (from generation 0)")
+
+	// Step 4: Update to workspace_3 (generation 1, version 2)
+	t.Log("Step 4: Update to workspace_3 (generation 1)")
+	foundResource, err = repo.FindResourceByKeys(db, key)
+	require.NoError(t, err)
+
+	updatedCommon, err = bizmodel.NewRepresentation(map[string]interface{}{"workspace_id": "workspace_3"})
+	require.NoError(t, err)
+	updatedReporter, err = bizmodel.NewRepresentation(map[string]interface{}{"hostname": "updated"})
+	require.NoError(t, err)
+
+	err = foundResource.Update(key, "", "", nil, updatedReporter, updatedCommon, newUniqueTxID("tx-gen-4"))
+	require.NoError(t, err)
+	err = repo.Save(db, *foundResource, biz.OperationTypeUpdated, "tx-gen-4")
+	require.NoError(t, err)
+
+	// Verify still generation 1
+	err = db.Raw(`
+		SELECT generation FROM reporter_resources 
+		WHERE local_resource_id = ? AND reporter_type = ?
+	`, "gen-boundary-test", "hbi").Scan(&gen).Error
+	require.NoError(t, err)
+	assert.Equal(t, uint(1), gen, "Should still be at generation 1")
+
+	// Query should find workspace_3 (current) and workspace_2 (previous)
+	version = uint(2)
+	representations, err = repo.FindCurrentAndPreviousVersionedRepresentations(db, key, &version, biz.OperationTypeUpdated)
+	require.NoError(t, err)
+
+	currentWS, previousWS = GetCurrentAndPreviousWorkspaceID(representations, version)
+	assert.Equal(t, "workspace_3", currentWS, "Current workspace should be workspace_3")
+	assert.Equal(t, "workspace_2", previousWS, "Previous workspace should be workspace_2")
+
+	// Step 5: Update to workspace_4 (generation 1, version 3)
+	t.Log("Step 5: Update to workspace_4 (generation 1)")
+	foundResource, err = repo.FindResourceByKeys(db, key)
+	require.NoError(t, err)
+
+	updatedCommon, err = bizmodel.NewRepresentation(map[string]interface{}{"workspace_id": "workspace_4"})
+	require.NoError(t, err)
+	updatedReporter, err = bizmodel.NewRepresentation(map[string]interface{}{"hostname": "updated2"})
+	require.NoError(t, err)
+
+	err = foundResource.Update(key, "", "", nil, updatedReporter, updatedCommon, newUniqueTxID("tx-gen-5"))
+	require.NoError(t, err)
+	err = repo.Save(db, *foundResource, biz.OperationTypeUpdated, "tx-gen-5")
+	require.NoError(t, err)
+
+	// Step 6: Delete resource again (tombstone=true, generation 1)
+	t.Log("Step 6: Delete resource again (tombstone=true, generation 1)")
+	foundResource, err = repo.FindResourceByKeys(db, key)
+	require.NoError(t, err)
+
+	err = foundResource.Delete(key)
+	require.NoError(t, err)
+	err = repo.Save(db, *foundResource, biz.OperationTypeDeleted, "tx-gen-6")
+	require.NoError(t, err)
+
+	// Verify still generation 1, but tombstoned
+	err = db.Raw(`
+		SELECT generation, tombstone FROM reporter_resources 
+		WHERE local_resource_id = ? AND reporter_type = ?
+	`, "gen-boundary-test", "hbi").Row().Scan(&gen, &tombstone)
+	require.NoError(t, err)
+	assert.Equal(t, uint(1), gen, "Should still be at generation 1")
+	assert.True(t, tombstone, "Should be tombstoned")
+
+	// Step 7: Resurrect with workspace_5 (generation 2, version 4)
+	t.Log("Step 7: Resurrect with workspace_5 (generation 2) - CRITICAL TEST #2")
+
+	foundResource, err = repo.FindResourceByKeys(db, key)
+	require.NoError(t, err)
+
+	updatedCommon, err = bizmodel.NewRepresentation(map[string]interface{}{"workspace_id": "workspace_5"})
+	require.NoError(t, err)
+	updatedReporter, err = bizmodel.NewRepresentation(map[string]interface{}{"hostname": "resurrected2"})
+	require.NoError(t, err)
+
+	err = foundResource.Update(key, "", "", nil, updatedReporter, updatedCommon, newUniqueTxID("tx-gen-7"))
+	require.NoError(t, err)
+	err = repo.Save(db, *foundResource, biz.OperationTypeUpdated, "tx-gen-7")
+	require.NoError(t, err)
+
+	// Verify generation incremented to 2
+	err = db.Raw(`
+		SELECT generation FROM reporter_resources 
+		WHERE local_resource_id = ? AND reporter_type = ?
+	`, "gen-boundary-test", "hbi").Scan(&gen).Error
+	require.NoError(t, err)
+	assert.Equal(t, uint(2), gen, "Should be at generation 2 after second resurrection")
+
+	// CRITICAL TEST #2: Query should find workspace_5 (current) and workspace_4 (previous from gen 1)
+	version = uint(4)
+	representations, err = repo.FindCurrentAndPreviousVersionedRepresentations(db, key, &version, biz.OperationTypeUpdated)
+	require.NoError(t, err)
+
+	currentWS, previousWS = GetCurrentAndPreviousWorkspaceID(representations, version)
+	assert.Equal(t, "workspace_5", currentWS, "Current workspace should be workspace_5")
+	assert.Equal(t, "workspace_4", previousWS, "Previous workspace should be workspace_4 (from generation 1)")
+
+	// Step 8: Update to workspace_6 (generation 2, version 5)
+	t.Log("Step 8: Update to workspace_6 (generation 2)")
+	foundResource, err = repo.FindResourceByKeys(db, key)
+	require.NoError(t, err)
+
+	updatedCommon, err = bizmodel.NewRepresentation(map[string]interface{}{"workspace_id": "workspace_6"})
+	require.NoError(t, err)
+	updatedReporter, err = bizmodel.NewRepresentation(map[string]interface{}{"hostname": "final"})
+	require.NoError(t, err)
+
+	err = foundResource.Update(key, "", "", nil, updatedReporter, updatedCommon, newUniqueTxID("tx-gen-8"))
+	require.NoError(t, err)
+	err = repo.Save(db, *foundResource, biz.OperationTypeUpdated, "tx-gen-8")
+	require.NoError(t, err)
+
+	// Final verification: workspace_6 (current) and workspace_5 (previous)
+	version = uint(5)
+	representations, err = repo.FindCurrentAndPreviousVersionedRepresentations(db, key, &version, biz.OperationTypeUpdated)
+	require.NoError(t, err)
+
+	currentWS, previousWS = GetCurrentAndPreviousWorkspaceID(representations, version)
+	assert.Equal(t, "workspace_6", currentWS, "Final workspace should be workspace_6")
+	assert.Equal(t, "workspace_5", previousWS, "Previous workspace should be workspace_5")
+
+	// Edge case verification: Ensure historical common_representations are preserved
+	t.Log("Edge case: Verify common_representations history is preserved")
+	var commonRepCount int64
+	err = db.Raw(`
+		SELECT COUNT(DISTINCT cr.version)
+		FROM common_representations cr
+		WHERE cr.resource_id = (
+			SELECT resource_id 
+			FROM reporter_resources 
+			WHERE local_resource_id = ? AND reporter_type = ?
+		)
+	`, "gen-boundary-test", "hbi").Scan(&commonRepCount).Error
+	require.NoError(t, err)
+	assert.GreaterOrEqual(t, commonRepCount, int64(6), "Should have at least 6 common representation versions")
+
+	// Verify resource_id is consistent across all generations
+	t.Log("Edge case: Verify resource_id stays consistent across generations")
+	var distinctResourceIds int64
+	err = db.Raw(`
+		SELECT COUNT(DISTINCT resource_id)
+		FROM reporter_resources
+		WHERE local_resource_id = ? AND reporter_type = ?
+	`, "gen-boundary-test", "hbi").Scan(&distinctResourceIds).Error
+	require.NoError(t, err)
+	assert.Equal(t, int64(1), distinctResourceIds, "Should have exactly 1 resource_id across all generations")
+
+	t.Log("Generation boundary test complete! Verified query works correctly across 3 generations (0, 1, 2)")
+}

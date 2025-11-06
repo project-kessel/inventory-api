@@ -314,6 +314,7 @@ func (r *resourceRepository) FindCurrentAndPreviousVersionedRepresentations(tx *
 		query = query.Where("cr.version = ?", *currentCommonVersion)
 	} else {
 		query = query.Where("(cr.version = ? OR cr.version = ?)", *currentCommonVersion, *currentCommonVersion-1)
+
 	}
 
 	err := query.Find(&results).Error

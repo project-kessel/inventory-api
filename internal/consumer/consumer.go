@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/project-kessel/inventory-api/cmd/common"
+	"github.com/project-kessel/inventory-api/internal"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
 	usecase_resources "github.com/project-kessel/inventory-api/internal/biz/usecase/resources"
 	"github.com/project-kessel/inventory-api/internal/consumer/auth"
@@ -62,19 +63,20 @@ type Consumer interface {
 
 // InventoryConsumer defines a Consumer with required clients and configs to call Relations API and update the Inventory DB with consistency tokens
 type InventoryConsumer struct {
-	Consumer         Consumer
-	OffsetStorage    []kafka.TopicPartition
-	Config           CompletedConfig
-	DB               *gorm.DB
-	AuthzConfig      authz.CompletedConfig
-	Authorizer       api.Authorizer
-	Errors           chan error
-	MetricsCollector *metricscollector.MetricsCollector
-	Logger           *log.Helper
-	AuthOptions      *auth.Options
-	RetryOptions     *retry.Options
-	Notifier         pubsub.Notifier
-	SchemaService    *usecase_resources.SchemaUsecase
+	Consumer           Consumer
+	OffsetStorage      []kafka.TopicPartition
+	Config             CompletedConfig
+	DB                 *gorm.DB
+	ResourceRepository data.ResourceRepository
+	AuthzConfig        authz.CompletedConfig
+	Authorizer         api.Authorizer
+	Errors             chan error
+	MetricsCollector   *metricscollector.MetricsCollector
+	Logger             *log.Helper
+	AuthOptions        *auth.Options
+	RetryOptions       *retry.Options
+	Notifier           pubsub.Notifier
+	SchemaService      *usecase_resources.SchemaUsecase
 	// offsetMutex protects OffsetStorage and coordinates offset commit operations
 	// to prevent race conditions between shutdown and rebalance callbacks
 	offsetMutex sync.Mutex
@@ -129,13 +131,14 @@ func New(config CompletedConfig, db *gorm.DB, authz authz.CompletedConfig, autho
 
 	maxSerializationRetries := viper.GetInt("storage.max-serialization-retries")
 	resourceRepository := data.NewResourceRepository(db, data.NewGormTransactionManager(&mc, maxSerializationRetries))
-	schemaService := usecase_resources.NewSchemaUsecase(resourceRepository, logger)
+	schemaService := usecase_resources.NewSchemaUsecase(logger)
 
 	return InventoryConsumer{
 		Consumer:           consumer,
 		OffsetStorage:      make([]kafka.TopicPartition, 0),
 		Config:             config,
 		DB:                 db,
+		ResourceRepository: resourceRepository,
 		AuthzConfig:        authz,
 		Authorizer:         authorizer,
 		Errors:             errChan,
@@ -306,14 +309,49 @@ func (i *InventoryConsumer) ProcessMessage(headers map[string]string, relationsE
 		i.Logger.Infof("processing message: operation=%s, txid=%s", operation, txid)
 		i.Logger.Debugf("processed message tuple=%s", msg.Value)
 		if relationsEnabled {
-			tuplesToReplicate, err := i.calculateTuplesOrNoOp(msg.Value, operation, biz.OperationTypeCreated, txid)
+			// Parse the message into a TupleEvent
+			tupleEvent, err := ParseMessage(msg.Value, operation)
 			if err != nil {
+				metricscollector.Incr(i.MetricsCollector.MsgProcessFailures, "ParseMessage")
+				i.Logger.Errorf("failed to parse message for tuple: %v", err)
+				return "", err
+			}
+			key := tupleEvent.ReporterResourceKey()
+			// If no current version, it's a no-op
+			if tupleEvent.CommonVersion() == nil {
+				i.Logger.Infof("no-op for operation=%s, txid=%s", operation, txid)
+				return "", nil
+			}
+			version := tupleEvent.CommonVersion().Uint()
+			currentVersion := &version
+			// Fetch current and previous representations from DB
+			representations, err := i.ResourceRepository.FindCurrentAndPreviousVersionedRepresentations(nil, key, currentVersion, biz.OperationTypeCreated)
+			if err != nil {
+				metricscollector.Incr(i.MetricsCollector.MsgProcessFailures, "FindRepresentations")
+				i.Logger.Errorf("failed to find representations: %v", err)
+				return "", err
+			}
+			// Calculate tuples using schema service from representations
+			tuplesToReplicate, err := i.SchemaService.CalculateTuples(representations, key)
+			if err != nil {
+				metricscollector.Incr(i.MetricsCollector.MsgProcessFailures, "CalculateTuples")
+				i.Logger.Errorf("failed to calculate tuples: %v", err)
 				return "", err
 			}
 
 			// Skip SpiceDB call if no tuples to replicate
 			if tuplesToReplicate.IsEmpty() {
-				return "", nil
+				// Fallback: generate a placeholder tuple to ensure consistency token propagation
+				placeholder := []model.RelationsTuple{model.NewWorkspaceRelationsTuple("", key)}
+				resp, err := i.Retry(func() (string, error) {
+					return i.CreateTuple(context.Background(), &placeholder)
+				}, i.MetricsCollector.MsgProcessFailures)
+				if err != nil {
+					metricscollector.Incr(i.MetricsCollector.MsgProcessFailures, "CreateTuple")
+					i.Logger.Errorf("failed to create tuple (placeholder): %v", err)
+					return "", err
+				}
+				return resp, nil
 			}
 
 			// Only retry the actual SpiceDB call
@@ -332,14 +370,49 @@ func (i *InventoryConsumer) ProcessMessage(headers map[string]string, relationsE
 		i.Logger.Infof("processing message: operation=%s, txid=%s", operation, txid)
 		i.Logger.Debugf("processed message tuple=%s", msg.Value)
 		if relationsEnabled {
-			tuplesToReplicate, err := i.calculateTuplesOrNoOp(msg.Value, operation, biz.OperationTypeUpdated, txid)
+			// Parse the message into a TupleEvent
+			tupleEvent, err := ParseMessage(msg.Value, operation)
 			if err != nil {
+				metricscollector.Incr(i.MetricsCollector.MsgProcessFailures, "ParseMessage")
+				i.Logger.Errorf("failed to parse message for tuple: %v", err)
+				return "", err
+			}
+			key := tupleEvent.ReporterResourceKey()
+			// If no current version, it's a no-op
+			if tupleEvent.CommonVersion() == nil {
+				i.Logger.Infof("no-op for operation=%s, txid=%s", operation, txid)
+				return "", nil
+			}
+			version := tupleEvent.CommonVersion().Uint()
+			currentVersion := &version
+			// Fetch current and previous representations from DB
+			representations, err := i.ResourceRepository.FindCurrentAndPreviousVersionedRepresentations(nil, key, currentVersion, biz.OperationTypeUpdated)
+			if err != nil {
+				metricscollector.Incr(i.MetricsCollector.MsgProcessFailures, "FindRepresentations")
+				i.Logger.Errorf("failed to find representations: %v", err)
+				return "", err
+			}
+			// Calculate tuples using schema service from representations
+			tuplesToReplicate, err := i.SchemaService.CalculateTuples(representations, key)
+			if err != nil {
+				metricscollector.Incr(i.MetricsCollector.MsgProcessFailures, "CalculateTuples")
+				i.Logger.Errorf("failed to calculate tuples: %v", err)
 				return "", err
 			}
 
 			// Skip SpiceDB call if no tuples to replicate
 			if tuplesToReplicate.IsEmpty() {
-				return "", nil
+				// Fallback: generate a placeholder tuple to ensure consistency token propagation
+				placeholder := []model.RelationsTuple{model.NewWorkspaceRelationsTuple("", key)}
+				resp, err := i.Retry(func() (string, error) {
+					return i.UpdateTuple(context.Background(), &placeholder, nil)
+				}, i.MetricsCollector.MsgProcessFailures)
+				if err != nil {
+					metricscollector.Incr(i.MetricsCollector.MsgProcessFailures, "UpdateTuple")
+					i.Logger.Errorf("failed to update tuple (placeholder): %v", err)
+					return "", err
+				}
+				return resp, nil
 			}
 
 			// Only retry the actual SpiceDB call
@@ -357,8 +430,31 @@ func (i *InventoryConsumer) ProcessMessage(headers map[string]string, relationsE
 		i.Logger.Infof("processing message: operation=%s, txid=%s", operation, txid)
 		i.Logger.Debugf("processed message tuple=%s", msg.Value)
 		if relationsEnabled {
-			tuplesToReplicate, err := i.calculateTuplesOrNoOp(msg.Value, operation, biz.OperationTypeDeleted, txid)
+			// Parse the message into a TupleEvent
+			tupleEvent, err := ParseMessage(msg.Value, operation)
 			if err != nil {
+				metricscollector.Incr(i.MetricsCollector.MsgProcessFailures, "ParseMessage")
+				i.Logger.Errorf("failed to parse message for tuple: %v", err)
+				return "", err
+			}
+			key := tupleEvent.ReporterResourceKey()
+			// Fetch latest representation from DB
+			representation, err := i.ResourceRepository.FindLatestRepresentations(nil, key)
+			if err != nil {
+				metricscollector.Incr(i.MetricsCollector.MsgProcessFailures, "FindLatestRepresentations")
+				i.Logger.Errorf("failed to find latest representations: %v", err)
+				return "", err
+			}
+			// For delete: synthesize an empty "current" state above the latest version
+			synth := data.RepresentationsByVersion{
+				Data:    internal.JsonObject{},      // no workspace -> delete
+				Version: representation.Version + 1, // ensure it is treated as current
+			}
+			reps := []data.RepresentationsByVersion{representation, synth}
+			tuplesToReplicate, err := i.SchemaService.CalculateTuples(reps, key)
+			if err != nil {
+				metricscollector.Incr(i.MetricsCollector.MsgProcessFailures, "CalculateTuples")
+				i.Logger.Errorf("failed to calculate tuples: %v", err)
 				return "", err
 			}
 
@@ -386,29 +482,7 @@ func (i *InventoryConsumer) ProcessMessage(headers map[string]string, relationsE
 	return "", nil
 }
 
-// calculateTuplesOrNoOp parses the message, calculates tuples, and checks if it's a no-op.
-// Returns the tuples, a boolean indicating if it's a no-op (empty), and an error.
-func (i *InventoryConsumer) calculateTuplesOrNoOp(msgValue []byte, operation string, operationType biz.EventOperationType, txid string) (model.TuplesToReplicate, error) {
-	tupleEvent, err := ParseMessage(msgValue, operation)
-	if err != nil {
-		metricscollector.Incr(i.MetricsCollector.MsgProcessFailures, "ParseMessage")
-		i.Logger.Errorf("failed to parse message for tuple: %v", err)
-		return model.TuplesToReplicate{}, err
-	}
-
-	tuplesToReplicate, err := i.SchemaService.CalculateTuples(*tupleEvent, operationType)
-	if err != nil {
-		metricscollector.Incr(i.MetricsCollector.MsgProcessFailures, "CalculateTuples")
-		i.Logger.Errorf("failed to calculate tuples: %v", err)
-		return model.TuplesToReplicate{}, err
-	}
-
-	if tuplesToReplicate.IsEmpty() {
-		i.Logger.Infof("no-op for operation=%s, txid=%s", operation, txid)
-	}
-
-	return tuplesToReplicate, nil
-}
+// (removed) calculateTuplesOrNoOp: logic moved inline per operation branch
 
 func ParseHeaders(msg *kafka.Message) (map[string]string, error) {
 	headers := make(map[string]string)

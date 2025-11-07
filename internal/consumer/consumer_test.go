@@ -7,7 +7,6 @@ import (
 
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
 	"github.com/google/uuid"
-	"github.com/project-kessel/inventory-api/internal/data"
 	"github.com/project-kessel/inventory-api/internal/metricscollector"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -105,8 +104,7 @@ func (t *TestCase) TestSetup(testingT *testing.T) []error {
 		return errs
 	}
 
-	fakeRepo := data.NewFakeResourceRepositoryWithWorkspaceOverrides("test-workspace-123", "")
-	t.inv.SchemaService = usecase_resources.NewSchemaUsecase(fakeRepo, t.logger)
+	t.inv.SchemaService = usecase_resources.NewSchemaUsecase(t.logger)
 
 	err = t.metrics.New(otel.Meter("github.com/project-kessel/inventory-api/blob/main/internal/server/otel"))
 	if err != nil {
@@ -940,8 +938,7 @@ func TestInventoryConsumer_UpdateWithSameWorkspace_NoOp(t *testing.T) {
 	assert.Nil(t, errs)
 
 	// Configure fake repo: same workspace for current and previous (simulates no change)
-	fakeRepo := data.NewFakeResourceRepositoryWithWorkspaceOverrides("ws-unchanged", "ws-unchanged")
-	tester.inv.SchemaService = usecase_resources.NewSchemaUsecase(fakeRepo, tester.logger)
+	tester.inv.SchemaService = usecase_resources.NewSchemaUsecase(tester.logger)
 
 	// Mock authorizer: should NOT be called (no tuples to create/delete)
 	authorizer := &mocks.MockAuthz{}

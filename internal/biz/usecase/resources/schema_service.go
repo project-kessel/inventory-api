@@ -82,10 +82,5 @@ func (sc *SchemaUsecase) buildTuplesToReplicate(currentWorkspaceID, previousWork
 		tuplesToDelete = append(tuplesToDelete, model.NewWorkspaceRelationsTuple(previousWorkspaceID, key))
 	}
 
-	tuples, err := model.NewTuplesToReplicate(tuplesToCreate, tuplesToDelete)
-	if err != nil {
-		return model.TuplesToReplicate{}, err
-	}
-
-	return tuples, nil
+	return model.NewTuplesToReplicate(tuplesToCreate, tuplesToDelete)
 }

@@ -306,7 +306,7 @@ func (r *resourceRepository) FindCurrentAndPreviousVersionedRepresentations(tx *
 
 	query := db.Table("reporter_resources rr").
 		Select("cr.data, cr.version").
-		Joins("JOIN common_representations cr ON cr.resource_id = rr.resource_id")
+		Joins("JOIN common_representations cr ON rr.resource_id = cr.resource_id")
 
 	query = r.buildReporterResourceKeyQuery(query, key)
 

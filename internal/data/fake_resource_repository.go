@@ -119,7 +119,7 @@ func (f *fakeResourceRepository) Save(tx *gorm.DB, resource bizmodel.Resource, o
 	stored := &storedResource{
 		resourceID:            resourceSnapshot.ID,
 		resourceType:          resourceSnapshot.Type,
-		commonVersion:         resourceSnapshot.CommonVersion,
+		commonVersion:         *resourceSnapshot.CommonVersion,
 		commonData:            commonRepresentationSnapshot.Representation.Data,
 		reporterResourceID:    reporterResourceSnapshot.ID,
 		localResourceID:       reporterResourceSnapshot.ReporterResourceKey.LocalResourceID,
@@ -199,7 +199,7 @@ func (f *fakeResourceRepository) FindResourceByKeys(tx *gorm.DB, key bizmodel.Re
 		resourceSnapshot := bizmodel.ResourceSnapshot{
 			ID:               latestResource.resourceID,
 			Type:             latestResource.resourceType,
-			CommonVersion:    latestResource.commonVersion,
+			CommonVersion:    &latestResource.commonVersion,
 			ConsistencyToken: "",
 		}
 

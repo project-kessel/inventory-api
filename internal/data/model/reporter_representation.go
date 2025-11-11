@@ -18,7 +18,7 @@ type ReporterRepresentation struct {
 	Version            uint      `gorm:"type:bigint;primaryKey;check:version >= 0"`
 	Generation         uint      `gorm:"type:bigint;primaryKey;check:generation >= 0"`
 	ReporterVersion    *string   `gorm:"size:128"`
-	CommonVersion      uint      `gorm:"type:bigint;check:common_version >= 0"`
+	CommonVersion      *uint     `gorm:"type:bigint;check:common_version IS NULL OR common_version >= 0"`
 	TransactionId      string    `gorm:"size:128;index:ux_reporter_reps_txid_nn,where:transaction_id IS NOT NULL AND transaction_id != '',unique"`
 	Tombstone          bool      `gorm:"not null"`
 	CreatedAt          time.Time
@@ -34,7 +34,7 @@ func NewReporterRepresentation(
 	reporterResourceID uuid.UUID,
 	version uint,
 	generation uint,
-	commonVersion uint,
+	commonVersion *uint,
 	transactionId string,
 	tombstone bool,
 	reporterVersion *string,
@@ -60,11 +60,17 @@ func NewReporterRepresentation(
 }
 
 func validateReporterRepresentation(rr *ReporterRepresentation) error {
+	// Validate common version only if it's provided
+	var commonVersionErr error
+	if rr.CommonVersion != nil {
+		commonVersionErr = bizmodel.ValidateMinValueUint("CommonVersion", *rr.CommonVersion, MinCommonVersion)
+	}
+	
 	return bizmodel.AggregateErrors(
 		bizmodel.ValidateUUIDRequired("ReporterResourceID", rr.ReporterResourceID),
 		bizmodel.ValidateMinValueUint("Version", rr.Version, MinVersionValue),
 		bizmodel.ValidateMinValueUint("Generation", rr.Generation, MinGenerationValue),
-		bizmodel.ValidateMinValueUint("CommonVersion", rr.CommonVersion, MinCommonVersion),
+		commonVersionErr,
 		bizmodel.ValidateMaxLength("TransactionId", rr.TransactionId, MaxTransactionIdLength),
 		bizmodel.ValidateOptionalString("ReporterVersion", rr.ReporterVersion, MaxReporterVersionLength),
 	)

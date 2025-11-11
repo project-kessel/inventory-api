@@ -339,6 +339,7 @@ func (f *TestFixture) SpecialCharsCommonRepresentation() *CommonRepresentation {
 
 // ValidReporterRepresentation returns a valid ReporterRepresentation for testing
 func (f *TestFixture) ValidReporterRepresentation() *ReporterRepresentation {
+	commonVersion := uint(1)
 	rr, err := NewReporterRepresentation(
 		internal.JsonObject{
 			"satellite_id":            "2c4196f1-0371-4f4c-8913-e113cfaa6e67",
@@ -347,9 +348,9 @@ func (f *TestFixture) ValidReporterRepresentation() *ReporterRepresentation {
 			"ansible_host":            "host-1",
 		},
 		uuid.MustParse("dd1b73b9-3e33-4264-968c-e3ce55b9afec"), // reporterResourceID
-		1, // version
-		1, // generation
-		1, // commonVersion
+		1,               // version
+		1,               // generation
+		&commonVersion,  // commonVersion
 		"test-transaction-id-valid-reporter",
 		false,
 		internal.StringPtr("2.7.16"),
@@ -366,6 +367,7 @@ func (f *TestFixture) ReporterRepresentationWithLocalResourceID(localResourceID 
 	if err != nil {
 		return nil, err
 	}
+	commonVersion := uint(1)
 	rr, err := NewReporterRepresentation(
 		internal.JsonObject{
 			"satellite_id":            "2c4196f1-0371-4f4c-8913-e113cfaa6e67",
@@ -376,7 +378,7 @@ func (f *TestFixture) ReporterRepresentationWithLocalResourceID(localResourceID 
 		reporterResourceUUID,
 		1,
 		1,
-		1,
+		&commonVersion,
 		"test-transaction-id-with-local-resource-id",
 		false,
 		internal.StringPtr("2.7.16"),
@@ -389,6 +391,7 @@ func (f *TestFixture) ReporterRepresentationWithLocalResourceID(localResourceID 
 
 // ReporterRepresentationWithResourceType returns a ReporterRepresentation with specified local resource ID
 func (f *TestFixture) ReporterRepresentationWithResourceType(resourceType string) (*ReporterRepresentation, error) {
+	commonVersion := uint(1)
 	rr, err := NewReporterRepresentation(
 		internal.JsonObject{
 			"satellite_id":            "2c4196f1-0371-4f4c-8913-e113cfaa6e67",
@@ -399,7 +402,7 @@ func (f *TestFixture) ReporterRepresentationWithResourceType(resourceType string
 		uuid.MustParse("dd1b73b9-3e33-4264-968c-e3ce55b9afec"),
 		1,
 		1,
-		1,
+		&commonVersion,
 		"test-transaction-id-with-resource-type",
 		false,
 		internal.StringPtr("2.7.16"),
@@ -436,12 +439,13 @@ func (f *TestFixture) ReporterRepresentationWithTombstone(tombstone bool) *Repor
 		}
 	}
 
+	commonVersion := uint(1)
 	rr, err := NewReporterRepresentation(
 		data,
 		uuid.MustParse("550e8400-e29b-41d4-a716-446655440001"),
 		1,
 		1,
-		1,
+		&commonVersion,
 		"test-transaction-id-with-tombstone",
 		tombstone,
 		nil,
@@ -454,12 +458,13 @@ func (f *TestFixture) ReporterRepresentationWithTombstone(tombstone bool) *Repor
 
 // ReporterRepresentationWithReporterVersion returns a ReporterRepresentation with a custom reporterVersion
 func (f *TestFixture) ReporterRepresentationWithReporterVersion(ver *string) *ReporterRepresentation {
+	commonVersion := uint(1)
 	rr, err := NewReporterRepresentation(
 		internal.JsonObject{"test": "data"},
 		uuid.MustParse("550e8400-e29b-41d4-a716-446655440002"),
 		2,
 		0,
-		1,
+		&commonVersion,
 		"test-transaction-id-with-reporter-version",
 		false,
 		ver,
@@ -472,12 +477,13 @@ func (f *TestFixture) ReporterRepresentationWithReporterVersion(ver *string) *Re
 
 // ReporterRepresentationWithNilReporterVersion returns a ReporterRepresentation with nil reporter version
 func (f *TestFixture) ReporterRepresentationWithNilReporterVersion() *ReporterRepresentation {
+	commonVersion := uint(1)
 	rr, err := NewReporterRepresentation(
 		internal.JsonObject{"test": "data"},
 		uuid.MustParse("550e8400-e29b-41d4-a716-446655440003"),
 		1,
 		1,
-		1,
+		&commonVersion,
 		"test-transaction-id-with-nil-reporter-version",
 		false,
 		nil,

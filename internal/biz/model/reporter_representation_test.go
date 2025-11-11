@@ -337,7 +337,7 @@ func TestReporterRepresentation_BusinessRules(t *testing.T) {
 			0, // zero version
 			0, // zero generation
 			fixture.ValidRepresentationType(),
-			0, // zero common version
+			fixture.NilCommonVersionType(), // nil common version (optional - testing without common representation)
 			fixture.ValidReporterVersionType(),
 			fixture.ValidTransactionIdType(),
 		)
@@ -348,5 +348,37 @@ func TestReporterRepresentation_BusinessRules(t *testing.T) {
 		if dataRep.Data() == nil {
 			t.Error("Expected valid ReporterDataRepresentation with zero values, got struct with nil data")
 		}
+	})
+
+	t.Run("should accept nil common version parameter", func(t *testing.T) {
+		t.Parallel()
+
+		dataRep, err := NewReporterDataRepresentation(
+			fixture.ValidReporterResourceIdType(),
+			fixture.ValidVersionType(),
+			fixture.ValidGenerationType(),
+			fixture.ValidRepresentationType(),
+			nil, // nil common version parameter
+			fixture.ValidReporterVersionType(),
+			fixture.ValidTransactionIdType(),
+		)
+
+		assertValidReporterDataRepresentation(t, dataRep, err, "nil common version parameter")
+	})
+
+	t.Run("should accept non-nil common version parameter", func(t *testing.T) {
+		t.Parallel()
+
+		dataRep, err := NewReporterDataRepresentation(
+			fixture.ValidReporterResourceIdType(),
+			fixture.ValidVersionType(),
+			fixture.ValidGenerationType(),
+			fixture.ValidRepresentationType(),
+			fixture.ValidCommonVersionType(), // non-nil common version parameter
+			fixture.ValidReporterVersionType(),
+			fixture.ValidTransactionIdType(),
+		)
+
+		assertValidReporterDataRepresentation(t, dataRep, err, "non-nil common version parameter")
 	})
 }

@@ -329,9 +329,14 @@ func (uc *Usecase) createResource(tx *gorm.DB, request *v1beta2.ReportResourceRe
 		return fmt.Errorf("invalid reporter representation: %w", err)
 	}
 
-	commonRepresentation, err := model.NewRepresentation(request.GetRepresentations().GetCommon().AsMap())
-	if err != nil {
-		return fmt.Errorf("invalid common representation: %w", err)
+	// Common representation is optional - check if it's provided
+	var commonRepresentation model.Representation
+	commonMap := request.GetRepresentations().GetCommon().AsMap()
+	if commonMap != nil && len(commonMap) > 0 {
+		commonRepresentation, err = model.NewRepresentation(commonMap)
+		if err != nil {
+			return fmt.Errorf("invalid common representation: %w", err)
+		}
 	}
 
 	transactionId := model.NewTransactionId(request.GetRepresentations().GetMetadata().GetTransactionId())
@@ -432,9 +437,14 @@ func extractUpdateDataFromRequest(request *v1beta2.ReportResourceRequest) (
 		reporterVersion = &rv
 	}
 
-	commonRepresentation, err := model.NewRepresentation(request.GetRepresentations().GetCommon().AsMap())
-	if err != nil {
-		return model.ReporterResourceKey{}, "", "", nil, model.Representation(nil), model.Representation(nil), "", fmt.Errorf("invalid common data: %w", err)
+	// Common representation is optional - check if it's provided
+	var commonRepresentation model.Representation
+	commonMap := request.GetRepresentations().GetCommon().AsMap()
+	if commonMap != nil && len(commonMap) > 0 {
+		commonRepresentation, err = model.NewRepresentation(commonMap)
+		if err != nil {
+			return model.ReporterResourceKey{}, "", "", nil, model.Representation(nil), model.Representation(nil), "", fmt.Errorf("invalid common data: %w", err)
+		}
 	}
 
 	reporterRepresentation, err := model.NewRepresentation(request.GetRepresentations().GetReporter().AsMap())

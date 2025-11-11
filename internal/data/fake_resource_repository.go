@@ -121,7 +121,7 @@ func (f *fakeResourceRepository) Save(tx *gorm.DB, resource bizmodel.Resource, o
 	stored := &storedResource{
 		resourceID:            resourceSnapshot.ID,
 		resourceType:          resourceSnapshot.Type,
-		commonVersion:         resourceSnapshot.CommonVersion,
+		commonVersion:         *resourceSnapshot.CommonVersion,
 		commonData:            commonRepresentationSnapshot.Representation.Data,
 		consistencyToken:      resourceSnapshot.ConsistencyToken,
 		reporterResourceID:    reporterResourceSnapshot.ID,

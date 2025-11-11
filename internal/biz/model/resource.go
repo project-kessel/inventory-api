@@ -12,7 +12,7 @@ const initialCommonVersion = 0
 type Resource struct {
 	id                   ResourceId
 	resourceType         ResourceType
-	commonVersion        Version
+	commonVersion        *Version
 	consistencyToken     ConsistencyToken
 	reporterResources    []ReporterResource
 	resourceReportEvents []ResourceReportEvent
@@ -30,7 +30,13 @@ func NewResource(id ResourceId, localResourceId LocalResourceId, resourceType Re
 		}
 	}
 
-	commonVersion := NewVersion(initialCommonVersion)
+	// If common representation data is provided, initialize commonVersion to 0
+	// Otherwise, leave it as nil
+	var commonVersion *Version
+	if commonRepresentationData != nil && len(commonRepresentationData) > 0 {
+		cv := NewVersion(initialCommonVersion)
+		commonVersion = &cv
+	}
 
 	reporterResource, err := NewReporterResource(
 		reporterResourceId,
@@ -88,7 +94,21 @@ func (r *Resource) Update(
 	commonRepresentationData Representation,
 	transactionId TransactionId,
 ) error {
-	r.commonVersion = r.commonVersion.Increment()
+	// Only increment commonVersion if common representation data is provided
+	var commonVersion *Version
+	if commonRepresentationData != nil && len(commonRepresentationData) > 0 {
+		// If we have existing commonVersion, increment it
+		if r.commonVersion != nil {
+			cv := r.commonVersion.Increment()
+			commonVersion = &cv
+		} else {
+			// If we didn't have commonVersion before but now we have common data, initialize to 0
+			cv := NewVersion(initialCommonVersion)
+			commonVersion = &cv
+		}
+		r.commonVersion = commonVersion
+	}
+	// If no common representation provided, keep commonVersion as nil (or unchanged if it was set before)
 
 	reporterResource, err := r.findReporterResourceToUpdateByKey(key)
 	if err != nil {
@@ -120,7 +140,7 @@ func (r *Resource) Update(
 		reporterVersion,
 		reporterResource.representationVersion,
 		reporterResource.generation,
-		r.commonVersion)
+		commonVersion)
 	if err != nil {
 		return fmt.Errorf("failed to create updated ResourceReportEvent: %w", err)
 	}
@@ -176,7 +196,7 @@ func resourceEventAndRepresentations(
 	reporterVersion *ReporterVersion,
 	representationVersion Version,
 	generation Generation,
-	commonVersion Version,
+	commonVersion *Version,
 ) (ResourceReportEvent, error) {
 
 	reporterRepresentation, err := NewReporterDataRepresentation(
@@ -192,17 +212,22 @@ func resourceEventAndRepresentations(
 		return ResourceReportEvent{}, fmt.Errorf("invalid ReporterRepresentation: %w", err)
 	}
 
-	commonRepresentation, err := NewCommonRepresentation(
-		resourceId,
-		commonData,
-		commonVersion,
-		reporterType,
-		reporterInstanceId,
-		transactionId,
-	)
-	if err != nil {
-		return ResourceReportEvent{}, fmt.Errorf("invalid CommonRepresentation: %w", err)
+	// Only create CommonRepresentation if common data is provided
+	var commonRepresentation CommonRepresentation
+	if commonData != nil && len(commonData) > 0 && commonVersion != nil {
+		commonRepresentation, err = NewCommonRepresentation(
+			resourceId,
+			commonData,
+			*commonVersion,
+			reporterType,
+			reporterInstanceId,
+			transactionId,
+		)
+		if err != nil {
+			return ResourceReportEvent{}, fmt.Errorf("invalid CommonRepresentation: %w", err)
+		}
 	}
+
 	resourceEvent, err := NewResourceReportEvent(
 		resourceId,
 		resourceType,
@@ -301,10 +326,16 @@ func (r Resource) Serialize() (ResourceSnapshot, ReporterResourceSnapshot, Repor
 		updatedAt = r.resourceReportEvents[0].updatedAt
 	}
 
+	var commonVersionUint *uint
+	if r.commonVersion != nil {
+		cv := r.commonVersion.Serialize()
+		commonVersionUint = &cv
+	}
+
 	resourceSnapshot := ResourceSnapshot{
 		ID:               r.id.Serialize(),
 		Type:             r.resourceType.Serialize(),
-		CommonVersion:    r.commonVersion.Serialize(),
+		CommonVersion:    commonVersionUint,
 		ConsistencyToken: r.consistencyToken.Serialize(),
 		CreatedAt:        createdAt,
 		UpdatedAt:        updatedAt,
@@ -351,10 +382,16 @@ func DeserializeResource(
 
 	resourceEvent := DeserializeResourceEvent(reporterRepresentationSnapshot, commonRepresentationSnapshot)
 
+	var commonVersion *Version
+	if resourceSnapshot.CommonVersion != nil {
+		cv := DeserializeVersion(*resourceSnapshot.CommonVersion)
+		commonVersion = &cv
+	}
+
 	return &Resource{
 		id:                   DeserializeResourceId(resourceSnapshot.ID),
 		resourceType:         DeserializeResourceType(resourceSnapshot.Type),
-		commonVersion:        DeserializeVersion(resourceSnapshot.CommonVersion),
+		commonVersion:        commonVersion,
 		consistencyToken:     DeserializeConsistencyToken(resourceSnapshot.ConsistencyToken),
 		reporterResources:    reporterResources,
 		resourceReportEvents: []ResourceReportEvent{resourceEvent},

@@ -152,7 +152,7 @@ func TestIndividualSnapshotMethods(t *testing.T) {
 		versionOne,
 		genOne,
 		testData,
-		versionOne,
+		&versionOne,
 		nil, // No reporter version for this test
 		transactionId,
 	)
@@ -191,10 +191,11 @@ func TestSnapshotSerialization(t *testing.T) {
 	t.Parallel()
 
 	// Test that snapshots can be used for JSON serialization
+	commonVersion := uint(1)
 	snapshot := ResourceSnapshot{
 		ID:               uuid.New(),
 		Type:             "test-resource",
-		CommonVersion:    1,
+		CommonVersion:    &commonVersion,
 		ConsistencyToken: "test-token",
 		CreatedAt:        time.Now(),
 		UpdatedAt:        time.Now(),
@@ -207,7 +208,7 @@ func TestSnapshotSerialization(t *testing.T) {
 	if snapshot.Type != "test-resource" {
 		t.Error("Snapshot Type should match")
 	}
-	if snapshot.CommonVersion != 1 {
+	if snapshot.CommonVersion == nil || *snapshot.CommonVersion != 1 {
 		t.Error("Snapshot CommonVersion should match")
 	}
 

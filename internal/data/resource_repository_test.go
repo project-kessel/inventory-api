@@ -2416,12 +2416,13 @@ func testTransactionIDUniqueConstraint(t *testing.T, repo ResourceRepository, db
 		duplicateTxID := newUniqueTxID("reporter-duplicate-test")
 		reporterResourceID := uuid.New()
 
+		commonVersion := uint(1)
 		reporterRep1, err := datamodel.NewReporterRepresentation(
 			internal.JsonObject{"name": "test-resource-1"},
 			reporterResourceID,
 			1,
 			1,
-			1,
+			&commonVersion,
 			duplicateTxID.Serialize(),
 			false,
 			nil,
@@ -2433,7 +2434,7 @@ func testTransactionIDUniqueConstraint(t *testing.T, repo ResourceRepository, db
 			uuid.New(), // Different reporter resource ID
 			1,
 			1,
-			1,
+			&commonVersion,
 			duplicateTxID.Serialize(), // Same TransactionID
 			false,
 			nil,

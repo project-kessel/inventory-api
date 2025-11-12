@@ -35,7 +35,7 @@ func NewResource(id ResourceId, localResourceId LocalResourceId, resourceType Re
 	// If common representation data is provided, initialize commonVersion to 0
 	// Otherwise, leave it as nil
 	var commonVersion *Version
-	if commonRepresentationData != nil && len(commonRepresentationData) > 0 {
+	if len(commonRepresentationData) > 0 {
 		cv := NewVersion(initialCommonVersion)
 		commonVersion = &cv
 	}
@@ -102,7 +102,7 @@ func (r *Resource) Update(
 ) error {
 	// Only increment commonVersion if common representation data is provided
 	var commonVersion *Version
-	if commonRepresentationData != nil && len(commonRepresentationData) > 0 {
+	if len(commonRepresentationData) > 0 {
 		// If we have existing commonVersion, increment it
 		if r.commonVersion != nil {
 			cv := r.commonVersion.Increment()
@@ -228,7 +228,7 @@ func resourceEventAndRepresentations(
 
 	// Only create CommonRepresentation if common data is provided
 	var commonRepresentation CommonRepresentation
-	if commonData != nil && len(commonData) > 0 && commonVersion != nil {
+	if len(commonData) > 0 && commonVersion != nil {
 		commonRepresentation, err = NewCommonRepresentation(
 			resourceId,
 			commonData,

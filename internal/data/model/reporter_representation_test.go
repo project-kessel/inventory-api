@@ -241,8 +241,8 @@ func TestReporterRepresentation_EdgeCases(t *testing.T) {
 		_, err := NewReporterRepresentation(
 			internal.JsonObject{"test": "data"},
 			uuid.MustParse("550e8400-e29b-41d4-a716-446655440012"),
-			4294967295, // Max uint32 Version
-			4294967295, // Max uint32 Generation
+			4294967295,     // Max uint32 Version
+			4294967295,     // Max uint32 Generation
 			&commonVersion, // Max uint32 CommonVersion
 			"test-transaction-id-large-integers",
 			false,

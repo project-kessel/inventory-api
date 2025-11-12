@@ -15,7 +15,6 @@ import (
 	"time"
 
 	"github.com/project-kessel/inventory-api/cmd/common"
-	"github.com/project-kessel/inventory-api/internal"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
 	usecase_resources "github.com/project-kessel/inventory-api/internal/biz/usecase/resources"
 	"github.com/project-kessel/inventory-api/internal/consumer/auth"
@@ -325,14 +324,14 @@ func (i *InventoryConsumer) ProcessMessage(headers map[string]string, relationsE
 			version := tupleEvent.CommonVersion().Uint()
 			currentVersion := &version
 			// Fetch current and previous representations from DB
-			representations, err := i.ResourceRepository.FindCurrentAndPreviousVersionedRepresentations(nil, key, currentVersion, biz.OperationTypeCreated)
+			current, previous, err := i.ResourceRepository.FindCurrentAndPreviousVersionedRepresentations(nil, key, currentVersion, biz.OperationTypeCreated)
 			if err != nil {
 				metricscollector.Incr(i.MetricsCollector.MsgProcessFailures, "FindRepresentations")
 				i.Logger.Errorf("failed to find representations: %v", err)
 				return "", err
 			}
 			// Calculate tuples using schema service from representations
-			tuplesToReplicate, err := i.SchemaService.CalculateTuples(representations, key)
+			tuplesToReplicate, err := i.SchemaService.CalculateTuples(current, previous, key)
 			if err != nil {
 				metricscollector.Incr(i.MetricsCollector.MsgProcessFailures, "CalculateTuples")
 				i.Logger.Errorf("failed to calculate tuples: %v", err)
@@ -386,14 +385,14 @@ func (i *InventoryConsumer) ProcessMessage(headers map[string]string, relationsE
 			version := tupleEvent.CommonVersion().Uint()
 			currentVersion := &version
 			// Fetch current and previous representations from DB
-			representations, err := i.ResourceRepository.FindCurrentAndPreviousVersionedRepresentations(nil, key, currentVersion, biz.OperationTypeUpdated)
+			current, previous, err := i.ResourceRepository.FindCurrentAndPreviousVersionedRepresentations(nil, key, currentVersion, biz.OperationTypeUpdated)
 			if err != nil {
 				metricscollector.Incr(i.MetricsCollector.MsgProcessFailures, "FindRepresentations")
 				i.Logger.Errorf("failed to find representations: %v", err)
 				return "", err
 			}
 			// Calculate tuples using schema service from representations
-			tuplesToReplicate, err := i.SchemaService.CalculateTuples(representations, key)
+			tuplesToReplicate, err := i.SchemaService.CalculateTuples(current, previous, key)
 			if err != nil {
 				metricscollector.Incr(i.MetricsCollector.MsgProcessFailures, "CalculateTuples")
 				i.Logger.Errorf("failed to calculate tuples: %v", err)
@@ -439,30 +438,22 @@ func (i *InventoryConsumer) ProcessMessage(headers map[string]string, relationsE
 			}
 			key := tupleEvent.ReporterResourceKey()
 			// Fetch latest representation from DB
-			representation, err := i.ResourceRepository.FindLatestRepresentations(nil, key)
+			previous, err := i.ResourceRepository.FindLatestRepresentations(nil, key)
 			if err != nil {
 				metricscollector.Incr(i.MetricsCollector.MsgProcessFailures, "FindLatestRepresentations")
 				i.Logger.Errorf("failed to find latest representations: %v", err)
 				return "", err
 			}
-			// For delete: synthesize an empty "current" state above the latest version
-			synth := data.RepresentationsByVersion{
-				Data:    internal.JsonObject{},      // no workspace -> delete
-				Version: representation.Version + 1, // ensure it is treated as current
-			}
-			reps := []data.RepresentationsByVersion{representation, synth}
-			tuplesToReplicate, err := i.SchemaService.CalculateTuples(reps, key)
+			tuplesToReplicate, err := i.SchemaService.CalculateTuples(nil, previous, key)
 			if err != nil {
 				metricscollector.Incr(i.MetricsCollector.MsgProcessFailures, "CalculateTuples")
 				i.Logger.Errorf("failed to calculate tuples: %v", err)
 				return "", err
 			}
-
 			// Skip SpiceDB call if no tuples to replicate
 			if tuplesToReplicate.IsEmpty() {
 				return "", nil
 			}
-
 			// Only retry the actual SpiceDB call
 			_, err = i.Retry(func() (string, error) {
 				return i.DeleteTuple(context.Background(), *tuplesToReplicate.TuplesToDelete())

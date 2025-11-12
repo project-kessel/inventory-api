@@ -5,8 +5,7 @@ import (
 
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/project-kessel/inventory-api/internal/biz"
-	"github.com/project-kessel/inventory-api/internal/biz/model"
-	"github.com/project-kessel/inventory-api/internal/data"
+	bizmodel "github.com/project-kessel/inventory-api/internal/biz/model"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -71,44 +70,44 @@ func TestCalculateTuples(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			sc := NewSchemaUsecase(log.NewHelper(log.DefaultLogger))
-			key, err := model.NewReporterResourceKey(
-				model.LocalResourceId("test-resource"),
-				model.ResourceType("host"),
-				model.ReporterType("HBI"),
-				model.ReporterInstanceId("test-instance"),
+			key, err := bizmodel.NewReporterResourceKey(
+				bizmodel.LocalResourceId("test-resource"),
+				bizmodel.ResourceType("host"),
+				bizmodel.ReporterType("HBI"),
+				bizmodel.ReporterInstanceId("test-instance"),
 			)
 			require.NoError(t, err)
 
 			// Build representations input
-			var reps []data.RepresentationsByVersion
+			var current, previous *bizmodel.Representations
+
+			currentData := map[string]interface{}{}
 			if tt.currentWorkspaceID != "" {
-				reps = append(reps, data.RepresentationsByVersion{
-					Version: tt.version,
-					Data: map[string]interface{}{
-						"workspace_id": tt.currentWorkspaceID,
-					},
-				})
-			} else {
-				// Synthetic empty current (for delete-like or no-op scenarios)
-				reps = append(reps, data.RepresentationsByVersion{
-					Version: tt.version,
-					Data:    map[string]interface{}{},
-				})
+				currentData = map[string]interface{}{"workspace_id": tt.currentWorkspaceID}
 			}
+			current, err = bizmodel.NewRepresentations(
+				bizmodel.Representation(currentData),
+				&tt.version,
+				nil,
+				nil,
+			)
+			require.NoError(t, err)
+
 			if tt.previousWorkspaceID != "" {
 				prevVer := uint(0)
 				if tt.version > 0 {
 					prevVer = tt.version - 1
 				}
-				reps = append(reps, data.RepresentationsByVersion{
-					Version: prevVer,
-					Data: map[string]interface{}{
-						"workspace_id": tt.previousWorkspaceID,
-					},
-				})
+				previous, err = bizmodel.NewRepresentations(
+					bizmodel.Representation(map[string]interface{}{"workspace_id": tt.previousWorkspaceID}),
+					&prevVer,
+					nil,
+					nil,
+				)
+				require.NoError(t, err)
 			}
 
-			result, err := sc.CalculateTuples(reps, key)
+			result, err := sc.CalculateTuples(current, previous, key)
 			require.NoError(t, err)
 			assert.Equal(t, tt.expectTuplesToCreate, result.HasTuplesToCreate())
 			assert.Equal(t, tt.expectTuplesToDelete, result.HasTuplesToDelete())
@@ -151,43 +150,54 @@ func TestCalculateTuples(t *testing.T) {
 func TestGetWorkspaceVersions(t *testing.T) {
 	sc := NewSchemaUsecase(log.NewHelper(log.DefaultLogger))
 
-	key, err := model.NewReporterResourceKey(
-		model.LocalResourceId("test-resource"),
-		model.ResourceType("host"),
-		model.ReporterType("HBI"),
-		model.ReporterInstanceId("test-instance"),
+	key, err := bizmodel.NewReporterResourceKey(
+		bizmodel.LocalResourceId("test-resource"),
+		bizmodel.ResourceType("host"),
+		bizmodel.ReporterType("HBI"),
+		bizmodel.ReporterInstanceId("test-instance"),
 	)
 	require.NoError(t, err)
 
 	version := uint(1)
-	reps := []data.RepresentationsByVersion{
-		{Version: version, Data: map[string]interface{}{"workspace_id": "ws-current"}},
-		{Version: version - 1, Data: map[string]interface{}{"workspace_id": "ws-prev"}},
-	}
-	result, err := sc.CalculateTuples(reps, key)
+	current, err := bizmodel.NewRepresentations(
+		bizmodel.Representation(map[string]interface{}{"workspace_id": "ws-current"}),
+		&version,
+		nil,
+		nil,
+	)
+	require.NoError(t, err)
+	prevVersion := version - 1
+	previous, err := bizmodel.NewRepresentations(
+		bizmodel.Representation(map[string]interface{}{"workspace_id": "ws-prev"}),
+		&prevVersion,
+		nil,
+		nil,
+	)
+	require.NoError(t, err)
+	result, err := sc.CalculateTuples(current, previous, key)
 	require.NoError(t, err)
 	assert.True(t, result.HasTuplesToCreate() || result.HasTuplesToDelete())
 }
 
 func TestCreateWorkspaceTuple(t *testing.T) {
-	key, err := model.NewReporterResourceKey(
-		model.LocalResourceId("test-resource"),
-		model.ResourceType("host"),
-		model.ReporterType("HBI"),
-		model.ReporterInstanceId("test-instance"),
+	key, err := bizmodel.NewReporterResourceKey(
+		bizmodel.LocalResourceId("test-resource"),
+		bizmodel.ResourceType("host"),
+		bizmodel.ReporterType("HBI"),
+		bizmodel.ReporterInstanceId("test-instance"),
 	)
 	require.NoError(t, err)
 
 	tests := []struct {
 		name        string
 		workspaceID string
-		validate    func(t *testing.T, tuple model.RelationsTuple)
+		validate    func(t *testing.T, tuple bizmodel.RelationsTuple)
 	}{
 		{
 			name:        "normal workspace ID",
 			workspaceID: "workspace-123",
-			validate: func(t *testing.T, tuple model.RelationsTuple) {
-				assert.IsType(t, model.RelationsTuple{}, tuple)
+			validate: func(t *testing.T, tuple bizmodel.RelationsTuple) {
+				assert.IsType(t, bizmodel.RelationsTuple{}, tuple)
 
 				resource := tuple.Resource()
 				assert.Equal(t, "test-resource", resource.Id().String())
@@ -206,7 +216,7 @@ func TestCreateWorkspaceTuple(t *testing.T) {
 		{
 			name:        "workspace ID with special characters",
 			workspaceID: "workspace-with-dashes_and_underscores",
-			validate: func(t *testing.T, tuple model.RelationsTuple) {
+			validate: func(t *testing.T, tuple bizmodel.RelationsTuple) {
 				subject := tuple.Subject()
 				subjectResource := subject.Subject()
 				assert.Equal(t, "workspace-with-dashes_and_underscores", subjectResource.Id().String())
@@ -217,7 +227,7 @@ func TestCreateWorkspaceTuple(t *testing.T) {
 		{
 			name:        "empty workspace ID",
 			workspaceID: "",
-			validate: func(t *testing.T, tuple model.RelationsTuple) {
+			validate: func(t *testing.T, tuple bizmodel.RelationsTuple) {
 				subject := tuple.Subject()
 				subjectResource := subject.Subject()
 				assert.Equal(t, "", subjectResource.Id().String())
@@ -229,7 +239,7 @@ func TestCreateWorkspaceTuple(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tuple := model.NewWorkspaceRelationsTuple(tt.workspaceID, key)
+			tuple := bizmodel.NewWorkspaceRelationsTuple(tt.workspaceID, key)
 			tt.validate(t, tuple)
 		})
 	}
@@ -238,31 +248,33 @@ func TestCreateWorkspaceTuple(t *testing.T) {
 func TestDetermineTupleOperations(t *testing.T) {
 	sc := NewSchemaUsecase(log.NewHelper(log.DefaultLogger))
 
-	key, err := model.NewReporterResourceKey(
-		model.LocalResourceId("test-resource"),
-		model.ResourceType("host"),
-		model.ReporterType("HBI"),
-		model.ReporterInstanceId("test-instance"),
+	key, err := bizmodel.NewReporterResourceKey(
+		bizmodel.LocalResourceId("test-resource"),
+		bizmodel.ResourceType("host"),
+		bizmodel.ReporterType("HBI"),
+		bizmodel.ReporterInstanceId("test-instance"),
 	)
 	require.NoError(t, err)
 
-	representationVersion := []data.RepresentationsByVersion{
-		{
-			Version: 2,
-			Data: map[string]interface{}{
-				"workspace_id": "workspace-new",
-			},
-		},
-		{
-			Version: 1,
-			Data: map[string]interface{}{
-				"workspace_id": "workspace-old",
-			},
-		},
-	}
+	version2 := uint(2)
+	current, err := bizmodel.NewRepresentations(
+		bizmodel.Representation(map[string]interface{}{"workspace_id": "workspace-new"}),
+		&version2,
+		nil,
+		nil,
+	)
+	require.NoError(t, err)
 
-	currentWorkspaceID, previousWorkspaceID := data.GetCurrentAndPreviousWorkspaceID(representationVersion, 2)
-	result, err := sc.BuildTuplesToReplicate(currentWorkspaceID, previousWorkspaceID, key)
+	version1 := uint(1)
+	previous, err := bizmodel.NewRepresentations(
+		bizmodel.Representation(map[string]interface{}{"workspace_id": "workspace-old"}),
+		&version1,
+		nil,
+		nil,
+	)
+	require.NoError(t, err)
+
+	result, err := sc.CalculateTuples(current, previous, key)
 	require.NoError(t, err)
 
 	assert.True(t, result.HasTuplesToCreate() || result.HasTuplesToDelete())
@@ -320,44 +332,49 @@ func TestCalculateTuples_OperationTypeScenarios(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			sc := NewSchemaUsecase(log.NewHelper(log.DefaultLogger))
 
-			key, err := model.NewReporterResourceKey(
-				model.LocalResourceId("test-resource"),
-				model.ResourceType("host"),
-				model.ReporterType("HBI"),
-				model.ReporterInstanceId("test-instance"),
+			key, err := bizmodel.NewReporterResourceKey(
+				bizmodel.LocalResourceId("test-resource"),
+				bizmodel.ResourceType("host"),
+				bizmodel.ReporterType("HBI"),
+				bizmodel.ReporterInstanceId("test-instance"),
 			)
 			require.NoError(t, err)
 
 			// Build representations to reflect the scenario
-			var reps []data.RepresentationsByVersion
+			var current, previous *bizmodel.Representations
+
+			// Build current representation
 			if tc.currentWorkspaceID != "" {
-				reps = append(reps, data.RepresentationsByVersion{
-					Version: tc.version,
-					Data: map[string]interface{}{
-						"workspace_id": tc.currentWorkspaceID,
-					},
-				})
+				currentData := map[string]interface{}{"workspace_id": tc.currentWorkspaceID}
+				currentRep, err := bizmodel.NewRepresentations(
+					bizmodel.Representation(currentData),
+					&tc.version,
+					nil,
+					nil,
+				)
+				require.NoError(t, err)
+				current = currentRep
 			} else {
-				// synthetic empty current (used to emulate delete)
-				reps = append(reps, data.RepresentationsByVersion{
-					Version: tc.version + 1, // ensure it's considered current
-					Data:    map[string]interface{}{},
-				})
+				// For DELETE: current is nil (no new/current state)
+				current = nil
 			}
+
+			// Build previous representation
 			if tc.previousWorkspaceID != "" {
 				prevVer := uint(0)
 				if tc.version > 0 {
 					prevVer = tc.version - 1
 				}
-				reps = append(reps, data.RepresentationsByVersion{
-					Version: prevVer,
-					Data: map[string]interface{}{
-						"workspace_id": tc.previousWorkspaceID,
-					},
-				})
+				previous, err = bizmodel.NewRepresentations(
+					bizmodel.Representation(map[string]interface{}{"workspace_id": tc.previousWorkspaceID}),
+					&prevVer,
+					nil,
+					nil,
+				)
+				require.NoError(t, err)
 			}
 
-			result, err := sc.CalculateTuples(reps, key)
+			result, err := sc.CalculateTuples(current, previous, key)
 			require.NoError(t, err)
 
 			// Verify tuple creation expectations

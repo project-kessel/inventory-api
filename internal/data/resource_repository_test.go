@@ -20,6 +20,11 @@ import (
 	"github.com/project-kessel/inventory-api/internal/metricscollector"
 )
 
+// Helper function to create a pointer to a uint
+func ptrUint(v uint) *uint {
+	return &v
+}
+
 func TestResourceRepositoryContract(t *testing.T) {
 	implementations := []struct {
 		name string
@@ -1992,16 +1997,16 @@ func TestFindLatestRepresentations(t *testing.T) {
 
 			if impl.name == "Fake Repository" {
 				// For fake repository, check default behavior
-				assert.Equal(t, "test-workspace-latest", ExtractWorkspaceID(result))
-				assert.Equal(t, uint(1), result.Version)
+				assert.Equal(t, "test-workspace-latest", result.CommonData()["workspace_id"])
+				assert.Equal(t, uint(1), *result.CommonVersion())
 			} else {
 				// For real repository, should return the latest version (version 2)
-				assert.Equal(t, "workspace-v2-latest", ExtractWorkspaceID(result))
-				assert.Equal(t, uint(2), result.Version)
+				assert.Equal(t, "workspace-v2-latest", result.CommonData()["workspace_id"])
+				assert.Equal(t, uint(2), *result.CommonVersion())
 
 				// Verify it contains the latest data
-				assert.Equal(t, "production", result.Data["environment"])
-				assert.Equal(t, "us-east-1", result.Data["region"])
+				assert.Equal(t, "production", result.CommonData()["environment"])
+				assert.Equal(t, "us-east-1", result.CommonData()["region"])
 			}
 		})
 	}
@@ -2070,11 +2075,10 @@ func TestFindCurrentAndPreviousVersionedRepresentations(t *testing.T) {
 
 					// Get current and previous versions; then pick current
 					version := uint(1)
-					representations, err := repo.FindCurrentAndPreviousVersionedRepresentations(db, key, &version, biz.OperationTypeUpdated)
+					cur, prev, err := repo.FindCurrentAndPreviousVersionedRepresentations(db, key, &version, biz.OperationTypeUpdated)
 					require.NoError(t, err)
 
-					// Test the GetCurrentAndPreviousWorkspaceID function
-					currentWS, previousWS := GetCurrentAndPreviousWorkspaceID(representations, 1)
+					currentWS, previousWS := GetCurrentAndPreviousWorkspaceID(cur, prev, 1)
 					assert.Equal(t, "workspace-v1", currentWS)
 					assert.Equal(t, "test-workspace", previousWS) // From initial creation
 				} else {
@@ -2084,10 +2088,10 @@ func TestFindCurrentAndPreviousVersionedRepresentations(t *testing.T) {
 
 					// Test version 1 scenario (should return current and previous)
 					version := uint(1)
-					representations, err := repo.FindCurrentAndPreviousVersionedRepresentations(db, key, &version, biz.OperationTypeUpdated)
+					cur, prev, err := repo.FindCurrentAndPreviousVersionedRepresentations(db, key, &version, biz.OperationTypeUpdated)
 					require.NoError(t, err)
 
-					currentWS, previousWS := GetCurrentAndPreviousWorkspaceID(representations, 1)
+					currentWS, previousWS := GetCurrentAndPreviousWorkspaceID(cur, prev, 1)
 					assert.Equal(t, "workspace-current", currentWS)
 					assert.Equal(t, "workspace-previous", previousWS)
 				}
@@ -2108,10 +2112,10 @@ func TestFindCurrentAndPreviousVersionedRepresentations(t *testing.T) {
 
 				// Get version 0 representations
 				version := uint(0)
-				representations, err := repo.FindCurrentAndPreviousVersionedRepresentations(db, key, &version, biz.OperationTypeCreated)
+				cur, prev, err := repo.FindCurrentAndPreviousVersionedRepresentations(db, key, &version, biz.OperationTypeCreated)
 				require.NoError(t, err)
 
-				currentWS, previousWS := GetCurrentAndPreviousWorkspaceID(representations, 0)
+				currentWS, previousWS := GetCurrentAndPreviousWorkspaceID(cur, prev, 0)
 
 				if impl.name != "Fake Repository" {
 					assert.Equal(t, "test-workspace", currentWS)
@@ -2122,21 +2126,27 @@ func TestFindCurrentAndPreviousVersionedRepresentations(t *testing.T) {
 			})
 
 			t.Run("GetCurrentAndPreviousWorkspaceID handles empty representations", func(t *testing.T) {
-				// Test the function directly with empty data
-				representations := []RepresentationsByVersion{}
-				currentWS, previousWS := GetCurrentAndPreviousWorkspaceID(representations, 1)
+				// Test the function directly with nil data
+				currentWS, previousWS := GetCurrentAndPreviousWorkspaceID(nil, nil, 1)
 				assert.Equal(t, "", currentWS)
 				assert.Equal(t, "", previousWS)
 			})
 
 			t.Run("GetCurrentAndPreviousWorkspaceID handles invalid workspace_id types", func(t *testing.T) {
 				// Test the function directly with invalid data
-				representations := []RepresentationsByVersion{
-					{Data: map[string]interface{}{"workspace_id": 123}, Version: 1},    // non-string
-					{Data: map[string]interface{}{"workspace_id": ""}, Version: 0},     // empty string
-					{Data: map[string]interface{}{"other_field": "value"}, Version: 2}, // missing workspace_id
-				}
-				currentWS, previousWS := GetCurrentAndPreviousWorkspaceID(representations, 1)
+				current, _ := bizmodel.NewRepresentations(
+					bizmodel.Representation(map[string]interface{}{"workspace_id": 123}), // non-string
+					ptrUint(1),
+					nil,
+					nil,
+				)
+				previous, _ := bizmodel.NewRepresentations(
+					bizmodel.Representation(map[string]interface{}{"other_field": "value"}), // missing workspace_id
+					ptrUint(0),
+					nil,
+					nil,
+				)
+				currentWS, previousWS := GetCurrentAndPreviousWorkspaceID(current, previous, 1)
 				assert.Equal(t, "", currentWS)
 				assert.Equal(t, "", previousWS)
 			})

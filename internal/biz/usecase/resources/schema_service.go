@@ -3,7 +3,6 @@ package resources
 import (
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
-	"github.com/project-kessel/inventory-api/internal/data"
 )
 
 type SchemaUsecase struct {
@@ -16,44 +15,24 @@ func NewSchemaUsecase(logger *log.Helper) *SchemaUsecase {
 	}
 }
 
-func (sc *SchemaUsecase) CalculateTuples(representations []data.RepresentationsByVersion, key model.ReporterResourceKey) (model.TuplesToReplicate, error) {
-	if len(representations) == 0 {
-		return model.TuplesToReplicate{}, nil
+func (sc *SchemaUsecase) CalculateTuples(currentRepresentation, previousRepresentation *model.Representations, key model.ReporterResourceKey) (model.TuplesToReplicate, error) {
+	// Extract workspace IDs from representations
+	// currentRepresentation can be nil for DELETE operations (meaning no current/new state)
+	currentWorkspaceID := ""
+	if currentRepresentation != nil {
+		currentWorkspaceID = currentRepresentation.WorkspaceID()
+	}
+	previousWorkspaceID := ""
+	if previousRepresentation != nil {
+		previousWorkspaceID = previousRepresentation.WorkspaceID()
 	}
 
-	// Identify current (max version) and previous (next lower version)
-	var maxVer uint
-	for _, r := range representations {
-		if r.Version > maxVer {
-			maxVer = r.Version
-		}
-	}
-	var (
-		currentWorkspaceID  string
-		previousWorkspaceID string
-	)
-	for _, r := range representations {
-		if r.Version == maxVer && currentWorkspaceID == "" {
-			currentWorkspaceID = data.ExtractWorkspaceID(r)
-		}
-	}
-	// find the largest version lower than maxVer
-	var prevVer uint
-	for _, r := range representations {
-		if r.Version < maxVer && r.Version > prevVer {
-			prevVer = r.Version
-			previousWorkspaceID = data.ExtractWorkspaceID(r)
-		}
-	}
-
-	return sc.BuildTuplesToReplicate(currentWorkspaceID, previousWorkspaceID, key)
-}
-
-func (sc *SchemaUsecase) BuildTuplesToReplicate(currentWorkspaceID, previousWorkspaceID string, key model.ReporterResourceKey) (model.TuplesToReplicate, error) {
+	// Handle no-op case where workspace hasn't changed
 	if previousWorkspaceID != "" && previousWorkspaceID == currentWorkspaceID {
 		return model.TuplesToReplicate{}, nil
 	}
 
+	// Build tuples to create and delete
 	var tuplesToCreate, tuplesToDelete []model.RelationsTuple
 
 	if currentWorkspaceID != "" {

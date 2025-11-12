@@ -65,7 +65,7 @@ func validateReporterRepresentation(rr *ReporterRepresentation) error {
 	if rr.CommonVersion != nil {
 		commonVersionErr = bizmodel.ValidateMinValueUint("CommonVersion", *rr.CommonVersion, MinCommonVersion)
 	}
-	
+
 	return bizmodel.AggregateErrors(
 		bizmodel.ValidateUUIDRequired("ReporterResourceID", rr.ReporterResourceID),
 		bizmodel.ValidateMinValueUint("Version", rr.Version, MinVersionValue),

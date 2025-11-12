@@ -332,7 +332,7 @@ func (uc *Usecase) createResource(tx *gorm.DB, request *v1beta2.ReportResourceRe
 	// Common representation is optional - check if it's provided
 	var commonRepresentation model.Representation
 	commonMap := request.GetRepresentations().GetCommon().AsMap()
-	if commonMap != nil && len(commonMap) > 0 {
+	if len(commonMap) > 0 {
 		commonRepresentation, err = model.NewRepresentation(commonMap)
 		if err != nil {
 			return fmt.Errorf("invalid common representation: %w", err)
@@ -440,7 +440,7 @@ func extractUpdateDataFromRequest(request *v1beta2.ReportResourceRequest) (
 	// Common representation is optional - check if it's provided
 	var commonRepresentation model.Representation
 	commonMap := request.GetRepresentations().GetCommon().AsMap()
-	if commonMap != nil && len(commonMap) > 0 {
+	if len(commonMap) > 0 {
 		commonRepresentation, err = model.NewRepresentation(commonMap)
 		if err != nil {
 			return model.ReporterResourceKey{}, "", "", nil, model.Representation(nil), model.Representation(nil), "", fmt.Errorf("invalid common data: %w", err)

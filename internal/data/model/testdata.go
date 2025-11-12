@@ -348,9 +348,9 @@ func (f *TestFixture) ValidReporterRepresentation() *ReporterRepresentation {
 			"ansible_host":            "host-1",
 		},
 		uuid.MustParse("dd1b73b9-3e33-4264-968c-e3ce55b9afec"), // reporterResourceID
-		1,               // version
-		1,               // generation
-		&commonVersion,  // commonVersion
+		1,              // version
+		1,              // generation
+		&commonVersion, // commonVersion
 		"test-transaction-id-valid-reporter",
 		false,
 		internal.StringPtr("2.7.16"),

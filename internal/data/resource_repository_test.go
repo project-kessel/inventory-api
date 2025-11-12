@@ -2428,12 +2428,13 @@ func testTransactionIDUniqueConstraint(t *testing.T, repo ResourceRepository, db
 		require.NoError(t, db.Create(&reporterResource1).Error)
 		require.NoError(t, db.Create(&reporterResource2).Error)
 
+		commonVersion := uint(1)
 		reporterRep1, err := datamodel.NewReporterRepresentation(
 			internal.JsonObject{"name": "test-resource-1"},
 			reporterResourceID,
 			1,
 			1,
-			1,
+			&commonVersion,
 			duplicateTxID.Serialize(),
 			false,
 			nil,
@@ -2445,7 +2446,7 @@ func testTransactionIDUniqueConstraint(t *testing.T, repo ResourceRepository, db
 			reporterResourceID2, // Different reporter resource ID
 			1,
 			1,
-			1,
+			&commonVersion,
 			duplicateTxID.Serialize(), // Same TransactionID
 			false,
 			nil,

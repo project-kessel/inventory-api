@@ -14,7 +14,7 @@ type ReporterRepresentation struct {
 	version            Version
 	generation         Generation
 	reporterVersion    *ReporterVersion
-	commonVersion      Version
+	commonVersion      *Version
 	tombstone          Tombstone
 	transactionId      TransactionId
 }
@@ -32,7 +32,7 @@ func NewReporterDataRepresentation(
 	version Version,
 	generation Generation,
 	data Representation,
-	commonVersion Version,
+	commonVersion *Version,
 	reporterVersion *ReporterVersion,
 	transactionId TransactionId,
 ) (ReporterDataRepresentation, error) {
@@ -74,6 +74,7 @@ func NewReporterDeleteRepresentation(
 			reporterResourceID: reporterResourceID,
 			version:            version,
 			generation:         generation,
+			commonVersion:      nil, // For delete operations, common_version is always nil
 			tombstone:          NewTombstone(true),
 		},
 	}, nil
@@ -94,6 +95,12 @@ func (rr ReporterRepresentation) Serialize() ReporterRepresentationSnapshot {
 		reporterVersionStr = &versionStr
 	}
 
+	var commonVersionUint *uint
+	if rr.commonVersion != nil {
+		cv := rr.commonVersion.Serialize()
+		commonVersionUint = &cv
+	}
+
 	// Create representation snapshot
 	representationSnapshot := RepresentationSnapshot{
 		Data: rr.Representation.Serialize(),
@@ -106,7 +113,7 @@ func (rr ReporterRepresentation) Serialize() ReporterRepresentationSnapshot {
 		Version:            rr.version.Serialize(),
 		Generation:         rr.generation.Serialize(),
 		ReporterVersion:    reporterVersionStr,
-		CommonVersion:      rr.commonVersion.Serialize(),
+		CommonVersion:      commonVersionUint,
 		Tombstone:          rr.tombstone.Serialize(),
 		TransactionId:      rr.transactionId.Serialize(),
 		CreatedAt:          time.Now(), // TODO: Add proper timestamp from domain entity if available
@@ -123,9 +130,14 @@ func DeserializeReporterDataRepresentation(snapshot *ReporterRepresentationSnaps
 	representation := DeserializeRepresentation(snapshot.Representation.Data)
 	version := DeserializeVersion(snapshot.Version)
 	generation := DeserializeGeneration(snapshot.Generation)
-	commonVersion := DeserializeVersion(snapshot.CommonVersion)
 	tombstone := DeserializeTombstone(snapshot.Tombstone)
 	transactionId := DeserializeTransactionId(snapshot.TransactionId)
+
+	var commonVersion *Version
+	if snapshot.CommonVersion != nil {
+		cv := DeserializeVersion(*snapshot.CommonVersion)
+		commonVersion = &cv
+	}
 
 	var reporterVersion *ReporterVersion
 	if snapshot.ReporterVersion != nil {

@@ -832,8 +832,8 @@ func TestResourceRepository_IdempotentOperations(t *testing.T) {
 				// Verify initial state
 				afterCreate, err := repo.FindResourceByKeys(db, key)
 				require.NoError(t, err, "Should find resource after creation")
-			require.NotNil(t, afterCreate)
-			initialState := afterCreate.ReporterResources()[0].Serialize()
+				require.NotNil(t, afterCreate)
+				initialState := afterCreate.ReporterResources()[0].Serialize()
 				assert.Equal(t, uint(0), initialState.RepresentationVersion, "Initial representationVersion should be 0")
 				assert.Equal(t, uint(0), initialState.Generation, "Initial generation should be 0")
 				assert.False(t, initialState.Tombstone, "Initial tombstone should be false")
@@ -857,8 +857,8 @@ func TestResourceRepository_IdempotentOperations(t *testing.T) {
 					t.Log("Delete succeeded, resource not found due to tombstone filter")
 				} else {
 					require.NoError(t, err, "Should find tombstoned resource")
-				require.NotNil(t, afterDelete1)
-				deleteState1 := afterDelete1.ReporterResources()[0].Serialize()
+					require.NotNil(t, afterDelete1)
+					deleteState1 := afterDelete1.ReporterResources()[0].Serialize()
 					assert.Equal(t, uint(1), deleteState1.RepresentationVersion, "RepresentationVersion should increment after delete")
 					assert.Equal(t, uint(0), deleteState1.Generation, "Generation should remain 0 after delete")
 					assert.True(t, deleteState1.Tombstone, "Resource should be tombstoned")
@@ -883,8 +883,8 @@ func TestResourceRepository_IdempotentOperations(t *testing.T) {
 					afterDelete2, err := repo.FindResourceByKeys(db, key)
 					if err != gorm.ErrRecordNotFound {
 						require.NoError(t, err, "Should find resource after duplicate delete")
-					require.NotNil(t, afterDelete2)
-					deleteState2 := afterDelete2.ReporterResources()[0].Serialize()
+						require.NotNil(t, afterDelete2)
+						deleteState2 := afterDelete2.ReporterResources()[0].Serialize()
 						// RepresentationVersion should NOT increment for duplicate deletes on already tombstoned resources
 						assert.Equal(t, uint(1), deleteState2.RepresentationVersion, "RepresentationVersion should remain unchanged for duplicate delete on tombstoned resource")
 						assert.True(t, deleteState2.Tombstone, "Resource should still be tombstoned")
@@ -990,8 +990,8 @@ func TestResourceRepository_IdempotentOperations(t *testing.T) {
 					// Verify current state after report/update
 					currentResource, err := repo.FindResourceByKeys(db, key)
 					require.NoError(t, err, "Should find resource after report/update in cycle %d", cycle)
-				require.NotNil(t, currentResource)
-				currentState := currentResource.ReporterResources()[0].Serialize()
+					require.NotNil(t, currentResource)
+					currentState := currentResource.ReporterResources()[0].Serialize()
 					t.Logf("Cycle %d after report: Generation=%d, RepVersion=%d, Tombstone=%t",
 						cycle, currentState.Generation, currentState.RepresentationVersion, currentState.Tombstone)
 
@@ -1008,8 +1008,8 @@ func TestResourceRepository_IdempotentOperations(t *testing.T) {
 						t.Logf("Cycle %d: Resource not found after delete (tombstone filter active)", cycle)
 					} else {
 						require.NoError(t, err, "Should find tombstoned resource in cycle %d", cycle)
-					require.NotNil(t, deletedResource)
-					deleteState := deletedResource.ReporterResources()[0].Serialize()
+						require.NotNil(t, deletedResource)
+						deleteState := deletedResource.ReporterResources()[0].Serialize()
 						assert.True(t, deleteState.Tombstone, "Resource should be tombstoned in cycle %d", cycle)
 						t.Logf("Cycle %d after delete: Generation=%d, RepVersion=%d, Tombstone=%t",
 							cycle, deleteState.Generation, deleteState.RepresentationVersion, deleteState.Tombstone)
@@ -1268,13 +1268,13 @@ func TestResourceRepository_MultipleHostsLifecycle(t *testing.T) {
 			// Verify both hosts can be found (tombstoned) with tombstone filter removed
 			foundHost1, err = repo.FindResourceByKeys(db, key1)
 			require.NoError(t, err, "Should find tombstoned host1")
-		require.NotNil(t, foundHost1)
-		assert.True(t, foundHost1.ReporterResources()[0].Serialize().Tombstone, "Host1 should be tombstoned")
+			require.NotNil(t, foundHost1)
+			assert.True(t, foundHost1.ReporterResources()[0].Serialize().Tombstone, "Host1 should be tombstoned")
 
 			foundHost2, err = repo.FindResourceByKeys(db, key2)
 			require.NoError(t, err, "Should find tombstoned host2")
-		require.NotNil(t, foundHost2)
-		assert.True(t, foundHost2.ReporterResources()[0].Serialize().Tombstone, "Host2 should be tombstoned")
+			require.NotNil(t, foundHost2)
+			assert.True(t, foundHost2.ReporterResources()[0].Serialize().Tombstone, "Host2 should be tombstoned")
 		})
 	}
 }

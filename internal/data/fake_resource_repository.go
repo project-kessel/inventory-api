@@ -220,53 +220,115 @@ func (f *fakeResourceRepository) FindResourceByKeys(tx *gorm.DB, key bizmodel.Re
 	return nil, gorm.ErrRecordNotFound
 }
 
-func (f *fakeResourceRepository) FindCurrentAndPreviousVersionedRepresentations(tx *gorm.DB, key bizmodel.ReporterResourceKey, currentVersion *uint, operationType biz.EventOperationType) ([]RepresentationsByVersion, error) {
+func (f *fakeResourceRepository) FindCurrentAndPreviousVersionedRepresentations(tx *gorm.DB, key bizmodel.ReporterResourceKey, currentVersion *uint, operationType biz.EventOperationType) (*bizmodel.Representations, *bizmodel.Representations, error) {
 	if currentVersion == nil {
-		return []RepresentationsByVersion{}, nil
+		return nil, nil, nil
 	}
 
-	var results []RepresentationsByVersion
+	var current *bizmodel.Representations
+	var previous *bizmodel.Representations
 
 	if f.overrideCurrent != "" {
-		if currentVersion != nil {
-			results = append(results, RepresentationsByVersion{Data: map[string]interface{}{"workspace_id": f.overrideCurrent}, Version: *currentVersion})
-			if f.overridePrevious != "" {
-				if *currentVersion > 0 {
-					results = append(results, RepresentationsByVersion{Data: map[string]interface{}{"workspace_id": f.overridePrevious}, Version: *currentVersion - 1})
-				}
+		var err error
+		current, err = bizmodel.NewRepresentations(
+			bizmodel.Representation(map[string]interface{}{"workspace_id": f.overrideCurrent}),
+			currentVersion,
+			nil,
+			nil,
+		)
+		if err != nil {
+			return nil, nil, err
+		}
+		if f.overridePrevious != "" && *currentVersion > 0 {
+			prevVer := *currentVersion - 1
+			previous, err = bizmodel.NewRepresentations(
+				bizmodel.Representation(map[string]interface{}{"workspace_id": f.overridePrevious}),
+				&prevVer,
+				nil,
+				nil,
+			)
+			if err != nil {
+				return nil, nil, err
 			}
 		}
-		return results, nil
+		return current, previous, nil
 	}
 
-	if currentVersion != nil {
-		switch *currentVersion {
-		case 0:
-			results = append(results, RepresentationsByVersion{Data: map[string]interface{}{"workspace_id": "test-workspace-initial"}, Version: *currentVersion})
-		case 1:
-			results = append(results, RepresentationsByVersion{Data: map[string]interface{}{"workspace_id": "test-workspace-v1"}, Version: *currentVersion})
-			results = append(results, RepresentationsByVersion{Data: map[string]interface{}{"workspace_id": "test-workspace-previous"}, Version: 0})
-		case 2:
-			results = append(results, RepresentationsByVersion{Data: map[string]interface{}{"workspace_id": "test-workspace-v2"}, Version: *currentVersion})
-			if *currentVersion > 0 {
-				results = append(results, RepresentationsByVersion{Data: map[string]interface{}{"workspace_id": "test-workspace-previous"}, Version: *currentVersion - 1})
+	var err error
+	switch *currentVersion {
+	case 0:
+		current, err = bizmodel.NewRepresentations(
+			bizmodel.Representation(map[string]interface{}{"workspace_id": "test-workspace-initial"}),
+			currentVersion,
+			nil,
+			nil,
+		)
+		if err != nil {
+			return nil, nil, err
+		}
+	case 1:
+		current, err = bizmodel.NewRepresentations(
+			bizmodel.Representation(map[string]interface{}{"workspace_id": "test-workspace-v1"}),
+			currentVersion,
+			nil,
+			nil,
+		)
+		if err != nil {
+			return nil, nil, err
+		}
+		prevVer := uint(0)
+		previous, err = bizmodel.NewRepresentations(
+			bizmodel.Representation(map[string]interface{}{"workspace_id": "test-workspace-previous"}),
+			&prevVer,
+			nil,
+			nil,
+		)
+		if err != nil {
+			return nil, nil, err
+		}
+	case 2:
+		current, err = bizmodel.NewRepresentations(
+			bizmodel.Representation(map[string]interface{}{"workspace_id": "test-workspace-v2"}),
+			currentVersion,
+			nil,
+			nil,
+		)
+		if err != nil {
+			return nil, nil, err
+		}
+		if *currentVersion > 0 {
+			prevVer := *currentVersion - 1
+			previous, err = bizmodel.NewRepresentations(
+				bizmodel.Representation(map[string]interface{}{"workspace_id": "test-workspace-previous"}),
+				&prevVer,
+				nil,
+				nil,
+			)
+			if err != nil {
+				return nil, nil, err
 			}
 		}
 	}
 
-	return results, nil
+	return current, previous, nil
 }
 
-func (f *fakeResourceRepository) FindLatestRepresentations(tx *gorm.DB, key bizmodel.ReporterResourceKey) (RepresentationsByVersion, error) {
+func (f *fakeResourceRepository) FindLatestRepresentations(tx *gorm.DB, key bizmodel.ReporterResourceKey) (*bizmodel.Representations, error) {
+	var data map[string]interface{}
+	version := uint(1)
+
 	if f.overrideCurrent != "" {
-		return RepresentationsByVersion{
-			Data: map[string]interface{}{"workspace_id": f.overrideCurrent}, Version: 1,
-		}, nil
+		data = map[string]interface{}{"workspace_id": f.overrideCurrent}
+	} else {
+		data = map[string]interface{}{"workspace_id": "test-workspace-latest"}
 	}
 
-	return RepresentationsByVersion{
-		Data: map[string]interface{}{"workspace_id": "test-workspace-latest"}, Version: 1,
-	}, nil
+	return bizmodel.NewRepresentations(
+		bizmodel.Representation(data),
+		&version,
+		nil,
+		nil,
+	)
 }
 
 func (f *fakeResourceRepository) GetDB() *gorm.DB {

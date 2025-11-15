@@ -9,6 +9,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/project-kessel/inventory-api/internal/config/schema"
+
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/project-kessel/inventory-api/internal/metricscollector"
 	"github.com/project-kessel/inventory-api/internal/service"
@@ -67,6 +69,7 @@ func NewCommand(
 	consistencyOptions *consistency.Options,
 	serviceOptions *service.Options,
 	loggerOptions common.LoggerOptions,
+	schemaOptions *schema.Options,
 ) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "serve",
@@ -145,6 +148,18 @@ func NewCommand(
 				return errors.NewAggregate(errs)
 			}
 			consistencyConfig, errs := consistency.NewConfig(consistencyOptions).Complete()
+			if errs != nil {
+				return errors.NewAggregate(errs)
+			}
+
+			// configure schemaService service
+			if errs := schemaOptions.Complete(); errs != nil {
+				return errors.NewAggregate(errs)
+			}
+			if errs := schemaOptions.Validate(); errs != nil {
+				return errors.NewAggregate(errs)
+			}
+			schemaConfig, errs := schema.NewConfig(schemaOptions).Complete()
 			if errs != nil {
 				return errors.NewAggregate(errs)
 			}
@@ -228,6 +243,12 @@ func NewCommand(
 				return err
 			}
 
+			// constructs schema repository
+			schemaRepository, err := data.NewSchemaRepository(ctx, schemaConfig, log.NewHelper(log.With(logger, "subsystem", "schemaRepository")))
+			if err != nil {
+				return err
+			}
+
 			// construct servers
 			server, err := server.New(serverConfig, middleware.Authentication(authenticator), authnConfig, logger)
 			if err != nil {
@@ -271,7 +292,7 @@ func NewCommand(
 			// wire together inventory service handling
 			resourceRepo := data.NewResourceRepository(db, transactionManager)
 			legacy_resource_repo := legacyresourcerepo.New(db, mc, transactionManager)
-			inventory_controller := resourcesctl.New(resourceRepo, legacy_resource_repo, inventoryresources_repo, authorizer, eventingManager, "notifications", log.With(logger, "subsystem", "notificationsintegrations_controller"), listenManager, waitForNotifCircuitBreaker, usecaseConfig, mc)
+			inventory_controller := resourcesctl.New(resourceRepo, legacy_resource_repo, inventoryresources_repo, schemaRepository, authorizer, eventingManager, "notifications", log.With(logger, "subsystem", "notificationsintegrations_controller"), listenManager, waitForNotifCircuitBreaker, usecaseConfig, mc)
 
 			inventory_service := resourcesvc.NewKesselInventoryServiceV1beta2(inventory_controller)
 			pbv1beta2.RegisterKesselInventoryServiceServer(server.GrpcServer, inventory_service)
@@ -280,21 +301,21 @@ func NewCommand(
 			//v1beta1
 
 			// wire together authz handling
-			authz_controller := resourcesctl.New(resourceRepo, legacy_resource_repo, inventoryresources_repo, authorizer, eventingManager, "authz", log.With(logger, "subsystem", "authz_controller"), listenManager, waitForNotifCircuitBreaker, usecaseConfig, mc)
+			authz_controller := resourcesctl.New(resourceRepo, legacy_resource_repo, inventoryresources_repo, schemaRepository, authorizer, eventingManager, "authz", log.With(logger, "subsystem", "authz_controller"), listenManager, waitForNotifCircuitBreaker, usecaseConfig, mc)
 			authz_service := resourcesvc.NewKesselCheckServiceV1beta1(authz_controller)
 			authzv1beta1.RegisterKesselCheckServiceServer(server.GrpcServer, authz_service)
 			authzv1beta1.RegisterKesselCheckServiceHTTPServer(server.HttpServer, authz_service)
 
 			// wire together k8sclusters handling
 			k8sclusters_repo := legacyresourcerepo.New(db, mc, transactionManager)
-			k8sclusters_controller := resourcesctl.New(resourceRepo, k8sclusters_repo, inventoryresources_repo, authorizer, eventingManager, "acm", log.With(logger, "subsystem", "k8sclusters_controller"), listenManager, waitForNotifCircuitBreaker, usecaseConfig, mc)
+			k8sclusters_controller := resourcesctl.New(resourceRepo, k8sclusters_repo, inventoryresources_repo, schemaRepository, authorizer, eventingManager, "acm", log.With(logger, "subsystem", "k8sclusters_controller"), listenManager, waitForNotifCircuitBreaker, usecaseConfig, mc)
 			k8sclusters_service := k8sclusterssvc.NewKesselK8SClusterServiceV1beta1(k8sclusters_controller)
 			pb.RegisterKesselK8SClusterServiceServer(server.GrpcServer, k8sclusters_service)
 			pb.RegisterKesselK8SClusterServiceHTTPServer(server.HttpServer, k8sclusters_service)
 
 			// wire together k8spolicies handling
 			k8spolicies_repo := legacyresourcerepo.New(db, mc, transactionManager)
-			k8spolicies_controller := resourcesctl.New(resourceRepo, k8spolicies_repo, inventoryresources_repo, authorizer, eventingManager, "acm", log.With(logger, "subsystem", "k8spolicies_controller"), listenManager, waitForNotifCircuitBreaker, usecaseConfig, mc)
+			k8spolicies_controller := resourcesctl.New(resourceRepo, k8spolicies_repo, inventoryresources_repo, schemaRepository, authorizer, eventingManager, "acm", log.With(logger, "subsystem", "k8spolicies_controller"), listenManager, waitForNotifCircuitBreaker, usecaseConfig, mc)
 			k8spolicies_service := k8spoliciessvc.NewKesselK8SPolicyServiceV1beta1(k8spolicies_controller)
 			pb.RegisterKesselK8SPolicyServiceServer(server.GrpcServer, k8spolicies_service)
 			pb.RegisterKesselK8SPolicyServiceHTTPServer(server.HttpServer, k8spolicies_service)
@@ -333,7 +354,7 @@ func NewCommand(
 						// If the consumer cannot process a message, the consumer loop is restarted
 						// This is to ensure we re-read the message and prevent it being dropped and moving to next message.
 						// To re-read the current message, we have to recreate the consumer connection so that the earliest offset is used
-						inventoryConsumer, err = consumer.New(consumerConfig, db, authzConfig, authorizer, notifier, log.NewHelper(log.With(logger, "subsystem", "inventoryConsumer")), nil)
+						inventoryConsumer, err = consumer.New(consumerConfig, db, schemaRepository, authzConfig, authorizer, notifier, log.NewHelper(log.With(logger, "subsystem", "inventoryConsumer")), nil)
 						if err != nil {
 							shutdown(err)
 						}

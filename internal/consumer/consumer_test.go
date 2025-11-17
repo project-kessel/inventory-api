@@ -18,6 +18,7 @@ import (
 	"github.com/project-kessel/inventory-api/internal/biz/model"
 	"github.com/project-kessel/inventory-api/internal/biz/model_legacy"
 	usecase_resources "github.com/project-kessel/inventory-api/internal/biz/usecase/resources"
+	"github.com/project-kessel/inventory-api/internal/data"
 	datamodel "github.com/project-kessel/inventory-api/internal/data/model"
 	"github.com/project-kessel/inventory-api/internal/mocks"
 
@@ -937,8 +938,27 @@ func TestInventoryConsumer_UpdateWithSameWorkspace_NoOp(t *testing.T) {
 	errs := tester.TestSetup(t)
 	assert.Nil(t, errs)
 
-	// Configure fake repo: same workspace for current and previous (simulates no change)
-	tester.inv.SchemaService = usecase_resources.NewSchemaUsecase(tester.logger)
+	const sameWorkspace = "test-workspace-same"
+	testData, err := model.NewResourceFixture("test-resource-4321", "integration", "notifications", "test-instance-1", sameWorkspace)
+	require.NoError(t, err)
+
+	fakeRepo := data.NewFakeResourceRepository()
+	require.NoError(t, fakeRepo.Save(nil, *testData.Resource, biz.OperationTypeCreated, string(testData.InitialTransactionId)))
+
+	err = testData.Resource.Update(
+		testData.Key,
+		testData.ApiHref,
+		testData.ConsoleHref,
+		nil,
+		testData.ReporterRepresentation,
+		testData.CommonRepresentation,
+		"tx-update",
+	)
+	require.NoError(t, err)
+
+	require.NoError(t, fakeRepo.Save(nil, *testData.Resource, biz.OperationTypeUpdated, "tx-update"))
+
+	tester.inv.ResourceRepository = fakeRepo
 
 	// Mock authorizer: should NOT be called (no tuples to create/delete)
 	authorizer := &mocks.MockAuthz{}

@@ -340,17 +340,7 @@ func (i *InventoryConsumer) ProcessMessage(headers map[string]string, relationsE
 
 			// Skip SpiceDB call if no tuples to replicate
 			if tuplesToReplicate.IsEmpty() {
-				// Fallback: generate a placeholder tuple to ensure consistency token propagation
-				placeholder := []model.RelationsTuple{model.NewWorkspaceRelationsTuple("", key)}
-				resp, err := i.Retry(func() (string, error) {
-					return i.CreateTuple(context.Background(), &placeholder)
-				}, i.MetricsCollector.MsgProcessFailures)
-				if err != nil {
-					metricscollector.Incr(i.MetricsCollector.MsgProcessFailures, "CreateTuple")
-					i.Logger.Errorf("failed to create tuple (placeholder): %v", err)
-					return "", err
-				}
-				return resp, nil
+				return "", nil
 			}
 
 			// Only retry the actual SpiceDB call
@@ -398,20 +388,10 @@ func (i *InventoryConsumer) ProcessMessage(headers map[string]string, relationsE
 				i.Logger.Errorf("failed to calculate tuples: %v", err)
 				return "", err
 			}
-
+			
 			// Skip SpiceDB call if no tuples to replicate
 			if tuplesToReplicate.IsEmpty() {
-				// Fallback: generate a placeholder tuple to ensure consistency token propagation
-				placeholder := []model.RelationsTuple{model.NewWorkspaceRelationsTuple("", key)}
-				resp, err := i.Retry(func() (string, error) {
-					return i.UpdateTuple(context.Background(), &placeholder, nil)
-				}, i.MetricsCollector.MsgProcessFailures)
-				if err != nil {
-					metricscollector.Incr(i.MetricsCollector.MsgProcessFailures, "UpdateTuple")
-					i.Logger.Errorf("failed to update tuple (placeholder): %v", err)
-					return "", err
-				}
-				return resp, nil
+				return "", nil
 			}
 
 			// Only retry the actual SpiceDB call

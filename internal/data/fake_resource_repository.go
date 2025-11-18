@@ -20,8 +20,6 @@ type fakeResourceRepository struct {
 	resourcesByCompositeKey  map[string]uuid.UUID          // composite key -> primary key mapping for unique constraint
 	resources                map[string]*storedResource    // legacy field for backward compatibility
 	representationsByVersion map[string]map[uint]*storedRepresentation
-	overrideCurrent          string          // test override for current workspace ID
-	overridePrevious         string          // test override for previous workspace ID
 	processedTransactionIds  map[string]bool // track processed transaction IDs for idempotency testing
 }
 
@@ -50,22 +48,7 @@ func NewFakeResourceRepository() ResourceRepository {
 		resourcesByCompositeKey:  make(map[string]uuid.UUID),
 		resources:                make(map[string]*storedResource),
 		representationsByVersion: make(map[string]map[uint]*storedRepresentation),
-		overrideCurrent:          "",
-		overridePrevious:         "",
 		processedTransactionIds:  make(map[string]bool),
-	}
-}
-
-// NewFakeResourceRepositoryWithWorkspaceOverrides allows tests to control the
-// workspace IDs returned for current and previous versions.
-func NewFakeResourceRepositoryWithWorkspaceOverrides(current, previous string) ResourceRepository {
-	return &fakeResourceRepository{
-		resourcesByPrimaryKey:    make(map[uuid.UUID]*storedResource),
-		resourcesByCompositeKey:  make(map[string]uuid.UUID),
-		resources:                make(map[string]*storedResource),
-		representationsByVersion: make(map[string]map[uint]*storedRepresentation),
-		overrideCurrent:          current,
-		overridePrevious:         previous,
 	}
 }
 
@@ -252,35 +235,6 @@ func (f *fakeResourceRepository) FindCurrentAndPreviousVersionedRepresentations(
 		return nil, nil, nil
 	}
 
-	var current *bizmodel.Representations
-	var previous *bizmodel.Representations
-
-	if f.overrideCurrent != "" {
-		var err error
-		current, err = bizmodel.NewRepresentations(
-			bizmodel.Representation(map[string]interface{}{"workspace_id": f.overrideCurrent}),
-			currentVersion,
-			nil,
-			nil,
-		)
-		if err != nil {
-			return nil, nil, err
-		}
-		if f.overridePrevious != "" && *currentVersion > 0 {
-			prevVer := *currentVersion - 1
-			previous, err = bizmodel.NewRepresentations(
-				bizmodel.Representation(map[string]interface{}{"workspace_id": f.overridePrevious}),
-				&prevVer,
-				nil,
-				nil,
-			)
-			if err != nil {
-				return nil, nil, err
-			}
-		}
-		return current, previous, nil
-	}
-
 	historyKey := f.makeHistoryKey(
 		key.LocalResourceId().Serialize(),
 		key.ReporterType().Serialize(),
@@ -295,6 +249,9 @@ func (f *fakeResourceRepository) FindCurrentAndPreviousVersionedRepresentations(
 	if versionMap == nil {
 		return nil, nil, fmt.Errorf("no representations found for key")
 	}
+
+	var current *bizmodel.Representations
+	var previous *bizmodel.Representations
 
 	if entry, ok := versionMap[*currentVersion]; ok {
 		var err error
@@ -328,16 +285,6 @@ func (f *fakeResourceRepository) FindCurrentAndPreviousVersionedRepresentations(
 }
 
 func (f *fakeResourceRepository) FindLatestRepresentations(tx *gorm.DB, key bizmodel.ReporterResourceKey) (*bizmodel.Representations, error) {
-	if f.overrideCurrent != "" {
-		version := uint(1)
-		return bizmodel.NewRepresentations(
-			bizmodel.Representation(map[string]interface{}{"workspace_id": f.overrideCurrent}),
-			&version,
-			nil,
-			nil,
-		)
-	}
-
 	historyKey := f.makeHistoryKey(
 		key.LocalResourceId().Serialize(),
 		key.ReporterType().Serialize(),

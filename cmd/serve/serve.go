@@ -25,7 +25,6 @@ import (
 	inventoryResourcesRepo "github.com/project-kessel/inventory-api/internal/data/inventoryresources"
 	legacyresourcerepo "github.com/project-kessel/inventory-api/internal/data/resources"
 	"github.com/project-kessel/inventory-api/internal/pubsub"
-	k8sclusterssvc "github.com/project-kessel/inventory-api/internal/service/resources/k8sclusters"
 	k8spoliciessvc "github.com/project-kessel/inventory-api/internal/service/resources/k8spolicies"
 
 	//v1beta2
@@ -273,13 +272,6 @@ func NewCommand(
 			pbv1beta2.RegisterKesselInventoryServiceHTTPServer(server.HttpServer, inventory_service)
 
 			//v1beta1
-
-			// wire together k8sclusters handling
-			k8sclusters_repo := legacyresourcerepo.New(db, mc, transactionManager)
-			k8sclusters_controller := resourcesctl.New(resourceRepo, k8sclusters_repo, inventoryresources_repo, authorizer, eventingManager, "acm", log.With(logger, "subsystem", "k8sclusters_controller"), listenManager, waitForNotifCircuitBreaker, usecaseConfig, mc)
-			k8sclusters_service := k8sclusterssvc.NewKesselK8SClusterServiceV1beta1(k8sclusters_controller)
-			pb.RegisterKesselK8SClusterServiceServer(server.GrpcServer, k8sclusters_service)
-			pb.RegisterKesselK8SClusterServiceHTTPServer(server.HttpServer, k8sclusters_service)
 
 			// wire together k8spolicies handling
 			k8spolicies_repo := legacyresourcerepo.New(db, mc, transactionManager)

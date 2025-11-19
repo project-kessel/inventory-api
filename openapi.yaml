@@ -42,76 +42,6 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/google.rpc.Status'
-    /api/inventory/v1beta1/resources/k8s-clusters:
-        put:
-            tags:
-                - KesselK8SClusterService
-            operationId: KesselK8SClusterService_UpdateK8SCluster
-            requestBody:
-                content:
-                    application/json:
-                        schema:
-                            $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.UpdateK8sClusterRequest'
-                required: true
-            responses:
-                "200":
-                    description: OK
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.UpdateK8sClusterResponse'
-                default:
-                    description: Default error response
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/google.rpc.Status'
-        post:
-            tags:
-                - KesselK8SClusterService
-            operationId: KesselK8SClusterService_CreateK8SCluster
-            requestBody:
-                content:
-                    application/json:
-                        schema:
-                            $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.CreateK8sClusterRequest'
-                required: true
-            responses:
-                "200":
-                    description: OK
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.CreateK8sClusterResponse'
-                default:
-                    description: Default error response
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/google.rpc.Status'
-        delete:
-            tags:
-                - KesselK8SClusterService
-            operationId: KesselK8SClusterService_DeleteK8SCluster
-            requestBody:
-                content:
-                    application/json:
-                        schema:
-                            $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.DeleteK8sClusterRequest'
-                required: true
-            responses:
-                "200":
-                    description: OK
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.DeleteK8sClusterResponse'
-                default:
-                    description: Default error response
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/google.rpc.Status'
     /api/inventory/v1beta1/resources/k8s-policies:
         put:
             tags:
@@ -379,16 +309,6 @@ components:
                 code:
                     type: integer
                     format: uint32
-        kessel.inventory.v1beta1.resources.CreateK8sClusterRequest:
-            type: object
-            properties:
-                k8s_cluster:
-                    allOf:
-                        - $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.K8sCluster'
-                    description: The k8s cluster to create in Kessel Asset Inventory
-        kessel.inventory.v1beta1.resources.CreateK8sClusterResponse:
-            type: object
-            properties: {}
         kessel.inventory.v1beta1.resources.CreateK8sPolicyRequest:
             type: object
             properties:
@@ -397,16 +317,6 @@ components:
                         - $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.K8sPolicy'
                     description: The policy to create in Kessel Asset Inventory
         kessel.inventory.v1beta1.resources.CreateK8sPolicyResponse:
-            type: object
-            properties: {}
-        kessel.inventory.v1beta1.resources.DeleteK8sClusterRequest:
-            type: object
-            properties:
-                reporter_data:
-                    allOf:
-                        - $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.ReporterData'
-                    description: "The resource to be deleted will be defined by \n \\\"<reporter_data.reporter_type>:<reporter_instaance_id>:<reporter_data.local_resource_id>\\\" \n from the request body."
-        kessel.inventory.v1beta1.resources.DeleteK8sClusterResponse:
             type: object
             properties: {}
         kessel.inventory.v1beta1.resources.DeleteK8sPolicyRequest:
@@ -419,102 +329,6 @@ components:
         kessel.inventory.v1beta1.resources.DeleteK8sPolicyResponse:
             type: object
             properties: {}
-        kessel.inventory.v1beta1.resources.K8sCluster:
-            type: object
-            properties:
-                metadata:
-                    allOf:
-                        - $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.Metadata'
-                    description: Metadata about this resource
-                reporter_data:
-                    allOf:
-                        - $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.ReporterData'
-                    description: Write only reporter specific data
-                resource_data:
-                    $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.K8sClusterDetail'
-        kessel.inventory.v1beta1.resources.K8sClusterDetail:
-            type: object
-            properties:
-                external_cluster_id:
-                    type: string
-                    description: The OCP cluster ID or ARN etc for *KS
-                cluster_status:
-                    enum:
-                        - CLUSTER_STATUS_UNSPECIFIED
-                        - CLUSTER_STATUS_OTHER
-                        - READY
-                        - FAILED
-                        - OFFLINE
-                    type: string
-                    format: enum
-                cluster_reason:
-                    type: string
-                kube_version:
-                    type: string
-                    description: The version of kubernetes
-                kube_vendor:
-                    enum:
-                        - KUBE_VENDOR_UNSPECIFIED
-                        - KUBE_VENDOR_OTHER
-                        - AKS
-                        - EKS
-                        - IKS
-                        - OPENSHIFT
-                        - GKE
-                    type: string
-                    format: enum
-                vendor_version:
-                    type: string
-                    description: The version of the productized kubernetes distribution
-                cloud_platform:
-                    enum:
-                        - CLOUD_PLATFORM_UNSPECIFIED
-                        - CLOUD_PLATFORM_OTHER
-                        - NONE_UPI
-                        - BAREMETAL_IPI
-                        - BAREMETAL_UPI
-                        - AWS_IPI
-                        - AWS_UPI
-                        - AZURE_IPI
-                        - AZURE_UPI
-                        - IBMCLOUD_IPI
-                        - IBMCLOUD_UPI
-                        - KUBEVIRT_IPI
-                        - OPENSTACK_IPI
-                        - OPENSTACK_UPI
-                        - GCP_IPI
-                        - GCP_UPI
-                        - NUTANIX_IPI
-                        - NUTANIX_UPI
-                        - VSPHERE_IPI
-                        - VSPHERE_UPI
-                        - OVIRT_IPI
-                    type: string
-                    format: enum
-                nodes:
-                    type: array
-                    items:
-                        $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.K8sClusterDetailNodesInner'
-        kessel.inventory.v1beta1.resources.K8sClusterDetailNodesInner:
-            type: object
-            properties:
-                name:
-                    type: string
-                    description: The name of the node (this can contain private info)
-                cpu:
-                    type: string
-                    description: CPU Capacity of the node defined in CPU units, e.g. \"0.5\"
-                memory:
-                    type: string
-                    description: Memory Capacity of the node defined as MiB, e.g. \"50Mi\"
-                labels:
-                    type: array
-                    items:
-                        $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.ResourceLabel'
-                    description: |-
-                        Map of string keys and string values that can be used to organize and
-                         categorize (scope and select) resources
-                         Todo: Do we require at least 1 label?
         kessel.inventory.v1beta1.resources.K8sPolicy:
             type: object
             properties:
@@ -627,16 +441,6 @@ components:
                     type: string
                 value:
                     type: string
-        kessel.inventory.v1beta1.resources.UpdateK8sClusterRequest:
-            type: object
-            properties:
-                k8s_cluster:
-                    allOf:
-                        - $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.K8sCluster'
-                    description: "The resource to be updated will be defined by \n \\\"<reporter_data.reporter_type>:<reporter_instaance_id>:<reporter_data.local_resource_id>\\\"\n from the request body."
-        kessel.inventory.v1beta1.resources.UpdateK8sClusterResponse:
-            type: object
-            properties: {}
         kessel.inventory.v1beta1.resources.UpdateK8sPolicyRequest:
             type: object
             properties:
@@ -818,5 +622,4 @@ tags:
       description: |-
         KesselInventoryService provides APIs to perform relationship checks
          and manage inventory resource lifecycles (reporting and deletion).
-    - name: KesselK8SClusterService
     - name: KesselK8SPolicyService

@@ -346,7 +346,7 @@ func NewCommand(
 	eventingOptions.AddFlags(cmd.Flags(), "eventing")
 	consumerOptions.AddFlags(cmd.Flags(), "consumer")
 	consistencyOptions.AddFlags(cmd.Flags(), "consistency")
-	serviceOptions.AddFlags(cmd.Flags(), "service")
+	serviceOptions.AddFlags()
 
 	return cmd
 }

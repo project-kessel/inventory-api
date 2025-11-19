@@ -41,135 +41,72 @@ func (c *InventoryService) ReportResource(ctx context.Context, r *pb.ReportResou
 	if err != nil {
 		return nil, err
 	}
-
-	if c.useV1beta2Db() {
-		log.Info("Report Resource using v1beta2db")
-		err := c.Ctl.ReportResource(ctx, r, identity.Principal)
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		log.Info("Report Resource NOT using v1beta2db")
-		resource, err := RequestToResource(r, identity)
-		if err != nil {
-			return nil, err
-		}
-		_, err = c.Ctl.Upsert(ctx, resource, r.GetWriteVisibility())
-		if err != nil {
-			return nil, err
-		}
+	err = c.Ctl.ReportResource(ctx, r, identity.Principal)
+	if err != nil {
+		return nil, err
 	}
+
 	return ResponseFromResource(), nil
 
 }
 
 func (c *InventoryService) DeleteResource(ctx context.Context, r *pb.DeleteResourceRequest) (*pb.DeleteResourceResponse, error) {
 
-	identity, err := middleware.GetIdentity(ctx)
+	_, err := middleware.GetIdentity(ctx)
 	if err != nil {
 		return nil, status.Errorf(codes.Unauthenticated, "failed to get identity: %v", err)
 	}
 
-	if c.useV1beta2Db() {
-		log.Info("Delete Resource using v1beta2db")
-		if reporterResourceKey, err := reporterKeyFromResourceReference(r.GetReference()); err == nil {
-			if err = c.Ctl.Delete(reporterResourceKey); err == nil {
-				return ResponseFromDeleteResource(), nil
-			} else {
-				log.Error("Failed to delete resource: ", err)
-
-				if errors.Is(err, resources.ErrResourceNotFound) {
-					return nil, status.Errorf(codes.NotFound, "resource not found")
-				}
-				// Default to internal error for unknown errors
-				return nil, status.Errorf(codes.Internal, "failed to delete resource due to an internal error")
-			}
+	if reporterResourceKey, err := reporterKeyFromResourceReference(r.GetReference()); err == nil {
+		if err = c.Ctl.Delete(reporterResourceKey); err == nil {
+			return ResponseFromDeleteResource(), nil
 		} else {
-			log.Error("Failed to build reporter resource key: ", err)
-			return nil, status.Errorf(codes.InvalidArgument, "failed to build reporter resource key: %v", err)
-		}
-	} else {
-		log.Info("Delete Resource NOT using v1beta2db")
-		reporterResource, err := RequestToDeleteResource(r, identity)
-		if err != nil {
-			log.Error("Failed to build reporter resource ID: ", err)
-			return nil, status.Errorf(codes.InvalidArgument, "failed to build reporter resource ID: %v", err)
-		}
-
-		err = c.Ctl.DeleteLegacy(ctx, reporterResource)
-		if err != nil {
 			log.Error("Failed to delete resource: ", err)
 
 			if errors.Is(err, resources.ErrResourceNotFound) {
 				return nil, status.Errorf(codes.NotFound, "resource not found")
 			}
-
 			// Default to internal error for unknown errors
 			return nil, status.Errorf(codes.Internal, "failed to delete resource due to an internal error")
 		}
+	} else {
+		log.Error("Failed to build reporter resource key: ", err)
+		return nil, status.Errorf(codes.InvalidArgument, "failed to build reporter resource key: %v", err)
 	}
-	return ResponseFromDeleteResource(), nil
 }
 
 func (s *InventoryService) Check(ctx context.Context, req *pb.CheckRequest) (*pb.CheckResponse, error) {
-	identity, err := middleware.GetIdentity(ctx)
+	_, err := middleware.GetIdentity(ctx)
 	if err != nil {
 		return nil, status.Errorf(codes.Unauthenticated, "failed to get identity: %v", err)
 	}
 
-	if s.useV1beta2Db() {
-		log.Info("Check using v1beta2 db")
-		if reporterResourceKey, err := reporterKeyFromResourceReference(req.Object); err == nil {
-			if resp, err := s.Ctl.Check(ctx, req.GetRelation(), req.Object.Reporter.GetType(), subjectReferenceFromSubject(req.GetSubject()), reporterResourceKey); err == nil {
-				return viewResponseFromAuthzRequestV1beta2(resp), nil
-			} else {
-				return nil, err
-			}
+	if reporterResourceKey, err := reporterKeyFromResourceReference(req.Object); err == nil {
+		if resp, err := s.Ctl.Check(ctx, req.GetRelation(), req.Object.Reporter.GetType(), subjectReferenceFromSubject(req.GetSubject()), reporterResourceKey); err == nil {
+			return viewResponseFromAuthzRequestV1beta2(resp), nil
 		} else {
 			return nil, err
 		}
 	} else {
-		log.Info("Check using v1beta1 db")
-		if resource, err := authzFromRequestV1beta2(identity, req.Object); err == nil {
-			if resp, err := s.Ctl.CheckLegacy(ctx, req.GetRelation(), req.Object.Reporter.GetType(), subjectReferenceFromSubject(req.GetSubject()), *resource); err == nil {
-				return viewResponseFromAuthzRequestV1beta2(resp), nil
-			} else {
-				return nil, err
-			}
-		} else {
-			return nil, err
-		}
+		return nil, err
 	}
 }
 
 func (s *InventoryService) CheckForUpdate(ctx context.Context, req *pb.CheckForUpdateRequest) (*pb.CheckForUpdateResponse, error) {
-	identity, err := middleware.GetIdentity(ctx)
+	_, err := middleware.GetIdentity(ctx)
 	if err != nil {
 		return nil, status.Errorf(codes.Unauthenticated, "failed to get identity: %v", err)
 	}
 
-	if s.useV1beta2Db() {
-		log.Info("CheckForUpdate using v1beta2 db")
-		if reporterResourceKey, err := reporterKeyFromResourceReference(req.Object); err == nil {
-			if resp, err := s.Ctl.CheckForUpdate(ctx, req.GetRelation(), req.Object.Reporter.GetType(), subjectReferenceFromSubject(req.GetSubject()), reporterResourceKey); err == nil {
-				return updateResponseFromAuthzRequestV1beta2(resp), nil
-			} else {
-				return nil, err
-			}
+	log.Info("CheckForUpdate using v1beta2 db")
+	if reporterResourceKey, err := reporterKeyFromResourceReference(req.Object); err == nil {
+		if resp, err := s.Ctl.CheckForUpdate(ctx, req.GetRelation(), req.Object.Reporter.GetType(), subjectReferenceFromSubject(req.GetSubject()), reporterResourceKey); err == nil {
+			return updateResponseFromAuthzRequestV1beta2(resp), nil
 		} else {
 			return nil, err
 		}
 	} else {
-		log.Info("CheckForUpdate using v1beta1 db")
-		if resource, err := authzFromRequestV1beta2(identity, req.Object); err == nil {
-			if resp, err := s.Ctl.CheckForUpdateLegacy(ctx, req.GetRelation(), req.Object.Reporter.GetType(), subjectReferenceFromSubject(req.GetSubject()), *resource); err == nil {
-				return updateResponseFromAuthzRequestV1beta2(resp), nil
-			} else {
-				return nil, err
-			}
-		} else {
-			return nil, err
-		}
+		return nil, err
 	}
 }
 
@@ -276,15 +213,6 @@ func ToLookupResourceResponse(response *pbv1beta1.LookupResourcesResponse) *pb.S
 	}
 }
 
-func authzFromRequestV1beta2(identity *authnapi.Identity, resource *pb.ResourceReference) (*model_legacy.ReporterResourceId, error) {
-	return &model_legacy.ReporterResourceId{
-		LocalResourceId: resource.ResourceId,
-		ResourceType:    resource.ResourceType,
-		ReporterId:      identity.Principal,
-		ReporterType:    identity.Type,
-	}, nil
-}
-
 func reporterKeyFromResourceReference(resource *pb.ResourceReference) (model.ReporterResourceKey, error) {
 	localResourceId, err := model.NewLocalResourceId(resource.GetResourceId())
 	if err != nil {
@@ -360,33 +288,6 @@ func RequestToResource(r *pb.ReportResourceRequest, identity *authnapi.Identity)
 	}
 
 	return conv.ResourceFromPb(resourceType, reporterType, reporterInstanceId, identity.Principal, resourceData, workspaceId, r.Representations, inventoryId), nil
-}
-
-func RequestToDeleteResource(r *pb.DeleteResourceRequest, identity *authnapi.Identity) (model_legacy.ReporterResourceId, error) {
-	log.Info("Delete Resource Request: ", r)
-
-	reference := r.GetReference()
-	if reference == nil {
-		return model_legacy.ReporterResourceId{}, fmt.Errorf("reference is required but was nil")
-	}
-
-	reporter := reference.GetReporter()
-	if reporter == nil {
-		return model_legacy.ReporterResourceId{}, fmt.Errorf("reporter is required but was nil")
-	}
-
-	localResourceId := reference.GetResourceId()
-	reporterType := reporter.GetType()
-	resourceType := reference.GetResourceType()
-
-	reporterResourceId := model_legacy.ReporterResourceId{
-		LocalResourceId: localResourceId,
-		ReporterType:    reporterType,
-		ReporterId:      identity.Principal,
-		ResourceType:    resourceType,
-	}
-
-	return reporterResourceId, nil
 }
 
 func ResponseFromResource() *pb.ReportResourceResponse {

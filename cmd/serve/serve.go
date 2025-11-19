@@ -25,7 +25,6 @@ import (
 	inventoryResourcesRepo "github.com/project-kessel/inventory-api/internal/data/inventoryresources"
 	legacyresourcerepo "github.com/project-kessel/inventory-api/internal/data/resources"
 	"github.com/project-kessel/inventory-api/internal/pubsub"
-	k8spoliciessvc "github.com/project-kessel/inventory-api/internal/service/resources/k8spolicies"
 
 	//v1beta2
 	resourcesvc "github.com/project-kessel/inventory-api/internal/service/resources"
@@ -41,7 +40,6 @@ import (
 	"github.com/project-kessel/inventory-api/internal/storage"
 
 	hb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1"
-	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/resources"
 	pbv1beta2 "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2"
 	healthctl "github.com/project-kessel/inventory-api/internal/biz/health"
 	healthrepo "github.com/project-kessel/inventory-api/internal/data/health"
@@ -270,15 +268,6 @@ func NewCommand(
 			inventory_service := resourcesvc.NewKesselInventoryServiceV1beta2(inventory_controller)
 			pbv1beta2.RegisterKesselInventoryServiceServer(server.GrpcServer, inventory_service)
 			pbv1beta2.RegisterKesselInventoryServiceHTTPServer(server.HttpServer, inventory_service)
-
-			//v1beta1
-
-			// wire together k8spolicies handling
-			k8spolicies_repo := legacyresourcerepo.New(db, mc, transactionManager)
-			k8spolicies_controller := resourcesctl.New(resourceRepo, k8spolicies_repo, inventoryresources_repo, authorizer, eventingManager, "acm", log.With(logger, "subsystem", "k8spolicies_controller"), listenManager, waitForNotifCircuitBreaker, usecaseConfig, mc)
-			k8spolicies_service := k8spoliciessvc.NewKesselK8SPolicyServiceV1beta1(k8spolicies_controller)
-			pb.RegisterKesselK8SPolicyServiceServer(server.GrpcServer, k8spolicies_service)
-			pb.RegisterKesselK8SPolicyServiceHTTPServer(server.HttpServer, k8spolicies_service)
 
 			health_repo := healthrepo.New(db, authorizer, authzConfig)
 			health_controller := healthctl.New(health_repo, log.With(logger, "subsystem", "health_controller"))

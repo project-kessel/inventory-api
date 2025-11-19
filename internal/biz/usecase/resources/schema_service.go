@@ -26,7 +26,7 @@ func (sc *SchemaUsecase) CalculateTuples(currentRepresentation, previousRepresen
 	if previousRepresentation != nil {
 		previousWorkspaceID = previousRepresentation.WorkspaceID()
 	}
-	
+
 	// Handle no-op case where workspace hasn't changed
 	if previousWorkspaceID != "" && previousWorkspaceID == currentWorkspaceID {
 		return model.TuplesToReplicate{}, nil

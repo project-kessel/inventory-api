@@ -296,7 +296,7 @@ func (f *fakeResourceRepository) FindLatestRepresentations(tx *gorm.DB, key bizm
 	defer f.mu.RUnlock()
 
 	versionMap := f.representationsByVersion[historyKey]
-	if versionMap == nil || len(versionMap) == 0 {
+	if len(versionMap) == 0 {
 		return nil, fmt.Errorf("no representations found for key")
 	}
 

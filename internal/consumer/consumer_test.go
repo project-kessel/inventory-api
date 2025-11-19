@@ -34,9 +34,10 @@ import (
 )
 
 const (
-	testMessageKey            = `{"schema":{"type":"string","optional":false},"payload":"00000000-0000-0000-0000-000000000000"}`
-	testCreateOrUpdateMessage = `{"schema":{"type":"string","optional":false,"name":"io.debezium.data.Json","version":1},"payload":{"reporter_resource_key":{"local_resource_id":"test-resource-4321","resource_type":"integration","reporter":{"reporter_type":"notifications","reporter_instance_id":"test-instance-1"}},"common_version":1}}`
-	testDeleteMessage         = `{"schema":{"type":"string","optional":false,"name":"io.debezium.data.Json","version":1},"payload":{"reporter_resource_key":{"local_resource_id":"test-resource-4321","resource_type":"integration","reporter":{"reporter_type":"notifications","reporter_instance_id":"test-instance-1"}},"common_version":1}}`
+	testMessageKey    = `{"schema":{"type":"string","optional":false},"payload":"00000000-0000-0000-0000-000000000000"}`
+	testCreateMessage = `{"schema":{"type":"string","optional":false,"name":"io.debezium.data.Json","version":1},"payload":{"reporter_resource_key":{"local_resource_id":"test-resource-4321","resource_type":"integration","reporter":{"reporter_type":"notifications","reporter_instance_id":"test-instance-1"}},"common_version":0}}`
+	testUpdateMessage = `{"schema":{"type":"string","optional":false,"name":"io.debezium.data.Json","version":1},"payload":{"reporter_resource_key":{"local_resource_id":"test-resource-4321","resource_type":"integration","reporter":{"reporter_type":"notifications","reporter_instance_id":"test-instance-1"}},"common_version":1}}`
+	testDeleteMessage = `{"schema":{"type":"string","optional":false,"name":"io.debezium.data.Json","version":1},"payload":{"reporter_resource_key":{"local_resource_id":"test-resource-4321","resource_type":"integration","reporter":{"reporter_type":"notifications","reporter_instance_id":"test-instance-1"}},"common_version":1}}`
 )
 
 func setupInMemoryDB(t *testing.T) *gorm.DB {
@@ -296,6 +297,7 @@ func TestInventoryConsumer_ProcessMessage(t *testing.T) {
 		expectedTxid      string
 		msg               *kafka.Message
 		relationsEnabled  bool
+		setupData         func(t *testing.T, repo data.ResourceRepository, db *gorm.DB)
 	}{
 		{
 			name:              "Create Operation",
@@ -303,9 +305,15 @@ func TestInventoryConsumer_ProcessMessage(t *testing.T) {
 			expectedTxid:      "123456",
 			msg: &kafka.Message{
 				Key:   []byte(testMessageKey),
-				Value: []byte(testCreateOrUpdateMessage),
+				Value: []byte(testCreateMessage),
 			},
 			relationsEnabled: true,
+			setupData: func(t *testing.T, repo data.ResourceRepository, db *gorm.DB) {
+				testData, err := model.NewResourceFixture("test-resource-4321", "integration", "notifications", "test-instance-1", "test-workspace-v0")
+				require.NoError(t, err)
+				err = repo.Save(db, *testData.Resource, biz.OperationTypeCreated, string(testData.InitialTransactionId))
+				require.NoError(t, err)
+			},
 		},
 		{
 			name:              "Update Operation",
@@ -313,9 +321,22 @@ func TestInventoryConsumer_ProcessMessage(t *testing.T) {
 			expectedTxid:      "123456",
 			msg: &kafka.Message{
 				Key:   []byte(testMessageKey),
-				Value: []byte(testCreateOrUpdateMessage),
+				Value: []byte(testUpdateMessage),
 			},
 			relationsEnabled: true,
+			setupData: func(t *testing.T, repo data.ResourceRepository, db *gorm.DB) {
+				testData, err := model.NewResourceFixture("test-resource-4321", "integration", "notifications", "test-instance-1", "test-workspace-v0")
+				require.NoError(t, err)
+				err = repo.Save(db, *testData.Resource, biz.OperationTypeCreated, string(testData.InitialTransactionId))
+				require.NoError(t, err)
+
+				updatedCommon, err := model.NewRepresentation(map[string]interface{}{"workspace_id": "test-workspace-v1"})
+				require.NoError(t, err)
+				err = testData.Resource.Update(testData.Key, testData.ApiHref, testData.ConsoleHref, nil, testData.ReporterRepresentation, updatedCommon, "tx-v1")
+				require.NoError(t, err)
+				err = repo.Save(db, *testData.Resource, biz.OperationTypeUpdated, "tx-v1")
+				require.NoError(t, err)
+			},
 		},
 		{
 			name:              "Delete Operation",
@@ -326,6 +347,19 @@ func TestInventoryConsumer_ProcessMessage(t *testing.T) {
 				Value: []byte(testDeleteMessage),
 			},
 			relationsEnabled: true,
+			setupData: func(t *testing.T, repo data.ResourceRepository, db *gorm.DB) {
+				testData, err := model.NewResourceFixture("test-resource-4321", "integration", "notifications", "test-instance-1", "test-workspace-v0")
+				require.NoError(t, err)
+				err = repo.Save(db, *testData.Resource, biz.OperationTypeCreated, string(testData.InitialTransactionId))
+				require.NoError(t, err)
+
+				updatedCommon, err := model.NewRepresentation(map[string]interface{}{"workspace_id": "test-workspace-v1"})
+				require.NoError(t, err)
+				err = testData.Resource.Update(testData.Key, testData.ApiHref, testData.ConsoleHref, nil, testData.ReporterRepresentation, updatedCommon, "tx-v1")
+				require.NoError(t, err)
+				err = repo.Save(db, *testData.Resource, biz.OperationTypeUpdated, "tx-v1")
+				require.NoError(t, err)
+			},
 		},
 		{
 			name:              "Fake Operation",
@@ -348,6 +382,10 @@ func TestInventoryConsumer_ProcessMessage(t *testing.T) {
 			tester := TestCase{}
 			errs := tester.TestSetup(t)
 			assert.Nil(t, errs)
+
+			if test.setupData != nil {
+				test.setupData(t, tester.inv.ResourceRepository, tester.inv.DB)
+			}
 
 			headers := []kafka.Header{
 				{Key: "operation", Value: []byte(test.expectedOperation)},
@@ -960,14 +998,11 @@ func TestInventoryConsumer_UpdateWithSameWorkspace_NoOp(t *testing.T) {
 
 	tester.inv.ResourceRepository = fakeRepo
 
-	// Mock authorizer: should NOT be called (no tuples to create/delete)
 	authorizer := &mocks.MockAuthz{}
 	tester.inv.Authorizer = authorizer
-
-	// Process UPDATE message where workspace didn't change
 	msg := &kafka.Message{
 		Key:   []byte(testMessageKey),
-		Value: []byte(testCreateOrUpdateMessage),
+		Value: []byte(testUpdateMessage),
 		Headers: []kafka.Header{
 			{Key: "operation", Value: []byte(string(biz.OperationTypeUpdated))},
 			{Key: "txid", Value: []byte("txid-noop")},
@@ -977,7 +1012,7 @@ func TestInventoryConsumer_UpdateWithSameWorkspace_NoOp(t *testing.T) {
 	resp, err := tester.inv.ProcessMessage(parsedHeaders, true, msg)
 
 	assert.Nil(t, err)
-	assert.Equal(t, "", resp) // No token for no-op
+	assert.Equal(t, "", resp)
 	authorizer.AssertNumberOfCalls(t, "CreateTuples", 0)
 	authorizer.AssertNumberOfCalls(t, "DeleteTuples", 0)
 }

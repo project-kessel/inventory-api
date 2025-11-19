@@ -284,6 +284,15 @@ func (uc *Usecase) CheckForUpdate(ctx context.Context, permission, namespace str
 	return false, nil
 }
 
+// CheckBulk forwards the request to Relations CheckBulk
+func (uc *Usecase) CheckBulk(ctx context.Context, req *kessel.CheckBulkRequest) (*kessel.CheckBulkResponse, error) {
+	resp, err := uc.Authz.CheckBulk(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+	return resp, nil
+}
+
 func (uc *Usecase) createResource(tx *gorm.DB, request *v1beta2.ReportResourceRequest, txidStr string) error {
 	resourceId, err := uc.resourceRepository.NextResourceId()
 	if err != nil {

@@ -259,6 +259,33 @@ func (a *KesselAuthz) CheckForUpdate(ctx context.Context, namespace string, upda
 	return resp.GetAllowed(), resp.GetConsistencyToken(), nil
 }
 
+func (a *KesselAuthz) CheckBulk(ctx context.Context, req *kessel.CheckBulkRequest) (*kessel.CheckBulkResponse, error) {
+
+	log.Infof("CheckBulk: checking %d items", len(req.GetItems()))
+
+	if req.GetConsistency() == nil {
+		req.Consistency = &kessel.Consistency{Requirement: &kessel.Consistency_MinimizeLatency{MinimizeLatency: true}}
+	}
+
+	opts, err := a.getCallOptions()
+	if err != nil {
+		a.incrFailureCounter("CheckBulk")
+		return nil, err
+	}
+
+	resp, err := a.CheckService.CheckBulk(ctx, &kessel.CheckBulkRequest{
+		Items:       req.GetItems(),
+		Consistency: req.GetConsistency(),
+	}, opts...)
+	if err != nil {
+		a.incrFailureCounter("CheckBulk")
+		return nil, err
+	}
+
+	a.incrSuccessCounter("CheckBulk")
+	return resp, nil
+}
+
 // SetWorkspace upsert inserts the relationship in relations if it doesn't exist and otherwise does nothing
 func (a *KesselAuthz) SetWorkspace(ctx context.Context, local_resource_id, workspace, namespace, name string, upsert bool) (*kessel.CreateTuplesResponse, error) {
 	if workspace == "" {

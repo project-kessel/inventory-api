@@ -5,7 +5,7 @@ import (
 
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/project-kessel/inventory-api/internal/biz"
-	bizmodel "github.com/project-kessel/inventory-api/internal/biz/model"
+	"github.com/project-kessel/inventory-api/internal/biz/model"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -70,23 +70,23 @@ func TestCalculateTuples(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			sc := NewSchemaUsecase(log.NewHelper(log.DefaultLogger))
-			key, err := bizmodel.NewReporterResourceKey(
-				bizmodel.LocalResourceId("test-resource"),
-				bizmodel.ResourceType("host"),
-				bizmodel.ReporterType("HBI"),
-				bizmodel.ReporterInstanceId("test-instance"),
+			key, err := model.NewReporterResourceKey(
+				model.LocalResourceId("test-resource"),
+				model.ResourceType("host"),
+				model.ReporterType("HBI"),
+				model.ReporterInstanceId("test-instance"),
 			)
 			require.NoError(t, err)
 
 			// Build representations input
-			var current, previous *bizmodel.Representations
+			var current, previous *model.Representations
 
 			currentData := map[string]interface{}{}
 			if tt.currentWorkspaceID != "" {
 				currentData = map[string]interface{}{"workspace_id": tt.currentWorkspaceID}
 			}
-			current, err = bizmodel.NewRepresentations(
-				bizmodel.Representation(currentData),
+			current, err = model.NewRepresentations(
+				model.Representation(currentData),
 				&tt.version,
 				nil,
 				nil,
@@ -98,8 +98,8 @@ func TestCalculateTuples(t *testing.T) {
 				if tt.version > 0 {
 					prevVer = tt.version - 1
 				}
-				previous, err = bizmodel.NewRepresentations(
-					bizmodel.Representation(map[string]interface{}{"workspace_id": tt.previousWorkspaceID}),
+				previous, err = model.NewRepresentations(
+					model.Representation(map[string]interface{}{"workspace_id": tt.previousWorkspaceID}),
 					&prevVer,
 					nil,
 					nil,
@@ -150,25 +150,25 @@ func TestCalculateTuples(t *testing.T) {
 func TestGetWorkspaceVersions(t *testing.T) {
 	sc := NewSchemaUsecase(log.NewHelper(log.DefaultLogger))
 
-	key, err := bizmodel.NewReporterResourceKey(
-		bizmodel.LocalResourceId("test-resource"),
-		bizmodel.ResourceType("host"),
-		bizmodel.ReporterType("HBI"),
-		bizmodel.ReporterInstanceId("test-instance"),
+	key, err := model.NewReporterResourceKey(
+		model.LocalResourceId("test-resource"),
+		model.ResourceType("host"),
+		model.ReporterType("HBI"),
+		model.ReporterInstanceId("test-instance"),
 	)
 	require.NoError(t, err)
 
 	version := uint(1)
-	current, err := bizmodel.NewRepresentations(
-		bizmodel.Representation(map[string]interface{}{"workspace_id": "ws-current"}),
+	current, err := model.NewRepresentations(
+		model.Representation(map[string]interface{}{"workspace_id": "ws-current"}),
 		&version,
 		nil,
 		nil,
 	)
 	require.NoError(t, err)
 	prevVersion := version - 1
-	previous, err := bizmodel.NewRepresentations(
-		bizmodel.Representation(map[string]interface{}{"workspace_id": "ws-prev"}),
+	previous, err := model.NewRepresentations(
+		model.Representation(map[string]interface{}{"workspace_id": "ws-prev"}),
 		&prevVersion,
 		nil,
 		nil,
@@ -180,24 +180,24 @@ func TestGetWorkspaceVersions(t *testing.T) {
 }
 
 func TestCreateWorkspaceTuple(t *testing.T) {
-	key, err := bizmodel.NewReporterResourceKey(
-		bizmodel.LocalResourceId("test-resource"),
-		bizmodel.ResourceType("host"),
-		bizmodel.ReporterType("HBI"),
-		bizmodel.ReporterInstanceId("test-instance"),
+	key, err := model.NewReporterResourceKey(
+		model.LocalResourceId("test-resource"),
+		model.ResourceType("host"),
+		model.ReporterType("HBI"),
+		model.ReporterInstanceId("test-instance"),
 	)
 	require.NoError(t, err)
 
 	tests := []struct {
 		name        string
 		workspaceID string
-		validate    func(t *testing.T, tuple bizmodel.RelationsTuple)
+		validate    func(t *testing.T, tuple model.RelationsTuple)
 	}{
 		{
 			name:        "normal workspace ID",
 			workspaceID: "workspace-123",
-			validate: func(t *testing.T, tuple bizmodel.RelationsTuple) {
-				assert.IsType(t, bizmodel.RelationsTuple{}, tuple)
+			validate: func(t *testing.T, tuple model.RelationsTuple) {
+				assert.IsType(t, model.RelationsTuple{}, tuple)
 
 				resource := tuple.Resource()
 				assert.Equal(t, "test-resource", resource.Id().String())
@@ -216,7 +216,7 @@ func TestCreateWorkspaceTuple(t *testing.T) {
 		{
 			name:        "workspace ID with special characters",
 			workspaceID: "workspace-with-dashes_and_underscores",
-			validate: func(t *testing.T, tuple bizmodel.RelationsTuple) {
+			validate: func(t *testing.T, tuple model.RelationsTuple) {
 				subject := tuple.Subject()
 				subjectResource := subject.Subject()
 				assert.Equal(t, "workspace-with-dashes_and_underscores", subjectResource.Id().String())
@@ -227,7 +227,7 @@ func TestCreateWorkspaceTuple(t *testing.T) {
 		{
 			name:        "empty workspace ID",
 			workspaceID: "",
-			validate: func(t *testing.T, tuple bizmodel.RelationsTuple) {
+			validate: func(t *testing.T, tuple model.RelationsTuple) {
 				subject := tuple.Subject()
 				subjectResource := subject.Subject()
 				assert.Equal(t, "", subjectResource.Id().String())
@@ -239,7 +239,7 @@ func TestCreateWorkspaceTuple(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tuple := bizmodel.NewWorkspaceRelationsTuple(tt.workspaceID, key)
+			tuple := model.NewWorkspaceRelationsTuple(tt.workspaceID, key)
 			tt.validate(t, tuple)
 		})
 	}
@@ -248,17 +248,17 @@ func TestCreateWorkspaceTuple(t *testing.T) {
 func TestDetermineTupleOperations(t *testing.T) {
 	sc := NewSchemaUsecase(log.NewHelper(log.DefaultLogger))
 
-	key, err := bizmodel.NewReporterResourceKey(
-		bizmodel.LocalResourceId("test-resource"),
-		bizmodel.ResourceType("host"),
-		bizmodel.ReporterType("HBI"),
-		bizmodel.ReporterInstanceId("test-instance"),
+	key, err := model.NewReporterResourceKey(
+		model.LocalResourceId("test-resource"),
+		model.ResourceType("host"),
+		model.ReporterType("HBI"),
+		model.ReporterInstanceId("test-instance"),
 	)
 	require.NoError(t, err)
 
 	version2 := uint(2)
-	current, err := bizmodel.NewRepresentations(
-		bizmodel.Representation(map[string]interface{}{"workspace_id": "workspace-new"}),
+	current, err := model.NewRepresentations(
+		model.Representation(map[string]interface{}{"workspace_id": "workspace-new"}),
 		&version2,
 		nil,
 		nil,
@@ -266,8 +266,8 @@ func TestDetermineTupleOperations(t *testing.T) {
 	require.NoError(t, err)
 
 	version1 := uint(1)
-	previous, err := bizmodel.NewRepresentations(
-		bizmodel.Representation(map[string]interface{}{"workspace_id": "workspace-old"}),
+	previous, err := model.NewRepresentations(
+		model.Representation(map[string]interface{}{"workspace_id": "workspace-old"}),
 		&version1,
 		nil,
 		nil,
@@ -332,22 +332,22 @@ func TestCalculateTuples_OperationTypeScenarios(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			sc := NewSchemaUsecase(log.NewHelper(log.DefaultLogger))
 
-			key, err := bizmodel.NewReporterResourceKey(
-				bizmodel.LocalResourceId("test-resource"),
-				bizmodel.ResourceType("host"),
-				bizmodel.ReporterType("HBI"),
-				bizmodel.ReporterInstanceId("test-instance"),
+			key, err := model.NewReporterResourceKey(
+				model.LocalResourceId("test-resource"),
+				model.ResourceType("host"),
+				model.ReporterType("HBI"),
+				model.ReporterInstanceId("test-instance"),
 			)
 			require.NoError(t, err)
 
 			// Build representations to reflect the scenario
-			var current, previous *bizmodel.Representations
+			var current, previous *model.Representations
 
 			// Build current representation
 			if tc.currentWorkspaceID != "" {
 				currentData := map[string]interface{}{"workspace_id": tc.currentWorkspaceID}
-				currentRep, err := bizmodel.NewRepresentations(
-					bizmodel.Representation(currentData),
+				currentRep, err := model.NewRepresentations(
+					model.Representation(currentData),
 					&tc.version,
 					nil,
 					nil,
@@ -365,8 +365,8 @@ func TestCalculateTuples_OperationTypeScenarios(t *testing.T) {
 				if tc.version > 0 {
 					prevVer = tc.version - 1
 				}
-				previous, err = bizmodel.NewRepresentations(
-					bizmodel.Representation(map[string]interface{}{"workspace_id": tc.previousWorkspaceID}),
+				previous, err = model.NewRepresentations(
+					model.Representation(map[string]interface{}{"workspace_id": tc.previousWorkspaceID}),
 					&prevVer,
 					nil,
 					nil,

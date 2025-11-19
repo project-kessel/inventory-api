@@ -2,7 +2,6 @@ package common
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"strings"
 
@@ -12,7 +11,6 @@ import (
 
 	"github.com/google/uuid"
 
-	pbrelation "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/relationships"
 	pbresource "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/resources"
 	pbresourcev1beta2 "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2"
 	"github.com/project-kessel/inventory-api/internal/biz/model_legacy"
@@ -130,66 +128,6 @@ func labelsFromPb(pbLabels []*pbresource.ResourceLabel) model_legacy.Labels {
 		})
 	}
 	return labels
-}
-
-func ReporterRelationshipIdFromPb(relationshipType, reporterId string, reporter *pbrelation.ReporterData) (model_legacy.ReporterRelationshipId, error) {
-	res := strings.Split(relationshipType, "_")
-
-	if len(res) != 3 {
-		return model_legacy.ReporterRelationshipId{}, errors.New("invalid relationship type, not in the expected format subject_relation_object ")
-	}
-
-	subjectType := conform(res[0])
-	objectType := conform(res[2])
-
-	return model_legacy.ReporterRelationshipId{
-		ReporterId:       reporterId,
-		ReporterType:     reporter.ReporterType.String(),
-		RelationshipType: relationshipType,
-		SubjectId: model_legacy.ReporterResourceId{
-			LocalResourceId: reporter.SubjectLocalResourceId,
-			ResourceType:    subjectType,
-			ReporterId:      reporterId,
-			ReporterType:    reporter.ReporterType.String(),
-		},
-		ObjectId: model_legacy.ReporterResourceId{
-			LocalResourceId: reporter.ObjectLocalResourceId,
-			ResourceType:    objectType,
-			ReporterId:      reporterId,
-			ReporterType:    reporter.ReporterType.String(),
-		},
-	}, nil
-}
-
-func RelationshipFromPb(relationshipType, reporterId string, relationshipData internal.JsonObject, metadata *pbrelation.Metadata, reporter *pbrelation.ReporterData) (*model_legacy.Relationship, error) {
-	res := strings.Split(relationshipType, "_")
-
-	if len(res) != 3 {
-		return nil, errors.New("invalid relationship type, not in the expected format subject_relation_object ")
-	}
-
-	subjectType := conform(res[0])
-	objectType := conform(res[2])
-
-	return &model_legacy.Relationship{
-		ID:               uuid.UUID{},
-		RelationshipData: relationshipData,
-		RelationshipType: relationshipType,
-		SubjectId:        uuid.UUID{},
-		ObjectId:         uuid.UUID{},
-		OrgId:            metadata.OrgId,
-		Reporter: model_legacy.RelationshipReporter{
-			Reporter: model_legacy.Reporter{
-				ReporterId:      reporterId,
-				ReporterType:    reporter.ReporterType.String(),
-				ReporterVersion: reporter.ReporterVersion,
-			},
-			SubjectLocalResourceId: reporter.SubjectLocalResourceId,
-			SubjectResourceType:    subjectType,
-			ObjectLocalResourceId:  reporter.ObjectLocalResourceId,
-			ObjectResourceType:     objectType,
-		},
-	}, nil
 }
 
 // Conform converts any hyphens in resource types to underscores to conform with SpiceDB validation requirements

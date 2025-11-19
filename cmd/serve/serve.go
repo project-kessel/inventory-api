@@ -18,16 +18,13 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/project-kessel/inventory-api/cmd/common"
-	relationshipsctl "github.com/project-kessel/inventory-api/internal/biz/usecase/relationships"
 	resourcesctl "github.com/project-kessel/inventory-api/internal/biz/usecase/resources"
 	"github.com/project-kessel/inventory-api/internal/consistency"
 	"github.com/project-kessel/inventory-api/internal/consumer"
 	"github.com/project-kessel/inventory-api/internal/data"
 	inventoryResourcesRepo "github.com/project-kessel/inventory-api/internal/data/inventoryresources"
-	relationshipsrepo "github.com/project-kessel/inventory-api/internal/data/relationships"
 	legacyresourcerepo "github.com/project-kessel/inventory-api/internal/data/resources"
 	"github.com/project-kessel/inventory-api/internal/pubsub"
-	relationshipssvc "github.com/project-kessel/inventory-api/internal/service/relationships/k8spolicy"
 	k8sclusterssvc "github.com/project-kessel/inventory-api/internal/service/resources/k8sclusters"
 	k8spoliciessvc "github.com/project-kessel/inventory-api/internal/service/resources/k8spolicies"
 
@@ -45,7 +42,6 @@ import (
 	"github.com/project-kessel/inventory-api/internal/storage"
 
 	hb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1"
-	rel "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/relationships"
 	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/resources"
 	pbv1beta2 "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2"
 	healthctl "github.com/project-kessel/inventory-api/internal/biz/health"
@@ -291,13 +287,6 @@ func NewCommand(
 			k8spolicies_service := k8spoliciessvc.NewKesselK8SPolicyServiceV1beta1(k8spolicies_controller)
 			pb.RegisterKesselK8SPolicyServiceServer(server.GrpcServer, k8spolicies_service)
 			pb.RegisterKesselK8SPolicyServiceHTTPServer(server.HttpServer, k8spolicies_service)
-
-			// wire together relationships handling
-			relationships_repo := relationshipsrepo.New(db)
-			relationships_controller := relationshipsctl.New(relationships_repo, eventingManager, log.With(logger, "subsystem", "relationships_controller"))
-			relationships_service := relationshipssvc.NewKesselK8SPolicyIsPropagatedToK8SClusterServiceV1beta1(relationships_controller)
-			rel.RegisterKesselK8SPolicyIsPropagatedToK8SClusterServiceServer(server.GrpcServer, relationships_service)
-			rel.RegisterKesselK8SPolicyIsPropagatedToK8SClusterServiceHTTPServer(server.HttpServer, relationships_service)
 
 			health_repo := healthrepo.New(db, authorizer, authzConfig)
 			health_controller := healthctl.New(health_repo, log.With(logger, "subsystem", "health_controller"))

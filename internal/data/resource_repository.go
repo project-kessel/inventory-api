@@ -277,7 +277,7 @@ func (r *resourceRepository) FindCurrentAndPreviousVersionedRepresentations(tx *
 		return nil, nil, nil
 	}
 
-	type CommonRepresentationRow struct {
+	type commonRepresentationRow struct {
 		Data                       internal.JsonObject
 		Version                    uint
 		ResourceId                 uuid.UUID
@@ -286,7 +286,7 @@ func (r *resourceRepository) FindCurrentAndPreviousVersionedRepresentations(tx *
 		TransactionId              string
 	}
 
-	var results []CommonRepresentationRow
+	var results []commonRepresentationRow
 
 	db := r.getDBSession(tx)
 

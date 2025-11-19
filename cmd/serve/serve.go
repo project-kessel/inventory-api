@@ -45,7 +45,6 @@ import (
 	"github.com/project-kessel/inventory-api/internal/storage"
 
 	hb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1"
-	authzv1beta1 "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/authz"
 	rel "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/relationships"
 	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta1/resources"
 	pbv1beta2 "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2"
@@ -278,12 +277,6 @@ func NewCommand(
 			pbv1beta2.RegisterKesselInventoryServiceHTTPServer(server.HttpServer, inventory_service)
 
 			//v1beta1
-
-			// wire together authz handling
-			authz_controller := resourcesctl.New(resourceRepo, legacy_resource_repo, inventoryresources_repo, authorizer, eventingManager, "authz", log.With(logger, "subsystem", "authz_controller"), listenManager, waitForNotifCircuitBreaker, usecaseConfig, mc)
-			authz_service := resourcesvc.NewKesselCheckServiceV1beta1(authz_controller)
-			authzv1beta1.RegisterKesselCheckServiceServer(server.GrpcServer, authz_service)
-			authzv1beta1.RegisterKesselCheckServiceHTTPServer(server.HttpServer, authz_service)
 
 			// wire together k8sclusters handling
 			k8sclusters_repo := legacyresourcerepo.New(db, mc, transactionManager)

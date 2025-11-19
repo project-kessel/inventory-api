@@ -16,7 +16,6 @@ import (
 	"github.com/project-kessel/inventory-api/internal/middleware"
 	conv "github.com/project-kessel/inventory-api/internal/service/common"
 	pbv1beta1 "github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
-	"github.com/spf13/viper"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -30,10 +29,6 @@ func NewKesselInventoryServiceV1beta2(c *resources.Usecase) *InventoryService {
 	return &InventoryService{
 		Ctl: c,
 	}
-}
-
-func (c *InventoryService) useV1beta2Db() bool {
-	return viper.GetBool("service.use_v1beta2_db")
 }
 
 func (c *InventoryService) ReportResource(ctx context.Context, r *pb.ReportResourceRequest) (*pb.ReportResourceResponse, error) {

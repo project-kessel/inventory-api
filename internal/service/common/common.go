@@ -3,7 +3,6 @@ package common
 import (
 	"encoding/json"
 	"fmt"
-	"strings"
 
 	"github.com/project-kessel/inventory-api/internal"
 	bizmodel "github.com/project-kessel/inventory-api/internal/biz/model"
@@ -83,9 +82,4 @@ func ExtractReporterInstanceID(reporterInstanceId string) (string, error) {
 		return "", fmt.Errorf("%w: ReporterInstanceId", bizmodel.ErrEmpty)
 	}
 	return reporterInstanceId, nil
-}
-
-// Conform converts any hyphens in resource types to underscores to conform with SpiceDB validation requirements
-func conform(resource string) string {
-	return strings.ReplaceAll(resource, "-", "_")
 }

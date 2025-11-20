@@ -1297,5 +1297,4 @@ func TestInventoryAPIHTTP_v1beta2_CheckBulk_OrderAndEcho(t *testing.T) {
 		}
 	}
 	assert.True(t, observed, "CheckBulk order/echo expectations not met within timeout")
-
 }

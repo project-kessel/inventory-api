@@ -17,7 +17,7 @@ message CheckBulkResponseItem {
 	Allowed allowed = 1;
 }
 
-// CheckBulksPair associates a request item with its corresponding result.
+// CheckBulkResponsePair associates a request item with its corresponding result.
 message CheckBulkResponsePair {
 	CheckBulkRequestItem request = 1;
 	oneof response {

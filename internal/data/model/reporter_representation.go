@@ -14,16 +14,16 @@ import (
 type ReporterRepresentation struct {
 	Representation
 
-	ReporterResourceID uuid.UUID `gorm:"size:128;primaryKey"`
-	Version            uint      `gorm:"type:bigint;primaryKey;check:version >= 0"`
-	Generation         uint      `gorm:"type:bigint;primaryKey;check:generation >= 0"`
-	ReporterVersion    *string   `gorm:"size:128"`
-	CommonVersion      uint      `gorm:"type:bigint;check:common_version >= 0"`
-	TransactionId      string    `gorm:"size:128;index:ux_reporter_reps_txid_nn,where:transaction_id IS NOT NULL AND transaction_id != '',unique"`
-	Tombstone          bool      `gorm:"not null"`
+	ReporterResourceID uuid.UUID
+	Version            uint
+	Generation         uint
+	ReporterVersion    *string
+	CommonVersion      uint
+	TransactionId      string
+	Tombstone          bool
 	CreatedAt          time.Time
 
-	ReporterResource ReporterResource `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;foreignKey:ReporterResourceID;references:ID"`
+	ReporterResource ReporterResource
 }
 
 // NewReporterRepresentation is the ONLY factory for creating a ReporterRepresentation. It guarantees that

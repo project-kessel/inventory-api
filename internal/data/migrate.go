@@ -1,53 +1,26 @@
 package data
 
 import (
+	"context"
 	"fmt"
 
-	"github.com/project-kessel/inventory-api/internal/biz/model_legacy"
-	"github.com/project-kessel/inventory-api/internal/data/model"
 	"gorm.io/gorm"
+	gormLogger "gorm.io/gorm/logger"
 
 	"github.com/go-kratos/kratos/v2/log"
+	"github.com/project-kessel/inventory-api/internal/data/migrations"
 )
 
-// Migrate the tables
-// See https://gorm.io/docs/migration.html
 func Migrate(db *gorm.DB, logger *log.Helper) error {
-	models := []interface{}{
-		&model_legacy.OutboxEvent{},
-		&model.ReporterRepresentation{},
-		&model.CommonRepresentation{},
-		&model.ReporterResource{},
-		&model.Resource{},
+	ctx := context.Background()
+
+	if db == nil {
+		return fmt.Errorf("cannot migrate with nil db")
 	}
-
-	if err := db.AutoMigrate(models...); err != nil {
-		return fmt.Errorf("auto migration has failed: %w", err)
+	// Ensure GORM logs at least WARN during migrations so problematic SQL statements are visible
+	_ = db.Session(&gorm.Session{Logger: gormLogger.Default.LogMode(gormLogger.Warn)})
+	if err := migrations.Run(ctx, db, logger); err != nil {
+		return err
 	}
-
-	if db.Name() == "sqlite" {
-		// Ensures sqlite honors the foreign keys
-		err := db.Exec("PRAGMA foreign_keys = ON").Error
-		if err != nil {
-			return err
-		}
-	}
-
-	for _, m := range models {
-		if gormDbIndexStatement, ok := m.(model_legacy.GormDbAfterMigrationHook); ok {
-			statement := &gorm.Statement{DB: db}
-			err := statement.Parse(m)
-			if err != nil {
-				return fmt.Errorf("statement parsing has failed: %w", err)
-			}
-
-			err = gormDbIndexStatement.GormDbAfterMigration(db, statement.Schema)
-			if err != nil {
-				return fmt.Errorf("migration failure: %w", err)
-			}
-		}
-	}
-
-	logger.Info("Migration successful!")
 	return nil
 }

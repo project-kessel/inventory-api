@@ -24,11 +24,11 @@ const (
 )
 
 type OutboxEvent struct {
-	ID            uuid.UUID              `gorm:"type:uuid;primarykey;not null"`
-	AggregateType AggregateType          `gorm:"column:aggregatetype;type:varchar(255);not null"`
-	AggregateID   string                 `gorm:"column:aggregateid;type:varchar(255);not null"`
-	Operation     biz.EventOperationType `gorm:"type:varchar(255);not null"`
-	TxId          string                 `gorm:"column:txid;type:varchar(255)"`
+	ID            uuid.UUID
+	AggregateType AggregateType
+	AggregateID   string
+	Operation     biz.EventOperationType
+	TxId          string
 	Payload       internal.JsonObject
 }
 

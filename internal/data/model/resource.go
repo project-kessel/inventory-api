@@ -8,16 +8,12 @@ import (
 )
 
 type Resource struct {
-	ID               uuid.UUID `gorm:"type:uuid;primaryKey"`
-	Type             string    `gorm:"size:128;not null;"`
-	CommonVersion    uint      `gorm:"type:bigint;check:common_version >= 0"`
-	ConsistencyToken string    `gorm:"size:1024;column:ktn;"`
+	ID               uuid.UUID
+	Type             string
+	CommonVersion    uint
+	ConsistencyToken string
 	CreatedAt        time.Time
 	UpdatedAt        time.Time
-}
-
-func (Resource) TableName() string {
-	return "resource"
 }
 
 // SerializeToSnapshot converts GORM Resource to snapshot type - direct initialization without validation

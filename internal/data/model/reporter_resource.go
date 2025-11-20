@@ -12,10 +12,10 @@ import (
 // a dedicated embedded struct makes the composite-key explicit and reusable in both the database layer and
 // higher-level domain/validation code.
 type ReporterResourceKey struct {
-	LocalResourceID    string `gorm:"size:256;index:reporter_resource_key_idx,unique;index:reporter_resource_search_idx,priority:1;not null"`
-	ReporterType       string `gorm:"size:128;index:reporter_resource_key_idx,unique;index:reporter_resource_search_idx,priority:2;not null"`
-	ResourceType       string `gorm:"size:128;index:reporter_resource_key_idx,unique;index:reporter_resource_search_idx,priority:3;not null"`
-	ReporterInstanceID string `gorm:"size:256;index:reporter_resource_key_idx,unique;index:reporter_resource_search_idx,priority:4;not null"`
+	LocalResourceID    string
+	ReporterType       string
+	ResourceType       string
+	ReporterInstanceID string
 }
 
 // ReporterResource is the *latest-state row* for a resource coming from a reporter. It combines an opaque
@@ -24,16 +24,16 @@ type ReporterResourceKey struct {
 // struct is treated as an immutable value from a domain perspective – updates happen by inserting a new row
 // via GORM where required, not by mutating an existing instance in-place.
 type ReporterResource struct {
-	ID uuid.UUID `gorm:"type:uuid;primaryKey"`
+	ID uuid.UUID
 	ReporterResourceKey
 
-	ResourceID  uuid.UUID `gorm:"index:reporter_resource_resource_id_idx;type:uuid;not null"`
-	APIHref     string    `gorm:"size:512;not null"`
-	ConsoleHref string    `gorm:"size:512"`
+	ResourceID  uuid.UUID
+	APIHref     string
+	ConsoleHref string
 
-	RepresentationVersion uint `gorm:"index:reporter_resource_key_idx,unique;not null"`
-	Generation            uint `gorm:"index:reporter_resource_key_idx,unique;not null"`
-	Tombstone             bool `gorm:"not null"`
+	RepresentationVersion uint
+	Generation            uint
+	Tombstone             bool
 
 	CreatedAt time.Time
 	UpdatedAt time.Time

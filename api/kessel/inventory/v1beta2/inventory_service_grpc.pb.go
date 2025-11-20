@@ -21,6 +21,7 @@ const _ = grpc.SupportPackageIsVersion9
 const (
 	KesselInventoryService_Check_FullMethodName               = "/kessel.inventory.v1beta2.KesselInventoryService/Check"
 	KesselInventoryService_CheckForUpdate_FullMethodName      = "/kessel.inventory.v1beta2.KesselInventoryService/CheckForUpdate"
+	KesselInventoryService_CheckBulk_FullMethodName           = "/kessel.inventory.v1beta2.KesselInventoryService/CheckBulk"
 	KesselInventoryService_ReportResource_FullMethodName      = "/kessel.inventory.v1beta2.KesselInventoryService/ReportResource"
 	KesselInventoryService_DeleteResource_FullMethodName      = "/kessel.inventory.v1beta2.KesselInventoryService/DeleteResource"
 	KesselInventoryService_StreamedListObjects_FullMethodName = "/kessel.inventory.v1beta2.KesselInventoryService/StreamedListObjects"
@@ -54,6 +55,20 @@ type KesselInventoryServiceClient interface {
 	// It is intended to be used just prior to sensitive operation (e.g., update, delete)
 	// which depend on the current state of the relationship.
 	CheckForUpdate(ctx context.Context, in *CheckForUpdateRequest, opts ...grpc.CallOption) (*CheckForUpdateResponse, error)
+	// Performs bulk permission checks for multiple resource-subject-relation combinations.
+	//
+	// This API is more efficient than making individual Check calls when verifying permissions
+	// for multiple items. It answers questions like:
+	// "Which of these resources can subject *X* perform action *Y* on?"
+	//
+	// Common use cases include:
+	// - Filtering lists based on user permissions
+	// - Batch authorization checks before performing bulk operations
+	// - Dashboard rendering with multiple permission checks
+	// - Pre-authorization for UI components
+	//
+	// The response includes a result for each item in the request, maintaining the same order.
+	CheckBulk(ctx context.Context, in *CheckBulkRequest, opts ...grpc.CallOption) (*CheckBulkResponse, error)
 	// Reports to Kessel Inventory that a Resource has been created or has been updated.
 	//
 	// Reporters can use this API to report facts about their resources in order to
@@ -136,6 +151,16 @@ func (c *kesselInventoryServiceClient) CheckForUpdate(ctx context.Context, in *C
 	return out, nil
 }
 
+func (c *kesselInventoryServiceClient) CheckBulk(ctx context.Context, in *CheckBulkRequest, opts ...grpc.CallOption) (*CheckBulkResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CheckBulkResponse)
+	err := c.cc.Invoke(ctx, KesselInventoryService_CheckBulk_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *kesselInventoryServiceClient) ReportResource(ctx context.Context, in *ReportResourceRequest, opts ...grpc.CallOption) (*ReportResourceResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(ReportResourceResponse)
@@ -203,6 +228,20 @@ type KesselInventoryServiceServer interface {
 	// It is intended to be used just prior to sensitive operation (e.g., update, delete)
 	// which depend on the current state of the relationship.
 	CheckForUpdate(context.Context, *CheckForUpdateRequest) (*CheckForUpdateResponse, error)
+	// Performs bulk permission checks for multiple resource-subject-relation combinations.
+	//
+	// This API is more efficient than making individual Check calls when verifying permissions
+	// for multiple items. It answers questions like:
+	// "Which of these resources can subject *X* perform action *Y* on?"
+	//
+	// Common use cases include:
+	// - Filtering lists based on user permissions
+	// - Batch authorization checks before performing bulk operations
+	// - Dashboard rendering with multiple permission checks
+	// - Pre-authorization for UI components
+	//
+	// The response includes a result for each item in the request, maintaining the same order.
+	CheckBulk(context.Context, *CheckBulkRequest) (*CheckBulkResponse, error)
 	// Reports to Kessel Inventory that a Resource has been created or has been updated.
 	//
 	// Reporters can use this API to report facts about their resources in order to
@@ -271,6 +310,9 @@ func (UnimplementedKesselInventoryServiceServer) Check(context.Context, *CheckRe
 func (UnimplementedKesselInventoryServiceServer) CheckForUpdate(context.Context, *CheckForUpdateRequest) (*CheckForUpdateResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CheckForUpdate not implemented")
 }
+func (UnimplementedKesselInventoryServiceServer) CheckBulk(context.Context, *CheckBulkRequest) (*CheckBulkResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CheckBulk not implemented")
+}
 func (UnimplementedKesselInventoryServiceServer) ReportResource(context.Context, *ReportResourceRequest) (*ReportResourceResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ReportResource not implemented")
 }
@@ -338,6 +380,24 @@ func _KesselInventoryService_CheckForUpdate_Handler(srv interface{}, ctx context
 	return interceptor(ctx, in, info, handler)
 }
 
+func _KesselInventoryService_CheckBulk_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CheckBulkRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(KesselInventoryServiceServer).CheckBulk(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: KesselInventoryService_CheckBulk_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(KesselInventoryServiceServer).CheckBulk(ctx, req.(*CheckBulkRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _KesselInventoryService_ReportResource_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(ReportResourceRequest)
 	if err := dec(in); err != nil {
@@ -399,6 +459,10 @@ var KesselInventoryService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "CheckForUpdate",
 			Handler:    _KesselInventoryService_CheckForUpdate_Handler,
+		},
+		{
+			MethodName: "CheckBulk",
+			Handler:    _KesselInventoryService_CheckBulk_Handler,
 		},
 		{
 			MethodName: "ReportResource",

@@ -644,6 +644,193 @@ func TestInventoryAPIHTTP_v1beta2_workspace_movement_tests(t *testing.T) {
 	assert.NoError(t, err, "Failed to Delete Resource during cleanup")
 }
 
+func TestInventoryAPIHTTP_v1beta2_CheckBulk_WithErrorPair(t *testing.T) {
+	enableShortMode(t)
+
+	ctx := context.Background()
+
+	conn, err := grpc.NewClient(
+		inventoryapi_grpc_url,
+		grpc.WithTransportCredentials(grpcinsecure.NewCredentials()),
+		grpc.WithPerRPCCredentials(&bearerAuth{token: "1234"}),
+	)
+	assert.NoError(t, err, "Failed to create gRPC client")
+	defer func() {
+		if connErr := conn.Close(); connErr != nil {
+			t.Logf("Failed to close gRPC connection: %v", connErr)
+		}
+	}()
+
+	conn.Connect()
+	assert.NoError(t, err, "Failed to connect gRPC client")
+
+	client := pbv1beta2.NewKesselInventoryServiceClient(conn)
+
+	// Seed a resource that will yield one TRUE and one FALSE
+	resourceId := "checkbulk-host-errorpair-0001"
+	reporterType := "hbi"
+	reporterInstanceId := "testuser-example-com"
+	trueWorkspace := "workspace-true-errorpair"
+	falseWorkspace := "workspace-false-errorpair"
+
+	resourceCreated := false
+	defer func() {
+		if !resourceCreated {
+			return
+		}
+		delReq := &pbv1beta2.DeleteResourceRequest{
+			Reference: &pbv1beta2.ResourceReference{
+				ResourceType: "host",
+				ResourceId:   resourceId,
+				Reporter: &pbv1beta2.ReporterReference{
+					Type:       reporterType,
+					InstanceId: proto.String(reporterInstanceId),
+				},
+			},
+		}
+		_, cleanupErr := client.DeleteResource(ctx, delReq)
+		assert.NoError(t, cleanupErr, "Failed to Delete Resource during cleanup")
+	}()
+
+	reporterStruct, err := structpb.NewStruct(map[string]interface{}{
+		"ansible_host": "checkbulk-errorpair-host.example.com",
+	})
+	assert.NoError(t, err, "Failed to create structpb for reporter")
+
+	req := &pbv1beta2.ReportResourceRequest{
+		WriteVisibility:    pbv1beta2.WriteVisibility_MINIMIZE_LATENCY,
+		Type:               "host",
+		ReporterType:       reporterType,
+		ReporterInstanceId: reporterInstanceId,
+		Representations: &pbv1beta2.ResourceRepresentations{
+			Metadata: &pbv1beta2.RepresentationMetadata{
+				LocalResourceId: resourceId,
+				ApiHref:         "https://api.example.com/hosts/checkbulk-host-errorpair-0001",
+				ConsoleHref:     proto.String("https://console.example.com/hosts/checkbulk-host-errorpair-0001"),
+			},
+			Common: &structpb.Struct{
+				Fields: map[string]*structpb.Value{
+					"workspace_id": structpb.NewStringValue(trueWorkspace),
+				},
+			},
+			Reporter: reporterStruct,
+		},
+	}
+	_, err = client.ReportResource(ctx, req)
+	assert.NoError(t, err, "Failed to Report Resource")
+	resourceCreated = true
+
+	// Build CheckBulk with:
+	// - one expected TRUE (trueWorkspace)
+	// - one expected FALSE (falseWorkspace)
+	// - one invalid subject type to produce an error pair
+	itemTrue := &pbv1beta2.CheckBulkRequestItem{
+		Object: &pbv1beta2.ResourceReference{
+			ResourceType: "host",
+			ResourceId:   resourceId,
+			Reporter: &pbv1beta2.ReporterReference{
+				Type:       reporterType,
+				InstanceId: proto.String(reporterInstanceId),
+			},
+		},
+		Relation: "workspace",
+		Subject: &pbv1beta2.SubjectReference{
+			Resource: &pbv1beta2.ResourceReference{
+				ResourceType: "workspace",
+				ResourceId:   trueWorkspace,
+				Reporter: &pbv1beta2.ReporterReference{
+					Type: "rbac",
+				},
+			},
+		},
+	}
+	itemFalse := &pbv1beta2.CheckBulkRequestItem{
+		Object: &pbv1beta2.ResourceReference{
+			ResourceType: "host",
+			ResourceId:   resourceId,
+			Reporter: &pbv1beta2.ReporterReference{
+				Type:       reporterType,
+				InstanceId: proto.String(reporterInstanceId),
+			},
+		},
+		Relation: "workspace",
+		Subject: &pbv1beta2.SubjectReference{
+			Resource: &pbv1beta2.ResourceReference{
+				ResourceType: "workspace",
+				ResourceId:   falseWorkspace,
+				Reporter: &pbv1beta2.ReporterReference{
+					Type: "rbac",
+				},
+			},
+		},
+	}
+	itemError := &pbv1beta2.CheckBulkRequestItem{
+		Object: &pbv1beta2.ResourceReference{
+			ResourceType: "host",
+			ResourceId:   resourceId,
+			Reporter: &pbv1beta2.ReporterReference{
+				Type:       reporterType,
+				InstanceId: proto.String(reporterInstanceId),
+			},
+		},
+		Relation: "workspace",
+		Subject: &pbv1beta2.SubjectReference{
+			// invalid subject resource type to force a per-item error
+			Resource: &pbv1beta2.ResourceReference{
+				ResourceType: "not_a_valid_type",
+				ResourceId:   "charlie",
+				Reporter: &pbv1beta2.ReporterReference{
+					Type: "rbac",
+				},
+			},
+		},
+	}
+
+	checkReq := &pbv1beta2.CheckBulkRequest{
+		Items: []*pbv1beta2.CheckBulkRequestItem{itemTrue, itemFalse, itemError},
+	}
+
+	// Poll up to 10 seconds to allow eventual consistency and error mapping
+	observed := false
+	for i := 0; i < 10; i++ {
+		resp, err := client.CheckBulk(ctx, checkReq)
+		if err == nil && resp != nil && len(resp.GetPairs()) == 3 {
+			results := map[string]pbv1beta2.Allowed{}
+			errorSubjects := []string{}
+			for _, p := range resp.GetPairs() {
+				reqItem := p.GetRequest()
+				if p.GetItem() != nil {
+					// Key by subject ResourceId
+					results[reqItem.GetSubject().GetResource().GetResourceId()] = p.GetItem().GetAllowed()
+				} else if p.GetError() != nil {
+					errorSubjects = append(errorSubjects, reqItem.GetSubject().GetResource().GetResourceId())
+				}
+			}
+			gotTrue := results[trueWorkspace] == pbv1beta2.Allowed_ALLOWED_TRUE
+			gotFalse := results[falseWorkspace] == pbv1beta2.Allowed_ALLOWED_FALSE
+			gotError := false
+			for _, s := range errorSubjects {
+				if s == "charlie" {
+					gotError = true
+					break
+				}
+			}
+			if gotTrue && gotFalse && gotError {
+				observed = true
+				break
+			}
+			t.Logf("CheckBulk attempt %d: true=%v false=%v errorPresent=%v", i+1, gotTrue, gotFalse, gotError)
+		} else if err != nil {
+			t.Logf("CheckBulk request failed (attempt %d): %v", i+1, err)
+		}
+		if i < 9 {
+			time.Sleep(1 * time.Second)
+		}
+	}
+	assert.True(t, observed, "CheckBulk with error pair expectations not met within timeout")
+
+}
+
 func TestInventoryAPIHTTP_v1beta2_create_check_delete_check_resource(t *testing.T) {
 	enableShortMode(t)
 	ctx := context.Background()
@@ -802,4 +989,312 @@ func enableShortMode(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping long-running test in short mode")
 	}
+}
+
+func TestInventoryAPIHTTP_v1beta2_CheckBulk_SingleTrueAndFalse(t *testing.T) {
+	enableShortMode(t)
+
+	ctx := context.Background()
+
+	conn, err := grpc.NewClient(
+		inventoryapi_grpc_url,
+		grpc.WithTransportCredentials(grpcinsecure.NewCredentials()),
+		grpc.WithPerRPCCredentials(&bearerAuth{token: "1234"}),
+	)
+	assert.NoError(t, err, "Failed to create gRPC client")
+	defer func() {
+		if connErr := conn.Close(); connErr != nil {
+			t.Logf("Failed to close gRPC connection: %v", connErr)
+		}
+	}()
+
+	conn.Connect()
+	assert.NoError(t, err, "Failed to connect gRPC client")
+
+	client := pbv1beta2.NewKesselInventoryServiceClient(conn)
+
+	resourceId := "checkbulk-host-0001"
+	reporterType := "hbi"
+	reporterInstanceId := "testuser-example-com"
+	trueWorkspace := "workspace-true"
+	falseWorkspace := "workspace-false"
+
+	resourceCreated := false
+	defer func() {
+		if !resourceCreated {
+			return
+		}
+		delReq := &pbv1beta2.DeleteResourceRequest{
+			Reference: &pbv1beta2.ResourceReference{
+				ResourceType: "host",
+				ResourceId:   resourceId,
+				Reporter: &pbv1beta2.ReporterReference{
+					Type:       reporterType,
+					InstanceId: proto.String(reporterInstanceId),
+				},
+			},
+		}
+		_, cleanupErr := client.DeleteResource(ctx, delReq)
+		assert.NoError(t, cleanupErr, "Failed to Delete Resource during cleanup")
+	}()
+
+	// Create a resource associated with trueWorkspace
+	reporterStruct, err := structpb.NewStruct(map[string]interface{}{
+		"ansible_host": "checkbulk-host.example.com",
+	})
+	assert.NoError(t, err, "Failed to create structpb for reporter")
+
+	req := &pbv1beta2.ReportResourceRequest{
+		WriteVisibility:    pbv1beta2.WriteVisibility_MINIMIZE_LATENCY,
+		Type:               "host",
+		ReporterType:       reporterType,
+		ReporterInstanceId: reporterInstanceId,
+		Representations: &pbv1beta2.ResourceRepresentations{
+			Metadata: &pbv1beta2.RepresentationMetadata{
+				LocalResourceId: resourceId,
+				ApiHref:         "https://api.example.com/hosts/checkbulk-host-0001",
+				ConsoleHref:     proto.String("https://console.example.com/hosts/checkbulk-host-0001"),
+			},
+			Common: &structpb.Struct{
+				Fields: map[string]*structpb.Value{
+					"workspace_id": structpb.NewStringValue(trueWorkspace),
+				},
+			},
+			Reporter: reporterStruct,
+		},
+	}
+	_, err = client.ReportResource(ctx, req)
+	assert.NoError(t, err, "Failed to Report Resource")
+	resourceCreated = true
+
+	// Build CheckBulk with one expected TRUE and one expected FALSE
+	checkBulkReq := &pbv1beta2.CheckBulkRequest{
+		Items: []*pbv1beta2.CheckBulkRequestItem{
+			{
+				Object: &pbv1beta2.ResourceReference{
+					ResourceType: "host",
+					ResourceId:   resourceId,
+					Reporter: &pbv1beta2.ReporterReference{
+						Type:       reporterType,
+						InstanceId: proto.String(reporterInstanceId),
+					},
+				},
+				Relation: "workspace",
+				Subject: &pbv1beta2.SubjectReference{
+					Resource: &pbv1beta2.ResourceReference{
+						ResourceType: "workspace",
+						ResourceId:   trueWorkspace,
+						Reporter: &pbv1beta2.ReporterReference{
+							Type: "rbac",
+						},
+					},
+				},
+			},
+			{
+				Object: &pbv1beta2.ResourceReference{
+					ResourceType: "host",
+					ResourceId:   resourceId,
+					Reporter: &pbv1beta2.ReporterReference{
+						Type:       reporterType,
+						InstanceId: proto.String(reporterInstanceId),
+					},
+				},
+				Relation: "workspace",
+				Subject: &pbv1beta2.SubjectReference{
+					Resource: &pbv1beta2.ResourceReference{
+						ResourceType: "workspace",
+						ResourceId:   falseWorkspace,
+						Reporter: &pbv1beta2.ReporterReference{
+							Type: "rbac",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	// Poll up to 10 seconds to account for eventual consistency
+	observed := false
+	for i := 0; i < 10; i++ {
+		resp, err := client.CheckBulk(ctx, checkBulkReq)
+		if err == nil && resp != nil && len(resp.GetPairs()) == 2 {
+			pairs := resp.GetPairs()
+			gotTrue := pairs[0].GetItem() != nil && pairs[0].GetItem().GetAllowed() == pbv1beta2.Allowed_ALLOWED_TRUE
+			gotFalse := pairs[1].GetItem() != nil && pairs[1].GetItem().GetAllowed() == pbv1beta2.Allowed_ALLOWED_FALSE
+			if gotTrue && gotFalse {
+				observed = true
+				break
+			}
+			t.Logf("CheckBulk attempt %d: got allowed = [%v, %v], expected [TRUE, FALSE]", i+1, pairs[0].GetItem().GetAllowed(), pairs[1].GetItem().GetAllowed())
+		} else if err != nil {
+			t.Logf("CheckBulk request failed (attempt %d): %v", i+1, err)
+		}
+		if i < 9 {
+			time.Sleep(1 * time.Second)
+		}
+	}
+	assert.True(t, observed, "CheckBulk didn't return [TRUE, FALSE] within timeout")
+
+}
+
+func TestInventoryAPIHTTP_v1beta2_CheckBulk_OrderAndEcho(t *testing.T) {
+	enableShortMode(t)
+
+	ctx := context.Background()
+
+	conn, err := grpc.NewClient(
+		inventoryapi_grpc_url,
+		grpc.WithTransportCredentials(grpcinsecure.NewCredentials()),
+		grpc.WithPerRPCCredentials(&bearerAuth{token: "1234"}),
+	)
+	assert.NoError(t, err, "Failed to create gRPC client")
+	defer func() {
+		if connErr := conn.Close(); connErr != nil {
+			t.Logf("Failed to close gRPC connection: %v", connErr)
+		}
+	}()
+
+	conn.Connect()
+	assert.NoError(t, err, "Failed to connect gRPC client")
+
+	client := pbv1beta2.NewKesselInventoryServiceClient(conn)
+
+	resourceId := "checkbulk-host-0002"
+	reporterType := "hbi"
+	reporterInstanceId := "testuser-example-com"
+	workspace := "workspace-echo"
+
+	resourceCreated := false
+	defer func() {
+		if !resourceCreated {
+			return
+		}
+		delReq := &pbv1beta2.DeleteResourceRequest{
+			Reference: &pbv1beta2.ResourceReference{
+				ResourceType: "host",
+				ResourceId:   resourceId,
+				Reporter: &pbv1beta2.ReporterReference{
+					Type:       reporterType,
+					InstanceId: proto.String(reporterInstanceId),
+				},
+			},
+		}
+		_, cleanupErr := client.DeleteResource(ctx, delReq)
+		assert.NoError(t, cleanupErr, "Failed to Delete Resource during cleanup")
+	}()
+
+	// Create resource
+	reporterStruct, err := structpb.NewStruct(map[string]interface{}{
+		"ansible_host": "checkbulk2-host.example.com",
+	})
+	assert.NoError(t, err, "Failed to create structpb for reporter")
+
+	req := &pbv1beta2.ReportResourceRequest{
+		WriteVisibility:    pbv1beta2.WriteVisibility_MINIMIZE_LATENCY,
+		Type:               "host",
+		ReporterType:       reporterType,
+		ReporterInstanceId: reporterInstanceId,
+		Representations: &pbv1beta2.ResourceRepresentations{
+			Metadata: &pbv1beta2.RepresentationMetadata{
+				LocalResourceId: resourceId,
+				ApiHref:         "https://api.example.com/hosts/checkbulk-host-0002",
+				ConsoleHref:     proto.String("https://console.example.com/hosts/checkbulk-host-0002"),
+			},
+			Common: &structpb.Struct{
+				Fields: map[string]*structpb.Value{
+					"workspace_id": structpb.NewStringValue(workspace),
+				},
+			},
+			Reporter: reporterStruct,
+		},
+	}
+	_, err = client.ReportResource(ctx, req)
+	assert.NoError(t, err, "Failed to Report Resource")
+	resourceCreated = true
+
+	item1 := &pbv1beta2.CheckBulkRequestItem{
+		Object: &pbv1beta2.ResourceReference{
+			ResourceType: "host",
+			ResourceId:   resourceId,
+			Reporter: &pbv1beta2.ReporterReference{
+				Type:       reporterType,
+				InstanceId: proto.String(reporterInstanceId),
+			},
+		},
+		Relation: "workspace",
+		Subject: &pbv1beta2.SubjectReference{
+			Resource: &pbv1beta2.ResourceReference{
+				ResourceType: "workspace",
+				ResourceId:   workspace,
+				Reporter: &pbv1beta2.ReporterReference{
+					Type: "rbac",
+				},
+			},
+		},
+	}
+	item2 := &pbv1beta2.CheckBulkRequestItem{
+		Object: &pbv1beta2.ResourceReference{
+			ResourceType: "host",
+			ResourceId:   resourceId,
+			Reporter: &pbv1beta2.ReporterReference{
+				Type:       reporterType,
+				InstanceId: proto.String(reporterInstanceId),
+			},
+		},
+		Relation: "workspace",
+		Subject: &pbv1beta2.SubjectReference{
+			Resource: &pbv1beta2.ResourceReference{
+				ResourceType: "workspace",
+				ResourceId:   "not-" + workspace,
+				Reporter: &pbv1beta2.ReporterReference{
+					Type: "rbac",
+				},
+			},
+		},
+	}
+
+	// Poll up to 10 seconds; verify order is preserved and request is echoed
+	observed := false
+	for i := 0; i < 10; i++ {
+		resp, err := client.CheckBulk(ctx, &pbv1beta2.CheckBulkRequest{
+			Items: []*pbv1beta2.CheckBulkRequestItem{item1, item2},
+		})
+		if err == nil && resp != nil && len(resp.GetPairs()) == 2 {
+			pairs := resp.GetPairs()
+			// Order preserved
+			firstReq := pairs[0].GetRequest()
+			secondReq := pairs[1].GetRequest()
+			orderOK := true
+
+			if firstReq != nil {
+				if firstReq.Object.ResourceId != item1.Object.ResourceId ||
+					firstReq.Subject.Resource.ResourceId != item1.Subject.Resource.ResourceId ||
+					firstReq.Relation != item1.Relation {
+					orderOK = false
+				}
+			}
+			if secondReq != nil {
+				if secondReq.Object.ResourceId != item2.Object.ResourceId ||
+					secondReq.Subject.Resource.ResourceId != item2.Subject.Resource.ResourceId ||
+					secondReq.Relation != item2.Relation {
+					orderOK = false
+				}
+			}
+			t.Logf("CheckBulk attempt %d: orderOK=%v firstReq=%v item1=%v secondReq=%v item2=%v", i+1, orderOK, firstReq, item1, secondReq, item2)
+			// Allowed values as expected in the response
+			allowedOK := pairs[0].GetItem() != nil && pairs[0].GetItem().GetAllowed() == pbv1beta2.Allowed_ALLOWED_TRUE &&
+				pairs[1].GetItem() != nil && pairs[1].GetItem().GetAllowed() == pbv1beta2.Allowed_ALLOWED_FALSE
+			if orderOK && allowedOK {
+				observed = true
+				break
+			}
+			t.Logf("CheckBulk attempt %d: orderOK=%v allowed0=%v allowed1=%v", i+1, orderOK, pairs[0].GetItem().GetAllowed(), pairs[1].GetItem().GetAllowed())
+		} else if err != nil {
+			t.Logf("CheckBulk request failed (attempt %d): %v", i+1, err)
+		}
+		if i < 9 {
+			time.Sleep(1 * time.Second)
+		}
+	}
+	assert.True(t, observed, "CheckBulk order/echo expectations not met within timeout")
 }

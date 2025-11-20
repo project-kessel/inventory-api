@@ -17,6 +17,7 @@ import (
 	conv "github.com/project-kessel/inventory-api/internal/service/common"
 	pbv1beta1 "github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
 	"github.com/spf13/viper"
+	rpcstatus "google.golang.org/genproto/googleapis/rpc/status"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -173,6 +174,24 @@ func (s *InventoryService) CheckForUpdate(ctx context.Context, req *pb.CheckForU
 	}
 }
 
+func (s *InventoryService) CheckBulk(ctx context.Context, req *pb.CheckBulkRequest) (*pb.CheckBulkResponse, error) {
+	_, err := middleware.GetIdentity(ctx)
+	if err != nil {
+		return nil, status.Errorf(codes.Unauthenticated, "failed to get identity: %v", err)
+	}
+
+	if s.useV1beta2Db() {
+		log.Info("CheckBulk using v1beta2 db")
+		v1beta1Req := mapCheckBulkRequestToV1beta1(req)
+		resp, err := s.Ctl.CheckBulk(ctx, v1beta1Req)
+		if err != nil {
+			return nil, err
+		}
+		return mapCheckBulkResponseFromV1beta1(resp), nil
+	}
+	return nil, status.Errorf(codes.Unimplemented, "checkbulk not supported in v1beta1 db")
+}
+
 func subjectReferenceFromSubject(subject *pb.SubjectReference) *pbv1beta1.SubjectReference {
 	return &pbv1beta1.SubjectReference{
 		Relation: subject.Relation,
@@ -183,6 +202,111 @@ func subjectReferenceFromSubject(subject *pb.SubjectReference) *pbv1beta1.Subjec
 			},
 			Id: subject.Resource.GetResourceId(),
 		},
+	}
+}
+
+func subjectReferenceFromSubjectV1beta1(subject *pbv1beta1.SubjectReference) *pb.SubjectReference {
+	return &pb.SubjectReference{
+		Relation: subject.Relation,
+		Resource: &pb.ResourceReference{
+			Reporter: &pb.ReporterReference{
+				Type: subject.Subject.Type.Namespace,
+			},
+			ResourceId:   subject.Subject.Id,
+			ResourceType: subject.Subject.Type.Name,
+		},
+	}
+}
+
+func mapCheckBulkRequestToV1beta1(req *pb.CheckBulkRequest) *pbv1beta1.CheckBulkRequest {
+	items := make([]*pbv1beta1.CheckBulkRequestItem, len(req.GetItems()))
+	for i, item := range req.GetItems() {
+		items[i] = &pbv1beta1.CheckBulkRequestItem{
+			Resource: &pbv1beta1.ObjectReference{
+				Type: &pbv1beta1.ObjectType{
+					Namespace: item.GetObject().GetReporter().GetType(),
+					Name:      item.GetObject().GetResourceType(),
+				},
+				Id: item.GetObject().GetResourceId(),
+			},
+			Subject:  subjectReferenceFromSubject(item.GetSubject()),
+			Relation: item.GetRelation(),
+		}
+	}
+
+	return &pbv1beta1.CheckBulkRequest{
+		Items:       items,
+		Consistency: convertConsistencyToV1beta1(req.GetConsistency()),
+	}
+}
+
+func convertConsistencyToV1beta1(consistency *pb.Consistency) *pbv1beta1.Consistency {
+	if consistency == nil {
+		return &pbv1beta1.Consistency{
+			Requirement: &pbv1beta1.Consistency_MinimizeLatency{MinimizeLatency: true},
+		}
+	}
+	if consistency.GetAtLeastAsFresh() != nil {
+		return &pbv1beta1.Consistency{
+			Requirement: &pbv1beta1.Consistency_AtLeastAsFresh{
+				AtLeastAsFresh: &pbv1beta1.ConsistencyToken{
+					Token: consistency.GetAtLeastAsFresh().GetToken(),
+				},
+			},
+		}
+	}
+	return &pbv1beta1.Consistency{
+		Requirement: &pbv1beta1.Consistency_MinimizeLatency{MinimizeLatency: true},
+	}
+}
+
+func mapCheckBulkResponseFromV1beta1(resp *pbv1beta1.CheckBulkResponse) *pb.CheckBulkResponse {
+	pairs := make([]*pb.CheckBulkResponsePair, len(resp.GetPairs()))
+	for i, pair := range resp.GetPairs() {
+
+		errResponse := &pb.CheckBulkResponsePair_Error{}
+		itemResponse := &pb.CheckBulkResponsePair_Item{}
+
+		if pair.GetError() != nil {
+			log.Errorf("Error in checkbulk for req: %v error-code: %v error-message: %v", pair.GetRequest(), pair.GetError().GetCode(), pair.GetError().GetMessage())
+			errResponse.Error = &rpcstatus.Status{
+				Code:    pair.GetError().GetCode(),
+				Message: pair.GetError().GetMessage(),
+			}
+		}
+
+		allowedResponse := pb.Allowed_ALLOWED_FALSE
+
+		if pair.GetItem().GetAllowed() == pbv1beta1.CheckBulkResponseItem_ALLOWED_TRUE {
+			allowedResponse = pb.Allowed_ALLOWED_TRUE
+		}
+		itemResponse.Item = &pb.CheckBulkResponseItem{
+			Allowed: allowedResponse,
+		}
+
+		pairs[i] = &pb.CheckBulkResponsePair{
+			Request: &pb.CheckBulkRequestItem{
+				Object: &pb.ResourceReference{
+					ResourceType: pair.GetRequest().GetResource().GetType().GetName(),
+					ResourceId:   pair.GetRequest().GetResource().GetId(),
+					Reporter: &pb.ReporterReference{
+						Type: pair.GetRequest().GetResource().GetType().GetNamespace(),
+						// InstanceId: Inline with other behavior we dont have this info back from relations
+					},
+				},
+				Relation: pair.GetRequest().GetRelation(),
+				Subject:  subjectReferenceFromSubjectV1beta1(pair.GetRequest().GetSubject()),
+			},
+		}
+		if pair.GetError() != nil {
+			pairs[i].Response = errResponse
+		} else {
+			pairs[i].Response = itemResponse
+		}
+	}
+	return &pb.CheckBulkResponse{
+		Pairs:            pairs,
+		ConsistencyToken: &pb.ConsistencyToken{Token: resp.GetConsistencyToken().GetToken()},
 	}
 }
 

@@ -17,7 +17,7 @@ require (
 	github.com/jackc/pgx/v5 v5.7.6
 	github.com/mattn/go-sqlite3 v1.14.32
 	github.com/patrickmn/go-cache v2.1.0+incompatible
-	github.com/project-kessel/relations-api v0.0.0-20251114141820-728eedab8b6e
+	github.com/project-kessel/relations-api v0.0.0-20251119124316-a1bcf57e036b
 	github.com/prometheus/client_golang v1.23.2
 	github.com/redhatinsights/app-common-go v1.6.9
 	github.com/sony/gobreaker v1.0.0
@@ -32,6 +32,7 @@ require (
 	go.opentelemetry.io/otel/sdk v1.38.0
 	go.opentelemetry.io/otel/sdk/metric v1.38.0
 	google.golang.org/genproto/googleapis/api v0.0.0-20251111163417-95abcf5c77ba
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20251111163417-95abcf5c77ba
 	google.golang.org/grpc v1.76.0
 	google.golang.org/protobuf v1.36.10
 	gopkg.in/yaml.v3 v3.0.1
@@ -96,10 +97,9 @@ require (
 	go.yaml.in/yaml/v2 v2.4.3 // indirect
 	golang.org/x/crypto v0.44.0 // indirect
 	golang.org/x/exp v0.0.0-20251113190631-e25ba8c21ef6 // indirect
-	golang.org/x/net v0.46.0 // indirect
+	golang.org/x/net v0.47.0 // indirect
 	golang.org/x/oauth2 v0.32.0 // indirect
 	golang.org/x/sync v0.18.0 // indirect
 	golang.org/x/sys v0.38.0 // indirect
 	golang.org/x/text v0.31.0 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20251111163417-95abcf5c77ba // indirect
 )

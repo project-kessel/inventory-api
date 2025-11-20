@@ -2,102 +2,6 @@ apiVersion: v1
 data:
   grafana-dashboard-kessel-inventory-api-ops.json: |-
     {
-      "uid": "kessel-ops",
-      "title": "Kessel - Operations Dashboard",
-      "style": "dark",
-      "schemaVersion": 31,
-      "version": 1,
-      "id": null,
-      "editable": true,
-      "graphTooltip": 0,
-      "fiscalYearStartMonth": 0,
-      "liveNow": false,
-      "time": {
-        "from": "now-1h",
-        "to": "now"
-      },
-      "timepicker": {
-        "refresh_intervals": [
-          "5s",
-          "10s",
-          "30s",
-          "1m",
-          "5m",
-          "15m",
-          "30m",
-          "1h",
-          "2h",
-          "1d"
-        ],
-        "time_options": [
-          "5m",
-          "15m",
-          "1h",
-          "6h",
-          "12h",
-          "24h",
-          "2d",
-          "7d",
-          "30d"
-        ]
-      },
-      "templating": {
-        "list": [
-          {
-            "datasource": {
-              "type": "prometheus",
-              "uid": "$datasource"
-            },
-            "definition": "label_values(server_requests_code_total{namespace=\"$namespace\",service=~\"kessel-inventory-api|kessel-relations-api\",operation!~\".*[Ll]ive[Zz].*|.*[Rr]eady[Zz].*\"}, operation)",
-            "label": "routes",
-            "current": {
-              "selected": true,
-              "text": "All",
-              "value": "$__all"
-            },
-            "hide": 0,
-            "includeAll": true,
-            "multi": true,
-            "name": "route",
-            "query": {
-              "query": "label_values(server_requests_code_total{namespace=\"$namespace\",service=~\"kessel-inventory-api|kessel-relations-api\",operation!~\".*[Ll]ive[Zz].*|.*[Rr]eady[Zz].*\"}, operation)",
-              "refId": "StandardVariableQuery"
-            },
-            "refresh": 1,
-            "type": "query"
-          },
-          {
-            "current": {
-              "text": "crcs02ue1-prometheus",
-              "value": "crcs02ue1-prometheus"
-            },
-            "name": "datasource",
-            "query": "prometheus",
-            "type": "datasource"
-          },
-          {
-            "current": {
-              "selected": true,
-              "text": "kessel-stage",
-              "value": "kessel-stage"
-            },
-            "name": "namespace",
-            "options": [
-              {
-                "selected": true,
-                "text": "kessel-stage",
-                "value": "kessel-stage"
-              },
-              {
-                "text": "kessel-prod",
-                "value": "kessel-prod"
-              }
-            ],
-            "query": "kessel-stage,kessel-prod",
-            "type": "custom"
-          }
-        ]
-      },
       "annotations": {
         "list": [
           {
@@ -118,10 +22,87 @@ data:
           }
         ]
       },
+      "editable": true,
+      "fiscalYearStartMonth": 0,
+      "graphTooltip": 0,
+      "id": 1092221,
+      "links": [
+        {
+          "asDropdown": false,
+          "icon": "dashboard",
+          "includeVars": false,
+          "keepTime": false,
+          "tags": [],
+          "targetBlank": true,
+          "title": "Inventory Dashboards",
+          "tooltip": "",
+          "type": "link",
+          "url": "https://grafana.app-sre.devshift.net/dashboards?query=Inventory%20API"
+        },
+        {
+          "asDropdown": false,
+          "icon": "dashboard",
+          "includeVars": false,
+          "keepTime": false,
+          "tags": [],
+          "targetBlank": true,
+          "title": "Relations Dashboards",
+          "tooltip": "",
+          "type": "link",
+          "url": "https://grafana.app-sre.devshift.net/dashboards?query=Relations"
+        },
+        {
+          "asDropdown": false,
+          "icon": "dashboard",
+          "includeVars": false,
+          "keepTime": false,
+          "tags": [],
+          "targetBlank": true,
+          "title": "SpiceDB Dashboards",
+          "tooltip": "",
+          "type": "link",
+          "url": "https://grafana.app-sre.devshift.net/dashboards?query=spicedb"
+        },
+        {
+          "asDropdown": false,
+          "icon": "dashboard",
+          "includeVars": false,
+          "keepTime": false,
+          "tags": [],
+          "targetBlank": true,
+          "title": "KIC Dashboards",
+          "tooltip": "",
+          "type": "link",
+          "url": "https://grafana.app-sre.devshift.net/dashboards?query=Inventory%20Consumer"
+        },
+        {
+          "asDropdown": false,
+          "icon": "dashboard",
+          "includeVars": false,
+          "keepTime": false,
+          "tags": [],
+          "targetBlank": true,
+          "title": "KKC Dashboards",
+          "tooltip": "",
+          "type": "link",
+          "url": "https://grafana.app-sre.devshift.net/dashboards?query=Kafka%20Connect"
+        },
+        {
+          "asDropdown": false,
+          "icon": "dashboard",
+          "includeVars": false,
+          "keepTime": false,
+          "tags": [],
+          "targetBlank": true,
+          "title": "RBAC Dashboards",
+          "tooltip": "",
+          "type": "link",
+          "url": "https://grafana.app-sre.devshift.net/dashboards?query=RBAC"
+        }
+      ],
       "panels": [
         {
-          "type": "row",
-          "title": "Inventory Overall",
+          "collapsed": false,
           "gridPos": {
             "h": 1,
             "w": 24,
@@ -129,679 +110,4247 @@ data:
             "y": 0
           },
           "id": 1,
-          "collapsed": true,
-          "datasource": {
-            "type": "prometheus",
-            "uid": "$datasource"
-          },
-          "panels": [
-            {
-              "datasource": {
-                "uid": "$datasource"
-              },
-              "description": "The percentage of time that the API is available (not returning 5xx errors or timeouts).",
-              "fieldConfig": {
-                "defaults": {
-                  "color": {
-                    "mode": "thresholds"
-                  },
-                  "mappings": [
-                    {
-                      "options": {
-                        "match": "null",
-                        "result": {
-                          "text": "N/A"
-                        }
-                      },
-                      "type": "special"
-                    }
-                  ],
-                  "thresholds": {
-                    "mode": "absolute",
-                    "steps": [
-                      {
-                        "color": "#d44a3a",
-                        "value": 0
-                      },
-                      {
-                        "color": "rgba(237, 129, 40, 0.89)",
-                        "value": 0.99
-                      },
-                      {
-                        "color": "#299c46",
-                        "value": 0.995
-                      }
-                    ]
-                  },
-                  "unit": "percentunit",
-                  "max": 1
-                },
-                "overrides": []
-              },
-              "gridPos": {
-                "h": 4,
-                "w": 3,
-                "x": 0,
-                "y": 1
-              },
-              "id": 2,
-              "maxDataPoints": 100,
-              "options": {
-                "colorMode": "value",
-                "graphMode": "none",
-                "justifyMode": "auto",
-                "orientation": "horizontal",
-                "reduceOptions": {
-                  "calcs": [
-                    "lastNotNull"
-                  ]
-                },
-                "textMode": "auto"
-              },
-              "pluginVersion": "8.5.2",
-              "targets": [
-                {
-                  "expr": "sum(increase(server_requests_code_total{namespace=\"$namespace\",service=~\"kessel-inventory-api\",operation!~\".*[Ll]ive[Zz].*|.*[Rr]eady[Zz].*\",code!~\"5..|14\"}[$__range])) / sum(increase(server_requests_code_total{namespace=\"$namespace\",service=~\"kessel-inventory-api\",operation!~\".*[Ll]ive[Zz].*|.*[Rr]eady[Zz].*\"}[$__range]))",
-                  "format": "time_series",
-                  "instant": true,
-                  "refId": "A"
-                }
-              ],
-              "title": "Availability (selected time)",
-              "type": "stat"
-            },
-            {
-              "datasource": {
-                "uid": "$datasource"
-              },
-              "description": "Number of requests per second by response codes.",
-              "fieldConfig": {
-                "defaults": {
-                  "unit": "reqps",
-                  "custom": {
-                    "fillOpacity": 10,
-                    "hideFrom": {},
-                    "lineWidth": 1,
-                    "pointSize": 5,
-                    "scaleDistribution": {
-                      "type": "linear"
-                    },
-                    "showPoints": "never",
-                    "stacking": {},
-                    "thresholdsStyle": {}
-                  }
-                },
-                "overrides": []
-              },
-              "gridPos": {
-                "h": 8,
-                "w": 7,
-                "x": 3,
-                "y": 1
-              },
-              "id": 3,
-              "options": {
-                "legend": {
-                  "calcs": [],
-                  "displayMode": "list",
-                  "placement": "bottom",
-                  "showLegend": true
-                },
-                "tooltip": {
-                  "mode": "multi",
-                  "sort": "none"
-                }
-              },
-              "pluginVersion": "10.4.1",
-              "targets": [
-                {
-                  "expr": "sum by (code) (label_replace(rate(server_requests_code_total{namespace=\"$namespace\",service=~\"kessel-inventory-api\",operation!~\".*[Ll]ive[Zz].*|.*[Rr]eady[Zz].*\"}[$__rate_interval]), \"code\", \"200\", \"code\", \"0\"))",
-                  "legendFormat": "{{code}}",
-                  "refId": "A"
-                }
-              ],
-              "title": "Requests",
-              "type": "timeseries"
-            },
-            {
-              "datasource": {
-                "uid": "$datasource"
-              },
-              "description": "The error percentage.",
-              "fieldConfig": {
-                "defaults": {
-                  "unit": "percentunit",
-                  "max": 1,
-                  "custom": {
-                    "hideFrom": {},
-                    "lineWidth": 1,
-                    "pointSize": 5,
-                    "scaleDistribution": {
-                      "type": "linear"
-                    },
-                    "showPoints": "never",
-                    "stacking": {},
-                    "thresholdsStyle": {}
-                  }
-                },
-                "overrides": []
-              },
-              "gridPos": {
-                "h": 8,
-                "w": 7,
-                "x": 10,
-                "y": 1
-              },
-              "id": 4,
-              "options": {
-                "legend": {
-                  "calcs": [],
-                  "displayMode": "list",
-                  "placement": "bottom",
-                  "showLegend": true
-                },
-                "tooltip": {
-                  "mode": "multi",
-                  "sort": "none"
-                }
-              },
-              "pluginVersion": "10.4.1",
-              "targets": [
-                {
-                  "expr": "sum(rate(server_requests_code_total{namespace=\"$namespace\",service=~\"kessel-inventory-api\",operation!~\".*[Ll]ive[Zz].*|.*[Rr]eady[Zz].*\",code!~\"0|2..\"}[$__rate_interval])) / sum(rate(server_requests_code_total{namespace=\"$namespace\",service=~\"kessel-inventory-api\",operation!~\".*[Ll]ive[Zz].*|.*[Rr]eady[Zz].*\"}[$__rate_interval]))",
-                  "legendFormat": "non-2xx/0",
-                  "refId": "A"
-                },
-                {
-                  "expr": "sum(rate(server_requests_code_total{namespace=\"$namespace\",service=~\"kessel-inventory-api\",operation!~\".*[Ll]ive[Zz].*|.*[Rr]eady[Zz].*\",code=~\"5..|14\"}[$__rate_interval])) / sum(rate(server_requests_code_total{namespace=\"$namespace\",service=~\"kessel-inventory-api\",operation!~\".*[Ll]ive[Zz].*|.*[Rr]eady[Zz].*\"}[$__rate_interval]))",
-                  "legendFormat": "5xx and timeout",
-                  "refId": "B"
-                }
-              ],
-              "title": "Errors",
-              "type": "timeseries"
-            },
-            {
-              "datasource": {
-                "uid": "$datasource"
-              },
-              "description": "The average request duration",
-              "fieldConfig": {
-                "defaults": {
-                  "unit": "s",
-                  "custom": {
-                    "fillOpacity": 10,
-                    "hideFrom": {},
-                    "lineWidth": 1,
-                    "pointSize": 5,
-                    "scaleDistribution": {
-                      "type": "linear"
-                    },
-                    "showPoints": "never",
-                    "stacking": {},
-                    "thresholdsStyle": {}
-                  }
-                },
-                "overrides": []
-              },
-              "gridPos": {
-                "h": 8,
-                "w": 7,
-                "x": 17,
-                "y": 1
-              },
-              "id": 5,
-              "options": {
-                "legend": {
-                  "calcs": [],
-                  "displayMode": "list",
-                  "placement": "bottom",
-                  "showLegend": true
-                },
-                "tooltip": {
-                  "mode": "multi",
-                  "sort": "none"
-                }
-              },
-              "pluginVersion": "10.4.1",
-              "targets": [
-                {
-                  "expr": "sum(increase(server_requests_seconds_bucket_seconds_sum{namespace=\"$namespace\",service=~\"kessel-inventory-api\",operation!~\".*[Ll]ive[Zz].*|.*[Rr]eady[Zz].*\",code!~\"5..|14\"}[$__rate_interval])) / sum(increase(server_requests_seconds_bucket_seconds_count{namespace=\"$namespace\",service=~\"kessel-inventory-api\",operation!~\".*[Ll]ive[Zz].*|.*[Rr]eady[Zz].*\",code!~\"5..|14\"}[$__rate_interval]))",
-                  "legendFormat": "Avg. response duration",
-                  "interval": "",
-                  "refId": "A"
-                }
-              ],
-              "title": "Duration",
-              "type": "timeseries"
-            },
-            {
-              "datasource": {
-                "uid": "$datasource"
-              },
-              "description": "The percentage of time that the API responds within 1 second.",
-              "fieldConfig": {
-                "defaults": {
-                  "color": {
-                    "mode": "thresholds"
-                  },
-                  "mappings": [
-                    {
-                      "options": {
-                        "match": "null",
-                        "result": {
-                          "text": "N/A"
-                        }
-                      },
-                      "type": "special"
-                    }
-                  ],
-                  "thresholds": {
-                    "mode": "absolute",
-                    "steps": [
-                      {
-                        "color": "#d44a3a"
-                      },
-                      {
-                        "color": "rgba(237, 129, 40, 0.89)",
-                        "value": 0.99
-                      },
-                      {
-                        "color": "#299c46",
-                        "value": 0.995
-                      }
-                    ]
-                  },
-                  "unit": "percentunit",
-                  "max": 1
-                }
-              },
-              "gridPos": {
-                "h": 4,
-                "w": 3,
-                "x": 0,
-                "y": 5
-              },
-              "id": 6,
-              "maxDataPoints": 100,
-              "options": {
-                "colorMode": "value",
-                "graphMode": "none",
-                "justifyMode": "auto",
-                "orientation": "horizontal",
-                "reduceOptions": {
-                  "calcs": [
-                    "lastNotNull"
-                  ],
-                  "fields": "",
-                  "values": false
-                },
-                "textMode": "auto"
-              },
-              "pluginVersion": "8.5.2",
-              "targets": [
-                {
-                  "expr": "sum(increase(server_requests_seconds_bucket_seconds_bucket{namespace=\"$namespace\",service=~\"kessel-inventory-api\",operation!~\".*[Ll]ive[Zz].*|.*[Rr]eady[Zz].*\",code!~\"5..|14\",le=\"1.0\"}[$__range])) / sum(increase(server_requests_seconds_bucket_seconds_count{namespace=\"$namespace\",service=~\"kessel-inventory-api\",operation!~\".*[Ll]ive[Zz].*|.*[Rr]eady[Zz].*\",code!~\"5..|14\"}[$__range]))",
-                  "format": "time_series",
-                  "instant": true,
-                  "refId": "A"
-                }
-              ],
-              "title": "Latency (< 1s)",
-              "type": "stat"
-            }
-          ]
+          "panels": [],
+          "title": "Inventory Overall",
+          "type": "row"
         },
         {
-          "type": "row",
-          "title": "Relations Overall",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  },
+                  {
+                    "color": "dark-red",
+                    "value": 1
+                  },
+                  {
+                    "color": "#EAB839",
+                    "value": 2
+                  },
+                  {
+                    "color": "green",
+                    "value": 3
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 3,
+            "w": 3,
+            "x": 0,
+            "y": 1
+          },
+          "id": 26,
+          "options": {
+            "colorMode": "value",
+            "graphMode": "none",
+            "justifyMode": "auto",
+            "orientation": "auto",
+            "percentChangeColorMode": "standard",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "showPercentChange": false,
+            "textMode": "auto",
+            "wideLayout": true
+          },
+          "pluginVersion": "11.6.3",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "exemplar": false,
+              "expr": "sum(up{job='kessel-inventory-api'})",
+              "instant": false,
+              "legendFormat": "__auto",
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "title": "Up",
+          "type": "stat"
+        },
+        {
+          "datasource": {
+            "uid": "$datasource"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisBorderShow": false,
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "barWidthFactor": 0.6,
+                "drawStyle": "line",
+                "fillOpacity": 100,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "insertNulls": false,
+                "lineInterpolation": "linear",
+                "lineWidth": 0,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "never",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "normal"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "min": 0,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  },
+                  {
+                    "color": "red",
+                    "value": 80
+                  }
+                ]
+              },
+              "unit": "short"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 6,
+            "w": 11,
+            "x": 3,
+            "y": 1
+          },
+          "id": 28,
+          "options": {
+            "dataLinks": [],
+            "legend": {
+              "calcs": [],
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "hideZeros": false,
+              "mode": "single",
+              "sort": "none"
+            }
+          },
+          "pluginVersion": "11.6.3",
+          "targets": [
+            {
+              "datasource": {
+                "uid": "$datasource"
+              },
+              "editorMode": "code",
+              "expr": "sum(node_namespace_pod_container:container_cpu_usage_seconds_total:sum_irate{namespace=\"$namespace\", container=\"kessel-inventory-api\"}) by (pod)",
+              "format": "time_series",
+              "intervalFactor": 2,
+              "legendFormat": "{{pod}}",
+              "range": true,
+              "refId": "A",
+              "step": 10
+            }
+          ],
+          "title": "CPU Usage",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "uid": "$datasource"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisBorderShow": false,
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "barWidthFactor": 0.6,
+                "drawStyle": "line",
+                "fillOpacity": 100,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "insertNulls": false,
+                "lineInterpolation": "linear",
+                "lineWidth": 0,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "never",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "normal"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "min": 0,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  },
+                  {
+                    "color": "red",
+                    "value": 80
+                  }
+                ]
+              },
+              "unit": "bytes"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 6,
+            "w": 10,
+            "x": 14,
+            "y": 1
+          },
+          "id": 29,
+          "options": {
+            "dataLinks": [],
+            "legend": {
+              "calcs": [],
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "hideZeros": false,
+              "mode": "single",
+              "sort": "none"
+            }
+          },
+          "pluginVersion": "11.6.3",
+          "targets": [
+            {
+              "datasource": {
+                "uid": "$datasource"
+              },
+              "editorMode": "code",
+              "expr": "sum(container_memory_working_set_bytes{namespace=\"$namespace\", container=\"kessel-inventory-api\"}) by (pod)",
+              "format": "time_series",
+              "intervalFactor": 2,
+              "legendFormat": "{{pod}}",
+              "range": true,
+              "refId": "A",
+              "step": 10
+            }
+          ],
+          "title": "Memory Usage (w/o cache)",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  },
+                  {
+                    "color": "green",
+                    "value": 0
+                  },
+                  {
+                    "color": "#EAB839",
+                    "value": 3
+                  },
+                  {
+                    "color": "dark-red",
+                    "value": 5
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 3,
+            "w": 3,
+            "x": 0,
+            "y": 4
+          },
+          "id": 27,
+          "options": {
+            "colorMode": "value",
+            "graphMode": "none",
+            "justifyMode": "auto",
+            "orientation": "auto",
+            "percentChangeColorMode": "standard",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "showPercentChange": false,
+            "textMode": "auto",
+            "wideLayout": true
+          },
+          "pluginVersion": "11.6.3",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "exemplar": false,
+              "expr": "sum(kube_pod_container_status_restarts_total{container='kessel-inventory-api'})",
+              "instant": false,
+              "legendFormat": "__auto",
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "title": "Restarts",
+          "type": "stat"
+        },
+        {
+          "datasource": {
+            "uid": "$datasource"
+          },
+          "description": "The percentage of time that the API is available (not returning 5xx errors or timeouts).",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "mappings": [
+                {
+                  "options": {
+                    "match": "null",
+                    "result": {
+                      "text": "N/A"
+                    }
+                  },
+                  "type": "special"
+                }
+              ],
+              "max": 1,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "#d44a3a"
+                  },
+                  {
+                    "color": "rgba(237, 129, 40, 0.89)",
+                    "value": 0.99
+                  },
+                  {
+                    "color": "#299c46",
+                    "value": 0.995
+                  }
+                ]
+              },
+              "unit": "percentunit"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 3,
+            "w": 3,
+            "x": 0,
+            "y": 7
+          },
+          "id": 2,
+          "maxDataPoints": 100,
+          "options": {
+            "colorMode": "value",
+            "graphMode": "none",
+            "justifyMode": "auto",
+            "orientation": "horizontal",
+            "percentChangeColorMode": "standard",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "showPercentChange": false,
+            "textMode": "auto",
+            "wideLayout": true
+          },
+          "pluginVersion": "11.6.3",
+          "targets": [
+            {
+              "datasource": {
+                "uid": "$datasource"
+              },
+              "expr": "sum(increase(server_requests_code_total{namespace=\"$namespace\",service=~\"kessel-inventory-api\",operation!~\".*[Ll]ive[Zz].*|.*[Rr]eady[Zz].*\",code!~\"5..|14\"}[$__range])) / sum(increase(server_requests_code_total{namespace=\"$namespace\",service=~\"kessel-inventory-api\",operation!~\".*[Ll]ive[Zz].*|.*[Rr]eady[Zz].*\"}[$__range]))",
+              "format": "time_series",
+              "instant": true,
+              "refId": "A"
+            }
+          ],
+          "title": "Availability (selected time)",
+          "type": "stat"
+        },
+        {
+          "datasource": {
+            "uid": "$datasource"
+          },
+          "description": "Number of requests per second by response codes.",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisBorderShow": false,
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "barWidthFactor": 0.6,
+                "drawStyle": "line",
+                "fillOpacity": 10,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "insertNulls": false,
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "never",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  },
+                  {
+                    "color": "red",
+                    "value": 80
+                  }
+                ]
+              },
+              "unit": "reqps"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 6,
+            "w": 7,
+            "x": 3,
+            "y": 7
+          },
+          "id": 3,
+          "options": {
+            "legend": {
+              "calcs": [],
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "hideZeros": false,
+              "mode": "multi",
+              "sort": "none"
+            }
+          },
+          "pluginVersion": "11.6.3",
+          "targets": [
+            {
+              "datasource": {
+                "uid": "$datasource"
+              },
+              "expr": "sum by (code) (label_replace(rate(server_requests_code_total{namespace=\"$namespace\",service=~\"kessel-inventory-api\",operation!~\".*[Ll]ive[Zz].*|.*[Rr]eady[Zz].*\"}[$__rate_interval]), \"code\", \"200\", \"code\", \"0\"))",
+              "legendFormat": "{{code}}",
+              "refId": "A"
+            }
+          ],
+          "title": "Requests",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "uid": "$datasource"
+          },
+          "description": "The error percentage.",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisBorderShow": false,
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "barWidthFactor": 0.6,
+                "drawStyle": "line",
+                "fillOpacity": 0,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "insertNulls": false,
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "never",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "max": 1,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  },
+                  {
+                    "color": "red",
+                    "value": 80
+                  }
+                ]
+              },
+              "unit": "percentunit"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 6,
+            "w": 7,
+            "x": 10,
+            "y": 7
+          },
+          "id": 23,
+          "options": {
+            "legend": {
+              "calcs": [],
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "hideZeros": false,
+              "mode": "multi",
+              "sort": "none"
+            }
+          },
+          "pluginVersion": "11.6.3",
+          "targets": [
+            {
+              "datasource": {
+                "uid": "$datasource"
+              },
+              "expr": "sum(rate(server_requests_code_total{namespace=\"$namespace\",service=~\"kessel-relations-api\",operation!~\".*[Ll]ive[Zz].*|.*[Rr]eady[Zz].*\",code!~\"0|2..\"}[$__rate_interval])) / sum(rate(server_requests_code_total{namespace=\"$namespace\",service=~\"kessel-relations-api\",operation!~\".*[Ll]ive[Zz].*|.*[Rr]eady[Zz].*\"}[$__rate_interval]))",
+              "legendFormat": "non-2xx/0",
+              "refId": "A"
+            },
+            {
+              "datasource": {
+                "uid": "$datasource"
+              },
+              "expr": "sum(rate(server_requests_code_total{namespace=\"$namespace\",service=~\"kessel-relations-api\",operation!~\".*[Ll]ive[Zz].*|.*[Rr]eady[Zz].*\",code=~\"5..|14\"}[$__rate_interval])) / sum(rate(server_requests_code_total{namespace=\"$namespace\",service=~\"kessel-relations-api\",operation!~\".*[Ll]ive[Zz].*|.*[Rr]eady[Zz].*\"}[$__rate_interval]))",
+              "legendFormat": "5xx and timeout",
+              "refId": "B"
+            }
+          ],
+          "title": "Errors",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "uid": "$datasource"
+          },
+          "description": "The average request duration",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisBorderShow": false,
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "barWidthFactor": 0.6,
+                "drawStyle": "line",
+                "fillOpacity": 10,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "insertNulls": false,
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "never",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  },
+                  {
+                    "color": "red",
+                    "value": 80
+                  }
+                ]
+              },
+              "unit": "s"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 6,
+            "w": 7,
+            "x": 17,
+            "y": 7
+          },
+          "id": 5,
+          "options": {
+            "legend": {
+              "calcs": [],
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "hideZeros": false,
+              "mode": "multi",
+              "sort": "none"
+            }
+          },
+          "pluginVersion": "11.6.3",
+          "targets": [
+            {
+              "datasource": {
+                "uid": "$datasource"
+              },
+              "expr": "sum(increase(server_requests_seconds_bucket_seconds_sum{namespace=\"$namespace\",service=~\"kessel-inventory-api\",operation!~\".*[Ll]ive[Zz].*|.*[Rr]eady[Zz].*\",code!~\"5..|14\"}[$__rate_interval])) / sum(increase(server_requests_seconds_bucket_seconds_count{namespace=\"$namespace\",service=~\"kessel-inventory-api\",operation!~\".*[Ll]ive[Zz].*|.*[Rr]eady[Zz].*\",code!~\"5..|14\"}[$__rate_interval]))",
+              "interval": "",
+              "legendFormat": "Avg. response duration",
+              "refId": "A"
+            }
+          ],
+          "title": "Duration",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "uid": "$datasource"
+          },
+          "description": "The percentage of time that the API responds within 1 second.",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "mappings": [
+                {
+                  "options": {
+                    "match": "null",
+                    "result": {
+                      "text": "N/A"
+                    }
+                  },
+                  "type": "special"
+                }
+              ],
+              "max": 1,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "#d44a3a"
+                  },
+                  {
+                    "color": "rgba(237, 129, 40, 0.89)",
+                    "value": 0.99
+                  },
+                  {
+                    "color": "#299c46",
+                    "value": 0.995
+                  }
+                ]
+              },
+              "unit": "percentunit"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 3,
+            "w": 3,
+            "x": 0,
+            "y": 10
+          },
+          "id": 6,
+          "maxDataPoints": 100,
+          "options": {
+            "colorMode": "value",
+            "graphMode": "none",
+            "justifyMode": "auto",
+            "orientation": "horizontal",
+            "percentChangeColorMode": "standard",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "showPercentChange": false,
+            "textMode": "auto",
+            "wideLayout": true
+          },
+          "pluginVersion": "11.6.3",
+          "targets": [
+            {
+              "datasource": {
+                "uid": "$datasource"
+              },
+              "expr": "sum(increase(server_requests_seconds_bucket_seconds_bucket{namespace=\"$namespace\",service=~\"kessel-inventory-api\",operation!~\".*[Ll]ive[Zz].*|.*[Rr]eady[Zz].*\",code!~\"5..|14\",le=\"1.0\"}[$__range])) / sum(increase(server_requests_seconds_bucket_seconds_count{namespace=\"$namespace\",service=~\"kessel-inventory-api\",operation!~\".*[Ll]ive[Zz].*|.*[Rr]eady[Zz].*\",code!~\"5..|14\"}[$__range]))",
+              "format": "time_series",
+              "instant": true,
+              "refId": "A"
+            }
+          ],
+          "title": "Latency (< 1s)",
+          "type": "stat"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisBorderShow": false,
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "barWidthFactor": 0.6,
+                "drawStyle": "line",
+                "fillOpacity": 0,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "insertNulls": false,
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "auto",
+                "spanNulls": true,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 5,
+            "w": 8,
+            "x": 0,
+            "y": 13
+          },
+          "id": 62,
+          "options": {
+            "legend": {
+              "calcs": [],
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "hideZeros": false,
+              "mode": "single",
+              "sort": "none"
+            }
+          },
+          "pluginVersion": "11.6.3",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "expr": "sum(rate(consumer_msgs_processed_total{job=\"kessel-inventory-api\"}[$__rate_interval]))",
+              "instant": false,
+              "legendFormat": "__auto",
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "title": "Consumer Processing Rate",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisBorderShow": false,
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "barWidthFactor": 0.6,
+                "drawStyle": "line",
+                "fillOpacity": 0,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "insertNulls": false,
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "auto",
+                "spanNulls": true,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 5,
+            "w": 8,
+            "x": 8,
+            "y": 13
+          },
+          "id": 63,
+          "options": {
+            "legend": {
+              "calcs": [],
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "hideZeros": false,
+              "mode": "single",
+              "sort": "none"
+            }
+          },
+          "pluginVersion": "11.6.3",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "expr": "sum(rate(consumer_msg_process_failures_total{job=\"kessel-inventory-api\"}[$__rate_interval])) / sum(rate(consumer_msgs_processed_total{job=\"kessel-inventory-api\"}[$__rate_interval])) or sum(up{job=\"kessel-inventory-api\"}) * 0",
+              "format": "time_series",
+              "instant": false,
+              "legendFormat": "__auto",
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "title": "Consumer Processing Failure Rate",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "description": "Errors related to the Consumer and not message processing",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisBorderShow": false,
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "barWidthFactor": 0.6,
+                "drawStyle": "line",
+                "fillOpacity": 0,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "insertNulls": false,
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "auto",
+                "spanNulls": true,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 5,
+            "w": 8,
+            "x": 16,
+            "y": 13
+          },
+          "id": 64,
+          "options": {
+            "legend": {
+              "calcs": [],
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "hideZeros": false,
+              "mode": "single",
+              "sort": "none"
+            }
+          },
+          "pluginVersion": "11.6.3",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "expr": "sum(rate(consumer_consumer_errors_total{job=\"kessel-inventory-api\"}[$__rate_interval])) / sum(rate(consumer_msgs_processed_total{job=\"kessel-inventory-api\"}[$__rate_interval])) or sum(up{job=\"kessel-inventory-api\"}) * 0",
+              "instant": false,
+              "legendFormat": "__auto",
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "title": "Consumer Error Rate",
+          "type": "timeseries"
+        },
+        {
+          "collapsed": false,
           "gridPos": {
             "h": 1,
             "w": 24,
             "x": 0,
-            "y": 1
+            "y": 18
           },
           "id": 20,
-          "collapsed": true,
-          "datasource": {
-            "type": "prometheus",
-            "uid": "$datasource"
-          },
-          "panels": [
-            {
-              "datasource": {
-                "uid": "$datasource"
-              },
-              "description": "The percentage of time that the API is available (not returning 5xx errors or timeouts).",
-              "fieldConfig": {
-                "defaults": {
-                  "color": {
-                    "mode": "thresholds"
-                  },
-                  "mappings": [
-                    {
-                      "options": {
-                        "match": "null",
-                        "result": {
-                          "text": "N/A"
-                        }
-                      },
-                      "type": "special"
-                    }
-                  ],
-                  "thresholds": {
-                    "mode": "absolute",
-                    "steps": [
-                      {
-                        "color": "#d44a3a",
-                        "value": 0
-                      },
-                      {
-                        "color": "rgba(237, 129, 40, 0.89)",
-                        "value": 0.99
-                      },
-                      {
-                        "color": "#299c46",
-                        "value": 0.995
-                      }
-                    ]
-                  },
-                  "unit": "percentunit",
-                  "max": 1
-                },
-                "overrides": []
-              },
-              "gridPos": {
-                "h": 4,
-                "w": 3,
-                "x": 0,
-                "y": 1
-              },
-              "id": 21,
-              "maxDataPoints": 100,
-              "options": {
-                "colorMode": "value",
-                "graphMode": "none",
-                "justifyMode": "auto",
-                "orientation": "horizontal",
-                "reduceOptions": {
-                  "calcs": [
-                    "lastNotNull"
-                  ]
-                },
-                "textMode": "auto"
-              },
-              "pluginVersion": "8.5.2",
-              "targets": [
-                {
-                  "expr": "sum(increase(server_requests_code_total{namespace=\"$namespace\",service=~\"kessel-relations-api\",operation!~\".*[Ll]ive[Zz].*|.*[Rr]eady[Zz].*\",code!~\"5..|14\"}[$__range])) / sum(increase(server_requests_code_total{namespace=\"$namespace\",service=~\"kessel-relations-api\",operation!~\".*[Ll]ive[Zz].*|.*[Rr]eady[Zz].*\"}[$__range]))",
-                  "format": "time_series",
-                  "instant": true,
-                  "refId": "A"
-                }
-              ],
-              "title": "Availability (selected time)",
-              "type": "stat"
-            },
-            {
-              "datasource": {
-                "uid": "$datasource"
-              },
-              "description": "Number of requests per second by response codes.",
-              "fieldConfig": {
-                "defaults": {
-                  "unit": "reqps",
-                  "custom": {
-                    "fillOpacity": 10,
-                    "hideFrom": {},
-                    "lineWidth": 1,
-                    "pointSize": 5,
-                    "scaleDistribution": {
-                      "type": "linear"
-                    },
-                    "showPoints": "never",
-                    "stacking": {},
-                    "thresholdsStyle": {}
-                  }
-                },
-                "overrides": []
-              },
-              "gridPos": {
-                "h": 8,
-                "w": 7,
-                "x": 3,
-                "y": 1
-              },
-              "id": 22,
-              "options": {
-                "legend": {
-                  "calcs": [],
-                  "displayMode": "list",
-                  "placement": "bottom",
-                  "showLegend": true
-                },
-                "tooltip": {
-                  "mode": "multi",
-                  "sort": "none"
-                }
-              },
-              "pluginVersion": "10.4.1",
-              "targets": [
-                {
-                  "expr": "sum by (code) (label_replace(rate(server_requests_code_total{namespace=\"$namespace\",service=~\"kessel-relations-api\",operation!~\".*[Ll]ive[Zz].*|.*[Rr]eady[Zz].*\"}[$__rate_interval]), \"code\", \"200\", \"code\", \"0\"))",
-                  "legendFormat": "{{code}}",
-                  "refId": "A"
-                }
-              ],
-              "title": "Requests",
-              "type": "timeseries"
-            },
-            {
-              "datasource": {
-                "uid": "$datasource"
-              },
-              "description": "The error percentage.",
-              "fieldConfig": {
-                "defaults": {
-                  "unit": "percentunit",
-                  "max": 1,
-                  "custom": {
-                    "hideFrom": {},
-                    "lineWidth": 1,
-                    "pointSize": 5,
-                    "scaleDistribution": {
-                      "type": "linear"
-                    },
-                    "showPoints": "never",
-                    "stacking": {},
-                    "thresholdsStyle": {}
-                  }
-                },
-                "overrides": []
-              },
-              "gridPos": {
-                "h": 8,
-                "w": 7,
-                "x": 10,
-                "y": 1
-              },
-              "id": 23,
-              "options": {
-                "legend": {
-                  "calcs": [],
-                  "displayMode": "list",
-                  "placement": "bottom",
-                  "showLegend": true
-                },
-                "tooltip": {
-                  "mode": "multi",
-                  "sort": "none"
-                }
-              },
-              "pluginVersion": "10.4.1",
-              "targets": [
-                {
-                  "expr": "sum(rate(server_requests_code_total{namespace=\"$namespace\",service=~\"kessel-relations-api\",operation!~\".*[Ll]ive[Zz].*|.*[Rr]eady[Zz].*\",code!~\"0|2..\"}[$__rate_interval])) / sum(rate(server_requests_code_total{namespace=\"$namespace\",service=~\"kessel-relations-api\",operation!~\".*[Ll]ive[Zz].*|.*[Rr]eady[Zz].*\"}[$__rate_interval]))",
-                  "legendFormat": "non-2xx/0",
-                  "refId": "A"
-                },
-                {
-                  "expr": "sum(rate(server_requests_code_total{namespace=\"$namespace\",service=~\"kessel-relations-api\",operation!~\".*[Ll]ive[Zz].*|.*[Rr]eady[Zz].*\",code=~\"5..|14\"}[$__rate_interval])) / sum(rate(server_requests_code_total{namespace=\"$namespace\",service=~\"kessel-relations-api\",operation!~\".*[Ll]ive[Zz].*|.*[Rr]eady[Zz].*\"}[$__rate_interval]))",
-                  "legendFormat": "5xx and timeout",
-                  "refId": "B"
-                }
-              ],
-              "title": "Errors",
-              "type": "timeseries"
-            },
-            {
-              "datasource": {
-                "uid": "$datasource"
-              },
-              "description": "The average request duration",
-              "fieldConfig": {
-                "defaults": {
-                  "unit": "s",
-                  "custom": {
-                    "fillOpacity": 10,
-                    "hideFrom": {},
-                    "lineWidth": 1,
-                    "pointSize": 5,
-                    "scaleDistribution": {
-                      "type": "linear"
-                    },
-                    "showPoints": "never",
-                    "stacking": {},
-                    "thresholdsStyle": {}
-                  }
-                },
-                "overrides": []
-              },
-              "gridPos": {
-                "h": 8,
-                "w": 7,
-                "x": 17,
-                "y": 1
-              },
-              "id": 24,
-              "options": {
-                "legend": {
-                  "calcs": [],
-                  "displayMode": "list",
-                  "placement": "bottom",
-                  "showLegend": true
-                },
-                "tooltip": {
-                  "mode": "multi",
-                  "sort": "none"
-                }
-              },
-              "pluginVersion": "10.4.1",
-              "targets": [
-                {
-                  "expr": "sum(increase(server_requests_seconds_bucket_seconds_sum{namespace=\"$namespace\",service=~\"kessel-relations-api\",operation!~\".*[Ll]ive[Zz].*|.*[Rr]eady[Zz].*\",code!~\"5..|14\"}[$__rate_interval])) / sum(increase(server_requests_seconds_bucket_seconds_count{namespace=\"$namespace\",service=~\"kessel-relations-api\",operation!~\".*[Ll]ive[Zz].*|.*[Rr]eady[Zz].*\",code!~\"5..|14\"}[$__rate_interval]))",
-                  "legendFormat": "Avg. response duration",
-                  "interval": "",
-                  "refId": "A"
-                }
-              ],
-              "title": "Duration",
-              "type": "timeseries"
-            },
-            {
-              "datasource": {
-                "uid": "$datasource"
-              },
-              "description": "The percentage of time that the API responds within 1 second.",
-              "fieldConfig": {
-                "defaults": {
-                  "color": {
-                    "mode": "thresholds"
-                  },
-                  "mappings": [
-                    {
-                      "options": {
-                        "match": "null",
-                        "result": {
-                          "text": "N/A"
-                        }
-                      },
-                      "type": "special"
-                    }
-                  ],
-                  "thresholds": {
-                    "mode": "absolute",
-                    "steps": [
-                      {
-                        "color": "#d44a3a"
-                      },
-                      {
-                        "color": "rgba(237, 129, 40, 0.89)",
-                        "value": 0.99
-                      },
-                      {
-                        "color": "#299c46",
-                        "value": 0.995
-                      }
-                    ]
-                  },
-                  "unit": "percentunit",
-                  "max": 1
-                }
-              },
-              "gridPos": {
-                "h": 4,
-                "w": 3,
-                "x": 0,
-                "y": 5
-              },
-              "id": 25,
-              "maxDataPoints": 100,
-              "options": {
-                "colorMode": "value",
-                "graphMode": "none",
-                "justifyMode": "auto",
-                "orientation": "horizontal",
-                "reduceOptions": {
-                  "calcs": [
-                    "lastNotNull"
-                  ],
-                  "fields": "",
-                  "values": false
-                },
-                "textMode": "auto"
-              },
-              "pluginVersion": "8.5.2",
-              "targets": [
-                {
-                  "expr": "sum(increase(server_requests_seconds_bucket_seconds_bucket{namespace=\"$namespace\",service=~\"kessel-relations-api\",operation!~\".*[Ll]ive[Zz].*|.*[Rr]eady[Zz].*\",code!~\"5..|14\",le=\"1.0\"}[$__range])) / sum(increase(server_requests_seconds_bucket_seconds_count{namespace=\"$namespace\",service=~\"kessel-relations-api\",operation!~\".*[Ll]ive[Zz].*|.*[Rr]eady[Zz].*\",code!~\"5..|14\"}[$__range]))",
-                  "format": "time_series",
-                  "instant": true,
-                  "refId": "A"
-                }
-              ],
-              "title": "Latency (< 1s)",
-              "type": "stat"
-            }
-          ]
+          "panels": [],
+          "title": "Relations Overall",
+          "type": "row"
         },
         {
-          "type": "row",
-          "title": "$route",
-          "repeat": "route",
-          "repeatDirection": "h",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  },
+                  {
+                    "color": "dark-red",
+                    "value": 1
+                  },
+                  {
+                    "color": "#EAB839",
+                    "value": 2
+                  },
+                  {
+                    "color": "green",
+                    "value": 3
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 3,
+            "w": 3,
+            "x": 0,
+            "y": 19
+          },
+          "id": 30,
+          "options": {
+            "colorMode": "value",
+            "graphMode": "none",
+            "justifyMode": "auto",
+            "orientation": "auto",
+            "percentChangeColorMode": "standard",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "showPercentChange": false,
+            "textMode": "auto",
+            "wideLayout": true
+          },
+          "pluginVersion": "11.6.3",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "exemplar": false,
+              "expr": "sum(up{job='kessel-relations-api'})",
+              "instant": false,
+              "legendFormat": "__auto",
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "title": "Up",
+          "type": "stat"
+        },
+        {
+          "datasource": {
+            "uid": "$datasource"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisBorderShow": false,
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "barWidthFactor": 0.6,
+                "drawStyle": "line",
+                "fillOpacity": 100,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "insertNulls": false,
+                "lineInterpolation": "linear",
+                "lineWidth": 0,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "never",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "normal"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "min": 0,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  },
+                  {
+                    "color": "red",
+                    "value": 80
+                  }
+                ]
+              },
+              "unit": "short"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 6,
+            "w": 11,
+            "x": 3,
+            "y": 19
+          },
+          "id": 32,
+          "options": {
+            "dataLinks": [],
+            "legend": {
+              "calcs": [],
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "hideZeros": false,
+              "mode": "single",
+              "sort": "none"
+            }
+          },
+          "pluginVersion": "11.6.3",
+          "targets": [
+            {
+              "datasource": {
+                "uid": "$datasource"
+              },
+              "editorMode": "code",
+              "expr": "sum(node_namespace_pod_container:container_cpu_usage_seconds_total:sum_irate{namespace=\"$namespace\", container=\"kessel-relations-api\"}) by (pod)",
+              "format": "time_series",
+              "intervalFactor": 2,
+              "legendFormat": "{{pod}}",
+              "range": true,
+              "refId": "A",
+              "step": 10
+            }
+          ],
+          "title": "CPU Usage",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "uid": "$datasource"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisBorderShow": false,
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "barWidthFactor": 0.6,
+                "drawStyle": "line",
+                "fillOpacity": 100,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "insertNulls": false,
+                "lineInterpolation": "linear",
+                "lineWidth": 0,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "never",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "normal"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "min": 0,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  },
+                  {
+                    "color": "red",
+                    "value": 80
+                  }
+                ]
+              },
+              "unit": "bytes"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 6,
+            "w": 10,
+            "x": 14,
+            "y": 19
+          },
+          "id": 33,
+          "options": {
+            "dataLinks": [],
+            "legend": {
+              "calcs": [],
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "hideZeros": false,
+              "mode": "single",
+              "sort": "none"
+            }
+          },
+          "pluginVersion": "11.6.3",
+          "targets": [
+            {
+              "datasource": {
+                "uid": "$datasource"
+              },
+              "editorMode": "code",
+              "expr": "sum(container_memory_working_set_bytes{namespace=\"$namespace\", container=\"kessel-relations-api\"}) by (pod)",
+              "format": "time_series",
+              "intervalFactor": 2,
+              "legendFormat": "{{pod}}",
+              "range": true,
+              "refId": "A",
+              "step": 10
+            }
+          ],
+          "title": "Memory Usage (w/o cache)",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  },
+                  {
+                    "color": "green",
+                    "value": 0
+                  },
+                  {
+                    "color": "#EAB839",
+                    "value": 3
+                  },
+                  {
+                    "color": "dark-red",
+                    "value": 5
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 3,
+            "w": 3,
+            "x": 0,
+            "y": 22
+          },
+          "id": 31,
+          "options": {
+            "colorMode": "value",
+            "graphMode": "none",
+            "justifyMode": "auto",
+            "orientation": "auto",
+            "percentChangeColorMode": "standard",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "showPercentChange": false,
+            "textMode": "auto",
+            "wideLayout": true
+          },
+          "pluginVersion": "11.6.3",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "exemplar": false,
+              "expr": "sum(kube_pod_container_status_restarts_total{container='kessel-relations-api'})",
+              "instant": false,
+              "legendFormat": "__auto",
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "title": "Restarts",
+          "type": "stat"
+        },
+        {
+          "datasource": {
+            "uid": "$datasource"
+          },
+          "description": "The percentage of time that the API is available (not returning 5xx errors or timeouts).",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "mappings": [
+                {
+                  "options": {
+                    "match": "null",
+                    "result": {
+                      "text": "N/A"
+                    }
+                  },
+                  "type": "special"
+                }
+              ],
+              "max": 1,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "#d44a3a"
+                  },
+                  {
+                    "color": "rgba(237, 129, 40, 0.89)",
+                    "value": 0.99
+                  },
+                  {
+                    "color": "#299c46",
+                    "value": 0.995
+                  }
+                ]
+              },
+              "unit": "percentunit"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 3,
+            "w": 3,
+            "x": 0,
+            "y": 25
+          },
+          "id": 21,
+          "maxDataPoints": 100,
+          "options": {
+            "colorMode": "value",
+            "graphMode": "none",
+            "justifyMode": "auto",
+            "orientation": "horizontal",
+            "percentChangeColorMode": "standard",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "showPercentChange": false,
+            "textMode": "auto",
+            "wideLayout": true
+          },
+          "pluginVersion": "11.6.3",
+          "targets": [
+            {
+              "datasource": {
+                "uid": "$datasource"
+              },
+              "expr": "sum(increase(server_requests_code_total{namespace=\"$namespace\",service=~\"kessel-relations-api\",operation!~\".*[Ll]ive[Zz].*|.*[Rr]eady[Zz].*\",code!~\"5..|14\"}[$__range])) / sum(increase(server_requests_code_total{namespace=\"$namespace\",service=~\"kessel-relations-api\",operation!~\".*[Ll]ive[Zz].*|.*[Rr]eady[Zz].*\"}[$__range]))",
+              "format": "time_series",
+              "instant": true,
+              "refId": "A"
+            }
+          ],
+          "title": "Availability (selected time)",
+          "type": "stat"
+        },
+        {
+          "datasource": {
+            "uid": "$datasource"
+          },
+          "description": "Number of requests per second by response codes.",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisBorderShow": false,
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "barWidthFactor": 0.6,
+                "drawStyle": "line",
+                "fillOpacity": 10,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "insertNulls": false,
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "never",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  },
+                  {
+                    "color": "red",
+                    "value": 80
+                  }
+                ]
+              },
+              "unit": "reqps"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 6,
+            "w": 7,
+            "x": 3,
+            "y": 25
+          },
+          "id": 22,
+          "options": {
+            "legend": {
+              "calcs": [],
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "hideZeros": false,
+              "mode": "multi",
+              "sort": "none"
+            }
+          },
+          "pluginVersion": "11.6.3",
+          "targets": [
+            {
+              "datasource": {
+                "uid": "$datasource"
+              },
+              "expr": "sum by (code) (label_replace(rate(server_requests_code_total{namespace=\"$namespace\",service=~\"kessel-relations-api\",operation!~\".*[Ll]ive[Zz].*|.*[Rr]eady[Zz].*\"}[$__rate_interval]), \"code\", \"200\", \"code\", \"0\"))",
+              "legendFormat": "{{code}}",
+              "refId": "A"
+            }
+          ],
+          "title": "Requests",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "uid": "$datasource"
+          },
+          "description": "The error percentage.",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisBorderShow": false,
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "barWidthFactor": 0.6,
+                "drawStyle": "line",
+                "fillOpacity": 0,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "insertNulls": false,
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "never",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "max": 1,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  },
+                  {
+                    "color": "red",
+                    "value": 80
+                  }
+                ]
+              },
+              "unit": "percentunit"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 6,
+            "w": 7,
+            "x": 10,
+            "y": 25
+          },
+          "id": 4,
+          "options": {
+            "legend": {
+              "calcs": [],
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "hideZeros": false,
+              "mode": "multi",
+              "sort": "none"
+            }
+          },
+          "pluginVersion": "11.6.3",
+          "targets": [
+            {
+              "datasource": {
+                "uid": "$datasource"
+              },
+              "editorMode": "code",
+              "expr": "sum(rate(server_requests_code_total{namespace=\"$namespace\",service=~\"kessel-relations-api\",operation!~\".*[Ll]ive[Zz].*|.*[Rr]eady[Zz].*\",code!~\"0|2..\"}[$__rate_interval])) / sum(rate(server_requests_code_total{namespace=\"$namespace\",service=~\"kessel-relations-api\",operation!~\".*[Ll]ive[Zz].*|.*[Rr]eady[Zz].*\"}[$__rate_interval]))",
+              "legendFormat": "non-2xx/0",
+              "range": true,
+              "refId": "A"
+            },
+            {
+              "datasource": {
+                "uid": "$datasource"
+              },
+              "expr": "sum(rate(server_requests_code_total{namespace=\"$namespace\",service=~\"kessel-inventory-api\",operation!~\".*[Ll]ive[Zz].*|.*[Rr]eady[Zz].*\",code=~\"5..|14\"}[$__rate_interval])) / sum(rate(server_requests_code_total{namespace=\"$namespace\",service=~\"kessel-inventory-api\",operation!~\".*[Ll]ive[Zz].*|.*[Rr]eady[Zz].*\"}[$__rate_interval]))",
+              "legendFormat": "5xx and timeout",
+              "refId": "B"
+            }
+          ],
+          "title": "Errors",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "uid": "$datasource"
+          },
+          "description": "The average request duration",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisBorderShow": false,
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "barWidthFactor": 0.6,
+                "drawStyle": "line",
+                "fillOpacity": 10,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "insertNulls": false,
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "never",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  },
+                  {
+                    "color": "red",
+                    "value": 80
+                  }
+                ]
+              },
+              "unit": "s"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 6,
+            "w": 7,
+            "x": 17,
+            "y": 25
+          },
+          "id": 24,
+          "options": {
+            "legend": {
+              "calcs": [],
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "hideZeros": false,
+              "mode": "multi",
+              "sort": "none"
+            }
+          },
+          "pluginVersion": "11.6.3",
+          "targets": [
+            {
+              "datasource": {
+                "uid": "$datasource"
+              },
+              "expr": "sum(increase(server_requests_seconds_bucket_seconds_sum{namespace=\"$namespace\",service=~\"kessel-relations-api\",operation!~\".*[Ll]ive[Zz].*|.*[Rr]eady[Zz].*\",code!~\"5..|14\"}[$__rate_interval])) / sum(increase(server_requests_seconds_bucket_seconds_count{namespace=\"$namespace\",service=~\"kessel-relations-api\",operation!~\".*[Ll]ive[Zz].*|.*[Rr]eady[Zz].*\",code!~\"5..|14\"}[$__rate_interval]))",
+              "interval": "",
+              "legendFormat": "Avg. response duration",
+              "refId": "A"
+            }
+          ],
+          "title": "Duration",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "uid": "$datasource"
+          },
+          "description": "The percentage of time that the API responds within 1 second.",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "mappings": [
+                {
+                  "options": {
+                    "match": "null",
+                    "result": {
+                      "text": "N/A"
+                    }
+                  },
+                  "type": "special"
+                }
+              ],
+              "max": 1,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "#d44a3a"
+                  },
+                  {
+                    "color": "rgba(237, 129, 40, 0.89)",
+                    "value": 0.99
+                  },
+                  {
+                    "color": "#299c46",
+                    "value": 0.995
+                  }
+                ]
+              },
+              "unit": "percentunit"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 3,
+            "w": 3,
+            "x": 0,
+            "y": 28
+          },
+          "id": 25,
+          "maxDataPoints": 100,
+          "options": {
+            "colorMode": "value",
+            "graphMode": "none",
+            "justifyMode": "auto",
+            "orientation": "horizontal",
+            "percentChangeColorMode": "standard",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "showPercentChange": false,
+            "textMode": "auto",
+            "wideLayout": true
+          },
+          "pluginVersion": "11.6.3",
+          "targets": [
+            {
+              "datasource": {
+                "uid": "$datasource"
+              },
+              "expr": "sum(increase(server_requests_seconds_bucket_seconds_bucket{namespace=\"$namespace\",service=~\"kessel-relations-api\",operation!~\".*[Ll]ive[Zz].*|.*[Rr]eady[Zz].*\",code!~\"5..|14\",le=\"1.0\"}[$__range])) / sum(increase(server_requests_seconds_bucket_seconds_count{namespace=\"$namespace\",service=~\"kessel-relations-api\",operation!~\".*[Ll]ive[Zz].*|.*[Rr]eady[Zz].*\",code!~\"5..|14\"}[$__range]))",
+              "format": "time_series",
+              "instant": true,
+              "refId": "A"
+            }
+          ],
+          "title": "Latency (< 1s)",
+          "type": "stat"
+        },
+        {
+          "collapsed": false,
           "gridPos": {
             "h": 1,
             "w": 24,
             "x": 0,
-            "y": 1
+            "y": 31
           },
-          "id": 7,
-          "collapsed": true,
+          "id": 35,
+          "panels": [],
+          "title": "SpiceDB Cluster Pods Overall",
+          "type": "row"
+        },
+        {
           "datasource": {
             "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  },
+                  {
+                    "color": "dark-red",
+                    "value": 1
+                  },
+                  {
+                    "color": "#EAB839",
+                    "value": 2
+                  },
+                  {
+                    "color": "green",
+                    "value": 3
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 3,
+            "w": 2,
+            "x": 0,
+            "y": 32
+          },
+          "id": 38,
+          "options": {
+            "colorMode": "value",
+            "graphMode": "none",
+            "justifyMode": "auto",
+            "orientation": "auto",
+            "percentChangeColorMode": "standard",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "showPercentChange": false,
+            "textMode": "auto",
+            "wideLayout": true
+          },
+          "pluginVersion": "11.6.3",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "exemplar": false,
+              "expr": "sum(up{job='kessel-relations-spicedb'})",
+              "instant": false,
+              "legendFormat": "__auto",
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "title": "Up",
+          "type": "stat"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  },
+                  {
+                    "color": "green",
+                    "value": 0
+                  },
+                  {
+                    "color": "#EAB839",
+                    "value": 3
+                  },
+                  {
+                    "color": "dark-red",
+                    "value": 5
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 3,
+            "w": 2,
+            "x": 2,
+            "y": 32
+          },
+          "id": 39,
+          "options": {
+            "colorMode": "value",
+            "graphMode": "none",
+            "justifyMode": "auto",
+            "orientation": "auto",
+            "percentChangeColorMode": "standard",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "showPercentChange": false,
+            "textMode": "auto",
+            "wideLayout": true
+          },
+          "pluginVersion": "11.6.3",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "exemplar": false,
+              "expr": "sum(kube_pod_container_status_restarts_total{container='spicedb'})",
+              "instant": false,
+              "legendFormat": "__auto",
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "title": "Restarts",
+          "type": "stat"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                }
+              },
+              "mappings": []
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 6,
+            "w": 3,
+            "x": 4,
+            "y": 32
+          },
+          "id": 66,
+          "options": {
+            "legend": {
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "pieType": "pie",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "tooltip": {
+              "hideZeros": false,
+              "mode": "single",
+              "sort": "none"
+            }
+          },
+          "pluginVersion": "11.6.3",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "exemplar": false,
+              "expr": "spicedb_operator_clusters_condition_count",
+              "hide": false,
+              "instant": false,
+              "legendFormat": "{{condition}}",
+              "range": true,
+              "refId": "B"
+            }
+          ],
+          "title": "Cluster Conditions",
+          "type": "piechart"
+        },
+        {
+          "datasource": {
             "uid": "$datasource"
           },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisBorderShow": false,
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "barWidthFactor": 0.6,
+                "drawStyle": "line",
+                "fillOpacity": 100,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "insertNulls": false,
+                "lineInterpolation": "linear",
+                "lineWidth": 0,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "never",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "normal"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "min": 0,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  },
+                  {
+                    "color": "red",
+                    "value": 80
+                  }
+                ]
+              },
+              "unit": "short"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 6,
+            "w": 9,
+            "x": 7,
+            "y": 32
+          },
+          "id": 40,
+          "options": {
+            "dataLinks": [],
+            "legend": {
+              "calcs": [],
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "hideZeros": false,
+              "mode": "single",
+              "sort": "none"
+            }
+          },
+          "pluginVersion": "11.6.3",
+          "targets": [
+            {
+              "datasource": {
+                "uid": "$datasource"
+              },
+              "editorMode": "code",
+              "expr": "sum(node_namespace_pod_container:container_cpu_usage_seconds_total:sum_irate{namespace=\"$namespace\", container=\"spicedb\"}) by (pod)",
+              "format": "time_series",
+              "intervalFactor": 2,
+              "legendFormat": "{{pod}}",
+              "range": true,
+              "refId": "A",
+              "step": 10
+            }
+          ],
+          "title": "CPU Usage",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "uid": "$datasource"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisBorderShow": false,
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "barWidthFactor": 0.6,
+                "drawStyle": "line",
+                "fillOpacity": 100,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "insertNulls": false,
+                "lineInterpolation": "linear",
+                "lineWidth": 0,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "never",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "normal"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "min": 0,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  },
+                  {
+                    "color": "red",
+                    "value": 80
+                  }
+                ]
+              },
+              "unit": "bytes"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 6,
+            "w": 8,
+            "x": 16,
+            "y": 32
+          },
+          "id": 41,
+          "options": {
+            "dataLinks": [],
+            "legend": {
+              "calcs": [],
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "hideZeros": false,
+              "mode": "single",
+              "sort": "none"
+            }
+          },
+          "pluginVersion": "11.6.3",
+          "targets": [
+            {
+              "datasource": {
+                "uid": "$datasource"
+              },
+              "editorMode": "code",
+              "expr": "sum(container_memory_working_set_bytes{namespace=\"$namespace\", container=\"spicedb\"}) by (pod)",
+              "format": "time_series",
+              "intervalFactor": 2,
+              "legendFormat": "{{pod}}",
+              "range": true,
+              "refId": "A",
+              "step": 10
+            }
+          ],
+          "title": "Memory Usage (w/o cache)",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  },
+                  {
+                    "color": "red",
+                    "value": 80
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 3,
+            "w": 2,
+            "x": 0,
+            "y": 35
+          },
+          "id": 67,
+          "options": {
+            "colorMode": "value",
+            "graphMode": "none",
+            "justifyMode": "auto",
+            "orientation": "auto",
+            "percentChangeColorMode": "standard",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "showPercentChange": false,
+            "textMode": "auto",
+            "wideLayout": true
+          },
+          "pluginVersion": "11.6.3",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "exemplar": false,
+              "expr": "spicedb_operator_clusters_count",
+              "hide": false,
+              "instant": false,
+              "legendFormat": "{{condition}}",
+              "range": true,
+              "refId": "B"
+            }
+          ],
+          "title": "Num Clusters",
+          "type": "stat"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  },
+                  {
+                    "color": "red",
+                    "value": 80
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 3,
+            "w": 2,
+            "x": 2,
+            "y": 35
+          },
+          "id": 68,
+          "options": {
+            "colorMode": "value",
+            "graphMode": "none",
+            "justifyMode": "auto",
+            "orientation": "auto",
+            "percentChangeColorMode": "standard",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "showPercentChange": false,
+            "textMode": "auto",
+            "wideLayout": true
+          },
+          "pluginVersion": "11.6.3",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "exemplar": false,
+              "expr": "spicedb_operator_clusters_status_collector_errors_count",
+              "hide": false,
+              "instant": false,
+              "legendFormat": "{{condition}}",
+              "range": true,
+              "refId": "B"
+            }
+          ],
+          "title": "Cluster Reconciliation Errors",
+          "type": "stat"
+        },
+        {
+          "collapsed": false,
+          "gridPos": {
+            "h": 1,
+            "w": 24,
+            "x": 0,
+            "y": 38
+          },
+          "id": 42,
+          "panels": [],
+          "title": "SpiceDB Operator Overall",
+          "type": "row"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  },
+                  {
+                    "color": "dark-red",
+                    "value": 0
+                  },
+                  {
+                    "color": "green",
+                    "value": 1
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 3,
+            "w": 3,
+            "x": 0,
+            "y": 39
+          },
+          "id": 43,
+          "options": {
+            "colorMode": "value",
+            "graphMode": "none",
+            "justifyMode": "auto",
+            "orientation": "auto",
+            "percentChangeColorMode": "standard",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "showPercentChange": false,
+            "textMode": "auto",
+            "wideLayout": true
+          },
+          "pluginVersion": "11.6.3",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "exemplar": false,
+              "expr": "sum(kube_pod_status_ready{pod=~'spicedb-operator.*'})",
+              "instant": false,
+              "legendFormat": "__auto",
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "title": "Up",
+          "type": "stat"
+        },
+        {
+          "datasource": {
+            "uid": "$datasource"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisBorderShow": false,
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "barWidthFactor": 0.6,
+                "drawStyle": "line",
+                "fillOpacity": 100,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "insertNulls": false,
+                "lineInterpolation": "linear",
+                "lineWidth": 0,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "never",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "normal"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "min": 0,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  },
+                  {
+                    "color": "red",
+                    "value": 80
+                  }
+                ]
+              },
+              "unit": "short"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 6,
+            "w": 11,
+            "x": 3,
+            "y": 39
+          },
+          "id": 45,
+          "options": {
+            "dataLinks": [],
+            "legend": {
+              "calcs": [],
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "hideZeros": false,
+              "mode": "single",
+              "sort": "none"
+            }
+          },
+          "pluginVersion": "11.6.3",
+          "targets": [
+            {
+              "datasource": {
+                "uid": "$datasource"
+              },
+              "editorMode": "code",
+              "expr": "sum(node_namespace_pod_container:container_cpu_usage_seconds_total:sum_irate{namespace=\"spicedb-operator\", container=\"spicedb-operator\"}) by (pod)",
+              "format": "time_series",
+              "intervalFactor": 2,
+              "legendFormat": "{{pod}}",
+              "range": true,
+              "refId": "A",
+              "step": 10
+            }
+          ],
+          "title": "CPU Usage",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "uid": "$datasource"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisBorderShow": false,
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "barWidthFactor": 0.6,
+                "drawStyle": "line",
+                "fillOpacity": 100,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "insertNulls": false,
+                "lineInterpolation": "linear",
+                "lineWidth": 0,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "never",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "normal"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "min": 0,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  },
+                  {
+                    "color": "red",
+                    "value": 80
+                  }
+                ]
+              },
+              "unit": "bytes"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 6,
+            "w": 10,
+            "x": 14,
+            "y": 39
+          },
+          "id": 46,
+          "options": {
+            "dataLinks": [],
+            "legend": {
+              "calcs": [],
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "hideZeros": false,
+              "mode": "single",
+              "sort": "none"
+            }
+          },
+          "pluginVersion": "11.6.3",
+          "targets": [
+            {
+              "datasource": {
+                "uid": "$datasource"
+              },
+              "editorMode": "code",
+              "expr": "sum(container_memory_working_set_bytes{namespace=\"spicedb-operator\", container=\"spicedb-operator\"}) by (pod)",
+              "format": "time_series",
+              "intervalFactor": 2,
+              "legendFormat": "{{pod}}",
+              "range": true,
+              "refId": "A",
+              "step": 10
+            }
+          ],
+          "title": "Memory Usage (w/o cache)",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  },
+                  {
+                    "color": "green",
+                    "value": 0
+                  },
+                  {
+                    "color": "#EAB839",
+                    "value": 3
+                  },
+                  {
+                    "color": "dark-red",
+                    "value": 5
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 3,
+            "w": 3,
+            "x": 0,
+            "y": 42
+          },
+          "id": 44,
+          "options": {
+            "colorMode": "value",
+            "graphMode": "none",
+            "justifyMode": "auto",
+            "orientation": "auto",
+            "percentChangeColorMode": "standard",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "showPercentChange": false,
+            "textMode": "auto",
+            "wideLayout": true
+          },
+          "pluginVersion": "11.6.3",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "exemplar": false,
+              "expr": "sum(kube_pod_container_status_restarts_total{container='spicedb-operator'})",
+              "instant": false,
+              "legendFormat": "__auto",
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "title": "Restarts",
+          "type": "stat"
+        },
+        {
+          "collapsed": false,
+          "gridPos": {
+            "h": 1,
+            "w": 24,
+            "x": 0,
+            "y": 45
+          },
+          "id": 34,
+          "panels": [],
+          "title": "Kessel Inventory Consumer Overall",
+          "type": "row"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  },
+                  {
+                    "color": "dark-red",
+                    "value": 1
+                  },
+                  {
+                    "color": "#EAB839",
+                    "value": 2
+                  },
+                  {
+                    "color": "green",
+                    "value": 3
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 3,
+            "w": 3,
+            "x": 0,
+            "y": 46
+          },
+          "id": 47,
+          "options": {
+            "colorMode": "value",
+            "graphMode": "none",
+            "justifyMode": "auto",
+            "orientation": "auto",
+            "percentChangeColorMode": "standard",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "showPercentChange": false,
+            "textMode": "auto",
+            "wideLayout": true
+          },
+          "pluginVersion": "11.6.3",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "exemplar": false,
+              "expr": "sum(up{job='kessel-inventory-consumer-service'})",
+              "instant": false,
+              "legendFormat": "__auto",
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "title": "Up",
+          "type": "stat"
+        },
+        {
+          "datasource": {
+            "uid": "$datasource"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisBorderShow": false,
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "barWidthFactor": 0.6,
+                "drawStyle": "line",
+                "fillOpacity": 100,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "insertNulls": false,
+                "lineInterpolation": "linear",
+                "lineWidth": 0,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "never",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "normal"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "min": 0,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  },
+                  {
+                    "color": "red",
+                    "value": 80
+                  }
+                ]
+              },
+              "unit": "short"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 6,
+            "w": 11,
+            "x": 3,
+            "y": 46
+          },
+          "id": 49,
+          "options": {
+            "dataLinks": [],
+            "legend": {
+              "calcs": [],
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "hideZeros": false,
+              "mode": "single",
+              "sort": "none"
+            }
+          },
+          "pluginVersion": "11.6.3",
+          "targets": [
+            {
+              "datasource": {
+                "uid": "$datasource"
+              },
+              "editorMode": "code",
+              "expr": "sum(node_namespace_pod_container:container_cpu_usage_seconds_total:sum_irate{namespace=\"$namespace\", container=\"kessel-inventory-consumer-service\"}) by (pod)",
+              "format": "time_series",
+              "intervalFactor": 2,
+              "legendFormat": "{{pod}}",
+              "range": true,
+              "refId": "A",
+              "step": 10
+            }
+          ],
+          "title": "CPU Usage",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "uid": "$datasource"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisBorderShow": false,
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "barWidthFactor": 0.6,
+                "drawStyle": "line",
+                "fillOpacity": 100,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "insertNulls": false,
+                "lineInterpolation": "linear",
+                "lineWidth": 0,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "never",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "normal"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "min": 0,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  },
+                  {
+                    "color": "red",
+                    "value": 80
+                  }
+                ]
+              },
+              "unit": "bytes"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 6,
+            "w": 10,
+            "x": 14,
+            "y": 46
+          },
+          "id": 50,
+          "options": {
+            "dataLinks": [],
+            "legend": {
+              "calcs": [],
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "hideZeros": false,
+              "mode": "single",
+              "sort": "none"
+            }
+          },
+          "pluginVersion": "11.6.3",
+          "targets": [
+            {
+              "datasource": {
+                "uid": "$datasource"
+              },
+              "editorMode": "code",
+              "expr": "sum(container_memory_working_set_bytes{namespace=\"$namespace\", container=\"kessel-inventory-consumer-service\"}) by (pod)",
+              "format": "time_series",
+              "intervalFactor": 2,
+              "legendFormat": "{{pod}}",
+              "range": true,
+              "refId": "A",
+              "step": 10
+            }
+          ],
+          "title": "Memory Usage (w/o cache)",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  },
+                  {
+                    "color": "green",
+                    "value": 0
+                  },
+                  {
+                    "color": "#EAB839",
+                    "value": 3
+                  },
+                  {
+                    "color": "dark-red",
+                    "value": 5
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 3,
+            "w": 3,
+            "x": 0,
+            "y": 49
+          },
+          "id": 48,
+          "options": {
+            "colorMode": "value",
+            "graphMode": "none",
+            "justifyMode": "auto",
+            "orientation": "auto",
+            "percentChangeColorMode": "standard",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "showPercentChange": false,
+            "textMode": "auto",
+            "wideLayout": true
+          },
+          "pluginVersion": "11.6.3",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "exemplar": false,
+              "expr": "sum(kube_pod_container_status_restarts_total{container='kessel-inventory-consumer-service'})",
+              "instant": false,
+              "legendFormat": "__auto",
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "title": "Restarts",
+          "type": "stat"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisBorderShow": false,
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "barWidthFactor": 0.6,
+                "drawStyle": "line",
+                "fillOpacity": 0,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "insertNulls": false,
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "auto",
+                "spanNulls": true,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 5,
+            "w": 8,
+            "x": 0,
+            "y": 52
+          },
+          "id": 59,
+          "options": {
+            "legend": {
+              "calcs": [],
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "hideZeros": false,
+              "mode": "single",
+              "sort": "none"
+            }
+          },
+          "pluginVersion": "11.6.3",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "expr": "sum(rate(consumer_msgs_processed_total{job=\"kessel-inventory-consumer-service\"}[$__rate_interval]))",
+              "instant": false,
+              "legendFormat": "__auto",
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "title": "Consumer Processing Rate",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisBorderShow": false,
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "barWidthFactor": 0.6,
+                "drawStyle": "line",
+                "fillOpacity": 0,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "insertNulls": false,
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "auto",
+                "spanNulls": true,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 5,
+            "w": 8,
+            "x": 8,
+            "y": 52
+          },
+          "id": 60,
+          "options": {
+            "legend": {
+              "calcs": [],
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "hideZeros": false,
+              "mode": "single",
+              "sort": "none"
+            }
+          },
+          "pluginVersion": "11.6.3",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "expr": "sum(rate(consumer_msg_process_failures_total{job=\"kessel-inventory-consumer-service\"}[$__rate_interval])) / sum(rate(consumer_msgs_processed_total{job=\"kessel-inventory-consumer-service\"}[$__rate_interval])) or sum(up{job=\"kessel-inventory-consumer-service\"}) * 0",
+              "format": "time_series",
+              "instant": false,
+              "legendFormat": "__auto",
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "title": "Consumer Processing Failure Rate",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "description": "Errors related to the Consumer and not message processing",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisBorderShow": false,
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "barWidthFactor": 0.6,
+                "drawStyle": "line",
+                "fillOpacity": 0,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "insertNulls": false,
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "auto",
+                "spanNulls": true,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 5,
+            "w": 8,
+            "x": 16,
+            "y": 52
+          },
+          "id": 61,
+          "options": {
+            "legend": {
+              "calcs": [],
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "hideZeros": false,
+              "mode": "single",
+              "sort": "none"
+            }
+          },
+          "pluginVersion": "11.6.3",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "expr": "sum(rate(consumer_errors_total{job=\"kessel-inventory-consumer-service\"}[$__rate_interval])) / sum(rate(consumer_msgs_processed_total{job=\"kessel-inventory-consumer-service\"}[$__rate_interval])) or sum(up{job=\"kessel-inventory-consumer-service\"}) * 0",
+              "instant": false,
+              "legendFormat": "__auto",
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "title": "Consumer Error Rate",
+          "type": "timeseries"
+        },
+        {
+          "collapsed": false,
+          "gridPos": {
+            "h": 1,
+            "w": 24,
+            "x": 0,
+            "y": 57
+          },
+          "id": 37,
+          "panels": [],
+          "title": "Kessel Kafka Connect Overall",
+          "type": "row"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  },
+                  {
+                    "color": "dark-red",
+                    "value": 0
+                  },
+                  {
+                    "color": "green",
+                    "value": 1
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 3,
+            "w": 3,
+            "x": 0,
+            "y": 58
+          },
+          "id": 51,
+          "options": {
+            "colorMode": "value",
+            "graphMode": "none",
+            "justifyMode": "auto",
+            "orientation": "auto",
+            "percentChangeColorMode": "standard",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "showPercentChange": false,
+            "textMode": "auto",
+            "wideLayout": true
+          },
+          "pluginVersion": "11.6.3",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "exemplar": false,
+              "expr": "sum(up{pod=~'kessel-kafka-connect-connect.*'})",
+              "instant": false,
+              "legendFormat": "__auto",
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "title": "Up",
+          "type": "stat"
+        },
+        {
+          "datasource": {
+            "uid": "$datasource"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisBorderShow": false,
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "barWidthFactor": 0.6,
+                "drawStyle": "line",
+                "fillOpacity": 100,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "insertNulls": false,
+                "lineInterpolation": "linear",
+                "lineWidth": 0,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "never",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "normal"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "min": 0,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  },
+                  {
+                    "color": "red",
+                    "value": 80
+                  }
+                ]
+              },
+              "unit": "short"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 6,
+            "w": 11,
+            "x": 3,
+            "y": 58
+          },
+          "id": 53,
+          "options": {
+            "dataLinks": [],
+            "legend": {
+              "calcs": [],
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "hideZeros": false,
+              "mode": "single",
+              "sort": "none"
+            }
+          },
+          "pluginVersion": "11.6.3",
+          "targets": [
+            {
+              "datasource": {
+                "uid": "$datasource"
+              },
+              "editorMode": "code",
+              "expr": "sum(node_namespace_pod_container:container_cpu_usage_seconds_total:sum_irate{namespace=\"kessel-kafka-connect-$env\", container=\"kessel-kafka-connect-connect\"}) by (pod)",
+              "format": "time_series",
+              "intervalFactor": 2,
+              "legendFormat": "{{pod}}",
+              "range": true,
+              "refId": "A",
+              "step": 10
+            }
+          ],
+          "title": "CPU Usage",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "uid": "$datasource"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisBorderShow": false,
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "barWidthFactor": 0.6,
+                "drawStyle": "line",
+                "fillOpacity": 100,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "insertNulls": false,
+                "lineInterpolation": "linear",
+                "lineWidth": 0,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "never",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "normal"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "min": 0,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  },
+                  {
+                    "color": "red",
+                    "value": 80
+                  }
+                ]
+              },
+              "unit": "bytes"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 6,
+            "w": 10,
+            "x": 14,
+            "y": 58
+          },
+          "id": 54,
+          "options": {
+            "dataLinks": [],
+            "legend": {
+              "calcs": [],
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "hideZeros": false,
+              "mode": "single",
+              "sort": "none"
+            }
+          },
+          "pluginVersion": "11.6.3",
+          "targets": [
+            {
+              "datasource": {
+                "uid": "$datasource"
+              },
+              "editorMode": "code",
+              "expr": "sum(container_memory_working_set_bytes{namespace=\"kessel-kafka-connect-$env\", container=\"kessel-kafka-connect-connect\"}) by (pod)",
+              "format": "time_series",
+              "intervalFactor": 2,
+              "legendFormat": "{{pod}}",
+              "range": true,
+              "refId": "A",
+              "step": 10
+            }
+          ],
+          "title": "Memory Usage (w/o cache)",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  },
+                  {
+                    "color": "green",
+                    "value": 0
+                  },
+                  {
+                    "color": "#EAB839",
+                    "value": 3
+                  },
+                  {
+                    "color": "dark-red",
+                    "value": 5
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 3,
+            "w": 3,
+            "x": 0,
+            "y": 61
+          },
+          "id": 52,
+          "options": {
+            "colorMode": "value",
+            "graphMode": "none",
+            "justifyMode": "auto",
+            "orientation": "auto",
+            "percentChangeColorMode": "standard",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "showPercentChange": false,
+            "textMode": "auto",
+            "wideLayout": true
+          },
+          "pluginVersion": "11.6.3",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "exemplar": false,
+              "expr": "sum(kube_pod_container_status_restarts_total{container='kessel-kafka-connect-connect'})",
+              "instant": false,
+              "legendFormat": "__auto",
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "title": "Restarts",
+          "type": "stat"
+        },
+        {
+          "collapsed": false,
+          "gridPos": {
+            "h": 1,
+            "w": 24,
+            "x": 0,
+            "y": 64
+          },
+          "id": 36,
+          "panels": [],
+          "title": "RBAC Overall",
+          "type": "row"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  },
+                  {
+                    "color": "dark-red",
+                    "value": 0
+                  },
+                  {
+                    "color": "green",
+                    "value": 1
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 3,
+            "w": 3,
+            "x": 0,
+            "y": 65
+          },
+          "id": 55,
+          "options": {
+            "colorMode": "value",
+            "graphMode": "none",
+            "justifyMode": "center",
+            "orientation": "auto",
+            "percentChangeColorMode": "standard",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "showPercentChange": false,
+            "textMode": "auto",
+            "wideLayout": true
+          },
+          "pluginVersion": "11.6.3",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "exemplar": false,
+              "expr": "sum(up{container='rbac-service'})",
+              "instant": false,
+              "legendFormat": "__auto",
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "title": "Up",
+          "type": "stat"
+        },
+        {
+          "datasource": {
+            "uid": "$datasource"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisBorderShow": false,
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "barWidthFactor": 0.6,
+                "drawStyle": "line",
+                "fillOpacity": 100,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "insertNulls": false,
+                "lineInterpolation": "linear",
+                "lineWidth": 0,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "never",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "normal"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "min": 0,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  },
+                  {
+                    "color": "red",
+                    "value": 80
+                  }
+                ]
+              },
+              "unit": "short"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 6,
+            "w": 11,
+            "x": 3,
+            "y": 65
+          },
+          "id": 57,
+          "options": {
+            "dataLinks": [],
+            "legend": {
+              "calcs": [],
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "hideZeros": false,
+              "mode": "single",
+              "sort": "none"
+            }
+          },
+          "pluginVersion": "11.6.3",
+          "targets": [
+            {
+              "datasource": {
+                "uid": "$datasource"
+              },
+              "editorMode": "code",
+              "expr": "sum(node_namespace_pod_container:container_cpu_usage_seconds_total:sum_irate{namespace=\"rbac-$env\", container=~\"rbac.*\"}) by (pod)",
+              "format": "time_series",
+              "intervalFactor": 2,
+              "legendFormat": "{{pod}}",
+              "range": true,
+              "refId": "A",
+              "step": 10
+            }
+          ],
+          "title": "CPU Usage",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "uid": "$datasource"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisBorderShow": false,
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "barWidthFactor": 0.6,
+                "drawStyle": "line",
+                "fillOpacity": 100,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "insertNulls": false,
+                "lineInterpolation": "linear",
+                "lineWidth": 0,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "never",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "normal"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "min": 0,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  },
+                  {
+                    "color": "red",
+                    "value": 80
+                  }
+                ]
+              },
+              "unit": "bytes"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 6,
+            "w": 10,
+            "x": 14,
+            "y": 65
+          },
+          "id": 58,
+          "options": {
+            "dataLinks": [],
+            "legend": {
+              "calcs": [],
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "hideZeros": false,
+              "mode": "single",
+              "sort": "none"
+            }
+          },
+          "pluginVersion": "11.6.3",
+          "targets": [
+            {
+              "datasource": {
+                "uid": "$datasource"
+              },
+              "editorMode": "code",
+              "expr": "sum(container_memory_working_set_bytes{namespace=\"rbac-$env\", container=~\"rbac.*\"}) by (pod)",
+              "format": "time_series",
+              "intervalFactor": 2,
+              "legendFormat": "{{pod}}",
+              "range": true,
+              "refId": "A",
+              "step": 10
+            }
+          ],
+          "title": "Memory Usage (w/o cache)",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  },
+                  {
+                    "color": "green",
+                    "value": 0
+                  },
+                  {
+                    "color": "#EAB839",
+                    "value": 3
+                  },
+                  {
+                    "color": "dark-red",
+                    "value": 5
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 3,
+            "w": 3,
+            "x": 0,
+            "y": 68
+          },
+          "id": 56,
+          "options": {
+            "colorMode": "value",
+            "graphMode": "none",
+            "justifyMode": "auto",
+            "orientation": "auto",
+            "percentChangeColorMode": "standard",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "showPercentChange": false,
+            "textMode": "auto",
+            "wideLayout": true
+          },
+          "pluginVersion": "11.6.3",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "exemplar": false,
+              "expr": "sum(kube_pod_container_status_restarts_total{container='rbac-service'})",
+              "instant": false,
+              "legendFormat": "__auto",
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "title": "Restarts",
+          "type": "stat"
+        },
+        {
+          "collapsed": true,
+          "gridPos": {
+            "h": 1,
+            "w": 24,
+            "x": 0,
+            "y": 71
+          },
+          "id": 7,
           "panels": [
             {
               "datasource": {
@@ -824,12 +4373,12 @@ data:
                       "type": "special"
                     }
                   ],
+                  "max": 1,
                   "thresholds": {
                     "mode": "absolute",
                     "steps": [
                       {
-                        "color": "#d44a3a",
-                        "value": 0
+                        "color": "#d44a3a"
                       },
                       {
                         "color": "rgba(237, 129, 40, 0.89)",
@@ -841,15 +4390,15 @@ data:
                       }
                     ]
                   },
-                  "unit": "percentunit",
-                  "max": 1
-                }
+                  "unit": "percentunit"
+                },
+                "overrides": []
               },
               "gridPos": {
                 "h": 4,
                 "w": 3,
                 "x": 0,
-                "y": 1
+                "y": 70
               },
               "id": 8,
               "maxDataPoints": 100,
@@ -858,16 +4407,24 @@ data:
                 "graphMode": "none",
                 "justifyMode": "auto",
                 "orientation": "horizontal",
+                "percentChangeColorMode": "standard",
                 "reduceOptions": {
                   "calcs": [
                     "lastNotNull"
-                  ]
+                  ],
+                  "fields": "",
+                  "values": false
                 },
-                "textMode": "auto"
+                "showPercentChange": false,
+                "textMode": "auto",
+                "wideLayout": true
               },
-              "pluginVersion": "8.5.2",
+              "pluginVersion": "11.6.3",
               "targets": [
                 {
+                  "datasource": {
+                    "uid": "$datasource"
+                  },
                   "expr": "sum(increase(server_requests_code_total{namespace=\"$namespace\",service=~\"kessel-inventory-api|kessel-relations-api\",operation=\"${route:raw}\",code!~\"5..|14\"}[$__range])) / sum(increase(server_requests_code_total{namespace=\"$namespace\",service=~\"kessel-inventory-api|kessel-relations-api\",operation=\"${route:raw}\"}[$__range]))",
                   "format": "time_series",
                   "instant": true,
@@ -878,242 +4435,303 @@ data:
               "type": "stat"
             },
             {
-              "bars": false,
-              "dashLengths": 10,
-              "dashes": false,
-              "fill": 1,
-              "fillGradient": 0,
-              "hiddenSeries": false,
-              "legend": {
-                "avg": false,
-                "current": false,
-                "max": false,
-                "min": false,
-                "show": true,
-                "total": false,
-                "values": false
-              },
-              "lines": true,
-              "lineWidth": 1,
-              "nullPointMode": "null as zero",
               "datasource": {
                 "uid": "$datasource"
               },
               "description": "Number of requests per second by response codes.",
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "palette-classic"
+                  },
+                  "custom": {
+                    "axisBorderShow": false,
+                    "axisCenteredZero": false,
+                    "axisColorMode": "text",
+                    "axisLabel": "",
+                    "axisPlacement": "auto",
+                    "barAlignment": 0,
+                    "barWidthFactor": 0.6,
+                    "drawStyle": "line",
+                    "fillOpacity": 0,
+                    "gradientMode": "none",
+                    "hideFrom": {
+                      "legend": false,
+                      "tooltip": false,
+                      "viz": false
+                    },
+                    "insertNulls": false,
+                    "lineInterpolation": "linear",
+                    "lineWidth": 1,
+                    "pointSize": 5,
+                    "scaleDistribution": {
+                      "type": "linear"
+                    },
+                    "showPoints": "auto",
+                    "spanNulls": false,
+                    "stacking": {
+                      "group": "A",
+                      "mode": "none"
+                    },
+                    "thresholdsStyle": {
+                      "mode": "off"
+                    }
+                  },
+                  "mappings": [],
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "green"
+                      },
+                      {
+                        "color": "red",
+                        "value": 80
+                      }
+                    ]
+                  }
+                },
+                "overrides": []
+              },
               "gridPos": {
                 "h": 8,
                 "w": 7,
                 "x": 3,
-                "y": 1
+                "y": 70
               },
               "id": 9,
               "options": {
-                "alertThreshold": true
+                "alertThreshold": true,
+                "legend": {
+                  "calcs": [],
+                  "displayMode": "list",
+                  "placement": "bottom",
+                  "showLegend": true
+                },
+                "tooltip": {
+                  "hideZeros": false,
+                  "mode": "single",
+                  "sort": "none"
+                }
               },
-              "pluginVersion": "8.5.2",
+              "pluginVersion": "11.6.3",
               "targets": [
                 {
+                  "datasource": {
+                    "uid": "$datasource"
+                  },
                   "expr": "sum by (code) (label_replace(rate(server_requests_code_total{namespace=\"$namespace\",service=~\"kessel-inventory-api|kessel-relations-api\",operation=\"${route:raw}\"}[$__rate_interval]), \"code\", \"200\", \"code\", \"0\"))",
                   "legendFormat": "{{code}}",
                   "refId": "A"
                 }
               ],
               "title": "Requests",
-              "type": "graph",
-              "percentage": false,
-              "pointRadius": 5,
-              "points": false,
-              "renderer": "flot",
-              "spaceLength": 10,
-              "stack": false,
-              "steppedLine": false,
-              "tooltip": {
-                "shared": true,
-                "sort": 0,
-                "valueType": "individual"
-              },
-              "xaxis": {
-                "mode": "time",
-                "show": true,
-                "values": []
-              },
-              "yaxes": [
-                {
-                  "format": "reqps",
-                  "logBase": 1,
-                  "show": true
-                },
-                {
-                  "format": "short",
-                  "logBase": 1,
-                  "show": true
-                }
-              ],
-              "yaxis": {
-                "align": false
-              }
+              "type": "timeseries"
             },
             {
-              "bars": false,
-              "dashLengths": 10,
-              "dashes": false,
-              "fill": 0,
-              "fillGradient": 0,
-              "hiddenSeries": false,
-              "legend": {
-                "avg": false,
-                "current": false,
-                "max": false,
-                "min": false,
-                "show": true,
-                "total": false,
-                "values": false
-              },
-              "lines": true,
-              "lineWidth": 1,
-              "nullPointMode": "null as zero",
               "datasource": {
                 "uid": "$datasource"
               },
               "description": "The error percentage.",
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "palette-classic"
+                  },
+                  "custom": {
+                    "axisBorderShow": false,
+                    "axisCenteredZero": false,
+                    "axisColorMode": "text",
+                    "axisLabel": "",
+                    "axisPlacement": "auto",
+                    "barAlignment": 0,
+                    "barWidthFactor": 0.6,
+                    "drawStyle": "line",
+                    "fillOpacity": 0,
+                    "gradientMode": "none",
+                    "hideFrom": {
+                      "legend": false,
+                      "tooltip": false,
+                      "viz": false
+                    },
+                    "insertNulls": false,
+                    "lineInterpolation": "linear",
+                    "lineWidth": 1,
+                    "pointSize": 5,
+                    "scaleDistribution": {
+                      "type": "linear"
+                    },
+                    "showPoints": "auto",
+                    "spanNulls": false,
+                    "stacking": {
+                      "group": "A",
+                      "mode": "none"
+                    },
+                    "thresholdsStyle": {
+                      "mode": "off"
+                    }
+                  },
+                  "mappings": [],
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "green"
+                      },
+                      {
+                        "color": "red",
+                        "value": 80
+                      }
+                    ]
+                  }
+                },
+                "overrides": []
+              },
               "gridPos": {
                 "h": 8,
                 "w": 7,
                 "x": 10,
-                "y": 1
+                "y": 70
               },
               "id": 10,
               "options": {
-                "alertThreshold": true
+                "alertThreshold": true,
+                "legend": {
+                  "calcs": [],
+                  "displayMode": "list",
+                  "placement": "bottom",
+                  "showLegend": true
+                },
+                "tooltip": {
+                  "hideZeros": false,
+                  "mode": "single",
+                  "sort": "none"
+                }
               },
-              "pluginVersion": "8.5.2",
+              "pluginVersion": "11.6.3",
               "targets": [
                 {
+                  "datasource": {
+                    "uid": "$datasource"
+                  },
                   "expr": "sum(rate(server_requests_code_total{namespace=\"$namespace\",service=~\"kessel-inventory-api|kessel-relations-api\",operation=\"${route:raw}\",code!~\"0|2..\"}[$__rate_interval])) / sum(rate(server_requests_code_total{namespace=\"$namespace\",service=~\"kessel-inventory-api|kessel-relations-api\",operation=\"${route:raw}\"}[$__rate_interval]))",
                   "legendFormat": "non-2xx/0",
                   "refId": "A"
                 },
                 {
+                  "datasource": {
+                    "uid": "$datasource"
+                  },
                   "expr": "sum(rate(server_requests_code_total{namespace=\"$namespace\",service=~\"kessel-inventory-api|kessel-relations-api\",operation=\"${route:raw}\",code=~\"5..|14\"}[$__rate_interval])) / sum(rate(server_requests_code_total{namespace=\"$namespace\",service=~\"kessel-inventory-api|kessel-relations-api\",operation=\"${route:raw}\"}[$__rate_interval]))",
                   "legendFormat": "5xx and timeout",
                   "refId": "B"
                 },
                 {
+                  "datasource": {
+                    "uid": "$datasource"
+                  },
                   "expr": "sum(rate(server_requests_code_total{namespace=\"$namespace\",service=~\"kessel-inventory-api|kessel-relations-api\",operation=\"${route:raw}\",code=~\"4..\"}[$__rate_interval])) / sum(rate(server_requests_code_total{namespace=\"$namespace\",service=~\"kessel-inventory-api|kessel-relations-api\",operation=\"${route:raw}\"}[$__rate_interval]))",
                   "legendFormat": "4xx",
                   "refId": "C"
                 }
               ],
               "title": "Errors",
-              "type": "graph",
-              "percentage": false,
-              "pointRadius": 5,
-              "points": false,
-              "renderer": "flot",
-              "spaceLength": 10,
-              "stack": false,
-              "steppedLine": false,
-              "tooltip": {
-                "shared": true,
-                "sort": 0,
-                "valueType": "individual"
-              },
-              "xaxis": {
-                "mode": "time",
-                "show": true,
-                "values": []
-              },
-              "yaxes": [
-                {
-                  "format": "percentunit",
-                  "logBase": 1,
-                  "min": "0",
-                  "show": true
-                },
-                {
-                  "format": "short",
-                  "logBase": 1,
-                  "show": true
-                }
-              ],
-              "yaxis": {
-                "align": false
-              }
+              "type": "timeseries"
             },
             {
-              "bars": false,
-              "dashLengths": 10,
-              "dashes": false,
-              "hiddenSeries": false,
-              "legend": {
-                "avg": false,
-                "current": false,
-                "max": false,
-                "min": false,
-                "show": true,
-                "total": false,
-                "values": false
-              },
-              "lines": true,
-              "lineWidth": 1,
-              "nullPointMode": "null as zero",
               "datasource": {
                 "uid": "$datasource"
               },
               "description": "The average request duration for successful requests",
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "palette-classic"
+                  },
+                  "custom": {
+                    "axisBorderShow": false,
+                    "axisCenteredZero": false,
+                    "axisColorMode": "text",
+                    "axisLabel": "",
+                    "axisPlacement": "auto",
+                    "barAlignment": 0,
+                    "barWidthFactor": 0.6,
+                    "drawStyle": "line",
+                    "fillOpacity": 0,
+                    "gradientMode": "none",
+                    "hideFrom": {
+                      "legend": false,
+                      "tooltip": false,
+                      "viz": false
+                    },
+                    "insertNulls": false,
+                    "lineInterpolation": "linear",
+                    "lineWidth": 1,
+                    "pointSize": 5,
+                    "scaleDistribution": {
+                      "type": "linear"
+                    },
+                    "showPoints": "auto",
+                    "spanNulls": false,
+                    "stacking": {
+                      "group": "A",
+                      "mode": "none"
+                    },
+                    "thresholdsStyle": {
+                      "mode": "off"
+                    }
+                  },
+                  "mappings": [],
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "green"
+                      },
+                      {
+                        "color": "red",
+                        "value": 80
+                      }
+                    ]
+                  }
+                },
+                "overrides": []
+              },
               "gridPos": {
                 "h": 8,
                 "w": 7,
                 "x": 17,
-                "y": 1
+                "y": 70
               },
               "id": 11,
               "options": {
-                "alertThreshold": true
+                "alertThreshold": true,
+                "legend": {
+                  "calcs": [],
+                  "displayMode": "list",
+                  "placement": "bottom",
+                  "showLegend": true
+                },
+                "tooltip": {
+                  "hideZeros": false,
+                  "mode": "single",
+                  "sort": "none"
+                }
               },
-              "pluginVersion": "8.5.1",
+              "pluginVersion": "11.6.3",
               "targets": [
                 {
+                  "datasource": {
+                    "uid": "$datasource"
+                  },
                   "expr": "sum(increase(server_requests_seconds_bucket_seconds_sum{namespace=\"$namespace\",service=~\"kessel-inventory-api|kessel-relations-api\",operation=\"${route:raw}\",code!~\"5..|14\"}[$__rate_interval])) / sum(increase(server_requests_seconds_bucket_seconds_count{namespace=\"$namespace\",service=~\"kessel-inventory-api|kessel-relations-api\",operation=\"${route:raw}\",code!~\"5..|14\"}[$__rate_interval]))",
-                  "legendFormat": "Avg. response duration",
                   "interval": "",
+                  "legendFormat": "Avg. response duration",
                   "refId": "A"
                 }
               ],
               "title": "Duration",
-              "type": "graph",
-              "percentage": false,
-              "pointRadius": 5,
-              "points": false,
-              "renderer": "flot",
-              "spaceLength": 10,
-              "stack": false,
-              "steppedLine": false,
-              "tooltip": {
-                "shared": true,
-                "sort": 0,
-                "valueType": "individual"
-              },
-              "xaxis": {
-                "mode": "time",
-                "show": true,
-                "values": []
-              },
-              "yaxes": [
-                {
-                  "format": "s",
-                  "logBase": 10,
-                  "show": true
-                },
-                {
-                  "format": "short",
-                  "logBase": 1,
-                  "show": true
-                }
-              ],
-              "yaxis": {
-                "align": false
-              }
+              "type": "timeseries"
             },
             {
               "datasource": {
@@ -1136,6 +4754,7 @@ data:
                       "type": "special"
                     }
                   ],
+                  "max": 1,
                   "thresholds": {
                     "mode": "absolute",
                     "steps": [
@@ -1152,15 +4771,15 @@ data:
                       }
                     ]
                   },
-                  "unit": "percentunit",
-                  "max": 1
-                }
+                  "unit": "percentunit"
+                },
+                "overrides": []
               },
               "gridPos": {
                 "h": 4,
                 "w": 3,
                 "x": 0,
-                "y": 5
+                "y": 74
               },
               "id": 12,
               "maxDataPoints": 100,
@@ -1169,6 +4788,7 @@ data:
                 "graphMode": "none",
                 "justifyMode": "auto",
                 "orientation": "horizontal",
+                "percentChangeColorMode": "standard",
                 "reduceOptions": {
                   "calcs": [
                     "lastNotNull"
@@ -1176,11 +4796,16 @@ data:
                   "fields": "",
                   "values": false
                 },
-                "textMode": "auto"
+                "showPercentChange": false,
+                "textMode": "auto",
+                "wideLayout": true
               },
-              "pluginVersion": "8.5.2",
+              "pluginVersion": "11.6.3",
               "targets": [
                 {
+                  "datasource": {
+                    "uid": "$datasource"
+                  },
                   "expr": "sum(increase(server_requests_seconds_bucket_seconds_bucket{namespace=\"$namespace\",service=~\"kessel-inventory-api|kessel-relations-api\",operation=\"${route:raw}\",code!~\"5..|14\",le=\"1.0\"}[$__range])) / sum(increase(server_requests_seconds_bucket_seconds_count{namespace=\"$namespace\",service=~\"kessel-inventory-api|kessel-relations-api\",operation=\"${route:raw}\",code!~\"5..|14\"}[$__range]))",
                   "format": "time_series",
                   "instant": true,
@@ -1190,9 +4815,106 @@ data:
               "title": "Latency (< 1s)",
               "type": "stat"
             }
-          ]
+          ],
+          "repeat": "route",
+          "title": "$route",
+          "type": "row"
         }
-      ]
+      ],
+      "preload": false,
+      "refresh": "",
+      "schemaVersion": 41,
+      "tags": [],
+      "templating": {
+        "list": [
+          {
+            "current": {
+              "text": "All",
+              "value": "$__all"
+            },
+            "datasource": {
+              "type": "prometheus",
+              "uid": "$datasource"
+            },
+            "definition": "label_values(server_requests_code_total{namespace=\"$namespace\",service=~\"kessel-inventory-api|kessel-relations-api\",operation!~\".*[Ll]ive[Zz].*|.*[Rr]eady[Zz].*\"}, operation)",
+            "includeAll": true,
+            "label": "routes",
+            "multi": true,
+            "name": "route",
+            "options": [],
+            "query": {
+              "query": "label_values(server_requests_code_total{namespace=\"$namespace\",service=~\"kessel-inventory-api|kessel-relations-api\",operation!~\".*[Ll]ive[Zz].*|.*[Rr]eady[Zz].*\"}, operation)",
+              "refId": "StandardVariableQuery"
+            },
+            "refresh": 1,
+            "type": "query"
+          },
+          {
+            "current": {
+              "text": "crcs02ue1-prometheus",
+              "value": "PDD8BE47D10408F45"
+            },
+            "name": "datasource",
+            "options": [],
+            "query": "prometheus",
+            "refresh": 1,
+            "type": "datasource"
+          },
+          {
+            "current": {
+              "text": "kessel-stage",
+              "value": "kessel-stage"
+            },
+            "name": "namespace",
+            "options": [
+              {
+                "selected": true,
+                "text": "kessel-stage",
+                "value": "kessel-stage"
+              },
+              {
+                "selected": false,
+                "text": "kessel-prod",
+                "value": "kessel-prod"
+              }
+            ],
+            "query": "kessel-stage,kessel-prod",
+            "type": "custom"
+          },
+          {
+            "current": {
+              "text": "stage",
+              "value": "stage"
+            },
+            "description": "Environment of the deployment (stage, prod)",
+            "label": "Env",
+            "name": "env",
+            "options": [
+              {
+                "selected": true,
+                "text": "stage",
+                "value": "stage"
+              },
+              {
+                "selected": false,
+                "text": "prod",
+                "value": "prod"
+              }
+            ],
+            "query": "stage,prod",
+            "type": "custom"
+          }
+        ]
+      },
+      "time": {
+        "from": "now-1h",
+        "to": "now"
+      },
+      "timepicker": {},
+      "timezone": "",
+      "uid": "kessel-ops",
+      "title": "Kessel - Operations Dashboard",
+      "version": 12
     }
 kind: ConfigMap
 metadata:

@@ -36,6 +36,21 @@ func (a *AllowAllAuthz) CheckForUpdate(context.Context, string, string, string, 
 	return v1beta1.CheckForUpdateResponse_ALLOWED_TRUE, nil, nil
 }
 
+func (a *AllowAllAuthz) CheckBulk(ctx context.Context, req *v1beta1.CheckBulkRequest) (*v1beta1.CheckBulkResponse, error) {
+	pairs := make([]*v1beta1.CheckBulkResponsePair, len(req.Items))
+	for i, item := range req.Items {
+		pairs[i] = &v1beta1.CheckBulkResponsePair{
+			Request: item,
+			Response: &v1beta1.CheckBulkResponsePair_Item{
+				Item: &v1beta1.CheckBulkResponseItem{
+					Allowed: v1beta1.CheckBulkResponseItem_ALLOWED_TRUE,
+				},
+			},
+		}
+	}
+	return &v1beta1.CheckBulkResponse{Pairs: pairs}, nil
+}
+
 type mockLookupResourcesClient struct {
 	ctx context.Context
 }

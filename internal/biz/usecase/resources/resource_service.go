@@ -284,6 +284,15 @@ func (uc *Usecase) CheckForUpdate(ctx context.Context, permission, namespace str
 	return false, nil
 }
 
+// CheckBulk forwards the request to Relations CheckBulk
+func (uc *Usecase) CheckBulk(ctx context.Context, req *kessel.CheckBulkRequest) (*kessel.CheckBulkResponse, error) {
+	resp, err := uc.Authz.CheckBulk(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+	return resp, nil
+}
+
 func (uc *Usecase) createResource(tx *gorm.DB, request *v1beta2.ReportResourceRequest, txidStr string) error {
 	resourceId, err := uc.resourceRepository.NextResourceId()
 	if err != nil {
@@ -328,6 +337,15 @@ func (uc *Usecase) createResource(tx *gorm.DB, request *v1beta2.ReportResourceRe
 		}
 	}
 
+	var reporterVersion *model.ReporterVersion
+	if reporterVersionValue := request.GetRepresentations().GetMetadata().GetReporterVersion(); reporterVersionValue != "" {
+		rv, err := model.NewReporterVersion(reporterVersionValue)
+		if err != nil {
+			return fmt.Errorf("invalid reporter version: %w", err)
+		}
+		reporterVersion = &rv
+	}
+
 	reporterRepresentation, err := model.NewRepresentation(request.GetRepresentations().GetReporter().AsMap())
 	if err != nil {
 		return fmt.Errorf("invalid reporter representation: %w", err)
@@ -340,7 +358,7 @@ func (uc *Usecase) createResource(tx *gorm.DB, request *v1beta2.ReportResourceRe
 
 	transactionId := model.NewTransactionId(request.GetRepresentations().GetMetadata().GetTransactionId())
 
-	resource, err := model.NewResource(resourceId, localResourceId, resourceType, reporterType, reporterInstanceId, transactionId, reporterResourceId, apiHref, consoleHref, reporterRepresentation, commonRepresentation, nil)
+	resource, err := model.NewResource(resourceId, localResourceId, resourceType, reporterType, reporterInstanceId, transactionId, reporterResourceId, apiHref, consoleHref, reporterRepresentation, commonRepresentation, reporterVersion)
 	if err != nil {
 		return err
 	}

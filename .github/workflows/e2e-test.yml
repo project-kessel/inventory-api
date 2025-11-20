@@ -10,7 +10,7 @@ jobs:
     name: E2E Test Inventory API
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
 
       - name: Inventory Up - Kind Cluster
         run: make inventory-up-kind

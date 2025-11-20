@@ -23,7 +23,7 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-// CheckBulkPermissionsResponseItem represents the result of a single permission check.
+// CheckBulkResponseItem represents the result of a single permission check.
 type CheckBulkResponseItem struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Allowed       Allowed                `protobuf:"varint,1,opt,name=allowed,proto3,enum=kessel.inventory.v1beta2.Allowed" json:"allowed,omitempty"`
@@ -68,7 +68,7 @@ func (x *CheckBulkResponseItem) GetAllowed() Allowed {
 	return Allowed_ALLOWED_UNSPECIFIED
 }
 
-// CheckBulkPermissionsPair associates a request item with its corresponding result.
+// CheckBulksPair associates a request item with its corresponding result.
 type CheckBulkResponsePair struct {
 	state   protoimpl.MessageState `protogen:"open.v1"`
 	Request *CheckBulkRequestItem  `protobuf:"bytes,1,opt,name=request,proto3" json:"request,omitempty"`
@@ -159,7 +159,7 @@ func (*CheckBulkResponsePair_Item) isCheckBulkResponsePair_Response() {}
 
 func (*CheckBulkResponsePair_Error) isCheckBulkResponsePair_Response() {}
 
-// CheckBulkPermissionsResponse contains the results of all permission checks in the request.
+// CheckBulkResponse contains the results of all permission checks in the request.
 type CheckBulkResponse struct {
 	state            protoimpl.MessageState   `protogen:"open.v1"`
 	Pairs            []*CheckBulkResponsePair `protobuf:"bytes,1,rep,name=pairs,proto3" json:"pairs,omitempty"`

@@ -673,6 +673,25 @@ func TestInventoryAPIHTTP_v1beta2_CheckBulk_WithErrorPair(t *testing.T) {
 	trueWorkspace := "workspace-true-errorpair"
 	falseWorkspace := "workspace-false-errorpair"
 
+	resourceCreated := false
+	defer func() {
+		if !resourceCreated {
+			return
+		}
+		delReq := &pbv1beta2.DeleteResourceRequest{
+			Reference: &pbv1beta2.ResourceReference{
+				ResourceType: "host",
+				ResourceId:   resourceId,
+				Reporter: &pbv1beta2.ReporterReference{
+					Type:       reporterType,
+					InstanceId: proto.String(reporterInstanceId),
+				},
+			},
+		}
+		_, cleanupErr := client.DeleteResource(ctx, delReq)
+		assert.NoError(t, cleanupErr, "Failed to Delete Resource during cleanup")
+	}()
+
 	reporterStruct, err := structpb.NewStruct(map[string]interface{}{
 		"ansible_host": "checkbulk-errorpair-host.example.com",
 	})
@@ -699,6 +718,7 @@ func TestInventoryAPIHTTP_v1beta2_CheckBulk_WithErrorPair(t *testing.T) {
 	}
 	_, err = client.ReportResource(ctx, req)
 	assert.NoError(t, err, "Failed to Report Resource")
+	resourceCreated = true
 
 	// Build CheckBulk with:
 	// - one expected TRUE (trueWorkspace)
@@ -809,19 +829,6 @@ func TestInventoryAPIHTTP_v1beta2_CheckBulk_WithErrorPair(t *testing.T) {
 	}
 	assert.True(t, observed, "CheckBulk with error pair expectations not met within timeout")
 
-	// Cleanup
-	delReq := &pbv1beta2.DeleteResourceRequest{
-		Reference: &pbv1beta2.ResourceReference{
-			ResourceType: "host",
-			ResourceId:   resourceId,
-			Reporter: &pbv1beta2.ReporterReference{
-				Type:       reporterType,
-				InstanceId: proto.String(reporterInstanceId),
-			},
-		},
-	}
-	_, err = client.DeleteResource(ctx, delReq)
-	assert.NoError(t, err, "Failed to Delete Resource during cleanup")
 }
 
 func TestInventoryAPIHTTP_v1beta2_create_check_delete_check_resource(t *testing.T) {
@@ -1012,6 +1019,25 @@ func TestInventoryAPIHTTP_v1beta2_CheckBulk_SingleTrueAndFalse(t *testing.T) {
 	trueWorkspace := "workspace-true"
 	falseWorkspace := "workspace-false"
 
+	resourceCreated := false
+	defer func() {
+		if !resourceCreated {
+			return
+		}
+		delReq := &pbv1beta2.DeleteResourceRequest{
+			Reference: &pbv1beta2.ResourceReference{
+				ResourceType: "host",
+				ResourceId:   resourceId,
+				Reporter: &pbv1beta2.ReporterReference{
+					Type:       reporterType,
+					InstanceId: proto.String(reporterInstanceId),
+				},
+			},
+		}
+		_, cleanupErr := client.DeleteResource(ctx, delReq)
+		assert.NoError(t, cleanupErr, "Failed to Delete Resource during cleanup")
+	}()
+
 	// Create a resource associated with trueWorkspace
 	reporterStruct, err := structpb.NewStruct(map[string]interface{}{
 		"ansible_host": "checkbulk-host.example.com",
@@ -1039,6 +1065,7 @@ func TestInventoryAPIHTTP_v1beta2_CheckBulk_SingleTrueAndFalse(t *testing.T) {
 	}
 	_, err = client.ReportResource(ctx, req)
 	assert.NoError(t, err, "Failed to Report Resource")
+	resourceCreated = true
 
 	// Build CheckBulk with one expected TRUE and one expected FALSE
 	checkBulkReq := &pbv1beta2.CheckBulkRequest{
@@ -1108,19 +1135,6 @@ func TestInventoryAPIHTTP_v1beta2_CheckBulk_SingleTrueAndFalse(t *testing.T) {
 	}
 	assert.True(t, observed, "CheckBulk didn't return [TRUE, FALSE] within timeout")
 
-	// Cleanup
-	delReq := &pbv1beta2.DeleteResourceRequest{
-		Reference: &pbv1beta2.ResourceReference{
-			ResourceType: "host",
-			ResourceId:   resourceId,
-			Reporter: &pbv1beta2.ReporterReference{
-				Type:       reporterType,
-				InstanceId: proto.String(reporterInstanceId),
-			},
-		},
-	}
-	_, err = client.DeleteResource(ctx, delReq)
-	assert.NoError(t, err, "Failed to Delete Resource during cleanup")
 }
 
 func TestInventoryAPIHTTP_v1beta2_CheckBulk_OrderAndEcho(t *testing.T) {
@@ -1150,6 +1164,25 @@ func TestInventoryAPIHTTP_v1beta2_CheckBulk_OrderAndEcho(t *testing.T) {
 	reporterInstanceId := "testuser-example-com"
 	workspace := "workspace-echo"
 
+	resourceCreated := false
+	defer func() {
+		if !resourceCreated {
+			return
+		}
+		delReq := &pbv1beta2.DeleteResourceRequest{
+			Reference: &pbv1beta2.ResourceReference{
+				ResourceType: "host",
+				ResourceId:   resourceId,
+				Reporter: &pbv1beta2.ReporterReference{
+					Type:       reporterType,
+					InstanceId: proto.String(reporterInstanceId),
+				},
+			},
+		}
+		_, cleanupErr := client.DeleteResource(ctx, delReq)
+		assert.NoError(t, cleanupErr, "Failed to Delete Resource during cleanup")
+	}()
+
 	// Create resource
 	reporterStruct, err := structpb.NewStruct(map[string]interface{}{
 		"ansible_host": "checkbulk2-host.example.com",
@@ -1177,6 +1210,7 @@ func TestInventoryAPIHTTP_v1beta2_CheckBulk_OrderAndEcho(t *testing.T) {
 	}
 	_, err = client.ReportResource(ctx, req)
 	assert.NoError(t, err, "Failed to Report Resource")
+	resourceCreated = true
 
 	item1 := &pbv1beta2.CheckBulkRequestItem{
 		Object: &pbv1beta2.ResourceReference{
@@ -1264,17 +1298,4 @@ func TestInventoryAPIHTTP_v1beta2_CheckBulk_OrderAndEcho(t *testing.T) {
 	}
 	assert.True(t, observed, "CheckBulk order/echo expectations not met within timeout")
 
-	// Cleanup
-	delReq := &pbv1beta2.DeleteResourceRequest{
-		Reference: &pbv1beta2.ResourceReference{
-			ResourceType: "host",
-			ResourceId:   resourceId,
-			Reporter: &pbv1beta2.ReporterReference{
-				Type:       reporterType,
-				InstanceId: proto.String(reporterInstanceId),
-			},
-		},
-	}
-	_, err = client.DeleteResource(ctx, delReq)
-	assert.NoError(t, err, "Failed to Delete Resource during cleanup")
 }

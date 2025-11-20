@@ -68,7 +68,7 @@ func (c *InventoryService) DeleteResource(ctx context.Context, r *pb.DeleteResou
 
 	identity, err := middleware.GetIdentity(ctx)
 	if err != nil {
-		return nil, status.Errorf(codes.Unauthenticated, "failed to get identity: %v", err)
+		return nil, status.Errorf(codes.Unauthenticated, "failed to get identity: %w", err)
 	}
 
 	if c.useV1beta2Db() {
@@ -115,7 +115,7 @@ func (c *InventoryService) DeleteResource(ctx context.Context, r *pb.DeleteResou
 func (s *InventoryService) Check(ctx context.Context, req *pb.CheckRequest) (*pb.CheckResponse, error) {
 	identity, err := middleware.GetIdentity(ctx)
 	if err != nil {
-		return nil, status.Errorf(codes.Unauthenticated, "failed to get identity: %v", err)
+		return nil, status.Errorf(codes.Unauthenticated, "failed to get identity: %w", err)
 	}
 
 	if s.useV1beta2Db() {
@@ -146,7 +146,7 @@ func (s *InventoryService) Check(ctx context.Context, req *pb.CheckRequest) (*pb
 func (s *InventoryService) CheckForUpdate(ctx context.Context, req *pb.CheckForUpdateRequest) (*pb.CheckForUpdateResponse, error) {
 	identity, err := middleware.GetIdentity(ctx)
 	if err != nil {
-		return nil, status.Errorf(codes.Unauthenticated, "failed to get identity: %v", err)
+		return nil, status.Errorf(codes.Unauthenticated, "failed to get identity: %w", err)
 	}
 
 	if s.useV1beta2Db() {
@@ -177,7 +177,7 @@ func (s *InventoryService) CheckForUpdate(ctx context.Context, req *pb.CheckForU
 func (s *InventoryService) CheckBulk(ctx context.Context, req *pb.CheckBulkRequest) (*pb.CheckBulkResponse, error) {
 	_, err := middleware.GetIdentity(ctx)
 	if err != nil {
-		return nil, status.Errorf(codes.Unauthenticated, "failed to get identity: %v", err)
+		return nil, status.Errorf(codes.Unauthenticated, "failed to get identity: %w", err)
 	}
 
 	if s.useV1beta2Db() {

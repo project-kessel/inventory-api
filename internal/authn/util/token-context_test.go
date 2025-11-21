@@ -10,20 +10,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// mockIDToken is a test helper that implements the IDToken interface for testing
-type mockIDToken struct {
-	claims map[string]interface{}
-}
-
-func (m *mockIDToken) Claims(v interface{}) error {
-	// Marshal and unmarshal to simulate the real behavior
-	data, err := json.Marshal(m.claims)
-	if err != nil {
-		return err
-	}
-	return json.Unmarshal(data, v)
-}
-
 func TestNewTokenContext(t *testing.T) {
 	ctx := context.Background()
 	var token *coreosoidc.IDToken

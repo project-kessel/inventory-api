@@ -58,9 +58,6 @@ func (o *OAuth2Authenticator) Authenticate(ctx context.Context, t transport.Tran
 		return nil, api.Deny
 	}
 
-	// Store the token in context so it can be accessed later (e.g., for logging client_id)
-	ctx = util.NewTokenContext(ctx, tok)
-
 	// TODO: make JWT claim fields configurable
 	// extract the claims we care about
 	u := &Claims{}

@@ -54,7 +54,7 @@ func (c *InventoryService) DeleteResource(ctx context.Context, r *pb.DeleteResou
 	}
 
 	if reporterResourceKey, err := reporterKeyFromResourceReference(r.GetReference()); err == nil {
-		if err = c.Ctl.Delete(reporterResourceKey); err == nil {
+		if err = c.Ctl.Delete(ctx, reporterResourceKey); err == nil {
 			return ResponseFromDeleteResource(), nil
 		} else {
 			log.Error("Failed to delete resource: ", err)

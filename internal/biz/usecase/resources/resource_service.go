@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2"
 	"github.com/project-kessel/inventory-api/cmd/common"
+	"github.com/project-kessel/inventory-api/internal/authn/interceptor"
 	authzapi "github.com/project-kessel/inventory-api/internal/authz/api"
 	"github.com/project-kessel/inventory-api/internal/biz"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
@@ -110,7 +111,8 @@ func New(resourceRepository data.ResourceRepository, reporterResourceRepository 
 }
 
 func (uc *Usecase) ReportResource(ctx context.Context, request *v1beta2.ReportResourceRequest, reporterPrincipal string) error {
-	log.Info("Reporting resource request: ", request)
+	clientID := interceptor.GetClientIDFromContext(ctx)
+	log.Info("Reporting resource request: ", request, " client_id: ", clientID)
 	var subscription pubsub.Subscription
 	txidStr, err := getNextTransactionID()
 	if err != nil {
@@ -205,13 +207,13 @@ func (uc *Usecase) ReportResource(ctx context.Context, request *v1beta2.ReportRe
 	return nil
 }
 
-func (uc *Usecase) Delete(reporterResourceKey model.ReporterResourceKey) error {
+func (uc *Usecase) Delete(ctx context.Context, reporterResourceKey model.ReporterResourceKey) error {
 	txidStr, err := getNextTransactionID()
 	if err != nil {
 		return err
 	}
-
-	log.Info("Reporter Resource Key to delete ", reporterResourceKey)
+	clientID := interceptor.GetClientIDFromContext(ctx)
+	log.Info("Reporter Resource Key to delete ", reporterResourceKey, " client_id: ", clientID)
 	err = uc.resourceRepository.GetTransactionManager().HandleSerializableTransaction(
 		DeleteResourceOperationName,
 		uc.resourceRepository.GetDB(),

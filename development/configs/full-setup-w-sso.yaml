@@ -8,7 +8,6 @@ authn:
     authn-server-url: http://keycloak:8084/realms/redhat-external
     skip-client-id-check: true
     skip-issuer-check: true
-    principal-user-domain: localhost
 authz:
   impl: kessel
   kessel:
@@ -44,4 +43,3 @@ log:
   level: "info"
   livez: true
   readyz: true
-

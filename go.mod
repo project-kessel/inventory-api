@@ -17,7 +17,7 @@ require (
 	github.com/jackc/pgx/v5 v5.7.6
 	github.com/mattn/go-sqlite3 v1.14.32
 	github.com/patrickmn/go-cache v2.1.0+incompatible
-	github.com/project-kessel/relations-api v0.0.0-20251119124316-a1bcf57e036b
+	github.com/project-kessel/relations-api v0.0.0-20251120185546-02a8502dc019
 	github.com/prometheus/client_golang v1.23.2
 	github.com/redhatinsights/app-common-go v1.6.9
 	github.com/sony/gobreaker v1.0.0

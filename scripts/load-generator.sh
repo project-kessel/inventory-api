@@ -72,14 +72,14 @@ for ((i = 0 ; i < ${NUM_RUNS} ; i++)); do
     '{"reference":{"resource_type":"host","resource_id":$local_resource_id,"reporter":{"type":"hbi"}}}')
 
   echo "Creating resource..."
-  curl -H "Content-Type: application/json" -d $REQUEST $INVENTORY_URL
+  curl -H "Content-Type: application/json" -H "Authorization: Bearer $TOKEN" -d $REQUEST $INVENTORY_URL
 
   if [[ ! "$CREATE_ONLY" == "true" ]]; then
     echo "Updating resource..."
-    curl -H "Content-Type: application/json" -d $REQUEST $INVENTORY_URL
+    curl -H "Content-Type: application/json" -H "Authorization: Bearer $TOKEN" -d $REQUEST $INVENTORY_URL
 
     echo "Deleting resource..."
-    curl -X DELETE -H "Content-Type: application/json" -d $DELETE_REQUEST $INVENTORY_URL
+    curl -X DELETE -H "Content-Type: application/json" -H "Authorization: Bearer $TOKEN" -d $DELETE_REQUEST $INVENTORY_URL
   fi
 
   sleep $INTERVAL

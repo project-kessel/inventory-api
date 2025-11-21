@@ -74,7 +74,7 @@ func (c *InventoryService) DeleteResource(ctx context.Context, r *pb.DeleteResou
 	if c.useV1beta2Db() {
 		log.Info("Delete Resource using v1beta2db")
 		if reporterResourceKey, err := reporterKeyFromResourceReference(r.GetReference()); err == nil {
-			if err = c.Ctl.Delete(reporterResourceKey); err == nil {
+			if err = c.Ctl.Delete(ctx, reporterResourceKey); err == nil {
 				return ResponseFromDeleteResource(), nil
 			} else {
 				log.Error("Failed to delete resource: ", err)

@@ -20,8 +20,10 @@ const _ = grpc.SupportPackageIsVersion9
 
 const (
 	KesselInventoryService_Check_FullMethodName               = "/kessel.inventory.v1beta2.KesselInventoryService/Check"
+	KesselInventoryService_CheckSelf_FullMethodName           = "/kessel.inventory.v1beta2.KesselInventoryService/CheckSelf"
 	KesselInventoryService_CheckForUpdate_FullMethodName      = "/kessel.inventory.v1beta2.KesselInventoryService/CheckForUpdate"
 	KesselInventoryService_CheckBulk_FullMethodName           = "/kessel.inventory.v1beta2.KesselInventoryService/CheckBulk"
+	KesselInventoryService_CheckSelfBulk_FullMethodName       = "/kessel.inventory.v1beta2.KesselInventoryService/CheckSelfBulk"
 	KesselInventoryService_ReportResource_FullMethodName      = "/kessel.inventory.v1beta2.KesselInventoryService/ReportResource"
 	KesselInventoryService_DeleteResource_FullMethodName      = "/kessel.inventory.v1beta2.KesselInventoryService/DeleteResource"
 	KesselInventoryService_StreamedListObjects_FullMethodName = "/kessel.inventory.v1beta2.KesselInventoryService/StreamedListObjects"
@@ -44,6 +46,16 @@ type KesselInventoryServiceClient interface {
 	// Common use cases include enforcing read access, conditional UI visibility,
 	// or authorization gating for downstream API calls.
 	Check(ctx context.Context, in *CheckRequest, opts ...grpc.CallOption) (*CheckResponse, error)
+	// Performs a relationship check where the subject is implicitly the caller
+	// (self), as determined by the authentication context, rather than being
+	// provided explicitly in the request.
+	//
+	// This API answers the question:
+	// "Does the current caller have relation *Y* on object *Z*?"
+	//
+	// Common use cases include enforcing access checks for the authenticated user
+	// without allowing callers to impersonate arbitrary subjects.
+	CheckSelf(ctx context.Context, in *CheckSelfRequest, opts ...grpc.CallOption) (*CheckSelfResponse, error)
 	// Performs a strongly consistent relationship check to determine whether a subject
 	// has a specific relation to an object (representing, for example, a permission).
 	//
@@ -69,6 +81,16 @@ type KesselInventoryServiceClient interface {
 	//
 	// The response includes a result for each item in the request, maintaining the same order.
 	CheckBulk(ctx context.Context, in *CheckBulkRequest, opts ...grpc.CallOption) (*CheckBulkResponse, error)
+	// Performs bulk permission checks where the subject is implicitly the caller
+	// (self) for multiple resource-relation combinations.
+	//
+	// This API is more efficient than making individual CheckSelf calls when
+	// verifying permissions for multiple items. It answers questions like:
+	// "Which of these resources can the current caller perform action *Y* on?"
+	//
+	// The response includes a result for each item in the request, maintaining
+	// the same order.
+	CheckSelfBulk(ctx context.Context, in *CheckSelfBulkRequest, opts ...grpc.CallOption) (*CheckSelfBulkResponse, error)
 	// Reports to Kessel Inventory that a Resource has been created or has been updated.
 	//
 	// Reporters can use this API to report facts about their resources in order to
@@ -141,6 +163,16 @@ func (c *kesselInventoryServiceClient) Check(ctx context.Context, in *CheckReque
 	return out, nil
 }
 
+func (c *kesselInventoryServiceClient) CheckSelf(ctx context.Context, in *CheckSelfRequest, opts ...grpc.CallOption) (*CheckSelfResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CheckSelfResponse)
+	err := c.cc.Invoke(ctx, KesselInventoryService_CheckSelf_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *kesselInventoryServiceClient) CheckForUpdate(ctx context.Context, in *CheckForUpdateRequest, opts ...grpc.CallOption) (*CheckForUpdateResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(CheckForUpdateResponse)
@@ -155,6 +187,16 @@ func (c *kesselInventoryServiceClient) CheckBulk(ctx context.Context, in *CheckB
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(CheckBulkResponse)
 	err := c.cc.Invoke(ctx, KesselInventoryService_CheckBulk_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *kesselInventoryServiceClient) CheckSelfBulk(ctx context.Context, in *CheckSelfBulkRequest, opts ...grpc.CallOption) (*CheckSelfBulkResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CheckSelfBulkResponse)
+	err := c.cc.Invoke(ctx, KesselInventoryService_CheckSelfBulk_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -217,6 +259,16 @@ type KesselInventoryServiceServer interface {
 	// Common use cases include enforcing read access, conditional UI visibility,
 	// or authorization gating for downstream API calls.
 	Check(context.Context, *CheckRequest) (*CheckResponse, error)
+	// Performs a relationship check where the subject is implicitly the caller
+	// (self), as determined by the authentication context, rather than being
+	// provided explicitly in the request.
+	//
+	// This API answers the question:
+	// "Does the current caller have relation *Y* on object *Z*?"
+	//
+	// Common use cases include enforcing access checks for the authenticated user
+	// without allowing callers to impersonate arbitrary subjects.
+	CheckSelf(context.Context, *CheckSelfRequest) (*CheckSelfResponse, error)
 	// Performs a strongly consistent relationship check to determine whether a subject
 	// has a specific relation to an object (representing, for example, a permission).
 	//
@@ -242,6 +294,16 @@ type KesselInventoryServiceServer interface {
 	//
 	// The response includes a result for each item in the request, maintaining the same order.
 	CheckBulk(context.Context, *CheckBulkRequest) (*CheckBulkResponse, error)
+	// Performs bulk permission checks where the subject is implicitly the caller
+	// (self) for multiple resource-relation combinations.
+	//
+	// This API is more efficient than making individual CheckSelf calls when
+	// verifying permissions for multiple items. It answers questions like:
+	// "Which of these resources can the current caller perform action *Y* on?"
+	//
+	// The response includes a result for each item in the request, maintaining
+	// the same order.
+	CheckSelfBulk(context.Context, *CheckSelfBulkRequest) (*CheckSelfBulkResponse, error)
 	// Reports to Kessel Inventory that a Resource has been created or has been updated.
 	//
 	// Reporters can use this API to report facts about their resources in order to
@@ -307,11 +369,17 @@ type UnimplementedKesselInventoryServiceServer struct{}
 func (UnimplementedKesselInventoryServiceServer) Check(context.Context, *CheckRequest) (*CheckResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Check not implemented")
 }
+func (UnimplementedKesselInventoryServiceServer) CheckSelf(context.Context, *CheckSelfRequest) (*CheckSelfResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CheckSelf not implemented")
+}
 func (UnimplementedKesselInventoryServiceServer) CheckForUpdate(context.Context, *CheckForUpdateRequest) (*CheckForUpdateResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CheckForUpdate not implemented")
 }
 func (UnimplementedKesselInventoryServiceServer) CheckBulk(context.Context, *CheckBulkRequest) (*CheckBulkResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CheckBulk not implemented")
+}
+func (UnimplementedKesselInventoryServiceServer) CheckSelfBulk(context.Context, *CheckSelfBulkRequest) (*CheckSelfBulkResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CheckSelfBulk not implemented")
 }
 func (UnimplementedKesselInventoryServiceServer) ReportResource(context.Context, *ReportResourceRequest) (*ReportResourceResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ReportResource not implemented")
@@ -362,6 +430,24 @@ func _KesselInventoryService_Check_Handler(srv interface{}, ctx context.Context,
 	return interceptor(ctx, in, info, handler)
 }
 
+func _KesselInventoryService_CheckSelf_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CheckSelfRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(KesselInventoryServiceServer).CheckSelf(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: KesselInventoryService_CheckSelf_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(KesselInventoryServiceServer).CheckSelf(ctx, req.(*CheckSelfRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _KesselInventoryService_CheckForUpdate_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(CheckForUpdateRequest)
 	if err := dec(in); err != nil {
@@ -394,6 +480,24 @@ func _KesselInventoryService_CheckBulk_Handler(srv interface{}, ctx context.Cont
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(KesselInventoryServiceServer).CheckBulk(ctx, req.(*CheckBulkRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _KesselInventoryService_CheckSelfBulk_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CheckSelfBulkRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(KesselInventoryServiceServer).CheckSelfBulk(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: KesselInventoryService_CheckSelfBulk_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(KesselInventoryServiceServer).CheckSelfBulk(ctx, req.(*CheckSelfBulkRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -457,12 +561,20 @@ var KesselInventoryService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _KesselInventoryService_Check_Handler,
 		},
 		{
+			MethodName: "CheckSelf",
+			Handler:    _KesselInventoryService_CheckSelf_Handler,
+		},
+		{
 			MethodName: "CheckForUpdate",
 			Handler:    _KesselInventoryService_CheckForUpdate_Handler,
 		},
 		{
 			MethodName: "CheckBulk",
 			Handler:    _KesselInventoryService_CheckBulk_Handler,
+		},
+		{
+			MethodName: "CheckSelfBulk",
+			Handler:    _KesselInventoryService_CheckSelfBulk_Handler,
 		},
 		{
 			MethodName: "ReportResource",

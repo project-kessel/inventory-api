@@ -22,6 +22,8 @@ const _ = http.SupportPackageIsVersion1
 const OperationKesselInventoryServiceCheck = "/kessel.inventory.v1beta2.KesselInventoryService/Check"
 const OperationKesselInventoryServiceCheckBulk = "/kessel.inventory.v1beta2.KesselInventoryService/CheckBulk"
 const OperationKesselInventoryServiceCheckForUpdate = "/kessel.inventory.v1beta2.KesselInventoryService/CheckForUpdate"
+const OperationKesselInventoryServiceCheckSelf = "/kessel.inventory.v1beta2.KesselInventoryService/CheckSelf"
+const OperationKesselInventoryServiceCheckSelfBulk = "/kessel.inventory.v1beta2.KesselInventoryService/CheckSelfBulk"
 const OperationKesselInventoryServiceDeleteResource = "/kessel.inventory.v1beta2.KesselInventoryService/DeleteResource"
 const OperationKesselInventoryServiceReportResource = "/kessel.inventory.v1beta2.KesselInventoryService/ReportResource"
 
@@ -61,6 +63,26 @@ type KesselInventoryServiceHTTPServer interface {
 	// It is intended to be used just prior to sensitive operation (e.g., update, delete)
 	// which depend on the current state of the relationship.
 	CheckForUpdate(context.Context, *CheckForUpdateRequest) (*CheckForUpdateResponse, error)
+	// CheckSelf Performs a relationship check where the subject is implicitly the caller
+	// (self), as determined by the authentication context, rather than being
+	// provided explicitly in the request.
+	//
+	// This API answers the question:
+	// "Does the current caller have relation *Y* on object *Z*?"
+	//
+	// Common use cases include enforcing access checks for the authenticated user
+	// without allowing callers to impersonate arbitrary subjects.
+	CheckSelf(context.Context, *CheckSelfRequest) (*CheckSelfResponse, error)
+	// CheckSelfBulk Performs bulk permission checks where the subject is implicitly the caller
+	// (self) for multiple resource-relation combinations.
+	//
+	// This API is more efficient than making individual CheckSelf calls when
+	// verifying permissions for multiple items. It answers questions like:
+	// "Which of these resources can the current caller perform action *Y* on?"
+	//
+	// The response includes a result for each item in the request, maintaining
+	// the same order.
+	CheckSelfBulk(context.Context, *CheckSelfBulkRequest) (*CheckSelfBulkResponse, error)
 	// DeleteResource Reports to Kessel Inventory that a Reporter's representation of a Resource has been deleted.
 	//
 	// This operation is typically used when a resource has been decommissioned or
@@ -107,8 +129,10 @@ type KesselInventoryServiceHTTPServer interface {
 func RegisterKesselInventoryServiceHTTPServer(s *http.Server, srv KesselInventoryServiceHTTPServer) {
 	r := s.Route("/")
 	r.POST("/api/inventory/v1beta2/check", _KesselInventoryService_Check0_HTTP_Handler(srv))
+	r.POST("/api/inventory/v1beta2/checkself", _KesselInventoryService_CheckSelf0_HTTP_Handler(srv))
 	r.POST("/api/inventory/v1beta2/checkforupdate", _KesselInventoryService_CheckForUpdate0_HTTP_Handler(srv))
 	r.POST("/api/inventory/v1beta2/checkbulk", _KesselInventoryService_CheckBulk0_HTTP_Handler(srv))
+	r.POST("/api/inventory/v1beta2/checkselfbulk", _KesselInventoryService_CheckSelfBulk0_HTTP_Handler(srv))
 	r.POST("/api/inventory/v1beta2/resources", _KesselInventoryService_ReportResource0_HTTP_Handler(srv))
 	r.DELETE("/api/inventory/v1beta2/resources", _KesselInventoryService_DeleteResource0_HTTP_Handler(srv))
 }
@@ -131,6 +155,28 @@ func _KesselInventoryService_Check0_HTTP_Handler(srv KesselInventoryServiceHTTPS
 			return err
 		}
 		reply := out.(*CheckResponse)
+		return ctx.Result(200, reply)
+	}
+}
+
+func _KesselInventoryService_CheckSelf0_HTTP_Handler(srv KesselInventoryServiceHTTPServer) func(ctx http.Context) error {
+	return func(ctx http.Context) error {
+		var in CheckSelfRequest
+		if err := ctx.Bind(&in); err != nil {
+			return err
+		}
+		if err := ctx.BindQuery(&in); err != nil {
+			return err
+		}
+		http.SetOperation(ctx, OperationKesselInventoryServiceCheckSelf)
+		h := ctx.Middleware(func(ctx context.Context, req interface{}) (interface{}, error) {
+			return srv.CheckSelf(ctx, req.(*CheckSelfRequest))
+		})
+		out, err := h(ctx, &in)
+		if err != nil {
+			return err
+		}
+		reply := out.(*CheckSelfResponse)
 		return ctx.Result(200, reply)
 	}
 }
@@ -175,6 +221,28 @@ func _KesselInventoryService_CheckBulk0_HTTP_Handler(srv KesselInventoryServiceH
 			return err
 		}
 		reply := out.(*CheckBulkResponse)
+		return ctx.Result(200, reply)
+	}
+}
+
+func _KesselInventoryService_CheckSelfBulk0_HTTP_Handler(srv KesselInventoryServiceHTTPServer) func(ctx http.Context) error {
+	return func(ctx http.Context) error {
+		var in CheckSelfBulkRequest
+		if err := ctx.Bind(&in); err != nil {
+			return err
+		}
+		if err := ctx.BindQuery(&in); err != nil {
+			return err
+		}
+		http.SetOperation(ctx, OperationKesselInventoryServiceCheckSelfBulk)
+		h := ctx.Middleware(func(ctx context.Context, req interface{}) (interface{}, error) {
+			return srv.CheckSelfBulk(ctx, req.(*CheckSelfBulkRequest))
+		})
+		out, err := h(ctx, &in)
+		if err != nil {
+			return err
+		}
+		reply := out.(*CheckSelfBulkResponse)
 		return ctx.Result(200, reply)
 	}
 }
@@ -227,6 +295,8 @@ type KesselInventoryServiceHTTPClient interface {
 	Check(ctx context.Context, req *CheckRequest, opts ...http.CallOption) (rsp *CheckResponse, err error)
 	CheckBulk(ctx context.Context, req *CheckBulkRequest, opts ...http.CallOption) (rsp *CheckBulkResponse, err error)
 	CheckForUpdate(ctx context.Context, req *CheckForUpdateRequest, opts ...http.CallOption) (rsp *CheckForUpdateResponse, err error)
+	CheckSelf(ctx context.Context, req *CheckSelfRequest, opts ...http.CallOption) (rsp *CheckSelfResponse, err error)
+	CheckSelfBulk(ctx context.Context, req *CheckSelfBulkRequest, opts ...http.CallOption) (rsp *CheckSelfBulkResponse, err error)
 	DeleteResource(ctx context.Context, req *DeleteResourceRequest, opts ...http.CallOption) (rsp *DeleteResourceResponse, err error)
 	ReportResource(ctx context.Context, req *ReportResourceRequest, opts ...http.CallOption) (rsp *ReportResourceResponse, err error)
 }
@@ -270,6 +340,32 @@ func (c *KesselInventoryServiceHTTPClientImpl) CheckForUpdate(ctx context.Contex
 	pattern := "/api/inventory/v1beta2/checkforupdate"
 	path := binding.EncodeURL(pattern, in, false)
 	opts = append(opts, http.Operation(OperationKesselInventoryServiceCheckForUpdate))
+	opts = append(opts, http.PathTemplate(pattern))
+	err := c.cc.Invoke(ctx, "POST", path, in, &out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+func (c *KesselInventoryServiceHTTPClientImpl) CheckSelf(ctx context.Context, in *CheckSelfRequest, opts ...http.CallOption) (*CheckSelfResponse, error) {
+	var out CheckSelfResponse
+	pattern := "/api/inventory/v1beta2/checkself"
+	path := binding.EncodeURL(pattern, in, false)
+	opts = append(opts, http.Operation(OperationKesselInventoryServiceCheckSelf))
+	opts = append(opts, http.PathTemplate(pattern))
+	err := c.cc.Invoke(ctx, "POST", path, in, &out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+func (c *KesselInventoryServiceHTTPClientImpl) CheckSelfBulk(ctx context.Context, in *CheckSelfBulkRequest, opts ...http.CallOption) (*CheckSelfBulkResponse, error) {
+	var out CheckSelfBulkResponse
+	pattern := "/api/inventory/v1beta2/checkselfbulk"
+	path := binding.EncodeURL(pattern, in, false)
+	opts = append(opts, http.Operation(OperationKesselInventoryServiceCheckSelfBulk))
 	opts = append(opts, http.PathTemplate(pattern))
 	err := c.cc.Invoke(ctx, "POST", path, in, &out, opts...)
 	if err != nil {

@@ -1,0 +1,35 @@
+syntax = "proto3";
+
+package kessel.inventory.v1beta2;
+
+import "kessel/inventory/v1beta2/check_self_bulk_request.proto";
+import "kessel/inventory/v1beta2/consistency_token.proto";
+import "kessel/inventory/v1beta2/allowed.proto";
+import "buf/validate/validate.proto";
+import "google/rpc/status.proto";
+
+option go_package = "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2";
+option java_multiple_files = true;
+option java_package = "org.project_kessel.api.inventory.v1beta2";
+
+// CheckSelfBulkResponseItem represents the result of a single self-access permission check.
+message CheckSelfBulkResponseItem {
+  Allowed allowed = 1;
+}
+
+// CheckSelfBulkResponsePair associates a self-access request item with its corresponding result.
+message CheckSelfBulkResponsePair {
+  CheckSelfBulkRequestItem request = 1;
+  oneof response {
+    CheckSelfBulkResponseItem item = 2;
+    google.rpc.Status error = 3;
+  };
+}
+
+// CheckSelfBulkResponse contains the results of all self-access permission checks in the request.
+message CheckSelfBulkResponse {
+  repeated CheckSelfBulkResponsePair pairs = 1 [(buf.validate.field).repeated.min_items = 1];
+  ConsistencyToken consistency_token = 2;
+}
+
+

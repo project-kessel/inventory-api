@@ -5,14 +5,15 @@ server:
     address: 0.0.0.0:9081
 authn:
   oidc:
-    authn-server-url: http://localhost:8084/realms/redhat-external
+    authn-server-url: http://keycloak:8084/realms/redhat-external
     skip-client-id-check: true
     skip-issuer-check: true
+    principal-user-domain: localhost
 authz:
   impl: kessel
   kessel:
     insecure-client: true
-    url: localhost:9000
+    url: relations-api:9000
     enable-oidc-auth: false
     principal-user-domain: 0.0.0.0:8084
 eventing:
@@ -22,22 +23,20 @@ storage:
   max-serialization-retries: 10
   database: postgres
   postgres:
-    host: "localhost"
+    host: "invdatabase"
     port: "5433"
     user: "postgres"
     password: "yPsw5e6ab4bvAGe5H"
     dbname: "spicedb"
 consumer:
   enabled: true
-  bootstrap-servers: localhost:9092
+  bootstrap-servers: kafka:9093
   retry-options:
     consumer-max-retries: 3
     operation-max-retries: 4
     backoff-factor: 5
   auth:
     enabled: false
-service:
-  use_v1beta2_db: true
 resources:
   schemaPath: "data/schema/resources"
   use_cache: true
@@ -45,4 +44,3 @@ log:
   level: "info"
   livez: true
   readyz: true
-

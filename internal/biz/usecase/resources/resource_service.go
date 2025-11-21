@@ -20,7 +20,7 @@ import (
 	"github.com/project-kessel/inventory-api/internal/pubsub"
 	"github.com/project-kessel/inventory-api/internal/server"
 	kessel "github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
-	"github.com/sony/gobreaker"
+	"github.com/sony/gobreaker/v2"
 	"google.golang.org/grpc"
 	"gorm.io/gorm"
 

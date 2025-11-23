@@ -19,18 +19,25 @@ log_warning() {
     echo -e "${YELLOW}[WARNING]${NC} $1"
 }
 
-# Step 0: Release existing reserved namespace
-log_info "Checking for currently reserved namespace..."
-CURRENT_NAMESPACE=$(bonfire namespace describe 2>/dev/null | grep -oE "ephemeral-[a-z0-9]+" | head -1 || true)
+# Step 0: Release existing reserved namespaces
+log_info "Checking for existing reserved namespaces..."
 
-if [ -n "$CURRENT_NAMESPACE" ]; then
-    log_warning "Found existing reserved namespace: $CURRENT_NAMESPACE"
-    log_info "Releasing namespace: $CURRENT_NAMESPACE"
-    bonfire namespace release $CURRENT_NAMESPACE 2>&1 || log_warning "Failed to release $CURRENT_NAMESPACE (may already be released)"
+# Detect current user from environment or system
+CURRENT_USER="${USER:-$(whoami)}"
+log_info "Current user: $CURRENT_USER"
+
+RESERVED_NAMESPACES=$(bonfire namespace list 2>/dev/null | grep -E "^ephemeral-.*true.*${CURRENT_USER}" | awk '{print $1}' || true)
+
+if [ -n "$RESERVED_NAMESPACES" ]; then
+    log_warning "Found existing reserved namespaces, releasing them..."
+    echo "$RESERVED_NAMESPACES" | while read ns; do
+        log_info "Releasing namespace: $ns"
+        bonfire namespace release $ns 2>&1 || log_warning "Failed to release $ns (may already be released)"
+    done
     log_info "Waiting for release to complete..."
     sleep 5
 else
-    log_info "No currently reserved namespace found"
+    log_info "No existing reserved namespaces found for $CURRENT_USER"
 fi
 
 # Step 1: Deploy kessel-inventory to ephemeral

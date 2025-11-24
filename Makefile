@@ -248,6 +248,7 @@ migrate: local-build
 	./bin/inventory-api migrate --config .inventory-api.yaml
 
 .PHONY: db/setup
+# Starts a postgres container for the inventory
 db/setup:
 	$(DOCKER) run --name psql-inventory \
 		-e POSTGRES_DB=$(DB_NAME) \
@@ -261,6 +262,7 @@ db/setup:
 	@echo "PostgreSQL container 'psql-inventory' is running on port $(DB_PORT)"
 
 .PHONY: db/teardown
+# Shutdowns the postgres container started by `db/setup`
 db/teardown:
 	$(DOCKER) stop psql-inventory
 	$(DOCKER) rm psql-inventory
@@ -277,7 +279,7 @@ help:
 	@echo ' make [target]'
 	@echo ''
 	@echo 'Targets:'
-	@awk '/^[a-zA-Z\-_0-9]+:/ { \
+	@awk '/^[a-zA-Z\-_0-9/]+:/ { \
 	helpMessage = match(lastLine, /^# (.*)/); \
 		if (helpMessage) { \
 			helpCommand = substr($$1, 0, index($$1, ":")); \

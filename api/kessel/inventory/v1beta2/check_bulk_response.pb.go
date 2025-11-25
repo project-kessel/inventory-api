@@ -68,7 +68,7 @@ func (x *CheckBulkResponseItem) GetAllowed() Allowed {
 	return Allowed_ALLOWED_UNSPECIFIED
 }
 
-// CheckBulksPair associates a request item with its corresponding result.
+// CheckBulkResponsePair associates a request item with its corresponding result.
 type CheckBulkResponsePair struct {
 	state   protoimpl.MessageState `protogen:"open.v1"`
 	Request *CheckBulkRequestItem  `protobuf:"bytes,1,opt,name=request,proto3" json:"request,omitempty"`

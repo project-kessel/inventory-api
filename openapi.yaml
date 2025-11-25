@@ -408,6 +408,74 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/google.rpc.Status'
+    /api/inventory/v1beta2/checkself:
+        post:
+            tags:
+                - KesselInventoryService
+            description: |-
+                Performs a relationship check where the subject is implicitly the caller
+                 (self), as determined by the authentication context, rather than being
+                 provided explicitly in the request.
+
+                 This API answers the question:
+                 "Does the current caller have relation *Y* on object *Z*?"
+
+                 Common use cases include enforcing access checks for the authenticated user
+                 without allowing callers to impersonate arbitrary subjects.
+            operationId: KesselInventoryService_CheckSelf
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/kessel.inventory.v1beta2.CheckSelfRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/kessel.inventory.v1beta2.CheckSelfResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/google.rpc.Status'
+    /api/inventory/v1beta2/checkselfbulk:
+        post:
+            tags:
+                - KesselInventoryService
+            description: |-
+                Performs bulk permission checks where the subject is implicitly the caller
+                 (self) for multiple resource-relation combinations.
+
+                 This API is more efficient than making individual CheckSelf calls when
+                 verifying permissions for multiple items. It answers questions like:
+                 "Which of these resources can the current caller perform action *Y* on?"
+
+                 The response includes a result for each item in the request, maintaining
+                 the same order.
+            operationId: KesselInventoryService_CheckSelfBulk
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/kessel.inventory.v1beta2.CheckSelfBulkRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/kessel.inventory.v1beta2.CheckSelfBulkResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/google.rpc.Status'
     /api/inventory/v1beta2/resources:
         post:
             tags:
@@ -1063,7 +1131,7 @@ components:
                     $ref: '#/components/schemas/kessel.inventory.v1beta2.CheckBulkResponseItem'
                 error:
                     $ref: '#/components/schemas/google.rpc.Status'
-            description: CheckBulksPair associates a request item with its corresponding result.
+            description: CheckBulkResponsePair associates a request item with its corresponding result.
         kessel.inventory.v1beta2.CheckForUpdateRequest:
             type: object
             properties:
@@ -1114,6 +1182,92 @@ components:
                         - ALLOWED_FALSE
                     type: string
                     format: enum
+        kessel.inventory.v1beta2.CheckSelfBulkRequest:
+            type: object
+            properties:
+                items:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/kessel.inventory.v1beta2.CheckSelfBulkRequestItem'
+                consistency:
+                    $ref: '#/components/schemas/kessel.inventory.v1beta2.Consistency'
+            description: |-
+                CheckSelfBulkRequest allows checking multiple permissions for the caller
+                 (self) in a single request. This is more efficient than making individual
+                 CheckSelf calls when verifying permissions for multiple
+                 resource-relation combinations.
+        kessel.inventory.v1beta2.CheckSelfBulkRequestItem:
+            type: object
+            properties:
+                object:
+                    $ref: '#/components/schemas/kessel.inventory.v1beta2.ResourceReference'
+                relation:
+                    type: string
+            description: |-
+                CheckSelfBulkRequestItem represents a single permission check for the caller
+                 (self) in a bulk request. The subject is derived from the caller's
+                 authenticated identity rather than being provided explicitly.
+        kessel.inventory.v1beta2.CheckSelfBulkResponse:
+            type: object
+            properties:
+                pairs:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/kessel.inventory.v1beta2.CheckSelfBulkResponsePair'
+                consistencyToken:
+                    $ref: '#/components/schemas/kessel.inventory.v1beta2.ConsistencyToken'
+            description: CheckSelfBulkResponse contains the results of all self-access permission checks in the request.
+        kessel.inventory.v1beta2.CheckSelfBulkResponseItem:
+            type: object
+            properties:
+                allowed:
+                    enum:
+                        - ALLOWED_UNSPECIFIED
+                        - ALLOWED_TRUE
+                        - ALLOWED_FALSE
+                    type: string
+                    format: enum
+            description: CheckSelfBulkResponseItem represents the result of a single self-access permission check.
+        kessel.inventory.v1beta2.CheckSelfBulkResponsePair:
+            type: object
+            properties:
+                request:
+                    $ref: '#/components/schemas/kessel.inventory.v1beta2.CheckSelfBulkRequestItem'
+                item:
+                    $ref: '#/components/schemas/kessel.inventory.v1beta2.CheckSelfBulkResponseItem'
+                error:
+                    $ref: '#/components/schemas/google.rpc.Status'
+            description: CheckSelfBulkResponsePair associates a self-access request item with its corresponding result.
+        kessel.inventory.v1beta2.CheckSelfRequest:
+            type: object
+            properties:
+                object:
+                    allOf:
+                        - $ref: '#/components/schemas/kessel.inventory.v1beta2.ResourceReference'
+                    description: |-
+                        Required parameters (from an authz perspective)
+                         - resource type and id
+                         - permission (cannot be derived from the type as a type may have multiple 'read' permissions. Ex: https://github.com/RedHatInsights/rbac-config/blob/master/configs/prod/schemas/src/notifications.ksl#L31)
+
+                         The subject is implicitly the caller, as determined by the authentication
+                         context, instead of being provided as a SubjectReference.
+                relation:
+                    type: string
+            description: |-
+                CheckSelfRequest performs an access check for the caller (self) against a
+                 specific object and relation. The subject is derived from the caller's
+                 authenticated identity rather than being provided explicitly.
+        kessel.inventory.v1beta2.CheckSelfResponse:
+            type: object
+            properties:
+                allowed:
+                    enum:
+                        - ALLOWED_UNSPECIFIED
+                        - ALLOWED_TRUE
+                        - ALLOWED_FALSE
+                    type: string
+                    format: enum
+            description: CheckSelfResponse represents the result of a self-access permission check.
         kessel.inventory.v1beta2.Consistency:
             type: object
             properties:

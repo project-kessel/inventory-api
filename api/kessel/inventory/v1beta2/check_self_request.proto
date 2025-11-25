@@ -1,0 +1,26 @@
+syntax = "proto3";
+
+package kessel.inventory.v1beta2;
+
+import "buf/validate/validate.proto";
+import "kessel/inventory/v1beta2/resource_reference.proto";
+
+option go_package = "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2";
+option java_multiple_files = true;
+option java_package = "org.project_kessel.api.inventory.v1beta2";
+
+// CheckSelfRequest performs an access check for the caller (self) against a
+// specific object and relation. The subject is derived from the caller's
+// authenticated identity rather than being provided explicitly.
+message CheckSelfRequest {
+  // Required parameters (from an authz perspective)
+  // - resource type and id
+  // - permission (cannot be derived from the type as a type may have multiple 'read' permissions. Ex: https://github.com/RedHatInsights/rbac-config/blob/master/configs/prod/schemas/src/notifications.ksl#L31)
+  //
+  // The subject is implicitly the caller, as determined by the authentication
+  // context, instead of being provided as a SubjectReference.
+  ResourceReference object = 1 [(buf.validate.field).required = true];
+  string relation = 2 [(buf.validate.field).string.min_len = 1];
+}
+
+

@@ -20,7 +20,7 @@ This repository implements a common inventory system with eventing.
 ## Development Setup
 
 ### Prerequisites
-- Go 1.23.9
+- Go 1.25.3
 - Make
 
 ### Debugging
@@ -79,13 +79,13 @@ Since there are official instructions on how to [manage multiple installs](https
 We accept the `GO` parameter when running make. e.g.
 
 ```shell
-GO=go1.23.1 make run
+GO=go1.25.3 make run
 ```
 
 or
 
 ```shell
-export GO=go1.23.1
+export GO=go1.25.3
 make run
 ```
 
@@ -164,7 +164,7 @@ The schemas are loaded in as a tarball in a configmap, to generate the tarball e
 make build-schemas
 ```
 
-The command will output the `binaryData` for `resources.tar.gz`. 
+The command will output the `binaryData` for `resources.tar.gz`.
 ```shell
 binaryData:
   resources.tar.gz: H4sIAEQ1L2gAA+2d3W7juBXHswWKoil62V4LaYG9mVEoUiTtAfbCmzg7xiRxNnZmd1ssDI2jJNqxpawkz05...

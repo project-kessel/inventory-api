@@ -578,8 +578,13 @@ func (f ReporterRepresentationTestFixture) ValidGenerationType() Generation {
 	return NewGeneration(f.ValidGeneration)
 }
 
-func (f ReporterRepresentationTestFixture) ValidCommonVersionType() Version {
-	return NewVersion(f.ValidCommonVersion)
+func (f ReporterRepresentationTestFixture) ValidCommonVersionType() *Version {
+	v := NewVersion(f.ValidCommonVersion)
+	return &v
+}
+
+func (f ReporterRepresentationTestFixture) NilCommonVersionType() *Version {
+	return nil
 }
 
 func (f ReporterRepresentationTestFixture) ValidReporterVersionType() *ReporterVersion {
@@ -1000,8 +1005,9 @@ func (f ResourceEventTestFixture) ValidCommonDataType() Representation {
 	return representation
 }
 
-func (f ResourceEventTestFixture) ValidCommonVersionType() Version {
-	return NewVersion(f.ValidCommonVersion)
+func (f ResourceEventTestFixture) ValidCommonVersionType() *Version {
+	v := NewVersion(f.ValidCommonVersion)
+	return &v
 }
 
 func (f ResourceEventTestFixture) ValidReporterVersionStrType() *ReporterVersion {

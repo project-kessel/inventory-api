@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"strconv"
 
+	"github.com/project-kessel/inventory-api/internal/config/schema"
+
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/project-kessel/inventory-api/cmd/common"
 	clowder "github.com/redhatinsights/app-common-go/pkg/api/v1"
@@ -28,6 +30,7 @@ type OptionsConfig struct {
 	Server      *server.Options
 	Consistency *consistency.Options
 	Service     *service.Options
+	Schema      *schema.Options
 }
 
 // NewOptionsConfig returns a new OptionsConfig with default options set
@@ -41,6 +44,7 @@ func NewOptionsConfig() *OptionsConfig {
 		server.NewOptions(),
 		consistency.NewOptions(),
 		service.NewOptions(),
+		schema.NewOptions(),
 	}
 }
 

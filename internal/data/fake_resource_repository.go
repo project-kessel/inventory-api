@@ -8,25 +8,26 @@ import (
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
+	"github.com/project-kessel/inventory-api/internal"
 	"github.com/project-kessel/inventory-api/internal/biz"
 	bizmodel "github.com/project-kessel/inventory-api/internal/biz/model"
 	"github.com/project-kessel/inventory-api/internal/biz/usecase"
 )
 
 type fakeResourceRepository struct {
-	mu                      sync.RWMutex
-	resourcesByPrimaryKey   map[uuid.UUID]*storedResource // keyed by primary key (ResourceID) - simulates database primary storage
-	resourcesByCompositeKey map[string]uuid.UUID          // composite key -> primary key mapping for unique constraint
-	resources               map[string]*storedResource    // legacy field for backward compatibility
-	overrideCurrent         string                        // test override for current workspace ID
-	overridePrevious        string                        // test override for previous workspace ID
-	processedTransactionIds map[string]bool               // track processed transaction IDs for idempotency testing
+	mu                       sync.RWMutex
+	resourcesByPrimaryKey    map[uuid.UUID]*storedResource // keyed by primary key (ResourceID) - simulates database primary storage
+	resourcesByCompositeKey  map[string]uuid.UUID          // composite key -> primary key mapping for unique constraint
+	resources                map[string]*storedResource    // legacy field for backward compatibility
+	representationsByVersion map[string]map[uint]*storedRepresentation
+	processedTransactionIds  map[string]bool // track processed transaction IDs for idempotency testing
 }
 
 type storedResource struct {
 	resourceID            uuid.UUID
 	resourceType          string
 	commonVersion         uint
+	commonData            internal.JsonObject
 	reporterResourceID    uuid.UUID
 	localResourceID       string
 	reporterType          string
@@ -36,26 +37,18 @@ type storedResource struct {
 	tombstone             bool
 }
 
-func NewFakeResourceRepository() ResourceRepository {
-	return &fakeResourceRepository{
-		resourcesByPrimaryKey:   make(map[uuid.UUID]*storedResource),
-		resourcesByCompositeKey: make(map[string]uuid.UUID),
-		resources:               make(map[string]*storedResource),
-		overrideCurrent:         "",
-		overridePrevious:        "",
-		processedTransactionIds: make(map[string]bool),
-	}
+type storedRepresentation struct {
+	commonData    internal.JsonObject
+	commonVersion uint
 }
 
-// NewFakeResourceRepositoryWithWorkspaceOverrides allows tests to control the
-// workspace IDs returned for current and previous versions.
-func NewFakeResourceRepositoryWithWorkspaceOverrides(current, previous string) ResourceRepository {
+func NewFakeResourceRepository() ResourceRepository {
 	return &fakeResourceRepository{
-		resourcesByPrimaryKey:   make(map[uuid.UUID]*storedResource),
-		resourcesByCompositeKey: make(map[string]uuid.UUID),
-		resources:               make(map[string]*storedResource),
-		overrideCurrent:         current,
-		overridePrevious:        previous,
+		resourcesByPrimaryKey:    make(map[uuid.UUID]*storedResource),
+		resourcesByCompositeKey:  make(map[string]uuid.UUID),
+		resources:                make(map[string]*storedResource),
+		representationsByVersion: make(map[string]map[uint]*storedRepresentation),
+		processedTransactionIds:  make(map[string]bool),
 	}
 }
 
@@ -127,6 +120,7 @@ func (f *fakeResourceRepository) Save(tx *gorm.DB, resource bizmodel.Resource, o
 		resourceID:            resourceSnapshot.ID,
 		resourceType:          resourceSnapshot.Type,
 		commonVersion:         resourceSnapshot.CommonVersion,
+		commonData:            commonRepresentationSnapshot.Representation.Data,
 		reporterResourceID:    reporterResourceSnapshot.ID,
 		localResourceID:       reporterResourceSnapshot.ReporterResourceKey.LocalResourceID,
 		reporterType:          reporterResourceSnapshot.ReporterResourceKey.ReporterType,
@@ -140,6 +134,22 @@ func (f *fakeResourceRepository) Save(tx *gorm.DB, resource bizmodel.Resource, o
 	f.resourcesByPrimaryKey[reporterResourcePrimaryKey] = stored
 	// Store composite key mapping (simulates unique constraint)
 	f.resourcesByCompositeKey[compositeKey] = reporterResourcePrimaryKey
+
+	historyKey := f.makeHistoryKey(
+		stored.localResourceID,
+		stored.reporterType,
+		stored.resourceType,
+		stored.reporterInstanceID,
+	)
+	if _, ok := f.representationsByVersion[historyKey]; !ok {
+		f.representationsByVersion[historyKey] = make(map[uint]*storedRepresentation)
+	}
+	commonVersion := commonRepresentationSnapshot.Version
+	f.representationsByVersion[historyKey][stored.representationVersion] = &storedRepresentation{
+		commonData:    cloneJsonObject(stored.commonData),
+		commonVersion: commonVersion,
+	}
+
 	// Mark transaction IDs as processed for idempotency testing
 	if reporterRepresentationSnapshot.TransactionId != "" {
 		f.markTransactionIdAsProcessed(reporterRepresentationSnapshot.TransactionId)
@@ -220,53 +230,91 @@ func (f *fakeResourceRepository) FindResourceByKeys(tx *gorm.DB, key bizmodel.Re
 	return nil, gorm.ErrRecordNotFound
 }
 
-func (f *fakeResourceRepository) FindCurrentAndPreviousVersionedRepresentations(tx *gorm.DB, key bizmodel.ReporterResourceKey, currentVersion *uint, operationType biz.EventOperationType) ([]RepresentationsByVersion, error) {
+func (f *fakeResourceRepository) FindCurrentAndPreviousVersionedRepresentations(tx *gorm.DB, key bizmodel.ReporterResourceKey, currentVersion *uint, operationType biz.EventOperationType) (*bizmodel.Representations, *bizmodel.Representations, error) {
 	if currentVersion == nil {
-		return []RepresentationsByVersion{}, nil
+		return nil, nil, nil
 	}
 
-	var results []RepresentationsByVersion
+	historyKey := f.makeHistoryKey(
+		key.LocalResourceId().Serialize(),
+		key.ReporterType().Serialize(),
+		key.ResourceType().Serialize(),
+		key.ReporterInstanceId().Serialize(),
+	)
 
-	if f.overrideCurrent != "" {
-		if currentVersion != nil {
-			results = append(results, RepresentationsByVersion{Data: map[string]interface{}{"workspace_id": f.overrideCurrent}, Version: *currentVersion})
-			if f.overridePrevious != "" {
-				if *currentVersion > 0 {
-					results = append(results, RepresentationsByVersion{Data: map[string]interface{}{"workspace_id": f.overridePrevious}, Version: *currentVersion - 1})
-				}
+	f.mu.RLock()
+	defer f.mu.RUnlock()
+
+	versionMap := f.representationsByVersion[historyKey]
+	if versionMap == nil {
+		return nil, nil, fmt.Errorf("no representations found for key")
+	}
+
+	var current *bizmodel.Representations
+	var previous *bizmodel.Representations
+
+	if entry, ok := versionMap[*currentVersion]; ok {
+		var err error
+		current, err = bizmodel.NewRepresentations(
+			bizmodel.Representation(cloneJsonObject(entry.commonData)),
+			uintPtr(entry.commonVersion),
+			nil,
+			nil,
+		)
+		if err != nil {
+			return nil, nil, err
+		}
+	}
+
+	if *currentVersion > 0 {
+		if entry, ok := versionMap[*currentVersion-1]; ok {
+			var err error
+			previous, err = bizmodel.NewRepresentations(
+				bizmodel.Representation(cloneJsonObject(entry.commonData)),
+				uintPtr(entry.commonVersion),
+				nil,
+				nil,
+			)
+			if err != nil {
+				return nil, nil, err
 			}
 		}
-		return results, nil
 	}
 
-	if currentVersion != nil {
-		switch *currentVersion {
-		case 0:
-			results = append(results, RepresentationsByVersion{Data: map[string]interface{}{"workspace_id": "test-workspace-initial"}, Version: *currentVersion})
-		case 1:
-			results = append(results, RepresentationsByVersion{Data: map[string]interface{}{"workspace_id": "test-workspace-v1"}, Version: *currentVersion})
-			results = append(results, RepresentationsByVersion{Data: map[string]interface{}{"workspace_id": "test-workspace-previous"}, Version: 0})
-		case 2:
-			results = append(results, RepresentationsByVersion{Data: map[string]interface{}{"workspace_id": "test-workspace-v2"}, Version: *currentVersion})
-			if *currentVersion > 0 {
-				results = append(results, RepresentationsByVersion{Data: map[string]interface{}{"workspace_id": "test-workspace-previous"}, Version: *currentVersion - 1})
-			}
-		}
-	}
-
-	return results, nil
+	return current, previous, nil
 }
 
-func (f *fakeResourceRepository) FindLatestRepresentations(tx *gorm.DB, key bizmodel.ReporterResourceKey) (RepresentationsByVersion, error) {
-	if f.overrideCurrent != "" {
-		return RepresentationsByVersion{
-			Data: map[string]interface{}{"workspace_id": f.overrideCurrent}, Version: 1,
-		}, nil
+func (f *fakeResourceRepository) FindLatestRepresentations(tx *gorm.DB, key bizmodel.ReporterResourceKey) (*bizmodel.Representations, error) {
+	historyKey := f.makeHistoryKey(
+		key.LocalResourceId().Serialize(),
+		key.ReporterType().Serialize(),
+		key.ResourceType().Serialize(),
+		key.ReporterInstanceId().Serialize(),
+	)
+
+	f.mu.RLock()
+	defer f.mu.RUnlock()
+
+	versionMap := f.representationsByVersion[historyKey]
+	if len(versionMap) == 0 {
+		return nil, fmt.Errorf("no representations found for key")
 	}
 
-	return RepresentationsByVersion{
-		Data: map[string]interface{}{"workspace_id": "test-workspace-latest"}, Version: 1,
-	}, nil
+	var maxVersion uint
+	var latest *storedRepresentation
+	for version, entry := range versionMap {
+		if latest == nil || version > maxVersion {
+			maxVersion = version
+			latest = entry
+		}
+	}
+
+	return bizmodel.NewRepresentations(
+		bizmodel.Representation(cloneJsonObject(latest.commonData)),
+		uintPtr(latest.commonVersion),
+		nil,
+		nil,
+	)
 }
 
 func (f *fakeResourceRepository) GetDB() *gorm.DB {
@@ -283,6 +331,10 @@ func (f *fakeResourceRepository) makeCompositeKey(localResourceID, reporterType,
 	return fmt.Sprintf("%s|%s|%s|%s|%d|%d", localResourceID, reporterType, resourceType, reporterInstanceID, representationVersion, generation)
 }
 
+func (f *fakeResourceRepository) makeHistoryKey(localResourceID, reporterType, resourceType, reporterInstanceID string) string {
+	return strings.ToLower(fmt.Sprintf("%s|%s|%s|%s", localResourceID, reporterType, resourceType, reporterInstanceID))
+}
+
 // markTransactionIdAsProcessed marks a transaction ID as processed for idempotency testing
 // Note: This method assumes the caller already holds the appropriate lock
 func (f *fakeResourceRepository) markTransactionIdAsProcessed(transactionId string) {
@@ -292,6 +344,30 @@ func (f *fakeResourceRepository) markTransactionIdAsProcessed(transactionId stri
 
 	// Don't acquire lock here since Save method already holds it
 	f.processedTransactionIds[transactionId] = true
+}
+
+func uintPtr(v uint) *uint {
+	value := v
+	return &value
+}
+
+func cloneJsonObject(src internal.JsonObject) internal.JsonObject {
+	if src == nil {
+		return nil
+	}
+	clone := make(internal.JsonObject, len(src))
+	for k, v := range src {
+		if nested, ok := v.(map[string]interface{}); ok {
+			nestedClone := make(map[string]interface{}, len(nested))
+			for nk, nv := range nested {
+				nestedClone[nk] = nv
+			}
+			clone[k] = nestedClone
+		} else {
+			clone[k] = v
+		}
+	}
+	return clone
 }
 
 // HasTransactionIdBeenProcessed checks if a transaction ID has been processed before

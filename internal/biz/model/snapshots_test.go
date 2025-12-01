@@ -213,4 +213,29 @@ func TestSnapshotSerialization(t *testing.T) {
 	}
 
 	t.Log("Snapshot serialization fields are accessible")
+
+	t.Run("json with nil CommonVersion", func(t *testing.T) {
+		t.Parallel()
+		snapshotWithNil := ResourceSnapshot{
+			ID:               uuid.New(),
+			Type:             "test-resource",
+			CommonVersion:    nil,
+			ConsistencyToken: "test-token",
+			CreatedAt:        time.Now(),
+			UpdatedAt:        time.Now(),
+		}
+
+		// Ensure the snapshot can be created and CommonVersion is nil
+		if snapshotWithNil.CommonVersion != nil {
+			t.Errorf("expected CommonVersion to be nil, got: %v", *snapshotWithNil.CommonVersion)
+		}
+
+		// Ensure other fields are still valid
+		if snapshotWithNil.ID == uuid.Nil {
+			t.Error("Snapshot ID should be valid even when CommonVersion is nil")
+		}
+		if snapshotWithNil.Type != "test-resource" {
+			t.Error("Snapshot Type should match even when CommonVersion is nil")
+		}
+	})
 }

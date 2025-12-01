@@ -42,265 +42,6 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/google.rpc.Status'
-    /api/inventory/v1beta1/authz/check:
-        post:
-            tags:
-                - KesselCheckService
-            description: "Checks for the existence of a single Relationship \n (a Relation between a Resource and a Subject or Subject Set)."
-            operationId: KesselCheckService_Check
-            requestBody:
-                content:
-                    application/json:
-                        schema:
-                            $ref: '#/components/schemas/kessel.inventory.v1beta1.authz.CheckRequest'
-                required: true
-            responses:
-                "200":
-                    description: OK
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/kessel.inventory.v1beta1.authz.CheckResponse'
-                default:
-                    description: Default error response
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/google.rpc.Status'
-    /api/inventory/v1beta1/authz/checkforupdate:
-        post:
-            tags:
-                - KesselCheckService
-            operationId: KesselCheckService_CheckForUpdate
-            requestBody:
-                content:
-                    application/json:
-                        schema:
-                            $ref: '#/components/schemas/kessel.inventory.v1beta1.authz.CheckForUpdateRequest'
-                required: true
-            responses:
-                "200":
-                    description: OK
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/kessel.inventory.v1beta1.authz.CheckForUpdateResponse'
-                default:
-                    description: Default error response
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/google.rpc.Status'
-    /api/inventory/v1beta1/resource-relationships/k8s-policy_is-propagated-to_k8s-cluster:
-        put:
-            tags:
-                - KesselK8SPolicyIsPropagatedToK8SClusterService
-            operationId: KesselK8SPolicyIsPropagatedToK8SClusterService_UpdateK8SPolicyIsPropagatedToK8SCluster
-            requestBody:
-                content:
-                    application/json:
-                        schema:
-                            $ref: '#/components/schemas/kessel.inventory.v1beta1.relationships.UpdateK8SPolicyIsPropagatedToK8SClusterRequest'
-                required: true
-            responses:
-                "200":
-                    description: OK
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/kessel.inventory.v1beta1.relationships.UpdateK8SPolicyIsPropagatedToK8SClusterResponse'
-                default:
-                    description: Default error response
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/google.rpc.Status'
-        post:
-            tags:
-                - KesselK8SPolicyIsPropagatedToK8SClusterService
-            operationId: KesselK8SPolicyIsPropagatedToK8SClusterService_CreateK8SPolicyIsPropagatedToK8SCluster
-            requestBody:
-                content:
-                    application/json:
-                        schema:
-                            $ref: '#/components/schemas/kessel.inventory.v1beta1.relationships.CreateK8SPolicyIsPropagatedToK8SClusterRequest'
-                required: true
-            responses:
-                "200":
-                    description: OK
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/kessel.inventory.v1beta1.relationships.CreateK8SPolicyIsPropagatedToK8SClusterResponse'
-                default:
-                    description: Default error response
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/google.rpc.Status'
-        delete:
-            tags:
-                - KesselK8SPolicyIsPropagatedToK8SClusterService
-            operationId: KesselK8SPolicyIsPropagatedToK8SClusterService_DeleteK8SPolicyIsPropagatedToK8SCluster
-            requestBody:
-                content:
-                    application/json:
-                        schema:
-                            $ref: '#/components/schemas/kessel.inventory.v1beta1.relationships.DeleteK8SPolicyIsPropagatedToK8SClusterRequest'
-                required: true
-            responses:
-                "200":
-                    description: OK
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/kessel.inventory.v1beta1.relationships.DeleteK8SPolicyIsPropagatedToK8SClusterResponse'
-                default:
-                    description: Default error response
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/google.rpc.Status'
-    /api/inventory/v1beta1/resources/k8s-clusters:
-        put:
-            tags:
-                - KesselK8SClusterService
-            operationId: KesselK8SClusterService_UpdateK8SCluster
-            requestBody:
-                content:
-                    application/json:
-                        schema:
-                            $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.UpdateK8sClusterRequest'
-                required: true
-            responses:
-                "200":
-                    description: OK
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.UpdateK8sClusterResponse'
-                default:
-                    description: Default error response
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/google.rpc.Status'
-        post:
-            tags:
-                - KesselK8SClusterService
-            operationId: KesselK8SClusterService_CreateK8SCluster
-            requestBody:
-                content:
-                    application/json:
-                        schema:
-                            $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.CreateK8sClusterRequest'
-                required: true
-            responses:
-                "200":
-                    description: OK
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.CreateK8sClusterResponse'
-                default:
-                    description: Default error response
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/google.rpc.Status'
-        delete:
-            tags:
-                - KesselK8SClusterService
-            operationId: KesselK8SClusterService_DeleteK8SCluster
-            requestBody:
-                content:
-                    application/json:
-                        schema:
-                            $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.DeleteK8sClusterRequest'
-                required: true
-            responses:
-                "200":
-                    description: OK
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.DeleteK8sClusterResponse'
-                default:
-                    description: Default error response
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/google.rpc.Status'
-    /api/inventory/v1beta1/resources/k8s-policies:
-        put:
-            tags:
-                - KesselK8SPolicyService
-            operationId: KesselK8SPolicyService_UpdateK8SPolicy
-            requestBody:
-                content:
-                    application/json:
-                        schema:
-                            $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.UpdateK8sPolicyRequest'
-                required: true
-            responses:
-                "200":
-                    description: OK
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.UpdateK8sPolicyResponse'
-                default:
-                    description: Default error response
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/google.rpc.Status'
-        post:
-            tags:
-                - KesselK8SPolicyService
-            operationId: KesselK8SPolicyService_CreateK8SPolicy
-            requestBody:
-                content:
-                    application/json:
-                        schema:
-                            $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.CreateK8sPolicyRequest'
-                required: true
-            responses:
-                "200":
-                    description: OK
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.CreateK8sPolicyResponse'
-                default:
-                    description: Default error response
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/google.rpc.Status'
-        delete:
-            tags:
-                - KesselK8SPolicyService
-            operationId: KesselK8SPolicyService_DeleteK8SPolicy
-            requestBody:
-                content:
-                    application/json:
-                        schema:
-                            $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.DeleteK8sPolicyRequest'
-                required: true
-            responses:
-                "200":
-                    description: OK
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.DeleteK8sPolicyResponse'
-                default:
-                    description: Default error response
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/google.rpc.Status'
     /api/inventory/v1beta2/check:
         post:
             tags:
@@ -329,6 +70,44 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/kessel.inventory.v1beta2.CheckResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/google.rpc.Status'
+    /api/inventory/v1beta2/checkbulk:
+        post:
+            tags:
+                - KesselInventoryService
+            description: |-
+                Performs bulk permission checks for multiple resource-subject-relation combinations.
+
+                 This API is more efficient than making individual Check calls when verifying permissions
+                 for multiple items. It answers questions like:
+                 "Which of these resources can subject *X* perform action *Y* on?"
+
+                 Common use cases include:
+                 - Filtering lists based on user permissions
+                 - Batch authorization checks before performing bulk operations
+                 - Dashboard rendering with multiple permission checks
+                 - Pre-authorization for UI components
+
+                 The response includes a result for each item in the request, maintaining the same order.
+            operationId: KesselInventoryService_CheckBulk
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/kessel.inventory.v1beta2.CheckBulkRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/kessel.inventory.v1beta2.CheckBulkResponse'
                 default:
                     description: Default error response
                     content:
@@ -498,22 +277,40 @@ components:
                 code:
                     type: integer
                     format: uint32
-        kessel.inventory.v1beta1.authz.CheckForUpdateRequest:
+        kessel.inventory.v1beta2.CheckBulkRequest:
             type: object
             properties:
-                parent:
-                    allOf:
-                        - $ref: '#/components/schemas/kessel.inventory.v1beta1.authz.ObjectReference'
-                    description: |-
-                        Required parameters (from an authz perspective)
-                         - resource type and id
-                         - permission (cannot be derived from type as types may have multiple edit permissions Ex: https://github.com/RedHatInsights/rbac-config/blob/master/configs/prod/schemas/src/notifications.ksl#L37)
-                         - user (possibly derived from an identity token)
+                items:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/kessel.inventory.v1beta2.CheckBulkRequestItem'
+                consistency:
+                    $ref: '#/components/schemas/kessel.inventory.v1beta2.Consistency'
+            description: |-
+                CheckBulkRequest allows checking multiple permissions in a single request.
+                 This is more efficient than making individual Check calls when verifying permissions
+                 for multiple resource-subject-relation combinations.
+        kessel.inventory.v1beta2.CheckBulkRequestItem:
+            type: object
+            properties:
+                object:
+                    $ref: '#/components/schemas/kessel.inventory.v1beta2.ResourceReference'
                 relation:
                     type: string
                 subject:
-                    $ref: '#/components/schemas/kessel.inventory.v1beta1.authz.SubjectReference'
-        kessel.inventory.v1beta1.authz.CheckForUpdateResponse:
+                    $ref: '#/components/schemas/kessel.inventory.v1beta2.SubjectReference'
+            description: CheckBulkRequestItem represents a single permission check in a bulk request.
+        kessel.inventory.v1beta2.CheckBulkResponse:
+            type: object
+            properties:
+                pairs:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/kessel.inventory.v1beta2.CheckBulkResponsePair'
+                consistencyToken:
+                    $ref: '#/components/schemas/kessel.inventory.v1beta2.ConsistencyToken'
+            description: CheckBulkResponse contains the results of all permission checks in the request.
+        kessel.inventory.v1beta2.CheckBulkResponseItem:
             type: object
             properties:
                 allowed:
@@ -523,455 +320,17 @@ components:
                         - ALLOWED_FALSE
                     type: string
                     format: enum
-        kessel.inventory.v1beta1.authz.CheckRequest:
+            description: CheckBulkResponseItem represents the result of a single permission check.
+        kessel.inventory.v1beta2.CheckBulkResponsePair:
             type: object
             properties:
-                parent:
-                    allOf:
-                        - $ref: '#/components/schemas/kessel.inventory.v1beta1.authz.ObjectReference'
-                    description: |-
-                        Required parameters (from an authz perspective)
-                         - resource type and id
-                         - permission (cannot be derived from the type as a type may have multiple 'read' permissions. Ex: https://github.com/RedHatInsights/rbac-config/blob/master/configs/prod/schemas/src/notifications.ksl#L31)
-                         - user (possibly derived from an identity token)
-                relation:
-                    type: string
-                subject:
-                    $ref: '#/components/schemas/kessel.inventory.v1beta1.authz.SubjectReference'
-        kessel.inventory.v1beta1.authz.CheckResponse:
-            type: object
-            properties:
-                allowed:
-                    enum:
-                        - ALLOWED_UNSPECIFIED
-                        - ALLOWED_TRUE
-                        - ALLOWED_FALSE
-                    type: string
-                    format: enum
-        kessel.inventory.v1beta1.authz.ObjectReference:
-            type: object
-            properties:
-                type:
-                    $ref: '#/components/schemas/kessel.inventory.v1beta1.authz.ObjectType'
-                id:
-                    type: string
-        kessel.inventory.v1beta1.authz.ObjectType:
-            type: object
-            properties:
-                namespace:
-                    type: string
-                name:
-                    type: string
-        kessel.inventory.v1beta1.authz.SubjectReference:
-            type: object
-            properties:
-                relation:
-                    type: string
-                    description: |-
-                        An optional relation which points to a set of Subjects instead of the single Subject.
-                         e.g. "members" or "owners" of a group identified in `subject`.
-                subject:
-                    $ref: '#/components/schemas/kessel.inventory.v1beta1.authz.ObjectReference'
-            description: A reference to a Subject or, if a `relation` is provided, a Subject Set.
-        kessel.inventory.v1beta1.relationships.CreateK8SPolicyIsPropagatedToK8SClusterRequest:
-            type: object
-            properties:
-                k8s-policy_is-propagated-to_k8s-cluster:
-                    allOf:
-                        - $ref: '#/components/schemas/kessel.inventory.v1beta1.relationships.K8SPolicyIsPropagatedToK8SCluster'
-                    description: The resource relationship to create in Kessel Asset Inventory
-        kessel.inventory.v1beta1.relationships.CreateK8SPolicyIsPropagatedToK8SClusterResponse:
-            type: object
-            properties: {}
-        kessel.inventory.v1beta1.relationships.DeleteK8SPolicyIsPropagatedToK8SClusterRequest:
-            type: object
-            properties:
-                reporter_data:
-                    allOf:
-                        - $ref: '#/components/schemas/kessel.inventory.v1beta1.relationships.ReporterData'
-                    description: "The resource-relationship to be deleted will be defined by \n \\\"<reporter_data.reporter_type>:<reporter_instance_id>:<reporter_data.subject_local_resource_id>\\\"\n AND \\\"<reporter_data.reporter_type>:<reporter_instance_id>:<reporter_data.object_local_resource_id>\\\"\n from the request body."
-        kessel.inventory.v1beta1.relationships.DeleteK8SPolicyIsPropagatedToK8SClusterResponse:
-            type: object
-            properties: {}
-        kessel.inventory.v1beta1.relationships.K8SPolicyIsPropagatedToK8SCluster:
-            type: object
-            properties:
-                metadata:
-                    allOf:
-                        - $ref: '#/components/schemas/kessel.inventory.v1beta1.relationships.Metadata'
-                    description: Metadata about this resource
-                reporter_data:
-                    allOf:
-                        - $ref: '#/components/schemas/kessel.inventory.v1beta1.relationships.ReporterData'
-                    description: Write only reporter specific data
-                relationship_data:
-                    $ref: '#/components/schemas/kessel.inventory.v1beta1.relationships.K8SPolicyIsPropagatedToK8SClusterDetail'
-        kessel.inventory.v1beta1.relationships.K8SPolicyIsPropagatedToK8SClusterDetail:
-            type: object
-            properties:
-                k8s_policy_id:
-                    readOnly: true
-                    type: string
-                    description: The resource ID assigned to the resource by Kessel Asset Inventory.
-                k8s_cluster_id:
-                    readOnly: true
-                    type: string
-                    description: The resource ID assigned to the resource by Kessel Asset Inventory.
-                status:
-                    enum:
-                        - STATUS_UNSPECIFIED
-                        - STATUS_OTHER
-                        - VIOLATIONS
-                        - NO_VIOLATIONS
-                    type: string
-                    format: enum
-        kessel.inventory.v1beta1.relationships.Metadata:
-            type: object
-            properties:
-                id:
-                    readOnly: true
-                    type: string
-                    description: Kessel Asset Inventory generated identifier.
-                relationship_type:
-                    readOnly: true
-                    type: string
-                    description: The type of Resource relationship
-                created_at:
-                    readOnly: true
-                    type: string
-                    description: Date and time when the inventory item was first reported.
-                    format: date-time
-                updated_at:
-                    readOnly: true
-                    type: string
-                    description: Date and time when the inventory item was last updated.
-                    format: date-time
-                deleted_at:
-                    readOnly: true
-                    type: string
-                    description: Date and time when the inventory item was deleted.
-                    format: date-time
-                org_id:
-                    type: string
-                    description: |-
-                        The org id in which this resource is a member for access control.  A
-                         resource can only be a member of one org.
-        kessel.inventory.v1beta1.relationships.ReporterData:
-            type: object
-            properties:
-                reporter_type:
-                    enum:
-                        - REPORTER_TYPE_UNSPECIFIED
-                        - REPORTER_TYPE_OTHER
-                        - ACM
-                        - HBI
-                        - OCM
-                        - NOTIFICATIONS
-                    type: string
-                    format: enum
-                reporter_instance_id:
-                    readOnly: true
-                    type: string
-                    description: |-
-                        The ID of the instance of the reporter. This is derived from the
-                         authentication mechanism, i.e. authentication token.
-                reporter_version:
-                    type: string
-                    description: version of the reporter
-                first_reported:
-                    readOnly: true
-                    type: string
-                    description: Date and time when the inventory item was first reported by this reporter
-                    format: date-time
-                last_reported:
-                    readOnly: true
-                    type: string
-                    description: Date and time when the inventory item was last updated by this reporter
-                    format: date-time
-                subject_local_resource_id:
-                    type: string
-                    description: "The ID assigned by the reporter to resource which is the subject of the relationship. For example \n OCM cluster ID, HBI's host id, or ACM managed cluster name etc."
-                object_local_resource_id:
-                    type: string
-                    description: "The ID assigned by the reporter to resource which is the object of the relationship. For example \n OCM cluster ID, HBI's host id, or ACM managed cluster name etc."
-        kessel.inventory.v1beta1.relationships.UpdateK8SPolicyIsPropagatedToK8SClusterRequest:
-            type: object
-            properties:
-                k8s-policy_is-propagated-to_k8s-cluster:
-                    allOf:
-                        - $ref: '#/components/schemas/kessel.inventory.v1beta1.relationships.K8SPolicyIsPropagatedToK8SCluster'
-                    description: "The resource-relationship to be updated will be defined by \n \\\"<reporter_data.reporter_type>:<reporter_instance_id>:<reporter_data.subject_local_resource_id>\\\"\n AND \\\"<reporter_data.reporter_type>:<reporter_instance_id>:<reporter_data.object_local_resource_id>\\\"\n from the request body."
-        kessel.inventory.v1beta1.relationships.UpdateK8SPolicyIsPropagatedToK8SClusterResponse:
-            type: object
-            properties: {}
-        kessel.inventory.v1beta1.resources.CreateK8sClusterRequest:
-            type: object
-            properties:
-                k8s_cluster:
-                    allOf:
-                        - $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.K8sCluster'
-                    description: The k8s cluster to create in Kessel Asset Inventory
-        kessel.inventory.v1beta1.resources.CreateK8sClusterResponse:
-            type: object
-            properties: {}
-        kessel.inventory.v1beta1.resources.CreateK8sPolicyRequest:
-            type: object
-            properties:
-                k8s_policy:
-                    allOf:
-                        - $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.K8sPolicy'
-                    description: The policy to create in Kessel Asset Inventory
-        kessel.inventory.v1beta1.resources.CreateK8sPolicyResponse:
-            type: object
-            properties: {}
-        kessel.inventory.v1beta1.resources.DeleteK8sClusterRequest:
-            type: object
-            properties:
-                reporter_data:
-                    allOf:
-                        - $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.ReporterData'
-                    description: "The resource to be deleted will be defined by \n \\\"<reporter_data.reporter_type>:<reporter_instaance_id>:<reporter_data.local_resource_id>\\\" \n from the request body."
-        kessel.inventory.v1beta1.resources.DeleteK8sClusterResponse:
-            type: object
-            properties: {}
-        kessel.inventory.v1beta1.resources.DeleteK8sPolicyRequest:
-            type: object
-            properties:
-                reporter_data:
-                    allOf:
-                        - $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.ReporterData'
-                    description: "The resource to be deleted will be defined by \n \\\"<reporter_data.reporter_type>:<reporter_instaance_id>:<reporter_data.local_resource_id>\\\"\n from the request body."
-        kessel.inventory.v1beta1.resources.DeleteK8sPolicyResponse:
-            type: object
-            properties: {}
-        kessel.inventory.v1beta1.resources.K8sCluster:
-            type: object
-            properties:
-                metadata:
-                    allOf:
-                        - $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.Metadata'
-                    description: Metadata about this resource
-                reporter_data:
-                    allOf:
-                        - $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.ReporterData'
-                    description: Write only reporter specific data
-                resource_data:
-                    $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.K8sClusterDetail'
-        kessel.inventory.v1beta1.resources.K8sClusterDetail:
-            type: object
-            properties:
-                external_cluster_id:
-                    type: string
-                    description: The OCP cluster ID or ARN etc for *KS
-                cluster_status:
-                    enum:
-                        - CLUSTER_STATUS_UNSPECIFIED
-                        - CLUSTER_STATUS_OTHER
-                        - READY
-                        - FAILED
-                        - OFFLINE
-                    type: string
-                    format: enum
-                cluster_reason:
-                    type: string
-                kube_version:
-                    type: string
-                    description: The version of kubernetes
-                kube_vendor:
-                    enum:
-                        - KUBE_VENDOR_UNSPECIFIED
-                        - KUBE_VENDOR_OTHER
-                        - AKS
-                        - EKS
-                        - IKS
-                        - OPENSHIFT
-                        - GKE
-                    type: string
-                    format: enum
-                vendor_version:
-                    type: string
-                    description: The version of the productized kubernetes distribution
-                cloud_platform:
-                    enum:
-                        - CLOUD_PLATFORM_UNSPECIFIED
-                        - CLOUD_PLATFORM_OTHER
-                        - NONE_UPI
-                        - BAREMETAL_IPI
-                        - BAREMETAL_UPI
-                        - AWS_IPI
-                        - AWS_UPI
-                        - AZURE_IPI
-                        - AZURE_UPI
-                        - IBMCLOUD_IPI
-                        - IBMCLOUD_UPI
-                        - KUBEVIRT_IPI
-                        - OPENSTACK_IPI
-                        - OPENSTACK_UPI
-                        - GCP_IPI
-                        - GCP_UPI
-                        - NUTANIX_IPI
-                        - NUTANIX_UPI
-                        - VSPHERE_IPI
-                        - VSPHERE_UPI
-                        - OVIRT_IPI
-                    type: string
-                    format: enum
-                nodes:
-                    type: array
-                    items:
-                        $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.K8sClusterDetailNodesInner'
-        kessel.inventory.v1beta1.resources.K8sClusterDetailNodesInner:
-            type: object
-            properties:
-                name:
-                    type: string
-                    description: The name of the node (this can contain private info)
-                cpu:
-                    type: string
-                    description: CPU Capacity of the node defined in CPU units, e.g. \"0.5\"
-                memory:
-                    type: string
-                    description: Memory Capacity of the node defined as MiB, e.g. \"50Mi\"
-                labels:
-                    type: array
-                    items:
-                        $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.ResourceLabel'
-                    description: |-
-                        Map of string keys and string values that can be used to organize and
-                         categorize (scope and select) resources
-                         Todo: Do we require at least 1 label?
-        kessel.inventory.v1beta1.resources.K8sPolicy:
-            type: object
-            properties:
-                metadata:
-                    allOf:
-                        - $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.Metadata'
-                    description: Metadata about this resource
-                reporter_data:
-                    allOf:
-                        - $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.ReporterData'
-                    description: Write only reporter specific data
-                resource_data:
-                    $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.K8sPolicyDetail'
-        kessel.inventory.v1beta1.resources.K8sPolicyDetail:
-            type: object
-            properties:
-                disabled:
-                    type: boolean
-                    description: Defines if the policy is currently enabled or disabled across all targets
-                severity:
-                    enum:
-                        - SEVERITY_UNSPECIFIED
-                        - SEVERITY_OTHER
-                        - LOW
-                        - MEDIUM
-                        - HIGH
-                        - CRITICAL
-                    type: string
-                    format: enum
-        kessel.inventory.v1beta1.resources.Metadata:
-            type: object
-            properties:
-                id:
-                    readOnly: true
-                    type: string
-                    description: Kessel Asset Inventory generated identifier.
-                resource_type:
-                    readOnly: true
-                    type: string
-                    description: The type of the Resource
-                created_at:
-                    readOnly: true
-                    type: string
-                    description: Date and time when the inventory item was first reported.
-                    format: date-time
-                updated_at:
-                    readOnly: true
-                    type: string
-                    description: Date and time when the inventory item was last updated.
-                    format: date-time
-                deleted_at:
-                    readOnly: true
-                    type: string
-                    description: Date and time when the inventory item was deleted.
-                    format: date-time
-                org_id:
-                    type: string
-                    description: |-
-                        The org id in which this resource is a member for access control.  A
-                         resource can only be a member of one org.
-                workspace_id:
-                    type: string
-                    description: |-
-                        The workspace id in which this resource is a member for access control.  A
-                         resource can only be a member of one workspace.
-                labels:
-                    type: array
-                    items:
-                        $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.ResourceLabel'
-        kessel.inventory.v1beta1.resources.ReporterData:
-            type: object
-            properties:
-                reporter_type:
-                    enum:
-                        - REPORTER_TYPE_UNSPECIFIED
-                        - REPORTER_TYPE_OTHER
-                        - ACM
-                        - HBI
-                        - OCM
-                        - NOTIFICATIONS
-                    type: string
-                    format: enum
-                reporter_instance_id:
-                    readOnly: true
-                    type: string
-                    description: |-
-                        The ID of the instance of the reporter. This is derived from the
-                         authentication mechanism, i.e. authentication token.
-                console_href:
-                    type: string
-                    description: |-
-                        The URL for this resource in the reporter's management UI console. For
-                         example this would be the cluster URL in the HCC Console for an OCM
-                         reported cluster.
-                api_href:
-                    type: string
-                    description: Reporter specific API link to the resource.
-                local_resource_id:
-                    type: string
-                    description: |-
-                        The ID assigned to this resource by the reporter, for example OCM cluster
-                         ID, HBI's host id, or ACM managed cluster name etc.
-                reporter_version:
-                    type: string
-                    description: version of the reporter
-        kessel.inventory.v1beta1.resources.ResourceLabel:
-            type: object
-            properties:
-                key:
-                    type: string
-                value:
-                    type: string
-        kessel.inventory.v1beta1.resources.UpdateK8sClusterRequest:
-            type: object
-            properties:
-                k8s_cluster:
-                    allOf:
-                        - $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.K8sCluster'
-                    description: "The resource to be updated will be defined by \n \\\"<reporter_data.reporter_type>:<reporter_instaance_id>:<reporter_data.local_resource_id>\\\"\n from the request body."
-        kessel.inventory.v1beta1.resources.UpdateK8sClusterResponse:
-            type: object
-            properties: {}
-        kessel.inventory.v1beta1.resources.UpdateK8sPolicyRequest:
-            type: object
-            properties:
-                k8s_policy:
-                    allOf:
-                        - $ref: '#/components/schemas/kessel.inventory.v1beta1.resources.K8sPolicy'
-                    description: "The resource to be updated will be defined by \n \\\"<reporter_data.reporter_type>:<reporter_instaance_id>:<reporter_data.local_resource_id>\\\"\n from the request body."
-        kessel.inventory.v1beta1.resources.UpdateK8sPolicyResponse:
-            type: object
-            properties: {}
+                request:
+                    $ref: '#/components/schemas/kessel.inventory.v1beta2.CheckBulkRequestItem'
+                item:
+                    $ref: '#/components/schemas/kessel.inventory.v1beta2.CheckBulkResponseItem'
+                error:
+                    $ref: '#/components/schemas/google.rpc.Status'
+            description: CheckBulkResponsePair associates a request item with its corresponding result.
         kessel.inventory.v1beta2.CheckForUpdateRequest:
             type: object
             properties:
@@ -1022,6 +381,27 @@ components:
                         - ALLOWED_FALSE
                     type: string
                     format: enum
+        kessel.inventory.v1beta2.Consistency:
+            type: object
+            properties:
+                minimizeLatency:
+                    type: boolean
+                    description: |-
+                        The service selects the fastest snapshot available.
+                         *Must* be set true if used.
+                atLeastAsFresh:
+                    allOf:
+                        - $ref: '#/components/schemas/kessel.inventory.v1beta2.ConsistencyToken'
+                    description: |-
+                        All data used in the API call must be *at least as fresh*
+                         as found in the ConsistencyToken. More recent data might be used
+                         if available or faster.
+            description: Defines how a request is handled by the service.
+        kessel.inventory.v1beta2.ConsistencyToken:
+            type: object
+            properties:
+                token:
+                    type: string
         kessel.inventory.v1beta2.DeleteResourceRequest:
             type: object
             properties:
@@ -1138,12 +518,8 @@ components:
                     $ref: '#/components/schemas/kessel.inventory.v1beta2.ResourceReference'
             description: A reference to a Subject or, if a `relation` is provided, a Subject Set.
 tags:
-    - name: KesselCheckService
     - name: KesselInventoryHealthService
     - name: KesselInventoryService
       description: |-
         KesselInventoryService provides APIs to perform relationship checks
          and manage inventory resource lifecycles (reporting and deletion).
-    - name: KesselK8SClusterService
-    - name: KesselK8SPolicyIsPropagatedToK8SClusterService
-    - name: KesselK8SPolicyService

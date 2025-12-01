@@ -25,10 +25,11 @@ var File_kessel_inventory_v1beta2_inventory_service_proto protoreflect.FileDescr
 
 const file_kessel_inventory_v1beta2_inventory_service_proto_rawDesc = "" +
 	"\n" +
-	"0kessel/inventory/v1beta2/inventory_service.proto\x12\x18kessel.inventory.v1beta2\x1a\x1cgoogle/api/annotations.proto\x1a,kessel/inventory/v1beta2/check_request.proto\x1a-kessel/inventory/v1beta2/check_response.proto\x1a7kessel/inventory/v1beta2/check_for_update_request.proto\x1a8kessel/inventory/v1beta2/check_for_update_response.proto\x1a6kessel/inventory/v1beta2/report_resource_request.proto\x1a7kessel/inventory/v1beta2/report_resource_response.proto\x1a6kessel/inventory/v1beta2/delete_resource_request.proto\x1a7kessel/inventory/v1beta2/delete_resource_response.proto\x1a<kessel/inventory/v1beta2/streamed_list_objects_request.proto\x1a=kessel/inventory/v1beta2/streamed_list_objects_response.proto2\x91\x06\n" +
+	"0kessel/inventory/v1beta2/inventory_service.proto\x12\x18kessel.inventory.v1beta2\x1a\x1cgoogle/api/annotations.proto\x1a,kessel/inventory/v1beta2/check_request.proto\x1a-kessel/inventory/v1beta2/check_response.proto\x1a7kessel/inventory/v1beta2/check_for_update_request.proto\x1a8kessel/inventory/v1beta2/check_for_update_response.proto\x1a6kessel/inventory/v1beta2/report_resource_request.proto\x1a7kessel/inventory/v1beta2/report_resource_response.proto\x1a6kessel/inventory/v1beta2/delete_resource_request.proto\x1a7kessel/inventory/v1beta2/delete_resource_response.proto\x1a<kessel/inventory/v1beta2/streamed_list_objects_request.proto\x1a=kessel/inventory/v1beta2/streamed_list_objects_response.proto\x1a1kessel/inventory/v1beta2/check_bulk_request.proto\x1a2kessel/inventory/v1beta2/check_bulk_response.proto2\xa5\a\n" +
 	"\x16KesselInventoryService\x12\x81\x01\n" +
 	"\x05Check\x12&.kessel.inventory.v1beta2.CheckRequest\x1a'.kessel.inventory.v1beta2.CheckResponse\"'\x82\xd3\xe4\x93\x02!:\x01*\"\x1c/api/inventory/v1beta2/check\x12\xa5\x01\n" +
-	"\x0eCheckForUpdate\x12/.kessel.inventory.v1beta2.CheckForUpdateRequest\x1a0.kessel.inventory.v1beta2.CheckForUpdateResponse\"0\x82\xd3\xe4\x93\x02*:\x01*\"%/api/inventory/v1beta2/checkforupdate\x12\xa0\x01\n" +
+	"\x0eCheckForUpdate\x12/.kessel.inventory.v1beta2.CheckForUpdateRequest\x1a0.kessel.inventory.v1beta2.CheckForUpdateResponse\"0\x82\xd3\xe4\x93\x02*:\x01*\"%/api/inventory/v1beta2/checkforupdate\x12\x91\x01\n" +
+	"\tCheckBulk\x12*.kessel.inventory.v1beta2.CheckBulkRequest\x1a+.kessel.inventory.v1beta2.CheckBulkResponse\"+\x82\xd3\xe4\x93\x02%:\x01*\" /api/inventory/v1beta2/checkbulk\x12\xa0\x01\n" +
 	"\x0eReportResource\x12/.kessel.inventory.v1beta2.ReportResourceRequest\x1a0.kessel.inventory.v1beta2.ReportResourceResponse\"+\x82\xd3\xe4\x93\x02%:\x01*\" /api/inventory/v1beta2/resources\x12\xa0\x01\n" +
 	"\x0eDeleteResource\x12/.kessel.inventory.v1beta2.DeleteResourceRequest\x1a0.kessel.inventory.v1beta2.DeleteResourceResponse\"+\x82\xd3\xe4\x93\x02%:\x01** /api/inventory/v1beta2/resources\x12\x84\x01\n" +
 	"\x13StreamedListObjects\x124.kessel.inventory.v1beta2.StreamedListObjectsRequest\x1a5.kessel.inventory.v1beta2.StreamedListObjectsResponse0\x01Br\n" +
@@ -37,31 +38,35 @@ const file_kessel_inventory_v1beta2_inventory_service_proto_rawDesc = "" +
 var file_kessel_inventory_v1beta2_inventory_service_proto_goTypes = []any{
 	(*CheckRequest)(nil),                // 0: kessel.inventory.v1beta2.CheckRequest
 	(*CheckForUpdateRequest)(nil),       // 1: kessel.inventory.v1beta2.CheckForUpdateRequest
-	(*ReportResourceRequest)(nil),       // 2: kessel.inventory.v1beta2.ReportResourceRequest
-	(*DeleteResourceRequest)(nil),       // 3: kessel.inventory.v1beta2.DeleteResourceRequest
-	(*StreamedListObjectsRequest)(nil),  // 4: kessel.inventory.v1beta2.StreamedListObjectsRequest
-	(*CheckResponse)(nil),               // 5: kessel.inventory.v1beta2.CheckResponse
-	(*CheckForUpdateResponse)(nil),      // 6: kessel.inventory.v1beta2.CheckForUpdateResponse
-	(*ReportResourceResponse)(nil),      // 7: kessel.inventory.v1beta2.ReportResourceResponse
-	(*DeleteResourceResponse)(nil),      // 8: kessel.inventory.v1beta2.DeleteResourceResponse
-	(*StreamedListObjectsResponse)(nil), // 9: kessel.inventory.v1beta2.StreamedListObjectsResponse
+	(*CheckBulkRequest)(nil),            // 2: kessel.inventory.v1beta2.CheckBulkRequest
+	(*ReportResourceRequest)(nil),       // 3: kessel.inventory.v1beta2.ReportResourceRequest
+	(*DeleteResourceRequest)(nil),       // 4: kessel.inventory.v1beta2.DeleteResourceRequest
+	(*StreamedListObjectsRequest)(nil),  // 5: kessel.inventory.v1beta2.StreamedListObjectsRequest
+	(*CheckResponse)(nil),               // 6: kessel.inventory.v1beta2.CheckResponse
+	(*CheckForUpdateResponse)(nil),      // 7: kessel.inventory.v1beta2.CheckForUpdateResponse
+	(*CheckBulkResponse)(nil),           // 8: kessel.inventory.v1beta2.CheckBulkResponse
+	(*ReportResourceResponse)(nil),      // 9: kessel.inventory.v1beta2.ReportResourceResponse
+	(*DeleteResourceResponse)(nil),      // 10: kessel.inventory.v1beta2.DeleteResourceResponse
+	(*StreamedListObjectsResponse)(nil), // 11: kessel.inventory.v1beta2.StreamedListObjectsResponse
 }
 var file_kessel_inventory_v1beta2_inventory_service_proto_depIdxs = []int32{
-	0, // 0: kessel.inventory.v1beta2.KesselInventoryService.Check:input_type -> kessel.inventory.v1beta2.CheckRequest
-	1, // 1: kessel.inventory.v1beta2.KesselInventoryService.CheckForUpdate:input_type -> kessel.inventory.v1beta2.CheckForUpdateRequest
-	2, // 2: kessel.inventory.v1beta2.KesselInventoryService.ReportResource:input_type -> kessel.inventory.v1beta2.ReportResourceRequest
-	3, // 3: kessel.inventory.v1beta2.KesselInventoryService.DeleteResource:input_type -> kessel.inventory.v1beta2.DeleteResourceRequest
-	4, // 4: kessel.inventory.v1beta2.KesselInventoryService.StreamedListObjects:input_type -> kessel.inventory.v1beta2.StreamedListObjectsRequest
-	5, // 5: kessel.inventory.v1beta2.KesselInventoryService.Check:output_type -> kessel.inventory.v1beta2.CheckResponse
-	6, // 6: kessel.inventory.v1beta2.KesselInventoryService.CheckForUpdate:output_type -> kessel.inventory.v1beta2.CheckForUpdateResponse
-	7, // 7: kessel.inventory.v1beta2.KesselInventoryService.ReportResource:output_type -> kessel.inventory.v1beta2.ReportResourceResponse
-	8, // 8: kessel.inventory.v1beta2.KesselInventoryService.DeleteResource:output_type -> kessel.inventory.v1beta2.DeleteResourceResponse
-	9, // 9: kessel.inventory.v1beta2.KesselInventoryService.StreamedListObjects:output_type -> kessel.inventory.v1beta2.StreamedListObjectsResponse
-	5, // [5:10] is the sub-list for method output_type
-	0, // [0:5] is the sub-list for method input_type
-	0, // [0:0] is the sub-list for extension type_name
-	0, // [0:0] is the sub-list for extension extendee
-	0, // [0:0] is the sub-list for field type_name
+	0,  // 0: kessel.inventory.v1beta2.KesselInventoryService.Check:input_type -> kessel.inventory.v1beta2.CheckRequest
+	1,  // 1: kessel.inventory.v1beta2.KesselInventoryService.CheckForUpdate:input_type -> kessel.inventory.v1beta2.CheckForUpdateRequest
+	2,  // 2: kessel.inventory.v1beta2.KesselInventoryService.CheckBulk:input_type -> kessel.inventory.v1beta2.CheckBulkRequest
+	3,  // 3: kessel.inventory.v1beta2.KesselInventoryService.ReportResource:input_type -> kessel.inventory.v1beta2.ReportResourceRequest
+	4,  // 4: kessel.inventory.v1beta2.KesselInventoryService.DeleteResource:input_type -> kessel.inventory.v1beta2.DeleteResourceRequest
+	5,  // 5: kessel.inventory.v1beta2.KesselInventoryService.StreamedListObjects:input_type -> kessel.inventory.v1beta2.StreamedListObjectsRequest
+	6,  // 6: kessel.inventory.v1beta2.KesselInventoryService.Check:output_type -> kessel.inventory.v1beta2.CheckResponse
+	7,  // 7: kessel.inventory.v1beta2.KesselInventoryService.CheckForUpdate:output_type -> kessel.inventory.v1beta2.CheckForUpdateResponse
+	8,  // 8: kessel.inventory.v1beta2.KesselInventoryService.CheckBulk:output_type -> kessel.inventory.v1beta2.CheckBulkResponse
+	9,  // 9: kessel.inventory.v1beta2.KesselInventoryService.ReportResource:output_type -> kessel.inventory.v1beta2.ReportResourceResponse
+	10, // 10: kessel.inventory.v1beta2.KesselInventoryService.DeleteResource:output_type -> kessel.inventory.v1beta2.DeleteResourceResponse
+	11, // 11: kessel.inventory.v1beta2.KesselInventoryService.StreamedListObjects:output_type -> kessel.inventory.v1beta2.StreamedListObjectsResponse
+	6,  // [6:12] is the sub-list for method output_type
+	0,  // [0:6] is the sub-list for method input_type
+	0,  // [0:0] is the sub-list for extension type_name
+	0,  // [0:0] is the sub-list for extension extendee
+	0,  // [0:0] is the sub-list for field type_name
 }
 
 func init() { file_kessel_inventory_v1beta2_inventory_service_proto_init() }
@@ -79,6 +84,8 @@ func file_kessel_inventory_v1beta2_inventory_service_proto_init() {
 	file_kessel_inventory_v1beta2_delete_resource_response_proto_init()
 	file_kessel_inventory_v1beta2_streamed_list_objects_request_proto_init()
 	file_kessel_inventory_v1beta2_streamed_list_objects_response_proto_init()
+	file_kessel_inventory_v1beta2_check_bulk_request_proto_init()
+	file_kessel_inventory_v1beta2_check_bulk_response_proto_init()
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{

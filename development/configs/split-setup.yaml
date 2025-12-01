@@ -31,8 +31,6 @@ consumer:
 resources:
   schemaPath: "data/schema/resources"
   use_cache: true
-service:
-  use_v1beta2_db: true
 log:
   level: "debug"
   livez: true

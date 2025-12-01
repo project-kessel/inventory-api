@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/project-kessel/inventory-api/cmd/common"
@@ -138,7 +139,8 @@ func initConfig() {
 		}
 	}
 
-	viper.SetEnvPrefix(Name)
+	viper.SetEnvPrefix(strings.ReplaceAll(Name, "-", "_"))
+	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 	viper.AutomaticEnv()
 
 	if err := viper.ReadInConfig(); err != nil {

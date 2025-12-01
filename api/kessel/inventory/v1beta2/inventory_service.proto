@@ -13,6 +13,8 @@ import "kessel/inventory/v1beta2/delete_resource_request.proto";
 import "kessel/inventory/v1beta2/delete_resource_response.proto";
 import "kessel/inventory/v1beta2/streamed_list_objects_request.proto";
 import "kessel/inventory/v1beta2/streamed_list_objects_response.proto";
+import "kessel/inventory/v1beta2/check_bulk_request.proto";
+import "kessel/inventory/v1beta2/check_bulk_response.proto";
 
 option go_package = "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2";
 option java_multiple_files = true;
@@ -54,6 +56,27 @@ service KesselInventoryService {
     };
   }
 
+
+  // Performs bulk permission checks for multiple resource-subject-relation combinations.
+  //
+  // This API is more efficient than making individual Check calls when verifying permissions
+  // for multiple items. It answers questions like:
+  // "Which of these resources can subject *X* perform action *Y* on?"
+  //
+  // Common use cases include:
+  // - Filtering lists based on user permissions
+  // - Batch authorization checks before performing bulk operations
+  // - Dashboard rendering with multiple permission checks
+  // - Pre-authorization for UI components
+  //
+  // The response includes a result for each item in the request, maintaining the same order.
+  rpc CheckBulk (CheckBulkRequest) returns (CheckBulkResponse) {
+      option (google.api.http) = {
+        post: "/api/inventory/v1beta2/checkbulk"
+        body: "*"
+      };
+  }
+  
   // Reports to Kessel Inventory that a Resource has been created or has been updated.
   //
   // Reporters can use this API to report facts about their resources in order to

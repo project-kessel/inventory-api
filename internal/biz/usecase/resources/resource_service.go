@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2"
 	"github.com/project-kessel/inventory-api/cmd/common"
+	"github.com/project-kessel/inventory-api/internal/authn/interceptor"
 	authzapi "github.com/project-kessel/inventory-api/internal/authz/api"
 	"github.com/project-kessel/inventory-api/internal/biz"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
@@ -110,7 +111,8 @@ func New(resourceRepository data.ResourceRepository, reporterResourceRepository 
 }
 
 func (uc *Usecase) ReportResource(ctx context.Context, request *v1beta2.ReportResourceRequest, reporterPrincipal string) error {
-	log.Info("Reporting resource request: ", request)
+	clientID := interceptor.GetClientIDFromContext(ctx)
+	log.Info("Reporting resource request: ", request, " client_id: ", clientID)
 	var subscription pubsub.Subscription
 	txidStr, err := getNextTransactionID()
 	if err != nil {
@@ -205,13 +207,13 @@ func (uc *Usecase) ReportResource(ctx context.Context, request *v1beta2.ReportRe
 	return nil
 }
 
-func (uc *Usecase) Delete(reporterResourceKey model.ReporterResourceKey) error {
+func (uc *Usecase) Delete(ctx context.Context, reporterResourceKey model.ReporterResourceKey) error {
 	txidStr, err := getNextTransactionID()
 	if err != nil {
 		return err
 	}
-
-	log.Info("Reporter Resource Key to delete ", reporterResourceKey)
+	clientID := interceptor.GetClientIDFromContext(ctx)
+	log.Info("Reporter Resource Key to delete ", reporterResourceKey, " client_id: ", clientID)
 	err = uc.resourceRepository.GetTransactionManager().HandleSerializableTransaction(
 		DeleteResourceOperationName,
 		uc.resourceRepository.GetDB(),
@@ -284,6 +286,15 @@ func (uc *Usecase) CheckForUpdate(ctx context.Context, permission, namespace str
 	return false, nil
 }
 
+// CheckBulk forwards the request to Relations CheckBulk
+func (uc *Usecase) CheckBulk(ctx context.Context, req *kessel.CheckBulkRequest) (*kessel.CheckBulkResponse, error) {
+	resp, err := uc.Authz.CheckBulk(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+	return resp, nil
+}
+
 func (uc *Usecase) createResource(tx *gorm.DB, request *v1beta2.ReportResourceRequest, txidStr string) error {
 	resourceId, err := uc.resourceRepository.NextResourceId()
 	if err != nil {
@@ -328,6 +339,15 @@ func (uc *Usecase) createResource(tx *gorm.DB, request *v1beta2.ReportResourceRe
 		}
 	}
 
+	var reporterVersion *model.ReporterVersion
+	if reporterVersionValue := request.GetRepresentations().GetMetadata().GetReporterVersion(); reporterVersionValue != "" {
+		rv, err := model.NewReporterVersion(reporterVersionValue)
+		if err != nil {
+			return fmt.Errorf("invalid reporter version: %w", err)
+		}
+		reporterVersion = &rv
+	}
+
 	reporterRepresentation, err := model.NewRepresentation(request.GetRepresentations().GetReporter().AsMap())
 	if err != nil {
 		return fmt.Errorf("invalid reporter representation: %w", err)
@@ -340,7 +360,7 @@ func (uc *Usecase) createResource(tx *gorm.DB, request *v1beta2.ReportResourceRe
 
 	transactionId := model.NewTransactionId(request.GetRepresentations().GetMetadata().GetTransactionId())
 
-	resource, err := model.NewResource(resourceId, localResourceId, resourceType, reporterType, reporterInstanceId, transactionId, reporterResourceId, apiHref, consoleHref, reporterRepresentation, commonRepresentation, nil)
+	resource, err := model.NewResource(resourceId, localResourceId, resourceType, reporterType, reporterInstanceId, transactionId, reporterResourceId, apiHref, consoleHref, reporterRepresentation, commonRepresentation, reporterVersion)
 	if err != nil {
 		return err
 	}

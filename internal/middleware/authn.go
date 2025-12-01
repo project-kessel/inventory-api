@@ -34,29 +34,26 @@ func Authentication(authenticator authnapi.Authenticator) func(middleware.Handle
 
 				ctx = context.WithValue(ctx, IdentityRequestKey, identity)
 
-				// If we had a token before, preserve it. Otherwise, try to get it from the context
-				// that OAuth2Authenticator might have modified (though it won't propagate automatically).
-				// As a fallback, extract from headers if OIDC authenticator was used.
+				// Try to get token from context if we don't have it yet
+				// (in case OAuth2Authenticator stored it during Authenticate)
 				if !hasToken {
-					// Check again after Authenticate (in case OAuth2Authenticator stored it)
-					if token, hasToken = util.FromTokenContext(ctx); !hasToken {
-						// Fallback: extract from headers (token was already verified by authenticator)
-						authHeader := t.RequestHeader().Get("Authorization")
-						if authHeader != "" {
-							parts := strings.SplitN(authHeader, " ", 2)
-							if len(parts) == 2 && strings.EqualFold(parts[0], "bearer") {
-								rawToken := parts[1]
-								// Store the raw token string so GetClientIDFromContext can decode it
-								ctx = util.NewRawTokenContext(ctx, rawToken)
-							}
-						}
-					} else {
-						// Token was found in context, preserve it
-						ctx = util.NewTokenContext(ctx, token)
-					}
-				} else {
-					// Preserve the token we had before
+					token, hasToken = util.FromTokenContext(ctx)
+				}
+
+				if hasToken {
+					// Preserve the token we found
 					ctx = util.NewTokenContext(ctx, token)
+				} else {
+					// Fallback: extract from headers (token was already verified by authenticator)
+					authHeader := t.RequestHeader().Get("Authorization")
+					if authHeader != "" {
+						parts := strings.SplitN(authHeader, " ", 2)
+						if len(parts) == 2 && strings.EqualFold(parts[0], "bearer") {
+							rawToken := parts[1]
+							// Store the raw token string so GetClientIDFromContext can decode it
+							ctx = util.NewRawTokenContext(ctx, rawToken)
+						}
+					}
 				}
 
 				return next(ctx, req)

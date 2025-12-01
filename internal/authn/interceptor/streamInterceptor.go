@@ -150,6 +150,7 @@ type Claims struct {
 	Subject           string `json:"sub"`
 	PreferredUsername string `json:"preferred_username"`
 	ClientID          string `json:"client_id"`
+	AuthorizedParty   string `json:"azp"`
 }
 
 func NewContextIdentity(ctx context.Context, identity api.Identity) context.Context {
@@ -178,7 +179,7 @@ func GetClientIDFromContext(ctx context.Context) string {
 		if claims.ClientID != "" {
 			return claims.ClientID
 		}
-		return claims.Audience
+		return claims.AuthorizedParty
 	}
 
 	// Fallback: try to get raw token from context and decode it
@@ -196,8 +197,8 @@ func GetClientIDFromContext(ctx context.Context) string {
 		return clientID
 	}
 
-	if aud, ok := claimsMap["aud"].(string); ok && aud != "" {
-		return aud
+	if azp, ok := claimsMap["azp"].(string); ok && azp != "" {
+		return azp
 	}
 
 	return ""

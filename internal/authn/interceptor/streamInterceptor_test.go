@@ -41,23 +41,23 @@ func TestGetClientIDFromContext(t *testing.T) {
 				// so we'll use the raw token approach for this test
 				rawToken := createTestJWT(map[string]interface{}{
 					"client_id": "test-client-id",
-					"aud":       "test-audience",
+					"azp":       "test-azp",
 				})
 				return util.NewRawTokenContext(ctx, rawToken)
 			},
 			wantClientID: "test-client-id",
 		},
 		{
-			name: "IDToken in context without client_id, has aud",
+			name: "IDToken in context without client_id, has azp",
 			setupCtx: func() context.Context {
 				ctx := context.Background()
 				rawToken := createTestJWT(map[string]interface{}{
-					"aud": "test-audience",
+					"azp": "test-azp",
 					"sub": "test-subject",
 				})
 				return util.NewRawTokenContext(ctx, rawToken)
 			},
-			wantClientID: "test-audience",
+			wantClientID: "test-azp",
 		},
 		{
 			name: "raw token in context with client_id",
@@ -65,23 +65,23 @@ func TestGetClientIDFromContext(t *testing.T) {
 				ctx := context.Background()
 				rawToken := createTestJWT(map[string]interface{}{
 					"client_id": "svc-test",
-					"aud":       "account",
+					"azp":       "test-azp",
 				})
 				return util.NewRawTokenContext(ctx, rawToken)
 			},
 			wantClientID: "svc-test",
 		},
 		{
-			name: "raw token in context without client_id, has aud",
+			name: "raw token in context without client_id, has azp",
 			setupCtx: func() context.Context {
 				ctx := context.Background()
 				rawToken := createTestJWT(map[string]interface{}{
-					"aud": "account",
+					"azp": "test-azp",
 					"sub": "test-subject",
 				})
 				return util.NewRawTokenContext(ctx, rawToken)
 			},
-			wantClientID: "account",
+			wantClientID: "test-azp",
 		},
 		{
 			name: "real world token from user",
@@ -109,7 +109,7 @@ func TestGetClientIDFromContext(t *testing.T) {
 			wantClientID: "",
 		},
 		{
-			name: "raw token with no client_id or aud",
+			name: "raw token with no client_id or azp",
 			setupCtx: func() context.Context {
 				ctx := context.Background()
 				rawToken := createTestJWT(map[string]interface{}{
@@ -121,16 +121,16 @@ func TestGetClientIDFromContext(t *testing.T) {
 			wantClientID: "",
 		},
 		{
-			name: "raw token with empty client_id, has aud",
+			name: "raw token with empty client_id, has azp",
 			setupCtx: func() context.Context {
 				ctx := context.Background()
 				rawToken := createTestJWT(map[string]interface{}{
 					"client_id": "",
-					"aud":       "fallback-audience",
+					"azp":       "fallback-azp",
 				})
 				return util.NewRawTokenContext(ctx, rawToken)
 			},
-			wantClientID: "fallback-audience",
+			wantClientID: "fallback-azp",
 		},
 		{
 			name: "raw token with client_id as non-string",
@@ -138,19 +138,19 @@ func TestGetClientIDFromContext(t *testing.T) {
 				ctx := context.Background()
 				rawToken := createTestJWT(map[string]interface{}{
 					"client_id": 12345, // non-string value
-					"aud":       "test-audience",
+					"azp":       "test-azp",
 				})
 				return util.NewRawTokenContext(ctx, rawToken)
 			},
-			wantClientID: "test-audience", // Should fallback to aud
+			wantClientID: "test-azp", // Should fallback to azp
 		},
 		{
-			name: "raw token with aud as non-string",
+			name: "raw token with azp as non-string",
 			setupCtx: func() context.Context {
 				ctx := context.Background()
 				rawToken := createTestJWT(map[string]interface{}{
 					"client_id": "test-client",
-					"aud":       12345, // non-string value
+					"azp":       12345, // non-string value
 				})
 				return util.NewRawTokenContext(ctx, rawToken)
 			},
@@ -180,7 +180,7 @@ func TestGetClientIDFromContextWithIDToken(t *testing.T) {
 	// Store raw token
 	rawToken := createTestJWT(map[string]interface{}{
 		"client_id": "raw-token-client",
-		"aud":       "raw-audience",
+		"azp":       "raw-azp",
 	})
 	ctx = util.NewRawTokenContext(ctx, rawToken)
 

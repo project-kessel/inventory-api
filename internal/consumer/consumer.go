@@ -62,20 +62,19 @@ type Consumer interface {
 
 // InventoryConsumer defines a Consumer with required clients and configs to call Relations API and update the Inventory DB with consistency tokens
 type InventoryConsumer struct {
-	Consumer           Consumer
-	OffsetStorage      []kafka.TopicPartition
-	Config             CompletedConfig
-	DB                 *gorm.DB
-	ResourceRepository data.ResourceRepository
-	AuthzConfig        authz.CompletedConfig
-	Authorizer         api.Authorizer
-	Errors             chan error
-	MetricsCollector   *metricscollector.MetricsCollector
-	Logger             *log.Helper
-	AuthOptions        *auth.Options
-	RetryOptions       *retry.Options
-	Notifier           pubsub.Notifier
-	SchemaService      *usecase_resources.SchemaUsecase
+	Consumer         Consumer
+	OffsetStorage    []kafka.TopicPartition
+	Config           CompletedConfig
+	DB               *gorm.DB
+	AuthzConfig      authz.CompletedConfig
+	Authorizer       api.Authorizer
+	Errors           chan error
+	MetricsCollector *metricscollector.MetricsCollector
+	Logger           *log.Helper
+	AuthOptions      *auth.Options
+	RetryOptions     *retry.Options
+	Notifier         pubsub.Notifier
+	SchemaService    *usecase_resources.SchemaUsecase
 	// offsetMutex protects OffsetStorage and coordinates offset commit operations
 	// to prevent race conditions between shutdown and rebalance callbacks
 	offsetMutex sync.Mutex
@@ -83,8 +82,9 @@ type InventoryConsumer struct {
 	// to coordinate with rebalance callback
 	shutdownInProgress bool
 
-	lockToken string
-	lockId    string
+	lockToken          string
+	lockId             string
+	ResourceRepository data.ResourceRepository
 }
 
 // New instantiates a new InventoryConsumer

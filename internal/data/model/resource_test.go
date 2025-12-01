@@ -154,6 +154,15 @@ func TestResource_Infrastructure_Validation(t *testing.T) {
 				isValid: true,
 			},
 			{
+				name: "valid resource with nil CommonVersion",
+				resource: Resource{
+					ID:            uuid.New(),
+					Type:          "k8s_cluster",
+					CommonVersion: nil,
+				},
+				isValid: true,
+			},
+			{
 				name: "nil ID",
 				resource: func() Resource {
 					cv := uint(1)

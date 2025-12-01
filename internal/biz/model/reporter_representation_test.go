@@ -364,6 +364,32 @@ func TestReporterRepresentation_BusinessRules(t *testing.T) {
 		)
 
 		assertValidReporterDataRepresentation(t, dataRep, err, "nil common version parameter")
+
+		// serialize the domain object and ensure the snapshot preserves the nil common version
+		snapshot := dataRep.Serialize()
+		if snapshot.CommonVersion != nil {
+			t.Errorf("expected snapshot.CommonVersion to be nil, got: %#v", snapshot.CommonVersion)
+		}
+
+		// deserialize back to the domain object and ensure nil common version is preserved
+		deserialized := DeserializeReporterDataRepresentation(&snapshot)
+		if deserialized == nil {
+			t.Fatal("expected non-nil ReporterDataRepresentation after deserialization")
+		}
+
+		// domain object should still have nil common version after round-trip
+		if deserialized.commonVersion != nil {
+			t.Errorf("expected deserialized.commonVersion to be nil after round-trip, got: %#v", deserialized.commonVersion)
+		}
+
+		// deserialized object should still have valid data
+		if deserialized.Data() == nil {
+			t.Error("expected deserialized ReporterDataRepresentation with nil common version to have valid data")
+		}
+
+		if deserialized.IsTombstone() {
+			t.Error("expected deserialized ReporterDataRepresentation with nil common version to have tombstone=false")
+		}
 	})
 
 	t.Run("should accept non-nil common version parameter", func(t *testing.T) {

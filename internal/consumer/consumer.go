@@ -377,13 +377,11 @@ func (i *InventoryConsumer) processRelationsOperation(
 
 	key := tupleEvent.ReporterResourceKey()
 
-	if tupleEvent.CommonVersion() == nil {
-		i.Logger.Infof("no-op for operation=%s, txid=%s", operation, txid)
-		return "", nil
+	var currentVersion *uint
+	if tupleEvent.CommonVersion() != nil {
+		version := tupleEvent.CommonVersion().Uint()
+		currentVersion = &version
 	}
-
-	version := tupleEvent.CommonVersion().Uint()
-	currentVersion := &version
 
 	current, previous, err := config.fetchRepresentations(i, key, currentVersion)
 	if err != nil {

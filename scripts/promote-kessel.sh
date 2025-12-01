@@ -5,7 +5,7 @@
 # It's recommended you copy this script to your PATH so it can be
 # used locally while in App Interface Path
 
-AVAILABLE_SERVICES=("relations-api" "inventory-api" "relations-sink-connector" "inventory-api-debezium-connector" "spicedb-operator")
+AVAILABLE_SERVICES=("relations-api" "inventory-api" "inventory-consumer" "relations-sink-connector" "spicedb-operator" "kessel-kafka-connect")
 
 
 help_me() {
@@ -79,9 +79,17 @@ update_saas_file() {
         DEPLOY_FILE="deploy-spicedb-operator.yml"
         export NAMESPACE="crcp"
         ;;
-      relations-sink-connector | inventory-api-debezium-connector)
+      relations-sink-connector)
         DEPLOY_FILE="deploy.yml"
         export NAMESPACE="platform-mq-prod"
+        ;;
+      inventory-consumer)
+        DEPLOY_FILE="deploy-kessel-inventory-consumer.yml"
+        export NAMESPACE="kessel-prod"
+        ;;
+      kessel-kafka-connect)
+        DEPLOY_FILE="deploy-kessel-kafka-connect.yml"
+        export NAMESPACE="kessel-kafka-connect-prod"
         ;;
       *)
         DEPLOY_FILE="deploy.yml"
@@ -144,7 +152,7 @@ update_saas_file() {
   popd 2>/dev/null
 
   # make the change (update hash)
-  yq e -i '(.resourceTemplates[].targets[] | select(.namespace."$ref" | contains(env(NAMESPACE)))).ref |= env(GIT_HASH)' $BASE_DIR/$KESSEL_DIR/$DEPLOY_FILE
+  yq e -i '(.resourceTemplates[] | select(.name == env(SERVICE_NAME)) | .targets[] | select(.namespace."$ref" | contains(env(NAMESPACE)))).ref |= env(GIT_HASH)' $BASE_DIR/$KESSEL_DIR/$DEPLOY_FILE
 
   # create branch for promotion
   git checkout -b "promote-$SERVICE_NAME-$GIT_HASH" ${REMOTE}/master
@@ -184,6 +192,8 @@ while getopts "s:g:h" flag; do
         h) help_me; exit 0;;
     esac
 done
+
+export SERVICE_NAME=$SERVICE_NAME
 
 # ensure we're on master branch
 git checkout master &> /dev/null

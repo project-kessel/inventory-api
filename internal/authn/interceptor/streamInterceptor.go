@@ -13,11 +13,10 @@ import (
 	"github.com/go-kratos/kratos/v2/middleware/auth/jwt"
 	"github.com/project-kessel/inventory-api/internal/authn"
 	"github.com/project-kessel/inventory-api/internal/authn/api"
+	"github.com/project-kessel/inventory-api/internal/authn/util"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 )
-
-type authKey struct{}
 
 const (
 	// bearerWord the bearer key word for authorization
@@ -128,7 +127,7 @@ func (i *StreamAuthInterceptor) Interceptor() grpc.StreamServerInterceptor {
 		}
 
 		// Store the ID token in context for compatibility
-		newCtx = NewContext(newCtx, idToken)
+		newCtx = util.NewTokenContext(newCtx, idToken)
 
 		wrappedStream := &authServerStream{ServerStream: ss, ctx: newCtx}
 		return handler(srv, wrappedStream)
@@ -150,10 +149,8 @@ type Claims struct {
 	Issuer            string `json:"iss"`
 	Subject           string `json:"sub"`
 	PreferredUsername string `json:"preferred_username"`
-}
-
-func NewContext(ctx context.Context, token *coreosoidc.IDToken) context.Context {
-	return context.WithValue(ctx, authKey{}, token)
+	ClientID          string `json:"client_id"`
+	AuthorizedParty   string `json:"azp"`
 }
 
 func NewContextIdentity(ctx context.Context, identity api.Identity) context.Context {
@@ -166,6 +163,43 @@ func FromContextIdentity(ctx context.Context) (api.Identity, bool) {
 }
 
 func FromContext(ctx context.Context) (*coreosoidc.IDToken, bool) {
-	token, ok := ctx.Value(authKey{}).(*coreosoidc.IDToken)
-	return token, ok
+	return util.FromTokenContext(ctx)
+}
+
+// GetClientIDFromContext extracts the client_id from a JWT token stored in the context.
+func GetClientIDFromContext(ctx context.Context) string {
+	// First, try to get the verified IDToken from context
+	token, ok := util.FromTokenContext(ctx)
+	if ok {
+		claims := &Claims{}
+		err := token.Claims(claims)
+		if err != nil {
+			return ""
+		}
+		if claims.ClientID != "" {
+			return claims.ClientID
+		}
+		return claims.AuthorizedParty
+	}
+
+	// Fallback: try to get raw token from context and decode it
+	rawToken, ok := util.FromRawTokenContext(ctx)
+	if !ok {
+		return ""
+	}
+
+	claimsMap, err := util.DecodeJWTClaims(rawToken)
+	if err != nil || claimsMap == nil {
+		return ""
+	}
+
+	if clientID, ok := claimsMap["client_id"].(string); ok && clientID != "" {
+		return clientID
+	}
+
+	if azp, ok := claimsMap["azp"].(string); ok && azp != "" {
+		return azp
+	}
+
+	return ""
 }

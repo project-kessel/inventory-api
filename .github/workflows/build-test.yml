@@ -23,7 +23,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v6
         with:
-          go-version: '1.25.x'
+          go-version-file: 'go.mod'
           cache: true
       - name: Install dependencies
         run: go get ./...
@@ -40,7 +40,7 @@ jobs:
 
           echo "COVERPKG: $COVERPKG"
 
-          GOTOOLCHAIN=go1.25.0+auto go test -short -covermode=atomic \
+          GOTOOLCHAIN=go1.25.3+auto go test -short -covermode=atomic \
             -coverpkg=$COVERPKG \
             -coverprofile=v1beta2-coverage.out \
             ./api/kessel/inventory/v1beta2/... ./internal/...

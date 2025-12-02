@@ -31,7 +31,7 @@ type FindResourceByKeysResult struct {
 }
 
 // GetCurrentAndPreviousWorkspaceID extracts current and previous workspace IDs from Representations
-func GetCurrentAndPreviousWorkspaceID(current, previous *bizmodel.Representations, currentVersion uint) (currentWorkspaceID, previousWorkspaceID string) {
+func GetCurrentAndPreviousWorkspaceID(current, previous *bizmodel.Representations) (currentWorkspaceID, previousWorkspaceID string) {
 	return current.WorkspaceID(), previous.WorkspaceID()
 }
 

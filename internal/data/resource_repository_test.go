@@ -2069,7 +2069,7 @@ func TestFindCurrentAndPreviousVersionedRepresentations(t *testing.T) {
 				cur, prev, err := repo.FindCurrentAndPreviousVersionedRepresentations(db, key, &version, biz.OperationTypeUpdated)
 				require.NoError(t, err)
 
-				currentWS, previousWS := GetCurrentAndPreviousWorkspaceID(cur, prev, 1)
+				currentWS, previousWS := GetCurrentAndPreviousWorkspaceID(cur, prev)
 				assert.Equal(t, "workspace-v1", currentWS)
 				assert.Equal(t, "test-workspace", previousWS) // From initial creation
 			})
@@ -2090,14 +2090,14 @@ func TestFindCurrentAndPreviousVersionedRepresentations(t *testing.T) {
 				cur, prev, err := repo.FindCurrentAndPreviousVersionedRepresentations(db, key, &version, biz.OperationTypeCreated)
 				require.NoError(t, err)
 
-				currentWS, previousWS := GetCurrentAndPreviousWorkspaceID(cur, prev, 0)
+				currentWS, previousWS := GetCurrentAndPreviousWorkspaceID(cur, prev)
 				assert.Equal(t, "test-workspace", currentWS)
 				assert.Equal(t, "", previousWS) // No previous version for version 0
 			})
 
 			t.Run("GetCurrentAndPreviousWorkspaceID handles empty representations", func(t *testing.T) {
 				// Test the function directly with nil data
-				currentWS, previousWS := GetCurrentAndPreviousWorkspaceID(nil, nil, 1)
+				currentWS, previousWS := GetCurrentAndPreviousWorkspaceID(nil, nil)
 				assert.Equal(t, "", currentWS)
 				assert.Equal(t, "", previousWS)
 			})
@@ -2116,7 +2116,7 @@ func TestFindCurrentAndPreviousVersionedRepresentations(t *testing.T) {
 					nil,
 					nil,
 				)
-				currentWS, previousWS := GetCurrentAndPreviousWorkspaceID(current, previous, 1)
+				currentWS, previousWS := GetCurrentAndPreviousWorkspaceID(current, previous)
 				assert.Equal(t, "", currentWS)
 				assert.Equal(t, "", previousWS)
 			})

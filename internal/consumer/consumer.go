@@ -351,14 +351,12 @@ func (i *InventoryConsumer) ProcessMessage(headers map[string]string, relationsE
 	return "", nil
 }
 
-// operationConfig defines the behavior for each operation type
 type operationConfig struct {
 	fetchRepresentations func(i *InventoryConsumer, key model.ReporterResourceKey, version *uint) (*model.Representations, *model.Representations, error)
 	executeSpiceDB       func(i *InventoryConsumer, tuples model.TuplesToReplicate) (string, error)
 	metricName           string
 }
 
-// processRelationsOperation handles the common flow for CREATE/UPDATE/DELETE operations
 func (i *InventoryConsumer) processRelationsOperation(
 	operation string,
 	txid string,

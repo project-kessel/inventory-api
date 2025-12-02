@@ -1054,7 +1054,7 @@ func TestGetCurrentAndPreviousWorkspaceID(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			current, previous := data.GetCurrentAndPreviousWorkspaceID(tt.current, tt.previous, tt.currentVersion)
+			current, previous := data.GetCurrentAndPreviousWorkspaceID(tt.current, tt.previous)
 
 			assert.Equal(t, tt.expectedCurrent, current)
 			assert.Equal(t, tt.expectedPrevious, previous)

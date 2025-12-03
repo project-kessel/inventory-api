@@ -17,12 +17,6 @@ type GormDbAfterMigrationHook interface {
 
 type OperationType string
 
-const (
-	OperationTypeCreate OperationType = "CREATE"
-	OperationTypeUpdate OperationType = "UPDATE"
-	OperationTypeDelete OperationType = "DELETE"
-)
-
 func (o *OperationType) Scan(value interface{}) error {
 	*o = OperationType(value.(string))
 	return nil
@@ -66,25 +60,6 @@ func (data *Labels) Scan(value interface{}) error {
 	b, ok := value.([]byte)
 	if !ok {
 		return errors.New("failed to parse Labels from database")
-	}
-	return json.Unmarshal(b, data)
-}
-
-// Helper functions for GORM database integration
-func GormDBDataType(db *gorm.DB, field *schema.Field) string {
-	switch db.Name() {
-	case "sqlite":
-		return "JSON"
-	case "postgres":
-		return "JSONB"
-	}
-	return ""
-}
-
-func Scan(value interface{}, data interface{}) error {
-	b, ok := value.([]byte)
-	if !ok {
-		return errors.New("failed to parse data from database")
 	}
 	return json.Unmarshal(b, data)
 }

@@ -25,99 +25,6 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-func TestRequestToResource_Success(t *testing.T) {
-	invID := "9b8b5a02-4ac7-4d6c-a2c0-123456789abc"
-	req := &pb.ReportResourceRequest{
-		Type:               "host",
-		ReporterType:       "hbi",
-		ReporterInstanceId: "inst-1",
-		InventoryId:        &invID,
-		Representations: &pb.ResourceRepresentations{
-			Common: &structpb.Struct{
-				Fields: map[string]*structpb.Value{
-					"workspace_id": structpb.NewStringValue("ws-123"),
-				},
-			},
-			Metadata: &pb.RepresentationMetadata{
-				LocalResourceId: "v1",
-			},
-		},
-	}
-	identity := &authnapi.Identity{Principal: "reporter-1"}
-
-	resource, err := svc.RequestToResource(req, identity)
-
-	assert.NoError(t, err)
-	assert.NotNil(t, resource)
-	assert.Equal(t, "host", req.GetType())
-	assert.Equal(t, "hbi", req.GetReporterType())
-	assert.Equal(t, "inst-1", req.GetReporterInstanceId())
-	assert.Equal(t, "9b8b5a02-4ac7-4d6c-a2c0-123456789abc", req.GetInventoryId())
-}
-
-func TestRequestToResource_Error_InvalidInventoryID(t *testing.T) {
-	id := "bad-uuid"
-	req := &pb.ReportResourceRequest{
-		InventoryId: &id,
-		Representations: &pb.ResourceRepresentations{
-			Common: &structpb.Struct{
-				Fields: map[string]*structpb.Value{
-					"workspace_id": structpb.NewStringValue("ws"),
-				},
-			},
-		},
-	}
-	identity := &authnapi.Identity{Principal: "reporter-1"}
-
-	resource, err := svc.RequestToResource(req, identity)
-
-	assert.Error(t, err)
-	assert.Nil(t, resource)
-	assert.Contains(t, err.Error(), "invalid inventory ID")
-}
-
-func TestRequestToResource_Error_MissingReporterType(t *testing.T) {
-	req := &pb.ReportResourceRequest{
-		ReporterType:       "",
-		ReporterInstanceId: "inst",
-		Representations: &pb.ResourceRepresentations{
-			Common: &structpb.Struct{
-				Fields: map[string]*structpb.Value{
-					"workspace_id": structpb.NewStringValue("ws"),
-				},
-			},
-		},
-	}
-	identity := &authnapi.Identity{Principal: "reporter-1"}
-
-	resource, err := svc.RequestToResource(req, identity)
-
-	assert.Error(t, err)
-	assert.Nil(t, resource)
-	assert.Contains(t, err.Error(), "cannot be empty: ReporterType")
-}
-
-func TestRequestToResource_Error_MissingReporterInstanceId(t *testing.T) {
-	req := &pb.ReportResourceRequest{
-		ReporterType:       "hbi",
-		ReporterInstanceId: "",
-		Representations: &pb.ResourceRepresentations{
-			Common: &structpb.Struct{
-				Fields: map[string]*structpb.Value{
-					"workspace_id": structpb.NewStringValue("ws"),
-				},
-			},
-		},
-	}
-	identity := &authnapi.Identity{Principal: "reporter-1"}
-
-	resource, err := svc.RequestToResource(req, identity)
-
-	assert.Error(t, err)
-	assert.Nil(t, resource)
-	assert.Contains(t, err.Error(), "cannot be empty: ReporterInstanceId")
-}
-
 func TestInventoryService_ReportResource_MissingReporterType(t *testing.T) {
 	id := &authnapi.Identity{Principal: "tester", Type: "reporterType"}
 	ctx := context.WithValue(context.Background(), middleware.IdentityRequestKey, id)
@@ -141,8 +48,6 @@ func TestInventoryService_ReportResource_MissingReporterType(t *testing.T) {
 
 	uc := usecase.New(
 		data.NewFakeResourceRepository(),
-		nil, // LegacyReporterResourceRepository
-		nil, // inventoryResourceRepository
 		nil, // Authz
 		nil, // Eventer
 		"",  // Namespace
@@ -183,8 +88,6 @@ func TestInventoryService_ReportResource_MissingReporterInstanceId(t *testing.T)
 
 	uc := usecase.New(
 		data.NewFakeResourceRepository(),
-		nil, // LegacyReporterResourceRepository
-		nil, // inventoryResourceRepository
 		nil, // Authz
 		nil, // Eventer
 		"",  // Namespace
@@ -228,8 +131,6 @@ func TestInventoryService_ReportResource_InvalidJsonObject(t *testing.T) {
 
 	uc := usecase.New(
 		data.NewFakeResourceRepository(),
-		nil, // LegacyReporterResourceRepository
-		nil, // inventoryResourceRepository
 		nil, // Authz
 		nil, // Eventer
 		"",  // Namespace

@@ -22,8 +22,6 @@ import (
 	"github.com/project-kessel/inventory-api/internal/consistency"
 	"github.com/project-kessel/inventory-api/internal/consumer"
 	"github.com/project-kessel/inventory-api/internal/data"
-	inventoryResourcesRepo "github.com/project-kessel/inventory-api/internal/data/inventoryresources"
-	legacyresourcerepo "github.com/project-kessel/inventory-api/internal/data/resources"
 	"github.com/project-kessel/inventory-api/internal/pubsub"
 
 	//v1beta2
@@ -232,8 +230,6 @@ func NewCommand(
 				return err
 			}
 
-			inventoryresources_repo := inventoryResourcesRepo.New(db)
-
 			usecaseConfig := &resourcesctl.UsecaseConfig{
 				ReadAfterWriteEnabled:   consistencyConfig.ReadAfterWriteEnabled,
 				ReadAfterWriteAllowlist: consistencyConfig.ReadAfterWriteAllowlist,
@@ -262,8 +258,7 @@ func NewCommand(
 			//v1beta2
 			// wire together inventory service handling
 			resourceRepo := data.NewResourceRepository(db, transactionManager)
-			legacy_resource_repo := legacyresourcerepo.New(db, mc, transactionManager)
-			inventory_controller := resourcesctl.New(resourceRepo, legacy_resource_repo, inventoryresources_repo, authorizer, eventingManager, "notifications", log.With(logger, "subsystem", "notificationsintegrations_controller"), listenManager, waitForNotifCircuitBreaker, usecaseConfig, mc)
+			inventory_controller := resourcesctl.New(resourceRepo, authorizer, eventingManager, "notifications", log.With(logger, "subsystem", "notificationsintegrations_controller"), listenManager, waitForNotifCircuitBreaker, usecaseConfig, mc)
 
 			inventory_service := resourcesvc.NewKesselInventoryServiceV1beta2(inventory_controller)
 			pbv1beta2.RegisterKesselInventoryServiceServer(server.GrpcServer, inventory_service)

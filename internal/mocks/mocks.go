@@ -4,7 +4,6 @@ import (
 	"context"
 	"io"
 
-	"github.com/google/uuid"
 	"github.com/project-kessel/inventory-api/internal/pubsub"
 	"google.golang.org/grpc/metadata"
 
@@ -16,8 +15,6 @@ import (
 	"github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
 	"github.com/stretchr/testify/mock"
 	"google.golang.org/grpc"
-
-	"github.com/project-kessel/inventory-api/internal/biz/model_legacy"
 )
 
 type MockHealthRepo struct {
@@ -183,66 +180,6 @@ func (m *MockLookupResourcesStream) SendMsg(msg interface{}) error {
 func (m *MockLookupResourcesStream) RecvMsg(msg interface{}) error {
 	args := m.Called(msg)
 	return args.Error(0)
-}
-
-func (r *MockedReporterResourceRepository) Create(ctx context.Context, resource *model_legacy.Resource, namespace string, txid string) (*model_legacy.Resource, error) {
-	args := r.Called(ctx, resource, namespace, txid)
-	return args.Get(0).(*model_legacy.Resource), args.Error(1)
-}
-
-func (r *MockedReporterResourceRepository) Update(ctx context.Context, resource *model_legacy.Resource, id uuid.UUID, namespace string, txid string) (*model_legacy.Resource, error) {
-	args := r.Called(ctx, resource, id, namespace, txid)
-	return args.Get(0).(*model_legacy.Resource), args.Error(1)
-}
-
-func (r *MockedReporterResourceRepository) Delete(ctx context.Context, id uuid.UUID, namespace string) (*model_legacy.Resource, error) {
-	args := r.Called(ctx, id, namespace)
-	return args.Get(0).(*model_legacy.Resource), args.Error(1)
-}
-
-func (r *MockedReporterResourceRepository) FindByID(ctx context.Context, id uuid.UUID) (*model_legacy.Resource, error) {
-	args := r.Called(ctx, id)
-	return args.Get(0).(*model_legacy.Resource), args.Error(1)
-}
-
-func (r *MockedReporterResourceRepository) FindByReporterResourceId(ctx context.Context, id model_legacy.ReporterResourceId) (*model_legacy.Resource, error) {
-	args := r.Called(ctx, id)
-	return args.Get(0).(*model_legacy.Resource), args.Error(1)
-}
-
-func (r *MockedReporterResourceRepository) FindByInventoryIdAndReporter(ctx context.Context, inventoryId *uuid.UUID, reporterResourceId string, reporterType string) (*model_legacy.Resource, error) {
-	args := r.Called(ctx, inventoryId, reporterResourceId, reporterType)
-	return args.Get(0).(*model_legacy.Resource), args.Error(1)
-}
-
-func (r *MockedReporterResourceRepository) FindByReporterResourceIdv1beta2(ctx context.Context, id model_legacy.ReporterResourceUniqueIndex) (*model_legacy.Resource, error) {
-	args := r.Called(ctx, id)
-	return args.Get(0).(*model_legacy.Resource), args.Error(1)
-}
-
-func (r *MockedReporterResourceRepository) FindByInventoryIdAndResourceType(ctx context.Context, inventoryId *uuid.UUID, resourceType string) (*model_legacy.Resource, error) {
-	args := r.Called(ctx, inventoryId, resourceType)
-	return args.Get(0).(*model_legacy.Resource), args.Error(1)
-}
-
-func (r *MockedReporterResourceRepository) FindByReporterData(ctx context.Context, reporterId string, resourceId string) (*model_legacy.Resource, error) {
-	args := r.Called(ctx, reporterId, resourceId)
-	return args.Get(0).(*model_legacy.Resource), args.Error(1)
-}
-
-func (r *MockedReporterResourceRepository) ListAll(ctx context.Context) ([]*model_legacy.Resource, error) {
-	args := r.Called(ctx)
-	return args.Get(0).([]*model_legacy.Resource), args.Error(1)
-}
-
-func (r *MockedInventoryResourceRepository) FindByID(ctx context.Context, id uuid.UUID) (*model_legacy.InventoryResource, error) {
-	args := r.Called(ctx, id)
-	return args.Get(0).(*model_legacy.InventoryResource), args.Error(1)
-}
-
-func (r *MockedReporterResourceRepository) FindByWorkspaceId(ctx context.Context, workspace_id string) ([]*model_legacy.Resource, error) {
-	args := r.Called(ctx)
-	return args.Get(0).([]*model_legacy.Resource), args.Error(1)
 }
 
 func (m *MockedListenManager) Subscribe(txid string) pubsub.Subscription {

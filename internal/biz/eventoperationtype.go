@@ -46,19 +46,3 @@ func (o *eventOperationType) UnmarshalJSON(data []byte) error {
 
 	return nil
 }
-
-// Helper functions to create EventOperationType instances
-func NewOperationTypeCreated() EventOperationType {
-	op := OperationTypeCreated
-	return &op
-}
-
-func NewOperationTypeUpdated() EventOperationType {
-	op := OperationTypeUpdated
-	return &op
-}
-
-func NewOperationTypeDeleted() EventOperationType {
-	op := OperationTypeDeleted
-	return &op
-}

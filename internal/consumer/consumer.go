@@ -41,7 +41,6 @@ import (
 	"github.com/project-kessel/inventory-api/internal/authz"
 	"github.com/project-kessel/inventory-api/internal/authz/api"
 	"github.com/project-kessel/inventory-api/internal/biz"
-	"github.com/project-kessel/inventory-api/internal/biz/model_legacy"
 	"go.opentelemetry.io/otel/metric"
 )
 
@@ -549,11 +548,10 @@ func (i *InventoryConsumer) CreateTuple(ctx context.Context, tuples *[]model.Rel
 			namespace := firstRelationship.GetResource().GetType().GetNamespace()
 			relation := firstRelationship.GetRelation()
 			subject := firstRelationship.GetSubject()
-			resource := &model_legacy.Resource{
-				ResourceType:       firstRelationship.GetResource().GetType().GetName(),
-				ReporterResourceId: firstRelationship.GetResource().GetId(),
-			}
-			_, token, err := i.Authorizer.Check(ctx, namespace, relation, "", resource.ResourceType, resource.ReporterResourceId, subject)
+			resourceType := firstRelationship.GetResource().GetType().GetName()
+			reporterResourceId := firstRelationship.GetResource().GetId()
+
+			_, token, err := i.Authorizer.Check(ctx, namespace, relation, "", resourceType, reporterResourceId, subject)
 			if err != nil {
 				return "", fmt.Errorf("failed to fetch consistency token: %w", err)
 			}

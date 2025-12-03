@@ -9,26 +9,7 @@ import (
 	"google.golang.org/protobuf/types/known/structpb"
 
 	"github.com/google/uuid"
-	pbresourcev1beta2 "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2"
-	"github.com/project-kessel/inventory-api/internal/biz/model_legacy"
 )
-
-func ResourceFromPb(resourceType, reporterType string, reporterInstanceId string, reporterId string, resourceData internal.JsonObject, workspaceId string, resourceRep *pbresourcev1beta2.ResourceRepresentations, inventoryId *uuid.UUID) *model_legacy.Resource {
-	return &model_legacy.Resource{
-		ID:                 uuid.UUID{},
-		InventoryId:        inventoryId,
-		ResourceData:       resourceData,
-		ResourceType:       resourceType,
-		WorkspaceId:        workspaceId,
-		ReporterResourceId: resourceRep.Metadata.LocalResourceId,
-		ReporterId:         reporterId,
-		ReporterType:       reporterType,
-		ReporterInstanceId: reporterInstanceId,
-		ReporterVersion:    resourceRep.Metadata.GetReporterVersion(),
-		ConsoleHref:        resourceRep.Metadata.GetConsoleHref(),
-		ApiHref:            resourceRep.Metadata.ApiHref,
-	}
-}
 
 func ToJsonObject(in interface{}) (internal.JsonObject, error) {
 	if in == nil {

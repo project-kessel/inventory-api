@@ -329,6 +329,46 @@ func TestReporterRepresentation_BusinessRules(t *testing.T) {
 		}
 	})
 
+	t.Run("should enforce nil common_version for delete representation", func(t *testing.T) {
+		t.Parallel()
+
+		deleteRep, err := NewReporterDeleteRepresentation(
+			fixture.ValidReporterResourceIdType(),
+			fixture.ValidVersionType(),
+			fixture.ValidGenerationType(),
+		)
+		if err != nil {
+			t.Fatalf("Expected no error, got %v", err)
+		}
+
+		snapshot := deleteRep.Serialize()
+		if snapshot.CommonVersion != nil {
+			t.Errorf("Expected delete representation to have nil common_version, got %v", *snapshot.CommonVersion)
+		}
+	})
+
+	t.Run("should enforce non-nil common_version for data representation", func(t *testing.T) {
+		t.Parallel()
+
+		dataRep, err := NewReporterDataRepresentation(
+			fixture.ValidReporterResourceIdType(),
+			fixture.ValidVersionType(),
+			fixture.ValidGenerationType(),
+			fixture.ValidRepresentationType(),
+			fixture.ValidCommonVersionType(),
+			fixture.ValidReporterVersionType(),
+			fixture.ValidTransactionIdType(),
+		)
+		if err != nil {
+			t.Fatalf("Expected no error, got %v", err)
+		}
+
+		snapshot := dataRep.Serialize()
+		if snapshot.CommonVersion == nil {
+			t.Error("Expected data representation to have non-nil common_version, got nil")
+		}
+	})
+
 	t.Run("should accept zero values for version and generation", func(t *testing.T) {
 		t.Parallel()
 

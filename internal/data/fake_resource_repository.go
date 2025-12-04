@@ -29,6 +29,7 @@ type storedResource struct {
 	resourceType          string
 	commonVersion         uint
 	commonData            internal.JsonObject
+	consistencyToken      string
 	reporterResourceID    uuid.UUID
 	localResourceID       string
 	reporterType          string
@@ -124,6 +125,7 @@ func (f *fakeResourceRepository) Save(tx *gorm.DB, resource bizmodel.Resource, o
 		resourceType:          resourceSnapshot.Type,
 		commonVersion:         resourceSnapshot.CommonVersion,
 		commonData:            commonRepresentationSnapshot.Representation.Data,
+		consistencyToken:      resourceSnapshot.ConsistencyToken,
 		reporterResourceID:    reporterResourceSnapshot.ID,
 		localResourceID:       reporterResourceSnapshot.ReporterResourceKey.LocalResourceID,
 		reporterType:          reporterResourceSnapshot.ReporterResourceKey.ReporterType,
@@ -205,7 +207,7 @@ func (f *fakeResourceRepository) FindResourceByKeys(tx *gorm.DB, key bizmodel.Re
 			ID:               latestResource.resourceID,
 			Type:             latestResource.resourceType,
 			CommonVersion:    latestResource.commonVersion,
-			ConsistencyToken: "",
+			ConsistencyToken: latestResource.consistencyToken,
 		}
 
 		reporterResourceSnapshot := bizmodel.ReporterResourceSnapshot{

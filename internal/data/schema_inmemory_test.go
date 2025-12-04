@@ -16,9 +16,7 @@ import (
 var validateSchemaTypeObject = validation.NewJsonSchemaValidatorFromString(`{"type": "object"}`)
 
 func TestInMemorySchemaRepository_CreateResource(t *testing.T) {
-	repo := &InMemorySchemaRepository{
-		content: make(map[string]resourceEntry),
-	}
+	repo := NewInMemorySchemaRepository()
 	ctx := context.Background()
 
 	resource := schema.ResourceRepresentation{
@@ -37,9 +35,7 @@ func TestInMemorySchemaRepository_CreateResource(t *testing.T) {
 }
 
 func TestInMemorySchemaRepository_CreateResource_AlreadyExists(t *testing.T) {
-	repo := &InMemorySchemaRepository{
-		content: make(map[string]resourceEntry),
-	}
+	repo := NewInMemorySchemaRepository()
 	ctx := context.Background()
 
 	resource := schema.ResourceRepresentation{
@@ -57,9 +53,7 @@ func TestInMemorySchemaRepository_CreateResource_AlreadyExists(t *testing.T) {
 }
 
 func TestInMemorySchemaRepository_GetResource(t *testing.T) {
-	repo := &InMemorySchemaRepository{
-		content: make(map[string]resourceEntry),
-	}
+	repo := NewInMemorySchemaRepository()
 	ctx := context.Background()
 
 	resource := schema.ResourceRepresentation{
@@ -76,9 +70,7 @@ func TestInMemorySchemaRepository_GetResource(t *testing.T) {
 }
 
 func TestInMemorySchemaRepository_GetResource_NotFound(t *testing.T) {
-	repo := &InMemorySchemaRepository{
-		content: make(map[string]resourceEntry),
-	}
+	repo := NewInMemorySchemaRepository()
 	ctx := context.Background()
 
 	_, err := repo.GetResourceSchema(ctx, "nonexistent")
@@ -86,9 +78,7 @@ func TestInMemorySchemaRepository_GetResource_NotFound(t *testing.T) {
 }
 
 func TestInMemorySchemaRepository_UpdateResource(t *testing.T) {
-	repo := &InMemorySchemaRepository{
-		content: make(map[string]resourceEntry),
-	}
+	repo := NewInMemorySchemaRepository()
 	ctx := context.Background()
 
 	resource := schema.ResourceRepresentation{
@@ -115,9 +105,7 @@ func TestInMemorySchemaRepository_UpdateResource(t *testing.T) {
 }
 
 func TestInMemorySchemaRepository_UpdateResource_NotFound(t *testing.T) {
-	repo := &InMemorySchemaRepository{
-		content: make(map[string]resourceEntry),
-	}
+	repo := NewInMemorySchemaRepository()
 	ctx := context.Background()
 
 	resource := schema.ResourceRepresentation{
@@ -130,9 +118,7 @@ func TestInMemorySchemaRepository_UpdateResource_NotFound(t *testing.T) {
 }
 
 func TestInMemorySchemaRepository_DeleteResource(t *testing.T) {
-	repo := &InMemorySchemaRepository{
-		content: make(map[string]resourceEntry),
-	}
+	repo := NewInMemorySchemaRepository()
 	ctx := context.Background()
 
 	resource := schema.ResourceRepresentation{
@@ -152,9 +138,7 @@ func TestInMemorySchemaRepository_DeleteResource(t *testing.T) {
 }
 
 func TestInMemorySchemaRepository_GetResources(t *testing.T) {
-	repo := &InMemorySchemaRepository{
-		content: make(map[string]resourceEntry),
-	}
+	repo := NewInMemorySchemaRepository()
 	ctx := context.Background()
 
 	resources := []schema.ResourceRepresentation{
@@ -177,9 +161,7 @@ func TestInMemorySchemaRepository_GetResources(t *testing.T) {
 }
 
 func TestInMemorySchemaRepository_CreateResourceReporter(t *testing.T) {
-	repo := &InMemorySchemaRepository{
-		content: make(map[string]resourceEntry),
-	}
+	repo := NewInMemorySchemaRepository()
 	ctx := context.Background()
 
 	// Create resource first
@@ -208,9 +190,7 @@ func TestInMemorySchemaRepository_CreateResourceReporter(t *testing.T) {
 }
 
 func TestInMemorySchemaRepository_GetResourceReporter_NotFound(t *testing.T) {
-	repo := &InMemorySchemaRepository{
-		content: make(map[string]resourceEntry),
-	}
+	repo := NewInMemorySchemaRepository()
 	ctx := context.Background()
 
 	// Create resource first
@@ -227,9 +207,7 @@ func TestInMemorySchemaRepository_GetResourceReporter_NotFound(t *testing.T) {
 }
 
 func TestInMemorySchemaRepository_UpdateResourceReporter(t *testing.T) {
-	repo := &InMemorySchemaRepository{
-		content: make(map[string]resourceEntry),
-	}
+	repo := NewInMemorySchemaRepository()
 	ctx := context.Background()
 
 	// Create resource and reporter
@@ -264,9 +242,7 @@ func TestInMemorySchemaRepository_UpdateResourceReporter(t *testing.T) {
 }
 
 func TestInMemorySchemaRepository_DeleteResourceReporter(t *testing.T) {
-	repo := &InMemorySchemaRepository{
-		content: make(map[string]resourceEntry),
-	}
+	repo := NewInMemorySchemaRepository()
 	ctx := context.Background()
 
 	// Create resource and reporter
@@ -295,9 +271,7 @@ func TestInMemorySchemaRepository_DeleteResourceReporter(t *testing.T) {
 }
 
 func TestInMemorySchemaRepository_GetResourceReporters(t *testing.T) {
-	repo := &InMemorySchemaRepository{
-		content: make(map[string]resourceEntry),
-	}
+	repo := NewInMemorySchemaRepository()
 	ctx := context.Background()
 
 	// Create resource
@@ -767,4 +741,27 @@ func TestLoadCommonResourceDataSchema_ComplexScenarios(t *testing.T) {
 			assert.Equal(t, expectedSchema, schemaContent)
 		}
 	})
+}
+
+func TestReporterMutationsPersist(t *testing.T) {
+	repo := NewInMemorySchemaRepository()
+	ctx := context.Background()
+
+	err := repo.CreateResourceSchema(ctx, schema.ResourceRepresentation{
+		ResourceType:     "host",
+		ValidationSchema: validateSchemaTypeObject,
+	})
+
+	assert.NoError(t, err)
+
+	err = repo.CreateReporterSchema(ctx, schema.ReporterRepresentation{
+		ResourceType:     "host",
+		ReporterType:     "hbi",
+		ValidationSchema: validateSchemaTypeObject,
+	})
+
+	assert.NoError(t, err)
+
+	reporters, _ := repo.GetReporterSchemas(ctx, "host")
+	assert.Contains(t, reporters, "hbi")
 }

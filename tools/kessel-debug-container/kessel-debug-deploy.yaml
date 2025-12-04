@@ -22,6 +22,7 @@ objects:
       app: kessel-debug
     name: kessel-debug
   spec:
+    restartPolicy: OnFailure
     containers:
     - image: ${DEBUG_IMAGE}:${IMAGE_TAG}
       name: kessel-debug

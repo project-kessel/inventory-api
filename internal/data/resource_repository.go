@@ -30,32 +30,9 @@ type FindResourceByKeysResult struct {
 	ConsistencyToken      string    `gorm:"column:consistency_token"`
 }
 
-type RepresentationsByVersion struct {
-	Data    internal.JsonObject `gorm:"column:data"`
-	Version uint                `gorm:"column:version"`
-}
-
-// GetCurrentAndPreviousWorkspaceID extracts current and previous workspace IDs from a slice of RepresentationsByVersion
-func ExtractWorkspaceID(repr RepresentationsByVersion) string {
-	if workspaceID, exists := repr.Data["workspace_id"].(string); exists {
-		return workspaceID
-	}
-	return ""
-}
-
-func GetCurrentAndPreviousWorkspaceID(representations []RepresentationsByVersion, currentVersion uint) (currentWorkspaceID, previousWorkspaceID string) {
-	for _, repr := range representations {
-		workspaceID := ExtractWorkspaceID(repr)
-		if workspaceID != "" {
-			switch repr.Version {
-			case currentVersion:
-				currentWorkspaceID = workspaceID
-			case currentVersion - 1:
-				previousWorkspaceID = workspaceID
-			}
-		}
-	}
-	return currentWorkspaceID, previousWorkspaceID
+// GetCurrentAndPreviousWorkspaceID extracts current and previous workspace IDs from Representations
+func GetCurrentAndPreviousWorkspaceID(current, previous *bizmodel.Representations) (currentWorkspaceID, previousWorkspaceID string) {
+	return current.WorkspaceID(), previous.WorkspaceID()
 }
 
 func ToSnapshotsFromResults(results []FindResourceByKeysResult) (*bizmodel.ResourceSnapshot, []bizmodel.ReporterResourceSnapshot) {
@@ -113,8 +90,8 @@ type ResourceRepository interface {
 	NextReporterResourceId() (bizmodel.ReporterResourceId, error)
 	Save(tx *gorm.DB, resource bizmodel.Resource, operationType biz.EventOperationType, txid string) error
 	FindResourceByKeys(tx *gorm.DB, key bizmodel.ReporterResourceKey) (*bizmodel.Resource, error)
-	FindCurrentAndPreviousVersionedRepresentations(tx *gorm.DB, key bizmodel.ReporterResourceKey, currentVersion *uint, operationType biz.EventOperationType) ([]RepresentationsByVersion, error)
-	FindLatestRepresentations(tx *gorm.DB, key bizmodel.ReporterResourceKey) (RepresentationsByVersion, error)
+	FindCurrentAndPreviousVersionedRepresentations(tx *gorm.DB, key bizmodel.ReporterResourceKey, currentVersion *uint, operationType biz.EventOperationType) (*bizmodel.Representations, *bizmodel.Representations, error)
+	FindLatestRepresentations(tx *gorm.DB, key bizmodel.ReporterResourceKey) (*bizmodel.Representations, error)
 	GetDB() *gorm.DB
 	GetTransactionManager() usecase.TransactionManager
 	HasTransactionIdBeenProcessed(tx *gorm.DB, transactionId string) (bool, error)
@@ -295,17 +272,26 @@ func (r *resourceRepository) GetTransactionManager() usecase.TransactionManager 
 	return r.transactionManager
 }
 
-func (r *resourceRepository) FindCurrentAndPreviousVersionedRepresentations(tx *gorm.DB, key bizmodel.ReporterResourceKey, currentCommonVersion *uint, operationType biz.EventOperationType) ([]RepresentationsByVersion, error) {
+func (r *resourceRepository) FindCurrentAndPreviousVersionedRepresentations(tx *gorm.DB, key bizmodel.ReporterResourceKey, currentCommonVersion *uint, operationType biz.EventOperationType) (*bizmodel.Representations, *bizmodel.Representations, error) {
 	if currentCommonVersion == nil {
-		return []RepresentationsByVersion{}, nil
+		return nil, nil, nil
 	}
 
-	var results []RepresentationsByVersion
+	type commonRepresentationRow struct {
+		Data                       internal.JsonObject
+		Version                    uint
+		ResourceId                 uuid.UUID
+		ReportedByReporterType     string
+		ReportedByReporterInstance string
+		TransactionId              string
+	}
+
+	var results []commonRepresentationRow
 
 	db := r.getDBSession(tx)
 
 	query := db.Table("reporter_resources rr").
-		Select("cr.data, cr.version").
+		Select("cr.data, cr.version, cr.resource_id, cr.reported_by_reporter_type, cr.reported_by_reporter_instance, cr.transaction_id").
 		Joins("JOIN common_representations cr ON rr.resource_id = cr.resource_id")
 
 	query = r.buildReporterResourceKeyQuery(query, key)
@@ -319,13 +305,31 @@ func (r *resourceRepository) FindCurrentAndPreviousVersionedRepresentations(tx *
 
 	err := query.Find(&results).Error
 	if err != nil {
-		return nil, fmt.Errorf("failed to find common representations by version: %w", err)
+		return nil, nil, fmt.Errorf("failed to find common representations by version: %w", err)
 	}
-	return results, nil
+
+	var current, previous *bizmodel.Representations
+	for _, row := range results {
+		rep, err := bizmodel.NewRepresentations(bizmodel.Representation(row.Data), &row.Version, nil, nil)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to create representation: %w", err)
+		}
+
+		if row.Version == *currentCommonVersion {
+			current = rep
+		} else if *currentCommonVersion > 0 && row.Version == *currentCommonVersion-1 {
+			previous = rep
+		}
+	}
+
+	return current, previous, nil
 }
 
-func (r *resourceRepository) FindLatestRepresentations(tx *gorm.DB, key bizmodel.ReporterResourceKey) (RepresentationsByVersion, error) {
-	var result RepresentationsByVersion
+func (r *resourceRepository) FindLatestRepresentations(tx *gorm.DB, key bizmodel.ReporterResourceKey) (*bizmodel.Representations, error) {
+	var result struct {
+		Data    internal.JsonObject
+		Version uint
+	}
 
 	db := r.getDBSession(tx)
 
@@ -337,9 +341,20 @@ func (r *resourceRepository) FindLatestRepresentations(tx *gorm.DB, key bizmodel
 
 	err := query.Order("cr.version DESC").Limit(1).Scan(&result).Error
 	if err != nil {
-		return RepresentationsByVersion{}, fmt.Errorf("failed to find latest representations: %w", err)
+		return nil, fmt.Errorf("failed to find latest representations: %w", err)
 	}
-	return result, nil
+
+	// Convert to Representations
+	rep, err := bizmodel.NewRepresentations(
+		bizmodel.Representation(result.Data),
+		&result.Version,
+		nil,
+		nil,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create representation: %w", err)
+	}
+	return rep, nil
 }
 
 // HasTransactionIdBeenProcessed checks if a transaction ID exists in either the

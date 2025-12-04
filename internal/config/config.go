@@ -10,6 +10,7 @@ import (
 
 	"github.com/project-kessel/inventory-api/internal/authn"
 	"github.com/project-kessel/inventory-api/internal/authz"
+	"github.com/project-kessel/inventory-api/internal/config/schema"
 	"github.com/project-kessel/inventory-api/internal/consistency"
 	"github.com/project-kessel/inventory-api/internal/consumer"
 	"github.com/project-kessel/inventory-api/internal/eventing"
@@ -28,6 +29,7 @@ type OptionsConfig struct {
 	Server      *server.Options
 	Consistency *consistency.Options
 	Service     *service.Options
+	Schema      *schema.Options
 }
 
 // NewOptionsConfig returns a new OptionsConfig with default options set
@@ -41,6 +43,7 @@ func NewOptionsConfig() *OptionsConfig {
 		server.NewOptions(),
 		consistency.NewOptions(),
 		service.NewOptions(),
+		schema.NewOptions(),
 	}
 }
 

@@ -27,6 +27,7 @@ type storedResource struct {
 	resourceID            uuid.UUID
 	resourceType          string
 	commonVersion         *uint
+	commonData            internal.JsonObject
 	reporterResourceID    uuid.UUID
 	localResourceID       string
 	reporterType          string

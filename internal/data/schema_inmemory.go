@@ -8,12 +8,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/project-kessel/inventory-api/internal/biz/schema/validation"
-	schema2 "github.com/project-kessel/inventory-api/internal/config/schema"
-	"github.com/project-kessel/inventory-api/internal/config/schema/inmemory"
-
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/project-kessel/inventory-api/internal/biz/schema"
+	"github.com/project-kessel/inventory-api/internal/biz/schema/validation"
 )
 
 type InMemorySchemaRepository struct {
@@ -344,20 +341,4 @@ func loadCommonResourceDataSchema(resourceType string, baseSchemaDir string) (st
 
 func NormalizeResourceType(resourceType string) string {
 	return strings.ReplaceAll(resourceType, "/", "_")
-}
-
-func NewSchemaRepository(ctx context.Context, c schema2.CompletedConfig, logger *log.Helper) (schema.Repository, error) {
-	switch c.Repository {
-	case schema2.InMemoryRepository:
-		switch c.InMemory.Type {
-		case inmemory.EmptyRepository:
-			return NewInMemorySchemaRepository(), nil
-		case inmemory.JSONRepository:
-			return NewInMemorySchemaRepositoryFromJsonFile(ctx, c.InMemory.Path, validation.NewJsonSchemaValidatorFromString)
-		case inmemory.DirRepository:
-			return NewInMemorySchemaRepositoryFromDir(ctx, c.InMemory.Path, validation.NewJsonSchemaValidatorFromString)
-		}
-	}
-
-	return nil, fmt.Errorf("invalid repository type: %s", c.Repository)
 }

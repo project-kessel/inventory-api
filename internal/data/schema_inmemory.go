@@ -162,7 +162,7 @@ func (o *InMemorySchemaRepository) DeleteReporterSchema(ctx context.Context, res
 
 func (o *InMemorySchemaRepository) getResourceEntry(resourceType string) (*resourceEntry, error) {
 	if entry, ok := o.content[resourceType]; !ok {
-		return nil, fmt.Errorf("resource type %s does not exist", resourceType)
+		return nil, schema.ResourceSchemaNotFound
 	} else {
 		return entry, nil
 	}

@@ -9,6 +9,9 @@ import (
 	"time"
 
 	"github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2"
+	"github.com/project-kessel/inventory-api/internal/biz/schema"
+	"github.com/project-kessel/inventory-api/internal/biz/schema/validation"
+	"github.com/project-kessel/inventory-api/internal/data"
 	"github.com/project-kessel/inventory-api/internal/metricscollector"
 	"github.com/project-kessel/inventory-api/internal/mocks"
 	"github.com/sony/gobreaker"
@@ -23,6 +26,55 @@ import (
 	"github.com/project-kessel/inventory-api/internal/biz/model_legacy"
 	"github.com/project-kessel/inventory-api/internal/pubsub"
 )
+
+func newFakeSchemaRepository(t *testing.T) schema.Repository {
+	schemaRepository := data.NewInMemorySchemaRepository()
+
+	emptyValidationSchema := validation.NewJsonSchemaValidatorFromString(`{
+		"$schema": "http://json-schema.org/draft-07/schema#",
+		"type": "object",
+		"properties": {
+		},
+		"required": []
+	}`)
+
+	withWorkspaceValidationSchema := validation.NewJsonSchemaValidatorFromString(`{
+		"$schema": "http://json-schema.org/draft-07/schema#",
+		"type": "object",
+		"properties": {
+			"workspace_id": { "type": "string" }
+		},
+		"required": ["workspace_id"]
+	}`)
+
+	err := schemaRepository.CreateResourceSchema(context.Background(), schema.ResourceRepresentation{
+		ResourceType:     "k8s_cluster",
+		ValidationSchema: withWorkspaceValidationSchema,
+	})
+	assert.NoError(t, err)
+
+	err = schemaRepository.CreateReporterSchema(context.Background(), schema.ReporterRepresentation{
+		ResourceType:     "k8s_cluster",
+		ReporterType:     "ocm",
+		ValidationSchema: emptyValidationSchema,
+	})
+	assert.NoError(t, err)
+
+	err = schemaRepository.CreateResourceSchema(context.Background(), schema.ResourceRepresentation{
+		ResourceType:     "host",
+		ValidationSchema: withWorkspaceValidationSchema,
+	})
+	assert.NoError(t, err)
+
+	err = schemaRepository.CreateReporterSchema(context.Background(), schema.ReporterRepresentation{
+		ResourceType:     "host",
+		ReporterType:     "hbi",
+		ValidationSchema: emptyValidationSchema,
+	})
+	assert.NoError(t, err)
+
+	return schemaRepository
+}
 
 func TestLookupResources_Success(t *testing.T) {
 	ctx := context.TODO()
@@ -85,7 +137,8 @@ func TestLookupResources_Success(t *testing.T) {
 		ReadAfterWriteAllowlist: []string{},
 		ConsumerEnabled:         true,
 	}
-	useCase := New(nil, repo, inventoryRepo, authz, nil, "", log.DefaultLogger, nil, cb, usecaseConfig, nil)
+	schemaRepository := newFakeSchemaRepository(t)
+	useCase := New(nil, repo, inventoryRepo, schemaRepository, authz, nil, "", log.DefaultLogger, nil, cb, usecaseConfig, nil)
 	stream, err := useCase.LookupResources(ctx, req)
 
 	assert.Nil(t, err)
@@ -237,7 +290,8 @@ func TestCreateReturnsDbError(t *testing.T) {
 	repo.On("FindByReporterData", mock.Anything, mock.Anything, mock.Anything).Return((*model_legacy.Resource)(nil), gorm.ErrDuplicatedKey)
 
 	mc := metricscollector.NewFakeMetricsCollector()
-	useCase := New(nil, repo, inventoryRepo, nil, nil, "", log.DefaultLogger, nil, cb, defaultUseCaseConfig, mc)
+	schemaRepository := newFakeSchemaRepository(t)
+	useCase := New(nil, repo, inventoryRepo, schemaRepository, nil, nil, "", log.DefaultLogger, nil, cb, defaultUseCaseConfig, mc)
 	ctx := context.TODO()
 
 	_, err := useCase.Create(ctx, resource)
@@ -256,7 +310,8 @@ func TestCreateReturnsDbErrorBackwardsCompatible(t *testing.T) {
 	repo.On("FindByReporterResourceId", mock.Anything, mock.Anything).Return((*model_legacy.Resource)(nil), gorm.ErrDuplicatedKey)
 
 	mc := metricscollector.NewFakeMetricsCollector()
-	useCase := New(nil, repo, inventoryRepo, nil, nil, "", log.DefaultLogger, nil, cb, defaultUseCaseConfig, mc)
+	schemaRepository := newFakeSchemaRepository(t)
+	useCase := New(nil, repo, inventoryRepo, schemaRepository, nil, nil, "", log.DefaultLogger, nil, cb, defaultUseCaseConfig, mc)
 	ctx := context.TODO()
 
 	_, err := useCase.Create(ctx, resource)
@@ -273,7 +328,8 @@ func TestCreateResourceAlreadyExists(t *testing.T) {
 	repo.On("FindByReporterData", mock.Anything, mock.Anything, mock.Anything).Return(&model_legacy.Resource{}, nil)
 
 	mc := metricscollector.NewFakeMetricsCollector()
-	useCase := New(nil, repo, inventoryRepo, nil, nil, "", log.DefaultLogger, nil, cb, defaultUseCaseConfig, mc)
+	schemaRepository := newFakeSchemaRepository(t)
+	useCase := New(nil, repo, inventoryRepo, schemaRepository, nil, nil, "", log.DefaultLogger, nil, cb, defaultUseCaseConfig, mc)
 	ctx := context.TODO()
 
 	_, err := useCase.Create(ctx, resource)
@@ -292,7 +348,8 @@ func TestCreateResourceAlreadyExistsBackwardsCompatible(t *testing.T) {
 	repo.On("FindByReporterResourceId", mock.Anything, mock.Anything).Return(&model_legacy.Resource{}, nil)
 
 	mc := metricscollector.NewFakeMetricsCollector()
-	useCase := New(nil, repo, inventoryRepo, nil, nil, "", log.DefaultLogger, nil, cb, defaultUseCaseConfig, mc)
+	schemaRepository := newFakeSchemaRepository(t)
+	useCase := New(nil, repo, inventoryRepo, schemaRepository, nil, nil, "", log.DefaultLogger, nil, cb, defaultUseCaseConfig, mc)
 	ctx := context.TODO()
 
 	_, err := useCase.Create(ctx, resource)
@@ -323,7 +380,8 @@ func TestCreateNewResource(t *testing.T) {
 	sub.On("BlockForNotification", mock.Anything).Return(nil)
 
 	mc := metricscollector.NewFakeMetricsCollector()
-	useCase := New(nil, repo, inventoryRepo, nil, nil, "", log.DefaultLogger, listenMan, cb, defaultUseCaseConfig, mc)
+	schemaRepository := newFakeSchemaRepository(t)
+	useCase := New(nil, repo, inventoryRepo, schemaRepository, nil, nil, "", log.DefaultLogger, listenMan, cb, defaultUseCaseConfig, mc)
 	ctx := context.TODO()
 
 	r, err := useCase.Create(ctx, resource)
@@ -362,7 +420,8 @@ func TestCreateNewResource_ConsumerDisabled(t *testing.T) {
 		ConsumerEnabled:         false,
 	}
 	mc := metricscollector.NewFakeMetricsCollector()
-	useCase := New(nil, repo, inventoryRepo, nil, nil, "", log.DefaultLogger, listenMan, cb, usecaseConfig, mc)
+	schemaRepository := newFakeSchemaRepository(t)
+	useCase := New(nil, repo, inventoryRepo, schemaRepository, nil, nil, "", log.DefaultLogger, listenMan, cb, usecaseConfig, mc)
 	ctx := context.TODO()
 
 	r, err := useCase.Create(ctx, resource)
@@ -406,7 +465,8 @@ func TestCreateNewResource_ConsistencyToken(t *testing.T) {
 		ConsumerEnabled:         true,
 	}
 	mc := metricscollector.NewFakeMetricsCollector()
-	useCase := New(nil, repo, inventoryRepo, m, nil, "", log.DefaultLogger, listenMan, cb, usecaseConfig, mc)
+	schemaRepository := newFakeSchemaRepository(t)
+	useCase := New(nil, repo, inventoryRepo, schemaRepository, m, nil, "", log.DefaultLogger, listenMan, cb, usecaseConfig, mc)
 	ctx := context.TODO()
 
 	r, err := useCase.Create(ctx, resource)
@@ -427,7 +487,8 @@ func TestUpdateReturnsDbError(t *testing.T) {
 	repo.On("FindByReporterData", mock.Anything, mock.Anything, mock.Anything).Return((*model_legacy.Resource)(nil), gorm.ErrDuplicatedKey)
 
 	mc := metricscollector.NewFakeMetricsCollector()
-	useCase := New(nil, repo, inventoryRepo, nil, nil, "", log.DefaultLogger, nil, cb, defaultUseCaseConfig, mc)
+	schemaRepository := newFakeSchemaRepository(t)
+	useCase := New(nil, repo, inventoryRepo, schemaRepository, nil, nil, "", log.DefaultLogger, nil, cb, defaultUseCaseConfig, mc)
 	ctx := context.TODO()
 
 	_, err := useCase.Update(ctx, resource, model_legacy.ReporterResourceId{})
@@ -445,7 +506,8 @@ func TestUpdateReturnsDbErrorBackwardsCompatible(t *testing.T) {
 	repo.On("FindByReporterResourceId", mock.Anything, mock.Anything).Return((*model_legacy.Resource)(nil), gorm.ErrDuplicatedKey)
 
 	mc := metricscollector.NewFakeMetricsCollector()
-	useCase := New(nil, repo, inventoryRepo, nil, nil, "", log.DefaultLogger, nil, cb, defaultUseCaseConfig, mc)
+	schemaRepository := newFakeSchemaRepository(t)
+	useCase := New(nil, repo, inventoryRepo, schemaRepository, nil, nil, "", log.DefaultLogger, nil, cb, defaultUseCaseConfig, mc)
 	ctx := context.TODO()
 
 	_, err := useCase.Update(ctx, resource, model_legacy.ReporterResourceId{})
@@ -477,7 +539,8 @@ func TestUpdateNewResourceCreatesIt(t *testing.T) {
 	sub.On("BlockForNotification", mock.Anything).Return(nil)
 
 	mc := metricscollector.NewFakeMetricsCollector()
-	useCase := New(nil, repo, inventoryRepo, nil, nil, "", log.DefaultLogger, listenMan, cb, defaultUseCaseConfig, mc)
+	schemaRepository := newFakeSchemaRepository(t)
+	useCase := New(nil, repo, inventoryRepo, schemaRepository, nil, nil, "", log.DefaultLogger, listenMan, cb, defaultUseCaseConfig, mc)
 	ctx := context.TODO()
 
 	r, err := useCase.Update(ctx, resource, model_legacy.ReporterResourceId{})
@@ -513,7 +576,8 @@ func TestUpdateExistingResource(t *testing.T) {
 	sub.On("BlockForNotification", mock.Anything).Return(nil)
 
 	mc := metricscollector.NewFakeMetricsCollector()
-	useCase := New(nil, repo, inventoryRepo, nil, nil, "", log.DefaultLogger, listenMan, cb, defaultUseCaseConfig, mc)
+	schemaRepository := newFakeSchemaRepository(t)
+	useCase := New(nil, repo, inventoryRepo, schemaRepository, nil, nil, "", log.DefaultLogger, listenMan, cb, defaultUseCaseConfig, mc)
 	ctx := context.TODO()
 
 	r, err := useCase.Update(ctx, resource, model_legacy.ReporterResourceId{})
@@ -551,7 +615,8 @@ func TestUpdateExistingResourceBackwardsCompatible(t *testing.T) {
 	sub.On("BlockForNotification", mock.Anything).Return(nil)
 
 	mc := metricscollector.NewFakeMetricsCollector()
-	useCase := New(nil, repo, inventoryRepo, nil, nil, "", log.DefaultLogger, listenMan, cb, defaultUseCaseConfig, mc)
+	schemaRepository := newFakeSchemaRepository(t)
+	useCase := New(nil, repo, inventoryRepo, schemaRepository, nil, nil, "", log.DefaultLogger, listenMan, cb, defaultUseCaseConfig, mc)
 	ctx := context.TODO()
 
 	r, err := useCase.Update(ctx, resource, model_legacy.ReporterResourceId{})
@@ -571,7 +636,8 @@ func TestDeleteReturnsDbError(t *testing.T) {
 	repo.On("FindByReporterData", mock.Anything, mock.Anything, mock.Anything).Return((*model_legacy.Resource)(nil), gorm.ErrDuplicatedKey)
 
 	mc := metricscollector.NewFakeMetricsCollector()
-	useCase := New(nil, repo, inventoryRepo, nil, nil, "", log.DefaultLogger, nil, cb, defaultUseCaseConfig, mc)
+	schemaRepository := newFakeSchemaRepository(t)
+	useCase := New(nil, repo, inventoryRepo, schemaRepository, nil, nil, "", log.DefaultLogger, nil, cb, defaultUseCaseConfig, mc)
 	ctx := context.TODO()
 
 	err := useCase.DeleteLegacy(ctx, model_legacy.ReporterResourceId{})
@@ -588,7 +654,8 @@ func TestDeleteReturnsDbErrorBackwardsCompatible(t *testing.T) {
 	repo.On("FindByReporterResourceId", mock.Anything, mock.Anything).Return((*model_legacy.Resource)(nil), gorm.ErrDuplicatedKey)
 
 	mc := metricscollector.NewFakeMetricsCollector()
-	useCase := New(nil, repo, inventoryRepo, nil, nil, "", log.DefaultLogger, nil, cb, defaultUseCaseConfig, mc)
+	schemaRepository := newFakeSchemaRepository(t)
+	useCase := New(nil, repo, inventoryRepo, schemaRepository, nil, nil, "", log.DefaultLogger, nil, cb, defaultUseCaseConfig, mc)
 	ctx := context.TODO()
 
 	err := useCase.DeleteLegacy(ctx, model_legacy.ReporterResourceId{})
@@ -605,7 +672,8 @@ func TestDeleteNonexistentResource(t *testing.T) {
 	repo.On("FindByReporterResourceId", mock.Anything, mock.Anything).Return((*model_legacy.Resource)(nil), gorm.ErrRecordNotFound)
 
 	mc := metricscollector.NewFakeMetricsCollector()
-	useCase := New(nil, repo, inventoryRepo, nil, nil, "", log.DefaultLogger, nil, cb, defaultUseCaseConfig, mc)
+	schemaRepository := newFakeSchemaRepository(t)
+	useCase := New(nil, repo, inventoryRepo, schemaRepository, nil, nil, "", log.DefaultLogger, nil, cb, defaultUseCaseConfig, mc)
 	ctx := context.TODO()
 
 	err := useCase.DeleteLegacy(ctx, model_legacy.ReporterResourceId{})
@@ -627,7 +695,8 @@ func TestDeleteResource(t *testing.T) {
 	repo.On("Delete", mock.Anything, (uuid.UUID)(id), mock.Anything).Return(&model_legacy.Resource{}, nil)
 
 	mc := metricscollector.NewFakeMetricsCollector()
-	useCase := New(nil, repo, inventoryRepo, nil, nil, "", log.DefaultLogger, nil, cb, defaultUseCaseConfig, mc)
+	schemaRepository := newFakeSchemaRepository(t)
+	useCase := New(nil, repo, inventoryRepo, schemaRepository, nil, nil, "", log.DefaultLogger, nil, cb, defaultUseCaseConfig, mc)
 
 	err = useCase.DeleteLegacy(ctx, model_legacy.ReporterResourceId{})
 	assert.Nil(t, err)
@@ -651,7 +720,8 @@ func TestDeleteResourceBackwardsCompatible(t *testing.T) {
 	repo.On("Delete", mock.Anything, (uuid.UUID)(id), mock.Anything).Return(&model_legacy.Resource{}, nil)
 
 	mc := metricscollector.NewFakeMetricsCollector()
-	useCase := New(nil, repo, inventoryRepo, nil, nil, "", log.DefaultLogger, nil, cb, defaultUseCaseConfig, mc)
+	schemaRepository := newFakeSchemaRepository(t)
+	useCase := New(nil, repo, inventoryRepo, schemaRepository, nil, nil, "", log.DefaultLogger, nil, cb, defaultUseCaseConfig, mc)
 
 	err = useCase.DeleteLegacy(ctx, model_legacy.ReporterResourceId{})
 	assert.Nil(t, err)
@@ -688,7 +758,8 @@ func TestUpdate_ReadAfterWrite(t *testing.T) {
 		ConsumerEnabled:         true,
 	}
 	mc := metricscollector.NewFakeMetricsCollector()
-	useCase := New(nil, repo, inventoryRepo, authz, nil, "", log.DefaultLogger, listenMan, cb, usecaseConfig, mc)
+	schemaRepository := newFakeSchemaRepository(t)
+	useCase := New(nil, repo, inventoryRepo, schemaRepository, authz, nil, "", log.DefaultLogger, listenMan, cb, usecaseConfig, mc)
 	ctx := context.TODO()
 
 	r, err := useCase.Update(ctx, resource, model_legacy.ReporterResourceId{})
@@ -729,7 +800,8 @@ func TestUpdate_ConsumerDisabled(t *testing.T) {
 		ConsumerEnabled:         false,
 	}
 	mc := metricscollector.NewFakeMetricsCollector()
-	useCase := New(nil, repo, inventoryRepo, authz, nil, "", log.DefaultLogger, listenMan, cb, usecaseConfig, mc)
+	schemaRepository := newFakeSchemaRepository(t)
+	useCase := New(nil, repo, inventoryRepo, schemaRepository, authz, nil, "", log.DefaultLogger, listenMan, cb, usecaseConfig, mc)
 	ctx := context.TODO()
 
 	r, err := useCase.Update(ctx, resource, model_legacy.ReporterResourceId{})
@@ -753,7 +825,8 @@ func TestCheck_MissingResource(t *testing.T) {
 	m.On("Check", mock.Anything, mock.Anything, "notifications_integration_view", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(v1beta1.CheckResponse_ALLOWED_TRUE, &v1beta1.ConsistencyToken{}, nil)
 
 	mc := metricscollector.NewFakeMetricsCollector()
-	useCase := New(nil, repo, inventoryRepo, m, nil, "", log.DefaultLogger, nil, cb, defaultUseCaseConfig, mc)
+	schemaRepository := newFakeSchemaRepository(t)
+	useCase := New(nil, repo, inventoryRepo, schemaRepository, m, nil, "", log.DefaultLogger, nil, cb, defaultUseCaseConfig, mc)
 	allowed, err := useCase.CheckLegacy(ctx, "notifications_integration_view", "rbac", &v1beta1.SubjectReference{}, model_legacy.ReporterResourceId{})
 
 	assert.Nil(t, err)
@@ -779,7 +852,8 @@ func TestCheck_ResourceExistsError(t *testing.T) {
 	repo.On("FindByReporterResourceId", mock.Anything, mock.Anything).Return(&model_legacy.Resource{}, gorm.ErrUnsupportedDriver) // some random error
 
 	mc := metricscollector.NewFakeMetricsCollector()
-	useCase := New(nil, repo, inventoryRepo, m, nil, "", log.DefaultLogger, nil, cb, defaultUseCaseConfig, mc)
+	schemaRepository := newFakeSchemaRepository(t)
+	useCase := New(nil, repo, inventoryRepo, schemaRepository, m, nil, "", log.DefaultLogger, nil, cb, defaultUseCaseConfig, mc)
 	allowed, err := useCase.CheckLegacy(ctx, "notifications_integration_view", "rbac", &v1beta1.SubjectReference{}, model_legacy.ReporterResourceId{})
 
 	assert.NotNil(t, err)
@@ -799,7 +873,8 @@ func TestCheck_ErrorWithKessel(t *testing.T) {
 	m.On("Check", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(v1beta1.CheckResponse_ALLOWED_FALSE, &v1beta1.ConsistencyToken{}, errors.New("failed during call to relations"))
 
 	mc := metricscollector.NewFakeMetricsCollector()
-	useCase := New(nil, repo, inventoryRepo, m, nil, "", log.DefaultLogger, nil, cb, defaultUseCaseConfig, mc)
+	schemaRepository := newFakeSchemaRepository(t)
+	useCase := New(nil, repo, inventoryRepo, schemaRepository, m, nil, "", log.DefaultLogger, nil, cb, defaultUseCaseConfig, mc)
 	allowed, err := useCase.CheckLegacy(ctx, "notifications_integration_view", "rbac", &v1beta1.SubjectReference{}, model_legacy.ReporterResourceId{})
 
 	assert.NotNil(t, err)
@@ -820,7 +895,8 @@ func TestCheck_Allowed(t *testing.T) {
 	m.On("Check", mock.Anything, mock.Anything, "notifications_integration_write", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(v1beta1.CheckResponse_ALLOWED_TRUE, &v1beta1.ConsistencyToken{}, nil)
 
 	mc := metricscollector.NewFakeMetricsCollector()
-	useCase := New(nil, repo, inventoryRepo, m, nil, "", log.DefaultLogger, nil, cb, defaultUseCaseConfig, mc)
+	schemaRepository := newFakeSchemaRepository(t)
+	useCase := New(nil, repo, inventoryRepo, schemaRepository, m, nil, "", log.DefaultLogger, nil, cb, defaultUseCaseConfig, mc)
 	allowed, err := useCase.CheckLegacy(ctx, "notifications_integration_write", "rbac", &v1beta1.SubjectReference{}, model_legacy.ReporterResourceId{})
 
 	assert.Nil(t, err)
@@ -846,7 +922,8 @@ func TestCheckForUpdate_ResourceExistsError(t *testing.T) {
 	repo.On("FindByReporterResourceId", mock.Anything, mock.Anything).Return(&model_legacy.Resource{}, gorm.ErrUnsupportedDriver) // some random error
 
 	mc := metricscollector.NewFakeMetricsCollector()
-	useCase := New(nil, repo, inventoryRepo, m, nil, "", log.DefaultLogger, nil, cb, defaultUseCaseConfig, mc)
+	schemaRepository := newFakeSchemaRepository(t)
+	useCase := New(nil, repo, inventoryRepo, schemaRepository, m, nil, "", log.DefaultLogger, nil, cb, defaultUseCaseConfig, mc)
 	allowed, err := useCase.CheckForUpdateLegacy(ctx, "notifications_integration_view", "rbac", &v1beta1.SubjectReference{}, model_legacy.ReporterResourceId{})
 
 	assert.NotNil(t, err)
@@ -866,7 +943,8 @@ func TestCheckForUpdate_ErrorWithKessel(t *testing.T) {
 	m.On("CheckForUpdate", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(v1beta1.CheckForUpdateResponse_ALLOWED_FALSE, &v1beta1.ConsistencyToken{}, errors.New("failed during call to relations"))
 
 	mc := metricscollector.NewFakeMetricsCollector()
-	useCase := New(nil, repo, inventoryRepo, m, nil, "", log.DefaultLogger, nil, cb, defaultUseCaseConfig, mc)
+	schemaRepository := newFakeSchemaRepository(t)
+	useCase := New(nil, repo, inventoryRepo, schemaRepository, m, nil, "", log.DefaultLogger, nil, cb, defaultUseCaseConfig, mc)
 	allowed, err := useCase.CheckForUpdateLegacy(ctx, "notifications_integration_view", "rbac", &v1beta1.SubjectReference{}, model_legacy.ReporterResourceId{})
 
 	assert.NotNil(t, err)
@@ -887,7 +965,8 @@ func TestCheckForUpdate_WorkspaceAllowed(t *testing.T) {
 	m.On("CheckForUpdate", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(v1beta1.CheckForUpdateResponse_ALLOWED_TRUE, &v1beta1.ConsistencyToken{}, nil)
 
 	mc := metricscollector.NewFakeMetricsCollector()
-	useCase := New(nil, repo, inventoryRepo, m, nil, "", log.DefaultLogger, nil, cb, defaultUseCaseConfig, mc)
+	schemaRepository := newFakeSchemaRepository(t)
+	useCase := New(nil, repo, inventoryRepo, schemaRepository, m, nil, "", log.DefaultLogger, nil, cb, defaultUseCaseConfig, mc)
 	allowed, err := useCase.CheckForUpdateLegacy(ctx, "notifications_integration_view", "rbac", &v1beta1.SubjectReference{}, model_legacy.ReporterResourceId{ResourceType: "workspace"})
 
 	assert.Nil(t, err)
@@ -907,7 +986,8 @@ func TestCheckForUpdate_MissingResource_Allowed(t *testing.T) {
 	m.On("CheckForUpdate", mock.Anything, mock.Anything, "notifications_integration_view", mock.Anything, mock.Anything, mock.Anything).Return(v1beta1.CheckForUpdateResponse_ALLOWED_TRUE, &v1beta1.ConsistencyToken{}, nil)
 
 	mc := metricscollector.NewFakeMetricsCollector()
-	useCase := New(nil, repo, inventoryRepo, m, nil, "", log.DefaultLogger, nil, cb, defaultUseCaseConfig, mc)
+	schemaRepository := newFakeSchemaRepository(t)
+	useCase := New(nil, repo, inventoryRepo, schemaRepository, m, nil, "", log.DefaultLogger, nil, cb, defaultUseCaseConfig, mc)
 	allowed, err := useCase.CheckForUpdateLegacy(ctx, "notifications_integration_view", "rbac", &v1beta1.SubjectReference{}, model_legacy.ReporterResourceId{})
 
 	// no consistency token being written.
@@ -933,7 +1013,8 @@ func TestCheckForUpdate_Allowed(t *testing.T) {
 	repo.On("Update", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&model_legacy.Resource{}, nil)
 
 	mc := metricscollector.NewFakeMetricsCollector()
-	useCase := New(nil, repo, inventoryRepo, m, nil, "", log.DefaultLogger, nil, cb, defaultUseCaseConfig, mc)
+	schemaRepository := newFakeSchemaRepository(t)
+	useCase := New(nil, repo, inventoryRepo, schemaRepository, m, nil, "", log.DefaultLogger, nil, cb, defaultUseCaseConfig, mc)
 	allowed, err := useCase.CheckForUpdateLegacy(ctx, "notifications_integration_view", "rbac", &v1beta1.SubjectReference{}, model_legacy.ReporterResourceId{})
 
 	assert.Nil(t, err)
@@ -960,7 +1041,8 @@ func TestListResourcesInWorkspace_Error(t *testing.T) {
 	repo.On("FindByWorkspaceId", mock.Anything, mock.Anything).Return([]*model_legacy.Resource{}, errors.New("failed querying"))
 
 	mc := metricscollector.NewFakeMetricsCollector()
-	useCase := New(nil, repo, inventoryRepo, m, nil, "", log.DefaultLogger, nil, cb, defaultUseCaseConfig, mc)
+	schemaRepository := newFakeSchemaRepository(t)
+	useCase := New(nil, repo, inventoryRepo, schemaRepository, m, nil, "", log.DefaultLogger, nil, cb, defaultUseCaseConfig, mc)
 	resource_chan, err_chan, err := useCase.ListResourcesInWorkspace(ctx, "notifications_integration_view", "rbac", &v1beta1.SubjectReference{}, "foo-id")
 
 	assert.NotNil(t, err)
@@ -980,7 +1062,8 @@ func TestListResourcesInWorkspace_NoResources(t *testing.T) {
 	repo.On("FindByWorkspaceId", mock.Anything, mock.Anything).Return([]*model_legacy.Resource{}, nil)
 
 	mc := metricscollector.NewFakeMetricsCollector()
-	useCase := New(nil, repo, inventoryRepo, m, nil, "", log.DefaultLogger, nil, cb, defaultUseCaseConfig, mc)
+	schemaRepository := newFakeSchemaRepository(t)
+	useCase := New(nil, repo, inventoryRepo, schemaRepository, m, nil, "", log.DefaultLogger, nil, cb, defaultUseCaseConfig, mc)
 	resource_chan, err_chan, err := useCase.ListResourcesInWorkspace(ctx, "notifications_integration_view", "rbac", &v1beta1.SubjectReference{}, "foo-id")
 
 	assert.Nil(t, err)
@@ -1006,7 +1089,8 @@ func TestListResourcesInWorkspace_ResourcesAllowedTrue(t *testing.T) {
 	m.On("Check", mock.Anything, mock.Anything, "notifications_integration_write", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(v1beta1.CheckResponse_ALLOWED_TRUE, &v1beta1.ConsistencyToken{}, nil)
 
 	mc := metricscollector.NewFakeMetricsCollector()
-	useCase := New(nil, repo, inventoryRepo, m, nil, "", log.DefaultLogger, nil, cb, defaultUseCaseConfig, mc)
+	schemaRepository := newFakeSchemaRepository(t)
+	useCase := New(nil, repo, inventoryRepo, schemaRepository, m, nil, "", log.DefaultLogger, nil, cb, defaultUseCaseConfig, mc)
 	resource_chan, err_chan, err := useCase.ListResourcesInWorkspace(ctx, "notifications_integration_write", "rbac", &v1beta1.SubjectReference{}, "foo-id")
 
 	assert.Nil(t, err)
@@ -1050,7 +1134,8 @@ func TestListResourcesInWorkspace_MultipleResourcesAllowedTrue(t *testing.T) {
 	m.On("Check", mock.Anything, mock.Anything, "notifications_integration_write", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(v1beta1.CheckResponse_ALLOWED_TRUE, &v1beta1.ConsistencyToken{}, nil)
 
 	mc := metricscollector.NewFakeMetricsCollector()
-	useCase := New(nil, repo, inventoryRepo, m, nil, "", log.DefaultLogger, nil, cb, defaultUseCaseConfig, mc)
+	schemaRepository := newFakeSchemaRepository(t)
+	useCase := New(nil, repo, inventoryRepo, schemaRepository, m, nil, "", log.DefaultLogger, nil, cb, defaultUseCaseConfig, mc)
 	resource_chan, err_chan, err := useCase.ListResourcesInWorkspace(ctx, "notifications_integration_write", "rbac", &v1beta1.SubjectReference{}, "foo-id")
 
 	assert.Nil(t, err)
@@ -1092,7 +1177,8 @@ func TestListResourcesInWorkspace_MultipleResourcesOneFalseTwoTrueLastError(t *t
 	m.On("Check", mock.Anything, mock.Anything, "notifications_integration_write", mock.Anything, "my-resource33", mock.Anything, mock.Anything).Return(v1beta1.CheckResponse_ALLOWED_UNSPECIFIED, &v1beta1.ConsistencyToken{}, theError)
 
 	mc := metricscollector.NewFakeMetricsCollector()
-	useCase := New(nil, repo, inventoryRepo, m, nil, "", log.DefaultLogger, nil, cb, defaultUseCaseConfig, mc)
+	schemaRepository := newFakeSchemaRepository(t)
+	useCase := New(nil, repo, inventoryRepo, schemaRepository, m, nil, "", log.DefaultLogger, nil, cb, defaultUseCaseConfig, mc)
 	resource_chan, err_chan, err := useCase.ListResourcesInWorkspace(ctx, "notifications_integration_write", "rbac", &v1beta1.SubjectReference{}, "foo-id")
 
 	assert.Nil(t, err)
@@ -1127,7 +1213,8 @@ func TestListResourcesInWorkspace_ResourcesAllowedError(t *testing.T) {
 	m.On("Check", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(v1beta1.CheckResponse_ALLOWED_TRUE, &v1beta1.ConsistencyToken{}, errors.New("failed calling relations"))
 
 	mc := metricscollector.NewFakeMetricsCollector()
-	useCase := New(nil, repo, inventoryRepo, m, nil, "", log.DefaultLogger, nil, cb, defaultUseCaseConfig, mc)
+	schemaRepository := newFakeSchemaRepository(t)
+	useCase := New(nil, repo, inventoryRepo, schemaRepository, m, nil, "", log.DefaultLogger, nil, cb, defaultUseCaseConfig, mc)
 	resource_chan, err_chan, err := useCase.ListResourcesInWorkspace(ctx, "notifications_integration_view", "rbac", &v1beta1.SubjectReference{}, "foo-id")
 
 	assert.Nil(t, err)
@@ -1307,7 +1394,8 @@ func TestUpsertReturnsDbError(t *testing.T) {
 	repo.On("FindByReporterResourceIdv1beta2", mock.Anything, mock.Anything).Return((*model_legacy.Resource)(nil), gorm.ErrDuplicatedKey)
 
 	mc := metricscollector.NewFakeMetricsCollector()
-	useCase := New(nil, repo, inventoryRepo, nil, nil, "", log.DefaultLogger, nil, cb, defaultUseCaseConfig, mc)
+	schemaRepository := newFakeSchemaRepository(t)
+	useCase := New(nil, repo, inventoryRepo, schemaRepository, nil, nil, "", log.DefaultLogger, nil, cb, defaultUseCaseConfig, mc)
 	ctx := context.TODO()
 
 	_, err := useCase.Upsert(ctx, resource, v1beta2.WriteVisibility_WRITE_VISIBILITY_UNSPECIFIED)
@@ -1325,7 +1413,8 @@ func TestUpsertReturnsExistingUpdatedResource(t *testing.T) {
 	repo.On("Update", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(resource, nil)
 
 	mc := metricscollector.NewFakeMetricsCollector()
-	useCase := New(nil, repo, inventoryRepo, nil, nil, "", log.DefaultLogger, nil, cb, defaultUseCaseConfig, mc)
+	schemaRepository := newFakeSchemaRepository(t)
+	useCase := New(nil, repo, inventoryRepo, schemaRepository, nil, nil, "", log.DefaultLogger, nil, cb, defaultUseCaseConfig, mc)
 	ctx := context.TODO()
 
 	res, err := useCase.Upsert(ctx, resource, v1beta2.WriteVisibility_WRITE_VISIBILITY_UNSPECIFIED)
@@ -1358,7 +1447,8 @@ func TestUpsert_ReadAfterWrite(t *testing.T) {
 		ConsumerEnabled:         true,
 	}
 	mc := metricscollector.NewFakeMetricsCollector()
-	useCase := New(nil, repo, inventoryRepo, authz, nil, "", log.DefaultLogger, listenMan, cb, usecaseConfig, mc)
+	schemaRepository := newFakeSchemaRepository(t)
+	useCase := New(nil, repo, inventoryRepo, schemaRepository, authz, nil, "", log.DefaultLogger, listenMan, cb, usecaseConfig, mc)
 	ctx := context.TODO()
 
 	r, err := useCase.Upsert(ctx, resource, v1beta2.WriteVisibility_IMMEDIATE)
@@ -1394,7 +1484,8 @@ func TestUpsert_ConsumerDisabled(t *testing.T) {
 		ConsumerEnabled:         false,
 	}
 	mc := metricscollector.NewFakeMetricsCollector()
-	useCase := New(nil, repo, inventoryRepo, authz, nil, "", log.DefaultLogger, listenMan, cb, usecaseConfig, mc)
+	schemaRepository := newFakeSchemaRepository(t)
+	useCase := New(nil, repo, inventoryRepo, schemaRepository, authz, nil, "", log.DefaultLogger, listenMan, cb, usecaseConfig, mc)
 	ctx := context.TODO()
 
 	r, err := useCase.Upsert(ctx, resource, v1beta2.WriteVisibility_IMMEDIATE)
@@ -1431,7 +1522,8 @@ func TestUpsert_WaitCircuitBreaker(t *testing.T) {
 		ConsumerEnabled:         true,
 	}
 	mc := metricscollector.NewFakeMetricsCollector()
-	useCase := New(nil, repo, inventoryRepo, authz, nil, "", log.DefaultLogger, listenMan, cb, usecaseConfig, mc)
+	schemaRepository := newFakeSchemaRepository(t)
+	useCase := New(nil, repo, inventoryRepo, schemaRepository, authz, nil, "", log.DefaultLogger, listenMan, cb, usecaseConfig, mc)
 	ctx := context.TODO()
 
 	// Attempt 1 - Trigger failure
@@ -1503,7 +1595,8 @@ func TestUpsertCreatesNewResourceWithCorrectUUID(t *testing.T) {
 	repo.On("Create", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&returnedResource, nil)
 
 	mc := metricscollector.NewFakeMetricsCollector()
-	useCase := New(nil, repo, inventoryRepo, nil, nil, "", log.DefaultLogger, nil, cb, defaultUseCaseConfig, mc)
+	schemaRepository := newFakeSchemaRepository(t)
+	useCase := New(nil, repo, inventoryRepo, schemaRepository, nil, nil, "", log.DefaultLogger, nil, cb, defaultUseCaseConfig, mc)
 	ctx := context.TODO()
 
 	// Call Upsert

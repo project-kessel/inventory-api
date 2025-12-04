@@ -18,12 +18,12 @@ import (
 
 type InMemorySchemaRepository struct {
 	// TODO: Not thread safe - a sync.Map might not help either as we have to sync reporters (see UpdateResourceSchema) as well
-	content map[string]resourceEntry
+	content map[string]*resourceEntry
 }
 
 type resourceEntry struct {
 	schema.ResourceRepresentation
-	reporters *map[string]reporterEntry
+	reporters map[string]*reporterEntry
 }
 
 type reporterEntry struct {
@@ -44,9 +44,9 @@ func (o *InMemorySchemaRepository) CreateResourceSchema(ctx context.Context, res
 		return fmt.Errorf("resource %s already exists", resource.ResourceType)
 	}
 
-	o.content[resource.ResourceType] = resourceEntry{
+	o.content[resource.ResourceType] = &resourceEntry{
 		ResourceRepresentation: resource,
-		reporters:              &map[string]reporterEntry{},
+		reporters:              map[string]*reporterEntry{},
 	}
 	return nil
 }
@@ -66,7 +66,7 @@ func (o *InMemorySchemaRepository) UpdateResourceSchema(ctx context.Context, res
 		return schema.ResourceSchemaNotFound
 	}
 
-	o.content[resource.ResourceType] = resourceEntry{
+	o.content[resource.ResourceType] = &resourceEntry{
 		ResourceRepresentation: resource,
 		reporters:              entry.reporters,
 	}
@@ -90,7 +90,7 @@ func (o *InMemorySchemaRepository) GetReporterSchemas(ctx context.Context, resou
 	}
 
 	var reporters []string
-	for _, reporter := range *entry.reporters {
+	for _, reporter := range entry.reporters {
 		reporters = append(reporters, reporter.ReporterType)
 	}
 
@@ -103,11 +103,11 @@ func (o *InMemorySchemaRepository) CreateReporterSchema(ctx context.Context, res
 		return err
 	}
 
-	if _, ok := (*entry.reporters)[resourceReporter.ReporterType]; ok {
+	if _, ok := (entry.reporters)[resourceReporter.ReporterType]; ok {
 		return fmt.Errorf("reporter %s for entry %s already exist", resourceReporter.ReporterType, resourceReporter.ResourceType)
 	}
 
-	(*entry.reporters)[resourceReporter.ReporterType] = reporterEntry{
+	entry.reporters[resourceReporter.ReporterType] = &reporterEntry{
 		resourceReporter,
 	}
 
@@ -120,7 +120,7 @@ func (o *InMemorySchemaRepository) GetReporterSchema(ctx context.Context, resour
 		return schema.ReporterRepresentation{}, err
 	}
 
-	reporter, ok := (*entry.reporters)[reporterType]
+	reporter, ok := entry.reporters[reporterType]
 	if !ok {
 		return schema.ReporterRepresentation{}, schema.ReporterSchemaNotfound
 	}
@@ -134,11 +134,11 @@ func (o *InMemorySchemaRepository) UpdateReporterSchema(ctx context.Context, res
 		return err
 	}
 
-	if _, ok := (*entry.reporters)[resourceReporter.ReporterType]; !ok {
+	if _, ok := entry.reporters[resourceReporter.ReporterType]; !ok {
 		return schema.ReporterSchemaNotfound
 	}
 
-	(*entry.reporters)[resourceReporter.ReporterType] = reporterEntry{
+	entry.reporters[resourceReporter.ReporterType] = &reporterEntry{
 		resourceReporter,
 	}
 
@@ -151,11 +151,11 @@ func (o *InMemorySchemaRepository) DeleteReporterSchema(ctx context.Context, res
 		return err
 	}
 
-	if _, ok := (*entry.reporters)[reporterType]; !ok {
+	if _, ok := entry.reporters[reporterType]; !ok {
 		return schema.ReporterSchemaNotfound
 	}
 
-	delete(*entry.reporters, reporterType)
+	delete(entry.reporters, reporterType)
 
 	return nil
 }
@@ -164,13 +164,13 @@ func (o *InMemorySchemaRepository) getResourceEntry(resourceType string) (*resou
 	if entry, ok := o.content[resourceType]; !ok {
 		return nil, fmt.Errorf("resource type %s does not exist", resourceType)
 	} else {
-		return &entry, nil
+		return entry, nil
 	}
 }
 
 func NewInMemorySchemaRepository() *InMemorySchemaRepository {
 	return &InMemorySchemaRepository{
-		content: make(map[string]resourceEntry),
+		content: map[string]*resourceEntry{},
 	}
 }
 
@@ -181,7 +181,7 @@ func NewInMemorySchemaRepositoryFromDir(ctx context.Context, resourceDir string,
 	}
 
 	repository := InMemorySchemaRepository{
-		content: make(map[string]resourceEntry),
+		content: map[string]*resourceEntry{},
 	}
 
 	for _, dir := range resourceDirs {
@@ -249,7 +249,7 @@ func NewInMemorySchemaRepositoryFromJsonFile(ctx context.Context, jsonFile strin
 
 func NewFromJsonBytes(ctx context.Context, jsonBytes []byte, validationSchemaFromString validation.SchemaFromString) (*InMemorySchemaRepository, error) {
 	repository := InMemorySchemaRepository{
-		content: make(map[string]resourceEntry),
+		content: map[string]*resourceEntry{},
 	}
 
 	jsonContent := make(map[string]interface{})

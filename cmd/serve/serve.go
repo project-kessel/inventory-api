@@ -19,6 +19,7 @@ import (
 
 	"github.com/project-kessel/inventory-api/cmd/common"
 	resourcesctl "github.com/project-kessel/inventory-api/internal/biz/usecase/resources"
+	"github.com/project-kessel/inventory-api/internal/config/schema"
 	"github.com/project-kessel/inventory-api/internal/consistency"
 	"github.com/project-kessel/inventory-api/internal/consumer"
 	"github.com/project-kessel/inventory-api/internal/data"
@@ -59,6 +60,7 @@ func NewCommand(
 	consistencyOptions *consistency.Options,
 	serviceOptions *service.Options,
 	loggerOptions common.LoggerOptions,
+	schemaOptions *schema.Options,
 ) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "serve",
@@ -137,6 +139,18 @@ func NewCommand(
 				return errors.NewAggregate(errs)
 			}
 			consistencyConfig, errs := consistency.NewConfig(consistencyOptions).Complete()
+			if errs != nil {
+				return errors.NewAggregate(errs)
+			}
+
+			// configure schemaService service
+			if errs := schemaOptions.Complete(); errs != nil {
+				return errors.NewAggregate(errs)
+			}
+			if errs := schemaOptions.Validate(); errs != nil {
+				return errors.NewAggregate(errs)
+			}
+			schemaConfig, errs := schema.NewConfig(schemaOptions).Complete()
 			if errs != nil {
 				return errors.NewAggregate(errs)
 			}
@@ -220,6 +234,12 @@ func NewCommand(
 				return err
 			}
 
+			// constructs schema repository
+			schemaRepository, err := data.NewSchemaRepository(ctx, schemaConfig, log.NewHelper(log.With(logger, "subsystem", "schemaRepository")))
+			if err != nil {
+				return err
+			}
+
 			// construct servers
 			server, err := server.New(serverConfig, middleware.Authentication(authenticator), authnConfig, logger)
 			if err != nil {
@@ -263,7 +283,7 @@ func NewCommand(
 			// wire together inventory service handling
 			resourceRepo := data.NewResourceRepository(db, transactionManager)
 			legacy_resource_repo := legacyresourcerepo.New(db, mc, transactionManager)
-			inventory_controller := resourcesctl.New(resourceRepo, legacy_resource_repo, inventoryresources_repo, authorizer, eventingManager, "notifications", log.With(logger, "subsystem", "notificationsintegrations_controller"), listenManager, waitForNotifCircuitBreaker, usecaseConfig, mc)
+			inventory_controller := resourcesctl.New(resourceRepo, legacy_resource_repo, inventoryresources_repo, schemaRepository, authorizer, eventingManager, "notifications", log.With(logger, "subsystem", "notificationsintegrations_controller"), listenManager, waitForNotifCircuitBreaker, usecaseConfig, mc)
 
 			inventory_service := resourcesvc.NewKesselInventoryServiceV1beta2(inventory_controller)
 			pbv1beta2.RegisterKesselInventoryServiceServer(server.GrpcServer, inventory_service)
@@ -296,7 +316,7 @@ func NewCommand(
 						// If the consumer cannot process a message, the consumer loop is restarted
 						// This is to ensure we re-read the message and prevent it being dropped and moving to next message.
 						// To re-read the current message, we have to recreate the consumer connection so that the earliest offset is used
-						inventoryConsumer, err = consumer.New(consumerConfig, db, authzConfig, authorizer, notifier, log.NewHelper(log.With(logger, "subsystem", "inventoryConsumer")), nil)
+						inventoryConsumer, err = consumer.New(consumerConfig, db, schemaRepository, authzConfig, authorizer, notifier, log.NewHelper(log.With(logger, "subsystem", "inventoryConsumer")), nil)
 						if err != nil {
 							shutdown(err)
 						}

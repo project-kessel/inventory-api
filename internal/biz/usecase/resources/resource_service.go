@@ -15,6 +15,7 @@ import (
 	"github.com/project-kessel/inventory-api/internal/biz"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
 	"github.com/project-kessel/inventory-api/internal/biz/model_legacy"
+	"github.com/project-kessel/inventory-api/internal/biz/schema"
 	"github.com/project-kessel/inventory-api/internal/data"
 	eventingapi "github.com/project-kessel/inventory-api/internal/eventing/api"
 	"github.com/project-kessel/inventory-api/internal/metricscollector"
@@ -79,6 +80,7 @@ type Usecase struct {
 	resourceRepository               data.ResourceRepository
 	LegacyReporterResourceRepository ReporterResourceRepository
 	inventoryResourceRepository      InventoryResourceRepository
+	schemaUsecase                    *SchemaUsecase
 	waitForNotifBreaker              *gobreaker.CircuitBreaker
 	Authz                            authzapi.Authorizer
 	Eventer                          eventingapi.Manager
@@ -91,12 +93,13 @@ type Usecase struct {
 }
 
 func New(resourceRepository data.ResourceRepository, reporterResourceRepository ReporterResourceRepository, inventoryResourceRepository InventoryResourceRepository,
-	authz authzapi.Authorizer, eventer eventingapi.Manager, namespace string, logger log.Logger,
+	schemaRepository schema.Repository, authz authzapi.Authorizer, eventer eventingapi.Manager, namespace string, logger log.Logger,
 	listenManager pubsub.ListenManagerImpl, waitForNotifBreaker *gobreaker.CircuitBreaker, usecaseConfig *UsecaseConfig, metricsCollector *metricscollector.MetricsCollector) *Usecase {
 	return &Usecase{
 		resourceRepository:               resourceRepository,
 		LegacyReporterResourceRepository: reporterResourceRepository,
 		inventoryResourceRepository:      inventoryResourceRepository,
+		schemaUsecase:                    NewSchemaUsecase(schemaRepository, log.NewHelper(logger)),
 		waitForNotifBreaker:              waitForNotifBreaker,
 		Authz:                            authz,
 		Eventer:                          eventer,

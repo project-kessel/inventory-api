@@ -6,6 +6,7 @@ import (
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/project-kessel/inventory-api/internal/biz"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
+	"github.com/project-kessel/inventory-api/internal/data"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -69,7 +70,7 @@ func TestCalculateTuples(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			sc := NewSchemaUsecase(log.NewHelper(log.DefaultLogger))
+			sc := NewSchemaUsecase(data.NewInMemorySchemaRepository(), log.NewHelper(log.DefaultLogger))
 			key, err := model.NewReporterResourceKey(
 				model.LocalResourceId("test-resource"),
 				model.ResourceType("host"),
@@ -148,7 +149,7 @@ func TestCalculateTuples(t *testing.T) {
 }
 
 func TestGetWorkspaceVersions(t *testing.T) {
-	sc := NewSchemaUsecase(log.NewHelper(log.DefaultLogger))
+	sc := NewSchemaUsecase(data.NewInMemorySchemaRepository(), log.NewHelper(log.DefaultLogger))
 
 	key, err := model.NewReporterResourceKey(
 		model.LocalResourceId("test-resource"),
@@ -246,7 +247,7 @@ func TestCreateWorkspaceTuple(t *testing.T) {
 }
 
 func TestDetermineTupleOperations(t *testing.T) {
-	sc := NewSchemaUsecase(log.NewHelper(log.DefaultLogger))
+	sc := NewSchemaUsecase(data.NewInMemorySchemaRepository(), log.NewHelper(log.DefaultLogger))
 
 	key, err := model.NewReporterResourceKey(
 		model.LocalResourceId("test-resource"),
@@ -330,7 +331,7 @@ func TestCalculateTuples_OperationTypeScenarios(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			sc := NewSchemaUsecase(log.NewHelper(log.DefaultLogger))
+			sc := NewSchemaUsecase(data.NewInMemorySchemaRepository(), log.NewHelper(log.DefaultLogger))
 
 			key, err := model.NewReporterResourceKey(
 				model.LocalResourceId("test-resource"),

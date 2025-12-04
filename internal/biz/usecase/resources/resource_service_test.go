@@ -180,7 +180,7 @@ func TestReportResourceThenDelete(t *testing.T) {
 			require.NoError(t, err)
 			require.NotNil(t, deleteFoundResource)
 
-			err = usecase.Delete(key)
+			err = usecase.Delete(ctx, key)
 			require.NoError(t, err)
 
 			// Delete should trigger another outbox event write
@@ -244,7 +244,7 @@ func TestDelete_ResourceNotFound(t *testing.T) {
 	key, err := model.NewReporterResourceKey(localResourceId, resourceType, reporterType, reporterInstanceId)
 	require.NoError(t, err)
 
-	err = usecase.Delete(key)
+	err = usecase.Delete(context.Background(), key)
 	require.Error(t, err)
 }
 
@@ -282,7 +282,7 @@ func TestReportFindDeleteFind_TombstoneLifecycle(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, foundResource)
 
-	err = usecase.Delete(key)
+	err = usecase.Delete(ctx, key)
 	require.NoError(t, err)
 
 	foundResource, err = resourceRepo.FindResourceByKeys(nil, key)
@@ -348,10 +348,10 @@ func TestMultipleHostsLifecycle(t *testing.T) {
 	require.NotNil(t, updatedHost2)
 
 	// Delete both hosts
-	err = usecase.Delete(key1)
+	err = usecase.Delete(ctx, key1)
 	require.NoError(t, err, "Should delete host1")
 
-	err = usecase.Delete(key2)
+	err = usecase.Delete(ctx, key2)
 	require.NoError(t, err, "Should delete host2")
 
 	// Verify both hosts can be found (tombstoned) with tombstone filter removed
@@ -624,7 +624,7 @@ func TestResourceLifecycle_ReportUpdateDeleteReport(t *testing.T) {
 
 		// 3. DELETE: Delete the resource
 		log.Info("Delete ---------------------")
-		err = usecase.Delete(key)
+		err = usecase.Delete(ctx, key)
 		require.NoError(t, err, "Delete should succeed")
 
 		// Verify state after delete: representationVersion incremented, generation unchanged, tombstoned
@@ -692,7 +692,7 @@ func TestResourceLifecycle_ReportUpdateDeleteReportDelete(t *testing.T) {
 
 		// 3. DELETE: Delete the resource
 		key := createReporterResourceKey(t, localResourceId, resourceType, reporterType, reporterInstance)
-		err = usecase.Delete(key)
+		err = usecase.Delete(ctx, key)
 		require.NoError(t, err, "First delete should succeed")
 
 		// 4. REPORT NEW: Report the same resource again after deletion
@@ -701,7 +701,7 @@ func TestResourceLifecycle_ReportUpdateDeleteReportDelete(t *testing.T) {
 		require.NoError(t, err, "Report after delete should succeed")
 
 		// 5. DELETE: Delete the recreated resource
-		err = usecase.Delete(key)
+		err = usecase.Delete(ctx, key)
 		require.NoError(t, err, "Second delete should succeed")
 
 		// Verify final state - resource should be tombstoned
@@ -772,7 +772,7 @@ func TestResourceLifecycle_ReportDeleteResubmitDelete(t *testing.T) {
 
 		// 2. DELETE: Delete the resource
 		log.Info("2. Delete ---------------------")
-		err = usecase.Delete(key)
+		err = usecase.Delete(ctx, key)
 		require.NoError(t, err, "Delete should succeed")
 
 		// Verify delete state
@@ -786,7 +786,7 @@ func TestResourceLifecycle_ReportDeleteResubmitDelete(t *testing.T) {
 
 		// 3. RESUBMIT SAME DELETE: Should be idempotent
 		log.Info("3. Resubmit Delete ---------------------")
-		err = usecase.Delete(key)
+		err = usecase.Delete(ctx, key)
 		require.NoError(t, err, "Resubmitted delete should succeed (idempotent)")
 
 		// Verify state after duplicate delete (operations are idempotent - no changes for tombstoned resources)
@@ -856,7 +856,7 @@ func TestResourceLifecycle_ReportResubmitDeleteResubmit(t *testing.T) {
 
 		// 3. DELETE: Delete the resource
 		log.Info("3. Delete ---------------------")
-		err = usecase.Delete(key)
+		err = usecase.Delete(ctx, key)
 		require.NoError(t, err, "Delete should succeed")
 
 		// Verify delete state
@@ -870,7 +870,7 @@ func TestResourceLifecycle_ReportResubmitDeleteResubmit(t *testing.T) {
 
 		// 4. RESUBMIT SAME DELETE: Should be idempotent
 		log.Info("4. Resubmit Delete ---------------------")
-		err = usecase.Delete(key)
+		err = usecase.Delete(ctx, key)
 		require.NoError(t, err, "Resubmitted delete should succeed (idempotent)")
 
 		// Verify final state after duplicate delete (operations are idempotent - no changes for tombstoned resources)
@@ -945,7 +945,7 @@ func TestResourceLifecycle_ComplexIdempotency(t *testing.T) {
 
 			// 3. DELETE: Delete the resource
 			log.Infof("Cycle %d: Delete Resource", cycle)
-			err = usecase.Delete(key)
+			err = usecase.Delete(ctx, key)
 			require.NoError(t, err, "Delete should succeed in cycle %d", cycle)
 
 			// Verify state after delete
@@ -1007,84 +1007,49 @@ func createTestReportRequestWithCycleData(t *testing.T, resourceType, reporterTy
 func TestGetCurrentAndPreviousWorkspaceID(t *testing.T) {
 	// Test the GetCurrentAndPreviousWorkspaceID function with test data
 	tests := []struct {
-		name                  string
-		representationVersion []data.RepresentationsByVersion
-		currentVersion        uint
-		expectedCurrent       string
-		expectedPrevious      string
+		name             string
+		current          *model.Representations
+		previous         *model.Representations
+		currentVersion   uint
+		expectedCurrent  string
+		expectedPrevious string
 	}{
 		{
-			name: "extract current and previous workspace IDs",
-			representationVersion: []data.RepresentationsByVersion{
-				{
-					Version: 2,
-					Data: map[string]interface{}{
-						"workspace_id": "workspace-new",
-					},
-				},
-				{
-					Version: 1,
-					Data: map[string]interface{}{
-						"workspace_id": "workspace-old",
-					},
-				},
-			},
+			name:             "extract current and previous workspace IDs",
+			current:          createTestRep(t, uint(2), map[string]interface{}{"workspace_id": "workspace-new"}),
+			previous:         createTestRep(t, uint(1), map[string]interface{}{"workspace_id": "workspace-old"}),
 			currentVersion:   2,
 			expectedCurrent:  "workspace-new",
 			expectedPrevious: "workspace-old",
 		},
 		{
-			name: "extract only current workspace ID",
-			representationVersion: []data.RepresentationsByVersion{
-				{
-					Version: 0,
-					Data: map[string]interface{}{
-						"workspace_id": "workspace-initial",
-					},
-				},
-			},
+			name:             "extract only current workspace ID",
+			current:          createTestRep(t, uint(0), map[string]interface{}{"workspace_id": "workspace-initial"}),
+			previous:         nil,
 			currentVersion:   0,
 			expectedCurrent:  "workspace-initial",
 			expectedPrevious: "",
 		},
 		{
-			name: "no workspace IDs found",
-			representationVersion: []data.RepresentationsByVersion{
-				{
-					Version: 1,
-					Data: map[string]interface{}{
-						"other_field": "value",
-					},
-				},
-			},
+			name:             "no workspace IDs found",
+			current:          createTestRep(t, uint(1), map[string]interface{}{"other_field": "value"}),
+			previous:         nil,
 			currentVersion:   1,
 			expectedCurrent:  "",
 			expectedPrevious: "",
 		},
 		{
-			name: "empty workspace ID ignored",
-			representationVersion: []data.RepresentationsByVersion{
-				{
-					Version: 1,
-					Data: map[string]interface{}{
-						"workspace_id": "",
-					},
-				},
-			},
+			name:             "empty workspace ID ignored",
+			current:          createTestRep(t, uint(1), map[string]interface{}{"workspace_id": ""}),
+			previous:         nil,
 			currentVersion:   1,
 			expectedCurrent:  "",
 			expectedPrevious: "",
 		},
 		{
-			name: "workspace ID with special characters",
-			representationVersion: []data.RepresentationsByVersion{
-				{
-					Version: 1,
-					Data: map[string]interface{}{
-						"workspace_id": "workspace-with-dashes_and_underscores",
-					},
-				},
-			},
+			name:             "workspace ID with special characters",
+			current:          createTestRep(t, uint(1), map[string]interface{}{"workspace_id": "workspace-with-dashes_and_underscores"}),
+			previous:         nil,
 			currentVersion:   1,
 			expectedCurrent:  "workspace-with-dashes_and_underscores",
 			expectedPrevious: "",
@@ -1093,12 +1058,24 @@ func TestGetCurrentAndPreviousWorkspaceID(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			current, previous := data.GetCurrentAndPreviousWorkspaceID(tt.representationVersion, tt.currentVersion)
+			current, previous := data.GetCurrentAndPreviousWorkspaceID(tt.current, tt.previous)
 
 			assert.Equal(t, tt.expectedCurrent, current)
 			assert.Equal(t, tt.expectedPrevious, previous)
 		})
 	}
+}
+
+// Helper function to create a Representations for testing
+func createTestRep(t *testing.T, version uint, data map[string]interface{}) *model.Representations {
+	rep, err := model.NewRepresentations(
+		model.Representation(data),
+		&version,
+		nil,
+		nil,
+	)
+	require.NoError(t, err)
+	return rep
 }
 
 func TestTransactionIdIdempotency(t *testing.T) {
@@ -1237,7 +1214,7 @@ func TestTransactionIdIdempotency(t *testing.T) {
 		assert.False(t, updateState.Tombstone, "Resource should remain active after update")
 
 		// 3. Delete resource (no transaction ID) - should update representations
-		err = usecase.Delete(key)
+		err = usecase.Delete(ctx, key)
 		require.NoError(t, err, "Delete should succeed")
 
 		// Verify state after delete
@@ -1292,7 +1269,7 @@ func TestTransactionIdIdempotency(t *testing.T) {
 		assert.False(t, secondState.Tombstone, "Resource should remain active")
 
 		// 3. Delete resource (no transaction ID) - should update representations
-		err = usecase.Delete(key)
+		err = usecase.Delete(ctx, key)
 		require.NoError(t, err, "Delete should succeed")
 
 		// Verify state after delete

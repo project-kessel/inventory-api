@@ -44,4 +44,3 @@ log:
   level: "info"
   livez: true
   readyz: true
-

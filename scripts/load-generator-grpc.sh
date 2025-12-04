@@ -7,7 +7,7 @@ help_me() {
     echo "It requires a local running Inventory API or port-forwarding connection to one in ephemeral (using port defined with -p)"
     echo ""
     echo "REQUIRED ARGUMENTS:"
-    echo "  -n NUM_RUNS: The number of times to run a test loop (one run is one create, update, and delete loop"
+    echo "  -n NUM_RUNS: The number of times to run a test loop (one run is one create, update, and delete loop)"
     echo "  -i INTERVAL: Amount of time between runs"
     echo "  -p PORT_NUM: Port number used for Inventory API"
     echo ""
@@ -22,7 +22,7 @@ help_me() {
 }
 
 livez_check() {
-  STATUS=$(curl -s $LIVEZ_URL | jq -r '.status')
+  STATUS=$(grpcurl -plaintext $LIVEZ_URL | jq -r '.status')
   if [[ "${STATUS}" != "OK" ]]; then
     echo "LiveZ check failed -- is Inventory running or port-forwarded?"
     exit 1
@@ -44,8 +44,8 @@ if [[  -z "${NUM_RUNS}" || -z "${INTERVAL}"  || -z "${PORT_NUM}" ]]; then
   help_me
 fi
 
-LIVEZ_URL="localhost:${PORT_NUM}/api/inventory/v1/livez"
-INVENTORY_URL="localhost:${PORT_NUM}/api/inventory/v1beta2/resources"
+LIVEZ_URL="localhost:${PORT_NUM} kessel.inventory.v1.KesselInventoryHealthService/GetLivez"
+INVENTORY_URL="localhost:${PORT_NUM} kessel.inventory.v1beta2.KesselInventoryService"
 
 for ((i = 0 ; i < ${NUM_RUNS} ; i++)); do
   livez_check
@@ -72,14 +72,14 @@ for ((i = 0 ; i < ${NUM_RUNS} ; i++)); do
     '{"reference":{"resource_type":"host","resource_id":$local_resource_id,"reporter":{"type":"hbi"}}}')
 
   echo "Creating resource..."
-  curl -H "Content-Type: application/json" -H "Authorization: Bearer $TOKEN" -d $REQUEST $INVENTORY_URL
+  grpcurl -plaintext -d "$REQUEST" ${INVENTORY_URL}/ReportResource
 
   if [[ ! "$CREATE_ONLY" == "true" ]]; then
     echo "Updating resource..."
-    curl -H "Content-Type: application/json" -H "Authorization: Bearer $TOKEN" -d $REQUEST $INVENTORY_URL
+    grpcurl -plaintext -d "$REQUEST" ${INVENTORY_URL}/ReportResource
 
     echo "Deleting resource..."
-    curl -X DELETE -H "Content-Type: application/json" -H "Authorization: Bearer $TOKEN" -d $DELETE_REQUEST $INVENTORY_URL
+    grpcurl -plaintext -d "$DELETE_REQUEST" ${INVENTORY_URL}/DeleteResource
   fi
 
   sleep $INTERVAL

@@ -89,6 +89,7 @@ type Claims struct {
 	Issuer            string `json:"iss"`
 	Subject           string `json:"sub"`
 	PreferredUsername string `json:"preferred_username"`
+	ClientID          string `json:"client_id"`
 }
 
 func (l *OAuth2Authenticator) Verify(token string) (*coreosoidc.IDToken, error) {

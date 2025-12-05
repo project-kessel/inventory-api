@@ -10,14 +10,13 @@ import (
 	"github.com/project-kessel/inventory-api/internal/biz"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 
 	"github.com/project-kessel/inventory-api/internal"
 	bizmodel "github.com/project-kessel/inventory-api/internal/biz/model"
-	"github.com/project-kessel/inventory-api/internal/biz/model_legacy"
 	datamodel "github.com/project-kessel/inventory-api/internal/data/model"
 	"github.com/project-kessel/inventory-api/internal/metricscollector"
+	"github.com/project-kessel/inventory-api/internal/testutil"
 )
 
 // Helper function to create a pointer to a uint
@@ -1540,12 +1539,9 @@ func TestSerializableUpdateFails(t *testing.T) {
 }
 
 func setupInMemoryDB(t *testing.T) *gorm.DB {
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{TranslateError: true})
-	require.NoError(t, err)
+	db := testutil.NewSQLiteTestDB(t, &gorm.Config{TranslateError: true})
 
-	err = db.AutoMigrate(&datamodel.Resource{}, &datamodel.ReporterResource{},
-		&datamodel.ReporterRepresentation{}, &datamodel.CommonRepresentation{},
-		&model_legacy.OutboxEvent{})
+	err := Migrate(db, nil)
 	require.NoError(t, err)
 
 	return db
@@ -2396,6 +2392,42 @@ func testTransactionIDUniqueConstraint(t *testing.T, repo ResourceRepository, db
 		duplicateTxID := newUniqueTxID("reporter-duplicate-test")
 		reporterResourceID := uuid.New()
 
+		// Create corresponding ReporterResource rows so the foreign key
+		// constraint on ReporterRepresentation is satisfied.
+		reporterResource1, err := datamodel.NewReporterResource(
+			reporterResourceID,
+			"local-id-1",
+			"ocm",
+			"k8s_cluster",
+			"instance-1",
+			uuid.New(), // resourceID
+			"https://api.example.com/resource/1",
+			"https://console.example.com/resource/1",
+			0,
+			0,
+			false,
+		)
+		require.NoError(t, err)
+
+		reporterResourceID2 := uuid.New()
+		reporterResource2, err := datamodel.NewReporterResource(
+			reporterResourceID2,
+			"local-id-2",
+			"ocm",
+			"k8s_cluster",
+			"instance-1",
+			uuid.New(), // resourceID
+			"https://api.example.com/resource/2",
+			"https://console.example.com/resource/2",
+			0,
+			0,
+			false,
+		)
+		require.NoError(t, err)
+
+		require.NoError(t, db.Create(&reporterResource1).Error)
+		require.NoError(t, db.Create(&reporterResource2).Error)
+
 		reporterRep1, err := datamodel.NewReporterRepresentation(
 			internal.JsonObject{"name": "test-resource-1"},
 			reporterResourceID,
@@ -2410,7 +2442,7 @@ func testTransactionIDUniqueConstraint(t *testing.T, repo ResourceRepository, db
 
 		reporterRep2, err := datamodel.NewReporterRepresentation(
 			internal.JsonObject{"name": "test-resource-2"},
-			uuid.New(), // Different reporter resource ID
+			reporterResourceID2, // Different reporter resource ID
 			1,
 			1,
 			1,

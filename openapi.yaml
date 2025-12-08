@@ -456,7 +456,7 @@ components:
                     type: array
                     items:
                         $ref: '#/components/schemas/kessel.inventory.v1beta2.CheckSelfBulkRequestItem'
-                consistency:
+                consistencyToken:
                     $ref: '#/components/schemas/kessel.inventory.v1beta2.Consistency'
             description: |-
                 CheckSelfBulkRequest allows checking multiple permissions for the caller
@@ -482,7 +482,7 @@ components:
                     items:
                         $ref: '#/components/schemas/kessel.inventory.v1beta2.CheckSelfBulkResponsePair'
                 consistencyToken:
-                    $ref: '#/components/schemas/kessel.inventory.v1beta2.ConsistencyToken'
+                    $ref: '#/components/schemas/kessel.inventory.v1beta2.Consistency'
             description: CheckSelfBulkResponse contains the results of all self-access permission checks in the request.
         kessel.inventory.v1beta2.CheckSelfBulkResponseItem:
             type: object
@@ -520,6 +520,8 @@ components:
                          context, instead of being provided as a SubjectReference.
                 relation:
                     type: string
+                consistencyToken:
+                    $ref: '#/components/schemas/kessel.inventory.v1beta2.Consistency'
             description: |-
                 CheckSelfRequest performs an access check for the caller (self) against a
                  specific object and relation. The subject is derived from the caller's
@@ -534,6 +536,8 @@ components:
                         - ALLOWED_FALSE
                     type: string
                     format: enum
+                consistencyToken:
+                    $ref: '#/components/schemas/kessel.inventory.v1beta2.Consistency'
             description: CheckSelfResponse represents the result of a self-access permission check.
         kessel.inventory.v1beta2.Consistency:
             type: object

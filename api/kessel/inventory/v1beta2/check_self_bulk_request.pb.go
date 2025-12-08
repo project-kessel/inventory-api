@@ -82,11 +82,11 @@ func (x *CheckSelfBulkRequestItem) GetRelation() string {
 // CheckSelf calls when verifying permissions for multiple
 // resource-relation combinations.
 type CheckSelfBulkRequest struct {
-	state         protoimpl.MessageState      `protogen:"open.v1"`
-	Items         []*CheckSelfBulkRequestItem `protobuf:"bytes,1,rep,name=items,proto3" json:"items,omitempty"`
-	Consistency   *Consistency                `protobuf:"bytes,2,opt,name=consistency,proto3" json:"consistency,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state            protoimpl.MessageState      `protogen:"open.v1"`
+	Items            []*CheckSelfBulkRequestItem `protobuf:"bytes,1,rep,name=items,proto3" json:"items,omitempty"`
+	ConsistencyToken *Consistency                `protobuf:"bytes,2,opt,name=consistency_token,json=consistencyToken,proto3,oneof" json:"consistency_token,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *CheckSelfBulkRequest) Reset() {
@@ -126,9 +126,9 @@ func (x *CheckSelfBulkRequest) GetItems() []*CheckSelfBulkRequestItem {
 	return nil
 }
 
-func (x *CheckSelfBulkRequest) GetConsistency() *Consistency {
+func (x *CheckSelfBulkRequest) GetConsistencyToken() *Consistency {
 	if x != nil {
-		return x.Consistency
+		return x.ConsistencyToken
 	}
 	return nil
 }
@@ -140,10 +140,11 @@ const file_kessel_inventory_v1beta2_check_self_bulk_request_proto_rawDesc = "" +
 	"6kessel/inventory/v1beta2/check_self_bulk_request.proto\x12\x18kessel.inventory.v1beta2\x1a\x1bbuf/validate/validate.proto\x1a1kessel/inventory/v1beta2/resource_reference.proto\x1a*kessel/inventory/v1beta2/consistency.proto\"\x8c\x01\n" +
 	"\x18CheckSelfBulkRequestItem\x12K\n" +
 	"\x06object\x18\x01 \x01(\v2+.kessel.inventory.v1beta2.ResourceReferenceB\x06\xbaH\x03\xc8\x01\x01R\x06object\x12#\n" +
-	"\brelation\x18\x02 \x01(\tB\a\xbaH\x04r\x02\x10\x01R\brelation\"\xb6\x01\n" +
+	"\brelation\x18\x02 \x01(\tB\a\xbaH\x04r\x02\x10\x01R\brelation\"\xdc\x01\n" +
 	"\x14CheckSelfBulkRequest\x12U\n" +
-	"\x05items\x18\x01 \x03(\v22.kessel.inventory.v1beta2.CheckSelfBulkRequestItemB\v\xbaH\b\x92\x01\x05\b\x01\x10\xe8\aR\x05items\x12G\n" +
-	"\vconsistency\x18\x02 \x01(\v2%.kessel.inventory.v1beta2.ConsistencyR\vconsistencyBr\n" +
+	"\x05items\x18\x01 \x03(\v22.kessel.inventory.v1beta2.CheckSelfBulkRequestItemB\v\xbaH\b\x92\x01\x05\b\x01\x10\xe8\aR\x05items\x12W\n" +
+	"\x11consistency_token\x18\x02 \x01(\v2%.kessel.inventory.v1beta2.ConsistencyH\x00R\x10consistencyToken\x88\x01\x01B\x14\n" +
+	"\x12_consistency_tokenBr\n" +
 	"(org.project_kessel.api.inventory.v1beta2P\x01ZDgithub.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2b\x06proto3"
 
 var (
@@ -168,7 +169,7 @@ var file_kessel_inventory_v1beta2_check_self_bulk_request_proto_goTypes = []any{
 var file_kessel_inventory_v1beta2_check_self_bulk_request_proto_depIdxs = []int32{
 	2, // 0: kessel.inventory.v1beta2.CheckSelfBulkRequestItem.object:type_name -> kessel.inventory.v1beta2.ResourceReference
 	0, // 1: kessel.inventory.v1beta2.CheckSelfBulkRequest.items:type_name -> kessel.inventory.v1beta2.CheckSelfBulkRequestItem
-	3, // 2: kessel.inventory.v1beta2.CheckSelfBulkRequest.consistency:type_name -> kessel.inventory.v1beta2.Consistency
+	3, // 2: kessel.inventory.v1beta2.CheckSelfBulkRequest.consistency_token:type_name -> kessel.inventory.v1beta2.Consistency
 	3, // [3:3] is the sub-list for method output_type
 	3, // [3:3] is the sub-list for method input_type
 	3, // [3:3] is the sub-list for extension type_name
@@ -183,6 +184,7 @@ func file_kessel_inventory_v1beta2_check_self_bulk_request_proto_init() {
 	}
 	file_kessel_inventory_v1beta2_resource_reference_proto_init()
 	file_kessel_inventory_v1beta2_consistency_proto_init()
+	file_kessel_inventory_v1beta2_check_self_bulk_request_proto_msgTypes[1].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{

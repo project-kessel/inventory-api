@@ -163,7 +163,7 @@ func (*CheckSelfBulkResponsePair_Error) isCheckSelfBulkResponsePair_Response() {
 type CheckSelfBulkResponse struct {
 	state            protoimpl.MessageState       `protogen:"open.v1"`
 	Pairs            []*CheckSelfBulkResponsePair `protobuf:"bytes,1,rep,name=pairs,proto3" json:"pairs,omitempty"`
-	ConsistencyToken *ConsistencyToken            `protobuf:"bytes,2,opt,name=consistency_token,json=consistencyToken,proto3" json:"consistency_token,omitempty"`
+	ConsistencyToken *Consistency                 `protobuf:"bytes,2,opt,name=consistency_token,json=consistencyToken,proto3,oneof" json:"consistency_token,omitempty"`
 	unknownFields    protoimpl.UnknownFields
 	sizeCache        protoimpl.SizeCache
 }
@@ -205,7 +205,7 @@ func (x *CheckSelfBulkResponse) GetPairs() []*CheckSelfBulkResponsePair {
 	return nil
 }
 
-func (x *CheckSelfBulkResponse) GetConsistencyToken() *ConsistencyToken {
+func (x *CheckSelfBulkResponse) GetConsistencyToken() *Consistency {
 	if x != nil {
 		return x.ConsistencyToken
 	}
@@ -216,7 +216,7 @@ var File_kessel_inventory_v1beta2_check_self_bulk_response_proto protoreflect.Fi
 
 const file_kessel_inventory_v1beta2_check_self_bulk_response_proto_rawDesc = "" +
 	"\n" +
-	"7kessel/inventory/v1beta2/check_self_bulk_response.proto\x12\x18kessel.inventory.v1beta2\x1a6kessel/inventory/v1beta2/check_self_bulk_request.proto\x1a0kessel/inventory/v1beta2/consistency_token.proto\x1a&kessel/inventory/v1beta2/allowed.proto\x1a\x1bbuf/validate/validate.proto\x1a\x17google/rpc/status.proto\"X\n" +
+	"7kessel/inventory/v1beta2/check_self_bulk_response.proto\x12\x18kessel.inventory.v1beta2\x1a6kessel/inventory/v1beta2/check_self_bulk_request.proto\x1a&kessel/inventory/v1beta2/allowed.proto\x1a\x1bbuf/validate/validate.proto\x1a\x17google/rpc/status.proto\x1a*kessel/inventory/v1beta2/consistency.proto\"X\n" +
 	"\x19CheckSelfBulkResponseItem\x12;\n" +
 	"\aallowed\x18\x01 \x01(\x0e2!.kessel.inventory.v1beta2.AllowedR\aallowed\"\xec\x01\n" +
 	"\x19CheckSelfBulkResponsePair\x12L\n" +
@@ -224,10 +224,11 @@ const file_kessel_inventory_v1beta2_check_self_bulk_response_proto_rawDesc = "" 
 	"\x04item\x18\x02 \x01(\v23.kessel.inventory.v1beta2.CheckSelfBulkResponseItemH\x00R\x04item\x12*\n" +
 	"\x05error\x18\x03 \x01(\v2\x12.google.rpc.StatusH\x00R\x05errorB\n" +
 	"\n" +
-	"\bresponse\"\xc5\x01\n" +
+	"\bresponse\"\xdb\x01\n" +
 	"\x15CheckSelfBulkResponse\x12S\n" +
 	"\x05pairs\x18\x01 \x03(\v23.kessel.inventory.v1beta2.CheckSelfBulkResponsePairB\b\xbaH\x05\x92\x01\x02\b\x01R\x05pairs\x12W\n" +
-	"\x11consistency_token\x18\x02 \x01(\v2*.kessel.inventory.v1beta2.ConsistencyTokenR\x10consistencyTokenBr\n" +
+	"\x11consistency_token\x18\x02 \x01(\v2%.kessel.inventory.v1beta2.ConsistencyH\x00R\x10consistencyToken\x88\x01\x01B\x14\n" +
+	"\x12_consistency_tokenBr\n" +
 	"(org.project_kessel.api.inventory.v1beta2P\x01ZDgithub.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2b\x06proto3"
 
 var (
@@ -250,7 +251,7 @@ var file_kessel_inventory_v1beta2_check_self_bulk_response_proto_goTypes = []any
 	(Allowed)(0),                      // 3: kessel.inventory.v1beta2.Allowed
 	(*CheckSelfBulkRequestItem)(nil),  // 4: kessel.inventory.v1beta2.CheckSelfBulkRequestItem
 	(*status.Status)(nil),             // 5: google.rpc.Status
-	(*ConsistencyToken)(nil),          // 6: kessel.inventory.v1beta2.ConsistencyToken
+	(*Consistency)(nil),               // 6: kessel.inventory.v1beta2.Consistency
 }
 var file_kessel_inventory_v1beta2_check_self_bulk_response_proto_depIdxs = []int32{
 	3, // 0: kessel.inventory.v1beta2.CheckSelfBulkResponseItem.allowed:type_name -> kessel.inventory.v1beta2.Allowed
@@ -258,7 +259,7 @@ var file_kessel_inventory_v1beta2_check_self_bulk_response_proto_depIdxs = []int
 	0, // 2: kessel.inventory.v1beta2.CheckSelfBulkResponsePair.item:type_name -> kessel.inventory.v1beta2.CheckSelfBulkResponseItem
 	5, // 3: kessel.inventory.v1beta2.CheckSelfBulkResponsePair.error:type_name -> google.rpc.Status
 	1, // 4: kessel.inventory.v1beta2.CheckSelfBulkResponse.pairs:type_name -> kessel.inventory.v1beta2.CheckSelfBulkResponsePair
-	6, // 5: kessel.inventory.v1beta2.CheckSelfBulkResponse.consistency_token:type_name -> kessel.inventory.v1beta2.ConsistencyToken
+	6, // 5: kessel.inventory.v1beta2.CheckSelfBulkResponse.consistency_token:type_name -> kessel.inventory.v1beta2.Consistency
 	6, // [6:6] is the sub-list for method output_type
 	6, // [6:6] is the sub-list for method input_type
 	6, // [6:6] is the sub-list for extension type_name
@@ -272,12 +273,13 @@ func file_kessel_inventory_v1beta2_check_self_bulk_response_proto_init() {
 		return
 	}
 	file_kessel_inventory_v1beta2_check_self_bulk_request_proto_init()
-	file_kessel_inventory_v1beta2_consistency_token_proto_init()
 	file_kessel_inventory_v1beta2_allowed_proto_init()
+	file_kessel_inventory_v1beta2_consistency_proto_init()
 	file_kessel_inventory_v1beta2_check_self_bulk_response_proto_msgTypes[1].OneofWrappers = []any{
 		(*CheckSelfBulkResponsePair_Item)(nil),
 		(*CheckSelfBulkResponsePair_Error)(nil),
 	}
+	file_kessel_inventory_v1beta2_check_self_bulk_response_proto_msgTypes[2].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{

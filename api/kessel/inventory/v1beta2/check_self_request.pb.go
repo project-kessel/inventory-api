@@ -33,10 +33,11 @@ type CheckSelfRequest struct {
 	//
 	// The subject is implicitly the caller, as determined by the authentication
 	// context, instead of being provided as a SubjectReference.
-	Object        *ResourceReference `protobuf:"bytes,1,opt,name=object,proto3" json:"object,omitempty"`
-	Relation      string             `protobuf:"bytes,2,opt,name=relation,proto3" json:"relation,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	Object           *ResourceReference `protobuf:"bytes,1,opt,name=object,proto3" json:"object,omitempty"`
+	Relation         string             `protobuf:"bytes,2,opt,name=relation,proto3" json:"relation,omitempty"`
+	ConsistencyToken *Consistency       `protobuf:"bytes,3,opt,name=consistency_token,json=consistencyToken,proto3,oneof" json:"consistency_token,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *CheckSelfRequest) Reset() {
@@ -83,14 +84,23 @@ func (x *CheckSelfRequest) GetRelation() string {
 	return ""
 }
 
+func (x *CheckSelfRequest) GetConsistencyToken() *Consistency {
+	if x != nil {
+		return x.ConsistencyToken
+	}
+	return nil
+}
+
 var File_kessel_inventory_v1beta2_check_self_request_proto protoreflect.FileDescriptor
 
 const file_kessel_inventory_v1beta2_check_self_request_proto_rawDesc = "" +
 	"\n" +
-	"1kessel/inventory/v1beta2/check_self_request.proto\x12\x18kessel.inventory.v1beta2\x1a\x1bbuf/validate/validate.proto\x1a1kessel/inventory/v1beta2/resource_reference.proto\"\x84\x01\n" +
+	"1kessel/inventory/v1beta2/check_self_request.proto\x12\x18kessel.inventory.v1beta2\x1a\x1bbuf/validate/validate.proto\x1a1kessel/inventory/v1beta2/resource_reference.proto\x1a*kessel/inventory/v1beta2/consistency.proto\"\xf3\x01\n" +
 	"\x10CheckSelfRequest\x12K\n" +
 	"\x06object\x18\x01 \x01(\v2+.kessel.inventory.v1beta2.ResourceReferenceB\x06\xbaH\x03\xc8\x01\x01R\x06object\x12#\n" +
-	"\brelation\x18\x02 \x01(\tB\a\xbaH\x04r\x02\x10\x01R\brelationBr\n" +
+	"\brelation\x18\x02 \x01(\tB\a\xbaH\x04r\x02\x10\x01R\brelation\x12W\n" +
+	"\x11consistency_token\x18\x03 \x01(\v2%.kessel.inventory.v1beta2.ConsistencyH\x00R\x10consistencyToken\x88\x01\x01B\x14\n" +
+	"\x12_consistency_tokenBr\n" +
 	"(org.project_kessel.api.inventory.v1beta2P\x01ZDgithub.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2b\x06proto3"
 
 var (
@@ -109,14 +119,16 @@ var file_kessel_inventory_v1beta2_check_self_request_proto_msgTypes = make([]pro
 var file_kessel_inventory_v1beta2_check_self_request_proto_goTypes = []any{
 	(*CheckSelfRequest)(nil),  // 0: kessel.inventory.v1beta2.CheckSelfRequest
 	(*ResourceReference)(nil), // 1: kessel.inventory.v1beta2.ResourceReference
+	(*Consistency)(nil),       // 2: kessel.inventory.v1beta2.Consistency
 }
 var file_kessel_inventory_v1beta2_check_self_request_proto_depIdxs = []int32{
 	1, // 0: kessel.inventory.v1beta2.CheckSelfRequest.object:type_name -> kessel.inventory.v1beta2.ResourceReference
-	1, // [1:1] is the sub-list for method output_type
-	1, // [1:1] is the sub-list for method input_type
-	1, // [1:1] is the sub-list for extension type_name
-	1, // [1:1] is the sub-list for extension extendee
-	0, // [0:1] is the sub-list for field type_name
+	2, // 1: kessel.inventory.v1beta2.CheckSelfRequest.consistency_token:type_name -> kessel.inventory.v1beta2.Consistency
+	2, // [2:2] is the sub-list for method output_type
+	2, // [2:2] is the sub-list for method input_type
+	2, // [2:2] is the sub-list for extension type_name
+	2, // [2:2] is the sub-list for extension extendee
+	0, // [0:2] is the sub-list for field type_name
 }
 
 func init() { file_kessel_inventory_v1beta2_check_self_request_proto_init() }
@@ -125,6 +137,8 @@ func file_kessel_inventory_v1beta2_check_self_request_proto_init() {
 		return
 	}
 	file_kessel_inventory_v1beta2_resource_reference_proto_init()
+	file_kessel_inventory_v1beta2_consistency_proto_init()
+	file_kessel_inventory_v1beta2_check_self_request_proto_msgTypes[0].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{

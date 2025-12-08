@@ -23,10 +23,11 @@ const (
 
 // CheckSelfResponse represents the result of a self-access permission check.
 type CheckSelfResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Allowed       Allowed                `protobuf:"varint,1,opt,name=allowed,proto3,enum=kessel.inventory.v1beta2.Allowed" json:"allowed,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state            protoimpl.MessageState `protogen:"open.v1"`
+	Allowed          Allowed                `protobuf:"varint,1,opt,name=allowed,proto3,enum=kessel.inventory.v1beta2.Allowed" json:"allowed,omitempty"`
+	ConsistencyToken *Consistency           `protobuf:"bytes,2,opt,name=consistency_token,json=consistencyToken,proto3,oneof" json:"consistency_token,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *CheckSelfResponse) Reset() {
@@ -66,13 +67,22 @@ func (x *CheckSelfResponse) GetAllowed() Allowed {
 	return Allowed_ALLOWED_UNSPECIFIED
 }
 
+func (x *CheckSelfResponse) GetConsistencyToken() *Consistency {
+	if x != nil {
+		return x.ConsistencyToken
+	}
+	return nil
+}
+
 var File_kessel_inventory_v1beta2_check_self_response_proto protoreflect.FileDescriptor
 
 const file_kessel_inventory_v1beta2_check_self_response_proto_rawDesc = "" +
 	"\n" +
-	"2kessel/inventory/v1beta2/check_self_response.proto\x12\x18kessel.inventory.v1beta2\x1a&kessel/inventory/v1beta2/allowed.proto\"P\n" +
+	"2kessel/inventory/v1beta2/check_self_response.proto\x12\x18kessel.inventory.v1beta2\x1a&kessel/inventory/v1beta2/allowed.proto\x1a*kessel/inventory/v1beta2/consistency.proto\"\xbf\x01\n" +
 	"\x11CheckSelfResponse\x12;\n" +
-	"\aallowed\x18\x01 \x01(\x0e2!.kessel.inventory.v1beta2.AllowedR\aallowedBr\n" +
+	"\aallowed\x18\x01 \x01(\x0e2!.kessel.inventory.v1beta2.AllowedR\aallowed\x12W\n" +
+	"\x11consistency_token\x18\x02 \x01(\v2%.kessel.inventory.v1beta2.ConsistencyH\x00R\x10consistencyToken\x88\x01\x01B\x14\n" +
+	"\x12_consistency_tokenBr\n" +
 	"(org.project_kessel.api.inventory.v1beta2P\x01ZDgithub.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2b\x06proto3"
 
 var (
@@ -91,14 +101,16 @@ var file_kessel_inventory_v1beta2_check_self_response_proto_msgTypes = make([]pr
 var file_kessel_inventory_v1beta2_check_self_response_proto_goTypes = []any{
 	(*CheckSelfResponse)(nil), // 0: kessel.inventory.v1beta2.CheckSelfResponse
 	(Allowed)(0),              // 1: kessel.inventory.v1beta2.Allowed
+	(*Consistency)(nil),       // 2: kessel.inventory.v1beta2.Consistency
 }
 var file_kessel_inventory_v1beta2_check_self_response_proto_depIdxs = []int32{
 	1, // 0: kessel.inventory.v1beta2.CheckSelfResponse.allowed:type_name -> kessel.inventory.v1beta2.Allowed
-	1, // [1:1] is the sub-list for method output_type
-	1, // [1:1] is the sub-list for method input_type
-	1, // [1:1] is the sub-list for extension type_name
-	1, // [1:1] is the sub-list for extension extendee
-	0, // [0:1] is the sub-list for field type_name
+	2, // 1: kessel.inventory.v1beta2.CheckSelfResponse.consistency_token:type_name -> kessel.inventory.v1beta2.Consistency
+	2, // [2:2] is the sub-list for method output_type
+	2, // [2:2] is the sub-list for method input_type
+	2, // [2:2] is the sub-list for extension type_name
+	2, // [2:2] is the sub-list for extension extendee
+	0, // [0:2] is the sub-list for field type_name
 }
 
 func init() { file_kessel_inventory_v1beta2_check_self_response_proto_init() }
@@ -107,6 +119,8 @@ func file_kessel_inventory_v1beta2_check_self_response_proto_init() {
 		return
 	}
 	file_kessel_inventory_v1beta2_allowed_proto_init()
+	file_kessel_inventory_v1beta2_consistency_proto_init()
+	file_kessel_inventory_v1beta2_check_self_response_proto_msgTypes[0].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{

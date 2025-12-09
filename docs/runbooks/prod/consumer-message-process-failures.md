@@ -11,8 +11,8 @@ Remediations covered in this guide will require the following:
 
 The Kessel Debug container contains all the tools and endpoints pre-configured for fixing numerous issues, including connecting to SpiceDB with `zed` cli, and Kafka admin scripts. If you need to access either Kafka or SpiceDB, it's recommended to use the debug container
 
-> [!NOTE]
-> Kessel Engineers do not have permissions to run containers in production. AppSRE will need to assist in running the container and if access can't be granted, AppSRE will need to run through these steps.
+> [!IMPORTANT]
+> Kessel Engineers do not have permissions to run or access containers in production without prior elevation of privileges. Before continuing, you must go through the [Breakglass process](https://project-kessel.github.io/docs-internal-overlay/for-red-hatters/running-kessel/monitoring-kessel/breakglass-sop) first in order to run and access the debug pod.
 
 To use:
 
@@ -21,7 +21,7 @@ To use:
 ```bash
 oc process --local \
     -f https://raw.githubusercontent.com/project-kessel/inventory-api/refs/heads/main/tools/kessel-debug-container/kessel-debug-deploy.yaml \
-    -p ENV=stage | oc apply -f -
+    -p ENV=prod | oc apply -f -
 ```
 
 2. Access the Kessel Debug container and configure
@@ -43,7 +43,7 @@ When done, always make sure to remove the Kessel Debug container
 # after exiting from your rsh session
 oc process --local \
     -f https://raw.githubusercontent.com/project-kessel/inventory-api/refs/heads/main/tools/kessel-debug-container/kessel-debug-deploy.yaml \
-    -p ENV=prod | oc apply -f -
+    -p ENV=prod | oc delete -f -
 ```
 
 ## Schema Related Issues
@@ -228,5 +228,5 @@ Once done, make sure to remove the Kessel Debug container
 # after exiting from your rsh session
 oc process --local \
     -f https://raw.githubusercontent.com/project-kessel/inventory-api/refs/heads/main/tools/kessel-debug-container/kessel-debug-deploy.yaml \
-    -p ENV=stage | oc apply -f -
+    -p ENV=prod | oc delete -f -
 ```

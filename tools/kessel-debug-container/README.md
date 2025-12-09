@@ -29,9 +29,13 @@ Everything needed for the debug container is either encompassed in the deploymen
 
 **To Run**:
 
-```shell
-oc process --local -f tools/kessel-debug-container/kessel-debug-deploy.yaml \
-    -p ENV=<target-environment (int, stage, or prod)> | oc apply -f -
+>[!IMPORTANT]
+> In order to use Kessel Debug, you must have permissions to create and exec/rsh to a container in the target environment. If this is for a production issue -- See the [Breakglass Process](https://project-kessel.github.io/docs-internal-overlay/for-red-hatters/running-kessel/monitoring-kessel/breakglass-sop).
+
+```bash
+oc process --local \
+    -f https://raw.githubusercontent.com/project-kessel/inventory-api/refs/heads/main/tools/kessel-debug-container/kessel-debug-deploy.yaml \
+    -p ENV=<target-environment (stage/prod)> | oc apply -f -
 ```
 
 ### Using the Debug Container
@@ -58,7 +62,12 @@ For example:
 * `zed schema read` to read the current schema
 * `zed relationship read hbi/host` to read all relationships for resource type `hbi/host`
 
-Note: using contexts with zed requires permissions to write to a config file which are denied in a rootless container. Environment variables prevent the need to use contexts and should be used in place of them.
+>[!Note]
+> Using contexts with zed requires permissions to write to a config file which are denied in a rootless container. Environment variables prevent the need to use contexts and should be used in place of them.
+
+>[!Warning]
+> The zed cli is called using a wrapper script to prevent delete/write operations by default. It is possible to call the zed cli outside of the wrapper script if needed but write/delete operations should NOT be done lightly. These operations should not be done without Fabric Kessel team guidance.
+
 
 #### Accessing Kafka
 
@@ -82,7 +91,8 @@ Its critical to always remove the debug container when finished.
 
 To destroy the container:
 
-```shell
-oc process --local -f tools/kessel-debug-container/kessel-debug-deploy.yaml \
-    -p ENV=<target-environment (int, stage, or prod)> | oc delete -f -
+```bash
+oc process --local \
+    -f https://raw.githubusercontent.com/project-kessel/inventory-api/refs/heads/main/tools/kessel-debug-container/kessel-debug-deploy.yaml \
+    -p ENV=<target-environment (stage/prod)> | oc delete -f -
 ```

@@ -7,7 +7,7 @@ require (
 	buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go v1.36.10-20250912141014-52f32327d4b0.1
 	buf.build/go/protovalidate v1.0.1
 	github.com/authzed/grpcutil v0.0.0-20250221190651-1985b19b35b8
-	github.com/cloudevents/sdk-go/protocol/kafka_confluent/v2 v2.0.0-20251110143013-8c56e02b0732
+	github.com/cloudevents/sdk-go/protocol/kafka_confluent/v2 v2.0.0-20251210153038-ea9f1fbf2bd9
 	github.com/cloudevents/sdk-go/v2 v2.16.2
 	github.com/confluentinc/confluent-kafka-go/v2 v2.12.0
 	github.com/coreos/go-oidc/v3 v3.17.0
@@ -94,7 +94,7 @@ require (
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/otel/trace v1.38.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
-	go.uber.org/zap v1.27.0 // indirect
+	go.uber.org/zap v1.27.1 // indirect
 	go.yaml.in/yaml/v2 v2.4.3 // indirect
 	golang.org/x/crypto v0.44.0 // indirect
 	golang.org/x/exp v0.0.0-20251113190631-e25ba8c21ef6 // indirect

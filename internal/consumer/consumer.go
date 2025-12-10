@@ -24,7 +24,7 @@ import (
 	"github.com/project-kessel/inventory-api/internal/metricscollector"
 
 	"github.com/project-kessel/inventory-api/internal/authz/allow"
-	"github.com/project-kessel/inventory-api/internal/authz/kessel"
+	"github.com/project-kessel/inventory-api/internal/authz/spicedb"
 	"github.com/project-kessel/inventory-api/internal/pubsub"
 
 	"github.com/spf13/viper"
@@ -33,15 +33,14 @@ import (
 
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
 	"github.com/go-kratos/kratos/v2/log"
-	"github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"gorm.io/gorm"
 
 	"github.com/project-kessel/inventory-api/internal/authz"
 	"github.com/project-kessel/inventory-api/internal/authz/api"
+	kessel "github.com/project-kessel/inventory-api/internal/authz/model"
 	"github.com/project-kessel/inventory-api/internal/biz"
-	"github.com/project-kessel/inventory-api/internal/biz/model_legacy"
 	"go.opentelemetry.io/otel/metric"
 )
 
@@ -180,7 +179,7 @@ func (i *InventoryConsumer) Consume() error {
 
 	var relationsEnabled bool
 	switch i.Authorizer.(type) {
-	case *kessel.KesselAuthz:
+	case *spicedb.SpiceDbRepository:
 		relationsEnabled = true
 	case *allow.AllowAllAuthz:
 		relationsEnabled = false
@@ -527,14 +526,12 @@ func (i *InventoryConsumer) CreateTuple(ctx context.Context, tuples *[]model.Rel
 		return "", fmt.Errorf("failed to convert tuples to relationships: %w", err)
 	}
 
-	resp, err := i.Authorizer.CreateTuples(ctx, &v1beta1.CreateTuplesRequest{
-		Upsert: true,
-		Tuples: relationships,
-		FencingCheck: &v1beta1.FencingCheck{
-			LockId:    i.lockId,
-			LockToken: i.lockToken,
-		},
-	})
+	fencingCheck := &kessel.FencingCheck{
+		LockId:    i.lockId,
+		LockToken: i.lockToken,
+	}
+
+	resp, err := i.Authorizer.CreateRelationships(ctx, relationships, true, fencingCheck)
 	if err != nil {
 		if status.Convert(err).Code() == codes.FailedPrecondition {
 			i.Logger.Errorf("invalid fencing token: %v", i.lockToken)
@@ -547,22 +544,20 @@ func (i *InventoryConsumer) CreateTuple(ctx context.Context, tuples *[]model.Rel
 
 			// Use the first relationship for token fetching
 			firstRelationship := relationships[0]
-			namespace := firstRelationship.GetResource().GetType().GetNamespace()
-			relation := firstRelationship.GetRelation()
-			subject := firstRelationship.GetSubject()
-			resource := &model_legacy.Resource{
-				ResourceType:       firstRelationship.GetResource().GetType().GetName(),
-				ReporterResourceId: firstRelationship.GetResource().GetId(),
-			}
-			_, token, err := i.Authorizer.Check(ctx, namespace, relation, "", resource.ResourceType, resource.ReporterResourceId, subject)
+			checkResp, err := i.Authorizer.Check(ctx, &kessel.CheckRequest{
+				Resource:    firstRelationship.Resource,
+				Relation:    firstRelationship.Relation,
+				Subject:     firstRelationship.Subject,
+				Consistency: kessel.NewConsistencyMinimizeLatency(),
+			})
 			if err != nil {
 				return "", fmt.Errorf("failed to fetch consistency token: %w", err)
 			}
-			return token.GetToken(), nil
+			return checkResp.ConsistencyToken.Token, nil
 		}
 		return "", fmt.Errorf("error creating tuple: %w", err)
 	}
-	return resp.GetConsistencyToken().GetToken(), nil
+	return resp.ConsistencyToken.Token, nil
 }
 
 // UpdateTuple calls the Relations API to create and delete tuples from the message payload received and returns the consistency token
@@ -596,6 +591,11 @@ func (i *InventoryConsumer) UpdateTuple(ctx context.Context, tuplesToCreate *[]m
 func (i *InventoryConsumer) DeleteTuple(ctx context.Context, tuples []model.RelationsTuple) (string, error) {
 	var token string
 
+	fencingCheck := &kessel.FencingCheck{
+		LockId:    i.lockId,
+		LockToken: i.lockToken,
+	}
+
 	// Delete each tuple
 	for _, tuple := range tuples {
 		// Convert RelationsTuple to RelationTupleFilter
@@ -604,13 +604,7 @@ func (i *InventoryConsumer) DeleteTuple(ctx context.Context, tuples []model.Rela
 			return "", fmt.Errorf("failed to convert tuple to filter: %w", err)
 		}
 
-		resp, err := i.Authorizer.DeleteTuples(ctx, &v1beta1.DeleteTuplesRequest{
-			Filter: filter,
-			FencingCheck: &v1beta1.FencingCheck{
-				LockId:    i.lockId,
-				LockToken: i.lockToken,
-			},
-		})
+		resp, err := i.Authorizer.DeleteRelationships(ctx, filter, fencingCheck)
 		if err != nil {
 			if status.Convert(err).Code() == codes.FailedPrecondition {
 				i.Logger.Errorf("invalid fencing token: %v", i.lockToken)
@@ -621,7 +615,7 @@ func (i *InventoryConsumer) DeleteTuple(ctx context.Context, tuples []model.Rela
 
 		// Use the latest token
 		if token == "" {
-			token = resp.GetConsistencyToken().Token
+			token = resp.ConsistencyToken.Token
 		}
 	}
 
@@ -722,13 +716,11 @@ func (i *InventoryConsumer) RebalanceCallback(consumer *kafka.Consumer, event ka
 			i.Logger.Infof("Attempting to acquire lock for lockId: %s", i.lockId)
 
 			lockToken, err := i.Retry(func() (string, error) {
-				resp, err := i.Authorizer.AcquireLock(context.Background(), &v1beta1.AcquireLockRequest{
-					LockId: i.lockId,
-				})
+				resp, err := i.Authorizer.AcquireLock(context.Background(), i.lockId)
 				if err != nil {
 					return "", err
 				}
-				return resp.GetLockToken(), nil
+				return resp.LockToken, nil
 			}, i.MetricsCollector.ConsumerErrors)
 			if err != nil {
 				i.Logger.Errorf("failed to acquire lock token for %s: %v", i.lockId, err)
@@ -782,9 +774,9 @@ func (i *InventoryConsumer) RebalanceCallback(consumer *kafka.Consumer, event ka
 	return nil
 }
 
-// convertTuplesToRelationships converts a slice of RelationsTuple to v1beta1.Relationship protobuf messages
-func (i *InventoryConsumer) convertTuplesToRelationships(tuples []model.RelationsTuple) ([]*v1beta1.Relationship, error) {
-	var relationships []*v1beta1.Relationship
+// convertTuplesToRelationships converts a slice of RelationsTuple to kessel.Relationship domain objects
+func (i *InventoryConsumer) convertTuplesToRelationships(tuples []model.RelationsTuple) ([]*kessel.Relationship, error) {
+	var relationships []*kessel.Relationship
 
 	for _, tuple := range tuples {
 		relationship, err := i.convertTupleToRelationship(tuple)
@@ -797,21 +789,21 @@ func (i *InventoryConsumer) convertTuplesToRelationships(tuples []model.Relation
 	return relationships, nil
 }
 
-// convertTupleToRelationship converts a single RelationsTuple to v1beta1.Relationship
-func (i *InventoryConsumer) convertTupleToRelationship(tuple model.RelationsTuple) (*v1beta1.Relationship, error) {
+// convertTupleToRelationship converts a single RelationsTuple to kessel.Relationship domain object
+func (i *InventoryConsumer) convertTupleToRelationship(tuple model.RelationsTuple) (*kessel.Relationship, error) {
 
-	return &v1beta1.Relationship{
-		Resource: &v1beta1.ObjectReference{
-			Type: &v1beta1.ObjectType{
+	return &kessel.Relationship{
+		Resource: &kessel.ObjectReference{
+			Type: &kessel.ObjectType{
 				Name:      tuple.Resource().Type().Name(),
 				Namespace: tuple.Resource().Type().Namespace(), // Use resource type as namespace
 			},
 			Id: tuple.Resource().Id().Serialize(),
 		},
 		Relation: tuple.Relation(),
-		Subject: &v1beta1.SubjectReference{
-			Subject: &v1beta1.ObjectReference{
-				Type: &v1beta1.ObjectType{
+		Subject: &kessel.SubjectReference{
+			Subject: &kessel.ObjectReference{
+				Type: &kessel.ObjectType{
 					Name:      tuple.Subject().Subject().Type().Name(),
 					Namespace: tuple.Subject().Subject().Type().Namespace(),
 				},
@@ -821,8 +813,8 @@ func (i *InventoryConsumer) convertTupleToRelationship(tuple model.RelationsTupl
 	}, nil
 }
 
-// convertTupleToFilter converts a model.RelationsTuple to v1beta1.RelationTupleFilter
-func (i *InventoryConsumer) convertTupleToFilter(tuple model.RelationsTuple) (*v1beta1.RelationTupleFilter, error) {
+// convertTupleToFilter converts a model.RelationsTuple to kessel.RelationTupleFilter
+func (i *InventoryConsumer) convertTupleToFilter(tuple model.RelationsTuple) (*kessel.RelationTupleFilter, error) {
 	// Store values in variables to take their addresses
 	resourceNamespace := tuple.Resource().Type().Namespace()
 	resourceType := tuple.Resource().Type().Name()
@@ -832,12 +824,12 @@ func (i *InventoryConsumer) convertTupleToFilter(tuple model.RelationsTuple) (*v
 	subjectType := tuple.Subject().Subject().Type().Name()
 	subjectId := tuple.Subject().Subject().Id().Serialize()
 
-	return &v1beta1.RelationTupleFilter{
+	return &kessel.RelationTupleFilter{
 		ResourceNamespace: &resourceNamespace,
 		ResourceType:      &resourceType,
 		ResourceId:        &resourceId,
 		Relation:          &relation,
-		SubjectFilter: &v1beta1.SubjectFilter{
+		SubjectFilter: &kessel.SubjectFilter{
 			SubjectNamespace: &subjectNamespace,
 			SubjectType:      &subjectType,
 			SubjectId:        &subjectId,

@@ -2,14 +2,12 @@ package allow
 
 import (
 	"context"
-	"io"
 
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/metadata"
 
 	"github.com/go-kratos/kratos/v2/log"
-	kesselv1 "github.com/project-kessel/relations-api/api/kessel/relations/v1"
-	"github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
+	"github.com/project-kessel/inventory-api/internal/authz/api"
+	kessel "github.com/project-kessel/inventory-api/internal/authz/model"
 )
 
 type AllowAllAuthz struct {
@@ -23,87 +21,71 @@ func New(logger *log.Helper) *AllowAllAuthz {
 	}
 }
 
-func (a *AllowAllAuthz) Health(ctx context.Context) (*kesselv1.GetReadyzResponse, error) {
-	return &kesselv1.GetReadyzResponse{Status: "OK", Code: 200}, nil
-
+func (a *AllowAllAuthz) Health(ctx context.Context) (*kessel.GetReadyzResponse, error) {
+	return &kessel.GetReadyzResponse{Status: "OK", Code: 200}, nil
 }
 
-func (a *AllowAllAuthz) Check(context.Context, string, string, string, string, string, *v1beta1.SubjectReference) (v1beta1.CheckResponse_Allowed, *v1beta1.ConsistencyToken, error) {
-	return v1beta1.CheckResponse_ALLOWED_TRUE, nil, nil
+func (a *AllowAllAuthz) IsBackendAvailable() error {
+	return nil
 }
 
-func (a *AllowAllAuthz) CheckForUpdate(context.Context, string, string, string, string, *v1beta1.SubjectReference) (v1beta1.CheckForUpdateResponse_Allowed, *v1beta1.ConsistencyToken, error) {
-	return v1beta1.CheckForUpdateResponse_ALLOWED_TRUE, nil, nil
+func (a *AllowAllAuthz) Check(ctx context.Context, request *kessel.CheckRequest) (*kessel.CheckResponse, error) {
+	return &kessel.CheckResponse{Allowed: kessel.AllowedTrue}, nil
 }
 
-func (a *AllowAllAuthz) CheckBulk(ctx context.Context, req *v1beta1.CheckBulkRequest) (*v1beta1.CheckBulkResponse, error) {
-	pairs := make([]*v1beta1.CheckBulkResponsePair, len(req.Items))
+func (a *AllowAllAuthz) CheckForUpdate(ctx context.Context, request *kessel.CheckForUpdateRequest) (*kessel.CheckForUpdateResponse, error) {
+	return &kessel.CheckForUpdateResponse{Allowed: kessel.AllowedTrue}, nil
+}
+
+func (a *AllowAllAuthz) CheckBulk(ctx context.Context, req *kessel.CheckBulkRequest) (*kessel.CheckBulkResponse, error) {
+	pairs := make([]*kessel.CheckBulkResponsePair, len(req.Items))
 	for i, item := range req.Items {
-		pairs[i] = &v1beta1.CheckBulkResponsePair{
+		pairs[i] = &kessel.CheckBulkResponsePair{
 			Request: item,
-			Response: &v1beta1.CheckBulkResponsePair_Item{
-				Item: &v1beta1.CheckBulkResponseItem{
-					Allowed: v1beta1.CheckBulkResponseItem_ALLOWED_TRUE,
-				},
+			Item: &kessel.CheckBulkResponseItem{
+				Allowed: kessel.AllowedTrue,
 			},
 		}
 	}
-	return &v1beta1.CheckBulkResponse{Pairs: pairs}, nil
+	return &kessel.CheckBulkResponse{Pairs: pairs}, nil
 }
 
-type mockLookupResourcesClient struct {
-	ctx context.Context
+func (a *AllowAllAuthz) CreateRelationships(ctx context.Context, rels []*kessel.Relationship, touch api.TouchSemantics, fencing *kessel.FencingCheck) (*kessel.CreateRelationshipsResponse, error) {
+	return &kessel.CreateRelationshipsResponse{}, nil
 }
 
-func (m *mockLookupResourcesClient) Recv() (*v1beta1.LookupResourcesResponse, error) {
-	// Return EOF immediately to indicate end of stream
-	return nil, io.EOF
+func (a *AllowAllAuthz) DeleteRelationships(ctx context.Context, filter *kessel.RelationTupleFilter, fencing *kessel.FencingCheck) (*kessel.DeleteRelationshipsResponse, error) {
+	return &kessel.DeleteRelationshipsResponse{}, nil
 }
 
-func (m *mockLookupResourcesClient) Header() (metadata.MD, error) {
-	return nil, nil
+func (a *AllowAllAuthz) ReadRelationships(ctx context.Context, filter *kessel.RelationTupleFilter, limit uint32, continuation api.ContinuationToken, consistency *kessel.Consistency) (chan *api.RelationshipResult, chan error, error) {
+	results := make(chan *api.RelationshipResult)
+	errs := make(chan error, 1)
+	close(results)
+	close(errs)
+	return results, errs, nil
 }
 
-func (m *mockLookupResourcesClient) Trailer() metadata.MD {
-	return nil
+func (a *AllowAllAuthz) LookupResources(ctx context.Context, resourceType *kessel.ObjectType, relation string, subject *kessel.SubjectReference, limit uint32, continuation api.ContinuationToken, consistency *kessel.Consistency) (chan *api.ResourceResult, chan error, error) {
+	results := make(chan *api.ResourceResult)
+	errs := make(chan error, 1)
+	close(results)
+	close(errs)
+	return results, errs, nil
 }
 
-func (m *mockLookupResourcesClient) CloseSend() error {
-	return nil
+func (a *AllowAllAuthz) LookupSubjects(ctx context.Context, subjectType *kessel.ObjectType, subjectRelation, relation string, resource *kessel.ObjectReference, limit uint32, continuation api.ContinuationToken, consistency *kessel.Consistency) (chan *api.SubjectResult, chan error, error) {
+	results := make(chan *api.SubjectResult)
+	errs := make(chan error, 1)
+	close(results)
+	close(errs)
+	return results, errs, nil
 }
 
-func (m *mockLookupResourcesClient) Context() context.Context {
-	return m.ctx
+func (a *AllowAllAuthz) ImportBulkTuples(stream grpc.ClientStreamingServer[kessel.ImportBulkTuplesRequest, kessel.ImportBulkTuplesResponse]) error {
+	return stream.SendAndClose(&kessel.ImportBulkTuplesResponse{NumImported: 0})
 }
 
-func (m *mockLookupResourcesClient) SendMsg(msg interface{}) error {
-	return nil
-}
-
-func (m *mockLookupResourcesClient) RecvMsg(msg interface{}) error {
-	return nil
-}
-
-func (a *AllowAllAuthz) LookupResources(ctx context.Context, in *v1beta1.LookupResourcesRequest) (grpc.ServerStreamingClient[v1beta1.LookupResourcesResponse], error) {
-	return &mockLookupResourcesClient{ctx: ctx}, nil
-}
-
-func (a *AllowAllAuthz) AcquireLock(ctx context.Context, r *v1beta1.AcquireLockRequest) (*v1beta1.AcquireLockResponse, error) {
-	return &v1beta1.AcquireLockResponse{}, nil
-}
-
-func (a *AllowAllAuthz) CreateTuples(ctx context.Context, r *v1beta1.CreateTuplesRequest) (*v1beta1.CreateTuplesResponse, error) {
-	return &v1beta1.CreateTuplesResponse{}, nil
-}
-
-func (a *AllowAllAuthz) DeleteTuples(ctx context.Context, r *v1beta1.DeleteTuplesRequest) (*v1beta1.DeleteTuplesResponse, error) {
-	return &v1beta1.DeleteTuplesResponse{}, nil
-}
-
-func (a *AllowAllAuthz) UnsetWorkspace(ctx context.Context, local_resource_id, name, namespace string) (*v1beta1.DeleteTuplesResponse, error) {
-	return &v1beta1.DeleteTuplesResponse{}, nil
-}
-
-func (a *AllowAllAuthz) SetWorkspace(ctx context.Context, local_resource_id, workspace, name, namespace string, upsert bool) (*v1beta1.CreateTuplesResponse, error) {
-	return &v1beta1.CreateTuplesResponse{}, nil
+func (a *AllowAllAuthz) AcquireLock(ctx context.Context, lockId string) (*kessel.AcquireLockResponse, error) {
+	return &kessel.AcquireLockResponse{LockToken: "fake-lock-token"}, nil
 }

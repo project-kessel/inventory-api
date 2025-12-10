@@ -50,7 +50,7 @@ func (r *healthRepo) IsBackendAvailable(ctx context.Context) (*pb.GetReadyzRespo
 	}
 	if authz.CheckAuthorizer(r.CompletedAuth) == "Kessel" {
 		if viper.GetBool("log.readyz") {
-			log.Infof("Storage type %s and relations-api %s", storageType, health.GetStatus())
+			log.Infof("Storage type %s and relations-api %s", storageType, health.Status)
 		}
 		return newResponse("STORAGE "+storageType+" and RELATIONS-API", 200), nil
 	}
@@ -66,7 +66,7 @@ func (r *healthRepo) IsRelationsAvailable(ctx context.Context) (*pb.GetReadyzRes
 	}
 	if authz.CheckAuthorizer(r.CompletedAuth) == "Kessel" {
 		if viper.GetBool("log.readyz") {
-			log.Infof("relations-api %s", health.GetStatus())
+			log.Infof("relations-api %s", health.Status)
 		}
 	}
 	return newResponse("RELATIONS-API", 200), nil

@@ -11,8 +11,7 @@ import (
 	"github.com/project-kessel/inventory-api/internal"
 	"github.com/project-kessel/inventory-api/internal/biz"
 	bizmodel "github.com/project-kessel/inventory-api/internal/biz/model"
-	kessel "github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
-	"google.golang.org/protobuf/proto"
+	kessel "github.com/project-kessel/inventory-api/internal/authz/model"
 	"gorm.io/gorm"
 )
 
@@ -385,11 +384,15 @@ func convertResourceToUnsetTupleEventLegacy(resource Resource, namespace string)
 		namespace = strings.ToLower(resource.Reporter.ReporterType)
 	}
 
+	resourceType := resource.ResourceType
+	resourceId := resource.ReporterResourceId
+	relation := "workspace"
+
 	tuple := &kessel.RelationTupleFilter{
-		ResourceNamespace: proto.String(namespace),
-		ResourceType:      proto.String(resource.ResourceType),
-		ResourceId:        proto.String(resource.ReporterResourceId),
-		Relation:          proto.String("workspace"),
+		ResourceNamespace: &namespace,
+		ResourceType:      &resourceType,
+		ResourceId:        &resourceId,
+		Relation:          &relation,
 	}
 
 	marshalledJson, err := json.Marshal(tuple)

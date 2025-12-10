@@ -12,6 +12,7 @@ import (
 	"github.com/project-kessel/inventory-api/cmd/common"
 	"github.com/project-kessel/inventory-api/internal/authn/interceptor"
 	authzapi "github.com/project-kessel/inventory-api/internal/authz/api"
+	kessel "github.com/project-kessel/inventory-api/internal/authz/model"
 	"github.com/project-kessel/inventory-api/internal/biz"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
 	"github.com/project-kessel/inventory-api/internal/biz/model_legacy"
@@ -20,9 +21,7 @@ import (
 	"github.com/project-kessel/inventory-api/internal/metricscollector"
 	"github.com/project-kessel/inventory-api/internal/pubsub"
 	"github.com/project-kessel/inventory-api/internal/server"
-	kessel "github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
 	"github.com/sony/gobreaker"
-	"google.golang.org/grpc"
 	"gorm.io/gorm"
 
 	"sync"
@@ -262,12 +261,30 @@ func (uc *Usecase) Check(ctx context.Context, permission, namespace string, sub 
 		consistencyToken = res.ConsistencyToken().Serialize()
 	}
 
-	allowed, _, err := uc.Authz.Check(ctx, namespace, permission, consistencyToken, reporterResourceKey.ResourceType().Serialize(), reporterResourceKey.LocalResourceId().Serialize(), sub)
+	var consistency *kessel.Consistency
+	if consistencyToken != "" {
+		consistency = kessel.NewConsistencyAtLeastAsFresh(consistencyToken)
+	} else {
+		consistency = kessel.NewConsistencyMinimizeLatency()
+	}
+
+	resp, err := uc.Authz.Check(ctx, &kessel.CheckRequest{
+		Resource: &kessel.ObjectReference{
+			Type: &kessel.ObjectType{
+				Namespace: namespace,
+				Name:      reporterResourceKey.ResourceType().Serialize(),
+			},
+			Id: reporterResourceKey.LocalResourceId().Serialize(),
+		},
+		Relation:    permission,
+		Subject:     sub,
+		Consistency: consistency,
+	})
 	if err != nil {
 		return false, err
 	}
 
-	if allowed == kessel.CheckResponse_ALLOWED_TRUE {
+	if resp.Allowed == kessel.AllowedTrue {
 		return true, nil
 	}
 	return false, nil
@@ -275,12 +292,22 @@ func (uc *Usecase) Check(ctx context.Context, permission, namespace string, sub 
 
 // CheckForUpdate forwards the request to Relations CheckForUpdate
 func (uc *Usecase) CheckForUpdate(ctx context.Context, permission, namespace string, sub *kessel.SubjectReference, reporterResourceKey model.ReporterResourceKey) (bool, error) {
-	allowed, _, err := uc.Authz.CheckForUpdate(ctx, namespace, permission, reporterResourceKey.ResourceType().Serialize(), reporterResourceKey.LocalResourceId().Serialize(), sub)
+	resp, err := uc.Authz.CheckForUpdate(ctx, &kessel.CheckForUpdateRequest{
+		Resource: &kessel.ObjectReference{
+			Type: &kessel.ObjectType{
+				Namespace: namespace,
+				Name:      reporterResourceKey.ResourceType().Serialize(),
+			},
+			Id: reporterResourceKey.LocalResourceId().Serialize(),
+		},
+		Relation: permission,
+		Subject:  sub,
+	})
 	if err != nil {
 		return false, err
 	}
 
-	if allowed == kessel.CheckForUpdateResponse_ALLOWED_TRUE {
+	if resp.Allowed == kessel.AllowedTrue {
 		return true, nil
 	}
 	return false, nil
@@ -605,8 +632,17 @@ func updateExistingReporterResource(ctx context.Context, m *model_legacy.Resourc
 }
 
 // LookupResources delegates resource lookup to the authorization service.
-func (uc *Usecase) LookupResources(ctx context.Context, request *kessel.LookupResourcesRequest) (grpc.ServerStreamingClient[kessel.LookupResourcesResponse], error) {
-	return uc.Authz.LookupResources(ctx, request)
+// Returns channels for streaming results - the caller needs to convert to gRPC stream.
+func (uc *Usecase) LookupResources(ctx context.Context, resourceType *kessel.ObjectType, relation string, subject *kessel.SubjectReference, limit uint32, continuationToken string) (chan *authzapi.ResourceResult, chan error, error) {
+	return uc.Authz.LookupResources(
+		ctx,
+		resourceType,
+		relation,
+		subject,
+		limit,
+		authzapi.ContinuationToken(continuationToken),
+		nil, // consistency - using default
+	)
 }
 
 // CheckLegacy verifies if a subject has the specified permission on a resource identified by the reporter resource ID.
@@ -622,12 +658,30 @@ func (uc *Usecase) CheckLegacy(ctx context.Context, permission, namespace string
 		res = &model_legacy.Resource{ResourceType: id.ResourceType, ReporterResourceId: id.LocalResourceId}
 	}
 
-	allowed, _, err := uc.Authz.Check(ctx, namespace, permission, res.ConsistencyToken, res.ResourceType, res.ReporterResourceId, sub)
+	var consistency *kessel.Consistency
+	if res.ConsistencyToken != "" {
+		consistency = kessel.NewConsistencyAtLeastAsFresh(res.ConsistencyToken)
+	} else {
+		consistency = kessel.NewConsistencyMinimizeLatency()
+	}
+
+	resp, err := uc.Authz.Check(ctx, &kessel.CheckRequest{
+		Resource: &kessel.ObjectReference{
+			Type: &kessel.ObjectType{
+				Namespace: namespace,
+				Name:      res.ResourceType,
+			},
+			Id: res.ReporterResourceId,
+		},
+		Relation:    permission,
+		Subject:     sub,
+		Consistency: consistency,
+	})
 	if err != nil {
 		return false, err
 	}
 
-	if allowed == kessel.CheckResponse_ALLOWED_TRUE {
+	if resp.Allowed == kessel.AllowedTrue {
 		return true, nil
 	}
 	return false, nil
@@ -650,19 +704,29 @@ func (uc *Usecase) CheckForUpdateLegacy(ctx context.Context, permission, namespa
 		}
 	}
 
-	allowed, consistency, err := uc.Authz.CheckForUpdate(ctx, namespace, permission, res.ResourceType, res.ReporterResourceId, sub)
+	resp, err := uc.Authz.CheckForUpdate(ctx, &kessel.CheckForUpdateRequest{
+		Resource: &kessel.ObjectReference{
+			Type: &kessel.ObjectType{
+				Namespace: namespace,
+				Name:      res.ResourceType,
+			},
+			Id: res.ReporterResourceId,
+		},
+		Relation: permission,
+		Subject:  sub,
+	})
 	if err != nil {
 		return false, err
 	}
 
-	if allowed == kessel.CheckForUpdateResponse_ALLOWED_TRUE {
+	if resp.Allowed == kessel.AllowedTrue {
 		if id.ResourceType == "workspace" && namespace == "rbac" { //TODO: delete this when workspaces are resources
 			return true, nil
 		}
 
 		// Only update consistency token if resource exists in DB.
-		if recordToken && consistency != nil {
-			res.ConsistencyToken = consistency.Token
+		if recordToken && resp.ConsistencyToken != nil {
+			res.ConsistencyToken = resp.ConsistencyToken.Token
 			_, err := uc.LegacyReporterResourceRepository.Update(ctx, res, res.ID, uc.Namespace, "")
 			if err != nil {
 				return false, err // we're allowed, but failed to update consistency token
@@ -719,12 +783,32 @@ func (uc *Usecase) checkWorker(ctx context.Context, permission, namespace string
 	for resource := range resourceChan {
 		log.Debugf("ListResourcesInWorkspace: checkforview on %+v", resource)
 
-		if allowed, _, err := uc.Authz.Check(ctx, namespace, permission, resource.ConsistencyToken, resource.ResourceType, resource.ReporterResourceId, sub); err == nil && allowed == kessel.CheckResponse_ALLOWED_TRUE {
+		var consistency *kessel.Consistency
+		if resource.ConsistencyToken != "" {
+			consistency = kessel.NewConsistencyAtLeastAsFresh(resource.ConsistencyToken)
+		} else {
+			consistency = kessel.NewConsistencyMinimizeLatency()
+		}
+
+		resp, err := uc.Authz.Check(ctx, &kessel.CheckRequest{
+			Resource: &kessel.ObjectReference{
+				Type: &kessel.ObjectType{
+					Namespace: namespace,
+					Name:      resource.ResourceType,
+				},
+				Id: resource.ReporterResourceId,
+			},
+			Relation:    permission,
+			Subject:     sub,
+			Consistency: consistency,
+		})
+
+		if err == nil && resp.Allowed == kessel.AllowedTrue {
 			allowedChan <- resource
 		} else if err != nil {
 			errorChan <- err
-		} else if allowed != kessel.CheckResponse_ALLOWED_TRUE {
-			log.Debugf("ListResourcesInWorkspace: response was not allowed: %v", allowed)
+		} else if resp.Allowed != kessel.AllowedTrue {
+			log.Debugf("ListResourcesInWorkspace: response was not allowed: %v", resp.Allowed)
 		}
 		wg.Done()
 	}

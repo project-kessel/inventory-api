@@ -3,29 +3,29 @@ package authz
 import (
 	"context"
 
-	"github.com/project-kessel/inventory-api/internal/authz/kessel"
+	"github.com/project-kessel/inventory-api/internal/authz/spicedb"
 )
 
 type Config struct {
-	Authz  string
-	Kessel *kessel.Config
+	Authz   string
+	SpiceDB *spicedb.Config
 }
 
 func NewConfig(o *Options) *Config {
-	var kcfg *kessel.Config
-	if o.Authz == Kessel {
-		kcfg = kessel.NewConfig(o.Kessel)
+	var scfg *spicedb.Config
+	if o.Authz == SpiceDB {
+		scfg = spicedb.NewConfig(o.SpiceDB)
 	}
 
 	return &Config{
-		Authz:  o.Authz,
-		Kessel: kcfg,
+		Authz:   o.Authz,
+		SpiceDB: scfg,
 	}
 }
 
 type completedConfig struct {
-	Authz  string
-	Kessel kessel.CompletedConfig
+	Authz   string
+	SpiceDB *spicedb.Config
 }
 
 type CompletedConfig struct {
@@ -37,12 +37,8 @@ func (c *Config) Complete(ctx context.Context) (CompletedConfig, []error) {
 		Authz: c.Authz,
 	}
 
-	if c.Authz == Kessel {
-		if ksl, errs := c.Kessel.Complete(ctx); errs != nil {
-			return CompletedConfig{}, nil
-		} else {
-			cfg.Kessel = ksl
-		}
+	if c.Authz == SpiceDB {
+		cfg.SpiceDB = c.SpiceDB
 	}
 
 	return CompletedConfig{cfg}, nil

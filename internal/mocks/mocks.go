@@ -12,7 +12,7 @@ import (
 
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
 
-	kesselv1 "github.com/project-kessel/relations-api/api/kessel/relations/v1"
+	kessel "github.com/project-kessel/inventory-api/internal/authz/model"
 	"github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
 	"github.com/stretchr/testify/mock"
 	"google.golang.org/grpc"
@@ -54,9 +54,9 @@ type MockLookupResourcesStream struct {
 	current   int
 }
 
-func (m *MockAuthz) Health(ctx context.Context) (*kesselv1.GetReadyzResponse, error) {
+func (m *MockAuthz) Health(ctx context.Context) (*kessel.GetReadyzResponse, error) {
 	args := m.Called(ctx)
-	return args.Get(0).(*kesselv1.GetReadyzResponse), args.Error(1)
+	return args.Get(0).(*kessel.GetReadyzResponse), args.Error(1)
 }
 
 func (m *MockHealthRepo) IsBackendAvailable(ctx context.Context) (*pb.GetReadyzResponse, error) {

@@ -68,11 +68,10 @@ func LogConfigurationInfo(options *OptionsConfig) {
 		)
 	}
 
-	if options.Authz.Authz == authz.Kessel {
-		log.Debugf("Authz Configuration: URL: %s, Insecure?: %t, OIDC?: %t",
-			options.Authz.Kessel.URL,
-			options.Authz.Kessel.Insecure,
-			options.Authz.Kessel.EnableOidcAuth,
+	if options.Authz.Authz == authz.SpiceDB {
+		log.Debugf("Authz Configuration: Endpoint: %s, UseTLS?: %t",
+			options.Authz.SpiceDB.Endpoint,
+			options.Authz.SpiceDB.UseTLS,
 		)
 	}
 
@@ -103,9 +102,8 @@ func (o *OptionsConfig) InjectClowdAppConfig(appconfig *clowder.AppConfig) error
 	// check for authz config
 	if len(appconfig.Endpoints) > 0 {
 		for _, endpoint := range appconfig.Endpoints {
-			if endpoint.App == authz.RelationsAPI {
-				o.ConfigureAuthz(endpoint)
-			}
+			// Skip Authz configuration as we're using SpiceDB directly now
+			_ = endpoint
 		}
 	}
 	// check for db config
@@ -123,9 +121,10 @@ func (o *OptionsConfig) InjectClowdAppConfig(appconfig *clowder.AppConfig) error
 }
 
 // ConfigureAuthz updates Authz settings based on ClowdApp AppConfig
+// Note: This is deprecated as we now use SpiceDB directly
 func (o *OptionsConfig) ConfigureAuthz(endpoint clowder.DependencyEndpoint) {
-	o.Authz.Authz = authz.Kessel
-	o.Authz.Kessel.URL = fmt.Sprintf("%s:%d", endpoint.Hostname, 9000)
+	// No-op: SpiceDB configuration should be done via config files
+	_ = endpoint
 }
 
 // ConfigureStorage updates Storage settings based on ClowdApp AppConfig

@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"strings"
 
 	"github.com/go-kratos/kratos/v2/log"
@@ -15,8 +14,7 @@ import (
 	"github.com/project-kessel/inventory-api/internal/biz/usecase/resources"
 	"github.com/project-kessel/inventory-api/internal/middleware"
 	conv "github.com/project-kessel/inventory-api/internal/service/common"
-	pbv1beta1 "github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
-	rpcstatus "google.golang.org/genproto/googleapis/rpc/status"
+	kessel "github.com/project-kessel/inventory-api/internal/authz/model"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -113,19 +111,19 @@ func (s *InventoryService) CheckBulk(ctx context.Context, req *pb.CheckBulkReque
 	}
 
 	log.Info("CheckBulk using v1beta2 db")
-	v1beta1Req := mapCheckBulkRequestToV1beta1(req)
-	resp, err := s.Ctl.CheckBulk(ctx, v1beta1Req)
+	kesselReq := mapCheckBulkRequestToKessel(req)
+	resp, err := s.Ctl.CheckBulk(ctx, kesselReq)
 	if err != nil {
 		return nil, err
 	}
-	return mapCheckBulkResponseFromV1beta1(resp), nil
+	return mapCheckBulkResponseFromKessel(resp), nil
 }
 
-func subjectReferenceFromSubject(subject *pb.SubjectReference) *pbv1beta1.SubjectReference {
-	return &pbv1beta1.SubjectReference{
+func subjectReferenceFromSubject(subject *pb.SubjectReference) *kessel.SubjectReference {
+	return &kessel.SubjectReference{
 		Relation: subject.Relation,
-		Subject: &pbv1beta1.ObjectReference{
-			Type: &pbv1beta1.ObjectType{
+		Subject: &kessel.ObjectReference{
+			Type: &kessel.ObjectType{
 				Namespace: subject.Resource.GetReporter().GetType(),
 				Name:      subject.Resource.GetResourceType(),
 			},
@@ -134,7 +132,7 @@ func subjectReferenceFromSubject(subject *pb.SubjectReference) *pbv1beta1.Subjec
 	}
 }
 
-func subjectReferenceFromSubjectV1beta1(subject *pbv1beta1.SubjectReference) *pb.SubjectReference {
+func subjectReferenceFromSubjectKessel(subject *kessel.SubjectReference) *pb.SubjectReference {
 	return &pb.SubjectReference{
 		Relation: subject.Relation,
 		Resource: &pb.ResourceReference{
@@ -147,12 +145,12 @@ func subjectReferenceFromSubjectV1beta1(subject *pbv1beta1.SubjectReference) *pb
 	}
 }
 
-func mapCheckBulkRequestToV1beta1(req *pb.CheckBulkRequest) *pbv1beta1.CheckBulkRequest {
-	items := make([]*pbv1beta1.CheckBulkRequestItem, len(req.GetItems()))
+func mapCheckBulkRequestToKessel(req *pb.CheckBulkRequest) *kessel.CheckBulkRequest {
+	items := make([]*kessel.CheckBulkRequestItem, len(req.GetItems()))
 	for i, item := range req.GetItems() {
-		items[i] = &pbv1beta1.CheckBulkRequestItem{
-			Resource: &pbv1beta1.ObjectReference{
-				Type: &pbv1beta1.ObjectType{
+		items[i] = &kessel.CheckBulkRequestItem{
+			Resource: &kessel.ObjectReference{
+				Type: &kessel.ObjectType{
 					Namespace: item.GetObject().GetReporter().GetType(),
 					Name:      item.GetObject().GetResourceType(),
 				},
@@ -163,50 +161,37 @@ func mapCheckBulkRequestToV1beta1(req *pb.CheckBulkRequest) *pbv1beta1.CheckBulk
 		}
 	}
 
-	return &pbv1beta1.CheckBulkRequest{
+	return &kessel.CheckBulkRequest{
 		Items:       items,
-		Consistency: convertConsistencyToV1beta1(req.GetConsistency()),
+		Consistency: convertConsistencyToKessel(req.GetConsistency()),
 	}
 }
 
-func convertConsistencyToV1beta1(consistency *pb.Consistency) *pbv1beta1.Consistency {
+func convertConsistencyToKessel(consistency *pb.Consistency) *kessel.Consistency {
 	if consistency == nil {
-		return &pbv1beta1.Consistency{
-			Requirement: &pbv1beta1.Consistency_MinimizeLatency{MinimizeLatency: true},
-		}
+		return kessel.NewConsistencyMinimizeLatency()
 	}
 	if consistency.GetAtLeastAsFresh() != nil {
-		return &pbv1beta1.Consistency{
-			Requirement: &pbv1beta1.Consistency_AtLeastAsFresh{
-				AtLeastAsFresh: &pbv1beta1.ConsistencyToken{
-					Token: consistency.GetAtLeastAsFresh().GetToken(),
-				},
-			},
-		}
+		return kessel.NewConsistencyAtLeastAsFresh(consistency.GetAtLeastAsFresh().GetToken())
 	}
-	return &pbv1beta1.Consistency{
-		Requirement: &pbv1beta1.Consistency_MinimizeLatency{MinimizeLatency: true},
-	}
+	return kessel.NewConsistencyMinimizeLatency()
 }
 
-func mapCheckBulkResponseFromV1beta1(resp *pbv1beta1.CheckBulkResponse) *pb.CheckBulkResponse {
-	pairs := make([]*pb.CheckBulkResponsePair, len(resp.GetPairs()))
-	for i, pair := range resp.GetPairs() {
+func mapCheckBulkResponseFromKessel(resp *kessel.CheckBulkResponse) *pb.CheckBulkResponse {
+	pairs := make([]*pb.CheckBulkResponsePair, len(resp.Pairs))
+	for i, pair := range resp.Pairs {
 
 		errResponse := &pb.CheckBulkResponsePair_Error{}
 		itemResponse := &pb.CheckBulkResponsePair_Item{}
 
-		if pair.GetError() != nil {
-			log.Errorf("Error in checkbulk for req: %v error-code: %v error-message: %v", pair.GetRequest(), pair.GetError().GetCode(), pair.GetError().GetMessage())
-			errResponse.Error = &rpcstatus.Status{
-				Code:    pair.GetError().GetCode(),
-				Message: pair.GetError().GetMessage(),
-			}
+		if pair.Error != nil {
+			log.Errorf("Error in checkbulk for req: %v error: %v", pair.Request, pair.Error.Error())
+			errResponse.Error = status.Convert(pair.Error).Proto()
 		}
 
 		allowedResponse := pb.Allowed_ALLOWED_FALSE
 
-		if pair.GetItem().GetAllowed() == pbv1beta1.CheckBulkResponseItem_ALLOWED_TRUE {
+		if pair.Item != nil && pair.Item.Allowed == kessel.AllowedTrue {
 			allowedResponse = pb.Allowed_ALLOWED_TRUE
 		}
 		itemResponse.Item = &pb.CheckBulkResponseItem{
@@ -216,18 +201,18 @@ func mapCheckBulkResponseFromV1beta1(resp *pbv1beta1.CheckBulkResponse) *pb.Chec
 		pairs[i] = &pb.CheckBulkResponsePair{
 			Request: &pb.CheckBulkRequestItem{
 				Object: &pb.ResourceReference{
-					ResourceType: pair.GetRequest().GetResource().GetType().GetName(),
-					ResourceId:   pair.GetRequest().GetResource().GetId(),
+					ResourceType: pair.Request.Resource.Type.Name,
+					ResourceId:   pair.Request.Resource.Id,
 					Reporter: &pb.ReporterReference{
-						Type: pair.GetRequest().GetResource().GetType().GetNamespace(),
+						Type: pair.Request.Resource.Type.Namespace,
 						// InstanceId: Inline with other behavior we dont have this info back from relations
 					},
 				},
-				Relation: pair.GetRequest().GetRelation(),
-				Subject:  subjectReferenceFromSubjectV1beta1(pair.GetRequest().GetSubject()),
+				Relation: pair.Request.Relation,
+				Subject:  subjectReferenceFromSubjectKessel(pair.Request.Subject),
 			},
 		}
-		if pair.GetError() != nil {
+		if pair.Error != nil {
 			pairs[i].Response = errResponse
 		} else {
 			pairs[i].Response = itemResponse
@@ -235,7 +220,7 @@ func mapCheckBulkResponseFromV1beta1(resp *pbv1beta1.CheckBulkResponse) *pb.Chec
 	}
 	return &pb.CheckBulkResponse{
 		Pairs:            pairs,
-		ConsistencyToken: &pb.ConsistencyToken{Token: resp.GetConsistencyToken().GetToken()},
+		ConsistencyToken: &pb.ConsistencyToken{Token: resp.ConsistencyToken.Token},
 	}
 }
 
@@ -247,86 +232,92 @@ func (s *InventoryService) StreamedListObjects(
 	//Example: how to use get the identity from the stream context
 	//identity, err := interceptor.FromContextIdentity(ctx)
 	//log.Info(identity)
-	lookupReq, err := ToLookupResourceRequest(req)
+	resourceType, relation, subject, limit, continuationToken, err := ToLookupResourceRequest(req)
 	if err != nil {
 		return fmt.Errorf("failed to build lookup request: %w", err)
 	}
 
-	clientStream, err := s.Ctl.LookupResources(ctx, lookupReq)
+	resourceChan, errChan, err := s.Ctl.LookupResources(ctx, resourceType, relation, subject, limit, continuationToken)
 	if err != nil {
 		return fmt.Errorf("failed to retrieve resources: %w", err)
 	}
 
+	// Read from channels and convert to gRPC stream
 	for {
-		// Receive next message from the server stream
-		resp, err := clientStream.Recv()
-		if err == io.EOF {
-			// Stream ended successfully
-			return nil
-		}
-		if err != nil {
-			return fmt.Errorf("error receiving resource: %w", err)
-		}
-
-		// Convert and send the response to the client
-		if err := stream.Send(ToLookupResourceResponse(resp)); err != nil {
-			return fmt.Errorf("error sending resource to client: %w", err)
+		select {
+		case result, ok := <-resourceChan:
+			if !ok {
+				// Channel closed, check for errors
+				if err := <-errChan; err != nil {
+					return fmt.Errorf("error during lookup: %w", err)
+				}
+				return nil
+			}
+				// Convert channel result to gRPC response
+			resp := &pb.StreamedListObjectsResponse{
+				Object: &pb.ResourceReference{
+					Reporter: &pb.ReporterReference{
+						Type: result.Resource.Type.Namespace,
+					},
+					ResourceId:   result.Resource.Id,
+					ResourceType: result.Resource.Type.Name,
+				},
+				Pagination: &pb.ResponsePagination{
+					ContinuationToken: string(result.Continuation),
+				},
+			}
+			if err := stream.Send(resp); err != nil {
+				return fmt.Errorf("error sending resource to client: %w", err)
+			}
+		case err := <-errChan:
+			if err != nil {
+				return fmt.Errorf("error receiving resource: %w", err)
+			}
 		}
 	}
 }
 
-func ToLookupResourceRequest(request *pb.StreamedListObjectsRequest) (*pbv1beta1.LookupResourcesRequest, error) {
+func ToLookupResourceRequest(request *pb.StreamedListObjectsRequest) (*kessel.ObjectType, string, *kessel.SubjectReference, uint32, string, error) {
 	if request == nil {
-		return nil, fmt.Errorf("request is nil")
+		return nil, "", nil, 0, "", fmt.Errorf("request is nil")
 	}
-	var pagination *pbv1beta1.RequestPagination
-	if request.Pagination != nil {
-		pagination = &pbv1beta1.RequestPagination{
-			Limit:             request.Pagination.Limit,
-			ContinuationToken: request.Pagination.ContinuationToken,
-		}
-	}
+
 	normalizedNamespace := NormalizeType(request.ObjectType.GetReporterType())
 	normalizedResourceType := NormalizeType(request.ObjectType.GetResourceType())
 
-	return &pbv1beta1.LookupResourcesRequest{
-		ResourceType: &pbv1beta1.ObjectType{
-			Namespace: normalizedNamespace,
-			Name:      normalizedResourceType,
-		},
-		Relation: request.Relation,
-		Subject: &pbv1beta1.SubjectReference{
-			Relation: request.Subject.Relation,
-			Subject: &pbv1beta1.ObjectReference{
-				Type: &pbv1beta1.ObjectType{
-					Name:      request.Subject.Resource.GetResourceType(),
-					Namespace: request.Subject.Resource.GetReporter().GetType(),
-				},
-				Id: request.Subject.Resource.GetResourceId(),
+	resourceType := &kessel.ObjectType{
+		Namespace: normalizedNamespace,
+		Name:      normalizedResourceType,
+	}
+
+	relation := request.Relation
+
+	subject := &kessel.SubjectReference{
+		Relation: request.Subject.Relation,
+		Subject: &kessel.ObjectReference{
+			Type: &kessel.ObjectType{
+				Name:      request.Subject.Resource.GetResourceType(),
+				Namespace: request.Subject.Resource.GetReporter().GetType(),
 			},
+			Id: request.Subject.Resource.GetResourceId(),
 		},
-		Pagination: pagination,
-	}, nil
+	}
+
+	var limit uint32
+	var continuationToken string
+	if request.Pagination != nil {
+		limit = request.Pagination.Limit
+		if request.Pagination.ContinuationToken != nil {
+			continuationToken = *request.Pagination.ContinuationToken
+		}
+	}
+
+	return resourceType, relation, subject, limit, continuationToken, nil
 }
 
 func NormalizeType(val string) string {
 	normalized := strings.ToLower(val)
 	return normalized
-}
-
-func ToLookupResourceResponse(response *pbv1beta1.LookupResourcesResponse) *pb.StreamedListObjectsResponse {
-	return &pb.StreamedListObjectsResponse{
-		Object: &pb.ResourceReference{
-			Reporter: &pb.ReporterReference{
-				Type: response.Resource.Type.Namespace,
-			},
-			ResourceId:   response.Resource.Id,
-			ResourceType: response.Resource.Type.Name,
-		},
-		Pagination: &pb.ResponsePagination{
-			ContinuationToken: response.Pagination.ContinuationToken,
-		},
-	}
 }
 
 func reporterKeyFromResourceReference(resource *pb.ResourceReference) (model.ReporterResourceKey, error) {

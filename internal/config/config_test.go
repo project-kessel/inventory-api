@@ -6,7 +6,7 @@ import (
 
 	. "github.com/project-kessel/inventory-api/cmd/common"
 	"github.com/project-kessel/inventory-api/internal/authz"
-	"github.com/project-kessel/inventory-api/internal/authz/kessel"
+	"github.com/project-kessel/inventory-api/internal/authz/spicedb"
 	"github.com/project-kessel/inventory-api/internal/consumer"
 	"github.com/project-kessel/inventory-api/internal/consumer/auth"
 	"github.com/project-kessel/inventory-api/internal/storage"
@@ -232,9 +232,9 @@ func TestInjectClowdAppConfig(t *testing.T) {
 		options: NewOptionsConfig(),
 		expected: &OptionsConfig{
 			Authz: &authz.Options{
-				Authz: authz.Kessel,
-				Kessel: &kessel.Options{
-					URL: "kessel-relations:9000",
+				Authz: authz.SpiceDB,
+				SpiceDB: &spicedb.Options{
+					Endpoint: "kessel-relations:9000",
 				},
 			},
 		},

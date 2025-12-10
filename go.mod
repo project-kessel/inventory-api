@@ -11,6 +11,7 @@ require (
 	github.com/cloudevents/sdk-go/v2 v2.16.2
 	github.com/confluentinc/confluent-kafka-go/v2 v2.12.0
 	github.com/coreos/go-oidc/v3 v3.17.0
+	github.com/go-gormigrate/gormigrate/v2 v2.1.5
 	github.com/go-kratos/kratos/v2 v2.9.2
 	github.com/golang-jwt/jwt/v5 v5.3.0
 	github.com/google/uuid v1.6.0

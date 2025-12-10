@@ -11,16 +11,15 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/otel"
-	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 
 	"github.com/project-kessel/inventory-api/internal/biz"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
-	"github.com/project-kessel/inventory-api/internal/biz/model_legacy"
 	usecase_resources "github.com/project-kessel/inventory-api/internal/biz/usecase/resources"
 	"github.com/project-kessel/inventory-api/internal/data"
 	datamodel "github.com/project-kessel/inventory-api/internal/data/model"
 	"github.com/project-kessel/inventory-api/internal/mocks"
+	"github.com/project-kessel/inventory-api/internal/testutil"
 
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
@@ -41,14 +40,9 @@ const (
 )
 
 func setupInMemoryDB(t *testing.T) *gorm.DB {
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	db := testutil.NewSQLiteTestDB(t, &gorm.Config{})
+	err := data.Migrate(db, nil)
 	require.NoError(t, err)
-
-	err = db.AutoMigrate(&datamodel.Resource{}, &datamodel.ReporterResource{},
-		&datamodel.ReporterRepresentation{}, &datamodel.CommonRepresentation{},
-		&model_legacy.OutboxEvent{})
-	require.NoError(t, err)
-
 	return db
 }
 

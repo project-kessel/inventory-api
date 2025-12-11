@@ -105,7 +105,7 @@ func (sc *SchemaUsecase) ReporterShallowValidate(ctx context.Context, resourceTy
 		if len(reporterRepresentation) > 0 {
 			return fmt.Errorf("no schema found for '%s:%s', but reporter representation was provided. Submission is not allowed", resourceType, reporterType)
 		}
-		log.Debugf("no schema found for %s:%s, treating as abstract reporter representation", resourceType, reporterType)
+		sc.Log.Debugf("no schema found for %s:%s, treating as abstract reporter representation", resourceType, reporterType)
 		return nil
 	}
 

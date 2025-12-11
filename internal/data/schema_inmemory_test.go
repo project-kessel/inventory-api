@@ -203,7 +203,7 @@ func TestInMemorySchemaRepository_GetResourceReporter_NotFound(t *testing.T) {
 
 	// Try to get non-existent reporter
 	_, err = repo.GetReporterSchema(ctx, "host", "nonexistent")
-	assert.ErrorIs(t, err, schema.ReporterSchemaNotfound)
+	assert.ErrorIs(t, err, schema.ReporterSchemaNotFound)
 }
 
 func TestInMemorySchemaRepository_UpdateResourceReporter(t *testing.T) {
@@ -267,7 +267,7 @@ func TestInMemorySchemaRepository_DeleteResourceReporter(t *testing.T) {
 
 	// Verify deletion
 	_, err = repo.GetReporterSchema(ctx, "host", "hbi")
-	assert.ErrorIs(t, err, schema.ReporterSchemaNotfound)
+	assert.ErrorIs(t, err, schema.ReporterSchemaNotFound)
 }
 
 func TestInMemorySchemaRepository_GetResourceReporters(t *testing.T) {

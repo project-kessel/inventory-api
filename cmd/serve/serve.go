@@ -367,6 +367,7 @@ func NewCommand(
 	consumerOptions.AddFlags(cmd.Flags(), "consumer")
 	consistencyOptions.AddFlags(cmd.Flags(), "consistency")
 	serviceOptions.AddFlags()
+	schemaOptions.AddFlags(cmd.Flags(), "schema")
 
 	return cmd
 }

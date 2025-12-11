@@ -56,7 +56,7 @@ func (sc *SchemaUsecase) CalculateTuples(currentRepresentation, previousRepresen
 // IsReporterForResource validates the resourceType and reporterType combination is valid. i.e. that there is a reporter that reports said resource.
 func (sc *SchemaUsecase) IsReporterForResource(ctx context.Context, resourceType string, reporterType string) (bool, error) {
 	if _, err := sc.schemaRepository.GetReporterSchema(ctx, resourceType, reporterType); err != nil {
-		if errors.Is(err, schema.ResourceSchemaNotFound) || errors.Is(err, schema.ReporterSchemaNotfound) {
+		if errors.Is(err, schema.ResourceSchemaNotFound) || errors.Is(err, schema.ReporterSchemaNotFound) {
 			return false, nil
 		}
 

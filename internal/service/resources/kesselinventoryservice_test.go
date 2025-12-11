@@ -141,11 +141,12 @@ func TestInventoryService_ReportResource_MissingReporterType(t *testing.T) {
 
 	uc := usecase.New(
 		data.NewFakeResourceRepository(),
-		nil, // LegacyReporterResourceRepository
-		nil, // inventoryResourceRepository
-		nil, // Authz
-		nil, // Eventer
-		"",  // Namespace
+		nil,                                // LegacyReporterResourceRepository
+		nil,                                // inventoryResourceRepository
+		data.NewInMemorySchemaRepository(), // schema repository
+		nil,                                // Authz
+		nil,                                // Eventer
+		"",                                 // Namespace
 		krlog.NewStdLogger(io.Discard),
 		nil, // ListenManager
 		nil, // waitForNotifBreaker
@@ -183,11 +184,12 @@ func TestInventoryService_ReportResource_MissingReporterInstanceId(t *testing.T)
 
 	uc := usecase.New(
 		data.NewFakeResourceRepository(),
-		nil, // LegacyReporterResourceRepository
-		nil, // inventoryResourceRepository
-		nil, // Authz
-		nil, // Eventer
-		"",  // Namespace
+		nil,                                // LegacyReporterResourceRepository
+		nil,                                // inventoryResourceRepository
+		data.NewInMemorySchemaRepository(), // schema repository
+		nil,                                // Authz
+		nil,                                // Eventer
+		"",                                 // Namespace
 		krlog.NewStdLogger(io.Discard),
 		nil, // ListenManager
 		nil, // waitForNotifBreaker
@@ -228,11 +230,12 @@ func TestInventoryService_ReportResource_InvalidJsonObject(t *testing.T) {
 
 	uc := usecase.New(
 		data.NewFakeResourceRepository(),
-		nil, // LegacyReporterResourceRepository
-		nil, // inventoryResourceRepository
-		nil, // Authz
-		nil, // Eventer
-		"",  // Namespace
+		nil,                                // LegacyReporterResourceRepository
+		nil,                                // inventoryResourceRepository
+		data.NewInMemorySchemaRepository(), // schema repository
+		nil,                                // Authz
+		nil,                                // Eventer
+		"",                                 // Namespace
 		krlog.NewStdLogger(io.Discard),
 		nil, // ListenManager
 		nil, // waitForNotifBreaker

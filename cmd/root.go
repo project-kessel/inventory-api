@@ -98,7 +98,7 @@ func init() {
 	if err != nil {
 		panic(err)
 	}
-	serveCmd := serve.NewCommand(options.Server, options.Storage, options.Authn, options.Authz, options.Eventing, options.Consumer, options.Consistency, options.Service, loggerOptions)
+	serveCmd := serve.NewCommand(options.Server, options.Storage, options.Authn, options.Authz, options.Eventing, options.Consumer, options.Consistency, options.Service, loggerOptions, options.Schema)
 	rootCmd.AddCommand(serveCmd)
 	err = viper.BindPFlags(serveCmd.Flags())
 	if err != nil {

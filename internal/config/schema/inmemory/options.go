@@ -19,8 +19,7 @@ type Options struct {
 
 func NewOptions() *Options {
 	return &Options{
-		Type: JSONRepository,
-		Path: "schema_cache.json",
+		Type: EmptyRepository,
 	}
 }
 

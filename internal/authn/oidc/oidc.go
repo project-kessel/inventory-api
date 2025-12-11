@@ -76,7 +76,10 @@ func (o *OAuth2Authenticator) Authenticate(ctx context.Context, t transport.Tran
 
 	if u.Subject != "" && o.PrincipalUserDomain != "" {
 		principal := fmt.Sprintf("%s/%s", o.PrincipalUserDomain, u.Subject)
-		return &api.Identity{Principal: principal}, api.Allow
+		return &api.Identity{
+			Principal: principal,
+			AuthType:  "oidc",
+		}, api.Allow
 	}
 
 	return nil, api.Deny

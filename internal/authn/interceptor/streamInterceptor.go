@@ -2,15 +2,15 @@ package interceptor
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"strings"
 
 	"github.com/project-kessel/inventory-api/internal/middleware"
 
 	coreosoidc "github.com/coreos/go-oidc/v3/oidc"
+	kerrors "github.com/go-kratos/kratos/v2/errors"
 	"github.com/go-kratos/kratos/v2/log"
-	"github.com/go-kratos/kratos/v2/middleware/auth/jwt"
+	"github.com/go-kratos/kratos/v2/transport"
 	"github.com/project-kessel/inventory-api/internal/authn"
 	"github.com/project-kessel/inventory-api/internal/authn/api"
 	"github.com/project-kessel/inventory-api/internal/authn/util"
@@ -19,50 +19,106 @@ import (
 )
 
 const (
-	// bearerWord the bearer key word for authorization
-	bearerWord string = "bearer"
-
 	// authorizationKey holds the key used to store the JWT Token in the request tokenHeader.
 	authorizationKey string = "authorization"
 )
 
+// grpcStreamTransporter adapts gRPC metadata to transport.Transporter interface.
+// Keep this minimal: only data that actually varies.
+type grpcStreamTransporter struct {
+	md metadata.MD
+	op string
+}
+
+func (t *grpcStreamTransporter) Kind() transport.Kind {
+	return transport.KindGRPC
+}
+
+func (t *grpcStreamTransporter) Endpoint() string {
+	// Not available for streams
+	return ""
+}
+
+func (t *grpcStreamTransporter) Operation() string {
+	return t.op
+}
+
+func (t *grpcStreamTransporter) RequestHeader() transport.Header {
+	return &grpcMetadataHeader{md: t.md}
+}
+
+// Unused today: keep a cheap, empty header for future use
+var emptyGRPCHeader = &grpcMetadataHeader{md: metadata.MD{}}
+
+func (t *grpcStreamTransporter) ReplyHeader() transport.Header {
+	return emptyGRPCHeader
+}
+
+type grpcMetadataHeader struct {
+	md metadata.MD
+}
+
+func (h *grpcMetadataHeader) Get(key string) string {
+	vals := h.md.Get(key)
+	if len(vals) == 0 {
+		return ""
+	}
+	return vals[0]
+}
+
+// These are currently unused by authenticators, but must exist to satisfy transport.Header.
+// Keeping them as simple delegations documents that they're not part of current behavior.
+func (h *grpcMetadataHeader) Set(key string, value string) {
+	h.md.Set(key, value)
+}
+
+func (h *grpcMetadataHeader) Add(key string, value string) {
+	h.md.Append(key, value)
+}
+
+func (h *grpcMetadataHeader) Keys() []string {
+	keys := make([]string, 0, len(h.md))
+	for k := range h.md {
+		keys = append(keys, k)
+	}
+	return keys
+}
+
+func (h *grpcMetadataHeader) Values(key string) []string {
+	return h.md.Get(key)
+}
+
 type StreamAuthConfig struct {
-	authn.CompletedConfig
-	clientContext context.Context
-	verifier      *coreosoidc.IDTokenVerifier
+	authenticator api.Authenticator
+	logger        log.Logger
 }
 
 type StreamAuthOption func(*StreamAuthConfig)
 
-func NewStreamAuthInterceptor(config authn.CompletedConfig, opts ...StreamAuthOption) (*StreamAuthInterceptor, error) {
+// NewStreamAuthInterceptor creates a stream authentication interceptor using the AggregatingAuthenticator.
+// If authenticator is provided, it will be used directly.
+// If authenticator is nil, it will be created from the config using authn.New (backwards compatible).
+//
+// The interceptor uses the aggregating authenticator to authenticate gRPC streams, supporting
+// all authenticator types in the chain (OIDC, x-rh-identity, guest, etc.).
+func NewStreamAuthInterceptor(config authn.CompletedConfig, authenticator api.Authenticator, logger log.Logger, opts ...StreamAuthOption) (*StreamAuthInterceptor, error) {
 	cfg := &StreamAuthConfig{
-		CompletedConfig: config,
+		authenticator: authenticator,
+		logger:        logger,
 	}
 
-	if config.Oidc.PrincipalUserDomain == "" {
-		config.Oidc.PrincipalUserDomain = "localhost"
+	// If authenticator is not provided, create it from config (backwards compatible)
+	if cfg.authenticator == nil {
+		authnLogger := log.NewHelper(log.With(logger, "subsystem", "authn", "component", "stream-interceptor"))
+		var err error
+		cfg.authenticator, err = authn.New(config, authnLogger)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	for _, opt := range opts {
 		opt(cfg)
-	}
-
-	if config.Oidc != nil {
-		// Use the same OIDC provider setup as the OIDC authenticator
-		ctx := coreosoidc.ClientContext(context.Background(), config.Oidc.Client)
-		provider, err := coreosoidc.NewProvider(ctx, config.Oidc.AuthorizationServerURL)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create OIDC provider: %w", err)
-		}
-
-		oidcConfig := &coreosoidc.Config{
-			ClientID:          config.Oidc.ClientId,
-			SkipClientIDCheck: config.Oidc.SkipClientIDCheck,
-			SkipIssuerCheck:   config.Oidc.SkipIssuerCheck,
-		}
-
-		cfg.clientContext = ctx
-		cfg.verifier = provider.Verifier(oidcConfig)
 	}
 
 	return &StreamAuthInterceptor{cfg: cfg}, nil
@@ -74,60 +130,41 @@ type StreamAuthInterceptor struct {
 
 func (i *StreamAuthInterceptor) Interceptor() grpc.StreamServerInterceptor {
 	return func(srv interface{}, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
-
-		if i.cfg.verifier == nil {
-			return jwt.ErrMissingKeyFunc
-		}
-
 		newCtx := ss.Context()
+
 		md, ok := metadata.FromIncomingContext(newCtx)
 		if !ok {
-			return jwt.ErrMissingJwtToken
+			return kerrors.Unauthorized("UNAUTHORIZED", fmt.Sprintf("Missing metadata for stream method: %s", info.FullMethod))
 		}
 
-		authHeader, ok := md[authorizationKey]
-		if !ok || len(authHeader) == 0 {
-			return jwt.ErrMissingJwtToken
+		// Create transport adapter for gRPC stream
+		transporter := &grpcStreamTransporter{
+			md: md,
+			op: info.FullMethod,
 		}
 
-		auths := strings.SplitN(authHeader[0], " ", 2)
-		if len(auths) != 2 || !strings.EqualFold(auths[0], bearerWord) {
-			return jwt.ErrMissingJwtToken
+		// Use aggregating authenticator to authenticate the stream
+		identity, decision := i.cfg.authenticator.Authenticate(newCtx, transporter)
+		if decision == api.Deny {
+			return kerrors.Unauthorized("UNAUTHORIZED", "Authentication denied")
+		} else if decision == api.Ignore {
+			return kerrors.Unauthorized("UNAUTHORIZED", "No valid authentication found")
+		} else if decision != api.Allow {
+			// Handle any unexpected decision values
+			return kerrors.Unauthorized("UNAUTHORIZED", fmt.Sprintf("Authentication failed with decision: %s", decision))
 		}
 
-		jwtToken := auths[1]
-
-		// Use OIDC verification like the OIDC authenticator
-		idToken, err := i.cfg.verifier.Verify(i.cfg.clientContext, jwtToken)
-		if err != nil {
-			log.Errorf("failed to verify the access token: %v", err)
-			return jwt.ErrTokenInvalid
+		// Defensive check: identity should not be nil when decision is Allow
+		// but we check to prevent panics if an authenticator implementation violates the contract
+		if identity == nil {
+			return kerrors.Unauthorized("UNAUTHORIZED", "Invalid identity: authenticator returned Allow with nil identity")
 		}
 
-		// Extract claims using the same structure as OIDC authenticator
-		claims := &Claims{}
-		err = idToken.Claims(claims)
-		if err != nil {
-			log.Errorf("failed to extract claims: %v", err)
-			return jwt.ErrTokenInvalid
-		}
+		// Set identity in context (includes AuthType)
+		newCtx = NewContextIdentity(newCtx, *identity)
 
-		// Audience check matching OIDC authenticator
-		if i.cfg.Oidc.EnforceAudCheck {
-			if claims.Audience != i.cfg.Oidc.ClientId {
-				log.Debugf("aud does not match the requesting client-id -- decision DENY")
-				return errors.New("audience mismatch")
-			}
-		}
-
-		// Create identity matching OIDC authenticator
-		if claims.Subject != "" && i.cfg.Oidc.PrincipalUserDomain != "" {
-			principal := fmt.Sprintf("%s/%s", i.cfg.Oidc.PrincipalUserDomain, claims.Subject)
-			newCtx = NewContextIdentity(newCtx, api.Identity{Principal: principal})
-		}
-
-		// Store the ID token in context for compatibility
-		newCtx = util.NewTokenContext(newCtx, idToken)
+		// Preserve token if available (for compatibility)
+		newCtx = preserveTokenContext(newCtx, md)
 
 		wrappedStream := &authServerStream{ServerStream: ss, ctx: newCtx}
 		return handler(srv, wrappedStream)
@@ -143,14 +180,25 @@ func (a *authServerStream) Context() context.Context {
 	return a.ctx
 }
 
-// Claims holds the values we want to extract from the JWT - matching OIDC authenticator
-type Claims struct {
-	Audience          string `json:"aud"`
-	Issuer            string `json:"iss"`
-	Subject           string `json:"sub"`
-	PreferredUsername string `json:"preferred_username"`
-	ClientID          string `json:"client_id"`
-	AuthorizedParty   string `json:"azp"`
+// preserveTokenContext extracts and preserves the token in context for compatibility.
+// First tries to get token from context (if authenticator stored it), then falls back
+// to extracting from Authorization header if present.
+func preserveTokenContext(ctx context.Context, md metadata.MD) context.Context {
+	if token, ok := util.FromTokenContext(ctx); ok {
+		return util.NewTokenContext(ctx, token)
+	}
+
+	authHeader := md.Get(authorizationKey)
+	if len(authHeader) == 0 {
+		return ctx
+	}
+
+	parts := strings.SplitN(authHeader[0], " ", 2)
+	if len(parts) == 2 && strings.EqualFold(parts[0], "bearer") {
+		return util.NewRawTokenContext(ctx, parts[1])
+	}
+
+	return ctx
 }
 
 func NewContextIdentity(ctx context.Context, identity api.Identity) context.Context {
@@ -202,4 +250,14 @@ func GetClientIDFromContext(ctx context.Context) string {
 	}
 
 	return ""
+}
+
+// Claims holds the values we want to extract from the JWT - matching OIDC authenticator
+type Claims struct {
+	Audience          string `json:"aud"`
+	Issuer            string `json:"iss"`
+	Subject           string `json:"sub"`
+	PreferredUsername string `json:"preferred_username"`
+	ClientID          string `json:"client_id"`
+	AuthorizedParty   string `json:"azp"`
 }

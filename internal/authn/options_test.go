@@ -3,8 +3,6 @@ package authn
 import (
 	"testing"
 
-	"github.com/project-kessel/inventory-api/internal/authn/oidc"
-	"github.com/project-kessel/inventory-api/internal/authn/psk"
 	"github.com/project-kessel/inventory-api/internal/helpers"
 	"github.com/spf13/pflag"
 	"github.com/stretchr/testify/assert"
@@ -17,8 +15,7 @@ func TestNewOptions(t *testing.T) {
 	}{
 		options: NewOptions(),
 		expectedOptions: &Options{
-			Oidc:          oidc.NewOptions(),
-			PreSharedKeys: psk.NewOptions(),
+			Authenticator: nil, // Authenticator is populated from config files
 		},
 	}
 	assert.Equal(t, test.expectedOptions, NewOptions())
@@ -35,7 +32,6 @@ func TestOptions_AddFlags(t *testing.T) {
 	test.options.AddFlags(fs, prefix)
 
 	// the below logic ensures that every possible option defined in the Options type
-	// has a defined flag for that option; oidc and psk are skipped in favor of testing
-	// in their own packages
-	helpers.AllOptionsHaveFlags(t, prefix, fs, *test.options, []string{"oidc", "psk"})
+	// has a defined flag for that option; authenticator config is typically loaded from YAML
+	helpers.AllOptionsHaveFlags(t, prefix, fs, *test.options, []string{"authenticator"})
 }

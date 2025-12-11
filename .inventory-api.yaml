@@ -7,7 +7,11 @@ server:
   pprof:
     enabled: true
 authn:
-   allow-unauthenticated: true
+  authenticator:
+    type: first_match
+    chain:
+      - type: guest
+        enabled: true
 authz:
   impl: allow-all
 eventing:

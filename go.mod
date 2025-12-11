@@ -1,12 +1,12 @@
 module github.com/project-kessel/inventory-api
 
 // Tke care to bump versions with FIPS compliance in mind
-go 1.25.3
+go 1.25.5
 
 require (
 	buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go v1.36.10-20250912141014-52f32327d4b0.1
 	buf.build/go/protovalidate v1.0.1
-	github.com/authzed/grpcutil v0.0.0-20250221190651-1985b19b35b8
+	github.com/authzed/grpcutil v0.0.0-20251209200951-640d04abb9d9
 	github.com/cloudevents/sdk-go/protocol/kafka_confluent/v2 v2.0.0-20251110143013-8c56e02b0732
 	github.com/cloudevents/sdk-go/v2 v2.16.2
 	github.com/confluentinc/confluent-kafka-go/v2 v2.12.0

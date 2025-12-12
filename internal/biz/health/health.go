@@ -10,7 +10,7 @@ import (
 
 type HealthRepo interface {
 	IsBackendAvailable(ctx context.Context) (*pb.GetReadyzResponse, error)
-	IsRelationsAvailable(ctx context.Context) (*pb.GetReadyzResponse, error)
+	IsRelationsRepositoryAvailable(ctx context.Context) (*pb.GetReadyzResponse, error)
 }
 
 // HealthUsecase is a Health usecase.

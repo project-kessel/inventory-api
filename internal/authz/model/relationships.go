@@ -12,19 +12,19 @@ type DeleteRelationshipsResponse struct {
 
 // RelationTupleFilter for filtering relationships
 type RelationTupleFilter struct {
-	ResourceNamespace *string
-	ResourceType      *string
-	ResourceId        *string
-	Relation          *string
-	SubjectFilter     *SubjectFilter
+	ResourceNamespace *string        `json:"resource_namespace,omitempty"`
+	ResourceType      *string        `json:"resource_type,omitempty"`
+	ResourceId        *string        `json:"resource_id,omitempty"`
+	Relation          *string        `json:"relation,omitempty"`
+	SubjectFilter     *SubjectFilter `json:"subject_filter,omitempty"`
 }
 
 // SubjectFilter for filtering subjects
 type SubjectFilter struct {
-	SubjectNamespace *string
-	SubjectType      *string
-	SubjectId        *string
-	Relation         *string
+	SubjectNamespace *string `json:"subject_namespace,omitempty"`
+	SubjectType      *string `json:"subject_type,omitempty"`
+	SubjectId        *string `json:"subject_id,omitempty"`
+	Relation         *string `json:"relation,omitempty"`
 }
 
 // FencingCheck for distributed lock validation

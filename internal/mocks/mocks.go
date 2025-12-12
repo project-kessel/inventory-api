@@ -12,8 +12,8 @@ import (
 
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
 
+	authzapi "github.com/project-kessel/inventory-api/internal/authz/api"
 	kessel "github.com/project-kessel/inventory-api/internal/authz/model"
-	"github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
 	"github.com/stretchr/testify/mock"
 	"google.golang.org/grpc"
 
@@ -50,70 +50,82 @@ type MockedSubscription struct {
 
 type MockLookupResourcesStream struct {
 	mock.Mock
-	Responses []*v1beta1.LookupResourcesResponse
+	Responses []*authzapi.ResourceResult
 	current   int
 }
+
+// MockAuthz Authorizer interface implementation
 
 func (m *MockAuthz) Health(ctx context.Context) (*kessel.GetReadyzResponse, error) {
 	args := m.Called(ctx)
 	return args.Get(0).(*kessel.GetReadyzResponse), args.Error(1)
 }
 
+func (m *MockAuthz) IsBackendAvailable() error {
+	args := m.Called()
+	return args.Error(0)
+}
+
+func (m *MockAuthz) Check(ctx context.Context, request *kessel.CheckRequest) (*kessel.CheckResponse, error) {
+	args := m.Called(ctx, request)
+	return args.Get(0).(*kessel.CheckResponse), args.Error(1)
+}
+
+func (m *MockAuthz) CheckForUpdate(ctx context.Context, request *kessel.CheckForUpdateRequest) (*kessel.CheckForUpdateResponse, error) {
+	args := m.Called(ctx, request)
+	return args.Get(0).(*kessel.CheckForUpdateResponse), args.Error(1)
+}
+
+func (m *MockAuthz) CheckBulk(ctx context.Context, req *kessel.CheckBulkRequest) (*kessel.CheckBulkResponse, error) {
+	args := m.Called(ctx, req)
+	return args.Get(0).(*kessel.CheckBulkResponse), args.Error(1)
+}
+
+func (m *MockAuthz) CreateRelationships(ctx context.Context, rels []*kessel.Relationship, touch authzapi.TouchSemantics, fencing *kessel.FencingCheck) (*kessel.CreateRelationshipsResponse, error) {
+	args := m.Called(ctx, rels, touch, fencing)
+	return args.Get(0).(*kessel.CreateRelationshipsResponse), args.Error(1)
+}
+
+func (m *MockAuthz) DeleteRelationships(ctx context.Context, filter *kessel.RelationTupleFilter, fencing *kessel.FencingCheck) (*kessel.DeleteRelationshipsResponse, error) {
+	args := m.Called(ctx, filter, fencing)
+	return args.Get(0).(*kessel.DeleteRelationshipsResponse), args.Error(1)
+}
+
+func (m *MockAuthz) ReadRelationships(ctx context.Context, filter *kessel.RelationTupleFilter, limit uint32, continuation authzapi.ContinuationToken, consistency *kessel.Consistency) (chan *authzapi.RelationshipResult, chan error, error) {
+	args := m.Called(ctx, filter, limit, continuation, consistency)
+	return args.Get(0).(chan *authzapi.RelationshipResult), args.Get(1).(chan error), args.Error(2)
+}
+
+func (m *MockAuthz) LookupResources(ctx context.Context, resourceType *kessel.ObjectType, relation string, subject *kessel.SubjectReference, limit uint32, continuation authzapi.ContinuationToken, consistency *kessel.Consistency) (chan *authzapi.ResourceResult, chan error, error) {
+	args := m.Called(ctx, resourceType, relation, subject, limit, continuation, consistency)
+	return args.Get(0).(chan *authzapi.ResourceResult), args.Get(1).(chan error), args.Error(2)
+}
+
+func (m *MockAuthz) LookupSubjects(ctx context.Context, subjectType *kessel.ObjectType, subjectRelation, relation string, resource *kessel.ObjectReference, limit uint32, continuation authzapi.ContinuationToken, consistency *kessel.Consistency) (chan *authzapi.SubjectResult, chan error, error) {
+	args := m.Called(ctx, subjectType, subjectRelation, relation, resource, limit, continuation, consistency)
+	return args.Get(0).(chan *authzapi.SubjectResult), args.Get(1).(chan error), args.Error(2)
+}
+
+func (m *MockAuthz) ImportBulkTuples(stream grpc.ClientStreamingServer[kessel.ImportBulkTuplesRequest, kessel.ImportBulkTuplesResponse]) error {
+	args := m.Called(stream)
+	return args.Error(0)
+}
+
+func (m *MockAuthz) AcquireLock(ctx context.Context, lockId string) (*kessel.AcquireLockResponse, error) {
+	args := m.Called(ctx, lockId)
+	return args.Get(0).(*kessel.AcquireLockResponse), args.Error(1)
+}
+
+// MockHealthRepo methods
+
 func (m *MockHealthRepo) IsBackendAvailable(ctx context.Context) (*pb.GetReadyzResponse, error) {
 	args := m.Called(ctx)
 	return args.Get(0).(*pb.GetReadyzResponse), args.Error(1)
 }
 
-func (m *MockHealthRepo) IsRelationsAvailable(ctx context.Context) (*pb.GetReadyzResponse, error) {
+func (m *MockHealthRepo) IsRelationsRepositoryAvailable(ctx context.Context) (*pb.GetReadyzResponse, error) {
 	args := m.Called(ctx)
 	return args.Get(0).(*pb.GetReadyzResponse), args.Error(1)
-
-}
-
-func (m *MockAuthz) Check(ctx context.Context, namespace string, permission string, consistencyToken string, resourceType string, localResourceId string, sub *v1beta1.SubjectReference) (v1beta1.CheckResponse_Allowed, *v1beta1.ConsistencyToken, error) {
-	args := m.Called(ctx, namespace, permission, consistencyToken, resourceType, localResourceId, sub)
-	return args.Get(0).(v1beta1.CheckResponse_Allowed), args.Get(1).(*v1beta1.ConsistencyToken), args.Error(2)
-}
-
-func (m *MockAuthz) CheckForUpdate(ctx context.Context, namespace string, permission string, resourceType string, localResourceId string, sub *v1beta1.SubjectReference) (v1beta1.CheckForUpdateResponse_Allowed, *v1beta1.ConsistencyToken, error) {
-	args := m.Called(ctx, namespace, permission, resourceType, localResourceId, sub)
-	return args.Get(0).(v1beta1.CheckForUpdateResponse_Allowed), args.Get(1).(*v1beta1.ConsistencyToken), args.Error(2)
-}
-
-func (m *MockAuthz) CheckBulk(ctx context.Context, req *v1beta1.CheckBulkRequest) (*v1beta1.CheckBulkResponse, error) {
-	args := m.Called(ctx, req)
-	return args.Get(0).(*v1beta1.CheckBulkResponse), args.Error(1)
-}
-
-func (m *MockAuthz) AcquireLock(ctx context.Context, req *v1beta1.AcquireLockRequest) (*v1beta1.AcquireLockResponse, error) {
-	args := m.Called(ctx, req)
-	return args.Get(0).(*v1beta1.AcquireLockResponse), args.Error(1)
-}
-
-func (m *MockAuthz) CreateTuples(ctx context.Context, req *v1beta1.CreateTuplesRequest) (*v1beta1.CreateTuplesResponse, error) {
-	args := m.Called(ctx, req)
-	return args.Get(0).(*v1beta1.CreateTuplesResponse), args.Error(1)
-}
-
-func (m *MockAuthz) DeleteTuples(ctx context.Context, request *v1beta1.DeleteTuplesRequest) (*v1beta1.DeleteTuplesResponse, error) {
-	args := m.Called(ctx, request)
-	return args.Get(0).(*v1beta1.DeleteTuplesResponse), args.Error(1)
-}
-
-func (m *MockAuthz) UnsetWorkspace(ctx context.Context, namespace, localResourceId, resourceType string) (*v1beta1.DeleteTuplesResponse, error) {
-	args := m.Called(ctx, namespace, localResourceId, resourceType)
-	return args.Get(0).(*v1beta1.DeleteTuplesResponse), args.Error(1)
-}
-
-func (m *MockAuthz) SetWorkspace(ctx context.Context, local_resource_id, workspace, namespace, name string, upsert bool) (*v1beta1.CreateTuplesResponse, error) {
-	args := m.Called(ctx, local_resource_id, workspace, namespace, name)
-	return args.Get(0).(*v1beta1.CreateTuplesResponse), args.Error(1)
-}
-
-// Update the MockAuthz LookupResources method to match the exact signature
-func (m *MockAuthz) LookupResources(ctx context.Context, request *v1beta1.LookupResourcesRequest) (grpc.ServerStreamingClient[v1beta1.LookupResourcesResponse], error) {
-	args := m.Called(ctx, request)
-	return args.Get(0).(grpc.ServerStreamingClient[v1beta1.LookupResourcesResponse]), args.Error(1)
 }
 
 func (m *MockConsumer) CommitOffsets(offsets []kafka.TopicPartition) ([]kafka.TopicPartition, error) {
@@ -146,7 +158,7 @@ func (m *MockConsumer) AssignmentLost() bool {
 	return args.Get(0).(bool)
 }
 
-func (m *MockLookupResourcesStream) Recv() (*v1beta1.LookupResourcesResponse, error) {
+func (m *MockLookupResourcesStream) Recv() (*authzapi.ResourceResult, error) {
 	if m.current >= len(m.Responses) {
 		return nil, io.EOF
 	}

@@ -6,8 +6,8 @@ import (
 
 // ObjectType represents a type of object in the authorization system
 type ObjectType struct {
-	Namespace string
-	Name      string
+	Namespace string `json:"namespace"`
+	Name      string `json:"name"`
 }
 
 func NewObjectType(namespace, name string) (*ObjectType, error) {
@@ -22,8 +22,8 @@ func NewObjectType(namespace, name string) (*ObjectType, error) {
 
 // ObjectReference uniquely identifies an object
 type ObjectReference struct {
-	Type *ObjectType
-	Id   string
+	Type *ObjectType `json:"type"`
+	Id   string      `json:"id"`
 }
 
 func NewObjectReference(objType *ObjectType, id string) (*ObjectReference, error) {
@@ -38,8 +38,8 @@ func NewObjectReference(objType *ObjectType, id string) (*ObjectReference, error
 
 // SubjectReference represents a subject in a relationship
 type SubjectReference struct {
-	Relation *string          // Optional
-	Subject  *ObjectReference
+	Relation *string          `json:"relation,omitempty"` // Optional
+	Subject  *ObjectReference `json:"subject"`
 }
 
 func NewSubjectReference(subject *ObjectReference, relation *string) (*SubjectReference, error) {
@@ -51,9 +51,9 @@ func NewSubjectReference(subject *ObjectReference, relation *string) (*SubjectRe
 
 // Relationship represents a relationship tuple
 type Relationship struct {
-	Resource *ObjectReference
-	Relation string
-	Subject  *SubjectReference
+	Resource *ObjectReference  `json:"resource"`
+	Relation string            `json:"relation"`
+	Subject  *SubjectReference `json:"subject"`
 }
 
 func NewRelationship(resource *ObjectReference, relation string, subject *SubjectReference) (*Relationship, error) {

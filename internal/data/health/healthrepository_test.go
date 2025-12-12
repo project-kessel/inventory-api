@@ -5,8 +5,8 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/project-kessel/inventory-api/internal/mocks"
 	kessel "github.com/project-kessel/inventory-api/internal/authz/model"
+	"github.com/project-kessel/inventory-api/internal/mocks"
 
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/stretchr/testify/assert"
@@ -33,8 +33,8 @@ func TestHealthInit(t *testing.T) {
 	db := setupGorm(t)
 	ctx := context.TODO()
 	authConfig, _ := authz.NewConfig(authz.NewOptions()).Complete(ctx)
-	spicedbConfig, _ := spicedb.NewConfig(spicedb.NewOptions()).Complete(ctx)
-	authorizer, _ := spicedb.New(ctx, spicedbConfig, log.NewHelper(log.DefaultLogger))
+	spicedbConfig := spicedb.NewConfig(spicedb.NewOptions())
+	authorizer, _ := spicedb.NewSpiceDbRepository(spicedbConfig, log.NewHelper(log.DefaultLogger))
 
 	healthRepo := New(db, authorizer, authConfig)
 	assert.NotNil(t, healthRepo)
@@ -46,7 +46,7 @@ func TestHealthInit(t *testing.T) {
 	assert.Equal(t, uint32(500), resp.Code)
 	assert.Equal(t, "RELATIONS-API UNHEALTHY", resp.Status)
 
-	resp, err = healthRepo.IsRelationsAvailable(ctx)
+	resp, err = healthRepo.IsRelationsRepositoryAvailable(ctx)
 	assert.Nil(t, err)
 	assert.Equal(t, uint32(500), resp.Code)
 	assert.Equal(t, "RELATIONS-API UNHEALTHY", resp.Status)
@@ -55,8 +55,8 @@ func TestHealthInit(t *testing.T) {
 func TestHealthRepo_IsBackendAvailable_AllCases(t *testing.T) {
 	ctx := context.TODO()
 	authConfig, _ := authz.NewConfig(authz.NewOptions()).Complete(ctx)
-	spicedbConfig, _ := spicedb.NewConfig(spicedb.NewOptions()).Complete(ctx)
-	authorizer, _ := spicedb.New(ctx, spicedbConfig, log.NewHelper(log.DefaultLogger))
+	spicedbConfig := spicedb.NewConfig(spicedb.NewOptions())
+	authorizer, _ := spicedb.NewSpiceDbRepository(spicedbConfig, log.NewHelper(log.DefaultLogger))
 
 	db := setupGorm(t)
 	healthRepo := New(db, authorizer, authConfig)

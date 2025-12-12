@@ -162,9 +162,11 @@ func assertResourceEvent(t *testing.T, operation biz.EventOperationType, resourc
 	assert.Equal(t, resourceEvent.Subject, fmt.Sprintf("/resources/%s/%s", resource.ResourceType, resource.ID))
 	switch operation {
 	case biz.OperationTypeCreated:
-		assert.Equal(t, resource.CreatedAt.Format(time.UnixDate), resourceEvent.Time.Format(time.UnixDate))
+		// Compare times ignoring timezone name differences (GMT vs UTC)
+		assert.Equal(t, resource.CreatedAt.Unix(), resourceEvent.Time.Unix())
 	case biz.OperationTypeUpdated:
-		assert.Equal(t, resource.UpdatedAt.Format(time.UnixDate), resourceEvent.Time.Format(time.UnixDate))
+		// Compare times ignoring timezone name differences (GMT vs UTC)
+		assert.Equal(t, resource.UpdatedAt.Unix(), resourceEvent.Time.Unix())
 	case biz.OperationTypeDeleted:
 		assert.NotNil(t, resourceEvent.Time)
 	}
@@ -182,9 +184,11 @@ func assertResourceEvent(t *testing.T, operation biz.EventOperationType, resourc
 	assert.Equal(t, resource.ResourceType, data.Metadata.ResourceType)
 	switch operation {
 	case biz.OperationTypeCreated:
-		assert.Equal(t, resource.CreatedAt.Format(time.UnixDate), data.Metadata.CreatedAt.Format(time.UnixDate))
+		// Compare times ignoring timezone name differences (GMT vs UTC)
+		assert.Equal(t, resource.CreatedAt.Unix(), data.Metadata.CreatedAt.Unix())
 	case biz.OperationTypeUpdated:
-		assert.Equal(t, resource.UpdatedAt.Format(time.UnixDate), data.Metadata.UpdatedAt.Format(time.UnixDate))
+		// Compare times ignoring timezone name differences (GMT vs UTC)
+		assert.Equal(t, resource.UpdatedAt.Unix(), data.Metadata.UpdatedAt.Unix())
 	case biz.OperationTypeDeleted:
 		assert.NotNil(t, data.Metadata.DeletedAt)
 	}

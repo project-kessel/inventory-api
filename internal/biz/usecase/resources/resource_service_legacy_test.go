@@ -3,19 +3,19 @@ package resources
 import (
 	"context"
 	"errors"
-	"io"
 	"sort"
 	"testing"
 	"time"
 
 	"github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2"
+	authzapi "github.com/project-kessel/inventory-api/internal/authz/api"
+	kessel "github.com/project-kessel/inventory-api/internal/authz/model"
 	"github.com/project-kessel/inventory-api/internal/metricscollector"
 	"github.com/project-kessel/inventory-api/internal/mocks"
 	"github.com/sony/gobreaker"
 
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/google/uuid"
-	"github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"gorm.io/gorm"
@@ -30,55 +30,50 @@ func TestLookupResources_Success(t *testing.T) {
 	inventoryRepo := &mocks.MockedInventoryResourceRepository{}
 	authz := &mocks.MockAuthz{}
 
-	req := &v1beta1.LookupResourcesRequest{
-		ResourceType: &v1beta1.ObjectType{
-			Namespace: "test-namespace",
-			Name:      "test-resource",
-		},
-		Relation: "view",
-		Subject: &v1beta1.SubjectReference{
-			Subject: &v1beta1.ObjectReference{
-				Type: &v1beta1.ObjectType{
-					Namespace: "user",
-					Name:      "default",
-				},
-				Id: "user1",
+	resourceType := &kessel.ObjectType{
+		Namespace: "test-namespace",
+		Name:      "test-resource",
+	}
+	relation := "view"
+	subject := &kessel.SubjectReference{
+		Subject: &kessel.ObjectReference{
+			Type: &kessel.ObjectType{
+				Namespace: "user",
+				Name:      "default",
 			},
+			Id: "user1",
 		},
 	}
 
-	mockResponses := []*v1beta1.LookupResourcesResponse{
-		{
-			Resource: &v1beta1.ObjectReference{
-				Type: &v1beta1.ObjectType{
-					Namespace: "test-namespace",
-					Name:      "test-resource",
-				},
-				Id: "resource1",
-			},
-		},
-		{
-			Resource: &v1beta1.ObjectReference{
-				Type: &v1beta1.ObjectType{
-					Namespace: "test-namespace",
-					Name:      "test-resource",
-				},
-				Id: "resource2",
-			},
-		},
-	}
+	// Create channels for mock return
+	resultChan := make(chan *authzapi.ResourceResult, 2)
+	errChan := make(chan error, 1)
 
-	// Set up mock stream
-	mockStream := &mocks.MockLookupResourcesStream{
-		Responses: mockResponses,
+	// Add mock results to channel
+	resultChan <- &authzapi.ResourceResult{
+		Resource: &kessel.ObjectReference{
+			Type: &kessel.ObjectType{
+				Namespace: "test-namespace",
+				Name:      "test-resource",
+			},
+			Id: "resource1",
+		},
 	}
-	mockStream.On("Recv").Return(mockResponses[0], nil).Once()
-	mockStream.On("Recv").Return(mockResponses[1], nil).Once()
-	mockStream.On("Recv").Return(nil, io.EOF).Once()
-	mockStream.On("Context").Return(ctx)
+	resultChan <- &authzapi.ResourceResult{
+		Resource: &kessel.ObjectReference{
+			Type: &kessel.ObjectType{
+				Namespace: "test-namespace",
+				Name:      "test-resource",
+			},
+			Id: "resource2",
+		},
+	}
+	close(resultChan)
+	close(errChan)
 
 	// Set up authz mock
-	authz.On("LookupResources", ctx, req).Return(mockStream, nil)
+	authz.On("LookupResources", ctx, resourceType, relation, subject, uint32(0), authzapi.ContinuationToken(""), mock.Anything).
+		Return(resultChan, errChan, nil)
 
 	usecaseConfig := &UsecaseConfig{
 		ReadAfterWriteEnabled:   true,
@@ -86,23 +81,22 @@ func TestLookupResources_Success(t *testing.T) {
 		ConsumerEnabled:         true,
 	}
 	useCase := New(nil, repo, inventoryRepo, authz, nil, "", log.DefaultLogger, nil, cb, usecaseConfig, nil)
-	stream, err := useCase.LookupResources(ctx, req)
+	resChan, _, err := useCase.LookupResources(ctx, resourceType, relation, subject, 0, "")
 
 	assert.Nil(t, err)
-	assert.NotNil(t, stream)
+	assert.NotNil(t, resChan)
 
 	// Verify we can receive all responses
-	res1, err := stream.Recv()
-	assert.Nil(t, err)
+	res1 := <-resChan
 	assert.Equal(t, "resource1", res1.Resource.Id)
 
-	res2, err := stream.Recv()
-	assert.Nil(t, err)
+	res2 := <-resChan
 	assert.Equal(t, "resource2", res2.Resource.Id)
 
-	// Verify EOF
-	_, err = stream.Recv()
-	assert.Equal(t, io.EOF, err)
+	// Verify channel is closed (no more results)
+	res3, ok := <-resChan
+	assert.False(t, ok)
+	assert.Nil(t, res3)
 }
 
 func resource1() *model_legacy.Resource {
@@ -750,18 +744,22 @@ func TestCheck_MissingResource(t *testing.T) {
 	m := &mocks.MockAuthz{}
 
 	repo.On("FindByReporterResourceId", mock.Anything, mock.Anything).Return(&model_legacy.Resource{}, gorm.ErrRecordNotFound)
-	m.On("Check", mock.Anything, mock.Anything, "notifications_integration_view", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(v1beta1.CheckResponse_ALLOWED_TRUE, &v1beta1.ConsistencyToken{}, nil)
+	m.On("Check", mock.Anything, mock.MatchedBy(func(req *kessel.CheckRequest) bool {
+		return req.Relation == "notifications_integration_view"
+	})).Return(&kessel.CheckResponse{Allowed: kessel.AllowedTrue, ConsistencyToken: &kessel.ConsistencyToken{}}, nil)
 
 	mc := metricscollector.NewFakeMetricsCollector()
 	useCase := New(nil, repo, inventoryRepo, m, nil, "", log.DefaultLogger, nil, cb, defaultUseCaseConfig, mc)
-	allowed, err := useCase.CheckLegacy(ctx, "notifications_integration_view", "rbac", &v1beta1.SubjectReference{}, model_legacy.ReporterResourceId{})
+	allowed, err := useCase.CheckLegacy(ctx, "notifications_integration_view", "rbac", &kessel.SubjectReference{}, model_legacy.ReporterResourceId{})
 
 	assert.Nil(t, err)
 	assert.True(t, allowed)
 
 	// check negative case
-	m.On("Check", mock.Anything, mock.Anything, "notifications_integration_write", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(v1beta1.CheckResponse_ALLOWED_FALSE, &v1beta1.ConsistencyToken{}, nil)
-	allowed, err = useCase.CheckLegacy(ctx, "notifications_integration_write", "rbac", &v1beta1.SubjectReference{}, model_legacy.ReporterResourceId{})
+	m.On("Check", mock.Anything, mock.MatchedBy(func(req *kessel.CheckRequest) bool {
+		return req.Relation == "notifications_integration_write"
+	})).Return(&kessel.CheckResponse{Allowed: kessel.AllowedFalse, ConsistencyToken: &kessel.ConsistencyToken{}}, nil)
+	allowed, err = useCase.CheckLegacy(ctx, "notifications_integration_write", "rbac", &kessel.SubjectReference{}, model_legacy.ReporterResourceId{})
 
 	assert.Nil(t, err)
 	assert.False(t, allowed)
@@ -780,7 +778,7 @@ func TestCheck_ResourceExistsError(t *testing.T) {
 
 	mc := metricscollector.NewFakeMetricsCollector()
 	useCase := New(nil, repo, inventoryRepo, m, nil, "", log.DefaultLogger, nil, cb, defaultUseCaseConfig, mc)
-	allowed, err := useCase.CheckLegacy(ctx, "notifications_integration_view", "rbac", &v1beta1.SubjectReference{}, model_legacy.ReporterResourceId{})
+	allowed, err := useCase.CheckLegacy(ctx, "notifications_integration_view", "rbac", &kessel.SubjectReference{}, model_legacy.ReporterResourceId{})
 
 	assert.NotNil(t, err)
 	assert.False(t, allowed)
@@ -796,11 +794,11 @@ func TestCheck_ErrorWithKessel(t *testing.T) {
 	m := &mocks.MockAuthz{}
 
 	repo.On("FindByReporterResourceId", mock.Anything, mock.Anything).Return(&model_legacy.Resource{}, nil)
-	m.On("Check", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(v1beta1.CheckResponse_ALLOWED_FALSE, &v1beta1.ConsistencyToken{}, errors.New("failed during call to relations"))
+	m.On("Check", mock.Anything, mock.Anything).Return(&kessel.CheckResponse{Allowed: kessel.AllowedFalse, ConsistencyToken: &kessel.ConsistencyToken{}}, errors.New("failed during call to relations"))
 
 	mc := metricscollector.NewFakeMetricsCollector()
 	useCase := New(nil, repo, inventoryRepo, m, nil, "", log.DefaultLogger, nil, cb, defaultUseCaseConfig, mc)
-	allowed, err := useCase.CheckLegacy(ctx, "notifications_integration_view", "rbac", &v1beta1.SubjectReference{}, model_legacy.ReporterResourceId{})
+	allowed, err := useCase.CheckLegacy(ctx, "notifications_integration_view", "rbac", &kessel.SubjectReference{}, model_legacy.ReporterResourceId{})
 
 	assert.NotNil(t, err)
 	assert.False(t, allowed)
@@ -817,18 +815,22 @@ func TestCheck_Allowed(t *testing.T) {
 	m := &mocks.MockAuthz{}
 
 	repo.On("FindByReporterResourceId", mock.Anything, mock.Anything).Return(resource, nil)
-	m.On("Check", mock.Anything, mock.Anything, "notifications_integration_write", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(v1beta1.CheckResponse_ALLOWED_TRUE, &v1beta1.ConsistencyToken{}, nil)
+	m.On("Check", mock.Anything, mock.MatchedBy(func(req *kessel.CheckRequest) bool {
+		return req.Relation == "notifications_integration_write"
+	})).Return(&kessel.CheckResponse{Allowed: kessel.AllowedTrue, ConsistencyToken: &kessel.ConsistencyToken{}}, nil)
 
 	mc := metricscollector.NewFakeMetricsCollector()
 	useCase := New(nil, repo, inventoryRepo, m, nil, "", log.DefaultLogger, nil, cb, defaultUseCaseConfig, mc)
-	allowed, err := useCase.CheckLegacy(ctx, "notifications_integration_write", "rbac", &v1beta1.SubjectReference{}, model_legacy.ReporterResourceId{})
+	allowed, err := useCase.CheckLegacy(ctx, "notifications_integration_write", "rbac", &kessel.SubjectReference{}, model_legacy.ReporterResourceId{})
 
 	assert.Nil(t, err)
 	assert.True(t, allowed)
 
 	// check negative case
-	m.On("Check", mock.Anything, mock.Anything, "notifications_integration_view", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(v1beta1.CheckResponse_ALLOWED_FALSE, &v1beta1.ConsistencyToken{}, nil)
-	allowed, err = useCase.CheckLegacy(ctx, "notifications_integration_view", "rbac", &v1beta1.SubjectReference{}, model_legacy.ReporterResourceId{})
+	m.On("Check", mock.Anything, mock.MatchedBy(func(req *kessel.CheckRequest) bool {
+		return req.Relation == "notifications_integration_view"
+	})).Return(&kessel.CheckResponse{Allowed: kessel.AllowedFalse, ConsistencyToken: &kessel.ConsistencyToken{}}, nil)
+	allowed, err = useCase.CheckLegacy(ctx, "notifications_integration_view", "rbac", &kessel.SubjectReference{}, model_legacy.ReporterResourceId{})
 
 	assert.Nil(t, err)
 	assert.False(t, allowed)
@@ -847,7 +849,7 @@ func TestCheckForUpdate_ResourceExistsError(t *testing.T) {
 
 	mc := metricscollector.NewFakeMetricsCollector()
 	useCase := New(nil, repo, inventoryRepo, m, nil, "", log.DefaultLogger, nil, cb, defaultUseCaseConfig, mc)
-	allowed, err := useCase.CheckForUpdateLegacy(ctx, "notifications_integration_view", "rbac", &v1beta1.SubjectReference{}, model_legacy.ReporterResourceId{})
+	allowed, err := useCase.CheckForUpdateLegacy(ctx, "notifications_integration_view", "rbac", &kessel.SubjectReference{}, model_legacy.ReporterResourceId{})
 
 	assert.NotNil(t, err)
 	assert.False(t, allowed)
@@ -863,11 +865,11 @@ func TestCheckForUpdate_ErrorWithKessel(t *testing.T) {
 	m := &mocks.MockAuthz{}
 
 	repo.On("FindByReporterResourceId", mock.Anything, mock.Anything).Return(&model_legacy.Resource{}, nil)
-	m.On("CheckForUpdate", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(v1beta1.CheckForUpdateResponse_ALLOWED_FALSE, &v1beta1.ConsistencyToken{}, errors.New("failed during call to relations"))
+	m.On("CheckForUpdate", mock.Anything, mock.Anything).Return(&kessel.CheckForUpdateResponse{Allowed: kessel.AllowedFalse, ConsistencyToken: &kessel.ConsistencyToken{}}, errors.New("failed during call to relations"))
 
 	mc := metricscollector.NewFakeMetricsCollector()
 	useCase := New(nil, repo, inventoryRepo, m, nil, "", log.DefaultLogger, nil, cb, defaultUseCaseConfig, mc)
-	allowed, err := useCase.CheckForUpdateLegacy(ctx, "notifications_integration_view", "rbac", &v1beta1.SubjectReference{}, model_legacy.ReporterResourceId{})
+	allowed, err := useCase.CheckForUpdateLegacy(ctx, "notifications_integration_view", "rbac", &kessel.SubjectReference{}, model_legacy.ReporterResourceId{})
 
 	assert.NotNil(t, err)
 	assert.False(t, allowed)
@@ -884,11 +886,11 @@ func TestCheckForUpdate_WorkspaceAllowed(t *testing.T) {
 	m := &mocks.MockAuthz{}
 
 	repo.On("FindByReporterResourceId", mock.Anything, mock.Anything).Return(resource, nil)
-	m.On("CheckForUpdate", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(v1beta1.CheckForUpdateResponse_ALLOWED_TRUE, &v1beta1.ConsistencyToken{}, nil)
+	m.On("CheckForUpdate", mock.Anything, mock.Anything).Return(&kessel.CheckForUpdateResponse{Allowed: kessel.AllowedTrue, ConsistencyToken: &kessel.ConsistencyToken{}}, nil)
 
 	mc := metricscollector.NewFakeMetricsCollector()
 	useCase := New(nil, repo, inventoryRepo, m, nil, "", log.DefaultLogger, nil, cb, defaultUseCaseConfig, mc)
-	allowed, err := useCase.CheckForUpdateLegacy(ctx, "notifications_integration_view", "rbac", &v1beta1.SubjectReference{}, model_legacy.ReporterResourceId{ResourceType: "workspace"})
+	allowed, err := useCase.CheckForUpdateLegacy(ctx, "notifications_integration_view", "rbac", &kessel.SubjectReference{}, model_legacy.ReporterResourceId{ResourceType: "workspace"})
 
 	assert.Nil(t, err)
 	assert.True(t, allowed)
@@ -904,11 +906,11 @@ func TestCheckForUpdate_MissingResource_Allowed(t *testing.T) {
 	m := &mocks.MockAuthz{}
 
 	repo.On("FindByReporterResourceId", mock.Anything, mock.Anything).Return(&model_legacy.Resource{}, gorm.ErrRecordNotFound)
-	m.On("CheckForUpdate", mock.Anything, mock.Anything, "notifications_integration_view", mock.Anything, mock.Anything, mock.Anything).Return(v1beta1.CheckForUpdateResponse_ALLOWED_TRUE, &v1beta1.ConsistencyToken{}, nil)
+	m.On("CheckForUpdate", mock.Anything, mock.Anything).Return(&kessel.CheckForUpdateResponse{Allowed: kessel.AllowedTrue, ConsistencyToken: &kessel.ConsistencyToken{}}, nil)
 
 	mc := metricscollector.NewFakeMetricsCollector()
 	useCase := New(nil, repo, inventoryRepo, m, nil, "", log.DefaultLogger, nil, cb, defaultUseCaseConfig, mc)
-	allowed, err := useCase.CheckForUpdateLegacy(ctx, "notifications_integration_view", "rbac", &v1beta1.SubjectReference{}, model_legacy.ReporterResourceId{})
+	allowed, err := useCase.CheckForUpdateLegacy(ctx, "notifications_integration_view", "rbac", &kessel.SubjectReference{}, model_legacy.ReporterResourceId{})
 
 	// no consistency token being written.
 
@@ -928,21 +930,25 @@ func TestCheckForUpdate_Allowed(t *testing.T) {
 	m := &mocks.MockAuthz{}
 
 	repo.On("FindByReporterResourceId", mock.Anything, mock.Anything).Return(resource, nil)
-	m.On("CheckForUpdate", mock.Anything, mock.Anything, "notifications_integration_view", mock.Anything, mock.Anything, mock.Anything).Return(v1beta1.CheckForUpdateResponse_ALLOWED_TRUE, &v1beta1.ConsistencyToken{}, nil)
+	m.On("CheckForUpdate", mock.Anything, mock.MatchedBy(func(req *kessel.CheckForUpdateRequest) bool {
+		return req.Relation == "notifications_integration_view"
+	})).Return(&kessel.CheckForUpdateResponse{Allowed: kessel.AllowedTrue, ConsistencyToken: &kessel.ConsistencyToken{}}, nil)
 
 	repo.On("Update", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&model_legacy.Resource{}, nil)
 
 	mc := metricscollector.NewFakeMetricsCollector()
 	useCase := New(nil, repo, inventoryRepo, m, nil, "", log.DefaultLogger, nil, cb, defaultUseCaseConfig, mc)
-	allowed, err := useCase.CheckForUpdateLegacy(ctx, "notifications_integration_view", "rbac", &v1beta1.SubjectReference{}, model_legacy.ReporterResourceId{})
+	allowed, err := useCase.CheckForUpdateLegacy(ctx, "notifications_integration_view", "rbac", &kessel.SubjectReference{}, model_legacy.ReporterResourceId{})
 
 	assert.Nil(t, err)
 	assert.True(t, allowed)
 
 	// check negative case
-	m.On("CheckForUpdate", mock.Anything, mock.Anything, "notifications_integration_write", mock.Anything, mock.Anything, mock.Anything).Return(v1beta1.CheckForUpdateResponse_ALLOWED_FALSE, &v1beta1.ConsistencyToken{}, nil)
+	m.On("CheckForUpdate", mock.Anything, mock.MatchedBy(func(req *kessel.CheckForUpdateRequest) bool {
+		return req.Relation == "notifications_integration_write"
+	})).Return(&kessel.CheckForUpdateResponse{Allowed: kessel.AllowedFalse, ConsistencyToken: &kessel.ConsistencyToken{}}, nil)
 
-	allowed, err = useCase.CheckForUpdateLegacy(ctx, "notifications_integration_write", "rbac", &v1beta1.SubjectReference{}, model_legacy.ReporterResourceId{})
+	allowed, err = useCase.CheckForUpdateLegacy(ctx, "notifications_integration_write", "rbac", &kessel.SubjectReference{}, model_legacy.ReporterResourceId{})
 
 	assert.Nil(t, err)
 	assert.False(t, allowed)
@@ -961,7 +967,7 @@ func TestListResourcesInWorkspace_Error(t *testing.T) {
 
 	mc := metricscollector.NewFakeMetricsCollector()
 	useCase := New(nil, repo, inventoryRepo, m, nil, "", log.DefaultLogger, nil, cb, defaultUseCaseConfig, mc)
-	resource_chan, err_chan, err := useCase.ListResourcesInWorkspace(ctx, "notifications_integration_view", "rbac", &v1beta1.SubjectReference{}, "foo-id")
+	resource_chan, err_chan, err := useCase.ListResourcesInWorkspace(ctx, "notifications_integration_view", "rbac", &kessel.SubjectReference{}, "foo-id")
 
 	assert.NotNil(t, err)
 	assert.Nil(t, resource_chan)
@@ -981,7 +987,7 @@ func TestListResourcesInWorkspace_NoResources(t *testing.T) {
 
 	mc := metricscollector.NewFakeMetricsCollector()
 	useCase := New(nil, repo, inventoryRepo, m, nil, "", log.DefaultLogger, nil, cb, defaultUseCaseConfig, mc)
-	resource_chan, err_chan, err := useCase.ListResourcesInWorkspace(ctx, "notifications_integration_view", "rbac", &v1beta1.SubjectReference{}, "foo-id")
+	resource_chan, err_chan, err := useCase.ListResourcesInWorkspace(ctx, "notifications_integration_view", "rbac", &kessel.SubjectReference{}, "foo-id")
 
 	assert.Nil(t, err)
 
@@ -1003,11 +1009,13 @@ func TestListResourcesInWorkspace_ResourcesAllowedTrue(t *testing.T) {
 	resource := resource1()
 
 	repo.On("FindByWorkspaceId", mock.Anything, mock.Anything).Return([]*model_legacy.Resource{resource}, nil)
-	m.On("Check", mock.Anything, mock.Anything, "notifications_integration_write", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(v1beta1.CheckResponse_ALLOWED_TRUE, &v1beta1.ConsistencyToken{}, nil)
+	m.On("Check", mock.Anything, mock.MatchedBy(func(req *kessel.CheckRequest) bool {
+		return req.Relation == "notifications_integration_write"
+	})).Return(&kessel.CheckResponse{Allowed: kessel.AllowedTrue, ConsistencyToken: &kessel.ConsistencyToken{}}, nil)
 
 	mc := metricscollector.NewFakeMetricsCollector()
 	useCase := New(nil, repo, inventoryRepo, m, nil, "", log.DefaultLogger, nil, cb, defaultUseCaseConfig, mc)
-	resource_chan, err_chan, err := useCase.ListResourcesInWorkspace(ctx, "notifications_integration_write", "rbac", &v1beta1.SubjectReference{}, "foo-id")
+	resource_chan, err_chan, err := useCase.ListResourcesInWorkspace(ctx, "notifications_integration_write", "rbac", &kessel.SubjectReference{}, "foo-id")
 
 	assert.Nil(t, err)
 
@@ -1022,8 +1030,10 @@ func TestListResourcesInWorkspace_ResourcesAllowedTrue(t *testing.T) {
 	assert.Empty(t, err_chan) // dont want any errors.
 
 	// check negative case (not allowed)
-	m.On("Check", mock.Anything, mock.Anything, "notifications_integration_view", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(v1beta1.CheckResponse_ALLOWED_FALSE, &v1beta1.ConsistencyToken{}, nil)
-	resource_chan, err_chan, err = useCase.ListResourcesInWorkspace(ctx, "notifications_integration_view", "rbac", &v1beta1.SubjectReference{}, "foo-id")
+	m.On("Check", mock.Anything, mock.MatchedBy(func(req *kessel.CheckRequest) bool {
+		return req.Relation == "notifications_integration_view"
+	})).Return(&kessel.CheckResponse{Allowed: kessel.AllowedFalse, ConsistencyToken: &kessel.ConsistencyToken{}}, nil)
+	resource_chan, err_chan, err = useCase.ListResourcesInWorkspace(ctx, "notifications_integration_view", "rbac", &kessel.SubjectReference{}, "foo-id")
 
 	assert.Nil(t, err)
 
@@ -1047,11 +1057,11 @@ func TestListResourcesInWorkspace_MultipleResourcesAllowedTrue(t *testing.T) {
 	resource3 := resource3()
 
 	repo.On("FindByWorkspaceId", mock.Anything, mock.Anything).Return([]*model_legacy.Resource{resource, resource2, resource3}, nil)
-	m.On("Check", mock.Anything, mock.Anything, "notifications_integration_write", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(v1beta1.CheckResponse_ALLOWED_TRUE, &v1beta1.ConsistencyToken{}, nil)
+	m.On("Check", mock.Anything, mock.Anything).Return(&kessel.CheckResponse{Allowed: kessel.AllowedTrue, ConsistencyToken: &kessel.ConsistencyToken{}}, nil)
 
 	mc := metricscollector.NewFakeMetricsCollector()
 	useCase := New(nil, repo, inventoryRepo, m, nil, "", log.DefaultLogger, nil, cb, defaultUseCaseConfig, mc)
-	resource_chan, err_chan, err := useCase.ListResourcesInWorkspace(ctx, "notifications_integration_write", "rbac", &v1beta1.SubjectReference{}, "foo-id")
+	resource_chan, err_chan, err := useCase.ListResourcesInWorkspace(ctx, "notifications_integration_write", "rbac", &kessel.SubjectReference{}, "foo-id")
 
 	assert.Nil(t, err)
 
@@ -1087,13 +1097,19 @@ func TestListResourcesInWorkspace_MultipleResourcesOneFalseTwoTrueLastError(t *t
 	theError := errors.New("failed calling relations")
 
 	repo.On("FindByWorkspaceId", mock.Anything, mock.Anything).Return([]*model_legacy.Resource{resource, resource2, resource3}, nil)
-	m.On("Check", mock.Anything, mock.Anything, "notifications_integration_write", mock.Anything, "my-resource", mock.Anything, mock.Anything).Return(v1beta1.CheckResponse_ALLOWED_FALSE, &v1beta1.ConsistencyToken{}, nil)
-	m.On("Check", mock.Anything, mock.Anything, "notifications_integration_write", mock.Anything, "my-resource2", mock.Anything, mock.Anything).Return(v1beta1.CheckResponse_ALLOWED_TRUE, &v1beta1.ConsistencyToken{}, nil)
-	m.On("Check", mock.Anything, mock.Anything, "notifications_integration_write", mock.Anything, "my-resource33", mock.Anything, mock.Anything).Return(v1beta1.CheckResponse_ALLOWED_UNSPECIFIED, &v1beta1.ConsistencyToken{}, theError)
+	m.On("Check", mock.Anything, mock.MatchedBy(func(req *kessel.CheckRequest) bool {
+		return req.Resource.Type.Name == "my-resource"
+	})).Return(&kessel.CheckResponse{Allowed: kessel.AllowedFalse, ConsistencyToken: &kessel.ConsistencyToken{}}, nil)
+	m.On("Check", mock.Anything, mock.MatchedBy(func(req *kessel.CheckRequest) bool {
+		return req.Resource.Type.Name == "my-resource2"
+	})).Return(&kessel.CheckResponse{Allowed: kessel.AllowedTrue, ConsistencyToken: &kessel.ConsistencyToken{}}, nil)
+	m.On("Check", mock.Anything, mock.MatchedBy(func(req *kessel.CheckRequest) bool {
+		return req.Resource.Type.Name == "my-resource33"
+	})).Return(&kessel.CheckResponse{Allowed: kessel.AllowedUnspecified, ConsistencyToken: &kessel.ConsistencyToken{}}, theError)
 
 	mc := metricscollector.NewFakeMetricsCollector()
 	useCase := New(nil, repo, inventoryRepo, m, nil, "", log.DefaultLogger, nil, cb, defaultUseCaseConfig, mc)
-	resource_chan, err_chan, err := useCase.ListResourcesInWorkspace(ctx, "notifications_integration_write", "rbac", &v1beta1.SubjectReference{}, "foo-id")
+	resource_chan, err_chan, err := useCase.ListResourcesInWorkspace(ctx, "notifications_integration_write", "rbac", &kessel.SubjectReference{}, "foo-id")
 
 	assert.Nil(t, err)
 
@@ -1124,11 +1140,11 @@ func TestListResourcesInWorkspace_ResourcesAllowedError(t *testing.T) {
 	resource := resource1()
 
 	repo.On("FindByWorkspaceId", mock.Anything, mock.Anything).Return([]*model_legacy.Resource{resource}, nil)
-	m.On("Check", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(v1beta1.CheckResponse_ALLOWED_TRUE, &v1beta1.ConsistencyToken{}, errors.New("failed calling relations"))
+	m.On("Check", mock.Anything, mock.Anything).Return(&kessel.CheckResponse{Allowed: kessel.AllowedTrue, ConsistencyToken: &kessel.ConsistencyToken{}}, errors.New("failed calling relations"))
 
 	mc := metricscollector.NewFakeMetricsCollector()
 	useCase := New(nil, repo, inventoryRepo, m, nil, "", log.DefaultLogger, nil, cb, defaultUseCaseConfig, mc)
-	resource_chan, err_chan, err := useCase.ListResourcesInWorkspace(ctx, "notifications_integration_view", "rbac", &v1beta1.SubjectReference{}, "foo-id")
+	resource_chan, err_chan, err := useCase.ListResourcesInWorkspace(ctx, "notifications_integration_view", "rbac", &kessel.SubjectReference{}, "foo-id")
 
 	assert.Nil(t, err)
 

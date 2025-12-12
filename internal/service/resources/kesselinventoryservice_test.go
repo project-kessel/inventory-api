@@ -9,7 +9,6 @@ import (
 
 	krlog "github.com/go-kratos/kratos/v2/log"
 	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2"
-	relationsV1beta1 "github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
 	"google.golang.org/protobuf/types/known/structpb"
 
 	"github.com/project-kessel/inventory-api/internal/data"
@@ -298,28 +297,18 @@ func TestToLookupResourceRequest(t *testing.T) {
 		},
 	}
 
-	expected := &relationsV1beta1.LookupResourcesRequest{
-		ResourceType: &relationsV1beta1.ObjectType{
-			Name: "hbi",
-		},
-		Relation: "view",
-		Subject: &relationsV1beta1.SubjectReference{
-			Relation: &permission,
-			Subject: &relationsV1beta1.ObjectReference{
-				Type: &relationsV1beta1.ObjectType{
-					Name:      "principal",
-					Namespace: "rbac",
-				},
-				Id: "res-id",
-			},
-		},
-		Pagination: &relationsV1beta1.RequestPagination{
-			Limit: 50,
-		},
-	}
+	// ToLookupResourceRequest now returns individual parameters instead of a request object
+	resourceType, relation, subject, limit, token, err := svc.ToLookupResourceRequest(input)
 
-	result, _ := svc.ToLookupResourceRequest(input)
-	assert.Equal(t, expected, result)
+	assert.Nil(t, err)
+	assert.Equal(t, "hbi", resourceType.Name)
+	assert.Equal(t, "view", relation)
+	assert.Equal(t, "principal", subject.Subject.Type.Name)
+	assert.Equal(t, "rbac", subject.Subject.Type.Namespace)
+	assert.Equal(t, "res-id", subject.Subject.Id)
+	assert.Equal(t, &permission, subject.Relation)
+	assert.Equal(t, uint32(50), limit)
+	assert.Equal(t, "", token)
 }
 
 func TestIsValidatedRepresentationType(t *testing.T) {
@@ -345,35 +334,4 @@ var typePattern = regexp.MustCompile(`^[A-Za-z0-9_]+$`)
 
 func IsValidType(val string) bool {
 	return typePattern.MatchString(val)
-}
-
-func TestToLookupResourceResponse(t *testing.T) {
-	input := &relationsV1beta1.LookupResourcesResponse{
-		Resource: &relationsV1beta1.ObjectReference{
-			Type: &relationsV1beta1.ObjectType{
-				Namespace: "reporter-x",
-				Name:      "type-y",
-			},
-			Id: "abc123",
-		},
-		Pagination: &relationsV1beta1.ResponsePagination{
-			ContinuationToken: "next-page-token",
-		},
-	}
-
-	expected := &pb.StreamedListObjectsResponse{
-		Object: &pb.ResourceReference{
-			Reporter: &pb.ReporterReference{
-				Type: "reporter-x",
-			},
-			ResourceId:   "abc123",
-			ResourceType: "type-y",
-		},
-		Pagination: &pb.ResponsePagination{
-			ContinuationToken: "next-page-token",
-		},
-	}
-
-	result := svc.ToLookupResourceResponse(input)
-	assert.Equal(t, expected, result)
 }

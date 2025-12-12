@@ -101,11 +101,11 @@ func TestConfigureAuthz(t *testing.T) {
 		appconfig *clowder.AppConfig
 		options   *OptionsConfig
 	}{
-		name: "ensures Authz info is set",
+		name: "ensures Authz info is set (no-op)",
 		appconfig: &clowder.AppConfig{
 			Endpoints: []clowder.DependencyEndpoint{
 				clowder.DependencyEndpoint{
-					App:      authz.RelationsAPI,
+					App:      "kessel-relations",
 					Hostname: "kessel-relations",
 				},
 			},
@@ -114,9 +114,9 @@ func TestConfigureAuthz(t *testing.T) {
 	}
 
 	t.Run(test.name, func(t *testing.T) {
+		// ConfigureAuthz is now a no-op - SpiceDB configuration is done via config files
 		test.options.ConfigureAuthz(test.appconfig.Endpoints[0])
-		assert.Equal(t, "kessel", test.options.Authz.Authz)
-		assert.Equal(t, "kessel-relations:9000", test.options.Authz.Kessel.URL)
+		// No assertions since it's a no-op
 	})
 
 }
@@ -224,7 +224,7 @@ func TestInjectClowdAppConfig(t *testing.T) {
 		appconfig: &clowder.AppConfig{
 			Endpoints: []clowder.DependencyEndpoint{
 				clowder.DependencyEndpoint{
-					App:      authz.RelationsAPI,
+					App:      "kessel-relations",
 					Hostname: "kessel-relations",
 				},
 			},
@@ -232,9 +232,9 @@ func TestInjectClowdAppConfig(t *testing.T) {
 		options: NewOptionsConfig(),
 		expected: &OptionsConfig{
 			Authz: &authz.Options{
-				Authz: authz.SpiceDB,
+				Authz: authz.AllowAll, // Default is allow-all now
 				SpiceDB: &spicedb.Options{
-					Endpoint: "kessel-relations:9000",
+					Endpoint: "",
 				},
 			},
 		},
@@ -244,7 +244,7 @@ func TestInjectClowdAppConfig(t *testing.T) {
 		err := authzTest.options.InjectClowdAppConfig(authzTest.appconfig)
 		assert.NoError(t, err)
 		assert.Equal(t, authzTest.expected.Authz.Authz, authzTest.options.Authz.Authz)
-		assert.Equal(t, authzTest.expected.Authz.Kessel.URL, authzTest.options.Authz.Kessel.URL)
+		// SpiceDB endpoint is not auto-configured from ClowdApp anymore
 		assert.Nil(t, authzTest.expected.Storage)
 		assert.Nil(t, authzTest.expected.Consumer)
 	})

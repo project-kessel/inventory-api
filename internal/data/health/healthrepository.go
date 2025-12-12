@@ -2,6 +2,8 @@ package health
 
 import (
 	"context"
+	"errors"
+	"reflect"
 
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/spf13/viper"
@@ -10,6 +12,7 @@ import (
 	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1"
 	"github.com/project-kessel/inventory-api/internal/authz"
 	authzapi "github.com/project-kessel/inventory-api/internal/authz/api"
+	kessel "github.com/project-kessel/inventory-api/internal/authz/model"
 )
 
 type healthRepo struct {
@@ -32,7 +35,14 @@ func (r *healthRepo) IsBackendAvailable(ctx context.Context) (*pb.GetReadyzRespo
 	if dbErr == nil {
 		dbErr = sqlDB.PingContext(ctx)
 	}
-	health, apiErr := r.Authz.Health(ctx)
+
+	var health *kessel.GetReadyzResponse
+	var apiErr error
+	if r.Authz != nil && !reflect.ValueOf(r.Authz).IsNil() {
+		health, apiErr = r.Authz.Health(ctx)
+	} else {
+		apiErr = errors.New("authorizer not initialized")
+	}
 
 	if dbErr != nil && apiErr != nil {
 		log.Errorf("STORAGE UNHEALTHY: %s and RELATIONS-API UNHEALTHY", storageType)
@@ -58,8 +68,14 @@ func (r *healthRepo) IsBackendAvailable(ctx context.Context) (*pb.GetReadyzRespo
 	return newResponse("Storage type "+storageType, 200), nil
 }
 
-func (r *healthRepo) IsRelationsAvailable(ctx context.Context) (*pb.GetReadyzResponse, error) {
-	health, apiErr := r.Authz.Health(ctx)
+func (r *healthRepo) IsRelationsRepositoryAvailable(ctx context.Context) (*pb.GetReadyzResponse, error) {
+	var health *kessel.GetReadyzResponse
+	var apiErr error
+	if r.Authz != nil && !reflect.ValueOf(r.Authz).IsNil() {
+		health, apiErr = r.Authz.Health(ctx)
+	} else {
+		apiErr = errors.New("authorizer not initialized")
+	}
 	if apiErr != nil {
 		log.Errorf("RELATIONS-API UNHEALTHY")
 		return newResponse("RELATIONS-API UNHEALTHY", 500), nil

@@ -23,11 +23,11 @@ import (
 	"github.com/project-kessel/inventory-api/internal/mocks"
 
 	"github.com/go-kratos/kratos/v2/log"
-	"github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
 	"github.com/stretchr/testify/assert"
 
 	. "github.com/project-kessel/inventory-api/cmd/common"
 	"github.com/project-kessel/inventory-api/internal/authz"
+	kessel "github.com/project-kessel/inventory-api/internal/authz/model"
 	"github.com/project-kessel/inventory-api/internal/pubsub"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -91,10 +91,10 @@ func (t *TestCase) TestSetup(testingT *testing.T) []error {
 	notifier := &pubsub.NotifierMock{}
 
 	authorizer := &mocks.MockAuthz{}
-	createTupleResponse := &v1beta1.CreateTuplesResponse{ConsistencyToken: &v1beta1.ConsistencyToken{Token: "test-token"}}
-	deleteTupleResponse := &v1beta1.DeleteTuplesResponse{ConsistencyToken: &v1beta1.ConsistencyToken{Token: "test-token"}}
-	authorizer.On("CreateTuples", mock.Anything, mock.Anything).Return(createTupleResponse, nil)
-	authorizer.On("DeleteTuples", mock.Anything, mock.Anything).Return(deleteTupleResponse, nil)
+	createRelationshipsResponse := &kessel.CreateRelationshipsResponse{ConsistencyToken: &kessel.ConsistencyToken{Token: "test-token"}}
+	deleteRelationshipsResponse := &kessel.DeleteRelationshipsResponse{ConsistencyToken: &kessel.ConsistencyToken{Token: "test-token"}}
+	authorizer.On("CreateRelationships", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(createRelationshipsResponse, nil)
+	authorizer.On("DeleteRelationships", mock.Anything, mock.Anything, mock.Anything).Return(deleteRelationshipsResponse, nil)
 
 	consumer := &mocks.MockConsumer{}
 	db := setupInMemoryDB(testingT)
@@ -517,7 +517,7 @@ func TestRebalanceCallback_AssignedPartitions(t *testing.T) {
 	tests := []struct {
 		name                  string
 		partitions            []kafka.TopicPartition
-		lockResponse          *v1beta1.AcquireLockResponse
+		lockResponse          *kessel.AcquireLockResponse
 		lockError             error
 		expectedLockId        string
 		expectedLockToken     string
@@ -529,7 +529,7 @@ func TestRebalanceCallback_AssignedPartitions(t *testing.T) {
 			partitions: []kafka.TopicPartition{
 				{Partition: 0, Topic: ToPointer("test-topic")},
 			},
-			lockResponse: &v1beta1.AcquireLockResponse{
+			lockResponse: &kessel.AcquireLockResponse{
 				LockToken: "test-lock-token-123",
 			},
 			lockError:             nil,
@@ -570,9 +570,7 @@ func TestRebalanceCallback_AssignedPartitions(t *testing.T) {
 
 			authorizer := &mocks.MockAuthz{}
 			if test.expectAcquireLockCall {
-				authorizer.On("AcquireLock", mock.Anything, mock.MatchedBy(func(req *v1beta1.AcquireLockRequest) bool {
-					return req.LockId == test.expectedLockId
-				})).Return(test.lockResponse, test.lockError)
+				authorizer.On("AcquireLock", mock.Anything, test.expectedLockId).Return(test.lockResponse, test.lockError)
 			}
 			tester.inv.Authorizer = authorizer
 
@@ -724,29 +722,27 @@ func TestFencingToken_WritingAfterRebalance(t *testing.T) {
 	testerB.inv.Config.ConsumerGroupID = "test-group"
 
 	authorizer := &mocks.MockAuthz{}
-	createSuccessResponse := &v1beta1.CreateTuplesResponse{ConsistencyToken: &v1beta1.ConsistencyToken{Token: "test-token"}}
+	createSuccessResponse := &kessel.CreateRelationshipsResponse{ConsistencyToken: &kessel.ConsistencyToken{Token: "test-token"}}
 
 	consumerAToken := "token-A"
 	consumerBToken := "token-B"
-	lockCall1 := authorizer.On("AcquireLock", mock.Anything, mock.MatchedBy(func(req *v1beta1.AcquireLockRequest) bool {
-		return req.LockId == "test-group/0"
-	})).Return(&v1beta1.AcquireLockResponse{LockToken: consumerAToken}, nil).Once()
+	lockCall1 := authorizer.On("AcquireLock", mock.Anything, "test-group/0").Return(&kessel.AcquireLockResponse{LockToken: consumerAToken}, nil).Once()
 
-	lockCall2 := authorizer.On("AcquireLock", mock.Anything, mock.MatchedBy(func(req *v1beta1.AcquireLockRequest) bool {
-		return req.LockId == "test-group/0"
-	})).Return(&v1beta1.AcquireLockResponse{LockToken: consumerBToken}, nil).Once()
+	lockCall2 := authorizer.On("AcquireLock", mock.Anything, "test-group/0").Return(&kessel.AcquireLockResponse{LockToken: consumerBToken}, nil).Once()
 
 	// Ensure the calls happen in the right order
 	lockCall2.NotBefore(lockCall1)
 
-	// Mock the CreateTuples calls to only accept consumer B's token
-	authorizer.On("CreateTuples", mock.Anything, mock.MatchedBy(func(req *v1beta1.CreateTuplesRequest) bool {
-		return req.FencingCheck != nil && req.FencingCheck.LockToken == consumerBToken
-	})).Return(createSuccessResponse, nil)
+	// Mock the CreateRelationships calls to only accept consumer B's token
+	authorizer.On("CreateRelationships", mock.Anything, mock.Anything, mock.Anything,
+		mock.MatchedBy(func(fencing *kessel.FencingCheck) bool {
+			return fencing != nil && fencing.LockToken == consumerBToken
+		})).Return(createSuccessResponse, nil)
 
-	authorizer.On("CreateTuples", mock.Anything, mock.MatchedBy(func(req *v1beta1.CreateTuplesRequest) bool {
-		return req.FencingCheck != nil && req.FencingCheck.LockToken == consumerAToken
-	})).Return((*v1beta1.CreateTuplesResponse)(nil), errors.New("fencing token is invalid or expired"))
+	authorizer.On("CreateRelationships", mock.Anything, mock.Anything, mock.Anything,
+		mock.MatchedBy(func(fencing *kessel.FencingCheck) bool {
+			return fencing != nil && fencing.LockToken == consumerAToken
+		})).Return((*kessel.CreateRelationshipsResponse)(nil), errors.New("fencing token is invalid or expired"))
 
 	testerA.inv.Authorizer = authorizer
 	testerB.inv.Authorizer = authorizer
@@ -806,7 +802,7 @@ func TestInventoryConsumer_CreateTuple_FailedPrecondition(t *testing.T) {
 	assert.Nil(t, errs)
 
 	authorizer := &mocks.MockAuthz{}
-	authorizer.On("CreateTuples", mock.Anything, mock.Anything).Return((*v1beta1.CreateTuplesResponse)(nil), status.Error(codes.FailedPrecondition, "invalid fencing token"))
+	authorizer.On("CreateRelationships", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return((*kessel.CreateRelationshipsResponse)(nil), status.Error(codes.FailedPrecondition, "invalid fencing token"))
 
 	tester.inv.Authorizer = authorizer
 	tester.inv.lockToken = "test-token"
@@ -841,7 +837,7 @@ func TestInventoryConsumer_UpdateTuple_FailedPrecondition(t *testing.T) {
 	assert.Nil(t, errs)
 
 	authorizer := &mocks.MockAuthz{}
-	authorizer.On("CreateTuples", mock.Anything, mock.Anything).Return((*v1beta1.CreateTuplesResponse)(nil), status.Error(codes.FailedPrecondition, "invalid fencing token"))
+	authorizer.On("CreateRelationships", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return((*kessel.CreateRelationshipsResponse)(nil), status.Error(codes.FailedPrecondition, "invalid fencing token"))
 
 	tester.inv.Authorizer = authorizer
 	tester.inv.lockToken = "test-token"
@@ -876,7 +872,7 @@ func TestInventoryConsumer_DeleteTuple_FailedPrecondition(t *testing.T) {
 	assert.Nil(t, errs)
 
 	authorizer := &mocks.MockAuthz{}
-	authorizer.On("DeleteTuples", mock.Anything, mock.Anything).Return((*v1beta1.DeleteTuplesResponse)(nil), status.Error(codes.FailedPrecondition, "invalid fencing token"))
+	authorizer.On("DeleteRelationships", mock.Anything, mock.Anything, mock.Anything).Return((*kessel.DeleteRelationshipsResponse)(nil), status.Error(codes.FailedPrecondition, "invalid fencing token"))
 
 	tester.inv.Authorizer = authorizer
 	tester.inv.lockToken = "test-token"
@@ -1013,6 +1009,6 @@ func TestInventoryConsumer_UpdateWithSameWorkspace_NoOp(t *testing.T) {
 
 	assert.Nil(t, err)
 	assert.Equal(t, "", resp)
-	authorizer.AssertNumberOfCalls(t, "CreateTuples", 0)
-	authorizer.AssertNumberOfCalls(t, "DeleteTuples", 0)
+	authorizer.AssertNumberOfCalls(t, "CreateRelationships", 0)
+	authorizer.AssertNumberOfCalls(t, "DeleteRelationships", 0)
 }

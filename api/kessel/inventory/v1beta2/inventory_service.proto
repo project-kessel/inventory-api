@@ -15,7 +15,10 @@ import "kessel/inventory/v1beta2/streamed_list_objects_request.proto";
 import "kessel/inventory/v1beta2/streamed_list_objects_response.proto";
 import "kessel/inventory/v1beta2/check_bulk_request.proto";
 import "kessel/inventory/v1beta2/check_bulk_response.proto";
-
+import "kessel/inventory/v1beta2/check_self_request.proto";
+import "kessel/inventory/v1beta2/check_self_response.proto";
+import "kessel/inventory/v1beta2/check_self_bulk_request.proto";
+import "kessel/inventory/v1beta2/check_self_bulk_response.proto";
 option go_package = "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2";
 option java_multiple_files = true;
 option java_package = "org.project_kessel.api.inventory.v1beta2";
@@ -35,6 +38,22 @@ service KesselInventoryService {
   rpc Check(CheckRequest) returns (CheckResponse) {
     option (google.api.http) = {
       post: "/api/inventory/v1beta2/check"
+      body: "*"
+    };
+  }
+
+  // Performs a relationship check where the subject is implicitly the caller
+  // (self), as determined by the authentication context, rather than being
+  // provided explicitly in the request.
+  //
+  // This API answers the question:
+  // "Does the current caller have relation *Y* on object *Z*?"
+  //
+  // Common use cases include enforcing access checks for the authenticated user
+  // without allowing callers to impersonate arbitrary subjects.
+  rpc CheckSelf(CheckSelfRequest) returns (CheckSelfResponse) {
+    option (google.api.http) = {
+      post: "/api/inventory/v1beta2/checkself"
       body: "*"
     };
   }
@@ -73,6 +92,22 @@ service KesselInventoryService {
   rpc CheckBulk (CheckBulkRequest) returns (CheckBulkResponse) {
       option (google.api.http) = {
         post: "/api/inventory/v1beta2/checkbulk"
+        body: "*"
+      };
+  }
+  
+  // Performs bulk permission checks where the subject is implicitly the caller
+  // (self) for multiple resource-relation combinations.
+  //
+  // This API is more efficient than making individual CheckSelf calls when
+  // verifying permissions for multiple items. It answers questions like:
+  // "Which of these resources can the current caller perform action *Y* on?"
+  //
+  // The response includes a result for each item in the request, maintaining
+  // the same order.
+  rpc CheckSelfBulk (CheckSelfBulkRequest) returns (CheckSelfBulkResponse) {
+      option (google.api.http) = {
+        post: "/api/inventory/v1beta2/checkselfbulk"
         body: "*"
       };
   }

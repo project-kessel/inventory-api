@@ -94,7 +94,7 @@ kubectl apply -f deploy/kind/relations/spicedb-kind-setup/postgres/storage.yaml
 
 # Install SpiceDB operator if not already installed
 kubectl get crd spicedbclusters.authzed.com > /dev/null 2>&1 || \
-  kubectl apply --server-side -f https://github.com/authzed/spicedb-operator/releases/download/v1.22.0/bundle.yaml
+  kubectl apply --server-side -f https://github.com/authzed/spicedb-operator/releases/download/v1.21.0/bundle.yaml
 
 kubectl apply -f deploy/kind/relations/spicedb-kind-setup/spicedb-cr.yaml
 kubectl apply -f deploy/kind/relations/spicedb-kind-setup/svc-ingress.yaml

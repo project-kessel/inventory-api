@@ -7,7 +7,7 @@ This repository implements a common inventory system with eventing.
 ## Codecov test coverage
 | main | v1beta2 |
 |------|---------|
-| [![codecov](https://codecov.io/gh/project-kessel/inventory-api/branch/main/graph/badge.svg?flag=main)](https://codecov.io/gh/project-kessel/inventory-api/branch/main) | [![codecov](https://codecov.io/gh/project-kessel/inventory-api/branch/Adam0Brien%3Astorage-tests/graph/badge.svg?flag=v1beta2)](https://codecov.io/gh/project-kessel/inventory-api) |
+| [![codecov](https://codecov.io/gh/project-kessel/inventory-api/branch/main/graph/badge.svg?flag=main)](https://codecov.io/gh/project-kessel/inventory-api/branch/main) | [![codecov](https://codecov.io/gh/project-kessel/inventory-api/branch/main/graph/badge.svg?flag=v1beta2)](https://codecov.io/gh/project-kessel/inventory-api) |
 
 
 ## Table of Contents

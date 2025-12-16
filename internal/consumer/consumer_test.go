@@ -92,15 +92,16 @@ func (t *TestCase) TestSetup(testingT *testing.T) []error {
 
 	consumer := &mocks.MockConsumer{}
 	db := setupInMemoryDB(testingT)
+	schemaRepository := data.NewInMemorySchemaRepository()
 
 	// Create consumer with real database first
-	t.inv, err = New(cfg, db, authz.CompletedConfig{}, authorizer, notifier, t.logger, consumer)
+	t.inv, err = New(cfg, db, schemaRepository, authz.CompletedConfig{}, authorizer, notifier, t.logger, consumer)
 	if err != nil {
 		errs = append(errs, err)
 		return errs
 	}
 
-	t.inv.SchemaService = usecase_resources.NewSchemaUsecase(t.logger)
+	t.inv.SchemaService = usecase_resources.NewSchemaUsecase(schemaRepository, t.logger)
 
 	err = t.metrics.New(otel.Meter("github.com/project-kessel/inventory-api/blob/main/internal/server/otel"))
 	if err != nil {

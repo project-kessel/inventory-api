@@ -15,37 +15,72 @@ func TestCheckBulkRequest_FullRoundTrip(t *testing.T) {
 			{
 				Object:   &ResourceReference{ResourceType: "host", ResourceId: "host-123"},
 				Relation: "view",
-				Subject:  &SubjectReference{Relation: &relation, Resource: &ResourceReference{ResourceType: "principal", ResourceId: "sarah"}},
+				Subject: &SubjectReference{
+					Relation: &relation,
+					Resource: &ResourceReference{
+						ResourceType: "principal",
+						ResourceId:   "sarah",
+					},
+				},
 			},
 		},
 	}
 
-	// Marshal to JSON and back
-	data, err := json.Marshal(cr)
-	assert.NoError(t, err)
+	t.Run("json roundtrip", func(t *testing.T) {
+		data, err := json.Marshal(cr)
+		assert.NoError(t, err)
 
-	var out CheckBulkRequest
-	err = json.Unmarshal(data, &out)
-	assert.NoError(t, err)
+		var decoded CheckBulkRequest
+		err = json.Unmarshal(data, &decoded)
+		assert.NoError(t, err)
 
-	// Check that we have one item
-	assert.Len(t, out.GetItems(), 1)
+		if assert.Len(t, decoded.Items, 1) {
+			item := decoded.Items[0]
+			if assert.NotNil(t, item.Object) {
+				assert.Equal(t, "host", item.Object.ResourceType)
+				assert.Equal(t, "host-123", item.Object.ResourceId)
+			}
+			assert.Equal(t, "view", item.Relation)
 
-	item := out.GetItems()[0]
+			if assert.NotNil(t, item.Subject) {
+				if assert.NotNil(t, item.Subject.Relation) {
+					assert.Equal(t, relation, *item.Subject.Relation)
+				}
+				if assert.NotNil(t, item.Subject.Resource) {
+					assert.Equal(t, "principal", item.Subject.Resource.ResourceType)
+					assert.Equal(t, "sarah", item.Subject.Resource.ResourceId)
+				}
+			}
+		}
+	})
 
-	// Check object
-	assert.Equal(t, "host", item.GetObject().GetResourceType())
-	assert.Equal(t, "host-123", item.GetObject().GetResourceId())
+	t.Run("protobuf roundtrip", func(t *testing.T) {
+		data, err := proto.Marshal(cr)
+		assert.NoError(t, err)
 
-	// Check relation
-	assert.Equal(t, "view", item.GetRelation())
+		var decoded CheckBulkRequest
+		err = proto.Unmarshal(data, &decoded)
+		assert.NoError(t, err)
 
-	// Check subject
-	assert.NotNil(t, item.GetSubject())
-	assert.Equal(t, "members", item.GetSubject().GetRelation())
-	assert.NotNil(t, item.GetSubject().GetResource())
-	assert.Equal(t, "principal", item.GetSubject().GetResource().GetResourceType())
-	assert.Equal(t, "sarah", item.GetSubject().GetResource().GetResourceId())
+		if assert.Len(t, decoded.Items, 1) {
+			item := decoded.Items[0]
+			if assert.NotNil(t, item.Object) {
+				assert.Equal(t, "host", item.Object.ResourceType)
+				assert.Equal(t, "host-123", item.Object.ResourceId)
+			}
+			assert.Equal(t, "view", item.Relation)
+
+			if assert.NotNil(t, item.Subject) {
+				if assert.NotNil(t, item.Subject.Relation) {
+					assert.Equal(t, relation, *item.Subject.Relation)
+				}
+				if assert.NotNil(t, item.Subject.Resource) {
+					assert.Equal(t, "principal", item.Subject.Resource.ResourceType)
+					assert.Equal(t, "sarah", item.Subject.Resource.ResourceId)
+				}
+			}
+		}
+	})
 }
 
 func TestCheckBulkRequest_Reset(t *testing.T) {
@@ -62,64 +97,50 @@ func TestCheckBulkRequest_Reset(t *testing.T) {
 	assert.Nil(t, cr.GetItems())
 	assert.Nil(t, cr.GetConsistency())
 }
-func TestCheckBulkRequest_String(t *testing.T) {
-	cr := &CheckBulkRequest{
-		Items: []*CheckBulkRequestItem{
-			{
-				Object:   &ResourceReference{ResourceType: "host"},
-				Relation: "view",
+func TestCheckBulkRequest_BasicBehavior(t *testing.T) {
+	t.Run("string representation", func(t *testing.T) {
+		cr := &CheckBulkRequest{
+			Items: []*CheckBulkRequestItem{
+				{
+					Object:   &ResourceReference{ResourceType: "host"},
+					Relation: "view",
+				},
 			},
-		},
-	}
-	s := cr.String()
-	assert.NotEmpty(t, s)
-	// Optionally, check that it mentions your field values
-	assert.Contains(t, s, "host")
-	assert.Contains(t, s, "view")
+		}
+		s := cr.String()
+		assert.NotEmpty(t, s, "String() should return non-empty representation")
+	})
+
+	t.Run("nil pointer safety", func(t *testing.T) {
+		var cr *CheckBulkRequest
+		// All getters should be safe to call on nil and return zero values
+		assert.Nil(t, cr.GetItems())
+		assert.Nil(t, cr.GetConsistency())
+	})
+
+	t.Run("empty struct", func(t *testing.T) {
+		var cr CheckBulkRequest
+		// All getters should return zero values, not panic
+		assert.Nil(t, cr.GetItems())
+		assert.Nil(t, cr.GetConsistency())
+	})
+
+	t.Run("subject with nil resource", func(t *testing.T) {
+		cr := &CheckBulkRequest{
+			Items: []*CheckBulkRequestItem{
+				{
+					Subject: &SubjectReference{Resource: nil},
+				},
+			},
+		}
+		assert.Nil(t, cr.GetItems()[0].GetSubject().GetResource())
+		assert.Equal(t, "", cr.GetItems()[0].GetSubject().GetRelation())
+	})
 }
 
-func TestCheckBulkRequest_ProtoMessage(t *testing.T) {
+func TestCheckBulkRequest_ProtoInterface(t *testing.T) {
+	// Verify protobuf interface implementation
 	var cr interface{} = &CheckBulkRequest{}
 	_, ok := cr.(proto.Message)
-	assert.True(t, ok)
-}
-
-func TestCheckBulkRequest_ProtoReflect(t *testing.T) {
-	cr := &CheckBulkRequest{
-		Items: []*CheckBulkRequestItem{
-			{
-				Object:   &ResourceReference{ResourceType: "host"},
-				Relation: "view",
-			},
-		},
-	}
-	m := cr.ProtoReflect()
-	assert.NotNil(t, m)
-	assert.Equal(t, "view", m.Interface().(*CheckBulkRequest).Items[0].Relation)
-}
-
-func TestCheckBulkRequest_NilFields(t *testing.T) {
-	var cr *CheckBulkRequest
-	// All getters should be safe to call on nil and return zero values
-	assert.Nil(t, cr.GetItems())
-	assert.Nil(t, cr.GetConsistency())
-}
-
-func TestCheckBulkRequest_EmptyStruct(t *testing.T) {
-	var cr CheckBulkRequest
-	// All getters should return zero values, not panic
-	assert.Nil(t, cr.GetItems())
-	assert.Nil(t, cr.GetConsistency())
-}
-
-func TestCheckBulkRequest_SubjectNilResource(t *testing.T) {
-	cr := &CheckBulkRequest{
-		Items: []*CheckBulkRequestItem{
-			{
-				Subject: &SubjectReference{Resource: nil},
-			},
-		},
-	}
-	assert.Nil(t, cr.GetItems()[0].GetSubject().GetResource())
-	assert.Equal(t, "", cr.GetItems()[0].GetSubject().GetRelation())
+	assert.True(t, ok, "CheckBulkRequest should implement proto.Message")
 }

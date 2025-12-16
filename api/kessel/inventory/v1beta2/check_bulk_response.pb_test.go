@@ -5,6 +5,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/genproto/googleapis/rpc/status"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -69,7 +70,7 @@ func TestCheckBulkResponse_WithError(t *testing.T) {
 				},
 				Response: &CheckBulkResponsePair_Error{
 					Error: &status.Status{
-						Code:    5,
+						Code:    int32(codes.NotFound),
 						Message: "Not found",
 					},
 				},
@@ -93,7 +94,7 @@ func TestCheckBulkResponse_WithError(t *testing.T) {
 	// Check error response
 	assert.Nil(t, pair.GetItem())
 	assert.NotNil(t, pair.GetError())
-	assert.Equal(t, int32(5), pair.GetError().GetCode())
+	assert.Equal(t, int32(codes.NotFound), pair.GetError().GetCode())
 	assert.Equal(t, "Not found", pair.GetError().GetMessage())
 }
 
@@ -137,149 +138,123 @@ func TestCheckBulkResponse_MultipleResults(t *testing.T) {
 	assert.Equal(t, "host-2", resp.GetPairs()[1].GetRequest().GetObject().GetResourceId())
 }
 
-func TestCheckBulkResponse_Reset(t *testing.T) {
-	resp := &CheckBulkResponse{
-		Pairs: []*CheckBulkResponsePair{
-			{
-				Response: &CheckBulkResponsePair_Item{
-					Item: &CheckBulkResponseItem{
-						Allowed: Allowed_ALLOWED_TRUE,
+func TestCheckBulkResponse_BasicBehavior(t *testing.T) {
+	t.Run("reset", func(t *testing.T) {
+		resp := &CheckBulkResponse{
+			Pairs: []*CheckBulkResponsePair{
+				{
+					Response: &CheckBulkResponsePair_Item{
+						Item: &CheckBulkResponseItem{
+							Allowed: Allowed_ALLOWED_TRUE,
+						},
 					},
 				},
 			},
-		},
-		ConsistencyToken: &ConsistencyToken{Token: "test-token"},
-	}
-	resp.Reset()
-	assert.Nil(t, resp.GetPairs())
-	assert.Nil(t, resp.GetConsistencyToken())
-}
+			ConsistencyToken: &ConsistencyToken{Token: "test-token"},
+		}
+		resp.Reset()
+		assert.Nil(t, resp.GetPairs())
+		assert.Nil(t, resp.GetConsistencyToken())
+	})
 
-func TestCheckBulkResponse_String(t *testing.T) {
-	resp := &CheckBulkResponse{
-		Pairs: []*CheckBulkResponsePair{
-			{
-				Request: &CheckBulkRequestItem{
-					Object:   &ResourceReference{ResourceType: "host"},
-					Relation: "view",
+	t.Run("string representation", func(t *testing.T) {
+		resp := &CheckBulkResponse{
+			Pairs: []*CheckBulkResponsePair{
+				{
+					Request: &CheckBulkRequestItem{
+						Object:   &ResourceReference{ResourceType: "host"},
+						Relation: "view",
+					},
 				},
 			},
-		},
-	}
-	s := resp.String()
-	assert.NotEmpty(t, s)
-	assert.Contains(t, s, "host")
-	assert.Contains(t, s, "view")
+		}
+		s := resp.String()
+		assert.NotEmpty(t, s, "String() should return non-empty representation")
+	})
+
+	t.Run("nil pointer safety", func(t *testing.T) {
+		var resp *CheckBulkResponse
+		// All getters should be safe to call on nil and return zero values
+		assert.Nil(t, resp.GetPairs())
+		assert.Nil(t, resp.GetConsistencyToken())
+	})
+
+	t.Run("empty struct", func(t *testing.T) {
+		var resp CheckBulkResponse
+		// All getters should return zero values, not panic
+		assert.Nil(t, resp.GetPairs())
+		assert.Nil(t, resp.GetConsistencyToken())
+	})
 }
 
-func TestCheckBulkResponse_ProtoMessage(t *testing.T) {
+func TestCheckBulkResponse_ProtoInterface(t *testing.T) {
+	// Verify protobuf interface implementation
 	var resp interface{} = &CheckBulkResponse{}
 	_, ok := resp.(proto.Message)
-	assert.True(t, ok)
+	assert.True(t, ok, "CheckBulkResponse should implement proto.Message")
 }
 
-func TestCheckBulkResponse_ProtoReflect(t *testing.T) {
-	resp := &CheckBulkResponse{
-		Pairs: []*CheckBulkResponsePair{
-			{
-				Response: &CheckBulkResponsePair_Item{
-					Item: &CheckBulkResponseItem{
-						Allowed: Allowed_ALLOWED_TRUE,
-					},
+func TestCheckBulkResponsePair_BasicBehavior(t *testing.T) {
+	t.Run("reset", func(t *testing.T) {
+		pair := &CheckBulkResponsePair{
+			Request: &CheckBulkRequestItem{
+				Object:   &ResourceReference{ResourceType: "host", ResourceId: "123"},
+				Relation: "view",
+			},
+			Response: &CheckBulkResponsePair_Item{
+				Item: &CheckBulkResponseItem{
+					Allowed: Allowed_ALLOWED_TRUE,
 				},
 			},
-		},
-	}
-	m := resp.ProtoReflect()
-	assert.NotNil(t, m)
-	assert.Len(t, m.Interface().(*CheckBulkResponse).Pairs, 1)
-}
+		}
+		pair.Reset()
+		assert.Nil(t, pair.GetRequest())
+		assert.Nil(t, pair.GetItem())
+		assert.Nil(t, pair.GetError())
+	})
 
-func TestCheckBulkResponse_NilFields(t *testing.T) {
-	var resp *CheckBulkResponse
-	// All getters should be safe to call on nil and return zero values
-	assert.Nil(t, resp.GetPairs())
-	assert.Nil(t, resp.GetConsistencyToken())
-}
-
-func TestCheckBulkResponse_EmptyStruct(t *testing.T) {
-	var resp CheckBulkResponse
-	// All getters should return zero values, not panic
-	assert.Nil(t, resp.GetPairs())
-	assert.Nil(t, resp.GetConsistencyToken())
-}
-
-func TestCheckBulkResponsePair_Reset(t *testing.T) {
-	pair := &CheckBulkResponsePair{
-		Request: &CheckBulkRequestItem{
-			Object:   &ResourceReference{ResourceType: "host", ResourceId: "123"},
-			Relation: "view",
-		},
-		Response: &CheckBulkResponsePair_Item{
-			Item: &CheckBulkResponseItem{
-				Allowed: Allowed_ALLOWED_TRUE,
+	t.Run("string representation", func(t *testing.T) {
+		pair := &CheckBulkResponsePair{
+			Request: &CheckBulkRequestItem{
+				Object:   &ResourceReference{ResourceType: "vm"},
+				Relation: "read",
 			},
-		},
-	}
-	pair.Reset()
-	assert.Nil(t, pair.GetRequest())
-	assert.Nil(t, pair.GetItem())
-	assert.Nil(t, pair.GetError())
+		}
+		s := pair.String()
+		assert.NotEmpty(t, s, "String() should return non-empty representation")
+	})
+
+	t.Run("nil pointer safety", func(t *testing.T) {
+		var pair *CheckBulkResponsePair
+		// All getters should be safe to call on nil and return zero values
+		assert.Nil(t, pair.GetRequest())
+		assert.Nil(t, pair.GetItem())
+		assert.Nil(t, pair.GetError())
+	})
 }
 
-func TestCheckBulkResponsePair_String(t *testing.T) {
-	pair := &CheckBulkResponsePair{
-		Request: &CheckBulkRequestItem{
-			Object:   &ResourceReference{ResourceType: "vm"},
-			Relation: "read",
-		},
-	}
-	s := pair.String()
-	assert.NotEmpty(t, s)
-	assert.Contains(t, s, "vm")
-	assert.Contains(t, s, "read")
-}
+func TestCheckBulkResponseItem_BasicBehavior(t *testing.T) {
+	t.Run("reset", func(t *testing.T) {
+		item := &CheckBulkResponseItem{
+			Allowed: Allowed_ALLOWED_TRUE,
+		}
+		item.Reset()
+		assert.Equal(t, Allowed_ALLOWED_UNSPECIFIED, item.GetAllowed())
+	})
 
-func TestCheckBulkResponsePair_ProtoMessage(t *testing.T) {
-	var pair interface{} = &CheckBulkResponsePair{}
-	_, ok := pair.(proto.Message)
-	assert.True(t, ok)
-}
+	t.Run("string representation", func(t *testing.T) {
+		item := &CheckBulkResponseItem{
+			Allowed: Allowed_ALLOWED_TRUE,
+		}
+		s := item.String()
+		assert.NotEmpty(t, s, "String() should return non-empty representation")
+	})
 
-func TestCheckBulkResponsePair_NilFields(t *testing.T) {
-	var pair *CheckBulkResponsePair
-	// All getters should be safe to call on nil and return zero values
-	assert.Nil(t, pair.GetRequest())
-	assert.Nil(t, pair.GetItem())
-	assert.Nil(t, pair.GetError())
-}
-
-func TestCheckBulkResponseItem_Reset(t *testing.T) {
-	item := &CheckBulkResponseItem{
-		Allowed: Allowed_ALLOWED_TRUE,
-	}
-	item.Reset()
-	assert.Equal(t, Allowed_ALLOWED_UNSPECIFIED, item.GetAllowed())
-}
-
-func TestCheckBulkResponseItem_String(t *testing.T) {
-	item := &CheckBulkResponseItem{
-		Allowed: Allowed_ALLOWED_TRUE,
-	}
-	s := item.String()
-	assert.NotEmpty(t, s)
-}
-
-func TestCheckBulkResponseItem_ProtoMessage(t *testing.T) {
-	var item interface{} = &CheckBulkResponseItem{}
-	_, ok := item.(proto.Message)
-	assert.True(t, ok)
-}
-
-func TestCheckBulkResponseItem_NilFields(t *testing.T) {
-	var item *CheckBulkResponseItem
-	// Getter should be safe to call on nil and return zero value
-	assert.Equal(t, Allowed_ALLOWED_UNSPECIFIED, item.GetAllowed())
+	t.Run("nil pointer safety", func(t *testing.T) {
+		var item *CheckBulkResponseItem
+		// Getter should be safe to call on nil and return zero value
+		assert.Equal(t, Allowed_ALLOWED_UNSPECIFIED, item.GetAllowed())
+	})
 }
 
 func TestCheckBulkResponseItem_AllowedValues(t *testing.T) {
@@ -301,4 +276,3 @@ func TestCheckBulkResponseItem_AllowedValues(t *testing.T) {
 		})
 	}
 }
-

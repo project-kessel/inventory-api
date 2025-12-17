@@ -9,6 +9,8 @@ import (
 
 	krlog "github.com/go-kratos/kratos/v2/log"
 	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2"
+	"github.com/project-kessel/inventory-api/internal/biz/schema"
+	"github.com/project-kessel/inventory-api/internal/biz/schema/validation"
 	relationsV1beta1 "github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
 	"google.golang.org/protobuf/types/known/structpb"
 
@@ -132,7 +134,8 @@ func TestInventoryService_ReportResource_MissingReporterType(t *testing.T) {
 			},
 			Common: &structpb.Struct{
 				Fields: map[string]*structpb.Value{
-					"hostname": structpb.NewStringValue("example-host"),
+					"workspace_id": structpb.NewStringValue("ws-123"),
+					"hostname":     structpb.NewStringValue("example-host"),
 				},
 			},
 			Reporter: &structpb.Struct{},
@@ -141,12 +144,12 @@ func TestInventoryService_ReportResource_MissingReporterType(t *testing.T) {
 
 	uc := usecase.New(
 		data.NewFakeResourceRepository(),
-		nil,                                // LegacyReporterResourceRepository
-		nil,                                // inventoryResourceRepository
-		data.NewInMemorySchemaRepository(), // schema repository
-		nil,                                // Authz
-		nil,                                // Eventer
-		"",                                 // Namespace
+		nil,                        // LegacyReporterResourceRepository
+		nil,                        // inventoryResourceRepository
+		newFakeSchemaRepository(t), // schema repository
+		nil,                        // Authz
+		nil,                        // Eventer
+		"",                         // Namespace
 		krlog.NewStdLogger(io.Discard),
 		nil, // ListenManager
 		nil, // waitForNotifBreaker
@@ -159,6 +162,7 @@ func TestInventoryService_ReportResource_MissingReporterType(t *testing.T) {
 
 	assert.Error(t, err)
 	assert.Nil(t, resp)
+	assert.Contains(t, err.Error(), "missing 'reporterType' field")
 }
 
 func TestInventoryService_ReportResource_MissingReporterInstanceId(t *testing.T) {
@@ -175,7 +179,8 @@ func TestInventoryService_ReportResource_MissingReporterInstanceId(t *testing.T)
 			},
 			Common: &structpb.Struct{
 				Fields: map[string]*structpb.Value{
-					"hostname": structpb.NewStringValue("example-host"),
+					"workspace_id": structpb.NewStringValue("ws-123"),
+					"hostname":     structpb.NewStringValue("example-host"),
 				},
 			},
 			Reporter: &structpb.Struct{},
@@ -184,12 +189,12 @@ func TestInventoryService_ReportResource_MissingReporterInstanceId(t *testing.T)
 
 	uc := usecase.New(
 		data.NewFakeResourceRepository(),
-		nil,                                // LegacyReporterResourceRepository
-		nil,                                // inventoryResourceRepository
-		data.NewInMemorySchemaRepository(), // schema repository
-		nil,                                // Authz
-		nil,                                // Eventer
-		"",                                 // Namespace
+		nil,                        // LegacyReporterResourceRepository
+		nil,                        // inventoryResourceRepository
+		newFakeSchemaRepository(t), // schema repository
+		nil,                        // Authz
+		nil,                        // Eventer
+		"",                         // Namespace
 		krlog.NewStdLogger(io.Discard),
 		nil, // ListenManager
 		nil, // waitForNotifBreaker
@@ -230,12 +235,12 @@ func TestInventoryService_ReportResource_InvalidJsonObject(t *testing.T) {
 
 	uc := usecase.New(
 		data.NewFakeResourceRepository(),
-		nil,                                // LegacyReporterResourceRepository
-		nil,                                // inventoryResourceRepository
-		data.NewInMemorySchemaRepository(), // schema repository
-		nil,                                // Authz
-		nil,                                // Eventer
-		"",                                 // Namespace
+		nil,                        // LegacyReporterResourceRepository
+		nil,                        // inventoryResourceRepository
+		newFakeSchemaRepository(t), // schema repository
+		nil,                        // Authz
+		nil,                        // Eventer
+		"",                         // Namespace
 		krlog.NewStdLogger(io.Discard),
 		nil, // ListenManager
 		nil, // waitForNotifBreaker
@@ -249,6 +254,7 @@ func TestInventoryService_ReportResource_InvalidJsonObject(t *testing.T) {
 
 	assert.Error(t, err)
 	assert.Nil(t, resp)
+	assert.Contains(t, err.Error(), "failed to marshal message")
 }
 
 func TestResponseFromResource(t *testing.T) {
@@ -379,4 +385,53 @@ func TestToLookupResourceResponse(t *testing.T) {
 
 	result := svc.ToLookupResourceResponse(input)
 	assert.Equal(t, expected, result)
+}
+
+func newFakeSchemaRepository(t *testing.T) schema.Repository {
+	schemaRepository := data.NewInMemorySchemaRepository()
+
+	emptyValidationSchema := validation.NewJsonSchemaValidatorFromString(`{
+		"$schema": "http://json-schema.org/draft-07/schema#",
+		"type": "object",
+		"properties": {
+		},
+		"required": []
+	}`)
+
+	withWorkspaceValidationSchema := validation.NewJsonSchemaValidatorFromString(`{
+		"$schema": "http://json-schema.org/draft-07/schema#",
+		"type": "object",
+		"properties": {
+			"workspace_id": { "type": "string" }
+		},
+		"required": ["workspace_id"]
+	}`)
+
+	err := schemaRepository.CreateResourceSchema(context.Background(), schema.ResourceRepresentation{
+		ResourceType:     "k8s_cluster",
+		ValidationSchema: withWorkspaceValidationSchema,
+	})
+	assert.NoError(t, err)
+
+	err = schemaRepository.CreateReporterSchema(context.Background(), schema.ReporterRepresentation{
+		ResourceType:     "k8s_cluster",
+		ReporterType:     "ocm",
+		ValidationSchema: emptyValidationSchema,
+	})
+	assert.NoError(t, err)
+
+	err = schemaRepository.CreateResourceSchema(context.Background(), schema.ResourceRepresentation{
+		ResourceType:     "host",
+		ValidationSchema: withWorkspaceValidationSchema,
+	})
+	assert.NoError(t, err)
+
+	err = schemaRepository.CreateReporterSchema(context.Background(), schema.ReporterRepresentation{
+		ResourceType:     "host",
+		ReporterType:     "hbi",
+		ValidationSchema: emptyValidationSchema,
+	})
+	assert.NoError(t, err)
+
+	return schemaRepository
 }

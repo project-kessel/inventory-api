@@ -200,8 +200,11 @@ stringData:
         dbname: "spicedb"
     service:
       use_v1beta2_db: true
-    resources:
-      schemaPath: "data/schema/resources"
+    schema:
+      repository: in-memory
+      in-memory:
+        type: dir
+        path: data/schema/resources
     log:
       level: "debug"
       livez: true

@@ -24,6 +24,7 @@ func (a *GuestAuthenticator) Authenticate(ctx context.Context, t transport.Trans
 	identity := &api.Identity{
 		Principal: ua,
 		IsGuest:   true,
+		AuthType:  "guest",
 	}
 
 	return identity, api.Allow

@@ -312,20 +312,19 @@ func NewFromJsonBytes(ctx context.Context, jsonBytes []byte, validationSchemaFro
 
 	// Find Reporters
 	for key, value := range jsonContent {
-		for _, resourceType := range resourceTypes {
-			if strings.HasPrefix(key, resourceType+":") {
-				reporterType := key[len(resourceType)+1:]
-				err := repository.CreateReporterSchema(ctx, schema.ReporterRepresentation{
-					ResourceType:     resourceType,
-					ReporterType:     reporterType,
-					ValidationSchema: validationSchemaFromString(value.(string)),
-				})
-				if err != nil {
-					return nil, err
-				}
+		resourceType := findResourceTypeFromJsonKey(key, resourceTypes)
+		if resourceType == "" {
+			continue
+		}
 
-				break
-			}
+		reporterType := key[len(resourceType)+1:]
+		err := repository.CreateReporterSchema(ctx, schema.ReporterRepresentation{
+			ResourceType:     resourceType,
+			ReporterType:     reporterType,
+			ValidationSchema: validationSchemaFromString(value.(string)),
+		})
+		if err != nil {
+			return nil, err
 		}
 	}
 
@@ -369,4 +368,14 @@ func NormalizeResourceType(resourceType string) string {
 
 func normalizeReporterType(reporterType string) string {
 	return strings.ToLower(reporterType)
+}
+
+func findResourceTypeFromJsonKey(jsonKey string, resourceTypes []string) string {
+	for _, resourceType := range resourceTypes {
+		if strings.HasPrefix(jsonKey, resourceType+":") {
+			return resourceType
+		}
+	}
+
+	return ""
 }

@@ -130,7 +130,10 @@ func (r *Resource) Update(
 	}
 
 	// Preserve the original created_at and set updated_at to current time
-	existingCreatedAt := r.resourceReportEvents[0].createdAt
+	existingCreatedAt, _ := r.GetTimestamps()
+	if existingCreatedAt.IsZero() {
+		return fmt.Errorf("invalid state: no existing events found for resource update")
+	}
 	resourceEvent.SetTimestamps(existingCreatedAt, time.Now())
 
 	r.resourceReportEvents = []ResourceReportEvent{resourceEvent}

@@ -833,7 +833,7 @@ data:
               "datasource": {
                 "uid": "$datasource"
               },
-              "expr": "sum(increase(server_requests_seconds_bucket_seconds_sum{namespace=\"$namespace\",service=~\"kessel-inventory-api\",operation!~\".*[Ll]ive[Zz].*|.*[Rr]eady[Zz].*\",code!~\"5..|14\"}[$__rate_interval])) / sum(increase(server_requests_seconds_bucket_seconds_count{namespace=\"$namespace\",service=~\"kessel-inventory-api\",operation!~\".*[Ll]ive[Zz].*|.*[Rr]eady[Zz].*\",code!~\"5..|14\"}[$__rate_interval]))",
+              "expr": "sum(increase(server_requests_seconds_bucket_sum{namespace=\"$namespace\",service=~\"kessel-inventory-api\",operation!~\".*[Ll]ive[Zz].*|.*[Rr]eady[Zz].*\",code!~\"5..|14\"}[$__rate_interval])) / sum(increase(server_requests_seconds_bucket_count{namespace=\"$namespace\",service=~\"kessel-inventory-api\",operation!~\".*[Ll]ive[Zz].*|.*[Rr]eady[Zz].*\",code!~\"5..|14\"}[$__rate_interval]))",
               "interval": "",
               "legendFormat": "Avg. response duration",
               "refId": "A"
@@ -915,7 +915,7 @@ data:
               "datasource": {
                 "uid": "$datasource"
               },
-              "expr": "sum(increase(server_requests_seconds_bucket_seconds_bucket{namespace=\"$namespace\",service=~\"kessel-inventory-api\",operation!~\".*[Ll]ive[Zz].*|.*[Rr]eady[Zz].*\",code!~\"5..|14\",le=\"1.0\"}[$__range])) / sum(increase(server_requests_seconds_bucket_seconds_count{namespace=\"$namespace\",service=~\"kessel-inventory-api\",operation!~\".*[Ll]ive[Zz].*|.*[Rr]eady[Zz].*\",code!~\"5..|14\"}[$__range]))",
+              "expr": "sum(increase(server_requests_seconds_bucket_bucket{namespace=\"$namespace\",service=~\"kessel-inventory-api\",operation!~\".*[Ll]ive[Zz].*|.*[Rr]eady[Zz].*\",code!~\"5..|14\",le=\"1.0\"}[$__range])) / sum(increase(server_requests_seconds_bucket_count{namespace=\"$namespace\",service=~\"kessel-inventory-api\",operation!~\".*[Ll]ive[Zz].*|.*[Rr]eady[Zz].*\",code!~\"5..|14\"}[$__range]))",
               "format": "time_series",
               "instant": true,
               "refId": "A"
@@ -1939,7 +1939,7 @@ data:
               "datasource": {
                 "uid": "$datasource"
               },
-              "expr": "sum(increase(server_requests_seconds_bucket_seconds_sum{namespace=\"$namespace\",service=~\"kessel-relations-api\",operation!~\".*[Ll]ive[Zz].*|.*[Rr]eady[Zz].*\",code!~\"5..|14\"}[$__rate_interval])) / sum(increase(server_requests_seconds_bucket_seconds_count{namespace=\"$namespace\",service=~\"kessel-relations-api\",operation!~\".*[Ll]ive[Zz].*|.*[Rr]eady[Zz].*\",code!~\"5..|14\"}[$__rate_interval]))",
+              "expr": "sum(increase(server_requests_seconds_bucket_sum{namespace=\"$namespace\",service=~\"kessel-relations-api\",operation!~\".*[Ll]ive[Zz].*|.*[Rr]eady[Zz].*\",code!~\"5..|14\"}[$__rate_interval])) / sum(increase(server_requests_seconds_bucket_count{namespace=\"$namespace\",service=~\"kessel-relations-api\",operation!~\".*[Ll]ive[Zz].*|.*[Rr]eady[Zz].*\",code!~\"5..|14\"}[$__rate_interval]))",
               "interval": "",
               "legendFormat": "Avg. response duration",
               "refId": "A"
@@ -2021,7 +2021,7 @@ data:
               "datasource": {
                 "uid": "$datasource"
               },
-              "expr": "sum(increase(server_requests_seconds_bucket_seconds_bucket{namespace=\"$namespace\",service=~\"kessel-relations-api\",operation!~\".*[Ll]ive[Zz].*|.*[Rr]eady[Zz].*\",code!~\"5..|14\",le=\"1.0\"}[$__range])) / sum(increase(server_requests_seconds_bucket_seconds_count{namespace=\"$namespace\",service=~\"kessel-relations-api\",operation!~\".*[Ll]ive[Zz].*|.*[Rr]eady[Zz].*\",code!~\"5..|14\"}[$__range]))",
+              "expr": "sum(increase(server_requests_seconds_bucket_bucket{namespace=\"$namespace\",service=~\"kessel-relations-api\",operation!~\".*[Ll]ive[Zz].*|.*[Rr]eady[Zz].*\",code!~\"5..|14\",le=\"1.0\"}[$__range])) / sum(increase(server_requests_seconds_bucket_count{namespace=\"$namespace\",service=~\"kessel-relations-api\",operation!~\".*[Ll]ive[Zz].*|.*[Rr]eady[Zz].*\",code!~\"5..|14\"}[$__range]))",
               "format": "time_series",
               "instant": true,
               "refId": "A"
@@ -4724,7 +4724,7 @@ data:
                   "datasource": {
                     "uid": "$datasource"
                   },
-                  "expr": "sum(increase(server_requests_seconds_bucket_seconds_sum{namespace=\"$namespace\",service=~\"kessel-inventory-api|kessel-relations-api\",operation=\"${route:raw}\",code!~\"5..|14\"}[$__rate_interval])) / sum(increase(server_requests_seconds_bucket_seconds_count{namespace=\"$namespace\",service=~\"kessel-inventory-api|kessel-relations-api\",operation=\"${route:raw}\",code!~\"5..|14\"}[$__rate_interval]))",
+                  "expr": "sum(increase(server_requests_seconds_bucket_sum{namespace=\"$namespace\",service=~\"kessel-inventory-api|kessel-relations-api\",operation=\"${route:raw}\",code!~\"5..|14\"}[$__rate_interval])) / sum(increase(server_requests_seconds_bucket_count{namespace=\"$namespace\",service=~\"kessel-inventory-api|kessel-relations-api\",operation=\"${route:raw}\",code!~\"5..|14\"}[$__rate_interval]))",
                   "interval": "",
                   "legendFormat": "Avg. response duration",
                   "refId": "A"
@@ -4806,7 +4806,7 @@ data:
                   "datasource": {
                     "uid": "$datasource"
                   },
-                  "expr": "sum(increase(server_requests_seconds_bucket_seconds_bucket{namespace=\"$namespace\",service=~\"kessel-inventory-api|kessel-relations-api\",operation=\"${route:raw}\",code!~\"5..|14\",le=\"1.0\"}[$__range])) / sum(increase(server_requests_seconds_bucket_seconds_count{namespace=\"$namespace\",service=~\"kessel-inventory-api|kessel-relations-api\",operation=\"${route:raw}\",code!~\"5..|14\"}[$__range]))",
+                  "expr": "sum(increase(server_requests_seconds_bucket_bucket{namespace=\"$namespace\",service=~\"kessel-inventory-api|kessel-relations-api\",operation=\"${route:raw}\",code!~\"5..|14\",le=\"1.0\"}[$__range])) / sum(increase(server_requests_seconds_bucket_count{namespace=\"$namespace\",service=~\"kessel-inventory-api|kessel-relations-api\",operation=\"${route:raw}\",code!~\"5..|14\"}[$__range]))",
                   "format": "time_series",
                   "instant": true,
                   "refId": "A"

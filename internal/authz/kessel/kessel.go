@@ -263,10 +263,6 @@ func (a *KesselAuthz) CheckBulk(ctx context.Context, req *kessel.CheckBulkReques
 
 	log.Infof("CheckBulk: checking %d items", len(req.GetItems()))
 
-	if req.GetConsistency() == nil {
-		req.Consistency = &kessel.Consistency{Requirement: &kessel.Consistency_MinimizeLatency{MinimizeLatency: true}}
-	}
-
 	opts, err := a.getCallOptions()
 	if err != nil {
 		a.incrFailureCounter("CheckBulk")

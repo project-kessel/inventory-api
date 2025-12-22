@@ -194,10 +194,7 @@ func (a *KesselAuthz) Check(ctx context.Context, namespace string, viewPermissio
 		return kessel.CheckResponse_ALLOWED_UNSPECIFIED, nil, err
 	}
 
-	// If resource doesn't exist in inventory DB
-	// default send a minimize_latency check request
-	consistency := &kessel.Consistency{Requirement: &kessel.Consistency_MinimizeLatency{MinimizeLatency: true}}
-
+	var consistency *kessel.Consistency
 	if consistencyToken != "" {
 		log.Infof("Check: with Consistency_AtLeastAsFresh as consistencyToken=%s", consistencyToken)
 		consistency = &kessel.Consistency{
@@ -262,10 +259,6 @@ func (a *KesselAuthz) CheckForUpdate(ctx context.Context, namespace string, upda
 func (a *KesselAuthz) CheckBulk(ctx context.Context, req *kessel.CheckBulkRequest) (*kessel.CheckBulkResponse, error) {
 
 	log.Infof("CheckBulk: checking %d items", len(req.GetItems()))
-
-	if req.GetConsistency() == nil {
-		req.Consistency = &kessel.Consistency{Requirement: &kessel.Consistency_MinimizeLatency{MinimizeLatency: true}}
-	}
 
 	opts, err := a.getCallOptions()
 	if err != nil {

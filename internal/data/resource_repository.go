@@ -2,6 +2,7 @@ package data
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/google/uuid"
@@ -28,6 +29,8 @@ type FindResourceByKeysResult struct {
 	ReporterType          string    `gorm:"column:reporter_type"`
 	ReporterInstanceID    string    `gorm:"column:reporter_instance_id"`
 	ConsistencyToken      string    `gorm:"column:consistency_token"`
+	CreatedAt             time.Time `gorm:"column:created_at"`
+	UpdatedAt             time.Time `gorm:"column:updated_at"`
 }
 
 // GetCurrentAndPreviousWorkspaceID extracts current and previous workspace IDs from Representations
@@ -62,6 +65,8 @@ func (result FindResourceByKeysResult) ToSnapshots() (bizmodel.ResourceSnapshot,
 		Type:             result.ResourceType,
 		CommonVersion:    result.CommonVersion,
 		ConsistencyToken: result.ConsistencyToken,
+		CreatedAt:        result.CreatedAt,
+		UpdatedAt:        result.UpdatedAt,
 	}
 
 	// Create ReporterResourceKeySnapshot
@@ -80,6 +85,8 @@ func (result FindResourceByKeysResult) ToSnapshots() (bizmodel.ResourceSnapshot,
 		RepresentationVersion: result.RepresentationVersion,
 		Generation:            result.Generation,
 		Tombstone:             result.Tombstone,
+		CreatedAt:             result.CreatedAt,
+		UpdatedAt:             result.UpdatedAt,
 	}
 
 	return resourceSnapshot, reporterResourceSnapshot
@@ -238,6 +245,8 @@ func (r *resourceRepository) FindResourceByKeys(tx *gorm.DB, key bizmodel.Report
 		res.common_version,
 		res.id AS resource_id,
 		res.ktn AS consistency_token,
+		res.created_at,
+		res.updated_at,
 		rr2.resource_type,
 		rr2.local_resource_id,
 		rr2.reporter_type,

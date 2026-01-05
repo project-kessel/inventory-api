@@ -208,6 +208,8 @@ func (f *fakeResourceRepository) FindResourceByKeys(tx *gorm.DB, key bizmodel.Re
 			Type:             latestResource.resourceType,
 			CommonVersion:    latestResource.commonVersion,
 			ConsistencyToken: latestResource.consistencyToken,
+			CreatedAt:        latestResource.createdAt,
+			UpdatedAt:        latestResource.updatedAt,
 		}
 
 		reporterResourceSnapshot := bizmodel.ReporterResourceSnapshot{

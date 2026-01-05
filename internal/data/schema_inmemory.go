@@ -37,6 +37,8 @@ func (o *InMemorySchemaRepository) GetResourceSchemas(ctx context.Context) ([]st
 }
 
 func (o *InMemorySchemaRepository) CreateResourceSchema(ctx context.Context, resource schema.ResourceRepresentation) error {
+	resource.ResourceType = NormalizeResourceType(resource.ResourceType)
+
 	if _, ok := o.content[resource.ResourceType]; ok {
 		return fmt.Errorf("resource %s already exists", resource.ResourceType)
 	}
@@ -49,6 +51,8 @@ func (o *InMemorySchemaRepository) CreateResourceSchema(ctx context.Context, res
 }
 
 func (o *InMemorySchemaRepository) GetResourceSchema(ctx context.Context, resourceType string) (schema.ResourceRepresentation, error) {
+	resourceType = NormalizeResourceType(resourceType)
+
 	resource, ok := o.content[resourceType]
 	if !ok {
 		return schema.ResourceRepresentation{}, schema.ResourceSchemaNotFound
@@ -58,6 +62,8 @@ func (o *InMemorySchemaRepository) GetResourceSchema(ctx context.Context, resour
 }
 
 func (o *InMemorySchemaRepository) UpdateResourceSchema(ctx context.Context, resource schema.ResourceRepresentation) error {
+	resource.ResourceType = NormalizeResourceType(resource.ResourceType)
+
 	entry, ok := o.content[resource.ResourceType]
 	if !ok {
 		return schema.ResourceSchemaNotFound
@@ -72,6 +78,8 @@ func (o *InMemorySchemaRepository) UpdateResourceSchema(ctx context.Context, res
 }
 
 func (o *InMemorySchemaRepository) DeleteResourceSchema(ctx context.Context, resourceType string) error {
+	resourceType = NormalizeResourceType(resourceType)
+
 	if _, ok := o.content[resourceType]; !ok {
 		return schema.ResourceSchemaNotFound
 	}
@@ -81,6 +89,8 @@ func (o *InMemorySchemaRepository) DeleteResourceSchema(ctx context.Context, res
 }
 
 func (o *InMemorySchemaRepository) GetReporterSchemas(ctx context.Context, resourceType string) ([]string, error) {
+	resourceType = NormalizeResourceType(resourceType)
+
 	entry, err := o.getResourceEntry(resourceType)
 	if err != nil {
 		return nil, err
@@ -95,6 +105,9 @@ func (o *InMemorySchemaRepository) GetReporterSchemas(ctx context.Context, resou
 }
 
 func (o *InMemorySchemaRepository) CreateReporterSchema(ctx context.Context, resourceReporter schema.ReporterRepresentation) error {
+	resourceReporter.ResourceType = NormalizeResourceType(resourceReporter.ResourceType)
+	resourceReporter.ReporterType = normalizeReporterType(resourceReporter.ReporterType)
+
 	entry, err := o.getResourceEntry(resourceReporter.ResourceType)
 	if err != nil {
 		return err
@@ -112,6 +125,9 @@ func (o *InMemorySchemaRepository) CreateReporterSchema(ctx context.Context, res
 }
 
 func (o *InMemorySchemaRepository) GetReporterSchema(ctx context.Context, resourceType string, reporterType string) (schema.ReporterRepresentation, error) {
+	resourceType = NormalizeResourceType(resourceType)
+	reporterType = normalizeReporterType(reporterType)
+
 	entry, err := o.getResourceEntry(resourceType)
 	if err != nil {
 		return schema.ReporterRepresentation{}, err
@@ -126,6 +142,9 @@ func (o *InMemorySchemaRepository) GetReporterSchema(ctx context.Context, resour
 }
 
 func (o *InMemorySchemaRepository) UpdateReporterSchema(ctx context.Context, resourceReporter schema.ReporterRepresentation) error {
+	resourceReporter.ResourceType = NormalizeResourceType(resourceReporter.ResourceType)
+	resourceReporter.ReporterType = normalizeReporterType(resourceReporter.ReporterType)
+
 	entry, err := o.getResourceEntry(resourceReporter.ResourceType)
 	if err != nil {
 		return err
@@ -143,6 +162,9 @@ func (o *InMemorySchemaRepository) UpdateReporterSchema(ctx context.Context, res
 }
 
 func (o *InMemorySchemaRepository) DeleteReporterSchema(ctx context.Context, resourceType string, reporterType string) error {
+	resourceType = NormalizeResourceType(resourceType)
+	reporterType = normalizeReporterType(reporterType)
+
 	entry, err := o.getResourceEntry(resourceType)
 	if err != nil {
 		return err
@@ -158,6 +180,8 @@ func (o *InMemorySchemaRepository) DeleteReporterSchema(ctx context.Context, res
 }
 
 func (o *InMemorySchemaRepository) getResourceEntry(resourceType string) (*resourceEntry, error) {
+	resourceType = NormalizeResourceType(resourceType)
+
 	if entry, ok := o.content[resourceType]; ok {
 		return entry, nil
 	}
@@ -288,20 +312,19 @@ func NewFromJsonBytes(ctx context.Context, jsonBytes []byte, validationSchemaFro
 
 	// Find Reporters
 	for key, value := range jsonContent {
-		for _, resourceType := range resourceTypes {
-			if strings.HasPrefix(key, resourceType+":") {
-				reporterType := key[len(resourceType)+1:]
-				err := repository.CreateReporterSchema(ctx, schema.ReporterRepresentation{
-					ResourceType:     resourceType,
-					ReporterType:     reporterType,
-					ValidationSchema: validationSchemaFromString(value.(string)),
-				})
-				if err != nil {
-					return nil, err
-				}
+		resourceType := findResourceTypeFromJsonKey(key, resourceTypes)
+		if resourceType == "" {
+			continue
+		}
 
-				break
-			}
+		reporterType := key[len(resourceType)+1:]
+		err := repository.CreateReporterSchema(ctx, schema.ReporterRepresentation{
+			ResourceType:     resourceType,
+			ReporterType:     reporterType,
+			ValidationSchema: validationSchemaFromString(value.(string)),
+		})
+		if err != nil {
+			return nil, err
 		}
 	}
 
@@ -340,5 +363,19 @@ func loadCommonResourceDataSchema(resourceType string, baseSchemaDir string) (st
 }
 
 func NormalizeResourceType(resourceType string) string {
-	return strings.ReplaceAll(resourceType, "/", "_")
+	return strings.ToLower(strings.ReplaceAll(resourceType, "/", "_"))
+}
+
+func normalizeReporterType(reporterType string) string {
+	return strings.ToLower(reporterType)
+}
+
+func findResourceTypeFromJsonKey(jsonKey string, resourceTypes []string) string {
+	for _, resourceType := range resourceTypes {
+		if strings.HasPrefix(jsonKey, resourceType+":") {
+			return resourceType
+		}
+	}
+
+	return ""
 }

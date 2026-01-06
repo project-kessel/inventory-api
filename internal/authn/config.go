@@ -28,6 +28,22 @@ type Config struct {
 func NewConfig(o *Options) *Config {
 	cfg := &Config{}
 
+	// Backwards compatibility: convert old format to new format
+	if o.AllowUnauthenticated != nil && *o.AllowUnauthenticated {
+		// Convert legacy allow-unauthenticated: true to new format
+		cfg.Authenticator = &AuthenticatorConfig{
+			Type: "first_match",
+			Chain: []ChainEntry{
+				{
+					Type:    "guest",
+					Enabled: nil, // nil means enabled=true (default)
+					Config:  nil,
+				},
+			},
+		}
+		return cfg
+	}
+
 	// Build authenticator config from options
 	if o.Authenticator != nil {
 		cfg.Authenticator = &AuthenticatorConfig{

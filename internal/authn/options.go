@@ -18,7 +18,8 @@ type AuthenticatorOptions struct {
 }
 
 type Options struct {
-	Authenticator *AuthenticatorOptions `mapstructure:"authenticator"`
+	Authenticator        *AuthenticatorOptions `mapstructure:"authenticator"`
+	AllowUnauthenticated *bool                 `mapstructure:"allow-unauthenticated"` // Legacy field for backwards compatibility
 }
 
 func NewOptions() *Options {
@@ -34,6 +35,17 @@ func (o *Options) AddFlags(fs *pflag.FlagSet, prefix string) {
 func (o *Options) Validate() []error {
 	var errs []error
 
+	// Backwards compatibility: if old format is used, skip new format validation
+	if o.AllowUnauthenticated != nil && *o.AllowUnauthenticated {
+		if o.Authenticator != nil {
+			errs = append(errs, &ConfigError{
+				Message: "cannot use both 'allow-unauthenticated' (legacy) and 'authenticator' (new) configuration formats",
+			})
+		}
+		return errs
+	}
+
+	// New format validation
 	if o.Authenticator == nil {
 		errs = append(errs, &ConfigError{Message: "authenticator configuration is required"})
 		return errs

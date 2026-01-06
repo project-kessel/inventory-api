@@ -145,14 +145,26 @@ func (i *StreamAuthInterceptor) Interceptor() grpc.StreamServerInterceptor {
 
 		// Use aggregating authenticator to authenticate the stream
 		identity, decision := i.cfg.authenticator.Authenticate(newCtx, transporter)
+
+		// Log decision at info level to diagnose authentication issues
+		logHelper := log.NewHelper(i.cfg.logger)
+		logHelper.Infof("Stream authentication decision for %s: %s (identity: %+v)", info.FullMethod, decision, identity)
+
 		if decision == api.Deny {
+			logHelper.Warnf("Stream authentication denied for %s", info.FullMethod)
 			return kerrors.Unauthorized("UNAUTHORIZED", "Authentication denied")
 		} else if decision == api.Ignore {
+			// Ignore means no authenticator could handle the request
+			// This should not happen if guest authentication is enabled
+			logHelper.Warnf("Stream authentication ignored for %s (no authenticator could handle request)", info.FullMethod)
 			return kerrors.Unauthorized("UNAUTHORIZED", "No valid authentication found")
 		} else if decision != api.Allow {
 			// Handle any unexpected decision values
+			logHelper.Errorf("Stream authentication failed with unexpected decision %s for %s", decision, info.FullMethod)
 			return kerrors.Unauthorized("UNAUTHORIZED", fmt.Sprintf("Authentication failed with decision: %s", decision))
 		}
+
+		logHelper.Debugf("Stream authentication allowed for %s with identity: %+v", info.FullMethod, identity)
 
 		// Defensive check: identity should not be nil when decision is Allow
 		// but we check to prevent panics if an authenticator implementation violates the contract

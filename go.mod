@@ -20,6 +20,7 @@ require (
 	github.com/project-kessel/relations-api v0.0.0-20251119124316-a1bcf57e036b
 	github.com/prometheus/client_golang v1.23.2
 	github.com/redhatinsights/app-common-go v1.6.9
+	github.com/redhatinsights/platform-go-middlewares/v2 v2.0.0
 	github.com/sony/gobreaker v1.0.0
 	github.com/spf13/cobra v1.10.1
 	github.com/spf13/pflag v1.0.9
@@ -81,7 +82,6 @@ require (
 	github.com/prometheus/common v0.67.2 // indirect
 	github.com/prometheus/otlptranslator v1.0.0 // indirect
 	github.com/prometheus/procfs v0.19.2 // indirect
-	github.com/redhatinsights/platform-go-middlewares/v2 v2.0.0 // indirect
 	github.com/sagikazarmark/locafero v0.7.0 // indirect
 	github.com/sourcegraph/conc v0.3.0 // indirect
 	github.com/spf13/afero v1.12.0 // indirect

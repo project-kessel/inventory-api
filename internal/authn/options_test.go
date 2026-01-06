@@ -33,7 +33,8 @@ func TestOptions_AddFlags(t *testing.T) {
 
 	// the below logic ensures that every possible option defined in the Options type
 	// has a defined flag for that option; authenticator config is typically loaded from YAML
-	helpers.AllOptionsHaveFlags(t, prefix, fs, *test.options, []string{"authenticator"})
+	// allow-unauthenticated is a legacy field for backwards compatibility, also loaded from YAML
+	helpers.AllOptionsHaveFlags(t, prefix, fs, *test.options, []string{"authenticator", "allow-unauthenticated"})
 }
 
 func TestOptions_Validate_BackwardsCompatibility(t *testing.T) {

@@ -171,9 +171,7 @@ func mapCheckBulkRequestToV1beta1(req *pb.CheckBulkRequest) *pbv1beta1.CheckBulk
 
 func convertConsistencyToV1beta1(consistency *pb.Consistency) *pbv1beta1.Consistency {
 	if consistency == nil {
-		return &pbv1beta1.Consistency{
-			Requirement: &pbv1beta1.Consistency_MinimizeLatency{MinimizeLatency: true},
-		}
+		return nil
 	}
 	if consistency.GetAtLeastAsFresh() != nil {
 		return &pbv1beta1.Consistency{

@@ -75,9 +75,7 @@ func (o *Options) Validate() []error {
 	}
 
 	// No new format: validate old format compatibility
-	legacyFormatUsed := false
 	if o.AllowUnauthenticated != nil && *o.AllowUnauthenticated {
-		legacyFormatUsed = true
 		if o.OIDC != nil {
 			errs = append(errs, &ConfigError{
 				Message: "cannot use both 'allow-unauthenticated' (legacy) and 'oidc' (legacy) configuration formats",
@@ -87,16 +85,11 @@ func (o *Options) Validate() []error {
 	}
 
 	if o.OIDC != nil {
-		legacyFormatUsed = true
 		return errs
 	}
 
-	// No format specified
-	if !legacyFormatUsed {
-		errs = append(errs, &ConfigError{Message: "authenticator configuration is required"})
-		return errs
-	}
-
+	// No format specified (neither new nor old)
+	errs = append(errs, &ConfigError{Message: "authenticator configuration is required"})
 	return errs
 }
 

@@ -28,7 +28,20 @@ type Config struct {
 func NewConfig(o *Options) *Config {
 	cfg := &Config{}
 
-	// Backwards compatibility: convert old format to new format
+	// Prefer new format: if new format is present, use it and ignore old formats
+	if o.Authenticator != nil {
+		cfg.Authenticator = &AuthenticatorConfig{
+			Type:  o.Authenticator.Type,
+			Chain: make([]ChainEntry, len(o.Authenticator.Chain)),
+		}
+
+		for i, entry := range o.Authenticator.Chain {
+			cfg.Authenticator.Chain[i] = ChainEntry(entry)
+		}
+		return cfg
+	}
+
+	// Backwards compatibility: convert old format to new format (only if new format not present)
 	if o.AllowUnauthenticated != nil && *o.AllowUnauthenticated {
 		// Convert legacy allow-unauthenticated: true to new format
 		cfg.Authenticator = &AuthenticatorConfig{
@@ -44,16 +57,43 @@ func NewConfig(o *Options) *Config {
 		return cfg
 	}
 
-	// Build authenticator config from options
-	if o.Authenticator != nil {
-		cfg.Authenticator = &AuthenticatorConfig{
-			Type:  o.Authenticator.Type,
-			Chain: make([]ChainEntry, len(o.Authenticator.Chain)),
+	// Backwards compatibility: convert old oidc format to new format
+	if o.OIDC != nil {
+		// Convert legacy oidc config to new format
+		oidcConfig := make(map[string]interface{})
+		if o.OIDC.AuthorizationServerURL != "" {
+			oidcConfig["authn-server-url"] = o.OIDC.AuthorizationServerURL
+		}
+		if o.OIDC.ClientId != "" {
+			oidcConfig["client-id"] = o.OIDC.ClientId
+		}
+		if o.OIDC.InsecureClient {
+			oidcConfig["insecure-client"] = o.OIDC.InsecureClient
+		}
+		if o.OIDC.SkipClientIDCheck {
+			oidcConfig["skip-client-id-check"] = o.OIDC.SkipClientIDCheck
+		}
+		if o.OIDC.EnforceAudCheck {
+			oidcConfig["enforce-aud-check"] = o.OIDC.EnforceAudCheck
+		}
+		if o.OIDC.SkipIssuerCheck {
+			oidcConfig["skip-issuer-check"] = o.OIDC.SkipIssuerCheck
+		}
+		if o.OIDC.PrincipalUserDomain != "" {
+			oidcConfig["principal-user-domain"] = o.OIDC.PrincipalUserDomain
 		}
 
-		for i, entry := range o.Authenticator.Chain {
-			cfg.Authenticator.Chain[i] = ChainEntry(entry)
+		cfg.Authenticator = &AuthenticatorConfig{
+			Type: "first_match",
+			Chain: []ChainEntry{
+				{
+					Type:    "oidc",
+					Enabled: nil, // nil means enabled=true (default)
+					Config:  oidcConfig,
+				},
+			},
 		}
+		return cfg
 	}
 
 	return cfg

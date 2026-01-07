@@ -2,6 +2,8 @@ package authn
 
 import (
 	"github.com/spf13/pflag"
+
+	"github.com/project-kessel/inventory-api/internal/authn/oidc"
 )
 
 // ChainEntryOptions represents options for a chain entry
@@ -20,6 +22,7 @@ type AuthenticatorOptions struct {
 type Options struct {
 	Authenticator        *AuthenticatorOptions `mapstructure:"authenticator"`
 	AllowUnauthenticated *bool                 `mapstructure:"allow-unauthenticated"` // Legacy field for backwards compatibility
+	OIDC                 *oidc.Options         `mapstructure:"oidc"`                  // Legacy field for backwards compatibility
 }
 
 func NewOptions() *Options {
@@ -35,50 +38,63 @@ func (o *Options) AddFlags(fs *pflag.FlagSet, prefix string) {
 func (o *Options) Validate() []error {
 	var errs []error
 
-	// Backwards compatibility: if old format is used, skip new format validation
+	// Prefer new format: if new format is present, validate it and ignore old formats
+	if o.Authenticator != nil {
+		// New format is present, validate it
+		if o.Authenticator.Type == "" {
+			errs = append(errs, &ConfigError{Message: "authenticator type is required"})
+		}
+
+		if len(o.Authenticator.Chain) == 0 {
+			errs = append(errs, &ConfigError{Message: "authenticator chain must contain at least one entry"})
+		}
+
+		// Validate chain entry types
+		validTypes := map[string]bool{
+			"oidc":          true,
+			"guest":         true,
+			"x-rh-identity": true,
+		}
+
+		for _, entry := range o.Authenticator.Chain {
+			if entry.Type == "" {
+				errs = append(errs, &ConfigError{
+					Message: "chain entry type is required",
+				})
+				continue
+			}
+			if !validTypes[entry.Type] {
+				errs = append(errs, &ConfigError{
+					Message: "invalid chain entry type",
+					Type:    entry.Type,
+				})
+			}
+		}
+
+		return errs
+	}
+
+	// No new format: validate old format compatibility
+	legacyFormatUsed := false
 	if o.AllowUnauthenticated != nil && *o.AllowUnauthenticated {
-		if o.Authenticator != nil {
+		legacyFormatUsed = true
+		if o.OIDC != nil {
 			errs = append(errs, &ConfigError{
-				Message: "cannot use both 'allow-unauthenticated' (legacy) and 'authenticator' (new) configuration formats",
+				Message: "cannot use both 'allow-unauthenticated' (legacy) and 'oidc' (legacy) configuration formats",
 			})
 		}
 		return errs
 	}
 
-	// New format validation
-	if o.Authenticator == nil {
+	if o.OIDC != nil {
+		legacyFormatUsed = true
+		return errs
+	}
+
+	// No format specified
+	if !legacyFormatUsed {
 		errs = append(errs, &ConfigError{Message: "authenticator configuration is required"})
 		return errs
-	}
-
-	if o.Authenticator.Type == "" {
-		errs = append(errs, &ConfigError{Message: "authenticator type is required"})
-	}
-
-	if len(o.Authenticator.Chain) == 0 {
-		errs = append(errs, &ConfigError{Message: "authenticator chain must contain at least one entry"})
-	}
-
-	// Validate chain entry types
-	validTypes := map[string]bool{
-		"oidc":          true,
-		"guest":         true,
-		"x-rh-identity": true,
-	}
-
-	for _, entry := range o.Authenticator.Chain {
-		if entry.Type == "" {
-			errs = append(errs, &ConfigError{
-				Message: "chain entry type is required",
-			})
-			continue
-		}
-		if !validTypes[entry.Type] {
-			errs = append(errs, &ConfigError{
-				Message: "invalid chain entry type",
-				Type:    entry.Type,
-			})
-		}
 	}
 
 	return errs

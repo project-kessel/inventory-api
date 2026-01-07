@@ -19,7 +19,10 @@ func New(config CompletedConfig, logger *log.Helper) (api.Authenticator, error) 
 	var aggregatingAuth aggregator.AggregatingAuthenticator
 	switch config.Authenticator.Type {
 	case aggregator.FirstMatch:
-		aggregatingAuth = aggregator.NewFirstMatch()
+		firstMatch := aggregator.NewFirstMatch()
+		// Set logger for debugging which authenticator allowed
+		firstMatch.SetLogger(logger)
+		aggregatingAuth = firstMatch
 	default:
 		return nil, fmt.Errorf("unknown authenticator strategy type: %s", config.Authenticator.Type)
 	}

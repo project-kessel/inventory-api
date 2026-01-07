@@ -3,6 +3,7 @@ package aggregator
 import (
 	"context"
 
+	"github.com/go-kratos/kratos/v2/log"
 	"github.com/go-kratos/kratos/v2/transport"
 
 	"github.com/project-kessel/inventory-api/internal/authn/api"
@@ -13,13 +14,20 @@ import (
 // It only denies if all authenticators return Deny (not Ignore).
 type FirstMatchAuthenticator struct {
 	Authenticators []api.Authenticator
+	logger         *log.Helper
 }
 
 // NewFirstMatch creates a new FirstMatchAuthenticator with an empty chain.
 func NewFirstMatch() *FirstMatchAuthenticator {
 	return &FirstMatchAuthenticator{
 		Authenticators: []api.Authenticator{},
+		logger:         nil, // Logger is optional, set via SetLogger if needed
 	}
+}
+
+// SetLogger sets the logger for this authenticator (optional, for debugging)
+func (f *FirstMatchAuthenticator) SetLogger(logger *log.Helper) {
+	f.logger = logger
 }
 
 // Add appends an authenticator to the chain.
@@ -29,19 +37,24 @@ func (f *FirstMatchAuthenticator) Add(a api.Authenticator) {
 
 // Authenticate checks all authenticators in the chain.
 // Returns Allow immediately if any authenticator returns Allow.
-// Returns Deny only if all authenticators return Deny (not Ignore).
-// Returns Ignore if all authenticators return Ignore (none can handle the request).
+// Returns Deny if all authenticators return Deny, or if there's a mix of Deny and Ignore (stricter policy).
+// Returns Ignore only if all authenticators return Ignore (none can handle the request).
 func (f *FirstMatchAuthenticator) Authenticate(ctx context.Context, t transport.Transporter) (*api.Identity, api.Decision) {
 	denyCount := 0
 	ignoreCount := 0
 
-	for _, a := range f.Authenticators {
+	for i, a := range f.Authenticators {
 		identity, decision := a.Authenticate(ctx, t)
 
 		// Handle decision using switch statement
 		switch decision {
 		case api.Allow:
 			// If any authenticator allows, return Allow immediately
+			// Log which authenticator allowed (at debug level for troubleshooting)
+			if f.logger != nil && identity != nil {
+				f.logger.Debugf("Authentication allowed by authenticator at chain index %d (authType: %s, principal: %s)",
+					i, identity.AuthType, identity.Principal)
+			}
 			return identity, api.Allow
 		case api.Deny:
 			denyCount++
@@ -65,12 +78,5 @@ func (f *FirstMatchAuthenticator) Authenticate(ctx context.Context, t transport.
 		return nil, api.Ignore
 	}
 
-	// Mix of Deny and Ignore: if any Deny, deny (stricter policy)
-	// This means: if at least one explicitly denies, deny the request
-	if denyCount > 0 {
-		return nil, api.Deny
-	}
-
-	// Should not reach here, but default to deny for safety
 	return nil, api.Deny
 }

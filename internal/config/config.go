@@ -9,6 +9,7 @@ import (
 	clowder "github.com/redhatinsights/app-common-go/pkg/api/v1"
 
 	"github.com/project-kessel/inventory-api/internal/authn"
+	authnFactory "github.com/project-kessel/inventory-api/internal/authn/factory"
 	"github.com/project-kessel/inventory-api/internal/authz"
 	"github.com/project-kessel/inventory-api/internal/consistency"
 	"github.com/project-kessel/inventory-api/internal/consumer"
@@ -54,10 +55,10 @@ func LogConfigurationInfo(options *OptionsConfig) {
 	// Log authn configuration if OIDC is configured
 	if options.Authn.Authenticator != nil {
 		for _, entry := range options.Authn.Authenticator.Chain {
-			if entry.Type == "oidc" {
-				if authServerURL, ok := entry.Config["authn-server-url"].(string); ok && authServerURL != "" {
+			if entry.Type == string(authnFactory.TypeOIDC) {
+				if authServerURL, ok := entry.Config[authn.OIDCConfigKeyAuthServerURL].(string); ok && authServerURL != "" {
 					clientID := ""
-					if cid, ok := entry.Config["client-id"].(string); ok {
+					if cid, ok := entry.Config[authn.OIDCConfigKeyClientID].(string); ok {
 						clientID = cid
 					}
 					log.Debugf("Authn Configuration: URL: %s, ClientID: %s", authServerURL, clientID)

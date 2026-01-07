@@ -7,6 +7,12 @@ import (
 	"github.com/project-kessel/inventory-api/internal/authn/oidc"
 )
 
+// OIDC configuration key constants for use in config maps
+const (
+	OIDCConfigKeyAuthServerURL = "authn-server-url"
+	OIDCConfigKeyClientID      = "client-id"
+)
+
 // ChainEntry represents a single authenticator in the chain
 type ChainEntry struct {
 	Type    string                 `mapstructure:"type"`
@@ -62,10 +68,10 @@ func NewConfig(o *Options) *Config {
 		// Convert legacy oidc config to new format
 		oidcConfig := make(map[string]interface{})
 		if o.OIDC.AuthorizationServerURL != "" {
-			oidcConfig["authn-server-url"] = o.OIDC.AuthorizationServerURL
+			oidcConfig[OIDCConfigKeyAuthServerURL] = o.OIDC.AuthorizationServerURL
 		}
 		if o.OIDC.ClientId != "" {
-			oidcConfig["client-id"] = o.OIDC.ClientId
+			oidcConfig[OIDCConfigKeyClientID] = o.OIDC.ClientId
 		}
 		if o.OIDC.InsecureClient {
 			oidcConfig["insecure-client"] = o.OIDC.InsecureClient
@@ -215,10 +221,10 @@ func (c *Config) completeChainEntry(entry ChainEntry, index int) (ChainCompleted
 			return chainConfig, errs
 		}
 		oidcOpts := oidc.NewOptions()
-		if clientID, ok := entry.Config["client-id"].(string); ok {
+		if clientID, ok := entry.Config[OIDCConfigKeyClientID].(string); ok {
 			oidcOpts.ClientId = clientID
 		}
-		if authServerURL, ok := entry.Config["authn-server-url"].(string); ok {
+		if authServerURL, ok := entry.Config[OIDCConfigKeyAuthServerURL].(string); ok {
 			oidcOpts.AuthorizationServerURL = authServerURL
 		}
 		if insecure, ok := entry.Config["insecure-client"].(bool); ok {

@@ -147,8 +147,14 @@ func (i *StreamAuthInterceptor) Interceptor() grpc.StreamServerInterceptor {
 		identity, decision := i.cfg.authenticator.Authenticate(newCtx, transporter)
 
 		// Log decision at info level to diagnose authentication issues
+		// Only log non-sensitive fields to prevent information leakage
 		logHelper := log.NewHelper(i.cfg.logger)
-		logHelper.Infof("Stream authentication decision for %s: %s (identity: %+v)", info.FullMethod, decision, identity)
+		if identity != nil {
+			logHelper.Infof("Stream authentication decision for %s: %s (principal: %s, authType: %s, isGuest: %v)",
+				info.FullMethod, decision, identity.Principal, identity.AuthType, identity.IsGuest)
+		} else {
+			logHelper.Infof("Stream authentication decision for %s: %s (identity: nil)", info.FullMethod, decision)
+		}
 
 		if decision == api.Deny {
 			logHelper.Warnf("Stream authentication denied for %s", info.FullMethod)
@@ -164,7 +170,9 @@ func (i *StreamAuthInterceptor) Interceptor() grpc.StreamServerInterceptor {
 			return kerrors.Unauthorized("UNAUTHORIZED", fmt.Sprintf("Authentication failed with decision: %s", decision))
 		}
 
-		logHelper.Debugf("Stream authentication allowed for %s with identity: %+v", info.FullMethod, identity)
+		// Log only non-sensitive fields at debug level
+		logHelper.Debugf("Stream authentication allowed for %s (principal: %s, authType: %s, isGuest: %v)",
+			info.FullMethod, identity.Principal, identity.AuthType, identity.IsGuest)
 
 		// Defensive check: identity should not be nil when decision is Allow
 		// but we check to prevent panics if an authenticator implementation violates the contract

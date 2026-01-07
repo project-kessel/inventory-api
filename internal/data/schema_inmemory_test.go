@@ -638,7 +638,7 @@ func TestNormalizeResourceType(t *testing.T) {
 		{
 			name:     "K8s_CLUSTER",
 			input:    "K8s_CLUSTER",
-			expected: "K8s_CLUSTER",
+			expected: "k8s_cluster",
 		},
 		{
 			name:     "rhel/host",
@@ -648,7 +648,7 @@ func TestNormalizeResourceType(t *testing.T) {
 		{
 			name:     "TEST/RESOURCE",
 			input:    "TEST/RESOURCE",
-			expected: "TEST_RESOURCE",
+			expected: "test_resource",
 		},
 		{
 			name:     "resource",

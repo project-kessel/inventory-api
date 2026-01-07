@@ -170,15 +170,16 @@ func (i *StreamAuthInterceptor) Interceptor() grpc.StreamServerInterceptor {
 			return kerrors.Unauthorized("UNAUTHORIZED", fmt.Sprintf("Authentication failed with decision: %s", decision))
 		}
 
-		// Log only non-sensitive fields at debug level
-		logHelper.Debugf("Stream authentication allowed for %s (principal: %s, authType: %s, isGuest: %v)",
-			info.FullMethod, identity.Principal, identity.AuthType, identity.IsGuest)
-
 		// Defensive check: identity should not be nil when decision is Allow
 		// but we check to prevent panics if an authenticator implementation violates the contract
 		if identity == nil {
+			logHelper.Errorf("Stream authentication allowed but identity is nil for %s", info.FullMethod)
 			return kerrors.Unauthorized("UNAUTHORIZED", "Invalid identity: authenticator returned Allow with nil identity")
 		}
+
+		// Log only non-sensitive fields at debug level
+		logHelper.Debugf("Stream authentication allowed for %s (principal: %s, authType: %s, isGuest: %v)",
+			info.FullMethod, identity.Principal, identity.AuthType, identity.IsGuest)
 
 		// Set identity in context (includes AuthType)
 		newCtx = NewContextIdentity(newCtx, *identity)

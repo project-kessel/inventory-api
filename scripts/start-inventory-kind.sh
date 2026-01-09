@@ -71,8 +71,6 @@ $KIND load image-archive inventory-api.tar --name inventory-cluster
 $KIND load image-archive inventory-e2e-tests.tar --name inventory-cluster
 $KIND load image-archive kafka-connect.tar --name inventory-cluster
 
-# checks for the config map first, or creates it if not found
-kubectl get configmap inventory-api-psks || kubectl create configmap inventory-api-psks --from-file=config/psks.yaml
 [ -f resources.tar.gz ] || tar czf resources.tar.gz -C data/schema/resources .
 kubectl get configmap resources-tarball || kubectl create configmap resources-tarball --from-file=resources.tar.gz
 

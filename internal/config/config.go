@@ -9,6 +9,7 @@ import (
 	clowder "github.com/redhatinsights/app-common-go/pkg/api/v1"
 
 	"github.com/project-kessel/inventory-api/internal/authn"
+	authnFactory "github.com/project-kessel/inventory-api/internal/authn/factory"
 	"github.com/project-kessel/inventory-api/internal/authz"
 	"github.com/project-kessel/inventory-api/internal/config/schema"
 	"github.com/project-kessel/inventory-api/internal/consistency"
@@ -54,11 +55,20 @@ func LogConfigurationInfo(options *OptionsConfig) {
 		options.Server.HttpOptions.Addr,
 		options.Server.GrpcOptions.Addr)
 
-	if options.Authn.Oidc.AuthorizationServerURL != "" {
-		log.Debugf("Authn Configuration: URL: %s, ClientID: %s",
-			options.Authn.Oidc.AuthorizationServerURL,
-			options.Authn.Oidc.ClientId,
-		)
+	// Log authn configuration if OIDC is configured
+	if options.Authn.Authenticator != nil {
+		for _, entry := range options.Authn.Authenticator.Chain {
+			if entry.Type == string(authnFactory.TypeOIDC) {
+				if authServerURL, ok := entry.Config[authn.OIDCConfigKeyAuthServerURL].(string); ok && authServerURL != "" {
+					clientID := ""
+					if cid, ok := entry.Config[authn.OIDCConfigKeyClientID].(string); ok {
+						clientID = cid
+					}
+					log.Debugf("Authn Configuration: URL: %s, ClientID: %s", authServerURL, clientID)
+				}
+				break
+			}
+		}
 	}
 
 	if options.Storage.Database == storage.Postgres {

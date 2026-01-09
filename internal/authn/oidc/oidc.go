@@ -54,7 +54,15 @@ func (o *OAuth2Authenticator) Authenticate(ctx context.Context, t transport.Tran
 	// verify and parse it
 	tok, err := o.Verify(rawToken)
 	if err != nil {
-		log.Errorf("failed to verify the access token: %v", err)
+		// Security: If a Bearer token is present, the client is attempting OIDC authentication.
+		// If verification fails, we must deny the request to prevent authentication bypass.
+		//
+		// Rationale:
+		// 1. The presence of a Bearer token indicates an explicit authentication attempt
+		// 2. Invalid tokens should be rejected, not ignored (which would allow fallback to guest)
+		// 3. This prevents attackers from bypassing authentication by sending malformed tokens
+		// 4. The first_match aggregator strategy ensures denial propagates (stricter security policy)
+		log.Debugf("OIDC token verification failed (invalid token or not an OIDC ID token): %v", err)
 		return nil, api.Deny
 	}
 
@@ -76,7 +84,10 @@ func (o *OAuth2Authenticator) Authenticate(ctx context.Context, t transport.Tran
 
 	if u.Subject != "" && o.PrincipalUserDomain != "" {
 		principal := fmt.Sprintf("%s/%s", o.PrincipalUserDomain, u.Subject)
-		return &api.Identity{Principal: principal}, api.Allow
+		return &api.Identity{
+			Principal: principal,
+			AuthType:  "oidc",
+		}, api.Allow
 	}
 
 	return nil, api.Deny

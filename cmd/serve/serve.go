@@ -241,7 +241,7 @@ func NewCommand(
 			}
 
 			// construct servers
-			server, err := server.New(serverConfig, middleware.Authentication(authenticator), authnConfig, logger)
+			server, err := server.New(serverConfig, middleware.Authentication(authenticator), authnConfig, authenticator, logger)
 			if err != nil {
 				return err
 			}

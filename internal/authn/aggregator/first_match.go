@@ -68,7 +68,7 @@ func (f *FirstMatchAuthenticator) Authenticate(ctx context.Context, t transport.
 		return nil, api.Deny
 	}
 
-	// Only deny if all authenticators returned Deny
+	// If all authenticators returned Deny, propagate Deny
 	if denyCount == len(f.Authenticators) {
 		return nil, api.Deny
 	}

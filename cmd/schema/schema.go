@@ -9,7 +9,7 @@ import (
 
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/project-kessel/inventory-api/cmd/common"
-	"github.com/project-kessel/inventory-api/internal/middleware"
+	"github.com/project-kessel/inventory-api/internal/data"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 )
@@ -40,7 +40,7 @@ func normalizeYAMLResourceType(yamlContent []byte) ([]byte, error) {
 
 	// Normalize the resources type if it exists
 	if resourceType, exists := yamlData["type"].(string); exists {
-		normalized := middleware.NormalizeResourceType(resourceType)
+		normalized := data.NormalizeResourceType(resourceType)
 		yamlData["type"] = normalized
 	}
 
@@ -82,7 +82,7 @@ func preloadSchemas() error {
 			continue
 		}
 
-		resourceType := middleware.NormalizeResourceType(resource.Name())
+		resourceType := data.NormalizeResourceType(resource.Name())
 		resourcePath := filepath.Join(schemaDir, resource.Name())
 
 		// Load common resource data schema
@@ -109,7 +109,7 @@ func preloadSchemas() error {
 					continue
 				}
 
-				reporterType := middleware.NormalizeResourceType(reporter.Name())
+				reporterType := data.NormalizeResourceType(reporter.Name())
 				reporterPath := filepath.Join(reportersPath, reporter.Name())
 
 				// Encode reporter's config.yaml

@@ -125,6 +125,50 @@ func (s *InventoryService) CheckBulk(ctx context.Context, req *pb.CheckBulkReque
 	return mapCheckBulkResponseFromV1beta1(resp), nil
 }
 
+func (s *InventoryService) CheckSelf(ctx context.Context, req *pb.CheckSelfRequest) (*pb.CheckSelfResponse, error) {
+	// Get identity from context (from x-rh-identity header or other auth methods)
+	identity, err := middleware.GetIdentity(ctx)
+	if err != nil {
+		return nil, status.Errorf(codes.Unauthenticated, "failed to get identity: %v", err)
+	}
+
+	if reporterResourceKey, err := reporterKeyFromResourceReference(req.Object); err == nil {
+		// Derive subject reference from identity (x-rh-identity header)
+		subjectRef := subjectReferenceFromIdentity(identity)
+		if resp, err := s.Ctl.Check(ctx, req.GetRelation(), req.Object.Reporter.GetType(), subjectRef, reporterResourceKey); err == nil {
+			allowed := pb.Allowed_ALLOWED_FALSE
+			if resp {
+				allowed = pb.Allowed_ALLOWED_TRUE
+			}
+			response := &pb.CheckSelfResponse{Allowed: allowed}
+			// Note: Consistency token not available from Check usecase (returns bool only)
+			// If consistency token is needed, usecase.Check would need to be enhanced
+			return response, nil
+		} else {
+			return nil, err
+		}
+	} else {
+		return nil, err
+	}
+}
+
+func (s *InventoryService) CheckSelfBulk(ctx context.Context, req *pb.CheckSelfBulkRequest) (*pb.CheckSelfBulkResponse, error) {
+	// Get identity from context (from x-rh-identity header or other auth methods)
+	identity, err := middleware.GetIdentity(ctx)
+	if err != nil {
+		return nil, status.Errorf(codes.Unauthenticated, "failed to get identity: %v", err)
+	}
+
+	log.Info("CheckSelfBulk using v1beta2 db")
+	// Map request to v1beta1 format, deriving subject from identity (x-rh-identity header)
+	v1beta1Req := mapCheckSelfBulkRequestToV1beta1(req, identity)
+	resp, err := s.Ctl.CheckBulk(ctx, v1beta1Req)
+	if err != nil {
+		return nil, err
+	}
+	return mapCheckSelfBulkResponseFromV1beta1(resp, req), nil
+}
+
 func subjectReferenceFromSubject(subject *pb.SubjectReference) *pbv1beta1.SubjectReference {
 	return &pbv1beta1.SubjectReference{
 		Relation: subject.Relation,
@@ -147,6 +191,53 @@ func subjectReferenceFromSubjectV1beta1(subject *pbv1beta1.SubjectReference) *pb
 			},
 			ResourceId:   subject.Subject.Id,
 			ResourceType: subject.Subject.Type.Name,
+		},
+	}
+}
+
+func subjectReferenceFromIdentity(identity *authnapi.Identity) *pbv1beta1.SubjectReference {
+	// Determine subject ID based on authentication type
+	// For x-rh-identity: Principal is username/email, UserID may also be available
+	// For OIDC: Principal is in "domain/subject" format
+	var subjectID string
+
+	if identity.AuthType == "x-rh-identity" {
+		// For x-rh-identity, prefer UserID if available (more stable identifier)
+		// Otherwise fall back to Principal (username/email)
+		if identity.UserID != "" {
+			subjectID = identity.UserID
+		} else if identity.Principal != "" {
+			subjectID = identity.Principal
+		} else {
+			// Fallback: should not happen for authenticated requests
+			subjectID = identity.Principal
+		}
+	} else {
+		// For OIDC and other auth types, parse Principal
+		// Principal might be in "domain/subject" format (OIDC) or just "subject"
+		subjectID = identity.Principal
+		if parts := strings.SplitN(identity.Principal, "/", 2); len(parts) == 2 {
+			subjectID = parts[1]
+		}
+	}
+
+	// Determine namespace
+	// For x-rh-identity: Type field contains "User", "System", etc. but we use "rbac" as namespace
+	// For OIDC: Type is typically empty, default to "rbac"
+	namespace := "rbac"
+	if identity.AuthType != "x-rh-identity" && identity.Type != "" {
+		// For non-x-rh-identity auth types, use Type if set
+		namespace = identity.Type
+	}
+
+	return &pbv1beta1.SubjectReference{
+		Relation: nil, // No relation for direct subject reference
+		Subject: &pbv1beta1.ObjectReference{
+			Type: &pbv1beta1.ObjectType{
+				Namespace: namespace,
+				Name:      "principal",
+			},
+			Id: subjectID,
 		},
 	}
 }
@@ -241,6 +332,90 @@ func mapCheckBulkResponseFromV1beta1(resp *pbv1beta1.CheckBulkResponse) *pb.Chec
 		Pairs:            pairs,
 		ConsistencyToken: &pb.ConsistencyToken{Token: resp.GetConsistencyToken().GetToken()},
 	}
+}
+
+func mapCheckSelfBulkRequestToV1beta1(req *pb.CheckSelfBulkRequest, identity *authnapi.Identity) *pbv1beta1.CheckBulkRequest {
+	items := make([]*pbv1beta1.CheckBulkRequestItem, len(req.GetItems()))
+	// Derive subject reference from identity (x-rh-identity header or other auth)
+	// All items in the bulk request use the same subject (the caller)
+	subjectRef := subjectReferenceFromIdentity(identity)
+
+	for i, item := range req.GetItems() {
+		items[i] = &pbv1beta1.CheckBulkRequestItem{
+			Resource: &pbv1beta1.ObjectReference{
+				Type: &pbv1beta1.ObjectType{
+					Namespace: item.GetObject().GetReporter().GetType(),
+					Name:      item.GetObject().GetResourceType(),
+				},
+				Id: item.GetObject().GetResourceId(),
+			},
+			Subject:  subjectRef,
+			Relation: item.GetRelation(),
+		}
+	}
+
+	consistency := convertConsistencyToV1beta1(req.GetConsistencyToken())
+	return &pbv1beta1.CheckBulkRequest{
+		Items:       items,
+		Consistency: consistency,
+	}
+}
+
+func mapCheckSelfBulkResponseFromV1beta1(resp *pbv1beta1.CheckBulkResponse, req *pb.CheckSelfBulkRequest) *pb.CheckSelfBulkResponse {
+	pairs := make([]*pb.CheckSelfBulkResponsePair, len(resp.GetPairs()))
+	for i, pair := range resp.GetPairs() {
+		errResponse := &pb.CheckSelfBulkResponsePair_Error{}
+		itemResponse := &pb.CheckSelfBulkResponsePair_Item{}
+
+		if pair.GetError() != nil {
+			log.Errorf("Error in checkselfbulk for req: %v error-code: %v error-message: %v", pair.GetRequest(), pair.GetError().GetCode(), pair.GetError().GetMessage())
+			errResponse.Error = &rpcstatus.Status{
+				Code:    pair.GetError().GetCode(),
+				Message: pair.GetError().GetMessage(),
+			}
+		}
+
+		allowedResponse := pb.Allowed_ALLOWED_FALSE
+		if pair.GetItem().GetAllowed() == pbv1beta1.CheckBulkResponseItem_ALLOWED_TRUE {
+			allowedResponse = pb.Allowed_ALLOWED_TRUE
+		}
+		itemResponse.Item = &pb.CheckSelfBulkResponseItem{
+			Allowed: allowedResponse,
+		}
+
+		// Map back to the original request item (no subject in CheckSelfBulkRequestItem)
+		requestItem := req.GetItems()[i]
+		pairs[i] = &pb.CheckSelfBulkResponsePair{
+			Request: &pb.CheckSelfBulkRequestItem{
+				Object: &pb.ResourceReference{
+					ResourceType: requestItem.GetObject().GetResourceType(),
+					ResourceId:   requestItem.GetObject().GetResourceId(),
+					Reporter: &pb.ReporterReference{
+						Type: requestItem.GetObject().GetReporter().GetType(),
+					},
+				},
+				Relation: requestItem.GetRelation(),
+			},
+		}
+		if pair.GetError() != nil {
+			pairs[i].Response = errResponse
+		} else {
+			pairs[i].Response = itemResponse
+		}
+	}
+
+	response := &pb.CheckSelfBulkResponse{
+		Pairs: pairs,
+	}
+	// Convert ConsistencyToken to Consistency format
+	if resp.GetConsistencyToken() != nil {
+		response.ConsistencyToken = &pb.Consistency{
+			Requirement: &pb.Consistency_AtLeastAsFresh{
+				AtLeastAsFresh: &pb.ConsistencyToken{Token: resp.GetConsistencyToken().GetToken()},
+			},
+		}
+	}
+	return response
 }
 
 func (s *InventoryService) StreamedListObjects(

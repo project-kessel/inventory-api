@@ -16,10 +16,12 @@ import (
 	"github.com/project-kessel/inventory-api/internal/metricscollector"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 
 	authnapi "github.com/project-kessel/inventory-api/internal/authn/api"
 	usecase "github.com/project-kessel/inventory-api/internal/biz/usecase/resources"
 	"github.com/project-kessel/inventory-api/internal/middleware"
+	"github.com/project-kessel/inventory-api/internal/mocks"
 	svc "github.com/project-kessel/inventory-api/internal/service/resources"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -287,4 +289,557 @@ func TestToLookupResourceResponse(t *testing.T) {
 
 	result := svc.ToLookupResourceResponse(input)
 	assert.Equal(t, expected, result)
+}
+
+func TestInventoryService_CheckSelf_Allowed_XRhIdentity(t *testing.T) {
+	// Test CheckSelf with x-rh-identity header (using UserID)
+	id := &authnapi.Identity{
+		Principal: "testuser",
+		UserID:    "user-123",
+		Type:      "User",
+		AuthType:  "x-rh-identity",
+	}
+	ctx := context.WithValue(context.Background(), middleware.IdentityRequestKey, id)
+
+	req := &pb.CheckSelfRequest{
+		Relation: "view",
+		Object: &pb.ResourceReference{
+			ResourceId:   "dd1b73b9-3e33-4264-968c-e3ce55b9afec",
+			ResourceType: "host",
+			Reporter:     &pb.ReporterReference{Type: "hbi"},
+		},
+	}
+
+	mockRepo := data.NewFakeResourceRepository()
+	mockAuthz := &mocks.MockAuthz{}
+	mockAuthz.
+		On("Check",
+			mock.Anything,
+			"hbi",
+			"view",
+			mock.Anything,
+			"host",
+			"dd1b73b9-3e33-4264-968c-e3ce55b9afec",
+			mock.MatchedBy(func(sub *relationsV1beta1.SubjectReference) bool {
+				// Verify subject is derived from identity (UserID for x-rh-identity)
+				return sub.Subject.Id == "user-123" &&
+					sub.Subject.Type.Name == "principal" &&
+					sub.Subject.Type.Namespace == "rbac"
+			}),
+		).
+		Return(relationsV1beta1.CheckResponse_ALLOWED_TRUE, &relationsV1beta1.ConsistencyToken{}, nil).
+		Once()
+
+	cfg := &usecase.UsecaseConfig{}
+	uc := usecase.New(
+		mockRepo,
+		nil,                                // LegacyReporterResourceRepository
+		nil,                                // inventoryResourceRepository
+		data.NewInMemorySchemaRepository(), // schema repository
+		mockAuthz,                          // Authz
+		nil,                                // Eventer
+		"rbac",                             // Namespace
+		krlog.NewStdLogger(io.Discard),
+		nil, // ListenManager
+		nil, // waitForNotifBreaker
+		cfg,
+		metricscollector.NewFakeMetricsCollector(),
+	)
+
+	service := svc.NewKesselInventoryServiceV1beta2(uc)
+
+	resp, err := service.CheckSelf(ctx, req)
+
+	assert.NoError(t, err)
+	if assert.NotNil(t, resp) {
+		assert.Equal(t, pb.Allowed_ALLOWED_TRUE, resp.Allowed)
+	}
+
+	mockAuthz.AssertExpectations(t)
+}
+
+func TestInventoryService_CheckSelf_Allowed_XRhIdentity_NoUserID(t *testing.T) {
+	// Test CheckSelf with x-rh-identity header (fallback to Principal when UserID not available)
+	id := &authnapi.Identity{
+		Principal: "testuser",
+		UserID:    "", // No UserID, should use Principal
+		Type:      "User",
+		AuthType:  "x-rh-identity",
+	}
+	ctx := context.WithValue(context.Background(), middleware.IdentityRequestKey, id)
+
+	req := &pb.CheckSelfRequest{
+		Relation: "view",
+		Object: &pb.ResourceReference{
+			ResourceId:   "dd1b73b9-3e33-4264-968c-e3ce55b9afec",
+			ResourceType: "host",
+			Reporter:     &pb.ReporterReference{Type: "hbi"},
+		},
+	}
+
+	mockRepo := data.NewFakeResourceRepository()
+	mockAuthz := &mocks.MockAuthz{}
+	mockAuthz.
+		On("Check",
+			mock.Anything,
+			"hbi",
+			"view",
+			mock.Anything,
+			"host",
+			"dd1b73b9-3e33-4264-968c-e3ce55b9afec",
+			mock.MatchedBy(func(sub *relationsV1beta1.SubjectReference) bool {
+				// Verify subject uses Principal when UserID not available
+				return sub.Subject.Id == "testuser" &&
+					sub.Subject.Type.Name == "principal" &&
+					sub.Subject.Type.Namespace == "rbac"
+			}),
+		).
+		Return(relationsV1beta1.CheckResponse_ALLOWED_TRUE, &relationsV1beta1.ConsistencyToken{}, nil).
+		Once()
+
+	cfg := &usecase.UsecaseConfig{}
+	uc := usecase.New(
+		mockRepo,
+		nil,                                // LegacyReporterResourceRepository
+		nil,                                // inventoryResourceRepository
+		data.NewInMemorySchemaRepository(), // schema repository
+		mockAuthz,                          // Authz
+		nil,                                // Eventer
+		"rbac",                             // Namespace
+		krlog.NewStdLogger(io.Discard),
+		nil, // ListenManager
+		nil, // waitForNotifBreaker
+		cfg,
+		metricscollector.NewFakeMetricsCollector(),
+	)
+
+	service := svc.NewKesselInventoryServiceV1beta2(uc)
+
+	resp, err := service.CheckSelf(ctx, req)
+
+	assert.NoError(t, err)
+	if assert.NotNil(t, resp) {
+		assert.Equal(t, pb.Allowed_ALLOWED_TRUE, resp.Allowed)
+	}
+
+	mockAuthz.AssertExpectations(t)
+}
+
+func TestInventoryService_CheckSelf_Denied(t *testing.T) {
+	id := &authnapi.Identity{
+		Principal: "testuser",
+		UserID:    "user-123",
+		Type:      "User",
+		AuthType:  "x-rh-identity",
+	}
+	ctx := context.WithValue(context.Background(), middleware.IdentityRequestKey, id)
+
+	req := &pb.CheckSelfRequest{
+		Relation: "view",
+		Object: &pb.ResourceReference{
+			ResourceId:   "dd1b73b9-3e33-4264-968c-e3ce55b9afec",
+			ResourceType: "host",
+			Reporter:     &pb.ReporterReference{Type: "hbi"},
+		},
+	}
+
+	mockRepo := data.NewFakeResourceRepository()
+	mockAuthz := &mocks.MockAuthz{}
+	mockAuthz.
+		On("Check",
+			mock.Anything,
+			"hbi",
+			"view",
+			mock.Anything,
+			"host",
+			"dd1b73b9-3e33-4264-968c-e3ce55b9afec",
+			mock.Anything,
+		).
+		Return(relationsV1beta1.CheckResponse_ALLOWED_FALSE, &relationsV1beta1.ConsistencyToken{}, nil).
+		Once()
+
+	cfg := &usecase.UsecaseConfig{}
+	uc := usecase.New(
+		mockRepo,
+		nil,                                // LegacyReporterResourceRepository
+		nil,                                // inventoryResourceRepository
+		data.NewInMemorySchemaRepository(), // schema repository
+		mockAuthz,                          // Authz
+		nil,                                // Eventer
+		"rbac",                             // Namespace
+		krlog.NewStdLogger(io.Discard),
+		nil, // ListenManager
+		nil, // waitForNotifBreaker
+		cfg,
+		metricscollector.NewFakeMetricsCollector(),
+	)
+
+	service := svc.NewKesselInventoryServiceV1beta2(uc)
+
+	resp, err := service.CheckSelf(ctx, req)
+
+	assert.NoError(t, err)
+	if assert.NotNil(t, resp) {
+		assert.Equal(t, pb.Allowed_ALLOWED_FALSE, resp.Allowed)
+	}
+
+	mockAuthz.AssertExpectations(t)
+}
+
+func TestInventoryService_CheckSelf_NoIdentity(t *testing.T) {
+	ctx := context.Background() // no identity
+
+	req := &pb.CheckSelfRequest{
+		Relation: "view",
+		Object: &pb.ResourceReference{
+			ResourceId:   "dd1b73b9-3e33-4264-968c-e3ce55b9afec",
+			ResourceType: "host",
+			Reporter:     &pb.ReporterReference{Type: "hbi"},
+		},
+	}
+
+	uc := &usecase.Usecase{}
+	service := svc.NewKesselInventoryServiceV1beta2(uc)
+
+	resp, err := service.CheckSelf(ctx, req)
+
+	assert.Error(t, err)
+	assert.Nil(t, resp)
+	assert.Contains(t, err.Error(), "failed to get identity")
+
+	// Check that it returns the correct gRPC status code
+	grpcStatus, ok := status.FromError(err)
+	assert.True(t, ok)
+	assert.Equal(t, codes.Unauthenticated, grpcStatus.Code())
+}
+
+func TestInventoryService_CheckSelfBulk_Allowed_XRhIdentity(t *testing.T) {
+	// Test CheckSelfBulk with x-rh-identity header
+	id := &authnapi.Identity{
+		Principal: "testuser",
+		UserID:    "user-123",
+		Type:      "User",
+		AuthType:  "x-rh-identity",
+	}
+	ctx := context.WithValue(context.Background(), middleware.IdentityRequestKey, id)
+
+	req := &pb.CheckSelfBulkRequest{
+		Items: []*pb.CheckSelfBulkRequestItem{
+			{
+				Object: &pb.ResourceReference{
+					ResourceId:   "resource-1",
+					ResourceType: "host",
+					Reporter:     &pb.ReporterReference{Type: "hbi"},
+				},
+				Relation: "view",
+			},
+			{
+				Object: &pb.ResourceReference{
+					ResourceId:   "resource-2",
+					ResourceType: "host",
+					Reporter:     &pb.ReporterReference{Type: "hbi"},
+				},
+				Relation: "edit",
+			},
+		},
+	}
+
+	mockAuthz := &mocks.MockAuthz{}
+	mockAuthz.
+		On("CheckBulk",
+			mock.Anything,
+			mock.MatchedBy(func(req *relationsV1beta1.CheckBulkRequest) bool {
+				// Verify all items use the same subject (derived from identity)
+				if len(req.Items) != 2 {
+					return false
+				}
+				// Check that both items have the same subject (UserID from x-rh-identity)
+				subject1 := req.Items[0].Subject
+				subject2 := req.Items[1].Subject
+				return subject1.Subject.Id == "user-123" &&
+					subject1.Subject.Type.Name == "principal" &&
+					subject1.Subject.Type.Namespace == "rbac" &&
+					subject2.Subject.Id == "user-123" &&
+					subject2.Subject.Type.Name == "principal" &&
+					subject2.Subject.Type.Namespace == "rbac"
+			}),
+		).
+		Return(&relationsV1beta1.CheckBulkResponse{
+			Pairs: []*relationsV1beta1.CheckBulkResponsePair{
+				{
+					Request: &relationsV1beta1.CheckBulkRequestItem{
+						Resource: &relationsV1beta1.ObjectReference{
+							Type: &relationsV1beta1.ObjectType{
+								Namespace: "hbi",
+								Name:      "host",
+							},
+							Id: "resource-1",
+						},
+						Relation: "view",
+					},
+					Response: &relationsV1beta1.CheckBulkResponsePair_Item{
+						Item: &relationsV1beta1.CheckBulkResponseItem{
+							Allowed: relationsV1beta1.CheckBulkResponseItem_ALLOWED_TRUE,
+						},
+					},
+				},
+				{
+					Request: &relationsV1beta1.CheckBulkRequestItem{
+						Resource: &relationsV1beta1.ObjectReference{
+							Type: &relationsV1beta1.ObjectType{
+								Namespace: "hbi",
+								Name:      "host",
+							},
+							Id: "resource-2",
+						},
+						Relation: "edit",
+					},
+					Response: &relationsV1beta1.CheckBulkResponsePair_Item{
+						Item: &relationsV1beta1.CheckBulkResponseItem{
+							Allowed: relationsV1beta1.CheckBulkResponseItem_ALLOWED_TRUE,
+						},
+					},
+				},
+			},
+			ConsistencyToken: &relationsV1beta1.ConsistencyToken{Token: "test-token"},
+		}, nil).
+		Once()
+
+	cfg := &usecase.UsecaseConfig{}
+	uc := usecase.New(
+		data.NewFakeResourceRepository(),
+		nil,                                // LegacyReporterResourceRepository
+		nil,                                // inventoryResourceRepository
+		data.NewInMemorySchemaRepository(), // schema repository
+		mockAuthz,                          // Authz
+		nil,                                // Eventer
+		"rbac",                             // Namespace
+		krlog.NewStdLogger(io.Discard),
+		nil, // ListenManager
+		nil, // waitForNotifBreaker
+		cfg,
+		metricscollector.NewFakeMetricsCollector(),
+	)
+
+	service := svc.NewKesselInventoryServiceV1beta2(uc)
+
+	resp, err := service.CheckSelfBulk(ctx, req)
+
+	assert.NoError(t, err)
+	if assert.NotNil(t, resp) {
+		assert.Len(t, resp.Pairs, 2)
+		assert.Equal(t, pb.Allowed_ALLOWED_TRUE, resp.Pairs[0].GetItem().Allowed)
+		assert.Equal(t, pb.Allowed_ALLOWED_TRUE, resp.Pairs[1].GetItem().Allowed)
+		// Verify consistency token conversion
+		assert.NotNil(t, resp.ConsistencyToken)
+		assert.Equal(t, "test-token", resp.ConsistencyToken.GetAtLeastAsFresh().GetToken())
+	}
+
+	mockAuthz.AssertExpectations(t)
+}
+
+func TestInventoryService_CheckSelfBulk_MixedResults(t *testing.T) {
+	id := &authnapi.Identity{
+		Principal: "testuser",
+		UserID:    "user-123",
+		Type:      "User",
+		AuthType:  "x-rh-identity",
+	}
+	ctx := context.WithValue(context.Background(), middleware.IdentityRequestKey, id)
+
+	req := &pb.CheckSelfBulkRequest{
+		Items: []*pb.CheckSelfBulkRequestItem{
+			{
+				Object: &pb.ResourceReference{
+					ResourceId:   "resource-1",
+					ResourceType: "host",
+					Reporter:     &pb.ReporterReference{Type: "hbi"},
+				},
+				Relation: "view",
+			},
+			{
+				Object: &pb.ResourceReference{
+					ResourceId:   "resource-2",
+					ResourceType: "host",
+					Reporter:     &pb.ReporterReference{Type: "hbi"},
+				},
+				Relation: "edit",
+			},
+		},
+	}
+
+	mockAuthz := &mocks.MockAuthz{}
+	mockAuthz.
+		On("CheckBulk", mock.Anything, mock.Anything).
+		Return(&relationsV1beta1.CheckBulkResponse{
+			Pairs: []*relationsV1beta1.CheckBulkResponsePair{
+				{
+					Request: &relationsV1beta1.CheckBulkRequestItem{
+						Resource: &relationsV1beta1.ObjectReference{
+							Type: &relationsV1beta1.ObjectType{
+								Namespace: "hbi",
+								Name:      "host",
+							},
+							Id: "resource-1",
+						},
+						Relation: "view",
+					},
+					Response: &relationsV1beta1.CheckBulkResponsePair_Item{
+						Item: &relationsV1beta1.CheckBulkResponseItem{
+							Allowed: relationsV1beta1.CheckBulkResponseItem_ALLOWED_TRUE,
+						},
+					},
+				},
+				{
+					Request: &relationsV1beta1.CheckBulkRequestItem{
+						Resource: &relationsV1beta1.ObjectReference{
+							Type: &relationsV1beta1.ObjectType{
+								Namespace: "hbi",
+								Name:      "host",
+							},
+							Id: "resource-2",
+						},
+						Relation: "edit",
+					},
+					Response: &relationsV1beta1.CheckBulkResponsePair_Item{
+						Item: &relationsV1beta1.CheckBulkResponseItem{
+							Allowed: relationsV1beta1.CheckBulkResponseItem_ALLOWED_FALSE,
+						},
+					},
+				},
+			},
+			ConsistencyToken: &relationsV1beta1.ConsistencyToken{Token: "test-token"},
+		}, nil).
+		Once()
+
+	cfg := &usecase.UsecaseConfig{}
+	uc := usecase.New(
+		data.NewFakeResourceRepository(),
+		nil,                                // LegacyReporterResourceRepository
+		nil,                                // inventoryResourceRepository
+		data.NewInMemorySchemaRepository(), // schema repository
+		mockAuthz,                          // Authz
+		nil,                                // Eventer
+		"rbac",                             // Namespace
+		krlog.NewStdLogger(io.Discard),
+		nil, // ListenManager
+		nil, // waitForNotifBreaker
+		cfg,
+		metricscollector.NewFakeMetricsCollector(),
+	)
+
+	service := svc.NewKesselInventoryServiceV1beta2(uc)
+
+	resp, err := service.CheckSelfBulk(ctx, req)
+
+	assert.NoError(t, err)
+	if assert.NotNil(t, resp) {
+		assert.Len(t, resp.Pairs, 2)
+		assert.Equal(t, pb.Allowed_ALLOWED_TRUE, resp.Pairs[0].GetItem().Allowed)
+		assert.Equal(t, pb.Allowed_ALLOWED_FALSE, resp.Pairs[1].GetItem().Allowed)
+		// Verify request items are mapped back correctly (no subject in CheckSelfBulkRequestItem)
+		assert.Equal(t, "resource-1", resp.Pairs[0].Request.Object.ResourceId)
+		assert.Equal(t, "view", resp.Pairs[0].Request.Relation)
+		assert.Equal(t, "resource-2", resp.Pairs[1].Request.Object.ResourceId)
+		assert.Equal(t, "edit", resp.Pairs[1].Request.Relation)
+	}
+
+	mockAuthz.AssertExpectations(t)
+}
+
+func TestInventoryService_CheckSelfBulk_NoIdentity(t *testing.T) {
+	ctx := context.Background() // no identity
+
+	req := &pb.CheckSelfBulkRequest{
+		Items: []*pb.CheckSelfBulkRequestItem{
+			{
+				Object: &pb.ResourceReference{
+					ResourceId:   "resource-1",
+					ResourceType: "host",
+					Reporter:     &pb.ReporterReference{Type: "hbi"},
+				},
+				Relation: "view",
+			},
+		},
+	}
+
+	uc := &usecase.Usecase{}
+	service := svc.NewKesselInventoryServiceV1beta2(uc)
+
+	resp, err := service.CheckSelfBulk(ctx, req)
+
+	assert.Error(t, err)
+	assert.Nil(t, resp)
+	assert.Contains(t, err.Error(), "failed to get identity")
+
+	// Check that it returns the correct gRPC status code
+	grpcStatus, ok := status.FromError(err)
+	assert.True(t, ok)
+	assert.Equal(t, codes.Unauthenticated, grpcStatus.Code())
+}
+
+func TestInventoryService_CheckSelf_OIDC_Identity(t *testing.T) {
+	// Test CheckSelf with OIDC identity (Principal in "domain/subject" format)
+	id := &authnapi.Identity{
+		Principal: "redhat.com/12345",
+		AuthType:  "oidc",
+		Type:      "",
+	}
+	ctx := context.WithValue(context.Background(), middleware.IdentityRequestKey, id)
+
+	req := &pb.CheckSelfRequest{
+		Relation: "view",
+		Object: &pb.ResourceReference{
+			ResourceId:   "dd1b73b9-3e33-4264-968c-e3ce55b9afec",
+			ResourceType: "host",
+			Reporter:     &pb.ReporterReference{Type: "hbi"},
+		},
+	}
+
+	mockRepo := data.NewFakeResourceRepository()
+	mockAuthz := &mocks.MockAuthz{}
+	mockAuthz.
+		On("Check",
+			mock.Anything,
+			"hbi",
+			"view",
+			mock.Anything,
+			"host",
+			"dd1b73b9-3e33-4264-968c-e3ce55b9afec",
+			mock.MatchedBy(func(sub *relationsV1beta1.SubjectReference) bool {
+				// Verify OIDC principal is parsed correctly (extract subject from "domain/subject")
+				return sub.Subject.Id == "12345" &&
+					sub.Subject.Type.Name == "principal" &&
+					sub.Subject.Type.Namespace == "rbac"
+			}),
+		).
+		Return(relationsV1beta1.CheckResponse_ALLOWED_TRUE, &relationsV1beta1.ConsistencyToken{}, nil).
+		Once()
+
+	cfg := &usecase.UsecaseConfig{}
+	uc := usecase.New(
+		mockRepo,
+		nil,                                // LegacyReporterResourceRepository
+		nil,                                // inventoryResourceRepository
+		data.NewInMemorySchemaRepository(), // schema repository
+		mockAuthz,                          // Authz
+		nil,                                // Eventer
+		"rbac",                             // Namespace
+		krlog.NewStdLogger(io.Discard),
+		nil, // ListenManager
+		nil, // waitForNotifBreaker
+		cfg,
+		metricscollector.NewFakeMetricsCollector(),
+	)
+
+	service := svc.NewKesselInventoryServiceV1beta2(uc)
+
+	resp, err := service.CheckSelf(ctx, req)
+
+	assert.NoError(t, err)
+	if assert.NotNil(t, resp) {
+		assert.Equal(t, pb.Allowed_ALLOWED_TRUE, resp.Allowed)
+	}
+
+	mockAuthz.AssertExpectations(t)
 }

@@ -2,7 +2,7 @@ package api
 
 // Identity is the identity of the requester
 type Identity struct {
-
+	UserID string `yaml:"user_id"`
 	// TODO: do we even need the tenant id?
 	Tenant string `yaml:"tenant"`
 
@@ -14,4 +14,8 @@ type Identity struct {
 	Type       string `yaml:"type"`
 	Href       string `yaml:"href"`
 	IsGuest    bool   `yaml:"is_guest"`
+
+	// AuthType indicates the authentication method used (e.g., "oidc", "guest")
+	// This is used by authorization middleware to make access control decisions
+	AuthType string `yaml:"auth_type"`
 }

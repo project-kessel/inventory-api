@@ -7,7 +7,22 @@ server:
   pprof:
     enabled: true
 authn:
-   allow-unauthenticated: true
+  allow-unauthenticated: true
+  authenticator:
+    type: first_match
+    chain:
+      - type: oidc
+        enabled: false 
+        config:
+          insecure-client: true
+          authn-server-url: http://127.0.0.1:8085/realms/redhat-external
+          skip-client-id-check: true
+          skip-issuer-check: true
+          principal-user-domain: localhost
+      - type: x-rh-identity
+        enabled: false    # Enabled - will check x-rh-identity header
+      - type: guest
+        enabled: true
 authz:
   impl: allow-all
 eventing:

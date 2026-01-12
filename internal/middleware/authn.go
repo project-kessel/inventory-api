@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	"github.com/go-kratos/kratos/v2/errors"
@@ -28,8 +29,19 @@ func Authentication(authenticator authnapi.Authenticator) func(middleware.Handle
 				token, hasToken := util.FromTokenContext(ctx)
 
 				identity, decision := authenticator.Authenticate(ctx, t)
-				if decision != authnapi.Allow {
-					return nil, errors.Unauthorized(reason, "Unauthorized")
+				if decision == authnapi.Deny {
+					return nil, errors.Unauthorized(reason, "Authentication denied")
+				} else if decision == authnapi.Ignore {
+					return nil, errors.Unauthorized(reason, "No valid authentication found")
+				} else if decision != authnapi.Allow {
+					// Handle any unexpected decision values
+					return nil, errors.Unauthorized(reason, fmt.Sprintf("Authentication failed with decision: %s", decision))
+				}
+
+				// Defensive check: identity should not be nil when decision is Allow
+				// but we check to prevent panics if an authenticator implementation violates the contract
+				if identity == nil {
+					return nil, errors.Unauthorized(reason, "Invalid identity: authenticator returned Allow with nil identity")
 				}
 
 				ctx = context.WithValue(ctx, IdentityRequestKey, identity)

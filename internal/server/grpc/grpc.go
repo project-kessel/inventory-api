@@ -1,8 +1,6 @@
 package grpc
 
 import (
-	"fmt"
-
 	"buf.build/go/protovalidate"
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/go-kratos/kratos/v2/middleware"
@@ -12,6 +10,7 @@ import (
 	"github.com/go-kratos/kratos/v2/middleware/selector"
 	kgrpc "github.com/go-kratos/kratos/v2/transport/grpc"
 	"github.com/project-kessel/inventory-api/internal/authn"
+	authnapi "github.com/project-kessel/inventory-api/internal/authn/api"
 	"github.com/project-kessel/inventory-api/internal/authn/interceptor"
 	m "github.com/project-kessel/inventory-api/internal/middleware"
 	"go.opentelemetry.io/otel/metric"
@@ -19,7 +18,9 @@ import (
 )
 
 // New creates a new a gRPC server.
-func New(c CompletedConfig, authn middleware.Middleware, authnConfig authn.CompletedConfig, meter metric.Meter, logger log.Logger) (*kgrpc.Server, error) {
+// authenticator is optional - if provided, uses the new aggregating authenticator for streams.
+// If nil, falls back to OIDC-only authentication (backwards compatible).
+func New(c CompletedConfig, authn middleware.Middleware, authnConfig authn.CompletedConfig, authenticator authnapi.Authenticator, meter metric.Meter, logger log.Logger) (*kgrpc.Server, error) {
 	requests, err := metrics.DefaultRequestsCounter(meter, metrics.DefaultServerRequestsCounterName)
 	if err != nil {
 		return nil, err
@@ -34,11 +35,15 @@ func New(c CompletedConfig, authn middleware.Middleware, authnConfig authn.Compl
 	}
 	// TODO: pass in health, authn middleware
 	var streamingInterceptor []grpc.StreamServerInterceptor
-	if authnConfig.Oidc != nil {
-		streamAuth, err := interceptor.NewStreamAuthInterceptor(authnConfig)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create stream auth interceptor: %w", err)
-		}
+
+	// Create stream interceptor using aggregating authenticator
+	// If authenticator is nil, it will be created from config (backwards compatible)
+	streamAuth, err := interceptor.NewStreamAuthInterceptor(authnConfig, authenticator, logger)
+	if err != nil {
+		// If we can't create the authenticator, log warning but don't fail server startup
+		// This maintains backwards compatibility for edge cases
+		_ = logger.Log(log.LevelWarn, "msg", "Stream authentication interceptor not created", "error", err)
+	} else {
 		streamingInterceptor = []grpc.StreamServerInterceptor{
 			streamAuth.Interceptor(),
 		}

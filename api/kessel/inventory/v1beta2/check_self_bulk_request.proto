@@ -25,7 +25,6 @@ message CheckSelfBulkRequestItem {
 message CheckSelfBulkRequest {
 	repeated CheckSelfBulkRequestItem items = 1 [(buf.validate.field).repeated.min_items = 1,
   (buf.validate.field).repeated.max_items = 1000];
-	optional Consistency consistency = 2;
+	optional Consistency consistency_token = 2;
 }
-
 

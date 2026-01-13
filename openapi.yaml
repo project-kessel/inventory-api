@@ -482,7 +482,7 @@ components:
                     items:
                         $ref: '#/components/schemas/kessel.inventory.v1beta2.CheckSelfBulkResponsePair'
                 consistencyToken:
-                    $ref: '#/components/schemas/kessel.inventory.v1beta2.Consistency'
+                    $ref: '#/components/schemas/kessel.inventory.v1beta2.ConsistencyToken'
             description: CheckSelfBulkResponse contains the results of all self-access permission checks in the request.
         kessel.inventory.v1beta2.CheckSelfBulkResponseItem:
             type: object
@@ -520,7 +520,7 @@ components:
                          context, instead of being provided as a SubjectReference.
                 relation:
                     type: string
-                consistencyToken:
+                consistency:
                     $ref: '#/components/schemas/kessel.inventory.v1beta2.Consistency'
             description: |-
                 CheckSelfRequest performs an access check for the caller (self) against a

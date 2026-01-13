@@ -732,9 +732,9 @@ func TestInventoryService_CheckSelfBulk_Allowed_XRhIdentity(t *testing.T) {
 		assert.Len(t, resp.Pairs, 2)
 		assert.Equal(t, pb.Allowed_ALLOWED_TRUE, resp.Pairs[0].GetItem().Allowed)
 		assert.Equal(t, pb.Allowed_ALLOWED_TRUE, resp.Pairs[1].GetItem().Allowed)
-		// Verify consistency token conversion
+		// Verify consistency token is set
 		assert.NotNil(t, resp.ConsistencyToken)
-		assert.Equal(t, "test-token", resp.ConsistencyToken.GetAtLeastAsFresh().GetToken())
+		assert.Equal(t, "test-token", resp.ConsistencyToken.GetToken())
 	}
 
 	mockAuthz.AssertExpectations(t)

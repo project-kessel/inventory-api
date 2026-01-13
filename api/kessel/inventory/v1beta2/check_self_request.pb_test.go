@@ -11,14 +11,14 @@ func TestCheckSelfRequest_Nil(t *testing.T) {
 	var cr *CheckSelfRequest
 	assert.Nil(t, cr.GetObject())
 	assert.Equal(t, "", cr.GetRelation())
-	assert.Nil(t, cr.GetConsistencyToken())
+	assert.Nil(t, cr.GetConsistency())
 }
 
 func TestCheckSelfRequest_ZeroStruct(t *testing.T) {
 	var cr CheckSelfRequest
 	assert.Nil(t, cr.GetObject())
 	assert.Equal(t, "", cr.GetRelation())
-	assert.Nil(t, cr.GetConsistencyToken())
+	assert.Nil(t, cr.GetConsistency())
 }
 
 func TestCheckSelfRequest_Reset(t *testing.T) {

@@ -407,13 +407,9 @@ func mapCheckSelfBulkResponseFromV1beta1(resp *pbv1beta1.CheckBulkResponse, req 
 	response := &pb.CheckSelfBulkResponse{
 		Pairs: pairs,
 	}
-	// Convert ConsistencyToken to Consistency format
+	// Set consistency token if available
 	if resp.GetConsistencyToken() != nil {
-		response.ConsistencyToken = &pb.Consistency{
-			Requirement: &pb.Consistency_AtLeastAsFresh{
-				AtLeastAsFresh: &pb.ConsistencyToken{Token: resp.GetConsistencyToken().GetToken()},
-			},
-		}
+		response.ConsistencyToken = &pb.ConsistencyToken{Token: resp.GetConsistencyToken().GetToken()}
 	}
 	return response
 }

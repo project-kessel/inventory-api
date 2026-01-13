@@ -28,7 +28,7 @@ message CheckSelfBulkResponsePair {
 // CheckSelfBulkResponse contains the results of all self-access permission checks in the request.
 message CheckSelfBulkResponse {
   repeated CheckSelfBulkResponsePair pairs = 1 [(buf.validate.field).repeated.min_items = 1];
-  optional Consistency consistency_token = 2;
+  optional ConsistencyToken consistency_token = 2;
 }
 
 

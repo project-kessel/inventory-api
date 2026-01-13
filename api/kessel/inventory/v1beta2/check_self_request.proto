@@ -21,7 +21,7 @@ message CheckSelfRequest {
   // context, instead of being provided as a SubjectReference.
   ResourceReference object = 1 [(buf.validate.field).required = true];
   string relation = 2 [(buf.validate.field).string.min_len = 1];
-  optional Consistency consistency_token = 3;
+  optional Consistency consistency = 3;
 }
 
 

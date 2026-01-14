@@ -35,7 +35,7 @@ func NewKesselInventoryServiceV1beta2(c *resources.Usecase) *InventoryService {
 func (c *InventoryService) ReportResource(ctx context.Context, r *pb.ReportResourceRequest) (*pb.ReportResourceResponse, error) {
 	identity, err := middleware.GetIdentity(ctx)
 	if err != nil {
-		return nil, err
+		return nil, status.Errorf(codes.Unauthenticated, "failed to get identity: %v", err)
 	}
 	err = c.Ctl.ReportResource(ctx, r, identity.Principal)
 	if err != nil {
@@ -84,7 +84,7 @@ func (s *InventoryService) Check(ctx context.Context, req *pb.CheckRequest) (*pb
 			return nil, err
 		}
 	} else {
-		return nil, err
+		return nil, status.Errorf(codes.InvalidArgument, "failed to build reporter resource key: %v", err)
 	}
 }
 
@@ -102,7 +102,7 @@ func (s *InventoryService) CheckForUpdate(ctx context.Context, req *pb.CheckForU
 			return nil, err
 		}
 	} else {
-		return nil, err
+		return nil, status.Errorf(codes.InvalidArgument, "failed to build reporter resource key: %v", err)
 	}
 }
 

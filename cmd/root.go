@@ -8,6 +8,7 @@ import (
 
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/project-kessel/inventory-api/cmd/common"
+	"github.com/project-kessel/inventory-api/cmd/jobs"
 	"github.com/project-kessel/inventory-api/cmd/migrate"
 	"github.com/project-kessel/inventory-api/cmd/schema"
 	"github.com/project-kessel/inventory-api/cmd/serve"
@@ -107,6 +108,13 @@ func init() {
 	schemaCmd := schema.NewCommand(loggerOptions)
 	rootCmd.AddCommand(schemaCmd)
 	err = viper.BindPFlags(schemaCmd.Flags())
+	if err != nil {
+		panic(err)
+	}
+
+	runJobCmd := jobs.NewRunJobCommand(options.Storage, loggerOptions)
+	rootCmd.AddCommand(runJobCmd)
+	err = viper.BindPFlags(runJobCmd.Flags())
 	if err != nil {
 		panic(err)
 	}

@@ -130,6 +130,7 @@ func (uc *Usecase) ReportResource(ctx context.Context, request *v1beta2.ReportRe
 
 	reporterResourceKey, err := getReporterResourceKeyFromRequest(request)
 	if err != nil {
+		log.Error("failed to create reporter resource key: ", err)
 		return status.Errorf(codes.InvalidArgument, "failed to create reporter resource key: %v", err)
 	}
 

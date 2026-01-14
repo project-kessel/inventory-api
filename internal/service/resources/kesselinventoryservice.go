@@ -35,7 +35,8 @@ func NewKesselInventoryServiceV1beta2(c *resources.Usecase) *InventoryService {
 func (c *InventoryService) ReportResource(ctx context.Context, r *pb.ReportResourceRequest) (*pb.ReportResourceResponse, error) {
 	identity, err := middleware.GetIdentity(ctx)
 	if err != nil {
-		return nil, status.Errorf(codes.Unauthenticated, "failed to get identity: %v", err)
+		log.Errorf("failed to get identity: %v", err)
+		return nil, status.Error(codes.Unauthenticated, "failed to get identity")
 	}
 	err = c.Ctl.ReportResource(ctx, r, identity.Principal)
 	if err != nil {
@@ -50,7 +51,8 @@ func (c *InventoryService) DeleteResource(ctx context.Context, r *pb.DeleteResou
 
 	_, err := middleware.GetIdentity(ctx)
 	if err != nil {
-		return nil, status.Errorf(codes.Unauthenticated, "failed to get identity: %v", err)
+		log.Errorf("failed to get identity: %v", err)
+		return nil, status.Error(codes.Unauthenticated, "failed to get identity")
 	}
 
 	if reporterResourceKey, err := reporterKeyFromResourceReference(r.GetReference()); err == nil {
@@ -74,7 +76,8 @@ func (c *InventoryService) DeleteResource(ctx context.Context, r *pb.DeleteResou
 func (s *InventoryService) Check(ctx context.Context, req *pb.CheckRequest) (*pb.CheckResponse, error) {
 	_, err := middleware.GetIdentity(ctx)
 	if err != nil {
-		return nil, status.Errorf(codes.Unauthenticated, "failed to get identity: %v", err)
+		log.Errorf("failed to get identity: %v", err)
+		return nil, status.Error(codes.Unauthenticated, "failed to get identity")
 	}
 
 	if reporterResourceKey, err := reporterKeyFromResourceReference(req.Object); err == nil {
@@ -84,6 +87,7 @@ func (s *InventoryService) Check(ctx context.Context, req *pb.CheckRequest) (*pb
 			return nil, err
 		}
 	} else {
+		log.Error("Failed to build reporter resource key: ", err)
 		return nil, status.Errorf(codes.InvalidArgument, "failed to build reporter resource key: %v", err)
 	}
 }
@@ -91,7 +95,8 @@ func (s *InventoryService) Check(ctx context.Context, req *pb.CheckRequest) (*pb
 func (s *InventoryService) CheckForUpdate(ctx context.Context, req *pb.CheckForUpdateRequest) (*pb.CheckForUpdateResponse, error) {
 	_, err := middleware.GetIdentity(ctx)
 	if err != nil {
-		return nil, status.Errorf(codes.Unauthenticated, "failed to get identity: %v", err)
+		log.Errorf("failed to get identity: %v", err)
+		return nil, status.Error(codes.Unauthenticated, "failed to get identity")
 	}
 
 	log.Info("CheckForUpdate using v1beta2 db")
@@ -102,6 +107,7 @@ func (s *InventoryService) CheckForUpdate(ctx context.Context, req *pb.CheckForU
 			return nil, err
 		}
 	} else {
+		log.Error("Failed to build reporter resource key: ", err)
 		return nil, status.Errorf(codes.InvalidArgument, "failed to build reporter resource key: %v", err)
 	}
 }
@@ -109,7 +115,8 @@ func (s *InventoryService) CheckForUpdate(ctx context.Context, req *pb.CheckForU
 func (s *InventoryService) CheckBulk(ctx context.Context, req *pb.CheckBulkRequest) (*pb.CheckBulkResponse, error) {
 	_, err := middleware.GetIdentity(ctx)
 	if err != nil {
-		return nil, status.Errorf(codes.Unauthenticated, "failed to get identity: %v", err)
+		log.Errorf("failed to get identity: %v", err)
+		return nil, status.Error(codes.Unauthenticated, "failed to get identity")
 	}
 
 	log.Info("CheckBulk using v1beta2 db")

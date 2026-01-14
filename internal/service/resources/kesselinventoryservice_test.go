@@ -159,6 +159,11 @@ func TestInventoryService_ReportResource_MissingReporterType(t *testing.T) {
 
 	assert.Error(t, err)
 	assert.Nil(t, resp)
+
+	// Check that it returns the correct gRPC status code
+	grpcStatus, ok := status.FromError(err)
+	assert.True(t, ok)
+	assert.Equal(t, codes.InvalidArgument, grpcStatus.Code())
 }
 
 func TestInventoryService_ReportResource_MissingReporterInstanceId(t *testing.T) {
@@ -203,6 +208,11 @@ func TestInventoryService_ReportResource_MissingReporterInstanceId(t *testing.T)
 	assert.Error(t, err)
 	assert.Nil(t, resp)
 	assert.Contains(t, err.Error(), "cannot be empty: ReporterInstanceId")
+
+	// Check that it returns the correct gRPC status code
+	grpcStatus, ok := status.FromError(err)
+	assert.True(t, ok)
+	assert.Equal(t, codes.InvalidArgument, grpcStatus.Code())
 }
 
 func TestInventoryService_ReportResource_InvalidJsonObject(t *testing.T) {

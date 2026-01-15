@@ -261,6 +261,7 @@ func (uc *Usecase) Check(ctx context.Context, permission, namespace string, sub 
 		if !errors.Is(err, gorm.ErrRecordNotFound) {
 			return false, err
 		}
+
 		consistencyToken = ""
 	} else {
 		consistencyToken = res.ConsistencyToken().Serialize()

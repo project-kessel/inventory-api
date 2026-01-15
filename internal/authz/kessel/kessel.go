@@ -196,15 +196,18 @@ func (a *KesselAuthz) Check(ctx context.Context, namespace string, viewPermissio
 
 	// If resource doesn't exist in inventory DB
 	// default send a minimize_latency check request
-	consistency := &kessel.Consistency{Requirement: &kessel.Consistency_MinimizeLatency{MinimizeLatency: true}}
+	var consistency *kessel.Consistency
 
 	if consistencyToken != "" {
-		log.Infof("Check: with Consistency_AtLeastAsFresh as consistencyToken=%s", consistencyToken)
+		log.Infof("Check: using Consistency_AtLeastAsFresh with consistencyToken=%s", consistencyToken)
 		consistency = &kessel.Consistency{
 			Requirement: &kessel.Consistency_AtLeastAsFresh{
 				AtLeastAsFresh: &kessel.ConsistencyToken{Token: consistencyToken},
 			},
 		}
+	} else {
+		log.Infof("Check: using MinimizeLatency (no consistency token)")
+		consistency = &kessel.Consistency{Requirement: &kessel.Consistency_MinimizeLatency{MinimizeLatency: true}}
 	}
 
 	resp, err := a.CheckService.Check(ctx, &kessel.CheckRequest{

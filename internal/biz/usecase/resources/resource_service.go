@@ -252,7 +252,7 @@ func (uc *Usecase) Delete(ctx context.Context, reporterResourceKey model.Reporte
 // Check verifies if a subject has the specified permission on a resource identified by the reporter resource ID.
 func (uc *Usecase) Check(ctx context.Context, permission, namespace string, sub *kessel.SubjectReference, reporterResourceKey model.ReporterResourceKey) (bool, error) {
 	res, err := uc.resourceRepository.FindResourceByKeys(nil, reporterResourceKey)
-  var consistencyToken string
+    var consistencyToken string
 	if err != nil {
 		log.Info("Did not find resource")
 		// If the resource doesn't exist in inventory (ie. no consistency token available)

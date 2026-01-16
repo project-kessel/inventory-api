@@ -36,6 +36,9 @@ consumer:
     backoff-factor: 5
   auth:
     enabled: false
+consistency:
+  check:
+    defaultConsistencyMode: minimizeLatency
 log:
   level: "info"
   livez: true

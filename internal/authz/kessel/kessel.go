@@ -17,6 +17,7 @@ import (
 	"google.golang.org/grpc"
 
 	authzapi "github.com/project-kessel/inventory-api/internal/authz/api"
+	"github.com/project-kessel/inventory-api/internal/consistency"
 )
 
 type KesselAuthz struct {
@@ -185,6 +186,32 @@ func (a *KesselAuthz) UnsetWorkspace(ctx context.Context, local_resource_id, nam
 	})
 }
 
+// buildRelationsConsistency creates a relations-api Consistency message from the mode and optional token.
+// If mode is AtLeastAsFresh and token is empty, falls back to MinimizeLatency.
+func buildRelationsConsistency(mode consistency.ConsistencyMode, token string) *kessel.Consistency {
+	switch mode {
+	case consistency.AtLeastAsFresh:
+		if token != "" {
+			log.Infof("CheckConfig: using Consistency_AtLeastAsFresh with consistencyToken=%s", token)
+			return &kessel.Consistency{
+				Requirement: &kessel.Consistency_AtLeastAsFresh{
+					AtLeastAsFresh: &kessel.ConsistencyToken{Token: token},
+				},
+			}
+		}
+		// Fall back to minimize latency if no token provided
+		log.Infof("CheckConfig: using MinimizeLatency (atLeastAsFresh requested but no token available)")
+		fallthrough
+	case consistency.MinimizeLatency:
+		fallthrough
+	default:
+		log.Infof("CheckConfig: using MinimizeLatency")
+		return &kessel.Consistency{
+			Requirement: &kessel.Consistency_MinimizeLatency{MinimizeLatency: true},
+		}
+	}
+}
+
 func (a *KesselAuthz) Check(ctx context.Context, namespace string, viewPermission string, consistencyToken string, resourceType string, localResourceId string, sub *kessel.SubjectReference) (kessel.CheckResponse_Allowed, *kessel.ConsistencyToken, error) {
 	log.Infof("Check: on resourceType=%s, localResourceId=%s, consistencyToken=%s", resourceType, localResourceId, consistencyToken)
 
@@ -194,21 +221,14 @@ func (a *KesselAuthz) Check(ctx context.Context, namespace string, viewPermissio
 		return kessel.CheckResponse_ALLOWED_UNSPECIFIED, nil, err
 	}
 
-	// If resource doesn't exist in inventory DB
-	// default send a minimize_latency check request
-	var consistency *kessel.Consistency
-
-	if consistencyToken != "" {
-		log.Infof("Check: using Consistency_AtLeastAsFresh with consistencyToken=%s", consistencyToken)
-		consistency = &kessel.Consistency{
-			Requirement: &kessel.Consistency_AtLeastAsFresh{
-				AtLeastAsFresh: &kessel.ConsistencyToken{Token: consistencyToken},
-			},
+	// Determine consistency mode from config, build consistency with optional token
+	mode := consistency.MinimizeLatency
+	if configMode := viper.GetString("consistency.check.defaultConsistencyMode"); configMode != "" {
+		if parsed, err := consistency.ParseConsistencyMode(configMode); err == nil {
+			mode = parsed
 		}
-	} else {
-		log.Infof("Check: using MinimizeLatency (no consistency token)")
-		consistency = &kessel.Consistency{Requirement: &kessel.Consistency_MinimizeLatency{MinimizeLatency: true}}
 	}
+	cons := buildRelationsConsistency(mode, consistencyToken)
 
 	resp, err := a.CheckService.Check(ctx, &kessel.CheckRequest{
 		Resource: &kessel.ObjectReference{
@@ -220,7 +240,7 @@ func (a *KesselAuthz) Check(ctx context.Context, namespace string, viewPermissio
 		},
 		Relation:    viewPermission,
 		Subject:     sub,
-		Consistency: consistency,
+		Consistency: cons,
 	}, opts...)
 
 	log.Infof("CheckForView resp: %v err: %v", resp, err)
@@ -267,7 +287,14 @@ func (a *KesselAuthz) CheckBulk(ctx context.Context, req *kessel.CheckBulkReques
 	log.Infof("CheckBulk: checking %d items", len(req.GetItems()))
 
 	if req.GetConsistency() == nil {
-		req.Consistency = &kessel.Consistency{Requirement: &kessel.Consistency_MinimizeLatency{MinimizeLatency: true}}
+		// Use config-based default consistency mode
+		mode := consistency.MinimizeLatency
+		if configMode := viper.GetString("consistency.check.defaultConsistencyMode"); configMode != "" {
+			if parsed, err := consistency.ParseConsistencyMode(configMode); err == nil {
+				mode = parsed
+			}
+		}
+		req.Consistency = buildRelationsConsistency(mode, "")
 	}
 
 	opts, err := a.getCallOptions()

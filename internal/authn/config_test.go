@@ -8,19 +8,18 @@ import (
 )
 
 func TestConfigComplete_EnableHTTP_EnableGRPC_OIDCConfigRequiredOnlyWhenEnabledForAnyProtocol(t *testing.T) {
-	t.Run("oidc enable_http=true requires config", func(t *testing.T) {
+	t.Run("oidc transport.http=true requires config", func(t *testing.T) {
 		c := &Config{
 			Authenticator: &AuthenticatorConfig{
 				Type: "first_match",
 				Chain: []ChainEntry{
 					{
-						Type:       "oidc",
-						EnableHTTP: boolPtr(true),
-						EnableGRPC: boolPtr(false),
-						Config:     nil,
+						Type:      "oidc",
+						Transport: &Transport{HTTP: boolPtr(true), GRPC: boolPtr(false)},
+						Config:    nil,
 					},
 					// Keep gRPC enabled overall so we don't trip the global validation.
-					{Type: "allow-unauthenticated", EnableHTTP: boolPtr(false), EnableGRPC: boolPtr(true)},
+					{Type: "allow-unauthenticated", Transport: &Transport{HTTP: boolPtr(false), GRPC: boolPtr(true)}},
 				},
 			},
 		}
@@ -38,19 +37,18 @@ func TestConfigComplete_EnableHTTP_EnableGRPC_OIDCConfigRequiredOnlyWhenEnabledF
 		assert.True(t, found, "expected an error mentioning missing oidc config, got: %v", errs)
 	})
 
-	t.Run("oidc enable_http/enable_grpc=false does not require config", func(t *testing.T) {
+	t.Run("oidc transport.http/grpc=false does not require config", func(t *testing.T) {
 		c := &Config{
 			Authenticator: &AuthenticatorConfig{
 				Type: "first_match",
 				Chain: []ChainEntry{
 					{
-						Type:       "oidc",
-						EnableHTTP: boolPtr(false),
-						EnableGRPC: boolPtr(false),
-						Config:     nil,
+						Type:      "oidc",
+						Transport: &Transport{HTTP: boolPtr(false), GRPC: boolPtr(false)},
+						Config:    nil,
 					},
 					// Satisfy global validation for both protocols
-					{Type: "x-rh-identity", EnableHTTP: boolPtr(true), EnableGRPC: boolPtr(true)},
+					{Type: "x-rh-identity", Transport: &Transport{HTTP: boolPtr(true), GRPC: boolPtr(true)}},
 				},
 			},
 		}
@@ -66,8 +64,8 @@ func TestConfigComplete_EnableHTTP_EnableGRPC_RequiresAtLeastOneAuthenticatorPer
 			Authenticator: &AuthenticatorConfig{
 				Type: "first_match",
 				Chain: []ChainEntry{
-					{Type: "x-rh-identity", EnableHTTP: boolPtr(false), EnableGRPC: boolPtr(true)},
-					{Type: "allow-unauthenticated", EnableHTTP: boolPtr(false), EnableGRPC: boolPtr(true)},
+					{Type: "x-rh-identity", Transport: &Transport{HTTP: boolPtr(false), GRPC: boolPtr(true)}},
+					{Type: "allow-unauthenticated", Transport: &Transport{HTTP: boolPtr(false), GRPC: boolPtr(true)}},
 				},
 			},
 		}
@@ -82,8 +80,8 @@ func TestConfigComplete_EnableHTTP_EnableGRPC_RequiresAtLeastOneAuthenticatorPer
 			Authenticator: &AuthenticatorConfig{
 				Type: "first_match",
 				Chain: []ChainEntry{
-					{Type: "x-rh-identity", EnableHTTP: boolPtr(true), EnableGRPC: boolPtr(false)},
-					{Type: "allow-unauthenticated", EnableHTTP: boolPtr(true), EnableGRPC: boolPtr(false)},
+					{Type: "x-rh-identity", Transport: &Transport{HTTP: boolPtr(true), GRPC: boolPtr(false)}},
+					{Type: "allow-unauthenticated", Transport: &Transport{HTTP: boolPtr(true), GRPC: boolPtr(false)}},
 				},
 			},
 		}

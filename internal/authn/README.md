@@ -41,18 +41,24 @@ authn:
     type: first_match
     chain:
       - type: x-rh-identity  # Check x-rh-identity header first
-        enable_http: false
-        enable_grpc: false
+        enable: true
+        transport:
+          http: true
+          grpc: true
       - type: oidc            # Then check Authorization: Bearer token
-        enable_http: false
-        enable_grpc: false
+        enable: true
+        transport:
+          http: true
+          grpc: true
         config:
           authn-server-url: https://auth.example.com
           client-id: my-client-id
           principal-user-domain: example.com
       - type: allow-unauthenticated           # Finally allow unauthenticated access
-        enable_http: true
-        enable_grpc: true
+        enable: true
+        transport:
+          http: true
+          grpc: true
 ```
 
 ### Example: Disabling Authenticators
@@ -65,17 +71,23 @@ authn:
     type: first_match
     chain:
       - type: x-rh-identity
-        enable_http: true
-        enable_grpc: true    # Enabled - will check x-rh-identity header
+        enable: true
+        transport:
+          http: true
+          grpc: true    # Enabled - will check x-rh-identity header
       - type: oidc
-        enable_http: false
-        enable_grpc: false   # Disabled - will be skipped
+        enable: false
+        transport:
+          http: false
+          grpc: false   # Disabled - will be skipped
         config:
           authn-server-url: https://auth.example.com
           client-id: my-client-id
       - type: allow-unauthenticated
-        enable_http: true
-        enable_grpc: true    # Enabled - fallback to unauthenticated access
+        enable: true
+        transport:
+          http: true
+          grpc: true    # Enabled - fallback to unauthenticated access
 ```
 
 **Note**: At least one authenticator in the chain must be enabled for HTTP and gRPC. If either protocol has all authenticators disabled, configuration validation will fail.
@@ -87,10 +99,11 @@ authn:
 **authenticator.chain**: An ordered list of authenticators to try. Each entry has:
 
 - `type`: One of `oidc`, `x-rh-identity`, or `allow-unauthenticated` (`guest` is accepted as a legacy alias)
-- `enable_http`: Boolean to enable/disable this authenticator for HTTP (optional)
-- `enable_grpc`: Boolean to enable/disable this authenticator for gRPC (optional)
-  - If **both** `enable_http` and `enable_grpc` are **omitted**, the authenticator is **enabled for both protocols by default**.
-  - If only one is set, the other is enabled by default.
+- `enable`: Boolean to enable/disable this authenticator (optional, defaults to `true`)
+- `transport`: Optional map controlling per-protocol enablement:
+  - `http`: enable for HTTP (optional, defaults to `true`)
+  - `grpc`: enable for gRPC (optional, defaults to `true`)
+  - If `transport` is omitted, the authenticator is enabled for both protocols by default.
 - `config`: Optional configuration map (required for `oidc`, not needed for `x-rh-identity` or `allow-unauthenticated`)
 
 ### OIDC Configuration

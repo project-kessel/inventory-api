@@ -7,26 +7,34 @@ server:
   pprof:
     enabled: true
 authn:
+  # This is a legacy field for backwards compatibility. 
+  # Will be deprecated in the future. and replaced with the authenticator chain. 
+  # Will be removed when the code is released to stage and prod and configs are updated there.
   allow-unauthenticated: true
   authenticator:
     type: first_match
     chain:
       - type: oidc
-        # If enable_http/enable_grpc are omitted on a chain entry, that authenticator is enabled for both by default.
-        enable_http: false
-        enable_grpc: false
+        enable: false
+        transport:
+          http: false
+          grpc: false
         config:
           insecure-client: true
           authn-server-url: http://127.0.0.1:8085/realms/redhat-external
           skip-client-id-check: true
           skip-issuer-check: true
           principal-user-domain: localhost
-      - type: x-rh-identity
-        enable_http: true
-        enable_grpc: false   # Enabled - will check x-rh-identity header
-      - type: allow-unauthenticated
-        enable_http: true
-        enable_grpc: true
+      - type: x-rh-identity  # x-rh-identity header support - currently applicable for http transport only
+        enable: true
+        transport:
+          http: true
+          grpc: false   
+      - type: allow-unauthenticated # This is a special authenticator that allows unauthenticated access - mainly for Local-dev/Test 
+        enable: true
+        transport:
+          http: true
+          grpc: true
 authz:
   impl: allow-all
 eventing:

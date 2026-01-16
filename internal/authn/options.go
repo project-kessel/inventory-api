@@ -9,10 +9,12 @@ import (
 // ChainEntryOptions represents options for a chain entry
 type ChainEntryOptions struct {
 	Type string `mapstructure:"type"`
-	// New format: explicit per-protocol enablement.
-	// If nil, defaults to true.
-	EnableHTTP *bool `mapstructure:"enable_http"`
-	EnableGRPC *bool `mapstructure:"enable_grpc"`
+	// Enable controls whether this authenticator is enabled at all (optional, defaults to true).
+	Enable *bool `mapstructure:"enable"`
+
+	// Transport controls per-protocol enablement (optional).
+	// If omitted, defaults to enabled for both HTTP and gRPC.
+	Transport *Transport `mapstructure:"transport"`
 
 	Config map[string]interface{} `mapstructure:"config"`
 }

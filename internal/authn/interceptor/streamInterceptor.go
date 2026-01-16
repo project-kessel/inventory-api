@@ -100,7 +100,7 @@ type StreamAuthOption func(*StreamAuthConfig)
 // If authenticator is nil, it will be created from the config using authn.New (backwards compatible).
 //
 // The interceptor uses the aggregating authenticator to authenticate gRPC streams, supporting
-// all authenticator types in the chain (OIDC, x-rh-identity, guest, etc.).
+// all authenticator types in the chain (OIDC, x-rh-identity, allow-unauthenticated, etc.).
 func NewStreamAuthInterceptor(config authn.CompletedConfig, authenticator api.Authenticator, logger log.Logger, opts ...StreamAuthOption) (*StreamAuthInterceptor, error) {
 	cfg := &StreamAuthConfig{
 		authenticator: authenticator,
@@ -161,7 +161,7 @@ func (i *StreamAuthInterceptor) Interceptor() grpc.StreamServerInterceptor {
 			return kerrors.Unauthorized("UNAUTHORIZED", "Authentication denied")
 		} else if decision == api.Ignore {
 			// Ignore means no authenticator could handle the request
-			// This should not happen if guest authentication is enabled
+			// This should not happen if allow-unauthenticated authentication is enabled
 			logHelper.Warnf("Stream authentication ignored for %s (no authenticator could handle request)", info.FullMethod)
 			return kerrors.Unauthorized("UNAUTHORIZED", "No valid authentication found")
 		} else if decision != api.Allow {

@@ -17,12 +17,19 @@ const (
 type ChainEntry struct {
 	Type string `mapstructure:"type"`
 
-	// New format: explicit per-protocol enablement.
-	// If nil, defaults to true.
-	EnableHTTP *bool `mapstructure:"enable_http"`
-	EnableGRPC *bool `mapstructure:"enable_grpc"`
+	// Enable controls whether this authenticator is enabled at all (optional, defaults to true).
+	Enable *bool `mapstructure:"enable"`
+
+	// Transport controls per-protocol enablement (optional).
+	// If omitted, defaults to enabled for both HTTP and gRPC.
+	Transport *Transport `mapstructure:"transport"`
 
 	Config map[string]interface{} `mapstructure:"config"`
+}
+
+type Transport struct {
+	HTTP *bool `mapstructure:"http"`
+	GRPC *bool `mapstructure:"grpc"`
 }
 
 // AuthenticatorConfig represents the aggregating authenticator configuration
@@ -211,14 +218,27 @@ func (c *Config) completeChainEntry(entry ChainEntry, index int) (ChainCompleted
 	var errs []error
 	// Determine effective enablement per protocol.
 	// Default is enabled for both protocols unless explicitly disabled.
-	enableHTTP := true
-	enableGRPC := true
-	if entry.EnableHTTP != nil {
-		enableHTTP = *entry.EnableHTTP
+	baseEnabled := true
+	if entry.Enable != nil {
+		baseEnabled = *entry.Enable
 	}
-	if entry.EnableGRPC != nil {
-		enableGRPC = *entry.EnableGRPC
+
+	// Default transport enablement
+	transportHTTP := true
+	transportGRPC := true
+
+	// If transport block is provided, it controls per-protocol enablement.
+	if entry.Transport != nil {
+		if entry.Transport.HTTP != nil {
+			transportHTTP = *entry.Transport.HTTP
+		}
+		if entry.Transport.GRPC != nil {
+			transportGRPC = *entry.Transport.GRPC
+		}
 	}
+
+	enableHTTP := baseEnabled && transportHTTP
+	enableGRPC := baseEnabled && transportGRPC
 
 	chainConfig := ChainCompletedConfig{
 		Type:        entry.Type,

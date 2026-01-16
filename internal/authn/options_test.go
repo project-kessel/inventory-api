@@ -121,8 +121,8 @@ func TestNewConfig_BackwardsCompatibility(t *testing.T) {
 		assert.Equal(t, "first_match", cfg.Authenticator.Type)
 		assert.Len(t, cfg.Authenticator.Chain, 1)
 		assert.Equal(t, "allow-unauthenticated", cfg.Authenticator.Chain[0].Type)
-		assert.Nil(t, cfg.Authenticator.Chain[0].EnableHTTP, "enable_http should be nil (defaults to true)")
-		assert.Nil(t, cfg.Authenticator.Chain[0].EnableGRPC, "enable_grpc should be nil (defaults to true)")
+		assert.Nil(t, cfg.Authenticator.Chain[0].Enable, "enable should be nil (defaults to true)")
+		assert.Nil(t, cfg.Authenticator.Chain[0].Transport, "transport should be nil (defaults to http/grpc enabled)")
 	})
 
 	t.Run("legacy oidc converts to oidc authenticator", func(t *testing.T) {
@@ -140,8 +140,8 @@ func TestNewConfig_BackwardsCompatibility(t *testing.T) {
 		assert.Equal(t, "first_match", cfg.Authenticator.Type)
 		assert.Len(t, cfg.Authenticator.Chain, 1)
 		assert.Equal(t, "oidc", cfg.Authenticator.Chain[0].Type)
-		assert.Nil(t, cfg.Authenticator.Chain[0].EnableHTTP, "enable_http should be nil (defaults to true)")
-		assert.Nil(t, cfg.Authenticator.Chain[0].EnableGRPC, "enable_grpc should be nil (defaults to true)")
+		assert.Nil(t, cfg.Authenticator.Chain[0].Enable, "enable should be nil (defaults to true)")
+		assert.Nil(t, cfg.Authenticator.Chain[0].Transport, "transport should be nil (defaults to http/grpc enabled)")
 		assert.NotNil(t, cfg.Authenticator.Chain[0].Config, "oidc config should be present")
 		assert.Equal(t, "http://keycloak:8084/realms/redhat-external", cfg.Authenticator.Chain[0].Config["authn-server-url"])
 		assert.Equal(t, true, cfg.Authenticator.Chain[0].Config["skip-client-id-check"])

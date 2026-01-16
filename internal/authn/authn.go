@@ -106,7 +106,7 @@ func NewForProtocol(config CompletedConfig, protocol Protocol, logger *log.Helpe
 			logger.Info("Allowing unauthenticated access")
 			auth, err = factory.CreateAuthenticator(factory.TypeAllowUnauthenticated, nil)
 			if err != nil {
-				return nil, fmt.Errorf("failed to create guest authenticator: %w", err)
+				return nil, fmt.Errorf("failed to create allow-unauthenticated authenticator: %w", err)
 			}
 
 		case string(factory.TypeXRhIdentity):

@@ -1,6 +1,7 @@
 package authn
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -27,7 +28,14 @@ func TestConfigComplete_EnableHTTP_EnableGRPC_OIDCConfigRequiredOnlyWhenEnabledF
 		_, errs := c.Complete()
 		assert.NotEmpty(t, errs)
 		// Should specifically complain about missing oidc config (because oidc is enabled for http).
-		assert.Contains(t, errs[0].Error(), "oidc authenticator requires config")
+		found := false
+		for _, err := range errs {
+			if strings.Contains(err.Error(), "oidc authenticator requires config") {
+				found = true
+				break
+			}
+		}
+		assert.True(t, found, "expected an error mentioning missing oidc config, got: %v", errs)
 	})
 
 	t.Run("oidc enable_http/enable_grpc=false does not require config", func(t *testing.T) {

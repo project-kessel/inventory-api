@@ -12,6 +12,7 @@ authn:
     type: first_match
     chain:
       - type: oidc
+        # If enable_http/enable_grpc are omitted on a chain entry, that authenticator is enabled for both by default.
         enable_http: false
         enable_grpc: false
         config:

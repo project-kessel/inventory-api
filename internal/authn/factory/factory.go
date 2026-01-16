@@ -4,8 +4,8 @@ import (
 	"fmt"
 
 	"github.com/project-kessel/inventory-api/internal/authn/api"
-	"github.com/project-kessel/inventory-api/internal/authn/guest"
 	"github.com/project-kessel/inventory-api/internal/authn/oidc"
+	"github.com/project-kessel/inventory-api/internal/authn/unauthenticated"
 	"github.com/project-kessel/inventory-api/internal/authn/xrhidentity"
 )
 
@@ -13,9 +13,12 @@ import (
 type AuthenticatorType string
 
 const (
-	TypeOIDC        AuthenticatorType = "oidc"
-	TypeGuest       AuthenticatorType = "guest"
-	TypeXRhIdentity AuthenticatorType = "x-rh-identity"
+	TypeOIDC AuthenticatorType = "oidc"
+	// TypeGuest is deprecated; kept for backwards compatibility with older configs.
+	TypeGuest AuthenticatorType = "guest"
+	// TypeAllowUnauthenticated is the preferred name for the unauthenticated (allow-all) authenticator.
+	TypeAllowUnauthenticated AuthenticatorType = "allow-unauthenticated"
+	TypeXRhIdentity          AuthenticatorType = "x-rh-identity"
 )
 
 // CreateAuthenticator creates an authenticator of the specified type with the given config.
@@ -35,11 +38,11 @@ func CreateAuthenticator(authType AuthenticatorType, config interface{}) (api.Au
 		}
 		return oidc.New(*oidcConfig)
 
-	case TypeGuest:
+	case TypeGuest, TypeAllowUnauthenticated:
 		if config != nil {
 			return nil, fmt.Errorf("guest authenticator does not require config")
 		}
-		return guest.New(), nil
+		return unauthenticated.New(), nil
 
 	case TypeXRhIdentity:
 		if config != nil {

@@ -21,15 +21,15 @@ This implementation follows the recommended pattern where:
 
 The package supports the following authentication methods:
 
-* **OAuth2/OIDC** (`oidc`) - Authenticates using OAuth2/OIDC JWT tokens from the `Authorization: Bearer` header
-* **x-rh-identity** (`x-rh-identity`) - Authenticates using the `x-rh-identity` header from Red Hat ConsoleDot/Cloud Platform
-* **Guest** (`guest`) - Allows unauthenticated access (uses User-Agent as principal)
+- **OAuth2/OIDC** (`oidc`) - Authenticates using OAuth2/OIDC JWT tokens from the `Authorization: Bearer` header
+- **x-rh-identity** (`x-rh-identity`) - Authenticates using the `x-rh-identity` header from Red Hat ConsoleDot/Cloud Platform
+- **Allow unauthenticated** (`allow-unauthenticated`) - Allows unauthenticated access (uses User-Agent as principal).
 
 ## Aggregation Strategy
 
 The authentication system uses an aggregating authenticator pattern where multiple authenticators can be chained together using the `first_match` strategy:
 
-* **first_match** - Allows the request if any authenticator returns Allow. Only denies if all authenticators return Deny. This is useful when a request might have multiple authentication methods (e.g., both `x-rh-identity` header and `Authorization: Bearer` token), and you want to accept whichever is valid.
+- **first_match** - Allows the request if any authenticator returns Allow. Only denies if all authenticators return Deny. This is useful when a request might have multiple authentication methods (e.g., both `x-rh-identity` header and `Authorization: Bearer` token), and you want to accept whichever is valid.
 
 ## Configuration
 
@@ -41,15 +41,24 @@ authn:
     type: first_match
     chain:
       - type: x-rh-identity  # Check x-rh-identity header first
-        enabled: true
+        enable: true
+        transport:
+          http: true
+          grpc: true
       - type: oidc            # Then check Authorization: Bearer token
-        enabled: true
+        enable: true
+        transport:
+          http: true
+          grpc: true
         config:
           authn-server-url: https://auth.example.com
           client-id: my-client-id
           principal-user-domain: example.com
-      - type: guest           # Finally allow guest access
-        enabled: true
+      - type: allow-unauthenticated           # Finally allow unauthenticated access
+        enable: true
+        transport:
+          http: true
+          grpc: true
 ```
 
 ### Example: Disabling Authenticators
@@ -62,30 +71,45 @@ authn:
     type: first_match
     chain:
       - type: x-rh-identity
-        enabled: true    # Enabled - will check x-rh-identity header
+        enable: true
+        transport:
+          http: true
+          grpc: true    # Enabled - will check x-rh-identity header
       - type: oidc
-        enabled: false   # Disabled - will be skipped
+        enable: false
+        transport:
+          http: false
+          grpc: false   # Disabled - will be skipped
         config:
           authn-server-url: https://auth.example.com
           client-id: my-client-id
-      - type: guest
-        enabled: true    # Enabled - fallback to guest access
+      - type: allow-unauthenticated
+        enable: true
+        transport:
+          http: true
+          grpc: true    # Enabled - fallback to unauthenticated access
 ```
 
-**Note**: At least one authenticator in the chain must be enabled. If all authenticators are disabled, configuration validation will fail.
+**Note**: At least one authenticator in the chain must be enabled for HTTP and gRPC. If either protocol has all authenticators disabled, configuration validation will fail.
 
 ### Configuration Fields
 
 **authenticator.type**: The aggregation strategy (currently only `first_match` is supported)
 
 **authenticator.chain**: An ordered list of authenticators to try. Each entry has:
-- `type`: One of `oidc`, `x-rh-identity`, or `guest`
-- `enabled`: Boolean to enable/disable this authenticator (optional, defaults to `true`)
-- `config`: Optional configuration map (required for `oidc`, not needed for `x-rh-identity` or `guest`)
+
+- `type`: One of `oidc`, `x-rh-identity`, or `allow-unauthenticated`
+- `enable`: Boolean to enable/disable this authenticator (optional, defaults to `true`)
+- `transport`: Optional map controlling per-protocol enablement:
+  - `http`: enable for HTTP (optional, defaults to `true`)
+  - `grpc`: enable for gRPC (optional, defaults to `true`)
+  - If `transport` is omitted, the authenticator is enabled for both protocols by default.
+- `config`: Optional configuration map (required for `oidc`, not needed for `x-rh-identity` or `allow-unauthenticated`)
 
 ### OIDC Configuration
 
 When using the `oidc` authenticator, the following config fields are available:
+
 - `authn-server-url`: URL of the OIDC authorization server (required)
 - `client-id`: OAuth2 client ID (required)
 - `principal-user-domain`: Domain to qualify principal IDs (optional, defaults to "localhost")
@@ -94,13 +118,13 @@ When using the `oidc` authenticator, the following config fields are available:
 - `enforce-aud-check`: Enforce audience claim check (default: false)
 - `skip-issuer-check`: Skip issuer validation (default: false)
 
-
 ## Identity Structure
 
 The `Identity` struct includes:
+
 - `Principal`: The authenticated principal identifier
 - `Groups`: Group memberships
-- `AuthType`: The authentication method used (`oidc`, `x-rh-identity`, or `guest`)
+- `AuthType`: The authentication method used (`oidc`, `x-rh-identity`, or `allow-unauthenticated`)
 - `IsGuest`: Whether this is a guest identity
 - `IsReporter`: Whether this is a reporter identity (for client cert auth)
 

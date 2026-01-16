@@ -15,9 +15,21 @@ const (
 
 // ChainEntry represents a single authenticator in the chain
 type ChainEntry struct {
-	Type    string                 `mapstructure:"type"`
-	Enabled *bool                  `mapstructure:"enabled"` // nil means enabled=true (default)
-	Config  map[string]interface{} `mapstructure:"config"`
+	Type string `mapstructure:"type"`
+
+	// Enable controls whether this authenticator is enabled at all (optional, defaults to true).
+	Enable *bool `mapstructure:"enable"`
+
+	// Transport controls per-protocol enablement (optional).
+	// If omitted, defaults to enabled for both HTTP and gRPC.
+	Transport *Transport `mapstructure:"transport"`
+
+	Config map[string]interface{} `mapstructure:"config"`
+}
+
+type Transport struct {
+	HTTP *bool `mapstructure:"http"`
+	GRPC *bool `mapstructure:"grpc"`
 }
 
 // AuthenticatorConfig represents the aggregating authenticator configuration
@@ -42,6 +54,7 @@ func NewConfig(o *Options) *Config {
 		}
 
 		for i, entry := range o.Authenticator.Chain {
+			// ChainEntryOptions and ChainEntry intentionally have identical fields, so use a direct conversion.
 			cfg.Authenticator.Chain[i] = ChainEntry(entry)
 		}
 		return cfg
@@ -54,9 +67,8 @@ func NewConfig(o *Options) *Config {
 			Type: "first_match",
 			Chain: []ChainEntry{
 				{
-					Type:    "guest",
-					Enabled: nil, // nil means enabled=true (default)
-					Config:  nil,
+					Type:   "allow-unauthenticated",
+					Config: nil,
 				},
 			},
 		}
@@ -93,9 +105,8 @@ func NewConfig(o *Options) *Config {
 			Type: "first_match",
 			Chain: []ChainEntry{
 				{
-					Type:    "oidc",
-					Enabled: nil, // nil means enabled=true (default)
-					Config:  oidcConfig,
+					Type:   "oidc",
+					Config: oidcConfig,
 				},
 			},
 		}
@@ -134,9 +145,10 @@ type AuthenticatorCompletedConfig struct {
 
 // ChainCompletedConfig represents a completed chain entry configuration
 type ChainCompletedConfig struct {
-	Type       string
-	Enabled    bool // true if enabled, false if disabled
-	OIDCConfig *oidc.CompletedConfig
+	Type        string
+	EnabledHTTP bool // true if enabled for HTTP, false if disabled
+	EnabledGRPC bool // true if enabled for gRPC, false if disabled
+	OIDCConfig  *oidc.CompletedConfig
 }
 
 func (c *Config) Complete() (CompletedConfig, []error) {
@@ -170,19 +182,26 @@ func (c *Config) Complete() (CompletedConfig, []error) {
 	}
 
 	// Validate that at least one authenticator is enabled
-	enabledCount := 0
+	enabledHTTPCount := 0
+	enabledGRPCCount := 0
 	for _, chainConfig := range chainConfigs {
-		if chainConfig.Enabled {
-			enabledCount++
+		if chainConfig.EnabledHTTP {
+			enabledHTTPCount++
+		}
+		if chainConfig.EnabledGRPC {
+			enabledGRPCCount++
 		}
 	}
-	if enabledCount == 0 {
+	if enabledHTTPCount == 0 {
 		errs = append(errs, &ConfigError{
-			Message: "at least one authenticator in the chain must be enabled",
+			Message: "at least one authenticator in the chain must be enabled for http",
 		})
-		return cfg, errs
 	}
-
+	if enabledGRPCCount == 0 {
+		errs = append(errs, &ConfigError{
+			Message: "at least one authenticator in the chain must be enabled for grpc",
+		})
+	}
 	if len(errs) > 0 {
 		return cfg, errs
 	}
@@ -197,22 +216,46 @@ func (c *Config) Complete() (CompletedConfig, []error) {
 
 func (c *Config) completeChainEntry(entry ChainEntry, index int) (ChainCompletedConfig, []error) {
 	var errs []error
-	// Default to enabled=true if not specified
-	enabled := true
-	if entry.Enabled != nil {
-		enabled = *entry.Enabled
+	// Determine effective enablement per protocol.
+	// Default is enabled for both protocols unless explicitly disabled.
+	baseEnabled := true
+	if entry.Enable != nil {
+		baseEnabled = *entry.Enable
 	}
+
+	// Default transport enablement
+	transportHTTP := true
+	transportGRPC := true
+
+	// If transport block is provided, it controls per-protocol enablement.
+	if entry.Transport != nil {
+		if entry.Transport.HTTP != nil {
+			transportHTTP = *entry.Transport.HTTP
+		}
+		if entry.Transport.GRPC != nil {
+			transportGRPC = *entry.Transport.GRPC
+		}
+	}
+
+	enableHTTP := baseEnabled && transportHTTP
+	enableGRPC := baseEnabled && transportGRPC
+
 	chainConfig := ChainCompletedConfig{
-		Type:    entry.Type,
-		Enabled: enabled,
+		Type:        entry.Type,
+		EnabledHTTP: enableHTTP,
+		EnabledGRPC: enableGRPC,
 	}
 
 	switch entry.Type {
-	case "guest", "x-rh-identity":
+	case "guest", "allow-unauthenticated", "x-rh-identity":
 		// No config needed
 		return chainConfig, nil
 
 	case "oidc":
+		// If OIDC is disabled for both protocols, skip config completion/validation.
+		if !enableHTTP && !enableGRPC {
+			return chainConfig, nil
+		}
 		if entry.Config == nil {
 			errs = append(errs, &ConfigError{
 				Message: fmt.Sprintf("oidc authenticator requires config at chain index %d", index),

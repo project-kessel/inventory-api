@@ -15,7 +15,7 @@ type Identity struct {
 	Href       string `yaml:"href"`
 	IsGuest    bool   `yaml:"is_guest"`
 
-	// AuthType indicates the authentication method used (e.g., "oidc", "guest")
+	// AuthType indicates the authentication method used (e.g., "oidc", "x-rh-identity", "allow-unauthenticated")
 	// This is used by authorization middleware to make access control decisions
 	AuthType string `yaml:"auth_type"`
 }

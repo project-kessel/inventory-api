@@ -12,7 +12,8 @@ authn:
     type: first_match
     chain:
       - type: oidc
-        enabled: false 
+        enable_http: false
+        enable_grpc: false
         config:
           insecure-client: true
           authn-server-url: http://127.0.0.1:8085/realms/redhat-external
@@ -20,9 +21,11 @@ authn:
           skip-issuer-check: true
           principal-user-domain: localhost
       - type: x-rh-identity
-        enabled: false    # Enabled - will check x-rh-identity header
-      - type: guest
-        enabled: true
+        enable_http: true
+        enable_grpc: false   # Enabled - will check x-rh-identity header
+      - type: allow-unauthenticated
+        enable_http: true
+        enable_grpc: true
 authz:
   impl: allow-all
 eventing:

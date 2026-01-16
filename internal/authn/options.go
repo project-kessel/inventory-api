@@ -8,9 +8,13 @@ import (
 
 // ChainEntryOptions represents options for a chain entry
 type ChainEntryOptions struct {
-	Type    string                 `mapstructure:"type"`
-	Enabled *bool                  `mapstructure:"enabled"` // nil means enabled=true (default)
-	Config  map[string]interface{} `mapstructure:"config"`
+	Type string `mapstructure:"type"`
+	// New format: explicit per-protocol enablement.
+	// If nil, defaults to true.
+	EnableHTTP *bool `mapstructure:"enable_http"`
+	EnableGRPC *bool `mapstructure:"enable_grpc"`
+
+	Config map[string]interface{} `mapstructure:"config"`
 }
 
 // AuthenticatorOptions represents options for the aggregating authenticator
@@ -51,9 +55,10 @@ func (o *Options) Validate() []error {
 
 		// Validate chain entry types
 		validTypes := map[string]bool{
-			"oidc":          true,
-			"guest":         true,
-			"x-rh-identity": true,
+			"oidc":                  true,
+			"guest":                 true,
+			"allow-unauthenticated": true,
+			"x-rh-identity":         true,
 		}
 
 		for _, entry := range o.Authenticator.Chain {

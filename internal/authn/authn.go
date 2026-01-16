@@ -1,9 +1,11 @@
 package authn
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/go-kratos/kratos/v2/log"
+	"github.com/go-kratos/kratos/v2/transport"
 
 	"github.com/project-kessel/inventory-api/internal/authn/aggregator"
 	"github.com/project-kessel/inventory-api/internal/authn/api"
@@ -11,6 +13,46 @@ import (
 )
 
 func New(config CompletedConfig, logger *log.Helper) (api.Authenticator, error) {
+	httpAuth, err := NewForProtocol(config, ProtocolHTTP, logger)
+	if err != nil {
+		return nil, err
+	}
+	grpcAuth, err := NewForProtocol(config, ProtocolGRPC, logger)
+	if err != nil {
+		return nil, err
+	}
+	return &protocolRoutingAuthenticator{
+		http: httpAuth,
+		grpc: grpcAuth,
+	}, nil
+}
+
+type Protocol string
+
+const (
+	ProtocolHTTP Protocol = "http"
+	ProtocolGRPC Protocol = "grpc"
+)
+
+// protocolRoutingAuthenticator dispatches to a protocol-specific authenticator
+// based on the transport.Kind() of the incoming request.
+type protocolRoutingAuthenticator struct {
+	http api.Authenticator
+	grpc api.Authenticator
+}
+
+func (a *protocolRoutingAuthenticator) Authenticate(ctx context.Context, t transport.Transporter) (*api.Identity, api.Decision) {
+	switch t.Kind() {
+	case transport.KindHTTP:
+		return a.http.Authenticate(ctx, t)
+	case transport.KindGRPC:
+		return a.grpc.Authenticate(ctx, t)
+	default:
+		return nil, api.Deny
+	}
+}
+
+func NewForProtocol(config CompletedConfig, protocol Protocol, logger *log.Helper) (api.Authenticator, error) {
 	if config.Authenticator == nil {
 		return nil, fmt.Errorf("authenticator configuration is required")
 	}
@@ -30,10 +72,20 @@ func New(config CompletedConfig, logger *log.Helper) (api.Authenticator, error) 
 	// Create authenticators from chain configs (only for enabled ones)
 	authenticatorsAdded := 0
 	for i, chainConfig := range config.Authenticator.ChainConfigs {
-		// Skip disabled authenticators
-		if !chainConfig.Enabled {
-			logger.Infof("Skipping disabled authenticator '%s' at chain index %d", chainConfig.Type, i)
-			continue
+		// Skip authenticators disabled for this protocol
+		switch protocol {
+		case ProtocolHTTP:
+			if !chainConfig.EnabledHTTP {
+				logger.Infof("Skipping authenticator '%s' disabled for http at chain index %d", chainConfig.Type, i)
+				continue
+			}
+		case ProtocolGRPC:
+			if !chainConfig.EnabledGRPC {
+				logger.Infof("Skipping authenticator '%s' disabled for grpc at chain index %d", chainConfig.Type, i)
+				continue
+			}
+		default:
+			return nil, fmt.Errorf("unknown protocol: %s", protocol)
 		}
 
 		var auth api.Authenticator
@@ -50,9 +102,9 @@ func New(config CompletedConfig, logger *log.Helper) (api.Authenticator, error) 
 				return nil, fmt.Errorf("failed to create oidc authenticator: %w", err)
 			}
 
-		case string(factory.TypeGuest):
+		case string(factory.TypeGuest), string(factory.TypeAllowUnauthenticated):
 			logger.Info("Allowing unauthenticated access")
-			auth, err = factory.CreateAuthenticator(factory.TypeGuest, nil)
+			auth, err = factory.CreateAuthenticator(factory.TypeAllowUnauthenticated, nil)
 			if err != nil {
 				return nil, fmt.Errorf("failed to create guest authenticator: %w", err)
 			}

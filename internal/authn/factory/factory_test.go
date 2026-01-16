@@ -83,6 +83,12 @@ func TestCreateAuthenticator_Guest(t *testing.T) {
 	}
 }
 
+func TestCreateAuthenticator_AllowUnauthenticated(t *testing.T) {
+	auth, err := CreateAuthenticator(TypeAllowUnauthenticated, nil)
+	assert.NoError(t, err)
+	assert.NotNil(t, auth)
+}
+
 func TestCreateAuthenticator_XRhIdentity(t *testing.T) {
 	tests := []struct {
 		name    string

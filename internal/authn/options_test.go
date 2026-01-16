@@ -55,7 +55,7 @@ func TestOptions_Validate_BackwardsCompatibility(t *testing.T) {
 			Authenticator: &AuthenticatorOptions{
 				Type: "first_match",
 				Chain: []ChainEntryOptions{
-					{Type: "guest"},
+					{Type: "allow-unauthenticated"},
 				},
 			},
 		}
@@ -70,7 +70,7 @@ func TestOptions_Validate_BackwardsCompatibility(t *testing.T) {
 			Authenticator: &AuthenticatorOptions{
 				Type: "first_match",
 				Chain: []ChainEntryOptions{
-					{Type: "guest"},
+					{Type: "allow-unauthenticated"},
 				},
 			},
 		}
@@ -99,7 +99,7 @@ func TestOptions_Validate_BackwardsCompatibility(t *testing.T) {
 			Authenticator: &AuthenticatorOptions{
 				Type: "first_match",
 				Chain: []ChainEntryOptions{
-					{Type: "guest"},
+					{Type: "allow-unauthenticated"},
 				},
 			},
 		}
@@ -110,7 +110,7 @@ func TestOptions_Validate_BackwardsCompatibility(t *testing.T) {
 }
 
 func TestNewConfig_BackwardsCompatibility(t *testing.T) {
-	t.Run("legacy allow-unauthenticated converts to guest authenticator", func(t *testing.T) {
+	t.Run("legacy allow-unauthenticated converts to allow-unauthenticated authenticator", func(t *testing.T) {
 		enabled := true
 		options := &Options{
 			AllowUnauthenticated: &enabled,
@@ -120,8 +120,9 @@ func TestNewConfig_BackwardsCompatibility(t *testing.T) {
 		assert.NotNil(t, cfg.Authenticator, "config should have authenticator")
 		assert.Equal(t, "first_match", cfg.Authenticator.Type)
 		assert.Len(t, cfg.Authenticator.Chain, 1)
-		assert.Equal(t, "guest", cfg.Authenticator.Chain[0].Type)
-		assert.Nil(t, cfg.Authenticator.Chain[0].Enabled, "enabled should be nil (defaults to true)")
+		assert.Equal(t, "allow-unauthenticated", cfg.Authenticator.Chain[0].Type)
+		assert.Nil(t, cfg.Authenticator.Chain[0].EnableHTTP, "enable_http should be nil (defaults to true)")
+		assert.Nil(t, cfg.Authenticator.Chain[0].EnableGRPC, "enable_grpc should be nil (defaults to true)")
 	})
 
 	t.Run("legacy oidc converts to oidc authenticator", func(t *testing.T) {
@@ -139,7 +140,8 @@ func TestNewConfig_BackwardsCompatibility(t *testing.T) {
 		assert.Equal(t, "first_match", cfg.Authenticator.Type)
 		assert.Len(t, cfg.Authenticator.Chain, 1)
 		assert.Equal(t, "oidc", cfg.Authenticator.Chain[0].Type)
-		assert.Nil(t, cfg.Authenticator.Chain[0].Enabled, "enabled should be nil (defaults to true)")
+		assert.Nil(t, cfg.Authenticator.Chain[0].EnableHTTP, "enable_http should be nil (defaults to true)")
+		assert.Nil(t, cfg.Authenticator.Chain[0].EnableGRPC, "enable_grpc should be nil (defaults to true)")
 		assert.NotNil(t, cfg.Authenticator.Chain[0].Config, "oidc config should be present")
 		assert.Equal(t, "http://keycloak:8084/realms/redhat-external", cfg.Authenticator.Chain[0].Config["authn-server-url"])
 		assert.Equal(t, true, cfg.Authenticator.Chain[0].Config["skip-client-id-check"])
@@ -154,7 +156,7 @@ func TestNewConfig_BackwardsCompatibility(t *testing.T) {
 			Authenticator: &AuthenticatorOptions{
 				Type: "first_match",
 				Chain: []ChainEntryOptions{
-					{Type: "guest"},
+					{Type: "allow-unauthenticated"},
 					{Type: "x-rh-identity"},
 				},
 			},
@@ -163,7 +165,7 @@ func TestNewConfig_BackwardsCompatibility(t *testing.T) {
 		assert.NotNil(t, cfg.Authenticator)
 		assert.Equal(t, "first_match", cfg.Authenticator.Type)
 		assert.Len(t, cfg.Authenticator.Chain, 2)
-		assert.Equal(t, "guest", cfg.Authenticator.Chain[0].Type)
+		assert.Equal(t, "allow-unauthenticated", cfg.Authenticator.Chain[0].Type)
 		assert.Equal(t, "x-rh-identity", cfg.Authenticator.Chain[1].Type)
 	})
 

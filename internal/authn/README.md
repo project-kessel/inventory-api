@@ -23,7 +23,7 @@ The package supports the following authentication methods:
 
 * **OAuth2/OIDC** (`oidc`) - Authenticates using OAuth2/OIDC JWT tokens from the `Authorization: Bearer` header
 * **x-rh-identity** (`x-rh-identity`) - Authenticates using the `x-rh-identity` header from Red Hat ConsoleDot/Cloud Platform
-* **Guest** (`guest`) - Allows unauthenticated access (uses User-Agent as principal)
+* **Allow unauthenticated** (`allow-unauthenticated`) - Allows unauthenticated access (uses User-Agent as principal). `guest` is accepted as a legacy alias.
 
 ## Aggregation Strategy
 
@@ -41,15 +41,18 @@ authn:
     type: first_match
     chain:
       - type: x-rh-identity  # Check x-rh-identity header first
-        enabled: true
+        enable_http: false
+        enable_grpc: false
       - type: oidc            # Then check Authorization: Bearer token
-        enabled: true
+        enable_http: false
+        enable_grpc: false
         config:
           authn-server-url: https://auth.example.com
           client-id: my-client-id
           principal-user-domain: example.com
-      - type: guest           # Finally allow guest access
-        enabled: true
+      - type: allow-unauthenticated           # Finally allow unauthenticated access
+        enable_http: true
+        enable_grpc: true
 ```
 
 ### Example: Disabling Authenticators
@@ -62,26 +65,30 @@ authn:
     type: first_match
     chain:
       - type: x-rh-identity
-        enabled: true    # Enabled - will check x-rh-identity header
+        enable_http: true
+        enable_grpc: true    # Enabled - will check x-rh-identity header
       - type: oidc
-        enabled: false   # Disabled - will be skipped
+        enable_http: false
+        enable_grpc: false   # Disabled - will be skipped
         config:
           authn-server-url: https://auth.example.com
           client-id: my-client-id
-      - type: guest
-        enabled: true    # Enabled - fallback to guest access
+      - type: allow-unauthenticated
+        enable_http: true
+        enable_grpc: true    # Enabled - fallback to unauthenticated access
 ```
 
-**Note**: At least one authenticator in the chain must be enabled. If all authenticators are disabled, configuration validation will fail.
+**Note**: At least one authenticator in the chain must be enabled for HTTP and gRPC. If either protocol has all authenticators disabled, configuration validation will fail.
 
 ### Configuration Fields
 
 **authenticator.type**: The aggregation strategy (currently only `first_match` is supported)
 
 **authenticator.chain**: An ordered list of authenticators to try. Each entry has:
-- `type`: One of `oidc`, `x-rh-identity`, or `guest`
-- `enabled`: Boolean to enable/disable this authenticator (optional, defaults to `true`)
-- `config`: Optional configuration map (required for `oidc`, not needed for `x-rh-identity` or `guest`)
+- `type`: One of `oidc`, `x-rh-identity`, or `allow-unauthenticated` (`guest` is accepted as a legacy alias)
+- `enable_http`: Boolean to enable/disable this authenticator for HTTP (optional, defaults to `true`)
+- `enable_grpc`: Boolean to enable/disable this authenticator for gRPC (optional, defaults to `true`)
+- `config`: Optional configuration map (required for `oidc`, not needed for `x-rh-identity` or `allow-unauthenticated`)
 
 ### OIDC Configuration
 
@@ -100,7 +107,7 @@ When using the `oidc` authenticator, the following config fields are available:
 The `Identity` struct includes:
 - `Principal`: The authenticated principal identifier
 - `Groups`: Group memberships
-- `AuthType`: The authentication method used (`oidc`, `x-rh-identity`, or `guest`)
+- `AuthType`: The authentication method used (`oidc`, `x-rh-identity`, or `allow-unauthenticated`)
 - `IsGuest`: Whether this is a guest identity
 - `IsReporter`: Whether this is a reporter identity (for client cert auth)
 

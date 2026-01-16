@@ -1,14 +1,45 @@
 package authn
 
 import (
+	"context"
 	"testing"
 
 	"github.com/go-kratos/kratos/v2/log"
+	"github.com/go-kratos/kratos/v2/transport"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/project-kessel/inventory-api/internal/authn/aggregator"
+	"github.com/project-kessel/inventory-api/internal/authn/api"
 	"github.com/project-kessel/inventory-api/internal/authn/oidc"
 )
+
+type mockHeader struct {
+	headers map[string]string
+}
+
+func (m *mockHeader) Get(key string) string {
+	if m.headers == nil {
+		return ""
+	}
+	return m.headers[key]
+}
+func (m *mockHeader) Set(key, value string)      {}
+func (m *mockHeader) Add(key, value string)      {}
+func (m *mockHeader) Keys() []string             { return nil }
+func (m *mockHeader) Values(key string) []string { return nil }
+
+type mockTransporter struct {
+	kind    transport.Kind
+	headers map[string]string
+}
+
+func (m *mockTransporter) Kind() transport.Kind            { return m.kind }
+func (m *mockTransporter) Endpoint() string                { return "/test" }
+func (m *mockTransporter) Operation() string               { return "test" }
+func (m *mockTransporter) RequestHeader() transport.Header { return &mockHeader{headers: m.headers} }
+func (m *mockTransporter) ReplyHeader() transport.Header {
+	return &mockHeader{headers: map[string]string{}}
+}
 
 func TestNew_NilConfig(t *testing.T) {
 	logger := log.NewHelper(log.DefaultLogger)
@@ -65,8 +96,8 @@ func TestNew_AllDisabled(t *testing.T) {
 			Authenticator: &AuthenticatorCompletedConfig{
 				Type: aggregator.FirstMatch,
 				ChainConfigs: []ChainCompletedConfig{
-					{Type: "guest", Enabled: false},
-					{Type: "x-rh-identity", Enabled: false},
+					{Type: "allow-unauthenticated", EnabledHTTP: false, EnabledGRPC: false},
+					{Type: "x-rh-identity", EnabledHTTP: false, EnabledGRPC: false},
 				},
 			},
 		},
@@ -78,14 +109,14 @@ func TestNew_AllDisabled(t *testing.T) {
 	assert.Nil(t, auth)
 }
 
-func TestNew_GuestAuthenticator(t *testing.T) {
+func TestNew_AllowUnauthenticatedAuthenticator(t *testing.T) {
 	logger := log.NewHelper(log.DefaultLogger)
 	config := CompletedConfig{
 		&completedConfig{
 			Authenticator: &AuthenticatorCompletedConfig{
 				Type: aggregator.FirstMatch,
 				ChainConfigs: []ChainCompletedConfig{
-					{Type: "guest", Enabled: true},
+					{Type: "allow-unauthenticated", EnabledHTTP: true, EnabledGRPC: true},
 				},
 			},
 		},
@@ -103,7 +134,7 @@ func TestNew_XRhIdentityAuthenticator(t *testing.T) {
 			Authenticator: &AuthenticatorCompletedConfig{
 				Type: aggregator.FirstMatch,
 				ChainConfigs: []ChainCompletedConfig{
-					{Type: "x-rh-identity", Enabled: true},
+					{Type: "x-rh-identity", EnabledHTTP: true, EnabledGRPC: true},
 				},
 			},
 		},
@@ -121,7 +152,7 @@ func TestNew_OIDCAuthenticator_NoConfig(t *testing.T) {
 			Authenticator: &AuthenticatorCompletedConfig{
 				Type: aggregator.FirstMatch,
 				ChainConfigs: []ChainCompletedConfig{
-					{Type: "oidc", Enabled: true, OIDCConfig: nil},
+					{Type: "oidc", EnabledHTTP: true, EnabledGRPC: true, OIDCConfig: nil},
 				},
 			},
 		},
@@ -153,9 +184,9 @@ func TestNew_MultipleAuthenticators(t *testing.T) {
 			Authenticator: &AuthenticatorCompletedConfig{
 				Type: aggregator.FirstMatch,
 				ChainConfigs: []ChainCompletedConfig{
-					{Type: "guest", Enabled: true},
-					{Type: "x-rh-identity", Enabled: true},
-					{Type: "oidc", Enabled: true, OIDCConfig: &completedOIDC},
+					{Type: "allow-unauthenticated", EnabledHTTP: true, EnabledGRPC: true},
+					{Type: "x-rh-identity", EnabledHTTP: true, EnabledGRPC: true},
+					{Type: "oidc", EnabledHTTP: true, EnabledGRPC: true, OIDCConfig: &completedOIDC},
 				},
 			},
 		},
@@ -181,9 +212,9 @@ func TestNew_SkipsDisabledAuthenticators(t *testing.T) {
 			Authenticator: &AuthenticatorCompletedConfig{
 				Type: aggregator.FirstMatch,
 				ChainConfigs: []ChainCompletedConfig{
-					{Type: "guest", Enabled: false},
-					{Type: "x-rh-identity", Enabled: true},
-					{Type: "guest", Enabled: false},
+					{Type: "allow-unauthenticated", EnabledHTTP: false, EnabledGRPC: false},
+					{Type: "x-rh-identity", EnabledHTTP: true, EnabledGRPC: true},
+					{Type: "allow-unauthenticated", EnabledHTTP: false, EnabledGRPC: false},
 				},
 			},
 		},
@@ -194,6 +225,134 @@ func TestNew_SkipsDisabledAuthenticators(t *testing.T) {
 	assert.NotNil(t, auth)
 }
 
+func TestNew_RoutesByTransportKind(t *testing.T) {
+	logger := log.NewHelper(log.DefaultLogger)
+	config := CompletedConfig{
+		&completedConfig{
+			Authenticator: &AuthenticatorCompletedConfig{
+				Type: aggregator.FirstMatch,
+				ChainConfigs: []ChainCompletedConfig{
+					{Type: "x-rh-identity", EnabledHTTP: true, EnabledGRPC: false},
+					{Type: "allow-unauthenticated", EnabledHTTP: false, EnabledGRPC: true},
+				},
+			},
+		},
+	}
+
+	auth, err := New(config, logger)
+	assert.NoError(t, err)
+	assert.NotNil(t, auth)
+
+	// HTTP: missing x-rh-identity should be ignored (no allow-unauthenticated fallback on HTTP in this config)
+	httpT := &mockTransporter{kind: transport.KindHTTP, headers: map[string]string{}}
+	identity, decision := auth.Authenticate(context.Background(), httpT)
+	assert.Nil(t, identity)
+	assert.Equal(t, api.Ignore, decision)
+
+	// gRPC: allow-unauthenticated enabled should allow
+	grpcT := &mockTransporter{kind: transport.KindGRPC, headers: map[string]string{}}
+	identity, decision = auth.Authenticate(context.Background(), grpcT)
+	assert.NotNil(t, identity)
+	assert.Equal(t, api.Allow, decision)
+}
+
+func TestNew_EnableHTTP_EnableGRPC_PerAuthenticatorType(t *testing.T) {
+	const validXRH = "eyJpZGVudGl0eSI6eyJhY2NvdW50X251bWJlciI6IjEyMzQ1NiIsIm9yZ19pZCI6IjEyMzQ1NiIsInVzZXIiOnsidXNlcm5hbWUiOiJ0ZXN0dXNlciIsImVtYWlsIjoidGVzdHVzZXJAZXhhbXBsZS5jb20iLCJ1c2VyX2lkIjoidXNlci0xMjMifSwiaW50ZXJuYWwiOnt9LCJ0eXBlIjoiVXNlciJ9fQ=="
+
+	t.Run("x-rh-identity enabled for http only", func(t *testing.T) {
+		logger := log.NewHelper(log.DefaultLogger)
+		config := CompletedConfig{
+			&completedConfig{
+				Authenticator: &AuthenticatorCompletedConfig{
+					Type: aggregator.FirstMatch,
+					ChainConfigs: []ChainCompletedConfig{
+						{Type: "x-rh-identity", EnabledHTTP: true, EnabledGRPC: false},
+						{Type: "allow-unauthenticated", EnabledHTTP: false, EnabledGRPC: true},
+						{Type: "x-rh-identity", EnabledHTTP: true, EnabledGRPC: false},
+						{Type: "allow-unauthenticated", EnabledHTTP: false, EnabledGRPC: true},
+					},
+				},
+			},
+		}
+
+		auth, err := New(config, logger)
+		assert.NoError(t, err)
+
+		httpT := &mockTransporter{kind: transport.KindHTTP, headers: map[string]string{"x-rh-identity": validXRH}}
+		identity, decision := auth.Authenticate(context.Background(), httpT)
+		assert.Equal(t, api.Allow, decision)
+		assert.NotNil(t, identity)
+		assert.Equal(t, "x-rh-identity", identity.AuthType)
+
+		grpcT := &mockTransporter{kind: transport.KindGRPC, headers: map[string]string{"x-rh-identity": validXRH}}
+		identity, decision = auth.Authenticate(context.Background(), grpcT)
+		assert.Equal(t, api.Allow, decision)
+		assert.NotNil(t, identity)
+		// x-rh-identity is disabled for grpc, so grpc should fall back to allow-unauthenticated.
+		assert.Equal(t, "allow-unauthenticated", identity.AuthType)
+	})
+
+	t.Run("allow-unauthenticated enabled for http only", func(t *testing.T) {
+		logger := log.NewHelper(log.DefaultLogger)
+		config := CompletedConfig{
+			&completedConfig{
+				Authenticator: &AuthenticatorCompletedConfig{
+					Type: aggregator.FirstMatch,
+					ChainConfigs: []ChainCompletedConfig{
+						{Type: "allow-unauthenticated", EnabledHTTP: true, EnabledGRPC: false},
+						{Type: "x-rh-identity", EnabledHTTP: false, EnabledGRPC: true},
+					},
+				},
+			},
+		}
+
+		auth, err := New(config, logger)
+		assert.NoError(t, err)
+
+		httpT := &mockTransporter{kind: transport.KindHTTP, headers: map[string]string{}}
+		identity, decision := auth.Authenticate(context.Background(), httpT)
+		assert.Equal(t, api.Allow, decision)
+		assert.NotNil(t, identity)
+		assert.Equal(t, "allow-unauthenticated", identity.AuthType)
+
+		grpcT := &mockTransporter{kind: transport.KindGRPC, headers: map[string]string{"x-rh-identity": validXRH}}
+		identity, decision = auth.Authenticate(context.Background(), grpcT)
+		assert.Equal(t, api.Allow, decision)
+		assert.NotNil(t, identity)
+		assert.Equal(t, "x-rh-identity", identity.AuthType)
+	})
+
+	t.Run("legacy guest type is accepted as alias and respects per-protocol enablement", func(t *testing.T) {
+		logger := log.NewHelper(log.DefaultLogger)
+		config := CompletedConfig{
+			&completedConfig{
+				Authenticator: &AuthenticatorCompletedConfig{
+					Type: aggregator.FirstMatch,
+					ChainConfigs: []ChainCompletedConfig{
+						{Type: "guest", EnabledHTTP: false, EnabledGRPC: true},
+						{Type: "x-rh-identity", EnabledHTTP: true, EnabledGRPC: false},
+					},
+				},
+			},
+		}
+
+		auth, err := New(config, logger)
+		assert.NoError(t, err)
+
+		httpT := &mockTransporter{kind: transport.KindHTTP, headers: map[string]string{"x-rh-identity": validXRH}}
+		identity, decision := auth.Authenticate(context.Background(), httpT)
+		assert.Equal(t, api.Allow, decision)
+		assert.NotNil(t, identity)
+		assert.Equal(t, "x-rh-identity", identity.AuthType)
+
+		grpcT := &mockTransporter{kind: transport.KindGRPC, headers: map[string]string{}}
+		identity, decision = auth.Authenticate(context.Background(), grpcT)
+		assert.Equal(t, api.Allow, decision)
+		assert.NotNil(t, identity)
+		assert.Equal(t, "allow-unauthenticated", identity.AuthType)
+	})
+}
+
 func TestNew_UnknownAuthenticatorType(t *testing.T) {
 	logger := log.NewHelper(log.DefaultLogger)
 	config := CompletedConfig{
@@ -201,7 +360,7 @@ func TestNew_UnknownAuthenticatorType(t *testing.T) {
 			Authenticator: &AuthenticatorCompletedConfig{
 				Type: aggregator.FirstMatch,
 				ChainConfigs: []ChainCompletedConfig{
-					{Type: "unknown-type", Enabled: true},
+					{Type: "unknown-type", EnabledHTTP: true, EnabledGRPC: true},
 				},
 			},
 		},

@@ -251,20 +251,20 @@ func (uc *Usecase) Delete(ctx context.Context, reporterResourceKey model.Reporte
 
 // Check verifies if a subject has the specified permission on a resource identified by the reporter resource ID.
 func (uc *Usecase) Check(ctx context.Context, permission, namespace string, sub *kessel.SubjectReference, reporterResourceKey model.ReporterResourceKey) (bool, error) {
-	res, err := uc.resourceRepository.FindResourceByKeys(nil, reporterResourceKey)
 	var consistencyToken string
+
+	resource, err := uc.resourceRepository.FindResourceByKeys(nil, reporterResourceKey)
 	if err != nil {
 		log.Info("Did not find resource")
 		// If the resource doesn't exist in inventory (ie. no consistency token available)
-		// we send a check request with minimize latency
-		// err otherwise.
+		// the authz layer will use the configured default consistency mode
 		if !errors.Is(err, gorm.ErrRecordNotFound) {
 			return false, err
 		}
-
-		consistencyToken = ""
 	} else {
-		consistencyToken = res.ConsistencyToken().Serialize()
+		// Resource found - pass its consistency token to authz layer
+		// The authz layer will decide whether to use it based on config
+		consistencyToken = resource.ConsistencyToken().Serialize()
 	}
 
 	allowed, _, err := uc.Authz.Check(ctx, namespace, permission, consistencyToken, reporterResourceKey.ResourceType().Serialize(), reporterResourceKey.LocalResourceId().Serialize(), sub)

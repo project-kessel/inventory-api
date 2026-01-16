@@ -322,7 +322,7 @@ func TestNew_EnableHTTP_EnableGRPC_PerAuthenticatorType(t *testing.T) {
 		assert.Equal(t, "x-rh-identity", identity.AuthType)
 	})
 
-	t.Run("legacy guest type is accepted as alias and respects per-protocol enablement", func(t *testing.T) {
+	t.Run("guest type works and respects per-protocol enablement", func(t *testing.T) {
 		logger := log.NewHelper(log.DefaultLogger)
 		config := CompletedConfig{
 			&completedConfig{

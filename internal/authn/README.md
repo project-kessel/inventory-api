@@ -23,7 +23,7 @@ The package supports the following authentication methods:
 
 - **OAuth2/OIDC** (`oidc`) - Authenticates using OAuth2/OIDC JWT tokens from the `Authorization: Bearer` header
 - **x-rh-identity** (`x-rh-identity`) - Authenticates using the `x-rh-identity` header from Red Hat ConsoleDot/Cloud Platform
-- **Allow unauthenticated** (`allow-unauthenticated`) - Allows unauthenticated access (uses User-Agent as principal). `guest` is accepted as a legacy alias.
+- **Allow unauthenticated** (`allow-unauthenticated`) - Allows unauthenticated access (uses User-Agent as principal).
 
 ## Aggregation Strategy
 
@@ -98,7 +98,7 @@ authn:
 
 **authenticator.chain**: An ordered list of authenticators to try. Each entry has:
 
-- `type`: One of `oidc`, `x-rh-identity`, or `allow-unauthenticated` (`guest` is accepted as a legacy alias)
+- `type`: One of `oidc`, `x-rh-identity`, or `allow-unauthenticated`
 - `enable`: Boolean to enable/disable this authenticator (optional, defaults to `true`)
 - `transport`: Optional map controlling per-protocol enablement:
   - `http`: enable for HTTP (optional, defaults to `true`)

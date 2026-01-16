@@ -220,53 +220,6 @@ func TestInventoryService_ReportResource_MissingReporterInstanceId(t *testing.T)
 	assert.Equal(t, codes.InvalidArgument, grpcStatus.Code())
 }
 
-func TestInventoryService_ReportResource_InvalidJsonObject(t *testing.T) {
-	id := &authnapi.Identity{Principal: "sarah", Type: "rbac"}
-	ctx := context.WithValue(context.Background(), middleware.IdentityRequestKey, id)
-
-	badCommon := &structpb.Struct{
-		Fields: map[string]*structpb.Value{
-			"invalid": nil, // use intentionally unsupported types
-		},
-	}
-
-	req := &pb.ReportResourceRequest{
-		Type:               "host",
-		ReporterType:       "hbi",
-		ReporterInstanceId: "instance-001",
-		Representations: &pb.ResourceRepresentations{
-			Common: badCommon,
-			Metadata: &pb.RepresentationMetadata{
-				LocalResourceId: "v1",
-			},
-			Reporter: &structpb.Struct{},
-		},
-	}
-
-	uc := usecase.New(
-		data.NewFakeResourceRepository(),
-		nil,                        // LegacyReporterResourceRepository
-		nil,                        // inventoryResourceRepository
-		newFakeSchemaRepository(t), // schema repository
-		nil,                        // Authz
-		nil,                        // Eventer
-		"",                         // Namespace
-		krlog.NewStdLogger(io.Discard),
-		nil, // ListenManager
-		nil, // waitForNotifBreaker
-		nil, // Config
-		metricscollector.NewFakeMetricsCollector(),
-	)
-
-	service := svc.NewKesselInventoryServiceV1beta2(uc)
-
-	resp, err := service.ReportResource(ctx, req)
-
-	assert.Error(t, err)
-	assert.Nil(t, resp)
-	assert.Contains(t, err.Error(), "failed to marshal message")
-}
-
 func TestResponseFromResource(t *testing.T) {
 	resp := svc.ResponseFromResource()
 

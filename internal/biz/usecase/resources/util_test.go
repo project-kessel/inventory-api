@@ -14,238 +14,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestExtractFields(t *testing.T) {
-	tests := []struct {
-		name      string
-		input     map[string]interface{}
-		key       string
-		expected  interface{}
-		expectErr bool
-		testType  string // "map" or "string"
-	}{
-		// Tests for ExtractMapField
-		{
-			name:      "Valid map extraction",
-			input:     map[string]interface{}{"key": map[string]interface{}{"subkey": "value"}},
-			key:       "key",
-			expected:  map[string]interface{}{"subkey": "value"},
-			expectErr: false,
-			testType:  "map",
-		},
-		{
-			name:      "Invalid map extraction (not a map)",
-			input:     map[string]interface{}{"key": "string_value"},
-			key:       "key",
-			expected:  nil,
-			expectErr: true,
-			testType:  "map",
-		},
-		{
-			name:      "Invalid map extraction (nonexistent key)",
-			input:     map[string]interface{}{},
-			key:       "nonexistent_key",
-			expected:  nil,
-			expectErr: true,
-			testType:  "map",
-		},
-
-		// Tests for ExtractStringField
-		{
-			name:      "Valid string extraction",
-			input:     map[string]interface{}{"key": "value"},
-			key:       "key",
-			expected:  "value",
-			expectErr: false,
-			testType:  "string",
-		},
-		{
-			name:      "Invalid string extraction (not a string)",
-			input:     map[string]interface{}{"key": 123},
-			key:       "key",
-			expected:  "",
-			expectErr: true,
-			testType:  "string",
-		},
-		{
-			name:      "Invalid string extraction (nonexistent key)",
-			input:     map[string]interface{}{},
-			key:       "nonexistent_key",
-			expected:  "",
-			expectErr: true,
-			testType:  "string",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			var result interface{}
-			var err error
-
-			switch tt.testType {
-			case "map":
-				result, err = extractMapField(tt.input, tt.key, validateFieldExists())
-			case "string":
-				result, err = extractStringField(tt.input, tt.key, validateFieldExists())
-			}
-
-			if tt.expectErr {
-				assert.Error(t, err, "Expected error but got nil")
-			} else {
-				assert.NoError(t, err, "Unexpected error")
-				assert.Equal(t, tt.expected, result, "Extracted value doesn't match")
-			}
-		})
-	}
-}
-
-func TestExtractFieldsWithOptions(t *testing.T) {
-	tests := []struct {
-		name      string
-		input     map[string]interface{}
-		key       string
-		option    extractOption
-		expected  interface{}
-		expectErr bool
-		testType  string // "map" or "string"
-	}{
-		// Tests for ValidateFieldExists option
-		{
-			name: "Map extraction with ValidateFieldExists - representations field exists",
-			input: map[string]interface{}{
-				"representations": map[string]interface{}{
-					"reporter": map[string]interface{}{"satellite_id": "123"},
-					"common":   map[string]interface{}{"workspace_id": "ws-456"},
-				},
-			},
-			key:    "representations",
-			option: validateFieldExists(),
-			expected: map[string]interface{}{
-				"reporter": map[string]interface{}{"satellite_id": "123"},
-				"common":   map[string]interface{}{"workspace_id": "ws-456"},
-			},
-			expectErr: false,
-			testType:  "map",
-		},
-		{
-			name:      "Map extraction with ValidateFieldExists - representations field missing",
-			input:     map[string]interface{}{"type": "host", "reporterType": "hbi"},
-			key:       "representations",
-			option:    validateFieldExists(),
-			expected:  nil,
-			expectErr: true,
-			testType:  "map",
-		},
-		{
-			name:      "String extraction with ValidateFieldExists - reporterType exists",
-			input:     map[string]interface{}{"type": "host", "reporterType": "hbi"},
-			key:       "reporterType",
-			option:    validateFieldExists(),
-			expected:  "hbi",
-			expectErr: false,
-			testType:  "string",
-		},
-		{
-			name:      "String extraction with ValidateFieldExists - reporterType missing",
-			input:     map[string]interface{}{"type": "host"},
-			key:       "reporterType",
-			option:    validateFieldExists(),
-			expected:  "",
-			expectErr: true,
-			testType:  "string",
-		},
-
-		// Tests for default behavior (no options)
-		{
-			name:      "Map extraction with no options - representations missing (default behavior)",
-			input:     map[string]interface{}{"type": "host", "reporterType": "hbi"},
-			key:       "representations",
-			option:    nil,
-			expected:  map[string]interface{}(nil),
-			expectErr: false,
-			testType:  "map",
-		},
-		{
-			name:      "String extraction with no options - reporterType missing (default behavior)",
-			input:     map[string]interface{}{"type": "k8s_policy"},
-			key:       "reporterType",
-			option:    nil,
-			expected:  "",
-			expectErr: false,
-			testType:  "string",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			var result interface{}
-			var err error
-
-			switch tt.testType {
-			case "map":
-				if tt.option != nil {
-					result, err = extractMapField(tt.input, tt.key, tt.option)
-				} else {
-					result, err = extractMapField(tt.input, tt.key)
-				}
-			case "string":
-				if tt.option != nil {
-					result, err = extractStringField(tt.input, tt.key, tt.option)
-				} else {
-					result, err = extractStringField(tt.input, tt.key)
-				}
-			}
-
-			if tt.expectErr {
-				assert.Error(t, err, "Expected error but got nil")
-			} else {
-				assert.NoError(t, err, "Unexpected error")
-				assert.Equal(t, tt.expected, result, "Extracted value doesn't match")
-			}
-		})
-	}
-}
-
-func TestMarshalProtoToJSON(t *testing.T) {
-	msg := &pbv1beta2.ReportResourceRequest{
-
-		Type: "k8s_cluster",
-	}
-	jsonData, err := marshalProtoToJSON(msg)
-	assert.NoError(t, err, "Expected no error while marshalling protobuf to JSON")
-	assert.Contains(t, string(jsonData), "k8s_cluster", "Expected resource type to be present in JSON")
-}
-
-func TestUnmarshalJSONToMap(t *testing.T) {
-	tests := []struct {
-		input     string
-		expected  map[string]interface{}
-		expectErr bool
-	}{
-		{
-			input:     `{"key": "value"}`,
-			expected:  map[string]interface{}{"key": "value"},
-			expectErr: false,
-		},
-		{
-			input:     `invalid json`,
-			expected:  nil,
-			expectErr: true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.input, func(t *testing.T) {
-			result, err := unmarshalJSONToMap([]byte(tt.input))
-			if tt.expectErr {
-				assert.Error(t, err, "Expected error but got nil")
-			} else {
-				assert.NoError(t, err, "Unexpected error")
-				assert.Equal(t, tt.expected, result, "Unmarshalled map doesn't match")
-			}
-		})
-	}
-}
-
 func TestRemoveNulls(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -435,7 +203,7 @@ func TestValidateReportResourceJSON_Success(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
-	err = validateReportResource(ctx, msg, NewSchemaUsecase(schemaRepository, log.NewHelper(log.DefaultLogger)))
+	err = validateReportResourceRequest(ctx, msg, NewSchemaUsecase(schemaRepository, log.NewHelper(log.DefaultLogger)))
 	assert.NoError(t, err)
 }
 
@@ -579,7 +347,7 @@ func TestValidateReportResourceJSON_FieldExtractionErrors(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			err := validateReportResource(ctx, tc.msg, NewSchemaUsecase(schemaRepository, log.NewHelper(log.DefaultLogger)))
+			err := validateReportResourceRequest(ctx, tc.msg, NewSchemaUsecase(schemaRepository, log.NewHelper(log.DefaultLogger)))
 			assert.Error(t, err)
 			assert.Contains(t, err.Error(), tc.expect)
 		})
@@ -798,7 +566,7 @@ func TestValidateReportResourceJSON_SchemaBasedValidation(t *testing.T) {
 			assert.NoError(t, err)
 
 			// Test the function
-			err = validateReportResource(ctx, tc.msg, NewSchemaUsecase(schemaRepository, log.NewHelper(log.DefaultLogger)))
+			err = validateReportResourceRequest(ctx, tc.msg, NewSchemaUsecase(schemaRepository, log.NewHelper(log.DefaultLogger)))
 			if tc.expectError {
 				assert.Error(t, err)
 			}

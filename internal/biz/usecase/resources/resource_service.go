@@ -26,7 +26,6 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/structpb"
 	"gorm.io/gorm"
 )
@@ -124,7 +123,7 @@ func (uc *Usecase) ReportResource(ctx context.Context, request *v1beta2.ReportRe
 		return err
 	}
 
-	err = validateReportResource(ctx, request, uc.schemaUsecase)
+	err = validateReportResourceRequest(ctx, request, uc.schemaUsecase)
 	if err != nil {
 		return status.Errorf(codes.InvalidArgument, "failed validation for report resource: %v", err)
 	}
@@ -517,28 +516,17 @@ func computeReadAfterWrite(uc *Usecase, write_visibility v1beta2.WriteVisibility
 	return !common.IsNil(uc.ListenManager) && uc.Config.ReadAfterWriteEnabled && isSPInAllowlist(reporterPrincipal, uc.Config.ReadAfterWriteAllowlist)
 }
 
-func validateReportResource(ctx context.Context, msg proto.Message, schemaUseCase *SchemaUsecase) error {
-	data, err := marshalProtoToJSON(msg)
-	if err != nil {
-		return err
+func validateReportResourceRequest(ctx context.Context, request *v1beta2.ReportResourceRequest, schemaUseCase *SchemaUsecase) error {
+	if request.Type == "" {
+		return fmt.Errorf("missing 'type' field")
+	}
+	if request.ReporterType == "" {
+		return fmt.Errorf("missing 'reporterType' field")
 	}
 
-	reportResourceMap, err := unmarshalJSONToMap(data)
-	if err != nil {
-		return err
-	}
+	resourceType := request.Type
+	reporterType := request.ReporterType
 
-	resourceType, err := extractStringField(reportResourceMap, "type", validateFieldExists())
-	if err != nil {
-		return err
-	}
-
-	reporterType, err := extractStringField(reportResourceMap, "reporterType", validateFieldExists())
-	if err != nil {
-		return err
-	}
-
-	// Validate the combination of resource_type and reporter_type e.g. k8s_cluster & ACM
 	if isReporter, err := schemaUseCase.IsReporterForResource(ctx, resourceType, reporterType); !isReporter {
 		if err != nil {
 			return err
@@ -547,14 +535,13 @@ func validateReportResource(ctx context.Context, msg proto.Message, schemaUseCas
 		return fmt.Errorf("reporter %s does not report resource types: %s", reporterType, resourceType)
 	}
 
-	representations, err := extractMapField(reportResourceMap, "representations", validateFieldExists())
-	if err != nil {
-		return err
+	if request.Representations == nil {
+		return fmt.Errorf("missing 'representations'")
 	}
 
-	reporterRepresentation, err := extractMapField(representations, "reporter")
-	if err != nil {
-		return err
+	var reporterRepresentation map[string]any
+	if request.Representations.Reporter != nil {
+		reporterRepresentation = request.Representations.Reporter.AsMap()
 	}
 
 	// Remove any fields with null values before validation.
@@ -565,13 +552,12 @@ func validateReportResource(ctx context.Context, msg proto.Message, schemaUseCas
 		sanitizedReporterRepresentation = nil
 	}
 
-	// Overwrite the proto's reporter struct with the sanitized version so downstream layers don't see nulls.
-	if rr, ok := msg.(*v1beta2.ReportResourceRequest); ok && sanitizedReporterRepresentation != nil {
+	if sanitizedReporterRepresentation != nil {
 		sanitizedStruct, err2 := structpb.NewStruct(sanitizedReporterRepresentation)
 		if err2 != nil {
 			return fmt.Errorf("failed to rebuild reporter struct: %w", err2)
 		}
-		rr.Representations.Reporter = sanitizedStruct
+		request.Representations.Reporter = sanitizedStruct
 	}
 
 	// Validate reporter-specific data using the sanitized map
@@ -579,9 +565,9 @@ func validateReportResource(ctx context.Context, msg proto.Message, schemaUseCas
 		return err
 	}
 
-	commonRepresentation, err := extractMapField(representations, "common")
-	if err != nil {
-		return err
+	var commonRepresentation map[string]any
+	if request.Representations.Common != nil {
+		commonRepresentation = request.Representations.Common.AsMap()
 	}
 
 	// Validate common data

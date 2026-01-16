@@ -47,12 +47,8 @@ func NewConfig(o *Options) *Config {
 		}
 
 		for i, entry := range o.Authenticator.Chain {
-			cfg.Authenticator.Chain[i] = ChainEntry{
-				Type:       entry.Type,
-				EnableHTTP: entry.EnableHTTP,
-				EnableGRPC: entry.EnableGRPC,
-				Config:     entry.Config,
-			}
+			// ChainEntryOptions and ChainEntry intentionally have identical fields, so use a direct conversion.
+			cfg.Authenticator.Chain[i] = ChainEntry(entry)
 		}
 		return cfg
 	}

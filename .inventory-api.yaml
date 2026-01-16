@@ -28,7 +28,7 @@ authn:
       - type: x-rh-identity  # x-rh-identity header support - currently applicable for http transport only
         enable: true
         transport:
-          http: true
+          http: false
           grpc: false   
       - type: allow-unauthenticated # This is a special authenticator that allows unauthenticated access - mainly for Local-dev/Test 
         enable: true

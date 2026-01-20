@@ -371,6 +371,12 @@ components:
                     type: string
                 subject:
                     $ref: '#/components/schemas/kessel.inventory.v1beta2.SubjectReference'
+                consistency:
+                    allOf:
+                        - $ref: '#/components/schemas/kessel.inventory.v1beta2.Consistency'
+                    description: |-
+                        Consistency requirement for the check operation.
+                         Defaults to minimize_latency if not specified.
         kessel.inventory.v1beta2.CheckResponse:
             type: object
             properties:
@@ -396,6 +402,12 @@ components:
                         All data used in the API call must be *at least as fresh*
                          as found in the ConsistencyToken. More recent data might be used
                          if available or faster.
+                inventoryManaged:
+                    type: boolean
+                    description: |-
+                        Inventory looks up the consistency token from its database.
+                         Provides read-after-write consistency for inventory-managed resources.
+                         Set to true to enable this mode.
             description: Defines how a request is handled by the service.
         kessel.inventory.v1beta2.ConsistencyToken:
             type: object

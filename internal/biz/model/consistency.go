@@ -6,15 +6,15 @@ type ConsistencyPreference int
 const (
 	// ConsistencyMinimizeLatency uses the fastest snapshot available (default).
 	// No consistency guarantee - uses whatever data is fastest to retrieve.
-	ConsistencyMinimizeLatency ConsistencyPreference = iota
+	ConsistencyMinimizeLatency ConsistencyPreference = 0
 
 	// ConsistencyInventoryManaged looks up the consistency token from inventory's database.
 	// Provides read-after-write consistency for inventory-managed resources.
-	ConsistencyInventoryManaged
+	ConsistencyInventoryManaged ConsistencyPreference = 1
 
 	// ConsistencyAtLeastAsFresh uses a consistency token provided by the caller.
 	// All data used in the API call must be at least as fresh as the token.
-	ConsistencyAtLeastAsFresh
+	ConsistencyAtLeastAsFresh ConsistencyPreference = 2
 )
 
 // String returns a human-readable representation of the consistency preference.

@@ -137,7 +137,7 @@ func (s *InventoryService) CheckSelf(ctx context.Context, req *pb.CheckSelfReque
 
 	if reporterResourceKey, err := reporterKeyFromResourceReference(req.Object); err == nil {
 		// Derive subject reference from identity (x-rh-identity header)
-		subjectRef := subjectReferenceFromIdentity(identity)
+		subjectRef := middleware.SubjectReferenceFromIdentity(identity)
 		if resp, err := s.Ctl.Check(ctx, req.GetRelation(), req.Object.Reporter.GetType(), subjectRef, reporterResourceKey); err == nil {
 			allowed := pb.Allowed_ALLOWED_FALSE
 			if resp {
@@ -160,6 +160,39 @@ func (s *InventoryService) CheckSelfBulk(ctx context.Context, req *pb.CheckSelfB
 	identity, err := middleware.GetIdentity(ctx)
 	if err != nil {
 		return nil, status.Errorf(codes.Unauthenticated, "failed to get identity: %v", err)
+	}
+
+	// Validate input: check items array
+	if len(req.GetItems()) == 0 {
+		return nil, status.Errorf(codes.InvalidArgument, "items array cannot be empty")
+	}
+
+	// Validate each item and reporter keys before processing
+	for i, item := range req.GetItems() {
+		if item == nil {
+			return nil, status.Errorf(codes.InvalidArgument, "item %d: cannot be nil", i)
+		}
+		if item.GetObject() == nil {
+			return nil, status.Errorf(codes.InvalidArgument, "item %d: object is required", i)
+		}
+		if item.GetObject().GetReporter() == nil {
+			return nil, status.Errorf(codes.InvalidArgument, "item %d: reporter is required", i)
+		}
+		if item.GetRelation() == "" {
+			return nil, status.Errorf(codes.InvalidArgument, "item %d: relation is required", i)
+		}
+		if item.GetObject().GetResourceType() == "" {
+			return nil, status.Errorf(codes.InvalidArgument, "item %d: resourceType is required", i)
+		}
+		if item.GetObject().GetResourceId() == "" {
+			return nil, status.Errorf(codes.InvalidArgument, "item %d: resourceId is required", i)
+		}
+
+		// Validate reporter key (consistent with CheckSelf)
+		if _, err := reporterKeyFromResourceReference(item.GetObject()); err != nil {
+			log.Errorf("Failed to build reporter resource key for item %d: %v", i, err)
+			return nil, status.Errorf(codes.InvalidArgument, "item %d: failed to build reporter resource key: %v", i, err)
+		}
 	}
 
 	log.Info("CheckSelfBulk using v1beta2 db")
@@ -199,50 +232,8 @@ func subjectReferenceFromSubjectV1beta1(subject *pbv1beta1.SubjectReference) *pb
 }
 
 func subjectReferenceFromIdentity(identity *authnapi.Identity) *pbv1beta1.SubjectReference {
-	// Determine subject ID based on authentication type
-	// For x-rh-identity: Principal is username/email, UserID may also be available
-	// For OIDC: Principal is in "domain/subject" format
-	var subjectID string
-
-	if identity.AuthType == "x-rh-identity" {
-		// For x-rh-identity, prefer UserID if available (more stable identifier)
-		// Otherwise fall back to Principal (username/email)
-		if identity.UserID != "" {
-			subjectID = identity.UserID
-		} else if identity.Principal != "" {
-			subjectID = identity.Principal
-		} else {
-			// Fallback: should not happen for authenticated requests
-			subjectID = identity.Principal
-		}
-	} else {
-		// For OIDC and other auth types, parse Principal
-		// Principal might be in "domain/subject" format (OIDC) or just "subject"
-		subjectID = identity.Principal
-		if parts := strings.SplitN(identity.Principal, "/", 2); len(parts) == 2 {
-			subjectID = parts[1]
-		}
-	}
-
-	// Determine namespace
-	// For x-rh-identity: Type field contains "User", "System", etc. but we use "rbac" as namespace
-	// For OIDC: Type is typically empty, default to "rbac"
-	namespace := "rbac"
-	if identity.AuthType != "x-rh-identity" && identity.Type != "" {
-		// For non-x-rh-identity auth types, use Type if set
-		namespace = identity.Type
-	}
-
-	return &pbv1beta1.SubjectReference{
-		Relation: nil, // No relation for direct subject reference
-		Subject: &pbv1beta1.ObjectReference{
-			Type: &pbv1beta1.ObjectType{
-				Namespace: namespace,
-				Name:      "principal",
-			},
-			Id: subjectID,
-		},
-	}
+	// Use shared subject derivation logic from middleware
+	return middleware.SubjectReferenceFromIdentity(identity)
 }
 
 func mapCheckBulkRequestToV1beta1(req *pb.CheckBulkRequest) *pbv1beta1.CheckBulkRequest {
@@ -344,13 +335,18 @@ func mapCheckSelfBulkRequestToV1beta1(req *pb.CheckSelfBulkRequest, identity *au
 	subjectRef := subjectReferenceFromIdentity(identity)
 
 	for i, item := range req.GetItems() {
+		// Note: Input validation is done in CheckSelfBulk handler, but defensive nil checks here
+		// for safety in case this function is called from elsewhere
+		obj := item.GetObject()
+		reporter := obj.GetReporter()
+
 		items[i] = &pbv1beta1.CheckBulkRequestItem{
 			Resource: &pbv1beta1.ObjectReference{
 				Type: &pbv1beta1.ObjectType{
-					Namespace: item.GetObject().GetReporter().GetType(),
-					Name:      item.GetObject().GetResourceType(),
+					Namespace: reporter.GetType(),
+					Name:      obj.GetResourceType(),
 				},
-				Id: item.GetObject().GetResourceId(),
+				Id: obj.GetResourceId(),
 			},
 			Subject:  subjectRef,
 			Relation: item.GetRelation(),
@@ -365,8 +361,25 @@ func mapCheckSelfBulkRequestToV1beta1(req *pb.CheckSelfBulkRequest, identity *au
 }
 
 func mapCheckSelfBulkResponseFromV1beta1(resp *pbv1beta1.CheckBulkResponse, req *pb.CheckSelfBulkRequest) *pb.CheckSelfBulkResponse {
-	pairs := make([]*pb.CheckSelfBulkResponsePair, len(resp.GetPairs()))
-	for i, pair := range resp.GetPairs() {
+	respPairs := resp.GetPairs()
+	reqItems := req.GetItems()
+
+	// Bounds check: ensure response pairs match request items
+	// Use the minimum length to avoid index out of bounds
+	minLen := len(respPairs)
+	if len(reqItems) < minLen {
+		minLen = len(reqItems)
+	}
+
+	if len(respPairs) != len(reqItems) {
+		log.Errorf("Mismatch in CheckSelfBulk response: expected %d pairs, got %d", len(reqItems), len(respPairs))
+	}
+
+	pairs := make([]*pb.CheckSelfBulkResponsePair, minLen)
+
+	// Only process up to minLen to avoid index out of bounds
+	for i := 0; i < minLen; i++ {
+		pair := respPairs[i]
 		errResponse := &pb.CheckSelfBulkResponsePair_Error{}
 		itemResponse := &pb.CheckSelfBulkResponsePair_Item{}
 
@@ -379,7 +392,7 @@ func mapCheckSelfBulkResponseFromV1beta1(resp *pbv1beta1.CheckBulkResponse, req 
 		}
 
 		allowedResponse := pb.Allowed_ALLOWED_FALSE
-		if pair.GetItem().GetAllowed() == pbv1beta1.CheckBulkResponseItem_ALLOWED_TRUE {
+		if pair.GetItem() != nil && pair.GetItem().GetAllowed() == pbv1beta1.CheckBulkResponseItem_ALLOWED_TRUE {
 			allowedResponse = pb.Allowed_ALLOWED_TRUE
 		}
 		itemResponse.Item = &pb.CheckSelfBulkResponseItem{
@@ -387,18 +400,32 @@ func mapCheckSelfBulkResponseFromV1beta1(resp *pbv1beta1.CheckBulkResponse, req 
 		}
 
 		// Map back to the original request item (no subject in CheckSelfBulkRequestItem)
-		requestItem := req.GetItems()[i]
-		pairs[i] = &pb.CheckSelfBulkResponsePair{
-			Request: &pb.CheckSelfBulkRequestItem{
+		// Note: i is guaranteed to be < len(reqItems) because we iterate only up to minLen
+		requestItem := reqItems[i]
+
+		// Defensive nil checks (input validation should prevent this, but be safe)
+		var requestItemProto *pb.CheckSelfBulkRequestItem
+		if requestItem != nil && requestItem.GetObject() != nil {
+			obj := requestItem.GetObject()
+			reporter := obj.GetReporter()
+			requestItemProto = &pb.CheckSelfBulkRequestItem{
 				Object: &pb.ResourceReference{
-					ResourceType: requestItem.GetObject().GetResourceType(),
-					ResourceId:   requestItem.GetObject().GetResourceId(),
+					ResourceType: obj.GetResourceType(),
+					ResourceId:   obj.GetResourceId(),
 					Reporter: &pb.ReporterReference{
-						Type: requestItem.GetObject().GetReporter().GetType(),
+						Type: reporter.GetType(),
 					},
 				},
 				Relation: requestItem.GetRelation(),
-			},
+			}
+		} else {
+			// Fallback: create empty request item if data is missing
+			log.Errorf("CheckSelfBulk response mapping: requestItem or object is nil at index %d", i)
+			requestItemProto = &pb.CheckSelfBulkRequestItem{}
+		}
+
+		pairs[i] = &pb.CheckSelfBulkResponsePair{
+			Request: requestItemProto,
 		}
 		if pair.GetError() != nil {
 			pairs[i].Response = errResponse

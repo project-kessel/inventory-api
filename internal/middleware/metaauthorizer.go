@@ -2,7 +2,7 @@ package middleware
 
 import (
 	"context"
-	"strings"
+	"fmt"
 
 	"github.com/go-kratos/kratos/v2/errors"
 	"github.com/go-kratos/kratos/v2/log"
@@ -45,7 +45,7 @@ type MetaAuthorizerConfig struct {
 // IMPORTANT: This middleware ONLY processes:
 //   - HTTP requests (not gRPC)
 //   - Requests with x-rh-identity auth type
-//   - CheckSelfRequest type
+//   - CheckSelfRequest and CheckSelfBulkRequest types
 //
 // Flowchart Logic for CheckSelf:
 //   - Inputs: authclaims, object, relation, [subject] - implicit
@@ -64,18 +64,24 @@ func MetaAuthorizerMiddleware(config MetaAuthorizerConfig, logger log.Logger) fu
 				return next(ctx, req)
 			}
 
-			// Only handle CheckSelf requests
-			checkSelfReq, ok := req.(*pb.CheckSelfRequest)
-			if !ok {
+			// Handle CheckSelf and CheckSelfBulk requests
+			checkSelfReq, isCheckSelf := req.(*pb.CheckSelfRequest)
+			checkSelfBulkReq, isCheckSelfBulk := req.(*pb.CheckSelfBulkRequest)
+
+			if !isCheckSelf && !isCheckSelfBulk {
 				// For other request types, pass through without meta-authz
-				logHelper.Debugf("Skipping meta-authorization: request is not CheckSelfRequest (type: %T)", req)
+				logHelper.Debugf("Skipping meta-authorization: request is not CheckSelfRequest or CheckSelfBulkRequest (type: %T)", req)
 				return next(ctx, req)
 			}
 
-			// // Block gRPC CheckSelf requests - only HTTP with x-rh-identity is allowed
+			// Block gRPC CheckSelf/CheckSelfBulk requests - only HTTP with x-rh-identity is allowed
 			t, ok := transport.FromServerContext(ctx)
 			if ok && t.Kind() == transport.KindGRPC {
-				logHelper.Warnf("Blocking gRPC CheckSelf request: gRPC transport is not allowed for CheckSelf requests")
+				if isCheckSelf {
+					logHelper.Warnf("Blocking gRPC CheckSelf request: gRPC transport is not allowed for CheckSelf requests")
+				} else {
+					logHelper.Warnf("Blocking gRPC CheckSelfBulk request: gRPC transport is not allowed for CheckSelfBulk requests")
+				}
 				return nil, ErrGRPCNotAllowed
 			}
 
@@ -93,36 +99,98 @@ func MetaAuthorizerMiddleware(config MetaAuthorizerConfig, logger log.Logger) fu
 				return next(ctx, req)
 			}
 
-			originalRelation := checkSelfReq.Relation
-			// Create a temporary request with relation="check_self" for Decision Rule 1 check
-			// We preserve the original relation for the actual service handler
-			tempReq := createTempRequestForDecisionLogic(checkSelfReq)
+			// Handle CheckSelf request
+			if isCheckSelf {
+				originalRelation := checkSelfReq.Relation
+				// Create a temporary request with relation="check_self" for Decision Rule 1 check
+				// We preserve the original relation for the actual service handler
+				tempReq := createTempRequestForDecisionLogic(checkSelfReq)
 
-			logHelper.Debugf("Meta-authorization: Using relation '%s' for decision logic (original relation was '%s')", CheckSelfRelation, originalRelation)
+				logHelper.Debugf("Meta-authorization: Using relation '%s' for decision logic (original relation was '%s')", CheckSelfRelation, originalRelation)
 
-			// Apply flowchart decision logic using tempReq with relation="check_self"
-			allowed, err := performMetaAuthorizerDecision(ctx, tempReq, identity, config, logHelper)
-			if err != nil {
-				logHelper.Errorf("Meta-authorization decision failed: %v", err)
-				return nil, err
-			}
+				// Apply flowchart decision logic using tempReq with relation="check_self"
+				allowed, err := performMetaAuthorizerDecision(ctx, tempReq, identity, config, logHelper)
+				if err != nil {
+					logHelper.Errorf("Meta-authorization decision failed: %v", err)
+					return nil, err
+				}
 
-			if !allowed {
-				logHelper.Warnf("Meta-authorization check failed: relation=%s, resourceType=%s, resourceId=%s, userID=%s",
+				if !allowed {
+					logHelper.Warnf("Meta-authorization check failed: relation=%s, resourceType=%s, resourceId=%s, userID=%s",
+						originalRelation,
+						checkSelfReq.Object.GetResourceType(),
+						checkSelfReq.Object.GetResourceId(),
+						identity.UserID)
+					return nil, ErrMetaAuthorizerFailed
+				}
+
+				logHelper.Debugf("Meta-authorization check passed: relation=%s, resourceType=%s, resourceId=%s, userID=%s",
 					originalRelation,
 					checkSelfReq.Object.GetResourceType(),
 					checkSelfReq.Object.GetResourceId(),
 					identity.UserID)
-				return nil, ErrMetaAuthorizerFailed
+
+				// Meta-authorization passed, proceed to next handler
+				return next(ctx, req)
 			}
 
-			logHelper.Debugf("Meta-authorization check passed: relation=%s, resourceType=%s, resourceId=%s, userID=%s",
-				originalRelation,
-				checkSelfReq.Object.GetResourceType(),
-				checkSelfReq.Object.GetResourceId(),
-				identity.UserID)
+			// Handle CheckSelfBulk request - check each item
+			if isCheckSelfBulk {
+				items := checkSelfBulkReq.GetItems()
 
-			// Meta-authorization passed, proceed to next handler
+				// Validate items array is not empty
+				if len(items) == 0 {
+					logHelper.Debugf("Meta-authorization: CheckSelfBulk request has no items, skipping")
+					return next(ctx, req)
+				}
+
+				logHelper.Debugf("Meta-authorization: Processing CheckSelfBulk request with %d items", len(items))
+
+				// Check each item in the bulk request
+				for i, item := range items {
+					// Validate item and object are not nil
+					if item == nil {
+						logHelper.Errorf("Meta-authorization: item %d is nil", i)
+						return nil, errors.BadRequest("INVALID_REQUEST", fmt.Sprintf("item %d: cannot be nil", i))
+					}
+					if item.GetObject() == nil {
+						logHelper.Errorf("Meta-authorization: item %d has nil object", i)
+						return nil, errors.BadRequest("INVALID_REQUEST", fmt.Sprintf("item %d: object is required", i))
+					}
+
+					// Create a temporary CheckSelfRequest for decision logic
+					tempReq := &pb.CheckSelfRequest{
+						Object:      item.Object,
+						Relation:    CheckSelfRelation,
+						Consistency: checkSelfBulkReq.GetConsistencyToken(),
+					}
+
+					allowed, err := performMetaAuthorizerDecision(ctx, tempReq, identity, config, logHelper)
+					if err != nil {
+						logHelper.Errorf("Meta-authorization decision failed for item %d: %v", i, err)
+						return nil, err
+					}
+
+					if !allowed {
+						logHelper.Warnf("Meta-authorization check failed for item %d: relation=%s, resourceType=%s, resourceId=%s, userID=%s",
+							i,
+							item.Relation,
+							item.Object.GetResourceType(),
+							item.Object.GetResourceId(),
+							identity.UserID)
+						return nil, ErrMetaAuthorizerFailed
+					}
+				}
+
+				logHelper.Debugf("Meta-authorization check passed for all %d items in CheckSelfBulk request, userID=%s",
+					len(items),
+					identity.UserID)
+
+				// Meta-authorization passed for all items, proceed to next handler
+				return next(ctx, req)
+			}
+
+			// Should not reach here, but handle gracefully
 			return next(ctx, req)
 		}
 	}
@@ -233,26 +301,10 @@ func performMetaAuthorizerMetacheck(ctx context.Context, object *pb.ResourceRefe
 // Conversion logic:
 //   - x-rh-identity: Uses UserID if available, otherwise Principal
 //   - OIDC: Parses Principal (extracts subject from "domain/subject" format)
-//   - Namespace: Always "rbac" for meta-authorization
+//   - Namespace: Uses config.SubjectNamespace (typically "rbac")
 //   - Type: Always "principal"
 func subjectReferenceFromIdentityForMetaAuthorizer(identity *authnapi.Identity, config MetaAuthorizerConfig) *kessel.SubjectReference {
-	// Determine subject ID based on authentication type
-	var subjectID string
-
-	if identity.AuthType == "x-rh-identity" {
-		// For x-rh-identity, prefer UserID if available
-		if identity.UserID != "" {
-			subjectID = identity.UserID
-		} else if identity.Principal != "" {
-			subjectID = identity.Principal
-		}
-	} else {
-		// For OIDC and other auth types, parse Principal
-		subjectID = identity.Principal
-		if parts := strings.SplitN(identity.Principal, "/", 2); len(parts) == 2 {
-			subjectID = parts[1]
-		}
-	}
+	subjectID := SubjectIDFromIdentity(identity)
 
 	return &kessel.SubjectReference{
 		Relation: nil,

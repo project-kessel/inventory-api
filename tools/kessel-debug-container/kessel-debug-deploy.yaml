@@ -54,12 +54,18 @@ objects:
       volumeMounts:
         - name: config-secret
           mountPath: /cdapp/
+        - name: spicedb-secret
+          mountPath: /spicedb/
         - name: kafka-ca-certs
           mountPath: "/kafka-ca-certs"
     volumes:
       - name: config-secret
         secret:
           secretName: kessel-inventory  # leverages inventory secret as it includes kafka info
+          defaultMode: 420
+      - name: spicedb-secret
+        secret:
+          secretName: kessel-relations-spicedb
           defaultMode: 420
       - name: kafka-ca-certs
         secret:

@@ -21,6 +21,7 @@ import (
 	"github.com/project-kessel/inventory-api/internal/server"
 	kessel "github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
 	"github.com/sony/gobreaker"
+	"github.com/spf13/viper"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -253,37 +254,59 @@ func (uc *Usecase) CheckForUpdate(ctx context.Context, permission, namespace str
 
 // resolveConsistencyToken resolves the consistency token based on the preference.
 func (uc *Usecase) resolveConsistencyToken(ctx context.Context, consistency model.ConsistencyConfig, reporterResourceKey model.ReporterResourceKey) (string, error) {
-	switch consistency.Preference {
-	case model.ConsistencyMinimizeLatency:
-		// No token needed - minimize_latency mode
-		log.Info("Using minimize_latency consistency")
-		return "", nil
+	// Feature flag: when true, force minimize_latency regardless of client request
+	// When false, use client-specified consistency (existing logic)
+	if viper.GetBool("authz.kessel.force-inventory-default-consistency-minimize-latency") {
+		log.Info("Feature flag authz.kessel.force-inventory-default-consistency-minimize-latency is enabled")
+		// Feature flag is true - use client-specified consistency (existing logic below)
+		switch consistency.Preference {
+		case model.ConsistencyMinimizeLatency:
+			// No token needed - minimize_latency mode
+			log.Info("Using minimize_latency consistency")
+			return "", nil
 
-	case model.ConsistencyAtLeastAsFresh:
-		// Use the token provided by the caller
-		log.Infof("Using at_least_as_fresh consistency with provided token: %s", consistency.Token)
-		return consistency.Token, nil
+		case model.ConsistencyAtLeastAsFresh:
+			// Use the token provided by the caller
+			log.Infof("Using at_least_as_fresh consistency with provided token: %s", consistency.Token)
+			return consistency.Token, nil
 
-	case model.ConsistencyAtLeastAsAcknowledged:
-		// Look up the token from inventory database
-		log.Info("Using at_least_as_acknowledged consistency - looking up token from DB")
+		case model.ConsistencyAtLeastAsAcknowledged:
+			// Look up the token from inventory database
+			log.Info("Using at_least_as_acknowledged consistency - looking up token from DB")
+			res, err := uc.resourceRepository.FindResourceByKeys(nil, reporterResourceKey)
+			if err != nil {
+				if errors.Is(err, gorm.ErrRecordNotFound) {
+					// Resource doesn't exist in inventory, fall back to minimize_latency
+					log.Info("Resource not found in inventory, falling back to minimize_latency")
+					return "", nil
+				}
+				return "", err
+			}
+			token := res.ConsistencyToken().Serialize()
+			log.Infof("Found inventory-managed consistency token: %s", token)
+			return token, nil
+
+		default:
+			// Default to minimize_latency
+			log.Info("Unknown consistency preference, defaulting to minimize_latency")
+			return "", nil
+		}
+
+	} else {
+		// Feature flag is false - always look up token from inventory DB
+		log.Info("Feature flag disabled - using inventory-managed consistency lookup")
 		res, err := uc.resourceRepository.FindResourceByKeys(nil, reporterResourceKey)
 		if err != nil {
-			if errors.Is(err, gorm.ErrRecordNotFound) {
-				// Resource doesn't exist in inventory, fall back to minimize_latency
-				log.Info("Resource not found in inventory, falling back to minimize_latency")
-				return "", nil
+			log.Info("Did not find resource")
+			// If the resource doesn't exist in inventory (ie. no consistency token available)
+			// we send a check request with minimize latency
+			// err otherwise.
+			if !errors.Is(err, gorm.ErrRecordNotFound) {
+				return "", err
 			}
-			return "", err
+			return "", nil
 		}
-		token := res.ConsistencyToken().Serialize()
-		log.Infof("Found inventory-managed consistency token: %s", token)
-		return token, nil
-
-	default:
-		// Default to minimize_latency
-		log.Info("Unknown consistency preference, defaulting to minimize_latency")
-		return "", nil
+		return res.ConsistencyToken().Serialize(), nil
 	}
 }
 

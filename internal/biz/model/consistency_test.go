@@ -18,9 +18,9 @@ func TestConsistencyPreference_String(t *testing.T) {
 			expected: "minimize_latency",
 		},
 		{
-			name:     "inventory_managed",
-			pref:     ConsistencyInventoryManaged,
-			expected: "inventory_managed",
+			name:     "at_least_as_acknowledged",
+			pref:     ConsistencyAtLeastAsAcknowledged,
+			expected: "at_least_as_acknowledged",
 		},
 		{
 			name:     "at_least_as_fresh",
@@ -47,9 +47,9 @@ func TestNewMinimizeLatencyConsistency(t *testing.T) {
 	assert.Empty(t, config.Token)
 }
 
-func TestNewInventoryManagedConsistency(t *testing.T) {
-	config := NewInventoryManagedConsistency()
-	assert.Equal(t, ConsistencyInventoryManaged, config.Preference)
+func TestNewAtLeastAsAcknowledgedConsistency(t *testing.T) {
+	config := NewAtLeastAsAcknowledgedConsistency()
+	assert.Equal(t, ConsistencyAtLeastAsAcknowledged, config.Preference)
 	assert.Empty(t, config.Token)
 }
 

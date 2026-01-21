@@ -8,9 +8,9 @@ const (
 	// No consistency guarantee - uses whatever data is fastest to retrieve.
 	ConsistencyMinimizeLatency ConsistencyPreference = 0
 
-	// ConsistencyInventoryManaged looks up the consistency token from inventory's database.
+	// ConsistencyAtLeastAsAcknowledged looks up the consistency token from inventory's database.
 	// Provides read-after-write consistency for inventory-managed resources.
-	ConsistencyInventoryManaged ConsistencyPreference = 1
+	ConsistencyAtLeastAsAcknowledged ConsistencyPreference = 1
 
 	// ConsistencyAtLeastAsFresh uses a consistency token provided by the caller.
 	// All data used in the API call must be at least as fresh as the token.
@@ -22,8 +22,8 @@ func (c ConsistencyPreference) String() string {
 	switch c {
 	case ConsistencyMinimizeLatency:
 		return "minimize_latency"
-	case ConsistencyInventoryManaged:
-		return "inventory_managed"
+	case ConsistencyAtLeastAsAcknowledged:
+		return "at_least_as_acknowledged"
 	case ConsistencyAtLeastAsFresh:
 		return "at_least_as_fresh"
 	default:
@@ -45,10 +45,10 @@ func NewMinimizeLatencyConsistency() ConsistencyConfig {
 	}
 }
 
-// NewInventoryManagedConsistency creates a consistency config for inventory_managed.
-func NewInventoryManagedConsistency() ConsistencyConfig {
+// NewAtLeastAsAcknowledgedConsistency creates a consistency config for at_least_as_acknowledged.
+func NewAtLeastAsAcknowledgedConsistency() ConsistencyConfig {
 	return ConsistencyConfig{
-		Preference: ConsistencyInventoryManaged,
+		Preference: ConsistencyAtLeastAsAcknowledged,
 	}
 }
 

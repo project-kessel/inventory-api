@@ -264,9 +264,9 @@ func (uc *Usecase) resolveConsistencyToken(ctx context.Context, consistency mode
 		log.Infof("Using at_least_as_fresh consistency with provided token: %s", consistency.Token)
 		return consistency.Token, nil
 
-	case model.ConsistencyInventoryManaged:
+	case model.ConsistencyAtLeastAsAcknowledged:
 		// Look up the token from inventory database
-		log.Info("Using inventory_managed consistency - looking up token from DB")
+		log.Info("Using at_least_as_acknowledged consistency - looking up token from DB")
 		res, err := uc.resourceRepository.FindResourceByKeys(nil, reporterResourceKey)
 		if err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {

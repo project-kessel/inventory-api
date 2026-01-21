@@ -209,8 +209,8 @@ func convertConsistencyToModel(consistency *pb.Consistency) model.ConsistencyCon
 		return model.NewMinimizeLatencyConsistency()
 	}
 
-	if consistency.GetInventoryManaged() {
-		return model.NewInventoryManagedConsistency()
+	if consistency.GetAtLeastAsAcknowledged() {
+		return model.NewAtLeastAsAcknowledgedConsistency()
 	}
 
 	if token := consistency.GetAtLeastAsFresh(); token != nil {

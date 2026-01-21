@@ -402,12 +402,13 @@ components:
                         All data used in the API call must be *at least as fresh*
                          as found in the ConsistencyToken. More recent data might be used
                          if available or faster.
-                inventoryManaged:
+                atLeastAsAcknowledged:
                     type: boolean
                     description: |-
-                        Inventory looks up the consistency token from its database.
+                        All data used in the API call must be *at least as acknowledged*
+                         meaning it will include data up to the latest write known to Inventory.
                          Provides read-after-write consistency for inventory-managed resources.
-                         Set to true to enable this mode.
+                         *Must* be set true if used.
             description: Defines how a request is handled by the service.
         kessel.inventory.v1beta2.ConsistencyToken:
             type: object

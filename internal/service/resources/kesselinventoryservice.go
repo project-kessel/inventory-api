@@ -350,7 +350,7 @@ func mapCheckSelfBulkRequestToV1beta1(req *pb.CheckSelfBulkRequest, identity *au
 		}
 	}
 
-	consistency := convertConsistencyToV1beta1(req.GetConsistencyToken())
+	consistency := convertConsistencyToV1beta1(req.GetConsistency())
 	return &pbv1beta1.CheckBulkRequest{
 		Items:       items,
 		Consistency: consistency,

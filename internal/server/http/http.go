@@ -17,7 +17,7 @@ import (
 )
 
 // New create a new http server.
-func New(c CompletedConfig, authn middleware.Middleware, meter metric.Meter, logger log.Logger) (*http.Server, error) {
+func New(c CompletedConfig, authn middleware.Middleware, metaAuthorizerMiddleware middleware.Middleware, meter metric.Meter, logger log.Logger) (*http.Server, error) {
 	requests, err := metrics.DefaultRequestsCounter(meter, metrics.DefaultServerRequestsCounterName)
 	if err != nil {
 		return nil, err
@@ -42,6 +42,7 @@ func New(c CompletedConfig, authn middleware.Middleware, meter metric.Meter, log
 			m.Validation(validator),
 			selector.Server(
 				authn,
+				metaAuthorizerMiddleware,
 			).Match(NewWhiteListMatcher).Build(),
 		),
 	}

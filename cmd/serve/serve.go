@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/go-kratos/kratos/v2/log"
+	kratosMiddleware "github.com/go-kratos/kratos/v2/middleware"
 	"github.com/project-kessel/inventory-api/internal/metricscollector"
 	"github.com/project-kessel/inventory-api/internal/service"
 	"github.com/sony/gobreaker"
@@ -224,6 +225,22 @@ func NewCommand(
 				return err
 			}
 
+			// Configure meta-authorizer middleware from config
+			var metaAuthorizerMiddleware kratosMiddleware.Middleware
+			if authzConfig.MetaAuthorizer != nil && authzConfig.MetaAuthorizer.Enabled {
+				metaAuthorizerConfig := middleware.MetaAuthorizerConfig{
+					Authorizer: authorizer,
+					Namespace:  authzConfig.MetaAuthorizer.Namespace,
+					Enabled:    authzConfig.MetaAuthorizer.Enabled,
+				}
+				metaAuthorizerMiddleware = middleware.MetaAuthorizerMiddleware(metaAuthorizerConfig, logger)
+			} else {
+				// Create a no-op middleware if meta-authorizer is disabled
+				metaAuthorizerMiddleware = func(next kratosMiddleware.Handler) kratosMiddleware.Handler {
+					return next
+				}
+			}
+
 			// construct eventing
 			// Note that we pass the server id here to act as the Source URI in cloudevents
 			// If a server ID isn't configured explicitly, `os.Hostname()` is used.
@@ -239,7 +256,7 @@ func NewCommand(
 			}
 
 			// construct servers
-			server, err := server.New(serverConfig, middleware.Authentication(authenticator), authnConfig, authenticator, logger)
+			server, err := server.New(serverConfig, middleware.Authentication(authenticator), metaAuthorizerMiddleware, authnConfig, authenticator, logger)
 			if err != nil {
 				return err
 			}

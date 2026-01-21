@@ -37,6 +37,9 @@ authn:
           grpc: true
 authz:
   impl: allow-all
+  metaauthorizer:
+    enabled: false
+    namespace: rbac
 eventing:
   eventer: stdout
 storage:
@@ -56,6 +59,6 @@ resources:
 consumer:
   enabled: false
 log:
-  level: "info"
+  level: "debug"
   livez: true
   readyz: true

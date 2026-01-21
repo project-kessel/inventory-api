@@ -12,8 +12,8 @@ import (
 type MetaAuthorizerOptions struct {
 	// Enabled controls whether meta authorization is enabled
 	Enabled *bool `mapstructure:"enabled"`
-	// Namespace is the namespace to use for metachecks (e.g., "rbac")
-	Namespace string `mapstructure:"namespace"`
+	// SubjectNamespace is the namespace to use for subject references in metachecks (e.g., "rbac")
+	SubjectNamespace string `mapstructure:"subject_namespace"`
 }
 
 // TODO: presumably more will go here to authenticate Common Inventory as a service to call Kessel.
@@ -30,14 +30,10 @@ const (
 )
 
 func NewOptions() *Options {
-	enabled := true
 	return &Options{
-		Authz:  AllowAll,
-		Kessel: kessel.NewOptions(),
-		MetaAuthorizer: &MetaAuthorizerOptions{
-			Enabled:   &enabled,
-			Namespace: "rbac",
-		},
+		Authz:          AllowAll,
+		Kessel:         kessel.NewOptions(),
+		MetaAuthorizer: nil, // Default to nil - only create if present in config
 	}
 }
 

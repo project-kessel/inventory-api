@@ -8,8 +8,8 @@ import (
 
 // MetaAuthorizerConfig holds the configuration for meta-authorization middleware
 type MetaAuthorizerConfig struct {
-	Enabled   bool
-	Namespace string
+	Enabled          bool
+	SubjectNamespace string
 }
 
 type Config struct {
@@ -26,17 +26,18 @@ func NewConfig(o *Options) *Config {
 
 	var metaAuthzConfig *MetaAuthorizerConfig
 	if o.MetaAuthorizer != nil {
-		enabled := true
+		// Default to disabled if not explicitly set
+		enabled := false
 		if o.MetaAuthorizer.Enabled != nil {
 			enabled = *o.MetaAuthorizer.Enabled
 		}
-		namespace := "rbac"
-		if o.MetaAuthorizer.Namespace != "" {
-			namespace = o.MetaAuthorizer.Namespace
+		subjectNamespace := "rbac"
+		if o.MetaAuthorizer.SubjectNamespace != "" {
+			subjectNamespace = o.MetaAuthorizer.SubjectNamespace
 		}
 		metaAuthzConfig = &MetaAuthorizerConfig{
-			Enabled:   enabled,
-			Namespace: namespace,
+			Enabled:          enabled,
+			SubjectNamespace: subjectNamespace,
 		}
 	}
 

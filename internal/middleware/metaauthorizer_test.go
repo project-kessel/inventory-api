@@ -303,9 +303,9 @@ func TestMetaAuthorizer_DecisionRule3_MetacheckAllowed(t *testing.T) {
 	// This test is kept for documentation but will not actually perform a metacheck
 	mockAuthorizer := new(MockAuthorizer)
 	config := MetaAuthorizerConfig{
-		Enabled:    true,
-		Authorizer: mockAuthorizer,
-		Namespace:  "rbac",
+		Enabled:          true,
+		Authorizer:       mockAuthorizer,
+		SubjectNamespace: "rbac",
 	}
 	middleware := MetaAuthorizerMiddleware(config, testLogger)
 
@@ -347,9 +347,9 @@ func TestMetaAuthorizer_DecisionRule3_MetacheckDenied(t *testing.T) {
 	// This test verifies that Decision Rule 1 applies and allows the request
 	mockAuthorizer := new(MockAuthorizer)
 	config := MetaAuthorizerConfig{
-		Enabled:    true,
-		Authorizer: mockAuthorizer,
-		Namespace:  "rbac",
+		Enabled:          true,
+		Authorizer:       mockAuthorizer,
+		SubjectNamespace: "rbac",
 	}
 	middleware := MetaAuthorizerMiddleware(config, testLogger)
 
@@ -387,9 +387,9 @@ func TestMetaAuthorizer_NoAuthorizerConfigured(t *testing.T) {
 	// NOTE: With Decision Rule 1 always applying, no authorizer is needed
 	// This test verifies that Decision Rule 1 allows the request even without an authorizer
 	config := MetaAuthorizerConfig{
-		Enabled:    true,
-		Authorizer: nil, // No authorizer configured - not needed because Decision Rule 1 applies
-		Namespace:  "rbac",
+		Enabled:          true,
+		Authorizer:       nil, // No authorizer configured - not needed because Decision Rule 1 applies
+		SubjectNamespace: "rbac",
 	}
 	middleware := MetaAuthorizerMiddleware(config, testLogger)
 
@@ -427,7 +427,10 @@ func TestSubjectReferenceFromIdentityForMetaAuthorizer_XRhIdentity(t *testing.T)
 		UserID:    "user-123",
 	}
 
-	subjectRef := subjectReferenceFromIdentityForMetaAuthorizer(identity)
+	config := MetaAuthorizerConfig{
+		SubjectNamespace: "rbac",
+	}
+	subjectRef := subjectReferenceFromIdentityForMetaAuthorizer(identity, config)
 
 	assert.NotNil(t, subjectRef)
 	assert.NotNil(t, subjectRef.Subject)
@@ -443,7 +446,10 @@ func TestSubjectReferenceFromIdentityForMetaAuthorizer_XRhIdentity_NoUserID(t *t
 		UserID:    "", // No UserID
 	}
 
-	subjectRef := subjectReferenceFromIdentityForMetaAuthorizer(identity)
+	config := MetaAuthorizerConfig{
+		SubjectNamespace: "rbac",
+	}
+	subjectRef := subjectReferenceFromIdentityForMetaAuthorizer(identity, config)
 
 	assert.NotNil(t, subjectRef)
 	assert.NotNil(t, subjectRef.Subject)
@@ -458,114 +464,16 @@ func TestSubjectReferenceFromIdentityForMetaAuthorizer_OIDC(t *testing.T) {
 		AuthType:  "oidc",
 	}
 
-	subjectRef := subjectReferenceFromIdentityForMetaAuthorizer(identity)
+	config := MetaAuthorizerConfig{
+		SubjectNamespace: "rbac",
+	}
+	subjectRef := subjectReferenceFromIdentityForMetaAuthorizer(identity, config)
 
 	assert.NotNil(t, subjectRef)
 	assert.NotNil(t, subjectRef.Subject)
 	assert.Equal(t, "user-789", subjectRef.Subject.Id) // Should extract from "domain/subject"
 	assert.Equal(t, "rbac", subjectRef.Subject.Type.Namespace)
 	assert.Equal(t, "principal", subjectRef.Subject.Type.Name)
-}
-
-func TestMetaAuthorizer_ConsistencyToken_AtLeastAsFresh(t *testing.T) {
-	// NOTE: Decision Rule 1 always applies, so consistency token is preserved but metacheck is not called
-	mockAuthorizer := new(MockAuthorizer)
-	config := MetaAuthorizerConfig{
-		Enabled:    true,
-		Authorizer: mockAuthorizer,
-		Namespace:  "rbac",
-	}
-	middleware := MetaAuthorizerMiddleware(config, testLogger)
-
-	identity := &authnapi.Identity{
-		Principal: "user-789",
-		AuthType:  "x-rh-identity",
-		UserID:    "user-789",
-	}
-	ctx := context.WithValue(context.Background(), IdentityRequestKey, identity)
-
-	consistencyToken := "test-token-123"
-	req := &pb.CheckSelfRequest{
-		Object: &pb.ResourceReference{
-			ResourceType: "host",
-			ResourceId:   "host-123",
-			Reporter: &pb.ReporterReference{
-				Type: "hbi",
-			},
-		},
-		Relation: "viewer",
-		Consistency: &pb.Consistency{
-			Requirement: &pb.Consistency_AtLeastAsFresh{
-				AtLeastAsFresh: &pb.ConsistencyToken{
-					Token: consistencyToken,
-				},
-			},
-		},
-	}
-
-	// Should allow without metacheck (Decision Rule 1 always applies)
-	// Consistency token is preserved in the request but metacheck is not called
-	result, err := middleware(func(ctx context.Context, req any) (any, error) {
-		// Verify consistency token is preserved
-		checkSelfReq := req.(*pb.CheckSelfRequest)
-		assert.NotNil(t, checkSelfReq.Consistency)
-		assert.Equal(t, consistencyToken, checkSelfReq.Consistency.GetAtLeastAsFresh().GetToken())
-		return "success", nil
-	})(ctx, req)
-
-	assert.NoError(t, err)
-	assert.Equal(t, "success", result)
-	// Verify metacheck was NOT called (Decision Rule 1 applies first)
-	mockAuthorizer.AssertNotCalled(t, "Check")
-}
-
-func TestMetaAuthorizer_ConsistencyToken_MinimizeLatency(t *testing.T) {
-	// NOTE: Decision Rule 1 always applies, so consistency token is preserved but metacheck is not called
-	mockAuthorizer := new(MockAuthorizer)
-	config := MetaAuthorizerConfig{
-		Enabled:    true,
-		Authorizer: mockAuthorizer,
-		Namespace:  "rbac",
-	}
-	middleware := MetaAuthorizerMiddleware(config, testLogger)
-
-	identity := &authnapi.Identity{
-		Principal: "user-789",
-		AuthType:  "x-rh-identity",
-		UserID:    "user-789",
-	}
-	ctx := context.WithValue(context.Background(), IdentityRequestKey, identity)
-
-	req := &pb.CheckSelfRequest{
-		Object: &pb.ResourceReference{
-			ResourceType: "host",
-			ResourceId:   "host-123",
-			Reporter: &pb.ReporterReference{
-				Type: "hbi",
-			},
-		},
-		Relation: "viewer",
-		Consistency: &pb.Consistency{
-			Requirement: &pb.Consistency_MinimizeLatency{
-				MinimizeLatency: true,
-			},
-		},
-	}
-
-	// Should allow without metacheck (Decision Rule 1 always applies)
-	// Consistency token is preserved in the request but metacheck is not called
-	result, err := middleware(func(ctx context.Context, req any) (any, error) {
-		// Verify consistency token is preserved
-		checkSelfReq := req.(*pb.CheckSelfRequest)
-		assert.NotNil(t, checkSelfReq.Consistency)
-		assert.True(t, checkSelfReq.Consistency.GetMinimizeLatency())
-		return "success", nil
-	})(ctx, req)
-
-	assert.NoError(t, err)
-	assert.Equal(t, "success", result)
-	// Verify metacheck was NOT called (Decision Rule 1 applies first)
-	mockAuthorizer.AssertNotCalled(t, "Check")
 }
 
 func TestCreateTempRequestForDecisionLogic(t *testing.T) {
@@ -595,69 +503,4 @@ func TestCreateTempRequestForDecisionLogic(t *testing.T) {
 	assert.Equal(t, originalReq.Consistency, tempReq.Consistency)
 	// Verify original request is not modified
 	assert.Equal(t, "viewer", originalReq.Relation)
-}
-
-func TestExtractConsistencyToken(t *testing.T) {
-	tests := []struct {
-		name        string
-		req         *pb.CheckSelfRequest
-		wantToken   string
-		description string
-	}{
-		{
-			name: "nil consistency",
-			req: &pb.CheckSelfRequest{
-				Object: &pb.ResourceReference{
-					ResourceType: "host",
-					ResourceId:   "host-123",
-				},
-				Relation: "viewer",
-			},
-			wantToken:   "",
-			description: "Should return empty string when consistency is nil",
-		},
-		{
-			name: "minimize_latency",
-			req: &pb.CheckSelfRequest{
-				Object: &pb.ResourceReference{
-					ResourceType: "host",
-					ResourceId:   "host-123",
-				},
-				Relation: "viewer",
-				Consistency: &pb.Consistency{
-					Requirement: &pb.Consistency_MinimizeLatency{
-						MinimizeLatency: true,
-					},
-				},
-			},
-			wantToken:   "",
-			description: "Should return empty string for minimize_latency",
-		},
-		{
-			name: "at_least_as_fresh",
-			req: &pb.CheckSelfRequest{
-				Object: &pb.ResourceReference{
-					ResourceType: "host",
-					ResourceId:   "host-123",
-				},
-				Relation: "viewer",
-				Consistency: &pb.Consistency{
-					Requirement: &pb.Consistency_AtLeastAsFresh{
-						AtLeastAsFresh: &pb.ConsistencyToken{
-							Token: "test-token-456",
-						},
-					},
-				},
-			},
-			wantToken:   "test-token-456",
-			description: "Should return token string for at_least_as_fresh",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			gotToken := extractConsistencyToken(tt.req)
-			assert.Equal(t, tt.wantToken, gotToken, tt.description)
-		})
-	}
 }

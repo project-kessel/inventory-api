@@ -37,9 +37,9 @@ authn:
           grpc: true
 authz:
   impl: allow-all
-  metaauthorizer:
+  metaauthorizer: # meta-authorization if config not present than meta-authorization is disabled
     enabled: false
-    namespace: rbac
+    subject_namespace: rbac # namespace for subject references in metachecks
 eventing:
   eventer: stdout
 storage:

@@ -228,18 +228,25 @@ func NewCommand(
 			}
 
 			// Configure meta-authorizer middleware from config
+			metaAuthorizerLogHelper := log.NewHelper(log.With(logger, "subsystem", "metaauthorizer"))
 			var metaAuthorizerMiddleware kratosMiddleware.Middleware
 			if authzConfig.MetaAuthorizer != nil && authzConfig.MetaAuthorizer.Enabled {
 				metaAuthorizerConfig := middleware.MetaAuthorizerConfig{
-					Authorizer: authorizer,
-					Namespace:  authzConfig.MetaAuthorizer.Namespace,
-					Enabled:    authzConfig.MetaAuthorizer.Enabled,
+					Authorizer:       authorizer,
+					SubjectNamespace: authzConfig.MetaAuthorizer.SubjectNamespace,
+					Enabled:          authzConfig.MetaAuthorizer.Enabled,
 				}
 				metaAuthorizerMiddleware = middleware.MetaAuthorizerMiddleware(metaAuthorizerConfig, logger)
+				metaAuthorizerLogHelper.Infof("Meta-authorizer enabled: subject_namespace=%s", authzConfig.MetaAuthorizer.SubjectNamespace)
 			} else {
 				// Create a no-op middleware if meta-authorizer is disabled
 				metaAuthorizerMiddleware = func(next kratosMiddleware.Handler) kratosMiddleware.Handler {
 					return next
+				}
+				if authzConfig.MetaAuthorizer == nil {
+					metaAuthorizerLogHelper.Info("Meta-authorizer disabled: configuration not present")
+				} else {
+					metaAuthorizerLogHelper.Info("Meta-authorizer disabled: enabled=false in configuration")
 				}
 			}
 

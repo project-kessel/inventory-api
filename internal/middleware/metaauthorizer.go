@@ -31,8 +31,8 @@ type MetaAuthorizerConfig struct {
 	// Authorizer is used to perform the actual authorization checks
 	// If nil, the middleware will use decision logic only (no actual metacheck)
 	Authorizer authzapi.Authorizer
-	// Namespace is the namespace to use for metachecks (e.g., "rbac")
-	Namespace string
+	// SubjectNamespace is the namespace to use for subject references in metachecks (e.g., "rbac")
+	SubjectNamespace string
 	// Enabled controls whether meta authorization is enabled
 	Enabled bool
 	// Logger is used for logging middleware operations
@@ -54,16 +54,6 @@ type MetaAuthorizerConfig struct {
 //     1. if relation == "check_self" → return allow
 //     2. if subject.authtype == "oidc" → return allow
 //     3. return deny (if metacheck fails)
-//
-// The middleware:
-//  1. Checks if transport is HTTP (skip if gRPC)
-//  2. Checks if auth type is x-rh-identity (skip if not)
-//  3. Only handles CheckSelf requests
-//  4. Extracts authclaims (identity) from context
-//  5. Extracts object and relation from CheckSelfRequest
-//  6. Applies decision logic (check_self relation or OIDC → allow)
-//  7. If decision logic doesn't apply, performs metacheck
-//  8. Allows or denies based on metacheck result
 func MetaAuthorizerMiddleware(config MetaAuthorizerConfig, logger log.Logger) func(middleware.Handler) middleware.Handler {
 	logHelper := log.NewHelper(log.With(logger, "subsystem", "metaauthorizer"))
 
@@ -147,8 +137,6 @@ func createTempRequestForDecisionLogic(originalReq *pb.CheckSelfRequest) *pb.Che
 }
 
 // extractConsistencyToken extracts the consistency token string from a CheckSelfRequest.
-// Returns empty string if consistency is nil or uses minimize_latency.
-// Returns the token string if consistency uses at_least_as_fresh.
 func extractConsistencyToken(req *pb.CheckSelfRequest) string {
 	consistency := req.GetConsistency()
 	if consistency == nil {
@@ -166,8 +154,6 @@ func extractConsistencyToken(req *pb.CheckSelfRequest) string {
 
 // performMetaAuthorizerDecision implements the flowchart decision logic for CheckSelf.
 func performMetaAuthorizerDecision(ctx context.Context, req *pb.CheckSelfRequest, identity *authnapi.Identity, config MetaAuthorizerConfig, logger *log.Helper) (bool, error) {
-	// Decision rule 1: If relation == "check_self" → allow
-	// Note: req.Relation is set to "check_self" before calling this function, so this always applies
 	if req.Relation == CheckSelfRelation {
 		logger.Debugf("Meta-authorization: Decision Rule 1 applies (relation == '%s'), allowing without metacheck", CheckSelfRelation)
 		return true, nil
@@ -193,7 +179,7 @@ func performMetaAuthorizerMetacheck(ctx context.Context, object *pb.ResourceRefe
 	}
 
 	// Convert identity (authclaims) to SubjectReference for the metacheck
-	subjectRef := subjectReferenceFromIdentityForMetaAuthorizer(identity)
+	subjectRef := subjectReferenceFromIdentityForMetaAuthorizer(identity, config)
 	subjectID := subjectRef.Subject.Id
 
 	logHelper.Debugf("Meta-authorization metacheck: subject '%s' can '%s' resource '%s/%s' in namespace '%s'",
@@ -201,14 +187,14 @@ func performMetaAuthorizerMetacheck(ctx context.Context, object *pb.ResourceRefe
 		relation,
 		object.ResourceType,
 		object.ResourceId,
-		config.Namespace)
+		config.SubjectNamespace)
 
 	// Perform the metacheck using the authorizer
 	allowed, _, err := config.Authorizer.Check(
 		ctx,
-		config.Namespace,
+		config.SubjectNamespace,
 		relation,
-		consistencyToken, // Use consistency token from request
+		consistencyToken,
 		object.ResourceType,
 		object.ResourceId,
 		subjectRef,
@@ -238,7 +224,6 @@ func performMetaAuthorizerMetacheck(ctx context.Context, object *pb.ResourceRefe
 			object.ResourceId)
 	}
 
-	// CheckResponse_ALLOWED_TRUE means the metacheck passed
 	return allowedResult, nil
 }
 
@@ -250,7 +235,7 @@ func performMetaAuthorizerMetacheck(ctx context.Context, object *pb.ResourceRefe
 //   - OIDC: Parses Principal (extracts subject from "domain/subject" format)
 //   - Namespace: Always "rbac" for meta-authorization
 //   - Type: Always "principal"
-func subjectReferenceFromIdentityForMetaAuthorizer(identity *authnapi.Identity) *kessel.SubjectReference {
+func subjectReferenceFromIdentityForMetaAuthorizer(identity *authnapi.Identity, config MetaAuthorizerConfig) *kessel.SubjectReference {
 	// Determine subject ID based on authentication type
 	var subjectID string
 
@@ -269,14 +254,11 @@ func subjectReferenceFromIdentityForMetaAuthorizer(identity *authnapi.Identity) 
 		}
 	}
 
-	// Determine namespace - always "rbac" for meta-authz
-	namespace := "rbac"
-
 	return &kessel.SubjectReference{
 		Relation: nil,
 		Subject: &kessel.ObjectReference{
 			Type: &kessel.ObjectType{
-				Namespace: namespace,
+				Namespace: config.SubjectNamespace,
 				Name:      "principal",
 			},
 			Id: subjectID,

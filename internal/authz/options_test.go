@@ -10,19 +10,15 @@ import (
 )
 
 func TestNewOptions(t *testing.T) {
-	enabled := true
 	test := struct {
 		options         *Options
 		expectedOptions *Options
 	}{
 		options: NewOptions(),
 		expectedOptions: &Options{
-			Authz:  AllowAll,
-			Kessel: kessel.NewOptions(),
-			MetaAuthorizer: &MetaAuthorizerOptions{
-				Enabled:   &enabled,
-				Namespace: "rbac",
-			},
+			Authz:          AllowAll,
+			Kessel:         kessel.NewOptions(),
+			MetaAuthorizer: nil, // Default to nil - disabled by default
 		},
 	}
 	assert.Equal(t, test.expectedOptions, NewOptions())

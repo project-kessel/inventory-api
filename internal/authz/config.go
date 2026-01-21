@@ -6,9 +6,16 @@ import (
 	"github.com/project-kessel/inventory-api/internal/authz/kessel"
 )
 
+// MetaAuthorizerConfig holds the configuration for meta-authorization middleware
+type MetaAuthorizerConfig struct {
+	Enabled   bool
+	Namespace string
+}
+
 type Config struct {
-	Authz  string
-	Kessel *kessel.Config
+	Authz          string
+	Kessel         *kessel.Config
+	MetaAuthorizer *MetaAuthorizerConfig
 }
 
 func NewConfig(o *Options) *Config {
@@ -17,15 +24,33 @@ func NewConfig(o *Options) *Config {
 		kcfg = kessel.NewConfig(o.Kessel)
 	}
 
+	var metaAuthzConfig *MetaAuthorizerConfig
+	if o.MetaAuthorizer != nil {
+		enabled := true
+		if o.MetaAuthorizer.Enabled != nil {
+			enabled = *o.MetaAuthorizer.Enabled
+		}
+		namespace := "rbac"
+		if o.MetaAuthorizer.Namespace != "" {
+			namespace = o.MetaAuthorizer.Namespace
+		}
+		metaAuthzConfig = &MetaAuthorizerConfig{
+			Enabled:   enabled,
+			Namespace: namespace,
+		}
+	}
+
 	return &Config{
-		Authz:  o.Authz,
-		Kessel: kcfg,
+		Authz:          o.Authz,
+		Kessel:         kcfg,
+		MetaAuthorizer: metaAuthzConfig,
 	}
 }
 
 type completedConfig struct {
-	Authz  string
-	Kessel kessel.CompletedConfig
+	Authz          string
+	Kessel         kessel.CompletedConfig
+	MetaAuthorizer *MetaAuthorizerConfig
 }
 
 type CompletedConfig struct {
@@ -34,7 +59,8 @@ type CompletedConfig struct {
 
 func (c *Config) Complete(ctx context.Context) (CompletedConfig, []error) {
 	cfg := &completedConfig{
-		Authz: c.Authz,
+		Authz:          c.Authz,
+		MetaAuthorizer: c.MetaAuthorizer,
 	}
 
 	if c.Authz == Kessel {

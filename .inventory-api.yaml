@@ -59,6 +59,6 @@ resources:
 consumer:
   enabled: false
 log:
-  level: "debug"
+  level: "info"
   livez: true
   readyz: true

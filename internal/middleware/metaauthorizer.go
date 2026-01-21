@@ -162,7 +162,7 @@ func MetaAuthorizerMiddleware(config MetaAuthorizerConfig, logger log.Logger) fu
 					tempReq := &pb.CheckSelfRequest{
 						Object:      item.Object,
 						Relation:    CheckSelfRelation,
-						Consistency: checkSelfBulkReq.GetConsistencyToken(),
+						Consistency: checkSelfBulkReq.GetConsistency(),
 					}
 
 					allowed, err := performMetaAuthorizerDecision(ctx, tempReq, identity, config, logHelper)

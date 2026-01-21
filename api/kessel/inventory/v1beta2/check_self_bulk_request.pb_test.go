@@ -38,13 +38,13 @@ func TestCheckSelfBulkRequestItem_ProtoMessage(t *testing.T) {
 func TestCheckSelfBulkRequest_Nil(t *testing.T) {
 	var req *CheckSelfBulkRequest
 	assert.Nil(t, req.GetItems())
-	assert.Nil(t, req.GetConsistencyToken())
+	assert.Nil(t, req.GetConsistency())
 }
 
 func TestCheckSelfBulkRequest_ZeroStruct(t *testing.T) {
 	var req CheckSelfBulkRequest
 	assert.Nil(t, req.GetItems())
-	assert.Nil(t, req.GetConsistencyToken())
+	assert.Nil(t, req.GetConsistency())
 }
 
 func TestCheckSelfBulkRequest_Reset(t *testing.T) {

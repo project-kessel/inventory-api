@@ -456,7 +456,7 @@ components:
                     type: array
                     items:
                         $ref: '#/components/schemas/kessel.inventory.v1beta2.CheckSelfBulkRequestItem'
-                consistencyToken:
+                consistency:
                     $ref: '#/components/schemas/kessel.inventory.v1beta2.Consistency'
             description: |-
                 CheckSelfBulkRequest allows checking multiple permissions for the caller

@@ -537,7 +537,7 @@ components:
                     type: string
                     format: enum
                 consistencyToken:
-                    $ref: '#/components/schemas/kessel.inventory.v1beta2.Consistency'
+                    $ref: '#/components/schemas/kessel.inventory.v1beta2.ConsistencyToken'
             description: CheckSelfResponse represents the result of a self-access permission check.
         kessel.inventory.v1beta2.Consistency:
             type: object

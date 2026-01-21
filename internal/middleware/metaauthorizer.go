@@ -35,8 +35,6 @@ type MetaAuthorizerConfig struct {
 	SubjectNamespace string
 	// Enabled controls whether meta authorization is enabled
 	Enabled bool
-	// Logger is used for logging middleware operations
-	Logger *log.Helper
 }
 
 // MetaAuthorizerMiddleware creates a middleware that performs meta-authorization checks

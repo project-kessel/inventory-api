@@ -2,7 +2,6 @@ package middleware
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/go-kratos/kratos/v2/errors"
 	"github.com/go-kratos/kratos/v2/log"
@@ -114,7 +113,7 @@ func MetaAuthorizerMiddleware(config MetaAuthorizerConfig, logger log.Logger) fu
 				}
 
 				if !allowed {
-					logHelper.Warnf("Meta-authorization check failed: relation=%s, resourceType=%s, resourceId=%s, userID=%s",
+					logHelper.Debugf("Meta-authorization check failed: relation=%s, resourceType=%s, resourceId=%s, userID=%s",
 						originalRelation,
 						checkSelfReq.Object.GetResourceType(),
 						checkSelfReq.Object.GetResourceId(),
@@ -136,26 +135,10 @@ func MetaAuthorizerMiddleware(config MetaAuthorizerConfig, logger log.Logger) fu
 			if isCheckSelfBulk {
 				items := checkSelfBulkReq.GetItems()
 
-				// Validate items array is not empty
-				if len(items) == 0 {
-					logHelper.Debugf("Meta-authorization: CheckSelfBulk request has no items, skipping")
-					return next(ctx, req)
-				}
-
 				logHelper.Debugf("Meta-authorization: Processing CheckSelfBulk request with %d items", len(items))
 
 				// Check each item in the bulk request
 				for i, item := range items {
-					// Validate item and object are not nil
-					if item == nil {
-						logHelper.Errorf("Meta-authorization: item %d is nil", i)
-						return nil, errors.BadRequest("INVALID_REQUEST", fmt.Sprintf("item %d: cannot be nil", i))
-					}
-					if item.GetObject() == nil {
-						logHelper.Errorf("Meta-authorization: item %d has nil object", i)
-						return nil, errors.BadRequest("INVALID_REQUEST", fmt.Sprintf("item %d: object is required", i))
-					}
-
 					// Create a temporary CheckSelfRequest for decision logic
 					tempReq := &pb.CheckSelfRequest{
 						Object:      item.Object,
@@ -245,7 +228,11 @@ func performMetaAuthorizerMetacheck(ctx context.Context, object *pb.ResourceRefe
 	}
 
 	// Convert identity (authclaims) to SubjectReference for the metacheck
-	subjectRef := subjectReferenceFromIdentityForMetaAuthorizer(identity, config)
+	subjectRef, err := subjectReferenceFromIdentityForMetaAuthorizer(identity, config)
+	if err != nil {
+		logHelper.Warnf("Meta-authorization metacheck failed: invalid identity: %v", err)
+		return false, errors.Unauthorized("UNAUTHENTICATED", "invalid identity for meta-authorization")
+	}
 	subjectID := subjectRef.Subject.Id
 
 	logHelper.Debugf("Meta-authorization metacheck: subject '%s' can '%s' resource '%s/%s' in namespace '%s'",
@@ -301,8 +288,11 @@ func performMetaAuthorizerMetacheck(ctx context.Context, object *pb.ResourceRefe
 //   - OIDC: Parses Principal (extracts subject from "domain/subject" format)
 //   - Namespace: Uses config.SubjectNamespace (typically "rbac")
 //   - Type: Always "principal"
-func subjectReferenceFromIdentityForMetaAuthorizer(identity *authnapi.Identity, config MetaAuthorizerConfig) *kessel.SubjectReference {
-	subjectID := SubjectIDFromIdentity(identity)
+func subjectReferenceFromIdentityForMetaAuthorizer(identity *authnapi.Identity, config MetaAuthorizerConfig) (*kessel.SubjectReference, error) {
+	subjectID, err := SubjectIDFromIdentity(identity)
+	if err != nil {
+		return nil, err
+	}
 
 	return &kessel.SubjectReference{
 		Relation: nil,
@@ -313,5 +303,5 @@ func subjectReferenceFromIdentityForMetaAuthorizer(identity *authnapi.Identity, 
 			},
 			Id: subjectID,
 		},
-	}
+	}, nil
 }

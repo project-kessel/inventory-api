@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"fmt"
 	"strings"
 
 	authnapi "github.com/project-kessel/inventory-api/internal/authn/api"
@@ -13,26 +14,36 @@ import (
 // Conversion logic:
 //   - x-rh-identity: Uses UserID if available, otherwise Principal
 //   - OIDC: Parses Principal (extracts subject from "domain/subject" format)
-func SubjectIDFromIdentity(identity *authnapi.Identity) string {
+func SubjectIDFromIdentity(identity *authnapi.Identity) (string, error) {
+	if identity == nil {
+		return "", fmt.Errorf("identity is nil")
+	}
+
 	if identity.AuthType == "x-rh-identity" {
 		// For x-rh-identity, prefer UserID if available (more stable identifier)
 		if identity.UserID != "" {
-			return identity.UserID
+			return identity.UserID, nil
 		}
 		if identity.Principal != "" {
-			return identity.Principal
+			return identity.Principal, nil
 		}
 		// Fallback: should not happen for authenticated requests
-		return identity.Principal
+		return "", fmt.Errorf("missing principal and userID for x-rh-identity")
 	}
 
 	// For OIDC and other auth types, parse Principal
 	// Principal might be in "domain/subject" format (OIDC) or just "subject"
+	if identity.Principal == "" {
+		return "", fmt.Errorf("missing principal for auth type %s", identity.AuthType)
+	}
 	subjectID := identity.Principal
 	if parts := strings.SplitN(identity.Principal, "/", 2); len(parts) == 2 {
 		subjectID = parts[1]
 	}
-	return subjectID
+	if subjectID == "" {
+		return "", fmt.Errorf("derived empty subject ID from principal")
+	}
+	return subjectID, nil
 }
 
 // SubjectReferenceFromIdentity converts identity to a v1beta1 SubjectReference.
@@ -41,8 +52,11 @@ func SubjectIDFromIdentity(identity *authnapi.Identity) string {
 // Namespace logic:
 //   - x-rh-identity: Always uses "rbac" namespace
 //   - OIDC/other: Uses "rbac" by default, but can use identity.Type if set
-func SubjectReferenceFromIdentity(identity *authnapi.Identity) *pbv1beta1.SubjectReference {
-	subjectID := SubjectIDFromIdentity(identity)
+func SubjectReferenceFromIdentity(identity *authnapi.Identity) (*pbv1beta1.SubjectReference, error) {
+	subjectID, err := SubjectIDFromIdentity(identity)
+	if err != nil {
+		return nil, err
+	}
 
 	// Determine namespace
 	// For x-rh-identity: Type field contains "User", "System", etc. but we use "rbac" as namespace
@@ -62,5 +76,5 @@ func SubjectReferenceFromIdentity(identity *authnapi.Identity) *pbv1beta1.Subjec
 			},
 			Id: subjectID,
 		},
-	}
+	}, nil
 }

@@ -430,7 +430,8 @@ func TestSubjectReferenceFromIdentityForMetaAuthorizer_XRhIdentity(t *testing.T)
 	config := MetaAuthorizerConfig{
 		SubjectNamespace: "rbac",
 	}
-	subjectRef := subjectReferenceFromIdentityForMetaAuthorizer(identity, config)
+	subjectRef, err := subjectReferenceFromIdentityForMetaAuthorizer(identity, config)
+	assert.NoError(t, err)
 
 	assert.NotNil(t, subjectRef)
 	assert.NotNil(t, subjectRef.Subject)
@@ -449,7 +450,8 @@ func TestSubjectReferenceFromIdentityForMetaAuthorizer_XRhIdentity_NoUserID(t *t
 	config := MetaAuthorizerConfig{
 		SubjectNamespace: "rbac",
 	}
-	subjectRef := subjectReferenceFromIdentityForMetaAuthorizer(identity, config)
+	subjectRef, err := subjectReferenceFromIdentityForMetaAuthorizer(identity, config)
+	assert.NoError(t, err)
 
 	assert.NotNil(t, subjectRef)
 	assert.NotNil(t, subjectRef.Subject)
@@ -467,7 +469,8 @@ func TestSubjectReferenceFromIdentityForMetaAuthorizer_OIDC(t *testing.T) {
 	config := MetaAuthorizerConfig{
 		SubjectNamespace: "rbac",
 	}
-	subjectRef := subjectReferenceFromIdentityForMetaAuthorizer(identity, config)
+	subjectRef, err := subjectReferenceFromIdentityForMetaAuthorizer(identity, config)
+	assert.NoError(t, err)
 
 	assert.NotNil(t, subjectRef)
 	assert.NotNil(t, subjectRef.Subject)

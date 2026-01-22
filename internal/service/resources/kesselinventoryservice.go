@@ -134,7 +134,10 @@ func (s *InventoryService) CheckSelf(ctx context.Context, req *pb.CheckSelfReque
 
 	if reporterResourceKey, err := reporterKeyFromResourceReference(req.Object); err == nil {
 		// Derive subject reference from identity (x-rh-identity header)
-		subjectRef := middleware.SubjectReferenceFromIdentity(identity)
+		subjectRef, err := middleware.SubjectReferenceFromIdentity(identity)
+		if err != nil {
+			return nil, status.Errorf(codes.Unauthenticated, "invalid identity: %v", err)
+		}
 		if resp, err := s.Ctl.Check(ctx, req.GetRelation(), req.Object.Reporter.GetType(), subjectRef, reporterResourceKey); err == nil {
 			allowed := pb.Allowed_ALLOWED_FALSE
 			if resp {
@@ -194,7 +197,10 @@ func (s *InventoryService) CheckSelfBulk(ctx context.Context, req *pb.CheckSelfB
 
 	log.Info("CheckSelfBulk using v1beta2 db")
 	// Map request to v1beta1 format, deriving subject from identity (x-rh-identity header)
-	v1beta1Req := mapCheckSelfBulkRequestToV1beta1(req, identity)
+	v1beta1Req, err := mapCheckSelfBulkRequestToV1beta1(req, identity)
+	if err != nil {
+		return nil, status.Errorf(codes.Unauthenticated, "invalid identity: %v", err)
+	}
 	resp, err := s.Ctl.CheckBulk(ctx, v1beta1Req)
 	if err != nil {
 		return nil, err
@@ -228,7 +234,7 @@ func subjectReferenceFromSubjectV1beta1(subject *pbv1beta1.SubjectReference) *pb
 	}
 }
 
-func subjectReferenceFromIdentity(identity *authnapi.Identity) *pbv1beta1.SubjectReference {
+func subjectReferenceFromIdentity(identity *authnapi.Identity) (*pbv1beta1.SubjectReference, error) {
 	// Use shared subject derivation logic from middleware
 	return middleware.SubjectReferenceFromIdentity(identity)
 }
@@ -325,11 +331,14 @@ func mapCheckBulkResponseFromV1beta1(resp *pbv1beta1.CheckBulkResponse) *pb.Chec
 	}
 }
 
-func mapCheckSelfBulkRequestToV1beta1(req *pb.CheckSelfBulkRequest, identity *authnapi.Identity) *pbv1beta1.CheckBulkRequest {
+func mapCheckSelfBulkRequestToV1beta1(req *pb.CheckSelfBulkRequest, identity *authnapi.Identity) (*pbv1beta1.CheckBulkRequest, error) {
 	items := make([]*pbv1beta1.CheckBulkRequestItem, len(req.GetItems()))
 	// Derive subject reference from identity (x-rh-identity header or other auth)
 	// All items in the bulk request use the same subject (the caller)
-	subjectRef := subjectReferenceFromIdentity(identity)
+	subjectRef, err := subjectReferenceFromIdentity(identity)
+	if err != nil {
+		return nil, err
+	}
 
 	for i, item := range req.GetItems() {
 		// Note: Input validation is done in CheckSelfBulk handler, but defensive nil checks here
@@ -354,7 +363,7 @@ func mapCheckSelfBulkRequestToV1beta1(req *pb.CheckSelfBulkRequest, identity *au
 	return &pbv1beta1.CheckBulkRequest{
 		Items:       items,
 		Consistency: consistency,
-	}
+	}, nil
 }
 
 func mapCheckSelfBulkResponseFromV1beta1(resp *pbv1beta1.CheckBulkResponse, req *pb.CheckSelfBulkRequest) *pb.CheckSelfBulkResponse {

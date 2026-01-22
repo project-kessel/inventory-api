@@ -20,9 +20,11 @@ storage:
     user: inventory_api
     password: postgres
     dbname: inventory
-resources:
-  schemaPath: "data/schema/resources"
-  use_cache: true
+schema:
+  repository: in-memory
+  in-memory:
+    type: json
+    path: schema_cache.json
 log:
   level: "info"
   livez: true

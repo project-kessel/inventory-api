@@ -256,8 +256,8 @@ func (uc *Usecase) CheckForUpdate(ctx context.Context, permission, namespace str
 func (uc *Usecase) resolveConsistencyToken(ctx context.Context, consistency model.ConsistencyConfig, reporterResourceKey model.ReporterResourceKey) (string, error) {
 	// Feature flag: when true, force minimize_latency regardless of client request
 	// When false, use client-specified consistency (existing logic)
-	if viper.GetBool("authz.kessel.force-inventory-default-consistency-minimize-latency") {
-		log.Info("Feature flag authz.kessel.force-inventory-default-consistency-minimize-latency is enabled")
+	if viper.GetBool("authz.kessel.allow-client-consistency-preference") {
+		log.Info("Feature flag authz.kessel.allow-client-consistency-preference is enabled")
 		// Feature flag is true - use client-specified consistency (existing logic below)
 		switch consistency.Preference {
 		case model.ConsistencyMinimizeLatency:

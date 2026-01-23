@@ -15,8 +15,24 @@ import (
 	"github.com/project-kessel/inventory-api/internal/metricscollector"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"gorm.io/gorm"
 )
+
+// newTestUsecase creates a Usecase with FakeStore for testing.
+func newTestUsecase(t *testing.T) (*Usecase, *data.FakeStore) {
+	t.Helper()
+	logger := log.DefaultLogger
+	store := data.NewFakeStore()
+	schemaRepository := newFakeSchemaRepository(t)
+	authorizer := &allow.AllowAllAuthz{}
+	usecaseConfig := &UsecaseConfig{
+		ReadAfterWriteEnabled: false,
+		ConsumerEnabled:       false,
+	}
+	mc := metricscollector.NewFakeMetricsCollector()
+
+	usecase := New(store, schemaRepository, authorizer, nil, "test-topic", logger, nil, usecaseConfig, mc)
+	return usecase, store
+}
 
 // createTestCommand creates a ReportResourceCommand for testing.
 func createTestCommand(t *testing.T, resourceType, reporterType, reporterInstance, localResourceId, workspaceId string) model.ReportResourceCommand {
@@ -284,17 +300,7 @@ func TestReportResource(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
-			logger := log.DefaultLogger
-
-			resourceRepo := data.NewFakeResourceRepository()
-			authorizer := &allow.AllowAllAuthz{}
-			usecaseConfig := &UsecaseConfig{
-				ReadAfterWriteEnabled: false,
-				ConsumerEnabled:       false,
-			}
-			mc := metricscollector.NewFakeMetricsCollector()
-			schemaRepository := newFakeSchemaRepository(t)
-			usecase := New(resourceRepo, schemaRepository, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig, mc)
+			usecase, store := newTestUsecase(t)
 
 			reportCmd := createTestCommand(t, tt.resourceType, tt.reporterType, tt.reporterInstance, tt.localResourceId, tt.workspaceId)
 			err := usecase.ReportResource(ctx, reportCmd, "test-reporter")
@@ -318,7 +324,9 @@ func TestReportResource(t *testing.T) {
 			key, err := model.NewReporterResourceKey(localResourceId, resourceType, reporterType, reporterInstanceId)
 			require.NoError(t, err)
 
-			foundResource, err := resourceRepo.FindResourceByKeys(nil, key)
+			resourceRepo := store.GetResourceRepository()
+
+			foundResource, err := resourceRepo.FindResourceByKeys(key)
 			require.NoError(t, err)
 			require.NotNil(t, foundResource)
 
@@ -350,13 +358,13 @@ func TestReportResourceThenDelete(t *testing.T) {
 			expectError:              false,
 		},
 		{
-			name:                     "deletes resource without reporterInstanceId",
+			name:                     "deletes resource with same reporterInstanceId",
 			resourceType:             "host",
 			reporterType:             "hbi",
 			reporterInstanceId:       "delete-test-instance-2",
 			localResourceId:          "delete-test-resource-2",
 			workspaceId:              "delete-test-workspace-2",
-			deleteReporterInstanceId: "",
+			deleteReporterInstanceId: "delete-test-instance-2",
 			expectError:              false,
 		},
 	}
@@ -364,17 +372,9 @@ func TestReportResourceThenDelete(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
-			logger := log.DefaultLogger
 
-			resourceRepo := data.NewFakeResourceRepository()
-			authorizer := &allow.AllowAllAuthz{}
-			usecaseConfig := &UsecaseConfig{
-				ReadAfterWriteEnabled: false,
-				ConsumerEnabled:       false,
-			}
-			mc := metricscollector.NewFakeMetricsCollector()
-			schemaRepository := newFakeSchemaRepository(t)
-			usecase := New(resourceRepo, schemaRepository, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig, mc)
+			usecase, store := newTestUsecase(t)
+			resourceRepo := store.GetResourceRepository()
 
 			reportCmd := createTestCommand(t, tt.resourceType, tt.reporterType, tt.reporterInstanceId, tt.localResourceId, tt.workspaceId)
 			err := usecase.ReportResource(ctx, reportCmd, "test-reporter")
@@ -392,7 +392,7 @@ func TestReportResourceThenDelete(t *testing.T) {
 			key, err := model.NewReporterResourceKey(localResourceId, resourceType, reporterType, reporterInstanceId)
 			require.NoError(t, err)
 
-			foundResource, err := resourceRepo.FindResourceByKeys(nil, key)
+			foundResource, err := resourceRepo.FindResourceByKeys(key)
 			require.NoError(t, err)
 			require.NotNil(t, foundResource)
 
@@ -410,7 +410,7 @@ func TestReportResourceThenDelete(t *testing.T) {
 			deleteKey, err := model.NewReporterResourceKey(localResourceId, resourceType, reporterType, deleteReporterInstanceId)
 			require.NoError(t, err)
 
-			deleteFoundResource, err := resourceRepo.FindResourceByKeys(nil, deleteKey)
+			deleteFoundResource, err := resourceRepo.FindResourceByKeys(deleteKey)
 			require.NoError(t, err)
 			require.NotNil(t, deleteFoundResource)
 
@@ -425,18 +425,7 @@ func TestReportResourceThenDelete(t *testing.T) {
 
 
 func TestDelete_ResourceNotFound(t *testing.T) {
-	logger := log.DefaultLogger
-
-	resourceRepo := data.NewFakeResourceRepository()
-	authorizer := &allow.AllowAllAuthz{}
-	usecaseConfig := &UsecaseConfig{
-		ReadAfterWriteEnabled: false,
-		ConsumerEnabled:       false,
-	}
-
-	mc := metricscollector.NewFakeMetricsCollector()
-	schemaRepository := newFakeSchemaRepository(t)
-	usecase := New(resourceRepo, schemaRepository, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig, mc)
+	usecase, _ := newTestUsecase(t)
 
 	localResourceId, err := model.NewLocalResourceId("non-existent-resource")
 	require.NoError(t, err)
@@ -456,18 +445,10 @@ func TestDelete_ResourceNotFound(t *testing.T) {
 
 func TestReportFindDeleteFind_TombstoneLifecycle(t *testing.T) {
 	ctx := context.Background()
-	logger := log.DefaultLogger
 
-	resourceRepo := data.NewFakeResourceRepository()
-	authorizer := &allow.AllowAllAuthz{}
-	usecaseConfig := &UsecaseConfig{
-		ReadAfterWriteEnabled: false,
-		ConsumerEnabled:       false,
-	}
+	usecase, store := newTestUsecase(t)
+			resourceRepo := store.GetResourceRepository()
 
-	mc := metricscollector.NewFakeMetricsCollector()
-	schemaRepository := newFakeSchemaRepository(t)
-	usecase := New(resourceRepo, schemaRepository, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig, mc)
 
 	reportCmd := createTestCommand(t, "k8s_cluster", "ocm", "lifecycle-instance", "lifecycle-resource", "lifecycle-workspace")
 	err := usecase.ReportResource(ctx, reportCmd, "test-reporter")
@@ -485,14 +466,14 @@ func TestReportFindDeleteFind_TombstoneLifecycle(t *testing.T) {
 	key, err := model.NewReporterResourceKey(localResourceId, resourceType, reporterType, reporterInstanceId)
 	require.NoError(t, err)
 
-	foundResource, err := resourceRepo.FindResourceByKeys(nil, key)
+	foundResource, err := resourceRepo.FindResourceByKeys(key)
 	require.NoError(t, err)
 	require.NotNil(t, foundResource)
 
 	err = usecase.Delete(ctx, key)
 	require.NoError(t, err)
 
-	foundResource, err = resourceRepo.FindResourceByKeys(nil, key)
+	foundResource, err = resourceRepo.FindResourceByKeys(key)
 	// With tombstone filter removed, we should find the tombstoned resource
 	require.NoError(t, err)
 	require.NotNil(t, foundResource)
@@ -501,18 +482,10 @@ func TestReportFindDeleteFind_TombstoneLifecycle(t *testing.T) {
 
 func TestMultipleHostsLifecycle(t *testing.T) {
 	ctx := context.Background()
-	logger := log.DefaultLogger
 
-	resourceRepo := data.NewFakeResourceRepository()
-	authorizer := &allow.AllowAllAuthz{}
-	usecaseConfig := &UsecaseConfig{
-		ReadAfterWriteEnabled: false,
-		ConsumerEnabled:       false,
-	}
+	usecase, store := newTestUsecase(t)
+			resourceRepo := store.GetResourceRepository()
 
-	mc := metricscollector.NewFakeMetricsCollector()
-	schemaRepository := newFakeSchemaRepository(t)
-	usecase := New(resourceRepo, schemaRepository, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig, mc)
 
 	// Create 2 hosts
 	host1Cmd := createTestCommand(t, "host", "hbi", "hbi-instance-1", "host-1", "workspace-1")
@@ -529,11 +502,11 @@ func TestMultipleHostsLifecycle(t *testing.T) {
 	key2, err := model.NewReporterResourceKey("host-2", "host", "hbi", "hbi-instance-1")
 	require.NoError(t, err)
 
-	foundHost1, err := resourceRepo.FindResourceByKeys(nil, key1)
+	foundHost1, err := resourceRepo.FindResourceByKeys(key1)
 	require.NoError(t, err, "Should find host1 after creation")
 	require.NotNil(t, foundHost1)
 
-	foundHost2, err := resourceRepo.FindResourceByKeys(nil, key2)
+	foundHost2, err := resourceRepo.FindResourceByKeys(key2)
 	require.NoError(t, err, "Should find host2 after creation")
 	require.NotNil(t, foundHost2)
 
@@ -547,11 +520,11 @@ func TestMultipleHostsLifecycle(t *testing.T) {
 	require.NoError(t, err, "Should update host2")
 
 	// Verify both updated hosts can still be found
-	updatedHost1, err := resourceRepo.FindResourceByKeys(nil, key1)
+	updatedHost1, err := resourceRepo.FindResourceByKeys(key1)
 	require.NoError(t, err, "Should find host1 after update")
 	require.NotNil(t, updatedHost1)
 
-	updatedHost2, err := resourceRepo.FindResourceByKeys(nil, key2)
+	updatedHost2, err := resourceRepo.FindResourceByKeys(key2)
 	require.NoError(t, err, "Should find host2 after update")
 	require.NotNil(t, updatedHost2)
 
@@ -563,12 +536,12 @@ func TestMultipleHostsLifecycle(t *testing.T) {
 	require.NoError(t, err, "Should delete host2")
 
 	// Verify both hosts can be found (tombstoned) with tombstone filter removed
-	foundHost1, err = resourceRepo.FindResourceByKeys(nil, key1)
+	foundHost1, err = resourceRepo.FindResourceByKeys(key1)
 	require.NoError(t, err, "Should find tombstoned host1")
 	require.NotNil(t, foundHost1)
 	assert.True(t, foundHost1.ReporterResources()[0].Serialize().Tombstone, "Host1 should be tombstoned")
 
-	foundHost2, err = resourceRepo.FindResourceByKeys(nil, key2)
+	foundHost2, err = resourceRepo.FindResourceByKeys(key2)
 	require.NoError(t, err, "Should find tombstoned host2")
 	require.NotNil(t, foundHost2)
 	assert.True(t, foundHost2.ReporterResources()[0].Serialize().Tombstone, "Host2 should be tombstoned")
@@ -577,18 +550,10 @@ func TestMultipleHostsLifecycle(t *testing.T) {
 
 func TestPartialDataScenarios(t *testing.T) {
 	ctx := context.Background()
-	logger := log.DefaultLogger
 
-	resourceRepo := data.NewFakeResourceRepository()
-	authorizer := &allow.AllowAllAuthz{}
-	usecaseConfig := &UsecaseConfig{
-		ReadAfterWriteEnabled: false,
-		ConsumerEnabled:       false,
-	}
+	usecase, store := newTestUsecase(t)
+			resourceRepo := store.GetResourceRepository()
 
-	mc := metricscollector.NewFakeMetricsCollector()
-	schemaRepository := newFakeSchemaRepository(t)
-	usecase := New(resourceRepo, schemaRepository, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig, mc)
 
 	t.Run("Report resource with rich reporter data and minimal common data", func(t *testing.T) {
 		request := createTestCommandWithReporterDataOnly(t, "k8s_cluster", "ocm", "ocm-instance-1", "reporter-rich-resource", "minimal-workspace")
@@ -598,7 +563,7 @@ func TestPartialDataScenarios(t *testing.T) {
 		key, err := model.NewReporterResourceKey("reporter-rich-resource", "k8s_cluster", "ocm", "ocm-instance-1")
 		require.NoError(t, err)
 
-		foundResource, err := resourceRepo.FindResourceByKeys(nil, key)
+		foundResource, err := resourceRepo.FindResourceByKeys(key)
 		require.NoError(t, err, "Should find resource with rich reporter data")
 		require.NotNil(t, foundResource)
 	})
@@ -611,7 +576,7 @@ func TestPartialDataScenarios(t *testing.T) {
 		key, err := model.NewReporterResourceKey("common-rich-resource", "k8s_cluster", "ocm", "ocm-instance-1")
 		require.NoError(t, err)
 
-		foundResource, err := resourceRepo.FindResourceByKeys(nil, key)
+		foundResource, err := resourceRepo.FindResourceByKeys(key)
 		require.NoError(t, err, "Should find resource with rich common data")
 		require.NotNil(t, foundResource)
 	})
@@ -625,7 +590,7 @@ func TestPartialDataScenarios(t *testing.T) {
 		key, err := model.NewReporterResourceKey("progressive-resource", "k8s_cluster", "ocm", "ocm-instance-1")
 		require.NoError(t, err)
 
-		foundResource, err := resourceRepo.FindResourceByKeys(nil, key)
+		foundResource, err := resourceRepo.FindResourceByKeys(key)
 		require.NoError(t, err, "Should find resource after initial creation")
 		require.NotNil(t, foundResource)
 
@@ -634,7 +599,7 @@ func TestPartialDataScenarios(t *testing.T) {
 		err = usecase.ReportResource(ctx, reporterFocusedRequest, "test-reporter")
 		require.NoError(t, err, "Should update resource with reporter-focused data")
 
-		foundResource, err = resourceRepo.FindResourceByKeys(nil, key)
+		foundResource, err = resourceRepo.FindResourceByKeys(key)
 		require.NoError(t, err, "Should find resource after reporter-focused update")
 		require.NotNil(t, foundResource)
 
@@ -643,7 +608,7 @@ func TestPartialDataScenarios(t *testing.T) {
 		err = usecase.ReportResource(ctx, commonFocusedRequest, "test-reporter")
 		require.NoError(t, err, "Should update resource with common-focused data")
 
-		finalResource, err := resourceRepo.FindResourceByKeys(nil, key)
+		finalResource, err := resourceRepo.FindResourceByKeys(key)
 		require.NoError(t, err, "Should find resource after all updates")
 		require.NotNil(t, finalResource)
 	})
@@ -653,18 +618,10 @@ func TestPartialDataScenarios(t *testing.T) {
 func TestResourceLifecycle_ReportUpdateDeleteReport(t *testing.T) {
 	t.Run("report new -> update -> delete -> report new", func(t *testing.T) {
 		ctx := context.Background()
-		logger := log.DefaultLogger
 
-		resourceRepo := data.NewFakeResourceRepository()
-		authorizer := &allow.AllowAllAuthz{}
-		usecaseConfig := &UsecaseConfig{
-			ReadAfterWriteEnabled: false,
-			ConsumerEnabled:       false,
-		}
+		usecase, store := newTestUsecase(t)
+			resourceRepo := store.GetResourceRepository()
 
-		mc := metricscollector.NewFakeMetricsCollector()
-		schemaRepository := newFakeSchemaRepository(t)
-		usecase := New(resourceRepo, schemaRepository, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig, mc)
 
 		resourceType := "host"
 		reporterType := "hbi"
@@ -681,7 +638,7 @@ func TestResourceLifecycle_ReportUpdateDeleteReport(t *testing.T) {
 		key := createReporterResourceKey(t, localResourceId, resourceType, reporterType, reporterInstance)
 
 		// Verify initial state: generation = 0, representationVersion = 0
-		afterCreate, err := resourceRepo.FindResourceByKeys(nil, key)
+		afterCreate, err := resourceRepo.FindResourceByKeys(key)
 		require.NoError(t, err, "Should find resource after creation")
 		require.NotNil(t, afterCreate)
 		initialGeneration := afterCreate.ReporterResources()[0].Serialize().Generation
@@ -698,7 +655,7 @@ func TestResourceLifecycle_ReportUpdateDeleteReport(t *testing.T) {
 		require.NoError(t, err, "Update should succeed")
 
 		// Verify state after update: representationVersion incremented, generation unchanged
-		afterUpdate, err := resourceRepo.FindResourceByKeys(nil, key)
+		afterUpdate, err := resourceRepo.FindResourceByKeys(key)
 		require.NoError(t, err, "Should find resource after update")
 		require.NotNil(t, afterUpdate)
 		updateGeneration := afterUpdate.ReporterResources()[0].Serialize().Generation
@@ -714,7 +671,7 @@ func TestResourceLifecycle_ReportUpdateDeleteReport(t *testing.T) {
 		require.NoError(t, err, "Delete should succeed")
 
 		// Verify state after delete: representationVersion incremented, generation unchanged, tombstoned
-		afterDelete, err := resourceRepo.FindResourceByKeys(nil, key)
+		afterDelete, err := resourceRepo.FindResourceByKeys(key)
 		require.NoError(t, err, "Should find tombstoned resource after delete")
 		require.NotNil(t, afterDelete)
 		deleteGeneration := afterDelete.ReporterResources()[0].Serialize().Generation
@@ -731,7 +688,7 @@ func TestResourceLifecycle_ReportUpdateDeleteReport(t *testing.T) {
 		require.NoError(t, err, "Report after delete should succeed")
 
 		// Verify final state after update on tombstoned resource
-		afterRevive, err := resourceRepo.FindResourceByKeys(nil, key)
+		afterRevive, err := resourceRepo.FindResourceByKeys(key)
 		require.NoError(t, err, "Should find resource after revival")
 		require.NotNil(t, afterRevive)
 		reviveGeneration := afterRevive.ReporterResources()[0].Serialize().Generation
@@ -746,18 +703,10 @@ func TestResourceLifecycle_ReportUpdateDeleteReport(t *testing.T) {
 func TestResourceLifecycle_ReportUpdateDeleteReportDelete(t *testing.T) {
 	t.Run("report new -> update -> delete -> report new -> delete", func(t *testing.T) {
 		ctx := context.Background()
-		logger := log.DefaultLogger
 
-		resourceRepo := data.NewFakeResourceRepository()
-		authorizer := &allow.AllowAllAuthz{}
-		usecaseConfig := &UsecaseConfig{
-			ReadAfterWriteEnabled: false,
-			ConsumerEnabled:       false,
-		}
+		usecase, store := newTestUsecase(t)
+			resourceRepo := store.GetResourceRepository()
 
-		mc := metricscollector.NewFakeMetricsCollector()
-		schemaRepository := newFakeSchemaRepository(t)
-		usecase := New(resourceRepo, schemaRepository, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig, mc)
 
 		resourceType := "k8s_cluster"
 		reporterType := "ocm"
@@ -790,13 +739,12 @@ func TestResourceLifecycle_ReportUpdateDeleteReportDelete(t *testing.T) {
 		require.NoError(t, err, "Second delete should succeed")
 
 		// Verify final state - resource should be tombstoned
-		finalResource, err := resourceRepo.FindResourceByKeys(nil, key)
-		if err == gorm.ErrRecordNotFound {
+		finalResource, err := resourceRepo.FindResourceByKeys(key)
+		if err != nil {
 			// This is expected with current tombstone filtering
 			assert.Nil(t, finalResource, "Resource should not be found if tombstone filter is active")
 		} else {
 			// If tombstone filter is removed, we should find the resource
-			require.NoError(t, err, "Should find tombstoned resource if filter is removed")
 			require.NotNil(t, finalResource)
 		}
 	})
@@ -820,18 +768,10 @@ func createReporterResourceKey(t *testing.T, localResourceId, resourceType, repo
 func TestResourceLifecycle_ReportDeleteResubmitDelete(t *testing.T) {
 	t.Run("report -> delete -> resubmit same delete", func(t *testing.T) {
 		ctx := context.Background()
-		logger := log.DefaultLogger
 
-		resourceRepo := data.NewFakeResourceRepository()
-		authorizer := &allow.AllowAllAuthz{}
-		usecaseConfig := &UsecaseConfig{
-			ReadAfterWriteEnabled: false,
-			ConsumerEnabled:       false,
-		}
+		usecase, store := newTestUsecase(t)
+			resourceRepo := store.GetResourceRepository()
 
-		mc := metricscollector.NewFakeMetricsCollector()
-		schemaRepository := newFakeSchemaRepository(t)
-		usecase := New(resourceRepo, schemaRepository, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig, mc)
 
 		resourceType := "k8s_cluster"
 		reporterType := "ocm"
@@ -848,7 +788,7 @@ func TestResourceLifecycle_ReportDeleteResubmitDelete(t *testing.T) {
 		key := createReporterResourceKey(t, localResourceId, resourceType, reporterType, reporterInstance)
 
 		// Verify initial state
-		afterReport1, err := resourceRepo.FindResourceByKeys(nil, key)
+		afterReport1, err := resourceRepo.FindResourceByKeys(key)
 		require.NoError(t, err, "Should find resource after initial report")
 		require.NotNil(t, afterReport1)
 		initialState := afterReport1.ReporterResources()[0].Serialize()
@@ -862,7 +802,7 @@ func TestResourceLifecycle_ReportDeleteResubmitDelete(t *testing.T) {
 		require.NoError(t, err, "Delete should succeed")
 
 		// Verify delete state
-		afterDelete1, err := resourceRepo.FindResourceByKeys(nil, key)
+		afterDelete1, err := resourceRepo.FindResourceByKeys(key)
 		require.NoError(t, err, "Should find tombstoned resource after delete")
 		require.NotNil(t, afterDelete1)
 		deleteState1 := afterDelete1.ReporterResources()[0].Serialize()
@@ -876,7 +816,7 @@ func TestResourceLifecycle_ReportDeleteResubmitDelete(t *testing.T) {
 		require.NoError(t, err, "Resubmitted delete should succeed (idempotent)")
 
 		// Verify state after duplicate delete (operations are idempotent - no changes for tombstoned resources)
-		afterDelete2, err := resourceRepo.FindResourceByKeys(nil, key)
+		afterDelete2, err := resourceRepo.FindResourceByKeys(key)
 		require.NoError(t, err, "Should still find tombstoned resource")
 		require.NotNil(t, afterDelete2)
 		deleteState2 := afterDelete2.ReporterResources()[0].Serialize()
@@ -890,18 +830,10 @@ func TestResourceLifecycle_ReportDeleteResubmitDelete(t *testing.T) {
 func TestResourceLifecycle_ReportResubmitDeleteResubmit(t *testing.T) {
 	t.Run("report -> resubmit same report -> delete -> resubmit same delete", func(t *testing.T) {
 		ctx := context.Background()
-		logger := log.DefaultLogger
 
-		resourceRepo := data.NewFakeResourceRepository()
-		authorizer := &allow.AllowAllAuthz{}
-		usecaseConfig := &UsecaseConfig{
-			ReadAfterWriteEnabled: false,
-			ConsumerEnabled:       false,
-		}
+		usecase, store := newTestUsecase(t)
+			resourceRepo := store.GetResourceRepository()
 
-		mc := metricscollector.NewFakeMetricsCollector()
-		schemaRepository := newFakeSchemaRepository(t)
-		usecase := New(resourceRepo, schemaRepository, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig, mc)
 
 		resourceType := "host"
 		reporterType := "hbi"
@@ -918,7 +850,7 @@ func TestResourceLifecycle_ReportResubmitDeleteResubmit(t *testing.T) {
 		key := createReporterResourceKey(t, localResourceId, resourceType, reporterType, reporterInstance)
 
 		// Verify initial state
-		afterReport1, err := resourceRepo.FindResourceByKeys(nil, key)
+		afterReport1, err := resourceRepo.FindResourceByKeys(key)
 		require.NoError(t, err, "Should find resource after initial report")
 		require.NotNil(t, afterReport1)
 		initialState := afterReport1.ReporterResources()[0].Serialize()
@@ -933,7 +865,7 @@ func TestResourceLifecycle_ReportResubmitDeleteResubmit(t *testing.T) {
 		require.NoError(t, err, "Resubmitted report should succeed (idempotent)")
 
 		// Verify state after duplicate report (should increment representation version)
-		afterReport2, err := resourceRepo.FindResourceByKeys(nil, key)
+		afterReport2, err := resourceRepo.FindResourceByKeys(key)
 		require.NoError(t, err, "Should find resource after duplicate report")
 		require.NotNil(t, afterReport2)
 		duplicateState := afterReport2.ReporterResources()[0].Serialize()
@@ -947,7 +879,7 @@ func TestResourceLifecycle_ReportResubmitDeleteResubmit(t *testing.T) {
 		require.NoError(t, err, "Delete should succeed")
 
 		// Verify delete state
-		afterDelete1, err := resourceRepo.FindResourceByKeys(nil, key)
+		afterDelete1, err := resourceRepo.FindResourceByKeys(key)
 		require.NoError(t, err, "Should find tombstoned resource after delete")
 		require.NotNil(t, afterDelete1)
 		deleteState1 := afterDelete1.ReporterResources()[0].Serialize()
@@ -961,7 +893,7 @@ func TestResourceLifecycle_ReportResubmitDeleteResubmit(t *testing.T) {
 		require.NoError(t, err, "Resubmitted delete should succeed (idempotent)")
 
 		// Verify final state after duplicate delete (operations are idempotent - no changes for tombstoned resources)
-		afterDelete2, err := resourceRepo.FindResourceByKeys(nil, key)
+		afterDelete2, err := resourceRepo.FindResourceByKeys(key)
 		require.NoError(t, err, "Should still find tombstoned resource")
 		require.NotNil(t, afterDelete2)
 		finalDeleteState := afterDelete2.ReporterResources()[0].Serialize()
@@ -974,18 +906,10 @@ func TestResourceLifecycle_ReportResubmitDeleteResubmit(t *testing.T) {
 func TestResourceLifecycle_ComplexIdempotency(t *testing.T) {
 	t.Run("3 cycles of create+update+delete for same resource", func(t *testing.T) {
 		ctx := context.Background()
-		logger := log.DefaultLogger
 
-		resourceRepo := data.NewFakeResourceRepository()
-		authorizer := &allow.AllowAllAuthz{}
-		usecaseConfig := &UsecaseConfig{
-			ReadAfterWriteEnabled: false,
-			ConsumerEnabled:       false,
-		}
+		usecase, store := newTestUsecase(t)
+			resourceRepo := store.GetResourceRepository()
 
-		mc := metricscollector.NewFakeMetricsCollector()
-		schemaRepository := newFakeSchemaRepository(t)
-		usecase := New(resourceRepo, schemaRepository, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig, mc)
 
 		resourceType := "k8s_cluster"
 		reporterType := "ocm"
@@ -1006,7 +930,7 @@ func TestResourceLifecycle_ComplexIdempotency(t *testing.T) {
 			require.NoError(t, err, "Report should succeed in cycle %d", cycle)
 
 			// Verify state after report
-			afterReport, err := resourceRepo.FindResourceByKeys(nil, key)
+			afterReport, err := resourceRepo.FindResourceByKeys(key)
 			require.NoError(t, err, "Should find resource after report in cycle %d", cycle)
 			require.NotNil(t, afterReport)
 			reportState := afterReport.ReporterResources()[0].Serialize()
@@ -1023,7 +947,7 @@ func TestResourceLifecycle_ComplexIdempotency(t *testing.T) {
 			require.NoError(t, err, "Update should succeed in cycle %d", cycle)
 
 			// Verify state after update
-			afterUpdate, err := resourceRepo.FindResourceByKeys(nil, key)
+			afterUpdate, err := resourceRepo.FindResourceByKeys(key)
 			require.NoError(t, err, "Should find resource after update in cycle %d", cycle)
 			require.NotNil(t, afterUpdate)
 			updateState := afterUpdate.ReporterResources()[0].Serialize()
@@ -1037,7 +961,7 @@ func TestResourceLifecycle_ComplexIdempotency(t *testing.T) {
 			require.NoError(t, err, "Delete should succeed in cycle %d", cycle)
 
 			// Verify state after delete
-			afterDelete, err := resourceRepo.FindResourceByKeys(nil, key)
+			afterDelete, err := resourceRepo.FindResourceByKeys(key)
 			require.NoError(t, err, "Should find tombstoned resource after delete in cycle %d", cycle)
 			require.NotNil(t, afterDelete)
 			deleteState := afterDelete.ReporterResources()[0].Serialize()
@@ -1050,7 +974,7 @@ func TestResourceLifecycle_ComplexIdempotency(t *testing.T) {
 		}
 
 		// Final verification: Resource should be in generation 2 after 3 cycles
-		finalResource, err := resourceRepo.FindResourceByKeys(nil, key)
+		finalResource, err := resourceRepo.FindResourceByKeys(key)
 		require.NoError(t, err, "Should find final resource")
 		require.NotNil(t, finalResource)
 		finalState := finalResource.ReporterResources()[0].Serialize()
@@ -1136,18 +1060,10 @@ func createTestRep(t *testing.T, version uint, data map[string]interface{}) *mod
 
 func TestTransactionIdIdempotency(t *testing.T) {
 	ctx := context.Background()
-	logger := log.DefaultLogger
 
-	resourceRepo := data.NewFakeResourceRepository()
-	authorizer := &allow.AllowAllAuthz{}
-	usecaseConfig := &UsecaseConfig{
-		ReadAfterWriteEnabled: false,
-		ConsumerEnabled:       false,
-	}
+	usecase, store := newTestUsecase(t)
+			resourceRepo := store.GetResourceRepository()
 
-	mc := metricscollector.NewFakeMetricsCollector()
-	schemaRepository := newFakeSchemaRepository(t)
-	usecase := New(resourceRepo, schemaRepository, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig, mc)
 
 	t.Run("Same transaction ID should be idempotent - no changes to representation tables", func(t *testing.T) {
 		resourceType := "host"
@@ -1166,7 +1082,7 @@ func TestTransactionIdIdempotency(t *testing.T) {
 		key := createReporterResourceKey(t, localResourceId, resourceType, reporterType, reporterInstance)
 
 		// Verify initial state
-		afterFirst, err := resourceRepo.FindResourceByKeys(nil, key)
+		afterFirst, err := resourceRepo.FindResourceByKeys(key)
 		require.NoError(t, err, "Should find resource after first report")
 		require.NotNil(t, afterFirst)
 		firstState := afterFirst.ReporterResources()[0].Serialize()
@@ -1179,7 +1095,7 @@ func TestTransactionIdIdempotency(t *testing.T) {
 		require.NoError(t, err, "Second report with same transaction ID should succeed (idempotent)")
 
 		// Verify no changes were made to representation tables
-		afterSecond, err := resourceRepo.FindResourceByKeys(nil, key)
+		afterSecond, err := resourceRepo.FindResourceByKeys(key)
 		require.NoError(t, err, "Should find resource after second report")
 		require.NotNil(t, afterSecond)
 		secondState := afterSecond.ReporterResources()[0].Serialize()
@@ -1206,7 +1122,7 @@ func TestTransactionIdIdempotency(t *testing.T) {
 		key := createReporterResourceKey(t, localResourceId, resourceType, reporterType, reporterInstance)
 
 		// Verify initial state
-		afterFirst, err := resourceRepo.FindResourceByKeys(nil, key)
+		afterFirst, err := resourceRepo.FindResourceByKeys(key)
 		require.NoError(t, err, "Should find resource after first report")
 		require.NotNil(t, afterFirst)
 		firstState := afterFirst.ReporterResources()[0].Serialize()
@@ -1219,7 +1135,7 @@ func TestTransactionIdIdempotency(t *testing.T) {
 		require.NoError(t, err, "Second report with different transaction ID should succeed")
 
 		// Verify representations were updated
-		afterSecond, err := resourceRepo.FindResourceByKeys(nil, key)
+		afterSecond, err := resourceRepo.FindResourceByKeys(key)
 		require.NoError(t, err, "Should find resource after second report")
 		require.NotNil(t, afterSecond)
 		secondState := afterSecond.ReporterResources()[0].Serialize()
@@ -1246,7 +1162,7 @@ func TestTransactionIdIdempotency(t *testing.T) {
 		key := createReporterResourceKey(t, localResourceId, resourceType, reporterType, reporterInstance)
 
 		// Verify initial state
-		afterFirst, err := resourceRepo.FindResourceByKeys(nil, key)
+		afterFirst, err := resourceRepo.FindResourceByKeys(key)
 		require.NoError(t, err, "Should find resource after first report")
 		require.NotNil(t, afterFirst)
 		firstState := afterFirst.ReporterResources()[0].Serialize()
@@ -1262,7 +1178,7 @@ func TestTransactionIdIdempotency(t *testing.T) {
 		require.NoError(t, err, "Update with different transaction ID should succeed")
 
 		// Verify state after update
-		afterUpdate, err := resourceRepo.FindResourceByKeys(nil, key)
+		afterUpdate, err := resourceRepo.FindResourceByKeys(key)
 		require.NoError(t, err, "Should find resource after update")
 		require.NotNil(t, afterUpdate)
 		updateState := afterUpdate.ReporterResources()[0].Serialize()
@@ -1275,7 +1191,7 @@ func TestTransactionIdIdempotency(t *testing.T) {
 		require.NoError(t, err, "Delete should succeed")
 
 		// Verify state after delete
-		afterDelete, err := resourceRepo.FindResourceByKeys(nil, key)
+		afterDelete, err := resourceRepo.FindResourceByKeys(key)
 		require.NoError(t, err, "Should find tombstoned resource after delete")
 		require.NotNil(t, afterDelete)
 		deleteState := afterDelete.ReporterResources()[0].Serialize()
@@ -1301,7 +1217,7 @@ func TestTransactionIdIdempotency(t *testing.T) {
 		key := createReporterResourceKey(t, localResourceId, resourceType, reporterType, reporterInstance)
 
 		// Verify initial state
-		afterFirst, err := resourceRepo.FindResourceByKeys(nil, key)
+		afterFirst, err := resourceRepo.FindResourceByKeys(key)
 		require.NoError(t, err, "Should find resource after first report")
 		require.NotNil(t, afterFirst)
 		firstState := afterFirst.ReporterResources()[0].Serialize()
@@ -1317,7 +1233,7 @@ func TestTransactionIdIdempotency(t *testing.T) {
 		require.NoError(t, err, "Second report with same transaction ID should succeed (idempotent)")
 
 		// Verify state hasn't changed (idempotent)
-		afterSecond, err := resourceRepo.FindResourceByKeys(nil, key)
+		afterSecond, err := resourceRepo.FindResourceByKeys(key)
 		require.NoError(t, err, "Should find resource after second report")
 		require.NotNil(t, afterSecond)
 		secondState := afterSecond.ReporterResources()[0].Serialize()
@@ -1330,7 +1246,7 @@ func TestTransactionIdIdempotency(t *testing.T) {
 		require.NoError(t, err, "Delete should succeed")
 
 		// Verify state after delete
-		afterDelete, err := resourceRepo.FindResourceByKeys(nil, key)
+		afterDelete, err := resourceRepo.FindResourceByKeys(key)
 		require.NoError(t, err, "Should find tombstoned resource after delete")
 		require.NotNil(t, afterDelete)
 		deleteState := afterDelete.ReporterResources()[0].Serialize()

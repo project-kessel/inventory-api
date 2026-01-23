@@ -276,6 +276,11 @@ func (ct ConsistencyToken) Serialize() string {
 	return SerializeString(ct)
 }
 
+// IsZero returns true if the token is empty.
+func (ct ConsistencyToken) IsZero() bool {
+	return ct == ""
+}
+
 type Generation uint
 
 func NewGeneration(generation uint) Generation {

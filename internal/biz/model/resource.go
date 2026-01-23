@@ -1,6 +1,7 @@
 package model
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"time"
@@ -10,21 +11,82 @@ import (
 
 const initialCommonVersion = 0
 
-type ResourceRepository interface {
-	Begin() (Tx, error)
-	Events() /** stream of events */ <-chan ResourceEvent
+// OutboxEvent represents an event from the outbox as received from Kafka.
+// This matches the shape of messages produced by Debezium CDC.
+type OutboxEvent struct {
+	operation   OperationType
+	txID        TransactionId
+	inventoryID ResourceId
+	tupleEvent  TupleEvent
 }
 
+// OperationType represents the type of operation for an outbox event.
+type OperationType string
+
+const (
+	OperationCreated OperationType = "created"
+	OperationUpdated OperationType = "updated"
+	OperationDeleted OperationType = "deleted"
+)
+
+// NewOutboxEvent creates a new OutboxEvent with validation.
+func NewOutboxEvent(operation OperationType, txID TransactionId, inventoryID ResourceId, tupleEvent TupleEvent) OutboxEvent {
+	return OutboxEvent{
+		operation:   operation,
+		txID:        txID,
+		inventoryID: inventoryID,
+		tupleEvent:  tupleEvent,
+	}
+}
+
+func (e OutboxEvent) Operation() OperationType   { return e.operation }
+func (e OutboxEvent) TxID() TransactionId        { return e.txID }
+func (e OutboxEvent) InventoryID() ResourceId    { return e.inventoryID }
+func (e OutboxEvent) TupleEvent() TupleEvent     { return e.tupleEvent }
+
+// Store provides transactional access to resource persistence, an event stream
+// for committed changes, and replication notification capabilities.
+type Store interface {
+	// Begin starts a new transaction.
+	Begin() (Tx, error)
+
+	// Events returns a channel that emits OutboxEvents after they are
+	// committed to the outbox. This is wired once at application startup.
+	// The Store internally consumes from Kafka (via Debezium CDC) and emits here.
+	Events() <-chan OutboxEvent
+
+	// WaitForReplication blocks until replication for the given transaction ID
+	// completes, or the context is cancelled. This encapsulates LISTEN semantics.
+	WaitForReplication(ctx context.Context, txid string) error
+
+	// NotifyReplicationComplete signals that replication for the given
+	// transaction ID has completed. Called by the consumer after processing.
+	// This encapsulates NOTIFY semantics.
+	NotifyReplicationComplete(ctx context.Context, txid string) error
+}
+
+// Tx represents a database transaction with access to repositories.
 type Tx interface {
+	// ResourceRepository returns the repository for resource operations
+	// within this transaction.
+	ResourceRepository() ResourceRepository
+
+	// Commit commits the transaction.
+	Commit() error
+
+	// Rollback aborts the transaction. It is safe to call after Commit
+	// (it will be a no-op), allowing the pattern: defer tx.Rollback()
+	Rollback() error
+}
+
+type ResourceRepository interface {
 	NextResourceId() (ResourceId, error)
 	NextReporterResourceId() (ReporterResourceId, error)
 	Save(resource Resource, operationType biz.EventOperationType, txid string) error
 	FindResourceByKeys(key ReporterResourceKey) (*Resource, error)
 	FindCurrentAndPreviousVersionedRepresentations(key ReporterResourceKey, currentVersion *uint, operationType biz.EventOperationType) (*Representations, *Representations, error)
 	FindLatestRepresentations(key ReporterResourceKey) (*Representations, error)
-	HasTransactionIdBeenProcessed(transactionId string) (bool, error)
-	Commit() error
-	Rollback() error
+	ContainsEventForTransactionId(transactionId string) (bool, error)
 }
 
 // Create Entities with unexported fields for encapsulation
@@ -310,6 +372,11 @@ func (r Resource) ReporterResources() []ReporterResource {
 
 func (r Resource) ConsistencyToken() ConsistencyToken {
 	return r.consistencyToken
+}
+
+// SetConsistencyToken updates the resource's consistency token.
+func (r *Resource) SetConsistencyToken(token ConsistencyToken) {
+	r.consistencyToken = token
 }
 
 // Serialization + Deserialization functions, direct initialization without validation

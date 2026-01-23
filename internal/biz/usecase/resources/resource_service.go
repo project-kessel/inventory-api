@@ -8,26 +8,17 @@ import (
 
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/google/uuid"
-	"github.com/project-kessel/inventory-api/cmd/common"
 	"github.com/project-kessel/inventory-api/internal/authn/interceptor"
 	authzapi "github.com/project-kessel/inventory-api/internal/authz/api"
 	"github.com/project-kessel/inventory-api/internal/biz"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
 	"github.com/project-kessel/inventory-api/internal/biz/schema"
-	"github.com/project-kessel/inventory-api/internal/data"
 	eventingapi "github.com/project-kessel/inventory-api/internal/eventing/api"
 	"github.com/project-kessel/inventory-api/internal/metricscollector"
-	"github.com/project-kessel/inventory-api/internal/pubsub"
 	"github.com/project-kessel/inventory-api/internal/server"
 	kessel "github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
 	"github.com/sony/gobreaker"
 	"google.golang.org/grpc"
-	"gorm.io/gorm"
-)
-
-const (
-	DeleteResourceOperationName = "DeleteResource"
-	ReportResourceOperationName = "ReportResource"
 )
 
 var (
@@ -52,9 +43,9 @@ type UsecaseConfig struct {
 }
 
 // Usecase provides business logic operations for resource management in the inventory system.
-// It coordinates between repositories, authorization, eventing, and other system components.
+// It coordinates between the Store, authorization, eventing, and other system components.
 type Usecase struct {
-	resourceRepository  data.ResourceRepository
+	store               model.Store
 	schemaUsecase       *SchemaUsecase
 	waitForNotifBreaker *gobreaker.CircuitBreaker
 	Authz               authzapi.Authorizer
@@ -62,23 +53,21 @@ type Usecase struct {
 	Namespace           string
 	Log                 *log.Helper
 	Server              server.Server
-	ListenManager       pubsub.ListenManagerImpl
 	Config              *UsecaseConfig
 	MetricsCollector    *metricscollector.MetricsCollector
 }
 
-func New(resourceRepository data.ResourceRepository,
+func New(store model.Store,
 	schemaRepository schema.Repository, authz authzapi.Authorizer, eventer eventingapi.Manager, namespace string, logger log.Logger,
-	listenManager pubsub.ListenManagerImpl, waitForNotifBreaker *gobreaker.CircuitBreaker, usecaseConfig *UsecaseConfig, metricsCollector *metricscollector.MetricsCollector) *Usecase {
+	waitForNotifBreaker *gobreaker.CircuitBreaker, usecaseConfig *UsecaseConfig, metricsCollector *metricscollector.MetricsCollector) *Usecase {
 	return &Usecase{
-		resourceRepository:  resourceRepository,
+		store:               store,
 		schemaUsecase:       NewSchemaUsecase(schemaRepository, log.NewHelper(logger)),
 		waitForNotifBreaker: waitForNotifBreaker,
 		Authz:               authz,
 		Eventer:             eventer,
 		Namespace:           namespace,
 		Log:                 log.NewHelper(logger),
-		ListenManager:       listenManager,
 		Config:              usecaseConfig,
 		MetricsCollector:    metricsCollector,
 	}
@@ -90,57 +79,59 @@ func (uc *Usecase) ReportResource(ctx context.Context, cmd model.ReportResourceC
 	clientID := interceptor.GetClientIDFromContext(ctx)
 	log.Infof("Reporting resource: key=%v, client_id=%s", cmd.Key(), clientID)
 
-	var subscription pubsub.Subscription
 	txidStr, err := getNextTransactionID()
 	if err != nil {
 		return err
 	}
 
 	readAfterWriteEnabled := uc.computeReadAfterWrite(cmd.WantsCommitPending(), reporterPrincipal)
-	if readAfterWriteEnabled && uc.Config.ConsumerEnabled {
-		subscription = uc.ListenManager.Subscribe(txidStr)
-		defer subscription.Unsubscribe()
-	}
-
 	reporterResourceKey := cmd.Key()
 
-	var operationType biz.EventOperationType
-	err = uc.resourceRepository.GetTransactionManager().HandleSerializableTransaction(
-		ReportResourceOperationName,
-		uc.resourceRepository.GetDB(),
-		func(tx *gorm.DB) error {
-			// Check for duplicate transaction ID's before we find the resource for quicker returns if it fails
-			transactionId := cmd.TransactionId().String()
-			if transactionId != "" {
-				alreadyProcessed, err := uc.resourceRepository.HasTransactionIdBeenProcessed(tx, transactionId)
-				if err != nil {
-					return fmt.Errorf("failed to check transaction ID: %w", err)
-				}
-				if alreadyProcessed {
-					log.Info("Transaction already processed, skipping update")
-					return nil
-				}
-			}
-
-			res, err := uc.resourceRepository.FindResourceByKeys(tx, reporterResourceKey)
-			if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
-				return fmt.Errorf("failed to lookup existing resource: %w", err)
-			}
-
-			if err == nil && res != nil {
-				log.Info("Resource already exists, updating")
-				operationType = biz.OperationTypeUpdated
-				return uc.updateResource(tx, cmd, res, txidStr)
-			}
-
-			log.Info("Creating new resource")
-			operationType = biz.OperationTypeCreated
-			return uc.createResource(tx, cmd, txidStr)
-		},
-	)
-
+	// Begin transaction
+	tx, err := uc.store.Begin()
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback() // Safe to call after Commit
+
+	repo := tx.ResourceRepository()
+
+	// Check for duplicate transaction ID's before we find the resource for quicker returns if it fails
+	transactionId := cmd.TransactionId().String()
+	if transactionId != "" {
+		alreadyProcessed, err := repo.ContainsEventForTransactionId(transactionId)
+		if err != nil {
+			return fmt.Errorf("failed to check transaction ID: %w", err)
+		}
+		if alreadyProcessed {
+			log.Info("Transaction already processed, skipping update")
+			return nil
+		}
+	}
+
+	res, err := repo.FindResourceByKeys(reporterResourceKey)
+	if err != nil && !isNotFoundError(err) {
+		return fmt.Errorf("failed to lookup existing resource: %w", err)
+	}
+
+	var operationType biz.EventOperationType
+	if err == nil && res != nil {
+		log.Info("Resource already exists, updating")
+		operationType = biz.OperationTypeUpdated
+		if err := uc.updateResource(repo, cmd, res, txidStr); err != nil {
+			return err
+		}
+	} else {
+		log.Info("Creating new resource")
+		operationType = biz.OperationTypeCreated
+		if err := uc.createResource(repo, cmd, txidStr); err != nil {
+			return err
+		}
+	}
+
+	// Commit transaction
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
 	// Increment outbox metrics only after successful transaction commit
@@ -148,37 +139,40 @@ func (uc *Usecase) ReportResource(ctx context.Context, cmd model.ReportResourceC
 		metricscollector.Incr(uc.MetricsCollector.OutboxEventWrites, string(operationType.OperationType()))
 	}
 
+	// Wait for replication if read-after-write is enabled
 	if readAfterWriteEnabled && uc.Config.ConsumerEnabled {
-		timeoutCtx, cancel := context.WithTimeout(ctx, listenTimeout)
-		defer cancel()
-
-		_, err := uc.waitForNotifBreaker.Execute(func() (interface{}, error) {
-			err = subscription.BlockForNotification(timeoutCtx)
-			if err != nil {
-				// Return error for circuit breaker
-				return nil, err
-			}
-			return nil, nil
-		})
-
-		if err != nil {
-			switch {
-			case errors.Is(err, pubsub.ErrWaitContextCancelled):
-				uc.Log.WithContext(ctx).Debugf("Reached timeout waiting for notification from consumer")
-				return nil
-			case errors.Is(err, gobreaker.ErrOpenState):
-				uc.Log.WithContext(ctx).Debugf("Circuit breaker is open, skipped waiting for notification from consumer")
-				return nil
-			case errors.Is(err, gobreaker.ErrTooManyRequests):
-				uc.Log.WithContext(ctx).Debugf("Circuit breaker is half-open, skipped waiting for notification from consumer")
-				return nil
-			default:
-				return err
-			}
-		}
+		uc.waitForReplication(ctx, txidStr)
 	}
 
 	return nil
+}
+
+// waitForReplication waits for the replication to complete, using circuit breaker.
+func (uc *Usecase) waitForReplication(ctx context.Context, txid string) {
+	timeoutCtx, cancel := context.WithTimeout(ctx, listenTimeout)
+	defer cancel()
+
+	_, err := uc.waitForNotifBreaker.Execute(func() (interface{}, error) {
+		return nil, uc.store.WaitForReplication(timeoutCtx, txid)
+	})
+
+	if err != nil {
+		switch {
+		case errors.Is(err, context.DeadlineExceeded), errors.Is(err, context.Canceled):
+			uc.Log.WithContext(ctx).Debugf("Reached timeout waiting for replication")
+		case errors.Is(err, gobreaker.ErrOpenState):
+			uc.Log.WithContext(ctx).Debugf("Circuit breaker is open, skipped waiting for replication")
+		case errors.Is(err, gobreaker.ErrTooManyRequests):
+			uc.Log.WithContext(ctx).Debugf("Circuit breaker is half-open, skipped waiting for replication")
+		default:
+			uc.Log.WithContext(ctx).Warnf("Error waiting for replication: %v", err)
+		}
+	}
+}
+
+// isNotFoundError checks if the error indicates a resource was not found.
+func isNotFoundError(err error) bool {
+	return errors.Is(err, ErrResourceNotFound)
 }
 
 func (uc *Usecase) Delete(ctx context.Context, reporterResourceKey model.ReporterResourceKey) error {
@@ -188,30 +182,39 @@ func (uc *Usecase) Delete(ctx context.Context, reporterResourceKey model.Reporte
 	}
 	clientID := interceptor.GetClientIDFromContext(ctx)
 	log.Info("Reporter Resource Key to delete ", reporterResourceKey, " client_id: ", clientID)
-	err = uc.resourceRepository.GetTransactionManager().HandleSerializableTransaction(
-		DeleteResourceOperationName,
-		uc.resourceRepository.GetDB(),
-		func(tx *gorm.DB) error {
-			res, err := uc.resourceRepository.FindResourceByKeys(tx, reporterResourceKey)
 
-			if err == nil && res != nil {
-				log.Info("Found Resource, deleting: ", res)
-				err := res.Delete(reporterResourceKey)
-				if err != nil {
-					return fmt.Errorf("failed to delete resource: %w", err)
-				}
-				return uc.resourceRepository.Save(tx, *res, biz.OperationTypeDeleted, txidStr)
-			} else {
-				if errors.Is(err, gorm.ErrRecordNotFound) {
-					return ErrResourceNotFound
-				}
-				return ErrDatabaseError
-			}
-		},
-	)
+	// Begin transaction
+	tx, err := uc.store.Begin()
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback() // Safe to call after Commit
+
+	repo := tx.ResourceRepository()
+	res, err := repo.FindResourceByKeys(reporterResourceKey)
 
 	if err != nil {
-		return err
+		if isNotFoundError(err) {
+			return ErrResourceNotFound
+		}
+		return ErrDatabaseError
+	}
+
+	if res == nil {
+		return ErrResourceNotFound
+	}
+
+	log.Info("Found Resource, deleting: ", res)
+	if err := res.Delete(reporterResourceKey); err != nil {
+		return fmt.Errorf("failed to delete resource: %w", err)
+	}
+
+	if err := repo.Save(*res, biz.OperationTypeDeleted, txidStr); err != nil {
+		return fmt.Errorf("failed to save deleted resource: %w", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
 	// Increment outbox metrics only after successful transaction commit
@@ -221,14 +224,21 @@ func (uc *Usecase) Delete(ctx context.Context, reporterResourceKey model.Reporte
 
 // Check verifies if a subject has the specified permission on a resource identified by the reporter resource ID.
 func (uc *Usecase) Check(ctx context.Context, permission, namespace string, sub *kessel.SubjectReference, reporterResourceKey model.ReporterResourceKey) (bool, error) {
-	res, err := uc.resourceRepository.FindResourceByKeys(nil, reporterResourceKey)
+	// Use a read-only transaction to find the resource
+	tx, err := uc.store.Begin()
+	if err != nil {
+		return false, fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	res, err := tx.ResourceRepository().FindResourceByKeys(reporterResourceKey)
 	var consistencyToken string
 	if err != nil {
 		log.Info("Did not find resource")
 		// If the resource doesn't exist in inventory (ie. no consistency token available)
 		// we send a check request with minimize latency
 		// err otherwise.
-		if !errors.Is(err, gorm.ErrRecordNotFound) {
+		if !isNotFoundError(err) {
 			return false, err
 		}
 
@@ -270,13 +280,13 @@ func (uc *Usecase) CheckBulk(ctx context.Context, req *kessel.CheckBulkRequest) 
 	return resp, nil
 }
 
-func (uc *Usecase) createResource(tx *gorm.DB, cmd model.ReportResourceCommand, txidStr string) error {
-	resourceId, err := uc.resourceRepository.NextResourceId()
+func (uc *Usecase) createResource(repo model.ResourceRepository, cmd model.ReportResourceCommand, txidStr string) error {
+	resourceId, err := repo.NextResourceId()
 	if err != nil {
 		return err
 	}
 
-	reporterResourceId, err := uc.resourceRepository.NextReporterResourceId()
+	reporterResourceId, err := repo.NextReporterResourceId()
 	if err != nil {
 		return err
 	}
@@ -300,10 +310,10 @@ func (uc *Usecase) createResource(tx *gorm.DB, cmd model.ReportResourceCommand, 
 		return err
 	}
 
-	return uc.resourceRepository.Save(tx, resource, biz.OperationTypeCreated, txidStr)
+	return repo.Save(resource, biz.OperationTypeCreated, txidStr)
 }
 
-func (uc *Usecase) updateResource(tx *gorm.DB, cmd model.ReportResourceCommand, existingResource *model.Resource, txidStr string) error {
+func (uc *Usecase) updateResource(repo model.ResourceRepository, cmd model.ReportResourceCommand, existingResource *model.Resource, txidStr string) error {
 	err := existingResource.Update(
 		cmd.Key(),
 		cmd.ApiHref(),
@@ -317,7 +327,7 @@ func (uc *Usecase) updateResource(tx *gorm.DB, cmd model.ReportResourceCommand, 
 		return fmt.Errorf("failed to update resource: %w", err)
 	}
 
-	return uc.resourceRepository.Save(tx, *existingResource, biz.OperationTypeUpdated, txidStr)
+	return repo.Save(*existingResource, biz.OperationTypeUpdated, txidStr)
 }
 
 func getNextTransactionID() (string, error) {
@@ -352,5 +362,5 @@ func (uc *Usecase) computeReadAfterWrite(wantsCommitPending bool, reporterPrinci
 	if !wantsCommitPending {
 		return false
 	}
-	return !common.IsNil(uc.ListenManager) && uc.Config.ReadAfterWriteEnabled && isSPInAllowlist(reporterPrincipal, uc.Config.ReadAfterWriteAllowlist)
+	return uc.store != nil && uc.Config.ReadAfterWriteEnabled && isSPInAllowlist(reporterPrincipal, uc.Config.ReadAfterWriteAllowlist)
 }

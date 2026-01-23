@@ -2,9 +2,8 @@ package resources_test
 
 import (
 	"context"
-	"regexp"
-
 	"io"
+	"regexp"
 	"testing"
 
 	krlog "github.com/go-kratos/kratos/v2/log"
@@ -24,6 +23,24 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
+
+// newTestUsecase creates a Usecase with FakeStore for testing.
+func newTestUsecase(t *testing.T) *usecase.Usecase {
+	t.Helper()
+	store := data.NewFakeStore()
+
+	return usecase.New(
+		store,
+		data.NewInMemorySchemaRepository(),
+		nil, // Authz
+		nil, // Eventer
+		"",  // Namespace
+		krlog.NewStdLogger(io.Discard),
+		nil, // waitForNotifBreaker
+		nil, // Config
+		metricscollector.NewFakeMetricsCollector(),
+	)
+}
 
 func TestRequestToResource_Success(t *testing.T) {
 	invID := "9b8b5a02-4ac7-4d6c-a2c0-123456789abc"
@@ -139,18 +156,7 @@ func TestInventoryService_ReportResource_MissingReporterType(t *testing.T) {
 		},
 	}
 
-	uc := usecase.New(
-		data.NewFakeResourceRepository(),
-		data.NewInMemorySchemaRepository(), // schema repository
-		nil,                                // Authz
-		nil,                                // Eventer
-		"",                                 // Namespace
-		krlog.NewStdLogger(io.Discard),
-		nil, // ListenManager
-		nil, // waitForNotifBreaker
-		nil, // Config
-		metricscollector.NewFakeMetricsCollector(),
-	)
+	uc := newTestUsecase(t)
 	service := svc.NewKesselInventoryServiceV1beta2(uc)
 
 	resp, err := service.ReportResource(ctx, req)
@@ -185,18 +191,7 @@ func TestInventoryService_ReportResource_MissingReporterInstanceId(t *testing.T)
 		},
 	}
 
-	uc := usecase.New(
-		data.NewFakeResourceRepository(),
-		data.NewInMemorySchemaRepository(), // schema repository
-		nil,                                // Authz
-		nil,                                // Eventer
-		"",                                 // Namespace
-		krlog.NewStdLogger(io.Discard),
-		nil, // ListenManager
-		nil, // waitForNotifBreaker
-		nil, // Config
-		metricscollector.NewFakeMetricsCollector(),
-	)
+	uc := newTestUsecase(t)
 	service := svc.NewKesselInventoryServiceV1beta2(uc)
 
 	resp, err := service.ReportResource(ctx, req)
@@ -234,18 +229,7 @@ func TestInventoryService_ReportResource_InvalidJsonObject(t *testing.T) {
 		},
 	}
 
-	uc := usecase.New(
-		data.NewFakeResourceRepository(),
-		data.NewInMemorySchemaRepository(), // schema repository
-		nil,                                // Authz
-		nil,                                // Eventer
-		"",                                 // Namespace
-		krlog.NewStdLogger(io.Discard),
-		nil, // ListenManager
-		nil, // waitForNotifBreaker
-		nil, // Config
-		metricscollector.NewFakeMetricsCollector(),
-	)
+	uc := newTestUsecase(t)
 
 	service := svc.NewKesselInventoryServiceV1beta2(uc)
 

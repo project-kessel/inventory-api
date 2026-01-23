@@ -9,12 +9,9 @@ import (
 
 	"github.com/go-kratos/kratos/v2/log"
 	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2"
-	authnapi "github.com/project-kessel/inventory-api/internal/authn/api"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
-	"github.com/project-kessel/inventory-api/internal/biz/model_legacy"
 	"github.com/project-kessel/inventory-api/internal/biz/usecase/resources"
 	"github.com/project-kessel/inventory-api/internal/middleware"
-	conv "github.com/project-kessel/inventory-api/internal/service/common"
 	pbv1beta1 "github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
 	rpcstatus "google.golang.org/genproto/googleapis/rpc/status"
 	"google.golang.org/grpc/codes"
@@ -379,38 +376,6 @@ func updateResponseFromAuthzRequestV1beta2(allowed bool) *pb.CheckForUpdateRespo
 	} else {
 		return &pb.CheckForUpdateResponse{Allowed: pb.Allowed_ALLOWED_FALSE}
 	}
-}
-
-func RequestToResource(r *pb.ReportResourceRequest, identity *authnapi.Identity) (*model_legacy.Resource, error) {
-	log.Info("Report Resource Request: ", r)
-	var resourceType = r.GetType()
-	resourceData, err := conv.ToJsonObject(r)
-	if err != nil {
-		return nil, err
-	}
-
-	var workspaceId, err2 = conv.ExtractWorkspaceId(r.Representations.Common)
-	if err2 != nil {
-		return nil, err2
-	}
-
-	var inventoryId, err3 = conv.ExtractInventoryId(r.GetInventoryId())
-	if err3 != nil {
-		return nil, err3
-	}
-	reporterType, err := conv.ExtractReporterType(r.ReporterType)
-	if err != nil {
-		log.Warn("Missing reporterType")
-		return nil, err
-	}
-
-	reporterInstanceId, err := conv.ExtractReporterInstanceID(r.ReporterInstanceId)
-	if err != nil {
-		log.Warn("Missing reporterInstanceId")
-		return nil, err
-	}
-
-	return conv.ResourceFromPb(resourceType, reporterType, reporterInstanceId, identity.Principal, resourceData, workspaceId, r.Representations, inventoryId), nil
 }
 
 func ResponseFromResource() *pb.ReportResourceResponse {

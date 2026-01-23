@@ -14,8 +14,6 @@ import (
 	authzapi "github.com/project-kessel/inventory-api/internal/authz/api"
 	"github.com/project-kessel/inventory-api/internal/biz"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
-	"github.com/project-kessel/inventory-api/internal/biz/model_legacy"
-	"github.com/project-kessel/inventory-api/internal/biz/schema"
 	"github.com/project-kessel/inventory-api/internal/data"
 	eventingapi "github.com/project-kessel/inventory-api/internal/eventing/api"
 	"github.com/project-kessel/inventory-api/internal/metricscollector"
@@ -28,27 +26,6 @@ import (
 	"google.golang.org/grpc/status"
 	"gorm.io/gorm"
 )
-
-// ReporterResourceRepository defines the interface for managing resources in the inventory system.
-// It provides CRUD operations and various query methods for resources.
-type ReporterResourceRepository interface {
-	Create(context.Context, *model_legacy.Resource, string, string) (*model_legacy.Resource, error)
-	Update(context.Context, *model_legacy.Resource, uuid.UUID, string, string) (*model_legacy.Resource, error)
-	Delete(context.Context, uuid.UUID, string) (*model_legacy.Resource, error)
-	FindByID(context.Context, uuid.UUID) (*model_legacy.Resource, error)
-	FindByWorkspaceId(context.Context, string) ([]*model_legacy.Resource, error)
-	FindByReporterResourceId(context.Context, model_legacy.ReporterResourceId) (*model_legacy.Resource, error)
-	FindByReporterResourceIdv1beta2(context.Context, model_legacy.ReporterResourceUniqueIndex) (*model_legacy.Resource, error)
-	FindByReporterData(context.Context, string, string) (*model_legacy.Resource, error)
-	FindByInventoryIdAndResourceType(ctx context.Context, inventoryId *uuid.UUID, resourceType string) (*model_legacy.Resource, error)
-	FindByInventoryIdAndReporter(ctx context.Context, inventoryId *uuid.UUID, reporterInstanceId string, reporterType string) (*model_legacy.Resource, error)
-	ListAll(context.Context) ([]*model_legacy.Resource, error)
-}
-
-// InventoryResourceRepository defines the interface for accessing inventory resource data.
-type InventoryResourceRepository interface {
-	FindByID(context.Context, uuid.UUID) (*model_legacy.InventoryResource, error)
-}
 
 const (
 	DeleteResourceOperationName = "DeleteResource"
@@ -79,37 +56,31 @@ type UsecaseConfig struct {
 // Usecase provides business logic operations for resource management in the inventory system.
 // It coordinates between repositories, authorization, eventing, and other system components.
 type Usecase struct {
-	resourceRepository               data.ResourceRepository
-	LegacyReporterResourceRepository ReporterResourceRepository
-	inventoryResourceRepository      InventoryResourceRepository
-	schemaUsecase                    *SchemaUsecase
-	waitForNotifBreaker              *gobreaker.CircuitBreaker
-	Authz                            authzapi.Authorizer
-	Eventer                          eventingapi.Manager
-	Namespace                        string
-	Log                              *log.Helper
-	Server                           server.Server
-	ListenManager                    pubsub.ListenManagerImpl
-	Config                           *UsecaseConfig
-	MetricsCollector                 *metricscollector.MetricsCollector
+	resourceRepository  data.ResourceRepository
+	waitForNotifBreaker *gobreaker.CircuitBreaker
+	Authz               authzapi.Authorizer
+	Eventer             eventingapi.Manager
+	Namespace           string
+	Log                 *log.Helper
+	Server              server.Server
+	ListenManager       pubsub.ListenManagerImpl
+	Config              *UsecaseConfig
+	MetricsCollector    *metricscollector.MetricsCollector
 }
 
-func New(resourceRepository data.ResourceRepository, reporterResourceRepository ReporterResourceRepository, inventoryResourceRepository InventoryResourceRepository,
-	schemaRepository schema.Repository, authz authzapi.Authorizer, eventer eventingapi.Manager, namespace string, logger log.Logger,
+func New(resourceRepository data.ResourceRepository,
+	authz authzapi.Authorizer, eventer eventingapi.Manager, namespace string, logger log.Logger,
 	listenManager pubsub.ListenManagerImpl, waitForNotifBreaker *gobreaker.CircuitBreaker, usecaseConfig *UsecaseConfig, metricsCollector *metricscollector.MetricsCollector) *Usecase {
 	return &Usecase{
-		resourceRepository:               resourceRepository,
-		LegacyReporterResourceRepository: reporterResourceRepository,
-		inventoryResourceRepository:      inventoryResourceRepository,
-		schemaUsecase:                    NewSchemaUsecase(schemaRepository, log.NewHelper(logger)),
-		waitForNotifBreaker:              waitForNotifBreaker,
-		Authz:                            authz,
-		Eventer:                          eventer,
-		Namespace:                        namespace,
-		Log:                              log.NewHelper(logger),
-		ListenManager:                    listenManager,
-		Config:                           usecaseConfig,
-		MetricsCollector:                 metricsCollector,
+		resourceRepository:  resourceRepository,
+		waitForNotifBreaker: waitForNotifBreaker,
+		Authz:               authz,
+		Eventer:             eventer,
+		Namespace:           namespace,
+		Log:                 log.NewHelper(logger),
+		ListenManager:       listenManager,
+		Config:              usecaseConfig,
+		MetricsCollector:    metricsCollector,
 	}
 }
 

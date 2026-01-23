@@ -8,13 +8,11 @@ import (
 
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/google/uuid"
-	"github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2"
 	"github.com/project-kessel/inventory-api/cmd/common"
 	"github.com/project-kessel/inventory-api/internal/authn/interceptor"
 	authzapi "github.com/project-kessel/inventory-api/internal/authz/api"
 	"github.com/project-kessel/inventory-api/internal/biz"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
-	"github.com/project-kessel/inventory-api/internal/biz/model_legacy"
 	"github.com/project-kessel/inventory-api/internal/biz/schema"
 	"github.com/project-kessel/inventory-api/internal/data"
 	eventingapi "github.com/project-kessel/inventory-api/internal/eventing/api"
@@ -24,31 +22,8 @@ import (
 	kessel "github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
 	"github.com/sony/gobreaker"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	"gorm.io/gorm"
 )
-
-// ReporterResourceRepository defines the interface for managing resources in the inventory system.
-// It provides CRUD operations and various query methods for resources.
-type ReporterResourceRepository interface {
-	Create(context.Context, *model_legacy.Resource, string, string) (*model_legacy.Resource, error)
-	Update(context.Context, *model_legacy.Resource, uuid.UUID, string, string) (*model_legacy.Resource, error)
-	Delete(context.Context, uuid.UUID, string) (*model_legacy.Resource, error)
-	FindByID(context.Context, uuid.UUID) (*model_legacy.Resource, error)
-	FindByWorkspaceId(context.Context, string) ([]*model_legacy.Resource, error)
-	FindByReporterResourceId(context.Context, model_legacy.ReporterResourceId) (*model_legacy.Resource, error)
-	FindByReporterResourceIdv1beta2(context.Context, model_legacy.ReporterResourceUniqueIndex) (*model_legacy.Resource, error)
-	FindByReporterData(context.Context, string, string) (*model_legacy.Resource, error)
-	FindByInventoryIdAndResourceType(ctx context.Context, inventoryId *uuid.UUID, resourceType string) (*model_legacy.Resource, error)
-	FindByInventoryIdAndReporter(ctx context.Context, inventoryId *uuid.UUID, reporterInstanceId string, reporterType string) (*model_legacy.Resource, error)
-	ListAll(context.Context) ([]*model_legacy.Resource, error)
-}
-
-// InventoryResourceRepository defines the interface for accessing inventory resource data.
-type InventoryResourceRepository interface {
-	FindByID(context.Context, uuid.UUID) (*model_legacy.InventoryResource, error)
-}
 
 const (
 	DeleteResourceOperationName = "DeleteResource"
@@ -79,60 +54,55 @@ type UsecaseConfig struct {
 // Usecase provides business logic operations for resource management in the inventory system.
 // It coordinates between repositories, authorization, eventing, and other system components.
 type Usecase struct {
-	resourceRepository               data.ResourceRepository
-	LegacyReporterResourceRepository ReporterResourceRepository
-	inventoryResourceRepository      InventoryResourceRepository
-	schemaUsecase                    *SchemaUsecase
-	waitForNotifBreaker              *gobreaker.CircuitBreaker
-	Authz                            authzapi.Authorizer
-	Eventer                          eventingapi.Manager
-	Namespace                        string
-	Log                              *log.Helper
-	Server                           server.Server
-	ListenManager                    pubsub.ListenManagerImpl
-	Config                           *UsecaseConfig
-	MetricsCollector                 *metricscollector.MetricsCollector
+	resourceRepository  data.ResourceRepository
+	schemaUsecase       *SchemaUsecase
+	waitForNotifBreaker *gobreaker.CircuitBreaker
+	Authz               authzapi.Authorizer
+	Eventer             eventingapi.Manager
+	Namespace           string
+	Log                 *log.Helper
+	Server              server.Server
+	ListenManager       pubsub.ListenManagerImpl
+	Config              *UsecaseConfig
+	MetricsCollector    *metricscollector.MetricsCollector
 }
 
-func New(resourceRepository data.ResourceRepository, reporterResourceRepository ReporterResourceRepository, inventoryResourceRepository InventoryResourceRepository,
+func New(resourceRepository data.ResourceRepository,
 	schemaRepository schema.Repository, authz authzapi.Authorizer, eventer eventingapi.Manager, namespace string, logger log.Logger,
 	listenManager pubsub.ListenManagerImpl, waitForNotifBreaker *gobreaker.CircuitBreaker, usecaseConfig *UsecaseConfig, metricsCollector *metricscollector.MetricsCollector) *Usecase {
 	return &Usecase{
-		resourceRepository:               resourceRepository,
-		LegacyReporterResourceRepository: reporterResourceRepository,
-		inventoryResourceRepository:      inventoryResourceRepository,
-		schemaUsecase:                    NewSchemaUsecase(schemaRepository, log.NewHelper(logger)),
-		waitForNotifBreaker:              waitForNotifBreaker,
-		Authz:                            authz,
-		Eventer:                          eventer,
-		Namespace:                        namespace,
-		Log:                              log.NewHelper(logger),
-		ListenManager:                    listenManager,
-		Config:                           usecaseConfig,
-		MetricsCollector:                 metricsCollector,
+		resourceRepository:  resourceRepository,
+		schemaUsecase:       NewSchemaUsecase(schemaRepository, log.NewHelper(logger)),
+		waitForNotifBreaker: waitForNotifBreaker,
+		Authz:               authz,
+		Eventer:             eventer,
+		Namespace:           namespace,
+		Log:                 log.NewHelper(logger),
+		ListenManager:       listenManager,
+		Config:              usecaseConfig,
+		MetricsCollector:    metricsCollector,
 	}
 }
 
-func (uc *Usecase) ReportResource(ctx context.Context, request *v1beta2.ReportResourceRequest, reporterPrincipal string) error {
+// ReportResource creates or updates a resource based on the provided command.
+// The reporterPrincipal is used for authorization checks and read-after-write allowlist validation.
+func (uc *Usecase) ReportResource(ctx context.Context, cmd model.ReportResourceCommand, reporterPrincipal string) error {
 	clientID := interceptor.GetClientIDFromContext(ctx)
-	log.Info("Reporting resource request: ", request, " client_id: ", clientID)
+	log.Infof("Reporting resource: key=%v, client_id=%s", cmd.Key(), clientID)
+
 	var subscription pubsub.Subscription
 	txidStr, err := getNextTransactionID()
 	if err != nil {
 		return err
 	}
 
-	readAfterWriteEnabled := computeReadAfterWrite(uc, request.WriteVisibility, reporterPrincipal)
+	readAfterWriteEnabled := uc.computeReadAfterWrite(cmd.WantsCommitPending(), reporterPrincipal)
 	if readAfterWriteEnabled && uc.Config.ConsumerEnabled {
 		subscription = uc.ListenManager.Subscribe(txidStr)
 		defer subscription.Unsubscribe()
 	}
 
-	reporterResourceKey, err := getReporterResourceKeyFromRequest(request)
-	if err != nil {
-		log.Error("failed to create reporter resource key: ", err)
-		return status.Errorf(codes.InvalidArgument, "failed to create reporter resource key: %v", err)
-	}
+	reporterResourceKey := cmd.Key()
 
 	var operationType biz.EventOperationType
 	err = uc.resourceRepository.GetTransactionManager().HandleSerializableTransaction(
@@ -140,7 +110,7 @@ func (uc *Usecase) ReportResource(ctx context.Context, request *v1beta2.ReportRe
 		uc.resourceRepository.GetDB(),
 		func(tx *gorm.DB) error {
 			// Check for duplicate transaction ID's before we find the resource for quicker returns if it fails
-			transactionId := request.GetRepresentations().GetMetadata().GetTransactionId()
+			transactionId := cmd.TransactionId().String()
 			if transactionId != "" {
 				alreadyProcessed, err := uc.resourceRepository.HasTransactionIdBeenProcessed(tx, transactionId)
 				if err != nil {
@@ -158,14 +128,14 @@ func (uc *Usecase) ReportResource(ctx context.Context, request *v1beta2.ReportRe
 			}
 
 			if err == nil && res != nil {
-				log.Info("Resource already exists, updating: ")
+				log.Info("Resource already exists, updating")
 				operationType = biz.OperationTypeUpdated
-				return uc.updateResource(tx, request, res, txidStr)
+				return uc.updateResource(tx, cmd, res, txidStr)
 			}
 
 			log.Info("Creating new resource")
 			operationType = biz.OperationTypeCreated
-			return uc.createResource(tx, request, txidStr)
+			return uc.createResource(tx, cmd, txidStr)
 		},
 	)
 
@@ -300,7 +270,7 @@ func (uc *Usecase) CheckBulk(ctx context.Context, req *kessel.CheckBulkRequest) 
 	return resp, nil
 }
 
-func (uc *Usecase) createResource(tx *gorm.DB, request *v1beta2.ReportResourceRequest, txidStr string) error {
+func (uc *Usecase) createResource(tx *gorm.DB, cmd model.ReportResourceCommand, txidStr string) error {
 	resourceId, err := uc.resourceRepository.NextResourceId()
 	if err != nil {
 		return err
@@ -311,61 +281,21 @@ func (uc *Usecase) createResource(tx *gorm.DB, request *v1beta2.ReportResourceRe
 		return err
 	}
 
-	localResourceId, err := model.NewLocalResourceId(request.GetRepresentations().GetMetadata().GetLocalResourceId())
-	if err != nil {
-		return fmt.Errorf("invalid local resource ID: %w", err)
-	}
-
-	resourceType, err := model.NewResourceType(request.GetType())
-	if err != nil {
-		return fmt.Errorf("invalid resource type: %w", err)
-	}
-
-	reporterType, err := model.NewReporterType(request.GetReporterType())
-	if err != nil {
-		return fmt.Errorf("invalid reporter type: %w", err)
-	}
-
-	reporterInstanceId, err := model.NewReporterInstanceId(request.GetReporterInstanceId())
-	if err != nil {
-		return fmt.Errorf("invalid reporter instance ID: %w", err)
-	}
-
-	apiHref, err := model.NewApiHref(request.GetRepresentations().GetMetadata().GetApiHref())
-	if err != nil {
-		return fmt.Errorf("invalid API href: %w", err)
-	}
-
-	var consoleHref model.ConsoleHref
-	if consoleHrefVal := request.GetRepresentations().GetMetadata().GetConsoleHref(); consoleHrefVal != "" {
-		consoleHref, err = model.NewConsoleHref(consoleHrefVal)
-		if err != nil {
-			return fmt.Errorf("invalid console href: %w", err)
-		}
-	}
-
-	var reporterVersion *model.ReporterVersion
-	if reporterVersionValue := request.GetRepresentations().GetMetadata().GetReporterVersion(); reporterVersionValue != "" {
-		rv, err := model.NewReporterVersion(reporterVersionValue)
-		if err != nil {
-			return fmt.Errorf("invalid reporter version: %w", err)
-		}
-		reporterVersion = &rv
-	}
-
-	reporterRepresentation, err := model.NewRepresentation(request.GetRepresentations().GetReporter().AsMap())
-	if err != nil {
-		return fmt.Errorf("invalid reporter representation: %w", err)
-	}
-
-	commonRepresentation, err := model.NewRepresentation(request.GetRepresentations().GetCommon().AsMap())
-	if err != nil {
-		return fmt.Errorf("invalid common representation: %w", err)
-	}
-
-	transactionId := model.NewTransactionId(request.GetRepresentations().GetMetadata().GetTransactionId())
-
-	resource, err := model.NewResource(resourceId, localResourceId, resourceType, reporterType, reporterInstanceId, transactionId, reporterResourceId, apiHref, consoleHref, reporterRepresentation, commonRepresentation, reporterVersion)
+	key := cmd.Key()
+	resource, err := model.NewResource(
+		resourceId,
+		key.LocalResourceId(),
+		key.ResourceType(),
+		key.ReporterType(),
+		key.ReporterInstanceId(),
+		cmd.TransactionId(),
+		reporterResourceId,
+		cmd.ApiHref(),
+		cmd.ConsoleHref(),
+		cmd.ReporterRepresentation(),
+		cmd.CommonRepresentation(),
+		cmd.ReporterVersion(),
+	)
 	if err != nil {
 		return err
 	}
@@ -373,107 +303,21 @@ func (uc *Usecase) createResource(tx *gorm.DB, request *v1beta2.ReportResourceRe
 	return uc.resourceRepository.Save(tx, resource, biz.OperationTypeCreated, txidStr)
 }
 
-func getReporterResourceKeyFromRequest(request *v1beta2.ReportResourceRequest) (model.ReporterResourceKey, error) {
-	localResourceId, err := model.NewLocalResourceId(request.GetRepresentations().GetMetadata().GetLocalResourceId())
-	if err != nil {
-		return model.ReporterResourceKey{}, fmt.Errorf("invalid local resource ID: %w", err)
-	}
-
-	resourceType, err := model.NewResourceType(request.GetType())
-	if err != nil {
-		return model.ReporterResourceKey{}, fmt.Errorf("invalid resource type: %w", err)
-	}
-
-	reporterType, err := model.NewReporterType(request.GetReporterType())
-	if err != nil {
-		return model.ReporterResourceKey{}, fmt.Errorf("invalid reporter type: %w", err)
-	}
-
-	reporterInstanceId, err := model.NewReporterInstanceId(request.GetReporterInstanceId())
-	if err != nil {
-		return model.ReporterResourceKey{}, fmt.Errorf("invalid reporter instance ID: %w", err)
-	}
-
-	return model.NewReporterResourceKey(
-		localResourceId,
-		resourceType,
-		reporterType,
-		reporterInstanceId,
-	)
-}
-
-func (uc *Usecase) updateResource(tx *gorm.DB, request *v1beta2.ReportResourceRequest, existingResource *model.Resource, txidStr string) error {
-	reporterResourceKey, apiHref, consoleHref, reporterVersion, commonData, reporterData, transactionId, err := extractUpdateDataFromRequest(request)
-	if err != nil {
-		return err
-	}
-
-	err = existingResource.Update(
-		reporterResourceKey,
-		apiHref,
-		consoleHref,
-		reporterVersion,
-		reporterData,
-		commonData,
-		transactionId,
+func (uc *Usecase) updateResource(tx *gorm.DB, cmd model.ReportResourceCommand, existingResource *model.Resource, txidStr string) error {
+	err := existingResource.Update(
+		cmd.Key(),
+		cmd.ApiHref(),
+		cmd.ConsoleHref(),
+		cmd.ReporterVersion(),
+		cmd.ReporterRepresentation(),
+		cmd.CommonRepresentation(),
+		cmd.TransactionId(),
 	)
 	if err != nil {
 		return fmt.Errorf("failed to update resource: %w", err)
 	}
 
 	return uc.resourceRepository.Save(tx, *existingResource, biz.OperationTypeUpdated, txidStr)
-}
-
-func extractUpdateDataFromRequest(request *v1beta2.ReportResourceRequest) (
-	model.ReporterResourceKey,
-	model.ApiHref,
-	model.ConsoleHref,
-	*model.ReporterVersion,
-	model.Representation,
-	model.Representation,
-	model.TransactionId,
-	error,
-) {
-	reporterResourceKey, err := getReporterResourceKeyFromRequest(request)
-	if err != nil {
-		return model.ReporterResourceKey{}, "", "", nil, model.Representation(nil), model.Representation(nil), "", fmt.Errorf("failed to create reporter resource key: %w", err)
-	}
-
-	apiHref, err := model.NewApiHref(request.GetRepresentations().GetMetadata().GetApiHref())
-	if err != nil {
-		return model.ReporterResourceKey{}, "", "", nil, model.Representation(nil), model.Representation(nil), "", fmt.Errorf("invalid API href: %w", err)
-	}
-
-	var consoleHref model.ConsoleHref
-	if consoleHrefVal := request.GetRepresentations().GetMetadata().GetConsoleHref(); consoleHrefVal != "" {
-		consoleHref, err = model.NewConsoleHref(consoleHrefVal)
-		if err != nil {
-			return model.ReporterResourceKey{}, "", "", nil, model.Representation(nil), model.Representation(nil), "", fmt.Errorf("invalid console href: %w", err)
-		}
-	}
-
-	var reporterVersion *model.ReporterVersion
-	if reporterVersionValue := request.GetRepresentations().GetMetadata().GetReporterVersion(); reporterVersionValue != "" {
-		rv, err := model.NewReporterVersion(reporterVersionValue)
-		if err != nil {
-			return model.ReporterResourceKey{}, "", "", nil, model.Representation(nil), model.Representation(nil), "", fmt.Errorf("invalid reporter version: %w", err)
-		}
-		reporterVersion = &rv
-	}
-
-	commonRepresentation, err := model.NewRepresentation(request.GetRepresentations().GetCommon().AsMap())
-	if err != nil {
-		return model.ReporterResourceKey{}, "", "", nil, model.Representation(nil), model.Representation(nil), "", fmt.Errorf("invalid common data: %w", err)
-	}
-
-	reporterRepresentation, err := model.NewRepresentation(request.GetRepresentations().GetReporter().AsMap())
-	if err != nil {
-		return model.ReporterResourceKey{}, "", "", nil, model.Representation(nil), model.Representation(nil), "", fmt.Errorf("invalid reporter data: %w", err)
-	}
-
-	transactionId := model.NewTransactionId(request.GetRepresentations().GetMetadata().GetTransactionId())
-
-	return reporterResourceKey, apiHref, consoleHref, reporterVersion, commonRepresentation, reporterRepresentation, transactionId, nil
 }
 
 func getNextTransactionID() (string, error) {
@@ -489,7 +333,7 @@ func (uc *Usecase) LookupResources(ctx context.Context, request *kessel.LookupRe
 	return uc.Authz.LookupResources(ctx, request)
 }
 
-// Check if request comes from SP in allowlist
+// isSPInAllowlist checks if the reporter principal is in the allowlist for read-after-write.
 func isSPInAllowlist(reporterPrincipal string, allowlist []string) bool {
 	for _, sp := range allowlist {
 		// either specific SP or everyone
@@ -497,15 +341,15 @@ func isSPInAllowlist(reporterPrincipal string, allowlist []string) bool {
 			return true
 		}
 	}
-
 	return false
 }
 
-func computeReadAfterWrite(uc *Usecase, write_visibility v1beta2.WriteVisibility, reporterPrincipal string) bool {
-	// read after write functionality is enabled/disabled globally.
-	// And executed if request specifies and
-	// came from service provider in allowlist
-	if write_visibility == v1beta2.WriteVisibility_WRITE_VISIBILITY_UNSPECIFIED || write_visibility == v1beta2.WriteVisibility_MINIMIZE_LATENCY {
+// computeReadAfterWrite determines if read-after-write should be enabled for this request.
+func (uc *Usecase) computeReadAfterWrite(wantsCommitPending bool, reporterPrincipal string) bool {
+	// Read-after-write functionality is enabled/disabled globally.
+	// It's executed if the request specifies commit-pending visibility
+	// and came from a service provider in the allowlist.
+	if !wantsCommitPending {
 		return false
 	}
 	return !common.IsNil(uc.ListenManager) && uc.Config.ReadAfterWriteEnabled && isSPInAllowlist(reporterPrincipal, uc.Config.ReadAfterWriteAllowlist)

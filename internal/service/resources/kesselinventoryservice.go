@@ -15,7 +15,7 @@ import (
 	"github.com/project-kessel/inventory-api/internal/biz/usecase/resources"
 	"github.com/project-kessel/inventory-api/internal/middleware"
 	conv "github.com/project-kessel/inventory-api/internal/service/common"
-	pbv1beta1 "github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
+	relations "github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
 	rpcstatus "google.golang.org/genproto/googleapis/rpc/status"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -38,13 +38,19 @@ func (c *InventoryService) ReportResource(ctx context.Context, r *pb.ReportResou
 		log.Errorf("failed to get identity: %v", err)
 		return nil, status.Error(codes.Unauthenticated, "failed to get identity")
 	}
-	err = c.Ctl.ReportResource(ctx, r, identity.Principal)
+
+	cmd, err := reportResourceCommandFromRequest(r)
+	if err != nil {
+		log.Errorf("failed to build report resource command: %v", err)
+		return nil, status.Errorf(codes.InvalidArgument, "invalid request: %v", err)
+	}
+
+	err = c.Ctl.ReportResource(ctx, cmd, identity.Principal)
 	if err != nil {
 		return nil, err
 	}
 
 	return ResponseFromResource(), nil
-
 }
 
 func (c *InventoryService) DeleteResource(ctx context.Context, r *pb.DeleteResourceRequest) (*pb.DeleteResourceResponse, error) {
@@ -128,11 +134,11 @@ func (s *InventoryService) CheckBulk(ctx context.Context, req *pb.CheckBulkReque
 	return mapCheckBulkResponseFromV1beta1(resp), nil
 }
 
-func subjectReferenceFromSubject(subject *pb.SubjectReference) *pbv1beta1.SubjectReference {
-	return &pbv1beta1.SubjectReference{
+func subjectReferenceFromSubject(subject *pb.SubjectReference) *relations.SubjectReference {
+	return &relations.SubjectReference{
 		Relation: subject.Relation,
-		Subject: &pbv1beta1.ObjectReference{
-			Type: &pbv1beta1.ObjectType{
+		Subject: &relations.ObjectReference{
+			Type: &relations.ObjectType{
 				Namespace: subject.Resource.GetReporter().GetType(),
 				Name:      subject.Resource.GetResourceType(),
 			},
@@ -141,7 +147,7 @@ func subjectReferenceFromSubject(subject *pb.SubjectReference) *pbv1beta1.Subjec
 	}
 }
 
-func subjectReferenceFromSubjectV1beta1(subject *pbv1beta1.SubjectReference) *pb.SubjectReference {
+func subjectReferenceFromSubjectV1beta1(subject *relations.SubjectReference) *pb.SubjectReference {
 	return &pb.SubjectReference{
 		Relation: subject.Relation,
 		Resource: &pb.ResourceReference{
@@ -154,12 +160,12 @@ func subjectReferenceFromSubjectV1beta1(subject *pbv1beta1.SubjectReference) *pb
 	}
 }
 
-func mapCheckBulkRequestToV1beta1(req *pb.CheckBulkRequest) *pbv1beta1.CheckBulkRequest {
-	items := make([]*pbv1beta1.CheckBulkRequestItem, len(req.GetItems()))
+func mapCheckBulkRequestToV1beta1(req *pb.CheckBulkRequest) *relations.CheckBulkRequest {
+	items := make([]*relations.CheckBulkRequestItem, len(req.GetItems()))
 	for i, item := range req.GetItems() {
-		items[i] = &pbv1beta1.CheckBulkRequestItem{
-			Resource: &pbv1beta1.ObjectReference{
-				Type: &pbv1beta1.ObjectType{
+		items[i] = &relations.CheckBulkRequestItem{
+			Resource: &relations.ObjectReference{
+				Type: &relations.ObjectType{
 					Namespace: item.GetObject().GetReporter().GetType(),
 					Name:      item.GetObject().GetResourceType(),
 				},
@@ -170,33 +176,33 @@ func mapCheckBulkRequestToV1beta1(req *pb.CheckBulkRequest) *pbv1beta1.CheckBulk
 		}
 	}
 
-	return &pbv1beta1.CheckBulkRequest{
+	return &relations.CheckBulkRequest{
 		Items:       items,
 		Consistency: convertConsistencyToV1beta1(req.GetConsistency()),
 	}
 }
 
-func convertConsistencyToV1beta1(consistency *pb.Consistency) *pbv1beta1.Consistency {
+func convertConsistencyToV1beta1(consistency *pb.Consistency) *relations.Consistency {
 	if consistency == nil {
-		return &pbv1beta1.Consistency{
-			Requirement: &pbv1beta1.Consistency_MinimizeLatency{MinimizeLatency: true},
+		return &relations.Consistency{
+			Requirement: &relations.Consistency_MinimizeLatency{MinimizeLatency: true},
 		}
 	}
 	if consistency.GetAtLeastAsFresh() != nil {
-		return &pbv1beta1.Consistency{
-			Requirement: &pbv1beta1.Consistency_AtLeastAsFresh{
-				AtLeastAsFresh: &pbv1beta1.ConsistencyToken{
+		return &relations.Consistency{
+			Requirement: &relations.Consistency_AtLeastAsFresh{
+				AtLeastAsFresh: &relations.ConsistencyToken{
 					Token: consistency.GetAtLeastAsFresh().GetToken(),
 				},
 			},
 		}
 	}
-	return &pbv1beta1.Consistency{
-		Requirement: &pbv1beta1.Consistency_MinimizeLatency{MinimizeLatency: true},
+	return &relations.Consistency{
+		Requirement: &relations.Consistency_MinimizeLatency{MinimizeLatency: true},
 	}
 }
 
-func mapCheckBulkResponseFromV1beta1(resp *pbv1beta1.CheckBulkResponse) *pb.CheckBulkResponse {
+func mapCheckBulkResponseFromV1beta1(resp *relations.CheckBulkResponse) *pb.CheckBulkResponse {
 	pairs := make([]*pb.CheckBulkResponsePair, len(resp.GetPairs()))
 	for i, pair := range resp.GetPairs() {
 
@@ -213,7 +219,7 @@ func mapCheckBulkResponseFromV1beta1(resp *pbv1beta1.CheckBulkResponse) *pb.Chec
 
 		allowedResponse := pb.Allowed_ALLOWED_FALSE
 
-		if pair.GetItem().GetAllowed() == pbv1beta1.CheckBulkResponseItem_ALLOWED_TRUE {
+		if pair.GetItem().GetAllowed() == relations.CheckBulkResponseItem_ALLOWED_TRUE {
 			allowedResponse = pb.Allowed_ALLOWED_TRUE
 		}
 		itemResponse.Item = &pb.CheckBulkResponseItem{
@@ -282,13 +288,13 @@ func (s *InventoryService) StreamedListObjects(
 	}
 }
 
-func ToLookupResourceRequest(request *pb.StreamedListObjectsRequest) (*pbv1beta1.LookupResourcesRequest, error) {
+func ToLookupResourceRequest(request *pb.StreamedListObjectsRequest) (*relations.LookupResourcesRequest, error) {
 	if request == nil {
 		return nil, fmt.Errorf("request is nil")
 	}
-	var pagination *pbv1beta1.RequestPagination
+	var pagination *relations.RequestPagination
 	if request.Pagination != nil {
-		pagination = &pbv1beta1.RequestPagination{
+		pagination = &relations.RequestPagination{
 			Limit:             request.Pagination.Limit,
 			ContinuationToken: request.Pagination.ContinuationToken,
 		}
@@ -296,16 +302,16 @@ func ToLookupResourceRequest(request *pb.StreamedListObjectsRequest) (*pbv1beta1
 	normalizedNamespace := NormalizeType(request.ObjectType.GetReporterType())
 	normalizedResourceType := NormalizeType(request.ObjectType.GetResourceType())
 
-	return &pbv1beta1.LookupResourcesRequest{
-		ResourceType: &pbv1beta1.ObjectType{
+	return &relations.LookupResourcesRequest{
+		ResourceType: &relations.ObjectType{
 			Namespace: normalizedNamespace,
 			Name:      normalizedResourceType,
 		},
 		Relation: request.Relation,
-		Subject: &pbv1beta1.SubjectReference{
+		Subject: &relations.SubjectReference{
 			Relation: request.Subject.Relation,
-			Subject: &pbv1beta1.ObjectReference{
-				Type: &pbv1beta1.ObjectType{
+			Subject: &relations.ObjectReference{
+				Type: &relations.ObjectType{
 					Name:      request.Subject.Resource.GetResourceType(),
 					Namespace: request.Subject.Resource.GetReporter().GetType(),
 				},
@@ -321,7 +327,7 @@ func NormalizeType(val string) string {
 	return normalized
 }
 
-func ToLookupResourceResponse(response *pbv1beta1.LookupResourcesResponse) *pb.StreamedListObjectsResponse {
+func ToLookupResourceResponse(response *relations.LookupResourcesResponse) *pb.StreamedListObjectsResponse {
 	return &pb.StreamedListObjectsResponse{
 		Object: &pb.ResourceReference{
 			Reporter: &pb.ReporterReference{
@@ -378,6 +384,81 @@ func updateResponseFromAuthzRequestV1beta2(allowed bool) *pb.CheckForUpdateRespo
 		return &pb.CheckForUpdateResponse{Allowed: pb.Allowed_ALLOWED_TRUE}
 	} else {
 		return &pb.CheckForUpdateResponse{Allowed: pb.Allowed_ALLOWED_FALSE}
+	}
+}
+
+// reportResourceCommandFromRequest converts a proto ReportResourceRequest to a domain ReportResourceCommand.
+func reportResourceCommandFromRequest(r *pb.ReportResourceRequest) (model.ReportResourceCommand, error) {
+	localResourceId, err := model.NewLocalResourceId(r.GetRepresentations().GetMetadata().GetLocalResourceId())
+	if err != nil {
+		return model.ReportResourceCommand{}, fmt.Errorf("invalid local resource ID: %w", err)
+	}
+
+	resourceType, err := model.NewResourceType(r.GetType())
+	if err != nil {
+		return model.ReportResourceCommand{}, fmt.Errorf("invalid resource type: %w", err)
+	}
+
+	reporterType, err := model.NewReporterType(r.GetReporterType())
+	if err != nil {
+		return model.ReportResourceCommand{}, fmt.Errorf("invalid reporter type: %w", err)
+	}
+
+	reporterInstanceId, err := model.NewReporterInstanceId(r.GetReporterInstanceId())
+	if err != nil {
+		return model.ReportResourceCommand{}, fmt.Errorf("invalid reporter instance ID: %w", err)
+	}
+
+	apiHref, err := model.NewApiHref(r.GetRepresentations().GetMetadata().GetApiHref())
+	if err != nil {
+		return model.ReportResourceCommand{}, fmt.Errorf("invalid API href: %w", err)
+	}
+
+	var consoleHref model.ConsoleHref
+	if consoleHrefVal := r.GetRepresentations().GetMetadata().GetConsoleHref(); consoleHrefVal != "" {
+		consoleHref, err = model.NewConsoleHref(consoleHrefVal)
+		if err != nil {
+			return model.ReportResourceCommand{}, fmt.Errorf("invalid console href: %w", err)
+		}
+	}
+
+	var reporterVersion *model.ReporterVersion
+	if reporterVersionValue := r.GetRepresentations().GetMetadata().GetReporterVersion(); reporterVersionValue != "" {
+		rv, err := model.NewReporterVersion(reporterVersionValue)
+		if err != nil {
+			return model.ReportResourceCommand{}, fmt.Errorf("invalid reporter version: %w", err)
+		}
+		reporterVersion = &rv
+	}
+
+	transactionId := model.NewTransactionId(r.GetRepresentations().GetMetadata().GetTransactionId())
+
+	writeVisibility := writeVisibilityFromProto(r.GetWriteVisibility())
+
+	return model.NewReportResourceCommand(
+		localResourceId,
+		resourceType,
+		reporterType,
+		reporterInstanceId,
+		apiHref,
+		consoleHref,
+		reporterVersion,
+		r.GetRepresentations().GetReporter().AsMap(),
+		r.GetRepresentations().GetCommon().AsMap(),
+		transactionId,
+		writeVisibility,
+	)
+}
+
+// writeVisibilityFromProto converts the proto WriteVisibility enum to the domain WriteVisibility type.
+func writeVisibilityFromProto(v pb.WriteVisibility) model.WriteVisibility {
+	switch v {
+	case pb.WriteVisibility_IMMEDIATE:
+		return model.WriteVisibilityCommitPending
+	case pb.WriteVisibility_MINIMIZE_LATENCY:
+		return model.WriteVisibilityMinimizeLatency
+	default:
+		return model.WriteVisibilityUnspecified
 	}
 }
 

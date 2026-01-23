@@ -6,12 +6,6 @@ import (
 	"testing"
 
 	"github.com/go-kratos/kratos/v2/log"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-	"google.golang.org/protobuf/types/known/structpb"
-	"gorm.io/gorm"
-
-	"github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2"
 	"github.com/project-kessel/inventory-api/internal"
 	"github.com/project-kessel/inventory-api/internal/authz/allow"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
@@ -19,7 +13,194 @@ import (
 	"github.com/project-kessel/inventory-api/internal/biz/schema/validation"
 	"github.com/project-kessel/inventory-api/internal/data"
 	"github.com/project-kessel/inventory-api/internal/metricscollector"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"gorm.io/gorm"
 )
+
+// createTestCommand creates a ReportResourceCommand for testing.
+func createTestCommand(t *testing.T, resourceType, reporterType, reporterInstance, localResourceId, workspaceId string) model.ReportResourceCommand {
+	t.Helper()
+	return createTestCommandWithOptions(t, resourceType, reporterType, reporterInstance, localResourceId, workspaceId, "", nil, nil)
+}
+
+// createTestCommandWithTransactionId creates a ReportResourceCommand with a transaction ID for testing.
+func createTestCommandWithTransactionId(t *testing.T, resourceType, reporterType, reporterInstance, localResourceId, workspaceId, transactionId string) model.ReportResourceCommand {
+	t.Helper()
+	return createTestCommandWithOptions(t, resourceType, reporterType, reporterInstance, localResourceId, workspaceId, transactionId, nil, nil)
+}
+
+// createTestCommandWithOptions creates a ReportResourceCommand with all options for testing.
+func createTestCommandWithOptions(t *testing.T, resourceType, reporterType, reporterInstance, localResourceId, workspaceId, transactionId string, reporterData, commonData internal.JsonObject) model.ReportResourceCommand {
+	t.Helper()
+
+	localResId, err := model.NewLocalResourceId(localResourceId)
+	require.NoError(t, err)
+
+	resType, err := model.NewResourceType(resourceType)
+	require.NoError(t, err)
+
+	repType, err := model.NewReporterType(reporterType)
+	require.NoError(t, err)
+
+	repInstanceId, err := model.NewReporterInstanceId(reporterInstance)
+	require.NoError(t, err)
+
+	apiHref, err := model.NewApiHref("https://api.example.com/resource/123")
+	require.NoError(t, err)
+
+	consoleHref, err := model.NewConsoleHref("https://console.example.com/resource/123")
+	require.NoError(t, err)
+
+	txId := model.NewTransactionId(transactionId)
+
+	if reporterData == nil {
+		reporterData = internal.JsonObject{
+			"local_resource_id": localResourceId,
+			"api_href":          "https://api.example.com/resource/123",
+			"console_href":      "https://console.example.com/resource/123",
+		}
+	}
+
+	if commonData == nil {
+		commonData = internal.JsonObject{
+			"workspace_id": workspaceId,
+			"name":         "test-cluster",
+			"namespace":    "default",
+		}
+	}
+
+	cmd, err := model.NewReportResourceCommand(
+		localResId,
+		resType,
+		repType,
+		repInstanceId,
+		apiHref,
+		consoleHref,
+		nil, // reporterVersion
+		reporterData,
+		commonData,
+		txId,
+		model.WriteVisibilityMinimizeLatency,
+	)
+	require.NoError(t, err)
+	return cmd
+}
+
+// createTestCommandWithUpdatedData creates a ReportResourceCommand with updated data for testing updates.
+func createTestCommandWithUpdatedData(t *testing.T, resourceType, reporterType, reporterInstance, localResourceId, workspaceId string) model.ReportResourceCommand {
+	t.Helper()
+	reporterData := internal.JsonObject{
+		"local_resource_id": localResourceId,
+		"api_href":          "https://api.example.com/updated/123",
+		"console_href":      "https://console.example.com/updated/123",
+		"hostname":          "updated-hostname",
+		"status":            "running",
+	}
+	commonData := internal.JsonObject{
+		"workspace_id": workspaceId,
+		"name":         "updated-host",
+		"environment":  "production",
+		"tags":         map[string]interface{}{"env": "prod", "updated": "true"},
+	}
+	return createTestCommandWithOptions(t, resourceType, reporterType, reporterInstance, localResourceId, workspaceId, "", reporterData, commonData)
+}
+
+// createTestCommandWithReporterDataOnly creates a command with rich reporter data and minimal common data.
+func createTestCommandWithReporterDataOnly(t *testing.T, resourceType, reporterType, reporterInstance, localResourceId, workspaceId string) model.ReportResourceCommand {
+	t.Helper()
+	reporterData := internal.JsonObject{
+		"local_resource_id":  localResourceId,
+		"api_href":           "https://api.example.com/reporter-rich",
+		"console_href":       "https://console.example.com/reporter-rich",
+		"cluster_name":       "reporter-focused-cluster",
+		"cluster_version":    "1.28.0",
+		"node_count":         10,
+		"cpu_total":          "40 cores",
+		"memory_total":       "160Gi",
+		"storage_total":      "1Ti",
+		"network_plugin":     "calico",
+		"ingress_controller": "nginx",
+	}
+	commonData := internal.JsonObject{
+		"workspace_id": workspaceId,
+	}
+	return createTestCommandWithOptions(t, resourceType, reporterType, reporterInstance, localResourceId, workspaceId, "", reporterData, commonData)
+}
+
+// createTestCommandWithCommonDataOnly creates a command with rich common data and minimal reporter data.
+func createTestCommandWithCommonDataOnly(t *testing.T, resourceType, reporterType, reporterInstance, localResourceId, workspaceId string) model.ReportResourceCommand {
+	t.Helper()
+	reporterData := internal.JsonObject{
+		"local_resource_id": localResourceId,
+		"api_href":          "https://api.example.com/common-rich",
+		"console_href":      "https://console.example.com/common-rich",
+		"name":              "minimal-cluster",
+	}
+	commonData := internal.JsonObject{
+		"workspace_id": workspaceId,
+		"environment":  "production",
+		"region":       "us-east-1",
+		"cost_center":  "engineering",
+		"owner":        "platform-team",
+		"project":      "inventory-system",
+		"labels": map[string]interface{}{
+			"env":        "prod",
+			"team":       "platform",
+			"monitoring": "enabled",
+			"backup":     "daily",
+			"tier":       "critical",
+		},
+		"compliance": map[string]interface{}{
+			"sox":   "required",
+			"hipaa": "not-applicable",
+			"gdpr":  "compliant",
+		},
+		"security": map[string]interface{}{
+			"encryption": "enabled",
+			"scanning":   "continuous",
+			"access":     "restricted",
+		},
+	}
+	return createTestCommandWithOptions(t, resourceType, reporterType, reporterInstance, localResourceId, workspaceId, "", reporterData, commonData)
+}
+
+// createTestCommandWithCycleData creates a command for cycle-based testing.
+func createTestCommandWithCycleData(t *testing.T, resourceType, reporterType, reporterInstance, localResourceId, workspaceId string, cycle int) model.ReportResourceCommand {
+	t.Helper()
+	reporterData := internal.JsonObject{
+		"local_resource_id": localResourceId,
+		"api_href":          fmt.Sprintf("https://api.example.com/cycle-%d", cycle),
+		"console_href":      fmt.Sprintf("https://console.example.com/cycle-%d", cycle),
+		"cycle":             cycle,
+	}
+	commonData := internal.JsonObject{
+		"workspace_id": workspaceId,
+		"name":         fmt.Sprintf("test-cluster-cycle-%d", cycle),
+		"namespace":    "default",
+		"cycle":        cycle,
+	}
+	return createTestCommandWithOptions(t, resourceType, reporterType, reporterInstance, localResourceId, workspaceId, "", reporterData, commonData)
+}
+
+// createTestCommandWithUpdatedDataAndTransactionId creates a command with updated data and transaction ID.
+func createTestCommandWithUpdatedDataAndTransactionId(t *testing.T, resourceType, reporterType, reporterInstance, localResourceId, workspaceId, transactionId string) model.ReportResourceCommand {
+	t.Helper()
+	reporterData := internal.JsonObject{
+		"local_resource_id": localResourceId,
+		"api_href":          "https://api.example.com/updated/123",
+		"console_href":      "https://console.example.com/updated/123",
+		"hostname":          "updated-hostname",
+		"status":            "running",
+	}
+	commonData := internal.JsonObject{
+		"workspace_id": workspaceId,
+		"name":         "updated-host",
+		"environment":  "production",
+		"tags":         map[string]interface{}{"env": "prod", "updated": "true"},
+	}
+	return createTestCommandWithOptions(t, resourceType, reporterType, reporterInstance, localResourceId, workspaceId, transactionId, reporterData, commonData)
+}
 
 func newFakeSchemaRepository(t *testing.T) schema.Repository {
 	schemaRepository := data.NewInMemorySchemaRepository()
@@ -113,10 +294,10 @@ func TestReportResource(t *testing.T) {
 			}
 			mc := metricscollector.NewFakeMetricsCollector()
 			schemaRepository := newFakeSchemaRepository(t)
-			usecase := New(resourceRepo, nil, nil, schemaRepository, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig, mc)
+			usecase := New(resourceRepo, schemaRepository, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig, mc)
 
-			reportRequest := createTestReportRequest(t, tt.resourceType, tt.reporterType, tt.reporterInstance, tt.localResourceId, tt.workspaceId)
-			err := usecase.ReportResource(ctx, reportRequest, "test-reporter")
+			reportCmd := createTestCommand(t, tt.resourceType, tt.reporterType, tt.reporterInstance, tt.localResourceId, tt.workspaceId)
+			err := usecase.ReportResource(ctx, reportCmd, "test-reporter")
 
 			if tt.expectError {
 				require.Error(t, err)
@@ -193,10 +374,10 @@ func TestReportResourceThenDelete(t *testing.T) {
 			}
 			mc := metricscollector.NewFakeMetricsCollector()
 			schemaRepository := newFakeSchemaRepository(t)
-			usecase := New(resourceRepo, nil, nil, schemaRepository, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig, mc)
+			usecase := New(resourceRepo, schemaRepository, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig, mc)
 
-			reportRequest := createTestReportRequest(t, tt.resourceType, tt.reporterType, tt.reporterInstanceId, tt.localResourceId, tt.workspaceId)
-			err := usecase.ReportResource(ctx, reportRequest, "test-reporter")
+			reportCmd := createTestCommand(t, tt.resourceType, tt.reporterType, tt.reporterInstanceId, tt.localResourceId, tt.workspaceId)
+			err := usecase.ReportResource(ctx, reportCmd, "test-reporter")
 			require.NoError(t, err)
 
 			localResourceId, err := model.NewLocalResourceId(tt.localResourceId)
@@ -242,35 +423,6 @@ func TestReportResourceThenDelete(t *testing.T) {
 	}
 }
 
-func createTestReportRequest(t *testing.T, resourceType, reporterType, reporterInstance, localResourceId, workspaceId string) *v1beta2.ReportResourceRequest {
-	reporterData, _ := structpb.NewStruct(map[string]interface{}{
-		"local_resource_id": localResourceId,
-		"api_href":          "https://api.example.com/resource/123",
-		"console_href":      "https://console.example.com/resource/123",
-	})
-
-	commonData, _ := structpb.NewStruct(map[string]interface{}{
-		"workspace_id": workspaceId,
-		"name":         "test-cluster",
-		"namespace":    "default",
-	})
-
-	return &v1beta2.ReportResourceRequest{
-		Type:               resourceType,
-		ReporterType:       reporterType,
-		ReporterInstanceId: reporterInstance,
-		Representations: &v1beta2.ResourceRepresentations{
-			Metadata: &v1beta2.RepresentationMetadata{
-				LocalResourceId: localResourceId,
-				ApiHref:         "https://api.example.com/resource/123",
-				ConsoleHref:     internal.StringPtr("https://console.example.com/resource/123"),
-			},
-			Reporter: reporterData,
-			Common:   commonData,
-		},
-		WriteVisibility: v1beta2.WriteVisibility_MINIMIZE_LATENCY,
-	}
-}
 
 func TestDelete_ResourceNotFound(t *testing.T) {
 	logger := log.DefaultLogger
@@ -284,7 +436,7 @@ func TestDelete_ResourceNotFound(t *testing.T) {
 
 	mc := metricscollector.NewFakeMetricsCollector()
 	schemaRepository := newFakeSchemaRepository(t)
-	usecase := New(resourceRepo, nil, nil, schemaRepository, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig, mc)
+	usecase := New(resourceRepo, schemaRepository, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig, mc)
 
 	localResourceId, err := model.NewLocalResourceId("non-existent-resource")
 	require.NoError(t, err)
@@ -315,10 +467,10 @@ func TestReportFindDeleteFind_TombstoneLifecycle(t *testing.T) {
 
 	mc := metricscollector.NewFakeMetricsCollector()
 	schemaRepository := newFakeSchemaRepository(t)
-	usecase := New(resourceRepo, nil, nil, schemaRepository, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig, mc)
+	usecase := New(resourceRepo, schemaRepository, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig, mc)
 
-	reportRequest := createTestReportRequest(t, "k8s_cluster", "ocm", "lifecycle-instance", "lifecycle-resource", "lifecycle-workspace")
-	err := usecase.ReportResource(ctx, reportRequest, "test-reporter")
+	reportCmd := createTestCommand(t, "k8s_cluster", "ocm", "lifecycle-instance", "lifecycle-resource", "lifecycle-workspace")
+	err := usecase.ReportResource(ctx, reportCmd, "test-reporter")
 	require.NoError(t, err)
 
 	localResourceId, err := model.NewLocalResourceId("lifecycle-resource")
@@ -360,15 +512,15 @@ func TestMultipleHostsLifecycle(t *testing.T) {
 
 	mc := metricscollector.NewFakeMetricsCollector()
 	schemaRepository := newFakeSchemaRepository(t)
-	usecase := New(resourceRepo, nil, nil, schemaRepository, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig, mc)
+	usecase := New(resourceRepo, schemaRepository, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig, mc)
 
 	// Create 2 hosts
-	host1Request := createTestReportRequest(t, "host", "hbi", "hbi-instance-1", "host-1", "workspace-1")
-	err := usecase.ReportResource(ctx, host1Request, "test-reporter")
+	host1Cmd := createTestCommand(t, "host", "hbi", "hbi-instance-1", "host-1", "workspace-1")
+	err := usecase.ReportResource(ctx, host1Cmd, "test-reporter")
 	require.NoError(t, err, "Should create host1")
 
-	host2Request := createTestReportRequest(t, "host", "hbi", "hbi-instance-1", "host-2", "workspace-1")
-	err = usecase.ReportResource(ctx, host2Request, "test-reporter")
+	host2Cmd := createTestCommand(t, "host", "hbi", "hbi-instance-1", "host-2", "workspace-1")
+	err = usecase.ReportResource(ctx, host2Cmd, "test-reporter")
 	require.NoError(t, err, "Should create host2")
 
 	// Verify both hosts can be found
@@ -386,11 +538,11 @@ func TestMultipleHostsLifecycle(t *testing.T) {
 	require.NotNil(t, foundHost2)
 
 	// Update both hosts by reporting them again with updated data
-	host1UpdateRequest := createTestReportRequestWithUpdatedData(t, "host", "hbi", "hbi-instance-1", "host-1", "workspace-1")
+	host1UpdateRequest := createTestCommandWithUpdatedData(t, "host", "hbi", "hbi-instance-1", "host-1", "workspace-1")
 	err = usecase.ReportResource(ctx, host1UpdateRequest, "test-reporter")
 	require.NoError(t, err, "Should update host1")
 
-	host2UpdateRequest := createTestReportRequestWithUpdatedData(t, "host", "hbi", "hbi-instance-1", "host-2", "workspace-1")
+	host2UpdateRequest := createTestCommandWithUpdatedData(t, "host", "hbi", "hbi-instance-1", "host-2", "workspace-1")
 	err = usecase.ReportResource(ctx, host2UpdateRequest, "test-reporter")
 	require.NoError(t, err, "Should update host2")
 
@@ -422,38 +574,6 @@ func TestMultipleHostsLifecycle(t *testing.T) {
 	assert.True(t, foundHost2.ReporterResources()[0].Serialize().Tombstone, "Host2 should be tombstoned")
 }
 
-func createTestReportRequestWithUpdatedData(t *testing.T, resourceType, reporterType, reporterInstance, localResourceId, workspaceId string) *v1beta2.ReportResourceRequest {
-	reporterData, _ := structpb.NewStruct(map[string]interface{}{
-		"local_resource_id": localResourceId,
-		"api_href":          "https://api.example.com/updated/123",
-		"console_href":      "https://console.example.com/updated/123",
-		"hostname":          "updated-hostname",
-		"status":            "running",
-	})
-
-	commonData, _ := structpb.NewStruct(map[string]interface{}{
-		"workspace_id": workspaceId,
-		"name":         "updated-host",
-		"environment":  "production",
-		"tags":         map[string]interface{}{"env": "prod", "updated": "true"},
-	})
-
-	return &v1beta2.ReportResourceRequest{
-		Type:               resourceType,
-		ReporterType:       reporterType,
-		ReporterInstanceId: reporterInstance,
-		Representations: &v1beta2.ResourceRepresentations{
-			Metadata: &v1beta2.RepresentationMetadata{
-				LocalResourceId: localResourceId,
-				ApiHref:         "https://api.example.com/updated/123",
-				ConsoleHref:     internal.StringPtr("https://console.example.com/updated/123"),
-			},
-			Reporter: reporterData,
-			Common:   commonData,
-		},
-		WriteVisibility: v1beta2.WriteVisibility_MINIMIZE_LATENCY,
-	}
-}
 
 func TestPartialDataScenarios(t *testing.T) {
 	ctx := context.Background()
@@ -468,10 +588,10 @@ func TestPartialDataScenarios(t *testing.T) {
 
 	mc := metricscollector.NewFakeMetricsCollector()
 	schemaRepository := newFakeSchemaRepository(t)
-	usecase := New(resourceRepo, nil, nil, schemaRepository, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig, mc)
+	usecase := New(resourceRepo, schemaRepository, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig, mc)
 
 	t.Run("Report resource with rich reporter data and minimal common data", func(t *testing.T) {
-		request := createTestReportRequestWithReporterDataOnly(t, "k8s_cluster", "ocm", "ocm-instance-1", "reporter-rich-resource", "minimal-workspace")
+		request := createTestCommandWithReporterDataOnly(t, "k8s_cluster", "ocm", "ocm-instance-1", "reporter-rich-resource", "minimal-workspace")
 		err := usecase.ReportResource(ctx, request, "test-reporter")
 		require.NoError(t, err, "Should create resource with rich reporter data")
 
@@ -484,7 +604,7 @@ func TestPartialDataScenarios(t *testing.T) {
 	})
 
 	t.Run("Report resource with minimal reporter data and rich common data", func(t *testing.T) {
-		request := createTestReportRequestWithCommonDataOnly(t, "k8s_cluster", "ocm", "ocm-instance-1", "common-rich-resource", "rich-workspace")
+		request := createTestCommandWithCommonDataOnly(t, "k8s_cluster", "ocm", "ocm-instance-1", "common-rich-resource", "rich-workspace")
 		err := usecase.ReportResource(ctx, request, "test-reporter")
 		require.NoError(t, err, "Should create resource with rich common data")
 
@@ -498,7 +618,7 @@ func TestPartialDataScenarios(t *testing.T) {
 
 	t.Run("Report resource with both data, then reporter-focused update, then common-focused update", func(t *testing.T) {
 		// 1. Initial report with both reporter and common data
-		initialRequest := createTestReportRequest(t, "k8s_cluster", "ocm", "ocm-instance-1", "progressive-resource", "initial-workspace")
+		initialRequest := createTestCommand(t, "k8s_cluster", "ocm", "ocm-instance-1", "progressive-resource", "initial-workspace")
 		err := usecase.ReportResource(ctx, initialRequest, "test-reporter")
 		require.NoError(t, err, "Should create resource with both data types")
 
@@ -510,7 +630,7 @@ func TestPartialDataScenarios(t *testing.T) {
 		require.NotNil(t, foundResource)
 
 		// 2. Reporter-focused update
-		reporterFocusedRequest := createTestReportRequestWithReporterDataOnly(t, "k8s_cluster", "ocm", "ocm-instance-1", "progressive-resource", "initial-workspace")
+		reporterFocusedRequest := createTestCommandWithReporterDataOnly(t, "k8s_cluster", "ocm", "ocm-instance-1", "progressive-resource", "initial-workspace")
 		err = usecase.ReportResource(ctx, reporterFocusedRequest, "test-reporter")
 		require.NoError(t, err, "Should update resource with reporter-focused data")
 
@@ -519,7 +639,7 @@ func TestPartialDataScenarios(t *testing.T) {
 		require.NotNil(t, foundResource)
 
 		// 3. Common-focused update
-		commonFocusedRequest := createTestReportRequestWithCommonDataOnly(t, "k8s_cluster", "ocm", "ocm-instance-1", "progressive-resource", "updated-workspace")
+		commonFocusedRequest := createTestCommandWithCommonDataOnly(t, "k8s_cluster", "ocm", "ocm-instance-1", "progressive-resource", "updated-workspace")
 		err = usecase.ReportResource(ctx, commonFocusedRequest, "test-reporter")
 		require.NoError(t, err, "Should update resource with common-focused data")
 
@@ -529,96 +649,6 @@ func TestPartialDataScenarios(t *testing.T) {
 	})
 }
 
-func createTestReportRequestWithReporterDataOnly(t *testing.T, resourceType, reporterType, reporterInstance, localResourceId, workspaceId string) *v1beta2.ReportResourceRequest {
-	// Rich reporter data
-	reporterData, _ := structpb.NewStruct(map[string]interface{}{
-		"local_resource_id":  localResourceId,
-		"api_href":           "https://api.example.com/reporter-rich",
-		"console_href":       "https://console.example.com/reporter-rich",
-		"cluster_name":       "reporter-focused-cluster",
-		"cluster_version":    "1.28.0",
-		"node_count":         10,
-		"cpu_total":          "40 cores",
-		"memory_total":       "160Gi",
-		"storage_total":      "1Ti",
-		"network_plugin":     "calico",
-		"ingress_controller": "nginx",
-	})
-
-	// Minimal common data
-	commonData, _ := structpb.NewStruct(map[string]interface{}{
-		"workspace_id": workspaceId,
-	})
-
-	return &v1beta2.ReportResourceRequest{
-		Type:               resourceType,
-		ReporterType:       reporterType,
-		ReporterInstanceId: reporterInstance,
-		Representations: &v1beta2.ResourceRepresentations{
-			Metadata: &v1beta2.RepresentationMetadata{
-				LocalResourceId: localResourceId,
-				ApiHref:         "https://api.example.com/reporter-rich",
-				ConsoleHref:     internal.StringPtr("https://console.example.com/reporter-rich"),
-			},
-			Reporter: reporterData,
-			Common:   commonData,
-		},
-		WriteVisibility: v1beta2.WriteVisibility_MINIMIZE_LATENCY,
-	}
-}
-
-func createTestReportRequestWithCommonDataOnly(t *testing.T, resourceType, reporterType, reporterInstance, localResourceId, workspaceId string) *v1beta2.ReportResourceRequest {
-	// Minimal reporter data
-	reporterData, _ := structpb.NewStruct(map[string]interface{}{
-		"local_resource_id": localResourceId,
-		"api_href":          "https://api.example.com/common-rich",
-		"console_href":      "https://console.example.com/common-rich",
-		"name":              "minimal-cluster",
-	})
-
-	// Rich common data
-	commonData, _ := structpb.NewStruct(map[string]interface{}{
-		"workspace_id": workspaceId,
-		"environment":  "production",
-		"region":       "us-east-1",
-		"cost_center":  "engineering",
-		"owner":        "platform-team",
-		"project":      "inventory-system",
-		"labels": map[string]interface{}{
-			"env":        "prod",
-			"team":       "platform",
-			"monitoring": "enabled",
-			"backup":     "daily",
-			"tier":       "critical",
-		},
-		"compliance": map[string]interface{}{
-			"sox":   "required",
-			"hipaa": "not-applicable",
-			"gdpr":  "compliant",
-		},
-		"security": map[string]interface{}{
-			"encryption": "enabled",
-			"scanning":   "continuous",
-			"access":     "restricted",
-		},
-	})
-
-	return &v1beta2.ReportResourceRequest{
-		Type:               resourceType,
-		ReporterType:       reporterType,
-		ReporterInstanceId: reporterInstance,
-		Representations: &v1beta2.ResourceRepresentations{
-			Metadata: &v1beta2.RepresentationMetadata{
-				LocalResourceId: localResourceId,
-				ApiHref:         "https://api.example.com/common-rich",
-				ConsoleHref:     internal.StringPtr("https://console.example.com/common-rich"),
-			},
-			Reporter: reporterData,
-			Common:   commonData,
-		},
-		WriteVisibility: v1beta2.WriteVisibility_MINIMIZE_LATENCY,
-	}
-}
 
 func TestResourceLifecycle_ReportUpdateDeleteReport(t *testing.T) {
 	t.Run("report new -> update -> delete -> report new", func(t *testing.T) {
@@ -634,7 +664,7 @@ func TestResourceLifecycle_ReportUpdateDeleteReport(t *testing.T) {
 
 		mc := metricscollector.NewFakeMetricsCollector()
 		schemaRepository := newFakeSchemaRepository(t)
-		usecase := New(resourceRepo, nil, nil, schemaRepository, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig, mc)
+		usecase := New(resourceRepo, schemaRepository, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig, mc)
 
 		resourceType := "host"
 		reporterType := "hbi"
@@ -644,7 +674,7 @@ func TestResourceLifecycle_ReportUpdateDeleteReport(t *testing.T) {
 
 		// 1. REPORT NEW: Initial resource creation
 		log.Info("Report New ---------------------")
-		reportRequest1 := createTestReportRequest(t, resourceType, reporterType, reporterInstance, localResourceId, workspaceId)
+		reportRequest1 := createTestCommand(t, resourceType, reporterType, reporterInstance, localResourceId, workspaceId)
 		err := usecase.ReportResource(ctx, reportRequest1, "test-reporter")
 		require.NoError(t, err, "Initial report should succeed")
 
@@ -663,7 +693,7 @@ func TestResourceLifecycle_ReportUpdateDeleteReport(t *testing.T) {
 
 		log.Info("Update 1 ---------------------")
 		// 2. UPDATE: Update the resource
-		reportRequest2 := createTestReportRequestWithUpdatedData(t, resourceType, reporterType, reporterInstance, localResourceId, workspaceId)
+		reportRequest2 := createTestCommandWithUpdatedData(t, resourceType, reporterType, reporterInstance, localResourceId, workspaceId)
 		err = usecase.ReportResource(ctx, reportRequest2, "test-reporter")
 		require.NoError(t, err, "Update should succeed")
 
@@ -696,7 +726,7 @@ func TestResourceLifecycle_ReportUpdateDeleteReport(t *testing.T) {
 
 		// 4. REPORT NEW: Report the same resource again after deletion (this should be an update)
 		log.Info("Revive again ---------------------")
-		reportRequest3 := createTestReportRequestWithUpdatedData(t, resourceType, reporterType, reporterInstance, localResourceId, workspaceId)
+		reportRequest3 := createTestCommandWithUpdatedData(t, resourceType, reporterType, reporterInstance, localResourceId, workspaceId)
 		err = usecase.ReportResource(ctx, reportRequest3, "test-reporter")
 		require.NoError(t, err, "Report after delete should succeed")
 
@@ -727,7 +757,7 @@ func TestResourceLifecycle_ReportUpdateDeleteReportDelete(t *testing.T) {
 
 		mc := metricscollector.NewFakeMetricsCollector()
 		schemaRepository := newFakeSchemaRepository(t)
-		usecase := New(resourceRepo, nil, nil, schemaRepository, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig, mc)
+		usecase := New(resourceRepo, schemaRepository, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig, mc)
 
 		resourceType := "k8s_cluster"
 		reporterType := "ocm"
@@ -736,12 +766,12 @@ func TestResourceLifecycle_ReportUpdateDeleteReportDelete(t *testing.T) {
 		workspaceId := "test-workspace-2"
 
 		// 1. REPORT NEW: Initial resource creation
-		reportRequest1 := createTestReportRequest(t, resourceType, reporterType, reporterInstance, localResourceId, workspaceId)
+		reportRequest1 := createTestCommand(t, resourceType, reporterType, reporterInstance, localResourceId, workspaceId)
 		err := usecase.ReportResource(ctx, reportRequest1, "test-reporter")
 		require.NoError(t, err, "Initial report should succeed")
 
 		// 2. UPDATE: Update the resource
-		reportRequest2 := createTestReportRequestWithUpdatedData(t, resourceType, reporterType, reporterInstance, localResourceId, workspaceId)
+		reportRequest2 := createTestCommandWithUpdatedData(t, resourceType, reporterType, reporterInstance, localResourceId, workspaceId)
 		err = usecase.ReportResource(ctx, reportRequest2, "test-reporter")
 		require.NoError(t, err, "Update should succeed")
 
@@ -751,7 +781,7 @@ func TestResourceLifecycle_ReportUpdateDeleteReportDelete(t *testing.T) {
 		require.NoError(t, err, "First delete should succeed")
 
 		// 4. REPORT NEW: Report the same resource again after deletion
-		reportRequest3 := createTestReportRequestWithUpdatedData(t, resourceType, reporterType, reporterInstance, localResourceId, workspaceId)
+		reportRequest3 := createTestCommandWithUpdatedData(t, resourceType, reporterType, reporterInstance, localResourceId, workspaceId)
 		err = usecase.ReportResource(ctx, reportRequest3, "test-reporter")
 		require.NoError(t, err, "Report after delete should succeed")
 
@@ -801,7 +831,7 @@ func TestResourceLifecycle_ReportDeleteResubmitDelete(t *testing.T) {
 
 		mc := metricscollector.NewFakeMetricsCollector()
 		schemaRepository := newFakeSchemaRepository(t)
-		usecase := New(resourceRepo, nil, nil, schemaRepository, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig, mc)
+		usecase := New(resourceRepo, schemaRepository, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig, mc)
 
 		resourceType := "k8s_cluster"
 		reporterType := "ocm"
@@ -811,7 +841,7 @@ func TestResourceLifecycle_ReportDeleteResubmitDelete(t *testing.T) {
 
 		// 1. REPORT: Initial resource creation
 		log.Info("1. Initial Report ---------------------")
-		reportRequest1 := createTestReportRequest(t, resourceType, reporterType, reporterInstance, localResourceId, workspaceId)
+		reportRequest1 := createTestCommand(t, resourceType, reporterType, reporterInstance, localResourceId, workspaceId)
 		err := usecase.ReportResource(ctx, reportRequest1, "test-reporter")
 		require.NoError(t, err, "Initial report should succeed")
 
@@ -871,7 +901,7 @@ func TestResourceLifecycle_ReportResubmitDeleteResubmit(t *testing.T) {
 
 		mc := metricscollector.NewFakeMetricsCollector()
 		schemaRepository := newFakeSchemaRepository(t)
-		usecase := New(resourceRepo, nil, nil, schemaRepository, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig, mc)
+		usecase := New(resourceRepo, schemaRepository, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig, mc)
 
 		resourceType := "host"
 		reporterType := "hbi"
@@ -881,7 +911,7 @@ func TestResourceLifecycle_ReportResubmitDeleteResubmit(t *testing.T) {
 
 		// 1. REPORT: Initial resource creation
 		log.Info("1. Initial Report ---------------------")
-		reportRequest1 := createTestReportRequest(t, resourceType, reporterType, reporterInstance, localResourceId, workspaceId)
+		reportRequest1 := createTestCommand(t, resourceType, reporterType, reporterInstance, localResourceId, workspaceId)
 		err := usecase.ReportResource(ctx, reportRequest1, "test-reporter")
 		require.NoError(t, err, "Initial report should succeed")
 
@@ -898,7 +928,7 @@ func TestResourceLifecycle_ReportResubmitDeleteResubmit(t *testing.T) {
 
 		// 2. RESUBMIT SAME REPORT: Should be idempotent
 		log.Info("2. Resubmit Same Report ---------------------")
-		reportRequest2 := createTestReportRequest(t, resourceType, reporterType, reporterInstance, localResourceId, workspaceId)
+		reportRequest2 := createTestCommand(t, resourceType, reporterType, reporterInstance, localResourceId, workspaceId)
 		err = usecase.ReportResource(ctx, reportRequest2, "test-reporter")
 		require.NoError(t, err, "Resubmitted report should succeed (idempotent)")
 
@@ -955,7 +985,7 @@ func TestResourceLifecycle_ComplexIdempotency(t *testing.T) {
 
 		mc := metricscollector.NewFakeMetricsCollector()
 		schemaRepository := newFakeSchemaRepository(t)
-		usecase := New(resourceRepo, nil, nil, schemaRepository, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig, mc)
+		usecase := New(resourceRepo, schemaRepository, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig, mc)
 
 		resourceType := "k8s_cluster"
 		reporterType := "ocm"
@@ -971,8 +1001,8 @@ func TestResourceLifecycle_ComplexIdempotency(t *testing.T) {
 
 			// 1. REPORT (CREATE or UPDATE): Should find existing or create new
 			log.Infof("Cycle %d: Report Resource", cycle)
-			reportRequest := createTestReportRequestWithCycleData(t, resourceType, reporterType, reporterInstance, localResourceId, workspaceId, cycle)
-			err := usecase.ReportResource(ctx, reportRequest, "test-reporter")
+			reportCmd := createTestCommandWithCycleData(t, resourceType, reporterType, reporterInstance, localResourceId, workspaceId, cycle)
+			err := usecase.ReportResource(ctx, reportCmd, "test-reporter")
 			require.NoError(t, err, "Report should succeed in cycle %d", cycle)
 
 			// Verify state after report
@@ -988,7 +1018,7 @@ func TestResourceLifecycle_ComplexIdempotency(t *testing.T) {
 
 			// 2. UPDATE: Update the resource
 			log.Infof("Cycle %d: Update Resource", cycle)
-			updateRequest := createTestReportRequestWithUpdatedData(t, resourceType, reporterType, reporterInstance, localResourceId, workspaceId)
+			updateRequest := createTestCommandWithUpdatedData(t, resourceType, reporterType, reporterInstance, localResourceId, workspaceId)
 			err = usecase.ReportResource(ctx, updateRequest, "test-reporter")
 			require.NoError(t, err, "Update should succeed in cycle %d", cycle)
 
@@ -1029,38 +1059,6 @@ func TestResourceLifecycle_ComplexIdempotency(t *testing.T) {
 	})
 }
 
-func createTestReportRequestWithCycleData(t *testing.T, resourceType, reporterType, reporterInstance, localResourceId, workspaceId string, cycle int) *v1beta2.ReportResourceRequest {
-	reporterData, _ := structpb.NewStruct(map[string]interface{}{
-		"local_resource_id": localResourceId,
-		"api_href":          fmt.Sprintf("https://api.example.com/cycle-%d", cycle),
-		"console_href":      fmt.Sprintf("https://console.example.com/cycle-%d", cycle),
-		"cycle":             cycle,
-	})
-
-	commonData, _ := structpb.NewStruct(map[string]interface{}{
-		"workspace_id": workspaceId,
-		"name":         fmt.Sprintf("test-cluster-cycle-%d", cycle),
-		"namespace":    "default",
-		"cycle":        cycle,
-	})
-
-	return &v1beta2.ReportResourceRequest{
-		Type:               resourceType,
-		ReporterType:       reporterType,
-		ReporterInstanceId: reporterInstance,
-		Representations: &v1beta2.ResourceRepresentations{
-			Metadata: &v1beta2.RepresentationMetadata{
-				LocalResourceId: localResourceId,
-				ApiHref:         fmt.Sprintf("https://api.example.com/cycle-%d", cycle),
-				ConsoleHref:     internal.StringPtr(fmt.Sprintf("https://console.example.com/cycle-%d", cycle)),
-			},
-			Reporter: reporterData,
-			Common:   commonData,
-		},
-		WriteVisibility: v1beta2.WriteVisibility_MINIMIZE_LATENCY,
-	}
-
-}
 
 func TestGetCurrentAndPreviousWorkspaceID(t *testing.T) {
 	// Test the GetCurrentAndPreviousWorkspaceID function with test data
@@ -1149,7 +1147,7 @@ func TestTransactionIdIdempotency(t *testing.T) {
 
 	mc := metricscollector.NewFakeMetricsCollector()
 	schemaRepository := newFakeSchemaRepository(t)
-	usecase := New(resourceRepo, nil, nil, schemaRepository, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig, mc)
+	usecase := New(resourceRepo, schemaRepository, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig, mc)
 
 	t.Run("Same transaction ID should be idempotent - no changes to representation tables", func(t *testing.T) {
 		resourceType := "host"
@@ -1160,7 +1158,7 @@ func TestTransactionIdIdempotency(t *testing.T) {
 		transactionId := "test-transaction-123"
 
 		// 1. First report with transaction ID
-		request1 := createTestReportRequestWithTransactionId(t, resourceType, reporterType, reporterInstance, localResourceId, workspaceId, transactionId)
+		request1 := createTestCommandWithTransactionId(t, resourceType, reporterType, reporterInstance, localResourceId, workspaceId, transactionId)
 		err := usecase.ReportResource(ctx, request1, "test-reporter")
 		require.NoError(t, err, "First report should succeed")
 
@@ -1176,7 +1174,7 @@ func TestTransactionIdIdempotency(t *testing.T) {
 		initialGeneration := firstState.Generation
 
 		// 2. Second report with SAME transaction ID - should be idempotent
-		request2 := createTestReportRequestWithTransactionId(t, resourceType, reporterType, reporterInstance, localResourceId, workspaceId, transactionId)
+		request2 := createTestCommandWithTransactionId(t, resourceType, reporterType, reporterInstance, localResourceId, workspaceId, transactionId)
 		err = usecase.ReportResource(ctx, request2, "test-reporter")
 		require.NoError(t, err, "Second report with same transaction ID should succeed (idempotent)")
 
@@ -1200,7 +1198,7 @@ func TestTransactionIdIdempotency(t *testing.T) {
 		transactionId2 := "test-transaction-789"
 
 		// 1. First report with transaction ID
-		request1 := createTestReportRequestWithTransactionId(t, resourceType, reporterType, reporterInstance, localResourceId, workspaceId, transactionId1)
+		request1 := createTestCommandWithTransactionId(t, resourceType, reporterType, reporterInstance, localResourceId, workspaceId, transactionId1)
 		err := usecase.ReportResource(ctx, request1, "test-reporter")
 		require.NoError(t, err, "First report should succeed")
 
@@ -1216,7 +1214,7 @@ func TestTransactionIdIdempotency(t *testing.T) {
 		initialGeneration := firstState.Generation
 
 		// 2. Second report with DIFFERENT transaction ID - should update representations
-		request2 := createTestReportRequestWithUpdatedDataAndTransactionId(t, resourceType, reporterType, reporterInstance, localResourceId, workspaceId, transactionId2)
+		request2 := createTestCommandWithUpdatedDataAndTransactionId(t, resourceType, reporterType, reporterInstance, localResourceId, workspaceId, transactionId2)
 		err = usecase.ReportResource(ctx, request2, "test-reporter")
 		require.NoError(t, err, "Second report with different transaction ID should succeed")
 
@@ -1240,7 +1238,7 @@ func TestTransactionIdIdempotency(t *testing.T) {
 		transactionId2 := "test-transaction-222"
 
 		// 1. First report with transaction ID
-		request1 := createTestReportRequestWithTransactionId(t, resourceType, reporterType, reporterInstance, localResourceId, workspaceId, transactionId1)
+		request1 := createTestCommandWithTransactionId(t, resourceType, reporterType, reporterInstance, localResourceId, workspaceId, transactionId1)
 		err := usecase.ReportResource(ctx, request1, "test-reporter")
 		require.NoError(t, err, "First report should succeed")
 
@@ -1259,7 +1257,7 @@ func TestTransactionIdIdempotency(t *testing.T) {
 		assert.False(t, firstState.Tombstone, "Initial tombstone should be false")
 
 		// 2. Update with DIFFERENT transaction ID - should update representations
-		request2 := createTestReportRequestWithUpdatedDataAndTransactionId(t, resourceType, reporterType, reporterInstance, localResourceId, workspaceId, transactionId2)
+		request2 := createTestCommandWithUpdatedDataAndTransactionId(t, resourceType, reporterType, reporterInstance, localResourceId, workspaceId, transactionId2)
 		err = usecase.ReportResource(ctx, request2, "test-reporter")
 		require.NoError(t, err, "Update with different transaction ID should succeed")
 
@@ -1295,7 +1293,7 @@ func TestTransactionIdIdempotency(t *testing.T) {
 		transactionId := "test-transaction-333"
 
 		// 1. First report with transaction ID
-		request1 := createTestReportRequestWithTransactionId(t, resourceType, reporterType, reporterInstance, localResourceId, workspaceId, transactionId)
+		request1 := createTestCommandWithTransactionId(t, resourceType, reporterType, reporterInstance, localResourceId, workspaceId, transactionId)
 		err := usecase.ReportResource(ctx, request1, "test-reporter")
 		require.NoError(t, err, "First report should succeed")
 
@@ -1314,7 +1312,7 @@ func TestTransactionIdIdempotency(t *testing.T) {
 		assert.False(t, firstState.Tombstone, "Initial tombstone should be false")
 
 		// 2. Second report with SAME transaction ID - should be idempotent
-		request2 := createTestReportRequestWithTransactionId(t, resourceType, reporterType, reporterInstance, localResourceId, workspaceId, transactionId)
+		request2 := createTestCommandWithTransactionId(t, resourceType, reporterType, reporterInstance, localResourceId, workspaceId, transactionId)
 		err = usecase.ReportResource(ctx, request2, "test-reporter")
 		require.NoError(t, err, "Second report with same transaction ID should succeed (idempotent)")
 
@@ -1342,69 +1340,3 @@ func TestTransactionIdIdempotency(t *testing.T) {
 	})
 }
 
-// Helper function to create a test request with transaction ID
-func createTestReportRequestWithTransactionId(t *testing.T, resourceType, reporterType, reporterInstance, localResourceId, workspaceId, transactionId string) *v1beta2.ReportResourceRequest {
-	reporterData, _ := structpb.NewStruct(map[string]interface{}{
-		"local_resource_id": localResourceId,
-		"api_href":          "https://api.example.com/resource/123",
-		"console_href":      "https://console.example.com/resource/123",
-	})
-
-	commonData, _ := structpb.NewStruct(map[string]interface{}{
-		"workspace_id": workspaceId,
-		"name":         "test-cluster",
-		"namespace":    "default",
-	})
-
-	return &v1beta2.ReportResourceRequest{
-		Type:               resourceType,
-		ReporterType:       reporterType,
-		ReporterInstanceId: reporterInstance,
-		Representations: &v1beta2.ResourceRepresentations{
-			Metadata: &v1beta2.RepresentationMetadata{
-				LocalResourceId: localResourceId,
-				ApiHref:         "https://api.example.com/resource/123",
-				ConsoleHref:     internal.StringPtr("https://console.example.com/resource/123"),
-				IdempotencyKey:  &v1beta2.RepresentationMetadata_TransactionId{TransactionId: transactionId},
-			},
-			Reporter: reporterData,
-			Common:   commonData,
-		},
-		WriteVisibility: v1beta2.WriteVisibility_MINIMIZE_LATENCY,
-	}
-}
-
-// Helper function to create a test request with updated data and transaction ID
-func createTestReportRequestWithUpdatedDataAndTransactionId(t *testing.T, resourceType, reporterType, reporterInstance, localResourceId, workspaceId, transactionId string) *v1beta2.ReportResourceRequest {
-	reporterData, _ := structpb.NewStruct(map[string]interface{}{
-		"local_resource_id": localResourceId,
-		"api_href":          "https://api.example.com/updated/123",
-		"console_href":      "https://console.example.com/updated/123",
-		"hostname":          "updated-hostname",
-		"status":            "running",
-	})
-
-	commonData, _ := structpb.NewStruct(map[string]interface{}{
-		"workspace_id": workspaceId,
-		"name":         "updated-host",
-		"environment":  "production",
-		"tags":         map[string]interface{}{"env": "prod", "updated": "true"},
-	})
-
-	return &v1beta2.ReportResourceRequest{
-		Type:               resourceType,
-		ReporterType:       reporterType,
-		ReporterInstanceId: reporterInstance,
-		Representations: &v1beta2.ResourceRepresentations{
-			Metadata: &v1beta2.RepresentationMetadata{
-				LocalResourceId: localResourceId,
-				ApiHref:         "https://api.example.com/updated/123",
-				ConsoleHref:     internal.StringPtr("https://console.example.com/updated/123"),
-				IdempotencyKey:  &v1beta2.RepresentationMetadata_TransactionId{TransactionId: transactionId},
-			},
-			Reporter: reporterData,
-			Common:   commonData,
-		},
-		WriteVisibility: v1beta2.WriteVisibility_MINIMIZE_LATENCY,
-	}
-}

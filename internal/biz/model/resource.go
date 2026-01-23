@@ -4,9 +4,28 @@ import (
 	"fmt"
 	"strings"
 	"time"
+
+	"github.com/project-kessel/inventory-api/internal/biz"
 )
 
 const initialCommonVersion = 0
+
+type ResourceRepository interface {
+	Begin() (Tx, error)
+	Events() /** stream of events */ <-chan ResourceEvent
+}
+
+type Tx interface {
+	NextResourceId() (ResourceId, error)
+	NextReporterResourceId() (ReporterResourceId, error)
+	Save(resource Resource, operationType biz.EventOperationType, txid string) error
+	FindResourceByKeys(key ReporterResourceKey) (*Resource, error)
+	FindCurrentAndPreviousVersionedRepresentations(key ReporterResourceKey, currentVersion *uint, operationType biz.EventOperationType) (*Representations, *Representations, error)
+	FindLatestRepresentations(key ReporterResourceKey) (*Representations, error)
+	HasTransactionIdBeenProcessed(transactionId string) (bool, error)
+	Commit() error
+	Rollback() error
+}
 
 // Create Entities with unexported fields for encapsulation
 type Resource struct {

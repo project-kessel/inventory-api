@@ -7,7 +7,7 @@ This repository implements a common inventory system with eventing.
 ## Codecov test coverage
 | main | v1beta2 |
 |------|---------|
-| [![codecov](https://codecov.io/gh/project-kessel/inventory-api/branch/main/graph/badge.svg?flag=main)](https://codecov.io/gh/project-kessel/inventory-api/branch/main) | [![codecov](https://codecov.io/gh/project-kessel/inventory-api/branch/Adam0Brien%3Astorage-tests/graph/badge.svg?flag=v1beta2)](https://codecov.io/gh/project-kessel/inventory-api) |
+| [![codecov](https://codecov.io/gh/project-kessel/inventory-api/branch/main/graph/badge.svg?flag=main)](https://codecov.io/gh/project-kessel/inventory-api/branch/main) | [![codecov](https://codecov.io/gh/project-kessel/inventory-api/branch/main/graph/badge.svg?flag=v1beta2)](https://codecov.io/gh/project-kessel/inventory-api) |
 
 
 ## Table of Contents
@@ -270,32 +270,6 @@ curl -X POST -H "Content-Type: application/json" -H "Authorization: Bearer $TOKE
 # delete the integration
 curl -X DELETE -H "Content-Type: application/json" -H "Authorization: Bearer $TOKEN" -d @data/testData/v1beta2/delete-notifications-integration.json localhost:8000/api/inventory/v1beta2/resources
 
-```
-### Adding a new relationship (k8s-policy is propagated to k8s-cluster)
-
-To add a `k8s-policy_ispropagatedto-k8s-cluster` relationship, first lets add the related resources `k8s-policy` and `k8s-cluster`.
-
-```shell
-curl -H "Content-Type: application/json" --data "@data/testData/v1beta1/k8s-cluster.json" http://localhost:8000/api/inventory/v1beta1/resources/k8s-clusters
-curl -H "Content-Type: application/json" --data "@data/testData/v1beta1/k8s-policy.json" http://localhost:8000/api/inventory/v1beta1/resources/k8s-policies
-```
-
-And then you can create the relation:
-
-```shell
-curl -H "Content-Type: application/json" --data "@data/testData/v1beta1/k8spolicy_ispropagatedto_k8scluster.json" http://localhost:8000/api/inventory/v1beta1/resource-relationships/k8s-policy_is-propagated-to_k8s-cluster
-```
-
-To update it:
-
-```shell
-curl -X PUT -H "Content-Type: application/json" --data "@data/testData/v1beta1/k8spolicy_ispropagatedto_k8scluster.json" http://localhost:8000/api/inventory/v1beta1/resource-relationships/k8s-policy_is-propagated-to_k8s-cluster
-```
-
-And finally, to delete it, notice that the data file is different this time. We only need the reporter data.
-
-```shell
-curl -X DELETE -H "Content-Type: application/json" --data "@data/testData/v1beta1/relationship_reporter_data.json" http://localhost:8000/api/inventory/v1beta1/resource-relationships/k8s-policy_is-propagated-to_k8s-cluster
 ```
 
 ## Configuration

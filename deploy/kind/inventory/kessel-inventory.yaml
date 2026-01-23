@@ -102,9 +102,6 @@ spec:
               path: /api/inventory/v1/readyz
               port: 8081
           volumeMounts:
-            - name: psks-volume
-              mountPath: "/psks.yaml"
-              subPath: psks.yaml
             - name: config-volume
               mountPath: "/inventory"
             - name: resource-volume
@@ -113,9 +110,6 @@ spec:
         - name: config-volume
           secret:
             secretName: inventory-api-config
-        - name: psks-volume
-          configMap:
-            name: inventory-api-psks
         - name: resource-volume
           emptyDir: {}
         - name: resources-tarball
@@ -170,8 +164,6 @@ stringData:
         address: 0.0.0.0:9081
     authn:
       allow-unauthenticated: true
-      #psk:
-          #pre-shared-key-file: /psks.yaml
     authz:
       impl: kessel
       kessel:

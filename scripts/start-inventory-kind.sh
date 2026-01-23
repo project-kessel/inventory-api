@@ -71,8 +71,6 @@ $KIND load image-archive inventory-api.tar --name inventory-cluster
 $KIND load image-archive inventory-e2e-tests.tar --name inventory-cluster
 $KIND load image-archive kafka-connect.tar --name inventory-cluster
 
-# checks for the config map first, or creates it if not found
-kubectl get configmap inventory-api-psks || kubectl create configmap inventory-api-psks --from-file=config/psks.yaml
 [ -f resources.tar.gz ] || tar czf resources.tar.gz -C data/schema/resources .
 kubectl get configmap resources-tarball || kubectl create configmap resources-tarball --from-file=resources.tar.gz
 
@@ -91,7 +89,11 @@ kubectl get configmap spicedb-schema || kubectl create configmap spicedb-schema 
 kubectl apply -f deploy/kind/relations/spicedb-kind-setup/postgres/secret.yaml
 kubectl apply -f deploy/kind/relations/spicedb-kind-setup/postgres/postgresql.yaml
 kubectl apply -f deploy/kind/relations/spicedb-kind-setup/postgres/storage.yaml
-kubectl apply -f deploy/kind/relations/spicedb-kind-setup/bundle.yaml
+
+# Install SpiceDB operator if not already installed
+kubectl get crd spicedbclusters.authzed.com > /dev/null 2>&1 || \
+  kubectl apply --server-side -f https://github.com/authzed/spicedb-operator/releases/download/v1.21.0/bundle.yaml
+
 kubectl apply -f deploy/kind/relations/spicedb-kind-setup/spicedb-cr.yaml
 kubectl apply -f deploy/kind/relations/spicedb-kind-setup/svc-ingress.yaml
 kubectl apply -f deploy/kind/relations/spicedb-kind-setup/relations-api/secret.yaml

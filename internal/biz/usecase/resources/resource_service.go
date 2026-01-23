@@ -22,6 +22,8 @@ import (
 	kessel "github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
 	"github.com/sony/gobreaker"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"gorm.io/gorm"
 )
 
@@ -99,7 +101,8 @@ func (uc *Usecase) ReportResource(ctx context.Context, request *v1beta2.ReportRe
 
 	reporterResourceKey, err := getReporterResourceKeyFromRequest(request)
 	if err != nil {
-		return fmt.Errorf("failed to create reporter resource key: %w", err)
+		log.Error("failed to create reporter resource key: ", err)
+		return status.Errorf(codes.InvalidArgument, "failed to create reporter resource key: %v", err)
 	}
 
 	var operationType biz.EventOperationType
@@ -229,6 +232,7 @@ func (uc *Usecase) Check(ctx context.Context, permission, namespace string, sub 
 		if !errors.Is(err, gorm.ErrRecordNotFound) {
 			return false, err
 		}
+
 		consistencyToken = ""
 	} else {
 		consistencyToken = res.ConsistencyToken().Serialize()

@@ -97,6 +97,7 @@ func NewWhiteListMatcher(ctx context.Context, operation string) bool {
 	whiteList["/kessel.inventory.v1.KesselInventoryHealthService/GetReadyz"] = struct{}{}
 	whiteList["/kessel.inventory.v1.KesselInventoryHealthService/GetLivez"] = struct{}{}
 	whiteList["/grpc.health.v1.Health/Check"] = struct{}{}
+	whiteList["/metrics"] = struct{}{}
 	if _, ok := whiteList[operation]; ok {
 		return false
 	}

@@ -15,9 +15,60 @@ import (
 	"github.com/project-kessel/inventory-api/internal"
 	"github.com/project-kessel/inventory-api/internal/authz/allow"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
+	"github.com/project-kessel/inventory-api/internal/biz/schema"
+	"github.com/project-kessel/inventory-api/internal/biz/schema/validation"
 	"github.com/project-kessel/inventory-api/internal/data"
 	"github.com/project-kessel/inventory-api/internal/metricscollector"
 )
+
+func newFakeSchemaRepository(t *testing.T) schema.Repository {
+	schemaRepository := data.NewInMemorySchemaRepository()
+
+	emptyValidationSchema := validation.NewJsonSchemaValidatorFromString(`{
+		"$schema": "http://json-schema.org/draft-07/schema#",
+		"type": "object",
+		"properties": {
+		},
+		"required": []
+	}`)
+
+	withWorkspaceValidationSchema := validation.NewJsonSchemaValidatorFromString(`{
+		"$schema": "http://json-schema.org/draft-07/schema#",
+		"type": "object",
+		"properties": {
+			"workspace_id": { "type": "string" }
+		},
+		"required": ["workspace_id"]
+	}`)
+
+	err := schemaRepository.CreateResourceSchema(context.Background(), schema.ResourceRepresentation{
+		ResourceType:     "k8s_cluster",
+		ValidationSchema: withWorkspaceValidationSchema,
+	})
+	assert.NoError(t, err)
+
+	err = schemaRepository.CreateReporterSchema(context.Background(), schema.ReporterRepresentation{
+		ResourceType:     "k8s_cluster",
+		ReporterType:     "ocm",
+		ValidationSchema: emptyValidationSchema,
+	})
+	assert.NoError(t, err)
+
+	err = schemaRepository.CreateResourceSchema(context.Background(), schema.ResourceRepresentation{
+		ResourceType:     "host",
+		ValidationSchema: withWorkspaceValidationSchema,
+	})
+	assert.NoError(t, err)
+
+	err = schemaRepository.CreateReporterSchema(context.Background(), schema.ReporterRepresentation{
+		ResourceType:     "host",
+		ReporterType:     "hbi",
+		ValidationSchema: emptyValidationSchema,
+	})
+	assert.NoError(t, err)
+
+	return schemaRepository
+}
 
 func TestReportResource(t *testing.T) {
 	tests := []struct {
@@ -811,7 +862,6 @@ func TestResourceLifecycle_ReportResubmitDeleteResubmit(t *testing.T) {
 
 		mc := metricscollector.NewFakeMetricsCollector()
 		usecase := New(resourceRepo, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig, mc)
-
 		resourceType := "host"
 		reporterType := "hbi"
 		reporterInstance := "idempotent-instance-2"
@@ -1003,84 +1053,49 @@ func createTestReportRequestWithCycleData(t *testing.T, resourceType, reporterTy
 func TestGetCurrentAndPreviousWorkspaceID(t *testing.T) {
 	// Test the GetCurrentAndPreviousWorkspaceID function with test data
 	tests := []struct {
-		name                  string
-		representationVersion []data.RepresentationsByVersion
-		currentVersion        uint
-		expectedCurrent       string
-		expectedPrevious      string
+		name             string
+		current          *model.Representations
+		previous         *model.Representations
+		currentVersion   uint
+		expectedCurrent  string
+		expectedPrevious string
 	}{
 		{
-			name: "extract current and previous workspace IDs",
-			representationVersion: []data.RepresentationsByVersion{
-				{
-					Version: 2,
-					Data: map[string]interface{}{
-						"workspace_id": "workspace-new",
-					},
-				},
-				{
-					Version: 1,
-					Data: map[string]interface{}{
-						"workspace_id": "workspace-old",
-					},
-				},
-			},
+			name:             "extract current and previous workspace IDs",
+			current:          createTestRep(t, uint(2), map[string]interface{}{"workspace_id": "workspace-new"}),
+			previous:         createTestRep(t, uint(1), map[string]interface{}{"workspace_id": "workspace-old"}),
 			currentVersion:   2,
 			expectedCurrent:  "workspace-new",
 			expectedPrevious: "workspace-old",
 		},
 		{
-			name: "extract only current workspace ID",
-			representationVersion: []data.RepresentationsByVersion{
-				{
-					Version: 0,
-					Data: map[string]interface{}{
-						"workspace_id": "workspace-initial",
-					},
-				},
-			},
+			name:             "extract only current workspace ID",
+			current:          createTestRep(t, uint(0), map[string]interface{}{"workspace_id": "workspace-initial"}),
+			previous:         nil,
 			currentVersion:   0,
 			expectedCurrent:  "workspace-initial",
 			expectedPrevious: "",
 		},
 		{
-			name: "no workspace IDs found",
-			representationVersion: []data.RepresentationsByVersion{
-				{
-					Version: 1,
-					Data: map[string]interface{}{
-						"other_field": "value",
-					},
-				},
-			},
+			name:             "no workspace IDs found",
+			current:          createTestRep(t, uint(1), map[string]interface{}{"other_field": "value"}),
+			previous:         nil,
 			currentVersion:   1,
 			expectedCurrent:  "",
 			expectedPrevious: "",
 		},
 		{
-			name: "empty workspace ID ignored",
-			representationVersion: []data.RepresentationsByVersion{
-				{
-					Version: 1,
-					Data: map[string]interface{}{
-						"workspace_id": "",
-					},
-				},
-			},
+			name:             "empty workspace ID ignored",
+			current:          createTestRep(t, uint(1), map[string]interface{}{"workspace_id": ""}),
+			previous:         nil,
 			currentVersion:   1,
 			expectedCurrent:  "",
 			expectedPrevious: "",
 		},
 		{
-			name: "workspace ID with special characters",
-			representationVersion: []data.RepresentationsByVersion{
-				{
-					Version: 1,
-					Data: map[string]interface{}{
-						"workspace_id": "workspace-with-dashes_and_underscores",
-					},
-				},
-			},
+			name:             "workspace ID with special characters",
+			current:          createTestRep(t, uint(1), map[string]interface{}{"workspace_id": "workspace-with-dashes_and_underscores"}),
+			previous:         nil,
 			currentVersion:   1,
 			expectedCurrent:  "workspace-with-dashes_and_underscores",
 			expectedPrevious: "",
@@ -1089,12 +1104,24 @@ func TestGetCurrentAndPreviousWorkspaceID(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			current, previous := data.GetCurrentAndPreviousWorkspaceID(tt.representationVersion, tt.currentVersion)
+			current, previous := data.GetCurrentAndPreviousWorkspaceID(tt.current, tt.previous)
 
 			assert.Equal(t, tt.expectedCurrent, current)
 			assert.Equal(t, tt.expectedPrevious, previous)
 		})
 	}
+}
+
+// Helper function to create a Representations for testing
+func createTestRep(t *testing.T, version uint, data map[string]interface{}) *model.Representations {
+	rep, err := model.NewRepresentations(
+		model.Representation(data),
+		&version,
+		nil,
+		nil,
+	)
+	require.NoError(t, err)
+	return rep
 }
 
 func TestTransactionIdIdempotency(t *testing.T) {

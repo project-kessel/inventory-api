@@ -70,8 +70,7 @@ func TestCalculateTuples(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			repo := data.NewFakeResourceRepositoryWithWorkspaceOverrides(tt.currentWorkspaceID, tt.previousWorkspaceID)
-			sc := NewSchemaUsecase(repo, log.NewHelper(log.DefaultLogger))
+			sc := NewSchemaUsecase(data.NewInMemorySchemaRepository(), log.NewHelper(log.DefaultLogger))
 			key, err := model.NewReporterResourceKey(
 				model.LocalResourceId("test-resource"),
 				model.ResourceType("host"),
@@ -80,11 +79,36 @@ func TestCalculateTuples(t *testing.T) {
 			)
 			require.NoError(t, err)
 
-			version := model.Version(tt.version)
-			tupleEvent, err := model.NewTupleEvent(key, &version, nil)
+			// Build representations input
+			var current, previous *model.Representations
+
+			currentData := map[string]interface{}{}
+			if tt.currentWorkspaceID != "" {
+				currentData = map[string]interface{}{"workspace_id": tt.currentWorkspaceID}
+			}
+			current, err = model.NewRepresentations(
+				model.Representation(currentData),
+				&tt.version,
+				nil,
+				nil,
+			)
 			require.NoError(t, err)
 
-			result, err := sc.CalculateTuples(tupleEvent, biz.OperationTypeCreated)
+			if tt.previousWorkspaceID != "" {
+				prevVer := uint(0)
+				if tt.version > 0 {
+					prevVer = tt.version - 1
+				}
+				previous, err = model.NewRepresentations(
+					model.Representation(map[string]interface{}{"workspace_id": tt.previousWorkspaceID}),
+					&prevVer,
+					nil,
+					nil,
+				)
+				require.NoError(t, err)
+			}
+
+			result, err := sc.CalculateTuples(current, previous, key)
 			require.NoError(t, err)
 			assert.Equal(t, tt.expectTuplesToCreate, result.HasTuplesToCreate())
 			assert.Equal(t, tt.expectTuplesToDelete, result.HasTuplesToDelete())
@@ -125,8 +149,7 @@ func TestCalculateTuples(t *testing.T) {
 }
 
 func TestGetWorkspaceVersions(t *testing.T) {
-	repo := data.NewFakeResourceRepository()
-	sc := NewSchemaUsecase(repo, log.NewHelper(log.DefaultLogger))
+	sc := NewSchemaUsecase(data.NewInMemorySchemaRepository(), log.NewHelper(log.DefaultLogger))
 
 	key, err := model.NewReporterResourceKey(
 		model.LocalResourceId("test-resource"),
@@ -137,9 +160,24 @@ func TestGetWorkspaceVersions(t *testing.T) {
 	require.NoError(t, err)
 
 	version := uint(1)
-	representations, err := sc.resourceRepository.FindCurrentAndPreviousVersionedRepresentations(nil, key, &version, biz.OperationTypeUpdated)
+	current, err := model.NewRepresentations(
+		model.Representation(map[string]interface{}{"workspace_id": "ws-current"}),
+		&version,
+		nil,
+		nil,
+	)
 	require.NoError(t, err)
-	assert.NotEmpty(t, representations)
+	prevVersion := version - 1
+	previous, err := model.NewRepresentations(
+		model.Representation(map[string]interface{}{"workspace_id": "ws-prev"}),
+		&prevVersion,
+		nil,
+		nil,
+	)
+	require.NoError(t, err)
+	result, err := sc.CalculateTuples(current, previous, key)
+	require.NoError(t, err)
+	assert.True(t, result.HasTuplesToCreate() || result.HasTuplesToDelete())
 }
 
 func TestCreateWorkspaceTuple(t *testing.T) {
@@ -209,8 +247,7 @@ func TestCreateWorkspaceTuple(t *testing.T) {
 }
 
 func TestDetermineTupleOperations(t *testing.T) {
-	repo := data.NewFakeResourceRepository()
-	sc := NewSchemaUsecase(repo, log.NewHelper(log.DefaultLogger))
+	sc := NewSchemaUsecase(data.NewInMemorySchemaRepository(), log.NewHelper(log.DefaultLogger))
 
 	key, err := model.NewReporterResourceKey(
 		model.LocalResourceId("test-resource"),
@@ -220,23 +257,25 @@ func TestDetermineTupleOperations(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	representationVersion := []data.RepresentationsByVersion{
-		{
-			Version: 2,
-			Data: map[string]interface{}{
-				"workspace_id": "workspace-new",
-			},
-		},
-		{
-			Version: 1,
-			Data: map[string]interface{}{
-				"workspace_id": "workspace-old",
-			},
-		},
-	}
+	version2 := uint(2)
+	current, err := model.NewRepresentations(
+		model.Representation(map[string]interface{}{"workspace_id": "workspace-new"}),
+		&version2,
+		nil,
+		nil,
+	)
+	require.NoError(t, err)
 
-	currentWorkspaceID, previousWorkspaceID := data.GetCurrentAndPreviousWorkspaceID(representationVersion, 2)
-	result, err := sc.buildTuplesToReplicate(currentWorkspaceID, previousWorkspaceID, key)
+	version1 := uint(1)
+	previous, err := model.NewRepresentations(
+		model.Representation(map[string]interface{}{"workspace_id": "workspace-old"}),
+		&version1,
+		nil,
+		nil,
+	)
+	require.NoError(t, err)
+
+	result, err := sc.CalculateTuples(current, previous, key)
 	require.NoError(t, err)
 
 	assert.True(t, result.HasTuplesToCreate() || result.HasTuplesToDelete())
@@ -245,7 +284,7 @@ func TestDetermineTupleOperations(t *testing.T) {
 func TestCalculateTuples_OperationTypeScenarios(t *testing.T) {
 	testCases := []struct {
 		name                 string
-		operationType        biz.EventOperationType
+		operationType        biz.EventOperationType // kept for scenario naming; not used by CalculateTuples
 		version              uint
 		currentWorkspaceID   string
 		previousWorkspaceID  string
@@ -283,8 +322,8 @@ func TestCalculateTuples_OperationTypeScenarios(t *testing.T) {
 			name:                 "DELETE operation should only delete tuples",
 			operationType:        biz.OperationTypeDeleted,
 			version:              1,
-			currentWorkspaceID:   "workspace-current",
-			previousWorkspaceID:  "",
+			currentWorkspaceID:   "",                  // synthetic empty current
+			previousWorkspaceID:  "workspace-current", // previous holds latest
 			expectTuplesToCreate: false,
 			expectTuplesToDelete: true,
 		},
@@ -292,16 +331,7 @@ func TestCalculateTuples_OperationTypeScenarios(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			var repo data.ResourceRepository
-			if tc.operationType.OperationType() == biz.OperationTypeDeleted {
-				// For delete operations, use a fake repo with current workspace override
-				repo = data.NewFakeResourceRepositoryWithWorkspaceOverrides(tc.currentWorkspaceID, "")
-			} else {
-				// For create/update operations, use workspace overrides
-				repo = data.NewFakeResourceRepositoryWithWorkspaceOverrides(tc.currentWorkspaceID, tc.previousWorkspaceID)
-			}
-
-			sc := NewSchemaUsecase(repo, log.NewHelper(log.DefaultLogger))
+			sc := NewSchemaUsecase(data.NewInMemorySchemaRepository(), log.NewHelper(log.DefaultLogger))
 
 			key, err := model.NewReporterResourceKey(
 				model.LocalResourceId("test-resource"),
@@ -311,11 +341,41 @@ func TestCalculateTuples_OperationTypeScenarios(t *testing.T) {
 			)
 			require.NoError(t, err)
 
-			version := model.Version(tc.version)
-			tupleEvent, err := model.NewTupleEvent(key, &version, nil)
-			require.NoError(t, err)
+			// Build representations to reflect the scenario
+			var current, previous *model.Representations
 
-			result, err := sc.CalculateTuples(tupleEvent, tc.operationType)
+			// Build current representation
+			if tc.currentWorkspaceID != "" {
+				currentData := map[string]interface{}{"workspace_id": tc.currentWorkspaceID}
+				currentRep, err := model.NewRepresentations(
+					model.Representation(currentData),
+					&tc.version,
+					nil,
+					nil,
+				)
+				require.NoError(t, err)
+				current = currentRep
+			} else {
+				// For DELETE: current is nil (no new/current state)
+				current = nil
+			}
+
+			// Build previous representation
+			if tc.previousWorkspaceID != "" {
+				prevVer := uint(0)
+				if tc.version > 0 {
+					prevVer = tc.version - 1
+				}
+				previous, err = model.NewRepresentations(
+					model.Representation(map[string]interface{}{"workspace_id": tc.previousWorkspaceID}),
+					&prevVer,
+					nil,
+					nil,
+				)
+				require.NoError(t, err)
+			}
+
+			result, err := sc.CalculateTuples(current, previous, key)
 			require.NoError(t, err)
 
 			// Verify tuple creation expectations

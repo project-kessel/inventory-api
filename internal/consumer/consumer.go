@@ -16,6 +16,7 @@ import (
 
 	"github.com/project-kessel/inventory-api/cmd/common"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
+	"github.com/project-kessel/inventory-api/internal/biz/schema"
 	usecase_resources "github.com/project-kessel/inventory-api/internal/biz/usecase/resources"
 	"github.com/project-kessel/inventory-api/internal/consumer/auth"
 	"github.com/project-kessel/inventory-api/internal/consumer/retry"
@@ -81,12 +82,13 @@ type InventoryConsumer struct {
 	// to coordinate with rebalance callback
 	shutdownInProgress bool
 
-	lockToken string
-	lockId    string
+	lockToken          string
+	lockId             string
+	ResourceRepository data.ResourceRepository
 }
 
 // New instantiates a new InventoryConsumer
-func New(config CompletedConfig, db *gorm.DB, authz authz.CompletedConfig, authorizer api.Authorizer, notifier pubsub.Notifier, logger *log.Helper, consumer Consumer) (InventoryConsumer, error) {
+func New(config CompletedConfig, db *gorm.DB, schemaRepository schema.Repository, authz authz.CompletedConfig, authorizer api.Authorizer, notifier pubsub.Notifier, logger *log.Helper, consumer Consumer) (InventoryConsumer, error) {
 	if consumer == nil {
 		logger.Info("Setting up kafka consumer")
 		logger.Debugf("completed kafka config: %+v", config.KafkaConfig)
@@ -128,13 +130,14 @@ func New(config CompletedConfig, db *gorm.DB, authz authz.CompletedConfig, autho
 
 	maxSerializationRetries := viper.GetInt("storage.max-serialization-retries")
 	resourceRepository := data.NewResourceRepository(db, data.NewGormTransactionManager(&mc, maxSerializationRetries))
-	schemaService := usecase_resources.NewSchemaUsecase(resourceRepository, logger)
+	schemaService := usecase_resources.NewSchemaUsecase(schemaRepository, logger)
 
 	return InventoryConsumer{
 		Consumer:           consumer,
 		OffsetStorage:      make([]kafka.TopicPartition, 0),
 		Config:             config,
 		DB:                 db,
+		ResourceRepository: resourceRepository,
 		AuthzConfig:        authz,
 		Authorizer:         authorizer,
 		Errors:             errChan,
@@ -302,80 +305,43 @@ func (i *InventoryConsumer) ProcessMessage(headers map[string]string, relationsE
 
 	switch operation {
 	case string(biz.OperationTypeCreated):
-		i.Logger.Infof("processing message: operation=%s, txid=%s", operation, txid)
-		i.Logger.Debugf("processed message tuple=%s", msg.Value)
 		if relationsEnabled {
-			tuplesToReplicate, err := i.calculateTuplesOrNoOp(msg.Value, operation, biz.OperationTypeCreated, txid)
-			if err != nil {
-				return "", err
-			}
-
-			// Skip SpiceDB call if no tuples to replicate
-			if tuplesToReplicate.IsEmpty() {
-				return "", nil
-			}
-
-			// Only retry the actual SpiceDB call
-			resp, err := i.Retry(func() (string, error) {
-				return i.CreateTuple(context.Background(), tuplesToReplicate.TuplesToCreate())
-			}, i.MetricsCollector.MsgProcessFailures)
-			if err != nil {
-				metricscollector.Incr(i.MetricsCollector.MsgProcessFailures, "CreateTuple")
-				i.Logger.Errorf("failed to create tuple: %v", err)
-				return "", err
-			}
-			return resp, nil
+			return i.processRelationsOperation(operation, txid, msg, operationConfig{
+				fetchRepresentations: func(i *InventoryConsumer, key model.ReporterResourceKey, version *uint) (*model.Representations, *model.Representations, error) {
+					return i.ResourceRepository.FindCurrentAndPreviousVersionedRepresentations(nil, key, version, biz.OperationTypeCreated)
+				},
+				executeSpiceDB: func(i *InventoryConsumer, tuples model.TuplesToReplicate) (string, error) {
+					return i.CreateTuple(context.Background(), tuples.TuplesToCreate())
+				},
+				metricName: "CreateTuple",
+			})
 		}
 
 	case string(biz.OperationTypeUpdated):
-		i.Logger.Infof("processing message: operation=%s, txid=%s", operation, txid)
-		i.Logger.Debugf("processed message tuple=%s", msg.Value)
 		if relationsEnabled {
-			tuplesToReplicate, err := i.calculateTuplesOrNoOp(msg.Value, operation, biz.OperationTypeUpdated, txid)
-			if err != nil {
-				return "", err
-			}
-
-			// Skip SpiceDB call if no tuples to replicate
-			if tuplesToReplicate.IsEmpty() {
-				return "", nil
-			}
-
-			// Only retry the actual SpiceDB call
-			resp, err := i.Retry(func() (string, error) {
-				return i.UpdateTuple(context.Background(), tuplesToReplicate.TuplesToCreate(), tuplesToReplicate.TuplesToDelete())
-			}, i.MetricsCollector.MsgProcessFailures)
-			if err != nil {
-				metricscollector.Incr(i.MetricsCollector.MsgProcessFailures, "UpdateTuple")
-				i.Logger.Errorf("failed to update tuple: %v", err)
-				return "", err
-			}
-			return resp, nil
+			return i.processRelationsOperation(operation, txid, msg, operationConfig{
+				fetchRepresentations: func(i *InventoryConsumer, key model.ReporterResourceKey, version *uint) (*model.Representations, *model.Representations, error) {
+					return i.ResourceRepository.FindCurrentAndPreviousVersionedRepresentations(nil, key, version, biz.OperationTypeUpdated)
+				},
+				executeSpiceDB: func(i *InventoryConsumer, tuples model.TuplesToReplicate) (string, error) {
+					return i.UpdateTuple(context.Background(), tuples.TuplesToCreate(), tuples.TuplesToDelete())
+				},
+				metricName: "UpdateTuple",
+			})
 		}
 	case string(biz.OperationTypeDeleted):
-		i.Logger.Infof("processing message: operation=%s, txid=%s", operation, txid)
-		i.Logger.Debugf("processed message tuple=%s", msg.Value)
 		if relationsEnabled {
-			tuplesToReplicate, err := i.calculateTuplesOrNoOp(msg.Value, operation, biz.OperationTypeDeleted, txid)
-			if err != nil {
-				return "", err
-			}
-
-			// Skip SpiceDB call if no tuples to replicate
-			if tuplesToReplicate.IsEmpty() {
-				return "", nil
-			}
-
-			// Only retry the actual SpiceDB call
-			_, err = i.Retry(func() (string, error) {
-				return i.DeleteTuple(context.Background(), *tuplesToReplicate.TuplesToDelete())
-			}, i.MetricsCollector.MsgProcessFailures)
-			if err != nil {
-				metricscollector.Incr(i.MetricsCollector.MsgProcessFailures, "DeleteTuple")
-				i.Logger.Errorf("failed to delete tuple: %v", err)
-				return "", err
-			}
-			return "", nil
+			return i.processRelationsOperation(operation, txid, msg, operationConfig{
+				fetchRepresentations: func(i *InventoryConsumer, key model.ReporterResourceKey, version *uint) (*model.Representations, *model.Representations, error) {
+					previous, err := i.ResourceRepository.FindLatestRepresentations(nil, key)
+					return nil, previous, err
+				},
+				executeSpiceDB: func(i *InventoryConsumer, tuples model.TuplesToReplicate) (string, error) {
+					_, err := i.DeleteTuple(context.Background(), *tuples.TuplesToDelete())
+					return "", err
+				},
+				metricName: "DeleteTuple",
+			})
 		}
 	default:
 		metricscollector.Incr(i.MetricsCollector.MsgProcessFailures, "unknown-operation-type")
@@ -385,28 +351,64 @@ func (i *InventoryConsumer) ProcessMessage(headers map[string]string, relationsE
 	return "", nil
 }
 
-// calculateTuplesOrNoOp parses the message, calculates tuples, and checks if it's a no-op.
-// Returns the tuples, a boolean indicating if it's a no-op (empty), and an error.
-func (i *InventoryConsumer) calculateTuplesOrNoOp(msgValue []byte, operation string, operationType biz.EventOperationType, txid string) (model.TuplesToReplicate, error) {
-	tupleEvent, err := ParseMessage(msgValue, operation)
+type operationConfig struct {
+	fetchRepresentations func(i *InventoryConsumer, key model.ReporterResourceKey, version *uint) (*model.Representations, *model.Representations, error)
+	executeSpiceDB       func(i *InventoryConsumer, tuples model.TuplesToReplicate) (string, error)
+	metricName           string
+}
+
+func (i *InventoryConsumer) processRelationsOperation(
+	operation string,
+	txid string,
+	msg *kafka.Message,
+	config operationConfig,
+) (string, error) {
+	i.Logger.Infof("processing message: operation=%s, txid=%s", operation, txid)
+	i.Logger.Debugf("processed message tuple=%s", msg.Value)
+
+	tupleEvent, err := ParseMessage(msg.Value, operation)
 	if err != nil {
 		metricscollector.Incr(i.MetricsCollector.MsgProcessFailures, "ParseMessage")
 		i.Logger.Errorf("failed to parse message for tuple: %v", err)
-		return model.TuplesToReplicate{}, err
+		return "", err
 	}
 
-	tuplesToReplicate, err := i.SchemaService.CalculateTuples(*tupleEvent, operationType)
+	key := tupleEvent.ReporterResourceKey()
+
+	var currentVersion *uint
+	if tupleEvent.CommonVersion() != nil {
+		version := tupleEvent.CommonVersion().Uint()
+		currentVersion = &version
+	}
+
+	current, previous, err := config.fetchRepresentations(i, key, currentVersion)
+	if err != nil {
+		metricscollector.Incr(i.MetricsCollector.MsgProcessFailures, "FindRepresentations")
+		i.Logger.Errorf("failed to find representations: %v", err)
+		return "", err
+	}
+
+	tuplesToReplicate, err := i.SchemaService.CalculateTuples(current, previous, key)
 	if err != nil {
 		metricscollector.Incr(i.MetricsCollector.MsgProcessFailures, "CalculateTuples")
 		i.Logger.Errorf("failed to calculate tuples: %v", err)
-		return model.TuplesToReplicate{}, err
+		return "", err
 	}
 
 	if tuplesToReplicate.IsEmpty() {
-		i.Logger.Infof("no-op for operation=%s, txid=%s", operation, txid)
+		return "", nil
 	}
 
-	return tuplesToReplicate, nil
+	resp, err := i.Retry(func() (string, error) {
+		return config.executeSpiceDB(i, tuplesToReplicate)
+	}, i.MetricsCollector.MsgProcessFailures)
+	if err != nil {
+		metricscollector.Incr(i.MetricsCollector.MsgProcessFailures, config.metricName)
+		i.Logger.Errorf("failed to %s: %v", config.metricName, err)
+		return "", err
+	}
+
+	return resp, nil
 }
 
 func ParseHeaders(msg *kafka.Message) (map[string]string, error) {

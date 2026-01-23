@@ -40,7 +40,7 @@ When done, always make sure to remove the Kessel Debug container
 # after exiting from your rsh session
 oc process --local \
     -f https://raw.githubusercontent.com/project-kessel/inventory-api/refs/heads/main/tools/kessel-debug-container/kessel-debug-deploy.yaml \
-    -p ENV=stage | oc apply -f -
+    -p ENV=stage | oc delete -f -
 ```
 
 ## Schema Related Issues
@@ -224,5 +224,5 @@ Once done, make sure to remove the Kessel Debug container
 # after exiting from your rsh session
 oc process --local \
     -f https://raw.githubusercontent.com/project-kessel/inventory-api/refs/heads/main/tools/kessel-debug-container/kessel-debug-deploy.yaml \
-    -p ENV=stage | oc apply -f -
+    -p ENV=stage | oc delete -f -
 ```

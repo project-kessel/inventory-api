@@ -47,8 +47,11 @@ update kafka-inventory-api.yaml
 
 ```yaml
 authn:
-  psk:
-    pre-shared-key-file: ./config/psks.yaml
+  authenticator:
+    type: first_match
+    chain:
+      - type: guest
+        enabled: true
 ```
 
 ### Run inventory locally

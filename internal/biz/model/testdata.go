@@ -521,6 +521,112 @@ func (f ReporterResourceTestFixture) ValidLocalResourceIdStringType() LocalResou
 	return id
 }
 
+type ReporterResourceRepositoryTestData struct {
+	Resource               *Resource
+	Key                    ReporterResourceKey
+	ApiHref                ApiHref
+	ConsoleHref            ConsoleHref
+	ReporterRepresentation Representation
+	CommonRepresentation   Representation
+	ReporterResourceId     ReporterResourceId
+	ResourceId             ResourceId
+	ReporterType           ReporterType
+	ReporterInstanceId     ReporterInstanceId
+	LocalResourceId        LocalResourceId
+	ResourceType           ResourceType
+	InitialTransactionId   TransactionId
+}
+
+func NewResourceFixture(localResourceId, resourceType, reporterType, reporterInstanceId, workspace string) (*ReporterResourceRepositoryTestData, error) {
+	fixture := NewReporterResourceTestFixture()
+
+	if localResourceId != "" {
+		fixture.ValidLocalResourceId = localResourceId
+	}
+	if resourceType != "" {
+		fixture.ValidResourceType = resourceType
+	}
+	if reporterType != "" {
+		fixture.ValidReporterType = reporterType
+	}
+	if reporterInstanceId != "" {
+		fixture.ValidReporterInstanceId = reporterInstanceId
+	}
+
+	fixture.ValidId = uuid.New()
+	fixture.ValidResourceId = uuid.New()
+
+	localId := fixture.ValidLocalResourceIdType()
+	resourceTypeTyped := fixture.ValidResourceTypeType()
+	reporterTypeTyped := fixture.ValidReporterTypeType()
+	reporterInstanceTyped := fixture.ValidReporterInstanceIdType()
+	reporterResourceId := fixture.ValidIdType()
+	resourceId := fixture.ValidResourceIdType()
+
+	apiHref := fixture.ValidApiHrefType()
+	consoleHref := fixture.ValidConsoleHrefType()
+
+	if workspace == "" {
+		workspace = "test-workspace"
+	}
+
+	reporterRepresentationData, err := NewRepresentation(internal.JsonObject{
+		"reporter_specific": "value",
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	commonRepresentationData, err := NewRepresentation(internal.JsonObject{
+		"workspace_id": workspace,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	transactionId := TransactionId("tx-create")
+	resource, err := NewResource(
+		resourceId,
+		localId,
+		resourceTypeTyped,
+		reporterTypeTyped,
+		reporterInstanceTyped,
+		transactionId,
+		reporterResourceId,
+		apiHref,
+		consoleHref,
+		reporterRepresentationData,
+		commonRepresentationData,
+		nil,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	key, err := NewReporterResourceKey(localId, resourceTypeTyped, reporterTypeTyped, reporterInstanceTyped)
+	if err != nil {
+		return nil, err
+	}
+
+	resourceCopy := resource
+
+	return &ReporterResourceRepositoryTestData{
+		Resource:               &resourceCopy,
+		Key:                    key,
+		ApiHref:                apiHref,
+		ConsoleHref:            consoleHref,
+		ReporterRepresentation: reporterRepresentationData,
+		CommonRepresentation:   commonRepresentationData,
+		ReporterResourceId:     reporterResourceId,
+		ResourceId:             resourceId,
+		ReporterType:           reporterTypeTyped,
+		ReporterInstanceId:     reporterInstanceTyped,
+		LocalResourceId:        localId,
+		ResourceType:           resourceTypeTyped,
+		InitialTransactionId:   transactionId,
+	}, nil
+}
+
 type ReporterRepresentationTestFixture struct {
 	ValidData                    internal.JsonObject
 	ValidReporterResourceId      string

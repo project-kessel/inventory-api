@@ -12,5 +12,5 @@ fi
 IMAGE_TAG=$(git rev-parse --short=7 HEAD)
 
 source ./scripts/check_docker_podman.sh
-${DOCKER} build --platform linux/amd64 --build-arg TARGETARCH=amd64 -t "${QUAY_REPO_INVENTORY}:${IMAGE_TAG}" -f ./Dockerfile
+${DOCKER} build --platform linux/amd64 --build-arg TARGETARCH=amd64 -t "${QUAY_REPO_INVENTORY}:${IMAGE_TAG}" -f ./Dockerfile .
 ${DOCKER} push "${QUAY_REPO_INVENTORY}:${IMAGE_TAG}"

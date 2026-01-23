@@ -30,6 +30,24 @@ For vscode users, you can set up your editor to use `goimports` for auto-formatt
 
 For jetbrains users see https://www.jetbrains.com/help/go/integration-with-go-tools.html#goimports
 
+## Canonical Representation
+
+The API normalizes certain identifiers (resource types, reporter types) to a canonical form to ensure consistent behavior:
+
+ - Resource types: lowercase, `/` replaced with `_`.
+ - Reporter types: lowercase
+
+This normalization:
+ - Prevents duplicate entries that differ only in casing (`host` vs `Host` or `k8s_cluster` vs `K8s_Cluster`)
+ - Ensure case-insensitive lookups work correctly.
+ - Maintains consistency across the API surface.
+
+The canonical form is what gets stored and returned in response. This is acceptable because:
+
+ 1. It is considered part of the business logic and not presentation logic.
+ 2. It's applied consistently across all operations.
+ 3. It's optimized for simplicity. Assuming we're based on spicedb but also open to others.
+
 ## Schema Changes
 
 When making changes to schema configuration files in `data/schema/`, you **must** rebuild and commit both the resources tarball and schema cache. This ensures that schema changes are properly captured and consumable in deployments.

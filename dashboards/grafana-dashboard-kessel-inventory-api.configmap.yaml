@@ -293,7 +293,7 @@ data:
                 "uid": "$datasource"
               },
               "editorMode": "code",
-              "expr": "sum(increase(server_requests_code_total{job=\"kessel-inventory-api\", code!=\"200\"}[$__range])) by (code) > 0",
+              "expr": "sum by (code)(rate(server_requests_code_total{job=\"kessel-inventory-api\", code!~\"200|0\"}[$__rate_interval]))",
               "format": "time_series",
               "instant": false,
               "interval": "15s",
@@ -302,7 +302,7 @@ data:
               "refId": "A"
             }
           ],
-          "title": "Error Status Codes Per Minute",
+          "title": "Error Status Codes Per Second",
           "type": "timeseries"
         },
         {
@@ -398,7 +398,7 @@ data:
                 "uid": "$datasource"
               },
               "editorMode": "code",
-              "expr": "(sum(rate(server_requests_seconds_bucket_seconds_bucket{le=\"0.25\", operation=~\"$operation\", job=\"kessel-inventory-api\"}[5m])) by (operation)\n/\nsum(rate(server_requests_seconds_bucket_seconds_count{job=\"kessel-inventory-api\"}[5m])) by (operation)) * 100",
+              "expr": "(sum(rate(server_requests_seconds_bucket_bucket{le=\"0.25\", operation=~\"$operation\", job=\"kessel-inventory-api\"}[5m])) by (operation)\n/\nsum(rate(server_requests_seconds_bucket_count{job=\"kessel-inventory-api\"}[5m])) by (operation)) * 100",
               "format": "time_series",
               "instant": false,
               "legendFormat": "__auto",
@@ -503,7 +503,7 @@ data:
               },
               "disableTextWrap": false,
               "editorMode": "code",
-              "expr": "histogram_quantile(0.95, sum by(le) (rate(server_requests_seconds_bucket_seconds_bucket{operation=~\"$operation\", job=\"kessel-inventory-api\"}[$__rate_interval])))",
+              "expr": "histogram_quantile(0.95, sum by(le) (rate(server_requests_seconds_bucket_bucket{operation=~\"$operation\", job=\"kessel-inventory-api\"}[$__rate_interval])))",
               "fullMetaSearch": false,
               "hide": false,
               "includeNullMetadata": false,
@@ -520,7 +520,7 @@ data:
               },
               "disableTextWrap": false,
               "editorMode": "code",
-              "expr": "histogram_quantile(0.99, sum by(le) (rate(server_requests_seconds_bucket_seconds_bucket{operation=~\"$operation\", job=\"kessel-inventory-api\"}[$__rate_interval])))",
+              "expr": "histogram_quantile(0.99, sum by(le) (rate(server_requests_seconds_bucket_bucket{operation=~\"$operation\", job=\"kessel-inventory-api\"}[$__rate_interval])))",
               "fullMetaSearch": false,
               "hide": false,
               "includeNullMetadata": false,
@@ -626,7 +626,7 @@ data:
               },
               "disableTextWrap": false,
               "editorMode": "code",
-              "expr": "irate(server_requests_seconds_bucket_seconds_count{operation=~\"$operation\", job=\"kessel-inventory-api\"}[5m])",
+              "expr": "irate(server_requests_seconds_bucket_count{operation=~\"$operation\", job=\"kessel-inventory-api\"}[5m])",
               "fullMetaSearch": false,
               "includeNullMetadata": true,
               "instant": false,
@@ -2067,7 +2067,7 @@ data:
             "options": [],
             "query": "prometheus",
             "refresh": 1,
-            "regex": "/(crcp01ue1-prometheus)|(crcfrp01ugw1-prometheus)|(crcs02ue1-prometheus)|(crcfrs01ugw1-prometheus)/",
+            "regex": "/(crcp01ue1-prometheus)|(crcfrp01ugw1-prometheus)|(crcs02ue1-prometheus)|(crcfrs01ugw1-prometheus)|(insights-perf-prometheus)/",
             "type": "datasource"
           },
           {

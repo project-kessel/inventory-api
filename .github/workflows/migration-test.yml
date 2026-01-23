@@ -1,0 +1,52 @@
+name: Database Migrations
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  test-migrations:
+    name: Smoke Test
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16.8
+        env:
+          POSTGRES_DB: inventory
+          POSTGRES_USER: inventory
+          POSTGRES_PASSWORD: inventory_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+    - uses: actions/checkout@v6
+      with:
+        fetch-depth: 2
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version-file: 'go.mod'
+        cache: true
+
+    - name: Install dependencies
+      run: go mod download
+
+    - name: Run Migrations
+      run: |
+        go run main.go migrate \
+          --storage.database=postgres \
+          --storage.postgres.host=localhost \
+          --storage.postgres.port=5432 \
+          --storage.postgres.dbname=inventory \
+          --storage.postgres.user=inventory \
+          --storage.postgres.password=inventory_password \
+          --storage.postgres.sslmode=disable
+

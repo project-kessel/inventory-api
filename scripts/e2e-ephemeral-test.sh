@@ -1,5 +1,6 @@
 #!/bin/bash
 set -ex
+set -o pipefail
 
 # Colors for output
 RED='\033[0;31m'
@@ -42,10 +43,18 @@ fi
 
 # Step 1: Deploy kessel-inventory to ephemeral
 log_info "Deploying kessel-inventory to ephemeral environment..."
-BONFIRE_OUTPUT=$(bonfire deploy kessel -C kessel-inventory 2>&1)
-DEPLOY_EXIT_CODE=$?
 
-echo "$BONFIRE_OUTPUT"
+BONFIRE_PARAMS=''
+if [[ -n "$INVENTORY_IMAGE" ]]; then
+  BONFIRE_PARAMS="$BONFIRE_PARAMS -p kessel-inventory/INVENTORY_IMAGE=$INVENTORY_IMAGE"
+fi
+
+if [[ -n "$IMAGE_TAG" ]]; then
+  BONFIRE_PARAMS="$BONFIRE_PARAMS -p kessel-inventory/IMAGE_TAG=$IMAGE_TAG"
+fi
+
+BONFIRE_OUTPUT=$(bonfire deploy kessel -C kessel-inventory ${BONFIRE_PARAMS} 2>&1 | tee /dev/tty)
+DEPLOY_EXIT_CODE=$?
 
 if [ $DEPLOY_EXIT_CODE -ne 0 ]; then
     log_error "Failed to deploy kessel-inventory"

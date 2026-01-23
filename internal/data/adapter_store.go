@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/go-kratos/kratos/v2/log"
 	"github.com/project-kessel/inventory-api/internal/biz"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
 	"github.com/project-kessel/inventory-api/internal/pubsub"
@@ -16,21 +17,61 @@ import (
 type AdapterStore struct {
 	resourceRepo  ResourceRepository
 	listenManager pubsub.ListenManagerImpl
+	notifier      pubsub.Notifier
+	eventSource   EventSource
+	logger        *log.Helper
 
-	// Event channel (not used in adapter - events come from consumer)
+	// Event channel fed by EventSource
 	events chan model.OutboxEvent
 }
 
+// AdapterStoreConfig holds configuration for creating an AdapterStore.
+type AdapterStoreConfig struct {
+	ResourceRepo  ResourceRepository
+	ListenManager pubsub.ListenManagerImpl
+	Notifier      pubsub.Notifier
+	EventSource   EventSource
+	Logger        log.Logger
+}
+
 // NewAdapterStore creates a new AdapterStore.
-func NewAdapterStore(resourceRepo ResourceRepository, listenManager pubsub.ListenManagerImpl) *AdapterStore {
+func NewAdapterStore(cfg AdapterStoreConfig) *AdapterStore {
+	var logger *log.Helper
+	if cfg.Logger != nil {
+		logger = log.NewHelper(cfg.Logger)
+	}
+
 	return &AdapterStore{
-		resourceRepo:  resourceRepo,
-		listenManager: listenManager,
+		resourceRepo:  cfg.ResourceRepo,
+		listenManager: cfg.ListenManager,
+		notifier:      cfg.Notifier,
+		eventSource:   cfg.EventSource,
+		logger:        logger,
 		events:        make(chan model.OutboxEvent, 100),
 	}
 }
 
 var _ model.Store = (*AdapterStore)(nil)
+
+// Start begins processing events from the EventSource if configured.
+func (s *AdapterStore) Start(ctx context.Context) error {
+	if s.eventSource == nil {
+		return nil
+	}
+
+	go s.eventSource.Run(ctx, s.emitEvent)
+	return nil
+}
+
+func (s *AdapterStore) emitEvent(event model.OutboxEvent) {
+	select {
+	case s.events <- event:
+	default:
+		if s.logger != nil {
+			s.logger.Warnf("Event channel full, dropping event: txid=%s", event.TxID())
+		}
+	}
+}
 
 // Begin starts a new transaction.
 func (s *AdapterStore) Begin() (model.Tx, error) {
@@ -66,8 +107,10 @@ func (s *AdapterStore) WaitForReplication(ctx context.Context, txid string) erro
 
 // NotifyReplicationComplete notifies that replication is complete.
 func (s *AdapterStore) NotifyReplicationComplete(ctx context.Context, txid string) error {
-	// Not used in adapter mode - the consumer handles this
-	return nil
+	if s.notifier == nil {
+		return nil
+	}
+	return s.notifier.Notify(ctx, txid)
 }
 
 // adapterTx implements model.Tx by wrapping a gorm transaction.

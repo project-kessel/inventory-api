@@ -15,9 +15,10 @@ import (
 // KafkaEventSource implements EventSource by consuming from Kafka.
 // It wraps a Kafka consumer and converts messages to OutboxEvents.
 type KafkaEventSource struct {
-	consumer KafkaConsumer
-	topic    string
-	logger   *log.Helper
+	kafkaConfig *kafka.ConfigMap
+	consumer    KafkaConsumer
+	topic       string
+	logger      *log.Helper
 }
 
 // KafkaConsumer is the interface for Kafka consumer operations.
@@ -30,26 +31,37 @@ type KafkaConsumer interface {
 
 // KafkaEventSourceConfig holds configuration for creating a KafkaEventSource.
 type KafkaEventSourceConfig struct {
-	Consumer KafkaConsumer
-	Topic    string
-	Logger   log.Logger
+	KafkaConfig *kafka.ConfigMap
+	Topic       string
+	Logger      log.Logger
 }
 
 // NewKafkaEventSource creates a new KafkaEventSource.
+// The Kafka consumer is created lazily when Run is called.
 func NewKafkaEventSource(cfg KafkaEventSourceConfig) *KafkaEventSource {
 	return &KafkaEventSource{
-		consumer: cfg.Consumer,
-		topic:    cfg.Topic,
-		logger:   log.NewHelper(cfg.Logger),
+		kafkaConfig: cfg.KafkaConfig,
+		topic:       cfg.Topic,
+		logger:      log.NewHelper(cfg.Logger),
 	}
 }
 
 // Ensure KafkaEventSource implements EventSource
 var _ EventSource = (*KafkaEventSource)(nil)
 
-// Run implements EventSource. It subscribes to the topic and polls for messages,
-// converting each to an OutboxEvent and calling emit.
+// Run implements EventSource. It creates a Kafka consumer (if needed),
+// subscribes to the topic, and polls for messages, converting each to an
+// OutboxEvent and calling emit.
 func (k *KafkaEventSource) Run(ctx context.Context, emit func(model.OutboxEvent)) error {
+	// Create consumer if not already set (allows injection for testing)
+	if k.consumer == nil {
+		kafkaConsumer, err := kafka.NewConsumer(k.kafkaConfig)
+		if err != nil {
+			return fmt.Errorf("failed to create kafka consumer: %w", err)
+		}
+		k.consumer = kafkaConsumer
+	}
+
 	if err := k.consumer.SubscribeTopics([]string{k.topic}, nil); err != nil {
 		return fmt.Errorf("failed to subscribe to topic %s: %w", k.topic, err)
 	}

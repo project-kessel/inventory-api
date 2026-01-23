@@ -18,6 +18,8 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/project-kessel/inventory-api/cmd/common"
+	"github.com/project-kessel/inventory-api/internal/biz/model"
+	"github.com/project-kessel/inventory-api/internal/biz/usecase/replication"
 	resourcesctl "github.com/project-kessel/inventory-api/internal/biz/usecase/resources"
 	"github.com/project-kessel/inventory-api/internal/config/schema"
 	"github.com/project-kessel/inventory-api/internal/consistency"
@@ -278,8 +280,51 @@ func NewCommand(
 		//v1beta2
 		// wire together inventory service handling
 		resourceRepo := data.NewResourceRepository(db, transactionManager)
-		store := data.NewAdapterStore(resourceRepo, listenManager)
+
+		// Create event source from consumer config if enabled
+		var eventSource data.EventSource
+		if consumerOptions.Enabled {
+			eventSource = data.NewKafkaEventSource(data.KafkaEventSourceConfig{
+				KafkaConfig: consumerConfig.KafkaConfig,
+				Topic:       consumerConfig.Topic,
+				Logger:      log.With(logger, "subsystem", "kafkaEventSource"),
+			})
+		}
+
+		store := data.NewAdapterStore(data.AdapterStoreConfig{
+			ResourceRepo:  resourceRepo,
+			ListenManager: listenManager,
+			Notifier:      notifier,
+			EventSource:   eventSource,
+			Logger:        log.With(logger, "subsystem", "store"),
+		})
+
+		// Start the store (begins event source processing)
+		if err := store.Start(ctx); err != nil {
+			return fmt.Errorf("failed to start store: %w", err)
+		}
+
 		inventory_controller := resourcesctl.New(store, schemaRepository, authorizer, eventingManager, "notifications", log.With(logger, "subsystem", "notificationsintegrations_controller"), waitForNotifCircuitBreaker, usecaseConfig, mc)
+
+		// Create and start replication usecase if consumer is enabled
+		var replicationUsecase *replication.RelationReplicationUsecase
+		if consumerOptions.Enabled {
+			// Create schema usecase for tuple calculation
+			schemaUsecase := resourcesctl.NewSchemaUsecase(schemaRepository, log.NewHelper(log.With(logger, "subsystem", "schemaUsecase")))
+
+			// Create authorizer replicator adapter
+			relationsReplicator := authz.NewAuthorizerReplicator(authorizer, "", "")
+
+			// Create replication service
+			replicationService := model.NewRelationReplicationService(relationsReplicator, schemaUsecase)
+
+			// Create replication usecase
+			replicationUsecase = replication.NewRelationReplicationUsecase(
+				store,
+				replicationService,
+				log.With(logger, "subsystem", "replicationUsecase"),
+			)
+		}
 
 			inventory_service := resourcesvc.NewKesselInventoryServiceV1beta2(inventory_controller)
 			pbv1beta2.RegisterKesselInventoryServiceServer(server.GrpcServer, inventory_service)
@@ -305,33 +350,14 @@ func NewCommand(
 
 			shutdown := shutdown(db, server, pprofServer, eventingManager, &inventoryConsumer, log.NewHelper(logger))
 
-			if consumerOptions.Enabled {
+			// Start replication usecase if enabled
+			replicationErrs := make(chan error, 1)
+			if consumerOptions.Enabled && replicationUsecase != nil {
 				go func() {
-					retries := 0
-					for consumerOptions.RetryOptions.ConsumerMaxRetries == -1 || retries < consumerOptions.RetryOptions.ConsumerMaxRetries {
-						// If the consumer cannot process a message, the consumer loop is restarted
-						// This is to ensure we re-read the message and prevent it being dropped and moving to next message.
-						// To re-read the current message, we have to recreate the consumer connection so that the earliest offset is used
-						inventoryConsumer, err = consumer.New(consumerConfig, db, schemaRepository, authzConfig, authorizer, notifier, log.NewHelper(log.With(logger, "subsystem", "inventoryConsumer")), nil)
-						if err != nil {
-							shutdown(err)
-						}
-						err = inventoryConsumer.Consume()
-						if e.Is(err, consumer.ErrClosed) {
-							inventoryConsumer.Logger.Errorf("consumer unable to process current message -- restarting consumer")
-							retries++
-							if consumerOptions.RetryOptions.ConsumerMaxRetries == -1 || retries < consumerOptions.RetryOptions.ConsumerMaxRetries {
-								backoff := min(time.Duration(inventoryConsumer.RetryOptions.BackoffFactor*retries*300)*time.Millisecond, time.Duration(consumerOptions.RetryOptions.MaxBackoffSeconds)*time.Second)
-								inventoryConsumer.Logger.Errorf("retrying in %v", backoff)
-								time.Sleep(backoff)
-							}
-							continue
-						} else {
-							inventoryConsumer.Logger.Errorf("consumer unable to process messages: %v", err)
-							shutdown(err)
-						}
+					log.NewHelper(logger).Info("Starting relation replication usecase")
+					if err := replicationUsecase.Run(ctx); err != nil && !e.Is(err, context.Canceled) {
+						replicationErrs <- err
 					}
-					shutdown(fmt.Errorf("consumer unable to process current message -- max retries reached"))
 				}()
 			}
 
@@ -349,8 +375,8 @@ func NewCommand(
 				shutdown(sig)
 			case emErr := <-eventingManager.Errs():
 				shutdown(emErr)
-			case cmErr := <-inventoryConsumer.Errs():
-				shutdown(cmErr)
+			case repErr := <-replicationErrs:
+				shutdown(repErr)
 			}
 			return nil
 		},

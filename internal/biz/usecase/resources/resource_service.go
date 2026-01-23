@@ -254,11 +254,9 @@ func (uc *Usecase) CheckForUpdate(ctx context.Context, permission, namespace str
 
 // resolveConsistencyToken resolves the consistency token based on the preference.
 func (uc *Usecase) resolveConsistencyToken(ctx context.Context, consistency model.ConsistencyConfig, reporterResourceKey model.ReporterResourceKey) (string, error) {
-	// Feature flag: when true, force minimize_latency regardless of client request
-	// When false, use client-specified consistency (existing logic)
+	// Feature flag: when true, use client-specified consistency
 	if viper.GetBool("authz.kessel.allow-client-consistency-preference") {
 		log.Info("Feature flag authz.kessel.allow-client-consistency-preference is enabled")
-		// Feature flag is true - use client-specified consistency (existing logic below)
 		switch consistency.Preference {
 		case model.ConsistencyMinimizeLatency:
 			// No token needed - minimize_latency mode
@@ -293,20 +291,9 @@ func (uc *Usecase) resolveConsistencyToken(ctx context.Context, consistency mode
 		}
 
 	} else {
-		// Feature flag is false - always look up token from inventory DB
-		log.Info("Feature flag disabled - using inventory-managed consistency lookup")
-		res, err := uc.resourceRepository.FindResourceByKeys(nil, reporterResourceKey)
-		if err != nil {
-			log.Info("Did not find resource")
-			// If the resource doesn't exist in inventory (ie. no consistency token available)
-			// we send a check request with minimize latency
-			// err otherwise.
-			if !errors.Is(err, gorm.ErrRecordNotFound) {
-				return "", err
-			}
-			return "", nil
-		}
-		return res.ConsistencyToken().Serialize(), nil
+		// Feature flag is false - force minimize_latency regardless of client request
+		log.Info("Feature flag authz.kessel.allow-client-consistency-preference is disabled - forcing minimize_latency")
+		return "", nil
 	}
 }
 

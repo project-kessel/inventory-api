@@ -8,19 +8,10 @@ import (
 	"github.com/project-kessel/inventory-api/internal/authz/kessel"
 )
 
-// MetaAuthorizerOptions holds configuration for meta-authorization middleware
-type MetaAuthorizerOptions struct {
-	// Enabled controls whether meta authorization is enabled
-	Enabled *bool `mapstructure:"enabled"`
-	// SubjectNamespace is the namespace to use for subject references in metachecks (e.g., "rbac")
-	SubjectNamespace string `mapstructure:"subject_namespace"`
-}
-
 // TODO: presumably more will go here to authenticate Common Inventory as a service to call Kessel.
 type Options struct {
-	Authz          string                 `mapstructure:"impl"`
-	Kessel         *kessel.Options        `mapstructure:"kessel"`
-	MetaAuthorizer *MetaAuthorizerOptions `mapstructure:"metaauthorizer"`
+	Authz  string          `mapstructure:"impl"`
+	Kessel *kessel.Options `mapstructure:"kessel"`
 }
 
 const (
@@ -31,9 +22,8 @@ const (
 
 func NewOptions() *Options {
 	return &Options{
-		Authz:          AllowAll,
-		Kessel:         kessel.NewOptions(),
-		MetaAuthorizer: nil, // Default to nil - only create if present in config
+		Authz:  AllowAll,
+		Kessel: kessel.NewOptions(),
 	}
 }
 

@@ -32,7 +32,7 @@ type Server struct {
 // It initializes both HTTP and gRPC servers with the given authentication middleware.
 // authenticator is optional - if provided, uses the new aggregating authenticator for streams.
 // If nil, falls back to OIDC-only authentication (backwards compatible).
-func New(c CompletedConfig, authn middleware.Middleware, metaAuthorizerMiddleware middleware.Middleware, authnConfig authn.CompletedConfig, authenticator authnapi.Authenticator, logger log.Logger) (*Server, error) {
+func New(c CompletedConfig, authn middleware.Middleware, authnConfig authn.CompletedConfig, authenticator authnapi.Authenticator, logger log.Logger) (*Server, error) {
 	s := &Server{
 		Id:     c.Options.Id,
 		Name:   c.Options.Name,
@@ -49,14 +49,14 @@ func New(c CompletedConfig, authn middleware.Middleware, metaAuthorizerMiddlewar
 		return nil, fmt.Errorf("init meter failed: %w", err)
 	}
 
-	httpServer, err := http.New(c.HttpConfig, authn, metaAuthorizerMiddleware, meter, logger)
+	httpServer, err := http.New(c.HttpConfig, authn, meter, logger)
 	if err != nil {
 		return nil, fmt.Errorf("init http server failed: %w", err)
 	}
 
 	// Pass authenticator to gRPC server for stream interceptor
 	// If nil, the interceptor will fall back to OIDC-only authentication (backwards compatible)
-	grpcServer, err := grpc.New(c.GrpcConfig, authn, metaAuthorizerMiddleware, authnConfig, authenticator, meter, logger)
+	grpcServer, err := grpc.New(c.GrpcConfig, authn, authnConfig, authenticator, meter, logger)
 	if err != nil {
 		return nil, fmt.Errorf("init grpc server failed: %w", err)
 	}

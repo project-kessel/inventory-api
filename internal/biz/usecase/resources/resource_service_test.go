@@ -13,6 +13,7 @@ import (
 
 	"github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2"
 	"github.com/project-kessel/inventory-api/internal"
+	authnapi "github.com/project-kessel/inventory-api/internal/authn/api"
 	"github.com/project-kessel/inventory-api/internal/authz/allow"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
 	"github.com/project-kessel/inventory-api/internal/biz/schema"
@@ -20,6 +21,19 @@ import (
 	"github.com/project-kessel/inventory-api/internal/data"
 	"github.com/project-kessel/inventory-api/internal/metricscollector"
 )
+
+func testAuthzContext() context.Context {
+	identity := &authnapi.Identity{
+		Principal: "test-user",
+		UserID:    "test-user",
+		AuthType:  "x-rh-identity",
+		Type:      "User",
+	}
+	return authnapi.NewAuthzContext(context.Background(), authnapi.AuthzContext{
+		Protocol: authnapi.ProtocolGRPC,
+		Identity: identity,
+	})
+}
 
 func newFakeSchemaRepository(t *testing.T) schema.Repository {
 	schemaRepository := data.NewInMemorySchemaRepository()
@@ -102,7 +116,7 @@ func TestReportResource(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctx := context.Background()
+			ctx := testAuthzContext()
 			logger := log.DefaultLogger
 
 			resourceRepo := data.NewFakeResourceRepository()
@@ -113,7 +127,7 @@ func TestReportResource(t *testing.T) {
 			}
 			mc := metricscollector.NewFakeMetricsCollector()
 			schemaRepository := newFakeSchemaRepository(t)
-			usecase := New(resourceRepo, nil, nil, schemaRepository, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig, mc)
+			usecase := New(resourceRepo, nil, nil, schemaRepository, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig, mc, nil)
 
 			reportRequest := createTestReportRequest(t, tt.resourceType, tt.reporterType, tt.reporterInstance, tt.localResourceId, tt.workspaceId)
 			err := usecase.ReportResource(ctx, reportRequest, "test-reporter")
@@ -182,7 +196,7 @@ func TestReportResourceThenDelete(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctx := context.Background()
+			ctx := testAuthzContext()
 			logger := log.DefaultLogger
 
 			resourceRepo := data.NewFakeResourceRepository()
@@ -193,7 +207,7 @@ func TestReportResourceThenDelete(t *testing.T) {
 			}
 			mc := metricscollector.NewFakeMetricsCollector()
 			schemaRepository := newFakeSchemaRepository(t)
-			usecase := New(resourceRepo, nil, nil, schemaRepository, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig, mc)
+			usecase := New(resourceRepo, nil, nil, schemaRepository, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig, mc, nil)
 
 			reportRequest := createTestReportRequest(t, tt.resourceType, tt.reporterType, tt.reporterInstanceId, tt.localResourceId, tt.workspaceId)
 			err := usecase.ReportResource(ctx, reportRequest, "test-reporter")
@@ -284,7 +298,7 @@ func TestDelete_ResourceNotFound(t *testing.T) {
 
 	mc := metricscollector.NewFakeMetricsCollector()
 	schemaRepository := newFakeSchemaRepository(t)
-	usecase := New(resourceRepo, nil, nil, schemaRepository, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig, mc)
+	usecase := New(resourceRepo, nil, nil, schemaRepository, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig, mc, nil)
 
 	localResourceId, err := model.NewLocalResourceId("non-existent-resource")
 	require.NoError(t, err)
@@ -298,12 +312,12 @@ func TestDelete_ResourceNotFound(t *testing.T) {
 	key, err := model.NewReporterResourceKey(localResourceId, resourceType, reporterType, reporterInstanceId)
 	require.NoError(t, err)
 
-	err = usecase.Delete(context.Background(), key)
+	err = usecase.Delete(testAuthzContext(), key)
 	require.Error(t, err)
 }
 
 func TestReportFindDeleteFind_TombstoneLifecycle(t *testing.T) {
-	ctx := context.Background()
+	ctx := testAuthzContext()
 	logger := log.DefaultLogger
 
 	resourceRepo := data.NewFakeResourceRepository()
@@ -315,7 +329,7 @@ func TestReportFindDeleteFind_TombstoneLifecycle(t *testing.T) {
 
 	mc := metricscollector.NewFakeMetricsCollector()
 	schemaRepository := newFakeSchemaRepository(t)
-	usecase := New(resourceRepo, nil, nil, schemaRepository, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig, mc)
+	usecase := New(resourceRepo, nil, nil, schemaRepository, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig, mc, nil)
 
 	reportRequest := createTestReportRequest(t, "k8s_cluster", "ocm", "lifecycle-instance", "lifecycle-resource", "lifecycle-workspace")
 	err := usecase.ReportResource(ctx, reportRequest, "test-reporter")
@@ -348,7 +362,7 @@ func TestReportFindDeleteFind_TombstoneLifecycle(t *testing.T) {
 }
 
 func TestMultipleHostsLifecycle(t *testing.T) {
-	ctx := context.Background()
+	ctx := testAuthzContext()
 	logger := log.DefaultLogger
 
 	resourceRepo := data.NewFakeResourceRepository()
@@ -360,7 +374,7 @@ func TestMultipleHostsLifecycle(t *testing.T) {
 
 	mc := metricscollector.NewFakeMetricsCollector()
 	schemaRepository := newFakeSchemaRepository(t)
-	usecase := New(resourceRepo, nil, nil, schemaRepository, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig, mc)
+	usecase := New(resourceRepo, nil, nil, schemaRepository, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig, mc, nil)
 
 	// Create 2 hosts
 	host1Request := createTestReportRequest(t, "host", "hbi", "hbi-instance-1", "host-1", "workspace-1")
@@ -456,7 +470,7 @@ func createTestReportRequestWithUpdatedData(t *testing.T, resourceType, reporter
 }
 
 func TestPartialDataScenarios(t *testing.T) {
-	ctx := context.Background()
+	ctx := testAuthzContext()
 	logger := log.DefaultLogger
 
 	resourceRepo := data.NewFakeResourceRepository()
@@ -468,7 +482,7 @@ func TestPartialDataScenarios(t *testing.T) {
 
 	mc := metricscollector.NewFakeMetricsCollector()
 	schemaRepository := newFakeSchemaRepository(t)
-	usecase := New(resourceRepo, nil, nil, schemaRepository, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig, mc)
+	usecase := New(resourceRepo, nil, nil, schemaRepository, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig, mc, nil)
 
 	t.Run("Report resource with rich reporter data and minimal common data", func(t *testing.T) {
 		request := createTestReportRequestWithReporterDataOnly(t, "k8s_cluster", "ocm", "ocm-instance-1", "reporter-rich-resource", "minimal-workspace")
@@ -622,7 +636,7 @@ func createTestReportRequestWithCommonDataOnly(t *testing.T, resourceType, repor
 
 func TestResourceLifecycle_ReportUpdateDeleteReport(t *testing.T) {
 	t.Run("report new -> update -> delete -> report new", func(t *testing.T) {
-		ctx := context.Background()
+		ctx := testAuthzContext()
 		logger := log.DefaultLogger
 
 		resourceRepo := data.NewFakeResourceRepository()
@@ -634,7 +648,7 @@ func TestResourceLifecycle_ReportUpdateDeleteReport(t *testing.T) {
 
 		mc := metricscollector.NewFakeMetricsCollector()
 		schemaRepository := newFakeSchemaRepository(t)
-		usecase := New(resourceRepo, nil, nil, schemaRepository, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig, mc)
+		usecase := New(resourceRepo, nil, nil, schemaRepository, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig, mc, nil)
 
 		resourceType := "host"
 		reporterType := "hbi"
@@ -715,7 +729,7 @@ func TestResourceLifecycle_ReportUpdateDeleteReport(t *testing.T) {
 
 func TestResourceLifecycle_ReportUpdateDeleteReportDelete(t *testing.T) {
 	t.Run("report new -> update -> delete -> report new -> delete", func(t *testing.T) {
-		ctx := context.Background()
+		ctx := testAuthzContext()
 		logger := log.DefaultLogger
 
 		resourceRepo := data.NewFakeResourceRepository()
@@ -727,7 +741,7 @@ func TestResourceLifecycle_ReportUpdateDeleteReportDelete(t *testing.T) {
 
 		mc := metricscollector.NewFakeMetricsCollector()
 		schemaRepository := newFakeSchemaRepository(t)
-		usecase := New(resourceRepo, nil, nil, schemaRepository, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig, mc)
+		usecase := New(resourceRepo, nil, nil, schemaRepository, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig, mc, nil)
 
 		resourceType := "k8s_cluster"
 		reporterType := "ocm"
@@ -789,7 +803,7 @@ func createReporterResourceKey(t *testing.T, localResourceId, resourceType, repo
 
 func TestResourceLifecycle_ReportDeleteResubmitDelete(t *testing.T) {
 	t.Run("report -> delete -> resubmit same delete", func(t *testing.T) {
-		ctx := context.Background()
+		ctx := testAuthzContext()
 		logger := log.DefaultLogger
 
 		resourceRepo := data.NewFakeResourceRepository()
@@ -801,7 +815,7 @@ func TestResourceLifecycle_ReportDeleteResubmitDelete(t *testing.T) {
 
 		mc := metricscollector.NewFakeMetricsCollector()
 		schemaRepository := newFakeSchemaRepository(t)
-		usecase := New(resourceRepo, nil, nil, schemaRepository, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig, mc)
+		usecase := New(resourceRepo, nil, nil, schemaRepository, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig, mc, nil)
 
 		resourceType := "k8s_cluster"
 		reporterType := "ocm"
@@ -859,7 +873,7 @@ func TestResourceLifecycle_ReportDeleteResubmitDelete(t *testing.T) {
 
 func TestResourceLifecycle_ReportResubmitDeleteResubmit(t *testing.T) {
 	t.Run("report -> resubmit same report -> delete -> resubmit same delete", func(t *testing.T) {
-		ctx := context.Background()
+		ctx := testAuthzContext()
 		logger := log.DefaultLogger
 
 		resourceRepo := data.NewFakeResourceRepository()
@@ -871,7 +885,7 @@ func TestResourceLifecycle_ReportResubmitDeleteResubmit(t *testing.T) {
 
 		mc := metricscollector.NewFakeMetricsCollector()
 		schemaRepository := newFakeSchemaRepository(t)
-		usecase := New(resourceRepo, nil, nil, schemaRepository, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig, mc)
+		usecase := New(resourceRepo, nil, nil, schemaRepository, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig, mc, nil)
 
 		resourceType := "host"
 		reporterType := "hbi"
@@ -943,7 +957,7 @@ func TestResourceLifecycle_ReportResubmitDeleteResubmit(t *testing.T) {
 
 func TestResourceLifecycle_ComplexIdempotency(t *testing.T) {
 	t.Run("3 cycles of create+update+delete for same resource", func(t *testing.T) {
-		ctx := context.Background()
+		ctx := testAuthzContext()
 		logger := log.DefaultLogger
 
 		resourceRepo := data.NewFakeResourceRepository()
@@ -955,7 +969,7 @@ func TestResourceLifecycle_ComplexIdempotency(t *testing.T) {
 
 		mc := metricscollector.NewFakeMetricsCollector()
 		schemaRepository := newFakeSchemaRepository(t)
-		usecase := New(resourceRepo, nil, nil, schemaRepository, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig, mc)
+		usecase := New(resourceRepo, nil, nil, schemaRepository, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig, mc, nil)
 
 		resourceType := "k8s_cluster"
 		reporterType := "ocm"
@@ -1137,7 +1151,7 @@ func createTestRep(t *testing.T, version uint, data map[string]interface{}) *mod
 }
 
 func TestTransactionIdIdempotency(t *testing.T) {
-	ctx := context.Background()
+	ctx := testAuthzContext()
 	logger := log.DefaultLogger
 
 	resourceRepo := data.NewFakeResourceRepository()
@@ -1149,7 +1163,7 @@ func TestTransactionIdIdempotency(t *testing.T) {
 
 	mc := metricscollector.NewFakeMetricsCollector()
 	schemaRepository := newFakeSchemaRepository(t)
-	usecase := New(resourceRepo, nil, nil, schemaRepository, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig, mc)
+	usecase := New(resourceRepo, nil, nil, schemaRepository, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig, mc, nil)
 
 	t.Run("Same transaction ID should be idempotent - no changes to representation tables", func(t *testing.T) {
 		resourceType := "host"

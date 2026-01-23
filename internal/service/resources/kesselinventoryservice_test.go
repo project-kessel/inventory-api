@@ -154,6 +154,7 @@ func TestInventoryService_ReportResource_MissingReporterType(t *testing.T) {
 		nil, // waitForNotifBreaker
 		nil, // Config
 		metricscollector.NewFakeMetricsCollector(),
+		nil,
 	)
 	service := svc.NewKesselInventoryServiceV1beta2(uc)
 
@@ -202,6 +203,7 @@ func TestInventoryService_ReportResource_MissingReporterInstanceId(t *testing.T)
 		nil, // waitForNotifBreaker
 		nil, // Config
 		metricscollector.NewFakeMetricsCollector(),
+		nil,
 	)
 	service := svc.NewKesselInventoryServiceV1beta2(uc)
 
@@ -253,6 +255,7 @@ func TestInventoryService_ReportResource_InvalidJsonObject(t *testing.T) {
 		nil, // waitForNotifBreaker
 		nil, // Config
 		metricscollector.NewFakeMetricsCollector(),
+		nil,
 	)
 
 	service := svc.NewKesselInventoryServiceV1beta2(uc)
@@ -446,6 +449,7 @@ func TestInventoryService_CheckSelf_Allowed_XRhIdentity(t *testing.T) {
 		nil, // waitForNotifBreaker
 		cfg,
 		metricscollector.NewFakeMetricsCollector(),
+		nil,
 	)
 
 	service := svc.NewKesselInventoryServiceV1beta2(uc)
@@ -513,6 +517,7 @@ func TestInventoryService_CheckSelf_Allowed_XRhIdentity_NoUserID(t *testing.T) {
 		nil, // waitForNotifBreaker
 		cfg,
 		metricscollector.NewFakeMetricsCollector(),
+		nil,
 	)
 
 	service := svc.NewKesselInventoryServiceV1beta2(uc)
@@ -574,6 +579,7 @@ func TestInventoryService_CheckSelf_Denied(t *testing.T) {
 		nil, // waitForNotifBreaker
 		cfg,
 		metricscollector.NewFakeMetricsCollector(),
+		nil,
 	)
 
 	service := svc.NewKesselInventoryServiceV1beta2(uc)
@@ -721,6 +727,7 @@ func TestInventoryService_CheckSelfBulk_Allowed_XRhIdentity(t *testing.T) {
 		nil, // waitForNotifBreaker
 		cfg,
 		metricscollector.NewFakeMetricsCollector(),
+		nil,
 	)
 
 	service := svc.NewKesselInventoryServiceV1beta2(uc)
@@ -828,6 +835,7 @@ func TestInventoryService_CheckSelfBulk_MixedResults(t *testing.T) {
 		nil, // waitForNotifBreaker
 		cfg,
 		metricscollector.NewFakeMetricsCollector(),
+		nil,
 	)
 
 	service := svc.NewKesselInventoryServiceV1beta2(uc)
@@ -900,23 +908,6 @@ func TestInventoryService_CheckSelf_OIDC_Identity(t *testing.T) {
 
 	mockRepo := data.NewFakeResourceRepository()
 	mockAuthz := &mocks.MockAuthz{}
-	mockAuthz.
-		On("Check",
-			mock.Anything,
-			"hbi",
-			"view",
-			mock.Anything,
-			"host",
-			"dd1b73b9-3e33-4264-968c-e3ce55b9afec",
-			mock.MatchedBy(func(sub *relationsV1beta1.SubjectReference) bool {
-				// Verify OIDC principal is parsed correctly (extract subject from "domain/subject")
-				return sub.Subject.Id == "12345" &&
-					sub.Subject.Type.Name == "principal" &&
-					sub.Subject.Type.Namespace == "rbac"
-			}),
-		).
-		Return(relationsV1beta1.CheckResponse_ALLOWED_TRUE, &relationsV1beta1.ConsistencyToken{}, nil).
-		Once()
 
 	cfg := &usecase.UsecaseConfig{}
 	uc := usecase.New(
@@ -932,16 +923,13 @@ func TestInventoryService_CheckSelf_OIDC_Identity(t *testing.T) {
 		nil, // waitForNotifBreaker
 		cfg,
 		metricscollector.NewFakeMetricsCollector(),
+		nil,
 	)
 
 	service := svc.NewKesselInventoryServiceV1beta2(uc)
 
 	resp, err := service.CheckSelf(ctx, req)
 
-	assert.NoError(t, err)
-	if assert.NotNil(t, resp) {
-		assert.Equal(t, pb.Allowed_ALLOWED_TRUE, resp.Allowed)
-	}
-
-	mockAuthz.AssertExpectations(t)
+	assert.Error(t, err)
+	assert.Nil(t, resp)
 }

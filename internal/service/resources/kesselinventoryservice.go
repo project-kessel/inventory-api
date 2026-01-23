@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/go-kratos/kratos/v2/log"
+	kratosTransport "github.com/go-kratos/kratos/v2/transport"
 	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2"
 	authnapi "github.com/project-kessel/inventory-api/internal/authn/api"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
@@ -38,6 +39,7 @@ func (c *InventoryService) ReportResource(ctx context.Context, r *pb.ReportResou
 		log.Errorf("failed to get identity: %v", err)
 		return nil, status.Error(codes.Unauthenticated, "failed to get identity")
 	}
+	ctx = ensureAuthzContext(ctx, identity)
 	err = c.Ctl.ReportResource(ctx, r, identity.Principal)
 	if err != nil {
 		return nil, err
@@ -49,11 +51,12 @@ func (c *InventoryService) ReportResource(ctx context.Context, r *pb.ReportResou
 
 func (c *InventoryService) DeleteResource(ctx context.Context, r *pb.DeleteResourceRequest) (*pb.DeleteResourceResponse, error) {
 
-	_, err := middleware.GetIdentity(ctx)
+	identity, err := middleware.GetIdentity(ctx)
 	if err != nil {
 		log.Errorf("failed to get identity: %v", err)
 		return nil, status.Error(codes.Unauthenticated, "failed to get identity")
 	}
+	ctx = ensureAuthzContext(ctx, identity)
 
 	if reporterResourceKey, err := reporterKeyFromResourceReference(r.GetReference()); err == nil {
 		if err = c.Ctl.Delete(ctx, reporterResourceKey); err == nil {
@@ -74,11 +77,12 @@ func (c *InventoryService) DeleteResource(ctx context.Context, r *pb.DeleteResou
 }
 
 func (s *InventoryService) Check(ctx context.Context, req *pb.CheckRequest) (*pb.CheckResponse, error) {
-	_, err := middleware.GetIdentity(ctx)
+	identity, err := middleware.GetIdentity(ctx)
 	if err != nil {
 		log.Errorf("failed to get identity: %v", err)
 		return nil, status.Error(codes.Unauthenticated, "failed to get identity")
 	}
+	ctx = ensureAuthzContext(ctx, identity)
 
 	if reporterResourceKey, err := reporterKeyFromResourceReference(req.Object); err == nil {
 		if resp, err := s.Ctl.Check(ctx, req.GetRelation(), req.Object.Reporter.GetType(), subjectReferenceFromSubject(req.GetSubject()), reporterResourceKey); err == nil {
@@ -93,11 +97,12 @@ func (s *InventoryService) Check(ctx context.Context, req *pb.CheckRequest) (*pb
 }
 
 func (s *InventoryService) CheckForUpdate(ctx context.Context, req *pb.CheckForUpdateRequest) (*pb.CheckForUpdateResponse, error) {
-	_, err := middleware.GetIdentity(ctx)
+	identity, err := middleware.GetIdentity(ctx)
 	if err != nil {
 		log.Errorf("failed to get identity: %v", err)
 		return nil, status.Error(codes.Unauthenticated, "failed to get identity")
 	}
+	ctx = ensureAuthzContext(ctx, identity)
 
 	log.Info("CheckForUpdate using v1beta2 db")
 	if reporterResourceKey, err := reporterKeyFromResourceReference(req.Object); err == nil {
@@ -113,11 +118,12 @@ func (s *InventoryService) CheckForUpdate(ctx context.Context, req *pb.CheckForU
 }
 
 func (s *InventoryService) CheckBulk(ctx context.Context, req *pb.CheckBulkRequest) (*pb.CheckBulkResponse, error) {
-	_, err := middleware.GetIdentity(ctx)
+	identity, err := middleware.GetIdentity(ctx)
 	if err != nil {
 		log.Errorf("failed to get identity: %v", err)
 		return nil, status.Error(codes.Unauthenticated, "failed to get identity")
 	}
+	ctx = ensureAuthzContext(ctx, identity)
 
 	log.Info("CheckBulk using v1beta2 db")
 	v1beta1Req := mapCheckBulkRequestToV1beta1(req)
@@ -134,6 +140,7 @@ func (s *InventoryService) CheckSelf(ctx context.Context, req *pb.CheckSelfReque
 	if err != nil {
 		return nil, status.Errorf(codes.Unauthenticated, "failed to get identity: %v", err)
 	}
+	ctx = ensureAuthzContext(ctx, identity)
 
 	if reporterResourceKey, err := reporterKeyFromResourceReference(req.Object); err == nil {
 		// Derive subject reference from identity (x-rh-identity header)
@@ -141,7 +148,7 @@ func (s *InventoryService) CheckSelf(ctx context.Context, req *pb.CheckSelfReque
 		if err != nil {
 			return nil, status.Errorf(codes.Unauthenticated, "invalid identity: %v", err)
 		}
-		if resp, err := s.Ctl.Check(ctx, req.GetRelation(), req.Object.Reporter.GetType(), subjectRef, reporterResourceKey); err == nil {
+		if resp, err := s.Ctl.CheckSelf(ctx, req.GetRelation(), req.Object.Reporter.GetType(), subjectRef, reporterResourceKey); err == nil {
 			allowed := pb.Allowed_ALLOWED_FALSE
 			if resp {
 				allowed = pb.Allowed_ALLOWED_TRUE
@@ -164,6 +171,7 @@ func (s *InventoryService) CheckSelfBulk(ctx context.Context, req *pb.CheckSelfB
 	if err != nil {
 		return nil, status.Errorf(codes.Unauthenticated, "failed to get identity: %v", err)
 	}
+	ctx = ensureAuthzContext(ctx, identity)
 
 	// Validate input: check items array
 	if len(req.GetItems()) == 0 {
@@ -204,7 +212,7 @@ func (s *InventoryService) CheckSelfBulk(ctx context.Context, req *pb.CheckSelfB
 	if err != nil {
 		return nil, status.Errorf(codes.Unauthenticated, "invalid identity: %v", err)
 	}
-	resp, err := s.Ctl.CheckBulk(ctx, v1beta1Req)
+	resp, err := s.Ctl.CheckSelfBulk(ctx, v1beta1Req)
 	if err != nil {
 		return nil, err
 	}
@@ -235,6 +243,30 @@ func subjectReferenceFromSubjectV1beta1(subject *pbv1beta1.SubjectReference) *pb
 			ResourceType: subject.Subject.Type.Name,
 		},
 	}
+}
+
+func ensureAuthzContext(ctx context.Context, identity *authnapi.Identity) context.Context {
+	if _, ok := authnapi.FromAuthzContext(ctx); ok {
+		return ctx
+	}
+
+	protocol := authnapi.ProtocolUnknown
+	if t, ok := kratosTransport.FromServerContext(ctx); ok {
+		switch t.Kind() {
+		case kratosTransport.KindHTTP:
+			protocol = authnapi.ProtocolHTTP
+		case kratosTransport.KindGRPC:
+			protocol = authnapi.ProtocolGRPC
+		}
+	}
+	if protocol == authnapi.ProtocolUnknown {
+		protocol = authnapi.ProtocolHTTP
+	}
+
+	return authnapi.NewAuthzContext(ctx, authnapi.AuthzContext{
+		Protocol: protocol,
+		Identity: identity,
+	})
 }
 
 func subjectReferenceFromIdentity(identity *authnapi.Identity) (*pbv1beta1.SubjectReference, error) {

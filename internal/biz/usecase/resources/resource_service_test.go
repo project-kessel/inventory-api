@@ -15,60 +15,9 @@ import (
 	"github.com/project-kessel/inventory-api/internal"
 	"github.com/project-kessel/inventory-api/internal/authz/allow"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
-	"github.com/project-kessel/inventory-api/internal/biz/schema"
-	"github.com/project-kessel/inventory-api/internal/biz/schema/validation"
 	"github.com/project-kessel/inventory-api/internal/data"
 	"github.com/project-kessel/inventory-api/internal/metricscollector"
 )
-
-func newFakeSchemaRepository(t *testing.T) schema.Repository {
-	schemaRepository := data.NewInMemorySchemaRepository()
-
-	emptyValidationSchema := validation.NewJsonSchemaValidatorFromString(`{
-		"$schema": "http://json-schema.org/draft-07/schema#",
-		"type": "object",
-		"properties": {
-		},
-		"required": []
-	}`)
-
-	withWorkspaceValidationSchema := validation.NewJsonSchemaValidatorFromString(`{
-		"$schema": "http://json-schema.org/draft-07/schema#",
-		"type": "object",
-		"properties": {
-			"workspace_id": { "type": "string" }
-		},
-		"required": ["workspace_id"]
-	}`)
-
-	err := schemaRepository.CreateResourceSchema(context.Background(), schema.ResourceRepresentation{
-		ResourceType:     "k8s_cluster",
-		ValidationSchema: withWorkspaceValidationSchema,
-	})
-	assert.NoError(t, err)
-
-	err = schemaRepository.CreateReporterSchema(context.Background(), schema.ReporterRepresentation{
-		ResourceType:     "k8s_cluster",
-		ReporterType:     "ocm",
-		ValidationSchema: emptyValidationSchema,
-	})
-	assert.NoError(t, err)
-
-	err = schemaRepository.CreateResourceSchema(context.Background(), schema.ResourceRepresentation{
-		ResourceType:     "host",
-		ValidationSchema: withWorkspaceValidationSchema,
-	})
-	assert.NoError(t, err)
-
-	err = schemaRepository.CreateReporterSchema(context.Background(), schema.ReporterRepresentation{
-		ResourceType:     "host",
-		ReporterType:     "hbi",
-		ValidationSchema: emptyValidationSchema,
-	})
-	assert.NoError(t, err)
-
-	return schemaRepository
-}
 
 func TestReportResource(t *testing.T) {
 	tests := []struct {

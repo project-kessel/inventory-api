@@ -144,16 +144,16 @@ func (i *StreamAuthInterceptor) Interceptor() grpc.StreamServerInterceptor {
 		}
 
 		// Use aggregating authenticator to authenticate the stream
-		identity, decision := i.cfg.authenticator.Authenticate(newCtx, transporter)
+		claims, decision := i.cfg.authenticator.Authenticate(newCtx, transporter)
 
 		// Log decision at info level to diagnose authentication issues
 		// Only log non-sensitive fields to prevent information leakage
 		logHelper := log.NewHelper(i.cfg.logger)
-		if identity != nil {
-			logHelper.Infof("Stream authentication decision for %s: %s (principal: %s, authType: %s, isGuest: %v)",
-				info.FullMethod, decision, identity.Principal, identity.AuthType, identity.IsGuest)
+		if claims != nil {
+			logHelper.Infof("Stream authentication decision for %s: %s (subject: %s, authType: %s)",
+				info.FullMethod, decision, claims.SubjectId, claims.AuthType)
 		} else {
-			logHelper.Infof("Stream authentication decision for %s: %s (identity: nil)", info.FullMethod, decision)
+			logHelper.Infof("Stream authentication decision for %s: %s (claims: nil)", info.FullMethod, decision)
 		}
 
 		if decision == api.Deny {
@@ -170,19 +170,19 @@ func (i *StreamAuthInterceptor) Interceptor() grpc.StreamServerInterceptor {
 			return kerrors.Unauthorized("UNAUTHORIZED", fmt.Sprintf("Authentication failed with decision: %s", decision))
 		}
 
-		// Defensive check: identity should not be nil when decision is Allow
+		// Defensive check: claims should not be nil when decision is Allow
 		// but we check to prevent panics if an authenticator implementation violates the contract
-		if identity == nil {
-			logHelper.Errorf("Stream authentication allowed but identity is nil for %s", info.FullMethod)
-			return kerrors.Unauthorized("UNAUTHORIZED", "Invalid identity: authenticator returned Allow with nil identity")
+		if claims == nil {
+			logHelper.Errorf("Stream authentication allowed but claims are nil for %s", info.FullMethod)
+			return kerrors.Unauthorized("UNAUTHORIZED", "Invalid claims: authenticator returned Allow with nil claims")
 		}
 
 		// Log only non-sensitive fields at debug level
-		logHelper.Debugf("Stream authentication allowed for %s (principal: %s, authType: %s, isGuest: %v)",
-			info.FullMethod, identity.Principal, identity.AuthType, identity.IsGuest)
+		logHelper.Debugf("Stream authentication allowed for %s (subject: %s, authType: %s)",
+			info.FullMethod, claims.SubjectId, claims.AuthType)
 
-		// Set identity in context (includes AuthType)
-		newCtx = NewContextIdentity(newCtx, *identity)
+		// Set claims in context (includes AuthType)
+		newCtx = NewContextClaims(newCtx, *claims)
 
 		// Preserve token if available (for compatibility)
 		newCtx = preserveTokenContext(newCtx, md)
@@ -222,13 +222,13 @@ func preserveTokenContext(ctx context.Context, md metadata.MD) context.Context {
 	return ctx
 }
 
-func NewContextIdentity(ctx context.Context, identity api.Identity) context.Context {
-	return context.WithValue(ctx, middleware.IdentityRequestKey, identity)
+func NewContextClaims(ctx context.Context, claims api.Claims) context.Context {
+	return context.WithValue(ctx, middleware.ClaimsRequestKey, claims)
 }
 
-func FromContextIdentity(ctx context.Context) (api.Identity, bool) {
-	identity, ok := ctx.Value(middleware.IdentityRequestKey).(api.Identity)
-	return identity, ok
+func FromContextClaims(ctx context.Context) (api.Claims, bool) {
+	claims, ok := ctx.Value(middleware.ClaimsRequestKey).(api.Claims)
+	return claims, ok
 }
 
 func FromContext(ctx context.Context) (*coreosoidc.IDToken, bool) {
@@ -240,7 +240,7 @@ func GetClientIDFromContext(ctx context.Context) string {
 	// First, try to get the verified IDToken from context
 	token, ok := util.FromTokenContext(ctx)
 	if ok {
-		claims := &Claims{}
+		claims := &TokenClaims{}
 		err := token.Claims(claims)
 		if err != nil {
 			return ""
@@ -273,8 +273,8 @@ func GetClientIDFromContext(ctx context.Context) string {
 	return ""
 }
 
-// Claims holds the values we want to extract from the JWT - matching OIDC authenticator
-type Claims struct {
+// TokenClaims holds the values we want to extract from the JWT - matching OIDC authenticator
+type TokenClaims struct {
 	Audience          string `json:"aud"`
 	Issuer            string `json:"iss"`
 	Subject           string `json:"sub"`

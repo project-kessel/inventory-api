@@ -161,8 +161,7 @@ paths:
                  This API answers the question:
                  "Does the current caller have relation *Y* on object *Z*?"
 
-                 Common use cases include enforcing access checks for the authenticated user
-                 without allowing callers to impersonate arbitrary subjects.
+                 Common use cases include enforcing access checks for the authenticated user.
             operationId: KesselInventoryService_CheckSelf
             requestBody:
                 content:

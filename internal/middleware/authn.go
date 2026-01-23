@@ -28,7 +28,7 @@ func Authentication(authenticator authnapi.Authenticator) func(middleware.Handle
 				// Check if token is already in context (from a previous middleware or interceptor)
 				token, hasToken := util.FromTokenContext(ctx)
 
-				identity, decision := authenticator.Authenticate(ctx, t)
+				claims, decision := authenticator.Authenticate(ctx, t)
 				if decision == authnapi.Deny {
 					return nil, errors.Unauthorized(reason, "Authentication denied")
 				} else if decision == authnapi.Ignore {
@@ -38,13 +38,14 @@ func Authentication(authenticator authnapi.Authenticator) func(middleware.Handle
 					return nil, errors.Unauthorized(reason, fmt.Sprintf("Authentication failed with decision: %s", decision))
 				}
 
-				// Defensive check: identity should not be nil when decision is Allow
+				// Defensive check: claims should not be nil when decision is Allow
 				// but we check to prevent panics if an authenticator implementation violates the contract
-				if identity == nil {
-					return nil, errors.Unauthorized(reason, "Invalid identity: authenticator returned Allow with nil identity")
+				if claims == nil {
+					return nil, errors.Unauthorized(reason, "Invalid claims: authenticator returned Allow with nil claims")
 				}
 
-				ctx = context.WithValue(ctx, IdentityRequestKey, identity)
+				ctx = context.WithValue(ctx, ClaimsRequestKey, claims)
+				ctx = EnsureAuthzContext(ctx, claims)
 
 				// Try to get token from context if we don't have it yet
 				// (in case OAuth2Authenticator stored it during Authenticate)
@@ -75,7 +76,32 @@ func Authentication(authenticator authnapi.Authenticator) func(middleware.Handle
 	}
 }
 
+// EnsureAuthzContext populates the authz context with claims and protocol if missing.
+func EnsureAuthzContext(ctx context.Context, claims *authnapi.Claims) context.Context {
+	if _, ok := authnapi.FromAuthzContext(ctx); ok {
+		return ctx
+	}
+
+	protocol := authnapi.ProtocolUnknown
+	if t, ok := transport.FromServerContext(ctx); ok {
+		switch t.Kind() {
+		case transport.KindHTTP:
+			protocol = authnapi.ProtocolHTTP
+		case transport.KindGRPC:
+			protocol = authnapi.ProtocolGRPC
+		default:
+			// leave as ProtocolUnknown to allow MetaAuthorizer to fail closed
+			protocol = authnapi.ProtocolUnknown
+		}
+	}
+
+	return authnapi.NewAuthzContext(ctx, authnapi.AuthzContext{
+		Protocol: protocol,
+		Claims:   claims,
+	})
+}
+
 var (
-	IdentityRequestKey = &contextKey{"authnapi.Identity"}
-	GetIdentity        = GetFromContext[authnapi.Identity](IdentityRequestKey)
+	ClaimsRequestKey = &contextKey{"authnapi.Claims"}
+	GetClaims        = GetFromContext[authnapi.Claims](ClaimsRequestKey)
 )

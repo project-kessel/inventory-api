@@ -163,7 +163,42 @@ stringData:
       grpc:
         address: 0.0.0.0:9081
     authn:
+      # This is a legacy field for backwards compatibility. 
+      # Will be deprecated in the future. and replaced with the authenticator chain. 
+      # Will be removed when the code is released to stage and prod and configs are updated there.
       allow-unauthenticated: true
+      authenticator:
+        type: first_match
+        chain:
+          - type: oidc
+            enable: false
+            transport:
+              http: false
+              grpc: false
+            config:
+              insecure-client: true
+              authn-server-url: http://127.0.0.1:8085/realms/redhat-external
+              skip-client-id-check: true
+              skip-issuer-check: true
+              principal-user-domain: localhost
+          - type: x-rh-identity  # x-rh-identity header support - currently applicable for http transport only
+            enable: true
+            transport:
+              http: true
+              grpc: false   
+          - type: allow-unauthenticated # This is a special authenticator that allows unauthenticated access - mainly for Local-dev/Test 
+            enable: true
+            transport:
+              http: false
+              grpc: true
+    selfSubjectStratergy:
+      redhatRbacSelfSubjectStratergy:
+        enabled: true
+        issuerDomain: redhat
+        oidcIssuerDomainMap:
+          "https://sso.redhat.com/auth/realms/redhat-external": redhat
+          "sso.redhat.com": redhat
+
     authz:
       impl: kessel
       kessel:

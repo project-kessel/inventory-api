@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/go-kratos/kratos/v2/log"
-	kratosMiddleware "github.com/go-kratos/kratos/v2/middleware"
 	"github.com/project-kessel/inventory-api/internal/metricscollector"
 	"github.com/project-kessel/inventory-api/internal/service"
 	"github.com/sony/gobreaker"
@@ -19,7 +18,9 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/project-kessel/inventory-api/cmd/common"
+	"github.com/project-kessel/inventory-api/internal/biz/usecase/metaauthorizer"
 	resourcesctl "github.com/project-kessel/inventory-api/internal/biz/usecase/resources"
+	appconfig "github.com/project-kessel/inventory-api/internal/config"
 	"github.com/project-kessel/inventory-api/internal/config/schema"
 	"github.com/project-kessel/inventory-api/internal/consistency"
 	"github.com/project-kessel/inventory-api/internal/consumer"
@@ -38,6 +39,7 @@ import (
 	"github.com/project-kessel/inventory-api/internal/server"
 	"github.com/project-kessel/inventory-api/internal/server/pprof"
 	"github.com/project-kessel/inventory-api/internal/storage"
+	"github.com/project-kessel/inventory-api/internal/subject/selfsubject"
 
 	hb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1"
 	pbv1beta2 "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2"
@@ -58,6 +60,7 @@ func NewCommand(
 	consumerOptions *consumer.Options,
 	consistencyOptions *consistency.Options,
 	serviceOptions *service.Options,
+	selfSubjectConfig *appconfig.SelfSubjectStrategyConfig,
 	loggerOptions common.LoggerOptions,
 	schemaOptions *schema.Options,
 ) *cobra.Command {
@@ -91,6 +94,8 @@ func NewCommand(
 			if errs != nil {
 				return errors.NewAggregate(errs)
 			}
+
+			selfSubjectResolver := selfsubject.NewResolver(appconfig.BuildSelfSubjectStrategy(selfSubjectConfig))
 
 			// configure authz
 			if errs := authzOptions.Complete(); errs != nil {
@@ -225,29 +230,6 @@ func NewCommand(
 				return err
 			}
 
-			// Configure meta-authorizer middleware from config
-			metaAuthorizerLogHelper := log.NewHelper(log.With(logger, "subsystem", "metaauthorizer"))
-			var metaAuthorizerMiddleware kratosMiddleware.Middleware
-			if authzConfig.MetaAuthorizer != nil && authzConfig.MetaAuthorizer.Enabled {
-				metaAuthorizerConfig := middleware.MetaAuthorizerConfig{
-					Authorizer:       authorizer,
-					SubjectNamespace: authzConfig.MetaAuthorizer.SubjectNamespace,
-					Enabled:          authzConfig.MetaAuthorizer.Enabled,
-				}
-				metaAuthorizerMiddleware = middleware.MetaAuthorizerMiddleware(metaAuthorizerConfig, logger)
-				metaAuthorizerLogHelper.Infof("Meta-authorizer enabled: subject_namespace=%s", authzConfig.MetaAuthorizer.SubjectNamespace)
-			} else {
-				// Create a no-op middleware if meta-authorizer is disabled
-				metaAuthorizerMiddleware = func(next kratosMiddleware.Handler) kratosMiddleware.Handler {
-					return next
-				}
-				if authzConfig.MetaAuthorizer == nil {
-					metaAuthorizerLogHelper.Info("Meta-authorizer disabled: configuration not present")
-				} else {
-					metaAuthorizerLogHelper.Info("Meta-authorizer disabled: enabled=false in configuration")
-				}
-			}
-
 			// construct eventing
 			// Note that we pass the server id here to act as the Source URI in cloudevents
 			// If a server ID isn't configured explicitly, `os.Hostname()` is used.
@@ -263,7 +245,7 @@ func NewCommand(
 			}
 
 			// construct servers
-			server, err := server.New(serverConfig, middleware.Authentication(authenticator), metaAuthorizerMiddleware, authnConfig, authenticator, logger)
+			server, err := server.New(serverConfig, middleware.Authentication(authenticator), authnConfig, authenticator, logger)
 			if err != nil {
 				return err
 			}
@@ -302,7 +284,7 @@ func NewCommand(
 			//v1beta2
 			// wire together inventory service handling
 			resourceRepo := data.NewResourceRepository(db, transactionManager)
-			inventory_controller := resourcesctl.New(resourceRepo, authorizer, eventingManager, "notifications", log.With(logger, "subsystem", "notificationsintegrations_controller"), listenManager, waitForNotifCircuitBreaker, usecaseConfig, mc)
+			inventory_controller := resourcesctl.New(resourceRepo, authorizer, eventingManager, "notifications", log.With(logger, "subsystem", "notificationsintegrations_controller"), listenManager, waitForNotifCircuitBreaker, usecaseConfig, mc, metaauthorizer.NewSimpleMetaAuthorizer(), selfSubjectResolver)
 
 			inventory_service := resourcesvc.NewKesselInventoryServiceV1beta2(inventory_controller)
 			pbv1beta2.RegisterKesselInventoryServiceServer(server.GrpcServer, inventory_service)

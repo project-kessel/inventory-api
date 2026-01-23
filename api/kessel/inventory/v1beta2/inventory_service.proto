@@ -49,8 +49,7 @@ service KesselInventoryService {
   // This API answers the question:
   // "Does the current caller have relation *Y* on object *Z*?"
   //
-  // Common use cases include enforcing access checks for the authenticated user
-  // without allowing callers to impersonate arbitrary subjects.
+  // Common use cases include enforcing access checks for the authenticated user.
   rpc CheckSelf(CheckSelfRequest) returns (CheckSelfResponse) {
     option (google.api.http) = {
       post: "/api/inventory/v1beta2/checkself"

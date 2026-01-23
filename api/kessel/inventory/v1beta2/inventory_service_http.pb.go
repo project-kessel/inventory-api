@@ -70,8 +70,7 @@ type KesselInventoryServiceHTTPServer interface {
 	// This API answers the question:
 	// "Does the current caller have relation *Y* on object *Z*?"
 	//
-	// Common use cases include enforcing access checks for the authenticated user
-	// without allowing callers to impersonate arbitrary subjects.
+	// Common use cases include enforcing access checks for the authenticated user.
 	CheckSelf(context.Context, *CheckSelfRequest) (*CheckSelfResponse, error)
 	// CheckSelfBulk Performs bulk permission checks where the subject is implicitly the caller
 	// (self) for multiple resource-relation combinations.

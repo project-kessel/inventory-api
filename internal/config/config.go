@@ -22,15 +22,16 @@ import (
 
 // OptionsConfig contains the settings for each configuration option
 type OptionsConfig struct {
-	Authn       *authn.Options
-	Authz       *authz.Options
-	Storage     *storage.Options
-	Eventing    *eventing.Options
-	Consumer    *consumer.Options
-	Server      *server.Options
-	Consistency *consistency.Options
-	Service     *service.Options
-	Schema      *schema.Options
+	Authn                *authn.Options
+	Authz                *authz.Options
+	Storage              *storage.Options
+	Eventing             *eventing.Options
+	Consumer             *consumer.Options
+	Server               *server.Options
+	Consistency          *consistency.Options
+	Service              *service.Options
+	Schema               *schema.Options
+	SelfSubjectStratergy *SelfSubjectStrategyConfig `mapstructure:"selfSubjectStratergy"`
 }
 
 // NewOptionsConfig returns a new OptionsConfig with default options set
@@ -45,6 +46,7 @@ func NewOptionsConfig() *OptionsConfig {
 		consistency.NewOptions(),
 		service.NewOptions(),
 		schema.NewOptions(),
+		NewSelfSubjectStrategyConfig(),
 	}
 }
 

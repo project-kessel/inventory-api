@@ -53,8 +53,7 @@ type KesselInventoryServiceClient interface {
 	// This API answers the question:
 	// "Does the current caller have relation *Y* on object *Z*?"
 	//
-	// Common use cases include enforcing access checks for the authenticated user
-	// without allowing callers to impersonate arbitrary subjects.
+	// Common use cases include enforcing access checks for the authenticated user.
 	CheckSelf(ctx context.Context, in *CheckSelfRequest, opts ...grpc.CallOption) (*CheckSelfResponse, error)
 	// Performs a strongly consistent relationship check to determine whether a subject
 	// has a specific relation to an object (representing, for example, a permission).
@@ -266,8 +265,7 @@ type KesselInventoryServiceServer interface {
 	// This API answers the question:
 	// "Does the current caller have relation *Y* on object *Z*?"
 	//
-	// Common use cases include enforcing access checks for the authenticated user
-	// without allowing callers to impersonate arbitrary subjects.
+	// Common use cases include enforcing access checks for the authenticated user.
 	CheckSelf(context.Context, *CheckSelfRequest) (*CheckSelfResponse, error)
 	// Performs a strongly consistent relationship check to determine whether a subject
 	// has a specific relation to an object (representing, for example, a permission).

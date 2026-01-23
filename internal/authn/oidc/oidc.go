@@ -42,7 +42,7 @@ func New(c CompletedConfig) (*OAuth2Authenticator, error) {
 
 }
 
-func (o *OAuth2Authenticator) Authenticate(ctx context.Context, t transport.Transporter) (*api.Identity, api.Decision) {
+func (o *OAuth2Authenticator) Authenticate(ctx context.Context, t transport.Transporter) (*api.Claims, api.Decision) {
 	// get the token from the request
 	rawToken := util.GetBearerToken(t)
 
@@ -68,7 +68,7 @@ func (o *OAuth2Authenticator) Authenticate(ctx context.Context, t transport.Tran
 
 	// TODO: make JWT claim fields configurable
 	// extract the claims we care about
-	u := &Claims{}
+	u := &TokenClaims{}
 	err = tok.Claims(u)
 	if err != nil {
 		log.Errorf("failed to extract claims: %v", err)
@@ -83,10 +83,10 @@ func (o *OAuth2Authenticator) Authenticate(ctx context.Context, t transport.Tran
 	}
 
 	if u.Subject != "" && o.PrincipalUserDomain != "" {
-		principal := fmt.Sprintf("%s/%s", o.PrincipalUserDomain, u.Subject)
-		return &api.Identity{
-			Principal: principal,
-			AuthType:  "oidc",
+		return &api.Claims{
+			SubjectId: api.SubjectId(u.Subject),
+			Issuer:    api.Issuer(u.Issuer),
+			AuthType:  api.AuthTypeOIDC,
 		}, api.Allow
 	}
 
@@ -94,8 +94,8 @@ func (o *OAuth2Authenticator) Authenticate(ctx context.Context, t transport.Tran
 }
 
 // TODO: make JWT claim fields configurable
-// Claims holds the values we want to extract from the JWT.
-type Claims struct {
+// TokenClaims holds the values we want to extract from the JWT.
+type TokenClaims struct {
 	Audience          string `json:"aud"`
 	Issuer            string `json:"iss"`
 	Subject           string `json:"sub"`

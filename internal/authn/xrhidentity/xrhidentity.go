@@ -13,6 +13,14 @@ import (
 // from Red Hat ConsoleDot/Cloud Platform.
 type XRhIdentityAuthenticator struct{}
 
+type identityType string
+
+const (
+	identityTypeUser           identityType = "User"
+	identityTypeSystem         identityType = "System"
+	identityTypeServiceAccount identityType = "ServiceAccount"
+)
+
 // New creates a new XRhIdentityAuthenticator instance.
 func New() *XRhIdentityAuthenticator {
 	return &XRhIdentityAuthenticator{}
@@ -21,7 +29,7 @@ func New() *XRhIdentityAuthenticator {
 // Authenticate parses the x-rh-identity header and returns an identity if valid.
 // Returns Ignore if the header is missing (allowing other authenticators to try).
 // Returns Deny if the header is present but invalid.
-func (a *XRhIdentityAuthenticator) Authenticate(ctx context.Context, t transport.Transporter) (*api.Identity, api.Decision) {
+func (a *XRhIdentityAuthenticator) Authenticate(ctx context.Context, t transport.Transporter) (*api.Claims, api.Decision) {
 	// Get the x-rh-identity header
 	identityHeader := t.RequestHeader().Get("x-rh-identity")
 	if identityHeader == "" {
@@ -36,55 +44,39 @@ func (a *XRhIdentityAuthenticator) Authenticate(ctx context.Context, t transport
 		return nil, api.Deny
 	}
 
-	// Convert platform identity to our internal Identity format
-	internalIdentity := convertPlatformIdentity(&xrhid.Identity)
-	return internalIdentity, api.Allow
+	// Convert platform identity to our internal Claims format
+	internalClaims := convertPlatformClaims(&xrhid.Identity)
+	return internalClaims, api.Allow
 }
 
-// convertPlatformIdentity converts a platform-go-middlewares Identity to our internal Identity format
-func convertPlatformIdentity(platformIdentity *identity.Identity) *api.Identity {
-	internalIdentity := &api.Identity{
-		AuthType: "x-rh-identity",
+// convertPlatformClaims converts a platform-go-middlewares Identity to our internal Claims format
+func convertPlatformClaims(platformIdentity *identity.Identity) *api.Claims {
+	internalClaims := &api.Claims{
+		AuthType: api.AuthTypeXRhIdentity,
 	}
 
-	// Set principal from user information
-	if platformIdentity.User != nil {
-		if platformIdentity.User.Username != "" {
-			internalIdentity.Principal = platformIdentity.User.Username
-		} else if platformIdentity.User.Email != "" {
-			internalIdentity.Principal = platformIdentity.User.Email
+	if platformIdentity.Type == string(identityTypeUser) {
+		// Set organization (prefer org_id, fallback to account_number)
+		if platformIdentity.OrgID != "" {
+			internalClaims.OrganizationId = api.OrganizationId(platformIdentity.OrgID)
+		}
+		// Set subject from user information
+		if platformIdentity.User != nil {
+			if platformIdentity.User.UserID != "" {
+				internalClaims.SubjectId = api.SubjectId(platformIdentity.User.UserID)
+			}
 		}
 	}
 
-	// Set account number as tenant if available
-	if platformIdentity.AccountNumber != "" {
-		internalIdentity.Tenant = platformIdentity.AccountNumber
+	if platformIdentity.Type == string(identityTypeSystem) {
+		// TODO: add claims mapping for System identity type if needed
+		_ = platformIdentity
 	}
 
-	// Set type and other fields if available
-	if platformIdentity.Type != "" {
-		internalIdentity.Type = platformIdentity.Type
+	if platformIdentity.Type == string(identityTypeServiceAccount) {
+		// TODO: add claims mapping for ServiceAccount identity type if needed
+		_ = platformIdentity
 	}
 
-	// Set auth type from platform identity if available
-	if platformIdentity.AuthType != "" {
-		internalIdentity.AuthType = platformIdentity.AuthType
-	}
-	if platformIdentity.User != nil && platformIdentity.User.UserID != "" {
-		internalIdentity.UserID = platformIdentity.User.UserID
-	}
-
-	// Check if this is an internal user (not a service account)
-	if platformIdentity.User != nil {
-		// Internal users are not guests
-		internalIdentity.IsGuest = false
-	} else if platformIdentity.ServiceAccount != nil {
-		// Service accounts are not guests
-		internalIdentity.IsGuest = false
-	} else {
-		// Missing user info might be treated as guest
-		internalIdentity.IsGuest = true
-	}
-
-	return internalIdentity
+	return internalClaims
 }

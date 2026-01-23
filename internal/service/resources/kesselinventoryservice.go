@@ -30,14 +30,14 @@ func NewKesselInventoryServiceV1beta2(c *resources.Usecase) *InventoryService {
 }
 
 func (c *InventoryService) ReportResource(ctx context.Context, r *pb.ReportResourceRequest) (*pb.ReportResourceResponse, error) {
-	identity, err := middleware.GetIdentity(ctx)
+	claims, err := middleware.GetClaims(ctx)
 	if err != nil {
-		log.Errorf("failed to get identity: %v", err)
-		return nil, status.Error(codes.Unauthenticated, "failed to get identity")
+		log.Errorf("failed to get claims: %v", err)
+		return nil, status.Error(codes.Unauthenticated, "failed to get claims")
 	}
-	err = c.Ctl.ReportResource(ctx, r, identity.Principal)
+	err = c.Ctl.ReportResource(ctx, r, string(claims.SubjectId))
 	if err != nil {
-		return nil, err
+		return nil, mapServiceError(err)
 	}
 
 	return ResponseFromResource(), nil
@@ -46,20 +46,19 @@ func (c *InventoryService) ReportResource(ctx context.Context, r *pb.ReportResou
 
 func (c *InventoryService) DeleteResource(ctx context.Context, r *pb.DeleteResourceRequest) (*pb.DeleteResourceResponse, error) {
 
-	_, err := middleware.GetIdentity(ctx)
+	_, err := middleware.GetClaims(ctx)
 	if err != nil {
-		log.Errorf("failed to get identity: %v", err)
-		return nil, status.Error(codes.Unauthenticated, "failed to get identity")
+		log.Errorf("failed to get claims: %v", err)
+		return nil, status.Error(codes.Unauthenticated, "failed to get claims")
 	}
-
 	if reporterResourceKey, err := reporterKeyFromResourceReference(r.GetReference()); err == nil {
 		if err = c.Ctl.Delete(ctx, reporterResourceKey); err == nil {
 			return ResponseFromDeleteResource(), nil
 		} else {
 			log.Error("Failed to delete resource: ", err)
 
-			if errors.Is(err, resources.ErrResourceNotFound) {
-				return nil, status.Errorf(codes.NotFound, "resource not found")
+			if mapped := mapServiceError(err); mapped != err {
+				return nil, mapped
 			}
 			// Default to internal error for unknown errors
 			return nil, status.Errorf(codes.Internal, "failed to delete resource due to an internal error")
@@ -71,17 +70,16 @@ func (c *InventoryService) DeleteResource(ctx context.Context, r *pb.DeleteResou
 }
 
 func (s *InventoryService) Check(ctx context.Context, req *pb.CheckRequest) (*pb.CheckResponse, error) {
-	_, err := middleware.GetIdentity(ctx)
+	_, err := middleware.GetClaims(ctx)
 	if err != nil {
-		log.Errorf("failed to get identity: %v", err)
-		return nil, status.Error(codes.Unauthenticated, "failed to get identity")
+		log.Errorf("failed to get claims: %v", err)
+		return nil, status.Error(codes.Unauthenticated, "failed to get claims")
 	}
-
 	if reporterResourceKey, err := reporterKeyFromResourceReference(req.Object); err == nil {
 		if resp, err := s.Ctl.Check(ctx, req.GetRelation(), req.Object.Reporter.GetType(), subjectReferenceFromSubject(req.GetSubject()), reporterResourceKey); err == nil {
 			return viewResponseFromAuthzRequestV1beta2(resp), nil
 		} else {
-			return nil, err
+			return nil, mapServiceError(err)
 		}
 	} else {
 		log.Error("Failed to build reporter resource key: ", err)
@@ -90,18 +88,17 @@ func (s *InventoryService) Check(ctx context.Context, req *pb.CheckRequest) (*pb
 }
 
 func (s *InventoryService) CheckForUpdate(ctx context.Context, req *pb.CheckForUpdateRequest) (*pb.CheckForUpdateResponse, error) {
-	_, err := middleware.GetIdentity(ctx)
+	_, err := middleware.GetClaims(ctx)
 	if err != nil {
-		log.Errorf("failed to get identity: %v", err)
-		return nil, status.Error(codes.Unauthenticated, "failed to get identity")
+		log.Errorf("failed to get claims: %v", err)
+		return nil, status.Error(codes.Unauthenticated, "failed to get claims")
 	}
-
 	log.Info("CheckForUpdate using v1beta2 db")
 	if reporterResourceKey, err := reporterKeyFromResourceReference(req.Object); err == nil {
 		if resp, err := s.Ctl.CheckForUpdate(ctx, req.GetRelation(), req.Object.Reporter.GetType(), subjectReferenceFromSubject(req.GetSubject()), reporterResourceKey); err == nil {
 			return updateResponseFromAuthzRequestV1beta2(resp), nil
 		} else {
-			return nil, err
+			return nil, mapServiceError(err)
 		}
 	} else {
 		log.Error("Failed to build reporter resource key: ", err)
@@ -110,35 +107,23 @@ func (s *InventoryService) CheckForUpdate(ctx context.Context, req *pb.CheckForU
 }
 
 func (s *InventoryService) CheckBulk(ctx context.Context, req *pb.CheckBulkRequest) (*pb.CheckBulkResponse, error) {
-	_, err := middleware.GetIdentity(ctx)
+	_, err := middleware.GetClaims(ctx)
 	if err != nil {
-		log.Errorf("failed to get identity: %v", err)
-		return nil, status.Error(codes.Unauthenticated, "failed to get identity")
+		log.Errorf("failed to get claims: %v", err)
+		return nil, status.Error(codes.Unauthenticated, "failed to get claims")
 	}
-
 	log.Info("CheckBulk using v1beta2 db")
 	v1beta1Req := mapCheckBulkRequestToV1beta1(req)
 	resp, err := s.Ctl.CheckBulk(ctx, v1beta1Req)
 	if err != nil {
-		return nil, err
+		return nil, mapServiceError(err)
 	}
 	return mapCheckBulkResponseFromV1beta1(resp), nil
 }
 
 func (s *InventoryService) CheckSelf(ctx context.Context, req *pb.CheckSelfRequest) (*pb.CheckSelfResponse, error) {
-	// Get identity from context (from x-rh-identity header or other auth methods)
-	identity, err := middleware.GetIdentity(ctx)
-	if err != nil {
-		return nil, status.Errorf(codes.Unauthenticated, "failed to get identity: %v", err)
-	}
-
 	if reporterResourceKey, err := reporterKeyFromResourceReference(req.Object); err == nil {
-		// Derive subject reference from identity (x-rh-identity header)
-		subjectRef, err := middleware.SubjectReferenceFromIdentity(identity)
-		if err != nil {
-			return nil, status.Errorf(codes.Unauthenticated, "invalid identity: %v", err)
-		}
-		if resp, err := s.Ctl.Check(ctx, req.GetRelation(), req.Object.Reporter.GetType(), subjectRef, reporterResourceKey); err == nil {
+		if resp, err := s.Ctl.CheckSelf(ctx, req.GetRelation(), req.Object.Reporter.GetType(), reporterResourceKey); err == nil {
 			allowed := pb.Allowed_ALLOWED_FALSE
 			if resp {
 				allowed = pb.Allowed_ALLOWED_TRUE
@@ -148,7 +133,7 @@ func (s *InventoryService) CheckSelf(ctx context.Context, req *pb.CheckSelfReque
 			// If consistency token is needed, usecase.Check would need to be enhanced
 			return response, nil
 		} else {
-			return nil, err
+			return nil, mapServiceError(err)
 		}
 	} else {
 		return nil, err
@@ -156,56 +141,23 @@ func (s *InventoryService) CheckSelf(ctx context.Context, req *pb.CheckSelfReque
 }
 
 func (s *InventoryService) CheckSelfBulk(ctx context.Context, req *pb.CheckSelfBulkRequest) (*pb.CheckSelfBulkResponse, error) {
-	// Get identity from context (from x-rh-identity header or other auth methods)
-	identity, err := middleware.GetIdentity(ctx)
-	if err != nil {
-		return nil, status.Errorf(codes.Unauthenticated, "failed to get identity: %v", err)
-	}
-
 	// Validate input: check items array
 	if len(req.GetItems()) == 0 {
 		return nil, status.Errorf(codes.InvalidArgument, "items array cannot be empty")
 	}
 
-	// Validate each item and reporter keys before processing
-	for i, item := range req.GetItems() {
-		if item == nil {
-			return nil, status.Errorf(codes.InvalidArgument, "item %d: cannot be nil", i)
-		}
-		if item.GetObject() == nil {
-			return nil, status.Errorf(codes.InvalidArgument, "item %d: object is required", i)
-		}
-		if item.GetObject().GetReporter() == nil {
-			return nil, status.Errorf(codes.InvalidArgument, "item %d: reporter is required", i)
-		}
-		if item.GetRelation() == "" {
-			return nil, status.Errorf(codes.InvalidArgument, "item %d: relation is required", i)
-		}
-		if item.GetObject().GetResourceType() == "" {
-			return nil, status.Errorf(codes.InvalidArgument, "item %d: resourceType is required", i)
-		}
-		if item.GetObject().GetResourceId() == "" {
-			return nil, status.Errorf(codes.InvalidArgument, "item %d: resourceId is required", i)
-		}
-
-		// Validate reporter key (consistent with CheckSelf)
-		if _, err := reporterKeyFromResourceReference(item.GetObject()); err != nil {
-			log.Errorf("Failed to build reporter resource key for item %d: %v", i, err)
-			return nil, status.Errorf(codes.InvalidArgument, "item %d: failed to build reporter resource key: %v", i, err)
-		}
-	}
-
 	log.Info("CheckSelfBulk using v1beta2 db")
-	// Map request to v1beta1 format, deriving subject from identity (x-rh-identity header)
-	v1beta1Req, err := mapCheckSelfBulkRequestToV1beta1(req, identity)
+	// Map request to v1beta1 format (subject derived in usecase)
+	v1beta1Req := mapCheckSelfBulkRequestToV1beta1(req)
+	resp, err := s.Ctl.CheckSelfBulk(ctx, v1beta1Req)
 	if err != nil {
-		return nil, status.Errorf(codes.Unauthenticated, "invalid identity: %v", err)
+		return nil, mapServiceError(err)
 	}
-	resp, err := s.Ctl.CheckBulk(ctx, v1beta1Req)
+	mappedResp, err := mapCheckSelfBulkResponseFromV1beta1(resp, req)
 	if err != nil {
 		return nil, err
 	}
-	return mapCheckSelfBulkResponseFromV1beta1(resp, req), nil
+	return mappedResp, nil
 }
 
 func subjectReferenceFromSubject(subject *pb.SubjectReference) *pbv1beta1.SubjectReference {
@@ -232,11 +184,6 @@ func subjectReferenceFromSubjectV1beta1(subject *pbv1beta1.SubjectReference) *pb
 			ResourceType: subject.Subject.Type.Name,
 		},
 	}
-}
-
-func subjectReferenceFromIdentity(identity *authnapi.Identity) (*pbv1beta1.SubjectReference, error) {
-	// Use shared subject derivation logic from middleware
-	return middleware.SubjectReferenceFromIdentity(identity)
 }
 
 func mapCheckBulkRequestToV1beta1(req *pb.CheckBulkRequest) *pbv1beta1.CheckBulkRequest {
@@ -331,14 +278,8 @@ func mapCheckBulkResponseFromV1beta1(resp *pbv1beta1.CheckBulkResponse) *pb.Chec
 	}
 }
 
-func mapCheckSelfBulkRequestToV1beta1(req *pb.CheckSelfBulkRequest, identity *authnapi.Identity) (*pbv1beta1.CheckBulkRequest, error) {
+func mapCheckSelfBulkRequestToV1beta1(req *pb.CheckSelfBulkRequest) *pbv1beta1.CheckBulkRequest {
 	items := make([]*pbv1beta1.CheckBulkRequestItem, len(req.GetItems()))
-	// Derive subject reference from identity (x-rh-identity header or other auth)
-	// All items in the bulk request use the same subject (the caller)
-	subjectRef, err := subjectReferenceFromIdentity(identity)
-	if err != nil {
-		return nil, err
-	}
 
 	for i, item := range req.GetItems() {
 		// Note: Input validation is done in CheckSelfBulk handler, but defensive nil checks here
@@ -354,7 +295,6 @@ func mapCheckSelfBulkRequestToV1beta1(req *pb.CheckSelfBulkRequest, identity *au
 				},
 				Id: obj.GetResourceId(),
 			},
-			Subject:  subjectRef,
 			Relation: item.GetRelation(),
 		}
 	}
@@ -363,28 +303,22 @@ func mapCheckSelfBulkRequestToV1beta1(req *pb.CheckSelfBulkRequest, identity *au
 	return &pbv1beta1.CheckBulkRequest{
 		Items:       items,
 		Consistency: consistency,
-	}, nil
+	}
 }
 
-func mapCheckSelfBulkResponseFromV1beta1(resp *pbv1beta1.CheckBulkResponse, req *pb.CheckSelfBulkRequest) *pb.CheckSelfBulkResponse {
+func mapCheckSelfBulkResponseFromV1beta1(resp *pbv1beta1.CheckBulkResponse, req *pb.CheckSelfBulkRequest) (*pb.CheckSelfBulkResponse, error) {
 	respPairs := resp.GetPairs()
 	reqItems := req.GetItems()
 
-	// Bounds check: ensure response pairs match request items
-	// Use the minimum length to avoid index out of bounds
-	minLen := len(respPairs)
-	if len(reqItems) < minLen {
-		minLen = len(reqItems)
-	}
-
+	// Treat any mismatch as a hard error to avoid silently dropping results.
 	if len(respPairs) != len(reqItems) {
 		log.Errorf("Mismatch in CheckSelfBulk response: expected %d pairs, got %d", len(reqItems), len(respPairs))
+		return nil, status.Error(codes.Internal, "internal error: mismatched backend check results")
 	}
 
-	pairs := make([]*pb.CheckSelfBulkResponsePair, minLen)
+	pairs := make([]*pb.CheckSelfBulkResponsePair, len(respPairs))
 
-	// Only process up to minLen to avoid index out of bounds
-	for i := 0; i < minLen; i++ {
+	for i := 0; i < len(respPairs); i++ {
 		pair := respPairs[i]
 		errResponse := &pb.CheckSelfBulkResponsePair_Error{}
 		itemResponse := &pb.CheckSelfBulkResponsePair_Item{}
@@ -447,7 +381,40 @@ func mapCheckSelfBulkResponseFromV1beta1(resp *pbv1beta1.CheckBulkResponse, req 
 	if resp.GetConsistencyToken() != nil {
 		response.ConsistencyToken = &pb.ConsistencyToken{Token: resp.GetConsistencyToken().GetToken()}
 	}
-	return response
+	return response, nil
+}
+
+func mapServiceError(err error) error {
+	if err == nil {
+		return nil
+	}
+	if st, ok := status.FromError(err); ok && st.Code() != codes.Unknown {
+		return err
+	}
+	switch {
+	case errors.Is(err, resources.ErrMetaAuthzContextMissing):
+		return status.Error(codes.Unauthenticated, "authz context missing")
+	case errors.Is(err, resources.ErrSelfSubjectMissing):
+		return status.Error(codes.Unauthenticated, "self subject missing")
+	case errors.Is(err, resources.ErrMetaAuthorizerUnavailable):
+		return status.Error(codes.Internal, "meta authorizer unavailable")
+	case errors.Is(err, resources.ErrMetaAuthorizationDenied):
+		return status.Error(codes.PermissionDenied, "meta authorization denied")
+	case errors.Is(err, resources.ErrResourceNotFound):
+		return status.Error(codes.NotFound, "resource not found")
+	case errors.Is(err, resources.ErrResourceAlreadyExists):
+		return status.Error(codes.AlreadyExists, "resource already exists")
+	case errors.Is(err, resources.ErrInventoryIdMismatch):
+		return status.Error(codes.FailedPrecondition, "resource inventory id mismatch")
+	case errors.Is(err, resources.ErrDatabaseError):
+		return status.Error(codes.Internal, "internal error")
+	case errors.Is(err, context.Canceled):
+		return status.Error(codes.Canceled, "request canceled")
+	case errors.Is(err, context.DeadlineExceeded):
+		return status.Error(codes.DeadlineExceeded, "request deadline exceeded")
+	default:
+		return err
+	}
 }
 
 func (s *InventoryService) StreamedListObjects(
@@ -455,9 +422,9 @@ func (s *InventoryService) StreamedListObjects(
 	stream pb.KesselInventoryService_StreamedListObjectsServer,
 ) error {
 	ctx := stream.Context()
-	//Example: how to use get the identity from the stream context
-	//identity, err := interceptor.FromContextIdentity(ctx)
-	//log.Info(identity)
+	// Example: how to use get the claims from the stream context
+	// claims, err := interceptor.FromContextClaims(ctx)
+	// log.Info(claims)
 	lookupReq, err := ToLookupResourceRequest(req)
 	if err != nil {
 		return fmt.Errorf("failed to build lookup request: %w", err)

@@ -39,23 +39,23 @@ func (f *FirstMatchAuthenticator) Add(a api.Authenticator) {
 // Returns Allow immediately if any authenticator returns Allow.
 // Returns Deny if all authenticators return Deny, or if there's a mix of Deny and Ignore (stricter policy).
 // Returns Ignore only if all authenticators return Ignore (none can handle the request).
-func (f *FirstMatchAuthenticator) Authenticate(ctx context.Context, t transport.Transporter) (*api.Identity, api.Decision) {
+func (f *FirstMatchAuthenticator) Authenticate(ctx context.Context, t transport.Transporter) (*api.Claims, api.Decision) {
 	denyCount := 0
 	ignoreCount := 0
 
 	for i, a := range f.Authenticators {
-		identity, decision := a.Authenticate(ctx, t)
+		claims, decision := a.Authenticate(ctx, t)
 
 		// Handle decision using switch statement
 		switch decision {
 		case api.Allow:
 			// If any authenticator allows, return Allow immediately
 			// Log which authenticator allowed (at debug level for troubleshooting)
-			if f.logger != nil && identity != nil {
-				f.logger.Debugf("Authentication allowed by authenticator at chain index %d (authType: %s, principal: %s)",
-					i, identity.AuthType, identity.Principal)
+			if f.logger != nil && claims != nil {
+				f.logger.Debugf("Authentication allowed by authenticator at chain index %d (authType: %s, subject: %s)",
+					i, claims.AuthType, claims.SubjectId)
 			}
-			return identity, api.Allow
+			return claims, api.Allow
 		case api.Deny:
 			denyCount++
 		case api.Ignore:

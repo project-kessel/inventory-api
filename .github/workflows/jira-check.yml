@@ -1,0 +1,21 @@
+name: jira-check
+on: pull_request
+permissions:
+  contents: read
+  pull-requests: read
+jobs:
+  verify-jira:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check for JIRA card in PR title
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          JIRA_PATTERN="[A-Za-z]+-[0-9]+"
+          if [[ "$PR_TITLE" =~ $JIRA_PATTERN ]]; then
+            echo "JIRA card found in PR title: $PR_TITLE"
+          else
+            echo "No JIRA card found in PR title: $PR_TITLE"
+            echo "PR title must include a JIRA card (e.g., RHCLOUD-112345)"
+            exit 1
+          fi

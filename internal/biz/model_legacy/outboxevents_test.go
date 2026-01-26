@@ -34,12 +34,13 @@ func createTestResourceReportEvent() bizmodel.ResourceReportEvent {
 		"workspace_id": "my-workspace",
 	})
 
+	commonVersion := bizmodel.NewVersion(1)
 	reporterRepresentation, _ := bizmodel.NewReporterDataRepresentation(
 		reporterResourceId,
 		bizmodel.NewVersion(1),
 		bizmodel.NewGeneration(0),
 		reporterData,
-		bizmodel.NewVersion(1),
+		&commonVersion,
 		nil,
 		transactionId,
 	)

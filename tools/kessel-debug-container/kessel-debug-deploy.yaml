@@ -26,6 +26,8 @@ objects:
     containers:
     - image: ${DEBUG_IMAGE}:${IMAGE_TAG}
       name: kessel-debug
+      command: ["sleep"]
+      args: ["${SLEEP_INTERVAL}"]
       imagePullPolicy: Always
       envFrom:
       - configMapRef:
@@ -85,3 +87,7 @@ parameters:
     description: Name of the secret that contains the Kafka CA Cert (if applicable)
     required: true
     value: kessel-kafka-connect-config
+  - name: SLEEP_INTERVAL
+    description: How long should sleep run to keep the pod alive (in seconds)
+    required: true
+    value: "7200"

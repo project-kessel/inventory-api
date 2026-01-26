@@ -89,4 +89,5 @@ parameters:
     value: kessel-kafka-connect-config
   - name: SLEEP_INTERVAL
     description: How long should sleep run to keep the pod alive (in seconds)
+    required: true
     value: "7200"

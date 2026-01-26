@@ -190,9 +190,6 @@ func convertConsistencyToV1beta1(consistency *pb.Consistency) *pbv1beta1.Consist
 			},
 		}
 	}
-	// Note: inventory_managed is not passed directly to v1beta1.
-	// It requires looking up the token from the database first.
-	// For CheckBulk, we don't support inventory_managed yet - it falls back to minimize_latency.
 	return &pbv1beta1.Consistency{
 		Requirement: &pbv1beta1.Consistency_MinimizeLatency{MinimizeLatency: true},
 	}

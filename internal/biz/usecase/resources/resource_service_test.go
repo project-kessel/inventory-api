@@ -1437,8 +1437,7 @@ func TestResolveConsistencyToken(t *testing.T) {
 				ConsumerEnabled:       false,
 			}
 			mc := metricscollector.NewFakeMetricsCollector()
-			schemaRepository := newFakeSchemaRepository(t)
-			uc := New(resourceRepo, nil, nil, schemaRepository, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig, mc)
+			uc := New(resourceRepo, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig, mc)
 
 			// Create test reporter resource key
 			localResourceId, err := model.NewLocalResourceId("test-resource-123")
@@ -1489,8 +1488,7 @@ func TestResolveConsistencyToken_UnknownPreference(t *testing.T) {
 	}
 
 	mc := metricscollector.NewFakeMetricsCollector()
-	schemaRepository := newFakeSchemaRepository(t)
-	uc := New(resourceRepo, nil, nil, schemaRepository, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig, mc)
+	uc := New(resourceRepo, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig, mc)
 
 	// Create test reporter resource key
 	localResourceId, err := model.NewLocalResourceId("test-resource-456")

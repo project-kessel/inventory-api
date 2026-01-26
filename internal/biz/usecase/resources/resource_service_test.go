@@ -1348,12 +1348,12 @@ func createTestReportRequestWithUpdatedDataAndTransactionId(t *testing.T, resour
 
 func TestResolveConsistencyToken(t *testing.T) {
 	tests := []struct {
-		name                string
-		featureFlagEnabled  bool
-		consistencyConfig   model.ConsistencyConfig
-		resourceExists      bool
-		expectedToken       string
-		expectedError       bool
+		name               string
+		featureFlagEnabled bool
+		consistencyConfig  model.ConsistencyConfig
+		resourceExists     bool
+		expectedToken      string
+		expectedError      bool
 	}{
 		{
 			name:               "feature flag disabled - returns empty token regardless of preference",

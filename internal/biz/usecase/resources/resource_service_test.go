@@ -1487,6 +1487,7 @@ func TestResolveConsistencyToken_UnknownPreference(t *testing.T) {
 		ReadAfterWriteEnabled: false,
 		ConsumerEnabled:       false,
 	}
+
 	mc := metricscollector.NewFakeMetricsCollector()
 	schemaRepository := newFakeSchemaRepository(t)
 	uc := New(resourceRepo, nil, nil, schemaRepository, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig, mc)

@@ -12,6 +12,7 @@ import (
 	relationsV1beta1 "github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
 	"google.golang.org/protobuf/types/known/structpb"
 
+	"github.com/project-kessel/inventory-api/internal/biz/model"
 	"github.com/project-kessel/inventory-api/internal/data"
 	"github.com/project-kessel/inventory-api/internal/metricscollector"
 
@@ -287,4 +288,66 @@ func TestToLookupResourceResponse(t *testing.T) {
 
 	result := svc.ToLookupResourceResponse(input)
 	assert.Equal(t, expected, result)
+}
+
+func TestConvertConsistencyToModel(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		input    *pb.Consistency
+		expected model.ConsistencyConfig
+	}{
+		{
+			name:     "nil consistency returns minimize_latency",
+			input:    nil,
+			expected: model.NewMinimizeLatencyConsistency(),
+		},
+		{
+			name: "minimize_latency true returns minimize_latency",
+			input: &pb.Consistency{
+				Requirement: &pb.Consistency_MinimizeLatency{MinimizeLatency: true},
+			},
+			expected: model.NewMinimizeLatencyConsistency(),
+		},
+		{
+			name: "at_least_as_acknowledged true returns at_least_as_acknowledged",
+			input: &pb.Consistency{
+				Requirement: &pb.Consistency_AtLeastAsAcknowledged{AtLeastAsAcknowledged: true},
+			},
+			expected: model.NewAtLeastAsAcknowledgedConsistency(),
+		},
+		{
+			name: "at_least_as_fresh with token returns at_least_as_fresh",
+			input: &pb.Consistency{
+				Requirement: &pb.Consistency_AtLeastAsFresh{
+					AtLeastAsFresh: &pb.ConsistencyToken{Token: "test-token-123"},
+				},
+			},
+			expected: model.NewAtLeastAsFreshConsistency("test-token-123"),
+		},
+		{
+			name: "at_least_as_fresh with empty token returns at_least_as_fresh with empty token",
+			input: &pb.Consistency{
+				Requirement: &pb.Consistency_AtLeastAsFresh{
+					AtLeastAsFresh: &pb.ConsistencyToken{Token: ""},
+				},
+			},
+			expected: model.NewAtLeastAsFreshConsistency(""),
+		},
+		{
+			name:     "empty consistency struct returns minimize_latency",
+			input:    &pb.Consistency{},
+			expected: model.NewMinimizeLatencyConsistency(),
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			result := svc.ConvertConsistencyToModel(tc.input)
+			assert.Equal(t, tc.expected.Preference, result.Preference)
+			assert.Equal(t, tc.expected.Token, result.Token)
+		})
+	}
 }

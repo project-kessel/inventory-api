@@ -77,7 +77,7 @@ func (s *InventoryService) Check(ctx context.Context, req *pb.CheckRequest) (*pb
 		return nil, status.Error(codes.Unauthenticated, "failed to get identity")
 	}
 
-	consistency := convertConsistencyToModel(req.GetConsistency())
+	consistency := ConvertConsistencyToModel(req.GetConsistency())
 
 	if reporterResourceKey, err := reporterKeyFromResourceReference(req.Object); err == nil {
 		if resp, err := s.Ctl.Check(ctx, req.GetRelation(), req.Object.Reporter.GetType(), subjectReferenceFromSubject(req.GetSubject()), reporterResourceKey, consistency); err == nil {
@@ -195,8 +195,8 @@ func convertConsistencyToV1beta1(consistency *pb.Consistency) *pbv1beta1.Consist
 	}
 }
 
-// convertConsistencyToModel converts the proto Consistency to internal model type.
-func convertConsistencyToModel(consistency *pb.Consistency) model.ConsistencyConfig {
+// ConvertConsistencyToModel converts the proto Consistency to internal model type.
+func ConvertConsistencyToModel(consistency *pb.Consistency) model.ConsistencyConfig {
 	if consistency == nil {
 		// Default to minimize_latency when not specified
 		return model.NewMinimizeLatencyConsistency()

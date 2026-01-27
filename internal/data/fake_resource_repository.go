@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
@@ -29,7 +28,6 @@ type storedResource struct {
 	resourceType          string
 	commonVersion         uint
 	commonData            internal.JsonObject
-	consistencyToken      string
 	reporterResourceID    uuid.UUID
 	localResourceID       string
 	reporterType          string
@@ -37,8 +35,6 @@ type storedResource struct {
 	representationVersion uint
 	generation            uint
 	tombstone             bool
-	createdAt             time.Time
-	updatedAt             time.Time
 }
 
 type storedRepresentation struct {
@@ -125,14 +121,11 @@ func (f *fakeResourceRepository) Save(tx *gorm.DB, resource bizmodel.Resource, o
 		resourceType:          resourceSnapshot.Type,
 		commonVersion:         resourceSnapshot.CommonVersion,
 		commonData:            commonRepresentationSnapshot.Representation.Data,
-		consistencyToken:      resourceSnapshot.ConsistencyToken,
 		reporterResourceID:    reporterResourceSnapshot.ID,
 		localResourceID:       reporterResourceSnapshot.ReporterResourceKey.LocalResourceID,
 		reporterType:          reporterResourceSnapshot.ReporterResourceKey.ReporterType,
 		reporterInstanceID:    reporterResourceSnapshot.ReporterResourceKey.ReporterInstanceID,
 		representationVersion: reporterResourceSnapshot.RepresentationVersion,
-		createdAt:             reporterResourceSnapshot.CreatedAt,
-		updatedAt:             reporterResourceSnapshot.UpdatedAt,
 		generation:            reporterResourceSnapshot.Generation,
 		tombstone:             reporterResourceSnapshot.Tombstone,
 	}
@@ -207,9 +200,7 @@ func (f *fakeResourceRepository) FindResourceByKeys(tx *gorm.DB, key bizmodel.Re
 			ID:               latestResource.resourceID,
 			Type:             latestResource.resourceType,
 			CommonVersion:    latestResource.commonVersion,
-			ConsistencyToken: latestResource.consistencyToken,
-			CreatedAt:        latestResource.createdAt,
-			UpdatedAt:        latestResource.updatedAt,
+			ConsistencyToken: "",
 		}
 
 		reporterResourceSnapshot := bizmodel.ReporterResourceSnapshot{
@@ -226,8 +217,6 @@ func (f *fakeResourceRepository) FindResourceByKeys(tx *gorm.DB, key bizmodel.Re
 			RepresentationVersion: latestResource.representationVersion,
 			Generation:            latestResource.generation,
 			Tombstone:             latestResource.tombstone,
-			CreatedAt:             latestResource.createdAt,
-			UpdatedAt:             latestResource.updatedAt,
 		}
 
 		// Use DeserializeResource to create a Resource that reflects the actual stored state

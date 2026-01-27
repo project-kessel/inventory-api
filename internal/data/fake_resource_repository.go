@@ -11,7 +11,6 @@ import (
 	"github.com/project-kessel/inventory-api/internal"
 	"github.com/project-kessel/inventory-api/internal/biz"
 	bizmodel "github.com/project-kessel/inventory-api/internal/biz/model"
-	"github.com/project-kessel/inventory-api/internal/biz/usecase"
 )
 
 type fakeResourceRepository struct {
@@ -322,7 +321,7 @@ func (f *fakeResourceRepository) GetDB() *gorm.DB {
 	return nil
 }
 
-func (f *fakeResourceRepository) GetTransactionManager() usecase.TransactionManager {
+func (f *fakeResourceRepository) GetTransactionManager() TransactionManager {
 	// Return a fake transaction manager for testing
 	return NewFakeTransactionManager(3) // Default retry count
 }

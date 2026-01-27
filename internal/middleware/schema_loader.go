@@ -6,26 +6,10 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/spf13/viper"
 	"gopkg.in/yaml.v3"
 )
-
-func ValidateResourceReporterCombination(resourceType, reporterType string) error {
-	resourceReporters, err := LoadValidReporters(resourceType)
-	if err != nil {
-		return fmt.Errorf("failed to load valid reporters for '%s': %w", resourceType, err)
-	}
-
-	// do a case insensitive check if reporter_type exists in the list of resource_reporters
-	for _, validReporter := range resourceReporters {
-		if strings.EqualFold(reporterType, validReporter) {
-			return nil
-		}
-	}
-	return fmt.Errorf("invalid reporter_type: %s for resource_type: %s", reporterType, resourceType)
-}
 
 // LoadResourceSchema finds the resources schema based on the directory structure of data/resources
 func LoadResourceSchema(resourceType string, reporterType string, dir string) (string, bool, error) {

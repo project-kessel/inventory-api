@@ -5,8 +5,6 @@ import (
 	"sync"
 
 	"gorm.io/gorm"
-
-	"github.com/project-kessel/inventory-api/internal/biz/usecase"
 )
 
 // fakeTransactionManager is a test implementation of TransactionManager
@@ -82,4 +80,4 @@ func (ftm *fakeTransactionManager) HandleSerializableTransaction(operationName s
 }
 
 // Ensure fakeTransactionManager implements TransactionManager interface
-var _ usecase.TransactionManager = (*fakeTransactionManager)(nil)
+var _ TransactionManager = (*fakeTransactionManager)(nil)

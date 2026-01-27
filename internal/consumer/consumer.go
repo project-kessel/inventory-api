@@ -16,8 +16,6 @@ import (
 
 	"github.com/project-kessel/inventory-api/cmd/common"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
-	"github.com/project-kessel/inventory-api/internal/biz/schema"
-	usecase_resources "github.com/project-kessel/inventory-api/internal/biz/usecase/resources"
 	"github.com/project-kessel/inventory-api/internal/consumer/auth"
 	"github.com/project-kessel/inventory-api/internal/consumer/retry"
 	"github.com/project-kessel/inventory-api/internal/data"
@@ -75,7 +73,7 @@ type InventoryConsumer struct {
 	AuthOptions      *auth.Options
 	RetryOptions     *retry.Options
 	Notifier         pubsub.Notifier
-	SchemaService    *usecase_resources.SchemaUsecase
+	SchemaService    *model.SchemaService
 	// offsetMutex protects OffsetStorage and coordinates offset commit operations
 	// to prevent race conditions between shutdown and rebalance callbacks
 	offsetMutex sync.Mutex
@@ -89,7 +87,7 @@ type InventoryConsumer struct {
 }
 
 // New instantiates a new InventoryConsumer
-func New(config CompletedConfig, db *gorm.DB, schemaRepository schema.Repository, authz authz.CompletedConfig, authorizer api.Authorizer, notifier pubsub.Notifier, logger *log.Helper, consumer Consumer) (InventoryConsumer, error) {
+func New(config CompletedConfig, db *gorm.DB, schemaRepository model.SchemaRepository, authz authz.CompletedConfig, authorizer api.Authorizer, notifier pubsub.Notifier, logger *log.Helper, consumer Consumer) (InventoryConsumer, error) {
 	if consumer == nil {
 		logger.Info("Setting up kafka consumer")
 		logger.Debugf("completed kafka config: %+v", config.KafkaConfig)
@@ -131,7 +129,7 @@ func New(config CompletedConfig, db *gorm.DB, schemaRepository schema.Repository
 
 	maxSerializationRetries := viper.GetInt("storage.max-serialization-retries")
 	resourceRepository := data.NewResourceRepository(db, data.NewGormTransactionManager(&mc, maxSerializationRetries))
-	schemaService := usecase_resources.NewSchemaUsecase(schemaRepository, logger)
+	schemaService := model.NewSchemaService(schemaRepository, logger)
 
 	return InventoryConsumer{
 		Consumer:           consumer,
@@ -389,7 +387,7 @@ func (i *InventoryConsumer) processRelationsOperation(
 		return "", err
 	}
 
-	tuplesToReplicate, err := i.SchemaService.CalculateTuples(current, previous, key)
+	tuplesToReplicate, err := i.SchemaService.CalculateTuplesForResource(context.Background(), current, previous, key)
 	if err != nil {
 		metricscollector.Incr(i.MetricsCollector.MsgProcessFailures, "CalculateTuples")
 		i.Logger.Errorf("failed to calculate tuples: %v", err)

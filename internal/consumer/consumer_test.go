@@ -15,7 +15,6 @@ import (
 
 	"github.com/project-kessel/inventory-api/internal/biz"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
-	usecase_resources "github.com/project-kessel/inventory-api/internal/biz/usecase/resources"
 	"github.com/project-kessel/inventory-api/internal/data"
 	datamodel "github.com/project-kessel/inventory-api/internal/data/model"
 	"github.com/project-kessel/inventory-api/internal/mocks"
@@ -101,7 +100,7 @@ func (t *TestCase) TestSetup(testingT *testing.T) []error {
 		return errs
 	}
 
-	t.inv.SchemaService = usecase_resources.NewSchemaUsecase(schemaRepository, t.logger)
+	t.inv.SchemaService = model.NewSchemaService(schemaRepository, t.logger)
 
 	err = t.metrics.New(otel.Meter("github.com/project-kessel/inventory-api/blob/main/internal/server/otel"))
 	if err != nil {

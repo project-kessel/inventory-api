@@ -12,7 +12,6 @@ import (
 	"github.com/project-kessel/inventory-api/internal"
 	bizmodel "github.com/project-kessel/inventory-api/internal/biz/model"
 	"github.com/project-kessel/inventory-api/internal/biz/model_legacy"
-	"github.com/project-kessel/inventory-api/internal/biz/usecase"
 	datamodel "github.com/project-kessel/inventory-api/internal/data/model"
 )
 
@@ -93,16 +92,16 @@ type ResourceRepository interface {
 	FindCurrentAndPreviousVersionedRepresentations(tx *gorm.DB, key bizmodel.ReporterResourceKey, currentVersion *uint, operationType biz.EventOperationType) (*bizmodel.Representations, *bizmodel.Representations, error)
 	FindLatestRepresentations(tx *gorm.DB, key bizmodel.ReporterResourceKey) (*bizmodel.Representations, error)
 	GetDB() *gorm.DB
-	GetTransactionManager() usecase.TransactionManager
+	GetTransactionManager() TransactionManager
 	HasTransactionIdBeenProcessed(tx *gorm.DB, transactionId string) (bool, error)
 }
 
 type resourceRepository struct {
 	db                 *gorm.DB
-	transactionManager usecase.TransactionManager
+	transactionManager TransactionManager
 }
 
-func NewResourceRepository(db *gorm.DB, transactionManager usecase.TransactionManager) ResourceRepository {
+func NewResourceRepository(db *gorm.DB, transactionManager TransactionManager) ResourceRepository {
 	return &resourceRepository{
 		db:                 db,
 		transactionManager: transactionManager,
@@ -268,7 +267,7 @@ func (r *resourceRepository) GetDB() *gorm.DB {
 	return r.db
 }
 
-func (r *resourceRepository) GetTransactionManager() usecase.TransactionManager {
+func (r *resourceRepository) GetTransactionManager() TransactionManager {
 	return r.transactionManager
 }
 

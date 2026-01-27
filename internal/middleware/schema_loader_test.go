@@ -10,39 +10,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestValidateResourceReporterCombination_Valid(t *testing.T) {
-	viper.Set("resources.use_cache", true)
-	resourceType := "testres"
-	reporterType := "repA"
-	config := map[string]interface{}{"resource_reporters": []string{"repA", "repB"}}
-	middleware.SchemaCache.Store("config:"+resourceType, config)
-
-	err := middleware.ValidateResourceReporterCombination(resourceType, reporterType)
-	assert.NoError(t, err)
-}
-
-func TestValidateResourceReporterCombination_Invalid(t *testing.T) {
-	viper.Set("resources.use_cache", true)
-	resourceType := "testres"
-	reporterType := "repC"
-	config := map[string]interface{}{"resource_reporters": []string{"repA", "repB"}}
-	middleware.SchemaCache.Store("config:"+resourceType, config)
-
-	err := middleware.ValidateResourceReporterCombination(resourceType, reporterType)
-	assert.Contains(t, err.Error(), "invalid reporter_type: repC for resource_type: testres")
-}
-
-func TestValidateResourceReporterCombination_ConfigNotFound(t *testing.T) {
-	viper.Set("resources.use_cache", true)
-	resourceType := "notfound"
-	reporterType := "repA"
-	middleware.SchemaCache.Delete("config:" + resourceType)
-
-	err := middleware.ValidateResourceReporterCombination(resourceType, reporterType)
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "failed to load valid reporters")
-}
-
 func TestLoadResourceSchema_Valid(t *testing.T) {
 	dir := t.TempDir()
 	resourceType := "foo"

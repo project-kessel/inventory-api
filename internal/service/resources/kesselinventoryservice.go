@@ -47,7 +47,13 @@ func (c *InventoryService) ReportResource(ctx context.Context, r *pb.ReportResou
 
 	err = c.Ctl.ReportResource(ctx, cmd, identity.Principal)
 	if err != nil {
-		return nil, err
+		log.Errorf("failed to report resource: %v", err)
+		// Map domain errors to gRPC status codes
+		if errors.Is(err, resources.ErrInvalidReporterForResource) || errors.Is(err, resources.ErrSchemaValidationFailed) {
+			return nil, status.Errorf(codes.InvalidArgument, "%v", err)
+		}
+		// Default to internal error for unknown errors
+		return nil, status.Errorf(codes.Internal, "failed to report resource: %v", err)
 	}
 
 	return ResponseFromResource(), nil

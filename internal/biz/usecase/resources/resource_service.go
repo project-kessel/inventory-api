@@ -12,7 +12,6 @@ import (
 	authzapi "github.com/project-kessel/inventory-api/internal/authz/api"
 	"github.com/project-kessel/inventory-api/internal/biz"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
-	"github.com/project-kessel/inventory-api/internal/biz/schema"
 	eventingapi "github.com/project-kessel/inventory-api/internal/eventing/api"
 	"github.com/project-kessel/inventory-api/internal/metricscollector"
 	"github.com/project-kessel/inventory-api/internal/server"
@@ -30,6 +29,10 @@ var (
 	ErrResourceAlreadyExists = errors.New("resource already exists")
 	// ErrInventoryIdMismatch indicates that the inventory ID in the request doesn't match the existing resource.
 	ErrInventoryIdMismatch = errors.New("resource inventory id mismatch")
+	// ErrInvalidReporterForResource indicates the reporter type is not valid for the given resource type.
+	ErrInvalidReporterForResource = errors.New("invalid reporter for resource type")
+	// ErrSchemaValidationFailed indicates the resource data failed schema validation.
+	ErrSchemaValidationFailed = errors.New("schema validation failed")
 )
 
 const listenTimeout = 10 * time.Second
@@ -47,7 +50,7 @@ type UsecaseConfig struct {
 type Usecase struct {
 	store               model.Store
 	clusterBroadcast    model.ClusterBroadcast
-	schemaUsecase       *SchemaUsecase
+	schemaService       *model.SchemaService
 	waitForNotifBreaker *gobreaker.CircuitBreaker
 	Authz               authzapi.Authorizer
 	Eventer             eventingapi.Manager
@@ -59,12 +62,12 @@ type Usecase struct {
 }
 
 func New(store model.Store, clusterBroadcast model.ClusterBroadcast,
-	schemaRepository schema.Repository, authz authzapi.Authorizer, eventer eventingapi.Manager, namespace string, logger log.Logger,
+	schemaRepository model.SchemaRepository, authz authzapi.Authorizer, eventer eventingapi.Manager, namespace string, logger log.Logger,
 	waitForNotifBreaker *gobreaker.CircuitBreaker, usecaseConfig *UsecaseConfig, metricsCollector *metricscollector.MetricsCollector) *Usecase {
 	return &Usecase{
 		store:               store,
 		clusterBroadcast:    clusterBroadcast,
-		schemaUsecase:       NewSchemaUsecase(schemaRepository, log.NewHelper(logger)),
+		schemaService:       model.NewSchemaService(schemaRepository, log.NewHelper(logger)),
 		waitForNotifBreaker: waitForNotifBreaker,
 		Authz:               authz,
 		Eventer:             eventer,
@@ -80,6 +83,11 @@ func New(store model.Store, clusterBroadcast model.ClusterBroadcast,
 func (uc *Usecase) ReportResource(ctx context.Context, cmd model.ReportResourceCommand, reporterPrincipal string) error {
 	clientID := interceptor.GetClientIDFromContext(ctx)
 	log.Infof("Reporting resource: key=%v, client_id=%s", cmd.Key(), clientID)
+
+	// Validate the reporter is allowed for this resource type
+	if err := uc.validateSchema(ctx, cmd); err != nil {
+		return err
+	}
 
 	txidStr, err := getNextTransactionID()
 	if err != nil {
@@ -179,6 +187,35 @@ func (uc *Usecase) waitForReplication(ctx context.Context, txid string) {
 // isNotFoundError checks if the error indicates a resource was not found.
 func isNotFoundError(err error) bool {
 	return errors.Is(err, ErrResourceNotFound)
+}
+
+// validateSchema validates the resource command against the schema.
+// It checks that the reporter is valid for the resource type and validates
+// both the common and reporter representations against their schemas.
+func (uc *Usecase) validateSchema(ctx context.Context, cmd model.ReportResourceCommand) error {
+	resourceType := cmd.Key().ResourceType().String()
+	reporterType := cmd.Key().ReporterType().String()
+
+	// Check if the reporter is valid for this resource type
+	isValid, err := uc.schemaService.IsReporterForResource(ctx, resourceType, reporterType)
+	if err != nil {
+		return fmt.Errorf("%w: %v", ErrSchemaValidationFailed, err)
+	}
+	if !isValid {
+		return fmt.Errorf("%w: reporter '%s' is not valid for resource type '%s'", ErrInvalidReporterForResource, reporterType, resourceType)
+	}
+
+	// Validate common representation against schema
+	if err := uc.schemaService.CommonShallowValidate(ctx, resourceType, cmd.CommonRepresentation().Data()); err != nil {
+		return fmt.Errorf("%w: common representation: %v", ErrSchemaValidationFailed, err)
+	}
+
+	// Validate reporter representation against schema
+	if err := uc.schemaService.ReporterShallowValidate(ctx, resourceType, reporterType, cmd.ReporterRepresentation().Data()); err != nil {
+		return fmt.Errorf("%w: reporter representation: %v", ErrSchemaValidationFailed, err)
+	}
+
+	return nil
 }
 
 func (uc *Usecase) Delete(ctx context.Context, reporterResourceKey model.ReporterResourceKey) error {

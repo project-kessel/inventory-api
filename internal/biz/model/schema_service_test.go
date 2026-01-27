@@ -1,6 +1,7 @@
-package resources
+package model_test
 
 import (
+	"context"
 	"testing"
 
 	"github.com/go-kratos/kratos/v2/log"
@@ -11,7 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestCalculateTuples(t *testing.T) {
+func TestCalculateTuplesForResource(t *testing.T) {
 	tests := []struct {
 		name                   string
 		version                uint
@@ -70,7 +71,7 @@ func TestCalculateTuples(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			sc := NewSchemaUsecase(data.NewInMemorySchemaRepository(), log.NewHelper(log.DefaultLogger))
+			sc := model.NewSchemaService(data.NewInMemorySchemaRepository(), log.NewHelper(log.DefaultLogger))
 			key, err := model.NewReporterResourceKey(
 				model.LocalResourceId("test-resource"),
 				model.ResourceType("host"),
@@ -108,7 +109,7 @@ func TestCalculateTuples(t *testing.T) {
 				require.NoError(t, err)
 			}
 
-			result, err := sc.CalculateTuples(current, previous, key)
+			result, err := sc.CalculateTuplesForResource(context.Background(), current, previous, key)
 			require.NoError(t, err)
 			assert.Equal(t, tt.expectTuplesToCreate, result.HasTuplesToCreate())
 			assert.Equal(t, tt.expectTuplesToDelete, result.HasTuplesToDelete())
@@ -149,7 +150,7 @@ func TestCalculateTuples(t *testing.T) {
 }
 
 func TestGetWorkspaceVersions(t *testing.T) {
-	sc := NewSchemaUsecase(data.NewInMemorySchemaRepository(), log.NewHelper(log.DefaultLogger))
+	sc := model.NewSchemaService(data.NewInMemorySchemaRepository(), log.NewHelper(log.DefaultLogger))
 
 	key, err := model.NewReporterResourceKey(
 		model.LocalResourceId("test-resource"),
@@ -175,7 +176,7 @@ func TestGetWorkspaceVersions(t *testing.T) {
 		nil,
 	)
 	require.NoError(t, err)
-	result, err := sc.CalculateTuples(current, previous, key)
+	result, err := sc.CalculateTuplesForResource(context.Background(), current, previous, key)
 	require.NoError(t, err)
 	assert.True(t, result.HasTuplesToCreate() || result.HasTuplesToDelete())
 }
@@ -247,7 +248,7 @@ func TestCreateWorkspaceTuple(t *testing.T) {
 }
 
 func TestDetermineTupleOperations(t *testing.T) {
-	sc := NewSchemaUsecase(data.NewInMemorySchemaRepository(), log.NewHelper(log.DefaultLogger))
+	sc := model.NewSchemaService(data.NewInMemorySchemaRepository(), log.NewHelper(log.DefaultLogger))
 
 	key, err := model.NewReporterResourceKey(
 		model.LocalResourceId("test-resource"),
@@ -275,13 +276,13 @@ func TestDetermineTupleOperations(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	result, err := sc.CalculateTuples(current, previous, key)
+	result, err := sc.CalculateTuplesForResource(context.Background(), current, previous, key)
 	require.NoError(t, err)
 
 	assert.True(t, result.HasTuplesToCreate() || result.HasTuplesToDelete())
 }
 
-func TestCalculateTuples_OperationTypeScenarios(t *testing.T) {
+func TestCalculateTuplesForResource_OperationTypeScenarios(t *testing.T) {
 	testCases := []struct {
 		name                 string
 		operationType        biz.EventOperationType // kept for scenario naming; not used by CalculateTuples
@@ -331,7 +332,7 @@ func TestCalculateTuples_OperationTypeScenarios(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			sc := NewSchemaUsecase(data.NewInMemorySchemaRepository(), log.NewHelper(log.DefaultLogger))
+			sc := model.NewSchemaService(data.NewInMemorySchemaRepository(), log.NewHelper(log.DefaultLogger))
 
 			key, err := model.NewReporterResourceKey(
 				model.LocalResourceId("test-resource"),
@@ -375,7 +376,7 @@ func TestCalculateTuples_OperationTypeScenarios(t *testing.T) {
 				require.NoError(t, err)
 			}
 
-			result, err := sc.CalculateTuples(current, previous, key)
+			result, err := sc.CalculateTuplesForResource(context.Background(), current, previous, key)
 			require.NoError(t, err)
 
 			// Verify tuple creation expectations

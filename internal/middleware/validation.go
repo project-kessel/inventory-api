@@ -4,14 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/spf13/viper"
-
-	"os"
-	"path/filepath"
-
 	"buf.build/go/protovalidate"
 	"github.com/go-kratos/kratos/v2/errors"
-	"github.com/go-kratos/kratos/v2/log"
 	"github.com/go-kratos/kratos/v2/middleware"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/structpb"
@@ -19,23 +13,10 @@ import (
 	pbv1beta2 "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2"
 )
 
-var (
-	resourceDir = viper.GetString("resources.schemaPath")
-)
-
+// Validation creates a middleware that performs proto validation and sanitizes request data.
+// Schema-based validation (reporter/resource combination, common and reporter representations)
+// is handled in the business layer (resources.Usecase.ReportResource).
 func Validation(validator protovalidate.Validator) middleware.Middleware {
-	if resourceDirFilePath, exists := os.LookupEnv("RESOURCE_DIR"); exists {
-		absPath, err := filepath.Abs(resourceDirFilePath)
-		if err != nil {
-			log.Errorf("failed to resolve absolute path for RESOURCE_DIR file: %v", err)
-		}
-		resourceDir = absPath
-	}
-
-	if err := PreloadAllSchemas(resourceDir); err != nil {
-		log.Warnf("Failed to preload schemas: %v", err)
-	}
-
 	return func(handler middleware.Handler) middleware.Handler {
 		return func(ctx context.Context, req interface{}) (interface{}, error) {
 			if v, ok := req.(proto.Message); ok {
@@ -43,10 +24,10 @@ func Validation(validator protovalidate.Validator) middleware.Middleware {
 					return nil, errors.BadRequest("VALIDATOR", err.Error()).WithCause(err)
 				}
 
-				switch v.(type) {
-				case *pbv1beta2.ReportResourceRequest:
-					if err := ValidateReportResourceJSON(v); err != nil {
-						return nil, errors.BadRequest("REPORT_RESOURCE_JSON_VALIDATOR", err.Error()).WithCause(err)
+				// Sanitize ReportResourceRequest to remove null values from reporter representation
+				if rr, ok := v.(*pbv1beta2.ReportResourceRequest); ok {
+					if err := sanitizeReportResourceRequest(rr); err != nil {
+						return nil, errors.BadRequest("SANITIZER", err.Error()).WithCause(err)
 					}
 				}
 			}
@@ -55,73 +36,28 @@ func Validation(validator protovalidate.Validator) middleware.Middleware {
 	}
 }
 
-func ValidateReportResourceJSON(msg proto.Message) error {
-	data, err := MarshalProtoToJSON(msg)
+// sanitizeReportResourceRequest removes null values from the reporter representation
+// so downstream layers don't need to handle them.
+func sanitizeReportResourceRequest(rr *pbv1beta2.ReportResourceRequest) error {
+	if rr.GetRepresentations() == nil || rr.GetRepresentations().GetReporter() == nil {
+		return nil
+	}
+
+	reporterMap := rr.GetRepresentations().GetReporter().AsMap()
+	if reporterMap == nil {
+		return nil
+	}
+
+	sanitized := RemoveNulls(reporterMap)
+	if sanitized == nil {
+		return nil
+	}
+
+	sanitizedStruct, err := structpb.NewStruct(sanitized)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to rebuild reporter struct: %w", err)
 	}
-
-	reportResourceMap, err := UnmarshalJSONToMap(data)
-	if err != nil {
-		return err
-	}
-
-	resourceType, err := ExtractStringField(reportResourceMap, "type", ValidateFieldExists())
-	if err != nil {
-		return err
-	}
-
-	reporterType, err := ExtractStringField(reportResourceMap, "reporterType", ValidateFieldExists())
-	if err != nil {
-		return err
-	}
-
-	// Validate the combination of resource_type and reporter_type e.g. k8s_cluster & ACM
-	if err := ValidateResourceReporterCombination(resourceType, reporterType); err != nil {
-		return err
-	}
-
-	representations, err := ExtractMapField(reportResourceMap, "representations", ValidateFieldExists())
-	if err != nil {
-		return err
-	}
-
-	reporterRepresentation, err := ExtractMapField(representations, "reporter")
-	if err != nil {
-		return err
-	}
-
-	// Remove any fields with null values before validation.
-	var sanitizedReporterRepresentation map[string]interface{}
-	if reporterRepresentation != nil {
-		sanitizedReporterRepresentation = RemoveNulls(reporterRepresentation)
-	} else {
-		sanitizedReporterRepresentation = nil
-	}
-
-	// Overwrite the proto's reporter struct with the sanitized version so downstream layers don't see nulls.
-	if rr, ok := msg.(*pbv1beta2.ReportResourceRequest); ok && sanitizedReporterRepresentation != nil {
-		sanitizedStruct, err2 := structpb.NewStruct(sanitizedReporterRepresentation)
-		if err2 != nil {
-			return fmt.Errorf("failed to rebuild reporter struct: %w", err2)
-		}
-		rr.Representations.Reporter = sanitizedStruct
-	}
-
-	// Validate reporter-specific data using the sanitized map
-	if err := ValidateReporterRepresentation(resourceType, reporterType, sanitizedReporterRepresentation); err != nil {
-		return err
-	}
-
-	commonRepresentation, err := ExtractMapField(representations, "common")
-	if err != nil {
-		return err
-	}
-
-	// Validate common data
-	if err := ValidateCommonRepresentation(resourceType, commonRepresentation); err != nil {
-		return err
-	}
+	rr.Representations.Reporter = sanitizedStruct
 
 	return nil
 }

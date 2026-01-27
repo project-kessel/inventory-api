@@ -16,26 +16,20 @@ type RelationsReplicator interface {
 	ReplicateTuples(ctx context.Context, creates, deletes []RelationsTuple, lock Lock) (ConsistencyToken, error)
 }
 
-// TupleCalculator calculates tuples from resource representations.
-type TupleCalculator interface {
-	// CalculateTuples computes the tuples to replicate based on current and previous representations.
-	CalculateTuples(current, previous *Representations, key ReporterResourceKey) (TuplesToReplicate, error)
-}
-
 // RelationReplicationService handles the domain logic for replicating inventory changes to relations.
 type RelationReplicationService struct {
 	relationsReplicator RelationsReplicator
-	tupleCalculator     TupleCalculator
+	schemaService       *SchemaService
 }
 
 // NewRelationReplicationService creates a new RelationReplicationService.
 func NewRelationReplicationService(
 	relationsReplicator RelationsReplicator,
-	tupleCalculator TupleCalculator,
+	schemaService *SchemaService,
 ) *RelationReplicationService {
 	return &RelationReplicationService{
 		relationsReplicator: relationsReplicator,
-		tupleCalculator:     tupleCalculator,
+		schemaService:       schemaService,
 	}
 }
 
@@ -56,7 +50,7 @@ func (s *RelationReplicationService) Replicate(ctx context.Context, tx Tx, deliv
 	}
 
 	// Calculate tuples to replicate
-	tuplesToReplicate, err := s.tupleCalculator.CalculateTuples(current, previous, key)
+	tuplesToReplicate, err := s.schemaService.CalculateTuplesForResource(ctx, current, previous, key)
 	if err != nil {
 		return fmt.Errorf("failed to calculate tuples: %w", err)
 	}

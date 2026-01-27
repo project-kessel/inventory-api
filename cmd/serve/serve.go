@@ -295,14 +295,14 @@ func NewCommand(
 		// Create replication usecase if consumer is enabled
 		var replicationUsecase *replication.RelationReplicationUsecase
 		if consumerOptions.Enabled {
-			// Create schema usecase for tuple calculation
-			schemaUsecase := resourcesctl.NewSchemaUsecase(schemaRepository, log.NewHelper(log.With(logger, "subsystem", "schemaUsecase")))
+			// Create schema service for tuple calculation
+			schemaService := model.NewSchemaService(schemaRepository, log.NewHelper(log.With(logger, "subsystem", "schemaService")))
 
 			// Create authorizer replicator adapter
 			relationsReplicator := authz.NewAuthorizerReplicator(authorizer)
 
 			// Create replication service
-			replicationService := model.NewRelationReplicationService(relationsReplicator, schemaUsecase)
+			replicationService := model.NewRelationReplicationService(relationsReplicator, schemaService)
 
 			// Create replication usecase (handler for deliveries)
 			replicationUsecase = replication.NewRelationReplicationUsecase(

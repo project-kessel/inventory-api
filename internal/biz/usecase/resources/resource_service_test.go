@@ -9,8 +9,6 @@ import (
 	"github.com/project-kessel/inventory-api/internal"
 	"github.com/project-kessel/inventory-api/internal/authz/allow"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
-	"github.com/project-kessel/inventory-api/internal/biz/schema"
-	"github.com/project-kessel/inventory-api/internal/biz/schema/validation"
 	"github.com/project-kessel/inventory-api/internal/data"
 	"github.com/project-kessel/inventory-api/internal/metricscollector"
 	"github.com/stretchr/testify/assert"
@@ -219,10 +217,10 @@ func createTestCommandWithUpdatedDataAndTransactionId(t *testing.T, resourceType
 	return createTestCommandWithOptions(t, resourceType, reporterType, reporterInstance, localResourceId, workspaceId, transactionId, reporterData, commonData)
 }
 
-func newFakeSchemaRepository(t *testing.T) schema.Repository {
+func newFakeSchemaRepository(t *testing.T) model.SchemaRepository {
 	schemaRepository := data.NewInMemorySchemaRepository()
 
-	emptyValidationSchema := validation.NewJsonSchemaValidatorFromString(`{
+	emptyValidationSchema := data.NewJsonSchemaWithWorkspacesFromString(`{
 		"$schema": "http://json-schema.org/draft-07/schema#",
 		"type": "object",
 		"properties": {
@@ -230,7 +228,7 @@ func newFakeSchemaRepository(t *testing.T) schema.Repository {
 		"required": []
 	}`)
 
-	withWorkspaceValidationSchema := validation.NewJsonSchemaValidatorFromString(`{
+	withWorkspaceValidationSchema := data.NewJsonSchemaWithWorkspacesFromString(`{
 		"$schema": "http://json-schema.org/draft-07/schema#",
 		"type": "object",
 		"properties": {
@@ -239,26 +237,26 @@ func newFakeSchemaRepository(t *testing.T) schema.Repository {
 		"required": ["workspace_id"]
 	}`)
 
-	err := schemaRepository.CreateResourceSchema(context.Background(), schema.ResourceRepresentation{
+	err := schemaRepository.CreateResourceSchema(context.Background(), model.ResourceSchemaRepresentation{
 		ResourceType:     "k8s_cluster",
 		ValidationSchema: withWorkspaceValidationSchema,
 	})
 	assert.NoError(t, err)
 
-	err = schemaRepository.CreateReporterSchema(context.Background(), schema.ReporterRepresentation{
+	err = schemaRepository.CreateReporterSchema(context.Background(), model.ReporterSchemaRepresentation{
 		ResourceType:     "k8s_cluster",
 		ReporterType:     "ocm",
 		ValidationSchema: emptyValidationSchema,
 	})
 	assert.NoError(t, err)
 
-	err = schemaRepository.CreateResourceSchema(context.Background(), schema.ResourceRepresentation{
+	err = schemaRepository.CreateResourceSchema(context.Background(), model.ResourceSchemaRepresentation{
 		ResourceType:     "host",
 		ValidationSchema: withWorkspaceValidationSchema,
 	})
 	assert.NoError(t, err)
 
-	err = schemaRepository.CreateReporterSchema(context.Background(), schema.ReporterRepresentation{
+	err = schemaRepository.CreateReporterSchema(context.Background(), model.ReporterSchemaRepresentation{
 		ResourceType:     "host",
 		ReporterType:     "hbi",
 		ValidationSchema: emptyValidationSchema,

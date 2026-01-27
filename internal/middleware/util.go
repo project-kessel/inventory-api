@@ -27,10 +27,6 @@ func GetFromContext[V any, I any](i I) func(context.Context) (*V, error) {
 	})
 }
 
-func NormalizeResourceType(resourceType string) string {
-	return strings.ReplaceAll(resourceType, "/", "_")
-}
-
 // RemoveNulls recursively creates a new map with keys removed where the value is null.
 // This function is safe for concurrent use as it does not modify the input map.
 func RemoveNulls(m map[string]interface{}) map[string]interface{} {

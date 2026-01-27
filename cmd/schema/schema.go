@@ -9,7 +9,7 @@ import (
 
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/project-kessel/inventory-api/cmd/common"
-	"github.com/project-kessel/inventory-api/internal/middleware"
+	"github.com/project-kessel/inventory-api/internal/biz/model"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 )
@@ -30,6 +30,15 @@ func readJSONFile(filePath string) (string, error) {
 	return string(data), nil
 }
 
+// normalizeResourceType normalizes a resource type string using the model type.
+func normalizeResourceType(s string) string {
+	rt, err := model.NewResourceType(s)
+	if err != nil {
+		return ""
+	}
+	return rt.String()
+}
+
 // Normalize the resources type field in YAML content
 func normalizeYAMLResourceType(yamlContent []byte) ([]byte, error) {
 	// Parse YAML into a map
@@ -40,7 +49,7 @@ func normalizeYAMLResourceType(yamlContent []byte) ([]byte, error) {
 
 	// Normalize the resources type if it exists
 	if resourceType, exists := yamlData["type"].(string); exists {
-		normalized := middleware.NormalizeResourceType(resourceType)
+		normalized := normalizeResourceType(resourceType)
 		yamlData["type"] = normalized
 	}
 
@@ -82,7 +91,7 @@ func preloadSchemas() error {
 			continue
 		}
 
-		resourceType := middleware.NormalizeResourceType(resource.Name())
+		resourceType := normalizeResourceType(resource.Name())
 		resourcePath := filepath.Join(schemaDir, resource.Name())
 
 		// Load common resource data schema
@@ -109,7 +118,7 @@ func preloadSchemas() error {
 					continue
 				}
 
-				reporterType := middleware.NormalizeResourceType(reporter.Name())
+				reporterType := normalizeResourceType(reporter.Name())
 				reporterPath := filepath.Join(reportersPath, reporter.Name())
 
 				// Encode reporter's config.yaml

@@ -12,12 +12,29 @@ import (
 
 var validateSchemaTypeObject = NewJsonSchemaWithWorkspacesFromString(`{"type": "object"}`)
 
+// Helper functions for creating test types
+func mustResourceType(s string) model.ResourceType {
+	rt, err := model.NewResourceType(s)
+	if err != nil {
+		panic(err)
+	}
+	return rt
+}
+
+func mustReporterType(s string) model.ReporterType {
+	rt, err := model.NewReporterType(s)
+	if err != nil {
+		panic(err)
+	}
+	return rt
+}
+
 func TestInMemorySchemaRepository_CreateResource(t *testing.T) {
 	repo := NewInMemorySchemaRepository()
 	ctx := context.Background()
 
 	resource := model.ResourceSchemaRepresentation{
-		ResourceType:     "host",
+		ResourceType:     mustResourceType("host"),
 		ValidationSchema: validateSchemaTypeObject,
 	}
 
@@ -25,9 +42,9 @@ func TestInMemorySchemaRepository_CreateResource(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Verify resource was created
-	retrieved, err := repo.GetResourceSchema(ctx, "host")
+	retrieved, err := repo.GetResourceSchema(ctx, mustResourceType("host"))
 	assert.NoError(t, err)
-	assert.Equal(t, "host", retrieved.ResourceType)
+	assert.Equal(t, mustResourceType("host"), retrieved.ResourceType)
 	assert.Equal(t, validateSchemaTypeObject, retrieved.ValidationSchema)
 }
 
@@ -36,7 +53,7 @@ func TestInMemorySchemaRepository_CreateResource_AlreadyExists(t *testing.T) {
 	ctx := context.Background()
 
 	resource := model.ResourceSchemaRepresentation{
-		ResourceType:     "host",
+		ResourceType:     mustResourceType("host"),
 		ValidationSchema: validateSchemaTypeObject,
 	}
 
@@ -54,23 +71,23 @@ func TestInMemorySchemaRepository_GetResource(t *testing.T) {
 	ctx := context.Background()
 
 	resource := model.ResourceSchemaRepresentation{
-		ResourceType:     "k8s_cluster",
+		ResourceType:     mustResourceType("k8s_cluster"),
 		ValidationSchema: validateSchemaTypeObject,
 	}
 
 	err := repo.CreateResourceSchema(ctx, resource)
 	assert.NoError(t, err)
 
-	retrieved, err := repo.GetResourceSchema(ctx, "k8s_cluster")
+	retrieved, err := repo.GetResourceSchema(ctx, mustResourceType("k8s_cluster"))
 	assert.NoError(t, err)
-	assert.Equal(t, "k8s_cluster", retrieved.ResourceType)
+	assert.Equal(t, mustResourceType("k8s_cluster"), retrieved.ResourceType)
 }
 
 func TestInMemorySchemaRepository_GetResource_NotFound(t *testing.T) {
 	repo := NewInMemorySchemaRepository()
 	ctx := context.Background()
 
-	_, err := repo.GetResourceSchema(ctx, "nonexistent")
+	_, err := repo.GetResourceSchema(ctx, mustResourceType("nonexistent"))
 	assert.ErrorIs(t, err, model.ResourceSchemaNotFound)
 }
 
@@ -79,7 +96,7 @@ func TestInMemorySchemaRepository_UpdateResource(t *testing.T) {
 	ctx := context.Background()
 
 	resource := model.ResourceSchemaRepresentation{
-		ResourceType:     "host",
+		ResourceType:     mustResourceType("host"),
 		ValidationSchema: validateSchemaTypeObject,
 	}
 
@@ -88,7 +105,7 @@ func TestInMemorySchemaRepository_UpdateResource(t *testing.T) {
 
 	// Update the resource
 	updatedResource := model.ResourceSchemaRepresentation{
-		ResourceType:     "host",
+		ResourceType:     mustResourceType("host"),
 		ValidationSchema: NewJsonSchemaWithWorkspacesFromString(`{"type": "object", "properties": {"name": {"type": "string"}}}`),
 	}
 
@@ -96,7 +113,7 @@ func TestInMemorySchemaRepository_UpdateResource(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Verify update
-	retrieved, err := repo.GetResourceSchema(ctx, "host")
+	retrieved, err := repo.GetResourceSchema(ctx, mustResourceType("host"))
 	assert.NoError(t, err)
 	assert.Equal(t, updatedResource.ValidationSchema, retrieved.ValidationSchema)
 }
@@ -106,7 +123,7 @@ func TestInMemorySchemaRepository_UpdateResource_NotFound(t *testing.T) {
 	ctx := context.Background()
 
 	resource := model.ResourceSchemaRepresentation{
-		ResourceType:     "nonexistent",
+		ResourceType:     mustResourceType("nonexistent"),
 		ValidationSchema: validateSchemaTypeObject,
 	}
 
@@ -119,18 +136,18 @@ func TestInMemorySchemaRepository_DeleteResource(t *testing.T) {
 	ctx := context.Background()
 
 	resource := model.ResourceSchemaRepresentation{
-		ResourceType:     "host",
+		ResourceType:     mustResourceType("host"),
 		ValidationSchema: validateSchemaTypeObject,
 	}
 
 	err := repo.CreateResourceSchema(ctx, resource)
 	assert.NoError(t, err)
 
-	err = repo.DeleteResourceSchema(ctx, "host")
+	err = repo.DeleteResourceSchema(ctx, mustResourceType("host"))
 	assert.NoError(t, err)
 
 	// Verify deletion
-	_, err = repo.GetResourceSchema(ctx, "host")
+	_, err = repo.GetResourceSchema(ctx, mustResourceType("host"))
 	assert.ErrorIs(t, err, model.ResourceSchemaNotFound)
 }
 
@@ -139,9 +156,9 @@ func TestInMemorySchemaRepository_GetResources(t *testing.T) {
 	ctx := context.Background()
 
 	resources := []model.ResourceSchemaRepresentation{
-		{ResourceType: "host", ValidationSchema: validateSchemaTypeObject},
-		{ResourceType: "k8s_cluster", ValidationSchema: validateSchemaTypeObject},
-		{ResourceType: "k8s_policy", ValidationSchema: validateSchemaTypeObject},
+		{ResourceType: mustResourceType("host"), ValidationSchema: validateSchemaTypeObject},
+		{ResourceType: mustResourceType("k8s_cluster"), ValidationSchema: validateSchemaTypeObject},
+		{ResourceType: mustResourceType("k8s_policy"), ValidationSchema: validateSchemaTypeObject},
 	}
 
 	for _, r := range resources {
@@ -152,9 +169,9 @@ func TestInMemorySchemaRepository_GetResources(t *testing.T) {
 	retrieved, err := repo.GetResourceSchemas(ctx)
 	assert.NoError(t, err)
 	assert.Len(t, retrieved, 3)
-	assert.Contains(t, retrieved, "host")
-	assert.Contains(t, retrieved, "k8s_cluster")
-	assert.Contains(t, retrieved, "k8s_policy")
+	assert.Contains(t, retrieved, mustResourceType("host"))
+	assert.Contains(t, retrieved, mustResourceType("k8s_cluster"))
+	assert.Contains(t, retrieved, mustResourceType("k8s_policy"))
 }
 
 func TestInMemorySchemaRepository_CreateResourceReporter(t *testing.T) {
@@ -163,7 +180,7 @@ func TestInMemorySchemaRepository_CreateResourceReporter(t *testing.T) {
 
 	// Create resource first
 	resource := model.ResourceSchemaRepresentation{
-		ResourceType:     "host",
+		ResourceType:     mustResourceType("host"),
 		ValidationSchema: validateSchemaTypeObject,
 	}
 	err := repo.CreateResourceSchema(ctx, resource)
@@ -171,8 +188,8 @@ func TestInMemorySchemaRepository_CreateResourceReporter(t *testing.T) {
 
 	// Create reporter
 	reporter := model.ReporterSchemaRepresentation{
-		ResourceType:     "host",
-		ReporterType:     "hbi",
+		ResourceType:     mustResourceType("host"),
+		ReporterType:     mustReporterType("hbi"),
 		ValidationSchema: NewJsonSchemaWithWorkspacesFromString(`{"type": "object", "properties": {"satellite_id": {"type": "string"}}}`),
 	}
 
@@ -180,10 +197,10 @@ func TestInMemorySchemaRepository_CreateResourceReporter(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Verify reporter was created
-	retrieved, err := repo.GetReporterSchema(ctx, "host", "hbi")
+	retrieved, err := repo.GetReporterSchema(ctx, mustResourceType("host"), mustReporterType("hbi"))
 	assert.NoError(t, err)
-	assert.Equal(t, "host", retrieved.ResourceType)
-	assert.Equal(t, "hbi", retrieved.ReporterType)
+	assert.Equal(t, mustResourceType("host"), retrieved.ResourceType)
+	assert.Equal(t, mustReporterType("hbi"), retrieved.ReporterType)
 }
 
 func TestInMemorySchemaRepository_GetResourceReporter_NotFound(t *testing.T) {
@@ -192,14 +209,14 @@ func TestInMemorySchemaRepository_GetResourceReporter_NotFound(t *testing.T) {
 
 	// Create resource first
 	resource := model.ResourceSchemaRepresentation{
-		ResourceType:     "host",
+		ResourceType:     mustResourceType("host"),
 		ValidationSchema: validateSchemaTypeObject,
 	}
 	err := repo.CreateResourceSchema(ctx, resource)
 	assert.NoError(t, err)
 
 	// Try to get non-existent reporter
-	_, err = repo.GetReporterSchema(ctx, "host", "nonexistent")
+	_, err = repo.GetReporterSchema(ctx, mustResourceType("host"), mustReporterType("nonexistent"))
 	assert.ErrorIs(t, err, model.ReporterSchemaNotFound)
 }
 
@@ -209,15 +226,15 @@ func TestInMemorySchemaRepository_UpdateResourceReporter(t *testing.T) {
 
 	// Create resource and reporter
 	resource := model.ResourceSchemaRepresentation{
-		ResourceType:     "host",
+		ResourceType:     mustResourceType("host"),
 		ValidationSchema: validateSchemaTypeObject,
 	}
 	err := repo.CreateResourceSchema(ctx, resource)
 	assert.NoError(t, err)
 
 	reporter := model.ReporterSchemaRepresentation{
-		ResourceType:     "host",
-		ReporterType:     "hbi",
+		ResourceType:     mustResourceType("host"),
+		ReporterType:     mustReporterType("hbi"),
 		ValidationSchema: validateSchemaTypeObject,
 	}
 	err = repo.CreateReporterSchema(ctx, reporter)
@@ -225,15 +242,15 @@ func TestInMemorySchemaRepository_UpdateResourceReporter(t *testing.T) {
 
 	// Update reporter
 	updatedReporter := model.ReporterSchemaRepresentation{
-		ResourceType:     "host",
-		ReporterType:     "hbi",
+		ResourceType:     mustResourceType("host"),
+		ReporterType:     mustReporterType("hbi"),
 		ValidationSchema: NewJsonSchemaWithWorkspacesFromString(`{"type": "object", "properties": {"satellite_id": {"type": "string"}}}`),
 	}
 	err = repo.UpdateReporterSchema(ctx, updatedReporter)
 	assert.NoError(t, err)
 
 	// Verify update
-	retrieved, err := repo.GetReporterSchema(ctx, "host", "hbi")
+	retrieved, err := repo.GetReporterSchema(ctx, mustResourceType("host"), mustReporterType("hbi"))
 	assert.NoError(t, err)
 	assert.Equal(t, updatedReporter.ValidationSchema, retrieved.ValidationSchema)
 }
@@ -244,26 +261,26 @@ func TestInMemorySchemaRepository_DeleteResourceReporter(t *testing.T) {
 
 	// Create resource and reporter
 	resource := model.ResourceSchemaRepresentation{
-		ResourceType:     "host",
+		ResourceType:     mustResourceType("host"),
 		ValidationSchema: validateSchemaTypeObject,
 	}
 	err := repo.CreateResourceSchema(ctx, resource)
 	assert.NoError(t, err)
 
 	reporter := model.ReporterSchemaRepresentation{
-		ResourceType:     "host",
-		ReporterType:     "hbi",
+		ResourceType:     mustResourceType("host"),
+		ReporterType:     mustReporterType("hbi"),
 		ValidationSchema: validateSchemaTypeObject,
 	}
 	err = repo.CreateReporterSchema(ctx, reporter)
 	assert.NoError(t, err)
 
 	// Delete reporter
-	err = repo.DeleteReporterSchema(ctx, "host", "hbi")
+	err = repo.DeleteReporterSchema(ctx, mustResourceType("host"), mustReporterType("hbi"))
 	assert.NoError(t, err)
 
 	// Verify deletion
-	_, err = repo.GetReporterSchema(ctx, "host", "hbi")
+	_, err = repo.GetReporterSchema(ctx, mustResourceType("host"), mustReporterType("hbi"))
 	assert.ErrorIs(t, err, model.ReporterSchemaNotFound)
 }
 
@@ -273,7 +290,7 @@ func TestInMemorySchemaRepository_GetResourceReporters(t *testing.T) {
 
 	// Create resource
 	resource := model.ResourceSchemaRepresentation{
-		ResourceType:     "host",
+		ResourceType:     mustResourceType("host"),
 		ValidationSchema: validateSchemaTypeObject,
 	}
 	err := repo.CreateResourceSchema(ctx, resource)
@@ -281,9 +298,9 @@ func TestInMemorySchemaRepository_GetResourceReporters(t *testing.T) {
 
 	// Create multiple reporters
 	reporters := []model.ReporterSchemaRepresentation{
-		{ResourceType: "host", ReporterType: "hbi", ValidationSchema: validateSchemaTypeObject},
-		{ResourceType: "host", ReporterType: "satellite", ValidationSchema: validateSchemaTypeObject},
-		{ResourceType: "host", ReporterType: "insights", ValidationSchema: validateSchemaTypeObject},
+		{ResourceType: mustResourceType("host"), ReporterType: mustReporterType("hbi"), ValidationSchema: validateSchemaTypeObject},
+		{ResourceType: mustResourceType("host"), ReporterType: mustReporterType("satellite"), ValidationSchema: validateSchemaTypeObject},
+		{ResourceType: mustResourceType("host"), ReporterType: mustReporterType("insights"), ValidationSchema: validateSchemaTypeObject},
 	}
 
 	for _, r := range reporters {
@@ -292,12 +309,12 @@ func TestInMemorySchemaRepository_GetResourceReporters(t *testing.T) {
 	}
 
 	// Get all reporters for resource
-	retrieved, err := repo.GetReporterSchemas(ctx, "host")
+	retrieved, err := repo.GetReporterSchemas(ctx, mustResourceType("host"))
 	assert.NoError(t, err)
 	assert.Len(t, retrieved, 3)
-	assert.Contains(t, retrieved, "hbi")
-	assert.Contains(t, retrieved, "satellite")
-	assert.Contains(t, retrieved, "insights")
+	assert.Contains(t, retrieved, mustReporterType("hbi"))
+	assert.Contains(t, retrieved, mustReporterType("satellite"))
+	assert.Contains(t, retrieved, mustReporterType("insights"))
 }
 
 func TestNewFromDir_InvalidDirectory(t *testing.T) {
@@ -335,16 +352,16 @@ func TestNewFromDir_ValidDirectory(t *testing.T) {
 	assert.NotNil(t, repo)
 
 	// Verify resource was loaded
-	resource, err := repo.GetResourceSchema(ctx, "host")
+	resource, err := repo.GetResourceSchema(ctx, mustResourceType("host"))
 	assert.NoError(t, err)
-	assert.Equal(t, "host", resource.ResourceType)
+	assert.Equal(t, mustResourceType("host"), resource.ResourceType)
 	assert.Equal(t, NewJsonSchemaWithWorkspacesFromString(commonSchema), resource.ValidationSchema)
 
 	// Verify reporter was loaded
-	reporter, err := repo.GetReporterSchema(ctx, "host", "hbi")
+	reporter, err := repo.GetReporterSchema(ctx, mustResourceType("host"), mustReporterType("hbi"))
 	assert.NoError(t, err)
-	assert.Equal(t, "host", reporter.ResourceType)
-	assert.Equal(t, "hbi", reporter.ReporterType)
+	assert.Equal(t, mustResourceType("host"), reporter.ResourceType)
+	assert.Equal(t, mustReporterType("hbi"), reporter.ReporterType)
 	assert.Equal(t, NewJsonSchemaWithWorkspacesFromString(reporterSchema), reporter.ValidationSchema)
 }
 
@@ -375,15 +392,15 @@ func TestNewFromJsonFile_ValidFile(t *testing.T) {
 	assert.NotNil(t, repo)
 
 	// Verify resource was loaded
-	resource, err := repo.GetResourceSchema(ctx, "host")
+	resource, err := repo.GetResourceSchema(ctx, mustResourceType("host"))
 	assert.NoError(t, err)
-	assert.Equal(t, "host", resource.ResourceType)
+	assert.Equal(t, mustResourceType("host"), resource.ResourceType)
 
 	// Verify reporter was loaded
-	reporter, err := repo.GetReporterSchema(ctx, "host", "hbi")
+	reporter, err := repo.GetReporterSchema(ctx, mustResourceType("host"), mustReporterType("hbi"))
 	assert.NoError(t, err)
-	assert.Equal(t, "host", reporter.ResourceType)
-	assert.Equal(t, "hbi", reporter.ReporterType)
+	assert.Equal(t, mustResourceType("host"), reporter.ResourceType)
+	assert.Equal(t, mustReporterType("hbi"), reporter.ReporterType)
 }
 
 func TestNewFromJsonBytes_ValidJSON(t *testing.T) {
@@ -403,19 +420,19 @@ func TestNewFromJsonBytes_ValidJSON(t *testing.T) {
 	// Verify resources were loaded
 	resources, err := repo.GetResourceSchemas(ctx)
 	assert.NoError(t, err)
-	assert.Contains(t, resources, "host")
-	assert.Contains(t, resources, "k8s_cluster")
+	assert.Contains(t, resources, mustResourceType("host"))
+	assert.Contains(t, resources, mustResourceType("k8s_cluster"))
 
 	// Verify reporters were loaded
-	hostReporter, err := repo.GetReporterSchema(ctx, "host", "hbi")
+	hostReporter, err := repo.GetReporterSchema(ctx, mustResourceType("host"), mustReporterType("hbi"))
 	assert.NoError(t, err)
-	assert.Equal(t, "host", hostReporter.ResourceType)
-	assert.Equal(t, "hbi", hostReporter.ReporterType)
+	assert.Equal(t, mustResourceType("host"), hostReporter.ResourceType)
+	assert.Equal(t, mustReporterType("hbi"), hostReporter.ReporterType)
 
-	k8sReporter, err := repo.GetReporterSchema(ctx, "k8s_cluster", "acm")
+	k8sReporter, err := repo.GetReporterSchema(ctx, mustResourceType("k8s_cluster"), mustReporterType("acm"))
 	assert.NoError(t, err)
-	assert.Equal(t, "k8s_cluster", k8sReporter.ResourceType)
-	assert.Equal(t, "acm", k8sReporter.ReporterType)
+	assert.Equal(t, mustResourceType("k8s_cluster"), k8sReporter.ResourceType)
+	assert.Equal(t, mustReporterType("acm"), k8sReporter.ReporterType)
 }
 
 func TestNewFromJsonBytes_InvalidJSON(t *testing.T) {
@@ -445,11 +462,11 @@ func TestNewFromJsonBytes_OnlyCommonSchemas(t *testing.T) {
 	resources, err := repo.GetResourceSchemas(ctx)
 	assert.NoError(t, err)
 	assert.Len(t, resources, 2)
-	assert.Contains(t, resources, "host")
-	assert.Contains(t, resources, "k8s_cluster")
+	assert.Contains(t, resources, mustResourceType("host"))
+	assert.Contains(t, resources, mustResourceType("k8s_cluster"))
 
 	// Verify no reporters exist
-	reporters, err := repo.GetReporterSchemas(ctx, "host")
+	reporters, err := repo.GetReporterSchemas(ctx, mustResourceType("host"))
 	assert.NoError(t, err)
 	assert.Empty(t, reporters)
 }
@@ -601,11 +618,12 @@ func TestLoadCommonResourceDataSchema(t *testing.T) {
 	}
 }
 
-func TestNormalizeResourceType(t *testing.T) {
+func TestResourceType_Normalization(t *testing.T) {
 	tests := []struct {
 		name     string
 		input    string
 		expected string
+		hasError bool
 	}{
 		{
 			name:     "Resource type with forward slash",
@@ -626,6 +644,7 @@ func TestNormalizeResourceType(t *testing.T) {
 			name:     "Empty string",
 			input:    "",
 			expected: "",
+			hasError: true,
 		},
 		{
 			name:     "Resource type already normalized",
@@ -656,8 +675,13 @@ func TestNormalizeResourceType(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := NormalizeResourceType(tt.input)
-			assert.Equal(t, tt.expected, result)
+			result, err := model.NewResourceType(tt.input)
+			if tt.hasError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, tt.expected, result.String())
+			}
 		})
 	}
 }
@@ -745,20 +769,20 @@ func TestReporterMutationsPersist(t *testing.T) {
 	ctx := context.Background()
 
 	err := repo.CreateResourceSchema(ctx, model.ResourceSchemaRepresentation{
-		ResourceType:     "host",
+		ResourceType:     mustResourceType("host"),
 		ValidationSchema: validateSchemaTypeObject,
 	})
 
 	assert.NoError(t, err)
 
 	err = repo.CreateReporterSchema(ctx, model.ReporterSchemaRepresentation{
-		ResourceType:     "host",
-		ReporterType:     "hbi",
+		ResourceType:     mustResourceType("host"),
+		ReporterType:     mustReporterType("hbi"),
 		ValidationSchema: validateSchemaTypeObject,
 	})
 
 	assert.NoError(t, err)
 
-	reporters, _ := repo.GetReporterSchemas(ctx, "host")
-	assert.Contains(t, reporters, "hbi")
+	reporters, _ := repo.GetReporterSchemas(ctx, mustResourceType("host"))
+	assert.Contains(t, reporters, mustReporterType("hbi"))
 }

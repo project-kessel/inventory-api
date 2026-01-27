@@ -25,7 +25,7 @@ func NewSchemaService(schemaRepository SchemaRepository, logger *log.Helper) *Sc
 
 // IsReporterForResource validates the resourceType and reporterType combination is valid.
 // Returns true if there is a reporter that reports said resource, false otherwise.
-func (sc *SchemaService) IsReporterForResource(ctx context.Context, resourceType string, reporterType string) (bool, error) {
+func (sc *SchemaService) IsReporterForResource(ctx context.Context, resourceType ResourceType, reporterType ReporterType) (bool, error) {
 	if _, err := sc.schemaRepository.GetReporterSchema(ctx, resourceType, reporterType); err != nil {
 		if errors.Is(err, ResourceSchemaNotFound) || errors.Is(err, ReporterSchemaNotFound) {
 			return false, nil
@@ -38,7 +38,7 @@ func (sc *SchemaService) IsReporterForResource(ctx context.Context, resourceType
 }
 
 // CommonShallowValidate validates the common representation for a given resourceType.
-func (sc *SchemaService) CommonShallowValidate(ctx context.Context, resourceType string, commonRepresentation map[string]interface{}) error {
+func (sc *SchemaService) CommonShallowValidate(ctx context.Context, resourceType ResourceType, commonRepresentation map[string]interface{}) error {
 	resource, err := sc.schemaRepository.GetResourceSchema(ctx, resourceType)
 	if err != nil {
 		return fmt.Errorf("failed to load common representation schema for '%s': %w", resourceType, err)
@@ -65,7 +65,7 @@ func (sc *SchemaService) CommonShallowValidate(ctx context.Context, resourceType
 }
 
 // ReporterShallowValidate validates the specific reporter representation for a given resourceType/reporterType.
-func (sc *SchemaService) ReporterShallowValidate(ctx context.Context, resourceType string, reporterType string, reporterRepresentation map[string]interface{}) error {
+func (sc *SchemaService) ReporterShallowValidate(ctx context.Context, resourceType ResourceType, reporterType ReporterType, reporterRepresentation map[string]interface{}) error {
 	reporter, err := sc.schemaRepository.GetReporterSchema(ctx, resourceType, reporterType)
 	if err != nil {
 		return err
@@ -100,13 +100,13 @@ func (sc *SchemaService) ReporterShallowValidate(ctx context.Context, resourceTy
 
 // GetResourceSchema retrieves the schema for a given resource type.
 // This is a pass-through to the repository for cases where the caller needs direct schema access.
-func (sc *SchemaService) GetResourceSchema(ctx context.Context, resourceType string) (ResourceSchemaRepresentation, error) {
+func (sc *SchemaService) GetResourceSchema(ctx context.Context, resourceType ResourceType) (ResourceSchemaRepresentation, error) {
 	return sc.schemaRepository.GetResourceSchema(ctx, resourceType)
 }
 
 // GetReporterSchema retrieves the schema for a given resource/reporter type combination.
 // This is a pass-through to the repository for cases where the caller needs direct schema access.
-func (sc *SchemaService) GetReporterSchema(ctx context.Context, resourceType string, reporterType string) (ReporterSchemaRepresentation, error) {
+func (sc *SchemaService) GetReporterSchema(ctx context.Context, resourceType ResourceType, reporterType ReporterType) (ReporterSchemaRepresentation, error) {
 	return sc.schemaRepository.GetReporterSchema(ctx, resourceType, reporterType)
 }
 
@@ -114,7 +114,7 @@ func (sc *SchemaService) GetReporterSchema(ctx context.Context, resourceType str
 // It retrieves the appropriate schema for the resource type and delegates tuple calculation to it.
 // If no schema is registered for the resource type, it uses a default schema implementation.
 func (sc *SchemaService) CalculateTuplesForResource(ctx context.Context, current, previous *Representations, key ReporterResourceKey) (TuplesToReplicate, error) {
-	resourceType := key.ResourceType().String()
+	resourceType := key.ResourceType()
 
 	resource, err := sc.schemaRepository.GetResourceSchema(ctx, resourceType)
 	if err != nil {

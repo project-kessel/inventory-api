@@ -193,8 +193,8 @@ func isNotFoundError(err error) bool {
 // It checks that the reporter is valid for the resource type and validates
 // both the common and reporter representations against their schemas.
 func (uc *Usecase) validateSchema(ctx context.Context, cmd model.ReportResourceCommand) error {
-	resourceType := cmd.Key().ResourceType().String()
-	reporterType := cmd.Key().ReporterType().String()
+	resourceType := cmd.Key().ResourceType()
+	reporterType := cmd.Key().ReporterType()
 
 	// Check if the reporter is valid for this resource type
 	isValid, err := uc.schemaService.IsReporterForResource(ctx, resourceType, reporterType)

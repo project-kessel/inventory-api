@@ -203,12 +203,15 @@ func (rr ReporterResourceId) Serialize() uuid.UUID {
 
 type ResourceType string
 
+// NewResourceType creates a normalized ResourceType from a string.
+// Normalization includes trimming whitespace, replacing "/" with "_", and lowercasing.
 func NewResourceType(resourceType string) (ResourceType, error) {
 	resourceType = strings.TrimSpace(resourceType)
 	if resourceType == "" {
 		return ResourceType(""), fmt.Errorf("%w: ResourceType", ErrEmpty)
 	}
-	return ResourceType(resourceType), nil
+	normalized := strings.ToLower(strings.ReplaceAll(resourceType, "/", "_"))
+	return ResourceType(normalized), nil
 }
 
 func (rt ResourceType) String() string {
@@ -216,18 +219,20 @@ func (rt ResourceType) String() string {
 }
 
 func (rt ResourceType) Serialize() string {
-	str := SerializeString(rt)
-	return strings.ToLower(str)
+	return string(rt) // Already normalized on creation
 }
 
 type ReporterType string
 
+// NewReporterType creates a normalized ReporterType from a string.
+// Normalization includes trimming whitespace and lowercasing.
 func NewReporterType(reporterType string) (ReporterType, error) {
 	reporterType = strings.TrimSpace(reporterType)
 	if reporterType == "" {
 		return ReporterType(""), fmt.Errorf("%w: ReporterType", ErrEmpty)
 	}
-	return ReporterType(reporterType), nil
+	normalized := strings.ToLower(reporterType)
+	return ReporterType(normalized), nil
 }
 
 func (rt ReporterType) String() string {
@@ -235,8 +240,7 @@ func (rt ReporterType) String() string {
 }
 
 func (rt ReporterType) Serialize() string {
-	str := SerializeString(rt)
-	return strings.ToLower(str)
+	return string(rt) // Already normalized on creation
 }
 
 type ReporterInstanceId string

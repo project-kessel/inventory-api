@@ -21,14 +21,14 @@ type SchemaFromString func(string) Schema
 
 // ResourceSchemaRepresentation holds a resource schema with its validation/tuple logic.
 type ResourceSchemaRepresentation struct {
-	ResourceType     string
+	ResourceType     ResourceType
 	ValidationSchema Schema
 }
 
 // ReporterSchemaRepresentation holds a reporter-specific schema.
 type ReporterSchemaRepresentation struct {
-	ResourceType     string
-	ReporterType     string
+	ResourceType     ResourceType
+	ReporterType     ReporterType
 	ValidationSchema Schema
 }
 
@@ -50,28 +50,28 @@ const (
 // This is the domain interface that schema storage implementations must satisfy.
 type SchemaRepository interface {
 	// GetResourceSchemas returns all the resourceTypes that have a ResourceSchemaRepresentation.
-	GetResourceSchemas(ctx context.Context) ([]string, error)
+	GetResourceSchemas(ctx context.Context) ([]ResourceType, error)
 	// CreateResourceSchema adds the ResourceSchemaRepresentation into the repository.
 	CreateResourceSchema(ctx context.Context, resource ResourceSchemaRepresentation) error
 	// GetResourceSchema returns the resource schema for the resourceType.
 	// Returns ResourceSchemaNotFound if the resource schema does not exist.
-	GetResourceSchema(ctx context.Context, resourceType string) (ResourceSchemaRepresentation, error)
+	GetResourceSchema(ctx context.Context, resourceType ResourceType) (ResourceSchemaRepresentation, error)
 	// UpdateResourceSchema updates the ResourceSchemaRepresentation for the resourceType.
 	// Returns ResourceSchemaNotFound if the resource schema does not exist.
 	UpdateResourceSchema(ctx context.Context, resource ResourceSchemaRepresentation) error
 	// DeleteResourceSchema deletes the ResourceSchemaRepresentation for the resourceType.
 	// Returns ResourceSchemaNotFound if the resource schema does not exist.
-	DeleteResourceSchema(ctx context.Context, resourceType string) error
+	DeleteResourceSchema(ctx context.Context, resourceType ResourceType) error
 	// GetReporterSchemas returns all the reporterTypes for resourceType.
 	// Returns ResourceSchemaNotFound if the resourceType does not exist.
-	GetReporterSchemas(ctx context.Context, resourceType string) ([]string, error)
+	GetReporterSchemas(ctx context.Context, resourceType ResourceType) ([]ReporterType, error)
 	// CreateReporterSchema adds the ReporterSchemaRepresentation into the repository.
 	// Returns ResourceSchemaNotFound if the resourceType does not exist.
 	CreateReporterSchema(ctx context.Context, resourceReporter ReporterSchemaRepresentation) error
 	// GetReporterSchema returns the ReporterSchemaRepresentation for the resourceType and reporterType.
 	// Returns ResourceSchemaNotFound if the resource schema does not exist and
 	// ReporterSchemaNotFound if the reporter schema does not exist for that resource.
-	GetReporterSchema(ctx context.Context, resourceType string, reporterType string) (ReporterSchemaRepresentation, error)
+	GetReporterSchema(ctx context.Context, resourceType ResourceType, reporterType ReporterType) (ReporterSchemaRepresentation, error)
 	// UpdateReporterSchema updates the ReporterSchemaRepresentation for the resourceType and reporterType.
 	// Returns ResourceSchemaNotFound if the resource schema does not exist and
 	// ReporterSchemaNotFound if the reporter schema does not exist for that resource.
@@ -79,5 +79,5 @@ type SchemaRepository interface {
 	// DeleteReporterSchema deletes the ReporterSchemaRepresentation for the resourceType and reporterType.
 	// Returns ResourceSchemaNotFound if the resource schema does not exist and
 	// ReporterSchemaNotFound if the reporter schema does not exist for that resource.
-	DeleteReporterSchema(ctx context.Context, resourceType string, reporterType string) error
+	DeleteReporterSchema(ctx context.Context, resourceType ResourceType, reporterType ReporterType) error
 }

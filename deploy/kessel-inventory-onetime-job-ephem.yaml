@@ -83,8 +83,8 @@ objects:
                   cpu: ${LIMITS_CPU}
           volumes:
             - name: config-volume
-              secret:
-                secretName: ${INVENTORY_API_CONFIG_NAME}
+              configMap:
+                name: ${INVENTORY_API_CONFIG_NAME}
 parameters:
   - description: Job name (e.g., resource-delete-job-20240113)
     name: JOB_NAME

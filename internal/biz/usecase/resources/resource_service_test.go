@@ -22,6 +22,7 @@ func newTestUsecase(t *testing.T) (*Usecase, *data.FakeStore) {
 	t.Helper()
 	logger := log.DefaultLogger
 	store := data.NewFakeStore()
+	clusterBroadcast := data.NewFakeClusterBroadcast()
 	schemaRepository := newFakeSchemaRepository(t)
 	authorizer := &allow.AllowAllAuthz{}
 	usecaseConfig := &UsecaseConfig{
@@ -30,7 +31,7 @@ func newTestUsecase(t *testing.T) (*Usecase, *data.FakeStore) {
 	}
 	mc := metricscollector.NewFakeMetricsCollector()
 
-	usecase := New(store, schemaRepository, authorizer, nil, "test-topic", logger, nil, usecaseConfig, mc)
+	usecase := New(store, clusterBroadcast, schemaRepository, authorizer, nil, "test-topic", logger, nil, usecaseConfig, mc)
 	return usecase, store
 }
 
@@ -423,7 +424,6 @@ func TestReportResourceThenDelete(t *testing.T) {
 	}
 }
 
-
 func TestDelete_ResourceNotFound(t *testing.T) {
 	usecase, _ := newTestUsecase(t)
 
@@ -447,8 +447,7 @@ func TestReportFindDeleteFind_TombstoneLifecycle(t *testing.T) {
 	ctx := context.Background()
 
 	usecase, store := newTestUsecase(t)
-			resourceRepo := store.GetResourceRepository()
-
+	resourceRepo := store.GetResourceRepository()
 
 	reportCmd := createTestCommand(t, "k8s_cluster", "ocm", "lifecycle-instance", "lifecycle-resource", "lifecycle-workspace")
 	err := usecase.ReportResource(ctx, reportCmd, "test-reporter")
@@ -484,8 +483,7 @@ func TestMultipleHostsLifecycle(t *testing.T) {
 	ctx := context.Background()
 
 	usecase, store := newTestUsecase(t)
-			resourceRepo := store.GetResourceRepository()
-
+	resourceRepo := store.GetResourceRepository()
 
 	// Create 2 hosts
 	host1Cmd := createTestCommand(t, "host", "hbi", "hbi-instance-1", "host-1", "workspace-1")
@@ -547,13 +545,11 @@ func TestMultipleHostsLifecycle(t *testing.T) {
 	assert.True(t, foundHost2.ReporterResources()[0].Serialize().Tombstone, "Host2 should be tombstoned")
 }
 
-
 func TestPartialDataScenarios(t *testing.T) {
 	ctx := context.Background()
 
 	usecase, store := newTestUsecase(t)
-			resourceRepo := store.GetResourceRepository()
-
+	resourceRepo := store.GetResourceRepository()
 
 	t.Run("Report resource with rich reporter data and minimal common data", func(t *testing.T) {
 		request := createTestCommandWithReporterDataOnly(t, "k8s_cluster", "ocm", "ocm-instance-1", "reporter-rich-resource", "minimal-workspace")
@@ -614,14 +610,12 @@ func TestPartialDataScenarios(t *testing.T) {
 	})
 }
 
-
 func TestResourceLifecycle_ReportUpdateDeleteReport(t *testing.T) {
 	t.Run("report new -> update -> delete -> report new", func(t *testing.T) {
 		ctx := context.Background()
 
 		usecase, store := newTestUsecase(t)
-			resourceRepo := store.GetResourceRepository()
-
+		resourceRepo := store.GetResourceRepository()
 
 		resourceType := "host"
 		reporterType := "hbi"
@@ -705,8 +699,7 @@ func TestResourceLifecycle_ReportUpdateDeleteReportDelete(t *testing.T) {
 		ctx := context.Background()
 
 		usecase, store := newTestUsecase(t)
-			resourceRepo := store.GetResourceRepository()
-
+		resourceRepo := store.GetResourceRepository()
 
 		resourceType := "k8s_cluster"
 		reporterType := "ocm"
@@ -770,8 +763,7 @@ func TestResourceLifecycle_ReportDeleteResubmitDelete(t *testing.T) {
 		ctx := context.Background()
 
 		usecase, store := newTestUsecase(t)
-			resourceRepo := store.GetResourceRepository()
-
+		resourceRepo := store.GetResourceRepository()
 
 		resourceType := "k8s_cluster"
 		reporterType := "ocm"
@@ -832,8 +824,7 @@ func TestResourceLifecycle_ReportResubmitDeleteResubmit(t *testing.T) {
 		ctx := context.Background()
 
 		usecase, store := newTestUsecase(t)
-			resourceRepo := store.GetResourceRepository()
-
+		resourceRepo := store.GetResourceRepository()
 
 		resourceType := "host"
 		reporterType := "hbi"
@@ -908,8 +899,7 @@ func TestResourceLifecycle_ComplexIdempotency(t *testing.T) {
 		ctx := context.Background()
 
 		usecase, store := newTestUsecase(t)
-			resourceRepo := store.GetResourceRepository()
-
+		resourceRepo := store.GetResourceRepository()
 
 		resourceType := "k8s_cluster"
 		reporterType := "ocm"
@@ -982,7 +972,6 @@ func TestResourceLifecycle_ComplexIdempotency(t *testing.T) {
 		assert.True(t, finalState.Tombstone, "Final resource should be tombstoned")
 	})
 }
-
 
 func TestGetCurrentAndPreviousWorkspaceID(t *testing.T) {
 	// Test the GetCurrentAndPreviousWorkspaceID function with test data
@@ -1062,8 +1051,7 @@ func TestTransactionIdIdempotency(t *testing.T) {
 	ctx := context.Background()
 
 	usecase, store := newTestUsecase(t)
-			resourceRepo := store.GetResourceRepository()
-
+	resourceRepo := store.GetResourceRepository()
 
 	t.Run("Same transaction ID should be idempotent - no changes to representation tables", func(t *testing.T) {
 		resourceType := "host"
@@ -1255,4 +1243,3 @@ func TestTransactionIdIdempotency(t *testing.T) {
 		assert.True(t, deleteState.Tombstone, "Resource should be tombstoned after delete")
 	})
 }
-

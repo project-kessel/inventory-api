@@ -27,6 +27,15 @@ var (
 	ErrEmptyReporterList = errors.New("must have at least one reporter resource")
 )
 
+// Replication sentinel errors - failures during event processing
+var (
+	// ErrFencingFailed indicates that a fencing condition check failed.
+	// This typically means the lock token is invalid or expired, and the
+	// operation should be safely ignored as it will be retried after
+	// the consumer reacquires a lock.
+	ErrFencingFailed = errors.New("fencing condition failed")
+)
+
 // ValidationError represents a field validation error with context
 type ValidationError struct {
 	Field   string

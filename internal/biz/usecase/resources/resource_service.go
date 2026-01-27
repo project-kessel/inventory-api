@@ -46,6 +46,7 @@ type UsecaseConfig struct {
 // It coordinates between the Store, authorization, eventing, and other system components.
 type Usecase struct {
 	store               model.Store
+	clusterBroadcast    model.ClusterBroadcast
 	schemaUsecase       *SchemaUsecase
 	waitForNotifBreaker *gobreaker.CircuitBreaker
 	Authz               authzapi.Authorizer
@@ -57,11 +58,12 @@ type Usecase struct {
 	MetricsCollector    *metricscollector.MetricsCollector
 }
 
-func New(store model.Store,
+func New(store model.Store, clusterBroadcast model.ClusterBroadcast,
 	schemaRepository schema.Repository, authz authzapi.Authorizer, eventer eventingapi.Manager, namespace string, logger log.Logger,
 	waitForNotifBreaker *gobreaker.CircuitBreaker, usecaseConfig *UsecaseConfig, metricsCollector *metricscollector.MetricsCollector) *Usecase {
 	return &Usecase{
 		store:               store,
+		clusterBroadcast:    clusterBroadcast,
 		schemaUsecase:       NewSchemaUsecase(schemaRepository, log.NewHelper(logger)),
 		waitForNotifBreaker: waitForNotifBreaker,
 		Authz:               authz,
@@ -149,11 +151,15 @@ func (uc *Usecase) ReportResource(ctx context.Context, cmd model.ReportResourceC
 
 // waitForReplication waits for the replication to complete, using circuit breaker.
 func (uc *Usecase) waitForReplication(ctx context.Context, txid string) {
+	if uc.clusterBroadcast == nil {
+		return
+	}
+
 	timeoutCtx, cancel := context.WithTimeout(ctx, listenTimeout)
 	defer cancel()
 
 	_, err := uc.waitForNotifBreaker.Execute(func() (interface{}, error) {
-		return nil, uc.store.WaitForReplication(timeoutCtx, txid)
+		return nil, uc.clusterBroadcast.Wait(timeoutCtx, model.SignalKey(txid))
 	})
 
 	if err != nil {

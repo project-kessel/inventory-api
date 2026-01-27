@@ -181,38 +181,29 @@ func NewCommand(
 				return err
 			}
 
-			// START: construct pubsub (postgres only)
-			var listenManager *pubsub.ListenManager
-			var notifier *pubsub.PgxNotifier
-			listenManagerErr := make(chan error)
+			// START: construct cluster broadcast (postgres only)
+			var clusterBroadcast model.ClusterBroadcast
 			if storageConfig.Options.Database == "postgres" {
-				pubSubLogger := log.NewHelper(log.With(logger, "subsystem", "pubsub"))
-				pgxPool, err := storage.NewPgx(storageConfig, pubSubLogger)
+				broadcastLogger := log.NewHelper(log.With(logger, "subsystem", "clusterBroadcast"))
+				pgxPool, err := storage.NewPgx(storageConfig, broadcastLogger)
 				if err != nil {
 					return err
 				}
+				// Use separate drivers for listening and notifying to avoid mutex contention.
+				// The listener driver's connection blocks while waiting for notifications,
+				// so a separate notifier driver ensures NOTIFY calls aren't blocked.
 				listenerDriver := pubsub.NewPgxDriver(pgxPool)
-				if err := listenerDriver.Connect(ctx); err != nil {
-					return fmt.Errorf("error setting up listenerDriver: %v", err)
-				}
-				err = listenerDriver.Listen(ctx)
-				if err != nil {
-					return fmt.Errorf("error setting up listener: %v", err)
-				}
-				listenManager = pubsub.NewListenManager(pubSubLogger, listenerDriver)
-
-				go func() {
-					listenManagerErr <- listenManager.Run(ctx)
-				}()
-
-				// Run notifier on a separate connection, as the listener requires it's own
 				notifierDriver := pubsub.NewPgxDriver(pgxPool)
-				if err := notifierDriver.Connect(ctx); err != nil {
-					return fmt.Errorf("error setting up notifierDriver: %v", err)
+				clusterBroadcast = data.NewPgxClusterBroadcast(data.PgxClusterBroadcastConfig{
+					ListenerDriver: listenerDriver,
+					NotifierDriver: notifierDriver,
+					Logger:         log.With(logger, "subsystem", "clusterBroadcast"),
+				})
+				if err := clusterBroadcast.(*data.PgxClusterBroadcast).Start(ctx); err != nil {
+					return fmt.Errorf("error starting cluster broadcast: %v", err)
 				}
-				notifier = pubsub.NewPgxNotifier(notifierDriver)
 			}
-			// STOP: construct pubsub
+			// STOP: construct cluster broadcast
 
 			// construct authn
 			authenticator, err := authn.New(authnConfig, log.NewHelper(log.With(logger, "subsystem", "authn")))
@@ -281,46 +272,42 @@ func NewCommand(
 		// wire together inventory service handling
 		resourceRepo := data.NewResourceRepository(db, transactionManager)
 
-		// Create event source from consumer config if enabled
-		var eventSource data.EventSource
+		// Create event source if consumer is enabled
+		var eventSource model.EventSource
 		if consumerOptions.Enabled {
 			eventSource = data.NewKafkaEventSource(data.KafkaEventSourceConfig{
-				KafkaConfig: consumerConfig.KafkaConfig,
-				Topic:       consumerConfig.Topic,
-				Logger:      log.With(logger, "subsystem", "kafkaEventSource"),
+				KafkaConfig:     consumerConfig.KafkaConfig,
+				Topic:           consumerConfig.Topic,
+				ConsumerGroupID: consumerConfig.ConsumerGroupID,
+				Logger:          log.With(logger, "subsystem", "kafkaEventSource"),
+				Authorizer:      authorizer,
 			})
 		}
 
+		// Create store for transactional access (with event source if enabled)
 		store := data.NewAdapterStore(data.AdapterStoreConfig{
-			ResourceRepo:  resourceRepo,
-			ListenManager: listenManager,
-			Notifier:      notifier,
-			EventSource:   eventSource,
-			Logger:        log.With(logger, "subsystem", "store"),
+			ResourceRepo: resourceRepo,
+			EventSource:  eventSource,
 		})
 
-		// Start the store (begins event source processing)
-		if err := store.Start(ctx); err != nil {
-			return fmt.Errorf("failed to start store: %w", err)
-		}
+		inventory_controller := resourcesctl.New(store, clusterBroadcast, schemaRepository, authorizer, eventingManager, "notifications", log.With(logger, "subsystem", "notificationsintegrations_controller"), waitForNotifCircuitBreaker, usecaseConfig, mc)
 
-		inventory_controller := resourcesctl.New(store, schemaRepository, authorizer, eventingManager, "notifications", log.With(logger, "subsystem", "notificationsintegrations_controller"), waitForNotifCircuitBreaker, usecaseConfig, mc)
-
-		// Create and start replication usecase if consumer is enabled
+		// Create replication usecase if consumer is enabled
 		var replicationUsecase *replication.RelationReplicationUsecase
 		if consumerOptions.Enabled {
 			// Create schema usecase for tuple calculation
 			schemaUsecase := resourcesctl.NewSchemaUsecase(schemaRepository, log.NewHelper(log.With(logger, "subsystem", "schemaUsecase")))
 
 			// Create authorizer replicator adapter
-			relationsReplicator := authz.NewAuthorizerReplicator(authorizer, "", "")
+			relationsReplicator := authz.NewAuthorizerReplicator(authorizer)
 
 			// Create replication service
 			replicationService := model.NewRelationReplicationService(relationsReplicator, schemaUsecase)
 
-			// Create replication usecase
+			// Create replication usecase (handler for deliveries)
 			replicationUsecase = replication.NewRelationReplicationUsecase(
 				store,
+				clusterBroadcast,
 				replicationService,
 				log.With(logger, "subsystem", "replicationUsecase"),
 			)
@@ -354,7 +341,6 @@ func NewCommand(
 			replicationErrs := make(chan error, 1)
 			if consumerOptions.Enabled && replicationUsecase != nil {
 				go func() {
-					log.NewHelper(logger).Info("Starting relation replication usecase")
 					if err := replicationUsecase.Run(ctx); err != nil && !e.Is(err, context.Canceled) {
 						replicationErrs <- err
 					}
@@ -369,8 +355,6 @@ func NewCommand(
 				shutdown(err)
 			case pprofErr := <-pprofErrs:
 				shutdown(pprofErr)
-			case lmErr := <-listenManagerErr:
-				shutdown(lmErr)
 			case sig := <-quit:
 				shutdown(sig)
 			case emErr := <-eventingManager.Errs():

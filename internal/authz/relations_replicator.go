@@ -2,6 +2,7 @@ package authz
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -15,33 +16,28 @@ import (
 // AuthorizerReplicator wraps an Authorizer to implement model.RelationsReplicator.
 type AuthorizerReplicator struct {
 	authorizer api.Authorizer
-	lockID     string
-	lockToken  string
 }
 
 // NewAuthorizerReplicator creates a new AuthorizerReplicator.
-func NewAuthorizerReplicator(authorizer api.Authorizer, lockID, lockToken string) *AuthorizerReplicator {
+func NewAuthorizerReplicator(authorizer api.Authorizer) *AuthorizerReplicator {
 	return &AuthorizerReplicator{
 		authorizer: authorizer,
-		lockID:     lockID,
-		lockToken:  lockToken,
 	}
 }
 
-// SetLock updates the lock credentials for fencing.
-func (a *AuthorizerReplicator) SetLock(lockID, lockToken string) {
-	a.lockID = lockID
-	a.lockToken = lockToken
-}
-
 // ReplicateTuples implements model.RelationsReplicator.
-func (a *AuthorizerReplicator) ReplicateTuples(ctx context.Context, creates, deletes []model.RelationsTuple) (model.ConsistencyToken, error) {
+// The lock parameter provides the fencing credentials for the operation.
+// If the fencing check fails (FailedPrecondition), ErrFencingFailed is returned.
+func (a *AuthorizerReplicator) ReplicateTuples(ctx context.Context, creates, deletes []model.RelationsTuple, lock model.Lock) (model.ConsistencyToken, error) {
 	var token string
 
 	// Create tuples if any
 	if len(creates) > 0 {
-		createToken, err := a.createTuples(ctx, creates)
+		createToken, err := a.createTuples(ctx, creates, lock)
 		if err != nil {
+			if errors.Is(err, model.ErrFencingFailed) {
+				return model.ConsistencyToken(""), err
+			}
 			return model.ConsistencyToken(""), fmt.Errorf("failed to create tuples: %w", err)
 		}
 		token = createToken
@@ -49,8 +45,11 @@ func (a *AuthorizerReplicator) ReplicateTuples(ctx context.Context, creates, del
 
 	// Delete tuples if any
 	if len(deletes) > 0 {
-		deleteToken, err := a.deleteTuples(ctx, deletes)
+		deleteToken, err := a.deleteTuples(ctx, deletes, lock)
 		if err != nil {
+			if errors.Is(err, model.ErrFencingFailed) {
+				return model.ConsistencyToken(""), err
+			}
 			return model.ConsistencyToken(""), fmt.Errorf("failed to delete tuples: %w", err)
 		}
 		if token == "" {
@@ -61,20 +60,20 @@ func (a *AuthorizerReplicator) ReplicateTuples(ctx context.Context, creates, del
 	return model.ConsistencyToken(token), nil
 }
 
-func (a *AuthorizerReplicator) createTuples(ctx context.Context, tuples []model.RelationsTuple) (string, error) {
+func (a *AuthorizerReplicator) createTuples(ctx context.Context, tuples []model.RelationsTuple, lock model.Lock) (string, error) {
 	relationships := a.convertToRelationships(tuples)
 
 	resp, err := a.authorizer.CreateTuples(ctx, &kessel.CreateTuplesRequest{
 		Upsert: true,
 		Tuples: relationships,
 		FencingCheck: &kessel.FencingCheck{
-			LockId:    a.lockID,
-			LockToken: a.lockToken,
+			LockId:    lock.ID().String(),
+			LockToken: lock.Token().String(),
 		},
 	})
 	if err != nil {
 		if status.Convert(err).Code() == codes.FailedPrecondition {
-			return "", fmt.Errorf("invalid fencing token: %w", err)
+			return "", fmt.Errorf("%w: %v", model.ErrFencingFailed, err)
 		}
 
 		// If the tuple exists already, fetch token via Check
@@ -86,7 +85,7 @@ func (a *AuthorizerReplicator) createTuples(ctx context.Context, tuples []model.
 	return resp.GetConsistencyToken().GetToken(), nil
 }
 
-func (a *AuthorizerReplicator) deleteTuples(ctx context.Context, tuples []model.RelationsTuple) (string, error) {
+func (a *AuthorizerReplicator) deleteTuples(ctx context.Context, tuples []model.RelationsTuple, lock model.Lock) (string, error) {
 	var token string
 
 	// Delete each tuple individually using filters
@@ -96,13 +95,13 @@ func (a *AuthorizerReplicator) deleteTuples(ctx context.Context, tuples []model.
 		resp, err := a.authorizer.DeleteTuples(ctx, &kessel.DeleteTuplesRequest{
 			Filter: filter,
 			FencingCheck: &kessel.FencingCheck{
-				LockId:    a.lockID,
-				LockToken: a.lockToken,
+				LockId:    lock.ID().String(),
+				LockToken: lock.Token().String(),
 			},
 		})
 		if err != nil {
 			if status.Convert(err).Code() == codes.FailedPrecondition {
-				return "", fmt.Errorf("invalid fencing token: %w", err)
+				return "", fmt.Errorf("%w: %v", model.ErrFencingFailed, err)
 			}
 			return "", fmt.Errorf("error deleting tuple: %w", err)
 		}

@@ -436,3 +436,76 @@ func GenerateTransactionId() (TransactionId, error) {
 
 	return NewTransactionId(id.String()), nil
 }
+
+// LockId represents the identifier for a distributed lock used for fencing.
+type LockId string
+
+// NewLockId creates a new LockId from a string.
+func NewLockId(id string) LockId {
+	return LockId(id)
+}
+
+func (l LockId) String() string {
+	return string(l)
+}
+
+func (l LockId) Serialize() string {
+	return SerializeString(l)
+}
+
+// IsZero returns true if the lock ID is empty.
+func (l LockId) IsZero() bool {
+	return l == ""
+}
+
+// LockToken represents the token for a distributed lock used for fencing.
+type LockToken string
+
+// NewLockToken creates a new LockToken from a string.
+func NewLockToken(token string) LockToken {
+	return LockToken(token)
+}
+
+func (l LockToken) String() string {
+	return string(l)
+}
+
+func (l LockToken) Serialize() string {
+	return SerializeString(l)
+}
+
+// IsZero returns true if the lock token is empty.
+func (l LockToken) IsZero() bool {
+	return l == ""
+}
+
+// Lock represents lock credentials for fencing operations.
+// It contains the lock ID and token acquired from the relations service
+// when a consumer is assigned a partition.
+type Lock struct {
+	id    LockId
+	token LockToken
+}
+
+// NewLock creates a new Lock with the given ID and token.
+func NewLock(id LockId, token LockToken) Lock {
+	return Lock{
+		id:    id,
+		token: token,
+	}
+}
+
+// ID returns the lock identifier.
+func (l Lock) ID() LockId {
+	return l.id
+}
+
+// Token returns the lock token.
+func (l Lock) Token() LockToken {
+	return l.token
+}
+
+// IsZero returns true if the lock has no ID or token set.
+func (l Lock) IsZero() bool {
+	return l.id.IsZero() && l.token.IsZero()
+}

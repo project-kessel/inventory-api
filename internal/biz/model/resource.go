@@ -39,31 +39,40 @@ func NewOutboxEvent(operation OperationType, txID TransactionId, inventoryID Res
 	}
 }
 
-func (e OutboxEvent) Operation() OperationType   { return e.operation }
-func (e OutboxEvent) TxID() TransactionId        { return e.txID }
-func (e OutboxEvent) InventoryID() ResourceId    { return e.inventoryID }
-func (e OutboxEvent) TupleEvent() TupleEvent     { return e.tupleEvent }
+func (e OutboxEvent) Operation() OperationType { return e.operation }
+func (e OutboxEvent) TxID() TransactionId      { return e.txID }
+func (e OutboxEvent) InventoryID() ResourceId  { return e.inventoryID }
+func (e OutboxEvent) TupleEvent() TupleEvent   { return e.tupleEvent }
 
-// Store provides transactional access to resource persistence, an event stream
-// for committed changes, and replication notification capabilities.
+// Store provides transactional access to resource persistence and an event stream
+// for committed changes.
 type Store interface {
 	// Begin starts a new transaction.
 	Begin() (Tx, error)
 
-	// Events returns a channel that emits OutboxEvents after they are
-	// committed to the outbox. This is wired once at application startup.
-	// The Store internally consumes from Kafka (via Debezium CDC) and emits here.
-	Events() <-chan OutboxEvent
-
-	// WaitForReplication blocks until replication for the given transaction ID
-	// completes, or the context is cancelled. This encapsulates LISTEN semantics.
-	WaitForReplication(ctx context.Context, txid string) error
-
-	// NotifyReplicationComplete signals that replication for the given
-	// transaction ID has completed. Called by the consumer after processing.
-	// This encapsulates NOTIFY semantics.
-	NotifyReplicationComplete(ctx context.Context, txid string) error
+	// EventSource returns the event source for consuming outbox events.
+	// May return nil if the store does not support event streaming.
+	EventSource() EventSource
 }
+
+// EventSource consumes events and processes them with a handler.
+// It encapsulates how events are received (e.g., from Kafka) and provides
+// at-least-once delivery guarantees with strong ordering.
+type EventSource interface {
+	// Run starts the event source and processes each delivery with the handler.
+	// Processing is synchronous - each delivery is fully processed before the next.
+	// If handler returns nil, the delivery is acknowledged.
+	// If handler returns ErrFencingFailed, the delivery is nacked for redelivery.
+	// If handler returns any other error, Run stops and returns the error.
+	// It blocks until ctx is cancelled or an error occurs.
+	Run(ctx context.Context, handler DeliveryHandler) error
+}
+
+// DeliveryHandler processes a delivery synchronously.
+// It returns nil on success (delivery will be acked) or an error on failure.
+// If the error is ErrFencingFailed, the delivery will be nacked for redelivery.
+// Other errors cause the consumer to stop.
+type DeliveryHandler func(ctx context.Context, delivery Delivery) error
 
 // Tx represents a database transaction with access to repositories.
 type Tx interface {

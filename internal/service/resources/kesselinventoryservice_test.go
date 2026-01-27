@@ -28,9 +28,11 @@ import (
 func newTestUsecase(t *testing.T) *usecase.Usecase {
 	t.Helper()
 	store := data.NewFakeStore()
+	clusterBroadcast := data.NewFakeClusterBroadcast()
 
 	return usecase.New(
 		store,
+		clusterBroadcast,
 		data.NewInMemorySchemaRepository(),
 		nil, // Authz
 		nil, // Eventer

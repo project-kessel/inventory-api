@@ -11,7 +11,9 @@ import (
 // This interface is satisfied by the Authorizer implementations.
 type RelationsReplicator interface {
 	// ReplicateTuples applies the given tuple changes and returns a consistency token.
-	ReplicateTuples(ctx context.Context, creates, deletes []RelationsTuple) (ConsistencyToken, error)
+	// The lock parameter provides the fencing credentials for the operation.
+	// If the fencing check fails, ErrFencingFailed should be returned.
+	ReplicateTuples(ctx context.Context, creates, deletes []RelationsTuple, lock Lock) (ConsistencyToken, error)
 }
 
 // TupleCalculator calculates tuples from resource representations.
@@ -37,8 +39,12 @@ func NewRelationReplicationService(
 	}
 }
 
-// Replicate processes an outbox event, replicating the changes to the relations service.
-func (s *RelationReplicationService) Replicate(ctx context.Context, tx Tx, event OutboxEvent) error {
+// Replicate processes a delivery, replicating the changes to the relations service.
+// The lock from the delivery is used to fence operations against the relations service.
+func (s *RelationReplicationService) Replicate(ctx context.Context, tx Tx, delivery Delivery) error {
+	event := delivery.Event()
+	lock := delivery.Lock()
+
 	repo := tx.ResourceRepository()
 	key := event.TupleEvent().ReporterResourceKey()
 	operation := event.Operation()
@@ -60,7 +66,7 @@ func (s *RelationReplicationService) Replicate(ctx context.Context, tx Tx, event
 	}
 
 	// Execute the relations operation and get consistency token
-	token, err := s.executeRelationsOperation(ctx, operation, tuplesToReplicate)
+	token, err := s.executeRelationsOperation(ctx, operation, tuplesToReplicate, lock)
 	if err != nil {
 		return fmt.Errorf("failed to execute relations operation: %w", err)
 	}
@@ -108,6 +114,7 @@ func (s *RelationReplicationService) executeRelationsOperation(
 	ctx context.Context,
 	operation OperationType,
 	tuples TuplesToReplicate,
+	lock Lock,
 ) (ConsistencyToken, error) {
 	var creates, deletes []RelationsTuple
 
@@ -120,13 +127,13 @@ func (s *RelationReplicationService) executeRelationsOperation(
 
 	switch operation {
 	case OperationCreated:
-		return s.relationsReplicator.ReplicateTuples(ctx, creates, nil)
+		return s.relationsReplicator.ReplicateTuples(ctx, creates, nil, lock)
 
 	case OperationUpdated:
-		return s.relationsReplicator.ReplicateTuples(ctx, creates, deletes)
+		return s.relationsReplicator.ReplicateTuples(ctx, creates, deletes, lock)
 
 	case OperationDeleted:
-		return s.relationsReplicator.ReplicateTuples(ctx, nil, deletes)
+		return s.relationsReplicator.ReplicateTuples(ctx, nil, deletes, lock)
 
 	default:
 		return ConsistencyToken(""), fmt.Errorf("unknown operation type: %s", operation)

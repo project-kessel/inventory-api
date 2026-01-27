@@ -1057,3 +1057,121 @@ func TestSerializationRoundtrip(t *testing.T) {
 		}
 	})
 }
+
+func TestLockId_Initialization(t *testing.T) {
+	t.Parallel()
+
+	t.Run("should create lock id with valid value", func(t *testing.T) {
+		t.Parallel()
+
+		lockId := NewLockId("test-consumer/0")
+
+		if lockId.String() != "test-consumer/0" {
+			t.Errorf("Expected lock id %s, got %s", "test-consumer/0", lockId.String())
+		}
+	})
+
+	t.Run("should report IsZero correctly", func(t *testing.T) {
+		t.Parallel()
+
+		emptyLockId := NewLockId("")
+		validLockId := NewLockId("test-lock")
+
+		if !emptyLockId.IsZero() {
+			t.Error("Expected empty lock id to be zero")
+		}
+		if validLockId.IsZero() {
+			t.Error("Expected valid lock id to not be zero")
+		}
+	})
+
+	t.Run("should serialize correctly", func(t *testing.T) {
+		t.Parallel()
+
+		lockId := NewLockId("consumer-group/1")
+
+		if lockId.Serialize() != "consumer-group/1" {
+			t.Errorf("Expected serialized lock id %s, got %s", "consumer-group/1", lockId.Serialize())
+		}
+	})
+}
+
+func TestLockToken_Initialization(t *testing.T) {
+	t.Parallel()
+
+	t.Run("should create lock token with valid value", func(t *testing.T) {
+		t.Parallel()
+
+		lockToken := NewLockToken("abc123xyz")
+
+		if lockToken.String() != "abc123xyz" {
+			t.Errorf("Expected lock token %s, got %s", "abc123xyz", lockToken.String())
+		}
+	})
+
+	t.Run("should report IsZero correctly", func(t *testing.T) {
+		t.Parallel()
+
+		emptyLockToken := NewLockToken("")
+		validLockToken := NewLockToken("valid-token")
+
+		if !emptyLockToken.IsZero() {
+			t.Error("Expected empty lock token to be zero")
+		}
+		if validLockToken.IsZero() {
+			t.Error("Expected valid lock token to not be zero")
+		}
+	})
+
+	t.Run("should serialize correctly", func(t *testing.T) {
+		t.Parallel()
+
+		lockToken := NewLockToken("token-value")
+
+		if lockToken.Serialize() != "token-value" {
+			t.Errorf("Expected serialized lock token %s, got %s", "token-value", lockToken.Serialize())
+		}
+	})
+}
+
+func TestLock_Initialization(t *testing.T) {
+	t.Parallel()
+
+	t.Run("should create lock with valid id and token", func(t *testing.T) {
+		t.Parallel()
+
+		lockId := NewLockId("consumer/0")
+		lockToken := NewLockToken("token123")
+		lock := NewLock(lockId, lockToken)
+
+		if lock.ID() != lockId {
+			t.Errorf("Expected lock id %s, got %s", lockId, lock.ID())
+		}
+		if lock.Token() != lockToken {
+			t.Errorf("Expected lock token %s, got %s", lockToken, lock.Token())
+		}
+	})
+
+	t.Run("should report IsZero correctly", func(t *testing.T) {
+		t.Parallel()
+
+		emptyLock := NewLock(NewLockId(""), NewLockToken(""))
+		partialLock1 := NewLock(NewLockId("lock-id"), NewLockToken(""))
+		partialLock2 := NewLock(NewLockId(""), NewLockToken("token"))
+		validLock := NewLock(NewLockId("lock-id"), NewLockToken("token"))
+
+		if !emptyLock.IsZero() {
+			t.Error("Expected empty lock to be zero")
+		}
+		// A lock is only zero if both id and token are empty
+		if partialLock1.IsZero() {
+			t.Error("Expected partial lock (with id) to not be zero")
+		}
+		if partialLock2.IsZero() {
+			t.Error("Expected partial lock (with token) to not be zero")
+		}
+		if validLock.IsZero() {
+			t.Error("Expected valid lock to not be zero")
+		}
+	})
+}

@@ -1,7 +1,6 @@
 package data
 
 import (
-	"context"
 	"fmt"
 	"strings"
 	"sync"
@@ -14,21 +13,21 @@ import (
 // FakeStore implements model.Store for testing.
 type FakeStore struct {
 	resourceRepo *fakeModelResourceRepository
-
-	// Notification tracking
-	mu                   sync.RWMutex
-	replicationCompleted map[string]chan struct{}
-
-	// Event channel
-	events chan model.OutboxEvent
+	eventSource  model.EventSource
 }
 
 // NewFakeStore creates a new FakeStore for testing.
 func NewFakeStore() *FakeStore {
 	return &FakeStore{
-		resourceRepo:         newFakeModelResourceRepository(),
-		replicationCompleted: make(map[string]chan struct{}),
-		events:               make(chan model.OutboxEvent, 100),
+		resourceRepo: newFakeModelResourceRepository(),
+	}
+}
+
+// NewFakeStoreWithEventSource creates a new FakeStore with a custom event source.
+func NewFakeStoreWithEventSource(eventSource model.EventSource) *FakeStore {
+	return &FakeStore{
+		resourceRepo: newFakeModelResourceRepository(),
+		eventSource:  eventSource,
 	}
 }
 
@@ -43,54 +42,10 @@ func (s *FakeStore) Begin() (model.Tx, error) {
 	}, nil
 }
 
-// Events returns the event channel.
-func (s *FakeStore) Events() <-chan model.OutboxEvent {
-	return s.events
-}
-
-// WaitForReplication waits for replication to complete for the given txid.
-func (s *FakeStore) WaitForReplication(ctx context.Context, txid string) error {
-	ch := make(chan struct{}, 1)
-
-	s.mu.Lock()
-	s.replicationCompleted[txid] = ch
-	s.mu.Unlock()
-
-	defer func() {
-		s.mu.Lock()
-		delete(s.replicationCompleted, txid)
-		s.mu.Unlock()
-	}()
-
-	select {
-	case <-ch:
-		return nil
-	case <-ctx.Done():
-		return ctx.Err()
-	}
-}
-
-// NotifyReplicationComplete signals that replication is complete for txid.
-func (s *FakeStore) NotifyReplicationComplete(ctx context.Context, txid string) error {
-	s.mu.RLock()
-	ch, exists := s.replicationCompleted[txid]
-	s.mu.RUnlock()
-
-	if exists {
-		select {
-		case ch <- struct{}{}:
-		default:
-		}
-	}
-	return nil
-}
-
-// EmitEvent sends an event to the Events channel (for testing).
-func (s *FakeStore) EmitEvent(event model.OutboxEvent) {
-	select {
-	case s.events <- event:
-	default:
-	}
+// EventSource returns the event source for consuming outbox events.
+// Returns nil if no event source was configured.
+func (s *FakeStore) EventSource() model.EventSource {
+	return s.eventSource
 }
 
 // GetResourceRepository returns the underlying fake repository for test assertions.

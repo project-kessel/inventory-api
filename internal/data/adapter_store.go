@@ -1,77 +1,36 @@
 package data
 
 import (
-	"context"
 	"fmt"
 	"sync"
 
-	"github.com/go-kratos/kratos/v2/log"
 	"github.com/project-kessel/inventory-api/internal/biz"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
-	"github.com/project-kessel/inventory-api/internal/pubsub"
 	"gorm.io/gorm"
 )
 
 // AdapterStore adapts the old ResourceRepository to the new model.Store interface.
 // This is a temporary bridge to allow incremental migration.
 type AdapterStore struct {
-	resourceRepo  ResourceRepository
-	listenManager pubsub.ListenManagerImpl
-	notifier      pubsub.Notifier
-	eventSource   EventSource
-	logger        *log.Helper
-
-	// Event channel fed by EventSource
-	events chan model.OutboxEvent
+	resourceRepo ResourceRepository
+	eventSource  model.EventSource
 }
 
 // AdapterStoreConfig holds configuration for creating an AdapterStore.
 type AdapterStoreConfig struct {
-	ResourceRepo  ResourceRepository
-	ListenManager pubsub.ListenManagerImpl
-	Notifier      pubsub.Notifier
-	EventSource   EventSource
-	Logger        log.Logger
+	ResourceRepo ResourceRepository
+	EventSource  model.EventSource
 }
 
 // NewAdapterStore creates a new AdapterStore.
 func NewAdapterStore(cfg AdapterStoreConfig) *AdapterStore {
-	var logger *log.Helper
-	if cfg.Logger != nil {
-		logger = log.NewHelper(cfg.Logger)
-	}
-
 	return &AdapterStore{
-		resourceRepo:  cfg.ResourceRepo,
-		listenManager: cfg.ListenManager,
-		notifier:      cfg.Notifier,
-		eventSource:   cfg.EventSource,
-		logger:        logger,
-		events:        make(chan model.OutboxEvent, 100),
+		resourceRepo: cfg.ResourceRepo,
+		eventSource:  cfg.EventSource,
 	}
 }
 
 var _ model.Store = (*AdapterStore)(nil)
-
-// Start begins processing events from the EventSource if configured.
-func (s *AdapterStore) Start(ctx context.Context) error {
-	if s.eventSource == nil {
-		return nil
-	}
-
-	go s.eventSource.Run(ctx, s.emitEvent)
-	return nil
-}
-
-func (s *AdapterStore) emitEvent(event model.OutboxEvent) {
-	select {
-	case s.events <- event:
-	default:
-		if s.logger != nil {
-			s.logger.Warnf("Event channel full, dropping event: txid=%s", event.TxID())
-		}
-	}
-}
 
 // Begin starts a new transaction.
 func (s *AdapterStore) Begin() (model.Tx, error) {
@@ -87,30 +46,10 @@ func (s *AdapterStore) Begin() (model.Tx, error) {
 	}, nil
 }
 
-// Events returns the event channel.
-func (s *AdapterStore) Events() <-chan model.OutboxEvent {
-	return s.events
-}
-
-// WaitForReplication waits for replication to complete.
-// Uses the ListenManager for backward compatibility.
-func (s *AdapterStore) WaitForReplication(ctx context.Context, txid string) error {
-	if s.listenManager == nil {
-		return nil
-	}
-
-	subscription := s.listenManager.Subscribe(txid)
-	defer subscription.Unsubscribe()
-
-	return subscription.BlockForNotification(ctx)
-}
-
-// NotifyReplicationComplete notifies that replication is complete.
-func (s *AdapterStore) NotifyReplicationComplete(ctx context.Context, txid string) error {
-	if s.notifier == nil {
-		return nil
-	}
-	return s.notifier.Notify(ctx, txid)
+// EventSource returns the event source for consuming outbox events.
+// May return nil if the store was created without an event source.
+func (s *AdapterStore) EventSource() model.EventSource {
+	return s.eventSource
 }
 
 // adapterTx implements model.Tx by wrapping a gorm transaction.

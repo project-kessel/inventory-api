@@ -13,6 +13,11 @@ func TestConsistencyPreference_String(t *testing.T) {
 		expected string
 	}{
 		{
+			name:     "unspecified",
+			pref:     ConsistencyUnspecified,
+			expected: "unspecified",
+		},
+		{
 			name:     "minimize_latency",
 			pref:     ConsistencyMinimizeLatency,
 			expected: "minimize_latency",
@@ -41,6 +46,12 @@ func TestConsistencyPreference_String(t *testing.T) {
 	}
 }
 
+func TestNewUnspecifiedConsistency(t *testing.T) {
+	config := NewUnspecifiedConsistency()
+	assert.Equal(t, ConsistencyUnspecified, config.Preference)
+	assert.Empty(t, config.Token)
+}
+
 func TestNewMinimizeLatencyConsistency(t *testing.T) {
 	config := NewMinimizeLatencyConsistency()
 	assert.Equal(t, ConsistencyMinimizeLatency, config.Preference)
@@ -61,8 +72,8 @@ func TestNewAtLeastAsFreshConsistency(t *testing.T) {
 }
 
 func TestConsistencyConfig_Defaults(t *testing.T) {
-	// Verify default values
+	// Verify default values - zero value should be unspecified
 	var config ConsistencyConfig
-	assert.Equal(t, ConsistencyMinimizeLatency, config.Preference)
+	assert.Equal(t, ConsistencyUnspecified, config.Preference)
 	assert.Empty(t, config.Token)
 }

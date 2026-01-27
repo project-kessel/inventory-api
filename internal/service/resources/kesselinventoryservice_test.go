@@ -299,9 +299,9 @@ func TestConvertConsistencyToModel(t *testing.T) {
 		expected model.ConsistencyConfig
 	}{
 		{
-			name:     "nil consistency returns minimize_latency",
+			name:     "nil consistency returns unspecified",
 			input:    nil,
-			expected: model.NewMinimizeLatencyConsistency(),
+			expected: model.NewUnspecifiedConsistency(),
 		},
 		{
 			name: "minimize_latency true returns minimize_latency",
@@ -336,9 +336,9 @@ func TestConvertConsistencyToModel(t *testing.T) {
 			expected: model.NewAtLeastAsFreshConsistency(""),
 		},
 		{
-			name:     "empty consistency struct returns minimize_latency",
+			name:     "empty consistency struct returns unspecified",
 			input:    &pb.Consistency{},
-			expected: model.NewMinimizeLatencyConsistency(),
+			expected: model.NewUnspecifiedConsistency(),
 		},
 	}
 

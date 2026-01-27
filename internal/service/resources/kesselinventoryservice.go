@@ -198,8 +198,8 @@ func convertConsistencyToV1beta1(consistency *pb.Consistency) *pbv1beta1.Consist
 // ConvertConsistencyToModel converts the proto Consistency to internal model type.
 func ConvertConsistencyToModel(consistency *pb.Consistency) model.ConsistencyConfig {
 	if consistency == nil {
-		// Default to minimize_latency when not specified
-		return model.NewMinimizeLatencyConsistency()
+		// Return unspecified - the usecase layer will handle the default based on feature flag
+		return model.NewUnspecifiedConsistency()
 	}
 
 	if consistency.GetMinimizeLatency() {
@@ -214,8 +214,8 @@ func ConvertConsistencyToModel(consistency *pb.Consistency) model.ConsistencyCon
 		return model.NewAtLeastAsFreshConsistency(token.GetToken())
 	}
 
-	// Default to minimize_latency
-	return model.NewMinimizeLatencyConsistency()
+	// Return unspecified - the usecase layer will handle the default based on feature flag
+	return model.NewUnspecifiedConsistency()
 }
 
 func mapCheckBulkResponseFromV1beta1(resp *pbv1beta1.CheckBulkResponse) *pb.CheckBulkResponse {

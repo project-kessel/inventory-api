@@ -271,11 +271,11 @@ func (uc *Usecase) lookupConsistencyTokenFromDB(reporterResourceKey model.Report
 
 // resolveConsistencyToken resolves the consistency token based on the preference.
 func (uc *Usecase) resolveConsistencyToken(ctx context.Context, consistency model.ConsistencyConfig, reporterResourceKey model.ReporterResourceKey) (string, error) {
-	featureFlagEnabled := viper.GetBool("authz.kessel.allow-client-consistency-preference")
+	featureFlagEnabled := viper.GetBool("authz.kessel.default-to-at-least-as-acknowledged")
 	if featureFlagEnabled {
-		log.Info("Feature flag authz.kessel.allow-client-consistency-preference is enabled")
+		log.Info("Feature flag authz.kessel.default-to-at-least-as-acknowledged is enabled")
 	} else {
-		log.Info("Feature flag authz.kessel.allow-client-consistency-preference is disabled")
+		log.Info("Feature flag authz.kessel.default-to-at-least-as-acknowledged is disabled")
 	}
 
 	switch consistency.Preference {

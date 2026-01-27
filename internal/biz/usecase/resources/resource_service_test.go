@@ -1425,7 +1425,7 @@ func TestResolveConsistencyToken(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Reset viper for each test
 			viper.Reset()
-			viper.Set("authz.kessel.allow-client-consistency-preference", tt.featureFlagEnabled)
+			viper.Set("authz.kessel.default-to-at-least-as-acknowledged", tt.featureFlagEnabled)
 
 			ctx := context.Background()
 			logger := log.DefaultLogger
@@ -1475,7 +1475,7 @@ func TestResolveConsistencyToken(t *testing.T) {
 func TestResolveConsistencyToken_UnknownPreference(t *testing.T) {
 	// Test that unknown preference defaults to minimize_latency (empty token)
 	viper.Reset()
-	viper.Set("authz.kessel.allow-client-consistency-preference", true)
+	viper.Set("authz.kessel.default-to-at-least-as-acknowledged", true)
 
 	ctx := context.Background()
 	logger := log.DefaultLogger

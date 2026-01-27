@@ -252,47 +252,57 @@ func (uc *Usecase) CheckForUpdate(ctx context.Context, permission, namespace str
 	return false, nil
 }
 
-// resolveConsistencyToken resolves the consistency token based on the preference.
-func (uc *Usecase) resolveConsistencyToken(ctx context.Context, consistency model.ConsistencyConfig, reporterResourceKey model.ReporterResourceKey) (string, error) {
-	// Feature flag: when true, use client-specified consistency
-	if viper.GetBool("authz.kessel.allow-client-consistency-preference") {
-		log.Info("Feature flag authz.kessel.allow-client-consistency-preference is enabled")
-		switch consistency.Preference {
-		case model.ConsistencyMinimizeLatency:
-			// No token needed - minimize_latency mode
-			log.Info("Using minimize_latency consistency")
-			return "", nil
-
-		case model.ConsistencyAtLeastAsFresh:
-			// Use the token provided by the caller
-			log.Infof("Using at_least_as_fresh consistency with provided token: %s", consistency.Token)
-			return consistency.Token, nil
-
-		case model.ConsistencyAtLeastAsAcknowledged:
-			// Look up the token from inventory database
-			log.Info("Using at_least_as_acknowledged consistency - looking up token from DB")
-			res, err := uc.resourceRepository.FindResourceByKeys(nil, reporterResourceKey)
-			if err != nil {
-				if errors.Is(err, gorm.ErrRecordNotFound) {
-					// Resource doesn't exist in inventory, fall back to minimize_latency
-					log.Info("Resource not found in inventory, falling back to minimize_latency")
-					return "", nil
-				}
-				return "", err
-			}
-			token := res.ConsistencyToken().Serialize()
-			log.Infof("Found inventory-managed consistency token: %s", token)
-			return token, nil
-
-		default:
-			// Default to minimize_latency
-			log.Info("Unknown consistency preference, defaulting to minimize_latency")
+// lookupConsistencyTokenFromDB looks up the consistency token from the inventory database.
+// Returns the token if found, empty string if resource not found, or error for other failures.
+func (uc *Usecase) lookupConsistencyTokenFromDB(reporterResourceKey model.ReporterResourceKey) (string, error) {
+	res, err := uc.resourceRepository.FindResourceByKeys(nil, reporterResourceKey)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			// Resource doesn't exist in inventory, fall back to minimize_latency
+			log.Info("Resource not found in inventory, falling back to minimize_latency")
 			return "", nil
 		}
+		return "", err
+	}
+	token := res.ConsistencyToken().Serialize()
+	log.Infof("Found inventory-managed consistency token: %s", token)
+	return token, nil
+}
 
+// resolveConsistencyToken resolves the consistency token based on the preference.
+func (uc *Usecase) resolveConsistencyToken(ctx context.Context, consistency model.ConsistencyConfig, reporterResourceKey model.ReporterResourceKey) (string, error) {
+	featureFlagEnabled := viper.GetBool("authz.kessel.allow-client-consistency-preference")
+	if featureFlagEnabled {
+		log.Info("Feature flag authz.kessel.allow-client-consistency-preference is enabled")
 	} else {
-		// Feature flag is false - force minimize_latency regardless of client request
-		log.Info("Feature flag authz.kessel.allow-client-consistency-preference is disabled - forcing minimize_latency")
+		log.Info("Feature flag authz.kessel.allow-client-consistency-preference is disabled")
+	}
+
+	switch consistency.Preference {
+	case model.ConsistencyMinimizeLatency:
+		// No token needed - minimize_latency mode
+		log.Info("Using minimize_latency consistency")
+		return "", nil
+
+	case model.ConsistencyAtLeastAsFresh:
+		// Use the token provided by the caller
+		log.Infof("Using at_least_as_fresh consistency with provided token: %s", consistency.Token)
+		return consistency.Token, nil
+
+	case model.ConsistencyAtLeastAsAcknowledged:
+		// Look up the token from inventory database
+		log.Info("Using at_least_as_acknowledged consistency - looking up token from DB")
+		return uc.lookupConsistencyTokenFromDB(reporterResourceKey)
+
+	default:
+		// Default behavior depends on feature flag:
+		// - Enabled: look up resource and use its consistency token (original check behavior)
+		// - Disabled: use minimize_latency
+		if featureFlagEnabled {
+			log.Info("Default consistency - looking up token from DB")
+			return uc.lookupConsistencyTokenFromDB(reporterResourceKey)
+		}
+		log.Info("Default consistency - using minimize_latency")
 		return "", nil
 	}
 }

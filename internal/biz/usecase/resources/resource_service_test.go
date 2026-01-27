@@ -1355,16 +1355,17 @@ func TestResolveConsistencyToken(t *testing.T) {
 		expectedToken      string
 		expectedError      bool
 	}{
+		// Feature flag only affects DEFAULT/UNSPECIFIED behavior - explicit preferences are always honored
 		{
-			name:               "feature flag disabled - returns empty token regardless of preference",
+			name:               "feature flag disabled - unspecified defaults to minimize_latency",
 			featureFlagEnabled: false,
-			consistencyConfig:  model.NewAtLeastAsAcknowledgedConsistency(),
+			consistencyConfig:  model.NewUnspecifiedConsistency(),
 			resourceExists:     true,
 			expectedToken:      "",
 			expectedError:      false,
 		},
 		{
-			name:               "feature flag disabled - minimize_latency also returns empty",
+			name:               "feature flag disabled - minimize_latency returns empty",
 			featureFlagEnabled: false,
 			consistencyConfig:  model.NewMinimizeLatencyConsistency(),
 			resourceExists:     false,
@@ -1372,11 +1373,27 @@ func TestResolveConsistencyToken(t *testing.T) {
 			expectedError:      false,
 		},
 		{
-			name:               "feature flag disabled - at_least_as_fresh ignored returns empty",
+			name:               "feature flag disabled - at_least_as_fresh still honored",
 			featureFlagEnabled: false,
 			consistencyConfig:  model.NewAtLeastAsFreshConsistency("client-provided-token"),
 			resourceExists:     false,
-			expectedToken:      "",
+			expectedToken:      "client-provided-token",
+			expectedError:      false,
+		},
+		{
+			name:               "feature flag disabled - at_least_as_acknowledged still honored",
+			featureFlagEnabled: false,
+			consistencyConfig:  model.NewAtLeastAsAcknowledgedConsistency(),
+			resourceExists:     true,
+			expectedToken:      "", // fake repo returns empty consistency token
+			expectedError:      false,
+		},
+		{
+			name:               "feature flag enabled - unspecified defaults to at_least_as_acknowledged (DB lookup)",
+			featureFlagEnabled: true,
+			consistencyConfig:  model.NewUnspecifiedConsistency(),
+			resourceExists:     true,
+			expectedToken:      "", // fake repo returns empty consistency token
 			expectedError:      false,
 		},
 		{

@@ -137,7 +137,7 @@ func TestDeleteBatchedReporterResources_DryRun(t *testing.T) {
 				createTestReporterResource(t, db, tt.resourceType, tt.reporterType)
 			}
 
-			count, err := deleteBatchedReporterResources(db, logger, true, tt.resourceType, tt.reporterType)
+			count, err := deleteBatchedReporterResources(db, logger, true, tt.resourceType, tt.reporterType, 100, 0)
 
 			assert.NoError(t, err)
 			assert.Equal(t, tt.expectedCount, count)
@@ -169,7 +169,7 @@ func TestDeleteBatchedReporterResources_ActualDeletion(t *testing.T) {
 		Count(&initialCount)
 	assert.Equal(t, int64(recordCount), initialCount)
 
-	deletedCount, err := deleteBatchedReporterResources(db, logger, false, resourceType, reporterType)
+	deletedCount, err := deleteBatchedReporterResources(db, logger, false, resourceType, reporterType, 100, 0)
 
 	assert.NoError(t, err)
 	assert.Equal(t, int64(recordCount), deletedCount)
@@ -189,7 +189,7 @@ func TestDeleteBatchedReporterResources_FiltersByType(t *testing.T) {
 	createTestReporterResource(t, db, "host", "ocm")
 	createTestReporterResource(t, db, "k8s-cluster", "hbi")
 
-	deletedCount, err := deleteBatchedReporterResources(db, logger, false, "host", "hbi")
+	deletedCount, err := deleteBatchedReporterResources(db, logger, false, "host", "hbi", 100, 0)
 
 	assert.NoError(t, err)
 	assert.Equal(t, int64(1), deletedCount)
@@ -236,7 +236,7 @@ func TestDeleteBatchedCommonRepresentations_DryRun(t *testing.T) {
 				createTestCommonRepresentation(t, db, tt.reporterType)
 			}
 
-			count, err := deleteBatchedCommonRepresentations(db, logger, true, tt.reporterType)
+			count, err := deleteBatchedCommonRepresentations(db, logger, true, tt.reporterType, 100, 0)
 
 			assert.NoError(t, err)
 			assert.Equal(t, tt.expectedCount, count)
@@ -287,7 +287,7 @@ func TestDeleteBatchedResources_DryRun(t *testing.T) {
 				createTestResource(t, db, tt.resourceType)
 			}
 
-			count, err := deleteBatchedResources(db, logger, true, tt.resourceType)
+			count, err := deleteBatchedResources(db, logger, true, tt.resourceType, 100, 0)
 
 			assert.NoError(t, err)
 			assert.Equal(t, tt.expectedCount, count)
@@ -318,7 +318,7 @@ func TestDeleteBatchedResources_ActualDeletion(t *testing.T) {
 		Count(&initialCount)
 	assert.Equal(t, int64(recordCount), initialCount)
 
-	deletedCount, err := deleteBatchedResources(db, logger, false, resourceType)
+	deletedCount, err := deleteBatchedResources(db, logger, false, resourceType, 100, 0)
 
 	assert.NoError(t, err)
 	assert.Equal(t, int64(recordCount), deletedCount)
@@ -338,7 +338,7 @@ func TestDeleteBatchedResources_FiltersByResourceType(t *testing.T) {
 	createTestResource(t, db, "k8s-cluster")
 	createTestResource(t, db, "host")
 
-	deletedCount, err := deleteBatchedResources(db, logger, false, "host")
+	deletedCount, err := deleteBatchedResources(db, logger, false, "host", 100, 0)
 
 	assert.NoError(t, err)
 	assert.Equal(t, int64(2), deletedCount)
@@ -352,7 +352,7 @@ func TestDeleteBatchedReporterResources_EmptyBatchTermination(t *testing.T) {
 	db := setupTestDB(t)
 	logger := testLogger()
 
-	deletedCount, err := deleteBatchedReporterResources(db, logger, false, "nonexistent-type", "nonexistent-reporter")
+	deletedCount, err := deleteBatchedReporterResources(db, logger, false, "nonexistent-type", "nonexistent-reporter", 100, 0)
 
 	assert.NoError(t, err)
 	assert.Equal(t, int64(0), deletedCount)

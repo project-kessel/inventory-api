@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/go-kratos/kratos/v2/log"
-	"github.com/google/uuid"
 	"github.com/project-kessel/inventory-api/cmd/common"
 	"github.com/project-kessel/inventory-api/internal/data/model"
 	"github.com/project-kessel/inventory-api/internal/storage"
@@ -14,27 +13,31 @@ import (
 )
 
 const (
-	DeleteBatchSize = 5000
-	BatchDelayMs    = 100
+	DefaultBatchSize  = 5000
+	DefaultBatchDelay = 1000
 )
 
 func NewResourceDeleteJobCommand(storageOptions *storage.Options, loggerOptions common.LoggerOptions) *cobra.Command {
 	var dryRun bool
 	var resourceType string
 	var reporterType string
+	var batchSize int
+	var batchDelayMs int
 
 	cmd := &cobra.Command{
 		Use:   "resource-delete-job",
 		Short: "Delete resources from the database",
 		Long:  "Delete resources from the database by resource type and reporter type",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return deleteResources(storageOptions, loggerOptions, dryRun, resourceType, reporterType)
+			return deleteResources(storageOptions, loggerOptions, dryRun, resourceType, reporterType, batchSize, batchDelayMs)
 		},
 	}
 
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "Preview deletion counts without executing any deletes")
 	cmd.Flags().StringVar(&resourceType, "resource-type", "", "The resource type to delete (e.g., 'host', 'k8s-cluster')")
 	cmd.Flags().StringVar(&reporterType, "reporter-type", "", "The reporter type to filter by (e.g., 'hbi', 'ocm')")
+	cmd.Flags().IntVar(&batchSize, "batch-size", DefaultBatchSize, "Number of records to delete per batch")
+	cmd.Flags().IntVar(&batchDelayMs, "batch-delay-ms", DefaultBatchDelay, "Delay between batches in milliseconds")
 
 	_ = cmd.MarkFlagRequired("resource-type")
 	_ = cmd.MarkFlagRequired("reporter-type")
@@ -42,7 +45,7 @@ func NewResourceDeleteJobCommand(storageOptions *storage.Options, loggerOptions 
 	return cmd
 }
 
-func deleteResources(storageOptions *storage.Options, loggerOptions common.LoggerOptions, dryRun bool, resourceType string, reporterType string) error {
+func deleteResources(storageOptions *storage.Options, loggerOptions common.LoggerOptions, dryRun bool, resourceType string, reporterType string, batchSize int, batchDelayMs int) error {
 	_, logger := common.InitLogger(common.GetLogLevel(), loggerOptions)
 	logHelper := log.NewHelper(log.With(logger, "job", "delete_resources"))
 
@@ -67,25 +70,25 @@ func deleteResources(storageOptions *storage.Options, loggerOptions common.Logge
 
 	logHelper.Infof("Starting resource deletion job for resource_type=%s, reporter_type=%s", resourceType, reporterType)
 	if !dryRun {
-		logHelper.Infof("Using batch size: %d rows, delay between batches: %dms", DeleteBatchSize, BatchDelayMs)
+		logHelper.Infof("Using batch size: %d rows, delay between batches: %dms", batchSize, batchDelayMs)
 	}
 
 	// Delete ReporterResource records in batches (CASCADE will automatically delete ReporterRepresentation)
-	totalReporterResources, err := deleteBatchedReporterResources(db, logHelper, dryRun, resourceType, reporterType)
+	totalReporterResources, err := deleteBatchedReporterResources(db, logHelper, dryRun, resourceType, reporterType, batchSize, batchDelayMs)
 	if err != nil {
 		return err
 	}
 	logDeleteResult(logHelper, dryRun, "ReporterResource records (ReporterRepresentation cascade deleted)", totalReporterResources)
 
 	// Delete CommonRepresentation records in batches
-	totalCommonRepresentations, err := deleteBatchedCommonRepresentations(db, logHelper, dryRun, reporterType)
+	totalCommonRepresentations, err := deleteBatchedCommonRepresentations(db, logHelper, dryRun, reporterType, batchSize, batchDelayMs)
 	if err != nil {
 		return err
 	}
 	logDeleteResult(logHelper, dryRun, "CommonRepresentation records", totalCommonRepresentations)
 
 	// Delete Resource records in batches
-	totalResources, err := deleteBatchedResources(db, logHelper, dryRun, resourceType)
+	totalResources, err := deleteBatchedResources(db, logHelper, dryRun, resourceType, batchSize, batchDelayMs)
 	if err != nil {
 		return err
 	}
@@ -103,13 +106,13 @@ func deleteResources(storageOptions *storage.Options, loggerOptions common.Logge
 	return nil
 }
 
-func logDryRunEstimate(logHelper *log.Helper, entityName string, count int64) {
-	estimatedBatches := (count + DeleteBatchSize - 1) / DeleteBatchSize
-	estimatedSeconds := estimatedBatches * int64(BatchDelayMs) / 1000
+func logDryRunEstimate(logHelper *log.Helper, entityName string, count int64, batchSize int, batchDelayMs int) {
+	estimatedBatches := (count + int64(batchSize) - 1) / int64(batchSize)
+	estimatedSeconds := estimatedBatches * int64(batchDelayMs) / 1000
 
 	logHelper.Infof("[DRY-RUN] %s: Found %d records", entityName, count)
 	logHelper.Infof("[DRY-RUN] Estimated batches: %d", estimatedBatches)
-	logHelper.Infof("[DRY-RUN] Estimated time: ~%d seconds", estimatedSeconds)
+	logHelper.Infof("[DRY-RUN] Estimated time: ~%d seconds. This is based on the number of batches and the delay between batches and does not account for the actual time it takes to delete the records.", estimatedSeconds)
 }
 
 func logDeleteResult(logHelper *log.Helper, dryRun bool, description string, count int64) {
@@ -120,52 +123,58 @@ func logDeleteResult(logHelper *log.Helper, dryRun bool, description string, cou
 	}
 }
 
-func deleteBatchedByIDs(db *gorm.DB, logHelper *log.Helper, entityName string, model interface{}, whereClause string, whereArgs ...interface{}) (int64, error) {
+func deleteBatchedByIDs(db *gorm.DB, logHelper *log.Helper, entityName string, model interface{}, batchSize int, batchDelayMs int, whereClause string, whereArgs ...interface{}) (int64, error) {
 	var totalDeleted int64
 	batchCount := 0
+
+	// Get the table name from the model
+	stmt := &gorm.Statement{DB: db}
+	if err := stmt.Parse(model); err != nil {
+		logHelper.Errorf("Failed to parse model for %s: %v", entityName, err)
+		return 0, err
+	}
+	tableName := stmt.Schema.Table
 
 	logHelper.Infof("Starting batched deletion of %s records...", entityName)
 
 	for {
-		var ids []uuid.UUID
-		result := db.Model(model).
-			Where(whereClause, whereArgs...).
-			Limit(DeleteBatchSize).
-			Pluck("id", &ids)
+		// Use subquery-based DELETE to avoid separate SELECT query
+		query := fmt.Sprintf(`
+			DELETE FROM %s
+			WHERE id IN (
+				SELECT id
+				FROM %s
+				WHERE %s
+				LIMIT ?
+			)
+		`, tableName, tableName, whereClause)
+
+		args := append(whereArgs, batchSize)
+		result := db.Exec(query, args...)
 
 		if result.Error != nil {
-			logHelper.Errorf("Failed to fetch %s IDs for batch %d: %v", entityName, batchCount+1, result.Error)
+			logHelper.Errorf("Failed to delete %s batch %d: %v", entityName, batchCount+1, result.Error)
 			return totalDeleted, result.Error
 		}
 
-		if len(ids) == 0 {
+		if result.RowsAffected == 0 {
 			break
 		}
 
-		deleteResult := db.Where("id IN ?", ids).Delete(model)
-		if deleteResult.Error != nil {
-			logHelper.Errorf("Failed to delete %s batch %d: %v", entityName, batchCount+1, deleteResult.Error)
-			return totalDeleted, deleteResult.Error
-		}
-
-		totalDeleted += deleteResult.RowsAffected
+		totalDeleted += result.RowsAffected
 		batchCount++
 
-		logHelper.Infof("Batch %d: Deleted %d %s records (total so far: %d)", batchCount, deleteResult.RowsAffected, entityName, totalDeleted)
+		logHelper.Infof("Batch %d: Deleted %d %s records (total so far: %d)", batchCount, result.RowsAffected, entityName, totalDeleted)
 
-		if len(ids) < DeleteBatchSize {
-			break
-		}
-
-		if BatchDelayMs > 0 {
-			time.Sleep(time.Duration(BatchDelayMs) * time.Millisecond)
+		if batchDelayMs > 0 {
+			time.Sleep(time.Duration(batchDelayMs) * time.Millisecond)
 		}
 	}
 
 	return totalDeleted, nil
 }
 
-func deleteBatchedReporterResources(db *gorm.DB, logHelper *log.Helper, dryRun bool, resourceType string, reporterType string) (int64, error) {
+func deleteBatchedReporterResources(db *gorm.DB, logHelper *log.Helper, dryRun bool, resourceType string, reporterType string, batchSize int, batchDelayMs int) (int64, error) {
 	if dryRun {
 		var count int64
 		result := db.Model(&model.ReporterResource{}).
@@ -177,15 +186,15 @@ func deleteBatchedReporterResources(db *gorm.DB, logHelper *log.Helper, dryRun b
 			return 0, result.Error
 		}
 
-		logDryRunEstimate(logHelper, "ReporterResource", count)
+		logDryRunEstimate(logHelper, "ReporterResource", count, batchSize, batchDelayMs)
 		return count, nil
 	}
 
-	return deleteBatchedByIDs(db, logHelper, "ReporterResource", &model.ReporterResource{},
+	return deleteBatchedByIDs(db, logHelper, "ReporterResource", &model.ReporterResource{}, batchSize, batchDelayMs,
 		"resource_type = ? AND reporter_type = ?", resourceType, reporterType)
 }
 
-func deleteBatchedCommonRepresentations(db *gorm.DB, logHelper *log.Helper, dryRun bool, reporterType string) (int64, error) {
+func deleteBatchedCommonRepresentations(db *gorm.DB, logHelper *log.Helper, dryRun bool, reporterType string, batchSize int, batchDelayMs int) (int64, error) {
 	if dryRun {
 		var count int64
 		result := db.Model(&model.CommonRepresentation{}).
@@ -197,7 +206,7 @@ func deleteBatchedCommonRepresentations(db *gorm.DB, logHelper *log.Helper, dryR
 			return 0, result.Error
 		}
 
-		logDryRunEstimate(logHelper, "CommonRepresentation", count)
+		logDryRunEstimate(logHelper, "CommonRepresentation", count, batchSize, batchDelayMs)
 		return count, nil
 	}
 
@@ -207,17 +216,16 @@ func deleteBatchedCommonRepresentations(db *gorm.DB, logHelper *log.Helper, dryR
 	logHelper.Info("Starting batched deletion of CommonRepresentation records...")
 
 	for {
-		// Use PostgreSQL-specific subquery with CTID to batch delete
-		// CTID is the physical row identifier, allowing us to LIMIT deletes
+		// Use subquery with composite primary key to batch delete
 		result := db.Exec(`
 			DELETE FROM common_representations
-			WHERE ctid IN (
-				SELECT ctid
+			WHERE (resource_id, version) IN (
+				SELECT resource_id, version
 				FROM common_representations
 				WHERE reported_by_reporter_type = ?
 				LIMIT ?
 			)
-		`, reporterType, DeleteBatchSize)
+		`, reporterType, batchSize)
 
 		if result.Error != nil {
 			logHelper.Errorf("Failed to delete CommonRepresentation batch %d: %v", batchCount+1, result.Error)
@@ -233,15 +241,15 @@ func deleteBatchedCommonRepresentations(db *gorm.DB, logHelper *log.Helper, dryR
 
 		logHelper.Infof("Batch %d: Deleted %d CommonRepresentation records (total so far: %d)", batchCount, result.RowsAffected, totalDeleted)
 
-		if BatchDelayMs > 0 {
-			time.Sleep(time.Duration(BatchDelayMs) * time.Millisecond)
+		if batchDelayMs > 0 {
+			time.Sleep(time.Duration(batchDelayMs) * time.Millisecond)
 		}
 	}
 
 	return totalDeleted, nil
 }
 
-func deleteBatchedResources(db *gorm.DB, logHelper *log.Helper, dryRun bool, resourceType string) (int64, error) {
+func deleteBatchedResources(db *gorm.DB, logHelper *log.Helper, dryRun bool, resourceType string, batchSize int, batchDelayMs int) (int64, error) {
 	if dryRun {
 		var count int64
 		result := db.Model(&model.Resource{}).
@@ -253,10 +261,10 @@ func deleteBatchedResources(db *gorm.DB, logHelper *log.Helper, dryRun bool, res
 			return 0, result.Error
 		}
 
-		logDryRunEstimate(logHelper, "Resource", count)
+		logDryRunEstimate(logHelper, "Resource", count, batchSize, batchDelayMs)
 		return count, nil
 	}
 
-	return deleteBatchedByIDs(db, logHelper, "Resource", &model.Resource{},
+	return deleteBatchedByIDs(db, logHelper, "Resource", &model.Resource{}, batchSize, batchDelayMs,
 		"type = ?", resourceType)
 }

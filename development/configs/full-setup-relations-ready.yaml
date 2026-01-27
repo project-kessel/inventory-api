@@ -12,7 +12,7 @@ authz:
     url: relations-api:9000
     enable-oidc-auth: false
     principal-user-domain: 0.0.0.0:8084
-    allow-client-consistency-preference: true
+    default-to-at-least-as-acknowledged: true
 eventing:
   eventer: stdout
   kafka:

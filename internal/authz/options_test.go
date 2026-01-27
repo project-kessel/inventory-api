@@ -16,8 +16,9 @@ func TestNewOptions(t *testing.T) {
 	}{
 		options: NewOptions(),
 		expectedOptions: &Options{
-			Authz:  AllowAll,
-			Kessel: kessel.NewOptions(),
+			Authz:          AllowAll,
+			Kessel:         kessel.NewOptions(),
+			MetaAuthorizer: nil, // Default to nil - disabled by default
 		},
 	}
 	assert.Equal(t, test.expectedOptions, NewOptions())
@@ -34,9 +35,9 @@ func TestOptions_AddFlags(t *testing.T) {
 	test.options.AddFlags(fs, prefix)
 
 	// the below logic ensures that every possible option defined in the Options type
-	// has a defined flag for that option; kessel section is skipped in favor of testing
-	// in its own package
-	helpers.AllOptionsHaveFlags(t, prefix, fs, *test.options, []string{"kessel"})
+	// has a defined flag for that option; kessel and metaauthorizer sections are skipped
+	// in favor of testing in their own packages or via config files
+	helpers.AllOptionsHaveFlags(t, prefix, fs, *test.options, []string{"kessel", "metaauthorizer"})
 }
 
 func TestOptions_Validate(t *testing.T) {

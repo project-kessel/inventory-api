@@ -20,7 +20,7 @@ import (
 // New creates a new a gRPC server.
 // authenticator is optional - if provided, uses the new aggregating authenticator for streams.
 // If nil, falls back to OIDC-only authentication (backwards compatible).
-func New(c CompletedConfig, authn middleware.Middleware, authnConfig authn.CompletedConfig, authenticator authnapi.Authenticator, meter metric.Meter, logger log.Logger) (*kgrpc.Server, error) {
+func New(c CompletedConfig, authn middleware.Middleware, metaAuthorizerMiddleware middleware.Middleware, authnConfig authn.CompletedConfig, authenticator authnapi.Authenticator, meter metric.Meter, logger log.Logger) (*kgrpc.Server, error) {
 	requests, err := metrics.DefaultRequestsCounter(meter, metrics.DefaultServerRequestsCounterName)
 	if err != nil {
 		return nil, err
@@ -60,6 +60,7 @@ func New(c CompletedConfig, authn middleware.Middleware, authnConfig authn.Compl
 			m.Validation(validator),
 			selector.Server(
 				authn,
+				metaAuthorizerMiddleware,
 			).Match(NewWhiteListMatcher).Build(),
 		),
 		kgrpc.StreamMiddleware(

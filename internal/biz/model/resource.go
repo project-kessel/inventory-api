@@ -66,6 +66,10 @@ func NewResource(id ResourceId, localResourceId LocalResourceId, resourceType Re
 		return Resource{}, fmt.Errorf("resource invalid ResourceReportEvent: %w", err)
 	}
 
+	// Set timestamps for new resource
+	now := time.Now()
+	resourceEvent.SetTimestamps(now, now)
+
 	reporterResources := []ReporterResource{reporterResource}
 
 	resource := Resource{
@@ -124,6 +128,13 @@ func (r *Resource) Update(
 	if err != nil {
 		return fmt.Errorf("failed to create updated ResourceReportEvent: %w", err)
 	}
+
+	// Preserve the original created_at and set updated_at to current time
+	existingCreatedAt, _ := r.GetTimestamps()
+	if existingCreatedAt.IsZero() {
+		return fmt.Errorf("invalid state: no existing events found for resource update")
+	}
+	resourceEvent.SetTimestamps(existingCreatedAt, time.Now())
 
 	r.resourceReportEvents = []ResourceReportEvent{resourceEvent}
 	return nil
@@ -293,6 +304,14 @@ func (r Resource) ConsistencyToken() ConsistencyToken {
 	return r.consistencyToken
 }
 
+// GetTimestamps returns createdAt and updatedAt from the resource's events, or zero times if no events exist
+func (r Resource) GetTimestamps() (createdAt time.Time, updatedAt time.Time) {
+	if len(r.resourceReportEvents) > 0 {
+		return r.resourceReportEvents[0].createdAt, r.resourceReportEvents[0].updatedAt
+	}
+	return time.Time{}, time.Time{}
+}
+
 // Serialization + Deserialization functions, direct initialization without validation
 func (r Resource) Serialize() (ResourceSnapshot, ReporterResourceSnapshot, ReporterRepresentationSnapshot, CommonRepresentationSnapshot, error) {
 	var createdAt, updatedAt time.Time
@@ -349,7 +368,7 @@ func DeserializeResource(
 		reporterResources = append(reporterResources, reporterResource)
 	}
 
-	resourceEvent := DeserializeResourceEvent(reporterRepresentationSnapshot, commonRepresentationSnapshot)
+	resourceEvent := DeserializeResourceEvent(reporterRepresentationSnapshot, commonRepresentationSnapshot, resourceSnapshot.CreatedAt, resourceSnapshot.UpdatedAt)
 
 	return &Resource{
 		id:                   DeserializeResourceId(resourceSnapshot.ID),

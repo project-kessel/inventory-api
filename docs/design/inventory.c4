@@ -1,0 +1,84 @@
+specification {
+    element actor
+    element layer
+    element package
+    element component
+    element aggregate
+    element entity
+    element valueobject
+}
+
+model {
+    caller = actor 'Caller' {
+        style {
+            shape person
+            color amber
+        }
+    }
+
+    main = layer 'Main'
+    presentation = layer 'Presentation' {
+        description 'Maps between transport (gRPC/etc) and application layer'
+        Server = component 'Server' {
+            description 'Background goroutine and socket listener that dispatches requests'
+        }
+        InventoryService = component 'InventoryService'
+        Authentication = component 'Authentication Middleware' {
+            description 'Parses Authorization Context from incoming requests'
+        }
+        
+
+        Server -> InventoryService 'dispatches'
+        Server -> Authentication 'authenticates'
+    }
+    application = layer 'Application' {
+        description 'Models external commands and queries in a protocol-agnostic way'
+        lifecycle = layer 'Resource Lifecycle' {
+            ResourceUsecase = component 'Resource Usecase'
+            RelationReplicationUsecase = component 'Relation Replication Usecase'
+        }
+        schema = layer 'Schema' {
+            SchemaUsecase = component 'Schema Usecase' {
+                description 'Operations for schema management'
+            }
+        }
+    }
+    domain = layer 'Domain' {
+        SchemaService = component 'Schema Service'
+        ResourceFactory = component 'Resource Factory'
+        ResourceRepository = component 'ResourceRepository'
+        SchemaRepository = component 'SchemaRepository'
+        EventSource = component 'Event Source'
+        Resource = aggregate 'Resource'
+        Schema = aggregate 'Schema'
+        Representation = valueobject 'Representation'
+    }
+    infrastructure = layer 'Infrastructure' {
+        PgResourceRepository = component 'PostgreSQL ResourceRepository'
+        KafkaEventSource = component 'Kafka Event Source'
+    }
+
+    caller -> presentation 'interacts with'
+    main -> presentation 'bootstraps'
+    main -> infrastructure 'configures'
+    main -> application 'invokes\n(CLI commands)'
+    application -> domain 'uses'
+
+    InventoryService -> ResourceUsecase 'invokes'
+    InventoryService -> SchemaUsecase 'invokes'
+
+    PgResourceRepository -> ResourceRepository 'implements'
+    KafkaEventSource -> EventSource 'implements'
+}
+
+views {
+    view index {
+        include *
+        include presentation.*
+        include application.*
+        include application.lifecycle.*
+        include application.schema.*
+        include domain.*
+        include infrastructure.*
+    }
+}

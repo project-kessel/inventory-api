@@ -2,16 +2,15 @@ package resources
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"strings"
 
 	"github.com/go-kratos/kratos/v2/log"
 	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2"
+	authnapi "github.com/project-kessel/inventory-api/internal/authn/api"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
 	"github.com/project-kessel/inventory-api/internal/biz/usecase/resources"
-	"github.com/project-kessel/inventory-api/internal/middleware"
 	pbv1beta1 "github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
 	rpcstatus "google.golang.org/genproto/googleapis/rpc/status"
 	"google.golang.org/grpc/codes"
@@ -30,14 +29,16 @@ func NewKesselInventoryServiceV1beta2(c *resources.Usecase) *InventoryService {
 }
 
 func (c *InventoryService) ReportResource(ctx context.Context, r *pb.ReportResourceRequest) (*pb.ReportResourceResponse, error) {
-	claims, err := middleware.GetClaims(ctx)
-	if err != nil {
-		log.Errorf("failed to get claims: %v", err)
-		return nil, status.Error(codes.Unauthenticated, "failed to get claims")
+	// Get SubjectId from AuthzContext (populated by auth middleware)
+	// TODO: push this to report resource to get its own reporter principal OR pass authzcontext as param to all Usecase methods
+	authzCtx, ok := authnapi.FromAuthzContext(ctx)
+	if !ok || authzCtx.Claims == nil {
+		log.Errorf("failed to get authz context or claims")
+		return nil, status.Error(codes.Unauthenticated, "authentication required")
 	}
-	err = c.Ctl.ReportResource(ctx, r, string(claims.SubjectId))
+	err := c.Ctl.ReportResource(ctx, r, string(authzCtx.Claims.SubjectId))
 	if err != nil {
-		return nil, mapServiceError(err)
+		return nil, err
 	}
 
 	return ResponseFromResource(), nil
@@ -45,78 +46,51 @@ func (c *InventoryService) ReportResource(ctx context.Context, r *pb.ReportResou
 }
 
 func (c *InventoryService) DeleteResource(ctx context.Context, r *pb.DeleteResourceRequest) (*pb.DeleteResourceResponse, error) {
-
-	_, err := middleware.GetClaims(ctx)
+	reporterResourceKey, err := reporterKeyFromResourceReference(r.GetReference())
 	if err != nil {
-		log.Errorf("failed to get claims: %v", err)
-		return nil, status.Error(codes.Unauthenticated, "failed to get claims")
-	}
-	if reporterResourceKey, err := reporterKeyFromResourceReference(r.GetReference()); err == nil {
-		if err = c.Ctl.Delete(ctx, reporterResourceKey); err == nil {
-			return ResponseFromDeleteResource(), nil
-		} else {
-			log.Error("Failed to delete resource: ", err)
-
-			if mapped := mapServiceError(err); mapped != err {
-				return nil, mapped
-			}
-			// Default to internal error for unknown errors
-			return nil, status.Errorf(codes.Internal, "failed to delete resource due to an internal error")
-		}
-	} else {
 		log.Error("Failed to build reporter resource key: ", err)
-		return nil, status.Errorf(codes.InvalidArgument, "failed to build reporter resource key: %v", err)
+		return nil, err
 	}
+	if err = c.Ctl.Delete(ctx, reporterResourceKey); err != nil {
+		log.Error("Failed to delete resource: ", err)
+		return nil, err
+	}
+	return ResponseFromDeleteResource(), nil
 }
 
 func (s *InventoryService) Check(ctx context.Context, req *pb.CheckRequest) (*pb.CheckResponse, error) {
-	_, err := middleware.GetClaims(ctx)
+	reporterResourceKey, err := reporterKeyFromResourceReference(req.Object)
 	if err != nil {
-		log.Errorf("failed to get claims: %v", err)
-		return nil, status.Error(codes.Unauthenticated, "failed to get claims")
-	}
-	if reporterResourceKey, err := reporterKeyFromResourceReference(req.Object); err == nil {
-		if resp, err := s.Ctl.Check(ctx, req.GetRelation(), req.Object.Reporter.GetType(), subjectReferenceFromSubject(req.GetSubject()), reporterResourceKey); err == nil {
-			return viewResponseFromAuthzRequestV1beta2(resp), nil
-		} else {
-			return nil, mapServiceError(err)
-		}
-	} else {
 		log.Error("Failed to build reporter resource key: ", err)
-		return nil, status.Errorf(codes.InvalidArgument, "failed to build reporter resource key: %v", err)
+		return nil, err
 	}
+	resp, err := s.Ctl.Check(ctx, req.GetRelation(), req.Object.Reporter.GetType(), subjectReferenceFromSubject(req.GetSubject()), reporterResourceKey)
+	if err != nil {
+		return nil, err
+	}
+	return viewResponseFromAuthzRequestV1beta2(resp), nil
 }
 
 func (s *InventoryService) CheckForUpdate(ctx context.Context, req *pb.CheckForUpdateRequest) (*pb.CheckForUpdateResponse, error) {
-	_, err := middleware.GetClaims(ctx)
-	if err != nil {
-		log.Errorf("failed to get claims: %v", err)
-		return nil, status.Error(codes.Unauthenticated, "failed to get claims")
-	}
 	log.Info("CheckForUpdate using v1beta2 db")
-	if reporterResourceKey, err := reporterKeyFromResourceReference(req.Object); err == nil {
-		if resp, err := s.Ctl.CheckForUpdate(ctx, req.GetRelation(), req.Object.Reporter.GetType(), subjectReferenceFromSubject(req.GetSubject()), reporterResourceKey); err == nil {
-			return updateResponseFromAuthzRequestV1beta2(resp), nil
-		} else {
-			return nil, mapServiceError(err)
-		}
-	} else {
+	reporterResourceKey, err := reporterKeyFromResourceReference(req.Object)
+	if err != nil {
 		log.Error("Failed to build reporter resource key: ", err)
-		return nil, status.Errorf(codes.InvalidArgument, "failed to build reporter resource key: %v", err)
+		return nil, err
 	}
+	resp, err := s.Ctl.CheckForUpdate(ctx, req.GetRelation(), req.Object.Reporter.GetType(), subjectReferenceFromSubject(req.GetSubject()), reporterResourceKey)
+	if err != nil {
+		return nil, err
+	}
+	return updateResponseFromAuthzRequestV1beta2(resp), nil
 }
 
 func (s *InventoryService) CheckBulk(ctx context.Context, req *pb.CheckBulkRequest) (*pb.CheckBulkResponse, error) {
-	_, err := middleware.GetClaims(ctx)
-	if err != nil {
-		log.Errorf("failed to get claims: %v", err)
-		return nil, status.Error(codes.Unauthenticated, "failed to get claims")
-	}
 	log.Info("CheckBulk using v1beta2 db")
 	v1beta1Req := mapCheckBulkRequestToV1beta1(req)
 	resp, err := s.Ctl.CheckBulk(ctx, v1beta1Req)
 	if err != nil {
-		return nil, mapServiceError(err)
+		return nil, err
 	}
 	return mapCheckBulkResponseFromV1beta1(resp), nil
 }
@@ -133,7 +107,7 @@ func (s *InventoryService) CheckSelf(ctx context.Context, req *pb.CheckSelfReque
 			// If consistency token is needed, usecase.Check would need to be enhanced
 			return response, nil
 		} else {
-			return nil, mapServiceError(err)
+			return nil, err
 		}
 	} else {
 		return nil, err
@@ -149,7 +123,7 @@ func (s *InventoryService) CheckSelfBulk(ctx context.Context, req *pb.CheckSelfB
 	v1beta1Req := mapCheckSelfBulkRequestToV1beta1(req)
 	resp, err := s.Ctl.CheckSelfBulk(ctx, v1beta1Req)
 	if err != nil {
-		return nil, mapServiceError(err)
+		return nil, err
 	}
 	mappedResp, err := mapCheckSelfBulkResponseFromV1beta1(resp, req)
 	if err != nil {
@@ -382,55 +356,20 @@ func mapCheckSelfBulkResponseFromV1beta1(resp *pbv1beta1.CheckBulkResponse, req 
 	return response, nil
 }
 
-func mapServiceError(err error) error {
-	if err == nil {
-		return nil
-	}
-	if st, ok := status.FromError(err); ok && st.Code() != codes.Unknown {
-		return err
-	}
-	switch {
-	case errors.Is(err, resources.ErrMetaAuthzContextMissing):
-		return status.Error(codes.Unauthenticated, "authz context missing")
-	case errors.Is(err, resources.ErrSelfSubjectMissing):
-		return status.Error(codes.Unauthenticated, "self subject missing")
-	case errors.Is(err, resources.ErrMetaAuthorizerUnavailable):
-		return status.Error(codes.Internal, "meta authorizer unavailable")
-	case errors.Is(err, resources.ErrMetaAuthorizationDenied):
-		return status.Error(codes.PermissionDenied, "meta authorization denied")
-	case errors.Is(err, resources.ErrResourceNotFound):
-		return status.Error(codes.NotFound, "resource not found")
-	case errors.Is(err, resources.ErrResourceAlreadyExists):
-		return status.Error(codes.AlreadyExists, "resource already exists")
-	case errors.Is(err, resources.ErrInventoryIdMismatch):
-		return status.Error(codes.FailedPrecondition, "resource inventory id mismatch")
-	case errors.Is(err, resources.ErrDatabaseError):
-		return status.Error(codes.Internal, "internal error")
-	case errors.Is(err, context.Canceled):
-		return status.Error(codes.Canceled, "request canceled")
-	case errors.Is(err, context.DeadlineExceeded):
-		return status.Error(codes.DeadlineExceeded, "request deadline exceeded")
-	default:
-		return err
-	}
-}
-
 func (s *InventoryService) StreamedListObjects(
 	req *pb.StreamedListObjectsRequest,
 	stream pb.KesselInventoryService_StreamedListObjectsServer,
 ) error {
 	ctx := stream.Context()
-	// Example: how to use get the claims from the stream context
-	// claims, err := interceptor.FromContextClaims(ctx)
-	// log.Info(claims)
+
 	lookupReq, err := ToLookupResourceRequest(req)
 	if err != nil {
-		return fmt.Errorf("failed to build lookup request: %w", err)
+		return err
 	}
 
 	clientStream, err := s.Ctl.LookupResources(ctx, lookupReq)
 	if err != nil {
-		return fmt.Errorf("failed to retrieve resources: %w", err)
+		return err
 	}
 
 	for {
@@ -441,12 +380,12 @@ func (s *InventoryService) StreamedListObjects(
 			return nil
 		}
 		if err != nil {
-			return fmt.Errorf("error receiving resource: %w", err)
+			return err
 		}
 
 		// Convert and send the response to the client
 		if err := stream.Send(ToLookupResourceResponse(resp)); err != nil {
-			return fmt.Errorf("error sending resource to client: %w", err)
+			return err
 		}
 	}
 }

@@ -2066,6 +2066,49 @@ func TestInventoryService_StreamedListObjects_NoIdentity(t *testing.T) {
 	assert.Equal(t, codes.Unauthenticated, grpcStatus.Code())
 }
 
+func TestInventoryService_StreamedListObjects_MetaAuthzDenied(t *testing.T) {
+	// Test that meta-authorization denial is properly mapped to PermissionDenied
+	// for streaming RPCs.
+	claims := &authnapi.Claims{
+		SubjectId: authnapi.SubjectId("user-123"),
+		AuthType:  authnapi.AuthTypeXRhIdentity,
+	}
+
+	reporterType := "hbi"
+	req := &pb.StreamedListObjectsRequest{
+		ObjectType: &pb.RepresentationType{
+			ReporterType: &reporterType,
+			ResourceType: "host",
+		},
+		Relation: "view",
+		Subject: &pb.SubjectReference{
+			Resource: &pb.ResourceReference{
+				ResourceId:   "subject-xyz",
+				ResourceType: "principal",
+				Reporter:     &pb.ReporterReference{Type: "rbac"},
+			},
+		},
+	}
+
+	uc := newTestUsecase(testUsecaseConfig{
+		MetaAuthorizer: &DenyingMetaAuthorizer{},
+	})
+	client := newTestServer(t, testServerConfig{
+		Usecase:       uc,
+		Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+	})
+
+	stream, err := client.StreamedListObjects(context.Background(), req)
+	require.NoError(t, err) // Stream creation succeeds
+
+	// First Recv should return the mapped error
+	_, err = stream.Recv()
+	assert.Error(t, err)
+	grpcStatus, ok := status.FromError(err)
+	assert.True(t, ok)
+	assert.Equal(t, codes.PermissionDenied, grpcStatus.Code())
+}
+
 // --- CheckForUpdate with NoIdentity ---
 
 func TestInventoryService_CheckForUpdate_NoIdentity(t *testing.T) {

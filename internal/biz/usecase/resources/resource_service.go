@@ -12,7 +12,6 @@ import (
 	"github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2"
 	"github.com/project-kessel/inventory-api/cmd/common"
 	authnapi "github.com/project-kessel/inventory-api/internal/authn/api"
-	"github.com/project-kessel/inventory-api/internal/authn/interceptor"
 	authzapi "github.com/project-kessel/inventory-api/internal/authz/api"
 	"github.com/project-kessel/inventory-api/internal/biz"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
@@ -21,7 +20,6 @@ import (
 	eventingapi "github.com/project-kessel/inventory-api/internal/eventing/api"
 	"github.com/project-kessel/inventory-api/internal/metricscollector"
 	"github.com/project-kessel/inventory-api/internal/pubsub"
-	"github.com/project-kessel/inventory-api/internal/server"
 	"github.com/project-kessel/inventory-api/internal/subject/selfsubject"
 	kessel "github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
 	"github.com/sony/gobreaker"
@@ -36,15 +34,16 @@ const (
 	ReportResourceOperationName = "ReportResource"
 )
 
+// Domain errors re-exported from model package.
 var (
-	// ErrResourceNotFound indicates that the requested resource could not be found in the database.
-	ErrResourceNotFound = errors.New("resource not found")
-	// ErrDatabaseError indicates a generic database error occurred while querying for resources.
-	ErrDatabaseError = errors.New("db error while querying for resource")
-	// ErrResourceAlreadyExists indicates that a resource with the same identifier already exists.
-	ErrResourceAlreadyExists = errors.New("resource already exists")
-	// ErrInventoryIdMismatch indicates that the inventory ID in the request doesn't match the existing resource.
-	ErrInventoryIdMismatch = errors.New("resource inventory id mismatch")
+	ErrResourceNotFound      = model.ErrResourceNotFound
+	ErrDatabaseError         = model.ErrDatabaseError
+	ErrResourceAlreadyExists = model.ErrResourceAlreadyExists
+	ErrInventoryIdMismatch   = model.ErrInventoryIdMismatch
+)
+
+// Application-layer errors for meta-authorization and self-subject resolution.
+var (
 	// ErrMetaAuthorizerUnavailable indicates the meta authorizer is not configured.
 	ErrMetaAuthorizerUnavailable = errors.New("meta authorizer unavailable")
 	// ErrMetaAuthorizationDenied indicates the meta authorization check failed.
@@ -76,7 +75,6 @@ type Usecase struct {
 	// TODO: Remove; unused
 	Namespace           string
 	Log                 *log.Helper
-	Server              server.Server
 	ListenManager       pubsub.ListenManagerImpl
 	Config              *UsecaseConfig
 	MetricsCollector    *metricscollector.MetricsCollector
@@ -109,7 +107,6 @@ func New(resourceRepository data.ResourceRepository,
 }
 
 func (uc *Usecase) ReportResource(ctx context.Context, request *v1beta2.ReportResourceRequest, reporterPrincipal string) error {
-
 	reporterResourceKey, err := getReporterResourceKeyFromRequest(request)
 	if err != nil {
 		log.Error("failed to create reporter resource key: ", err)
@@ -120,8 +117,10 @@ func (uc *Usecase) ReportResource(ctx context.Context, request *v1beta2.ReportRe
 		return err
 	}
 
-	clientID := interceptor.GetClientIDFromContext(ctx)
-	log.Info("Reporting resource request: ", request, " client_id: ", clientID)
+	// Log client_id if available (from OIDC authentication)
+	if authzCtx, ok := authnapi.FromAuthzContext(ctx); ok && authzCtx.Claims != nil && authzCtx.Claims.ClientID != "" {
+		log.Infof("Reporting resource request from client_id: %s", authzCtx.Claims.ClientID)
+	}
 	var subscription pubsub.Subscription
 	txidStr, err := getNextTransactionID()
 	if err != nil {
@@ -220,8 +219,10 @@ func (uc *Usecase) Delete(ctx context.Context, reporterResourceKey model.Reporte
 	if err != nil {
 		return err
 	}
-	clientID := interceptor.GetClientIDFromContext(ctx)
-	log.Info("Reporter Resource Key to delete ", reporterResourceKey, " client_id: ", clientID)
+	// Log client_id if available (from OIDC authentication)
+	if authzCtx, ok := authnapi.FromAuthzContext(ctx); ok && authzCtx.Claims != nil && authzCtx.Claims.ClientID != "" {
+		log.Infof("Deleting resource %v from client_id: %s", reporterResourceKey, authzCtx.Claims.ClientID)
+	}
 
 	err = uc.resourceRepository.GetTransactionManager().HandleSerializableTransaction(
 		DeleteResourceOperationName,

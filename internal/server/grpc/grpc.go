@@ -11,7 +11,6 @@ import (
 	kgrpc "github.com/go-kratos/kratos/v2/transport/grpc"
 	"github.com/project-kessel/inventory-api/internal/authn"
 	authnapi "github.com/project-kessel/inventory-api/internal/authn/api"
-	"github.com/project-kessel/inventory-api/internal/authn/interceptor"
 	m "github.com/project-kessel/inventory-api/internal/middleware"
 	"go.opentelemetry.io/otel/metric"
 	"google.golang.org/grpc"
@@ -66,19 +65,21 @@ func New(c CompletedConfig, authnMiddleware middleware.Middleware, authnConfig a
 
 func NewWithDeps(deps ServerDeps) (*kgrpc.Server, error) {
 	// TODO: pass in health, authn middleware
-	var streamingInterceptor []grpc.StreamServerInterceptor
+	// Error mapping interceptor is always added for streaming RPCs
+	streamingInterceptor := []grpc.StreamServerInterceptor{
+		m.ErrorMappingStreamInterceptor(),
+	}
 
 	// Create stream interceptor using aggregating authenticator
 	// If authenticator is nil, it will be created from config (backwards compatible)
-	streamAuth, err := interceptor.NewStreamAuthInterceptorFromAuthenticator(deps.Authenticator, deps.Logger)
+	streamAuth, err := m.NewStreamAuthInterceptorFromAuthenticator(deps.Authenticator, deps.Logger)
 	if err != nil {
 		// If we can't create the authenticator, log warning but don't fail server startup
 		// This maintains backwards compatibility for edge cases
 		_ = deps.Logger.Log(log.LevelWarn, "msg", "Stream authentication interceptor not created", "error", err)
 	} else {
-		streamingInterceptor = []grpc.StreamServerInterceptor{
-			streamAuth.Interceptor(),
-		}
+		// Auth interceptor runs before error mapping (added to front of chain)
+		streamingInterceptor = append([]grpc.StreamServerInterceptor{streamAuth.Interceptor()}, streamingInterceptor...)
 	}
 
 	var authnMiddleware middleware.Middleware
@@ -97,11 +98,13 @@ func NewWithDeps(deps ServerDeps) (*kgrpc.Server, error) {
 			selector.Server(
 				authnMiddleware,
 			).Match(NewWhiteListMatcher).Build(),
+			m.ErrorMapping(),
 		),
 		kgrpc.StreamMiddleware(
 			recovery.Recovery(),
 			logging.Server(deps.Logger),
 			deps.Metrics,
+			// Error mapping handled by interceptor due to Kratos limitations
 		),
 		kgrpc.Options(grpc.ChainStreamInterceptor(
 			streamingInterceptor...,

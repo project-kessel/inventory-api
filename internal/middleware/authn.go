@@ -2,7 +2,6 @@ package middleware
 
 import (
 	"context"
-	"fmt"
 	"strings"
 
 	"github.com/go-kratos/kratos/v2/errors"
@@ -29,22 +28,11 @@ func Authentication(authenticator authnapi.Authenticator) func(middleware.Handle
 				token, hasToken := util.FromTokenContext(ctx)
 
 				claims, decision := authenticator.Authenticate(ctx, t)
-				if decision == authnapi.Deny {
-					return nil, errors.Unauthorized(reason, "Authentication denied")
-				} else if decision == authnapi.Ignore {
-					return nil, errors.Unauthorized(reason, "No valid authentication found")
-				} else if decision != authnapi.Allow {
-					// Handle any unexpected decision values
-					return nil, errors.Unauthorized(reason, fmt.Sprintf("Authentication failed with decision: %s", decision))
+				if err := validateAuthDecision(decision, claims); err != nil {
+					return nil, err
 				}
 
-				// Defensive check: claims should not be nil when decision is Allow
-				// but we check to prevent panics if an authenticator implementation violates the contract
-				if claims == nil {
-					return nil, errors.Unauthorized(reason, "Invalid claims: authenticator returned Allow with nil claims")
-				}
-
-				ctx = context.WithValue(ctx, ClaimsRequestKey, claims)
+				// Store claims in AuthzContext (the authoritative source for auth info)
 				ctx = EnsureAuthzContext(ctx, claims)
 
 				// Try to get token from context if we don't have it yet
@@ -53,11 +41,12 @@ func Authentication(authenticator authnapi.Authenticator) func(middleware.Handle
 					token, hasToken = util.FromTokenContext(ctx)
 				}
 
+				// Legacy token preservation for backward compatibility.
+				// Note: ClientID is now available via AuthzContext.Claims.ClientID for OIDC auth.
+				// This token preservation can be removed once all callers migrate to using Claims.
 				if hasToken {
-					// Preserve the token we found
 					ctx = util.NewTokenContext(ctx, token)
 				} else {
-					// Fallback: extract from headers (token was already verified by authenticator)
 					authHeader := t.RequestHeader().Get("Authorization")
 					if authHeader != "" {
 						parts := strings.SplitN(authHeader, " ", 2)
@@ -100,8 +89,3 @@ func EnsureAuthzContext(ctx context.Context, claims *authnapi.Claims) context.Co
 		Claims:   claims,
 	})
 }
-
-var (
-	ClaimsRequestKey = &contextKey{"authnapi.Claims"}
-	GetClaims        = GetFromContext[authnapi.Claims](ClaimsRequestKey)
-)

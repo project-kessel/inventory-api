@@ -86,6 +86,7 @@ func (o *OAuth2Authenticator) Authenticate(ctx context.Context, t transport.Tran
 		return &api.Claims{
 			SubjectId: api.SubjectId(u.Subject),
 			Issuer:    api.Issuer(u.Issuer),
+			ClientID:  api.ClientID(u.ClientID),
 			AuthType:  api.AuthTypeOIDC,
 		}, api.Allow
 	}

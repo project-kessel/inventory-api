@@ -6,6 +6,8 @@ type OrganizationId string
 
 type Issuer string
 
+type ClientID string
+
 type AuthType string
 
 const (
@@ -19,6 +21,7 @@ type Claims struct {
 	SubjectId      SubjectId      `json:"sub" yaml:"sub"`
 	OrganizationId OrganizationId `json:"org_id" yaml:"org_id"`
 	Issuer         Issuer         `json:"iss" yaml:"iss"`
+	ClientID       ClientID       `json:"client_id" yaml:"client_id"`
 	AuthType       AuthType       `json:"auth_type" yaml:"auth_type"`
 }
 

@@ -102,19 +102,31 @@ type StreamAuthOption func(*StreamAuthConfig)
 // The interceptor uses the aggregating authenticator to authenticate gRPC streams, supporting
 // all authenticator types in the chain (OIDC, x-rh-identity, allow-unauthenticated, etc.).
 func NewStreamAuthInterceptor(config authn.CompletedConfig, authenticator api.Authenticator, logger log.Logger, opts ...StreamAuthOption) (*StreamAuthInterceptor, error) {
-	cfg := &StreamAuthConfig{
-		authenticator: authenticator,
-		logger:        logger,
-	}
 
 	// If authenticator is not provided, create it from config (backwards compatible)
-	if cfg.authenticator == nil {
+	if authenticator == nil {
 		authnLogger := log.NewHelper(log.With(logger, "subsystem", "authn", "component", "stream-interceptor"))
 		var err error
-		cfg.authenticator, err = authn.New(config, authnLogger)
+		authenticator, err = authn.New(config, authnLogger)
 		if err != nil {
 			return nil, err
 		}
+	}
+
+	return NewStreamAuthInterceptorFromAuthenticator(authenticator, logger, opts...)
+}
+
+// NewStreamAuthInterceptorFromAuthenticator creates a stream authentication interceptor
+// using a pre-configured authenticator. This is useful for tests where the authenticator
+// is already constructed.
+func NewStreamAuthInterceptorFromAuthenticator(authenticator api.Authenticator, logger log.Logger, opts ...StreamAuthOption) (*StreamAuthInterceptor, error) {
+	if authenticator == nil {
+		return nil, fmt.Errorf("authenticator is required")
+	}
+
+	cfg := &StreamAuthConfig{
+		authenticator: authenticator,
+		logger:        logger,
 	}
 
 	for _, opt := range opts {
@@ -183,6 +195,9 @@ func (i *StreamAuthInterceptor) Interceptor() grpc.StreamServerInterceptor {
 
 		// Set claims in context (includes AuthType)
 		newCtx = NewContextClaims(newCtx, *claims)
+
+		// Set up AuthzContext for meta-authorization checks
+		newCtx = middleware.EnsureAuthzContext(newCtx, claims)
 
 		// Preserve token if available (for compatibility)
 		newCtx = preserveTokenContext(newCtx, md)

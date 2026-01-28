@@ -115,6 +115,25 @@ func GetSchemaFromCache(cacheKey string) (string, error) {
 	return "", fmt.Errorf("schema not found for key '%s'", cacheKey)
 }
 
+// PopulateSchemaCache directly populates the schema cache with provided entries.
+// This is useful for tests that need to set up schemas without filesystem access.
+// The entries map uses the same key format as the cache: "config:{resourceType}",
+// "common:{resourceType}", or "{resourceType}:{reporterType}".
+func PopulateSchemaCache(entries map[string]interface{}) {
+	for key, value := range entries {
+		SchemaCache.Store(key, value)
+	}
+}
+
+// ClearSchemaCache clears all entries from the schema cache.
+// This is useful for test cleanup.
+func ClearSchemaCache() {
+	SchemaCache.Range(func(key, value interface{}) bool {
+		SchemaCache.Delete(key)
+		return true
+	})
+}
+
 func LoadConfigFile(resourceDir string, resourceType string) (struct {
 	ResourceType      string   `yaml:"resource_type"`
 	ResourceReporters []string `yaml:"resource_reporters"`

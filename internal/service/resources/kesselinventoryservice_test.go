@@ -127,6 +127,15 @@ func (p *PermissiveMetaAuthorizer) Check(_ context.Context, _ model.RelationsRes
 	return true, nil
 }
 
+// DenyingMetaAuthorizer is a MetaAuthorizer that denies all operations for testing.
+// Use this to test that meta-authorization denial errors are properly mapped.
+type DenyingMetaAuthorizer struct{}
+
+// Check implements metaauthorizer.MetaAuthorizer and always returns false.
+func (d *DenyingMetaAuthorizer) Check(_ context.Context, _ model.RelationsResource, _ metaauthorizer.Relation, _ authnapi.AuthzContext) (bool, error) {
+	return false, nil
+}
+
 const bufSize = 1024 * 1024
 
 // testServerConfig holds configuration for creating a test gRPC server.
@@ -1119,6 +1128,48 @@ func TestInventoryService_Check_Denied(t *testing.T) {
 	assert.Equal(t, pb.Allowed_ALLOWED_FALSE, resp.Allowed)
 }
 
+func TestInventoryService_Check_MetaAuthzDenied(t *testing.T) {
+	// Test that meta-authorization denial is properly mapped to PermissionDenied.
+	// NOTE: This tests the EXPECTED behavior. Currently Check does NOT use
+	// mapServiceError, so this test will FAIL until the inconsistency is fixed.
+	claims := &authnapi.Claims{
+		SubjectId: authnapi.SubjectId("user-123"),
+		AuthType:  authnapi.AuthTypeXRhIdentity,
+	}
+
+	req := &pb.CheckRequest{
+		Relation: "view",
+		Object: &pb.ResourceReference{
+			ResourceId:   "resource-123",
+			ResourceType: "host",
+			Reporter:     &pb.ReporterReference{Type: "hbi"},
+		},
+		Subject: &pb.SubjectReference{
+			Resource: &pb.ResourceReference{
+				ResourceId:   "subject-456",
+				ResourceType: "principal",
+				Reporter:     &pb.ReporterReference{Type: "rbac"},
+			},
+		},
+	}
+
+	uc := newTestUsecase(testUsecaseConfig{
+		MetaAuthorizer: &DenyingMetaAuthorizer{},
+	})
+	client := newTestServer(t, testServerConfig{
+		Usecase:       uc,
+		Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+	})
+
+	resp, err := client.Check(context.Background(), req)
+
+	assert.Error(t, err)
+	assert.Nil(t, resp)
+	grpcStatus, ok := status.FromError(err)
+	assert.True(t, ok)
+	assert.Equal(t, codes.PermissionDenied, grpcStatus.Code())
+}
+
 func TestInventoryService_CheckForUpdate_Allowed(t *testing.T) {
 	claims := &authnapi.Claims{
 		SubjectId: authnapi.SubjectId("user-123"),
@@ -1188,6 +1239,48 @@ func TestInventoryService_CheckForUpdate_Denied(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Equal(t, pb.Allowed_ALLOWED_FALSE, resp.Allowed)
+}
+
+func TestInventoryService_CheckForUpdate_MetaAuthzDenied(t *testing.T) {
+	// Test that meta-authorization denial is properly mapped to PermissionDenied.
+	// NOTE: This tests the EXPECTED behavior. Currently CheckForUpdate does NOT use
+	// mapServiceError, so this test will FAIL until the inconsistency is fixed.
+	claims := &authnapi.Claims{
+		SubjectId: authnapi.SubjectId("user-123"),
+		AuthType:  authnapi.AuthTypeXRhIdentity,
+	}
+
+	req := &pb.CheckForUpdateRequest{
+		Relation: "edit",
+		Object: &pb.ResourceReference{
+			ResourceId:   "resource-123",
+			ResourceType: "host",
+			Reporter:     &pb.ReporterReference{Type: "hbi"},
+		},
+		Subject: &pb.SubjectReference{
+			Resource: &pb.ResourceReference{
+				ResourceId:   "subject-456",
+				ResourceType: "principal",
+				Reporter:     &pb.ReporterReference{Type: "rbac"},
+			},
+		},
+	}
+
+	uc := newTestUsecase(testUsecaseConfig{
+		MetaAuthorizer: &DenyingMetaAuthorizer{},
+	})
+	client := newTestServer(t, testServerConfig{
+		Usecase:       uc,
+		Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+	})
+
+	resp, err := client.CheckForUpdate(context.Background(), req)
+
+	assert.Error(t, err)
+	assert.Nil(t, resp)
+	grpcStatus, ok := status.FromError(err)
+	assert.True(t, ok)
+	assert.Equal(t, codes.PermissionDenied, grpcStatus.Code())
 }
 
 func TestInventoryService_CheckBulk_MixedResults(t *testing.T) {
@@ -2046,3 +2139,566 @@ func TestInventoryService_CheckBulk_NoIdentity(t *testing.T) {
 	assert.True(t, ok)
 	assert.Equal(t, codes.Unauthenticated, grpcStatus.Code())
 }
+
+// =============================================================================
+// ERROR SCENARIO TESTS
+// =============================================================================
+// These tests document the current error handling behavior. Some inconsistencies
+// are noted but preserved for backward compatibility.
+
+// --- DeleteResource Error Scenarios ---
+
+func TestInventoryService_DeleteResource_ResourceNotFound(t *testing.T) {
+	// DeleteResource returns NotFound when resource doesn't exist
+	claims := &authnapi.Claims{
+		SubjectId: authnapi.SubjectId("reporter-service"),
+		AuthType:  authnapi.AuthTypeXRhIdentity,
+	}
+
+	instanceID := "instance-001"
+	req := &pb.DeleteResourceRequest{
+		Reference: &pb.ResourceReference{
+			ResourceType: "host",
+			ResourceId:   "nonexistent-resource",
+			Reporter: &pb.ReporterReference{
+				Type:       "hbi",
+				InstanceId: &instanceID,
+			},
+		},
+	}
+
+	uc := newTestUsecase(testUsecaseConfig{})
+	client := newTestServer(t, testServerConfig{
+		Usecase:       uc,
+		Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+	})
+
+	resp, err := client.DeleteResource(context.Background(), req)
+
+	assert.Error(t, err)
+	assert.Nil(t, resp)
+	grpcStatus, ok := status.FromError(err)
+	assert.True(t, ok)
+	assert.Equal(t, codes.NotFound, grpcStatus.Code())
+}
+
+func TestInventoryService_DeleteResource_InvalidReference_EmptyResourceId(t *testing.T) {
+	// DeleteResource returns InvalidArgument for invalid resource reference
+	claims := &authnapi.Claims{
+		SubjectId: authnapi.SubjectId("reporter-service"),
+		AuthType:  authnapi.AuthTypeXRhIdentity,
+	}
+
+	instanceID := "instance-001"
+	req := &pb.DeleteResourceRequest{
+		Reference: &pb.ResourceReference{
+			ResourceType: "host",
+			ResourceId:   "", // Empty resource ID
+			Reporter: &pb.ReporterReference{
+				Type:       "hbi",
+				InstanceId: &instanceID,
+			},
+		},
+	}
+
+	uc := newTestUsecase(testUsecaseConfig{})
+	client := newTestServer(t, testServerConfig{
+		Usecase:       uc,
+		Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+	})
+
+	resp, err := client.DeleteResource(context.Background(), req)
+
+	assert.Error(t, err)
+	assert.Nil(t, resp)
+	grpcStatus, ok := status.FromError(err)
+	assert.True(t, ok)
+	assert.Equal(t, codes.InvalidArgument, grpcStatus.Code())
+}
+
+func TestInventoryService_DeleteResource_InvalidReference_EmptyResourceType(t *testing.T) {
+	claims := &authnapi.Claims{
+		SubjectId: authnapi.SubjectId("reporter-service"),
+		AuthType:  authnapi.AuthTypeXRhIdentity,
+	}
+
+	instanceID := "instance-001"
+	req := &pb.DeleteResourceRequest{
+		Reference: &pb.ResourceReference{
+			ResourceType: "", // Empty resource type
+			ResourceId:   "resource-123",
+			Reporter: &pb.ReporterReference{
+				Type:       "hbi",
+				InstanceId: &instanceID,
+			},
+		},
+	}
+
+	uc := newTestUsecase(testUsecaseConfig{})
+	client := newTestServer(t, testServerConfig{
+		Usecase:       uc,
+		Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+	})
+
+	resp, err := client.DeleteResource(context.Background(), req)
+
+	assert.Error(t, err)
+	assert.Nil(t, resp)
+	grpcStatus, ok := status.FromError(err)
+	assert.True(t, ok)
+	assert.Equal(t, codes.InvalidArgument, grpcStatus.Code())
+}
+
+func TestInventoryService_DeleteResource_InvalidReference_EmptyReporterType(t *testing.T) {
+	claims := &authnapi.Claims{
+		SubjectId: authnapi.SubjectId("reporter-service"),
+		AuthType:  authnapi.AuthTypeXRhIdentity,
+	}
+
+	instanceID := "instance-001"
+	req := &pb.DeleteResourceRequest{
+		Reference: &pb.ResourceReference{
+			ResourceType: "host",
+			ResourceId:   "resource-123",
+			Reporter: &pb.ReporterReference{
+				Type:       "", // Empty reporter type
+				InstanceId: &instanceID,
+			},
+		},
+	}
+
+	uc := newTestUsecase(testUsecaseConfig{})
+	client := newTestServer(t, testServerConfig{
+		Usecase:       uc,
+		Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+	})
+
+	resp, err := client.DeleteResource(context.Background(), req)
+
+	assert.Error(t, err)
+	assert.Nil(t, resp)
+	grpcStatus, ok := status.FromError(err)
+	assert.True(t, ok)
+	assert.Equal(t, codes.InvalidArgument, grpcStatus.Code())
+}
+
+// --- Check Error Scenarios ---
+
+func TestInventoryService_Check_InvalidReference_EmptyResourceId(t *testing.T) {
+	// Check returns InvalidArgument for invalid resource reference
+	claims := &authnapi.Claims{
+		SubjectId: authnapi.SubjectId("user-123"),
+		AuthType:  authnapi.AuthTypeXRhIdentity,
+	}
+
+	req := &pb.CheckRequest{
+		Relation: "view",
+		Object: &pb.ResourceReference{
+			ResourceId:   "", // Empty
+			ResourceType: "host",
+			Reporter:     &pb.ReporterReference{Type: "hbi"},
+		},
+		Subject: &pb.SubjectReference{
+			Resource: &pb.ResourceReference{
+				ResourceId:   "subject-456",
+				ResourceType: "principal",
+				Reporter:     &pb.ReporterReference{Type: "rbac"},
+			},
+		},
+	}
+
+	uc := newTestUsecase(testUsecaseConfig{})
+	client := newTestServer(t, testServerConfig{
+		Usecase:       uc,
+		Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+	})
+
+	resp, err := client.Check(context.Background(), req)
+
+	assert.Error(t, err)
+	assert.Nil(t, resp)
+	grpcStatus, ok := status.FromError(err)
+	assert.True(t, ok)
+	assert.Equal(t, codes.InvalidArgument, grpcStatus.Code())
+}
+
+// --- CheckForUpdate Error Scenarios ---
+
+func TestInventoryService_CheckForUpdate_InvalidReference_EmptyResourceId(t *testing.T) {
+	claims := &authnapi.Claims{
+		SubjectId: authnapi.SubjectId("user-123"),
+		AuthType:  authnapi.AuthTypeXRhIdentity,
+	}
+
+	req := &pb.CheckForUpdateRequest{
+		Relation: "edit",
+		Object: &pb.ResourceReference{
+			ResourceId:   "", // Empty
+			ResourceType: "host",
+			Reporter:     &pb.ReporterReference{Type: "hbi"},
+		},
+		Subject: &pb.SubjectReference{
+			Resource: &pb.ResourceReference{
+				ResourceId:   "subject-789",
+				ResourceType: "principal",
+				Reporter:     &pb.ReporterReference{Type: "rbac"},
+			},
+		},
+	}
+
+	uc := newTestUsecase(testUsecaseConfig{})
+	client := newTestServer(t, testServerConfig{
+		Usecase:       uc,
+		Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+	})
+
+	resp, err := client.CheckForUpdate(context.Background(), req)
+
+	assert.Error(t, err)
+	assert.Nil(t, resp)
+	grpcStatus, ok := status.FromError(err)
+	assert.True(t, ok)
+	assert.Equal(t, codes.InvalidArgument, grpcStatus.Code())
+}
+
+// --- CheckSelf Error Scenarios ---
+// NOTE: CheckSelf does NOT check claims at the service layer - it relies on
+// the usecase (selfSubjectFromContext) to validate identity. This means
+// Unauthenticated errors come via mapServiceError(ErrMetaAuthzContextMissing).
+
+func TestInventoryService_CheckSelf_InvalidReference_EmptyResourceId(t *testing.T) {
+	// Empty resource_id is caught by protovalidate middleware BEFORE reaching the
+	// service handler. The protovalidate middleware returns InvalidArgument.
+	claims := &authnapi.Claims{
+		SubjectId: authnapi.SubjectId("user-123"),
+		AuthType:  authnapi.AuthTypeXRhIdentity,
+	}
+
+	req := &pb.CheckSelfRequest{
+		Relation: "view",
+		Object: &pb.ResourceReference{
+			ResourceId:   "", // Empty - caught by protovalidate
+			ResourceType: "host",
+			Reporter:     &pb.ReporterReference{Type: "hbi"},
+		},
+	}
+
+	uc := newTestUsecase(testUsecaseConfig{})
+	client := newTestServer(t, testServerConfig{
+		Usecase:       uc,
+		Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+	})
+
+	resp, err := client.CheckSelf(context.Background(), req)
+
+	assert.Error(t, err)
+	assert.Nil(t, resp)
+	grpcStatus, ok := status.FromError(err)
+	assert.True(t, ok)
+	// protovalidate catches this and returns InvalidArgument
+	assert.Equal(t, codes.InvalidArgument, grpcStatus.Code())
+}
+
+func TestInventoryService_CheckSelf_MetaAuthzDenied(t *testing.T) {
+	// Test that meta-authorization denial is properly mapped to PermissionDenied
+	// using mapServiceError
+	claims := &authnapi.Claims{
+		SubjectId: authnapi.SubjectId("user-123"),
+		AuthType:  authnapi.AuthTypeOIDC, // OIDC is denied by SimpleMetaAuthorizer
+	}
+
+	req := &pb.CheckSelfRequest{
+		Relation: "view",
+		Object: &pb.ResourceReference{
+			ResourceId:   "resource-123",
+			ResourceType: "host",
+			Reporter:     &pb.ReporterReference{Type: "hbi"},
+		},
+	}
+
+	uc := newTestUsecase(testUsecaseConfig{
+		MetaAuthorizer: metaauthorizer.NewSimpleMetaAuthorizer(),
+	})
+	client := newTestServer(t, testServerConfig{
+		Usecase:       uc,
+		Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+	})
+
+	resp, err := client.CheckSelf(context.Background(), req)
+
+	assert.Error(t, err)
+	assert.Nil(t, resp)
+	grpcStatus, ok := status.FromError(err)
+	assert.True(t, ok)
+	assert.Equal(t, codes.PermissionDenied, grpcStatus.Code())
+}
+
+// --- CheckSelfBulk Error Scenarios ---
+// NOTE: CheckSelfBulk also does NOT check claims at the service layer.
+
+func TestInventoryService_CheckSelfBulk_EmptyItems(t *testing.T) {
+	// Empty items array is caught by protovalidate middleware BEFORE reaching
+	// the service handler's own validation check.
+	claims := &authnapi.Claims{
+		SubjectId: authnapi.SubjectId("user-123"),
+		AuthType:  authnapi.AuthTypeXRhIdentity,
+	}
+
+	req := &pb.CheckSelfBulkRequest{
+		Items: []*pb.CheckSelfBulkRequestItem{}, // Empty - caught by protovalidate
+	}
+
+	uc := newTestUsecase(testUsecaseConfig{})
+	client := newTestServer(t, testServerConfig{
+		Usecase:       uc,
+		Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+	})
+
+	resp, err := client.CheckSelfBulk(context.Background(), req)
+
+	assert.Error(t, err)
+	assert.Nil(t, resp)
+	grpcStatus, ok := status.FromError(err)
+	assert.True(t, ok)
+	assert.Equal(t, codes.InvalidArgument, grpcStatus.Code())
+	// protovalidate error message format
+	assert.Contains(t, grpcStatus.Message(), "items")
+}
+
+func TestInventoryService_CheckSelfBulk_MetaAuthzDenied(t *testing.T) {
+	// Test that meta-authorization denial is properly mapped to PermissionDenied
+	claims := &authnapi.Claims{
+		SubjectId: authnapi.SubjectId("user-123"),
+		AuthType:  authnapi.AuthTypeOIDC, // OIDC is denied by SimpleMetaAuthorizer
+	}
+
+	req := &pb.CheckSelfBulkRequest{
+		Items: []*pb.CheckSelfBulkRequestItem{
+			{
+				Object: &pb.ResourceReference{
+					ResourceId:   "resource-1",
+					ResourceType: "host",
+					Reporter:     &pb.ReporterReference{Type: "hbi"},
+				},
+				Relation: "view",
+			},
+		},
+	}
+
+	uc := newTestUsecase(testUsecaseConfig{
+		MetaAuthorizer: metaauthorizer.NewSimpleMetaAuthorizer(),
+	})
+	client := newTestServer(t, testServerConfig{
+		Usecase:       uc,
+		Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+	})
+
+	resp, err := client.CheckSelfBulk(context.Background(), req)
+
+	assert.Error(t, err)
+	assert.Nil(t, resp)
+	grpcStatus, ok := status.FromError(err)
+	assert.True(t, ok)
+	assert.Equal(t, codes.PermissionDenied, grpcStatus.Code())
+}
+
+// --- CheckBulk Error Scenarios ---
+
+func TestInventoryService_CheckBulk_MetaAuthzAllowedOnGRPC(t *testing.T) {
+	// SimpleMetaAuthorizer behavior on gRPC:
+	// - gRPC: allow ALL relations EXCEPT "check_self"
+	// - This means CheckBulk (relation="check_bulk") is ALLOWED on gRPC
+	//
+	// Even with OIDC auth type, the protocol (gRPC) takes precedence.
+	// This is by design for service-to-service communication.
+	claims := &authnapi.Claims{
+		SubjectId: authnapi.SubjectId("user-123"),
+		AuthType:  authnapi.AuthTypeOIDC,
+	}
+
+	simpleAuthz := authz.NewSimpleAuthorizer()
+	simpleAuthz.Grant("subject-a", "view", "hbi", "host", "resource-1")
+
+	req := &pb.CheckBulkRequest{
+		Items: []*pb.CheckBulkRequestItem{
+			{
+				Object: &pb.ResourceReference{
+					ResourceId:   "resource-1",
+					ResourceType: "host",
+					Reporter:     &pb.ReporterReference{Type: "hbi"},
+				},
+				Subject: &pb.SubjectReference{
+					Resource: &pb.ResourceReference{
+						ResourceId:   "subject-a",
+						ResourceType: "principal",
+						Reporter:     &pb.ReporterReference{Type: "rbac"},
+					},
+				},
+				Relation: "view",
+			},
+		},
+	}
+
+	uc := newTestUsecase(testUsecaseConfig{
+		Authz:          simpleAuthz,
+		MetaAuthorizer: metaauthorizer.NewSimpleMetaAuthorizer(),
+	})
+	client := newTestServer(t, testServerConfig{
+		Usecase:       uc,
+		Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+	})
+
+	resp, err := client.CheckBulk(context.Background(), req)
+
+	// gRPC allows CheckBulk even with OIDC auth type
+	require.NoError(t, err)
+	assert.NotNil(t, resp)
+	assert.Equal(t, pb.Allowed_ALLOWED_TRUE, resp.Pairs[0].GetItem().Allowed)
+}
+
+func TestInventoryService_CheckBulk_MetaAuthzDenied(t *testing.T) {
+	// Test that meta-authorization denial is properly mapped to PermissionDenied.
+	// NOTE: This tests the EXPECTED behavior. Currently CheckBulk does NOT use
+	// mapServiceError, so this test will FAIL until the inconsistency is fixed.
+	claims := &authnapi.Claims{
+		SubjectId: authnapi.SubjectId("user-123"),
+		AuthType:  authnapi.AuthTypeXRhIdentity,
+	}
+
+	req := &pb.CheckBulkRequest{
+		Items: []*pb.CheckBulkRequestItem{
+			{
+				Object: &pb.ResourceReference{
+					ResourceId:   "resource-1",
+					ResourceType: "host",
+					Reporter:     &pb.ReporterReference{Type: "hbi"},
+				},
+				Subject: &pb.SubjectReference{
+					Resource: &pb.ResourceReference{
+						ResourceId:   "subject-a",
+						ResourceType: "principal",
+						Reporter:     &pb.ReporterReference{Type: "rbac"},
+					},
+				},
+				Relation: "view",
+			},
+		},
+	}
+
+	uc := newTestUsecase(testUsecaseConfig{
+		MetaAuthorizer: &DenyingMetaAuthorizer{},
+	})
+	client := newTestServer(t, testServerConfig{
+		Usecase:       uc,
+		Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+	})
+
+	resp, err := client.CheckBulk(context.Background(), req)
+
+	assert.Error(t, err)
+	assert.Nil(t, resp)
+	grpcStatus, ok := status.FromError(err)
+	assert.True(t, ok)
+	assert.Equal(t, codes.PermissionDenied, grpcStatus.Code())
+}
+
+// --- ReportResource Error Scenarios ---
+// NOTE: ReportResource also passes usecase errors through directly without mapServiceError.
+
+func TestInventoryService_ReportResource_MetaAuthzAllowedOnGRPC(t *testing.T) {
+	// SimpleMetaAuthorizer behavior on gRPC:
+	// - gRPC: allow ALL relations EXCEPT "check_self"
+	// - This means ReportResource (relation="report_resource") is ALLOWED on gRPC
+	//
+	// Even with OIDC auth type, the protocol (gRPC) takes precedence.
+	// This is by design for service-to-service communication.
+	claims := &authnapi.Claims{
+		SubjectId: authnapi.SubjectId("reporter-service"),
+		AuthType:  authnapi.AuthTypeOIDC,
+	}
+
+	req := &pb.ReportResourceRequest{
+		Type:               "host",
+		ReporterType:       "hbi",
+		ReporterInstanceId: "instance-001",
+		Representations: &pb.ResourceRepresentations{
+			Metadata: &pb.RepresentationMetadata{
+				LocalResourceId: "my-host-123",
+				ApiHref:         "https://api.example.com/hosts/my-host-123",
+			},
+			Common: &structpb.Struct{
+				Fields: map[string]*structpb.Value{
+					"hostname": structpb.NewStringValue("example.com"),
+				},
+			},
+			Reporter: &structpb.Struct{
+				Fields: map[string]*structpb.Value{
+					"field": structpb.NewStringValue("value"),
+				},
+			},
+		},
+	}
+
+	uc := newTestUsecase(testUsecaseConfig{
+		MetaAuthorizer: metaauthorizer.NewSimpleMetaAuthorizer(),
+	})
+	client := newTestServer(t, testServerConfig{
+		Usecase:       uc,
+		Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+	})
+
+	resp, err := client.ReportResource(context.Background(), req)
+
+	// gRPC allows ReportResource even with OIDC auth type
+	require.NoError(t, err)
+	assert.NotNil(t, resp)
+}
+
+// --- StreamedListObjects Error Scenarios ---
+// NOTE: StreamedListObjects uses fmt.Errorf without gRPC status codes.
+
+func TestInventoryService_StreamedListObjects_NilRequest(t *testing.T) {
+	// ToLookupResourceRequest returns error for nil request
+	// This is validated by protovalidate before reaching the handler,
+	// so this tests the internal function behavior only.
+	_, err := svc.ToLookupResourceRequest(nil)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "request is nil")
+}
+
+// =============================================================================
+// ERROR HANDLING BEHAVIOR DOCUMENTATION
+// =============================================================================
+//
+// BEHAVIOR NOTES (preserved for backward compatibility):
+//
+// 1. Protovalidate middleware catches validation errors BEFORE service handlers:
+//    - Empty resource_id, empty items arrays, etc. return InvalidArgument
+//    - Error messages come from protovalidate, not service-layer validation
+//
+// 2. mapServiceError usage is inconsistent:
+//    - CheckSelf, CheckSelfBulk: USE mapServiceError
+//    - ReportResource, Check, CheckForUpdate, CheckBulk: DO NOT use mapServiceError
+//      (errors from usecase pass through directly, becoming codes.Unknown)
+//
+// 3. Claims checking at service layer:
+//    - ReportResource, DeleteResource, Check, CheckForUpdate, CheckBulk:
+//      Explicitly check claims with middleware.GetClaims() and return Unauthenticated
+//    - CheckSelf, CheckSelfBulk: NO claims check at service layer
+//      (rely on usecase selfSubjectFromContext which returns ErrMetaAuthzContextMissing)
+//
+// 4. StreamedListObjects error wrapping:
+//    - Uses fmt.Errorf which doesn't preserve gRPC status codes
+//    - Auth relies on stream interceptor, not handler-level check
+//
+// 5. DeleteResource error handling:
+//    - Has its own inline error mapping (NotFound for ErrResourceNotFound, Internal for others)
+//    - Does NOT use mapServiceError
+//
+// 6. SimpleMetaAuthorizer protocol rules:
+//    - gRPC: allow ALL relations EXCEPT "check_self"
+//    - HTTP + x-rh-identity: allow ONLY "check_self"
+//    - HTTP + OIDC: deny ALL
+//    - This means on gRPC, CheckBulk/ReportResource/etc are allowed regardless of auth type
+//    - Only CheckSelf is denied on gRPC (designed for HTTP user-facing calls)
+//

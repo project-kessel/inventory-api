@@ -3,15 +3,21 @@ package resources_test
 import (
 	"context"
 	"fmt"
-	"regexp"
-
 	"io"
+	"net"
+	"net/url"
+	"regexp"
 	"testing"
 
 	krlog "github.com/go-kratos/kratos/v2/log"
+	kratosMiddleware "github.com/go-kratos/kratos/v2/middleware"
 	kratosTransport "github.com/go-kratos/kratos/v2/transport"
+	kgrpc "github.com/go-kratos/kratos/v2/transport/grpc"
 	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2"
 	relationsV1beta1 "github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/test/bufconn"
 	"google.golang.org/protobuf/types/known/structpb"
 
 	"github.com/project-kessel/inventory-api/internal/data"
@@ -19,8 +25,12 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 
 	authnapi "github.com/project-kessel/inventory-api/internal/authn/api"
+	authzapi "github.com/project-kessel/inventory-api/internal/authz/api"
+	"github.com/project-kessel/inventory-api/internal/biz/model"
+	"github.com/project-kessel/inventory-api/internal/biz/usecase/metaauthorizer"
 	usecase "github.com/project-kessel/inventory-api/internal/biz/usecase/resources"
 	"github.com/project-kessel/inventory-api/internal/middleware"
 	"github.com/project-kessel/inventory-api/internal/mocks"
@@ -43,9 +53,137 @@ func newTestResolver() *selfsubject.Resolver {
 	return selfsubject.NewResolver(testSelfSubjectStrategy{})
 }
 
+// StubAuthenticator is a configurable authenticator for testing.
+// It returns the configured Claims and Decision for any authentication request.
+type StubAuthenticator struct {
+	Claims   *authnapi.Claims
+	Decision authnapi.Decision
+}
+
+// Authenticate implements authnapi.Authenticator.
+func (s *StubAuthenticator) Authenticate(_ context.Context, _ kratosTransport.Transporter) (*authnapi.Claims, authnapi.Decision) {
+	return s.Claims, s.Decision
+}
+
+// PermissiveMetaAuthorizer is a MetaAuthorizer that allows all operations for testing.
+// Use this when testing service logic without protocol-based authorization restrictions.
+type PermissiveMetaAuthorizer struct{}
+
+// Check implements metaauthorizer.MetaAuthorizer and always returns true.
+func (p *PermissiveMetaAuthorizer) Check(_ context.Context, _ model.RelationsResource, _ metaauthorizer.Relation, _ authnapi.AuthzContext) (bool, error) {
+	return true, nil
+}
+
+const bufSize = 1024 * 1024
+
+// testServerConfig holds configuration for creating a test gRPC server.
+type testServerConfig struct {
+	Usecase       *usecase.Usecase
+	Authenticator authnapi.Authenticator // nil = no auth middleware
+}
+
+// newTestServer creates a gRPC server with the KesselInventoryService using
+// an in-memory bufconn transport. Cleanup is registered via t.Cleanup() automatically.
+// The server uses the production Authentication middleware with the provided authenticator.
+func newTestServer(t *testing.T, cfg testServerConfig) pb.KesselInventoryServiceClient {
+	t.Helper()
+
+	lis := bufconn.Listen(bufSize)
+
+	// Build middleware chain - reuse production Authentication middleware
+	var middlewares []kratosMiddleware.Middleware
+	if cfg.Authenticator != nil {
+		middlewares = append(middlewares, middleware.Authentication(cfg.Authenticator))
+	}
+
+	// Create Kratos gRPC server with bufconn listener
+	// We need to provide an explicit endpoint since bufconn doesn't have a real address
+	testEndpoint := &url.URL{Scheme: "grpc", Host: "bufconn"}
+	srv := kgrpc.NewServer(
+		kgrpc.Listener(lis),
+		kgrpc.Endpoint(testEndpoint),
+		kgrpc.Middleware(middlewares...),
+	)
+
+	// Register service
+	service := svc.NewKesselInventoryServiceV1beta2(cfg.Usecase)
+	pb.RegisterKesselInventoryServiceServer(srv, service)
+
+	// Start server in background
+	go func() {
+		if err := srv.Start(context.Background()); err != nil {
+			t.Logf("Server exited: %v", err)
+		}
+	}()
+
+	// Create client via bufconn dialer
+	conn, err := grpc.NewClient("passthrough://bufnet",
+		grpc.WithContextDialer(func(ctx context.Context, _ string) (net.Conn, error) {
+			return lis.DialContext(ctx)
+		}),
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+	)
+	require.NoError(t, err)
+
+	t.Cleanup(func() {
+		conn.Close()
+		srv.Stop(context.Background())
+	})
+
+	return pb.NewKesselInventoryServiceClient(conn)
+}
+
+// testUsecaseConfig holds optional overrides for constructing a test Usecase.
+// All fields have sensible defaults when left as zero values.
+type testUsecaseConfig struct {
+	Repo           data.ResourceRepository
+	Authz          authzapi.Authorizer
+	Namespace      string
+	Config         *usecase.UsecaseConfig
+	MetaAuthorizer metaauthorizer.MetaAuthorizer
+}
+
+// newTestUsecase constructs a Usecase with test defaults.
+// Override specific fields via testUsecaseConfig; unset fields use defaults.
+func newTestUsecase(cfg testUsecaseConfig) *usecase.Usecase {
+	repo := cfg.Repo
+	if repo == nil {
+		repo = data.NewFakeResourceRepository()
+	}
+
+	namespace := cfg.Namespace
+	if namespace == "" {
+		namespace = "rbac"
+	}
+
+	usecaseCfg := cfg.Config
+	if usecaseCfg == nil {
+		usecaseCfg = &usecase.UsecaseConfig{}
+	}
+
+	// Default to PermissiveMetaAuthorizer for tests unless explicitly overridden
+	meta := cfg.MetaAuthorizer
+	if meta == nil {
+		meta = &PermissiveMetaAuthorizer{}
+	}
+
+	return usecase.New(
+		repo,
+		cfg.Authz,
+		nil, // Eventer
+		namespace,
+		krlog.NewStdLogger(io.Discard),
+		nil, // ListenManager
+		nil, // waitForNotifBreaker
+		usecaseCfg,
+		metricscollector.NewFakeMetricsCollector(),
+		meta,
+		newTestResolver(),
+	)
+}
+
 func TestInventoryService_ReportResource_MissingReporterType(t *testing.T) {
 	claims := &authnapi.Claims{SubjectId: authnapi.SubjectId("tester"), AuthType: authnapi.AuthTypeXRhIdentity}
-	ctx := ctxWithClaimsAndTransport(claims, kratosTransport.KindGRPC)
 
 	req := &pb.ReportResourceRequest{
 		Type:               "host",
@@ -64,22 +202,12 @@ func TestInventoryService_ReportResource_MissingReporterType(t *testing.T) {
 		},
 	}
 
-	uc := usecase.New(
-		data.NewFakeResourceRepository(),
-		nil, // Authz
-		nil, // Eventer
-		"",  // Namespace
-		krlog.NewStdLogger(io.Discard),
-		nil, // ListenManager
-		nil, // waitForNotifBreaker
-		nil, // Config
-		metricscollector.NewFakeMetricsCollector(),
-		nil,
-		newTestResolver(),
-	)
-	service := svc.NewKesselInventoryServiceV1beta2(uc)
-
-	resp, err := service.ReportResource(ctx, req)
+	uc := newTestUsecase(testUsecaseConfig{})
+	client := newTestServer(t, testServerConfig{
+		Usecase:       uc,
+		Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+	})
+	resp, err := client.ReportResource(context.Background(), req)
 
 	assert.Error(t, err)
 	assert.Nil(t, resp)
@@ -92,7 +220,6 @@ func TestInventoryService_ReportResource_MissingReporterType(t *testing.T) {
 
 func TestInventoryService_ReportResource_MissingReporterInstanceId(t *testing.T) {
 	claims := &authnapi.Claims{SubjectId: authnapi.SubjectId("tester"), AuthType: authnapi.AuthTypeXRhIdentity}
-	ctx := ctxWithClaimsAndTransport(claims, kratosTransport.KindGRPC)
 
 	req := &pb.ReportResourceRequest{
 		Type:               "host",
@@ -111,22 +238,12 @@ func TestInventoryService_ReportResource_MissingReporterInstanceId(t *testing.T)
 		},
 	}
 
-	uc := usecase.New(
-		data.NewFakeResourceRepository(),
-		nil, // Authz
-		nil, // Eventer
-		"",  // Namespace
-		krlog.NewStdLogger(io.Discard),
-		nil, // ListenManager
-		nil, // waitForNotifBreaker
-		nil, // Config
-		metricscollector.NewFakeMetricsCollector(),
-		nil,
-		newTestResolver(),
-	)
-	service := svc.NewKesselInventoryServiceV1beta2(uc)
-
-	resp, err := service.ReportResource(ctx, req)
+	uc := newTestUsecase(testUsecaseConfig{})
+	client := newTestServer(t, testServerConfig{
+		Usecase:       uc,
+		Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+	})
+	resp, err := client.ReportResource(context.Background(), req)
 
 	assert.Error(t, err)
 	assert.Nil(t, resp)
@@ -140,7 +257,6 @@ func TestInventoryService_ReportResource_MissingReporterInstanceId(t *testing.T)
 
 func TestInventoryService_ReportResource_InvalidJsonObject(t *testing.T) {
 	claims := &authnapi.Claims{SubjectId: authnapi.SubjectId("sarah"), AuthType: authnapi.AuthTypeXRhIdentity}
-	ctx := ctxWithClaimsAndTransport(claims, kratosTransport.KindGRPC)
 
 	badCommon := &structpb.Struct{
 		Fields: map[string]*structpb.Value{
@@ -161,23 +277,12 @@ func TestInventoryService_ReportResource_InvalidJsonObject(t *testing.T) {
 		},
 	}
 
-	uc := usecase.New(
-		data.NewFakeResourceRepository(),
-		nil, // Authz
-		nil, // Eventer
-		"",  // Namespace
-		krlog.NewStdLogger(io.Discard),
-		nil, // ListenManager
-		nil, // waitForNotifBreaker
-		nil, // Config
-		metricscollector.NewFakeMetricsCollector(),
-		nil,
-		newTestResolver(),
-	)
-
-	service := svc.NewKesselInventoryServiceV1beta2(uc)
-
-	resp, err := service.ReportResource(ctx, req)
+	uc := newTestUsecase(testUsecaseConfig{})
+	client := newTestServer(t, testServerConfig{
+		Usecase:       uc,
+		Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+	})
+	resp, err := client.ReportResource(context.Background(), req)
 
 	assert.Error(t, err)
 	assert.Nil(t, resp)
@@ -192,14 +297,15 @@ func TestResponseFromResource(t *testing.T) {
 }
 
 func TestInventoryService_DeleteResource_NoIdentity(t *testing.T) {
-	ctx := context.Background() // no identity
-
 	req := &pb.DeleteResourceRequest{}
 
-	uc := &usecase.Usecase{}
-	service := svc.NewKesselInventoryServiceV1beta2(uc)
-
-	resp, err := service.DeleteResource(ctx, req)
+	uc := newTestUsecase(testUsecaseConfig{})
+	// No authenticator configured - simulates unauthenticated request
+	client := newTestServer(t, testServerConfig{
+		Usecase:       uc,
+		Authenticator: nil,
+	})
+	resp, err := client.DeleteResource(context.Background(), req)
 
 	assert.Error(t, err)
 	assert.Nil(t, resp)
@@ -282,24 +388,6 @@ func IsValidType(val string) bool {
 	return typePattern.MatchString(val)
 }
 
-type testTransport struct {
-	kind kratosTransport.Kind
-}
-
-func (t testTransport) Kind() kratosTransport.Kind { return t.kind }
-func (testTransport) Endpoint() string             { return "" }
-func (testTransport) Operation() string            { return "" }
-func (testTransport) RequestHeader() kratosTransport.Header {
-	return nil
-}
-func (testTransport) ReplyHeader() kratosTransport.Header { return nil }
-
-func ctxWithClaimsAndTransport(claims *authnapi.Claims, kind kratosTransport.Kind) context.Context {
-	ctx := context.WithValue(context.Background(), middleware.ClaimsRequestKey, claims)
-	ctx = kratosTransport.NewServerContext(ctx, testTransport{kind: kind})
-	return middleware.EnsureAuthzContext(ctx, claims)
-}
-
 func TestToLookupResourceResponse(t *testing.T) {
 	input := &relationsV1beta1.LookupResourcesResponse{
 		Resource: &relationsV1beta1.ObjectReference{
@@ -337,7 +425,6 @@ func TestInventoryService_CheckSelf_Allowed_XRhIdentity(t *testing.T) {
 		SubjectId: authnapi.SubjectId("user-123"),
 		AuthType:  authnapi.AuthTypeXRhIdentity,
 	}
-	ctx := ctxWithClaimsAndTransport(claims, kratosTransport.KindHTTP)
 
 	req := &pb.CheckSelfRequest{
 		Relation: "view",
@@ -348,7 +435,6 @@ func TestInventoryService_CheckSelf_Allowed_XRhIdentity(t *testing.T) {
 		},
 	}
 
-	mockRepo := data.NewFakeResourceRepository()
 	mockAuthz := &mocks.MockAuthz{}
 	mockAuthz.
 		On("Check",
@@ -368,24 +454,12 @@ func TestInventoryService_CheckSelf_Allowed_XRhIdentity(t *testing.T) {
 		Return(relationsV1beta1.CheckResponse_ALLOWED_TRUE, &relationsV1beta1.ConsistencyToken{}, nil).
 		Once()
 
-	cfg := &usecase.UsecaseConfig{}
-	uc := usecase.New(
-		mockRepo,
-		mockAuthz, // Authz
-		nil,       // Eventer
-		"rbac",    // Namespace
-		krlog.NewStdLogger(io.Discard),
-		nil, // ListenManager
-		nil, // waitForNotifBreaker
-		cfg,
-		metricscollector.NewFakeMetricsCollector(),
-		nil,
-		newTestResolver(),
-	)
-
-	service := svc.NewKesselInventoryServiceV1beta2(uc)
-
-	resp, err := service.CheckSelf(ctx, req)
+	uc := newTestUsecase(testUsecaseConfig{Authz: mockAuthz})
+	client := newTestServer(t, testServerConfig{
+		Usecase:       uc,
+		Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+	})
+	resp, err := client.CheckSelf(context.Background(), req)
 
 	assert.NoError(t, err)
 	if assert.NotNil(t, resp) {
@@ -401,7 +475,6 @@ func TestInventoryService_CheckSelf_Allowed_XRhIdentity_NoUserID(t *testing.T) {
 		SubjectId: authnapi.SubjectId("testuser"),
 		AuthType:  authnapi.AuthTypeXRhIdentity,
 	}
-	ctx := ctxWithClaimsAndTransport(claims, kratosTransport.KindHTTP)
 
 	req := &pb.CheckSelfRequest{
 		Relation: "view",
@@ -412,7 +485,6 @@ func TestInventoryService_CheckSelf_Allowed_XRhIdentity_NoUserID(t *testing.T) {
 		},
 	}
 
-	mockRepo := data.NewFakeResourceRepository()
 	mockAuthz := &mocks.MockAuthz{}
 	mockAuthz.
 		On("Check",
@@ -432,24 +504,12 @@ func TestInventoryService_CheckSelf_Allowed_XRhIdentity_NoUserID(t *testing.T) {
 		Return(relationsV1beta1.CheckResponse_ALLOWED_TRUE, &relationsV1beta1.ConsistencyToken{}, nil).
 		Once()
 
-	cfg := &usecase.UsecaseConfig{}
-	uc := usecase.New(
-		mockRepo,
-		mockAuthz, // Authz
-		nil,       // Eventer
-		"rbac",    // Namespace
-		krlog.NewStdLogger(io.Discard),
-		nil, // ListenManager
-		nil, // waitForNotifBreaker
-		cfg,
-		metricscollector.NewFakeMetricsCollector(),
-		nil,
-		newTestResolver(),
-	)
-
-	service := svc.NewKesselInventoryServiceV1beta2(uc)
-
-	resp, err := service.CheckSelf(ctx, req)
+	uc := newTestUsecase(testUsecaseConfig{Authz: mockAuthz})
+	client := newTestServer(t, testServerConfig{
+		Usecase:       uc,
+		Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+	})
+	resp, err := client.CheckSelf(context.Background(), req)
 
 	assert.NoError(t, err)
 	if assert.NotNil(t, resp) {
@@ -464,7 +524,6 @@ func TestInventoryService_CheckSelf_Denied(t *testing.T) {
 		SubjectId: authnapi.SubjectId("user-123"),
 		AuthType:  authnapi.AuthTypeXRhIdentity,
 	}
-	ctx := ctxWithClaimsAndTransport(claims, kratosTransport.KindHTTP)
 
 	req := &pb.CheckSelfRequest{
 		Relation: "view",
@@ -475,7 +534,6 @@ func TestInventoryService_CheckSelf_Denied(t *testing.T) {
 		},
 	}
 
-	mockRepo := data.NewFakeResourceRepository()
 	mockAuthz := &mocks.MockAuthz{}
 	mockAuthz.
 		On("Check",
@@ -490,24 +548,12 @@ func TestInventoryService_CheckSelf_Denied(t *testing.T) {
 		Return(relationsV1beta1.CheckResponse_ALLOWED_FALSE, &relationsV1beta1.ConsistencyToken{}, nil).
 		Once()
 
-	cfg := &usecase.UsecaseConfig{}
-	uc := usecase.New(
-		mockRepo,
-		mockAuthz, // Authz
-		nil,       // Eventer
-		"rbac",    // Namespace
-		krlog.NewStdLogger(io.Discard),
-		nil, // ListenManager
-		nil, // waitForNotifBreaker
-		cfg,
-		metricscollector.NewFakeMetricsCollector(),
-		nil,
-		newTestResolver(),
-	)
-
-	service := svc.NewKesselInventoryServiceV1beta2(uc)
-
-	resp, err := service.CheckSelf(ctx, req)
+	uc := newTestUsecase(testUsecaseConfig{Authz: mockAuthz})
+	client := newTestServer(t, testServerConfig{
+		Usecase:       uc,
+		Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+	})
+	resp, err := client.CheckSelf(context.Background(), req)
 
 	assert.NoError(t, err)
 	if assert.NotNil(t, resp) {
@@ -518,8 +564,6 @@ func TestInventoryService_CheckSelf_Denied(t *testing.T) {
 }
 
 func TestInventoryService_CheckSelf_NoIdentity(t *testing.T) {
-	ctx := context.Background() // no identity
-
 	req := &pb.CheckSelfRequest{
 		Relation: "view",
 		Object: &pb.ResourceReference{
@@ -529,10 +573,13 @@ func TestInventoryService_CheckSelf_NoIdentity(t *testing.T) {
 		},
 	}
 
-	uc := &usecase.Usecase{}
-	service := svc.NewKesselInventoryServiceV1beta2(uc)
-
-	resp, err := service.CheckSelf(ctx, req)
+	uc := newTestUsecase(testUsecaseConfig{})
+	// No authenticator configured - simulates unauthenticated request
+	client := newTestServer(t, testServerConfig{
+		Usecase:       uc,
+		Authenticator: nil,
+	})
+	resp, err := client.CheckSelf(context.Background(), req)
 
 	assert.Error(t, err)
 	assert.Nil(t, resp)
@@ -550,7 +597,6 @@ func TestInventoryService_CheckSelfBulk_Allowed_XRhIdentity(t *testing.T) {
 		SubjectId: authnapi.SubjectId("user-123"),
 		AuthType:  authnapi.AuthTypeXRhIdentity,
 	}
-	ctx := ctxWithClaimsAndTransport(claims, kratosTransport.KindHTTP)
 
 	req := &pb.CheckSelfBulkRequest{
 		Items: []*pb.CheckSelfBulkRequestItem{
@@ -634,24 +680,12 @@ func TestInventoryService_CheckSelfBulk_Allowed_XRhIdentity(t *testing.T) {
 		}, nil).
 		Once()
 
-	cfg := &usecase.UsecaseConfig{}
-	uc := usecase.New(
-		data.NewFakeResourceRepository(),
-		mockAuthz, // Authz
-		nil,       // Eventer
-		"rbac",    // Namespace
-		krlog.NewStdLogger(io.Discard),
-		nil, // ListenManager
-		nil, // waitForNotifBreaker
-		cfg,
-		metricscollector.NewFakeMetricsCollector(),
-		nil,
-		newTestResolver(),
-	)
-
-	service := svc.NewKesselInventoryServiceV1beta2(uc)
-
-	resp, err := service.CheckSelfBulk(ctx, req)
+	uc := newTestUsecase(testUsecaseConfig{Authz: mockAuthz})
+	client := newTestServer(t, testServerConfig{
+		Usecase:       uc,
+		Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+	})
+	resp, err := client.CheckSelfBulk(context.Background(), req)
 
 	assert.NoError(t, err)
 	if assert.NotNil(t, resp) {
@@ -671,7 +705,6 @@ func TestInventoryService_CheckSelfBulk_MixedResults(t *testing.T) {
 		SubjectId: authnapi.SubjectId("user-123"),
 		AuthType:  authnapi.AuthTypeXRhIdentity,
 	}
-	ctx := ctxWithClaimsAndTransport(claims, kratosTransport.KindHTTP)
 
 	req := &pb.CheckSelfBulkRequest{
 		Items: []*pb.CheckSelfBulkRequestItem{
@@ -738,24 +771,12 @@ func TestInventoryService_CheckSelfBulk_MixedResults(t *testing.T) {
 		}, nil).
 		Once()
 
-	cfg := &usecase.UsecaseConfig{}
-	uc := usecase.New(
-		data.NewFakeResourceRepository(),
-		mockAuthz, // Authz
-		nil,       // Eventer
-		"rbac",    // Namespace
-		krlog.NewStdLogger(io.Discard),
-		nil, // ListenManager
-		nil, // waitForNotifBreaker
-		cfg,
-		metricscollector.NewFakeMetricsCollector(),
-		nil,
-		newTestResolver(),
-	)
-
-	service := svc.NewKesselInventoryServiceV1beta2(uc)
-
-	resp, err := service.CheckSelfBulk(ctx, req)
+	uc := newTestUsecase(testUsecaseConfig{Authz: mockAuthz})
+	client := newTestServer(t, testServerConfig{
+		Usecase:       uc,
+		Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+	})
+	resp, err := client.CheckSelfBulk(context.Background(), req)
 
 	assert.NoError(t, err)
 	if assert.NotNil(t, resp) {
@@ -777,7 +798,6 @@ func TestInventoryService_CheckSelfBulk_ResponseLengthMismatch(t *testing.T) {
 		SubjectId: authnapi.SubjectId("user-123"),
 		AuthType:  authnapi.AuthTypeXRhIdentity,
 	}
-	ctx := ctxWithClaimsAndTransport(claims, kratosTransport.KindHTTP)
 
 	req := &pb.CheckSelfBulkRequest{
 		Items: []*pb.CheckSelfBulkRequestItem{
@@ -835,24 +855,12 @@ func TestInventoryService_CheckSelfBulk_ResponseLengthMismatch(t *testing.T) {
 		}, nil).
 		Once()
 
-	cfg := &usecase.UsecaseConfig{}
-	uc := usecase.New(
-		data.NewFakeResourceRepository(),
-		mockAuthz, // Authz
-		nil,       // Eventer
-		"rbac",    // Namespace
-		krlog.NewStdLogger(io.Discard),
-		nil, // ListenManager
-		nil, // waitForNotifBreaker
-		cfg,
-		metricscollector.NewFakeMetricsCollector(),
-		nil,
-		newTestResolver(),
-	)
-
-	service := svc.NewKesselInventoryServiceV1beta2(uc)
-
-	resp, err := service.CheckSelfBulk(ctx, req)
+	uc := newTestUsecase(testUsecaseConfig{Authz: mockAuthz})
+	client := newTestServer(t, testServerConfig{
+		Usecase:       uc,
+		Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+	})
+	resp, err := client.CheckSelfBulk(context.Background(), req)
 
 	assert.Nil(t, resp)
 	assert.Error(t, err)
@@ -863,8 +871,6 @@ func TestInventoryService_CheckSelfBulk_ResponseLengthMismatch(t *testing.T) {
 }
 
 func TestInventoryService_CheckSelfBulk_NoIdentity(t *testing.T) {
-	ctx := context.Background() // no identity
-
 	req := &pb.CheckSelfBulkRequest{
 		Items: []*pb.CheckSelfBulkRequestItem{
 			{
@@ -878,10 +884,13 @@ func TestInventoryService_CheckSelfBulk_NoIdentity(t *testing.T) {
 		},
 	}
 
-	uc := &usecase.Usecase{}
-	service := svc.NewKesselInventoryServiceV1beta2(uc)
-
-	resp, err := service.CheckSelfBulk(ctx, req)
+	uc := newTestUsecase(testUsecaseConfig{})
+	// No authenticator configured - simulates unauthenticated request
+	client := newTestServer(t, testServerConfig{
+		Usecase:       uc,
+		Authenticator: nil,
+	})
+	resp, err := client.CheckSelfBulk(context.Background(), req)
 
 	assert.Error(t, err)
 	assert.Nil(t, resp)
@@ -893,13 +902,48 @@ func TestInventoryService_CheckSelfBulk_NoIdentity(t *testing.T) {
 	assert.Equal(t, codes.Unauthenticated, grpcStatus.Code())
 }
 
+func TestInventoryService_Check_NoIdentity(t *testing.T) {
+	req := &pb.CheckRequest{
+		Relation: "view",
+		Object: &pb.ResourceReference{
+			ResourceId:   "resource-123",
+			ResourceType: "host",
+			Reporter:     &pb.ReporterReference{Type: "hbi"},
+		},
+		Subject: &pb.SubjectReference{
+			Resource: &pb.ResourceReference{
+				ResourceId:   "user-456",
+				ResourceType: "principal",
+				Reporter:     &pb.ReporterReference{Type: "rbac"},
+			},
+		},
+	}
+
+	uc := newTestUsecase(testUsecaseConfig{})
+	// No authenticator configured - simulates unauthenticated request
+	client := newTestServer(t, testServerConfig{
+		Usecase:       uc,
+		Authenticator: nil,
+	})
+	resp, err := client.Check(context.Background(), req)
+
+	assert.Error(t, err)
+	assert.Nil(t, resp)
+
+	grpcStatus, ok := status.FromError(err)
+	assert.True(t, ok)
+	assert.Equal(t, codes.Unauthenticated, grpcStatus.Code())
+	assert.Contains(t, err.Error(), "failed to get claims")
+}
+
 func TestInventoryService_CheckSelf_OIDC_Identity(t *testing.T) {
 	// Test CheckSelf with OIDC claims (SubjectId in "domain/subject" format)
+	// This test verifies that OIDC identities are denied at the meta-authorization layer.
+	// We use the real SimpleMetaAuthorizer (not the permissive one) to test this behavior.
 	claims := &authnapi.Claims{
-		SubjectId: authnapi.SubjectId("redhat.com/12345"),
+		SubjectId: authnapi.SubjectId("12345"),
 		AuthType:  authnapi.AuthTypeOIDC,
 	}
-	ctx := ctxWithClaimsAndTransport(claims, kratosTransport.KindHTTP)
 
 	req := &pb.CheckSelfRequest{
 		Relation: "view",
@@ -910,27 +954,17 @@ func TestInventoryService_CheckSelf_OIDC_Identity(t *testing.T) {
 		},
 	}
 
-	mockRepo := data.NewFakeResourceRepository()
 	mockAuthz := &mocks.MockAuthz{}
-
-	cfg := &usecase.UsecaseConfig{}
-	uc := usecase.New(
-		mockRepo,
-		mockAuthz, // Authz
-		nil,       // Eventer
-		"rbac",    // Namespace
-		krlog.NewStdLogger(io.Discard),
-		nil, // ListenManager
-		nil, // waitForNotifBreaker
-		cfg,
-		metricscollector.NewFakeMetricsCollector(),
-		nil,
-		newTestResolver(),
-	)
-
-	service := svc.NewKesselInventoryServiceV1beta2(uc)
-
-	resp, err := service.CheckSelf(ctx, req)
+	// Use SimpleMetaAuthorizer to test protocol/auth-type based authorization
+	uc := newTestUsecase(testUsecaseConfig{
+		Authz:          mockAuthz,
+		MetaAuthorizer: metaauthorizer.NewSimpleMetaAuthorizer(),
+	})
+	client := newTestServer(t, testServerConfig{
+		Usecase:       uc,
+		Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+	})
+	resp, err := client.CheckSelf(context.Background(), req)
 
 	assert.Error(t, err)
 	assert.Nil(t, resp)

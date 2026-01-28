@@ -146,8 +146,6 @@ func (s *InventoryService) CheckSelfBulk(ctx context.Context, req *pb.CheckSelfB
 		return nil, status.Errorf(codes.InvalidArgument, "items array cannot be empty")
 	}
 
-	log.Info("CheckSelfBulk using v1beta2 db")
-	// Map request to v1beta1 format (subject derived in usecase)
 	v1beta1Req := mapCheckSelfBulkRequestToV1beta1(req)
 	resp, err := s.Ctl.CheckSelfBulk(ctx, v1beta1Req)
 	if err != nil {

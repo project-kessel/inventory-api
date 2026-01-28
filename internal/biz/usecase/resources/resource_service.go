@@ -73,6 +73,7 @@ type Usecase struct {
 	Authz               authzapi.Authorizer
 	MetaAuthorizer      metaauthorizer.MetaAuthorizer
 	Eventer             eventingapi.Manager
+	// TODO: Remove; unused
 	Namespace           string
 	Log                 *log.Helper
 	Server              server.Server

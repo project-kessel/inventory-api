@@ -22,5 +22,11 @@ message Consistency {
     // as found in the ConsistencyToken. More recent data might be used
     // if available or faster.
     ConsistencyToken at_least_as_fresh = 2;
+
+    // All data used in the API call must be *at least as acknowledged*
+    // meaning it will include data up to the latest write known to Inventory.
+    // Provides read-after-write consistency for inventory-managed resources.
+    // *Must* be set true if used.
+    bool at_least_as_acknowledged = 3 [(buf.validate.field).bool.const = true];
   }
 }

@@ -21,6 +21,7 @@ import (
 	"github.com/project-kessel/inventory-api/internal/server"
 	kessel "github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
 	"github.com/sony/gobreaker"
+	"github.com/spf13/viper"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -221,21 +222,10 @@ func (uc *Usecase) Delete(ctx context.Context, reporterResourceKey model.Reporte
 }
 
 // Check verifies if a subject has the specified permission on a resource identified by the reporter resource ID.
-func (uc *Usecase) Check(ctx context.Context, permission, namespace string, sub *kessel.SubjectReference, reporterResourceKey model.ReporterResourceKey) (bool, error) {
-	res, err := uc.resourceRepository.FindResourceByKeys(nil, reporterResourceKey)
-	var consistencyToken string
+func (uc *Usecase) Check(ctx context.Context, permission, namespace string, sub *kessel.SubjectReference, reporterResourceKey model.ReporterResourceKey, consistency model.ConsistencyConfig) (bool, error) {
+	consistencyToken, err := uc.resolveConsistencyToken(ctx, consistency, reporterResourceKey)
 	if err != nil {
-		log.Info("Did not find resource")
-		// If the resource doesn't exist in inventory (ie. no consistency token available)
-		// we send a check request with minimize latency
-		// err otherwise.
-		if !errors.Is(err, gorm.ErrRecordNotFound) {
-			return false, err
-		}
-
-		consistencyToken = ""
-	} else {
-		consistencyToken = res.ConsistencyToken().Serialize()
+		return false, err
 	}
 
 	allowed, _, err := uc.Authz.Check(ctx, namespace, permission, consistencyToken, reporterResourceKey.ResourceType().Serialize(), reporterResourceKey.LocalResourceId().Serialize(), sub)
@@ -260,6 +250,61 @@ func (uc *Usecase) CheckForUpdate(ctx context.Context, permission, namespace str
 		return true, nil
 	}
 	return false, nil
+}
+
+// lookupConsistencyTokenFromDB looks up the consistency token from the inventory database.
+// Returns the token if found, empty string if resource not found, or error for other failures.
+func (uc *Usecase) lookupConsistencyTokenFromDB(reporterResourceKey model.ReporterResourceKey) (string, error) {
+	res, err := uc.resourceRepository.FindResourceByKeys(nil, reporterResourceKey)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			// Resource doesn't exist in inventory, fall back to minimize_latency
+			log.Info("Resource not found in inventory, falling back to minimize_latency")
+			return "", nil
+		}
+		return "", err
+	}
+	token := res.ConsistencyToken().Serialize()
+	log.Infof("Found inventory-managed consistency token: %s", token)
+	return token, nil
+}
+
+// resolveConsistencyToken resolves the consistency token based on the preference.
+func (uc *Usecase) resolveConsistencyToken(ctx context.Context, consistency model.ConsistencyConfig, reporterResourceKey model.ReporterResourceKey) (string, error) {
+	featureFlagEnabled := viper.GetBool("authz.kessel.default-to-at-least-as-acknowledged")
+	if featureFlagEnabled {
+		log.Info("Feature flag authz.kessel.default-to-at-least-as-acknowledged is enabled")
+	} else {
+		log.Info("Feature flag authz.kessel.default-to-at-least-as-acknowledged is disabled")
+	}
+
+	switch consistency.Preference {
+	case model.ConsistencyMinimizeLatency:
+		// No token needed - minimize_latency mode
+		log.Info("Using minimize_latency consistency")
+		return "", nil
+
+	case model.ConsistencyAtLeastAsFresh:
+		// Use the token provided by the caller
+		log.Infof("Using at_least_as_fresh consistency with provided token: %s", consistency.Token)
+		return consistency.Token, nil
+
+	case model.ConsistencyAtLeastAsAcknowledged:
+		// Look up the token from inventory database
+		log.Info("Using at_least_as_acknowledged consistency - looking up token from DB")
+		return uc.lookupConsistencyTokenFromDB(reporterResourceKey)
+
+	default:
+		// Default behavior depends on feature flag:
+		// - Enabled: look up resource and use its consistency token (original check behavior)
+		// - Disabled: use minimize_latency
+		if featureFlagEnabled {
+			log.Info("Default consistency - looking up token from DB")
+			return uc.lookupConsistencyTokenFromDB(reporterResourceKey)
+		}
+		log.Info("Default consistency - using minimize_latency")
+		return "", nil
+	}
 }
 
 // CheckBulk forwards the request to Relations CheckBulk

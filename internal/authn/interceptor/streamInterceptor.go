@@ -11,7 +11,6 @@ import (
 	kerrors "github.com/go-kratos/kratos/v2/errors"
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/go-kratos/kratos/v2/transport"
-	"github.com/project-kessel/inventory-api/internal/authn"
 	"github.com/project-kessel/inventory-api/internal/authn/api"
 	"github.com/project-kessel/inventory-api/internal/authn/util"
 	"google.golang.org/grpc"
@@ -95,26 +94,19 @@ type StreamAuthConfig struct {
 
 type StreamAuthOption func(*StreamAuthConfig)
 
-// NewStreamAuthInterceptor creates a stream authentication interceptor using the AggregatingAuthenticator.
-// If authenticator is provided, it will be used directly.
-// If authenticator is nil, it will be created from the config using authn.New (backwards compatible).
+// NewStreamAuthInterceptor creates a stream authentication interceptor using the provided authenticator.
+// The authenticator is required and must not be nil.
 //
 // The interceptor uses the aggregating authenticator to authenticate gRPC streams, supporting
 // all authenticator types in the chain (OIDC, x-rh-identity, allow-unauthenticated, etc.).
-func NewStreamAuthInterceptor(config authn.CompletedConfig, authenticator api.Authenticator, logger log.Logger, opts ...StreamAuthOption) (*StreamAuthInterceptor, error) {
+func NewStreamAuthInterceptor(authenticator api.Authenticator, logger log.Logger, opts ...StreamAuthOption) (*StreamAuthInterceptor, error) {
+	if authenticator == nil {
+		return nil, fmt.Errorf("authenticator is required")
+	}
+
 	cfg := &StreamAuthConfig{
 		authenticator: authenticator,
 		logger:        logger,
-	}
-
-	// If authenticator is not provided, create it from config (backwards compatible)
-	if cfg.authenticator == nil {
-		authnLogger := log.NewHelper(log.With(logger, "subsystem", "authn", "component", "stream-interceptor"))
-		var err error
-		cfg.authenticator, err = authn.New(config, authnLogger)
-		if err != nil {
-			return nil, err
-		}
 	}
 
 	for _, opt := range opts {

@@ -25,7 +25,6 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	. "github.com/project-kessel/inventory-api/cmd/common"
-	"github.com/project-kessel/inventory-api/internal/authz"
 	"github.com/project-kessel/inventory-api/internal/pubsub"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -94,7 +93,7 @@ func (t *TestCase) TestSetup(testingT *testing.T) []error {
 	schemaRepository := data.NewInMemorySchemaRepository()
 
 	// Create consumer with real database first
-	t.inv, err = New(cfg, db, schemaRepository, authz.CompletedConfig{}, authorizer, notifier, t.logger, consumer)
+	t.inv, err = New(cfg, db, schemaRepository, authorizer, notifier, t.logger, consumer)
 	if err != nil {
 		errs = append(errs, err)
 		return errs

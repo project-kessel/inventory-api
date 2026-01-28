@@ -7,12 +7,12 @@ import (
 
 	"github.com/project-kessel/inventory-api/internal/data"
 	"github.com/project-kessel/inventory-api/internal/errors"
-	"github.com/project-kessel/inventory-api/internal/storage"
+	"github.com/project-kessel/inventory-api/internal/provider"
 )
 
 // NewCommand creates a new cobra command for database migration.
 // It creates or migrates the database tables using the provided storage options.
-func NewCommand(options *storage.Options, loggerOptions common.LoggerOptions) *cobra.Command {
+func NewCommand(options *provider.StorageOptions, loggerOptions common.LoggerOptions) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "migrate",
 		Short: "Create or migrate the database tables",
@@ -20,17 +20,11 @@ func NewCommand(options *storage.Options, loggerOptions common.LoggerOptions) *c
 			_, logger := common.InitLogger(common.GetLogLevel(), loggerOptions)
 			logHelper := log.NewHelper(log.With(logger, "group", "storage"))
 
-			if errs := options.Complete(); errs != nil {
-				return errors.NewAggregate(errs)
-			}
-
 			if errs := options.Validate(); errs != nil {
 				return errors.NewAggregate(errs)
 			}
 
-			config := storage.NewConfig(options).Complete()
-
-			db, err := storage.New(config, logHelper)
+			db, err := provider.NewStorage(options, logHelper)
 			if err != nil {
 				return err
 			}

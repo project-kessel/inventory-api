@@ -13,16 +13,14 @@ import (
 )
 
 type healthRepo struct {
-	DB            *gorm.DB
-	Authz         authzapi.Authorizer
-	CompletedAuth authz.CompletedConfig
+	DB    *gorm.DB
+	Authz authzapi.Authorizer
 }
 
-func New(g *gorm.DB, a authzapi.Authorizer, completedAuth authz.CompletedConfig) *healthRepo {
+func New(g *gorm.DB, a authzapi.Authorizer) *healthRepo {
 	return &healthRepo{
-		DB:            g,
-		Authz:         a,
-		CompletedAuth: completedAuth,
+		DB:    g,
+		Authz: a,
 	}
 }
 
@@ -48,7 +46,7 @@ func (r *healthRepo) IsBackendAvailable(ctx context.Context) (*pb.GetReadyzRespo
 		log.Errorf("RELATIONS-API UNHEALTHY")
 		return newResponse("RELATIONS-API UNHEALTHY", 500), nil
 	}
-	if authz.CheckAuthorizer(r.CompletedAuth) == "Kessel" {
+	if authz.CheckAuthorizerType(r.Authz) == "Kessel" {
 		if viper.GetBool("log.readyz") {
 			log.Infof("Storage type %s and relations-api %s", storageType, health.GetStatus())
 		}
@@ -64,7 +62,7 @@ func (r *healthRepo) IsRelationsAvailable(ctx context.Context) (*pb.GetReadyzRes
 		log.Errorf("RELATIONS-API UNHEALTHY")
 		return newResponse("RELATIONS-API UNHEALTHY", 500), nil
 	}
-	if authz.CheckAuthorizer(r.CompletedAuth) == "Kessel" {
+	if authz.CheckAuthorizerType(r.Authz) == "Kessel" {
 		if viper.GetBool("log.readyz") {
 			log.Infof("relations-api %s", health.GetStatus())
 		}

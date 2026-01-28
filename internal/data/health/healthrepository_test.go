@@ -14,7 +14,6 @@ import (
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 
-	"github.com/project-kessel/inventory-api/internal/authz"
 	"github.com/project-kessel/inventory-api/internal/authz/kessel"
 	"github.com/project-kessel/inventory-api/internal/data"
 )
@@ -32,11 +31,10 @@ func setupGorm(t *testing.T) *gorm.DB {
 func TestHealthInit(t *testing.T) {
 	db := setupGorm(t)
 	ctx := context.TODO()
-	authConfig, _ := authz.NewConfig(authz.NewOptions()).Complete(ctx)
 	kesselConfig, _ := kessel.NewConfig(kessel.NewOptions()).Complete(ctx)
 	authorizer, _ := kessel.New(ctx, kesselConfig, log.NewHelper(log.DefaultLogger))
 
-	healthRepo := New(db, authorizer, authConfig)
+	healthRepo := New(db, authorizer)
 	assert.NotNil(t, healthRepo)
 
 	// just check default negative case for now when using sqlite db, and empty config
@@ -54,12 +52,11 @@ func TestHealthInit(t *testing.T) {
 
 func TestHealthRepo_IsBackendAvailable_AllCases(t *testing.T) {
 	ctx := context.TODO()
-	authConfig, _ := authz.NewConfig(authz.NewOptions()).Complete(ctx)
 	kesselConfig, _ := kessel.NewConfig(kessel.NewOptions()).Complete(ctx)
 	authorizer, _ := kessel.New(ctx, kesselConfig, log.NewHelper(log.DefaultLogger))
 
 	db := setupGorm(t)
-	healthRepo := New(db, authorizer, authConfig)
+	healthRepo := New(db, authorizer)
 	assert.NotNil(t, healthRepo)
 	resp, err := healthRepo.IsBackendAvailable(ctx)
 	assert.Nil(t, err)
@@ -79,7 +76,7 @@ func TestHealthRepo_IsBackendAvailable_AllCases(t *testing.T) {
 	db1 := setupGorm(t)
 	mockAuthz1 := &mocks.MockAuthz{}
 	mockAuthz1.On("Health", ctx).Return(&kesselv1.GetReadyzResponse{Status: "OK"}, nil)
-	healthRepo1 := New(db1, mockAuthz1, authConfig)
+	healthRepo1 := New(db1, mockAuthz1)
 	resp, err = healthRepo1.IsBackendAvailable(ctx)
 	assert.NoError(t, err)
 	assert.Equal(t, uint32(200), resp.Code)
@@ -92,7 +89,7 @@ func TestHealthRepo_IsBackendAvailable_AllCases(t *testing.T) {
 	if err := sqlDB2.Close(); err != nil {
 		t.Logf("Warning: failed to close db: %v", err)
 	}
-	healthRepo2 := New(db2, mockAuthz2, authConfig)
+	healthRepo2 := New(db2, mockAuthz2)
 	resp, err = healthRepo2.IsBackendAvailable(ctx)
 	assert.NoError(t, err)
 	assert.Equal(t, uint32(500), resp.Code)
@@ -102,7 +99,7 @@ func TestHealthRepo_IsBackendAvailable_AllCases(t *testing.T) {
 	db3 := setupGorm(t)
 	mockAuthz3 := &mocks.MockAuthz{}
 	mockAuthz3.On("Health", ctx).Return((*kesselv1.GetReadyzResponse)(nil), errors.New("RELATIONS-API UNHEALTHY"))
-	healthRepo3 := New(db3, mockAuthz3, authConfig)
+	healthRepo3 := New(db3, mockAuthz3)
 	resp, err = healthRepo3.IsBackendAvailable(ctx)
 	assert.NoError(t, err)
 	assert.Equal(t, uint32(500), resp.Code)

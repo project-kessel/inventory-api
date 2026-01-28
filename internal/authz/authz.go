@@ -1,36 +1,25 @@
 package authz
 
 import (
-	"context"
-	"fmt"
-
-	"github.com/go-kratos/kratos/v2/log"
-
 	"github.com/project-kessel/inventory-api/internal/authz/allow"
 	"github.com/project-kessel/inventory-api/internal/authz/api"
 	"github.com/project-kessel/inventory-api/internal/authz/kessel"
 )
 
-func New(ctx context.Context, config CompletedConfig, logger *log.Helper) (api.Authorizer, error) {
-	switch config.Authz {
-	case AllowAll:
-		return allow.New(logger), nil
-	case Kessel:
-		return kessel.New(ctx, config.Kessel, logger)
-	default:
-		return nil, fmt.Errorf("unrecognized authz.impl: %s", config.Authz)
-	}
-}
+// Authorizer type constants (kept for provider compatibility).
+const (
+	AllowAll = "allow-all"
+	Kessel   = "kessel"
+)
 
-func CheckAuthorizer(config CompletedConfig) string {
-	var authType string
-	switch config.Authz {
-	case AllowAll:
-		authType = "AllowAll"
-	case Kessel:
-		authType = "Kessel"
+// CheckAuthorizerType returns the authorizer type by checking the interface.
+func CheckAuthorizerType(authorizer api.Authorizer) string {
+	switch authorizer.(type) {
+	case *allow.AllowAllAuthz:
+		return "AllowAll"
+	case *kessel.KesselAuthz:
+		return "Kessel"
 	default:
-		authType = "Unknown"
+		return "Unknown"
 	}
-	return authType
 }

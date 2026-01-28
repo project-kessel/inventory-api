@@ -8,7 +8,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/project-kessel/inventory-api/cmd/common"
 	"github.com/project-kessel/inventory-api/internal/data/model"
-	"github.com/project-kessel/inventory-api/internal/storage"
+	"github.com/project-kessel/inventory-api/internal/provider"
 	"github.com/spf13/cobra"
 	"gorm.io/gorm"
 )
@@ -18,7 +18,7 @@ const (
 	BatchDelayMs    = 100
 )
 
-func NewResourceDeleteJobCommand(storageOptions *storage.Options, loggerOptions common.LoggerOptions) *cobra.Command {
+func NewResourceDeleteJobCommand(storageOptions *provider.StorageOptions, loggerOptions common.LoggerOptions) *cobra.Command {
 	var dryRun bool
 	var resourceType string
 	var reporterType string
@@ -42,7 +42,7 @@ func NewResourceDeleteJobCommand(storageOptions *storage.Options, loggerOptions 
 	return cmd
 }
 
-func deleteResources(storageOptions *storage.Options, loggerOptions common.LoggerOptions, dryRun bool, resourceType string, reporterType string) error {
+func deleteResources(storageOptions *provider.StorageOptions, loggerOptions common.LoggerOptions, dryRun bool, resourceType string, reporterType string) error {
 	_, logger := common.InitLogger(common.GetLogLevel(), loggerOptions)
 	logHelper := log.NewHelper(log.With(logger, "job", "delete_resources"))
 
@@ -55,8 +55,7 @@ func deleteResources(storageOptions *storage.Options, loggerOptions common.Logge
 		return fmt.Errorf("reporter-type flag is required")
 	}
 
-	storageConfig := storage.NewConfig(storageOptions).Complete()
-	db, err := storage.New(storageConfig, logHelper)
+	db, err := provider.NewStorage(storageOptions, logHelper)
 	if err != nil {
 		return err
 	}

@@ -37,7 +37,6 @@ import (
 	"google.golang.org/grpc/status"
 	"gorm.io/gorm"
 
-	"github.com/project-kessel/inventory-api/internal/authz"
 	"github.com/project-kessel/inventory-api/internal/authz/api"
 	"github.com/project-kessel/inventory-api/internal/biz"
 	"github.com/project-kessel/inventory-api/internal/biz/model_legacy"
@@ -65,7 +64,6 @@ type InventoryConsumer struct {
 	OffsetStorage    []kafka.TopicPartition
 	Config           CompletedConfig
 	DB               *gorm.DB
-	AuthzConfig      authz.CompletedConfig
 	Authorizer       api.Authorizer
 	Errors           chan error
 	MetricsCollector *metricscollector.MetricsCollector
@@ -87,7 +85,7 @@ type InventoryConsumer struct {
 }
 
 // New instantiates a new InventoryConsumer
-func New(config CompletedConfig, db *gorm.DB, schemaRepository model.SchemaRepository, authz authz.CompletedConfig, authorizer api.Authorizer, notifier pubsub.Notifier, logger *log.Helper, consumer Consumer) (InventoryConsumer, error) {
+func New(config CompletedConfig, db *gorm.DB, schemaRepository model.SchemaRepository, authorizer api.Authorizer, notifier pubsub.Notifier, logger *log.Helper, consumer Consumer) (InventoryConsumer, error) {
 	if consumer == nil {
 		logger.Info("Setting up kafka consumer")
 		logger.Debugf("completed kafka config: %+v", config.KafkaConfig)
@@ -137,7 +135,6 @@ func New(config CompletedConfig, db *gorm.DB, schemaRepository model.SchemaRepos
 		Config:             config,
 		DB:                 db,
 		ResourceRepository: resourceRepository,
-		AuthzConfig:        authz,
 		Authorizer:         authorizer,
 		Errors:             errChan,
 		MetricsCollector:   &mc,

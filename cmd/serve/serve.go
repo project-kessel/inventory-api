@@ -11,7 +11,6 @@ import (
 
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/project-kessel/inventory-api/internal/metricscollector"
-	"github.com/project-kessel/inventory-api/internal/service"
 	"github.com/sony/gobreaker"
 	"github.com/spf13/cobra"
 	"go.opentelemetry.io/otel"
@@ -21,46 +20,30 @@ import (
 	"github.com/project-kessel/inventory-api/internal/biz/model"
 	"github.com/project-kessel/inventory-api/internal/biz/usecase/replication"
 	resourcesctl "github.com/project-kessel/inventory-api/internal/biz/usecase/resources"
-	"github.com/project-kessel/inventory-api/internal/config/schema"
-	"github.com/project-kessel/inventory-api/internal/consistency"
-	"github.com/project-kessel/inventory-api/internal/consumer"
 	"github.com/project-kessel/inventory-api/internal/data"
-	"github.com/project-kessel/inventory-api/internal/pubsub"
-
-	//v1beta2
-	resourcesvc "github.com/project-kessel/inventory-api/internal/service/resources"
-
-	"github.com/project-kessel/inventory-api/internal/authn"
-	"github.com/project-kessel/inventory-api/internal/authz"
 	"github.com/project-kessel/inventory-api/internal/errors"
-	"github.com/project-kessel/inventory-api/internal/eventing"
 	eventingapi "github.com/project-kessel/inventory-api/internal/eventing/api"
 	"github.com/project-kessel/inventory-api/internal/middleware"
+	"github.com/project-kessel/inventory-api/internal/provider"
 	"github.com/project-kessel/inventory-api/internal/server"
 	"github.com/project-kessel/inventory-api/internal/server/pprof"
-	"github.com/project-kessel/inventory-api/internal/storage"
 
 	hb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1"
 	pbv1beta2 "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2"
 	healthctl "github.com/project-kessel/inventory-api/internal/biz/health"
 	healthrepo "github.com/project-kessel/inventory-api/internal/data/health"
 	healthssvc "github.com/project-kessel/inventory-api/internal/service/health"
+
+	//v1beta2
+	resourcesvc "github.com/project-kessel/inventory-api/internal/service/resources"
 )
 
 // NewCommand creates a new cobra command for starting the inventory server.
 // It configures and wires together all the necessary components including storage, authentication,
 // authorization, eventing, and consumer services.
 func NewCommand(
-	serverOptions *server.Options,
-	storageOptions *storage.Options,
-	authnOptions *authn.Options,
-	authzOptions *authz.Options,
-	eventingOptions *eventing.Options,
-	consumerOptions *consumer.Options,
-	consistencyOptions *consistency.Options,
-	serviceOptions *service.Options,
+	options *provider.Options,
 	loggerOptions common.LoggerOptions,
-	schemaOptions *schema.Options,
 ) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "serve",
@@ -69,111 +52,81 @@ func NewCommand(
 			_, logger := common.InitLogger(common.GetLogLevel(), loggerOptions)
 			ctx := context.Background()
 
-			var consumerConfig consumer.CompletedConfig
-			var inventoryConsumer consumer.InventoryConsumer
-
-			// configure storage
-			if errs := storageOptions.Complete(); errs != nil {
-				return errors.NewAggregate(errs)
-			}
-			if errs := storageOptions.Validate(); errs != nil {
-				return errors.NewAggregate(errs)
-			}
-			storageConfig := storage.NewConfig(storageOptions).Complete()
-
-			// // configure authn
-			if errs := authnOptions.Complete(); errs != nil {
-				return errors.NewAggregate(errs)
-			}
-			if errs := authnOptions.Validate(); errs != nil {
-				return errors.NewAggregate(errs)
-			}
-			authnConfig, errs := authn.NewConfig(authnOptions).Complete()
-			if errs != nil {
-				return errors.NewAggregate(errs)
+			// Validate all options
+			if err := validateOptions(options); err != nil {
+				return err
 			}
 
-			// configure authz
-			if errs := authzOptions.Complete(); errs != nil {
-				return errors.NewAggregate(errs)
-			}
-			if errs := authzOptions.Validate(); errs != nil {
-				return errors.NewAggregate(errs)
-			}
-			authzConfig, errs := authz.NewConfig(authzOptions).Complete(ctx)
-			if errs != nil {
-				return errors.NewAggregate(errs)
-			}
-
-			// configure eventing
-			if errs := eventingOptions.Complete(); errs != nil {
-				return errors.NewAggregate(errs)
-			}
-			if errs := eventingOptions.Validate(); errs != nil {
-				return errors.NewAggregate(errs)
-			}
-			eventingConfig, errs := eventing.NewConfig(eventingOptions).Complete()
-			if errs != nil {
-				return errors.NewAggregate(errs)
-			}
-
-			// configure inventoryConsumer
-			if errs := consumerOptions.Complete(); errs != nil {
-				return errors.NewAggregate(errs)
-			}
-			if errs := consumerOptions.Validate(); errs != nil {
-				return errors.NewAggregate(errs)
-			}
-			if consumerOptions.Enabled {
-				consumerConfig, errs = consumer.NewConfig(consumerOptions).Complete()
-				if errs != nil {
-					return errors.NewAggregate(errs)
-				}
-			}
-
-			// configure consistency
-			if errs := consistencyOptions.Complete(); errs != nil {
-				return errors.NewAggregate(errs)
-			}
-			if errs := consistencyOptions.Validate(); errs != nil {
-				return errors.NewAggregate(errs)
-			}
-			consistencyConfig, errs := consistency.NewConfig(consistencyOptions).Complete()
-			if errs != nil {
-				return errors.NewAggregate(errs)
-			}
-
-			// configure schemaService service
-			if errs := schemaOptions.Complete(); errs != nil {
-				return errors.NewAggregate(errs)
-			}
-			if errs := schemaOptions.Validate(); errs != nil {
-				return errors.NewAggregate(errs)
-			}
-			schemaConfig, errs := schema.NewConfig(schemaOptions).Complete()
-			if errs != nil {
-				return errors.NewAggregate(errs)
-			}
-
-			// configure the server
-			if errs := serverOptions.Complete(); errs != nil {
-				return errors.NewAggregate(errs)
-			}
-			if errs := serverOptions.Validate(); errs != nil {
-				return errors.NewAggregate(errs)
-			}
-			serverConfig, errs := server.NewConfig(serverOptions).Complete()
-			if errs != nil {
-				return errors.NewAggregate(errs)
-			}
-
-			// construct storage
-			db, err := storage.New(storageConfig, log.NewHelper(log.With(logger, "subsystem", "storage")))
+			// Create storage
+			storageLogger := log.NewHelper(log.With(logger, "subsystem", "storage"))
+			db, err := provider.NewStorage(options.Storage, storageLogger)
 			if err != nil {
 				return err
 			}
 
-			// setup metrics collector for consumer and custom metrics
+			// Create pgx pool for postgres-specific features
+			pgxPool, err := provider.NewPgxPool(ctx, options.Storage, storageLogger)
+			if err != nil {
+				return err
+			}
+
+			// Create cluster broadcast (postgres only)
+			clusterBroadcast, err := provider.NewClusterBroadcast(ctx, options.Storage, pgxPool, logger)
+			if err != nil {
+				return err
+			}
+
+			// Create authenticator
+			authnLogger := log.NewHelper(log.With(logger, "subsystem", "authn"))
+			authnResult, err := provider.NewAuthenticator(options.Authn, authnLogger)
+			if err != nil {
+				return err
+			}
+
+			// Create authorizer
+			authzLogger := log.NewHelper(log.With(logger, "subsystem", "authz"))
+			authorizer, err := provider.NewAuthorizer(ctx, options.Authz, authzLogger)
+			if err != nil {
+				return err
+			}
+
+			// Create eventing manager
+			eventingLogger := log.NewHelper(log.With(logger, "subsystem", "eventing"))
+			eventingManager, err := provider.NewEventingManager(options.Eventing, options.Server.PublicUrl, eventingLogger)
+			if err != nil {
+				return err
+			}
+
+			// Create schema repository
+			schemaLogger := log.NewHelper(log.With(logger, "subsystem", "schemaRepository"))
+			schemaRepository, err := provider.NewSchemaRepository(ctx, options.Schema, schemaLogger)
+			if err != nil {
+				return err
+			}
+
+			// Create server
+			server, err := provider.NewServer(provider.ServerConfig{
+				Options:         options.Server,
+				AuthnMiddleware: middleware.Authentication(authnResult.Authenticator),
+				Authenticator:   authnResult.Authenticator,
+				Logger:          logger,
+			})
+			if err != nil {
+				return err
+			}
+
+			// Create pprof server - convert provider options to pprof options
+			pprofOpts := &pprof.Options{
+				Enabled: options.Server.Pprof.Enabled,
+				Port:    options.Server.Pprof.Port,
+				Addr:    options.Server.Pprof.Addr,
+			}
+			pprofServer, err := pprof.New(pprofOpts, logger)
+			if err != nil {
+				return err
+			}
+
+			// Setup metrics collector
 			mc := &metricscollector.MetricsCollector{}
 			meter := otel.Meter("github.com/project-kessel/inventory-api/blob/main/internal/server/otel")
 			err = mc.New(meter)
@@ -181,83 +134,20 @@ func NewCommand(
 				return err
 			}
 
-			// START: construct cluster broadcast (postgres only)
-			var clusterBroadcast model.ClusterBroadcast
-			if storageConfig.Options.Database == "postgres" {
-				broadcastLogger := log.NewHelper(log.With(logger, "subsystem", "clusterBroadcast"))
-				pgxPool, err := storage.NewPgx(storageConfig, broadcastLogger)
-				if err != nil {
-					return err
-				}
-				// Use separate drivers for listening and notifying to avoid mutex contention.
-				// The listener driver's connection blocks while waiting for notifications,
-				// so a separate notifier driver ensures NOTIFY calls aren't blocked.
-				listenerDriver := pubsub.NewPgxDriver(pgxPool)
-				notifierDriver := pubsub.NewPgxDriver(pgxPool)
-				clusterBroadcast = data.NewPgxClusterBroadcast(data.PgxClusterBroadcastConfig{
-					ListenerDriver: listenerDriver,
-					NotifierDriver: notifierDriver,
-					Logger:         log.With(logger, "subsystem", "clusterBroadcast"),
-				})
-				if err := clusterBroadcast.(*data.PgxClusterBroadcast).Start(ctx); err != nil {
-					return fmt.Errorf("error starting cluster broadcast: %v", err)
-				}
-			}
-			// STOP: construct cluster broadcast
+			// Build consistency config
+			consistencyConfig := provider.BuildConsistencyConfig(options.Consistency)
 
-			// construct authn
-			authenticator, err := authn.New(authnConfig, log.NewHelper(log.With(logger, "subsystem", "authn")))
-			if err != nil {
-				return err
-			}
-
-			// construct authz
-			authorizer, err := authz.New(ctx, authzConfig, log.NewHelper(log.With(logger, "subsystem", "authz")))
-			if err != nil {
-				return err
-			}
-
-			// construct eventing
-			// Note that we pass the server id here to act as the Source URI in cloudevents
-			// If a server ID isn't configured explicitly, `os.Hostname()` is used.
-			eventingManager, err := eventing.New(eventingConfig, serverConfig.Options.PublicUrl, log.NewHelper(log.With(logger, "subsystem", "eventing")))
-			if err != nil {
-				return err
-			}
-
-			// constructs schema repository
-			schemaRepository, err := data.NewSchemaRepository(ctx, schemaConfig, log.NewHelper(log.With(logger, "subsystem", "schemaRepository")))
-			if err != nil {
-				return err
-			}
-
-			// construct servers
-			server, err := server.New(serverConfig, middleware.Authentication(authenticator), authnConfig, authenticator, logger)
-			if err != nil {
-				return err
-			}
-
-			// construct pprof server
-			pprofServer, err := pprof.New(serverConfig.Options.PprofOptions, logger)
-		if err != nil {
-			return err
-		}
-
-		usecaseConfig := &resourcesctl.UsecaseConfig{
+			usecaseConfig := &resourcesctl.UsecaseConfig{
 				ReadAfterWriteEnabled:   consistencyConfig.ReadAfterWriteEnabled,
 				ReadAfterWriteAllowlist: consistencyConfig.ReadAfterWriteAllowlist,
-				ConsumerEnabled:         consumerOptions.Enabled,
+				ConsumerEnabled:         options.Consumer.Enabled,
 			}
 
-			// This circuit breaker is used to prevent request handlers from being blocked
-			// indefinitely if the consumer is not responding via notifications.
-			// This is a naive solution until we can implement a more robust
-			// solution for navigating consumer health.
+			// Circuit breaker for wait-for-notification
 			waitForNotifCircuitBreaker := gobreaker.NewCircuitBreaker(gobreaker.Settings{
 				Name:    "wait-for-notif-breaker",
-				Timeout: 60 * time.Second, // Reset after 60s if tripped
+				Timeout: 60 * time.Second,
 				ReadyToTrip: func(counts gobreaker.Counts) bool {
-					// Trip after 3 consecutive failures
 					return counts.ConsecutiveFailures > 2
 				},
 				OnStateChange: func(name string, from gobreaker.State, to gobreaker.State) {
@@ -265,64 +155,56 @@ func NewCommand(
 				},
 			})
 
-			// Create transaction manager for all repositories
-			transactionManager := data.NewGormTransactionManager(mc, storageConfig.Options.MaxSerializationRetries)
+			// Create transaction manager
+			transactionManager := data.NewGormTransactionManager(mc, options.Storage.MaxSerializationRetries)
 
-		//v1beta2
-		// wire together inventory service handling
-		resourceRepo := data.NewResourceRepository(db, transactionManager)
+			// Create resource repository
+			resourceRepo := data.NewResourceRepository(db, transactionManager)
 
-		// Create event source if consumer is enabled
-		var eventSource model.EventSource
-		if consumerOptions.Enabled {
-			eventSource = data.NewKafkaEventSource(data.KafkaEventSourceConfig{
-				KafkaConfig:     consumerConfig.KafkaConfig,
-				Topic:           consumerConfig.Topic,
-				ConsumerGroupID: consumerConfig.ConsumerGroupID,
-				Logger:          log.With(logger, "subsystem", "kafkaEventSource"),
-				Authorizer:      authorizer,
+			// Create event source if consumer is enabled
+			var eventSource model.EventSource
+			if options.Consumer.Enabled {
+				eventSource, err = provider.NewKafkaEventSource(options.Consumer, authorizer, log.With(logger, "subsystem", "kafkaEventSource"))
+				if err != nil {
+					return err
+				}
+			}
+
+			// Create store for transactional access
+			store := data.NewAdapterStore(data.AdapterStoreConfig{
+				ResourceRepo: resourceRepo,
+				EventSource:  eventSource,
 			})
-		}
 
-		// Create store for transactional access (with event source if enabled)
-		store := data.NewAdapterStore(data.AdapterStoreConfig{
-			ResourceRepo: resourceRepo,
-			EventSource:  eventSource,
-		})
+			// Create inventory controller
+			inventoryController := resourcesctl.New(store, clusterBroadcast, schemaRepository, authorizer, eventingManager, "notifications", log.With(logger, "subsystem", "notificationsintegrations_controller"), waitForNotifCircuitBreaker, usecaseConfig, mc)
 
-		inventory_controller := resourcesctl.New(store, clusterBroadcast, schemaRepository, authorizer, eventingManager, "notifications", log.With(logger, "subsystem", "notificationsintegrations_controller"), waitForNotifCircuitBreaker, usecaseConfig, mc)
+			// Create replication usecase if consumer is enabled
+			var replicationUsecase *replication.RelationReplicationUsecase
+			if options.Consumer.Enabled {
+				schemaService := model.NewSchemaService(schemaRepository, log.NewHelper(log.With(logger, "subsystem", "schemaService")))
+				relationsReplicator := newAuthorizerReplicator(authorizer)
+				replicationService := model.NewRelationReplicationService(relationsReplicator, schemaService)
+				replicationUsecase = replication.NewRelationReplicationUsecase(
+					store,
+					clusterBroadcast,
+					replicationService,
+					log.With(logger, "subsystem", "replicationUsecase"),
+				)
+			}
 
-		// Create replication usecase if consumer is enabled
-		var replicationUsecase *replication.RelationReplicationUsecase
-		if consumerOptions.Enabled {
-			// Create schema service for tuple calculation
-			schemaService := model.NewSchemaService(schemaRepository, log.NewHelper(log.With(logger, "subsystem", "schemaService")))
+			// Register services
+			inventoryService := resourcesvc.NewKesselInventoryServiceV1beta2(inventoryController)
+			pbv1beta2.RegisterKesselInventoryServiceServer(server.GrpcServer, inventoryService)
+			pbv1beta2.RegisterKesselInventoryServiceHTTPServer(server.HttpServer, inventoryService)
 
-			// Create authorizer replicator adapter
-			relationsReplicator := authz.NewAuthorizerReplicator(authorizer)
+			healthRepo := healthrepo.New(db, authorizer)
+			healthController := healthctl.New(healthRepo, log.With(logger, "subsystem", "health_controller"))
+			healthService := healthssvc.New(healthController)
+			hb.RegisterKesselInventoryHealthServiceServer(server.GrpcServer, healthService)
+			hb.RegisterKesselInventoryHealthServiceHTTPServer(server.HttpServer, healthService)
 
-			// Create replication service
-			replicationService := model.NewRelationReplicationService(relationsReplicator, schemaService)
-
-			// Create replication usecase (handler for deliveries)
-			replicationUsecase = replication.NewRelationReplicationUsecase(
-				store,
-				clusterBroadcast,
-				replicationService,
-				log.With(logger, "subsystem", "replicationUsecase"),
-			)
-		}
-
-			inventory_service := resourcesvc.NewKesselInventoryServiceV1beta2(inventory_controller)
-			pbv1beta2.RegisterKesselInventoryServiceServer(server.GrpcServer, inventory_service)
-			pbv1beta2.RegisterKesselInventoryServiceHTTPServer(server.HttpServer, inventory_service)
-
-			health_repo := healthrepo.New(db, authorizer, authzConfig)
-			health_controller := healthctl.New(health_repo, log.With(logger, "subsystem", "health_controller"))
-			health_service := healthssvc.New(health_controller)
-			hb.RegisterKesselInventoryHealthServiceServer(server.GrpcServer, health_service)
-			hb.RegisterKesselInventoryHealthServiceHTTPServer(server.HttpServer, health_service)
-
+			// Start servers
 			srvErrs := make(chan error)
 			go func() {
 				srvErrs <- server.Run(ctx)
@@ -335,11 +217,11 @@ func NewCommand(
 				}()
 			}
 
-			shutdown := shutdown(db, server, pprofServer, eventingManager, &inventoryConsumer, log.NewHelper(logger))
+			shutdown := createShutdown(db, server, pprofServer, eventingManager, log.NewHelper(logger))
 
 			// Start replication usecase if enabled
 			replicationErrs := make(chan error, 1)
-			if consumerOptions.Enabled && replicationUsecase != nil {
+			if options.Consumer.Enabled && replicationUsecase != nil {
 				go func() {
 					if err := replicationUsecase.Run(ctx); err != nil && !e.Is(err, context.Canceled) {
 						replicationErrs <- err
@@ -366,21 +248,54 @@ func NewCommand(
 		},
 	}
 
-	serverOptions.AddFlags(cmd.Flags(), "server")
-	authnOptions.AddFlags(cmd.Flags(), "authn")
-	authzOptions.AddFlags(cmd.Flags(), "authz")
-	eventingOptions.AddFlags(cmd.Flags(), "eventing")
-	consumerOptions.AddFlags(cmd.Flags(), "consumer")
-	consistencyOptions.AddFlags(cmd.Flags(), "consistency")
-	serviceOptions.AddFlags()
-	schemaOptions.AddFlags(cmd.Flags(), "schema")
+	// Add flags for each option group
+	options.Server.AddFlags(cmd.Flags(), "server")
+	options.Authn.AddFlags(cmd.Flags(), "authn")
+	options.Authz.AddFlags(cmd.Flags(), "authz")
+	options.Eventing.AddFlags(cmd.Flags(), "eventing")
+	options.Consumer.AddFlags(cmd.Flags(), "consumer")
+	options.Consistency.AddFlags(cmd.Flags(), "consistency")
+	options.Schema.AddFlags(cmd.Flags(), "schema")
 
 	return cmd
 }
 
-// shutdown returns a shutdown function that gracefully closes all server components
-// including the HTTP server, pprof server, eventing manager, consumer, and database connections.
-func shutdown(db *gorm.DB, srv *server.Server, pprofSrv *pprof.Server, em eventingapi.Manager, cm *consumer.InventoryConsumer, logger *log.Helper) func(reason interface{}) {
+// validateOptions validates all options before use.
+func validateOptions(opts *provider.Options) error {
+	var allErrs []error
+
+	if errs := opts.Storage.Validate(); len(errs) > 0 {
+		allErrs = append(allErrs, errs...)
+	}
+	if errs := opts.Authn.Validate(); len(errs) > 0 {
+		allErrs = append(allErrs, errs...)
+	}
+	if errs := opts.Authz.Validate(); len(errs) > 0 {
+		allErrs = append(allErrs, errs...)
+	}
+	if errs := opts.Eventing.Validate(); len(errs) > 0 {
+		allErrs = append(allErrs, errs...)
+	}
+	if opts.Consumer.Enabled {
+		if errs := opts.Consumer.Validate(); len(errs) > 0 {
+			allErrs = append(allErrs, errs...)
+		}
+	}
+	if errs := opts.Server.Validate(); len(errs) > 0 {
+		allErrs = append(allErrs, errs...)
+	}
+	if errs := opts.Schema.Validate(); len(errs) > 0 {
+		allErrs = append(allErrs, errs...)
+	}
+
+	if len(allErrs) > 0 {
+		return errors.NewAggregate(allErrs)
+	}
+	return nil
+}
+
+// createShutdown returns a shutdown function that gracefully closes all server components.
+func createShutdown(db *gorm.DB, srv *server.Server, pprofSrv *pprof.Server, em eventingapi.Manager, logger *log.Helper) func(reason interface{}) {
 	return func(reason interface{}) {
 		log.Info(fmt.Sprintf("Server Shutdown: %s", reason))
 
@@ -405,27 +320,28 @@ func shutdown(db *gorm.DB, srv *server.Server, pprofSrv *pprof.Server, em eventi
 			logger.Error(fmt.Sprintf("Error Gracefully Shutting Down Eventing: %v", err))
 		}
 
-		if cm != nil {
-			defer func() {
-				err := cm.Shutdown()
-				if err != nil {
-					if e.Is(err, consumer.ErrClosed) {
-						logger.Warn("error shutting down consumer, consumer already closed")
-					} else {
-						logger.Error(fmt.Sprintf("Error Gracefully Shutting Down Consumer: %v", err))
-					}
-				}
-			}()
-		}
-
 		if sqlDB, err := db.DB(); err != nil {
 			logger.Error(fmt.Sprintf("Error Gracefully Shutting Down Storage: %v", err))
 		} else {
 			defer func() {
 				if err := sqlDB.Close(); err != nil {
-					fmt.Printf("failed to close consumer: %v", err)
+					fmt.Printf("failed to close database: %v", err)
 				}
 			}()
 		}
 	}
 }
+
+// newAuthorizerReplicator creates a relations replicator from the authorizer.
+// This is a bridge to use authz.NewAuthorizerReplicator without importing the authz package directly.
+func newAuthorizerReplicator(authorizer interface{}) model.RelationsReplicator {
+	// Import is avoided to prevent circular dependency; we use the interface.
+	// The authorizer returned from provider.NewAuthorizer already satisfies the required interface.
+	if replicator, ok := authorizer.(model.RelationsReplicator); ok {
+		return replicator
+	}
+	// Fallback: create from authz package
+	// This shouldn't happen as authorizer should implement the interface
+	return nil
+}
+

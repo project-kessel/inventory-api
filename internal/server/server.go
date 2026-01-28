@@ -9,7 +9,6 @@ import (
 	"github.com/go-kratos/kratos/v2/middleware"
 	kgrpc "github.com/go-kratos/kratos/v2/transport/grpc"
 	khttp "github.com/go-kratos/kratos/v2/transport/http"
-	"github.com/project-kessel/inventory-api/internal/authn"
 	authnapi "github.com/project-kessel/inventory-api/internal/authn/api"
 
 	"github.com/project-kessel/inventory-api/internal/server/grpc"
@@ -30,9 +29,8 @@ type Server struct {
 
 // New creates a new Server instance with the provided configuration and middleware.
 // It initializes both HTTP and gRPC servers with the given authentication middleware.
-// authenticator is optional - if provided, uses the new aggregating authenticator for streams.
-// If nil, falls back to OIDC-only authentication (backwards compatible).
-func New(c CompletedConfig, authn middleware.Middleware, authnConfig authn.CompletedConfig, authenticator authnapi.Authenticator, logger log.Logger) (*Server, error) {
+// authenticator is used for gRPC stream authentication.
+func New(c CompletedConfig, authn middleware.Middleware, authenticator authnapi.Authenticator, logger log.Logger) (*Server, error) {
 	s := &Server{
 		Id:     c.Options.Id,
 		Name:   c.Options.Name,
@@ -54,9 +52,7 @@ func New(c CompletedConfig, authn middleware.Middleware, authnConfig authn.Compl
 		return nil, fmt.Errorf("init http server failed: %w", err)
 	}
 
-	// Pass authenticator to gRPC server for stream interceptor
-	// If nil, the interceptor will fall back to OIDC-only authentication (backwards compatible)
-	grpcServer, err := grpc.New(c.GrpcConfig, authn, authnConfig, authenticator, meter, logger)
+	grpcServer, err := grpc.New(c.GrpcConfig, authn, authenticator, meter, logger)
 	if err != nil {
 		return nil, fmt.Errorf("init grpc server failed: %w", err)
 	}

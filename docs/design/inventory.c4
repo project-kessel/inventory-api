@@ -2,10 +2,23 @@ specification {
     element actor
     element layer
     element package
-    element component
-    element aggregate
-    element entity
-    element valueobject
+    element interface
+    element component 
+    element aggregate {
+        style {
+            size small
+        }
+    }
+    element entity {
+        style {
+            size small
+        }   
+    }
+    element valueobject {
+        style {
+            size small
+        }
+    }
 }
 
 model {
@@ -23,13 +36,15 @@ model {
             description 'Background goroutine and socket listener that dispatches requests'
         }
         InventoryService = component 'InventoryService'
-        Authentication = component 'Authentication Middleware' {
-            description 'Parses Authorization Context from incoming requests'
+        layer middleware {
+            Authentication = component 'Authentication Middleware' {
+                description 'Parses Authorization Context from incoming requests'
+            }
+            Pagination = component 'Pagination Middleware'
         }
-        
 
         Server -> InventoryService 'dispatches'
-        Server -> Authentication 'authenticates'
+        Server -> middleware
     }
     application = layer 'Application' {
         description 'Models external commands and queries in a protocol-agnostic way'
@@ -42,20 +57,28 @@ model {
                 description 'Operations for schema management'
             }
         }
+        MetaAuthorizer = component 'Meta Authorizer' {
+            description 'Authorizes requests to Inventory.'
+        }
     }
     domain = layer 'Domain' {
         SchemaService = component 'Schema Service'
-        ResourceFactory = component 'Resource Factory'
-        ResourceRepository = component 'ResourceRepository'
-        SchemaRepository = component 'SchemaRepository'
-        EventSource = component 'Event Source'
+        ResourceFactory = component 'Resource Factory' {
+            description 'For creating new Resources'
+        }
+        ResourceRepository = interface 'ResourceRepository'
+        SchemaRepository = interface 'SchemaRepository'
+        EventSource = interface 'Event Source'
+        Schema = interface 'Schema'
         Resource = aggregate 'Resource'
-        Schema = aggregate 'Schema'
         Representation = valueobject 'Representation'
     }
     infrastructure = layer 'Infrastructure' {
         PgResourceRepository = component 'PostgreSQL ResourceRepository'
         KafkaEventSource = component 'Kafka Event Source'
+        JsonSchemaWithWorkspace = component 'JSON Schema with Workspace'
+        InMemorySchemaRepository = component 'InMemory Schema Repository'
+        SimpleMetaAuthorizer = component 'Simple Meta Authorizer'
     }
 
     caller -> presentation 'interacts with'
@@ -66,19 +89,37 @@ model {
 
     InventoryService -> ResourceUsecase 'invokes'
     InventoryService -> SchemaUsecase 'invokes'
+    EventSource -> RelationReplicationUsecase 'invokes'
 
     PgResourceRepository -> ResourceRepository 'implements'
     KafkaEventSource -> EventSource 'implements'
+    JsonSchemaWithWorkspace -> Schema 'implements'
+    InMemorySchemaRepository -> SchemaRepository 'implements'
+    SimpleMetaAuthorizer -> MetaAuthorizer 'implements'
 }
 
 views {
     view index {
         include *
         include presentation.*
+        include presentation.middleware.*
         include application.*
         include application.lifecycle.*
         include application.schema.*
         include domain.*
         include infrastructure.*
-    }
+
+        rank source {
+            caller
+        }
+
+        rank same {
+            application,
+            domain
+        }
+
+        rank sink {
+            infrastructure
+        }
+	}
 }

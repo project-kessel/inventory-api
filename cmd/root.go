@@ -12,7 +12,7 @@ import (
 	"github.com/project-kessel/inventory-api/cmd/migrate"
 	"github.com/project-kessel/inventory-api/cmd/schema"
 	"github.com/project-kessel/inventory-api/cmd/serve"
-	"github.com/project-kessel/inventory-api/internal/config"
+	"github.com/project-kessel/inventory-api/internal/provider"
 	clowder "github.com/redhatinsights/app-common-go/pkg/api/v1"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -34,7 +34,7 @@ var (
 		Short:   "A simple common inventory system",
 	}
 
-	options = config.NewOptionsConfig()
+	options = provider.NewOptions()
 )
 
 // Execute is called by main.main(). It only needs to happen once to the rootCmd.
@@ -57,7 +57,7 @@ func Initialize() {
 		ServiceVersion: Version,
 	})
 	if logLevel == "debug" {
-		config.LogConfigurationInfo(options)
+		LogConfigurationInfo(options)
 	}
 }
 
@@ -99,12 +99,14 @@ func init() {
 	if err != nil {
 		panic(err)
 	}
-	serveCmd := serve.NewCommand(options.Server, options.Storage, options.Authn, options.Authz, options.Eventing, options.Consumer, options.Consistency, options.Service, loggerOptions, options.Schema)
+
+	serveCmd := serve.NewCommand(options, loggerOptions)
 	rootCmd.AddCommand(serveCmd)
 	err = viper.BindPFlags(serveCmd.Flags())
 	if err != nil {
 		panic(err)
 	}
+
 	schemaCmd := schema.NewCommand(loggerOptions)
 	rootCmd.AddCommand(schemaCmd)
 	err = viper.BindPFlags(schemaCmd.Flags())
@@ -161,4 +163,66 @@ func initConfig() {
 	if err := viper.Unmarshal(&options); err != nil {
 		panic(err)
 	}
+}
+
+// LogConfigurationInfo outputs connection details to logs when in debug for testing (no secret data is output)
+func LogConfigurationInfo(options *provider.Options) {
+	log.Debugf("Server Configuration: Public URL: %s, HTTP Listener: %s, GRPC Listener: %s",
+		options.Server.PublicUrl,
+		options.Server.Http.Addr,
+		options.Server.Grpc.Addr)
+
+	// Log authn configuration if OIDC is configured
+	if options.Authn.Authenticator != nil {
+		for _, entry := range options.Authn.Authenticator.Chain {
+			if entry.Type == "oidc" {
+				if authServerURL, ok := entry.Config[provider.OIDCConfigKeyAuthServerURL].(string); ok && authServerURL != "" {
+					clientID := ""
+					if cid, ok := entry.Config[provider.OIDCConfigKeyClientID].(string); ok {
+						clientID = cid
+					}
+					log.Debugf("Authn Configuration: URL: %s, ClientID: %s", authServerURL, clientID)
+				}
+				break
+			}
+		}
+	}
+
+	if options.Storage.Database == provider.DatabasePostgres {
+		log.Debugf("Storage Configuration: Host: %s, DB: %s, Port: %s, SSLMode: %s, RDSCACert: %s",
+			options.Storage.Postgres.Host,
+			options.Storage.Postgres.DbName,
+			options.Storage.Postgres.Port,
+			options.Storage.Postgres.SSLMode,
+			options.Storage.Postgres.SSLRootCert,
+		)
+	}
+
+	if options.Authz.Authz == provider.AuthzKessel {
+		log.Debugf("Authz Configuration: URL: %s, Insecure?: %t, OIDC?: %t",
+			options.Authz.Kessel.URL,
+			options.Authz.Kessel.Insecure,
+			options.Authz.Kessel.EnableOidcAuth,
+		)
+	}
+
+	log.Debugf("Consumer Configuration: Bootstrap Server: %s, Topic: %s, Consumer Max Retries: %d, Operation Max Retries: %d, Backoff Factor: %d, Max Backoff Seconds: %d",
+		options.Consumer.BootstrapServers,
+		options.Consumer.Topic,
+		options.Consumer.Retry.ConsumerMaxRetries,
+		options.Consumer.Retry.OperationMaxRetries,
+		options.Consumer.Retry.BackoffFactor,
+		options.Consumer.Retry.MaxBackoffSeconds,
+	)
+
+	log.Debugf("Consumer Auth Settings: Enabled: %v, Security Protocol: %s, Mechanism: %s, Username: %s",
+		options.Consumer.Auth.Enabled,
+		options.Consumer.Auth.SecurityProtocol,
+		options.Consumer.Auth.SASLMechanism,
+		options.Consumer.Auth.SASLUsername)
+
+	log.Debugf("Consistency Configuration: Read-After-Write Enabled: %t, Read-After-Write Allowlist: %+s",
+		options.Consistency.ReadAfterWriteEnabled,
+		options.Consistency.ReadAfterWriteAllowlist,
+	)
 }

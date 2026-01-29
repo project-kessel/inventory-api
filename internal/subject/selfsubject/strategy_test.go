@@ -13,14 +13,16 @@ func TestRedHatRbacSelfSubjectStrategy_XRhIdentity_User(t *testing.T) {
 		XRhIdentityDomain: "redhat",
 	})
 
-	subject, err := strategy.SubjectFromAuthorizationContext(authnapi.AuthzContext{
+	subjectRef, err := strategy.SubjectFromAuthorizationContext(authnapi.AuthzContext{
 		Claims: &authnapi.Claims{
 			AuthType:  authnapi.AuthTypeXRhIdentity,
 			SubjectId: authnapi.SubjectId("user-123"),
 		},
 	})
 	assert.NoError(t, err)
-	assert.Equal(t, "redhat/user-123", subject)
+	assert.Equal(t, "redhat/user-123", subjectRef.Subject().LocalResourceId().String())
+	assert.Equal(t, "principal", subjectRef.Subject().ResourceType().String())
+	assert.Equal(t, "rbac", subjectRef.Subject().ReporterType().String())
 }
 
 func TestRedHatRbacSelfSubjectStrategy_OIDC_IssuerMap(t *testing.T) {
@@ -31,7 +33,7 @@ func TestRedHatRbacSelfSubjectStrategy_OIDC_IssuerMap(t *testing.T) {
 		},
 	})
 
-	subject, err := strategy.SubjectFromAuthorizationContext(authnapi.AuthzContext{
+	subjectRef, err := strategy.SubjectFromAuthorizationContext(authnapi.AuthzContext{
 		Claims: &authnapi.Claims{
 			AuthType:  authnapi.AuthTypeOIDC,
 			Issuer:    authnapi.Issuer("https://sso.redhat.com/auth/realms/redhat-external"),
@@ -39,7 +41,7 @@ func TestRedHatRbacSelfSubjectStrategy_OIDC_IssuerMap(t *testing.T) {
 		},
 	})
 	assert.NoError(t, err)
-	assert.Equal(t, "redhat/user-123", subject)
+	assert.Equal(t, "redhat/user-123", subjectRef.Subject().LocalResourceId().String())
 }
 
 func TestRedHatRbacSelfSubjectStrategy_OIDC_IssuerHostFallback(t *testing.T) {
@@ -50,7 +52,7 @@ func TestRedHatRbacSelfSubjectStrategy_OIDC_IssuerHostFallback(t *testing.T) {
 		},
 	})
 
-	subject, err := strategy.SubjectFromAuthorizationContext(authnapi.AuthzContext{
+	subjectRef, err := strategy.SubjectFromAuthorizationContext(authnapi.AuthzContext{
 		Claims: &authnapi.Claims{
 			AuthType:  authnapi.AuthTypeOIDC,
 			Issuer:    authnapi.Issuer("https://sso.redhat.com/auth/realms/redhat-external"),
@@ -58,7 +60,7 @@ func TestRedHatRbacSelfSubjectStrategy_OIDC_IssuerHostFallback(t *testing.T) {
 		},
 	})
 	assert.NoError(t, err)
-	assert.Equal(t, "redhat/user-123", subject)
+	assert.Equal(t, "redhat/user-123", subjectRef.Subject().LocalResourceId().String())
 }
 
 func TestRedHatRbacSelfSubjectStrategy_OIDC_NormalizedHostNotSupported(t *testing.T) {

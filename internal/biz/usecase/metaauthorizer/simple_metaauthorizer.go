@@ -4,7 +4,6 @@ import (
 	"context"
 
 	authnapi "github.com/project-kessel/inventory-api/internal/authn/api"
-	"github.com/project-kessel/inventory-api/internal/biz/model"
 )
 
 type Relation string
@@ -30,7 +29,7 @@ func NewSimpleMetaAuthorizer() *SimpleMetaAuthorizer {
 	return &SimpleMetaAuthorizer{}
 }
 
-func (s *SimpleMetaAuthorizer) Check(_ context.Context, _ model.RelationsResource, relation Relation, authzCtx authnapi.AuthzContext) (bool, error) {
+func (s *SimpleMetaAuthorizer) Check(_ context.Context, _ MetaObject, relation Relation, authzCtx authnapi.AuthzContext) (bool, error) {
 	if authzCtx.Protocol == authnapi.ProtocolUnknown {
 		return false, nil
 	}

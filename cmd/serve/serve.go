@@ -39,7 +39,6 @@ import (
 	"github.com/project-kessel/inventory-api/internal/server"
 	"github.com/project-kessel/inventory-api/internal/server/pprof"
 	"github.com/project-kessel/inventory-api/internal/storage"
-	"github.com/project-kessel/inventory-api/internal/subject/selfsubject"
 
 	hb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1"
 	pbv1beta2 "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2"
@@ -95,7 +94,7 @@ func NewCommand(
 				return errors.NewAggregate(errs)
 			}
 
-			selfSubjectResolver := selfsubject.NewResolver(appconfig.BuildSelfSubjectStrategy(selfSubjectConfig))
+			selfSubjectStrategy := appconfig.BuildSelfSubjectStrategy(selfSubjectConfig)
 
 			// configure authz
 			if errs := authzOptions.Complete(); errs != nil {
@@ -284,7 +283,7 @@ func NewCommand(
 			//v1beta2
 			// wire together inventory service handling
 			resourceRepo := data.NewResourceRepository(db, transactionManager)
-			inventory_controller := resourcesctl.New(resourceRepo, authorizer, eventingManager, "notifications", log.With(logger, "subsystem", "notificationsintegrations_controller"), listenManager, waitForNotifCircuitBreaker, usecaseConfig, mc, metaauthorizer.NewSimpleMetaAuthorizer(), selfSubjectResolver)
+			inventory_controller := resourcesctl.New(resourceRepo, authorizer, eventingManager, "notifications", log.With(logger, "subsystem", "notificationsintegrations_controller"), listenManager, waitForNotifCircuitBreaker, usecaseConfig, mc, metaauthorizer.NewSimpleMetaAuthorizer(), selfSubjectStrategy)
 
 			inventory_service := resourcesvc.NewKesselInventoryServiceV1beta2(inventory_controller)
 			pbv1beta2.RegisterKesselInventoryServiceServer(server.GrpcServer, inventory_service)

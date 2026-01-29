@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"github.com/go-kratos/kratos/v2/log"
-	kessel "github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/types/known/structpb"
@@ -36,15 +35,37 @@ func testAuthzContext() context.Context {
 
 type testSelfSubjectStrategy struct{}
 
-func (testSelfSubjectStrategy) SubjectFromAuthorizationContext(authzContext authnapi.AuthzContext) (string, error) {
+func (testSelfSubjectStrategy) SubjectFromAuthorizationContext(authzContext authnapi.AuthzContext) (model.SubjectReference, error) {
 	if !authzContext.IsAuthenticated() || authzContext.Claims.SubjectId == "" {
-		return "", fmt.Errorf("subject claims not found")
+		return model.SubjectReference{}, fmt.Errorf("subject claims not found")
 	}
-	return string(authzContext.Claims.SubjectId), nil
+	subjectID := string(authzContext.Claims.SubjectId)
+	return buildTestSubjectReference(subjectID)
 }
 
-func newTestResolver() *selfsubject.Resolver {
-	return selfsubject.NewResolver(testSelfSubjectStrategy{})
+// buildTestSubjectReference creates a model.SubjectReference for testing.
+func buildTestSubjectReference(subjectID string) (model.SubjectReference, error) {
+	localResourceId, err := model.NewLocalResourceId(subjectID)
+	if err != nil {
+		return model.SubjectReference{}, err
+	}
+	resourceType, err := model.NewResourceType("principal")
+	if err != nil {
+		return model.SubjectReference{}, err
+	}
+	reporterType, err := model.NewReporterType("rbac")
+	if err != nil {
+		return model.SubjectReference{}, err
+	}
+	key, err := model.NewReporterResourceKey(localResourceId, resourceType, reporterType, model.ReporterInstanceId(""))
+	if err != nil {
+		return model.SubjectReference{}, err
+	}
+	return model.NewSubjectReferenceWithoutRelation(key), nil
+}
+
+func newTestSelfSubjectStrategy() selfsubject.SelfSubjectStrategy {
+	return testSelfSubjectStrategy{}
 }
 
 type recordingMetaAuthorizer struct {
@@ -54,7 +75,7 @@ type recordingMetaAuthorizer struct {
 	calls     int
 }
 
-func (r *recordingMetaAuthorizer) Check(_ context.Context, _ model.RelationsResource, relation metaauthorizer.Relation, _ authnapi.AuthzContext) (bool, error) {
+func (r *recordingMetaAuthorizer) Check(_ context.Context, _ metaauthorizer.MetaObject, relation metaauthorizer.Relation, _ authnapi.AuthzContext) (bool, error) {
 	r.calls++
 	r.relations = append(r.relations, relation)
 	return r.allowed, r.err
@@ -74,12 +95,14 @@ func TestCheckSelf_UsesCheckSelfRelation(t *testing.T) {
 		&UsecaseConfig{},
 		metricscollector.NewFakeMetricsCollector(),
 		meta,
-		newTestResolver(),
+		newTestSelfSubjectStrategy(),
 	)
 
 	key := createReporterResourceKey(t, "host-1", "host", "hbi", "instance-1")
+	relation, err := model.NewRelation("view")
+	require.NoError(t, err)
 
-	allowed, err := usecase.CheckSelf(ctx, "view", "rbac", key)
+	allowed, err := usecase.CheckSelf(ctx, relation, key)
 	require.NoError(t, err)
 	assert.True(t, allowed)
 	assert.Equal(t, 1, meta.calls)
@@ -100,12 +123,14 @@ func TestCheckSelf_DeniedByMetaAuthz(t *testing.T) {
 		&UsecaseConfig{},
 		metricscollector.NewFakeMetricsCollector(),
 		meta,
-		newTestResolver(),
+		newTestSelfSubjectStrategy(),
 	)
 
 	key := createReporterResourceKey(t, "host-1", "host", "hbi", "instance-1")
+	relation, err := model.NewRelation("view")
+	require.NoError(t, err)
 
-	_, err := usecase.CheckSelf(ctx, "view", "rbac", key)
+	_, err = usecase.CheckSelf(ctx, relation, key)
 	assert.ErrorIs(t, err, ErrMetaAuthorizationDenied)
 }
 
@@ -122,12 +147,14 @@ func TestCheckSelf_MissingAuthzContext(t *testing.T) {
 		&UsecaseConfig{},
 		metricscollector.NewFakeMetricsCollector(),
 		meta,
-		newTestResolver(),
+		newTestSelfSubjectStrategy(),
 	)
 
 	key := createReporterResourceKey(t, "host-1", "host", "hbi", "instance-1")
+	relation, err := model.NewRelation("view")
+	require.NoError(t, err)
 
-	_, err := usecase.CheckSelf(context.Background(), "view", "rbac", key)
+	_, err = usecase.CheckSelf(context.Background(), relation, key)
 	assert.ErrorIs(t, err, ErrMetaAuthzContextMissing)
 	assert.Equal(t, 0, meta.calls)
 }
@@ -146,7 +173,7 @@ func TestReportResource_UsesReportRelation(t *testing.T) {
 		&UsecaseConfig{},
 		metricscollector.NewFakeMetricsCollector(),
 		meta,
-		newTestResolver(),
+		newTestSelfSubjectStrategy(),
 	)
 
 	reportRequest := createTestReportRequest(t, "host", "hbi", "instance-1", "host-1", "workspace-1")
@@ -170,7 +197,7 @@ func TestDelete_UsesDeleteRelation(t *testing.T) {
 		&UsecaseConfig{},
 		metricscollector.NewFakeMetricsCollector(),
 		meta,
-		newTestResolver(),
+		newTestSelfSubjectStrategy(),
 	)
 
 	reportRequest := createTestReportRequest(t, "host", "hbi", "instance-1", "host-1", "workspace-1")
@@ -201,21 +228,16 @@ func TestCheck_UsesCheckRelation(t *testing.T) {
 		&UsecaseConfig{},
 		metricscollector.NewFakeMetricsCollector(),
 		meta,
-		newTestResolver(),
+		newTestSelfSubjectStrategy(),
 	)
 
-	subject := &kessel.SubjectReference{
-		Subject: &kessel.ObjectReference{
-			Type: &kessel.ObjectType{
-				Namespace: "rbac",
-				Name:      "principal",
-			},
-			Id: "user-1",
-		},
-	}
+	subject, err := buildTestSubjectReference("user-1")
+	require.NoError(t, err)
 	key := createReporterResourceKey(t, "host-1", "host", "hbi", "instance-1")
+	relation, err := model.NewRelation("view")
+	require.NoError(t, err)
 
-	allowed, err := usecase.Check(ctx, "view", "hbi", subject, key)
+	allowed, err := usecase.Check(ctx, relation, subject, key)
 	require.NoError(t, err)
 	assert.True(t, allowed)
 	assert.Equal(t, 1, meta.calls)
@@ -236,21 +258,16 @@ func TestCheckForUpdate_UsesCheckForUpdateRelation(t *testing.T) {
 		&UsecaseConfig{},
 		metricscollector.NewFakeMetricsCollector(),
 		meta,
-		newTestResolver(),
+		newTestSelfSubjectStrategy(),
 	)
 
-	subject := &kessel.SubjectReference{
-		Subject: &kessel.ObjectReference{
-			Type: &kessel.ObjectType{
-				Namespace: "rbac",
-				Name:      "principal",
-			},
-			Id: "user-1",
-		},
-	}
+	subject, err := buildTestSubjectReference("user-1")
+	require.NoError(t, err)
 	key := createReporterResourceKey(t, "host-1", "host", "hbi", "instance-1")
+	relation, err := model.NewRelation("view")
+	require.NoError(t, err)
 
-	allowed, err := usecase.CheckForUpdate(ctx, "view", "hbi", subject, key)
+	allowed, err := usecase.CheckForUpdate(ctx, relation, subject, key)
 	require.NoError(t, err)
 	assert.True(t, allowed)
 	assert.Equal(t, 1, meta.calls)
@@ -271,37 +288,27 @@ func TestCheckSelfBulk_UsesCheckSelfRelationForEachItem(t *testing.T) {
 		&UsecaseConfig{},
 		metricscollector.NewFakeMetricsCollector(),
 		meta,
-		newTestResolver(),
+		newTestSelfSubjectStrategy(),
 	)
 
-	req := &kessel.CheckBulkRequest{
-		Items: []*kessel.CheckBulkRequestItem{
-			{
-				Relation: "view",
-				Resource: &kessel.ObjectReference{
-					Type: &kessel.ObjectType{
-						Namespace: "hbi",
-						Name:      "host",
-					},
-					Id: "host-1",
-				},
-			},
-			{
-				Relation: "edit",
-				Resource: &kessel.ObjectReference{
-					Type: &kessel.ObjectType{
-						Namespace: "hbi",
-						Name:      "host",
-					},
-					Id: "host-2",
-				},
-			},
+	key1 := createReporterResourceKey(t, "host-1", "host", "hbi", "instance-1")
+	key2 := createReporterResourceKey(t, "host-2", "host", "hbi", "instance-1")
+	viewRelation, err := model.NewRelation("view")
+	require.NoError(t, err)
+	editRelation, err := model.NewRelation("edit")
+	require.NoError(t, err)
+
+	cmd := CheckSelfBulkCommand{
+		Items: []CheckSelfBulkItem{
+			{Resource: key1, Relation: viewRelation},
+			{Resource: key2, Relation: editRelation},
 		},
+		Consistency: model.NewConsistencyMinimizeLatency(),
 	}
 
-	resp, err := usecase.CheckSelfBulk(ctx, req)
+	resp, err := usecase.CheckSelfBulk(ctx, cmd)
 	require.NoError(t, err)
-	require.Len(t, resp.GetPairs(), 2)
+	require.Len(t, resp.Pairs, 2)
 	assert.Equal(t, []metaauthorizer.Relation{metaauthorizer.RelationCheckSelf, metaauthorizer.RelationCheckSelf}, meta.relations)
 }
 
@@ -318,25 +325,21 @@ func TestCheckSelfBulk_MissingAuthzContext(t *testing.T) {
 		&UsecaseConfig{},
 		metricscollector.NewFakeMetricsCollector(),
 		meta,
-		newTestResolver(),
+		newTestSelfSubjectStrategy(),
 	)
 
-	req := &kessel.CheckBulkRequest{
-		Items: []*kessel.CheckBulkRequestItem{
-			{
-				Relation: "view",
-				Resource: &kessel.ObjectReference{
-					Type: &kessel.ObjectType{
-						Namespace: "hbi",
-						Name:      "host",
-					},
-					Id: "host-1",
-				},
-			},
+	key := createReporterResourceKey(t, "host-1", "host", "hbi", "instance-1")
+	viewRelation, err := model.NewRelation("view")
+	require.NoError(t, err)
+
+	cmd := CheckSelfBulkCommand{
+		Items: []CheckSelfBulkItem{
+			{Resource: key, Relation: viewRelation},
 		},
+		Consistency: model.NewConsistencyMinimizeLatency(),
 	}
 
-	_, err := usecase.CheckSelfBulk(context.Background(), req)
+	_, err = usecase.CheckSelfBulk(context.Background(), cmd)
 	assert.ErrorIs(t, err, ErrMetaAuthzContextMissing)
 	assert.Equal(t, 0, meta.calls)
 }
@@ -383,7 +386,7 @@ func TestReportResource(t *testing.T) {
 				ConsumerEnabled:       false,
 			}
 			mc := metricscollector.NewFakeMetricsCollector()
-			usecase := New(resourceRepo, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig, mc, nil, newTestResolver())
+			usecase := New(resourceRepo, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig, mc, nil, newTestSelfSubjectStrategy())
 
 			reportRequest := createTestReportRequest(t, tt.resourceType, tt.reporterType, tt.reporterInstance, tt.localResourceId, tt.workspaceId)
 			err := usecase.ReportResource(ctx, reportRequest, "test-reporter")
@@ -462,7 +465,7 @@ func TestReportResourceThenDelete(t *testing.T) {
 				ConsumerEnabled:       false,
 			}
 			mc := metricscollector.NewFakeMetricsCollector()
-			usecase := New(resourceRepo, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig, mc, nil, newTestResolver())
+			usecase := New(resourceRepo, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig, mc, nil, newTestSelfSubjectStrategy())
 
 			reportRequest := createTestReportRequest(t, tt.resourceType, tt.reporterType, tt.reporterInstanceId, tt.localResourceId, tt.workspaceId)
 			err := usecase.ReportResource(ctx, reportRequest, "test-reporter")
@@ -552,7 +555,7 @@ func TestDelete_ResourceNotFound(t *testing.T) {
 	}
 
 	mc := metricscollector.NewFakeMetricsCollector()
-	usecase := New(resourceRepo, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig, mc, nil, newTestResolver())
+	usecase := New(resourceRepo, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig, mc, nil, newTestSelfSubjectStrategy())
 
 	localResourceId, err := model.NewLocalResourceId("non-existent-resource")
 	require.NoError(t, err)
@@ -582,7 +585,7 @@ func TestReportFindDeleteFind_TombstoneLifecycle(t *testing.T) {
 	}
 
 	mc := metricscollector.NewFakeMetricsCollector()
-	usecase := New(resourceRepo, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig, mc, nil, newTestResolver())
+	usecase := New(resourceRepo, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig, mc, nil, newTestSelfSubjectStrategy())
 
 	reportRequest := createTestReportRequest(t, "k8s_cluster", "ocm", "lifecycle-instance", "lifecycle-resource", "lifecycle-workspace")
 	err := usecase.ReportResource(ctx, reportRequest, "test-reporter")
@@ -626,7 +629,7 @@ func TestMultipleHostsLifecycle(t *testing.T) {
 	}
 
 	mc := metricscollector.NewFakeMetricsCollector()
-	usecase := New(resourceRepo, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig, mc, nil, newTestResolver())
+	usecase := New(resourceRepo, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig, mc, nil, newTestSelfSubjectStrategy())
 
 	// Create 2 hosts
 	host1Request := createTestReportRequest(t, "host", "hbi", "hbi-instance-1", "host-1", "workspace-1")
@@ -733,7 +736,7 @@ func TestPartialDataScenarios(t *testing.T) {
 	}
 
 	mc := metricscollector.NewFakeMetricsCollector()
-	usecase := New(resourceRepo, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig, mc, nil, newTestResolver())
+	usecase := New(resourceRepo, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig, mc, nil, newTestSelfSubjectStrategy())
 
 	t.Run("Report resource with rich reporter data and minimal common data", func(t *testing.T) {
 		request := createTestReportRequestWithReporterDataOnly(t, "k8s_cluster", "ocm", "ocm-instance-1", "reporter-rich-resource", "minimal-workspace")
@@ -898,7 +901,7 @@ func TestResourceLifecycle_ReportUpdateDeleteReport(t *testing.T) {
 		}
 
 		mc := metricscollector.NewFakeMetricsCollector()
-		usecase := New(resourceRepo, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig, mc, nil, newTestResolver())
+		usecase := New(resourceRepo, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig, mc, nil, newTestSelfSubjectStrategy())
 
 		resourceType := "host"
 		reporterType := "hbi"
@@ -990,7 +993,7 @@ func TestResourceLifecycle_ReportUpdateDeleteReportDelete(t *testing.T) {
 		}
 
 		mc := metricscollector.NewFakeMetricsCollector()
-		usecase := New(resourceRepo, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig, mc, nil, newTestResolver())
+		usecase := New(resourceRepo, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig, mc, nil, newTestSelfSubjectStrategy())
 
 		resourceType := "k8s_cluster"
 		reporterType := "ocm"
@@ -1063,7 +1066,7 @@ func TestResourceLifecycle_ReportDeleteResubmitDelete(t *testing.T) {
 		}
 
 		mc := metricscollector.NewFakeMetricsCollector()
-		usecase := New(resourceRepo, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig, mc, nil, newTestResolver())
+		usecase := New(resourceRepo, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig, mc, nil, newTestSelfSubjectStrategy())
 
 		resourceType := "k8s_cluster"
 		reporterType := "ocm"
@@ -1132,7 +1135,7 @@ func TestResourceLifecycle_ReportResubmitDeleteResubmit(t *testing.T) {
 		}
 
 		mc := metricscollector.NewFakeMetricsCollector()
-		usecase := New(resourceRepo, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig, mc, nil, newTestResolver())
+		usecase := New(resourceRepo, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig, mc, nil, newTestSelfSubjectStrategy())
 		resourceType := "host"
 		reporterType := "hbi"
 		reporterInstance := "idempotent-instance-2"
@@ -1214,7 +1217,7 @@ func TestResourceLifecycle_ComplexIdempotency(t *testing.T) {
 		}
 
 		mc := metricscollector.NewFakeMetricsCollector()
-		usecase := New(resourceRepo, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig, mc, nil, newTestResolver())
+		usecase := New(resourceRepo, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig, mc, nil, newTestSelfSubjectStrategy())
 
 		resourceType := "k8s_cluster"
 		reporterType := "ocm"
@@ -1407,7 +1410,7 @@ func TestTransactionIdIdempotency(t *testing.T) {
 	}
 
 	mc := metricscollector.NewFakeMetricsCollector()
-	usecase := New(resourceRepo, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig, mc, nil, newTestResolver())
+	usecase := New(resourceRepo, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig, mc, nil, newTestSelfSubjectStrategy())
 
 	t.Run("Same transaction ID should be idempotent - no changes to representation tables", func(t *testing.T) {
 		resourceType := "host"

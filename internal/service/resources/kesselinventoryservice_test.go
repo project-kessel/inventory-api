@@ -45,11 +45,33 @@ import (
 
 type testSelfSubjectStrategy struct{}
 
-func (testSelfSubjectStrategy) SubjectFromAuthorizationContext(authzContext authnapi.AuthzContext) (string, error) {
+func (testSelfSubjectStrategy) SubjectFromAuthorizationContext(authzContext authnapi.AuthzContext) (model.SubjectReference, error) {
 	if !authzContext.IsAuthenticated() || authzContext.Claims.SubjectId == "" {
-		return "", fmt.Errorf("subject claims not found")
+		return model.SubjectReference{}, fmt.Errorf("subject claims not found")
 	}
-	return string(authzContext.Claims.SubjectId), nil
+	subjectID := string(authzContext.Claims.SubjectId)
+	return buildTestSubjectReference(subjectID)
+}
+
+// buildTestSubjectReference creates a model.SubjectReference for testing.
+func buildTestSubjectReference(subjectID string) (model.SubjectReference, error) {
+	localResourceId, err := model.NewLocalResourceId(subjectID)
+	if err != nil {
+		return model.SubjectReference{}, err
+	}
+	resourceType, err := model.NewResourceType("principal")
+	if err != nil {
+		return model.SubjectReference{}, err
+	}
+	reporterType, err := model.NewReporterType("rbac")
+	if err != nil {
+		return model.SubjectReference{}, err
+	}
+	key, err := model.NewReporterResourceKey(localResourceId, resourceType, reporterType, model.ReporterInstanceId(""))
+	if err != nil {
+		return model.SubjectReference{}, err
+	}
+	return model.NewSubjectReferenceWithoutRelation(key), nil
 }
 
 // setupTestSchemas populates the schema cache with minimal test schemas.
@@ -93,8 +115,8 @@ resource_reporters:
 	})
 }
 
-func newTestResolver() *selfsubject.Resolver {
-	return selfsubject.NewResolver(testSelfSubjectStrategy{})
+func newTestSelfSubjectStrategy() selfsubject.SelfSubjectStrategy {
+	return testSelfSubjectStrategy{}
 }
 
 // StubAuthenticator is a configurable authenticator for testing.
@@ -123,7 +145,7 @@ func (d *DenyAuthenticator) Authenticate(_ context.Context, _ kratosTransport.Tr
 type PermissiveMetaAuthorizer struct{}
 
 // Check implements metaauthorizer.MetaAuthorizer and always returns true.
-func (p *PermissiveMetaAuthorizer) Check(_ context.Context, _ model.RelationsResource, _ metaauthorizer.Relation, _ authnapi.AuthzContext) (bool, error) {
+func (p *PermissiveMetaAuthorizer) Check(_ context.Context, _ metaauthorizer.MetaObject, _ metaauthorizer.Relation, _ authnapi.AuthzContext) (bool, error) {
 	return true, nil
 }
 
@@ -132,7 +154,7 @@ func (p *PermissiveMetaAuthorizer) Check(_ context.Context, _ model.RelationsRes
 type DenyingMetaAuthorizer struct{}
 
 // Check implements metaauthorizer.MetaAuthorizer and always returns false.
-func (d *DenyingMetaAuthorizer) Check(_ context.Context, _ model.RelationsResource, _ metaauthorizer.Relation, _ authnapi.AuthzContext) (bool, error) {
+func (d *DenyingMetaAuthorizer) Check(_ context.Context, _ metaauthorizer.MetaObject, _ metaauthorizer.Relation, _ authnapi.AuthzContext) (bool, error) {
 	return false, nil
 }
 
@@ -252,7 +274,7 @@ func newTestUsecase(cfg testUsecaseConfig) *usecase.Usecase {
 		usecaseCfg,
 		metricscollector.NewFakeMetricsCollector(),
 		meta,
-		newTestResolver(),
+		newTestSelfSubjectStrategy(),
 	)
 }
 
@@ -401,11 +423,13 @@ func TestInventoryService_DeleteResource_NoIdentity(t *testing.T) {
 	assert.Equal(t, codes.Unauthenticated, grpcStatus.Code())
 }
 
-func TestToLookupResourceRequest(t *testing.T) {
+func TestToLookupResourcesCommand(t *testing.T) {
 	permission := "view"
+	reporterType := "hbi"
 	input := &pb.StreamedListObjectsRequest{
 		ObjectType: &pb.RepresentationType{
-			ResourceType: "hbi",
+			ResourceType: "host",
+			ReporterType: &reporterType,
 		},
 		Relation: "view",
 		Subject: &pb.SubjectReference{
@@ -423,28 +447,17 @@ func TestToLookupResourceRequest(t *testing.T) {
 		},
 	}
 
-	expected := &relationsV1beta1.LookupResourcesRequest{
-		ResourceType: &relationsV1beta1.ObjectType{
-			Name: "hbi",
-		},
-		Relation: "view",
-		Subject: &relationsV1beta1.SubjectReference{
-			Relation: &permission,
-			Subject: &relationsV1beta1.ObjectReference{
-				Type: &relationsV1beta1.ObjectType{
-					Name:      "principal",
-					Namespace: "rbac",
-				},
-				Id: "res-id",
-			},
-		},
-		Pagination: &relationsV1beta1.RequestPagination{
-			Limit: 50,
-		},
-	}
+	result, err := svc.ToLookupResourcesCommand(input)
+	require.NoError(t, err)
 
-	result, _ := svc.ToLookupResourceRequest(input)
-	assert.Equal(t, expected, result)
+	// Verify the command fields
+	assert.Equal(t, "host", result.ResourceType.Serialize())
+	assert.Equal(t, "hbi", result.ReporterType.Serialize())
+	assert.Equal(t, "view", result.Relation.Serialize())
+	assert.Equal(t, "res-id", result.Subject.Subject().LocalResourceId().Serialize())
+	assert.Equal(t, "principal", result.Subject.Subject().ResourceType().Serialize())
+	assert.Equal(t, "rbac", result.Subject.Subject().ReporterType().Serialize())
+	assert.Equal(t, uint32(50), result.Limit)
 }
 
 func TestIsValidatedRepresentationType(t *testing.T) {
@@ -2645,9 +2658,6 @@ func TestInventoryService_CheckBulk_MetaAuthzDenied(t *testing.T) {
 	assert.Equal(t, codes.PermissionDenied, grpcStatus.Code())
 }
 
-// --- ReportResource Error Scenarios ---
-// NOTE: ReportResource also passes usecase errors through directly without mapServiceError.
-
 func TestInventoryService_ReportResource_MetaAuthzAllowedOnGRPC(t *testing.T) {
 	// SimpleMetaAuthorizer behavior on gRPC:
 	// - gRPC: allow ALL relations EXCEPT "check_self"
@@ -2697,51 +2707,11 @@ func TestInventoryService_ReportResource_MetaAuthzAllowedOnGRPC(t *testing.T) {
 	assert.NotNil(t, resp)
 }
 
-// --- StreamedListObjects Error Scenarios ---
-// NOTE: StreamedListObjects uses fmt.Errorf without gRPC status codes.
-
 func TestInventoryService_StreamedListObjects_NilRequest(t *testing.T) {
-	// ToLookupResourceRequest returns error for nil request
+	// ToLookupResourcesCommand returns error for nil request
 	// This is validated by protovalidate before reaching the handler,
 	// so this tests the internal function behavior only.
-	_, err := svc.ToLookupResourceRequest(nil)
+	_, err := svc.ToLookupResourcesCommand(nil)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "request is nil")
 }
-
-// =============================================================================
-// ERROR HANDLING BEHAVIOR DOCUMENTATION
-// =============================================================================
-//
-// BEHAVIOR NOTES (preserved for backward compatibility):
-//
-// 1. Protovalidate middleware catches validation errors BEFORE service handlers:
-//    - Empty resource_id, empty items arrays, etc. return InvalidArgument
-//    - Error messages come from protovalidate, not service-layer validation
-//
-// 2. mapServiceError usage is inconsistent:
-//    - CheckSelf, CheckSelfBulk: USE mapServiceError
-//    - ReportResource, Check, CheckForUpdate, CheckBulk: DO NOT use mapServiceError
-//      (errors from usecase pass through directly, becoming codes.Unknown)
-//
-// 3. Claims checking at service layer:
-//    - ReportResource, DeleteResource, Check, CheckForUpdate, CheckBulk:
-//      Explicitly check claims with middleware.GetClaims() and return Unauthenticated
-//    - CheckSelf, CheckSelfBulk: NO claims check at service layer
-//      (rely on usecase selfSubjectFromContext which returns ErrMetaAuthzContextMissing)
-//
-// 4. StreamedListObjects error wrapping:
-//    - Uses fmt.Errorf which doesn't preserve gRPC status codes
-//    - Auth relies on stream interceptor, not handler-level check
-//
-// 5. DeleteResource error handling:
-//    - Has its own inline error mapping (NotFound for ErrResourceNotFound, Internal for others)
-//    - Does NOT use mapServiceError
-//
-// 6. SimpleMetaAuthorizer protocol rules:
-//    - gRPC: allow ALL relations EXCEPT "check_self"
-//    - HTTP + x-rh-identity: allow ONLY "check_self"
-//    - HTTP + OIDC: deny ALL
-//    - This means on gRPC, CheckBulk/ReportResource/etc are allowed regardless of auth type
-//    - Only CheckSelf is denied on gRPC (designed for HTTP user-facing calls)
-//

@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	authnapi "github.com/project-kessel/inventory-api/internal/authn/api"
+	"github.com/project-kessel/inventory-api/internal/biz/model"
 )
 
 // RedHatRbacSelfSubjectStrategy implements RBAC subject derivation for Red Hat identity domains.
@@ -27,12 +28,25 @@ func (s *RedHatRbacSelfSubjectStrategy) Enabled() bool {
 	return s != nil && s.enabled
 }
 
-// SubjectFromAuthorizationContext derives a domain-qualified subject string for self-authorization.
-func (s *RedHatRbacSelfSubjectStrategy) SubjectFromAuthorizationContext(authzContext authnapi.AuthzContext) (string, error) {
+// SubjectFromAuthorizationContext derives a SubjectReference for self-authorization.
+func (s *RedHatRbacSelfSubjectStrategy) SubjectFromAuthorizationContext(authzContext authnapi.AuthzContext) (model.SubjectReference, error) {
+	subjectID, err := s.deriveSubjectID(authzContext)
+	if err != nil {
+		return model.SubjectReference{}, err
+	}
+	if subjectID == "" {
+		return model.SubjectReference{}, fmt.Errorf("subject not found")
+	}
+
+	return buildSubjectReference(subjectID)
+}
+
+// deriveSubjectID derives the domain-qualified subject ID string from the authorization context.
+func (s *RedHatRbacSelfSubjectStrategy) deriveSubjectID(authzContext authnapi.AuthzContext) (string, error) {
 	if s == nil || !s.enabled {
 		return "", fmt.Errorf("self-subject strategy disabled")
 	}
-	// Un-authenticated requests  - we cannot derive a subject for them
+	// Un-authenticated requests - we cannot derive a subject for them
 	if !authzContext.IsAuthenticated() {
 		return "", nil
 	}
@@ -64,4 +78,28 @@ func (s *RedHatRbacSelfSubjectStrategy) SubjectFromAuthorizationContext(authzCon
 	default:
 		return "", fmt.Errorf("unsupported auth type")
 	}
+}
+
+// buildSubjectReference creates a SubjectReference for RBAC authorization.
+// Uses fixed values: namespace="rbac", resource type="principal".
+func buildSubjectReference(subjectID string) (model.SubjectReference, error) {
+	localResourceId, err := model.NewLocalResourceId(subjectID)
+	if err != nil {
+		return model.SubjectReference{}, fmt.Errorf("invalid subject ID: %w", err)
+	}
+	resourceType, err := model.NewResourceType("principal")
+	if err != nil {
+		return model.SubjectReference{}, fmt.Errorf("invalid resource type: %w", err)
+	}
+	reporterType, err := model.NewReporterType("rbac")
+	if err != nil {
+		return model.SubjectReference{}, fmt.Errorf("invalid reporter type: %w", err)
+	}
+
+	key, err := model.NewReporterResourceKey(localResourceId, resourceType, reporterType, model.ReporterInstanceId(""))
+	if err != nil {
+		return model.SubjectReference{}, fmt.Errorf("failed to build subject key: %w", err)
+	}
+
+	return model.NewSubjectReferenceWithoutRelation(key), nil
 }

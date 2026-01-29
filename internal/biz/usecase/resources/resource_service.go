@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/go-kratos/kratos/v2/log"
@@ -78,17 +77,14 @@ type Usecase struct {
 	ListenManager       pubsub.ListenManagerImpl
 	Config              *UsecaseConfig
 	MetricsCollector    *metricscollector.MetricsCollector
-	SelfSubjectResolver *selfsubject.Resolver
+	SelfSubjectStrategy selfsubject.SelfSubjectStrategy
 }
 
 func New(resourceRepository data.ResourceRepository,
 	authz authzapi.Authorizer, eventer eventingapi.Manager, namespace string, logger log.Logger,
-	listenManager pubsub.ListenManagerImpl, waitForNotifBreaker *gobreaker.CircuitBreaker, usecaseConfig *UsecaseConfig, metricsCollector *metricscollector.MetricsCollector, metaAuthorizer metaauthorizer.MetaAuthorizer, selfSubjectResolver *selfsubject.Resolver) *Usecase {
+	listenManager pubsub.ListenManagerImpl, waitForNotifBreaker *gobreaker.CircuitBreaker, usecaseConfig *UsecaseConfig, metricsCollector *metricscollector.MetricsCollector, metaAuthorizer metaauthorizer.MetaAuthorizer, selfSubjectStrategy selfsubject.SelfSubjectStrategy) *Usecase {
 	if metaAuthorizer == nil {
 		metaAuthorizer = metaauthorizer.NewSimpleMetaAuthorizer()
-	}
-	if selfSubjectResolver == nil {
-		selfSubjectResolver = selfsubject.NewResolver(nil)
 	}
 
 	return &Usecase{
@@ -102,7 +98,7 @@ func New(resourceRepository data.ResourceRepository,
 		ListenManager:       listenManager,
 		Config:              usecaseConfig,
 		MetricsCollector:    metricsCollector,
-		SelfSubjectResolver: selfSubjectResolver,
+		SelfSubjectStrategy: selfSubjectStrategy,
 	}
 }
 
@@ -113,7 +109,7 @@ func (uc *Usecase) ReportResource(ctx context.Context, request *v1beta2.ReportRe
 		return status.Errorf(codes.InvalidArgument, "failed to create reporter resource key: %v", err)
 	}
 
-	if err := uc.EnforceMetaAuthz(ctx, request.GetReporterType(), metaauthorizer.RelationReportResource, reporterResourceKey); err != nil {
+	if err := uc.enforceMetaAuthzObject(ctx, metaauthorizer.RelationReportResource, metaauthorizer.NewInventoryResourceFromKey(reporterResourceKey)); err != nil {
 		return err
 	}
 
@@ -211,7 +207,7 @@ func (uc *Usecase) ReportResource(ctx context.Context, request *v1beta2.ReportRe
 }
 
 func (uc *Usecase) Delete(ctx context.Context, reporterResourceKey model.ReporterResourceKey) error {
-	if err := uc.EnforceMetaAuthz(ctx, reporterResourceKey.ReporterType().Serialize(), metaauthorizer.RelationDeleteResource, reporterResourceKey); err != nil {
+	if err := uc.enforceMetaAuthzObject(ctx, metaauthorizer.RelationDeleteResource, metaauthorizer.NewInventoryResourceFromKey(reporterResourceKey)); err != nil {
 		return err
 	}
 
@@ -255,34 +251,39 @@ func (uc *Usecase) Delete(ctx context.Context, reporterResourceKey model.Reporte
 	return nil
 }
 
-// Check verifies if a subject has the specified permission on a resource identified by the reporter resource ID.
-func (uc *Usecase) Check(ctx context.Context, permission, namespace string, sub *kessel.SubjectReference, reporterResourceKey model.ReporterResourceKey) (bool, error) {
-	if err := uc.EnforceMetaAuthz(ctx, namespace, metaauthorizer.RelationCheck, reporterResourceKey); err != nil {
+// Check verifies if a subject has the specified relation/permission on a resource.
+func (uc *Usecase) Check(ctx context.Context, relation model.Relation, sub model.SubjectReference, reporterResourceKey model.ReporterResourceKey) (bool, error) {
+	// TODO: should also check caller is allowed to check subject also
+	if err := uc.enforceMetaAuthzObject(ctx, metaauthorizer.RelationCheck, metaauthorizer.NewInventoryResourceFromKey(reporterResourceKey)); err != nil {
 		return false, err
 	}
 
-	return uc.checkPermission(ctx, permission, namespace, sub, reporterResourceKey)
+	return uc.checkPermission(ctx, relation, sub, reporterResourceKey)
 }
 
-// CheckSelf verifies access for CheckSelf/CheckSelfBulk using relation="check_self" for meta-authorization.
-func (uc *Usecase) CheckSelf(ctx context.Context, permission, namespace string, reporterResourceKey model.ReporterResourceKey) (bool, error) {
+// CheckSelf verifies access for the authenticated user using the self-subject strategy.
+// Uses relation="check_self" for meta-authorization.
+func (uc *Usecase) CheckSelf(ctx context.Context, relation model.Relation, reporterResourceKey model.ReporterResourceKey) (bool, error) {
 	subjectRef, err := uc.selfSubjectFromContext(ctx)
 	if err != nil {
 		return false, err
 	}
-	if err := uc.EnforceMetaAuthz(ctx, namespace, metaauthorizer.RelationCheckSelf, reporterResourceKey); err != nil {
+	if err := uc.enforceMetaAuthzObject(ctx, metaauthorizer.RelationCheckSelf, metaauthorizer.NewInventoryResourceFromKey(reporterResourceKey)); err != nil {
 		return false, err
 	}
-	return uc.checkPermission(ctx, permission, namespace, subjectRef, reporterResourceKey)
+	return uc.checkPermission(ctx, relation, subjectRef, reporterResourceKey)
 }
 
-// CheckForUpdate forwards the request to Relations CheckForUpdate
-func (uc *Usecase) CheckForUpdate(ctx context.Context, permission, namespace string, sub *kessel.SubjectReference, reporterResourceKey model.ReporterResourceKey) (bool, error) {
-	if err := uc.EnforceMetaAuthz(ctx, namespace, metaauthorizer.RelationCheckForUpdate, reporterResourceKey); err != nil {
+// CheckForUpdate verifies if a subject can update the resource.
+func (uc *Usecase) CheckForUpdate(ctx context.Context, relation model.Relation, sub model.SubjectReference, reporterResourceKey model.ReporterResourceKey) (bool, error) {
+	if err := uc.enforceMetaAuthzObject(ctx, metaauthorizer.RelationCheckForUpdate, metaauthorizer.NewInventoryResourceFromKey(reporterResourceKey)); err != nil {
 		return false, err
 	}
 
-	allowed, _, err := uc.Authz.CheckForUpdate(ctx, namespace, permission, reporterResourceKey.ResourceType().Serialize(), reporterResourceKey.LocalResourceId().Serialize(), sub)
+	// Convert model types to v1beta1 for the Authz interface
+	namespace := reporterResourceKey.ReporterType().Serialize()
+	v1beta1Subject := subjectToV1Beta1(sub)
+	allowed, _, err := uc.Authz.CheckForUpdate(ctx, namespace, relation.Serialize(), reporterResourceKey.ResourceType().Serialize(), reporterResourceKey.LocalResourceId().Serialize(), v1beta1Subject)
 	if err != nil {
 		return false, err
 	}
@@ -293,7 +294,7 @@ func (uc *Usecase) CheckForUpdate(ctx context.Context, permission, namespace str
 	return false, nil
 }
 
-func (uc *Usecase) checkPermission(ctx context.Context, permission, namespace string, sub *kessel.SubjectReference, reporterResourceKey model.ReporterResourceKey) (bool, error) {
+func (uc *Usecase) checkPermission(ctx context.Context, relation model.Relation, sub model.SubjectReference, reporterResourceKey model.ReporterResourceKey) (bool, error) {
 	res, err := uc.resourceRepository.FindResourceByKeys(nil, reporterResourceKey)
 	var consistencyToken string
 	if err != nil {
@@ -310,7 +311,10 @@ func (uc *Usecase) checkPermission(ctx context.Context, permission, namespace st
 		consistencyToken = res.ConsistencyToken().Serialize()
 	}
 
-	allowed, _, err := uc.Authz.Check(ctx, namespace, permission, consistencyToken, reporterResourceKey.ResourceType().Serialize(), reporterResourceKey.LocalResourceId().Serialize(), sub)
+	// Convert model types to v1beta1 for the Authz interface
+	namespace := reporterResourceKey.ReporterType().Serialize()
+	v1beta1Subject := subjectToV1Beta1(sub)
+	allowed, _, err := uc.Authz.Check(ctx, namespace, relation.Serialize(), consistencyToken, reporterResourceKey.ResourceType().Serialize(), reporterResourceKey.LocalResourceId().Serialize(), v1beta1Subject)
 	if err != nil {
 		return false, err
 	}
@@ -321,34 +325,23 @@ func (uc *Usecase) checkPermission(ctx context.Context, permission, namespace st
 	return false, nil
 }
 
-func (uc *Usecase) selfSubjectFromContext(ctx context.Context) (*kessel.SubjectReference, error) {
+func (uc *Usecase) selfSubjectFromContext(ctx context.Context) (model.SubjectReference, error) {
 	authzCtx, ok := authnapi.FromAuthzContext(ctx)
 	if !ok {
-		return nil, ErrMetaAuthzContextMissing
+		return model.SubjectReference{}, ErrMetaAuthzContextMissing
 	}
-	if uc == nil || uc.SelfSubjectResolver == nil {
-		return nil, ErrSelfSubjectMissing
+	if uc == nil || uc.SelfSubjectStrategy == nil {
+		return model.SubjectReference{}, ErrSelfSubjectMissing
 	}
-	subjectRef, err := uc.SelfSubjectResolver.SubjectReferenceFromAuthzContext(authzCtx)
+	subjectRef, err := uc.SelfSubjectStrategy.SubjectFromAuthorizationContext(authzCtx)
 	if err != nil {
-		return nil, ErrSelfSubjectMissing
+		return model.SubjectReference{}, ErrSelfSubjectMissing
 	}
 	return subjectRef, nil
 }
 
-// EnforceMetaAuthz calls the MetaAuthorizer to validate access to the object.
-func (uc *Usecase) EnforceMetaAuthz(ctx context.Context, namespace string, relation metaauthorizer.Relation, reporterResourceKey model.ReporterResourceKey) error {
-	object := &kessel.ObjectReference{
-		Type: &kessel.ObjectType{
-			Namespace: namespace,
-			Name:      reporterResourceKey.ResourceType().Serialize(),
-		},
-		Id: reporterResourceKey.LocalResourceId().Serialize(),
-	}
-	return uc.enforceMetaAuthzWithObject(ctx, object, relation)
-}
-
-func (uc *Usecase) enforceMetaAuthzWithObject(ctx context.Context, object *kessel.ObjectReference, relation metaauthorizer.Relation) error {
+// enforceMetaAuthzObject calls the MetaAuthorizer to validate access using a MetaObject.
+func (uc *Usecase) enforceMetaAuthzObject(ctx context.Context, relation metaauthorizer.Relation, metaObject metaauthorizer.MetaObject) error {
 	authzCtx, ok := authnapi.FromAuthzContext(ctx)
 	if !ok {
 		return ErrMetaAuthzContextMissing
@@ -357,9 +350,7 @@ func (uc *Usecase) enforceMetaAuthzWithObject(ctx context.Context, object *kesse
 		return ErrMetaAuthorizerUnavailable
 	}
 
-	modelObject, _ := toRelationsResource(object)
-
-	allowed, err := uc.MetaAuthorizer.Check(ctx, modelObject, relation, authzCtx)
+	allowed, err := uc.MetaAuthorizer.Check(ctx, metaObject, relation, authzCtx)
 	if err != nil {
 		return err
 	}
@@ -369,79 +360,164 @@ func (uc *Usecase) enforceMetaAuthzWithObject(ctx context.Context, object *kesse
 	return nil
 }
 
-func toRelationsResource(object *kessel.ObjectReference) (model.RelationsResource, error) {
-	if object == nil || object.Type == nil {
-		return model.RelationsResource{}, fmt.Errorf("missing object reference")
+// subjectToV1Beta1 converts a model.SubjectReference to a v1beta1 SubjectReference for the Authz interface.
+func subjectToV1Beta1(sub model.SubjectReference) *kessel.SubjectReference {
+	subKey := sub.Subject()
+	ref := &kessel.SubjectReference{
+		Subject: &kessel.ObjectReference{
+			Type: &kessel.ObjectType{
+				Namespace: subKey.ReporterType().Serialize(),
+				Name:      subKey.ResourceType().Serialize(),
+			},
+			Id: subKey.LocalResourceId().Serialize(),
+		},
 	}
-	resourceID, err := model.NewLocalResourceId(object.Id)
-	if err != nil {
-		return model.RelationsResource{}, err
+	if sub.HasRelation() {
+		relation := sub.Relation().Serialize()
+		ref.Relation = &relation
 	}
-	objectType := model.NewRelationsObjectType(
-		strings.ToLower(object.Type.Name),
-		strings.ToLower(object.Type.Namespace),
-	)
-	return model.NewRelationsResource(resourceID, objectType), nil
+	return ref
 }
 
-// CheckBulk forwards the request to Relations CheckBulk
-func (uc *Usecase) CheckBulk(ctx context.Context, req *kessel.CheckBulkRequest) (*kessel.CheckBulkResponse, error) {
-	for _, item := range req.GetItems() {
-		if item == nil {
-			continue
-		}
-		if err := uc.enforceMetaAuthzWithObject(ctx, item.GetResource(), metaauthorizer.RelationCheckBulk); err != nil {
-			uc.Log.WithContext(ctx).Errorf("meta authz failed for check bulk item: %v error: %v", item.GetResource(), err)
+// CheckBulk performs bulk permission checks.
+func (uc *Usecase) CheckBulk(ctx context.Context, cmd CheckBulkCommand) (*CheckBulkResult, error) {
+	// Meta-authorization for each item
+	for _, item := range cmd.Items {
+		if err := uc.enforceMetaAuthzObject(ctx, metaauthorizer.RelationCheckBulk, metaauthorizer.NewInventoryResourceFromKey(item.Resource)); err != nil {
+			uc.Log.WithContext(ctx).Errorf("meta authz failed for check bulk item: %v error: %v", item.Resource, err)
 			return nil, err
 		}
 	}
 
-	resp, err := uc.Authz.CheckBulk(ctx, req)
+	// Convert to v1beta1 for the Authz interface
+	v1beta1Req := checkBulkCommandToV1beta1(cmd)
+	resp, err := uc.Authz.CheckBulk(ctx, v1beta1Req)
 	if err != nil {
 		return nil, err
 	}
-	return resp, nil
+
+	return checkBulkResultFromV1beta1(resp, cmd)
 }
 
-// CheckSelfBulk performs meta-authorization using relation="check_self" for each item.
-func (uc *Usecase) CheckSelfBulk(ctx context.Context, req *kessel.CheckBulkRequest) (*kessel.CheckBulkResponse, error) {
+// CheckSelfBulk performs bulk permission checks for the authenticated user.
+// Uses relation="check_self" for meta-authorization.
+func (uc *Usecase) CheckSelfBulk(ctx context.Context, cmd CheckSelfBulkCommand) (*CheckBulkResult, error) {
 	subjectRef, err := uc.selfSubjectFromContext(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	items, err := uc.checkSelfItemsWithAuthz(ctx, req, subjectRef)
-	if err != nil {
-		return nil, err
-	}
-
-	resp, err := uc.Authz.CheckBulk(ctx, &kessel.CheckBulkRequest{
-		Items:       items,
-		Consistency: req.GetConsistency(),
-	})
-	if err != nil {
-		return nil, err
-	}
-	return resp, nil
-}
-
-func (uc *Usecase) checkSelfItemsWithAuthz(ctx context.Context, req *kessel.CheckBulkRequest, subjectRef *kessel.SubjectReference) ([]*kessel.CheckBulkRequestItem, error) {
-	items := make([]*kessel.CheckBulkRequestItem, len(req.GetItems()))
-	for i, item := range req.GetItems() {
-		if item == nil {
-			continue
-		}
-		if err := uc.enforceMetaAuthzWithObject(ctx, item.GetResource(), metaauthorizer.RelationCheckSelf); err != nil {
-			uc.Log.WithContext(ctx).Errorf("meta authz failed for check self item: %v error: %v", item.GetResource(), err)
+	// Meta-authorization for each item
+	for _, item := range cmd.Items {
+		if err := uc.enforceMetaAuthzObject(ctx, metaauthorizer.RelationCheckSelf, metaauthorizer.NewInventoryResourceFromKey(item.Resource)); err != nil {
+			uc.Log.WithContext(ctx).Errorf("meta authz failed for check self item: %v error: %v", item.Resource, err)
 			return nil, err
 		}
-		items[i] = &kessel.CheckBulkRequestItem{
-			Relation: item.Relation,
+	}
+
+	// Convert to CheckBulkCommand with the resolved subject
+	bulkCmd := CheckBulkCommand{
+		Items:       make([]CheckBulkItem, len(cmd.Items)),
+		Consistency: cmd.Consistency,
+	}
+	for i, item := range cmd.Items {
+		bulkCmd.Items[i] = CheckBulkItem{
 			Resource: item.Resource,
+			Relation: item.Relation,
 			Subject:  subjectRef,
 		}
 	}
-	return items, nil
+
+	// Convert to v1beta1 for the Authz interface
+	v1beta1Req := checkBulkCommandToV1beta1(bulkCmd)
+	resp, err := uc.Authz.CheckBulk(ctx, v1beta1Req)
+	if err != nil {
+		return nil, err
+	}
+
+	return checkBulkResultFromV1beta1(resp, bulkCmd)
+}
+
+// checkBulkCommandToV1beta1 converts a CheckBulkCommand to v1beta1 for the Authz interface.
+func checkBulkCommandToV1beta1(cmd CheckBulkCommand) *kessel.CheckBulkRequest {
+	items := make([]*kessel.CheckBulkRequestItem, len(cmd.Items))
+	for i, item := range cmd.Items {
+		items[i] = &kessel.CheckBulkRequestItem{
+			Resource: &kessel.ObjectReference{
+				Type: &kessel.ObjectType{
+					Namespace: item.Resource.ReporterType().Serialize(),
+					Name:      item.Resource.ResourceType().Serialize(),
+				},
+				Id: item.Resource.LocalResourceId().Serialize(),
+			},
+			Relation: item.Relation.Serialize(),
+			Subject:  subjectToV1Beta1(item.Subject),
+		}
+	}
+
+	var consistency *kessel.Consistency
+	if !cmd.Consistency.MinimizeLatency() {
+		consistency = &kessel.Consistency{
+			Requirement: &kessel.Consistency_AtLeastAsFresh{
+				AtLeastAsFresh: &kessel.ConsistencyToken{
+					Token: cmd.Consistency.AtLeastAsFresh().Serialize(),
+				},
+			},
+		}
+	} else {
+		consistency = &kessel.Consistency{
+			Requirement: &kessel.Consistency_MinimizeLatency{
+				MinimizeLatency: true,
+			},
+		}
+	}
+
+	return &kessel.CheckBulkRequest{
+		Items:       items,
+		Consistency: consistency,
+	}
+}
+
+// checkBulkResultFromV1beta1 converts a v1beta1 CheckBulkResponse to CheckBulkResult.
+// Returns error if the response length doesn't match the command items length.
+func checkBulkResultFromV1beta1(resp *kessel.CheckBulkResponse, cmd CheckBulkCommand) (*CheckBulkResult, error) {
+	respPairs := resp.GetPairs()
+	if len(respPairs) != len(cmd.Items) {
+		return nil, status.Errorf(codes.Internal, "internal error: mismatched backend check results: expected %d pairs, got %d", len(cmd.Items), len(respPairs))
+	}
+
+	pairs := make([]CheckBulkResultPair, len(respPairs))
+	for i, pair := range respPairs {
+		var resultItem CheckBulkResultItem
+		if pair.GetError() != nil {
+			resultItem = CheckBulkResultItem{
+				Allowed:   false,
+				Error:     fmt.Errorf("check failed: %s", pair.GetError().GetMessage()),
+				ErrorCode: pair.GetError().GetCode(),
+			}
+		} else if pair.GetItem() != nil {
+			resultItem = CheckBulkResultItem{
+				Allowed:   pair.GetItem().GetAllowed() == kessel.CheckBulkResponseItem_ALLOWED_TRUE,
+				Error:     nil,
+				ErrorCode: 0,
+			}
+		}
+
+		pairs[i] = CheckBulkResultPair{
+			Request: cmd.Items[i],
+			Result:  resultItem,
+		}
+	}
+
+	var token model.ConsistencyToken
+	if resp.GetConsistencyToken() != nil {
+		token = model.DeserializeConsistencyToken(resp.GetConsistencyToken().GetToken())
+	}
+
+	return &CheckBulkResult{
+		Pairs:            pairs,
+		ConsistencyToken: token,
+	}, nil
 }
 
 func (uc *Usecase) createResource(tx *gorm.DB, request *v1beta2.ReportResourceRequest, txidStr string) error {
@@ -629,15 +705,39 @@ func getNextTransactionID() (string, error) {
 }
 
 // LookupResources delegates resource lookup to the authorization service.
-func (uc *Usecase) LookupResources(ctx context.Context, request *kessel.LookupResourcesRequest) (grpc.ServerStreamingClient[kessel.LookupResourcesResponse], error) {
-	object := &kessel.ObjectReference{
-		Type: request.GetResourceType(),
-		Id:   request.GetResourceType().GetName(),
-	}
-	if err := uc.enforceMetaAuthzWithObject(ctx, object, metaauthorizer.RelationLookupResources); err != nil {
+// Returns a streaming client for receiving lookup results.
+// TODO: remove v1beta1 response type
+func (uc *Usecase) LookupResources(ctx context.Context, cmd LookupResourcesCommand) (grpc.ServerStreamingClient[kessel.LookupResourcesResponse], error) {
+	// Meta-authorize against the resource type (not a specific resource instance)
+	metaObject := metaauthorizer.NewResourceTypeRef(cmd.ReporterType, cmd.ResourceType)
+	if err := uc.enforceMetaAuthzObject(ctx, metaauthorizer.RelationLookupResources, metaObject); err != nil {
 		return nil, err
 	}
-	return uc.Authz.LookupResources(ctx, request)
+
+	// Convert to v1beta1 for the Authz interface
+	v1beta1Req := lookupResourcesCommandToV1beta1(cmd)
+	return uc.Authz.LookupResources(ctx, v1beta1Req)
+}
+
+// lookupResourcesCommandToV1beta1 converts a LookupResourcesCommand to v1beta1.
+func lookupResourcesCommandToV1beta1(cmd LookupResourcesCommand) *kessel.LookupResourcesRequest {
+	var continuationToken *string
+	if cmd.Continuation != "" {
+		continuationToken = &cmd.Continuation
+	}
+
+	return &kessel.LookupResourcesRequest{
+		ResourceType: &kessel.ObjectType{
+			Namespace: cmd.ReporterType.Serialize(),
+			Name:      cmd.ResourceType.Serialize(),
+		},
+		Relation: cmd.Relation.Serialize(),
+		Subject:  subjectToV1Beta1(cmd.Subject),
+		Pagination: &kessel.RequestPagination{
+			Limit:             cmd.Limit,
+			ContinuationToken: continuationToken,
+		},
+	}
 }
 
 // Check if request comes from SP in allowlist

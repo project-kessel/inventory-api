@@ -216,8 +216,12 @@ func newTestServer(t *testing.T, cfg testServerConfig) pb.KesselInventoryService
 	require.NoError(t, err)
 
 	t.Cleanup(func() {
-		conn.Close()
-		srv.Stop(context.Background())
+		if err := conn.Close(); err != nil {
+			t.Logf("Failed to close client connection: %v", err)
+		}
+		if err := srv.Stop(context.Background()); err != nil {
+			t.Logf("Failed to stop gRPC server: %v", err)
+		}
 	})
 
 	return pb.NewKesselInventoryServiceClient(conn)

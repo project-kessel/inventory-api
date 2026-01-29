@@ -49,9 +49,11 @@ func New(c CompletedConfig, authnMiddleware middleware.Middleware, authnConfig a
 		return nil, err
 	}
 	authnLogger := log.NewHelper(log.With(logger, "subsystem", "authn", "component", "stream-interceptor"))
-	authenticator, err = authn.New(authnConfig, authnLogger)
-	if err != nil {
-		return nil, err
+	if authenticator == nil {
+		authenticator, err = authn.New(authnConfig, authnLogger)
+		if err != nil {
+			return nil, err
+		}
 	}
 	return NewWithDeps(ServerDeps{
 		Authenticator:   authenticator,

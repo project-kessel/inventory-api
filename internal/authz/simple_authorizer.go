@@ -129,7 +129,7 @@ func (s *SimpleAuthorizer) getTuplesForToken(token string) map[tupleKey]bool {
 
 	// Check current version (always available)
 	if s.version >= requested && (bestVersion == -1 || s.version < bestVersion) {
-		bestVersion = s.version
+		// bestVersion = s.version
 		bestTuples = s.tuples
 	}
 
@@ -193,11 +193,11 @@ func hasTupleInSnapshot(tuples map[tupleKey]bool, resourceNamespace, resourceTyp
 }
 
 // hasTuple checks if a tuple exists in the current (latest) state.
-func (s *SimpleAuthorizer) hasTuple(resourceNamespace, resourceType, resourceID, relation, subjectNamespace, subjectType, subjectID string) bool {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	return hasTupleInSnapshot(s.tuples, resourceNamespace, resourceType, resourceID, relation, subjectNamespace, subjectType, subjectID)
-}
+// func (s *SimpleAuthorizer) hasTuple(resourceNamespace, resourceType, resourceID, relation, subjectNamespace, subjectType, subjectID string) bool {
+// 	s.mu.RLock()
+// 	defer s.mu.RUnlock()
+// 	return hasTupleInSnapshot(s.tuples, resourceNamespace, resourceType, resourceID, relation, subjectNamespace, subjectType, subjectID)
+// }
 
 func tupleKeyFromRelationship(rel *kessel.Relationship) tupleKey {
 	key := tupleKey{}

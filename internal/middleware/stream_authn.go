@@ -1,21 +1,20 @@
-package interceptor
+package middleware
 
 import (
 	"context"
 	"fmt"
 	"strings"
 
-	"github.com/project-kessel/inventory-api/internal/middleware"
-
 	coreosoidc "github.com/coreos/go-oidc/v3/oidc"
 	kerrors "github.com/go-kratos/kratos/v2/errors"
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/go-kratos/kratos/v2/transport"
-	"github.com/project-kessel/inventory-api/internal/authn"
-	"github.com/project-kessel/inventory-api/internal/authn/api"
-	"github.com/project-kessel/inventory-api/internal/authn/util"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
+
+	"github.com/project-kessel/inventory-api/internal/authn"
+	authnapi "github.com/project-kessel/inventory-api/internal/authn/api"
+	"github.com/project-kessel/inventory-api/internal/authn/util"
 )
 
 const (
@@ -88,11 +87,13 @@ func (h *grpcMetadataHeader) Values(key string) []string {
 	return h.md.Get(key)
 }
 
+// StreamAuthConfig holds configuration for the stream authentication interceptor.
 type StreamAuthConfig struct {
-	authenticator api.Authenticator
+	authenticator authnapi.Authenticator
 	logger        log.Logger
 }
 
+// StreamAuthOption is a functional option for configuring StreamAuthInterceptor.
 type StreamAuthOption func(*StreamAuthConfig)
 
 // NewStreamAuthInterceptor creates a stream authentication interceptor using the AggregatingAuthenticator.
@@ -101,20 +102,32 @@ type StreamAuthOption func(*StreamAuthConfig)
 //
 // The interceptor uses the aggregating authenticator to authenticate gRPC streams, supporting
 // all authenticator types in the chain (OIDC, x-rh-identity, allow-unauthenticated, etc.).
-func NewStreamAuthInterceptor(config authn.CompletedConfig, authenticator api.Authenticator, logger log.Logger, opts ...StreamAuthOption) (*StreamAuthInterceptor, error) {
-	cfg := &StreamAuthConfig{
-		authenticator: authenticator,
-		logger:        logger,
-	}
+func NewStreamAuthInterceptor(config authn.CompletedConfig, authenticator authnapi.Authenticator, logger log.Logger, opts ...StreamAuthOption) (*StreamAuthInterceptor, error) {
 
 	// If authenticator is not provided, create it from config (backwards compatible)
-	if cfg.authenticator == nil {
+	if authenticator == nil {
 		authnLogger := log.NewHelper(log.With(logger, "subsystem", "authn", "component", "stream-interceptor"))
 		var err error
-		cfg.authenticator, err = authn.New(config, authnLogger)
+		authenticator, err = authn.New(config, authnLogger)
 		if err != nil {
 			return nil, err
 		}
+	}
+
+	return NewStreamAuthInterceptorFromAuthenticator(authenticator, logger, opts...)
+}
+
+// NewStreamAuthInterceptorFromAuthenticator creates a stream authentication interceptor
+// using a pre-configured authenticator. This is useful for tests where the authenticator
+// is already constructed.
+func NewStreamAuthInterceptorFromAuthenticator(authenticator authnapi.Authenticator, logger log.Logger, opts ...StreamAuthOption) (*StreamAuthInterceptor, error) {
+	if authenticator == nil {
+		return nil, fmt.Errorf("authenticator is required")
+	}
+
+	cfg := &StreamAuthConfig{
+		authenticator: authenticator,
+		logger:        logger,
 	}
 
 	for _, opt := range opts {
@@ -124,10 +137,12 @@ func NewStreamAuthInterceptor(config authn.CompletedConfig, authenticator api.Au
 	return &StreamAuthInterceptor{cfg: cfg}, nil
 }
 
+// StreamAuthInterceptor implements gRPC stream authentication.
 type StreamAuthInterceptor struct {
 	cfg *StreamAuthConfig
 }
 
+// Interceptor returns the gRPC stream server interceptor function.
 func (i *StreamAuthInterceptor) Interceptor() grpc.StreamServerInterceptor {
 	return func(srv interface{}, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
 		newCtx := ss.Context()
@@ -144,48 +159,37 @@ func (i *StreamAuthInterceptor) Interceptor() grpc.StreamServerInterceptor {
 		}
 
 		// Use aggregating authenticator to authenticate the stream
-		identity, decision := i.cfg.authenticator.Authenticate(newCtx, transporter)
+		claims, decision := i.cfg.authenticator.Authenticate(newCtx, transporter)
 
 		// Log decision at info level to diagnose authentication issues
 		// Only log non-sensitive fields to prevent information leakage
 		logHelper := log.NewHelper(i.cfg.logger)
-		if identity != nil {
-			logHelper.Infof("Stream authentication decision for %s: %s (principal: %s, authType: %s, isGuest: %v)",
-				info.FullMethod, decision, identity.Principal, identity.AuthType, identity.IsGuest)
+		if claims != nil {
+			logHelper.Infof("Stream authentication decision for %s: %s (subject: %s, authType: %s)",
+				info.FullMethod, decision, claims.SubjectId, claims.AuthType)
 		} else {
-			logHelper.Infof("Stream authentication decision for %s: %s (identity: nil)", info.FullMethod, decision)
+			logHelper.Infof("Stream authentication decision for %s: %s (claims: nil)", info.FullMethod, decision)
 		}
 
-		if decision == api.Deny {
-			logHelper.Warnf("Stream authentication denied for %s", info.FullMethod)
-			return kerrors.Unauthorized("UNAUTHORIZED", "Authentication denied")
-		} else if decision == api.Ignore {
-			// Ignore means no authenticator could handle the request
-			// This should not happen if allow-unauthenticated authentication is enabled
-			logHelper.Warnf("Stream authentication ignored for %s (no authenticator could handle request)", info.FullMethod)
-			return kerrors.Unauthorized("UNAUTHORIZED", "No valid authentication found")
-		} else if decision != api.Allow {
-			// Handle any unexpected decision values
-			logHelper.Errorf("Stream authentication failed with unexpected decision %s for %s", decision, info.FullMethod)
-			return kerrors.Unauthorized("UNAUTHORIZED", fmt.Sprintf("Authentication failed with decision: %s", decision))
-		}
-
-		// Defensive check: identity should not be nil when decision is Allow
-		// but we check to prevent panics if an authenticator implementation violates the contract
-		if identity == nil {
-			logHelper.Errorf("Stream authentication allowed but identity is nil for %s", info.FullMethod)
-			return kerrors.Unauthorized("UNAUTHORIZED", "Invalid identity: authenticator returned Allow with nil identity")
+		if err := validateAuthDecision(decision, claims); err != nil {
+			// Log at appropriate level based on decision
+			if decision == authnapi.Deny || decision == authnapi.Ignore {
+				logHelper.Warnf("Stream authentication failed for %s: %v", info.FullMethod, err)
+			} else {
+				logHelper.Errorf("Stream authentication failed for %s: %v", info.FullMethod, err)
+			}
+			return err
 		}
 
 		// Log only non-sensitive fields at debug level
-		logHelper.Debugf("Stream authentication allowed for %s (principal: %s, authType: %s, isGuest: %v)",
-			info.FullMethod, identity.Principal, identity.AuthType, identity.IsGuest)
+		logHelper.Debugf("Stream authentication allowed for %s (subject: %s, authType: %s)",
+			info.FullMethod, claims.SubjectId, claims.AuthType)
 
-		// Set identity in context (includes AuthType)
-		newCtx = NewContextIdentity(newCtx, *identity)
+		// Store claims in AuthzContext (the authoritative source for auth info)
+		newCtx = EnsureAuthzContext(newCtx, claims)
 
 		// Preserve token if available (for compatibility)
-		newCtx = preserveTokenContext(newCtx, md)
+		newCtx = preserveStreamTokenContext(newCtx, md)
 
 		wrappedStream := &authServerStream{ServerStream: ss, ctx: newCtx}
 		return handler(srv, wrappedStream)
@@ -201,10 +205,10 @@ func (a *authServerStream) Context() context.Context {
 	return a.ctx
 }
 
-// preserveTokenContext extracts and preserves the token in context for compatibility.
-// First tries to get token from context (if authenticator stored it), then falls back
-// to extracting from Authorization header if present.
-func preserveTokenContext(ctx context.Context, md metadata.MD) context.Context {
+// preserveStreamTokenContext extracts and preserves the token in context for legacy compatibility.
+// Note: ClientID is now available via AuthzContext.Claims.ClientID for OIDC auth.
+// This token preservation can be removed once all callers migrate to using Claims.
+func preserveStreamTokenContext(ctx context.Context, md metadata.MD) context.Context {
 	if token, ok := util.FromTokenContext(ctx); ok {
 		return util.NewTokenContext(ctx, token)
 	}
@@ -222,25 +226,18 @@ func preserveTokenContext(ctx context.Context, md metadata.MD) context.Context {
 	return ctx
 }
 
-func NewContextIdentity(ctx context.Context, identity api.Identity) context.Context {
-	return context.WithValue(ctx, middleware.IdentityRequestKey, identity)
-}
-
-func FromContextIdentity(ctx context.Context) (api.Identity, bool) {
-	identity, ok := ctx.Value(middleware.IdentityRequestKey).(api.Identity)
-	return identity, ok
-}
-
-func FromContext(ctx context.Context) (*coreosoidc.IDToken, bool) {
+// FromStreamContext retrieves the OIDC ID token from context.
+func FromStreamContext(ctx context.Context) (*coreosoidc.IDToken, bool) {
 	return util.FromTokenContext(ctx)
 }
 
 // GetClientIDFromContext extracts the client_id from a JWT token stored in the context.
+// Deprecated: Use Claims.ClientID instead once ClientID is added to Claims.
 func GetClientIDFromContext(ctx context.Context) string {
 	// First, try to get the verified IDToken from context
 	token, ok := util.FromTokenContext(ctx)
 	if ok {
-		claims := &Claims{}
+		claims := &StreamTokenClaims{}
 		err := token.Claims(claims)
 		if err != nil {
 			return ""
@@ -273,8 +270,8 @@ func GetClientIDFromContext(ctx context.Context) string {
 	return ""
 }
 
-// Claims holds the values we want to extract from the JWT - matching OIDC authenticator
-type Claims struct {
+// StreamTokenClaims holds the values we want to extract from the JWT - matching OIDC authenticator
+type StreamTokenClaims struct {
 	Audience          string `json:"aud"`
 	Issuer            string `json:"iss"`
 	Subject           string `json:"sub"`

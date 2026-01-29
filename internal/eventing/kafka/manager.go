@@ -93,11 +93,11 @@ func (m *KafkaManager) Errs() <-chan error {
 	return m.Errors
 }
 
-// Lookup figures out which topic should be used for the given identity and resource.
-func (m *KafkaManager) Lookup(identity *authnapi.Identity, resource_type string, resource_id uuid.UUID) (api.Producer, error) {
+// Lookup figures out which topic should be used for the given claims and resource.
+func (m *KafkaManager) Lookup(claims *authnapi.Claims, resource_type string, resource_id uuid.UUID) (api.Producer, error) {
 
 	// there is no complicated topic dispatch logic... for now.
-	producer, err := NewProducer(m, m.Config.DefaultTopic, identity)
+	producer, err := NewProducer(m, m.Config.DefaultTopic, claims)
 	if err != nil {
 		return nil, err
 	}
@@ -109,9 +109,9 @@ func (m *KafkaManager) Shutdown(ctx context.Context) error {
 }
 
 type kafkaProducer struct {
-	Manager  *KafkaManager
-	Topic    string
-	Identity *authnapi.Identity
+	Manager *KafkaManager
+	Topic   string
+	Claims  *authnapi.Claims
 
 	Logger        *log.Helper
 	eventsCounter metric.Int64Counter
@@ -123,16 +123,16 @@ func NewProducerEventsCounter(meter metric.Meter, histogramName string) (metric.
 }
 
 // NewProducer produces a kafka producer that is bound to a particular topic.
-func NewProducer(manager *KafkaManager, topic string, identity *authnapi.Identity) (*kafkaProducer, error) {
+func NewProducer(manager *KafkaManager, topic string, claims *authnapi.Claims) (*kafkaProducer, error) {
 	meter := otel.Meter("github.com/project-kessel/inventory-api/blob/main/internal/server/otel")
 	eventsCounter, err := NewProducerEventsCounter(meter, "kafka_event")
 	if err != nil {
 		return nil, err
 	}
 	return &kafkaProducer{
-		Manager:  manager,
-		Topic:    topic,
-		Identity: identity,
+		Manager: manager,
+		Topic:   topic,
+		Claims:  claims,
 
 		Logger:        manager.Logger,
 		eventsCounter: eventsCounter,

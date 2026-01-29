@@ -19,10 +19,10 @@ const (
 )
 
 // Authenticator defines the interface for authentication providers.
-// Implementations should examine the transport and return an identity and decision.
+// Implementations should examine the transport and return claims and decision.
 type Authenticator interface {
 
 	// TODO: update the return value so it can carry a message in the DENY case
-	// Authenticate examines the transport context and returns an identity and authentication decision.
-	Authenticate(context.Context, transport.Transporter) (*Identity, Decision)
+	// Authenticate examines the transport context and returns claims and authentication decision.
+	Authenticate(context.Context, transport.Transporter) (*Claims, Decision)
 }

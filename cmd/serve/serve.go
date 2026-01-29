@@ -18,7 +18,9 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/project-kessel/inventory-api/cmd/common"
+	"github.com/project-kessel/inventory-api/internal/biz/usecase/metaauthorizer"
 	resourcesctl "github.com/project-kessel/inventory-api/internal/biz/usecase/resources"
+	appconfig "github.com/project-kessel/inventory-api/internal/config"
 	"github.com/project-kessel/inventory-api/internal/config/schema"
 	"github.com/project-kessel/inventory-api/internal/consistency"
 	"github.com/project-kessel/inventory-api/internal/consumer"
@@ -57,6 +59,7 @@ func NewCommand(
 	consumerOptions *consumer.Options,
 	consistencyOptions *consistency.Options,
 	serviceOptions *service.Options,
+	selfSubjectConfig *appconfig.SelfSubjectStrategyConfig,
 	loggerOptions common.LoggerOptions,
 	schemaOptions *schema.Options,
 ) *cobra.Command {
@@ -90,6 +93,8 @@ func NewCommand(
 			if errs != nil {
 				return errors.NewAggregate(errs)
 			}
+
+			selfSubjectStrategy := appconfig.BuildSelfSubjectStrategy(selfSubjectConfig)
 
 			// configure authz
 			if errs := authzOptions.Complete(); errs != nil {
@@ -278,7 +283,7 @@ func NewCommand(
 			//v1beta2
 			// wire together inventory service handling
 			resourceRepo := data.NewResourceRepository(db, transactionManager)
-			inventory_controller := resourcesctl.New(resourceRepo, authorizer, eventingManager, "notifications", log.With(logger, "subsystem", "notificationsintegrations_controller"), listenManager, waitForNotifCircuitBreaker, usecaseConfig, mc)
+			inventory_controller := resourcesctl.New(resourceRepo, authorizer, eventingManager, "notifications", log.With(logger, "subsystem", "notificationsintegrations_controller"), listenManager, waitForNotifCircuitBreaker, usecaseConfig, mc, metaauthorizer.NewSimpleMetaAuthorizer(), selfSubjectStrategy)
 
 			inventory_service := resourcesvc.NewKesselInventoryServiceV1beta2(inventory_controller)
 			pbv1beta2.RegisterKesselInventoryServiceServer(server.GrpcServer, inventory_service)

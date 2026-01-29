@@ -12,12 +12,12 @@ import (
 
 // mockAuthenticator is a test helper that returns predefined decisions
 type mockAuthenticator struct {
-	identity *api.Identity
+	claims   *api.Claims
 	decision api.Decision
 }
 
-func (m *mockAuthenticator) Authenticate(ctx context.Context, t transport.Transporter) (*api.Identity, api.Decision) {
-	return m.identity, m.decision
+func (m *mockAuthenticator) Authenticate(ctx context.Context, t transport.Transporter) (*api.Claims, api.Decision) {
+	return m.claims, m.decision
 }
 
 // mockTransporter is a test helper that implements transport.Transporter
@@ -46,11 +46,11 @@ func TestNewFirstMatch(t *testing.T) {
 func TestFirstMatchAuthenticator_Add(t *testing.T) {
 	auth := NewFirstMatch()
 	mock1 := &mockAuthenticator{
-		identity: &api.Identity{Principal: "user1", AuthType: "test1"},
+		claims:   &api.Claims{SubjectId: api.SubjectId("user1"), AuthType: api.AuthType("test1")},
 		decision: api.Allow,
 	}
 	mock2 := &mockAuthenticator{
-		identity: &api.Identity{Principal: "user2", AuthType: "test2"},
+		claims:   &api.Claims{SubjectId: api.SubjectId("user2"), AuthType: api.AuthType("test2")},
 		decision: api.Deny,
 	}
 
@@ -65,35 +65,35 @@ func TestFirstMatchAuthenticator_Authenticate_Allow(t *testing.T) {
 	tests := []struct {
 		name           string
 		authenticators []*mockAuthenticator
-		wantIdentity   *api.Identity
+		wantClaims     *api.Claims
 		wantDecision   api.Decision
 	}{
 		{
 			name: "first authenticator allows",
 			authenticators: []*mockAuthenticator{
-				{identity: &api.Identity{Principal: "user1", AuthType: "test1"}, decision: api.Allow},
-				{identity: &api.Identity{Principal: "user2", AuthType: "test2"}, decision: api.Deny},
+				{claims: &api.Claims{SubjectId: api.SubjectId("user1"), AuthType: api.AuthType("test1")}, decision: api.Allow},
+				{claims: &api.Claims{SubjectId: api.SubjectId("user2"), AuthType: api.AuthType("test2")}, decision: api.Deny},
 			},
-			wantIdentity: &api.Identity{Principal: "user1", AuthType: "test1"},
+			wantClaims:   &api.Claims{SubjectId: api.SubjectId("user1"), AuthType: api.AuthType("test1")},
 			wantDecision: api.Allow,
 		},
 		{
 			name: "second authenticator allows",
 			authenticators: []*mockAuthenticator{
-				{identity: nil, decision: api.Ignore},
-				{identity: &api.Identity{Principal: "user2", AuthType: "test2"}, decision: api.Allow},
+				{claims: nil, decision: api.Ignore},
+				{claims: &api.Claims{SubjectId: api.SubjectId("user2"), AuthType: api.AuthType("test2")}, decision: api.Allow},
 			},
-			wantIdentity: &api.Identity{Principal: "user2", AuthType: "test2"},
+			wantClaims:   &api.Claims{SubjectId: api.SubjectId("user2"), AuthType: api.AuthType("test2")},
 			wantDecision: api.Allow,
 		},
 		{
 			name: "middle authenticator allows",
 			authenticators: []*mockAuthenticator{
-				{identity: nil, decision: api.Ignore},
-				{identity: &api.Identity{Principal: "user2", AuthType: "test2"}, decision: api.Allow},
-				{identity: nil, decision: api.Deny},
+				{claims: nil, decision: api.Ignore},
+				{claims: &api.Claims{SubjectId: api.SubjectId("user2"), AuthType: api.AuthType("test2")}, decision: api.Allow},
+				{claims: nil, decision: api.Deny},
 			},
-			wantIdentity: &api.Identity{Principal: "user2", AuthType: "test2"},
+			wantClaims:   &api.Claims{SubjectId: api.SubjectId("user2"), AuthType: api.AuthType("test2")},
 			wantDecision: api.Allow,
 		},
 	}
@@ -105,12 +105,12 @@ func TestFirstMatchAuthenticator_Authenticate_Allow(t *testing.T) {
 				auth.Add(a)
 			}
 
-			identity, decision := auth.Authenticate(context.Background(), &mockTransporter{})
+			claims, decision := auth.Authenticate(context.Background(), &mockTransporter{})
 			assert.Equal(t, tt.wantDecision, decision)
-			if tt.wantIdentity != nil {
-				assert.NotNil(t, identity)
-				assert.Equal(t, tt.wantIdentity.Principal, identity.Principal)
-				assert.Equal(t, tt.wantIdentity.AuthType, identity.AuthType)
+			if tt.wantClaims != nil {
+				assert.NotNil(t, claims)
+				assert.Equal(t, tt.wantClaims.SubjectId, claims.SubjectId)
+				assert.Equal(t, tt.wantClaims.AuthType, claims.AuthType)
 			}
 		})
 	}
@@ -125,24 +125,24 @@ func TestFirstMatchAuthenticator_Authenticate_Deny(t *testing.T) {
 		{
 			name: "all deny",
 			authenticators: []*mockAuthenticator{
-				{identity: nil, decision: api.Deny},
-				{identity: nil, decision: api.Deny},
+				{claims: nil, decision: api.Deny},
+				{claims: nil, decision: api.Deny},
 			},
 			wantDecision: api.Deny,
 		},
 		{
 			name: "all ignore - returns Ignore",
 			authenticators: []*mockAuthenticator{
-				{identity: nil, decision: api.Ignore},
-				{identity: nil, decision: api.Ignore},
+				{claims: nil, decision: api.Ignore},
+				{claims: nil, decision: api.Ignore},
 			},
 			wantDecision: api.Ignore,
 		},
 		{
 			name: "mix of deny and ignore - denies if any deny",
 			authenticators: []*mockAuthenticator{
-				{identity: nil, decision: api.Deny},
-				{identity: nil, decision: api.Ignore},
+				{claims: nil, decision: api.Deny},
+				{claims: nil, decision: api.Ignore},
 			},
 			wantDecision: api.Deny,
 		},
@@ -160,9 +160,9 @@ func TestFirstMatchAuthenticator_Authenticate_Deny(t *testing.T) {
 				auth.Add(a)
 			}
 
-			identity, decision := auth.Authenticate(context.Background(), &mockTransporter{})
+			claims, decision := auth.Authenticate(context.Background(), &mockTransporter{})
 			assert.Equal(t, tt.wantDecision, decision)
-			assert.Nil(t, identity)
+			assert.Nil(t, claims)
 		})
 	}
 }
@@ -171,11 +171,11 @@ func TestFirstMatchAuthenticator_Authenticate_ReturnsImmediatelyOnAllow(t *testi
 	// Test that we return immediately on Allow and don't check remaining authenticators
 	callCount := 0
 	mock1 := &mockAuthenticator{
-		identity: &api.Identity{Principal: "user1", AuthType: "test1"},
+		claims:   &api.Claims{SubjectId: api.SubjectId("user1"), AuthType: api.AuthType("test1")},
 		decision: api.Allow,
 	}
 	mock2 := &mockAuthenticator{
-		identity: nil,
+		claims:   nil,
 		decision: api.Deny,
 	}
 
@@ -189,10 +189,10 @@ func TestFirstMatchAuthenticator_Authenticate_ReturnsImmediatelyOnAllow(t *testi
 	auth.Add(mock1)
 	auth.Add(trackedMock2)
 
-	identity, decision := auth.Authenticate(context.Background(), &mockTransporter{})
+	claims, decision := auth.Authenticate(context.Background(), &mockTransporter{})
 	assert.Equal(t, api.Allow, decision)
-	assert.NotNil(t, identity)
-	assert.Equal(t, "user1", identity.Principal)
+	assert.NotNil(t, claims)
+	assert.Equal(t, api.SubjectId("user1"), claims.SubjectId)
 	// mock2 should not have been called because mock1 returned Allow
 	assert.Equal(t, 0, callCount)
 }
@@ -202,7 +202,7 @@ type trackingAuthenticator struct {
 	callCount     *int
 }
 
-func (t *trackingAuthenticator) Authenticate(ctx context.Context, transporter transport.Transporter) (*api.Identity, api.Decision) {
+func (t *trackingAuthenticator) Authenticate(ctx context.Context, transporter transport.Transporter) (*api.Claims, api.Decision) {
 	*t.callCount++
 	return t.authenticator.Authenticate(ctx, transporter)
 }

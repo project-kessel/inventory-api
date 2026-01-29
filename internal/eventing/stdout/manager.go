@@ -38,8 +38,8 @@ func (m *StdOutManager) Errs() <-chan error {
 	return m.Errors
 }
 
-// Lookup figures out which Producer should be used for the given identity and resource.
-func (m *StdOutManager) Lookup(identity *authnapi.Identity, resource_type string, resource_id uuid.UUID) (api.Producer, error) {
+// Lookup figures out which Producer should be used for the given claims and resource.
+func (m *StdOutManager) Lookup(claims *authnapi.Claims, resource_type string, resource_id uuid.UUID) (api.Producer, error) {
 	return m, nil
 }
 

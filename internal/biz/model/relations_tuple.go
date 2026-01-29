@@ -62,6 +62,8 @@ func (rot RelationsObjectType) Namespace() string {
 	return rot.namespace
 }
 
+// Deprecated: Use ReporterResourceKey instead
+//
 // RelationsResource represents a resource in a relationship tuple
 type RelationsResource struct {
 	id         LocalResourceId

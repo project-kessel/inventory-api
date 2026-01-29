@@ -41,7 +41,7 @@ type protocolRoutingAuthenticator struct {
 	grpc api.Authenticator
 }
 
-func (a *protocolRoutingAuthenticator) Authenticate(ctx context.Context, t transport.Transporter) (*api.Identity, api.Decision) {
+func (a *protocolRoutingAuthenticator) Authenticate(ctx context.Context, t transport.Transporter) (*api.Claims, api.Decision) {
 	switch t.Kind() {
 	case transport.KindHTTP:
 		return a.http.Authenticate(ctx, t)

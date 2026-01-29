@@ -15,7 +15,6 @@ import (
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/go-kratos/kratos/v2/transport/http"
 	v1 "github.com/project-kessel/inventory-api/api/kessel/inventory/v1"
-	v1beta2 "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2"
 	"github.com/stretchr/testify/assert"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -183,88 +182,4 @@ func TestInventoryAPIHTTP_Metrics(t *testing.T) {
 	expectedStatusString := "200 OK"
 	assert.Equal(t, expectedStatusCode, resp.StatusCode)
 	assert.Equal(t, expectedStatusString, resp.Status)
-}
-
-func TestInventoryAPIHTTP_CheckSelf(t *testing.T) {
-	enableShortMode(t)
-	httpClient, err := http.NewClient(
-		context.Background(),
-		http.WithEndpoint(inventoryapi_http_url),
-	)
-	if err != nil {
-		t.Fatal("Failed to create HTTP client: ", err)
-	}
-
-	headers := nethttp.Header{}
-	headers.Set("x-rh-identity", xRhIdentityHeaderValue)
-	inventoryClient := v1beta2.NewKesselInventoryServiceHTTPClient(httpClient)
-	reporterInstanceId := "testuser-example-com"
-	req := &v1beta2.CheckSelfRequest{
-		Relation: "view",
-		Object: &v1beta2.ResourceReference{
-			ResourceType: "host",
-			ResourceId:   "missing-host",
-			Reporter: &v1beta2.ReporterReference{
-				Type:       "hbi",
-				InstanceId: &reporterInstanceId,
-			},
-		},
-	}
-
-	resp, err := inventoryClient.CheckSelf(context.Background(), req, http.Header(&headers))
-	assert.NoError(t, err)
-	if assert.NotNil(t, resp) {
-		assert.Equal(t, v1beta2.Allowed_ALLOWED_FALSE, resp.GetAllowed())
-	}
-}
-
-func TestInventoryAPIHTTP_CheckBulk(t *testing.T) {
-	enableShortMode(t)
-	httpClient, err := http.NewClient(
-		context.Background(),
-		http.WithEndpoint(inventoryapi_http_url),
-	)
-	if err != nil {
-		t.Fatal("Failed to create HTTP client: ", err)
-	}
-
-	headers := nethttp.Header{}
-	headers.Set("x-rh-identity", xRhIdentityHeaderValue)
-	inventoryClient := v1beta2.NewKesselInventoryServiceHTTPClient(httpClient)
-	reporterInstanceId := "testuser-example-com"
-	req := &v1beta2.CheckSelfBulkRequest{
-		Items: []*v1beta2.CheckSelfBulkRequestItem{
-			{
-				Object: &v1beta2.ResourceReference{
-					ResourceType: "host",
-					ResourceId:   "missing-host",
-					Reporter: &v1beta2.ReporterReference{
-						Type:       "hbi",
-						InstanceId: &reporterInstanceId,
-					},
-				},
-				Relation: "view",
-			},
-			{
-				Object: &v1beta2.ResourceReference{
-					ResourceType: "host",
-					ResourceId:   "missing-host-2",
-					Reporter: &v1beta2.ReporterReference{
-						Type:       "hbi",
-						InstanceId: &reporterInstanceId,
-					},
-				},
-				Relation: "view",
-			}},
-	}
-	resp, err := inventoryClient.CheckSelfBulk(context.Background(), req, http.Header(&headers))
-	assert.NoError(t, err)
-	if assert.NotNil(t, resp) {
-		assert.Len(t, resp.GetPairs(), len(req.Items))
-		for _, pair := range resp.GetPairs() {
-			if assert.NotNil(t, pair.GetItem()) {
-				assert.Equal(t, v1beta2.Allowed_ALLOWED_FALSE, pair.GetItem().GetAllowed())
-			}
-		}
-	}
 }

@@ -11,8 +11,8 @@ authz:
     insecure-client: true
     url: relations-api:9000
     enable-oidc-auth: false
-    principal-user-domain: 0.0.0.0:8084
-    default-to-at-least-as-acknowledged: true
+consistency:
+  default-to-at-least-as-acknowledged: false
 eventing:
   eventer: stdout
   kafka:

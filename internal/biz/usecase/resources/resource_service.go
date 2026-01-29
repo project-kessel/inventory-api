@@ -21,7 +21,6 @@ import (
 	"github.com/project-kessel/inventory-api/internal/server"
 	kessel "github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
 	"github.com/sony/gobreaker"
-	"github.com/spf13/viper"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -49,9 +48,10 @@ const listenTimeout = 10 * time.Second
 // UsecaseConfig contains configuration flags that control the behavior of usecase operations.
 // These flags should be consistent across all handlers.
 type UsecaseConfig struct {
-	ReadAfterWriteEnabled   bool
-	ReadAfterWriteAllowlist []string
-	ConsumerEnabled         bool
+	ReadAfterWriteEnabled          bool
+	ReadAfterWriteAllowlist        []string
+	ConsumerEnabled                bool
+	DefaultToAtLeastAsAcknowledged bool
 }
 
 // Usecase provides business logic operations for resource management in the inventory system.
@@ -271,7 +271,7 @@ func (uc *Usecase) lookupConsistencyTokenFromDB(reporterResourceKey model.Report
 
 // resolveConsistencyToken resolves the consistency token based on the preference.
 func (uc *Usecase) resolveConsistencyToken(ctx context.Context, consistency model.ConsistencyConfig, reporterResourceKey model.ReporterResourceKey) (string, error) {
-	featureFlagEnabled := viper.GetBool("authz.kessel.default-to-at-least-as-acknowledged")
+	featureFlagEnabled := uc.Config.DefaultToAtLeastAsAcknowledged
 	if featureFlagEnabled {
 		log.Info("Feature flag authz.kessel.default-to-at-least-as-acknowledged is enabled")
 	} else {

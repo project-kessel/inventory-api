@@ -20,12 +20,12 @@ import (
 	"github.com/project-kessel/inventory-api/cmd/common"
 	"github.com/project-kessel/inventory-api/internal/biz/usecase/metaauthorizer"
 	resourcesctl "github.com/project-kessel/inventory-api/internal/biz/usecase/resources"
-	appconfig "github.com/project-kessel/inventory-api/internal/config"
 	"github.com/project-kessel/inventory-api/internal/config/schema"
 	"github.com/project-kessel/inventory-api/internal/consistency"
 	"github.com/project-kessel/inventory-api/internal/consumer"
 	"github.com/project-kessel/inventory-api/internal/data"
 	"github.com/project-kessel/inventory-api/internal/pubsub"
+	"github.com/project-kessel/inventory-api/internal/subject/selfsubject"
 
 	//v1beta2
 	resourcesvc "github.com/project-kessel/inventory-api/internal/service/resources"
@@ -59,7 +59,7 @@ func NewCommand(
 	consumerOptions *consumer.Options,
 	consistencyOptions *consistency.Options,
 	serviceOptions *service.Options,
-	selfSubjectConfig *appconfig.SelfSubjectStrategyConfig,
+	selfSubjectOptions *selfsubject.Options,
 	loggerOptions common.LoggerOptions,
 	schemaOptions *schema.Options,
 ) *cobra.Command {
@@ -94,7 +94,14 @@ func NewCommand(
 				return errors.NewAggregate(errs)
 			}
 
-			selfSubjectStrategy := appconfig.BuildSelfSubjectStrategy(selfSubjectConfig)
+			// configure selfsubject
+			if errs := selfSubjectOptions.Complete(); errs != nil {
+				return errors.NewAggregate(errs)
+			}
+			if errs := selfSubjectOptions.Validate(); errs != nil {
+				return errors.NewAggregate(errs)
+			}
+			selfSubjectStrategy := selfSubjectOptions.Build()
 
 			// configure authz
 			if errs := authzOptions.Complete(); errs != nil {
@@ -368,6 +375,7 @@ func NewCommand(
 	consistencyOptions.AddFlags(cmd.Flags(), "consistency")
 	serviceOptions.AddFlags()
 	schemaOptions.AddFlags(cmd.Flags(), "schema")
+	selfSubjectOptions.AddFlags(cmd.Flags(), "selfsubjectstrategy")
 
 	return cmd
 }

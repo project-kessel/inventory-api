@@ -197,7 +197,6 @@ stringData:
         issuerDomain: redhat
         oidcIssuerDomainMap:
           "https://sso.redhat.com/auth/realms/redhat-external": redhat
-          "sso.redhat.com": redhat      
     authz:
       impl: kessel
       kessel:

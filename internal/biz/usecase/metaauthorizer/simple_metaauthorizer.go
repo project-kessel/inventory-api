@@ -36,7 +36,7 @@ func (s *SimpleMetaAuthorizer) Check(_ context.Context, _ MetaObject, relation R
 	if authzCtx.Protocol == authnapi.ProtocolGRPC {
 		return relation != RelationCheckSelf, nil
 	}
-	if authzCtx.IsAuthenticated() && authzCtx.Claims.AuthType == authnapi.AuthTypeXRhIdentity {
+	if authzCtx.IsAuthenticated() && authzCtx.Subject.AuthType == authnapi.AuthTypeXRhIdentity {
 		return relation == RelationCheckSelf, nil
 	}
 	return false, nil

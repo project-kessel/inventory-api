@@ -86,6 +86,6 @@ func EnsureAuthzContext(ctx context.Context, claims *authnapi.Claims) context.Co
 
 	return authnapi.NewAuthzContext(ctx, authnapi.AuthzContext{
 		Protocol: protocol,
-		Claims:   claims,
+		Subject:  claims,
 	})
 }

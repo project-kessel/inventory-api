@@ -13,7 +13,7 @@ func TestSimpleMetaAuthorizer_HTTP_XRhIdentity(t *testing.T) {
 	ctx := context.Background()
 	authzCtx := authnapi.AuthzContext{
 		Protocol: authnapi.ProtocolHTTP,
-		Claims:   &authnapi.Claims{AuthType: authnapi.AuthTypeXRhIdentity},
+		Subject:  &authnapi.Claims{AuthType: authnapi.AuthTypeXRhIdentity},
 	}
 
 	allowed, err := authorizer.Check(ctx, InventoryResource{}, RelationCheckSelf, authzCtx)
@@ -44,7 +44,7 @@ func TestSimpleMetaAuthorizer_HTTP_OIDC_Denies(t *testing.T) {
 	ctx := context.Background()
 	authzCtx := authnapi.AuthzContext{
 		Protocol: authnapi.ProtocolHTTP,
-		Claims:   &authnapi.Claims{AuthType: authnapi.AuthTypeOIDC},
+		Subject:  &authnapi.Claims{AuthType: authnapi.AuthTypeOIDC},
 	}
 
 	allowed, err := authorizer.Check(ctx, InventoryResource{}, RelationCheckSelf, authzCtx)
@@ -61,7 +61,7 @@ func TestSimpleMetaAuthorizer_GRPC_OverridesXRhIdentity(t *testing.T) {
 	ctx := context.Background()
 	authzCtx := authnapi.AuthzContext{
 		Protocol: authnapi.ProtocolGRPC,
-		Claims:   &authnapi.Claims{AuthType: authnapi.AuthTypeXRhIdentity},
+		Subject:  &authnapi.Claims{AuthType: authnapi.AuthTypeXRhIdentity},
 	}
 
 	allowed, err := authorizer.Check(ctx, InventoryResource{}, RelationCheckSelf, authzCtx)
@@ -74,7 +74,7 @@ func TestSimpleMetaAuthorizer_UnknownProtocol_Denies(t *testing.T) {
 	ctx := context.Background()
 	authzCtx := authnapi.AuthzContext{
 		Protocol: authnapi.ProtocolUnknown,
-		Claims:   &authnapi.Claims{AuthType: authnapi.AuthTypeXRhIdentity},
+		Subject:  &authnapi.Claims{AuthType: authnapi.AuthTypeXRhIdentity},
 	}
 
 	allowed, err := authorizer.Check(ctx, InventoryResource{}, RelationCheckSelf, authzCtx)

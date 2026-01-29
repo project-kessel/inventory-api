@@ -46,10 +46,10 @@ import (
 type testSelfSubjectStrategy struct{}
 
 func (testSelfSubjectStrategy) SubjectFromAuthorizationContext(authzContext authnapi.AuthzContext) (model.SubjectReference, error) {
-	if !authzContext.IsAuthenticated() || authzContext.Claims.SubjectId == "" {
+	if !authzContext.IsAuthenticated() || authzContext.Subject.SubjectId == "" {
 		return model.SubjectReference{}, fmt.Errorf("subject claims not found")
 	}
-	subjectID := string(authzContext.Claims.SubjectId)
+	subjectID := string(authzContext.Subject.SubjectId)
 	return buildTestSubjectReference(subjectID)
 }
 

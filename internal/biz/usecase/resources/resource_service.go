@@ -114,8 +114,8 @@ func (uc *Usecase) ReportResource(ctx context.Context, request *v1beta2.ReportRe
 	}
 
 	// Log client_id if available (from OIDC authentication)
-	if authzCtx, ok := authnapi.FromAuthzContext(ctx); ok && authzCtx.Claims != nil && authzCtx.Claims.ClientID != "" {
-		log.Infof("Reporting resource request from client_id: %s", authzCtx.Claims.ClientID)
+	if authzCtx, ok := authnapi.FromAuthzContext(ctx); ok && authzCtx.Subject != nil && authzCtx.Subject.ClientID != "" {
+		log.Infof("Reporting resource request from client_id: %s", authzCtx.Subject.ClientID)
 	}
 	var subscription pubsub.Subscription
 	txidStr, err := getNextTransactionID()
@@ -216,8 +216,8 @@ func (uc *Usecase) Delete(ctx context.Context, reporterResourceKey model.Reporte
 		return err
 	}
 	// Log client_id if available (from OIDC authentication)
-	if authzCtx, ok := authnapi.FromAuthzContext(ctx); ok && authzCtx.Claims != nil && authzCtx.Claims.ClientID != "" {
-		log.Infof("Deleting resource %v from client_id: %s", reporterResourceKey, authzCtx.Claims.ClientID)
+	if authzCtx, ok := authnapi.FromAuthzContext(ctx); ok && authzCtx.Subject != nil && authzCtx.Subject.ClientID != "" {
+		log.Infof("Deleting resource %v from client_id: %s", reporterResourceKey, authzCtx.Subject.ClientID)
 	}
 
 	err = uc.resourceRepository.GetTransactionManager().HandleSerializableTransaction(

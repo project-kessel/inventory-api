@@ -14,16 +14,16 @@ const (
 // AuthzContext carries authentication/transport context into authorization decisions.
 type AuthzContext struct {
 	Protocol Protocol
-	// Claims are optional; some transports may be unauthenticated.
-	Claims *Claims
+	// Subject are optional; some transports may be unauthenticated.
+	Subject *Claims
 }
 
 // IsAuthenticated reports whether the context carries authenticated claims.
 func (a AuthzContext) IsAuthenticated() bool {
-	if a.Claims == nil {
+	if a.Subject == nil {
 		return false
 	}
-	return a.Claims.IsAuthenticated()
+	return a.Subject.IsAuthenticated()
 }
 
 type authzContextKey struct{}

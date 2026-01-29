@@ -51,7 +51,7 @@ func (s *RedHatRbacSelfSubjectStrategy) deriveSubjectID(authzContext authnapi.Au
 		return "", nil
 	}
 
-	claims := authzContext.Claims
+	claims := authzContext.Subject
 	subjectID := extractSubjectID(string(claims.SubjectId))
 
 	switch claims.AuthType {

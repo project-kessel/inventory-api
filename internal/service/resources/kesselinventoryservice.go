@@ -32,11 +32,11 @@ func (c *InventoryService) ReportResource(ctx context.Context, r *pb.ReportResou
 	// Get SubjectId from AuthzContext (populated by auth middleware)
 	// TODO: push this to report resource to get its own reporter principal OR pass authzcontext as param to all Usecase methods
 	authzCtx, ok := authnapi.FromAuthzContext(ctx)
-	if !ok || authzCtx.Claims == nil {
+	if !ok || authzCtx.Subject == nil {
 		log.Errorf("failed to get authz context or claims")
 		return nil, status.Error(codes.Unauthenticated, "authentication required")
 	}
-	err := c.Ctl.ReportResource(ctx, r, string(authzCtx.Claims.SubjectId))
+	err := c.Ctl.ReportResource(ctx, r, string(authzCtx.Subject.SubjectId))
 	if err != nil {
 		return nil, err
 	}

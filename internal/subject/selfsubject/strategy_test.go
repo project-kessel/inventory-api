@@ -14,7 +14,7 @@ func TestRedHatRbacSelfSubjectStrategy_XRhIdentity_User(t *testing.T) {
 	})
 
 	subjectRef, err := strategy.SubjectFromAuthorizationContext(authnapi.AuthzContext{
-		Claims: &authnapi.Claims{
+		Subject: &authnapi.Claims{
 			AuthType:  authnapi.AuthTypeXRhIdentity,
 			SubjectId: authnapi.SubjectId("user-123"),
 		},
@@ -34,7 +34,7 @@ func TestRedHatRbacSelfSubjectStrategy_OIDC_IssuerMap(t *testing.T) {
 	})
 
 	subjectRef, err := strategy.SubjectFromAuthorizationContext(authnapi.AuthzContext{
-		Claims: &authnapi.Claims{
+		Subject: &authnapi.Claims{
 			AuthType:  authnapi.AuthTypeOIDC,
 			Issuer:    authnapi.Issuer("https://sso.redhat.com/auth/realms/redhat-external"),
 			SubjectId: authnapi.SubjectId("user-123"),
@@ -53,7 +53,7 @@ func TestRedHatRbacSelfSubjectStrategy_OIDC_IssuerHostFallback(t *testing.T) {
 	})
 
 	subjectRef, err := strategy.SubjectFromAuthorizationContext(authnapi.AuthzContext{
-		Claims: &authnapi.Claims{
+		Subject: &authnapi.Claims{
 			AuthType:  authnapi.AuthTypeOIDC,
 			Issuer:    authnapi.Issuer("https://sso.redhat.com/auth/realms/redhat-external"),
 			SubjectId: authnapi.SubjectId("user-123"),
@@ -73,7 +73,7 @@ func TestRedHatRbacSelfSubjectStrategy_OIDC_NormalizedHostNotSupported(t *testin
 	})
 
 	_, err := strategy.SubjectFromAuthorizationContext(authnapi.AuthzContext{
-		Claims: &authnapi.Claims{
+		Subject: &authnapi.Claims{
 			AuthType:  authnapi.AuthTypeOIDC,
 			Issuer:    authnapi.Issuer("https://sso.redhat.com/auth/realms/redhat-external"),
 			SubjectId: authnapi.SubjectId("user-123"),
@@ -88,7 +88,7 @@ func TestRedHatRbacSelfSubjectStrategy_OIDC_MissingIssuer(t *testing.T) {
 	})
 
 	_, err := strategy.SubjectFromAuthorizationContext(authnapi.AuthzContext{
-		Claims: &authnapi.Claims{
+		Subject: &authnapi.Claims{
 			AuthType:  authnapi.AuthTypeOIDC,
 			SubjectId: authnapi.SubjectId("user-123"),
 		},

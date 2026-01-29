@@ -6,6 +6,8 @@ import (
 	"testing"
 
 	"github.com/go-kratos/kratos/v2/log"
+	"github.com/project-kessel/inventory-api/internal/biz/schema"
+	"github.com/project-kessel/inventory-api/internal/biz/schema/validation"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/types/known/structpb"
@@ -86,6 +88,7 @@ func TestCheckSelf_UsesCheckSelfRelation(t *testing.T) {
 	meta := &recordingMetaAuthorizer{allowed: true}
 	usecase := New(
 		data.NewFakeResourceRepository(),
+		newFakeSchemaRepository(t),
 		&allow.AllowAllAuthz{},
 		nil,
 		"rbac",
@@ -114,6 +117,7 @@ func TestCheckSelf_DeniedByMetaAuthz(t *testing.T) {
 	meta := &recordingMetaAuthorizer{allowed: false}
 	usecase := New(
 		data.NewFakeResourceRepository(),
+		newFakeSchemaRepository(t),
 		&allow.AllowAllAuthz{},
 		nil,
 		"rbac",
@@ -138,6 +142,7 @@ func TestCheckSelf_MissingAuthzContext(t *testing.T) {
 	meta := &recordingMetaAuthorizer{allowed: true}
 	usecase := New(
 		data.NewFakeResourceRepository(),
+		newFakeSchemaRepository(t),
 		&allow.AllowAllAuthz{},
 		nil,
 		"rbac",
@@ -164,6 +169,7 @@ func TestReportResource_UsesReportRelation(t *testing.T) {
 	meta := &recordingMetaAuthorizer{allowed: true}
 	usecase := New(
 		data.NewFakeResourceRepository(),
+		newFakeSchemaRepository(t),
 		&allow.AllowAllAuthz{},
 		nil,
 		"rbac",
@@ -188,6 +194,7 @@ func TestDelete_UsesDeleteRelation(t *testing.T) {
 	meta := &recordingMetaAuthorizer{allowed: true}
 	usecase := New(
 		data.NewFakeResourceRepository(),
+		newFakeSchemaRepository(t),
 		&allow.AllowAllAuthz{},
 		nil,
 		"rbac",
@@ -219,6 +226,7 @@ func TestCheck_UsesCheckRelation(t *testing.T) {
 	meta := &recordingMetaAuthorizer{allowed: true}
 	usecase := New(
 		data.NewFakeResourceRepository(),
+		newFakeSchemaRepository(t),
 		&allow.AllowAllAuthz{},
 		nil,
 		"rbac",
@@ -249,6 +257,7 @@ func TestCheckForUpdate_UsesCheckForUpdateRelation(t *testing.T) {
 	meta := &recordingMetaAuthorizer{allowed: true}
 	usecase := New(
 		data.NewFakeResourceRepository(),
+		newFakeSchemaRepository(t),
 		&allow.AllowAllAuthz{},
 		nil,
 		"rbac",
@@ -279,6 +288,7 @@ func TestCheckSelfBulk_UsesCheckSelfRelationForEachItem(t *testing.T) {
 	meta := &recordingMetaAuthorizer{allowed: true}
 	usecase := New(
 		data.NewFakeResourceRepository(),
+		newFakeSchemaRepository(t),
 		&allow.AllowAllAuthz{},
 		nil,
 		"rbac",
@@ -316,6 +326,7 @@ func TestCheckSelfBulk_MissingAuthzContext(t *testing.T) {
 	meta := &recordingMetaAuthorizer{allowed: true}
 	usecase := New(
 		data.NewFakeResourceRepository(),
+		newFakeSchemaRepository(t),
 		&allow.AllowAllAuthz{},
 		nil,
 		"rbac",
@@ -342,6 +353,55 @@ func TestCheckSelfBulk_MissingAuthzContext(t *testing.T) {
 	_, err = usecase.CheckSelfBulk(context.Background(), cmd)
 	assert.ErrorIs(t, err, ErrMetaAuthzContextMissing)
 	assert.Equal(t, 0, meta.calls)
+}
+
+func newFakeSchemaRepository(t *testing.T) schema.Repository {
+	schemaRepository := data.NewInMemorySchemaRepository()
+
+	emptyValidationSchema := validation.NewJsonSchemaValidatorFromString(`{
+		"$schema": "http://json-schema.org/draft-07/schema#",
+		"type": "object",
+		"properties": {
+		},
+		"required": []
+	}`)
+
+	withWorkspaceValidationSchema := validation.NewJsonSchemaValidatorFromString(`{
+		"$schema": "http://json-schema.org/draft-07/schema#",
+		"type": "object",
+		"properties": {
+			"workspace_id": { "type": "string" }
+		},
+		"required": ["workspace_id"]
+	}`)
+
+	err := schemaRepository.CreateResourceSchema(context.Background(), schema.ResourceRepresentation{
+		ResourceType:     "k8s_cluster",
+		ValidationSchema: withWorkspaceValidationSchema,
+	})
+	assert.NoError(t, err)
+
+	err = schemaRepository.CreateReporterSchema(context.Background(), schema.ReporterRepresentation{
+		ResourceType:     "k8s_cluster",
+		ReporterType:     "ocm",
+		ValidationSchema: emptyValidationSchema,
+	})
+	assert.NoError(t, err)
+
+	err = schemaRepository.CreateResourceSchema(context.Background(), schema.ResourceRepresentation{
+		ResourceType:     "host",
+		ValidationSchema: withWorkspaceValidationSchema,
+	})
+	assert.NoError(t, err)
+
+	err = schemaRepository.CreateReporterSchema(context.Background(), schema.ReporterRepresentation{
+		ResourceType:     "host",
+		ReporterType:     "hbi",
+		ValidationSchema: emptyValidationSchema,
+	})
+	assert.NoError(t, err)
+
+	return schemaRepository
 }
 
 func TestReportResource(t *testing.T) {
@@ -380,13 +440,14 @@ func TestReportResource(t *testing.T) {
 			logger := log.DefaultLogger
 
 			resourceRepo := data.NewFakeResourceRepository()
+			schemaRepo := newFakeSchemaRepository(t)
 			authorizer := &allow.AllowAllAuthz{}
 			usecaseConfig := &UsecaseConfig{
 				ReadAfterWriteEnabled: false,
 				ConsumerEnabled:       false,
 			}
 			mc := metricscollector.NewFakeMetricsCollector()
-			usecase := New(resourceRepo, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig, mc, nil, newTestSelfSubjectStrategy())
+			usecase := New(resourceRepo, schemaRepo, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig, mc, nil, newTestSelfSubjectStrategy())
 
 			reportRequest := createTestReportRequest(t, tt.resourceType, tt.reporterType, tt.reporterInstance, tt.localResourceId, tt.workspaceId)
 			err := usecase.ReportResource(ctx, reportRequest, "test-reporter")
@@ -459,13 +520,14 @@ func TestReportResourceThenDelete(t *testing.T) {
 			logger := log.DefaultLogger
 
 			resourceRepo := data.NewFakeResourceRepository()
+			schemaRepo := newFakeSchemaRepository(t)
 			authorizer := &allow.AllowAllAuthz{}
 			usecaseConfig := &UsecaseConfig{
 				ReadAfterWriteEnabled: false,
 				ConsumerEnabled:       false,
 			}
 			mc := metricscollector.NewFakeMetricsCollector()
-			usecase := New(resourceRepo, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig, mc, nil, newTestSelfSubjectStrategy())
+			usecase := New(resourceRepo, schemaRepo, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig, mc, nil, newTestSelfSubjectStrategy())
 
 			reportRequest := createTestReportRequest(t, tt.resourceType, tt.reporterType, tt.reporterInstanceId, tt.localResourceId, tt.workspaceId)
 			err := usecase.ReportResource(ctx, reportRequest, "test-reporter")
@@ -548,6 +610,7 @@ func TestDelete_ResourceNotFound(t *testing.T) {
 	logger := log.DefaultLogger
 
 	resourceRepo := data.NewFakeResourceRepository()
+	schemaRepo := newFakeSchemaRepository(t)
 	authorizer := &allow.AllowAllAuthz{}
 	usecaseConfig := &UsecaseConfig{
 		ReadAfterWriteEnabled: false,
@@ -555,7 +618,7 @@ func TestDelete_ResourceNotFound(t *testing.T) {
 	}
 
 	mc := metricscollector.NewFakeMetricsCollector()
-	usecase := New(resourceRepo, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig, mc, nil, newTestSelfSubjectStrategy())
+	usecase := New(resourceRepo, schemaRepo, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig, mc, nil, newTestSelfSubjectStrategy())
 
 	localResourceId, err := model.NewLocalResourceId("non-existent-resource")
 	require.NoError(t, err)
@@ -578,6 +641,7 @@ func TestReportFindDeleteFind_TombstoneLifecycle(t *testing.T) {
 	logger := log.DefaultLogger
 
 	resourceRepo := data.NewFakeResourceRepository()
+	schemaRepo := newFakeSchemaRepository(t)
 	authorizer := &allow.AllowAllAuthz{}
 	usecaseConfig := &UsecaseConfig{
 		ReadAfterWriteEnabled: false,
@@ -585,7 +649,7 @@ func TestReportFindDeleteFind_TombstoneLifecycle(t *testing.T) {
 	}
 
 	mc := metricscollector.NewFakeMetricsCollector()
-	usecase := New(resourceRepo, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig, mc, nil, newTestSelfSubjectStrategy())
+	usecase := New(resourceRepo, schemaRepo, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig, mc, nil, newTestSelfSubjectStrategy())
 
 	reportRequest := createTestReportRequest(t, "k8s_cluster", "ocm", "lifecycle-instance", "lifecycle-resource", "lifecycle-workspace")
 	err := usecase.ReportResource(ctx, reportRequest, "test-reporter")
@@ -622,6 +686,7 @@ func TestMultipleHostsLifecycle(t *testing.T) {
 	logger := log.DefaultLogger
 
 	resourceRepo := data.NewFakeResourceRepository()
+	schemaRepo := newFakeSchemaRepository(t)
 	authorizer := &allow.AllowAllAuthz{}
 	usecaseConfig := &UsecaseConfig{
 		ReadAfterWriteEnabled: false,
@@ -629,7 +694,7 @@ func TestMultipleHostsLifecycle(t *testing.T) {
 	}
 
 	mc := metricscollector.NewFakeMetricsCollector()
-	usecase := New(resourceRepo, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig, mc, nil, newTestSelfSubjectStrategy())
+	usecase := New(resourceRepo, schemaRepo, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig, mc, nil, newTestSelfSubjectStrategy())
 
 	// Create 2 hosts
 	host1Request := createTestReportRequest(t, "host", "hbi", "hbi-instance-1", "host-1", "workspace-1")
@@ -729,6 +794,7 @@ func TestPartialDataScenarios(t *testing.T) {
 	logger := log.DefaultLogger
 
 	resourceRepo := data.NewFakeResourceRepository()
+	schemaRepo := newFakeSchemaRepository(t)
 	authorizer := &allow.AllowAllAuthz{}
 	usecaseConfig := &UsecaseConfig{
 		ReadAfterWriteEnabled: false,
@@ -736,7 +802,7 @@ func TestPartialDataScenarios(t *testing.T) {
 	}
 
 	mc := metricscollector.NewFakeMetricsCollector()
-	usecase := New(resourceRepo, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig, mc, nil, newTestSelfSubjectStrategy())
+	usecase := New(resourceRepo, schemaRepo, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig, mc, nil, newTestSelfSubjectStrategy())
 
 	t.Run("Report resource with rich reporter data and minimal common data", func(t *testing.T) {
 		request := createTestReportRequestWithReporterDataOnly(t, "k8s_cluster", "ocm", "ocm-instance-1", "reporter-rich-resource", "minimal-workspace")
@@ -894,6 +960,7 @@ func TestResourceLifecycle_ReportUpdateDeleteReport(t *testing.T) {
 		logger := log.DefaultLogger
 
 		resourceRepo := data.NewFakeResourceRepository()
+		schemaRepo := newFakeSchemaRepository(t)
 		authorizer := &allow.AllowAllAuthz{}
 		usecaseConfig := &UsecaseConfig{
 			ReadAfterWriteEnabled: false,
@@ -901,7 +968,7 @@ func TestResourceLifecycle_ReportUpdateDeleteReport(t *testing.T) {
 		}
 
 		mc := metricscollector.NewFakeMetricsCollector()
-		usecase := New(resourceRepo, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig, mc, nil, newTestSelfSubjectStrategy())
+		usecase := New(resourceRepo, schemaRepo, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig, mc, nil, newTestSelfSubjectStrategy())
 
 		resourceType := "host"
 		reporterType := "hbi"
@@ -986,6 +1053,7 @@ func TestResourceLifecycle_ReportUpdateDeleteReportDelete(t *testing.T) {
 		logger := log.DefaultLogger
 
 		resourceRepo := data.NewFakeResourceRepository()
+		schemaRepo := newFakeSchemaRepository(t)
 		authorizer := &allow.AllowAllAuthz{}
 		usecaseConfig := &UsecaseConfig{
 			ReadAfterWriteEnabled: false,
@@ -993,7 +1061,7 @@ func TestResourceLifecycle_ReportUpdateDeleteReportDelete(t *testing.T) {
 		}
 
 		mc := metricscollector.NewFakeMetricsCollector()
-		usecase := New(resourceRepo, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig, mc, nil, newTestSelfSubjectStrategy())
+		usecase := New(resourceRepo, schemaRepo, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig, mc, nil, newTestSelfSubjectStrategy())
 
 		resourceType := "k8s_cluster"
 		reporterType := "ocm"
@@ -1059,6 +1127,7 @@ func TestResourceLifecycle_ReportDeleteResubmitDelete(t *testing.T) {
 		logger := log.DefaultLogger
 
 		resourceRepo := data.NewFakeResourceRepository()
+		schemaRepo := newFakeSchemaRepository(t)
 		authorizer := &allow.AllowAllAuthz{}
 		usecaseConfig := &UsecaseConfig{
 			ReadAfterWriteEnabled: false,
@@ -1066,7 +1135,7 @@ func TestResourceLifecycle_ReportDeleteResubmitDelete(t *testing.T) {
 		}
 
 		mc := metricscollector.NewFakeMetricsCollector()
-		usecase := New(resourceRepo, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig, mc, nil, newTestSelfSubjectStrategy())
+		usecase := New(resourceRepo, schemaRepo, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig, mc, nil, newTestSelfSubjectStrategy())
 
 		resourceType := "k8s_cluster"
 		reporterType := "ocm"
@@ -1128,6 +1197,7 @@ func TestResourceLifecycle_ReportResubmitDeleteResubmit(t *testing.T) {
 		logger := log.DefaultLogger
 
 		resourceRepo := data.NewFakeResourceRepository()
+		schemaRepo := newFakeSchemaRepository(t)
 		authorizer := &allow.AllowAllAuthz{}
 		usecaseConfig := &UsecaseConfig{
 			ReadAfterWriteEnabled: false,
@@ -1135,7 +1205,7 @@ func TestResourceLifecycle_ReportResubmitDeleteResubmit(t *testing.T) {
 		}
 
 		mc := metricscollector.NewFakeMetricsCollector()
-		usecase := New(resourceRepo, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig, mc, nil, newTestSelfSubjectStrategy())
+		usecase := New(resourceRepo, schemaRepo, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig, mc, nil, newTestSelfSubjectStrategy())
 		resourceType := "host"
 		reporterType := "hbi"
 		reporterInstance := "idempotent-instance-2"
@@ -1210,6 +1280,7 @@ func TestResourceLifecycle_ComplexIdempotency(t *testing.T) {
 		logger := log.DefaultLogger
 
 		resourceRepo := data.NewFakeResourceRepository()
+		schemaRepo := newFakeSchemaRepository(t)
 		authorizer := &allow.AllowAllAuthz{}
 		usecaseConfig := &UsecaseConfig{
 			ReadAfterWriteEnabled: false,
@@ -1217,7 +1288,7 @@ func TestResourceLifecycle_ComplexIdempotency(t *testing.T) {
 		}
 
 		mc := metricscollector.NewFakeMetricsCollector()
-		usecase := New(resourceRepo, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig, mc, nil, newTestSelfSubjectStrategy())
+		usecase := New(resourceRepo, schemaRepo, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig, mc, nil, newTestSelfSubjectStrategy())
 
 		resourceType := "k8s_cluster"
 		reporterType := "ocm"
@@ -1403,6 +1474,7 @@ func TestTransactionIdIdempotency(t *testing.T) {
 	logger := log.DefaultLogger
 
 	resourceRepo := data.NewFakeResourceRepository()
+	schemaRepo := newFakeSchemaRepository(t)
 	authorizer := &allow.AllowAllAuthz{}
 	usecaseConfig := &UsecaseConfig{
 		ReadAfterWriteEnabled: false,
@@ -1410,7 +1482,7 @@ func TestTransactionIdIdempotency(t *testing.T) {
 	}
 
 	mc := metricscollector.NewFakeMetricsCollector()
-	usecase := New(resourceRepo, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig, mc, nil, newTestSelfSubjectStrategy())
+	usecase := New(resourceRepo, schemaRepo, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig, mc, nil, newTestSelfSubjectStrategy())
 
 	t.Run("Same transaction ID should be idempotent - no changes to representation tables", func(t *testing.T) {
 		resourceType := "host"

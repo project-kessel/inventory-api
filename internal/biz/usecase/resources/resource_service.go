@@ -14,6 +14,7 @@ import (
 	authzapi "github.com/project-kessel/inventory-api/internal/authz/api"
 	"github.com/project-kessel/inventory-api/internal/biz"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
+	"github.com/project-kessel/inventory-api/internal/biz/schema"
 	"github.com/project-kessel/inventory-api/internal/biz/usecase/metaauthorizer"
 	"github.com/project-kessel/inventory-api/internal/data"
 	eventingapi "github.com/project-kessel/inventory-api/internal/eventing/api"
@@ -67,6 +68,7 @@ type UsecaseConfig struct {
 // Usecase provides business logic operations for resource management in the inventory system.
 // It coordinates between repositories, authorization, eventing, and other system components.
 type Usecase struct {
+	schemaUsecase       *SchemaUsecase
 	resourceRepository  data.ResourceRepository
 	waitForNotifBreaker *gobreaker.CircuitBreaker
 	Authz               authzapi.Authorizer
@@ -81,7 +83,7 @@ type Usecase struct {
 	SelfSubjectStrategy selfsubject.SelfSubjectStrategy
 }
 
-func New(resourceRepository data.ResourceRepository,
+func New(resourceRepository data.ResourceRepository, schemaRepository schema.Repository,
 	authz authzapi.Authorizer, eventer eventingapi.Manager, namespace string, logger log.Logger,
 	listenManager pubsub.ListenManagerImpl, waitForNotifBreaker *gobreaker.CircuitBreaker, usecaseConfig *UsecaseConfig, metricsCollector *metricscollector.MetricsCollector, metaAuthorizer metaauthorizer.MetaAuthorizer, selfSubjectStrategy selfsubject.SelfSubjectStrategy) *Usecase {
 	if metaAuthorizer == nil {
@@ -90,6 +92,7 @@ func New(resourceRepository data.ResourceRepository,
 
 	return &Usecase{
 		resourceRepository:  resourceRepository,
+		schemaUsecase:       NewSchemaUsecase(schemaRepository, log.NewHelper(logger)),
 		waitForNotifBreaker: waitForNotifBreaker,
 		Authz:               authz,
 		Eventer:             eventer,

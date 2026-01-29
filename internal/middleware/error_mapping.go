@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 
+	"github.com/go-kratos/kratos/v2/log"
 	"github.com/go-kratos/kratos/v2/middleware"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -50,6 +51,9 @@ func MapError(err error) error {
 	if st, ok := status.FromError(err); ok && st.Code() != codes.Unknown {
 		return err
 	}
+
+	log.Errorf("request failed with application error. mapping to status code. error: %v", err)
+
 	switch {
 	// Application-layer errors (from usecase)
 	case errors.Is(err, resources.ErrMetaAuthzContextMissing):

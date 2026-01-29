@@ -33,7 +33,7 @@ func Authentication(authenticator authnapi.Authenticator) func(middleware.Handle
 				}
 
 				// Store claims in AuthzContext (the authoritative source for auth info)
-				ctx = EnsureAuthzContext(ctx, claims)
+				ctx = ensureAuthzContext(ctx, claims)
 
 				// Try to get token from context if we don't have it yet
 				// (in case OAuth2Authenticator stored it during Authenticate)
@@ -65,8 +65,8 @@ func Authentication(authenticator authnapi.Authenticator) func(middleware.Handle
 	}
 }
 
-// EnsureAuthzContext populates the authz context with claims and protocol if missing.
-func EnsureAuthzContext(ctx context.Context, claims *authnapi.Claims) context.Context {
+// ensureAuthzContext populates the authz context with claims and protocol if missing.
+func ensureAuthzContext(ctx context.Context, claims *authnapi.Claims) context.Context {
 	if _, ok := authnapi.FromAuthzContext(ctx); ok {
 		return ctx
 	}

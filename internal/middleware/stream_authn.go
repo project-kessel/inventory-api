@@ -186,7 +186,7 @@ func (i *StreamAuthInterceptor) Interceptor() grpc.StreamServerInterceptor {
 			info.FullMethod, claims.SubjectId, claims.AuthType)
 
 		// Store claims in AuthzContext (the authoritative source for auth info)
-		newCtx = EnsureAuthzContext(newCtx, claims)
+		newCtx = ensureAuthzContext(newCtx, claims)
 
 		// Preserve token if available (for compatibility)
 		newCtx = preserveStreamTokenContext(newCtx, md)

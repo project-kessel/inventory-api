@@ -487,6 +487,368 @@ func TestResource_Update(t *testing.T) {
 			t.Error("Expected generated transaction ID to be non-empty in common representation")
 		}
 	})
+
+	// Backwards compatibility tests for legacy resources with zero timestamps
+	t.Run("should handle update of resource loaded from DB with zero created_at timestamps", func(t *testing.T) {
+		// This test simulates a legacy resource that was created in the database before
+		// the created_at/updated_at timestamp feature was implemented. Such resources
+		// would have zero timestamps when loaded from the database.
+		t.Parallel()
+
+		// Create resource snapshot with ZERO timestamps (simulating legacy DB record)
+		resourceSnapshot := &ResourceSnapshot{
+			ID:               fixture.ValidResourceIdType().Serialize(),
+			Type:             fixture.ValidResourceTypeType().Serialize(),
+			CommonVersion:    0,
+			ConsistencyToken: "",
+			CreatedAt:        time.Time{}, // Zero timestamp - simulates NULL in DB
+			UpdatedAt:        time.Time{}, // Zero timestamp - simulates NULL in DB
+		}
+
+		// Create reporter resource snapshot
+		reporterResourceSnapshot := ReporterResourceSnapshot{
+			ID: fixture.ValidReporterResourceIdType().Serialize(),
+			ReporterResourceKey: ReporterResourceKeySnapshot{
+				LocalResourceID:    fixture.ValidLocalResourceIdType().Serialize(),
+				ReporterType:       fixture.ValidReporterTypeType().Serialize(),
+				ResourceType:       fixture.ValidResourceTypeType().Serialize(),
+				ReporterInstanceID: fixture.ValidReporterInstanceIdType().Serialize(),
+			},
+			ResourceID:            fixture.ValidResourceIdType().Serialize(),
+			RepresentationVersion: 0,
+			Generation:            0,
+			Tombstone:             false,
+			CreatedAt:             time.Time{}, // Zero timestamp
+			UpdatedAt:             time.Time{}, // Zero timestamp
+		}
+
+		// Deserialize the resource (simulating loading from database)
+		resource := DeserializeResource(resourceSnapshot, []ReporterResourceSnapshot{reporterResourceSnapshot}, nil, nil)
+		require.NotNil(t, resource, "DeserializeResource should return a non-nil resource")
+
+		// Verify the resource has zero timestamps (our precondition)
+		existingCreatedAt, existingUpdatedAt := resource.GetTimestamps()
+		require.True(t, existingCreatedAt.IsZero(), "Precondition: created_at should be zero")
+		require.True(t, existingUpdatedAt.IsZero(), "Precondition: updated_at should be zero")
+
+		// Now perform an update - this should NOT fail even with zero timestamps
+		apiHref, _ := NewApiHref("https://api.example.com/updated")
+		consoleHref, _ := NewConsoleHref("https://console.example.com/updated")
+		commonData, _ := NewRepresentation(internal.JsonObject{"workspace_id": "updated-workspace"})
+		reporterData, _ := NewRepresentation(internal.JsonObject{"updated": true})
+
+		beforeUpdate := time.Now()
+		err := resource.Update(
+			resource.ReporterResources()[0].Key(),
+			apiHref,
+			consoleHref,
+			nil,
+			commonData,
+			reporterData,
+			NewTransactionId(""),
+		)
+		afterUpdate := time.Now()
+
+		// The update should succeed (backwards compatibility fix)
+		require.NoError(t, err, "Update should succeed even with zero timestamps for backwards compatibility")
+
+		// Verify that timestamps are now set
+		updatedSnapshot, _, _, _, err := resource.Serialize()
+		require.NoError(t, err)
+
+		// created_at should be set to a reasonable time (around now, since there was no original)
+		assert.False(t, updatedSnapshot.CreatedAt.IsZero(), "created_at should no longer be zero after update")
+		assert.True(t, updatedSnapshot.CreatedAt.After(beforeUpdate.Add(-time.Second)) || updatedSnapshot.CreatedAt.Equal(beforeUpdate), "created_at should be around the update time")
+		assert.True(t, updatedSnapshot.CreatedAt.Before(afterUpdate.Add(time.Second)), "created_at should be around the update time")
+
+		// updated_at should be set to a reasonable time
+		assert.False(t, updatedSnapshot.UpdatedAt.IsZero(), "updated_at should no longer be zero after update")
+		assert.True(t, updatedSnapshot.UpdatedAt.After(beforeUpdate.Add(-time.Second)) || updatedSnapshot.UpdatedAt.Equal(beforeUpdate), "updated_at should be around the update time")
+		assert.True(t, updatedSnapshot.UpdatedAt.Before(afterUpdate.Add(time.Second)), "updated_at should be around the update time")
+	})
+
+	t.Run("should preserve original created_at when updating resource with valid timestamps", func(t *testing.T) {
+		// This test ensures that when a resource HAS valid timestamps,
+		// the created_at is preserved on update (regression test)
+		t.Parallel()
+
+		// Create a resource with valid timestamps
+		originalCreatedAt := time.Now().Add(-24 * time.Hour) // 1 day ago
+		originalUpdatedAt := time.Now().Add(-1 * time.Hour)  // 1 hour ago
+
+		resourceSnapshot := &ResourceSnapshot{
+			ID:               fixture.ValidResourceIdType().Serialize(),
+			Type:             fixture.ValidResourceTypeType().Serialize(),
+			CommonVersion:    5,
+			ConsistencyToken: "some-token",
+			CreatedAt:        originalCreatedAt,
+			UpdatedAt:        originalUpdatedAt,
+		}
+
+		reporterResourceSnapshot := ReporterResourceSnapshot{
+			ID: fixture.ValidReporterResourceIdType().Serialize(),
+			ReporterResourceKey: ReporterResourceKeySnapshot{
+				LocalResourceID:    fixture.ValidLocalResourceIdType().Serialize(),
+				ReporterType:       fixture.ValidReporterTypeType().Serialize(),
+				ResourceType:       fixture.ValidResourceTypeType().Serialize(),
+				ReporterInstanceID: fixture.ValidReporterInstanceIdType().Serialize(),
+			},
+			ResourceID:            fixture.ValidResourceIdType().Serialize(),
+			RepresentationVersion: 5,
+			Generation:            0,
+			Tombstone:             false,
+			CreatedAt:             originalCreatedAt,
+			UpdatedAt:             originalUpdatedAt,
+		}
+
+		resource := DeserializeResource(resourceSnapshot, []ReporterResourceSnapshot{reporterResourceSnapshot}, nil, nil)
+		require.NotNil(t, resource)
+
+		// Perform an update
+		apiHref, _ := NewApiHref("https://api.example.com/updated")
+		consoleHref, _ := NewConsoleHref("https://console.example.com/updated")
+		commonData, _ := NewRepresentation(internal.JsonObject{"workspace_id": "updated-workspace"})
+		reporterData, _ := NewRepresentation(internal.JsonObject{"updated": true})
+
+		err := resource.Update(
+			resource.ReporterResources()[0].Key(),
+			apiHref,
+			consoleHref,
+			nil,
+			commonData,
+			reporterData,
+			NewTransactionId(""),
+		)
+		require.NoError(t, err)
+
+		// Verify timestamps
+		updatedSnapshot, _, _, _, err := resource.Serialize()
+		require.NoError(t, err)
+
+		// created_at should be preserved (not changed)
+		assert.Equal(t, originalCreatedAt.Unix(), updatedSnapshot.CreatedAt.Unix(), "created_at should be preserved from original")
+
+		// updated_at should be updated to now (newer than original)
+		assert.True(t, updatedSnapshot.UpdatedAt.After(originalUpdatedAt), "updated_at should be updated to a newer time")
+	})
+
+	t.Run("should set created_at equal to updated_at when first backfilling zero timestamps", func(t *testing.T) {
+		// When a legacy resource with zero timestamps is first updated,
+		// both created_at and updated_at should be set to the same value (now)
+		t.Parallel()
+
+		resourceSnapshot := &ResourceSnapshot{
+			ID:               fixture.ValidResourceIdType().Serialize(),
+			Type:             fixture.ValidResourceTypeType().Serialize(),
+			CommonVersion:    0,
+			ConsistencyToken: "",
+			CreatedAt:        time.Time{}, // Zero timestamp
+			UpdatedAt:        time.Time{}, // Zero timestamp
+		}
+
+		reporterResourceSnapshot := ReporterResourceSnapshot{
+			ID: fixture.ValidReporterResourceIdType().Serialize(),
+			ReporterResourceKey: ReporterResourceKeySnapshot{
+				LocalResourceID:    fixture.ValidLocalResourceIdType().Serialize(),
+				ReporterType:       fixture.ValidReporterTypeType().Serialize(),
+				ResourceType:       fixture.ValidResourceTypeType().Serialize(),
+				ReporterInstanceID: fixture.ValidReporterInstanceIdType().Serialize(),
+			},
+			ResourceID:            fixture.ValidResourceIdType().Serialize(),
+			RepresentationVersion: 0,
+			Generation:            0,
+			Tombstone:             false,
+			CreatedAt:             time.Time{},
+			UpdatedAt:             time.Time{},
+		}
+
+		resource := DeserializeResource(resourceSnapshot, []ReporterResourceSnapshot{reporterResourceSnapshot}, nil, nil)
+		require.NotNil(t, resource)
+
+		apiHref, _ := NewApiHref("https://api.example.com/updated")
+		consoleHref, _ := NewConsoleHref("https://console.example.com/updated")
+		commonData, _ := NewRepresentation(internal.JsonObject{"workspace_id": "test"})
+		reporterData, _ := NewRepresentation(internal.JsonObject{"test": true})
+
+		err := resource.Update(
+			resource.ReporterResources()[0].Key(),
+			apiHref,
+			consoleHref,
+			nil,
+			commonData,
+			reporterData,
+			NewTransactionId(""),
+		)
+		require.NoError(t, err)
+
+		updatedSnapshot, _, _, _, err := resource.Serialize()
+		require.NoError(t, err)
+
+		// Both timestamps should be equal (set to 'now' at the same moment)
+		assert.Equal(t, updatedSnapshot.CreatedAt.Unix(), updatedSnapshot.UpdatedAt.Unix(),
+			"created_at and updated_at should be equal when backfilling zero timestamps")
+	})
+
+	t.Run("should maintain consistent created_at across multiple updates after backfill", func(t *testing.T) {
+		// After the first update backfills created_at, subsequent updates
+		// should preserve that created_at value
+		t.Parallel()
+
+		resourceSnapshot := &ResourceSnapshot{
+			ID:               fixture.ValidResourceIdType().Serialize(),
+			Type:             fixture.ValidResourceTypeType().Serialize(),
+			CommonVersion:    0,
+			ConsistencyToken: "",
+			CreatedAt:        time.Time{}, // Zero timestamp - legacy resource
+			UpdatedAt:        time.Time{}, // Zero timestamp
+		}
+
+		reporterResourceSnapshot := ReporterResourceSnapshot{
+			ID: fixture.ValidReporterResourceIdType().Serialize(),
+			ReporterResourceKey: ReporterResourceKeySnapshot{
+				LocalResourceID:    fixture.ValidLocalResourceIdType().Serialize(),
+				ReporterType:       fixture.ValidReporterTypeType().Serialize(),
+				ResourceType:       fixture.ValidResourceTypeType().Serialize(),
+				ReporterInstanceID: fixture.ValidReporterInstanceIdType().Serialize(),
+			},
+			ResourceID:            fixture.ValidResourceIdType().Serialize(),
+			RepresentationVersion: 0,
+			Generation:            0,
+			Tombstone:             false,
+			CreatedAt:             time.Time{},
+			UpdatedAt:             time.Time{},
+		}
+
+		resource := DeserializeResource(resourceSnapshot, []ReporterResourceSnapshot{reporterResourceSnapshot}, nil, nil)
+		require.NotNil(t, resource)
+
+		// First update - this will backfill the created_at
+		apiHref, _ := NewApiHref("https://api.example.com/v1")
+		consoleHref, _ := NewConsoleHref("https://console.example.com/v1")
+		commonData, _ := NewRepresentation(internal.JsonObject{"workspace_id": "test"})
+		reporterData, _ := NewRepresentation(internal.JsonObject{"version": 1})
+
+		err := resource.Update(
+			resource.ReporterResources()[0].Key(),
+			apiHref,
+			consoleHref,
+			nil,
+			commonData,
+			reporterData,
+			NewTransactionId(""),
+		)
+		require.NoError(t, err)
+
+		firstSnapshot, _, _, _, err := resource.Serialize()
+		require.NoError(t, err)
+		backfilledCreatedAt := firstSnapshot.CreatedAt
+
+		// Small delay to ensure time difference
+		time.Sleep(10 * time.Millisecond)
+
+		// Second update - should preserve the backfilled created_at
+		apiHref2, _ := NewApiHref("https://api.example.com/v2")
+		consoleHref2, _ := NewConsoleHref("https://console.example.com/v2")
+		commonData2, _ := NewRepresentation(internal.JsonObject{"workspace_id": "test-v2"})
+		reporterData2, _ := NewRepresentation(internal.JsonObject{"version": 2})
+
+		err = resource.Update(
+			resource.ReporterResources()[0].Key(),
+			apiHref2,
+			consoleHref2,
+			nil,
+			commonData2,
+			reporterData2,
+			NewTransactionId(""),
+		)
+		require.NoError(t, err)
+
+		secondSnapshot, _, _, _, err := resource.Serialize()
+		require.NoError(t, err)
+
+		// created_at should be preserved from first update's backfill
+		assert.Equal(t, backfilledCreatedAt.Unix(), secondSnapshot.CreatedAt.Unix(),
+			"created_at should be preserved after second update")
+
+		// updated_at should be newer than the first update
+		assert.True(t, secondSnapshot.UpdatedAt.After(firstSnapshot.UpdatedAt),
+			"updated_at should be updated on second update")
+	})
+
+	t.Run("should handle edge case where only created_at is zero but updated_at has value", func(t *testing.T) {
+		// Edge case: resource has updated_at set but created_at is zero
+		// This could happen due to data inconsistency or migration issues
+		t.Parallel()
+
+		pastUpdatedAt := time.Now().Add(-1 * time.Hour)
+
+		resourceSnapshot := &ResourceSnapshot{
+			ID:               fixture.ValidResourceIdType().Serialize(),
+			Type:             fixture.ValidResourceTypeType().Serialize(),
+			CommonVersion:    3,
+			ConsistencyToken: "token",
+			CreatedAt:        time.Time{},   // Zero - inconsistent state
+			UpdatedAt:        pastUpdatedAt, // Has a value
+		}
+
+		reporterResourceSnapshot := ReporterResourceSnapshot{
+			ID: fixture.ValidReporterResourceIdType().Serialize(),
+			ReporterResourceKey: ReporterResourceKeySnapshot{
+				LocalResourceID:    fixture.ValidLocalResourceIdType().Serialize(),
+				ReporterType:       fixture.ValidReporterTypeType().Serialize(),
+				ResourceType:       fixture.ValidResourceTypeType().Serialize(),
+				ReporterInstanceID: fixture.ValidReporterInstanceIdType().Serialize(),
+			},
+			ResourceID:            fixture.ValidResourceIdType().Serialize(),
+			RepresentationVersion: 3,
+			Generation:            0,
+			Tombstone:             false,
+			CreatedAt:             time.Time{},
+			UpdatedAt:             pastUpdatedAt,
+		}
+
+		resource := DeserializeResource(resourceSnapshot, []ReporterResourceSnapshot{reporterResourceSnapshot}, nil, nil)
+		require.NotNil(t, resource)
+
+		// Verify precondition - created_at is zero but updated_at is not
+		existingCreatedAt, existingUpdatedAt := resource.GetTimestamps()
+		require.True(t, existingCreatedAt.IsZero(), "Precondition: created_at should be zero")
+		require.False(t, existingUpdatedAt.IsZero(), "Precondition: updated_at should NOT be zero")
+
+		beforeUpdate := time.Now()
+
+		apiHref, _ := NewApiHref("https://api.example.com/updated")
+		consoleHref, _ := NewConsoleHref("https://console.example.com/updated")
+		commonData, _ := NewRepresentation(internal.JsonObject{"workspace_id": "test"})
+		reporterData, _ := NewRepresentation(internal.JsonObject{"test": true})
+
+		err := resource.Update(
+			resource.ReporterResources()[0].Key(),
+			apiHref,
+			consoleHref,
+			nil,
+			commonData,
+			reporterData,
+			NewTransactionId(""),
+		)
+		require.NoError(t, err, "Update should succeed even with zero created_at")
+
+		afterUpdate := time.Now()
+
+		updatedSnapshot, _, _, _, err := resource.Serialize()
+		require.NoError(t, err)
+
+		// created_at should now be backfilled to 'now' (not zero anymore)
+		assert.False(t, updatedSnapshot.CreatedAt.IsZero(), "created_at should be backfilled")
+		assert.True(t, updatedSnapshot.CreatedAt.After(beforeUpdate.Add(-time.Second)) ||
+			updatedSnapshot.CreatedAt.Equal(beforeUpdate), "created_at should be around update time")
+		assert.True(t, updatedSnapshot.CreatedAt.Before(afterUpdate.Add(time.Second)),
+			"created_at should be around update time")
+
+		// updated_at should also be set to 'now'
+		assert.True(t, updatedSnapshot.UpdatedAt.After(pastUpdatedAt),
+			"updated_at should be newer than the previous value")
+	})
 }
 
 func TestResource_FindReporterResourceToUpdateByKey(t *testing.T) {

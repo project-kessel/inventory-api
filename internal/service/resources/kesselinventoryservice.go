@@ -77,8 +77,10 @@ func (s *InventoryService) Check(ctx context.Context, req *pb.CheckRequest) (*pb
 		return nil, status.Error(codes.Unauthenticated, "failed to get identity")
 	}
 
+	consistency := ConvertConsistencyToModel(req.GetConsistency())
+
 	if reporterResourceKey, err := reporterKeyFromResourceReference(req.Object); err == nil {
-		if resp, err := s.Ctl.Check(ctx, req.GetRelation(), req.Object.Reporter.GetType(), subjectReferenceFromSubject(req.GetSubject()), reporterResourceKey); err == nil {
+		if resp, err := s.Ctl.Check(ctx, req.GetRelation(), req.Object.Reporter.GetType(), subjectReferenceFromSubject(req.GetSubject()), reporterResourceKey, consistency); err == nil {
 			return viewResponseFromAuthzRequestV1beta2(resp), nil
 		} else {
 			return nil, err
@@ -191,6 +193,29 @@ func convertConsistencyToV1beta1(consistency *pb.Consistency) *pbv1beta1.Consist
 	return &pbv1beta1.Consistency{
 		Requirement: &pbv1beta1.Consistency_MinimizeLatency{MinimizeLatency: true},
 	}
+}
+
+// ConvertConsistencyToModel converts the proto Consistency to internal model type.
+func ConvertConsistencyToModel(consistency *pb.Consistency) model.ConsistencyConfig {
+	if consistency == nil {
+		// Return unspecified - the usecase layer will handle the default based on feature flag
+		return model.NewUnspecifiedConsistency()
+	}
+
+	if consistency.GetMinimizeLatency() {
+		return model.NewMinimizeLatencyConsistency()
+	}
+
+	if consistency.GetAtLeastAsAcknowledged() {
+		return model.NewAtLeastAsAcknowledgedConsistency()
+	}
+
+	if token := consistency.GetAtLeastAsFresh(); token != nil {
+		return model.NewAtLeastAsFreshConsistency(token.GetToken())
+	}
+
+	// Return unspecified - the usecase layer will handle the default based on feature flag
+	return model.NewUnspecifiedConsistency()
 }
 
 func mapCheckBulkResponseFromV1beta1(resp *pbv1beta1.CheckBulkResponse) *pb.CheckBulkResponse {

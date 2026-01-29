@@ -44,7 +44,7 @@ func TestRedHatRbacSelfSubjectStrategy_OIDC_IssuerMap(t *testing.T) {
 	assert.Equal(t, "redhat/user-123", subjectRef.Subject().LocalResourceId().String())
 }
 
-func TestRedHatRbacSelfSubjectStrategy_OIDC_IssuerHostFallback(t *testing.T) {
+func TestRedHatRbacSelfSubjectStrategy_OIDC_Issuer_IsExact(t *testing.T) {
 	strategy := NewRedHatRbacSelfSubjectStrategy(RedHatRbacSelfSubjectStrategyConfig{
 		Enabled: true,
 		OIDCIssuerDomainMap: map[string]string{
@@ -52,15 +52,14 @@ func TestRedHatRbacSelfSubjectStrategy_OIDC_IssuerHostFallback(t *testing.T) {
 		},
 	})
 
-	subjectRef, err := strategy.SubjectFromAuthorizationContext(authnapi.AuthzContext{
+	_, err := strategy.SubjectFromAuthorizationContext(authnapi.AuthzContext{
 		Subject: &authnapi.Claims{
 			AuthType:  authnapi.AuthTypeOIDC,
 			Issuer:    authnapi.Issuer("https://sso.redhat.com/auth/realms/redhat-external"),
 			SubjectId: authnapi.SubjectId("user-123"),
 		},
 	})
-	assert.NoError(t, err)
-	assert.Equal(t, "redhat/user-123", subjectRef.Subject().LocalResourceId().String())
+	assert.ErrorContains(t, err, "unsupported issuer for oidc")
 }
 
 func TestRedHatRbacSelfSubjectStrategy_OIDC_NormalizedHostNotSupported(t *testing.T) {

@@ -2,7 +2,6 @@ package selfsubject
 
 import (
 	"fmt"
-	"net/url"
 	"strings"
 
 	authnapi "github.com/project-kessel/inventory-api/internal/authn/api"
@@ -88,11 +87,6 @@ func (s *RedHatRbacSelfSubjectStrategy) resolveOIDCIssuerDomain(issuer string) s
 	}
 	if domain, ok := s.oidcIssuerDomains[issuer]; ok && domain != "" {
 		return domain
-	}
-	if parsed, err := url.Parse(issuer); err == nil && parsed.Host != "" {
-		if domain, ok := s.oidcIssuerDomains[parsed.Host]; ok && domain != "" {
-			return domain
-		}
 	}
 	return ""
 }

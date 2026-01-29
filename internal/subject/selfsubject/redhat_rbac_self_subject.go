@@ -53,7 +53,7 @@ func (s *RedHatRbacSelfSubjectStrategy) deriveSubjectID(authzContext authnapi.Au
 	}
 
 	claims := authzContext.Subject
-	subjectID := extractSubjectID(string(claims.SubjectId))
+	subjectID := strings.TrimSpace(string(claims.SubjectId))
 
 	switch claims.AuthType {
 	case authnapi.AuthTypeXRhIdentity:
@@ -92,11 +92,7 @@ func (s *RedHatRbacSelfSubjectStrategy) resolveOIDCIssuerDomain(issuer string) s
 }
 
 func extractSubjectID(subject string) string {
-	subject = strings.TrimSpace(subject)
-	if subject == "" {
-		return ""
-	}
-	return subject
+	return strings.TrimSpace(subject)
 }
 
 // buildSubjectReference creates a SubjectReference for RBAC authorization.

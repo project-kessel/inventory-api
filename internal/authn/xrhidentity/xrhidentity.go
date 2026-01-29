@@ -55,8 +55,9 @@ func convertPlatformClaims(platformIdentity *identity.Identity) *api.Claims {
 		AuthType: api.AuthTypeXRhIdentity,
 	}
 
-	if platformIdentity.Type == string(identityTypeUser) {
-		// Set organization (prefer org_id, fallback to account_number)
+	switch platformIdentity.Type {
+	case string(identityTypeUser):
+		// Set organization
 		if platformIdentity.OrgID != "" {
 			internalClaims.OrganizationId = api.OrganizationId(platformIdentity.OrgID)
 		}
@@ -66,14 +67,10 @@ func convertPlatformClaims(platformIdentity *identity.Identity) *api.Claims {
 				internalClaims.SubjectId = api.SubjectId(platformIdentity.User.UserID)
 			}
 		}
-	}
-
-	if platformIdentity.Type == string(identityTypeSystem) {
+	case string(identityTypeSystem):
 		// TODO: add claims mapping for System identity type if needed
 		_ = platformIdentity
-	}
-
-	if platformIdentity.Type == string(identityTypeServiceAccount) {
+	case string(identityTypeServiceAccount):
 		// TODO: add claims mapping for ServiceAccount identity type if needed
 		_ = platformIdentity
 	}

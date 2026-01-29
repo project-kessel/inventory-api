@@ -115,7 +115,7 @@ func (uc *Usecase) ReportResource(ctx context.Context, request *v1beta2.ReportRe
 
 	// Log client_id if available (from OIDC authentication)
 	if authzCtx, ok := authnapi.FromAuthzContext(ctx); ok && authzCtx.Subject != nil && authzCtx.Subject.ClientID != "" {
-		log.Infof("Reporting resource request from client_id: %s", authzCtx.Subject.ClientID)
+		log.Infof("Reporting resource request from client_id: %s, request: %v", authzCtx.Subject.ClientID, request)
 	}
 	var subscription pubsub.Subscription
 	txidStr, err := getNextTransactionID()
@@ -206,6 +206,101 @@ func (uc *Usecase) ReportResource(ctx context.Context, request *v1beta2.ReportRe
 	return nil
 }
 
+func (uc *Usecase) createResource(tx *gorm.DB, request *v1beta2.ReportResourceRequest, txidStr string) error {
+	resourceId, err := uc.resourceRepository.NextResourceId()
+	if err != nil {
+		return err
+	}
+
+	reporterResourceId, err := uc.resourceRepository.NextReporterResourceId()
+	if err != nil {
+		return err
+	}
+
+	localResourceId, err := model.NewLocalResourceId(request.GetRepresentations().GetMetadata().GetLocalResourceId())
+	if err != nil {
+		return fmt.Errorf("invalid local resource ID: %w", err)
+	}
+
+	resourceType, err := model.NewResourceType(request.GetType())
+	if err != nil {
+		return fmt.Errorf("invalid resource type: %w", err)
+	}
+
+	reporterType, err := model.NewReporterType(request.GetReporterType())
+	if err != nil {
+		return fmt.Errorf("invalid reporter type: %w", err)
+	}
+
+	reporterInstanceId, err := model.NewReporterInstanceId(request.GetReporterInstanceId())
+	if err != nil {
+		return fmt.Errorf("invalid reporter instance ID: %w", err)
+	}
+
+	apiHref, err := model.NewApiHref(request.GetRepresentations().GetMetadata().GetApiHref())
+	if err != nil {
+		return fmt.Errorf("invalid API href: %w", err)
+	}
+
+	var consoleHref model.ConsoleHref
+	if consoleHrefVal := request.GetRepresentations().GetMetadata().GetConsoleHref(); consoleHrefVal != "" {
+		consoleHref, err = model.NewConsoleHref(consoleHrefVal)
+		if err != nil {
+			return fmt.Errorf("invalid console href: %w", err)
+		}
+	}
+
+	var reporterVersion *model.ReporterVersion
+	if reporterVersionValue := request.GetRepresentations().GetMetadata().GetReporterVersion(); reporterVersionValue != "" {
+		rv, err := model.NewReporterVersion(reporterVersionValue)
+		if err != nil {
+			return fmt.Errorf("invalid reporter version: %w", err)
+		}
+		reporterVersion = &rv
+	}
+
+	reporterRepresentation, err := model.NewRepresentation(request.GetRepresentations().GetReporter().AsMap())
+	if err != nil {
+		return fmt.Errorf("invalid reporter representation: %w", err)
+	}
+
+	commonRepresentation, err := model.NewRepresentation(request.GetRepresentations().GetCommon().AsMap())
+	if err != nil {
+		return fmt.Errorf("invalid common representation: %w", err)
+	}
+
+	transactionId := model.NewTransactionId(request.GetRepresentations().GetMetadata().GetTransactionId())
+
+	resource, err := model.NewResource(resourceId, localResourceId, resourceType, reporterType, reporterInstanceId, transactionId, reporterResourceId, apiHref, consoleHref, reporterRepresentation, commonRepresentation, reporterVersion)
+	if err != nil {
+		return err
+	}
+
+	return uc.resourceRepository.Save(tx, resource, biz.OperationTypeCreated, txidStr)
+}
+
+func (uc *Usecase) updateResource(tx *gorm.DB, request *v1beta2.ReportResourceRequest, existingResource *model.Resource, txidStr string) error {
+	reporterResourceKey, apiHref, consoleHref, reporterVersion, commonData, reporterData, transactionId, err := extractUpdateDataFromRequest(request)
+	if err != nil {
+		return err
+	}
+
+	err = existingResource.Update(
+		reporterResourceKey,
+		apiHref,
+		consoleHref,
+		reporterVersion,
+		reporterData,
+		commonData,
+		transactionId,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to update resource: %w", err)
+	}
+
+	return uc.resourceRepository.Save(tx, *existingResource, biz.OperationTypeUpdated, txidStr)
+}
+
 func (uc *Usecase) Delete(ctx context.Context, reporterResourceKey model.ReporterResourceKey) error {
 	if err := uc.enforceMetaAuthzObject(ctx, metaauthorizer.RelationDeleteResource, metaauthorizer.NewInventoryResourceFromKey(reporterResourceKey)); err != nil {
 		return err
@@ -264,11 +359,11 @@ func (uc *Usecase) Check(ctx context.Context, relation model.Relation, sub model
 // CheckSelf verifies access for the authenticated user using the self-subject strategy.
 // Uses relation="check_self" for meta-authorization.
 func (uc *Usecase) CheckSelf(ctx context.Context, relation model.Relation, reporterResourceKey model.ReporterResourceKey) (bool, error) {
-	subjectRef, err := uc.selfSubjectFromContext(ctx)
-	if err != nil {
+	if err := uc.enforceMetaAuthzObject(ctx, metaauthorizer.RelationCheckSelf, metaauthorizer.NewInventoryResourceFromKey(reporterResourceKey)); err != nil {
 		return false, err
 	}
-	if err := uc.enforceMetaAuthzObject(ctx, metaauthorizer.RelationCheckSelf, metaauthorizer.NewInventoryResourceFromKey(reporterResourceKey)); err != nil {
+	subjectRef, err := uc.selfSubjectFromContext(ctx)
+	if err != nil {
 		return false, err
 	}
 	return uc.checkPermission(ctx, relation, subjectRef, reporterResourceKey)
@@ -292,6 +387,65 @@ func (uc *Usecase) CheckForUpdate(ctx context.Context, relation model.Relation, 
 		return true, nil
 	}
 	return false, nil
+}
+
+// CheckBulk performs bulk permission checks.
+func (uc *Usecase) CheckBulk(ctx context.Context, cmd CheckBulkCommand) (*CheckBulkResult, error) {
+	// Meta-authorization for each item
+	for _, item := range cmd.Items {
+		if err := uc.enforceMetaAuthzObject(ctx, metaauthorizer.RelationCheckBulk, metaauthorizer.NewInventoryResourceFromKey(item.Resource)); err != nil {
+			uc.Log.WithContext(ctx).Errorf("meta authz failed for check bulk item: %v error: %v", item.Resource, err)
+			return nil, err
+		}
+	}
+
+	// Convert to v1beta1 for the Authz interface
+	v1beta1Req := checkBulkCommandToV1beta1(cmd)
+	resp, err := uc.Authz.CheckBulk(ctx, v1beta1Req)
+	if err != nil {
+		return nil, err
+	}
+
+	return checkBulkResultFromV1beta1(resp, cmd)
+}
+
+// CheckSelfBulk performs bulk permission checks for the authenticated user.
+// Uses relation="check_self" for meta-authorization.
+func (uc *Usecase) CheckSelfBulk(ctx context.Context, cmd CheckSelfBulkCommand) (*CheckBulkResult, error) {
+	// Meta-authorization for each item
+	for _, item := range cmd.Items {
+		if err := uc.enforceMetaAuthzObject(ctx, metaauthorizer.RelationCheckSelf, metaauthorizer.NewInventoryResourceFromKey(item.Resource)); err != nil {
+			uc.Log.WithContext(ctx).Errorf("meta authz failed for check self item: %v error: %v", item.Resource, err)
+			return nil, err
+		}
+	}
+
+	subjectRef, err := uc.selfSubjectFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	// Convert to CheckBulkCommand with the resolved subject
+	bulkCmd := CheckBulkCommand{
+		Items:       make([]CheckBulkItem, len(cmd.Items)),
+		Consistency: cmd.Consistency,
+	}
+	for i, item := range cmd.Items {
+		bulkCmd.Items[i] = CheckBulkItem{
+			Resource: item.Resource,
+			Relation: item.Relation,
+			Subject:  subjectRef,
+		}
+	}
+
+	// Convert to v1beta1 for the Authz interface
+	v1beta1Req := checkBulkCommandToV1beta1(bulkCmd)
+	resp, err := uc.Authz.CheckBulk(ctx, v1beta1Req)
+	if err != nil {
+		return nil, err
+	}
+
+	return checkBulkResultFromV1beta1(resp, bulkCmd)
 }
 
 func (uc *Usecase) checkPermission(ctx context.Context, relation model.Relation, sub model.SubjectReference, reporterResourceKey model.ReporterResourceKey) (bool, error) {
@@ -323,6 +477,21 @@ func (uc *Usecase) checkPermission(ctx context.Context, relation model.Relation,
 		return true, nil
 	}
 	return false, nil
+}
+
+// LookupResources delegates resource lookup to the authorization service.
+// Returns a streaming client for receiving lookup results.
+// TODO: remove v1beta1 response type
+func (uc *Usecase) LookupResources(ctx context.Context, cmd LookupResourcesCommand) (grpc.ServerStreamingClient[kessel.LookupResourcesResponse], error) {
+	// Meta-authorize against the resource type (not a specific resource instance)
+	metaObject := metaauthorizer.NewResourceTypeRef(cmd.ReporterType, cmd.ResourceType)
+	if err := uc.enforceMetaAuthzObject(ctx, metaauthorizer.RelationLookupResources, metaObject); err != nil {
+		return nil, err
+	}
+
+	// Convert to v1beta1 for the Authz interface
+	v1beta1Req := lookupResourcesCommandToV1beta1(cmd)
+	return uc.Authz.LookupResources(ctx, v1beta1Req)
 }
 
 func (uc *Usecase) selfSubjectFromContext(ctx context.Context) (model.SubjectReference, error) {
@@ -377,65 +546,6 @@ func subjectToV1Beta1(sub model.SubjectReference) *kessel.SubjectReference {
 		ref.Relation = &relation
 	}
 	return ref
-}
-
-// CheckBulk performs bulk permission checks.
-func (uc *Usecase) CheckBulk(ctx context.Context, cmd CheckBulkCommand) (*CheckBulkResult, error) {
-	// Meta-authorization for each item
-	for _, item := range cmd.Items {
-		if err := uc.enforceMetaAuthzObject(ctx, metaauthorizer.RelationCheckBulk, metaauthorizer.NewInventoryResourceFromKey(item.Resource)); err != nil {
-			uc.Log.WithContext(ctx).Errorf("meta authz failed for check bulk item: %v error: %v", item.Resource, err)
-			return nil, err
-		}
-	}
-
-	// Convert to v1beta1 for the Authz interface
-	v1beta1Req := checkBulkCommandToV1beta1(cmd)
-	resp, err := uc.Authz.CheckBulk(ctx, v1beta1Req)
-	if err != nil {
-		return nil, err
-	}
-
-	return checkBulkResultFromV1beta1(resp, cmd)
-}
-
-// CheckSelfBulk performs bulk permission checks for the authenticated user.
-// Uses relation="check_self" for meta-authorization.
-func (uc *Usecase) CheckSelfBulk(ctx context.Context, cmd CheckSelfBulkCommand) (*CheckBulkResult, error) {
-	subjectRef, err := uc.selfSubjectFromContext(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	// Meta-authorization for each item
-	for _, item := range cmd.Items {
-		if err := uc.enforceMetaAuthzObject(ctx, metaauthorizer.RelationCheckSelf, metaauthorizer.NewInventoryResourceFromKey(item.Resource)); err != nil {
-			uc.Log.WithContext(ctx).Errorf("meta authz failed for check self item: %v error: %v", item.Resource, err)
-			return nil, err
-		}
-	}
-
-	// Convert to CheckBulkCommand with the resolved subject
-	bulkCmd := CheckBulkCommand{
-		Items:       make([]CheckBulkItem, len(cmd.Items)),
-		Consistency: cmd.Consistency,
-	}
-	for i, item := range cmd.Items {
-		bulkCmd.Items[i] = CheckBulkItem{
-			Resource: item.Resource,
-			Relation: item.Relation,
-			Subject:  subjectRef,
-		}
-	}
-
-	// Convert to v1beta1 for the Authz interface
-	v1beta1Req := checkBulkCommandToV1beta1(bulkCmd)
-	resp, err := uc.Authz.CheckBulk(ctx, v1beta1Req)
-	if err != nil {
-		return nil, err
-	}
-
-	return checkBulkResultFromV1beta1(resp, bulkCmd)
 }
 
 // checkBulkCommandToV1beta1 converts a CheckBulkCommand to v1beta1 for the Authz interface.
@@ -519,80 +629,6 @@ func checkBulkResultFromV1beta1(resp *kessel.CheckBulkResponse, cmd CheckBulkCom
 		ConsistencyToken: token,
 	}, nil
 }
-
-func (uc *Usecase) createResource(tx *gorm.DB, request *v1beta2.ReportResourceRequest, txidStr string) error {
-	resourceId, err := uc.resourceRepository.NextResourceId()
-	if err != nil {
-		return err
-	}
-
-	reporterResourceId, err := uc.resourceRepository.NextReporterResourceId()
-	if err != nil {
-		return err
-	}
-
-	localResourceId, err := model.NewLocalResourceId(request.GetRepresentations().GetMetadata().GetLocalResourceId())
-	if err != nil {
-		return fmt.Errorf("invalid local resource ID: %w", err)
-	}
-
-	resourceType, err := model.NewResourceType(request.GetType())
-	if err != nil {
-		return fmt.Errorf("invalid resource type: %w", err)
-	}
-
-	reporterType, err := model.NewReporterType(request.GetReporterType())
-	if err != nil {
-		return fmt.Errorf("invalid reporter type: %w", err)
-	}
-
-	reporterInstanceId, err := model.NewReporterInstanceId(request.GetReporterInstanceId())
-	if err != nil {
-		return fmt.Errorf("invalid reporter instance ID: %w", err)
-	}
-
-	apiHref, err := model.NewApiHref(request.GetRepresentations().GetMetadata().GetApiHref())
-	if err != nil {
-		return fmt.Errorf("invalid API href: %w", err)
-	}
-
-	var consoleHref model.ConsoleHref
-	if consoleHrefVal := request.GetRepresentations().GetMetadata().GetConsoleHref(); consoleHrefVal != "" {
-		consoleHref, err = model.NewConsoleHref(consoleHrefVal)
-		if err != nil {
-			return fmt.Errorf("invalid console href: %w", err)
-		}
-	}
-
-	var reporterVersion *model.ReporterVersion
-	if reporterVersionValue := request.GetRepresentations().GetMetadata().GetReporterVersion(); reporterVersionValue != "" {
-		rv, err := model.NewReporterVersion(reporterVersionValue)
-		if err != nil {
-			return fmt.Errorf("invalid reporter version: %w", err)
-		}
-		reporterVersion = &rv
-	}
-
-	reporterRepresentation, err := model.NewRepresentation(request.GetRepresentations().GetReporter().AsMap())
-	if err != nil {
-		return fmt.Errorf("invalid reporter representation: %w", err)
-	}
-
-	commonRepresentation, err := model.NewRepresentation(request.GetRepresentations().GetCommon().AsMap())
-	if err != nil {
-		return fmt.Errorf("invalid common representation: %w", err)
-	}
-
-	transactionId := model.NewTransactionId(request.GetRepresentations().GetMetadata().GetTransactionId())
-
-	resource, err := model.NewResource(resourceId, localResourceId, resourceType, reporterType, reporterInstanceId, transactionId, reporterResourceId, apiHref, consoleHref, reporterRepresentation, commonRepresentation, reporterVersion)
-	if err != nil {
-		return err
-	}
-
-	return uc.resourceRepository.Save(tx, resource, biz.OperationTypeCreated, txidStr)
-}
-
 func getReporterResourceKeyFromRequest(request *v1beta2.ReportResourceRequest) (model.ReporterResourceKey, error) {
 	localResourceId, err := model.NewLocalResourceId(request.GetRepresentations().GetMetadata().GetLocalResourceId())
 	if err != nil {
@@ -620,28 +656,6 @@ func getReporterResourceKeyFromRequest(request *v1beta2.ReportResourceRequest) (
 		reporterType,
 		reporterInstanceId,
 	)
-}
-
-func (uc *Usecase) updateResource(tx *gorm.DB, request *v1beta2.ReportResourceRequest, existingResource *model.Resource, txidStr string) error {
-	reporterResourceKey, apiHref, consoleHref, reporterVersion, commonData, reporterData, transactionId, err := extractUpdateDataFromRequest(request)
-	if err != nil {
-		return err
-	}
-
-	err = existingResource.Update(
-		reporterResourceKey,
-		apiHref,
-		consoleHref,
-		reporterVersion,
-		reporterData,
-		commonData,
-		transactionId,
-	)
-	if err != nil {
-		return fmt.Errorf("failed to update resource: %w", err)
-	}
-
-	return uc.resourceRepository.Save(tx, *existingResource, biz.OperationTypeUpdated, txidStr)
 }
 
 func extractUpdateDataFromRequest(request *v1beta2.ReportResourceRequest) (
@@ -702,21 +716,6 @@ func getNextTransactionID() (string, error) {
 		return "", err
 	}
 	return txid.String(), nil
-}
-
-// LookupResources delegates resource lookup to the authorization service.
-// Returns a streaming client for receiving lookup results.
-// TODO: remove v1beta1 response type
-func (uc *Usecase) LookupResources(ctx context.Context, cmd LookupResourcesCommand) (grpc.ServerStreamingClient[kessel.LookupResourcesResponse], error) {
-	// Meta-authorize against the resource type (not a specific resource instance)
-	metaObject := metaauthorizer.NewResourceTypeRef(cmd.ReporterType, cmd.ResourceType)
-	if err := uc.enforceMetaAuthzObject(ctx, metaauthorizer.RelationLookupResources, metaObject); err != nil {
-		return nil, err
-	}
-
-	// Convert to v1beta1 for the Authz interface
-	v1beta1Req := lookupResourcesCommandToV1beta1(cmd)
-	return uc.Authz.LookupResources(ctx, v1beta1Req)
 }
 
 // lookupResourcesCommandToV1beta1 converts a LookupResourcesCommand to v1beta1.

@@ -3,6 +3,8 @@ package authz
 import (
 	"context"
 	"io"
+	"maps"
+	"slices"
 	"strconv"
 	"sync"
 
@@ -69,9 +71,7 @@ func (s *SimpleAuthorizer) RetainCurrentSnapshot() int64 {
 
 	// Copy current tuples to snapshot
 	snapshot := make(map[tupleKey]bool, len(s.tuples))
-	for k, v := range s.tuples {
-		snapshot[k] = v
-	}
+	maps.Copy(snapshot, s.tuples)
 	s.snapshots[s.version] = snapshot
 	return s.version
 }
@@ -105,40 +105,31 @@ func (s *SimpleAuthorizer) getTuplesForToken(token string) map[tupleKey]bool {
 	// Parse token, default to 0 (oldest available)
 	var requested int64 = 0
 	if token != "" {
-		parsed, err := parseConsistencyToken(token)
-		if err == nil {
+		if parsed, err := parseConsistencyToken(token); err == nil {
 			requested = parsed
 		}
 		// On parse error, use 0 (oldest available)
 	}
 
-	// Find the oldest available snapshot with version >= requested.
-	// Available snapshots are: retained snapshots + current version.
-	// We want the minimum version that is >= requested.
+	// Collect all available versions (snapshots + current)
+	versions := make([]int64, 0, len(s.snapshots)+1)
+	for v := range s.snapshots {
+		versions = append(versions, v)
+	}
+	versions = append(versions, s.version)
+	slices.Sort(versions)
 
-	var bestVersion int64 = -1
-	var bestTuples map[tupleKey]bool
-
-	// Check retained snapshots
-	for v, tuples := range s.snapshots {
-		if v >= requested && (bestVersion == -1 || v < bestVersion) {
-			bestVersion = v
-			bestTuples = tuples
+	// Find the minimum version >= requested
+	idx, _ := slices.BinarySearch(versions, requested)
+	if idx < len(versions) {
+		v := versions[idx]
+		if v == s.version {
+			return s.tuples
 		}
+		return s.snapshots[v]
 	}
 
-	// Check current version (always available)
-	if s.version >= requested && (bestVersion == -1 || s.version < bestVersion) {
-		// bestVersion = s.version
-		bestTuples = s.tuples
-	}
-
-	// bestTuples should never be nil since current version is always >= 0
-	if bestTuples == nil {
-		return s.tuples
-	}
-
-	return bestTuples
+	return s.tuples
 }
 
 // formatConsistencyToken formats a version as a consistency token string.
@@ -191,13 +182,6 @@ func hasTupleInSnapshot(tuples map[tupleKey]bool, resourceNamespace, resourceTyp
 	}
 	return tuples[key]
 }
-
-// hasTuple checks if a tuple exists in the current (latest) state.
-// func (s *SimpleAuthorizer) hasTuple(resourceNamespace, resourceType, resourceID, relation, subjectNamespace, subjectType, subjectID string) bool {
-// 	s.mu.RLock()
-// 	defer s.mu.RUnlock()
-// 	return hasTupleInSnapshot(s.tuples, resourceNamespace, resourceType, resourceID, relation, subjectNamespace, subjectType, subjectID)
-// }
 
 func tupleKeyFromRelationship(rel *kessel.Relationship) tupleKey {
 	key := tupleKey{}

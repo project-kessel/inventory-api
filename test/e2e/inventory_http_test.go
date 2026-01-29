@@ -4,12 +4,10 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
-	"encoding/base64"
 	"fmt"
 	nethttp "net/http"
 	"os"
 	"strconv"
-	"strings"
 	"testing"
 
 	"github.com/go-kratos/kratos/v2/log"
@@ -27,10 +25,6 @@ var db *gorm.DB
 
 // v1beta2
 var inventoryapi_grpc_url string
-
-const xRhIdentityJSON = `{"identity":{"account_number":"123456","org_id":"123456","user":{"username":"testuser","email":"testuser@example.com","user_id":"user-123"},"internal":{},"type":"User"}}`
-
-var xRhIdentityHeaderValue = base64.StdEncoding.EncodeToString([]byte(strings.TrimSpace(xRhIdentityJSON)))
 
 func TestMain(m *testing.M) {
 	var err error

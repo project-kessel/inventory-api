@@ -570,8 +570,8 @@ func TestInventoryService_CheckSelf_Allowed_XRhIdentity(t *testing.T) {
 	mockAuthz.AssertExpectations(t)
 }
 
-func TestInventoryService_CheckSelf_Allowed_XRhIdentity_NoUserID(t *testing.T) {
-	// Test CheckSelf with x-rh-identity claims (SubjectId fallback value)
+func TestInventoryService_CheckSelf_Allowed_XRhIdentity_SubjectIdMatch(t *testing.T) {
+	// Test CheckSelf with x-rh-identity claims
 	claims := &authnapi.Claims{
 		SubjectId: authnapi.SubjectId("testuser"),
 		AuthType:  authnapi.AuthTypeXRhIdentity,
@@ -1147,8 +1147,6 @@ func TestInventoryService_Check_Denied(t *testing.T) {
 
 func TestInventoryService_Check_MetaAuthzDenied(t *testing.T) {
 	// Test that meta-authorization denial is properly mapped to PermissionDenied.
-	// NOTE: This tests the EXPECTED behavior. Currently Check does NOT use
-	// mapServiceError, so this test will FAIL until the inconsistency is fixed.
 	claims := &authnapi.Claims{
 		SubjectId: authnapi.SubjectId("user-123"),
 		AuthType:  authnapi.AuthTypeXRhIdentity,
@@ -1260,8 +1258,6 @@ func TestInventoryService_CheckForUpdate_Denied(t *testing.T) {
 
 func TestInventoryService_CheckForUpdate_MetaAuthzDenied(t *testing.T) {
 	// Test that meta-authorization denial is properly mapped to PermissionDenied.
-	// NOTE: This tests the EXPECTED behavior. Currently CheckForUpdate does NOT use
-	// mapServiceError, so this test will FAIL until the inconsistency is fixed.
 	claims := &authnapi.Claims{
 		SubjectId: authnapi.SubjectId("user-123"),
 		AuthType:  authnapi.AuthTypeXRhIdentity,
@@ -1692,7 +1688,7 @@ func TestInventoryService_ReportResource_Update_DifferentReporterInstance(t *tes
 }
 
 // --- Consistency Token Tests ---
-// Note: In the v1beta2 API, only CheckBulkRequest supports consistency tokens.
+// Note: In the v1beta2 API, CheckBulkRequest and CheckSelfBulkRequest support consistency tokens.
 // CheckRequest and CheckForUpdateRequest do not have consistency token fields.
 
 func TestInventoryService_CheckBulk_ConsistencyToken(t *testing.T) {
@@ -1877,6 +1873,149 @@ func TestInventoryService_CheckBulk_ConsistencyToken(t *testing.T) {
 	assert.Equal(t, pb.Allowed_ALLOWED_TRUE, resp.Pairs[1].GetItem().Allowed, "old token uses snapshot, second allowed")
 }
 
+func TestInventoryService_CheckSelfBulk_ConsistencyToken(t *testing.T) {
+	// The testSelfSubjectStrategy converts claims.SubjectId to rbac/principal/{subjectId}
+	// So we use subject IDs that match what we grant in the authorizer.
+	claims := &authnapi.Claims{
+		SubjectId: authnapi.SubjectId("subject-a"),
+		AuthType:  authnapi.AuthTypeXRhIdentity,
+	}
+
+	simpleAuthz := authz.NewSimpleAuthorizer()
+	// Grant permission at initial version -> v3
+	// The self subject strategy maps "subject-a" to rbac/principal/subject-a
+	simpleAuthz.Grant("subject-a", "view", "hbi", "host", "resource-1")
+	simpleAuthz.Grant("subject-a", "edit", "hbi", "host", "resource-2")
+	snapshotVersion := simpleAuthz.RetainCurrentSnapshot() // Retain at v3
+
+	// Remove one permission -> v4
+	namespace := "hbi"
+	resourceType := "host"
+	resourceID := "resource-1"
+	relation := "view"
+	subjectNamespace := "rbac"
+	subjectType := "principal"
+	subjectID := "subject-a"
+
+	_, _ = simpleAuthz.DeleteTuples(context.Background(), &relationsV1beta1.DeleteTuplesRequest{
+		Filter: &relationsV1beta1.RelationTupleFilter{
+			ResourceNamespace: &namespace,
+			ResourceType:      &resourceType,
+			ResourceId:        &resourceID,
+			Relation:          &relation,
+			SubjectFilter: &relationsV1beta1.SubjectFilter{
+				SubjectNamespace: &subjectNamespace,
+				SubjectType:      &subjectType,
+				SubjectId:        &subjectID,
+			},
+		},
+	})
+	currentVersion := simpleAuthz.Version()
+
+	uc := newTestUsecase(testUsecaseConfig{Authz: simpleAuthz})
+	client := newTestServer(t, testServerConfig{
+		Usecase:       uc,
+		Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+	})
+
+	// CheckSelfBulk without token -> uses oldest available (snapshot at v3) -> both allowed
+	reqNoToken := &pb.CheckSelfBulkRequest{
+		Items: []*pb.CheckSelfBulkRequestItem{
+			{
+				Object: &pb.ResourceReference{
+					ResourceId:   "resource-1",
+					ResourceType: "host",
+					Reporter:     &pb.ReporterReference{Type: "hbi"},
+				},
+				Relation: "view",
+			},
+			{
+				Object: &pb.ResourceReference{
+					ResourceId:   "resource-2",
+					ResourceType: "host",
+					Reporter:     &pb.ReporterReference{Type: "hbi"},
+				},
+				Relation: "edit",
+			},
+		},
+	}
+
+	resp, err := client.CheckSelfBulk(context.Background(), reqNoToken)
+	require.NoError(t, err)
+	assert.Equal(t, pb.Allowed_ALLOWED_TRUE, resp.Pairs[0].GetItem().Allowed, "no token uses oldest (snapshot), first allowed")
+	assert.Equal(t, pb.Allowed_ALLOWED_TRUE, resp.Pairs[1].GetItem().Allowed, "no token uses oldest (snapshot), second allowed")
+
+	// CheckSelfBulk with token >= current version -> uses current (v4) -> first denied, second allowed
+	currentTokenStr := fmt.Sprintf("%d", currentVersion)
+	reqWithCurrentToken := &pb.CheckSelfBulkRequest{
+		Consistency: &pb.Consistency{
+			Requirement: &pb.Consistency_AtLeastAsFresh{
+				AtLeastAsFresh: &pb.ConsistencyToken{
+					Token: currentTokenStr,
+				},
+			},
+		},
+		Items: []*pb.CheckSelfBulkRequestItem{
+			{
+				Object: &pb.ResourceReference{
+					ResourceId:   "resource-1",
+					ResourceType: "host",
+					Reporter:     &pb.ReporterReference{Type: "hbi"},
+				},
+				Relation: "view",
+			},
+			{
+				Object: &pb.ResourceReference{
+					ResourceId:   "resource-2",
+					ResourceType: "host",
+					Reporter:     &pb.ReporterReference{Type: "hbi"},
+				},
+				Relation: "edit",
+			},
+		},
+	}
+
+	resp, err = client.CheckSelfBulk(context.Background(), reqWithCurrentToken)
+	require.NoError(t, err)
+	assert.Equal(t, pb.Allowed_ALLOWED_FALSE, resp.Pairs[0].GetItem().Allowed, "current token uses latest, first denied")
+	assert.Equal(t, pb.Allowed_ALLOWED_TRUE, resp.Pairs[1].GetItem().Allowed, "current token uses latest, second still allowed")
+
+	// CheckSelfBulk with old token (snapshot version) -> uses snapshot -> both allowed
+	tokenStr := fmt.Sprintf("%d", snapshotVersion)
+	reqWithToken := &pb.CheckSelfBulkRequest{
+		Consistency: &pb.Consistency{
+			Requirement: &pb.Consistency_AtLeastAsFresh{
+				AtLeastAsFresh: &pb.ConsistencyToken{
+					Token: tokenStr,
+				},
+			},
+		},
+		Items: []*pb.CheckSelfBulkRequestItem{
+			{
+				Object: &pb.ResourceReference{
+					ResourceId:   "resource-1",
+					ResourceType: "host",
+					Reporter:     &pb.ReporterReference{Type: "hbi"},
+				},
+				Relation: "view",
+			},
+			{
+				Object: &pb.ResourceReference{
+					ResourceId:   "resource-2",
+					ResourceType: "host",
+					Reporter:     &pb.ReporterReference{Type: "hbi"},
+				},
+				Relation: "edit",
+			},
+		},
+	}
+
+	resp, err = client.CheckSelfBulk(context.Background(), reqWithToken)
+	require.NoError(t, err)
+	assert.Equal(t, pb.Allowed_ALLOWED_TRUE, resp.Pairs[0].GetItem().Allowed, "old token uses snapshot, first allowed")
+	assert.Equal(t, pb.Allowed_ALLOWED_TRUE, resp.Pairs[1].GetItem().Allowed, "old token uses snapshot, second allowed")
+}
+
 // Note: CheckForUpdateResponse in v1beta2 does not include a consistency token.
 
 // --- ReporterInstanceId Tests ---
@@ -1978,6 +2117,7 @@ func TestInventoryService_DeleteResource_WithoutReporterInstanceId(t *testing.T)
 	require.NoError(t, err)
 
 	// Delete without instance ID (nil)
+	// FIXME: THIS IS BROKEN.
 	// Note: The current implementation uses empty string for instance ID when nil is provided,
 	// which creates a different reporter key. However, the FakeResourceRepository
 	// implementation seems to match by local_resource_id alone, allowing the delete.
@@ -2203,8 +2343,7 @@ func TestInventoryService_CheckBulk_NoIdentity(t *testing.T) {
 // =============================================================================
 // ERROR SCENARIO TESTS
 // =============================================================================
-// These tests document the current error handling behavior. Some inconsistencies
-// are noted but preserved for backward compatibility.
+// These tests document the current error handling behavior.
 
 // --- DeleteResource Error Scenarios ---
 
@@ -2422,9 +2561,6 @@ func TestInventoryService_CheckForUpdate_InvalidReference_EmptyResourceId(t *tes
 }
 
 // --- CheckSelf Error Scenarios ---
-// NOTE: CheckSelf does NOT check claims at the service layer - it relies on
-// the usecase (selfSubjectFromContext) to validate identity. This means
-// Unauthenticated errors come via mapServiceError(ErrMetaAuthzContextMissing).
 
 func TestInventoryService_CheckSelf_InvalidReference_EmptyResourceId(t *testing.T) {
 	// Empty resource_id is caught by protovalidate middleware BEFORE reaching the
@@ -2461,7 +2597,6 @@ func TestInventoryService_CheckSelf_InvalidReference_EmptyResourceId(t *testing.
 
 func TestInventoryService_CheckSelf_MetaAuthzDenied(t *testing.T) {
 	// Test that meta-authorization denial is properly mapped to PermissionDenied
-	// using mapServiceError
 	claims := &authnapi.Claims{
 		SubjectId: authnapi.SubjectId("user-123"),
 		AuthType:  authnapi.AuthTypeOIDC, // OIDC is denied by SimpleMetaAuthorizer
@@ -2494,7 +2629,6 @@ func TestInventoryService_CheckSelf_MetaAuthzDenied(t *testing.T) {
 }
 
 // --- CheckSelfBulk Error Scenarios ---
-// NOTE: CheckSelfBulk also does NOT check claims at the service layer.
 
 func TestInventoryService_CheckSelfBulk_EmptyItems(t *testing.T) {
 	// Empty items array is caught by protovalidate middleware BEFORE reaching
@@ -2618,8 +2752,6 @@ func TestInventoryService_CheckBulk_MetaAuthzAllowedOnGRPC(t *testing.T) {
 
 func TestInventoryService_CheckBulk_MetaAuthzDenied(t *testing.T) {
 	// Test that meta-authorization denial is properly mapped to PermissionDenied.
-	// NOTE: This tests the EXPECTED behavior. Currently CheckBulk does NOT use
-	// mapServiceError, so this test will FAIL until the inconsistency is fixed.
 	claims := &authnapi.Claims{
 		SubjectId: authnapi.SubjectId("user-123"),
 		AuthType:  authnapi.AuthTypeXRhIdentity,

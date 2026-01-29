@@ -164,6 +164,7 @@ func subjectReferenceFromProto(subject *pb.SubjectReference) (model.SubjectRefer
 	if err != nil {
 		return model.SubjectReference{}, err
 	}
+	// TODO: Reporter is optional and we should also consider instance ID
 	reporterType, err := model.NewReporterType(subject.Resource.GetReporter().GetType())
 	if err != nil {
 		return model.SubjectReference{}, err
@@ -392,7 +393,7 @@ func ToLookupResourcesCommand(request *pb.StreamedListObjectsRequest) (resources
 	if request == nil {
 		return resources.LookupResourcesCommand{}, fmt.Errorf("request is nil")
 	}
-
+	// TODO: value normalization should be moved to model
 	resourceType, err := model.NewResourceType(NormalizeType(request.ObjectType.GetResourceType()))
 	if err != nil {
 		return resources.LookupResourcesCommand{}, fmt.Errorf("invalid resource type: %w", err)

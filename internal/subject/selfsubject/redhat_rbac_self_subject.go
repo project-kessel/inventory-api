@@ -91,10 +91,6 @@ func (s *RedHatRbacSelfSubjectStrategy) resolveOIDCIssuerDomain(issuer string) s
 	return ""
 }
 
-func extractSubjectID(subject string) string {
-	return strings.TrimSpace(subject)
-}
-
 // buildSubjectReference creates a SubjectReference for RBAC authorization.
 // Uses fixed values: namespace="rbac", resource type="principal".
 func buildSubjectReference(subjectID string) (model.SubjectReference, error) {

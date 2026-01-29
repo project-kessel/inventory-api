@@ -12,8 +12,9 @@ type Options struct {
 
 func NewOptions() *Options {
 	return &Options{
-		ReadAfterWriteEnabled:   true,
-		ReadAfterWriteAllowlist: []string{},
+		ReadAfterWriteEnabled:          true,
+		ReadAfterWriteAllowlist:        []string{},
+		DefaultToAtLeastAsAcknowledged: true,
 	}
 }
 

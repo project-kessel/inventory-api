@@ -273,9 +273,9 @@ func (uc *Usecase) lookupConsistencyTokenFromDB(reporterResourceKey model.Report
 func (uc *Usecase) resolveConsistencyToken(ctx context.Context, consistency model.ConsistencyConfig, reporterResourceKey model.ReporterResourceKey) (string, error) {
 	featureFlagEnabled := uc.Config.DefaultToAtLeastAsAcknowledged
 	if featureFlagEnabled {
-		log.Info("Feature flag authz.kessel.default-to-at-least-as-acknowledged is enabled")
+		log.Info("Feature flag default-to-at-least-as-acknowledged is enabled")
 	} else {
-		log.Info("Feature flag authz.kessel.default-to-at-least-as-acknowledged is disabled")
+		log.Info("Feature flag default-to-at-least-as-acknowledged is disabled")
 	}
 
 	switch consistency.Preference {

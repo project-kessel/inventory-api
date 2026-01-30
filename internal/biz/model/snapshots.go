@@ -16,7 +16,7 @@ type RepresentationSnapshot struct {
 type ResourceSnapshot struct {
 	ID               uuid.UUID `json:"id"`
 	Type             string    `json:"type"`
-	CommonVersion    uint      `json:"common_version"`
+	CommonVersion    *uint     `json:"common_version,omitempty"`
 	ConsistencyToken string    `json:"consistency_token"`
 	CreatedAt        time.Time `json:"created_at"`
 	UpdatedAt        time.Time `json:"updated_at"`
@@ -62,7 +62,7 @@ type ReporterRepresentationSnapshot struct {
 	Version            uint                   `json:"version"`
 	Generation         uint                   `json:"generation"`
 	ReporterVersion    *string                `json:"reporter_version"`
-	CommonVersion      uint                   `json:"common_version"`
+	CommonVersion      *uint                  `json:"common_version,omitempty"`
 	TransactionId      string                 `json:"transaction_id"`
 	Tombstone          bool                   `json:"tombstone"`
 	CreatedAt          time.Time              `json:"created_at"`

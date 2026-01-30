@@ -13,7 +13,7 @@ require (
 	github.com/coreos/go-oidc/v3 v3.17.0
 	github.com/go-gormigrate/gormigrate/v2 v2.1.5
 	github.com/go-kratos/kratos/v2 v2.9.2
-	github.com/golang-jwt/jwt/v5 v5.3.0
+	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.7.6
 	github.com/mattn/go-sqlite3 v1.14.32

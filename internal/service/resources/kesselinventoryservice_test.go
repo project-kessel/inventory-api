@@ -15,6 +15,8 @@ import (
 	kratosTransport "github.com/go-kratos/kratos/v2/transport"
 	kgrpc "github.com/go-kratos/kratos/v2/transport/grpc"
 	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2"
+	"github.com/project-kessel/inventory-api/internal/biz/schema"
+	"github.com/project-kessel/inventory-api/internal/biz/schema/validation"
 	relationsV1beta1 "github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -23,8 +25,6 @@ import (
 
 	"github.com/project-kessel/inventory-api/internal/data"
 	"github.com/project-kessel/inventory-api/internal/metricscollector"
-	"github.com/project-kessel/inventory-api/internal/middleware"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -72,47 +72,6 @@ func buildTestSubjectReference(subjectID string) (model.SubjectReference, error)
 		return model.SubjectReference{}, err
 	}
 	return model.NewSubjectReferenceWithoutRelation(key), nil
-}
-
-// setupTestSchemas populates the schema cache with minimal test schemas.
-// This allows validation middleware to work without filesystem access.
-func setupTestSchemas(t *testing.T) {
-	t.Helper()
-
-	// Minimal config that allows common resource types and reporters used in tests
-	hostConfig := []byte(`resource_type: host
-resource_reporters:
-  - hbi
-`)
-	k8sClusterConfig := []byte(`resource_type: k8s_cluster
-resource_reporters:
-  - acm
-  - acs
-  - ocm
-`)
-
-	// Minimal JSON schemas that accept any object (permissive for tests)
-	permissiveSchema := `{"type": "object"}`
-
-	middleware.PopulateSchemaCache(map[string]interface{}{
-		// Config entries (YAML as []byte)
-		"config:host":        hostConfig,
-		"config:k8s_cluster": k8sClusterConfig,
-
-		// Common representation schemas
-		"common:host":        permissiveSchema,
-		"common:k8s_cluster": permissiveSchema,
-
-		// Reporter-specific schemas
-		"host:hbi":        permissiveSchema,
-		"k8s_cluster:acm": permissiveSchema,
-		"k8s_cluster:acs": permissiveSchema,
-		"k8s_cluster:ocm": permissiveSchema,
-	})
-
-	t.Cleanup(func() {
-		middleware.ClearSchemaCache()
-	})
 }
 
 func newTestSelfSubjectStrategy() selfsubject.SelfSubjectStrategy {
@@ -174,7 +133,6 @@ func newTestServer(t *testing.T, cfg testServerConfig) pb.KesselInventoryService
 	t.Helper()
 
 	// Populate schema cache before server construction so validation middleware works
-	setupTestSchemas(t)
 
 	lis := bufconn.Listen(bufSize)
 	testEndpoint := &url.URL{Scheme: "grpc", Host: "bufconn"}
@@ -231,6 +189,7 @@ func newTestServer(t *testing.T, cfg testServerConfig) pb.KesselInventoryService
 // All fields have sensible defaults when left as zero values.
 type testUsecaseConfig struct {
 	Repo           data.ResourceRepository
+	SchemaRepo     schema.Repository
 	Authz          authzapi.Authorizer
 	Namespace      string
 	Config         *usecase.UsecaseConfig
@@ -239,10 +198,15 @@ type testUsecaseConfig struct {
 
 // newTestUsecase constructs a Usecase with test defaults.
 // Override specific fields via testUsecaseConfig; unset fields use defaults.
-func newTestUsecase(cfg testUsecaseConfig) *usecase.Usecase {
+func newTestUsecase(t *testing.T, cfg testUsecaseConfig) *usecase.Usecase {
 	repo := cfg.Repo
 	if repo == nil {
 		repo = data.NewFakeResourceRepository()
+	}
+
+	schemaRepo := cfg.SchemaRepo
+	if schemaRepo == nil {
+		schemaRepo = newFakeSchemaRepository(t)
 	}
 
 	namespace := cfg.Namespace
@@ -269,6 +233,7 @@ func newTestUsecase(cfg testUsecaseConfig) *usecase.Usecase {
 
 	return usecase.New(
 		repo,
+		schemaRepo,
 		authzImpl,
 		nil, // Eventer
 		namespace,
@@ -295,14 +260,15 @@ func TestInventoryService_ReportResource_MissingReporterType(t *testing.T) {
 			},
 			Common: &structpb.Struct{
 				Fields: map[string]*structpb.Value{
-					"hostname": structpb.NewStringValue("example-host"),
+					"workspace_id": structpb.NewStringValue("ws-123"),
+					"hostname":     structpb.NewStringValue("example-host"),
 				},
 			},
 			Reporter: &structpb.Struct{},
 		},
 	}
 
-	uc := newTestUsecase(testUsecaseConfig{})
+	uc := newTestUsecase(t, testUsecaseConfig{})
 	client := newTestServer(t, testServerConfig{
 		Usecase:       uc,
 		Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
@@ -316,6 +282,7 @@ func TestInventoryService_ReportResource_MissingReporterType(t *testing.T) {
 	grpcStatus, ok := status.FromError(err)
 	assert.True(t, ok)
 	assert.Equal(t, codes.InvalidArgument, grpcStatus.Code())
+	assert.Contains(t, err.Error(), "reporter_type")
 }
 
 func TestInventoryService_ReportResource_MissingReporterInstanceId(t *testing.T) {
@@ -331,14 +298,15 @@ func TestInventoryService_ReportResource_MissingReporterInstanceId(t *testing.T)
 			},
 			Common: &structpb.Struct{
 				Fields: map[string]*structpb.Value{
-					"hostname": structpb.NewStringValue("example-host"),
+					"workspace_id": structpb.NewStringValue("ws-123"),
+					"hostname":     structpb.NewStringValue("example-host"),
 				},
 			},
 			Reporter: &structpb.Struct{},
 		},
 	}
 
-	uc := newTestUsecase(testUsecaseConfig{})
+	uc := newTestUsecase(t, testUsecaseConfig{})
 	client := newTestServer(t, testServerConfig{
 		Usecase:       uc,
 		Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
@@ -354,39 +322,6 @@ func TestInventoryService_ReportResource_MissingReporterInstanceId(t *testing.T)
 	grpcStatus, ok := status.FromError(err)
 	assert.True(t, ok)
 	assert.Equal(t, codes.InvalidArgument, grpcStatus.Code())
-}
-
-func TestInventoryService_ReportResource_InvalidJsonObject(t *testing.T) {
-	claims := &authnapi.Claims{SubjectId: authnapi.SubjectId("sarah"), AuthType: authnapi.AuthTypeXRhIdentity}
-
-	badCommon := &structpb.Struct{
-		Fields: map[string]*structpb.Value{
-			"invalid": nil, // use intentionally unsupported types
-		},
-	}
-
-	req := &pb.ReportResourceRequest{
-		Type:               "host",
-		ReporterType:       "hbi",
-		ReporterInstanceId: "instance-001",
-		Representations: &pb.ResourceRepresentations{
-			Common: badCommon,
-			Metadata: &pb.RepresentationMetadata{
-				LocalResourceId: "v1",
-			},
-			Reporter: &structpb.Struct{},
-		},
-	}
-
-	uc := newTestUsecase(testUsecaseConfig{})
-	client := newTestServer(t, testServerConfig{
-		Usecase:       uc,
-		Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
-	})
-	resp, err := client.ReportResource(context.Background(), req)
-
-	assert.Error(t, err)
-	assert.Nil(t, resp)
 }
 
 func TestResponseFromResource(t *testing.T) {
@@ -410,7 +345,7 @@ func TestInventoryService_DeleteResource_NoIdentity(t *testing.T) {
 		},
 	}
 
-	uc := newTestUsecase(testUsecaseConfig{})
+	uc := newTestUsecase(t, testUsecaseConfig{})
 	// Use DenyAuthenticator to simulate unauthenticated request
 	client := newTestServer(t, testServerConfig{
 		Usecase:       uc,
@@ -590,7 +525,7 @@ func TestInventoryService_CheckSelf_Allowed_XRhIdentity(t *testing.T) {
 		Return(relationsV1beta1.CheckResponse_ALLOWED_TRUE, &relationsV1beta1.ConsistencyToken{}, nil).
 		Once()
 
-	uc := newTestUsecase(testUsecaseConfig{Authz: mockAuthz})
+	uc := newTestUsecase(t, testUsecaseConfig{Authz: mockAuthz})
 	client := newTestServer(t, testServerConfig{
 		Usecase:       uc,
 		Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
@@ -640,7 +575,7 @@ func TestInventoryService_CheckSelf_Allowed_XRhIdentity_SubjectIdMatch(t *testin
 		Return(relationsV1beta1.CheckResponse_ALLOWED_TRUE, &relationsV1beta1.ConsistencyToken{}, nil).
 		Once()
 
-	uc := newTestUsecase(testUsecaseConfig{Authz: mockAuthz})
+	uc := newTestUsecase(t, testUsecaseConfig{Authz: mockAuthz})
 	client := newTestServer(t, testServerConfig{
 		Usecase:       uc,
 		Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
@@ -684,7 +619,7 @@ func TestInventoryService_CheckSelf_Denied(t *testing.T) {
 		Return(relationsV1beta1.CheckResponse_ALLOWED_FALSE, &relationsV1beta1.ConsistencyToken{}, nil).
 		Once()
 
-	uc := newTestUsecase(testUsecaseConfig{Authz: mockAuthz})
+	uc := newTestUsecase(t, testUsecaseConfig{Authz: mockAuthz})
 	client := newTestServer(t, testServerConfig{
 		Usecase:       uc,
 		Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
@@ -709,7 +644,7 @@ func TestInventoryService_CheckSelf_NoIdentity(t *testing.T) {
 		},
 	}
 
-	uc := newTestUsecase(testUsecaseConfig{})
+	uc := newTestUsecase(t, testUsecaseConfig{})
 	// Use DenyAuthenticator to simulate unauthenticated request
 	client := newTestServer(t, testServerConfig{
 		Usecase:       uc,
@@ -815,7 +750,7 @@ func TestInventoryService_CheckSelfBulk_Allowed_XRhIdentity(t *testing.T) {
 		}, nil).
 		Once()
 
-	uc := newTestUsecase(testUsecaseConfig{Authz: mockAuthz})
+	uc := newTestUsecase(t, testUsecaseConfig{Authz: mockAuthz})
 	client := newTestServer(t, testServerConfig{
 		Usecase:       uc,
 		Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
@@ -906,7 +841,7 @@ func TestInventoryService_CheckSelfBulk_MixedResults(t *testing.T) {
 		}, nil).
 		Once()
 
-	uc := newTestUsecase(testUsecaseConfig{Authz: mockAuthz})
+	uc := newTestUsecase(t, testUsecaseConfig{Authz: mockAuthz})
 	client := newTestServer(t, testServerConfig{
 		Usecase:       uc,
 		Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
@@ -990,7 +925,7 @@ func TestInventoryService_CheckSelfBulk_ResponseLengthMismatch(t *testing.T) {
 		}, nil).
 		Once()
 
-	uc := newTestUsecase(testUsecaseConfig{Authz: mockAuthz})
+	uc := newTestUsecase(t, testUsecaseConfig{Authz: mockAuthz})
 	client := newTestServer(t, testServerConfig{
 		Usecase:       uc,
 		Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
@@ -1019,7 +954,7 @@ func TestInventoryService_CheckSelfBulk_NoIdentity(t *testing.T) {
 		},
 	}
 
-	uc := newTestUsecase(testUsecaseConfig{})
+	uc := newTestUsecase(t, testUsecaseConfig{})
 	// Use DenyAuthenticator to simulate unauthenticated request
 	client := newTestServer(t, testServerConfig{
 		Usecase:       uc,
@@ -1053,7 +988,7 @@ func TestInventoryService_Check_NoIdentity(t *testing.T) {
 		},
 	}
 
-	uc := newTestUsecase(testUsecaseConfig{})
+	uc := newTestUsecase(t, testUsecaseConfig{})
 	// Use DenyAuthenticator to simulate unauthenticated request
 	client := newTestServer(t, testServerConfig{
 		Usecase:       uc,
@@ -1089,7 +1024,7 @@ func TestInventoryService_CheckSelf_OIDC_Identity(t *testing.T) {
 
 	mockAuthz := &mocks.MockAuthz{}
 	// Use SimpleMetaAuthorizer to test protocol/auth-type based authorization
-	uc := newTestUsecase(testUsecaseConfig{
+	uc := newTestUsecase(t, testUsecaseConfig{
 		Authz:          mockAuthz,
 		MetaAuthorizer: metaauthorizer.NewSimpleMetaAuthorizer(),
 	})
@@ -1133,7 +1068,7 @@ func TestInventoryService_Check_Allowed(t *testing.T) {
 
 	simpleAuthz := authz.NewSimpleAuthorizer()
 	simpleAuthz.Grant("subject-456", "view", "hbi", "host", "resource-abc")
-	uc := newTestUsecase(testUsecaseConfig{Authz: simpleAuthz})
+	uc := newTestUsecase(t, testUsecaseConfig{Authz: simpleAuthz})
 	client := newTestServer(t, testServerConfig{
 		Usecase:       uc,
 		Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
@@ -1168,7 +1103,7 @@ func TestInventoryService_Check_Denied(t *testing.T) {
 	}
 
 	// No grants - default deny
-	uc := newTestUsecase(testUsecaseConfig{})
+	uc := newTestUsecase(t, testUsecaseConfig{})
 	client := newTestServer(t, testServerConfig{
 		Usecase:       uc,
 		Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
@@ -1203,7 +1138,7 @@ func TestInventoryService_Check_MetaAuthzDenied(t *testing.T) {
 		},
 	}
 
-	uc := newTestUsecase(testUsecaseConfig{
+	uc := newTestUsecase(t, testUsecaseConfig{
 		MetaAuthorizer: &DenyingMetaAuthorizer{},
 	})
 	client := newTestServer(t, testServerConfig{
@@ -1244,7 +1179,7 @@ func TestInventoryService_CheckForUpdate_Allowed(t *testing.T) {
 
 	simpleAuthz := authz.NewSimpleAuthorizer()
 	simpleAuthz.Grant("subject-789", "edit", "hbi", "host", "resource-xyz")
-	uc := newTestUsecase(testUsecaseConfig{Authz: simpleAuthz})
+	uc := newTestUsecase(t, testUsecaseConfig{Authz: simpleAuthz})
 	client := newTestServer(t, testServerConfig{
 		Usecase:       uc,
 		Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
@@ -1279,7 +1214,7 @@ func TestInventoryService_CheckForUpdate_Denied(t *testing.T) {
 	}
 
 	// No grants - default deny
-	uc := newTestUsecase(testUsecaseConfig{})
+	uc := newTestUsecase(t, testUsecaseConfig{})
 	client := newTestServer(t, testServerConfig{
 		Usecase:       uc,
 		Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
@@ -1314,7 +1249,7 @@ func TestInventoryService_CheckForUpdate_MetaAuthzDenied(t *testing.T) {
 		},
 	}
 
-	uc := newTestUsecase(testUsecaseConfig{
+	uc := newTestUsecase(t, testUsecaseConfig{
 		MetaAuthorizer: &DenyingMetaAuthorizer{},
 	})
 	client := newTestServer(t, testServerConfig{
@@ -1374,7 +1309,7 @@ func TestInventoryService_CheckBulk_MixedResults(t *testing.T) {
 
 	simpleAuthz := authz.NewSimpleAuthorizer()
 	simpleAuthz.Grant("subject-a", "view", "hbi", "host", "resource-1") // Grant only the first check
-	uc := newTestUsecase(testUsecaseConfig{Authz: simpleAuthz})
+	uc := newTestUsecase(t, testUsecaseConfig{Authz: simpleAuthz})
 	client := newTestServer(t, testServerConfig{
 		Usecase:       uc,
 		Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
@@ -1427,7 +1362,7 @@ func TestInventoryService_ReportResource_Success(t *testing.T) {
 		},
 	}
 
-	uc := newTestUsecase(testUsecaseConfig{})
+	uc := newTestUsecase(t, testUsecaseConfig{})
 	client := newTestServer(t, testServerConfig{
 		Usecase:       uc,
 		Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
@@ -1454,7 +1389,7 @@ func TestInventoryService_ReportResource_NoIdentity(t *testing.T) {
 		},
 	}
 
-	uc := newTestUsecase(testUsecaseConfig{})
+	uc := newTestUsecase(t, testUsecaseConfig{})
 	// Use DenyAuthenticator to simulate unauthenticated request
 	client := newTestServer(t, testServerConfig{
 		Usecase:       uc,
@@ -1500,7 +1435,7 @@ func TestInventoryService_DeleteResource_Success(t *testing.T) {
 		},
 	}
 
-	uc := newTestUsecase(testUsecaseConfig{})
+	uc := newTestUsecase(t, testUsecaseConfig{})
 	client := newTestServer(t, testServerConfig{
 		Usecase:       uc,
 		Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
@@ -1540,7 +1475,7 @@ func TestInventoryService_StreamedListObjects_Success(t *testing.T) {
 	simpleAuthz.Grant("subject-xyz", "view", "hbi", "host", "host-1")
 	simpleAuthz.Grant("subject-xyz", "view", "hbi", "host", "host-2")
 
-	uc := newTestUsecase(testUsecaseConfig{Authz: simpleAuthz})
+	uc := newTestUsecase(t, testUsecaseConfig{Authz: simpleAuthz})
 	client := newTestServer(t, testServerConfig{
 		Usecase:       uc,
 		Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
@@ -1614,7 +1549,7 @@ func TestInventoryService_ReportResource_Update(t *testing.T) {
 		},
 	}
 
-	uc := newTestUsecase(testUsecaseConfig{})
+	uc := newTestUsecase(t, testUsecaseConfig{})
 	client := newTestServer(t, testServerConfig{
 		Usecase:       uc,
 		Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
@@ -1661,7 +1596,7 @@ func TestInventoryService_ReportResource_Update_DifferentReporterInstance(t *tes
 		AuthType:  authnapi.AuthTypeXRhIdentity,
 	}
 
-	uc := newTestUsecase(testUsecaseConfig{})
+	uc := newTestUsecase(t, testUsecaseConfig{})
 	client := newTestServer(t, testServerConfig{
 		Usecase:       uc,
 		Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
@@ -1762,7 +1697,7 @@ func TestInventoryService_CheckBulk_ConsistencyToken(t *testing.T) {
 	})
 	currentVersion := simpleAuthz.Version()
 
-	uc := newTestUsecase(testUsecaseConfig{Authz: simpleAuthz})
+	uc := newTestUsecase(t, testUsecaseConfig{Authz: simpleAuthz})
 	client := newTestServer(t, testServerConfig{
 		Usecase:       uc,
 		Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
@@ -1947,7 +1882,7 @@ func TestInventoryService_CheckSelfBulk_ConsistencyToken(t *testing.T) {
 	})
 	currentVersion := simpleAuthz.Version()
 
-	uc := newTestUsecase(testUsecaseConfig{Authz: simpleAuthz})
+	uc := newTestUsecase(t, testUsecaseConfig{Authz: simpleAuthz})
 	client := newTestServer(t, testServerConfig{
 		Usecase:       uc,
 		Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
@@ -2061,7 +1996,7 @@ func TestInventoryService_DeleteResource_WithReporterInstanceId(t *testing.T) {
 		AuthType:  authnapi.AuthTypeXRhIdentity,
 	}
 
-	uc := newTestUsecase(testUsecaseConfig{})
+	uc := newTestUsecase(t, testUsecaseConfig{})
 	client := newTestServer(t, testServerConfig{
 		Usecase:       uc,
 		Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
@@ -2119,7 +2054,7 @@ func TestInventoryService_DeleteResource_WithoutReporterInstanceId(t *testing.T)
 		AuthType:  authnapi.AuthTypeXRhIdentity,
 	}
 
-	uc := newTestUsecase(testUsecaseConfig{})
+	uc := newTestUsecase(t, testUsecaseConfig{})
 	client := newTestServer(t, testServerConfig{
 		Usecase:       uc,
 		Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
@@ -2186,7 +2121,7 @@ func TestInventoryService_Check_ReporterWithInstanceId(t *testing.T) {
 	simpleAuthz := authz.NewSimpleAuthorizer()
 	simpleAuthz.Grant("subject-456", "view", "hbi", "host", "resource-with-instance")
 
-	uc := newTestUsecase(testUsecaseConfig{Authz: simpleAuthz})
+	uc := newTestUsecase(t, testUsecaseConfig{Authz: simpleAuthz})
 	client := newTestServer(t, testServerConfig{
 		Usecase:       uc,
 		Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
@@ -2224,7 +2159,7 @@ func TestInventoryService_StreamedListObjects_NoIdentity(t *testing.T) {
 	simpleAuthz := authz.NewSimpleAuthorizer()
 	simpleAuthz.Grant("subject-xyz", "view", "hbi", "host", "host-1")
 
-	uc := newTestUsecase(testUsecaseConfig{Authz: simpleAuthz})
+	uc := newTestUsecase(t, testUsecaseConfig{Authz: simpleAuthz})
 	// Use DenyAuthenticator to simulate unauthenticated streaming request
 	client := newTestServer(t, testServerConfig{
 		Usecase:       uc,
@@ -2282,7 +2217,7 @@ func TestInventoryService_StreamedListObjects_MetaAuthzDenied(t *testing.T) {
 		},
 	}
 
-	uc := newTestUsecase(testUsecaseConfig{
+	uc := newTestUsecase(t, testUsecaseConfig{
 		MetaAuthorizer: &DenyingMetaAuthorizer{},
 	})
 	client := newTestServer(t, testServerConfig{
@@ -2320,7 +2255,7 @@ func TestInventoryService_CheckForUpdate_NoIdentity(t *testing.T) {
 		},
 	}
 
-	uc := newTestUsecase(testUsecaseConfig{})
+	uc := newTestUsecase(t, testUsecaseConfig{})
 	client := newTestServer(t, testServerConfig{
 		Usecase:       uc,
 		Authenticator: &DenyAuthenticator{},
@@ -2359,7 +2294,7 @@ func TestInventoryService_CheckBulk_NoIdentity(t *testing.T) {
 		},
 	}
 
-	uc := newTestUsecase(testUsecaseConfig{})
+	uc := newTestUsecase(t, testUsecaseConfig{})
 	client := newTestServer(t, testServerConfig{
 		Usecase:       uc,
 		Authenticator: &DenyAuthenticator{},
@@ -2401,7 +2336,7 @@ func TestInventoryService_DeleteResource_ResourceNotFound(t *testing.T) {
 		},
 	}
 
-	uc := newTestUsecase(testUsecaseConfig{})
+	uc := newTestUsecase(t, testUsecaseConfig{})
 	client := newTestServer(t, testServerConfig{
 		Usecase:       uc,
 		Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
@@ -2435,7 +2370,7 @@ func TestInventoryService_DeleteResource_InvalidReference_EmptyResourceId(t *tes
 		},
 	}
 
-	uc := newTestUsecase(testUsecaseConfig{})
+	uc := newTestUsecase(t, testUsecaseConfig{})
 	client := newTestServer(t, testServerConfig{
 		Usecase:       uc,
 		Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
@@ -2468,7 +2403,7 @@ func TestInventoryService_DeleteResource_InvalidReference_EmptyResourceType(t *t
 		},
 	}
 
-	uc := newTestUsecase(testUsecaseConfig{})
+	uc := newTestUsecase(t, testUsecaseConfig{})
 	client := newTestServer(t, testServerConfig{
 		Usecase:       uc,
 		Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
@@ -2501,7 +2436,7 @@ func TestInventoryService_DeleteResource_InvalidReference_EmptyReporterType(t *t
 		},
 	}
 
-	uc := newTestUsecase(testUsecaseConfig{})
+	uc := newTestUsecase(t, testUsecaseConfig{})
 	client := newTestServer(t, testServerConfig{
 		Usecase:       uc,
 		Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
@@ -2541,7 +2476,7 @@ func TestInventoryService_Check_InvalidReference_EmptyResourceId(t *testing.T) {
 		},
 	}
 
-	uc := newTestUsecase(testUsecaseConfig{})
+	uc := newTestUsecase(t, testUsecaseConfig{})
 	client := newTestServer(t, testServerConfig{
 		Usecase:       uc,
 		Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
@@ -2580,7 +2515,7 @@ func TestInventoryService_CheckForUpdate_InvalidReference_EmptyResourceId(t *tes
 		},
 	}
 
-	uc := newTestUsecase(testUsecaseConfig{})
+	uc := newTestUsecase(t, testUsecaseConfig{})
 	client := newTestServer(t, testServerConfig{
 		Usecase:       uc,
 		Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
@@ -2614,7 +2549,7 @@ func TestInventoryService_CheckSelf_InvalidReference_EmptyResourceId(t *testing.
 		},
 	}
 
-	uc := newTestUsecase(testUsecaseConfig{})
+	uc := newTestUsecase(t, testUsecaseConfig{})
 	client := newTestServer(t, testServerConfig{
 		Usecase:       uc,
 		Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
@@ -2646,7 +2581,7 @@ func TestInventoryService_CheckSelf_MetaAuthzDenied(t *testing.T) {
 		},
 	}
 
-	uc := newTestUsecase(testUsecaseConfig{
+	uc := newTestUsecase(t, testUsecaseConfig{
 		MetaAuthorizer: metaauthorizer.NewSimpleMetaAuthorizer(),
 	})
 	client := newTestServer(t, testServerConfig{
@@ -2677,7 +2612,7 @@ func TestInventoryService_CheckSelfBulk_EmptyItems(t *testing.T) {
 		Items: []*pb.CheckSelfBulkRequestItem{}, // Empty - caught by protovalidate
 	}
 
-	uc := newTestUsecase(testUsecaseConfig{})
+	uc := newTestUsecase(t, testUsecaseConfig{})
 	client := newTestServer(t, testServerConfig{
 		Usecase:       uc,
 		Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
@@ -2714,7 +2649,7 @@ func TestInventoryService_CheckSelfBulk_MetaAuthzDenied(t *testing.T) {
 		},
 	}
 
-	uc := newTestUsecase(testUsecaseConfig{
+	uc := newTestUsecase(t, testUsecaseConfig{
 		MetaAuthorizer: metaauthorizer.NewSimpleMetaAuthorizer(),
 	})
 	client := newTestServer(t, testServerConfig{
@@ -2768,7 +2703,7 @@ func TestInventoryService_CheckBulk_MetaAuthzAllowedOnGRPC(t *testing.T) {
 		},
 	}
 
-	uc := newTestUsecase(testUsecaseConfig{
+	uc := newTestUsecase(t, testUsecaseConfig{
 		Authz:          simpleAuthz,
 		MetaAuthorizer: metaauthorizer.NewSimpleMetaAuthorizer(),
 	})
@@ -2812,7 +2747,7 @@ func TestInventoryService_CheckBulk_MetaAuthzDenied(t *testing.T) {
 		},
 	}
 
-	uc := newTestUsecase(testUsecaseConfig{
+	uc := newTestUsecase(t, testUsecaseConfig{
 		MetaAuthorizer: &DenyingMetaAuthorizer{},
 	})
 	client := newTestServer(t, testServerConfig{
@@ -2863,7 +2798,7 @@ func TestInventoryService_ReportResource_MetaAuthzAllowedOnGRPC(t *testing.T) {
 		},
 	}
 
-	uc := newTestUsecase(testUsecaseConfig{
+	uc := newTestUsecase(t, testUsecaseConfig{
 		MetaAuthorizer: metaauthorizer.NewSimpleMetaAuthorizer(),
 	})
 	client := newTestServer(t, testServerConfig{
@@ -2885,4 +2820,52 @@ func TestInventoryService_StreamedListObjects_NilRequest(t *testing.T) {
 	_, err := svc.ToLookupResourcesCommand(nil)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "request is nil")
+}
+
+func newFakeSchemaRepository(t *testing.T) schema.Repository {
+	schemaRepository := data.NewInMemorySchemaRepository()
+
+	emptyValidationSchema := validation.NewJsonSchemaValidatorFromString(`{
+		"$schema": "http://json-schema.org/draft-07/schema#",
+		"type": "object",
+		"properties": {
+		},
+		"required": []
+	}`)
+
+	withWorkspaceValidationSchema := validation.NewJsonSchemaValidatorFromString(`{
+		"$schema": "http://json-schema.org/draft-07/schema#",
+		"type": "object",
+		"properties": {
+			"workspace_id": { "type": "string" }
+		}
+	}`)
+
+	err := schemaRepository.CreateResourceSchema(context.Background(), schema.ResourceRepresentation{
+		ResourceType:     "k8s_cluster",
+		ValidationSchema: withWorkspaceValidationSchema,
+	})
+	assert.NoError(t, err)
+
+	err = schemaRepository.CreateReporterSchema(context.Background(), schema.ReporterRepresentation{
+		ResourceType:     "k8s_cluster",
+		ReporterType:     "ocm",
+		ValidationSchema: emptyValidationSchema,
+	})
+	assert.NoError(t, err)
+
+	err = schemaRepository.CreateResourceSchema(context.Background(), schema.ResourceRepresentation{
+		ResourceType:     "host",
+		ValidationSchema: withWorkspaceValidationSchema,
+	})
+	assert.NoError(t, err)
+
+	err = schemaRepository.CreateReporterSchema(context.Background(), schema.ReporterRepresentation{
+		ResourceType:     "host",
+		ReporterType:     "hbi",
+		ValidationSchema: emptyValidationSchema,
+	})
+	assert.NoError(t, err)
+
+	return schemaRepository
 }

@@ -14,6 +14,7 @@ import (
 	authzapi "github.com/project-kessel/inventory-api/internal/authz/api"
 	"github.com/project-kessel/inventory-api/internal/biz"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
+	"github.com/project-kessel/inventory-api/internal/biz/schema"
 	"github.com/project-kessel/inventory-api/internal/biz/usecase/metaauthorizer"
 	"github.com/project-kessel/inventory-api/internal/data"
 	eventingapi "github.com/project-kessel/inventory-api/internal/eventing/api"
@@ -25,6 +26,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/structpb"
 	"gorm.io/gorm"
 )
 
@@ -66,6 +68,7 @@ type UsecaseConfig struct {
 // Usecase provides business logic operations for resource management in the inventory system.
 // It coordinates between repositories, authorization, eventing, and other system components.
 type Usecase struct {
+	schemaUsecase       *SchemaUsecase
 	resourceRepository  data.ResourceRepository
 	waitForNotifBreaker *gobreaker.CircuitBreaker
 	Authz               authzapi.Authorizer
@@ -80,7 +83,7 @@ type Usecase struct {
 	SelfSubjectStrategy selfsubject.SelfSubjectStrategy
 }
 
-func New(resourceRepository data.ResourceRepository,
+func New(resourceRepository data.ResourceRepository, schemaRepository schema.Repository,
 	authz authzapi.Authorizer, eventer eventingapi.Manager, namespace string, logger log.Logger,
 	listenManager pubsub.ListenManagerImpl, waitForNotifBreaker *gobreaker.CircuitBreaker, usecaseConfig *UsecaseConfig, metricsCollector *metricscollector.MetricsCollector, metaAuthorizer metaauthorizer.MetaAuthorizer, selfSubjectStrategy selfsubject.SelfSubjectStrategy) *Usecase {
 	if metaAuthorizer == nil {
@@ -89,6 +92,7 @@ func New(resourceRepository data.ResourceRepository,
 
 	return &Usecase{
 		resourceRepository:  resourceRepository,
+		schemaUsecase:       NewSchemaUsecase(schemaRepository, log.NewHelper(logger)),
 		waitForNotifBreaker: waitForNotifBreaker,
 		Authz:               authz,
 		Eventer:             eventer,
@@ -121,6 +125,11 @@ func (uc *Usecase) ReportResource(ctx context.Context, request *v1beta2.ReportRe
 	txidStr, err := getNextTransactionID()
 	if err != nil {
 		return err
+	}
+
+	err = validateReportResourceRequest(ctx, request, uc.schemaUsecase)
+	if err != nil {
+		return status.Errorf(codes.InvalidArgument, "failed validation for report resource: %v", err)
 	}
 
 	readAfterWriteEnabled := computeReadAfterWrite(uc, request.WriteVisibility, reporterPrincipal)
@@ -759,4 +768,66 @@ func computeReadAfterWrite(uc *Usecase, write_visibility v1beta2.WriteVisibility
 		return false
 	}
 	return !common.IsNil(uc.ListenManager) && uc.Config.ReadAfterWriteEnabled && isSPInAllowlist(reporterPrincipal, uc.Config.ReadAfterWriteAllowlist)
+}
+
+func validateReportResourceRequest(ctx context.Context, request *v1beta2.ReportResourceRequest, schemaUseCase *SchemaUsecase) error {
+	if request.Type == "" {
+		return fmt.Errorf("missing 'type' field")
+	}
+	if request.ReporterType == "" {
+		return fmt.Errorf("missing 'reporterType' field")
+	}
+
+	resourceType := request.Type
+	reporterType := request.ReporterType
+
+	if isReporter, err := schemaUseCase.IsReporterForResource(ctx, resourceType, reporterType); !isReporter {
+		if err != nil {
+			return err
+		}
+
+		return fmt.Errorf("reporter %s does not report resource types: %s", reporterType, resourceType)
+	}
+
+	if request.Representations == nil {
+		return fmt.Errorf("missing 'representations'")
+	}
+
+	var reporterRepresentation map[string]any
+	if request.Representations.Reporter != nil {
+		reporterRepresentation = request.Representations.Reporter.AsMap()
+	}
+
+	// Remove any fields with null values before validation.
+	var sanitizedReporterRepresentation map[string]interface{}
+	if reporterRepresentation != nil {
+		sanitizedReporterRepresentation = removeNulls(reporterRepresentation)
+	} else {
+		sanitizedReporterRepresentation = nil
+	}
+
+	if sanitizedReporterRepresentation != nil {
+		sanitizedStruct, err2 := structpb.NewStruct(sanitizedReporterRepresentation)
+		if err2 != nil {
+			return fmt.Errorf("failed to rebuild reporter struct: %w", err2)
+		}
+		request.Representations.Reporter = sanitizedStruct
+	}
+
+	// Validate reporter-specific data using the sanitized map
+	if err := schemaUseCase.ReporterShallowValidate(ctx, resourceType, reporterType, sanitizedReporterRepresentation); err != nil {
+		return err
+	}
+
+	var commonRepresentation map[string]any
+	if request.Representations.Common != nil {
+		commonRepresentation = request.Representations.Common.AsMap()
+	}
+
+	// Validate common data
+	if err := schemaUseCase.CommonShallowValidate(ctx, resourceType, commonRepresentation); err != nil {
+		return err
+	}
+
+	return nil
 }

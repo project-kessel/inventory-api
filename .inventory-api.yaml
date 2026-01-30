@@ -59,9 +59,11 @@ storage:
     dbname: inventory
   sqlite3:
     dsn: inventory.db
-resources:
-  schemaPath: "data/schema/resources"
-  use_cache: true
+schema:
+  repository: in-memory
+  in-memory:
+    type: json
+    path: schema_cache.json
 consumer:
   enabled: false
 log:

@@ -28,15 +28,24 @@ authn:
       - type: x-rh-identity  # x-rh-identity header support - currently applicable for http transport only
         enable: true
         transport:
-          http: false
+          http: true
           grpc: false   
       - type: allow-unauthenticated # This is a special authenticator that allows unauthenticated access - mainly for Local-dev/Test 
         enable: true
         transport:
-          http: true
+          http: false
           grpc: true
 authz:
   impl: allow-all
+selfsubjectstrategy:
+  redhatRbacSelfSubjectStrategy:
+    enabled: true
+    issuerDomain: redhat
+    oidcIssuerDomains:
+      - iss: "https://sso.redhat.com/auth/realms/redhat-external"
+        domain: redhat
+      - iss: "sso.redhat.com"
+        domain: redhat
 eventing:
   eventer: stdout
 storage:

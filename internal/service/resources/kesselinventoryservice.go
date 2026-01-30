@@ -411,7 +411,7 @@ func ToLookupResourcesCommand(request *pb.StreamedListObjectsRequest) (resources
 		return resources.LookupResourcesCommand{}, fmt.Errorf("invalid subject: %w", err)
 	}
 
-	var limit uint32
+	var limit uint32 = 1000
 	var continuation string
 	if request.Pagination != nil {
 		limit = request.Pagination.Limit

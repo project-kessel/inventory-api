@@ -37,13 +37,15 @@ authn:
           grpc: true
 authz:
   impl: allow-all
-selfSubjectStratergy:
+selfsubjectstrategy:
   redhatRbacSelfSubjectStratergy:
     enabled: true
     issuerDomain: redhat
-    oidcIssuerDomainMap:
-      "https://sso.redhat.com/auth/realms/redhat-external": redhat
-      "sso.redhat.com": redhat
+    oidcIssuerDomains:
+      - iss: "https://sso.redhat.com/auth/realms/redhat-external"
+        domain: redhat
+      - iss: "sso.redhat.com"
+        domain: redhat
 eventing:
   eventer: stdout
 storage:

@@ -163,10 +163,6 @@ stringData:
       grpc:
         address: 0.0.0.0:9081
     authn:
-      # This is a legacy field for backwards compatibility. 
-      # Will be deprecated in the future. and replaced with the authenticator chain. 
-      # Will be removed when the code is released to stage and prod and configs are updated there.
-      allow-unauthenticated: true
       authenticator:
           type: first_match
           chain:
@@ -195,8 +191,9 @@ stringData:
       redhatRbacSelfSubjectStratergy:
         enabled: true
         issuerDomain: redhat
-        oidcIssuerDomainMap:
-          "https://sso.redhat.com/auth/realms/redhat-external": redhat
+        oidcIssuerDomains:
+          - iss: "https://sso.redhat.com/auth/realms/redhat-external"
+            domain: redhat
     authz:
       impl: kessel
       kessel:

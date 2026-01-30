@@ -32,6 +32,18 @@ func TestOptions_Validate_EnabledRequiresDomain(t *testing.T) {
 	assert.Contains(t, errs[0].Error(), "issuer-domain is required")
 }
 
+func TestOptions_Validate_EnabledRequiresOIDCIssuerDomains(t *testing.T) {
+	opts := NewOptions()
+	opts.RedHatRbac.Enabled = true
+	opts.RedHatRbac.XRhIdentityDomain = "redhat"
+	opts.RedHatRbac.OIDCIssuerDomainMap = nil
+	opts.RedHatRbac.OIDCIssuerDomains = nil
+
+	errs := opts.Validate()
+	assert.Len(t, errs, 1)
+	assert.Contains(t, errs[0].Error(), "oidcIssuerDomains is required")
+}
+
 func TestOptions_Validate_EnabledWithDomainPasses(t *testing.T) {
 	opts := NewOptions()
 	opts.RedHatRbac.Enabled = true
@@ -66,6 +78,35 @@ func TestOptions_Build_PassesIssuerDomainMap(t *testing.T) {
 		"https://sso.redhat.com/auth/realms/redhat-external": "redhat",
 		"https://login.example.com":                          "example",
 	}
+
+	errs := opts.Complete()
+	assert.Empty(t, errs)
+
+	strategy := opts.Build()
+	assert.NotNil(t, strategy)
+
+	rbacStrategy := strategy.(*RedHatRbacSelfSubjectStrategy)
+	assert.Equal(t, "redhat", rbacStrategy.oidcIssuerDomains["https://sso.redhat.com/auth/realms/redhat-external"])
+	assert.Equal(t, "example", rbacStrategy.oidcIssuerDomains["https://login.example.com"])
+}
+
+func TestOptions_Complete_UsesIssuerDomainsList(t *testing.T) {
+	opts := NewOptions()
+	opts.RedHatRbac.Enabled = true
+	opts.RedHatRbac.XRhIdentityDomain = "redhat"
+	opts.RedHatRbac.OIDCIssuerDomains = []OIDCIssuerDomainEntry{
+		{
+			Issuer: "https://sso.redhat.com/auth/realms/redhat-external",
+			Domain: "redhat",
+		},
+		{
+			Issuer: "https://login.example.com",
+			Domain: "example",
+		},
+	}
+
+	errs := opts.Complete()
+	assert.Empty(t, errs)
 
 	strategy := opts.Build()
 	assert.NotNil(t, strategy)

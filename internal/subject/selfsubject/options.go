@@ -13,9 +13,16 @@ type Options struct {
 
 // RedHatRbacOptions configures the Red Hat RBAC strategy.
 type RedHatRbacOptions struct {
-	Enabled             bool              `mapstructure:"enabled"`
-	XRhIdentityDomain   string            `mapstructure:"issuerDomain"`
-	OIDCIssuerDomainMap map[string]string `mapstructure:"oidcIssuerDomainMap"`
+	Enabled             bool                    `mapstructure:"enabled"`
+	XRhIdentityDomain   string                  `mapstructure:"issuerDomain"`
+	OIDCIssuerDomains   []OIDCIssuerDomainEntry `mapstructure:"oidcIssuerDomains"`
+	OIDCIssuerDomainMap map[string]string       `mapstructure:"oidcIssuerDomainMap"`
+}
+
+// OIDCIssuerDomainEntry maps an OIDC issuer to a domain.
+type OIDCIssuerDomainEntry struct {
+	Issuer string `mapstructure:"iss"`
+	Domain string `mapstructure:"domain"`
 }
 
 // NewOptions returns a new Options with default values.
@@ -43,6 +50,9 @@ func (o *Options) Validate() []error {
 		if o.RedHatRbac.XRhIdentityDomain == "" {
 			errs = append(errs, fmt.Errorf("selfsubject.redhat-rbac.issuer-domain is required when enabled"))
 		}
+		if len(o.RedHatRbac.OIDCIssuerDomainMap) == 0 {
+			errs = append(errs, fmt.Errorf("selfsubject.redhat-rbac.oidcIssuerDomains is required when enabled"))
+		}
 	}
 
 	return errs
@@ -50,7 +60,37 @@ func (o *Options) Validate() []error {
 
 // Complete finalizes the configuration.
 func (o *Options) Complete() []error {
+	if o == nil || o.RedHatRbac == nil {
+		return nil
+	}
+
+	if len(o.RedHatRbac.OIDCIssuerDomains) > 0 {
+		mapped, err := buildOIDCIssuerDomainMap(o.RedHatRbac.OIDCIssuerDomains)
+		if err != nil {
+			return []error{err}
+		}
+		o.RedHatRbac.OIDCIssuerDomainMap = mapped
+		return nil
+	}
+
+	if o.RedHatRbac.OIDCIssuerDomainMap == nil {
+		o.RedHatRbac.OIDCIssuerDomainMap = map[string]string{}
+	}
 	return nil
+}
+
+func buildOIDCIssuerDomainMap(entries []OIDCIssuerDomainEntry) (map[string]string, error) {
+	out := make(map[string]string)
+	for _, entry := range entries {
+		if entry.Issuer == "" {
+			return nil, fmt.Errorf("selfsubject.redhat-rbac.oidcIssuerDomains.iss is required")
+		}
+		if entry.Domain == "" {
+			return nil, fmt.Errorf("selfsubject.redhat-rbac.oidcIssuerDomains.domain is required")
+		}
+		out[entry.Issuer] = entry.Domain
+	}
+	return out, nil
 }
 
 // Build constructs the configured SelfSubjectStrategy or returns nil when disabled.

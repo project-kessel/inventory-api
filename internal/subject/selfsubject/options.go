@@ -8,7 +8,7 @@ import (
 
 // Options holds settings for self-subject derivation strategies.
 type Options struct {
-	RedHatRbac *RedHatRbacOptions `mapstructure:"redhatRbacSelfSubjectStratergy"`
+	RedHatRbac *RedHatRbacOptions `mapstructure:"redhatRbacSelfSubjectStrategy"`
 }
 
 // RedHatRbacOptions configures the Red Hat RBAC strategy.

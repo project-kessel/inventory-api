@@ -28,8 +28,9 @@ func TestOptions_Validate_EnabledRequiresDomain(t *testing.T) {
 	opts.RedHatRbac.XRhIdentityDomain = ""
 
 	errs := opts.Validate()
-	assert.Len(t, errs, 1)
+	assert.Len(t, errs, 2)
 	assert.Contains(t, errs[0].Error(), "issuer-domain is required")
+	assert.Contains(t, errs[1].Error(), "oidcIssuerDomains is required")
 }
 
 func TestOptions_Validate_EnabledRequiresOIDCIssuerDomains(t *testing.T) {
@@ -48,6 +49,9 @@ func TestOptions_Validate_EnabledWithDomainPasses(t *testing.T) {
 	opts := NewOptions()
 	opts.RedHatRbac.Enabled = true
 	opts.RedHatRbac.XRhIdentityDomain = "redhat"
+	opts.RedHatRbac.OIDCIssuerDomainMap = map[string]string{
+		"https://sso.redhat.com/auth/realms/redhat-external": "redhat",
+	}
 
 	errs := opts.Validate()
 	assert.Empty(t, errs)

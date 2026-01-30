@@ -38,7 +38,7 @@ authn:
 authz:
   impl: allow-all
 selfsubjectstrategy:
-  redhatRbacSelfSubjectStratergy:
+  redhatRbacSelfSubjectStrategy:
     enabled: true
     issuerDomain: redhat
     oidcIssuerDomains:

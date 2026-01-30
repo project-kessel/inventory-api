@@ -187,8 +187,8 @@ stringData:
               transport:
                 http: false
                 grpc: true
-    selfSubjectStratergy:
-      redhatRbacSelfSubjectStratergy:
+    selfSubjectStrategy:
+      redhatRbacSelfSubjectStrategy:
         enabled: true
         issuerDomain: redhat
         oidcIssuerDomains:

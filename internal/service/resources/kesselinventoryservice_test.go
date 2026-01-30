@@ -464,6 +464,41 @@ func TestToLookupResourcesCommand(t *testing.T) {
 	assert.Equal(t, uint32(50), result.Limit)
 }
 
+func TestToLookupResourcesCommand_NoPagination(t *testing.T) {
+	permission := "view"
+	reporterType := "hbi"
+	input := &pb.StreamedListObjectsRequest{
+		ObjectType: &pb.RepresentationType{
+			ResourceType: "host",
+			ReporterType: &reporterType,
+		},
+		Relation: "view",
+		Subject: &pb.SubjectReference{
+			Relation: &permission,
+			Resource: &pb.ResourceReference{
+				ResourceId:   "res-id",
+				ResourceType: "principal",
+				Reporter: &pb.ReporterReference{
+					Type: "rbac",
+				},
+			},
+		},
+		// Pagination intentionally omitted
+	}
+
+	result, err := svc.ToLookupResourcesCommand(input)
+	require.NoError(t, err)
+
+	assert.Equal(t, "host", result.ResourceType.Serialize())
+	assert.Equal(t, "hbi", result.ReporterType.Serialize())
+	assert.Equal(t, "view", result.Relation.Serialize())
+	assert.Equal(t, "res-id", result.Subject.Subject().LocalResourceId().Serialize())
+	assert.Equal(t, "principal", result.Subject.Subject().ResourceType().Serialize())
+	assert.Equal(t, "rbac", result.Subject.Subject().ReporterType().Serialize())
+	assert.Equal(t, uint32(1000), result.Limit)
+	assert.Equal(t, "", result.Continuation)
+}
+
 func TestIsValidatedRepresentationType(t *testing.T) {
 
 	assert.True(t, IsValidType("hbi"))

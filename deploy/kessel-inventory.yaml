@@ -50,14 +50,14 @@ objects:
             args: ["serve"]
             livenessProbe:
               httpGet:
-                path: /api/inventory/v1/livez
+                path: /api/kessel/v1/livez
                 port: 8000
               timeoutSeconds: 5
               periodSeconds: 15
               failureThreshold: 3
             readinessProbe:
               httpGet:
-                path: /api/inventory/v1/readyz
+                path: /api/kessel/v1/readyz
                 port: 8000
               timeoutSeconds: 5
               periodSeconds: 10

@@ -15,7 +15,6 @@ import (
 	"github.com/project-kessel/inventory-api/internal/biz"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
 	"github.com/project-kessel/inventory-api/internal/data"
-	eventingapi "github.com/project-kessel/inventory-api/internal/eventing/api"
 	"github.com/project-kessel/inventory-api/internal/metricscollector"
 	"github.com/project-kessel/inventory-api/internal/pubsub"
 	"github.com/project-kessel/inventory-api/internal/server"
@@ -54,12 +53,11 @@ type UsecaseConfig struct {
 }
 
 // Usecase provides business logic operations for resource management in the inventory system.
-// It coordinates between repositories, authorization, eventing, and other system components.
+// It coordinates between repositories, authorization, and other system components.
 type Usecase struct {
 	resourceRepository  data.ResourceRepository
 	waitForNotifBreaker *gobreaker.CircuitBreaker
 	Authz               authzapi.Authorizer
-	Eventer             eventingapi.Manager
 	Namespace           string
 	Log                 *log.Helper
 	Server              server.Server
@@ -69,13 +67,12 @@ type Usecase struct {
 }
 
 func New(resourceRepository data.ResourceRepository,
-	authz authzapi.Authorizer, eventer eventingapi.Manager, namespace string, logger log.Logger,
+	authz authzapi.Authorizer, namespace string, logger log.Logger,
 	listenManager pubsub.ListenManagerImpl, waitForNotifBreaker *gobreaker.CircuitBreaker, usecaseConfig *UsecaseConfig, metricsCollector *metricscollector.MetricsCollector) *Usecase {
 	return &Usecase{
 		resourceRepository:  resourceRepository,
 		waitForNotifBreaker: waitForNotifBreaker,
 		Authz:               authz,
-		Eventer:             eventer,
 		Namespace:           namespace,
 		Log:                 log.NewHelper(logger),
 		ListenManager:       listenManager,

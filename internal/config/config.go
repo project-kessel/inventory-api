@@ -14,7 +14,6 @@ import (
 	"github.com/project-kessel/inventory-api/internal/config/schema"
 	"github.com/project-kessel/inventory-api/internal/consistency"
 	"github.com/project-kessel/inventory-api/internal/consumer"
-	"github.com/project-kessel/inventory-api/internal/eventing"
 	"github.com/project-kessel/inventory-api/internal/server"
 	"github.com/project-kessel/inventory-api/internal/service"
 	"github.com/project-kessel/inventory-api/internal/storage"
@@ -25,7 +24,6 @@ type OptionsConfig struct {
 	Authn       *authn.Options
 	Authz       *authz.Options
 	Storage     *storage.Options
-	Eventing    *eventing.Options
 	Consumer    *consumer.Options
 	Server      *server.Options
 	Consistency *consistency.Options
@@ -39,7 +37,6 @@ func NewOptionsConfig() *OptionsConfig {
 		authn.NewOptions(),
 		authz.NewOptions(),
 		storage.NewOptions(),
-		eventing.NewOptions(),
 		consumer.NewOptions(),
 		server.NewOptions(),
 		consistency.NewOptions(),

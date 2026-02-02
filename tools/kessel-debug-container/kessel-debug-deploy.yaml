@@ -5,17 +5,6 @@ metadata:
   namespace: kessel-${ENV}
 objects:
 - apiVersion: v1
-  kind: ConfigMap
-  metadata:
-    name: kessel-debug-config
-  data:
-    ZED_ENDPOINT: "kessel-relations-spicedb.kessel-${ENV}.svc:50051"
-    ZED_INSECURE: "true"
-    RELATIONS_API_GRPC_ENDPOINT: "kessel-relations-api.kessel-${ENV}.svc:9000"
-    RELATIONS_API_HTTP_ENDPOINT: "kessel-relations-api.kessel-${ENV}.svc:8000"
-    INVENTORY_API_GRPC_ENDPOINT: "kessel-inventory-api.kessel-${ENV}.svc:9000"
-    INVENTORY_API_HTTP_ENDPOINT: "kessel-inventory-api.kessel-${ENV}.svc:8000"
-- apiVersion: v1
   kind: Pod
   metadata:
     labels:
@@ -29,10 +18,19 @@ objects:
       command: ["sleep"]
       args: ["${SLEEP_INTERVAL}"]
       imagePullPolicy: Always
-      envFrom:
-      - configMapRef:
-          name: kessel-debug-config
       env:
+      - name: ZED_ENDPOINT
+        value: "kessel-relations-spicedb.kessel-${ENV}.svc:50051"
+      - name: ZED_INSECURE
+        value: "true"
+      - name: RELATIONS_API_GRPC_ENDPOINT
+        value: "kessel-relations-api.kessel-${ENV}.svc:9000"
+      - name: RELATIONS_API_HTTP_ENDPOINT
+        value: "kessel-relations-api.kessel-${ENV}.svc:8000"
+      - name: INVENTORY_API_GRPC_ENDPOINT
+        value: "kessel-inventory-api.kessel-${ENV}.svc:9000"
+      - name: INVENTORY_API_HTTP_ENDPOINT
+        value: "kessel-inventory-api.kessel-${ENV}.svc:8000"
       - name: ZED_TOKEN
         valueFrom:
           secretKeyRef:

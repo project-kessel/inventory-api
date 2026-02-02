@@ -17,31 +17,34 @@ import (
 	"github.com/project-kessel/inventory-api/internal/server"
 	"github.com/project-kessel/inventory-api/internal/service"
 	"github.com/project-kessel/inventory-api/internal/storage"
+	"github.com/project-kessel/inventory-api/internal/subject/selfsubject"
 )
 
 // OptionsConfig contains the settings for each configuration option
 type OptionsConfig struct {
-	Authn       *authn.Options
-	Authz       *authz.Options
-	Storage     *storage.Options
-	Consumer    *consumer.Options
-	Server      *server.Options
-	Consistency *consistency.Options
-	Service     *service.Options
-	Schema      *schema.Options
+	Authn               *authn.Options
+	Authz               *authz.Options
+	Storage             *storage.Options
+	Consumer            *consumer.Options
+	Server              *server.Options
+	Consistency         *consistency.Options
+	Service             *service.Options
+	Schema              *schema.Options
+	SelfSubjectStrategy *selfsubject.Options
 }
 
 // NewOptionsConfig returns a new OptionsConfig with default options set
 func NewOptionsConfig() *OptionsConfig {
 	return &OptionsConfig{
-		authn.NewOptions(),
-		authz.NewOptions(),
-		storage.NewOptions(),
-		consumer.NewOptions(),
-		server.NewOptions(),
-		consistency.NewOptions(),
-		service.NewOptions(),
-		schema.NewOptions(),
+		Authn:               authn.NewOptions(),
+		Authz:               authz.NewOptions(),
+		Storage:             storage.NewOptions(),
+		Consumer:            consumer.NewOptions(),
+		Server:              server.NewOptions(),
+		Consistency:         consistency.NewOptions(),
+		Service:             service.NewOptions(),
+		Schema:              schema.NewOptions(),
+		SelfSubjectStrategy: selfsubject.NewOptions(),
 	}
 }
 

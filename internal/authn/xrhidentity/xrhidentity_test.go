@@ -47,9 +47,9 @@ func TestAuthenticate_MissingHeader(t *testing.T) {
 		headers: make(map[string]string),
 	}
 
-	identity, decision := auth.Authenticate(context.Background(), transporter)
+	claims, decision := auth.Authenticate(context.Background(), transporter)
 
-	assert.Nil(t, identity)
+	assert.Nil(t, claims)
 	assert.Equal(t, api.Ignore, decision)
 }
 
@@ -61,9 +61,9 @@ func TestAuthenticate_InvalidHeader(t *testing.T) {
 		},
 	}
 
-	identity, decision := auth.Authenticate(context.Background(), transporter)
+	claims, decision := auth.Authenticate(context.Background(), transporter)
 
-	assert.Nil(t, identity)
+	assert.Nil(t, claims)
 	assert.Equal(t, api.Deny, decision)
 }
 
@@ -80,16 +80,14 @@ func TestAuthenticate_ValidHeader_WithUsername(t *testing.T) {
 		},
 	}
 
-	identity, decision := auth.Authenticate(context.Background(), transporter)
+	claims, decision := auth.Authenticate(context.Background(), transporter)
 
-	require.NotNil(t, identity)
+	require.NotNil(t, claims)
 	assert.Equal(t, api.Allow, decision)
-	assert.Equal(t, "x-rh-identity", identity.AuthType)
-	assert.Equal(t, "testuser", identity.Principal)
-	assert.Equal(t, "123456", identity.Tenant)
-	assert.Equal(t, "User", identity.Type)
-	assert.Equal(t, "user-123", identity.UserID)
-	assert.False(t, identity.IsGuest)
+	assert.Equal(t, api.AuthTypeXRhIdentity, claims.AuthType)
+	assert.Equal(t, api.SubjectId("user-123"), claims.SubjectId)
+	assert.Equal(t, api.OrganizationId("123456"), claims.OrganizationId)
+	assert.Empty(t, claims.Issuer)
 }
 
 func TestAuthenticate_ValidHeader_WithEmailOnly(t *testing.T) {
@@ -104,13 +102,13 @@ func TestAuthenticate_ValidHeader_WithEmailOnly(t *testing.T) {
 		},
 	}
 
-	identity, decision := auth.Authenticate(context.Background(), transporter)
+	claims, decision := auth.Authenticate(context.Background(), transporter)
 
-	require.NotNil(t, identity)
+	require.NotNil(t, claims)
 	assert.Equal(t, api.Allow, decision)
-	assert.Equal(t, "user@example.com", identity.Principal) // Should use email when username is missing
-	assert.Equal(t, "789012", identity.Tenant)
-	assert.False(t, identity.IsGuest)
+	assert.Equal(t, api.SubjectId("user-456"), claims.SubjectId) // UserID preferred when present
+	assert.Equal(t, api.OrganizationId("789012"), claims.OrganizationId)
+	assert.Empty(t, claims.Issuer)
 }
 
 func TestAuthenticate_ValidHeader_WithServiceAccount(t *testing.T) {
@@ -125,14 +123,14 @@ func TestAuthenticate_ValidHeader_WithServiceAccount(t *testing.T) {
 		},
 	}
 
-	identity, decision := auth.Authenticate(context.Background(), transporter)
+	claims, decision := auth.Authenticate(context.Background(), transporter)
 
-	require.NotNil(t, identity)
+	require.NotNil(t, claims)
 	assert.Equal(t, api.Allow, decision)
-	assert.Equal(t, "x-rh-identity", identity.AuthType)
-	assert.Equal(t, "345678", identity.Tenant)
-	assert.Equal(t, "ServiceAccount", identity.Type)
-	assert.False(t, identity.IsGuest) // Service accounts are not guests
+	assert.Equal(t, api.AuthTypeXRhIdentity, claims.AuthType)
+	assert.Empty(t, claims.SubjectId)
+	assert.Empty(t, claims.OrganizationId)
+	assert.Empty(t, claims.Issuer)
 }
 
 func TestAuthenticate_ValidHeader_NoUserOrServiceAccount(t *testing.T) {
@@ -147,15 +145,14 @@ func TestAuthenticate_ValidHeader_NoUserOrServiceAccount(t *testing.T) {
 		},
 	}
 
-	identity, decision := auth.Authenticate(context.Background(), transporter)
+	claims, decision := auth.Authenticate(context.Background(), transporter)
 
-	require.NotNil(t, identity)
+	require.NotNil(t, claims)
 	assert.Equal(t, api.Allow, decision)
-	assert.Equal(t, "x-rh-identity", identity.AuthType)
-	assert.Equal(t, "999999", identity.Tenant)
-	assert.Equal(t, "System", identity.Type)
-	assert.True(t, identity.IsGuest)    // Missing user info is treated as guest
-	assert.Empty(t, identity.Principal) // No principal when no user/service account
+	assert.Equal(t, api.AuthTypeXRhIdentity, claims.AuthType)
+	assert.Empty(t, claims.OrganizationId)
+	assert.Empty(t, claims.SubjectId) // No subject when no user/service account
+	assert.Empty(t, claims.Issuer)
 }
 
 func TestAuthenticate_ValidHeader_WithAuthType(t *testing.T) {
@@ -170,82 +167,87 @@ func TestAuthenticate_ValidHeader_WithAuthType(t *testing.T) {
 		},
 	}
 
-	identity, decision := auth.Authenticate(context.Background(), transporter)
+	claims, decision := auth.Authenticate(context.Background(), transporter)
 
-	require.NotNil(t, identity)
+	require.NotNil(t, claims)
 	assert.Equal(t, api.Allow, decision)
-	assert.Equal(t, "cert-auth", identity.AuthType) // Should use platform identity's AuthType
-	assert.Equal(t, "certuser", identity.Principal)
+	assert.Equal(t, api.AuthTypeXRhIdentity, claims.AuthType)
+	assert.Empty(t, claims.SubjectId)
 }
 
-func TestConvertPlatformIdentity_UsernamePreference(t *testing.T) {
+func TestConvertPlatformClaims_UserIDPreferred(t *testing.T) {
 	platformIdentity := &identity.Identity{
+		Type: "User",
 		User: &identity.User{
+			UserID:   "user-123",
 			Username: "username",
 			Email:    "email@example.com",
 		},
 	}
 
-	result := convertPlatformIdentity(platformIdentity)
-	assert.Equal(t, "username", result.Principal) // Username should be preferred over email
+	result := convertPlatformClaims(platformIdentity)
+	assert.Equal(t, api.SubjectId("user-123"), result.SubjectId)
 }
 
-func TestConvertPlatformIdentity_EmailFallback(t *testing.T) {
+func TestConvertPlatformClaims_NoUserID(t *testing.T) {
 	platformIdentity := &identity.Identity{
+		Type: "User",
 		User: &identity.User{
 			Email: "email@example.com",
 			// No username
 		},
 	}
 
-	result := convertPlatformIdentity(platformIdentity)
-	assert.Equal(t, "email@example.com", result.Principal) // Should use email when username is missing
+	result := convertPlatformClaims(platformIdentity)
+	assert.Empty(t, result.SubjectId)
 }
 
-func TestConvertPlatformIdentity_NoUserInfo(t *testing.T) {
+func TestConvertPlatformClaims_NoUserInfo(t *testing.T) {
 	platformIdentity := &identity.Identity{
+		Type:          "User",
 		AccountNumber: "123456",
 		// No User or ServiceAccount
 	}
 
-	result := convertPlatformIdentity(platformIdentity)
-	assert.Empty(t, result.Principal)
-	assert.Equal(t, "123456", result.Tenant)
-	assert.True(t, result.IsGuest) // Should be guest when no user info
+	result := convertPlatformClaims(platformIdentity)
+	assert.Empty(t, result.SubjectId)
+	assert.Empty(t, result.OrganizationId)
 }
 
-func TestConvertPlatformIdentity_NilUser(t *testing.T) {
+func TestConvertPlatformClaims_NilUser(t *testing.T) {
 	platformIdentity := &identity.Identity{
+		Type:          "User",
 		AccountNumber: "123456",
 		User:          nil,
 	}
 
-	result := convertPlatformIdentity(platformIdentity)
-	assert.Empty(t, result.Principal)
-	assert.True(t, result.IsGuest)
+	result := convertPlatformClaims(platformIdentity)
+	assert.Empty(t, result.SubjectId)
 }
 
-func TestConvertPlatformIdentity_EmptyAccountNumber(t *testing.T) {
+func TestConvertPlatformClaims_EmptyAccountNumber(t *testing.T) {
 	platformIdentity := &identity.Identity{
+		Type: "User",
 		User: &identity.User{
 			Username: "testuser",
 		},
 		// No AccountNumber
 	}
 
-	result := convertPlatformIdentity(platformIdentity)
-	assert.Empty(t, result.Tenant)
-	assert.Equal(t, "testuser", result.Principal)
+	result := convertPlatformClaims(platformIdentity)
+	assert.Empty(t, result.OrganizationId)
+	assert.Empty(t, result.SubjectId)
 }
 
-func TestConvertPlatformIdentity_DefaultAuthType(t *testing.T) {
+func TestConvertPlatformClaims_DefaultAuthType(t *testing.T) {
 	platformIdentity := &identity.Identity{
+		Type: "User",
 		User: &identity.User{
 			Username: "testuser",
 		},
 		// No AuthType specified
 	}
 
-	result := convertPlatformIdentity(platformIdentity)
-	assert.Equal(t, "x-rh-identity", result.AuthType) // Should default to "x-rh-identity"
+	result := convertPlatformClaims(platformIdentity)
+	assert.Equal(t, api.AuthTypeXRhIdentity, result.AuthType) // Should default to "x-rh-identity"
 }

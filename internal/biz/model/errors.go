@@ -27,6 +27,17 @@ var (
 	ErrEmptyReporterList = errors.New("must have at least one reporter resource")
 )
 
+// Service-level sentinel errors - operation failures
+var (
+	// ErrResourceAlreadyExists indicates the resource already exists when creating.
+	ErrResourceAlreadyExists = errors.New("resource already exists")
+	// ErrInventoryIdMismatch indicates the inventory ID in the request doesn't match the existing resource.
+	// TODO: what is this? it's unused.
+	ErrInventoryIdMismatch = errors.New("resource inventory id mismatch")
+	// ErrDatabaseError indicates a database operation failure.
+	ErrDatabaseError = errors.New("database error")
+)
+
 // ValidationError represents a field validation error with context
 type ValidationError struct {
 	Field   string

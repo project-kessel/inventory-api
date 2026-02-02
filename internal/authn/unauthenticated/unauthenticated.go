@@ -16,15 +16,9 @@ func New() *UnauthenticatedAuthenticator {
 	return &UnauthenticatedAuthenticator{}
 }
 
-// Authenticate creates an unauthenticated identity using the User-Agent header and always allows the request.
-func (a *UnauthenticatedAuthenticator) Authenticate(ctx context.Context, t transport.Transporter) (*api.Identity, api.Decision) {
-	// TODO: should we use something else? ip address?
-	ua := t.RequestHeader().Get("User-Agent")
-	identity := &api.Identity{
-		Principal: ua,
-		IsGuest:   true,
-		AuthType:  "allow-unauthenticated",
-	}
-
-	return identity, api.Allow
+// Authenticate creates unauthenticated claims using the User-Agent header and always allows the request.
+func (a *UnauthenticatedAuthenticator) Authenticate(ctx context.Context, t transport.Transporter) (*api.Claims, api.Decision) {
+	// No claims for unauthenticated requests
+	claims := api.UnauthenticatedClaims()
+	return claims, api.Allow
 }

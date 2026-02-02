@@ -32,6 +32,8 @@ objects:
                 - --resource-type=${RESOURCE_TYPE}
                 - --reporter-type=${REPORTER_TYPE}
                 - --dry-run=${DRY_RUN}
+                - --batch-size=${BATCH_SIZE}
+                - --batch-delay-ms=${BATCH_DELAY_MS}
               env:
                 - name: CLOWDER_ENABLED
                   value: ${CLOWDER_ENABLED}
@@ -83,8 +85,8 @@ objects:
                   cpu: ${LIMITS_CPU}
           volumes:
             - name: config-volume
-              configMap:
-                name: ${INVENTORY_API_CONFIG_NAME}
+              secret:
+                secretName: ${INVENTORY_API_CONFIG_NAME}
 parameters:
   - description: Job name (e.g., resource-delete-job-20240113)
     name: JOB_NAME
@@ -107,6 +109,12 @@ parameters:
   - description: Whether to run in dry-run mode (true/false)
     name: DRY_RUN
     value: "true"
+  - description: Number of records to delete per batch
+    name: BATCH_SIZE
+    value: "5000"
+  - description: Delay between batches in milliseconds
+    name: BATCH_DELAY_MS
+    value: "1000"
   - description: Enable Clowder integration (true/false)
     name: CLOWDER_ENABLED
     value: "true"

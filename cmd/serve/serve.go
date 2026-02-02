@@ -18,12 +18,14 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/project-kessel/inventory-api/cmd/common"
+	"github.com/project-kessel/inventory-api/internal/biz/usecase/metaauthorizer"
 	resourcesctl "github.com/project-kessel/inventory-api/internal/biz/usecase/resources"
 	"github.com/project-kessel/inventory-api/internal/config/schema"
 	"github.com/project-kessel/inventory-api/internal/consistency"
 	"github.com/project-kessel/inventory-api/internal/consumer"
 	"github.com/project-kessel/inventory-api/internal/data"
 	"github.com/project-kessel/inventory-api/internal/pubsub"
+	"github.com/project-kessel/inventory-api/internal/subject/selfsubject"
 
 	//v1beta2
 	resourcesvc "github.com/project-kessel/inventory-api/internal/service/resources"
@@ -54,6 +56,7 @@ func NewCommand(
 	consumerOptions *consumer.Options,
 	consistencyOptions *consistency.Options,
 	serviceOptions *service.Options,
+	selfSubjectOptions *selfsubject.Options,
 	loggerOptions common.LoggerOptions,
 	schemaOptions *schema.Options,
 ) *cobra.Command {
@@ -87,6 +90,15 @@ func NewCommand(
 			if errs != nil {
 				return errors.NewAggregate(errs)
 			}
+
+			// configure selfsubject
+			if errs := selfSubjectOptions.Complete(); errs != nil {
+				return errors.NewAggregate(errs)
+			}
+			if errs := selfSubjectOptions.Validate(); errs != nil {
+				return errors.NewAggregate(errs)
+			}
+			selfSubjectStrategy := selfSubjectOptions.Build()
 
 			// configure authz
 			if errs := authzOptions.Complete(); errs != nil {
@@ -255,7 +267,7 @@ func NewCommand(
 			//v1beta2
 			// wire together inventory service handling
 			resourceRepo := data.NewResourceRepository(db, transactionManager)
-			inventory_controller := resourcesctl.New(resourceRepo, authorizer, "notifications", log.With(logger, "subsystem", "notificationsintegrations_controller"), listenManager, waitForNotifCircuitBreaker, usecaseConfig, mc)
+			inventory_controller := resourcesctl.New(resourceRepo, authorizer, "notifications", log.With(logger, "subsystem", "notificationsintegrations_controller"), listenManager, waitForNotifCircuitBreaker, usecaseConfig, mc, metaauthorizer.NewSimpleMetaAuthorizer(), selfSubjectStrategy)
 
 			inventory_service := resourcesvc.NewKesselInventoryServiceV1beta2(inventory_controller)
 			pbv1beta2.RegisterKesselInventoryServiceServer(server.GrpcServer, inventory_service)
@@ -337,6 +349,7 @@ func NewCommand(
 	consistencyOptions.AddFlags(cmd.Flags(), "consistency")
 	serviceOptions.AddFlags()
 	schemaOptions.AddFlags(cmd.Flags(), "schema")
+	selfSubjectOptions.AddFlags(cmd.Flags(), "selfsubjectstrategy")
 
 	return cmd
 }

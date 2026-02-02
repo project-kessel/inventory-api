@@ -52,10 +52,16 @@ objects:
               httpGet:
                 path: /api/inventory/v1/livez
                 port: 8000
+              timeoutSeconds: 5
+              periodSeconds: 15
+              failureThreshold: 3
             readinessProbe:
               httpGet:
                 path: /api/inventory/v1/readyz
                 port: 8000
+              timeoutSeconds: 5
+              periodSeconds: 10
+              failureThreshold: 3
             resources:
               requests:
                 memory: ${INVENTORY_REQUESTS_MEMORY}
@@ -98,7 +104,6 @@ objects:
             public:
               enabled: true
               apiPath: inventory
-              tls: true
 
       testing:
         iqePlugin: kessel-inventory

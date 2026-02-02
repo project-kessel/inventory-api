@@ -1,0 +1,135 @@
+apiVersion: template.openshift.io/v1
+kind: Template
+metadata:
+  name: kessel-inventory-onetime-job
+objects:
+  - apiVersion: batch/v1
+    kind: Job
+    metadata:
+      name: ${JOB_NAME}
+      labels:
+        app: kessel-inventory-jobs
+        job-type: ${JOB_NAME}
+    spec:
+      backoffLimit: 0
+      completions: 1
+      parallelism: 1
+      template:
+        metadata:
+          labels:
+            app: kessel-inventory-jobs
+            job-type: ${JOB_NAME}
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: ${JOB_NAME}
+              image: ${INVENTORY_IMAGE}:${IMAGE_TAG}
+              imagePullPolicy: Always
+              command:
+                - inventory-api
+                - run-job
+                - ${JOB_COMMAND}
+                - --resource-type=${RESOURCE_TYPE}
+                - --reporter-type=${REPORTER_TYPE}
+                - --dry-run=${DRY_RUN}
+                - --batch-size=${BATCH_SIZE}
+                - --batch-delay-ms=${BATCH_DELAY_MS}
+              env:
+                - name: CLOWDER_ENABLED
+                  value: ${CLOWDER_ENABLED}
+                - name: INVENTORY_API_CONFIG
+                  value: "/inventory/inventory-api-config.yaml"
+                - name: PGDATA
+                  value: /temp/data
+                - name: INVENTORY_API_STORAGE_POSTGRES_HOST
+                  valueFrom:
+                    secretKeyRef:
+                      name: kessel-inventory-db
+                      key: db.host
+                      optional: true
+                - name: INVENTORY_API_STORAGE_POSTGRES_PORT
+                  valueFrom:
+                    secretKeyRef:
+                      name: kessel-inventory-db
+                      key: db.port
+                      optional: true
+                - name: INVENTORY_API_STORAGE_POSTGRES_DBNAME
+                  valueFrom:
+                    secretKeyRef:
+                      name: kessel-inventory-db
+                      key: db.name
+                      optional: true
+                - name: INVENTORY_API_STORAGE_POSTGRES_USER
+                  valueFrom:
+                    secretKeyRef:
+                      name: kessel-inventory-db
+                      key: db.user
+                      optional: true
+                - name: INVENTORY_API_STORAGE_POSTGRES_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: kessel-inventory-db
+                      key: db.password
+                      optional: true
+                - name: INVENTORY_API_STORAGE_DATABASE
+                  value: postgres
+              volumeMounts:
+                - name: config-volume
+                  mountPath: "/inventory"
+              resources:
+                requests:
+                  memory: ${REQUESTS_MEMORY}
+                  cpu: ${REQUESTS_CPU}
+                limits:
+                  memory: ${LIMITS_MEMORY}
+                  cpu: ${LIMITS_CPU}
+          volumes:
+            - name: config-volume
+              configMap:
+                name: ${INVENTORY_API_CONFIG_NAME}
+parameters:
+  - description: Job name (e.g., resource-delete-job-20240113)
+    name: JOB_NAME
+    required: true
+  - description: The run-job subcommand passed to the inventory-api command (e.g., "resource-delete-job")
+    name: JOB_COMMAND
+    required: true
+  - description: App Image
+    name: INVENTORY_IMAGE
+    value: quay.io/redhat-services-prod/project-kessel-tenant/kessel-inventory/inventory-api
+  - description: Image Tag
+    name: IMAGE_TAG
+    required: true
+  - description: Resource type to delete (e.g., host, k8s-cluster, k8s-policy-report)
+    name: RESOURCE_TYPE
+    required: true
+  - description: Reporter type to filter by (e.g., hbi, ocm)
+    name: REPORTER_TYPE
+    required: true
+  - description: Whether to run in dry-run mode (true/false)
+    name: DRY_RUN
+    value: "true"
+  - description: Number of records to delete per batch
+    name: BATCH_SIZE
+    value: "5000"
+  - description: Delay between batches in milliseconds
+    name: BATCH_DELAY_MS
+    value: "1000"
+  - description: Enable Clowder integration (true/false)
+    name: CLOWDER_ENABLED
+    value: "true"
+  - description: Name of the Inventory API Config ConfigMap
+    name: INVENTORY_API_CONFIG_NAME
+    value: inventory-api-config
+  - description: Memory request for job
+    name: REQUESTS_MEMORY
+    value: '384Mi'
+  - description: CPU request for job
+    name: REQUESTS_CPU
+    value: '100m'
+  - description: Memory limit for job
+    name: LIMITS_MEMORY
+    value: '512Mi'
+  - description: CPU limit for job
+    name: LIMITS_CPU
+    value: '200m'

@@ -210,10 +210,10 @@ const file_kessel_inventory_v1_health_proto_rawDesc = "" +
 	"\x10GetReadyzRequest\"?\n" +
 	"\x11GetReadyzResponse\x12\x16\n" +
 	"\x06status\x18\x01 \x01(\tR\x06status\x12\x12\n" +
-	"\x04code\x18\x02 \x01(\rR\x04code2\x96\x02\n" +
-	"\x1cKesselInventoryHealthService\x12x\n" +
-	"\bGetLivez\x12$.kessel.inventory.v1.GetLivezRequest\x1a%.kessel.inventory.v1.GetLivezResponse\"\x1f\x82\xd3\xe4\x93\x02\x19\x12\x17/api/inventory/v1/livez\x12|\n" +
-	"\tGetReadyz\x12%.kessel.inventory.v1.GetReadyzRequest\x1a&.kessel.inventory.v1.GetReadyzResponse\" \x82\xd3\xe4\x93\x02\x1a\x12\x18/api/inventory/v1/readyzBh\n" +
+	"\x04code\x18\x02 \x01(\rR\x04code2\x90\x02\n" +
+	"\x1cKesselInventoryHealthService\x12u\n" +
+	"\bGetLivez\x12$.kessel.inventory.v1.GetLivezRequest\x1a%.kessel.inventory.v1.GetLivezResponse\"\x1c\x82\xd3\xe4\x93\x02\x16\x12\x14/api/kessel/v1/livez\x12y\n" +
+	"\tGetReadyz\x12%.kessel.inventory.v1.GetReadyzRequest\x1a&.kessel.inventory.v1.GetReadyzResponse\"\x1d\x82\xd3\xe4\x93\x02\x17\x12\x15/api/kessel/v1/readyzBh\n" +
 	"#org.project_kessel.api.inventory.v1P\x01Z?github.com/project-kessel/inventory-api/api/kessel/inventory/v1b\x06proto3"
 
 var (

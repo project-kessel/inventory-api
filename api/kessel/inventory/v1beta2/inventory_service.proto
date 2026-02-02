@@ -37,7 +37,7 @@ service KesselInventoryService {
   // or authorization gating for downstream API calls.
   rpc Check(CheckRequest) returns (CheckResponse) {
     option (google.api.http) = {
-      post: "/api/inventory/v1beta2/check"
+      post: "/api/kessel/v1beta2/check"
       body: "*"
     };
   }
@@ -52,7 +52,7 @@ service KesselInventoryService {
   // Common use cases include enforcing access checks for the authenticated user.
   rpc CheckSelf(CheckSelfRequest) returns (CheckSelfResponse) {
     option (google.api.http) = {
-      post: "/api/inventory/v1beta2/checkself"
+      post: "/api/kessel/v1beta2/checkself"
       body: "*"
     };
   }
@@ -69,7 +69,7 @@ service KesselInventoryService {
   // which depend on the current state of the relationship.
   rpc CheckForUpdate(CheckForUpdateRequest) returns (CheckForUpdateResponse) {
     option (google.api.http) = {
-      post: "/api/inventory/v1beta2/checkforupdate"
+      post: "/api/kessel/v1beta2/checkforupdate"
       body: "*"
     };
   }
@@ -90,7 +90,7 @@ service KesselInventoryService {
   // The response includes a result for each item in the request, maintaining the same order.
   rpc CheckBulk (CheckBulkRequest) returns (CheckBulkResponse) {
       option (google.api.http) = {
-        post: "/api/inventory/v1beta2/checkbulk"
+        post: "/api/kessel/v1beta2/checkbulk"
         body: "*"
       };
   }
@@ -106,7 +106,7 @@ service KesselInventoryService {
   // the same order.
   rpc CheckSelfBulk (CheckSelfBulkRequest) returns (CheckSelfBulkResponse) {
       option (google.api.http) = {
-        post: "/api/inventory/v1beta2/checkselfbulk"
+        post: "/api/kessel/v1beta2/checkselfbulk"
         body: "*"
       };
   }
@@ -141,7 +141,7 @@ service KesselInventoryService {
   //
   rpc ReportResource(ReportResourceRequest) returns (ReportResourceResponse) {
     option (google.api.http) = {
-      post: "/api/inventory/v1beta2/resources"
+      post: "/api/kessel/v1beta2/resources"
       body: "*"
     };
   }
@@ -159,7 +159,7 @@ service KesselInventoryService {
   // As an example, it can revoke previously granted access across the system.
   rpc DeleteResource(DeleteResourceRequest) returns (DeleteResourceResponse) {
     option (google.api.http) = {
-      delete: "/api/inventory/v1beta2/resources"
+      delete: "/api/kessel/v1beta2/resources"
       body: "*"
     };
   }

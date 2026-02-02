@@ -154,7 +154,7 @@ objects:
                     secretKeyRef:
                       name: kessel-sso-sa
                       key: url
-                image: registry.access.redhat.com/ubi9/ubi-minimal
+                image: quay.io/redhat-services-prod/project-kessel-tenant/kessel-debug:latest
                 resources:
                   limits:
                     cpu: 200m

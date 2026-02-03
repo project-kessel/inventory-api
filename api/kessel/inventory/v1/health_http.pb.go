@@ -29,8 +29,8 @@ type KesselInventoryHealthServiceHTTPServer interface {
 
 func RegisterKesselInventoryHealthServiceHTTPServer(s *http.Server, srv KesselInventoryHealthServiceHTTPServer) {
 	r := s.Route("/")
-	r.GET("/api/inventory/v1/livez", _KesselInventoryHealthService_GetLivez0_HTTP_Handler(srv))
-	r.GET("/api/inventory/v1/readyz", _KesselInventoryHealthService_GetReadyz0_HTTP_Handler(srv))
+	r.GET("/api/kessel/v1/livez", _KesselInventoryHealthService_GetLivez0_HTTP_Handler(srv))
+	r.GET("/api/kessel/v1/readyz", _KesselInventoryHealthService_GetReadyz0_HTTP_Handler(srv))
 }
 
 func _KesselInventoryHealthService_GetLivez0_HTTP_Handler(srv KesselInventoryHealthServiceHTTPServer) func(ctx http.Context) error {
@@ -86,7 +86,7 @@ func NewKesselInventoryHealthServiceHTTPClient(client *http.Client) KesselInvent
 
 func (c *KesselInventoryHealthServiceHTTPClientImpl) GetLivez(ctx context.Context, in *GetLivezRequest, opts ...http.CallOption) (*GetLivezResponse, error) {
 	var out GetLivezResponse
-	pattern := "/api/inventory/v1/livez"
+	pattern := "/api/kessel/v1/livez"
 	path := binding.EncodeURL(pattern, in, true)
 	opts = append(opts, http.Operation(OperationKesselInventoryHealthServiceGetLivez))
 	opts = append(opts, http.PathTemplate(pattern))
@@ -99,7 +99,7 @@ func (c *KesselInventoryHealthServiceHTTPClientImpl) GetLivez(ctx context.Contex
 
 func (c *KesselInventoryHealthServiceHTTPClientImpl) GetReadyz(ctx context.Context, in *GetReadyzRequest, opts ...http.CallOption) (*GetReadyzResponse, error) {
 	var out GetReadyzResponse
-	pattern := "/api/inventory/v1/readyz"
+	pattern := "/api/kessel/v1/readyz"
 	path := binding.EncodeURL(pattern, in, true)
 	opts = append(opts, http.Operation(OperationKesselInventoryHealthServiceGetReadyz))
 	opts = append(opts, http.PathTemplate(pattern))

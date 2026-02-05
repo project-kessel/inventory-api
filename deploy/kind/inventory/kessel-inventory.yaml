@@ -61,8 +61,6 @@ spec:
                 secretKeyRef:
                   name: inventory-api-config
                   key: db_password
-            - name: RESOURCE_DIR
-              value: "/data/schema/resources"
           volumeMounts:
             - name: config-volume
               mountPath: "/inventory"
@@ -91,8 +89,6 @@ spec:
                 secretKeyRef:
                   name: inventory-api-config
                   key: db_password
-            - name: RESOURCE_DIR
-              value: "/data/schema/resources"
           livenessProbe:
             httpGet:
               path: /api/kessel/v1/livez
@@ -230,8 +226,11 @@ stringData:
         dbname: "spicedb"
     service:
       use_v1beta2_db: true
-    resources:
-      schemaPath: "data/schema/resources"
+    schema:
+      repository: in-memory
+      in-memory:
+        type: dir
+        path: /data/schema/resources
     log:
       level: "debug"
       livez: true

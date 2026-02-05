@@ -1,23 +1,145 @@
-package middleware_test
+package resources
 
 import (
+	"context"
 	"testing"
 
-	"github.com/spf13/viper"
-
+	"github.com/go-kratos/kratos/v2/log"
+	"github.com/project-kessel/inventory-api/internal/biz/schema"
+	"github.com/project-kessel/inventory-api/internal/biz/schema/validation"
+	"github.com/project-kessel/inventory-api/internal/data"
 	"google.golang.org/protobuf/types/known/structpb"
 
 	pbv1beta2 "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2"
-
 	"github.com/stretchr/testify/assert"
-
-	"github.com/project-kessel/inventory-api/internal/middleware"
 )
 
-func AsStruct(t *testing.T, m map[string]interface{}) *structpb.Struct {
-	s, err := structpb.NewStruct(m)
-	assert.NoError(t, err)
-	return s
+func TestRemoveNulls(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    map[string]interface{}
+		expected map[string]interface{}
+	}{
+		{
+			name: "HBI host with all fields",
+			input: map[string]interface{}{
+				"insights_id":  "b5c36330-79cf-426e-a950-df2e972c3ef4",
+				"satellite_id": "some-satellite-id",
+				"ansible_host": "my-ansible-host.example.com",
+			},
+			expected: map[string]interface{}{
+				"insights_id":  "b5c36330-79cf-426e-a950-df2e972c3ef4",
+				"satellite_id": "some-satellite-id",
+				"ansible_host": "my-ansible-host.example.com",
+			},
+		},
+		{
+			name: "HBI host with null ansible_host",
+			input: map[string]interface{}{
+				"insights_id":  "b5c36330-79cf-426e-a950-df2e972c3ef4",
+				"satellite_id": "some-satellite-id",
+				"ansible_host": nil,
+			},
+			expected: map[string]interface{}{
+				"insights_id":  "b5c36330-79cf-426e-a950-df2e972c3ef4",
+				"satellite_id": "some-satellite-id",
+			},
+		},
+		{
+			name: "HBI host with multiple nulls",
+			input: map[string]interface{}{
+				"insights_id":  "b5c36330-79cf-426e-a950-df2e972c3ef4",
+				"satellite_id": nil,
+				"ansible_host": "null",
+			},
+			expected: map[string]interface{}{
+				"insights_id": "b5c36330-79cf-426e-a950-df2e972c3ef4",
+			},
+		},
+		{
+			name: "nested nulls in a generic structure",
+			input: map[string]interface{}{
+				"metadata": map[string]interface{}{
+					"source": "some-source",
+					"notes":  nil,
+				},
+				"data": "some-data",
+			},
+			expected: map[string]interface{}{
+				"metadata": map[string]interface{}{
+					"source": "some-source",
+				},
+				"data": "some-data",
+			},
+		},
+		{
+			name:     "empty map",
+			input:    map[string]interface{}{},
+			expected: map[string]interface{}{},
+		},
+		{
+			name: "nested string 'null' value",
+			input: map[string]interface{}{
+				"details": map[string]interface{}{
+					"comment": "NULL",
+					"user":    "alice",
+				},
+			},
+			expected: map[string]interface{}{
+				"details": map[string]interface{}{
+					"user": "alice",
+				},
+			},
+		},
+		{
+			name: "nested string 'null' value case insensitive",
+			input: map[string]interface{}{
+				"details": map[string]interface{}{
+					"comment": "null",
+					"user":    "alice",
+				},
+			},
+			expected: map[string]interface{}{
+				"details": map[string]interface{}{
+					"user": "alice",
+				},
+			},
+		},
+		{
+			name: "nested map becomes empty",
+			input: map[string]interface{}{
+				"meta": map[string]interface{}{
+					"comment": nil,
+				},
+			},
+			expected: map[string]interface{}{},
+		},
+		{
+			name: "deeply nested null values",
+			input: map[string]interface{}{
+				"a": map[string]interface{}{
+					"b": map[string]interface{}{
+						"c": nil,
+						"d": "valid",
+					},
+				},
+			},
+			expected: map[string]interface{}{
+				"a": map[string]interface{}{
+					"b": map[string]interface{}{
+						"d": "valid",
+					},
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := removeNulls(tt.input)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
 }
 
 func TestValidateReportResourceJSON_Success(t *testing.T) {
@@ -46,35 +168,49 @@ func TestValidateReportResourceJSON_Success(t *testing.T) {
 		},
 	}
 
-	viper.Set("resources.use_cache", true)
-	middleware.SchemaCache.Store("config:host", map[string]interface{}{
-		"resource_reporters": []string{"hbi"},
+	ctx := context.Background()
+	schemaRepository := data.NewInMemorySchemaRepository()
+
+	err = schemaRepository.CreateResourceSchema(ctx, schema.ResourceRepresentation{
+		ResourceType: "host",
+		ValidationSchema: validation.NewJsonSchemaValidatorFromString(`{
+		  "$schema": "http://json-schema.org/draft-07/schema#",
+		  "type": "object",
+		  "properties": {
+			"workspace_id": { "type": "string" }
+		  },
+		  "required": [
+			"workspace_id"
+		  ]
+		}`),
 	})
-
-	middleware.SchemaCache.Store("host:hbi", `{
-	  "$schema": "http://json-schema.org/draft-07/schema#",
-	  "type": "object",
-	  "properties": {
-		"satellite_id": { "type": "string", "format": "uuid" },
-		"subscription_manager_id": { "type": "string", "format": "uuid" },
-		"insights_id": { "type": "string", "format": "uuid" },
-		"ansible_host": { "type": "string", "maxLength": 255 }
-	  },
-	  "required": []
-	}`)
-
-	middleware.SchemaCache.Store("common:host", `{
-	  "$schema": "http://json-schema.org/draft-07/schema#",
-	  "type": "object",
-	  "properties": {
-		"workspace_id": { "type": "string" }
-	  },
-	  "required": [
-		"workspace_id"
-	  ]
-	}`)
-	err = middleware.ValidateReportResourceJSON(msg)
 	assert.NoError(t, err)
+
+	err = schemaRepository.CreateReporterSchema(ctx, schema.ReporterRepresentation{
+		ResourceType: "host",
+		ReporterType: "hbi",
+		ValidationSchema: validation.NewJsonSchemaValidatorFromString(`{
+		  "$schema": "http://json-schema.org/draft-07/schema#",
+		  "type": "object",
+		  "properties": {
+			"satellite_id": { "type": "string", "format": "uuid" },
+			"subscription_manager_id": { "type": "string", "format": "uuid" },
+			"insights_id": { "type": "string", "format": "uuid" },
+			"ansible_host": { "type": "string", "maxLength": 255 }
+		  },
+		  "required": []
+		}`),
+	})
+	assert.NoError(t, err)
+
+	err = validateReportResourceRequest(ctx, msg, NewSchemaUsecase(schemaRepository, log.NewHelper(log.DefaultLogger)))
+	assert.NoError(t, err)
+}
+
+func AsStruct(t *testing.T, m map[string]interface{}) *structpb.Struct {
+	s, err := structpb.NewStruct(m)
+	assert.NoError(t, err)
+	return s
 }
 
 func TestValidateReportResourceJSON_FieldExtractionErrors(t *testing.T) {
@@ -101,35 +237,42 @@ func TestValidateReportResourceJSON_FieldExtractionErrors(t *testing.T) {
 		},
 	}
 
-	viper.Set("resources.use_cache", true)
-	middleware.SchemaCache.Store("config:host", map[string]interface{}{
-		"resource_reporters": []string{"hbi"},
+	ctx := context.Background()
+	schemaRepository := data.NewInMemorySchemaRepository()
+
+	err := schemaRepository.CreateResourceSchema(ctx, schema.ResourceRepresentation{
+		ResourceType: "host",
+		ValidationSchema: validation.NewJsonSchemaValidatorFromString(`{
+		  "$schema": "http://json-schema.org/draft-07/schema#",
+		  "type": "object",
+		  "properties": {
+			"workspace_id": { "type": "string" }
+		  },
+		  "required": [
+			"workspace_id"
+		  ]
+		}`),
 	})
+	assert.NoError(t, err)
 
-	middleware.SchemaCache.Store("host:hbi", `{
-	  "$schema": "http://json-schema.org/draft-07/schema#",
-	  "type": "object",
-	  "properties": {
-		"satellite_id": { "type": "string", "format": "uuid" },
-		"subscription_manager_id": { "type": "string", "format": "uuid" },
-		"insights_id": { "type": "string", "format": "uuid" },
-		"ansible_host": { "type": "string", "maxLength": 255 }
-	  },
-	  "required": [
-		"subscription_manager_id"
-		]
-	}`)
-
-	middleware.SchemaCache.Store("common:host", `{
-	  "$schema": "http://json-schema.org/draft-07/schema#",
-	  "type": "object",
-	  "properties": {
-		"workspace_id": { "type": "string" }
-	  },
-	  "required": [
-		"workspace_id"
-	  ]
-	}`)
+	err = schemaRepository.CreateReporterSchema(ctx, schema.ReporterRepresentation{
+		ResourceType: "host",
+		ReporterType: "hbi",
+		ValidationSchema: validation.NewJsonSchemaValidatorFromString(`{
+		  "$schema": "http://json-schema.org/draft-07/schema#",
+		  "type": "object",
+		  "properties": {
+			"satellite_id": { "type": "string", "format": "uuid" },
+			"subscription_manager_id": { "type": "string", "format": "uuid" },
+			"insights_id": { "type": "string", "format": "uuid" },
+			"ansible_host": { "type": "string", "maxLength": 255 }
+		  },
+		  "required": [
+			"subscription_manager_id"
+			]
+		}`),
+	})
+	assert.NoError(t, err)
 
 	tests := []struct {
 		name   string
@@ -198,13 +341,13 @@ func TestValidateReportResourceJSON_FieldExtractionErrors(t *testing.T) {
 					Common:   baseMsg.Representations.Common,
 				},
 			},
-			expect: "invalid reporter_type: bar for resource_type: host",
+			expect: "reporter bar does not report resource types: host",
 		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			err := middleware.ValidateReportResourceJSON(tc.msg)
+			err := validateReportResourceRequest(ctx, tc.msg, NewSchemaUsecase(schemaRepository, log.NewHelper(log.DefaultLogger)))
 			assert.Error(t, err)
 			assert.Contains(t, err.Error(), tc.expect)
 		})
@@ -212,13 +355,6 @@ func TestValidateReportResourceJSON_FieldExtractionErrors(t *testing.T) {
 }
 
 func TestValidateReportResourceJSON_SchemaBasedValidation(t *testing.T) {
-	viper.Set("resources.use_cache", true)
-
-	// Setup config for k8s_policy with acm reporter
-	middleware.SchemaCache.Store("config:k8s_policy", map[string]interface{}{
-		"resource_reporters": []string{"acm"},
-	})
-
 	tests := []struct {
 		name           string
 		msg            *pbv1beta2.ReportResourceRequest
@@ -409,11 +545,31 @@ func TestValidateReportResourceJSON_SchemaBasedValidation(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			// Setup schemas in cache
-			middleware.SchemaCache.Store("k8s_policy:acm", tc.reporterSchema)
-			middleware.SchemaCache.Store("common:k8s_policy", tc.commonSchema)
+			ctx := context.Background()
+			schemaRepository := data.NewInMemorySchemaRepository()
+
+			// Setup config for k8s_policy with acm reporter
+			err := schemaRepository.CreateResourceSchema(ctx, schema.ResourceRepresentation{
+				ResourceType:     "k8s_policy",
+				ValidationSchema: validation.NewJsonSchemaValidatorFromString(tc.commonSchema),
+			})
+			assert.NoError(t, err)
+
+			err = schemaRepository.CreateReporterSchema(
+				ctx,
+				schema.ReporterRepresentation{
+					ResourceType:     "k8s_policy",
+					ReporterType:     "acm",
+					ValidationSchema: validation.NewJsonSchemaValidatorFromString(tc.reporterSchema),
+				},
+			)
+			assert.NoError(t, err)
 
 			// Test the function
-			err := middleware.ValidateReportResourceJSON(tc.msg)
+			err = validateReportResourceRequest(ctx, tc.msg, NewSchemaUsecase(schemaRepository, log.NewHelper(log.DefaultLogger)))
+			if tc.expectError {
+				assert.Error(t, err)
+			}
 
 			if tc.expectError {
 				assert.Error(t, err)
@@ -423,10 +579,6 @@ func TestValidateReportResourceJSON_SchemaBasedValidation(t *testing.T) {
 			} else {
 				assert.NoError(t, err)
 			}
-
-			// Cleanup
-			middleware.SchemaCache.Delete("k8s_policy:acm")
-			middleware.SchemaCache.Delete("common:k8s_policy")
 		})
 	}
 }

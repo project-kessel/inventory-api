@@ -552,17 +552,15 @@ func TestResource_Update(t *testing.T) {
 		// The update should succeed (backwards compatibility fix)
 		require.NoError(t, err, "Update should succeed even with zero timestamps for backwards compatibility")
 
-		// Verify that timestamps are now set
+		// Verify timestamps after update
 		updatedSnapshot, _, _, _, err := resource.Serialize()
 		require.NoError(t, err)
 
-		// created_at should be set to a reasonable time (around now, since there was no original)
-		assert.False(t, updatedSnapshot.CreatedAt.IsZero(), "created_at should no longer be zero after update")
-		assert.True(t, updatedSnapshot.CreatedAt.After(beforeUpdate.Add(-time.Second)) || updatedSnapshot.CreatedAt.Equal(beforeUpdate), "created_at should be around the update time")
-		assert.True(t, updatedSnapshot.CreatedAt.Before(afterUpdate.Add(time.Second)), "created_at should be around the update time")
+		// created_at should remain zero (we don't backfill fake timestamps)
+		assert.True(t, updatedSnapshot.CreatedAt.IsZero(), "created_at should remain zero for legacy resources")
 
-		// updated_at should be set to a reasonable time
-		assert.False(t, updatedSnapshot.UpdatedAt.IsZero(), "updated_at should no longer be zero after update")
+		// updated_at should be set to the update time
+		assert.False(t, updatedSnapshot.UpdatedAt.IsZero(), "updated_at should be set after update")
 		assert.True(t, updatedSnapshot.UpdatedAt.After(beforeUpdate.Add(-time.Second)) || updatedSnapshot.UpdatedAt.Equal(beforeUpdate), "updated_at should be around the update time")
 		assert.True(t, updatedSnapshot.UpdatedAt.Before(afterUpdate.Add(time.Second)), "updated_at should be around the update time")
 	})
@@ -632,9 +630,9 @@ func TestResource_Update(t *testing.T) {
 		assert.True(t, updatedSnapshot.UpdatedAt.After(originalUpdatedAt), "updated_at should be updated to a newer time")
 	})
 
-	t.Run("should set created_at equal to updated_at when first backfilling zero timestamps", func(t *testing.T) {
-		// When a legacy resource with zero timestamps is first updated,
-		// both created_at and updated_at should be set to the same value (now)
+	t.Run("should keep created_at zero while setting updated_at on legacy resource update", func(t *testing.T) {
+		// When a legacy resource with zero timestamps is updated,
+		// created_at should remain zero (preserving data integrity) while updated_at is set
 		t.Parallel()
 
 		resourceSnapshot := &ResourceSnapshot{
@@ -684,14 +682,17 @@ func TestResource_Update(t *testing.T) {
 		updatedSnapshot, _, _, _, err := resource.Serialize()
 		require.NoError(t, err)
 
-		// Both timestamps should be equal (set to 'now' at the same moment)
-		assert.Equal(t, updatedSnapshot.CreatedAt.Unix(), updatedSnapshot.UpdatedAt.Unix(),
-			"created_at and updated_at should be equal when backfilling zero timestamps")
+		// created_at should remain zero (we don't backfill fake data)
+		assert.True(t, updatedSnapshot.CreatedAt.IsZero(),
+			"created_at should remain zero for legacy resources")
+		// updated_at should be set
+		assert.False(t, updatedSnapshot.UpdatedAt.IsZero(),
+			"updated_at should be set on update")
 	})
 
-	t.Run("should maintain consistent created_at across multiple updates after backfill", func(t *testing.T) {
-		// After the first update backfills created_at, subsequent updates
-		// should preserve that created_at value
+	t.Run("should keep created_at zero across multiple updates for legacy resource", func(t *testing.T) {
+		// For legacy resources, created_at should remain zero across multiple updates
+		// while updated_at is updated each time
 		t.Parallel()
 
 		resourceSnapshot := &ResourceSnapshot{
@@ -722,7 +723,7 @@ func TestResource_Update(t *testing.T) {
 		resource := DeserializeResource(resourceSnapshot, []ReporterResourceSnapshot{reporterResourceSnapshot}, nil, nil)
 		require.NotNil(t, resource)
 
-		// First update - this will backfill the created_at
+		// First update
 		apiHref, _ := NewApiHref("https://api.example.com/v1")
 		consoleHref, _ := NewConsoleHref("https://console.example.com/v1")
 		commonData, _ := NewRepresentation(internal.JsonObject{"workspace_id": "test"})
@@ -741,12 +742,14 @@ func TestResource_Update(t *testing.T) {
 
 		firstSnapshot, _, _, _, err := resource.Serialize()
 		require.NoError(t, err)
-		backfilledCreatedAt := firstSnapshot.CreatedAt
+
+		// created_at should be zero after first update
+		assert.True(t, firstSnapshot.CreatedAt.IsZero(), "created_at should remain zero after first update")
 
 		// Small delay to ensure time difference
 		time.Sleep(10 * time.Millisecond)
 
-		// Second update - should preserve the backfilled created_at
+		// Second update
 		apiHref2, _ := NewApiHref("https://api.example.com/v2")
 		consoleHref2, _ := NewConsoleHref("https://console.example.com/v2")
 		commonData2, _ := NewRepresentation(internal.JsonObject{"workspace_id": "test-v2"})
@@ -766,9 +769,9 @@ func TestResource_Update(t *testing.T) {
 		secondSnapshot, _, _, _, err := resource.Serialize()
 		require.NoError(t, err)
 
-		// created_at should be preserved from first update's backfill
-		assert.Equal(t, backfilledCreatedAt.Unix(), secondSnapshot.CreatedAt.Unix(),
-			"created_at should be preserved after second update")
+		// created_at should still be zero after second update
+		assert.True(t, secondSnapshot.CreatedAt.IsZero(),
+			"created_at should remain zero after second update")
 
 		// updated_at should be newer than the first update
 		assert.True(t, secondSnapshot.UpdatedAt.After(firstSnapshot.UpdatedAt),
@@ -815,8 +818,6 @@ func TestResource_Update(t *testing.T) {
 		require.True(t, existingCreatedAt.IsZero(), "Precondition: created_at should be zero")
 		require.False(t, existingUpdatedAt.IsZero(), "Precondition: updated_at should NOT be zero")
 
-		beforeUpdate := time.Now()
-
 		apiHref, _ := NewApiHref("https://api.example.com/updated")
 		consoleHref, _ := NewConsoleHref("https://console.example.com/updated")
 		commonData, _ := NewRepresentation(internal.JsonObject{"workspace_id": "test"})
@@ -833,19 +834,14 @@ func TestResource_Update(t *testing.T) {
 		)
 		require.NoError(t, err, "Update should succeed even with zero created_at")
 
-		afterUpdate := time.Now()
-
 		updatedSnapshot, _, _, _, err := resource.Serialize()
 		require.NoError(t, err)
 
-		// created_at should now be backfilled to 'now' (not zero anymore)
-		assert.False(t, updatedSnapshot.CreatedAt.IsZero(), "created_at should be backfilled")
-		assert.True(t, updatedSnapshot.CreatedAt.After(beforeUpdate.Add(-time.Second)) ||
-			updatedSnapshot.CreatedAt.Equal(beforeUpdate), "created_at should be around update time")
-		assert.True(t, updatedSnapshot.CreatedAt.Before(afterUpdate.Add(time.Second)),
-			"created_at should be around update time")
+		// created_at should remain zero (don't backfill fake data)
+		assert.True(t, updatedSnapshot.CreatedAt.IsZero(),
+			"created_at should remain zero for legacy resources")
 
-		// updated_at should also be set to 'now'
+		// updated_at should be set to 'now'
 		assert.True(t, updatedSnapshot.UpdatedAt.After(pastUpdatedAt),
 			"updated_at should be newer than the previous value")
 	})

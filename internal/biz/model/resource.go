@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"strings"
 	"time"
+
+	"github.com/go-kratos/kratos/v2/log"
 )
 
 const initialCommonVersion = 0
@@ -133,9 +135,7 @@ func (r *Resource) Update(
 	existingCreatedAt, _ := r.GetTimestamps()
 	now := time.Now()
 	if existingCreatedAt.IsZero() {
-		// For backwards compatibility with existing resources that don't have created_at set,
-		// use the current time as the created_at timestamp
-		existingCreatedAt = now
+		log.Debugf("resource %s has zero created_at timestamp", r.id)
 	}
 	resourceEvent.SetTimestamps(existingCreatedAt, now)
 

@@ -3,6 +3,7 @@ package model
 import (
 	"strings"
 	"testing"
+	"time"
 )
 
 func assertValidReporterResource(t *testing.T, reporterResource ReporterResource, err error, testCase string) {
@@ -322,4 +323,91 @@ func TestReporterResource_Update(t *testing.T) {
 			t.Error("Expected error for whitespace consoleHref, got none")
 		}
 	})
+}
+
+func TestReporterResource_TimestampsAreSetOnCreation(t *testing.T) {
+	t.Parallel()
+	fixture := NewReporterResourceTestFixture()
+
+	rr, err := NewReporterResource(
+		fixture.ValidIdType(),
+		fixture.ValidLocalResourceIdType(),
+		fixture.ValidResourceTypeType(),
+		fixture.ValidReporterTypeType(),
+		fixture.ValidReporterInstanceIdType(),
+		fixture.ValidResourceIdType(),
+		fixture.ValidApiHrefType(),
+		fixture.ValidConsoleHrefType(),
+	)
+
+	if err != nil {
+		t.Fatalf("NewReporterResource failed: %v", err)
+	}
+
+	if rr.CreatedAt().IsZero() || rr.UpdatedAt().IsZero() {
+		t.Error("Expected timestamps to be set")
+	}
+
+	if rr.UpdatedAt().Sub(rr.CreatedAt()) > time.Millisecond {
+		t.Error("Expected createdAt and updatedAt to be nearly identical on creation")
+	}
+}
+
+func TestReporterResource_CreatedAtStaysConstantOnUpdate(t *testing.T) {
+	t.Parallel()
+	fixture := NewReporterResourceTestFixture()
+
+	rr, _ := NewReporterResource(
+		fixture.ValidIdType(),
+		fixture.ValidLocalResourceIdType(),
+		fixture.ValidResourceTypeType(),
+		fixture.ValidReporterTypeType(),
+		fixture.ValidReporterInstanceIdType(),
+		fixture.ValidResourceIdType(),
+		fixture.ValidApiHrefType(),
+		fixture.ValidConsoleHrefType(),
+	)
+
+	originalCreatedAt := rr.CreatedAt()
+	time.Sleep(10 * time.Millisecond)
+
+	newApiHref, _ := NewApiHref("https://api.updated.com")
+	newConsoleHref, _ := NewConsoleHref("https://console.updated.com")
+	rr.Update(newApiHref, newConsoleHref)
+
+	if !rr.CreatedAt().Equal(originalCreatedAt) {
+		t.Error("createdAt should not change on Update")
+	}
+
+	if rr.UpdatedAt().Sub(rr.CreatedAt()) < 10*time.Millisecond {
+		t.Error("updatedAt should be different from createdAt after Update")
+	}
+}
+
+func TestReporterResource_CreatedAtStaysConstantOnDelete(t *testing.T) {
+	t.Parallel()
+	fixture := NewReporterResourceTestFixture()
+
+	rr, _ := NewReporterResource(
+		fixture.ValidIdType(),
+		fixture.ValidLocalResourceIdType(),
+		fixture.ValidResourceTypeType(),
+		fixture.ValidReporterTypeType(),
+		fixture.ValidReporterInstanceIdType(),
+		fixture.ValidResourceIdType(),
+		fixture.ValidApiHrefType(),
+		fixture.ValidConsoleHrefType(),
+	)
+
+	originalCreatedAt := rr.CreatedAt()
+	time.Sleep(10 * time.Millisecond)
+	rr.Delete()
+
+	if !rr.CreatedAt().Equal(originalCreatedAt) {
+		t.Error("createdAt should not change on Delete")
+	}
+
+	if rr.UpdatedAt().Sub(rr.CreatedAt()) < 10*time.Millisecond {
+		t.Error("updatedAt should be different from createdAt after Delete")
+	}
 }

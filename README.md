@@ -202,13 +202,13 @@ The Kessel Inventory includes health check endpoints for readiness and liveness 
 #### Readyz
 The readyz endpoint checks if the service is ready to handle requests.
 ```shell
-curl http://localhost:8000/api/inventory/v1/readyz
+curl http://localhost:8000/api/kessel/v1/readyz
 ```
 
 #### Livez
 The livez endpoint checks if the service is alive and functioning correctly.
 ```shell
-curl http://localhost:8000/api/inventory/v1/livez
+curl http://localhost:8000/api/kessel/v1/livez
 ```
 
 ### Resource lifecycle
@@ -224,7 +224,7 @@ To add a rhel-host to the inventory:
 To hit the REST endpoint use the following `curl` command
 
 ```shell
-curl -X POST -H "Content-Type: application/json" --data "@data/testData/v1beta2/host.json" http://localhost:8000/api/inventory/v1beta2/resources
+curl -X POST -H "Content-Type: application/json" --data "@data/testData/v1beta2/host.json" http://localhost:8000/api/kessel/v1beta2/resources
 ```
 
 To hit the gRPC endpoint use the following `grpcurl` command
@@ -238,7 +238,7 @@ To update it:
 To hit the REST endpoint
 
 ```shell
-curl -X POST -H "Content-Type: application/json" --data "@data/testData/v1beta2/host.json" http://localhost:8000/api/inventory/v1beta2/resources
+curl -X POST -H "Content-Type: application/json" --data "@data/testData/v1beta2/host.json" http://localhost:8000/api/kessel/v1beta2/resources
 ```
 
 To hit the gRPC endpoint
@@ -253,7 +253,7 @@ and finally, to delete it, note that we use a different file, as the only requir
 To hit the REST endpoint
 
 ```shell
-curl -XDELETE -H "Content-Type: application/json" --data "@data/testData/v1beta2/delete-host.json" http://localhost:8000/api/inventory/v1beta2/resources
+curl -XDELETE -H "Content-Type: application/json" --data "@data/testData/v1beta2/delete-host.json" http://localhost:8000/api/kessel/v1beta2/resources
 ```
 
 To hit the gRPC endpoint
@@ -265,10 +265,10 @@ To add a notifications integration (useful for testing in stage)
 
 ```shell
 # create the integration (auth is required for stage -- see internal docs)
-curl -X POST -H "Content-Type: application/json" -H "Authorization: Bearer $TOKEN" -d @data/testData/v1beta2/notifications-integrations.json localhost:8000/api/inventory/v1beta2/resources
+curl -X POST -H "Content-Type: application/json" -H "Authorization: Bearer $TOKEN" -d @data/testData/v1beta2/notifications-integrations.json localhost:8000/api/kessel/v1beta2/resources
 
 # delete the integration
-curl -X DELETE -H "Content-Type: application/json" -H "Authorization: Bearer $TOKEN" -d @data/testData/v1beta2/delete-notifications-integration.json localhost:8000/api/inventory/v1beta2/resources
+curl -X DELETE -H "Content-Type: application/json" -H "Authorization: Bearer $TOKEN" -d @data/testData/v1beta2/delete-notifications-integration.json localhost:8000/api/kessel/v1beta2/resources
 
 ```
 

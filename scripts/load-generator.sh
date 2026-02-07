@@ -44,8 +44,8 @@ if [[  -z "${NUM_RUNS}" || -z "${INTERVAL}"  || -z "${PORT_NUM}" ]]; then
   help_me
 fi
 
-LIVEZ_URL="localhost:${PORT_NUM}/api/inventory/v1/livez"
-INVENTORY_URL="localhost:${PORT_NUM}/api/inventory/v1beta2/resources"
+LIVEZ_URL="localhost:${PORT_NUM}/api/kessel/v1/livez"
+INVENTORY_URL="localhost:${PORT_NUM}/api/kessel/v1beta2/resources"
 
 for ((i = 0 ; i < ${NUM_RUNS} ; i++)); do
   livez_check

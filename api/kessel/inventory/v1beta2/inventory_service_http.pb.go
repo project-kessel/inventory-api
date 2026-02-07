@@ -127,13 +127,13 @@ type KesselInventoryServiceHTTPServer interface {
 
 func RegisterKesselInventoryServiceHTTPServer(s *http.Server, srv KesselInventoryServiceHTTPServer) {
 	r := s.Route("/")
-	r.POST("/api/inventory/v1beta2/check", _KesselInventoryService_Check0_HTTP_Handler(srv))
-	r.POST("/api/inventory/v1beta2/checkself", _KesselInventoryService_CheckSelf0_HTTP_Handler(srv))
-	r.POST("/api/inventory/v1beta2/checkforupdate", _KesselInventoryService_CheckForUpdate0_HTTP_Handler(srv))
-	r.POST("/api/inventory/v1beta2/checkbulk", _KesselInventoryService_CheckBulk0_HTTP_Handler(srv))
-	r.POST("/api/inventory/v1beta2/checkselfbulk", _KesselInventoryService_CheckSelfBulk0_HTTP_Handler(srv))
-	r.POST("/api/inventory/v1beta2/resources", _KesselInventoryService_ReportResource0_HTTP_Handler(srv))
-	r.DELETE("/api/inventory/v1beta2/resources", _KesselInventoryService_DeleteResource0_HTTP_Handler(srv))
+	r.POST("/api/kessel/v1beta2/check", _KesselInventoryService_Check0_HTTP_Handler(srv))
+	r.POST("/api/kessel/v1beta2/checkself", _KesselInventoryService_CheckSelf0_HTTP_Handler(srv))
+	r.POST("/api/kessel/v1beta2/checkforupdate", _KesselInventoryService_CheckForUpdate0_HTTP_Handler(srv))
+	r.POST("/api/kessel/v1beta2/checkbulk", _KesselInventoryService_CheckBulk0_HTTP_Handler(srv))
+	r.POST("/api/kessel/v1beta2/checkselfbulk", _KesselInventoryService_CheckSelfBulk0_HTTP_Handler(srv))
+	r.POST("/api/kessel/v1beta2/resources", _KesselInventoryService_ReportResource0_HTTP_Handler(srv))
+	r.DELETE("/api/kessel/v1beta2/resources", _KesselInventoryService_DeleteResource0_HTTP_Handler(srv))
 }
 
 func _KesselInventoryService_Check0_HTTP_Handler(srv KesselInventoryServiceHTTPServer) func(ctx http.Context) error {
@@ -310,7 +310,7 @@ func NewKesselInventoryServiceHTTPClient(client *http.Client) KesselInventorySer
 
 func (c *KesselInventoryServiceHTTPClientImpl) Check(ctx context.Context, in *CheckRequest, opts ...http.CallOption) (*CheckResponse, error) {
 	var out CheckResponse
-	pattern := "/api/inventory/v1beta2/check"
+	pattern := "/api/kessel/v1beta2/check"
 	path := binding.EncodeURL(pattern, in, false)
 	opts = append(opts, http.Operation(OperationKesselInventoryServiceCheck))
 	opts = append(opts, http.PathTemplate(pattern))
@@ -323,7 +323,7 @@ func (c *KesselInventoryServiceHTTPClientImpl) Check(ctx context.Context, in *Ch
 
 func (c *KesselInventoryServiceHTTPClientImpl) CheckBulk(ctx context.Context, in *CheckBulkRequest, opts ...http.CallOption) (*CheckBulkResponse, error) {
 	var out CheckBulkResponse
-	pattern := "/api/inventory/v1beta2/checkbulk"
+	pattern := "/api/kessel/v1beta2/checkbulk"
 	path := binding.EncodeURL(pattern, in, false)
 	opts = append(opts, http.Operation(OperationKesselInventoryServiceCheckBulk))
 	opts = append(opts, http.PathTemplate(pattern))
@@ -336,7 +336,7 @@ func (c *KesselInventoryServiceHTTPClientImpl) CheckBulk(ctx context.Context, in
 
 func (c *KesselInventoryServiceHTTPClientImpl) CheckForUpdate(ctx context.Context, in *CheckForUpdateRequest, opts ...http.CallOption) (*CheckForUpdateResponse, error) {
 	var out CheckForUpdateResponse
-	pattern := "/api/inventory/v1beta2/checkforupdate"
+	pattern := "/api/kessel/v1beta2/checkforupdate"
 	path := binding.EncodeURL(pattern, in, false)
 	opts = append(opts, http.Operation(OperationKesselInventoryServiceCheckForUpdate))
 	opts = append(opts, http.PathTemplate(pattern))
@@ -349,7 +349,7 @@ func (c *KesselInventoryServiceHTTPClientImpl) CheckForUpdate(ctx context.Contex
 
 func (c *KesselInventoryServiceHTTPClientImpl) CheckSelf(ctx context.Context, in *CheckSelfRequest, opts ...http.CallOption) (*CheckSelfResponse, error) {
 	var out CheckSelfResponse
-	pattern := "/api/inventory/v1beta2/checkself"
+	pattern := "/api/kessel/v1beta2/checkself"
 	path := binding.EncodeURL(pattern, in, false)
 	opts = append(opts, http.Operation(OperationKesselInventoryServiceCheckSelf))
 	opts = append(opts, http.PathTemplate(pattern))
@@ -362,7 +362,7 @@ func (c *KesselInventoryServiceHTTPClientImpl) CheckSelf(ctx context.Context, in
 
 func (c *KesselInventoryServiceHTTPClientImpl) CheckSelfBulk(ctx context.Context, in *CheckSelfBulkRequest, opts ...http.CallOption) (*CheckSelfBulkResponse, error) {
 	var out CheckSelfBulkResponse
-	pattern := "/api/inventory/v1beta2/checkselfbulk"
+	pattern := "/api/kessel/v1beta2/checkselfbulk"
 	path := binding.EncodeURL(pattern, in, false)
 	opts = append(opts, http.Operation(OperationKesselInventoryServiceCheckSelfBulk))
 	opts = append(opts, http.PathTemplate(pattern))
@@ -375,7 +375,7 @@ func (c *KesselInventoryServiceHTTPClientImpl) CheckSelfBulk(ctx context.Context
 
 func (c *KesselInventoryServiceHTTPClientImpl) DeleteResource(ctx context.Context, in *DeleteResourceRequest, opts ...http.CallOption) (*DeleteResourceResponse, error) {
 	var out DeleteResourceResponse
-	pattern := "/api/inventory/v1beta2/resources"
+	pattern := "/api/kessel/v1beta2/resources"
 	path := binding.EncodeURL(pattern, in, false)
 	opts = append(opts, http.Operation(OperationKesselInventoryServiceDeleteResource))
 	opts = append(opts, http.PathTemplate(pattern))
@@ -388,7 +388,7 @@ func (c *KesselInventoryServiceHTTPClientImpl) DeleteResource(ctx context.Contex
 
 func (c *KesselInventoryServiceHTTPClientImpl) ReportResource(ctx context.Context, in *ReportResourceRequest, opts ...http.CallOption) (*ReportResourceResponse, error) {
 	var out ReportResourceResponse
-	pattern := "/api/inventory/v1beta2/resources"
+	pattern := "/api/kessel/v1beta2/resources"
 	path := binding.EncodeURL(pattern, in, false)
 	opts = append(opts, http.Operation(OperationKesselInventoryServiceReportResource))
 	opts = append(opts, http.PathTemplate(pattern))

@@ -1828,7 +1828,7 @@ data:
                 "uid": "$datasource"
               },
               "editorMode": "code",
-              "expr": "sum(rate(server_requests_code_total{job=\"kessel-inventory-api\",operation!~\".*[Ll]ive[Zz].*|.*[Rr]eady[Zz].*\"}[$__rate_interval]))",
+              "expr": "sum(rate(server_requests_code_total{job=\"kessel-inventory-api\",operation!~\".*[Ll]ive[Zz].*|.*[Rr]eady[Zz].*|.*grpc.health.*|.*[Ss]erver[Rr]eflection.*\"}[$__rate_interval]))",
               "instant": false,
               "legendFormat": "RPS",
               "range": true,

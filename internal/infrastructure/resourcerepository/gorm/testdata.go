@@ -1,4 +1,4 @@
-package model
+package gorm
 
 import (
 	"reflect"
@@ -545,7 +545,6 @@ func AssertValidationError(t *testing.T, err error, expectedField string, messag
 func AssertTableName(t *testing.T, model interface{}, expectedTableName string) {
 	t.Helper()
 
-	// Check if the model has a TableName method
 	value := reflect.ValueOf(model)
 	method := value.MethodByName("TableName")
 	if !method.IsValid() {
@@ -553,7 +552,6 @@ func AssertTableName(t *testing.T, model interface{}, expectedTableName string) 
 		return
 	}
 
-	// Call the TableName method
 	results := method.Call(nil)
 	if len(results) != 1 {
 		t.Errorf("TableName method should return exactly one value")

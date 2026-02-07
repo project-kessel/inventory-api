@@ -1,4 +1,4 @@
-package model
+package gorm
 
 import (
 	"time"
@@ -7,6 +7,7 @@ import (
 	bizmodel "github.com/project-kessel/inventory-api/internal/biz/model"
 )
 
+// Resource is the GORM model for the resource table.
 type Resource struct {
 	ID               uuid.UUID `gorm:"type:uuid;primaryKey"`
 	Type             string    `gorm:"size:128;not null;"`
@@ -20,7 +21,7 @@ func (Resource) TableName() string {
 	return "resource"
 }
 
-// SerializeToSnapshot converts GORM Resource to snapshot type - direct initialization without validation
+// SerializeToSnapshot converts GORM Resource to snapshot type - direct initialization without validation.
 func (r Resource) SerializeToSnapshot() bizmodel.ResourceSnapshot {
 	return bizmodel.ResourceSnapshot{
 		ID:               r.ID,
@@ -32,7 +33,7 @@ func (r Resource) SerializeToSnapshot() bizmodel.ResourceSnapshot {
 	}
 }
 
-// DeserializeFromSnapshot creates GORM Resource from snapshot - direct initialization without validation
+// DeserializeResourceFromSnapshot creates GORM Resource from snapshot - direct initialization without validation.
 func DeserializeResourceFromSnapshot(snapshot bizmodel.ResourceSnapshot) Resource {
 	return Resource{
 		ID:               snapshot.ID,

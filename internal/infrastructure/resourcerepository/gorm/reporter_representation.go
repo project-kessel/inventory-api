@@ -1,4 +1,4 @@
-package model
+package gorm
 
 import (
 	"time"
@@ -70,9 +70,8 @@ func validateReporterRepresentation(rr *ReporterRepresentation) error {
 	)
 }
 
-// SerializeToSnapshot converts GORM ReporterRepresentation to snapshot type - direct initialization without validation
+// SerializeToSnapshot converts GORM ReporterRepresentation to snapshot type - direct initialization without validation.
 func (rr ReporterRepresentation) SerializeToSnapshot() bizmodel.ReporterRepresentationSnapshot {
-	// Create representation snapshot
 	representationSnapshot := bizmodel.RepresentationSnapshot{
 		Data: rr.Data,
 	}
@@ -90,7 +89,7 @@ func (rr ReporterRepresentation) SerializeToSnapshot() bizmodel.ReporterRepresen
 	}
 }
 
-// DeserializeReporterRepresentationFromSnapshot creates GORM ReporterRepresentation from snapshot - direct initialization without validation
+// DeserializeReporterRepresentationFromSnapshot creates GORM ReporterRepresentation from snapshot - direct initialization without validation.
 func DeserializeReporterRepresentationFromSnapshot(snapshot bizmodel.ReporterRepresentationSnapshot) ReporterRepresentation {
 	return ReporterRepresentation{
 		Representation: Representation{

@@ -6,7 +6,7 @@ import (
 
 	"github.com/go-gormigrate/gormigrate/v2"
 
-	schema "github.com/project-kessel/inventory-api/internal/data/migrations/schema"
+	schema "github.com/project-kessel/inventory-api/internal/infrastructure/resourcerepository/gorm/migrations/schema"
 )
 
 // Ordered list of schema migrations.

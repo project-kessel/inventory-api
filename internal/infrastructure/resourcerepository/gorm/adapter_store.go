@@ -1,4 +1,4 @@
-package data
+package gorm
 
 import (
 	"fmt"
@@ -6,19 +6,20 @@ import (
 
 	"github.com/project-kessel/inventory-api/internal/biz"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
+	"github.com/project-kessel/inventory-api/internal/infrastructure/resourcerepository"
 	"gorm.io/gorm"
 )
 
 // AdapterStore adapts the old ResourceRepository to the new model.Store interface.
 // This is a temporary bridge to allow incremental migration.
 type AdapterStore struct {
-	resourceRepo ResourceRepository
+	resourceRepo resourcerepository.ResourceRepository
 	eventSource  model.EventSource
 }
 
 // AdapterStoreConfig holds configuration for creating an AdapterStore.
 type AdapterStoreConfig struct {
-	ResourceRepo ResourceRepository
+	ResourceRepo resourcerepository.ResourceRepository
 	EventSource  model.EventSource
 }
 
@@ -55,7 +56,7 @@ func (s *AdapterStore) EventSource() model.EventSource {
 // adapterTx implements model.Tx by wrapping a gorm transaction.
 type adapterTx struct {
 	gormTx       *gorm.DB
-	resourceRepo ResourceRepository
+	resourceRepo resourcerepository.ResourceRepository
 	mu           sync.Mutex
 	done         bool // true after Commit or Rollback
 }
@@ -101,7 +102,7 @@ func (tx *adapterTx) Rollback() error {
 // adapterResourceRepository adapts ResourceRepository to model.ResourceRepository.
 type adapterResourceRepository struct {
 	gormTx       *gorm.DB
-	resourceRepo ResourceRepository
+	resourceRepo resourcerepository.ResourceRepository
 }
 
 var _ model.ResourceRepository = (*adapterResourceRepository)(nil)

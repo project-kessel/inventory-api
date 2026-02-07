@@ -1,4 +1,4 @@
-package model
+package gorm
 
 import (
 	"time"
@@ -61,9 +61,8 @@ func validateCommonRepresentation(cr *CommonRepresentation) error {
 	)
 }
 
-// SerializeToSnapshot converts GORM CommonRepresentation to snapshot type - direct initialization without validation
+// SerializeToSnapshot converts GORM CommonRepresentation to snapshot type - direct initialization without validation.
 func (cr CommonRepresentation) SerializeToSnapshot() bizmodel.CommonRepresentationSnapshot {
-	// Create representation snapshot
 	representationSnapshot := bizmodel.RepresentationSnapshot{
 		Data: cr.Data,
 	}
@@ -79,7 +78,7 @@ func (cr CommonRepresentation) SerializeToSnapshot() bizmodel.CommonRepresentati
 	}
 }
 
-// DeserializeCommonRepresentationFromSnapshot creates GORM CommonRepresentation from snapshot - direct initialization without validation
+// DeserializeCommonRepresentationFromSnapshot creates GORM CommonRepresentation from snapshot - direct initialization without validation.
 func DeserializeCommonRepresentationFromSnapshot(snapshot bizmodel.CommonRepresentationSnapshot) CommonRepresentation {
 	return CommonRepresentation{
 		Representation: Representation{

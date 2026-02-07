@@ -1,4 +1,4 @@
-package model
+package gorm
 
 // Field size constraints for GORM models
 const (

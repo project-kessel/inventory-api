@@ -1,4 +1,4 @@
-package model
+package gorm
 
 import (
 	"time"
@@ -20,7 +20,7 @@ type ReporterResourceKey struct {
 
 // ReporterResource is the *latest-state row* for a resource coming from a reporter. It combines an opaque
 // surrogate UUID (`ID`) with the natural composite key (`ReporterResourceKey`).  Non-versioned fields
-// (APIHref, ConsoleHref, Generation, Tombstone, …) always reflect the reporter’s most recent view. The
+// (APIHref, ConsoleHref, Generation, Tombstone, …) always reflect the reporter's most recent view. The
 // struct is treated as an immutable value from a domain perspective – updates happen by inserting a new row
 // via GORM where required, not by mutating an existing instance in-place.
 type ReporterResource struct {
@@ -97,9 +97,8 @@ func validateReporterResource(r *ReporterResource) error {
 	)
 }
 
-// SerializeToSnapshot converts GORM ReporterResource to snapshot type - direct initialization without validation
+// SerializeToSnapshot converts GORM ReporterResource to snapshot type - direct initialization without validation.
 func (rr ReporterResource) SerializeToSnapshot() bizmodel.ReporterResourceSnapshot {
-	// Create ReporterResourceKey snapshot
 	keySnapshot := bizmodel.ReporterResourceKeySnapshot{
 		LocalResourceID:    rr.LocalResourceID,
 		ReporterType:       rr.ReporterType,
@@ -121,7 +120,7 @@ func (rr ReporterResource) SerializeToSnapshot() bizmodel.ReporterResourceSnapsh
 	}
 }
 
-// DeserializeFromSnapshot creates GORM ReporterResource from snapshot - direct initialization without validation
+// DeserializeReporterResourceFromSnapshot creates GORM ReporterResource from snapshot - direct initialization without validation.
 func DeserializeReporterResourceFromSnapshot(snapshot bizmodel.ReporterResourceSnapshot) ReporterResource {
 	return ReporterResource{
 		ID: snapshot.ID,

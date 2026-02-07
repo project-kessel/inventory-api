@@ -1,4 +1,4 @@
-package data
+package memory
 
 import (
 	"fmt"
@@ -6,11 +6,11 @@ import (
 	"sync"
 
 	"github.com/google/uuid"
-	"gorm.io/gorm"
-
 	"github.com/project-kessel/inventory-api/internal"
 	"github.com/project-kessel/inventory-api/internal/biz"
 	bizmodel "github.com/project-kessel/inventory-api/internal/biz/model"
+	"github.com/project-kessel/inventory-api/internal/infrastructure/resourcerepository"
+	"gorm.io/gorm"
 )
 
 type fakeResourceRepository struct {
@@ -41,7 +41,8 @@ type storedRepresentation struct {
 	commonVersion uint
 }
 
-func NewFakeResourceRepository() ResourceRepository {
+// NewFakeResourceRepository creates a new in-memory [resourcerepository.ResourceRepository] for testing.
+func NewFakeResourceRepository() resourcerepository.ResourceRepository {
 	return &fakeResourceRepository{
 		resourcesByPrimaryKey:    make(map[uuid.UUID]*storedResource),
 		resourcesByCompositeKey:  make(map[string]uuid.UUID),
@@ -166,7 +167,6 @@ func (f *fakeResourceRepository) FindResourceByKeys(tx *gorm.DB, key bizmodel.Re
 
 	// Note: This fake implementation doesn't use the transaction parameter,
 	// but we acknowledge it for consistency with the real implementation.
-	// In a real scenario, tx would be used for database operations.
 	_ = tx // Explicitly acknowledge the transaction parameter
 
 	// Match the real repository's behavior: if reporterInstanceId is empty,
@@ -321,7 +321,7 @@ func (f *fakeResourceRepository) GetDB() *gorm.DB {
 	return nil
 }
 
-func (f *fakeResourceRepository) GetTransactionManager() TransactionManager {
+func (f *fakeResourceRepository) GetTransactionManager() resourcerepository.TransactionManager {
 	// Return a fake transaction manager for testing
 	return NewFakeTransactionManager(3) // Default retry count
 }
@@ -334,8 +334,8 @@ func (f *fakeResourceRepository) makeHistoryKey(localResourceID, reporterType, r
 	return strings.ToLower(fmt.Sprintf("%s|%s|%s|%s", localResourceID, reporterType, resourceType, reporterInstanceID))
 }
 
-// markTransactionIdAsProcessed marks a transaction ID as processed for idempotency testing
-// Note: This method assumes the caller already holds the appropriate lock
+// markTransactionIdAsProcessed marks a transaction ID as processed for idempotency testing.
+// Note: This method assumes the caller already holds the appropriate lock.
 func (f *fakeResourceRepository) markTransactionIdAsProcessed(transactionId string) {
 	if transactionId == "" {
 		return
@@ -369,8 +369,8 @@ func cloneJsonObject(src internal.JsonObject) internal.JsonObject {
 	return clone
 }
 
-// HasTransactionIdBeenProcessed checks if a transaction ID has been processed before
-// Returns true if the transaction has already been processed, false otherwise
+// HasTransactionIdBeenProcessed checks if a transaction ID has been processed before.
+// Returns true if the transaction has already been processed, false otherwise.
 func (f *fakeResourceRepository) HasTransactionIdBeenProcessed(tx *gorm.DB, transactionId string) (bool, error) {
 	if transactionId == "" {
 		return false, nil

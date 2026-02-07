@@ -5,8 +5,8 @@ import (
 	"github.com/project-kessel/inventory-api/cmd/common"
 	"github.com/spf13/cobra"
 
-	"github.com/project-kessel/inventory-api/internal/data"
 	"github.com/project-kessel/inventory-api/internal/errors"
+	gormrepo "github.com/project-kessel/inventory-api/internal/infrastructure/resourcerepository/gorm"
 	"github.com/project-kessel/inventory-api/internal/provider"
 )
 
@@ -29,7 +29,7 @@ func NewCommand(options *provider.StorageOptions, loggerOptions common.LoggerOpt
 				return err
 			}
 
-			return data.Migrate(db, logHelper)
+			return gormrepo.Migrate(db, logHelper)
 		},
 	}
 

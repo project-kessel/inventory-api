@@ -1,114 +1,41 @@
-package data
+package gorm
 
 import (
 	"fmt"
 
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/google/uuid"
+	"github.com/project-kessel/inventory-api/internal"
 	"github.com/project-kessel/inventory-api/internal/biz"
+	bizmodel "github.com/project-kessel/inventory-api/internal/biz/model"
+	"github.com/project-kessel/inventory-api/internal/biz/model_legacy"
+	"github.com/project-kessel/inventory-api/internal/infrastructure/resourcerepository"
 	"gorm.io/gorm"
 
 	"github.com/go-kratos/kratos/v2/errors"
-	"github.com/project-kessel/inventory-api/internal"
-	bizmodel "github.com/project-kessel/inventory-api/internal/biz/model"
-	"github.com/project-kessel/inventory-api/internal/biz/model_legacy"
-	datamodel "github.com/project-kessel/inventory-api/internal/data/model"
 )
 
-type FindResourceByKeysResult struct {
-	ReporterResourceID    uuid.UUID `gorm:"column:reporter_resource_id"`
-	RepresentationVersion uint      `gorm:"column:representation_version"`
-	Generation            uint      `gorm:"column:generation"`
-	Tombstone             bool      `gorm:"column:tombstone"`
-	CommonVersion         uint      `gorm:"column:common_version"`
-	ResourceID            uuid.UUID `gorm:"column:resource_id"`
-	ResourceType          string    `gorm:"column:resource_type"`
-	LocalResourceID       string    `gorm:"column:local_resource_id"`
-	ReporterType          string    `gorm:"column:reporter_type"`
-	ReporterInstanceID    string    `gorm:"column:reporter_instance_id"`
-	ConsistencyToken      string    `gorm:"column:consistency_token"`
-}
-
-// GetCurrentAndPreviousWorkspaceID extracts current and previous workspace IDs from Representations
-func GetCurrentAndPreviousWorkspaceID(current, previous *bizmodel.Representations) (currentWorkspaceID, previousWorkspaceID string) {
-	return current.WorkspaceID(), previous.WorkspaceID()
-}
-
-func ToSnapshotsFromResults(results []FindResourceByKeysResult) (*bizmodel.ResourceSnapshot, []bizmodel.ReporterResourceSnapshot) {
-	if len(results) == 0 {
-		return nil, nil
-	}
-
-	var reporterSnapshots []bizmodel.ReporterResourceSnapshot
-	var resourceSnapshot bizmodel.ResourceSnapshot
-
-	for i, result := range results {
-		resSnap, repSnap := result.ToSnapshots()
-
-		if i == 0 {
-			resourceSnapshot = resSnap
-		}
-		reporterSnapshots = append(reporterSnapshots, repSnap)
-	}
-
-	return &resourceSnapshot, reporterSnapshots
-}
-
-func (result FindResourceByKeysResult) ToSnapshots() (bizmodel.ResourceSnapshot, bizmodel.ReporterResourceSnapshot) {
-	// Create ResourceSnapshot
-	resourceSnapshot := bizmodel.ResourceSnapshot{
-		ID:               result.ResourceID,
-		Type:             result.ResourceType,
-		CommonVersion:    result.CommonVersion,
-		ConsistencyToken: result.ConsistencyToken,
-	}
-
-	// Create ReporterResourceKeySnapshot
-	keySnapshot := bizmodel.ReporterResourceKeySnapshot{
-		LocalResourceID:    result.LocalResourceID,
-		ReporterType:       result.ReporterType,
-		ResourceType:       result.ResourceType,
-		ReporterInstanceID: result.ReporterInstanceID,
-	}
-
-	// Create ReporterResourceSnapshot
-	reporterResourceSnapshot := bizmodel.ReporterResourceSnapshot{
-		ID:                    result.ReporterResourceID,
-		ReporterResourceKey:   keySnapshot,
-		ResourceID:            result.ResourceID,
-		RepresentationVersion: result.RepresentationVersion,
-		Generation:            result.Generation,
-		Tombstone:             result.Tombstone,
-	}
-
-	return resourceSnapshot, reporterResourceSnapshot
-}
-
-type ResourceRepository interface {
-	NextResourceId() (bizmodel.ResourceId, error)
-	NextReporterResourceId() (bizmodel.ReporterResourceId, error)
-	Save(tx *gorm.DB, resource bizmodel.Resource, operationType biz.EventOperationType, txid string) error
-	FindResourceByKeys(tx *gorm.DB, key bizmodel.ReporterResourceKey) (*bizmodel.Resource, error)
-	FindCurrentAndPreviousVersionedRepresentations(tx *gorm.DB, key bizmodel.ReporterResourceKey, currentVersion *uint, operationType biz.EventOperationType) (*bizmodel.Representations, *bizmodel.Representations, error)
-	FindLatestRepresentations(tx *gorm.DB, key bizmodel.ReporterResourceKey) (*bizmodel.Representations, error)
-	GetDB() *gorm.DB
-	GetTransactionManager() TransactionManager
-	HasTransactionIdBeenProcessed(tx *gorm.DB, transactionId string) (bool, error)
-}
-
-type resourceRepository struct {
+// ResourceRepository is the GORM-backed implementation of
+// [resourcerepository.ResourceRepository].
+type ResourceRepository struct {
 	db                 *gorm.DB
-	transactionManager TransactionManager
+	transactionManager resourcerepository.TransactionManager
 }
 
-func NewResourceRepository(db *gorm.DB, transactionManager TransactionManager) ResourceRepository {
-	return &resourceRepository{
+// NewResourceRepository creates a new GORM-backed [resourcerepository.ResourceRepository].
+func NewResourceRepository(db *gorm.DB, transactionManager resourcerepository.TransactionManager) *ResourceRepository {
+	return &ResourceRepository{
 		db:                 db,
 		transactionManager: transactionManager,
 	}
 }
 
-func (r *resourceRepository) NextResourceId() (bizmodel.ResourceId, error) {
+// DB returns the underlying [gorm.DB] handle.
+func (r *ResourceRepository) DB() *gorm.DB {
+	return r.db
+}
+
+func (r *ResourceRepository) NextResourceId() (bizmodel.ResourceId, error) {
 	uuidV7, err := uuid.NewV7()
 	if err != nil {
 		return bizmodel.ResourceId{}, err
@@ -117,7 +44,7 @@ func (r *resourceRepository) NextResourceId() (bizmodel.ResourceId, error) {
 	return bizmodel.NewResourceId(uuidV7)
 }
 
-func (r *resourceRepository) NextReporterResourceId() (bizmodel.ReporterResourceId, error) {
+func (r *ResourceRepository) NextReporterResourceId() (bizmodel.ReporterResourceId, error) {
 	uuidV7, err := uuid.NewV7()
 	if err != nil {
 		return bizmodel.ReporterResourceId{}, err
@@ -126,16 +53,16 @@ func (r *resourceRepository) NextReporterResourceId() (bizmodel.ReporterResource
 	return bizmodel.NewReporterResourceId(uuidV7)
 }
 
-func (r *resourceRepository) Save(tx *gorm.DB, resource bizmodel.Resource, operationType biz.EventOperationType, txid string) error {
+func (r *ResourceRepository) Save(tx *gorm.DB, resource bizmodel.Resource, operationType biz.EventOperationType, txid string) error {
 	resourceSnapshot, reporterResourceSnapshot, reporterRepresentationSnapshot, commonRepresentationSnapshot, err := resource.Serialize()
 	if err != nil {
 		return fmt.Errorf("failed to serialize resource: %w", err)
 	}
 
-	dataResource := datamodel.DeserializeResourceFromSnapshot(resourceSnapshot)
-	dataReporterResource := datamodel.DeserializeReporterResourceFromSnapshot(reporterResourceSnapshot)
-	dataReporterRepresentation := datamodel.DeserializeReporterRepresentationFromSnapshot(reporterRepresentationSnapshot)
-	dataCommonRepresentation := datamodel.DeserializeCommonRepresentationFromSnapshot(commonRepresentationSnapshot)
+	dataResource := DeserializeResourceFromSnapshot(resourceSnapshot)
+	dataReporterResource := DeserializeReporterResourceFromSnapshot(reporterResourceSnapshot)
+	dataReporterRepresentation := DeserializeReporterRepresentationFromSnapshot(reporterRepresentationSnapshot)
+	dataCommonRepresentation := DeserializeCommonRepresentationFromSnapshot(commonRepresentationSnapshot)
 
 	if err := tx.Save(&dataResource).Error; err != nil {
 		return fmt.Errorf("failed to save resource: %w", err)
@@ -184,7 +111,7 @@ func (r *resourceRepository) Save(tx *gorm.DB, resource bizmodel.Resource, opera
 	return nil
 }
 
-func (r *resourceRepository) handleOutboxEvents(tx *gorm.DB, resourceEvent bizmodel.ResourceEvent, operationType biz.EventOperationType, txid string) error {
+func (r *ResourceRepository) handleOutboxEvents(tx *gorm.DB, resourceEvent bizmodel.ResourceEvent, operationType biz.EventOperationType, txid string) error {
 	resourceMessage, tupleMessage, err := model_legacy.NewOutboxEventsFromResourceEvent(resourceEvent, operationType, txid)
 	if err != nil {
 		return err
@@ -203,14 +130,14 @@ func (r *resourceRepository) handleOutboxEvents(tx *gorm.DB, resourceEvent bizmo
 	return nil
 }
 
-func (r *resourceRepository) getDBSession(tx *gorm.DB) *gorm.DB {
+func (r *ResourceRepository) getDBSession(tx *gorm.DB) *gorm.DB {
 	if tx == nil {
 		return r.db.Session(&gorm.Session{})
 	}
 	return tx
 }
 
-func (r *resourceRepository) buildReporterResourceKeyQuery(db *gorm.DB, key bizmodel.ReporterResourceKey) *gorm.DB {
+func (r *ResourceRepository) buildReporterResourceKeyQuery(db *gorm.DB, key bizmodel.ReporterResourceKey) *gorm.DB {
 	query := db.
 		Where("rr.local_resource_id = ?", key.LocalResourceId().Serialize()).
 		Where("rr.resource_type = ?", key.ResourceType().Serialize()).
@@ -223,7 +150,7 @@ func (r *resourceRepository) buildReporterResourceKeyQuery(db *gorm.DB, key bizm
 	return query
 }
 
-func (r *resourceRepository) FindResourceByKeys(tx *gorm.DB, key bizmodel.ReporterResourceKey) (*bizmodel.Resource, error) {
+func (r *ResourceRepository) FindResourceByKeys(tx *gorm.DB, key bizmodel.ReporterResourceKey) (*bizmodel.Resource, error) {
 	var results []FindResourceByKeysResult
 
 	db := r.getDBSession(tx)
@@ -263,15 +190,15 @@ func (r *resourceRepository) FindResourceByKeys(tx *gorm.DB, key bizmodel.Report
 	return resource, nil
 }
 
-func (r *resourceRepository) GetDB() *gorm.DB {
+func (r *ResourceRepository) GetDB() *gorm.DB {
 	return r.db
 }
 
-func (r *resourceRepository) GetTransactionManager() TransactionManager {
+func (r *ResourceRepository) GetTransactionManager() resourcerepository.TransactionManager {
 	return r.transactionManager
 }
 
-func (r *resourceRepository) FindCurrentAndPreviousVersionedRepresentations(tx *gorm.DB, key bizmodel.ReporterResourceKey, currentCommonVersion *uint, operationType biz.EventOperationType) (*bizmodel.Representations, *bizmodel.Representations, error) {
+func (r *ResourceRepository) FindCurrentAndPreviousVersionedRepresentations(tx *gorm.DB, key bizmodel.ReporterResourceKey, currentCommonVersion *uint, operationType biz.EventOperationType) (*bizmodel.Representations, *bizmodel.Representations, error) {
 	if currentCommonVersion == nil {
 		return nil, nil, nil
 	}
@@ -323,7 +250,7 @@ func (r *resourceRepository) FindCurrentAndPreviousVersionedRepresentations(tx *
 	return current, previous, nil
 }
 
-func (r *resourceRepository) FindLatestRepresentations(tx *gorm.DB, key bizmodel.ReporterResourceKey) (*bizmodel.Representations, error) {
+func (r *ResourceRepository) FindLatestRepresentations(tx *gorm.DB, key bizmodel.ReporterResourceKey) (*bizmodel.Representations, error) {
 	var result struct {
 		Data    internal.JsonObject
 		Version uint
@@ -358,7 +285,7 @@ func (r *resourceRepository) FindLatestRepresentations(tx *gorm.DB, key bizmodel
 // HasTransactionIdBeenProcessed checks if a transaction ID exists in either the
 // reporter_representations or common_representations tables.
 // Returns true if the transaction has already been processed, false otherwise.
-func (r *resourceRepository) HasTransactionIdBeenProcessed(tx *gorm.DB, transactionId string) (bool, error) {
+func (r *ResourceRepository) HasTransactionIdBeenProcessed(tx *gorm.DB, transactionId string) (bool, error) {
 	if transactionId == "" {
 		return false, nil
 	}

@@ -1,4 +1,4 @@
-package data
+package gorm
 
 import (
 	"database/sql"
@@ -8,9 +8,9 @@ import (
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/mattn/go-sqlite3"
-	"gorm.io/gorm"
-
+	"github.com/project-kessel/inventory-api/internal/infrastructure/resourcerepository"
 	"github.com/project-kessel/inventory-api/internal/metricscollector"
+	"gorm.io/gorm"
 )
 
 type gormTransactionManager struct {
@@ -18,16 +18,16 @@ type gormTransactionManager struct {
 	maxSerializationRetries int
 }
 
-// NewGormTransactionManager creates a new GORM-based transaction manager
-func NewGormTransactionManager(mc *metricscollector.MetricsCollector, maxSerializationRetries int) TransactionManager {
+// NewGormTransactionManager creates a new GORM-based transaction manager.
+func NewGormTransactionManager(mc *metricscollector.MetricsCollector, maxSerializationRetries int) resourcerepository.TransactionManager {
 	return &gormTransactionManager{
 		metricsCollector:        mc,
 		maxSerializationRetries: maxSerializationRetries,
 	}
 }
 
-// HandleSerializableTransaction executes the provided function within a serializable transaction
-// It automatically handles retries in case of serialization failures
+// HandleSerializableTransaction executes the provided function within a serializable transaction.
+// It automatically handles retries in case of serialization failures.
 func (tm *gormTransactionManager) HandleSerializableTransaction(operationName string, db *gorm.DB, txFunc func(tx *gorm.DB) error) error {
 	var err error
 	for i := 0; i < tm.maxSerializationRetries; i++ {

@@ -10,22 +10,14 @@ import (
 
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 
 	"github.com/project-kessel/inventory-api/internal/authz/kessel"
-	"github.com/project-kessel/inventory-api/internal/data"
+	gormrepo "github.com/project-kessel/inventory-api/internal/infrastructure/resourcerepository/gorm"
 )
 
 func setupGorm(t *testing.T) *gorm.DB {
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{TranslateError: true})
-	require.Nil(t, err)
-
-	err = data.Migrate(db, log.NewHelper(log.DefaultLogger))
-	require.Nil(t, err)
-
-	return db
+	return gormrepo.NewTestResourceRepository(t).DB()
 }
 
 func TestHealthInit(t *testing.T) {

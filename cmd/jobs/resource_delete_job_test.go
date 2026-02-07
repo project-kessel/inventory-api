@@ -6,11 +6,9 @@ import (
 
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/google/uuid"
-	"github.com/project-kessel/inventory-api/internal/data"
-	"github.com/project-kessel/inventory-api/internal/data/model"
+	gormrepo "github.com/project-kessel/inventory-api/internal/infrastructure/resourcerepository/gorm"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
 
@@ -19,13 +17,7 @@ func testLogger() *log.Helper {
 }
 
 func setupTestDB(t *testing.T) *gorm.DB {
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{TranslateError: true})
-	require.NoError(t, err)
-
-	err = data.Migrate(db, testLogger())
-	require.NoError(t, err)
-
-	return db
+	return gormrepo.NewTestResourceRepository(t).DB()
 }
 
 func createTestReporterResource(t *testing.T, db *gorm.DB, resourceType, reporterType string) uuid.UUID {
@@ -34,15 +26,15 @@ func createTestReporterResource(t *testing.T, db *gorm.DB, resourceType, reporte
 	resourceID := uuid.New()
 	reporterResourceID := uuid.New()
 
-	resource := model.Resource{
+	resource := gormrepo.Resource{
 		ID:   resourceID,
 		Type: resourceType,
 	}
 	require.NoError(t, db.Create(&resource).Error)
 
-	reporterResource := model.ReporterResource{
+	reporterResource := gormrepo.ReporterResource{
 		ID: reporterResourceID,
-		ReporterResourceKey: model.ReporterResourceKey{
+		ReporterResourceKey: gormrepo.ReporterResourceKey{
 			LocalResourceID:    "local-" + resourceID.String(),
 			ReporterType:       reporterType,
 			ResourceType:       resourceType,
@@ -65,13 +57,13 @@ func createTestCommonRepresentation(t *testing.T, db *gorm.DB, reporterType stri
 
 	resourceID := uuid.New()
 
-	resource := model.Resource{
+	resource := gormrepo.Resource{
 		ID:   resourceID,
 		Type: "host",
 	}
 	require.NoError(t, db.Create(&resource).Error)
 
-	commonRep := model.CommonRepresentation{
+	commonRep := gormrepo.CommonRepresentation{
 		ResourceId:                 resourceID,
 		Version:                    1,
 		ReportedByReporterType:     reporterType,
@@ -87,7 +79,7 @@ func createTestResource(t *testing.T, db *gorm.DB, resourceType string) uuid.UUI
 
 	resourceID := uuid.New()
 
-	resource := model.Resource{
+	resource := gormrepo.Resource{
 		ID:   resourceID,
 		Type: resourceType,
 	}
@@ -143,7 +135,7 @@ func TestDeleteBatchedReporterResources_DryRun(t *testing.T) {
 			assert.Equal(t, tt.expectedCount, count)
 
 			var remaining int64
-			db.Model(&model.ReporterResource{}).
+			db.Model(&gormrepo.ReporterResource{}).
 				Where("resource_type = ? AND reporter_type = ?", tt.resourceType, tt.reporterType).
 				Count(&remaining)
 			assert.Equal(t, tt.expectedCount, remaining, "dry-run should not delete any records")
@@ -164,7 +156,7 @@ func TestDeleteBatchedReporterResources_ActualDeletion(t *testing.T) {
 	}
 
 	var initialCount int64
-	db.Model(&model.ReporterResource{}).
+	db.Model(&gormrepo.ReporterResource{}).
 		Where("resource_type = ? AND reporter_type = ?", resourceType, reporterType).
 		Count(&initialCount)
 	assert.Equal(t, int64(recordCount), initialCount)
@@ -175,7 +167,7 @@ func TestDeleteBatchedReporterResources_ActualDeletion(t *testing.T) {
 	assert.Equal(t, int64(recordCount), deletedCount)
 
 	var remainingCount int64
-	db.Model(&model.ReporterResource{}).
+	db.Model(&gormrepo.ReporterResource{}).
 		Where("resource_type = ? AND reporter_type = ?", resourceType, reporterType).
 		Count(&remainingCount)
 	assert.Equal(t, int64(0), remainingCount)
@@ -195,7 +187,7 @@ func TestDeleteBatchedReporterResources_FiltersByType(t *testing.T) {
 	assert.Equal(t, int64(1), deletedCount)
 
 	var remainingCount int64
-	db.Model(&model.ReporterResource{}).Count(&remainingCount)
+	db.Model(&gormrepo.ReporterResource{}).Count(&remainingCount)
 	assert.Equal(t, int64(2), remainingCount)
 }
 
@@ -242,7 +234,7 @@ func TestDeleteBatchedCommonRepresentations_DryRun(t *testing.T) {
 			assert.Equal(t, tt.expectedCount, count)
 
 			var remaining int64
-			db.Model(&model.CommonRepresentation{}).
+			db.Model(&gormrepo.CommonRepresentation{}).
 				Where("reported_by_reporter_type = ?", tt.reporterType).
 				Count(&remaining)
 			assert.Equal(t, tt.expectedCount, remaining, "dry-run should not delete any records")
@@ -293,7 +285,7 @@ func TestDeleteBatchedResources_DryRun(t *testing.T) {
 			assert.Equal(t, tt.expectedCount, count)
 
 			var remaining int64
-			db.Model(&model.Resource{}).
+			db.Model(&gormrepo.Resource{}).
 				Where("type = ?", tt.resourceType).
 				Count(&remaining)
 			assert.Equal(t, tt.expectedCount, remaining, "dry-run should not delete any records")
@@ -313,7 +305,7 @@ func TestDeleteBatchedResources_ActualDeletion(t *testing.T) {
 	}
 
 	var initialCount int64
-	db.Model(&model.Resource{}).
+	db.Model(&gormrepo.Resource{}).
 		Where("type = ?", resourceType).
 		Count(&initialCount)
 	assert.Equal(t, int64(recordCount), initialCount)
@@ -324,7 +316,7 @@ func TestDeleteBatchedResources_ActualDeletion(t *testing.T) {
 	assert.Equal(t, int64(recordCount), deletedCount)
 
 	var remainingCount int64
-	db.Model(&model.Resource{}).
+	db.Model(&gormrepo.Resource{}).
 		Where("type = ?", resourceType).
 		Count(&remainingCount)
 	assert.Equal(t, int64(0), remainingCount)
@@ -344,7 +336,7 @@ func TestDeleteBatchedResources_FiltersByResourceType(t *testing.T) {
 	assert.Equal(t, int64(2), deletedCount)
 
 	var remainingCount int64
-	db.Model(&model.Resource{}).Count(&remainingCount)
+	db.Model(&gormrepo.Resource{}).Count(&remainingCount)
 	assert.Equal(t, int64(1), remainingCount)
 }
 

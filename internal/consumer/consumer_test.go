@@ -16,9 +16,10 @@ import (
 	"github.com/project-kessel/inventory-api/internal/biz"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
 	"github.com/project-kessel/inventory-api/internal/data"
-	datamodel "github.com/project-kessel/inventory-api/internal/data/model"
+	gormrepo "github.com/project-kessel/inventory-api/internal/infrastructure/resourcerepository/gorm"
+	"github.com/project-kessel/inventory-api/internal/infrastructure/resourcerepository"
+	"github.com/project-kessel/inventory-api/internal/infrastructure/resourcerepository/memory"
 	"github.com/project-kessel/inventory-api/internal/mocks"
-	"github.com/project-kessel/inventory-api/internal/testutil"
 
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
@@ -38,10 +39,7 @@ const (
 )
 
 func setupInMemoryDB(t *testing.T) *gorm.DB {
-	db := testutil.NewSQLiteTestDB(t, &gorm.Config{})
-	err := data.Migrate(db, nil)
-	require.NoError(t, err)
-	return db
+	return gormrepo.NewTestResourceRepository(t).DB()
 }
 
 type TestCase struct {
@@ -290,7 +288,7 @@ func TestInventoryConsumer_ProcessMessage(t *testing.T) {
 		expectedTxid      string
 		msg               *kafka.Message
 		relationsEnabled  bool
-		setupData         func(t *testing.T, repo data.ResourceRepository, db *gorm.DB)
+		setupData         func(t *testing.T, repo resourcerepository.ResourceRepository, db *gorm.DB)
 	}{
 		{
 			name:              "Create Operation",
@@ -301,7 +299,7 @@ func TestInventoryConsumer_ProcessMessage(t *testing.T) {
 				Value: []byte(testCreateMessage),
 			},
 			relationsEnabled: true,
-			setupData: func(t *testing.T, repo data.ResourceRepository, db *gorm.DB) {
+			setupData: func(t *testing.T, repo resourcerepository.ResourceRepository, db *gorm.DB) {
 				testData, err := model.NewResourceFixture("test-resource-4321", "integration", "notifications", "test-instance-1", "test-workspace-v0")
 				require.NoError(t, err)
 				err = repo.Save(db, *testData.Resource, biz.OperationTypeCreated, string(testData.InitialTransactionId))
@@ -317,7 +315,7 @@ func TestInventoryConsumer_ProcessMessage(t *testing.T) {
 				Value: []byte(testUpdateMessage),
 			},
 			relationsEnabled: true,
-			setupData: func(t *testing.T, repo data.ResourceRepository, db *gorm.DB) {
+			setupData: func(t *testing.T, repo resourcerepository.ResourceRepository, db *gorm.DB) {
 				testData, err := model.NewResourceFixture("test-resource-4321", "integration", "notifications", "test-instance-1", "test-workspace-v0")
 				require.NoError(t, err)
 				err = repo.Save(db, *testData.Resource, biz.OperationTypeCreated, string(testData.InitialTransactionId))
@@ -340,7 +338,7 @@ func TestInventoryConsumer_ProcessMessage(t *testing.T) {
 				Value: []byte(testDeleteMessage),
 			},
 			relationsEnabled: true,
-			setupData: func(t *testing.T, repo data.ResourceRepository, db *gorm.DB) {
+			setupData: func(t *testing.T, repo resourcerepository.ResourceRepository, db *gorm.DB) {
 				testData, err := model.NewResourceFixture("test-resource-4321", "integration", "notifications", "test-instance-1", "test-workspace-v0")
 				require.NoError(t, err)
 				err = repo.Save(db, *testData.Resource, biz.OperationTypeCreated, string(testData.InitialTransactionId))
@@ -937,7 +935,7 @@ func TestUpdateConsistencyTokenIfPresent(t *testing.T) {
 			resourceUUID, err := uuid.Parse(testResourceID)
 			require.Nil(t, err)
 
-			initialResource := datamodel.Resource{
+			initialResource := gormrepo.Resource{
 				ID:               resourceUUID,
 				Type:             testResourceType,
 				CommonVersion:    1,
@@ -948,7 +946,7 @@ func TestUpdateConsistencyTokenIfPresent(t *testing.T) {
 			require.Nil(t, result.Error)
 
 			// Verify initial token is set
-			var dbResource datamodel.Resource
+			var dbResource gormrepo.Resource
 			result = tester.inv.DB.Where("id = ?", resourceUUID).First(&dbResource)
 			require.Nil(t, result.Error)
 			assert.Equal(t, initialToken, dbResource.ConsistencyToken)
@@ -973,7 +971,7 @@ func TestInventoryConsumer_UpdateWithSameWorkspace_NoOp(t *testing.T) {
 	testData, err := model.NewResourceFixture("test-resource-4321", "integration", "notifications", "test-instance-1", sameWorkspace)
 	require.NoError(t, err)
 
-	fakeRepo := data.NewFakeResourceRepository()
+	fakeRepo := memory.NewFakeResourceRepository()
 	require.NoError(t, fakeRepo.Save(nil, *testData.Resource, biz.OperationTypeCreated, string(testData.InitialTransactionId)))
 
 	err = testData.Resource.Update(

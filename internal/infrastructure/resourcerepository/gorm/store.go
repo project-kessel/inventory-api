@@ -1,22 +1,22 @@
-package data
+package gorm
 
 import (
 	"database/sql"
 	"fmt"
 
 	"github.com/go-kratos/kratos/v2/log"
-	"gorm.io/gorm"
-
 	"github.com/project-kessel/inventory-api/internal/biz"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
+	"github.com/project-kessel/inventory-api/internal/infrastructure/resourcerepository"
 	"github.com/project-kessel/inventory-api/internal/metricscollector"
+	"gorm.io/gorm"
 )
 
 // PostgresStore implements model.Store, encapsulating persistence concerns.
 // It is explicitly a Postgres-backed store.
 type PostgresStore struct {
 	db                      *gorm.DB
-	resourceRepo            ResourceRepository // existing data.ResourceRepository for delegation
+	resourceRepo            resourcerepository.ResourceRepository // existing ResourceRepository for delegation
 	eventSource             model.EventSource
 	metricsCollector        *metricscollector.MetricsCollector
 	maxSerializationRetries int
@@ -26,7 +26,7 @@ type PostgresStore struct {
 // PostgresStoreConfig holds configuration for creating a PostgresStore.
 type PostgresStoreConfig struct {
 	DB                      *gorm.DB
-	ResourceRepo            ResourceRepository // existing repository for delegation
+	ResourceRepo            resourcerepository.ResourceRepository // existing repository for delegation
 	EventSource             model.EventSource
 	MetricsCollector        *metricscollector.MetricsCollector
 	MaxSerializationRetries int
@@ -112,7 +112,7 @@ func (tx *postgresTx) Rollback() error {
 // transaction's gorm.DB. This is a bridge pattern for incremental migration.
 type txResourceRepository struct {
 	gormTx   *gorm.DB
-	delegate ResourceRepository // existing data.ResourceRepository
+	delegate resourcerepository.ResourceRepository // existing ResourceRepository
 }
 
 var _ model.ResourceRepository = (*txResourceRepository)(nil)

@@ -18,8 +18,8 @@ import (
 	"github.com/project-kessel/inventory-api/internal/biz/model"
 	"github.com/project-kessel/inventory-api/internal/consumer/auth"
 	"github.com/project-kessel/inventory-api/internal/consumer/retry"
-	"github.com/project-kessel/inventory-api/internal/data"
-	datamodel "github.com/project-kessel/inventory-api/internal/data/model"
+	gormrepo "github.com/project-kessel/inventory-api/internal/infrastructure/resourcerepository/gorm"
+	"github.com/project-kessel/inventory-api/internal/infrastructure/resourcerepository"
 	"github.com/project-kessel/inventory-api/internal/metricscollector"
 
 	"github.com/project-kessel/inventory-api/internal/authz/allow"
@@ -81,7 +81,7 @@ type InventoryConsumer struct {
 
 	lockToken          string
 	lockId             string
-	ResourceRepository data.ResourceRepository
+	ResourceRepository resourcerepository.ResourceRepository
 }
 
 // New instantiates a new InventoryConsumer
@@ -126,7 +126,7 @@ func New(config CompletedConfig, db *gorm.DB, schemaRepository model.SchemaRepos
 	var errChan chan error
 
 	maxSerializationRetries := viper.GetInt("storage.max-serialization-retries")
-	resourceRepository := data.NewResourceRepository(db, data.NewGormTransactionManager(&mc, maxSerializationRetries))
+	resourceRepository := gormrepo.NewResourceRepository(db, gormrepo.NewGormTransactionManager(&mc, maxSerializationRetries))
 	schemaService := model.NewSchemaService(schemaRepository, logger)
 
 	return InventoryConsumer{
@@ -638,7 +638,7 @@ func (i *InventoryConsumer) UpdateConsistencyTokenIfPresent(resourceId, token st
 // UpdateConsistencyToken updates the resource in the inventory DB to add the consistency token
 func (i *InventoryConsumer) UpdateConsistencyToken(resourceId, token string) error {
 	// this will update all records for the same inventory_id with current consistency token
-	result := i.DB.Model(datamodel.Resource{}).Where("id = ?", resourceId).Update("ktn", token)
+	result := i.DB.Model(gormrepo.Resource{}).Where("id = ?", resourceId).Update("ktn", token)
 	if result.Error != nil {
 		metricscollector.Incr(i.MetricsCollector.ConsumerErrors, "UpdateConsistencyToken")
 		return result.Error

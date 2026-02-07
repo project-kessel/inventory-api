@@ -1,4 +1,4 @@
-package data
+package memory
 
 import (
 	"fmt"
@@ -83,12 +83,13 @@ func (tx *fakeStoreTx) Rollback() error {
 	return nil
 }
 
-// fakeModelResourceRepository implements model.ResourceRepository for testing.
+// FakeModelResourceRepository implements model.ResourceRepository for testing.
+// Exported so tests can call helper methods like FindResourceByKeysForTest.
 type fakeModelResourceRepository struct {
-	mu                sync.RWMutex
-	resources         map[string]*model.Resource
-	processedTxIds    map[string]bool
-	representations   map[string]*model.Representations
+	mu              sync.RWMutex
+	resources       map[string]*model.Resource
+	processedTxIds  map[string]bool
+	representations map[string]*model.Representations
 }
 
 func newFakeModelResourceRepository() *fakeModelResourceRepository {

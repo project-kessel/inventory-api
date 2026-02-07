@@ -7,7 +7,7 @@ import (
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/google/uuid"
 	"github.com/project-kessel/inventory-api/cmd/common"
-	"github.com/project-kessel/inventory-api/internal/data/model"
+	gormrepo "github.com/project-kessel/inventory-api/internal/infrastructure/resourcerepository/gorm"
 	"github.com/project-kessel/inventory-api/internal/provider"
 	"github.com/spf13/cobra"
 	"gorm.io/gorm"
@@ -167,7 +167,7 @@ func deleteBatchedByIDs(db *gorm.DB, logHelper *log.Helper, entityName string, m
 func deleteBatchedReporterResources(db *gorm.DB, logHelper *log.Helper, dryRun bool, resourceType string, reporterType string) (int64, error) {
 	if dryRun {
 		var count int64
-		result := db.Model(&model.ReporterResource{}).
+		result := db.Model(&gormrepo.ReporterResource{}).
 			Where("resource_type = ? AND reporter_type = ?", resourceType, reporterType).
 			Count(&count)
 
@@ -180,14 +180,14 @@ func deleteBatchedReporterResources(db *gorm.DB, logHelper *log.Helper, dryRun b
 		return count, nil
 	}
 
-	return deleteBatchedByIDs(db, logHelper, "ReporterResource", &model.ReporterResource{},
+	return deleteBatchedByIDs(db, logHelper, "ReporterResource", &gormrepo.ReporterResource{},
 		"resource_type = ? AND reporter_type = ?", resourceType, reporterType)
 }
 
 func deleteBatchedCommonRepresentations(db *gorm.DB, logHelper *log.Helper, dryRun bool, reporterType string) (int64, error) {
 	if dryRun {
 		var count int64
-		result := db.Model(&model.CommonRepresentation{}).
+		result := db.Model(&gormrepo.CommonRepresentation{}).
 			Where("reported_by_reporter_type = ?", reporterType).
 			Count(&count)
 
@@ -243,7 +243,7 @@ func deleteBatchedCommonRepresentations(db *gorm.DB, logHelper *log.Helper, dryR
 func deleteBatchedResources(db *gorm.DB, logHelper *log.Helper, dryRun bool, resourceType string) (int64, error) {
 	if dryRun {
 		var count int64
-		result := db.Model(&model.Resource{}).
+		result := db.Model(&gormrepo.Resource{}).
 			Where("type = ?", resourceType).
 			Count(&count)
 
@@ -256,6 +256,6 @@ func deleteBatchedResources(db *gorm.DB, logHelper *log.Helper, dryRun bool, res
 		return count, nil
 	}
 
-	return deleteBatchedByIDs(db, logHelper, "Resource", &model.Resource{},
+	return deleteBatchedByIDs(db, logHelper, "Resource", &gormrepo.Resource{},
 		"type = ?", resourceType)
 }

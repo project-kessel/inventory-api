@@ -20,7 +20,7 @@ import (
 	"github.com/project-kessel/inventory-api/internal/biz/model"
 	"github.com/project-kessel/inventory-api/internal/biz/usecase/replication"
 	resourcesctl "github.com/project-kessel/inventory-api/internal/biz/usecase/resources"
-	"github.com/project-kessel/inventory-api/internal/data"
+	gormrepo "github.com/project-kessel/inventory-api/internal/infrastructure/resourcerepository/gorm"
 	"github.com/project-kessel/inventory-api/internal/errors"
 	eventingapi "github.com/project-kessel/inventory-api/internal/eventing/api"
 	"github.com/project-kessel/inventory-api/internal/middleware"
@@ -156,10 +156,10 @@ func NewCommand(
 			})
 
 			// Create transaction manager
-			transactionManager := data.NewGormTransactionManager(mc, options.Storage.MaxSerializationRetries)
+			transactionManager := gormrepo.NewGormTransactionManager(mc, options.Storage.MaxSerializationRetries)
 
 			// Create resource repository
-			resourceRepo := data.NewResourceRepository(db, transactionManager)
+			resourceRepo := gormrepo.NewResourceRepository(db, transactionManager)
 
 			// Create event source if consumer is enabled
 			var eventSource model.EventSource
@@ -171,7 +171,7 @@ func NewCommand(
 			}
 
 			// Create store for transactional access
-			store := data.NewAdapterStore(data.AdapterStoreConfig{
+			store := gormrepo.NewAdapterStore(gormrepo.AdapterStoreConfig{
 				ResourceRepo: resourceRepo,
 				EventSource:  eventSource,
 			})

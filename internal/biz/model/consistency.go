@@ -25,7 +25,7 @@ func NewConsistencyAtLeastAsAcknowledged() Consistency {
 	return Consistency{Preference: ConsistencyAtLeastAsAcknowledged, Token: MinimizeLatencyToken}
 }
 
-// NewConsistencyAtLeastAsFresh creates a Consistency requiring at-least-as-fresh semantics with the given token.
+// NewConsistencyAtLeastAsFresh creates a Consistency requiring at-least-as-fresh semantics.
 func NewConsistencyAtLeastAsFresh(token ConsistencyToken) Consistency {
 	return Consistency{Preference: ConsistencyAtLeastAsFresh, Token: token}
 }
@@ -35,7 +35,7 @@ func (c Consistency) MinimizeLatency() bool {
 	return c.Preference == ConsistencyMinimizeLatency
 }
 
-// AtLeastAsFresh returns the consistency token when Preference is AtLeastAsFresh; otherwise empty.
+// AtLeastAsFresh returns the consistency token, or empty if minimize latency.
 func (c Consistency) AtLeastAsFresh() ConsistencyToken {
 	if c.Preference == ConsistencyAtLeastAsFresh {
 		return c.Token

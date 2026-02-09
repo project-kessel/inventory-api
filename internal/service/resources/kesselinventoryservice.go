@@ -61,8 +61,8 @@ func (c *InventoryService) DeleteResource(ctx context.Context, r *pb.DeleteResou
 func (s *InventoryService) Check(ctx context.Context, req *pb.CheckRequest) (*pb.CheckResponse, error) {
 	reporterResourceKey, err := reporterKeyFromResourceReference(req.Object)
 	if err != nil {
-		log.Errorf("failed to get reporter resource key: %v", err)
-		return nil, status.Error(codes.InvalidArgument, "invalid object reference")
+		log.Error("Failed to build reporter resource key: ", err)
+		return nil, err
 	}
 	subjectRef, err := subjectReferenceFromProto(req.GetSubject())
 	if err != nil {
@@ -74,6 +74,8 @@ func (s *InventoryService) Check(ctx context.Context, req *pb.CheckRequest) (*pb
 		log.Error("Failed to build relation: ", err)
 		return nil, err
 	}
+	consistency := ConvertConsistencyToModel(req.GetConsistency())
+	log.Infof("Check request consistency: %s", consistency.Preference)
 	resp, err := s.Ctl.Check(ctx, relation, subjectRef, reporterResourceKey)
 	if err != nil {
 		return nil, err
@@ -127,6 +129,8 @@ func (s *InventoryService) CheckSelf(ctx context.Context, req *pb.CheckSelfReque
 	if err != nil {
 		return nil, err
 	}
+	consistency := ConvertConsistencyToModel(req.GetConsistency())
+	log.Infof("CheckSelf request consistency: %s", consistency.Preference)
 	resp, err := s.Ctl.CheckSelf(ctx, relation, reporterResourceKey)
 	if err != nil {
 		return nil, err

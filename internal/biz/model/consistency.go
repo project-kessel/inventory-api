@@ -15,7 +15,7 @@ func NewConsistencyUnspecified() Consistency {
 	return Consistency{Preference: ConsistencyUnspecified, Token: MinimizeLatencyToken}
 }
 
-// NewConsistencyMinimizeLatency creates a Consistency that minimizes latency (empty string).
+// NewConsistencyMinimizeLatency creates a Consistency that minimizes latency.
 func NewConsistencyMinimizeLatency() Consistency {
 	return Consistency{Preference: ConsistencyMinimizeLatency, Token: MinimizeLatencyToken}
 }

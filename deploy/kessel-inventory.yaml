@@ -50,12 +50,18 @@ objects:
             args: ["serve"]
             livenessProbe:
               httpGet:
-                path: /api/inventory/v1/livez
+                path: /api/kessel/v1/livez
                 port: 8000
+              timeoutSeconds: 5
+              periodSeconds: 15
+              failureThreshold: 3
             readinessProbe:
               httpGet:
-                path: /api/inventory/v1/readyz
+                path: /api/kessel/v1/readyz
                 port: 8000
+              timeoutSeconds: 5
+              periodSeconds: 10
+              failureThreshold: 3
             resources:
               requests:
                 memory: ${INVENTORY_REQUESTS_MEMORY}
@@ -70,8 +76,6 @@ objects:
               value: "/inventory/inventory-api-config.yaml"
             - name: PGDATA
               value: /temp/data
-            - name: RESOURCE_DIR
-              value: "/data/schema/resources"
             volumeMounts:
                 - name: config-volume
                   mountPath: "/inventory"
@@ -98,7 +102,6 @@ objects:
             public:
               enabled: true
               apiPath: inventory
-              tls: true
 
       testing:
         iqePlugin: kessel-inventory
@@ -149,7 +152,7 @@ objects:
                     secretKeyRef:
                       name: kessel-sso-sa
                       key: url
-                image: registry.access.redhat.com/ubi9/ubi-minimal
+                image: quay.io/redhat-services-prod/project-kessel-tenant/kessel-debug:latest
                 resources:
                   limits:
                     cpu: 200m

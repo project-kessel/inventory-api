@@ -2,7 +2,6 @@ package middleware
 
 import (
 	"context"
-	"fmt"
 	"strings"
 
 	"github.com/go-kratos/kratos/v2/errors"
@@ -28,23 +27,13 @@ func Authentication(authenticator authnapi.Authenticator) func(middleware.Handle
 				// Check if token is already in context (from a previous middleware or interceptor)
 				token, hasToken := util.FromTokenContext(ctx)
 
-				identity, decision := authenticator.Authenticate(ctx, t)
-				if decision == authnapi.Deny {
-					return nil, errors.Unauthorized(reason, "Authentication denied")
-				} else if decision == authnapi.Ignore {
-					return nil, errors.Unauthorized(reason, "No valid authentication found")
-				} else if decision != authnapi.Allow {
-					// Handle any unexpected decision values
-					return nil, errors.Unauthorized(reason, fmt.Sprintf("Authentication failed with decision: %s", decision))
+				claims, decision := authenticator.Authenticate(ctx, t)
+				if err := validateAuthDecision(decision, claims); err != nil {
+					return nil, err
 				}
 
-				// Defensive check: identity should not be nil when decision is Allow
-				// but we check to prevent panics if an authenticator implementation violates the contract
-				if identity == nil {
-					return nil, errors.Unauthorized(reason, "Invalid identity: authenticator returned Allow with nil identity")
-				}
-
-				ctx = context.WithValue(ctx, IdentityRequestKey, identity)
+				// Store claims in AuthzContext (the authoritative source for auth info)
+				ctx = ensureAuthzContext(ctx, claims)
 
 				// Try to get token from context if we don't have it yet
 				// (in case OAuth2Authenticator stored it during Authenticate)
@@ -52,11 +41,12 @@ func Authentication(authenticator authnapi.Authenticator) func(middleware.Handle
 					token, hasToken = util.FromTokenContext(ctx)
 				}
 
+				// Legacy token preservation for backward compatibility.
+				// Note: ClientID is now available via AuthzContext.Claims.ClientID for OIDC auth.
+				// This token preservation can be removed once all callers migrate to using Claims.
 				if hasToken {
-					// Preserve the token we found
 					ctx = util.NewTokenContext(ctx, token)
 				} else {
-					// Fallback: extract from headers (token was already verified by authenticator)
 					authHeader := t.RequestHeader().Get("Authorization")
 					if authHeader != "" {
 						parts := strings.SplitN(authHeader, " ", 2)
@@ -75,7 +65,27 @@ func Authentication(authenticator authnapi.Authenticator) func(middleware.Handle
 	}
 }
 
-var (
-	IdentityRequestKey = &contextKey{"authnapi.Identity"}
-	GetIdentity        = GetFromContext[authnapi.Identity](IdentityRequestKey)
-)
+// ensureAuthzContext populates the authz context with claims and protocol if missing.
+func ensureAuthzContext(ctx context.Context, claims *authnapi.Claims) context.Context {
+	if _, ok := authnapi.FromAuthzContext(ctx); ok {
+		return ctx
+	}
+
+	protocol := authnapi.ProtocolUnknown
+	if t, ok := transport.FromServerContext(ctx); ok {
+		switch t.Kind() {
+		case transport.KindHTTP:
+			protocol = authnapi.ProtocolHTTP
+		case transport.KindGRPC:
+			protocol = authnapi.ProtocolGRPC
+		default:
+			// leave as ProtocolUnknown to allow MetaAuthorizer to fail closed
+			protocol = authnapi.ProtocolUnknown
+		}
+	}
+
+	return authnapi.NewAuthzContext(ctx, authnapi.AuthzContext{
+		Protocol: protocol,
+		Subject:  claims,
+	})
+}

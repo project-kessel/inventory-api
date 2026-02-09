@@ -15,7 +15,7 @@ spec:
             - "-c"
             - |
               echo "Waiting for kessel-inventory-service to be ready..."
-              while ! curl -s http://kessel-inventory-service:8081/api/inventory/v1/readyz; do
+              while ! curl -s http://kessel-inventory-service:8081/api/kessel/v1/readyz; do
                 echo "Inventory service not ready yet. Sleeping for 5 seconds..."
                 sleep 5
               done

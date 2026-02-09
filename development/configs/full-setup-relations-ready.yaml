@@ -25,9 +25,11 @@ storage:
     user: "postgres"
     password: "yPsw5e6ab4bvAGe5H"
     dbname: "spicedb"
-resources:
-  schemaPath: "data/schema/resources"
-  use_cache: true
+schema:
+  repository: in-memory
+  in-memory:
+    type: json
+    path: schema_cache.json
 consumer:
   enabled: true
   bootstrap-servers: kafka:9093

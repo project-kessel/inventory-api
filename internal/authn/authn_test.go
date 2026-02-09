@@ -245,14 +245,14 @@ func TestNew_RoutesByTransportKind(t *testing.T) {
 
 	// HTTP: missing x-rh-identity should be ignored (no allow-unauthenticated fallback on HTTP in this config)
 	httpT := &mockTransporter{kind: transport.KindHTTP, headers: map[string]string{}}
-	identity, decision := auth.Authenticate(context.Background(), httpT)
-	assert.Nil(t, identity)
+	claims, decision := auth.Authenticate(context.Background(), httpT)
+	assert.Nil(t, claims)
 	assert.Equal(t, api.Ignore, decision)
 
 	// gRPC: allow-unauthenticated enabled should allow
 	grpcT := &mockTransporter{kind: transport.KindGRPC, headers: map[string]string{}}
-	identity, decision = auth.Authenticate(context.Background(), grpcT)
-	assert.NotNil(t, identity)
+	claims, decision = auth.Authenticate(context.Background(), grpcT)
+	assert.NotNil(t, claims)
 	assert.Equal(t, api.Allow, decision)
 }
 
@@ -279,17 +279,17 @@ func TestNew_EnableHTTP_EnableGRPC_PerAuthenticatorType(t *testing.T) {
 		assert.NoError(t, err)
 
 		httpT := &mockTransporter{kind: transport.KindHTTP, headers: map[string]string{"x-rh-identity": validXRH}}
-		identity, decision := auth.Authenticate(context.Background(), httpT)
+		claims, decision := auth.Authenticate(context.Background(), httpT)
 		assert.Equal(t, api.Allow, decision)
-		assert.NotNil(t, identity)
-		assert.Equal(t, "x-rh-identity", identity.AuthType)
+		assert.NotNil(t, claims)
+		assert.Equal(t, api.AuthTypeXRhIdentity, claims.AuthType)
 
 		grpcT := &mockTransporter{kind: transport.KindGRPC, headers: map[string]string{"x-rh-identity": validXRH}}
-		identity, decision = auth.Authenticate(context.Background(), grpcT)
+		claims, decision = auth.Authenticate(context.Background(), grpcT)
 		assert.Equal(t, api.Allow, decision)
-		assert.NotNil(t, identity)
+		assert.NotNil(t, claims)
 		// x-rh-identity is disabled for grpc, so grpc should fall back to allow-unauthenticated.
-		assert.Equal(t, "allow-unauthenticated", identity.AuthType)
+		assert.Equal(t, api.AuthTypeAllowUnauthenticated, claims.AuthType)
 	})
 
 	t.Run("allow-unauthenticated enabled for http only", func(t *testing.T) {
@@ -310,16 +310,16 @@ func TestNew_EnableHTTP_EnableGRPC_PerAuthenticatorType(t *testing.T) {
 		assert.NoError(t, err)
 
 		httpT := &mockTransporter{kind: transport.KindHTTP, headers: map[string]string{}}
-		identity, decision := auth.Authenticate(context.Background(), httpT)
+		claims, decision := auth.Authenticate(context.Background(), httpT)
 		assert.Equal(t, api.Allow, decision)
-		assert.NotNil(t, identity)
-		assert.Equal(t, "allow-unauthenticated", identity.AuthType)
+		assert.NotNil(t, claims)
+		assert.Equal(t, api.AuthTypeAllowUnauthenticated, claims.AuthType)
 
 		grpcT := &mockTransporter{kind: transport.KindGRPC, headers: map[string]string{"x-rh-identity": validXRH}}
-		identity, decision = auth.Authenticate(context.Background(), grpcT)
+		claims, decision = auth.Authenticate(context.Background(), grpcT)
 		assert.Equal(t, api.Allow, decision)
-		assert.NotNil(t, identity)
-		assert.Equal(t, "x-rh-identity", identity.AuthType)
+		assert.NotNil(t, claims)
+		assert.Equal(t, api.AuthTypeXRhIdentity, claims.AuthType)
 	})
 
 	t.Run("guest type works and respects per-protocol enablement", func(t *testing.T) {
@@ -340,16 +340,16 @@ func TestNew_EnableHTTP_EnableGRPC_PerAuthenticatorType(t *testing.T) {
 		assert.NoError(t, err)
 
 		httpT := &mockTransporter{kind: transport.KindHTTP, headers: map[string]string{"x-rh-identity": validXRH}}
-		identity, decision := auth.Authenticate(context.Background(), httpT)
+		claims, decision := auth.Authenticate(context.Background(), httpT)
 		assert.Equal(t, api.Allow, decision)
-		assert.NotNil(t, identity)
-		assert.Equal(t, "x-rh-identity", identity.AuthType)
+		assert.NotNil(t, claims)
+		assert.Equal(t, api.AuthTypeXRhIdentity, claims.AuthType)
 
 		grpcT := &mockTransporter{kind: transport.KindGRPC, headers: map[string]string{}}
-		identity, decision = auth.Authenticate(context.Background(), grpcT)
+		claims, decision = auth.Authenticate(context.Background(), grpcT)
 		assert.Equal(t, api.Allow, decision)
-		assert.NotNil(t, identity)
-		assert.Equal(t, "allow-unauthenticated", identity.AuthType)
+		assert.NotNil(t, claims)
+		assert.Equal(t, api.AuthTypeAllowUnauthenticated, claims.AuthType)
 	})
 }
 

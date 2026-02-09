@@ -33,9 +33,11 @@ consumer:
     backoff-factor: 5
   auth:
     enabled: false
-resources:
-  schemaPath: "data/schema/resources"
-  use_cache: true
+schema:
+  repository: in-memory
+  in-memory:
+    type: json
+    path: schema_cache.json
 log:
   level: "debug"
   livez: true

@@ -11,12 +11,12 @@ option java_package = "org.project_kessel.api.inventory.v1";
 service KesselInventoryHealthService {
   rpc GetLivez (GetLivezRequest) returns (GetLivezResponse){
     option (google.api.http) = {
-      get: "/api/inventory/v1/livez"
+      get: "/api/kessel/v1/livez"
     };
   };
   rpc GetReadyz (GetReadyzRequest) returns (GetReadyzResponse){
     option (google.api.http) = {
-      get: "/api/inventory/v1/readyz"
+      get: "/api/kessel/v1/readyz"
     };
   };
 }

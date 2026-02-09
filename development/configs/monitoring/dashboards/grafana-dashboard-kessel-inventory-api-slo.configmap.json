@@ -229,7 +229,7 @@
           "datasource": {
             "uid": "$datasource"
           },
-          "expr": "(\n  sum by (operation) (\n    increase(server_requests_code_total{job=~\"kessel-inventory-api\",operation!~\".*[Ll]ive[Zz].*|.*[Rr]eady[Zz].*\",code!~\"5..|14\"}[$slo_period])\n  )\n  /\n  sum by (operation) (\n    increase(server_requests_code_total{job=~\"kessel-inventory-api\",operation!~\".*[Ll]ive[Zz].*|.*[Rr]eady[Zz].*\"}[$slo_period])\n  )\n)",
+          "expr": "(\n  sum by (operation) (\n    increase(server_requests_code_total{job=~\"kessel-inventory-api\",operation!~\".*[Ll]ive[Zz].*|.*[Rr]eady[Zz].*|.*grpc.health.*|.*[Ss]erver[Rr]eflection.*\",code!~\"5..|14\"}[$slo_period])\n  )\n  /\n  sum by (operation) (\n    increase(server_requests_code_total{job=~\"kessel-inventory-api\",operation!~\".*[Ll]ive[Zz].*|.*[Rr]eady[Zz].*|.*grpc.health.*|.*[Ss]erver[Rr]eflection.*\"}[$slo_period])\n  )\n)",
           "format": "table",
           "instant": true,
           "legendFormat": "{{operation}}",
@@ -239,7 +239,7 @@
           "datasource": {
             "uid": "$datasource"
           },
-          "expr": "(\n  sum by (operation) (\n    increase(server_requests_seconds_bucket_bucket{job=~\"kessel-inventory-api\",operation!~\".*[Ll]ive[Zz].*|.*[Rr]eady[Zz].*\",code!~\"5..|14\",le=\"$latency_slo_target\"}[$slo_period])\n  )\n  /\n  sum by (operation) (\n    increase(server_requests_seconds_bucket_count{job=~\"kessel-inventory-api\",operation!~\".*[Ll]ive[Zz].*|.*[Rr]eady[Zz].*\",code!~\"5..|14\"}[$slo_period])\n  )\n)",
+          "expr": "(\n  sum by (operation) (\n    increase(server_requests_seconds_bucket_bucket{job=~\"kessel-inventory-api\",operation!~\".*[Ll]ive[Zz].*|.*[Rr]eady[Zz].*|.*grpc.health.*|.*[Ss]erver[Rr]eflection.*\",code!~\"5..|14\",le=\"$latency_slo_target\"}[$slo_period])\n  )\n  /\n  sum by (operation) (\n    increase(server_requests_seconds_bucket_count{job=~\"kessel-inventory-api\",operation!~\".*[Ll]ive[Zz].*|.*[Rr]eady[Zz].*|.*grpc.health.*|.*[Ss]erver[Rr]eflection.*\",code!~\"5..|14\"}[$slo_period])\n  )\n)",
           "format": "table",
           "instant": true,
           "legendFormat": "{{operation}}",
@@ -249,7 +249,7 @@
           "datasource": {
             "uid": "$datasource"
           },
-          "expr": "(\n  sum by (operation) (\n    rate(server_requests_code_total{job=~\"kessel-inventory-api\",operation!~\".*[Ll]ive[Zz].*|.*[Rr]eady[Zz].*\"}[5m])\n  )\n)",
+          "expr": "(\n  sum by (operation) (\n    rate(server_requests_code_total{job=~\"kessel-inventory-api\",operation!~\".*[Ll]ive[Zz].*|.*[Rr]eady[Zz].*|.*grpc.health.*|.*[Ss]erver[Rr]eflection.*\"}[5m])\n  )\n)",
           "format": "table",
           "instant": true,
           "legendFormat": "{{operation}}",
@@ -259,7 +259,7 @@
           "datasource": {
             "uid": "$datasource"
           },
-          "expr": "(\n  1 - (\n    sum by (operation) (\n      increase(server_requests_code_total{job=~\"kessel-inventory-api\",operation!~\".*[Ll]ive[Zz].*|.*[Rr]eady[Zz].*\",code!~\"5..|14\"}[$slo_period])\n    )\n    /\n    sum by (operation) (\n      increase(server_requests_code_total{job=~\"kessel-inventory-api\",operation!~\".*[Ll]ive[Zz].*|.*[Rr]eady[Zz].*\"}[$slo_period])\n    )\n  )\n)",
+          "expr": "(\n  1 - (\n    sum by (operation) (\n      increase(server_requests_code_total{job=~\"kessel-inventory-api\",operation!~\".*[Ll]ive[Zz].*|.*[Rr]eady[Zz].*|.*grpc.health.*|.*[Ss]erver[Rr]eflection.*\",code!~\"5..|14\"}[$slo_period])\n    )\n    /\n    sum by (operation) (\n      increase(server_requests_code_total{job=~\"kessel-inventory-api\",operation!~\".*[Ll]ive[Zz].*|.*[Rr]eady[Zz].*|.*grpc.health.*|.*[Ss]erver[Rr]eflection.*\"}[$slo_period])\n    )\n  )\n)",
           "format": "table",
           "instant": true,
           "legendFormat": "{{operation}}",
@@ -1095,14 +1095,14 @@
           "type": "prometheus",
           "uid": "$datasource"
         },
-        "definition": "label_values(server_requests_seconds_bucket_count{job=~\"kessel-inventory-api\",operation!~\".*[Ll]ive[Zz].*|.*[Rr]eady[Zz].*\"}, operation)",
+        "definition": "label_values(server_requests_seconds_bucket_count{job=~\"kessel-inventory-api\",operation!~\".*[Ll]ive[Zz].*|.*[Rr]eady[Zz].*|.*grpc.health.*|.*[Ss]erver[Rr]eflection.*\"}, operation)",
         "includeAll": true,
         "label": "routes",
         "multi": true,
         "name": "route",
         "options": [],
         "query": {
-          "query": "label_values(server_requests_seconds_bucket_count{job=~\"kessel-inventory-api\",operation!~\".*[Ll]ive[Zz].*|.*[Rr]eady[Zz].*\"}, operation)",
+          "query": "label_values(server_requests_seconds_bucket_count{job=~\"kessel-inventory-api\",operation!~\".*[Ll]ive[Zz].*|.*[Rr]eady[Zz].*|.*grpc.health.*|.*[Ss]erver[Rr]eflection.*\"}, operation)",
           "refId": "StandardVariableQuery"
         },
         "refresh": 1,

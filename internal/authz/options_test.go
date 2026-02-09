@@ -34,8 +34,8 @@ func TestOptions_AddFlags(t *testing.T) {
 	test.options.AddFlags(fs, prefix)
 
 	// the below logic ensures that every possible option defined in the Options type
-	// has a defined flag for that option; kessel section is skipped in favor of testing
-	// in its own package
+	// has a defined flag for that option; kessel section is skipped
+	// in favor of testing in their own packages or via config files
 	helpers.AllOptionsHaveFlags(t, prefix, fs, *test.options, []string{"kessel"})
 }
 

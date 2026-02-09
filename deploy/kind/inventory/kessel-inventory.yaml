@@ -61,8 +61,6 @@ spec:
                 secretKeyRef:
                   name: inventory-api-config
                   key: db_password
-            - name: RESOURCE_DIR
-              value: "/data/schema/resources"
           volumeMounts:
             - name: config-volume
               mountPath: "/inventory"
@@ -91,15 +89,13 @@ spec:
                 secretKeyRef:
                   name: inventory-api-config
                   key: db_password
-            - name: RESOURCE_DIR
-              value: "/data/schema/resources"
           livenessProbe:
             httpGet:
-              path: /api/inventory/v1/livez
+              path: /api/kessel/v1/livez
               port: 8081
           readinessProbe:
             httpGet:
-              path: /api/inventory/v1/readyz
+              path: /api/kessel/v1/readyz
               port: 8081
           volumeMounts:
             - name: config-volume
@@ -163,7 +159,37 @@ stringData:
       grpc:
         address: 0.0.0.0:9081
     authn:
-      allow-unauthenticated: true
+      authenticator:
+          type: first_match
+          chain:
+            - type: oidc
+              enable: false
+              transport:
+                http: false
+                grpc: false
+              config:
+                insecure-client: true
+                authn-server-url: http://127.0.0.1:8085/realms/redhat-external
+                skip-client-id-check: true
+                skip-issuer-check: true
+                principal-user-domain: localhost
+            - type: x-rh-identity  # x-rh-identity header support - currently applicable for http transport only
+              enable: true
+              transport:
+                http: true
+                grpc: false   
+            - type: allow-unauthenticated # This is a special authenticator that allows unauthenticated access - mainly for Local-dev/Test 
+              enable: true
+              transport:
+                http: false
+                grpc: true
+    selfSubjectStrategy:
+      redhatRbacSelfSubjectStrategy:
+        enabled: true
+        issuerDomain: redhat
+        oidcIssuerDomains:
+          - iss: "https://sso.redhat.com/auth/realms/redhat-external"
+            domain: redhat
     authz:
       impl: kessel
       kessel:
@@ -200,8 +226,11 @@ stringData:
         dbname: "spicedb"
     service:
       use_v1beta2_db: true
-    resources:
-      schemaPath: "data/schema/resources"
+    schema:
+      repository: in-memory
+      in-memory:
+        type: dir
+        path: /data/schema/resources
     log:
       level: "debug"
       livez: true

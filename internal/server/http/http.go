@@ -43,6 +43,7 @@ func New(c CompletedConfig, authn middleware.Middleware, meter metric.Meter, log
 			selector.Server(
 				authn,
 			).Match(NewWhiteListMatcher).Build(),
+			m.ErrorMapping(),
 		),
 	}
 	opts = append(opts, c.ServerOptions...)

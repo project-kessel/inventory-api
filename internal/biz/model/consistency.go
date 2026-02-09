@@ -1,5 +1,6 @@
 package model
 
+
 // MinimizeLatencyToken is the token value for minimize-latency consistency (empty string).
 const MinimizeLatencyToken ConsistencyToken = ""
 

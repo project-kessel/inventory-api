@@ -16,10 +16,13 @@ func NewSchemaRepository(ctx context.Context, c schemaConfig.CompletedConfig, lo
 	case schemaConfig.InMemoryRepository:
 		switch c.InMemory.Type {
 		case inmemoryConfig.EmptyRepository:
+			logger.Infof("Using empty in-memory schema repository")
 			return NewInMemorySchemaRepository(), nil
 		case inmemoryConfig.JSONRepository:
+			logger.Infof("Using json in-memory schema repository from path %q", c.InMemory.Path)
 			return NewInMemorySchemaRepositoryFromJsonFile(ctx, c.InMemory.Path, validation.NewJsonSchemaValidatorFromString)
 		case inmemoryConfig.DirRepository:
+			logger.Infof("Using dir in-memory schema repository from path %q", c.InMemory.Path)
 			return NewInMemorySchemaRepositoryFromDir(ctx, c.InMemory.Path, validation.NewJsonSchemaValidatorFromString)
 		default:
 			return nil, fmt.Errorf("invalid repository type: %s/%s", c.Repository, c.InMemory.Type)

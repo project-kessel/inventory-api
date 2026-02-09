@@ -46,34 +46,34 @@ func TestConsistencyPreference_String(t *testing.T) {
 	}
 }
 
-func TestNewUnspecifiedConsistency(t *testing.T) {
-	config := NewUnspecifiedConsistency()
-	assert.Equal(t, ConsistencyUnspecified, config.Preference)
-	assert.Empty(t, config.Token)
+func TestNewConsistencyUnspecified(t *testing.T) {
+	c := NewConsistencyUnspecified()
+	assert.Equal(t, ConsistencyUnspecified, c.Preference)
+	assert.Empty(t, c.Token)
 }
 
-func TestNewMinimizeLatencyConsistency(t *testing.T) {
-	config := NewMinimizeLatencyConsistency()
-	assert.Equal(t, ConsistencyMinimizeLatency, config.Preference)
-	assert.Empty(t, config.Token)
+func TestNewConsistencyMinimizeLatency(t *testing.T) {
+	c := NewConsistencyMinimizeLatency()
+	assert.Equal(t, ConsistencyMinimizeLatency, c.Preference)
+	assert.Empty(t, c.Token)
 }
 
-func TestNewAtLeastAsAcknowledgedConsistency(t *testing.T) {
-	config := NewAtLeastAsAcknowledgedConsistency()
-	assert.Equal(t, ConsistencyAtLeastAsAcknowledged, config.Preference)
-	assert.Empty(t, config.Token)
+func TestNewConsistencyAtLeastAsAcknowledged(t *testing.T) {
+	c := NewConsistencyAtLeastAsAcknowledged()
+	assert.Equal(t, ConsistencyAtLeastAsAcknowledged, c.Preference)
+	assert.Empty(t, c.Token)
 }
 
-func TestNewAtLeastAsFreshConsistency(t *testing.T) {
+func TestNewConsistencyAtLeastAsFresh(t *testing.T) {
 	token := "test-token-123"
-	config := NewAtLeastAsFreshConsistency(token)
-	assert.Equal(t, ConsistencyAtLeastAsFresh, config.Preference)
-	assert.Equal(t, token, config.Token)
+	c := NewConsistencyAtLeastAsFresh(ConsistencyToken(token))
+	assert.Equal(t, ConsistencyAtLeastAsFresh, c.Preference)
+	assert.Equal(t, token, string(c.Token))
 }
 
-func TestConsistencyConfig_Defaults(t *testing.T) {
-	// Verify default values - zero value should be unspecified
-	var config ConsistencyConfig
-	assert.Equal(t, ConsistencyUnspecified, config.Preference)
-	assert.Empty(t, config.Token)
+func TestConsistency_Defaults(t *testing.T) {
+	// Zero value should be unspecified
+	var c Consistency
+	assert.Equal(t, ConsistencyUnspecified, c.Preference)
+	assert.Empty(t, c.Token)
 }

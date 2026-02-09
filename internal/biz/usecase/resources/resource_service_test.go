@@ -1350,7 +1350,7 @@ func TestResolveConsistencyToken(t *testing.T) {
 	tests := []struct {
 		name               string
 		featureFlagEnabled bool
-		consistencyConfig  model.ConsistencyConfig
+		consistency        model.Consistency
 		resourceExists     bool
 		expectedToken      string
 		expectedError      bool
@@ -1359,7 +1359,7 @@ func TestResolveConsistencyToken(t *testing.T) {
 		{
 			name:               "feature flag disabled - unspecified defaults to minimize_latency",
 			featureFlagEnabled: false,
-			consistencyConfig:  model.NewUnspecifiedConsistency(),
+			consistency:        model.NewConsistencyUnspecified(),
 			resourceExists:     true,
 			expectedToken:      "",
 			expectedError:      false,
@@ -1367,7 +1367,7 @@ func TestResolveConsistencyToken(t *testing.T) {
 		{
 			name:               "feature flag disabled - minimize_latency returns empty",
 			featureFlagEnabled: false,
-			consistencyConfig:  model.NewMinimizeLatencyConsistency(),
+			consistency:        model.NewConsistencyMinimizeLatency(),
 			resourceExists:     false,
 			expectedToken:      "",
 			expectedError:      false,
@@ -1375,7 +1375,7 @@ func TestResolveConsistencyToken(t *testing.T) {
 		{
 			name:               "feature flag disabled - at_least_as_fresh still honored",
 			featureFlagEnabled: false,
-			consistencyConfig:  model.NewAtLeastAsFreshConsistency("client-provided-token"),
+			consistency:        model.NewConsistencyAtLeastAsFresh(model.ConsistencyToken("client-provided-token")),
 			resourceExists:     false,
 			expectedToken:      "client-provided-token",
 			expectedError:      false,
@@ -1383,7 +1383,7 @@ func TestResolveConsistencyToken(t *testing.T) {
 		{
 			name:               "feature flag disabled - at_least_as_acknowledged still honored",
 			featureFlagEnabled: false,
-			consistencyConfig:  model.NewAtLeastAsAcknowledgedConsistency(),
+			consistency:        model.NewConsistencyAtLeastAsAcknowledged(),
 			resourceExists:     true,
 			expectedToken:      "", // fake repo returns empty consistency token
 			expectedError:      false,
@@ -1391,7 +1391,7 @@ func TestResolveConsistencyToken(t *testing.T) {
 		{
 			name:               "feature flag enabled - unspecified defaults to at_least_as_acknowledged (DB lookup)",
 			featureFlagEnabled: true,
-			consistencyConfig:  model.NewUnspecifiedConsistency(),
+			consistency:        model.NewConsistencyUnspecified(),
 			resourceExists:     true,
 			expectedToken:      "", // fake repo returns empty consistency token
 			expectedError:      false,
@@ -1399,7 +1399,7 @@ func TestResolveConsistencyToken(t *testing.T) {
 		{
 			name:               "feature flag enabled - minimize_latency returns empty token",
 			featureFlagEnabled: true,
-			consistencyConfig:  model.NewMinimizeLatencyConsistency(),
+			consistency:        model.NewConsistencyMinimizeLatency(),
 			resourceExists:     false,
 			expectedToken:      "",
 			expectedError:      false,
@@ -1407,7 +1407,7 @@ func TestResolveConsistencyToken(t *testing.T) {
 		{
 			name:               "feature flag enabled - at_least_as_fresh returns provided token",
 			featureFlagEnabled: true,
-			consistencyConfig:  model.NewAtLeastAsFreshConsistency("client-provided-token"),
+			consistency:        model.NewConsistencyAtLeastAsFresh(model.ConsistencyToken("client-provided-token")),
 			resourceExists:     false,
 			expectedToken:      "client-provided-token",
 			expectedError:      false,
@@ -1415,7 +1415,7 @@ func TestResolveConsistencyToken(t *testing.T) {
 		{
 			name:               "feature flag enabled - at_least_as_fresh with empty token",
 			featureFlagEnabled: true,
-			consistencyConfig:  model.NewAtLeastAsFreshConsistency(""),
+			consistency:        model.NewConsistencyAtLeastAsFresh(model.MinimizeLatencyToken),
 			resourceExists:     false,
 			expectedToken:      "",
 			expectedError:      false,
@@ -1423,7 +1423,7 @@ func TestResolveConsistencyToken(t *testing.T) {
 		{
 			name:               "feature flag enabled - at_least_as_acknowledged resource not found falls back to empty",
 			featureFlagEnabled: true,
-			consistencyConfig:  model.NewAtLeastAsAcknowledgedConsistency(),
+			consistency:        model.NewConsistencyAtLeastAsAcknowledged(),
 			resourceExists:     false,
 			expectedToken:      "",
 			expectedError:      false,
@@ -1431,7 +1431,7 @@ func TestResolveConsistencyToken(t *testing.T) {
 		{
 			name:               "feature flag enabled - at_least_as_acknowledged resource exists returns token",
 			featureFlagEnabled: true,
-			consistencyConfig:  model.NewAtLeastAsAcknowledgedConsistency(),
+			consistency:        model.NewConsistencyAtLeastAsAcknowledged(),
 			resourceExists:     true,
 			expectedToken:      "", // fake repo returns empty consistency token
 			expectedError:      false,
@@ -1477,7 +1477,7 @@ func TestResolveConsistencyToken(t *testing.T) {
 			}
 
 			// Call the function under test
-			token, err := uc.resolveConsistencyToken(ctx, tt.consistencyConfig, reporterResourceKey)
+			token, err := uc.resolveConsistencyToken(ctx, tt.consistency, reporterResourceKey)
 
 			if tt.expectedError {
 				assert.Error(t, err)
@@ -1521,8 +1521,9 @@ func TestResolveConsistencyToken_UnknownPreference(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create a config with an invalid/unknown preference value
-	unknownConfig := model.ConsistencyConfig{
+	unknownConfig := model.Consistency{
 		Preference: model.ConsistencyPreference(999), // Invalid preference
+		Token:      model.MinimizeLatencyToken,
 	}
 
 	token, err := uc.resolveConsistencyToken(ctx, unknownConfig, reporterResourceKey)

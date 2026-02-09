@@ -296,26 +296,26 @@ func TestConvertConsistencyToModel(t *testing.T) {
 	tests := []struct {
 		name     string
 		input    *pb.Consistency
-		expected model.ConsistencyConfig
+		expected model.Consistency
 	}{
 		{
 			name:     "nil consistency returns unspecified",
 			input:    nil,
-			expected: model.NewUnspecifiedConsistency(),
+			expected: model.NewConsistencyUnspecified(),
 		},
 		{
 			name: "minimize_latency true returns minimize_latency",
 			input: &pb.Consistency{
 				Requirement: &pb.Consistency_MinimizeLatency{MinimizeLatency: true},
 			},
-			expected: model.NewMinimizeLatencyConsistency(),
+			expected: model.NewConsistencyMinimizeLatency(),
 		},
 		{
 			name: "at_least_as_acknowledged true returns at_least_as_acknowledged",
 			input: &pb.Consistency{
 				Requirement: &pb.Consistency_AtLeastAsAcknowledged{AtLeastAsAcknowledged: true},
 			},
-			expected: model.NewAtLeastAsAcknowledgedConsistency(),
+			expected: model.NewConsistencyAtLeastAsAcknowledged(),
 		},
 		{
 			name: "at_least_as_fresh with token returns at_least_as_fresh",
@@ -324,7 +324,7 @@ func TestConvertConsistencyToModel(t *testing.T) {
 					AtLeastAsFresh: &pb.ConsistencyToken{Token: "test-token-123"},
 				},
 			},
-			expected: model.NewAtLeastAsFreshConsistency("test-token-123"),
+			expected: model.NewConsistencyAtLeastAsFresh(model.ConsistencyToken("test-token-123")),
 		},
 		{
 			name: "at_least_as_fresh with empty token returns at_least_as_fresh with empty token",
@@ -333,12 +333,12 @@ func TestConvertConsistencyToModel(t *testing.T) {
 					AtLeastAsFresh: &pb.ConsistencyToken{Token: ""},
 				},
 			},
-			expected: model.NewAtLeastAsFreshConsistency(""),
+			expected: model.NewConsistencyAtLeastAsFresh(model.MinimizeLatencyToken),
 		},
 		{
 			name:     "empty consistency struct returns unspecified",
 			input:    &pb.Consistency{},
-			expected: model.NewUnspecifiedConsistency(),
+			expected: model.NewConsistencyUnspecified(),
 		},
 	}
 

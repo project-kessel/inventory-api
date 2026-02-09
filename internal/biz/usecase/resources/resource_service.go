@@ -222,7 +222,7 @@ func (uc *Usecase) Delete(ctx context.Context, reporterResourceKey model.Reporte
 }
 
 // Check verifies if a subject has the specified permission on a resource identified by the reporter resource ID.
-func (uc *Usecase) Check(ctx context.Context, permission, namespace string, sub *kessel.SubjectReference, reporterResourceKey model.ReporterResourceKey, consistency model.ConsistencyConfig) (bool, error) {
+func (uc *Usecase) Check(ctx context.Context, permission, namespace string, sub *kessel.SubjectReference, reporterResourceKey model.ReporterResourceKey, consistency model.Consistency) (bool, error) {
 	consistencyToken, err := uc.resolveConsistencyToken(ctx, consistency, reporterResourceKey)
 	if err != nil {
 		return false, err
@@ -270,7 +270,7 @@ func (uc *Usecase) lookupConsistencyTokenFromDB(reporterResourceKey model.Report
 }
 
 // resolveConsistencyToken resolves the consistency token based on the preference.
-func (uc *Usecase) resolveConsistencyToken(ctx context.Context, consistency model.ConsistencyConfig, reporterResourceKey model.ReporterResourceKey) (string, error) {
+func (uc *Usecase) resolveConsistencyToken(ctx context.Context, consistency model.Consistency, reporterResourceKey model.ReporterResourceKey) (string, error) {
 	featureFlagEnabled := uc.Config.DefaultToAtLeastAsAcknowledged
 	if featureFlagEnabled {
 		log.Info("Feature flag default-to-at-least-as-acknowledged is enabled")
@@ -287,7 +287,7 @@ func (uc *Usecase) resolveConsistencyToken(ctx context.Context, consistency mode
 	case model.ConsistencyAtLeastAsFresh:
 		// Use the token provided by the caller
 		log.Infof("Using at_least_as_fresh consistency with provided token: %s", consistency.Token)
-		return consistency.Token, nil
+		return string(consistency.Token), nil
 
 	case model.ConsistencyAtLeastAsAcknowledged:
 		// Look up the token from inventory database

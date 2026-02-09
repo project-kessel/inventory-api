@@ -235,7 +235,6 @@ func newTestUsecase(t *testing.T, cfg testUsecaseConfig) *usecase.Usecase {
 		repo,
 		schemaRepo,
 		authzImpl,
-		nil, // Eventer
 		namespace,
 		krlog.NewStdLogger(io.Discard),
 		nil, // ListenManager

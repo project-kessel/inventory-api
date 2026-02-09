@@ -17,7 +17,6 @@ import (
 	"github.com/project-kessel/inventory-api/internal/biz/schema"
 	"github.com/project-kessel/inventory-api/internal/biz/usecase/metaauthorizer"
 	"github.com/project-kessel/inventory-api/internal/data"
-	eventingapi "github.com/project-kessel/inventory-api/internal/eventing/api"
 	"github.com/project-kessel/inventory-api/internal/metricscollector"
 	"github.com/project-kessel/inventory-api/internal/pubsub"
 	"github.com/project-kessel/inventory-api/internal/subject/selfsubject"
@@ -66,15 +65,13 @@ type UsecaseConfig struct {
 }
 
 // Usecase provides business logic operations for resource management in the inventory system.
-// It coordinates between repositories, authorization, eventing, and other system components.
+// It coordinates between repositories, authorization, and other system components.
 type Usecase struct {
 	schemaUsecase       *SchemaUsecase
 	resourceRepository  data.ResourceRepository
 	waitForNotifBreaker *gobreaker.CircuitBreaker
 	Authz               authzapi.Authorizer
 	MetaAuthorizer      metaauthorizer.MetaAuthorizer
-	Eventer             eventingapi.Manager
-	// TODO: Remove; unused
 	Namespace           string
 	Log                 *log.Helper
 	ListenManager       pubsub.ListenManagerImpl
@@ -84,7 +81,7 @@ type Usecase struct {
 }
 
 func New(resourceRepository data.ResourceRepository, schemaRepository schema.Repository,
-	authz authzapi.Authorizer, eventer eventingapi.Manager, namespace string, logger log.Logger,
+	authz authzapi.Authorizer, namespace string, logger log.Logger,
 	listenManager pubsub.ListenManagerImpl, waitForNotifBreaker *gobreaker.CircuitBreaker, usecaseConfig *UsecaseConfig, metricsCollector *metricscollector.MetricsCollector, metaAuthorizer metaauthorizer.MetaAuthorizer, selfSubjectStrategy selfsubject.SelfSubjectStrategy) *Usecase {
 	if metaAuthorizer == nil {
 		metaAuthorizer = metaauthorizer.NewSimpleMetaAuthorizer()
@@ -95,7 +92,6 @@ func New(resourceRepository data.ResourceRepository, schemaRepository schema.Rep
 		schemaUsecase:       NewSchemaUsecase(schemaRepository, log.NewHelper(logger)),
 		waitForNotifBreaker: waitForNotifBreaker,
 		Authz:               authz,
-		Eventer:             eventer,
 		MetaAuthorizer:      metaAuthorizer,
 		Namespace:           namespace,
 		Log:                 log.NewHelper(logger),

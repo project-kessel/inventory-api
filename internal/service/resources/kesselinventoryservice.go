@@ -300,37 +300,6 @@ func ConvertConsistencyToModel(consistency *pb.Consistency) model.Consistency {
 	return model.NewConsistencyUnspecified()
 }
 
-func mapCheckBulkResponseFromV1beta1(resp *pbv1beta1.CheckBulkResponse) *pb.CheckBulkResponse {
-	pairs := make([]*pb.CheckBulkResponsePair, len(resp.GetPairs()))
-	for i, pair := range resp.GetPairs() {
-		errResponse := &pb.CheckBulkResponsePair_Error{}
-		itemResponse := &pb.CheckBulkResponsePair_Item{}
-		if pair.GetError() != nil {
-			errResponse.Error = &rpcstatus.Status{
-				Code:    pair.GetError().GetCode(),
-				Message: pair.GetError().GetMessage(),
-			}
-		} else if pair.GetItem() != nil {
-			allowed := pb.Allowed_ALLOWED_FALSE
-			if pair.GetItem().GetAllowed() == pbv1beta1.CheckBulkResponseItem_ALLOWED_TRUE {
-				allowed = pb.Allowed_ALLOWED_TRUE
-			}
-			itemResponse.Item = &pb.CheckBulkResponseItem{Allowed: allowed}
-		}
-		pairs[i] = &pb.CheckBulkResponsePair{}
-		if pair.GetError() != nil {
-			pairs[i].Response = errResponse
-		} else {
-			pairs[i].Response = itemResponse
-		}
-	}
-	out := &pb.CheckBulkResponse{Pairs: pairs}
-	if resp.GetConsistencyToken() != nil {
-		out.ConsistencyToken = &pb.ConsistencyToken{Token: resp.GetConsistencyToken().GetToken()}
-	}
-	return out
-}
-
 // toCheckSelfBulkCommand converts a v1beta2 CheckSelfBulkRequest to a usecase CheckSelfBulkCommand.
 func toCheckSelfBulkCommand(req *pb.CheckSelfBulkRequest) (resources.CheckSelfBulkCommand, error) {
 	items := make([]resources.CheckSelfBulkItem, len(req.GetItems()))

@@ -33,7 +33,6 @@ import (
 	authnapi "github.com/project-kessel/inventory-api/internal/authn/api"
 	"github.com/project-kessel/inventory-api/internal/authz"
 	authzapi "github.com/project-kessel/inventory-api/internal/authz/api"
-	"github.com/project-kessel/inventory-api/internal/biz/model"
 	"github.com/project-kessel/inventory-api/internal/biz/usecase/metaauthorizer"
 	usecase "github.com/project-kessel/inventory-api/internal/biz/usecase/resources"
 	"github.com/project-kessel/inventory-api/internal/mocks"
@@ -551,6 +550,8 @@ func TestConvertConsistencyToModel(t *testing.T) {
 			assert.Equal(t, tc.expected.Token, result.Token)
 		})
 	}
+}
+
 func TestInventoryService_CheckSelf_Allowed_XRhIdentity(t *testing.T) {
 	// Test CheckSelf with x-rh-identity claims (using SubjectId)
 	claims := &authnapi.Claims{

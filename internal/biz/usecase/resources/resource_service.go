@@ -462,7 +462,14 @@ func (uc *Usecase) checkPermission(ctx context.Context, relation model.Relation,
 	res, err := uc.resourceRepository.FindResourceByKeys(nil, reporterResourceKey)
 	var consistencyToken string
 	if err != nil {
-		return false, err
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			// Resource not in inventory: use empty token (minimize_latency) and still call Authz
+			consistencyToken = ""
+		} else {
+			return false, err
+		}
+	} else {
+		consistencyToken = res.ConsistencyToken().Serialize()
 	}
 
 	// Convert model types to v1beta1 for the Authz interface
@@ -549,11 +556,6 @@ func (uc *Usecase) resolveConsistencyToken(ctx context.Context, consistency mode
 	}
 }
 
-// CheckBulk forwards the request to Relations CheckBulk
-func (uc *Usecase) CheckBulk(ctx context.Context, req *kessel.CheckBulkRequest) (*kessel.CheckBulkResponse, error) {
-	resp, err := uc.Authz.CheckBulk(ctx, req)
-	if err != nil {
-		return nil, err
 func (uc *Usecase) selfSubjectFromContext(ctx context.Context) (model.SubjectReference, error) {
 	authzCtx, ok := authnapi.FromAuthzContext(ctx)
 	if !ok {

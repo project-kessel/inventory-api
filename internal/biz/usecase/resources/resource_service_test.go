@@ -6,9 +6,9 @@ import (
 	"testing"
 
 	"github.com/go-kratos/kratos/v2/log"
-	"github.com/spf13/viper"
 	"github.com/project-kessel/inventory-api/internal/biz/schema"
 	"github.com/project-kessel/inventory-api/internal/biz/schema/validation"
+	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/types/known/structpb"
@@ -1845,17 +1845,19 @@ func TestResolveConsistencyToken(t *testing.T) {
 			viper.Reset()
 			viper.Set("authz.kessel.default-to-at-least-as-acknowledged", tt.featureFlagEnabled)
 
-			ctx := context.Background()
+			// Use testAuthzContext so ReportResource (when resourceExists) can pass meta-authz
+			ctx := testAuthzContext()
 			logger := log.DefaultLogger
 
 			resourceRepo := data.NewFakeResourceRepository()
+			schemaRepo := newFakeSchemaRepository(t)
 			authorizer := &allow.AllowAllAuthz{}
 			usecaseConfig := &UsecaseConfig{
 				ReadAfterWriteEnabled: false,
 				ConsumerEnabled:       false,
 			}
 			mc := metricscollector.NewFakeMetricsCollector()
-			uc := New(resourceRepo, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig, mc)
+			uc := New(resourceRepo, schemaRepo, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig, mc, nil, newTestSelfSubjectStrategy())
 
 			// Create test reporter resource key
 			localResourceId, err := model.NewLocalResourceId("test-resource-123")
@@ -1895,10 +1897,11 @@ func TestResolveConsistencyToken_UnknownPreference(t *testing.T) {
 	viper.Reset()
 	viper.Set("authz.kessel.default-to-at-least-as-acknowledged", true)
 
-	ctx := context.Background()
+	ctx := testAuthzContext()
 	logger := log.DefaultLogger
 
 	resourceRepo := data.NewFakeResourceRepository()
+	schemaRepo := newFakeSchemaRepository(t)
 	authorizer := &allow.AllowAllAuthz{}
 	usecaseConfig := &UsecaseConfig{
 		ReadAfterWriteEnabled: false,
@@ -1906,7 +1909,7 @@ func TestResolveConsistencyToken_UnknownPreference(t *testing.T) {
 	}
 
 	mc := metricscollector.NewFakeMetricsCollector()
-	uc := New(resourceRepo, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig, mc)
+	uc := New(resourceRepo, schemaRepo, authorizer, nil, "test-topic", logger, nil, nil, usecaseConfig, mc, nil, newTestSelfSubjectStrategy())
 
 	// Create test reporter resource key
 	localResourceId, err := model.NewLocalResourceId("test-resource-456")

@@ -61,21 +61,8 @@ func (c *InventoryService) DeleteResource(ctx context.Context, r *pb.DeleteResou
 func (s *InventoryService) Check(ctx context.Context, req *pb.CheckRequest) (*pb.CheckResponse, error) {
 	reporterResourceKey, err := reporterKeyFromResourceReference(req.Object)
 	if err != nil {
-		log.Errorf("failed to get identity: %v", err)
-		return nil, status.Error(codes.Unauthenticated, "failed to get identity")
-	}
-
-	consistency := ConvertConsistencyToModel(req.GetConsistency())
-
-	if reporterResourceKey, err := reporterKeyFromResourceReference(req.Object); err == nil {
-		if resp, err := s.Ctl.Check(ctx, req.GetRelation(), req.Object.Reporter.GetType(), subjectReferenceFromSubject(req.GetSubject()), reporterResourceKey, consistency); err == nil {
-			return viewResponseFromAuthzRequestV1beta2(resp), nil
-		} else {
-			return nil, err
-		}
-	} else {
-		log.Error("Failed to build reporter resource key: ", err)
-		return nil, err
+		log.Errorf("failed to get reporter resource key: %v", err)
+		return nil, status.Error(codes.InvalidArgument, "invalid object reference")
 	}
 	subjectRef, err := subjectReferenceFromProto(req.GetSubject())
 	if err != nil {
@@ -316,6 +303,34 @@ func ConvertConsistencyToModel(consistency *pb.Consistency) model.Consistency {
 func mapCheckBulkResponseFromV1beta1(resp *pbv1beta1.CheckBulkResponse) *pb.CheckBulkResponse {
 	pairs := make([]*pb.CheckBulkResponsePair, len(resp.GetPairs()))
 	for i, pair := range resp.GetPairs() {
+		errResponse := &pb.CheckBulkResponsePair_Error{}
+		itemResponse := &pb.CheckBulkResponsePair_Item{}
+		if pair.GetError() != nil {
+			errResponse.Error = &rpcstatus.Status{
+				Code:    pair.GetError().GetCode(),
+				Message: pair.GetError().GetMessage(),
+			}
+		} else if pair.GetItem() != nil {
+			allowed := pb.Allowed_ALLOWED_FALSE
+			if pair.GetItem().GetAllowed() == pbv1beta1.CheckBulkResponseItem_ALLOWED_TRUE {
+				allowed = pb.Allowed_ALLOWED_TRUE
+			}
+			itemResponse.Item = &pb.CheckBulkResponseItem{Allowed: allowed}
+		}
+		pairs[i] = &pb.CheckBulkResponsePair{}
+		if pair.GetError() != nil {
+			pairs[i].Response = errResponse
+		} else {
+			pairs[i].Response = itemResponse
+		}
+	}
+	out := &pb.CheckBulkResponse{Pairs: pairs}
+	if resp.GetConsistencyToken() != nil {
+		out.ConsistencyToken = &pb.ConsistencyToken{Token: resp.GetConsistencyToken().GetToken()}
+	}
+	return out
+}
+
 // toCheckSelfBulkCommand converts a v1beta2 CheckSelfBulkRequest to a usecase CheckSelfBulkCommand.
 func toCheckSelfBulkCommand(req *pb.CheckSelfBulkRequest) (resources.CheckSelfBulkCommand, error) {
 	items := make([]resources.CheckSelfBulkItem, len(req.GetItems()))

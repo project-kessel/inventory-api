@@ -11,7 +11,7 @@ objects:
       strimzi.io/cluster: ${KAFKA_CONNECT_INSTANCE}
   spec:
     class: io.debezium.connector.postgresql.PostgresConnector
-    tasksMax: ${{MAX_TASKS}}
+    tasksMax: 1 # source connector only supports 1 task
     config:
       database.server.name: kessel-inventory-db
       database.dbname: ${secrets:kessel-inventory-db:db.name}
@@ -35,9 +35,6 @@ parameters:
 - name: KAFKA_CONNECT_INSTANCE
   value: platform-kafka-connect
   description: Name of the target Kafka Connect instance for Connector
-- name: MAX_TASKS
-  value: "1"
-  description: How many tasks the Kafka Connect instance can create to process this Connector's work
 - name: TOPIC_HEARTBEAT_PREFIX
   value: debezium-heartbeat
   description: Prefix for the connector heartbeat topic

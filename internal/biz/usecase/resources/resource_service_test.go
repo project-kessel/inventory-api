@@ -246,7 +246,7 @@ func TestCheck_UsesCheckRelation(t *testing.T) {
 	relation, err := model.NewRelation("view")
 	require.NoError(t, err)
 
-	allowed, err := usecase.Check(ctx, relation, subject, key)
+	allowed, err := usecase.Check(ctx, relation, subject, key, model.NewConsistencyMinimizeLatency())
 	require.NoError(t, err)
 	assert.True(t, allowed)
 	assert.Equal(t, 1, meta.calls)

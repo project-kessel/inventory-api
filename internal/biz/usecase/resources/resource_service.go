@@ -357,13 +357,16 @@ func (uc *Usecase) Delete(ctx context.Context, reporterResourceKey model.Reporte
 }
 
 // Check verifies if a subject has the specified relation/permission on a resource.
-func (uc *Usecase) Check(ctx context.Context, relation model.Relation, sub model.SubjectReference, reporterResourceKey model.ReporterResourceKey) (bool, error) {
+func (uc *Usecase) Check(ctx context.Context, relation model.Relation, sub model.SubjectReference, reporterResourceKey model.ReporterResourceKey, consistency model.Consistency) (bool, error) {
 	// TODO: should also check caller is allowed to check subject also
 	if err := uc.enforceMetaAuthzObject(ctx, metaauthorizer.RelationCheck, metaauthorizer.NewInventoryResourceFromKey(reporterResourceKey)); err != nil {
 		return false, err
 	}
-
-	return uc.checkPermission(ctx, relation, sub, reporterResourceKey)
+	token, err := uc.resolveConsistencyToken(ctx, consistency, reporterResourceKey)
+	if err != nil {
+		return false, err
+	}
+	return uc.checkWithToken(ctx, relation, sub, reporterResourceKey, token)
 }
 
 // CheckSelf verifies access for the authenticated user using the self-subject strategy.
@@ -471,8 +474,11 @@ func (uc *Usecase) checkPermission(ctx context.Context, relation model.Relation,
 	} else {
 		consistencyToken = res.ConsistencyToken().Serialize()
 	}
+	return uc.checkWithToken(ctx, relation, sub, reporterResourceKey, consistencyToken)
+}
 
-	// Convert model types to v1beta1 for the Authz interface
+// checkWithToken runs Authz.Check with the given consistency token. Used by Check (after resolveConsistencyToken) and by checkPermission (CheckSelf).
+func (uc *Usecase) checkWithToken(ctx context.Context, relation model.Relation, sub model.SubjectReference, reporterResourceKey model.ReporterResourceKey, consistencyToken string) (bool, error) {
 	namespace := reporterResourceKey.ReporterType().Serialize()
 	v1beta1Subject := subjectToV1Beta1(sub)
 	allowed, _, err := uc.Authz.Check(ctx, namespace, relation.Serialize(), consistencyToken, reporterResourceKey.ResourceType().Serialize(), reporterResourceKey.LocalResourceId().Serialize(), v1beta1Subject)

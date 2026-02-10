@@ -75,8 +75,7 @@ func (s *InventoryService) Check(ctx context.Context, req *pb.CheckRequest) (*pb
 		return nil, err
 	}
 	consistency := ConvertConsistencyToModel(req.GetConsistency())
-	log.Infof("Check request consistency: %s", consistency.Preference)
-	resp, err := s.Ctl.Check(ctx, relation, subjectRef, reporterResourceKey)
+	resp, err := s.Ctl.Check(ctx, relation, subjectRef, reporterResourceKey, consistency)
 	if err != nil {
 		return nil, err
 	}

@@ -70,7 +70,8 @@ func (s *InventoryService) Check(ctx context.Context, req *pb.CheckRequest) (*pb
 		log.Error("Failed to build relation: ", err)
 		return nil, err
 	}
-	resp, err := s.Ctl.Check(ctx, relation, subjectRef, reporterResourceKey)
+	consistency := ConvertConsistencyToModel(req.GetConsistency())
+	resp, err := s.Ctl.Check(ctx, relation, subjectRef, reporterResourceKey, consistency)
 	if err != nil {
 		return nil, err
 	}
@@ -123,6 +124,8 @@ func (s *InventoryService) CheckSelf(ctx context.Context, req *pb.CheckSelfReque
 	if err != nil {
 		return nil, err
 	}
+	consistency := ConvertConsistencyToModel(req.GetConsistency())
+	log.Infof("CheckSelf request consistency: %s", consistency.Preference)
 	resp, err := s.Ctl.CheckSelf(ctx, relation, reporterResourceKey)
 	if err != nil {
 		return nil, err
@@ -271,6 +274,29 @@ func fromCheckBulkResult(result *resources.CheckBulkResult, req *pb.CheckBulkReq
 		resp.ConsistencyToken = &pb.ConsistencyToken{Token: result.ConsistencyToken.Serialize()}
 	}
 	return resp
+}
+
+// ConvertConsistencyToModel converts the proto Consistency to internal model type.
+func ConvertConsistencyToModel(consistency *pb.Consistency) model.Consistency {
+	if consistency == nil {
+		// Return unspecified - the usecase layer will handle the default based on feature flag
+		return model.NewConsistencyUnspecified()
+	}
+
+	if consistency.GetMinimizeLatency() {
+		return model.NewConsistencyMinimizeLatency()
+	}
+
+	if consistency.GetAtLeastAsAcknowledged() {
+		return model.NewConsistencyAtLeastAsAcknowledged()
+	}
+
+	if token := consistency.GetAtLeastAsFresh(); token != nil {
+		return model.NewConsistencyAtLeastAsFresh(model.ConsistencyToken(token.GetToken()))
+	}
+
+	// Return unspecified - the usecase layer will handle the default based on feature flag
+	return model.NewConsistencyUnspecified()
 }
 
 // toCheckSelfBulkCommand converts a v1beta2 CheckSelfBulkRequest to a usecase CheckSelfBulkCommand.

@@ -437,6 +437,68 @@ func TestToLookupResourceResponse(t *testing.T) {
 	assert.Equal(t, expected, result)
 }
 
+func TestConvertConsistencyToModel(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		input    *pb.Consistency
+		expected model.Consistency
+	}{
+		{
+			name:     "nil consistency returns unspecified",
+			input:    nil,
+			expected: model.NewConsistencyUnspecified(),
+		},
+		{
+			name: "minimize_latency true returns minimize_latency",
+			input: &pb.Consistency{
+				Requirement: &pb.Consistency_MinimizeLatency{MinimizeLatency: true},
+			},
+			expected: model.NewConsistencyMinimizeLatency(),
+		},
+		{
+			name: "at_least_as_acknowledged true returns at_least_as_acknowledged",
+			input: &pb.Consistency{
+				Requirement: &pb.Consistency_AtLeastAsAcknowledged{AtLeastAsAcknowledged: true},
+			},
+			expected: model.NewConsistencyAtLeastAsAcknowledged(),
+		},
+		{
+			name: "at_least_as_fresh with token returns at_least_as_fresh",
+			input: &pb.Consistency{
+				Requirement: &pb.Consistency_AtLeastAsFresh{
+					AtLeastAsFresh: &pb.ConsistencyToken{Token: "test-token-123"},
+				},
+			},
+			expected: model.NewConsistencyAtLeastAsFresh(model.ConsistencyToken("test-token-123")),
+		},
+		{
+			name: "at_least_as_fresh with empty token returns at_least_as_fresh with empty token",
+			input: &pb.Consistency{
+				Requirement: &pb.Consistency_AtLeastAsFresh{
+					AtLeastAsFresh: &pb.ConsistencyToken{Token: ""},
+				},
+			},
+			expected: model.NewConsistencyAtLeastAsFresh(model.MinimizeLatencyToken),
+		},
+		{
+			name:     "empty consistency struct returns unspecified",
+			input:    &pb.Consistency{},
+			expected: model.NewConsistencyUnspecified(),
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			result := svc.ConvertConsistencyToModel(tc.input)
+			assert.Equal(t, tc.expected.Preference, result.Preference)
+			assert.Equal(t, tc.expected.Token, result.Token)
+		})
+	}
+}
+
 func TestInventoryService_CheckSelf_Allowed_XRhIdentity(t *testing.T) {
 	claims := &authnapi.Claims{
 		SubjectId: authnapi.SubjectId("user-123"),

@@ -64,9 +64,10 @@ const listenTimeout = 10 * time.Second
 // UsecaseConfig contains configuration flags that control the behavior of usecase operations.
 // These flags should be consistent across all handlers.
 type UsecaseConfig struct {
-	ReadAfterWriteEnabled   bool
-	ReadAfterWriteAllowlist []string
-	ConsumerEnabled         bool
+	ReadAfterWriteEnabled          bool
+	ReadAfterWriteAllowlist        []string
+	ConsumerEnabled                bool
+	DefaultToAtLeastAsAcknowledged bool
 }
 
 // Usecase provides business logic operations for resource management in the inventory system.

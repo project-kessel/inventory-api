@@ -7,6 +7,9 @@ import (
 	"testing"
 
 	"github.com/go-kratos/kratos/v2/log"
+	"github.com/project-kessel/inventory-api/internal/biz/schema"
+	"github.com/project-kessel/inventory-api/internal/biz/schema/validation"
+	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gorm.io/gorm"
@@ -235,7 +238,7 @@ func TestCheck_UsesCheckRelation(t *testing.T) {
 	relation, err := model.NewRelation("view")
 	require.NoError(t, err)
 
-	allowed, err := usecase.Check(ctx, relation, subject, key, model.NewConsistencyMinimizeLatency())
+	allowed, err := usecase.Check(ctx, relation, subject, key, model.NewConsistencyUnspecified())
 	require.NoError(t, err)
 	assert.True(t, allowed)
 	assert.Equal(t, 1, meta.calls)
@@ -1904,4 +1907,193 @@ func TestReportResource_ValidationErrorFormat(t *testing.T) {
 			assert.Contains(t, err.Error(), tc.expectErrorMsg)
 		})
 	}
+}
+
+func TestResolveConsistencyToken(t *testing.T) {
+	tests := []struct {
+		name               string
+		featureFlagEnabled bool
+		consistency        model.Consistency
+		resourceExists     bool
+		expectedToken      string
+		expectedError      bool
+	}{
+		// Feature flag only affects DEFAULT/UNSPECIFIED behavior - explicit preferences are always honored
+		{
+			name:               "feature flag disabled - unspecified defaults to minimize_latency",
+			featureFlagEnabled: false,
+			consistency:        model.NewConsistencyUnspecified(),
+			resourceExists:     true,
+			expectedToken:      "",
+			expectedError:      false,
+		},
+		{
+			name:               "feature flag disabled - minimize_latency returns empty",
+			featureFlagEnabled: false,
+			consistency:        model.NewConsistencyMinimizeLatency(),
+			resourceExists:     false,
+			expectedToken:      "",
+			expectedError:      false,
+		},
+		{
+			name:               "feature flag disabled - at_least_as_fresh still honored",
+			featureFlagEnabled: false,
+			consistency:        model.NewConsistencyAtLeastAsFresh(model.ConsistencyToken("client-provided-token")),
+			resourceExists:     false,
+			expectedToken:      "client-provided-token",
+			expectedError:      false,
+		},
+		{
+			name:               "feature flag disabled - at_least_as_acknowledged still honored",
+			featureFlagEnabled: false,
+			consistency:        model.NewConsistencyAtLeastAsAcknowledged(),
+			resourceExists:     true,
+			expectedToken:      "", // fake repo returns empty consistency token
+			expectedError:      false,
+		},
+		{
+			name:               "feature flag enabled - unspecified defaults to at_least_as_acknowledged (DB lookup)",
+			featureFlagEnabled: true,
+			consistency:        model.NewConsistencyUnspecified(),
+			resourceExists:     true,
+			expectedToken:      "", // fake repo returns empty consistency token
+			expectedError:      false,
+		},
+		{
+			name:               "feature flag enabled - minimize_latency returns empty token",
+			featureFlagEnabled: true,
+			consistency:        model.NewConsistencyMinimizeLatency(),
+			resourceExists:     false,
+			expectedToken:      "",
+			expectedError:      false,
+		},
+		{
+			name:               "feature flag enabled - at_least_as_fresh returns provided token",
+			featureFlagEnabled: true,
+			consistency:        model.NewConsistencyAtLeastAsFresh(model.ConsistencyToken("client-provided-token")),
+			resourceExists:     false,
+			expectedToken:      "client-provided-token",
+			expectedError:      false,
+		},
+		{
+			name:               "feature flag enabled - at_least_as_fresh with empty token",
+			featureFlagEnabled: true,
+			consistency:        model.NewConsistencyAtLeastAsFresh(model.MinimizeLatencyToken),
+			resourceExists:     false,
+			expectedToken:      "",
+			expectedError:      false,
+		},
+		{
+			name:               "feature flag enabled - at_least_as_acknowledged resource not found falls back to empty",
+			featureFlagEnabled: true,
+			consistency:        model.NewConsistencyAtLeastAsAcknowledged(),
+			resourceExists:     false,
+			expectedToken:      "",
+			expectedError:      false,
+		},
+		{
+			name:               "feature flag enabled - at_least_as_acknowledged resource exists returns token",
+			featureFlagEnabled: true,
+			consistency:        model.NewConsistencyAtLeastAsAcknowledged(),
+			resourceExists:     true,
+			expectedToken:      "", // fake repo returns empty consistency token
+			expectedError:      false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Reset viper for each test
+			viper.Reset()
+			viper.Set("authz.kessel.default-to-at-least-as-acknowledged", tt.featureFlagEnabled)
+
+			// Use testAuthzContext so ReportResource (when resourceExists) can pass meta-authz
+			ctx := testAuthzContext()
+			logger := log.DefaultLogger
+
+			resourceRepo := data.NewFakeResourceRepository()
+			schemaRepo := newFakeSchemaRepository(t)
+			authorizer := &allow.AllowAllAuthz{}
+			usecaseConfig := &UsecaseConfig{
+				ReadAfterWriteEnabled: false,
+				ConsumerEnabled:       false,
+			}
+			mc := metricscollector.NewFakeMetricsCollector()
+			uc := New(resourceRepo, schemaRepo, authorizer, "test-topic", logger, nil, nil, usecaseConfig, mc, nil, newTestSelfSubjectStrategy())
+
+			// Create test reporter resource key
+			localResourceId, err := model.NewLocalResourceId("test-resource-123")
+			require.NoError(t, err)
+			resourceType, err := model.NewResourceType("host")
+			require.NoError(t, err)
+			reporterType, err := model.NewReporterType("hbi")
+			require.NoError(t, err)
+			reporterInstanceId, err := model.NewReporterInstanceId("test-instance")
+			require.NoError(t, err)
+
+			reporterResourceKey, err := model.NewReporterResourceKey(localResourceId, resourceType, reporterType, reporterInstanceId)
+			require.NoError(t, err)
+
+			// If resource should exist, create it first
+			if tt.resourceExists {
+				reportRequest := createTestReportRequest(t, "host", "hbi", "test-instance", "test-resource-123", "test-workspace")
+				err := uc.ReportResource(ctx, reportRequest, "test-reporter")
+				require.NoError(t, err)
+			}
+
+			// Call the function under test
+			token, err := uc.resolveConsistencyToken(ctx, tt.consistency, reporterResourceKey)
+
+			if tt.expectedError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, tt.expectedToken, token)
+			}
+		})
+	}
+}
+
+func TestResolveConsistencyToken_UnknownPreference(t *testing.T) {
+	// Test that unknown preference defaults to minimize_latency (empty token)
+	viper.Reset()
+	viper.Set("authz.kessel.default-to-at-least-as-acknowledged", true)
+
+	ctx := testAuthzContext()
+	logger := log.DefaultLogger
+
+	resourceRepo := data.NewFakeResourceRepository()
+	schemaRepo := newFakeSchemaRepository(t)
+	authorizer := &allow.AllowAllAuthz{}
+	usecaseConfig := &UsecaseConfig{
+		ReadAfterWriteEnabled: false,
+		ConsumerEnabled:       false,
+	}
+
+	mc := metricscollector.NewFakeMetricsCollector()
+	uc := New(resourceRepo, schemaRepo, authorizer, "test-topic", logger, nil, nil, usecaseConfig, mc, nil, newTestSelfSubjectStrategy())
+
+	// Create test reporter resource key
+	localResourceId, err := model.NewLocalResourceId("test-resource-456")
+	require.NoError(t, err)
+	resourceType, err := model.NewResourceType("host")
+	require.NoError(t, err)
+	reporterType, err := model.NewReporterType("hbi")
+	require.NoError(t, err)
+	reporterInstanceId, err := model.NewReporterInstanceId("test-instance")
+	require.NoError(t, err)
+
+	reporterResourceKey, err := model.NewReporterResourceKey(localResourceId, resourceType, reporterType, reporterInstanceId)
+	require.NoError(t, err)
+
+	// Create a config with an invalid/unknown preference value
+	unknownConfig := model.Consistency{
+		Preference: model.ConsistencyPreference(999), // Invalid preference
+		Token:      model.MinimizeLatencyToken,
+	}
+
+	token, err := uc.resolveConsistencyToken(ctx, unknownConfig, reporterResourceKey)
+
+	assert.NoError(t, err)
+	assert.Equal(t, "", token) // Should default to minimize_latency
 }

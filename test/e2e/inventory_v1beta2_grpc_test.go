@@ -1426,29 +1426,48 @@ func TestInventoryAPIHTTP_v1beta2_StreamedListObjects(t *testing.T) {
 	})
 
 	t.Run("AtLeastAsFresh", func(t *testing.T) {
-		// Optional: at_least_as_fresh with a consistency token from the resource
-		var host datamodel.Resource
+		// Get consistency token from CheckBulk response (same pattern as simple_authorizer_test snapshot/token).
+		// When server uses SimpleAuthorizer, CheckBulk returns a version token we can use for at_least_as_fresh.
+		checkBulkReq := &pbv1beta2.CheckBulkRequest{
+			Items: []*pbv1beta2.CheckBulkRequestItem{
+				{
+					Object: &pbv1beta2.ResourceReference{
+						ResourceType: "host",
+						ResourceId:   resourceId,
+						Reporter:     &pbv1beta2.ReporterReference{Type: reporterType, InstanceId: proto.String(reporterInstanceId)},
+					},
+					Relation: "workspace",
+					Subject: &pbv1beta2.SubjectReference{
+						Resource: &pbv1beta2.ResourceReference{
+							ResourceType: "workspace",
+							ResourceId:   workspace,
+							Reporter:     &pbv1beta2.ReporterReference{Type: "rbac"},
+						},
+					},
+				},
+			},
+		}
+		var consistencyToken string
 		for attempt := 0; attempt < 10; attempt++ {
-			err := db.Table("resource r").
-				Select("r.*").
-				Joins("JOIN reporter_resources rr ON r.id = rr.resource_id").
-				Where("rr.local_resource_id = ?", resourceId).
-				First(&host).Error
-			if err == nil && host.ConsistencyToken != "" {
+			checkResp, err := client.CheckBulk(ctx, checkBulkReq)
+			assert.NoError(t, err, "CheckBulk failed")
+			if checkResp.GetConsistencyToken() != nil && checkResp.GetConsistencyToken().GetToken() != "" {
+				consistencyToken = checkResp.GetConsistencyToken().GetToken()
+				t.Logf("StreamedListObjects AtLeastAsFresh: got consistency token from CheckBulk (attempt %d)", attempt+1)
 				break
 			}
 			if attempt < 9 {
 				time.Sleep(1 * time.Second)
 			}
 		}
-		assert.NotEmpty(t, host.ConsistencyToken, "resource must have consistency token for at_least_as_fresh")
+		assert.NotEmpty(t, consistencyToken, "CheckBulk must return a consistency token for at_least_as_fresh (e.g. when server uses SimpleAuthorizer)")
 		listReq := proto.Clone(baseListReq).(*pbv1beta2.StreamedListObjectsRequest)
 		listReq.Consistency = &pbv1beta2.Consistency{
 			Requirement: &pbv1beta2.Consistency_AtLeastAsFresh{
-				AtLeastAsFresh: &pbv1beta2.ConsistencyToken{Token: host.ConsistencyToken},
+				AtLeastAsFresh: &pbv1beta2.ConsistencyToken{Token: consistencyToken},
 			},
 		}
-		t.Logf("StreamedListObjects test case: consistency=at_least_as_fresh (token=%s...)", truncateToken(host.ConsistencyToken))
+		t.Logf("StreamedListObjects test case: consistency=at_least_as_fresh (token=%s...)", truncateToken(consistencyToken))
 		resourceIDs := runStreamAndPoll(t, listReq, "at_least_as_fresh")
 		assert.Contains(t, resourceIDs, resourceId, "stream should contain reported resource (got: %v)", resourceIDs)
 	})

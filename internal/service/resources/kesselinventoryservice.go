@@ -360,6 +360,12 @@ func (s *InventoryService) StreamedListObjects(
 ) error {
 	ctx := stream.Context()
 
+	if c := req.GetConsistency(); c != nil && c.GetAtLeastAsFresh() != nil {
+		log.Infof("StreamedListObjects consistency: at_least_as_fresh token=%s", c.GetAtLeastAsFresh().GetToken())
+	} else {
+		log.Info("StreamedListObjects consistency: minimize_latency")
+	}
+
 	lookupCmd, err := ToLookupResourcesCommand(req)
 	if err != nil {
 		return err

@@ -25,7 +25,7 @@ const (
 type CheckSelfResponse struct {
 	state            protoimpl.MessageState `protogen:"open.v1"`
 	Allowed          Allowed                `protobuf:"varint,1,opt,name=allowed,proto3,enum=kessel.inventory.v1beta2.Allowed" json:"allowed,omitempty"`
-	ConsistencyToken *ConsistencyToken      `protobuf:"bytes,2,opt,name=consistency_token,json=consistencyToken,proto3,oneof" json:"consistency_token,omitempty"`
+	ConsistencyToken *ConsistencyToken      `protobuf:"bytes,2,opt,name=consistency_token,json=consistencyToken,proto3" json:"consistency_token,omitempty"`
 	unknownFields    protoimpl.UnknownFields
 	sizeCache        protoimpl.SizeCache
 }
@@ -78,11 +78,10 @@ var File_kessel_inventory_v1beta2_check_self_response_proto protoreflect.FileDes
 
 const file_kessel_inventory_v1beta2_check_self_response_proto_rawDesc = "" +
 	"\n" +
-	"2kessel/inventory/v1beta2/check_self_response.proto\x12\x18kessel.inventory.v1beta2\x1a&kessel/inventory/v1beta2/allowed.proto\x1a0kessel/inventory/v1beta2/consistency_token.proto\"\xc4\x01\n" +
+	"2kessel/inventory/v1beta2/check_self_response.proto\x12\x18kessel.inventory.v1beta2\x1a&kessel/inventory/v1beta2/allowed.proto\x1a0kessel/inventory/v1beta2/consistency_token.proto\"\xa9\x01\n" +
 	"\x11CheckSelfResponse\x12;\n" +
-	"\aallowed\x18\x01 \x01(\x0e2!.kessel.inventory.v1beta2.AllowedR\aallowed\x12\\\n" +
-	"\x11consistency_token\x18\x02 \x01(\v2*.kessel.inventory.v1beta2.ConsistencyTokenH\x00R\x10consistencyToken\x88\x01\x01B\x14\n" +
-	"\x12_consistency_tokenBr\n" +
+	"\aallowed\x18\x01 \x01(\x0e2!.kessel.inventory.v1beta2.AllowedR\aallowed\x12W\n" +
+	"\x11consistency_token\x18\x02 \x01(\v2*.kessel.inventory.v1beta2.ConsistencyTokenR\x10consistencyTokenBr\n" +
 	"(org.project_kessel.api.inventory.v1beta2P\x01ZDgithub.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2b\x06proto3"
 
 var (
@@ -120,7 +119,6 @@ func file_kessel_inventory_v1beta2_check_self_response_proto_init() {
 	}
 	file_kessel_inventory_v1beta2_allowed_proto_init()
 	file_kessel_inventory_v1beta2_consistency_token_proto_init()
-	file_kessel_inventory_v1beta2_check_self_response_proto_msgTypes[0].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{

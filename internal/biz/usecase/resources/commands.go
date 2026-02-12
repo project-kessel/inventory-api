@@ -58,6 +58,7 @@ type LookupResourcesCommand struct {
 	Subject      model.SubjectReference
 	Limit        uint32
 	Continuation string
+	Consistency  model.Consistency
 }
 
 // LookupResourcesResultItem represents a single resource from lookup.

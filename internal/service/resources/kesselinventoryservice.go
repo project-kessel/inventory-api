@@ -410,6 +410,7 @@ func ToLookupResourcesCommand(request *pb.StreamedListObjectsRequest) (resources
 	if err != nil {
 		return resources.LookupResourcesCommand{}, fmt.Errorf("invalid subject: %w", err)
 	}
+	consistency := consistencyFromProto(request.GetConsistency())
 
 	var limit uint32 = 1000
 	var continuation string
@@ -427,6 +428,7 @@ func ToLookupResourcesCommand(request *pb.StreamedListObjectsRequest) (resources
 		Subject:      subjectRef,
 		Limit:        limit,
 		Continuation: continuation,
+		Consistency:  consistency,
 	}, nil
 }
 

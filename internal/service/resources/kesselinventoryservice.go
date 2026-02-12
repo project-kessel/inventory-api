@@ -360,6 +360,12 @@ func (s *InventoryService) StreamedListObjects(
 ) error {
 	ctx := stream.Context()
 
+	if c := req.GetConsistency(); c != nil && c.GetAtLeastAsFresh() != nil {
+		log.Debugf("StreamedListObjects consistency: at_least_as_fresh token=%s", c.GetAtLeastAsFresh().GetToken())
+	} else {
+		log.Debugf("StreamedListObjects consistency: minimize_latency")
+	}
+
 	lookupCmd, err := ToLookupResourcesCommand(req)
 	if err != nil {
 		return err
@@ -410,6 +416,7 @@ func ToLookupResourcesCommand(request *pb.StreamedListObjectsRequest) (resources
 	if err != nil {
 		return resources.LookupResourcesCommand{}, fmt.Errorf("invalid subject: %w", err)
 	}
+	consistency := consistencyFromProto(request.GetConsistency())
 
 	var limit uint32 = 1000
 	var continuation string
@@ -427,6 +434,7 @@ func ToLookupResourcesCommand(request *pb.StreamedListObjectsRequest) (resources
 		Subject:      subjectRef,
 		Limit:        limit,
 		Continuation: continuation,
+		Consistency:  consistency,
 	}, nil
 }
 

@@ -729,6 +729,22 @@ func lookupResourcesCommandToV1beta1(cmd LookupResourcesCommand) *kessel.LookupR
 	if cmd.Continuation != "" {
 		continuationToken = &cmd.Continuation
 	}
+	var consistency *kessel.Consistency
+	if !cmd.Consistency.MinimizeLatency() {
+		consistency = &kessel.Consistency{
+			Requirement: &kessel.Consistency_AtLeastAsFresh{
+				AtLeastAsFresh: &kessel.ConsistencyToken{
+					Token: cmd.Consistency.AtLeastAsFresh().Serialize(),
+				},
+			},
+		}
+	} else {
+		consistency = &kessel.Consistency{
+			Requirement: &kessel.Consistency_MinimizeLatency{
+				MinimizeLatency: true,
+			},
+		}
+	}
 
 	return &kessel.LookupResourcesRequest{
 		ResourceType: &kessel.ObjectType{
@@ -741,6 +757,7 @@ func lookupResourcesCommandToV1beta1(cmd LookupResourcesCommand) *kessel.LookupR
 			Limit:             cmd.Limit,
 			ContinuationToken: continuationToken,
 		},
+		Consistency: consistency,
 	}
 }
 

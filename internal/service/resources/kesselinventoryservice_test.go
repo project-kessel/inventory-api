@@ -398,6 +398,40 @@ func TestToLookupResourcesCommand(t *testing.T) {
 	assert.Equal(t, uint32(50), result.Limit)
 }
 
+func TestToLookupResourcesCommand_WithConsistencyToken(t *testing.T) {
+	permission := "view"
+	reporterType := "hbi"
+	token := "test-consistency-token"
+	input := &pb.StreamedListObjectsRequest{
+		ObjectType: &pb.RepresentationType{
+			ResourceType: "host",
+			ReporterType: &reporterType,
+		},
+		Relation: "view",
+		Subject: &pb.SubjectReference{
+			Relation: &permission,
+			Resource: &pb.ResourceReference{
+				ResourceId:   "res-id",
+				ResourceType: "principal",
+				Reporter: &pb.ReporterReference{
+					Type: "rbac",
+				},
+			},
+		},
+		Consistency: &pb.Consistency{
+			Requirement: &pb.Consistency_AtLeastAsFresh{
+				AtLeastAsFresh: &pb.ConsistencyToken{Token: token},
+			},
+		},
+	}
+
+	result, err := svc.ToLookupResourcesCommand(input)
+	require.NoError(t, err)
+
+	assert.False(t, result.Consistency.MinimizeLatency(), "expected at-least-as-fresh when token provided")
+	assert.Equal(t, token, result.Consistency.AtLeastAsFresh().String(), "command should use the request consistency token")
+}
+
 func TestToLookupResourcesCommand_NoPagination(t *testing.T) {
 	permission := "view"
 	reporterType := "hbi"

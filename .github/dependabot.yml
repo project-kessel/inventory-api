@@ -13,6 +13,10 @@ updates:
     directory: "/"
     schedule:
       interval: "daily"
+  - package-ecosystem: "docker" # to check versions used in kessel-debug Dockerfile
+    directory: "/tools/kessel-debug-container"
+    schedule:
+      interval: "daily"
   - package-ecosystem: "github-actions" # to check versions of github actions we use
     directory: "/"
     schedule:

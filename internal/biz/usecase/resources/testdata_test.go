@@ -1,16 +1,22 @@
 package resources
 
 import (
+	"testing"
+
 	"github.com/project-kessel/inventory-api/internal/biz/model"
+	"github.com/stretchr/testify/require"
 )
 
 // fixture returns a ReportResourceCommandFixture for creating test commands.
-func fixture() ReportResourceCommandFixture {
-	return ReportResourceCommandFixture{}
+func fixture(t *testing.T) ReportResourceCommandFixture {
+	t.Helper()
+	return ReportResourceCommandFixture{t: t}
 }
 
 // ReportResourceCommandFixture provides test fixtures for ReportResourceCommand.
-type ReportResourceCommandFixture struct{}
+type ReportResourceCommandFixture struct {
+	t *testing.T
+}
 
 // Basic creates a basic ReportResourceCommand with default values.
 func (f ReportResourceCommandFixture) Basic(resourceType, reporterType, reporterInstance, localResourceId, workspaceId string) ReportResourceCommand {
@@ -26,14 +32,24 @@ func (f ReportResourceCommandFixture) Basic(resourceType, reporterType, reporter
 
 // WithData creates a ReportResourceCommand with custom reporter and common data.
 func (f ReportResourceCommandFixture) WithData(resourceType, reporterType, reporterInstance, localResourceId string, reporterData, commonData map[string]interface{}) ReportResourceCommand {
-	localResId, _ := model.NewLocalResourceId(localResourceId)
-	resType, _ := model.NewResourceType(resourceType)
-	repType, _ := model.NewReporterType(reporterType)
-	repInstanceId, _ := model.NewReporterInstanceId(reporterInstance)
-	apiHref, _ := model.NewApiHref("https://api.example.com/resource/123")
-	consoleHref, _ := model.NewConsoleHref("https://console.example.com/resource/123")
-	reporterRep, _ := model.NewRepresentation(reporterData)
-	commonRep, _ := model.NewRepresentation(commonData)
+	f.t.Helper()
+
+	localResId, err := model.NewLocalResourceId(localResourceId)
+	require.NoError(f.t, err)
+	resType, err := model.NewResourceType(resourceType)
+	require.NoError(f.t, err)
+	repType, err := model.NewReporterType(reporterType)
+	require.NoError(f.t, err)
+	repInstanceId, err := model.NewReporterInstanceId(reporterInstance)
+	require.NoError(f.t, err)
+	apiHref, err := model.NewApiHref("https://api.example.com/resource/123")
+	require.NoError(f.t, err)
+	consoleHref, err := model.NewConsoleHref("https://console.example.com/resource/123")
+	require.NoError(f.t, err)
+	reporterRep, err := model.NewRepresentation(reporterData)
+	require.NoError(f.t, err)
+	commonRep, err := model.NewRepresentation(commonData)
+	require.NoError(f.t, err)
 
 	return ReportResourceCommand{
 		LocalResourceId:        localResId,

@@ -187,7 +187,7 @@ func TestValidateReportResourceCommand_Success(t *testing.T) {
 	assert.NoError(t, err)
 
 	usecase := newValidationTestUsecase(t, schemaRepository)
-	cmd := fixture().WithData("host", "hbi", "instance-1", "host-1",
+	cmd := fixture(t).WithData("host", "hbi", "instance-1", "host-1",
 		map[string]interface{}{
 			"satellite_id": "2c4196f1-0371-4f4c-8913-e113cfaa6e67",
 			"ansible_host": "host-1",
@@ -241,7 +241,7 @@ func TestValidateReportResourceCommand_FieldExtractionErrors(t *testing.T) {
 	}{
 		{
 			name: "reporter type not allowed for resource",
-			cmd: fixture().WithData("host", "unknown_reporter", "instance-1", "host-1",
+			cmd: fixture(t).WithData("host", "unknown_reporter", "instance-1", "host-1",
 				map[string]interface{}{"key": "value"},
 				map[string]interface{}{"workspace_id": "ws-123"},
 			),

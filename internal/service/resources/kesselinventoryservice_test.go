@@ -2980,14 +2980,14 @@ func TestInventoryService_ReportResource_NilOrEmptyRepresentationStructs(t *test
 		localResourceId string
 		common          *structpb.Struct
 		reporter        *structpb.Struct
-		expectInMsg     string
+		expectMsg       string
 	}{
 		{
 			name:            "both nil",
 			localResourceId: "host-both-nil",
 			common:          nil,
 			reporter:        nil,
-			expectInMsg:     "reporter representation",
+			expectMsg:       "invalid reporter representation: representation data cannot be empty",
 		},
 		{
 			name:            "common set, reporter nil",
@@ -2997,8 +2997,8 @@ func TestInventoryService_ReportResource_NilOrEmptyRepresentationStructs(t *test
 					"workspace_id": structpb.NewStringValue("ws-common-only"),
 				},
 			},
-			reporter:    nil,
-			expectInMsg: "reporter representation",
+			reporter:  nil,
+			expectMsg: "invalid reporter representation: representation data cannot be empty",
 		},
 		{
 			name:            "common nil, reporter set",
@@ -3009,14 +3009,14 @@ func TestInventoryService_ReportResource_NilOrEmptyRepresentationStructs(t *test
 					"reporter_field": structpb.NewStringValue("val"),
 				},
 			},
-			expectInMsg: "common representation",
+			expectMsg: "invalid common representation: representation data cannot be empty",
 		},
 		{
 			name:            "both empty structs",
 			localResourceId: "host-both-empty",
 			common:          &structpb.Struct{},
 			reporter:        &structpb.Struct{},
-			expectInMsg:     "reporter representation",
+			expectMsg:       "invalid reporter representation: representation data cannot be empty",
 		},
 	}
 
@@ -3046,7 +3046,12 @@ func TestInventoryService_ReportResource_NilOrEmptyRepresentationStructs(t *test
 			resp, err := client.ReportResource(context.Background(), req)
 			assert.Error(t, err)
 			assert.Nil(t, resp)
-			assert.Contains(t, err.Error(), tc.expectInMsg)
+
+			grpcStatus, ok := status.FromError(err)
+			require.True(t, ok)
+			assert.Equal(t, codes.Unknown, grpcStatus.Code(),
+				"nil/empty representation errors are not mapped to a specific gRPC code")
+			assert.Contains(t, grpcStatus.Message(), tc.expectMsg)
 		})
 	}
 }
@@ -3199,51 +3204,51 @@ func TestInventoryService_ReportResource_MissingRequiredFields(t *testing.T) {
 	}
 
 	cases := []struct {
-		name        string
-		mutate      func(r *pb.ReportResourceRequest)
-		expectInMsg string
+		name      string
+		mutate    func(r *pb.ReportResourceRequest)
+		expectMsg string
 	}{
 		{
 			name: "missing type",
 			mutate: func(r *pb.ReportResourceRequest) {
 				r.Type = ""
 			},
-			expectInMsg: "type",
+			expectMsg: "type: value length must be at least 1 characters",
 		},
 		{
 			name: "invalid type pattern",
 			mutate: func(r *pb.ReportResourceRequest) {
 				r.Type = "host!@#"
 			},
-			expectInMsg: "type",
+			expectMsg: "type: value does not match regex pattern `^[A-Za-z0-9_-]+$`",
 		},
 		{
 			name: "missing representations",
 			mutate: func(r *pb.ReportResourceRequest) {
 				r.Representations = nil
 			},
-			expectInMsg: "representations",
+			expectMsg: "representations: value is required",
 		},
 		{
 			name: "missing metadata",
 			mutate: func(r *pb.ReportResourceRequest) {
 				r.Representations.Metadata = nil
 			},
-			expectInMsg: "metadata",
+			expectMsg: "representations.metadata: value is required",
 		},
 		{
 			name: "missing local_resource_id",
 			mutate: func(r *pb.ReportResourceRequest) {
 				r.Representations.Metadata.LocalResourceId = ""
 			},
-			expectInMsg: "local_resource_id",
+			expectMsg: "representations.metadata.local_resource_id: value length must be at least 1 characters",
 		},
 		{
 			name: "missing api_href",
 			mutate: func(r *pb.ReportResourceRequest) {
 				r.Representations.Metadata.ApiHref = ""
 			},
-			expectInMsg: "api_href",
+			expectMsg: "representations.metadata.api_href: value length must be at least 1 characters",
 		},
 	}
 
@@ -3263,9 +3268,9 @@ func TestInventoryService_ReportResource_MissingRequiredFields(t *testing.T) {
 			assert.Nil(t, resp)
 
 			grpcStatus, ok := status.FromError(err)
-			assert.True(t, ok)
+			require.True(t, ok)
 			assert.Equal(t, codes.InvalidArgument, grpcStatus.Code())
-			assert.Contains(t, grpcStatus.Message(), tc.expectInMsg)
+			assert.Contains(t, grpcStatus.Message(), tc.expectMsg)
 		})
 	}
 }

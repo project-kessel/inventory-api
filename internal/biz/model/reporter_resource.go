@@ -142,6 +142,12 @@ func (rr ReporterResource) Key() ReporterResourceKey {
 	return rr.ReporterResourceKey
 }
 
+// ApiHref returns the API href for this reporter resource.
+func (rr ReporterResource) ApiHref() ApiHref { return rr.apiHref }
+
+// ConsoleHref returns the console href for this reporter resource.
+func (rr ReporterResource) ConsoleHref() ConsoleHref { return rr.consoleHref }
+
 // Add timestamp getters
 func (rr ReporterResource) CreatedAt() time.Time {
 	return rr.createdAt

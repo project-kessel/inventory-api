@@ -25,9 +25,11 @@ import (
 
 	"github.com/project-kessel/inventory-api/internal/data"
 	"github.com/project-kessel/inventory-api/internal/metricscollector"
+	"github.com/project-kessel/inventory-api/internal/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"gorm.io/gorm"
 
 	authnapi "github.com/project-kessel/inventory-api/internal/authn/api"
 	"github.com/project-kessel/inventory-api/internal/authz"
@@ -2853,6 +2855,531 @@ func TestInventoryService_StreamedListObjects_NilRequest(t *testing.T) {
 	_, err := svc.ToLookupResourcesCommand(nil)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "request is nil")
+}
+
+// newSQLiteTestRepo creates a real GORM repository backed by an in-memory SQLite
+// database with all migrations applied. Returns the repository and the underlying
+// *gorm.DB for use in assertions.
+func newSQLiteTestRepo(t *testing.T) (data.ResourceRepository, *gorm.DB) {
+	t.Helper()
+	db := testutil.NewSQLiteTestDB(t, &gorm.Config{TranslateError: true})
+	err := data.Migrate(db, nil)
+	require.NoError(t, err)
+	mc := metricscollector.NewFakeMetricsCollector()
+	tm := data.NewGormTransactionManager(mc, 3)
+	repo := data.NewResourceRepository(db, tm)
+	return repo, db
+}
+
+// buildReporterResourceKey is a test helper that constructs a model.ReporterResourceKey
+// from plain string values matching a ReportResourceRequest.
+func buildReporterResourceKey(t *testing.T, localResourceId, resourceType, reporterType, reporterInstanceId string) model.ReporterResourceKey {
+	t.Helper()
+	lid, err := model.NewLocalResourceId(localResourceId)
+	require.NoError(t, err)
+	rt, err := model.NewResourceType(resourceType)
+	require.NoError(t, err)
+	rpt, err := model.NewReporterType(reporterType)
+	require.NoError(t, err)
+	rid, err := model.NewReporterInstanceId(reporterInstanceId)
+	require.NoError(t, err)
+	key, err := model.NewReporterResourceKey(lid, rt, rpt, rid)
+	require.NoError(t, err)
+	return key
+}
+
+// --- ReportResource: Optional Metadata Fields ---
+
+func TestInventoryService_ReportResource_AllOptionalMetadataFields(t *testing.T) {
+	claims := &authnapi.Claims{
+		SubjectId: authnapi.SubjectId("reporter-service"),
+		AuthType:  authnapi.AuthTypeXRhIdentity,
+	}
+
+	txId := "txn-all-optional-metadata"
+	consoleHref := "https://console.example.com/hosts/my-host-123"
+	reporterVersion := "1.2.3"
+
+	req := &pb.ReportResourceRequest{
+		Type:               "host",
+		ReporterType:       "hbi",
+		ReporterInstanceId: "instance-001",
+		Representations: &pb.ResourceRepresentations{
+			Metadata: &pb.RepresentationMetadata{
+				LocalResourceId: "host-all-optional",
+				ApiHref:         "https://api.example.com/hosts/host-all-optional",
+				ConsoleHref:     &consoleHref,
+				ReporterVersion: &reporterVersion,
+				IdempotencyKey: &pb.RepresentationMetadata_TransactionId{
+					TransactionId: txId,
+				},
+			},
+			Common: &structpb.Struct{
+				Fields: map[string]*structpb.Value{
+					"workspace_id": structpb.NewStringValue("ws-all-optional"),
+				},
+			},
+			Reporter: &structpb.Struct{
+				Fields: map[string]*structpb.Value{
+					"reporter_field": structpb.NewStringValue("reporter-value"),
+				},
+			},
+		},
+	}
+
+	repo, db := newSQLiteTestRepo(t)
+	uc := newTestUsecase(t, testUsecaseConfig{Repo: repo})
+	client := newTestServer(t, testServerConfig{
+		Usecase:       uc,
+		Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+	})
+
+	resp, err := client.ReportResource(context.Background(), req)
+	require.NoError(t, err)
+	assert.NotNil(t, resp)
+
+	key := buildReporterResourceKey(t, "host-all-optional", "host", "hbi", "instance-001")
+	resource, err := repo.FindResourceByKeys(db, key)
+	require.NoError(t, err)
+	require.NotNil(t, resource)
+
+	rr := resource.ReporterResources()[0]
+	assert.Equal(t, "host-all-optional", rr.Key().LocalResourceId().String())
+	assert.Equal(t, "host", rr.Key().ResourceType().String())
+	assert.Equal(t, "hbi", rr.Key().ReporterType().String())
+	assert.Equal(t, "instance-001", rr.Key().ReporterInstanceId().String())
+	assert.Equal(t, "https://api.example.com/hosts/host-all-optional", rr.ApiHref().String())
+	assert.Equal(t, consoleHref, rr.ConsoleHref().String())
+
+	reps, err := repo.FindLatestRepresentations(db, key)
+	require.NoError(t, err)
+	require.NotNil(t, reps)
+	assert.Equal(t, "ws-all-optional", string(reps.CommonData()["workspace_id"].(string)))
+
+	processed, err := repo.HasTransactionIdBeenProcessed(db, txId)
+	require.NoError(t, err)
+	assert.True(t, processed, "transaction_id should be recorded as processed")
+}
+
+// --- ReportResource: Nil/Empty Optional Struct Combinations ---
+
+// The model layer requires both common and reporter representation data to be
+// non-empty. Sending nil or empty structs produces an error. These tests verify
+// the error paths.
+
+// TODO: This is actually not correct behavior.
+// These should be optional, and it depends on schema.
+func TestInventoryService_ReportResource_NilOrEmptyRepresentationStructs(t *testing.T) {
+	claims := &authnapi.Claims{
+		SubjectId: authnapi.SubjectId("reporter-service"),
+		AuthType:  authnapi.AuthTypeXRhIdentity,
+	}
+
+	cases := []struct {
+		name            string
+		localResourceId string
+		common          *structpb.Struct
+		reporter        *structpb.Struct
+		expectInMsg     string
+	}{
+		{
+			name:            "both nil",
+			localResourceId: "host-both-nil",
+			common:          nil,
+			reporter:        nil,
+			expectInMsg:     "reporter representation",
+		},
+		{
+			name:            "common set, reporter nil",
+			localResourceId: "host-common-only",
+			common: &structpb.Struct{
+				Fields: map[string]*structpb.Value{
+					"workspace_id": structpb.NewStringValue("ws-common-only"),
+				},
+			},
+			reporter:    nil,
+			expectInMsg: "reporter representation",
+		},
+		{
+			name:            "common nil, reporter set",
+			localResourceId: "host-reporter-only",
+			common:          nil,
+			reporter: &structpb.Struct{
+				Fields: map[string]*structpb.Value{
+					"reporter_field": structpb.NewStringValue("val"),
+				},
+			},
+			expectInMsg: "common representation",
+		},
+		{
+			name:            "both empty structs",
+			localResourceId: "host-both-empty",
+			common:          &structpb.Struct{},
+			reporter:        &structpb.Struct{},
+			expectInMsg:     "reporter representation",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			repo, _ := newSQLiteTestRepo(t)
+			uc := newTestUsecase(t, testUsecaseConfig{Repo: repo})
+			client := newTestServer(t, testServerConfig{
+				Usecase:       uc,
+				Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+			})
+
+			req := &pb.ReportResourceRequest{
+				Type:               "host",
+				ReporterType:       "hbi",
+				ReporterInstanceId: "instance-001",
+				Representations: &pb.ResourceRepresentations{
+					Metadata: &pb.RepresentationMetadata{
+						LocalResourceId: tc.localResourceId,
+						ApiHref:         "https://api.example.com/hosts/" + tc.localResourceId,
+					},
+					Common:   tc.common,
+					Reporter: tc.reporter,
+				},
+			}
+
+			resp, err := client.ReportResource(context.Background(), req)
+			assert.Error(t, err)
+			assert.Nil(t, resp)
+			assert.Contains(t, err.Error(), tc.expectInMsg)
+		})
+	}
+}
+
+// --- ReportResource: WriteVisibility Variations ---
+
+func TestInventoryService_ReportResource_WriteVisibility(t *testing.T) {
+	claims := &authnapi.Claims{
+		SubjectId: authnapi.SubjectId("reporter-service"),
+		AuthType:  authnapi.AuthTypeXRhIdentity,
+	}
+
+	cases := []struct {
+		name            string
+		visibility      pb.WriteVisibility
+		localResourceId string
+	}{
+		{
+			name:            "UNSPECIFIED",
+			visibility:      pb.WriteVisibility_WRITE_VISIBILITY_UNSPECIFIED,
+			localResourceId: "host-vis-unspecified",
+		},
+		{
+			name:            "MINIMIZE_LATENCY",
+			visibility:      pb.WriteVisibility_MINIMIZE_LATENCY,
+			localResourceId: "host-vis-minimize",
+		},
+		{
+			name:            "IMMEDIATE",
+			visibility:      pb.WriteVisibility_IMMEDIATE,
+			localResourceId: "host-vis-immediate",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			repo, db := newSQLiteTestRepo(t)
+			uc := newTestUsecase(t, testUsecaseConfig{Repo: repo})
+			client := newTestServer(t, testServerConfig{
+				Usecase:       uc,
+				Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+			})
+
+			req := &pb.ReportResourceRequest{
+				Type:               "host",
+				ReporterType:       "hbi",
+				ReporterInstanceId: "instance-001",
+				WriteVisibility:    tc.visibility,
+				Representations: &pb.ResourceRepresentations{
+					Metadata: &pb.RepresentationMetadata{
+						LocalResourceId: tc.localResourceId,
+						ApiHref:         "https://api.example.com/hosts/" + tc.localResourceId,
+					},
+					Common: &structpb.Struct{
+						Fields: map[string]*structpb.Value{
+							"workspace_id": structpb.NewStringValue("ws-vis"),
+						},
+					},
+					Reporter: &structpb.Struct{
+						Fields: map[string]*structpb.Value{
+							"reporter_key": structpb.NewStringValue("reporter-val"),
+						},
+					},
+				},
+			}
+
+			resp, err := client.ReportResource(context.Background(), req)
+			require.NoError(t, err)
+			assert.NotNil(t, resp)
+
+			key := buildReporterResourceKey(t, tc.localResourceId, "host", "hbi", "instance-001")
+			resource, err := repo.FindResourceByKeys(db, key)
+			require.NoError(t, err)
+			require.NotNil(t, resource, "resource should be persisted regardless of write_visibility")
+		})
+	}
+}
+
+// --- ReportResource: inventory_id Set (Regression Guard) ---
+
+func TestInventoryService_ReportResource_InventoryIdSet(t *testing.T) {
+	claims := &authnapi.Claims{
+		SubjectId: authnapi.SubjectId("reporter-service"),
+		AuthType:  authnapi.AuthTypeXRhIdentity,
+	}
+
+	inventoryId := "inv-12345"
+	req := &pb.ReportResourceRequest{
+		InventoryId:        &inventoryId,
+		Type:               "host",
+		ReporterType:       "hbi",
+		ReporterInstanceId: "instance-001",
+		Representations: &pb.ResourceRepresentations{
+			Metadata: &pb.RepresentationMetadata{
+				LocalResourceId: "host-with-inventory-id",
+				ApiHref:         "https://api.example.com/hosts/host-with-inventory-id",
+			},
+			Common: &structpb.Struct{
+				Fields: map[string]*structpb.Value{
+					"workspace_id": structpb.NewStringValue("ws-inv-id"),
+				},
+			},
+			Reporter: &structpb.Struct{
+				Fields: map[string]*structpb.Value{
+					"reporter_key": structpb.NewStringValue("reporter-val"),
+				},
+			},
+		},
+	}
+
+	repo, db := newSQLiteTestRepo(t)
+	uc := newTestUsecase(t, testUsecaseConfig{Repo: repo})
+	client := newTestServer(t, testServerConfig{
+		Usecase:       uc,
+		Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+	})
+
+	resp, err := client.ReportResource(context.Background(), req)
+	require.NoError(t, err)
+	assert.NotNil(t, resp)
+
+	key := buildReporterResourceKey(t, "host-with-inventory-id", "host", "hbi", "instance-001")
+	resource, err := repo.FindResourceByKeys(db, key)
+	require.NoError(t, err)
+	require.NotNil(t, resource, "inventory_id should not interfere with persistence")
+}
+
+// --- ReportResource: Missing Required Fields (Validation) ---
+
+func TestInventoryService_ReportResource_MissingRequiredFields(t *testing.T) {
+	claims := &authnapi.Claims{
+		SubjectId: authnapi.SubjectId("reporter-service"),
+		AuthType:  authnapi.AuthTypeXRhIdentity,
+	}
+
+	validReq := func() *pb.ReportResourceRequest {
+		return &pb.ReportResourceRequest{
+			Type:               "host",
+			ReporterType:       "hbi",
+			ReporterInstanceId: "instance-001",
+			Representations: &pb.ResourceRepresentations{
+				Metadata: &pb.RepresentationMetadata{
+					LocalResourceId: "valid-host",
+					ApiHref:         "https://api.example.com/hosts/valid-host",
+				},
+				Common:   &structpb.Struct{},
+				Reporter: &structpb.Struct{},
+			},
+		}
+	}
+
+	cases := []struct {
+		name        string
+		mutate      func(r *pb.ReportResourceRequest)
+		expectInMsg string
+	}{
+		{
+			name: "missing type",
+			mutate: func(r *pb.ReportResourceRequest) {
+				r.Type = ""
+			},
+			expectInMsg: "type",
+		},
+		{
+			name: "invalid type pattern",
+			mutate: func(r *pb.ReportResourceRequest) {
+				r.Type = "host!@#"
+			},
+			expectInMsg: "type",
+		},
+		{
+			name: "missing representations",
+			mutate: func(r *pb.ReportResourceRequest) {
+				r.Representations = nil
+			},
+			expectInMsg: "representations",
+		},
+		{
+			name: "missing metadata",
+			mutate: func(r *pb.ReportResourceRequest) {
+				r.Representations.Metadata = nil
+			},
+			expectInMsg: "metadata",
+		},
+		{
+			name: "missing local_resource_id",
+			mutate: func(r *pb.ReportResourceRequest) {
+				r.Representations.Metadata.LocalResourceId = ""
+			},
+			expectInMsg: "local_resource_id",
+		},
+		{
+			name: "missing api_href",
+			mutate: func(r *pb.ReportResourceRequest) {
+				r.Representations.Metadata.ApiHref = ""
+			},
+			expectInMsg: "api_href",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			uc := newTestUsecase(t, testUsecaseConfig{})
+			client := newTestServer(t, testServerConfig{
+				Usecase:       uc,
+				Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+			})
+
+			req := validReq()
+			tc.mutate(req)
+
+			resp, err := client.ReportResource(context.Background(), req)
+			assert.Error(t, err)
+			assert.Nil(t, resp)
+
+			grpcStatus, ok := status.FromError(err)
+			assert.True(t, ok)
+			assert.Equal(t, codes.InvalidArgument, grpcStatus.Code())
+			assert.Contains(t, grpcStatus.Message(), tc.expectInMsg)
+		})
+	}
+}
+
+// --- ReportResource: Transaction ID Idempotency ---
+
+func TestInventoryService_ReportResource_TransactionIdIdempotency(t *testing.T) {
+	claims := &authnapi.Claims{
+		SubjectId: authnapi.SubjectId("reporter-service"),
+		AuthType:  authnapi.AuthTypeXRhIdentity,
+	}
+
+	txId := "txn-idempotency-test"
+	makeReq := func(apiHref string) *pb.ReportResourceRequest {
+		return &pb.ReportResourceRequest{
+			Type:               "host",
+			ReporterType:       "hbi",
+			ReporterInstanceId: "instance-001",
+			Representations: &pb.ResourceRepresentations{
+				Metadata: &pb.RepresentationMetadata{
+					LocalResourceId: "host-idempotent",
+					ApiHref:         apiHref,
+					IdempotencyKey: &pb.RepresentationMetadata_TransactionId{
+						TransactionId: txId,
+					},
+				},
+				Common: &structpb.Struct{
+					Fields: map[string]*structpb.Value{
+						"workspace_id": structpb.NewStringValue("ws-idempotent"),
+					},
+				},
+				Reporter: &structpb.Struct{
+					Fields: map[string]*structpb.Value{
+						"reporter_key": structpb.NewStringValue("reporter-val"),
+					},
+				},
+			},
+		}
+	}
+
+	repo, db := newSQLiteTestRepo(t)
+	uc := newTestUsecase(t, testUsecaseConfig{Repo: repo})
+	client := newTestServer(t, testServerConfig{
+		Usecase:       uc,
+		Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+	})
+
+	// First report
+	resp1, err := client.ReportResource(context.Background(), makeReq("https://api.example.com/v1"))
+	require.NoError(t, err)
+	assert.NotNil(t, resp1)
+
+	key := buildReporterResourceKey(t, "host-idempotent", "host", "hbi", "instance-001")
+
+	processed, err := repo.HasTransactionIdBeenProcessed(db, txId)
+	require.NoError(t, err)
+	assert.True(t, processed, "transaction_id should be recorded after first report")
+
+	resource1, err := repo.FindResourceByKeys(db, key)
+	require.NoError(t, err)
+	require.NotNil(t, resource1)
+	apiHrefAfterFirst := resource1.ReporterResources()[0].ApiHref().String()
+
+	// Second report with same transaction_id but different api_href
+	resp2, err := client.ReportResource(context.Background(), makeReq("https://api.example.com/v2-should-be-ignored"))
+	require.NoError(t, err)
+	assert.NotNil(t, resp2)
+
+	resource2, err := repo.FindResourceByKeys(db, key)
+	require.NoError(t, err)
+	require.NotNil(t, resource2)
+	apiHrefAfterSecond := resource2.ReporterResources()[0].ApiHref().String()
+
+	assert.Equal(t, apiHrefAfterFirst, apiHrefAfterSecond,
+		"second report with same transaction_id should be a no-op; api_href should not change")
+}
+
+// --- ReportResource: MetaAuthorizer Denied ---
+
+func TestInventoryService_ReportResource_MetaAuthzDenied(t *testing.T) {
+	claims := &authnapi.Claims{
+		SubjectId: authnapi.SubjectId("reporter-service"),
+		AuthType:  authnapi.AuthTypeXRhIdentity,
+	}
+
+	req := &pb.ReportResourceRequest{
+		Type:               "host",
+		ReporterType:       "hbi",
+		ReporterInstanceId: "instance-001",
+		Representations: &pb.ResourceRepresentations{
+			Metadata: &pb.RepresentationMetadata{
+				LocalResourceId: "host-denied",
+				ApiHref:         "https://api.example.com/hosts/host-denied",
+			},
+			Common:   &structpb.Struct{},
+			Reporter: &structpb.Struct{},
+		},
+	}
+
+	uc := newTestUsecase(t, testUsecaseConfig{
+		MetaAuthorizer: &DenyingMetaAuthorizer{},
+	})
+	client := newTestServer(t, testServerConfig{
+		Usecase:       uc,
+		Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+	})
+
+	resp, err := client.ReportResource(context.Background(), req)
+
+	assert.Error(t, err)
+	assert.Nil(t, resp)
+	grpcStatus, ok := status.FromError(err)
+	assert.True(t, ok)
+	assert.Equal(t, codes.PermissionDenied, grpcStatus.Code())
 }
 
 func newFakeSchemaRepository(t *testing.T) schema.Repository {

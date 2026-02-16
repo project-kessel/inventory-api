@@ -396,7 +396,7 @@ objects:
           webServices:
             public:
               enabled: true
-              apiPath: inventory
+              apiPath: kessel
       testing:
         iqePlugin: kessel-inventory
 parameters:

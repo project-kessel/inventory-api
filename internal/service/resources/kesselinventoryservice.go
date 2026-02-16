@@ -104,9 +104,13 @@ func (s *InventoryService) CheckForUpdate(ctx context.Context, req *pb.CheckForU
 
 func (s *InventoryService) CheckBulk(ctx context.Context, req *pb.CheckBulkRequest) (*pb.CheckBulkResponse, error) {
 	log.Info("CheckBulk using v1beta2 db")
+	consistency := ConvertConsistencyToModel(req.GetConsistency())
+	if consistency.Preference == model.ConsistencyAtLeastAsFresh {
+		return nil, status.Errorf(codes.InvalidArgument, "at_least_as_fresh is not supported for CheckBulk")
+	}
 	cmd, err := toCheckBulkCommand(req)
 	if err != nil {
-		return nil, err
+		return nil, status.Errorf(codes.InvalidArgument, "%v", err)
 	}
 	resp, err := s.Ctl.CheckBulk(ctx, cmd)
 	if err != nil {

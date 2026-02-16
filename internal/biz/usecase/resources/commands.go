@@ -31,9 +31,9 @@ type ReportResourceCommand struct {
 	ReporterVersion *model.ReporterVersion
 	TransactionId   *model.TransactionId
 
-	// Representations
-	ReporterRepresentation model.Representation
-	CommonRepresentation   model.Representation
+	// Representations (optional)
+	ReporterRepresentation *model.Representation
+	CommonRepresentation   *model.Representation
 
 	// Write behavior
 	WriteVisibility WriteVisibility

@@ -58,8 +58,8 @@ func (f ReportResourceCommandFixture) WithData(resourceType, reporterType, repor
 		ReporterInstanceId:     repInstanceId,
 		ApiHref:                apiHref,
 		ConsoleHref:            &consoleHref,
-		ReporterRepresentation: reporterRep,
-		CommonRepresentation:   commonRep,
+		ReporterRepresentation: &reporterRep,
+		CommonRepresentation:   &commonRep,
 		WriteVisibility:        WriteVisibilityMinimizeLatency,
 	}
 }

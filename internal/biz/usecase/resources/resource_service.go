@@ -241,6 +241,16 @@ func (uc *Usecase) createResource(tx *gorm.DB, cmd ReportResourceCommand, txidSt
 		transactionId = *cmd.TransactionId
 	}
 
+	var reporterRepresentation model.Representation
+	if cmd.ReporterRepresentation != nil {
+		reporterRepresentation = *cmd.ReporterRepresentation
+	}
+
+	var commonRepresentation model.Representation
+	if cmd.CommonRepresentation != nil {
+		commonRepresentation = *cmd.CommonRepresentation
+	}
+
 	// TODO: need to model explicitly optional fields, see RHCLOUD-41760
 	resource, err := model.NewResource(
 		resourceId,
@@ -252,8 +262,8 @@ func (uc *Usecase) createResource(tx *gorm.DB, cmd ReportResourceCommand, txidSt
 		reporterResourceId,
 		cmd.ApiHref,
 		consoleHref,
-		cmd.ReporterRepresentation,
-		cmd.CommonRepresentation,
+		reporterRepresentation,
+		commonRepresentation,
 		cmd.ReporterVersion,
 	)
 	if err != nil {
@@ -284,14 +294,24 @@ func (uc *Usecase) updateResource(tx *gorm.DB, cmd ReportResourceCommand, existi
 		transactionId = *cmd.TransactionId
 	}
 
+	var reporterRepresentation model.Representation
+	if cmd.ReporterRepresentation != nil {
+		reporterRepresentation = *cmd.ReporterRepresentation
+	}
+
+	var commonRepresentation model.Representation
+	if cmd.CommonRepresentation != nil {
+		commonRepresentation = *cmd.CommonRepresentation
+	}
+
 	// TODO: need to model explicitly optional fields, see RHCLOUD-41760
 	err = existingResource.Update(
 		reporterResourceKey,
 		cmd.ApiHref,
 		consoleHref,
 		cmd.ReporterVersion,
-		cmd.ReporterRepresentation,
-		cmd.CommonRepresentation,
+		reporterRepresentation,
+		commonRepresentation,
 		transactionId,
 	)
 	if err != nil {
@@ -552,7 +572,7 @@ func (uc *Usecase) validateReportResourceCommand(ctx context.Context, cmd Report
 
 	var sanitizedReporterRepresentation map[string]interface{}
 	if cmd.ReporterRepresentation != nil {
-		sanitizedReporterRepresentation = removeNulls(map[string]interface{}(cmd.ReporterRepresentation))
+		sanitizedReporterRepresentation = removeNulls(map[string]interface{}(*cmd.ReporterRepresentation))
 	}
 
 	// Validate reporter-specific data using the sanitized map
@@ -563,7 +583,7 @@ func (uc *Usecase) validateReportResourceCommand(ctx context.Context, cmd Report
 	// Get common representation (no sanitization needed based on original code)
 	var commonRepresentation map[string]interface{}
 	if cmd.CommonRepresentation != nil {
-		commonRepresentation = map[string]interface{}(cmd.CommonRepresentation)
+		commonRepresentation = map[string]interface{}(*cmd.CommonRepresentation)
 	}
 
 	// Validate common data

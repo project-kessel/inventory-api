@@ -109,7 +109,7 @@ func (uc *Usecase) ReportResource(ctx context.Context, cmd ReportResourceCommand
 	reporterPrincipal := string(authzCtx.Subject.SubjectId)
 
 	// Validate command against schemas
-	if err := uc.schemaUsecase.ShallowValidate(ctx, cmd); err != nil {
+	if err := uc.validateReportResourceCommand(ctx, cmd); err != nil {
 		return status.Errorf(codes.InvalidArgument, "validation failed: %v", err)
 	}
 
@@ -504,6 +504,33 @@ func (uc *Usecase) enforceMetaAuthzObject(ctx context.Context, relation metaauth
 	if !allowed {
 		return ErrMetaAuthorizationDenied
 	}
+	return nil
+}
+
+// validateReportResourceCommand validates a ReportResourceCommand against schemas.
+// It checks that the reporter is allowed for the resource type,
+// and validates both reporter and common representations.
+func (uc *Usecase) validateReportResourceCommand(ctx context.Context, cmd ReportResourceCommand) error {
+	resourceType := cmd.ResourceType.String()
+	reporterType := cmd.ReporterType.String()
+
+	if isReporter, err := uc.schemaUsecase.IsReporterForResource(ctx, resourceType, reporterType); !isReporter {
+		if err != nil {
+			return err
+		}
+		return fmt.Errorf("reporter %s does not report resource types: %s", reporterType, resourceType)
+	}
+
+	// Validate reporter-specific data
+	if err := uc.schemaUsecase.ReporterShallowValidate(ctx, resourceType, reporterType, map[string]interface{}(cmd.ReporterRepresentation)); err != nil {
+		return err
+	}
+
+	// Validate common data
+	if err := uc.schemaUsecase.CommonShallowValidate(ctx, resourceType, map[string]interface{}(cmd.CommonRepresentation)); err != nil {
+		return err
+	}
+
 	return nil
 }
 

@@ -60,7 +60,7 @@ func New(c CompletedConfig, authn middleware.Middleware, authnConfig authn.Compl
 
 	// Pass authenticator to gRPC server for stream interceptor
 	// If nil, the interceptor will fall back to OIDC-only authentication (backwards compatible)
-	grpcServer, err := grpc.New(c.GrpcConfig, authn, authnConfig, authenticator, meter, logger)
+	grpcServer, err := grpc.New(c.GrpcConfig, authn, authnConfig, authenticator, meter, logger, c.Options.ReadOnlyMode)
 	if err != nil {
 		return nil, fmt.Errorf("init grpc server failed: %w", err)
 	}

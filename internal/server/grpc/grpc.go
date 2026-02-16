@@ -26,12 +26,13 @@ type ServerDeps struct {
 	Logger          log.Logger
 	Validator       protovalidate.Validator
 	ServerOptions   []kgrpc.ServerOption
+	ReadOnlyMode    bool
 }
 
 // New creates a new a gRPC server.
 // authenticator is optional - if provided, uses the new aggregating authenticator for streams.
 // If nil, falls back to OIDC-only authentication (backwards compatible).
-func New(c CompletedConfig, authnMiddleware middleware.Middleware, authnConfig authn.CompletedConfig, authenticator authnapi.Authenticator, meter metric.Meter, logger log.Logger) (*kgrpc.Server, error) {
+func New(c CompletedConfig, authnMiddleware middleware.Middleware, authnConfig authn.CompletedConfig, authenticator authnapi.Authenticator, meter metric.Meter, logger log.Logger, readOnlyMode bool) (*kgrpc.Server, error) {
 	requests, err := metrics.DefaultRequestsCounter(meter, metrics.DefaultServerRequestsCounterName)
 	if err != nil {
 		return nil, err
@@ -62,6 +63,7 @@ func New(c CompletedConfig, authnMiddleware middleware.Middleware, authnConfig a
 		Logger:          logger,
 		Validator:       validator,
 		ServerOptions:   c.ServerOptions,
+		ReadOnlyMode:    readOnlyMode,
 	})
 }
 
@@ -70,6 +72,10 @@ func NewWithDeps(deps ServerDeps) (*kgrpc.Server, error) {
 	// Error mapping interceptor is always added for streaming RPCs
 	streamingInterceptor := []grpc.StreamServerInterceptor{
 		m.ErrorMappingStreamInterceptor(),
+	}
+
+	unaryInterceptor := []grpc.UnaryServerInterceptor{
+		m.UnaryReadOnlyInterceptor(),
 	}
 
 	// Create stream interceptor using aggregating authenticator
@@ -108,9 +114,13 @@ func NewWithDeps(deps ServerDeps) (*kgrpc.Server, error) {
 			deps.Metrics,
 			// Error mapping handled by interceptor due to Kratos limitations
 		),
-		kgrpc.Options(grpc.ChainStreamInterceptor(
-			streamingInterceptor...,
-		)),
+		kgrpc.Options(
+			grpc.ChainStreamInterceptor(streamingInterceptor...),
+		),
+	}
+	// only enables the read-only interceptor if in read only mode to reduce overhead
+	if deps.ReadOnlyMode {
+		opts = append(opts, kgrpc.Options(grpc.ChainUnaryInterceptor(unaryInterceptor...)))
 	}
 	opts = append(opts, deps.ServerOptions...)
 	srv := kgrpc.NewServer(opts...)

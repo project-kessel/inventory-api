@@ -103,7 +103,7 @@ func TestCheckSelf_UsesCheckSelfRelation(t *testing.T) {
 	relation, err := model.NewRelation("view")
 	require.NoError(t, err)
 
-	allowed, err := usecase.CheckSelf(ctx, relation, key)
+	allowed, err := usecase.CheckSelf(ctx, relation, key, model.NewConsistencyMinimizeLatency())
 	require.NoError(t, err)
 	assert.True(t, allowed)
 	assert.Equal(t, 1, meta.calls)
@@ -131,7 +131,7 @@ func TestCheckSelf_DeniedByMetaAuthz(t *testing.T) {
 	relation, err := model.NewRelation("view")
 	require.NoError(t, err)
 
-	_, err = usecase.CheckSelf(ctx, relation, key)
+	_, err = usecase.CheckSelf(ctx, relation, key, model.NewConsistencyMinimizeLatency())
 	assert.ErrorIs(t, err, ErrMetaAuthorizationDenied)
 }
 
@@ -155,7 +155,7 @@ func TestCheckSelf_MissingAuthzContext(t *testing.T) {
 	relation, err := model.NewRelation("view")
 	require.NoError(t, err)
 
-	_, err = usecase.CheckSelf(context.Background(), relation, key)
+	_, err = usecase.CheckSelf(context.Background(), relation, key, model.NewConsistencyMinimizeLatency())
 	assert.ErrorIs(t, err, ErrMetaAuthzContextMissing)
 	assert.Equal(t, 0, meta.calls)
 }

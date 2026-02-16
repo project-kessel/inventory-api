@@ -113,7 +113,8 @@ func (uc *Usecase) ReportResource(ctx context.Context, cmd ReportResourceCommand
 		cmd.ReporterInstanceId,
 	)
 	if err != nil {
-		return fmt.Errorf("failed to create reporter resource key: %w", err)
+		log.Error("failed to create reporter resource key: ", err)
+		return status.Errorf(codes.InvalidArgument, "failed to create reporter resource key: %v", err)
 	}
 
 	if err := uc.enforceMetaAuthzObject(ctx, metaauthorizer.RelationReportResource, metaauthorizer.NewInventoryResourceFromKey(reporterResourceKey)); err != nil {
@@ -133,7 +134,7 @@ func (uc *Usecase) ReportResource(ctx context.Context, cmd ReportResourceCommand
 
 	// Validate command against schemas
 	if err := uc.validateReportResourceCommand(ctx, cmd); err != nil {
-		return status.Errorf(codes.InvalidArgument, "validation failed: %v", err)
+		return status.Errorf(codes.InvalidArgument, "failed validation for report resource: %v", err)
 	}
 
 	readAfterWriteEnabled := computeReadAfterWrite(uc, cmd.WriteVisibility, authzCtx.Subject.SubjectId)

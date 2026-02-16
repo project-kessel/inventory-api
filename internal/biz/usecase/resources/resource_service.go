@@ -581,6 +581,7 @@ func (uc *Usecase) resolveConsistencyToken(ctx context.Context, consistency mode
 
 // resolveConsistencyTokenForSelf resolves the consistency token for CheckSelf.
 // Same as resolveConsistencyToken except unspecified consistency always uses minimize_latency (no feature flag).
+// Duplicate function can be removed once the Check feature flag for HBI is removed
 func (uc *Usecase) resolveConsistencyTokenForSelf(ctx context.Context, consistency model.Consistency, reporterResourceKey model.ReporterResourceKey) (string, error) {
 	switch consistency.Preference {
 	case model.ConsistencyMinimizeLatency:

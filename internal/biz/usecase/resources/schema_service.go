@@ -53,8 +53,33 @@ func (sc *SchemaUsecase) CalculateTuples(currentRepresentation, previousRepresen
 	return model.NewTuplesToReplicate(tuplesToCreate, tuplesToDelete)
 }
 
-// IsReporterForResource validates the resourceType and reporterType combination is valid. i.e. that there is a reporter that reports said resource.
-func (sc *SchemaUsecase) IsReporterForResource(ctx context.Context, resourceType string, reporterType string) (bool, error) {
+// ShallowValidate validates a ReportResourceCommand against schemas.
+// It checks that the reporter is allowed for the resource type,
+// and validates both reporter and common representations.
+func (sc *SchemaUsecase) ShallowValidate(ctx context.Context, cmd ReportResourceCommand) error {
+	resourceType := cmd.ResourceType.String()
+	reporterType := cmd.ReporterType.String()
+
+	if isReporter, err := sc.isReporterForResource(ctx, resourceType, reporterType); !isReporter {
+		if err != nil {
+			return err
+		}
+		return fmt.Errorf("reporter %s does not report resource types: %s", reporterType, resourceType)
+	}
+
+	if err := sc.reporterShallowValidate(ctx, resourceType, reporterType, cmd.ReporterRepresentation); err != nil {
+		return err
+	}
+
+	if err := sc.commonShallowValidate(ctx, resourceType, cmd.CommonRepresentation); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// isReporterForResource validates the resourceType and reporterType combination is valid.
+func (sc *SchemaUsecase) isReporterForResource(ctx context.Context, resourceType string, reporterType string) (bool, error) {
 	if _, err := sc.schemaRepository.GetReporterSchema(ctx, resourceType, reporterType); err != nil {
 		if errors.Is(err, schema.ResourceSchemaNotFound) || errors.Is(err, schema.ReporterSchemaNotFound) {
 			return false, nil
@@ -66,8 +91,8 @@ func (sc *SchemaUsecase) IsReporterForResource(ctx context.Context, resourceType
 	return true, nil
 }
 
-// CommonShallowValidate validates the common representation for a given resourceType.
-func (sc *SchemaUsecase) CommonShallowValidate(ctx context.Context, resourceType string, commonRepresentation map[string]interface{}) error {
+// commonShallowValidate validates the common representation for a given resourceType.
+func (sc *SchemaUsecase) commonShallowValidate(ctx context.Context, resourceType string, commonRepresentation map[string]interface{}) error {
 	resource, err := sc.schemaRepository.GetResourceSchema(ctx, resourceType)
 	if err != nil {
 		return fmt.Errorf("failed to load common representation schema for '%s': %w", resourceType, err)
@@ -93,8 +118,8 @@ func (sc *SchemaUsecase) CommonShallowValidate(ctx context.Context, resourceType
 	return nil
 }
 
-// ReporterShallowValidate validates the specific reporter representation for a given resourceType/reporterType.
-func (sc *SchemaUsecase) ReporterShallowValidate(ctx context.Context, resourceType string, reporterType string, reporterRepresentation map[string]interface{}) error {
+// reporterShallowValidate validates the specific reporter representation for a given resourceType/reporterType.
+func (sc *SchemaUsecase) reporterShallowValidate(ctx context.Context, resourceType string, reporterType string, reporterRepresentation map[string]interface{}) error {
 	reporter, err := sc.schemaRepository.GetReporterSchema(ctx, resourceType, reporterType)
 	if err != nil {
 		return err

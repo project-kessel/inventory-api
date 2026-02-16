@@ -17,7 +17,7 @@ import (
 )
 
 // New create a new http server.
-func New(c CompletedConfig, authn middleware.Middleware, meter metric.Meter, logger log.Logger) (*http.Server, error) {
+func New(c CompletedConfig, authn middleware.Middleware, meter metric.Meter, logger log.Logger, readOnlyMode bool) (*http.Server, error) {
 	requests, err := metrics.DefaultRequestsCounter(meter, metrics.DefaultServerRequestsCounterName)
 	if err != nil {
 		return nil, err
@@ -47,6 +47,12 @@ func New(c CompletedConfig, authn middleware.Middleware, meter metric.Meter, log
 		),
 	}
 	opts = append(opts, c.ServerOptions...)
+
+	// only enables the read-only middleware if in read only mode to reduce overhead
+	if readOnlyMode {
+		opts = append(opts, http.Middleware(m.HTTPReadOnlyMiddleware))
+	}
+
 	srv := http.NewServer(opts...)
 	srv.HandlePrefix("/metrics", promhttp.HandlerFor(
 		prometheus.DefaultGatherer,

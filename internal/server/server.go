@@ -53,7 +53,7 @@ func New(c CompletedConfig, authn middleware.Middleware, authnConfig authn.Compl
 		return nil, fmt.Errorf("init meter failed: %w", err)
 	}
 
-	httpServer, err := http.New(c.HttpConfig, authn, meter, logger)
+	httpServer, err := http.New(c.HttpConfig, authn, meter, logger, c.Options.ReadOnlyMode)
 	if err != nil {
 		return nil, fmt.Errorf("init http server failed: %w", err)
 	}

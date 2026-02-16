@@ -388,7 +388,7 @@ func (uc *Usecase) CheckSelf(ctx context.Context, relation model.Relation, repor
 	if err != nil {
 		return false, err
 	}
-	token, err := uc.resolveConsistencyToken(ctx, consistency, reporterResourceKey)
+	token, err := uc.resolveConsistencyTokenForSelf(ctx, consistency, reporterResourceKey)
 	if err != nil {
 		return false, err
 	}
@@ -547,6 +547,7 @@ func (uc *Usecase) lookupConsistencyTokenFromDB(reporterResourceKey model.Report
 }
 
 // resolveConsistencyToken resolves the consistency token based on the preference.
+// Used by Check. For unspecified consistency, uses the DefaultToAtLeastAsAcknowledged feature flag.
 func (uc *Usecase) resolveConsistencyToken(ctx context.Context, consistency model.Consistency, reporterResourceKey model.ReporterResourceKey) (string, error) {
 	featureFlagEnabled := uc.Config.DefaultToAtLeastAsAcknowledged
 	if featureFlagEnabled {
@@ -557,28 +558,44 @@ func (uc *Usecase) resolveConsistencyToken(ctx context.Context, consistency mode
 
 	switch consistency.Preference {
 	case model.ConsistencyMinimizeLatency:
-		// No token needed - minimize_latency mode
 		log.Info("Using minimize_latency consistency")
 		return "", nil
 
 	case model.ConsistencyAtLeastAsFresh:
-		// Use the token provided by the caller
 		log.Infof("Using at_least_as_fresh consistency with provided token: %s", consistency.Token)
 		return string(consistency.Token), nil
 
 	case model.ConsistencyAtLeastAsAcknowledged:
-		// Look up the token from inventory database
 		log.Info("Using at_least_as_acknowledged consistency - looking up token from DB")
 		return uc.lookupConsistencyTokenFromDB(reporterResourceKey)
 
 	default:
-		// Default behavior depends on feature flag:
-		// - Enabled: look up resource and use its consistency token (original check behavior)
-		// - Disabled: use minimize_latency
 		if featureFlagEnabled {
 			log.Info("Default consistency - looking up token from DB")
 			return uc.lookupConsistencyTokenFromDB(reporterResourceKey)
 		}
+		log.Info("Default consistency - using minimize_latency")
+		return "", nil
+	}
+}
+
+// resolveConsistencyTokenForSelf resolves the consistency token for CheckSelf.
+// Same as resolveConsistencyToken except unspecified consistency always uses minimize_latency (no feature flag).
+func (uc *Usecase) resolveConsistencyTokenForSelf(ctx context.Context, consistency model.Consistency, reporterResourceKey model.ReporterResourceKey) (string, error) {
+	switch consistency.Preference {
+	case model.ConsistencyMinimizeLatency:
+		log.Info("Using minimize_latency consistency")
+		return "", nil
+
+	case model.ConsistencyAtLeastAsFresh:
+		log.Infof("Using at_least_as_fresh consistency with provided token: %s", consistency.Token)
+		return string(consistency.Token), nil
+
+	case model.ConsistencyAtLeastAsAcknowledged:
+		log.Info("Using at_least_as_acknowledged consistency - looking up token from DB")
+		return uc.lookupConsistencyTokenFromDB(reporterResourceKey)
+
+	default:
 		log.Info("Default consistency - using minimize_latency")
 		return "", nil
 	}

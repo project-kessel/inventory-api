@@ -413,6 +413,9 @@ func (uc *Usecase) CheckForUpdate(ctx context.Context, relation model.Relation, 
 
 // CheckBulk performs bulk permission checks.
 func (uc *Usecase) CheckBulk(ctx context.Context, cmd CheckBulkCommand) (*CheckBulkResult, error) {
+	if cmd.Consistency.Preference == model.ConsistencyAtLeastAsAcknowledged {
+		return nil, status.Errorf(codes.InvalidArgument, "inventory managed zookies aren't available")
+	}
 	// Meta-authorization for each item
 	for _, item := range cmd.Items {
 		if err := uc.enforceMetaAuthzObject(ctx, metaauthorizer.RelationCheckBulk, metaauthorizer.NewInventoryResourceFromKey(item.Resource)); err != nil {
@@ -434,6 +437,9 @@ func (uc *Usecase) CheckBulk(ctx context.Context, cmd CheckBulkCommand) (*CheckB
 // CheckSelfBulk performs bulk permission checks for the authenticated user.
 // Uses relation="check_self" for meta-authorization.
 func (uc *Usecase) CheckSelfBulk(ctx context.Context, cmd CheckSelfBulkCommand) (*CheckBulkResult, error) {
+	if cmd.Consistency.Preference == model.ConsistencyAtLeastAsAcknowledged {
+		return nil, status.Errorf(codes.InvalidArgument, "inventory managed zookies aren't available")
+	}
 	// Meta-authorization for each item
 	for _, item := range cmd.Items {
 		if err := uc.enforceMetaAuthzObject(ctx, metaauthorizer.RelationCheckSelf, metaauthorizer.NewInventoryResourceFromKey(item.Resource)); err != nil {
@@ -505,6 +511,9 @@ func (uc *Usecase) checkWithToken(ctx context.Context, relation model.Relation, 
 // Returns a streaming client for receiving lookup results.
 // TODO: remove v1beta1 response type
 func (uc *Usecase) LookupResources(ctx context.Context, cmd LookupResourcesCommand) (grpc.ServerStreamingClient[kessel.LookupResourcesResponse], error) {
+	if cmd.Consistency.Preference == model.ConsistencyAtLeastAsAcknowledged {
+		return nil, status.Errorf(codes.InvalidArgument, "inventory managed zookies aren't available")
+	}
 	// Meta-authorize against the resource type (not a specific resource instance)
 	metaObject := metaauthorizer.NewResourceTypeRef(cmd.ReporterType, cmd.ResourceType)
 	if err := uc.enforceMetaAuthzObject(ctx, metaauthorizer.RelationLookupResources, metaObject); err != nil {

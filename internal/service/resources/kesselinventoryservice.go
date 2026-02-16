@@ -120,10 +120,6 @@ func (s *InventoryService) CheckBulk(ctx context.Context, req *pb.CheckBulkReque
 }
 
 func (s *InventoryService) CheckSelf(ctx context.Context, req *pb.CheckSelfRequest) (*pb.CheckSelfResponse, error) {
-	consistency := ConvertConsistencyToModel(req.GetConsistency())
-	if consistency.Preference == model.ConsistencyAtLeastAsAcknowledged {
-		return nil, status.Errorf(codes.InvalidArgument, "inventory managed zookies aren't available")
-	}
 	reporterResourceKey, err := reporterKeyFromResourceReference(req.Object)
 	if err != nil {
 		return nil, err
@@ -132,6 +128,7 @@ func (s *InventoryService) CheckSelf(ctx context.Context, req *pb.CheckSelfReque
 	if err != nil {
 		return nil, err
 	}
+	consistency := ConvertConsistencyToModel(req.GetConsistency())
 	log.Infof("CheckSelf request consistency: %s", consistency.Preference)
 	resp, err := s.Ctl.CheckSelf(ctx, relation, reporterResourceKey)
 	if err != nil {
@@ -148,10 +145,6 @@ func (s *InventoryService) CheckSelfBulk(ctx context.Context, req *pb.CheckSelfB
 	// Validate input: check items array
 	if len(req.GetItems()) == 0 {
 		return nil, status.Errorf(codes.InvalidArgument, "items array cannot be empty")
-	}
-	consistency := ConvertConsistencyToModel(req.GetConsistency())
-	if consistency.Preference == model.ConsistencyAtLeastAsAcknowledged {
-		return nil, status.Errorf(codes.InvalidArgument, "inventory managed zookies aren't available")
 	}
 
 	cmd, err := toCheckSelfBulkCommand(req)
@@ -449,7 +442,7 @@ func ToLookupResourcesCommand(request *pb.StreamedListObjectsRequest) (resources
 	if err != nil {
 		return resources.LookupResourcesCommand{}, fmt.Errorf("invalid subject: %w", err)
 	}
-	consistency := consistencyFromProto(request.GetConsistency())
+	consistency := ConvertConsistencyToModel(request.GetConsistency())
 
 	var limit uint32 = 1000
 	var continuation string

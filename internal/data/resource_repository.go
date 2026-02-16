@@ -28,6 +28,8 @@ type FindResourceByKeysResult struct {
 	LocalResourceID       string    `gorm:"column:local_resource_id"`
 	ReporterType          string    `gorm:"column:reporter_type"`
 	ReporterInstanceID    string    `gorm:"column:reporter_instance_id"`
+	APIHref               string    `gorm:"column:api_href"`
+	ConsoleHref           string    `gorm:"column:console_href"`
 	ConsistencyToken      string    `gorm:"column:consistency_token"`
 	CreatedAt             time.Time `gorm:"column:created_at"`
 	UpdatedAt             time.Time `gorm:"column:updated_at"`
@@ -82,6 +84,8 @@ func (result FindResourceByKeysResult) ToSnapshots() (bizmodel.ResourceSnapshot,
 		ID:                    result.ReporterResourceID,
 		ReporterResourceKey:   keySnapshot,
 		ResourceID:            result.ResourceID,
+		APIHref:               result.APIHref,
+		ConsoleHref:           result.ConsoleHref,
 		RepresentationVersion: result.RepresentationVersion,
 		Generation:            result.Generation,
 		Tombstone:             result.Tombstone,
@@ -250,7 +254,9 @@ func (r *resourceRepository) FindResourceByKeys(tx *gorm.DB, key bizmodel.Report
 		rr2.resource_type,
 		rr2.local_resource_id,
 		rr2.reporter_type,
-		rr2.reporter_instance_id
+		rr2.reporter_instance_id,
+		rr2.api_href,
+		rr2.console_href
 	`).
 		Joins(`
 		JOIN reporter_resources AS rr2 ON rr2.resource_id = rr.resource_id

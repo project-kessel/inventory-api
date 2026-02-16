@@ -106,13 +106,6 @@ func (uc *Usecase) ReportResource(ctx context.Context, cmd ReportResourceCommand
 	if !ok || authzCtx.Subject == nil {
 		return status.Error(codes.Unauthenticated, "authentication required")
 	}
-	reporterPrincipal := string(authzCtx.Subject.SubjectId)
-
-	// Validate command against schemas
-	if err := uc.validateReportResourceCommand(ctx, cmd); err != nil {
-		return status.Errorf(codes.InvalidArgument, "validation failed: %v", err)
-	}
-
 	reporterResourceKey, err := model.NewReporterResourceKey(
 		cmd.LocalResourceId,
 		cmd.ResourceType,
@@ -138,7 +131,12 @@ func (uc *Usecase) ReportResource(ctx context.Context, cmd ReportResourceCommand
 		return err
 	}
 
-	readAfterWriteEnabled := computeReadAfterWrite(uc, cmd.WriteVisibility, reporterPrincipal)
+	// Validate command against schemas
+	if err := uc.validateReportResourceCommand(ctx, cmd); err != nil {
+		return status.Errorf(codes.InvalidArgument, "validation failed: %v", err)
+	}
+
+	readAfterWriteEnabled := computeReadAfterWrite(uc, cmd.WriteVisibility, authzCtx.Subject.SubjectId)
 	if readAfterWriteEnabled && uc.Config.ConsumerEnabled {
 		subscription = uc.ListenManager.Subscribe(txidStr)
 		defer subscription.Unsubscribe()
@@ -681,11 +679,10 @@ func lookupResourcesCommandToV1beta1(cmd LookupResourcesCommand) *kessel.LookupR
 	}
 }
 
-// Check if request comes from SP in allowlist
-func isSPInAllowlist(reporterPrincipal string, allowlist []string) bool {
+// isSPInAllowlist checks if the caller subject is in the allowlist.
+func isSPInAllowlist(callerSubject authnapi.SubjectId, allowlist []string) bool {
 	for _, sp := range allowlist {
-		// either specific SP or everyone
-		if sp == reporterPrincipal || sp == "*" {
+		if sp == string(callerSubject) || sp == "*" {
 			return true
 		}
 	}
@@ -693,12 +690,9 @@ func isSPInAllowlist(reporterPrincipal string, allowlist []string) bool {
 	return false
 }
 
-func computeReadAfterWrite(uc *Usecase, writeVisibility WriteVisibility, reporterPrincipal string) bool {
-	// read after write functionality is enabled/disabled globally.
-	// And executed if request specifies and
-	// came from service provider in allowlist
+func computeReadAfterWrite(uc *Usecase, writeVisibility WriteVisibility, callerSubject authnapi.SubjectId) bool {
 	if writeVisibility == WriteVisibilityUnspecified || writeVisibility == WriteVisibilityMinimizeLatency {
 		return false
 	}
-	return !common.IsNil(uc.ListenManager) && uc.Config.ReadAfterWriteEnabled && isSPInAllowlist(reporterPrincipal, uc.Config.ReadAfterWriteAllowlist)
+	return !common.IsNil(uc.ListenManager) && uc.Config.ReadAfterWriteEnabled && isSPInAllowlist(callerSubject, uc.Config.ReadAfterWriteAllowlist)
 }

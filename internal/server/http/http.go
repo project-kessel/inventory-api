@@ -31,27 +31,30 @@ func New(c CompletedConfig, authn middleware.Middleware, meter metric.Meter, log
 		return nil, err
 	}
 	// TODO: pass in health, authn middleware
-	var opts = []http.ServerOption{
-		http.Middleware(
-			recovery.Recovery(),
-			logging.Server(logger),
-			metrics.Server(
-				metrics.WithSeconds(seconds),
-				metrics.WithRequests(requests),
-			),
-			m.Validation(validator),
-			selector.Server(
-				authn,
-			).Match(NewWhiteListMatcher).Build(),
-			m.ErrorMapping(),
+	middlewares := []middleware.Middleware{
+		recovery.Recovery(),
+		logging.Server(logger),
+		metrics.Server(
+			metrics.WithSeconds(seconds),
+			metrics.WithRequests(requests),
 		),
+		m.Validation(validator),
+		selector.Server(
+			authn,
+		).Match(NewWhiteListMatcher).Build(),
+		m.ErrorMapping(),
+	}
+
+	// Only add read-only middleware if in read-only mode to reduce overhead
+	if readOnlyMode {
+		middlewares = append(middlewares, m.HTTPReadOnlyMiddleware)
+	}
+
+	var opts = []http.ServerOption{
+		http.Middleware(middlewares...),
 	}
 	opts = append(opts, c.ServerOptions...)
 
-	// only enables the read-only middleware if in read only mode to reduce overhead
-	if readOnlyMode {
-		opts = append(opts, http.Middleware(m.HTTPReadOnlyMiddleware))
-	}
 
 	srv := http.NewServer(opts...)
 	srv.HandlePrefix("/metrics", promhttp.HandlerFor(

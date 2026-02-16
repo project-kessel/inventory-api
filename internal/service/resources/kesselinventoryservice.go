@@ -535,12 +535,13 @@ func toReportResourceCommand(r *pb.ReportResourceRequest) (resources.ReportResou
 		return resources.ReportResourceCommand{}, fmt.Errorf("invalid API href: %w", err)
 	}
 
-	var consoleHref model.ConsoleHref
+	var consoleHref *model.ConsoleHref
 	if consoleHrefVal := r.GetRepresentations().GetMetadata().GetConsoleHref(); consoleHrefVal != "" {
-		consoleHref, err = model.NewConsoleHref(consoleHrefVal)
+		ch, err := model.NewConsoleHref(consoleHrefVal)
 		if err != nil {
 			return resources.ReportResourceCommand{}, fmt.Errorf("invalid console href: %w", err)
 		}
+		consoleHref = &ch
 	}
 
 	var reporterVersion *model.ReporterVersion
@@ -562,7 +563,11 @@ func toReportResourceCommand(r *pb.ReportResourceRequest) (resources.ReportResou
 		return resources.ReportResourceCommand{}, fmt.Errorf("invalid common representation: %w", err)
 	}
 
-	transactionId := model.NewTransactionId(r.GetRepresentations().GetMetadata().GetTransactionId())
+	var transactionId *model.TransactionId
+	if txIdVal := r.GetRepresentations().GetMetadata().GetTransactionId(); txIdVal != "" {
+		txId := model.NewTransactionId(txIdVal)
+		transactionId = &txId
+	}
 
 	writeVisibility := writeVisibilityFromProto(r.GetWriteVisibility())
 

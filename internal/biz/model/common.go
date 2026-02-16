@@ -419,6 +419,8 @@ func (t TransactionId) Serialize() string {
 	return SerializeString(t)
 }
 
+// TODO: this needs to return an error if the transactionId is invalid
+// This will break a bunch of tests.
 func NewTransactionId(transactionId string) TransactionId {
 	return TransactionId(transactionId)
 }

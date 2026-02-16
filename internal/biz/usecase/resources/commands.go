@@ -27,9 +27,9 @@ type ReportResourceCommand struct {
 
 	// Metadata
 	ApiHref         model.ApiHref
-	ConsoleHref     model.ConsoleHref
+	ConsoleHref     *model.ConsoleHref
 	ReporterVersion *model.ReporterVersion
-	TransactionId   model.TransactionId
+	TransactionId   *model.TransactionId
 
 	// Representations
 	ReporterRepresentation model.Representation

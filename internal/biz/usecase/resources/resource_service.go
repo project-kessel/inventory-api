@@ -148,8 +148,9 @@ func (uc *Usecase) ReportResource(ctx context.Context, cmd ReportResourceCommand
 		uc.resourceRepository.GetDB(),
 		func(tx *gorm.DB) error {
 			// Check for duplicate transaction ID's before we find the resource for quicker returns if it fails
-			if cmd.TransactionId != "" {
-				alreadyProcessed, err := uc.resourceRepository.HasTransactionIdBeenProcessed(tx, string(cmd.TransactionId))
+			if cmd.TransactionId != nil {
+				// TODO: repository should accept the transactionID type natively
+				alreadyProcessed, err := uc.resourceRepository.HasTransactionIdBeenProcessed(tx, string(*cmd.TransactionId))
 				if err != nil {
 					return fmt.Errorf("failed to check transaction ID: %w", err)
 				}
@@ -229,16 +230,27 @@ func (uc *Usecase) createResource(tx *gorm.DB, cmd ReportResourceCommand, txidSt
 		return err
 	}
 
+	var consoleHref model.ConsoleHref
+	if cmd.ConsoleHref != nil {
+		consoleHref = *cmd.ConsoleHref
+	}
+
+	var transactionId model.TransactionId
+	if cmd.TransactionId != nil {
+		transactionId = *cmd.TransactionId
+	}
+
+	// TODO: need to model explicitly optional fields, see RHCLOUD-41760
 	resource, err := model.NewResource(
 		resourceId,
 		cmd.LocalResourceId,
 		cmd.ResourceType,
 		cmd.ReporterType,
 		cmd.ReporterInstanceId,
-		cmd.TransactionId,
+		transactionId,
 		reporterResourceId,
 		cmd.ApiHref,
-		cmd.ConsoleHref,
+		consoleHref,
 		cmd.ReporterRepresentation,
 		cmd.CommonRepresentation,
 		cmd.ReporterVersion,
@@ -261,14 +273,25 @@ func (uc *Usecase) updateResource(tx *gorm.DB, cmd ReportResourceCommand, existi
 		return fmt.Errorf("failed to create reporter resource key: %w", err)
 	}
 
+	var consoleHref model.ConsoleHref
+	if cmd.ConsoleHref != nil {
+		consoleHref = *cmd.ConsoleHref
+	}
+
+	var transactionId model.TransactionId
+	if cmd.TransactionId != nil {
+		transactionId = *cmd.TransactionId
+	}
+
+	// TODO: need to model explicitly optional fields, see RHCLOUD-41760
 	err = existingResource.Update(
 		reporterResourceKey,
 		cmd.ApiHref,
-		cmd.ConsoleHref,
+		consoleHref,
 		cmd.ReporterVersion,
 		cmd.ReporterRepresentation,
 		cmd.CommonRepresentation,
-		cmd.TransactionId,
+		transactionId,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to update resource: %w", err)

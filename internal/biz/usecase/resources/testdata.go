@@ -58,7 +58,7 @@ func (f *ReportResourceCommandFixture) WithData(resourceType, reporterType, repo
 		ReporterType:           repType,
 		ReporterInstanceId:     repInstanceId,
 		ApiHref:                apiHref,
-		ConsoleHref:            consoleHref,
+		ConsoleHref:            &consoleHref,
 		ReporterRepresentation: reporterRep,
 		CommonRepresentation:   commonRep,
 		WriteVisibility:        WriteVisibilityMinimizeLatency,
@@ -68,7 +68,8 @@ func (f *ReportResourceCommandFixture) WithData(resourceType, reporterType, repo
 // WithTransactionId creates a ReportResourceCommand with a transaction ID.
 func (f *ReportResourceCommandFixture) WithTransactionId(resourceType, reporterType, reporterInstance, localResourceId, workspaceId, transactionId string) ReportResourceCommand {
 	cmd := f.Basic(resourceType, reporterType, reporterInstance, localResourceId, workspaceId)
-	cmd.TransactionId = model.NewTransactionId(transactionId)
+	txId := model.NewTransactionId(transactionId)
+	cmd.TransactionId = &txId
 	return cmd
 }
 
@@ -135,6 +136,7 @@ func (f *ReportResourceCommandFixture) WithCycleData(resourceType, reporterType,
 // UpdatedWithTransactionId creates an updated ReportResourceCommand with a transaction ID.
 func (f *ReportResourceCommandFixture) UpdatedWithTransactionId(resourceType, reporterType, reporterInstance, localResourceId, workspaceId, transactionId string) ReportResourceCommand {
 	cmd := f.Updated(resourceType, reporterType, reporterInstance, localResourceId, workspaceId)
-	cmd.TransactionId = model.NewTransactionId(transactionId)
+	txId := model.NewTransactionId(transactionId)
+	cmd.TransactionId = &txId
 	return cmd
 }

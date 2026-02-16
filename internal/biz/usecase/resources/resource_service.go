@@ -512,6 +512,13 @@ func (uc *Usecase) validateReportResourceCommand(ctx context.Context, cmd Report
 	resourceType := cmd.ResourceType.String()
 	reporterType := cmd.ReporterType.String()
 
+	if resourceType == "" {
+		return fmt.Errorf("missing 'type' field")
+	}
+	if reporterType == "" {
+		return fmt.Errorf("missing 'reporterType' field")
+	}
+
 	if isReporter, err := uc.schemaUsecase.IsReporterForResource(ctx, resourceType, reporterType); !isReporter {
 		if err != nil {
 			return err
@@ -519,13 +526,24 @@ func (uc *Usecase) validateReportResourceCommand(ctx context.Context, cmd Report
 		return fmt.Errorf("reporter %s does not report resource types: %s", reporterType, resourceType)
 	}
 
-	// Validate reporter-specific data
-	if err := uc.schemaUsecase.ReporterShallowValidate(ctx, resourceType, reporterType, map[string]interface{}(cmd.ReporterRepresentation)); err != nil {
+	var sanitizedReporterRepresentation map[string]interface{}
+	if cmd.ReporterRepresentation != nil {
+		sanitizedReporterRepresentation = removeNulls(map[string]interface{}(cmd.ReporterRepresentation))
+	}
+
+	// Validate reporter-specific data using the sanitized map
+	if err := uc.schemaUsecase.ReporterShallowValidate(ctx, resourceType, reporterType, sanitizedReporterRepresentation); err != nil {
 		return err
 	}
 
+	// Get common representation (no sanitization needed based on original code)
+	var commonRepresentation map[string]interface{}
+	if cmd.CommonRepresentation != nil {
+		commonRepresentation = map[string]interface{}(cmd.CommonRepresentation)
+	}
+
 	// Validate common data
-	if err := uc.schemaUsecase.CommonShallowValidate(ctx, resourceType, map[string]interface{}(cmd.CommonRepresentation)); err != nil {
+	if err := uc.schemaUsecase.CommonShallowValidate(ctx, resourceType, commonRepresentation); err != nil {
 		return err
 	}
 

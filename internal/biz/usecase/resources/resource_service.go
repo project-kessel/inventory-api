@@ -235,6 +235,29 @@ func (uc *Usecase) ReportResource(ctx context.Context, cmd ReportResourceCommand
 	return nil
 }
 
+// resolveOptionalFields dereferences optional pointer fields from the command.
+// TODO: Remove this helper when model optional fields explicitly (RHCLOUD-41760)
+func resolveOptionalFields(cmd ReportResourceCommand) (
+	consoleHref model.ConsoleHref,
+	transactionId model.TransactionId,
+	reporterRepresentation model.Representation,
+	commonRepresentation model.Representation,
+) {
+	if cmd.ConsoleHref != nil {
+		consoleHref = *cmd.ConsoleHref
+	}
+	if cmd.TransactionId != nil {
+		transactionId = *cmd.TransactionId
+	}
+	if cmd.ReporterRepresentation != nil {
+		reporterRepresentation = *cmd.ReporterRepresentation
+	}
+	if cmd.CommonRepresentation != nil {
+		commonRepresentation = *cmd.CommonRepresentation
+	}
+	return
+}
+
 func (uc *Usecase) createResource(tx *gorm.DB, cmd ReportResourceCommand, txidStr string) error {
 	resourceId, err := uc.resourceRepository.NextResourceId()
 	if err != nil {
@@ -246,25 +269,7 @@ func (uc *Usecase) createResource(tx *gorm.DB, cmd ReportResourceCommand, txidSt
 		return err
 	}
 
-	var consoleHref model.ConsoleHref
-	if cmd.ConsoleHref != nil {
-		consoleHref = *cmd.ConsoleHref
-	}
-
-	var transactionId model.TransactionId
-	if cmd.TransactionId != nil {
-		transactionId = *cmd.TransactionId
-	}
-
-	var reporterRepresentation model.Representation
-	if cmd.ReporterRepresentation != nil {
-		reporterRepresentation = *cmd.ReporterRepresentation
-	}
-
-	var commonRepresentation model.Representation
-	if cmd.CommonRepresentation != nil {
-		commonRepresentation = *cmd.CommonRepresentation
-	}
+	consoleHref, transactionId, reporterRepresentation, commonRepresentation := resolveOptionalFields(cmd)
 
 	// TODO: need to model explicitly optional fields, see RHCLOUD-41760
 	resource, err := model.NewResource(
@@ -299,25 +304,7 @@ func (uc *Usecase) updateResource(tx *gorm.DB, cmd ReportResourceCommand, existi
 		return fmt.Errorf("failed to create reporter resource key: %w", err)
 	}
 
-	var consoleHref model.ConsoleHref
-	if cmd.ConsoleHref != nil {
-		consoleHref = *cmd.ConsoleHref
-	}
-
-	var transactionId model.TransactionId
-	if cmd.TransactionId != nil {
-		transactionId = *cmd.TransactionId
-	}
-
-	var reporterRepresentation model.Representation
-	if cmd.ReporterRepresentation != nil {
-		reporterRepresentation = *cmd.ReporterRepresentation
-	}
-
-	var commonRepresentation model.Representation
-	if cmd.CommonRepresentation != nil {
-		commonRepresentation = *cmd.CommonRepresentation
-	}
+	consoleHref, transactionId, reporterRepresentation, commonRepresentation := resolveOptionalFields(cmd)
 
 	// TODO: need to model explicitly optional fields, see RHCLOUD-41760
 	err = existingResource.Update(
@@ -592,8 +579,7 @@ func (uc *Usecase) validateReportResourceCommand(ctx context.Context, cmd Report
 		return &RepresentationRequiredError{Kind: "common"}
 	}
 
-	var sanitizedReporterRepresentation map[string]interface{}
-	sanitizedReporterRepresentation = removeNulls(map[string]interface{}(*cmd.ReporterRepresentation))
+	sanitizedReporterRepresentation := removeNulls(map[string]interface{}(*cmd.ReporterRepresentation))
 
 	// Validate reporter-specific data using the sanitized map
 	if err := uc.schemaUsecase.ReporterShallowValidate(ctx, resourceType, reporterType, sanitizedReporterRepresentation); err != nil {

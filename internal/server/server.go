@@ -39,6 +39,10 @@ func New(c CompletedConfig, authn middleware.Middleware, authnConfig authn.Compl
 		Logger: log.With(logger, "service.id", c.Options.Id),
 	}
 
+	if c.Options.ReadOnlyMode {
+		logger.Log(log.LevelWarn, "msg", "SERVER IS STARTING IN READ-ONLY MODE")
+	}
+
 	meterProvider, err := NewMeterProvider(s)
 	if err != nil {
 		return nil, fmt.Errorf("init meter provider failed: %w", err)

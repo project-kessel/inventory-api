@@ -32,11 +32,6 @@ func testAuthzContext() context.Context {
 	})
 }
 
-// fixture returns a ReportResourceCommandFixture for creating test commands.
-func fixture(t *testing.T) *ReportResourceCommandFixture {
-	return NewReportResourceCommandFixture(t)
-}
-
 type testSelfSubjectStrategy struct{}
 
 func (testSelfSubjectStrategy) SubjectFromAuthorizationContext(authzContext authnapi.AuthzContext) (model.SubjectReference, error) {
@@ -180,7 +175,7 @@ func TestReportResource_UsesReportRelation(t *testing.T) {
 		newTestSelfSubjectStrategy(),
 	)
 
-	cmd := fixture(t).Basic("host", "hbi", "instance-1", "host-1", "workspace-1")
+	cmd := fixture().Basic("host", "hbi", "instance-1", "host-1", "workspace-1")
 	err := usecase.ReportResource(ctx, cmd)
 	require.NoError(t, err)
 	assert.Equal(t, 1, meta.calls)
@@ -204,7 +199,7 @@ func TestDelete_UsesDeleteRelation(t *testing.T) {
 		newTestSelfSubjectStrategy(),
 	)
 
-	cmd := fixture(t).Basic("host", "hbi", "instance-1", "host-1", "workspace-1")
+	cmd := fixture().Basic("host", "hbi", "instance-1", "host-1", "workspace-1")
 	err := usecase.ReportResource(ctx, cmd)
 	require.NoError(t, err)
 
@@ -442,7 +437,7 @@ func TestReportResource(t *testing.T) {
 			mc := metricscollector.NewFakeMetricsCollector()
 			usecase := New(resourceRepo, schemaRepo, authorizer, "test-topic", logger, nil, nil, usecaseConfig, mc, nil, newTestSelfSubjectStrategy())
 
-			cmd := fixture(t).Basic(tt.resourceType, tt.reporterType, tt.reporterInstance, tt.localResourceId, tt.workspaceId)
+			cmd := fixture().Basic(tt.resourceType, tt.reporterType, tt.reporterInstance, tt.localResourceId, tt.workspaceId)
 			err := usecase.ReportResource(ctx, cmd)
 
 			if tt.expectError {
@@ -522,7 +517,7 @@ func TestReportResourceThenDelete(t *testing.T) {
 			mc := metricscollector.NewFakeMetricsCollector()
 			usecase := New(resourceRepo, schemaRepo, authorizer, "test-topic", logger, nil, nil, usecaseConfig, mc, nil, newTestSelfSubjectStrategy())
 
-			cmd := fixture(t).Basic(tt.resourceType, tt.reporterType, tt.reporterInstanceId, tt.localResourceId, tt.workspaceId)
+			cmd := fixture().Basic(tt.resourceType, tt.reporterType, tt.reporterInstanceId, tt.localResourceId, tt.workspaceId)
 			err := usecase.ReportResource(ctx, cmd)
 			require.NoError(t, err)
 
@@ -614,7 +609,7 @@ func TestReportFindDeleteFind_TombstoneLifecycle(t *testing.T) {
 	mc := metricscollector.NewFakeMetricsCollector()
 	usecase := New(resourceRepo, schemaRepo, authorizer, "test-topic", logger, nil, nil, usecaseConfig, mc, nil, newTestSelfSubjectStrategy())
 
-	cmd := fixture(t).Basic("k8s_cluster", "ocm", "lifecycle-instance", "lifecycle-resource", "lifecycle-workspace")
+	cmd := fixture().Basic("k8s_cluster", "ocm", "lifecycle-instance", "lifecycle-resource", "lifecycle-workspace")
 	err := usecase.ReportResource(ctx, cmd)
 	require.NoError(t, err)
 
@@ -660,11 +655,11 @@ func TestMultipleHostsLifecycle(t *testing.T) {
 	usecase := New(resourceRepo, schemaRepo, authorizer, "test-topic", logger, nil, nil, usecaseConfig, mc, nil, newTestSelfSubjectStrategy())
 
 	// Create 2 hosts
-	cmd := fixture(t).Basic("host", "hbi", "hbi-instance-1", "host-1", "workspace-1")
+	cmd := fixture().Basic("host", "hbi", "hbi-instance-1", "host-1", "workspace-1")
 	err := usecase.ReportResource(ctx, cmd)
 	require.NoError(t, err, "Should create host1")
 
-	cmd = fixture(t).Basic("host", "hbi", "hbi-instance-1", "host-2", "workspace-1")
+	cmd = fixture().Basic("host", "hbi", "hbi-instance-1", "host-2", "workspace-1")
 	err = usecase.ReportResource(ctx, cmd)
 	require.NoError(t, err, "Should create host2")
 
@@ -683,11 +678,11 @@ func TestMultipleHostsLifecycle(t *testing.T) {
 	require.NotNil(t, foundHost2)
 
 	// Update both hosts by reporting them again with updated data
-	cmd = fixture(t).Updated("host", "hbi", "hbi-instance-1", "host-1", "workspace-1")
+	cmd = fixture().Updated("host", "hbi", "hbi-instance-1", "host-1", "workspace-1")
 	err = usecase.ReportResource(ctx, cmd)
 	require.NoError(t, err, "Should update host1")
 
-	cmd = fixture(t).Updated("host", "hbi", "hbi-instance-1", "host-2", "workspace-1")
+	cmd = fixture().Updated("host", "hbi", "hbi-instance-1", "host-2", "workspace-1")
 	err = usecase.ReportResource(ctx, cmd)
 	require.NoError(t, err, "Should update host2")
 
@@ -735,7 +730,7 @@ func TestPartialDataScenarios(t *testing.T) {
 	usecase := New(resourceRepo, schemaRepo, authorizer, "test-topic", logger, nil, nil, usecaseConfig, mc, nil, newTestSelfSubjectStrategy())
 
 	t.Run("Report resource with rich reporter data and minimal common data", func(t *testing.T) {
-		cmd := fixture(t).ReporterRich("k8s_cluster", "ocm", "ocm-instance-1", "reporter-rich-resource", "minimal-workspace")
+		cmd := fixture().ReporterRich("k8s_cluster", "ocm", "ocm-instance-1", "reporter-rich-resource", "minimal-workspace")
 		err := usecase.ReportResource(ctx, cmd)
 		require.NoError(t, err, "Should create resource with rich reporter data")
 
@@ -748,7 +743,7 @@ func TestPartialDataScenarios(t *testing.T) {
 	})
 
 	t.Run("Report resource with minimal reporter data and rich common data", func(t *testing.T) {
-		cmd := fixture(t).CommonRich("k8s_cluster", "ocm", "ocm-instance-1", "common-rich-resource", "rich-workspace")
+		cmd := fixture().CommonRich("k8s_cluster", "ocm", "ocm-instance-1", "common-rich-resource", "rich-workspace")
 		err := usecase.ReportResource(ctx, cmd)
 		require.NoError(t, err, "Should create resource with rich common data")
 
@@ -762,7 +757,7 @@ func TestPartialDataScenarios(t *testing.T) {
 
 	t.Run("Report resource with both data, then reporter-focused update, then common-focused update", func(t *testing.T) {
 		// 1. Initial report with both reporter and common data
-		cmd := fixture(t).Basic("k8s_cluster", "ocm", "ocm-instance-1", "progressive-resource", "initial-workspace")
+		cmd := fixture().Basic("k8s_cluster", "ocm", "ocm-instance-1", "progressive-resource", "initial-workspace")
 		err := usecase.ReportResource(ctx, cmd)
 		require.NoError(t, err, "Should create resource with both data types")
 
@@ -774,7 +769,7 @@ func TestPartialDataScenarios(t *testing.T) {
 		require.NotNil(t, foundResource)
 
 		// 2. Reporter-focused update
-		cmd = fixture(t).ReporterRich("k8s_cluster", "ocm", "ocm-instance-1", "progressive-resource", "initial-workspace")
+		cmd = fixture().ReporterRich("k8s_cluster", "ocm", "ocm-instance-1", "progressive-resource", "initial-workspace")
 		err = usecase.ReportResource(ctx, cmd)
 		require.NoError(t, err, "Should update resource with reporter-focused data")
 
@@ -783,7 +778,7 @@ func TestPartialDataScenarios(t *testing.T) {
 		require.NotNil(t, foundResource)
 
 		// 3. Common-focused update
-		cmd = fixture(t).CommonRich("k8s_cluster", "ocm", "ocm-instance-1", "progressive-resource", "updated-workspace")
+		cmd = fixture().CommonRich("k8s_cluster", "ocm", "ocm-instance-1", "progressive-resource", "updated-workspace")
 		err = usecase.ReportResource(ctx, cmd)
 		require.NoError(t, err, "Should update resource with common-focused data")
 
@@ -817,7 +812,7 @@ func TestResourceLifecycle_ReportUpdateDeleteReport(t *testing.T) {
 
 		// 1. REPORT NEW: Initial resource creation
 		log.Info("Report New ---------------------")
-		cmd := fixture(t).Basic(resourceType, reporterType, reporterInstance, localResourceId, workspaceId)
+		cmd := fixture().Basic(resourceType, reporterType, reporterInstance, localResourceId, workspaceId)
 		err := usecase.ReportResource(ctx, cmd)
 		require.NoError(t, err, "Initial report should succeed")
 
@@ -837,7 +832,7 @@ func TestResourceLifecycle_ReportUpdateDeleteReport(t *testing.T) {
 
 		log.Info("Update 1 ---------------------")
 		// 2. UPDATE: Update the resource
-		cmd = fixture(t).Updated(resourceType, reporterType, reporterInstance, localResourceId, workspaceId)
+		cmd = fixture().Updated(resourceType, reporterType, reporterInstance, localResourceId, workspaceId)
 		err = usecase.ReportResource(ctx, cmd)
 		require.NoError(t, err, "Update should succeed")
 
@@ -872,7 +867,7 @@ func TestResourceLifecycle_ReportUpdateDeleteReport(t *testing.T) {
 
 		// 4. REPORT NEW: Report the same resource again after deletion (this should be an update)
 		log.Info("Revive again ---------------------")
-		cmd = fixture(t).Updated(resourceType, reporterType, reporterInstance, localResourceId, workspaceId)
+		cmd = fixture().Updated(resourceType, reporterType, reporterInstance, localResourceId, workspaceId)
 		err = usecase.ReportResource(ctx, cmd)
 		require.NoError(t, err, "Report after delete should succeed")
 
@@ -913,12 +908,12 @@ func TestResourceLifecycle_ReportUpdateDeleteReportDelete(t *testing.T) {
 		workspaceId := "test-workspace-2"
 
 		// 1. REPORT NEW: Initial resource creation
-		cmd := fixture(t).Basic(resourceType, reporterType, reporterInstance, localResourceId, workspaceId)
+		cmd := fixture().Basic(resourceType, reporterType, reporterInstance, localResourceId, workspaceId)
 		err := usecase.ReportResource(ctx, cmd)
 		require.NoError(t, err, "Initial report should succeed")
 
 		// 2. UPDATE: Update the resource
-		cmd = fixture(t).Updated(resourceType, reporterType, reporterInstance, localResourceId, workspaceId)
+		cmd = fixture().Updated(resourceType, reporterType, reporterInstance, localResourceId, workspaceId)
 		err = usecase.ReportResource(ctx, cmd)
 		require.NoError(t, err, "Update should succeed")
 
@@ -928,7 +923,7 @@ func TestResourceLifecycle_ReportUpdateDeleteReportDelete(t *testing.T) {
 		require.NoError(t, err, "First delete should succeed")
 
 		// 4. REPORT NEW: Report the same resource again after deletion
-		cmd = fixture(t).Updated(resourceType, reporterType, reporterInstance, localResourceId, workspaceId)
+		cmd = fixture().Updated(resourceType, reporterType, reporterInstance, localResourceId, workspaceId)
 		err = usecase.ReportResource(ctx, cmd)
 		require.NoError(t, err, "Report after delete should succeed")
 
@@ -988,7 +983,7 @@ func TestResourceLifecycle_ReportDeleteResubmitDelete(t *testing.T) {
 
 		// 1. REPORT: Initial resource creation
 		log.Info("1. Initial Report ---------------------")
-		cmd := fixture(t).Basic(resourceType, reporterType, reporterInstance, localResourceId, workspaceId)
+		cmd := fixture().Basic(resourceType, reporterType, reporterInstance, localResourceId, workspaceId)
 		err := usecase.ReportResource(ctx, cmd)
 		require.NoError(t, err, "Initial report should succeed")
 
@@ -1057,7 +1052,7 @@ func TestResourceLifecycle_ReportResubmitDeleteResubmit(t *testing.T) {
 
 		// 1. REPORT: Initial resource creation
 		log.Info("1. Initial Report ---------------------")
-		cmd := fixture(t).Basic(resourceType, reporterType, reporterInstance, localResourceId, workspaceId)
+		cmd := fixture().Basic(resourceType, reporterType, reporterInstance, localResourceId, workspaceId)
 		err := usecase.ReportResource(ctx, cmd)
 		require.NoError(t, err, "Initial report should succeed")
 
@@ -1074,7 +1069,7 @@ func TestResourceLifecycle_ReportResubmitDeleteResubmit(t *testing.T) {
 
 		// 2. RESUBMIT SAME REPORT: Should be idempotent
 		log.Info("2. Resubmit Same Report ---------------------")
-		cmd = fixture(t).Basic(resourceType, reporterType, reporterInstance, localResourceId, workspaceId)
+		cmd = fixture().Basic(resourceType, reporterType, reporterInstance, localResourceId, workspaceId)
 		err = usecase.ReportResource(ctx, cmd)
 		require.NoError(t, err, "Resubmitted report should succeed (idempotent)")
 
@@ -1147,7 +1142,7 @@ func TestResourceLifecycle_ComplexIdempotency(t *testing.T) {
 
 			// 1. REPORT (CREATE or UPDATE): Should find existing or create new
 			log.Infof("Cycle %d: Report Resource", cycle)
-			cmd := fixture(t).WithCycleData(resourceType, reporterType, reporterInstance, localResourceId, workspaceId, cycle)
+			cmd := fixture().WithCycleData(resourceType, reporterType, reporterInstance, localResourceId, workspaceId, cycle)
 			err := usecase.ReportResource(ctx, cmd)
 			require.NoError(t, err, "Report should succeed in cycle %d", cycle)
 
@@ -1164,7 +1159,7 @@ func TestResourceLifecycle_ComplexIdempotency(t *testing.T) {
 
 			// 2. UPDATE: Update the resource
 			log.Infof("Cycle %d: Update Resource", cycle)
-			cmd = fixture(t).Updated(resourceType, reporterType, reporterInstance, localResourceId, workspaceId)
+			cmd = fixture().Updated(resourceType, reporterType, reporterInstance, localResourceId, workspaceId)
 			err = usecase.ReportResource(ctx, cmd)
 			require.NoError(t, err, "Update should succeed in cycle %d", cycle)
 
@@ -1303,7 +1298,7 @@ func TestTransactionIdIdempotency(t *testing.T) {
 		transactionId := "test-transaction-123"
 
 		// 1. First report with transaction ID
-		cmd := fixture(t).WithTransactionId(resourceType, reporterType, reporterInstance, localResourceId, workspaceId, transactionId)
+		cmd := fixture().WithTransactionId(resourceType, reporterType, reporterInstance, localResourceId, workspaceId, transactionId)
 		err := usecase.ReportResource(ctx, cmd)
 		require.NoError(t, err, "First report should succeed")
 
@@ -1319,7 +1314,7 @@ func TestTransactionIdIdempotency(t *testing.T) {
 		initialGeneration := firstState.Generation
 
 		// 2. Second report with SAME transaction ID - should be idempotent
-		cmd = fixture(t).WithTransactionId(resourceType, reporterType, reporterInstance, localResourceId, workspaceId, transactionId)
+		cmd = fixture().WithTransactionId(resourceType, reporterType, reporterInstance, localResourceId, workspaceId, transactionId)
 		err = usecase.ReportResource(ctx, cmd)
 		require.NoError(t, err, "Second report with same transaction ID should succeed (idempotent)")
 
@@ -1343,7 +1338,7 @@ func TestTransactionIdIdempotency(t *testing.T) {
 		transactionId2 := "test-transaction-789"
 
 		// 1. First report with transaction ID
-		cmd := fixture(t).WithTransactionId(resourceType, reporterType, reporterInstance, localResourceId, workspaceId, transactionId1)
+		cmd := fixture().WithTransactionId(resourceType, reporterType, reporterInstance, localResourceId, workspaceId, transactionId1)
 		err := usecase.ReportResource(ctx, cmd)
 		require.NoError(t, err, "First report should succeed")
 
@@ -1359,7 +1354,7 @@ func TestTransactionIdIdempotency(t *testing.T) {
 		initialGeneration := firstState.Generation
 
 		// 2. Second report with DIFFERENT transaction ID - should update representations
-		cmd = fixture(t).UpdatedWithTransactionId(resourceType, reporterType, reporterInstance, localResourceId, workspaceId, transactionId2)
+		cmd = fixture().UpdatedWithTransactionId(resourceType, reporterType, reporterInstance, localResourceId, workspaceId, transactionId2)
 		err = usecase.ReportResource(ctx, cmd)
 		require.NoError(t, err, "Second report with different transaction ID should succeed")
 
@@ -1383,7 +1378,7 @@ func TestTransactionIdIdempotency(t *testing.T) {
 		transactionId2 := "test-transaction-222"
 
 		// 1. First report with transaction ID
-		cmd := fixture(t).WithTransactionId(resourceType, reporterType, reporterInstance, localResourceId, workspaceId, transactionId1)
+		cmd := fixture().WithTransactionId(resourceType, reporterType, reporterInstance, localResourceId, workspaceId, transactionId1)
 		err := usecase.ReportResource(ctx, cmd)
 		require.NoError(t, err, "First report should succeed")
 
@@ -1402,7 +1397,7 @@ func TestTransactionIdIdempotency(t *testing.T) {
 		assert.False(t, firstState.Tombstone, "Initial tombstone should be false")
 
 		// 2. Update with DIFFERENT transaction ID - should update representations
-		cmd = fixture(t).UpdatedWithTransactionId(resourceType, reporterType, reporterInstance, localResourceId, workspaceId, transactionId2)
+		cmd = fixture().UpdatedWithTransactionId(resourceType, reporterType, reporterInstance, localResourceId, workspaceId, transactionId2)
 		err = usecase.ReportResource(ctx, cmd)
 		require.NoError(t, err, "Update with different transaction ID should succeed")
 
@@ -1438,7 +1433,7 @@ func TestTransactionIdIdempotency(t *testing.T) {
 		transactionId := "test-transaction-333"
 
 		// 1. First report with transaction ID
-		cmd := fixture(t).WithTransactionId(resourceType, reporterType, reporterInstance, localResourceId, workspaceId, transactionId)
+		cmd := fixture().WithTransactionId(resourceType, reporterType, reporterInstance, localResourceId, workspaceId, transactionId)
 		err := usecase.ReportResource(ctx, cmd)
 		require.NoError(t, err, "First report should succeed")
 
@@ -1457,7 +1452,7 @@ func TestTransactionIdIdempotency(t *testing.T) {
 		assert.False(t, firstState.Tombstone, "Initial tombstone should be false")
 
 		// 2. Second report with SAME transaction ID - should be idempotent
-		cmd = fixture(t).WithTransactionId(resourceType, reporterType, reporterInstance, localResourceId, workspaceId, transactionId)
+		cmd = fixture().WithTransactionId(resourceType, reporterType, reporterInstance, localResourceId, workspaceId, transactionId)
 		err = usecase.ReportResource(ctx, cmd)
 		require.NoError(t, err, "Second report with same transaction ID should succeed (idempotent)")
 

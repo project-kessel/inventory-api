@@ -52,6 +52,17 @@ var (
 	ErrSelfSubjectMissing = errors.New("self subject missing")
 )
 
+// RepresentationRequiredError indicates a required representation was not provided.
+// Kind identifies which representation is missing (e.g. "reporter", "common").
+// TODO: the logic is not correct around this currently, but this can be fixed later
+type RepresentationRequiredError struct {
+	Kind string
+}
+
+func (e *RepresentationRequiredError) Error() string {
+	return fmt.Sprintf("invalid %s representation: representation required", e.Kind)
+}
+
 const listenTimeout = 10 * time.Second
 
 // UsecaseConfig contains configuration flags that control the behavior of usecase operations.
@@ -134,6 +145,10 @@ func (uc *Usecase) ReportResource(ctx context.Context, cmd ReportResourceCommand
 
 	// Validate command against schemas
 	if err := uc.validateReportResourceCommand(ctx, cmd); err != nil {
+		var repReqErr *RepresentationRequiredError
+		if errors.As(err, &repReqErr) {
+			return err
+		}
 		return status.Errorf(codes.InvalidArgument, "failed validation for report resource: %v", err)
 	}
 
@@ -570,10 +585,15 @@ func (uc *Usecase) validateReportResourceCommand(ctx context.Context, cmd Report
 		return fmt.Errorf("reporter %s does not report resource types: %s", reporterType, resourceType)
 	}
 
-	var sanitizedReporterRepresentation map[string]interface{}
-	if cmd.ReporterRepresentation != nil {
-		sanitizedReporterRepresentation = removeNulls(map[string]interface{}(*cmd.ReporterRepresentation))
+	if cmd.ReporterRepresentation == nil {
+		return &RepresentationRequiredError{Kind: "reporter"}
 	}
+	if cmd.CommonRepresentation == nil {
+		return &RepresentationRequiredError{Kind: "common"}
+	}
+
+	var sanitizedReporterRepresentation map[string]interface{}
+	sanitizedReporterRepresentation = removeNulls(map[string]interface{}(*cmd.ReporterRepresentation))
 
 	// Validate reporter-specific data using the sanitized map
 	if err := uc.schemaUsecase.ReporterShallowValidate(ctx, resourceType, reporterType, sanitizedReporterRepresentation); err != nil {
@@ -581,10 +601,7 @@ func (uc *Usecase) validateReportResourceCommand(ctx context.Context, cmd Report
 	}
 
 	// Get common representation (no sanitization needed based on original code)
-	var commonRepresentation map[string]interface{}
-	if cmd.CommonRepresentation != nil {
-		commonRepresentation = map[string]interface{}(*cmd.CommonRepresentation)
-	}
+	commonRepresentation := map[string]interface{}(*cmd.CommonRepresentation)
 
 	// Validate common data
 	if err := uc.schemaUsecase.CommonShallowValidate(ctx, resourceType, commonRepresentation); err != nil {

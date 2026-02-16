@@ -3091,7 +3091,7 @@ func TestInventoryService_ReportResource_NilOrEmptyRepresentationStructs(t *test
 			localResourceId: "host-both-nil",
 			common:          nil,
 			reporter:        nil,
-			expectMsg:       "invalid reporter representation: representation data cannot be empty",
+			expectMsg:       "invalid reporter representation: representation required",
 		},
 		{
 			name:            "common set, reporter nil",
@@ -3102,7 +3102,7 @@ func TestInventoryService_ReportResource_NilOrEmptyRepresentationStructs(t *test
 				},
 			},
 			reporter:  nil,
-			expectMsg: "invalid reporter representation: representation data cannot be empty",
+			expectMsg: "invalid reporter representation: representation required",
 		},
 		{
 			name:            "common nil, reporter set",
@@ -3113,7 +3113,7 @@ func TestInventoryService_ReportResource_NilOrEmptyRepresentationStructs(t *test
 					"reporter_field": structpb.NewStringValue("val"),
 				},
 			},
-			expectMsg: "invalid common representation: representation data cannot be empty",
+			expectMsg: "invalid common representation: representation required",
 		},
 		{
 			name:            "both empty structs",
@@ -3153,8 +3153,7 @@ func TestInventoryService_ReportResource_NilOrEmptyRepresentationStructs(t *test
 
 			grpcStatus, ok := status.FromError(err)
 			require.True(t, ok)
-			assert.Equal(t, codes.Unknown, grpcStatus.Code(),
-				"nil/empty representation errors are not mapped to a specific gRPC code")
+			assert.Equal(t, codes.InvalidArgument, grpcStatus.Code())
 			assert.Contains(t, grpcStatus.Message(), tc.expectMsg)
 		})
 	}

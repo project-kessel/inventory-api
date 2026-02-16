@@ -80,7 +80,7 @@ func NewKafkaEventSource(cfg KafkaEventSourceConfig) *KafkaEventSource {
 // Ensure KafkaEventSource implements model.EventSource
 var _ model.EventSource = (*KafkaEventSource)(nil)
 
-// Run implements EventSource. It creates a Kafka consumer (if needed),
+// Listen implements EventSource. It creates a Kafka consumer (if needed),
 // subscribes to the topic, and polls for messages, processing each synchronously
 // with the provided handler.
 //
@@ -88,9 +88,9 @@ var _ model.EventSource = (*KafkaEventSource)(nil)
 //   - Messages are processed in order, one at a time
 //   - If handler returns nil, the offset is stored for commit
 //   - If handler returns ErrFencingFailed, the offset is NOT stored (will be redelivered)
-//   - If handler returns any other error, Run stops and returns the error
+//   - If handler returns any other error, Listen stops and returns the error
 //   - Offsets are batch-committed based on commitThreshold
-func (k *KafkaEventSource) Run(ctx context.Context, handler model.DeliveryHandler) error {
+func (k *KafkaEventSource) Listen(ctx context.Context, handler model.DeliveryHandler) error {
 	// Create consumer if not already set (allows injection for testing)
 	if k.consumer == nil {
 		kafkaConsumer, err := kafka.NewConsumer(k.kafkaConfig)

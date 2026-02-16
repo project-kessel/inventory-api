@@ -59,13 +59,13 @@ type Store interface {
 // It encapsulates how events are received (e.g., from Kafka) and provides
 // at-least-once delivery guarantees with strong ordering.
 type EventSource interface {
-	// Run starts the event source and processes each delivery with the handler.
+	// Listen starts the event source and processes each delivery with the handler.
 	// Processing is synchronous - each delivery is fully processed before the next.
 	// If handler returns nil, the delivery is acknowledged.
 	// If handler returns ErrFencingFailed, the delivery is nacked for redelivery.
-	// If handler returns any other error, Run stops and returns the error.
+	// If handler returns any other error, Listen stops and returns the error.
 	// It blocks until ctx is cancelled or an error occurs.
-	Run(ctx context.Context, handler DeliveryHandler) error
+	Listen(ctx context.Context, handler DeliveryHandler) error
 }
 
 // DeliveryHandler processes a delivery synchronously.

@@ -44,7 +44,7 @@ func (u *RelationReplicationUsecase) Run(ctx context.Context) error {
 	}
 
 	u.logger.Info("Starting relation replication usecase")
-	return eventSource.Run(ctx, u.handle)
+	return eventSource.Listen(ctx, u.handle)
 }
 
 // handle processes a single delivery synchronously.

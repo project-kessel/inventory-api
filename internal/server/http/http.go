@@ -55,7 +55,6 @@ func New(c CompletedConfig, authn middleware.Middleware, meter metric.Meter, log
 	}
 	opts = append(opts, c.ServerOptions...)
 
-
 	srv := http.NewServer(opts...)
 	srv.HandlePrefix("/metrics", promhttp.HandlerFor(
 		prometheus.DefaultGatherer,

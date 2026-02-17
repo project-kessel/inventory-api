@@ -40,7 +40,7 @@ func New(c CompletedConfig, authn middleware.Middleware, authnConfig authn.Compl
 	}
 
 	if c.Options.ReadOnlyMode {
-		logger.Log(log.LevelWarn, "msg", "SERVER IS STARTING IN READ-ONLY MODE")
+		_ = logger.Log(log.LevelWarn, "msg", "SERVER IS STARTING IN READ-ONLY MODE")
 	}
 
 	meterProvider, err := NewMeterProvider(s)

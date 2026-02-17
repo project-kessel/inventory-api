@@ -137,7 +137,7 @@ func TestHTTPReadOnlyMiddleware_BlocksWriteEndpoints(t *testing.T) {
 			operation:    "/api/kessel/v1beta2/resources",
 			hasTransport: true,
 			expectErr:    true,
-			expectedCode: http.StatusForbidden,
+			expectedCode: http.StatusServiceUnavailable,
 		},
 		{
 			name:         "allows non-write endpoint",

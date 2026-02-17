@@ -52,7 +52,7 @@ func HTTPReadOnlyMiddleware(handler middleware.Handler) middleware.Handler {
 
 		endpoint := t.Operation()
 		if IsWriteEndpoint(endpoint) {
-			return nil, errors.Forbidden(
+			return nil, errors.ServiceUnavailable(
 				"READ_ONLY_MODE",
 				fmt.Sprintf("endpoint %s is a write endpoint and server is in read-only mode", endpoint))
 		}

@@ -74,10 +74,6 @@ func NewWithDeps(deps ServerDeps) (*kgrpc.Server, error) {
 		m.ErrorMappingStreamInterceptor(),
 	}
 
-	unaryInterceptor := []grpc.UnaryServerInterceptor{
-		m.UnaryReadOnlyInterceptor(),
-	}
-
 	// Create stream interceptor using aggregating authenticator
 	// If authenticator is nil, it will be created from config (backwards compatible)
 	streamAuth, err := m.NewStreamAuthInterceptorFromAuthenticator(deps.Authenticator, deps.Logger)
@@ -120,6 +116,9 @@ func NewWithDeps(deps ServerDeps) (*kgrpc.Server, error) {
 	}
 	// only enables the read-only interceptor if in read only mode to reduce overhead
 	if deps.ReadOnlyMode {
+		unaryInterceptor := []grpc.UnaryServerInterceptor{
+			m.UnaryReadOnlyInterceptor(),
+		}
 		opts = append(opts, kgrpc.Options(grpc.ChainUnaryInterceptor(unaryInterceptor...)))
 	}
 	opts = append(opts, deps.ServerOptions...)

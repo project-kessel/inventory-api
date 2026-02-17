@@ -36,7 +36,7 @@ import (
 )
 
 // ---------------------------------------------------------------------------
-// Core types
+// TestServerConfig
 // ---------------------------------------------------------------------------
 
 // TestServerConfig holds configuration for creating isolated test servers.
@@ -45,22 +45,123 @@ type TestServerConfig struct {
 	Authenticator authnapi.Authenticator
 }
 
-// TestCase pairs a request specification with expected outcomes for both protocols.
-type TestCase struct {
-	Request TestRequest
-	Expect  TestExpect
-}
+// ---------------------------------------------------------------------------
+// Request — how to send a request via both protocols
+// ---------------------------------------------------------------------------
 
-// TestRequest describes how to make a request via both gRPC and HTTP.
-type TestRequest struct {
+// Request describes how to make a request via both gRPC and HTTP.
+// Use [withBody] for the common case. Construct directly for low-level control.
+type Request struct {
 	GRPC func(ctx context.Context, client pb.KesselInventoryServiceClient) (proto.Message, error)
 	HTTP func(ctx context.Context, baseURL string) (statusCode int, body []byte, err error)
 }
 
-// TestExpect holds per-protocol verifiers.
-type TestExpect struct {
+// ---------------------------------------------------------------------------
+// Response — polymorphic result from a transport invocation
+// ---------------------------------------------------------------------------
+
+// Response is the result of invoking a [Request] through a [Transport].
+// Use [Assert] or [Extract] to verify the response.
+type Response interface {
+	apply(grpcFn func(proto.Message, error), httpFn func(int, []byte))
+}
+
+type grpcResponse struct {
+	resp proto.Message
+	err  error
+}
+
+func (r *grpcResponse) apply(grpcFn func(proto.Message, error), _ func(int, []byte)) {
+	grpcFn(r.resp, r.err)
+}
+
+type httpResponse struct {
+	statusCode int
+	body       []byte
+}
+
+func (r *httpResponse) apply(_ func(proto.Message, error), httpFn func(int, []byte)) {
+	httpFn(r.statusCode, r.body)
+}
+
+// ---------------------------------------------------------------------------
+// Transport — protocol-agnostic client
+// ---------------------------------------------------------------------------
+
+// Transport abstracts a single protocol for a test. Use [Transport.Invoke] to
+// send a [Request] and receive a [Response].
+type Transport struct {
+	invoke func(ctx context.Context, req Request) Response
+}
+
+// Invoke sends a request through the transport and returns a [Response].
+func (tr *Transport) Invoke(ctx context.Context, req Request) Response {
+	return tr.invoke(ctx, req)
+}
+
+// ---------------------------------------------------------------------------
+// Expectation — void verification of a Response
+// ---------------------------------------------------------------------------
+
+// Expectation holds per-protocol verifiers that do not return a value.
+// Use [Assert] to apply an Expectation to a [Response].
+type Expectation struct {
 	GRPC func(t *testing.T, resp proto.Message, err error)
 	HTTP func(t *testing.T, statusCode int, body []byte)
+}
+
+// And returns a new [Expectation] that first runs the original verifiers,
+// then calls fn. Useful for composing extra verification (e.g. mock assertions).
+func (e Expectation) And(fn func(t *testing.T)) Expectation {
+	return Expectation{
+		GRPC: func(t *testing.T, resp proto.Message, err error) {
+			t.Helper()
+			e.GRPC(t, resp, err)
+			fn(t)
+		},
+		HTTP: func(t *testing.T, statusCode int, body []byte) {
+			t.Helper()
+			e.HTTP(t, statusCode, body)
+			fn(t)
+		},
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Extraction — value-returning verification of a Response
+// ---------------------------------------------------------------------------
+
+// Extraction holds per-protocol verifiers that return a typed value.
+// Use [Extract] to apply an Extraction to a [Response].
+type Extraction[T any] struct {
+	GRPC func(t *testing.T, resp proto.Message, err error) T
+	HTTP func(t *testing.T, statusCode int, body []byte) T
+}
+
+// ---------------------------------------------------------------------------
+// Assert / Extract — free functions for polymorphic dispatch
+// ---------------------------------------------------------------------------
+
+// Assert applies an [Expectation] to a [Response], dispatching to the
+// correct protocol arm via the Response's internal apply method.
+func Assert(t *testing.T, res Response, e Expectation) {
+	t.Helper()
+	res.apply(
+		func(resp proto.Message, err error) { e.GRPC(t, resp, err) },
+		func(statusCode int, body []byte) { e.HTTP(t, statusCode, body) },
+	)
+}
+
+// Extract applies an [Extraction] to a [Response], dispatching to the
+// correct protocol arm and returning the typed result.
+func Extract[T any](t *testing.T, res Response, e Extraction[T]) T {
+	t.Helper()
+	var result T
+	res.apply(
+		func(resp proto.Message, err error) { result = e.GRPC(t, resp, err) },
+		func(statusCode int, body []byte) { result = e.HTTP(t, statusCode, body) },
+	)
+	return result
 }
 
 // ---------------------------------------------------------------------------
@@ -112,13 +213,6 @@ type HTTPEndpoint struct {
 	Path   string
 }
 
-// ---------------------------------------------------------------------------
-// Builder functions: grpc(), http(), withBody()
-// ---------------------------------------------------------------------------
-
-// grpcCall is a readability wrapper; it returns its argument unchanged.
-func grpcCall(call GRPCCall) GRPCCall { return call }
-
 // httpEndpoint parses a spec like "POST /api/kessel/v1beta2/check" into an [HTTPEndpoint].
 func httpEndpoint(spec string) HTTPEndpoint {
 	parts := strings.SplitN(spec, " ", 2)
@@ -128,11 +222,15 @@ func httpEndpoint(spec string) HTTPEndpoint {
 	return HTTPEndpoint{Method: parts[0], Path: parts[1]}
 }
 
-// withBody creates a [TestRequest] that sends the given proto message to both protocols.
+// ---------------------------------------------------------------------------
+// Request builder: withBody
+// ---------------------------------------------------------------------------
+
+// withBody creates a [Request] that sends the given proto message to both protocols.
 // The gRPC side uses the provided [GRPCCall]. The HTTP side marshals req to proto-JSON
 // and makes a raw HTTP request to baseURL+path.
-func withBody(req proto.Message, g GRPCCall, h HTTPEndpoint) TestRequest {
-	return TestRequest{
+func withBody(req proto.Message, g GRPCCall, h HTTPEndpoint) Request {
+	return Request{
 		GRPC: func(ctx context.Context, client pb.KesselInventoryServiceClient) (proto.Message, error) {
 			return g(ctx, client, req)
 		},
@@ -164,31 +262,13 @@ func withBody(req proto.Message, g GRPCCall, h HTTPEndpoint) TestRequest {
 }
 
 // ---------------------------------------------------------------------------
-// Expect helpers
+// Expectation helpers (void)
 // ---------------------------------------------------------------------------
 
-// And returns a new [TestExpect] that first runs the original verifiers, then calls fn.
-// This is useful for composing extra verification (e.g. mock assertions) with helpers
-// like [commonError] or [expectSuccess].
-func (e TestExpect) And(fn func(t *testing.T)) TestExpect {
-	return TestExpect{
-		GRPC: func(t *testing.T, resp proto.Message, err error) {
-			t.Helper()
-			e.GRPC(t, resp, err)
-			fn(t)
-		},
-		HTTP: func(t *testing.T, statusCode int, body []byte) {
-			t.Helper()
-			e.HTTP(t, statusCode, body)
-			fn(t)
-		},
-	}
-}
-
-// commonError verifies that both gRPC and HTTP return an equivalent error for code.
-func commonError(code codes.Code) TestExpect {
+// requireError verifies that both gRPC and HTTP return an equivalent error for code.
+func requireError(code codes.Code) Expectation {
 	expectedHTTP := httpstatus.FromGRPCCode(code)
-	return TestExpect{
+	return Expectation{
 		GRPC: func(t *testing.T, resp proto.Message, err error) {
 			t.Helper()
 			require.Error(t, err)
@@ -204,11 +284,11 @@ func commonError(code codes.Code) TestExpect {
 	}
 }
 
-// commonErrorContaining is like [commonError] but also checks that the error
+// requireErrorContaining is like [requireError] but also checks that the error
 // message (gRPC) or response body (HTTP) contains substr.
-func commonErrorContaining(code codes.Code, substr string) TestExpect {
+func requireErrorContaining(code codes.Code, substr string) Expectation {
 	expectedHTTP := httpstatus.FromGRPCCode(code)
-	return TestExpect{
+	return Expectation{
 		GRPC: func(t *testing.T, resp proto.Message, err error) {
 			t.Helper()
 			require.Error(t, err)
@@ -226,22 +306,42 @@ func commonErrorContaining(code codes.Code, substr string) TestExpect {
 	}
 }
 
-// expectSuccess verifies a successful response on both protocols using a shared verifier.
-// The HTTP JSON body is unmarshalled into a fresh Resp created by newResp.
-func expectSuccess[Resp proto.Message](newResp func() Resp, verify func(*testing.T, Resp)) TestExpect {
-	return TestExpect{
+// requireSuccess verifies a successful response without unmarshalling it.
+func requireSuccess() Expectation {
+	return Expectation{
 		GRPC: func(t *testing.T, resp proto.Message, err error) {
 			t.Helper()
 			require.NoError(t, err)
 			require.NotNil(t, resp)
-			verify(t, resp.(Resp))
 		},
-		HTTP: func(t *testing.T, statusCode int, body []byte) {
+		HTTP: func(t *testing.T, statusCode int, _ []byte) {
 			t.Helper()
 			require.Equal(t, nethttp.StatusOK, statusCode)
-			resp := newResp()
-			require.NoError(t, protojson.Unmarshal(body, resp))
-			verify(t, resp)
+		},
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Extraction helper (value-returning)
+// ---------------------------------------------------------------------------
+
+// expectSuccess verifies a successful response on both protocols and returns
+// the typed response. The HTTP JSON body is unmarshalled into a fresh Resp
+// created by newResp.
+func expectSuccess[Resp proto.Message](newResp func() Resp) Extraction[Resp] {
+	return Extraction[Resp]{
+		GRPC: func(t *testing.T, resp proto.Message, err error) Resp {
+			t.Helper()
+			require.NoError(t, err)
+			require.NotNil(t, resp)
+			return resp.(Resp)
+		},
+		HTTP: func(t *testing.T, statusCode int, body []byte) Resp {
+			t.Helper()
+			require.Equal(t, nethttp.StatusOK, statusCode)
+			r := newResp()
+			require.NoError(t, protojson.Unmarshal(body, r))
+			return r
 		},
 	}
 }
@@ -319,7 +419,6 @@ func newTestHTTPServer(t *testing.T, cfg TestServerConfig) string {
 	service := svc.NewKesselInventoryServiceV1beta2(cfg.Usecase)
 	pb.RegisterKesselInventoryServiceHTTPServer(kratosSrv, service)
 
-	// Wrap the Kratos HTTP server (which implements http.Handler) in httptest.
 	ts := httptest.NewServer(kratosSrv)
 	t.Cleanup(ts.Close)
 
@@ -330,25 +429,34 @@ func newTestHTTPServer(t *testing.T, cfg TestServerConfig) string {
 // runServerTest — the main entry point
 // ---------------------------------------------------------------------------
 
-// runServerTest creates isolated gRPC and HTTP servers from the factory and runs
-// the test case against both. Each protocol gets its own server with independent
-// state. The factory returns both the server config and the test case so that
-// Expect closures can close over mocks/state created during setup.
-func runServerTest(t *testing.T, setup func(t *testing.T) (TestServerConfig, *TestCase)) {
+// runServerTest creates isolated gRPC and HTTP servers and runs the test
+// function against both protocols. The factory returns both the server
+// config and the test callback so that the test closure can capture
+// setup-scoped objects (repos, mocks, etc.) via closure.
+func runServerTest(
+	t *testing.T,
+	factory func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)),
+) {
 	t.Helper()
 
 	t.Run("grpc", func(t *testing.T) {
-		cfg, tc := setup(t)
+		cfg, test := factory(t)
 		client := newTestGRPCServer(t, cfg)
-		resp, err := tc.Request.GRPC(context.Background(), client)
-		tc.Expect.GRPC(t, resp, err)
+		tr := &Transport{invoke: func(ctx context.Context, req Request) Response {
+			resp, err := req.GRPC(ctx, client)
+			return &grpcResponse{resp: resp, err: err}
+		}}
+		test(t, tr)
 	})
 
 	t.Run("http", func(t *testing.T) {
-		cfg, tc := setup(t)
+		cfg, test := factory(t)
 		baseURL := newTestHTTPServer(t, cfg)
-		statusCode, body, err := tc.Request.HTTP(context.Background(), baseURL)
-		require.NoError(t, err, "HTTP transport error")
-		tc.Expect.HTTP(t, statusCode, body)
+		tr := &Transport{invoke: func(ctx context.Context, req Request) Response {
+			statusCode, body, err := req.HTTP(ctx, baseURL)
+			require.NoError(t, err, "HTTP transport error")
+			return &httpResponse{statusCode: statusCode, body: body}
+		}}
+		test(t, tr)
 	})
 }

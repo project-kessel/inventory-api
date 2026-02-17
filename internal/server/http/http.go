@@ -29,7 +29,6 @@ type ServerDeps struct {
 }
 
 // New creates a new HTTP server.
-// New create a new http server.
 func New(c CompletedConfig, authn middleware.Middleware, meter metric.Meter, logger log.Logger, readOnlyMode bool) (*http.Server, error) {
 	requests, err := metrics.DefaultRequestsCounter(meter, metrics.DefaultServerRequestsCounterName)
 	if err != nil {

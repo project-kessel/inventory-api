@@ -29,7 +29,8 @@ type ServerDeps struct {
 }
 
 // New creates a new HTTP server.
-func New(c CompletedConfig, authn middleware.Middleware, meter metric.Meter, logger log.Logger) (*http.Server, error) {
+// New create a new http server.
+func New(c CompletedConfig, authn middleware.Middleware, meter metric.Meter, logger log.Logger, readOnlyMode bool) (*http.Server, error) {
 	requests, err := metrics.DefaultRequestsCounter(meter, metrics.DefaultServerRequestsCounterName)
 	if err != nil {
 		return nil, err
@@ -51,7 +52,7 @@ func New(c CompletedConfig, authn middleware.Middleware, meter metric.Meter, log
 		Logger:        logger,
 		Validator:     validator,
 		ServerOptions: c.ServerOptions,
-	}, authn)
+	}, authn, readOnlyMode)
 	if err != nil {
 		return nil, err
 	}
@@ -67,7 +68,7 @@ func New(c CompletedConfig, authn middleware.Middleware, meter metric.Meter, log
 // NewWithDeps creates an HTTP server from pre-built dependencies.
 // If authnOverride is non-nil it is used as the authentication middleware;
 // otherwise one is derived from deps.Authenticator.
-func NewWithDeps(deps ServerDeps, authnOverride ...middleware.Middleware) (*http.Server, error) {
+func NewWithDeps(deps ServerDeps, authnOverride ...middleware.Middleware, readOnlyMode bool) (*http.Server, error) {
 	var authnMiddleware middleware.Middleware
 	if len(authnOverride) > 0 && authnOverride[0] != nil {
 		authnMiddleware = authnOverride[0]
@@ -75,19 +76,30 @@ func NewWithDeps(deps ServerDeps, authnOverride ...middleware.Middleware) (*http
 		authnMiddleware = m.Authentication(deps.Authenticator)
 	}
 
-	var opts = []http.ServerOption{
-		http.Middleware(
-			recovery.Recovery(),
-			logging.Server(deps.Logger),
-			deps.Metrics,
-			m.Validation(deps.Validator),
-			selector.Server(
-				authnMiddleware,
-			).Match(NewWhiteListMatcher).Build(),
-			m.ErrorMapping(),
+	// TODO: pass in health, authn middleware
+	middlewares := []middleware.Middleware{
+		recovery.Recovery(),
+		logging.Server(logger),
+		metrics.Server(
+			metrics.WithSeconds(seconds),
+			metrics.WithRequests(requests),
 		),
+		m.Validation(validator),
+		selector.Server(
+			authn,
+		).Match(NewWhiteListMatcher).Build(),
+		m.ErrorMapping(),
 	}
-	opts = append(opts, deps.ServerOptions...)
+
+	// Only add read-only middleware if in read-only mode to reduce overhead
+	if readOnlyMode {
+		middlewares = append(middlewares, m.HTTPReadOnlyMiddleware)
+	}
+
+	var opts = []http.ServerOption{
+		http.Middleware(middlewares...),
+	}
+	opts = append(opts, c.ServerOptions...)
 	srv := http.NewServer(opts...)
 	return srv, nil
 }

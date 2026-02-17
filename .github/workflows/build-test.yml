@@ -40,7 +40,7 @@ jobs:
 
           echo "COVERPKG: $COVERPKG"
 
-          GOTOOLCHAIN=go1.25.3+auto go test -short -covermode=atomic \
+          GOTOOLCHAIN=go1.25.7+auto go test -short -covermode=atomic \
             -coverpkg=$COVERPKG \
             -coverprofile=v1beta2-coverage.out \
             ./api/kessel/inventory/v1beta2/... ./internal/...

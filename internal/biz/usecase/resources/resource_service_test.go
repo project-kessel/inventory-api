@@ -2,6 +2,7 @@ package resources
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"testing"
 
@@ -1765,6 +1766,144 @@ func TestReportResource_SchemaValidation(t *testing.T) {
 			} else {
 				assert.NoError(t, err)
 			}
+		})
+	}
+}
+
+// --- ReportResource: Error Message Format Tests ---
+// These tests verify the exact error message format returned by the usecase layer.
+// They serve as a contract and must be updated if error formats change.
+
+// TestReportResource_RepresentationRequiredError tests that nil representations
+// return RepresentationRequiredError with the correct message format.
+func TestReportResource_RepresentationRequiredError(t *testing.T) {
+	ctx := testAuthzContext()
+	schemaRepo := newFakeSchemaRepository(t)
+	usecase := New(
+		data.NewFakeResourceRepository(),
+		schemaRepo,
+		&allow.AllowAllAuthz{},
+		"test-topic",
+		log.DefaultLogger,
+		nil, nil,
+		&UsecaseConfig{},
+		metricscollector.NewFakeMetricsCollector(),
+		nil,
+		newTestSelfSubjectStrategy(),
+	)
+
+	commonRep, _ := model.NewRepresentation(map[string]interface{}{"workspace_id": "ws-123"})
+	reporterRep, _ := model.NewRepresentation(map[string]interface{}{"satellite_id": "sat-123"})
+
+	tests := []struct {
+		name                   string
+		reporterRepresentation *model.Representation
+		commonRepresentation   *model.Representation
+		expectErrorMsg         string
+	}{
+		{
+			name:                   "nil reporter representation",
+			reporterRepresentation: nil,
+			commonRepresentation:   &commonRep,
+			expectErrorMsg:         "invalid reporter representation: representation required",
+		},
+		{
+			name:                   "nil common representation",
+			reporterRepresentation: &reporterRep,
+			commonRepresentation:   nil,
+			expectErrorMsg:         "invalid common representation: representation required",
+		},
+		{
+			name:                   "both nil",
+			reporterRepresentation: nil,
+			commonRepresentation:   nil,
+			expectErrorMsg:         "invalid reporter representation: representation required",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			localResId, _ := model.NewLocalResourceId("test-host")
+			resType, _ := model.NewResourceType("host")
+			repType, _ := model.NewReporterType("hbi")
+			repInstanceId, _ := model.NewReporterInstanceId("instance-1")
+			apiHref, _ := model.NewApiHref("https://api.example.com/resource/123")
+
+			cmd := ReportResourceCommand{
+				LocalResourceId:        localResId,
+				ResourceType:           resType,
+				ReporterType:           repType,
+				ReporterInstanceId:     repInstanceId,
+				ApiHref:                apiHref,
+				ReporterRepresentation: tc.reporterRepresentation,
+				CommonRepresentation:   tc.commonRepresentation,
+				WriteVisibility:        WriteVisibilityMinimizeLatency,
+			}
+
+			err := usecase.ReportResource(ctx, cmd)
+			assert.Error(t, err)
+			assert.Contains(t, err.Error(), tc.expectErrorMsg)
+
+			// Verify it's a RepresentationRequiredError type
+			var repReqErr *RepresentationRequiredError
+			assert.True(t, errors.As(err, &repReqErr), "expected RepresentationRequiredError type")
+		})
+	}
+}
+
+// TestReportResource_ValidationErrorFormat tests that validation failures
+// return errors with the expected message format.
+func TestReportResource_ValidationErrorFormat(t *testing.T) {
+	ctx := testAuthzContext()
+	schemaRepo := newFakeSchemaRepository(t)
+	usecase := New(
+		data.NewFakeResourceRepository(),
+		schemaRepo,
+		&allow.AllowAllAuthz{},
+		"test-topic",
+		log.DefaultLogger,
+		nil, nil,
+		&UsecaseConfig{},
+		metricscollector.NewFakeMetricsCollector(),
+		nil,
+		newTestSelfSubjectStrategy(),
+	)
+
+	tests := []struct {
+		name           string
+		cmd            ReportResourceCommand
+		expectErrorMsg string
+	}{
+		{
+			name: "missing type field",
+			cmd: func() ReportResourceCommand {
+				cmd := fixture(t).Basic("host", "hbi", "instance-1", "test-host", "ws-123")
+				cmd.ResourceType = ""
+				return cmd
+			}(),
+			expectErrorMsg: "failed validation for report resource: missing 'type' field",
+		},
+		{
+			name: "missing reporterType field",
+			cmd: func() ReportResourceCommand {
+				cmd := fixture(t).Basic("host", "hbi", "instance-1", "test-host", "ws-123")
+				cmd.ReporterType = ""
+				return cmd
+			}(),
+			expectErrorMsg: "failed validation for report resource: missing 'reporterType' field",
+		},
+		{
+			name:           "unknown reporter for resource type",
+			cmd:            fixture(t).Basic("host", "unknown_reporter", "instance-1", "test-host", "ws-123"),
+			expectErrorMsg: "failed validation for report resource: reporter unknown_reporter does not report resource types: host",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			err := usecase.ReportResource(ctx, tc.cmd)
+			assert.Error(t, err)
+			assert.Contains(t, err.Error(), tc.expectErrorMsg)
 		})
 	}
 }

@@ -20,7 +20,7 @@ This repository implements a common inventory system.
 ## Development Setup
 
 ### Prerequisites
-- Go 1.25.3
+- Go 1.25.7
 - Make
 
 ### Debugging
@@ -79,13 +79,13 @@ Since there are official instructions on how to [manage multiple installs](https
 We accept the `GO` parameter when running make. e.g.
 
 ```shell
-GO=go1.25.3 make run
+GO=go1.25.7 make run
 ```
 
 or
 
 ```shell
-export GO=go1.25.3
+export GO=go1.25.7
 make run
 ```
 

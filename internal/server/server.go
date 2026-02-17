@@ -39,6 +39,10 @@ func New(c CompletedConfig, authn middleware.Middleware, authnConfig authn.Compl
 		Logger: log.With(logger, "service.id", c.Options.Id),
 	}
 
+	if c.Options.ReadOnlyMode {
+		_ = logger.Log(log.LevelWarn, "msg", "SERVER IS STARTING IN READ-ONLY MODE")
+	}
+
 	meterProvider, err := NewMeterProvider(s)
 	if err != nil {
 		return nil, fmt.Errorf("init meter provider failed: %w", err)
@@ -49,14 +53,14 @@ func New(c CompletedConfig, authn middleware.Middleware, authnConfig authn.Compl
 		return nil, fmt.Errorf("init meter failed: %w", err)
 	}
 
-	httpServer, err := http.New(c.HttpConfig, authn, meter, logger)
+	httpServer, err := http.New(c.HttpConfig, authn, meter, logger, c.Options.ReadOnlyMode)
 	if err != nil {
 		return nil, fmt.Errorf("init http server failed: %w", err)
 	}
 
 	// Pass authenticator to gRPC server for stream interceptor
 	// If nil, the interceptor will fall back to OIDC-only authentication (backwards compatible)
-	grpcServer, err := grpc.New(c.GrpcConfig, authn, authnConfig, authenticator, meter, logger)
+	grpcServer, err := grpc.New(c.GrpcConfig, authn, authnConfig, authenticator, meter, logger, c.Options.ReadOnlyMode)
 	if err != nil {
 		return nil, fmt.Errorf("init grpc server failed: %w", err)
 	}

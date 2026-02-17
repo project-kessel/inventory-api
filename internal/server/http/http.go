@@ -17,7 +17,7 @@ import (
 )
 
 // New create a new http server.
-func New(c CompletedConfig, authn middleware.Middleware, meter metric.Meter, logger log.Logger) (*http.Server, error) {
+func New(c CompletedConfig, authn middleware.Middleware, meter metric.Meter, logger log.Logger, readOnlyMode bool) (*http.Server, error) {
 	requests, err := metrics.DefaultRequestsCounter(meter, metrics.DefaultServerRequestsCounterName)
 	if err != nil {
 		return nil, err
@@ -31,22 +31,30 @@ func New(c CompletedConfig, authn middleware.Middleware, meter metric.Meter, log
 		return nil, err
 	}
 	// TODO: pass in health, authn middleware
-	var opts = []http.ServerOption{
-		http.Middleware(
-			recovery.Recovery(),
-			logging.Server(logger),
-			metrics.Server(
-				metrics.WithSeconds(seconds),
-				metrics.WithRequests(requests),
-			),
-			m.Validation(validator),
-			selector.Server(
-				authn,
-			).Match(NewWhiteListMatcher).Build(),
-			m.ErrorMapping(),
+	middlewares := []middleware.Middleware{
+		recovery.Recovery(),
+		logging.Server(logger),
+		metrics.Server(
+			metrics.WithSeconds(seconds),
+			metrics.WithRequests(requests),
 		),
+		m.Validation(validator),
+		selector.Server(
+			authn,
+		).Match(NewWhiteListMatcher).Build(),
+		m.ErrorMapping(),
+	}
+
+	// Only add read-only middleware if in read-only mode to reduce overhead
+	if readOnlyMode {
+		middlewares = append(middlewares, m.HTTPReadOnlyMiddleware)
+	}
+
+	var opts = []http.ServerOption{
+		http.Middleware(middlewares...),
 	}
 	opts = append(opts, c.ServerOptions...)
+
 	srv := http.NewServer(opts...)
 	srv.HandlePrefix("/metrics", promhttp.HandlerFor(
 		prometheus.DefaultGatherer,

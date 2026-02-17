@@ -11,9 +11,10 @@ import (
 )
 
 type Options struct {
-	Id        string `mapstructure:"id"`
-	Name      string `mapstructure:"name"`
-	PublicUrl string `mapstructure:"public_url"`
+	Id           string `mapstructure:"id"`
+	Name         string `mapstructure:"name"`
+	PublicUrl    string `mapstructure:"public_url"`
+	ReadOnlyMode bool   `mapstructure:"read-only"`
 
 	GrpcOptions  *grpc.Options  `mapstructure:"grpc"`
 	HttpOptions  *http.Options  `mapstructure:"http"`
@@ -23,9 +24,10 @@ type Options struct {
 func NewOptions() *Options {
 	id, _ := os.Hostname()
 	return &Options{
-		Id:        id,
-		Name:      "kessel-inventory-api",
-		PublicUrl: "http://localhost:8000",
+		Id:           id,
+		Name:         "kessel-inventory-api",
+		PublicUrl:    "http://localhost:8000",
+		ReadOnlyMode: false,
 
 		GrpcOptions:  grpc.NewOptions(),
 		HttpOptions:  http.NewOptions(),
@@ -41,6 +43,7 @@ func (o *Options) AddFlags(fs *pflag.FlagSet, prefix string) {
 	fs.StringVar(&o.Id, prefix+"id", o.Id, "id of the server")
 	fs.StringVar(&o.Name, prefix+"name", o.Name, "name of the server")
 	fs.StringVar(&o.PublicUrl, prefix+"public_url", o.PublicUrl, "Public url where the server is reachable")
+	fs.BoolVar(&o.ReadOnlyMode, prefix+"read-only", o.ReadOnlyMode, "starts the server in read only mode, blocking write operations")
 
 	o.GrpcOptions.AddFlags(fs, prefix+"grpc")
 	o.HttpOptions.AddFlags(fs, prefix+"http")

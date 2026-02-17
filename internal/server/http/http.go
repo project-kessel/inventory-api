@@ -13,10 +13,22 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.opentelemetry.io/otel/metric"
 
+	authnapi "github.com/project-kessel/inventory-api/internal/authn/api"
 	m "github.com/project-kessel/inventory-api/internal/middleware"
 )
 
-// New create a new http server.
+// ServerDeps holds injectable dependencies for creating an HTTP server.
+// This enables tests to inject their own implementations while sharing
+// the same middleware construction logic as production.
+type ServerDeps struct {
+	Authenticator authnapi.Authenticator
+	Metrics       middleware.Middleware
+	Logger        log.Logger
+	Validator     protovalidate.Validator
+	ServerOptions []http.ServerOption
+}
+
+// New creates a new HTTP server.
 func New(c CompletedConfig, authn middleware.Middleware, meter metric.Meter, logger log.Logger) (*http.Server, error) {
 	requests, err := metrics.DefaultRequestsCounter(meter, metrics.DefaultServerRequestsCounterName)
 	if err != nil {
@@ -30,29 +42,52 @@ func New(c CompletedConfig, authn middleware.Middleware, meter metric.Meter, log
 	if err != nil {
 		return nil, err
 	}
-	// TODO: pass in health, authn middleware
-	var opts = []http.ServerOption{
-		http.Middleware(
-			recovery.Recovery(),
-			logging.Server(logger),
-			metrics.Server(
-				metrics.WithSeconds(seconds),
-				metrics.WithRequests(requests),
-			),
-			m.Validation(validator),
-			selector.Server(
-				authn,
-			).Match(NewWhiteListMatcher).Build(),
-			m.ErrorMapping(),
+
+	srv, err := NewWithDeps(ServerDeps{
+		Metrics: metrics.Server(
+			metrics.WithSeconds(seconds),
+			metrics.WithRequests(requests),
 		),
+		Logger:        logger,
+		Validator:     validator,
+		ServerOptions: c.ServerOptions,
+	}, authn)
+	if err != nil {
+		return nil, err
 	}
-	opts = append(opts, c.ServerOptions...)
-	srv := http.NewServer(opts...)
 	srv.HandlePrefix("/metrics", promhttp.HandlerFor(
 		prometheus.DefaultGatherer,
 		promhttp.HandlerOpts{
 			EnableOpenMetrics: true,
 		},
 	))
+	return srv, nil
+}
+
+// NewWithDeps creates an HTTP server from pre-built dependencies.
+// If authnOverride is non-nil it is used as the authentication middleware;
+// otherwise one is derived from deps.Authenticator.
+func NewWithDeps(deps ServerDeps, authnOverride ...middleware.Middleware) (*http.Server, error) {
+	var authnMiddleware middleware.Middleware
+	if len(authnOverride) > 0 && authnOverride[0] != nil {
+		authnMiddleware = authnOverride[0]
+	} else {
+		authnMiddleware = m.Authentication(deps.Authenticator)
+	}
+
+	var opts = []http.ServerOption{
+		http.Middleware(
+			recovery.Recovery(),
+			logging.Server(deps.Logger),
+			deps.Metrics,
+			m.Validation(deps.Validator),
+			selector.Server(
+				authnMiddleware,
+			).Match(NewWhiteListMatcher).Build(),
+			m.ErrorMapping(),
+		),
+	}
+	opts = append(opts, deps.ServerOptions...)
+	srv := http.NewServer(opts...)
 	return srv, nil
 }

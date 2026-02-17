@@ -4,23 +4,15 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"net"
-	"net/url"
 	"regexp"
 	"testing"
 
-	"buf.build/go/protovalidate"
 	krlog "github.com/go-kratos/kratos/v2/log"
-	"github.com/go-kratos/kratos/v2/middleware/metrics"
 	kratosTransport "github.com/go-kratos/kratos/v2/transport"
-	kgrpc "github.com/go-kratos/kratos/v2/transport/grpc"
 	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2"
 	"github.com/project-kessel/inventory-api/internal/biz/schema"
 	"github.com/project-kessel/inventory-api/internal/biz/schema/validation"
 	relationsV1beta1 "github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
-	"google.golang.org/grpc/test/bufconn"
 	"google.golang.org/protobuf/types/known/structpb"
 
 	"github.com/project-kessel/inventory-api/internal/data"
@@ -38,11 +30,11 @@ import (
 	"github.com/project-kessel/inventory-api/internal/biz/usecase/metaauthorizer"
 	usecase "github.com/project-kessel/inventory-api/internal/biz/usecase/resources"
 	"github.com/project-kessel/inventory-api/internal/mocks"
-	servergrpc "github.com/project-kessel/inventory-api/internal/server/grpc"
 	svc "github.com/project-kessel/inventory-api/internal/service/resources"
 	"github.com/project-kessel/inventory-api/internal/subject/selfsubject"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/proto"
 )
 
 type testSelfSubjectStrategy struct{}
@@ -119,72 +111,11 @@ func (d *DenyingMetaAuthorizer) Check(_ context.Context, _ metaauthorizer.MetaOb
 	return false, nil
 }
 
-const bufSize = 1024 * 1024
-
-// testServerConfig holds configuration for creating a test gRPC server.
-type testServerConfig struct {
-	Usecase       *usecase.Usecase
-	Authenticator authnapi.Authenticator // nil = no auth middleware
-}
-
-// newTestServer creates a gRPC server with the KesselInventoryService using
-// an in-memory bufconn transport. Cleanup is registered via t.Cleanup() automatically.
-// The server uses the production middleware stack via grpc.NewWithDeps, ensuring
-// tests exercise the same middleware chain as production (including streaming auth).
-func newTestServer(t *testing.T, cfg testServerConfig) pb.KesselInventoryServiceClient {
+// newTestServer is a convenience wrapper around newTestGRPCServer for tests
+// that have not yet been migrated to the dual-protocol framework.
+func newTestServer(t *testing.T, cfg TestServerConfig) pb.KesselInventoryServiceClient {
 	t.Helper()
-
-	// Populate schema cache before server construction so validation middleware works
-
-	lis := bufconn.Listen(bufSize)
-	testEndpoint := &url.URL{Scheme: "grpc", Host: "bufconn"}
-	validator, err := protovalidate.New()
-	if err != nil {
-		t.Fatalf("Failed to create protovalidate validator: %v", err)
-	}
-
-	// Use the production server construction with injectable dependencies
-	deps := servergrpc.ServerDeps{
-		Authenticator: cfg.Authenticator,
-		Logger:        krlog.NewStdLogger(io.Discard),
-		Metrics:       metrics.Server(),
-		Validator:     validator,
-		ServerOptions: []kgrpc.ServerOption{kgrpc.Endpoint(testEndpoint), kgrpc.Listener(lis)},
-	}
-
-	srv, err := servergrpc.NewWithDeps(deps)
-	require.NoError(t, err)
-
-	// Register service
-	service := svc.NewKesselInventoryServiceV1beta2(cfg.Usecase)
-	pb.RegisterKesselInventoryServiceServer(srv, service)
-
-	// Start server in background
-	go func() {
-		if err := srv.Start(context.Background()); err != nil {
-			t.Logf("Server exited: %v", err)
-		}
-	}()
-
-	// Create client via bufconn dialer
-	conn, err := grpc.NewClient("passthrough://bufnet",
-		grpc.WithContextDialer(func(ctx context.Context, _ string) (net.Conn, error) {
-			return lis.DialContext(ctx)
-		}),
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
-	)
-	require.NoError(t, err)
-
-	t.Cleanup(func() {
-		if err := conn.Close(); err != nil {
-			t.Logf("Failed to close client connection: %v", err)
-		}
-		if err := srv.Stop(context.Background()); err != nil {
-			t.Logf("Failed to stop gRPC server: %v", err)
-		}
-	})
-
-	return pb.NewKesselInventoryServiceClient(conn)
+	return newTestGRPCServer(t, cfg)
 }
 
 // testUsecaseConfig holds optional overrides for constructing a test Usecase.
@@ -251,7 +182,7 @@ func newTestUsecase(t *testing.T, cfg testUsecaseConfig) *usecase.Usecase {
 func TestInventoryService_ReportResource_MissingReporterType(t *testing.T) {
 	claims := &authnapi.Claims{SubjectId: authnapi.SubjectId("tester"), AuthType: authnapi.AuthTypeXRhIdentity}
 
-	req := &pb.ReportResourceRequest{
+	protoReq := &pb.ReportResourceRequest{
 		Type:               "host",
 		ReporterType:       "",
 		ReporterInstanceId: "instance-001",
@@ -269,27 +200,21 @@ func TestInventoryService_ReportResource_MissingReporterType(t *testing.T) {
 		},
 	}
 
-	uc := newTestUsecase(t, testUsecaseConfig{})
-	client := newTestServer(t, testServerConfig{
-		Usecase:       uc,
-		Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+	runServerTest(t, func(t *testing.T) (TestServerConfig, *TestCase) {
+		return TestServerConfig{
+				Usecase:       newTestUsecase(t, testUsecaseConfig{}),
+				Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+			}, &TestCase{
+				Request: withBody(protoReq, grpcCall(ReportResource), httpEndpoint("POST /api/kessel/v1beta2/resources")),
+				Expect:  commonErrorContaining(codes.InvalidArgument, "reporter_type"),
+			}
 	})
-	resp, err := client.ReportResource(context.Background(), req)
-
-	assert.Error(t, err)
-	assert.Nil(t, resp)
-
-	// Check that it returns the correct gRPC status code
-	grpcStatus, ok := status.FromError(err)
-	assert.True(t, ok)
-	assert.Equal(t, codes.InvalidArgument, grpcStatus.Code())
-	assert.Contains(t, err.Error(), "reporter_type")
 }
 
 func TestInventoryService_ReportResource_MissingReporterInstanceId(t *testing.T) {
 	claims := &authnapi.Claims{SubjectId: authnapi.SubjectId("tester"), AuthType: authnapi.AuthTypeXRhIdentity}
 
-	req := &pb.ReportResourceRequest{
+	protoReq := &pb.ReportResourceRequest{
 		Type:               "host",
 		ReporterType:       "hbi",
 		ReporterInstanceId: "",
@@ -307,22 +232,15 @@ func TestInventoryService_ReportResource_MissingReporterInstanceId(t *testing.T)
 		},
 	}
 
-	uc := newTestUsecase(t, testUsecaseConfig{})
-	client := newTestServer(t, testServerConfig{
-		Usecase:       uc,
-		Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+	runServerTest(t, func(t *testing.T) (TestServerConfig, *TestCase) {
+		return TestServerConfig{
+				Usecase:       newTestUsecase(t, testUsecaseConfig{}),
+				Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+			}, &TestCase{
+				Request: withBody(protoReq, grpcCall(ReportResource), httpEndpoint("POST /api/kessel/v1beta2/resources")),
+				Expect:  commonErrorContaining(codes.InvalidArgument, "reporter_instance_id"),
+			}
 	})
-	resp, err := client.ReportResource(context.Background(), req)
-
-	assert.Error(t, err)
-	assert.Nil(t, resp)
-	// protovalidate catches this before service-level validation
-	assert.Contains(t, err.Error(), "reporter_instance_id")
-
-	// Check that it returns the correct gRPC status code
-	grpcStatus, ok := status.FromError(err)
-	assert.True(t, ok)
-	assert.Equal(t, codes.InvalidArgument, grpcStatus.Code())
 }
 
 func TestResponseFromResource(t *testing.T) {
@@ -335,7 +253,7 @@ func TestResponseFromResource(t *testing.T) {
 
 func TestInventoryService_DeleteResource_NoIdentity(t *testing.T) {
 	instanceID := "instance-001"
-	req := &pb.DeleteResourceRequest{
+	protoReq := &pb.DeleteResourceRequest{
 		Reference: &pb.ResourceReference{
 			ResourceType: "host",
 			ResourceId:   "resource-123",
@@ -346,21 +264,15 @@ func TestInventoryService_DeleteResource_NoIdentity(t *testing.T) {
 		},
 	}
 
-	uc := newTestUsecase(t, testUsecaseConfig{})
-	// Use DenyAuthenticator to simulate unauthenticated request
-	client := newTestServer(t, testServerConfig{
-		Usecase:       uc,
-		Authenticator: &DenyAuthenticator{},
+	runServerTest(t, func(t *testing.T) (TestServerConfig, *TestCase) {
+		return TestServerConfig{
+				Usecase:       newTestUsecase(t, testUsecaseConfig{}),
+				Authenticator: &DenyAuthenticator{},
+			}, &TestCase{
+				Request: withBody(protoReq, grpcCall(DeleteResource), httpEndpoint("DELETE /api/kessel/v1beta2/resources")),
+				Expect:  commonError(codes.Unauthenticated),
+			}
 	})
-	resp, err := client.DeleteResource(context.Background(), req)
-
-	assert.Error(t, err)
-	assert.Nil(t, resp)
-
-	// Check that it returns the correct gRPC status code
-	grpcStatus, ok := status.FromError(err)
-	assert.True(t, ok)
-	assert.Equal(t, codes.Unauthenticated, grpcStatus.Code())
 }
 
 func TestToLookupResourcesCommand(t *testing.T) {
@@ -526,13 +438,12 @@ func TestToLookupResourceResponse(t *testing.T) {
 }
 
 func TestInventoryService_CheckSelf_Allowed_XRhIdentity(t *testing.T) {
-	// Test CheckSelf with x-rh-identity claims (using SubjectId)
 	claims := &authnapi.Claims{
 		SubjectId: authnapi.SubjectId("user-123"),
 		AuthType:  authnapi.AuthTypeXRhIdentity,
 	}
 
-	req := &pb.CheckSelfRequest{
+	protoReq := &pb.CheckSelfRequest{
 		Relation: "view",
 		Object: &pb.ResourceReference{
 			ResourceId:   "dd1b73b9-3e33-4264-968c-e3ce55b9afec",
@@ -541,48 +452,47 @@ func TestInventoryService_CheckSelf_Allowed_XRhIdentity(t *testing.T) {
 		},
 	}
 
-	mockAuthz := &mocks.MockAuthz{}
-	mockAuthz.
-		On("Check",
-			mock.Anything,
-			"hbi",
-			"view",
-			mock.Anything,
-			"host",
-			"dd1b73b9-3e33-4264-968c-e3ce55b9afec",
-			mock.MatchedBy(func(sub *relationsV1beta1.SubjectReference) bool {
-				// Verify subject is derived from claims (SubjectId for x-rh-identity)
-				return sub.Subject.Id == "user-123" &&
-					sub.Subject.Type.Name == "principal" &&
-					sub.Subject.Type.Namespace == "rbac"
-			}),
-		).
-		Return(relationsV1beta1.CheckResponse_ALLOWED_TRUE, &relationsV1beta1.ConsistencyToken{}, nil).
-		Once()
-
-	uc := newTestUsecase(t, testUsecaseConfig{Authz: mockAuthz})
-	client := newTestServer(t, testServerConfig{
-		Usecase:       uc,
-		Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+	runServerTest(t, func(t *testing.T) (TestServerConfig, *TestCase) {
+		mockAuthz := &mocks.MockAuthz{}
+		mockAuthz.
+			On("Check",
+				mock.Anything,
+				"hbi",
+				"view",
+				mock.Anything,
+				"host",
+				"dd1b73b9-3e33-4264-968c-e3ce55b9afec",
+				mock.MatchedBy(func(sub *relationsV1beta1.SubjectReference) bool {
+					return sub.Subject.Id == "user-123" &&
+						sub.Subject.Type.Name == "principal" &&
+						sub.Subject.Type.Namespace == "rbac"
+				}),
+			).
+			Return(relationsV1beta1.CheckResponse_ALLOWED_TRUE, &relationsV1beta1.ConsistencyToken{}, nil).
+			Once()
+		return TestServerConfig{
+				Usecase:       newTestUsecase(t, testUsecaseConfig{Authz: mockAuthz}),
+				Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+			}, &TestCase{
+				Request: withBody(protoReq, grpcCall(CheckSelf), httpEndpoint("POST /api/kessel/v1beta2/checkself")),
+				Expect: expectSuccess(
+					func() *pb.CheckSelfResponse { return &pb.CheckSelfResponse{} },
+					func(t *testing.T, resp *pb.CheckSelfResponse) {
+						assert.Equal(t, pb.Allowed_ALLOWED_TRUE, resp.Allowed)
+						mockAuthz.AssertExpectations(t)
+					},
+				),
+			}
 	})
-	resp, err := client.CheckSelf(context.Background(), req)
-
-	assert.NoError(t, err)
-	if assert.NotNil(t, resp) {
-		assert.Equal(t, pb.Allowed_ALLOWED_TRUE, resp.Allowed)
-	}
-
-	mockAuthz.AssertExpectations(t)
 }
 
 func TestInventoryService_CheckSelf_Allowed_XRhIdentity_SubjectIdMatch(t *testing.T) {
-	// Test CheckSelf with x-rh-identity claims
 	claims := &authnapi.Claims{
 		SubjectId: authnapi.SubjectId("testuser"),
 		AuthType:  authnapi.AuthTypeXRhIdentity,
 	}
 
-	req := &pb.CheckSelfRequest{
+	protoReq := &pb.CheckSelfRequest{
 		Relation: "view",
 		Object: &pb.ResourceReference{
 			ResourceId:   "dd1b73b9-3e33-4264-968c-e3ce55b9afec",
@@ -591,38 +501,38 @@ func TestInventoryService_CheckSelf_Allowed_XRhIdentity_SubjectIdMatch(t *testin
 		},
 	}
 
-	mockAuthz := &mocks.MockAuthz{}
-	mockAuthz.
-		On("Check",
-			mock.Anything,
-			"hbi",
-			"view",
-			mock.Anything,
-			"host",
-			"dd1b73b9-3e33-4264-968c-e3ce55b9afec",
-			mock.MatchedBy(func(sub *relationsV1beta1.SubjectReference) bool {
-				// Verify subject uses claims.SubjectId
-				return sub.Subject.Id == "testuser" &&
-					sub.Subject.Type.Name == "principal" &&
-					sub.Subject.Type.Namespace == "rbac"
-			}),
-		).
-		Return(relationsV1beta1.CheckResponse_ALLOWED_TRUE, &relationsV1beta1.ConsistencyToken{}, nil).
-		Once()
-
-	uc := newTestUsecase(t, testUsecaseConfig{Authz: mockAuthz})
-	client := newTestServer(t, testServerConfig{
-		Usecase:       uc,
-		Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+	runServerTest(t, func(t *testing.T) (TestServerConfig, *TestCase) {
+		mockAuthz := &mocks.MockAuthz{}
+		mockAuthz.
+			On("Check",
+				mock.Anything,
+				"hbi",
+				"view",
+				mock.Anything,
+				"host",
+				"dd1b73b9-3e33-4264-968c-e3ce55b9afec",
+				mock.MatchedBy(func(sub *relationsV1beta1.SubjectReference) bool {
+					return sub.Subject.Id == "testuser" &&
+						sub.Subject.Type.Name == "principal" &&
+						sub.Subject.Type.Namespace == "rbac"
+				}),
+			).
+			Return(relationsV1beta1.CheckResponse_ALLOWED_TRUE, &relationsV1beta1.ConsistencyToken{}, nil).
+			Once()
+		return TestServerConfig{
+				Usecase:       newTestUsecase(t, testUsecaseConfig{Authz: mockAuthz}),
+				Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+			}, &TestCase{
+				Request: withBody(protoReq, grpcCall(CheckSelf), httpEndpoint("POST /api/kessel/v1beta2/checkself")),
+				Expect: expectSuccess(
+					func() *pb.CheckSelfResponse { return &pb.CheckSelfResponse{} },
+					func(t *testing.T, resp *pb.CheckSelfResponse) {
+						assert.Equal(t, pb.Allowed_ALLOWED_TRUE, resp.Allowed)
+						mockAuthz.AssertExpectations(t)
+					},
+				),
+			}
 	})
-	resp, err := client.CheckSelf(context.Background(), req)
-
-	assert.NoError(t, err)
-	if assert.NotNil(t, resp) {
-		assert.Equal(t, pb.Allowed_ALLOWED_TRUE, resp.Allowed)
-	}
-
-	mockAuthz.AssertExpectations(t)
 }
 
 func TestInventoryService_CheckSelf_Denied(t *testing.T) {
@@ -631,7 +541,7 @@ func TestInventoryService_CheckSelf_Denied(t *testing.T) {
 		AuthType:  authnapi.AuthTypeXRhIdentity,
 	}
 
-	req := &pb.CheckSelfRequest{
+	protoReq := &pb.CheckSelfRequest{
 		Relation: "view",
 		Object: &pb.ResourceReference{
 			ResourceId:   "dd1b73b9-3e33-4264-968c-e3ce55b9afec",
@@ -640,37 +550,38 @@ func TestInventoryService_CheckSelf_Denied(t *testing.T) {
 		},
 	}
 
-	mockAuthz := &mocks.MockAuthz{}
-	mockAuthz.
-		On("Check",
-			mock.Anything,
-			"hbi",
-			"view",
-			mock.Anything,
-			"host",
-			"dd1b73b9-3e33-4264-968c-e3ce55b9afec",
-			mock.Anything,
-		).
-		Return(relationsV1beta1.CheckResponse_ALLOWED_FALSE, &relationsV1beta1.ConsistencyToken{}, nil).
-		Once()
-
-	uc := newTestUsecase(t, testUsecaseConfig{Authz: mockAuthz})
-	client := newTestServer(t, testServerConfig{
-		Usecase:       uc,
-		Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+	runServerTest(t, func(t *testing.T) (TestServerConfig, *TestCase) {
+		mockAuthz := &mocks.MockAuthz{}
+		mockAuthz.
+			On("Check",
+				mock.Anything,
+				"hbi",
+				"view",
+				mock.Anything,
+				"host",
+				"dd1b73b9-3e33-4264-968c-e3ce55b9afec",
+				mock.Anything,
+			).
+			Return(relationsV1beta1.CheckResponse_ALLOWED_FALSE, &relationsV1beta1.ConsistencyToken{}, nil).
+			Once()
+		return TestServerConfig{
+				Usecase:       newTestUsecase(t, testUsecaseConfig{Authz: mockAuthz}),
+				Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+			}, &TestCase{
+				Request: withBody(protoReq, grpcCall(CheckSelf), httpEndpoint("POST /api/kessel/v1beta2/checkself")),
+				Expect: expectSuccess(
+					func() *pb.CheckSelfResponse { return &pb.CheckSelfResponse{} },
+					func(t *testing.T, resp *pb.CheckSelfResponse) {
+						assert.Equal(t, pb.Allowed_ALLOWED_FALSE, resp.Allowed)
+						mockAuthz.AssertExpectations(t)
+					},
+				),
+			}
 	})
-	resp, err := client.CheckSelf(context.Background(), req)
-
-	assert.NoError(t, err)
-	if assert.NotNil(t, resp) {
-		assert.Equal(t, pb.Allowed_ALLOWED_FALSE, resp.Allowed)
-	}
-
-	mockAuthz.AssertExpectations(t)
 }
 
 func TestInventoryService_CheckSelf_NoIdentity(t *testing.T) {
-	req := &pb.CheckSelfRequest{
+	protoReq := &pb.CheckSelfRequest{
 		Relation: "view",
 		Object: &pb.ResourceReference{
 			ResourceId:   "dd1b73b9-3e33-4264-968c-e3ce55b9afec",
@@ -679,31 +590,24 @@ func TestInventoryService_CheckSelf_NoIdentity(t *testing.T) {
 		},
 	}
 
-	uc := newTestUsecase(t, testUsecaseConfig{})
-	// Use DenyAuthenticator to simulate unauthenticated request
-	client := newTestServer(t, testServerConfig{
-		Usecase:       uc,
-		Authenticator: &DenyAuthenticator{},
+	runServerTest(t, func(t *testing.T) (TestServerConfig, *TestCase) {
+		return TestServerConfig{
+				Usecase:       newTestUsecase(t, testUsecaseConfig{}),
+				Authenticator: &DenyAuthenticator{},
+			}, &TestCase{
+				Request: withBody(protoReq, grpcCall(CheckSelf), httpEndpoint("POST /api/kessel/v1beta2/checkself")),
+				Expect:  commonError(codes.Unauthenticated),
+			}
 	})
-	resp, err := client.CheckSelf(context.Background(), req)
-
-	assert.Error(t, err)
-	assert.Nil(t, resp)
-
-	// Check that it returns the correct gRPC status code
-	grpcStatus, ok := status.FromError(err)
-	assert.True(t, ok)
-	assert.Equal(t, codes.Unauthenticated, grpcStatus.Code())
 }
 
 func TestInventoryService_CheckSelfBulk_Allowed_XRhIdentity(t *testing.T) {
-	// Test CheckSelfBulk with x-rh-identity claims
 	claims := &authnapi.Claims{
 		SubjectId: authnapi.SubjectId("user-123"),
 		AuthType:  authnapi.AuthTypeXRhIdentity,
 	}
 
-	req := &pb.CheckSelfBulkRequest{
+	protoReq := &pb.CheckSelfBulkRequest{
 		Items: []*pb.CheckSelfBulkRequestItem{
 			{
 				Object: &pb.ResourceReference{
@@ -724,85 +628,77 @@ func TestInventoryService_CheckSelfBulk_Allowed_XRhIdentity(t *testing.T) {
 		},
 	}
 
-	mockAuthz := &mocks.MockAuthz{}
-	mockAuthz.
-		On("CheckBulk",
-			mock.Anything,
-			mock.MatchedBy(func(req *relationsV1beta1.CheckBulkRequest) bool {
-				// Verify all items use the same subject (derived from claims)
-				if len(req.Items) != 2 {
-					return false
-				}
-				// Check that both items have the same subject (SubjectId from x-rh-identity)
-				subject1 := req.Items[0].Subject
-				subject2 := req.Items[1].Subject
-				return subject1.Subject.Id == "user-123" &&
-					subject1.Subject.Type.Name == "principal" &&
-					subject1.Subject.Type.Namespace == "rbac" &&
-					subject2.Subject.Id == "user-123" &&
-					subject2.Subject.Type.Name == "principal" &&
-					subject2.Subject.Type.Namespace == "rbac"
-			}),
-		).
-		Return(&relationsV1beta1.CheckBulkResponse{
-			Pairs: []*relationsV1beta1.CheckBulkResponsePair{
-				{
-					Request: &relationsV1beta1.CheckBulkRequestItem{
-						Resource: &relationsV1beta1.ObjectReference{
-							Type: &relationsV1beta1.ObjectType{
-								Namespace: "hbi",
-								Name:      "host",
+	runServerTest(t, func(t *testing.T) (TestServerConfig, *TestCase) {
+		mockAuthz := &mocks.MockAuthz{}
+		mockAuthz.
+			On("CheckBulk",
+				mock.Anything,
+				mock.MatchedBy(func(req *relationsV1beta1.CheckBulkRequest) bool {
+					if len(req.Items) != 2 {
+						return false
+					}
+					s1 := req.Items[0].Subject
+					s2 := req.Items[1].Subject
+					return s1.Subject.Id == "user-123" &&
+						s1.Subject.Type.Name == "principal" &&
+						s1.Subject.Type.Namespace == "rbac" &&
+						s2.Subject.Id == "user-123" &&
+						s2.Subject.Type.Name == "principal" &&
+						s2.Subject.Type.Namespace == "rbac"
+				}),
+			).
+			Return(&relationsV1beta1.CheckBulkResponse{
+				Pairs: []*relationsV1beta1.CheckBulkResponsePair{
+					{
+						Request: &relationsV1beta1.CheckBulkRequestItem{
+							Resource: &relationsV1beta1.ObjectReference{
+								Type: &relationsV1beta1.ObjectType{Namespace: "hbi", Name: "host"},
+								Id:   "resource-1",
 							},
-							Id: "resource-1",
+							Relation: "view",
 						},
-						Relation: "view",
+						Response: &relationsV1beta1.CheckBulkResponsePair_Item{
+							Item: &relationsV1beta1.CheckBulkResponseItem{
+								Allowed: relationsV1beta1.CheckBulkResponseItem_ALLOWED_TRUE,
+							},
+						},
 					},
-					Response: &relationsV1beta1.CheckBulkResponsePair_Item{
-						Item: &relationsV1beta1.CheckBulkResponseItem{
-							Allowed: relationsV1beta1.CheckBulkResponseItem_ALLOWED_TRUE,
+					{
+						Request: &relationsV1beta1.CheckBulkRequestItem{
+							Resource: &relationsV1beta1.ObjectReference{
+								Type: &relationsV1beta1.ObjectType{Namespace: "hbi", Name: "host"},
+								Id:   "resource-2",
+							},
+							Relation: "edit",
+						},
+						Response: &relationsV1beta1.CheckBulkResponsePair_Item{
+							Item: &relationsV1beta1.CheckBulkResponseItem{
+								Allowed: relationsV1beta1.CheckBulkResponseItem_ALLOWED_TRUE,
+							},
 						},
 					},
 				},
-				{
-					Request: &relationsV1beta1.CheckBulkRequestItem{
-						Resource: &relationsV1beta1.ObjectReference{
-							Type: &relationsV1beta1.ObjectType{
-								Namespace: "hbi",
-								Name:      "host",
-							},
-							Id: "resource-2",
-						},
-						Relation: "edit",
+				ConsistencyToken: &relationsV1beta1.ConsistencyToken{Token: "test-token"},
+			}, nil).
+			Once()
+		return TestServerConfig{
+				Usecase:       newTestUsecase(t, testUsecaseConfig{Authz: mockAuthz}),
+				Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+			}, &TestCase{
+				Request: withBody(protoReq, grpcCall(CheckSelfBulk), httpEndpoint("POST /api/kessel/v1beta2/checkselfbulk")),
+				Expect: expectSuccess(
+					func() *pb.CheckSelfBulkResponse { return &pb.CheckSelfBulkResponse{} },
+					func(t *testing.T, resp *pb.CheckSelfBulkResponse) {
+						require.Len(t, resp.Pairs, 2)
+						assert.Equal(t, pb.Allowed_ALLOWED_TRUE, resp.Pairs[0].GetItem().Allowed)
+						assert.Equal(t, pb.Allowed_ALLOWED_TRUE, resp.Pairs[1].GetItem().Allowed)
+						assert.NotNil(t, resp.ConsistencyToken)
+						assert.Equal(t, "test-token", resp.ConsistencyToken.GetToken())
+						mockAuthz.AssertExpectations(t)
 					},
-					Response: &relationsV1beta1.CheckBulkResponsePair_Item{
-						Item: &relationsV1beta1.CheckBulkResponseItem{
-							Allowed: relationsV1beta1.CheckBulkResponseItem_ALLOWED_TRUE,
-						},
-					},
-				},
-			},
-			ConsistencyToken: &relationsV1beta1.ConsistencyToken{Token: "test-token"},
-		}, nil).
-		Once()
-
-	uc := newTestUsecase(t, testUsecaseConfig{Authz: mockAuthz})
-	client := newTestServer(t, testServerConfig{
-		Usecase:       uc,
-		Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+				),
+			}
 	})
-	resp, err := client.CheckSelfBulk(context.Background(), req)
-
-	assert.NoError(t, err)
-	if assert.NotNil(t, resp) {
-		assert.Len(t, resp.Pairs, 2)
-		assert.Equal(t, pb.Allowed_ALLOWED_TRUE, resp.Pairs[0].GetItem().Allowed)
-		assert.Equal(t, pb.Allowed_ALLOWED_TRUE, resp.Pairs[1].GetItem().Allowed)
-		// Verify consistency token is set
-		assert.NotNil(t, resp.ConsistencyToken)
-		assert.Equal(t, "test-token", resp.ConsistencyToken.GetToken())
-	}
-
-	mockAuthz.AssertExpectations(t)
 }
 
 func TestInventoryService_CheckSelfBulk_MixedResults(t *testing.T) {
@@ -811,7 +707,7 @@ func TestInventoryService_CheckSelfBulk_MixedResults(t *testing.T) {
 		AuthType:  authnapi.AuthTypeXRhIdentity,
 	}
 
-	req := &pb.CheckSelfBulkRequest{
+	protoReq := &pb.CheckSelfBulkRequest{
 		Items: []*pb.CheckSelfBulkRequestItem{
 			{
 				Object: &pb.ResourceReference{
@@ -832,70 +728,64 @@ func TestInventoryService_CheckSelfBulk_MixedResults(t *testing.T) {
 		},
 	}
 
-	mockAuthz := &mocks.MockAuthz{}
-	mockAuthz.
-		On("CheckBulk", mock.Anything, mock.Anything).
-		Return(&relationsV1beta1.CheckBulkResponse{
-			Pairs: []*relationsV1beta1.CheckBulkResponsePair{
-				{
-					Request: &relationsV1beta1.CheckBulkRequestItem{
-						Resource: &relationsV1beta1.ObjectReference{
-							Type: &relationsV1beta1.ObjectType{
-								Namespace: "hbi",
-								Name:      "host",
+	runServerTest(t, func(t *testing.T) (TestServerConfig, *TestCase) {
+		mockAuthz := &mocks.MockAuthz{}
+		mockAuthz.
+			On("CheckBulk", mock.Anything, mock.Anything).
+			Return(&relationsV1beta1.CheckBulkResponse{
+				Pairs: []*relationsV1beta1.CheckBulkResponsePair{
+					{
+						Request: &relationsV1beta1.CheckBulkRequestItem{
+							Resource: &relationsV1beta1.ObjectReference{
+								Type: &relationsV1beta1.ObjectType{Namespace: "hbi", Name: "host"},
+								Id:   "resource-1",
 							},
-							Id: "resource-1",
+							Relation: "view",
 						},
-						Relation: "view",
+						Response: &relationsV1beta1.CheckBulkResponsePair_Item{
+							Item: &relationsV1beta1.CheckBulkResponseItem{
+								Allowed: relationsV1beta1.CheckBulkResponseItem_ALLOWED_TRUE,
+							},
+						},
 					},
-					Response: &relationsV1beta1.CheckBulkResponsePair_Item{
-						Item: &relationsV1beta1.CheckBulkResponseItem{
-							Allowed: relationsV1beta1.CheckBulkResponseItem_ALLOWED_TRUE,
+					{
+						Request: &relationsV1beta1.CheckBulkRequestItem{
+							Resource: &relationsV1beta1.ObjectReference{
+								Type: &relationsV1beta1.ObjectType{Namespace: "hbi", Name: "host"},
+								Id:   "resource-2",
+							},
+							Relation: "edit",
+						},
+						Response: &relationsV1beta1.CheckBulkResponsePair_Item{
+							Item: &relationsV1beta1.CheckBulkResponseItem{
+								Allowed: relationsV1beta1.CheckBulkResponseItem_ALLOWED_FALSE,
+							},
 						},
 					},
 				},
-				{
-					Request: &relationsV1beta1.CheckBulkRequestItem{
-						Resource: &relationsV1beta1.ObjectReference{
-							Type: &relationsV1beta1.ObjectType{
-								Namespace: "hbi",
-								Name:      "host",
-							},
-							Id: "resource-2",
-						},
-						Relation: "edit",
+				ConsistencyToken: &relationsV1beta1.ConsistencyToken{Token: "test-token"},
+			}, nil).
+			Once()
+		return TestServerConfig{
+				Usecase:       newTestUsecase(t, testUsecaseConfig{Authz: mockAuthz}),
+				Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+			}, &TestCase{
+				Request: withBody(protoReq, grpcCall(CheckSelfBulk), httpEndpoint("POST /api/kessel/v1beta2/checkselfbulk")),
+				Expect: expectSuccess(
+					func() *pb.CheckSelfBulkResponse { return &pb.CheckSelfBulkResponse{} },
+					func(t *testing.T, resp *pb.CheckSelfBulkResponse) {
+						require.Len(t, resp.Pairs, 2)
+						assert.Equal(t, pb.Allowed_ALLOWED_TRUE, resp.Pairs[0].GetItem().Allowed)
+						assert.Equal(t, pb.Allowed_ALLOWED_FALSE, resp.Pairs[1].GetItem().Allowed)
+						assert.Equal(t, "resource-1", resp.Pairs[0].Request.Object.ResourceId)
+						assert.Equal(t, "view", resp.Pairs[0].Request.Relation)
+						assert.Equal(t, "resource-2", resp.Pairs[1].Request.Object.ResourceId)
+						assert.Equal(t, "edit", resp.Pairs[1].Request.Relation)
+						mockAuthz.AssertExpectations(t)
 					},
-					Response: &relationsV1beta1.CheckBulkResponsePair_Item{
-						Item: &relationsV1beta1.CheckBulkResponseItem{
-							Allowed: relationsV1beta1.CheckBulkResponseItem_ALLOWED_FALSE,
-						},
-					},
-				},
-			},
-			ConsistencyToken: &relationsV1beta1.ConsistencyToken{Token: "test-token"},
-		}, nil).
-		Once()
-
-	uc := newTestUsecase(t, testUsecaseConfig{Authz: mockAuthz})
-	client := newTestServer(t, testServerConfig{
-		Usecase:       uc,
-		Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+				),
+			}
 	})
-	resp, err := client.CheckSelfBulk(context.Background(), req)
-
-	assert.NoError(t, err)
-	if assert.NotNil(t, resp) {
-		assert.Len(t, resp.Pairs, 2)
-		assert.Equal(t, pb.Allowed_ALLOWED_TRUE, resp.Pairs[0].GetItem().Allowed)
-		assert.Equal(t, pb.Allowed_ALLOWED_FALSE, resp.Pairs[1].GetItem().Allowed)
-		// Verify request items are mapped back correctly (no subject in CheckSelfBulkRequestItem)
-		assert.Equal(t, "resource-1", resp.Pairs[0].Request.Object.ResourceId)
-		assert.Equal(t, "view", resp.Pairs[0].Request.Relation)
-		assert.Equal(t, "resource-2", resp.Pairs[1].Request.Object.ResourceId)
-		assert.Equal(t, "edit", resp.Pairs[1].Request.Relation)
-	}
-
-	mockAuthz.AssertExpectations(t)
 }
 
 func TestInventoryService_CheckSelfBulk_ResponseLengthMismatch(t *testing.T) {
@@ -904,7 +794,7 @@ func TestInventoryService_CheckSelfBulk_ResponseLengthMismatch(t *testing.T) {
 		AuthType:  authnapi.AuthTypeXRhIdentity,
 	}
 
-	req := &pb.CheckSelfBulkRequest{
+	protoReq := &pb.CheckSelfBulkRequest{
 		Items: []*pb.CheckSelfBulkRequestItem{
 			{
 				Relation: "view",
@@ -917,66 +807,55 @@ func TestInventoryService_CheckSelfBulk_ResponseLengthMismatch(t *testing.T) {
 		},
 	}
 
-	mockAuthz := &mocks.MockAuthz{}
-	mockAuthz.
-		On("CheckBulk", mock.Anything, mock.Anything).
-		Return(&relationsV1beta1.CheckBulkResponse{
-			Pairs: []*relationsV1beta1.CheckBulkResponsePair{
-				{
-					Request: &relationsV1beta1.CheckBulkRequestItem{
-						Resource: &relationsV1beta1.ObjectReference{
-							Type: &relationsV1beta1.ObjectType{
-								Namespace: "hbi",
-								Name:      "host",
+	runServerTest(t, func(t *testing.T) (TestServerConfig, *TestCase) {
+		mockAuthz := &mocks.MockAuthz{}
+		mockAuthz.
+			On("CheckBulk", mock.Anything, mock.Anything).
+			Return(&relationsV1beta1.CheckBulkResponse{
+				Pairs: []*relationsV1beta1.CheckBulkResponsePair{
+					{
+						Request: &relationsV1beta1.CheckBulkRequestItem{
+							Resource: &relationsV1beta1.ObjectReference{
+								Type: &relationsV1beta1.ObjectType{Namespace: "hbi", Name: "host"},
+								Id:   "resource-1",
 							},
-							Id: "resource-1",
+							Relation: "view",
 						},
-						Relation: "view",
+						Response: &relationsV1beta1.CheckBulkResponsePair_Item{
+							Item: &relationsV1beta1.CheckBulkResponseItem{
+								Allowed: relationsV1beta1.CheckBulkResponseItem_ALLOWED_TRUE,
+							},
+						},
 					},
-					Response: &relationsV1beta1.CheckBulkResponsePair_Item{
-						Item: &relationsV1beta1.CheckBulkResponseItem{
-							Allowed: relationsV1beta1.CheckBulkResponseItem_ALLOWED_TRUE,
+					{
+						Request: &relationsV1beta1.CheckBulkRequestItem{
+							Resource: &relationsV1beta1.ObjectReference{
+								Type: &relationsV1beta1.ObjectType{Namespace: "hbi", Name: "host"},
+								Id:   "resource-2",
+							},
+							Relation: "view",
+						},
+						Response: &relationsV1beta1.CheckBulkResponsePair_Item{
+							Item: &relationsV1beta1.CheckBulkResponseItem{
+								Allowed: relationsV1beta1.CheckBulkResponseItem_ALLOWED_TRUE,
+							},
 						},
 					},
 				},
-				{
-					Request: &relationsV1beta1.CheckBulkRequestItem{
-						Resource: &relationsV1beta1.ObjectReference{
-							Type: &relationsV1beta1.ObjectType{
-								Namespace: "hbi",
-								Name:      "host",
-							},
-							Id: "resource-2",
-						},
-						Relation: "view",
-					},
-					Response: &relationsV1beta1.CheckBulkResponsePair_Item{
-						Item: &relationsV1beta1.CheckBulkResponseItem{
-							Allowed: relationsV1beta1.CheckBulkResponseItem_ALLOWED_TRUE,
-						},
-					},
-				},
-			},
-		}, nil).
-		Once()
-
-	uc := newTestUsecase(t, testUsecaseConfig{Authz: mockAuthz})
-	client := newTestServer(t, testServerConfig{
-		Usecase:       uc,
-		Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+			}, nil).
+			Once()
+		return TestServerConfig{
+				Usecase:       newTestUsecase(t, testUsecaseConfig{Authz: mockAuthz}),
+				Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+			}, &TestCase{
+				Request: withBody(protoReq, grpcCall(CheckSelfBulk), httpEndpoint("POST /api/kessel/v1beta2/checkselfbulk")),
+				Expect:  commonError(codes.Internal).And(func(t *testing.T) { mockAuthz.AssertExpectations(t) }),
+			}
 	})
-	resp, err := client.CheckSelfBulk(context.Background(), req)
-
-	assert.Nil(t, resp)
-	assert.Error(t, err)
-	grpcStatus, ok := status.FromError(err)
-	assert.True(t, ok)
-	assert.Equal(t, codes.Internal, grpcStatus.Code())
-	mockAuthz.AssertExpectations(t)
 }
 
 func TestInventoryService_CheckSelfBulk_NoIdentity(t *testing.T) {
-	req := &pb.CheckSelfBulkRequest{
+	protoReq := &pb.CheckSelfBulkRequest{
 		Items: []*pb.CheckSelfBulkRequestItem{
 			{
 				Object: &pb.ResourceReference{
@@ -989,25 +868,19 @@ func TestInventoryService_CheckSelfBulk_NoIdentity(t *testing.T) {
 		},
 	}
 
-	uc := newTestUsecase(t, testUsecaseConfig{})
-	// Use DenyAuthenticator to simulate unauthenticated request
-	client := newTestServer(t, testServerConfig{
-		Usecase:       uc,
-		Authenticator: &DenyAuthenticator{},
+	runServerTest(t, func(t *testing.T) (TestServerConfig, *TestCase) {
+		return TestServerConfig{
+				Usecase:       newTestUsecase(t, testUsecaseConfig{}),
+				Authenticator: &DenyAuthenticator{},
+			}, &TestCase{
+				Request: withBody(protoReq, grpcCall(CheckSelfBulk), httpEndpoint("POST /api/kessel/v1beta2/checkselfbulk")),
+				Expect:  commonError(codes.Unauthenticated),
+			}
 	})
-	resp, err := client.CheckSelfBulk(context.Background(), req)
-
-	assert.Error(t, err)
-	assert.Nil(t, resp)
-
-	// Check that it returns the correct gRPC status code
-	grpcStatus, ok := status.FromError(err)
-	assert.True(t, ok)
-	assert.Equal(t, codes.Unauthenticated, grpcStatus.Code())
 }
 
 func TestInventoryService_Check_NoIdentity(t *testing.T) {
-	req := &pb.CheckRequest{
+	protoReq := &pb.CheckRequest{
 		Relation: "view",
 		Object: &pb.ResourceReference{
 			ResourceId:   "resource-123",
@@ -1023,32 +896,26 @@ func TestInventoryService_Check_NoIdentity(t *testing.T) {
 		},
 	}
 
-	uc := newTestUsecase(t, testUsecaseConfig{})
-	// Use DenyAuthenticator to simulate unauthenticated request
-	client := newTestServer(t, testServerConfig{
-		Usecase:       uc,
-		Authenticator: &DenyAuthenticator{},
+	runServerTest(t, func(t *testing.T) (TestServerConfig, *TestCase) {
+		return TestServerConfig{
+				Usecase:       newTestUsecase(t, testUsecaseConfig{}),
+				Authenticator: &DenyAuthenticator{},
+			}, &TestCase{
+				Request: withBody(protoReq, grpcCall(Check), httpEndpoint("POST /api/kessel/v1beta2/check")),
+				Expect:  commonError(codes.Unauthenticated),
+			}
 	})
-	resp, err := client.Check(context.Background(), req)
-
-	assert.Error(t, err)
-	assert.Nil(t, resp)
-
-	grpcStatus, ok := status.FromError(err)
-	assert.True(t, ok)
-	assert.Equal(t, codes.Unauthenticated, grpcStatus.Code())
 }
 
 func TestInventoryService_CheckSelf_OIDC_Identity(t *testing.T) {
-	// Test CheckSelf with OIDC claims (SubjectId in "domain/subject" format)
-	// This test verifies that OIDC identities are denied at the meta-authorization layer.
-	// We use the real SimpleMetaAuthorizer (not the permissive one) to test this behavior.
+	// SimpleMetaAuthorizer denies check_self on gRPC (check_self is excluded from gRPC),
+	// and denies OIDC on HTTP. So OIDC + check_self = denied on both protocols.
 	claims := &authnapi.Claims{
 		SubjectId: authnapi.SubjectId("12345"),
 		AuthType:  authnapi.AuthTypeOIDC,
 	}
 
-	req := &pb.CheckSelfRequest{
+	protoReq := &pb.CheckSelfRequest{
 		Relation: "view",
 		Object: &pb.ResourceReference{
 			ResourceId:   "dd1b73b9-3e33-4264-968c-e3ce55b9afec",
@@ -1057,24 +924,17 @@ func TestInventoryService_CheckSelf_OIDC_Identity(t *testing.T) {
 		},
 	}
 
-	mockAuthz := &mocks.MockAuthz{}
-	// Use SimpleMetaAuthorizer to test protocol/auth-type based authorization
-	uc := newTestUsecase(t, testUsecaseConfig{
-		Authz:          mockAuthz,
-		MetaAuthorizer: metaauthorizer.NewSimpleMetaAuthorizer(),
+	runServerTest(t, func(t *testing.T) (TestServerConfig, *TestCase) {
+		return TestServerConfig{
+				Usecase: newTestUsecase(t, testUsecaseConfig{
+					MetaAuthorizer: metaauthorizer.NewSimpleMetaAuthorizer(),
+				}),
+				Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+			}, &TestCase{
+				Request: withBody(protoReq, grpcCall(CheckSelf), httpEndpoint("POST /api/kessel/v1beta2/checkself")),
+				Expect:  commonError(codes.PermissionDenied),
+			}
 	})
-	client := newTestServer(t, testServerConfig{
-		Usecase:       uc,
-		Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
-	})
-	resp, err := client.CheckSelf(context.Background(), req)
-
-	assert.Error(t, err)
-	assert.Nil(t, resp)
-
-	grpcStatus, ok := status.FromError(err)
-	assert.True(t, ok)
-	assert.Equal(t, codes.PermissionDenied, grpcStatus.Code())
 }
 
 // --- Success Path Tests Using SimpleAuthorizer ---
@@ -1085,7 +945,7 @@ func TestInventoryService_Check_Allowed(t *testing.T) {
 		AuthType:  authnapi.AuthTypeXRhIdentity,
 	}
 
-	req := &pb.CheckRequest{
+	protoReq := &pb.CheckRequest{
 		Relation: "view",
 		Object: &pb.ResourceReference{
 			ResourceId:   "resource-abc",
@@ -1101,18 +961,22 @@ func TestInventoryService_Check_Allowed(t *testing.T) {
 		},
 	}
 
-	simpleAuthz := authz.NewSimpleAuthorizer()
-	simpleAuthz.Grant("subject-456", "view", "hbi", "host", "resource-abc")
-	uc := newTestUsecase(t, testUsecaseConfig{Authz: simpleAuthz})
-	client := newTestServer(t, testServerConfig{
-		Usecase:       uc,
-		Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+	runServerTest(t, func(t *testing.T) (TestServerConfig, *TestCase) {
+		simpleAuthz := authz.NewSimpleAuthorizer()
+		simpleAuthz.Grant("subject-456", "view", "hbi", "host", "resource-abc")
+		return TestServerConfig{
+				Usecase:       newTestUsecase(t, testUsecaseConfig{Authz: simpleAuthz}),
+				Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+			}, &TestCase{
+				Request: withBody(protoReq, grpcCall(Check), httpEndpoint("POST /api/kessel/v1beta2/check")),
+				Expect: expectSuccess(
+					func() *pb.CheckResponse { return &pb.CheckResponse{} },
+					func(t *testing.T, resp *pb.CheckResponse) {
+						assert.Equal(t, pb.Allowed_ALLOWED_TRUE, resp.Allowed)
+					},
+				),
+			}
 	})
-
-	resp, err := client.Check(context.Background(), req)
-
-	require.NoError(t, err)
-	assert.Equal(t, pb.Allowed_ALLOWED_TRUE, resp.Allowed)
 }
 
 func TestInventoryService_Check_Denied(t *testing.T) {
@@ -1121,7 +985,7 @@ func TestInventoryService_Check_Denied(t *testing.T) {
 		AuthType:  authnapi.AuthTypeXRhIdentity,
 	}
 
-	req := &pb.CheckRequest{
+	protoReq := &pb.CheckRequest{
 		Relation: "view",
 		Object: &pb.ResourceReference{
 			ResourceId:   "resource-abc",
@@ -1137,27 +1001,29 @@ func TestInventoryService_Check_Denied(t *testing.T) {
 		},
 	}
 
-	// No grants - default deny
-	uc := newTestUsecase(t, testUsecaseConfig{})
-	client := newTestServer(t, testServerConfig{
-		Usecase:       uc,
-		Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+	runServerTest(t, func(t *testing.T) (TestServerConfig, *TestCase) {
+		return TestServerConfig{
+				Usecase:       newTestUsecase(t, testUsecaseConfig{}),
+				Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+			}, &TestCase{
+				Request: withBody(protoReq, grpcCall(Check), httpEndpoint("POST /api/kessel/v1beta2/check")),
+				Expect: expectSuccess(
+					func() *pb.CheckResponse { return &pb.CheckResponse{} },
+					func(t *testing.T, resp *pb.CheckResponse) {
+						assert.Equal(t, pb.Allowed_ALLOWED_FALSE, resp.Allowed)
+					},
+				),
+			}
 	})
-
-	resp, err := client.Check(context.Background(), req)
-
-	require.NoError(t, err)
-	assert.Equal(t, pb.Allowed_ALLOWED_FALSE, resp.Allowed)
 }
 
 func TestInventoryService_Check_MetaAuthzDenied(t *testing.T) {
-	// Test that meta-authorization denial is properly mapped to PermissionDenied.
 	claims := &authnapi.Claims{
 		SubjectId: authnapi.SubjectId("user-123"),
 		AuthType:  authnapi.AuthTypeXRhIdentity,
 	}
 
-	req := &pb.CheckRequest{
+	protoReq := &pb.CheckRequest{
 		Relation: "view",
 		Object: &pb.ResourceReference{
 			ResourceId:   "resource-123",
@@ -1173,21 +1039,15 @@ func TestInventoryService_Check_MetaAuthzDenied(t *testing.T) {
 		},
 	}
 
-	uc := newTestUsecase(t, testUsecaseConfig{
-		MetaAuthorizer: &DenyingMetaAuthorizer{},
+	runServerTest(t, func(t *testing.T) (TestServerConfig, *TestCase) {
+		return TestServerConfig{
+				Usecase:       newTestUsecase(t, testUsecaseConfig{MetaAuthorizer: &DenyingMetaAuthorizer{}}),
+				Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+			}, &TestCase{
+				Request: withBody(protoReq, grpcCall(Check), httpEndpoint("POST /api/kessel/v1beta2/check")),
+				Expect:  commonError(codes.PermissionDenied),
+			}
 	})
-	client := newTestServer(t, testServerConfig{
-		Usecase:       uc,
-		Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
-	})
-
-	resp, err := client.Check(context.Background(), req)
-
-	assert.Error(t, err)
-	assert.Nil(t, resp)
-	grpcStatus, ok := status.FromError(err)
-	assert.True(t, ok)
-	assert.Equal(t, codes.PermissionDenied, grpcStatus.Code())
 }
 
 func TestInventoryService_CheckForUpdate_Allowed(t *testing.T) {
@@ -1196,7 +1056,7 @@ func TestInventoryService_CheckForUpdate_Allowed(t *testing.T) {
 		AuthType:  authnapi.AuthTypeXRhIdentity,
 	}
 
-	req := &pb.CheckForUpdateRequest{
+	protoReq := &pb.CheckForUpdateRequest{
 		Relation: "edit",
 		Object: &pb.ResourceReference{
 			ResourceId:   "resource-xyz",
@@ -1212,18 +1072,22 @@ func TestInventoryService_CheckForUpdate_Allowed(t *testing.T) {
 		},
 	}
 
-	simpleAuthz := authz.NewSimpleAuthorizer()
-	simpleAuthz.Grant("subject-789", "edit", "hbi", "host", "resource-xyz")
-	uc := newTestUsecase(t, testUsecaseConfig{Authz: simpleAuthz})
-	client := newTestServer(t, testServerConfig{
-		Usecase:       uc,
-		Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+	runServerTest(t, func(t *testing.T) (TestServerConfig, *TestCase) {
+		simpleAuthz := authz.NewSimpleAuthorizer()
+		simpleAuthz.Grant("subject-789", "edit", "hbi", "host", "resource-xyz")
+		return TestServerConfig{
+				Usecase:       newTestUsecase(t, testUsecaseConfig{Authz: simpleAuthz}),
+				Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+			}, &TestCase{
+				Request: withBody(protoReq, grpcCall(CheckForUpdate), httpEndpoint("POST /api/kessel/v1beta2/checkforupdate")),
+				Expect: expectSuccess(
+					func() *pb.CheckForUpdateResponse { return &pb.CheckForUpdateResponse{} },
+					func(t *testing.T, resp *pb.CheckForUpdateResponse) {
+						assert.Equal(t, pb.Allowed_ALLOWED_TRUE, resp.Allowed)
+					},
+				),
+			}
 	})
-
-	resp, err := client.CheckForUpdate(context.Background(), req)
-
-	require.NoError(t, err)
-	assert.Equal(t, pb.Allowed_ALLOWED_TRUE, resp.Allowed)
 }
 
 func TestInventoryService_CheckForUpdate_Denied(t *testing.T) {
@@ -1232,7 +1096,7 @@ func TestInventoryService_CheckForUpdate_Denied(t *testing.T) {
 		AuthType:  authnapi.AuthTypeXRhIdentity,
 	}
 
-	req := &pb.CheckForUpdateRequest{
+	protoReq := &pb.CheckForUpdateRequest{
 		Relation: "edit",
 		Object: &pb.ResourceReference{
 			ResourceId:   "resource-xyz",
@@ -1248,27 +1112,29 @@ func TestInventoryService_CheckForUpdate_Denied(t *testing.T) {
 		},
 	}
 
-	// No grants - default deny
-	uc := newTestUsecase(t, testUsecaseConfig{})
-	client := newTestServer(t, testServerConfig{
-		Usecase:       uc,
-		Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+	runServerTest(t, func(t *testing.T) (TestServerConfig, *TestCase) {
+		return TestServerConfig{
+				Usecase:       newTestUsecase(t, testUsecaseConfig{}),
+				Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+			}, &TestCase{
+				Request: withBody(protoReq, grpcCall(CheckForUpdate), httpEndpoint("POST /api/kessel/v1beta2/checkforupdate")),
+				Expect: expectSuccess(
+					func() *pb.CheckForUpdateResponse { return &pb.CheckForUpdateResponse{} },
+					func(t *testing.T, resp *pb.CheckForUpdateResponse) {
+						assert.Equal(t, pb.Allowed_ALLOWED_FALSE, resp.Allowed)
+					},
+				),
+			}
 	})
-
-	resp, err := client.CheckForUpdate(context.Background(), req)
-
-	require.NoError(t, err)
-	assert.Equal(t, pb.Allowed_ALLOWED_FALSE, resp.Allowed)
 }
 
 func TestInventoryService_CheckForUpdate_MetaAuthzDenied(t *testing.T) {
-	// Test that meta-authorization denial is properly mapped to PermissionDenied.
 	claims := &authnapi.Claims{
 		SubjectId: authnapi.SubjectId("user-123"),
 		AuthType:  authnapi.AuthTypeXRhIdentity,
 	}
 
-	req := &pb.CheckForUpdateRequest{
+	protoReq := &pb.CheckForUpdateRequest{
 		Relation: "edit",
 		Object: &pb.ResourceReference{
 			ResourceId:   "resource-123",
@@ -1284,21 +1150,15 @@ func TestInventoryService_CheckForUpdate_MetaAuthzDenied(t *testing.T) {
 		},
 	}
 
-	uc := newTestUsecase(t, testUsecaseConfig{
-		MetaAuthorizer: &DenyingMetaAuthorizer{},
+	runServerTest(t, func(t *testing.T) (TestServerConfig, *TestCase) {
+		return TestServerConfig{
+				Usecase:       newTestUsecase(t, testUsecaseConfig{MetaAuthorizer: &DenyingMetaAuthorizer{}}),
+				Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+			}, &TestCase{
+				Request: withBody(protoReq, grpcCall(CheckForUpdate), httpEndpoint("POST /api/kessel/v1beta2/checkforupdate")),
+				Expect:  commonError(codes.PermissionDenied),
+			}
 	})
-	client := newTestServer(t, testServerConfig{
-		Usecase:       uc,
-		Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
-	})
-
-	resp, err := client.CheckForUpdate(context.Background(), req)
-
-	assert.Error(t, err)
-	assert.Nil(t, resp)
-	grpcStatus, ok := status.FromError(err)
-	assert.True(t, ok)
-	assert.Equal(t, codes.PermissionDenied, grpcStatus.Code())
 }
 
 func TestInventoryService_CheckBulk_MixedResults(t *testing.T) {
@@ -1307,7 +1167,7 @@ func TestInventoryService_CheckBulk_MixedResults(t *testing.T) {
 		AuthType:  authnapi.AuthTypeXRhIdentity,
 	}
 
-	req := &pb.CheckBulkRequest{
+	protoReq := &pb.CheckBulkRequest{
 		Items: []*pb.CheckBulkRequestItem{
 			{
 				Object: &pb.ResourceReference{
@@ -1342,31 +1202,29 @@ func TestInventoryService_CheckBulk_MixedResults(t *testing.T) {
 		},
 	}
 
-	simpleAuthz := authz.NewSimpleAuthorizer()
-	simpleAuthz.Grant("subject-a", "view", "hbi", "host", "resource-1") // Grant only the first check
-	uc := newTestUsecase(t, testUsecaseConfig{Authz: simpleAuthz})
-	client := newTestServer(t, testServerConfig{
-		Usecase:       uc,
-		Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+	runServerTest(t, func(t *testing.T) (TestServerConfig, *TestCase) {
+		simpleAuthz := authz.NewSimpleAuthorizer()
+		simpleAuthz.Grant("subject-a", "view", "hbi", "host", "resource-1")
+		return TestServerConfig{
+				Usecase:       newTestUsecase(t, testUsecaseConfig{Authz: simpleAuthz}),
+				Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+			}, &TestCase{
+				Request: withBody(protoReq, grpcCall(CheckBulk), httpEndpoint("POST /api/kessel/v1beta2/checkbulk")),
+				Expect: expectSuccess(
+					func() *pb.CheckBulkResponse { return &pb.CheckBulkResponse{} },
+					func(t *testing.T, resp *pb.CheckBulkResponse) {
+						require.Len(t, resp.Pairs, 2)
+						assert.Equal(t, pb.Allowed_ALLOWED_TRUE, resp.Pairs[0].GetItem().Allowed)
+						assert.Equal(t, "resource-1", resp.Pairs[0].Request.Object.ResourceId)
+						assert.Equal(t, "view", resp.Pairs[0].Request.Relation)
+						assert.Equal(t, pb.Allowed_ALLOWED_FALSE, resp.Pairs[1].GetItem().Allowed)
+						assert.Equal(t, "resource-2", resp.Pairs[1].Request.Object.ResourceId)
+						assert.Equal(t, "edit", resp.Pairs[1].Request.Relation)
+						assert.NotNil(t, resp.ConsistencyToken)
+					},
+				),
+			}
 	})
-
-	resp, err := client.CheckBulk(context.Background(), req)
-
-	require.NoError(t, err)
-	require.Len(t, resp.Pairs, 2)
-
-	// First item should be allowed
-	assert.Equal(t, pb.Allowed_ALLOWED_TRUE, resp.Pairs[0].GetItem().Allowed)
-	assert.Equal(t, "resource-1", resp.Pairs[0].Request.Object.ResourceId)
-	assert.Equal(t, "view", resp.Pairs[0].Request.Relation)
-
-	// Second item should be denied (no grant)
-	assert.Equal(t, pb.Allowed_ALLOWED_FALSE, resp.Pairs[1].GetItem().Allowed)
-	assert.Equal(t, "resource-2", resp.Pairs[1].Request.Object.ResourceId)
-	assert.Equal(t, "edit", resp.Pairs[1].Request.Relation)
-
-	// Verify consistency token is returned
-	assert.NotNil(t, resp.ConsistencyToken)
 }
 
 func TestInventoryService_ReportResource_Success(t *testing.T) {
@@ -1375,7 +1233,7 @@ func TestInventoryService_ReportResource_Success(t *testing.T) {
 		AuthType:  authnapi.AuthTypeXRhIdentity,
 	}
 
-	req := &pb.ReportResourceRequest{
+	protoReq := &pb.ReportResourceRequest{
 		Type:               "host",
 		ReporterType:       "hbi",
 		ReporterInstanceId: "instance-001",
@@ -1397,20 +1255,24 @@ func TestInventoryService_ReportResource_Success(t *testing.T) {
 		},
 	}
 
-	uc := newTestUsecase(t, testUsecaseConfig{})
-	client := newTestServer(t, testServerConfig{
-		Usecase:       uc,
-		Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+	runServerTest(t, func(t *testing.T) (TestServerConfig, *TestCase) {
+		return TestServerConfig{
+				Usecase:       newTestUsecase(t, testUsecaseConfig{}),
+				Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+			}, &TestCase{
+				Request: withBody(protoReq, grpcCall(ReportResource), httpEndpoint("POST /api/kessel/v1beta2/resources")),
+				Expect: expectSuccess(
+					func() *pb.ReportResourceResponse { return &pb.ReportResourceResponse{} },
+					func(t *testing.T, resp *pb.ReportResourceResponse) {
+						assert.NotNil(t, resp)
+					},
+				),
+			}
 	})
-
-	resp, err := client.ReportResource(context.Background(), req)
-
-	require.NoError(t, err)
-	assert.NotNil(t, resp)
 }
 
 func TestInventoryService_ReportResource_NoIdentity(t *testing.T) {
-	req := &pb.ReportResourceRequest{
+	protoReq := &pb.ReportResourceRequest{
 		Type:               "host",
 		ReporterType:       "hbi",
 		ReporterInstanceId: "instance-001",
@@ -1424,21 +1286,15 @@ func TestInventoryService_ReportResource_NoIdentity(t *testing.T) {
 		},
 	}
 
-	uc := newTestUsecase(t, testUsecaseConfig{})
-	// Use DenyAuthenticator to simulate unauthenticated request
-	client := newTestServer(t, testServerConfig{
-		Usecase:       uc,
-		Authenticator: &DenyAuthenticator{},
+	runServerTest(t, func(t *testing.T) (TestServerConfig, *TestCase) {
+		return TestServerConfig{
+				Usecase:       newTestUsecase(t, testUsecaseConfig{}),
+				Authenticator: &DenyAuthenticator{},
+			}, &TestCase{
+				Request: withBody(protoReq, grpcCall(ReportResource), httpEndpoint("POST /api/kessel/v1beta2/resources")),
+				Expect:  commonError(codes.Unauthenticated),
+			}
 	})
-
-	resp, err := client.ReportResource(context.Background(), req)
-
-	assert.Error(t, err)
-	assert.Nil(t, resp)
-
-	grpcStatus, ok := status.FromError(err)
-	assert.True(t, ok)
-	assert.Equal(t, codes.Unauthenticated, grpcStatus.Code())
 }
 
 func TestInventoryService_DeleteResource_Success(t *testing.T) {
@@ -1471,7 +1327,7 @@ func TestInventoryService_DeleteResource_Success(t *testing.T) {
 	}
 
 	uc := newTestUsecase(t, testUsecaseConfig{})
-	client := newTestServer(t, testServerConfig{
+	client := newTestServer(t, TestServerConfig{
 		Usecase:       uc,
 		Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
 	})
@@ -1511,7 +1367,7 @@ func TestInventoryService_StreamedListObjects_Success(t *testing.T) {
 	simpleAuthz.Grant("subject-xyz", "view", "hbi", "host", "host-2")
 
 	uc := newTestUsecase(t, testUsecaseConfig{Authz: simpleAuthz})
-	client := newTestServer(t, testServerConfig{
+	client := newTestServer(t, TestServerConfig{
 		Usecase:       uc,
 		Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
 	})
@@ -1585,7 +1441,7 @@ func TestInventoryService_ReportResource_Update(t *testing.T) {
 	}
 
 	uc := newTestUsecase(t, testUsecaseConfig{})
-	client := newTestServer(t, testServerConfig{
+	client := newTestServer(t, TestServerConfig{
 		Usecase:       uc,
 		Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
 	})
@@ -1633,7 +1489,7 @@ func TestInventoryService_ReportResource_Update_FieldsEffective(t *testing.T) {
 
 	repo, db := newSQLiteTestRepo(t)
 	uc := newTestUsecase(t, testUsecaseConfig{Repo: repo})
-	client := newTestServer(t, testServerConfig{
+	client := newTestServer(t, TestServerConfig{
 		Usecase:       uc,
 		Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
 	})
@@ -1736,7 +1592,7 @@ func TestInventoryService_ReportResource_Update_DifferentReporterInstance(t *tes
 	}
 
 	uc := newTestUsecase(t, testUsecaseConfig{})
-	client := newTestServer(t, testServerConfig{
+	client := newTestServer(t, TestServerConfig{
 		Usecase:       uc,
 		Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
 	})
@@ -1837,7 +1693,7 @@ func TestInventoryService_CheckBulk_ConsistencyToken(t *testing.T) {
 	currentVersion := simpleAuthz.Version()
 
 	uc := newTestUsecase(t, testUsecaseConfig{Authz: simpleAuthz})
-	client := newTestServer(t, testServerConfig{
+	client := newTestServer(t, TestServerConfig{
 		Usecase:       uc,
 		Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
 	})
@@ -2022,7 +1878,7 @@ func TestInventoryService_CheckSelfBulk_ConsistencyToken(t *testing.T) {
 	currentVersion := simpleAuthz.Version()
 
 	uc := newTestUsecase(t, testUsecaseConfig{Authz: simpleAuthz})
-	client := newTestServer(t, testServerConfig{
+	client := newTestServer(t, TestServerConfig{
 		Usecase:       uc,
 		Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
 	})
@@ -2136,7 +1992,7 @@ func TestInventoryService_DeleteResource_WithReporterInstanceId(t *testing.T) {
 	}
 
 	uc := newTestUsecase(t, testUsecaseConfig{})
-	client := newTestServer(t, testServerConfig{
+	client := newTestServer(t, TestServerConfig{
 		Usecase:       uc,
 		Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
 	})
@@ -2194,7 +2050,7 @@ func TestInventoryService_DeleteResource_WithoutReporterInstanceId(t *testing.T)
 	}
 
 	uc := newTestUsecase(t, testUsecaseConfig{})
-	client := newTestServer(t, testServerConfig{
+	client := newTestServer(t, TestServerConfig{
 		Usecase:       uc,
 		Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
 	})
@@ -2257,17 +2113,8 @@ func TestInventoryService_Check_ReporterWithInstanceId(t *testing.T) {
 		AuthType:  authnapi.AuthTypeXRhIdentity,
 	}
 
-	simpleAuthz := authz.NewSimpleAuthorizer()
-	simpleAuthz.Grant("subject-456", "view", "hbi", "host", "resource-with-instance")
-
-	uc := newTestUsecase(t, testUsecaseConfig{Authz: simpleAuthz})
-	client := newTestServer(t, testServerConfig{
-		Usecase:       uc,
-		Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
-	})
-
 	instanceId := "instance-001"
-	req := &pb.CheckRequest{
+	protoReq := &pb.CheckRequest{
 		Relation: "view",
 		Object: &pb.ResourceReference{
 			ResourceId:   "resource-with-instance",
@@ -2286,10 +2133,22 @@ func TestInventoryService_Check_ReporterWithInstanceId(t *testing.T) {
 		},
 	}
 
-	resp, err := client.Check(context.Background(), req)
-
-	require.NoError(t, err)
-	assert.Equal(t, pb.Allowed_ALLOWED_TRUE, resp.Allowed)
+	runServerTest(t, func(t *testing.T) (TestServerConfig, *TestCase) {
+		simpleAuthz := authz.NewSimpleAuthorizer()
+		simpleAuthz.Grant("subject-456", "view", "hbi", "host", "resource-with-instance")
+		return TestServerConfig{
+				Usecase:       newTestUsecase(t, testUsecaseConfig{Authz: simpleAuthz}),
+				Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+			}, &TestCase{
+				Request: withBody(protoReq, grpcCall(Check), httpEndpoint("POST /api/kessel/v1beta2/check")),
+				Expect: expectSuccess(
+					func() *pb.CheckResponse { return &pb.CheckResponse{} },
+					func(t *testing.T, resp *pb.CheckResponse) {
+						assert.Equal(t, pb.Allowed_ALLOWED_TRUE, resp.Allowed)
+					},
+				),
+			}
+	})
 }
 
 // --- StreamedListObjects with NoIdentity ---
@@ -2300,7 +2159,7 @@ func TestInventoryService_StreamedListObjects_NoIdentity(t *testing.T) {
 
 	uc := newTestUsecase(t, testUsecaseConfig{Authz: simpleAuthz})
 	// Use DenyAuthenticator to simulate unauthenticated streaming request
-	client := newTestServer(t, testServerConfig{
+	client := newTestServer(t, TestServerConfig{
 		Usecase:       uc,
 		Authenticator: &DenyAuthenticator{},
 	})
@@ -2359,7 +2218,7 @@ func TestInventoryService_StreamedListObjects_MetaAuthzDenied(t *testing.T) {
 	uc := newTestUsecase(t, testUsecaseConfig{
 		MetaAuthorizer: &DenyingMetaAuthorizer{},
 	})
-	client := newTestServer(t, testServerConfig{
+	client := newTestServer(t, TestServerConfig{
 		Usecase:       uc,
 		Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
 	})
@@ -2378,7 +2237,7 @@ func TestInventoryService_StreamedListObjects_MetaAuthzDenied(t *testing.T) {
 // --- CheckForUpdate with NoIdentity ---
 
 func TestInventoryService_CheckForUpdate_NoIdentity(t *testing.T) {
-	req := &pb.CheckForUpdateRequest{
+	protoReq := &pb.CheckForUpdateRequest{
 		Relation: "edit",
 		Object: &pb.ResourceReference{
 			ResourceId:   "resource-xyz",
@@ -2394,26 +2253,21 @@ func TestInventoryService_CheckForUpdate_NoIdentity(t *testing.T) {
 		},
 	}
 
-	uc := newTestUsecase(t, testUsecaseConfig{})
-	client := newTestServer(t, testServerConfig{
-		Usecase:       uc,
-		Authenticator: &DenyAuthenticator{},
+	runServerTest(t, func(t *testing.T) (TestServerConfig, *TestCase) {
+		return TestServerConfig{
+				Usecase:       newTestUsecase(t, testUsecaseConfig{}),
+				Authenticator: &DenyAuthenticator{},
+			}, &TestCase{
+				Request: withBody(protoReq, grpcCall(CheckForUpdate), httpEndpoint("POST /api/kessel/v1beta2/checkforupdate")),
+				Expect:  commonError(codes.Unauthenticated),
+			}
 	})
-
-	resp, err := client.CheckForUpdate(context.Background(), req)
-
-	assert.Error(t, err)
-	assert.Nil(t, resp)
-
-	grpcStatus, ok := status.FromError(err)
-	assert.True(t, ok)
-	assert.Equal(t, codes.Unauthenticated, grpcStatus.Code())
 }
 
 // --- CheckBulk with NoIdentity ---
 
 func TestInventoryService_CheckBulk_NoIdentity(t *testing.T) {
-	req := &pb.CheckBulkRequest{
+	protoReq := &pb.CheckBulkRequest{
 		Items: []*pb.CheckBulkRequestItem{
 			{
 				Object: &pb.ResourceReference{
@@ -2433,20 +2287,15 @@ func TestInventoryService_CheckBulk_NoIdentity(t *testing.T) {
 		},
 	}
 
-	uc := newTestUsecase(t, testUsecaseConfig{})
-	client := newTestServer(t, testServerConfig{
-		Usecase:       uc,
-		Authenticator: &DenyAuthenticator{},
+	runServerTest(t, func(t *testing.T) (TestServerConfig, *TestCase) {
+		return TestServerConfig{
+				Usecase:       newTestUsecase(t, testUsecaseConfig{}),
+				Authenticator: &DenyAuthenticator{},
+			}, &TestCase{
+				Request: withBody(protoReq, grpcCall(CheckBulk), httpEndpoint("POST /api/kessel/v1beta2/checkbulk")),
+				Expect:  commonError(codes.Unauthenticated),
+			}
 	})
-
-	resp, err := client.CheckBulk(context.Background(), req)
-
-	assert.Error(t, err)
-	assert.Nil(t, resp)
-
-	grpcStatus, ok := status.FromError(err)
-	assert.True(t, ok)
-	assert.Equal(t, codes.Unauthenticated, grpcStatus.Code())
 }
 
 // =============================================================================
@@ -2457,14 +2306,13 @@ func TestInventoryService_CheckBulk_NoIdentity(t *testing.T) {
 // --- DeleteResource Error Scenarios ---
 
 func TestInventoryService_DeleteResource_ResourceNotFound(t *testing.T) {
-	// DeleteResource returns NotFound when resource doesn't exist
 	claims := &authnapi.Claims{
 		SubjectId: authnapi.SubjectId("reporter-service"),
 		AuthType:  authnapi.AuthTypeXRhIdentity,
 	}
 
 	instanceID := "instance-001"
-	req := &pb.DeleteResourceRequest{
+	protoReq := &pb.DeleteResourceRequest{
 		Reference: &pb.ResourceReference{
 			ResourceType: "host",
 			ResourceId:   "nonexistent-resource",
@@ -2475,33 +2323,28 @@ func TestInventoryService_DeleteResource_ResourceNotFound(t *testing.T) {
 		},
 	}
 
-	uc := newTestUsecase(t, testUsecaseConfig{})
-	client := newTestServer(t, testServerConfig{
-		Usecase:       uc,
-		Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+	runServerTest(t, func(t *testing.T) (TestServerConfig, *TestCase) {
+		return TestServerConfig{
+				Usecase:       newTestUsecase(t, testUsecaseConfig{}),
+				Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+			}, &TestCase{
+				Request: withBody(protoReq, grpcCall(DeleteResource), httpEndpoint("DELETE /api/kessel/v1beta2/resources")),
+				Expect:  commonError(codes.NotFound),
+			}
 	})
-
-	resp, err := client.DeleteResource(context.Background(), req)
-
-	assert.Error(t, err)
-	assert.Nil(t, resp)
-	grpcStatus, ok := status.FromError(err)
-	assert.True(t, ok)
-	assert.Equal(t, codes.NotFound, grpcStatus.Code())
 }
 
 func TestInventoryService_DeleteResource_InvalidReference_EmptyResourceId(t *testing.T) {
-	// DeleteResource returns InvalidArgument for invalid resource reference
 	claims := &authnapi.Claims{
 		SubjectId: authnapi.SubjectId("reporter-service"),
 		AuthType:  authnapi.AuthTypeXRhIdentity,
 	}
 
 	instanceID := "instance-001"
-	req := &pb.DeleteResourceRequest{
+	protoReq := &pb.DeleteResourceRequest{
 		Reference: &pb.ResourceReference{
 			ResourceType: "host",
-			ResourceId:   "", // Empty resource ID
+			ResourceId:   "",
 			Reporter: &pb.ReporterReference{
 				Type:       "hbi",
 				InstanceId: &instanceID,
@@ -2509,19 +2352,15 @@ func TestInventoryService_DeleteResource_InvalidReference_EmptyResourceId(t *tes
 		},
 	}
 
-	uc := newTestUsecase(t, testUsecaseConfig{})
-	client := newTestServer(t, testServerConfig{
-		Usecase:       uc,
-		Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+	runServerTest(t, func(t *testing.T) (TestServerConfig, *TestCase) {
+		return TestServerConfig{
+				Usecase:       newTestUsecase(t, testUsecaseConfig{}),
+				Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+			}, &TestCase{
+				Request: withBody(protoReq, grpcCall(DeleteResource), httpEndpoint("DELETE /api/kessel/v1beta2/resources")),
+				Expect:  commonError(codes.InvalidArgument),
+			}
 	})
-
-	resp, err := client.DeleteResource(context.Background(), req)
-
-	assert.Error(t, err)
-	assert.Nil(t, resp)
-	grpcStatus, ok := status.FromError(err)
-	assert.True(t, ok)
-	assert.Equal(t, codes.InvalidArgument, grpcStatus.Code())
 }
 
 func TestInventoryService_DeleteResource_InvalidReference_EmptyResourceType(t *testing.T) {
@@ -2531,9 +2370,9 @@ func TestInventoryService_DeleteResource_InvalidReference_EmptyResourceType(t *t
 	}
 
 	instanceID := "instance-001"
-	req := &pb.DeleteResourceRequest{
+	protoReq := &pb.DeleteResourceRequest{
 		Reference: &pb.ResourceReference{
-			ResourceType: "", // Empty resource type
+			ResourceType: "",
 			ResourceId:   "resource-123",
 			Reporter: &pb.ReporterReference{
 				Type:       "hbi",
@@ -2542,19 +2381,15 @@ func TestInventoryService_DeleteResource_InvalidReference_EmptyResourceType(t *t
 		},
 	}
 
-	uc := newTestUsecase(t, testUsecaseConfig{})
-	client := newTestServer(t, testServerConfig{
-		Usecase:       uc,
-		Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+	runServerTest(t, func(t *testing.T) (TestServerConfig, *TestCase) {
+		return TestServerConfig{
+				Usecase:       newTestUsecase(t, testUsecaseConfig{}),
+				Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+			}, &TestCase{
+				Request: withBody(protoReq, grpcCall(DeleteResource), httpEndpoint("DELETE /api/kessel/v1beta2/resources")),
+				Expect:  commonError(codes.InvalidArgument),
+			}
 	})
-
-	resp, err := client.DeleteResource(context.Background(), req)
-
-	assert.Error(t, err)
-	assert.Nil(t, resp)
-	grpcStatus, ok := status.FromError(err)
-	assert.True(t, ok)
-	assert.Equal(t, codes.InvalidArgument, grpcStatus.Code())
 }
 
 func TestInventoryService_DeleteResource_InvalidReference_EmptyReporterType(t *testing.T) {
@@ -2564,45 +2399,40 @@ func TestInventoryService_DeleteResource_InvalidReference_EmptyReporterType(t *t
 	}
 
 	instanceID := "instance-001"
-	req := &pb.DeleteResourceRequest{
+	protoReq := &pb.DeleteResourceRequest{
 		Reference: &pb.ResourceReference{
 			ResourceType: "host",
 			ResourceId:   "resource-123",
 			Reporter: &pb.ReporterReference{
-				Type:       "", // Empty reporter type
+				Type:       "",
 				InstanceId: &instanceID,
 			},
 		},
 	}
 
-	uc := newTestUsecase(t, testUsecaseConfig{})
-	client := newTestServer(t, testServerConfig{
-		Usecase:       uc,
-		Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+	runServerTest(t, func(t *testing.T) (TestServerConfig, *TestCase) {
+		return TestServerConfig{
+				Usecase:       newTestUsecase(t, testUsecaseConfig{}),
+				Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+			}, &TestCase{
+				Request: withBody(protoReq, grpcCall(DeleteResource), httpEndpoint("DELETE /api/kessel/v1beta2/resources")),
+				Expect:  commonError(codes.InvalidArgument),
+			}
 	})
-
-	resp, err := client.DeleteResource(context.Background(), req)
-
-	assert.Error(t, err)
-	assert.Nil(t, resp)
-	grpcStatus, ok := status.FromError(err)
-	assert.True(t, ok)
-	assert.Equal(t, codes.InvalidArgument, grpcStatus.Code())
 }
 
 // --- Check Error Scenarios ---
 
 func TestInventoryService_Check_InvalidReference_EmptyResourceId(t *testing.T) {
-	// Check returns InvalidArgument for invalid resource reference
 	claims := &authnapi.Claims{
 		SubjectId: authnapi.SubjectId("user-123"),
 		AuthType:  authnapi.AuthTypeXRhIdentity,
 	}
 
-	req := &pb.CheckRequest{
+	protoReq := &pb.CheckRequest{
 		Relation: "view",
 		Object: &pb.ResourceReference{
-			ResourceId:   "", // Empty
+			ResourceId:   "",
 			ResourceType: "host",
 			Reporter:     &pb.ReporterReference{Type: "hbi"},
 		},
@@ -2615,19 +2445,15 @@ func TestInventoryService_Check_InvalidReference_EmptyResourceId(t *testing.T) {
 		},
 	}
 
-	uc := newTestUsecase(t, testUsecaseConfig{})
-	client := newTestServer(t, testServerConfig{
-		Usecase:       uc,
-		Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+	runServerTest(t, func(t *testing.T) (TestServerConfig, *TestCase) {
+		return TestServerConfig{
+				Usecase:       newTestUsecase(t, testUsecaseConfig{}),
+				Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+			}, &TestCase{
+				Request: withBody(protoReq, grpcCall(Check), httpEndpoint("POST /api/kessel/v1beta2/check")),
+				Expect:  commonError(codes.InvalidArgument),
+			}
 	})
-
-	resp, err := client.Check(context.Background(), req)
-
-	assert.Error(t, err)
-	assert.Nil(t, resp)
-	grpcStatus, ok := status.FromError(err)
-	assert.True(t, ok)
-	assert.Equal(t, codes.InvalidArgument, grpcStatus.Code())
 }
 
 // --- CheckForUpdate Error Scenarios ---
@@ -2638,10 +2464,10 @@ func TestInventoryService_CheckForUpdate_InvalidReference_EmptyResourceId(t *tes
 		AuthType:  authnapi.AuthTypeXRhIdentity,
 	}
 
-	req := &pb.CheckForUpdateRequest{
+	protoReq := &pb.CheckForUpdateRequest{
 		Relation: "edit",
 		Object: &pb.ResourceReference{
-			ResourceId:   "", // Empty
+			ResourceId:   "",
 			ResourceType: "host",
 			Reporter:     &pb.ReporterReference{Type: "hbi"},
 		},
@@ -2654,64 +2480,54 @@ func TestInventoryService_CheckForUpdate_InvalidReference_EmptyResourceId(t *tes
 		},
 	}
 
-	uc := newTestUsecase(t, testUsecaseConfig{})
-	client := newTestServer(t, testServerConfig{
-		Usecase:       uc,
-		Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+	runServerTest(t, func(t *testing.T) (TestServerConfig, *TestCase) {
+		return TestServerConfig{
+				Usecase:       newTestUsecase(t, testUsecaseConfig{}),
+				Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+			}, &TestCase{
+				Request: withBody(protoReq, grpcCall(CheckForUpdate), httpEndpoint("POST /api/kessel/v1beta2/checkforupdate")),
+				Expect:  commonError(codes.InvalidArgument),
+			}
 	})
-
-	resp, err := client.CheckForUpdate(context.Background(), req)
-
-	assert.Error(t, err)
-	assert.Nil(t, resp)
-	grpcStatus, ok := status.FromError(err)
-	assert.True(t, ok)
-	assert.Equal(t, codes.InvalidArgument, grpcStatus.Code())
 }
 
 // --- CheckSelf Error Scenarios ---
 
 func TestInventoryService_CheckSelf_InvalidReference_EmptyResourceId(t *testing.T) {
-	// Empty resource_id is caught by protovalidate middleware BEFORE reaching the
-	// service handler. The protovalidate middleware returns InvalidArgument.
 	claims := &authnapi.Claims{
 		SubjectId: authnapi.SubjectId("user-123"),
 		AuthType:  authnapi.AuthTypeXRhIdentity,
 	}
 
-	req := &pb.CheckSelfRequest{
+	protoReq := &pb.CheckSelfRequest{
 		Relation: "view",
 		Object: &pb.ResourceReference{
-			ResourceId:   "", // Empty - caught by protovalidate
+			ResourceId:   "",
 			ResourceType: "host",
 			Reporter:     &pb.ReporterReference{Type: "hbi"},
 		},
 	}
 
-	uc := newTestUsecase(t, testUsecaseConfig{})
-	client := newTestServer(t, testServerConfig{
-		Usecase:       uc,
-		Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+	runServerTest(t, func(t *testing.T) (TestServerConfig, *TestCase) {
+		return TestServerConfig{
+				Usecase:       newTestUsecase(t, testUsecaseConfig{}),
+				Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+			}, &TestCase{
+				Request: withBody(protoReq, grpcCall(CheckSelf), httpEndpoint("POST /api/kessel/v1beta2/checkself")),
+				Expect:  commonError(codes.InvalidArgument),
+			}
 	})
-
-	resp, err := client.CheckSelf(context.Background(), req)
-
-	assert.Error(t, err)
-	assert.Nil(t, resp)
-	grpcStatus, ok := status.FromError(err)
-	assert.True(t, ok)
-	// protovalidate catches this and returns InvalidArgument
-	assert.Equal(t, codes.InvalidArgument, grpcStatus.Code())
 }
 
 func TestInventoryService_CheckSelf_MetaAuthzDenied(t *testing.T) {
-	// Test that meta-authorization denial is properly mapped to PermissionDenied
+	// SimpleMetaAuthorizer denies check_self on gRPC regardless of auth type,
+	// and denies OIDC on HTTP. So OIDC + check_self is denied on both protocols.
 	claims := &authnapi.Claims{
 		SubjectId: authnapi.SubjectId("user-123"),
-		AuthType:  authnapi.AuthTypeOIDC, // OIDC is denied by SimpleMetaAuthorizer
+		AuthType:  authnapi.AuthTypeOIDC,
 	}
 
-	req := &pb.CheckSelfRequest{
+	protoReq := &pb.CheckSelfRequest{
 		Relation: "view",
 		Object: &pb.ResourceReference{
 			ResourceId:   "resource-123",
@@ -2720,62 +2536,49 @@ func TestInventoryService_CheckSelf_MetaAuthzDenied(t *testing.T) {
 		},
 	}
 
-	uc := newTestUsecase(t, testUsecaseConfig{
-		MetaAuthorizer: metaauthorizer.NewSimpleMetaAuthorizer(),
+	runServerTest(t, func(t *testing.T) (TestServerConfig, *TestCase) {
+		return TestServerConfig{
+				Usecase:       newTestUsecase(t, testUsecaseConfig{MetaAuthorizer: metaauthorizer.NewSimpleMetaAuthorizer()}),
+				Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+			}, &TestCase{
+				Request: withBody(protoReq, grpcCall(CheckSelf), httpEndpoint("POST /api/kessel/v1beta2/checkself")),
+				Expect:  commonError(codes.PermissionDenied),
+			}
 	})
-	client := newTestServer(t, testServerConfig{
-		Usecase:       uc,
-		Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
-	})
-
-	resp, err := client.CheckSelf(context.Background(), req)
-
-	assert.Error(t, err)
-	assert.Nil(t, resp)
-	grpcStatus, ok := status.FromError(err)
-	assert.True(t, ok)
-	assert.Equal(t, codes.PermissionDenied, grpcStatus.Code())
 }
 
 // --- CheckSelfBulk Error Scenarios ---
 
 func TestInventoryService_CheckSelfBulk_EmptyItems(t *testing.T) {
-	// Empty items array is caught by protovalidate middleware BEFORE reaching
-	// the service handler's own validation check.
 	claims := &authnapi.Claims{
 		SubjectId: authnapi.SubjectId("user-123"),
 		AuthType:  authnapi.AuthTypeXRhIdentity,
 	}
 
-	req := &pb.CheckSelfBulkRequest{
-		Items: []*pb.CheckSelfBulkRequestItem{}, // Empty - caught by protovalidate
+	protoReq := &pb.CheckSelfBulkRequest{
+		Items: []*pb.CheckSelfBulkRequestItem{},
 	}
 
-	uc := newTestUsecase(t, testUsecaseConfig{})
-	client := newTestServer(t, testServerConfig{
-		Usecase:       uc,
-		Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+	runServerTest(t, func(t *testing.T) (TestServerConfig, *TestCase) {
+		return TestServerConfig{
+				Usecase:       newTestUsecase(t, testUsecaseConfig{}),
+				Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+			}, &TestCase{
+				Request: withBody(protoReq, grpcCall(CheckSelfBulk), httpEndpoint("POST /api/kessel/v1beta2/checkselfbulk")),
+				Expect:  commonErrorContaining(codes.InvalidArgument, "items"),
+			}
 	})
-
-	resp, err := client.CheckSelfBulk(context.Background(), req)
-
-	assert.Error(t, err)
-	assert.Nil(t, resp)
-	grpcStatus, ok := status.FromError(err)
-	assert.True(t, ok)
-	assert.Equal(t, codes.InvalidArgument, grpcStatus.Code())
-	// protovalidate error message format
-	assert.Contains(t, grpcStatus.Message(), "items")
 }
 
 func TestInventoryService_CheckSelfBulk_MetaAuthzDenied(t *testing.T) {
-	// Test that meta-authorization denial is properly mapped to PermissionDenied
+	// SimpleMetaAuthorizer denies check_self_bulk on gRPC (it's "check_self" relation),
+	// and denies OIDC on HTTP. So OIDC + check_self_bulk is denied on both protocols.
 	claims := &authnapi.Claims{
 		SubjectId: authnapi.SubjectId("user-123"),
-		AuthType:  authnapi.AuthTypeOIDC, // OIDC is denied by SimpleMetaAuthorizer
+		AuthType:  authnapi.AuthTypeOIDC,
 	}
 
-	req := &pb.CheckSelfBulkRequest{
+	protoReq := &pb.CheckSelfBulkRequest{
 		Items: []*pb.CheckSelfBulkRequestItem{
 			{
 				Object: &pb.ResourceReference{
@@ -2788,41 +2591,29 @@ func TestInventoryService_CheckSelfBulk_MetaAuthzDenied(t *testing.T) {
 		},
 	}
 
-	uc := newTestUsecase(t, testUsecaseConfig{
-		MetaAuthorizer: metaauthorizer.NewSimpleMetaAuthorizer(),
+	runServerTest(t, func(t *testing.T) (TestServerConfig, *TestCase) {
+		return TestServerConfig{
+				Usecase:       newTestUsecase(t, testUsecaseConfig{MetaAuthorizer: metaauthorizer.NewSimpleMetaAuthorizer()}),
+				Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+			}, &TestCase{
+				Request: withBody(protoReq, grpcCall(CheckSelfBulk), httpEndpoint("POST /api/kessel/v1beta2/checkselfbulk")),
+				Expect:  commonError(codes.PermissionDenied),
+			}
 	})
-	client := newTestServer(t, testServerConfig{
-		Usecase:       uc,
-		Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
-	})
-
-	resp, err := client.CheckSelfBulk(context.Background(), req)
-
-	assert.Error(t, err)
-	assert.Nil(t, resp)
-	grpcStatus, ok := status.FromError(err)
-	assert.True(t, ok)
-	assert.Equal(t, codes.PermissionDenied, grpcStatus.Code())
 }
 
 // --- CheckBulk Error Scenarios ---
 
-func TestInventoryService_CheckBulk_MetaAuthzAllowedOnGRPC(t *testing.T) {
-	// SimpleMetaAuthorizer behavior on gRPC:
-	// - gRPC: allow ALL relations EXCEPT "check_self"
-	// - This means CheckBulk (relation="check_bulk") is ALLOWED on gRPC
-	//
-	// Even with OIDC auth type, the protocol (gRPC) takes precedence.
-	// This is by design for service-to-service communication.
+func TestInventoryService_CheckBulk_MetaAuthzProtocolBehavior(t *testing.T) {
+	// SimpleMetaAuthorizer protocol-aware behavior:
+	// - gRPC: allow ALL relations EXCEPT "check_self" -> CheckBulk ALLOWED
+	// - HTTP + OIDC: deny (only x-rh-identity + check_self is allowed) -> PermissionDenied
 	claims := &authnapi.Claims{
 		SubjectId: authnapi.SubjectId("user-123"),
 		AuthType:  authnapi.AuthTypeOIDC,
 	}
 
-	simpleAuthz := authz.NewSimpleAuthorizer()
-	simpleAuthz.Grant("subject-a", "view", "hbi", "host", "resource-1")
-
-	req := &pb.CheckBulkRequest{
+	protoReq := &pb.CheckBulkRequest{
 		Items: []*pb.CheckBulkRequestItem{
 			{
 				Object: &pb.ResourceReference{
@@ -2842,31 +2633,38 @@ func TestInventoryService_CheckBulk_MetaAuthzAllowedOnGRPC(t *testing.T) {
 		},
 	}
 
-	uc := newTestUsecase(t, testUsecaseConfig{
-		Authz:          simpleAuthz,
-		MetaAuthorizer: metaauthorizer.NewSimpleMetaAuthorizer(),
+	runServerTest(t, func(t *testing.T) (TestServerConfig, *TestCase) {
+		simpleAuthz := authz.NewSimpleAuthorizer()
+		simpleAuthz.Grant("subject-a", "view", "hbi", "host", "resource-1")
+		return TestServerConfig{
+				Usecase: newTestUsecase(t, testUsecaseConfig{
+					Authz:          simpleAuthz,
+					MetaAuthorizer: metaauthorizer.NewSimpleMetaAuthorizer(),
+				}),
+				Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+			}, &TestCase{
+				Request: withBody(protoReq, grpcCall(CheckBulk), httpEndpoint("POST /api/kessel/v1beta2/checkbulk")),
+				Expect: TestExpect{
+					GRPC: func(t *testing.T, resp proto.Message, err error) {
+						require.NoError(t, err)
+						r := resp.(*pb.CheckBulkResponse)
+						assert.Equal(t, pb.Allowed_ALLOWED_TRUE, r.Pairs[0].GetItem().Allowed)
+					},
+					HTTP: func(t *testing.T, statusCode int, _ []byte) {
+						assert.Equal(t, 403, statusCode)
+					},
+				},
+			}
 	})
-	client := newTestServer(t, testServerConfig{
-		Usecase:       uc,
-		Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
-	})
-
-	resp, err := client.CheckBulk(context.Background(), req)
-
-	// gRPC allows CheckBulk even with OIDC auth type
-	require.NoError(t, err)
-	assert.NotNil(t, resp)
-	assert.Equal(t, pb.Allowed_ALLOWED_TRUE, resp.Pairs[0].GetItem().Allowed)
 }
 
 func TestInventoryService_CheckBulk_MetaAuthzDenied(t *testing.T) {
-	// Test that meta-authorization denial is properly mapped to PermissionDenied.
 	claims := &authnapi.Claims{
 		SubjectId: authnapi.SubjectId("user-123"),
 		AuthType:  authnapi.AuthTypeXRhIdentity,
 	}
 
-	req := &pb.CheckBulkRequest{
+	protoReq := &pb.CheckBulkRequest{
 		Items: []*pb.CheckBulkRequestItem{
 			{
 				Object: &pb.ResourceReference{
@@ -2886,36 +2684,27 @@ func TestInventoryService_CheckBulk_MetaAuthzDenied(t *testing.T) {
 		},
 	}
 
-	uc := newTestUsecase(t, testUsecaseConfig{
-		MetaAuthorizer: &DenyingMetaAuthorizer{},
+	runServerTest(t, func(t *testing.T) (TestServerConfig, *TestCase) {
+		return TestServerConfig{
+				Usecase:       newTestUsecase(t, testUsecaseConfig{MetaAuthorizer: &DenyingMetaAuthorizer{}}),
+				Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+			}, &TestCase{
+				Request: withBody(protoReq, grpcCall(CheckBulk), httpEndpoint("POST /api/kessel/v1beta2/checkbulk")),
+				Expect:  commonError(codes.PermissionDenied),
+			}
 	})
-	client := newTestServer(t, testServerConfig{
-		Usecase:       uc,
-		Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
-	})
-
-	resp, err := client.CheckBulk(context.Background(), req)
-
-	assert.Error(t, err)
-	assert.Nil(t, resp)
-	grpcStatus, ok := status.FromError(err)
-	assert.True(t, ok)
-	assert.Equal(t, codes.PermissionDenied, grpcStatus.Code())
 }
 
-func TestInventoryService_ReportResource_MetaAuthzAllowedOnGRPC(t *testing.T) {
-	// SimpleMetaAuthorizer behavior on gRPC:
-	// - gRPC: allow ALL relations EXCEPT "check_self"
-	// - This means ReportResource (relation="report_resource") is ALLOWED on gRPC
-	//
-	// Even with OIDC auth type, the protocol (gRPC) takes precedence.
-	// This is by design for service-to-service communication.
+func TestInventoryService_ReportResource_MetaAuthzProtocolBehavior(t *testing.T) {
+	// SimpleMetaAuthorizer protocol-aware behavior:
+	// - gRPC: allow ALL relations EXCEPT "check_self" -> ReportResource ALLOWED
+	// - HTTP + OIDC: deny (only x-rh-identity + check_self is allowed) -> PermissionDenied
 	claims := &authnapi.Claims{
 		SubjectId: authnapi.SubjectId("reporter-service"),
 		AuthType:  authnapi.AuthTypeOIDC,
 	}
 
-	req := &pb.ReportResourceRequest{
+	protoReq := &pb.ReportResourceRequest{
 		Type:               "host",
 		ReporterType:       "hbi",
 		ReporterInstanceId: "instance-001",
@@ -2937,19 +2726,25 @@ func TestInventoryService_ReportResource_MetaAuthzAllowedOnGRPC(t *testing.T) {
 		},
 	}
 
-	uc := newTestUsecase(t, testUsecaseConfig{
-		MetaAuthorizer: metaauthorizer.NewSimpleMetaAuthorizer(),
+	runServerTest(t, func(t *testing.T) (TestServerConfig, *TestCase) {
+		return TestServerConfig{
+				Usecase: newTestUsecase(t, testUsecaseConfig{
+					MetaAuthorizer: metaauthorizer.NewSimpleMetaAuthorizer(),
+				}),
+				Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+			}, &TestCase{
+				Request: withBody(protoReq, grpcCall(ReportResource), httpEndpoint("POST /api/kessel/v1beta2/resources")),
+				Expect: TestExpect{
+					GRPC: func(t *testing.T, resp proto.Message, err error) {
+						require.NoError(t, err)
+						assert.NotNil(t, resp)
+					},
+					HTTP: func(t *testing.T, statusCode int, _ []byte) {
+						assert.Equal(t, 403, statusCode)
+					},
+				},
+			}
 	})
-	client := newTestServer(t, testServerConfig{
-		Usecase:       uc,
-		Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
-	})
-
-	resp, err := client.ReportResource(context.Background(), req)
-
-	// gRPC allows ReportResource even with OIDC auth type
-	require.NoError(t, err)
-	assert.NotNil(t, resp)
 }
 
 func TestInventoryService_StreamedListObjects_NilRequest(t *testing.T) {
@@ -3033,7 +2828,7 @@ func TestInventoryService_ReportResource_AllOptionalMetadataFields(t *testing.T)
 
 	repo, db := newSQLiteTestRepo(t)
 	uc := newTestUsecase(t, testUsecaseConfig{Repo: repo})
-	client := newTestServer(t, testServerConfig{
+	client := newTestServer(t, TestServerConfig{
 		Usecase:       uc,
 		Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
 	})
@@ -3128,7 +2923,7 @@ func TestInventoryService_ReportResource_NilOrEmptyRepresentationStructs(t *test
 		t.Run(tc.name, func(t *testing.T) {
 			repo, _ := newSQLiteTestRepo(t)
 			uc := newTestUsecase(t, testUsecaseConfig{Repo: repo})
-			client := newTestServer(t, testServerConfig{
+			client := newTestServer(t, TestServerConfig{
 				Usecase:       uc,
 				Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
 			})
@@ -3238,7 +3033,7 @@ func TestInventoryService_ReportResource_ErrorFormats(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			uc := newTestUsecase(t, testUsecaseConfig{})
-			client := newTestServer(t, testServerConfig{
+			client := newTestServer(t, TestServerConfig{
 				Usecase:       uc,
 				Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
 			})
@@ -3333,7 +3128,7 @@ func TestInventoryService_ReportResource_ValidationErrorFormats(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			repo, _ := newSQLiteTestRepo(t)
 			uc := newTestUsecase(t, testUsecaseConfig{Repo: repo})
-			client := newTestServer(t, testServerConfig{
+			client := newTestServer(t, TestServerConfig{
 				Usecase:       uc,
 				Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
 			})
@@ -3398,7 +3193,7 @@ func TestInventoryService_ReportResource_WriteVisibility(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			repo, db := newSQLiteTestRepo(t)
 			uc := newTestUsecase(t, testUsecaseConfig{Repo: repo})
-			client := newTestServer(t, testServerConfig{
+			client := newTestServer(t, TestServerConfig{
 				Usecase:       uc,
 				Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
 			})
@@ -3472,7 +3267,7 @@ func TestInventoryService_ReportResource_InventoryIdSet(t *testing.T) {
 
 	repo, db := newSQLiteTestRepo(t)
 	uc := newTestUsecase(t, testUsecaseConfig{Repo: repo})
-	client := newTestServer(t, testServerConfig{
+	client := newTestServer(t, TestServerConfig{
 		Usecase:       uc,
 		Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
 	})
@@ -3563,7 +3358,7 @@ func TestInventoryService_ReportResource_MissingRequiredFields(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			uc := newTestUsecase(t, testUsecaseConfig{})
-			client := newTestServer(t, testServerConfig{
+			client := newTestServer(t, TestServerConfig{
 				Usecase:       uc,
 				Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
 			})
@@ -3621,7 +3416,7 @@ func TestInventoryService_ReportResource_TransactionIdIdempotency(t *testing.T) 
 
 	repo, db := newSQLiteTestRepo(t)
 	uc := newTestUsecase(t, testUsecaseConfig{Repo: repo})
-	client := newTestServer(t, testServerConfig{
+	client := newTestServer(t, TestServerConfig{
 		Usecase:       uc,
 		Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
 	})
@@ -3664,7 +3459,7 @@ func TestInventoryService_ReportResource_MetaAuthzDenied(t *testing.T) {
 		AuthType:  authnapi.AuthTypeXRhIdentity,
 	}
 
-	req := &pb.ReportResourceRequest{
+	protoReq := &pb.ReportResourceRequest{
 		Type:               "host",
 		ReporterType:       "hbi",
 		ReporterInstanceId: "instance-001",
@@ -3676,21 +3471,15 @@ func TestInventoryService_ReportResource_MetaAuthzDenied(t *testing.T) {
 		},
 	}
 
-	uc := newTestUsecase(t, testUsecaseConfig{
-		MetaAuthorizer: &DenyingMetaAuthorizer{},
+	runServerTest(t, func(t *testing.T) (TestServerConfig, *TestCase) {
+		return TestServerConfig{
+				Usecase:       newTestUsecase(t, testUsecaseConfig{MetaAuthorizer: &DenyingMetaAuthorizer{}}),
+				Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+			}, &TestCase{
+				Request: withBody(protoReq, grpcCall(ReportResource), httpEndpoint("POST /api/kessel/v1beta2/resources")),
+				Expect:  commonError(codes.PermissionDenied),
+			}
 	})
-	client := newTestServer(t, testServerConfig{
-		Usecase:       uc,
-		Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
-	})
-
-	resp, err := client.ReportResource(context.Background(), req)
-
-	assert.Error(t, err)
-	assert.Nil(t, resp)
-	grpcStatus, ok := status.FromError(err)
-	assert.True(t, ok)
-	assert.Equal(t, codes.PermissionDenied, grpcStatus.Code())
 }
 
 func newFakeSchemaRepository(t *testing.T) schema.Repository {

@@ -1556,6 +1556,24 @@ func TestReportResource_ValidationErrors(t *testing.T) {
 			cmd:         fixture(t).Basic("host", "unknown_reporter", "instance-1", "test-host", "ws-123"),
 			expectError: "reporter unknown_reporter does not report resource types: host",
 		},
+		{
+			name: "missing reporter representation",
+			cmd: func() ReportResourceCommand {
+				cmd := fixture(t).Basic("host", "hbi", "instance-1", "test-host", "ws-123")
+				cmd.ReporterRepresentation = nil
+				return cmd
+			}(),
+			expectError: "invalid reporter representation: representation required",
+		},
+		{
+			name: "missing common representation",
+			cmd: func() ReportResourceCommand {
+				cmd := fixture(t).Basic("host", "hbi", "instance-1", "test-host", "ws-123")
+				cmd.CommonRepresentation = nil
+				return cmd
+			}(),
+			expectError: "invalid common representation: representation required",
+		},
 	}
 
 	for _, tc := range tests {

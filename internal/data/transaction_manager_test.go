@@ -14,7 +14,7 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 
-	"github.com/project-kessel/inventory-api/internal/biz/usecase"
+	bizmodel "github.com/project-kessel/inventory-api/internal/biz/model"
 	"github.com/project-kessel/inventory-api/internal/metricscollector"
 )
 
@@ -39,14 +39,14 @@ func TestGormTransactionManager_Interface(t *testing.T) {
 	tm := NewGormTransactionManager(mc, 3)
 
 	// Verify it implements the interface
-	var _ = usecase.TransactionManager(tm)
+	var _ = bizmodel.TransactionManager(tm)
 }
 
 func TestFakeTransactionManager_Interface(t *testing.T) {
 	tm := NewFakeTransactionManager(3)
 
 	// Verify it implements the interface
-	var _ = usecase.TransactionManager(tm)
+	var _ = bizmodel.TransactionManager(tm)
 }
 
 // =============================================================================

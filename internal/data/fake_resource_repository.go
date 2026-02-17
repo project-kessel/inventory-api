@@ -10,9 +10,7 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/project-kessel/inventory-api/internal"
-	"github.com/project-kessel/inventory-api/internal/biz"
 	bizmodel "github.com/project-kessel/inventory-api/internal/biz/model"
-	"github.com/project-kessel/inventory-api/internal/biz/usecase"
 )
 
 type fakeResourceRepository struct {
@@ -46,7 +44,7 @@ type storedRepresentation struct {
 	commonVersion uint
 }
 
-func NewFakeResourceRepository() ResourceRepository {
+func NewFakeResourceRepository() bizmodel.ResourceRepository {
 	return &fakeResourceRepository{
 		resourcesByPrimaryKey:    make(map[uuid.UUID]*storedResource),
 		resourcesByCompositeKey:  make(map[string]uuid.UUID),
@@ -74,7 +72,7 @@ func (f *fakeResourceRepository) NextReporterResourceId() (bizmodel.ReporterReso
 	return bizmodel.NewReporterResourceId(uuidV7)
 }
 
-func (f *fakeResourceRepository) Save(tx *gorm.DB, resource bizmodel.Resource, operationType biz.EventOperationType, txid string) error {
+func (f *fakeResourceRepository) Save(tx *gorm.DB, resource bizmodel.Resource, operationType bizmodel.EventOperationType, txid string) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
@@ -241,7 +239,7 @@ func (f *fakeResourceRepository) FindResourceByKeys(tx *gorm.DB, key bizmodel.Re
 	return nil, gorm.ErrRecordNotFound
 }
 
-func (f *fakeResourceRepository) FindCurrentAndPreviousVersionedRepresentations(tx *gorm.DB, key bizmodel.ReporterResourceKey, currentVersion *uint, operationType biz.EventOperationType) (*bizmodel.Representations, *bizmodel.Representations, error) {
+func (f *fakeResourceRepository) FindCurrentAndPreviousVersionedRepresentations(tx *gorm.DB, key bizmodel.ReporterResourceKey, currentVersion *uint, operationType bizmodel.EventOperationType) (*bizmodel.Representations, *bizmodel.Representations, error) {
 	if currentVersion == nil {
 		return nil, nil, nil
 	}
@@ -333,7 +331,7 @@ func (f *fakeResourceRepository) GetDB() *gorm.DB {
 	return nil
 }
 
-func (f *fakeResourceRepository) GetTransactionManager() usecase.TransactionManager {
+func (f *fakeResourceRepository) GetTransactionManager() bizmodel.TransactionManager {
 	// Return a fake transaction manager for testing
 	return NewFakeTransactionManager(3) // Default retry count
 }

@@ -7,8 +7,6 @@ import (
 	"testing"
 
 	"github.com/go-kratos/kratos/v2/log"
-	"github.com/project-kessel/inventory-api/internal/biz/schema"
-	"github.com/project-kessel/inventory-api/internal/biz/schema/validation"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gorm.io/gorm"
@@ -344,10 +342,10 @@ func TestCheckSelfBulk_MissingAuthzContext(t *testing.T) {
 	assert.Equal(t, 0, meta.calls)
 }
 
-func newFakeSchemaRepository(t *testing.T) schema.Repository {
+func newFakeSchemaRepository(t *testing.T) model.SchemaRepository {
 	schemaRepository := data.NewInMemorySchemaRepository()
 
-	emptyValidationSchema := validation.NewJsonSchemaValidatorFromString(`{
+	emptyValidationSchema := model.NewJsonSchemaValidatorFromString(`{
 		"$schema": "http://json-schema.org/draft-07/schema#",
 		"type": "object",
 		"properties": {
@@ -355,7 +353,7 @@ func newFakeSchemaRepository(t *testing.T) schema.Repository {
 		"required": []
 	}`)
 
-	withWorkspaceValidationSchema := validation.NewJsonSchemaValidatorFromString(`{
+	withWorkspaceValidationSchema := model.NewJsonSchemaValidatorFromString(`{
 		"$schema": "http://json-schema.org/draft-07/schema#",
 		"type": "object",
 		"properties": {
@@ -364,26 +362,26 @@ func newFakeSchemaRepository(t *testing.T) schema.Repository {
 		"required": ["workspace_id"]
 	}`)
 
-	err := schemaRepository.CreateResourceSchema(context.Background(), schema.ResourceRepresentation{
+	err := schemaRepository.CreateResourceSchema(context.Background(), model.ResourceSchema{
 		ResourceType:     "k8s_cluster",
 		ValidationSchema: withWorkspaceValidationSchema,
 	})
 	assert.NoError(t, err)
 
-	err = schemaRepository.CreateReporterSchema(context.Background(), schema.ReporterRepresentation{
+	err = schemaRepository.CreateReporterSchema(context.Background(), model.ReporterSchema{
 		ResourceType:     "k8s_cluster",
 		ReporterType:     "ocm",
 		ValidationSchema: emptyValidationSchema,
 	})
 	assert.NoError(t, err)
 
-	err = schemaRepository.CreateResourceSchema(context.Background(), schema.ResourceRepresentation{
+	err = schemaRepository.CreateResourceSchema(context.Background(), model.ResourceSchema{
 		ResourceType:     "host",
 		ValidationSchema: withWorkspaceValidationSchema,
 	})
 	assert.NoError(t, err)
 
-	err = schemaRepository.CreateReporterSchema(context.Background(), schema.ReporterRepresentation{
+	err = schemaRepository.CreateReporterSchema(context.Background(), model.ReporterSchema{
 		ResourceType:     "host",
 		ReporterType:     "hbi",
 		ValidationSchema: emptyValidationSchema,
@@ -1726,16 +1724,16 @@ func TestReportResource_SchemaValidation(t *testing.T) {
 			ctx := testAuthzContext()
 			schemaRepository := data.NewInMemorySchemaRepository()
 
-			err := schemaRepository.CreateResourceSchema(context.Background(), schema.ResourceRepresentation{
+			err := schemaRepository.CreateResourceSchema(context.Background(), model.ResourceSchema{
 				ResourceType:     tc.resourceType,
-				ValidationSchema: validation.NewJsonSchemaValidatorFromString(tc.commonSchema),
+				ValidationSchema: model.NewJsonSchemaValidatorFromString(tc.commonSchema),
 			})
 			require.NoError(t, err)
 
-			err = schemaRepository.CreateReporterSchema(context.Background(), schema.ReporterRepresentation{
+			err = schemaRepository.CreateReporterSchema(context.Background(), model.ReporterSchema{
 				ResourceType:     tc.resourceType,
 				ReporterType:     tc.reporterType,
-				ValidationSchema: validation.NewJsonSchemaValidatorFromString(tc.reporterSchema),
+				ValidationSchema: model.NewJsonSchemaValidatorFromString(tc.reporterSchema),
 			})
 			require.NoError(t, err)
 

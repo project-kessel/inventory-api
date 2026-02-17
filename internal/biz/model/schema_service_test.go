@@ -1,10 +1,9 @@
-package resources
+package model_test
 
 import (
 	"testing"
 
 	"github.com/go-kratos/kratos/v2/log"
-	"github.com/project-kessel/inventory-api/internal/biz"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
 	"github.com/project-kessel/inventory-api/internal/data"
 	"github.com/stretchr/testify/assert"
@@ -70,7 +69,7 @@ func TestCalculateTuples(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			sc := NewSchemaUsecase(data.NewInMemorySchemaRepository(), log.NewHelper(log.DefaultLogger))
+			sc := model.NewSchemaService(data.NewInMemorySchemaRepository(), log.NewHelper(log.DefaultLogger))
 			key, err := model.NewReporterResourceKey(
 				model.LocalResourceId("test-resource"),
 				model.ResourceType("host"),
@@ -149,7 +148,7 @@ func TestCalculateTuples(t *testing.T) {
 }
 
 func TestGetWorkspaceVersions(t *testing.T) {
-	sc := NewSchemaUsecase(data.NewInMemorySchemaRepository(), log.NewHelper(log.DefaultLogger))
+	sc := model.NewSchemaService(data.NewInMemorySchemaRepository(), log.NewHelper(log.DefaultLogger))
 
 	key, err := model.NewReporterResourceKey(
 		model.LocalResourceId("test-resource"),
@@ -247,7 +246,7 @@ func TestCreateWorkspaceTuple(t *testing.T) {
 }
 
 func TestDetermineTupleOperations(t *testing.T) {
-	sc := NewSchemaUsecase(data.NewInMemorySchemaRepository(), log.NewHelper(log.DefaultLogger))
+	sc := model.NewSchemaService(data.NewInMemorySchemaRepository(), log.NewHelper(log.DefaultLogger))
 
 	key, err := model.NewReporterResourceKey(
 		model.LocalResourceId("test-resource"),
@@ -284,7 +283,7 @@ func TestDetermineTupleOperations(t *testing.T) {
 func TestCalculateTuples_OperationTypeScenarios(t *testing.T) {
 	testCases := []struct {
 		name                 string
-		operationType        biz.EventOperationType // kept for scenario naming; not used by CalculateTuples
+		operationType        model.EventOperationType // kept for scenario naming; not used by CalculateTuples
 		version              uint
 		currentWorkspaceID   string
 		previousWorkspaceID  string
@@ -293,7 +292,7 @@ func TestCalculateTuples_OperationTypeScenarios(t *testing.T) {
 	}{
 		{
 			name:                 "CREATE operation should only create tuples",
-			operationType:        biz.OperationTypeCreated,
+			operationType:        model.OperationTypeCreated,
 			version:              0,
 			currentWorkspaceID:   "workspace-new",
 			previousWorkspaceID:  "",
@@ -302,7 +301,7 @@ func TestCalculateTuples_OperationTypeScenarios(t *testing.T) {
 		},
 		{
 			name:                 "UPDATE operation with workspace change should create and delete tuples",
-			operationType:        biz.OperationTypeUpdated,
+			operationType:        model.OperationTypeUpdated,
 			version:              1,
 			currentWorkspaceID:   "workspace-new",
 			previousWorkspaceID:  "workspace-old",
@@ -311,7 +310,7 @@ func TestCalculateTuples_OperationTypeScenarios(t *testing.T) {
 		},
 		{
 			name:                 "UPDATE operation with same workspace should not create or delete tuples",
-			operationType:        biz.OperationTypeUpdated,
+			operationType:        model.OperationTypeUpdated,
 			version:              1,
 			currentWorkspaceID:   "workspace-same",
 			previousWorkspaceID:  "workspace-same",
@@ -320,7 +319,7 @@ func TestCalculateTuples_OperationTypeScenarios(t *testing.T) {
 		},
 		{
 			name:                 "DELETE operation should only delete tuples",
-			operationType:        biz.OperationTypeDeleted,
+			operationType:        model.OperationTypeDeleted,
 			version:              1,
 			currentWorkspaceID:   "",                  // synthetic empty current
 			previousWorkspaceID:  "workspace-current", // previous holds latest
@@ -331,7 +330,7 @@ func TestCalculateTuples_OperationTypeScenarios(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			sc := NewSchemaUsecase(data.NewInMemorySchemaRepository(), log.NewHelper(log.DefaultLogger))
+			sc := model.NewSchemaService(data.NewInMemorySchemaRepository(), log.NewHelper(log.DefaultLogger))
 
 			key, err := model.NewReporterResourceKey(
 				model.LocalResourceId("test-resource"),
@@ -388,7 +387,7 @@ func TestCalculateTuples_OperationTypeScenarios(t *testing.T) {
 
 			// Additional validations based on operation type
 			switch tc.operationType.OperationType() {
-			case biz.OperationTypeCreated:
+			case model.OperationTypeCreated:
 				// For CREATE operations, check if delete tuples are actually empty
 				if result.HasTuplesToDelete() {
 					deleteTuples := result.TuplesToDelete()
@@ -411,7 +410,7 @@ func TestCalculateTuples_OperationTypeScenarios(t *testing.T) {
 					assert.True(t, result.HasTuplesToCreate(), "CREATE operations should create tuples when workspace exists")
 				}
 
-			case biz.OperationTypeUpdated:
+			case model.OperationTypeUpdated:
 				// UPDATE behavior depends on workspace changes
 				if tc.currentWorkspaceID != tc.previousWorkspaceID && tc.currentWorkspaceID != "" && tc.previousWorkspaceID != "" {
 					assert.True(t, result.HasTuplesToCreate(), "UPDATE with workspace change should create new tuple")
@@ -421,7 +420,7 @@ func TestCalculateTuples_OperationTypeScenarios(t *testing.T) {
 					assert.False(t, result.HasTuplesToDelete(), "UPDATE with same workspace should not delete tuples")
 				}
 
-			case biz.OperationTypeDeleted:
+			case model.OperationTypeDeleted:
 				// DELETE should never create tuples
 				assert.False(t, result.HasTuplesToCreate(), "DELETE operations should never create tuples")
 				if tc.currentWorkspaceID != "" {

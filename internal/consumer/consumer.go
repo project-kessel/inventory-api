@@ -16,8 +16,6 @@ import (
 
 	"github.com/project-kessel/inventory-api/cmd/common"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
-	"github.com/project-kessel/inventory-api/internal/biz/schema"
-	usecase_resources "github.com/project-kessel/inventory-api/internal/biz/usecase/resources"
 	"github.com/project-kessel/inventory-api/internal/consumer/auth"
 	"github.com/project-kessel/inventory-api/internal/consumer/retry"
 	"github.com/project-kessel/inventory-api/internal/data"
@@ -40,8 +38,6 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/project-kessel/inventory-api/internal/authz"
-	"github.com/project-kessel/inventory-api/internal/authz/api"
-	"github.com/project-kessel/inventory-api/internal/biz"
 	"go.opentelemetry.io/otel/metric"
 )
 
@@ -67,14 +63,14 @@ type InventoryConsumer struct {
 	Config           CompletedConfig
 	DB               *gorm.DB
 	AuthzConfig      authz.CompletedConfig
-	Authorizer       api.Authorizer
+	Authorizer       model.Authorizer
 	Errors           chan error
 	MetricsCollector *metricscollector.MetricsCollector
 	Logger           *log.Helper
 	AuthOptions      *auth.Options
 	RetryOptions     *retry.Options
 	Notifier         pubsub.Notifier
-	SchemaService    *usecase_resources.SchemaUsecase
+	SchemaService    *model.SchemaService
 	// offsetMutex protects OffsetStorage and coordinates offset commit operations
 	// to prevent race conditions between shutdown and rebalance callbacks
 	offsetMutex sync.Mutex
@@ -84,11 +80,11 @@ type InventoryConsumer struct {
 
 	lockToken          string
 	lockId             string
-	ResourceRepository data.ResourceRepository
+	ResourceRepository model.ResourceRepository
 }
 
 // New instantiates a new InventoryConsumer
-func New(config CompletedConfig, db *gorm.DB, schemaRepository schema.Repository, authz authz.CompletedConfig, authorizer api.Authorizer, notifier pubsub.Notifier, logger *log.Helper, consumer Consumer) (InventoryConsumer, error) {
+func New(config CompletedConfig, db *gorm.DB, schemaRepository model.SchemaRepository, authz authz.CompletedConfig, authorizer model.Authorizer, notifier pubsub.Notifier, logger *log.Helper, consumer Consumer) (InventoryConsumer, error) {
 	if consumer == nil {
 		logger.Info("Setting up kafka consumer")
 		logger.Debugf("completed kafka config: %+v", config.KafkaConfig)
@@ -130,7 +126,7 @@ func New(config CompletedConfig, db *gorm.DB, schemaRepository schema.Repository
 
 	maxSerializationRetries := viper.GetInt("storage.max-serialization-retries")
 	resourceRepository := data.NewResourceRepository(db, data.NewGormTransactionManager(&mc, maxSerializationRetries))
-	schemaService := usecase_resources.NewSchemaUsecase(schemaRepository, logger)
+	schemaService := model.NewSchemaService(schemaRepository, logger)
 
 	return InventoryConsumer{
 		Consumer:           consumer,
@@ -222,7 +218,7 @@ func (i *InventoryConsumer) Consume() error {
 					continue
 				}
 
-				if operation != string(biz.OperationTypeDeleted) {
+				if operation != string(model.OperationTypeDeleted) {
 					inventoryID, err := ParseMessageKey(e.Key)
 					if err != nil {
 						metricscollector.Incr(i.MetricsCollector.MsgProcessFailures, "ParseMessageKey")
@@ -304,11 +300,11 @@ func (i *InventoryConsumer) ProcessMessage(headers map[string]string, relationsE
 	txid := headers["txid"]
 
 	switch operation {
-	case string(biz.OperationTypeCreated):
+	case string(model.OperationTypeCreated):
 		if relationsEnabled {
 			return i.processRelationsOperation(operation, txid, msg, operationConfig{
 				fetchRepresentations: func(i *InventoryConsumer, key model.ReporterResourceKey, version *uint) (*model.Representations, *model.Representations, error) {
-					return i.ResourceRepository.FindCurrentAndPreviousVersionedRepresentations(nil, key, version, biz.OperationTypeCreated)
+					return i.ResourceRepository.FindCurrentAndPreviousVersionedRepresentations(nil, key, version, model.OperationTypeCreated)
 				},
 				executeSpiceDB: func(i *InventoryConsumer, tuples model.TuplesToReplicate) (string, error) {
 					return i.CreateTuple(context.Background(), tuples.TuplesToCreate())
@@ -317,11 +313,11 @@ func (i *InventoryConsumer) ProcessMessage(headers map[string]string, relationsE
 			})
 		}
 
-	case string(biz.OperationTypeUpdated):
+	case string(model.OperationTypeUpdated):
 		if relationsEnabled {
 			return i.processRelationsOperation(operation, txid, msg, operationConfig{
 				fetchRepresentations: func(i *InventoryConsumer, key model.ReporterResourceKey, version *uint) (*model.Representations, *model.Representations, error) {
-					return i.ResourceRepository.FindCurrentAndPreviousVersionedRepresentations(nil, key, version, biz.OperationTypeUpdated)
+					return i.ResourceRepository.FindCurrentAndPreviousVersionedRepresentations(nil, key, version, model.OperationTypeUpdated)
 				},
 				executeSpiceDB: func(i *InventoryConsumer, tuples model.TuplesToReplicate) (string, error) {
 					return i.UpdateTuple(context.Background(), tuples.TuplesToCreate(), tuples.TuplesToDelete())
@@ -329,7 +325,7 @@ func (i *InventoryConsumer) ProcessMessage(headers map[string]string, relationsE
 				metricName: "UpdateTuple",
 			})
 		}
-	case string(biz.OperationTypeDeleted):
+	case string(model.OperationTypeDeleted):
 		if relationsEnabled {
 			return i.processRelationsOperation(operation, txid, msg, operationConfig{
 				fetchRepresentations: func(i *InventoryConsumer, key model.ReporterResourceKey, version *uint) (*model.Representations, *model.Representations, error) {

@@ -1,4 +1,4 @@
-package biz
+package model
 
 import (
 	"encoding/json"

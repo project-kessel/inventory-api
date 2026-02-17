@@ -9,16 +9,16 @@ import (
 
 	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1"
 	"github.com/project-kessel/inventory-api/internal/authz"
-	authzapi "github.com/project-kessel/inventory-api/internal/authz/api"
+	authzmodel "github.com/project-kessel/inventory-api/internal/biz/model"
 )
 
 type healthRepo struct {
 	DB            *gorm.DB
-	Authz         authzapi.Authorizer
+	Authz         authzmodel.Authorizer
 	CompletedAuth authz.CompletedConfig
 }
 
-func New(g *gorm.DB, a authzapi.Authorizer, completedAuth authz.CompletedConfig) *healthRepo {
+func New(g *gorm.DB, a authzmodel.Authorizer, completedAuth authz.CompletedConfig) *healthRepo {
 	return &healthRepo{
 		DB:            g,
 		Authz:         a,

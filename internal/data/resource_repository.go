@@ -6,14 +6,12 @@ import (
 
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/google/uuid"
-	"github.com/project-kessel/inventory-api/internal/biz"
 	"gorm.io/gorm"
 
 	"github.com/go-kratos/kratos/v2/errors"
 	"github.com/project-kessel/inventory-api/internal"
 	bizmodel "github.com/project-kessel/inventory-api/internal/biz/model"
 	"github.com/project-kessel/inventory-api/internal/biz/model_legacy"
-	"github.com/project-kessel/inventory-api/internal/biz/usecase"
 	datamodel "github.com/project-kessel/inventory-api/internal/data/model"
 )
 
@@ -96,24 +94,12 @@ func (result FindResourceByKeysResult) ToSnapshots() (bizmodel.ResourceSnapshot,
 	return resourceSnapshot, reporterResourceSnapshot
 }
 
-type ResourceRepository interface {
-	NextResourceId() (bizmodel.ResourceId, error)
-	NextReporterResourceId() (bizmodel.ReporterResourceId, error)
-	Save(tx *gorm.DB, resource bizmodel.Resource, operationType biz.EventOperationType, txid string) error
-	FindResourceByKeys(tx *gorm.DB, key bizmodel.ReporterResourceKey) (*bizmodel.Resource, error)
-	FindCurrentAndPreviousVersionedRepresentations(tx *gorm.DB, key bizmodel.ReporterResourceKey, currentVersion *uint, operationType biz.EventOperationType) (*bizmodel.Representations, *bizmodel.Representations, error)
-	FindLatestRepresentations(tx *gorm.DB, key bizmodel.ReporterResourceKey) (*bizmodel.Representations, error)
-	GetDB() *gorm.DB
-	GetTransactionManager() usecase.TransactionManager
-	HasTransactionIdBeenProcessed(tx *gorm.DB, transactionId string) (bool, error)
-}
-
 type resourceRepository struct {
 	db                 *gorm.DB
-	transactionManager usecase.TransactionManager
+	transactionManager bizmodel.TransactionManager
 }
 
-func NewResourceRepository(db *gorm.DB, transactionManager usecase.TransactionManager) ResourceRepository {
+func NewResourceRepository(db *gorm.DB, transactionManager bizmodel.TransactionManager) bizmodel.ResourceRepository {
 	return &resourceRepository{
 		db:                 db,
 		transactionManager: transactionManager,
@@ -138,7 +124,7 @@ func (r *resourceRepository) NextReporterResourceId() (bizmodel.ReporterResource
 	return bizmodel.NewReporterResourceId(uuidV7)
 }
 
-func (r *resourceRepository) Save(tx *gorm.DB, resource bizmodel.Resource, operationType biz.EventOperationType, txid string) error {
+func (r *resourceRepository) Save(tx *gorm.DB, resource bizmodel.Resource, operationType bizmodel.EventOperationType, txid string) error {
 	resourceSnapshot, reporterResourceSnapshot, reporterRepresentationSnapshot, commonRepresentationSnapshot, err := resource.Serialize()
 	if err != nil {
 		return fmt.Errorf("failed to serialize resource: %w", err)
@@ -178,7 +164,7 @@ func (r *resourceRepository) Save(tx *gorm.DB, resource bizmodel.Resource, opera
 
 	var resourceEvent bizmodel.ResourceEvent
 	switch operationType {
-	case biz.OperationTypeDeleted:
+	case bizmodel.OperationTypeDeleted:
 		deleteEvents := resource.ResourceDeleteEvents()
 		log.Infof("DeleteEvents to publish to outbox : %+v", deleteEvents)
 		if len(deleteEvents) == 0 {
@@ -196,7 +182,7 @@ func (r *resourceRepository) Save(tx *gorm.DB, resource bizmodel.Resource, opera
 	return nil
 }
 
-func (r *resourceRepository) handleOutboxEvents(tx *gorm.DB, resourceEvent bizmodel.ResourceEvent, operationType biz.EventOperationType, txid string) error {
+func (r *resourceRepository) handleOutboxEvents(tx *gorm.DB, resourceEvent bizmodel.ResourceEvent, operationType bizmodel.EventOperationType, txid string) error {
 	resourceMessage, tupleMessage, err := model_legacy.NewOutboxEventsFromResourceEvent(resourceEvent, operationType, txid)
 	if err != nil {
 		return err
@@ -283,11 +269,11 @@ func (r *resourceRepository) GetDB() *gorm.DB {
 	return r.db
 }
 
-func (r *resourceRepository) GetTransactionManager() usecase.TransactionManager {
+func (r *resourceRepository) GetTransactionManager() bizmodel.TransactionManager {
 	return r.transactionManager
 }
 
-func (r *resourceRepository) FindCurrentAndPreviousVersionedRepresentations(tx *gorm.DB, key bizmodel.ReporterResourceKey, currentCommonVersion *uint, operationType biz.EventOperationType) (*bizmodel.Representations, *bizmodel.Representations, error) {
+func (r *resourceRepository) FindCurrentAndPreviousVersionedRepresentations(tx *gorm.DB, key bizmodel.ReporterResourceKey, currentCommonVersion *uint, operationType bizmodel.EventOperationType) (*bizmodel.Representations, *bizmodel.Representations, error) {
 	if currentCommonVersion == nil {
 		return nil, nil, nil
 	}
@@ -311,7 +297,7 @@ func (r *resourceRepository) FindCurrentAndPreviousVersionedRepresentations(tx *
 
 	query = r.buildReporterResourceKeyQuery(query, key)
 
-	if operationType.OperationType() == biz.OperationTypeCreated {
+	if operationType.OperationType() == bizmodel.OperationTypeCreated {
 		query = query.Where("cr.version = ?", *currentCommonVersion)
 	} else {
 		query = query.Where("(cr.version = ? OR cr.version = ?)", *currentCommonVersion, *currentCommonVersion-1)

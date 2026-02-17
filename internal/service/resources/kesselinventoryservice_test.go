@@ -15,8 +15,6 @@ import (
 	kratosTransport "github.com/go-kratos/kratos/v2/transport"
 	kgrpc "github.com/go-kratos/kratos/v2/transport/grpc"
 	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2"
-	"github.com/project-kessel/inventory-api/internal/biz/schema"
-	"github.com/project-kessel/inventory-api/internal/biz/schema/validation"
 	relationsV1beta1 "github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -33,7 +31,6 @@ import (
 
 	authnapi "github.com/project-kessel/inventory-api/internal/authn/api"
 	"github.com/project-kessel/inventory-api/internal/authz"
-	authzapi "github.com/project-kessel/inventory-api/internal/authz/api"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
 	"github.com/project-kessel/inventory-api/internal/biz/usecase/metaauthorizer"
 	usecase "github.com/project-kessel/inventory-api/internal/biz/usecase/resources"
@@ -190,9 +187,9 @@ func newTestServer(t *testing.T, cfg testServerConfig) pb.KesselInventoryService
 // testUsecaseConfig holds optional overrides for constructing a test Usecase.
 // All fields have sensible defaults when left as zero values.
 type testUsecaseConfig struct {
-	Repo           data.ResourceRepository
-	SchemaRepo     schema.Repository
-	Authz          authzapi.Authorizer
+	Repo           model.ResourceRepository
+	SchemaRepo     model.SchemaRepository
+	Authz          model.Authorizer
 	Namespace      string
 	Config         *usecase.UsecaseConfig
 	MetaAuthorizer metaauthorizer.MetaAuthorizer
@@ -2964,7 +2961,7 @@ func TestInventoryService_StreamedListObjects_NilRequest(t *testing.T) {
 // newSQLiteTestRepo creates a real GORM repository backed by an in-memory SQLite
 // database with all migrations applied. Returns the repository and the underlying
 // *gorm.DB for use in assertions.
-func newSQLiteTestRepo(t *testing.T) (data.ResourceRepository, *gorm.DB) {
+func newSQLiteTestRepo(t *testing.T) (model.ResourceRepository, *gorm.DB) {
 	t.Helper()
 	db := testutil.NewSQLiteTestDB(t, &gorm.Config{TranslateError: true})
 	err := data.Migrate(db, nil)
@@ -3693,10 +3690,10 @@ func TestInventoryService_ReportResource_MetaAuthzDenied(t *testing.T) {
 	assert.Equal(t, codes.PermissionDenied, grpcStatus.Code())
 }
 
-func newFakeSchemaRepository(t *testing.T) schema.Repository {
+func newFakeSchemaRepository(t *testing.T) model.SchemaRepository {
 	schemaRepository := data.NewInMemorySchemaRepository()
 
-	emptyValidationSchema := validation.NewJsonSchemaValidatorFromString(`{
+	emptyValidationSchema := model.NewJsonSchemaValidatorFromString(`{
 		"$schema": "http://json-schema.org/draft-07/schema#",
 		"type": "object",
 		"properties": {
@@ -3704,7 +3701,7 @@ func newFakeSchemaRepository(t *testing.T) schema.Repository {
 		"required": []
 	}`)
 
-	withWorkspaceValidationSchema := validation.NewJsonSchemaValidatorFromString(`{
+	withWorkspaceValidationSchema := model.NewJsonSchemaValidatorFromString(`{
 		"$schema": "http://json-schema.org/draft-07/schema#",
 		"type": "object",
 		"properties": {
@@ -3712,26 +3709,26 @@ func newFakeSchemaRepository(t *testing.T) schema.Repository {
 		}
 	}`)
 
-	err := schemaRepository.CreateResourceSchema(context.Background(), schema.ResourceRepresentation{
+	err := schemaRepository.CreateResourceSchema(context.Background(), model.ResourceSchema{
 		ResourceType:     "k8s_cluster",
 		ValidationSchema: withWorkspaceValidationSchema,
 	})
 	assert.NoError(t, err)
 
-	err = schemaRepository.CreateReporterSchema(context.Background(), schema.ReporterRepresentation{
+	err = schemaRepository.CreateReporterSchema(context.Background(), model.ReporterSchema{
 		ResourceType:     "k8s_cluster",
 		ReporterType:     "ocm",
 		ValidationSchema: emptyValidationSchema,
 	})
 	assert.NoError(t, err)
 
-	err = schemaRepository.CreateResourceSchema(context.Background(), schema.ResourceRepresentation{
+	err = schemaRepository.CreateResourceSchema(context.Background(), model.ResourceSchema{
 		ResourceType:     "host",
 		ValidationSchema: withWorkspaceValidationSchema,
 	})
 	assert.NoError(t, err)
 
-	err = schemaRepository.CreateReporterSchema(context.Background(), schema.ReporterRepresentation{
+	err = schemaRepository.CreateReporterSchema(context.Background(), model.ReporterSchema{
 		ResourceType:     "host",
 		ReporterType:     "hbi",
 		ValidationSchema: emptyValidationSchema,

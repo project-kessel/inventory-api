@@ -1,4 +1,4 @@
-package validation
+package model
 
 import (
 	"fmt"
@@ -7,11 +7,16 @@ import (
 	"github.com/xeipuuv/gojsonschema"
 )
 
+type ValidationSchema interface {
+	Validate(data interface{}) (bool, error)
+}
+type ValidationSchemaFromString func(string) ValidationSchema
+
 type jsonSchemaValidator struct {
 	jsonSchema string
 }
 
-func NewJsonSchemaValidatorFromString(jsonSchema string) Schema {
+func NewJsonSchemaValidatorFromString(jsonSchema string) ValidationSchema {
 	return jsonSchemaValidator{
 		jsonSchema: jsonSchema,
 	}

@@ -301,7 +301,7 @@ func (uc *Usecase) updateResource(tx *gorm.DB, cmd ReportResourceCommand, existi
 		cmd.ReporterInstanceId,
 	)
 	if err != nil {
-		return fmt.Errorf("failed to create reporter resource key: %w", err)
+		return err
 	}
 
 	consoleHref, transactionId, reporterRepresentation, commonRepresentation := resolveOptionalFields(cmd)

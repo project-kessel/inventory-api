@@ -70,7 +70,7 @@ func (s *InventoryService) Check(ctx context.Context, req *pb.CheckRequest) (*pb
 		log.Error("Failed to build relation: ", err)
 		return nil, err
 	}
-	consistency := ConvertConsistencyToModel(req.GetConsistency())
+	consistency := ConsistencyFromProto(req.GetConsistency())
 	resp, err := s.Ctl.Check(ctx, relation, subjectRef, reporterResourceKey, consistency)
 	if err != nil {
 		return nil, err
@@ -124,7 +124,7 @@ func (s *InventoryService) CheckSelf(ctx context.Context, req *pb.CheckSelfReque
 	if err != nil {
 		return nil, err
 	}
-	consistency := ConvertConsistencyToModel(req.GetConsistency())
+	consistency := ConsistencyFromProto(req.GetConsistency())
 	log.Infof("CheckSelf request consistency: %s", consistency.Preference)
 	resp, err := s.Ctl.CheckSelf(ctx, relation, reporterResourceKey, consistency)
 	if err != nil {
@@ -208,16 +208,26 @@ func toCheckBulkCommand(req *pb.CheckBulkRequest) (resources.CheckBulkCommand, e
 		}
 	}
 
-	consistency := consistencyFromProto(req.GetConsistency())
+	consistency := ConsistencyFromProto(req.GetConsistency())
 	return resources.CheckBulkCommand{
 		Items:       items,
 		Consistency: consistency,
 	}, nil
 }
 
-// consistencyFromProto converts v1beta2 Consistency to model.Consistency.
-func consistencyFromProto(c *pb.Consistency) model.Consistency {
-	if c == nil || c.GetAtLeastAsFresh() == nil {
+// ConsistencyFromProto converts v1beta2 Consistency to model.Consistency.
+// Used by Check, CheckSelf, CheckBulk, CheckSelfBulk, and LookupResources.
+func ConsistencyFromProto(c *pb.Consistency) model.Consistency {
+	if c == nil {
+		return model.NewConsistencyMinimizeLatency()
+	}
+	if c.GetMinimizeLatency() {
+		return model.NewConsistencyMinimizeLatency()
+	}
+	if c.GetAtLeastAsAcknowledged() {
+		return model.NewConsistencyAtLeastAsAcknowledged()
+	}
+	if c.GetAtLeastAsFresh() == nil {
 		return model.NewConsistencyMinimizeLatency()
 	}
 	token := model.DeserializeConsistencyToken(c.GetAtLeastAsFresh().GetToken())
@@ -276,29 +286,6 @@ func fromCheckBulkResult(result *resources.CheckBulkResult, req *pb.CheckBulkReq
 	return resp
 }
 
-// ConvertConsistencyToModel converts the proto Consistency to internal model type.
-func ConvertConsistencyToModel(consistency *pb.Consistency) model.Consistency {
-	if consistency == nil {
-		// Return unspecified - the usecase layer will handle the default based on feature flag
-		return model.NewConsistencyUnspecified()
-	}
-
-	if consistency.GetMinimizeLatency() {
-		return model.NewConsistencyMinimizeLatency()
-	}
-
-	if consistency.GetAtLeastAsAcknowledged() {
-		return model.NewConsistencyAtLeastAsAcknowledged()
-	}
-
-	if token := consistency.GetAtLeastAsFresh(); token != nil {
-		return model.NewConsistencyAtLeastAsFresh(model.ConsistencyToken(token.GetToken()))
-	}
-
-	// Return unspecified - the usecase layer will handle the default based on feature flag
-	return model.NewConsistencyUnspecified()
-}
-
 // toCheckSelfBulkCommand converts a v1beta2 CheckSelfBulkRequest to a usecase CheckSelfBulkCommand.
 func toCheckSelfBulkCommand(req *pb.CheckSelfBulkRequest) (resources.CheckSelfBulkCommand, error) {
 	items := make([]resources.CheckSelfBulkItem, len(req.GetItems()))
@@ -317,7 +304,7 @@ func toCheckSelfBulkCommand(req *pb.CheckSelfBulkRequest) (resources.CheckSelfBu
 		}
 	}
 
-	consistency := consistencyFromProto(req.GetConsistency())
+	consistency := ConsistencyFromProto(req.GetConsistency())
 	return resources.CheckSelfBulkCommand{
 		Items:       items,
 		Consistency: consistency,
@@ -438,7 +425,7 @@ func ToLookupResourcesCommand(request *pb.StreamedListObjectsRequest) (resources
 	if err != nil {
 		return resources.LookupResourcesCommand{}, fmt.Errorf("invalid subject: %w", err)
 	}
-	consistency := ConvertConsistencyToModel(request.GetConsistency())
+	consistency := ConsistencyFromProto(request.GetConsistency())
 
 	var limit uint32 = 1000
 	var continuation string

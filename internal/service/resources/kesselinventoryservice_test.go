@@ -437,7 +437,7 @@ func TestToLookupResourceResponse(t *testing.T) {
 	assert.Equal(t, expected, result)
 }
 
-func TestConvertConsistencyToModel(t *testing.T) {
+func TestConsistencyFromProto(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -446,9 +446,9 @@ func TestConvertConsistencyToModel(t *testing.T) {
 		expected model.Consistency
 	}{
 		{
-			name:     "nil consistency returns unspecified",
+			name:     "nil consistency returns minimize_latency",
 			input:    nil,
-			expected: model.NewConsistencyUnspecified(),
+			expected: model.NewConsistencyMinimizeLatency(),
 		},
 		{
 			name: "minimize_latency true returns minimize_latency",
@@ -483,16 +483,16 @@ func TestConvertConsistencyToModel(t *testing.T) {
 			expected: model.NewConsistencyAtLeastAsFresh(model.MinimizeLatencyToken),
 		},
 		{
-			name:     "empty consistency struct returns unspecified",
+			name:     "empty consistency struct returns minimize_latency",
 			input:    &pb.Consistency{},
-			expected: model.NewConsistencyUnspecified(),
+			expected: model.NewConsistencyMinimizeLatency(),
 		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			result := svc.ConvertConsistencyToModel(tc.input)
+			result := svc.ConsistencyFromProto(tc.input)
 			assert.Equal(t, tc.expected.Preference, result.Preference)
 			assert.Equal(t, tc.expected.Token, result.Token)
 		})

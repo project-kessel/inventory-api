@@ -480,22 +480,6 @@ func (uc *Usecase) CheckSelfBulk(ctx context.Context, cmd CheckSelfBulkCommand) 
 	return checkBulkResultFromV1beta1(resp, bulkCmd)
 }
 
-func (uc *Usecase) checkPermission(ctx context.Context, relation model.Relation, sub model.SubjectReference, reporterResourceKey model.ReporterResourceKey) (bool, error) {
-	res, err := uc.resourceRepository.FindResourceByKeys(nil, reporterResourceKey)
-	var consistencyToken string
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			// Resource not in inventory: use empty token (minimize_latency) and still call Authz
-			consistencyToken = ""
-		} else {
-			return false, err
-		}
-	} else {
-		consistencyToken = res.ConsistencyToken().Serialize()
-	}
-	return uc.checkWithToken(ctx, relation, sub, reporterResourceKey, consistencyToken)
-}
-
 // checkWithToken runs Authz.Check with the given consistency token. Used by Check (after resolveConsistencyToken) and by checkPermission (CheckSelf).
 func (uc *Usecase) checkWithToken(ctx context.Context, relation model.Relation, sub model.SubjectReference, reporterResourceKey model.ReporterResourceKey, consistencyToken string) (bool, error) {
 	namespace := reporterResourceKey.ReporterType().Serialize()

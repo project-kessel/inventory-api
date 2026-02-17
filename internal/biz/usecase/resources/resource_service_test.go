@@ -2036,8 +2036,8 @@ func TestResolveConsistencyToken(t *testing.T) {
 
 			// If resource should exist, create it first
 			if tt.resourceExists {
-				reportRequest := createTestReportRequest(t, "host", "hbi", "test-instance", "test-resource-123", "test-workspace")
-				err := uc.ReportResource(ctx, reportRequest, "test-reporter")
+				cmd := fixture(t).Basic("host", "hbi", "test-instance", "test-resource-123", "test-workspace")
+				err := uc.ReportResource(ctx, cmd)
 				require.NoError(t, err)
 			}
 

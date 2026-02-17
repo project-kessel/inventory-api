@@ -8,7 +8,6 @@ import (
 
 	"github.com/go-kratos/kratos/v2/log"
 	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2"
-	authnapi "github.com/project-kessel/inventory-api/internal/authn/api"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
 	"github.com/project-kessel/inventory-api/internal/biz/usecase/resources"
 	pbv1beta1 "github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
@@ -29,20 +28,17 @@ func NewKesselInventoryServiceV1beta2(c *resources.Usecase) *InventoryService {
 }
 
 func (c *InventoryService) ReportResource(ctx context.Context, r *pb.ReportResourceRequest) (*pb.ReportResourceResponse, error) {
-	// Get SubjectId from AuthzContext (populated by auth middleware)
-	// TODO: push this to report resource to get its own reporter principal OR pass authzcontext as param to all Usecase methods
-	authzCtx, ok := authnapi.FromAuthzContext(ctx)
-	if !ok || authzCtx.Subject == nil {
-		log.Errorf("failed to get authz context or claims")
-		return nil, status.Error(codes.Unauthenticated, "authentication required")
+	cmd, err := toReportResourceCommand(r)
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid request: %v", err)
 	}
-	err := c.Ctl.ReportResource(ctx, r, string(authzCtx.Subject.SubjectId))
+
+	err = c.Ctl.ReportResource(ctx, cmd)
 	if err != nil {
 		return nil, err
 	}
 
 	return ResponseFromResource(), nil
-
 }
 
 func (c *InventoryService) DeleteResource(ctx context.Context, r *pb.DeleteResourceRequest) (*pb.DeleteResourceResponse, error) {
@@ -509,4 +505,103 @@ func ResponseFromResource() *pb.ReportResourceResponse {
 
 func ResponseFromDeleteResource() *pb.DeleteResourceResponse {
 	return &pb.DeleteResourceResponse{}
+}
+
+// toReportResourceCommand converts a protobuf ReportResourceRequest to a domain ReportResourceCommand.
+// This function handles all the conversion from presentation types to domain types.
+func toReportResourceCommand(r *pb.ReportResourceRequest) (resources.ReportResourceCommand, error) {
+	localResourceId, err := model.NewLocalResourceId(r.GetRepresentations().GetMetadata().GetLocalResourceId())
+	if err != nil {
+		return resources.ReportResourceCommand{}, fmt.Errorf("invalid local resource ID: %w", err)
+	}
+
+	resourceType, err := model.NewResourceType(r.GetType())
+	if err != nil {
+		return resources.ReportResourceCommand{}, fmt.Errorf("invalid resource type: %w", err)
+	}
+
+	reporterType, err := model.NewReporterType(r.GetReporterType())
+	if err != nil {
+		return resources.ReportResourceCommand{}, fmt.Errorf("invalid reporter type: %w", err)
+	}
+
+	reporterInstanceId, err := model.NewReporterInstanceId(r.GetReporterInstanceId())
+	if err != nil {
+		return resources.ReportResourceCommand{}, fmt.Errorf("invalid reporter instance ID: %w", err)
+	}
+
+	apiHref, err := model.NewApiHref(r.GetRepresentations().GetMetadata().GetApiHref())
+	if err != nil {
+		return resources.ReportResourceCommand{}, fmt.Errorf("invalid API href: %w", err)
+	}
+
+	var consoleHref *model.ConsoleHref
+	if consoleHrefVal := r.GetRepresentations().GetMetadata().GetConsoleHref(); consoleHrefVal != "" {
+		ch, err := model.NewConsoleHref(consoleHrefVal)
+		if err != nil {
+			return resources.ReportResourceCommand{}, fmt.Errorf("invalid console href: %w", err)
+		}
+		consoleHref = &ch
+	}
+
+	var reporterVersion *model.ReporterVersion
+	if reporterVersionVal := r.GetRepresentations().GetMetadata().GetReporterVersion(); reporterVersionVal != "" {
+		rv, err := model.NewReporterVersion(reporterVersionVal)
+		if err != nil {
+			return resources.ReportResourceCommand{}, fmt.Errorf("invalid reporter version: %w", err)
+		}
+		reporterVersion = &rv
+	}
+
+	var reporterRepresentation *model.Representation
+	if r.GetRepresentations().GetReporter() != nil {
+		rep, err := model.NewRepresentation(r.GetRepresentations().GetReporter().AsMap())
+		if err != nil {
+			return resources.ReportResourceCommand{}, fmt.Errorf("invalid reporter representation: %w", err)
+		}
+		reporterRepresentation = &rep
+	}
+
+	var commonRepresentation *model.Representation
+	if r.GetRepresentations().GetCommon() != nil {
+		rep, err := model.NewRepresentation(r.GetRepresentations().GetCommon().AsMap())
+		if err != nil {
+			return resources.ReportResourceCommand{}, fmt.Errorf("invalid common representation: %w", err)
+		}
+		commonRepresentation = &rep
+	}
+
+	var transactionId *model.TransactionId
+	if txIdVal := r.GetRepresentations().GetMetadata().GetTransactionId(); txIdVal != "" {
+		txId := model.NewTransactionId(txIdVal)
+		transactionId = &txId
+	}
+
+	writeVisibility := writeVisibilityFromProto(r.GetWriteVisibility())
+
+	return resources.ReportResourceCommand{
+		LocalResourceId:        localResourceId,
+		ResourceType:           resourceType,
+		ReporterType:           reporterType,
+		ReporterInstanceId:     reporterInstanceId,
+		ApiHref:                apiHref,
+		ConsoleHref:            consoleHref,
+		ReporterVersion:        reporterVersion,
+		TransactionId:          transactionId,
+		ReporterRepresentation: reporterRepresentation,
+		CommonRepresentation:   commonRepresentation,
+		WriteVisibility:        writeVisibility,
+	}, nil
+}
+
+// writeVisibilityFromProto converts a protobuf WriteVisibility to domain WriteVisibility.
+func writeVisibilityFromProto(wv pb.WriteVisibility) resources.WriteVisibility {
+	switch wv {
+	case pb.WriteVisibility_IMMEDIATE:
+		return resources.WriteVisibilityConsistent
+	case pb.WriteVisibility_MINIMIZE_LATENCY:
+		return resources.WriteVisibilityMinimizeLatency
+	default:
+		return resources.WriteVisibilityUnspecified
+	}
 }

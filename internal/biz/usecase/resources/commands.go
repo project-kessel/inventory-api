@@ -4,6 +4,41 @@ import (
 	"github.com/project-kessel/inventory-api/internal/biz/model"
 )
 
+// WriteVisibility represents the write visibility option for resource operations.
+type WriteVisibility int
+
+const (
+	// WriteVisibilityUnspecified means no specific visibility was requested.
+	WriteVisibilityUnspecified WriteVisibility = iota
+	// WriteVisibilityMinimizeLatency prioritizes speed over consistency.
+	WriteVisibilityMinimizeLatency
+	// WriteVisibilityConsistent waits for the write to be visible.
+	WriteVisibilityConsistent
+)
+
+// ReportResourceCommand contains the data needed to report a resource.
+// This is the domain command used by the usecase layer, decoupled from protobuf types.
+type ReportResourceCommand struct {
+	// Resource identification
+	LocalResourceId    model.LocalResourceId
+	ResourceType       model.ResourceType
+	ReporterType       model.ReporterType
+	ReporterInstanceId model.ReporterInstanceId
+
+	// Metadata
+	ApiHref         model.ApiHref
+	ConsoleHref     *model.ConsoleHref
+	ReporterVersion *model.ReporterVersion
+	TransactionId   *model.TransactionId
+
+	// Representations (optional)
+	ReporterRepresentation *model.Representation
+	CommonRepresentation   *model.Representation
+
+	// Write behavior
+	WriteVisibility WriteVisibility
+}
+
 // CheckBulkItem represents a single item in a bulk check request.
 type CheckBulkItem struct {
 	Resource model.ReporterResourceKey

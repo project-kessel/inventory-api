@@ -1623,6 +1623,110 @@ func TestInventoryService_ReportResource_Update(t *testing.T) {
 	assert.NotNil(t, resp2)
 }
 
+func TestInventoryService_ReportResource_Update_FieldsEffective(t *testing.T) {
+	// Test that reporting the same resource again with different field values
+	// actually persists the updated values.
+	claims := &authnapi.Claims{
+		SubjectId: authnapi.SubjectId("reporter-service"),
+		AuthType:  authnapi.AuthTypeXRhIdentity,
+	}
+
+	repo, db := newSQLiteTestRepo(t)
+	uc := newTestUsecase(t, testUsecaseConfig{Repo: repo})
+	client := newTestServer(t, testServerConfig{
+		Usecase:       uc,
+		Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+	})
+
+	originalConsoleHref := "https://console.example.com/hosts/original"
+
+	// First report - create
+	createReq := &pb.ReportResourceRequest{
+		Type:               "host",
+		ReporterType:       "hbi",
+		ReporterInstanceId: "instance-001",
+		Representations: &pb.ResourceRepresentations{
+			Metadata: &pb.RepresentationMetadata{
+				LocalResourceId: "update-effective-host",
+				ApiHref:         "https://api.example.com/v1/hosts/original",
+				ConsoleHref:     &originalConsoleHref,
+			},
+			Common: &structpb.Struct{
+				Fields: map[string]*structpb.Value{
+					"workspace_id": structpb.NewStringValue("ws-original"),
+				},
+			},
+			Reporter: &structpb.Struct{
+				Fields: map[string]*structpb.Value{
+					"version": structpb.NewStringValue("1.0"),
+				},
+			},
+		},
+	}
+
+	resp1, err := client.ReportResource(context.Background(), createReq)
+	require.NoError(t, err)
+	require.NotNil(t, resp1)
+
+	key := buildReporterResourceKey(t, "update-effective-host", "host", "hbi", "instance-001")
+
+	// Verify initial state
+	resource1, err := repo.FindResourceByKeys(db, key)
+	require.NoError(t, err)
+	require.NotNil(t, resource1)
+	assert.Equal(t, "https://api.example.com/v1/hosts/original", resource1.ReporterResources()[0].ApiHref().String())
+	assert.Equal(t, originalConsoleHref, resource1.ReporterResources()[0].ConsoleHref().String())
+
+	reps1, err := repo.FindLatestRepresentations(db, key)
+	require.NoError(t, err)
+	assert.Equal(t, "ws-original", reps1.CommonData()["workspace_id"])
+
+	// Second report - update with changed values
+	updatedConsoleHref := "https://console.example.com/hosts/updated"
+	updateReq := &pb.ReportResourceRequest{
+		Type:               "host",
+		ReporterType:       "hbi",
+		ReporterInstanceId: "instance-001",
+		Representations: &pb.ResourceRepresentations{
+			Metadata: &pb.RepresentationMetadata{
+				LocalResourceId: "update-effective-host",
+				ApiHref:         "https://api.example.com/v2/hosts/updated",
+				ConsoleHref:     &updatedConsoleHref,
+			},
+			Common: &structpb.Struct{
+				Fields: map[string]*structpb.Value{
+					"workspace_id": structpb.NewStringValue("ws-updated"),
+				},
+			},
+			Reporter: &structpb.Struct{
+				Fields: map[string]*structpb.Value{
+					"version": structpb.NewStringValue("2.0"),
+				},
+			},
+		},
+	}
+
+	resp2, err := client.ReportResource(context.Background(), updateReq)
+	require.NoError(t, err)
+	require.NotNil(t, resp2)
+
+	// Verify updated state
+	resource2, err := repo.FindResourceByKeys(db, key)
+	require.NoError(t, err)
+	require.NotNil(t, resource2)
+
+	rr := resource2.ReporterResources()[0]
+	assert.Equal(t, "https://api.example.com/v2/hosts/updated", rr.ApiHref().String(),
+		"api_href should reflect the updated value")
+	assert.Equal(t, updatedConsoleHref, rr.ConsoleHref().String(),
+		"console_href should reflect the updated value")
+
+	reps2, err := repo.FindLatestRepresentations(db, key)
+	require.NoError(t, err)
+	assert.Equal(t, "ws-updated", reps2.CommonData()["workspace_id"],
+		"common data should reflect the updated value")
+}
+
 func TestInventoryService_ReportResource_Update_DifferentReporterInstance(t *testing.T) {
 	// Test that reporting same local_resource_id from a different reporter instance
 	// creates a new resource (different reporter key)
@@ -2987,7 +3091,7 @@ func TestInventoryService_ReportResource_NilOrEmptyRepresentationStructs(t *test
 			localResourceId: "host-both-nil",
 			common:          nil,
 			reporter:        nil,
-			expectMsg:       "invalid reporter representation: representation data cannot be empty",
+			expectMsg:       "invalid reporter representation: representation required",
 		},
 		{
 			name:            "common set, reporter nil",
@@ -2998,7 +3102,7 @@ func TestInventoryService_ReportResource_NilOrEmptyRepresentationStructs(t *test
 				},
 			},
 			reporter:  nil,
-			expectMsg: "invalid reporter representation: representation data cannot be empty",
+			expectMsg: "invalid reporter representation: representation required",
 		},
 		{
 			name:            "common nil, reporter set",
@@ -3009,7 +3113,7 @@ func TestInventoryService_ReportResource_NilOrEmptyRepresentationStructs(t *test
 					"reporter_field": structpb.NewStringValue("val"),
 				},
 			},
-			expectMsg: "invalid common representation: representation data cannot be empty",
+			expectMsg: "invalid common representation: representation required",
 		},
 		{
 			name:            "both empty structs",
@@ -3049,9 +3153,213 @@ func TestInventoryService_ReportResource_NilOrEmptyRepresentationStructs(t *test
 
 			grpcStatus, ok := status.FromError(err)
 			require.True(t, ok)
-			assert.Equal(t, codes.Unknown, grpcStatus.Code(),
-				"nil/empty representation errors are not mapped to a specific gRPC code")
+			assert.Equal(t, codes.InvalidArgument, grpcStatus.Code())
 			assert.Contains(t, grpcStatus.Message(), tc.expectMsg)
+		})
+	}
+}
+
+// --- ReportResource: Error Message Format Tests ---
+// These tests verify the exact error message format returned by the service layer.
+// They serve as a contract for API consumers and must be updated if error formats change.
+
+// TestInventoryService_ReportResource_ErrorFormats tests error messages
+// from the protovalidate middleware, which catches empty/invalid fields before they
+// reach the service layer.
+func TestInventoryService_ReportResource_ErrorFormats(t *testing.T) {
+	claims := &authnapi.Claims{
+		SubjectId: authnapi.SubjectId("reporter-service"),
+		AuthType:  authnapi.AuthTypeXRhIdentity,
+	}
+
+	validCommon := &structpb.Struct{
+		Fields: map[string]*structpb.Value{
+			"workspace_id": structpb.NewStringValue("ws-123"),
+		},
+	}
+	validReporter := &structpb.Struct{
+		Fields: map[string]*structpb.Value{
+			"satellite_id": structpb.NewStringValue("sat-123"),
+		},
+	}
+
+	cases := []struct {
+		name              string
+		resourceType      string
+		reporterType      string
+		reporterInstance  string
+		localResourceId   string
+		apiHref           string
+		expectCode        codes.Code
+		expectMsgContains string
+	}{
+		{
+			name:              "empty local_resource_id",
+			resourceType:      "host",
+			reporterType:      "hbi",
+			reporterInstance:  "instance-001",
+			localResourceId:   "",
+			apiHref:           "https://api.example.com/hosts/test",
+			expectCode:        codes.InvalidArgument,
+			expectMsgContains: "local_resource_id",
+		},
+		{
+			name:              "empty resource_type",
+			resourceType:      "",
+			reporterType:      "hbi",
+			reporterInstance:  "instance-001",
+			localResourceId:   "test-host",
+			apiHref:           "https://api.example.com/hosts/test",
+			expectCode:        codes.InvalidArgument,
+			expectMsgContains: "type",
+		},
+		{
+			name:              "empty reporter_type",
+			resourceType:      "host",
+			reporterType:      "",
+			reporterInstance:  "instance-001",
+			localResourceId:   "test-host",
+			apiHref:           "https://api.example.com/hosts/test",
+			expectCode:        codes.InvalidArgument,
+			expectMsgContains: "reporter_type",
+		},
+		{
+			name:              "empty reporter_instance_id",
+			resourceType:      "host",
+			reporterType:      "hbi",
+			reporterInstance:  "",
+			localResourceId:   "test-host",
+			apiHref:           "https://api.example.com/hosts/test",
+			expectCode:        codes.InvalidArgument,
+			expectMsgContains: "reporter_instance_id",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			uc := newTestUsecase(t, testUsecaseConfig{})
+			client := newTestServer(t, testServerConfig{
+				Usecase:       uc,
+				Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+			})
+
+			req := &pb.ReportResourceRequest{
+				Type:               tc.resourceType,
+				ReporterType:       tc.reporterType,
+				ReporterInstanceId: tc.reporterInstance,
+				Representations: &pb.ResourceRepresentations{
+					Metadata: &pb.RepresentationMetadata{
+						LocalResourceId: tc.localResourceId,
+						ApiHref:         tc.apiHref,
+					},
+					Common:   validCommon,
+					Reporter: validReporter,
+				},
+			}
+
+			resp, err := client.ReportResource(context.Background(), req)
+			assert.Error(t, err)
+			assert.Nil(t, resp)
+
+			grpcStatus, ok := status.FromError(err)
+			require.True(t, ok)
+			assert.Equal(t, tc.expectCode, grpcStatus.Code(), "unexpected status code")
+			assert.Contains(t, grpcStatus.Message(), tc.expectMsgContains, "unexpected error message")
+		})
+	}
+}
+
+func TestInventoryService_ReportResource_ValidationErrorFormats(t *testing.T) {
+	claims := &authnapi.Claims{
+		SubjectId: authnapi.SubjectId("reporter-service"),
+		AuthType:  authnapi.AuthTypeXRhIdentity,
+	}
+
+	cases := []struct {
+		name              string
+		resourceType      string
+		reporterType      string
+		common            *structpb.Struct
+		reporter          *structpb.Struct
+		expectCode        codes.Code
+		expectMsgContains string
+	}{
+		{
+			name:         "unknown reporter for resource type",
+			resourceType: "host",
+			reporterType: "unknown_reporter",
+			common: &structpb.Struct{
+				Fields: map[string]*structpb.Value{
+					"workspace_id": structpb.NewStringValue("ws-123"),
+				},
+			},
+			reporter: &structpb.Struct{
+				Fields: map[string]*structpb.Value{
+					"data": structpb.NewStringValue("value"),
+				},
+			},
+			expectCode:        codes.InvalidArgument,
+			expectMsgContains: "failed validation for report resource",
+		},
+		{
+			name:         "nil reporter representation",
+			resourceType: "host",
+			reporterType: "hbi",
+			common: &structpb.Struct{
+				Fields: map[string]*structpb.Value{
+					"workspace_id": structpb.NewStringValue("ws-123"),
+				},
+			},
+			reporter:          nil,
+			expectCode:        codes.InvalidArgument,
+			expectMsgContains: "invalid reporter representation: representation required",
+		},
+		{
+			name:         "nil common representation",
+			resourceType: "host",
+			reporterType: "hbi",
+			common:       nil,
+			reporter: &structpb.Struct{
+				Fields: map[string]*structpb.Value{
+					"satellite_id": structpb.NewStringValue("sat-123"),
+				},
+			},
+			expectCode:        codes.InvalidArgument,
+			expectMsgContains: "invalid common representation: representation required",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			repo, _ := newSQLiteTestRepo(t)
+			uc := newTestUsecase(t, testUsecaseConfig{Repo: repo})
+			client := newTestServer(t, testServerConfig{
+				Usecase:       uc,
+				Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+			})
+
+			req := &pb.ReportResourceRequest{
+				Type:               tc.resourceType,
+				ReporterType:       tc.reporterType,
+				ReporterInstanceId: "instance-001",
+				Representations: &pb.ResourceRepresentations{
+					Metadata: &pb.RepresentationMetadata{
+						LocalResourceId: "test-host",
+						ApiHref:         "https://api.example.com/hosts/test",
+					},
+					Common:   tc.common,
+					Reporter: tc.reporter,
+				},
+			}
+
+			resp, err := client.ReportResource(context.Background(), req)
+			assert.Error(t, err)
+			assert.Nil(t, resp)
+
+			grpcStatus, ok := status.FromError(err)
+			require.True(t, ok)
+			assert.Equal(t, tc.expectCode, grpcStatus.Code(), "unexpected status code")
+			assert.Contains(t, grpcStatus.Message(), tc.expectMsgContains, "unexpected error message")
 		})
 	}
 }
@@ -3365,8 +3673,6 @@ func TestInventoryService_ReportResource_MetaAuthzDenied(t *testing.T) {
 				LocalResourceId: "host-denied",
 				ApiHref:         "https://api.example.com/hosts/host-denied",
 			},
-			Common:   &structpb.Struct{},
-			Reporter: &structpb.Struct{},
 		},
 	}
 

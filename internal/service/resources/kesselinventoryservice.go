@@ -219,7 +219,7 @@ func toCheckBulkCommand(req *pb.CheckBulkRequest) (resources.CheckBulkCommand, e
 // Used by Check, CheckSelf, CheckBulk, CheckSelfBulk, and LookupResources.
 func ConsistencyFromProto(c *pb.Consistency) model.Consistency {
 	if c == nil {
-		return model.NewConsistencyMinimizeLatency()
+		return model.NewConsistencyUnspecified()
 	}
 	if c.GetMinimizeLatency() {
 		return model.NewConsistencyMinimizeLatency()
@@ -228,7 +228,7 @@ func ConsistencyFromProto(c *pb.Consistency) model.Consistency {
 		return model.NewConsistencyAtLeastAsAcknowledged()
 	}
 	if c.GetAtLeastAsFresh() == nil {
-		return model.NewConsistencyMinimizeLatency()
+		return model.NewConsistencyUnspecified()
 	}
 	token := model.DeserializeConsistencyToken(c.GetAtLeastAsFresh().GetToken())
 	return model.NewConsistencyAtLeastAsFresh(token)

@@ -2015,8 +2015,9 @@ func TestResolveConsistencyToken(t *testing.T) {
 			schemaRepo := newFakeSchemaRepository(t)
 			authorizer := &allow.AllowAllAuthz{}
 			usecaseConfig := &UsecaseConfig{
-				ReadAfterWriteEnabled: false,
-				ConsumerEnabled:       false,
+				ReadAfterWriteEnabled:          false,
+				ConsumerEnabled:                false,
+				DefaultToAtLeastAsAcknowledged: tt.featureFlagEnabled,
 			}
 			mc := metricscollector.NewFakeMetricsCollector()
 			uc := New(resourceRepo, schemaRepo, authorizer, "test-topic", logger, nil, nil, usecaseConfig, mc, nil, newTestSelfSubjectStrategy())

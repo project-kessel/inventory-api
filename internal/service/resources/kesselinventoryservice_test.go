@@ -446,9 +446,9 @@ func TestConsistencyFromProto(t *testing.T) {
 		expected model.Consistency
 	}{
 		{
-			name:     "nil consistency returns minimize_latency",
+			name:     "nil consistency returns unspecified",
 			input:    nil,
-			expected: model.NewConsistencyMinimizeLatency(),
+			expected: model.NewConsistencyUnspecified(),
 		},
 		{
 			name: "minimize_latency true returns minimize_latency",
@@ -483,9 +483,9 @@ func TestConsistencyFromProto(t *testing.T) {
 			expected: model.NewConsistencyAtLeastAsFresh(model.MinimizeLatencyToken),
 		},
 		{
-			name:     "empty consistency struct returns minimize_latency",
+			name:     "empty consistency struct returns unspecified",
 			input:    &pb.Consistency{},
-			expected: model.NewConsistencyMinimizeLatency(),
+			expected: model.NewConsistencyUnspecified(),
 		},
 	}
 

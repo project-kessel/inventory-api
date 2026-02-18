@@ -443,7 +443,7 @@ components:
                         - $ref: '#/components/schemas/kessel.inventory.v1beta2.Consistency'
                     description: |-
                         Consistency requirement for the check operation.
-                         If not specified, standard server configuration defaults to minimize_latency.
+                         If not specified, standard server configuration defaults to at_least_as_acknowledged.
                          Server deployments may override this default behavior (for example, to
                          at_least_as_acknowledged).
         kessel.inventory.v1beta2.CheckResponse:

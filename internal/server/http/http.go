@@ -67,8 +67,6 @@ func New(c CompletedConfig, authn middleware.Middleware, meter metric.Meter, log
 }
 
 // NewWithDeps creates an HTTP server from pre-built dependencies.
-// If authnOverride is non-nil it is used as the authentication middleware;
-// otherwise one is derived from deps.Authenticator.
 func NewWithDeps(deps ServerConfig) (*http.Server, error) {
 	// TODO: pass in health, authn middleware
 	middlewares := []middleware.Middleware{

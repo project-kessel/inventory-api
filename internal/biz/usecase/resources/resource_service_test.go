@@ -20,6 +20,7 @@ import (
 	"github.com/project-kessel/inventory-api/internal/data"
 	"github.com/project-kessel/inventory-api/internal/metricscollector"
 	"github.com/project-kessel/inventory-api/internal/subject/selfsubject"
+	kessel "github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
 )
 
 func testAuthzContext() context.Context {
@@ -2051,7 +2052,7 @@ func TestResolveConsistencyToken(t *testing.T) {
 }
 
 func TestResolveConsistencyToken_UnknownPreference(t *testing.T) {
-	// Test that unknown preference defaults to minimize_latency (empty token)
+	// Unknown preferences are rejected defensively.
 	ctx := testAuthzContext()
 	logger := log.DefaultLogger
 
@@ -2061,7 +2062,7 @@ func TestResolveConsistencyToken_UnknownPreference(t *testing.T) {
 	usecaseConfig := &UsecaseConfig{
 		ReadAfterWriteEnabled:          false,
 		ConsumerEnabled:                false,
-		DefaultToAtLeastAsAcknowledged: true,
+		DefaultToAtLeastAsAcknowledged: false,
 	}
 
 	mc := metricscollector.NewFakeMetricsCollector()
@@ -2088,6 +2089,57 @@ func TestResolveConsistencyToken_UnknownPreference(t *testing.T) {
 
 	token, err := uc.resolveConsistencyToken(ctx, unknownConfig, reporterResourceKey)
 
-	assert.NoError(t, err)
-	assert.Equal(t, "", token) // Should default to minimize_latency
+	assert.Error(t, err)
+	assert.Equal(t, "", token)
+}
+
+func TestCheckBulkCommandToV1beta1_UsesMinimizeLatencyForUnspecified(t *testing.T) {
+	subject, err := buildTestSubjectReference("user-1")
+	require.NoError(t, err)
+	relation, err := model.NewRelation("view")
+	require.NoError(t, err)
+
+	cmd := CheckBulkCommand{
+		Items: []CheckBulkItem{
+			{
+				Resource: createReporterResourceKey(t, "host-1", "host", "hbi", "instance-1"),
+				Relation: relation,
+				Subject:  subject,
+			},
+		},
+		Consistency: model.NewConsistencyUnspecified(),
+	}
+
+	req := checkBulkCommandToV1beta1(cmd)
+	require.NotNil(t, req)
+	require.NotNil(t, req.Consistency)
+	_, ok := req.Consistency.Requirement.(*kessel.Consistency_MinimizeLatency)
+	assert.True(t, ok, "unspecified consistency should map to minimize_latency for bulk authz requests")
+}
+
+func TestLookupResourcesCommandToV1beta1_UsesMinimizeLatencyForUnspecified(t *testing.T) {
+	subject, err := buildTestSubjectReference("user-1")
+	require.NoError(t, err)
+	resourceType, err := model.NewResourceType("host")
+	require.NoError(t, err)
+	reporterType, err := model.NewReporterType("hbi")
+	require.NoError(t, err)
+	relation, err := model.NewRelation("view")
+	require.NoError(t, err)
+
+	cmd := LookupResourcesCommand{
+		ResourceType: resourceType,
+		ReporterType: reporterType,
+		Relation:     relation,
+		Subject:      subject,
+		Limit:        100,
+		Continuation: "",
+		Consistency:  model.NewConsistencyUnspecified(),
+	}
+
+	req := lookupResourcesCommandToV1beta1(cmd)
+	require.NotNil(t, req)
+	require.NotNil(t, req.Consistency)
+	_, ok := req.Consistency.Requirement.(*kessel.Consistency_MinimizeLatency)
+	assert.True(t, ok, "unspecified consistency should map to minimize_latency for lookup authz requests")
 }

@@ -38,7 +38,11 @@ func (c Consistency) MinimizeLatency() bool {
 	return c.Preference == ConsistencyMinimizeLatency
 }
 
-// AtLeastAsFresh returns the consistency token, or empty if minimize latency.
+// AtLeastAsFresh returns c.Token only when Preference is
+// ConsistencyAtLeastAsFresh.
+// For ConsistencyUnspecified and ConsistencyAtLeastAsAcknowledged it returns
+// MinimizeLatencyToken until consistency is resolved by higher-level logic
+// (for example, resolveConsistencyToken).
 func (c Consistency) AtLeastAsFresh() ConsistencyToken {
 	if c.Preference == ConsistencyAtLeastAsFresh {
 		return c.Token

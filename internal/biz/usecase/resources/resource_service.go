@@ -516,6 +516,7 @@ func (uc *Usecase) LookupResources(ctx context.Context, cmd LookupResourcesComma
 // lookupConsistencyTokenFromDB looks up the consistency token from the inventory database.
 // Returns the token if found, empty string if resource not found, or error for other failures.
 func (uc *Usecase) lookupConsistencyTokenFromDB(ctx context.Context, reporterResourceKey model.ReporterResourceKey) (string, error) {
+	// Passing nil tx is deliberate: this read-only consistency lookup should not run in a transaction.
 	res, err := uc.resourceRepository.FindResourceByKeys(nil, reporterResourceKey)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -553,13 +554,16 @@ func (uc *Usecase) resolveConsistencyToken(ctx context.Context, consistency mode
 		uc.Log.WithContext(ctx).Debug("Using at_least_as_acknowledged consistency - looking up token from DB")
 		return uc.lookupConsistencyTokenFromDB(ctx, reporterResourceKey)
 
-	default:
+	case model.ConsistencyUnspecified:
 		if featureFlagEnabled {
 			uc.Log.WithContext(ctx).Debug("Default consistency - looking up token from DB")
 			return uc.lookupConsistencyTokenFromDB(ctx, reporterResourceKey)
 		}
 		uc.Log.WithContext(ctx).Debug("Default consistency - using minimize_latency")
 		return "", nil
+
+	default:
+		return "", status.Errorf(codes.Internal, "unexpected consistency preference: %v", consistency.Preference)
 	}
 }
 
@@ -580,9 +584,12 @@ func (uc *Usecase) resolveConsistencyTokenForSelf(ctx context.Context, consisten
 		uc.Log.WithContext(ctx).Debug("Using at_least_as_acknowledged consistency - looking up token from DB")
 		return uc.lookupConsistencyTokenFromDB(ctx, reporterResourceKey)
 
-	default:
-		uc.Log.WithContext(ctx).Debug("Default consistency - using minimize_latency")
+	case model.ConsistencyUnspecified:
+		uc.Log.WithContext(ctx).Debug("Unspecified consistency for CheckSelf - using minimize_latency")
 		return "", nil
+
+	default:
+		return "", status.Errorf(codes.Internal, "unexpected consistency preference: %v", consistency.Preference)
 	}
 }
 
@@ -704,7 +711,7 @@ func checkBulkCommandToV1beta1(cmd CheckBulkCommand) *kessel.CheckBulkRequest {
 	}
 
 	var consistency *kessel.Consistency
-	if !cmd.Consistency.MinimizeLatency() {
+	if cmd.Consistency.Preference == model.ConsistencyAtLeastAsFresh {
 		consistency = &kessel.Consistency{
 			Requirement: &kessel.Consistency_AtLeastAsFresh{
 				AtLeastAsFresh: &kessel.ConsistencyToken{
@@ -783,7 +790,7 @@ func lookupResourcesCommandToV1beta1(cmd LookupResourcesCommand) *kessel.LookupR
 		continuationToken = &cmd.Continuation
 	}
 	var consistency *kessel.Consistency
-	if !cmd.Consistency.MinimizeLatency() {
+	if cmd.Consistency.Preference == model.ConsistencyAtLeastAsFresh {
 		consistency = &kessel.Consistency{
 			Requirement: &kessel.Consistency_AtLeastAsFresh{
 				AtLeastAsFresh: &kessel.ConsistencyToken{

@@ -57,6 +57,7 @@ import (
 	httpstatus "github.com/go-kratos/kratos/v2/transport/http/status"
 	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2"
 	authnapi "github.com/project-kessel/inventory-api/internal/authn/api"
+	"github.com/project-kessel/inventory-api/internal/middleware"
 	servergrpc "github.com/project-kessel/inventory-api/internal/server/grpc"
 	serverhttp "github.com/project-kessel/inventory-api/internal/server/http"
 	svc "github.com/project-kessel/inventory-api/internal/service/resources"
@@ -263,7 +264,7 @@ func withBody(req proto.Message, g GRPCCall, h HTTPEndpoint) Request {
 			if err != nil {
 				return 0, nil, err
 			}
-			defer resp.Body.Close()
+			defer func() { _ = resp.Body.Close() }()
 
 			body, err := io.ReadAll(resp.Body)
 			if err != nil {
@@ -390,6 +391,7 @@ func newTestGRPCServer(t *testing.T, cfg TestServerConfig) pb.KesselInventorySer
 			t.Logf("gRPC server exited: %v", startErr)
 		}
 	}()
+	t.Cleanup(func() { _ = srv.Stop(context.Background()) })
 
 	conn, err := grpc.NewClient("passthrough://bufnet",
 		grpc.WithContextDialer(func(ctx context.Context, _ string) (net.Conn, error) {
@@ -398,11 +400,7 @@ func newTestGRPCServer(t *testing.T, cfg TestServerConfig) pb.KesselInventorySer
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 	)
 	require.NoError(t, err)
-
-	t.Cleanup(func() {
-		_ = conn.Close()
-		_ = srv.Stop(context.Background())
-	})
+	t.Cleanup(func() { _ = conn.Close() })
 
 	return pb.NewKesselInventoryServiceClient(conn)
 }
@@ -416,13 +414,13 @@ func newTestHTTPServer(t *testing.T, cfg TestServerConfig) string {
 	require.NoError(t, err)
 
 	deps := serverhttp.ServerConfig{
-		Authenticator: cfg.Authenticator,
-		Logger:        krlog.NewStdLogger(io.Discard),
-		Metrics:       metrics.Server(),
-		Validator:     validator,
+		AuthnMiddleware: middleware.Authentication(cfg.Authenticator),
+		Logger:          krlog.NewStdLogger(io.Discard),
+		Metrics:         metrics.Server(),
+		Validator:       validator,
 	}
 
-	kratosSrv, err := serverhttp.NewWithDeps(deps, nil, false)
+	kratosSrv, err := serverhttp.NewWithDeps(deps)
 	require.NoError(t, err)
 
 	service := svc.NewKesselInventoryServiceV1beta2(cfg.Usecase)

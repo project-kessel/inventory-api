@@ -23,5 +23,5 @@ message CheckRequest {
   // If not specified, standard server configuration defaults to minimize_latency.
   // Server deployments may override this default behavior (for example, to
   // at_least_as_acknowledged).
-  Consistency consistency = 4;
+  optional Consistency consistency = 4;
 }

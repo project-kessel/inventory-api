@@ -35,7 +35,7 @@ type CheckRequest struct {
 	// If not specified, standard server configuration defaults to minimize_latency.
 	// Server deployments may override this default behavior (for example, to
 	// at_least_as_acknowledged).
-	Consistency   *Consistency `protobuf:"bytes,4,opt,name=consistency,proto3" json:"consistency,omitempty"`
+	Consistency   *Consistency `protobuf:"bytes,4,opt,name=consistency,proto3,oneof" json:"consistency,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -102,12 +102,13 @@ var File_kessel_inventory_v1beta2_check_request_proto protoreflect.FileDescripto
 
 const file_kessel_inventory_v1beta2_check_request_proto_rawDesc = "" +
 	"\n" +
-	",kessel/inventory/v1beta2/check_request.proto\x12\x18kessel.inventory.v1beta2\x1a\x1bbuf/validate/validate.proto\x1a1kessel/inventory/v1beta2/resource_reference.proto\x1a0kessel/inventory/v1beta2/subject_reference.proto\x1a*kessel/inventory/v1beta2/consistency.proto\"\x97\x02\n" +
+	",kessel/inventory/v1beta2/check_request.proto\x12\x18kessel.inventory.v1beta2\x1a\x1bbuf/validate/validate.proto\x1a1kessel/inventory/v1beta2/resource_reference.proto\x1a0kessel/inventory/v1beta2/subject_reference.proto\x1a*kessel/inventory/v1beta2/consistency.proto\"\xac\x02\n" +
 	"\fCheckRequest\x12K\n" +
 	"\x06object\x18\x01 \x01(\v2+.kessel.inventory.v1beta2.ResourceReferenceB\x06\xbaH\x03\xc8\x01\x01R\x06object\x12#\n" +
 	"\brelation\x18\x02 \x01(\tB\a\xbaH\x04r\x02\x10\x01R\brelation\x12L\n" +
-	"\asubject\x18\x03 \x01(\v2*.kessel.inventory.v1beta2.SubjectReferenceB\x06\xbaH\x03\xc8\x01\x01R\asubject\x12G\n" +
-	"\vconsistency\x18\x04 \x01(\v2%.kessel.inventory.v1beta2.ConsistencyR\vconsistencyBr\n" +
+	"\asubject\x18\x03 \x01(\v2*.kessel.inventory.v1beta2.SubjectReferenceB\x06\xbaH\x03\xc8\x01\x01R\asubject\x12L\n" +
+	"\vconsistency\x18\x04 \x01(\v2%.kessel.inventory.v1beta2.ConsistencyH\x00R\vconsistency\x88\x01\x01B\x0e\n" +
+	"\f_consistencyBr\n" +
 	"(org.project_kessel.api.inventory.v1beta2P\x01ZDgithub.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2b\x06proto3"
 
 var (
@@ -148,6 +149,7 @@ func file_kessel_inventory_v1beta2_check_request_proto_init() {
 	file_kessel_inventory_v1beta2_resource_reference_proto_init()
 	file_kessel_inventory_v1beta2_subject_reference_proto_init()
 	file_kessel_inventory_v1beta2_consistency_proto_init()
+	file_kessel_inventory_v1beta2_check_request_proto_msgTypes[0].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{

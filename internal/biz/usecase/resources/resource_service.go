@@ -525,8 +525,8 @@ func (uc *Usecase) lookupConsistencyTokenFromDB(ctx context.Context, reporterRes
 	res, err := uc.resourceRepository.FindResourceByKeys(nil, reporterResourceKey)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			// Resource doesn't exist in inventory, fall back to minimize_latency
-			uc.Log.WithContext(ctx).Debug("Resource not found in inventory, falling back to minimize_latency")
+			// Resource doesn't exist in inventory, fall back to minimize_latency.
+			uc.Log.WithContext(ctx).Warnf("Resource not found in inventory, falling back to minimize_latency for key: %v", reporterResourceKey)
 			return "", nil
 		}
 		return "", err

@@ -515,18 +515,18 @@ func (uc *Usecase) LookupResources(ctx context.Context, cmd LookupResourcesComma
 
 // lookupConsistencyTokenFromDB looks up the consistency token from the inventory database.
 // Returns the token if found, empty string if resource not found, or error for other failures.
-func (uc *Usecase) lookupConsistencyTokenFromDB(reporterResourceKey model.ReporterResourceKey) (string, error) {
+func (uc *Usecase) lookupConsistencyTokenFromDB(ctx context.Context, reporterResourceKey model.ReporterResourceKey) (string, error) {
 	res, err := uc.resourceRepository.FindResourceByKeys(nil, reporterResourceKey)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			// Resource doesn't exist in inventory, fall back to minimize_latency
-			log.Info("Resource not found in inventory, falling back to minimize_latency")
+			uc.Log.WithContext(ctx).Debug("Resource not found in inventory, falling back to minimize_latency")
 			return "", nil
 		}
 		return "", err
 	}
 	token := res.ConsistencyToken().Serialize()
-	log.Infof("Found inventory-managed consistency token: %s", token)
+	uc.Log.WithContext(ctx).Debug("Found inventory-managed consistency token")
 	return token, nil
 }
 
@@ -535,30 +535,30 @@ func (uc *Usecase) lookupConsistencyTokenFromDB(reporterResourceKey model.Report
 func (uc *Usecase) resolveConsistencyToken(ctx context.Context, consistency model.Consistency, reporterResourceKey model.ReporterResourceKey) (string, error) {
 	featureFlagEnabled := uc.Config.DefaultToAtLeastAsAcknowledged
 	if featureFlagEnabled {
-		log.Info("Feature flag default-to-at-least-as-acknowledged is enabled")
+		uc.Log.WithContext(ctx).Debug("Feature flag default-to-at-least-as-acknowledged is enabled")
 	} else {
-		log.Info("Feature flag default-to-at-least-as-acknowledged is disabled")
+		uc.Log.WithContext(ctx).Debug("Feature flag default-to-at-least-as-acknowledged is disabled")
 	}
 
 	switch consistency.Preference {
 	case model.ConsistencyMinimizeLatency:
-		log.Info("Using minimize_latency consistency")
+		uc.Log.WithContext(ctx).Debug("Using minimize_latency consistency")
 		return "", nil
 
 	case model.ConsistencyAtLeastAsFresh:
-		log.Infof("Using at_least_as_fresh consistency with provided token: %s", consistency.Token)
+		uc.Log.WithContext(ctx).Debug("Using at_least_as_fresh consistency")
 		return string(consistency.Token), nil
 
 	case model.ConsistencyAtLeastAsAcknowledged:
-		log.Info("Using at_least_as_acknowledged consistency - looking up token from DB")
-		return uc.lookupConsistencyTokenFromDB(reporterResourceKey)
+		uc.Log.WithContext(ctx).Debug("Using at_least_as_acknowledged consistency - looking up token from DB")
+		return uc.lookupConsistencyTokenFromDB(ctx, reporterResourceKey)
 
 	default:
 		if featureFlagEnabled {
-			log.Info("Default consistency - looking up token from DB")
-			return uc.lookupConsistencyTokenFromDB(reporterResourceKey)
+			uc.Log.WithContext(ctx).Debug("Default consistency - looking up token from DB")
+			return uc.lookupConsistencyTokenFromDB(ctx, reporterResourceKey)
 		}
-		log.Info("Default consistency - using minimize_latency")
+		uc.Log.WithContext(ctx).Debug("Default consistency - using minimize_latency")
 		return "", nil
 	}
 }
@@ -569,19 +569,19 @@ func (uc *Usecase) resolveConsistencyToken(ctx context.Context, consistency mode
 func (uc *Usecase) resolveConsistencyTokenForSelf(ctx context.Context, consistency model.Consistency, reporterResourceKey model.ReporterResourceKey) (string, error) {
 	switch consistency.Preference {
 	case model.ConsistencyMinimizeLatency:
-		log.Info("Using minimize_latency consistency")
+		uc.Log.WithContext(ctx).Debug("Using minimize_latency consistency")
 		return "", nil
 
 	case model.ConsistencyAtLeastAsFresh:
-		log.Infof("Using at_least_as_fresh consistency with provided token: %s", consistency.Token)
+		uc.Log.WithContext(ctx).Debug("Using at_least_as_fresh consistency")
 		return string(consistency.Token), nil
 
 	case model.ConsistencyAtLeastAsAcknowledged:
-		log.Info("Using at_least_as_acknowledged consistency - looking up token from DB")
-		return uc.lookupConsistencyTokenFromDB(reporterResourceKey)
+		uc.Log.WithContext(ctx).Debug("Using at_least_as_acknowledged consistency - looking up token from DB")
+		return uc.lookupConsistencyTokenFromDB(ctx, reporterResourceKey)
 
 	default:
-		log.Info("Default consistency - using minimize_latency")
+		uc.Log.WithContext(ctx).Debug("Default consistency - using minimize_latency")
 		return "", nil
 	}
 }

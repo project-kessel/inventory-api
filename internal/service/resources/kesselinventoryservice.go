@@ -71,11 +71,11 @@ func (s *InventoryService) Check(ctx context.Context, req *pb.CheckRequest) (*pb
 		return nil, err
 	}
 	consistency := ConsistencyFromProto(req.GetConsistency())
-	resp, err := s.Ctl.Check(ctx, relation, subjectRef, reporterResourceKey, consistency)
+	allowed, consistencyToken, err := s.Ctl.Check(ctx, relation, subjectRef, reporterResourceKey, consistency)
 	if err != nil {
 		return nil, err
 	}
-	return viewResponseFromAuthzRequestV1beta2(resp), nil
+	return viewResponseFromAuthzRequestV1beta2(allowed, consistencyToken), nil
 }
 
 func (s *InventoryService) CheckForUpdate(ctx context.Context, req *pb.CheckForUpdateRequest) (*pb.CheckForUpdateResponse, error) {
@@ -496,12 +496,17 @@ func reporterKeyFromResourceReference(resource *pb.ResourceReference) (model.Rep
 	return model.NewReporterResourceKey(localResourceId, resourceType, reporterType, reporterInstanceId)
 }
 
-func viewResponseFromAuthzRequestV1beta2(allowed bool) *pb.CheckResponse {
+func viewResponseFromAuthzRequestV1beta2(allowed bool, consistencyToken model.ConsistencyToken) *pb.CheckResponse {
+	response := &pb.CheckResponse{}
 	if allowed {
-		return &pb.CheckResponse{Allowed: pb.Allowed_ALLOWED_TRUE}
+		response.Allowed = pb.Allowed_ALLOWED_TRUE
 	} else {
-		return &pb.CheckResponse{Allowed: pb.Allowed_ALLOWED_FALSE}
+		response.Allowed = pb.Allowed_ALLOWED_FALSE
 	}
+	if consistencyToken != model.MinimizeLatencyToken {
+		response.ConsistencyToken = &pb.ConsistencyToken{Token: consistencyToken.Serialize()}
+	}
+	return response
 }
 
 func updateResponseFromAuthzRequestV1beta2(allowed bool) *pb.CheckForUpdateResponse {

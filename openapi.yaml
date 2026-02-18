@@ -456,6 +456,8 @@ components:
                         - ALLOWED_FALSE
                     type: string
                     format: enum
+                consistencyToken:
+                    $ref: '#/components/schemas/kessel.inventory.v1beta2.ConsistencyToken'
         kessel.inventory.v1beta2.CheckSelfBulkRequest:
             type: object
             properties:

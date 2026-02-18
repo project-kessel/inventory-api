@@ -366,14 +366,14 @@ func (uc *Usecase) Delete(ctx context.Context, reporterResourceKey model.Reporte
 }
 
 // Check verifies if a subject has the specified relation/permission on a resource.
-func (uc *Usecase) Check(ctx context.Context, relation model.Relation, sub model.SubjectReference, reporterResourceKey model.ReporterResourceKey, consistency model.Consistency) (bool, error) {
+func (uc *Usecase) Check(ctx context.Context, relation model.Relation, sub model.SubjectReference, reporterResourceKey model.ReporterResourceKey, consistency model.Consistency) (bool, model.ConsistencyToken, error) {
 	// TODO: should also check caller is allowed to check subject also
 	if err := uc.enforceMetaAuthzObject(ctx, metaauthorizer.RelationCheck, metaauthorizer.NewInventoryResourceFromKey(reporterResourceKey)); err != nil {
-		return false, err
+		return false, model.MinimizeLatencyToken, err
 	}
 	token, err := uc.resolveConsistencyToken(ctx, consistency, reporterResourceKey)
 	if err != nil {
-		return false, err
+		return false, model.MinimizeLatencyToken, err
 	}
 	return uc.checkWithToken(ctx, relation, sub, reporterResourceKey, token)
 }
@@ -392,7 +392,8 @@ func (uc *Usecase) CheckSelf(ctx context.Context, relation model.Relation, repor
 	if err != nil {
 		return false, err
 	}
-	return uc.checkWithToken(ctx, relation, subjectRef, reporterResourceKey, token)
+	allowed, _, err := uc.checkWithToken(ctx, relation, subjectRef, reporterResourceKey, token)
+	return allowed, err
 }
 
 // CheckForUpdate verifies if a subject can update the resource.
@@ -481,18 +482,23 @@ func (uc *Usecase) CheckSelfBulk(ctx context.Context, cmd CheckSelfBulkCommand) 
 }
 
 // checkWithToken runs Authz.Check with the given consistency token. Used by Check (after resolveConsistencyToken) and by checkPermission (CheckSelf).
-func (uc *Usecase) checkWithToken(ctx context.Context, relation model.Relation, sub model.SubjectReference, reporterResourceKey model.ReporterResourceKey, consistencyToken string) (bool, error) {
+func (uc *Usecase) checkWithToken(ctx context.Context, relation model.Relation, sub model.SubjectReference, reporterResourceKey model.ReporterResourceKey, consistencyToken string) (bool, model.ConsistencyToken, error) {
 	namespace := reporterResourceKey.ReporterType().Serialize()
 	v1beta1Subject := subjectToV1Beta1(sub)
-	allowed, _, err := uc.Authz.Check(ctx, namespace, relation.Serialize(), consistencyToken, reporterResourceKey.ResourceType().Serialize(), reporterResourceKey.LocalResourceId().Serialize(), v1beta1Subject)
+	allowed, returnedToken, err := uc.Authz.Check(ctx, namespace, relation.Serialize(), consistencyToken, reporterResourceKey.ResourceType().Serialize(), reporterResourceKey.LocalResourceId().Serialize(), v1beta1Subject)
 	if err != nil {
-		return false, err
+		return false, model.MinimizeLatencyToken, err
+	}
+
+	consistencyResponseToken := model.MinimizeLatencyToken
+	if returnedToken != nil {
+		consistencyResponseToken = model.DeserializeConsistencyToken(returnedToken.GetToken())
 	}
 
 	if allowed == kessel.CheckResponse_ALLOWED_TRUE {
-		return true, nil
+		return true, consistencyResponseToken, nil
 	}
-	return false, nil
+	return false, consistencyResponseToken, nil
 }
 
 // LookupResources delegates resource lookup to the authorization service.

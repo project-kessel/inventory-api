@@ -1024,6 +1024,8 @@ func TestInventoryService_Check_Allowed(t *testing.T) {
 				res := tr.Invoke(ctx, withBody(protoReq, Check, httpEndpoint("POST /api/kessel/v1beta2/check")))
 				resp := Extract(t, res, expectSuccess(func() *pb.CheckResponse { return &pb.CheckResponse{} }))
 				assert.Equal(t, pb.Allowed_ALLOWED_TRUE, resp.Allowed)
+				assert.NotNil(t, resp.ConsistencyToken)
+				assert.NotEmpty(t, resp.ConsistencyToken.GetToken())
 			}
 	})
 }
@@ -1059,6 +1061,8 @@ func TestInventoryService_Check_Denied(t *testing.T) {
 				res := tr.Invoke(ctx, withBody(protoReq, Check, httpEndpoint("POST /api/kessel/v1beta2/check")))
 				resp := Extract(t, res, expectSuccess(func() *pb.CheckResponse { return &pb.CheckResponse{} }))
 				assert.Equal(t, pb.Allowed_ALLOWED_FALSE, resp.Allowed)
+				assert.NotNil(t, resp.ConsistencyToken)
+				assert.NotEmpty(t, resp.ConsistencyToken.GetToken())
 			}
 	})
 }

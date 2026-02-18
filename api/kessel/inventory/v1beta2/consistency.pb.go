@@ -23,6 +23,9 @@ const (
 )
 
 // Defines how a request is handled by the service.
+// If consistency is omitted by the client, standard server configuration uses
+// minimize_latency by default, but deployments may override that default (for
+// example, to at_least_as_acknowledged).
 type Consistency struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Types that are valid to be assigned to Requirement:
@@ -120,6 +123,8 @@ type Consistency_AtLeastAsAcknowledged struct {
 	// All data used in the API call must be *at least as acknowledged*
 	// meaning it will include data up to the latest write known to Inventory.
 	// Provides read-after-write consistency for inventory-managed resources.
+	// Some deployments may use this behavior as the server-side default when
+	// consistency is omitted.
 	// *Must* be set true if used.
 	AtLeastAsAcknowledged bool `protobuf:"varint,3,opt,name=at_least_as_acknowledged,json=atLeastAsAcknowledged,proto3,oneof"`
 }

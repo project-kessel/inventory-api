@@ -20,6 +20,8 @@ message CheckRequest {
   string relation = 2 [(buf.validate.field).string.min_len = 1];
   SubjectReference subject = 3 [(buf.validate.field).required = true];
   // Consistency requirement for the check operation.
-  // Defaults to minimize_latency if not specified.
+  // If not specified, standard server configuration defaults to minimize_latency.
+  // Server deployments may override this default behavior (for example, to
+  // at_least_as_acknowledged).
   Consistency consistency = 4;
 }

@@ -443,7 +443,9 @@ components:
                         - $ref: '#/components/schemas/kessel.inventory.v1beta2.Consistency'
                     description: |-
                         Consistency requirement for the check operation.
-                         Defaults to minimize_latency if not specified.
+                         If not specified, standard server configuration defaults to minimize_latency.
+                         Server deployments may override this default behavior (for example, to
+                         at_least_as_acknowledged).
         kessel.inventory.v1beta2.CheckResponse:
             type: object
             properties:
@@ -565,8 +567,14 @@ components:
                         All data used in the API call must be *at least as acknowledged*
                          meaning it will include data up to the latest write known to Inventory.
                          Provides read-after-write consistency for inventory-managed resources.
+                         Some deployments may use this behavior as the server-side default when
+                         consistency is omitted.
                          *Must* be set true if used.
-            description: Defines how a request is handled by the service.
+            description: |-
+                Defines how a request is handled by the service.
+                 If consistency is omitted by the client, standard server configuration uses
+                 minimize_latency by default, but deployments may override that default (for
+                 example, to at_least_as_acknowledged).
         kessel.inventory.v1beta2.ConsistencyToken:
             type: object
             properties:

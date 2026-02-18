@@ -32,7 +32,9 @@ type CheckRequest struct {
 	Relation string             `protobuf:"bytes,2,opt,name=relation,proto3" json:"relation,omitempty"`
 	Subject  *SubjectReference  `protobuf:"bytes,3,opt,name=subject,proto3" json:"subject,omitempty"`
 	// Consistency requirement for the check operation.
-	// Defaults to minimize_latency if not specified.
+	// If not specified, standard server configuration defaults to minimize_latency.
+	// Server deployments may override this default behavior (for example, to
+	// at_least_as_acknowledged).
 	Consistency   *Consistency `protobuf:"bytes,4,opt,name=consistency,proto3" json:"consistency,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache

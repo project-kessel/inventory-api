@@ -10,6 +10,9 @@ option java_multiple_files = true;
 option java_package = "org.project_kessel.api.inventory.v1beta2";
 
 // Defines how a request is handled by the service.
+// If consistency is omitted by the client, standard server configuration uses
+// minimize_latency by default, but deployments may override that default (for
+// example, to at_least_as_acknowledged).
 message Consistency {
   oneof requirement {
     option (buf.validate.oneof).required = true;
@@ -26,6 +29,8 @@ message Consistency {
     // All data used in the API call must be *at least as acknowledged*
     // meaning it will include data up to the latest write known to Inventory.
     // Provides read-after-write consistency for inventory-managed resources.
+    // Some deployments may use this behavior as the server-side default when
+    // consistency is omitted.
     // *Must* be set true if used.
     bool at_least_as_acknowledged = 3 [(buf.validate.field).bool.const = true];
   }

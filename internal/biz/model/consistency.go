@@ -10,7 +10,10 @@ type Consistency struct {
 	Token      ConsistencyToken      // MinimizeLatencyToken ("") for minimize latency; set when Preference is AtLeastAsFresh
 }
 
-// NewConsistencyUnspecified creates a Consistency when no preference was specified. Uses MinimiezLatency by default.
+// NewConsistencyUnspecified creates a Consistency with Preference set to
+// ConsistencyUnspecified and Token set to MinimizeLatencyToken.
+// It is a placeholder value only; final consistency behavior is resolved
+// elsewhere (for example, via configuration or feature flags).
 func NewConsistencyUnspecified() Consistency {
 	return Consistency{Preference: ConsistencyUnspecified, Token: MinimizeLatencyToken}
 }

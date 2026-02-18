@@ -13,19 +13,19 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.opentelemetry.io/otel/metric"
 
-	authnapi "github.com/project-kessel/inventory-api/internal/authn/api"
 	m "github.com/project-kessel/inventory-api/internal/middleware"
 )
 
-// ServerDeps holds injectable dependencies for creating an HTTP server.
+// ServerConfig holds injectable dependencies for creating an HTTP server.
 // This enables tests to inject their own implementations while sharing
 // the same middleware construction logic as production.
-type ServerDeps struct {
-	Authenticator authnapi.Authenticator
-	Metrics       middleware.Middleware
-	Logger        log.Logger
-	Validator     protovalidate.Validator
-	ServerOptions []http.ServerOption
+type ServerConfig struct {
+	AuthnMiddleware middleware.Middleware
+	Metrics         middleware.Middleware
+	Logger          log.Logger
+	Validator       protovalidate.Validator
+	ServerOptions   []http.ServerOption
+	ReadOnlyMode    bool
 }
 
 // New creates a new HTTP server.
@@ -43,7 +43,8 @@ func New(c CompletedConfig, authn middleware.Middleware, meter metric.Meter, log
 		return nil, err
 	}
 
-	srv, err := NewWithDeps(ServerDeps{
+	srv, err := NewWithDeps(ServerConfig{
+		AuthnMiddleware: authn,
 		Metrics: metrics.Server(
 			metrics.WithSeconds(seconds),
 			metrics.WithRequests(requests),
@@ -51,7 +52,8 @@ func New(c CompletedConfig, authn middleware.Middleware, meter metric.Meter, log
 		Logger:        logger,
 		Validator:     validator,
 		ServerOptions: c.ServerOptions,
-	}, authn, readOnlyMode)
+		ReadOnlyMode:  readOnlyMode,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -67,14 +69,7 @@ func New(c CompletedConfig, authn middleware.Middleware, meter metric.Meter, log
 // NewWithDeps creates an HTTP server from pre-built dependencies.
 // If authnOverride is non-nil it is used as the authentication middleware;
 // otherwise one is derived from deps.Authenticator.
-func NewWithDeps(deps ServerDeps, authnOverride middleware.Middleware, readOnlyMode bool) (*http.Server, error) {
-	var authnMiddleware middleware.Middleware
-	if authnOverride != nil {
-		authnMiddleware = authnOverride
-	} else {
-		authnMiddleware = m.Authentication(deps.Authenticator)
-	}
-
+func NewWithDeps(deps ServerConfig) (*http.Server, error) {
 	// TODO: pass in health, authn middleware
 	middlewares := []middleware.Middleware{
 		recovery.Recovery(),
@@ -82,13 +77,13 @@ func NewWithDeps(deps ServerDeps, authnOverride middleware.Middleware, readOnlyM
 		deps.Metrics,
 		m.Validation(deps.Validator),
 		selector.Server(
-			authnMiddleware,
+			deps.AuthnMiddleware,
 		).Match(NewWhiteListMatcher).Build(),
 		m.ErrorMapping(),
 	}
 
 	// Only add read-only middleware if in read-only mode to reduce overhead
-	if readOnlyMode {
+	if deps.ReadOnlyMode {
 		middlewares = append(middlewares, m.HTTPReadOnlyMiddleware)
 	}
 

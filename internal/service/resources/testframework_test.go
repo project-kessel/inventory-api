@@ -371,7 +371,7 @@ func newTestGRPCServer(t *testing.T, cfg TestServerConfig) pb.KesselInventorySer
 	validator, err := protovalidate.New()
 	require.NoError(t, err)
 
-	deps := servergrpc.ServerDeps{
+	deps := servergrpc.ServerConfig{
 		Authenticator: cfg.Authenticator,
 		Logger:        krlog.NewStdLogger(io.Discard),
 		Metrics:       metrics.Server(),
@@ -415,7 +415,7 @@ func newTestHTTPServer(t *testing.T, cfg TestServerConfig) string {
 	validator, err := protovalidate.New()
 	require.NoError(t, err)
 
-	deps := serverhttp.ServerDeps{
+	deps := serverhttp.ServerConfig{
 		Authenticator: cfg.Authenticator,
 		Logger:        krlog.NewStdLogger(io.Discard),
 		Metrics:       metrics.Server(),

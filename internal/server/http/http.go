@@ -68,7 +68,7 @@ func New(c CompletedConfig, authn middleware.Middleware, meter metric.Meter, log
 
 // NewWithDeps creates an HTTP server from pre-built dependencies.
 func NewWithDeps(deps ServerConfig) (*http.Server, error) {
-	// TODO: pass in health, authn middleware
+	// TODO: pass in health middleware
 	middlewares := []middleware.Middleware{
 		recovery.Recovery(),
 		logging.Server(deps.Logger),

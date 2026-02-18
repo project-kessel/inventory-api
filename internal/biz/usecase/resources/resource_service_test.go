@@ -9,7 +9,6 @@ import (
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/project-kessel/inventory-api/internal/biz/schema"
 	"github.com/project-kessel/inventory-api/internal/biz/schema/validation"
-	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gorm.io/gorm"
@@ -2003,10 +2002,6 @@ func TestResolveConsistencyToken(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Reset viper for each test
-			viper.Reset()
-			viper.Set("authz.kessel.default-to-at-least-as-acknowledged", tt.featureFlagEnabled)
-
 			// Use testAuthzContext so ReportResource (when resourceExists) can pass meta-authz
 			ctx := testAuthzContext()
 			logger := log.DefaultLogger
@@ -2057,9 +2052,6 @@ func TestResolveConsistencyToken(t *testing.T) {
 
 func TestResolveConsistencyToken_UnknownPreference(t *testing.T) {
 	// Test that unknown preference defaults to minimize_latency (empty token)
-	viper.Reset()
-	viper.Set("authz.kessel.default-to-at-least-as-acknowledged", true)
-
 	ctx := testAuthzContext()
 	logger := log.DefaultLogger
 
@@ -2067,8 +2059,9 @@ func TestResolveConsistencyToken_UnknownPreference(t *testing.T) {
 	schemaRepo := newFakeSchemaRepository(t)
 	authorizer := &allow.AllowAllAuthz{}
 	usecaseConfig := &UsecaseConfig{
-		ReadAfterWriteEnabled: false,
-		ConsumerEnabled:       false,
+		ReadAfterWriteEnabled:          false,
+		ConsumerEnabled:                false,
+		DefaultToAtLeastAsAcknowledged: true,
 	}
 
 	mc := metricscollector.NewFakeMetricsCollector()

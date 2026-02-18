@@ -16,7 +16,19 @@ import (
 	m "github.com/project-kessel/inventory-api/internal/middleware"
 )
 
-// New create a new http server.
+// ServerConfig holds injectable dependencies for creating an HTTP server.
+// This enables tests to inject their own implementations while sharing
+// the same middleware construction logic as production.
+type ServerConfig struct {
+	AuthnMiddleware middleware.Middleware
+	Metrics         middleware.Middleware
+	Logger          log.Logger
+	Validator       protovalidate.Validator
+	ServerOptions   []http.ServerOption
+	ReadOnlyMode    bool
+}
+
+// New creates a new HTTP server.
 func New(c CompletedConfig, authn middleware.Middleware, meter metric.Meter, logger log.Logger, readOnlyMode bool) (*http.Server, error) {
 	requests, err := metrics.DefaultRequestsCounter(meter, metrics.DefaultServerRequestsCounterName)
 	if err != nil {
@@ -30,37 +42,53 @@ func New(c CompletedConfig, authn middleware.Middleware, meter metric.Meter, log
 	if err != nil {
 		return nil, err
 	}
-	// TODO: pass in health, authn middleware
-	middlewares := []middleware.Middleware{
-		recovery.Recovery(),
-		logging.Server(logger),
-		metrics.Server(
+
+	srv, err := NewWithDeps(ServerConfig{
+		AuthnMiddleware: authn,
+		Metrics: metrics.Server(
 			metrics.WithSeconds(seconds),
 			metrics.WithRequests(requests),
 		),
-		m.Validation(validator),
-		selector.Server(
-			authn,
-		).Match(NewWhiteListMatcher).Build(),
-		m.ErrorMapping(),
+		Logger:        logger,
+		Validator:     validator,
+		ServerOptions: c.ServerOptions,
+		ReadOnlyMode:  readOnlyMode,
+	})
+	if err != nil {
+		return nil, err
 	}
-
-	// Only add read-only middleware if in read-only mode to reduce overhead
-	if readOnlyMode {
-		middlewares = append(middlewares, m.HTTPReadOnlyMiddleware)
-	}
-
-	var opts = []http.ServerOption{
-		http.Middleware(middlewares...),
-	}
-	opts = append(opts, c.ServerOptions...)
-
-	srv := http.NewServer(opts...)
 	srv.HandlePrefix("/metrics", promhttp.HandlerFor(
 		prometheus.DefaultGatherer,
 		promhttp.HandlerOpts{
 			EnableOpenMetrics: true,
 		},
 	))
+	return srv, nil
+}
+
+// NewWithDeps creates an HTTP server from pre-built dependencies.
+func NewWithDeps(deps ServerConfig) (*http.Server, error) {
+	// TODO: pass in health middleware
+	middlewares := []middleware.Middleware{
+		recovery.Recovery(),
+		logging.Server(deps.Logger),
+		deps.Metrics,
+		m.Validation(deps.Validator),
+		selector.Server(
+			deps.AuthnMiddleware,
+		).Match(NewWhiteListMatcher).Build(),
+		m.ErrorMapping(),
+	}
+
+	// Only add read-only middleware if in read-only mode to reduce overhead
+	if deps.ReadOnlyMode {
+		middlewares = append(middlewares, m.HTTPReadOnlyMiddleware)
+	}
+
+	var opts = []http.ServerOption{
+		http.Middleware(middlewares...),
+	}
+	opts = append(opts, deps.ServerOptions...)
+	srv := http.NewServer(opts...)
 	return srv, nil
 }

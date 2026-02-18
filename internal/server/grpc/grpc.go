@@ -16,10 +16,10 @@ import (
 	"google.golang.org/grpc"
 )
 
-// ServerDeps holds injectable dependencies for creating a gRPC server.
+// ServerConfig holds injectable dependencies for creating a gRPC server.
 // This enables tests to inject their own implementations while sharing
 // the same middleware construction logic as production.
-type ServerDeps struct {
+type ServerConfig struct {
 	Authenticator   authnapi.Authenticator
 	AuthnMiddleware middleware.Middleware
 	Metrics         middleware.Middleware
@@ -56,7 +56,7 @@ func New(c CompletedConfig, authnMiddleware middleware.Middleware, authnConfig a
 			return nil, err
 		}
 	}
-	return NewWithDeps(ServerDeps{
+	return NewWithDeps(ServerConfig{
 		Authenticator:   authenticator,
 		AuthnMiddleware: authnMiddleware,
 		Metrics:         metrics,
@@ -67,7 +67,7 @@ func New(c CompletedConfig, authnMiddleware middleware.Middleware, authnConfig a
 	})
 }
 
-func NewWithDeps(deps ServerDeps) (*kgrpc.Server, error) {
+func NewWithDeps(deps ServerConfig) (*kgrpc.Server, error) {
 	// TODO: pass in health, authn middleware
 	// Error mapping interceptor is always added for streaming RPCs
 	streamingInterceptor := []grpc.StreamServerInterceptor{

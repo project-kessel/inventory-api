@@ -386,11 +386,7 @@ func newTestGRPCServer(t *testing.T, cfg TestServerConfig) pb.KesselInventorySer
 	service := svc.NewKesselInventoryServiceV1beta2(cfg.Usecase)
 	pb.RegisterKesselInventoryServiceServer(srv, service)
 
-	go func() {
-		if startErr := srv.Start(context.Background()); startErr != nil {
-			t.Logf("gRPC server exited: %v", startErr)
-		}
-	}()
+	go func() { _ = srv.Start(context.Background()) }()
 	t.Cleanup(func() { _ = srv.Stop(context.Background()) })
 
 	conn, err := grpc.NewClient("passthrough://bufnet",

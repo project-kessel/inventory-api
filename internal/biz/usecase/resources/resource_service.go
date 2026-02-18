@@ -380,20 +380,19 @@ func (uc *Usecase) Check(ctx context.Context, relation model.Relation, sub model
 
 // CheckSelf verifies access for the authenticated user using the self-subject strategy.
 // Uses relation="check_self" for meta-authorization.
-func (uc *Usecase) CheckSelf(ctx context.Context, relation model.Relation, reporterResourceKey model.ReporterResourceKey, consistency model.Consistency) (bool, error) {
+func (uc *Usecase) CheckSelf(ctx context.Context, relation model.Relation, reporterResourceKey model.ReporterResourceKey, consistency model.Consistency) (bool, model.ConsistencyToken, error) {
 	if err := uc.enforceMetaAuthzObject(ctx, metaauthorizer.RelationCheckSelf, metaauthorizer.NewInventoryResourceFromKey(reporterResourceKey)); err != nil {
-		return false, err
+		return false, model.MinimizeLatencyToken, err
 	}
 	subjectRef, err := uc.selfSubjectFromContext(ctx)
 	if err != nil {
-		return false, err
+		return false, model.MinimizeLatencyToken, err
 	}
 	token, err := uc.resolveConsistencyTokenForSelf(ctx, consistency, reporterResourceKey)
 	if err != nil {
-		return false, err
+		return false, model.MinimizeLatencyToken, err
 	}
-	allowed, _, err := uc.checkWithToken(ctx, relation, subjectRef, reporterResourceKey, token)
-	return allowed, err
+	return uc.checkWithToken(ctx, relation, subjectRef, reporterResourceKey, token)
 }
 
 // CheckForUpdate verifies if a subject can update the resource.

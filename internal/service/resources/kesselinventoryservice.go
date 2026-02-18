@@ -126,7 +126,7 @@ func (s *InventoryService) CheckSelf(ctx context.Context, req *pb.CheckSelfReque
 	}
 	consistency := ConsistencyFromProto(req.GetConsistency())
 	log.Infof("CheckSelf request consistency: %s", consistency.Preference)
-	resp, err := s.Ctl.CheckSelf(ctx, relation, reporterResourceKey, consistency)
+	resp, consistencyToken, err := s.Ctl.CheckSelf(ctx, relation, reporterResourceKey, consistency)
 	if err != nil {
 		return nil, err
 	}
@@ -134,7 +134,11 @@ func (s *InventoryService) CheckSelf(ctx context.Context, req *pb.CheckSelfReque
 	if resp {
 		allowed = pb.Allowed_ALLOWED_TRUE
 	}
-	return &pb.CheckSelfResponse{Allowed: allowed}, nil
+	response := &pb.CheckSelfResponse{Allowed: allowed}
+	if consistencyToken != model.MinimizeLatencyToken {
+		response.ConsistencyToken = &pb.ConsistencyToken{Token: consistencyToken.Serialize()}
+	}
+	return response, nil
 }
 
 func (s *InventoryService) CheckSelfBulk(ctx context.Context, req *pb.CheckSelfBulkRequest) (*pb.CheckSelfBulkResponse, error) {

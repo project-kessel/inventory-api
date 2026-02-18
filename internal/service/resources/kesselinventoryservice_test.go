@@ -525,12 +525,13 @@ func TestInventoryService_CheckSelf_Allowed_XRhIdentity(t *testing.T) {
 				"host",
 				"dd1b73b9-3e33-4264-968c-e3ce55b9afec",
 				mock.MatchedBy(func(sub *relationsV1beta1.SubjectReference) bool {
+					// Verify subject is derived from claims (SubjectId for x-rh-identity).
 					return sub.Subject.Id == "user-123" &&
 						sub.Subject.Type.Name == "principal" &&
 						sub.Subject.Type.Namespace == "rbac"
 				}),
 			).
-			Return(relationsV1beta1.CheckResponse_ALLOWED_TRUE, &relationsV1beta1.ConsistencyToken{}, nil).
+			Return(relationsV1beta1.CheckResponse_ALLOWED_TRUE, &relationsV1beta1.ConsistencyToken{Token: "test-token"}, nil).
 			Once()
 		return TestServerConfig{
 				Usecase:       newTestUsecase(t, testUsecaseConfig{Authz: mockAuthz}),
@@ -540,6 +541,8 @@ func TestInventoryService_CheckSelf_Allowed_XRhIdentity(t *testing.T) {
 				res := tr.Invoke(ctx, withBody(protoReq, CheckSelf, httpEndpoint("POST /api/kessel/v1beta2/checkself")))
 				resp := Extract(t, res, expectSuccess(func() *pb.CheckSelfResponse { return &pb.CheckSelfResponse{} }))
 				assert.Equal(t, pb.Allowed_ALLOWED_TRUE, resp.Allowed)
+				assert.NotNil(t, resp.ConsistencyToken)
+				assert.Equal(t, "test-token", resp.ConsistencyToken.GetToken())
 				mockAuthz.AssertExpectations(t)
 			}
 	})

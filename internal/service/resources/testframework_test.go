@@ -413,7 +413,7 @@ func newTestHTTPServer(t *testing.T, cfg TestServerConfig) string {
 		Validator:     validator,
 	}
 
-	kratosSrv, err := serverhttp.NewWithDeps(deps)
+	kratosSrv, err := serverhttp.NewWithDeps(deps, nil, false)
 	require.NoError(t, err)
 
 	service := svc.NewKesselInventoryServiceV1beta2(cfg.Usecase)

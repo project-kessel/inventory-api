@@ -67,10 +67,10 @@ func New(c CompletedConfig, authn middleware.Middleware, meter metric.Meter, log
 // NewWithDeps creates an HTTP server from pre-built dependencies.
 // If authnOverride is non-nil it is used as the authentication middleware;
 // otherwise one is derived from deps.Authenticator.
-func NewWithDeps(deps ServerDeps, authnOverride ...middleware.Middleware, readOnlyMode bool) (*http.Server, error) {
+func NewWithDeps(deps ServerDeps, authnOverride middleware.Middleware, readOnlyMode bool) (*http.Server, error) {
 	var authnMiddleware middleware.Middleware
-	if len(authnOverride) > 0 && authnOverride[0] != nil {
-		authnMiddleware = authnOverride[0]
+	if authnOverride != nil {
+		authnMiddleware = authnOverride
 	} else {
 		authnMiddleware = m.Authentication(deps.Authenticator)
 	}
@@ -78,14 +78,11 @@ func NewWithDeps(deps ServerDeps, authnOverride ...middleware.Middleware, readOn
 	// TODO: pass in health, authn middleware
 	middlewares := []middleware.Middleware{
 		recovery.Recovery(),
-		logging.Server(logger),
-		metrics.Server(
-			metrics.WithSeconds(seconds),
-			metrics.WithRequests(requests),
-		),
-		m.Validation(validator),
+		logging.Server(deps.Logger),
+		deps.Metrics,
+		m.Validation(deps.Validator),
 		selector.Server(
-			authn,
+			authnMiddleware,
 		).Match(NewWhiteListMatcher).Build(),
 		m.ErrorMapping(),
 	}
@@ -98,7 +95,7 @@ func NewWithDeps(deps ServerDeps, authnOverride ...middleware.Middleware, readOn
 	var opts = []http.ServerOption{
 		http.Middleware(middlewares...),
 	}
-	opts = append(opts, c.ServerOptions...)
+	opts = append(opts, deps.ServerOptions...)
 	srv := http.NewServer(opts...)
 	return srv, nil
 }

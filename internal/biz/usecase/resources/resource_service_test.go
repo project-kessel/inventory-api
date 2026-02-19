@@ -21,6 +21,8 @@ import (
 	"github.com/project-kessel/inventory-api/internal/metricscollector"
 	"github.com/project-kessel/inventory-api/internal/subject/selfsubject"
 	kessel "github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 func testAuthzContext() context.Context {
@@ -342,6 +344,81 @@ func TestCheckSelfBulk_MissingAuthzContext(t *testing.T) {
 
 	_, err = usecase.CheckSelfBulk(context.Background(), cmd)
 	assert.ErrorIs(t, err, ErrMetaAuthzContextMissing)
+	assert.Equal(t, 0, meta.calls)
+}
+
+func TestCheckBulk_RejectsInventoryManagedConsistency(t *testing.T) {
+	ctx := testAuthzContext()
+	meta := &recordingMetaAuthorizer{allowed: true}
+	usecase := New(
+		data.NewFakeResourceRepository(),
+		newFakeSchemaRepository(t),
+		&allow.AllowAllAuthz{},
+		"rbac",
+		log.DefaultLogger,
+		nil,
+		nil,
+		&UsecaseConfig{},
+		metricscollector.NewFakeMetricsCollector(),
+		meta,
+		newTestSelfSubjectStrategy(),
+	)
+
+	subject, err := buildTestSubjectReference("user-1")
+	require.NoError(t, err)
+	viewRelation, err := model.NewRelation("view")
+	require.NoError(t, err)
+	key := createReporterResourceKey(t, "host-1", "host", "hbi", "instance-1")
+
+	_, err = usecase.CheckBulk(ctx, CheckBulkCommand{
+		Items: []CheckBulkItem{
+			{
+				Resource: key,
+				Relation: viewRelation,
+				Subject:  subject,
+			},
+		},
+		Consistency: model.NewConsistencyAtLeastAsAcknowledged(),
+	})
+	require.Error(t, err)
+	assert.Equal(t, codes.InvalidArgument, status.Code(err))
+	assert.Contains(t, err.Error(), "inventory-managed consistency is not supported for bulk checks")
+	assert.Equal(t, 0, meta.calls)
+}
+
+func TestCheckSelfBulk_RejectsInventoryManagedConsistency(t *testing.T) {
+	ctx := testAuthzContext()
+	meta := &recordingMetaAuthorizer{allowed: true}
+	usecase := New(
+		data.NewFakeResourceRepository(),
+		newFakeSchemaRepository(t),
+		&allow.AllowAllAuthz{},
+		"rbac",
+		log.DefaultLogger,
+		nil,
+		nil,
+		&UsecaseConfig{},
+		metricscollector.NewFakeMetricsCollector(),
+		meta,
+		newTestSelfSubjectStrategy(),
+	)
+
+	viewRelation, err := model.NewRelation("view")
+	require.NoError(t, err)
+	key := createReporterResourceKey(t, "host-1", "host", "hbi", "instance-1")
+
+	_, err = usecase.CheckSelfBulk(ctx, CheckSelfBulkCommand{
+		Items: []CheckSelfBulkItem{
+			{
+				Resource: key,
+				Relation: viewRelation,
+			},
+		},
+		Consistency: model.NewConsistencyAtLeastAsAcknowledged(),
+	})
+	require.Error(t, err)
+	assert.Equal(t, codes.InvalidArgument, status.Code(err))
+	assert.Contains(t, err.Error(), "inventory-managed consistency is not supported for bulk checks")
 	assert.Equal(t, 0, meta.calls)
 }
 
@@ -2039,7 +2116,7 @@ func TestResolveConsistencyToken(t *testing.T) {
 			}
 
 			// Call the function under test
-			token, err := uc.resolveConsistencyToken(ctx, tt.consistency, reporterResourceKey)
+			token, err := uc.resolveConsistencyToken(ctx, tt.consistency, reporterResourceKey, false)
 
 			if tt.expectedError {
 				assert.Error(t, err)
@@ -2087,7 +2164,7 @@ func TestResolveConsistencyToken_UnknownPreference(t *testing.T) {
 		Token:      model.MinimizeLatencyToken,
 	}
 
-	token, err := uc.resolveConsistencyToken(ctx, unknownConfig, reporterResourceKey)
+	token, err := uc.resolveConsistencyToken(ctx, unknownConfig, reporterResourceKey, false)
 
 	assert.Error(t, err)
 	assert.Equal(t, "", token)

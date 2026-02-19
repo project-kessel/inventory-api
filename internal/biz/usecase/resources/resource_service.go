@@ -371,7 +371,7 @@ func (uc *Usecase) Check(ctx context.Context, relation model.Relation, sub model
 	if err := uc.enforceMetaAuthzObject(ctx, metaauthorizer.RelationCheck, metaauthorizer.NewInventoryResourceFromKey(reporterResourceKey)); err != nil {
 		return false, model.MinimizeLatencyToken, err
 	}
-	token, err := uc.resolveConsistencyToken(ctx, consistency, reporterResourceKey)
+	token, err := uc.resolveConsistencyToken(ctx, consistency, reporterResourceKey, false)
 	if err != nil {
 		return false, model.MinimizeLatencyToken, err
 	}
@@ -388,7 +388,7 @@ func (uc *Usecase) CheckSelf(ctx context.Context, relation model.Relation, repor
 	if err != nil {
 		return false, model.MinimizeLatencyToken, err
 	}
-	token, err := uc.resolveConsistencyTokenForSelf(ctx, consistency, reporterResourceKey)
+	token, err := uc.resolveConsistencyToken(ctx, consistency, reporterResourceKey, true)
 	if err != nil {
 		return false, model.MinimizeLatencyToken, err
 	}
@@ -538,9 +538,9 @@ func (uc *Usecase) lookupConsistencyTokenFromDB(ctx context.Context, reporterRes
 
 // resolveConsistencyToken resolves the consistency token based on the preference.
 // Used by Check. For unspecified consistency, uses the DefaultToAtLeastAsAcknowledged feature flag.
-func (uc *Usecase) resolveConsistencyToken(ctx context.Context, consistency model.Consistency, reporterResourceKey model.ReporterResourceKey) (string, error) {
+func (uc *Usecase) resolveConsistencyToken(ctx context.Context, consistency model.Consistency, reporterResourceKey model.ReporterResourceKey, overrideFeatureFlag bool) (string, error) {
 	featureFlagEnabled := uc.Config.DefaultToAtLeastAsAcknowledged
-	if featureFlagEnabled {
+	if featureFlagEnabled && !overrideFeatureFlag {
 		uc.Log.WithContext(ctx).Debug("Feature flag default-to-at-least-as-acknowledged is enabled")
 	} else {
 		uc.Log.WithContext(ctx).Debug("Feature flag default-to-at-least-as-acknowledged is disabled")
@@ -560,37 +560,11 @@ func (uc *Usecase) resolveConsistencyToken(ctx context.Context, consistency mode
 		return uc.lookupConsistencyTokenFromDB(ctx, reporterResourceKey)
 
 	case model.ConsistencyUnspecified:
-		if featureFlagEnabled {
+		if featureFlagEnabled && !overrideFeatureFlag {
 			uc.Log.WithContext(ctx).Debug("Default consistency - looking up token from DB")
 			return uc.lookupConsistencyTokenFromDB(ctx, reporterResourceKey)
 		}
 		uc.Log.WithContext(ctx).Debug("Default consistency - using minimize_latency")
-		return "", nil
-
-	default:
-		return "", status.Errorf(codes.Internal, "unexpected consistency preference: %v", consistency.Preference)
-	}
-}
-
-// resolveConsistencyTokenForSelf resolves the consistency token for CheckSelf.
-// Same as resolveConsistencyToken except unspecified consistency always uses minimize_latency (no feature flag).
-// Duplicate function can be removed once the Check feature flag for HBI is removed
-func (uc *Usecase) resolveConsistencyTokenForSelf(ctx context.Context, consistency model.Consistency, reporterResourceKey model.ReporterResourceKey) (string, error) {
-	switch consistency.Preference {
-	case model.ConsistencyMinimizeLatency:
-		uc.Log.WithContext(ctx).Debug("Using minimize_latency consistency")
-		return "", nil
-
-	case model.ConsistencyAtLeastAsFresh:
-		uc.Log.WithContext(ctx).Debug("Using at_least_as_fresh consistency")
-		return string(consistency.Token), nil
-
-	case model.ConsistencyAtLeastAsAcknowledged:
-		uc.Log.WithContext(ctx).Debug("Using at_least_as_acknowledged consistency - looking up token from DB")
-		return uc.lookupConsistencyTokenFromDB(ctx, reporterResourceKey)
-
-	case model.ConsistencyUnspecified:
-		uc.Log.WithContext(ctx).Debug("Unspecified consistency for CheckSelf - using minimize_latency")
 		return "", nil
 
 	default:

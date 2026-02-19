@@ -437,6 +437,68 @@ func TestToLookupResourceResponse(t *testing.T) {
 	assert.Equal(t, expected, result)
 }
 
+func TestConsistencyFromProto(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		input    *pb.Consistency
+		expected model.Consistency
+	}{
+		{
+			name:     "nil consistency returns unspecified",
+			input:    nil,
+			expected: model.NewConsistencyUnspecified(),
+		},
+		{
+			name: "minimize_latency true returns minimize_latency",
+			input: &pb.Consistency{
+				Requirement: &pb.Consistency_MinimizeLatency{MinimizeLatency: true},
+			},
+			expected: model.NewConsistencyMinimizeLatency(),
+		},
+		{
+			name: "at_least_as_acknowledged true returns at_least_as_acknowledged",
+			input: &pb.Consistency{
+				Requirement: &pb.Consistency_AtLeastAsAcknowledged{AtLeastAsAcknowledged: true},
+			},
+			expected: model.NewConsistencyAtLeastAsAcknowledged(),
+		},
+		{
+			name: "at_least_as_fresh with token returns at_least_as_fresh",
+			input: &pb.Consistency{
+				Requirement: &pb.Consistency_AtLeastAsFresh{
+					AtLeastAsFresh: &pb.ConsistencyToken{Token: "test-token-123"},
+				},
+			},
+			expected: model.NewConsistencyAtLeastAsFresh(model.ConsistencyToken("test-token-123")),
+		},
+		{
+			name: "at_least_as_fresh with empty token returns at_least_as_fresh with empty token",
+			input: &pb.Consistency{
+				Requirement: &pb.Consistency_AtLeastAsFresh{
+					AtLeastAsFresh: &pb.ConsistencyToken{Token: ""},
+				},
+			},
+			expected: model.NewConsistencyAtLeastAsFresh(model.MinimizeLatencyToken),
+		},
+		{
+			name:     "empty consistency struct returns unspecified",
+			input:    &pb.Consistency{},
+			expected: model.NewConsistencyUnspecified(),
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			result := svc.ConsistencyFromProto(tc.input)
+			assert.Equal(t, tc.expected.Preference, result.Preference)
+			assert.Equal(t, tc.expected.Token, result.Token)
+		})
+	}
+}
+
 func TestInventoryService_CheckSelf_Allowed_XRhIdentity(t *testing.T) {
 	claims := &authnapi.Claims{
 		SubjectId: authnapi.SubjectId("user-123"),
@@ -463,12 +525,13 @@ func TestInventoryService_CheckSelf_Allowed_XRhIdentity(t *testing.T) {
 				"host",
 				"dd1b73b9-3e33-4264-968c-e3ce55b9afec",
 				mock.MatchedBy(func(sub *relationsV1beta1.SubjectReference) bool {
+					// Verify subject is derived from claims (SubjectId for x-rh-identity).
 					return sub.Subject.Id == "user-123" &&
 						sub.Subject.Type.Name == "principal" &&
 						sub.Subject.Type.Namespace == "rbac"
 				}),
 			).
-			Return(relationsV1beta1.CheckResponse_ALLOWED_TRUE, &relationsV1beta1.ConsistencyToken{}, nil).
+			Return(relationsV1beta1.CheckResponse_ALLOWED_TRUE, &relationsV1beta1.ConsistencyToken{Token: "test-token"}, nil).
 			Once()
 		return TestServerConfig{
 				Usecase:       newTestUsecase(t, testUsecaseConfig{Authz: mockAuthz}),
@@ -478,6 +541,8 @@ func TestInventoryService_CheckSelf_Allowed_XRhIdentity(t *testing.T) {
 				res := tr.Invoke(ctx, withBody(protoReq, CheckSelf, httpEndpoint("POST /api/kessel/v1beta2/checkself")))
 				resp := Extract(t, res, expectSuccess(func() *pb.CheckSelfResponse { return &pb.CheckSelfResponse{} }))
 				assert.Equal(t, pb.Allowed_ALLOWED_TRUE, resp.Allowed)
+				assert.NotNil(t, resp.ConsistencyToken)
+				assert.Equal(t, "test-token", resp.ConsistencyToken.GetToken())
 				mockAuthz.AssertExpectations(t)
 			}
 	})
@@ -962,6 +1027,8 @@ func TestInventoryService_Check_Allowed(t *testing.T) {
 				res := tr.Invoke(ctx, withBody(protoReq, Check, httpEndpoint("POST /api/kessel/v1beta2/check")))
 				resp := Extract(t, res, expectSuccess(func() *pb.CheckResponse { return &pb.CheckResponse{} }))
 				assert.Equal(t, pb.Allowed_ALLOWED_TRUE, resp.Allowed)
+				assert.NotNil(t, resp.ConsistencyToken)
+				assert.NotEmpty(t, resp.ConsistencyToken.GetToken())
 			}
 	})
 }
@@ -997,6 +1064,8 @@ func TestInventoryService_Check_Denied(t *testing.T) {
 				res := tr.Invoke(ctx, withBody(protoReq, Check, httpEndpoint("POST /api/kessel/v1beta2/check")))
 				resp := Extract(t, res, expectSuccess(func() *pb.CheckResponse { return &pb.CheckResponse{} }))
 				assert.Equal(t, pb.Allowed_ALLOWED_FALSE, resp.Allowed)
+				assert.NotNil(t, resp.ConsistencyToken)
+				assert.NotEmpty(t, resp.ConsistencyToken.GetToken())
 			}
 	})
 }

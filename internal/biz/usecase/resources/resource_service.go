@@ -10,12 +10,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/project-kessel/inventory-api/cmd/common"
 	authnapi "github.com/project-kessel/inventory-api/internal/authn/api"
-	authzapi "github.com/project-kessel/inventory-api/internal/authz/api"
-	"github.com/project-kessel/inventory-api/internal/biz"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
-	"github.com/project-kessel/inventory-api/internal/biz/schema"
 	"github.com/project-kessel/inventory-api/internal/biz/usecase/metaauthorizer"
-	"github.com/project-kessel/inventory-api/internal/data"
 	"github.com/project-kessel/inventory-api/internal/metricscollector"
 	"github.com/project-kessel/inventory-api/internal/pubsub"
 	"github.com/project-kessel/inventory-api/internal/subject/selfsubject"
@@ -76,10 +72,10 @@ type UsecaseConfig struct {
 // Usecase provides business logic operations for resource management in the inventory system.
 // It coordinates between repositories, authorization, and other system components.
 type Usecase struct {
-	schemaUsecase       *SchemaUsecase
-	resourceRepository  data.ResourceRepository
+	schemaService       *model.SchemaService
+	resourceRepository  model.ResourceRepository
 	waitForNotifBreaker *gobreaker.CircuitBreaker
-	Authz               authzapi.Authorizer
+	Authz               model.Authorizer
 	MetaAuthorizer      metaauthorizer.MetaAuthorizer
 	Namespace           string
 	Log                 *log.Helper
@@ -89,8 +85,8 @@ type Usecase struct {
 	SelfSubjectStrategy selfsubject.SelfSubjectStrategy
 }
 
-func New(resourceRepository data.ResourceRepository, schemaRepository schema.Repository,
-	authz authzapi.Authorizer, namespace string, logger log.Logger,
+func New(resourceRepository model.ResourceRepository, schemaRepository model.SchemaRepository,
+	authz model.Authorizer, namespace string, logger log.Logger,
 	listenManager pubsub.ListenManagerImpl, waitForNotifBreaker *gobreaker.CircuitBreaker, usecaseConfig *UsecaseConfig, metricsCollector *metricscollector.MetricsCollector, metaAuthorizer metaauthorizer.MetaAuthorizer, selfSubjectStrategy selfsubject.SelfSubjectStrategy) *Usecase {
 	if metaAuthorizer == nil {
 		metaAuthorizer = metaauthorizer.NewSimpleMetaAuthorizer()
@@ -98,7 +94,7 @@ func New(resourceRepository data.ResourceRepository, schemaRepository schema.Rep
 
 	return &Usecase{
 		resourceRepository:  resourceRepository,
-		schemaUsecase:       NewSchemaUsecase(schemaRepository, log.NewHelper(logger)),
+		schemaService:       model.NewSchemaService(schemaRepository, log.NewHelper(logger)),
 		waitForNotifBreaker: waitForNotifBreaker,
 		Authz:               authz,
 		MetaAuthorizer:      metaAuthorizer,
@@ -158,7 +154,7 @@ func (uc *Usecase) ReportResource(ctx context.Context, cmd ReportResourceCommand
 		defer subscription.Unsubscribe()
 	}
 
-	var operationType biz.EventOperationType
+	var operationType model.EventOperationType
 	err = uc.resourceRepository.GetTransactionManager().HandleSerializableTransaction(
 		ReportResourceOperationName,
 		uc.resourceRepository.GetDB(),
@@ -183,12 +179,12 @@ func (uc *Usecase) ReportResource(ctx context.Context, cmd ReportResourceCommand
 
 			if err == nil && res != nil {
 				log.Info("Resource already exists, updating: ")
-				operationType = biz.OperationTypeUpdated
+				operationType = model.OperationTypeUpdated
 				return uc.updateResource(tx, cmd, res, txidStr)
 			}
 
 			log.Info("Creating new resource")
-			operationType = biz.OperationTypeCreated
+			operationType = model.OperationTypeCreated
 			return uc.createResource(tx, cmd, txidStr)
 		},
 	)
@@ -290,7 +286,7 @@ func (uc *Usecase) createResource(tx *gorm.DB, cmd ReportResourceCommand, txidSt
 		return err
 	}
 
-	return uc.resourceRepository.Save(tx, resource, biz.OperationTypeCreated, txidStr)
+	return uc.resourceRepository.Save(tx, resource, model.OperationTypeCreated, txidStr)
 }
 
 func (uc *Usecase) updateResource(tx *gorm.DB, cmd ReportResourceCommand, existingResource *model.Resource, txidStr string) error {
@@ -320,7 +316,7 @@ func (uc *Usecase) updateResource(tx *gorm.DB, cmd ReportResourceCommand, existi
 		return fmt.Errorf("failed to update resource: %w", err)
 	}
 
-	return uc.resourceRepository.Save(tx, *existingResource, biz.OperationTypeUpdated, txidStr)
+	return uc.resourceRepository.Save(tx, *existingResource, model.OperationTypeUpdated, txidStr)
 }
 
 func (uc *Usecase) Delete(ctx context.Context, reporterResourceKey model.ReporterResourceKey) error {
@@ -349,7 +345,7 @@ func (uc *Usecase) Delete(ctx context.Context, reporterResourceKey model.Reporte
 				if err != nil {
 					return fmt.Errorf("failed to delete resource: %w", err)
 				}
-				return uc.resourceRepository.Save(tx, *res, biz.OperationTypeDeleted, txidStr)
+				return uc.resourceRepository.Save(tx, *res, model.OperationTypeDeleted, txidStr)
 			} else {
 				if errors.Is(err, gorm.ErrRecordNotFound) {
 					return ErrResourceNotFound
@@ -364,7 +360,7 @@ func (uc *Usecase) Delete(ctx context.Context, reporterResourceKey model.Reporte
 	}
 
 	// Increment outbox metrics only after successful transaction commit
-	metricscollector.Incr(uc.MetricsCollector.OutboxEventWrites, string(biz.OperationTypeDeleted.OperationType()))
+	metricscollector.Incr(uc.MetricsCollector.OutboxEventWrites, string(model.OperationTypeDeleted.OperationType()))
 	return nil
 }
 
@@ -565,7 +561,7 @@ func (uc *Usecase) validateReportResourceCommand(ctx context.Context, cmd Report
 		return fmt.Errorf("missing 'reporterType' field")
 	}
 
-	if isReporter, err := uc.schemaUsecase.IsReporterForResource(ctx, resourceType, reporterType); !isReporter {
+	if isReporter, err := uc.schemaService.IsReporterForResource(ctx, resourceType, reporterType); !isReporter {
 		if err != nil {
 			return err
 		}
@@ -582,7 +578,7 @@ func (uc *Usecase) validateReportResourceCommand(ctx context.Context, cmd Report
 	sanitizedReporterRepresentation := removeNulls(map[string]interface{}(*cmd.ReporterRepresentation))
 
 	// Validate reporter-specific data using the sanitized map
-	if err := uc.schemaUsecase.ReporterShallowValidate(ctx, resourceType, reporterType, sanitizedReporterRepresentation); err != nil {
+	if err := uc.schemaService.ReporterShallowValidate(ctx, resourceType, reporterType, sanitizedReporterRepresentation); err != nil {
 		return err
 	}
 
@@ -590,7 +586,7 @@ func (uc *Usecase) validateReportResourceCommand(ctx context.Context, cmd Report
 	commonRepresentation := map[string]interface{}(*cmd.CommonRepresentation)
 
 	// Validate common data
-	if err := uc.schemaUsecase.CommonShallowValidate(ctx, resourceType, commonRepresentation); err != nil {
+	if err := uc.schemaService.CommonShallowValidate(ctx, resourceType, commonRepresentation); err != nil {
 		return err
 	}
 

@@ -1,4 +1,4 @@
-package usecase
+package model
 
 import "gorm.io/gorm"
 

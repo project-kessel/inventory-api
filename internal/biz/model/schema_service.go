@@ -1,4 +1,4 @@
-package resources
+package model
 
 import (
 	"context"
@@ -6,23 +6,21 @@ import (
 	"fmt"
 
 	"github.com/go-kratos/kratos/v2/log"
-	"github.com/project-kessel/inventory-api/internal/biz/model"
-	"github.com/project-kessel/inventory-api/internal/biz/schema"
 )
 
-type SchemaUsecase struct {
+type SchemaService struct {
 	Log              *log.Helper
-	schemaRepository schema.Repository
+	schemaRepository SchemaRepository
 }
 
-func NewSchemaUsecase(schemaRepository schema.Repository, logger *log.Helper) *SchemaUsecase {
-	return &SchemaUsecase{
+func NewSchemaService(schemaRepository SchemaRepository, logger *log.Helper) *SchemaService {
+	return &SchemaService{
 		Log:              logger,
 		schemaRepository: schemaRepository,
 	}
 }
 
-func (sc *SchemaUsecase) CalculateTuples(currentRepresentation, previousRepresentation *model.Representations, key model.ReporterResourceKey) (model.TuplesToReplicate, error) {
+func (sc *SchemaService) CalculateTuples(currentRepresentation, previousRepresentation *Representations, key ReporterResourceKey) (TuplesToReplicate, error) {
 	// Extract workspace IDs from representations
 	// currentRepresentation can be nil for DELETE operations (meaning no current/new state)
 	currentWorkspaceID := ""
@@ -36,27 +34,27 @@ func (sc *SchemaUsecase) CalculateTuples(currentRepresentation, previousRepresen
 
 	// Handle no-op case where workspace hasn't changed
 	if previousWorkspaceID != "" && previousWorkspaceID == currentWorkspaceID {
-		return model.TuplesToReplicate{}, nil
+		return TuplesToReplicate{}, nil
 	}
 
 	// Build tuples to create and delete
-	var tuplesToCreate, tuplesToDelete []model.RelationsTuple
+	var tuplesToCreate, tuplesToDelete []RelationsTuple
 
 	if currentWorkspaceID != "" {
-		tuplesToCreate = append(tuplesToCreate, model.NewWorkspaceRelationsTuple(currentWorkspaceID, key))
+		tuplesToCreate = append(tuplesToCreate, NewWorkspaceRelationsTuple(currentWorkspaceID, key))
 	}
 
 	if previousWorkspaceID != "" {
-		tuplesToDelete = append(tuplesToDelete, model.NewWorkspaceRelationsTuple(previousWorkspaceID, key))
+		tuplesToDelete = append(tuplesToDelete, NewWorkspaceRelationsTuple(previousWorkspaceID, key))
 	}
 
-	return model.NewTuplesToReplicate(tuplesToCreate, tuplesToDelete)
+	return NewTuplesToReplicate(tuplesToCreate, tuplesToDelete)
 }
 
 // IsReporterForResource validates the resourceType and reporterType combination is valid. i.e. that there is a reporter that reports said resource.
-func (sc *SchemaUsecase) IsReporterForResource(ctx context.Context, resourceType string, reporterType string) (bool, error) {
+func (sc *SchemaService) IsReporterForResource(ctx context.Context, resourceType string, reporterType string) (bool, error) {
 	if _, err := sc.schemaRepository.GetReporterSchema(ctx, resourceType, reporterType); err != nil {
-		if errors.Is(err, schema.ResourceSchemaNotFound) || errors.Is(err, schema.ReporterSchemaNotFound) {
+		if errors.Is(err, ResourceSchemaNotFound) || errors.Is(err, ReporterSchemaNotFound) {
 			return false, nil
 		}
 
@@ -67,7 +65,7 @@ func (sc *SchemaUsecase) IsReporterForResource(ctx context.Context, resourceType
 }
 
 // CommonShallowValidate validates the common representation for a given resourceType.
-func (sc *SchemaUsecase) CommonShallowValidate(ctx context.Context, resourceType string, commonRepresentation map[string]interface{}) error {
+func (sc *SchemaService) CommonShallowValidate(ctx context.Context, resourceType string, commonRepresentation map[string]interface{}) error {
 	resource, err := sc.schemaRepository.GetResourceSchema(ctx, resourceType)
 	if err != nil {
 		return fmt.Errorf("failed to load common representation schema for '%s': %w", resourceType, err)
@@ -94,7 +92,7 @@ func (sc *SchemaUsecase) CommonShallowValidate(ctx context.Context, resourceType
 }
 
 // ReporterShallowValidate validates the specific reporter representation for a given resourceType/reporterType.
-func (sc *SchemaUsecase) ReporterShallowValidate(ctx context.Context, resourceType string, reporterType string, reporterRepresentation map[string]interface{}) error {
+func (sc *SchemaService) ReporterShallowValidate(ctx context.Context, resourceType string, reporterType string, reporterRepresentation map[string]interface{}) error {
 	reporter, err := sc.schemaRepository.GetReporterSchema(ctx, resourceType, reporterType)
 	if err != nil {
 		return err

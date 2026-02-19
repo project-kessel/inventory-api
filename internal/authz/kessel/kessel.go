@@ -16,7 +16,7 @@ import (
 	"go.opentelemetry.io/otel/metric"
 	"google.golang.org/grpc"
 
-	authzapi "github.com/project-kessel/inventory-api/internal/authz/api"
+	"github.com/project-kessel/inventory-api/internal/biz/model"
 )
 
 type KesselAuthz struct {
@@ -30,7 +30,7 @@ type KesselAuthz struct {
 	failureCounter metric.Int64Counter
 }
 
-var _ authzapi.Authorizer = &KesselAuthz{}
+var _ model.Authorizer = &KesselAuthz{}
 
 func New(ctx context.Context, config CompletedConfig, logger *log.Helper) (*KesselAuthz, error) {
 	logger.Info("Using authorizer: kessel")

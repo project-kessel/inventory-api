@@ -382,7 +382,7 @@ func TestCheckBulk_RejectsInventoryManagedConsistency(t *testing.T) {
 	})
 	require.Error(t, err)
 	assert.Equal(t, codes.InvalidArgument, status.Code(err))
-	assert.Contains(t, err.Error(), "inventory-managed consistency is not supported for bulk checks")
+	assert.Contains(t, err.Error(), "inventory managed zookies aren't available")
 	assert.Equal(t, 0, meta.calls)
 }
 
@@ -418,7 +418,7 @@ func TestCheckSelfBulk_RejectsInventoryManagedConsistency(t *testing.T) {
 	})
 	require.Error(t, err)
 	assert.Equal(t, codes.InvalidArgument, status.Code(err))
-	assert.Contains(t, err.Error(), "inventory-managed consistency is not supported for bulk checks")
+	assert.Contains(t, err.Error(), "inventory managed zookies aren't available")
 	assert.Equal(t, 0, meta.calls)
 }
 

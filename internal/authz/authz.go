@@ -8,10 +8,10 @@ import (
 
 	"github.com/project-kessel/inventory-api/internal/authz/allow"
 	"github.com/project-kessel/inventory-api/internal/authz/kessel"
-	authzmodel "github.com/project-kessel/inventory-api/internal/biz/model"
+	"github.com/project-kessel/inventory-api/internal/biz/model"
 )
 
-func New(ctx context.Context, config CompletedConfig, logger *log.Helper) (authzmodel.Authorizer, error) {
+func New(ctx context.Context, config CompletedConfig, logger *log.Helper) (model.Authorizer, error) {
 	switch config.Authz {
 	case AllowAll:
 		return allow.New(logger), nil

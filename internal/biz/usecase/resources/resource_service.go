@@ -538,7 +538,6 @@ func (uc *Usecase) lookupConsistencyTokenFromDB(ctx context.Context, reporterRes
 
 // resolveConsistencyToken resolves the consistency token based on the preference.
 // Used by Check. For unspecified consistency, uses the DefaultToAtLeastAsAcknowledged feature flag.
-//
 func (uc *Usecase) resolveConsistencyToken(ctx context.Context, consistency model.Consistency, reporterResourceKey model.ReporterResourceKey, overrideFeatureFlag bool) (string, error) {
 	featureFlagEnabled := uc.Config.DefaultToAtLeastAsAcknowledged
 	if featureFlagEnabled && !overrideFeatureFlag {

@@ -382,7 +382,7 @@ func TestCheckBulk_RejectsInventoryManagedConsistency(t *testing.T) {
 	})
 	require.Error(t, err)
 	assert.Equal(t, codes.InvalidArgument, status.Code(err))
-	assert.Contains(t, err.Error(), "inventory managed zookies aren't available")
+	assert.Contains(t, err.Error(), "inventory-managed consistency tokens aren't available")
 	assert.Equal(t, 0, meta.calls)
 }
 

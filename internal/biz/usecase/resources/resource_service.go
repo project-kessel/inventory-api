@@ -418,7 +418,7 @@ func (uc *Usecase) CheckForUpdate(ctx context.Context, relation model.Relation, 
 // CheckBulk performs bulk permission checks.
 func (uc *Usecase) CheckBulk(ctx context.Context, cmd CheckBulkCommand) (*CheckBulkResult, error) {
 	if cmd.Consistency.Preference == model.ConsistencyAtLeastAsAcknowledged {
-		return nil, status.Errorf(codes.InvalidArgument, "inventory managed zookies aren't available")
+		return nil, status.Errorf(codes.InvalidArgument, "inventory-managed consistency tokens aren't available")
 	}
 	// Meta-authorization for each item
 	for _, item := range cmd.Items {
@@ -505,7 +505,7 @@ func (uc *Usecase) checkWithToken(ctx context.Context, relation model.Relation, 
 // TODO: remove v1beta1 response type
 func (uc *Usecase) LookupResources(ctx context.Context, cmd LookupResourcesCommand) (grpc.ServerStreamingClient[kessel.LookupResourcesResponse], error) {
 	if cmd.Consistency.Preference == model.ConsistencyAtLeastAsAcknowledged {
-		return nil, status.Errorf(codes.InvalidArgument, "inventory managed zookies aren't available")
+		return nil, status.Errorf(codes.InvalidArgument, "inventory-managed consistency tokens aren't available")
 	}
 	// Meta-authorize against the resource type (not a specific resource instance)
 	metaObject := metaauthorizer.NewResourceTypeRef(cmd.ReporterType, cmd.ResourceType)

@@ -70,7 +70,7 @@ func (s *InventoryService) Check(ctx context.Context, req *pb.CheckRequest) (*pb
 		log.Error("Failed to build relation: ", err)
 		return nil, err
 	}
-	consistency := ConsistencyFromProto(req.GetConsistency())
+	consistency := consistencyFromProto(req.GetConsistency())
 	allowed, consistencyToken, err := s.Ctl.Check(ctx, relation, subjectRef, reporterResourceKey, consistency)
 	if err != nil {
 		return nil, err
@@ -124,7 +124,7 @@ func (s *InventoryService) CheckSelf(ctx context.Context, req *pb.CheckSelfReque
 	if err != nil {
 		return nil, err
 	}
-	consistency := ConsistencyFromProto(req.GetConsistency())
+	consistency := consistencyFromProto(req.GetConsistency())
 	log.Infof("CheckSelf request consistency: %s", consistency.Preference)
 	resp, consistencyToken, err := s.Ctl.CheckSelf(ctx, relation, reporterResourceKey, consistency)
 	if err != nil {
@@ -212,7 +212,7 @@ func toCheckBulkCommand(req *pb.CheckBulkRequest) (resources.CheckBulkCommand, e
 		}
 	}
 
-	consistency := ConsistencyFromProto(req.GetConsistency())
+	consistency := consistencyFromProto(req.GetConsistency())
 	return resources.CheckBulkCommand{
 		Items:       items,
 		Consistency: consistency,
@@ -221,7 +221,7 @@ func toCheckBulkCommand(req *pb.CheckBulkRequest) (resources.CheckBulkCommand, e
 
 // ConsistencyFromProto converts v1beta2 Consistency to model.Consistency.
 // Used by Check, CheckSelf, CheckBulk, CheckSelfBulk, and LookupResources.
-func ConsistencyFromProto(c *pb.Consistency) model.Consistency {
+func consistencyFromProto(c *pb.Consistency) model.Consistency {
 	if c == nil {
 		return model.NewConsistencyUnspecified()
 	}
@@ -308,7 +308,7 @@ func toCheckSelfBulkCommand(req *pb.CheckSelfBulkRequest) (resources.CheckSelfBu
 		}
 	}
 
-	consistency := ConsistencyFromProto(req.GetConsistency())
+	consistency := consistencyFromProto(req.GetConsistency())
 	return resources.CheckSelfBulkCommand{
 		Items:       items,
 		Consistency: consistency,
@@ -373,7 +373,7 @@ func (s *InventoryService) StreamedListObjects(
 ) error {
 	ctx := stream.Context()
 
-	consistency := ConsistencyFromProto(req.GetConsistency())
+	consistency := consistencyFromProto(req.GetConsistency())
 	log.Debugf("StreamedListObjects consistency: %s", consistency.Preference)
 
 	lookupCmd, err := ToLookupResourcesCommand(req)
@@ -426,7 +426,7 @@ func ToLookupResourcesCommand(request *pb.StreamedListObjectsRequest) (resources
 	if err != nil {
 		return resources.LookupResourcesCommand{}, fmt.Errorf("invalid subject: %w", err)
 	}
-	consistency := ConsistencyFromProto(request.GetConsistency())
+	consistency := consistencyFromProto(request.GetConsistency())
 
 	var limit uint32 = 1000
 	var continuation string

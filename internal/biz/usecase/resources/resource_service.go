@@ -375,7 +375,7 @@ func (uc *Usecase) Check(ctx context.Context, relation model.Relation, sub model
 	if err != nil {
 		return false, model.MinimizeLatencyToken, err
 	}
-	return uc.checkWithToken(ctx, relation, sub, reporterResourceKey, token)
+	return uc.checkPermission(ctx, relation, sub, reporterResourceKey, token)
 }
 
 // CheckSelf verifies access for the authenticated user using the self-subject strategy.
@@ -392,7 +392,7 @@ func (uc *Usecase) CheckSelf(ctx context.Context, relation model.Relation, repor
 	if err != nil {
 		return false, model.MinimizeLatencyToken, err
 	}
-	return uc.checkWithToken(ctx, relation, subjectRef, reporterResourceKey, token)
+	return uc.checkPermission(ctx, relation, subjectRef, reporterResourceKey, token)
 }
 
 // CheckForUpdate verifies if a subject can update the resource.
@@ -480,8 +480,8 @@ func (uc *Usecase) CheckSelfBulk(ctx context.Context, cmd CheckSelfBulkCommand) 
 	return checkBulkResultFromV1beta1(resp, bulkCmd)
 }
 
-// checkWithToken runs Authz.Check with the given consistency token. Used by Check (after resolveConsistencyToken) and by checkPermission (CheckSelf).
-func (uc *Usecase) checkWithToken(ctx context.Context, relation model.Relation, sub model.SubjectReference, reporterResourceKey model.ReporterResourceKey, consistencyToken string) (bool, model.ConsistencyToken, error) {
+// checkPermission runs Authz.Check with the given consistency token. Used by Check (after resolveConsistencyToken) and by CheckSelf.
+func (uc *Usecase) checkPermission(ctx context.Context, relation model.Relation, sub model.SubjectReference, reporterResourceKey model.ReporterResourceKey, consistencyToken string) (bool, model.ConsistencyToken, error) {
 	namespace := reporterResourceKey.ReporterType().Serialize()
 	v1beta1Subject := subjectToV1Beta1(sub)
 	allowed, returnedToken, err := uc.Authz.Check(ctx, namespace, relation.Serialize(), consistencyToken, reporterResourceKey.ResourceType().Serialize(), reporterResourceKey.LocalResourceId().Serialize(), v1beta1Subject)

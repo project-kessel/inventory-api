@@ -329,6 +329,46 @@ func TestReporterRepresentation_BusinessRules(t *testing.T) {
 		}
 	})
 
+	t.Run("should enforce nil common_version for delete representation", func(t *testing.T) {
+		t.Parallel()
+
+		deleteRep, err := NewReporterDeleteRepresentation(
+			fixture.ValidReporterResourceIdType(),
+			fixture.ValidVersionType(),
+			fixture.ValidGenerationType(),
+		)
+		if err != nil {
+			t.Fatalf("Expected no error, got %v", err)
+		}
+
+		snapshot := deleteRep.Serialize()
+		if snapshot.CommonVersion != nil {
+			t.Errorf("Expected delete representation to have nil common_version, got %v", *snapshot.CommonVersion)
+		}
+	})
+
+	t.Run("should enforce non-nil common_version for data representation", func(t *testing.T) {
+		t.Parallel()
+
+		dataRep, err := NewReporterDataRepresentation(
+			fixture.ValidReporterResourceIdType(),
+			fixture.ValidVersionType(),
+			fixture.ValidGenerationType(),
+			fixture.ValidRepresentationType(),
+			fixture.ValidCommonVersionType(),
+			fixture.ValidReporterVersionType(),
+			fixture.ValidTransactionIdType(),
+		)
+		if err != nil {
+			t.Fatalf("Expected no error, got %v", err)
+		}
+
+		snapshot := dataRep.Serialize()
+		if snapshot.CommonVersion == nil {
+			t.Error("Expected data representation to have non-nil common_version, got nil")
+		}
+	})
+
 	t.Run("should accept zero values for version and generation", func(t *testing.T) {
 		t.Parallel()
 
@@ -337,7 +377,7 @@ func TestReporterRepresentation_BusinessRules(t *testing.T) {
 			0, // zero version
 			0, // zero generation
 			fixture.ValidRepresentationType(),
-			0, // zero common version
+			fixture.NilCommonVersionType(), // nil common version (optional - testing without common representation)
 			fixture.ValidReporterVersionType(),
 			fixture.ValidTransactionIdType(),
 		)
@@ -348,5 +388,63 @@ func TestReporterRepresentation_BusinessRules(t *testing.T) {
 		if dataRep.Data() == nil {
 			t.Error("Expected valid ReporterDataRepresentation with zero values, got struct with nil data")
 		}
+	})
+
+	t.Run("should accept nil common version parameter", func(t *testing.T) {
+		t.Parallel()
+
+		dataRep, err := NewReporterDataRepresentation(
+			fixture.ValidReporterResourceIdType(),
+			fixture.ValidVersionType(),
+			fixture.ValidGenerationType(),
+			fixture.ValidRepresentationType(),
+			nil, // nil common version parameter
+			fixture.ValidReporterVersionType(),
+			fixture.ValidTransactionIdType(),
+		)
+
+		assertValidReporterDataRepresentation(t, dataRep, err, "nil common version parameter")
+
+		// serialize the domain object and ensure the snapshot preserves the nil common version
+		snapshot := dataRep.Serialize()
+		if snapshot.CommonVersion != nil {
+			t.Errorf("expected snapshot.CommonVersion to be nil, got: %#v", snapshot.CommonVersion)
+		}
+
+		// deserialize back to the domain object and ensure nil common version is preserved
+		deserialized := DeserializeReporterDataRepresentation(&snapshot)
+		if deserialized == nil {
+			t.Fatal("expected non-nil ReporterDataRepresentation after deserialization")
+		}
+
+		// domain object should still have nil common version after round-trip
+		if deserialized.commonVersion != nil {
+			t.Errorf("expected deserialized.commonVersion to be nil after round-trip, got: %#v", deserialized.commonVersion)
+		}
+
+		// deserialized object should still have valid data
+		if deserialized.Data() == nil {
+			t.Error("expected deserialized ReporterDataRepresentation with nil common version to have valid data")
+		}
+
+		if deserialized.IsTombstone() {
+			t.Error("expected deserialized ReporterDataRepresentation with nil common version to have tombstone=false")
+		}
+	})
+
+	t.Run("should accept non-nil common version parameter", func(t *testing.T) {
+		t.Parallel()
+
+		dataRep, err := NewReporterDataRepresentation(
+			fixture.ValidReporterResourceIdType(),
+			fixture.ValidVersionType(),
+			fixture.ValidGenerationType(),
+			fixture.ValidRepresentationType(),
+			fixture.ValidCommonVersionType(), // non-nil common version parameter
+			fixture.ValidReporterVersionType(),
+			fixture.ValidTransactionIdType(),
+		)
+
+		assertValidReporterDataRepresentation(t, dataRep, err, "non-nil common version parameter")
 	})
 }

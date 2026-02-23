@@ -25,7 +25,7 @@ type fakeResourceRepository struct {
 type storedResource struct {
 	resourceID            uuid.UUID
 	resourceType          string
-	commonVersion         uint
+	commonVersion         *uint
 	commonData            internal.JsonObject
 	consistencyToken      string
 	reporterResourceID    uuid.UUID

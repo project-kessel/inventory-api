@@ -25,7 +25,7 @@ func TestResource_Infrastructure_Structure(t *testing.T) {
 		// Test field types
 		AssertFieldType(t, r, "ID", reflect.TypeOf(uuid.UUID{}))
 		AssertFieldType(t, r, "Type", reflect.TypeOf(""))
-		AssertFieldType(t, r, "CommonVersion", reflect.TypeOf(uint(0)))
+		AssertFieldType(t, r, "CommonVersion", reflect.TypeOf((*uint)(nil)))
 		AssertFieldType(t, r, "ConsistencyToken", reflect.TypeOf(""))
 		AssertFieldType(t, r, "CreatedAt", reflect.TypeOf(time.Time{}))
 		AssertFieldType(t, r, "UpdatedAt", reflect.TypeOf(time.Time{}))
@@ -38,7 +38,7 @@ func TestResource_Infrastructure_Structure(t *testing.T) {
 
 		// Check primary key fields have correct GORM tags
 		AssertGORMTag(t, r, "ID", "type:uuid;primaryKey")
-		AssertGORMTag(t, r, "CommonVersion", "type:bigint;check:common_version >= 0")
+		AssertGORMTag(t, r, "CommonVersion", "type:bigint;check:common_version IS NULL OR common_version >= 0")
 	})
 
 	t.Run("should have correct GORM size constraints", func(t *testing.T) {
@@ -56,10 +56,9 @@ func TestResource_Infrastructure_Structure(t *testing.T) {
 
 		r := &Resource{}
 
-		// All required fields should be non-nullable
+		// All required fields should be non-nullable (CommonVersion is now nullable)
 		AssertFieldType(t, r, "ID", reflect.TypeOf(uuid.UUID{}))
 		AssertFieldType(t, r, "Type", reflect.TypeOf(""))
-		AssertFieldType(t, r, "CommonVersion", reflect.TypeOf(uint(0)))
 	})
 
 	t.Run("should have correct table name", func(t *testing.T) {
@@ -81,17 +80,20 @@ func TestResource_Infrastructure_EdgeCases(t *testing.T) {
 		// Zero values should be acceptable for optional fields
 		AssertEqual(t, uuid.Nil, r.ID, "ID should default to nil UUID")
 		AssertEqual(t, "", r.Type, "Type should default to empty string")
-		AssertEqual(t, uint(0), r.CommonVersion, "CommonVersion should default to 0")
+		if r.CommonVersion != nil {
+			t.Error("CommonVersion should default to nil")
+		}
 		AssertEqual(t, "", r.ConsistencyToken, "ConsistencyToken should default to empty string")
 	})
 
 	t.Run("should handle unicode characters in Type", func(t *testing.T) {
 		t.Parallel()
 
+		commonVersion := uint(1)
 		r := &Resource{
 			ID:               uuid.New(),
 			Type:             "资源类型",
-			CommonVersion:    1,
+			CommonVersion:    &commonVersion,
 			ConsistencyToken: "token-with-unicode-字符",
 		}
 
@@ -114,10 +116,11 @@ func TestResource_Infrastructure_EdgeCases(t *testing.T) {
 			maxToken[i] = 'B'
 		}
 
+		commonVersion := uint(999999)
 		r := &Resource{
 			ID:               uuid.New(),
 			Type:             string(maxType),
-			CommonVersion:    999999,
+			CommonVersion:    &commonVersion,
 			ConsistencyToken: string(maxToken),
 		}
 
@@ -140,29 +143,47 @@ func TestResource_Infrastructure_Validation(t *testing.T) {
 		}{
 			{
 				name: "valid resource",
+				resource: func() Resource {
+					cv := uint(1)
+					return Resource{
+						ID:            uuid.New(),
+						Type:          "k8s_cluster",
+						CommonVersion: &cv,
+					}
+				}(),
+				isValid: true,
+			},
+			{
+				name: "valid resource with nil CommonVersion",
 				resource: Resource{
 					ID:            uuid.New(),
 					Type:          "k8s_cluster",
-					CommonVersion: 1,
+					CommonVersion: nil,
 				},
 				isValid: true,
 			},
 			{
 				name: "nil ID",
-				resource: Resource{
-					ID:            uuid.Nil,
-					Type:          "k8s_cluster",
-					CommonVersion: 1,
-				},
+				resource: func() Resource {
+					cv := uint(1)
+					return Resource{
+						ID:            uuid.Nil,
+						Type:          "k8s_cluster",
+						CommonVersion: &cv,
+					}
+				}(),
 				isValid: false,
 			},
 			{
 				name: "empty type",
-				resource: Resource{
-					ID:            uuid.New(),
-					Type:          "",
-					CommonVersion: 1,
-				},
+				resource: func() Resource {
+					cv := uint(1)
+					return Resource{
+						ID:            uuid.New(),
+						Type:          "",
+						CommonVersion: &cv,
+					}
+				}(),
 				isValid: false,
 			},
 		}
@@ -197,10 +218,11 @@ func TestResource_Infrastructure_Timestamps(t *testing.T) {
 		t.Parallel()
 
 		now := time.Now()
+		commonVersion := uint(1)
 		r := &Resource{
 			ID:            uuid.New(),
 			Type:          "test_resource",
-			CommonVersion: 1,
+			CommonVersion: &commonVersion,
 			CreatedAt:     now,
 			UpdatedAt:     now,
 		}

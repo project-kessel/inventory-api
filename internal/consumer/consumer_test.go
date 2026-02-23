@@ -937,10 +937,11 @@ func TestUpdateConsistencyTokenIfPresent(t *testing.T) {
 			resourceUUID, err := uuid.Parse(testResourceID)
 			require.Nil(t, err)
 
+			commonVersion := uint(1)
 			initialResource := datamodel.Resource{
 				ID:               resourceUUID,
 				Type:             testResourceType,
-				CommonVersion:    1,
+				CommonVersion:    &commonVersion,
 				ConsistencyToken: initialToken,
 			}
 

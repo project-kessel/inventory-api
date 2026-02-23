@@ -512,6 +512,14 @@ func (uc *Usecase) LookupResources(ctx context.Context, cmd LookupResourcesComma
 	return uc.Authz.LookupResources(ctx, v1beta1Req)
 }
 
+	// Common representation is optional - check if it's provided
+	var commonRepresentation model.Representation
+	commonMap := request.GetRepresentations().GetCommon().AsMap()
+	if len(commonMap) > 0 {
+		commonRepresentation, err = model.NewRepresentation(commonMap)
+		if err != nil {
+			return fmt.Errorf("invalid common representation: %w", err)
+		}
 func (uc *Usecase) selfSubjectFromContext(ctx context.Context) (model.SubjectReference, error) {
 	authzCtx, ok := authnapi.FromAuthzContext(ctx)
 	if !ok {
@@ -646,6 +654,14 @@ func checkBulkCommandToV1beta1(cmd CheckBulkCommand) *kessel.CheckBulkRequest {
 		}
 	}
 
+	// Common representation is optional - check if it's provided
+	var commonRepresentation model.Representation
+	commonMap := request.GetRepresentations().GetCommon().AsMap()
+	if len(commonMap) > 0 {
+		commonRepresentation, err = model.NewRepresentation(commonMap)
+		if err != nil {
+			return model.ReporterResourceKey{}, "", "", nil, model.Representation(nil), model.Representation(nil), "", fmt.Errorf("invalid common data: %w", err)
+		}
 	return &kessel.CheckBulkRequest{
 		Items:       items,
 		Consistency: consistency,

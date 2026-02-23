@@ -20,7 +20,7 @@ type FindResourceByKeysResult struct {
 	RepresentationVersion uint      `gorm:"column:representation_version"`
 	Generation            uint      `gorm:"column:generation"`
 	Tombstone             bool      `gorm:"column:tombstone"`
-	CommonVersion         uint      `gorm:"column:common_version"`
+	CommonVersion         *uint     `gorm:"column:common_version"`
 	ResourceID            uuid.UUID `gorm:"column:resource_id"`
 	ResourceType          string    `gorm:"column:resource_type"`
 	LocalResourceID       string    `gorm:"column:local_resource_id"`

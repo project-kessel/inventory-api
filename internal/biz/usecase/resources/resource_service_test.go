@@ -2126,6 +2126,94 @@ func TestResolveConsistencyToken(t *testing.T) {
 	}
 }
 
+func TestResolveConsistencyToken_OverrideFeatureFlag(t *testing.T) {
+	tests := []struct {
+		name               string
+		featureFlagEnabled bool
+		consistency        model.Consistency
+		resourceExists     bool
+		expectedToken      string
+		expectedError      bool
+	}{
+		{
+			name:               "feature flag enabled - unspecified bypasses to minimize_latency when override is true",
+			featureFlagEnabled: true,
+			consistency:        model.NewConsistencyUnspecified(),
+			resourceExists:     true,
+			expectedToken:      "",
+			expectedError:      false,
+		},
+		{
+			name:               "feature flag disabled - unspecified remains minimize_latency when override is true",
+			featureFlagEnabled: false,
+			consistency:        model.NewConsistencyUnspecified(),
+			resourceExists:     true,
+			expectedToken:      "",
+			expectedError:      false,
+		},
+		{
+			name:               "feature flag enabled - at_least_as_fresh still returns client token when override is true",
+			featureFlagEnabled: true,
+			consistency:        model.NewConsistencyAtLeastAsFresh(model.ConsistencyToken("client-provided-token")),
+			resourceExists:     false,
+			expectedToken:      "client-provided-token",
+			expectedError:      false,
+		},
+		{
+			name:               "feature flag enabled - at_least_as_acknowledged still performs DB lookup when override is true",
+			featureFlagEnabled: true,
+			consistency:        model.NewConsistencyAtLeastAsAcknowledged(),
+			resourceExists:     true,
+			expectedToken:      "", // fake repo returns empty consistency token
+			expectedError:      false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := testAuthzContext()
+			logger := log.DefaultLogger
+
+			resourceRepo := data.NewFakeResourceRepository()
+			schemaRepo := newFakeSchemaRepository(t)
+			authorizer := &allow.AllowAllAuthz{}
+			usecaseConfig := &UsecaseConfig{
+				ReadAfterWriteEnabled:          false,
+				ConsumerEnabled:                false,
+				DefaultToAtLeastAsAcknowledged: tt.featureFlagEnabled,
+			}
+			mc := metricscollector.NewFakeMetricsCollector()
+			uc := New(resourceRepo, schemaRepo, authorizer, "test-topic", logger, nil, nil, usecaseConfig, mc, nil, newTestSelfSubjectStrategy())
+
+			localResourceId, err := model.NewLocalResourceId("test-resource-override")
+			require.NoError(t, err)
+			resourceType, err := model.NewResourceType("host")
+			require.NoError(t, err)
+			reporterType, err := model.NewReporterType("hbi")
+			require.NoError(t, err)
+			reporterInstanceId, err := model.NewReporterInstanceId("test-instance")
+			require.NoError(t, err)
+
+			reporterResourceKey, err := model.NewReporterResourceKey(localResourceId, resourceType, reporterType, reporterInstanceId)
+			require.NoError(t, err)
+
+			if tt.resourceExists {
+				cmd := fixture(t).Basic("host", "hbi", "test-instance", "test-resource-override", "test-workspace")
+				err := uc.ReportResource(ctx, cmd)
+				require.NoError(t, err)
+			}
+
+			token, err := uc.resolveConsistencyToken(ctx, tt.consistency, reporterResourceKey, true)
+			if tt.expectedError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, tt.expectedToken, token)
+			}
+		})
+	}
+}
+
 func TestResolveConsistencyToken_UnknownPreference(t *testing.T) {
 	// Unknown preferences are rejected defensively.
 	ctx := testAuthzContext()

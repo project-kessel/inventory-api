@@ -442,7 +442,7 @@ func (uc *Usecase) CheckBulk(ctx context.Context, cmd CheckBulkCommand) (*CheckB
 // Uses relation="check_self" for meta-authorization.
 func (uc *Usecase) CheckSelfBulk(ctx context.Context, cmd CheckSelfBulkCommand) (*CheckBulkResult, error) {
 	if cmd.Consistency.Preference == model.ConsistencyAtLeastAsAcknowledged {
-		return nil, status.Errorf(codes.InvalidArgument, "inventory managed zookies aren't available")
+		return nil, status.Errorf(codes.InvalidArgument, "inventory-managed consistency tokens aren't available")
 	}
 	// Meta-authorization for each item
 	for _, item := range cmd.Items {

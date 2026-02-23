@@ -1,9 +1,11 @@
 package resources
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/go-kratos/kratos/v2/log"
@@ -2254,6 +2256,84 @@ func TestResolveConsistencyToken_UnknownPreference(t *testing.T) {
 
 	assert.Error(t, err)
 	assert.Equal(t, "", token)
+}
+
+func TestResolveConsistencyToken_OverrideFeatureFlag_LogsBypassWhenEnabled(t *testing.T) {
+	ctx := testAuthzContext()
+
+	var logBuf bytes.Buffer
+	logger := log.NewStdLogger(&logBuf)
+
+	resourceRepo := data.NewFakeResourceRepository()
+	schemaRepo := newFakeSchemaRepository(t)
+	authorizer := &allow.AllowAllAuthz{}
+	usecaseConfig := &UsecaseConfig{
+		ReadAfterWriteEnabled:          false,
+		ConsumerEnabled:                false,
+		DefaultToAtLeastAsAcknowledged: true,
+	}
+
+	mc := metricscollector.NewFakeMetricsCollector()
+	uc := New(resourceRepo, schemaRepo, authorizer, "test-topic", logger, nil, nil, usecaseConfig, mc, nil, newTestSelfSubjectStrategy())
+
+	reporterResourceKey := createReporterResourceKey(t, "host-123", "host", "hbi", "instance-1")
+
+	token, err := uc.resolveConsistencyToken(ctx, model.NewConsistencyUnspecified(), reporterResourceKey, true)
+	require.NoError(t, err)
+	assert.Equal(t, "", token)
+	assert.Contains(t, strings.ToLower(logBuf.String()), "enabled but bypassed for this call")
+}
+
+func TestResolveConsistencyToken_OverrideFeatureFlag_LogsEnabledWhenNotBypassed(t *testing.T) {
+	ctx := testAuthzContext()
+
+	var logBuf bytes.Buffer
+	logger := log.NewStdLogger(&logBuf)
+
+	resourceRepo := data.NewFakeResourceRepository()
+	schemaRepo := newFakeSchemaRepository(t)
+	authorizer := &allow.AllowAllAuthz{}
+	usecaseConfig := &UsecaseConfig{
+		ReadAfterWriteEnabled:          false,
+		ConsumerEnabled:                false,
+		DefaultToAtLeastAsAcknowledged: true,
+	}
+
+	mc := metricscollector.NewFakeMetricsCollector()
+	uc := New(resourceRepo, schemaRepo, authorizer, "test-topic", logger, nil, nil, usecaseConfig, mc, nil, newTestSelfSubjectStrategy())
+
+	reporterResourceKey := createReporterResourceKey(t, "host-456", "host", "hbi", "instance-1")
+
+	token, err := uc.resolveConsistencyToken(ctx, model.NewConsistencyUnspecified(), reporterResourceKey, false)
+	require.NoError(t, err)
+	assert.Equal(t, "", token)
+	assert.Contains(t, strings.ToLower(logBuf.String()), "feature flag default-to-at-least-as-acknowledged is enabled")
+}
+
+func TestResolveConsistencyToken_OverrideFeatureFlag_LogsDisabledWhenFeatureOff(t *testing.T) {
+	ctx := testAuthzContext()
+
+	var logBuf bytes.Buffer
+	logger := log.NewStdLogger(&logBuf)
+
+	resourceRepo := data.NewFakeResourceRepository()
+	schemaRepo := newFakeSchemaRepository(t)
+	authorizer := &allow.AllowAllAuthz{}
+	usecaseConfig := &UsecaseConfig{
+		ReadAfterWriteEnabled:          false,
+		ConsumerEnabled:                false,
+		DefaultToAtLeastAsAcknowledged: false,
+	}
+
+	mc := metricscollector.NewFakeMetricsCollector()
+	uc := New(resourceRepo, schemaRepo, authorizer, "test-topic", logger, nil, nil, usecaseConfig, mc, nil, newTestSelfSubjectStrategy())
+
+	reporterResourceKey := createReporterResourceKey(t, "host-789", "host", "hbi", "instance-1")
+
+	token, err := uc.resolveConsistencyToken(ctx, model.NewConsistencyUnspecified(), reporterResourceKey, true)
+	require.NoError(t, err)
+	assert.Equal(t, "", token)
+	assert.Contains(t, strings.ToLower(logBuf.String()), "feature flag default-to-at-least-as-acknowledged is disabled")
 }
 
 func TestCheckBulkCommandToV1beta1_UsesMinimizeLatencyForUnspecified(t *testing.T) {

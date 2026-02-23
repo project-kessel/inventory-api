@@ -540,8 +540,12 @@ func (uc *Usecase) lookupConsistencyTokenFromDB(ctx context.Context, reporterRes
 // Used by Check. For unspecified consistency, uses the DefaultToAtLeastAsAcknowledged feature flag.
 func (uc *Usecase) resolveConsistencyToken(ctx context.Context, consistency model.Consistency, reporterResourceKey model.ReporterResourceKey, overrideFeatureFlag bool) (string, error) {
 	featureFlagEnabled := uc.Config.DefaultToAtLeastAsAcknowledged
-	if featureFlagEnabled && !overrideFeatureFlag {
-		uc.Log.WithContext(ctx).Debug("Feature flag default-to-at-least-as-acknowledged is enabled")
+	if featureFlagEnabled {
+		if overrideFeatureFlag {
+			uc.Log.WithContext(ctx).Debug("Feature flag default-to-at-least-as-acknowledged is enabled but bypassed for this call")
+		} else {
+			uc.Log.WithContext(ctx).Debug("Feature flag default-to-at-least-as-acknowledged is enabled")
+		}
 	} else {
 		uc.Log.WithContext(ctx).Debug("Feature flag default-to-at-least-as-acknowledged is disabled")
 	}

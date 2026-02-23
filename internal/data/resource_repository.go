@@ -2,17 +2,16 @@ package data
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/google/uuid"
-	"github.com/project-kessel/inventory-api/internal/biz"
 	"gorm.io/gorm"
 
 	"github.com/go-kratos/kratos/v2/errors"
 	"github.com/project-kessel/inventory-api/internal"
 	bizmodel "github.com/project-kessel/inventory-api/internal/biz/model"
 	"github.com/project-kessel/inventory-api/internal/biz/model_legacy"
-	"github.com/project-kessel/inventory-api/internal/biz/usecase"
 	datamodel "github.com/project-kessel/inventory-api/internal/data/model"
 )
 
@@ -27,7 +26,11 @@ type FindResourceByKeysResult struct {
 	LocalResourceID       string    `gorm:"column:local_resource_id"`
 	ReporterType          string    `gorm:"column:reporter_type"`
 	ReporterInstanceID    string    `gorm:"column:reporter_instance_id"`
+	APIHref               string    `gorm:"column:api_href"`
+	ConsoleHref           string    `gorm:"column:console_href"`
 	ConsistencyToken      string    `gorm:"column:consistency_token"`
+	CreatedAt             time.Time `gorm:"column:created_at"`
+	UpdatedAt             time.Time `gorm:"column:updated_at"`
 }
 
 // GetCurrentAndPreviousWorkspaceID extracts current and previous workspace IDs from Representations
@@ -62,6 +65,8 @@ func (result FindResourceByKeysResult) ToSnapshots() (bizmodel.ResourceSnapshot,
 		Type:             result.ResourceType,
 		CommonVersion:    result.CommonVersion,
 		ConsistencyToken: result.ConsistencyToken,
+		CreatedAt:        result.CreatedAt,
+		UpdatedAt:        result.UpdatedAt,
 	}
 
 	// Create ReporterResourceKeySnapshot
@@ -77,32 +82,24 @@ func (result FindResourceByKeysResult) ToSnapshots() (bizmodel.ResourceSnapshot,
 		ID:                    result.ReporterResourceID,
 		ReporterResourceKey:   keySnapshot,
 		ResourceID:            result.ResourceID,
+		APIHref:               result.APIHref,
+		ConsoleHref:           result.ConsoleHref,
 		RepresentationVersion: result.RepresentationVersion,
 		Generation:            result.Generation,
 		Tombstone:             result.Tombstone,
+		CreatedAt:             result.CreatedAt,
+		UpdatedAt:             result.UpdatedAt,
 	}
 
 	return resourceSnapshot, reporterResourceSnapshot
 }
 
-type ResourceRepository interface {
-	NextResourceId() (bizmodel.ResourceId, error)
-	NextReporterResourceId() (bizmodel.ReporterResourceId, error)
-	Save(tx *gorm.DB, resource bizmodel.Resource, operationType biz.EventOperationType, txid string) error
-	FindResourceByKeys(tx *gorm.DB, key bizmodel.ReporterResourceKey) (*bizmodel.Resource, error)
-	FindCurrentAndPreviousVersionedRepresentations(tx *gorm.DB, key bizmodel.ReporterResourceKey, currentVersion *uint, operationType biz.EventOperationType) (*bizmodel.Representations, *bizmodel.Representations, error)
-	FindLatestRepresentations(tx *gorm.DB, key bizmodel.ReporterResourceKey) (*bizmodel.Representations, error)
-	GetDB() *gorm.DB
-	GetTransactionManager() usecase.TransactionManager
-	HasTransactionIdBeenProcessed(tx *gorm.DB, transactionId string) (bool, error)
-}
-
 type resourceRepository struct {
 	db                 *gorm.DB
-	transactionManager usecase.TransactionManager
+	transactionManager bizmodel.TransactionManager
 }
 
-func NewResourceRepository(db *gorm.DB, transactionManager usecase.TransactionManager) ResourceRepository {
+func NewResourceRepository(db *gorm.DB, transactionManager bizmodel.TransactionManager) bizmodel.ResourceRepository {
 	return &resourceRepository{
 		db:                 db,
 		transactionManager: transactionManager,
@@ -127,7 +124,7 @@ func (r *resourceRepository) NextReporterResourceId() (bizmodel.ReporterResource
 	return bizmodel.NewReporterResourceId(uuidV7)
 }
 
-func (r *resourceRepository) Save(tx *gorm.DB, resource bizmodel.Resource, operationType biz.EventOperationType, txid string) error {
+func (r *resourceRepository) Save(tx *gorm.DB, resource bizmodel.Resource, operationType bizmodel.EventOperationType, txid string) error {
 	resourceSnapshot, reporterResourceSnapshot, reporterRepresentationSnapshot, commonRepresentationSnapshot, err := resource.Serialize()
 	if err != nil {
 		return fmt.Errorf("failed to serialize resource: %w", err)
@@ -167,7 +164,7 @@ func (r *resourceRepository) Save(tx *gorm.DB, resource bizmodel.Resource, opera
 
 	var resourceEvent bizmodel.ResourceEvent
 	switch operationType {
-	case biz.OperationTypeDeleted:
+	case bizmodel.OperationTypeDeleted:
 		deleteEvents := resource.ResourceDeleteEvents()
 		log.Infof("DeleteEvents to publish to outbox : %+v", deleteEvents)
 		if len(deleteEvents) == 0 {
@@ -185,7 +182,7 @@ func (r *resourceRepository) Save(tx *gorm.DB, resource bizmodel.Resource, opera
 	return nil
 }
 
-func (r *resourceRepository) handleOutboxEvents(tx *gorm.DB, resourceEvent bizmodel.ResourceEvent, operationType biz.EventOperationType, txid string) error {
+func (r *resourceRepository) handleOutboxEvents(tx *gorm.DB, resourceEvent bizmodel.ResourceEvent, operationType bizmodel.EventOperationType, txid string) error {
 	resourceMessage, tupleMessage, err := model_legacy.NewOutboxEventsFromResourceEvent(resourceEvent, operationType, txid)
 	if err != nil {
 		return err
@@ -238,10 +235,14 @@ func (r *resourceRepository) FindResourceByKeys(tx *gorm.DB, key bizmodel.Report
 		res.common_version,
 		res.id AS resource_id,
 		res.ktn AS consistency_token,
+		res.created_at,
+		res.updated_at,
 		rr2.resource_type,
 		rr2.local_resource_id,
 		rr2.reporter_type,
-		rr2.reporter_instance_id
+		rr2.reporter_instance_id,
+		rr2.api_href,
+		rr2.console_href
 	`).
 		Joins(`
 		JOIN reporter_resources AS rr2 ON rr2.resource_id = rr.resource_id
@@ -268,11 +269,11 @@ func (r *resourceRepository) GetDB() *gorm.DB {
 	return r.db
 }
 
-func (r *resourceRepository) GetTransactionManager() usecase.TransactionManager {
+func (r *resourceRepository) GetTransactionManager() bizmodel.TransactionManager {
 	return r.transactionManager
 }
 
-func (r *resourceRepository) FindCurrentAndPreviousVersionedRepresentations(tx *gorm.DB, key bizmodel.ReporterResourceKey, currentCommonVersion *uint, operationType biz.EventOperationType) (*bizmodel.Representations, *bizmodel.Representations, error) {
+func (r *resourceRepository) FindCurrentAndPreviousVersionedRepresentations(tx *gorm.DB, key bizmodel.ReporterResourceKey, currentCommonVersion *uint, operationType bizmodel.EventOperationType) (*bizmodel.Representations, *bizmodel.Representations, error) {
 	if currentCommonVersion == nil {
 		return nil, nil, nil
 	}
@@ -296,7 +297,7 @@ func (r *resourceRepository) FindCurrentAndPreviousVersionedRepresentations(tx *
 
 	query = r.buildReporterResourceKeyQuery(query, key)
 
-	if operationType.OperationType() == biz.OperationTypeCreated {
+	if operationType.OperationType() == bizmodel.OperationTypeCreated {
 		query = query.Where("cr.version = ?", *currentCommonVersion)
 	} else {
 		query = query.Where("(cr.version = ? OR cr.version = ?)", *currentCommonVersion, *currentCommonVersion-1)

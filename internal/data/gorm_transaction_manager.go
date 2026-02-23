@@ -10,7 +10,7 @@ import (
 	"github.com/mattn/go-sqlite3"
 	"gorm.io/gorm"
 
-	"github.com/project-kessel/inventory-api/internal/biz/usecase"
+	bizmodel "github.com/project-kessel/inventory-api/internal/biz/model"
 	"github.com/project-kessel/inventory-api/internal/metricscollector"
 )
 
@@ -20,7 +20,7 @@ type gormTransactionManager struct {
 }
 
 // NewGormTransactionManager creates a new GORM-based transaction manager
-func NewGormTransactionManager(mc *metricscollector.MetricsCollector, maxSerializationRetries int) usecase.TransactionManager {
+func NewGormTransactionManager(mc *metricscollector.MetricsCollector, maxSerializationRetries int) bizmodel.TransactionManager {
 	return &gormTransactionManager{
 		metricsCollector:        mc,
 		maxSerializationRetries: maxSerializationRetries,

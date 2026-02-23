@@ -8,17 +8,13 @@ import (
 
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/google/uuid"
-	"github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2"
 	"github.com/project-kessel/inventory-api/cmd/common"
-	"github.com/project-kessel/inventory-api/internal/authn/interceptor"
-	authzapi "github.com/project-kessel/inventory-api/internal/authz/api"
-	"github.com/project-kessel/inventory-api/internal/biz"
+	authnapi "github.com/project-kessel/inventory-api/internal/authn/api"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
-	"github.com/project-kessel/inventory-api/internal/data"
-	eventingapi "github.com/project-kessel/inventory-api/internal/eventing/api"
+	"github.com/project-kessel/inventory-api/internal/biz/usecase/metaauthorizer"
 	"github.com/project-kessel/inventory-api/internal/metricscollector"
 	"github.com/project-kessel/inventory-api/internal/pubsub"
-	"github.com/project-kessel/inventory-api/internal/server"
+	"github.com/project-kessel/inventory-api/internal/subject/selfsubject"
 	kessel "github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
 	"github.com/sony/gobreaker"
 	"google.golang.org/grpc"
@@ -32,16 +28,36 @@ const (
 	ReportResourceOperationName = "ReportResource"
 )
 
+// Domain errors re-exported from model package.
 var (
-	// ErrResourceNotFound indicates that the requested resource could not be found in the database.
-	ErrResourceNotFound = errors.New("resource not found")
-	// ErrDatabaseError indicates a generic database error occurred while querying for resources.
-	ErrDatabaseError = errors.New("db error while querying for resource")
-	// ErrResourceAlreadyExists indicates that a resource with the same identifier already exists.
-	ErrResourceAlreadyExists = errors.New("resource already exists")
-	// ErrInventoryIdMismatch indicates that the inventory ID in the request doesn't match the existing resource.
-	ErrInventoryIdMismatch = errors.New("resource inventory id mismatch")
+	ErrResourceNotFound      = model.ErrResourceNotFound
+	ErrDatabaseError         = model.ErrDatabaseError
+	ErrResourceAlreadyExists = model.ErrResourceAlreadyExists
+	ErrInventoryIdMismatch   = model.ErrInventoryIdMismatch
 )
+
+// Application-layer errors for meta-authorization and self-subject resolution.
+var (
+	// ErrMetaAuthorizerUnavailable indicates the meta authorizer is not configured.
+	ErrMetaAuthorizerUnavailable = errors.New("meta authorizer unavailable")
+	// ErrMetaAuthorizationDenied indicates the meta authorization check failed.
+	ErrMetaAuthorizationDenied = errors.New("meta authorization denied")
+	// ErrMetaAuthzContextMissing indicates missing authz context in request.
+	ErrMetaAuthzContextMissing = errors.New("meta authorization context missing")
+	// ErrSelfSubjectMissing indicates the subject could not be derived for self checks.
+	ErrSelfSubjectMissing = errors.New("self subject missing")
+)
+
+// RepresentationRequiredError indicates a required representation was not provided.
+// Kind identifies which representation is missing (e.g. "reporter", "common").
+// TODO: the logic is not correct around this currently, but this can be fixed later
+type RepresentationRequiredError struct {
+	Kind string
+}
+
+func (e *RepresentationRequiredError) Error() string {
+	return fmt.Sprintf("invalid %s representation: representation required", e.Kind)
+}
 
 const listenTimeout = 10 * time.Second
 
@@ -54,66 +70,99 @@ type UsecaseConfig struct {
 }
 
 // Usecase provides business logic operations for resource management in the inventory system.
-// It coordinates between repositories, authorization, eventing, and other system components.
+// It coordinates between repositories, authorization, and other system components.
 type Usecase struct {
-	resourceRepository  data.ResourceRepository
+	schemaService       *model.SchemaService
+	resourceRepository  model.ResourceRepository
 	waitForNotifBreaker *gobreaker.CircuitBreaker
-	Authz               authzapi.Authorizer
-	Eventer             eventingapi.Manager
+	Authz               model.Authorizer
+	MetaAuthorizer      metaauthorizer.MetaAuthorizer
 	Namespace           string
 	Log                 *log.Helper
-	Server              server.Server
 	ListenManager       pubsub.ListenManagerImpl
 	Config              *UsecaseConfig
 	MetricsCollector    *metricscollector.MetricsCollector
+	SelfSubjectStrategy selfsubject.SelfSubjectStrategy
 }
 
-func New(resourceRepository data.ResourceRepository,
-	authz authzapi.Authorizer, eventer eventingapi.Manager, namespace string, logger log.Logger,
-	listenManager pubsub.ListenManagerImpl, waitForNotifBreaker *gobreaker.CircuitBreaker, usecaseConfig *UsecaseConfig, metricsCollector *metricscollector.MetricsCollector) *Usecase {
+func New(resourceRepository model.ResourceRepository, schemaRepository model.SchemaRepository,
+	authz model.Authorizer, namespace string, logger log.Logger,
+	listenManager pubsub.ListenManagerImpl, waitForNotifBreaker *gobreaker.CircuitBreaker, usecaseConfig *UsecaseConfig, metricsCollector *metricscollector.MetricsCollector, metaAuthorizer metaauthorizer.MetaAuthorizer, selfSubjectStrategy selfsubject.SelfSubjectStrategy) *Usecase {
+	if metaAuthorizer == nil {
+		metaAuthorizer = metaauthorizer.NewSimpleMetaAuthorizer()
+	}
+
 	return &Usecase{
 		resourceRepository:  resourceRepository,
+		schemaService:       model.NewSchemaService(schemaRepository, log.NewHelper(logger)),
 		waitForNotifBreaker: waitForNotifBreaker,
 		Authz:               authz,
-		Eventer:             eventer,
+		MetaAuthorizer:      metaAuthorizer,
 		Namespace:           namespace,
 		Log:                 log.NewHelper(logger),
 		ListenManager:       listenManager,
 		Config:              usecaseConfig,
 		MetricsCollector:    metricsCollector,
+		SelfSubjectStrategy: selfSubjectStrategy,
 	}
 }
 
-func (uc *Usecase) ReportResource(ctx context.Context, request *v1beta2.ReportResourceRequest, reporterPrincipal string) error {
-	clientID := interceptor.GetClientIDFromContext(ctx)
-	log.Info("Reporting resource request: ", request, " client_id: ", clientID)
+func (uc *Usecase) ReportResource(ctx context.Context, cmd ReportResourceCommand) error {
+	// Get authz context - required for authorization checks
+	authzCtx, ok := authnapi.FromAuthzContext(ctx)
+	if !ok || authzCtx.Subject == nil {
+		return status.Error(codes.Unauthenticated, "authentication required")
+	}
+	reporterResourceKey, err := model.NewReporterResourceKey(
+		cmd.LocalResourceId,
+		cmd.ResourceType,
+		cmd.ReporterType,
+		cmd.ReporterInstanceId,
+	)
+	if err != nil {
+		log.Error("failed to create reporter resource key: ", err)
+		return status.Errorf(codes.InvalidArgument, "failed to create reporter resource key: %v", err)
+	}
+
+	if err := uc.enforceMetaAuthzObject(ctx, metaauthorizer.RelationReportResource, metaauthorizer.NewInventoryResourceFromKey(reporterResourceKey)); err != nil {
+		return err
+	}
+
+	// Log client_id if available (from OIDC authentication)
+	if authzCtx.Subject.ClientID != "" {
+		log.Infof("Reporting resource request from client_id: %s, resource_type: %s, reporter_type: %s", authzCtx.Subject.ClientID, cmd.ResourceType, cmd.ReporterType)
+	}
+
 	var subscription pubsub.Subscription
 	txidStr, err := getNextTransactionID()
 	if err != nil {
 		return err
 	}
 
-	readAfterWriteEnabled := computeReadAfterWrite(uc, request.WriteVisibility, reporterPrincipal)
+	// Validate command against schemas
+	if err := uc.validateReportResourceCommand(ctx, cmd); err != nil {
+		var repReqErr *RepresentationRequiredError
+		if errors.As(err, &repReqErr) {
+			return err
+		}
+		return status.Errorf(codes.InvalidArgument, "failed validation for report resource: %v", err)
+	}
+
+	readAfterWriteEnabled := computeReadAfterWrite(uc, cmd.WriteVisibility, authzCtx.Subject.SubjectId)
 	if readAfterWriteEnabled && uc.Config.ConsumerEnabled {
 		subscription = uc.ListenManager.Subscribe(txidStr)
 		defer subscription.Unsubscribe()
 	}
 
-	reporterResourceKey, err := getReporterResourceKeyFromRequest(request)
-	if err != nil {
-		log.Error("failed to create reporter resource key: ", err)
-		return status.Errorf(codes.InvalidArgument, "failed to create reporter resource key: %v", err)
-	}
-
-	var operationType biz.EventOperationType
+	var operationType model.EventOperationType
 	err = uc.resourceRepository.GetTransactionManager().HandleSerializableTransaction(
 		ReportResourceOperationName,
 		uc.resourceRepository.GetDB(),
 		func(tx *gorm.DB) error {
 			// Check for duplicate transaction ID's before we find the resource for quicker returns if it fails
-			transactionId := request.GetRepresentations().GetMetadata().GetTransactionId()
-			if transactionId != "" {
-				alreadyProcessed, err := uc.resourceRepository.HasTransactionIdBeenProcessed(tx, transactionId)
+			if cmd.TransactionId != nil {
+				// TODO: repository should accept the transactionID type natively
+				alreadyProcessed, err := uc.resourceRepository.HasTransactionIdBeenProcessed(tx, string(*cmd.TransactionId))
 				if err != nil {
 					return fmt.Errorf("failed to check transaction ID: %w", err)
 				}
@@ -130,13 +179,13 @@ func (uc *Usecase) ReportResource(ctx context.Context, request *v1beta2.ReportRe
 
 			if err == nil && res != nil {
 				log.Info("Resource already exists, updating: ")
-				operationType = biz.OperationTypeUpdated
-				return uc.updateResource(tx, request, res, txidStr)
+				operationType = model.OperationTypeUpdated
+				return uc.updateResource(tx, cmd, res, txidStr)
 			}
 
 			log.Info("Creating new resource")
-			operationType = biz.OperationTypeCreated
-			return uc.createResource(tx, request, txidStr)
+			operationType = model.OperationTypeCreated
+			return uc.createResource(tx, cmd, txidStr)
 		},
 	)
 
@@ -182,13 +231,108 @@ func (uc *Usecase) ReportResource(ctx context.Context, request *v1beta2.ReportRe
 	return nil
 }
 
+// resolveOptionalFields dereferences optional pointer fields from the command.
+// TODO: Remove this helper when model optional fields explicitly (RHCLOUD-41760)
+func resolveOptionalFields(cmd ReportResourceCommand) (
+	consoleHref model.ConsoleHref,
+	transactionId model.TransactionId,
+	reporterRepresentation model.Representation,
+	commonRepresentation model.Representation,
+) {
+	if cmd.ConsoleHref != nil {
+		consoleHref = *cmd.ConsoleHref
+	}
+	if cmd.TransactionId != nil {
+		transactionId = *cmd.TransactionId
+	}
+	if cmd.ReporterRepresentation != nil {
+		reporterRepresentation = *cmd.ReporterRepresentation
+	}
+	if cmd.CommonRepresentation != nil {
+		commonRepresentation = *cmd.CommonRepresentation
+	}
+	return
+}
+
+func (uc *Usecase) createResource(tx *gorm.DB, cmd ReportResourceCommand, txidStr string) error {
+	resourceId, err := uc.resourceRepository.NextResourceId()
+	if err != nil {
+		return err
+	}
+
+	reporterResourceId, err := uc.resourceRepository.NextReporterResourceId()
+	if err != nil {
+		return err
+	}
+
+	consoleHref, transactionId, reporterRepresentation, commonRepresentation := resolveOptionalFields(cmd)
+
+	// TODO: need to model explicitly optional fields, see RHCLOUD-41760
+	resource, err := model.NewResource(
+		resourceId,
+		cmd.LocalResourceId,
+		cmd.ResourceType,
+		cmd.ReporterType,
+		cmd.ReporterInstanceId,
+		transactionId,
+		reporterResourceId,
+		cmd.ApiHref,
+		consoleHref,
+		reporterRepresentation,
+		commonRepresentation,
+		cmd.ReporterVersion,
+	)
+	if err != nil {
+		return err
+	}
+
+	return uc.resourceRepository.Save(tx, resource, model.OperationTypeCreated, txidStr)
+}
+
+func (uc *Usecase) updateResource(tx *gorm.DB, cmd ReportResourceCommand, existingResource *model.Resource, txidStr string) error {
+	reporterResourceKey, err := model.NewReporterResourceKey(
+		cmd.LocalResourceId,
+		cmd.ResourceType,
+		cmd.ReporterType,
+		cmd.ReporterInstanceId,
+	)
+	if err != nil {
+		return err
+	}
+
+	consoleHref, transactionId, reporterRepresentation, commonRepresentation := resolveOptionalFields(cmd)
+
+	// TODO: need to model explicitly optional fields, see RHCLOUD-41760
+	err = existingResource.Update(
+		reporterResourceKey,
+		cmd.ApiHref,
+		consoleHref,
+		cmd.ReporterVersion,
+		reporterRepresentation,
+		commonRepresentation,
+		transactionId,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to update resource: %w", err)
+	}
+
+	return uc.resourceRepository.Save(tx, *existingResource, model.OperationTypeUpdated, txidStr)
+}
+
 func (uc *Usecase) Delete(ctx context.Context, reporterResourceKey model.ReporterResourceKey) error {
+	if err := uc.enforceMetaAuthzObject(ctx, metaauthorizer.RelationDeleteResource, metaauthorizer.NewInventoryResourceFromKey(reporterResourceKey)); err != nil {
+		return err
+	}
+
 	txidStr, err := getNextTransactionID()
 	if err != nil {
 		return err
 	}
-	clientID := interceptor.GetClientIDFromContext(ctx)
-	log.Info("Reporter Resource Key to delete ", reporterResourceKey, " client_id: ", clientID)
+	// Log client_id if available (from OIDC authentication)
+	if authzCtx, ok := authnapi.FromAuthzContext(ctx); ok && authzCtx.Subject != nil && authzCtx.Subject.ClientID != "" {
+		log.Infof("Deleting resource %v from client_id: %s", reporterResourceKey, authzCtx.Subject.ClientID)
+	}
+
 	err = uc.resourceRepository.GetTransactionManager().HandleSerializableTransaction(
 		DeleteResourceOperationName,
 		uc.resourceRepository.GetDB(),
@@ -201,7 +345,7 @@ func (uc *Usecase) Delete(ctx context.Context, reporterResourceKey model.Reporte
 				if err != nil {
 					return fmt.Errorf("failed to delete resource: %w", err)
 				}
-				return uc.resourceRepository.Save(tx, *res, biz.OperationTypeDeleted, txidStr)
+				return uc.resourceRepository.Save(tx, *res, model.OperationTypeDeleted, txidStr)
 			} else {
 				if errors.Is(err, gorm.ErrRecordNotFound) {
 					return ErrResourceNotFound
@@ -216,12 +360,113 @@ func (uc *Usecase) Delete(ctx context.Context, reporterResourceKey model.Reporte
 	}
 
 	// Increment outbox metrics only after successful transaction commit
-	metricscollector.Incr(uc.MetricsCollector.OutboxEventWrites, string(biz.OperationTypeDeleted.OperationType()))
+	metricscollector.Incr(uc.MetricsCollector.OutboxEventWrites, string(model.OperationTypeDeleted.OperationType()))
 	return nil
 }
 
-// Check verifies if a subject has the specified permission on a resource identified by the reporter resource ID.
-func (uc *Usecase) Check(ctx context.Context, permission, namespace string, sub *kessel.SubjectReference, reporterResourceKey model.ReporterResourceKey) (bool, error) {
+// Check verifies if a subject has the specified relation/permission on a resource.
+func (uc *Usecase) Check(ctx context.Context, relation model.Relation, sub model.SubjectReference, reporterResourceKey model.ReporterResourceKey) (bool, error) {
+	// TODO: should also check caller is allowed to check subject also
+	if err := uc.enforceMetaAuthzObject(ctx, metaauthorizer.RelationCheck, metaauthorizer.NewInventoryResourceFromKey(reporterResourceKey)); err != nil {
+		return false, err
+	}
+
+	return uc.checkPermission(ctx, relation, sub, reporterResourceKey)
+}
+
+// CheckSelf verifies access for the authenticated user using the self-subject strategy.
+// Uses relation="check_self" for meta-authorization.
+func (uc *Usecase) CheckSelf(ctx context.Context, relation model.Relation, reporterResourceKey model.ReporterResourceKey) (bool, error) {
+	if err := uc.enforceMetaAuthzObject(ctx, metaauthorizer.RelationCheckSelf, metaauthorizer.NewInventoryResourceFromKey(reporterResourceKey)); err != nil {
+		return false, err
+	}
+	subjectRef, err := uc.selfSubjectFromContext(ctx)
+	if err != nil {
+		return false, err
+	}
+	return uc.checkPermission(ctx, relation, subjectRef, reporterResourceKey)
+}
+
+// CheckForUpdate verifies if a subject can update the resource.
+func (uc *Usecase) CheckForUpdate(ctx context.Context, relation model.Relation, sub model.SubjectReference, reporterResourceKey model.ReporterResourceKey) (bool, error) {
+	if err := uc.enforceMetaAuthzObject(ctx, metaauthorizer.RelationCheckForUpdate, metaauthorizer.NewInventoryResourceFromKey(reporterResourceKey)); err != nil {
+		return false, err
+	}
+
+	// Convert model types to v1beta1 for the Authz interface
+	namespace := reporterResourceKey.ReporterType().Serialize()
+	v1beta1Subject := subjectToV1Beta1(sub)
+	allowed, _, err := uc.Authz.CheckForUpdate(ctx, namespace, relation.Serialize(), reporterResourceKey.ResourceType().Serialize(), reporterResourceKey.LocalResourceId().Serialize(), v1beta1Subject)
+	if err != nil {
+		return false, err
+	}
+
+	if allowed == kessel.CheckForUpdateResponse_ALLOWED_TRUE {
+		return true, nil
+	}
+	return false, nil
+}
+
+// CheckBulk performs bulk permission checks.
+func (uc *Usecase) CheckBulk(ctx context.Context, cmd CheckBulkCommand) (*CheckBulkResult, error) {
+	// Meta-authorization for each item
+	for _, item := range cmd.Items {
+		if err := uc.enforceMetaAuthzObject(ctx, metaauthorizer.RelationCheckBulk, metaauthorizer.NewInventoryResourceFromKey(item.Resource)); err != nil {
+			uc.Log.WithContext(ctx).Errorf("meta authz failed for check bulk item: %v error: %v", item.Resource, err)
+			return nil, err
+		}
+	}
+
+	// Convert to v1beta1 for the Authz interface
+	v1beta1Req := checkBulkCommandToV1beta1(cmd)
+	resp, err := uc.Authz.CheckBulk(ctx, v1beta1Req)
+	if err != nil {
+		return nil, err
+	}
+
+	return checkBulkResultFromV1beta1(resp, cmd)
+}
+
+// CheckSelfBulk performs bulk permission checks for the authenticated user.
+// Uses relation="check_self" for meta-authorization.
+func (uc *Usecase) CheckSelfBulk(ctx context.Context, cmd CheckSelfBulkCommand) (*CheckBulkResult, error) {
+	// Meta-authorization for each item
+	for _, item := range cmd.Items {
+		if err := uc.enforceMetaAuthzObject(ctx, metaauthorizer.RelationCheckSelf, metaauthorizer.NewInventoryResourceFromKey(item.Resource)); err != nil {
+			uc.Log.WithContext(ctx).Errorf("meta authz failed for check self item: %v error: %v", item.Resource, err)
+			return nil, err
+		}
+	}
+
+	subjectRef, err := uc.selfSubjectFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	// Convert to CheckBulkCommand with the resolved subject
+	bulkCmd := CheckBulkCommand{
+		Items:       make([]CheckBulkItem, len(cmd.Items)),
+		Consistency: cmd.Consistency,
+	}
+	for i, item := range cmd.Items {
+		bulkCmd.Items[i] = CheckBulkItem{
+			Resource: item.Resource,
+			Relation: item.Relation,
+			Subject:  subjectRef,
+		}
+	}
+
+	// Convert to v1beta1 for the Authz interface
+	v1beta1Req := checkBulkCommandToV1beta1(bulkCmd)
+	resp, err := uc.Authz.CheckBulk(ctx, v1beta1Req)
+	if err != nil {
+		return nil, err
+	}
+
+	return checkBulkResultFromV1beta1(resp, bulkCmd)
+}
+
+func (uc *Usecase) checkPermission(ctx context.Context, relation model.Relation, sub model.SubjectReference, reporterResourceKey model.ReporterResourceKey) (bool, error) {
 	res, err := uc.resourceRepository.FindResourceByKeys(nil, reporterResourceKey)
 	var consistencyToken string
 	if err != nil {
@@ -238,7 +483,10 @@ func (uc *Usecase) Check(ctx context.Context, permission, namespace string, sub 
 		consistencyToken = res.ConsistencyToken().Serialize()
 	}
 
-	allowed, _, err := uc.Authz.Check(ctx, namespace, permission, consistencyToken, reporterResourceKey.ResourceType().Serialize(), reporterResourceKey.LocalResourceId().Serialize(), sub)
+	// Convert model types to v1beta1 for the Authz interface
+	namespace := reporterResourceKey.ReporterType().Serialize()
+	v1beta1Subject := subjectToV1Beta1(sub)
+	allowed, _, err := uc.Authz.Check(ctx, namespace, relation.Serialize(), consistencyToken, reporterResourceKey.ResourceType().Serialize(), reporterResourceKey.LocalResourceId().Serialize(), v1beta1Subject)
 	if err != nil {
 		return false, err
 	}
@@ -249,85 +497,20 @@ func (uc *Usecase) Check(ctx context.Context, permission, namespace string, sub 
 	return false, nil
 }
 
-// CheckForUpdate forwards the request to Relations CheckForUpdate
-func (uc *Usecase) CheckForUpdate(ctx context.Context, permission, namespace string, sub *kessel.SubjectReference, reporterResourceKey model.ReporterResourceKey) (bool, error) {
-	allowed, _, err := uc.Authz.CheckForUpdate(ctx, namespace, permission, reporterResourceKey.ResourceType().Serialize(), reporterResourceKey.LocalResourceId().Serialize(), sub)
-	if err != nil {
-		return false, err
-	}
-
-	if allowed == kessel.CheckForUpdateResponse_ALLOWED_TRUE {
-		return true, nil
-	}
-	return false, nil
-}
-
-// CheckBulk forwards the request to Relations CheckBulk
-func (uc *Usecase) CheckBulk(ctx context.Context, req *kessel.CheckBulkRequest) (*kessel.CheckBulkResponse, error) {
-	resp, err := uc.Authz.CheckBulk(ctx, req)
-	if err != nil {
+// LookupResources delegates resource lookup to the authorization service.
+// Returns a streaming client for receiving lookup results.
+// TODO: remove v1beta1 response type
+func (uc *Usecase) LookupResources(ctx context.Context, cmd LookupResourcesCommand) (grpc.ServerStreamingClient[kessel.LookupResourcesResponse], error) {
+	// Meta-authorize against the resource type (not a specific resource instance)
+	metaObject := metaauthorizer.NewResourceTypeRef(cmd.ReporterType, cmd.ResourceType)
+	if err := uc.enforceMetaAuthzObject(ctx, metaauthorizer.RelationLookupResources, metaObject); err != nil {
 		return nil, err
 	}
-	return resp, nil
+
+	// Convert to v1beta1 for the Authz interface
+	v1beta1Req := lookupResourcesCommandToV1beta1(cmd)
+	return uc.Authz.LookupResources(ctx, v1beta1Req)
 }
-
-func (uc *Usecase) createResource(tx *gorm.DB, request *v1beta2.ReportResourceRequest, txidStr string) error {
-	resourceId, err := uc.resourceRepository.NextResourceId()
-	if err != nil {
-		return err
-	}
-
-	reporterResourceId, err := uc.resourceRepository.NextReporterResourceId()
-	if err != nil {
-		return err
-	}
-
-	localResourceId, err := model.NewLocalResourceId(request.GetRepresentations().GetMetadata().GetLocalResourceId())
-	if err != nil {
-		return fmt.Errorf("invalid local resource ID: %w", err)
-	}
-
-	resourceType, err := model.NewResourceType(request.GetType())
-	if err != nil {
-		return fmt.Errorf("invalid resource type: %w", err)
-	}
-
-	reporterType, err := model.NewReporterType(request.GetReporterType())
-	if err != nil {
-		return fmt.Errorf("invalid reporter type: %w", err)
-	}
-
-	reporterInstanceId, err := model.NewReporterInstanceId(request.GetReporterInstanceId())
-	if err != nil {
-		return fmt.Errorf("invalid reporter instance ID: %w", err)
-	}
-
-	apiHref, err := model.NewApiHref(request.GetRepresentations().GetMetadata().GetApiHref())
-	if err != nil {
-		return fmt.Errorf("invalid API href: %w", err)
-	}
-
-	var consoleHref model.ConsoleHref
-	if consoleHrefVal := request.GetRepresentations().GetMetadata().GetConsoleHref(); consoleHrefVal != "" {
-		consoleHref, err = model.NewConsoleHref(consoleHrefVal)
-		if err != nil {
-			return fmt.Errorf("invalid console href: %w", err)
-		}
-	}
-
-	var reporterVersion *model.ReporterVersion
-	if reporterVersionValue := request.GetRepresentations().GetMetadata().GetReporterVersion(); reporterVersionValue != "" {
-		rv, err := model.NewReporterVersion(reporterVersionValue)
-		if err != nil {
-			return fmt.Errorf("invalid reporter version: %w", err)
-		}
-		reporterVersion = &rv
-	}
-
-	reporterRepresentation, err := model.NewRepresentation(request.GetRepresentations().GetReporter().AsMap())
-	if err != nil {
-		return fmt.Errorf("invalid reporter representation: %w", err)
-	}
 
 	// Common representation is optional - check if it's provided
 	var commonRepresentation model.Representation
@@ -337,104 +520,138 @@ func (uc *Usecase) createResource(tx *gorm.DB, request *v1beta2.ReportResourceRe
 		if err != nil {
 			return fmt.Errorf("invalid common representation: %w", err)
 		}
+func (uc *Usecase) selfSubjectFromContext(ctx context.Context) (model.SubjectReference, error) {
+	authzCtx, ok := authnapi.FromAuthzContext(ctx)
+	if !ok {
+		return model.SubjectReference{}, ErrMetaAuthzContextMissing
+	}
+	if uc == nil || uc.SelfSubjectStrategy == nil {
+		return model.SubjectReference{}, ErrSelfSubjectMissing
+	}
+	subjectRef, err := uc.SelfSubjectStrategy.SubjectFromAuthorizationContext(authzCtx)
+	if err != nil {
+		return model.SubjectReference{}, ErrSelfSubjectMissing
+	}
+	return subjectRef, nil
+}
+
+// enforceMetaAuthzObject calls the MetaAuthorizer to validate access using a MetaObject.
+func (uc *Usecase) enforceMetaAuthzObject(ctx context.Context, relation metaauthorizer.Relation, metaObject metaauthorizer.MetaObject) error {
+	authzCtx, ok := authnapi.FromAuthzContext(ctx)
+	if !ok {
+		return ErrMetaAuthzContextMissing
+	}
+	if uc.MetaAuthorizer == nil {
+		return ErrMetaAuthorizerUnavailable
 	}
 
-	transactionId := model.NewTransactionId(request.GetRepresentations().GetMetadata().GetTransactionId())
-
-	resource, err := model.NewResource(resourceId, localResourceId, resourceType, reporterType, reporterInstanceId, transactionId, reporterResourceId, apiHref, consoleHref, reporterRepresentation, commonRepresentation, reporterVersion)
+	allowed, err := uc.MetaAuthorizer.Check(ctx, metaObject, relation, authzCtx)
 	if err != nil {
 		return err
 	}
-
-	return uc.resourceRepository.Save(tx, resource, biz.OperationTypeCreated, txidStr)
+	if !allowed {
+		return ErrMetaAuthorizationDenied
+	}
+	return nil
 }
 
-func getReporterResourceKeyFromRequest(request *v1beta2.ReportResourceRequest) (model.ReporterResourceKey, error) {
-	localResourceId, err := model.NewLocalResourceId(request.GetRepresentations().GetMetadata().GetLocalResourceId())
-	if err != nil {
-		return model.ReporterResourceKey{}, fmt.Errorf("invalid local resource ID: %w", err)
+// validateReportResourceCommand validates a ReportResourceCommand against schemas.
+// It checks that the reporter is allowed for the resource type,
+// and validates both reporter and common representations.
+func (uc *Usecase) validateReportResourceCommand(ctx context.Context, cmd ReportResourceCommand) error {
+	resourceType := cmd.ResourceType.String()
+	reporterType := cmd.ReporterType.String()
+
+	if resourceType == "" {
+		return fmt.Errorf("missing 'type' field")
+	}
+	if reporterType == "" {
+		return fmt.Errorf("missing 'reporterType' field")
 	}
 
-	resourceType, err := model.NewResourceType(request.GetType())
-	if err != nil {
-		return model.ReporterResourceKey{}, fmt.Errorf("invalid resource type: %w", err)
+	if isReporter, err := uc.schemaService.IsReporterForResource(ctx, resourceType, reporterType); !isReporter {
+		if err != nil {
+			return err
+		}
+		return fmt.Errorf("reporter %s does not report resource types: %s", reporterType, resourceType)
 	}
 
-	reporterType, err := model.NewReporterType(request.GetReporterType())
-	if err != nil {
-		return model.ReporterResourceKey{}, fmt.Errorf("invalid reporter type: %w", err)
+	if cmd.ReporterRepresentation == nil {
+		return &RepresentationRequiredError{Kind: "reporter"}
+	}
+	if cmd.CommonRepresentation == nil {
+		return &RepresentationRequiredError{Kind: "common"}
 	}
 
-	reporterInstanceId, err := model.NewReporterInstanceId(request.GetReporterInstanceId())
-	if err != nil {
-		return model.ReporterResourceKey{}, fmt.Errorf("invalid reporter instance ID: %w", err)
-	}
+	sanitizedReporterRepresentation := removeNulls(map[string]interface{}(*cmd.ReporterRepresentation))
 
-	return model.NewReporterResourceKey(
-		localResourceId,
-		resourceType,
-		reporterType,
-		reporterInstanceId,
-	)
-}
-
-func (uc *Usecase) updateResource(tx *gorm.DB, request *v1beta2.ReportResourceRequest, existingResource *model.Resource, txidStr string) error {
-	reporterResourceKey, apiHref, consoleHref, reporterVersion, commonData, reporterData, transactionId, err := extractUpdateDataFromRequest(request)
-	if err != nil {
+	// Validate reporter-specific data using the sanitized map
+	if err := uc.schemaService.ReporterShallowValidate(ctx, resourceType, reporterType, sanitizedReporterRepresentation); err != nil {
 		return err
 	}
 
-	err = existingResource.Update(
-		reporterResourceKey,
-		apiHref,
-		consoleHref,
-		reporterVersion,
-		reporterData,
-		commonData,
-		transactionId,
-	)
-	if err != nil {
-		return fmt.Errorf("failed to update resource: %w", err)
+	// Get common representation (no sanitization needed based on original code)
+	commonRepresentation := map[string]interface{}(*cmd.CommonRepresentation)
+
+	// Validate common data
+	if err := uc.schemaService.CommonShallowValidate(ctx, resourceType, commonRepresentation); err != nil {
+		return err
 	}
 
-	return uc.resourceRepository.Save(tx, *existingResource, biz.OperationTypeUpdated, txidStr)
+	return nil
 }
 
-func extractUpdateDataFromRequest(request *v1beta2.ReportResourceRequest) (
-	model.ReporterResourceKey,
-	model.ApiHref,
-	model.ConsoleHref,
-	*model.ReporterVersion,
-	model.Representation,
-	model.Representation,
-	model.TransactionId,
-	error,
-) {
-	reporterResourceKey, err := getReporterResourceKeyFromRequest(request)
-	if err != nil {
-		return model.ReporterResourceKey{}, "", "", nil, model.Representation(nil), model.Representation(nil), "", fmt.Errorf("failed to create reporter resource key: %w", err)
+// subjectToV1Beta1 converts a model.SubjectReference to a v1beta1 SubjectReference for the Authz interface.
+func subjectToV1Beta1(sub model.SubjectReference) *kessel.SubjectReference {
+	subKey := sub.Subject()
+	ref := &kessel.SubjectReference{
+		Subject: &kessel.ObjectReference{
+			Type: &kessel.ObjectType{
+				Namespace: subKey.ReporterType().Serialize(),
+				Name:      subKey.ResourceType().Serialize(),
+			},
+			Id: subKey.LocalResourceId().Serialize(),
+		},
 	}
-
-	apiHref, err := model.NewApiHref(request.GetRepresentations().GetMetadata().GetApiHref())
-	if err != nil {
-		return model.ReporterResourceKey{}, "", "", nil, model.Representation(nil), model.Representation(nil), "", fmt.Errorf("invalid API href: %w", err)
+	if sub.HasRelation() {
+		relation := sub.Relation().Serialize()
+		ref.Relation = &relation
 	}
+	return ref
+}
 
-	var consoleHref model.ConsoleHref
-	if consoleHrefVal := request.GetRepresentations().GetMetadata().GetConsoleHref(); consoleHrefVal != "" {
-		consoleHref, err = model.NewConsoleHref(consoleHrefVal)
-		if err != nil {
-			return model.ReporterResourceKey{}, "", "", nil, model.Representation(nil), model.Representation(nil), "", fmt.Errorf("invalid console href: %w", err)
+// checkBulkCommandToV1beta1 converts a CheckBulkCommand to v1beta1 for the Authz interface.
+func checkBulkCommandToV1beta1(cmd CheckBulkCommand) *kessel.CheckBulkRequest {
+	items := make([]*kessel.CheckBulkRequestItem, len(cmd.Items))
+	for i, item := range cmd.Items {
+		items[i] = &kessel.CheckBulkRequestItem{
+			Resource: &kessel.ObjectReference{
+				Type: &kessel.ObjectType{
+					Namespace: item.Resource.ReporterType().Serialize(),
+					Name:      item.Resource.ResourceType().Serialize(),
+				},
+				Id: item.Resource.LocalResourceId().Serialize(),
+			},
+			Relation: item.Relation.Serialize(),
+			Subject:  subjectToV1Beta1(item.Subject),
 		}
 	}
 
-	var reporterVersion *model.ReporterVersion
-	if reporterVersionValue := request.GetRepresentations().GetMetadata().GetReporterVersion(); reporterVersionValue != "" {
-		rv, err := model.NewReporterVersion(reporterVersionValue)
-		if err != nil {
-			return model.ReporterResourceKey{}, "", "", nil, model.Representation(nil), model.Representation(nil), "", fmt.Errorf("invalid reporter version: %w", err)
+	var consistency *kessel.Consistency
+	if !cmd.Consistency.MinimizeLatency() {
+		consistency = &kessel.Consistency{
+			Requirement: &kessel.Consistency_AtLeastAsFresh{
+				AtLeastAsFresh: &kessel.ConsistencyToken{
+					Token: cmd.Consistency.AtLeastAsFresh().Serialize(),
+				},
+			},
 		}
-		reporterVersion = &rv
+	} else {
+		consistency = &kessel.Consistency{
+			Requirement: &kessel.Consistency_MinimizeLatency{
+				MinimizeLatency: true,
+			},
+		}
 	}
 
 	// Common representation is optional - check if it's provided
@@ -445,16 +662,52 @@ func extractUpdateDataFromRequest(request *v1beta2.ReportResourceRequest) (
 		if err != nil {
 			return model.ReporterResourceKey{}, "", "", nil, model.Representation(nil), model.Representation(nil), "", fmt.Errorf("invalid common data: %w", err)
 		}
+	return &kessel.CheckBulkRequest{
+		Items:       items,
+		Consistency: consistency,
+	}
+}
+
+// checkBulkResultFromV1beta1 converts a v1beta1 CheckBulkResponse to CheckBulkResult.
+// Returns error if the response length doesn't match the command items length.
+func checkBulkResultFromV1beta1(resp *kessel.CheckBulkResponse, cmd CheckBulkCommand) (*CheckBulkResult, error) {
+	respPairs := resp.GetPairs()
+	if len(respPairs) != len(cmd.Items) {
+		return nil, status.Errorf(codes.Internal, "internal error: mismatched backend check results: expected %d pairs, got %d", len(cmd.Items), len(respPairs))
 	}
 
-	reporterRepresentation, err := model.NewRepresentation(request.GetRepresentations().GetReporter().AsMap())
-	if err != nil {
-		return model.ReporterResourceKey{}, "", "", nil, model.Representation(nil), model.Representation(nil), "", fmt.Errorf("invalid reporter data: %w", err)
+	pairs := make([]CheckBulkResultPair, len(respPairs))
+	for i, pair := range respPairs {
+		var resultItem CheckBulkResultItem
+		if pair.GetError() != nil {
+			resultItem = CheckBulkResultItem{
+				Allowed:   false,
+				Error:     fmt.Errorf("check failed: %s", pair.GetError().GetMessage()),
+				ErrorCode: pair.GetError().GetCode(),
+			}
+		} else if pair.GetItem() != nil {
+			resultItem = CheckBulkResultItem{
+				Allowed:   pair.GetItem().GetAllowed() == kessel.CheckBulkResponseItem_ALLOWED_TRUE,
+				Error:     nil,
+				ErrorCode: 0,
+			}
+		}
+
+		pairs[i] = CheckBulkResultPair{
+			Request: cmd.Items[i],
+			Result:  resultItem,
+		}
 	}
 
-	transactionId := model.NewTransactionId(request.GetRepresentations().GetMetadata().GetTransactionId())
+	var token model.ConsistencyToken
+	if resp.GetConsistencyToken() != nil {
+		token = model.DeserializeConsistencyToken(resp.GetConsistencyToken().GetToken())
+	}
 
-	return reporterResourceKey, apiHref, consoleHref, reporterVersion, commonRepresentation, reporterRepresentation, transactionId, nil
+	return &CheckBulkResult{
+		Pairs:            pairs,
+		ConsistencyToken: token,
+	}, nil
 }
 
 func getNextTransactionID() (string, error) {
@@ -465,16 +718,48 @@ func getNextTransactionID() (string, error) {
 	return txid.String(), nil
 }
 
-// LookupResources delegates resource lookup to the authorization service.
-func (uc *Usecase) LookupResources(ctx context.Context, request *kessel.LookupResourcesRequest) (grpc.ServerStreamingClient[kessel.LookupResourcesResponse], error) {
-	return uc.Authz.LookupResources(ctx, request)
+// lookupResourcesCommandToV1beta1 converts a LookupResourcesCommand to v1beta1.
+func lookupResourcesCommandToV1beta1(cmd LookupResourcesCommand) *kessel.LookupResourcesRequest {
+	var continuationToken *string
+	if cmd.Continuation != "" {
+		continuationToken = &cmd.Continuation
+	}
+	var consistency *kessel.Consistency
+	if !cmd.Consistency.MinimizeLatency() {
+		consistency = &kessel.Consistency{
+			Requirement: &kessel.Consistency_AtLeastAsFresh{
+				AtLeastAsFresh: &kessel.ConsistencyToken{
+					Token: cmd.Consistency.AtLeastAsFresh().Serialize(),
+				},
+			},
+		}
+	} else {
+		consistency = &kessel.Consistency{
+			Requirement: &kessel.Consistency_MinimizeLatency{
+				MinimizeLatency: true,
+			},
+		}
+	}
+
+	return &kessel.LookupResourcesRequest{
+		ResourceType: &kessel.ObjectType{
+			Namespace: cmd.ReporterType.Serialize(),
+			Name:      cmd.ResourceType.Serialize(),
+		},
+		Relation: cmd.Relation.Serialize(),
+		Subject:  subjectToV1Beta1(cmd.Subject),
+		Pagination: &kessel.RequestPagination{
+			Limit:             cmd.Limit,
+			ContinuationToken: continuationToken,
+		},
+		Consistency: consistency,
+	}
 }
 
-// Check if request comes from SP in allowlist
-func isSPInAllowlist(reporterPrincipal string, allowlist []string) bool {
+// isSPInAllowlist checks if the caller subject is in the allowlist.
+func isSPInAllowlist(callerSubject authnapi.SubjectId, allowlist []string) bool {
 	for _, sp := range allowlist {
-		// either specific SP or everyone
-		if sp == reporterPrincipal || sp == "*" {
+		if sp == string(callerSubject) || sp == "*" {
 			return true
 		}
 	}
@@ -482,12 +767,9 @@ func isSPInAllowlist(reporterPrincipal string, allowlist []string) bool {
 	return false
 }
 
-func computeReadAfterWrite(uc *Usecase, write_visibility v1beta2.WriteVisibility, reporterPrincipal string) bool {
-	// read after write functionality is enabled/disabled globally.
-	// And executed if request specifies and
-	// came from service provider in allowlist
-	if write_visibility == v1beta2.WriteVisibility_WRITE_VISIBILITY_UNSPECIFIED || write_visibility == v1beta2.WriteVisibility_MINIMIZE_LATENCY {
+func computeReadAfterWrite(uc *Usecase, writeVisibility WriteVisibility, callerSubject authnapi.SubjectId) bool {
+	if writeVisibility == WriteVisibilityUnspecified || writeVisibility == WriteVisibilityMinimizeLatency {
 		return false
 	}
-	return !common.IsNil(uc.ListenManager) && uc.Config.ReadAfterWriteEnabled && isSPInAllowlist(reporterPrincipal, uc.Config.ReadAfterWriteAllowlist)
+	return !common.IsNil(uc.ListenManager) && uc.Config.ReadAfterWriteEnabled && isSPInAllowlist(callerSubject, uc.Config.ReadAfterWriteAllowlist)
 }

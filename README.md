@@ -1,6 +1,6 @@
 # Common Inventory
 
-This repository implements a common inventory system with eventing.
+This repository implements a common inventory system.
 
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
@@ -20,7 +20,7 @@ This repository implements a common inventory system with eventing.
 ## Development Setup
 
 ### Prerequisites
-- Go 1.25.3
+- Go 1.25.7
 - Make
 
 ### Debugging
@@ -79,13 +79,13 @@ Since there are official instructions on how to [manage multiple installs](https
 We accept the `GO` parameter when running make. e.g.
 
 ```shell
-GO=go1.25.3 make run
+GO=go1.25.7 make run
 ```
 
 or
 
 ```shell
-export GO=go1.25.3
+export GO=go1.25.7
 make run
 ```
 
@@ -202,13 +202,13 @@ The Kessel Inventory includes health check endpoints for readiness and liveness 
 #### Readyz
 The readyz endpoint checks if the service is ready to handle requests.
 ```shell
-curl http://localhost:8000/api/inventory/v1/readyz
+curl http://localhost:8000/api/kessel/v1/readyz
 ```
 
 #### Livez
 The livez endpoint checks if the service is alive and functioning correctly.
 ```shell
-curl http://localhost:8000/api/inventory/v1/livez
+curl http://localhost:8000/api/kessel/v1/livez
 ```
 
 ### Resource lifecycle
@@ -224,7 +224,7 @@ To add a rhel-host to the inventory:
 To hit the REST endpoint use the following `curl` command
 
 ```shell
-curl -X POST -H "Content-Type: application/json" --data "@data/testData/v1beta2/host.json" http://localhost:8000/api/inventory/v1beta2/resources
+curl -X POST -H "Content-Type: application/json" --data "@data/testData/v1beta2/host.json" http://localhost:8000/api/kessel/v1beta2/resources
 ```
 
 To hit the gRPC endpoint use the following `grpcurl` command
@@ -238,7 +238,7 @@ To update it:
 To hit the REST endpoint
 
 ```shell
-curl -X POST -H "Content-Type: application/json" --data "@data/testData/v1beta2/host.json" http://localhost:8000/api/inventory/v1beta2/resources
+curl -X POST -H "Content-Type: application/json" --data "@data/testData/v1beta2/host.json" http://localhost:8000/api/kessel/v1beta2/resources
 ```
 
 To hit the gRPC endpoint
@@ -253,7 +253,7 @@ and finally, to delete it, note that we use a different file, as the only requir
 To hit the REST endpoint
 
 ```shell
-curl -XDELETE -H "Content-Type: application/json" --data "@data/testData/v1beta2/delete-host.json" http://localhost:8000/api/inventory/v1beta2/resources
+curl -XDELETE -H "Content-Type: application/json" --data "@data/testData/v1beta2/delete-host.json" http://localhost:8000/api/kessel/v1beta2/resources
 ```
 
 To hit the gRPC endpoint
@@ -265,10 +265,10 @@ To add a notifications integration (useful for testing in stage)
 
 ```shell
 # create the integration (auth is required for stage -- see internal docs)
-curl -X POST -H "Content-Type: application/json" -H "Authorization: Bearer $TOKEN" -d @data/testData/v1beta2/notifications-integrations.json localhost:8000/api/inventory/v1beta2/resources
+curl -X POST -H "Content-Type: application/json" -H "Authorization: Bearer $TOKEN" -d @data/testData/v1beta2/notifications-integrations.json localhost:8000/api/kessel/v1beta2/resources
 
 # delete the integration
-curl -X DELETE -H "Content-Type: application/json" -H "Authorization: Bearer $TOKEN" -d @data/testData/v1beta2/delete-notifications-integration.json localhost:8000/api/inventory/v1beta2/resources
+curl -X DELETE -H "Content-Type: application/json" -H "Authorization: Bearer $TOKEN" -d @data/testData/v1beta2/delete-notifications-integration.json localhost:8000/api/kessel/v1beta2/resources
 
 ```
 

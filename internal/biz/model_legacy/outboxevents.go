@@ -9,7 +9,6 @@ import (
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/google/uuid"
 	"github.com/project-kessel/inventory-api/internal"
-	"github.com/project-kessel/inventory-api/internal/biz"
 	bizmodel "github.com/project-kessel/inventory-api/internal/biz/model"
 	"gorm.io/gorm"
 )
@@ -22,11 +21,11 @@ const (
 )
 
 type OutboxEvent struct {
-	ID            uuid.UUID              `gorm:"type:uuid;primarykey;not null"`
-	AggregateType AggregateType          `gorm:"column:aggregatetype;type:varchar(255);not null"`
-	AggregateID   string                 `gorm:"column:aggregateid;type:varchar(255);not null"`
-	Operation     biz.EventOperationType `gorm:"type:varchar(255);not null"`
-	TxId          string                 `gorm:"column:txid;type:varchar(255)"`
+	ID            uuid.UUID                   `gorm:"type:uuid;primarykey;not null"`
+	AggregateType AggregateType               `gorm:"column:aggregatetype;type:varchar(255);not null"`
+	AggregateID   string                      `gorm:"column:aggregateid;type:varchar(255);not null"`
+	Operation     bizmodel.EventOperationType `gorm:"type:varchar(255);not null"`
+	TxId          string                      `gorm:"column:txid;type:varchar(255)"`
 	Payload       internal.JsonObject
 }
 
@@ -105,7 +104,7 @@ type EventRelationshipReporter struct {
 	ReporterInstanceId     string `json:"reporter_instance_id"`
 }
 
-func newResourceEvent(operationType biz.EventOperationType, resourceEvent *bizmodel.ResourceReportEvent) (*ResourceEvent, error) {
+func newResourceEvent(operationType bizmodel.EventOperationType, resourceEvent *bizmodel.ResourceReportEvent) (*ResourceEvent, error) {
 	const eventType = "resources"
 	now := time.Now()
 
@@ -120,13 +119,13 @@ func newResourceEvent(operationType biz.EventOperationType, resourceEvent *bizmo
 	var deletedAt *time.Time
 
 	switch operationType {
-	case biz.OperationTypeCreated:
+	case bizmodel.OperationTypeCreated:
 		createdAt = resourceEvent.CreatedAt()
 		reportedTime = *createdAt
-	case biz.OperationTypeUpdated:
+	case bizmodel.OperationTypeUpdated:
 		updatedAt = resourceEvent.UpdatedAt()
 		reportedTime = *updatedAt
-	case biz.OperationTypeDeleted:
+	case bizmodel.OperationTypeDeleted:
 		deletedAt = &now
 		reportedTime = *deletedAt
 	}
@@ -161,7 +160,7 @@ func newResourceEvent(operationType biz.EventOperationType, resourceEvent *bizmo
 	}, nil
 }
 
-func convertResourceToResourceEvent(resourceReportEvent bizmodel.ResourceReportEvent, operationType biz.EventOperationType) (internal.JsonObject, error) {
+func convertResourceToResourceEvent(resourceReportEvent bizmodel.ResourceReportEvent, operationType bizmodel.EventOperationType) (internal.JsonObject, error) {
 	payload := internal.JsonObject{}
 
 	resourceEvent, err := newResourceEvent(operationType, &resourceReportEvent)
@@ -182,7 +181,7 @@ func convertResourceToResourceEvent(resourceReportEvent bizmodel.ResourceReportE
 	return payload, nil
 }
 
-func convertResourceToTupleEvent(reporterResourceKey bizmodel.ReporterResourceKey, operationType biz.EventOperationType, currentCommonVersion *bizmodel.Version, currentReporterRepresentationVersion *bizmodel.Version) (internal.JsonObject, error) {
+func convertResourceToTupleEvent(reporterResourceKey bizmodel.ReporterResourceKey, operationType bizmodel.EventOperationType, currentCommonVersion *bizmodel.Version, currentReporterRepresentationVersion *bizmodel.Version) (internal.JsonObject, error) {
 	payload := internal.JsonObject{}
 
 	tuple, err := bizmodel.NewTupleEvent(reporterResourceKey, currentCommonVersion, currentReporterRepresentationVersion)
@@ -201,7 +200,7 @@ func convertResourceToTupleEvent(reporterResourceKey bizmodel.ReporterResourceKe
 	return payload, nil
 }
 
-func NewOutboxEventsFromResourceEvent(domainResourceEvent bizmodel.ResourceEvent, operationType biz.EventOperationType, txid string) (*OutboxEvent, *OutboxEvent, error) {
+func NewOutboxEventsFromResourceEvent(domainResourceEvent bizmodel.ResourceEvent, operationType bizmodel.EventOperationType, txid string) (*OutboxEvent, *OutboxEvent, error) {
 	var payload internal.JsonObject
 	var tuplePayload internal.JsonObject
 	var err error
@@ -212,7 +211,7 @@ func NewOutboxEventsFromResourceEvent(domainResourceEvent bizmodel.ResourceEvent
 	}
 
 	switch operationType.OperationType() {
-	case biz.OperationTypeDeleted:
+	case bizmodel.OperationTypeDeleted:
 		//TODO: Not publishing anything for resource event right now so we can decide what to publish correctly
 		payload = internal.JsonObject{}
 	default:

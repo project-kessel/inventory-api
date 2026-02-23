@@ -7,11 +7,11 @@ import (
 	"github.com/go-kratos/kratos/v2/log"
 
 	"github.com/project-kessel/inventory-api/internal/authz/allow"
-	"github.com/project-kessel/inventory-api/internal/authz/api"
 	"github.com/project-kessel/inventory-api/internal/authz/kessel"
+	"github.com/project-kessel/inventory-api/internal/biz/model"
 )
 
-func New(ctx context.Context, config CompletedConfig, logger *log.Helper) (api.Authorizer, error) {
+func New(ctx context.Context, config CompletedConfig, logger *log.Helper) (model.Authorizer, error) {
 	switch config.Authz {
 	case AllowAll:
 		return allow.New(logger), nil

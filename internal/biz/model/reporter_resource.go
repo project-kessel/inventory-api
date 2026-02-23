@@ -19,6 +19,10 @@ type ReporterResource struct {
 	representationVersion Version
 	generation            Generation
 	tombstone             Tombstone
+
+	// Timestamp fields - each reporter resource owns its lifecycle
+	createdAt time.Time
+	updatedAt time.Time
 }
 
 type ReporterResourceKey struct {
@@ -48,6 +52,7 @@ func NewReporterResource(
 		return ReporterResource{}, fmt.Errorf("ReporterResource invalid key: %w", err)
 	}
 
+	now := time.Now()
 	resource := ReporterResource{
 		id:                    id,
 		ReporterResourceKey:   reporterResourceKey,
@@ -57,6 +62,8 @@ func NewReporterResource(
 		representationVersion: NewVersion(initialReporterRepresentationVersion),
 		generation:            NewGeneration(initialGeneration),
 		tombstone:             NewTombstone(initialTombstone),
+		createdAt:             now,
+		updatedAt:             now,
 	}
 	return resource, nil
 }
@@ -84,6 +91,7 @@ func (rr *ReporterResource) Update(
 	rr.apiHref = apiHref
 	rr.consoleHref = consoleHref
 	rr.representationVersion = rr.representationVersion.Increment()
+	rr.updatedAt = time.Now()
 	if tombstoned(rr) {
 		startNewGeneration(rr)
 	}
@@ -102,6 +110,7 @@ func tombstoned(rr *ReporterResource) bool {
 func (rr *ReporterResource) Delete() {
 	rr.representationVersion = rr.representationVersion.Increment()
 	rr.tombstone = true
+	rr.updatedAt = time.Now()
 }
 
 // Add getters only where needed
@@ -133,6 +142,21 @@ func (rr ReporterResource) Key() ReporterResourceKey {
 	return rr.ReporterResourceKey
 }
 
+// ApiHref returns the API href for this reporter resource.
+func (rr ReporterResource) ApiHref() ApiHref { return rr.apiHref }
+
+// ConsoleHref returns the console href for this reporter resource.
+func (rr ReporterResource) ConsoleHref() ConsoleHref { return rr.consoleHref }
+
+// Add timestamp getters
+func (rr ReporterResource) CreatedAt() time.Time {
+	return rr.createdAt
+}
+
+func (rr ReporterResource) UpdatedAt() time.Time {
+	return rr.updatedAt
+}
+
 // Serialization + Deserialization functions, direct initialization without validation, convert to snapshots so we can bypass New validation
 func (rr ReporterResource) Serialize() ReporterResourceSnapshot {
 	keySnapshot := ReporterResourceKeySnapshot{
@@ -151,8 +175,8 @@ func (rr ReporterResource) Serialize() ReporterResourceSnapshot {
 		RepresentationVersion: rr.representationVersion.Serialize(),
 		Generation:            rr.generation.Serialize(),
 		Tombstone:             rr.tombstone.Serialize(),
-		CreatedAt:             time.Now(), // TODO: Add proper timestamp from domain entity if available
-		UpdatedAt:             time.Now(), // TODO: Add proper timestamp from domain entity if available
+		CreatedAt:             rr.createdAt,
+		UpdatedAt:             rr.updatedAt,
 	}
 }
 
@@ -169,6 +193,8 @@ func DeserializeReporterResource(snapshot ReporterResourceSnapshot) ReporterReso
 		representationVersion: DeserializeVersion(snapshot.RepresentationVersion),
 		generation:            DeserializeGeneration(snapshot.Generation),
 		tombstone:             DeserializeTombstone(snapshot.Tombstone),
+		createdAt:             snapshot.CreatedAt,
+		updatedAt:             snapshot.UpdatedAt,
 	}
 }
 

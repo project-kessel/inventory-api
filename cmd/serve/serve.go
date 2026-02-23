@@ -18,12 +18,14 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/project-kessel/inventory-api/cmd/common"
+	"github.com/project-kessel/inventory-api/internal/biz/usecase/metaauthorizer"
 	resourcesctl "github.com/project-kessel/inventory-api/internal/biz/usecase/resources"
 	"github.com/project-kessel/inventory-api/internal/config/schema"
 	"github.com/project-kessel/inventory-api/internal/consistency"
 	"github.com/project-kessel/inventory-api/internal/consumer"
 	"github.com/project-kessel/inventory-api/internal/data"
 	"github.com/project-kessel/inventory-api/internal/pubsub"
+	"github.com/project-kessel/inventory-api/internal/subject/selfsubject"
 
 	//v1beta2
 	resourcesvc "github.com/project-kessel/inventory-api/internal/service/resources"
@@ -31,8 +33,6 @@ import (
 	"github.com/project-kessel/inventory-api/internal/authn"
 	"github.com/project-kessel/inventory-api/internal/authz"
 	"github.com/project-kessel/inventory-api/internal/errors"
-	"github.com/project-kessel/inventory-api/internal/eventing"
-	eventingapi "github.com/project-kessel/inventory-api/internal/eventing/api"
 	"github.com/project-kessel/inventory-api/internal/middleware"
 	"github.com/project-kessel/inventory-api/internal/server"
 	"github.com/project-kessel/inventory-api/internal/server/pprof"
@@ -47,16 +47,16 @@ import (
 
 // NewCommand creates a new cobra command for starting the inventory server.
 // It configures and wires together all the necessary components including storage, authentication,
-// authorization, eventing, and consumer services.
+// authorization, and consumer services.
 func NewCommand(
 	serverOptions *server.Options,
 	storageOptions *storage.Options,
 	authnOptions *authn.Options,
 	authzOptions *authz.Options,
-	eventingOptions *eventing.Options,
 	consumerOptions *consumer.Options,
 	consistencyOptions *consistency.Options,
 	serviceOptions *service.Options,
+	selfSubjectOptions *selfsubject.Options,
 	loggerOptions common.LoggerOptions,
 	schemaOptions *schema.Options,
 ) *cobra.Command {
@@ -91,6 +91,15 @@ func NewCommand(
 				return errors.NewAggregate(errs)
 			}
 
+			// configure selfsubject
+			if errs := selfSubjectOptions.Complete(); errs != nil {
+				return errors.NewAggregate(errs)
+			}
+			if errs := selfSubjectOptions.Validate(); errs != nil {
+				return errors.NewAggregate(errs)
+			}
+			selfSubjectStrategy := selfSubjectOptions.Build()
+
 			// configure authz
 			if errs := authzOptions.Complete(); errs != nil {
 				return errors.NewAggregate(errs)
@@ -99,18 +108,6 @@ func NewCommand(
 				return errors.NewAggregate(errs)
 			}
 			authzConfig, errs := authz.NewConfig(authzOptions).Complete(ctx)
-			if errs != nil {
-				return errors.NewAggregate(errs)
-			}
-
-			// configure eventing
-			if errs := eventingOptions.Complete(); errs != nil {
-				return errors.NewAggregate(errs)
-			}
-			if errs := eventingOptions.Validate(); errs != nil {
-				return errors.NewAggregate(errs)
-			}
-			eventingConfig, errs := eventing.NewConfig(eventingOptions).Complete()
 			if errs != nil {
 				return errors.NewAggregate(errs)
 			}
@@ -224,14 +221,6 @@ func NewCommand(
 				return err
 			}
 
-			// construct eventing
-			// Note that we pass the server id here to act as the Source URI in cloudevents
-			// If a server ID isn't configured explicitly, `os.Hostname()` is used.
-			eventingManager, err := eventing.New(eventingConfig, serverConfig.Options.PublicUrl, log.NewHelper(log.With(logger, "subsystem", "eventing")))
-			if err != nil {
-				return err
-			}
-
 			// constructs schema repository
 			schemaRepository, err := data.NewSchemaRepository(ctx, schemaConfig, log.NewHelper(log.With(logger, "subsystem", "schemaRepository")))
 			if err != nil {
@@ -278,7 +267,7 @@ func NewCommand(
 			//v1beta2
 			// wire together inventory service handling
 			resourceRepo := data.NewResourceRepository(db, transactionManager)
-			inventory_controller := resourcesctl.New(resourceRepo, authorizer, eventingManager, "notifications", log.With(logger, "subsystem", "notificationsintegrations_controller"), listenManager, waitForNotifCircuitBreaker, usecaseConfig, mc)
+			inventory_controller := resourcesctl.New(resourceRepo, schemaRepository, authorizer, "notifications", log.With(logger, "subsystem", "notificationsintegrations_controller"), listenManager, waitForNotifCircuitBreaker, usecaseConfig, mc, metaauthorizer.NewSimpleMetaAuthorizer(), selfSubjectStrategy)
 
 			inventory_service := resourcesvc.NewKesselInventoryServiceV1beta2(inventory_controller)
 			pbv1beta2.RegisterKesselInventoryServiceServer(server.GrpcServer, inventory_service)
@@ -302,7 +291,7 @@ func NewCommand(
 				}()
 			}
 
-			shutdown := shutdown(db, server, pprofServer, eventingManager, &inventoryConsumer, log.NewHelper(logger))
+			shutdown := shutdown(db, server, pprofServer, &inventoryConsumer, log.NewHelper(logger))
 
 			if consumerOptions.Enabled {
 				go func() {
@@ -346,8 +335,6 @@ func NewCommand(
 				shutdown(lmErr)
 			case sig := <-quit:
 				shutdown(sig)
-			case emErr := <-eventingManager.Errs():
-				shutdown(emErr)
 			case cmErr := <-inventoryConsumer.Errs():
 				shutdown(cmErr)
 			}
@@ -358,18 +345,18 @@ func NewCommand(
 	serverOptions.AddFlags(cmd.Flags(), "server")
 	authnOptions.AddFlags(cmd.Flags(), "authn")
 	authzOptions.AddFlags(cmd.Flags(), "authz")
-	eventingOptions.AddFlags(cmd.Flags(), "eventing")
 	consumerOptions.AddFlags(cmd.Flags(), "consumer")
 	consistencyOptions.AddFlags(cmd.Flags(), "consistency")
 	serviceOptions.AddFlags()
 	schemaOptions.AddFlags(cmd.Flags(), "schema")
+	selfSubjectOptions.AddFlags(cmd.Flags(), "selfsubjectstrategy")
 
 	return cmd
 }
 
 // shutdown returns a shutdown function that gracefully closes all server components
-// including the HTTP server, pprof server, eventing manager, consumer, and database connections.
-func shutdown(db *gorm.DB, srv *server.Server, pprofSrv *pprof.Server, em eventingapi.Manager, cm *consumer.InventoryConsumer, logger *log.Helper) func(reason interface{}) {
+// including the HTTP server, pprof server, consumer, and database connections.
+func shutdown(db *gorm.DB, srv *server.Server, pprofSrv *pprof.Server, cm *consumer.InventoryConsumer, logger *log.Helper) func(reason interface{}) {
 	return func(reason interface{}) {
 		log.Info(fmt.Sprintf("Server Shutdown: %s", reason))
 
@@ -386,12 +373,6 @@ func shutdown(db *gorm.DB, srv *server.Server, pprofSrv *pprof.Server, em eventi
 			if err := pprofSrv.Shutdown(ctx); err != nil {
 				logger.Error(fmt.Sprintf("Error Gracefully Shutting Down pprof: %v", err))
 			}
-		}
-
-		ctx, cancel = context.WithTimeout(context.Background(), timeout)
-		defer cancel()
-		if err := em.Shutdown(ctx); err != nil {
-			logger.Error(fmt.Sprintf("Error Gracefully Shutting Down Eventing: %v", err))
 		}
 
 		if cm != nil {

@@ -13,9 +13,7 @@ import (
 	"go.opentelemetry.io/otel"
 	"gorm.io/gorm"
 
-	"github.com/project-kessel/inventory-api/internal/biz"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
-	usecase_resources "github.com/project-kessel/inventory-api/internal/biz/usecase/resources"
 	"github.com/project-kessel/inventory-api/internal/data"
 	datamodel "github.com/project-kessel/inventory-api/internal/data/model"
 	"github.com/project-kessel/inventory-api/internal/mocks"
@@ -101,7 +99,7 @@ func (t *TestCase) TestSetup(testingT *testing.T) []error {
 		return errs
 	}
 
-	t.inv.SchemaService = usecase_resources.NewSchemaUsecase(schemaRepository, t.logger)
+	t.inv.SchemaService = model.NewSchemaService(schemaRepository, t.logger)
 
 	err = t.metrics.New(otel.Meter("github.com/project-kessel/inventory-api/blob/main/internal/server/otel"))
 	if err != nil {
@@ -137,11 +135,11 @@ func TestParseHeaders(t *testing.T) {
 	}{
 		{
 			name:              "Create Operation",
-			expectedOperation: string(biz.OperationTypeCreated),
+			expectedOperation: string(model.OperationTypeCreated),
 			expectedTxid:      "123456",
 			msg: &kafka.Message{
 				Headers: []kafka.Header{
-					{Key: "operation", Value: []byte(string(biz.OperationTypeCreated))},
+					{Key: "operation", Value: []byte(string(model.OperationTypeCreated))},
 					{Key: "txid", Value: []byte("123456")},
 				},
 			},
@@ -149,11 +147,11 @@ func TestParseHeaders(t *testing.T) {
 		},
 		{
 			name:              "Update Operation",
-			expectedOperation: string(biz.OperationTypeUpdated),
+			expectedOperation: string(model.OperationTypeUpdated),
 			expectedTxid:      "123456",
 			msg: &kafka.Message{
 				Headers: []kafka.Header{
-					{Key: "operation", Value: []byte(string(biz.OperationTypeUpdated))},
+					{Key: "operation", Value: []byte(string(model.OperationTypeUpdated))},
 					{Key: "txid", Value: []byte("123456")},
 				},
 			},
@@ -161,11 +159,11 @@ func TestParseHeaders(t *testing.T) {
 		},
 		{
 			name:              "Delete Operation",
-			expectedOperation: string(biz.OperationTypeDeleted),
+			expectedOperation: string(model.OperationTypeDeleted),
 			expectedTxid:      "",
 			msg: &kafka.Message{
 				Headers: []kafka.Header{
-					{Key: "operation", Value: []byte(string(biz.OperationTypeDeleted))},
+					{Key: "operation", Value: []byte(string(model.OperationTypeDeleted))},
 					{Key: "txid", Value: []byte{}},
 				},
 			},
@@ -219,11 +217,11 @@ func TestParseHeaders(t *testing.T) {
 		},
 		{
 			name:              "Extra Headers",
-			expectedOperation: string(biz.OperationTypeCreated),
+			expectedOperation: string(model.OperationTypeCreated),
 			expectedTxid:      "123456",
 			msg: &kafka.Message{
 				Headers: []kafka.Header{
-					{Key: "operation", Value: []byte(string(biz.OperationTypeCreated))},
+					{Key: "operation", Value: []byte(string(model.OperationTypeCreated))},
 					{Key: "txid", Value: []byte("123456")},
 					{Key: "unused-header", Value: []byte("unused-header-data")},
 				},
@@ -292,67 +290,67 @@ func TestInventoryConsumer_ProcessMessage(t *testing.T) {
 		expectedTxid      string
 		msg               *kafka.Message
 		relationsEnabled  bool
-		setupData         func(t *testing.T, repo data.ResourceRepository, db *gorm.DB)
+		setupData         func(t *testing.T, repo model.ResourceRepository, db *gorm.DB)
 	}{
 		{
 			name:              "Create Operation",
-			expectedOperation: string(biz.OperationTypeCreated),
+			expectedOperation: string(model.OperationTypeCreated),
 			expectedTxid:      "123456",
 			msg: &kafka.Message{
 				Key:   []byte(testMessageKey),
 				Value: []byte(testCreateMessage),
 			},
 			relationsEnabled: true,
-			setupData: func(t *testing.T, repo data.ResourceRepository, db *gorm.DB) {
+			setupData: func(t *testing.T, repo model.ResourceRepository, db *gorm.DB) {
 				testData, err := model.NewResourceFixture("test-resource-4321", "integration", "notifications", "test-instance-1", "test-workspace-v0")
 				require.NoError(t, err)
-				err = repo.Save(db, *testData.Resource, biz.OperationTypeCreated, string(testData.InitialTransactionId))
+				err = repo.Save(db, *testData.Resource, model.OperationTypeCreated, string(testData.InitialTransactionId))
 				require.NoError(t, err)
 			},
 		},
 		{
 			name:              "Update Operation",
-			expectedOperation: string(biz.OperationTypeUpdated),
+			expectedOperation: string(model.OperationTypeUpdated),
 			expectedTxid:      "123456",
 			msg: &kafka.Message{
 				Key:   []byte(testMessageKey),
 				Value: []byte(testUpdateMessage),
 			},
 			relationsEnabled: true,
-			setupData: func(t *testing.T, repo data.ResourceRepository, db *gorm.DB) {
+			setupData: func(t *testing.T, repo model.ResourceRepository, db *gorm.DB) {
 				testData, err := model.NewResourceFixture("test-resource-4321", "integration", "notifications", "test-instance-1", "test-workspace-v0")
 				require.NoError(t, err)
-				err = repo.Save(db, *testData.Resource, biz.OperationTypeCreated, string(testData.InitialTransactionId))
+				err = repo.Save(db, *testData.Resource, model.OperationTypeCreated, string(testData.InitialTransactionId))
 				require.NoError(t, err)
 
 				updatedCommon, err := model.NewRepresentation(map[string]interface{}{"workspace_id": "test-workspace-v1"})
 				require.NoError(t, err)
 				err = testData.Resource.Update(testData.Key, testData.ApiHref, testData.ConsoleHref, nil, testData.ReporterRepresentation, updatedCommon, "tx-v1")
 				require.NoError(t, err)
-				err = repo.Save(db, *testData.Resource, biz.OperationTypeUpdated, "tx-v1")
+				err = repo.Save(db, *testData.Resource, model.OperationTypeUpdated, "tx-v1")
 				require.NoError(t, err)
 			},
 		},
 		{
 			name:              "Delete Operation",
-			expectedOperation: string(biz.OperationTypeDeleted),
+			expectedOperation: string(model.OperationTypeDeleted),
 			expectedTxid:      "",
 			msg: &kafka.Message{
 				Key:   []byte(testMessageKey),
 				Value: []byte(testDeleteMessage),
 			},
 			relationsEnabled: true,
-			setupData: func(t *testing.T, repo data.ResourceRepository, db *gorm.DB) {
+			setupData: func(t *testing.T, repo model.ResourceRepository, db *gorm.DB) {
 				testData, err := model.NewResourceFixture("test-resource-4321", "integration", "notifications", "test-instance-1", "test-workspace-v0")
 				require.NoError(t, err)
-				err = repo.Save(db, *testData.Resource, biz.OperationTypeCreated, string(testData.InitialTransactionId))
+				err = repo.Save(db, *testData.Resource, model.OperationTypeCreated, string(testData.InitialTransactionId))
 				require.NoError(t, err)
 
 				updatedCommon, err := model.NewRepresentation(map[string]interface{}{"workspace_id": "test-workspace-v1"})
 				require.NoError(t, err)
 				err = testData.Resource.Update(testData.Key, testData.ApiHref, testData.ConsoleHref, nil, testData.ReporterRepresentation, updatedCommon, "tx-v1")
 				require.NoError(t, err)
-				err = repo.Save(db, *testData.Resource, biz.OperationTypeUpdated, "tx-v1")
+				err = repo.Save(db, *testData.Resource, model.OperationTypeUpdated, "tx-v1")
 				require.NoError(t, err)
 			},
 		},
@@ -365,7 +363,7 @@ func TestInventoryConsumer_ProcessMessage(t *testing.T) {
 		},
 		{
 			name:              "Created but relations disabled",
-			expectedOperation: string(biz.OperationTypeCreated),
+			expectedOperation: string(model.OperationTypeCreated),
 			expectedTxid:      "123456",
 			msg:               &kafka.Message{},
 			relationsEnabled:  false,
@@ -392,7 +390,7 @@ func TestInventoryConsumer_ProcessMessage(t *testing.T) {
 			assert.Equal(t, parsedHeaders["operation"], test.expectedOperation)
 			assert.Equal(t, parsedHeaders["txid"], test.expectedTxid)
 
-			if (test.expectedOperation == string(biz.OperationTypeCreated) || test.expectedOperation == string(biz.OperationTypeUpdated)) && test.relationsEnabled {
+			if (test.expectedOperation == string(model.OperationTypeCreated) || test.expectedOperation == string(model.OperationTypeUpdated)) && test.relationsEnabled {
 				resp, err := tester.inv.ProcessMessage(parsedHeaders, test.relationsEnabled, test.msg)
 				assert.Nil(t, err)
 				assert.Equal(t, "test-token", resp)
@@ -977,7 +975,7 @@ func TestInventoryConsumer_UpdateWithSameWorkspace_NoOp(t *testing.T) {
 	require.NoError(t, err)
 
 	fakeRepo := data.NewFakeResourceRepository()
-	require.NoError(t, fakeRepo.Save(nil, *testData.Resource, biz.OperationTypeCreated, string(testData.InitialTransactionId)))
+	require.NoError(t, fakeRepo.Save(nil, *testData.Resource, model.OperationTypeCreated, string(testData.InitialTransactionId)))
 
 	err = testData.Resource.Update(
 		testData.Key,
@@ -990,7 +988,7 @@ func TestInventoryConsumer_UpdateWithSameWorkspace_NoOp(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	require.NoError(t, fakeRepo.Save(nil, *testData.Resource, biz.OperationTypeUpdated, "tx-update"))
+	require.NoError(t, fakeRepo.Save(nil, *testData.Resource, model.OperationTypeUpdated, "tx-update"))
 
 	tester.inv.ResourceRepository = fakeRepo
 
@@ -1000,7 +998,7 @@ func TestInventoryConsumer_UpdateWithSameWorkspace_NoOp(t *testing.T) {
 		Key:   []byte(testMessageKey),
 		Value: []byte(testUpdateMessage),
 		Headers: []kafka.Header{
-			{Key: "operation", Value: []byte(string(biz.OperationTypeUpdated))},
+			{Key: "operation", Value: []byte(string(model.OperationTypeUpdated))},
 			{Key: "txid", Value: []byte("txid-noop")},
 		},
 	}

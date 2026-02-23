@@ -6,7 +6,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/project-kessel/inventory-api/internal"
-	"github.com/project-kessel/inventory-api/internal/biz"
 	bizmodel "github.com/project-kessel/inventory-api/internal/biz/model"
 	"github.com/stretchr/testify/assert"
 )
@@ -71,32 +70,32 @@ func createTestResourceReportEvent() bizmodel.ResourceReportEvent {
 
 func TestNewOutboxEventsFromResourceEventCreated(t *testing.T) {
 	resourceEvent := createTestResourceReportEvent()
-	outboxResourceEvent, tupleEvent, err := NewOutboxEventsFromResourceEvent(resourceEvent, biz.OperationTypeCreated, txid)
+	outboxResourceEvent, tupleEvent, err := NewOutboxEventsFromResourceEvent(resourceEvent, bizmodel.OperationTypeCreated, txid)
 	assert.Nil(t, err)
 	assert.NotNil(t, outboxResourceEvent)
 	assert.NotNil(t, tupleEvent)
-	assertResourceEventFromDomainEvent(t, biz.OperationTypeCreated, resourceEvent, outboxResourceEvent)
+	assertResourceEventFromDomainEvent(t, bizmodel.OperationTypeCreated, resourceEvent, outboxResourceEvent)
 	assertTupleEventFromDomainEvent(t, resourceEvent, tupleEvent)
 }
 
 func TestNewOutboxEventsFromResourceEventUpdated(t *testing.T) {
 	resourceEvent := createTestResourceReportEvent()
-	outboxResourceEvent, tupleEvent, err := NewOutboxEventsFromResourceEvent(resourceEvent, biz.OperationTypeUpdated, txid)
+	outboxResourceEvent, tupleEvent, err := NewOutboxEventsFromResourceEvent(resourceEvent, bizmodel.OperationTypeUpdated, txid)
 	assert.Nil(t, err)
 	assert.NotNil(t, outboxResourceEvent)
 	assert.NotNil(t, tupleEvent)
-	assertResourceEventFromDomainEvent(t, biz.OperationTypeUpdated, resourceEvent, outboxResourceEvent)
+	assertResourceEventFromDomainEvent(t, bizmodel.OperationTypeUpdated, resourceEvent, outboxResourceEvent)
 	assertTupleEventFromDomainEvent(t, resourceEvent, tupleEvent)
 }
 
 func TestNewOutboxEventsFromResourceEventDeleted(t *testing.T) {
 	resourceEvent := createTestResourceReportEvent()
-	outboxResourceEvent, tupleEvent, err := NewOutboxEventsFromResourceEvent(resourceEvent, biz.OperationTypeDeleted, txid)
+	outboxResourceEvent, tupleEvent, err := NewOutboxEventsFromResourceEvent(resourceEvent, bizmodel.OperationTypeDeleted, txid)
 	assert.Nil(t, err)
 	assert.NotNil(t, outboxResourceEvent)
 	assert.NotNil(t, tupleEvent)
 	// For deleted events, payload is empty
-	assert.Equal(t, biz.OperationTypeDeleted, outboxResourceEvent.Operation)
+	assert.Equal(t, bizmodel.OperationTypeDeleted, outboxResourceEvent.Operation)
 	assertTupleEventFromDomainEvent(t, resourceEvent, tupleEvent)
 }
 
@@ -123,7 +122,7 @@ func assertTupleEventFromDomainEvent(t *testing.T, resourceEvent bizmodel.Resour
 	assert.NotNil(t, tupleEvent.ReporterRepresentationVersion())
 }
 
-func assertResourceEventFromDomainEvent(t *testing.T, operation biz.EventOperationType, resourceEvent bizmodel.ResourceReportEvent, event *OutboxEvent) {
+func assertResourceEventFromDomainEvent(t *testing.T, operation bizmodel.EventOperationType, resourceEvent bizmodel.ResourceReportEvent, event *OutboxEvent) {
 	assert.NotNil(t, event)
 	assert.Equal(t, operation, event.Operation)
 	assert.Equal(t, ResourceAggregateType, event.AggregateType)

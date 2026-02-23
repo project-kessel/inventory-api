@@ -4,67 +4,46 @@ import (
 	"context"
 	"io"
 
+	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
+	"github.com/go-kratos/kratos/v2/transport"
+	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1"
 	"github.com/project-kessel/inventory-api/internal/pubsub"
+	kesselv1 "github.com/project-kessel/relations-api/api/kessel/relations/v1"
+	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 
-	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1"
-
-	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
-
-	kesselv1 "github.com/project-kessel/relations-api/api/kessel/relations/v1"
 	"github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
 	"github.com/stretchr/testify/mock"
-	"google.golang.org/grpc"
 )
 
 type MockHealthRepo struct {
 	mock.Mock
 }
 
-type MockAuthz struct {
-	mock.Mock
-}
-
-type MockConsumer struct {
-	mock.Mock
-}
-
-type MockedReporterResourceRepository struct {
-	mock.Mock
-}
-
-type MockedInventoryResourceRepository struct {
-	mock.Mock
-}
-
-type MockedListenManager struct {
-	mock.Mock
-}
-
-type MockedSubscription struct {
-	mock.Mock
-}
-
-type MockLookupResourcesStream struct {
-	mock.Mock
-	Responses []*v1beta1.LookupResourcesResponse
-	current   int
-}
-
-func (m *MockAuthz) Health(ctx context.Context) (*kesselv1.GetReadyzResponse, error) {
-	args := m.Called(ctx)
-	return args.Get(0).(*kesselv1.GetReadyzResponse), args.Error(1)
-}
-
 func (m *MockHealthRepo) IsBackendAvailable(ctx context.Context) (*pb.GetReadyzResponse, error) {
 	args := m.Called(ctx)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
 	return args.Get(0).(*pb.GetReadyzResponse), args.Error(1)
 }
 
 func (m *MockHealthRepo) IsRelationsAvailable(ctx context.Context) (*pb.GetReadyzResponse, error) {
 	args := m.Called(ctx)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
 	return args.Get(0).(*pb.GetReadyzResponse), args.Error(1)
 
+}
+
+type MockAuthz struct {
+	mock.Mock
+}
+
+func (m *MockAuthz) Health(ctx context.Context) (*kesselv1.GetReadyzResponse, error) {
+	args := m.Called(ctx)
+	return args.Get(0).(*kesselv1.GetReadyzResponse), args.Error(1)
 }
 
 func (m *MockAuthz) Check(ctx context.Context, namespace string, permission string, consistencyToken string, resourceType string, localResourceId string, sub *v1beta1.SubjectReference) (v1beta1.CheckResponse_Allowed, *v1beta1.ConsistencyToken, error) {
@@ -113,6 +92,10 @@ func (m *MockAuthz) LookupResources(ctx context.Context, request *v1beta1.Lookup
 	return args.Get(0).(grpc.ServerStreamingClient[v1beta1.LookupResourcesResponse]), args.Error(1)
 }
 
+type MockConsumer struct {
+	mock.Mock
+}
+
 func (m *MockConsumer) CommitOffsets(offsets []kafka.TopicPartition) ([]kafka.TopicPartition, error) {
 	args := m.Called(offsets)
 	return args.Get(0).([]kafka.TopicPartition), args.Error(1)
@@ -141,6 +124,27 @@ func (m *MockConsumer) Close() error {
 func (m *MockConsumer) AssignmentLost() bool {
 	args := m.Called()
 	return args.Get(0).(bool)
+}
+
+type MockedReporterResourceRepository struct {
+	mock.Mock
+}
+
+type MockedInventoryResourceRepository struct {
+	mock.Mock
+}
+
+type MockedListenManager struct {
+	mock.Mock
+}
+
+type MockedSubscription struct {
+	mock.Mock
+}
+type MockLookupResourcesStream struct {
+	mock.Mock
+	Responses []*v1beta1.LookupResourcesResponse
+	current   int
 }
 
 func (m *MockLookupResourcesStream) Recv() (*v1beta1.LookupResourcesResponse, error) {
@@ -210,3 +214,23 @@ func (m *MockedSubscription) BlockForNotification(ctx context.Context) error {
 	args := m.Called(ctx)
 	return args.Error(0)
 }
+
+// MockTransporter is a test helper that implements transport.Transporter
+type MockTransporter struct {
+	OperationValue string
+}
+
+func (m *MockTransporter) Kind() transport.Kind            { return transport.KindHTTP }
+func (m *MockTransporter) Endpoint() string                { return "/test" }
+func (m *MockTransporter) Operation() string               { return m.OperationValue }
+func (m *MockTransporter) RequestHeader() transport.Header { return &MockHeader{} }
+func (m *MockTransporter) ReplyHeader() transport.Header   { return &MockHeader{} }
+
+// MockHeader is a test helper that implements transport.Header
+type MockHeader struct{}
+
+func (m *MockHeader) Get(key string) string      { return "" }
+func (m *MockHeader) Set(key, value string)      {}
+func (m *MockHeader) Add(key, value string)      {}
+func (m *MockHeader) Keys() []string             { return nil }
+func (m *MockHeader) Values(key string) []string { return nil }

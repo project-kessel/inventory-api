@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
-	"github.com/project-kessel/inventory-api/internal/biz"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gorm.io/gorm"
@@ -27,12 +26,12 @@ func ptrUint(v uint) *uint {
 func TestResourceRepositoryContract(t *testing.T) {
 	implementations := []struct {
 		name string
-		repo func() ResourceRepository
+		repo func() bizmodel.ResourceRepository
 		db   func() *gorm.DB
 	}{
 		{
 			name: "Real Repository with GormTransactionManager",
-			repo: func() ResourceRepository {
+			repo: func() bizmodel.ResourceRepository {
 				db := setupInMemoryDB(t)
 				mc := metricscollector.NewFakeMetricsCollector()
 				tm := NewGormTransactionManager(mc, 3)
@@ -44,7 +43,7 @@ func TestResourceRepositoryContract(t *testing.T) {
 		},
 		{
 			name: "Fake Repository",
-			repo: func() ResourceRepository {
+			repo: func() bizmodel.ResourceRepository {
 				return NewFakeResourceRepository()
 			},
 			db: func() *gorm.DB {
@@ -60,7 +59,7 @@ func TestResourceRepositoryContract(t *testing.T) {
 	}
 }
 
-func testRepositoryContract(t *testing.T, repo ResourceRepository, db *gorm.DB) {
+func testRepositoryContract(t *testing.T, repo bizmodel.ResourceRepository, db *gorm.DB) {
 	t.Run("NextResourceId generates valid UUIDs", func(t *testing.T) {
 		id1, err := repo.NextResourceId()
 		require.NoError(t, err)
@@ -85,7 +84,7 @@ func testRepositoryContract(t *testing.T, repo ResourceRepository, db *gorm.DB) 
 
 	t.Run("Save and FindResourceByKeys basic workflow", func(t *testing.T) {
 		resource := createTestResourceWithLocalId(t, "contract-test-1")
-		err := repo.Save(db, resource, biz.OperationTypeCreated, "contract-tx-1")
+		err := repo.Save(db, resource, bizmodel.OperationTypeCreated, "contract-tx-1")
 		require.NoError(t, err, "Save should succeed")
 
 		key := createContractReporterResourceKey(t, "contract-test-1", "k8s_cluster", "ocm", "ocm-instance-1")
@@ -107,7 +106,7 @@ func testRepositoryContract(t *testing.T, repo ResourceRepository, db *gorm.DB) 
 	t.Run("Save-Update-Save workflow", func(t *testing.T) {
 		// Create initial resource
 		resource := createTestResourceWithLocalId(t, "contract-update-test")
-		err := repo.Save(db, resource, biz.OperationTypeCreated, "contract-tx-create")
+		err := repo.Save(db, resource, bizmodel.OperationTypeCreated, "contract-tx-create")
 		require.NoError(t, err, "Initial save should succeed")
 
 		// Find and update
@@ -128,7 +127,7 @@ func testRepositoryContract(t *testing.T, repo ResourceRepository, db *gorm.DB) 
 		require.NoError(t, err, "Update should succeed")
 
 		// Save updated resource
-		err = repo.Save(db, *foundResource, biz.OperationTypeUpdated, "contract-tx-update")
+		err = repo.Save(db, *foundResource, bizmodel.OperationTypeUpdated, "contract-tx-update")
 		require.NoError(t, err, "Updated save should succeed")
 
 		// Verify update persisted
@@ -140,7 +139,7 @@ func testRepositoryContract(t *testing.T, repo ResourceRepository, db *gorm.DB) 
 	t.Run("Save-Delete workflow", func(t *testing.T) {
 		// Create resource
 		resource := createTestResourceWithLocalId(t, "contract-delete-test")
-		err := repo.Save(db, resource, biz.OperationTypeCreated, "contract-tx-create")
+		err := repo.Save(db, resource, bizmodel.OperationTypeCreated, "contract-tx-create")
 		require.NoError(t, err, "Initial save should succeed")
 
 		// Find and delete
@@ -155,7 +154,7 @@ func testRepositoryContract(t *testing.T, repo ResourceRepository, db *gorm.DB) 
 		require.NoError(t, err, "Delete should succeed")
 
 		// Save deleted resource
-		err = repo.Save(db, *foundResource, biz.OperationTypeDeleted, "contract-tx-delete")
+		err = repo.Save(db, *foundResource, bizmodel.OperationTypeDeleted, "contract-tx-delete")
 		require.NoError(t, err, "Delete save should succeed")
 
 		// Verify deletion behavior is consistent
@@ -171,12 +170,12 @@ func testRepositoryContract(t *testing.T, repo ResourceRepository, db *gorm.DB) 
 	t.Run("Unique constraint enforcement", func(t *testing.T) {
 		// Create first resource
 		resource1 := createTestResourceWithLocalId(t, "contract-unique-test")
-		err := repo.Save(db, resource1, biz.OperationTypeCreated, "contract-tx-1")
+		err := repo.Save(db, resource1, bizmodel.OperationTypeCreated, "contract-tx-1")
 		require.NoError(t, err, "First save should succeed")
 
 		// Try to create second resource with same composite key
 		resource2 := createTestResourceWithLocalId(t, "contract-unique-test")
-		err = repo.Save(db, resource2, biz.OperationTypeCreated, "contract-tx-2")
+		err = repo.Save(db, resource2, bizmodel.OperationTypeCreated, "contract-tx-2")
 		require.Error(t, err, "Second save with duplicate key should fail")
 
 		// Error should indicate constraint violation
@@ -188,7 +187,7 @@ func testRepositoryContract(t *testing.T, repo ResourceRepository, db *gorm.DB) 
 	t.Run("Case insensitive key matching for non ID fields", func(t *testing.T) {
 		// Create resource with mixed case
 		resource := createTestResourceWithReporter(t, "Contract-Case-Test", "OCM", "Instance-1")
-		err := repo.Save(db, resource, biz.OperationTypeCreated, "contract-case-tx")
+		err := repo.Save(db, resource, bizmodel.OperationTypeCreated, "contract-case-tx")
 		require.NoError(t, err, "Save should succeed")
 
 		// Find with different casing
@@ -204,7 +203,7 @@ func testRepositoryContract(t *testing.T, repo ResourceRepository, db *gorm.DB) 
 		if db == nil {
 			// Fake repository test
 			resource := createTestResourceWithLocalId(t, "contract-nil-tx-test")
-			err := repo.Save(nil, resource, biz.OperationTypeCreated, "contract-nil-tx")
+			err := repo.Save(nil, resource, bizmodel.OperationTypeCreated, "contract-nil-tx")
 			require.NoError(t, err, "Save with nil transaction should succeed in fake repo")
 
 			key := createContractReporterResourceKey(t, "contract-nil-tx-test", "k8s_cluster", "ocm", "ocm-instance-1")
@@ -215,7 +214,7 @@ func testRepositoryContract(t *testing.T, repo ResourceRepository, db *gorm.DB) 
 		} else {
 			// Real repository test - use actual db transaction
 			resource := createTestResourceWithLocalId(t, "contract-real-tx-test")
-			err := repo.Save(db, resource, biz.OperationTypeCreated, "contract-real-tx")
+			err := repo.Save(db, resource, bizmodel.OperationTypeCreated, "contract-real-tx")
 			require.NoError(t, err, "Save with db transaction should succeed in real repo")
 
 			key := createContractReporterResourceKey(t, "contract-real-tx-test", "k8s_cluster", "ocm", "ocm-instance-1")
@@ -231,7 +230,7 @@ func testRepositoryContract(t *testing.T, repo ResourceRepository, db *gorm.DB) 
 
 		// 1. Create
 		resource := createTestResourceWithLocalId(t, localResourceId)
-		err := repo.Save(db, resource, biz.OperationTypeCreated, "contract-create")
+		err := repo.Save(db, resource, bizmodel.OperationTypeCreated, "contract-create")
 		require.NoError(t, err, "Create should succeed")
 
 		key := createContractReporterResourceKey(t, localResourceId, "k8s_cluster", "ocm", "ocm-instance-1")
@@ -249,7 +248,7 @@ func testRepositoryContract(t *testing.T, repo ResourceRepository, db *gorm.DB) 
 		err = foundResource.Update(key, apiHref, consoleHref, nil, reporterData, commonData, transactionId)
 		require.NoError(t, err, "Update should succeed")
 
-		err = repo.Save(db, *foundResource, biz.OperationTypeUpdated, "contract-update")
+		err = repo.Save(db, *foundResource, bizmodel.OperationTypeUpdated, "contract-update")
 		require.NoError(t, err, "Update save should succeed")
 
 		// 3. Delete
@@ -259,7 +258,7 @@ func testRepositoryContract(t *testing.T, repo ResourceRepository, db *gorm.DB) 
 		err = deletedResource.Delete(key)
 		require.NoError(t, err, "Delete should succeed")
 
-		err = repo.Save(db, *deletedResource, biz.OperationTypeDeleted, "contract-delete")
+		err = repo.Save(db, *deletedResource, bizmodel.OperationTypeDeleted, "contract-delete")
 		require.NoError(t, err, "Delete save should succeed")
 
 		// 4. Verify delete behavior
@@ -274,7 +273,7 @@ func testRepositoryContract(t *testing.T, repo ResourceRepository, db *gorm.DB) 
 
 		// 5. Recreate (this should work the same way in both implementations)
 		newResource := createTestResourceWithLocalId(t, localResourceId)
-		err = repo.Save(db, newResource, biz.OperationTypeCreated, "contract-recreate")
+		err = repo.Save(db, newResource, bizmodel.OperationTypeCreated, "contract-recreate")
 
 		// The behavior should be identical between implementations
 		recreateResource, findErr := repo.FindResourceByKeys(db, key)
@@ -294,12 +293,12 @@ func testRepositoryContract(t *testing.T, repo ResourceRepository, db *gorm.DB) 
 func TestFindResourceByKeys(t *testing.T) {
 	implementations := []struct {
 		name string
-		repo func() ResourceRepository
+		repo func() bizmodel.ResourceRepository
 		db   func() *gorm.DB
 	}{
 		{
 			name: "Real Repository with GormTransactionManager",
-			repo: func() ResourceRepository {
+			repo: func() bizmodel.ResourceRepository {
 				db := setupInMemoryDB(t)
 				mc := metricscollector.NewFakeMetricsCollector()
 				tm := NewGormTransactionManager(mc, 3)
@@ -311,7 +310,7 @@ func TestFindResourceByKeys(t *testing.T) {
 		},
 		{
 			name: "Fake Repository",
-			repo: func() ResourceRepository {
+			repo: func() bizmodel.ResourceRepository {
 				return NewFakeResourceRepository()
 			},
 			db: func() *gorm.DB {
@@ -323,7 +322,7 @@ func TestFindResourceByKeys(t *testing.T) {
 	for _, impl := range implementations {
 		t.Run(impl.name, func(t *testing.T) {
 			// Helper function to get fresh instances for each test
-			getFreshInstances := func() (ResourceRepository, *gorm.DB) {
+			getFreshInstances := func() (bizmodel.ResourceRepository, *gorm.DB) {
 				if impl.name == "Fake Repository" {
 					return impl.repo(), impl.db()
 				}
@@ -338,7 +337,7 @@ func TestFindResourceByKeys(t *testing.T) {
 				repo, db := getFreshInstances()
 
 				resource := createTestResource(t)
-				err := repo.Save(db, resource, biz.OperationTypeCreated, "test-tx-123")
+				err := repo.Save(db, resource, bizmodel.OperationTypeCreated, "test-tx-123")
 				require.NoError(t, err)
 
 				key, err := bizmodel.NewReporterResourceKey(
@@ -377,9 +376,9 @@ func TestFindResourceByKeys(t *testing.T) {
 
 				repo, db := getFreshInstances()
 
-				err := repo.Save(db, resource1, biz.OperationTypeCreated, "test-tx-1")
+				err := repo.Save(db, resource1, bizmodel.OperationTypeCreated, "test-tx-1")
 				require.NoError(t, err)
-				err = repo.Save(db, resource2, biz.OperationTypeCreated, "test-tx-2")
+				err = repo.Save(db, resource2, bizmodel.OperationTypeCreated, "test-tx-2")
 				require.NoError(t, err)
 
 				key1, err := bizmodel.NewReporterResourceKey("resource-1", "k8s_cluster", "ocm", "ocm-instance-1")
@@ -407,7 +406,7 @@ func TestFindResourceByKeys(t *testing.T) {
 				repo, db := getFreshInstances()
 
 				resource := createTestResource(t)
-				err := repo.Save(db, resource, biz.OperationTypeCreated, "test-tx-1")
+				err := repo.Save(db, resource, bizmodel.OperationTypeCreated, "test-tx-1")
 				require.NoError(t, err)
 
 				key, err := bizmodel.NewReporterResourceKey(
@@ -444,7 +443,7 @@ func TestFindResourceByKeys(t *testing.T) {
 				repo, db := getFreshInstances()
 
 				resource := createTestResourceWithLocalId(t, "test-resource-no-instance-lookup")
-				err := repo.Save(db, resource, biz.OperationTypeCreated, "test-tx-no-instance")
+				err := repo.Save(db, resource, bizmodel.OperationTypeCreated, "test-tx-no-instance")
 				require.NoError(t, err)
 
 				key, err := bizmodel.NewReporterResourceKey(
@@ -467,7 +466,7 @@ func TestFindResourceByKeys(t *testing.T) {
 
 				// Create a resource with mixed case values
 				resource := createTestResourceWithMixedCase(t)
-				err := repo.Save(db, resource, biz.OperationTypeCreated, "test-tx-case")
+				err := repo.Save(db, resource, bizmodel.OperationTypeCreated, "test-tx-case")
 				require.NoError(t, err)
 
 				testCases := []struct {
@@ -556,12 +555,12 @@ func TestFindResourceByKeys(t *testing.T) {
 func TestFindResourceByKeys_TombstoneFilter(t *testing.T) {
 	implementations := []struct {
 		name string
-		repo func() ResourceRepository
+		repo func() bizmodel.ResourceRepository
 		db   func() *gorm.DB
 	}{
 		{
 			name: "Real Repository with GormTransactionManager",
-			repo: func() ResourceRepository {
+			repo: func() bizmodel.ResourceRepository {
 				db := setupInMemoryDB(t)
 				mc := metricscollector.NewFakeMetricsCollector()
 				tm := NewGormTransactionManager(mc, 3)
@@ -573,7 +572,7 @@ func TestFindResourceByKeys_TombstoneFilter(t *testing.T) {
 		},
 		{
 			name: "Fake Repository",
-			repo: func() ResourceRepository {
+			repo: func() bizmodel.ResourceRepository {
 				return NewFakeResourceRepository()
 			},
 			db: func() *gorm.DB {
@@ -584,7 +583,7 @@ func TestFindResourceByKeys_TombstoneFilter(t *testing.T) {
 
 	for _, impl := range implementations {
 		t.Run(impl.name, func(t *testing.T) {
-			getFreshInstances := func() (ResourceRepository, *gorm.DB) {
+			getFreshInstances := func() (bizmodel.ResourceRepository, *gorm.DB) {
 				if impl.name == "Fake Repository" {
 					return impl.repo(), impl.db()
 				}
@@ -598,7 +597,7 @@ func TestFindResourceByKeys_TombstoneFilter(t *testing.T) {
 			repo, db := getFreshInstances()
 
 			resource := createTestResourceWithLocalId(t, "tombstoned-resource")
-			err := repo.Save(db, resource, biz.OperationTypeCreated, "test-tx-tombstone")
+			err := repo.Save(db, resource, bizmodel.OperationTypeCreated, "test-tx-tombstone")
 			require.NoError(t, err)
 
 			key, err := bizmodel.NewReporterResourceKey(
@@ -616,7 +615,7 @@ func TestFindResourceByKeys_TombstoneFilter(t *testing.T) {
 			err = foundResource.Delete(key)
 			require.NoError(t, err)
 
-			err = repo.Save(db, *foundResource, biz.OperationTypeDeleted, "test-tx-delete")
+			err = repo.Save(db, *foundResource, bizmodel.OperationTypeDeleted, "test-tx-delete")
 			require.NoError(t, err)
 
 			// With tombstone filter removed, we should be able to find the tombstoned resource
@@ -637,12 +636,12 @@ func TestFindResourceByKeys_TombstoneFilter(t *testing.T) {
 func TestUniqueConstraint_ReporterResourceCompositeKey(t *testing.T) {
 	implementations := []struct {
 		name string
-		repo func() ResourceRepository
+		repo func() bizmodel.ResourceRepository
 		db   func() *gorm.DB
 	}{
 		{
 			name: "Real Repository with GormTransactionManager",
-			repo: func() ResourceRepository {
+			repo: func() bizmodel.ResourceRepository {
 				db := setupInMemoryDB(t)
 				mc := metricscollector.NewFakeMetricsCollector()
 				tm := NewGormTransactionManager(mc, 3)
@@ -654,7 +653,7 @@ func TestUniqueConstraint_ReporterResourceCompositeKey(t *testing.T) {
 		},
 		{
 			name: "Fake Repository",
-			repo: func() ResourceRepository {
+			repo: func() bizmodel.ResourceRepository {
 				return NewFakeResourceRepository()
 			},
 			db: func() *gorm.DB {
@@ -665,7 +664,7 @@ func TestUniqueConstraint_ReporterResourceCompositeKey(t *testing.T) {
 
 	for _, impl := range implementations {
 		t.Run(impl.name, func(t *testing.T) {
-			getFreshInstances := func() (ResourceRepository, *gorm.DB) {
+			getFreshInstances := func() (bizmodel.ResourceRepository, *gorm.DB) {
 				if impl.name == "Fake Repository" {
 					return impl.repo(), impl.db()
 				}
@@ -681,13 +680,13 @@ func TestUniqueConstraint_ReporterResourceCompositeKey(t *testing.T) {
 
 				// Create first resource
 				resource1 := createTestResourceWithLocalId(t, "duplicate-key-test")
-				err := repo.Save(db, resource1, biz.OperationTypeCreated, "test-tx-1")
+				err := repo.Save(db, resource1, bizmodel.OperationTypeCreated, "test-tx-1")
 				require.NoError(t, err, "First save should succeed")
 
 				// Create second resource with same composite key components
 				// (same LocalResourceID, ReporterType, ResourceType, ReporterInstanceID, RepresentationVersion=0, Generation=0)
 				resource2 := createTestResourceWithLocalId(t, "duplicate-key-test") // Same local ID
-				err = repo.Save(db, resource2, biz.OperationTypeCreated, "test-tx-2")
+				err = repo.Save(db, resource2, bizmodel.OperationTypeCreated, "test-tx-2")
 
 				// Both implementations should reject this duplicate
 				require.Error(t, err, "Second save with duplicate composite key should fail")
@@ -704,7 +703,7 @@ func TestUniqueConstraint_ReporterResourceCompositeKey(t *testing.T) {
 
 				// Create and save initial resource
 				resource := createTestResourceWithLocalId(t, "version-test-resource")
-				err := repo.Save(db, resource, biz.OperationTypeCreated, "test-tx-create")
+				err := repo.Save(db, resource, bizmodel.OperationTypeCreated, "test-tx-create")
 				require.NoError(t, err, "Initial save should succeed")
 
 				// Update the resource (this increments representation version and potentially generation)
@@ -726,7 +725,7 @@ func TestUniqueConstraint_ReporterResourceCompositeKey(t *testing.T) {
 				require.NoError(t, err, "Update should succeed")
 
 				// Save the updated resource (different version/generation should be allowed)
-				err = repo.Save(db, resource, biz.OperationTypeUpdated, "test-tx-update")
+				err = repo.Save(db, resource, bizmodel.OperationTypeUpdated, "test-tx-update")
 				require.NoError(t, err, "Save with different version should succeed")
 			})
 
@@ -735,12 +734,12 @@ func TestUniqueConstraint_ReporterResourceCompositeKey(t *testing.T) {
 
 				// Create first resource with k8s_cluster type
 				resource1 := createTestResourceWithLocalIdAndType(t, "multi-type-test", "k8s_cluster")
-				err := repo.Save(db, resource1, biz.OperationTypeCreated, "test-tx-1")
+				err := repo.Save(db, resource1, bizmodel.OperationTypeCreated, "test-tx-1")
 				require.NoError(t, err, "First save should succeed")
 
 				// Create second resource with same local ID but different resource type
 				resource2 := createTestResourceWithLocalIdAndType(t, "multi-type-test", "host")
-				err = repo.Save(db, resource2, biz.OperationTypeCreated, "test-tx-2")
+				err = repo.Save(db, resource2, bizmodel.OperationTypeCreated, "test-tx-2")
 				require.NoError(t, err, "Save with different resource type should succeed")
 			})
 
@@ -749,12 +748,12 @@ func TestUniqueConstraint_ReporterResourceCompositeKey(t *testing.T) {
 
 				// Create resource with OCM reporter
 				resource1 := createTestResourceWithReporter(t, "reporter-test", "ocm", "ocm-instance-1")
-				err := repo.Save(db, resource1, biz.OperationTypeCreated, "test-tx-1")
+				err := repo.Save(db, resource1, bizmodel.OperationTypeCreated, "test-tx-1")
 				require.NoError(t, err, "First save should succeed")
 
 				// Create resource with same local ID but different reporter type
 				resource2 := createTestResourceWithReporter(t, "reporter-test", "hbi", "hbi-instance-1")
-				err = repo.Save(db, resource2, biz.OperationTypeCreated, "test-tx-2")
+				err = repo.Save(db, resource2, bizmodel.OperationTypeCreated, "test-tx-2")
 				require.NoError(t, err, "Save with different reporter type should succeed")
 			})
 
@@ -763,12 +762,12 @@ func TestUniqueConstraint_ReporterResourceCompositeKey(t *testing.T) {
 
 				// Create resource with instance-1
 				resource1 := createTestResourceWithReporter(t, "instance-test", "ocm", "ocm-instance-1")
-				err := repo.Save(db, resource1, biz.OperationTypeCreated, "test-tx-1")
+				err := repo.Save(db, resource1, bizmodel.OperationTypeCreated, "test-tx-1")
 				require.NoError(t, err, "First save should succeed")
 
 				// Create resource with same components but different reporter instance
 				resource2 := createTestResourceWithReporter(t, "instance-test", "ocm", "ocm-instance-2")
-				err = repo.Save(db, resource2, biz.OperationTypeCreated, "test-tx-2")
+				err = repo.Save(db, resource2, bizmodel.OperationTypeCreated, "test-tx-2")
 				require.NoError(t, err, "Save with different reporter instance should succeed")
 			})
 		})
@@ -778,12 +777,12 @@ func TestUniqueConstraint_ReporterResourceCompositeKey(t *testing.T) {
 func TestResourceRepository_IdempotentOperations(t *testing.T) {
 	implementations := []struct {
 		name string
-		repo func() ResourceRepository
+		repo func() bizmodel.ResourceRepository
 		db   func() *gorm.DB
 	}{
 		{
 			name: "Real Repository with GormTransactionManager",
-			repo: func() ResourceRepository {
+			repo: func() bizmodel.ResourceRepository {
 				db := setupInMemoryDB(t)
 				mc := metricscollector.NewFakeMetricsCollector()
 				tm := NewGormTransactionManager(mc, 3)
@@ -795,7 +794,7 @@ func TestResourceRepository_IdempotentOperations(t *testing.T) {
 		},
 		{
 			name: "Fake Repository",
-			repo: func() ResourceRepository {
+			repo: func() bizmodel.ResourceRepository {
 				return NewFakeResourceRepository()
 			},
 			db: func() *gorm.DB {
@@ -806,7 +805,7 @@ func TestResourceRepository_IdempotentOperations(t *testing.T) {
 
 	for _, impl := range implementations {
 		t.Run(impl.name, func(t *testing.T) {
-			getFreshInstances := func() (ResourceRepository, *gorm.DB) {
+			getFreshInstances := func() (bizmodel.ResourceRepository, *gorm.DB) {
 				if impl.name == "Fake Repository" {
 					return impl.repo(), impl.db()
 				}
@@ -824,7 +823,7 @@ func TestResourceRepository_IdempotentOperations(t *testing.T) {
 
 				// 1. REPORT: Create initial resource
 				resource := createTestResourceWithLocalId(t, localResourceId)
-				err := repo.Save(db, resource, biz.OperationTypeCreated, "repo-create-1")
+				err := repo.Save(db, resource, bizmodel.OperationTypeCreated, "repo-create-1")
 				require.NoError(t, err, "Initial save should succeed")
 
 				key := createContractReporterResourceKey(t, localResourceId, "k8s_cluster", "ocm", "ocm-instance-1")
@@ -846,7 +845,7 @@ func TestResourceRepository_IdempotentOperations(t *testing.T) {
 				err = foundResource.Delete(key)
 				require.NoError(t, err, "Delete operation should succeed")
 
-				err = repo.Save(db, *foundResource, biz.OperationTypeDeleted, "repo-delete-1")
+				err = repo.Save(db, *foundResource, bizmodel.OperationTypeDeleted, "repo-delete-1")
 				require.NoError(t, err, "Delete save should succeed")
 
 				// Verify delete state
@@ -876,7 +875,7 @@ func TestResourceRepository_IdempotentOperations(t *testing.T) {
 					err = foundResource2.Delete(key)
 					require.NoError(t, err, "Duplicate delete operation should succeed")
 
-					err = repo.Save(db, *foundResource2, biz.OperationTypeDeleted, "repo-delete-2")
+					err = repo.Save(db, *foundResource2, bizmodel.OperationTypeDeleted, "repo-delete-2")
 					require.NoError(t, err, "Duplicate delete save should succeed")
 
 					// Verify state after duplicate delete
@@ -899,7 +898,7 @@ func TestResourceRepository_IdempotentOperations(t *testing.T) {
 
 				// 1. REPORT: Create initial resource
 				resource1 := createTestResourceWithLocalId(t, localResourceId)
-				err := repo.Save(db, resource1, biz.OperationTypeCreated, "repo-create-1")
+				err := repo.Save(db, resource1, bizmodel.OperationTypeCreated, "repo-create-1")
 				require.NoError(t, err, "Initial save should succeed")
 
 				key := createContractReporterResourceKey(t, localResourceId, "k8s_cluster", "ocm", "ocm-instance-1")
@@ -918,7 +917,7 @@ func TestResourceRepository_IdempotentOperations(t *testing.T) {
 				err = foundResource1.Update(key, apiHref, consoleHref, nil, reporterData, commonData, transactionId)
 				require.NoError(t, err, "Update should succeed")
 
-				err = repo.Save(db, *foundResource1, biz.OperationTypeUpdated, "repo-update-1")
+				err = repo.Save(db, *foundResource1, bizmodel.OperationTypeUpdated, "repo-update-1")
 				require.NoError(t, err, "Duplicate report save should succeed")
 
 				// 3. DELETE: Delete the resource
@@ -929,7 +928,7 @@ func TestResourceRepository_IdempotentOperations(t *testing.T) {
 				err = foundResource2.Delete(key)
 				require.NoError(t, err, "Delete operation should succeed")
 
-				err = repo.Save(db, *foundResource2, biz.OperationTypeDeleted, "repo-delete-1")
+				err = repo.Save(db, *foundResource2, bizmodel.OperationTypeDeleted, "repo-delete-1")
 				require.NoError(t, err, "Delete save should succeed")
 
 				// 4. RESUBMIT SAME DELETE: Should succeed
@@ -944,7 +943,7 @@ func TestResourceRepository_IdempotentOperations(t *testing.T) {
 					err = foundResource3.Delete(key)
 					require.NoError(t, err, "Duplicate delete operation should succeed")
 
-					err = repo.Save(db, *foundResource3, biz.OperationTypeDeleted, "repo-delete-2")
+					err = repo.Save(db, *foundResource3, bizmodel.OperationTypeDeleted, "repo-delete-2")
 					require.NoError(t, err, "Duplicate delete save should succeed")
 				}
 			})
@@ -966,7 +965,7 @@ func TestResourceRepository_IdempotentOperations(t *testing.T) {
 						// Resource doesn't exist - create new one
 						t.Logf("Cycle %d: Creating new resource", cycle)
 						resource := createTestResourceWithLocalId(t, localResourceId)
-						err := repo.Save(db, resource, biz.OperationTypeCreated, fmt.Sprintf("repo-cycle-%d-create", cycle))
+						err := repo.Save(db, resource, bizmodel.OperationTypeCreated, fmt.Sprintf("repo-cycle-%d-create", cycle))
 						require.NoError(t, err, "Save should succeed in cycle %d", cycle)
 					} else {
 						// Resource exists (potentially tombstoned) - update it
@@ -983,7 +982,7 @@ func TestResourceRepository_IdempotentOperations(t *testing.T) {
 						err = foundResource.Update(key, apiHref, consoleHref, nil, reporterData, commonData, transactionId)
 						require.NoError(t, err, "Update should succeed in cycle %d", cycle)
 
-						err = repo.Save(db, *foundResource, biz.OperationTypeUpdated, fmt.Sprintf("repo-cycle-%d-update", cycle))
+						err = repo.Save(db, *foundResource, bizmodel.OperationTypeUpdated, fmt.Sprintf("repo-cycle-%d-update", cycle))
 						require.NoError(t, err, "Update save should succeed in cycle %d", cycle)
 					}
 
@@ -999,7 +998,7 @@ func TestResourceRepository_IdempotentOperations(t *testing.T) {
 					err = currentResource.Delete(key)
 					require.NoError(t, err, "Delete should succeed in cycle %d", cycle)
 
-					err = repo.Save(db, *currentResource, biz.OperationTypeDeleted, fmt.Sprintf("repo-cycle-%d-delete", cycle))
+					err = repo.Save(db, *currentResource, bizmodel.OperationTypeDeleted, fmt.Sprintf("repo-cycle-%d-delete", cycle))
 					require.NoError(t, err, "Delete save should succeed in cycle %d", cycle)
 
 					// Verify state after delete
@@ -1023,12 +1022,12 @@ func TestResourceRepository_IdempotentOperations(t *testing.T) {
 func TestSave(t *testing.T) {
 	implementations := []struct {
 		name string
-		repo func() ResourceRepository
+		repo func() bizmodel.ResourceRepository
 		db   func() *gorm.DB
 	}{
 		{
 			name: "Real Repository with GormTransactionManager",
-			repo: func() ResourceRepository {
+			repo: func() bizmodel.ResourceRepository {
 				db := setupInMemoryDB(t)
 				mc := metricscollector.NewFakeMetricsCollector()
 				tm := NewGormTransactionManager(mc, 3)
@@ -1040,7 +1039,7 @@ func TestSave(t *testing.T) {
 		},
 		{
 			name: "Fake Repository",
-			repo: func() ResourceRepository {
+			repo: func() bizmodel.ResourceRepository {
 				return NewFakeResourceRepository()
 			},
 			db: func() *gorm.DB {
@@ -1052,7 +1051,7 @@ func TestSave(t *testing.T) {
 	for _, impl := range implementations {
 		t.Run(impl.name, func(t *testing.T) {
 			// Helper function to get fresh instances for each test
-			getFreshInstances := func() (ResourceRepository, *gorm.DB) {
+			getFreshInstances := func() (bizmodel.ResourceRepository, *gorm.DB) {
 				if impl.name == "Fake Repository" {
 					return impl.repo(), impl.db()
 				}
@@ -1067,7 +1066,7 @@ func TestSave(t *testing.T) {
 				repo, db := getFreshInstances()
 
 				resource := createTestResourceWithLocalId(t, "update-test")
-				err := repo.Save(db, resource, biz.OperationTypeCreated, "test-tx-1")
+				err := repo.Save(db, resource, bizmodel.OperationTypeCreated, "test-tx-1")
 				require.NoError(t, err)
 
 				key, err := bizmodel.NewReporterResourceKey("update-test", "k8s_cluster", "ocm", "ocm-instance-1")
@@ -1096,7 +1095,7 @@ func TestSave(t *testing.T) {
 				err = resource.Update(key, apiHref, consoleHref, nil, updatedReporterData, updatedCommonData, updatedTransactionId)
 				require.NoError(t, err)
 
-				err = repo.Save(db, resource, biz.OperationTypeUpdated, "test-tx-2")
+				err = repo.Save(db, resource, bizmodel.OperationTypeUpdated, "test-tx-2")
 				require.NoError(t, err)
 
 				foundResource, err := repo.FindResourceByKeys(db, key)
@@ -1110,7 +1109,7 @@ func TestSave(t *testing.T) {
 
 				resource := createTestResourceWithLocalId(t, "save-new-test")
 
-				err := repo.Save(db, resource, biz.OperationTypeCreated, "test-tx-save")
+				err := repo.Save(db, resource, bizmodel.OperationTypeCreated, "test-tx-save")
 				require.NoError(t, err)
 
 				key, err := bizmodel.NewReporterResourceKey("save-new-test", "k8s_cluster", "ocm", "ocm-instance-1")
@@ -1130,7 +1129,7 @@ func TestSave(t *testing.T) {
 				repo, db := getFreshInstances()
 
 				resource := createTestResourceWithLocalId(t, "zero-pk-test")
-				err := repo.Save(db, resource, biz.OperationTypeCreated, "test-tx-zero-pk")
+				err := repo.Save(db, resource, bizmodel.OperationTypeCreated, "test-tx-zero-pk")
 				require.NoError(t, err, "Save should succeed and skip representations with zero value primary keys")
 
 				key, err := bizmodel.NewReporterResourceKey("zero-pk-test", "k8s_cluster", "ocm", "ocm-instance-1")
@@ -1147,12 +1146,12 @@ func TestSave(t *testing.T) {
 func TestResourceRepository_MultipleHostsLifecycle(t *testing.T) {
 	implementations := []struct {
 		name string
-		repo func() ResourceRepository
+		repo func() bizmodel.ResourceRepository
 		db   func() *gorm.DB
 	}{
 		{
 			name: "Real Repository with GormTransactionManager",
-			repo: func() ResourceRepository {
+			repo: func() bizmodel.ResourceRepository {
 				db := setupInMemoryDB(t)
 				mc := metricscollector.NewFakeMetricsCollector()
 				tm := NewGormTransactionManager(mc, 3)
@@ -1164,7 +1163,7 @@ func TestResourceRepository_MultipleHostsLifecycle(t *testing.T) {
 		},
 		{
 			name: "Fake Repository",
-			repo: func() ResourceRepository {
+			repo: func() bizmodel.ResourceRepository {
 				return NewFakeResourceRepository()
 			},
 			db: func() *gorm.DB {
@@ -1175,7 +1174,7 @@ func TestResourceRepository_MultipleHostsLifecycle(t *testing.T) {
 
 	for _, impl := range implementations {
 		t.Run(impl.name, func(t *testing.T) {
-			getFreshInstances := func() (ResourceRepository, *gorm.DB) {
+			getFreshInstances := func() (bizmodel.ResourceRepository, *gorm.DB) {
 				if impl.name == "Fake Repository" {
 					return impl.repo(), impl.db()
 				}
@@ -1192,10 +1191,10 @@ func TestResourceRepository_MultipleHostsLifecycle(t *testing.T) {
 			host1 := createTestResourceWithLocalIdAndType(t, "host-1", "host")
 			host2 := createTestResourceWithLocalIdAndType(t, "host-2", "host")
 
-			err := repo.Save(db, host1, biz.OperationTypeCreated, "tx-create-host1")
+			err := repo.Save(db, host1, bizmodel.OperationTypeCreated, "tx-create-host1")
 			require.NoError(t, err, "Should create host1")
 
-			err = repo.Save(db, host2, biz.OperationTypeCreated, "tx-create-host2")
+			err = repo.Save(db, host2, bizmodel.OperationTypeCreated, "tx-create-host2")
 			require.NoError(t, err, "Should create host2")
 
 			// Verify both hosts can be found
@@ -1237,10 +1236,10 @@ func TestResourceRepository_MultipleHostsLifecycle(t *testing.T) {
 			err = foundHost2.Update(key2, apiHref, consoleHref, nil, updatedReporterData, updatedCommonData, updatedTransactionId2)
 			require.NoError(t, err, "Should update host2")
 
-			err = repo.Save(db, *foundHost1, biz.OperationTypeUpdated, "tx-update-host1")
+			err = repo.Save(db, *foundHost1, bizmodel.OperationTypeUpdated, "tx-update-host1")
 			require.NoError(t, err, "Should save updated host1")
 
-			err = repo.Save(db, *foundHost2, biz.OperationTypeUpdated, "tx-update-host2")
+			err = repo.Save(db, *foundHost2, bizmodel.OperationTypeUpdated, "tx-update-host2")
 			require.NoError(t, err, "Should save updated host2")
 
 			// Verify both updated hosts can still be found
@@ -1259,10 +1258,10 @@ func TestResourceRepository_MultipleHostsLifecycle(t *testing.T) {
 			err = updatedHost2.Delete(key2)
 			require.NoError(t, err, "Should delete host2")
 
-			err = repo.Save(db, *updatedHost1, biz.OperationTypeDeleted, "tx-delete-host1")
+			err = repo.Save(db, *updatedHost1, bizmodel.OperationTypeDeleted, "tx-delete-host1")
 			require.NoError(t, err, "Should save deleted host1")
 
-			err = repo.Save(db, *updatedHost2, biz.OperationTypeDeleted, "tx-delete-host2")
+			err = repo.Save(db, *updatedHost2, bizmodel.OperationTypeDeleted, "tx-delete-host2")
 			require.NoError(t, err, "Should save deleted host2")
 
 			// Verify both hosts can be found (tombstoned) with tombstone filter removed
@@ -1282,12 +1281,12 @@ func TestResourceRepository_MultipleHostsLifecycle(t *testing.T) {
 func TestResourceRepository_PartialDataScenarios(t *testing.T) {
 	implementations := []struct {
 		name string
-		repo func() ResourceRepository
+		repo func() bizmodel.ResourceRepository
 		db   func() *gorm.DB
 	}{
 		{
 			name: "Real Repository with GormTransactionManager",
-			repo: func() ResourceRepository {
+			repo: func() bizmodel.ResourceRepository {
 				db := setupInMemoryDB(t)
 				mc := metricscollector.NewFakeMetricsCollector()
 				tm := NewGormTransactionManager(mc, 3)
@@ -1299,7 +1298,7 @@ func TestResourceRepository_PartialDataScenarios(t *testing.T) {
 		},
 		{
 			name: "Fake Repository",
-			repo: func() ResourceRepository {
+			repo: func() bizmodel.ResourceRepository {
 				return NewFakeResourceRepository()
 			},
 			db: func() *gorm.DB {
@@ -1310,7 +1309,7 @@ func TestResourceRepository_PartialDataScenarios(t *testing.T) {
 
 	for _, impl := range implementations {
 		t.Run(impl.name, func(t *testing.T) {
-			getFreshInstances := func() (ResourceRepository, *gorm.DB) {
+			getFreshInstances := func() (bizmodel.ResourceRepository, *gorm.DB) {
 				if impl.name == "Fake Repository" {
 					return impl.repo(), impl.db()
 				}
@@ -1325,7 +1324,7 @@ func TestResourceRepository_PartialDataScenarios(t *testing.T) {
 				repo, db := getFreshInstances()
 
 				resource := createTestResourceWithReporterDataOnly(t, "reporter-only-resource")
-				err := repo.Save(db, resource, biz.OperationTypeCreated, "tx-reporter-only")
+				err := repo.Save(db, resource, bizmodel.OperationTypeCreated, "tx-reporter-only")
 				require.NoError(t, err, "Should save resource with only reporter data")
 
 				key, err := bizmodel.NewReporterResourceKey("reporter-only-resource", "k8s_cluster", "ocm", "ocm-instance-1")
@@ -1340,7 +1339,7 @@ func TestResourceRepository_PartialDataScenarios(t *testing.T) {
 				repo, db := getFreshInstances()
 
 				resource := createTestResourceWithCommonDataOnly(t, "common-only-resource")
-				err := repo.Save(db, resource, biz.OperationTypeCreated, "tx-common-only")
+				err := repo.Save(db, resource, bizmodel.OperationTypeCreated, "tx-common-only")
 				require.NoError(t, err, "Should save resource with only common data")
 
 				key, err := bizmodel.NewReporterResourceKey("common-only-resource", "k8s_cluster", "ocm", "ocm-instance-1")
@@ -1356,7 +1355,7 @@ func TestResourceRepository_PartialDataScenarios(t *testing.T) {
 
 				// 1. Report with both reporter and common data
 				resourceBoth := createTestResourceWithLocalId(t, "progressive-resource")
-				err := repo.Save(db, resourceBoth, biz.OperationTypeCreated, "tx-both")
+				err := repo.Save(db, resourceBoth, bizmodel.OperationTypeCreated, "tx-both")
 				require.NoError(t, err, "Should save resource with both data types")
 
 				key, err := bizmodel.NewReporterResourceKey("progressive-resource", "k8s_cluster", "ocm", "ocm-instance-1")
@@ -1386,7 +1385,7 @@ func TestResourceRepository_PartialDataScenarios(t *testing.T) {
 				err = foundResource.Update(key, apiHref, consoleHref, nil, reporterOnlyData, emptyCommonData, updatedTransactionId1)
 				require.NoError(t, err, "Should update with reporter data only")
 
-				err = repo.Save(db, *foundResource, biz.OperationTypeUpdated, "tx-reporter-update")
+				err = repo.Save(db, *foundResource, bizmodel.OperationTypeUpdated, "tx-reporter-update")
 				require.NoError(t, err, "Should save resource with reporter-only update")
 
 				// 3. Update with just common data
@@ -1408,7 +1407,7 @@ func TestResourceRepository_PartialDataScenarios(t *testing.T) {
 				err = foundResource.Update(key, apiHref, consoleHref, nil, emptyReporterData, commonOnlyData, updatedTransactionId2)
 				require.NoError(t, err, "Should update with common data only")
 
-				err = repo.Save(db, *foundResource, biz.OperationTypeUpdated, "tx-common-update")
+				err = repo.Save(db, *foundResource, bizmodel.OperationTypeUpdated, "tx-common-update")
 				require.NoError(t, err, "Should save resource with common-only update")
 
 				// Verify final resource can still be found
@@ -1423,12 +1422,12 @@ func TestResourceRepository_PartialDataScenarios(t *testing.T) {
 func TestSerializableCreateFails(t *testing.T) {
 	implementations := []struct {
 		name string
-		repo func() ResourceRepository
+		repo func() bizmodel.ResourceRepository
 		db   func() *gorm.DB
 	}{
 		{
 			name: "Real Repository with GormTransactionManager",
-			repo: func() ResourceRepository {
+			repo: func() bizmodel.ResourceRepository {
 				db := setupInMemoryDB(t)
 				mc := metricscollector.NewFakeMetricsCollector()
 				tm := NewGormTransactionManager(mc, 3)
@@ -1456,7 +1455,7 @@ func TestSerializableCreateFails(t *testing.T) {
 			foundResource, err := repo.FindResourceByKeys(conflictTx, resource.ReporterResources()[0].ReporterResourceKey)
 			assert.NotNil(t, err)
 			assert.Nil(t, foundResource)
-			assert.NoError(t, repo.Save(conflictTx, resource, biz.OperationTypeCreated, "tx-conflict"))
+			assert.NoError(t, repo.Save(conflictTx, resource, bizmodel.OperationTypeCreated, "tx-conflict"))
 			// Do NOT commit yet to hold locks
 
 			// Attempt to create the same resource via a separate serializable transaction managed by TM
@@ -1464,7 +1463,7 @@ func TestSerializableCreateFails(t *testing.T) {
 				foundResource, err := repo.FindResourceByKeys(tx, resource.ReporterResources()[0].ReporterResourceKey)
 				assert.NotNil(t, err)
 				assert.Nil(t, foundResource)
-				return repo.Save(tx, resource, biz.OperationTypeCreated, "tx-create")
+				return repo.Save(tx, resource, bizmodel.OperationTypeCreated, "tx-create")
 			})
 			assert.Error(t, err)
 			assert.ErrorContains(t, err, "transaction failed")
@@ -1478,12 +1477,12 @@ func TestSerializableCreateFails(t *testing.T) {
 func TestSerializableUpdateFails(t *testing.T) {
 	implementations := []struct {
 		name string
-		repo func() ResourceRepository
+		repo func() bizmodel.ResourceRepository
 		db   func() *gorm.DB
 	}{
 		{
 			name: "Real Repository with GormTransactionManager",
-			repo: func() ResourceRepository {
+			repo: func() bizmodel.ResourceRepository {
 				db := setupInMemoryDB(t)
 				mc := metricscollector.NewFakeMetricsCollector()
 				tm := NewGormTransactionManager(mc, 3)
@@ -1505,7 +1504,7 @@ func TestSerializableUpdateFails(t *testing.T) {
 
 			// Create initial resource (committed)
 			resource := createTestResourceWithLocalId(t, "serializable-update-conflict")
-			assert.NoError(t, repo.Save(db, resource, biz.OperationTypeCreated, "tx-initial"))
+			assert.NoError(t, repo.Save(db, resource, bizmodel.OperationTypeCreated, "tx-initial"))
 
 			// Prepare an updated version
 			key, err := bizmodel.NewReporterResourceKey("serializable-update-conflict", "k8s_cluster", "ocm", "ocm-instance-1")
@@ -1522,12 +1521,12 @@ func TestSerializableUpdateFails(t *testing.T) {
 			foundResource, err := repo.FindResourceByKeys(conflictTx, resource.ReporterResources()[0].ReporterResourceKey)
 			assert.Nil(t, err)
 			assert.NotNil(t, foundResource)
-			assert.NoError(t, repo.Save(conflictTx, resource, biz.OperationTypeUpdated, "tx-conflict"))
+			assert.NoError(t, repo.Save(conflictTx, resource, bizmodel.OperationTypeUpdated, "tx-conflict"))
 			// Do NOT commit yet to hold locks
 
 			// Attempt to update the same resource via TM-managed serializable transaction
 			err = tm.HandleSerializableTransaction("test_update_resource", db, func(tx *gorm.DB) error {
-				return repo.Save(tx, resource, biz.OperationTypeUpdated, "tx-update")
+				return repo.Save(tx, resource, bizmodel.OperationTypeUpdated, "tx-update")
 			})
 			assert.Error(t, err)
 			assert.ErrorContains(t, err, "transaction failed")
@@ -1905,12 +1904,12 @@ func createContractReporterResourceKey(t *testing.T, localResourceId, resourceTy
 func TestFindLatestRepresentations(t *testing.T) {
 	implementations := []struct {
 		name string
-		repo func() ResourceRepository
+		repo func() bizmodel.ResourceRepository
 		db   func() *gorm.DB
 	}{
 		{
 			name: "Real Repository with GormTransactionManager",
-			repo: func() ResourceRepository {
+			repo: func() bizmodel.ResourceRepository {
 				db := setupInMemoryDB(t)
 				mc := metricscollector.NewFakeMetricsCollector()
 				tm := NewGormTransactionManager(mc, 3)
@@ -1920,7 +1919,7 @@ func TestFindLatestRepresentations(t *testing.T) {
 		},
 		{
 			name: "Fake Repository",
-			repo: func() ResourceRepository { return NewFakeResourceRepository() },
+			repo: func() bizmodel.ResourceRepository { return NewFakeResourceRepository() },
 			db:   func() *gorm.DB { return nil },
 		},
 	}
@@ -1928,7 +1927,7 @@ func TestFindLatestRepresentations(t *testing.T) {
 	for _, impl := range implementations {
 		t.Run(impl.name, func(t *testing.T) {
 			// Helper to get fresh instances
-			getFresh := func() (ResourceRepository, *gorm.DB) {
+			getFresh := func() (bizmodel.ResourceRepository, *gorm.DB) {
 				if impl.name == "Fake Repository" {
 					return impl.repo(), impl.db()
 				}
@@ -1947,7 +1946,7 @@ func TestFindLatestRepresentations(t *testing.T) {
 			resource := createTestResourceWithLocalIdAndType(t, "localResourceId-latest", "host")
 
 			// Save initial version (version 0)
-			err = repo.Save(db, resource, biz.OperationTypeCreated, "tx-latest-v0")
+			err = repo.Save(db, resource, bizmodel.OperationTypeCreated, "tx-latest-v0")
 			require.NoError(t, err)
 
 			// Update to version 1
@@ -1964,7 +1963,7 @@ func TestFindLatestRepresentations(t *testing.T) {
 			transactionId1 := bizmodel.NewTransactionId("test-transaction-id-v1")
 			err = resource.Update(key, "", "", nil, updatedReporter1, updatedCommon1, transactionId1)
 			require.NoError(t, err)
-			err = repo.Save(db, resource, biz.OperationTypeUpdated, "tx-latest-v1")
+			err = repo.Save(db, resource, bizmodel.OperationTypeUpdated, "tx-latest-v1")
 			require.NoError(t, err)
 
 			// Update to version 2 (this should be the latest)
@@ -1982,7 +1981,7 @@ func TestFindLatestRepresentations(t *testing.T) {
 			transactionId2 := bizmodel.NewTransactionId("test-transaction-id-v2")
 			err = resource.Update(key, "", "", nil, updatedReporter2, updatedCommon2, transactionId2)
 			require.NoError(t, err)
-			err = repo.Save(db, resource, biz.OperationTypeUpdated, "tx-latest-v2")
+			err = repo.Save(db, resource, bizmodel.OperationTypeUpdated, "tx-latest-v2")
 			require.NoError(t, err)
 
 			// Test FindLatestRepresentations
@@ -2003,12 +2002,12 @@ func TestFindLatestRepresentations(t *testing.T) {
 func TestFindCurrentAndPreviousVersionedRepresentations(t *testing.T) {
 	implementations := []struct {
 		name string
-		repo func() ResourceRepository
+		repo func() bizmodel.ResourceRepository
 		db   func() *gorm.DB
 	}{
 		{
 			name: "Real Repository with GormTransactionManager",
-			repo: func() ResourceRepository {
+			repo: func() bizmodel.ResourceRepository {
 				db := setupInMemoryDB(t)
 				mc := metricscollector.NewFakeMetricsCollector()
 				tm := NewGormTransactionManager(mc, 3)
@@ -2018,7 +2017,7 @@ func TestFindCurrentAndPreviousVersionedRepresentations(t *testing.T) {
 		},
 		{
 			name: "Fake Repository",
-			repo: func() ResourceRepository {
+			repo: func() bizmodel.ResourceRepository {
 				return NewFakeResourceRepository()
 			},
 			db: func() *gorm.DB { return nil },
@@ -2027,7 +2026,7 @@ func TestFindCurrentAndPreviousVersionedRepresentations(t *testing.T) {
 
 	for _, impl := range implementations {
 		t.Run(impl.name, func(t *testing.T) {
-			getFreshInstances := func() (ResourceRepository, *gorm.DB) {
+			getFreshInstances := func() (bizmodel.ResourceRepository, *gorm.DB) {
 				if impl.name == "Fake Repository" {
 					return impl.repo(), impl.db()
 				}
@@ -2043,7 +2042,7 @@ func TestFindCurrentAndPreviousVersionedRepresentations(t *testing.T) {
 
 				// Create and update a resource to have versioned representations (same for both implementations)
 				resource := createTestResourceWithLocalIdAndType(t, "workspace-test-resource", "host")
-				err := repo.Save(db, resource, biz.OperationTypeCreated, "tx-ws-test")
+				err := repo.Save(db, resource, bizmodel.OperationTypeCreated, "tx-ws-test")
 				require.NoError(t, err)
 
 				// Update to create version 1
@@ -2058,11 +2057,11 @@ func TestFindCurrentAndPreviousVersionedRepresentations(t *testing.T) {
 				transactionId := newUniqueTxID("test-transaction-id-workspace-unique")
 				err = resource.Update(key, "", "", nil, updatedReporter, updatedCommon, transactionId)
 				require.NoError(t, err)
-				require.NoError(t, repo.Save(db, resource, biz.OperationTypeUpdated, "tx-ws-update"))
+				require.NoError(t, repo.Save(db, resource, bizmodel.OperationTypeUpdated, "tx-ws-update"))
 
 				// Get current and previous versions
 				version := uint(1)
-				cur, prev, err := repo.FindCurrentAndPreviousVersionedRepresentations(db, key, &version, biz.OperationTypeUpdated)
+				cur, prev, err := repo.FindCurrentAndPreviousVersionedRepresentations(db, key, &version, bizmodel.OperationTypeUpdated)
 				require.NoError(t, err)
 
 				currentWS, previousWS := GetCurrentAndPreviousWorkspaceID(cur, prev)
@@ -2078,12 +2077,12 @@ func TestFindCurrentAndPreviousVersionedRepresentations(t *testing.T) {
 
 				// Create a resource without updates (version 0) - same for both implementations
 				resource := createTestResourceWithLocalIdAndType(t, "test-resource-v0", "host")
-				err = repo.Save(db, resource, biz.OperationTypeCreated, "tx-v0-test")
+				err = repo.Save(db, resource, bizmodel.OperationTypeCreated, "tx-v0-test")
 				require.NoError(t, err)
 
 				// Get version 0 representations
 				version := uint(0)
-				cur, prev, err := repo.FindCurrentAndPreviousVersionedRepresentations(db, key, &version, biz.OperationTypeCreated)
+				cur, prev, err := repo.FindCurrentAndPreviousVersionedRepresentations(db, key, &version, bizmodel.OperationTypeCreated)
 				require.NoError(t, err)
 
 				currentWS, previousWS := GetCurrentAndPreviousWorkspaceID(cur, prev)
@@ -2123,12 +2122,12 @@ func TestFindCurrentAndPreviousVersionedRepresentations(t *testing.T) {
 func TestHasTransactionIdBeenProcessed(t *testing.T) {
 	implementations := []struct {
 		name string
-		repo func() ResourceRepository
+		repo func() bizmodel.ResourceRepository
 		db   func() *gorm.DB
 	}{
 		{
 			name: "Real Repository with GormTransactionManager",
-			repo: func() ResourceRepository {
+			repo: func() bizmodel.ResourceRepository {
 				db := setupInMemoryDB(t)
 				mc := metricscollector.NewFakeMetricsCollector()
 				tm := NewGormTransactionManager(mc, 3)
@@ -2140,7 +2139,7 @@ func TestHasTransactionIdBeenProcessed(t *testing.T) {
 		},
 		{
 			name: "Fake Repository",
-			repo: func() ResourceRepository {
+			repo: func() bizmodel.ResourceRepository {
 				return NewFakeResourceRepository()
 			},
 			db: func() *gorm.DB {
@@ -2156,7 +2155,7 @@ func TestHasTransactionIdBeenProcessed(t *testing.T) {
 	}
 }
 
-func testHasTransactionIdBeenProcessed(t *testing.T, repo ResourceRepository, db *gorm.DB) {
+func testHasTransactionIdBeenProcessed(t *testing.T, repo bizmodel.ResourceRepository, db *gorm.DB) {
 	t.Run("Empty transaction ID returns false", func(t *testing.T) {
 		processed, err := repo.HasTransactionIdBeenProcessed(db, "")
 		require.NoError(t, err)
@@ -2297,12 +2296,12 @@ func testHasTransactionIdBeenProcessed(t *testing.T, repo ResourceRepository, db
 func TestTransactionIDUniqueConstraint(t *testing.T) {
 	implementations := []struct {
 		name string
-		repo func() ResourceRepository
+		repo func() bizmodel.ResourceRepository
 		db   func() *gorm.DB
 	}{
 		{
 			name: "Real Repository with GormTransactionManager",
-			repo: func() ResourceRepository {
+			repo: func() bizmodel.ResourceRepository {
 				db := setupInMemoryDB(t)
 				mc := metricscollector.NewFakeMetricsCollector()
 				tm := NewGormTransactionManager(mc, 3)
@@ -2321,7 +2320,7 @@ func TestTransactionIDUniqueConstraint(t *testing.T) {
 	}
 }
 
-func testTransactionIDUniqueConstraint(t *testing.T, repo ResourceRepository, db *gorm.DB) {
+func testTransactionIDUniqueConstraint(t *testing.T, repo bizmodel.ResourceRepository, db *gorm.DB) {
 	t.Run("should enforce unique TransactionID constraint on duplicate operations", func(t *testing.T) {
 		// Create first resource with a specific TransactionID
 		duplicateTxID := newUniqueTxID("duplicate-test")
@@ -2337,7 +2336,7 @@ func testTransactionIDUniqueConstraint(t *testing.T, repo ResourceRepository, db
 		err := resource1.Update(key1, apiHref, consoleHref, nil, reporterData, commonData, duplicateTxID)
 		require.NoError(t, err)
 
-		err = repo.Save(db, resource1, biz.OperationTypeCreated, "tx-duplicate-1")
+		err = repo.Save(db, resource1, bizmodel.OperationTypeCreated, "tx-duplicate-1")
 		require.NoError(t, err, "First save should succeed")
 
 		// Create second resource with the same TransactionID
@@ -2348,7 +2347,7 @@ func testTransactionIDUniqueConstraint(t *testing.T, repo ResourceRepository, db
 		require.NoError(t, err)
 
 		// This should fail due to unique constraint violation
-		err = repo.Save(db, resource2, biz.OperationTypeCreated, "tx-duplicate-2")
+		err = repo.Save(db, resource2, bizmodel.OperationTypeCreated, "tx-duplicate-2")
 		require.Error(t, err, "Second save should fail due to duplicate TransactionID")
 		assert.Contains(t, err.Error(), "NON-UNIQUE TRANSACTION ID")
 	})

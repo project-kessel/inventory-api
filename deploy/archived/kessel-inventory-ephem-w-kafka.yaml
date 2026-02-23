@@ -242,7 +242,7 @@ objects:
         strimzi.io/cluster: inventory-kafka-connect
     spec:
       class: io.debezium.connector.postgresql.PostgresConnector
-      tasksMax: ${{MAX_TASKS}}
+      tasksMax: 1 # source connector only supports 1 task
       config:
         database.server.name: kessel-inventory-db
         database.dbname: ${secrets:kessel-inventory-db:db.name}
@@ -307,11 +307,11 @@ objects:
             args: ["serve"]
             livenessProbe:
               httpGet:
-                path: /api/inventory/v1/livez
+                path: /api/kessel/v1/livez
                 port: 8000
             readinessProbe:
               httpGet:
-                path: /api/inventory/v1/readyz
+                path: /api/kessel/v1/readyz
                 port: 8000
             env:
             - name: CLOWDER_ENABLED
@@ -320,8 +320,6 @@ objects:
               value: "/inventory/inventory-api-config.yaml"
             - name: PGDATA
               value: /temp/data
-            - name: RESOURCE_DIR
-              value: "/data/schema/resources"
             volumeMounts:
                 - name: config-volume
                   mountPath: "/inventory"
@@ -362,9 +360,6 @@ parameters:
   - name: KAFKA_CONNECT_INSTANCE
     value: inventory-kafka-connect
     description: Name of the target Kafka Connect instance for Connector
-  - name: MAX_TASKS
-    value: "1"
-    description: How many tasks the Kafka Connect instance can create to process this Connector's work
   - name: TOPIC_HEARTBEAT_PREFIX
     value: debezium-heartbeat
     description: Prefix for the connector heartbeat topic

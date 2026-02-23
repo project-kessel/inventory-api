@@ -4,14 +4,13 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
 	"github.com/project-kessel/inventory-api/internal"
-	"github.com/project-kessel/inventory-api/internal/biz"
 	bizmodel "github.com/project-kessel/inventory-api/internal/biz/model"
-	"github.com/project-kessel/inventory-api/internal/biz/usecase"
 )
 
 type fakeResourceRepository struct {
@@ -28,6 +27,7 @@ type storedResource struct {
 	resourceType          string
 	commonVersion         *uint
 	commonData            internal.JsonObject
+	consistencyToken      string
 	reporterResourceID    uuid.UUID
 	localResourceID       string
 	reporterType          string
@@ -35,6 +35,8 @@ type storedResource struct {
 	representationVersion uint
 	generation            uint
 	tombstone             bool
+	createdAt             time.Time
+	updatedAt             time.Time
 }
 
 type storedRepresentation struct {
@@ -42,7 +44,7 @@ type storedRepresentation struct {
 	commonVersion uint
 }
 
-func NewFakeResourceRepository() ResourceRepository {
+func NewFakeResourceRepository() bizmodel.ResourceRepository {
 	return &fakeResourceRepository{
 		resourcesByPrimaryKey:    make(map[uuid.UUID]*storedResource),
 		resourcesByCompositeKey:  make(map[string]uuid.UUID),
@@ -70,7 +72,7 @@ func (f *fakeResourceRepository) NextReporterResourceId() (bizmodel.ReporterReso
 	return bizmodel.NewReporterResourceId(uuidV7)
 }
 
-func (f *fakeResourceRepository) Save(tx *gorm.DB, resource bizmodel.Resource, operationType biz.EventOperationType, txid string) error {
+func (f *fakeResourceRepository) Save(tx *gorm.DB, resource bizmodel.Resource, operationType bizmodel.EventOperationType, txid string) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
@@ -121,11 +123,14 @@ func (f *fakeResourceRepository) Save(tx *gorm.DB, resource bizmodel.Resource, o
 		resourceType:          resourceSnapshot.Type,
 		commonVersion:         resourceSnapshot.CommonVersion,
 		commonData:            commonRepresentationSnapshot.Representation.Data,
+		consistencyToken:      resourceSnapshot.ConsistencyToken,
 		reporterResourceID:    reporterResourceSnapshot.ID,
 		localResourceID:       reporterResourceSnapshot.ReporterResourceKey.LocalResourceID,
 		reporterType:          reporterResourceSnapshot.ReporterResourceKey.ReporterType,
 		reporterInstanceID:    reporterResourceSnapshot.ReporterResourceKey.ReporterInstanceID,
 		representationVersion: reporterResourceSnapshot.RepresentationVersion,
+		createdAt:             reporterResourceSnapshot.CreatedAt,
+		updatedAt:             reporterResourceSnapshot.UpdatedAt,
 		generation:            reporterResourceSnapshot.Generation,
 		tombstone:             reporterResourceSnapshot.Tombstone,
 	}
@@ -200,7 +205,9 @@ func (f *fakeResourceRepository) FindResourceByKeys(tx *gorm.DB, key bizmodel.Re
 			ID:               latestResource.resourceID,
 			Type:             latestResource.resourceType,
 			CommonVersion:    latestResource.commonVersion,
-			ConsistencyToken: "",
+			ConsistencyToken: latestResource.consistencyToken,
+			CreatedAt:        latestResource.createdAt,
+			UpdatedAt:        latestResource.updatedAt,
 		}
 
 		reporterResourceSnapshot := bizmodel.ReporterResourceSnapshot{
@@ -217,6 +224,8 @@ func (f *fakeResourceRepository) FindResourceByKeys(tx *gorm.DB, key bizmodel.Re
 			RepresentationVersion: latestResource.representationVersion,
 			Generation:            latestResource.generation,
 			Tombstone:             latestResource.tombstone,
+			CreatedAt:             latestResource.createdAt,
+			UpdatedAt:             latestResource.updatedAt,
 		}
 
 		// Use DeserializeResource to create a Resource that reflects the actual stored state
@@ -230,7 +239,7 @@ func (f *fakeResourceRepository) FindResourceByKeys(tx *gorm.DB, key bizmodel.Re
 	return nil, gorm.ErrRecordNotFound
 }
 
-func (f *fakeResourceRepository) FindCurrentAndPreviousVersionedRepresentations(tx *gorm.DB, key bizmodel.ReporterResourceKey, currentVersion *uint, operationType biz.EventOperationType) (*bizmodel.Representations, *bizmodel.Representations, error) {
+func (f *fakeResourceRepository) FindCurrentAndPreviousVersionedRepresentations(tx *gorm.DB, key bizmodel.ReporterResourceKey, currentVersion *uint, operationType bizmodel.EventOperationType) (*bizmodel.Representations, *bizmodel.Representations, error) {
 	if currentVersion == nil {
 		return nil, nil, nil
 	}
@@ -322,7 +331,7 @@ func (f *fakeResourceRepository) GetDB() *gorm.DB {
 	return nil
 }
 
-func (f *fakeResourceRepository) GetTransactionManager() usecase.TransactionManager {
+func (f *fakeResourceRepository) GetTransactionManager() bizmodel.TransactionManager {
 	// Return a fake transaction manager for testing
 	return NewFakeTransactionManager(3) // Default retry count
 }

@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"strings"
 	"time"
+
+	"github.com/go-kratos/kratos/v2/log"
 )
 
 const initialCommonVersion = 0
@@ -71,6 +73,10 @@ func NewResource(id ResourceId, localResourceId LocalResourceId, resourceType Re
 	if err != nil {
 		return Resource{}, fmt.Errorf("resource invalid ResourceReportEvent: %w", err)
 	}
+
+	// Set timestamps for new resource
+	now := time.Now()
+	resourceEvent.SetTimestamps(now, now)
 
 	reporterResources := []ReporterResource{reporterResource}
 
@@ -144,6 +150,14 @@ func (r *Resource) Update(
 	if err != nil {
 		return fmt.Errorf("failed to create updated ResourceReportEvent: %w", err)
 	}
+
+	// Preserve the original created_at and set updated_at to current time
+	existingCreatedAt, _ := r.GetTimestamps()
+	now := time.Now()
+	if existingCreatedAt.IsZero() {
+		log.Debugf("resource %s has zero created_at timestamp", r.id)
+	}
+	resourceEvent.SetTimestamps(existingCreatedAt, now)
 
 	r.resourceReportEvents = []ResourceReportEvent{resourceEvent}
 	return nil
@@ -318,6 +332,14 @@ func (r Resource) ConsistencyToken() ConsistencyToken {
 	return r.consistencyToken
 }
 
+// GetTimestamps returns createdAt and updatedAt from the resource's events, or zero times if no events exist
+func (r Resource) GetTimestamps() (createdAt time.Time, updatedAt time.Time) {
+	if len(r.resourceReportEvents) > 0 {
+		return r.resourceReportEvents[0].createdAt, r.resourceReportEvents[0].updatedAt
+	}
+	return time.Time{}, time.Time{}
+}
+
 // Serialization + Deserialization functions, direct initialization without validation
 func (r Resource) Serialize() (ResourceSnapshot, ReporterResourceSnapshot, ReporterRepresentationSnapshot, CommonRepresentationSnapshot, error) {
 	var createdAt, updatedAt time.Time
@@ -380,7 +402,7 @@ func DeserializeResource(
 		reporterResources = append(reporterResources, reporterResource)
 	}
 
-	resourceEvent := DeserializeResourceEvent(reporterRepresentationSnapshot, commonRepresentationSnapshot)
+	resourceEvent := DeserializeResourceEvent(reporterRepresentationSnapshot, commonRepresentationSnapshot, resourceSnapshot.CreatedAt, resourceSnapshot.UpdatedAt)
 
 	var commonVersion *Version
 	if resourceSnapshot.CommonVersion != nil {

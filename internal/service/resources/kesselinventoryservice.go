@@ -373,11 +373,8 @@ func (s *InventoryService) StreamedListObjects(
 ) error {
 	ctx := stream.Context()
 
-	if c := req.GetConsistency(); c != nil && c.GetAtLeastAsFresh() != nil {
-		log.Debugf("StreamedListObjects consistency: at_least_as_fresh token=%s", c.GetAtLeastAsFresh().GetToken())
-	} else {
-		log.Debugf("StreamedListObjects consistency: minimize_latency")
-	}
+	consistency := ConsistencyFromProto(req.GetConsistency())
+	log.Debugf("StreamedListObjects consistency: %s", consistency.Preference)
 
 	lookupCmd, err := ToLookupResourcesCommand(req)
 	if err != nil {

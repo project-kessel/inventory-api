@@ -14,7 +14,8 @@ fi
 for file in $(ls ./dashboards/); do
     DEST="./development/configs/monitoring/dashboards/${file%.*}.json"
     yq '.data' ./dashboards/$file | tail -n +2 > $DEST
-    yq -iP '(.templating.list[] | select(.name == "datasource") | .regex) = "/(prometheus)/"' $DEST
+    yq -iP '(.templating.list[] | select(.name == "datasource") | .regex) = "/(prometheus.*)/"' $DEST
+    yq -iP '(.templating.list[] | select(.name == "kafka_datasource") | .regex) = "/(prometheus.*)/"' $DEST
     # sed -i'' is so it works on linux and mac
     sed -i'' 's/namespace=\\\"\$namespace\\\",//g' $DEST
     sed -i'' 's/service=~/job=~/g' $DEST

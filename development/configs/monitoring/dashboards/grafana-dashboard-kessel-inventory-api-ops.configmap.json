@@ -4856,7 +4856,7 @@
         "query": "prometheus",
         "refresh": 1,
         "type": "datasource",
-        "regex": "/(prometheus)/"
+        "regex": "/(prometheus.*)/"
       },
       {
         "current": {

@@ -73,10 +73,6 @@ For example:
 
 All Kafka CLI tools shipped with Kafka have been installed to `/opt/kafka/bin`, the pod starts in the `/opt/kafka` directory to shorten the path to run those tools. When leveraging any Kafka command-line tool in this path, at minimum the `--bootstrap-server` and `--command-config` flags will need to be set. The `BOOTSTRAP_SERVERS` env var can be used for `--bootstrap-server` value, and the `KAFKA_AUTH_CONFIG` env var can be used for the `--command-config` value. Note some commands have different names for the auth config flag (for example, `kafka-console-consumer` uses `--consumer.config`). Check the commands `--help` flag for details on what flag to use.
 
-#### Accessing Inventory API DB
-
-Postgres connection details are set using standard supported [Postgres environment variables](https://www.postgresql.org/docs/16/libpq-envars.html). To connect to Inventory API DB and execute queries, simply run `psql` to be dropped into a shell where you can execute queries against the DB.
-
 #### Authenticating with kcat
 
 `kcat` is a useful tool for both consuming events from topics and producing events to them, especially where headers must be defined, as the built-in Kafka tools do not support setting headers. We leverage `kcat` for pushing an event to a topic for replication fixes or for trigging ad-hoc snapshots with Debeizum.

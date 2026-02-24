@@ -31,7 +31,7 @@ echo "Setting up EPEL Repository..."
 rpm -ivh https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.noarch.rpm
 
 echo "Installing packages..."
-microdnf install -y tar gzip wget bind-utils nmap-ncat openssl vim java-21-openjdk kcat postgresql util-linux less
+microdnf install -y tar gzip wget bind-utils nmap-ncat openssl vim java-21-openjdk kcat util-linux less
 rpm -ivh /tmp/grpcurl_${GRPCURL_VERSION}_linux_amd64.rpm /tmp/zed_${ZED_VERSION}_linux_amd64.rpm
 
 mkdir -pv /opt/kafka

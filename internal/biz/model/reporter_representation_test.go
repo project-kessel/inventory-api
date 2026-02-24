@@ -114,7 +114,7 @@ func TestReporterDataRepresentation_Initialization(t *testing.T) {
 		assertInvalidReporterDataRepresentation(t, dataRep, err, ErrInvalidData)
 	})
 
-	t.Run("should accept data representation with empty non-nil data", func(t *testing.T) {
+	t.Run("should reject empty data", func(t *testing.T) {
 		t.Parallel()
 
 		dataRep, err := NewReporterDataRepresentation(
@@ -127,12 +127,7 @@ func TestReporterDataRepresentation_Initialization(t *testing.T) {
 			fixture.ValidTransactionIdType(),
 		)
 
-		if err != nil {
-			t.Errorf("Expected no error for empty non-nil data, got %v", err)
-		}
-		if dataRep.IsTombstone() {
-			t.Error("Expected tombstone to be false for empty data representation")
-		}
+		assertInvalidReporterDataRepresentation(t, dataRep, err, ErrInvalidData)
 	})
 
 	t.Run("should reject data representation with empty reporter resource ID", func(t *testing.T) {

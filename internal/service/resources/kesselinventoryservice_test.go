@@ -3515,6 +3515,32 @@ func TestInventoryService_ReportResource_ValidationErrorFormats(t *testing.T) {
 			expectCode:        codes.InvalidArgument,
 			expectMsgContains: "failed validation for report resource",
 		},
+		{
+			name:         "nil reporter representation (common-only returns error)",
+			resourceType: "host",
+			reporterType: "hbi",
+			common: &structpb.Struct{
+				Fields: map[string]*structpb.Value{
+					"workspace_id": structpb.NewStringValue("ws-123"),
+				},
+			},
+			reporter:          nil,
+			expectCode:        codes.InvalidArgument,
+			expectMsgContains: "invalid ReporterRepresentation representation: representation required",
+		},
+		{
+			name:         "nil common representation (reporter-only returns error)",
+			resourceType: "host",
+			reporterType: "hbi",
+			common:       nil,
+			reporter: &structpb.Struct{
+				Fields: map[string]*structpb.Value{
+					"satellite_id": structpb.NewStringValue("sat-123"),
+				},
+			},
+			expectCode:        codes.InvalidArgument,
+			expectMsgContains: "invalid CommonRepresentation representation: representation required",
+		},
 	}
 
 	for _, tc := range cases {

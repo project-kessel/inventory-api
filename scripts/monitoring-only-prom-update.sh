@@ -4,6 +4,17 @@ CENGINE=$(command -v podman || command -v docker)
 BASE_CONFIG_PATH=development/configs/monitoring/base-ephemeral-prometheus.yml
 CONFIG_PATH=development/configs/monitoring/ephemeral-prometheus.yml
 
+# Use gawk with inplace extension if available, otherwise use temp file method
+if command -v gawk >/dev/null 2>&1; then
+    awk_inplace() {
+        gawk -i inplace "$@" "$CONFIG_PATH"
+    }
+else
+    awk_inplace() {
+        awk "$@" "$CONFIG_PATH" > "${CONFIG_PATH}.tmp" && mv "${CONFIG_PATH}.tmp" "$CONFIG_PATH"
+    }
+fi
+
 NAMESPACE=$(oc project -q 2> /dev/null)
 IS_ACTIVE=$(oc get pods --no-headers | grep kessel | wc -l)
 if [[ ! "${NAMESPACE}" == "ephemeral"* ]] || [[ "$IS_ACTIVE" -eq 0 ]]; then
@@ -18,10 +29,7 @@ KKC_PODS=$(oc get sps kessel-kafka-connect-connect -o jsonpath='{.status.readyPo
 
 # clean up all files/volumes and setup config
 echo "Removing old grafana volume if it exists..."
-$CENGINE volume exists development_grafana-storage
-if [[ "$?" -eq 0 ]]; then
-    $CENGINE volume rm development_grafana-storage
-fi
+$CENGINE volume rm development_grafana-storage 2>/dev/null || true
 rm -f $CONFIG_PATH
 cp $BASE_CONFIG_PATH $CONFIG_PATH
 
@@ -36,7 +44,7 @@ if [[ "$INVENTORY_PODS" -ge 1 ]]; then
         exit 1
     fi
     echo "Updating prometheus config..."
-    sed -i'' "s/EPHEM_INVENTORY_ROUTE/${EPHEM_INVENTORY_ROUTE}/" $CONFIG_PATH
+    awk_inplace -v old="EPHEM_INVENTORY_ROUTE" -v new="${EPHEM_INVENTORY_ROUTE}" '{gsub(old, new)}1'
 fi
 
 # KIC is only deployed if explicitly done
@@ -50,10 +58,10 @@ if [[ "$KIC_PODS" -ge 1 ]]; then
         exit 1
     fi
     echo "Updating prometheus config..."
-    sed -i'' "s/EPHEM_KIC_ROUTE/${EPHEM_KIC_ROUTE}/" $CONFIG_PATH
+    awk_inplace -v old="EPHEM_KIC_ROUTE" -v new="${EPHEM_KIC_ROUTE}" '{gsub(old, new)}1'
 else
     # Remove the entire job block to avoid invalid scrape targets if KIC is not also deployed
-    sed -i'' '/job_name: kessel-inventory-consumer/,/^[[:space:]]*-[[:space:]]job_name\|^[^[:space:]]/{ /job_name: kessel-inventory-consumer/!{ /^[[:space:]]*-[[:space:]]job_name\|^[^[:space:]]/!d } }' $CONFIG_PATH
+    awk_inplace '/job_name: kessel-inventory-consumer/ {in_block=1} in_block && (/^[[:space:]]*-[[:space:]]job_name/ || /^[^[:space:]]/) {in_block=0} !in_block'
 fi
 
 # KKC is always expected to be deployed but check just in case
@@ -69,5 +77,5 @@ if [[ "$KKC_PODS" -ge 1 ]]; then
         exit 1
     fi
     echo "Updating prometheus config..."
-    sed -i'' "s/EPHEM_KKC_ROUTE/${EPHEM_KKC_ROUTE}/" $CONFIG_PATH
+    awk_inplace -v old="EPHEM_KKC_ROUTE" -v new="${EPHEM_KKC_ROUTE}" '{gsub(old, new)}1'
 fi

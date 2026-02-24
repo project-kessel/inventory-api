@@ -160,7 +160,7 @@ You must either deploy Kessel to ephemeral using bonfire **OR** target an existi
 OR
 * `oc project existing-ephemeral-namespace`
 
-The latter option allows you to monitor another users namespace for any particular reason such as onboarding assistance or troubleshotting
+The latter option allows you to monitor another user's namespace for any particular reason such as onboarding assistance or troubleshooting.
 
 To start the monitoring stack:
 ```shell

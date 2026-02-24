@@ -62,15 +62,20 @@ func (cr CommonRepresentation) Serialize() CommonRepresentationSnapshot {
 		Data: cr.Data(),
 	}
 
-	// Create CommonRepresentation snapshot - direct initialization without validation
+	// TransactionId: nil when empty (optional), else pointer to serialized value
+	var txID *string
+	if s := cr.transactionId.Serialize(); s != "" {
+		txID = &s
+	}
+	now := time.Now()
 	return CommonRepresentationSnapshot{
 		Representation:             representationSnapshot,
 		ResourceId:                 cr.resourceId.UUID(),
 		Version:                    cr.version.Serialize(),
 		ReportedByReporterType:     reporterType,
 		ReportedByReporterInstance: reporterInstanceId,
-		TransactionId:              cr.transactionId.Serialize(),
-		CreatedAt:                  time.Now(), // TODO: Add proper timestamp from domain entity if available
+		TransactionId:              txID,
+		CreatedAt:                  now,
 	}
 }
 
@@ -81,7 +86,11 @@ func DeserializeCommonRepresentation(snapshot *CommonRepresentationSnapshot) Com
 	version := DeserializeVersion(snapshot.Version)
 	reporterType := ReporterType(snapshot.ReportedByReporterType)
 	reporterInstanceId := ReporterInstanceId(snapshot.ReportedByReporterInstance)
-	transactionId := TransactionId(snapshot.TransactionId)
+	txIDStr := ""
+	if snapshot.TransactionId != nil {
+		txIDStr = *snapshot.TransactionId
+	}
+	transactionId := TransactionId(txIDStr)
 
 	// Create reporter ID
 	reporterId := ReporterId{

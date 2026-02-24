@@ -40,9 +40,8 @@ func NewReporterDataRepresentation(
 	if reporterResourceID.UUID() == uuid.Nil {
 		return ReporterDataRepresentation{}, fmt.Errorf("%w: ReporterResourceId", ErrInvalidUUID)
 	}
-
-	if len(data) == 0 {
-		return ReporterDataRepresentation{}, fmt.Errorf("%w: ReporterDataRepresentation data", ErrInvalidData)
+	if data == nil {
+		return ReporterDataRepresentation{}, fmt.Errorf("%w: Representation (data)", ErrNil)
 	}
 
 	return ReporterDataRepresentation{
@@ -99,6 +98,11 @@ func (rr ReporterRepresentation) Serialize() ReporterRepresentationSnapshot {
 		Data: rr.Representation.Serialize(),
 	}
 
+	// TransactionId: nil when empty (optional), else pointer to serialized value
+	var txID *string
+	if s := rr.transactionId.Serialize(); s != "" {
+		txID = &s
+	}
 	// Create ReporterRepresentation snapshot - direct initialization without validation
 	return ReporterRepresentationSnapshot{
 		Representation:     representationSnapshot,
@@ -108,8 +112,8 @@ func (rr ReporterRepresentation) Serialize() ReporterRepresentationSnapshot {
 		ReporterVersion:    reporterVersionStr,
 		CommonVersion:      rr.commonVersion.Serialize(),
 		Tombstone:          rr.tombstone.Serialize(),
-		TransactionId:      rr.transactionId.Serialize(),
-		CreatedAt:          time.Now(), // TODO: Add proper timestamp from domain entity if available
+		TransactionId:      txID,
+		CreatedAt:          time.Now(),
 	}
 }
 
@@ -125,7 +129,11 @@ func DeserializeReporterDataRepresentation(snapshot *ReporterRepresentationSnaps
 	generation := DeserializeGeneration(snapshot.Generation)
 	commonVersion := DeserializeVersion(snapshot.CommonVersion)
 	tombstone := DeserializeTombstone(snapshot.Tombstone)
-	transactionId := DeserializeTransactionId(snapshot.TransactionId)
+	txIDStr := ""
+	if snapshot.TransactionId != nil {
+		txIDStr = *snapshot.TransactionId
+	}
+	transactionId := DeserializeTransactionId(txIDStr)
 
 	var reporterVersion *ReporterVersion
 	if snapshot.ReporterVersion != nil {

@@ -97,11 +97,11 @@ type EventRelationshipMetadata struct {
 }
 
 type EventRelationshipReporter struct {
-	ReporterType           string `json:"reporter_type"`
-	SubjectLocalResourceId string `json:"subject_local_resource_id"`
-	ObjectLocalResourceId  string `json:"object_local_resource_id"`
-	ReporterVersion        string `json:"reporter_version"`
-	ReporterInstanceId     string `json:"reporter_instance_id"`
+	ReporterType           string  `json:"reporter_type"`
+	SubjectLocalResourceId string  `json:"subject_local_resource_id"`
+	ObjectLocalResourceId  string  `json:"object_local_resource_id"`
+	ReporterVersion        *string `json:"reporter_version,omitempty"`
+	ReporterInstanceId     string  `json:"reporter_instance_id"`
 }
 
 func newResourceEvent(operationType bizmodel.EventOperationType, resourceEvent *bizmodel.ResourceReportEvent) (*ResourceEvent, error) {

@@ -26,7 +26,20 @@ func TestResourceSnapshot_FromDomainEntity(t *testing.T) {
 	reporterData := fixture.ValidReporterRepresentationType()
 
 	// Create domain Resource
-	resource, err := NewResource(resourceId, localResourceId, resourceType, reporterType, reporterInstanceId, transactionId, reporterResourceId, apiHref, consoleHref, reporterData, commonData, nil)
+	resource, err := NewResource(
+		resourceId,
+		localResourceId,
+		resourceType,
+		reporterType,
+		reporterInstanceId,
+		&transactionId,
+		reporterResourceId,
+		apiHref,
+		&consoleHref,
+		&reporterData,
+		&commonData,
+		nil,
+	)
 	if err != nil {
 		t.Fatalf("Failed to create test resource: %v", err)
 	}
@@ -101,6 +114,7 @@ func TestIndividualSnapshotMethods(t *testing.T) {
 	reporterResourceFixture := NewReporterResourceTestFixture()
 
 	// Test ReporterResource snapshot
+	ch := reporterResourceFixture.ValidConsoleHrefType()
 	reporterResource, err := NewReporterResource(
 		reporterResourceFixture.ValidIdType(),
 		reporterResourceFixture.ValidLocalResourceIdType(),
@@ -109,7 +123,7 @@ func TestIndividualSnapshotMethods(t *testing.T) {
 		reporterResourceFixture.ValidReporterInstanceIdType(),
 		reporterResourceFixture.ValidResourceIdType(),
 		reporterResourceFixture.ValidApiHrefType(),
-		reporterResourceFixture.ValidConsoleHrefType(),
+		&ch,
 	)
 	if err != nil {
 		t.Fatalf("Failed to create ReporterResource: %v", err)
@@ -191,13 +205,14 @@ func TestSnapshotSerialization(t *testing.T) {
 	t.Parallel()
 
 	// Test that snapshots can be used for JSON serialization
+	now := time.Now()
 	snapshot := ResourceSnapshot{
 		ID:               uuid.New(),
 		Type:             "test-resource",
 		CommonVersion:    1,
 		ConsistencyToken: "test-token",
-		CreatedAt:        time.Now(),
-		UpdatedAt:        time.Now(),
+		CreatedAt:        now,
+		UpdatedAt:        now,
 	}
 
 	// Test that all fields are accessible and properly typed
@@ -212,4 +227,72 @@ func TestSnapshotSerialization(t *testing.T) {
 	}
 
 	t.Log("Snapshot serialization fields are accessible")
+}
+
+// TestCommonRepresentationSnapshot_TransactionId_NilMeansNotSet documents that
+// when TransactionId is not set, the snapshot uses nil (optional semantics).
+func TestCommonRepresentationSnapshot_TransactionId_NilMeansNotSet(t *testing.T) {
+	t.Parallel()
+
+	// Build a snapshot with nil TransactionId (optional = not set)
+	snapshot := CommonRepresentationSnapshot{
+		Representation:             RepresentationSnapshot{Data: map[string]interface{}{"id": "test"}},
+		ResourceId:                 uuid.New(),
+		Version:                    1,
+		ReportedByReporterType:     "test-reporter",
+		ReportedByReporterInstance: "instance-1",
+		TransactionId:              nil, // nil = not set (optional)
+		CreatedAt:                  time.Time{},
+	}
+	// Round-trip: deserialize to domain, serialize back
+	cr := DeserializeCommonRepresentation(&snapshot)
+	roundTrip := cr.Serialize()
+	if roundTrip.TransactionId != nil {
+		t.Errorf("Expected nil TransactionId to round-trip as nil, got %v", roundTrip.TransactionId)
+	}
+}
+
+// TestReporterRepresentationSnapshot_TransactionId_NilMeansNotSet documents the same
+// optional convention for reporter representation snapshots (nil = not set).
+func TestReporterRepresentationSnapshot_TransactionId_NilMeansNotSet(t *testing.T) {
+	t.Parallel()
+
+	snapshot := ReporterRepresentationSnapshot{
+		Representation:     RepresentationSnapshot{Data: map[string]interface{}{"k": "v"}},
+		ReporterResourceID: uuid.New(),
+		Version:            1,
+		Generation:         0,
+		ReporterVersion:    nil,
+		CommonVersion:      0,
+		TransactionId:      nil, // nil = not set
+		Tombstone:          false,
+		CreatedAt:          time.Time{},
+	}
+	// Deserialize and serialize back
+	rr := DeserializeReporterDataRepresentation(&snapshot)
+	roundTrip := rr.Serialize()
+	if roundTrip.TransactionId != nil {
+		t.Errorf("Expected nil TransactionId to round-trip as nil, got %v", roundTrip.TransactionId)
+	}
+}
+
+// TestResourceSnapshot_CreatedAtUpdatedAt_ZeroMeansNotSet documents that
+// when timestamps are not set, the snapshot uses zero value (time.Time).
+func TestResourceSnapshot_CreatedAtUpdatedAt_ZeroMeansNotSet(t *testing.T) {
+	t.Parallel()
+
+	snapshot := ResourceSnapshot{
+		ID:               uuid.New(),
+		Type:             "test",
+		CommonVersion:    0,
+		ConsistencyToken: "",
+		CreatedAt:        time.Time{}, // zero = not set
+		UpdatedAt:        time.Time{},
+	}
+	if !snapshot.CreatedAt.IsZero() {
+		t.Error("CreatedAt zero means not set")
+	}
+	if !snapshot.UpdatedAt.IsZero() {
+		t.Error("UpdatedAt zero means not set")
+	}
 }

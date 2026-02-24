@@ -231,27 +231,15 @@ func (uc *Usecase) ReportResource(ctx context.Context, cmd ReportResourceCommand
 	return nil
 }
 
-// resolveOptionalFields dereferences optional pointer fields from the command.
-// TODO: Remove this helper when model optional fields explicitly (RHCLOUD-41760)
+// resolveOptionalFields returns optional pointer fields from the command without collapsing to zero value.
+// Callers pass these pointers through to the domain (nil = not set).
 func resolveOptionalFields(cmd ReportResourceCommand) (
-	consoleHref model.ConsoleHref,
-	transactionId model.TransactionId,
-	reporterRepresentation model.Representation,
-	commonRepresentation model.Representation,
+	consoleHref *model.ConsoleHref,
+	transactionId *model.TransactionId,
+	reporterRepresentation *model.Representation,
+	commonRepresentation *model.Representation,
 ) {
-	if cmd.ConsoleHref != nil {
-		consoleHref = *cmd.ConsoleHref
-	}
-	if cmd.TransactionId != nil {
-		transactionId = *cmd.TransactionId
-	}
-	if cmd.ReporterRepresentation != nil {
-		reporterRepresentation = *cmd.ReporterRepresentation
-	}
-	if cmd.CommonRepresentation != nil {
-		commonRepresentation = *cmd.CommonRepresentation
-	}
-	return
+	return cmd.ConsoleHref, cmd.TransactionId, cmd.ReporterRepresentation, cmd.CommonRepresentation
 }
 
 func (uc *Usecase) createResource(tx *gorm.DB, cmd ReportResourceCommand, txidStr string) error {
@@ -267,7 +255,6 @@ func (uc *Usecase) createResource(tx *gorm.DB, cmd ReportResourceCommand, txidSt
 
 	consoleHref, transactionId, reporterRepresentation, commonRepresentation := resolveOptionalFields(cmd)
 
-	// TODO: need to model explicitly optional fields, see RHCLOUD-41760
 	resource, err := model.NewResource(
 		resourceId,
 		cmd.LocalResourceId,
@@ -302,7 +289,6 @@ func (uc *Usecase) updateResource(tx *gorm.DB, cmd ReportResourceCommand, existi
 
 	consoleHref, transactionId, reporterRepresentation, commonRepresentation := resolveOptionalFields(cmd)
 
-	// TODO: need to model explicitly optional fields, see RHCLOUD-41760
 	err = existingResource.Update(
 		reporterResourceKey,
 		cmd.ApiHref,
@@ -568,26 +554,29 @@ func (uc *Usecase) validateReportResourceCommand(ctx context.Context, cmd Report
 		return fmt.Errorf("reporter %s does not report resource types: %s", reporterType, resourceType)
 	}
 
+	// Require both reporter and common representation
+	if cmd.ReporterRepresentation == nil && cmd.CommonRepresentation == nil {
+		return &RepresentationRequiredError{Kind: "both"}
+	}
 	if cmd.ReporterRepresentation == nil {
-		return &RepresentationRequiredError{Kind: "reporter"}
+		return &RepresentationRequiredError{Kind: "ReporterRepresentation"}
 	}
 	if cmd.CommonRepresentation == nil {
-		return &RepresentationRequiredError{Kind: "common"}
+		return &RepresentationRequiredError{Kind: "CommonRepresentation"}
 	}
 
-	sanitizedReporterRepresentation := removeNulls(map[string]interface{}(*cmd.ReporterRepresentation))
-
-	// Validate reporter-specific data using the sanitized map
-	if err := uc.schemaService.ReporterShallowValidate(ctx, resourceType, reporterType, sanitizedReporterRepresentation); err != nil {
-		return err
+	if cmd.ReporterRepresentation != nil {
+		sanitizedReporterRepresentation := removeNulls(map[string]interface{}(*cmd.ReporterRepresentation))
+		if err := uc.schemaService.ReporterShallowValidate(ctx, resourceType, reporterType, sanitizedReporterRepresentation); err != nil {
+			return err
+		}
 	}
 
-	// Get common representation (no sanitization needed based on original code)
-	commonRepresentation := map[string]interface{}(*cmd.CommonRepresentation)
-
-	// Validate common data
-	if err := uc.schemaService.CommonShallowValidate(ctx, resourceType, commonRepresentation); err != nil {
-		return err
+	if cmd.CommonRepresentation != nil {
+		commonRepresentation := map[string]interface{}(*cmd.CommonRepresentation)
+		if err := uc.schemaService.CommonShallowValidate(ctx, resourceType, commonRepresentation); err != nil {
+			return err
+		}
 	}
 
 	return nil

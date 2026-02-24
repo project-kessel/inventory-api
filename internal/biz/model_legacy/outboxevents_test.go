@@ -153,3 +153,60 @@ func assertResourceEventFromDomainEvent(t *testing.T, operation bizmodel.EventOp
 	assert.Equal(t, resourceEvent.ApiHref(), data.ReporterData.ApiHref)
 	assert.Equal(t, resourceEvent.LocalResourceId(), data.ReporterData.LocalResourceId)
 }
+
+// TestEventResourceReporter_ReporterVersion_Optional documents that EventResourceReporter
+// uses *string for ReporterVersion (nil = not set). Phase 2 will align EventRelationshipReporter.
+func TestEventResourceReporter_ReporterVersion_Optional(t *testing.T) {
+	// Nil ReporterVersion round-trips as omitted/zero in JSON
+	er := EventResourceReporter{
+		ReporterInstanceId: "inst",
+		ReporterType:       "type",
+		ConsoleHref:        "",
+		ApiHref:            "",
+		LocalResourceId:    "local",
+		ReporterVersion:    nil,
+	}
+	b, err := json.Marshal(er)
+	assert.NoError(t, err)
+	var decoded EventResourceReporter
+	err = json.Unmarshal(b, &decoded)
+	assert.NoError(t, err)
+	assert.Nil(t, decoded.ReporterVersion)
+
+	// Non-nil ReporterVersion round-trips
+	ver := "1.0"
+	er.ReporterVersion = &ver
+	b, err = json.Marshal(er)
+	assert.NoError(t, err)
+	err = json.Unmarshal(b, &decoded)
+	assert.NoError(t, err)
+	assert.NotNil(t, decoded.ReporterVersion)
+	assert.Equal(t, "1.0", *decoded.ReporterVersion)
+}
+
+// TestEventRelationshipReporter_ReporterVersion_Optional documents that EventRelationshipReporter
+// uses *string for ReporterVersion (nil = not set), aligned with EventResourceReporter.
+func TestEventRelationshipReporter_ReporterVersion_Optional(t *testing.T) {
+	er := EventRelationshipReporter{
+		ReporterType:           "type",
+		SubjectLocalResourceId: "sub",
+		ObjectLocalResourceId:  "obj",
+		ReporterVersion:        nil, // nil = not set
+		ReporterInstanceId:     "inst",
+	}
+	b, err := json.Marshal(er)
+	assert.NoError(t, err)
+	var decoded EventRelationshipReporter
+	err = json.Unmarshal(b, &decoded)
+	assert.NoError(t, err)
+	assert.Nil(t, decoded.ReporterVersion)
+
+	ver := "1.0"
+	er.ReporterVersion = &ver
+	b, err = json.Marshal(er)
+	assert.NoError(t, err)
+	err = json.Unmarshal(b, &decoded)
+	assert.NoError(t, err)
+	assert.NotNil(t, decoded.ReporterVersion)
+	assert.Equal(t, "1.0", *decoded.ReporterVersion)
+}

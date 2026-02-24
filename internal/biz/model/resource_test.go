@@ -12,6 +12,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// timeVal returns the time (for use with time.Time; kept for compatibility where value may be zero).
+func timeVal(t time.Time) time.Time {
+	return t
+}
+
 func TestResource_Initialization(t *testing.T) {
 	t.Parallel()
 	fixture := NewResourceTestFixture()
@@ -218,8 +223,8 @@ func TestResource_Update(t *testing.T) {
 		if updatedReporterResource.apiHref.String() != newApiHref {
 			t.Errorf("Expected apiHref %s, got %s", newApiHref, updatedReporterResource.apiHref.String())
 		}
-		if updatedReporterResource.consoleHref.String() != newConsoleHref {
-			t.Errorf("Expected consoleHref %s, got %s", newConsoleHref, updatedReporterResource.consoleHref.String())
+		if updatedReporterResource.ConsoleHref().String() != newConsoleHref {
+			t.Errorf("Expected consoleHref %s, got %s", newConsoleHref, updatedReporterResource.ConsoleHref().String())
 		}
 
 		// Verify resource event was created
@@ -261,6 +266,7 @@ func TestResource_Update(t *testing.T) {
 			nil,
 			commonData,
 			reporterData,
+			TransactionId("tx-nonexistent"),
 		)
 
 		if err == nil {
@@ -295,6 +301,7 @@ func TestResource_Update(t *testing.T) {
 			nil,
 			commonData,
 			reporterData,
+			TransactionId("tx-preserve-fields"),
 		)
 
 		if err != nil {
@@ -337,6 +344,7 @@ func TestResource_Update(t *testing.T) {
 			nil,
 			commonData,
 			reporterData,
+			TransactionId("tx-empty-console-href"),
 		)
 
 		if err != nil {
@@ -344,8 +352,8 @@ func TestResource_Update(t *testing.T) {
 		}
 
 		updatedReporterResource := original.ReporterResources()[0]
-		if updatedReporterResource.consoleHref.String() != "" {
-			t.Errorf("Expected empty consoleHref, got %s", updatedReporterResource.consoleHref.String())
+		if updatedReporterResource.ConsoleHref().String() != "" {
+			t.Errorf("Expected empty consoleHref, got %s", updatedReporterResource.ConsoleHref().String())
 		}
 	})
 
@@ -394,6 +402,7 @@ func TestResource_Update(t *testing.T) {
 			nil, // nil reporter version
 			commonData,
 			reporterData,
+			TransactionId("tx-nil-reporter-version"),
 		)
 
 		if err != nil {
@@ -434,7 +443,9 @@ func TestResource_Update(t *testing.T) {
 		updatedSnapshot, _, _, _, err := resource.Serialize()
 		require.NoError(t, err)
 
-		assert.Equal(t, initialCreatedAt, updatedSnapshot.CreatedAt, "created_at should be preserved")
+		require.False(t, updatedSnapshot.CreatedAt.IsZero(), "created_at should be preserved")
+		assert.True(t, updatedSnapshot.CreatedAt.Equal(initialCreatedAt), "created_at should be preserved")
+		require.False(t, updatedSnapshot.UpdatedAt.IsZero(), "updated_at should be updated")
 		assert.True(t, updatedSnapshot.UpdatedAt.After(initialUpdatedAt), "updated_at should be updated")
 	})
 
@@ -465,7 +476,7 @@ func TestResource_Update(t *testing.T) {
 			nil,
 			commonData,
 			reporterData,
-			emptyTransactionId,
+			&emptyTransactionId,
 		)
 
 		if err != nil {
@@ -501,8 +512,8 @@ func TestResource_Update(t *testing.T) {
 			Type:             fixture.ValidResourceTypeType().Serialize(),
 			CommonVersion:    0,
 			ConsistencyToken: "",
-			CreatedAt:        time.Time{}, // Zero timestamp - simulates NULL in DB
-			UpdatedAt:        time.Time{}, // Zero timestamp - simulates NULL in DB
+			CreatedAt:        time.Time{}, // zero = not set (legacy/NULL in DB)
+			UpdatedAt:        time.Time{},
 		}
 
 		// Create reporter resource snapshot
@@ -518,8 +529,8 @@ func TestResource_Update(t *testing.T) {
 			RepresentationVersion: 0,
 			Generation:            0,
 			Tombstone:             false,
-			CreatedAt:             time.Time{}, // Zero timestamp
-			UpdatedAt:             time.Time{}, // Zero timestamp
+			CreatedAt:             time.Time{},
+			UpdatedAt:             time.Time{},
 		}
 
 		// Deserialize the resource (simulating loading from database)
@@ -624,9 +635,11 @@ func TestResource_Update(t *testing.T) {
 		require.NoError(t, err)
 
 		// created_at should be preserved (not changed)
+		require.False(t, updatedSnapshot.CreatedAt.IsZero())
 		assert.Equal(t, originalCreatedAt.Unix(), updatedSnapshot.CreatedAt.Unix(), "created_at should be preserved from original")
 
 		// updated_at should be updated to now (newer than original)
+		require.False(t, updatedSnapshot.UpdatedAt.IsZero())
 		assert.True(t, updatedSnapshot.UpdatedAt.After(originalUpdatedAt), "updated_at should be updated to a newer time")
 	})
 
@@ -640,8 +653,8 @@ func TestResource_Update(t *testing.T) {
 			Type:             fixture.ValidResourceTypeType().Serialize(),
 			CommonVersion:    0,
 			ConsistencyToken: "",
-			CreatedAt:        time.Time{}, // Zero timestamp
-			UpdatedAt:        time.Time{}, // Zero timestamp
+			CreatedAt:        time.Time{},
+			UpdatedAt:        time.Time{},
 		}
 
 		reporterResourceSnapshot := ReporterResourceSnapshot{
@@ -700,8 +713,8 @@ func TestResource_Update(t *testing.T) {
 			Type:             fixture.ValidResourceTypeType().Serialize(),
 			CommonVersion:    0,
 			ConsistencyToken: "",
-			CreatedAt:        time.Time{}, // Zero timestamp - legacy resource
-			UpdatedAt:        time.Time{}, // Zero timestamp
+			CreatedAt:        time.Time{},
+			UpdatedAt:        time.Time{},
 		}
 
 		reporterResourceSnapshot := ReporterResourceSnapshot{
@@ -774,6 +787,8 @@ func TestResource_Update(t *testing.T) {
 			"created_at should remain zero after second update")
 
 		// updated_at should be newer than the first update
+		require.False(t, secondSnapshot.UpdatedAt.IsZero())
+		require.False(t, firstSnapshot.UpdatedAt.IsZero())
 		assert.True(t, secondSnapshot.UpdatedAt.After(firstSnapshot.UpdatedAt),
 			"updated_at should be updated on second update")
 	})
@@ -790,8 +805,8 @@ func TestResource_Update(t *testing.T) {
 			Type:             fixture.ValidResourceTypeType().Serialize(),
 			CommonVersion:    3,
 			ConsistencyToken: "token",
-			CreatedAt:        time.Time{},   // Zero - inconsistent state
-			UpdatedAt:        pastUpdatedAt, // Has a value
+			CreatedAt:        time.Time{},    // Zero - inconsistent state
+			UpdatedAt:        pastUpdatedAt,  // Has a value
 		}
 
 		reporterResourceSnapshot := ReporterResourceSnapshot{
@@ -842,6 +857,7 @@ func TestResource_Update(t *testing.T) {
 			"created_at should remain zero for legacy resources")
 
 		// updated_at should be set to 'now'
+		require.False(t, updatedSnapshot.UpdatedAt.IsZero())
 		assert.True(t, updatedSnapshot.UpdatedAt.After(pastUpdatedAt),
 			"updated_at should be newer than the previous value")
 	})

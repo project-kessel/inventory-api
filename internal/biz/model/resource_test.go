@@ -193,14 +193,16 @@ func TestResource_Update(t *testing.T) {
 		reporterVersionDomain, _ := NewReporterVersion(reporterVersion)
 		commonRepresentation, _ := NewRepresentation(newCommonData)
 		reporterRepresentation, _ := NewRepresentation(newReporterData)
+		txID := TransactionId("tx-update-with-version")
 
 		err = original.Update(
 			reporterResourceKey,
 			apiHref,
-			consoleHref,
+			&consoleHref,
 			&reporterVersionDomain,
-			commonRepresentation,
-			reporterRepresentation,
+			&reporterRepresentation,
+			&commonRepresentation,
+			&txID,
 		)
 
 		if err != nil {
@@ -259,14 +261,15 @@ func TestResource_Update(t *testing.T) {
 		commonData, _ := NewRepresentation(internal.JsonObject{"test": "data"})
 		reporterData, _ := NewRepresentation(internal.JsonObject{"test": "data"})
 
+		txID := TransactionId("tx-nonexistent")
 		err = original.Update(
 			nonExistentKey,
 			apiHref,
-			consoleHref,
+			&consoleHref,
 			nil,
-			commonData,
-			reporterData,
-			TransactionId("tx-nonexistent"),
+			&reporterData,
+			&commonData,
+			&txID,
 		)
 
 		if err == nil {
@@ -294,14 +297,15 @@ func TestResource_Update(t *testing.T) {
 		commonData, _ := NewRepresentation(internal.JsonObject{"test": "data"})
 		reporterData, _ := NewRepresentation(internal.JsonObject{"test": "data"})
 
+		txID := TransactionId("tx-preserve-fields")
 		err = original.Update(
 			reporterResourceKey,
 			apiHref,
-			consoleHref,
+			&consoleHref,
 			nil,
-			commonData,
-			reporterData,
-			TransactionId("tx-preserve-fields"),
+			&reporterData,
+			&commonData,
+			&txID,
 		)
 
 		if err != nil {
@@ -337,14 +341,15 @@ func TestResource_Update(t *testing.T) {
 		commonData, _ := NewRepresentation(internal.JsonObject{"test": "data"})
 		reporterData, _ := NewRepresentation(internal.JsonObject{"test": "data"})
 
+		txID := TransactionId("tx-empty-console-href")
 		err = original.Update(
 			reporterResourceKey,
 			apiHref,
-			consoleHref,
+			&consoleHref,
 			nil,
-			commonData,
-			reporterData,
-			TransactionId("tx-empty-console-href"),
+			&reporterData,
+			&commonData,
+			&txID,
 		)
 
 		if err != nil {
@@ -395,14 +400,15 @@ func TestResource_Update(t *testing.T) {
 		commonData, _ := NewRepresentation(internal.JsonObject{"test": "data"})
 		reporterData, _ := NewRepresentation(internal.JsonObject{"test": "data"})
 
+		txID := TransactionId("tx-nil-reporter-version")
 		err = original.Update(
 			reporterResourceKey,
 			apiHref,
-			consoleHref,
+			&consoleHref,
 			nil, // nil reporter version
-			commonData,
-			reporterData,
-			TransactionId("tx-nil-reporter-version"),
+			&reporterData,
+			&commonData,
+			&txID,
 		)
 
 		if err != nil {
@@ -436,8 +442,9 @@ func TestResource_Update(t *testing.T) {
 		consoleHref, _ := NewConsoleHref("https://console.example.com/updated")
 		commonData, _ := NewRepresentation(internal.JsonObject{"workspace_id": "updated-workspace"})
 		reporterData, _ := NewRepresentation(internal.JsonObject{"updated": true})
+		emptyTxID, _ := NewTransactionId("")
 
-		err = resource.Update(resource.ReporterResources()[0].Key(), apiHref, consoleHref, nil, commonData, reporterData, NewTransactionId(""))
+		err = resource.Update(resource.ReporterResources()[0].Key(), apiHref, &consoleHref, nil, &reporterData, &commonData, &emptyTxID)
 		require.NoError(t, err)
 
 		updatedSnapshot, _, _, _, err := resource.Serialize()
@@ -472,10 +479,10 @@ func TestResource_Update(t *testing.T) {
 		err = original.Update(
 			reporterResourceKey,
 			apiHref,
-			consoleHref,
+			&consoleHref,
 			nil,
-			commonData,
-			reporterData,
+			&reporterData,
+			&commonData,
 			&emptyTransactionId,
 		)
 
@@ -549,14 +556,15 @@ func TestResource_Update(t *testing.T) {
 		reporterData, _ := NewRepresentation(internal.JsonObject{"updated": true})
 
 		beforeUpdate := time.Now()
+		emptyTxID, _ := NewTransactionId("")
 		err := resource.Update(
 			resource.ReporterResources()[0].Key(),
 			apiHref,
-			consoleHref,
+			&consoleHref,
 			nil,
-			commonData,
-			reporterData,
-			NewTransactionId(""),
+			&reporterData,
+			&commonData,
+			&emptyTxID,
 		)
 		afterUpdate := time.Now()
 
@@ -618,15 +626,16 @@ func TestResource_Update(t *testing.T) {
 		consoleHref, _ := NewConsoleHref("https://console.example.com/updated")
 		commonData, _ := NewRepresentation(internal.JsonObject{"workspace_id": "updated-workspace"})
 		reporterData, _ := NewRepresentation(internal.JsonObject{"updated": true})
+		emptyTxID, _ := NewTransactionId("")
 
 		err := resource.Update(
 			resource.ReporterResources()[0].Key(),
 			apiHref,
-			consoleHref,
+			&consoleHref,
 			nil,
-			commonData,
-			reporterData,
-			NewTransactionId(""),
+			&reporterData,
+			&commonData,
+			&emptyTxID,
 		)
 		require.NoError(t, err)
 
@@ -680,15 +689,16 @@ func TestResource_Update(t *testing.T) {
 		consoleHref, _ := NewConsoleHref("https://console.example.com/updated")
 		commonData, _ := NewRepresentation(internal.JsonObject{"workspace_id": "test"})
 		reporterData, _ := NewRepresentation(internal.JsonObject{"test": true})
+		emptyTxID, _ := NewTransactionId("")
 
 		err := resource.Update(
 			resource.ReporterResources()[0].Key(),
 			apiHref,
-			consoleHref,
+			&consoleHref,
 			nil,
-			commonData,
-			reporterData,
-			NewTransactionId(""),
+			&reporterData,
+			&commonData,
+			&emptyTxID,
 		)
 		require.NoError(t, err)
 
@@ -741,15 +751,16 @@ func TestResource_Update(t *testing.T) {
 		consoleHref, _ := NewConsoleHref("https://console.example.com/v1")
 		commonData, _ := NewRepresentation(internal.JsonObject{"workspace_id": "test"})
 		reporterData, _ := NewRepresentation(internal.JsonObject{"version": 1})
+		emptyTxID, _ := NewTransactionId("")
 
 		err := resource.Update(
 			resource.ReporterResources()[0].Key(),
 			apiHref,
-			consoleHref,
+			&consoleHref,
 			nil,
-			commonData,
-			reporterData,
-			NewTransactionId(""),
+			&reporterData,
+			&commonData,
+			&emptyTxID,
 		)
 		require.NoError(t, err)
 
@@ -771,11 +782,11 @@ func TestResource_Update(t *testing.T) {
 		err = resource.Update(
 			resource.ReporterResources()[0].Key(),
 			apiHref2,
-			consoleHref2,
+			&consoleHref2,
 			nil,
-			commonData2,
-			reporterData2,
-			NewTransactionId(""),
+			&reporterData2,
+			&commonData2,
+			&emptyTxID,
 		)
 		require.NoError(t, err)
 
@@ -837,15 +848,16 @@ func TestResource_Update(t *testing.T) {
 		consoleHref, _ := NewConsoleHref("https://console.example.com/updated")
 		commonData, _ := NewRepresentation(internal.JsonObject{"workspace_id": "test"})
 		reporterData, _ := NewRepresentation(internal.JsonObject{"test": true})
+		emptyTxID, _ := NewTransactionId("")
 
 		err := resource.Update(
 			resource.ReporterResources()[0].Key(),
 			apiHref,
-			consoleHref,
+			&consoleHref,
 			nil,
-			commonData,
-			reporterData,
-			NewTransactionId(""),
+			&reporterData,
+			&commonData,
+			&emptyTxID,
 		)
 		require.NoError(t, err, "Update should succeed even with zero created_at")
 

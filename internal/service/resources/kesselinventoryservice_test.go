@@ -2833,9 +2833,8 @@ func TestInventoryService_ReportResource_AllOptionalMetadataFields(t *testing.T)
 
 // --- ReportResource: Nil/Empty Optional Struct Combinations ---
 
-// Representation validation: both common and reporter must be non-nil.
-// Both nil, reporter-only, or common-only return an error.
-// Empty structs are accepted by the domain (empty representation data).
+// Representation validation: both common and reporter must be non-nil and non-empty.
+// Both nil, reporter-only, common-only, or both-empty return an error.
 func TestInventoryService_ReportResource_NilOrEmptyRepresentationStructs(t *testing.T) {
 	claims := &authnapi.Claims{
 		SubjectId: authnapi.SubjectId("reporter-service"),
@@ -2847,7 +2846,6 @@ func TestInventoryService_ReportResource_NilOrEmptyRepresentationStructs(t *test
 		localResourceId string
 		common          *structpb.Struct
 		reporter        *structpb.Struct
-		expectSuccess   bool
 		expectMsg       string
 	}{
 		{
@@ -2907,12 +2905,7 @@ func TestInventoryService_ReportResource_NilOrEmptyRepresentationStructs(t *test
 						Reporter: tc.reporter,
 					},
 				}
-				var expectation Expectation
-				if tc.expectSuccess {
-					expectation = requireSuccess()
-				} else {
-					expectation = requireErrorContaining(codes.InvalidArgument, tc.expectMsg)
-				}
+				expectation := requireErrorContaining(codes.InvalidArgument, tc.expectMsg)
 				return TestServerConfig{
 						Usecase:       uc,
 						Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
@@ -3045,7 +3038,6 @@ func TestInventoryService_ReportResource_ValidationErrorFormats(t *testing.T) {
 		reporterType      string
 		common            *structpb.Struct
 		reporter          *structpb.Struct
-		expectSuccess     bool
 		expectCode        codes.Code
 		expectMsgContains string
 	}{
@@ -3077,7 +3069,7 @@ func TestInventoryService_ReportResource_ValidationErrorFormats(t *testing.T) {
 			},
 			reporter:          nil,
 			expectCode:        codes.InvalidArgument,
-			expectMsgContains: "representation required",
+			expectMsgContains: "invalid ReporterRepresentation representation: representation required",
 		},
 		{
 			name:         "nil common representation (reporter-only returns error)",
@@ -3090,7 +3082,7 @@ func TestInventoryService_ReportResource_ValidationErrorFormats(t *testing.T) {
 				},
 			},
 			expectCode:        codes.InvalidArgument,
-			expectMsgContains: "representation required",
+			expectMsgContains: "invalid CommonRepresentation representation: representation required",
 		},
 	}
 
@@ -3113,12 +3105,7 @@ func TestInventoryService_ReportResource_ValidationErrorFormats(t *testing.T) {
 						Reporter: tc.reporter,
 					},
 				}
-				var expectation Expectation
-				if tc.expectSuccess {
-					expectation = requireSuccess()
-				} else {
-					expectation = requireErrorContaining(tc.expectCode, tc.expectMsgContains)
-				}
+				expectation := requireErrorContaining(tc.expectCode, tc.expectMsgContains)
 				return TestServerConfig{
 						Usecase:       uc,
 						Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},

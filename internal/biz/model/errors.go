@@ -72,6 +72,14 @@ func ValidateUUIDRequired(field string, id uuid.UUID) error {
 	return nil
 }
 
+// ValidateNotNil validates that a value is not nil. Returns wrapped ErrNil when value is nil.
+func ValidateNotNil(field string, value interface{}) error {
+	if value == nil {
+		return fmt.Errorf("%w: %s", ErrNil, field)
+	}
+	return nil
+}
+
 // ValidateMaxLength validates that a string does not exceed maximum length
 func ValidateMaxLength(field, value string, maxLength int) error {
 	if len(value) > maxLength {

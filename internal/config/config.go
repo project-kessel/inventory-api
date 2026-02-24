@@ -147,15 +147,14 @@ func (o *OptionsConfig) InjectClowdAppConfig(appconfig *clowder.AppConfig) error
 	return nil
 }
 
-// ConfigureAuthz updates Authz settings based on ClowdApp AppConfig. No-op if Authz or Kessel options are nil.
+// ConfigureAuthz updates Authz settings based on ClowdApp AppConfig.
+// No-op if OptionsConfig, Authz, or Kessel is nil.
 func (o *OptionsConfig) ConfigureAuthz(endpoint clowder.DependencyEndpoint) {
-	if o == nil || o.Authz == nil {
+	if o == nil || o.Authz == nil || o.Authz.Kessel == nil {
 		return
 	}
 	o.Authz.Authz = authz.Kessel
-	if o.Authz.Kessel != nil {
-		o.Authz.Kessel.URL = fmt.Sprintf("%s:%d", endpoint.Hostname, 9000)
-	}
+	o.Authz.Kessel.URL = fmt.Sprintf("%s:%d", endpoint.Hostname, 9000)
 }
 
 // ConfigureStorage updates Storage settings based on ClowdApp AppConfig. Returns error if Storage is nil.

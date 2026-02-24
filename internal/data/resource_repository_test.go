@@ -1962,8 +1962,9 @@ func TestFindLatestRepresentations(t *testing.T) {
 			require.NoError(t, err)
 
 			transactionId1 := bizmodel.NewTransactionId("test-transaction-id-v1")
-			emptyApiHref, _ := bizmodel.NewApiHref("")
-			err = resource.Update(key, emptyApiHref, nil, nil, &updatedReporter1, &updatedCommon1, &transactionId1)
+			placeholderApiHref, err := bizmodel.NewApiHref("https://api.example.com/placeholder")
+			require.NoError(t, err)
+			err = resource.Update(key, placeholderApiHref, nil, nil, &updatedReporter1, &updatedCommon1, &transactionId1)
 			require.NoError(t, err)
 			err = repo.Save(db, resource, bizmodel.OperationTypeUpdated, "tx-latest-v1")
 			require.NoError(t, err)
@@ -1981,7 +1982,7 @@ func TestFindLatestRepresentations(t *testing.T) {
 			require.NoError(t, err)
 
 			transactionId2 := bizmodel.NewTransactionId("test-transaction-id-v2")
-			err = resource.Update(key, emptyApiHref, nil, nil, &updatedReporter2, &updatedCommon2, &transactionId2)
+			err = resource.Update(key, placeholderApiHref, nil, nil, &updatedReporter2, &updatedCommon2, &transactionId2)
 			require.NoError(t, err)
 			err = repo.Save(db, resource, bizmodel.OperationTypeUpdated, "tx-latest-v2")
 			require.NoError(t, err)
@@ -2057,8 +2058,9 @@ func TestFindCurrentAndPreviousVersionedRepresentations(t *testing.T) {
 				require.NoError(t, err)
 
 				transactionId := newUniqueTxID("test-transaction-id-workspace-unique")
-				emptyApiHref, _ := bizmodel.NewApiHref("")
-				err = resource.Update(key, emptyApiHref, nil, nil, &updatedReporter, &updatedCommon, &transactionId)
+				placeholderApiHref, err := bizmodel.NewApiHref("https://api.example.com/placeholder")
+				require.NoError(t, err)
+				err = resource.Update(key, placeholderApiHref, nil, nil, &updatedReporter, &updatedCommon, &transactionId)
 				require.NoError(t, err)
 				require.NoError(t, repo.Save(db, resource, bizmodel.OperationTypeUpdated, "tx-ws-update"))
 

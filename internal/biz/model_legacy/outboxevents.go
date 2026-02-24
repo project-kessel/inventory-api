@@ -85,7 +85,7 @@ type EventResourceReporter struct {
 	ConsoleHref        string  `json:"console_href"`
 	ApiHref            string  `json:"api_href"`
 	LocalResourceId    string  `json:"local_resource_id"`
-	ReporterVersion    *string `json:"reporter_version"`
+	ReporterVersion    *string `json:"reporter_version,omitempty"`
 }
 
 type EventRelationshipMetadata struct {

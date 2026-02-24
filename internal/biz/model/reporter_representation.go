@@ -116,7 +116,7 @@ func (rr ReporterRepresentation) Serialize() ReporterRepresentationSnapshot {
 		CommonVersion:      commonVersionUint,
 		Tombstone:          rr.tombstone.Serialize(),
 		TransactionId:      rr.transactionId.Serialize(),
-		CreatedAt:          time.Now(), // TODO: Add proper timestamp from domain entity if available
+		CreatedAt:          time.Now(),
 	}
 }
 

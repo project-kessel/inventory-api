@@ -12,9 +12,9 @@ if [[ ! "${NAMESPACE}" == "ephemeral"* ]] || [[ "$IS_ACTIVE" -eq 0 ]]; then
     exit 1
 fi
 
-INVENTORY_PODS=$(oc get deploy kessel-inventory-api -o jsonpath='{.status.readyReplicas}')
-KIC_PODS=$(oc get deploy kessel-inventory-consumer-service -o jsonpath='{.status.readyReplicas}')
-KKC_PODS=$(oc get sps kessel-kafka-connect-connect -o jsonpath='{.status.readyPods}')
+INVENTORY_PODS=$(oc get deploy kessel-inventory-api -o jsonpath='{.status.readyReplicas}' 2> /dev/null)
+KIC_PODS=$(oc get deploy kessel-inventory-consumer-service -o jsonpath='{.status.readyReplicas}' 2> /dev/null)
+KKC_PODS=$(oc get sps kessel-kafka-connect-connect -o jsonpath='{.status.readyPods}' 2> /dev/null)
 
 # clean up all files/volumes and setup config
 echo "Removing old grafana volume if it exists..."

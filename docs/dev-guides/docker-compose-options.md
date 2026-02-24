@@ -153,9 +153,14 @@ make inventory-down
 
 If you need just the monitoring stack for metrics-related testing (such as monitoring other dependencies like the Kessel Inventory Consumer or Kessel Kafka Connect), this setup provides a local running Prometheus, Grafana, and Alertmanager, configured to scrape services running in Ephemeral. The Prometheus config is dynamically generated for your ephemeral namespace and captures metrics from Kessel Inventory, Kessel Inventory Consumer, and Kessel Kafka Connect in Ephemeral. Grafana is also pre-loaded with a `prometheus-ephem` data source and loads our current dashboards which were extracted from our [dashboards folder](../../dashboards/)
 
-Prerequesites:
-1. Kessel Inventory is deployed to ephemeral: `bonfire deploy kessel -C kessel-inventory` OR `bonfire deploy kessel -C kessel-inventory-consumer` to capture all possible metrics with this setup
-2.
+**Prerequisites**
+
+You must either deploy Kessel to ephemeral using bonfire **OR** target an existing ephemeral namespace where Kessel is already deployed
+* `bonfire deploy kessel -C kessel-inventory` (or `kessel-inventory-consumer` to capture all possible metrics)
+OR
+* `oc project existing-ephemeral-namespace`
+
+The latter option allows you to monitor another users namespace for any particular reason such as onboarding assistance or troubleshotting
 
 To start the monitoring stack:
 ```shell

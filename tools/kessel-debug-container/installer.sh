@@ -24,7 +24,18 @@ grep "grpcurl_${GRPCURL_VERSION}_linux_amd64.rpm" grpcurl_checksums.txt | sha256
 grep "zed_${ZED_VERSION}_linux_amd64.rpm" zed_checksums.txt | sha256sum -c -
 popd
 
-# Download kafka tools
+# Download latest 3.9.x kafka tools
+# note currently hardcoded to only support kafka 3.9.x
+# this should remain until clusters move to 4.x
+BASE_URL="https://dlcdn.apache.org/kafka/"
+KAFKA_VERSION=$(
+  curl -fsSL "$BASE_URL" \
+    | grep -Eo 'href="3\.9\.[0-9]+/' \
+    | sed -E 's|href="||; s|/||' \
+    | sort -V \
+    | tail -n 1
+)
+
 curl -fLo /tmp/kafka.tgz https://dlcdn.apache.org/kafka/${KAFKA_VERSION}/kafka_${SCALA_VERSION}-${KAFKA_VERSION}.tgz
 
 echo "Setting up EPEL Repository..."

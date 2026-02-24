@@ -116,7 +116,7 @@ func TestReporterDataRepresentation_Initialization(t *testing.T) {
 		require.ErrorIs(t, err, ErrNil)
 	})
 
-	t.Run("should accept empty data for partial representation (common-only)", func(t *testing.T) {
+	t.Run("should reject empty data", func(t *testing.T) {
 		t.Parallel()
 
 		dataRep, err := NewReporterDataRepresentation(
@@ -129,7 +129,7 @@ func TestReporterDataRepresentation_Initialization(t *testing.T) {
 			fixture.ValidTransactionIdType(),
 		)
 
-		assertValidReporterDataRepresentation(t, dataRep, err, "empty data allowed for partial representation")
+		assertInvalidReporterDataRepresentation(t, dataRep, err, ErrInvalidData)
 	})
 
 	t.Run("should reject data representation with empty reporter resource ID", func(t *testing.T) {

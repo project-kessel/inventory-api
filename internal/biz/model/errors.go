@@ -73,7 +73,7 @@ func ValidateUUIDRequired(field string, id uuid.UUID) error {
 }
 
 // ValidateNotNil validates that a value is not nil. Returns wrapped ErrNil when value is nil.
-func ValidateNotNil(field string, value interface{}) error {
+func ValidateNotNil[T any](field string, value *T) error {
 	if value == nil {
 		return fmt.Errorf("%w: %s", ErrNil, field)
 	}

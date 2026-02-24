@@ -151,9 +151,13 @@ make inventory-down
 
 ## Monitoring Stack Only
 
-If you need just the monitoring stack for metrics related testing (such as monitoring other dependencies like the Kessel Inventory Consumer or Kessel Kafka Connect), this setup provides a local running Prometheus, Grafana, and Alertmanager, configured to scrape services running in Ephemeral. The Prometheus config is dynamically generated for your ephemeral namespace and captures metrics from Kessel Inventory, Kessel Inventory Consumer, and Kessel Kafka Connect in Ephemeral. Grafana is also pre-loaded with a `prometheus-ephem` data source and loads our current dashboards which were extracted from our [dashboards folder](../../dashboards/)
+If you need just the monitoring stack for metrics-related testing (such as monitoring other dependencies like the Kessel Inventory Consumer or Kessel Kafka Connect), this setup provides a local running Prometheus, Grafana, and Alertmanager, configured to scrape services running in Ephemeral. The Prometheus config is dynamically generated for your ephemeral namespace and captures metrics from Kessel Inventory, Kessel Inventory Consumer, and Kessel Kafka Connect in Ephemeral. Grafana is also pre-loaded with a `prometheus-ephem` data source and loads our current dashboards which were extracted from our [dashboards folder](../../dashboards/)
 
-To start Inventory and the monitoring stack:
+Prerequesites:
+1. Kessel Inventory is deployed to ephemeral: `bonfire deploy kessel -C kessel-inventory` OR `bonfire deploy kessel -C kessel-inventory-consumer` to capture all possible metrics with this setup
+2.
+
+To start the monitoring stack:
 ```shell
 make monitoring-only
 ```
@@ -163,10 +167,9 @@ To stop the monitoring stack:
 make monitoring-down
 ```
 
-> Note: If it's your first time spinning up Grafana, there is an initial login configured that you'll need to reset.
+> Note: There is an initial login configured for Grafana by default that you'll need to reset or hit the `skip` link on the login page.
 > username: `admin`
 > password: `admin`.
-> You will be prompted to reset it afterwards.
 > Grafana is configured with 2 datasources, make sure to select `prometheus-ephem` on any dashboards.
 
 Grafana URL: http://localhost:3000

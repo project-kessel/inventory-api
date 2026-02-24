@@ -2249,7 +2249,7 @@ func TestResolveConsistencyToken_UnknownPreference(t *testing.T) {
 	// Create a config with an invalid/unknown preference value
 	unknownConfig := model.Consistency{
 		Preference: model.ConsistencyPreference(999), // Invalid preference
-		Token:      model.MinimizeLatencyToken,
+		Token:      nil,
 	}
 
 	token, err := uc.resolveConsistencyToken(ctx, unknownConfig, reporterResourceKey, false)

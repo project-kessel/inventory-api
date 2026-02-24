@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestConsistencyPreference_String(t *testing.T) {
@@ -49,31 +50,32 @@ func TestConsistencyPreference_String(t *testing.T) {
 func TestNewConsistencyUnspecified(t *testing.T) {
 	c := NewConsistencyUnspecified()
 	assert.Equal(t, ConsistencyUnspecified, c.Preference)
-	assert.Empty(t, c.Token)
+	assert.Nil(t, c.Token)
 }
 
 func TestNewConsistencyMinimizeLatency(t *testing.T) {
 	c := NewConsistencyMinimizeLatency()
 	assert.Equal(t, ConsistencyMinimizeLatency, c.Preference)
-	assert.Empty(t, c.Token)
+	assert.Nil(t, c.Token)
 }
 
 func TestNewConsistencyAtLeastAsAcknowledged(t *testing.T) {
 	c := NewConsistencyAtLeastAsAcknowledged()
 	assert.Equal(t, ConsistencyAtLeastAsAcknowledged, c.Preference)
-	assert.Empty(t, c.Token)
+	assert.Nil(t, c.Token)
 }
 
 func TestNewConsistencyAtLeastAsFresh(t *testing.T) {
 	token := "test-token-123"
 	c := NewConsistencyAtLeastAsFresh(ConsistencyToken(token))
 	assert.Equal(t, ConsistencyAtLeastAsFresh, c.Preference)
-	assert.Equal(t, token, string(c.Token))
+	require.NotNil(t, c.Token)
+	assert.Equal(t, token, c.Token.String())
 }
 
 func TestConsistency_Defaults(t *testing.T) {
 	// Zero value should be unspecified
 	var c Consistency
 	assert.Equal(t, ConsistencyUnspecified, c.Preference)
-	assert.Empty(t, c.Token)
+	assert.Nil(t, c.Token)
 }

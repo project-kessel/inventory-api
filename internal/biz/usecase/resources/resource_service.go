@@ -557,7 +557,11 @@ func (uc *Usecase) resolveConsistencyToken(ctx context.Context, consistency mode
 
 	case model.ConsistencyAtLeastAsFresh:
 		uc.Log.WithContext(ctx).Debug("Using at_least_as_fresh consistency")
-		return string(consistency.Token), nil
+		token := consistency.AtLeastAsFresh()
+		if token == nil {
+			return "", status.Error(codes.Internal, "at_least_as_fresh consistency is missing token")
+		}
+		return token.Serialize(), nil
 
 	case model.ConsistencyAtLeastAsAcknowledged:
 		uc.Log.WithContext(ctx).Debug("Using at_least_as_acknowledged consistency - looking up token from DB")
@@ -694,11 +698,11 @@ func checkBulkCommandToV1beta1(cmd CheckBulkCommand) *kessel.CheckBulkRequest {
 	}
 
 	var consistency *kessel.Consistency
-	if cmd.Consistency.Preference == model.ConsistencyAtLeastAsFresh {
+	if token := cmd.Consistency.AtLeastAsFresh(); token != nil {
 		consistency = &kessel.Consistency{
 			Requirement: &kessel.Consistency_AtLeastAsFresh{
 				AtLeastAsFresh: &kessel.ConsistencyToken{
-					Token: cmd.Consistency.AtLeastAsFresh().Serialize(),
+					Token: token.Serialize(),
 				},
 			},
 		}
@@ -773,11 +777,11 @@ func lookupResourcesCommandToV1beta1(cmd LookupResourcesCommand) *kessel.LookupR
 		continuationToken = &cmd.Continuation
 	}
 	var consistency *kessel.Consistency
-	if cmd.Consistency.Preference == model.ConsistencyAtLeastAsFresh {
+	if token := cmd.Consistency.AtLeastAsFresh(); token != nil {
 		consistency = &kessel.Consistency{
 			Requirement: &kessel.Consistency_AtLeastAsFresh{
 				AtLeastAsFresh: &kessel.ConsistencyToken{
-					Token: cmd.Consistency.AtLeastAsFresh().Serialize(),
+					Token: token.Serialize(),
 				},
 			},
 		}

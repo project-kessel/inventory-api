@@ -120,9 +120,12 @@ type Consistency_AtLeastAsFresh struct {
 }
 
 type Consistency_AtLeastAsAcknowledged struct {
-	// All data used in the API call must be *at least as acknowledged*
-	// meaning it will include data up to the latest write known to Inventory.
-	// Provides read-after-write consistency for inventory-managed resources.
+	// All data used in the API call must be *at least as acknowledged*,
+	// meaning it includes data up to the latest write known to Inventory.
+	// This aligns with `ReportResource` write visibility: when
+	// `write_visibility=IMMEDIATE`, the write waits for acknowledgement, so a
+	// subsequent read with `at_least_as_acknowledged` is guaranteed to be at
+	// least as recent as that write.
 	// Some deployments may use this behavior as the server-side default when
 	// consistency is omitted.
 	// *Must* be set true if used.

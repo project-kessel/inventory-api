@@ -12,6 +12,7 @@ import (
 // Validation sentinel errors
 var (
 	ErrEmpty       = errors.New("cannot be empty")
+	ErrNil         = errors.New("cannot be nil")
 	ErrTooLong     = errors.New("exceeds maximum length")
 	ErrTooSmall    = errors.New("below minimum value")
 	ErrInvalidURL  = errors.New("invalid url")

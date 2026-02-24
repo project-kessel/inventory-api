@@ -149,11 +149,11 @@ func (f *fakeResourceRepository) Save(tx *gorm.DB, resource bizmodel.Resource, o
 		commonVersion: commonVersion,
 	}
 
-	if reporterRepresentationSnapshot != nil && reporterRepresentationSnapshot.TransactionId != "" {
-		f.markTransactionIdAsProcessed(reporterRepresentationSnapshot.TransactionId)
+	if reporterRepresentationSnapshot != nil && reporterRepresentationSnapshot.TransactionId != nil && *reporterRepresentationSnapshot.TransactionId != "" {
+		f.markTransactionIdAsProcessed(*reporterRepresentationSnapshot.TransactionId)
 	}
-	if commonRepresentationSnapshot != nil && commonRepresentationSnapshot.TransactionId != "" {
-		f.markTransactionIdAsProcessed(commonRepresentationSnapshot.TransactionId)
+	if commonRepresentationSnapshot != nil && commonRepresentationSnapshot.TransactionId != nil && *commonRepresentationSnapshot.TransactionId != "" {
+		f.markTransactionIdAsProcessed(*commonRepresentationSnapshot.TransactionId)
 	}
 
 	return nil

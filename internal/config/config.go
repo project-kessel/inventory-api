@@ -48,15 +48,21 @@ func NewOptionsConfig() *OptionsConfig {
 	}
 }
 
-// LogConfigurationInfo outputs connection details to logs when in debug for testing (no secret data is output)
+// LogConfigurationInfo outputs connection details to logs when in debug for testing (no secret data is output).
+// Option groups (Server, Authn, Storage, etc.) are optional pointers; nil groups are skipped.
 func LogConfigurationInfo(options *OptionsConfig) {
-	log.Debugf("Server Configuration: Public URL: %s, HTTP Listener: %s, GRPC Listener: %s",
-		options.Server.PublicUrl,
-		options.Server.HttpOptions.Addr,
-		options.Server.GrpcOptions.Addr)
+	if options == nil {
+		return
+	}
+	if options.Server != nil {
+		log.Debugf("Server Configuration: Public URL: %s, HTTP Listener: %s, GRPC Listener: %s",
+			options.Server.PublicUrl,
+			options.Server.HttpOptions.Addr,
+			options.Server.GrpcOptions.Addr)
+	}
 
 	// Log authn configuration if OIDC is configured
-	if options.Authn.Authenticator != nil {
+	if options.Authn != nil && options.Authn.Authenticator != nil {
 		for _, entry := range options.Authn.Authenticator.Chain {
 			if entry.Type == string(authnFactory.TypeOIDC) {
 				if authServerURL, ok := entry.Config[authn.OIDCConfigKeyAuthServerURL].(string); ok && authServerURL != "" {
@@ -71,7 +77,7 @@ func LogConfigurationInfo(options *OptionsConfig) {
 		}
 	}
 
-	if options.Storage.Database == storage.Postgres {
+	if options.Storage != nil && options.Storage.Database == storage.Postgres {
 		log.Debugf("Storage Configuration: Host: %s, DB: %s, Port: %s, SSLMode: %s, RDSCACert: %s",
 			options.Storage.Postgres.Host,
 			options.Storage.Postgres.DbName,
@@ -81,7 +87,7 @@ func LogConfigurationInfo(options *OptionsConfig) {
 		)
 	}
 
-	if options.Authz.Authz == authz.Kessel {
+	if options.Authz != nil && options.Authz.Authz == authz.Kessel && options.Authz.Kessel != nil {
 		log.Debugf("Authz Configuration: URL: %s, Insecure?: %t, OIDC?: %t",
 			options.Authz.Kessel.URL,
 			options.Authz.Kessel.Insecure,
@@ -89,60 +95,74 @@ func LogConfigurationInfo(options *OptionsConfig) {
 		)
 	}
 
-	log.Debugf("Consumer Configuration: Bootstrap Server: %s, Topic: %s, Consumer Max Retries: %d, Operation Max Retries: %d, Backoff Factor: %d, Max Backoff Seconds: %d",
-		options.Consumer.BootstrapServers,
-		options.Consumer.Topic,
-		options.Consumer.RetryOptions.ConsumerMaxRetries,
-		options.Consumer.RetryOptions.OperationMaxRetries,
-		options.Consumer.RetryOptions.BackoffFactor,
-		options.Consumer.RetryOptions.MaxBackoffSeconds,
-	)
+	if options.Consumer != nil {
+		log.Debugf("Consumer Configuration: Bootstrap Server: %s, Topic: %s, Consumer Max Retries: %d, Operation Max Retries: %d, Backoff Factor: %d, Max Backoff Seconds: %d",
+			options.Consumer.BootstrapServers,
+			options.Consumer.Topic,
+			options.Consumer.RetryOptions.ConsumerMaxRetries,
+			options.Consumer.RetryOptions.OperationMaxRetries,
+			options.Consumer.RetryOptions.BackoffFactor,
+			options.Consumer.RetryOptions.MaxBackoffSeconds,
+		)
+		log.Debugf("Consumer Auth Settings: Enabled: %v, Security Protocol: %s, Mechanism: %s, Username: %s",
+			options.Consumer.AuthOptions.Enabled,
+			options.Consumer.AuthOptions.SecurityProtocol,
+			options.Consumer.AuthOptions.SASLMechanism,
+			options.Consumer.AuthOptions.SASLUsername)
+	}
 
-	log.Debugf("Consumer Auth Settings: Enabled: %v, Security Protocol: %s, Mechanism: %s, Username: %s",
-		options.Consumer.AuthOptions.Enabled,
-		options.Consumer.AuthOptions.SecurityProtocol,
-		options.Consumer.AuthOptions.SASLMechanism,
-		options.Consumer.AuthOptions.SASLUsername)
-
-	log.Debugf("Consistency Configuration: Read-After-Write Enabled: %t, Read-After-Write Allowlist: %+s",
-		options.Consistency.ReadAfterWriteEnabled,
-		options.Consistency.ReadAfterWriteAllowlist,
-	)
-
+	if options.Consistency != nil {
+		log.Debugf("Consistency Configuration: Read-After-Write Enabled: %t, Read-After-Write Allowlist: %+s",
+			options.Consistency.ReadAfterWriteEnabled,
+			options.Consistency.ReadAfterWriteAllowlist,
+		)
+	}
 }
 
-// InjectClowdAppConfig updates service options based on values in the ClowdApp AppConfig
+// InjectClowdAppConfig updates service options based on values in the ClowdApp AppConfig.
+// Option groups (Authz, Storage, Consumer) are optional; nil groups are skipped.
 func (o *OptionsConfig) InjectClowdAppConfig(appconfig *clowder.AppConfig) error {
+	if o == nil {
+		return nil
+	}
 	// check for authz config
-	if len(appconfig.Endpoints) > 0 {
+	if o.Authz != nil && len(appconfig.Endpoints) > 0 {
 		for _, endpoint := range appconfig.Endpoints {
 			if endpoint.App == authz.RelationsAPI {
 				o.ConfigureAuthz(endpoint)
+				break
 			}
 		}
 	}
 	// check for db config
-	if !common.IsNil(appconfig.Database) {
-		err := o.ConfigureStorage(appconfig)
-		if err != nil {
+	if o.Storage != nil && !common.IsNil(appconfig.Database) {
+		if err := o.ConfigureStorage(appconfig); err != nil {
 			return fmt.Errorf("failed to configure storage: %w", err)
 		}
 	}
 	// check for consumer config
-	if !common.IsNil(appconfig.Kafka) {
+	if o.Consumer != nil && !common.IsNil(appconfig.Kafka) {
 		o.ConfigureConsumer(appconfig)
 	}
 	return nil
 }
 
-// ConfigureAuthz updates Authz settings based on ClowdApp AppConfig
+// ConfigureAuthz updates Authz settings based on ClowdApp AppConfig. No-op if Authz or Kessel options are nil.
 func (o *OptionsConfig) ConfigureAuthz(endpoint clowder.DependencyEndpoint) {
+	if o == nil || o.Authz == nil {
+		return
+	}
 	o.Authz.Authz = authz.Kessel
-	o.Authz.Kessel.URL = fmt.Sprintf("%s:%d", endpoint.Hostname, 9000)
+	if o.Authz.Kessel != nil {
+		o.Authz.Kessel.URL = fmt.Sprintf("%s:%d", endpoint.Hostname, 9000)
+	}
 }
 
-// ConfigureStorage updates Storage settings based on ClowdApp AppConfig
+// ConfigureStorage updates Storage settings based on ClowdApp AppConfig. Returns error if Storage is nil.
 func (o *OptionsConfig) ConfigureStorage(appconfig *clowder.AppConfig) error {
+	if o == nil || o.Storage == nil {
+		return fmt.Errorf("options or storage config is nil")
+	}
 	o.Storage.Database = storage.Postgres
 	o.Storage.Postgres.Host = appconfig.Database.Hostname
 	o.Storage.Postgres.Port = strconv.Itoa(appconfig.Database.Port)
@@ -161,8 +181,11 @@ func (o *OptionsConfig) ConfigureStorage(appconfig *clowder.AppConfig) error {
 	return nil
 }
 
-// ConfigureConsumer updates Consumer settings based on ClowdApp AppConfig
+// ConfigureConsumer updates Consumer settings based on ClowdApp AppConfig. No-op if Consumer is nil.
 func (o *OptionsConfig) ConfigureConsumer(appconfig *clowder.AppConfig) {
+	if o == nil || o.Consumer == nil {
+		return
+	}
 	var brokers []string
 	for _, broker := range appconfig.Kafka.Brokers {
 		brokers = append(brokers, fmt.Sprintf("%s:%d", broker.Hostname, *broker.Port))

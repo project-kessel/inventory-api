@@ -417,7 +417,7 @@ func (uc *Usecase) CheckForUpdate(ctx context.Context, relation model.Relation, 
 
 // CheckBulk performs bulk permission checks.
 func (uc *Usecase) CheckBulk(ctx context.Context, cmd CheckBulkCommand) (*CheckBulkResult, error) {
-	if model.ConsistencyPreferenceOf(cmd.Consistency) == model.ConsistencyAtLeastAsAcknowledged {
+	if model.ConsistencyTypeOf(cmd.Consistency) == model.ConsistencyAtLeastAsAcknowledged {
 		return nil, status.Errorf(codes.InvalidArgument, "inventory-managed consistency tokens aren't available")
 	}
 	// Meta-authorization for each item
@@ -441,7 +441,7 @@ func (uc *Usecase) CheckBulk(ctx context.Context, cmd CheckBulkCommand) (*CheckB
 // CheckSelfBulk performs bulk permission checks for the authenticated user.
 // Uses relation="check_self" for meta-authorization.
 func (uc *Usecase) CheckSelfBulk(ctx context.Context, cmd CheckSelfBulkCommand) (*CheckBulkResult, error) {
-	if model.ConsistencyPreferenceOf(cmd.Consistency) == model.ConsistencyAtLeastAsAcknowledged {
+	if model.ConsistencyTypeOf(cmd.Consistency) == model.ConsistencyAtLeastAsAcknowledged {
 		return nil, status.Errorf(codes.InvalidArgument, "inventory-managed consistency tokens aren't available")
 	}
 	// Meta-authorization for each item
@@ -504,7 +504,7 @@ func (uc *Usecase) checkPermission(ctx context.Context, relation model.Relation,
 // Returns a streaming client for receiving lookup results.
 // TODO: remove v1beta1 response type
 func (uc *Usecase) LookupResources(ctx context.Context, cmd LookupResourcesCommand) (grpc.ServerStreamingClient[kessel.LookupResourcesResponse], error) {
-	if model.ConsistencyPreferenceOf(cmd.Consistency) == model.ConsistencyAtLeastAsAcknowledged {
+	if model.ConsistencyTypeOf(cmd.Consistency) == model.ConsistencyAtLeastAsAcknowledged {
 		return nil, status.Errorf(codes.InvalidArgument, "inventory-managed consistency tokens aren't available")
 	}
 	// Meta-authorize against the resource type (not a specific resource instance)
@@ -550,7 +550,7 @@ func (uc *Usecase) resolveConsistencyToken(ctx context.Context, consistency mode
 		uc.Log.WithContext(ctx).Debug("Feature flag default-to-at-least-as-acknowledged is disabled")
 	}
 
-	switch model.ConsistencyPreferenceOf(consistency) {
+	switch model.ConsistencyTypeOf(consistency) {
 	case model.ConsistencyMinimizeLatency:
 		uc.Log.WithContext(ctx).Debug("Using minimize_latency consistency")
 		return "", nil
@@ -576,7 +576,7 @@ func (uc *Usecase) resolveConsistencyToken(ctx context.Context, consistency mode
 		return "", nil
 
 	default:
-		return "", status.Errorf(codes.Internal, "unexpected consistency preference: %v", model.ConsistencyPreferenceOf(consistency))
+		return "", status.Errorf(codes.Internal, "unexpected consistency preference: %v", model.ConsistencyTypeOf(consistency))
 	}
 }
 

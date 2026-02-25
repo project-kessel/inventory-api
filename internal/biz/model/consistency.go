@@ -79,12 +79,6 @@ func normalizeConsistency(c Consistency) Consistency {
 	return c
 }
 
-// ConsistencyPreferenceOf returns the preference for the provided consistency.
-// Nil consistency is treated as unspecified.
-func ConsistencyPreferenceOf(c Consistency) ConsistencyPreference {
-	return ConsistencyTypeOf(c)
-}
-
 // ConsistencyTypeOf returns the type for the provided consistency.
 // Nil consistency is treated as unspecified.
 func ConsistencyTypeOf(c Consistency) ConsistencyType {

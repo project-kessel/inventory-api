@@ -2216,8 +2216,8 @@ func TestResolveConsistencyToken_OverrideFeatureFlag(t *testing.T) {
 	}
 }
 
-func TestResolveConsistencyToken_UnknownPreference(t *testing.T) {
-	// Unknown preferences are rejected defensively.
+func TestResolveConsistencyToken_NilConsistencyDefaultsToUnspecified(t *testing.T) {
+	// Nil consistency should behave like unspecified for backward compatibility.
 	ctx := testAuthzContext()
 	logger := log.DefaultLogger
 
@@ -2246,15 +2246,9 @@ func TestResolveConsistencyToken_UnknownPreference(t *testing.T) {
 	reporterResourceKey, err := model.NewReporterResourceKey(localResourceId, resourceType, reporterType, reporterInstanceId)
 	require.NoError(t, err)
 
-	// Create a config with an invalid/unknown preference value
-	unknownConfig := model.Consistency{
-		Preference: model.ConsistencyPreference(999), // Invalid preference
-		Token:      nil,
-	}
+	token, err := uc.resolveConsistencyToken(ctx, nil, reporterResourceKey, false)
 
-	token, err := uc.resolveConsistencyToken(ctx, unknownConfig, reporterResourceKey, false)
-
-	assert.Error(t, err)
+	assert.NoError(t, err)
 	assert.Equal(t, "", token)
 }
 

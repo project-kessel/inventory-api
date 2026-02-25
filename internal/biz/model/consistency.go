@@ -3,11 +3,73 @@ package model
 // MinimizeLatencyToken as an empty token string.
 const MinimizeLatencyToken ConsistencyToken = ""
 
-// Consistency represents the consistency requirement for authorization checks.
-// It holds all options: Unspecified, MinimizeLatency, AtLeastAsAcknowledged, and AtLeastAsFresh (with token).
-type Consistency struct {
-	Preference ConsistencyPreference // Unspecified, MinimizeLatency, AtLeastAsAcknowledged, or AtLeastAsFresh
-	Token      *ConsistencyToken     // Set only when Preference is AtLeastAsFresh
+// Consistency models consistency requirements as a closed set of variants.
+// Implementations are intentionally sealed to this package.
+type Consistency interface {
+	sealedConsistency()
+	Preference() ConsistencyPreference
+	MinimizeLatency() bool
+	AtLeastAsFresh() *ConsistencyToken
+}
+
+type unspecifiedConsistency struct{}
+type minimizeLatencyConsistency struct{}
+type atLeastAsAcknowledgedConsistency struct{}
+type atLeastAsFreshConsistency struct {
+	token ConsistencyToken
+}
+
+func (unspecifiedConsistency) sealedConsistency()           {}
+func (minimizeLatencyConsistency) sealedConsistency()       {}
+func (atLeastAsAcknowledgedConsistency) sealedConsistency() {}
+func (atLeastAsFreshConsistency) sealedConsistency()        {}
+
+func (unspecifiedConsistency) Preference() ConsistencyPreference {
+	return ConsistencyUnspecified
+}
+
+func (minimizeLatencyConsistency) Preference() ConsistencyPreference {
+	return ConsistencyMinimizeLatency
+}
+
+func (atLeastAsAcknowledgedConsistency) Preference() ConsistencyPreference {
+	return ConsistencyAtLeastAsAcknowledged
+}
+
+func (atLeastAsFreshConsistency) Preference() ConsistencyPreference {
+	return ConsistencyAtLeastAsFresh
+}
+
+func (unspecifiedConsistency) MinimizeLatency() bool {
+	return false
+}
+
+func (minimizeLatencyConsistency) MinimizeLatency() bool {
+	return true
+}
+
+func (atLeastAsAcknowledgedConsistency) MinimizeLatency() bool {
+	return false
+}
+
+func (atLeastAsFreshConsistency) MinimizeLatency() bool {
+	return false
+}
+
+func (unspecifiedConsistency) AtLeastAsFresh() *ConsistencyToken {
+	return nil
+}
+
+func (minimizeLatencyConsistency) AtLeastAsFresh() *ConsistencyToken {
+	return nil
+}
+
+func (atLeastAsAcknowledgedConsistency) AtLeastAsFresh() *ConsistencyToken {
+	return nil
+}
+
+func (c atLeastAsFreshConsistency) AtLeastAsFresh() *ConsistencyToken {
+	return &c.token
 }
 
 // NewConsistencyUnspecified creates a Consistency with Preference set to
@@ -15,37 +77,42 @@ type Consistency struct {
 // It is a placeholder value only; final consistency behavior is resolved
 // elsewhere (for example, via configuration or feature flags).
 func NewConsistencyUnspecified() Consistency {
-	return Consistency{Preference: ConsistencyUnspecified, Token: nil}
+	return unspecifiedConsistency{}
 }
 
 // NewConsistencyMinimizeLatency creates a Consistency that minimizes latency.
 func NewConsistencyMinimizeLatency() Consistency {
-	return Consistency{Preference: ConsistencyMinimizeLatency, Token: nil}
+	return minimizeLatencyConsistency{}
 }
 
 // NewConsistencyAtLeastAsAcknowledged creates a Consistency for at_least_as_acknowledged.
 func NewConsistencyAtLeastAsAcknowledged() Consistency {
-	return Consistency{Preference: ConsistencyAtLeastAsAcknowledged, Token: nil}
+	return atLeastAsAcknowledgedConsistency{}
 }
 
 // NewConsistencyAtLeastAsFresh creates a Consistency requiring at-least-as-fresh semantics.
 func NewConsistencyAtLeastAsFresh(token ConsistencyToken) Consistency {
-	return Consistency{Preference: ConsistencyAtLeastAsFresh, Token: &token}
+	return atLeastAsFreshConsistency{token: token}
 }
 
-// MinimizeLatency returns true if this consistency prefers minimal latency over freshness.
-func (c Consistency) MinimizeLatency() bool {
-	return c.Preference == ConsistencyMinimizeLatency
-}
-
-// AtLeastAsFresh returns the consistency token only when Preference is
-// ConsistencyAtLeastAsFresh and a token is present.
-// For all other preferences, it returns nil.
-func (c Consistency) AtLeastAsFresh() *ConsistencyToken {
-	if c.Preference == ConsistencyAtLeastAsFresh {
-		return c.Token
+// normalizeConsistency maps nil Consistency to the unspecified variant.
+func normalizeConsistency(c Consistency) Consistency {
+	if c == nil {
+		return NewConsistencyUnspecified()
 	}
-	return nil
+	return c
+}
+
+// ConsistencyPreferenceOf returns the preference for the provided consistency.
+// Nil consistency is treated as unspecified.
+func ConsistencyPreferenceOf(c Consistency) ConsistencyPreference {
+	return normalizeConsistency(c).Preference()
+}
+
+// ConsistencyAtLeastAsFreshToken returns the token only for at-least-as-fresh consistency.
+// Nil consistency is treated as unspecified.
+func ConsistencyAtLeastAsFreshToken(c Consistency) *ConsistencyToken {
+	return normalizeConsistency(c).AtLeastAsFresh()
 }
 
 // ConsistencyPreference represents how consistency should be handled for authz checks.

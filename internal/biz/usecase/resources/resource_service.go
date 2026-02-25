@@ -417,7 +417,7 @@ func (uc *Usecase) CheckForUpdate(ctx context.Context, relation model.Relation, 
 
 // CheckBulk performs bulk permission checks.
 func (uc *Usecase) CheckBulk(ctx context.Context, cmd CheckBulkCommand) (*CheckBulkResult, error) {
-	if cmd.Consistency.Preference == model.ConsistencyAtLeastAsAcknowledged {
+	if model.ConsistencyPreferenceOf(cmd.Consistency) == model.ConsistencyAtLeastAsAcknowledged {
 		return nil, status.Errorf(codes.InvalidArgument, "inventory-managed consistency tokens aren't available")
 	}
 	// Meta-authorization for each item
@@ -441,7 +441,7 @@ func (uc *Usecase) CheckBulk(ctx context.Context, cmd CheckBulkCommand) (*CheckB
 // CheckSelfBulk performs bulk permission checks for the authenticated user.
 // Uses relation="check_self" for meta-authorization.
 func (uc *Usecase) CheckSelfBulk(ctx context.Context, cmd CheckSelfBulkCommand) (*CheckBulkResult, error) {
-	if cmd.Consistency.Preference == model.ConsistencyAtLeastAsAcknowledged {
+	if model.ConsistencyPreferenceOf(cmd.Consistency) == model.ConsistencyAtLeastAsAcknowledged {
 		return nil, status.Errorf(codes.InvalidArgument, "inventory-managed consistency tokens aren't available")
 	}
 	// Meta-authorization for each item
@@ -504,7 +504,7 @@ func (uc *Usecase) checkPermission(ctx context.Context, relation model.Relation,
 // Returns a streaming client for receiving lookup results.
 // TODO: remove v1beta1 response type
 func (uc *Usecase) LookupResources(ctx context.Context, cmd LookupResourcesCommand) (grpc.ServerStreamingClient[kessel.LookupResourcesResponse], error) {
-	if cmd.Consistency.Preference == model.ConsistencyAtLeastAsAcknowledged {
+	if model.ConsistencyPreferenceOf(cmd.Consistency) == model.ConsistencyAtLeastAsAcknowledged {
 		return nil, status.Errorf(codes.InvalidArgument, "inventory-managed consistency tokens aren't available")
 	}
 	// Meta-authorize against the resource type (not a specific resource instance)
@@ -550,14 +550,14 @@ func (uc *Usecase) resolveConsistencyToken(ctx context.Context, consistency mode
 		uc.Log.WithContext(ctx).Debug("Feature flag default-to-at-least-as-acknowledged is disabled")
 	}
 
-	switch consistency.Preference {
+	switch model.ConsistencyPreferenceOf(consistency) {
 	case model.ConsistencyMinimizeLatency:
 		uc.Log.WithContext(ctx).Debug("Using minimize_latency consistency")
 		return "", nil
 
 	case model.ConsistencyAtLeastAsFresh:
 		uc.Log.WithContext(ctx).Debug("Using at_least_as_fresh consistency")
-		token := consistency.AtLeastAsFresh()
+		token := model.ConsistencyAtLeastAsFreshToken(consistency)
 		if token == nil {
 			return "", status.Error(codes.Internal, "at_least_as_fresh consistency is missing token")
 		}
@@ -576,7 +576,7 @@ func (uc *Usecase) resolveConsistencyToken(ctx context.Context, consistency mode
 		return "", nil
 
 	default:
-		return "", status.Errorf(codes.Internal, "unexpected consistency preference: %v", consistency.Preference)
+		return "", status.Errorf(codes.Internal, "unexpected consistency preference: %v", model.ConsistencyPreferenceOf(consistency))
 	}
 }
 
@@ -698,7 +698,7 @@ func checkBulkCommandToV1beta1(cmd CheckBulkCommand) *kessel.CheckBulkRequest {
 	}
 
 	var consistency *kessel.Consistency
-	if token := cmd.Consistency.AtLeastAsFresh(); token != nil {
+	if token := model.ConsistencyAtLeastAsFreshToken(cmd.Consistency); token != nil {
 		consistency = &kessel.Consistency{
 			Requirement: &kessel.Consistency_AtLeastAsFresh{
 				AtLeastAsFresh: &kessel.ConsistencyToken{
@@ -777,7 +777,7 @@ func lookupResourcesCommandToV1beta1(cmd LookupResourcesCommand) *kessel.LookupR
 		continuationToken = &cmd.Continuation
 	}
 	var consistency *kessel.Consistency
-	if token := cmd.Consistency.AtLeastAsFresh(); token != nil {
+	if token := model.ConsistencyAtLeastAsFreshToken(cmd.Consistency); token != nil {
 		consistency = &kessel.Consistency{
 			Requirement: &kessel.Consistency_AtLeastAsFresh{
 				AtLeastAsFresh: &kessel.ConsistencyToken{

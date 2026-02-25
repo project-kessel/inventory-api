@@ -49,33 +49,85 @@ func TestConsistencyPreference_String(t *testing.T) {
 
 func TestNewConsistencyUnspecified(t *testing.T) {
 	c := NewConsistencyUnspecified()
-	assert.Equal(t, ConsistencyUnspecified, c.Preference)
-	assert.Nil(t, c.Token)
+	assert.Equal(t, ConsistencyUnspecified, ConsistencyPreferenceOf(c))
+	assert.Nil(t, ConsistencyAtLeastAsFreshToken(c))
 }
 
 func TestNewConsistencyMinimizeLatency(t *testing.T) {
 	c := NewConsistencyMinimizeLatency()
-	assert.Equal(t, ConsistencyMinimizeLatency, c.Preference)
-	assert.Nil(t, c.Token)
+	assert.Equal(t, ConsistencyMinimizeLatency, ConsistencyPreferenceOf(c))
+	assert.Nil(t, ConsistencyAtLeastAsFreshToken(c))
+	assert.True(t, c.MinimizeLatency())
 }
 
 func TestNewConsistencyAtLeastAsAcknowledged(t *testing.T) {
 	c := NewConsistencyAtLeastAsAcknowledged()
-	assert.Equal(t, ConsistencyAtLeastAsAcknowledged, c.Preference)
-	assert.Nil(t, c.Token)
+	assert.Equal(t, ConsistencyAtLeastAsAcknowledged, ConsistencyPreferenceOf(c))
+	assert.Nil(t, ConsistencyAtLeastAsFreshToken(c))
+	assert.False(t, c.MinimizeLatency())
 }
 
 func TestNewConsistencyAtLeastAsFresh(t *testing.T) {
 	token := "test-token-123"
 	c := NewConsistencyAtLeastAsFresh(ConsistencyToken(token))
-	assert.Equal(t, ConsistencyAtLeastAsFresh, c.Preference)
-	require.NotNil(t, c.Token)
-	assert.Equal(t, token, c.Token.String())
+	assert.Equal(t, ConsistencyAtLeastAsFresh, ConsistencyPreferenceOf(c))
+	atLeastAsFresh := ConsistencyAtLeastAsFreshToken(c)
+	require.NotNil(t, atLeastAsFresh)
+	assert.Equal(t, token, atLeastAsFresh.String())
+	assert.False(t, c.MinimizeLatency())
 }
 
 func TestConsistency_Defaults(t *testing.T) {
-	// Zero value should be unspecified
+	// Nil interface value should be treated as unspecified.
 	var c Consistency
-	assert.Equal(t, ConsistencyUnspecified, c.Preference)
-	assert.Nil(t, c.Token)
+	assert.Equal(t, ConsistencyUnspecified, ConsistencyPreferenceOf(c))
+	assert.Nil(t, ConsistencyAtLeastAsFreshToken(c))
+}
+
+func TestConsistencyAtLeastAsFreshToken_OnlyFreshCarriesToken(t *testing.T) {
+	freshToken := ConsistencyToken("fresh-token-xyz")
+	tests := []struct {
+		name         string
+		consistency  Consistency
+		expectNil    bool
+		expectedPref ConsistencyPreference
+	}{
+		{
+			name:         "unspecified has no token",
+			consistency:  NewConsistencyUnspecified(),
+			expectNil:    true,
+			expectedPref: ConsistencyUnspecified,
+		},
+		{
+			name:         "minimize_latency has no token",
+			consistency:  NewConsistencyMinimizeLatency(),
+			expectNil:    true,
+			expectedPref: ConsistencyMinimizeLatency,
+		},
+		{
+			name:         "at_least_as_acknowledged has no token",
+			consistency:  NewConsistencyAtLeastAsAcknowledged(),
+			expectNil:    true,
+			expectedPref: ConsistencyAtLeastAsAcknowledged,
+		},
+		{
+			name:         "at_least_as_fresh carries token",
+			consistency:  NewConsistencyAtLeastAsFresh(freshToken),
+			expectNil:    false,
+			expectedPref: ConsistencyAtLeastAsFresh,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.expectedPref, ConsistencyPreferenceOf(tt.consistency))
+			token := ConsistencyAtLeastAsFreshToken(tt.consistency)
+			if tt.expectNil {
+				assert.Nil(t, token)
+				return
+			}
+			require.NotNil(t, token)
+			assert.Equal(t, freshToken, *token)
+		})
+	}
 }

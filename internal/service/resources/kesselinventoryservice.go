@@ -125,7 +125,7 @@ func (s *InventoryService) CheckSelf(ctx context.Context, req *pb.CheckSelfReque
 		return nil, err
 	}
 	consistency := consistencyFromProto(req.GetConsistency())
-	log.Infof("CheckSelf request consistency: %s", consistency.Preference)
+	log.Infof("CheckSelf request consistency: %s", model.ConsistencyPreferenceOf(consistency))
 	resp, consistencyToken, err := s.Ctl.CheckSelf(ctx, relation, reporterResourceKey, consistency)
 	if err != nil {
 		return nil, err
@@ -371,7 +371,7 @@ func (s *InventoryService) StreamedListObjects(
 	ctx := stream.Context()
 
 	consistency := consistencyFromProto(req.GetConsistency())
-	log.Debugf("StreamedListObjects consistency: %s", consistency.Preference)
+	log.Debugf("StreamedListObjects consistency: %s", model.ConsistencyPreferenceOf(consistency))
 
 	lookupCmd, err := ToLookupResourcesCommand(req)
 	if err != nil {

@@ -342,8 +342,10 @@ func TestToLookupResourcesCommand_WithConsistencyToken(t *testing.T) {
 	result, err := svc.ToLookupResourcesCommand(input)
 	require.NoError(t, err)
 
-	assert.False(t, result.Consistency.MinimizeLatency(), "expected at-least-as-fresh when token provided")
-	assert.Equal(t, token, result.Consistency.AtLeastAsFresh().String(), "command should use the request consistency token")
+	assert.Equal(t, model.ConsistencyAtLeastAsFresh, model.ConsistencyTypeOf(result.Consistency), "expected at-least-as-fresh when token provided")
+	atLeastAsFreshToken := model.ConsistencyAtLeastAsFreshToken(result.Consistency)
+	require.NotNil(t, atLeastAsFreshToken)
+	assert.Equal(t, token, atLeastAsFreshToken.String(), "command should use the request consistency token")
 }
 
 func TestToLookupResourcesCommand_NoPagination(t *testing.T) {

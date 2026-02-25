@@ -57,14 +57,14 @@ func TestNewConsistencyMinimizeLatency(t *testing.T) {
 	c := NewConsistencyMinimizeLatency()
 	assert.Equal(t, ConsistencyMinimizeLatency, ConsistencyPreferenceOf(c))
 	assert.Nil(t, ConsistencyAtLeastAsFreshToken(c))
-	assert.True(t, c.MinimizeLatency())
+	assert.Equal(t, ConsistencyMinimizeLatency, ConsistencyTypeOf(c))
 }
 
 func TestNewConsistencyAtLeastAsAcknowledged(t *testing.T) {
 	c := NewConsistencyAtLeastAsAcknowledged()
 	assert.Equal(t, ConsistencyAtLeastAsAcknowledged, ConsistencyPreferenceOf(c))
 	assert.Nil(t, ConsistencyAtLeastAsFreshToken(c))
-	assert.False(t, c.MinimizeLatency())
+	assert.Equal(t, ConsistencyAtLeastAsAcknowledged, ConsistencyTypeOf(c))
 }
 
 func TestNewConsistencyAtLeastAsFresh(t *testing.T) {
@@ -74,7 +74,9 @@ func TestNewConsistencyAtLeastAsFresh(t *testing.T) {
 	atLeastAsFresh := ConsistencyAtLeastAsFreshToken(c)
 	require.NotNil(t, atLeastAsFresh)
 	assert.Equal(t, token, atLeastAsFresh.String())
-	assert.False(t, c.MinimizeLatency())
+	freshConsistency, ok := AsAtLeastAsFresh(c)
+	require.True(t, ok)
+	assert.Equal(t, ConsistencyToken(token), freshConsistency.ConsistencyToken())
 }
 
 func TestConsistency_Defaults(t *testing.T) {

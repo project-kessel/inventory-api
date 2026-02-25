@@ -7,9 +7,13 @@ const MinimizeLatencyToken ConsistencyToken = ""
 // Implementations are intentionally sealed to this package.
 type Consistency interface {
 	sealedConsistency()
-	Preference() ConsistencyPreference
-	MinimizeLatency() bool
-	AtLeastAsFresh() *ConsistencyToken
+	Type() ConsistencyType
+}
+
+// AtLeastAsFreshConsistency is the only consistency subtype that carries a token.
+type AtLeastAsFreshConsistency interface {
+	Consistency
+	ConsistencyToken() ConsistencyToken
 }
 
 type unspecifiedConsistency struct{}
@@ -24,52 +28,24 @@ func (minimizeLatencyConsistency) sealedConsistency()       {}
 func (atLeastAsAcknowledgedConsistency) sealedConsistency() {}
 func (atLeastAsFreshConsistency) sealedConsistency()        {}
 
-func (unspecifiedConsistency) Preference() ConsistencyPreference {
+func (unspecifiedConsistency) Type() ConsistencyType {
 	return ConsistencyUnspecified
 }
 
-func (minimizeLatencyConsistency) Preference() ConsistencyPreference {
+func (minimizeLatencyConsistency) Type() ConsistencyType {
 	return ConsistencyMinimizeLatency
 }
 
-func (atLeastAsAcknowledgedConsistency) Preference() ConsistencyPreference {
+func (atLeastAsAcknowledgedConsistency) Type() ConsistencyType {
 	return ConsistencyAtLeastAsAcknowledged
 }
 
-func (atLeastAsFreshConsistency) Preference() ConsistencyPreference {
+func (atLeastAsFreshConsistency) Type() ConsistencyType {
 	return ConsistencyAtLeastAsFresh
 }
 
-func (unspecifiedConsistency) MinimizeLatency() bool {
-	return false
-}
-
-func (minimizeLatencyConsistency) MinimizeLatency() bool {
-	return true
-}
-
-func (atLeastAsAcknowledgedConsistency) MinimizeLatency() bool {
-	return false
-}
-
-func (atLeastAsFreshConsistency) MinimizeLatency() bool {
-	return false
-}
-
-func (unspecifiedConsistency) AtLeastAsFresh() *ConsistencyToken {
-	return nil
-}
-
-func (minimizeLatencyConsistency) AtLeastAsFresh() *ConsistencyToken {
-	return nil
-}
-
-func (atLeastAsAcknowledgedConsistency) AtLeastAsFresh() *ConsistencyToken {
-	return nil
-}
-
-func (c atLeastAsFreshConsistency) AtLeastAsFresh() *ConsistencyToken {
-	return &c.token
+func (c atLeastAsFreshConsistency) ConsistencyToken() ConsistencyToken {
+	return c.token
 }
 
 // NewConsistencyUnspecified creates a Consistency with Preference set to
@@ -106,38 +82,58 @@ func normalizeConsistency(c Consistency) Consistency {
 // ConsistencyPreferenceOf returns the preference for the provided consistency.
 // Nil consistency is treated as unspecified.
 func ConsistencyPreferenceOf(c Consistency) ConsistencyPreference {
-	return normalizeConsistency(c).Preference()
+	return ConsistencyTypeOf(c)
+}
+
+// ConsistencyTypeOf returns the type for the provided consistency.
+// Nil consistency is treated as unspecified.
+func ConsistencyTypeOf(c Consistency) ConsistencyType {
+	return normalizeConsistency(c).Type()
+}
+
+// AsAtLeastAsFresh narrows Consistency to AtLeastAsFreshConsistency when possible.
+func AsAtLeastAsFresh(c Consistency) (AtLeastAsFreshConsistency, bool) {
+	fresh, ok := normalizeConsistency(c).(AtLeastAsFreshConsistency)
+	return fresh, ok
 }
 
 // ConsistencyAtLeastAsFreshToken returns the token only for at-least-as-fresh consistency.
 // Nil consistency is treated as unspecified.
 func ConsistencyAtLeastAsFreshToken(c Consistency) *ConsistencyToken {
-	return normalizeConsistency(c).AtLeastAsFresh()
+	fresh, ok := AsAtLeastAsFresh(c)
+	if !ok {
+		return nil
+	}
+	token := fresh.ConsistencyToken()
+	return &token
 }
 
-// ConsistencyPreference represents how consistency should be handled for authz checks.
-type ConsistencyPreference int
+// ConsistencyType represents how consistency should be handled for authz checks.
+type ConsistencyType int
+
+// ConsistencyPreference is a backward-compatible alias for ConsistencyType.
+type ConsistencyPreference = ConsistencyType
 
 const (
 	// ConsistencyUnspecified indicates no preference was specified by the client.
 	// The behavior depends on the feature flag authz.kessel.default-to-at-least-as-acknowledged.
-	ConsistencyUnspecified ConsistencyPreference = 0
+	ConsistencyUnspecified ConsistencyType = 0
 
 	// ConsistencyMinimizeLatency uses the fastest snapshot available.
 	// No consistency guarantee - uses whatever data is fastest to retrieve.
-	ConsistencyMinimizeLatency ConsistencyPreference = 1
+	ConsistencyMinimizeLatency ConsistencyType = 1
 
 	// ConsistencyAtLeastAsAcknowledged looks up the consistency token from inventory's database.
 	// Provides read-after-write consistency for inventory-managed resources.
-	ConsistencyAtLeastAsAcknowledged ConsistencyPreference = 2
+	ConsistencyAtLeastAsAcknowledged ConsistencyType = 2
 
 	// ConsistencyAtLeastAsFresh uses a consistency token provided by the caller.
 	// All data used in the API call must be at least as fresh as the token.
-	ConsistencyAtLeastAsFresh ConsistencyPreference = 3
+	ConsistencyAtLeastAsFresh ConsistencyType = 3
 )
 
-// String returns a human-readable representation of the consistency preference.
-func (c ConsistencyPreference) String() string {
+// String returns a human-readable representation of the consistency type.
+func (c ConsistencyType) String() string {
 	switch c {
 	case ConsistencyUnspecified:
 		return "unspecified"

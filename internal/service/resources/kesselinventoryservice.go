@@ -222,20 +222,19 @@ func toCheckBulkCommand(req *pb.CheckBulkRequest) (resources.CheckBulkCommand, e
 // ConsistencyFromProto converts v1beta2 Consistency to model.Consistency.
 // Used by Check, CheckSelf, CheckBulk, CheckSelfBulk, and LookupResources.
 func consistencyFromProto(c *pb.Consistency) model.Consistency {
-	if c == nil {
-		return model.NewConsistencyUnspecified()
-	}
 	if c.GetMinimizeLatency() {
 		return model.NewConsistencyMinimizeLatency()
 	}
 	if c.GetAtLeastAsAcknowledged() {
 		return model.NewConsistencyAtLeastAsAcknowledged()
 	}
-	if c.GetAtLeastAsFresh() == nil {
+	if c.GetAtLeastAsFresh() != nil {
+		token := model.DeserializeConsistencyToken(c.GetAtLeastAsFresh().GetToken())
+		return model.NewConsistencyAtLeastAsFresh(token)
+	} else if c.GetAtLeastAsFresh() != nil {
 		return model.NewConsistencyUnspecified()
 	}
-	token := model.DeserializeConsistencyToken(c.GetAtLeastAsFresh().GetToken())
-	return model.NewConsistencyAtLeastAsFresh(token)
+	return model.NewConsistencyUnspecified()
 }
 
 // fromCheckBulkResult converts a usecase CheckBulkResult to v1beta2 CheckBulkResponse.

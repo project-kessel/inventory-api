@@ -105,9 +105,6 @@ func ConsistencyAtLeastAsFreshToken(c Consistency) *ConsistencyToken {
 // ConsistencyType represents how consistency should be handled for authz checks.
 type ConsistencyType int
 
-// ConsistencyPreference is a backward-compatible alias for ConsistencyType.
-type ConsistencyPreference = ConsistencyType
-
 const (
 	// ConsistencyUnspecified indicates no preference was specified by the client.
 	// The behavior depends on the feature flag authz.kessel.default-to-at-least-as-acknowledged.

@@ -7,10 +7,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestConsistencyPreference_String(t *testing.T) {
+func TestConsistencyType_String(t *testing.T) {
 	tests := []struct {
 		name     string
-		pref     ConsistencyPreference
+		pref     ConsistencyType
 		expected string
 	}{
 		{
@@ -35,7 +35,7 @@ func TestConsistencyPreference_String(t *testing.T) {
 		},
 		{
 			name:     "unknown",
-			pref:     ConsistencyPreference(99),
+			pref:     ConsistencyType(99),
 			expected: "unknown",
 		},
 	}
@@ -57,14 +57,12 @@ func TestNewConsistencyMinimizeLatency(t *testing.T) {
 	c := NewConsistencyMinimizeLatency()
 	assert.Equal(t, ConsistencyMinimizeLatency, ConsistencyTypeOf(c))
 	assert.Nil(t, ConsistencyAtLeastAsFreshToken(c))
-	assert.Equal(t, ConsistencyMinimizeLatency, ConsistencyTypeOf(c))
 }
 
 func TestNewConsistencyAtLeastAsAcknowledged(t *testing.T) {
 	c := NewConsistencyAtLeastAsAcknowledged()
 	assert.Equal(t, ConsistencyAtLeastAsAcknowledged, ConsistencyTypeOf(c))
 	assert.Nil(t, ConsistencyAtLeastAsFreshToken(c))
-	assert.Equal(t, ConsistencyAtLeastAsAcknowledged, ConsistencyTypeOf(c))
 }
 
 func TestNewConsistencyAtLeastAsFresh(t *testing.T) {
@@ -92,37 +90,37 @@ func TestConsistencyAtLeastAsFreshToken_OnlyFreshCarriesToken(t *testing.T) {
 		name         string
 		consistency  Consistency
 		expectNil    bool
-		expectedPref ConsistencyPreference
+		expectedType ConsistencyType
 	}{
 		{
 			name:         "unspecified has no token",
 			consistency:  NewConsistencyUnspecified(),
 			expectNil:    true,
-			expectedPref: ConsistencyUnspecified,
+			expectedType: ConsistencyUnspecified,
 		},
 		{
 			name:         "minimize_latency has no token",
 			consistency:  NewConsistencyMinimizeLatency(),
 			expectNil:    true,
-			expectedPref: ConsistencyMinimizeLatency,
+			expectedType: ConsistencyMinimizeLatency,
 		},
 		{
 			name:         "at_least_as_acknowledged has no token",
 			consistency:  NewConsistencyAtLeastAsAcknowledged(),
 			expectNil:    true,
-			expectedPref: ConsistencyAtLeastAsAcknowledged,
+			expectedType: ConsistencyAtLeastAsAcknowledged,
 		},
 		{
 			name:         "at_least_as_fresh carries token",
 			consistency:  NewConsistencyAtLeastAsFresh(freshToken),
 			expectNil:    false,
-			expectedPref: ConsistencyAtLeastAsFresh,
+			expectedType: ConsistencyAtLeastAsFresh,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.expectedPref, ConsistencyTypeOf(tt.consistency))
+			assert.Equal(t, tt.expectedType, ConsistencyTypeOf(tt.consistency))
 			token := ConsistencyAtLeastAsFreshToken(tt.consistency)
 			if tt.expectNil {
 				assert.Nil(t, token)

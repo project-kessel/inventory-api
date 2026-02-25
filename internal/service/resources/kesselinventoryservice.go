@@ -231,8 +231,6 @@ func consistencyFromProto(c *pb.Consistency) model.Consistency {
 	if c.GetAtLeastAsFresh() != nil {
 		token := model.DeserializeConsistencyToken(c.GetAtLeastAsFresh().GetToken())
 		return model.NewConsistencyAtLeastAsFresh(token)
-	} else if c.GetAtLeastAsFresh() != nil {
-		return model.NewConsistencyUnspecified()
 	}
 	return model.NewConsistencyUnspecified()
 }

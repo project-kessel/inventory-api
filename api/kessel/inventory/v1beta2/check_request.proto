@@ -22,6 +22,9 @@ message CheckRequest {
   // Consistency requirement for the check operation.
   // If not specified, standard server configuration defaults to at_least_as_acknowledged.
   // Server deployments may override this default behavior (for example, to
-  // minimizeLatency).
+  // Consistency requirement for the check operation.
+  // If not specified, standard server configuration defaults to minimizeLatency.
+  // Server deployments may override this default behavior (for example, to
+  // at_least_as_acknowledged).
   optional Consistency consistency = 4;
 }

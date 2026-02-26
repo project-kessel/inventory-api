@@ -34,7 +34,10 @@ type CheckRequest struct {
 	// Consistency requirement for the check operation.
 	// If not specified, standard server configuration defaults to at_least_as_acknowledged.
 	// Server deployments may override this default behavior (for example, to
-	// minimizeLatency).
+	// Consistency requirement for the check operation.
+	// If not specified, standard server configuration defaults to minimizeLatency.
+	// Server deployments may override this default behavior (for example, to
+	// at_least_as_acknowledged).
 	Consistency   *Consistency `protobuf:"bytes,4,opt,name=consistency,proto3,oneof" json:"consistency,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache

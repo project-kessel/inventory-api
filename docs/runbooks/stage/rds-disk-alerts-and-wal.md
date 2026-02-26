@@ -4,9 +4,6 @@
 * TransactionLogDiskSpaceUsageHigh
 * ReplicationSlotLagOrUsageAnomaly
 
->[!NOTE]
-> There is a known issue that whenever the Kafka Connect that facilitates Debezium is restarted, it triggers this WAL growth issue to occur when there is no active API traffic after the restart. This issue will go away as the service is utilized more, but in the interim, a CronJob has been deployed to update a resource every hour and prevent this issue. The CronJob is deployed with the [service](https://github.com/project-kessel/inventory-api/blob/441a0a0b7210b5c837bc4aa40414ea80f2d0ecc3/deploy/kessel-inventory.yaml#L102) and utilizes a [script](https://github.com/project-kessel/inventory-api/blob/main/scripts/heartbeat-fix.sh) in this repo. More details can be found in [RHCLOUD-40690](https://issues.redhat.com/browse/RHCLOUD-40690)
-
 ### Reason
 
 `TransactionLogDiskSpaceUsageHigh` and `ReplicationSlotLagOrUsageAnomaly` alerts are related to the use of logical replication slots for Debezium and would only fire if disk usage by WAL increased substantially over a period of time. Increases in disk usage by the WAL log are generally related to either a replication slot being lost/inactive or the replication slot being idle

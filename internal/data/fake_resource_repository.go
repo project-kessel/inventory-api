@@ -156,11 +156,11 @@ func (f *fakeResourceRepository) Save(tx *gorm.DB, resource bizmodel.Resource, o
 	}
 
 	// Mark transaction IDs as processed for idempotency testing
-	if reporterRepresentationSnapshot.TransactionId != "" {
-		f.markTransactionIdAsProcessed(reporterRepresentationSnapshot.TransactionId)
+	if reporterRepresentationSnapshot.TransactionId != nil && *reporterRepresentationSnapshot.TransactionId != "" {
+		f.markTransactionIdAsProcessed(*reporterRepresentationSnapshot.TransactionId)
 	}
-	if commonRepresentationSnapshot.TransactionId != "" {
-		f.markTransactionIdAsProcessed(commonRepresentationSnapshot.TransactionId)
+	if commonRepresentationSnapshot.TransactionId != nil && *commonRepresentationSnapshot.TransactionId != "" {
+		f.markTransactionIdAsProcessed(*commonRepresentationSnapshot.TransactionId)
 	}
 
 	return nil
@@ -220,7 +220,7 @@ func (f *fakeResourceRepository) FindResourceByKeys(tx *gorm.DB, key bizmodel.Re
 			},
 			ResourceID:            latestResource.resourceID,
 			APIHref:               "",
-			ConsoleHref:           "",
+			ConsoleHref:           nil, // optional
 			RepresentationVersion: latestResource.representationVersion,
 			Generation:            latestResource.generation,
 			Tombstone:             latestResource.tombstone,

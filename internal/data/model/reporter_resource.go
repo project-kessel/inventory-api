@@ -107,12 +107,16 @@ func (rr ReporterResource) SerializeToSnapshot() bizmodel.ReporterResourceSnapsh
 		ReporterInstanceID: rr.ReporterInstanceID,
 	}
 
+	var consoleHref *string
+	if rr.ConsoleHref != "" {
+		consoleHref = &rr.ConsoleHref
+	}
 	return bizmodel.ReporterResourceSnapshot{
 		ID:                    rr.ID,
 		ReporterResourceKey:   keySnapshot,
 		ResourceID:            rr.ResourceID,
 		APIHref:               rr.APIHref,
-		ConsoleHref:           rr.ConsoleHref,
+		ConsoleHref:           consoleHref,
 		RepresentationVersion: rr.RepresentationVersion,
 		Generation:            rr.Generation,
 		Tombstone:             rr.Tombstone,
@@ -123,6 +127,10 @@ func (rr ReporterResource) SerializeToSnapshot() bizmodel.ReporterResourceSnapsh
 
 // DeserializeFromSnapshot creates GORM ReporterResource from snapshot - direct initialization without validation
 func DeserializeReporterResourceFromSnapshot(snapshot bizmodel.ReporterResourceSnapshot) ReporterResource {
+	consoleHref := ""
+	if snapshot.ConsoleHref != nil {
+		consoleHref = *snapshot.ConsoleHref
+	}
 	return ReporterResource{
 		ID: snapshot.ID,
 		ReporterResourceKey: ReporterResourceKey{
@@ -133,7 +141,7 @@ func DeserializeReporterResourceFromSnapshot(snapshot bizmodel.ReporterResourceS
 		},
 		ResourceID:            snapshot.ResourceID,
 		APIHref:               snapshot.APIHref,
-		ConsoleHref:           snapshot.ConsoleHref,
+		ConsoleHref:           consoleHref,
 		RepresentationVersion: snapshot.RepresentationVersion,
 		Generation:            snapshot.Generation,
 		Tombstone:             snapshot.Tombstone,

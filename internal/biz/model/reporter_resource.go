@@ -7,14 +7,15 @@ import (
 	"time"
 )
 
-// Create Entities with unexported fields for encapsulation
+// Create Entities with unexported fields for encapsulation.
+// consoleHref is optional; nil means not set.
 type ReporterResource struct {
 	id ReporterResourceId
 	ReporterResourceKey
 
 	resourceID  ResourceId
 	apiHref     ApiHref
-	consoleHref ConsoleHref
+	consoleHref *ConsoleHref
 
 	representationVersion Version
 	generation            Generation
@@ -31,7 +32,7 @@ type ReporterResourceKey struct {
 	reporter        ReporterId
 }
 
-// Factory methods
+// Factory methods. consoleHref is optional (nil = not set).
 func NewReporterResource(
 	id ReporterResourceId,
 	localResourceId LocalResourceId,
@@ -40,7 +41,7 @@ func NewReporterResource(
 	reporterInstanceId ReporterInstanceId,
 	resourceId ResourceId,
 	apiHref ApiHref,
-	consoleHref ConsoleHref,
+	consoleHref *ConsoleHref,
 ) (ReporterResource, error) {
 	reporterResourceKey, err := NewReporterResourceKey(
 		localResourceId,
@@ -83,10 +84,10 @@ func NewReporterResourceKey(
 	}, nil
 }
 
-// Model Behavior
+// Model Behavior. consoleHref is optional (nil = leave unchanged or clear).
 func (rr *ReporterResource) Update(
 	apiHref ApiHref,
-	consoleHref ConsoleHref,
+	consoleHref *ConsoleHref,
 ) {
 	rr.apiHref = apiHref
 	rr.consoleHref = consoleHref
@@ -145,10 +146,14 @@ func (rr ReporterResource) Key() ReporterResourceKey {
 // ApiHref returns the API href for this reporter resource.
 func (rr ReporterResource) ApiHref() ApiHref { return rr.apiHref }
 
-// ConsoleHref returns the console href for this reporter resource.
-func (rr ReporterResource) ConsoleHref() ConsoleHref { return rr.consoleHref }
+// ConsoleHref returns the console href for this reporter resource. Returns zero value when not set (nil).
+func (rr ReporterResource) ConsoleHref() ConsoleHref {
+	if rr.consoleHref == nil {
+		return ConsoleHref("")
+	}
+	return *rr.consoleHref
+}
 
-// Add timestamp getters
 func (rr ReporterResource) CreatedAt() time.Time {
 	return rr.createdAt
 }
@@ -166,12 +171,17 @@ func (rr ReporterResource) Serialize() ReporterResourceSnapshot {
 		ReporterInstanceID: rr.reporter.reporterInstanceId.Serialize(),
 	}
 
+	var consoleHref *string
+	if rr.consoleHref != nil {
+		s := rr.consoleHref.Serialize()
+		consoleHref = &s
+	}
 	return ReporterResourceSnapshot{
 		ID:                    rr.Id().Serialize(),
 		ReporterResourceKey:   keySnapshot,
 		ResourceID:            rr.resourceID.Serialize(),
 		APIHref:               rr.apiHref.Serialize(),
-		ConsoleHref:           rr.consoleHref.Serialize(),
+		ConsoleHref:           consoleHref,
 		RepresentationVersion: rr.representationVersion.Serialize(),
 		Generation:            rr.generation.Serialize(),
 		Tombstone:             rr.tombstone.Serialize(),
@@ -180,16 +190,22 @@ func (rr ReporterResource) Serialize() ReporterResourceSnapshot {
 	}
 }
 
+// DeserializeReporterResource creates a ReporterResource from a snapshot (no validation).
 func DeserializeReporterResource(snapshot ReporterResourceSnapshot) ReporterResource {
-
 	log.Printf("----------------------------------")
 	log.Printf("ReporterResourceSnapshot : %+v, ", snapshot)
+
+	var consoleHref *ConsoleHref
+	if snapshot.ConsoleHref != nil {
+		ch := DeserializeConsoleHref(*snapshot.ConsoleHref)
+		consoleHref = &ch
+	}
 	return ReporterResource{
 		id:                    DeserializeReporterResourceId(snapshot.ID),
 		ReporterResourceKey:   DeserializeReporterResourceKey(snapshot.ReporterResourceKey.LocalResourceID, snapshot.ReporterResourceKey.ResourceType, snapshot.ReporterResourceKey.ReporterType, snapshot.ReporterResourceKey.ReporterInstanceID),
 		resourceID:            DeserializeResourceId(snapshot.ResourceID),
 		apiHref:               DeserializeApiHref(snapshot.APIHref),
-		consoleHref:           DeserializeConsoleHref(snapshot.ConsoleHref),
+		consoleHref:           consoleHref,
 		representationVersion: DeserializeVersion(snapshot.RepresentationVersion),
 		generation:            DeserializeGeneration(snapshot.Generation),
 		tombstone:             DeserializeTombstone(snapshot.Tombstone),

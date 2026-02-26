@@ -1288,6 +1288,19 @@ func TestTransactionIdIdempotency(t *testing.T) {
 	mc := metricscollector.NewFakeMetricsCollector()
 	usecase := New(resourceRepo, schemaRepo, authorizer, "test-topic", logger, nil, nil, usecaseConfig, mc, nil, newTestSelfSubjectStrategy())
 
+	// When TransactionId is nil, resolveOptionalFields returns nil; domain generates a new transaction ID.
+	// ReportResource should still succeed.
+	t.Run("Nil TransactionId in command resolves to generated ID and create succeeds", func(t *testing.T) {
+		cmd := fixture(t).Basic("host", "hbi", "nil-tx-instance", "local-nil-tx", "ws-nil-tx")
+		require.Nil(t, cmd.TransactionId, "fixture Basic leaves TransactionId nil")
+		err := usecase.ReportResource(ctx, cmd)
+		require.NoError(t, err, "ReportResource with nil TransactionId should succeed (ID generated)")
+		key := createReporterResourceKey(t, "local-nil-tx", "host", "hbi", "nil-tx-instance")
+		found, err := resourceRepo.FindResourceByKeys(nil, key)
+		require.NoError(t, err)
+		require.NotNil(t, found, "Resource should exist after create with nil TransactionId")
+	})
+
 	t.Run("Same transaction ID should be idempotent - no changes to representation tables", func(t *testing.T) {
 		resourceType := "host"
 		reporterType := "hbi"
@@ -1479,6 +1492,22 @@ func TestTransactionIdIdempotency(t *testing.T) {
 	})
 }
 
+// TestResolveOptionalFields_NilOptionalFields_ReturnNils asserts Phase 3.7 behavior:
+// resolveOptionalFields returns pointers as-is; nil in command stays nil (no zero-value collapse).
+func TestResolveOptionalFields_NilOptionalFields_ReturnNils(t *testing.T) {
+	cmd := ReportResourceCommand{
+		TransactionId:          nil,
+		ConsoleHref:            nil,
+		ReporterRepresentation: nil,
+		CommonRepresentation:   nil,
+	}
+	ch, tx, rep, com := resolveOptionalFields(cmd)
+	assert.Nil(t, ch, "ConsoleHref should be nil when cmd.ConsoleHref is nil")
+	assert.Nil(t, tx, "TransactionId should be nil when cmd.TransactionId is nil")
+	assert.Nil(t, rep, "ReporterRepresentation should be nil when cmd.ReporterRepresentation is nil")
+	assert.Nil(t, com, "CommonRepresentation should be nil when cmd.CommonRepresentation is nil")
+}
+
 // TestReportResource_ValidationSuccess tests that a valid request passes validation.
 func TestReportResource_ValidationSuccess(t *testing.T) {
 	ctx := testAuthzContext()
@@ -1556,30 +1585,44 @@ func TestReportResource_ValidationErrors(t *testing.T) {
 			expectError: "reporter unknown_reporter does not report resource types: host",
 		},
 		{
-			name: "missing reporter representation",
-			cmd: func() ReportResourceCommand {
-				cmd := fixture(t).Basic("host", "hbi", "instance-1", "test-host", "ws-123")
-				cmd.ReporterRepresentation = nil
-				return cmd
-			}(),
-			expectError: "invalid reporter representation: representation required",
-		},
-		{
-			name: "missing common representation",
+			name: "reporter-only (common nil) returns representation required error",
 			cmd: func() ReportResourceCommand {
 				cmd := fixture(t).Basic("host", "hbi", "instance-1", "test-host", "ws-123")
 				cmd.CommonRepresentation = nil
 				return cmd
 			}(),
-			expectError: "invalid common representation: representation required",
+			expectError: "representation required",
+		},
+		{
+			name: "common-only (reporter nil) returns representation required error",
+			cmd: func() ReportResourceCommand {
+				cmd := fixture(t).Basic("host", "hbi", "instance-1", "test-host", "ws-123")
+				cmd.ReporterRepresentation = nil
+				return cmd
+			}(),
+			expectError: "representation required",
+		},
+		{
+			name: "both representations nil returns representation required error",
+			cmd: func() ReportResourceCommand {
+				cmd := fixture(t).Basic("host", "hbi", "instance-1", "test-host", "ws-123")
+				cmd.ReporterRepresentation = nil
+				cmd.CommonRepresentation = nil
+				return cmd
+			}(),
+			expectError: "representation required",
 		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			err := usecase.ReportResource(ctx, tc.cmd)
-			assert.Error(t, err)
-			assert.Contains(t, err.Error(), tc.expectError)
+			if tc.expectError != "" {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), tc.expectError)
+			} else {
+				assert.NoError(t, err)
+			}
 		})
 	}
 }
@@ -1797,25 +1840,29 @@ func TestReportResource_RepresentationRequiredError(t *testing.T) {
 		name                   string
 		reporterRepresentation *model.Representation
 		commonRepresentation   *model.Representation
+		expectError            bool
 		expectErrorMsg         string
 	}{
 		{
-			name:                   "nil reporter representation",
-			reporterRepresentation: nil,
-			commonRepresentation:   &commonRep,
-			expectErrorMsg:         "invalid reporter representation: representation required",
-		},
-		{
-			name:                   "nil common representation",
+			name:                   "reporter-only (common nil) returns RepresentationRequiredError",
 			reporterRepresentation: &reporterRep,
 			commonRepresentation:   nil,
-			expectErrorMsg:         "invalid common representation: representation required",
+			expectError:            true,
+			expectErrorMsg:         "invalid CommonRepresentation representation: representation required",
 		},
 		{
-			name:                   "both nil",
+			name:                   "common-only (reporter nil) returns RepresentationRequiredError",
+			reporterRepresentation: nil,
+			commonRepresentation:   &commonRep,
+			expectError:            true,
+			expectErrorMsg:         "invalid ReporterRepresentation representation: representation required",
+		},
+		{
+			name:                   "both nil returns RepresentationRequiredError",
 			reporterRepresentation: nil,
 			commonRepresentation:   nil,
-			expectErrorMsg:         "invalid reporter representation: representation required",
+			expectError:            true,
+			expectErrorMsg:         "invalid both representation: representation required",
 		},
 	}
 
@@ -1839,12 +1886,14 @@ func TestReportResource_RepresentationRequiredError(t *testing.T) {
 			}
 
 			err := usecase.ReportResource(ctx, cmd)
-			assert.Error(t, err)
-			assert.Contains(t, err.Error(), tc.expectErrorMsg)
-
-			// Verify it's a RepresentationRequiredError type
-			var repReqErr *RepresentationRequiredError
-			assert.True(t, errors.As(err, &repReqErr), "expected RepresentationRequiredError type")
+			if tc.expectError {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), tc.expectErrorMsg)
+				var repReqErr *RepresentationRequiredError
+				assert.True(t, errors.As(err, &repReqErr), "expected RepresentationRequiredError type")
+			} else {
+				assert.NoError(t, err)
+			}
 		})
 	}
 }

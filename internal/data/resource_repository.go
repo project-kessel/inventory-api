@@ -77,13 +77,17 @@ func (result FindResourceByKeysResult) ToSnapshots() (bizmodel.ResourceSnapshot,
 		ReporterInstanceID: result.ReporterInstanceID,
 	}
 
+	var consoleHref *string
+	if result.ConsoleHref != "" {
+		consoleHref = &result.ConsoleHref
+	}
 	// Create ReporterResourceSnapshot
 	reporterResourceSnapshot := bizmodel.ReporterResourceSnapshot{
 		ID:                    result.ReporterResourceID,
 		ReporterResourceKey:   keySnapshot,
 		ResourceID:            result.ResourceID,
 		APIHref:               result.APIHref,
-		ConsoleHref:           result.ConsoleHref,
+		ConsoleHref:           consoleHref,
 		RepresentationVersion: result.RepresentationVersion,
 		Generation:            result.Generation,
 		Tombstone:             result.Tombstone,

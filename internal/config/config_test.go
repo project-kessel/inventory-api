@@ -397,3 +397,31 @@ func TestInjectClowdAppConfig(t *testing.T) {
 		assert.Equal(t, noConfigTest.expected.Consumer, noConfigTest.options.Consumer)
 	})
 }
+
+// TestLogConfigurationInfo_WithFullOptions_DoesNotPanic documents that when all option
+// groups are set (e.g. via NewOptionsConfig()), LogConfigurationInfo does not panic.
+func TestLogConfigurationInfo_WithFullOptions_DoesNotPanic(t *testing.T) {
+	options := NewOptionsConfig()
+	assert.NotPanics(t, func() {
+		LogConfigurationInfo(options)
+	})
+}
+
+// TestLogConfigurationInfo_WithNilOptionGroups_DoesNotPanic documents that when some
+// option groups are nil (partial config), LogConfigurationInfo skips them and does not panic.
+func TestLogConfigurationInfo_WithNilOptionGroups_DoesNotPanic(t *testing.T) {
+	options := &OptionsConfig{
+		Server: nil,
+		Authz:  nil,
+	}
+	assert.NotPanics(t, func() {
+		LogConfigurationInfo(options)
+	})
+	options = &OptionsConfig{}
+	assert.NotPanics(t, func() {
+		LogConfigurationInfo(options)
+	})
+	assert.NotPanics(t, func() {
+		LogConfigurationInfo(nil)
+	})
+}

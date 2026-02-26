@@ -85,7 +85,7 @@ type EventResourceReporter struct {
 	ConsoleHref        string  `json:"console_href"`
 	ApiHref            string  `json:"api_href"`
 	LocalResourceId    string  `json:"local_resource_id"`
-	ReporterVersion    *string `json:"reporter_version"`
+	ReporterVersion    *string `json:"reporter_version,omitempty"`
 }
 
 type EventRelationshipMetadata struct {
@@ -97,11 +97,11 @@ type EventRelationshipMetadata struct {
 }
 
 type EventRelationshipReporter struct {
-	ReporterType           string `json:"reporter_type"`
-	SubjectLocalResourceId string `json:"subject_local_resource_id"`
-	ObjectLocalResourceId  string `json:"object_local_resource_id"`
-	ReporterVersion        string `json:"reporter_version"`
-	ReporterInstanceId     string `json:"reporter_instance_id"`
+	ReporterType           string  `json:"reporter_type"`
+	SubjectLocalResourceId string  `json:"subject_local_resource_id"`
+	ObjectLocalResourceId  string  `json:"object_local_resource_id"`
+	ReporterVersion        *string `json:"reporter_version,omitempty"`
+	ReporterInstanceId     string  `json:"reporter_instance_id"`
 }
 
 func newResourceEvent(operationType bizmodel.EventOperationType, resourceEvent *bizmodel.ResourceReportEvent) (*ResourceEvent, error) {

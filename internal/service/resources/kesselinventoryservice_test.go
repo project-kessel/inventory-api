@@ -2833,12 +2833,8 @@ func TestInventoryService_ReportResource_AllOptionalMetadataFields(t *testing.T)
 
 // --- ReportResource: Nil/Empty Optional Struct Combinations ---
 
-// The model layer requires both common and reporter representation data to be
-// non-empty. Sending nil or empty structs produces an error. These tests verify
-// the error paths.
-
-// TODO: This is actually not correct behavior.
-// These should be optional, and it depends on schema.
+// Representation validation: both common and reporter must be non-nil and non-empty.
+// Both nil, reporter-only, common-only, or both-empty return an error.
 func TestInventoryService_ReportResource_NilOrEmptyRepresentationStructs(t *testing.T) {
 	claims := &authnapi.Claims{
 		SubjectId: authnapi.SubjectId("reporter-service"),
@@ -2857,7 +2853,7 @@ func TestInventoryService_ReportResource_NilOrEmptyRepresentationStructs(t *test
 			localResourceId: "host-both-nil",
 			common:          nil,
 			reporter:        nil,
-			expectMsg:       "invalid reporter representation: representation required",
+			expectMsg:       "invalid both representation: representation required",
 		},
 		{
 			name:            "common set, reporter nil",
@@ -2868,7 +2864,7 @@ func TestInventoryService_ReportResource_NilOrEmptyRepresentationStructs(t *test
 				},
 			},
 			reporter:  nil,
-			expectMsg: "invalid reporter representation: representation required",
+			expectMsg: "invalid ReporterRepresentation representation: representation required",
 		},
 		{
 			name:            "common nil, reporter set",
@@ -2879,14 +2875,14 @@ func TestInventoryService_ReportResource_NilOrEmptyRepresentationStructs(t *test
 					"reporter_field": structpb.NewStringValue("val"),
 				},
 			},
-			expectMsg: "invalid common representation: representation required",
+			expectMsg: "invalid CommonRepresentation representation: representation required",
 		},
 		{
 			name:            "both empty structs",
 			localResourceId: "host-both-empty",
 			common:          &structpb.Struct{},
 			reporter:        &structpb.Struct{},
-			expectMsg:       "invalid reporter representation: representation data cannot be empty",
+			expectMsg:       "representation data cannot be empty",
 		},
 	}
 
@@ -2909,13 +2905,14 @@ func TestInventoryService_ReportResource_NilOrEmptyRepresentationStructs(t *test
 						Reporter: tc.reporter,
 					},
 				}
+				expectation := requireErrorContaining(codes.InvalidArgument, tc.expectMsg)
 				return TestServerConfig{
 						Usecase:       uc,
 						Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
 					}, func(t *testing.T, tr *Transport) {
 						ctx := context.Background()
 						res := tr.Invoke(ctx, withBody(req, ReportResource, httpEndpoint("POST /api/kessel/v1beta2/resources")))
-						Assert(t, res, requireErrorContaining(codes.InvalidArgument, tc.expectMsg))
+						Assert(t, res, expectation)
 					}
 			})
 		})
@@ -3062,7 +3059,7 @@ func TestInventoryService_ReportResource_ValidationErrorFormats(t *testing.T) {
 			expectMsgContains: "failed validation for report resource",
 		},
 		{
-			name:         "nil reporter representation",
+			name:         "nil reporter representation (common-only returns error)",
 			resourceType: "host",
 			reporterType: "hbi",
 			common: &structpb.Struct{
@@ -3072,10 +3069,10 @@ func TestInventoryService_ReportResource_ValidationErrorFormats(t *testing.T) {
 			},
 			reporter:          nil,
 			expectCode:        codes.InvalidArgument,
-			expectMsgContains: "invalid reporter representation: representation required",
+			expectMsgContains: "invalid ReporterRepresentation representation: representation required",
 		},
 		{
-			name:         "nil common representation",
+			name:         "nil common representation (reporter-only returns error)",
 			resourceType: "host",
 			reporterType: "hbi",
 			common:       nil,
@@ -3085,7 +3082,7 @@ func TestInventoryService_ReportResource_ValidationErrorFormats(t *testing.T) {
 				},
 			},
 			expectCode:        codes.InvalidArgument,
-			expectMsgContains: "invalid common representation: representation required",
+			expectMsgContains: "invalid CommonRepresentation representation: representation required",
 		},
 	}
 
@@ -3108,13 +3105,14 @@ func TestInventoryService_ReportResource_ValidationErrorFormats(t *testing.T) {
 						Reporter: tc.reporter,
 					},
 				}
+				expectation := requireErrorContaining(tc.expectCode, tc.expectMsgContains)
 				return TestServerConfig{
 						Usecase:       uc,
 						Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
 					}, func(t *testing.T, tr *Transport) {
 						ctx := context.Background()
 						res := tr.Invoke(ctx, withBody(req, ReportResource, httpEndpoint("POST /api/kessel/v1beta2/resources")))
-						Assert(t, res, requireErrorContaining(tc.expectCode, tc.expectMsgContains))
+						Assert(t, res, expectation)
 					}
 			})
 		})

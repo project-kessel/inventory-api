@@ -212,6 +212,7 @@ inventory-up-kind:
 
 .PHONY: monitoring-only
 monitoring-only:
+	./scripts/monitoring-only-prom-update.sh
 	./scripts/start-inventory.sh monitoring-only 8000 9000
 
 .PHONY: monitoring-down

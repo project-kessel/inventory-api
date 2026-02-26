@@ -2064,7 +2064,7 @@
         "options": [],
         "query": "prometheus",
         "refresh": 1,
-        "regex": "/(prometheus)/",
+        "regex": "/(prometheus.*)/",
         "type": "datasource"
       },
       {
@@ -2079,7 +2079,7 @@
         "options": [],
         "query": "prometheus",
         "refresh": 1,
-        "regex": "/(appsres11ue1-prometheus)|(appsrep11ue1-prometheus)/",
+        "regex": "/(prometheus.*)/",
         "type": "datasource"
       }
     ]
@@ -2092,5 +2092,5 @@
   "timezone": "browser",
   "title": "Kessel - Inventory API",
   "uid": "ddxs3i6o0xpmof",
-  "version": 10
+  "version": 11
 }

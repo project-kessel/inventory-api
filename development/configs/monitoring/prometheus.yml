@@ -5,15 +5,3 @@ scrape_configs:
    static_configs:
     - targets:
        - development-inventory-api-1:8081
-       # for ephemeral only - requires port forwarding
-       - host.containers.internal:8000
-# for ephemeral only - requires port forwarding
- - job_name: kessel-inventory-consumer
-   static_configs:
-    - targets:
-       - host.containers.internal:9000
- - job_name: kessel-kafka-connect
-   static_configs:
-    - targets:
-       - host.containers.internal:9404
-

@@ -15,8 +15,9 @@ func TestNewOptions(t *testing.T) {
 	}{
 		options: NewOptions(),
 		expectedOptions: &Options{
-			ReadAfterWriteEnabled:   true,
-			ReadAfterWriteAllowlist: []string{},
+			ReadAfterWriteEnabled:          true,
+			ReadAfterWriteAllowlist:        []string{},
+			DefaultToAtLeastAsAcknowledged: true,
 		},
 	}
 	assert.Equal(t, test.expectedOptions, NewOptions())

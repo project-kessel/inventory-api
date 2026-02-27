@@ -5,6 +5,7 @@ package kessel.inventory.v1beta2;
 import "buf/validate/validate.proto";
 import "kessel/inventory/v1beta2/resource_reference.proto";
 import "kessel/inventory/v1beta2/subject_reference.proto";
+import "kessel/inventory/v1beta2/consistency.proto";
 
 option go_package = "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2";
 option java_multiple_files = true;
@@ -18,4 +19,9 @@ message CheckRequest {
   ResourceReference object = 1 [(buf.validate.field).required = true];
   string relation = 2 [(buf.validate.field).string.min_len = 1];
   SubjectReference subject = 3 [(buf.validate.field).required = true];
+  // Consistency requirement for the check operation.
+  // If not specified, standard server configuration defaults to minimizeLatency.
+  // Server deployments may override this default behavior (for example, to
+  // at_least_as_acknowledged).
+  optional Consistency consistency = 4;
 }

@@ -64,9 +64,10 @@ const listenTimeout = 10 * time.Second
 // UsecaseConfig contains configuration flags that control the behavior of usecase operations.
 // These flags should be consistent across all handlers.
 type UsecaseConfig struct {
-	ReadAfterWriteEnabled   bool
-	ReadAfterWriteAllowlist []string
-	ConsumerEnabled         bool
+	ReadAfterWriteEnabled          bool
+	ReadAfterWriteAllowlist        []string
+	ConsumerEnabled                bool
+	DefaultToAtLeastAsAcknowledged bool
 }
 
 // Usecase provides business logic operations for resource management in the inventory system.
@@ -365,26 +366,33 @@ func (uc *Usecase) Delete(ctx context.Context, reporterResourceKey model.Reporte
 }
 
 // Check verifies if a subject has the specified relation/permission on a resource.
-func (uc *Usecase) Check(ctx context.Context, relation model.Relation, sub model.SubjectReference, reporterResourceKey model.ReporterResourceKey) (bool, error) {
+func (uc *Usecase) Check(ctx context.Context, relation model.Relation, sub model.SubjectReference, reporterResourceKey model.ReporterResourceKey, consistency model.Consistency) (bool, model.ConsistencyToken, error) {
 	// TODO: should also check caller is allowed to check subject also
 	if err := uc.enforceMetaAuthzObject(ctx, metaauthorizer.RelationCheck, metaauthorizer.NewInventoryResourceFromKey(reporterResourceKey)); err != nil {
-		return false, err
+		return false, model.MinimizeLatencyToken, err
 	}
-
-	return uc.checkPermission(ctx, relation, sub, reporterResourceKey)
+	token, err := uc.resolveConsistencyToken(ctx, consistency, reporterResourceKey, false)
+	if err != nil {
+		return false, model.MinimizeLatencyToken, err
+	}
+	return uc.checkPermission(ctx, relation, sub, reporterResourceKey, token)
 }
 
 // CheckSelf verifies access for the authenticated user using the self-subject strategy.
 // Uses relation="check_self" for meta-authorization.
-func (uc *Usecase) CheckSelf(ctx context.Context, relation model.Relation, reporterResourceKey model.ReporterResourceKey) (bool, error) {
+func (uc *Usecase) CheckSelf(ctx context.Context, relation model.Relation, reporterResourceKey model.ReporterResourceKey, consistency model.Consistency) (bool, model.ConsistencyToken, error) {
 	if err := uc.enforceMetaAuthzObject(ctx, metaauthorizer.RelationCheckSelf, metaauthorizer.NewInventoryResourceFromKey(reporterResourceKey)); err != nil {
-		return false, err
+		return false, model.MinimizeLatencyToken, err
 	}
 	subjectRef, err := uc.selfSubjectFromContext(ctx)
 	if err != nil {
-		return false, err
+		return false, model.MinimizeLatencyToken, err
 	}
-	return uc.checkPermission(ctx, relation, subjectRef, reporterResourceKey)
+	token, err := uc.resolveConsistencyToken(ctx, consistency, reporterResourceKey, true)
+	if err != nil {
+		return false, model.MinimizeLatencyToken, err
+	}
+	return uc.checkPermission(ctx, relation, subjectRef, reporterResourceKey, token)
 }
 
 // CheckForUpdate verifies if a subject can update the resource.
@@ -409,6 +417,9 @@ func (uc *Usecase) CheckForUpdate(ctx context.Context, relation model.Relation, 
 
 // CheckBulk performs bulk permission checks.
 func (uc *Usecase) CheckBulk(ctx context.Context, cmd CheckBulkCommand) (*CheckBulkResult, error) {
+	if model.ConsistencyTypeOf(cmd.Consistency) == model.ConsistencyAtLeastAsAcknowledged {
+		return nil, status.Errorf(codes.InvalidArgument, "inventory-managed consistency tokens aren't available")
+	}
 	// Meta-authorization for each item
 	for _, item := range cmd.Items {
 		if err := uc.enforceMetaAuthzObject(ctx, metaauthorizer.RelationCheckBulk, metaauthorizer.NewInventoryResourceFromKey(item.Resource)); err != nil {
@@ -430,6 +441,9 @@ func (uc *Usecase) CheckBulk(ctx context.Context, cmd CheckBulkCommand) (*CheckB
 // CheckSelfBulk performs bulk permission checks for the authenticated user.
 // Uses relation="check_self" for meta-authorization.
 func (uc *Usecase) CheckSelfBulk(ctx context.Context, cmd CheckSelfBulkCommand) (*CheckBulkResult, error) {
+	if model.ConsistencyTypeOf(cmd.Consistency) == model.ConsistencyAtLeastAsAcknowledged {
+		return nil, status.Errorf(codes.InvalidArgument, "inventory-managed consistency tokens aren't available")
+	}
 	// Meta-authorization for each item
 	for _, item := range cmd.Items {
 		if err := uc.enforceMetaAuthzObject(ctx, metaauthorizer.RelationCheckSelf, metaauthorizer.NewInventoryResourceFromKey(item.Resource)); err != nil {
@@ -466,41 +480,33 @@ func (uc *Usecase) CheckSelfBulk(ctx context.Context, cmd CheckSelfBulkCommand) 
 	return checkBulkResultFromV1beta1(resp, bulkCmd)
 }
 
-func (uc *Usecase) checkPermission(ctx context.Context, relation model.Relation, sub model.SubjectReference, reporterResourceKey model.ReporterResourceKey) (bool, error) {
-	res, err := uc.resourceRepository.FindResourceByKeys(nil, reporterResourceKey)
-	var consistencyToken string
-	if err != nil {
-		log.Info("Did not find resource")
-		// If the resource doesn't exist in inventory (ie. no consistency token available)
-		// we send a check request with minimize latency
-		// err otherwise.
-		if !errors.Is(err, gorm.ErrRecordNotFound) {
-			return false, err
-		}
-
-		consistencyToken = ""
-	} else {
-		consistencyToken = res.ConsistencyToken().Serialize()
-	}
-
-	// Convert model types to v1beta1 for the Authz interface
+// checkPermission runs Authz.Check with the given consistency token. Used by Check (after resolveConsistencyToken) and by CheckSelf.
+func (uc *Usecase) checkPermission(ctx context.Context, relation model.Relation, sub model.SubjectReference, reporterResourceKey model.ReporterResourceKey, consistencyToken string) (bool, model.ConsistencyToken, error) {
 	namespace := reporterResourceKey.ReporterType().Serialize()
 	v1beta1Subject := subjectToV1Beta1(sub)
-	allowed, _, err := uc.Authz.Check(ctx, namespace, relation.Serialize(), consistencyToken, reporterResourceKey.ResourceType().Serialize(), reporterResourceKey.LocalResourceId().Serialize(), v1beta1Subject)
+	allowed, returnedToken, err := uc.Authz.Check(ctx, namespace, relation.Serialize(), consistencyToken, reporterResourceKey.ResourceType().Serialize(), reporterResourceKey.LocalResourceId().Serialize(), v1beta1Subject)
 	if err != nil {
-		return false, err
+		return false, model.MinimizeLatencyToken, err
+	}
+
+	consistencyResponseToken := model.MinimizeLatencyToken
+	if returnedToken != nil {
+		consistencyResponseToken = model.DeserializeConsistencyToken(returnedToken.GetToken())
 	}
 
 	if allowed == kessel.CheckResponse_ALLOWED_TRUE {
-		return true, nil
+		return true, consistencyResponseToken, nil
 	}
-	return false, nil
+	return false, consistencyResponseToken, nil
 }
 
 // LookupResources delegates resource lookup to the authorization service.
 // Returns a streaming client for receiving lookup results.
 // TODO: remove v1beta1 response type
 func (uc *Usecase) LookupResources(ctx context.Context, cmd LookupResourcesCommand) (grpc.ServerStreamingClient[kessel.LookupResourcesResponse], error) {
+	if model.ConsistencyTypeOf(cmd.Consistency) == model.ConsistencyAtLeastAsAcknowledged {
+		return nil, status.Errorf(codes.InvalidArgument, "inventory-managed consistency tokens aren't available")
+	}
 	// Meta-authorize against the resource type (not a specific resource instance)
 	metaObject := metaauthorizer.NewResourceTypeRef(cmd.ReporterType, cmd.ResourceType)
 	if err := uc.enforceMetaAuthzObject(ctx, metaauthorizer.RelationLookupResources, metaObject); err != nil {
@@ -510,6 +516,68 @@ func (uc *Usecase) LookupResources(ctx context.Context, cmd LookupResourcesComma
 	// Convert to v1beta1 for the Authz interface
 	v1beta1Req := lookupResourcesCommandToV1beta1(cmd)
 	return uc.Authz.LookupResources(ctx, v1beta1Req)
+}
+
+// lookupConsistencyTokenFromDB looks up the consistency token from the inventory database.
+// Returns the token if found, empty string if resource not found, or error for other failures.
+func (uc *Usecase) lookupConsistencyTokenFromDB(ctx context.Context, reporterResourceKey model.ReporterResourceKey) (string, error) {
+	// Passing nil tx is deliberate: this read-only consistency lookup should not run in a transaction.
+	res, err := uc.resourceRepository.FindResourceByKeys(nil, reporterResourceKey)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			// Resource doesn't exist in inventory, fall back to minimize_latency.
+			uc.Log.WithContext(ctx).Warnf("Resource not found in inventory, falling back to minimize_latency for key: %v", reporterResourceKey)
+			return "", nil
+		}
+		return "", err
+	}
+	token := res.ConsistencyToken().Serialize()
+	uc.Log.WithContext(ctx).Debug("Found inventory-managed consistency token")
+	return token, nil
+}
+
+// resolveConsistencyToken resolves the consistency token based on the preference.
+// Used by Check. For unspecified consistency, uses the DefaultToAtLeastAsAcknowledged feature flag.
+func (uc *Usecase) resolveConsistencyToken(ctx context.Context, consistency model.Consistency, reporterResourceKey model.ReporterResourceKey, overrideFeatureFlag bool) (string, error) {
+	featureFlagEnabled := uc.Config.DefaultToAtLeastAsAcknowledged
+	if featureFlagEnabled {
+		if overrideFeatureFlag {
+			uc.Log.WithContext(ctx).Debug("Feature flag default-to-at-least-as-acknowledged is enabled but bypassed for this call")
+		} else {
+			uc.Log.WithContext(ctx).Debug("Feature flag default-to-at-least-as-acknowledged is enabled")
+		}
+	} else {
+		uc.Log.WithContext(ctx).Debug("Feature flag default-to-at-least-as-acknowledged is disabled")
+	}
+
+	switch model.ConsistencyTypeOf(consistency) {
+	case model.ConsistencyMinimizeLatency:
+		uc.Log.WithContext(ctx).Debug("Using minimize_latency consistency")
+		return "", nil
+
+	case model.ConsistencyAtLeastAsFresh:
+		uc.Log.WithContext(ctx).Debug("Using at_least_as_fresh consistency")
+		token := model.ConsistencyAtLeastAsFreshToken(consistency)
+		if token == nil {
+			return "", status.Error(codes.Internal, "at_least_as_fresh consistency is missing token")
+		}
+		return token.Serialize(), nil
+
+	case model.ConsistencyAtLeastAsAcknowledged:
+		uc.Log.WithContext(ctx).Debug("Using at_least_as_acknowledged consistency - looking up token from DB")
+		return uc.lookupConsistencyTokenFromDB(ctx, reporterResourceKey)
+
+	case model.ConsistencyUnspecified:
+		if featureFlagEnabled && !overrideFeatureFlag {
+			uc.Log.WithContext(ctx).Debug("Default consistency - looking up token from DB")
+			return uc.lookupConsistencyTokenFromDB(ctx, reporterResourceKey)
+		}
+		uc.Log.WithContext(ctx).Debug("Default consistency - using minimize_latency")
+		return "", nil
+
+	default:
+		return "", status.Errorf(codes.Internal, "unexpected consistency preference: %v", model.ConsistencyTypeOf(consistency))
+	}
 }
 
 func (uc *Usecase) selfSubjectFromContext(ctx context.Context) (model.SubjectReference, error) {
@@ -630,11 +698,11 @@ func checkBulkCommandToV1beta1(cmd CheckBulkCommand) *kessel.CheckBulkRequest {
 	}
 
 	var consistency *kessel.Consistency
-	if !cmd.Consistency.MinimizeLatency() {
+	if token := model.ConsistencyAtLeastAsFreshToken(cmd.Consistency); token != nil {
 		consistency = &kessel.Consistency{
 			Requirement: &kessel.Consistency_AtLeastAsFresh{
 				AtLeastAsFresh: &kessel.ConsistencyToken{
-					Token: cmd.Consistency.AtLeastAsFresh().Serialize(),
+					Token: token.Serialize(),
 				},
 			},
 		}
@@ -709,11 +777,11 @@ func lookupResourcesCommandToV1beta1(cmd LookupResourcesCommand) *kessel.LookupR
 		continuationToken = &cmd.Continuation
 	}
 	var consistency *kessel.Consistency
-	if !cmd.Consistency.MinimizeLatency() {
+	if token := model.ConsistencyAtLeastAsFreshToken(cmd.Consistency); token != nil {
 		consistency = &kessel.Consistency{
 			Requirement: &kessel.Consistency_AtLeastAsFresh{
 				AtLeastAsFresh: &kessel.ConsistencyToken{
-					Token: cmd.Consistency.AtLeastAsFresh().Serialize(),
+					Token: token.Serialize(),
 				},
 			},
 		}

@@ -1,9 +1,11 @@
 package resources
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/go-kratos/kratos/v2/log"
@@ -18,6 +20,9 @@ import (
 	"github.com/project-kessel/inventory-api/internal/data"
 	"github.com/project-kessel/inventory-api/internal/metricscollector"
 	"github.com/project-kessel/inventory-api/internal/subject/selfsubject"
+	kessel "github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 func testAuthzContext() context.Context {
@@ -100,7 +105,7 @@ func TestCheckSelf_UsesCheckSelfRelation(t *testing.T) {
 	relation, err := model.NewRelation("view")
 	require.NoError(t, err)
 
-	allowed, err := usecase.CheckSelf(ctx, relation, key)
+	allowed, _, err := usecase.CheckSelf(ctx, relation, key, model.NewConsistencyMinimizeLatency())
 	require.NoError(t, err)
 	assert.True(t, allowed)
 	assert.Equal(t, 1, meta.calls)
@@ -128,7 +133,7 @@ func TestCheckSelf_DeniedByMetaAuthz(t *testing.T) {
 	relation, err := model.NewRelation("view")
 	require.NoError(t, err)
 
-	_, err = usecase.CheckSelf(ctx, relation, key)
+	_, _, err = usecase.CheckSelf(ctx, relation, key, model.NewConsistencyMinimizeLatency())
 	assert.ErrorIs(t, err, ErrMetaAuthorizationDenied)
 }
 
@@ -152,7 +157,7 @@ func TestCheckSelf_MissingAuthzContext(t *testing.T) {
 	relation, err := model.NewRelation("view")
 	require.NoError(t, err)
 
-	_, err = usecase.CheckSelf(context.Background(), relation, key)
+	_, _, err = usecase.CheckSelf(context.Background(), relation, key, model.NewConsistencyMinimizeLatency())
 	assert.ErrorIs(t, err, ErrMetaAuthzContextMissing)
 	assert.Equal(t, 0, meta.calls)
 }
@@ -235,7 +240,7 @@ func TestCheck_UsesCheckRelation(t *testing.T) {
 	relation, err := model.NewRelation("view")
 	require.NoError(t, err)
 
-	allowed, err := usecase.Check(ctx, relation, subject, key)
+	allowed, _, err := usecase.Check(ctx, relation, subject, key, model.NewConsistencyUnspecified())
 	require.NoError(t, err)
 	assert.True(t, allowed)
 	assert.Equal(t, 1, meta.calls)
@@ -339,6 +344,81 @@ func TestCheckSelfBulk_MissingAuthzContext(t *testing.T) {
 
 	_, err = usecase.CheckSelfBulk(context.Background(), cmd)
 	assert.ErrorIs(t, err, ErrMetaAuthzContextMissing)
+	assert.Equal(t, 0, meta.calls)
+}
+
+func TestCheckBulk_RejectsInventoryManagedConsistency(t *testing.T) {
+	ctx := testAuthzContext()
+	meta := &recordingMetaAuthorizer{allowed: true}
+	usecase := New(
+		data.NewFakeResourceRepository(),
+		newFakeSchemaRepository(t),
+		&allow.AllowAllAuthz{},
+		"rbac",
+		log.DefaultLogger,
+		nil,
+		nil,
+		&UsecaseConfig{},
+		metricscollector.NewFakeMetricsCollector(),
+		meta,
+		newTestSelfSubjectStrategy(),
+	)
+
+	subject, err := buildTestSubjectReference("user-1")
+	require.NoError(t, err)
+	viewRelation, err := model.NewRelation("view")
+	require.NoError(t, err)
+	key := createReporterResourceKey(t, "host-1", "host", "hbi", "instance-1")
+
+	_, err = usecase.CheckBulk(ctx, CheckBulkCommand{
+		Items: []CheckBulkItem{
+			{
+				Resource: key,
+				Relation: viewRelation,
+				Subject:  subject,
+			},
+		},
+		Consistency: model.NewConsistencyAtLeastAsAcknowledged(),
+	})
+	require.Error(t, err)
+	assert.Equal(t, codes.InvalidArgument, status.Code(err))
+	assert.Contains(t, err.Error(), "inventory-managed consistency tokens aren't available")
+	assert.Equal(t, 0, meta.calls)
+}
+
+func TestCheckSelfBulk_RejectsInventoryManagedConsistency(t *testing.T) {
+	ctx := testAuthzContext()
+	meta := &recordingMetaAuthorizer{allowed: true}
+	usecase := New(
+		data.NewFakeResourceRepository(),
+		newFakeSchemaRepository(t),
+		&allow.AllowAllAuthz{},
+		"rbac",
+		log.DefaultLogger,
+		nil,
+		nil,
+		&UsecaseConfig{},
+		metricscollector.NewFakeMetricsCollector(),
+		meta,
+		newTestSelfSubjectStrategy(),
+	)
+
+	viewRelation, err := model.NewRelation("view")
+	require.NoError(t, err)
+	key := createReporterResourceKey(t, "host-1", "host", "hbi", "instance-1")
+
+	_, err = usecase.CheckSelfBulk(ctx, CheckSelfBulkCommand{
+		Items: []CheckSelfBulkItem{
+			{
+				Resource: key,
+				Relation: viewRelation,
+			},
+		},
+		Consistency: model.NewConsistencyAtLeastAsAcknowledged(),
+	})
+	require.Error(t, err)
+	assert.Equal(t, codes.InvalidArgument, status.Code(err))
+	assert.Contains(t, err.Error(), "inventory-managed consistency tokens aren't available")
 	assert.Equal(t, 0, meta.calls)
 }
 
@@ -1904,4 +1984,399 @@ func TestReportResource_ValidationErrorFormat(t *testing.T) {
 			assert.Contains(t, err.Error(), tc.expectErrorMsg)
 		})
 	}
+}
+
+func TestResolveConsistencyToken(t *testing.T) {
+	tests := []struct {
+		name               string
+		featureFlagEnabled bool
+		consistency        model.Consistency
+		resourceExists     bool
+		expectedToken      string
+		expectedError      bool
+	}{
+		// Feature flag only affects DEFAULT/UNSPECIFIED behavior - explicit preferences are always honored
+		{
+			name:               "feature flag disabled - unspecified defaults to minimize_latency",
+			featureFlagEnabled: false,
+			consistency:        model.NewConsistencyUnspecified(),
+			resourceExists:     true,
+			expectedToken:      "",
+			expectedError:      false,
+		},
+		{
+			name:               "feature flag disabled - minimize_latency returns empty",
+			featureFlagEnabled: false,
+			consistency:        model.NewConsistencyMinimizeLatency(),
+			resourceExists:     false,
+			expectedToken:      "",
+			expectedError:      false,
+		},
+		{
+			name:               "feature flag disabled - at_least_as_fresh still honored",
+			featureFlagEnabled: false,
+			consistency:        model.NewConsistencyAtLeastAsFresh(model.ConsistencyToken("client-provided-token")),
+			resourceExists:     false,
+			expectedToken:      "client-provided-token",
+			expectedError:      false,
+		},
+		{
+			name:               "feature flag disabled - at_least_as_acknowledged still honored",
+			featureFlagEnabled: false,
+			consistency:        model.NewConsistencyAtLeastAsAcknowledged(),
+			resourceExists:     true,
+			expectedToken:      "", // fake repo returns empty consistency token
+			expectedError:      false,
+		},
+		{
+			name:               "feature flag enabled - unspecified defaults to at_least_as_acknowledged (DB lookup)",
+			featureFlagEnabled: true,
+			consistency:        model.NewConsistencyUnspecified(),
+			resourceExists:     true,
+			expectedToken:      "", // fake repo returns empty consistency token
+			expectedError:      false,
+		},
+		{
+			name:               "feature flag enabled - minimize_latency returns empty token",
+			featureFlagEnabled: true,
+			consistency:        model.NewConsistencyMinimizeLatency(),
+			resourceExists:     false,
+			expectedToken:      "",
+			expectedError:      false,
+		},
+		{
+			name:               "feature flag enabled - at_least_as_fresh returns provided token",
+			featureFlagEnabled: true,
+			consistency:        model.NewConsistencyAtLeastAsFresh(model.ConsistencyToken("client-provided-token")),
+			resourceExists:     false,
+			expectedToken:      "client-provided-token",
+			expectedError:      false,
+		},
+		{
+			name:               "feature flag enabled - at_least_as_fresh with empty token",
+			featureFlagEnabled: true,
+			consistency:        model.NewConsistencyAtLeastAsFresh(model.MinimizeLatencyToken),
+			resourceExists:     false,
+			expectedToken:      "",
+			expectedError:      false,
+		},
+		{
+			name:               "feature flag enabled - at_least_as_acknowledged resource not found falls back to empty",
+			featureFlagEnabled: true,
+			consistency:        model.NewConsistencyAtLeastAsAcknowledged(),
+			resourceExists:     false,
+			expectedToken:      "",
+			expectedError:      false,
+		},
+		{
+			name:               "feature flag enabled - at_least_as_acknowledged resource exists returns token",
+			featureFlagEnabled: true,
+			consistency:        model.NewConsistencyAtLeastAsAcknowledged(),
+			resourceExists:     true,
+			expectedToken:      "", // fake repo returns empty consistency token
+			expectedError:      false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Use testAuthzContext so ReportResource (when resourceExists) can pass meta-authz
+			ctx := testAuthzContext()
+			logger := log.DefaultLogger
+
+			resourceRepo := data.NewFakeResourceRepository()
+			schemaRepo := newFakeSchemaRepository(t)
+			authorizer := &allow.AllowAllAuthz{}
+			usecaseConfig := &UsecaseConfig{
+				ReadAfterWriteEnabled:          false,
+				ConsumerEnabled:                false,
+				DefaultToAtLeastAsAcknowledged: tt.featureFlagEnabled,
+			}
+			mc := metricscollector.NewFakeMetricsCollector()
+			uc := New(resourceRepo, schemaRepo, authorizer, "test-topic", logger, nil, nil, usecaseConfig, mc, nil, newTestSelfSubjectStrategy())
+
+			// Create test reporter resource key
+			localResourceId, err := model.NewLocalResourceId("test-resource-123")
+			require.NoError(t, err)
+			resourceType, err := model.NewResourceType("host")
+			require.NoError(t, err)
+			reporterType, err := model.NewReporterType("hbi")
+			require.NoError(t, err)
+			reporterInstanceId, err := model.NewReporterInstanceId("test-instance")
+			require.NoError(t, err)
+
+			reporterResourceKey, err := model.NewReporterResourceKey(localResourceId, resourceType, reporterType, reporterInstanceId)
+			require.NoError(t, err)
+
+			// If resource should exist, create it first
+			if tt.resourceExists {
+				cmd := fixture(t).Basic("host", "hbi", "test-instance", "test-resource-123", "test-workspace")
+				err := uc.ReportResource(ctx, cmd)
+				require.NoError(t, err)
+			}
+
+			// Call the function under test
+			token, err := uc.resolveConsistencyToken(ctx, tt.consistency, reporterResourceKey, false)
+
+			if tt.expectedError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, tt.expectedToken, token)
+			}
+		})
+	}
+}
+
+func TestResolveConsistencyToken_OverrideFeatureFlag(t *testing.T) {
+	tests := []struct {
+		name               string
+		featureFlagEnabled bool
+		consistency        model.Consistency
+		resourceExists     bool
+		expectedToken      string
+		expectedError      bool
+	}{
+		{
+			name:               "feature flag enabled - unspecified bypasses to minimize_latency when override is true",
+			featureFlagEnabled: true,
+			consistency:        model.NewConsistencyUnspecified(),
+			resourceExists:     true,
+			expectedToken:      "",
+			expectedError:      false,
+		},
+		{
+			name:               "feature flag disabled - unspecified remains minimize_latency when override is true",
+			featureFlagEnabled: false,
+			consistency:        model.NewConsistencyUnspecified(),
+			resourceExists:     true,
+			expectedToken:      "",
+			expectedError:      false,
+		},
+		{
+			name:               "feature flag enabled - at_least_as_fresh still returns client token when override is true",
+			featureFlagEnabled: true,
+			consistency:        model.NewConsistencyAtLeastAsFresh(model.ConsistencyToken("client-provided-token")),
+			resourceExists:     false,
+			expectedToken:      "client-provided-token",
+			expectedError:      false,
+		},
+		{
+			name:               "feature flag enabled - at_least_as_acknowledged still performs DB lookup when override is true",
+			featureFlagEnabled: true,
+			consistency:        model.NewConsistencyAtLeastAsAcknowledged(),
+			resourceExists:     true,
+			expectedToken:      "", // fake repo returns empty consistency token
+			expectedError:      false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := testAuthzContext()
+			logger := log.DefaultLogger
+
+			resourceRepo := data.NewFakeResourceRepository()
+			schemaRepo := newFakeSchemaRepository(t)
+			authorizer := &allow.AllowAllAuthz{}
+			usecaseConfig := &UsecaseConfig{
+				ReadAfterWriteEnabled:          false,
+				ConsumerEnabled:                false,
+				DefaultToAtLeastAsAcknowledged: tt.featureFlagEnabled,
+			}
+			mc := metricscollector.NewFakeMetricsCollector()
+			uc := New(resourceRepo, schemaRepo, authorizer, "test-topic", logger, nil, nil, usecaseConfig, mc, nil, newTestSelfSubjectStrategy())
+
+			localResourceId, err := model.NewLocalResourceId("test-resource-override")
+			require.NoError(t, err)
+			resourceType, err := model.NewResourceType("host")
+			require.NoError(t, err)
+			reporterType, err := model.NewReporterType("hbi")
+			require.NoError(t, err)
+			reporterInstanceId, err := model.NewReporterInstanceId("test-instance")
+			require.NoError(t, err)
+
+			reporterResourceKey, err := model.NewReporterResourceKey(localResourceId, resourceType, reporterType, reporterInstanceId)
+			require.NoError(t, err)
+
+			if tt.resourceExists {
+				cmd := fixture(t).Basic("host", "hbi", "test-instance", "test-resource-override", "test-workspace")
+				err := uc.ReportResource(ctx, cmd)
+				require.NoError(t, err)
+			}
+
+			token, err := uc.resolveConsistencyToken(ctx, tt.consistency, reporterResourceKey, true)
+			if tt.expectedError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, tt.expectedToken, token)
+			}
+		})
+	}
+}
+
+func TestResolveConsistencyToken_NilConsistencyDefaultsToUnspecified(t *testing.T) {
+	// Nil consistency should behave like unspecified for backward compatibility.
+	ctx := testAuthzContext()
+	logger := log.DefaultLogger
+
+	resourceRepo := data.NewFakeResourceRepository()
+	schemaRepo := newFakeSchemaRepository(t)
+	authorizer := &allow.AllowAllAuthz{}
+	usecaseConfig := &UsecaseConfig{
+		ReadAfterWriteEnabled:          false,
+		ConsumerEnabled:                false,
+		DefaultToAtLeastAsAcknowledged: false,
+	}
+
+	mc := metricscollector.NewFakeMetricsCollector()
+	uc := New(resourceRepo, schemaRepo, authorizer, "test-topic", logger, nil, nil, usecaseConfig, mc, nil, newTestSelfSubjectStrategy())
+
+	// Create test reporter resource key
+	localResourceId, err := model.NewLocalResourceId("test-resource-456")
+	require.NoError(t, err)
+	resourceType, err := model.NewResourceType("host")
+	require.NoError(t, err)
+	reporterType, err := model.NewReporterType("hbi")
+	require.NoError(t, err)
+	reporterInstanceId, err := model.NewReporterInstanceId("test-instance")
+	require.NoError(t, err)
+
+	reporterResourceKey, err := model.NewReporterResourceKey(localResourceId, resourceType, reporterType, reporterInstanceId)
+	require.NoError(t, err)
+
+	token, err := uc.resolveConsistencyToken(ctx, nil, reporterResourceKey, false)
+
+	assert.NoError(t, err)
+	assert.Equal(t, "", token)
+}
+
+func TestResolveConsistencyToken_OverrideFeatureFlag_LogsBypassWhenEnabled(t *testing.T) {
+	ctx := testAuthzContext()
+
+	var logBuf bytes.Buffer
+	logger := log.NewStdLogger(&logBuf)
+
+	resourceRepo := data.NewFakeResourceRepository()
+	schemaRepo := newFakeSchemaRepository(t)
+	authorizer := &allow.AllowAllAuthz{}
+	usecaseConfig := &UsecaseConfig{
+		ReadAfterWriteEnabled:          false,
+		ConsumerEnabled:                false,
+		DefaultToAtLeastAsAcknowledged: true,
+	}
+
+	mc := metricscollector.NewFakeMetricsCollector()
+	uc := New(resourceRepo, schemaRepo, authorizer, "test-topic", logger, nil, nil, usecaseConfig, mc, nil, newTestSelfSubjectStrategy())
+
+	reporterResourceKey := createReporterResourceKey(t, "host-123", "host", "hbi", "instance-1")
+
+	token, err := uc.resolveConsistencyToken(ctx, model.NewConsistencyUnspecified(), reporterResourceKey, true)
+	require.NoError(t, err)
+	assert.Equal(t, "", token)
+	assert.Contains(t, strings.ToLower(logBuf.String()), "enabled but bypassed for this call")
+}
+
+func TestResolveConsistencyToken_OverrideFeatureFlag_LogsEnabledWhenNotBypassed(t *testing.T) {
+	ctx := testAuthzContext()
+
+	var logBuf bytes.Buffer
+	logger := log.NewStdLogger(&logBuf)
+
+	resourceRepo := data.NewFakeResourceRepository()
+	schemaRepo := newFakeSchemaRepository(t)
+	authorizer := &allow.AllowAllAuthz{}
+	usecaseConfig := &UsecaseConfig{
+		ReadAfterWriteEnabled:          false,
+		ConsumerEnabled:                false,
+		DefaultToAtLeastAsAcknowledged: true,
+	}
+
+	mc := metricscollector.NewFakeMetricsCollector()
+	uc := New(resourceRepo, schemaRepo, authorizer, "test-topic", logger, nil, nil, usecaseConfig, mc, nil, newTestSelfSubjectStrategy())
+
+	reporterResourceKey := createReporterResourceKey(t, "host-456", "host", "hbi", "instance-1")
+
+	token, err := uc.resolveConsistencyToken(ctx, model.NewConsistencyUnspecified(), reporterResourceKey, false)
+	require.NoError(t, err)
+	assert.Equal(t, "", token)
+	assert.Contains(t, strings.ToLower(logBuf.String()), "feature flag default-to-at-least-as-acknowledged is enabled")
+}
+
+func TestResolveConsistencyToken_OverrideFeatureFlag_LogsDisabledWhenFeatureOff(t *testing.T) {
+	ctx := testAuthzContext()
+
+	var logBuf bytes.Buffer
+	logger := log.NewStdLogger(&logBuf)
+
+	resourceRepo := data.NewFakeResourceRepository()
+	schemaRepo := newFakeSchemaRepository(t)
+	authorizer := &allow.AllowAllAuthz{}
+	usecaseConfig := &UsecaseConfig{
+		ReadAfterWriteEnabled:          false,
+		ConsumerEnabled:                false,
+		DefaultToAtLeastAsAcknowledged: false,
+	}
+
+	mc := metricscollector.NewFakeMetricsCollector()
+	uc := New(resourceRepo, schemaRepo, authorizer, "test-topic", logger, nil, nil, usecaseConfig, mc, nil, newTestSelfSubjectStrategy())
+
+	reporterResourceKey := createReporterResourceKey(t, "host-789", "host", "hbi", "instance-1")
+
+	token, err := uc.resolveConsistencyToken(ctx, model.NewConsistencyUnspecified(), reporterResourceKey, true)
+	require.NoError(t, err)
+	assert.Equal(t, "", token)
+	assert.Contains(t, strings.ToLower(logBuf.String()), "feature flag default-to-at-least-as-acknowledged is disabled")
+}
+
+func TestCheckBulkCommandToV1beta1_UsesMinimizeLatencyForUnspecified(t *testing.T) {
+	subject, err := buildTestSubjectReference("user-1")
+	require.NoError(t, err)
+	relation, err := model.NewRelation("view")
+	require.NoError(t, err)
+
+	cmd := CheckBulkCommand{
+		Items: []CheckBulkItem{
+			{
+				Resource: createReporterResourceKey(t, "host-1", "host", "hbi", "instance-1"),
+				Relation: relation,
+				Subject:  subject,
+			},
+		},
+		Consistency: model.NewConsistencyUnspecified(),
+	}
+
+	req := checkBulkCommandToV1beta1(cmd)
+	require.NotNil(t, req)
+	require.NotNil(t, req.Consistency)
+	_, ok := req.Consistency.Requirement.(*kessel.Consistency_MinimizeLatency)
+	assert.True(t, ok, "unspecified consistency should map to minimize_latency for bulk authz requests")
+}
+
+func TestLookupResourcesCommandToV1beta1_UsesMinimizeLatencyForUnspecified(t *testing.T) {
+	subject, err := buildTestSubjectReference("user-1")
+	require.NoError(t, err)
+	resourceType, err := model.NewResourceType("host")
+	require.NoError(t, err)
+	reporterType, err := model.NewReporterType("hbi")
+	require.NoError(t, err)
+	relation, err := model.NewRelation("view")
+	require.NoError(t, err)
+
+	cmd := LookupResourcesCommand{
+		ResourceType: resourceType,
+		ReporterType: reporterType,
+		Relation:     relation,
+		Subject:      subject,
+		Limit:        100,
+		Continuation: "",
+		Consistency:  model.NewConsistencyUnspecified(),
+	}
+
+	req := lookupResourcesCommandToV1beta1(cmd)
+	require.NotNil(t, req)
+	require.NotNil(t, req.Consistency)
+	_, ok := req.Consistency.Requirement.(*kessel.Consistency_MinimizeLatency)
+	assert.True(t, ok, "unspecified consistency should map to minimize_latency for lookup authz requests")
 }

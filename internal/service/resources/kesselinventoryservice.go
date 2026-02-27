@@ -70,11 +70,12 @@ func (s *InventoryService) Check(ctx context.Context, req *pb.CheckRequest) (*pb
 		log.Error("Failed to build relation: ", err)
 		return nil, err
 	}
-	resp, err := s.Ctl.Check(ctx, relation, subjectRef, reporterResourceKey)
+	consistency := consistencyFromProto(req.GetConsistency())
+	allowed, consistencyToken, err := s.Ctl.Check(ctx, relation, subjectRef, reporterResourceKey, consistency)
 	if err != nil {
 		return nil, err
 	}
-	return viewResponseFromAuthzRequestV1beta2(resp), nil
+	return viewResponseFromAuthzRequestV1beta2(allowed, consistencyToken), nil
 }
 
 func (s *InventoryService) CheckForUpdate(ctx context.Context, req *pb.CheckForUpdateRequest) (*pb.CheckForUpdateResponse, error) {
@@ -105,7 +106,7 @@ func (s *InventoryService) CheckBulk(ctx context.Context, req *pb.CheckBulkReque
 	log.Info("CheckBulk using v1beta2 db")
 	cmd, err := toCheckBulkCommand(req)
 	if err != nil {
-		return nil, err
+		return nil, status.Errorf(codes.InvalidArgument, "%v", err)
 	}
 	resp, err := s.Ctl.CheckBulk(ctx, cmd)
 	if err != nil {
@@ -123,7 +124,9 @@ func (s *InventoryService) CheckSelf(ctx context.Context, req *pb.CheckSelfReque
 	if err != nil {
 		return nil, err
 	}
-	resp, err := s.Ctl.CheckSelf(ctx, relation, reporterResourceKey)
+	consistency := consistencyFromProto(req.GetConsistency())
+	log.Infof("CheckSelf request consistency: %s", model.ConsistencyTypeOf(consistency))
+	resp, consistencyToken, err := s.Ctl.CheckSelf(ctx, relation, reporterResourceKey, consistency)
 	if err != nil {
 		return nil, err
 	}
@@ -131,7 +134,11 @@ func (s *InventoryService) CheckSelf(ctx context.Context, req *pb.CheckSelfReque
 	if resp {
 		allowed = pb.Allowed_ALLOWED_TRUE
 	}
-	return &pb.CheckSelfResponse{Allowed: allowed}, nil
+	response := &pb.CheckSelfResponse{Allowed: allowed}
+	if consistencyToken != model.MinimizeLatencyToken {
+		response.ConsistencyToken = &pb.ConsistencyToken{Token: consistencyToken.Serialize()}
+	}
+	return response, nil
 }
 
 func (s *InventoryService) CheckSelfBulk(ctx context.Context, req *pb.CheckSelfBulkRequest) (*pb.CheckSelfBulkResponse, error) {
@@ -212,13 +219,20 @@ func toCheckBulkCommand(req *pb.CheckBulkRequest) (resources.CheckBulkCommand, e
 	}, nil
 }
 
-// consistencyFromProto converts v1beta2 Consistency to model.Consistency.
+// ConsistencyFromProto converts v1beta2 Consistency to model.Consistency.
+// Used by Check, CheckSelf, CheckBulk, CheckSelfBulk, and LookupResources.
 func consistencyFromProto(c *pb.Consistency) model.Consistency {
-	if c == nil || c.GetAtLeastAsFresh() == nil {
+	if c.GetMinimizeLatency() {
 		return model.NewConsistencyMinimizeLatency()
 	}
-	token := model.DeserializeConsistencyToken(c.GetAtLeastAsFresh().GetToken())
-	return model.NewConsistencyAtLeastAsFresh(token)
+	if c.GetAtLeastAsAcknowledged() {
+		return model.NewConsistencyAtLeastAsAcknowledged()
+	}
+	if c.GetAtLeastAsFresh() != nil {
+		token := model.DeserializeConsistencyToken(c.GetAtLeastAsFresh().GetToken())
+		return model.NewConsistencyAtLeastAsFresh(token)
+	}
+	return model.NewConsistencyUnspecified()
 }
 
 // fromCheckBulkResult converts a usecase CheckBulkResult to v1beta2 CheckBulkResponse.
@@ -356,11 +370,8 @@ func (s *InventoryService) StreamedListObjects(
 ) error {
 	ctx := stream.Context()
 
-	if c := req.GetConsistency(); c != nil && c.GetAtLeastAsFresh() != nil {
-		log.Debugf("StreamedListObjects consistency: at_least_as_fresh token=%s", c.GetAtLeastAsFresh().GetToken())
-	} else {
-		log.Debugf("StreamedListObjects consistency: minimize_latency")
-	}
+	consistency := consistencyFromProto(req.GetConsistency())
+	log.Debugf("StreamedListObjects consistency: %s", model.ConsistencyTypeOf(consistency))
 
 	lookupCmd, err := ToLookupResourcesCommand(req)
 	if err != nil {
@@ -483,12 +494,17 @@ func reporterKeyFromResourceReference(resource *pb.ResourceReference) (model.Rep
 	return model.NewReporterResourceKey(localResourceId, resourceType, reporterType, reporterInstanceId)
 }
 
-func viewResponseFromAuthzRequestV1beta2(allowed bool) *pb.CheckResponse {
+func viewResponseFromAuthzRequestV1beta2(allowed bool, consistencyToken model.ConsistencyToken) *pb.CheckResponse {
+	response := &pb.CheckResponse{}
 	if allowed {
-		return &pb.CheckResponse{Allowed: pb.Allowed_ALLOWED_TRUE}
+		response.Allowed = pb.Allowed_ALLOWED_TRUE
 	} else {
-		return &pb.CheckResponse{Allowed: pb.Allowed_ALLOWED_FALSE}
+		response.Allowed = pb.Allowed_ALLOWED_FALSE
 	}
+	if consistencyToken != model.MinimizeLatencyToken {
+		response.ConsistencyToken = &pb.ConsistencyToken{Token: consistencyToken.Serialize()}
+	}
+	return response
 }
 
 func updateResponseFromAuthzRequestV1beta2(allowed bool) *pb.CheckForUpdateResponse {

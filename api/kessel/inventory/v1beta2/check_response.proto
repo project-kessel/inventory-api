@@ -3,6 +3,7 @@ syntax = "proto3";
 package kessel.inventory.v1beta2;
 
 import "kessel/inventory/v1beta2/allowed.proto";
+import "kessel/inventory/v1beta2/consistency_token.proto";
 
 option go_package = "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2";
 option java_multiple_files = true;
@@ -10,4 +11,5 @@ option java_package = "org.project_kessel.api.inventory.v1beta2";
 
 message CheckResponse {
   Allowed allowed = 1;
+  ConsistencyToken consistency_token = 2;
 }

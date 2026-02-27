@@ -438,6 +438,14 @@ components:
                     type: string
                 subject:
                     $ref: '#/components/schemas/kessel.inventory.v1beta2.SubjectReference'
+                consistency:
+                    allOf:
+                        - $ref: '#/components/schemas/kessel.inventory.v1beta2.Consistency'
+                    description: |-
+                        Consistency requirement for the check operation.
+                         If not specified, standard server configuration defaults to minimizeLatency.
+                         Server deployments may override this default behavior (for example, to
+                         at_least_as_acknowledged).
         kessel.inventory.v1beta2.CheckResponse:
             type: object
             properties:
@@ -448,6 +456,8 @@ components:
                         - ALLOWED_FALSE
                     type: string
                     format: enum
+                consistencyToken:
+                    $ref: '#/components/schemas/kessel.inventory.v1beta2.ConsistencyToken'
         kessel.inventory.v1beta2.CheckSelfBulkRequest:
             type: object
             properties:
@@ -553,7 +563,23 @@ components:
                         All data used in the API call must be *at least as fresh*
                          as found in the ConsistencyToken. More recent data might be used
                          if available or faster.
-            description: Defines how a request is handled by the service.
+                atLeastAsAcknowledged:
+                    type: boolean
+                    description: |-
+                        All data used in the API call must be *at least as acknowledged*,
+                         meaning it includes data up to the latest write known to Inventory.
+                         This aligns with `ReportResource` write visibility: when
+                         `write_visibility=IMMEDIATE`, the write waits for acknowledgement, so a
+                         subsequent read with `at_least_as_acknowledged` is guaranteed to be at
+                         least as recent as that write.
+                         Some deployments may use this behavior as the server-side default when
+                         consistency is omitted.
+                         *Must* be set true if used.
+            description: |-
+                Defines how a request is handled by the service.
+                 If consistency is omitted by the client, standard server configuration uses
+                 minimize_latency by default, but deployments may override that default (for
+                 example, to at_least_as_acknowledged).
         kessel.inventory.v1beta2.ConsistencyToken:
             type: object
             properties:

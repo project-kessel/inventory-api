@@ -1921,7 +1921,7 @@ data:
                 "uid": "$datasource"
               },
               "editorMode": "code",
-              "expr": "sum(rate(kessel_inventory_serialization_failures{job=\"kessel-inventory-api\"}[$__rate_interval]))",
+              "expr": "sum(rate(kessel_inventory_serialization_failures_total{job=\"kessel-inventory-api\"}[$__rate_interval]))",
               "instant": false,
               "legendFormat": "serialization failures/s",
               "range": true,
@@ -2014,7 +2014,7 @@ data:
                 "uid": "$datasource"
               },
               "editorMode": "code",
-              "expr": "sum(rate(kessel_inventory_serialization_exhaustions{job=\"kessel-inventory-api\"}[$__rate_interval]))",
+              "expr": "sum(rate(kessel_inventory_serialization_exhaustions_total{job=\"kessel-inventory-api\"}[$__rate_interval]))",
               "instant": false,
               "legendFormat": "serialization exhaustions/s",
               "range": true,

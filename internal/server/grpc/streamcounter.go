@@ -53,6 +53,7 @@ func NewStreamFirstResponseLatencyHistogram(meter metric.Meter) (metric.Float64H
 		StreamFirstResponseLatencyHistogramName,
 		metric.WithDescription("Time from stream open to first server response sent"),
 		metric.WithUnit("s"),
+		metric.WithExplicitBucketBoundaries(0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0),
 	)
 }
 
@@ -61,6 +62,7 @@ func NewStreamMessageLatencyHistogram(meter metric.Meter) (metric.Float64Histogr
 		StreamMessageLatencyHistogramName,
 		metric.WithDescription("Duration of individual stream message send/receive operations"),
 		metric.WithUnit("s"),
+		metric.WithExplicitBucketBoundaries(0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0),
 	)
 }
 

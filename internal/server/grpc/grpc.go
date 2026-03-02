@@ -23,6 +23,7 @@ type ServerConfig struct {
 	Authenticator   authnapi.Authenticator
 	AuthnMiddleware middleware.Middleware
 	Metrics         middleware.Middleware
+	Meter           metric.Meter
 	Logger          log.Logger
 	Validator       protovalidate.Validator
 	ServerOptions   []kgrpc.ServerOption
@@ -41,7 +42,7 @@ func New(c CompletedConfig, authnMiddleware middleware.Middleware, authnConfig a
 	if err != nil {
 		return nil, err
 	}
-	metrics := metrics.Server(
+	metricsMiddleware := metrics.Server(
 		metrics.WithRequests(requests),
 		metrics.WithSeconds(seconds),
 	)
@@ -59,7 +60,8 @@ func New(c CompletedConfig, authnMiddleware middleware.Middleware, authnConfig a
 	return NewWithDeps(ServerConfig{
 		Authenticator:   authenticator,
 		AuthnMiddleware: authnMiddleware,
-		Metrics:         metrics,
+		Metrics:         metricsMiddleware,
+		Meter:           meter,
 		Logger:          logger,
 		Validator:       validator,
 		ServerOptions:   c.ServerOptions,
@@ -68,10 +70,15 @@ func New(c CompletedConfig, authnMiddleware middleware.Middleware, authnConfig a
 }
 
 func NewWithDeps(deps ServerConfig) (*kgrpc.Server, error) {
-	// TODO: pass in health, authn middleware
-	// Error mapping interceptor is always added for streaming RPCs
+	// Create stream metrics from the meter
+	sm, err := newStreamMetrics(deps.Meter)
+	if err != nil {
+		return nil, err
+	}
+
+	// Stream counter is first so it captures all streams including auth failures
 	streamingInterceptor := []grpc.StreamServerInterceptor{
-		m.ErrorMappingStreamInterceptor(),
+		newStreamCounterInterceptor(sm),
 	}
 
 	// Create stream interceptor using aggregating authenticator
@@ -82,9 +89,10 @@ func NewWithDeps(deps ServerConfig) (*kgrpc.Server, error) {
 		// This maintains backwards compatibility for edge cases
 		_ = deps.Logger.Log(log.LevelWarn, "msg", "Stream authentication interceptor not created", "error", err)
 	} else {
-		// Auth interceptor runs before error mapping (added to front of chain)
-		streamingInterceptor = append([]grpc.StreamServerInterceptor{streamAuth.Interceptor()}, streamingInterceptor...)
+		streamingInterceptor = append(streamingInterceptor, streamAuth.Interceptor())
 	}
+
+	streamingInterceptor = append(streamingInterceptor, m.ErrorMappingStreamInterceptor())
 
 	var authnMiddleware middleware.Middleware
 	if deps.AuthnMiddleware != nil {
@@ -107,8 +115,8 @@ func NewWithDeps(deps ServerConfig) (*kgrpc.Server, error) {
 		kgrpc.StreamMiddleware(
 			recovery.Recovery(),
 			logging.Server(deps.Logger),
-			deps.Metrics,
-			// Error mapping handled by interceptor due to Kratos limitations
+			// Metrics intentionally omitted: Kratos StreamMiddleware counts per-message
+			// instead of per-stream. Stream metrics are handled by newStreamCounterInterceptor.
 		),
 		kgrpc.Options(
 			grpc.ChainStreamInterceptor(streamingInterceptor...),

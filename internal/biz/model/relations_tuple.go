@@ -87,7 +87,8 @@ func (rr RelationsResource) Type() RelationsObjectType {
 
 // RelationsSubject represents a subject in a relationship tuple
 type RelationsSubject struct {
-	subject RelationsResource // Subject is also a resource reference
+	subject  RelationsResource // Subject is also a resource reference
+	relation string
 }
 
 func NewRelationsSubject(subject RelationsResource) RelationsSubject {
@@ -98,6 +99,10 @@ func NewRelationsSubject(subject RelationsResource) RelationsSubject {
 
 func (rs RelationsSubject) Subject() RelationsResource {
 	return rs.subject
+}
+
+func (rs RelationsSubject) Relation() string {
+	return rs.relation
 }
 
 const (

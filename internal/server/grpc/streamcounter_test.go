@@ -301,6 +301,49 @@ func TestStreamCounterInterceptor_FirstResponseLatencyHistogram(t *testing.T) {
 	require.True(t, metricFound, "expected %s metric to be emitted", StreamFirstResponseLatencyHistogramName)
 }
 
+func TestStreamHistograms_HaveSubSecondBucketBoundaries(t *testing.T) {
+	reader := sdkmetric.NewManualReader()
+	provider := sdkmetric.NewMeterProvider(sdkmetric.WithReader(reader))
+	meter := provider.Meter("test")
+
+	sm := newTestStreamMetrics(t, meter)
+	interceptor := newStreamCounterInterceptor(sm)
+
+	stream := &mockServerStream{ctx: context.Background()}
+	info := &grpc.StreamServerInfo{FullMethod: "/test.Service/StreamMethod"}
+
+	err := interceptor(nil, stream, info, func(_ interface{}, ss grpc.ServerStream) error {
+		return ss.SendMsg(nil)
+	})
+	require.NoError(t, err)
+
+	var rm metricdata.ResourceMetrics
+	err = reader.Collect(context.Background(), &rm)
+	require.NoError(t, err)
+
+	expectedBounds := []float64{0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0}
+
+	firstResponseFound := false
+	messageLatencyFound := false
+	for _, sm := range rm.ScopeMetrics {
+		for _, m := range sm.Metrics {
+			if m.Name == StreamFirstResponseLatencyHistogramName || m.Name == StreamMessageLatencyHistogramName {
+				hist, ok := m.Data.(metricdata.Histogram[float64])
+				require.True(t, ok)
+				require.NotEmpty(t, hist.DataPoints)
+				assert.Equal(t, expectedBounds, hist.DataPoints[0].Bounds, "%s should have sub-second bucket boundaries", m.Name)
+				if m.Name == StreamFirstResponseLatencyHistogramName {
+					firstResponseFound = true
+				} else {
+					messageLatencyFound = true
+				}
+			}
+		}
+	}
+	require.True(t, firstResponseFound, "expected %s metric to be emitted", StreamFirstResponseLatencyHistogramName)
+	require.True(t, messageLatencyFound, "expected %s metric to be emitted", StreamMessageLatencyHistogramName)
+}
+
 func TestStreamCounterInterceptor_MessageLatencyHistogram(t *testing.T) {
 	reader := sdkmetric.NewManualReader()
 	provider := sdkmetric.NewMeterProvider(sdkmetric.WithReader(reader))

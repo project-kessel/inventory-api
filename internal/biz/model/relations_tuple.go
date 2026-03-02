@@ -25,7 +25,7 @@ func NewRelationsTuple(resource RelationsResource, relation string, subject Rela
 	return RelationsTuple{
 		resource: relationsResource,
 		relation: strings.ToLower(relation),
-		subject:  NewRelationsSubject(subjectResource),
+		subject:  NewRelationsSubject(subjectResource, ""),
 	}
 }
 
@@ -91,9 +91,10 @@ type RelationsSubject struct {
 	relation string
 }
 
-func NewRelationsSubject(subject RelationsResource) RelationsSubject {
+func NewRelationsSubject(subject RelationsResource, relation string) RelationsSubject {
 	return RelationsSubject{
-		subject: subject,
+		subject:  subject,
+		relation: relation,
 	}
 }
 
@@ -126,7 +127,7 @@ func NewWorkspaceRelationsTuple(workspaceID string, key ReporterResourceKey) Rel
 	workspaceSubjectId, _ := NewLocalResourceId(workspaceID)
 	workspaceObjectType := NewRelationsObjectType(WorkspaceRelation, RbacNamespace)
 	workspaceSubject := NewRelationsResource(workspaceSubjectId, workspaceObjectType)
-	subject := NewRelationsSubject(workspaceSubject)
+	subject := NewRelationsSubject(workspaceSubject, "")
 
 	return NewRelationsTuple(resource, WorkspaceRelation, subject)
 }

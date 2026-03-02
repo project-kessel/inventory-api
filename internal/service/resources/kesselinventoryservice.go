@@ -125,7 +125,7 @@ func (s *InventoryService) CheckSelf(ctx context.Context, req *pb.CheckSelfReque
 		return nil, err
 	}
 	consistency := consistencyFromProto(req.GetConsistency())
-	log.Infof("CheckSelf request consistency: %s", model.ConsistencyTypeOf(consistency))
+	log.Debugf("CheckSelf request consistency: %s", model.ConsistencyTypeOf(consistency))
 	resp, consistencyToken, err := s.Ctl.CheckSelf(ctx, relation, reporterResourceKey, consistency)
 	if err != nil {
 		return nil, err

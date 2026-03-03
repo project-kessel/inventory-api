@@ -212,7 +212,7 @@ func NewResourceType(resourceType string) (ResourceType, error) {
 }
 
 func (rt ResourceType) String() string {
-	return string(rt)
+	return strings.ToLower(string(rt))
 }
 
 func (rt ResourceType) Serialize() string {
@@ -231,7 +231,7 @@ func NewReporterType(reporterType string) (ReporterType, error) {
 }
 
 func (rt ReporterType) String() string {
-	return string(rt)
+	return strings.ToLower(string(rt))
 }
 
 func (rt ReporterType) Serialize() string {

@@ -11,21 +11,10 @@ type RelationsTuple struct {
 }
 
 func NewRelationsTuple(resource RelationsResource, relation string, subject RelationsSubject) RelationsTuple {
-
-	resourceId := resource.Id()
-	resourceName := strings.ToLower(resource.Type().Name())
-	resourceNamespace := strings.ToLower(resource.Type().Namespace())
-	relationsResource := NewRelationsResource(resourceId, NewRelationsObjectType(resourceName, resourceNamespace))
-
-	subjectResourceId := subject.Subject().Id()
-	subjectResourceName := strings.ToLower(subject.Subject().Type().Name())
-	subjectResourceNamespace := strings.ToLower(subject.Subject().Type().Namespace())
-	subjectResource := NewRelationsResource(subjectResourceId, NewRelationsObjectType(subjectResourceName, subjectResourceNamespace))
-
 	return RelationsTuple{
-		resource: relationsResource,
-		relation: strings.ToLower(relation),
-		subject:  NewRelationsSubject(subjectResource, subject.Relation()),
+		resource: resource,
+		relation: relation,
+		subject:  subject,
 	}
 }
 
@@ -55,11 +44,11 @@ func NewRelationsObjectType(name, namespace string) RelationsObjectType {
 }
 
 func (rot RelationsObjectType) Name() string {
-	return rot.name
+	return strings.ToLower(rot.name)
 }
 
 func (rot RelationsObjectType) Namespace() string {
-	return rot.namespace
+	return strings.ToLower(rot.namespace)
 }
 
 // Deprecated: Use ReporterResourceKey instead
@@ -103,7 +92,7 @@ func (rs RelationsSubject) Subject() RelationsResource {
 }
 
 func (rs RelationsSubject) Relation() string {
-	return rs.relation
+	return strings.ToLower(rs.relation)
 }
 
 const (
@@ -116,10 +105,9 @@ func NewWorkspaceRelationsTuple(workspaceID string, key ReporterResourceKey) Rel
 	resourceType := key.ResourceType()
 	reporterType := key.ReporterType()
 
-	namespace := strings.ToLower(reporterType.String())
-
+	namespace := reporterType.String()
 	resourceObjectType := NewRelationsObjectType(
-		strings.ToLower(resourceType.String()),
+		resourceType.String(),
 		namespace,
 	)
 	resource := NewRelationsResource(resourceId, resourceObjectType)

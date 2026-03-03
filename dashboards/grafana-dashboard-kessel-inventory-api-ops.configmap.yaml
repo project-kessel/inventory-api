@@ -1000,7 +1000,7 @@ data:
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "sum(increase(grpc_server_streams_total{namespace=\"$namespace\",job=\"kessel-inventory-api\",code!~\"5..|14\"}[$__range])) / sum(increase(grpc_server_streams_total{namespace=\"$namespace\",job=\"kessel-inventory-api\"}[$__range]))",
+              "expr": "sum(increase(grpc_server_streams_total{namespace=\"$namespace\",job=\"kessel-inventory-api\",code!~\"5..|14\",operation!~\".*[Ss]erver[Rr]eflection.*\"}[$__range])) / sum(increase(grpc_server_streams_total{namespace=\"$namespace\",job=\"kessel-inventory-api\",operation!~\".*[Ss]erver[Rr]eflection.*\"}[$__range]))",
               "format": "time_series",
               "instant": true,
               "refId": "A"
@@ -1098,7 +1098,7 @@ data:
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "sum by (code) (label_replace(rate(grpc_server_streams_total{namespace=\"$namespace\",job=\"kessel-inventory-api\"}[$__rate_interval]), \"code\", \"200\", \"code\", \"0\"))",
+              "expr": "sum by (code) (label_replace(rate(grpc_server_streams_total{namespace=\"$namespace\",job=\"kessel-inventory-api\",operation!~\".*[Ss]erver[Rr]eflection.*\"}[$__rate_interval]), \"code\", \"200\", \"code\", \"0\"))",
               "legendFormat": "{{code}}",
               "refId": "A"
             }
@@ -1196,7 +1196,7 @@ data:
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "sum(rate(grpc_server_streams_total{namespace=\"$namespace\",job=\"kessel-inventory-api\",code!~\"0|2..\"}[$__rate_interval])) / sum(rate(grpc_server_streams_total{namespace=\"$namespace\",job=\"kessel-inventory-api\"}[$__rate_interval]))",
+              "expr": "sum(rate(grpc_server_streams_total{namespace=\"$namespace\",job=\"kessel-inventory-api\",code!~\"0|2..\",operation!~\".*[Ss]erver[Rr]eflection.*\"}[$__rate_interval])) / sum(rate(grpc_server_streams_total{namespace=\"$namespace\",job=\"kessel-inventory-api\",operation!~\".*[Ss]erver[Rr]eflection.*\"}[$__rate_interval]))",
               "legendFormat": "non-2xx/0",
               "refId": "A"
             },
@@ -1206,7 +1206,7 @@ data:
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "sum(rate(grpc_server_streams_total{namespace=\"$namespace\",job=\"kessel-inventory-api\",code=~\"5..|14\"}[$__rate_interval])) / sum(rate(grpc_server_streams_total{namespace=\"$namespace\",job=\"kessel-inventory-api\"}[$__rate_interval]))",
+              "expr": "sum(rate(grpc_server_streams_total{namespace=\"$namespace\",job=\"kessel-inventory-api\",code=~\"5..|14\",operation!~\".*[Ss]erver[Rr]eflection.*\"}[$__rate_interval])) / sum(rate(grpc_server_streams_total{namespace=\"$namespace\",job=\"kessel-inventory-api\",operation!~\".*[Ss]erver[Rr]eflection.*\"}[$__rate_interval]))",
               "legendFormat": "5xx and timeout",
               "refId": "B"
             }
@@ -1303,7 +1303,7 @@ data:
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "sum(increase(grpc_server_stream_first_response_duration_seconds_sum{namespace=\"$namespace\",job=\"kessel-inventory-api\"}[$__rate_interval])) / sum(increase(grpc_server_stream_first_response_duration_seconds_count{namespace=\"$namespace\",job=\"kessel-inventory-api\"}[$__rate_interval]))",
+              "expr": "sum(increase(grpc_server_stream_first_response_duration_seconds_sum{namespace=\"$namespace\",job=\"kessel-inventory-api\",operation!~\".*[Ss]erver[Rr]eflection.*\"}[$__rate_interval])) / sum(increase(grpc_server_stream_first_response_duration_seconds_count{namespace=\"$namespace\",job=\"kessel-inventory-api\",operation!~\".*[Ss]erver[Rr]eflection.*\"}[$__rate_interval]))",
               "interval": "",
               "legendFormat": "Avg. first response duration",
               "refId": "A"
@@ -1388,7 +1388,7 @@ data:
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "sum(increase(grpc_server_stream_first_response_duration_seconds_bucket{namespace=\"$namespace\",job=\"kessel-inventory-api\",le=\"1.0\"}[$__range])) / sum(increase(grpc_server_stream_first_response_duration_seconds_count{namespace=\"$namespace\",job=\"kessel-inventory-api\"}[$__range]))",
+              "expr": "sum(increase(grpc_server_stream_first_response_duration_seconds_bucket{namespace=\"$namespace\",job=\"kessel-inventory-api\",le=\"1.0\",operation!~\".*[Ss]erver[Rr]eflection.*\"}[$__range])) / sum(increase(grpc_server_stream_first_response_duration_seconds_count{namespace=\"$namespace\",job=\"kessel-inventory-api\",operation!~\".*[Ss]erver[Rr]eflection.*\"}[$__range]))",
               "format": "time_series",
               "instant": true,
               "refId": "A"
@@ -6109,14 +6109,14 @@ data:
               "type": "prometheus",
               "uid": "$datasource"
             },
-            "definition": "label_values(grpc_server_streams_total{namespace=\"$namespace\",job=\"kessel-inventory-api\"}, operation)",
+            "definition": "label_values(grpc_server_streams_total{namespace=\"$namespace\",job=\"kessel-inventory-api\",operation!~\".*[Ss]erver[Rr]eflection.*\"}, operation)",
             "includeAll": true,
             "label": "streaming routes",
             "multi": true,
             "name": "stream_route",
             "options": [],
             "query": {
-              "query": "label_values(grpc_server_streams_total{namespace=\"$namespace\",job=\"kessel-inventory-api\"}, operation)",
+              "query": "label_values(grpc_server_streams_total{namespace=\"$namespace\",job=\"kessel-inventory-api\",operation!~\".*[Ss]erver[Rr]eflection.*\"}, operation)",
               "refId": "StandardVariableQuery"
             },
             "refresh": 1,

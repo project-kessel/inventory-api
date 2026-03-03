@@ -775,7 +775,7 @@ func TestFencingToken_WritingAfterRebalance(t *testing.T) {
 	assert.Nil(t, err)
 	subjectType := model.NewRelationsObjectType("workspace", "rbac")
 	subjectResource := model.NewRelationsResource(subjectId, subjectType)
-	subject := model.NewRelationsSubject(subjectResource)
+	subject := model.NewRelationsSubject(subjectResource, "")
 
 	domainTuple := model.NewRelationsTuple(resource, "t_workspace", subject)
 	tuples := &[]model.RelationsTuple{domainTuple}
@@ -814,7 +814,7 @@ func TestInventoryConsumer_CreateTuple_FailedPrecondition(t *testing.T) {
 	assert.Nil(t, err)
 	subjectType := model.NewRelationsObjectType("workspace", "rbac")
 	subjectResource := model.NewRelationsResource(subjectId, subjectType)
-	subject := model.NewRelationsSubject(subjectResource)
+	subject := model.NewRelationsSubject(subjectResource, "")
 
 	domainTuple := model.NewRelationsTuple(resource, "t_workspace", subject)
 	tuples := &[]model.RelationsTuple{domainTuple}
@@ -849,7 +849,7 @@ func TestInventoryConsumer_UpdateTuple_FailedPrecondition(t *testing.T) {
 	assert.Nil(t, err)
 	subjectType := model.NewRelationsObjectType("workspace", "rbac")
 	subjectResource := model.NewRelationsResource(subjectId, subjectType)
-	subject := model.NewRelationsSubject(subjectResource)
+	subject := model.NewRelationsSubject(subjectResource, "")
 
 	domainTuple := model.NewRelationsTuple(resource, "t_workspace", subject)
 	tuples := &[]model.RelationsTuple{domainTuple}
@@ -884,7 +884,7 @@ func TestInventoryConsumer_DeleteTuple_FailedPrecondition(t *testing.T) {
 	assert.Nil(t, err)
 	subjectType := model.NewRelationsObjectType("workspace", "rbac")
 	subjectResource := model.NewRelationsResource(subjectId, subjectType)
-	subject := model.NewRelationsSubject(subjectResource)
+	subject := model.NewRelationsSubject(subjectResource, "")
 
 	domainTuple := model.NewRelationsTuple(resource, "t_workspace", subject)
 	tuples := []model.RelationsTuple{domainTuple}

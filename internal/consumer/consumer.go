@@ -826,6 +826,7 @@ func (i *InventoryConsumer) convertTupleToFilter(tuple model.RelationsTuple) (*v
 	subjectNamespace := tuple.Subject().Subject().Type().Namespace()
 	subjectType := tuple.Subject().Subject().Type().Name()
 	subjectId := tuple.Subject().Subject().Id().Serialize()
+	subjectRelations := tuple.Subject().Relation()
 
 	return &v1beta1.RelationTupleFilter{
 		ResourceNamespace: &resourceNamespace,
@@ -836,6 +837,7 @@ func (i *InventoryConsumer) convertTupleToFilter(tuple model.RelationsTuple) (*v
 			SubjectNamespace: &subjectNamespace,
 			SubjectType:      &subjectType,
 			SubjectId:        &subjectId,
+			Relation:         &subjectRelations,
 		},
 	}, nil
 }

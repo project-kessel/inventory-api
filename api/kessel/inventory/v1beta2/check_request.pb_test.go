@@ -112,3 +112,40 @@ func TestCheckRequest_SubjectNilResource(t *testing.T) {
 	assert.Nil(t, cr.GetSubject().GetResource())
 	assert.Equal(t, "", cr.GetSubject().GetRelation())
 }
+
+func TestCheckRequest_Consistency(t *testing.T) {
+	// Test all consistency options
+	tests := []struct {
+		name        string
+		consistency *Consistency
+	}{
+		{"nil", nil},
+		{"minimize_latency", &Consistency{Requirement: &Consistency_MinimizeLatency{MinimizeLatency: true}}},
+		{"at_least_as_fresh", &Consistency{Requirement: &Consistency_AtLeastAsFresh{AtLeastAsFresh: &ConsistencyToken{Token: "token"}}}},
+		{"at_least_as_acknowledged", &Consistency{Requirement: &Consistency_AtLeastAsAcknowledged{AtLeastAsAcknowledged: true}}},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			cr := &CheckRequest{
+				Object:      &ResourceReference{ResourceType: "host", ResourceId: "123"},
+				Relation:    "view",
+				Consistency: tc.consistency,
+			}
+
+			// Proto round-trip
+			data, err := proto.Marshal(cr)
+			assert.NoError(t, err)
+
+			var out CheckRequest
+			err = proto.Unmarshal(data, &out)
+			assert.NoError(t, err)
+
+			if tc.consistency == nil {
+				assert.Nil(t, out.GetConsistency())
+			} else {
+				assert.NotNil(t, out.GetConsistency())
+			}
+		})
+	}
+}

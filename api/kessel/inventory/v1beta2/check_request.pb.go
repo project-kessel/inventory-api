@@ -28,9 +28,14 @@ type CheckRequest struct {
 	// - resource type and id
 	// - permission (cannot be derived from the type as a type may have multiple 'read' permissions. Ex: https://github.com/RedHatInsights/rbac-config/blob/master/configs/prod/schemas/src/notifications.ksl#L31)
 	// - user (possibly derived from an identity token)
-	Object        *ResourceReference `protobuf:"bytes,1,opt,name=object,proto3" json:"object,omitempty"`
-	Relation      string             `protobuf:"bytes,2,opt,name=relation,proto3" json:"relation,omitempty"`
-	Subject       *SubjectReference  `protobuf:"bytes,3,opt,name=subject,proto3" json:"subject,omitempty"`
+	Object   *ResourceReference `protobuf:"bytes,1,opt,name=object,proto3" json:"object,omitempty"`
+	Relation string             `protobuf:"bytes,2,opt,name=relation,proto3" json:"relation,omitempty"`
+	Subject  *SubjectReference  `protobuf:"bytes,3,opt,name=subject,proto3" json:"subject,omitempty"`
+	// Consistency requirement for the check operation.
+	// If not specified, standard server configuration defaults to minimizeLatency.
+	// Server deployments may override this default behavior (for example, to
+	// at_least_as_acknowledged).
+	Consistency   *Consistency `protobuf:"bytes,4,opt,name=consistency,proto3,oneof" json:"consistency,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -86,15 +91,24 @@ func (x *CheckRequest) GetSubject() *SubjectReference {
 	return nil
 }
 
+func (x *CheckRequest) GetConsistency() *Consistency {
+	if x != nil {
+		return x.Consistency
+	}
+	return nil
+}
+
 var File_kessel_inventory_v1beta2_check_request_proto protoreflect.FileDescriptor
 
 const file_kessel_inventory_v1beta2_check_request_proto_rawDesc = "" +
 	"\n" +
-	",kessel/inventory/v1beta2/check_request.proto\x12\x18kessel.inventory.v1beta2\x1a\x1bbuf/validate/validate.proto\x1a1kessel/inventory/v1beta2/resource_reference.proto\x1a0kessel/inventory/v1beta2/subject_reference.proto\"\xce\x01\n" +
+	",kessel/inventory/v1beta2/check_request.proto\x12\x18kessel.inventory.v1beta2\x1a\x1bbuf/validate/validate.proto\x1a1kessel/inventory/v1beta2/resource_reference.proto\x1a0kessel/inventory/v1beta2/subject_reference.proto\x1a*kessel/inventory/v1beta2/consistency.proto\"\xac\x02\n" +
 	"\fCheckRequest\x12K\n" +
 	"\x06object\x18\x01 \x01(\v2+.kessel.inventory.v1beta2.ResourceReferenceB\x06\xbaH\x03\xc8\x01\x01R\x06object\x12#\n" +
 	"\brelation\x18\x02 \x01(\tB\a\xbaH\x04r\x02\x10\x01R\brelation\x12L\n" +
-	"\asubject\x18\x03 \x01(\v2*.kessel.inventory.v1beta2.SubjectReferenceB\x06\xbaH\x03\xc8\x01\x01R\asubjectBr\n" +
+	"\asubject\x18\x03 \x01(\v2*.kessel.inventory.v1beta2.SubjectReferenceB\x06\xbaH\x03\xc8\x01\x01R\asubject\x12L\n" +
+	"\vconsistency\x18\x04 \x01(\v2%.kessel.inventory.v1beta2.ConsistencyH\x00R\vconsistency\x88\x01\x01B\x0e\n" +
+	"\f_consistencyBr\n" +
 	"(org.project_kessel.api.inventory.v1beta2P\x01ZDgithub.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2b\x06proto3"
 
 var (
@@ -114,15 +128,17 @@ var file_kessel_inventory_v1beta2_check_request_proto_goTypes = []any{
 	(*CheckRequest)(nil),      // 0: kessel.inventory.v1beta2.CheckRequest
 	(*ResourceReference)(nil), // 1: kessel.inventory.v1beta2.ResourceReference
 	(*SubjectReference)(nil),  // 2: kessel.inventory.v1beta2.SubjectReference
+	(*Consistency)(nil),       // 3: kessel.inventory.v1beta2.Consistency
 }
 var file_kessel_inventory_v1beta2_check_request_proto_depIdxs = []int32{
 	1, // 0: kessel.inventory.v1beta2.CheckRequest.object:type_name -> kessel.inventory.v1beta2.ResourceReference
 	2, // 1: kessel.inventory.v1beta2.CheckRequest.subject:type_name -> kessel.inventory.v1beta2.SubjectReference
-	2, // [2:2] is the sub-list for method output_type
-	2, // [2:2] is the sub-list for method input_type
-	2, // [2:2] is the sub-list for extension type_name
-	2, // [2:2] is the sub-list for extension extendee
-	0, // [0:2] is the sub-list for field type_name
+	3, // 2: kessel.inventory.v1beta2.CheckRequest.consistency:type_name -> kessel.inventory.v1beta2.Consistency
+	3, // [3:3] is the sub-list for method output_type
+	3, // [3:3] is the sub-list for method input_type
+	3, // [3:3] is the sub-list for extension type_name
+	3, // [3:3] is the sub-list for extension extendee
+	0, // [0:3] is the sub-list for field type_name
 }
 
 func init() { file_kessel_inventory_v1beta2_check_request_proto_init() }
@@ -132,6 +148,8 @@ func file_kessel_inventory_v1beta2_check_request_proto_init() {
 	}
 	file_kessel_inventory_v1beta2_resource_reference_proto_init()
 	file_kessel_inventory_v1beta2_subject_reference_proto_init()
+	file_kessel_inventory_v1beta2_consistency_proto_init()
+	file_kessel_inventory_v1beta2_check_request_proto_msgTypes[0].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{

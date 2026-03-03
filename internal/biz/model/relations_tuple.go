@@ -25,7 +25,7 @@ func NewRelationsTuple(resource RelationsResource, relation string, subject Rela
 	return RelationsTuple{
 		resource: relationsResource,
 		relation: strings.ToLower(relation),
-		subject:  NewRelationsSubject(subjectResource, ""),
+		subject:  NewRelationsSubject(subjectResource, subject.Relation()),
 	}
 }
 
@@ -127,6 +127,12 @@ func NewWorkspaceRelationsTuple(workspaceID string, key ReporterResourceKey) Rel
 	workspaceSubjectId, _ := NewLocalResourceId(workspaceID)
 	workspaceObjectType := NewRelationsObjectType(WorkspaceRelation, RbacNamespace)
 	workspaceSubject := NewRelationsResource(workspaceSubjectId, workspaceObjectType)
+	/*
+	 The only relation Inventory currently replicates to relations is a workspace, in which
+	 the subject is the workspace itself; there should not be any subject relation.
+	 Setting the subject relation to an empty string to indicate that the value should be empty in the query
+	 and avoids nil which uses wildcard semantics.
+	*/
 	subject := NewRelationsSubject(workspaceSubject, "")
 
 	return NewRelationsTuple(resource, WorkspaceRelation, subject)

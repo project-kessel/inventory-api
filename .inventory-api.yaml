@@ -37,6 +37,8 @@ authn:
           grpc: true
 authz:
   impl: allow-all
+consistency:
+  default-to-at-least-as-acknowledged: true
 selfsubjectstrategy:
   redhatRbacSelfSubjectStrategy:
     enabled: true

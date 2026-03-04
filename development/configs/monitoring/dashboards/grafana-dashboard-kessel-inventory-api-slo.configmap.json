@@ -229,7 +229,7 @@
           "datasource": {
             "uid": "$datasource"
           },
-          "expr": "(\n  sum by (operation) (\n    increase(server_requests_code_total{job=~\"kessel-inventory-api\",operation!~\".*[Ll]ive[Zz].*|.*[Rr]eady[Zz].*|.*grpc.health.*|.*[Ss]erver[Rr]eflection.*\",code!~\"5..|14\"}[$slo_period])\n  )\n  /\n  sum by (operation) (\n    increase(server_requests_code_total{job=~\"kessel-inventory-api\",operation!~\".*[Ll]ive[Zz].*|.*[Rr]eady[Zz].*|.*grpc.health.*|.*[Ss]erver[Rr]eflection.*\"}[$slo_period])\n  )\n)",
+          "expr": "(\n  sum by (operation) (\n    increase(server_requests_code_total{job=~\"kessel-inventory-api\",operation!~\".*[Ll]ive[Zz].*|.*[Rr]eady[Zz].*|.*grpc.health.*|.*[Ss]erver[Rr]eflection.*\",code!~\"5..|14\"}[$slo_period])\n  )\n  /\n  sum by (operation) (\n    increase(server_requests_code_total{job=~\"kessel-inventory-api\",operation!~\".*[Ll]ive[Zz].*|.*[Rr]eady[Zz].*|.*grpc.health.*|.*[Ss]erver[Rr]eflection.*\"}[$slo_period])\n  )\n)\nor\n(\n  sum by (operation) (\n    increase(grpc_server_streams_total{job=\"kessel-inventory-api\",operation!~\".*[Ss]erver[Rr]eflection.*\",code!~\"5..|14\"}[$slo_period])\n  )\n  /\n  sum by (operation) (\n    increase(grpc_server_streams_total{job=\"kessel-inventory-api\",operation!~\".*[Ss]erver[Rr]eflection.*\"}[$slo_period])\n  )\n)",
           "format": "table",
           "instant": true,
           "legendFormat": "{{operation}}",
@@ -239,7 +239,7 @@
           "datasource": {
             "uid": "$datasource"
           },
-          "expr": "(\n  sum by (operation) (\n    increase(server_requests_seconds_bucket_bucket{job=~\"kessel-inventory-api\",operation!~\".*[Ll]ive[Zz].*|.*[Rr]eady[Zz].*|.*grpc.health.*|.*[Ss]erver[Rr]eflection.*\",code!~\"5..|14\",le=\"$latency_slo_target\"}[$slo_period])\n  )\n  /\n  sum by (operation) (\n    increase(server_requests_seconds_bucket_count{job=~\"kessel-inventory-api\",operation!~\".*[Ll]ive[Zz].*|.*[Rr]eady[Zz].*|.*grpc.health.*|.*[Ss]erver[Rr]eflection.*\",code!~\"5..|14\"}[$slo_period])\n  )\n)",
+          "expr": "(\n  sum by (operation) (\n    increase(server_requests_seconds_bucket_bucket{job=~\"kessel-inventory-api\",operation!~\".*[Ll]ive[Zz].*|.*[Rr]eady[Zz].*|.*grpc.health.*|.*[Ss]erver[Rr]eflection.*\",code!~\"5..|14\",le=\"$latency_slo_target\"}[$slo_period])\n  )\n  /\n  sum by (operation) (\n    increase(server_requests_seconds_bucket_count{job=~\"kessel-inventory-api\",operation!~\".*[Ll]ive[Zz].*|.*[Rr]eady[Zz].*|.*grpc.health.*|.*[Ss]erver[Rr]eflection.*\",code!~\"5..|14\"}[$slo_period])\n  )\n)\nor\n(\n  sum by (operation) (\n    increase(grpc_server_stream_first_response_duration_seconds_bucket{job=\"kessel-inventory-api\",operation!~\".*[Ss]erver[Rr]eflection.*\",le=\"$latency_slo_target\"}[$slo_period])\n  )\n  /\n  sum by (operation) (\n    increase(grpc_server_stream_first_response_duration_seconds_count{job=\"kessel-inventory-api\",operation!~\".*[Ss]erver[Rr]eflection.*\"}[$slo_period])\n  )\n)",
           "format": "table",
           "instant": true,
           "legendFormat": "{{operation}}",
@@ -249,7 +249,7 @@
           "datasource": {
             "uid": "$datasource"
           },
-          "expr": "(\n  sum by (operation) (\n    rate(server_requests_code_total{job=~\"kessel-inventory-api\",operation!~\".*[Ll]ive[Zz].*|.*[Rr]eady[Zz].*|.*grpc.health.*|.*[Ss]erver[Rr]eflection.*\"}[5m])\n  )\n)",
+          "expr": "(\n  sum by (operation) (\n    rate(server_requests_code_total{job=~\"kessel-inventory-api\",operation!~\".*[Ll]ive[Zz].*|.*[Rr]eady[Zz].*|.*grpc.health.*|.*[Ss]erver[Rr]eflection.*\"}[5m])\n  )\n)\nor\n(\n  sum by (operation) (\n    rate(grpc_server_streams_total{job=\"kessel-inventory-api\",operation!~\".*[Ss]erver[Rr]eflection.*\"}[5m])\n  )\n)",
           "format": "table",
           "instant": true,
           "legendFormat": "{{operation}}",
@@ -259,7 +259,7 @@
           "datasource": {
             "uid": "$datasource"
           },
-          "expr": "(\n  1 - (\n    sum by (operation) (\n      increase(server_requests_code_total{job=~\"kessel-inventory-api\",operation!~\".*[Ll]ive[Zz].*|.*[Rr]eady[Zz].*|.*grpc.health.*|.*[Ss]erver[Rr]eflection.*\",code!~\"5..|14\"}[$slo_period])\n    )\n    /\n    sum by (operation) (\n      increase(server_requests_code_total{job=~\"kessel-inventory-api\",operation!~\".*[Ll]ive[Zz].*|.*[Rr]eady[Zz].*|.*grpc.health.*|.*[Ss]erver[Rr]eflection.*\"}[$slo_period])\n    )\n  )\n)",
+          "expr": "(\n  1 - (\n    sum by (operation) (\n      increase(server_requests_code_total{job=~\"kessel-inventory-api\",operation!~\".*[Ll]ive[Zz].*|.*[Rr]eady[Zz].*|.*grpc.health.*|.*[Ss]erver[Rr]eflection.*\",code!~\"5..|14\"}[$slo_period])\n    )\n    /\n    sum by (operation) (\n      increase(server_requests_code_total{job=~\"kessel-inventory-api\",operation!~\".*[Ll]ive[Zz].*|.*[Rr]eady[Zz].*|.*grpc.health.*|.*[Ss]erver[Rr]eflection.*\"}[$slo_period])\n    )\n  )\n)\nor\n(\n  1 - (\n    sum by (operation) (\n      increase(grpc_server_streams_total{job=\"kessel-inventory-api\",operation!~\".*[Ss]erver[Rr]eflection.*\",code!~\"5..|14\"}[$slo_period])\n    )\n    /\n    sum by (operation) (\n      increase(grpc_server_streams_total{job=\"kessel-inventory-api\",operation!~\".*[Ss]erver[Rr]eflection.*\"}[$slo_period])\n    )\n  )\n)",
           "format": "table",
           "instant": true,
           "legendFormat": "{{operation}}",
@@ -674,6 +674,356 @@
         "x": 0,
         "y": 12
       },
+      "id": 400,
+      "panels": [
+        {
+          "datasource": {
+            "uid": "$datasource"
+          },
+          "description": "Streaming availability SLO compliance for this endpoint. Success rate excluding 5xx and timeout errors. Green >=SLO target, Yellow 99-SLO target, Red <99%.",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "decimals": 2,
+              "mappings": [],
+              "max": 1,
+              "min": 0.98,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "red"
+                  },
+                  {
+                    "color": "yellow",
+                    "value": 0.99
+                  },
+                  {
+                    "color": "green",
+                    "value": 0.999
+                  }
+                ]
+              },
+              "unit": "percentunit"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 6,
+            "w": 8,
+            "x": 0,
+            "y": 17
+          },
+          "id": 401,
+          "options": {
+            "orientation": "auto",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "showThresholdLabels": false,
+            "showThresholdMarkers": true,
+            "text": {}
+          },
+          "pluginVersion": "8.5.2",
+          "targets": [
+            {
+              "datasource": {
+                "uid": "$datasource"
+              },
+              "expr": "sum(increase(grpc_server_streams_total{job=\"kessel-inventory-api\",operation=\"${stream_route:raw}\",code!~\"5..|14\"}[$slo_period]))\n/\nsum(increase(grpc_server_streams_total{job=\"kessel-inventory-api\",operation=\"${stream_route:raw}\"}[$slo_period]))",
+              "refId": "A"
+            }
+          ],
+          "title": "Streaming Availability ($availability_slo_target)",
+          "type": "gauge"
+        },
+        {
+          "datasource": {
+            "uid": "$datasource"
+          },
+          "description": "Rate at which streaming availability error budget is being consumed. Values are multiplied by 1000 for visibility (e.g., 10 = 1% error rate). Normal: <10, Warning: 10-50, Critical: >50.",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "decimals": 2,
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  },
+                  {
+                    "color": "yellow",
+                    "value": 10
+                  },
+                  {
+                    "color": "red",
+                    "value": 50
+                  }
+                ]
+              },
+              "unit": "short"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 6,
+            "w": 8,
+            "x": 8,
+            "y": 17
+          },
+          "id": 402,
+          "options": {
+            "orientation": "auto",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "showThresholdLabels": false,
+            "showThresholdMarkers": true,
+            "text": {}
+          },
+          "pluginVersion": "8.5.2",
+          "targets": [
+            {
+              "datasource": {
+                "uid": "$datasource"
+              },
+              "expr": "(\n  1 - (\n    sum(rate(grpc_server_streams_total{job=\"kessel-inventory-api\",operation=\"${stream_route:raw}\",code!~\"5..|14\"}[1h]))\n    /\n    sum(rate(grpc_server_streams_total{job=\"kessel-inventory-api\",operation=\"${stream_route:raw}\"}[1h]))\n  )\n) * 1000",
+              "refId": "A"
+            }
+          ],
+          "title": "Streaming Availability Burn Rate",
+          "type": "gauge"
+        },
+        {
+          "datasource": {
+            "uid": "$datasource"
+          },
+          "description": "Percentage of streaming availability error budget consumed over the past day. 0% = no budget used, 100% = SLO violated. Colors: Red >80%, Yellow 50-80%, Green <50%.",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "decimals": 2,
+              "mappings": [],
+              "max": 1,
+              "min": 0,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  },
+                  {
+                    "color": "yellow",
+                    "value": 0.5
+                  },
+                  {
+                    "color": "red",
+                    "value": 0.8
+                  }
+                ]
+              },
+              "unit": "percentunit"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 6,
+            "w": 8,
+            "x": 16,
+            "y": 17
+          },
+          "id": 403,
+          "options": {
+            "orientation": "auto",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "showThresholdLabels": false,
+            "showThresholdMarkers": true,
+            "text": {}
+          },
+          "pluginVersion": "8.5.2",
+          "targets": [
+            {
+              "datasource": {
+                "uid": "$datasource"
+              },
+              "expr": "1 - clamp_min(\n  (\n    (1 - $availability_slo_target) - (\n      1 - (\n        sum(increase(grpc_server_streams_total{job=\"kessel-inventory-api\",operation=\"${stream_route:raw}\",code!~\"5..|14\"}[1d]))\n        /\n        sum(increase(grpc_server_streams_total{job=\"kessel-inventory-api\",operation=\"${stream_route:raw}\"}[1d]))\n      )\n    )\n  ) / (1 - $availability_slo_target),\n  0\n)",
+              "refId": "A"
+            }
+          ],
+          "title": "Streaming Availability Budget Used",
+          "type": "gauge"
+        },
+        {
+          "datasource": {
+            "uid": "$datasource"
+          },
+          "description": "Streaming availability trend showing daily availability percentage over 28 days. Green line = availability, red dashed line = SLO target.",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 0,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "vis": false
+                },
+                "lineInterpolation": "linear",
+                "lineWidth": 2,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "auto",
+                "spanNulls": true,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "decimals": 3,
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  }
+                ]
+              },
+              "unit": "percentunit"
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "SLO Target"
+                },
+                "properties": [
+                  {
+                    "id": "custom.drawStyle",
+                    "value": "line"
+                  },
+                  {
+                    "id": "custom.lineStyle",
+                    "value": {
+                      "dash": [
+                        10,
+                        10
+                      ],
+                      "fill": "dash"
+                    }
+                  },
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "red",
+                      "mode": "fixed"
+                    }
+                  },
+                  {
+                    "id": "custom.hideFrom",
+                    "value": {
+                      "legend": true,
+                      "tooltip": true,
+                      "vis": false
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 24,
+            "x": 0,
+            "y": 23
+          },
+          "id": 404,
+          "options": {
+            "legend": {
+              "calcs": [
+                "min",
+                "mean",
+                "max"
+              ],
+              "displayMode": "table",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "single",
+              "sort": "none"
+            }
+          },
+          "targets": [
+            {
+              "datasource": {
+                "uid": "$datasource"
+              },
+              "expr": "(\n  sum(\n    increase(grpc_server_streams_total{job=\"kessel-inventory-api\",operation=\"${stream_route:raw}\",code!~\"5..|14\"}[1d])\n  )\n  /\n  sum(\n    increase(grpc_server_streams_total{job=\"kessel-inventory-api\",operation=\"${stream_route:raw}\"}[1d])\n  )\n)",
+              "interval": "1d",
+              "legendFormat": "Availability",
+              "refId": "A"
+            },
+            {
+              "datasource": {
+                "uid": "$datasource"
+              },
+              "expr": "$availability_slo_target",
+              "interval": "1d",
+              "legendFormat": "SLO Target",
+              "refId": "B"
+            }
+          ],
+          "title": "Streaming Availability Trend",
+          "type": "timeseries"
+        }
+      ],
+      "repeat": "stream_route",
+      "title": "Streaming Availability SLO - ${stream_route:raw}",
+      "type": "row"
+    },
+    {
+      "collapsed": true,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 16
+      },
       "id": 300,
       "panels": [
         {
@@ -1076,6 +1426,417 @@
       "repeat": "route",
       "title": "Latency SLO - ${route:raw}",
       "type": "row"
+    },
+    {
+      "collapsed": true,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 20
+      },
+      "id": 500,
+      "panels": [
+        {
+          "datasource": {
+            "uid": "$datasource"
+          },
+          "description": "Streaming latency SLO compliance for this endpoint. Percentage of streams with first response under target latency. Green >=95%, Yellow 90-95%, Red <90%.",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "decimals": 2,
+              "mappings": [],
+              "max": 1,
+              "min": 0.85,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "red"
+                  },
+                  {
+                    "color": "yellow",
+                    "value": 0.9
+                  },
+                  {
+                    "color": "green",
+                    "value": 0.95
+                  }
+                ]
+              },
+              "unit": "percentunit"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 6,
+            "w": 8,
+            "x": 0,
+            "y": 21
+          },
+          "id": 501,
+          "options": {
+            "orientation": "auto",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "showThresholdLabels": false,
+            "showThresholdMarkers": true,
+            "text": {}
+          },
+          "pluginVersion": "8.5.2",
+          "targets": [
+            {
+              "datasource": {
+                "uid": "$datasource"
+              },
+              "expr": "sum(increase(grpc_server_stream_first_response_duration_seconds_bucket{job=\"kessel-inventory-api\",operation=\"${stream_route:raw}\",le=\"$latency_slo_target\"}[$slo_period]))\n/\nsum(increase(grpc_server_stream_first_response_duration_seconds_count{job=\"kessel-inventory-api\",operation=\"${stream_route:raw}\"}[$slo_period]))",
+              "refId": "A"
+            }
+          ],
+          "title": "Streaming Latency (95% <$latency_slo_target)",
+          "type": "gauge"
+        },
+        {
+          "datasource": {
+            "uid": "$datasource"
+          },
+          "description": "Rate at which streaming latency error budget is being consumed. Values are multiplied by 20 for visibility (e.g., 5 = 25% slow streams). Normal: <5, Warning: 5-15, Critical: >15.",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "decimals": 2,
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  },
+                  {
+                    "color": "yellow",
+                    "value": 5
+                  },
+                  {
+                    "color": "red",
+                    "value": 15
+                  }
+                ]
+              },
+              "unit": "short"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 6,
+            "w": 8,
+            "x": 8,
+            "y": 21
+          },
+          "id": 502,
+          "options": {
+            "orientation": "auto",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "showThresholdLabels": false,
+            "showThresholdMarkers": true,
+            "text": {}
+          },
+          "pluginVersion": "8.5.2",
+          "targets": [
+            {
+              "datasource": {
+                "uid": "$datasource"
+              },
+              "expr": "(\n  1 - (\n    sum(rate(grpc_server_stream_first_response_duration_seconds_bucket{job=\"kessel-inventory-api\",operation=\"${stream_route:raw}\",le=\"$latency_slo_target\"}[1h]))\n    /\n    sum(rate(grpc_server_stream_first_response_duration_seconds_count{job=\"kessel-inventory-api\",operation=\"${stream_route:raw}\"}[1h]))\n  )\n) * 20",
+              "refId": "A"
+            }
+          ],
+          "title": "Streaming Latency Burn Rate",
+          "type": "gauge"
+        },
+        {
+          "datasource": {
+            "uid": "$datasource"
+          },
+          "description": "Percentage of streaming latency error budget consumed over the past day. Shows cumulative slow stream budget usage. 0% = all streams fast, 100% = latency SLO violated. Colors: Red >80%, Yellow 50-80%, Green <50%.",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "decimals": 2,
+              "mappings": [],
+              "max": 1,
+              "min": 0,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  },
+                  {
+                    "color": "yellow",
+                    "value": 0.5
+                  },
+                  {
+                    "color": "red",
+                    "value": 0.8
+                  }
+                ]
+              },
+              "unit": "percentunit"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 6,
+            "w": 8,
+            "x": 16,
+            "y": 21
+          },
+          "id": 503,
+          "options": {
+            "orientation": "auto",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "showThresholdLabels": false,
+            "showThresholdMarkers": true,
+            "text": {}
+          },
+          "pluginVersion": "8.5.2",
+          "targets": [
+            {
+              "datasource": {
+                "uid": "$datasource"
+              },
+              "expr": "1 - clamp_min(\n  (\n    0.05 - (\n      1 - (\n        sum(increase(grpc_server_stream_first_response_duration_seconds_bucket{job=\"kessel-inventory-api\",operation=\"${stream_route:raw}\",le=\"$latency_slo_target\"}[1d]))\n        /\n        sum(increase(grpc_server_stream_first_response_duration_seconds_count{job=\"kessel-inventory-api\",operation=\"${stream_route:raw}\"}[1d]))\n      )\n    )\n  ) / 0.05,\n  0\n)",
+              "refId": "A"
+            }
+          ],
+          "title": "Streaming Latency Budget Used",
+          "type": "gauge"
+        },
+        {
+          "datasource": {
+            "uid": "$datasource"
+          },
+          "description": "Streaming latency trend showing daily P95 first-response latency and SLO compliance percentage over 28 days. Blue line = P95 latency, Green line = SLO compliance %, Red dashed line = latency SLO target.",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 0,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "vis": false
+                },
+                "lineInterpolation": "linear",
+                "lineWidth": 2,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "auto",
+                "spanNulls": true,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  }
+                ]
+              }
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "P95 Latency"
+                },
+                "properties": [
+                  {
+                    "id": "unit",
+                    "value": "s"
+                  },
+                  {
+                    "id": "custom.axisPlacement",
+                    "value": "left"
+                  },
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "blue",
+                      "mode": "fixed"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "SLO Compliance"
+                },
+                "properties": [
+                  {
+                    "id": "unit",
+                    "value": "percentunit"
+                  },
+                  {
+                    "id": "custom.axisPlacement",
+                    "value": "right"
+                  },
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "green",
+                      "mode": "fixed"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Latency SLO Target"
+                },
+                "properties": [
+                  {
+                    "id": "unit",
+                    "value": "s"
+                  },
+                  {
+                    "id": "custom.axisPlacement",
+                    "value": "left"
+                  },
+                  {
+                    "id": "custom.drawStyle",
+                    "value": "line"
+                  },
+                  {
+                    "id": "custom.lineStyle",
+                    "value": {
+                      "dash": [
+                        10,
+                        10
+                      ],
+                      "fill": "dash"
+                    }
+                  },
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "red",
+                      "mode": "fixed"
+                    }
+                  },
+                  {
+                    "id": "custom.hideFrom",
+                    "value": {
+                      "legend": true,
+                      "tooltip": true,
+                      "vis": false
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 24,
+            "x": 0,
+            "y": 27
+          },
+          "id": 504,
+          "options": {
+            "legend": {
+              "calcs": [
+                "min",
+                "mean",
+                "max"
+              ],
+              "displayMode": "table",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "none"
+            }
+          },
+          "targets": [
+            {
+              "datasource": {
+                "uid": "$datasource"
+              },
+              "expr": "histogram_quantile(0.95,\n  sum by (le) (\n    rate(grpc_server_stream_first_response_duration_seconds_bucket{job=\"kessel-inventory-api\",operation=\"${stream_route:raw}\"}[1d])\n  )\n)",
+              "interval": "1d",
+              "legendFormat": "P95 Latency",
+              "refId": "A"
+            },
+            {
+              "datasource": {
+                "uid": "$datasource"
+              },
+              "expr": "(\n  sum(\n    increase(grpc_server_stream_first_response_duration_seconds_bucket{job=\"kessel-inventory-api\",operation=\"${stream_route:raw}\",le=\"$latency_slo_target\"}[1d])\n  )\n  /\n  sum(\n    increase(grpc_server_stream_first_response_duration_seconds_count{job=\"kessel-inventory-api\",operation=\"${stream_route:raw}\"}[1d])\n  )\n)",
+              "interval": "1d",
+              "legendFormat": "SLO Compliance",
+              "refId": "B"
+            },
+            {
+              "datasource": {
+                "uid": "$datasource"
+              },
+              "expr": "$latency_slo_target",
+              "interval": "1d",
+              "legendFormat": "Latency SLO Target",
+              "refId": "C"
+            }
+          ],
+          "title": "Streaming Latency Trend",
+          "type": "timeseries"
+        }
+      ],
+      "repeat": "stream_route",
+      "title": "Streaming Latency SLO - ${stream_route:raw}",
+      "type": "row"
     }
   ],
   "preload": false,
@@ -1103,6 +1864,30 @@
         "options": [],
         "query": {
           "query": "label_values(server_requests_seconds_bucket_count{job=~\"kessel-inventory-api\",operation!~\".*[Ll]ive[Zz].*|.*[Rr]eady[Zz].*|.*grpc.health.*|.*[Ss]erver[Rr]eflection.*\"}, operation)",
+          "refId": "StandardVariableQuery"
+        },
+        "refresh": 1,
+        "type": "query"
+      },
+      {
+        "current": {
+          "text": "All",
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "$datasource"
+        },
+        "definition": "label_values(grpc_server_streams_total{job=\"kessel-inventory-api\",operation!~\".*[Ss]erver[Rr]eflection.*\"}, operation)",
+        "includeAll": true,
+        "label": "stream routes",
+        "multi": true,
+        "name": "stream_route",
+        "options": [],
+        "query": {
+          "query": "label_values(grpc_server_streams_total{job=\"kessel-inventory-api\",operation!~\".*[Ss]erver[Rr]eflection.*\"}, operation)",
           "refId": "StandardVariableQuery"
         },
         "refresh": 1,

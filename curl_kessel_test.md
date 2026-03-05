@@ -407,7 +407,7 @@ grpcurl -plaintext -d '{
       "subject": {
         "resource": {
           "resourceType": "group",
-          "resourceId": "user-1",
+          "resourceId": "group-1",
           "reporter": {"type": "rbac"}
         }
       }
@@ -422,13 +422,13 @@ grpcurl -plaintext -d '{
       "subject": {
         "resource": {
           "resourceType": "group",
-          "resourceId": "user-1",
+          "resourceId": "group-1",
           "reporter": {"type": "rbac"}
         }
       }
     }
   ]
-}' localhost:9081 kessel.inventory.v1beta2.KesselInventoryService/CheckBulkForUpdate
+}' localhost:9000 kessel.inventory.v1beta2.KesselInventoryService/CheckBulkForUpdate
 ```
 
 ### HTTP (with x-rh-identity)

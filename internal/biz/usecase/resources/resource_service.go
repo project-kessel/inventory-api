@@ -415,6 +415,39 @@ func (uc *Usecase) CheckForUpdate(ctx context.Context, relation model.Relation, 
 	return false, nil
 }
 
+// CheckBulkForUpdate performs bulk strongly consistent check-for-update permission checks.
+// Each item is evaluated via Authz.CheckForUpdate (no new downstream RPC required).
+func (uc *Usecase) CheckBulkForUpdate(ctx context.Context, cmd CheckBulkForUpdateCommand) (*CheckBulkResult, error) {
+	for _, item := range cmd.Items {
+		if err := uc.enforceMetaAuthzObject(ctx, metaauthorizer.RelationCheckBulkForUpdate, metaauthorizer.NewInventoryResourceFromKey(item.Resource)); err != nil {
+			uc.Log.WithContext(ctx).Errorf("meta authz failed for check for update bulk item: %v error: %v", item.Resource, err)
+			return nil, err
+		}
+	}
+
+	pairs := make([]CheckBulkResultPair, len(cmd.Items))
+	for i, item := range cmd.Items {
+		allowed, err := uc.CheckForUpdate(ctx, item.Relation, item.Subject, item.Resource)
+		if err != nil {
+			code := int32(codes.Unknown)
+			if st, ok := status.FromError(err); ok {
+				code = int32(st.Code())
+			}
+			pairs[i] = CheckBulkResultPair{
+				Request: item,
+				Result:  CheckBulkResultItem{Allowed: false, Error: err, ErrorCode: code},
+			}
+			continue
+		}
+		pairs[i] = CheckBulkResultPair{
+			Request: item,
+			Result:  CheckBulkResultItem{Allowed: allowed},
+		}
+	}
+
+	return &CheckBulkResult{Pairs: pairs}, nil
+}
+
 // CheckBulk performs bulk permission checks.
 func (uc *Usecase) CheckBulk(ctx context.Context, cmd CheckBulkCommand) (*CheckBulkResult, error) {
 	if model.ConsistencyTypeOf(cmd.Consistency) == model.ConsistencyAtLeastAsAcknowledged {

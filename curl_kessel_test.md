@@ -390,7 +390,92 @@ curl -X POST http://localhost:8000/api/kessel/v1beta2/checkforupdate \
 
 ---
 
-## 7. CheckBulk (Bulk Permission Checks)
+## 7. CheckBulkForUpdate (Bulk Strongly Consistent Update Checks)
+
+### gRPC (CheckBulkForUpdate)
+
+```bash
+grpcurl -plaintext -d '{
+  "items": [
+    {
+      "object": {
+        "resourceType": "host",
+        "resourceId": "host-1",
+        "reporter": {"type": "hbi"}
+      },
+      "relation": "update",
+      "subject": {
+        "resource": {
+          "resourceType": "group",
+          "resourceId": "user-1",
+          "reporter": {"type": "rbac"}
+        }
+      }
+    },
+    {
+      "object": {
+        "resourceType": "host",
+        "resourceId": "host-2",
+        "reporter": {"type": "hbi"}
+      },
+      "relation": "update",
+      "subject": {
+        "resource": {
+          "resourceType": "group",
+          "resourceId": "user-1",
+          "reporter": {"type": "rbac"}
+        }
+      }
+    }
+  ]
+}' localhost:9081 kessel.inventory.v1beta2.KesselInventoryService/CheckBulkForUpdate
+```
+
+### HTTP (with x-rh-identity)
+
+```bash
+X_RH_IDENTITY=$(echo -n '{"identity":{"account_number":"12345","org_id":"67890","type":"User","user":{"email":"test@example.com","username":"testuser"}}}' | base64)
+
+curl -X POST http://localhost:8000/api/kessel/v1beta2/checkbulkforupdate \
+  -H "Content-Type: application/json" \
+  -H "x-rh-identity: $X_RH_IDENTITY" \
+  -d '{
+    "items": [
+      {
+        "object": {
+          "resourceType": "host",
+          "resourceId": "host-1",
+          "reporter": {"type": "hbi"}
+        },
+        "relation": "update",
+        "subject": {
+          "resource": {
+            "resourceType": "group",
+            "resourceId": "group-1",
+            "reporter": {"type": "rbac"}
+          }
+        }
+      },
+      {
+        "object": {
+          "resourceType": "host",
+          "resourceId": "host-2",
+          "reporter": {"type": "hbi"}
+        },
+        "relation": "update",
+        "subject": {
+          "resource": {
+            "resourceType": "group",
+            "resourceId": "group-1",
+            "reporter": {"type": "rbac"}
+          }
+        }
+      }
+    ]
+  }'
+```
+
+## 8. CheckBulk (Bulk Permission Checks)
 
 ### gRPC
 
@@ -432,7 +517,7 @@ curl -X POST http://localhost:8000/api/kessel/v1beta2/checkbulk \
 
 ---
 
-## 8. CheckSelfBulk (Bulk Self Permission Checks)
+## 9. CheckSelfBulk (Bulk Self Permission Checks)
 
 ### gRPC
 
@@ -468,7 +553,7 @@ curl -X POST http://localhost:8000/api/kessel/v1beta2/checkselfbulk \
 
 ---
 
-## 9. StreamedListObjects
+## 10. StreamedListObjects
 
 ### gRPC
 
@@ -495,7 +580,7 @@ grpcurl -plaintext -d '{
 
 ---
 
-## 10. List Available gRPC Services
+## 11. List Available gRPC Services
 
 ```bash
 # List all services

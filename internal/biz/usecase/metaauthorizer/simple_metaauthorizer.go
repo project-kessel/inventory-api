@@ -16,7 +16,7 @@ const RelationDeleteResource Relation = "delete_resource"
 const RelationCheck Relation = "check"
 const RelationCheckBulk Relation = "check_bulk"
 const RelationCheckSelfBulk Relation = "check_self_bulk"
-const RelationCheckForUpdateBulk Relation = "check_for_update_bulk"
+const RelationCheckBulkForUpdate Relation = "check_bulk_for_update"
 const RelationCheckForUpdateSelfBulk Relation = "check_for_update_self_bulk"
 
 // SimpleMetaAuthorizer implements the current decision rules:

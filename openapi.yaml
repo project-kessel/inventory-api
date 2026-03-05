@@ -114,6 +114,38 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/google.rpc.Status'
+    /api/kessel/v1beta2/checkbulkforupdate:
+        post:
+            tags:
+                - KesselInventoryService
+            description: |-
+                Performs bulk strongly consistent "check for update" permission checks.
+
+                 This API is more efficient than making individual CheckForUpdate calls when verifying
+                 update permissions for multiple resource-subject-relation combinations. Each item
+                 is evaluated with strong consistency (same semantics as CheckForUpdate).
+
+                 Common use cases include batch pre-authorization before bulk update or delete operations.
+            operationId: KesselInventoryService_CheckBulkForUpdate
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/kessel.inventory.v1beta2.CheckBulkForUpdateRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/kessel.inventory.v1beta2.CheckBulkForUpdateResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/google.rpc.Status'
     /api/kessel/v1beta2/checkforupdate:
         post:
             tags:
@@ -344,6 +376,47 @@ components:
                 code:
                     type: integer
                     format: uint32
+        kessel.inventory.v1beta2.CheckBulkForUpdateRequest:
+            type: object
+            properties:
+                items:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/kessel.inventory.v1beta2.CheckBulkRequestItem'
+            description: |-
+                CheckBulkForUpdateRequest allows checking multiple "can subject update resource?" permissions
+                 in a single request. Each check is strongly consistent (same semantics as CheckForUpdate).
+                 This is more efficient than making individual CheckForUpdate calls when verifying update
+                 permissions for multiple resource-subject-relation combinations.
+        kessel.inventory.v1beta2.CheckBulkForUpdateResponse:
+            type: object
+            properties:
+                pairs:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/kessel.inventory.v1beta2.CheckBulkForUpdateResponsePair'
+            description: CheckBulkForUpdateResponse contains the results of all check-for-update checks in the request.
+        kessel.inventory.v1beta2.CheckBulkForUpdateResponseItem:
+            type: object
+            properties:
+                allowed:
+                    enum:
+                        - ALLOWED_UNSPECIFIED
+                        - ALLOWED_TRUE
+                        - ALLOWED_FALSE
+                    type: string
+                    format: enum
+            description: CheckBulkForUpdateResponseItem represents the result of a single check-for-update.
+        kessel.inventory.v1beta2.CheckBulkForUpdateResponsePair:
+            type: object
+            properties:
+                request:
+                    $ref: '#/components/schemas/kessel.inventory.v1beta2.CheckBulkRequestItem'
+                item:
+                    $ref: '#/components/schemas/kessel.inventory.v1beta2.CheckBulkForUpdateResponseItem'
+                error:
+                    $ref: '#/components/schemas/google.rpc.Status'
+            description: CheckBulkForUpdateResponsePair associates a request item with its corresponding result.
         kessel.inventory.v1beta2.CheckBulkRequest:
             type: object
             properties:

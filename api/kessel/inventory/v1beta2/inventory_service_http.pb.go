@@ -21,6 +21,7 @@ const _ = http.SupportPackageIsVersion1
 
 const OperationKesselInventoryServiceCheck = "/kessel.inventory.v1beta2.KesselInventoryService/Check"
 const OperationKesselInventoryServiceCheckBulk = "/kessel.inventory.v1beta2.KesselInventoryService/CheckBulk"
+const OperationKesselInventoryServiceCheckBulkForUpdate = "/kessel.inventory.v1beta2.KesselInventoryService/CheckBulkForUpdate"
 const OperationKesselInventoryServiceCheckForUpdate = "/kessel.inventory.v1beta2.KesselInventoryService/CheckForUpdate"
 const OperationKesselInventoryServiceCheckSelf = "/kessel.inventory.v1beta2.KesselInventoryService/CheckSelf"
 const OperationKesselInventoryServiceCheckSelfBulk = "/kessel.inventory.v1beta2.KesselInventoryService/CheckSelfBulk"
@@ -52,6 +53,14 @@ type KesselInventoryServiceHTTPServer interface {
 	//
 	// The response includes a result for each item in the request, maintaining the same order.
 	CheckBulk(context.Context, *CheckBulkRequest) (*CheckBulkResponse, error)
+	// CheckBulkForUpdate Performs bulk strongly consistent "check for update" permission checks.
+	//
+	// This API is more efficient than making individual CheckForUpdate calls when verifying
+	// update permissions for multiple resource-subject-relation combinations. Each item
+	// is evaluated with strong consistency (same semantics as CheckForUpdate).
+	//
+	// Common use cases include batch pre-authorization before bulk update or delete operations.
+	CheckBulkForUpdate(context.Context, *CheckBulkForUpdateRequest) (*CheckBulkForUpdateResponse, error)
 	// CheckForUpdate Performs a strongly consistent relationship check to determine whether a subject
 	// has a specific relation to an object (representing, for example, a permission).
 	//
@@ -130,6 +139,7 @@ func RegisterKesselInventoryServiceHTTPServer(s *http.Server, srv KesselInventor
 	r.POST("/api/kessel/v1beta2/check", _KesselInventoryService_Check0_HTTP_Handler(srv))
 	r.POST("/api/kessel/v1beta2/checkself", _KesselInventoryService_CheckSelf0_HTTP_Handler(srv))
 	r.POST("/api/kessel/v1beta2/checkforupdate", _KesselInventoryService_CheckForUpdate0_HTTP_Handler(srv))
+	r.POST("/api/kessel/v1beta2/checkbulkforupdate", _KesselInventoryService_CheckBulkForUpdate0_HTTP_Handler(srv))
 	r.POST("/api/kessel/v1beta2/checkbulk", _KesselInventoryService_CheckBulk0_HTTP_Handler(srv))
 	r.POST("/api/kessel/v1beta2/checkselfbulk", _KesselInventoryService_CheckSelfBulk0_HTTP_Handler(srv))
 	r.POST("/api/kessel/v1beta2/resources", _KesselInventoryService_ReportResource0_HTTP_Handler(srv))
@@ -198,6 +208,28 @@ func _KesselInventoryService_CheckForUpdate0_HTTP_Handler(srv KesselInventorySer
 			return err
 		}
 		reply := out.(*CheckForUpdateResponse)
+		return ctx.Result(200, reply)
+	}
+}
+
+func _KesselInventoryService_CheckBulkForUpdate0_HTTP_Handler(srv KesselInventoryServiceHTTPServer) func(ctx http.Context) error {
+	return func(ctx http.Context) error {
+		var in CheckBulkForUpdateRequest
+		if err := ctx.Bind(&in); err != nil {
+			return err
+		}
+		if err := ctx.BindQuery(&in); err != nil {
+			return err
+		}
+		http.SetOperation(ctx, OperationKesselInventoryServiceCheckBulkForUpdate)
+		h := ctx.Middleware(func(ctx context.Context, req interface{}) (interface{}, error) {
+			return srv.CheckBulkForUpdate(ctx, req.(*CheckBulkForUpdateRequest))
+		})
+		out, err := h(ctx, &in)
+		if err != nil {
+			return err
+		}
+		reply := out.(*CheckBulkForUpdateResponse)
 		return ctx.Result(200, reply)
 	}
 }
@@ -293,6 +325,7 @@ func _KesselInventoryService_DeleteResource0_HTTP_Handler(srv KesselInventorySer
 type KesselInventoryServiceHTTPClient interface {
 	Check(ctx context.Context, req *CheckRequest, opts ...http.CallOption) (rsp *CheckResponse, err error)
 	CheckBulk(ctx context.Context, req *CheckBulkRequest, opts ...http.CallOption) (rsp *CheckBulkResponse, err error)
+	CheckBulkForUpdate(ctx context.Context, req *CheckBulkForUpdateRequest, opts ...http.CallOption) (rsp *CheckBulkForUpdateResponse, err error)
 	CheckForUpdate(ctx context.Context, req *CheckForUpdateRequest, opts ...http.CallOption) (rsp *CheckForUpdateResponse, err error)
 	CheckSelf(ctx context.Context, req *CheckSelfRequest, opts ...http.CallOption) (rsp *CheckSelfResponse, err error)
 	CheckSelfBulk(ctx context.Context, req *CheckSelfBulkRequest, opts ...http.CallOption) (rsp *CheckSelfBulkResponse, err error)
@@ -326,6 +359,19 @@ func (c *KesselInventoryServiceHTTPClientImpl) CheckBulk(ctx context.Context, in
 	pattern := "/api/kessel/v1beta2/checkbulk"
 	path := binding.EncodeURL(pattern, in, false)
 	opts = append(opts, http.Operation(OperationKesselInventoryServiceCheckBulk))
+	opts = append(opts, http.PathTemplate(pattern))
+	err := c.cc.Invoke(ctx, "POST", path, in, &out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+func (c *KesselInventoryServiceHTTPClientImpl) CheckBulkForUpdate(ctx context.Context, in *CheckBulkForUpdateRequest, opts ...http.CallOption) (*CheckBulkForUpdateResponse, error) {
+	var out CheckBulkForUpdateResponse
+	pattern := "/api/kessel/v1beta2/checkbulkforupdate"
+	path := binding.EncodeURL(pattern, in, false)
+	opts = append(opts, http.Operation(OperationKesselInventoryServiceCheckBulkForUpdate))
 	opts = append(opts, http.PathTemplate(pattern))
 	err := c.cc.Invoke(ctx, "POST", path, in, &out, opts...)
 	if err != nil {

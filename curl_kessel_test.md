@@ -607,6 +607,7 @@ grpcurl -plaintext localhost:9000 list kessel.inventory.v1beta2.KesselInventoryS
 ```
 kessel.inventory.v1beta2.KesselInventoryService.Check
 kessel.inventory.v1beta2.KesselInventoryService.CheckBulk
+kessel.inventory.v1beta2.KesselInventoryService.CheckBulkForUpdate
 kessel.inventory.v1beta2.KesselInventoryService.CheckForUpdate
 kessel.inventory.v1beta2.KesselInventoryService.CheckSelf
 kessel.inventory.v1beta2.KesselInventoryService.CheckSelfBulk

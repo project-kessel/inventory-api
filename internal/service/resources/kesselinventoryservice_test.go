@@ -2853,29 +2853,7 @@ func TestInventoryService_ReportResource_NilOrEmptyRepresentationStructs(t *test
 			localResourceId: "host-both-nil",
 			common:          nil,
 			reporter:        nil,
-			expectMsg:       "invalid both representation: representation required",
-		},
-		{
-			name:            "common set, reporter nil",
-			localResourceId: "host-common-only",
-			common: &structpb.Struct{
-				Fields: map[string]*structpb.Value{
-					"workspace_id": structpb.NewStringValue("ws-common-only"),
-				},
-			},
-			reporter:  nil,
-			expectMsg: "invalid ReporterRepresentation representation: representation required",
-		},
-		{
-			name:            "common nil, reporter set",
-			localResourceId: "host-reporter-only",
-			common:          nil,
-			reporter: &structpb.Struct{
-				Fields: map[string]*structpb.Value{
-					"reporter_field": structpb.NewStringValue("val"),
-				},
-			},
-			expectMsg: "invalid CommonRepresentation representation: representation required",
+			expectMsg:       "at least one of reporterRepresentation or commonRepresentation must be provided",
 		},
 		{
 			name:            "both empty structs",
@@ -3057,32 +3035,6 @@ func TestInventoryService_ReportResource_ValidationErrorFormats(t *testing.T) {
 			},
 			expectCode:        codes.InvalidArgument,
 			expectMsgContains: "failed validation for report resource",
-		},
-		{
-			name:         "nil reporter representation (common-only returns error)",
-			resourceType: "host",
-			reporterType: "hbi",
-			common: &structpb.Struct{
-				Fields: map[string]*structpb.Value{
-					"workspace_id": structpb.NewStringValue("ws-123"),
-				},
-			},
-			reporter:          nil,
-			expectCode:        codes.InvalidArgument,
-			expectMsgContains: "invalid ReporterRepresentation representation: representation required",
-		},
-		{
-			name:         "nil common representation (reporter-only returns error)",
-			resourceType: "host",
-			reporterType: "hbi",
-			common:       nil,
-			reporter: &structpb.Struct{
-				Fields: map[string]*structpb.Value{
-					"satellite_id": structpb.NewStringValue("sat-123"),
-				},
-			},
-			expectCode:        codes.InvalidArgument,
-			expectMsgContains: "invalid CommonRepresentation representation: representation required",
 		},
 	}
 

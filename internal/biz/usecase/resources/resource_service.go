@@ -48,17 +48,6 @@ var (
 	ErrSelfSubjectMissing = errors.New("self subject missing")
 )
 
-// RepresentationRequiredError indicates a required representation was not provided.
-// Kind identifies which representation is missing (e.g. "reporter", "common").
-// TODO: the logic is not correct around this currently, but this can be fixed later
-type RepresentationRequiredError struct {
-	Kind string
-}
-
-func (e *RepresentationRequiredError) Error() string {
-	return fmt.Sprintf("invalid %s representation: representation required", e.Kind)
-}
-
 const listenTimeout = 10 * time.Second
 
 // UsecaseConfig contains configuration flags that control the behavior of usecase operations.
@@ -147,10 +136,6 @@ func (uc *Usecase) ReportResource(ctx context.Context, cmd ReportResourceCommand
 
 	// Validate command against schemas
 	if err := uc.validateReportResourceCommand(ctx, cmd); err != nil {
-		var repReqErr *RepresentationRequiredError
-		if errors.As(err, &repReqErr) {
-			return err
-		}
 		return status.Errorf(codes.InvalidArgument, "failed validation for report resource: %v", err)
 	}
 

@@ -23,8 +23,9 @@ var (
 	ErrVersionConflict   = errors.New("optimistic concurrency failure")
 	ErrReporterDuplicate = errors.New("reporter already exists for resource")
 	ErrResourceNotFound  = errors.New("resource not found")
-	ErrInvalidData       = errors.New("invalid data structure")
-	ErrEmptyReporterList = errors.New("must have at least one reporter resource")
+	ErrInvalidData              = errors.New("invalid data structure")
+	ErrEmptyReporterList        = errors.New("must have at least one reporter resource")
+	ErrNoRepresentationProvided = errors.New("at least one of reporterRepresentation or commonRepresentation must be provided")
 )
 
 // Service-level sentinel errors - operation failures

@@ -224,7 +224,7 @@ func resourceEventAndRepresentations(
 ) (ResourceReportEvent, error) {
 
 	if reporterData == nil && commonData == nil {
-		return ResourceReportEvent{}, fmt.Errorf("at least one of reporterRepresentation or commonRepresentation must be provided")
+		return ResourceReportEvent{}, ErrNoRepresentationProvided
 	}
 
 	var reporterRepresentation *ReporterDataRepresentation

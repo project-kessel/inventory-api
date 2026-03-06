@@ -32,6 +32,10 @@ func NewResourceReportEvent(
 	reporterDataRepresentation *ReporterDataRepresentation,
 	commonRepresentation *CommonRepresentation,
 ) (ResourceReportEvent, error) {
+	if reporterDataRepresentation == nil && commonRepresentation == nil {
+		return ResourceReportEvent{}, ErrNoRepresentationProvided
+	}
+
 	reporterId := NewReporterId(reporterType, reporterInstanceId)
 
 	return ResourceReportEvent{

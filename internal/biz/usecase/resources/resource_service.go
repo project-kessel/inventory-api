@@ -237,15 +237,6 @@ func (uc *Usecase) ReportResource(ctx context.Context, cmd ReportResourceCommand
 	return nil
 }
 
-// resolveOptionalFields returns optional pointer fields from the command.
-func resolveOptionalFields(cmd ReportResourceCommand) (
-	consoleHref *model.ConsoleHref,
-	reporterRepresentation *model.Representation,
-	commonRepresentation *model.Representation,
-) {
-	return cmd.ConsoleHref, cmd.ReporterRepresentation, cmd.CommonRepresentation
-}
-
 func (uc *Usecase) createResource(tx *gorm.DB, cmd ReportResourceCommand, txidStr string) error {
 	resourceId, err := uc.resourceRepository.NextResourceId()
 	if err != nil {
@@ -257,8 +248,6 @@ func (uc *Usecase) createResource(tx *gorm.DB, cmd ReportResourceCommand, txidSt
 		return err
 	}
 
-	consoleHref, reporterRepresentation, commonRepresentation := resolveOptionalFields(cmd)
-
 	resource, err := model.NewResource(
 		resourceId,
 		cmd.LocalResourceId,
@@ -268,9 +257,9 @@ func (uc *Usecase) createResource(tx *gorm.DB, cmd ReportResourceCommand, txidSt
 		*cmd.TransactionId,
 		reporterResourceId,
 		cmd.ApiHref,
-		consoleHref,
-		reporterRepresentation,
-		commonRepresentation,
+		cmd.ConsoleHref,
+		cmd.ReporterRepresentation,
+		cmd.CommonRepresentation,
 		cmd.ReporterVersion,
 	)
 	if err != nil {
@@ -291,15 +280,13 @@ func (uc *Usecase) updateResource(tx *gorm.DB, cmd ReportResourceCommand, existi
 		return err
 	}
 
-	consoleHref, reporterRepresentation, commonRepresentation := resolveOptionalFields(cmd)
-
 	err = existingResource.Update(
 		reporterResourceKey,
 		cmd.ApiHref,
-		consoleHref,
+		cmd.ConsoleHref,
 		cmd.ReporterVersion,
-		reporterRepresentation,
-		commonRepresentation,
+		cmd.ReporterRepresentation,
+		cmd.CommonRepresentation,
 		*cmd.TransactionId,
 	)
 	if err != nil {

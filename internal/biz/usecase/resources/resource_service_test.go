@@ -1491,21 +1491,6 @@ func TestTransactionIdIdempotency(t *testing.T) {
 	})
 }
 
-// TestResolveOptionalFields_NilOptionalFields_ReturnNils asserts Phase 3.7 behavior:
-// resolveOptionalFields returns pointers as-is; nil in command stays nil (no zero-value collapse).
-func TestResolveOptionalFields_NilOptionalFields_ReturnNils(t *testing.T) {
-	cmd := ReportResourceCommand{
-		TransactionId:          nil,
-		ConsoleHref:            nil,
-		ReporterRepresentation: nil,
-		CommonRepresentation:   nil,
-	}
-	ch, rep, com := resolveOptionalFields(cmd)
-	assert.Nil(t, ch, "ConsoleHref should be nil when cmd.ConsoleHref is nil")
-	assert.Nil(t, rep, "ReporterRepresentation should be nil when cmd.ReporterRepresentation is nil")
-	assert.Nil(t, com, "CommonRepresentation should be nil when cmd.CommonRepresentation is nil")
-}
-
 // TestReportResource_ValidationSuccess tests that a valid request passes validation.
 func TestReportResource_ValidationSuccess(t *testing.T) {
 	ctx := testAuthzContext()

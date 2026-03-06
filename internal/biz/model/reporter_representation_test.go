@@ -114,7 +114,7 @@ func TestReporterDataRepresentation_Initialization(t *testing.T) {
 		assertInvalidReporterDataRepresentation(t, dataRep, err, ErrInvalidData)
 	})
 
-	t.Run("should reject empty data", func(t *testing.T) {
+	t.Run("should reject data representation with empty data", func(t *testing.T) {
 		t.Parallel()
 
 		dataRep, err := NewReporterDataRepresentation(

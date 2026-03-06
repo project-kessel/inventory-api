@@ -70,12 +70,11 @@ func (re ResourceReportEvent) ReporterInstanceId() string {
 	return re.reporterId.reporterInstanceId.String()
 }
 
-func (re ResourceReportEvent) ReporterVersion() *string {
-	if re.reporterRepresentation == nil || re.reporterRepresentation.reporterVersion == nil {
+func (re ResourceReportEvent) ReporterVersion() *ReporterVersion {
+	if re.reporterRepresentation == nil {
 		return nil
 	}
-	versionStr := re.reporterRepresentation.reporterVersion.String()
-	return &versionStr
+	return re.reporterRepresentation.reporterVersion
 }
 
 // CurrentCommonVersion returns the version from the CommonRepresentation, or nil if no common
@@ -108,11 +107,8 @@ func (re ResourceReportEvent) ResourceId() uuid.UUID {
 	return uuid.UUID(re.id)
 }
 
-func (re ResourceReportEvent) ConsoleHref() string {
-	if re.consoleHref == nil {
-		return ""
-	}
-	return re.consoleHref.String()
+func (re ResourceReportEvent) ConsoleHref() *ConsoleHref {
+	return re.consoleHref
 }
 
 func (re ResourceReportEvent) ApiHref() string {

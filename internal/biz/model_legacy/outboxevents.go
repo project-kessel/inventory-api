@@ -135,10 +135,15 @@ func newResourceEvent(operationType bizmodel.EventOperationType, resourceEvent *
 	if workspaceID != "" {
 		workspaceIDPtr = &workspaceID
 	}
-	consoleHrefStr := resourceEvent.ConsoleHref()
 	var consoleHrefPtr *string
-	if consoleHrefStr != "" {
-		consoleHrefPtr = &consoleHrefStr
+	if ch := resourceEvent.ConsoleHref(); ch != nil {
+		s := ch.String()
+		consoleHrefPtr = &s
+	}
+	var reporterVersionPtr *string
+	if rv := resourceEvent.ReporterVersion(); rv != nil {
+		s := rv.String()
+		reporterVersionPtr = &s
 	}
 
 	return &ResourceEvent{
@@ -164,7 +169,7 @@ func newResourceEvent(operationType bizmodel.EventOperationType, resourceEvent *
 				ConsoleHref:        consoleHrefPtr,
 				ApiHref:            resourceEvent.ApiHref(),
 				LocalResourceId:    resourceEvent.LocalResourceId(),
-				ReporterVersion:    resourceEvent.ReporterVersion(),
+				ReporterVersion:    reporterVersionPtr,
 			},
 			ResourceData: resourceEvent.Data(),
 		},
@@ -264,3 +269,4 @@ func makeEventType(eventType, resourceType, operation string) string {
 func makeEventSubject(eventType, resourceType, resourceId string) string {
 	return "/" + strings.Join([]string{eventType, resourceType, resourceId}, "/")
 }
+

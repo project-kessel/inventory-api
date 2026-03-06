@@ -176,6 +176,10 @@ func resourceEventAndRepresentations(
 	commonVersion Version,
 ) (ResourceReportEvent, error) {
 
+	if reporterData == nil && commonData == nil {
+		return ResourceReportEvent{}, fmt.Errorf("at least one of reporterRepresentation or commonRepresentation must be provided")
+	}
+
 	var reporterRepresentation *ReporterDataRepresentation
 	if reporterData != nil {
 		rr, err := NewReporterDataRepresentation(

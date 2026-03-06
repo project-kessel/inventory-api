@@ -291,6 +291,8 @@ objects:
       name: kessel-inventory-source-connector
       labels:
         strimzi.io/cluster: kessel-kafka-connect
+      annotations:
+        ${KCTR_ANNOTATION_KEY}: ${KCTR_ANNOTATION_VAL}
     spec:
       class: io.debezium.connector.postgresql.PostgresConnector
       tasksMax: 1 # source connector only supports 1 task
@@ -443,3 +445,9 @@ parameters:
   - name: VERSION
     description: Kafka Connect version to use (should match the Kafka version of cluster and connect base image)
     value: "3.9.0"
+  - name: KCTR_ANNOTATION_KEY
+    description: Allows setting a single annotation key for connector management, such as restarting a task. Defaults to an ignored value
+    value: "kessel/no-op"
+  - name: KCTR_ANNOTATION_VAL
+    description: Allows setting a single annotation value for connector management, such as restarting a task. Defaults to an ignored value
+    value: ""

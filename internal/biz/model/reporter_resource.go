@@ -146,12 +146,7 @@ func (rr ReporterResource) Key() ReporterResourceKey {
 func (rr ReporterResource) ApiHref() ApiHref { return rr.apiHref }
 
 // ConsoleHref returns the console href for this reporter resource.
-func (rr ReporterResource) ConsoleHref() ConsoleHref {
-	if rr.consoleHref == nil {
-		return ConsoleHref("")
-	}
-	return *rr.consoleHref
-}
+func (rr ReporterResource) ConsoleHref() *ConsoleHref { return rr.consoleHref }
 
 // Add timestamp getters
 func (rr ReporterResource) CreatedAt() time.Time {

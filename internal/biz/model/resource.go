@@ -25,18 +25,12 @@ type Resource struct {
 	resourceDeleteEvents []ResourceDeleteEvent
 }
 
-// Factory methods. Optional fields are passed as pointers; nil means not set (domain generates or uses empty where defined).
+// Factory methods
 func NewResource(id ResourceId, localResourceId LocalResourceId, resourceType ResourceType, reporterType ReporterType, reporterInstanceId ReporterInstanceId, transactionId *TransactionId, reporterResourceId ReporterResourceId, apiHref ApiHref, consoleHref *ConsoleHref, reporterRepresentationData *Representation, commonRepresentationData *Representation, reporterVersion *ReporterVersion) (Resource, error) {
-	var txId TransactionId
 	if transactionId == nil || *transactionId == "" {
-		var err error
-		txId, err = GenerateTransactionId()
-		if err != nil {
-			return Resource{}, err
-		}
-	} else {
-		txId = *transactionId
+		return Resource{}, fmt.Errorf("%w: TransactionId", ErrEmpty)
 	}
+	txId := *transactionId
 
 	// If common representation data is provided, initialize commonVersion to 0
 	// Otherwise, leave it as nil
@@ -97,7 +91,7 @@ func NewResource(id ResourceId, localResourceId LocalResourceId, resourceType Re
 	return resource, nil
 }
 
-// Model Behavior. Optional fields are pointers; nil means not set.
+// Model Behavior
 func (r *Resource) Update(
 	key ReporterResourceKey,
 	apiHref ApiHref,
@@ -139,16 +133,10 @@ func (r *Resource) Update(
 
 	reporterResource.Update(apiHref, consoleHref)
 
-	var txId TransactionId
 	if transactionId == nil || *transactionId == "" {
-		var genErr error
-		txId, genErr = GenerateTransactionId()
-		if genErr != nil {
-			return genErr
-		}
-	} else {
-		txId = *transactionId
+		return fmt.Errorf("%w: TransactionId", ErrEmpty)
 	}
+	txId := *transactionId
 
 	resourceEvent, err := resourceEventAndRepresentations(
 		reporterResource.resourceID,
@@ -359,7 +347,7 @@ func (r Resource) ConsistencyToken() ConsistencyToken {
 	return r.consistencyToken
 }
 
-// GetTimestamps returns createdAt and updatedAt from the resource's events, or zero time if no events
+// GetTimestamps returns createdAt and updatedAt from the resource's events, or zero times if no events exist
 func (r Resource) GetTimestamps() (createdAt time.Time, updatedAt time.Time) {
 	if len(r.resourceReportEvents) > 0 {
 		return r.resourceReportEvents[0].createdAt, r.resourceReportEvents[0].updatedAt

@@ -23,10 +23,6 @@ type Resource struct {
 
 // Factory methods
 func NewResource(id ResourceId, localResourceId LocalResourceId, resourceType ResourceType, reporterType ReporterType, reporterInstanceId ReporterInstanceId, transactionId TransactionId, reporterResourceId ReporterResourceId, apiHref ApiHref, consoleHref *ConsoleHref, reporterRepresentationData *Representation, commonRepresentationData *Representation, reporterVersion *ReporterVersion) (Resource, error) {
-	if transactionId == "" {
-		return Resource{}, fmt.Errorf("%w: TransactionId", ErrEmpty)
-	}
-
 	commonVersion := NewVersion(initialCommonVersion)
 
 	reporterResource, err := NewReporterResource(
@@ -89,10 +85,6 @@ func (r *Resource) Update(
 	commonRepresentationData *Representation,
 	transactionId TransactionId,
 ) error {
-	if transactionId == "" {
-		return fmt.Errorf("%w: TransactionId", ErrEmpty)
-	}
-
 	r.commonVersion = r.commonVersion.Increment()
 
 	reporterResource, err := r.findReporterResourceToUpdateByKey(key)

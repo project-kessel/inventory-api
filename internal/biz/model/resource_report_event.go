@@ -14,9 +14,9 @@ type ResourceReportEvent struct {
 	reporterId             ReporterId
 	localResourceId        LocalResourceId
 	apiHref                ApiHref
-	consoleHref            ConsoleHref
-	reporterRepresentation ReporterDataRepresentation
-	commonRepresentation   CommonRepresentation
+	consoleHref            *ConsoleHref
+	reporterRepresentation *ReporterDataRepresentation
+	commonRepresentation   *CommonRepresentation
 	createdAt              time.Time
 	updatedAt              time.Time
 }
@@ -28,9 +28,9 @@ func NewResourceReportEvent(
 	reporterInstanceId ReporterInstanceId,
 	localResourceId LocalResourceId,
 	apiHref ApiHref,
-	consoleHref ConsoleHref,
-	reporterDataRepresentation ReporterDataRepresentation,
-	commonRepresentation CommonRepresentation,
+	consoleHref *ConsoleHref,
+	reporterDataRepresentation *ReporterDataRepresentation,
+	commonRepresentation *CommonRepresentation,
 ) (ResourceReportEvent, error) {
 	reporterId := NewReporterId(reporterType, reporterInstanceId)
 
@@ -67,20 +67,26 @@ func (re ResourceReportEvent) ReporterInstanceId() string {
 }
 
 func (re ResourceReportEvent) ReporterVersion() *string {
-	if re.reporterRepresentation.reporterVersion == nil {
+	if re.reporterRepresentation == nil || re.reporterRepresentation.reporterVersion == nil {
 		return nil
 	}
 	versionStr := re.reporterRepresentation.reporterVersion.String()
 	return &versionStr
 }
 
-// CurrentCommonVersion returns the version from the CommonRepresentation
+// CurrentCommonVersion returns the version from the CommonRepresentation, or nil if absent.
 func (re ResourceReportEvent) CurrentCommonVersion() *Version {
+	if re.commonRepresentation == nil {
+		return nil
+	}
 	return &re.commonRepresentation.version
 }
 
-// CurrentReporterRepresentationVersion returns the version from the ReporterRepresentation
+// CurrentReporterRepresentationVersion returns the version from the ReporterRepresentation, or nil if absent.
 func (re ResourceReportEvent) CurrentReporterRepresentationVersion() *Version {
+	if re.reporterRepresentation == nil {
+		return nil
+	}
 	return &re.reporterRepresentation.version
 }
 
@@ -97,6 +103,9 @@ func (re ResourceReportEvent) ResourceId() uuid.UUID {
 }
 
 func (re ResourceReportEvent) ConsoleHref() string {
+	if re.consoleHref == nil {
+		return ""
+	}
 	return re.consoleHref.String()
 }
 
@@ -105,10 +114,16 @@ func (re ResourceReportEvent) ApiHref() string {
 }
 
 func (re ResourceReportEvent) Data() internal.JsonObject {
+	if re.reporterRepresentation == nil {
+		return nil
+	}
 	return re.reporterRepresentation.Data()
 }
 
 func (re ResourceReportEvent) WorkspaceId() string {
+	if re.commonRepresentation == nil {
+		return ""
+	}
 	if workspaceId, ok := re.commonRepresentation.Data()["workspace_id"]; ok {
 		if workspaceIdStr, ok := workspaceId.(string); ok {
 			return workspaceIdStr
@@ -142,11 +157,12 @@ func DeserializeResourceEvent(
 	var event ResourceReportEvent
 
 	if commonRepresentationSnapshot != nil {
-		event.commonRepresentation = DeserializeCommonRepresentation(commonRepresentationSnapshot)
+		cr := DeserializeCommonRepresentation(commonRepresentationSnapshot)
+		event.commonRepresentation = &cr
 	}
 
 	if reporterRepresentationSnapshot != nil {
-		event.reporterRepresentation = *DeserializeReporterDataRepresentation(reporterRepresentationSnapshot)
+		event.reporterRepresentation = DeserializeReporterDataRepresentation(reporterRepresentationSnapshot)
 	}
 
 	event.createdAt = createdAt

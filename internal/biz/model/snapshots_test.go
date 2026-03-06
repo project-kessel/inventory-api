@@ -86,6 +86,9 @@ func TestResourceSnapshot_FromDomainEntity(t *testing.T) {
 	}
 
 	// Verify CommonRepresentationSnapshot
+	if commonRepSnapshot == nil {
+		t.Fatal("CommonRepresentationSnapshot should not be nil")
+	}
 	if commonRepSnapshot.ResourceId == uuid.Nil {
 		t.Error("CommonRepresentationSnapshot should have a valid ResourceId")
 	}
@@ -97,6 +100,9 @@ func TestResourceSnapshot_FromDomainEntity(t *testing.T) {
 	}
 
 	// Verify ReporterRepresentationSnapshot
+	if reporterRepSnapshot == nil {
+		t.Fatal("ReporterRepresentationSnapshot should not be nil")
+	}
 	if reporterRepSnapshot.ReporterResourceID == uuid.Nil {
 		t.Error("ReporterRepresentationSnapshot should have a valid ReporterResourceID")
 	}
@@ -229,32 +235,32 @@ func TestSnapshotSerialization(t *testing.T) {
 	t.Log("Snapshot serialization fields are accessible")
 }
 
-// TestCommonRepresentationSnapshot_TransactionId_NilMeansNotSet documents that
-// when TransactionId is not set, the snapshot uses nil (optional semantics).
-func TestCommonRepresentationSnapshot_TransactionId_NilMeansNotSet(t *testing.T) {
+// TestCommonRepresentationSnapshot_TransactionId_EmptyMeansNotSet documents that
+// when TransactionId is not set, the snapshot uses empty string.
+func TestCommonRepresentationSnapshot_TransactionId_EmptyMeansNotSet(t *testing.T) {
 	t.Parallel()
 
-	// Build a snapshot with nil TransactionId (optional = not set)
+	// Build a snapshot with empty TransactionId (optional = not set)
 	snapshot := CommonRepresentationSnapshot{
 		Representation:             RepresentationSnapshot{Data: map[string]interface{}{"id": "test"}},
 		ResourceId:                 uuid.New(),
 		Version:                    1,
 		ReportedByReporterType:     "test-reporter",
 		ReportedByReporterInstance: "instance-1",
-		TransactionId:              nil, // nil = not set (optional)
+		TransactionId:              "", // empty = not set
 		CreatedAt:                  time.Time{},
 	}
 	// Round-trip: deserialize to domain, serialize back
 	cr := DeserializeCommonRepresentation(&snapshot)
 	roundTrip := cr.Serialize()
-	if roundTrip.TransactionId != nil {
-		t.Errorf("Expected nil TransactionId to round-trip as nil, got %v", roundTrip.TransactionId)
+	if roundTrip.TransactionId != "" {
+		t.Errorf("Expected empty TransactionId to round-trip as empty, got %v", roundTrip.TransactionId)
 	}
 }
 
-// TestReporterRepresentationSnapshot_TransactionId_NilMeansNotSet documents the same
-// optional convention for reporter representation snapshots (nil = not set).
-func TestReporterRepresentationSnapshot_TransactionId_NilMeansNotSet(t *testing.T) {
+// TestReporterRepresentationSnapshot_TransactionId_EmptyMeansNotSet documents the same
+// convention for reporter representation snapshots (empty = not set).
+func TestReporterRepresentationSnapshot_TransactionId_EmptyMeansNotSet(t *testing.T) {
 	t.Parallel()
 
 	snapshot := ReporterRepresentationSnapshot{
@@ -264,15 +270,15 @@ func TestReporterRepresentationSnapshot_TransactionId_NilMeansNotSet(t *testing.
 		Generation:         0,
 		ReporterVersion:    nil,
 		CommonVersion:      0,
-		TransactionId:      nil, // nil = not set
+		TransactionId:      "", // empty = not set
 		Tombstone:          false,
 		CreatedAt:          time.Time{},
 	}
 	// Deserialize and serialize back
 	rr := DeserializeReporterDataRepresentation(&snapshot)
 	roundTrip := rr.Serialize()
-	if roundTrip.TransactionId != nil {
-		t.Errorf("Expected nil TransactionId to round-trip as nil, got %v", roundTrip.TransactionId)
+	if roundTrip.TransactionId != "" {
+		t.Errorf("Expected empty TransactionId to round-trip as empty, got %v", roundTrip.TransactionId)
 	}
 }
 

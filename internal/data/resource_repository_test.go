@@ -2398,6 +2398,7 @@ func testTransactionIDUniqueConstraint(t *testing.T, repo bizmodel.ResourceRepos
 
 		// Create corresponding ReporterResource rows so the foreign key
 		// constraint on ReporterRepresentation is satisfied.
+		consoleHref1 := "https://console.example.com/resource/1"
 		reporterResource1, err := datamodel.NewReporterResource(
 			reporterResourceID,
 			"local-id-1",
@@ -2406,7 +2407,7 @@ func testTransactionIDUniqueConstraint(t *testing.T, repo bizmodel.ResourceRepos
 			"instance-1",
 			uuid.New(), // resourceID
 			"https://api.example.com/resource/1",
-			"https://console.example.com/resource/1",
+			&consoleHref1,
 			0,
 			0,
 			false,
@@ -2414,6 +2415,7 @@ func testTransactionIDUniqueConstraint(t *testing.T, repo bizmodel.ResourceRepos
 		require.NoError(t, err)
 
 		reporterResourceID2 := uuid.New()
+		consoleHref2 := "https://console.example.com/resource/2"
 		reporterResource2, err := datamodel.NewReporterResource(
 			reporterResourceID2,
 			"local-id-2",
@@ -2422,7 +2424,7 @@ func testTransactionIDUniqueConstraint(t *testing.T, repo bizmodel.ResourceRepos
 			"instance-1",
 			uuid.New(), // resourceID
 			"https://api.example.com/resource/2",
-			"https://console.example.com/resource/2",
+			&consoleHref2,
 			0,
 			0,
 			false,

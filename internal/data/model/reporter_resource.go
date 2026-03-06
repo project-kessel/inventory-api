@@ -29,7 +29,7 @@ type ReporterResource struct {
 
 	ResourceID  uuid.UUID `gorm:"index:reporter_resource_resource_id_idx;type:uuid;not null"`
 	APIHref     string    `gorm:"size:512;not null"`
-	ConsoleHref string    `gorm:"size:512"`
+	ConsoleHref *string   `gorm:"size:512"`
 
 	RepresentationVersion uint `gorm:"index:reporter_resource_key_idx,unique;not null"`
 	Generation            uint `gorm:"index:reporter_resource_key_idx,unique;not null"`
@@ -51,7 +51,7 @@ func NewReporterResource(
 	reporterInstanceID string,
 	resourceID uuid.UUID,
 	apiHref string,
-	consoleHref string,
+	consoleHref *string,
 	representationVersion uint,
 	generation uint,
 	tombstone bool,
@@ -79,6 +79,10 @@ func NewReporterResource(
 }
 
 func validateReporterResource(r *ReporterResource) error {
+	consoleHref := ""
+	if r.ConsoleHref != nil {
+		consoleHref = *r.ConsoleHref
+	}
 	return bizmodel.AggregateErrors(
 		bizmodel.ValidateUUIDRequired("ID", r.ID),
 		bizmodel.ValidateStringRequired("LocalResourceID", r.LocalResourceID),
@@ -93,13 +97,12 @@ func validateReporterResource(r *ReporterResource) error {
 		bizmodel.ValidateMinValue("Generation", r.Generation, MinGenerationValue),
 		bizmodel.ValidateMinValue("RepresentationVersion", r.RepresentationVersion, 0),
 		bizmodel.ValidateOptionalURL("APIHref", r.APIHref, MaxAPIHrefLength),
-		bizmodel.ValidateOptionalURL("ConsoleHref", r.ConsoleHref, MaxConsoleHrefLength),
+		bizmodel.ValidateOptionalURL("ConsoleHref", consoleHref, MaxConsoleHrefLength),
 	)
 }
 
 // SerializeToSnapshot converts GORM ReporterResource to snapshot type - direct initialization without validation
 func (rr ReporterResource) SerializeToSnapshot() bizmodel.ReporterResourceSnapshot {
-	// Create ReporterResourceKey snapshot
 	keySnapshot := bizmodel.ReporterResourceKeySnapshot{
 		LocalResourceID:    rr.LocalResourceID,
 		ReporterType:       rr.ReporterType,
@@ -107,16 +110,12 @@ func (rr ReporterResource) SerializeToSnapshot() bizmodel.ReporterResourceSnapsh
 		ReporterInstanceID: rr.ReporterInstanceID,
 	}
 
-	var consoleHref *string
-	if rr.ConsoleHref != "" {
-		consoleHref = &rr.ConsoleHref
-	}
 	return bizmodel.ReporterResourceSnapshot{
 		ID:                    rr.ID,
 		ReporterResourceKey:   keySnapshot,
 		ResourceID:            rr.ResourceID,
 		APIHref:               rr.APIHref,
-		ConsoleHref:           consoleHref,
+		ConsoleHref:           rr.ConsoleHref,
 		RepresentationVersion: rr.RepresentationVersion,
 		Generation:            rr.Generation,
 		Tombstone:             rr.Tombstone,
@@ -127,10 +126,6 @@ func (rr ReporterResource) SerializeToSnapshot() bizmodel.ReporterResourceSnapsh
 
 // DeserializeFromSnapshot creates GORM ReporterResource from snapshot - direct initialization without validation
 func DeserializeReporterResourceFromSnapshot(snapshot bizmodel.ReporterResourceSnapshot) ReporterResource {
-	consoleHref := ""
-	if snapshot.ConsoleHref != nil {
-		consoleHref = *snapshot.ConsoleHref
-	}
 	return ReporterResource{
 		ID: snapshot.ID,
 		ReporterResourceKey: ReporterResourceKey{
@@ -141,7 +136,7 @@ func DeserializeReporterResourceFromSnapshot(snapshot bizmodel.ReporterResourceS
 		},
 		ResourceID:            snapshot.ResourceID,
 		APIHref:               snapshot.APIHref,
-		ConsoleHref:           consoleHref,
+		ConsoleHref:           snapshot.ConsoleHref,
 		RepresentationVersion: snapshot.RepresentationVersion,
 		Generation:            snapshot.Generation,
 		Tombstone:             snapshot.Tombstone,

@@ -50,17 +50,6 @@ func NewResource(id ResourceId, localResourceId LocalResourceId, resourceType Re
 		return Resource{}, fmt.Errorf("resource invalid ReporterResource: %w", err)
 	}
 
-	var reporterData, commonData Representation
-	if reporterRepresentationData != nil {
-		reporterData = *reporterRepresentationData
-	}
-	if commonRepresentationData != nil {
-		commonData = *commonRepresentationData
-	}
-	var eventConsoleHref ConsoleHref
-	if consoleHref != nil {
-		eventConsoleHref = *consoleHref
-	}
 	resourceEvent, err := resourceEventAndRepresentations(
 		reporterResource.resourceID,
 		resourceType,
@@ -70,9 +59,9 @@ func NewResource(id ResourceId, localResourceId LocalResourceId, resourceType Re
 		localResourceId,
 		reporterResource.Id(),
 		apiHref,
-		eventConsoleHref,
-		reporterData,
-		commonData,
+		consoleHref,
+		reporterRepresentationData,
+		commonRepresentationData,
 		reporterVersion,
 		reporterResource.representationVersion,
 		reporterResource.generation,
@@ -127,17 +116,6 @@ func (r *Resource) Update(
 		txId = *transactionId
 	}
 
-	var reporterData, commonData Representation
-	if reporterRepresentationData != nil {
-		reporterData = *reporterRepresentationData
-	}
-	if commonRepresentationData != nil {
-		commonData = *commonRepresentationData
-	}
-	var eventConsoleHref ConsoleHref
-	if consoleHref != nil {
-		eventConsoleHref = *consoleHref
-	}
 	resourceEvent, err := resourceEventAndRepresentations(
 		reporterResource.resourceID,
 		key.ResourceType(),
@@ -147,9 +125,9 @@ func (r *Resource) Update(
 		key.LocalResourceId(),
 		reporterResource.Id(),
 		apiHref,
-		eventConsoleHref,
-		reporterData,
-		commonData,
+		consoleHref,
+		reporterRepresentationData,
+		commonRepresentationData,
 		reporterVersion,
 		reporterResource.representationVersion,
 		reporterResource.generation,
@@ -211,39 +189,48 @@ func resourceEventAndRepresentations(
 	localResourceId LocalResourceId,
 	reporterResourceId ReporterResourceId,
 	apiHref ApiHref,
-	consoleHref ConsoleHref,
-	reporterData Representation,
-	commonData Representation,
+	consoleHref *ConsoleHref,
+	reporterData *Representation,
+	commonData *Representation,
 	reporterVersion *ReporterVersion,
 	representationVersion Version,
 	generation Generation,
 	commonVersion Version,
 ) (ResourceReportEvent, error) {
 
-	reporterRepresentation, err := NewReporterDataRepresentation(
-		reporterResourceId,
-		representationVersion,
-		generation,
-		reporterData,
-		commonVersion,
-		reporterVersion,
-		transactionId,
-	)
-	if err != nil {
-		return ResourceReportEvent{}, fmt.Errorf("invalid ReporterRepresentation: %w", err)
+	var reporterRepresentation *ReporterDataRepresentation
+	if reporterData != nil {
+		rr, err := NewReporterDataRepresentation(
+			reporterResourceId,
+			representationVersion,
+			generation,
+			*reporterData,
+			commonVersion,
+			reporterVersion,
+			transactionId,
+		)
+		if err != nil {
+			return ResourceReportEvent{}, fmt.Errorf("invalid ReporterRepresentation: %w", err)
+		}
+		reporterRepresentation = &rr
 	}
 
-	commonRepresentation, err := NewCommonRepresentation(
-		resourceId,
-		commonData,
-		commonVersion,
-		reporterType,
-		reporterInstanceId,
-		transactionId,
-	)
-	if err != nil {
-		return ResourceReportEvent{}, fmt.Errorf("invalid CommonRepresentation: %w", err)
+	var commonRepresentation *CommonRepresentation
+	if commonData != nil {
+		cr, err := NewCommonRepresentation(
+			resourceId,
+			*commonData,
+			commonVersion,
+			reporterType,
+			reporterInstanceId,
+			transactionId,
+		)
+		if err != nil {
+			return ResourceReportEvent{}, fmt.Errorf("invalid CommonRepresentation: %w", err)
+		}
+		commonRepresentation = &cr
 	}
+
 	resourceEvent, err := NewResourceReportEvent(
 		resourceId,
 		resourceType,
@@ -343,7 +330,7 @@ func (r Resource) GetTimestamps() (createdAt time.Time, updatedAt time.Time) {
 }
 
 // Serialization + Deserialization functions, direct initialization without validation
-func (r Resource) Serialize() (ResourceSnapshot, ReporterResourceSnapshot, ReporterRepresentationSnapshot, CommonRepresentationSnapshot, error) {
+func (r Resource) Serialize() (ResourceSnapshot, ReporterResourceSnapshot, *ReporterRepresentationSnapshot, *CommonRepresentationSnapshot, error) {
 	var createdAt, updatedAt time.Time
 	if len(r.resourceReportEvents) > 0 {
 		createdAt = r.resourceReportEvents[0].createdAt
@@ -365,16 +352,23 @@ func (r Resource) Serialize() (ResourceSnapshot, ReporterResourceSnapshot, Repor
 		reporterResourceSnapshot = r.reporterResources[0].Serialize()
 	}
 
-	var reporterRepresentationSnapshot ReporterRepresentationSnapshot
-	var commonRepresentationSnapshot CommonRepresentationSnapshot
+	var reporterRepresentationSnapshot *ReporterRepresentationSnapshot
+	var commonRepresentationSnapshot *CommonRepresentationSnapshot
 	if len(r.resourceReportEvents) > 0 {
 		//TODO: Fix this to serialize all ResourceEvents
-		reporterRepresentationSnapshot = r.resourceReportEvents[0].reporterRepresentation.Serialize()
-		commonRepresentationSnapshot = r.resourceReportEvents[0].commonRepresentation.Serialize()
+		if rr := r.resourceReportEvents[0].reporterRepresentation; rr != nil {
+			s := rr.Serialize()
+			reporterRepresentationSnapshot = &s
+		}
+		if cr := r.resourceReportEvents[0].commonRepresentation; cr != nil {
+			s := cr.Serialize()
+			commonRepresentationSnapshot = &s
+		}
 	}
 	if len(r.resourceDeleteEvents) > 0 {
 		//TODO: Fix this to serialize all ResourceEvents
-		reporterRepresentationSnapshot = r.resourceDeleteEvents[0].reporterRepresentation.Serialize()
+		s := r.resourceDeleteEvents[0].reporterRepresentation.Serialize()
+		reporterRepresentationSnapshot = &s
 	}
 
 	return resourceSnapshot, reporterResourceSnapshot, reporterRepresentationSnapshot, commonRepresentationSnapshot, nil

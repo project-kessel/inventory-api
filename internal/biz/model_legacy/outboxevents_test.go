@@ -59,9 +59,9 @@ func createTestResourceReportEvent() bizmodel.ResourceReportEvent {
 		reporterInstanceId,
 		localResourceId,
 		apiHref,
-		consoleHref,
-		reporterRepresentation,
-		commonRepresentation,
+		&consoleHref,
+		&reporterRepresentation,
+		&commonRepresentation,
 	)
 
 	return event

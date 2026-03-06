@@ -134,16 +134,14 @@ func (uc *Usecase) ReportResource(ctx context.Context, cmd ReportResourceCommand
 	}
 
 	var subscription pubsub.Subscription
+
 	txidStr, err := getNextTransactionID()
 	if err != nil {
 		return err
 	}
 
 	if cmd.TransactionId == nil || *cmd.TransactionId == "" {
-		generated, genErr := model.GenerateTransactionId()
-		if genErr != nil {
-			return genErr
-		}
+		generated := model.NewTransactionId(txidStr)
 		cmd.TransactionId = &generated
 	}
 

@@ -235,22 +235,18 @@ func TestSnapshotSerialization(t *testing.T) {
 	t.Log("Snapshot serialization fields are accessible")
 }
 
-// TestCommonRepresentationSnapshot_TransactionId_EmptyMeansNotSet documents that
-// when TransactionId is not set, the snapshot uses empty string.
 func TestCommonRepresentationSnapshot_TransactionId_EmptyMeansNotSet(t *testing.T) {
 	t.Parallel()
 
-	// Build a snapshot with empty TransactionId (optional = not set)
 	snapshot := CommonRepresentationSnapshot{
 		Representation:             RepresentationSnapshot{Data: map[string]interface{}{"id": "test"}},
 		ResourceId:                 uuid.New(),
 		Version:                    1,
 		ReportedByReporterType:     "test-reporter",
 		ReportedByReporterInstance: "instance-1",
-		TransactionId:              "", // empty = not set
+		TransactionId:              "",
 		CreatedAt:                  time.Time{},
 	}
-	// Round-trip: deserialize to domain, serialize back
 	cr := DeserializeCommonRepresentation(&snapshot)
 	roundTrip := cr.Serialize()
 	if roundTrip.TransactionId != "" {
@@ -258,8 +254,6 @@ func TestCommonRepresentationSnapshot_TransactionId_EmptyMeansNotSet(t *testing.
 	}
 }
 
-// TestReporterRepresentationSnapshot_TransactionId_EmptyMeansNotSet documents the same
-// convention for reporter representation snapshots (empty = not set).
 func TestReporterRepresentationSnapshot_TransactionId_EmptyMeansNotSet(t *testing.T) {
 	t.Parallel()
 
@@ -270,11 +264,10 @@ func TestReporterRepresentationSnapshot_TransactionId_EmptyMeansNotSet(t *testin
 		Generation:         0,
 		ReporterVersion:    nil,
 		CommonVersion:      0,
-		TransactionId:      "", // empty = not set
+		TransactionId:      "",
 		Tombstone:          false,
 		CreatedAt:          time.Time{},
 	}
-	// Deserialize and serialize back
 	rr := DeserializeReporterDataRepresentation(&snapshot)
 	roundTrip := rr.Serialize()
 	if roundTrip.TransactionId != "" {
@@ -282,8 +275,6 @@ func TestReporterRepresentationSnapshot_TransactionId_EmptyMeansNotSet(t *testin
 	}
 }
 
-// TestResourceSnapshot_CreatedAtUpdatedAt_ZeroMeansNotSet documents that
-// when timestamps are not set, the snapshot uses zero value (time.Time).
 func TestResourceSnapshot_CreatedAtUpdatedAt_ZeroMeansNotSet(t *testing.T) {
 	t.Parallel()
 
@@ -292,7 +283,7 @@ func TestResourceSnapshot_CreatedAtUpdatedAt_ZeroMeansNotSet(t *testing.T) {
 		Type:             "test",
 		CommonVersion:    0,
 		ConsistencyToken: "",
-		CreatedAt:        time.Time{}, // zero = not set
+		CreatedAt:        time.Time{},
 		UpdatedAt:        time.Time{},
 	}
 	if !snapshot.CreatedAt.IsZero() {

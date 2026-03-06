@@ -16,7 +16,6 @@ func assertValidReporterResource(t *testing.T, reporterResource ReporterResource
 	}
 }
 
-// consoleHrefPtr returns a pointer for *ConsoleHref parameters (optional field).
 func consoleHrefPtr(ch ConsoleHref) *ConsoleHref { return &ch }
 
 func TestReporterResource_Initialization(t *testing.T) {

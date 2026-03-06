@@ -139,6 +139,14 @@ func (uc *Usecase) ReportResource(ctx context.Context, cmd ReportResourceCommand
 		return err
 	}
 
+	if cmd.TransactionId == nil || *cmd.TransactionId == "" {
+		generated, genErr := model.GenerateTransactionId()
+		if genErr != nil {
+			return genErr
+		}
+		cmd.TransactionId = &generated
+	}
+
 	// Validate command against schemas
 	if err := uc.validateReportResourceCommand(ctx, cmd); err != nil {
 		var repReqErr *RepresentationRequiredError
@@ -231,15 +239,13 @@ func (uc *Usecase) ReportResource(ctx context.Context, cmd ReportResourceCommand
 	return nil
 }
 
-// resolveOptionalFields returns optional pointer fields from the command without collapsing to zero value.
-// Callers pass these pointers through to the domain (nil = not set).
+// resolveOptionalFields returns optional pointer fields from the command.
 func resolveOptionalFields(cmd ReportResourceCommand) (
 	consoleHref *model.ConsoleHref,
-	transactionId *model.TransactionId,
 	reporterRepresentation *model.Representation,
 	commonRepresentation *model.Representation,
 ) {
-	return cmd.ConsoleHref, cmd.TransactionId, cmd.ReporterRepresentation, cmd.CommonRepresentation
+	return cmd.ConsoleHref, cmd.ReporterRepresentation, cmd.CommonRepresentation
 }
 
 func (uc *Usecase) createResource(tx *gorm.DB, cmd ReportResourceCommand, txidStr string) error {
@@ -253,7 +259,7 @@ func (uc *Usecase) createResource(tx *gorm.DB, cmd ReportResourceCommand, txidSt
 		return err
 	}
 
-	consoleHref, transactionId, reporterRepresentation, commonRepresentation := resolveOptionalFields(cmd)
+	consoleHref, reporterRepresentation, commonRepresentation := resolveOptionalFields(cmd)
 
 	resource, err := model.NewResource(
 		resourceId,
@@ -261,7 +267,7 @@ func (uc *Usecase) createResource(tx *gorm.DB, cmd ReportResourceCommand, txidSt
 		cmd.ResourceType,
 		cmd.ReporterType,
 		cmd.ReporterInstanceId,
-		transactionId,
+		cmd.TransactionId,
 		reporterResourceId,
 		cmd.ApiHref,
 		consoleHref,
@@ -287,7 +293,7 @@ func (uc *Usecase) updateResource(tx *gorm.DB, cmd ReportResourceCommand, existi
 		return err
 	}
 
-	consoleHref, transactionId, reporterRepresentation, commonRepresentation := resolveOptionalFields(cmd)
+	consoleHref, reporterRepresentation, commonRepresentation := resolveOptionalFields(cmd)
 
 	err = existingResource.Update(
 		reporterResourceKey,
@@ -296,7 +302,7 @@ func (uc *Usecase) updateResource(tx *gorm.DB, cmd ReportResourceCommand, existi
 		cmd.ReporterVersion,
 		reporterRepresentation,
 		commonRepresentation,
-		transactionId,
+		cmd.TransactionId,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to update resource: %w", err)

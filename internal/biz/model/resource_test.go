@@ -12,11 +12,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// timeVal returns the time (for use with time.Time; kept for compatibility where value may be zero).
-func timeVal(t time.Time) time.Time {
-	return t
-}
-
 func TestResource_Initialization(t *testing.T) {
 	t.Parallel()
 	fixture := NewResourceTestFixture()
@@ -519,8 +514,8 @@ func TestResource_Update(t *testing.T) {
 			Type:             fixture.ValidResourceTypeType().Serialize(),
 			CommonVersion:    0,
 			ConsistencyToken: "",
-			CreatedAt:        time.Time{}, // zero = not set (legacy/NULL in DB)
-			UpdatedAt:        time.Time{},
+			CreatedAt:        time.Time{}, // Zero timestamp - simulates NULL in DB
+			UpdatedAt:        time.Time{}, // Zero timestamp - simulates NULL in DB
 		}
 
 		// Create reporter resource snapshot
@@ -536,8 +531,8 @@ func TestResource_Update(t *testing.T) {
 			RepresentationVersion: 0,
 			Generation:            0,
 			Tombstone:             false,
-			CreatedAt:             time.Time{},
-			UpdatedAt:             time.Time{},
+			CreatedAt:             time.Time{}, // Zero timestamp
+			UpdatedAt:             time.Time{}, // Zero timestamp
 		}
 
 		// Deserialize the resource (simulating loading from database)
@@ -662,8 +657,8 @@ func TestResource_Update(t *testing.T) {
 			Type:             fixture.ValidResourceTypeType().Serialize(),
 			CommonVersion:    0,
 			ConsistencyToken: "",
-			CreatedAt:        time.Time{},
-			UpdatedAt:        time.Time{},
+			CreatedAt:        time.Time{}, // Zero timestamp
+			UpdatedAt:        time.Time{}, // Zero timestamp
 		}
 
 		reporterResourceSnapshot := ReporterResourceSnapshot{
@@ -723,8 +718,8 @@ func TestResource_Update(t *testing.T) {
 			Type:             fixture.ValidResourceTypeType().Serialize(),
 			CommonVersion:    0,
 			ConsistencyToken: "",
-			CreatedAt:        time.Time{},
-			UpdatedAt:        time.Time{},
+			CreatedAt:        time.Time{}, // Zero timestamp - legacy resource
+			UpdatedAt:        time.Time{}, // Zero timestamp
 		}
 
 		reporterResourceSnapshot := ReporterResourceSnapshot{
@@ -816,8 +811,8 @@ func TestResource_Update(t *testing.T) {
 			Type:             fixture.ValidResourceTypeType().Serialize(),
 			CommonVersion:    3,
 			ConsistencyToken: "token",
-			CreatedAt:        time.Time{},    // Zero - inconsistent state
-			UpdatedAt:        pastUpdatedAt,  // Has a value
+			CreatedAt:        time.Time{},   // Zero - inconsistent state
+			UpdatedAt:        pastUpdatedAt, // Has a value
 		}
 
 		reporterResourceSnapshot := ReporterResourceSnapshot{

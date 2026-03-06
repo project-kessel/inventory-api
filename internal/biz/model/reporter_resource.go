@@ -7,8 +7,7 @@ import (
 	"time"
 )
 
-// Create Entities with unexported fields for encapsulation.
-// consoleHref is optional; nil means not set.
+// Create Entities with unexported fields for encapsulation
 type ReporterResource struct {
 	id ReporterResourceId
 	ReporterResourceKey
@@ -32,7 +31,7 @@ type ReporterResourceKey struct {
 	reporter        ReporterId
 }
 
-// Factory methods. consoleHref is optional (nil = not set).
+// Factory methods
 func NewReporterResource(
 	id ReporterResourceId,
 	localResourceId LocalResourceId,
@@ -84,7 +83,7 @@ func NewReporterResourceKey(
 	}, nil
 }
 
-// Model Behavior. consoleHref is optional (nil = leave unchanged or clear).
+// Model Behavior
 func (rr *ReporterResource) Update(
 	apiHref ApiHref,
 	consoleHref *ConsoleHref,
@@ -146,7 +145,7 @@ func (rr ReporterResource) Key() ReporterResourceKey {
 // ApiHref returns the API href for this reporter resource.
 func (rr ReporterResource) ApiHref() ApiHref { return rr.apiHref }
 
-// ConsoleHref returns the console href for this reporter resource. Returns zero value when not set (nil).
+// ConsoleHref returns the console href for this reporter resource.
 func (rr ReporterResource) ConsoleHref() ConsoleHref {
 	if rr.consoleHref == nil {
 		return ConsoleHref("")
@@ -154,6 +153,7 @@ func (rr ReporterResource) ConsoleHref() ConsoleHref {
 	return *rr.consoleHref
 }
 
+// Add timestamp getters
 func (rr ReporterResource) CreatedAt() time.Time {
 	return rr.createdAt
 }
@@ -190,7 +190,6 @@ func (rr ReporterResource) Serialize() ReporterResourceSnapshot {
 	}
 }
 
-// DeserializeReporterResource creates a ReporterResource from a snapshot (no validation).
 func DeserializeReporterResource(snapshot ReporterResourceSnapshot) ReporterResource {
 	log.Printf("----------------------------------")
 	log.Printf("ReporterResourceSnapshot : %+v, ", snapshot)

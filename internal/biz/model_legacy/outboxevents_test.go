@@ -155,7 +155,7 @@ func assertResourceEventFromDomainEvent(t *testing.T, operation bizmodel.EventOp
 }
 
 // TestEventResourceReporter_ReporterVersion_Optional documents that EventResourceReporter
-// uses *string for ReporterVersion (nil = not set).
+// uses *string for ReporterVersion.
 func TestEventResourceReporter_ReporterVersion_Optional(t *testing.T) {
 	// Nil ReporterVersion round-trips as null in JSON (omitempty omits the field when nil)
 	er := EventResourceReporter{
@@ -185,13 +185,13 @@ func TestEventResourceReporter_ReporterVersion_Optional(t *testing.T) {
 }
 
 // TestEventRelationshipReporter_ReporterVersion_Optional documents that EventRelationshipReporter
-// uses *string for ReporterVersion (nil = not set), aligned with EventResourceReporter.
+// uses *string for ReporterVersion, aligned with EventResourceReporter.
 func TestEventRelationshipReporter_ReporterVersion_Optional(t *testing.T) {
 	er := EventRelationshipReporter{
 		ReporterType:           "type",
 		SubjectLocalResourceId: "sub",
 		ObjectLocalResourceId:  "obj",
-		ReporterVersion:        nil, // nil = not set
+		ReporterVersion:        nil,
 		ReporterInstanceId:     "inst",
 	}
 	b, err := json.Marshal(er)

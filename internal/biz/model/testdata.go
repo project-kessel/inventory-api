@@ -822,6 +822,7 @@ func NewResourceTestFixture() ResourceTestFixture {
 		EmptyResourceType:         "",
 		WhitespaceResourceType:    "  \t\n  ",
 		// Individual values for NewResource function
+		ValidTransactionId:              "tx-test-fixture",
 		ValidLocalResourceId:            "local-resource-123",
 		ValidReporterType:               "acm",
 		ValidReporterInstanceId:         "acm-instance-001",

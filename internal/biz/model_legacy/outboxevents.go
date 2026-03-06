@@ -130,6 +130,17 @@ func newResourceEvent(operationType bizmodel.EventOperationType, resourceEvent *
 		reportedTime = *deletedAt
 	}
 
+	workspaceID := resourceEvent.WorkspaceId()
+	var workspaceIDPtr *string
+	if workspaceID != "" {
+		workspaceIDPtr = &workspaceID
+	}
+	consoleHrefStr := resourceEvent.ConsoleHref()
+	var consoleHrefPtr *string
+	if consoleHrefStr != "" {
+		consoleHrefPtr = &consoleHrefStr
+	}
+
 	return &ResourceEvent{
 		Specversion:     "1.0",
 		Type:            makeEventType(eventType, resourceEvent.ResourceType(), string(operationType.OperationType())),
@@ -145,15 +156,15 @@ func newResourceEvent(operationType bizmodel.EventOperationType, resourceEvent *
 				CreatedAt:    createdAt,
 				UpdatedAt:    updatedAt,
 				DeletedAt:    deletedAt,
-				WorkspaceId:  resourceEvent.WorkspaceId(),
+				WorkspaceId:  workspaceIDPtr,
 			},
 			ReporterData: EventResourceReporter{
 				ReporterInstanceId: resourceEvent.ReporterInstanceId(),
 				ReporterType:       resourceEvent.ReporterType(),
-				ConsoleHref:        bizmodel.SerializeStringPtr(resourceEvent.ConsoleHref()),
+				ConsoleHref:        consoleHrefPtr,
 				ApiHref:            resourceEvent.ApiHref(),
 				LocalResourceId:    resourceEvent.LocalResourceId(),
-				ReporterVersion:    bizmodel.SerializeStringPtr(resourceEvent.ReporterVersion()),
+				ReporterVersion:    resourceEvent.ReporterVersion(),
 			},
 			ResourceData: resourceEvent.Data(),
 		},

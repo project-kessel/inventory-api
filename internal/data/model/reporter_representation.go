@@ -77,10 +77,6 @@ func (rr ReporterRepresentation) SerializeToSnapshot() bizmodel.ReporterRepresen
 		Data: rr.Data,
 	}
 
-	var txID *string
-	if rr.TransactionId != "" {
-		txID = &rr.TransactionId
-	}
 	return bizmodel.ReporterRepresentationSnapshot{
 		Representation:     representationSnapshot,
 		ReporterResourceID: rr.ReporterResourceID,
@@ -88,7 +84,7 @@ func (rr ReporterRepresentation) SerializeToSnapshot() bizmodel.ReporterRepresen
 		Generation:         rr.Generation,
 		ReporterVersion:    rr.ReporterVersion,
 		CommonVersion:      rr.CommonVersion,
-		TransactionId:      txID,
+		TransactionId:      rr.TransactionId,
 		Tombstone:          rr.Tombstone,
 		CreatedAt:          rr.CreatedAt,
 	}
@@ -96,10 +92,6 @@ func (rr ReporterRepresentation) SerializeToSnapshot() bizmodel.ReporterRepresen
 
 // DeserializeReporterRepresentationFromSnapshot creates GORM ReporterRepresentation from snapshot - direct initialization without validation
 func DeserializeReporterRepresentationFromSnapshot(snapshot bizmodel.ReporterRepresentationSnapshot) ReporterRepresentation {
-	txID := ""
-	if snapshot.TransactionId != nil {
-		txID = *snapshot.TransactionId
-	}
 	return ReporterRepresentation{
 		Representation: Representation{
 			Data: snapshot.Representation.Data,
@@ -109,7 +101,7 @@ func DeserializeReporterRepresentationFromSnapshot(snapshot bizmodel.ReporterRep
 		Generation:         snapshot.Generation,
 		ReporterVersion:    snapshot.ReporterVersion,
 		CommonVersion:      snapshot.CommonVersion,
-		TransactionId:      txID,
+		TransactionId:      snapshot.TransactionId,
 		Tombstone:          snapshot.Tombstone,
 		CreatedAt:          snapshot.CreatedAt,
 	}

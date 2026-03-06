@@ -67,27 +67,19 @@ func (cr CommonRepresentation) SerializeToSnapshot() bizmodel.CommonRepresentati
 	representationSnapshot := bizmodel.RepresentationSnapshot{
 		Data: cr.Data,
 	}
-	var txID *string
-	if cr.TransactionId != "" {
-		txID = &cr.TransactionId
-	}
 	return bizmodel.CommonRepresentationSnapshot{
 		Representation:             representationSnapshot,
 		ResourceId:                 cr.ResourceId,
 		Version:                    cr.Version,
 		ReportedByReporterType:     cr.ReportedByReporterType,
 		ReportedByReporterInstance: cr.ReportedByReporterInstance,
-		TransactionId:              txID,
+		TransactionId:              cr.TransactionId,
 		CreatedAt:                  cr.CreatedAt,
 	}
 }
 
 // DeserializeCommonRepresentationFromSnapshot creates GORM CommonRepresentation from snapshot - direct initialization without validation
 func DeserializeCommonRepresentationFromSnapshot(snapshot bizmodel.CommonRepresentationSnapshot) CommonRepresentation {
-	txID := ""
-	if snapshot.TransactionId != nil {
-		txID = *snapshot.TransactionId
-	}
 	return CommonRepresentation{
 		Representation: Representation{
 			Data: snapshot.Representation.Data,
@@ -96,7 +88,7 @@ func DeserializeCommonRepresentationFromSnapshot(snapshot bizmodel.CommonReprese
 		Version:                    snapshot.Version,
 		ReportedByReporterType:     snapshot.ReportedByReporterType,
 		ReportedByReporterInstance: snapshot.ReportedByReporterInstance,
-		TransactionId:              txID,
+		TransactionId:              snapshot.TransactionId,
 		CreatedAt:                  snapshot.CreatedAt,
 	}
 }

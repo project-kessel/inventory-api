@@ -47,19 +47,17 @@ type ReporterResourceSnapshot struct {
 }
 
 // CommonRepresentationSnapshot is a DTO that mirrors the GORM CommonRepresentation model structure.
-// TransactionId is optional; nil means not set (no idempotency key).
 type CommonRepresentationSnapshot struct {
 	Representation             RepresentationSnapshot `json:"representation"`
 	ResourceId                 uuid.UUID              `json:"resource_id"`
 	Version                    uint                   `json:"version"`
 	ReportedByReporterType     string                 `json:"reported_by_reporter_type"`
 	ReportedByReporterInstance string                 `json:"reported_by_reporter_instance"`
-	TransactionId              *string                `json:"transaction_id,omitempty"`
+	TransactionId              string                 `json:"transaction_id"`
 	CreatedAt                  time.Time              `json:"created_at"`
 }
 
 // ReporterRepresentationSnapshot is a DTO that mirrors the GORM ReporterRepresentation model structure.
-// TransactionId is optional; nil means not set (no idempotency key).
 type ReporterRepresentationSnapshot struct {
 	Representation     RepresentationSnapshot `json:"representation"`
 	ReporterResourceID uuid.UUID              `json:"reporter_resource_id"`
@@ -67,7 +65,7 @@ type ReporterRepresentationSnapshot struct {
 	Generation         uint                   `json:"generation"`
 	ReporterVersion    *string                `json:"reporter_version"`
 	CommonVersion      uint                   `json:"common_version"`
-	TransactionId      *string                `json:"transaction_id,omitempty"`
+	TransactionId      string                 `json:"transaction_id"`
 	Tombstone          bool                   `json:"tombstone"`
 	CreatedAt          time.Time              `json:"created_at"`
 }

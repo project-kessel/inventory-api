@@ -590,7 +590,7 @@ func NewResourceFixture(localResourceId, resourceType, reporterType, reporterIns
 		resourceTypeTyped,
 		reporterTypeTyped,
 		reporterInstanceTyped,
-		transactionId,
+		&transactionId,
 		reporterResourceId,
 		apiHref,
 		fixture.ValidConsoleHrefType(),

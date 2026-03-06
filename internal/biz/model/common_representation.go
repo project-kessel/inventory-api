@@ -62,11 +62,6 @@ func (cr CommonRepresentation) Serialize() CommonRepresentationSnapshot {
 		Data: cr.Data(),
 	}
 
-	// TransactionId: nil when empty (optional), else pointer to serialized value
-	var txID *string
-	if s := cr.transactionId.Serialize(); s != "" {
-		txID = &s
-	}
 	now := time.Now()
 	return CommonRepresentationSnapshot{
 		Representation:             representationSnapshot,
@@ -74,7 +69,7 @@ func (cr CommonRepresentation) Serialize() CommonRepresentationSnapshot {
 		Version:                    cr.version.Serialize(),
 		ReportedByReporterType:     reporterType,
 		ReportedByReporterInstance: reporterInstanceId,
-		TransactionId:              txID,
+		TransactionId:              cr.transactionId.Serialize(),
 		CreatedAt:                  now,
 	}
 }
@@ -86,11 +81,7 @@ func DeserializeCommonRepresentation(snapshot *CommonRepresentationSnapshot) Com
 	version := DeserializeVersion(snapshot.Version)
 	reporterType := ReporterType(snapshot.ReportedByReporterType)
 	reporterInstanceId := ReporterInstanceId(snapshot.ReportedByReporterInstance)
-	txIDStr := ""
-	if snapshot.TransactionId != nil {
-		txIDStr = *snapshot.TransactionId
-	}
-	transactionId := TransactionId(txIDStr)
+	transactionId := TransactionId(snapshot.TransactionId)
 
 	// Create reporter ID
 	reporterId := ReporterId{

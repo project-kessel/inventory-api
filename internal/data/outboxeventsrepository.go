@@ -64,6 +64,8 @@ func publishOutboxEventWAL(tx *gorm.DB, event *model_legacy.OutboxEvent) error {
 	// this ensures outbox router smt still properly routes to the correct topics as before
 	prefix := string(event.AggregateType)
 
+	// the first arg to pg_logical_emit_message is set to 'true' to ensure the message is part of
+	// the current transaction, meaning it only appears in the WAL if the surrounding transaction commits.
 	return tx.Exec(
 		"SELECT pg_logical_emit_message(true, ?, ?)", prefix, string(content),
 	).Error

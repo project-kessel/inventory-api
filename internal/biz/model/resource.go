@@ -21,11 +21,17 @@ type Resource struct {
 	resourceDeleteEvents []ResourceDeleteEvent
 }
 
-// Factory methods
-func NewResource(id ResourceId, localResourceId LocalResourceId, resourceType ResourceType, reporterType ReporterType, reporterInstanceId ReporterInstanceId, transactionId TransactionId, reporterResourceId ReporterResourceId, apiHref ApiHref, consoleHref *ConsoleHref, reporterRepresentationData *Representation, commonRepresentationData *Representation, reporterVersion *ReporterVersion) (Resource, error) {
-	if reporterRepresentationData == nil && commonRepresentationData != nil {
-		emptyRep := NewEmptyRepresentation()
-		reporterRepresentationData = &emptyRep
+// Factory methods. Optional fields are passed as pointers; nil means not set (domain generates or uses empty where defined).
+func NewResource(id ResourceId, localResourceId LocalResourceId, resourceType ResourceType, reporterType ReporterType, reporterInstanceId ReporterInstanceId, transactionId *TransactionId, reporterResourceId ReporterResourceId, apiHref ApiHref, consoleHref *ConsoleHref, reporterRepresentationData *Representation, commonRepresentationData *Representation, reporterVersion *ReporterVersion) (Resource, error) {
+	var txId TransactionId
+	if transactionId == nil || *transactionId == "" {
+		var err error
+		txId, err = GenerateTransactionId()
+		if err != nil {
+			return Resource{}, err
+		}
+	} else {
+		txId = *transactionId
 	}
 
 	commonVersion := NewVersion(initialCommonVersion)
@@ -49,7 +55,7 @@ func NewResource(id ResourceId, localResourceId LocalResourceId, resourceType Re
 		resourceType,
 		reporterType,
 		reporterInstanceId,
-		transactionId,
+		txId,
 		localResourceId,
 		reporterResource.Id(),
 		apiHref,
@@ -80,7 +86,7 @@ func NewResource(id ResourceId, localResourceId LocalResourceId, resourceType Re
 	return resource, nil
 }
 
-// Model Behavior
+// Model Behavior. Optional fields are pointers; nil means not set.
 func (r *Resource) Update(
 	key ReporterResourceKey,
 	apiHref ApiHref,
@@ -88,7 +94,7 @@ func (r *Resource) Update(
 	reporterVersion *ReporterVersion,
 	reporterRepresentationData *Representation,
 	commonRepresentationData *Representation,
-	transactionId TransactionId,
+	transactionId *TransactionId,
 ) error {
 	r.commonVersion = r.commonVersion.Increment()
 
@@ -99,12 +105,23 @@ func (r *Resource) Update(
 
 	reporterResource.Update(apiHref, consoleHref)
 
+	var txId TransactionId
+	if transactionId == nil || *transactionId == "" {
+		var genErr error
+		txId, genErr = GenerateTransactionId()
+		if genErr != nil {
+			return genErr
+		}
+	} else {
+		txId = *transactionId
+	}
+
 	resourceEvent, err := resourceEventAndRepresentations(
 		reporterResource.resourceID,
 		key.ResourceType(),
 		key.ReporterType(),
 		key.ReporterInstanceId(),
-		transactionId,
+		txId,
 		key.LocalResourceId(),
 		reporterResource.Id(),
 		apiHref,
@@ -180,10 +197,6 @@ func resourceEventAndRepresentations(
 	generation Generation,
 	commonVersion Version,
 ) (ResourceReportEvent, error) {
-
-	if reporterData == nil && commonData == nil {
-		return ResourceReportEvent{}, ErrNoRepresentationProvided
-	}
 
 	var reporterRepresentation *ReporterDataRepresentation
 	if reporterData != nil {
@@ -308,7 +321,7 @@ func (r Resource) ConsistencyToken() ConsistencyToken {
 	return r.consistencyToken
 }
 
-// GetTimestamps returns createdAt and updatedAt from the resource's events, or zero times if no events exist
+// GetTimestamps returns createdAt and updatedAt from the resource's events, or zero time if no events
 func (r Resource) GetTimestamps() (createdAt time.Time, updatedAt time.Time) {
 	if len(r.resourceReportEvents) > 0 {
 		return r.resourceReportEvents[0].createdAt, r.resourceReportEvents[0].updatedAt

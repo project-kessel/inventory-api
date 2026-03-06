@@ -67,8 +67,8 @@ func (re ResourceDeleteEvent) ResourceId() uuid.UUID {
 	return uuid.UUID(re.id)
 }
 
-func (re ResourceDeleteEvent) WorkspaceId() *string {
-	return nil
+func (re ResourceDeleteEvent) WorkspaceId() string {
+	return ""
 }
 
 // CurrentCommonVersion returns nil for delete events since common version is not applicable

@@ -7,6 +7,7 @@ import (
 
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
 	"github.com/google/uuid"
+	"github.com/project-kessel/inventory-api/internal/biz/model_legacy"
 	"github.com/project-kessel/inventory-api/internal/metricscollector"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -38,6 +39,12 @@ const (
 )
 
 func setupInMemoryDB(t *testing.T) *gorm.DB {
+	// Since SQLite doesn't support WAL or pg_logical_emit_message
+	// used for outbox processing, overriding the PublishOutboxEvent to a no-op
+	original := data.PublishOutboxEvent
+	data.PublishOutboxEvent = func(tx *gorm.DB, event *model_legacy.OutboxEvent) error { return nil }
+	t.Cleanup(func() { data.PublishOutboxEvent = original })
+
 	db := testutil.NewSQLiteTestDB(t, &gorm.Config{})
 	err := data.Migrate(db, nil)
 	require.NoError(t, err)

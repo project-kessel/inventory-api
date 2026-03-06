@@ -10,6 +10,7 @@ import (
 	krlog "github.com/go-kratos/kratos/v2/log"
 	kratosTransport "github.com/go-kratos/kratos/v2/transport"
 	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2"
+	"github.com/project-kessel/inventory-api/internal/biz/model_legacy"
 	relationsV1beta1 "github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
 	"google.golang.org/protobuf/types/known/structpb"
 
@@ -2738,6 +2739,12 @@ func TestInventoryService_StreamedListObjects_NilRequest(t *testing.T) {
 // database with all migrations applied. Returns the repository and the underlying
 // *gorm.DB for use in assertions.
 func newSQLiteTestRepo(t *testing.T) (model.ResourceRepository, *gorm.DB) {
+	// Since SQLite doesn't support WAL or pg_logical_emit_message
+	// used for outbox processing, overriding the PublishOutboxEvent to a no-op
+	original := data.PublishOutboxEvent
+	data.PublishOutboxEvent = func(tx *gorm.DB, event *model_legacy.OutboxEvent) error { return nil }
+	t.Cleanup(func() { data.PublishOutboxEvent = original })
+
 	t.Helper()
 	db := testutil.NewSQLiteTestDB(t, &gorm.Config{TranslateError: true})
 	err := data.Migrate(db, nil)

@@ -13,6 +13,7 @@ import (
 
 	"github.com/project-kessel/inventory-api/internal"
 	bizmodel "github.com/project-kessel/inventory-api/internal/biz/model"
+	"github.com/project-kessel/inventory-api/internal/biz/model_legacy"
 	datamodel "github.com/project-kessel/inventory-api/internal/data/model"
 	"github.com/project-kessel/inventory-api/internal/metricscollector"
 	"github.com/project-kessel/inventory-api/internal/testutil"
@@ -1538,6 +1539,12 @@ func TestSerializableUpdateFails(t *testing.T) {
 }
 
 func setupInMemoryDB(t *testing.T) *gorm.DB {
+	// Since SQLite doesn't support WAL or pg_logical_emit_message
+	// used for outbox processing, overriding the PublishOutboxEvent to a no-op
+	original := PublishOutboxEvent
+	PublishOutboxEvent = func(tx *gorm.DB, event *model_legacy.OutboxEvent) error { return nil }
+	t.Cleanup(func() { PublishOutboxEvent = original })
+
 	db := testutil.NewSQLiteTestDB(t, &gorm.Config{TranslateError: true})
 
 	err := Migrate(db, nil)

@@ -62,7 +62,7 @@ func (cr CommonRepresentation) Serialize() CommonRepresentationSnapshot {
 		Data: cr.Data(),
 	}
 
-	now := time.Now()
+	// Create CommonRepresentation snapshot - direct initialization without validation
 	return CommonRepresentationSnapshot{
 		Representation:             representationSnapshot,
 		ResourceId:                 cr.resourceId.UUID(),
@@ -70,7 +70,7 @@ func (cr CommonRepresentation) Serialize() CommonRepresentationSnapshot {
 		ReportedByReporterType:     reporterType,
 		ReportedByReporterInstance: reporterInstanceId,
 		TransactionId:              cr.transactionId.Serialize(),
-		CreatedAt:                  now,
+		CreatedAt:                  time.Now(), // TODO: Add proper timestamp from domain entity if available
 	}
 }
 

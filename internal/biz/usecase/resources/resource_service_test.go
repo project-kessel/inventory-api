@@ -2,7 +2,6 @@ package resources
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"testing"
 
@@ -1584,32 +1583,14 @@ func TestReportResource_ValidationErrors(t *testing.T) {
 			expectError: "reporter unknown_reporter does not report resource types: host",
 		},
 		{
-			name: "reporter-only (common nil) returns representation required error",
-			cmd: func() ReportResourceCommand {
-				cmd := fixture(t).Basic("host", "hbi", "instance-1", "test-host", "ws-123")
-				cmd.CommonRepresentation = nil
-				return cmd
-			}(),
-			expectError: "representation required",
-		},
-		{
-			name: "common-only (reporter nil) returns representation required error",
-			cmd: func() ReportResourceCommand {
-				cmd := fixture(t).Basic("host", "hbi", "instance-1", "test-host", "ws-123")
-				cmd.ReporterRepresentation = nil
-				return cmd
-			}(),
-			expectError: "representation required",
-		},
-		{
-			name: "both representations nil returns representation required error",
+			name: "both representations nil returns error",
 			cmd: func() ReportResourceCommand {
 				cmd := fixture(t).Basic("host", "hbi", "instance-1", "test-host", "ws-123")
 				cmd.ReporterRepresentation = nil
 				cmd.CommonRepresentation = nil
 				return cmd
 			}(),
-			expectError: "representation required",
+			expectError: "at least one of reporterRepresentation or commonRepresentation must be provided",
 		},
 	}
 
@@ -1815,8 +1796,9 @@ func TestReportResource_SchemaValidation(t *testing.T) {
 // They serve as a contract and must be updated if error formats change.
 
 // TestReportResource_RepresentationRequiredError tests that nil representations
-// return RepresentationRequiredError with the correct message format.
-func TestReportResource_RepresentationRequiredError(t *testing.T) {
+// TestReportResource_BothRepresentationsNil tests that when both representations
+// are nil, the domain rejects the request.
+func TestReportResource_BothRepresentationsNil(t *testing.T) {
 	ctx := testAuthzContext()
 	schemaRepo := newFakeSchemaRepository(t)
 	usecase := New(
@@ -1832,69 +1814,26 @@ func TestReportResource_RepresentationRequiredError(t *testing.T) {
 		newTestSelfSubjectStrategy(),
 	)
 
-	commonRep, _ := model.NewRepresentation(map[string]interface{}{"workspace_id": "ws-123"})
-	reporterRep, _ := model.NewRepresentation(map[string]interface{}{"satellite_id": "sat-123"})
+	localResId, _ := model.NewLocalResourceId("test-host")
+	resType, _ := model.NewResourceType("host")
+	repType, _ := model.NewReporterType("hbi")
+	repInstanceId, _ := model.NewReporterInstanceId("instance-1")
+	apiHref, _ := model.NewApiHref("https://api.example.com/resource/123")
 
-	tests := []struct {
-		name                   string
-		reporterRepresentation *model.Representation
-		commonRepresentation   *model.Representation
-		expectError            bool
-		expectErrorMsg         string
-	}{
-		{
-			name:                   "reporter-only (common nil) returns RepresentationRequiredError",
-			reporterRepresentation: &reporterRep,
-			commonRepresentation:   nil,
-			expectError:            true,
-			expectErrorMsg:         "invalid CommonRepresentation representation: representation required",
-		},
-		{
-			name:                   "common-only (reporter nil) returns RepresentationRequiredError",
-			reporterRepresentation: nil,
-			commonRepresentation:   &commonRep,
-			expectError:            true,
-			expectErrorMsg:         "invalid ReporterRepresentation representation: representation required",
-		},
-		{
-			name:                   "both nil returns RepresentationRequiredError",
-			reporterRepresentation: nil,
-			commonRepresentation:   nil,
-			expectError:            true,
-			expectErrorMsg:         "invalid both representation: representation required",
-		},
+	cmd := ReportResourceCommand{
+		LocalResourceId:        localResId,
+		ResourceType:           resType,
+		ReporterType:           repType,
+		ReporterInstanceId:     repInstanceId,
+		ApiHref:                apiHref,
+		ReporterRepresentation: nil,
+		CommonRepresentation:   nil,
+		WriteVisibility:        WriteVisibilityMinimizeLatency,
 	}
 
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			localResId, _ := model.NewLocalResourceId("test-host")
-			resType, _ := model.NewResourceType("host")
-			repType, _ := model.NewReporterType("hbi")
-			repInstanceId, _ := model.NewReporterInstanceId("instance-1")
-			apiHref, _ := model.NewApiHref("https://api.example.com/resource/123")
-
-			cmd := ReportResourceCommand{
-				LocalResourceId:        localResId,
-				ResourceType:           resType,
-				ReporterType:           repType,
-				ReporterInstanceId:     repInstanceId,
-				ApiHref:                apiHref,
-				ReporterRepresentation: tc.reporterRepresentation,
-				CommonRepresentation:   tc.commonRepresentation,
-				WriteVisibility:        WriteVisibilityMinimizeLatency,
-			}
-
-			err := usecase.ReportResource(ctx, cmd)
-			if tc.expectError {
-				assert.Error(t, err)
-				assert.Contains(t, err.Error(), tc.expectErrorMsg)
-				var repReqErr *RepresentationRequiredError
-				assert.True(t, errors.As(err, &repReqErr), "expected RepresentationRequiredError type")
-			} else {
-				assert.NoError(t, err)
-			}
-		})
-	}
+	err := usecase.ReportResource(ctx, cmd)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "at least one of reporterRepresentation or commonRepresentation must be provided")
 }
 
 // TestReportResource_ValidationErrorFormat tests that validation failures

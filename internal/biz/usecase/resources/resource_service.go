@@ -560,17 +560,6 @@ func (uc *Usecase) validateReportResourceCommand(ctx context.Context, cmd Report
 		return fmt.Errorf("reporter %s does not report resource types: %s", reporterType, resourceType)
 	}
 
-	// Require both reporter and common representation
-	if cmd.ReporterRepresentation == nil && cmd.CommonRepresentation == nil {
-		return &RepresentationRequiredError{Kind: "both"}
-	}
-	if cmd.ReporterRepresentation == nil {
-		return &RepresentationRequiredError{Kind: "ReporterRepresentation"}
-	}
-	if cmd.CommonRepresentation == nil {
-		return &RepresentationRequiredError{Kind: "CommonRepresentation"}
-	}
-
 	if cmd.ReporterRepresentation != nil {
 		sanitizedReporterRepresentation := removeNulls(map[string]interface{}(*cmd.ReporterRepresentation))
 		if err := uc.schemaService.ReporterShallowValidate(ctx, resourceType, reporterType, sanitizedReporterRepresentation); err != nil {

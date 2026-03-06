@@ -1501,9 +1501,8 @@ func TestResolveOptionalFields_NilOptionalFields_ReturnNils(t *testing.T) {
 		ReporterRepresentation: nil,
 		CommonRepresentation:   nil,
 	}
-	ch, tx, rep, com := resolveOptionalFields(cmd)
+	ch, rep, com := resolveOptionalFields(cmd)
 	assert.Nil(t, ch, "ConsoleHref should be nil when cmd.ConsoleHref is nil")
-	assert.Nil(t, tx, "TransactionId should be nil when cmd.TransactionId is nil")
 	assert.Nil(t, rep, "ReporterRepresentation should be nil when cmd.ReporterRepresentation is nil")
 	assert.Nil(t, com, "CommonRepresentation should be nil when cmd.CommonRepresentation is nil")
 }

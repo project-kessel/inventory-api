@@ -326,7 +326,7 @@ func TestInventoryConsumer_ProcessMessage(t *testing.T) {
 				updatedCommon, err := model.NewRepresentation(map[string]interface{}{"workspace_id": "test-workspace-v1"})
 				require.NoError(t, err)
 				txId := model.TransactionId("tx-v1")
-				err = testData.Resource.Update(testData.Key, testData.ApiHref, &testData.ConsoleHref, nil, &testData.ReporterRepresentation, &updatedCommon, &txId)
+				err = testData.Resource.Update(testData.Key, testData.ApiHref, &testData.ConsoleHref, nil, &testData.ReporterRepresentation, &updatedCommon, txId)
 				require.NoError(t, err)
 				err = repo.Save(db, *testData.Resource, model.OperationTypeUpdated, "tx-v1")
 				require.NoError(t, err)
@@ -350,7 +350,7 @@ func TestInventoryConsumer_ProcessMessage(t *testing.T) {
 				updatedCommon, err := model.NewRepresentation(map[string]interface{}{"workspace_id": "test-workspace-v1"})
 				require.NoError(t, err)
 				txId := model.TransactionId("tx-v1")
-				err = testData.Resource.Update(testData.Key, testData.ApiHref, &testData.ConsoleHref, nil, &testData.ReporterRepresentation, &updatedCommon, &txId)
+				err = testData.Resource.Update(testData.Key, testData.ApiHref, &testData.ConsoleHref, nil, &testData.ReporterRepresentation, &updatedCommon, txId)
 				require.NoError(t, err)
 				err = repo.Save(db, *testData.Resource, model.OperationTypeUpdated, "tx-v1")
 				require.NoError(t, err)
@@ -986,7 +986,7 @@ func TestInventoryConsumer_UpdateWithSameWorkspace_NoOp(t *testing.T) {
 		nil,
 		&testData.ReporterRepresentation,
 		&testData.CommonRepresentation,
-		&txId,
+		txId,
 	)
 	require.NoError(t, err)
 

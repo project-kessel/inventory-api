@@ -22,11 +22,10 @@ type Resource struct {
 }
 
 // Factory methods
-func NewResource(id ResourceId, localResourceId LocalResourceId, resourceType ResourceType, reporterType ReporterType, reporterInstanceId ReporterInstanceId, transactionId *TransactionId, reporterResourceId ReporterResourceId, apiHref ApiHref, consoleHref *ConsoleHref, reporterRepresentationData *Representation, commonRepresentationData *Representation, reporterVersion *ReporterVersion) (Resource, error) {
-	if transactionId == nil || *transactionId == "" {
+func NewResource(id ResourceId, localResourceId LocalResourceId, resourceType ResourceType, reporterType ReporterType, reporterInstanceId ReporterInstanceId, transactionId TransactionId, reporterResourceId ReporterResourceId, apiHref ApiHref, consoleHref *ConsoleHref, reporterRepresentationData *Representation, commonRepresentationData *Representation, reporterVersion *ReporterVersion) (Resource, error) {
+	if transactionId == "" {
 		return Resource{}, fmt.Errorf("%w: TransactionId", ErrEmpty)
 	}
-	txId := *transactionId
 
 	commonVersion := NewVersion(initialCommonVersion)
 
@@ -49,7 +48,7 @@ func NewResource(id ResourceId, localResourceId LocalResourceId, resourceType Re
 		resourceType,
 		reporterType,
 		reporterInstanceId,
-		txId,
+		transactionId,
 		localResourceId,
 		reporterResource.Id(),
 		apiHref,
@@ -88,8 +87,12 @@ func (r *Resource) Update(
 	reporterVersion *ReporterVersion,
 	reporterRepresentationData *Representation,
 	commonRepresentationData *Representation,
-	transactionId *TransactionId,
+	transactionId TransactionId,
 ) error {
+	if transactionId == "" {
+		return fmt.Errorf("%w: TransactionId", ErrEmpty)
+	}
+
 	r.commonVersion = r.commonVersion.Increment()
 
 	reporterResource, err := r.findReporterResourceToUpdateByKey(key)
@@ -99,17 +102,12 @@ func (r *Resource) Update(
 
 	reporterResource.Update(apiHref, consoleHref)
 
-	if transactionId == nil || *transactionId == "" {
-		return fmt.Errorf("%w: TransactionId", ErrEmpty)
-	}
-	txId := *transactionId
-
 	resourceEvent, err := resourceEventAndRepresentations(
 		reporterResource.resourceID,
 		key.ResourceType(),
 		key.ReporterType(),
 		key.ReporterInstanceId(),
-		txId,
+		transactionId,
 		key.LocalResourceId(),
 		reporterResource.Id(),
 		apiHref,

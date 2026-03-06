@@ -267,7 +267,7 @@ func (uc *Usecase) createResource(tx *gorm.DB, cmd ReportResourceCommand, txidSt
 		cmd.ResourceType,
 		cmd.ReporterType,
 		cmd.ReporterInstanceId,
-		cmd.TransactionId,
+		*cmd.TransactionId,
 		reporterResourceId,
 		cmd.ApiHref,
 		consoleHref,
@@ -302,7 +302,7 @@ func (uc *Usecase) updateResource(tx *gorm.DB, cmd ReportResourceCommand, existi
 		cmd.ReporterVersion,
 		reporterRepresentation,
 		commonRepresentation,
-		cmd.TransactionId,
+		*cmd.TransactionId,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to update resource: %w", err)

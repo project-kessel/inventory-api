@@ -149,7 +149,7 @@ func assertResourceEventFromDomainEvent(t *testing.T, operation bizmodel.EventOp
 	assert.Equal(t, resourceEvent.WorkspaceId(), data.Metadata.WorkspaceId)
 	assert.Equal(t, resourceEvent.ReporterInstanceId(), data.ReporterData.ReporterInstanceId)
 	assert.Equal(t, resourceEvent.ReporterType(), data.ReporterData.ReporterType)
-	assert.Equal(t, resourceEvent.ConsoleHref(), data.ReporterData.ConsoleHref)
+	assert.Equal(t, bizmodel.SerializeStringPtr(resourceEvent.ConsoleHref()), data.ReporterData.ConsoleHref)
 	assert.Equal(t, resourceEvent.ApiHref(), data.ReporterData.ApiHref)
 	assert.Equal(t, resourceEvent.LocalResourceId(), data.ReporterData.LocalResourceId)
 }
@@ -161,7 +161,7 @@ func TestEventResourceReporter_ReporterVersion_Optional(t *testing.T) {
 	er := EventResourceReporter{
 		ReporterInstanceId: "inst",
 		ReporterType:       "type",
-		ConsoleHref:        "",
+		ConsoleHref:        nil,
 		ApiHref:            "",
 		LocalResourceId:    "local",
 		ReporterVersion:    nil,

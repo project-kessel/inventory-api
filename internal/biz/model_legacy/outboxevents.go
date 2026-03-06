@@ -82,7 +82,7 @@ type EventResourceLabel struct {
 type EventResourceReporter struct {
 	ReporterInstanceId string  `json:"reporter_instance_id"`
 	ReporterType       string  `json:"reporter_type"`
-	ConsoleHref        string  `json:"console_href"`
+	ConsoleHref        *string `json:"console_href,omitempty"`
 	ApiHref            string  `json:"api_href"`
 	LocalResourceId    string  `json:"local_resource_id"`
 	ReporterVersion    *string `json:"reporter_version,omitempty"`
@@ -150,10 +150,10 @@ func newResourceEvent(operationType bizmodel.EventOperationType, resourceEvent *
 			ReporterData: EventResourceReporter{
 				ReporterInstanceId: resourceEvent.ReporterInstanceId(),
 				ReporterType:       resourceEvent.ReporterType(),
-				ConsoleHref:        resourceEvent.ConsoleHref(),
+				ConsoleHref:        bizmodel.SerializeStringPtr(resourceEvent.ConsoleHref()),
 				ApiHref:            resourceEvent.ApiHref(),
 				LocalResourceId:    resourceEvent.LocalResourceId(),
-				ReporterVersion:    resourceEvent.ReporterVersion(), //nolint:staticcheck
+				ReporterVersion:    bizmodel.SerializeStringPtr(resourceEvent.ReporterVersion()),
 			},
 			ResourceData: resourceEvent.Data(),
 		},
@@ -253,3 +253,4 @@ func makeEventType(eventType, resourceType, operation string) string {
 func makeEventSubject(eventType, resourceType, resourceId string) string {
 	return "/" + strings.Join([]string{eventType, resourceType, resourceId}, "/")
 }
+

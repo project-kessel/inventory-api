@@ -26,6 +26,14 @@ func SerializeString[U ~string](tinyType U) string {
 	return string(tinyType)
 }
 
+func SerializeStringPtr[U ~string](v *U) *string {
+	if v == nil {
+		return nil
+	}
+	s := string(*v)
+	return &s
+}
+
 func SerializeUint[U ~uint](tinyType U) uint {
 	return uint(tinyType)
 }

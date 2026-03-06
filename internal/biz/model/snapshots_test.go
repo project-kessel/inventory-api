@@ -33,7 +33,7 @@ func TestResourceSnapshot_FromDomainEntity(t *testing.T) {
 		resourceType,
 		reporterType,
 		reporterInstanceId,
-		&transactionId,
+		transactionId,
 		reporterResourceId,
 		apiHref,
 		&consoleHref,

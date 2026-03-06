@@ -155,7 +155,7 @@ func assertResourceEventFromDomainEvent(t *testing.T, operation bizmodel.EventOp
 }
 
 // TestEventResourceReporter_ReporterVersion_Optional documents that EventResourceReporter
-// uses *string for ReporterVersion (nil = not set).
+// uses *string for ReporterVersion.
 func TestEventResourceReporter_ReporterVersion_Optional(t *testing.T) {
 	// Nil ReporterVersion round-trips as null in JSON (omitempty omits the field when nil)
 	er := EventResourceReporter{

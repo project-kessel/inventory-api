@@ -12,8 +12,7 @@ type RepresentationSnapshot struct {
 	Data internal.JsonObject `json:"data"`
 }
 
-// ResourceSnapshot is a DTO that mirrors the GORM Resource model structure.
-// CreatedAt and UpdatedAt use zero value for "not set" (e.g. legacy/backfill).
+// ResourceSnapshot is a DTO that mirrors the GORM Resource model structure
 type ResourceSnapshot struct {
 	ID               uuid.UUID `json:"id"`
 	Type             string    `json:"type"`
@@ -31,8 +30,7 @@ type ReporterResourceKeySnapshot struct {
 	ReporterInstanceID string `json:"reporter_instance_id"`
 }
 
-// ReporterResourceSnapshot is a DTO that mirrors the GORM ReporterResource model structure.
-// ConsoleHref is optional; nil means not set.
+// ReporterResourceSnapshot is a DTO that mirrors the GORM ReporterResource model structure
 type ReporterResourceSnapshot struct {
 	ID                    uuid.UUID                   `json:"id"`
 	ReporterResourceKey   ReporterResourceKeySnapshot `json:"reporter_resource_key"`
@@ -46,7 +44,7 @@ type ReporterResourceSnapshot struct {
 	UpdatedAt             time.Time                   `json:"updated_at"`
 }
 
-// CommonRepresentationSnapshot is a DTO that mirrors the GORM CommonRepresentation model structure.
+// CommonRepresentationSnapshot is a DTO that mirrors the GORM CommonRepresentation model structure
 type CommonRepresentationSnapshot struct {
 	Representation             RepresentationSnapshot `json:"representation"`
 	ResourceId                 uuid.UUID              `json:"resource_id"`
@@ -57,7 +55,7 @@ type CommonRepresentationSnapshot struct {
 	CreatedAt                  time.Time              `json:"created_at"`
 }
 
-// ReporterRepresentationSnapshot is a DTO that mirrors the GORM ReporterRepresentation model structure.
+// ReporterRepresentationSnapshot is a DTO that mirrors the GORM ReporterRepresentation model structure
 type ReporterRepresentationSnapshot struct {
 	Representation     RepresentationSnapshot `json:"representation"`
 	ReporterResourceID uuid.UUID              `json:"reporter_resource_id"`

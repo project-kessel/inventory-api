@@ -74,7 +74,7 @@ func (re ResourceReportEvent) ReporterVersion() *string {
 	return &versionStr
 }
 
-// CurrentCommonVersion returns the version from the CommonRepresentation, or nil if absent.
+// CurrentCommonVersion returns the version from the CommonRepresentation
 func (re ResourceReportEvent) CurrentCommonVersion() *Version {
 	if re.commonRepresentation == nil {
 		return nil
@@ -82,7 +82,7 @@ func (re ResourceReportEvent) CurrentCommonVersion() *Version {
 	return &re.commonRepresentation.version
 }
 
-// CurrentReporterRepresentationVersion returns the version from the ReporterRepresentation, or nil if absent.
+// CurrentReporterRepresentationVersion returns the version from the ReporterRepresentation
 func (re ResourceReportEvent) CurrentReporterRepresentationVersion() *Version {
 	if re.reporterRepresentation == nil {
 		return nil

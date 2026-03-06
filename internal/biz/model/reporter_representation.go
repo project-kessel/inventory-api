@@ -40,12 +40,11 @@ func NewReporterDataRepresentation(
 	if reporterResourceID.UUID() == uuid.Nil {
 		return ReporterDataRepresentation{}, fmt.Errorf("%w: ReporterResourceId", ErrInvalidUUID)
 	}
-	if data == nil {
-		return ReporterDataRepresentation{}, fmt.Errorf("%w: Representation (data)", ErrNil)
-	}
+
 	if len(data) == 0 {
-		return ReporterDataRepresentation{}, fmt.Errorf("%w: Representation (data)", ErrInvalidData)
+		return ReporterDataRepresentation{}, fmt.Errorf("%w: ReporterDataRepresentation data", ErrInvalidData)
 	}
+
 	return ReporterDataRepresentation{
 		ReporterRepresentation: ReporterRepresentation{
 			Representation:     data,
@@ -100,6 +99,7 @@ func (rr ReporterRepresentation) Serialize() ReporterRepresentationSnapshot {
 		Data: rr.Representation.Serialize(),
 	}
 
+	// Create ReporterRepresentation snapshot - direct initialization without validation
 	return ReporterRepresentationSnapshot{
 		Representation:     representationSnapshot,
 		ReporterResourceID: rr.reporterResourceID.Serialize(),

@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/project-kessel/inventory-api/internal/errors"
-	"github.com/stretchr/testify/require"
 )
 
 func assertValidReporterDataRepresentation(t *testing.T, dataRep ReporterDataRepresentation, err error, testCase string) {
@@ -99,10 +98,10 @@ func TestReporterDataRepresentation_Initialization(t *testing.T) {
 		assertValidReporterDataRepresentation(t, dataRep, err, "nil reporter version")
 	})
 
-	t.Run("should reject nil data", func(t *testing.T) {
+	t.Run("should reject data representation with nil data", func(t *testing.T) {
 		t.Parallel()
 
-		_, err := NewReporterDataRepresentation(
+		dataRep, err := NewReporterDataRepresentation(
 			fixture.ValidReporterResourceIdType(),
 			fixture.ValidVersionType(),
 			fixture.ValidGenerationType(),
@@ -112,11 +111,10 @@ func TestReporterDataRepresentation_Initialization(t *testing.T) {
 			fixture.ValidTransactionIdType(),
 		)
 
-		require.Error(t, err)
-		require.ErrorIs(t, err, ErrNil)
+		assertInvalidReporterDataRepresentation(t, dataRep, err, ErrInvalidData)
 	})
 
-	t.Run("should reject empty data", func(t *testing.T) {
+	t.Run("should reject data representation with empty data", func(t *testing.T) {
 		t.Parallel()
 
 		dataRep, err := NewReporterDataRepresentation(

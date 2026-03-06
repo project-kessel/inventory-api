@@ -12,7 +12,6 @@ import (
 // Validation sentinel errors
 var (
 	ErrEmpty       = errors.New("cannot be empty")
-	ErrNil         = errors.New("cannot be nil")
 	ErrTooLong     = errors.New("exceeds maximum length")
 	ErrTooSmall    = errors.New("below minimum value")
 	ErrInvalidURL  = errors.New("invalid url")
@@ -68,14 +67,6 @@ func ValidateStringRequired(field, value string) error {
 func ValidateUUIDRequired(field string, id uuid.UUID) error {
 	if id == uuid.Nil {
 		return fmt.Errorf("%w: %s", ErrInvalidUUID, field)
-	}
-	return nil
-}
-
-// ValidateNotNil validates that a value is not nil. Returns wrapped ErrNil when value is nil.
-func ValidateNotNil[T any](field string, value *T) error {
-	if value == nil {
-		return fmt.Errorf("%w: %s", ErrNil, field)
 	}
 	return nil
 }

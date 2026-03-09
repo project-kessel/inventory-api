@@ -1,7 +1,8 @@
 name: Verify Schema Tarball
 
+# pull_request_target: needed so we can comment on fork PRs (token has write there).
 on:
-  pull_request:
+  pull_request_target:
     branches: ['main']
     paths:
       - 'data/schema/**'
@@ -20,6 +21,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v6
         with:
+          ref: ${{ github.event.pull_request.head.sha }}  # PR head when using pull_request_target
           fetch-depth: 0  # Fetch all history for accurate diff
 
       - name: Get changed files

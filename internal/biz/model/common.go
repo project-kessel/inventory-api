@@ -432,5 +432,3 @@ func (t TransactionId) Serialize() string {
 func NewTransactionId(transactionId string) TransactionId {
 	return TransactionId(transactionId)
 }
-
-

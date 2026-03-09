@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/go-kratos/kratos/v2/log"
 	"github.com/google/uuid"
 	"github.com/project-kessel/inventory-api/internal"
 	"gorm.io/gorm"
@@ -27,7 +28,8 @@ func mapOutboxEventToWALMessage(event *model_legacy.OutboxEvent) (walOutboxMessa
 	if event.ID == uuid.Nil {
 		id, err := uuid.NewV7()
 		if err != nil {
-			return walOutboxMessage{}, fmt.Errorf("failed to generate uuid for WAL message: %w", err)
+			return walOutboxMessage{}, fmt.Errorf(
+				"failed to generate uuid for WAL message: err=%w, event=%v", err, event.Payload)
 		}
 		event.ID = id
 	}
@@ -40,6 +42,11 @@ func mapOutboxEventToWALMessage(event *model_legacy.OutboxEvent) (walOutboxMessa
 		TxID:          event.TxId,
 		Payload:       event.Payload,
 	}
+	log.Infof("outbox event successfully converted to WAL message: id=%s, aggregateType=%s, aggregateid=%s",
+		msg.ID, msg.AggregateType, msg.AggregateID,
+	)
+	log.Debugf("operation=%s, txid=%s, payload=%v", msg.Operation, msg.TxID, msg.Payload)
+
 	return msg, nil
 }
 

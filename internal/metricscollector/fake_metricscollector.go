@@ -96,4 +96,8 @@ func (fc *fakeCounter) Add(ctx context.Context, incr int64, options ...metric.Ad
 	incrementCounter(fc.counterType)
 }
 
+func (fc *fakeCounter) Enabled(context.Context) bool {
+	return true
+}
+
 var _ metric.Int64Counter = (*fakeCounter)(nil)

@@ -39,12 +39,6 @@ const (
 )
 
 func setupInMemoryDB(t *testing.T) *gorm.DB {
-	// Since SQLite doesn't support WAL or pg_logical_emit_message
-	// used for outbox processing, overriding the PublishOutboxEvent to a no-op
-	original := data.PublishOutboxEvent
-	data.PublishOutboxEvent = func(tx *gorm.DB, event *model_legacy.OutboxEvent) error { return nil }
-	t.Cleanup(func() { data.PublishOutboxEvent = original })
-
 	db := testutil.NewSQLiteTestDB(t, &gorm.Config{})
 	err := data.Migrate(db, nil)
 	require.NoError(t, err)
@@ -105,6 +99,10 @@ func (t *TestCase) TestSetup(testingT *testing.T) []error {
 		errs = append(errs, err)
 		return errs
 	}
+
+	// Replace the repository with one using a no-op outbox publisher for SQLite compatibility
+	noopPublisher := data.OutboxPublisher(func(_ *gorm.DB, _ *model_legacy.OutboxEvent) error { return nil })
+	t.inv.ResourceRepository = data.NewResourceRepository(db, data.NewGormTransactionManager(t.inv.MetricsCollector, 3), noopPublisher)
 
 	t.inv.SchemaService = model.NewSchemaService(schemaRepository, t.logger)
 

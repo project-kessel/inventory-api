@@ -2739,19 +2739,14 @@ func TestInventoryService_StreamedListObjects_NilRequest(t *testing.T) {
 // database with all migrations applied. Returns the repository and the underlying
 // *gorm.DB for use in assertions.
 func newSQLiteTestRepo(t *testing.T) (model.ResourceRepository, *gorm.DB) {
-	// Since SQLite doesn't support WAL or pg_logical_emit_message
-	// used for outbox processing, overriding the PublishOutboxEvent to a no-op
-	original := data.PublishOutboxEvent
-	data.PublishOutboxEvent = func(tx *gorm.DB, event *model_legacy.OutboxEvent) error { return nil }
-	t.Cleanup(func() { data.PublishOutboxEvent = original })
-
 	t.Helper()
 	db := testutil.NewSQLiteTestDB(t, &gorm.Config{TranslateError: true})
 	err := data.Migrate(db, nil)
 	require.NoError(t, err)
 	mc := metricscollector.NewFakeMetricsCollector()
 	tm := data.NewGormTransactionManager(mc, 3)
-	repo := data.NewResourceRepository(db, tm)
+	noopPublisher := func(_ *gorm.DB, _ *model_legacy.OutboxEvent) error { return nil }
+	repo := data.NewResourceRepository(db, tm, noopPublisher)
 	return repo, db
 }
 

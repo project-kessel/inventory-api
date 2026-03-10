@@ -36,7 +36,7 @@ func TestResourceRepositoryContract(t *testing.T) {
 				db := setupInMemoryDB(t)
 				mc := metricscollector.NewFakeMetricsCollector()
 				tm := NewGormTransactionManager(mc, 3)
-				return NewResourceRepository(db, tm)
+				return NewResourceRepository(db, tm, noopOutboxPublisher)
 			},
 			db: func() *gorm.DB {
 				return setupInMemoryDB(t)
@@ -303,7 +303,7 @@ func TestFindResourceByKeys(t *testing.T) {
 				db := setupInMemoryDB(t)
 				mc := metricscollector.NewFakeMetricsCollector()
 				tm := NewGormTransactionManager(mc, 3)
-				return NewResourceRepository(db, tm)
+				return NewResourceRepository(db, tm, noopOutboxPublisher)
 			},
 			db: func() *gorm.DB {
 				return setupInMemoryDB(t)
@@ -330,7 +330,7 @@ func TestFindResourceByKeys(t *testing.T) {
 				db := setupInMemoryDB(t)
 				mc := metricscollector.NewFakeMetricsCollector()
 				tm := NewGormTransactionManager(mc, 3)
-				repo := NewResourceRepository(db, tm)
+				repo := NewResourceRepository(db, tm, noopOutboxPublisher)
 				return repo, db
 			}
 
@@ -565,7 +565,7 @@ func TestFindResourceByKeys_TombstoneFilter(t *testing.T) {
 				db := setupInMemoryDB(t)
 				mc := metricscollector.NewFakeMetricsCollector()
 				tm := NewGormTransactionManager(mc, 3)
-				return NewResourceRepository(db, tm)
+				return NewResourceRepository(db, tm, noopOutboxPublisher)
 			},
 			db: func() *gorm.DB {
 				return setupInMemoryDB(t)
@@ -591,7 +591,7 @@ func TestFindResourceByKeys_TombstoneFilter(t *testing.T) {
 				db := setupInMemoryDB(t)
 				mc := metricscollector.NewFakeMetricsCollector()
 				tm := NewGormTransactionManager(mc, 3)
-				repo := NewResourceRepository(db, tm)
+				repo := NewResourceRepository(db, tm, noopOutboxPublisher)
 				return repo, db
 			}
 
@@ -646,7 +646,7 @@ func TestUniqueConstraint_ReporterResourceCompositeKey(t *testing.T) {
 				db := setupInMemoryDB(t)
 				mc := metricscollector.NewFakeMetricsCollector()
 				tm := NewGormTransactionManager(mc, 3)
-				return NewResourceRepository(db, tm)
+				return NewResourceRepository(db, tm, noopOutboxPublisher)
 			},
 			db: func() *gorm.DB {
 				return setupInMemoryDB(t)
@@ -672,7 +672,7 @@ func TestUniqueConstraint_ReporterResourceCompositeKey(t *testing.T) {
 				db := setupInMemoryDB(t)
 				mc := metricscollector.NewFakeMetricsCollector()
 				tm := NewGormTransactionManager(mc, 3)
-				repo := NewResourceRepository(db, tm)
+				repo := NewResourceRepository(db, tm, noopOutboxPublisher)
 				return repo, db
 			}
 
@@ -787,7 +787,7 @@ func TestResourceRepository_IdempotentOperations(t *testing.T) {
 				db := setupInMemoryDB(t)
 				mc := metricscollector.NewFakeMetricsCollector()
 				tm := NewGormTransactionManager(mc, 3)
-				return NewResourceRepository(db, tm)
+				return NewResourceRepository(db, tm, noopOutboxPublisher)
 			},
 			db: func() *gorm.DB {
 				return setupInMemoryDB(t)
@@ -813,7 +813,7 @@ func TestResourceRepository_IdempotentOperations(t *testing.T) {
 				db := setupInMemoryDB(t)
 				mc := metricscollector.NewFakeMetricsCollector()
 				tm := NewGormTransactionManager(mc, 3)
-				repo := NewResourceRepository(db, tm)
+				repo := NewResourceRepository(db, tm, noopOutboxPublisher)
 				return repo, db
 			}
 
@@ -1032,7 +1032,7 @@ func TestSave(t *testing.T) {
 				db := setupInMemoryDB(t)
 				mc := metricscollector.NewFakeMetricsCollector()
 				tm := NewGormTransactionManager(mc, 3)
-				return NewResourceRepository(db, tm)
+				return NewResourceRepository(db, tm, noopOutboxPublisher)
 			},
 			db: func() *gorm.DB {
 				return setupInMemoryDB(t)
@@ -1059,7 +1059,7 @@ func TestSave(t *testing.T) {
 				db := setupInMemoryDB(t)
 				mc := metricscollector.NewFakeMetricsCollector()
 				tm := NewGormTransactionManager(mc, 3)
-				repo := NewResourceRepository(db, tm)
+				repo := NewResourceRepository(db, tm, noopOutboxPublisher)
 				return repo, db
 			}
 
@@ -1156,7 +1156,7 @@ func TestResourceRepository_MultipleHostsLifecycle(t *testing.T) {
 				db := setupInMemoryDB(t)
 				mc := metricscollector.NewFakeMetricsCollector()
 				tm := NewGormTransactionManager(mc, 3)
-				return NewResourceRepository(db, tm)
+				return NewResourceRepository(db, tm, noopOutboxPublisher)
 			},
 			db: func() *gorm.DB {
 				return setupInMemoryDB(t)
@@ -1182,7 +1182,7 @@ func TestResourceRepository_MultipleHostsLifecycle(t *testing.T) {
 				db := setupInMemoryDB(t)
 				mc := metricscollector.NewFakeMetricsCollector()
 				tm := NewGormTransactionManager(mc, 3)
-				repo := NewResourceRepository(db, tm)
+				repo := NewResourceRepository(db, tm, noopOutboxPublisher)
 				return repo, db
 			}
 
@@ -1291,7 +1291,7 @@ func TestResourceRepository_PartialDataScenarios(t *testing.T) {
 				db := setupInMemoryDB(t)
 				mc := metricscollector.NewFakeMetricsCollector()
 				tm := NewGormTransactionManager(mc, 3)
-				return NewResourceRepository(db, tm)
+				return NewResourceRepository(db, tm, noopOutboxPublisher)
 			},
 			db: func() *gorm.DB {
 				return setupInMemoryDB(t)
@@ -1317,7 +1317,7 @@ func TestResourceRepository_PartialDataScenarios(t *testing.T) {
 				db := setupInMemoryDB(t)
 				mc := metricscollector.NewFakeMetricsCollector()
 				tm := NewGormTransactionManager(mc, 3)
-				repo := NewResourceRepository(db, tm)
+				repo := NewResourceRepository(db, tm, noopOutboxPublisher)
 				return repo, db
 			}
 
@@ -1432,7 +1432,7 @@ func TestSerializableCreateFails(t *testing.T) {
 				db := setupInMemoryDB(t)
 				mc := metricscollector.NewFakeMetricsCollector()
 				tm := NewGormTransactionManager(mc, 3)
-				return NewResourceRepository(db, tm)
+				return NewResourceRepository(db, tm, noopOutboxPublisher)
 			},
 			db: func() *gorm.DB {
 				return setupInMemoryDB(t)
@@ -1446,7 +1446,7 @@ func TestSerializableCreateFails(t *testing.T) {
 			db := setupInMemoryDB(t)
 			mc := metricscollector.NewFakeMetricsCollector()
 			tm := NewGormTransactionManager(mc, 3)
-			repo := NewResourceRepository(db, tm)
+			repo := NewResourceRepository(db, tm, noopOutboxPublisher)
 
 			resource := createTestResourceWithLocalId(t, "serializable-create-conflict")
 
@@ -1487,7 +1487,7 @@ func TestSerializableUpdateFails(t *testing.T) {
 				db := setupInMemoryDB(t)
 				mc := metricscollector.NewFakeMetricsCollector()
 				tm := NewGormTransactionManager(mc, 3)
-				return NewResourceRepository(db, tm)
+				return NewResourceRepository(db, tm, noopOutboxPublisher)
 			},
 			db: func() *gorm.DB {
 				return setupInMemoryDB(t)
@@ -1501,7 +1501,7 @@ func TestSerializableUpdateFails(t *testing.T) {
 			db := setupInMemoryDB(t)
 			mc := metricscollector.NewFakeMetricsCollector()
 			tm := NewGormTransactionManager(mc, 3)
-			repo := NewResourceRepository(db, tm)
+			repo := NewResourceRepository(db, tm, noopOutboxPublisher)
 
 			// Create initial resource (committed)
 			resource := createTestResourceWithLocalId(t, "serializable-update-conflict")
@@ -1539,12 +1539,6 @@ func TestSerializableUpdateFails(t *testing.T) {
 }
 
 func setupInMemoryDB(t *testing.T) *gorm.DB {
-	// Since SQLite doesn't support WAL or pg_logical_emit_message
-	// used for outbox processing, overriding the PublishOutboxEvent to a no-op
-	original := PublishOutboxEvent
-	PublishOutboxEvent = func(tx *gorm.DB, event *model_legacy.OutboxEvent) error { return nil }
-	t.Cleanup(func() { PublishOutboxEvent = original })
-
 	db := testutil.NewSQLiteTestDB(t, &gorm.Config{TranslateError: true})
 
 	err := Migrate(db, nil)
@@ -1552,6 +1546,9 @@ func setupInMemoryDB(t *testing.T) *gorm.DB {
 
 	return db
 }
+
+// noopOutboxPublisher is a no-op OutboxPublisher for use with SQLite in tests
+func noopOutboxPublisher(_ *gorm.DB, _ *model_legacy.OutboxEvent) error { return nil }
 
 // newUniqueTxID creates a unique TransactionID with the given prefix
 func newUniqueTxID(prefix string) bizmodel.TransactionId {
@@ -1920,7 +1917,7 @@ func TestFindLatestRepresentations(t *testing.T) {
 				db := setupInMemoryDB(t)
 				mc := metricscollector.NewFakeMetricsCollector()
 				tm := NewGormTransactionManager(mc, 3)
-				return NewResourceRepository(db, tm)
+				return NewResourceRepository(db, tm, noopOutboxPublisher)
 			},
 			db: func() *gorm.DB { return setupInMemoryDB(t) },
 		},
@@ -1941,7 +1938,7 @@ func TestFindLatestRepresentations(t *testing.T) {
 				db := setupInMemoryDB(t)
 				mc := metricscollector.NewFakeMetricsCollector()
 				tm := NewGormTransactionManager(mc, 3)
-				return NewResourceRepository(db, tm), db
+				return NewResourceRepository(db, tm, noopOutboxPublisher), db
 			}
 
 			repo, db := getFresh()
@@ -2018,7 +2015,7 @@ func TestFindCurrentAndPreviousVersionedRepresentations(t *testing.T) {
 				db := setupInMemoryDB(t)
 				mc := metricscollector.NewFakeMetricsCollector()
 				tm := NewGormTransactionManager(mc, 3)
-				return NewResourceRepository(db, tm)
+				return NewResourceRepository(db, tm, noopOutboxPublisher)
 			},
 			db: func() *gorm.DB { return setupInMemoryDB(t) },
 		},
@@ -2040,7 +2037,7 @@ func TestFindCurrentAndPreviousVersionedRepresentations(t *testing.T) {
 				db := setupInMemoryDB(t)
 				mc := metricscollector.NewFakeMetricsCollector()
 				tm := NewGormTransactionManager(mc, 3)
-				repo := NewResourceRepository(db, tm)
+				repo := NewResourceRepository(db, tm, noopOutboxPublisher)
 				return repo, db
 			}
 
@@ -2138,7 +2135,7 @@ func TestHasTransactionIdBeenProcessed(t *testing.T) {
 				db := setupInMemoryDB(t)
 				mc := metricscollector.NewFakeMetricsCollector()
 				tm := NewGormTransactionManager(mc, 3)
-				return NewResourceRepository(db, tm)
+				return NewResourceRepository(db, tm, noopOutboxPublisher)
 			},
 			db: func() *gorm.DB {
 				return setupInMemoryDB(t)
@@ -2312,7 +2309,7 @@ func TestTransactionIDUniqueConstraint(t *testing.T) {
 				db := setupInMemoryDB(t)
 				mc := metricscollector.NewFakeMetricsCollector()
 				tm := NewGormTransactionManager(mc, 3)
-				return NewResourceRepository(db, tm)
+				return NewResourceRepository(db, tm, noopOutboxPublisher)
 			},
 			db: func() *gorm.DB {
 				return setupInMemoryDB(t)

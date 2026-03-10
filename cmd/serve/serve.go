@@ -267,7 +267,7 @@ func NewCommand(
 
 			//v1beta2
 			// wire together inventory service handling
-			resourceRepo := data.NewResourceRepository(db, transactionManager)
+			resourceRepo := data.NewResourceRepository(db, transactionManager, nil)
 			inventory_controller := resourcesctl.New(resourceRepo, schemaRepository, authorizer, "notifications", log.With(logger, "subsystem", "notificationsintegrations_controller"), listenManager, waitForNotifCircuitBreaker, usecaseConfig, mc, metaauthorizer.NewSimpleMetaAuthorizer(), selfSubjectStrategy)
 
 			inventory_service := resourcesvc.NewKesselInventoryServiceV1beta2(inventory_controller)

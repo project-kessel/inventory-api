@@ -3,7 +3,7 @@
 The Kessel Debug Container is a useful tool for investigating Kessel service issues in cluster. It contains all the necessary CLI's needed for interacting with Kessel services, and configures environment variables for all Kessel endpoints and configurations needed to connect with dependent services such as SpiceDB or Kafka
 
 **What's Included?**:
-* Basic Networking tools (DNS testing tools, netcat, openssl, curl, wget, grpcurl)
+* Basic Networking tools (DNS testing tools, netcat, openssl, curl, wget)
 * JQ for parsing JSON data
 * Zed CLI to interact with SpiceDB
 * Kafka command-line tools (available under `/opt/kafka/bin`)

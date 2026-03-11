@@ -2682,7 +2682,7 @@ data:
             "options": [],
             "query": "prometheus",
             "refresh": 1,
-            "regex": "/(crcp01ue1-prometheus)|(crcfrp01ugw1-prometheus)|(crcs02ue1-prometheus)|(crcfrs01ugw1-prometheus)|(insights-perf-prometheus)|(hccs01ue1-prometheus)/",
+            "regex": "/(crcp01ue1-prometheus)|(crcfrp01ugw1-prometheus)|(crcs02ue1-prometheus)|(crcfrs01ugw1-prometheus)|(insights-perf-prometheus)|(hccs01ue1-prometheus)|(hccp01ue1-prometheus)/",
             "type": "datasource"
           },
           {
@@ -2710,7 +2710,7 @@ data:
       "timezone": "browser",
       "title": "Kessel - Inventory API",
       "uid": "ddxs3i6o0xpmof",
-      "version": 11
+      "version": 12
     }
 kind: ConfigMap
 metadata:

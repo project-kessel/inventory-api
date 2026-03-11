@@ -96,7 +96,6 @@ func (fc *fakeCounter) Add(ctx context.Context, incr int64, options ...metric.Ad
 	incrementCounter(fc.counterType)
 }
 
-// Enabled returns true so the fake counter is considered active (satisfies metric.Int64Counter).
 func (fc *fakeCounter) Enabled(context.Context) bool {
 	return true
 }

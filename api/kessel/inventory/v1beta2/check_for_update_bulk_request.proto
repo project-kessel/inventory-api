@@ -9,11 +9,11 @@ option go_package = "github.com/project-kessel/inventory-api/api/kessel/inventor
 option java_multiple_files = true;
 option java_package = "org.project_kessel.api.inventory.v1beta2";
 
-// CheckBulkForUpdateRequest allows checking multiple "can subject update resource?" permissions
+// CheckForUpdateBulkRequest allows checking multiple "can subject update resource?" permissions
 // in a single request. Each check is strongly consistent (same semantics as CheckForUpdate).
 // This is more efficient than making individual CheckForUpdate calls when verifying update
 // permissions for multiple resource-subject-relation combinations.
-message CheckBulkForUpdateRequest {
+message CheckForUpdateBulkRequest {
   repeated CheckBulkRequestItem items = 1 [(buf.validate.field).repeated.min_items = 1,
     (buf.validate.field).repeated.max_items = 1000];
 }

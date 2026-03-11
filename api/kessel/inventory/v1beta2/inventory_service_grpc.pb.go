@@ -22,7 +22,7 @@ const (
 	KesselInventoryService_Check_FullMethodName               = "/kessel.inventory.v1beta2.KesselInventoryService/Check"
 	KesselInventoryService_CheckSelf_FullMethodName           = "/kessel.inventory.v1beta2.KesselInventoryService/CheckSelf"
 	KesselInventoryService_CheckForUpdate_FullMethodName      = "/kessel.inventory.v1beta2.KesselInventoryService/CheckForUpdate"
-	KesselInventoryService_CheckBulkForUpdate_FullMethodName  = "/kessel.inventory.v1beta2.KesselInventoryService/CheckBulkForUpdate"
+	KesselInventoryService_CheckForUpdateBulk_FullMethodName  = "/kessel.inventory.v1beta2.KesselInventoryService/CheckForUpdateBulk"
 	KesselInventoryService_CheckBulk_FullMethodName           = "/kessel.inventory.v1beta2.KesselInventoryService/CheckBulk"
 	KesselInventoryService_CheckSelfBulk_FullMethodName       = "/kessel.inventory.v1beta2.KesselInventoryService/CheckSelfBulk"
 	KesselInventoryService_ReportResource_FullMethodName      = "/kessel.inventory.v1beta2.KesselInventoryService/ReportResource"
@@ -74,7 +74,7 @@ type KesselInventoryServiceClient interface {
 	// is evaluated with strong consistency (same semantics as CheckForUpdate).
 	//
 	// Common use cases include batch pre-authorization before bulk update or delete operations.
-	CheckBulkForUpdate(ctx context.Context, in *CheckBulkForUpdateRequest, opts ...grpc.CallOption) (*CheckBulkForUpdateResponse, error)
+	CheckForUpdateBulk(ctx context.Context, in *CheckForUpdateBulkRequest, opts ...grpc.CallOption) (*CheckForUpdateBulkResponse, error)
 	// Performs bulk permission checks for multiple resource-subject-relation combinations.
 	//
 	// This API is more efficient than making individual Check calls when verifying permissions
@@ -191,10 +191,10 @@ func (c *kesselInventoryServiceClient) CheckForUpdate(ctx context.Context, in *C
 	return out, nil
 }
 
-func (c *kesselInventoryServiceClient) CheckBulkForUpdate(ctx context.Context, in *CheckBulkForUpdateRequest, opts ...grpc.CallOption) (*CheckBulkForUpdateResponse, error) {
+func (c *kesselInventoryServiceClient) CheckForUpdateBulk(ctx context.Context, in *CheckForUpdateBulkRequest, opts ...grpc.CallOption) (*CheckForUpdateBulkResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(CheckBulkForUpdateResponse)
-	err := c.cc.Invoke(ctx, KesselInventoryService_CheckBulkForUpdate_FullMethodName, in, out, cOpts...)
+	out := new(CheckForUpdateBulkResponse)
+	err := c.cc.Invoke(ctx, KesselInventoryService_CheckForUpdateBulk_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -304,7 +304,7 @@ type KesselInventoryServiceServer interface {
 	// is evaluated with strong consistency (same semantics as CheckForUpdate).
 	//
 	// Common use cases include batch pre-authorization before bulk update or delete operations.
-	CheckBulkForUpdate(context.Context, *CheckBulkForUpdateRequest) (*CheckBulkForUpdateResponse, error)
+	CheckForUpdateBulk(context.Context, *CheckForUpdateBulkRequest) (*CheckForUpdateBulkResponse, error)
 	// Performs bulk permission checks for multiple resource-subject-relation combinations.
 	//
 	// This API is more efficient than making individual Check calls when verifying permissions
@@ -400,8 +400,8 @@ func (UnimplementedKesselInventoryServiceServer) CheckSelf(context.Context, *Che
 func (UnimplementedKesselInventoryServiceServer) CheckForUpdate(context.Context, *CheckForUpdateRequest) (*CheckForUpdateResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CheckForUpdate not implemented")
 }
-func (UnimplementedKesselInventoryServiceServer) CheckBulkForUpdate(context.Context, *CheckBulkForUpdateRequest) (*CheckBulkForUpdateResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method CheckBulkForUpdate not implemented")
+func (UnimplementedKesselInventoryServiceServer) CheckForUpdateBulk(context.Context, *CheckForUpdateBulkRequest) (*CheckForUpdateBulkResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CheckForUpdateBulk not implemented")
 }
 func (UnimplementedKesselInventoryServiceServer) CheckBulk(context.Context, *CheckBulkRequest) (*CheckBulkResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CheckBulk not implemented")
@@ -494,20 +494,20 @@ func _KesselInventoryService_CheckForUpdate_Handler(srv interface{}, ctx context
 	return interceptor(ctx, in, info, handler)
 }
 
-func _KesselInventoryService_CheckBulkForUpdate_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(CheckBulkForUpdateRequest)
+func _KesselInventoryService_CheckForUpdateBulk_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CheckForUpdateBulkRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(KesselInventoryServiceServer).CheckBulkForUpdate(ctx, in)
+		return srv.(KesselInventoryServiceServer).CheckForUpdateBulk(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: KesselInventoryService_CheckBulkForUpdate_FullMethodName,
+		FullMethod: KesselInventoryService_CheckForUpdateBulk_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(KesselInventoryServiceServer).CheckBulkForUpdate(ctx, req.(*CheckBulkForUpdateRequest))
+		return srv.(KesselInventoryServiceServer).CheckForUpdateBulk(ctx, req.(*CheckForUpdateBulkRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -615,8 +615,8 @@ var KesselInventoryService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _KesselInventoryService_CheckForUpdate_Handler,
 		},
 		{
-			MethodName: "CheckBulkForUpdate",
-			Handler:    _KesselInventoryService_CheckBulkForUpdate_Handler,
+			MethodName: "CheckForUpdateBulk",
+			Handler:    _KesselInventoryService_CheckForUpdateBulk_Handler,
 		},
 		{
 			MethodName: "CheckBulk",

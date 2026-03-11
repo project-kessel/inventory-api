@@ -212,8 +212,8 @@ var (
 	CheckForUpdate GRPCCall = func(ctx context.Context, c pb.KesselInventoryServiceClient, req proto.Message) (proto.Message, error) {
 		return c.CheckForUpdate(ctx, req.(*pb.CheckForUpdateRequest))
 	}
-	CheckBulkForUpdate GRPCCall = func(ctx context.Context, c pb.KesselInventoryServiceClient, req proto.Message) (proto.Message, error) {
-		return c.CheckBulkForUpdate(ctx, req.(*pb.CheckBulkForUpdateRequest))
+	CheckForUpdateBulk GRPCCall = func(ctx context.Context, c pb.KesselInventoryServiceClient, req proto.Message) (proto.Message, error) {
+		return c.CheckForUpdateBulk(ctx, req.(*pb.CheckForUpdateBulkRequest))
 	}
 	CheckBulk GRPCCall = func(ctx context.Context, c pb.KesselInventoryServiceClient, req proto.Message) (proto.Message, error) {
 		return c.CheckBulk(ctx, req.(*pb.CheckBulkRequest))

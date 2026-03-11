@@ -390,9 +390,9 @@ curl -X POST http://localhost:8000/api/kessel/v1beta2/checkforupdate \
 
 ---
 
-## 7. CheckBulkForUpdate (Bulk Strongly Consistent Update Checks)
+## 7. CheckForUpdateBulk (Bulk Strongly Consistent Update Checks)
 
-### gRPC (CheckBulkForUpdate)
+### gRPC (CheckForUpdateBulk)
 
 ```bash
 grpcurl -plaintext -d '{
@@ -428,7 +428,7 @@ grpcurl -plaintext -d '{
       }
     }
   ]
-}' localhost:9000 kessel.inventory.v1beta2.KesselInventoryService/CheckBulkForUpdate
+}' localhost:9000 kessel.inventory.v1beta2.KesselInventoryService/CheckForUpdateBulk
 ```
 
 ### HTTP (with x-rh-identity)
@@ -436,7 +436,7 @@ grpcurl -plaintext -d '{
 ```bash
 X_RH_IDENTITY=$(echo -n '{"identity":{"account_number":"12345","org_id":"67890","type":"User","user":{"email":"test@example.com","username":"testuser"}}}' | base64)
 
-curl -X POST http://localhost:8000/api/kessel/v1beta2/checkbulkforupdate \
+curl -X POST http://localhost:8000/api/kessel/v1beta2/checkforupdatebulk \
   -H "Content-Type: application/json" \
   -H "x-rh-identity: $X_RH_IDENTITY" \
   -d '{
@@ -607,7 +607,7 @@ grpcurl -plaintext localhost:9000 list kessel.inventory.v1beta2.KesselInventoryS
 ```
 kessel.inventory.v1beta2.KesselInventoryService.Check
 kessel.inventory.v1beta2.KesselInventoryService.CheckBulk
-kessel.inventory.v1beta2.KesselInventoryService.CheckBulkForUpdate
+kessel.inventory.v1beta2.KesselInventoryService.CheckForUpdateBulk
 kessel.inventory.v1beta2.KesselInventoryService.CheckForUpdate
 kessel.inventory.v1beta2.KesselInventoryService.CheckSelf
 kessel.inventory.v1beta2.KesselInventoryService.CheckSelfBulk

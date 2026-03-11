@@ -415,37 +415,21 @@ func (uc *Usecase) CheckForUpdate(ctx context.Context, relation model.Relation, 
 	return false, nil
 }
 
-// CheckBulkForUpdate performs bulk strongly consistent check-for-update permission checks.
-// Each item is evaluated via Authz.CheckForUpdate (no new downstream RPC required).
-func (uc *Usecase) CheckBulkForUpdate(ctx context.Context, cmd CheckBulkForUpdateCommand) (*CheckBulkResult, error) {
+// CheckForUpdateBulk performs bulk strongly consistent check-for-update permission checks via relations-api.
+func (uc *Usecase) CheckForUpdateBulk(ctx context.Context, cmd CheckForUpdateBulkCommand) (*CheckBulkResult, error) {
 	for _, item := range cmd.Items {
-		if err := uc.enforceMetaAuthzObject(ctx, metaauthorizer.RelationCheckBulkForUpdate, metaauthorizer.NewInventoryResourceFromKey(item.Resource)); err != nil {
+		if err := uc.enforceMetaAuthzObject(ctx, metaauthorizer.RelationCheckForUpdateBulk, metaauthorizer.NewInventoryResourceFromKey(item.Resource)); err != nil {
 			uc.Log.WithContext(ctx).Errorf("meta authz failed for check for update bulk item: %v error: %v", item.Resource, err)
 			return nil, err
 		}
 	}
 
-	pairs := make([]CheckBulkResultPair, len(cmd.Items))
-	for i, item := range cmd.Items {
-		allowed, err := uc.CheckForUpdate(ctx, item.Relation, item.Subject, item.Resource)
-		if err != nil {
-			code := int32(codes.Unknown)
-			if st, ok := status.FromError(err); ok {
-				code = int32(st.Code())
-			}
-			pairs[i] = CheckBulkResultPair{
-				Request: item,
-				Result:  CheckBulkResultItem{Allowed: false, Error: err, ErrorCode: code},
-			}
-			continue
-		}
-		pairs[i] = CheckBulkResultPair{
-			Request: item,
-			Result:  CheckBulkResultItem{Allowed: allowed},
-		}
+	req := checkForUpdateBulkCommandToV1beta1(cmd)
+	resp, err := uc.Authz.CheckForUpdateBulk(ctx, req)
+	if err != nil {
+		return nil, err
 	}
-
-	return &CheckBulkResult{Pairs: pairs}, nil
+	return checkForUpdateBulkResultFromV1beta1(resp, cmd)
 }
 
 // CheckBulk performs bulk permission checks.
@@ -793,6 +777,55 @@ func checkBulkResultFromV1beta1(resp *kessel.CheckBulkResponse, cmd CheckBulkCom
 		Pairs:            pairs,
 		ConsistencyToken: token,
 	}, nil
+}
+
+// checkForUpdateBulkCommandToV1beta1 converts CheckForUpdateBulkCommand to relations-api v1beta1 request.
+func checkForUpdateBulkCommandToV1beta1(cmd CheckForUpdateBulkCommand) *kessel.CheckForUpdateBulkRequest {
+	items := make([]*kessel.CheckBulkRequestItem, len(cmd.Items))
+	for i, item := range cmd.Items {
+		items[i] = &kessel.CheckBulkRequestItem{
+			Resource: &kessel.ObjectReference{
+				Type: &kessel.ObjectType{
+					Namespace: item.Resource.ReporterType().Serialize(),
+					Name:      item.Resource.ResourceType().Serialize(),
+				},
+				Id: item.Resource.LocalResourceId().Serialize(),
+			},
+			Relation: item.Relation.Serialize(),
+			Subject:  subjectToV1Beta1(item.Subject),
+		}
+	}
+	return &kessel.CheckForUpdateBulkRequest{Items: items}
+}
+
+// checkForUpdateBulkResultFromV1beta1 converts relations-api CheckForUpdateBulkResponse to CheckBulkResult.
+func checkForUpdateBulkResultFromV1beta1(resp *kessel.CheckForUpdateBulkResponse, cmd CheckForUpdateBulkCommand) (*CheckBulkResult, error) {
+	respPairs := resp.GetPairs()
+	if len(respPairs) != len(cmd.Items) {
+		return nil, status.Errorf(codes.Internal, "internal error: mismatched backend check-for-update results: expected %d pairs, got %d", len(cmd.Items), len(respPairs))
+	}
+	pairs := make([]CheckBulkResultPair, len(respPairs))
+	for i, pair := range respPairs {
+		var resultItem CheckBulkResultItem
+		if pair.GetError() != nil {
+			resultItem = CheckBulkResultItem{
+				Allowed:   false,
+				Error:     fmt.Errorf("check for update failed: %s", pair.GetError().GetMessage()),
+				ErrorCode: pair.GetError().GetCode(),
+			}
+		} else if pair.GetItem() != nil {
+			resultItem = CheckBulkResultItem{
+				Allowed:   pair.GetItem().GetAllowed() == kessel.CheckBulkResponseItem_ALLOWED_TRUE,
+				Error:     nil,
+				ErrorCode: 0,
+			}
+		}
+		pairs[i] = CheckBulkResultPair{
+			Request: cmd.Items[i],
+			Result:  resultItem,
+		}
+	}
+	return &CheckBulkResult{Pairs: pairs}, nil
 }
 
 func getNextTransactionID() (string, error) {

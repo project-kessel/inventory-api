@@ -321,6 +321,48 @@ func (s *SimpleAuthorizer) CheckBulk(_ context.Context, req *kessel.CheckBulkReq
 	}, nil
 }
 
+// CheckForUpdateBulk implements Authorizer by calling CheckForUpdate per item (no relations-api).
+func (s *SimpleAuthorizer) CheckForUpdateBulk(ctx context.Context, req *kessel.CheckForUpdateBulkRequest) (*kessel.CheckForUpdateBulkResponse, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	tuples := s.getTuplesForToken("")
+
+	pairs := make([]*kessel.CheckBulkResponsePair, len(req.GetItems()))
+	for i, item := range req.GetItems() {
+		subjectNamespace := ""
+		subjectType := ""
+		subjectID := ""
+		if item.Subject != nil && item.Subject.Subject != nil {
+			subjectID = item.Subject.Subject.Id
+			if item.Subject.Subject.Type != nil {
+				subjectNamespace = item.Subject.Subject.Type.Namespace
+				subjectType = item.Subject.Subject.Type.Name
+			}
+		}
+		resourceNamespace := ""
+		resourceType := ""
+		resourceID := ""
+		if item.Resource != nil {
+			resourceID = item.Resource.Id
+			if item.Resource.Type != nil {
+				resourceNamespace = item.Resource.Type.Namespace
+				resourceType = item.Resource.Type.Name
+			}
+		}
+		allowed := kessel.CheckBulkResponseItem_ALLOWED_FALSE
+		if hasTupleInSnapshot(tuples, resourceNamespace, resourceType, resourceID, item.Relation, subjectNamespace, subjectType, subjectID) {
+			allowed = kessel.CheckBulkResponseItem_ALLOWED_TRUE
+		}
+		pairs[i] = &kessel.CheckBulkResponsePair{
+			Request: item,
+			Response: &kessel.CheckBulkResponsePair_Item{
+				Item: &kessel.CheckBulkResponseItem{Allowed: allowed},
+			},
+		}
+	}
+	return &kessel.CheckForUpdateBulkResponse{Pairs: pairs}, nil
+}
+
 // LookupResources implements Authorizer.
 // It returns resources where the subject has the specified relation.
 // This is a simple direct-tuple lookup, not a full ReBAC graph traversal.

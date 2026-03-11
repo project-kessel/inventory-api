@@ -11,21 +11,21 @@ option go_package = "github.com/project-kessel/inventory-api/api/kessel/inventor
 option java_multiple_files = true;
 option java_package = "org.project_kessel.api.inventory.v1beta2";
 
-// CheckBulkForUpdateResponseItem represents the result of a single check-for-update.
-message CheckBulkForUpdateResponseItem {
+// CheckForUpdateBulkResponseItem represents the result of a single check-for-update.
+message CheckForUpdateBulkResponseItem {
   Allowed allowed = 1;
 }
 
-// CheckBulkForUpdateResponsePair associates a request item with its corresponding result.
-message CheckBulkForUpdateResponsePair {
+// CheckForUpdateBulkResponsePair associates a request item with its corresponding result.
+message CheckForUpdateBulkResponsePair {
   CheckBulkRequestItem request = 1;
   oneof response {
-    CheckBulkForUpdateResponseItem item = 2;
+    CheckForUpdateBulkResponseItem item = 2;
     google.rpc.Status error = 3;
   }
 }
 
-// CheckBulkForUpdateResponse contains the results of all check-for-update checks in the request.
-message CheckBulkForUpdateResponse {
-  repeated CheckBulkForUpdateResponsePair pairs = 1 [(buf.validate.field).repeated.min_items = 1];
+// CheckForUpdateBulkResponse contains the results of all check-for-update checks in the request.
+message CheckForUpdateBulkResponse {
+  repeated CheckForUpdateBulkResponsePair pairs = 1 [(buf.validate.field).repeated.min_items = 1];
 }

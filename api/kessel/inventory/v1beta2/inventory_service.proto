@@ -19,8 +19,8 @@ import "kessel/inventory/v1beta2/check_self_request.proto";
 import "kessel/inventory/v1beta2/check_self_response.proto";
 import "kessel/inventory/v1beta2/check_self_bulk_request.proto";
 import "kessel/inventory/v1beta2/check_self_bulk_response.proto";
-import "kessel/inventory/v1beta2/check_bulk_for_update_request.proto";
-import "kessel/inventory/v1beta2/check_bulk_for_update_response.proto";
+import "kessel/inventory/v1beta2/check_for_update_bulk_request.proto";
+import "kessel/inventory/v1beta2/check_for_update_bulk_response.proto";
 option go_package = "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2";
 option java_multiple_files = true;
 option java_package = "org.project_kessel.api.inventory.v1beta2";
@@ -83,9 +83,9 @@ service KesselInventoryService {
   // is evaluated with strong consistency (same semantics as CheckForUpdate).
   //
   // Common use cases include batch pre-authorization before bulk update or delete operations.
-  rpc CheckBulkForUpdate(CheckBulkForUpdateRequest) returns (CheckBulkForUpdateResponse) {
+  rpc CheckForUpdateBulk(CheckForUpdateBulkRequest) returns (CheckForUpdateBulkResponse) {
     option (google.api.http) = {
-      post: "/api/kessel/v1beta2/checkbulkforupdate"
+      post: "/api/kessel/v1beta2/checkforupdatebulk"
       body: "*"
     };
   }

@@ -286,6 +286,22 @@ func (a *KesselAuthz) CheckBulk(ctx context.Context, req *kessel.CheckBulkReques
 	return resp, nil
 }
 
+func (a *KesselAuthz) CheckForUpdateBulk(ctx context.Context, req *kessel.CheckForUpdateBulkRequest) (*kessel.CheckForUpdateBulkResponse, error) {
+	log.Infof("CheckForUpdateBulk: checking %d items", len(req.GetItems()))
+	opts, err := a.getCallOptions()
+	if err != nil {
+		a.incrFailureCounter("CheckForUpdateBulk")
+		return nil, err
+	}
+	resp, err := a.CheckService.CheckForUpdateBulk(ctx, req, opts...)
+	if err != nil {
+		a.incrFailureCounter("CheckForUpdateBulk")
+		return nil, err
+	}
+	a.incrSuccessCounter("CheckForUpdateBulk")
+	return resp, nil
+}
+
 // SetWorkspace upsert inserts the relationship in relations if it doesn't exist and otherwise does nothing
 func (a *KesselAuthz) SetWorkspace(ctx context.Context, local_resource_id, workspace, namespace, name string, upsert bool) (*kessel.CreateTuplesResponse, error) {
 	if workspace == "" {

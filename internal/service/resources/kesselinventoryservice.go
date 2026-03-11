@@ -102,20 +102,20 @@ func (s *InventoryService) CheckForUpdate(ctx context.Context, req *pb.CheckForU
 	return updateResponseFromAuthzRequestV1beta2(resp), nil
 }
 
-func (s *InventoryService) CheckBulkForUpdate(ctx context.Context, req *pb.CheckBulkForUpdateRequest) (*pb.CheckBulkForUpdateResponse, error) {
-	log.Info("CheckBulkForUpdate using v1beta2 db")
+func (s *InventoryService) CheckForUpdateBulk(ctx context.Context, req *pb.CheckForUpdateBulkRequest) (*pb.CheckForUpdateBulkResponse, error) {
+	log.Info("CheckForUpdateBulk using v1beta2 db")
 	if len(req.GetItems()) == 0 {
 		return nil, status.Errorf(codes.InvalidArgument, "items array cannot be empty")
 	}
-	cmd, err := toCheckBulkForUpdateCommand(req)
+	cmd, err := toCheckForUpdateBulkCommand(req)
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "%v", err)
 	}
-	resp, err := s.Ctl.CheckBulkForUpdate(ctx, cmd)
+	resp, err := s.Ctl.CheckForUpdateBulk(ctx, cmd)
 	if err != nil {
 		return nil, err
 	}
-	return fromCheckBulkForUpdateResult(resp, req), nil
+	return fromCheckForUpdateBulkResult(resp, req), nil
 }
 
 func (s *InventoryService) CheckBulk(ctx context.Context, req *pb.CheckBulkRequest) (*pb.CheckBulkResponse, error) {
@@ -205,21 +205,21 @@ func subjectReferenceFromProto(subject *pb.SubjectReference) (model.SubjectRefer
 	return model.NewSubjectReferenceWithoutRelation(key), nil
 }
 
-// toCheckBulkForUpdateCommand converts a v1beta2 CheckBulkForUpdateRequest to a usecase CheckBulkForUpdateCommand.
-func toCheckBulkForUpdateCommand(req *pb.CheckBulkForUpdateRequest) (resources.CheckBulkForUpdateCommand, error) {
+// toCheckForUpdateBulkCommand converts a v1beta2 CheckForUpdateBulkRequest to a usecase CheckForUpdateBulkCommand.
+func toCheckForUpdateBulkCommand(req *pb.CheckForUpdateBulkRequest) (resources.CheckForUpdateBulkCommand, error) {
 	items := make([]resources.CheckBulkItem, len(req.GetItems()))
 	for i, item := range req.GetItems() {
 		resourceKey, err := reporterKeyFromResourceReference(item.GetObject())
 		if err != nil {
-			return resources.CheckBulkForUpdateCommand{}, fmt.Errorf("invalid resource at index %d: %w", i, err)
+			return resources.CheckForUpdateBulkCommand{}, fmt.Errorf("invalid resource at index %d: %w", i, err)
 		}
 		subjectRef, err := subjectReferenceFromProto(item.GetSubject())
 		if err != nil {
-			return resources.CheckBulkForUpdateCommand{}, fmt.Errorf("invalid subject at index %d: %w", i, err)
+			return resources.CheckForUpdateBulkCommand{}, fmt.Errorf("invalid subject at index %d: %w", i, err)
 		}
 		relation, err := model.NewRelation(item.GetRelation())
 		if err != nil {
-			return resources.CheckBulkForUpdateCommand{}, fmt.Errorf("invalid relation at index %d: %w", i, err)
+			return resources.CheckForUpdateBulkCommand{}, fmt.Errorf("invalid relation at index %d: %w", i, err)
 		}
 		items[i] = resources.CheckBulkItem{
 			Resource: resourceKey,
@@ -227,7 +227,7 @@ func toCheckBulkForUpdateCommand(req *pb.CheckBulkForUpdateRequest) (resources.C
 			Subject:  subjectRef,
 		}
 	}
-	return resources.CheckBulkForUpdateCommand{Items: items}, nil
+	return resources.CheckForUpdateBulkCommand{Items: items}, nil
 }
 
 // toCheckBulkCommand converts a v1beta2 CheckBulkRequest to a usecase CheckBulkCommand.
@@ -328,19 +328,19 @@ func fromCheckBulkResult(result *resources.CheckBulkResult, req *pb.CheckBulkReq
 	return resp
 }
 
-// fromCheckBulkForUpdateResult converts a usecase CheckBulkResult to v1beta2 CheckBulkForUpdateResponse.
-func fromCheckBulkForUpdateResult(result *resources.CheckBulkResult, req *pb.CheckBulkForUpdateRequest) *pb.CheckBulkForUpdateResponse {
-	pairs := make([]*pb.CheckBulkForUpdateResponsePair, len(result.Pairs))
+// fromCheckForUpdateBulkResult converts a usecase CheckBulkResult to v1beta2 CheckForUpdateBulkResponse.
+func fromCheckForUpdateBulkResult(result *resources.CheckBulkResult, req *pb.CheckForUpdateBulkRequest) *pb.CheckForUpdateBulkResponse {
+	pairs := make([]*pb.CheckForUpdateBulkResponsePair, len(result.Pairs))
 	for i, pair := range result.Pairs {
-		errResponse := &pb.CheckBulkForUpdateResponsePair_Error{}
-		itemResponse := &pb.CheckBulkForUpdateResponsePair_Item{}
+		errResponse := &pb.CheckForUpdateBulkResponsePair_Error{}
+		itemResponse := &pb.CheckForUpdateBulkResponsePair_Item{}
 
 		if pair.Result.Error != nil {
 			errorCode := pair.Result.ErrorCode
 			if errorCode == 0 {
 				errorCode = int32(codes.Internal)
 			}
-			log.Errorf("Error in checkbulkforupdate for item %d, code %d: %v", i, errorCode, pair.Result.Error)
+			log.Errorf("Error in checkforupdatebulk for item %d, code %d: %v", i, errorCode, pair.Result.Error)
 			errResponse.Error = &rpcstatus.Status{
 				Code:    errorCode,
 				Message: pair.Result.Error.Error(),
@@ -351,7 +351,7 @@ func fromCheckBulkForUpdateResult(result *resources.CheckBulkResult, req *pb.Che
 		if pair.Result.Allowed {
 			allowedResponse = pb.Allowed_ALLOWED_TRUE
 		}
-		itemResponse.Item = &pb.CheckBulkForUpdateResponseItem{
+		itemResponse.Item = &pb.CheckForUpdateBulkResponseItem{
 			Allowed: allowedResponse,
 		}
 
@@ -360,7 +360,7 @@ func fromCheckBulkForUpdateResult(result *resources.CheckBulkResult, req *pb.Che
 			requestItem = req.GetItems()[i]
 		}
 
-		pairs[i] = &pb.CheckBulkForUpdateResponsePair{
+		pairs[i] = &pb.CheckForUpdateBulkResponsePair{
 			Request: requestItem,
 		}
 		if pair.Result.Error != nil {
@@ -369,7 +369,7 @@ func fromCheckBulkForUpdateResult(result *resources.CheckBulkResult, req *pb.Che
 			pairs[i].Response = itemResponse
 		}
 	}
-	return &pb.CheckBulkForUpdateResponse{Pairs: pairs}
+	return &pb.CheckForUpdateBulkResponse{Pairs: pairs}
 }
 
 // toCheckSelfBulkCommand converts a v1beta2 CheckSelfBulkRequest to a usecase CheckSelfBulkCommand.

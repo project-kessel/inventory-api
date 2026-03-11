@@ -277,7 +277,7 @@ func TestCheckForUpdate_UsesCheckForUpdateRelation(t *testing.T) {
 	assert.Equal(t, []metaauthorizer.Relation{metaauthorizer.RelationCheckForUpdate}, meta.relations)
 }
 
-func TestCheckBulkForUpdate_UsesCheckBulkForUpdateRelation(t *testing.T) {
+func TestCheckForUpdateBulk_UsesCheckForUpdateBulkRelation(t *testing.T) {
 	ctx := testAuthzContext()
 	meta := &recordingMetaAuthorizer{allowed: true}
 	usecase := New(
@@ -300,18 +300,18 @@ func TestCheckBulkForUpdate_UsesCheckBulkForUpdateRelation(t *testing.T) {
 	relation, err := model.NewRelation("edit")
 	require.NoError(t, err)
 
-	cmd := CheckBulkForUpdateCommand{
+	cmd := CheckForUpdateBulkCommand{
 		Items: []CheckBulkItem{
 			{Resource: key, Relation: relation, Subject: subject},
 		},
 	}
-	result, err := usecase.CheckBulkForUpdate(ctx, cmd)
+	result, err := usecase.CheckForUpdateBulk(ctx, cmd)
 	require.NoError(t, err)
 	require.Len(t, result.Pairs, 1)
 	assert.True(t, result.Pairs[0].Result.Allowed)
-	// One meta-authz for the bulk (check_bulk_for_update), one per item from CheckForUpdate (check_for_update).
-	assert.Equal(t, 2, meta.calls)
-	assert.Equal(t, []metaauthorizer.Relation{metaauthorizer.RelationCheckBulkForUpdate, metaauthorizer.RelationCheckForUpdate}, meta.relations)
+	// One meta-authz per item (check_for_update_bulk); Authz.CheckForUpdateBulk called once.
+	assert.Equal(t, 1, meta.calls)
+	assert.Equal(t, []metaauthorizer.Relation{metaauthorizer.RelationCheckForUpdateBulk}, meta.relations)
 }
 
 func TestCheckSelfBulk_UsesCheckSelfRelationForEachItem(t *testing.T) {

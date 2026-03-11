@@ -71,9 +71,9 @@ type CheckBulkResult struct {
 	ConsistencyToken model.ConsistencyToken
 }
 
-// CheckBulkForUpdateCommand contains the request for a bulk check-for-update (strongly consistent).
+// CheckForUpdateBulkCommand contains the request for a bulk check-for-update (strongly consistent).
 // Reuses CheckBulkItem; no consistency token since each check is strongly consistent.
-type CheckBulkForUpdateCommand struct {
+type CheckForUpdateBulkCommand struct {
 	Items []CheckBulkItem
 }
 

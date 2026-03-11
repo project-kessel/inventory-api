@@ -160,12 +160,12 @@ func (uc *Usecase) ReportResource(ctx context.Context, cmd ReportResourceCommand
 	// provides the actual correctness guarantee, if a duplicate sneaks past this
 	// advisory check due to a concurrent commit.
 	if cmd.TransactionId != nil {
-		alreadyProcessed, err := uc.resourceRepository.HasTransactionIdBeenProcessed(uc.resourceRepository.GetDB(), string(*cmd.TransactionId))
+		alreadyProcessed, err := uc.resourceRepository.HasTransactionIdBeenProcessed(uc.resourceRepository.GetDB(), cmd.TransactionId.String())
 		if err != nil {
 			return fmt.Errorf("failed to check transaction ID: %w", err)
 		}
 		if alreadyProcessed {
-			log.Info("Transaction already processed, skipping update")
+			log.Infof("Transaction already processed, skipping update: transaction_id=%s", cmd.TransactionId.String())
 			return nil
 		}
 	}

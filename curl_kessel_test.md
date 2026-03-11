@@ -401,7 +401,7 @@ grpcurl -plaintext -d '{
       "object": {
         "resourceType": "host",
         "resourceId": "host-1",
-        "reporter": {"type": "hbi"}
+        "reporter": {"type": "hbi", "instanceId": "hbi"}
       },
       "relation": "update",
       "subject": {
@@ -416,7 +416,7 @@ grpcurl -plaintext -d '{
       "object": {
         "resourceType": "host",
         "resourceId": "host-2",
-        "reporter": {"type": "hbi"}
+        "reporter": {"type": "hbi", "instanceId": "hbi"}
       },
       "relation": "update",
       "subject": {
@@ -445,7 +445,7 @@ curl -X POST http://localhost:8000/api/kessel/v1beta2/checkforupdatebulk \
         "object": {
           "resourceType": "host",
           "resourceId": "host-1",
-          "reporter": {"type": "hbi"}
+          "reporter": {"type": "hbi", "instanceId": "hbi"}
         },
         "relation": "update",
         "subject": {
@@ -460,7 +460,7 @@ curl -X POST http://localhost:8000/api/kessel/v1beta2/checkforupdatebulk \
         "object": {
           "resourceType": "host",
           "resourceId": "host-2",
-          "reporter": {"type": "hbi"}
+          "reporter": {"type": "hbi", "instanceId": "hbi"}
         },
         "relation": "update",
         "subject": {

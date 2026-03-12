@@ -51,9 +51,20 @@ func mapOutboxEventToWALMessage(event *model_legacy.OutboxEvent) (walOutboxMessa
 }
 
 // OutboxPublisher is a function type for emitting outbox events.
-// The default implementation uses PostgreSQL WAL logical decoding messages.
 // Tests can provide a no-op implementation for SQLite compatibility.
 type OutboxPublisher func(tx *gorm.DB, event *model_legacy.OutboxEvent) error
+
+// SetOutboxPublisher returns the appropriate OutboxPublisher for the given mode.
+func SetOutboxPublisher(mode string) OutboxPublisher {
+	switch mode {
+	case "wal":
+		log.Info("Using WAL logical decoding message outbox publisher")
+		return publishOutboxEventWAL
+	default:
+		log.Info("Using table-based outbox publisher")
+		return publishOutboxEvent
+	}
+}
 
 // publishOutboxEventWAL publishes an event to WAL using logical decoding messages
 func publishOutboxEventWAL(tx *gorm.DB, event *model_legacy.OutboxEvent) error {
@@ -76,4 +87,16 @@ func publishOutboxEventWAL(tx *gorm.DB, event *model_legacy.OutboxEvent) error {
 	return tx.Exec(
 		"SELECT pg_logical_emit_message(true, ?, ?)", prefix, string(content),
 	).Error
+}
+
+// original outbox implementation, kept to allow for flipping
+// to new WAL version using flag to simplify rollout
+func publishOutboxEvent(tx *gorm.DB, event *model_legacy.OutboxEvent) error {
+	if err := tx.Create(event).Error; err != nil {
+		return err
+	}
+	if err := tx.Delete(event).Error; err != nil {
+		return err
+	}
+	return nil
 }

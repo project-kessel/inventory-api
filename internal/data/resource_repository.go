@@ -102,7 +102,7 @@ type resourceRepository struct {
 
 func NewResourceRepository(db *gorm.DB, transactionManager bizmodel.TransactionManager, outboxPublisher OutboxPublisher) bizmodel.ResourceRepository {
 	if outboxPublisher == nil {
-		outboxPublisher = publishOutboxEventWAL
+		outboxPublisher = publishOutboxEvent
 	}
 	return &resourceRepository{
 		db:                 db,

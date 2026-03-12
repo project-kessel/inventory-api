@@ -10,6 +10,7 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/project-kessel/inventory-api/internal/biz/model_legacy"
+	"github.com/project-kessel/inventory-api/internal/storage"
 )
 
 // walOutboxMessage defines the content value of a logical decoding message
@@ -57,7 +58,7 @@ type OutboxPublisher func(tx *gorm.DB, event *model_legacy.OutboxEvent) error
 // SetOutboxPublisher returns the appropriate OutboxPublisher for the given mode.
 func SetOutboxPublisher(mode string) OutboxPublisher {
 	switch mode {
-	case "wal":
+	case storage.OutboxModeWAL:
 		log.Info("Using WAL logical decoding message outbox publisher")
 		return publishOutboxEventWAL
 	default:

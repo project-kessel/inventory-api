@@ -21,6 +21,7 @@ eventing:
   kafka:
 storage:
   max-serialization-retries: 10
+  outbox-mode: wal
   database: postgres
   postgres:
     host: "invdatabase"

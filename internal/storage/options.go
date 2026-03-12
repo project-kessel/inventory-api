@@ -42,7 +42,7 @@ func (o *Options) AddFlags(fs *pflag.FlagSet, prefix string) {
 
 	fs.StringVar(&o.Database, prefix+"database", o.Database, "The database type to use.  Either sqlite3 or postgres.")
 	fs.IntVar(&o.MaxSerializationRetries, prefix+"max-serialization-retries", o.MaxSerializationRetries, "Maximum number of retries for serialized transactions")
-	fs.StringVar(&o.OutboxMode, prefix+"outbox-mode", o.OutboxMode, "Outbox publishing mode: 'table' (INSERT+DELETE) or 'wal' (pg_logical_emit_message)")
+	fs.StringVar(&o.OutboxMode, prefix+"outbox-mode", o.OutboxMode, "Outbox publishing mode: 'table' (outbox_events table) or 'wal' (pg_logical_emit_message)")
 
 	o.Postgres.AddFlags(fs, prefix+"postgres")
 	o.SqlLite3.AddFlags(fs, prefix+"sqlite3")
@@ -67,6 +67,10 @@ func (o *Options) Validate() []error {
 
 	if o.OutboxMode != OutboxModeTable && o.OutboxMode != OutboxModeWAL {
 		errs = append(errs, errors.New("outbox-mode must be either 'table' or 'wal'"))
+	}
+
+	if o.OutboxMode == OutboxModeWAL && o.Database != Postgres {
+		errs = append(errs, errors.New("outbox-mode 'wal' is only supported with postgres"))
 	}
 
 	return errs

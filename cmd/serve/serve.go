@@ -31,7 +31,6 @@ import (
 	resourcesvc "github.com/project-kessel/inventory-api/internal/service/resources"
 
 	"github.com/project-kessel/inventory-api/internal/authn"
-	"github.com/project-kessel/inventory-api/internal/authz"
 	"github.com/project-kessel/inventory-api/internal/errors"
 	"github.com/project-kessel/inventory-api/internal/middleware"
 	"github.com/project-kessel/inventory-api/internal/server"
@@ -52,7 +51,7 @@ func NewCommand(
 	serverOptions *server.Options,
 	storageOptions *storage.Options,
 	authnOptions *authn.Options,
-	authzOptions *authz.Options,
+	authzOptions *data.RelationsOptionsRoot,
 	consumerOptions *consumer.Options,
 	consistencyOptions *consistency.Options,
 	serviceOptions *service.Options,
@@ -101,14 +100,14 @@ func NewCommand(
 			}
 			selfSubjectStrategy := selfSubjectOptions.Build()
 
-			// configure authz
+			// configure relations
 			if errs := authzOptions.Complete(); errs != nil {
 				return errors.NewAggregate(errs)
 			}
 			if errs := authzOptions.Validate(); errs != nil {
 				return errors.NewAggregate(errs)
 			}
-			authzConfig, errs := authz.NewConfig(authzOptions).Complete(ctx)
+			relationsConfig, errs := data.NewRelationsConfig(authzOptions).Complete(ctx)
 			if errs != nil {
 				return errors.NewAggregate(errs)
 			}
@@ -216,11 +215,12 @@ func NewCommand(
 				return err
 			}
 
-			// construct authz
-			authorizer, err := authz.New(ctx, authzConfig, log.NewHelper(log.With(logger, "subsystem", "authz")))
+			// construct relations repository
+			relationsRepo, err := data.NewRelationsRepository(ctx, relationsConfig, log.NewHelper(log.With(logger, "subsystem", "relations")))
 			if err != nil {
 				return err
 			}
+			relationsEnabled := relationsConfig.Impl == data.RelationsImplKessel
 
 			// constructs schema repository
 			schemaRepository, err := data.NewSchemaRepository(ctx, schemaConfig, log.NewHelper(log.With(logger, "subsystem", "schemaRepository")))
@@ -275,13 +275,13 @@ func NewCommand(
 			//v1beta2
 			// wire together inventory service handling
 			resourceRepo := data.NewResourceRepository(db, transactionManager, data.SetOutboxPublisher(storageConfig.Options.OutboxMode))
-			inventory_controller := resourcesctl.New(resourceRepo, schemaRepository, authorizer, "notifications", log.With(logger, "subsystem", "notificationsintegrations_controller"), listenManager, waitForNotifCircuitBreaker, usecaseConfig, mc, metaauthorizer.NewSimpleMetaAuthorizer(), selfSubjectStrategy)
+			inventory_controller := resourcesctl.New(resourceRepo, schemaRepository, relationsRepo, "notifications", log.With(logger, "subsystem", "notificationsintegrations_controller"), listenManager, waitForNotifCircuitBreaker, usecaseConfig, mc, metaauthorizer.NewSimpleMetaAuthorizer(), selfSubjectStrategy)
 
 			inventory_service := resourcesvc.NewKesselInventoryServiceV1beta2(inventory_controller)
 			pbv1beta2.RegisterKesselInventoryServiceServer(server.GrpcServer, inventory_service)
 			pbv1beta2.RegisterKesselInventoryServiceHTTPServer(server.HttpServer, inventory_service)
 
-			health_repo := healthrepo.New(db, authorizer, authzConfig)
+			health_repo := healthrepo.New(db, relationsRepo, relationsConfig)
 			health_controller := healthctl.New(health_repo, log.With(logger, "subsystem", "health_controller"))
 			health_service := healthssvc.New(health_controller)
 			hb.RegisterKesselInventoryHealthServiceServer(server.GrpcServer, health_service)
@@ -308,7 +308,7 @@ func NewCommand(
 						// If the consumer cannot process a message, the consumer loop is restarted
 						// This is to ensure we re-read the message and prevent it being dropped and moving to next message.
 						// To re-read the current message, we have to recreate the consumer connection so that the earliest offset is used
-						inventoryConsumer, err = consumer.New(consumerConfig, db, schemaRepository, authzConfig, authorizer, notifier, log.NewHelper(log.With(logger, "subsystem", "inventoryConsumer")), nil)
+						inventoryConsumer, err = consumer.New(consumerConfig, db, schemaRepository, relationsRepo, relationsEnabled, notifier, log.NewHelper(log.With(logger, "subsystem", "inventoryConsumer")), nil)
 						if err != nil {
 							shutdown(err)
 						}

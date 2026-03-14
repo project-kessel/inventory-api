@@ -1,4 +1,4 @@
-package kessel
+package data
 
 import (
 	"bytes"
@@ -16,21 +16,19 @@ import (
 )
 
 const (
-	tokenLifeDuration            = 5 * time.Minute
-	cacheCleanupInterval         = 5 * time.Minute
-	client_credentials_granttype = "client_credentials"
+	relationsTokenLifeDuration    = 5 * time.Minute
+	relationsCacheCleanupInterval = 5 * time.Minute
+	relationsGrantType            = "client_credentials"
 )
 
 type secureMetadataCreds map[string]string
 
 func (c secureMetadataCreds) RequireTransportSecurity() bool { return true }
-func (c secureMetadataCreds) GetRequestMetadata(context.Context, ...string) (map[string]string, error) {
+func (c secureMetadataCreds) GetRequestMetadata(_ context.Context, _ ...string) (map[string]string, error) {
 	return c, nil
 }
 
-// WithBearerToken returns a grpc.CallOption that adds a standard HTTP Bearer
-// token to all requests sent from a client.
-func WithBearerToken(token string) grpc.CallOption {
+func withBearerToken(token string) grpc.CallOption {
 	return grpc.PerRPCCredentials(secureMetadataCreds{"Authorization": "Bearer " + token})
 }
 
@@ -41,33 +39,17 @@ func (c insecureMetadataCreds) GetRequestMetadata(_ context.Context, _ ...string
 	return c, nil
 }
 
-// WithInsecureBearerToken returns a grpc.CallOption that adds a standard HTTP
-// Bearer token to all requests sent from an insecure client.
-//
-// Must be used in conjunction with `insecure.NewCredentials()`.
-func WithInsecureBearerToken(token string) grpc.CallOption {
+func withInsecureBearerToken(token string) grpc.CallOption {
 	return grpc.PerRPCCredentials(insecureMetadataCreds{"Authorization": "Bearer " + token})
 }
 
-// NewTokenClient creates and returns a new tokenClient client.
-func NewTokenClient(config *tokenClientConfig) *tokenClient {
-	return &tokenClient{
-		ClientID:       config.clientId,
-		ClientSecret:   config.clientSecret,
-		URL:            config.url,
-		EnableOIDCAuth: config.enableOIDCAuth,
-		Insecure:       config.insecure,
-		cache:          cache.New(tokenLifeDuration, cacheCleanupInterval),
-	}
-}
-
-type TokenResponse struct {
+type relationsTokenResponse struct {
 	AccessToken  string `json:"access_token"`
 	ExpiresIn    int    `json:"expires_in"`
 	RefreshToken string `json:"refresh_token"`
 }
 
-type tokenClient struct {
+type relationsTokenClient struct {
 	ClientID       string
 	ClientSecret   string
 	URL            string
@@ -76,7 +58,18 @@ type tokenClient struct {
 	cache          *cache.Cache
 }
 
-func (a *tokenClient) GetCachedToken(tokenKey string) (string, error) {
+func newRelationsTokenClient(config *relationsTokenClientConfig) *relationsTokenClient {
+	return &relationsTokenClient{
+		ClientID:       config.clientId,
+		ClientSecret:   config.clientSecret,
+		URL:            config.url,
+		EnableOIDCAuth: config.enableOIDCAuth,
+		Insecure:       config.insecure,
+		cache:          cache.New(relationsTokenLifeDuration, relationsCacheCleanupInterval),
+	}
+}
+
+func (a *relationsTokenClient) getCachedToken(tokenKey string) (string, error) {
 	cachedToken, isCached := a.cache.Get(tokenKey)
 	ct, _ := cachedToken.(string)
 	if isCached {
@@ -85,7 +78,7 @@ func (a *tokenClient) GetCachedToken(tokenKey string) (string, error) {
 	return "", fmt.Errorf("failed to retrieve cached token")
 }
 
-func IsJWTTokenExpired(accessToken string) (bool, time.Time) {
+func isJWTTokenExpired(accessToken string) (bool, time.Time) {
 	if token, _ := jwt.Parse(accessToken, nil); token != nil {
 		tokenClaims := token.Claims.(jwt.MapClaims)
 		if _, ok := tokenClaims["exp"]; ok {
@@ -96,20 +89,19 @@ func IsJWTTokenExpired(accessToken string) (bool, time.Time) {
 	return true, time.Time{}
 }
 
-func (a *tokenClient) getToken() (*TokenResponse, error) {
-
+func (a *relationsTokenClient) getToken() (*relationsTokenResponse, error) {
 	cachedTokenKey := fmt.Sprintf("%s%s", a.URL, a.ClientID)
-	cachedToken, _ := a.GetCachedToken(cachedTokenKey)
-	IsExpired, _ := IsJWTTokenExpired(cachedToken)
-	if cachedToken != "" && !IsExpired {
-		return &TokenResponse{AccessToken: cachedToken}, nil
+	cachedToken, _ := a.getCachedToken(cachedTokenKey)
+	isExpired, _ := isJWTTokenExpired(cachedToken)
+	if cachedToken != "" && !isExpired {
+		return &relationsTokenResponse{AccessToken: cachedToken}, nil
 	}
 
 	client := &http.Client{}
 	data := url.Values{}
 	data.Set("client_id", a.ClientID)
 	data.Set("client_secret", a.ClientSecret)
-	data.Set("grant_type", client_credentials_granttype)
+	data.Set("grant_type", relationsGrantType)
 	req, err := http.NewRequest("POST", a.URL, bytes.NewBufferString(data.Encode()))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create token request: %w", err)
@@ -124,13 +116,12 @@ func (a *tokenClient) getToken() (*TokenResponse, error) {
 	}
 	defer func() {
 		if err := resp.Body.Close(); err != nil {
-			fmt.Printf("failed to close consumer: %v", err)
+			fmt.Printf("failed to close response body: %v", err)
 		}
 	}()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-
 		return nil, fmt.Errorf("failed to parse token response: %w", err)
 	}
 
@@ -138,10 +129,10 @@ func (a *tokenClient) getToken() (*TokenResponse, error) {
 		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
 	}
 
-	var tokenResponse TokenResponse
+	var tokenResponse relationsTokenResponse
 	if err := json.Unmarshal(body, &tokenResponse); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal token response: %w", err)
 	}
-	a.cache.Set(cachedTokenKey, tokenResponse.AccessToken, cacheCleanupInterval)
+	a.cache.Set(cachedTokenKey, tokenResponse.AccessToken, relationsCacheCleanupInterval)
 	return &tokenResponse, nil
 }

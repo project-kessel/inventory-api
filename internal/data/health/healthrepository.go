@@ -8,21 +8,21 @@ import (
 	"gorm.io/gorm"
 
 	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1"
-	"github.com/project-kessel/inventory-api/internal/authz"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
+	"github.com/project-kessel/inventory-api/internal/data"
 )
 
 type healthRepo struct {
 	DB            *gorm.DB
-	Authz         model.Authorizer
-	CompletedAuth authz.CompletedConfig
+	RelationsRepo model.RelationsRepository
+	RelationsImpl string
 }
 
-func New(g *gorm.DB, a model.Authorizer, completedAuth authz.CompletedConfig) *healthRepo {
+func New(g *gorm.DB, relationsRepo model.RelationsRepository, relationsConfig data.RelationsCompletedConfig) *healthRepo {
 	return &healthRepo{
 		DB:            g,
-		Authz:         a,
-		CompletedAuth: completedAuth,
+		RelationsRepo: relationsRepo,
+		RelationsImpl: data.CheckRelationsImpl(relationsConfig),
 	}
 }
 
@@ -32,7 +32,7 @@ func (r *healthRepo) IsBackendAvailable(ctx context.Context) (*pb.GetReadyzRespo
 	if dbErr == nil {
 		dbErr = sqlDB.PingContext(ctx)
 	}
-	health, apiErr := r.Authz.Health(ctx)
+	apiErr := r.RelationsRepo.Health(ctx)
 
 	if dbErr != nil && apiErr != nil {
 		log.Errorf("STORAGE UNHEALTHY: %s and RELATIONS-API UNHEALTHY", storageType)
@@ -48,9 +48,9 @@ func (r *healthRepo) IsBackendAvailable(ctx context.Context) (*pb.GetReadyzRespo
 		log.Errorf("RELATIONS-API UNHEALTHY")
 		return newResponse("RELATIONS-API UNHEALTHY", 500), nil
 	}
-	if authz.CheckAuthorizer(r.CompletedAuth) == "Kessel" {
+	if r.RelationsImpl == "Kessel" {
 		if viper.GetBool("log.readyz") {
-			log.Infof("Storage type %s and relations-api %s", storageType, health.GetStatus())
+			log.Infof("Storage type %s and relations-api OK", storageType)
 		}
 		return newResponse("STORAGE "+storageType+" and RELATIONS-API", 200), nil
 	}
@@ -59,14 +59,14 @@ func (r *healthRepo) IsBackendAvailable(ctx context.Context) (*pb.GetReadyzRespo
 }
 
 func (r *healthRepo) IsRelationsAvailable(ctx context.Context) (*pb.GetReadyzResponse, error) {
-	health, apiErr := r.Authz.Health(ctx)
+	apiErr := r.RelationsRepo.Health(ctx)
 	if apiErr != nil {
 		log.Errorf("RELATIONS-API UNHEALTHY")
 		return newResponse("RELATIONS-API UNHEALTHY", 500), nil
 	}
-	if authz.CheckAuthorizer(r.CompletedAuth) == "Kessel" {
+	if r.RelationsImpl == "Kessel" {
 		if viper.GetBool("log.readyz") {
-			log.Infof("relations-api %s", health.GetStatus())
+			log.Infof("relations-api OK")
 		}
 	}
 	return newResponse("RELATIONS-API", 200), nil

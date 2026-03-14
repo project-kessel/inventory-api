@@ -38,6 +38,7 @@ objects:
         consistency:
           read-after-write-enabled: true # false == off for all service providers
           read-after-write-allowlist: ["*"] # specify ["*"] to allow any request to optionally r-a-w
+          default-to-at-least-as-acknowledged: true
         log:
           level: "info"
   - apiVersion: v1

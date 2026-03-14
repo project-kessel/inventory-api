@@ -1,0 +1,29 @@
+# Table-mode KafkaConnector for e2e testing of the legacy outbox table publisher.
+# Remove this file when the outbox table is deprecated.
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaConnector
+metadata:
+  name: kessel-inventory-source-connector
+  labels:
+    strimzi.io/cluster: inventory-kafka-connect
+spec:
+  class: io.debezium.connector.postgresql.PostgresConnector
+  tasksMax: 1
+  config:
+    slot.name: inventory_api_debezium
+    snapshot.mode: no_data
+    database.server.name: kessel-inventory-db
+    database.dbname: spicedb
+    database.hostname: invdatabase
+    database.port: 5433
+    database.user: postgres
+    database.password: "yPsw5e6ab4bvAGe5H"
+    topic.prefix: kessel-inventory
+    table.include.list: public.outbox_events
+    transforms: outbox
+    transforms.outbox.type: io.debezium.transforms.outbox.EventRouter
+    transforms.outbox.table.fields.additional.placement: operation:header, txid:header
+    transforms.outbox.table.expand.json.payload: true
+    value.converter: org.apache.kafka.connect.json.JsonConverter
+    plugin.name: pgoutput
+    poll.interval.ms: 250

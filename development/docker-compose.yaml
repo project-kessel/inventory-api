@@ -75,7 +75,7 @@ services:
     image: bash:3.1-alpine3.21
     command: ["echo", "starting monitoring-only"]
     depends_on:
-    - prometheus
+    - prometheus-ephem
     - grafana
     - alertmanager
     networks:
@@ -247,11 +247,20 @@ services:
     image: prom/prometheus
     volumes:
       - "./configs/monitoring/prometheus.yml:/etc/prometheus/prometheus.yml"
-    # - "./configs/monitoring/rules.yml:/etc/prometheus/rules.yml"
     networks:
       - kessel
     ports:
       - 9050:9090
+
+  prometheus-ephem:
+    image: prom/prometheus
+    volumes:
+      - "./configs/monitoring/ephemeral-prometheus.yml:/etc/prometheus/prometheus.yml"
+    networks:
+      - kessel
+    ports:
+      - 9050:9090
+
   alertmanager:
     image: prom/alertmanager
     # volumes:
@@ -260,6 +269,7 @@ services:
       - kessel
     ports:
       - 9093:9093
+
   grafana:
     image: grafana/grafana-enterprise
     container_name: grafana

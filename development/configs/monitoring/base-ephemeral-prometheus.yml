@@ -1,0 +1,16 @@
+global:
+  scrape_interval: 10s
+scrape_configs:
+ - job_name: kessel-inventory-api
+   static_configs:
+    - targets:
+       - EPHEM_INVENTORY_ROUTE
+ - job_name: kessel-inventory-consumer
+   static_configs:
+    - targets:
+       - EPHEM_KIC_ROUTE
+ - job_name: kessel-kafka-connect
+   static_configs:
+    - targets:
+       - EPHEM_KKC_ROUTE
+

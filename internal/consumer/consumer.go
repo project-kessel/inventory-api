@@ -121,7 +121,8 @@ func New(config CompletedConfig, db *gorm.DB, schemaRepository model.SchemaRepos
 	var errChan chan error
 
 	maxSerializationRetries := viper.GetInt("storage.max-serialization-retries")
-	resourceRepository := data.NewResourceRepository(db, data.NewGormTransactionManager(&mc, maxSerializationRetries))
+	outboxMode := viper.GetString("storage.outbox-mode")
+	resourceRepository := data.NewResourceRepository(db, data.NewGormTransactionManager(&mc, maxSerializationRetries), data.SetOutboxPublisher(outboxMode))
 	schemaService := model.NewSchemaService(schemaRepository, logger)
 
 	return InventoryConsumer{

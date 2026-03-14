@@ -7,6 +7,7 @@ import (
 
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
 	"github.com/google/uuid"
+	"github.com/project-kessel/inventory-api/internal/biz/model_legacy"
 	"github.com/project-kessel/inventory-api/internal/metricscollector"
 	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/otel"
@@ -90,6 +91,10 @@ func (t *TestCase) TestSetup(testingT *testing.T) []error {
 		errs = append(errs, err)
 		return errs
 	}
+
+	// Replace the repository with one using a no-op outbox publisher for SQLite compatibility
+	noopPublisher := data.OutboxPublisher(func(_ *gorm.DB, _ *model_legacy.OutboxEvent) error { return nil })
+	t.inv.ResourceRepository = data.NewResourceRepository(db, data.NewGormTransactionManager(t.inv.MetricsCollector, 3), noopPublisher)
 
 	t.inv.SchemaService = model.NewSchemaService(schemaRepository, t.logger)
 
@@ -753,7 +758,7 @@ func TestFencingToken_WritingAfterRebalance(t *testing.T) {
 	assert.Nil(t, err)
 	subjectType := model.NewRelationsObjectType("workspace", "rbac")
 	subjectResource := model.NewRelationsResource(subjectId, subjectType)
-	subject := model.NewRelationsSubject(subjectResource)
+	subject := model.NewRelationsSubject(subjectResource, "")
 
 	domainTuple := model.NewRelationsTuple(resource, "t_workspace", subject)
 	tuples := &[]model.RelationsTuple{domainTuple}
@@ -792,7 +797,7 @@ func TestInventoryConsumer_CreateTuple_FailedPrecondition(t *testing.T) {
 	assert.Nil(t, err)
 	subjectType := model.NewRelationsObjectType("workspace", "rbac")
 	subjectResource := model.NewRelationsResource(subjectId, subjectType)
-	subject := model.NewRelationsSubject(subjectResource)
+	subject := model.NewRelationsSubject(subjectResource, "")
 
 	domainTuple := model.NewRelationsTuple(resource, "t_workspace", subject)
 	tuples := &[]model.RelationsTuple{domainTuple}
@@ -827,7 +832,7 @@ func TestInventoryConsumer_UpdateTuple_FailedPrecondition(t *testing.T) {
 	assert.Nil(t, err)
 	subjectType := model.NewRelationsObjectType("workspace", "rbac")
 	subjectResource := model.NewRelationsResource(subjectId, subjectType)
-	subject := model.NewRelationsSubject(subjectResource)
+	subject := model.NewRelationsSubject(subjectResource, "")
 
 	domainTuple := model.NewRelationsTuple(resource, "t_workspace", subject)
 	tuples := &[]model.RelationsTuple{domainTuple}
@@ -862,7 +867,7 @@ func TestInventoryConsumer_DeleteTuple_FailedPrecondition(t *testing.T) {
 	assert.Nil(t, err)
 	subjectType := model.NewRelationsObjectType("workspace", "rbac")
 	subjectResource := model.NewRelationsResource(subjectId, subjectType)
-	subject := model.NewRelationsSubject(subjectResource)
+	subject := model.NewRelationsSubject(subjectResource, "")
 
 	domainTuple := model.NewRelationsTuple(resource, "t_workspace", subject)
 	tuples := []model.RelationsTuple{domainTuple}

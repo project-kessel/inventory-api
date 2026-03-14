@@ -96,12 +96,17 @@ func (result FindResourceByKeysResult) ToSnapshots() (bizmodel.ResourceSnapshot,
 type resourceRepository struct {
 	db                 *gorm.DB
 	transactionManager bizmodel.TransactionManager
+	outboxPublisher    OutboxPublisher
 }
 
-func NewResourceRepository(db *gorm.DB, transactionManager bizmodel.TransactionManager) bizmodel.ResourceRepository {
+func NewResourceRepository(db *gorm.DB, transactionManager bizmodel.TransactionManager, outboxPublisher OutboxPublisher) bizmodel.ResourceRepository {
+	if outboxPublisher == nil {
+		outboxPublisher = publishOutboxEvent
+	}
 	return &resourceRepository{
 		db:                 db,
 		transactionManager: transactionManager,
+		outboxPublisher:    outboxPublisher,
 	}
 }
 
@@ -186,12 +191,12 @@ func (r *resourceRepository) handleOutboxEvents(tx *gorm.DB, resourceEvent bizmo
 		return err
 	}
 
-	err = PublishOutboxEvent(tx, resourceMessage)
+	err = r.outboxPublisher(tx, resourceMessage)
 	if err != nil {
 		return err
 	}
 
-	err = PublishOutboxEvent(tx, tupleMessage)
+	err = r.outboxPublisher(tx, tupleMessage)
 	if err != nil {
 		return err
 	}

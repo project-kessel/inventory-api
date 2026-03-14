@@ -25,12 +25,13 @@ EOF
 fi
 
 echo "Kafka Setup Complete!"
-echo "Setting up Postgres Connection Info..."
+# psql has been removed -- leaving this commented if we ever add it back
+# echo "Setting up Postgres Connection Info..."
 
-export PGHOST=$(cat $CDAPPCONFIG | jq -r '.database.hostname')
-export PGPORT=$(cat $CDAPPCONFIG | jq -r '.database.port')
-export PGDATABASE=$(cat $CDAPPCONFIG | jq -r '.database.name')
-export PGUSER=$(cat $CDAPPCONFIG | jq -r '.database.username')
-export PGPASSWORD=$(cat $CDAPPCONFIG | jq -r '.database.password')
+# export PGHOST=$(cat $CDAPPCONFIG | jq -r '.database.hostname')
+# export PGPORT=$(cat $CDAPPCONFIG | jq -r '.database.port')
+# export PGDATABASE=$(cat $CDAPPCONFIG | jq -r '.database.name')
+# export PGUSER=$(cat $CDAPPCONFIG | jq -r '.database.username')
+# export PGPASSWORD=$(cat $CDAPPCONFIG | jq -r '.database.password')
 
-echo "Postgres Setup Complete!"
+# echo "Postgres Setup Complete!"

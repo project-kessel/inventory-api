@@ -3,7 +3,7 @@
 The Kessel Debug Container is a useful tool for investigating Kessel service issues in cluster. It contains all the necessary CLI's needed for interacting with Kessel services, and configures environment variables for all Kessel endpoints and configurations needed to connect with dependent services such as SpiceDB or Kafka
 
 **What's Included?**:
-* Basic Networking tools (DNS testing tools, netcat, openssl, curl, wget, grpcurl)
+* Basic Networking tools (DNS testing tools, netcat, openssl, curl, wget)
 * JQ for parsing JSON data
 * Zed CLI to interact with SpiceDB
 * Kafka command-line tools (available under `/opt/kafka/bin`)
@@ -72,10 +72,6 @@ For example:
 #### Accessing Kafka
 
 All Kafka CLI tools shipped with Kafka have been installed to `/opt/kafka/bin`, the pod starts in the `/opt/kafka` directory to shorten the path to run those tools. When leveraging any Kafka command-line tool in this path, at minimum the `--bootstrap-server` and `--command-config` flags will need to be set. The `BOOTSTRAP_SERVERS` env var can be used for `--bootstrap-server` value, and the `KAFKA_AUTH_CONFIG` env var can be used for the `--command-config` value. Note some commands have different names for the auth config flag (for example, `kafka-console-consumer` uses `--consumer.config`). Check the commands `--help` flag for details on what flag to use.
-
-#### Accessing Inventory API DB
-
-Postgres connection details are set using standard supported [Postgres environment variables](https://www.postgresql.org/docs/16/libpq-envars.html). To connect to Inventory API DB and execute queries, simply run `psql` to be dropped into a shell where you can execute queries against the DB.
 
 #### Authenticating with kcat
 

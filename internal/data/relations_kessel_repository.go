@@ -344,17 +344,17 @@ func subjectRefToV1Beta1(sub model.SubjectReference) *kessel.SubjectReference {
 }
 
 func consistencyToV1Beta1(c model.Consistency) *kessel.Consistency {
-	if c.MinimizeLatency() {
+	if token := model.ConsistencyAtLeastAsFreshToken(c); token != nil {
 		return &kessel.Consistency{
-			Requirement: &kessel.Consistency_MinimizeLatency{MinimizeLatency: true},
+			Requirement: &kessel.Consistency_AtLeastAsFresh{
+				AtLeastAsFresh: &kessel.ConsistencyToken{
+					Token: token.Serialize(),
+				},
+			},
 		}
 	}
 	return &kessel.Consistency{
-		Requirement: &kessel.Consistency_AtLeastAsFresh{
-			AtLeastAsFresh: &kessel.ConsistencyToken{
-				Token: c.AtLeastAsFresh().Serialize(),
-			},
-		},
+		Requirement: &kessel.Consistency_MinimizeLatency{MinimizeLatency: true},
 	}
 }
 

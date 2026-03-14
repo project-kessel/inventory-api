@@ -11,6 +11,7 @@ objects:
       inventory-api-config.yaml: |
         storage:
           max-serialization-retries: 10
+          outbox-mode: wal
         authn:
           allow-unauthenticated: true
         authz:
@@ -291,11 +292,14 @@ objects:
       name: kessel-inventory-source-connector
       labels:
         strimzi.io/cluster: kessel-kafka-connect
+      annotations:
+        ${KCTR_ANNOTATION_KEY}: ${KCTR_ANNOTATION_VAL}
     spec:
       class: io.debezium.connector.postgresql.PostgresConnector
       tasksMax: 1 # source connector only supports 1 task
       config:
-        slot.name: kessel_inventory_debezium
+        slot.name: inventory_api_debezium
+        snapshot.mode: no_data
         database.server.name: kessel-inventory-db
         database.dbname: ${secrets:kessel-inventory-db:db.name}
         database.hostname: ${secrets:kessel-inventory-db:db.host}
@@ -303,8 +307,10 @@ objects:
         database.user: ${secrets:kessel-inventory-db:db.user}
         database.password: ${secrets:kessel-inventory-db:db.password}
         topic.prefix: kessel-inventory
-        table.include.list: public.outbox_events
-        transforms: outbox
+        table.exclude.list: ".*"
+        message.prefix.include.list: "kessel.tuples,kessel.resources"
+        transforms: "decode,outbox"
+        transforms.decode.type: io.debezium.connector.postgresql.transforms.DecodeLogicalDecodingMessageContent
         transforms.outbox.type: io.debezium.transforms.outbox.EventRouter
         transforms.outbox.table.fields.additional.placement: operation:header, txid:header
         transforms.outbox.table.expand.json.payload: true
@@ -443,3 +449,9 @@ parameters:
   - name: VERSION
     description: Kafka Connect version to use (should match the Kafka version of cluster and connect base image)
     value: "3.9.0"
+  - name: KCTR_ANNOTATION_KEY
+    description: Allows setting a single annotation key for connector management, such as restarting a task. Defaults to an ignored value
+    value: "kessel/no-op"
+  - name: KCTR_ANNOTATION_VAL
+    description: Allows setting a single annotation value for connector management, such as restarting a task. Defaults to an ignored value
+    value: ""

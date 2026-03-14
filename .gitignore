@@ -50,4 +50,4 @@ kafka-connect.tar
 multicluster-global-hub/
 scripts/kubeconfig-global-hub
 
-
+development/configs/monitoring/ephemeral-prometheus.yml

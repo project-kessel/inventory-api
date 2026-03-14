@@ -151,9 +151,18 @@ make inventory-down
 
 ## Monitoring Stack Only
 
-If you need just the monitoring stack for any other metrics related testing (such as monitoring other dependencies like the Kessel Inventory Consumer or Kessel Kafka Connect), this setup provides just Prometheus, Grafana, and Alertmanager. The Prometheus config includes extra scrape targets for capturing metrics from Kessel Inventory, Kessel Inventory Consumer, and Kessel Kafka Connect, when running locally through localhost or via port-forwarding when deployed in Ephemeral (See related [doc](https://github.com/project-kessel/inventory-consumer/blob/main/README.md#monitoring-in-ephemeral-using-podman-compose))  Grafana is also pre-loaded with the local prometheus data source and loads our current dashboards which were extracted from our [dashboards folder](../../dashboards/)
+If you need just the monitoring stack for metrics-related testing (such as monitoring other dependencies like the Kessel Inventory Consumer or Kessel Kafka Connect), this setup provides a local running Prometheus, Grafana, and Alertmanager, configured to scrape services running in Ephemeral. The Prometheus config is dynamically generated for your ephemeral namespace and captures metrics from Kessel Inventory, Kessel Inventory Consumer, and Kessel Kafka Connect in Ephemeral. Grafana is also pre-loaded with a `prometheus-ephem` data source and loads our current dashboards which were extracted from our [dashboards folder](../../dashboards/)
 
-To start Inventory and the monitoring stack:
+**Prerequisites**
+
+You must either deploy Kessel to ephemeral using bonfire **OR** target an existing ephemeral namespace where Kessel is already deployed
+* `bonfire deploy kessel -C kessel-inventory` (or `kessel-inventory-consumer` to capture all possible metrics)
+OR
+* `oc project existing-ephemeral-namespace`
+
+The latter option allows you to monitor another user's namespace for any particular reason such as onboarding assistance or troubleshooting.
+
+To start the monitoring stack:
 ```shell
 make monitoring-only
 ```
@@ -163,11 +172,10 @@ To stop the monitoring stack:
 make monitoring-down
 ```
 
-> Note: If it's your first time spinning up Grafana, there is an initial login configured that you'll need to reset.
+> Note: There is an initial login configured for Grafana by default that you'll need to reset or hit the `skip` link on the login page.
 > username: `admin`
 > password: `admin`.
-> You will be prompted to reset it afterwards.
-> The local running Prometheus is configured by default as a datasource so no other work is needed other than adding your own dashboards
+> Grafana is configured with 2 datasources, make sure to select `prometheus-ephem` on any dashboards.
 
 Grafana URL: http://localhost:3000
 

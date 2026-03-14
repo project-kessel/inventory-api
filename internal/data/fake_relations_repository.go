@@ -159,12 +159,12 @@ func (f *FakeRelationsRepository) Check(_ context.Context, resource model.Report
 	f.mu.RLock()
 	defer f.mu.RUnlock()
 
-	token := ""
-	if !consistency.MinimizeLatency() {
-		token = consistency.AtLeastAsFresh().Serialize()
+	tokenStr := ""
+	if t := model.ConsistencyAtLeastAsFreshToken(consistency); t != nil {
+		tokenStr = t.Serialize()
 	}
 
-	tuples := f.getTuplesForToken(token)
+	tuples := f.getTuplesForToken(tokenStr)
 	resultToken := f.formatToken()
 
 	subKey := subject.Subject()
@@ -207,11 +207,11 @@ func (f *FakeRelationsRepository) CheckBulk(_ context.Context, items []model.Che
 	f.mu.RLock()
 	defer f.mu.RUnlock()
 
-	token := ""
-	if !consistency.MinimizeLatency() {
-		token = consistency.AtLeastAsFresh().Serialize()
+	tokenStr := ""
+	if t := model.ConsistencyAtLeastAsFreshToken(consistency); t != nil {
+		tokenStr = t.Serialize()
 	}
-	tuples := f.getTuplesForToken(token)
+	tuples := f.getTuplesForToken(tokenStr)
 	resultToken := f.formatToken()
 
 	results := make([]model.CheckBulkResultItem, len(items))

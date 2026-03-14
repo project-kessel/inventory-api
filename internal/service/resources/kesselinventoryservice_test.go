@@ -10,7 +10,6 @@ import (
 	krlog "github.com/go-kratos/kratos/v2/log"
 	kratosTransport "github.com/go-kratos/kratos/v2/transport"
 	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2"
-	relationsV1beta1 "github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
 	"google.golang.org/protobuf/types/known/structpb"
 
 	"github.com/project-kessel/inventory-api/internal/data"
@@ -22,7 +21,6 @@ import (
 	"gorm.io/gorm"
 
 	authnapi "github.com/project-kessel/inventory-api/internal/authn/api"
-	"github.com/project-kessel/inventory-api/internal/authz"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
 	"github.com/project-kessel/inventory-api/internal/biz/usecase/metaauthorizer"
 	usecase "github.com/project-kessel/inventory-api/internal/biz/usecase/resources"
@@ -67,6 +65,15 @@ func buildTestSubjectReference(subjectID string) (model.SubjectReference, error)
 
 func newTestSelfSubjectStrategy() selfsubject.SelfSubjectStrategy {
 	return testSelfSubjectStrategy{}
+}
+
+// buildTestRelationsTuple creates a model.RelationsTuple for testing DeleteTuples.
+func buildTestRelationsTuple(resourceNamespace, resourceType, resourceID, relation, subjectNamespace, subjectType, subjectID string) model.RelationsTuple {
+	rid, _ := model.NewLocalResourceId(resourceID)
+	resource := model.NewRelationsResource(rid, model.NewRelationsObjectType(resourceType, resourceNamespace))
+	sid, _ := model.NewLocalResourceId(subjectID)
+	subject := model.NewRelationsSubject(model.NewRelationsResource(sid, model.NewRelationsObjectType(subjectType, subjectNamespace)))
+	return model.NewRelationsTuple(resource, relation, subject)
 }
 
 // StubAuthenticator is a configurable authenticator for testing.
@@ -120,7 +127,7 @@ func newTestServer(t *testing.T, cfg TestServerConfig) pb.KesselInventoryService
 type testUsecaseConfig struct {
 	Repo           model.ResourceRepository
 	SchemaRepo     model.SchemaRepository
-	Authz          model.Authorizer
+	RelationsRepo  model.RelationsRepository
 	Namespace      string
 	Config         *usecase.UsecaseConfig
 	MetaAuthorizer metaauthorizer.MetaAuthorizer
@@ -155,16 +162,16 @@ func newTestUsecase(t *testing.T, cfg testUsecaseConfig) *usecase.Usecase {
 		meta = &PermissiveMetaAuthorizer{}
 	}
 
-	// Default to SimpleAuthorizer when Authz is nil
-	authzImpl := cfg.Authz
-	if authzImpl == nil {
-		authzImpl = authz.NewSimpleAuthorizer()
+	// Default to FakeRelationsRepository when RelationsRepo is nil
+	relationsRepo := cfg.RelationsRepo
+	if relationsRepo == nil {
+		relationsRepo = data.NewFakeRelationsRepository()
 	}
 
 	return usecase.New(
 		repo,
 		schemaRepo,
-		authzImpl,
+		relationsRepo,
 		namespace,
 		krlog.NewStdLogger(io.Discard),
 		nil, // ListenManager
@@ -407,17 +414,14 @@ func IsValidType(val string) bool {
 }
 
 func TestToLookupResourceResponse(t *testing.T) {
-	input := &relationsV1beta1.LookupResourcesResponse{
-		Resource: &relationsV1beta1.ObjectReference{
-			Type: &relationsV1beta1.ObjectType{
-				Namespace: "reporter-x",
-				Name:      "type-y",
-			},
-			Id: "abc123",
-		},
-		Pagination: &relationsV1beta1.ResponsePagination{
-			ContinuationToken: "next-page-token",
-		},
+	resourceId, _ := model.NewLocalResourceId("abc123")
+	resourceType, _ := model.NewResourceType("type-y")
+	namespace, _ := model.NewReporterType("reporter-x")
+	input := &model.LookupResourceResult{
+		ResourceId:        resourceId,
+		ResourceType:      resourceType,
+		Namespace:         namespace,
+		ContinuationToken: "next-page-token",
 	}
 
 	expected := &pb.StreamedListObjectsResponse{
@@ -453,32 +457,16 @@ func TestInventoryService_CheckSelf_Allowed_XRhIdentity(t *testing.T) {
 	}
 
 	runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
-		mockAuthz := &mocks.MockAuthz{}
-		mockAuthz.
-			On("Check",
-				mock.Anything,
-				"hbi",
-				"view",
-				mock.Anything,
-				"host",
-				"dd1b73b9-3e33-4264-968c-e3ce55b9afec",
-				mock.MatchedBy(func(sub *relationsV1beta1.SubjectReference) bool {
-					return sub.Subject.Id == "user-123" &&
-						sub.Subject.Type.Name == "principal" &&
-						sub.Subject.Type.Namespace == "rbac"
-				}),
-			).
-			Return(relationsV1beta1.CheckResponse_ALLOWED_TRUE, &relationsV1beta1.ConsistencyToken{}, nil).
-			Once()
+		fakeRelations := data.NewFakeRelationsRepository()
+		fakeRelations.Grant("user-123", "view", "hbi", "host", "dd1b73b9-3e33-4264-968c-e3ce55b9afec")
 		return TestServerConfig{
-				Usecase:       newTestUsecase(t, testUsecaseConfig{Authz: mockAuthz}),
+				Usecase:       newTestUsecase(t, testUsecaseConfig{RelationsRepo: fakeRelations}),
 				Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
 			}, func(t *testing.T, tr *Transport) {
 				ctx := context.Background()
 				res := tr.Invoke(ctx, withBody(protoReq, CheckSelf, httpEndpoint("POST /api/kessel/v1beta2/checkself")))
 				resp := Extract(t, res, expectSuccess(func() *pb.CheckSelfResponse { return &pb.CheckSelfResponse{} }))
 				assert.Equal(t, pb.Allowed_ALLOWED_TRUE, resp.Allowed)
-				mockAuthz.AssertExpectations(t)
 			}
 	})
 }
@@ -499,32 +487,16 @@ func TestInventoryService_CheckSelf_Allowed_XRhIdentity_SubjectIdMatch(t *testin
 	}
 
 	runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
-		mockAuthz := &mocks.MockAuthz{}
-		mockAuthz.
-			On("Check",
-				mock.Anything,
-				"hbi",
-				"view",
-				mock.Anything,
-				"host",
-				"dd1b73b9-3e33-4264-968c-e3ce55b9afec",
-				mock.MatchedBy(func(sub *relationsV1beta1.SubjectReference) bool {
-					return sub.Subject.Id == "testuser" &&
-						sub.Subject.Type.Name == "principal" &&
-						sub.Subject.Type.Namespace == "rbac"
-				}),
-			).
-			Return(relationsV1beta1.CheckResponse_ALLOWED_TRUE, &relationsV1beta1.ConsistencyToken{}, nil).
-			Once()
+		fakeRelations := data.NewFakeRelationsRepository()
+		fakeRelations.Grant("testuser", "view", "hbi", "host", "dd1b73b9-3e33-4264-968c-e3ce55b9afec")
 		return TestServerConfig{
-				Usecase:       newTestUsecase(t, testUsecaseConfig{Authz: mockAuthz}),
+				Usecase:       newTestUsecase(t, testUsecaseConfig{RelationsRepo: fakeRelations}),
 				Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
 			}, func(t *testing.T, tr *Transport) {
 				ctx := context.Background()
 				res := tr.Invoke(ctx, withBody(protoReq, CheckSelf, httpEndpoint("POST /api/kessel/v1beta2/checkself")))
 				resp := Extract(t, res, expectSuccess(func() *pb.CheckSelfResponse { return &pb.CheckSelfResponse{} }))
 				assert.Equal(t, pb.Allowed_ALLOWED_TRUE, resp.Allowed)
-				mockAuthz.AssertExpectations(t)
 			}
 	})
 }
@@ -545,28 +517,15 @@ func TestInventoryService_CheckSelf_Denied(t *testing.T) {
 	}
 
 	runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
-		mockAuthz := &mocks.MockAuthz{}
-		mockAuthz.
-			On("Check",
-				mock.Anything,
-				"hbi",
-				"view",
-				mock.Anything,
-				"host",
-				"dd1b73b9-3e33-4264-968c-e3ce55b9afec",
-				mock.Anything,
-			).
-			Return(relationsV1beta1.CheckResponse_ALLOWED_FALSE, &relationsV1beta1.ConsistencyToken{}, nil).
-			Once()
+		// No grant - FakeRelationsRepository denies by default
 		return TestServerConfig{
-				Usecase:       newTestUsecase(t, testUsecaseConfig{Authz: mockAuthz}),
+				Usecase:       newTestUsecase(t, testUsecaseConfig{}),
 				Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
 			}, func(t *testing.T, tr *Transport) {
 				ctx := context.Background()
 				res := tr.Invoke(ctx, withBody(protoReq, CheckSelf, httpEndpoint("POST /api/kessel/v1beta2/checkself")))
 				resp := Extract(t, res, expectSuccess(func() *pb.CheckSelfResponse { return &pb.CheckSelfResponse{} }))
 				assert.Equal(t, pb.Allowed_ALLOWED_FALSE, resp.Allowed)
-				mockAuthz.AssertExpectations(t)
 			}
 	})
 }
@@ -621,60 +580,11 @@ func TestInventoryService_CheckSelfBulk_Allowed_XRhIdentity(t *testing.T) {
 	}
 
 	runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
-		mockAuthz := &mocks.MockAuthz{}
-		mockAuthz.
-			On("CheckBulk",
-				mock.Anything,
-				mock.MatchedBy(func(req *relationsV1beta1.CheckBulkRequest) bool {
-					if len(req.Items) != 2 {
-						return false
-					}
-					s1 := req.Items[0].Subject
-					s2 := req.Items[1].Subject
-					return s1.Subject.Id == "user-123" &&
-						s1.Subject.Type.Name == "principal" &&
-						s1.Subject.Type.Namespace == "rbac" &&
-						s2.Subject.Id == "user-123" &&
-						s2.Subject.Type.Name == "principal" &&
-						s2.Subject.Type.Namespace == "rbac"
-				}),
-			).
-			Return(&relationsV1beta1.CheckBulkResponse{
-				Pairs: []*relationsV1beta1.CheckBulkResponsePair{
-					{
-						Request: &relationsV1beta1.CheckBulkRequestItem{
-							Resource: &relationsV1beta1.ObjectReference{
-								Type: &relationsV1beta1.ObjectType{Namespace: "hbi", Name: "host"},
-								Id:   "resource-1",
-							},
-							Relation: "view",
-						},
-						Response: &relationsV1beta1.CheckBulkResponsePair_Item{
-							Item: &relationsV1beta1.CheckBulkResponseItem{
-								Allowed: relationsV1beta1.CheckBulkResponseItem_ALLOWED_TRUE,
-							},
-						},
-					},
-					{
-						Request: &relationsV1beta1.CheckBulkRequestItem{
-							Resource: &relationsV1beta1.ObjectReference{
-								Type: &relationsV1beta1.ObjectType{Namespace: "hbi", Name: "host"},
-								Id:   "resource-2",
-							},
-							Relation: "edit",
-						},
-						Response: &relationsV1beta1.CheckBulkResponsePair_Item{
-							Item: &relationsV1beta1.CheckBulkResponseItem{
-								Allowed: relationsV1beta1.CheckBulkResponseItem_ALLOWED_TRUE,
-							},
-						},
-					},
-				},
-				ConsistencyToken: &relationsV1beta1.ConsistencyToken{Token: "test-token"},
-			}, nil).
-			Once()
+		fakeRelations := data.NewFakeRelationsRepository()
+		fakeRelations.Grant("user-123", "view", "hbi", "host", "resource-1")
+		fakeRelations.Grant("user-123", "edit", "hbi", "host", "resource-2")
 		return TestServerConfig{
-				Usecase:       newTestUsecase(t, testUsecaseConfig{Authz: mockAuthz}),
+				Usecase:       newTestUsecase(t, testUsecaseConfig{RelationsRepo: fakeRelations}),
 				Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
 			}, func(t *testing.T, tr *Transport) {
 				ctx := context.Background()
@@ -684,8 +594,7 @@ func TestInventoryService_CheckSelfBulk_Allowed_XRhIdentity(t *testing.T) {
 				assert.Equal(t, pb.Allowed_ALLOWED_TRUE, resp.Pairs[0].GetItem().Allowed)
 				assert.Equal(t, pb.Allowed_ALLOWED_TRUE, resp.Pairs[1].GetItem().Allowed)
 				assert.NotNil(t, resp.ConsistencyToken)
-				assert.Equal(t, "test-token", resp.ConsistencyToken.GetToken())
-				mockAuthz.AssertExpectations(t)
+				assert.NotEmpty(t, resp.ConsistencyToken.GetToken())
 			}
 	})
 }
@@ -718,45 +627,11 @@ func TestInventoryService_CheckSelfBulk_MixedResults(t *testing.T) {
 	}
 
 	runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
-		mockAuthz := &mocks.MockAuthz{}
-		mockAuthz.
-			On("CheckBulk", mock.Anything, mock.Anything).
-			Return(&relationsV1beta1.CheckBulkResponse{
-				Pairs: []*relationsV1beta1.CheckBulkResponsePair{
-					{
-						Request: &relationsV1beta1.CheckBulkRequestItem{
-							Resource: &relationsV1beta1.ObjectReference{
-								Type: &relationsV1beta1.ObjectType{Namespace: "hbi", Name: "host"},
-								Id:   "resource-1",
-							},
-							Relation: "view",
-						},
-						Response: &relationsV1beta1.CheckBulkResponsePair_Item{
-							Item: &relationsV1beta1.CheckBulkResponseItem{
-								Allowed: relationsV1beta1.CheckBulkResponseItem_ALLOWED_TRUE,
-							},
-						},
-					},
-					{
-						Request: &relationsV1beta1.CheckBulkRequestItem{
-							Resource: &relationsV1beta1.ObjectReference{
-								Type: &relationsV1beta1.ObjectType{Namespace: "hbi", Name: "host"},
-								Id:   "resource-2",
-							},
-							Relation: "edit",
-						},
-						Response: &relationsV1beta1.CheckBulkResponsePair_Item{
-							Item: &relationsV1beta1.CheckBulkResponseItem{
-								Allowed: relationsV1beta1.CheckBulkResponseItem_ALLOWED_FALSE,
-							},
-						},
-					},
-				},
-				ConsistencyToken: &relationsV1beta1.ConsistencyToken{Token: "test-token"},
-			}, nil).
-			Once()
+		fakeRelations := data.NewFakeRelationsRepository()
+		fakeRelations.Grant("user-123", "view", "hbi", "host", "resource-1")
+		// No grant for resource-2 edit - will be denied
 		return TestServerConfig{
-				Usecase:       newTestUsecase(t, testUsecaseConfig{Authz: mockAuthz}),
+				Usecase:       newTestUsecase(t, testUsecaseConfig{RelationsRepo: fakeRelations}),
 				Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
 			}, func(t *testing.T, tr *Transport) {
 				ctx := context.Background()
@@ -769,7 +644,6 @@ func TestInventoryService_CheckSelfBulk_MixedResults(t *testing.T) {
 				assert.Equal(t, "view", resp.Pairs[0].Request.Relation)
 				assert.Equal(t, "resource-2", resp.Pairs[1].Request.Object.ResourceId)
 				assert.Equal(t, "edit", resp.Pairs[1].Request.Relation)
-				mockAuthz.AssertExpectations(t)
 			}
 	})
 }
@@ -794,49 +668,23 @@ func TestInventoryService_CheckSelfBulk_ResponseLengthMismatch(t *testing.T) {
 	}
 
 	runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
-		mockAuthz := &mocks.MockAuthz{}
-		mockAuthz.
-			On("CheckBulk", mock.Anything, mock.Anything).
-			Return(&relationsV1beta1.CheckBulkResponse{
-				Pairs: []*relationsV1beta1.CheckBulkResponsePair{
-					{
-						Request: &relationsV1beta1.CheckBulkRequestItem{
-							Resource: &relationsV1beta1.ObjectReference{
-								Type: &relationsV1beta1.ObjectType{Namespace: "hbi", Name: "host"},
-								Id:   "resource-1",
-							},
-							Relation: "view",
-						},
-						Response: &relationsV1beta1.CheckBulkResponsePair_Item{
-							Item: &relationsV1beta1.CheckBulkResponseItem{
-								Allowed: relationsV1beta1.CheckBulkResponseItem_ALLOWED_TRUE,
-							},
-						},
-					},
-					{
-						Request: &relationsV1beta1.CheckBulkRequestItem{
-							Resource: &relationsV1beta1.ObjectReference{
-								Type: &relationsV1beta1.ObjectType{Namespace: "hbi", Name: "host"},
-								Id:   "resource-2",
-							},
-							Relation: "view",
-						},
-						Response: &relationsV1beta1.CheckBulkResponsePair_Item{
-							Item: &relationsV1beta1.CheckBulkResponseItem{
-								Allowed: relationsV1beta1.CheckBulkResponseItem_ALLOWED_TRUE,
-							},
-						},
-					},
-				},
-			}, nil).
+		mockRelations := &mocks.MockRelationsRepository{}
+		// Return 2 items when 1 was requested - triggers Internal error for length mismatch
+		mockRelations.
+			On("CheckBulk", mock.Anything, mock.Anything, mock.Anything).
+			Return(
+				[]model.CheckBulkResultItem{{Allowed: true}, {Allowed: true}},
+				model.DeserializeConsistencyToken("test-token"),
+				nil,
+			).
 			Once()
 		return TestServerConfig{
-				Usecase:       newTestUsecase(t, testUsecaseConfig{Authz: mockAuthz}),
+				Usecase:       newTestUsecase(t, testUsecaseConfig{RelationsRepo: mockRelations}),
 				Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
 			}, func(t *testing.T, tr *Transport) {
 				ctx := context.Background()
 				res := tr.Invoke(ctx, withBody(protoReq, CheckSelfBulk, httpEndpoint("POST /api/kessel/v1beta2/checkselfbulk")))
-				Assert(t, res, requireError(codes.Internal).And(func(t *testing.T) { mockAuthz.AssertExpectations(t) }))
+				Assert(t, res, requireError(codes.Internal).And(func(t *testing.T) { mockRelations.AssertExpectations(t) }))
 			}
 	})
 }
@@ -952,10 +800,10 @@ func TestInventoryService_Check_Allowed(t *testing.T) {
 	}
 
 	runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
-		simpleAuthz := authz.NewSimpleAuthorizer()
-		simpleAuthz.Grant("subject-456", "view", "hbi", "host", "resource-abc")
+		fakeRelations := data.NewFakeRelationsRepository()
+		fakeRelations.Grant("subject-456", "view", "hbi", "host", "resource-abc")
 		return TestServerConfig{
-				Usecase:       newTestUsecase(t, testUsecaseConfig{Authz: simpleAuthz}),
+				Usecase:       newTestUsecase(t, testUsecaseConfig{RelationsRepo: fakeRelations}),
 				Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
 			}, func(t *testing.T, tr *Transport) {
 				ctx := context.Background()
@@ -1058,10 +906,10 @@ func TestInventoryService_CheckForUpdate_Allowed(t *testing.T) {
 	}
 
 	runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
-		simpleAuthz := authz.NewSimpleAuthorizer()
-		simpleAuthz.Grant("subject-789", "edit", "hbi", "host", "resource-xyz")
+		fakeRelations := data.NewFakeRelationsRepository()
+		fakeRelations.Grant("subject-789", "edit", "hbi", "host", "resource-xyz")
 		return TestServerConfig{
-				Usecase:       newTestUsecase(t, testUsecaseConfig{Authz: simpleAuthz}),
+				Usecase:       newTestUsecase(t, testUsecaseConfig{RelationsRepo: fakeRelations}),
 				Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
 			}, func(t *testing.T, tr *Transport) {
 				ctx := context.Background()
@@ -1183,10 +1031,10 @@ func TestInventoryService_CheckBulk_MixedResults(t *testing.T) {
 	}
 
 	runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
-		simpleAuthz := authz.NewSimpleAuthorizer()
-		simpleAuthz.Grant("subject-a", "view", "hbi", "host", "resource-1")
+		fakeRelations := data.NewFakeRelationsRepository()
+		fakeRelations.Grant("subject-a", "view", "hbi", "host", "resource-1")
 		return TestServerConfig{
-				Usecase:       newTestUsecase(t, testUsecaseConfig{Authz: simpleAuthz}),
+				Usecase:       newTestUsecase(t, testUsecaseConfig{RelationsRepo: fakeRelations}),
 				Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
 			}, func(t *testing.T, tr *Transport) {
 				ctx := context.Background()
@@ -1331,12 +1179,12 @@ func TestInventoryService_StreamedListObjects_Success(t *testing.T) {
 		AuthType:  authnapi.AuthTypeXRhIdentity,
 	}
 
-	// Set up SimpleAuthorizer with tuples that grant subject-xyz view on two hosts
-	simpleAuthz := authz.NewSimpleAuthorizer()
-	simpleAuthz.Grant("subject-xyz", "view", "hbi", "host", "host-1")
-	simpleAuthz.Grant("subject-xyz", "view", "hbi", "host", "host-2")
+	// Set up FakeRelationsRepository with tuples that grant subject-xyz view on two hosts
+	fakeRelations := data.NewFakeRelationsRepository()
+	fakeRelations.Grant("subject-xyz", "view", "hbi", "host", "host-1")
+	fakeRelations.Grant("subject-xyz", "view", "hbi", "host", "host-2")
 
-	uc := newTestUsecase(t, testUsecaseConfig{Authz: simpleAuthz})
+	uc := newTestUsecase(t, testUsecaseConfig{RelationsRepo: fakeRelations})
 	client := newTestServer(t, TestServerConfig{
 		Usecase:       uc,
 		Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
@@ -1615,37 +1463,19 @@ func TestInventoryService_CheckBulk_ConsistencyToken(t *testing.T) {
 			AuthType:  authnapi.AuthTypeXRhIdentity,
 		}
 
-		simpleAuthz := authz.NewSimpleAuthorizer()
+		fakeRelations := data.NewFakeRelationsRepository()
 		// Grant both permissions at initial version -> v3
-		simpleAuthz.Grant("subject-a", "view", "hbi", "host", "resource-1")
-		simpleAuthz.Grant("subject-b", "edit", "hbi", "host", "resource-2")
-		snapshotVersion := simpleAuthz.RetainCurrentSnapshot() // Retain at v3
+		fakeRelations.Grant("subject-a", "view", "hbi", "host", "resource-1")
+		fakeRelations.Grant("subject-b", "edit", "hbi", "host", "resource-2")
+		snapshotVersion := fakeRelations.RetainCurrentSnapshot() // Retain at v3
 
 		// Remove one permission -> v4
-		namespace := "hbi"
-		resourceType := "host"
-		resourceID := "resource-1"
-		relation := "view"
-		subjectNamespace := "rbac"
-		subjectType := "principal"
-		subjectID := "subject-a"
+		tupleToDelete := buildTestRelationsTuple("hbi", "host", "resource-1", "view", "rbac", "principal", "subject-a")
+		_, _ = fakeRelations.DeleteTuples(context.Background(), []model.RelationsTuple{tupleToDelete}, "", "")
 
-		_, _ = simpleAuthz.DeleteTuples(context.Background(), &relationsV1beta1.DeleteTuplesRequest{
-			Filter: &relationsV1beta1.RelationTupleFilter{
-				ResourceNamespace: &namespace,
-				ResourceType:      &resourceType,
-				ResourceId:        &resourceID,
-				Relation:          &relation,
-				SubjectFilter: &relationsV1beta1.SubjectFilter{
-					SubjectNamespace: &subjectNamespace,
-					SubjectType:      &subjectType,
-					SubjectId:        &subjectID,
-				},
-			},
-		})
-		currentVersion := simpleAuthz.Version()
+		currentVersion := fakeRelations.Version()
 
-		uc := newTestUsecase(t, testUsecaseConfig{Authz: simpleAuthz})
+		uc := newTestUsecase(t, testUsecaseConfig{RelationsRepo: fakeRelations})
 		cfg := TestServerConfig{
 			Usecase:       uc,
 			Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
@@ -1802,38 +1632,20 @@ func TestInventoryService_CheckSelfBulk_ConsistencyToken(t *testing.T) {
 			AuthType:  authnapi.AuthTypeXRhIdentity,
 		}
 
-		simpleAuthz := authz.NewSimpleAuthorizer()
+		fakeRelations := data.NewFakeRelationsRepository()
 		// Grant permission at initial version -> v3
 		// The self subject strategy maps "subject-a" to rbac/principal/subject-a
-		simpleAuthz.Grant("subject-a", "view", "hbi", "host", "resource-1")
-		simpleAuthz.Grant("subject-a", "edit", "hbi", "host", "resource-2")
-		snapshotVersion := simpleAuthz.RetainCurrentSnapshot() // Retain at v3
+		fakeRelations.Grant("subject-a", "view", "hbi", "host", "resource-1")
+		fakeRelations.Grant("subject-a", "edit", "hbi", "host", "resource-2")
+		snapshotVersion := fakeRelations.RetainCurrentSnapshot() // Retain at v3
 
 		// Remove one permission -> v4
-		namespace := "hbi"
-		resourceType := "host"
-		resourceID := "resource-1"
-		relation := "view"
-		subjectNamespace := "rbac"
-		subjectType := "principal"
-		subjectID := "subject-a"
+		tupleToDelete := buildTestRelationsTuple("hbi", "host", "resource-1", "view", "rbac", "principal", "subject-a")
+		_, _ = fakeRelations.DeleteTuples(context.Background(), []model.RelationsTuple{tupleToDelete}, "", "")
 
-		_, _ = simpleAuthz.DeleteTuples(context.Background(), &relationsV1beta1.DeleteTuplesRequest{
-			Filter: &relationsV1beta1.RelationTupleFilter{
-				ResourceNamespace: &namespace,
-				ResourceType:      &resourceType,
-				ResourceId:        &resourceID,
-				Relation:          &relation,
-				SubjectFilter: &relationsV1beta1.SubjectFilter{
-					SubjectNamespace: &subjectNamespace,
-					SubjectType:      &subjectType,
-					SubjectId:        &subjectID,
-				},
-			},
-		})
-		currentVersion := simpleAuthz.Version()
+		currentVersion := fakeRelations.Version()
 
-		uc := newTestUsecase(t, testUsecaseConfig{Authz: simpleAuthz})
+		uc := newTestUsecase(t, testUsecaseConfig{RelationsRepo: fakeRelations})
 		cfg := TestServerConfig{
 			Usecase:       uc,
 			Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
@@ -2091,10 +1903,10 @@ func TestInventoryService_Check_ReporterWithInstanceId(t *testing.T) {
 				},
 			},
 		}
-		simpleAuthz := authz.NewSimpleAuthorizer()
-		simpleAuthz.Grant("subject-456", "view", "hbi", "host", "resource-with-instance")
+		fakeRelations := data.NewFakeRelationsRepository()
+		fakeRelations.Grant("subject-456", "view", "hbi", "host", "resource-with-instance")
 		return TestServerConfig{
-				Usecase:       newTestUsecase(t, testUsecaseConfig{Authz: simpleAuthz}),
+				Usecase:       newTestUsecase(t, testUsecaseConfig{RelationsRepo: fakeRelations}),
 				Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
 			}, func(t *testing.T, tr *Transport) {
 				ctx := context.Background()
@@ -2108,10 +1920,10 @@ func TestInventoryService_Check_ReporterWithInstanceId(t *testing.T) {
 // --- StreamedListObjects with NoIdentity ---
 
 func TestInventoryService_StreamedListObjects_NoIdentity(t *testing.T) {
-	simpleAuthz := authz.NewSimpleAuthorizer()
-	simpleAuthz.Grant("subject-xyz", "view", "hbi", "host", "host-1")
+	fakeRelations := data.NewFakeRelationsRepository()
+	fakeRelations.Grant("subject-xyz", "view", "hbi", "host", "host-1")
 
-	uc := newTestUsecase(t, testUsecaseConfig{Authz: simpleAuthz})
+	uc := newTestUsecase(t, testUsecaseConfig{RelationsRepo: fakeRelations})
 	// Use DenyAuthenticator to simulate unauthenticated streaming request
 	client := newTestServer(t, TestServerConfig{
 		Usecase:       uc,
@@ -2600,11 +2412,11 @@ func TestInventoryService_CheckBulk_MetaAuthzProtocolBehavior(t *testing.T) {
 	}
 
 	runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
-		simpleAuthz := authz.NewSimpleAuthorizer()
-		simpleAuthz.Grant("subject-a", "view", "hbi", "host", "resource-1")
+		fakeRelations := data.NewFakeRelationsRepository()
+		fakeRelations.Grant("subject-a", "view", "hbi", "host", "resource-1")
 		return TestServerConfig{
 				Usecase: newTestUsecase(t, testUsecaseConfig{
-					Authz:          simpleAuthz,
+					RelationsRepo:  fakeRelations,
 					MetaAuthorizer: metaauthorizer.NewSimpleMetaAuthorizer(),
 				}),
 				Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},

@@ -15,9 +15,7 @@ import (
 	"github.com/project-kessel/inventory-api/internal/metricscollector"
 	"github.com/project-kessel/inventory-api/internal/pubsub"
 	"github.com/project-kessel/inventory-api/internal/subject/selfsubject"
-	kessel "github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
 	"github.com/sony/gobreaker"
-	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"gorm.io/gorm"
@@ -64,7 +62,7 @@ type Usecase struct {
 	schemaService       *model.SchemaService
 	resourceRepository  model.ResourceRepository
 	waitForNotifBreaker *gobreaker.CircuitBreaker
-	Authz               model.Authorizer
+	RelationsRepo       model.RelationsRepository
 	MetaAuthorizer      metaauthorizer.MetaAuthorizer
 	Namespace           string
 	Log                 *log.Helper
@@ -75,7 +73,7 @@ type Usecase struct {
 }
 
 func New(resourceRepository model.ResourceRepository, schemaRepository model.SchemaRepository,
-	authz model.Authorizer, namespace string, logger log.Logger,
+	relationsRepo model.RelationsRepository, namespace string, logger log.Logger,
 	listenManager pubsub.ListenManagerImpl, waitForNotifBreaker *gobreaker.CircuitBreaker, usecaseConfig *UsecaseConfig, metricsCollector *metricscollector.MetricsCollector, metaAuthorizer metaauthorizer.MetaAuthorizer, selfSubjectStrategy selfsubject.SelfSubjectStrategy) *Usecase {
 	if metaAuthorizer == nil {
 		metaAuthorizer = metaauthorizer.NewSimpleMetaAuthorizer()
@@ -85,7 +83,7 @@ func New(resourceRepository model.ResourceRepository, schemaRepository model.Sch
 		resourceRepository:  resourceRepository,
 		schemaService:       model.NewSchemaService(schemaRepository, log.NewHelper(logger)),
 		waitForNotifBreaker: waitForNotifBreaker,
-		Authz:               authz,
+		RelationsRepo:       relationsRepo,
 		MetaAuthorizer:      metaAuthorizer,
 		Namespace:           namespace,
 		Log:                 log.NewHelper(logger),
@@ -355,18 +353,11 @@ func (uc *Usecase) CheckForUpdate(ctx context.Context, relation model.Relation, 
 		return false, err
 	}
 
-	// Convert model types to v1beta1 for the Authz interface
-	namespace := reporterResourceKey.ReporterType().Serialize()
-	v1beta1Subject := subjectToV1Beta1(sub)
-	allowed, _, err := uc.Authz.CheckForUpdate(ctx, namespace, relation.Serialize(), reporterResourceKey.ResourceType().Serialize(), reporterResourceKey.LocalResourceId().Serialize(), v1beta1Subject)
+	allowed, _, err := uc.RelationsRepo.CheckForUpdate(ctx, reporterResourceKey, relation, sub)
 	if err != nil {
 		return false, err
 	}
-
-	if allowed == kessel.CheckForUpdateResponse_ALLOWED_TRUE {
-		return true, nil
-	}
-	return false, nil
+	return allowed, nil
 }
 
 // CheckBulk performs bulk permission checks.
@@ -379,14 +370,39 @@ func (uc *Usecase) CheckBulk(ctx context.Context, cmd CheckBulkCommand) (*CheckB
 		}
 	}
 
-	// Convert to v1beta1 for the Authz interface
-	v1beta1Req := checkBulkCommandToV1beta1(cmd)
-	resp, err := uc.Authz.CheckBulk(ctx, v1beta1Req)
+	checkItems := make([]model.CheckItem, len(cmd.Items))
+	for i, item := range cmd.Items {
+		checkItems[i] = model.CheckItem{
+			Resource: item.Resource,
+			Relation: item.Relation,
+			Subject:  item.Subject,
+		}
+	}
+
+	results, token, err := uc.RelationsRepo.CheckBulk(ctx, checkItems, cmd.Consistency)
 	if err != nil {
 		return nil, err
 	}
 
-	return checkBulkResultFromV1beta1(resp, cmd)
+	if len(results) != len(cmd.Items) {
+		return nil, status.Errorf(codes.Internal, "internal error: mismatched backend check results: expected %d pairs, got %d", len(cmd.Items), len(results))
+	}
+
+	pairs := make([]CheckBulkResultPair, len(results))
+	for i, result := range results {
+		pairs[i] = CheckBulkResultPair{
+			Request: cmd.Items[i],
+			Result: CheckBulkResultItem{
+				Allowed: result.Allowed,
+				Error:   result.Error,
+			},
+		}
+	}
+
+	return &CheckBulkResult{
+		Pairs:            pairs,
+		ConsistencyToken: token,
+	}, nil
 }
 
 // CheckSelfBulk performs bulk permission checks for the authenticated user.
@@ -405,7 +421,6 @@ func (uc *Usecase) CheckSelfBulk(ctx context.Context, cmd CheckSelfBulkCommand) 
 		return nil, err
 	}
 
-	// Convert to CheckBulkCommand with the resolved subject
 	bulkCmd := CheckBulkCommand{
 		Items:       make([]CheckBulkItem, len(cmd.Items)),
 		Consistency: cmd.Consistency,
@@ -418,60 +433,51 @@ func (uc *Usecase) CheckSelfBulk(ctx context.Context, cmd CheckSelfBulkCommand) 
 		}
 	}
 
-	// Convert to v1beta1 for the Authz interface
-	v1beta1Req := checkBulkCommandToV1beta1(bulkCmd)
-	resp, err := uc.Authz.CheckBulk(ctx, v1beta1Req)
-	if err != nil {
-		return nil, err
-	}
-
-	return checkBulkResultFromV1beta1(resp, bulkCmd)
+	return uc.CheckBulk(ctx, bulkCmd)
 }
 
 func (uc *Usecase) checkPermission(ctx context.Context, relation model.Relation, sub model.SubjectReference, reporterResourceKey model.ReporterResourceKey) (bool, error) {
 	res, err := uc.resourceRepository.FindResourceByKeys(nil, reporterResourceKey)
-	var consistencyToken string
+	var consistency model.Consistency
 	if err != nil {
 		log.Info("Did not find resource")
-		// If the resource doesn't exist in inventory (ie. no consistency token available)
-		// we send a check request with minimize latency
-		// err otherwise.
 		if !errors.Is(err, gorm.ErrRecordNotFound) {
 			return false, err
 		}
-
-		consistencyToken = ""
+		consistency = model.NewConsistencyMinimizeLatency()
 	} else {
-		consistencyToken = res.ConsistencyToken().Serialize()
+		token := res.ConsistencyToken()
+		if token == "" {
+			consistency = model.NewConsistencyMinimizeLatency()
+		} else {
+			consistency = model.NewConsistencyAtLeastAsFresh(token)
+		}
 	}
 
-	// Convert model types to v1beta1 for the Authz interface
-	namespace := reporterResourceKey.ReporterType().Serialize()
-	v1beta1Subject := subjectToV1Beta1(sub)
-	allowed, _, err := uc.Authz.Check(ctx, namespace, relation.Serialize(), consistencyToken, reporterResourceKey.ResourceType().Serialize(), reporterResourceKey.LocalResourceId().Serialize(), v1beta1Subject)
+	allowed, _, err := uc.RelationsRepo.Check(ctx, reporterResourceKey, relation, sub, consistency)
 	if err != nil {
 		return false, err
 	}
-
-	if allowed == kessel.CheckResponse_ALLOWED_TRUE {
-		return true, nil
-	}
-	return false, nil
+	return allowed, nil
 }
 
 // LookupResources delegates resource lookup to the authorization service.
-// Returns a streaming client for receiving lookup results.
-// TODO: remove v1beta1 response type
-func (uc *Usecase) LookupResources(ctx context.Context, cmd LookupResourcesCommand) (grpc.ServerStreamingClient[kessel.LookupResourcesResponse], error) {
-	// Meta-authorize against the resource type (not a specific resource instance)
+// Returns an iterator for receiving lookup results.
+func (uc *Usecase) LookupResources(ctx context.Context, cmd LookupResourcesCommand) (model.LookupResourcesIterator, error) {
 	metaObject := metaauthorizer.NewResourceTypeRef(cmd.ReporterType, cmd.ResourceType)
 	if err := uc.enforceMetaAuthzObject(ctx, metaauthorizer.RelationLookupResources, metaObject); err != nil {
 		return nil, err
 	}
 
-	// Convert to v1beta1 for the Authz interface
-	v1beta1Req := lookupResourcesCommandToV1beta1(cmd)
-	return uc.Authz.LookupResources(ctx, v1beta1Req)
+	return uc.RelationsRepo.LookupResources(ctx, model.LookupResourcesQuery{
+		ResourceType: cmd.ResourceType,
+		ReporterType: cmd.ReporterType,
+		Relation:     cmd.Relation,
+		Subject:      cmd.Subject,
+		Limit:        cmd.Limit,
+		Continuation: cmd.Continuation,
+		Consistency:  cmd.Consistency,
+	})
 }
 
 func (uc *Usecase) selfSubjectFromContext(ctx context.Context) (model.SubjectReference, error) {
@@ -547,151 +553,12 @@ func (uc *Usecase) validateReportResourceCommand(ctx context.Context, cmd Report
 	return nil
 }
 
-// subjectToV1Beta1 converts a model.SubjectReference to a v1beta1 SubjectReference for the Authz interface.
-func subjectToV1Beta1(sub model.SubjectReference) *kessel.SubjectReference {
-	subKey := sub.Subject()
-	ref := &kessel.SubjectReference{
-		Subject: &kessel.ObjectReference{
-			Type: &kessel.ObjectType{
-				Namespace: subKey.ReporterType().Serialize(),
-				Name:      subKey.ResourceType().Serialize(),
-			},
-			Id: subKey.LocalResourceId().Serialize(),
-		},
-	}
-	if sub.HasRelation() {
-		relation := sub.Relation().Serialize()
-		ref.Relation = &relation
-	}
-	return ref
-}
-
-// checkBulkCommandToV1beta1 converts a CheckBulkCommand to v1beta1 for the Authz interface.
-func checkBulkCommandToV1beta1(cmd CheckBulkCommand) *kessel.CheckBulkRequest {
-	items := make([]*kessel.CheckBulkRequestItem, len(cmd.Items))
-	for i, item := range cmd.Items {
-		items[i] = &kessel.CheckBulkRequestItem{
-			Resource: &kessel.ObjectReference{
-				Type: &kessel.ObjectType{
-					Namespace: item.Resource.ReporterType().Serialize(),
-					Name:      item.Resource.ResourceType().Serialize(),
-				},
-				Id: item.Resource.LocalResourceId().Serialize(),
-			},
-			Relation: item.Relation.Serialize(),
-			Subject:  subjectToV1Beta1(item.Subject),
-		}
-	}
-
-	var consistency *kessel.Consistency
-	if !cmd.Consistency.MinimizeLatency() {
-		consistency = &kessel.Consistency{
-			Requirement: &kessel.Consistency_AtLeastAsFresh{
-				AtLeastAsFresh: &kessel.ConsistencyToken{
-					Token: cmd.Consistency.AtLeastAsFresh().Serialize(),
-				},
-			},
-		}
-	} else {
-		consistency = &kessel.Consistency{
-			Requirement: &kessel.Consistency_MinimizeLatency{
-				MinimizeLatency: true,
-			},
-		}
-	}
-
-	return &kessel.CheckBulkRequest{
-		Items:       items,
-		Consistency: consistency,
-	}
-}
-
-// checkBulkResultFromV1beta1 converts a v1beta1 CheckBulkResponse to CheckBulkResult.
-// Returns error if the response length doesn't match the command items length.
-func checkBulkResultFromV1beta1(resp *kessel.CheckBulkResponse, cmd CheckBulkCommand) (*CheckBulkResult, error) {
-	respPairs := resp.GetPairs()
-	if len(respPairs) != len(cmd.Items) {
-		return nil, status.Errorf(codes.Internal, "internal error: mismatched backend check results: expected %d pairs, got %d", len(cmd.Items), len(respPairs))
-	}
-
-	pairs := make([]CheckBulkResultPair, len(respPairs))
-	for i, pair := range respPairs {
-		var resultItem CheckBulkResultItem
-		if pair.GetError() != nil {
-			resultItem = CheckBulkResultItem{
-				Allowed:   false,
-				Error:     fmt.Errorf("check failed: %s", pair.GetError().GetMessage()),
-				ErrorCode: pair.GetError().GetCode(),
-			}
-		} else if pair.GetItem() != nil {
-			resultItem = CheckBulkResultItem{
-				Allowed:   pair.GetItem().GetAllowed() == kessel.CheckBulkResponseItem_ALLOWED_TRUE,
-				Error:     nil,
-				ErrorCode: 0,
-			}
-		}
-
-		pairs[i] = CheckBulkResultPair{
-			Request: cmd.Items[i],
-			Result:  resultItem,
-		}
-	}
-
-	var token model.ConsistencyToken
-	if resp.GetConsistencyToken() != nil {
-		token = model.DeserializeConsistencyToken(resp.GetConsistencyToken().GetToken())
-	}
-
-	return &CheckBulkResult{
-		Pairs:            pairs,
-		ConsistencyToken: token,
-	}, nil
-}
-
 func getNextTransactionID() (string, error) {
 	txid, err := uuid.NewV7()
 	if err != nil {
 		return "", err
 	}
 	return txid.String(), nil
-}
-
-// lookupResourcesCommandToV1beta1 converts a LookupResourcesCommand to v1beta1.
-func lookupResourcesCommandToV1beta1(cmd LookupResourcesCommand) *kessel.LookupResourcesRequest {
-	var continuationToken *string
-	if cmd.Continuation != "" {
-		continuationToken = &cmd.Continuation
-	}
-	var consistency *kessel.Consistency
-	if !cmd.Consistency.MinimizeLatency() {
-		consistency = &kessel.Consistency{
-			Requirement: &kessel.Consistency_AtLeastAsFresh{
-				AtLeastAsFresh: &kessel.ConsistencyToken{
-					Token: cmd.Consistency.AtLeastAsFresh().Serialize(),
-				},
-			},
-		}
-	} else {
-		consistency = &kessel.Consistency{
-			Requirement: &kessel.Consistency_MinimizeLatency{
-				MinimizeLatency: true,
-			},
-		}
-	}
-
-	return &kessel.LookupResourcesRequest{
-		ResourceType: &kessel.ObjectType{
-			Namespace: cmd.ReporterType.Serialize(),
-			Name:      cmd.ResourceType.Serialize(),
-		},
-		Relation: cmd.Relation.Serialize(),
-		Subject:  subjectToV1Beta1(cmd.Subject),
-		Pagination: &kessel.RequestPagination{
-			Limit:             cmd.Limit,
-			ContinuationToken: continuationToken,
-		},
-		Consistency: consistency,
-	}
 }
 
 // isSPInAllowlist checks if the caller subject is in the allowlist.

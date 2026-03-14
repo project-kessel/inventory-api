@@ -253,4 +253,3 @@ func makeEventType(eventType, resourceType, operation string) string {
 func makeEventSubject(eventType, resourceType, resourceId string) string {
 	return "/" + strings.Join([]string{eventType, resourceType, resourceId}, "/")
 }
-

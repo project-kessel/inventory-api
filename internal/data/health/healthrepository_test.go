@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"github.com/project-kessel/inventory-api/internal/mocks"
-	kesselv1 "github.com/project-kessel/relations-api/api/kessel/relations/v1"
 
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/stretchr/testify/assert"
@@ -14,8 +13,6 @@ import (
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 
-	"github.com/project-kessel/inventory-api/internal/authz"
-	"github.com/project-kessel/inventory-api/internal/authz/kessel"
 	"github.com/project-kessel/inventory-api/internal/data"
 )
 
@@ -29,18 +26,22 @@ func setupGorm(t *testing.T) *gorm.DB {
 	return db
 }
 
+func allowAllRelationsConfig() data.RelationsCompletedConfig {
+	opts := data.NewRelationsOptionsRoot()
+	cfg, _ := data.NewRelationsConfig(opts).Complete(context.TODO())
+	return cfg
+}
+
 func TestHealthInit(t *testing.T) {
 	db := setupGorm(t)
 	ctx := context.TODO()
-	authConfig, _ := authz.NewConfig(authz.NewOptions()).Complete(ctx)
-	kesselConfig, _ := kessel.NewConfig(kessel.NewOptions()).Complete(ctx)
-	authorizer, _ := kessel.New(ctx, kesselConfig, log.NewHelper(log.DefaultLogger))
 
-	healthRepo := New(db, authorizer, authConfig)
+	mockRepo := &mocks.MockRelationsRepository{}
+	mockRepo.On("Health", ctx).Return(errors.New("RELATIONS-API UNHEALTHY"))
+
+	healthRepo := New(db, mockRepo, allowAllRelationsConfig())
 	assert.NotNil(t, healthRepo)
 
-	// just check default negative case for now when using sqlite db, and empty config
-	// storage should be okay, relations api should not because tokenConfig is empty
 	resp, err := healthRepo.IsBackendAvailable(ctx)
 	assert.Nil(t, err)
 	assert.Equal(t, uint32(500), resp.Code)
@@ -54,12 +55,13 @@ func TestHealthInit(t *testing.T) {
 
 func TestHealthRepo_IsBackendAvailable_AllCases(t *testing.T) {
 	ctx := context.TODO()
-	authConfig, _ := authz.NewConfig(authz.NewOptions()).Complete(ctx)
-	kesselConfig, _ := kessel.NewConfig(kessel.NewOptions()).Complete(ctx)
-	authorizer, _ := kessel.New(ctx, kesselConfig, log.NewHelper(log.DefaultLogger))
+	relConfig := allowAllRelationsConfig()
 
 	db := setupGorm(t)
-	healthRepo := New(db, authorizer, authConfig)
+	unhealthyRepo := &mocks.MockRelationsRepository{}
+	unhealthyRepo.On("Health", ctx).Return(errors.New("RELATIONS-API UNHEALTHY"))
+
+	healthRepo := New(db, unhealthyRepo, relConfig)
 	assert.NotNil(t, healthRepo)
 	resp, err := healthRepo.IsBackendAvailable(ctx)
 	assert.Nil(t, err)
@@ -77,22 +79,22 @@ func TestHealthRepo_IsBackendAvailable_AllCases(t *testing.T) {
 	assert.Contains(t, resp.Status, "RELATIONS-API UNHEALTHY")
 
 	db1 := setupGorm(t)
-	mockAuthz1 := &mocks.MockAuthz{}
-	mockAuthz1.On("Health", ctx).Return(&kesselv1.GetReadyzResponse{Status: "OK"}, nil)
-	healthRepo1 := New(db1, mockAuthz1, authConfig)
+	healthyRepo1 := &mocks.MockRelationsRepository{}
+	healthyRepo1.On("Health", ctx).Return(nil)
+	healthRepo1 := New(db1, healthyRepo1, relConfig)
 	resp, err = healthRepo1.IsBackendAvailable(ctx)
 	assert.NoError(t, err)
 	assert.Equal(t, uint32(200), resp.Code)
 	assert.Contains(t, resp.Status, "Storage type sqlite")
 
 	db2 := setupGorm(t)
-	mockAuthz2 := &mocks.MockAuthz{}
-	mockAuthz2.On("Health", ctx).Return(&kesselv1.GetReadyzResponse{Status: "OK"}, nil)
+	healthyRepo2 := &mocks.MockRelationsRepository{}
+	healthyRepo2.On("Health", ctx).Return(nil)
 	sqlDB2, _ := db2.DB()
 	if err := sqlDB2.Close(); err != nil {
 		t.Logf("Warning: failed to close db: %v", err)
 	}
-	healthRepo2 := New(db2, mockAuthz2, authConfig)
+	healthRepo2 := New(db2, healthyRepo2, relConfig)
 	resp, err = healthRepo2.IsBackendAvailable(ctx)
 	assert.NoError(t, err)
 	assert.Equal(t, uint32(500), resp.Code)
@@ -100,12 +102,11 @@ func TestHealthRepo_IsBackendAvailable_AllCases(t *testing.T) {
 	assert.NotContains(t, resp.Status, "RELATIONS-API UNHEALTHY")
 
 	db3 := setupGorm(t)
-	mockAuthz3 := &mocks.MockAuthz{}
-	mockAuthz3.On("Health", ctx).Return((*kesselv1.GetReadyzResponse)(nil), errors.New("RELATIONS-API UNHEALTHY"))
-	healthRepo3 := New(db3, mockAuthz3, authConfig)
+	unhealthyRepo3 := &mocks.MockRelationsRepository{}
+	unhealthyRepo3.On("Health", ctx).Return(errors.New("RELATIONS-API UNHEALTHY"))
+	healthRepo3 := New(db3, unhealthyRepo3, relConfig)
 	resp, err = healthRepo3.IsBackendAvailable(ctx)
 	assert.NoError(t, err)
 	assert.Equal(t, uint32(500), resp.Code)
 	assert.Equal(t, "RELATIONS-API UNHEALTHY", resp.Status)
-
 }

@@ -2,17 +2,13 @@ package mocks
 
 import (
 	"context"
-	"io"
 
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
 	"github.com/go-kratos/kratos/v2/transport"
 	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1"
+	"github.com/project-kessel/inventory-api/internal/biz/model"
 	"github.com/project-kessel/inventory-api/internal/pubsub"
-	kesselv1 "github.com/project-kessel/relations-api/api/kessel/relations/v1"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/metadata"
 
-	"github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
 	"github.com/stretchr/testify/mock"
 )
 
@@ -37,69 +33,53 @@ func (m *MockHealthRepo) IsRelationsAvailable(ctx context.Context) (*pb.GetReady
 
 }
 
-type MockAuthz struct {
+type MockRelationsRepository struct {
 	mock.Mock
 }
 
-func (m *MockAuthz) Health(ctx context.Context) (*kesselv1.GetReadyzResponse, error) {
+func (m *MockRelationsRepository) Health(ctx context.Context) error {
 	args := m.Called(ctx)
-	return args.Get(0).(*kesselv1.GetReadyzResponse), args.Error(1)
+	return args.Error(0)
 }
 
-func (m *MockAuthz) Check(ctx context.Context, namespace string, permission string, consistencyToken string, resourceType string, localResourceId string, sub *v1beta1.SubjectReference) (v1beta1.CheckResponse_Allowed, *v1beta1.ConsistencyToken, error) {
-	args := m.Called(ctx, namespace, permission, consistencyToken, resourceType, localResourceId, sub)
-	return args.Get(0).(v1beta1.CheckResponse_Allowed), args.Get(1).(*v1beta1.ConsistencyToken), args.Error(2)
+func (m *MockRelationsRepository) Check(ctx context.Context, resource model.ReporterResourceKey, relation model.Relation,
+	subject model.SubjectReference, consistency model.Consistency) (bool, model.ConsistencyToken, error) {
+	args := m.Called(ctx, resource, relation, subject, consistency)
+	return args.Bool(0), args.Get(1).(model.ConsistencyToken), args.Error(2)
 }
 
-func (m *MockAuthz) CheckForUpdate(ctx context.Context, namespace string, permission string, resourceType string, localResourceId string, sub *v1beta1.SubjectReference) (v1beta1.CheckForUpdateResponse_Allowed, *v1beta1.ConsistencyToken, error) {
-	args := m.Called(ctx, namespace, permission, resourceType, localResourceId, sub)
-	return args.Get(0).(v1beta1.CheckForUpdateResponse_Allowed), args.Get(1).(*v1beta1.ConsistencyToken), args.Error(2)
+func (m *MockRelationsRepository) CheckForUpdate(ctx context.Context, resource model.ReporterResourceKey, relation model.Relation,
+	subject model.SubjectReference) (bool, model.ConsistencyToken, error) {
+	args := m.Called(ctx, resource, relation, subject)
+	return args.Bool(0), args.Get(1).(model.ConsistencyToken), args.Error(2)
 }
 
-func (m *MockAuthz) CheckBulk(ctx context.Context, req *v1beta1.CheckBulkRequest) (*v1beta1.CheckBulkResponse, error) {
-	args := m.Called(ctx, req)
-	return args.Get(0).(*v1beta1.CheckBulkResponse), args.Error(1)
+func (m *MockRelationsRepository) CheckBulk(ctx context.Context, items []model.CheckItem,
+	consistency model.Consistency) ([]model.CheckBulkResultItem, model.ConsistencyToken, error) {
+	args := m.Called(ctx, items, consistency)
+	return args.Get(0).([]model.CheckBulkResultItem), args.Get(1).(model.ConsistencyToken), args.Error(2)
 }
 
-func (m *MockAuthz) CheckForUpdateBulk(ctx context.Context, req *v1beta1.CheckForUpdateBulkRequest) (*v1beta1.CheckForUpdateBulkResponse, error) {
-	args := m.Called(ctx, req)
-	return args.Get(0).(*v1beta1.CheckForUpdateBulkResponse), args.Error(1)
+func (m *MockRelationsRepository) LookupResources(ctx context.Context, query model.LookupResourcesQuery) (model.LookupResourcesIterator, error) {
+	args := m.Called(ctx, query)
+	return args.Get(0).(model.LookupResourcesIterator), args.Error(1)
 }
 
-func (m *MockAuthz) AcquireLock(ctx context.Context, req *v1beta1.AcquireLockRequest) (*v1beta1.AcquireLockResponse, error) {
-	args := m.Called(ctx, req)
-	return args.Get(0).(*v1beta1.AcquireLockResponse), args.Error(1)
+func (m *MockRelationsRepository) CreateTuples(ctx context.Context, tuples []model.RelationsTuple, upsert bool,
+	lockId, lockToken string) (model.ConsistencyToken, error) {
+	args := m.Called(ctx, tuples, upsert, lockId, lockToken)
+	return args.Get(0).(model.ConsistencyToken), args.Error(1)
 }
 
-func (m *MockAuthz) CreateTuples(ctx context.Context, req *v1beta1.CreateTuplesRequest) (*v1beta1.CreateTuplesResponse, error) {
-	args := m.Called(ctx, req)
-	return args.Get(0).(*v1beta1.CreateTuplesResponse), args.Error(1)
+func (m *MockRelationsRepository) DeleteTuples(ctx context.Context, tuples []model.RelationsTuple,
+	lockId, lockToken string) (model.ConsistencyToken, error) {
+	args := m.Called(ctx, tuples, lockId, lockToken)
+	return args.Get(0).(model.ConsistencyToken), args.Error(1)
 }
 
-func (m *MockAuthz) DeleteTuples(ctx context.Context, request *v1beta1.DeleteTuplesRequest) (*v1beta1.DeleteTuplesResponse, error) {
-	args := m.Called(ctx, request)
-	return args.Get(0).(*v1beta1.DeleteTuplesResponse), args.Error(1)
-}
-
-func (m *MockAuthz) UnsetWorkspace(ctx context.Context, namespace, localResourceId, resourceType string) (*v1beta1.DeleteTuplesResponse, error) {
-	args := m.Called(ctx, namespace, localResourceId, resourceType)
-	return args.Get(0).(*v1beta1.DeleteTuplesResponse), args.Error(1)
-}
-
-func (m *MockAuthz) SetWorkspace(ctx context.Context, local_resource_id, workspace, namespace, name string, upsert bool) (*v1beta1.CreateTuplesResponse, error) {
-	args := m.Called(ctx, local_resource_id, workspace, namespace, name)
-	return args.Get(0).(*v1beta1.CreateTuplesResponse), args.Error(1)
-}
-
-// Update the MockAuthz LookupResources method to match the exact signature
-func (m *MockAuthz) LookupResources(ctx context.Context, request *v1beta1.LookupResourcesRequest) (grpc.ServerStreamingClient[v1beta1.LookupResourcesResponse], error) {
-	args := m.Called(ctx, request)
-	return args.Get(0).(grpc.ServerStreamingClient[v1beta1.LookupResourcesResponse]), args.Error(1)
-}
-
-func (m *MockAuthz) LookupSubjects(ctx context.Context, request *v1beta1.LookupSubjectsRequest) (grpc.ServerStreamingClient[v1beta1.LookupSubjectsResponse], error) {
-	args := m.Called(ctx, request)
-	return args.Get(0).(grpc.ServerStreamingClient[v1beta1.LookupSubjectsResponse]), args.Error(1)
+func (m *MockRelationsRepository) AcquireLock(ctx context.Context, lockId string) (string, error) {
+	args := m.Called(ctx, lockId)
+	return args.String(0), args.Error(1)
 }
 
 type MockConsumer struct {
@@ -150,50 +130,6 @@ type MockedListenManager struct {
 
 type MockedSubscription struct {
 	mock.Mock
-}
-type MockLookupResourcesStream struct {
-	mock.Mock
-	Responses []*v1beta1.LookupResourcesResponse
-	current   int
-}
-
-func (m *MockLookupResourcesStream) Recv() (*v1beta1.LookupResourcesResponse, error) {
-	if m.current >= len(m.Responses) {
-		return nil, io.EOF
-	}
-	res := m.Responses[m.current]
-	m.current++
-	return res, nil
-}
-
-func (m *MockLookupResourcesStream) Header() (metadata.MD, error) {
-	args := m.Called()
-	return args.Get(0).(metadata.MD), args.Error(1)
-}
-
-func (m *MockLookupResourcesStream) Trailer() metadata.MD {
-	args := m.Called()
-	return args.Get(0).(metadata.MD)
-}
-
-func (m *MockLookupResourcesStream) CloseSend() error {
-	args := m.Called()
-	return args.Error(0)
-}
-
-func (m *MockLookupResourcesStream) Context() context.Context {
-	args := m.Called()
-	return args.Get(0).(context.Context)
-}
-
-func (m *MockLookupResourcesStream) SendMsg(msg interface{}) error {
-	args := m.Called(msg)
-	return args.Error(0)
-}
-
-func (m *MockLookupResourcesStream) RecvMsg(msg interface{}) error {
-	args := m.Called(msg)
-	return args.Error(0)
 }
 
 func (m *MockedListenManager) Subscribe(txid string) pubsub.Subscription {

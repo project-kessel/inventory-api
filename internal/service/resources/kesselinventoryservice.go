@@ -10,7 +10,6 @@ import (
 	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
 	"github.com/project-kessel/inventory-api/internal/biz/usecase/resources"
-	pbv1beta1 "github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
 	rpcstatus "google.golang.org/genproto/googleapis/rpc/status"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -95,25 +94,11 @@ func (s *InventoryService) CheckForUpdate(ctx context.Context, req *pb.CheckForU
 		log.Error("Failed to build relation: ", err)
 		return nil, err
 	}
-	allowed, consistencyToken, err := s.Ctl.CheckForUpdate(ctx, relation, subjectRef, reporterResourceKey)
+	resp, err := s.Ctl.CheckForUpdate(ctx, relation, subjectRef, reporterResourceKey)
 	if err != nil {
 		return nil, err
 	}
-	return updateResponseFromAuthzRequestV1beta2(allowed, consistencyToken), nil
-}
-
-func (s *InventoryService) CheckForUpdateBulk(ctx context.Context, req *pb.CheckForUpdateBulkRequest) (*pb.CheckForUpdateBulkResponse, error) {
-	log.Info("CheckForUpdateBulk using v1beta2 db")
-
-	cmd, err := toCheckForUpdateBulkCommand(req)
-	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "%v", err)
-	}
-	resp, err := s.Ctl.CheckForUpdateBulk(ctx, cmd)
-	if err != nil {
-		return nil, err
-	}
-	return fromCheckForUpdateBulkResult(resp, req), nil
+	return updateResponseFromAuthzRequestV1beta2(resp), nil
 }
 
 func (s *InventoryService) CheckBulk(ctx context.Context, req *pb.CheckBulkRequest) (*pb.CheckBulkResponse, error) {
@@ -203,51 +188,27 @@ func subjectReferenceFromProto(subject *pb.SubjectReference) (model.SubjectRefer
 	return model.NewSubjectReferenceWithoutRelation(key), nil
 }
 
-// protoToCheckBulkItem converts a single *pb.CheckBulkRequestItem to a resources.CheckBulkItem.
-// Both CheckBulkRequest and CheckForUpdateBulkRequest share the same item type, so this helper
-// is reused by toCheckBulkCommand and toCheckForUpdateBulkCommand.
-func protoToCheckBulkItem(item *pb.CheckBulkRequestItem, idx int) (resources.CheckBulkItem, error) {
-	resourceKey, err := reporterKeyFromResourceReference(item.GetObject())
-	if err != nil {
-		return resources.CheckBulkItem{}, fmt.Errorf("invalid resource at index %d: %w", idx, err)
-	}
-	subjectRef, err := subjectReferenceFromProto(item.GetSubject())
-	if err != nil {
-		return resources.CheckBulkItem{}, fmt.Errorf("invalid subject at index %d: %w", idx, err)
-	}
-	relation, err := model.NewRelation(item.GetRelation())
-	if err != nil {
-		return resources.CheckBulkItem{}, fmt.Errorf("invalid relation at index %d: %w", idx, err)
-	}
-	return resources.CheckBulkItem{
-		Resource: resourceKey,
-		Relation: relation,
-		Subject:  subjectRef,
-	}, nil
-}
-
-// toCheckForUpdateBulkCommand converts a v1beta2 CheckForUpdateBulkRequest to a usecase CheckForUpdateBulkCommand.
-func toCheckForUpdateBulkCommand(req *pb.CheckForUpdateBulkRequest) (resources.CheckForUpdateBulkCommand, error) {
-	items := make([]resources.CheckBulkItem, len(req.GetItems()))
-	for i, item := range req.GetItems() {
-		bulkItem, err := protoToCheckBulkItem(item, i)
-		if err != nil {
-			return resources.CheckForUpdateBulkCommand{}, err
-		}
-		items[i] = bulkItem
-	}
-	return resources.CheckForUpdateBulkCommand{Items: items}, nil
-}
-
 // toCheckBulkCommand converts a v1beta2 CheckBulkRequest to a usecase CheckBulkCommand.
 func toCheckBulkCommand(req *pb.CheckBulkRequest) (resources.CheckBulkCommand, error) {
 	items := make([]resources.CheckBulkItem, len(req.GetItems()))
 	for i, item := range req.GetItems() {
-		bulkItem, err := protoToCheckBulkItem(item, i)
+		resourceKey, err := reporterKeyFromResourceReference(item.GetObject())
 		if err != nil {
-			return resources.CheckBulkCommand{}, err
+			return resources.CheckBulkCommand{}, fmt.Errorf("invalid resource at index %d: %w", i, err)
 		}
-		items[i] = bulkItem
+		subjectRef, err := subjectReferenceFromProto(item.GetSubject())
+		if err != nil {
+			return resources.CheckBulkCommand{}, fmt.Errorf("invalid subject at index %d: %w", i, err)
+		}
+		relation, err := model.NewRelation(item.GetRelation())
+		if err != nil {
+			return resources.CheckBulkCommand{}, fmt.Errorf("invalid relation at index %d: %w", i, err)
+		}
+		items[i] = resources.CheckBulkItem{
+			Resource: resourceKey,
+			Relation: relation,
+			Subject:  subjectRef,
+		}
 	}
 
 	consistency := consistencyFromProto(req.GetConsistency())
@@ -273,86 +234,52 @@ func consistencyFromProto(c *pb.Consistency) model.Consistency {
 	return model.NewConsistencyUnspecified()
 }
 
-func paginationFromProto(p *pb.RequestPagination) *model.Pagination {
-	if p == nil {
-		return nil
-	}
-	return &model.Pagination{
-		Limit:        p.Limit,
-		Continuation: p.ContinuationToken,
-	}
-}
-
-// checkBulkResultItemToProtoFields derives the proto Allowed enum and, if the result carries an
-// error, a populated *rpcstatus.Status ready for embedding in a response pair. opName is used
-// only for the error log message. Returns (allowed, nil) when the item succeeded.
-func checkBulkResultItemToProtoFields(item resources.CheckBulkResultItem, idx int, opName string) (pb.Allowed, *rpcstatus.Status) {
-	allowed := pb.Allowed_ALLOWED_FALSE
-	if item.Allowed {
-		allowed = pb.Allowed_ALLOWED_TRUE
-	}
-	if item.Error == nil {
-		return allowed, nil
-	}
-	errorCode := item.ErrorCode
-	if errorCode == 0 {
-		errorCode = int32(codes.Internal)
-	}
-	log.Errorf("Error in %s for item %d, code %d: %v", opName, idx, errorCode, item.Error)
-	return allowed, &rpcstatus.Status{
-		Code:    errorCode,
-		Message: item.Error.Error(),
-	}
-}
-
 // fromCheckBulkResult converts a usecase CheckBulkResult to v1beta2 CheckBulkResponse.
 func fromCheckBulkResult(result *resources.CheckBulkResult, req *pb.CheckBulkRequest) *pb.CheckBulkResponse {
 	pairs := make([]*pb.CheckBulkResponsePair, len(result.Pairs))
 	for i, pair := range result.Pairs {
-		allowed, errStatus := checkBulkResultItemToProtoFields(pair.Result, i, "checkbulk")
+		errResponse := &pb.CheckBulkResponsePair_Error{}
+		itemResponse := &pb.CheckBulkResponsePair_Item{}
 
+		if pair.Result.Error != nil {
+			errorCode := pair.Result.ErrorCode
+			if errorCode == 0 {
+				errorCode = int32(codes.Internal)
+			}
+			log.Errorf("Error in checkbulk for item %d, code %d: %v", i, errorCode, pair.Result.Error)
+			errResponse.Error = &rpcstatus.Status{
+				Code:    errorCode,
+				Message: pair.Result.Error.Error(),
+			}
+		}
+
+		allowedResponse := pb.Allowed_ALLOWED_FALSE
+		if pair.Result.Allowed {
+			allowedResponse = pb.Allowed_ALLOWED_TRUE
+		}
+		itemResponse.Item = &pb.CheckBulkResponseItem{
+			Allowed: allowedResponse,
+		}
+
+		// Use original request item for the response
 		var requestItem *pb.CheckBulkRequestItem
 		if i < len(req.GetItems()) {
 			requestItem = req.GetItems()[i]
 		}
 
-		p := &pb.CheckBulkResponsePair{Request: requestItem}
-		if errStatus != nil {
-			p.Response = &pb.CheckBulkResponsePair_Error{Error: errStatus}
+		pairs[i] = &pb.CheckBulkResponsePair{
+			Request: requestItem,
+		}
+		if pair.Result.Error != nil {
+			pairs[i].Response = errResponse
 		} else {
-			p.Response = &pb.CheckBulkResponsePair_Item{Item: &pb.CheckBulkResponseItem{Allowed: allowed}}
+			pairs[i].Response = itemResponse
 		}
-		pairs[i] = p
 	}
 
-	resp := &pb.CheckBulkResponse{Pairs: pairs}
-	if result.ConsistencyToken != "" {
-		resp.ConsistencyToken = &pb.ConsistencyToken{Token: result.ConsistencyToken.Serialize()}
+	resp := &pb.CheckBulkResponse{
+		Pairs: pairs,
 	}
-	return resp
-}
-
-// fromCheckForUpdateBulkResult converts a usecase CheckBulkResult to v1beta2 CheckForUpdateBulkResponse.
-func fromCheckForUpdateBulkResult(result *resources.CheckBulkResult, req *pb.CheckForUpdateBulkRequest) *pb.CheckForUpdateBulkResponse {
-	pairs := make([]*pb.CheckForUpdateBulkResponsePair, len(result.Pairs))
-	for i, pair := range result.Pairs {
-		allowed, errStatus := checkBulkResultItemToProtoFields(pair.Result, i, "checkforupdatebulk")
-
-		var requestItem *pb.CheckBulkRequestItem
-		if i < len(req.GetItems()) {
-			requestItem = req.GetItems()[i]
-		}
-
-		p := &pb.CheckForUpdateBulkResponsePair{Request: requestItem}
-		if errStatus != nil {
-			p.Response = &pb.CheckForUpdateBulkResponsePair_Error{Error: errStatus}
-		} else {
-			p.Response = &pb.CheckForUpdateBulkResponsePair_Item{Item: &pb.CheckForUpdateBulkResponseItem{Allowed: allowed}}
-		}
-		pairs[i] = p
-	}
-
-	resp := &pb.CheckForUpdateBulkResponse{Pairs: pairs}
 	if result.ConsistencyToken != "" {
 		resp.ConsistencyToken = &pb.ConsistencyToken{Token: result.ConsistencyToken.Serialize()}
 	}
@@ -450,61 +377,21 @@ func (s *InventoryService) StreamedListObjects(
 		return err
 	}
 
-	clientStream, err := s.Ctl.LookupResources(ctx, lookupCmd)
+	iter, err := s.Ctl.LookupResources(ctx, lookupCmd)
 	if err != nil {
 		return err
 	}
 
 	for {
-		// Receive next message from the server stream
-		resp, err := clientStream.Recv()
+		result, err := iter.Next()
 		if err == io.EOF {
-			// Stream ended successfully
 			return nil
 		}
 		if err != nil {
 			return err
 		}
 
-		// Convert and send the response to the client
-		if err := stream.Send(ToLookupResourceResponse(resp)); err != nil {
-			return err
-		}
-	}
-}
-
-func (s *InventoryService) StreamedListSubjects(
-	req *pb.StreamedListSubjectsRequest,
-	stream pb.KesselInventoryService_StreamedListSubjectsServer,
-) error {
-	ctx := stream.Context()
-
-	consistency := consistencyFromProto(req.GetConsistency())
-	log.Debugf("StreamedListSubjects consistency: %s", model.ConsistencyTypeOf(consistency))
-
-	lookupCmd, err := ToLookupSubjectsCommand(req)
-	if err != nil {
-		return err
-	}
-
-	clientStream, err := s.Ctl.LookupSubjects(ctx, lookupCmd)
-	if err != nil {
-		return err
-	}
-
-	for {
-		// Receive next message from the server stream
-		resp, err := clientStream.Recv()
-		if err == io.EOF {
-			// Stream ended successfully
-			return nil
-		}
-		if err != nil {
-			return err
-		}
-
-		// Convert and send the response to the client
-		if err := stream.Send(ToLookupSubjectsResponse(resp)); err != nil {
+		if err := stream.Send(ToLookupResourceResponse(result)); err != nil {
 			return err
 		}
 	}
@@ -532,14 +419,25 @@ func ToLookupResourcesCommand(request *pb.StreamedListObjectsRequest) (resources
 	if err != nil {
 		return resources.LookupResourcesCommand{}, fmt.Errorf("invalid subject: %w", err)
 	}
+	consistency := consistencyFromProto(request.GetConsistency())
+
+	var limit uint32 = 1000
+	var continuation *string
+	if request.Pagination != nil {
+		limit = request.Pagination.Limit
+		continuation = request.Pagination.ContinuationToken
+	}
 
 	return resources.LookupResourcesCommand{
 		ResourceType: resourceType,
 		ReporterType: reporterType,
 		Relation:     relation,
 		Subject:      subjectRef,
-		Pagination:   paginationFromProto(request.Pagination),
-		Consistency:  consistencyFromProto(request.GetConsistency()),
+		Pagination: &model.Pagination{
+			Limit:        limit,
+			Continuation: continuation,
+		},
+		Consistency: consistency,
 	}, nil
 }
 
@@ -548,80 +446,17 @@ func NormalizeType(val string) string {
 	return normalized
 }
 
-func ToLookupResourceResponse(response *pbv1beta1.LookupResourcesResponse) *pb.StreamedListObjectsResponse {
+func ToLookupResourceResponse(result *model.LookupResourceResult) *pb.StreamedListObjectsResponse {
 	return &pb.StreamedListObjectsResponse{
 		Object: &pb.ResourceReference{
 			Reporter: &pb.ReporterReference{
-				Type: response.Resource.Type.Namespace,
+				Type: result.Namespace.Serialize(),
 			},
-			ResourceId:   response.Resource.Id,
-			ResourceType: response.Resource.Type.Name,
+			ResourceId:   result.ResourceId.Serialize(),
+			ResourceType: result.ResourceType.Serialize(),
 		},
 		Pagination: &pb.ResponsePagination{
-			ContinuationToken: response.Pagination.ContinuationToken,
-		},
-	}
-}
-
-// ToLookupSubjectsCommand converts a v1beta2 LookupSubjectsRequest to a LookupSubjectsCommand.
-func ToLookupSubjectsCommand(request *pb.StreamedListSubjectsRequest) (resources.LookupSubjectsCommand, error) {
-	if request == nil {
-		return resources.LookupSubjectsCommand{}, fmt.Errorf("request is nil")
-	}
-	reporterResourceKey, err := reporterKeyFromResourceReference(request.Resource)
-	if err != nil {
-		return resources.LookupSubjectsCommand{}, fmt.Errorf("invalid resource: %w", err)
-	}
-	relation, err := model.NewRelation(request.Relation)
-	if err != nil {
-		return resources.LookupSubjectsCommand{}, fmt.Errorf("invalid relation: %w", err)
-	}
-	subjectType, err := model.NewResourceType(NormalizeType(request.SubjectType.GetResourceType()))
-	if err != nil {
-		return resources.LookupSubjectsCommand{}, fmt.Errorf("invalid subject type: %w", err)
-	}
-	subjectReporter, err := model.NewReporterType(NormalizeType(request.SubjectType.GetReporterType()))
-	if err != nil {
-		return resources.LookupSubjectsCommand{}, fmt.Errorf("invalid subject reporter: %w", err)
-	}
-
-	var subjectRelation *model.Relation
-	if request.SubjectRelation != nil && *request.SubjectRelation != "" {
-		rel, err := model.NewRelation(*request.SubjectRelation)
-		if err != nil {
-			return resources.LookupSubjectsCommand{}, fmt.Errorf("invalid subject relation: %w", err)
-		}
-		subjectRelation = &rel
-	}
-
-	return resources.LookupSubjectsCommand{
-		Resource:        reporterResourceKey,
-		Relation:        relation,
-		SubjectType:     subjectType,
-		SubjectReporter: subjectReporter,
-		SubjectRelation: subjectRelation,
-		Pagination:      paginationFromProto(request.Pagination),
-		Consistency:     consistencyFromProto(request.GetConsistency()),
-	}, nil
-}
-
-func ToLookupSubjectsResponse(response *pbv1beta1.LookupSubjectsResponse) *pb.StreamedListSubjectsResponse {
-	subjectRef := &pb.SubjectReference{
-		Resource: &pb.ResourceReference{
-			Reporter: &pb.ReporterReference{
-				Type: response.Subject.Subject.Type.Namespace,
-			},
-			ResourceId:   response.Subject.Subject.Id,
-			ResourceType: response.Subject.Subject.Type.Name,
-		},
-	}
-	if response.Subject.Relation != nil {
-		subjectRef.Relation = response.Subject.Relation
-	}
-	return &pb.StreamedListSubjectsResponse{
-		Subject: subjectRef,
-		Pagination: &pb.ResponsePagination{
-			ContinuationToken: response.Pagination.ContinuationToken,
+			ContinuationToken: result.ContinuationToken,
 		},
 	}
 }
@@ -668,17 +503,12 @@ func viewResponseFromAuthzRequestV1beta2(allowed bool, consistencyToken model.Co
 	return response
 }
 
-func updateResponseFromAuthzRequestV1beta2(allowed bool, consistencyToken model.ConsistencyToken) *pb.CheckForUpdateResponse {
-	response := &pb.CheckForUpdateResponse{}
+func updateResponseFromAuthzRequestV1beta2(allowed bool) *pb.CheckForUpdateResponse {
 	if allowed {
-		response.Allowed = pb.Allowed_ALLOWED_TRUE
+		return &pb.CheckForUpdateResponse{Allowed: pb.Allowed_ALLOWED_TRUE}
 	} else {
-		response.Allowed = pb.Allowed_ALLOWED_FALSE
+		return &pb.CheckForUpdateResponse{Allowed: pb.Allowed_ALLOWED_FALSE}
 	}
-	if consistencyToken != "" {
-		response.ConsistencyToken = &pb.ConsistencyToken{Token: consistencyToken.Serialize()}
-	}
-	return response
 }
 
 func ResponseFromResource() *pb.ReportResourceResponse {

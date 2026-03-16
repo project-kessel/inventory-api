@@ -3,6 +3,7 @@ syntax = "proto3";
 package kessel.inventory.v1beta2;
 
 import "kessel/inventory/v1beta2/check_bulk_request.proto";
+import "kessel/inventory/v1beta2/consistency_token.proto";
 import "kessel/inventory/v1beta2/allowed.proto";
 import "buf/validate/validate.proto";
 import "google/rpc/status.proto";
@@ -28,4 +29,5 @@ message CheckForUpdateBulkResponsePair {
 // CheckForUpdateBulkResponse contains the results of all check-for-update checks in the request.
 message CheckForUpdateBulkResponse {
   repeated CheckForUpdateBulkResponsePair pairs = 1 [(buf.validate.field).repeated.min_items = 1];
+  ConsistencyToken consistency_token = 2;
 }

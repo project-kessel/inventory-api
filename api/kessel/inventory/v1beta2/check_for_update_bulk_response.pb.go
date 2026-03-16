@@ -161,10 +161,11 @@ func (*CheckForUpdateBulkResponsePair_Error) isCheckForUpdateBulkResponsePair_Re
 
 // CheckForUpdateBulkResponse contains the results of all check-for-update checks in the request.
 type CheckForUpdateBulkResponse struct {
-	state         protoimpl.MessageState            `protogen:"open.v1"`
-	Pairs         []*CheckForUpdateBulkResponsePair `protobuf:"bytes,1,rep,name=pairs,proto3" json:"pairs,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state            protoimpl.MessageState            `protogen:"open.v1"`
+	Pairs            []*CheckForUpdateBulkResponsePair `protobuf:"bytes,1,rep,name=pairs,proto3" json:"pairs,omitempty"`
+	ConsistencyToken *ConsistencyToken                 `protobuf:"bytes,2,opt,name=consistency_token,json=consistencyToken,proto3" json:"consistency_token,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *CheckForUpdateBulkResponse) Reset() {
@@ -204,11 +205,18 @@ func (x *CheckForUpdateBulkResponse) GetPairs() []*CheckForUpdateBulkResponsePai
 	return nil
 }
 
+func (x *CheckForUpdateBulkResponse) GetConsistencyToken() *ConsistencyToken {
+	if x != nil {
+		return x.ConsistencyToken
+	}
+	return nil
+}
+
 var File_kessel_inventory_v1beta2_check_for_update_bulk_response_proto protoreflect.FileDescriptor
 
 const file_kessel_inventory_v1beta2_check_for_update_bulk_response_proto_rawDesc = "" +
 	"\n" +
-	"=kessel/inventory/v1beta2/check_for_update_bulk_response.proto\x12\x18kessel.inventory.v1beta2\x1a1kessel/inventory/v1beta2/check_bulk_request.proto\x1a&kessel/inventory/v1beta2/allowed.proto\x1a\x1bbuf/validate/validate.proto\x1a\x17google/rpc/status.proto\"]\n" +
+	"=kessel/inventory/v1beta2/check_for_update_bulk_response.proto\x12\x18kessel.inventory.v1beta2\x1a1kessel/inventory/v1beta2/check_bulk_request.proto\x1a0kessel/inventory/v1beta2/consistency_token.proto\x1a&kessel/inventory/v1beta2/allowed.proto\x1a\x1bbuf/validate/validate.proto\x1a\x17google/rpc/status.proto\"]\n" +
 	"\x1eCheckForUpdateBulkResponseItem\x12;\n" +
 	"\aallowed\x18\x01 \x01(\x0e2!.kessel.inventory.v1beta2.AllowedR\aallowed\"\xf2\x01\n" +
 	"\x1eCheckForUpdateBulkResponsePair\x12H\n" +
@@ -216,9 +224,10 @@ const file_kessel_inventory_v1beta2_check_for_update_bulk_response_proto_rawDesc
 	"\x04item\x18\x02 \x01(\v28.kessel.inventory.v1beta2.CheckForUpdateBulkResponseItemH\x00R\x04item\x12*\n" +
 	"\x05error\x18\x03 \x01(\v2\x12.google.rpc.StatusH\x00R\x05errorB\n" +
 	"\n" +
-	"\bresponse\"v\n" +
+	"\bresponse\"\xcf\x01\n" +
 	"\x1aCheckForUpdateBulkResponse\x12X\n" +
-	"\x05pairs\x18\x01 \x03(\v28.kessel.inventory.v1beta2.CheckForUpdateBulkResponsePairB\b\xbaH\x05\x92\x01\x02\b\x01R\x05pairsBr\n" +
+	"\x05pairs\x18\x01 \x03(\v28.kessel.inventory.v1beta2.CheckForUpdateBulkResponsePairB\b\xbaH\x05\x92\x01\x02\b\x01R\x05pairs\x12W\n" +
+	"\x11consistency_token\x18\x02 \x01(\v2*.kessel.inventory.v1beta2.ConsistencyTokenR\x10consistencyTokenBr\n" +
 	"(org.project_kessel.api.inventory.v1beta2P\x01ZDgithub.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2b\x06proto3"
 
 var (
@@ -241,6 +250,7 @@ var file_kessel_inventory_v1beta2_check_for_update_bulk_response_proto_goTypes =
 	(Allowed)(0),                           // 3: kessel.inventory.v1beta2.Allowed
 	(*CheckBulkRequestItem)(nil),           // 4: kessel.inventory.v1beta2.CheckBulkRequestItem
 	(*status.Status)(nil),                  // 5: google.rpc.Status
+	(*ConsistencyToken)(nil),               // 6: kessel.inventory.v1beta2.ConsistencyToken
 }
 var file_kessel_inventory_v1beta2_check_for_update_bulk_response_proto_depIdxs = []int32{
 	3, // 0: kessel.inventory.v1beta2.CheckForUpdateBulkResponseItem.allowed:type_name -> kessel.inventory.v1beta2.Allowed
@@ -248,11 +258,12 @@ var file_kessel_inventory_v1beta2_check_for_update_bulk_response_proto_depIdxs =
 	0, // 2: kessel.inventory.v1beta2.CheckForUpdateBulkResponsePair.item:type_name -> kessel.inventory.v1beta2.CheckForUpdateBulkResponseItem
 	5, // 3: kessel.inventory.v1beta2.CheckForUpdateBulkResponsePair.error:type_name -> google.rpc.Status
 	1, // 4: kessel.inventory.v1beta2.CheckForUpdateBulkResponse.pairs:type_name -> kessel.inventory.v1beta2.CheckForUpdateBulkResponsePair
-	5, // [5:5] is the sub-list for method output_type
-	5, // [5:5] is the sub-list for method input_type
-	5, // [5:5] is the sub-list for extension type_name
-	5, // [5:5] is the sub-list for extension extendee
-	0, // [0:5] is the sub-list for field type_name
+	6, // 5: kessel.inventory.v1beta2.CheckForUpdateBulkResponse.consistency_token:type_name -> kessel.inventory.v1beta2.ConsistencyToken
+	6, // [6:6] is the sub-list for method output_type
+	6, // [6:6] is the sub-list for method input_type
+	6, // [6:6] is the sub-list for extension type_name
+	6, // [6:6] is the sub-list for extension extendee
+	0, // [0:6] is the sub-list for field type_name
 }
 
 func init() { file_kessel_inventory_v1beta2_check_for_update_bulk_response_proto_init() }
@@ -261,6 +272,7 @@ func file_kessel_inventory_v1beta2_check_for_update_bulk_response_proto_init() {
 		return
 	}
 	file_kessel_inventory_v1beta2_check_bulk_request_proto_init()
+	file_kessel_inventory_v1beta2_consistency_token_proto_init()
 	file_kessel_inventory_v1beta2_allowed_proto_init()
 	file_kessel_inventory_v1beta2_check_for_update_bulk_response_proto_msgTypes[1].OneofWrappers = []any{
 		(*CheckForUpdateBulkResponsePair_Item)(nil),

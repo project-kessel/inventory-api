@@ -825,7 +825,16 @@ func checkForUpdateBulkResultFromV1beta1(resp *kessel.CheckForUpdateBulkResponse
 			Result:  resultItem,
 		}
 	}
-	return &CheckBulkResult{Pairs: pairs}, nil
+
+	var token model.ConsistencyToken
+	if resp.GetConsistencyToken() != nil {
+		token = model.DeserializeConsistencyToken(resp.GetConsistencyToken().GetToken())
+	}
+
+	return &CheckBulkResult{
+		Pairs:            pairs,
+		ConsistencyToken: token,
+	}, nil
 }
 
 func getNextTransactionID() (string, error) {

@@ -369,7 +369,13 @@ func fromCheckForUpdateBulkResult(result *resources.CheckBulkResult, req *pb.Che
 			pairs[i].Response = itemResponse
 		}
 	}
-	return &pb.CheckForUpdateBulkResponse{Pairs: pairs}
+	resp := &pb.CheckForUpdateBulkResponse{
+		Pairs: pairs,
+	}
+	if result.ConsistencyToken != "" {
+		resp.ConsistencyToken = &pb.ConsistencyToken{Token: result.ConsistencyToken.Serialize()}
+	}
+	return resp
 }
 
 // toCheckSelfBulkCommand converts a v1beta2 CheckSelfBulkRequest to a usecase CheckSelfBulkCommand.

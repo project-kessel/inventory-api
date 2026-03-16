@@ -449,6 +449,8 @@ components:
                     type: array
                     items:
                         $ref: '#/components/schemas/kessel.inventory.v1beta2.CheckForUpdateBulkResponsePair'
+                consistencyToken:
+                    $ref: '#/components/schemas/kessel.inventory.v1beta2.ConsistencyToken'
             description: CheckForUpdateBulkResponse contains the results of all check-for-update checks in the request.
         kessel.inventory.v1beta2.CheckForUpdateBulkResponseItem:
             type: object

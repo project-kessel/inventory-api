@@ -7,7 +7,7 @@ require (
 	buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go v1.36.11-20251209175733-2a1774d88802.1
 	buf.build/go/protovalidate v1.1.0
 	github.com/authzed/grpcutil v0.0.0-20250221190651-1985b19b35b8
-	github.com/confluentinc/confluent-kafka-go/v2 v2.12.0
+	github.com/confluentinc/confluent-kafka-go/v2 v2.13.3
 	github.com/coreos/go-oidc/v3 v3.17.0
 	github.com/go-gormigrate/gormigrate/v2 v2.1.5
 	github.com/go-kratos/kratos/v2 v2.9.2

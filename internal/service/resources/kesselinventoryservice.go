@@ -104,9 +104,7 @@ func (s *InventoryService) CheckForUpdate(ctx context.Context, req *pb.CheckForU
 
 func (s *InventoryService) CheckForUpdateBulk(ctx context.Context, req *pb.CheckForUpdateBulkRequest) (*pb.CheckForUpdateBulkResponse, error) {
 	log.Info("CheckForUpdateBulk using v1beta2 db")
-	if len(req.GetItems()) == 0 {
-		return nil, status.Errorf(codes.InvalidArgument, "items array cannot be empty")
-	}
+
 	cmd, err := toCheckForUpdateBulkCommand(req)
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "%v", err)

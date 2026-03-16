@@ -155,24 +155,26 @@ func (uc *Usecase) ReportResource(ctx context.Context, cmd ReportResourceCommand
 		defer subscription.Unsubscribe()
 	}
 
+	// Check for duplicate transaction ID outside the serializable transaction to avoid
+	// predicate locks on the transaction_id indexes. The unique constraint on transaction_id
+	// provides the actual correctness guarantee, if a duplicate sneaks past this
+	// advisory check due to a concurrent commit.
+	if cmd.TransactionId != nil {
+		alreadyProcessed, err := uc.resourceRepository.HasTransactionIdBeenProcessed(uc.resourceRepository.GetDB(), cmd.TransactionId.String())
+		if err != nil {
+			return fmt.Errorf("failed to check transaction ID: %w", err)
+		}
+		if alreadyProcessed {
+			log.Infof("Transaction already processed, skipping update: transaction_id=%s", cmd.TransactionId.String())
+			return nil
+		}
+	}
+
 	var operationType model.EventOperationType
 	err = uc.resourceRepository.GetTransactionManager().HandleSerializableTransaction(
 		ReportResourceOperationName,
 		uc.resourceRepository.GetDB(),
 		func(tx *gorm.DB) error {
-			// Check for duplicate transaction ID's before we find the resource for quicker returns if it fails
-			if cmd.TransactionId != nil {
-				// TODO: repository should accept the transactionID type natively
-				alreadyProcessed, err := uc.resourceRepository.HasTransactionIdBeenProcessed(tx, string(*cmd.TransactionId))
-				if err != nil {
-					return fmt.Errorf("failed to check transaction ID: %w", err)
-				}
-				if alreadyProcessed {
-					log.Info("Transaction already processed, skipping update")
-					return nil
-				}
-			}
-
 			res, err := uc.resourceRepository.FindResourceByKeys(tx, reporterResourceKey)
 			if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 				return fmt.Errorf("failed to lookup existing resource: %w", err)

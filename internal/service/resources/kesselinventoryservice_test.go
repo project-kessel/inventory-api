@@ -10,6 +10,7 @@ import (
 	krlog "github.com/go-kratos/kratos/v2/log"
 	kratosTransport "github.com/go-kratos/kratos/v2/transport"
 	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2"
+	"github.com/project-kessel/inventory-api/internal/biz/model_legacy"
 	relationsV1beta1 "github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
 	"google.golang.org/protobuf/types/known/structpb"
 
@@ -2744,7 +2745,8 @@ func newSQLiteTestRepo(t *testing.T) (model.ResourceRepository, *gorm.DB) {
 	require.NoError(t, err)
 	mc := metricscollector.NewFakeMetricsCollector()
 	tm := data.NewGormTransactionManager(mc, 3)
-	repo := data.NewResourceRepository(db, tm)
+	noopPublisher := func(_ *gorm.DB, _ *model_legacy.OutboxEvent) error { return nil }
+	repo := data.NewResourceRepository(db, tm, noopPublisher)
 	return repo, db
 }
 

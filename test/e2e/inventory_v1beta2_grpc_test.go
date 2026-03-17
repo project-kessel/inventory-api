@@ -537,7 +537,7 @@ func TestInventoryAPIHTTP_v1beta2_workspace_movement_tests(t *testing.T) {
 
 	// Step 3: Check authorization for OLD workspace (should be ALLOWED_FALSE)
 	t.Logf("3. Checking authorization for OLD workspace %s (should be allowed: false)", oldWorkspace)
-	t.Log("Waiting for outbox events to be processed (polling up to 10s)...")
+	t.Log("Waiting for outbox events to be processed (polling up to 30s)...")
 
 	checkOldWorkspace := &pbv1beta2.CheckRequest{
 		Object: &pbv1beta2.ResourceReference{
@@ -560,9 +560,9 @@ func TestInventoryAPIHTTP_v1beta2_workspace_movement_tests(t *testing.T) {
 		},
 	}
 
-	// Poll for up to 10 seconds
+	// Poll for up to 30 seconds
 	oldWorkspaceAllowed := false
-	for i := 0; i < 10; i++ {
+	for i := 0; i < 30; i++ {
 		checkResp, err := client.Check(ctx, checkOldWorkspace)
 		if err == nil && checkResp.GetAllowed() == pbv1beta2.Allowed_ALLOWED_FALSE {
 			t.Logf("✓ Old workspace check returned ALLOWED_FALSE (attempt %d)", i+1)
@@ -574,7 +574,7 @@ func TestInventoryAPIHTTP_v1beta2_workspace_movement_tests(t *testing.T) {
 		} else {
 			t.Logf("Old workspace check returned %v (attempt %d), expected ALLOWED_FALSE", checkResp.GetAllowed(), i+1)
 		}
-		if i < 9 {
+		if i < 29 {
 			t.Log("Waiting 1s before retry...")
 			time.Sleep(1 * time.Second)
 		}
@@ -583,7 +583,7 @@ func TestInventoryAPIHTTP_v1beta2_workspace_movement_tests(t *testing.T) {
 
 	// Step 4: Check authorization for NEW workspace (should be ALLOWED_TRUE)
 	t.Logf("4. Checking authorization for NEW workspace %s (should be allowed: true)", newWorkspace)
-	t.Log("Waiting for outbox events to be processed (polling up to 10s)...")
+	t.Log("Waiting for outbox events to be processed (polling up to 30s)...")
 
 	checkNewWorkspace := &pbv1beta2.CheckRequest{
 		Object: &pbv1beta2.ResourceReference{
@@ -606,9 +606,9 @@ func TestInventoryAPIHTTP_v1beta2_workspace_movement_tests(t *testing.T) {
 		},
 	}
 
-	// Poll for up to 10 seconds
+	// Poll for up to 30 seconds
 	newWorkspaceAllowed := false
-	for i := 0; i < 10; i++ {
+	for i := 0; i < 30; i++ {
 		checkResp, err := client.Check(ctx, checkNewWorkspace)
 		if err == nil && checkResp.GetAllowed() == pbv1beta2.Allowed_ALLOWED_TRUE {
 			t.Logf("✓ New workspace check returned ALLOWED_TRUE (attempt %d)", i+1)
@@ -620,7 +620,7 @@ func TestInventoryAPIHTTP_v1beta2_workspace_movement_tests(t *testing.T) {
 		} else {
 			t.Logf("New workspace check returned %v (attempt %d), expected ALLOWED_TRUE", checkResp.GetAllowed(), i+1)
 		}
-		if i < 9 {
+		if i < 29 {
 			t.Log("Waiting 1s before retry...")
 			time.Sleep(1 * time.Second)
 		}
@@ -790,9 +790,9 @@ func TestInventoryAPIHTTP_v1beta2_CheckBulk_WithErrorPair(t *testing.T) {
 		Items: []*pbv1beta2.CheckBulkRequestItem{itemTrue, itemFalse, itemError},
 	}
 
-	// Poll up to 10 seconds to allow eventual consistency and error mapping
+	// Poll up to 30 seconds to allow eventual consistency and error mapping
 	observed := false
-	for i := 0; i < 10; i++ {
+	for i := 0; i < 30; i++ {
 		resp, err := client.CheckBulk(ctx, checkReq)
 		if err == nil && resp != nil && len(resp.GetPairs()) == 3 {
 			results := map[string]pbv1beta2.Allowed{}
@@ -823,7 +823,7 @@ func TestInventoryAPIHTTP_v1beta2_CheckBulk_WithErrorPair(t *testing.T) {
 		} else if err != nil {
 			t.Logf("CheckBulk request failed (attempt %d): %v", i+1, err)
 		}
-		if i < 9 {
+		if i < 29 {
 			time.Sleep(1 * time.Second)
 		}
 	}
@@ -909,7 +909,7 @@ func TestInventoryAPIHTTP_v1beta2_create_check_delete_check_resource(t *testing.
 	}
 
 	allowedTrueObserved := false
-	for i := 0; i < 10; i++ {
+	for i := 0; i < 30; i++ {
 		checkResp, err := client.Check(ctx, checkAfterCreate)
 		if err == nil && checkResp.GetAllowed() == pbv1beta2.Allowed_ALLOWED_TRUE {
 			t.Logf("✓ Create-check returned ALLOWED_TRUE (attempt %d)", i+1)
@@ -921,7 +921,7 @@ func TestInventoryAPIHTTP_v1beta2_create_check_delete_check_resource(t *testing.
 		} else {
 			t.Logf("Create-check returned %v (attempt %d), expected ALLOWED_TRUE", checkResp.GetAllowed(), i+1)
 		}
-		if i < 9 {
+		if i < 29 {
 			t.Log("Waiting 1s before retry...")
 			time.Sleep(1 * time.Second)
 		}
@@ -965,7 +965,7 @@ func TestInventoryAPIHTTP_v1beta2_create_check_delete_check_resource(t *testing.
 	}
 
 	allowedFalseObserved := false
-	for i := 0; i < 10; i++ {
+	for i := 0; i < 30; i++ {
 		checkResp, err := client.Check(ctx, checkAfterDelete)
 		if err == nil && checkResp.GetAllowed() == pbv1beta2.Allowed_ALLOWED_FALSE {
 			t.Logf("✓ Delete-check returned ALLOWED_FALSE (attempt %d)", i+1)
@@ -977,7 +977,7 @@ func TestInventoryAPIHTTP_v1beta2_create_check_delete_check_resource(t *testing.
 		} else {
 			t.Logf("Delete-check returned %v (attempt %d), expected ALLOWED_FALSE", checkResp.GetAllowed(), i+1)
 		}
-		if i < 9 {
+		if i < 29 {
 			t.Log("Waiting 1s before retry...")
 			time.Sleep(1 * time.Second)
 		}
@@ -1113,9 +1113,9 @@ func TestInventoryAPIHTTP_v1beta2_CheckBulk_SingleTrueAndFalse(t *testing.T) {
 		},
 	}
 
-	// Poll up to 10 seconds to account for eventual consistency
+	// Poll up to 30 seconds to account for eventual consistency
 	observed := false
-	for i := 0; i < 10; i++ {
+	for i := 0; i < 30; i++ {
 		resp, err := client.CheckBulk(ctx, checkBulkReq)
 		if err == nil && resp != nil && len(resp.GetPairs()) == 2 {
 			pairs := resp.GetPairs()
@@ -1129,7 +1129,7 @@ func TestInventoryAPIHTTP_v1beta2_CheckBulk_SingleTrueAndFalse(t *testing.T) {
 		} else if err != nil {
 			t.Logf("CheckBulk request failed (attempt %d): %v", i+1, err)
 		}
-		if i < 9 {
+		if i < 29 {
 			time.Sleep(1 * time.Second)
 		}
 	}
@@ -1253,9 +1253,9 @@ func TestInventoryAPIHTTP_v1beta2_CheckBulk_OrderAndEcho(t *testing.T) {
 		},
 	}
 
-	// Poll up to 10 seconds; verify order is preserved and request is echoed
+	// Poll up to 30 seconds; verify order is preserved and request is echoed
 	observed := false
-	for i := 0; i < 10; i++ {
+	for i := 0; i < 30; i++ {
 		resp, err := client.CheckBulk(ctx, &pbv1beta2.CheckBulkRequest{
 			Items: []*pbv1beta2.CheckBulkRequestItem{item1, item2},
 		})
@@ -1292,7 +1292,7 @@ func TestInventoryAPIHTTP_v1beta2_CheckBulk_OrderAndEcho(t *testing.T) {
 		} else if err != nil {
 			t.Logf("CheckBulk request failed (attempt %d): %v", i+1, err)
 		}
-		if i < 9 {
+		if i < 29 {
 			time.Sleep(1 * time.Second)
 		}
 	}

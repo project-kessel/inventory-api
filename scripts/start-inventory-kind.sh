@@ -48,7 +48,9 @@ check_connector_readiness() {
     echo "Connector '$connector_name' not ready yet (state: $state). Retrying in 5 seconds... ($i/$max_retries)"
     sleep 5
   done
+  connector_status=$(kubectl exec "$(kubectl get pods -l strimzi.io/kind=KafkaConnect -o jsonpath='{.items[0].metadata.name}')" -- curl -sf "http://localhost:8083/connectors/$connector_name/status")
   echo "Timeout waiting for connector '$connector_name' readiness."
+  echo "Status for '$connector_name': '$connector_status'"
   exit 1
 }
 

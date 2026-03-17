@@ -40,7 +40,7 @@ check_connector_readiness() {
   echo "Waiting for Kafka Connect connector '$connector_name' to be ready..."
   local state=""
   for i in $(seq 1 $max_retries); do
-    state=$(kubectl exec "$(kubectl get pods -l strimzi.io/kind=KafkaConnect -o jsonpath='{.items[0].metadata.name}')" -- curl -sf "http://localhost:8083/connectors/$connector_name/status" 2>/dev/null | grep -o '"state":"[A-Z]*"' | head -1 | grep -o '[A-Z]*')
+    state=$(kubectl exec "$(kubectl get pods -l strimzi.io/kind=KafkaConnect -o jsonpath='{.items[0].metadata.name}')" -- curl -sf "http://localhost:8083/connectors/$connector_name/status" 2>/dev/null | grep -o '"state":"[A-Z]*"' | head -1 | grep -o '[A-Z]*' || true)
     if [ "$state" = "RUNNING" ]; then
       echo "Connector '$connector_name' is ready."
       return 0
@@ -130,7 +130,7 @@ while true; do
   POD_STATUSES=$(kubectl get pods --no-headers)
 
   POD_COUNT=$(echo "$POD_STATUSES" | grep -c . || true)
-  NOT_READY=$(echo "$POD_STATUSES" | awk '{split($2,a,"/"); if(a[1]!=a[2]) print}' | wc -l)
+  NOT_READY=$(echo "$POD_STATUSES" | awk '$3 != "Completed" && $3 != "Succeeded" {split($2,a,"/"); if(a[1]!=a[2]) print}' | wc -l)
 
   if [ "$POD_COUNT" -gt 0 ] && [ "$NOT_READY" -eq 0 ]; then
     echo "All pods are ready."
@@ -220,17 +220,11 @@ if [ "$STATUS" != "Completed" ]; then
   exit 1
 fi
 
-# --- Clean up database and WAL job before table-mode run ---
-echo "Cleaning up WAL e2e test data from database..."
-kubectl exec "$(kubectl get pods -l app=invdatabase -o jsonpath='{.items[0].metadata.name}')" -- \
-  psql -U postgres -d spicedb -c \
-  "TRUNCATE TABLE reporter_representations, common_representations, reporter_resources, resource, outbox_events CASCADE;"
-echo "Database cleanup complete."
-
+# --- Clean up WAL job before table-mode run ---
 echo "Deleting WAL e2e job..."
 kubectl delete job e2e-inventory-http-tests --ignore-not-found=true
 echo "Waiting for WAL e2e job pod to be fully removed..."
-kubectl wait --for=delete pod --selector=job-name=e2e-inventory-http-tests --timeout=60s 2>/dev/null || true
+kubectl wait --for=delete pod --selector=job-name=e2e-inventory-http-tests --timeout=60s
 
 # --- Swap to table-mode and run e2e tests ---
 # Remove this block when the outbox table is deprecated.

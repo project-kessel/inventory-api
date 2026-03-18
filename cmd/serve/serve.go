@@ -220,7 +220,7 @@ func NewCommand(
 			if err != nil {
 				return err
 			}
-			relationsEnabled := relationsConfig.Impl == data.RelationsImplKessel
+			relationsEnabled := relationsConfig.Impl == data.RelationsImplSpiceDB
 
 			// constructs schema repository
 			schemaRepository, err := data.NewSchemaRepository(ctx, schemaConfig, log.NewHelper(log.With(logger, "subsystem", "schemaRepository")))

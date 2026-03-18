@@ -48,7 +48,7 @@ func (r *healthRepo) IsBackendAvailable(ctx context.Context) (*pb.GetReadyzRespo
 		log.Errorf("RELATIONS-API UNHEALTHY")
 		return newResponse("RELATIONS-API UNHEALTHY", 500), nil
 	}
-	if r.RelationsImpl == "Kessel" {
+	if r.RelationsImpl == "SpiceDB" {
 		if viper.GetBool("log.readyz") {
 			log.Infof("Storage type %s and relations-api OK", storageType)
 		}
@@ -64,7 +64,7 @@ func (r *healthRepo) IsRelationsAvailable(ctx context.Context) (*pb.GetReadyzRes
 		log.Errorf("RELATIONS-API UNHEALTHY")
 		return newResponse("RELATIONS-API UNHEALTHY", 500), nil
 	}
-	if r.RelationsImpl == "Kessel" {
+	if r.RelationsImpl == "SpiceDB" {
 		if viper.GetBool("log.readyz") {
 			log.Infof("relations-api OK")
 		}

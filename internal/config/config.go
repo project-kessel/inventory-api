@@ -84,11 +84,11 @@ func LogConfigurationInfo(options *OptionsConfig) {
 		)
 	}
 
-	if options.Authz.Impl == data.RelationsImplKessel {
+	if options.Authz.Impl == data.RelationsImplSpiceDB {
 		log.Debugf("Authz Configuration: URL: %s, Insecure?: %t, OIDC?: %t",
-			options.Authz.Kessel.URL,
-			options.Authz.Kessel.Insecure,
-			options.Authz.Kessel.EnableOidcAuth,
+			options.Authz.SpiceDB.URL,
+			options.Authz.SpiceDB.Insecure,
+			options.Authz.SpiceDB.EnableOidcAuth,
 		)
 	}
 
@@ -140,8 +140,8 @@ func (o *OptionsConfig) InjectClowdAppConfig(appconfig *clowder.AppConfig) error
 
 // ConfigureAuthz updates Authz settings based on ClowdApp AppConfig
 func (o *OptionsConfig) ConfigureAuthz(endpoint clowder.DependencyEndpoint) {
-	o.Authz.Impl = data.RelationsImplKessel
-	o.Authz.Kessel.URL = fmt.Sprintf("%s:%d", endpoint.Hostname, 9000)
+	o.Authz.Impl = data.RelationsImplSpiceDB
+	o.Authz.SpiceDB.URL = fmt.Sprintf("%s:%d", endpoint.Hostname, 9000)
 }
 
 // ConfigureStorage updates Storage settings based on ClowdApp AppConfig

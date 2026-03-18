@@ -14,8 +14,8 @@ func NewRelationsRepository(ctx context.Context, config RelationsCompletedConfig
 	switch config.Impl {
 	case RelationsImplAllowAll:
 		return newAllowAllRelationsRepository(logger), nil
-	case RelationsImplKessel:
-		return newKesselRelationsRepository(ctx, config, logger)
+	case RelationsImplSpiceDB:
+		return newSpicedbRelationsRepository(ctx, config, logger)
 	default:
 		return nil, fmt.Errorf("unrecognized relations.impl: %s", config.Impl)
 	}
@@ -26,8 +26,8 @@ func CheckRelationsImpl(config RelationsCompletedConfig) string {
 	switch config.Impl {
 	case RelationsImplAllowAll:
 		return "AllowAll"
-	case RelationsImplKessel:
-		return "Kessel"
+	case RelationsImplSpiceDB:
+		return "SpiceDB"
 	default:
 		return "Unknown"
 	}

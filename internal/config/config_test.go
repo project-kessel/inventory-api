@@ -114,8 +114,8 @@ func TestConfigureAuthz(t *testing.T) {
 
 	t.Run(test.name, func(t *testing.T) {
 		test.options.ConfigureAuthz(test.appconfig.Endpoints[0])
-		assert.Equal(t, data.RelationsImplKessel, test.options.Authz.Impl)
-		assert.Equal(t, "kessel-relations:9000", test.options.Authz.Kessel.URL)
+		assert.Equal(t, data.RelationsImplSpiceDB, test.options.Authz.Impl)
+		assert.Equal(t, "kessel-relations:9000", test.options.Authz.SpiceDB.URL)
 	})
 
 }
@@ -231,8 +231,8 @@ func TestInjectClowdAppConfig(t *testing.T) {
 		options: NewOptionsConfig(),
 		expected: &OptionsConfig{
 			Authz: &data.RelationsOptionsRoot{
-				Impl: data.RelationsImplKessel,
-				Kessel: &data.RelationsOptions{
+				Impl: data.RelationsImplSpiceDB,
+				SpiceDB: &data.RelationsOptions{
 					URL: "kessel-relations:9000",
 				},
 			},
@@ -243,7 +243,7 @@ func TestInjectClowdAppConfig(t *testing.T) {
 		err := authzTest.options.InjectClowdAppConfig(authzTest.appconfig)
 		assert.NoError(t, err)
 		assert.Equal(t, authzTest.expected.Authz.Impl, authzTest.options.Authz.Impl)
-		assert.Equal(t, authzTest.expected.Authz.Kessel.URL, authzTest.options.Authz.Kessel.URL)
+		assert.Equal(t, authzTest.expected.Authz.SpiceDB.URL, authzTest.options.Authz.SpiceDB.URL)
 		assert.Nil(t, authzTest.expected.Storage)
 		assert.Nil(t, authzTest.expected.Consumer)
 	})

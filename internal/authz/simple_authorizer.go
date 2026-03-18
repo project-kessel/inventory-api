@@ -326,6 +326,7 @@ func (s *SimpleAuthorizer) CheckForUpdateBulk(ctx context.Context, req *kessel.C
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	tuples := s.getTuplesForToken("")
+	resultToken := formatConsistencyToken(s.version)
 
 	pairs := make([]*kessel.CheckBulkResponsePair, len(req.GetItems()))
 	for i, item := range req.GetItems() {
@@ -360,7 +361,10 @@ func (s *SimpleAuthorizer) CheckForUpdateBulk(ctx context.Context, req *kessel.C
 			},
 		}
 	}
-	return &kessel.CheckForUpdateBulkResponse{Pairs: pairs}, nil
+	return &kessel.CheckForUpdateBulkResponse{
+		Pairs:            pairs,
+		ConsistencyToken: &kessel.ConsistencyToken{Token: resultToken},
+	}, nil
 }
 
 // LookupResources implements Authorizer.

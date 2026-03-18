@@ -73,7 +73,7 @@ func buildTestRelationsTuple(resourceNamespace, resourceType, resourceID, relati
 	rid, _ := model.NewLocalResourceId(resourceID)
 	resource := model.NewRelationsResource(rid, model.NewRelationsObjectType(resourceType, resourceNamespace))
 	sid, _ := model.NewLocalResourceId(subjectID)
-	subject := model.NewRelationsSubject(model.NewRelationsResource(sid, model.NewRelationsObjectType(subjectType, subjectNamespace)))
+	subject := model.NewRelationsSubject(model.NewRelationsResource(sid, model.NewRelationsObjectType(subjectType, subjectNamespace)), "")
 	return model.NewRelationsTuple(resource, relation, subject)
 }
 

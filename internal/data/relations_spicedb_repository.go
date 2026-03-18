@@ -17,7 +17,7 @@ import (
 	"github.com/project-kessel/inventory-api/internal/biz/model"
 )
 
-type kesselRelationsRepository struct {
+type spicedbRelationsRepository struct {
 	healthService  kesselv1.KesselRelationsHealthServiceClient
 	checkService   kessel.KesselCheckServiceClient
 	tupleService   kessel.KesselTupleServiceClient
@@ -28,10 +28,10 @@ type kesselRelationsRepository struct {
 	failureCounter metric.Int64Counter
 }
 
-var _ model.RelationsRepository = &kesselRelationsRepository{}
+var _ model.RelationsRepository = &spicedbRelationsRepository{}
 
-func newKesselRelationsRepository(_ context.Context, config RelationsCompletedConfig, logger *log.Helper) (*kesselRelationsRepository, error) {
-	logger.Info("Using relations repository: kessel")
+func newSpicedbRelationsRepository(_ context.Context, config RelationsCompletedConfig, logger *log.Helper) (*spicedbRelationsRepository, error) {
+	logger.Info("Using relations repository: spicedb")
 	tokenCli := newRelationsTokenClient(config.tokenConfig)
 
 	meter := otel.Meter("github.com/project-kessel/inventory-api/blob/main/internal/server/otel")
@@ -46,7 +46,7 @@ func newKesselRelationsRepository(_ context.Context, config RelationsCompletedCo
 		return nil, fmt.Errorf("failed to create failure counter: %w", err)
 	}
 
-	return &kesselRelationsRepository{
+	return &spicedbRelationsRepository{
 		healthService:  kesselv1.NewKesselRelationsHealthServiceClient(config.gRPCConn),
 		checkService:   kessel.NewKesselCheckServiceClient(config.gRPCConn),
 		tupleService:   kessel.NewKesselTupleServiceClient(config.gRPCConn),
@@ -58,17 +58,17 @@ func newKesselRelationsRepository(_ context.Context, config RelationsCompletedCo
 	}, nil
 }
 
-func (r *kesselRelationsRepository) incrFailureCounter(method string) {
+func (r *spicedbRelationsRepository) incrFailureCounter(method string) {
 	r.failureCounter.Add(context.Background(), 1, metric.WithAttributes(
 		attribute.String("method", method),
 	))
 }
 
-func (r *kesselRelationsRepository) incrSuccessCounter(method string) {
+func (r *spicedbRelationsRepository) incrSuccessCounter(method string) {
 	r.successCounter.Add(context.Background(), 1, metric.WithAttributes(attribute.String("method", method)))
 }
 
-func (r *kesselRelationsRepository) getCallOptions() ([]grpc.CallOption, error) {
+func (r *spicedbRelationsRepository) getCallOptions() ([]grpc.CallOption, error) {
 	var opts []grpc.CallOption
 	opts = append(opts, grpc.EmptyCallOption{})
 	if r.tokenClient.EnableOIDCAuth {
@@ -85,7 +85,7 @@ func (r *kesselRelationsRepository) getCallOptions() ([]grpc.CallOption, error) 
 	return opts, nil
 }
 
-func (r *kesselRelationsRepository) Health(ctx context.Context) error {
+func (r *spicedbRelationsRepository) Health(ctx context.Context) error {
 	opts, err := r.getCallOptions()
 	if err != nil {
 		r.incrFailureCounter("Health")
@@ -100,7 +100,7 @@ func (r *kesselRelationsRepository) Health(ctx context.Context) error {
 	return nil
 }
 
-func (r *kesselRelationsRepository) Check(ctx context.Context, resource model.ReporterResourceKey, relation model.Relation,
+func (r *spicedbRelationsRepository) Check(ctx context.Context, resource model.ReporterResourceKey, relation model.Relation,
 	subject model.SubjectReference, consistency model.Consistency) (bool, model.ConsistencyToken, error) {
 
 	opts, err := r.getCallOptions()
@@ -125,7 +125,7 @@ func (r *kesselRelationsRepository) Check(ctx context.Context, resource model.Re
 	return resp.GetAllowed() == kessel.CheckResponse_ALLOWED_TRUE, token, nil
 }
 
-func (r *kesselRelationsRepository) CheckForUpdate(ctx context.Context, resource model.ReporterResourceKey, relation model.Relation,
+func (r *spicedbRelationsRepository) CheckForUpdate(ctx context.Context, resource model.ReporterResourceKey, relation model.Relation,
 	subject model.SubjectReference) (bool, model.ConsistencyToken, error) {
 
 	opts, err := r.getCallOptions()
@@ -149,7 +149,7 @@ func (r *kesselRelationsRepository) CheckForUpdate(ctx context.Context, resource
 	return resp.GetAllowed() == kessel.CheckForUpdateResponse_ALLOWED_TRUE, token, nil
 }
 
-func (r *kesselRelationsRepository) CheckBulk(ctx context.Context, items []model.CheckItem,
+func (r *spicedbRelationsRepository) CheckBulk(ctx context.Context, items []model.CheckItem,
 	consistency model.Consistency) ([]model.CheckBulkResultItem, model.ConsistencyToken, error) {
 
 	v1Items := make([]*kessel.CheckBulkRequestItem, len(items))
@@ -196,7 +196,7 @@ func (r *kesselRelationsRepository) CheckBulk(ctx context.Context, items []model
 	return results, token, nil
 }
 
-func (r *kesselRelationsRepository) LookupResources(ctx context.Context, query model.LookupResourcesQuery) (model.LookupResourcesIterator, error) {
+func (r *spicedbRelationsRepository) LookupResources(ctx context.Context, query model.LookupResourcesQuery) (model.LookupResourcesIterator, error) {
 	var continuationToken *string
 	if query.Continuation != "" {
 		continuationToken = &query.Continuation
@@ -227,10 +227,10 @@ func (r *kesselRelationsRepository) LookupResources(ctx context.Context, query m
 	}
 
 	r.incrSuccessCounter("LookupResources")
-	return &kesselLookupResourcesIterator{stream: stream}, nil
+	return &relationsLookupResourcesIterator{stream: stream}, nil
 }
 
-func (r *kesselRelationsRepository) CreateTuples(ctx context.Context, tuples []model.RelationsTuple, upsert bool,
+func (r *spicedbRelationsRepository) CreateTuples(ctx context.Context, tuples []model.RelationsTuple, upsert bool,
 	lockId, lockToken string) (model.ConsistencyToken, error) {
 
 	rels := tuplesToV1Beta1Relationships(tuples)
@@ -262,7 +262,7 @@ func (r *kesselRelationsRepository) CreateTuples(ctx context.Context, tuples []m
 	return tokenFromV1Beta1(resp.GetConsistencyToken()), nil
 }
 
-func (r *kesselRelationsRepository) DeleteTuples(ctx context.Context, tuples []model.RelationsTuple,
+func (r *spicedbRelationsRepository) DeleteTuples(ctx context.Context, tuples []model.RelationsTuple,
 	lockId, lockToken string) (model.ConsistencyToken, error) {
 
 	opts, err := r.getCallOptions()
@@ -294,7 +294,7 @@ func (r *kesselRelationsRepository) DeleteTuples(ctx context.Context, tuples []m
 	return "", nil
 }
 
-func (r *kesselRelationsRepository) AcquireLock(ctx context.Context, lockId string) (string, error) {
+func (r *spicedbRelationsRepository) AcquireLock(ctx context.Context, lockId string) (string, error) {
 	opts, err := r.getCallOptions()
 	if err != nil {
 		r.incrFailureCounter("AcquireLock")
@@ -417,12 +417,12 @@ func tupleToV1Beta1Filter(tuple model.RelationsTuple) *kessel.RelationTupleFilte
 	}
 }
 
-// kesselLookupResourcesIterator wraps a gRPC streaming client as a LookupResourcesIterator.
-type kesselLookupResourcesIterator struct {
+// relationsLookupResourcesIterator wraps a gRPC streaming client as a LookupResourcesIterator.
+type relationsLookupResourcesIterator struct {
 	stream grpc.ServerStreamingClient[kessel.LookupResourcesResponse]
 }
 
-func (it *kesselLookupResourcesIterator) Next() (*model.LookupResourceResult, error) {
+func (it *relationsLookupResourcesIterator) Next() (*model.LookupResourceResult, error) {
 	resp, err := it.stream.Recv()
 	if err == io.EOF {
 		return nil, io.EOF

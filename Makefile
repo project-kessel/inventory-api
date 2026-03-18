@@ -42,7 +42,7 @@ DB_PORT ?= 5435
 DB_NAME ?= inventory
 DB_USER ?= inventory_api
 DB_PASSWORD ?= postgres
-PG_VERSION ?= 16.8
+PG_VERSION ?= 17.8
 
 .PHONY: init
 # init env

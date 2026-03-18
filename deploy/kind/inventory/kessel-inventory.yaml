@@ -38,7 +38,18 @@ spec:
             - "-c"
             - |
               echo "Waiting for PostgreSQL to be ready..."
-              sleep 20
+              RETRIES=0
+              MAX_RETRIES=60
+              until cat < /dev/tcp/invdatabase/5433 > /dev/null 2>&1; do
+                RETRIES=$((RETRIES + 1))
+                if [ "$RETRIES" -ge "$MAX_RETRIES" ]; then
+                  echo "Timeout waiting for PostgreSQL at invdatabase:5433 after $MAX_RETRIES attempts ($(( MAX_RETRIES * 2 ))s)"
+                  exit 1
+                fi
+                echo "PostgreSQL not ready yet. Sleeping for 2 seconds... ($RETRIES/$MAX_RETRIES)"
+                sleep 2
+              done
+              echo "PostgreSQL is accepting connections!"
 
               inventory-api migrate
           env:
@@ -93,10 +104,14 @@ spec:
             httpGet:
               path: /api/kessel/v1/livez
               port: 8081
+            initialDelaySeconds: 15
+            periodSeconds: 10
           readinessProbe:
             httpGet:
               path: /api/kessel/v1/readyz
               port: 8081
+            initialDelaySeconds: 10
+            periodSeconds: 5
           volumeMounts:
             - name: config-volume
               mountPath: "/inventory"

@@ -28,8 +28,11 @@ spec:
         app: postgres
     spec:
       containers:
-      - image: postgres:16.8
+      - image: postgres:17.8
         name: postgres
+        # SpiceDB requires "track_commit_timestamp=on" for its watch API, which
+        # underpins at_least_as_fresh consistency checks used by CheckPermission.
+        args: ["-c", "track_commit_timestamp=on"]
         envFrom:
           - secretRef:
               name: postgres-credentials

@@ -762,6 +762,12 @@ func checkBulkResultFromV1beta1(resp *kessel.CheckBulkResponse, cmd CheckBulkCom
 				Error:     nil,
 				ErrorCode: 0,
 			}
+		} else {
+			resultItem = CheckBulkResultItem{
+				Allowed:   false,
+				Error:     fmt.Errorf("malformed backend response: both error and item are nil for pair %v", pair),
+				ErrorCode: int32(codes.Internal),
+			}
 		}
 
 		pairs[i] = CheckBulkResultPair{
@@ -820,6 +826,12 @@ func checkForUpdateBulkResultFromV1beta1(resp *kessel.CheckForUpdateBulkResponse
 				Allowed:   pair.GetItem().GetAllowed() == kessel.CheckBulkResponseItem_ALLOWED_TRUE,
 				Error:     nil,
 				ErrorCode: 0,
+			}
+		} else {
+			resultItem = CheckBulkResultItem{
+				Allowed:   false,
+				Error:     fmt.Errorf("malformed backend response: both error and item are nil for pair %v", pair),
+				ErrorCode: int32(codes.Internal),
 			}
 		}
 		pairs[i] = CheckBulkResultPair{

@@ -5,10 +5,9 @@ import (
 	"testing"
 
 	. "github.com/project-kessel/inventory-api/cmd/common"
-	"github.com/project-kessel/inventory-api/internal/authz"
-	"github.com/project-kessel/inventory-api/internal/authz/kessel"
 	"github.com/project-kessel/inventory-api/internal/consumer"
 	"github.com/project-kessel/inventory-api/internal/consumer/auth"
+	"github.com/project-kessel/inventory-api/internal/data"
 	"github.com/project-kessel/inventory-api/internal/storage"
 	"github.com/project-kessel/inventory-api/internal/storage/postgres"
 
@@ -105,7 +104,7 @@ func TestConfigureAuthz(t *testing.T) {
 		appconfig: &clowder.AppConfig{
 			Endpoints: []clowder.DependencyEndpoint{
 				clowder.DependencyEndpoint{
-					App:      authz.RelationsAPI,
+					App:      "kessel-relations",
 					Hostname: "kessel-relations",
 				},
 			},
@@ -115,8 +114,8 @@ func TestConfigureAuthz(t *testing.T) {
 
 	t.Run(test.name, func(t *testing.T) {
 		test.options.ConfigureAuthz(test.appconfig.Endpoints[0])
-		assert.Equal(t, "kessel", test.options.Authz.Authz)
-		assert.Equal(t, "kessel-relations:9000", test.options.Authz.Kessel.URL)
+		assert.Equal(t, data.RelationsImplSpiceDB, test.options.Authz.Impl)
+		assert.Equal(t, "kessel-relations:9000", test.options.Authz.SpiceDB.URL)
 	})
 
 }
@@ -224,16 +223,16 @@ func TestInjectClowdAppConfig(t *testing.T) {
 		appconfig: &clowder.AppConfig{
 			Endpoints: []clowder.DependencyEndpoint{
 				clowder.DependencyEndpoint{
-					App:      authz.RelationsAPI,
+					App:      "kessel-relations",
 					Hostname: "kessel-relations",
 				},
 			},
 		},
 		options: NewOptionsConfig(),
 		expected: &OptionsConfig{
-			Authz: &authz.Options{
-				Authz: authz.Kessel,
-				Kessel: &kessel.Options{
+			Authz: &data.RelationsOptionsRoot{
+				Impl: data.RelationsImplSpiceDB,
+				SpiceDB: &data.RelationsOptions{
 					URL: "kessel-relations:9000",
 				},
 			},
@@ -243,8 +242,8 @@ func TestInjectClowdAppConfig(t *testing.T) {
 	t.Run(authzTest.name, func(t *testing.T) {
 		err := authzTest.options.InjectClowdAppConfig(authzTest.appconfig)
 		assert.NoError(t, err)
-		assert.Equal(t, authzTest.expected.Authz.Authz, authzTest.options.Authz.Authz)
-		assert.Equal(t, authzTest.expected.Authz.Kessel.URL, authzTest.options.Authz.Kessel.URL)
+		assert.Equal(t, authzTest.expected.Authz.Impl, authzTest.options.Authz.Impl)
+		assert.Equal(t, authzTest.expected.Authz.SpiceDB.URL, authzTest.options.Authz.SpiceDB.URL)
 		assert.Nil(t, authzTest.expected.Storage)
 		assert.Nil(t, authzTest.expected.Consumer)
 	})

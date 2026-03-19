@@ -22,8 +22,6 @@ import (
 	datamodel "github.com/project-kessel/inventory-api/internal/data/model"
 	"github.com/project-kessel/inventory-api/internal/metricscollector"
 
-	"github.com/project-kessel/inventory-api/internal/authz/allow"
-	"github.com/project-kessel/inventory-api/internal/authz/kessel"
 	"github.com/project-kessel/inventory-api/internal/pubsub"
 
 	"github.com/spf13/viper"
@@ -32,12 +30,10 @@ import (
 
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
 	"github.com/go-kratos/kratos/v2/log"
-	"github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"gorm.io/gorm"
 
-	"github.com/project-kessel/inventory-api/internal/authz"
 	"go.opentelemetry.io/otel/metric"
 )
 
@@ -62,8 +58,8 @@ type InventoryConsumer struct {
 	OffsetStorage    []kafka.TopicPartition
 	Config           CompletedConfig
 	DB               *gorm.DB
-	AuthzConfig      authz.CompletedConfig
-	Authorizer       model.Authorizer
+	RelationsRepo    model.RelationsRepository
+	RelationsEnabled bool
 	Errors           chan error
 	MetricsCollector *metricscollector.MetricsCollector
 	Logger           *log.Helper
@@ -84,7 +80,7 @@ type InventoryConsumer struct {
 }
 
 // New instantiates a new InventoryConsumer
-func New(config CompletedConfig, db *gorm.DB, schemaRepository model.SchemaRepository, authz authz.CompletedConfig, authorizer model.Authorizer, notifier pubsub.Notifier, logger *log.Helper, consumer Consumer) (InventoryConsumer, error) {
+func New(config CompletedConfig, db *gorm.DB, schemaRepository model.SchemaRepository, relationsRepo model.RelationsRepository, relationsEnabled bool, notifier pubsub.Notifier, logger *log.Helper, consumer Consumer) (InventoryConsumer, error) {
 	if consumer == nil {
 		logger.Info("Setting up kafka consumer")
 		logger.Debugf("completed kafka config: %+v", config.KafkaConfig)
@@ -135,8 +131,8 @@ func New(config CompletedConfig, db *gorm.DB, schemaRepository model.SchemaRepos
 		Config:             config,
 		DB:                 db,
 		ResourceRepository: resourceRepository,
-		AuthzConfig:        authz,
-		Authorizer:         authorizer,
+		RelationsRepo:      relationsRepo,
+		RelationsEnabled:   relationsEnabled,
 		Errors:             errChan,
 		MetricsCollector:   &mc,
 		Logger:             logger,
@@ -175,13 +171,7 @@ func (i *InventoryConsumer) Consume() error {
 	sigchan := make(chan os.Signal, 1)
 	signal.Notify(sigchan, syscall.SIGINT, syscall.SIGTERM)
 
-	var relationsEnabled bool
-	switch i.Authorizer.(type) {
-	case *kessel.KesselAuthz:
-		relationsEnabled = true
-	case *allow.AllowAllAuthz:
-		relationsEnabled = false
-	}
+	relationsEnabled := i.RelationsEnabled
 
 	// Process messages
 	run := true
@@ -519,46 +509,44 @@ func (i *InventoryConsumer) CreateTuple(ctx context.Context, tuples *[]model.Rel
 		return "", fmt.Errorf("no tuples provided")
 	}
 
-	relationships, err := i.convertTuplesToRelationships(*tuples)
-	if err != nil {
-		return "", fmt.Errorf("failed to convert tuples to relationships: %w", err)
-	}
-
-	resp, err := i.Authorizer.CreateTuples(ctx, &v1beta1.CreateTuplesRequest{
-		Upsert: true,
-		Tuples: relationships,
-		FencingCheck: &v1beta1.FencingCheck{
-			LockId:    i.lockId,
-			LockToken: i.lockToken,
-		},
-	})
+	token, err := i.RelationsRepo.CreateTuples(ctx, *tuples, true, i.lockId, i.lockToken)
 	if err != nil {
 		if status.Convert(err).Code() == codes.FailedPrecondition {
 			i.Logger.Errorf("invalid fencing token: %v", i.lockToken)
 			return "", fmt.Errorf("invalid fencing token: %w", err)
 		}
 
-		// If the tuple exists already, capture the token using Check to ensure idempotent updates to tokens in DB
 		if status.Convert(err).Code() == codes.AlreadyExists {
 			i.Logger.Info("tuple already exists; fetching consistency token")
-
-			// Use the first relationship for token fetching
-			firstRelationship := relationships[0]
-			namespace := firstRelationship.GetResource().GetType().GetNamespace()
-			relation := firstRelationship.GetRelation()
-			subject := firstRelationship.GetSubject()
-			resourceType := firstRelationship.GetResource().GetType().GetName()
-			reporterResourceId := firstRelationship.GetResource().GetId()
-
-			_, token, err := i.Authorizer.Check(ctx, namespace, relation, "", resourceType, reporterResourceId, subject)
-			if err != nil {
-				return "", fmt.Errorf("failed to fetch consistency token: %w", err)
+			firstTuple := (*tuples)[0]
+			resKey, buildErr := model.NewReporterResourceKey(
+				firstTuple.Resource().Id(),
+				model.DeserializeResourceType(firstTuple.Resource().Type().Name()),
+				model.DeserializeReporterType(firstTuple.Resource().Type().Namespace()),
+				model.ReporterInstanceId(""),
+			)
+			if buildErr != nil {
+				return "", fmt.Errorf("failed to build resource key: %w", buildErr)
 			}
-			return token.GetToken(), nil
+			rel := model.DeserializeRelation(firstTuple.Relation())
+			subId := firstTuple.Subject().Subject().Id()
+			subResType := model.DeserializeResourceType(firstTuple.Subject().Subject().Type().Name())
+			subRepType := model.DeserializeReporterType(firstTuple.Subject().Subject().Type().Namespace())
+			subKey, buildErr := model.NewReporterResourceKey(subId, subResType, subRepType, model.ReporterInstanceId(""))
+			if buildErr != nil {
+				return "", fmt.Errorf("failed to build subject key: %w", buildErr)
+			}
+			sub := model.NewSubjectReferenceWithoutRelation(subKey)
+
+			_, checkToken, checkErr := i.RelationsRepo.Check(ctx, resKey, rel, sub, model.NewConsistencyMinimizeLatency())
+			if checkErr != nil {
+				return "", fmt.Errorf("failed to fetch consistency token: %w", checkErr)
+			}
+			return checkToken.Serialize(), nil
 		}
 		return "", fmt.Errorf("error creating tuple: %w", err)
 	}
-	return resp.GetConsistencyToken().GetToken(), nil
+	return token.Serialize(), nil
 }
 
 // UpdateTuple calls the Relations API to create and delete tuples from the message payload received and returns the consistency token
@@ -590,38 +578,15 @@ func (i *InventoryConsumer) UpdateTuple(ctx context.Context, tuplesToCreate *[]m
 
 // DeleteTuple calls the Relations API to delete tuples from the RelationsTuple slice and returns the consistency token
 func (i *InventoryConsumer) DeleteTuple(ctx context.Context, tuples []model.RelationsTuple) (string, error) {
-	var token string
-
-	// Delete each tuple
-	for _, tuple := range tuples {
-		// Convert RelationsTuple to RelationTupleFilter
-		filter, err := i.convertTupleToFilter(tuple)
-		if err != nil {
-			return "", fmt.Errorf("failed to convert tuple to filter: %w", err)
+	token, err := i.RelationsRepo.DeleteTuples(ctx, tuples, i.lockId, i.lockToken)
+	if err != nil {
+		if status.Convert(err).Code() == codes.FailedPrecondition {
+			i.Logger.Errorf("invalid fencing token: %v", i.lockToken)
+			return "", fmt.Errorf("invalid fencing token: %w", err)
 		}
-
-		resp, err := i.Authorizer.DeleteTuples(ctx, &v1beta1.DeleteTuplesRequest{
-			Filter: filter,
-			FencingCheck: &v1beta1.FencingCheck{
-				LockId:    i.lockId,
-				LockToken: i.lockToken,
-			},
-		})
-		if err != nil {
-			if status.Convert(err).Code() == codes.FailedPrecondition {
-				i.Logger.Errorf("invalid fencing token: %v", i.lockToken)
-				return "", fmt.Errorf("invalid fencing token: %w", err)
-			}
-			return "", fmt.Errorf("error deleting tuple: %w", err)
-		}
-
-		// Use the latest token
-		if token == "" {
-			token = resp.GetConsistencyToken().Token
-		}
+		return "", fmt.Errorf("error deleting tuple: %w", err)
 	}
-
-	return token, nil
+	return token.Serialize(), nil
 }
 
 // updateConsistencyTokenIfPresent updates the consistency token in the DB only if the token is non-empty.
@@ -718,13 +683,7 @@ func (i *InventoryConsumer) RebalanceCallback(consumer *kafka.Consumer, event ka
 			i.Logger.Infof("Attempting to acquire lock for lockId: %s", i.lockId)
 
 			lockToken, err := i.Retry(func() (string, error) {
-				resp, err := i.Authorizer.AcquireLock(context.Background(), &v1beta1.AcquireLockRequest{
-					LockId: i.lockId,
-				})
-				if err != nil {
-					return "", err
-				}
-				return resp.GetLockToken(), nil
+				return i.RelationsRepo.AcquireLock(context.Background(), i.lockId)
 			}, i.MetricsCollector.ConsumerErrors)
 			if err != nil {
 				i.Logger.Errorf("failed to acquire lock token for %s: %v", i.lockId, err)
@@ -777,93 +736,3 @@ func (i *InventoryConsumer) RebalanceCallback(consumer *kafka.Consumer, event ka
 	}
 	return nil
 }
-
-// convertTuplesToRelationships converts a slice of RelationsTuple to v1beta1.Relationship protobuf messages
-func (i *InventoryConsumer) convertTuplesToRelationships(tuples []model.RelationsTuple) ([]*v1beta1.Relationship, error) {
-	var relationships []*v1beta1.Relationship
-
-	for _, tuple := range tuples {
-		relationship, err := i.convertTupleToRelationship(tuple)
-		if err != nil {
-			return nil, fmt.Errorf("failed to convert tuple %+v: %w", tuple, err)
-		}
-		relationships = append(relationships, relationship)
-	}
-
-	return relationships, nil
-}
-
-// convertTupleToRelationship converts a single RelationsTuple to v1beta1.Relationship
-func (i *InventoryConsumer) convertTupleToRelationship(tuple model.RelationsTuple) (*v1beta1.Relationship, error) {
-
-	return &v1beta1.Relationship{
-		Resource: &v1beta1.ObjectReference{
-			Type: &v1beta1.ObjectType{
-				Name:      tuple.Resource().Type().Name(),
-				Namespace: tuple.Resource().Type().Namespace(), // Use resource type as namespace
-			},
-			Id: tuple.Resource().Id().Serialize(),
-		},
-		Relation: tuple.Relation(),
-		Subject: &v1beta1.SubjectReference{
-			Subject: &v1beta1.ObjectReference{
-				Type: &v1beta1.ObjectType{
-					Name:      tuple.Subject().Subject().Type().Name(),
-					Namespace: tuple.Subject().Subject().Type().Namespace(),
-				},
-				Id: tuple.Subject().Subject().Id().Serialize(),
-			},
-		},
-	}, nil
-}
-
-// convertTupleToFilter converts a model.RelationsTuple to v1beta1.RelationTupleFilter
-func (i *InventoryConsumer) convertTupleToFilter(tuple model.RelationsTuple) (*v1beta1.RelationTupleFilter, error) {
-	// Store values in variables to take their addresses
-	resourceNamespace := tuple.Resource().Type().Namespace()
-	resourceType := tuple.Resource().Type().Name()
-	resourceId := tuple.Resource().Id().Serialize()
-	relation := tuple.Relation()
-	subjectNamespace := tuple.Subject().Subject().Type().Namespace()
-	subjectType := tuple.Subject().Subject().Type().Name()
-	subjectId := tuple.Subject().Subject().Id().Serialize()
-	subjectRelations := tuple.Subject().Relation()
-
-	return &v1beta1.RelationTupleFilter{
-		ResourceNamespace: &resourceNamespace,
-		ResourceType:      &resourceType,
-		ResourceId:        &resourceId,
-		Relation:          &relation,
-		SubjectFilter: &v1beta1.SubjectFilter{
-			SubjectNamespace: &subjectNamespace,
-			SubjectType:      &subjectType,
-			SubjectId:        &subjectId,
-			Relation:         &subjectRelations,
-		},
-	}, nil
-}
-
-//Unused at the moment but can be used to convert a v1beta1.RelationTupleFilter to model.RelationsTuple
-
-// // convertFilterToTuple converts a v1beta1.RelationTupleFilter to model.RelationsTuple
-// func (i *InventoryConsumer) convertFilterToTuple(filter *v1beta1.RelationTupleFilter) (model.RelationsTuple, error) {
-// 	// Extract resource information
-// 	resourceId, err := model.NewLocalResourceId(*filter.ResourceId)
-// 	if err != nil {
-// 		return model.RelationsTuple{}, fmt.Errorf("failed to create resource ID: %w", err)
-// 	}
-// 	resourceType := model.NewRelationsObjectType(*filter.ResourceType, *filter.ResourceNamespace)
-// 	resource := model.NewRelationsResource(resourceId, resourceType)
-
-// 	// Extract subject information
-// 	subjectId, err := model.NewLocalResourceId(*filter.SubjectFilter.SubjectId)
-// 	if err != nil {
-// 		return model.RelationsTuple{}, fmt.Errorf("failed to create subject ID: %w", err)
-// 	}
-// 	subjectType := model.NewRelationsObjectType(*filter.SubjectFilter.SubjectType, *filter.SubjectFilter.SubjectNamespace)
-// 	subjectResource := model.NewRelationsResource(subjectId, subjectType)
-// 	subject := model.NewRelationsSubject(subjectResource)
-
-// 	// Create the tuple
-// 	return model.NewRelationsTuple(resource, *filter.Relation, subject), nil
-// }

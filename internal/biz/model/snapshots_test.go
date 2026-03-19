@@ -26,7 +26,20 @@ func TestResourceSnapshot_FromDomainEntity(t *testing.T) {
 	reporterData := fixture.ValidReporterRepresentationType()
 
 	// Create domain Resource
-	resource, err := NewResource(resourceId, localResourceId, resourceType, reporterType, reporterInstanceId, transactionId, reporterResourceId, apiHref, consoleHref, reporterData, commonData, nil)
+	resource, err := NewResource(
+		resourceId,
+		localResourceId,
+		resourceType,
+		reporterType,
+		reporterInstanceId,
+		transactionId,
+		reporterResourceId,
+		apiHref,
+		&consoleHref,
+		&reporterData,
+		&commonData,
+		nil,
+	)
 	if err != nil {
 		t.Fatalf("Failed to create test resource: %v", err)
 	}
@@ -73,6 +86,9 @@ func TestResourceSnapshot_FromDomainEntity(t *testing.T) {
 	}
 
 	// Verify CommonRepresentationSnapshot
+	if commonRepSnapshot == nil {
+		t.Fatal("CommonRepresentationSnapshot should not be nil")
+	}
 	if commonRepSnapshot.ResourceId == uuid.Nil {
 		t.Error("CommonRepresentationSnapshot should have a valid ResourceId")
 	}
@@ -84,6 +100,9 @@ func TestResourceSnapshot_FromDomainEntity(t *testing.T) {
 	}
 
 	// Verify ReporterRepresentationSnapshot
+	if reporterRepSnapshot == nil {
+		t.Fatal("ReporterRepresentationSnapshot should not be nil")
+	}
 	if reporterRepSnapshot.ReporterResourceID == uuid.Nil {
 		t.Error("ReporterRepresentationSnapshot should have a valid ReporterResourceID")
 	}
@@ -101,6 +120,7 @@ func TestIndividualSnapshotMethods(t *testing.T) {
 	reporterResourceFixture := NewReporterResourceTestFixture()
 
 	// Test ReporterResource snapshot
+	ch := reporterResourceFixture.ValidConsoleHrefType()
 	reporterResource, err := NewReporterResource(
 		reporterResourceFixture.ValidIdType(),
 		reporterResourceFixture.ValidLocalResourceIdType(),
@@ -109,7 +129,7 @@ func TestIndividualSnapshotMethods(t *testing.T) {
 		reporterResourceFixture.ValidReporterInstanceIdType(),
 		reporterResourceFixture.ValidResourceIdType(),
 		reporterResourceFixture.ValidApiHrefType(),
-		reporterResourceFixture.ValidConsoleHrefType(),
+		&ch,
 	)
 	if err != nil {
 		t.Fatalf("Failed to create ReporterResource: %v", err)
@@ -191,13 +211,14 @@ func TestSnapshotSerialization(t *testing.T) {
 	t.Parallel()
 
 	// Test that snapshots can be used for JSON serialization
+	now := time.Now()
 	snapshot := ResourceSnapshot{
 		ID:               uuid.New(),
 		Type:             "test-resource",
 		CommonVersion:    1,
 		ConsistencyToken: "test-token",
-		CreatedAt:        time.Now(),
-		UpdatedAt:        time.Now(),
+		CreatedAt:        now,
+		UpdatedAt:        now,
 	}
 
 	// Test that all fields are accessible and properly typed
@@ -212,4 +233,63 @@ func TestSnapshotSerialization(t *testing.T) {
 	}
 
 	t.Log("Snapshot serialization fields are accessible")
+}
+
+func TestCommonRepresentationSnapshot_TransactionId_EmptyMeansNotSet(t *testing.T) {
+	t.Parallel()
+
+	snapshot := CommonRepresentationSnapshot{
+		Representation:             RepresentationSnapshot{Data: map[string]interface{}{"id": "test"}},
+		ResourceId:                 uuid.New(),
+		Version:                    1,
+		ReportedByReporterType:     "test-reporter",
+		ReportedByReporterInstance: "instance-1",
+		TransactionId:              "",
+		CreatedAt:                  time.Time{},
+	}
+	cr := DeserializeCommonRepresentation(&snapshot)
+	roundTrip := cr.Serialize()
+	if roundTrip.TransactionId != "" {
+		t.Errorf("Expected empty TransactionId to round-trip as empty, got %v", roundTrip.TransactionId)
+	}
+}
+
+func TestReporterRepresentationSnapshot_TransactionId_EmptyMeansNotSet(t *testing.T) {
+	t.Parallel()
+
+	snapshot := ReporterRepresentationSnapshot{
+		Representation:     RepresentationSnapshot{Data: map[string]interface{}{"k": "v"}},
+		ReporterResourceID: uuid.New(),
+		Version:            1,
+		Generation:         0,
+		ReporterVersion:    nil,
+		CommonVersion:      0,
+		TransactionId:      "",
+		Tombstone:          false,
+		CreatedAt:          time.Time{},
+	}
+	rr := DeserializeReporterDataRepresentation(&snapshot)
+	roundTrip := rr.Serialize()
+	if roundTrip.TransactionId != "" {
+		t.Errorf("Expected empty TransactionId to round-trip as empty, got %v", roundTrip.TransactionId)
+	}
+}
+
+func TestResourceSnapshot_CreatedAtUpdatedAt_ZeroMeansNotSet(t *testing.T) {
+	t.Parallel()
+
+	snapshot := ResourceSnapshot{
+		ID:               uuid.New(),
+		Type:             "test",
+		CommonVersion:    0,
+		ConsistencyToken: "",
+		CreatedAt:        time.Time{},
+		UpdatedAt:        time.Time{},
+	}
+	if !snapshot.CreatedAt.IsZero() {
+		t.Error("CreatedAt zero means not set")
+	}
+	if !snapshot.UpdatedAt.IsZero() {
+		t.Error("UpdatedAt zero means not set")
+	}
 }

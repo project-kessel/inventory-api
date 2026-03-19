@@ -26,6 +26,14 @@ func SerializeString[U ~string](tinyType U) string {
 	return string(tinyType)
 }
 
+func SerializeStringPtr[U ~string](v *U) *string {
+	if v == nil {
+		return nil
+	}
+	s := string(*v)
+	return &s
+}
+
 func SerializeUint[U ~uint](tinyType U) uint {
 	return uint(tinyType)
 }
@@ -423,13 +431,4 @@ func (t TransactionId) Serialize() string {
 // This will break a bunch of tests.
 func NewTransactionId(transactionId string) TransactionId {
 	return TransactionId(transactionId)
-}
-
-func GenerateTransactionId() (TransactionId, error) {
-	id, err := uuid.NewV7()
-	if err != nil {
-		return "", err
-	}
-
-	return NewTransactionId(id.String()), nil
 }

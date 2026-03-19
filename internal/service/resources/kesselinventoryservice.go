@@ -102,6 +102,20 @@ func (s *InventoryService) CheckForUpdate(ctx context.Context, req *pb.CheckForU
 	return updateResponseFromAuthzRequestV1beta2(allowed, consistencyToken), nil
 }
 
+func (s *InventoryService) CheckForUpdateBulk(ctx context.Context, req *pb.CheckForUpdateBulkRequest) (*pb.CheckForUpdateBulkResponse, error) {
+	log.Info("CheckForUpdateBulk using v1beta2 db")
+
+	cmd, err := toCheckForUpdateBulkCommand(req)
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "%v", err)
+	}
+	resp, err := s.Ctl.CheckForUpdateBulk(ctx, cmd)
+	if err != nil {
+		return nil, err
+	}
+	return fromCheckForUpdateBulkResult(resp, req), nil
+}
+
 func (s *InventoryService) CheckBulk(ctx context.Context, req *pb.CheckBulkRequest) (*pb.CheckBulkResponse, error) {
 	log.Info("CheckBulk using v1beta2 db")
 	cmd, err := toCheckBulkCommand(req)
@@ -189,27 +203,51 @@ func subjectReferenceFromProto(subject *pb.SubjectReference) (model.SubjectRefer
 	return model.NewSubjectReferenceWithoutRelation(key), nil
 }
 
+// protoToCheckBulkItem converts a single *pb.CheckBulkRequestItem to a resources.CheckBulkItem.
+// Both CheckBulkRequest and CheckForUpdateBulkRequest share the same item type, so this helper
+// is reused by toCheckBulkCommand and toCheckForUpdateBulkCommand.
+func protoToCheckBulkItem(item *pb.CheckBulkRequestItem, idx int) (resources.CheckBulkItem, error) {
+	resourceKey, err := reporterKeyFromResourceReference(item.GetObject())
+	if err != nil {
+		return resources.CheckBulkItem{}, fmt.Errorf("invalid resource at index %d: %w", idx, err)
+	}
+	subjectRef, err := subjectReferenceFromProto(item.GetSubject())
+	if err != nil {
+		return resources.CheckBulkItem{}, fmt.Errorf("invalid subject at index %d: %w", idx, err)
+	}
+	relation, err := model.NewRelation(item.GetRelation())
+	if err != nil {
+		return resources.CheckBulkItem{}, fmt.Errorf("invalid relation at index %d: %w", idx, err)
+	}
+	return resources.CheckBulkItem{
+		Resource: resourceKey,
+		Relation: relation,
+		Subject:  subjectRef,
+	}, nil
+}
+
+// toCheckForUpdateBulkCommand converts a v1beta2 CheckForUpdateBulkRequest to a usecase CheckForUpdateBulkCommand.
+func toCheckForUpdateBulkCommand(req *pb.CheckForUpdateBulkRequest) (resources.CheckForUpdateBulkCommand, error) {
+	items := make([]resources.CheckBulkItem, len(req.GetItems()))
+	for i, item := range req.GetItems() {
+		bulkItem, err := protoToCheckBulkItem(item, i)
+		if err != nil {
+			return resources.CheckForUpdateBulkCommand{}, err
+		}
+		items[i] = bulkItem
+	}
+	return resources.CheckForUpdateBulkCommand{Items: items}, nil
+}
+
 // toCheckBulkCommand converts a v1beta2 CheckBulkRequest to a usecase CheckBulkCommand.
 func toCheckBulkCommand(req *pb.CheckBulkRequest) (resources.CheckBulkCommand, error) {
 	items := make([]resources.CheckBulkItem, len(req.GetItems()))
 	for i, item := range req.GetItems() {
-		resourceKey, err := reporterKeyFromResourceReference(item.GetObject())
+		bulkItem, err := protoToCheckBulkItem(item, i)
 		if err != nil {
-			return resources.CheckBulkCommand{}, fmt.Errorf("invalid resource at index %d: %w", i, err)
+			return resources.CheckBulkCommand{}, err
 		}
-		subjectRef, err := subjectReferenceFromProto(item.GetSubject())
-		if err != nil {
-			return resources.CheckBulkCommand{}, fmt.Errorf("invalid subject at index %d: %w", i, err)
-		}
-		relation, err := model.NewRelation(item.GetRelation())
-		if err != nil {
-			return resources.CheckBulkCommand{}, fmt.Errorf("invalid relation at index %d: %w", i, err)
-		}
-		items[i] = resources.CheckBulkItem{
-			Resource: resourceKey,
-			Relation: relation,
-			Subject:  subjectRef,
-		}
+		items[i] = bulkItem
 	}
 
 	consistency := consistencyFromProto(req.GetConsistency())
@@ -235,52 +273,76 @@ func consistencyFromProto(c *pb.Consistency) model.Consistency {
 	return model.NewConsistencyUnspecified()
 }
 
+// checkBulkResultItemToProtoFields derives the proto Allowed enum and, if the result carries an
+// error, a populated *rpcstatus.Status ready for embedding in a response pair. opName is used
+// only for the error log message. Returns (allowed, nil) when the item succeeded.
+func checkBulkResultItemToProtoFields(item resources.CheckBulkResultItem, idx int, opName string) (pb.Allowed, *rpcstatus.Status) {
+	allowed := pb.Allowed_ALLOWED_FALSE
+	if item.Allowed {
+		allowed = pb.Allowed_ALLOWED_TRUE
+	}
+	if item.Error == nil {
+		return allowed, nil
+	}
+	errorCode := item.ErrorCode
+	if errorCode == 0 {
+		errorCode = int32(codes.Internal)
+	}
+	log.Errorf("Error in %s for item %d, code %d: %v", opName, idx, errorCode, item.Error)
+	return allowed, &rpcstatus.Status{
+		Code:    errorCode,
+		Message: item.Error.Error(),
+	}
+}
+
 // fromCheckBulkResult converts a usecase CheckBulkResult to v1beta2 CheckBulkResponse.
 func fromCheckBulkResult(result *resources.CheckBulkResult, req *pb.CheckBulkRequest) *pb.CheckBulkResponse {
 	pairs := make([]*pb.CheckBulkResponsePair, len(result.Pairs))
 	for i, pair := range result.Pairs {
-		errResponse := &pb.CheckBulkResponsePair_Error{}
-		itemResponse := &pb.CheckBulkResponsePair_Item{}
+		allowed, errStatus := checkBulkResultItemToProtoFields(pair.Result, i, "checkbulk")
 
-		if pair.Result.Error != nil {
-			errorCode := pair.Result.ErrorCode
-			if errorCode == 0 {
-				errorCode = int32(codes.Internal)
-			}
-			log.Errorf("Error in checkbulk for item %d, code %d: %v", i, errorCode, pair.Result.Error)
-			errResponse.Error = &rpcstatus.Status{
-				Code:    errorCode,
-				Message: pair.Result.Error.Error(),
-			}
-		}
-
-		allowedResponse := pb.Allowed_ALLOWED_FALSE
-		if pair.Result.Allowed {
-			allowedResponse = pb.Allowed_ALLOWED_TRUE
-		}
-		itemResponse.Item = &pb.CheckBulkResponseItem{
-			Allowed: allowedResponse,
-		}
-
-		// Use original request item for the response
 		var requestItem *pb.CheckBulkRequestItem
 		if i < len(req.GetItems()) {
 			requestItem = req.GetItems()[i]
 		}
 
-		pairs[i] = &pb.CheckBulkResponsePair{
-			Request: requestItem,
-		}
-		if pair.Result.Error != nil {
-			pairs[i].Response = errResponse
+		p := &pb.CheckBulkResponsePair{Request: requestItem}
+		if errStatus != nil {
+			p.Response = &pb.CheckBulkResponsePair_Error{Error: errStatus}
 		} else {
-			pairs[i].Response = itemResponse
+			p.Response = &pb.CheckBulkResponsePair_Item{Item: &pb.CheckBulkResponseItem{Allowed: allowed}}
 		}
+		pairs[i] = p
 	}
 
-	resp := &pb.CheckBulkResponse{
-		Pairs: pairs,
+	resp := &pb.CheckBulkResponse{Pairs: pairs}
+	if result.ConsistencyToken != "" {
+		resp.ConsistencyToken = &pb.ConsistencyToken{Token: result.ConsistencyToken.Serialize()}
 	}
+	return resp
+}
+
+// fromCheckForUpdateBulkResult converts a usecase CheckBulkResult to v1beta2 CheckForUpdateBulkResponse.
+func fromCheckForUpdateBulkResult(result *resources.CheckBulkResult, req *pb.CheckForUpdateBulkRequest) *pb.CheckForUpdateBulkResponse {
+	pairs := make([]*pb.CheckForUpdateBulkResponsePair, len(result.Pairs))
+	for i, pair := range result.Pairs {
+		allowed, errStatus := checkBulkResultItemToProtoFields(pair.Result, i, "checkforupdatebulk")
+
+		var requestItem *pb.CheckBulkRequestItem
+		if i < len(req.GetItems()) {
+			requestItem = req.GetItems()[i]
+		}
+
+		p := &pb.CheckForUpdateBulkResponsePair{Request: requestItem}
+		if errStatus != nil {
+			p.Response = &pb.CheckForUpdateBulkResponsePair_Error{Error: errStatus}
+		} else {
+			p.Response = &pb.CheckForUpdateBulkResponsePair_Item{Item: &pb.CheckForUpdateBulkResponseItem{Allowed: allowed}}
+		}
+		pairs[i] = p
+	}
+
+	resp := &pb.CheckForUpdateBulkResponse{Pairs: pairs}
 	if result.ConsistencyToken != "" {
 		resp.ConsistencyToken = &pb.ConsistencyToken{Token: result.ConsistencyToken.Serialize()}
 	}

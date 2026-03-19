@@ -398,23 +398,28 @@ func (uc *Usecase) CheckSelf(ctx context.Context, relation model.Relation, repor
 }
 
 // CheckForUpdate verifies if a subject can update the resource.
-func (uc *Usecase) CheckForUpdate(ctx context.Context, relation model.Relation, sub model.SubjectReference, reporterResourceKey model.ReporterResourceKey) (bool, error) {
+func (uc *Usecase) CheckForUpdate(ctx context.Context, relation model.Relation, sub model.SubjectReference, reporterResourceKey model.ReporterResourceKey) (bool, model.ConsistencyToken, error) {
 	if err := uc.enforceMetaAuthzObject(ctx, metaauthorizer.RelationCheckForUpdate, metaauthorizer.NewInventoryResourceFromKey(reporterResourceKey)); err != nil {
-		return false, err
+		return false, "", err
 	}
 
 	// Convert model types to v1beta1 for the Authz interface
 	namespace := reporterResourceKey.ReporterType().Serialize()
 	v1beta1Subject := subjectToV1Beta1(sub)
-	allowed, _, err := uc.Authz.CheckForUpdate(ctx, namespace, relation.Serialize(), reporterResourceKey.ResourceType().Serialize(), reporterResourceKey.LocalResourceId().Serialize(), v1beta1Subject)
+	allowed, token, err := uc.Authz.CheckForUpdate(ctx, namespace, relation.Serialize(), reporterResourceKey.ResourceType().Serialize(), reporterResourceKey.LocalResourceId().Serialize(), v1beta1Subject)
 	if err != nil {
-		return false, err
+		return false, "", err
+	}
+
+	var consistencyToken model.ConsistencyToken
+	if token != nil {
+		consistencyToken = model.DeserializeConsistencyToken(token.GetToken())
 	}
 
 	if allowed == kessel.CheckForUpdateResponse_ALLOWED_TRUE {
-		return true, nil
+		return true, consistencyToken, nil
 	}
-	return false, nil
+	return false, consistencyToken, nil
 }
 
 // CheckForUpdateBulk performs bulk strongly consistent check-for-update permission checks via relations-api.

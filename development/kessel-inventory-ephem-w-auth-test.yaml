@@ -117,7 +117,7 @@ objects:
       envName: ${ENV_NAME}
       database:
         name: kessel-inventory
-        version: 16
+        version: 17
       kafkaTopics:
         - topicName: outbox.event.kessel.tuples
           partitions: 1

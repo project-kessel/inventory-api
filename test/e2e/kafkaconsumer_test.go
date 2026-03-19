@@ -113,7 +113,6 @@ func ensureTopicExists(adminClient *kafka.AdminClient, topic string) error {
 
 // Test_ACMKafkaConsumer reads events from a Kafka topic and verifies their schema.
 func Test_ACMKafkaConsumer(t *testing.T) {
-	t.Parallel()
 	kafkaBootstrapServers := getEnvOrDefault("KAFKA_BOOTSTRAP_SERVERS", "localhost:9092")
 	kafkaSecProtocol := os.Getenv("KAFKA_SECURITY_PROTOCOL")
 	kafkaCaLocation := os.Getenv("KAFKA_SSL_CA_LOCATION")
@@ -238,6 +237,21 @@ func Test_ACMKafkaConsumer(t *testing.T) {
 					e.TopicPartition, string(e.Value))
 				if e.Headers != nil {
 					fmt.Printf("%% Headers: %v\n", e.Headers)
+				}
+
+				// Skip delete tombstones — these are produced by Debezium
+				// for delete events and don't carry the full CloudEvents
+				// structure we want to validate.
+				isDelete := false
+				for _, h := range e.Headers {
+					if h.Key == "operation" && string(h.Value) == "deleted" {
+						isDelete = true
+						break
+					}
+				}
+				if isDelete {
+					t.Log("Skipping delete event, waiting for create/update event...")
+					continue
 				}
 
 				err = VerifyInventoryEventSchema(e.Value, inventoryEventSchema)

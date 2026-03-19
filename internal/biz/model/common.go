@@ -103,8 +103,12 @@ func DeserializeGeneration(value uint) Generation {
 	return DeserializeUint[Generation](value)
 }
 
-func DeserializeReporterVersion(value string) ReporterVersion {
-	return Deserialize[ReporterVersion](value)
+func DeserializeReporterVersion(value *string) *ReporterVersion {
+	if value == nil {
+		return nil
+	}
+	rv := Deserialize[ReporterVersion](*value)
+	return &rv
 }
 
 func DeserializeTombstone(value bool) Tombstone {
@@ -119,8 +123,12 @@ func DeserializeApiHref(value string) ApiHref {
 	return ApiHref(DeserializeURI(value))
 }
 
-func DeserializeConsoleHref(value string) ConsoleHref {
-	return ConsoleHref(DeserializeURI(value))
+func DeserializeConsoleHref(value *string) *ConsoleHref {
+	if value == nil {
+		return nil
+	}
+	ch := ConsoleHref(DeserializeURI(*value))
+	return &ch
 }
 
 func DeserializeLocalResourceId(value string) LocalResourceId {

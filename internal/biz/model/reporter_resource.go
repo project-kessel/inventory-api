@@ -189,17 +189,12 @@ func DeserializeReporterResource(snapshot ReporterResourceSnapshot) ReporterReso
 	log.Printf("----------------------------------")
 	log.Printf("ReporterResourceSnapshot : %+v, ", snapshot)
 
-	var consoleHref *ConsoleHref
-	if snapshot.ConsoleHref != nil {
-		ch := DeserializeConsoleHref(*snapshot.ConsoleHref)
-		consoleHref = &ch
-	}
 	return ReporterResource{
 		id:                    DeserializeReporterResourceId(snapshot.ID),
 		ReporterResourceKey:   DeserializeReporterResourceKey(snapshot.ReporterResourceKey.LocalResourceID, snapshot.ReporterResourceKey.ResourceType, snapshot.ReporterResourceKey.ReporterType, snapshot.ReporterResourceKey.ReporterInstanceID),
 		resourceID:            DeserializeResourceId(snapshot.ResourceID),
 		apiHref:               DeserializeApiHref(snapshot.APIHref),
-		consoleHref:           consoleHref,
+		consoleHref:           DeserializeConsoleHref(snapshot.ConsoleHref),
 		representationVersion: DeserializeVersion(snapshot.RepresentationVersion),
 		generation:            DeserializeGeneration(snapshot.Generation),
 		tombstone:             DeserializeTombstone(snapshot.Tombstone),

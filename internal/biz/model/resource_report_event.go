@@ -161,9 +161,7 @@ func DeserializeResourceEvent(
 		event.commonRepresentation = &cr
 	}
 
-	if reporterRepresentationSnapshot != nil {
-		event.reporterRepresentation = DeserializeReporterDataRepresentation(reporterRepresentationSnapshot)
-	}
+	event.reporterRepresentation = DeserializeReporterDataRepresentation(reporterRepresentationSnapshot)
 
 	event.createdAt = createdAt
 	event.updatedAt = updatedAt

@@ -127,12 +127,6 @@ func DeserializeReporterDataRepresentation(snapshot *ReporterRepresentationSnaps
 	tombstone := DeserializeTombstone(snapshot.Tombstone)
 	transactionId := DeserializeTransactionId(snapshot.TransactionId)
 
-	var reporterVersion *ReporterVersion
-	if snapshot.ReporterVersion != nil {
-		rv := DeserializeReporterVersion(*snapshot.ReporterVersion)
-		reporterVersion = &rv
-	}
-
 	return &ReporterDataRepresentation{
 		ReporterRepresentation{
 			Representation:     representation,
@@ -140,7 +134,7 @@ func DeserializeReporterDataRepresentation(snapshot *ReporterRepresentationSnaps
 			version:            version,
 			generation:         generation,
 			commonVersion:      commonVersion,
-			reporterVersion:    reporterVersion,
+			reporterVersion:    DeserializeReporterVersion(snapshot.ReporterVersion),
 			tombstone:          tombstone,
 			transactionId:      transactionId,
 		},

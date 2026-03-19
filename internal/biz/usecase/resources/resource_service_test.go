@@ -270,11 +270,50 @@ func TestCheckForUpdate_UsesCheckForUpdateRelation(t *testing.T) {
 	relation, err := model.NewRelation("view")
 	require.NoError(t, err)
 
-	allowed, err := usecase.CheckForUpdate(ctx, relation, subject, key)
+	allowed, _, err := usecase.CheckForUpdate(ctx, relation, subject, key)
 	require.NoError(t, err)
 	assert.True(t, allowed)
 	assert.Equal(t, 1, meta.calls)
 	assert.Equal(t, []metaauthorizer.Relation{metaauthorizer.RelationCheckForUpdate}, meta.relations)
+}
+
+type stubCheckForUpdateAuthz struct {
+	allow.AllowAllAuthz
+	token string
+}
+
+func (s *stubCheckForUpdateAuthz) CheckForUpdate(ctx context.Context, namespace, permission, resourceType, localResourceId string, sub *kessel.SubjectReference) (kessel.CheckForUpdateResponse_Allowed, *kessel.ConsistencyToken, error) {
+	return kessel.CheckForUpdateResponse_ALLOWED_TRUE, &kessel.ConsistencyToken{Token: s.token}, nil
+}
+
+func TestCheckForUpdate_ReturnsConsistencyToken(t *testing.T) {
+	ctx := testAuthzContext()
+	meta := &recordingMetaAuthorizer{allowed: true}
+
+	usecase := New(
+		data.NewFakeResourceRepository(),
+		newFakeSchemaRepository(t),
+		&stubCheckForUpdateAuthz{token: "some-token"},
+		"rbac",
+		log.DefaultLogger,
+		nil,
+		nil,
+		&UsecaseConfig{},
+		metricscollector.NewFakeMetricsCollector(),
+		meta,
+		newTestSelfSubjectStrategy(),
+	)
+
+	subject, err := buildTestSubjectReference("user-1")
+	require.NoError(t, err)
+	key := createReporterResourceKey(t, "host-1", "host", "hbi", "instance-1")
+	relation, err := model.NewRelation("view")
+	require.NoError(t, err)
+
+	allowed, token, err := usecase.CheckForUpdate(ctx, relation, subject, key)
+	require.NoError(t, err)
+	assert.True(t, allowed)
+	assert.NotEmpty(t, token)
 }
 
 func TestCheckSelfBulk_UsesCheckSelfRelationForEachItem(t *testing.T) {

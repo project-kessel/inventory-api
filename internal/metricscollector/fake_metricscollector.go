@@ -32,6 +32,8 @@ func NewFakeMetricsCollector() *MetricsCollector {
 		MsgProcessFailures:       &fakeCounter{counterType: "msg_process_failures"},
 		ConsumerErrors:           &fakeCounter{counterType: "consumer_errors"},
 		KafkaErrorEvents:         &fakeCounter{counterType: "kafka_error_events"},
+		ResourcesPerWorkspace:    &fakeHistogram{},
+		ResourceCount:            &fakeGauge{},
 	}
 	return mc
 }
@@ -101,3 +103,21 @@ func (fc *fakeCounter) Enabled(context.Context) bool {
 }
 
 var _ metric.Int64Counter = (*fakeCounter)(nil)
+
+type fakeHistogram struct {
+	embedded.Float64Histogram
+}
+
+func (fh *fakeHistogram) Record(ctx context.Context, value float64, options ...metric.RecordOption) {}
+func (fh *fakeHistogram) Enabled(context.Context) bool                                             { return true }
+
+var _ metric.Float64Histogram = (*fakeHistogram)(nil)
+
+type fakeGauge struct {
+	embedded.Int64Gauge
+}
+
+func (fg *fakeGauge) Record(ctx context.Context, value int64, options ...metric.RecordOption) {}
+func (fg *fakeGauge) Enabled(context.Context) bool                                           { return true }
+
+var _ metric.Int64Gauge = (*fakeGauge)(nil)

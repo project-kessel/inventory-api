@@ -95,11 +95,11 @@ func (s *InventoryService) CheckForUpdate(ctx context.Context, req *pb.CheckForU
 		log.Error("Failed to build relation: ", err)
 		return nil, err
 	}
-	resp, err := s.Ctl.CheckForUpdate(ctx, relation, subjectRef, reporterResourceKey)
+	allowed, consistencyToken, err := s.Ctl.CheckForUpdate(ctx, relation, subjectRef, reporterResourceKey)
 	if err != nil {
 		return nil, err
 	}
-	return updateResponseFromAuthzRequestV1beta2(resp), nil
+	return updateResponseFromAuthzRequestV1beta2(allowed, consistencyToken), nil
 }
 
 func (s *InventoryService) CheckBulk(ctx context.Context, req *pb.CheckBulkRequest) (*pb.CheckBulkResponse, error) {
@@ -507,12 +507,17 @@ func viewResponseFromAuthzRequestV1beta2(allowed bool, consistencyToken model.Co
 	return response
 }
 
-func updateResponseFromAuthzRequestV1beta2(allowed bool) *pb.CheckForUpdateResponse {
+func updateResponseFromAuthzRequestV1beta2(allowed bool, consistencyToken model.ConsistencyToken) *pb.CheckForUpdateResponse {
+	response := &pb.CheckForUpdateResponse{}
 	if allowed {
-		return &pb.CheckForUpdateResponse{Allowed: pb.Allowed_ALLOWED_TRUE}
+		response.Allowed = pb.Allowed_ALLOWED_TRUE
 	} else {
-		return &pb.CheckForUpdateResponse{Allowed: pb.Allowed_ALLOWED_FALSE}
+		response.Allowed = pb.Allowed_ALLOWED_FALSE
 	}
+	if consistencyToken != "" {
+		response.ConsistencyToken = &pb.ConsistencyToken{Token: consistencyToken.Serialize()}
+	}
+	return response
 }
 
 func ResponseFromResource() *pb.ReportResourceResponse {

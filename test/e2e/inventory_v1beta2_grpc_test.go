@@ -1259,7 +1259,7 @@ func TestInventoryAPIHTTP_v1beta2_CheckForUpdate_AllowedFalse(t *testing.T) {
 	client := pbv1beta2.NewKesselInventoryServiceClient(conn)
 
 	resourceCreated := false
-	defer func() {qq
+	defer func() {
 		if !resourceCreated {
 			return
 		}

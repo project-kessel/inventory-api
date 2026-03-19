@@ -270,9 +270,10 @@ func TestCheckForUpdate_UsesCheckForUpdateRelation(t *testing.T) {
 	relation, err := model.NewRelation("view")
 	require.NoError(t, err)
 
-	allowed, err := usecase.CheckForUpdate(ctx, relation, subject, key)
+	allowed, consistencyToken, err := usecase.CheckForUpdate(ctx, relation, subject, key)
 	require.NoError(t, err)
 	assert.True(t, allowed)
+	assert.NotEmpty(t, consistencyToken)
 	assert.Equal(t, 1, meta.calls)
 	assert.Equal(t, []metaauthorizer.Relation{metaauthorizer.RelationCheckForUpdate}, meta.relations)
 }

@@ -84,10 +84,22 @@ func TestGRPC_UnimplementedServer(t *testing.T) {
 		assert.Contains(t, st.Message(), "not implemented")
 	})
 
-	t.Run("embeds correctly", func(t *testing.T) {
-		// This should compile and not panic
+	t.Run("value embedding does not panic", func(t *testing.T) {
+		// Value-embedding is the correct pattern; these calls must not panic.
 		server.mustEmbedUnimplementedKesselInventoryHealthServiceServer()
 		server.testEmbeddedByValue()
+	})
+
+	t.Run("pointer embedding with nil triggers guard panic", func(t *testing.T) {
+		// A server that embeds *UnimplementedKesselInventoryHealthServiceServer by pointer
+		// and leaves that pointer nil should cause RegisterKesselInventoryHealthServiceServer
+		// to panic via the testEmbeddedByValue guard, catching the misuse at init time.
+		nilEmbeddingServer := &struct {
+			*UnimplementedKesselInventoryHealthServiceServer
+		}{}
+		assert.Panics(t, func() {
+			RegisterKesselInventoryHealthServiceServer(nil, nilEmbeddingServer)
+		})
 	})
 }
 
@@ -134,13 +146,16 @@ func TestGRPC_ServerClientIntegration(t *testing.T) {
 	}
 	RegisterKesselInventoryHealthServiceServer(s, mockServer)
 
-	// Start server in goroutine
+	errCh := make(chan error, 1)
 	go func() {
-		if err := s.Serve(lis); err != nil {
-			t.Logf("Server exited with error: %v", err)
+		errCh <- s.Serve(lis)
+	}()
+	defer func() {
+		s.Stop()
+		if err := <-errCh; err != nil {
+			t.Errorf("unexpected server error: %v", err)
 		}
 	}()
-	defer s.Stop()
 
 	// Setup client
 	ctx := context.Background()
@@ -189,12 +204,16 @@ func TestGRPC_ServerClientErrors(t *testing.T) {
 	}
 	RegisterKesselInventoryHealthServiceServer(s, mockServer)
 
+	errCh2 := make(chan error, 1)
 	go func() {
-		if err := s.Serve(lis); err != nil {
-			t.Logf("Server exited with error: %v", err)
+		errCh2 <- s.Serve(lis)
+	}()
+	defer func() {
+		s.Stop()
+		if err := <-errCh2; err != nil {
+			t.Errorf("unexpected server error: %v", err)
 		}
 	}()
-	defer s.Stop()
 
 	ctx := context.Background()
 	//nolint:staticcheck // grpc.DialContext is deprecated but grpc.NewClient requires different setup
@@ -250,12 +269,16 @@ func TestGRPC_ContextCancellation(t *testing.T) {
 	}
 	RegisterKesselInventoryHealthServiceServer(s, mockServer)
 
+	errCh3 := make(chan error, 1)
 	go func() {
-		if err := s.Serve(lis); err != nil {
-			t.Logf("Server exited with error: %v", err)
+		errCh3 <- s.Serve(lis)
+	}()
+	defer func() {
+		s.Stop()
+		if err := <-errCh3; err != nil {
+			t.Errorf("unexpected server error: %v", err)
 		}
 	}()
-	defer s.Stop()
 
 	//nolint:staticcheck // grpc.DialContext is deprecated but grpc.NewClient requires different setup
 	conn, err := grpc.DialContext(context.Background(), "bufnet",

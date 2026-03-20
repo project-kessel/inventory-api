@@ -16,34 +16,17 @@ func TestGetLivezRequest_BasicBehavior(t *testing.T) {
 		assert.NotNil(t, req)
 	})
 
-	t.Run("reset", func(t *testing.T) {
-		req := &GetLivezRequest{}
-		req.Reset()
-		assert.NotNil(t, req)
-	})
+	t.Run("proto roundtrip", func(t *testing.T) {
+		original := &GetLivezRequest{}
+		data, err := proto.Marshal(original)
+		assert.NoError(t, err)
 
-	t.Run("string representation", func(t *testing.T) {
-		req := &GetLivezRequest{}
-		// String() should not panic, even for empty request
-		assert.NotPanics(t, func() {
-			_ = req.String()
-		})
-	})
+		var decoded GetLivezRequest
+		err = proto.Unmarshal(data, &decoded)
+		assert.NoError(t, err)
 
-	t.Run("nil pointer safety", func(t *testing.T) {
-		var req *GetLivezRequest
-		// String() should be safe to call on nil
-		assert.NotPanics(t, func() {
-			_ = req.String()
-		})
+		assert.True(t, proto.Equal(original, &decoded))
 	})
-}
-
-func TestGetLivezRequest_ProtoInterface(t *testing.T) {
-	// Verify protobuf interface implementation
-	var req interface{} = &GetLivezRequest{}
-	_, ok := req.(proto.Message)
-	assert.True(t, ok, "GetLivezRequest should implement proto.Message")
 }
 
 // GetLivezResponse Tests
@@ -220,34 +203,17 @@ func TestGetReadyzRequest_BasicBehavior(t *testing.T) {
 		assert.NotNil(t, req)
 	})
 
-	t.Run("reset", func(t *testing.T) {
-		req := &GetReadyzRequest{}
-		req.Reset()
-		assert.NotNil(t, req)
-	})
+	t.Run("proto roundtrip", func(t *testing.T) {
+		original := &GetReadyzRequest{}
+		data, err := proto.Marshal(original)
+		assert.NoError(t, err)
 
-	t.Run("string representation", func(t *testing.T) {
-		req := &GetReadyzRequest{}
-		// String() should not panic, even for empty request
-		assert.NotPanics(t, func() {
-			_ = req.String()
-		})
-	})
+		var decoded GetReadyzRequest
+		err = proto.Unmarshal(data, &decoded)
+		assert.NoError(t, err)
 
-	t.Run("nil pointer safety", func(t *testing.T) {
-		var req *GetReadyzRequest
-		// String() should be safe to call on nil
-		assert.NotPanics(t, func() {
-			_ = req.String()
-		})
+		assert.True(t, proto.Equal(original, &decoded))
 	})
-}
-
-func TestGetReadyzRequest_ProtoInterface(t *testing.T) {
-	// Verify protobuf interface implementation
-	var req interface{} = &GetReadyzRequest{}
-	_, ok := req.(proto.Message)
-	assert.True(t, ok, "GetReadyzRequest should implement proto.Message")
 }
 
 // GetReadyzResponse Tests

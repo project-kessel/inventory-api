@@ -37,9 +37,13 @@ type mockHTTPHealthServer struct {
 	livezError     error
 	readyzResponse *GetReadyzResponse
 	readyzError    error
+	captureCtx     func(context.Context)
 }
 
 func (m *mockHTTPHealthServer) GetLivez(ctx context.Context, req *GetLivezRequest) (*GetLivezResponse, error) {
+	if m.captureCtx != nil {
+		m.captureCtx(ctx)
+	}
 	if m.livezError != nil {
 		return nil, m.livezError
 	}
@@ -125,51 +129,55 @@ func TestHTTP_ClientInterface(t *testing.T) {
 	})
 }
 
-// TestHTTP_Routes verifies the expected HTTP routes
+// TestHTTP_Routes verifies the actual registered HTTP routes by exercising the handler.
 func TestHTTP_Routes(t *testing.T) {
+	srv := kratoshttp.NewServer()
+	RegisterKesselInventoryHealthServiceHTTPServer(srv, &mockHTTPHealthServer{})
+	handler := srv.Handler
+
 	tests := []struct {
 		name     string
 		endpoint string
-		method   string
 	}{
-		{
-			name:     "livez endpoint",
-			endpoint: "/api/inventory/v1/livez",
-			method:   "GET",
-		},
-		{
-			name:     "readyz endpoint",
-			endpoint: "/api/inventory/v1/readyz",
-			method:   "GET",
-		},
+		{"livez endpoint", "/api/inventory/v1/livez"},
+		{"readyz endpoint", "/api/inventory/v1/readyz"},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.NotEmpty(t, tt.endpoint, "endpoint should be defined")
-			assert.Equal(t, "GET", tt.method, "health endpoints should use GET method")
+			req := httptest.NewRequest(http.MethodGet, tt.endpoint, nil)
+			w := httptest.NewRecorder()
+			handler.ServeHTTP(w, req)
+			assert.NotEqual(t, http.StatusNotFound, w.Code,
+				"expected route to be registered: %s", tt.endpoint)
 		})
 	}
 }
 
-// TestHTTP_EndpointVersioning verifies consistent API versioning
+// TestHTTP_EndpointVersioning verifies that v1 paths are registered and unversioned paths are not.
 func TestHTTP_EndpointVersioning(t *testing.T) {
-	livezPath := "/api/inventory/v1/livez"
-	readyzPath := "/api/inventory/v1/readyz"
+	srv := kratoshttp.NewServer()
+	RegisterKesselInventoryHealthServiceHTTPServer(srv, &mockHTTPHealthServer{})
+	handler := srv.Handler
 
-	t.Run("endpoints use same version", func(t *testing.T) {
-		assert.Contains(t, livezPath, "/v1/", "livez should use v1 versioning")
-		assert.Contains(t, readyzPath, "/v1/", "readyz should use v1 versioning")
+	t.Run("v1 paths respond", func(t *testing.T) {
+		for _, path := range []string{"/api/inventory/v1/livez", "/api/inventory/v1/readyz"} {
+			req := httptest.NewRequest(http.MethodGet, path, nil)
+			w := httptest.NewRecorder()
+			handler.ServeHTTP(w, req)
+			assert.NotEqual(t, http.StatusNotFound, w.Code,
+				"v1 path should be registered: %s", path)
+		}
 	})
 
-	t.Run("endpoints follow REST conventions", func(t *testing.T) {
-		assert.Contains(t, livezPath, "/api/inventory", "should include api/inventory prefix")
-		assert.Contains(t, readyzPath, "/api/inventory", "should include api/inventory prefix")
-	})
-
-	t.Run("health check naming", func(t *testing.T) {
-		assert.Contains(t, livezPath, "livez", "should use livez for liveness")
-		assert.Contains(t, readyzPath, "readyz", "should use readyz for readiness")
+	t.Run("unversioned paths return not found", func(t *testing.T) {
+		for _, path := range []string{"/api/inventory/livez", "/api/inventory/readyz"} {
+			req := httptest.NewRequest(http.MethodGet, path, nil)
+			w := httptest.NewRecorder()
+			handler.ServeHTTP(w, req)
+			assert.Equal(t, http.StatusNotFound, w.Code,
+				"unversioned path should not be registered: %s", path)
+		}
 	})
 }
 
@@ -220,12 +228,14 @@ func TestHTTP_ResponseCodes(t *testing.T) {
 	})
 }
 
-// TestHTTP_ContextPropagation tests that context is properly propagated
+// TestHTTP_ContextPropagation tests that context values are forwarded to the handler.
 func TestHTTP_ContextPropagation(t *testing.T) {
 	type contextKey string
 	const testKey contextKey = "test-key"
 
+	var capturedCtx context.Context
 	server := &mockHTTPHealthServer{
+		captureCtx: func(ctx context.Context) { capturedCtx = ctx },
 		livezResponse: &GetLivezResponse{
 			Status: "ok",
 			Code:   200,
@@ -235,11 +245,11 @@ func TestHTTP_ContextPropagation(t *testing.T) {
 	ctx := context.WithValue(context.Background(), testKey, "test-value")
 
 	t.Run("context is passed to handler", func(t *testing.T) {
-		// This test verifies the context is properly passed through
-		// In a real implementation, you'd check the context in the handler
 		resp, err := server.GetLivez(ctx, &GetLivezRequest{})
-		assert.NoError(t, err)
-		assert.NotNil(t, resp)
+		require.NoError(t, err)
+		require.NotNil(t, resp)
+		require.NotNil(t, capturedCtx, "handler should have received a context")
+		assert.Equal(t, "test-value", capturedCtx.Value(testKey))
 	})
 }
 

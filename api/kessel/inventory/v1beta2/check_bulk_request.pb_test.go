@@ -1,10 +1,11 @@
 package v1beta2
 
 import (
-	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -27,12 +28,12 @@ func TestCheckBulkRequest_FullRoundTrip(t *testing.T) {
 	}
 
 	t.Run("json roundtrip", func(t *testing.T) {
-		data, err := json.Marshal(cr)
-		assert.NoError(t, err)
+		data, err := protojson.Marshal(cr)
+		require.NoError(t, err)
 
 		var decoded CheckBulkRequest
-		err = json.Unmarshal(data, &decoded)
-		assert.NoError(t, err)
+		err = protojson.Unmarshal(data, &decoded)
+		require.NoError(t, err)
 
 		if assert.Len(t, decoded.Items, 1) {
 			item := decoded.Items[0]
@@ -83,64 +84,66 @@ func TestCheckBulkRequest_FullRoundTrip(t *testing.T) {
 	})
 }
 
-func TestCheckBulkRequest_Reset(t *testing.T) {
+func TestCheckBulkRequest_MultipleItems(t *testing.T) {
+	cr := &CheckBulkRequest{
+		Items: []*CheckBulkRequestItem{
+			{Object: &ResourceReference{ResourceType: "host", ResourceId: "host-1"}, Relation: "view"},
+			{Object: &ResourceReference{ResourceType: "host", ResourceId: "host-2"}, Relation: "edit"},
+			{Object: &ResourceReference{ResourceType: "k8s_cluster", ResourceId: "cluster-1"}, Relation: "admin"},
+		},
+	}
+
+	data, err := proto.Marshal(cr)
+	require.NoError(t, err)
+
+	var decoded CheckBulkRequest
+	err = proto.Unmarshal(data, &decoded)
+	require.NoError(t, err)
+
+	require.Len(t, decoded.GetItems(), 3)
+	assert.Equal(t, "host-1", decoded.GetItems()[0].GetObject().GetResourceId())
+	assert.Equal(t, "view", decoded.GetItems()[0].GetRelation())
+	assert.Equal(t, "host-2", decoded.GetItems()[1].GetObject().GetResourceId())
+	assert.Equal(t, "edit", decoded.GetItems()[1].GetRelation())
+	assert.Equal(t, "cluster-1", decoded.GetItems()[2].GetObject().GetResourceId())
+	assert.Equal(t, "admin", decoded.GetItems()[2].GetRelation())
+}
+
+func TestCheckBulkRequest_OptionalRelationField(t *testing.T) {
+	withRelation := "members"
 	cr := &CheckBulkRequest{
 		Items: []*CheckBulkRequestItem{
 			{
-				Object:   &ResourceReference{ResourceType: "vm", ResourceId: "123"},
-				Relation: "read",
-				Subject:  &SubjectReference{},
+				Object:   &ResourceReference{ResourceType: "host", ResourceId: "host-1"},
+				Relation: "view",
+				Subject: &SubjectReference{
+					Relation: &withRelation,
+					Resource: &ResourceReference{ResourceType: "principal", ResourceId: "alice"},
+				},
+			},
+			{
+				Object:   &ResourceReference{ResourceType: "host", ResourceId: "host-2"},
+				Relation: "view",
+				Subject: &SubjectReference{
+					Resource: &ResourceReference{ResourceType: "principal", ResourceId: "bob"},
+				},
 			},
 		},
 	}
-	cr.Reset()
-	assert.Nil(t, cr.GetItems())
-	assert.Nil(t, cr.GetConsistency())
-}
-func TestCheckBulkRequest_BasicBehavior(t *testing.T) {
-	t.Run("string representation", func(t *testing.T) {
-		cr := &CheckBulkRequest{
-			Items: []*CheckBulkRequestItem{
-				{
-					Object:   &ResourceReference{ResourceType: "host"},
-					Relation: "view",
-				},
-			},
-		}
-		s := cr.String()
-		assert.NotEmpty(t, s, "String() should return non-empty representation")
-	})
 
-	t.Run("nil pointer safety", func(t *testing.T) {
-		var cr *CheckBulkRequest
-		// All getters should be safe to call on nil and return zero values
-		assert.Nil(t, cr.GetItems())
-		assert.Nil(t, cr.GetConsistency())
-	})
+	data, err := proto.Marshal(cr)
+	require.NoError(t, err)
 
-	t.Run("empty struct", func(t *testing.T) {
-		var cr CheckBulkRequest
-		// All getters should return zero values, not panic
-		assert.Nil(t, cr.GetItems())
-		assert.Nil(t, cr.GetConsistency())
-	})
+	var decoded CheckBulkRequest
+	err = proto.Unmarshal(data, &decoded)
+	require.NoError(t, err)
 
-	t.Run("subject with nil resource", func(t *testing.T) {
-		cr := &CheckBulkRequest{
-			Items: []*CheckBulkRequestItem{
-				{
-					Subject: &SubjectReference{Resource: nil},
-				},
-			},
-		}
-		assert.Nil(t, cr.GetItems()[0].GetSubject().GetResource())
-		assert.Equal(t, "", cr.GetItems()[0].GetSubject().GetRelation())
-	})
-}
+	// First item: optional Relation should be preserved
+	firstSubject := decoded.GetItems()[0].GetSubject()
+	require.NotNil(t, firstSubject.Relation, "optional relation should be preserved through roundtrip")
+	assert.Equal(t, "members", *firstSubject.Relation)
 
-func TestCheckBulkRequest_ProtoInterface(t *testing.T) {
-	// Verify protobuf interface implementation
-	var cr interface{} = &CheckBulkRequest{}
-	_, ok := cr.(proto.Message)
-	assert.True(t, ok, "CheckBulkRequest should implement proto.Message")
+	// Second item: no Relation means the pointer remains nil
+	secondSubject := decoded.GetItems()[1].GetSubject()
+	assert.Nil(t, secondSubject.Relation, "unset optional relation should remain nil after roundtrip")
 }

@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"google.golang.org/genproto/googleapis/rpc/status"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/protobuf/proto"
@@ -107,9 +108,7 @@ func TestCheckBulkResponse_MultipleResults(t *testing.T) {
 					Relation: "view",
 				},
 				Response: &CheckBulkResponsePair_Item{
-					Item: &CheckBulkResponseItem{
-						Allowed: Allowed_ALLOWED_TRUE,
-					},
+					Item: &CheckBulkResponseItem{Allowed: Allowed_ALLOWED_TRUE},
 				},
 			},
 			{
@@ -118,115 +117,39 @@ func TestCheckBulkResponse_MultipleResults(t *testing.T) {
 					Relation: "delete",
 				},
 				Response: &CheckBulkResponsePair_Item{
-					Item: &CheckBulkResponseItem{
-						Allowed: Allowed_ALLOWED_FALSE,
-					},
+					Item: &CheckBulkResponseItem{Allowed: Allowed_ALLOWED_FALSE},
 				},
 			},
 		},
 	}
 
-	// Check that we have two pairs
-	assert.Len(t, resp.GetPairs(), 2)
+	data, err := proto.Marshal(resp)
+	require.NoError(t, err)
 
-	// Check first result
-	assert.Equal(t, Allowed_ALLOWED_TRUE, resp.GetPairs()[0].GetItem().GetAllowed())
-	assert.Equal(t, "host-1", resp.GetPairs()[0].GetRequest().GetObject().GetResourceId())
+	var decoded CheckBulkResponse
+	err = proto.Unmarshal(data, &decoded)
+	require.NoError(t, err)
 
-	// Check second result
-	assert.Equal(t, Allowed_ALLOWED_FALSE, resp.GetPairs()[1].GetItem().GetAllowed())
-	assert.Equal(t, "host-2", resp.GetPairs()[1].GetRequest().GetObject().GetResourceId())
+	require.Len(t, decoded.GetPairs(), 2)
+
+	assert.Equal(t, Allowed_ALLOWED_TRUE, decoded.GetPairs()[0].GetItem().GetAllowed())
+	assert.Equal(t, "host-1", decoded.GetPairs()[0].GetRequest().GetObject().GetResourceId())
+
+	assert.Equal(t, Allowed_ALLOWED_FALSE, decoded.GetPairs()[1].GetItem().GetAllowed())
+	assert.Equal(t, "host-2", decoded.GetPairs()[1].GetRequest().GetObject().GetResourceId())
 }
 
 func TestCheckBulkResponse_BasicBehavior(t *testing.T) {
-	t.Run("reset", func(t *testing.T) {
-		resp := &CheckBulkResponse{
-			Pairs: []*CheckBulkResponsePair{
-				{
-					Response: &CheckBulkResponsePair_Item{
-						Item: &CheckBulkResponseItem{
-							Allowed: Allowed_ALLOWED_TRUE,
-						},
-					},
-				},
-			},
-			ConsistencyToken: &ConsistencyToken{Token: "test-token"},
-		}
-		resp.Reset()
-		assert.Nil(t, resp.GetPairs())
-		assert.Nil(t, resp.GetConsistencyToken())
-	})
-
-	t.Run("string representation", func(t *testing.T) {
-		resp := &CheckBulkResponse{
-			Pairs: []*CheckBulkResponsePair{
-				{
-					Request: &CheckBulkRequestItem{
-						Object:   &ResourceReference{ResourceType: "host"},
-						Relation: "view",
-					},
-				},
-			},
-		}
-		s := resp.String()
-		assert.NotEmpty(t, s, "String() should return non-empty representation")
-	})
-
 	t.Run("nil pointer safety", func(t *testing.T) {
 		var resp *CheckBulkResponse
-		// All getters should be safe to call on nil and return zero values
 		assert.Nil(t, resp.GetPairs())
 		assert.Nil(t, resp.GetConsistencyToken())
 	})
-
-	t.Run("empty struct", func(t *testing.T) {
-		var resp CheckBulkResponse
-		// All getters should return zero values, not panic
-		assert.Nil(t, resp.GetPairs())
-		assert.Nil(t, resp.GetConsistencyToken())
-	})
-}
-
-func TestCheckBulkResponse_ProtoInterface(t *testing.T) {
-	// Verify protobuf interface implementation
-	var resp interface{} = &CheckBulkResponse{}
-	_, ok := resp.(proto.Message)
-	assert.True(t, ok, "CheckBulkResponse should implement proto.Message")
 }
 
 func TestCheckBulkResponsePair_BasicBehavior(t *testing.T) {
-	t.Run("reset", func(t *testing.T) {
-		pair := &CheckBulkResponsePair{
-			Request: &CheckBulkRequestItem{
-				Object:   &ResourceReference{ResourceType: "host", ResourceId: "123"},
-				Relation: "view",
-			},
-			Response: &CheckBulkResponsePair_Item{
-				Item: &CheckBulkResponseItem{
-					Allowed: Allowed_ALLOWED_TRUE,
-				},
-			},
-		}
-		pair.Reset()
-		assert.Nil(t, pair.GetRequest())
-		assert.Nil(t, pair.GetItem())
-		assert.Nil(t, pair.GetError())
-	})
-
-	t.Run("string representation", func(t *testing.T) {
-		pair := &CheckBulkResponsePair{
-			Request: &CheckBulkRequestItem{
-				Object:   &ResourceReference{ResourceType: "vm"},
-				Relation: "read",
-			},
-		}
-		s := pair.String()
-		assert.NotEmpty(t, s, "String() should return non-empty representation")
-	})
-
 	t.Run("nil pointer safety", func(t *testing.T) {
 		var pair *CheckBulkResponsePair
-		// All getters should be safe to call on nil and return zero values
 		assert.Nil(t, pair.GetRequest())
 		assert.Nil(t, pair.GetItem())
 		assert.Nil(t, pair.GetError())
@@ -234,27 +157,74 @@ func TestCheckBulkResponsePair_BasicBehavior(t *testing.T) {
 }
 
 func TestCheckBulkResponseItem_BasicBehavior(t *testing.T) {
-	t.Run("reset", func(t *testing.T) {
-		item := &CheckBulkResponseItem{
-			Allowed: Allowed_ALLOWED_TRUE,
-		}
-		item.Reset()
-		assert.Equal(t, Allowed_ALLOWED_UNSPECIFIED, item.GetAllowed())
-	})
-
-	t.Run("string representation", func(t *testing.T) {
-		item := &CheckBulkResponseItem{
-			Allowed: Allowed_ALLOWED_TRUE,
-		}
-		s := item.String()
-		assert.NotEmpty(t, s, "String() should return non-empty representation")
-	})
-
 	t.Run("nil pointer safety", func(t *testing.T) {
 		var item *CheckBulkResponseItem
-		// Getter should be safe to call on nil and return zero value
 		assert.Equal(t, Allowed_ALLOWED_UNSPECIFIED, item.GetAllowed())
 	})
+}
+
+// TestCheckBulkResponse_MixedItemsAndErrors verifies that a response containing both Item
+// and Error pairs round-trips correctly, that oneof exclusivity is preserved, and that the
+// ConsistencyToken survives serialization.
+func TestCheckBulkResponse_MixedItemsAndErrors(t *testing.T) {
+	relation := "members"
+	resp := &CheckBulkResponse{
+		Pairs: []*CheckBulkResponsePair{
+			{
+				Request: &CheckBulkRequestItem{
+					Object:   &ResourceReference{ResourceType: "host", ResourceId: "host-1"},
+					Relation: "view",
+					Subject: &SubjectReference{
+						Relation: &relation,
+						Resource: &ResourceReference{ResourceType: "principal", ResourceId: "alice"},
+					},
+				},
+				Response: &CheckBulkResponsePair_Item{
+					Item: &CheckBulkResponseItem{Allowed: Allowed_ALLOWED_TRUE},
+				},
+			},
+			{
+				Request: &CheckBulkRequestItem{
+					Object:   &ResourceReference{ResourceType: "host", ResourceId: "host-2"},
+					Relation: "delete",
+				},
+				Response: &CheckBulkResponsePair_Error{
+					Error: &status.Status{
+						Code:    int32(codes.PermissionDenied),
+						Message: "permission denied",
+					},
+				},
+			},
+		},
+		ConsistencyToken: &ConsistencyToken{Token: "consistency-xyz"},
+	}
+
+	data, err := proto.Marshal(resp)
+	require.NoError(t, err)
+
+	var decoded CheckBulkResponse
+	err = proto.Unmarshal(data, &decoded)
+	require.NoError(t, err)
+
+	require.NotNil(t, decoded.GetConsistencyToken())
+	assert.Equal(t, "consistency-xyz", decoded.GetConsistencyToken().GetToken())
+
+	require.Len(t, decoded.GetPairs(), 2)
+
+	// First pair: Item response — Error must be nil (oneof exclusivity).
+	pair0 := decoded.GetPairs()[0]
+	assert.Equal(t, "host-1", pair0.GetRequest().GetObject().GetResourceId())
+	assert.NotNil(t, pair0.GetItem(), "first pair should carry an Item response")
+	assert.Nil(t, pair0.GetError(), "first pair must not carry an Error (oneof)")
+	assert.Equal(t, Allowed_ALLOWED_TRUE, pair0.GetItem().GetAllowed())
+
+	// Second pair: Error response — Item must be nil (oneof exclusivity).
+	pair1 := decoded.GetPairs()[1]
+	assert.Equal(t, "host-2", pair1.GetRequest().GetObject().GetResourceId())
+	assert.Nil(t, pair1.GetItem(), "second pair must not carry an Item (oneof)")
+	assert.NotNil(t, pair1.GetError(), "second pair should carry an Error response")
+	assert.Equal(t, int32(codes.PermissionDenied), pair1.GetError().GetCode())
+	assert.Equal(t, "permission denied", pair1.GetError().GetMessage())
 }
 
 func TestCheckBulkResponseItem_AllowedValues(t *testing.T) {

@@ -332,7 +332,6 @@ func TestResource_Update(t *testing.T) {
 
 		// Convert primitives to domain types
 		apiHref, _ := NewApiHref("https://api.example.com/updated")
-		consoleHref, _ := NewConsoleHref("") // Empty console href
 		commonData, _ := NewRepresentation(internal.JsonObject{"test": "data"})
 		reporterData, _ := NewRepresentation(internal.JsonObject{"test": "data"})
 
@@ -340,7 +339,7 @@ func TestResource_Update(t *testing.T) {
 		err = original.Update(
 			reporterResourceKey,
 			apiHref,
-			&consoleHref,
+			nil,
 			nil,
 			&reporterData,
 			&commonData,
@@ -352,8 +351,11 @@ func TestResource_Update(t *testing.T) {
 		}
 
 		updatedReporterResource := original.ReporterResources()[0]
-		if updatedReporterResource.ConsoleHref().String() != "" {
-			t.Errorf("Expected empty consoleHref, got %s", updatedReporterResource.ConsoleHref().String())
+		if updatedReporterResource.ConsoleHref() != nil {
+			t.Errorf("expected nil consoleHref when omitted in Update, got %v", updatedReporterResource.ConsoleHref())
+		}
+		if snap := updatedReporterResource.Serialize(); snap.ConsoleHref != nil {
+			t.Errorf("expected Serialize to omit console_href, got %v", *snap.ConsoleHref)
 		}
 	})
 

@@ -594,9 +594,9 @@ func NewResourceFixture(localResourceId, resourceType, reporterType, reporterIns
 		transactionId,
 		reporterResourceId,
 		apiHref,
-		consoleHref,
-		reporterRepresentationData,
-		commonRepresentationData,
+		&consoleHref,
+		&reporterRepresentationData,
+		&commonRepresentationData,
 		nil,
 	)
 	if err != nil {
@@ -789,7 +789,7 @@ func NewResourceTestFixture() ResourceTestFixture {
 		reporterInstanceId1,
 		resourceId1,
 		apiHref1,
-		consoleHref1,
+		&consoleHref1,
 	)
 
 	reporterResourceId2, _ := NewReporterResourceId(uuid.MustParse("550e8400-e29b-41d4-a716-446655440500"))
@@ -799,8 +799,6 @@ func NewResourceTestFixture() ResourceTestFixture {
 	reporterInstanceId2, _ := NewReporterInstanceId("ocm-instance-001")
 	resourceId2, _ := NewResourceId(uuid.MustParse("550e8400-e29b-41d4-a716-446655440501"))
 	apiHref2, _ := NewApiHref("/api/v1/resources/456")
-	consoleHref2 := ConsoleHref("")
-
 	anotherReporterResource, _ := NewReporterResource(
 		reporterResourceId2,
 		localResourceId2,
@@ -809,7 +807,7 @@ func NewResourceTestFixture() ResourceTestFixture {
 		reporterInstanceId2,
 		resourceId2,
 		apiHref2,
-		consoleHref2,
+		nil, // empty console href
 	)
 
 	return ResourceTestFixture{
@@ -824,6 +822,7 @@ func NewResourceTestFixture() ResourceTestFixture {
 		EmptyResourceType:         "",
 		WhitespaceResourceType:    "  \t\n  ",
 		// Individual values for NewResource function
+		ValidTransactionId:              "tx-test-fixture",
 		ValidLocalResourceId:            "local-resource-123",
 		ValidReporterType:               "acm",
 		ValidReporterInstanceId:         "acm-instance-001",

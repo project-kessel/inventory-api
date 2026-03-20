@@ -54,10 +54,8 @@ func MapError(err error) error {
 
 	log.Errorf("request failed with application error. mapping to status code. error: %v", err)
 
-	// Typed errors (matched by type via errors.As)
-	var repReqErr *resources.RepresentationRequiredError
-	if errors.As(err, &repReqErr) {
-		return status.Errorf(codes.InvalidArgument, "invalid %s representation: representation required", repReqErr.Kind)
+	if errors.Is(err, model.ErrNoRepresentationProvided) {
+		return status.Errorf(codes.InvalidArgument, "%v", err)
 	}
 
 	switch {

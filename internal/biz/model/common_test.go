@@ -955,11 +955,23 @@ func TestSerializationRoundtrip(t *testing.T) {
 				t.Fatalf("Failed to create ReporterVersion: %v", err)
 			}
 			serialized := reporterVersion.Serialize()
-			deserialized := DeserializeReporterVersion(serialized)
+			deserialized := DeserializeReporterVersion(&serialized)
 
+			if deserialized == nil {
+				t.Fatalf("DeserializeReporterVersion returned nil for non-nil input")
+			}
 			if deserialized.String() != original {
 				t.Errorf("ReporterVersion roundtrip failed: %s -> %s -> %s", original, serialized, deserialized.String())
 			}
+		}
+	})
+
+	t.Run("ReporterVersion deserialize nil", func(t *testing.T) {
+		t.Parallel()
+
+		deserialized := DeserializeReporterVersion(nil)
+		if deserialized != nil {
+			t.Errorf("DeserializeReporterVersion(nil) should return nil, got %v", deserialized)
 		}
 	})
 
@@ -1028,10 +1040,22 @@ func TestSerializationRoundtrip(t *testing.T) {
 			t.Fatalf("Failed to create ConsoleHref: %v", err)
 		}
 		serialized := consoleHref.Serialize()
-		deserialized := DeserializeConsoleHref(serialized)
+		deserialized := DeserializeConsoleHref(&serialized)
 
+		if deserialized == nil {
+			t.Fatalf("DeserializeConsoleHref returned nil for non-nil input")
+		}
 		if deserialized.String() != original {
 			t.Errorf("ConsoleHref roundtrip failed: %s -> %s -> %s", original, serialized, deserialized.String())
+		}
+	})
+
+	t.Run("ConsoleHref deserialize nil", func(t *testing.T) {
+		t.Parallel()
+
+		deserialized := DeserializeConsoleHref(nil)
+		if deserialized != nil {
+			t.Errorf("DeserializeConsoleHref(nil) should return nil, got %v", deserialized)
 		}
 	})
 

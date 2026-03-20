@@ -133,7 +133,8 @@ func TestHTTP_ClientInterface(t *testing.T) {
 func TestHTTP_Routes(t *testing.T) {
 	srv := kratoshttp.NewServer()
 	RegisterKesselInventoryHealthServiceHTTPServer(srv, &mockHTTPHealthServer{})
-	handler := srv.Handler
+	ts := httptest.NewServer(srv.Handler)
+	defer ts.Close()
 
 	tests := []struct {
 		name     string
@@ -145,10 +146,10 @@ func TestHTTP_Routes(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			req := httptest.NewRequest(http.MethodGet, tt.endpoint, nil)
-			w := httptest.NewRecorder()
-			handler.ServeHTTP(w, req)
-			assert.NotEqual(t, http.StatusNotFound, w.Code,
+			resp, err := http.Get(ts.URL + tt.endpoint) //nolint:noctx
+			require.NoError(t, err)
+			_ = resp.Body.Close()
+			assert.NotEqual(t, http.StatusNotFound, resp.StatusCode,
 				"expected route to be registered: %s", tt.endpoint)
 		})
 	}
@@ -158,24 +159,25 @@ func TestHTTP_Routes(t *testing.T) {
 func TestHTTP_EndpointVersioning(t *testing.T) {
 	srv := kratoshttp.NewServer()
 	RegisterKesselInventoryHealthServiceHTTPServer(srv, &mockHTTPHealthServer{})
-	handler := srv.Handler
+	ts := httptest.NewServer(srv.Handler)
+	defer ts.Close()
 
 	t.Run("v1 paths respond", func(t *testing.T) {
 		for _, path := range []string{"/api/inventory/v1/livez", "/api/inventory/v1/readyz"} {
-			req := httptest.NewRequest(http.MethodGet, path, nil)
-			w := httptest.NewRecorder()
-			handler.ServeHTTP(w, req)
-			assert.NotEqual(t, http.StatusNotFound, w.Code,
+			resp, err := http.Get(ts.URL + path) //nolint:noctx
+			require.NoError(t, err)
+			_ = resp.Body.Close()
+			assert.NotEqual(t, http.StatusNotFound, resp.StatusCode,
 				"v1 path should be registered: %s", path)
 		}
 	})
 
 	t.Run("unversioned paths return not found", func(t *testing.T) {
 		for _, path := range []string{"/api/inventory/livez", "/api/inventory/readyz"} {
-			req := httptest.NewRequest(http.MethodGet, path, nil)
-			w := httptest.NewRecorder()
-			handler.ServeHTTP(w, req)
-			assert.Equal(t, http.StatusNotFound, w.Code,
+			resp, err := http.Get(ts.URL + path) //nolint:noctx
+			require.NoError(t, err)
+			_ = resp.Body.Close()
+			assert.Equal(t, http.StatusNotFound, resp.StatusCode,
 				"unversioned path should not be registered: %s", path)
 		}
 	})
@@ -355,40 +357,23 @@ func TestHTTP_ServerResponses(t *testing.T) {
 
 // TestHTTP_ActualHandlerIntegration tests the actual generated HTTP handlers
 func TestHTTP_ActualHandlerIntegration(t *testing.T) {
-	// Create a mock server implementation
 	mockServer := &mockHTTPHealthServer{
-		livezResponse: &GetLivezResponse{
-			Status: "ok",
-			Code:   200,
-		},
-		readyzResponse: &GetReadyzResponse{
-			Status: "ready",
-			Code:   200,
-		},
+		livezResponse:  &GetLivezResponse{Status: "ok", Code: 200},
+		readyzResponse: &GetReadyzResponse{Status: "ready", Code: 200},
 	}
 
-	// Create Kratos HTTP server
 	srv := kratoshttp.NewServer()
 	RegisterKesselInventoryHealthServiceHTTPServer(srv, mockServer)
-
-	// Get the underlying HTTP handler
-	handler := srv.Handler
+	ts := httptest.NewServer(srv.Handler)
+	defer ts.Close()
 
 	t.Run("GetLivez handler", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodGet, "/api/inventory/v1/livez", nil)
-		w := httptest.NewRecorder()
+		resp, err := http.Get(ts.URL + "/api/inventory/v1/livez") //nolint:noctx
+		require.NoError(t, err)
+		defer func() { _ = resp.Body.Close() }()
 
-		handler.ServeHTTP(w, req)
-
-		resp := w.Result()
-		defer func() {
-			_ = resp.Body.Close()
-		}()
-
-		// Check status code
 		assert.Equal(t, http.StatusOK, resp.StatusCode)
 
-		// Parse response body
 		body, err := io.ReadAll(resp.Body)
 		require.NoError(t, err)
 
@@ -401,20 +386,12 @@ func TestHTTP_ActualHandlerIntegration(t *testing.T) {
 	})
 
 	t.Run("GetReadyz handler", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodGet, "/api/inventory/v1/readyz", nil)
-		w := httptest.NewRecorder()
+		resp, err := http.Get(ts.URL + "/api/inventory/v1/readyz") //nolint:noctx
+		require.NoError(t, err)
+		defer func() { _ = resp.Body.Close() }()
 
-		handler.ServeHTTP(w, req)
-
-		resp := w.Result()
-		defer func() {
-			_ = resp.Body.Close()
-		}()
-
-		// Check status code
 		assert.Equal(t, http.StatusOK, resp.StatusCode)
 
-		// Parse response body
 		body, err := io.ReadAll(resp.Body)
 		require.NoError(t, err)
 
@@ -429,44 +406,27 @@ func TestHTTP_ActualHandlerIntegration(t *testing.T) {
 
 // TestHTTP_HandlerWithErrors tests error handling in actual HTTP handlers
 func TestHTTP_HandlerWithErrors(t *testing.T) {
-	// Create a mock server that returns errors
 	mockServer := &mockHTTPHealthServer{
 		livezError:  assert.AnError,
 		readyzError: assert.AnError,
 	}
 
-	// Create Kratos HTTP server
 	srv := kratoshttp.NewServer()
 	RegisterKesselInventoryHealthServiceHTTPServer(srv, mockServer)
-	handler := srv.Handler
+	ts := httptest.NewServer(srv.Handler)
+	defer ts.Close()
 
 	t.Run("GetLivez error handling", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodGet, "/api/inventory/v1/livez", nil)
-		w := httptest.NewRecorder()
-
-		handler.ServeHTTP(w, req)
-
-		resp := w.Result()
-		defer func() {
-			_ = resp.Body.Close()
-		}()
-
-		// Should return error status code
+		resp, err := http.Get(ts.URL + "/api/inventory/v1/livez") //nolint:noctx
+		require.NoError(t, err)
+		_ = resp.Body.Close()
 		assert.NotEqual(t, http.StatusOK, resp.StatusCode)
 	})
 
 	t.Run("GetReadyz error handling", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodGet, "/api/inventory/v1/readyz", nil)
-		w := httptest.NewRecorder()
-
-		handler.ServeHTTP(w, req)
-
-		resp := w.Result()
-		defer func() {
-			_ = resp.Body.Close()
-		}()
-
-		// Should return error status code
+		resp, err := http.Get(ts.URL + "/api/inventory/v1/readyz") //nolint:noctx
+		require.NoError(t, err)
+		_ = resp.Body.Close()
 		assert.NotEqual(t, http.StatusOK, resp.StatusCode)
 	})
 }
@@ -522,30 +482,19 @@ func TestHTTP_ClientImplementation(t *testing.T) {
 // TestHTTP_UnhealthyResponses tests various unhealthy scenarios
 func TestHTTP_UnhealthyResponses(t *testing.T) {
 	mockServer := &mockHTTPHealthServer{
-		livezResponse: &GetLivezResponse{
-			Status: "unhealthy",
-			Code:   503,
-		},
-		readyzResponse: &GetReadyzResponse{
-			Status: "not ready",
-			Code:   503,
-		},
+		livezResponse:  &GetLivezResponse{Status: "unhealthy", Code: 503},
+		readyzResponse: &GetReadyzResponse{Status: "not ready", Code: 503},
 	}
 
 	srv := kratoshttp.NewServer()
 	RegisterKesselInventoryHealthServiceHTTPServer(srv, mockServer)
-	handler := srv.Handler
+	ts := httptest.NewServer(srv.Handler)
+	defer ts.Close()
 
 	t.Run("unhealthy livez", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodGet, "/api/inventory/v1/livez", nil)
-		w := httptest.NewRecorder()
-
-		handler.ServeHTTP(w, req)
-
-		resp := w.Result()
-		defer func() {
-			_ = resp.Body.Close()
-		}()
+		resp, err := http.Get(ts.URL + "/api/inventory/v1/livez") //nolint:noctx
+		require.NoError(t, err)
+		defer func() { _ = resp.Body.Close() }()
 
 		assert.Equal(t, http.StatusOK, resp.StatusCode)
 
@@ -561,15 +510,9 @@ func TestHTTP_UnhealthyResponses(t *testing.T) {
 	})
 
 	t.Run("not ready readyz", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodGet, "/api/inventory/v1/readyz", nil)
-		w := httptest.NewRecorder()
-
-		handler.ServeHTTP(w, req)
-
-		resp := w.Result()
-		defer func() {
-			_ = resp.Body.Close()
-		}()
+		resp, err := http.Get(ts.URL + "/api/inventory/v1/readyz") //nolint:noctx
+		require.NoError(t, err)
+		defer func() { _ = resp.Body.Close() }()
 
 		assert.Equal(t, http.StatusOK, resp.StatusCode)
 
@@ -593,22 +536,18 @@ func TestHTTP_WrongHTTPMethod(t *testing.T) {
 
 	srv := kratoshttp.NewServer()
 	RegisterKesselInventoryHealthServiceHTTPServer(srv, mockServer)
-	handler := srv.Handler
+	ts := httptest.NewServer(srv.Handler)
+	defer ts.Close()
 
 	wrongMethods := []string{http.MethodPost, http.MethodPut, http.MethodDelete, http.MethodPatch}
 
 	for _, method := range wrongMethods {
 		t.Run("livez with "+method, func(t *testing.T) {
-			req := httptest.NewRequest(method, "/api/inventory/v1/livez", nil)
-			w := httptest.NewRecorder()
-
-			handler.ServeHTTP(w, req)
-
-			resp := w.Result()
-			defer func() {
-				_ = resp.Body.Close()
-			}()
-
+			req, err := http.NewRequestWithContext(context.Background(), method, ts.URL+"/api/inventory/v1/livez", nil)
+			require.NoError(t, err)
+			resp, err := http.DefaultClient.Do(req)
+			require.NoError(t, err)
+			_ = resp.Body.Close()
 			// Should return method not allowed or not found
 			assert.Contains(t, []int{http.StatusMethodNotAllowed, http.StatusNotFound}, resp.StatusCode)
 		})

@@ -61,6 +61,11 @@ func (m *MockAuthz) CheckBulk(ctx context.Context, req *v1beta1.CheckBulkRequest
 	return args.Get(0).(*v1beta1.CheckBulkResponse), args.Error(1)
 }
 
+func (m *MockAuthz) CheckForUpdateBulk(ctx context.Context, req *v1beta1.CheckForUpdateBulkRequest) (*v1beta1.CheckForUpdateBulkResponse, error) {
+	args := m.Called(ctx, req)
+	return args.Get(0).(*v1beta1.CheckForUpdateBulkResponse), args.Error(1)
+}
+
 func (m *MockAuthz) AcquireLock(ctx context.Context, req *v1beta1.AcquireLockRequest) (*v1beta1.AcquireLockResponse, error) {
 	args := m.Called(ctx, req)
 	return args.Get(0).(*v1beta1.AcquireLockResponse), args.Error(1)

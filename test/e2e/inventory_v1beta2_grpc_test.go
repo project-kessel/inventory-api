@@ -1137,6 +1137,197 @@ func TestInventoryAPIHTTP_v1beta2_CheckBulk_SingleTrueAndFalse(t *testing.T) {
 
 }
 
+func TestInventoryAPIHTTP_v1beta2_CheckForUpdate_AllowedTrue(t *testing.T) {
+	enableShortMode(t)
+	ctx := context.Background()
+
+	resourceId := "checkforupdate-host-0001"
+	reporterType := "hbi"
+	reporterInstanceId := "testuser-example-com"
+	workspace := "workspace-checkforupdate-true"
+
+	conn, err := grpc.NewClient(
+		inventoryapi_grpc_url,
+		grpc.WithTransportCredentials(grpcinsecure.NewCredentials()),
+		grpc.WithPerRPCCredentials(&bearerAuth{token: "1234"}),
+	)
+	assert.NoError(t, err, "Failed to create gRPC client")
+	defer func() {
+		if connErr := conn.Close(); connErr != nil {
+			t.Logf("Failed to close gRPC connection: %v", connErr)
+		}
+	}()
+
+	conn.Connect()
+	client := pbv1beta2.NewKesselInventoryServiceClient(conn)
+
+	resourceCreated := false
+	defer func() {
+		if !resourceCreated {
+			return
+		}
+		_, cleanupErr := client.DeleteResource(ctx, &pbv1beta2.DeleteResourceRequest{
+			Reference: &pbv1beta2.ResourceReference{
+				ResourceType: "host",
+				ResourceId:   resourceId,
+				Reporter: &pbv1beta2.ReporterReference{
+					Type:       reporterType,
+					InstanceId: proto.String(reporterInstanceId),
+				},
+			},
+		})
+		assert.NoError(t, cleanupErr, "Failed to Delete Resource during cleanup")
+	}()
+
+	reporterStruct, err := structpb.NewStruct(map[string]interface{}{
+		"ansible_host": "checkforupdate-host.example.com",
+	})
+	assert.NoError(t, err, "Failed to create structpb for reporter")
+
+	_, err = client.ReportResource(ctx, &pbv1beta2.ReportResourceRequest{
+		WriteVisibility:    pbv1beta2.WriteVisibility_IMMEDIATE,
+		Type:               "host",
+		ReporterType:       reporterType,
+		ReporterInstanceId: reporterInstanceId,
+		Representations: &pbv1beta2.ResourceRepresentations{
+			Metadata: &pbv1beta2.RepresentationMetadata{
+				LocalResourceId: resourceId,
+				ApiHref:         "https://api.example.com/hosts/checkforupdate-host-0001",
+				ConsoleHref:     proto.String("https://console.example.com/hosts/checkforupdate-host-0001"),
+			},
+			Common: &structpb.Struct{
+				Fields: map[string]*structpb.Value{
+					"workspace_id": structpb.NewStringValue(workspace),
+				},
+			},
+			Reporter: reporterStruct,
+		},
+	})
+	assert.NoError(t, err, "Failed to Report Resource")
+	resourceCreated = true
+
+	resp, err := client.CheckForUpdate(ctx, &pbv1beta2.CheckForUpdateRequest{
+		Object: &pbv1beta2.ResourceReference{
+			ResourceType: "host",
+			ResourceId:   resourceId,
+			Reporter: &pbv1beta2.ReporterReference{
+				Type:       reporterType,
+				InstanceId: proto.String(reporterInstanceId),
+			},
+		},
+		Relation: "workspace",
+		Subject: &pbv1beta2.SubjectReference{
+			Resource: &pbv1beta2.ResourceReference{
+				ResourceType: "workspace",
+				ResourceId:   workspace,
+				Reporter: &pbv1beta2.ReporterReference{
+					Type: "rbac",
+				},
+			},
+		},
+	})
+	assert.NoError(t, err, "CheckForUpdate request failed")
+	assert.NotNil(t, resp, "CheckForUpdate response should not be nil")
+	assert.Equal(t, pbv1beta2.Allowed_ALLOWED_TRUE, resp.GetAllowed(), "Expected ALLOWED_TRUE after resource creation")
+	assert.NotNil(t, resp.GetConsistencyToken(), "Expected consistency token in CheckForUpdate response")
+	assert.NotEmpty(t, resp.GetConsistencyToken().GetToken(), "Expected non-empty consistency token")
+}
+
+func TestInventoryAPIHTTP_v1beta2_CheckForUpdate_AllowedFalse(t *testing.T) {
+	enableShortMode(t)
+	ctx := context.Background()
+
+	resourceId := "checkforupdate-host-0002"
+	reporterType := "hbi"
+	reporterInstanceId := "testuser-example-com"
+	workspace := "workspace-checkforupdate-false-a"
+	otherWorkspace := "workspace-checkforupdate-false-b"
+
+	conn, err := grpc.NewClient(
+		inventoryapi_grpc_url,
+		grpc.WithTransportCredentials(grpcinsecure.NewCredentials()),
+		grpc.WithPerRPCCredentials(&bearerAuth{token: "1234"}),
+	)
+	assert.NoError(t, err, "Failed to create gRPC client")
+	defer func() {
+		if connErr := conn.Close(); connErr != nil {
+			t.Logf("Failed to close gRPC connection: %v", connErr)
+		}
+	}()
+
+	conn.Connect()
+	client := pbv1beta2.NewKesselInventoryServiceClient(conn)
+
+	resourceCreated := false
+	defer func() {
+		if !resourceCreated {
+			return
+		}
+		_, cleanupErr := client.DeleteResource(ctx, &pbv1beta2.DeleteResourceRequest{
+			Reference: &pbv1beta2.ResourceReference{
+				ResourceType: "host",
+				ResourceId:   resourceId,
+				Reporter: &pbv1beta2.ReporterReference{
+					Type:       reporterType,
+					InstanceId: proto.String(reporterInstanceId),
+				},
+			},
+		})
+		assert.NoError(t, cleanupErr, "Failed to Delete Resource during cleanup")
+	}()
+
+	reporterStruct, err := structpb.NewStruct(map[string]interface{}{
+		"ansible_host": "checkforupdate-host2.example.com",
+	})
+	assert.NoError(t, err, "Failed to create structpb for reporter")
+
+	_, err = client.ReportResource(ctx, &pbv1beta2.ReportResourceRequest{
+		WriteVisibility:    pbv1beta2.WriteVisibility_IMMEDIATE,
+		Type:               "host",
+		ReporterType:       reporterType,
+		ReporterInstanceId: reporterInstanceId,
+		Representations: &pbv1beta2.ResourceRepresentations{
+			Metadata: &pbv1beta2.RepresentationMetadata{
+				LocalResourceId: resourceId,
+				ApiHref:         "https://api.example.com/hosts/checkforupdate-host-0002",
+				ConsoleHref:     proto.String("https://console.example.com/hosts/checkforupdate-host-0002"),
+			},
+			Common: &structpb.Struct{
+				Fields: map[string]*structpb.Value{
+					"workspace_id": structpb.NewStringValue(workspace),
+				},
+			},
+			Reporter: reporterStruct,
+		},
+	})
+	assert.NoError(t, err, "Failed to Report Resource")
+	resourceCreated = true
+
+	resp, err := client.CheckForUpdate(ctx, &pbv1beta2.CheckForUpdateRequest{
+		Object: &pbv1beta2.ResourceReference{
+			ResourceType: "host",
+			ResourceId:   resourceId,
+			Reporter: &pbv1beta2.ReporterReference{
+				Type:       reporterType,
+				InstanceId: proto.String(reporterInstanceId),
+			},
+		},
+		Relation: "workspace",
+		Subject: &pbv1beta2.SubjectReference{
+			Resource: &pbv1beta2.ResourceReference{
+				ResourceType: "workspace",
+				ResourceId:   otherWorkspace,
+				Reporter: &pbv1beta2.ReporterReference{
+					Type: "rbac",
+				},
+			},
+		},
+	})
+	assert.NoError(t, err, "CheckForUpdate request failed")
+	assert.NotNil(t, resp, "CheckForUpdate response should not be nil")
+	assert.Equal(t, pbv1beta2.Allowed_ALLOWED_FALSE, resp.GetAllowed(), "Expected ALLOWED_FALSE for non-matching workspace")
+}
+
 func TestInventoryAPIHTTP_v1beta2_CheckBulk_OrderAndEcho(t *testing.T) {
 	enableShortMode(t)
 

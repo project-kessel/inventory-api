@@ -48,7 +48,7 @@ var (
 	ErrSelfSubjectMissing = errors.New("self subject missing")
 )
 
-// RepresentationRequiredError indicates a required representation was not provided.
+// RepresentationRequiredError indicates a required representation was not provided (nil).
 // Kind identifies which representation is missing (e.g. "reporter", "common").
 // TODO: the logic is not correct around this currently, but this can be fixed later
 type RepresentationRequiredError struct {
@@ -671,7 +671,7 @@ func (uc *Usecase) validateReportResourceCommand(ctx context.Context, cmd Report
 		return err
 	}
 
-	// Allow nil/empty common representation — CommonShallowValidate will reject it
+	// Allow nil common representation — CommonShallowValidate will reject it
 	// only if the schema for this resource type declares required fields.
 	var commonRepresentation map[string]interface{}
 	if cmd.CommonRepresentation != nil {

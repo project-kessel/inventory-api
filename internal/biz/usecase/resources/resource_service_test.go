@@ -1681,15 +1681,6 @@ func TestReportResource_ValidationErrors(t *testing.T) {
 			}(),
 			expectError: "invalid reporter representation: representation required",
 		},
-		{
-			name: "missing common representation",
-			cmd: func() ReportResourceCommand {
-				cmd := fixture(t).Basic("host", "hbi", "instance-1", "test-host", "ws-123")
-				cmd.CommonRepresentation = nil
-				return cmd
-			}(),
-			expectError: "invalid common representation: representation required",
-		},
 	}
 
 	for _, tc := range tests {
@@ -1908,7 +1899,6 @@ func TestReportResource_RepresentationRequiredError(t *testing.T) {
 	)
 
 	commonRep, _ := model.NewRepresentation(map[string]interface{}{"workspace_id": "ws-123"})
-	reporterRep, _ := model.NewRepresentation(map[string]interface{}{"satellite_id": "sat-123"})
 
 	tests := []struct {
 		name                   string
@@ -1921,12 +1911,6 @@ func TestReportResource_RepresentationRequiredError(t *testing.T) {
 			reporterRepresentation: nil,
 			commonRepresentation:   &commonRep,
 			expectErrorMsg:         "invalid reporter representation: representation required",
-		},
-		{
-			name:                   "nil common representation",
-			reporterRepresentation: &reporterRep,
-			commonRepresentation:   nil,
-			expectErrorMsg:         "invalid common representation: representation required",
 		},
 		{
 			name:                   "both nil",

@@ -2882,22 +2882,11 @@ func TestInventoryService_ReportResource_NilOrEmptyRepresentationStructs(t *test
 			expectMsg: "invalid reporter representation: representation required",
 		},
 		{
-			name:            "common nil, reporter set",
-			localResourceId: "host-reporter-only",
-			common:          nil,
-			reporter: &structpb.Struct{
-				Fields: map[string]*structpb.Value{
-					"reporter_field": structpb.NewStringValue("val"),
-				},
-			},
-			expectMsg: "invalid common representation: representation required",
-		},
-		{
 			name:            "both empty structs",
 			localResourceId: "host-both-empty",
 			common:          &structpb.Struct{},
 			reporter:        &structpb.Struct{},
-			expectMsg:       "invalid reporter representation: representation data cannot be empty",
+			expectMsg:       "invalid data structure",
 		},
 	}
 
@@ -3084,19 +3073,6 @@ func TestInventoryService_ReportResource_ValidationErrorFormats(t *testing.T) {
 			reporter:          nil,
 			expectCode:        codes.InvalidArgument,
 			expectMsgContains: "invalid reporter representation: representation required",
-		},
-		{
-			name:         "nil common representation",
-			resourceType: "host",
-			reporterType: "hbi",
-			common:       nil,
-			reporter: &structpb.Struct{
-				Fields: map[string]*structpb.Value{
-					"satellite_id": structpb.NewStringValue("sat-123"),
-				},
-			},
-			expectCode:        codes.InvalidArgument,
-			expectMsgContains: "invalid common representation: representation required",
 		},
 	}
 

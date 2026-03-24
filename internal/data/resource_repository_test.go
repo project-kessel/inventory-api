@@ -2551,7 +2551,7 @@ func testTransactionIDUniqueConstraint(t *testing.T, repo bizmodel.ResourceRepos
 		require.NoError(t, err)
 
 		// Save the resource
-		err = repo.Save(db, resource, biz.OperationTypeCreated, "")
+		err = repo.Save(db, resource, bizmodel.OperationTypeCreated, "")
 		require.NoError(t, err, "Should save resource without common representation")
 
 		// Read the resource back

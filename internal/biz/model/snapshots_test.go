@@ -210,14 +210,11 @@ func TestSnapshotSerialization(t *testing.T) {
 	t.Parallel()
 
 	// Test that snapshots can be used for JSON serialization
-	now := time.Now()
 	snapshot := ResourceSnapshot{
 		ID:               uuid.New(),
 		Type:             "test-resource",
 		CommonVersion:    1,
 		ConsistencyToken: "test-token",
-		CreatedAt:        now,
-		UpdatedAt:        now,
 	}
 
 	// Test that all fields are accessible and properly typed

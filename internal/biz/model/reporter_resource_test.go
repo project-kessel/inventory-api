@@ -16,8 +16,6 @@ func assertValidReporterResource(t *testing.T, reporterResource ReporterResource
 	}
 }
 
-func consoleHrefPtr(ch ConsoleHref) *ConsoleHref { return &ch }
-
 func TestReporterResource_Initialization(t *testing.T) {
 	t.Parallel()
 	fixture := NewReporterResourceTestFixture()
@@ -33,7 +31,7 @@ func TestReporterResource_Initialization(t *testing.T) {
 			fixture.ValidReporterInstanceIdType(),
 			fixture.ValidResourceIdType(),
 			fixture.ValidApiHrefType(),
-			consoleHrefPtr(fixture.ValidConsoleHrefType()),
+			fixture.ValidConsoleHrefType(),
 		)
 
 		assertValidReporterResource(t, reporterResource, err, "valid inputs")
@@ -67,7 +65,7 @@ func TestReporterResource_Initialization(t *testing.T) {
 			fixture.ValidReporterInstanceIdType(),
 			fixture.ValidResourceIdType(),
 			fixture.ValidApiHrefType(),
-			consoleHrefPtr(fixture.ValidConsoleHrefType()),
+			fixture.ValidConsoleHrefType(),
 		)
 
 		assertValidReporterResource(t, reporterResource, err, "UUID format local resource ID")
@@ -84,7 +82,7 @@ func TestReporterResource_Initialization(t *testing.T) {
 			fixture.ValidReporterInstanceIdType(),
 			fixture.ValidResourceIdType(),
 			fixture.ValidApiHrefType(),
-			consoleHrefPtr(fixture.ValidConsoleHrefType()),
+			fixture.ValidConsoleHrefType(),
 		)
 
 		assertValidReporterResource(t, reporterResource, err, "string format local resource ID")
@@ -106,7 +104,7 @@ func TestReporterResource_Id(t *testing.T) {
 			fixture.ValidReporterInstanceIdType(),
 			fixture.ValidResourceIdType(),
 			fixture.ValidApiHrefType(),
-			consoleHrefPtr(fixture.ValidConsoleHrefType()),
+			fixture.ValidConsoleHrefType(),
 		)
 
 		if err != nil {
@@ -135,7 +133,7 @@ func TestReporterResource_Key(t *testing.T) {
 			fixture.ValidReporterInstanceIdType(),
 			fixture.ValidResourceIdType(),
 			fixture.ValidApiHrefType(),
-			consoleHrefPtr(fixture.ValidConsoleHrefType()),
+			fixture.ValidConsoleHrefType(),
 		)
 
 		if err != nil {
@@ -173,7 +171,7 @@ func TestReporterResource_Update(t *testing.T) {
 			fixture.ValidReporterInstanceIdType(),
 			fixture.ValidResourceIdType(),
 			fixture.ValidApiHrefType(),
-			consoleHrefPtr(fixture.ValidConsoleHrefType()),
+			fixture.ValidConsoleHrefType(),
 		)
 
 		if err != nil {
@@ -210,7 +208,7 @@ func TestReporterResource_Update(t *testing.T) {
 			fixture.ValidReporterInstanceIdType(),
 			fixture.ValidResourceIdType(),
 			fixture.ValidApiHrefType(),
-			consoleHrefPtr(fixture.ValidConsoleHrefType()),
+			fixture.ValidConsoleHrefType(),
 		)
 
 		if err != nil {
@@ -247,7 +245,7 @@ func TestReporterResource_Update(t *testing.T) {
 			fixture.ValidReporterInstanceIdType(),
 			fixture.ValidResourceIdType(),
 			fixture.ValidApiHrefType(),
-			consoleHrefPtr(fixture.ValidConsoleHrefType()),
+			fixture.ValidConsoleHrefType(),
 		)
 
 		if err != nil {
@@ -339,7 +337,7 @@ func TestReporterResource_TimestampsAreSetOnCreation(t *testing.T) {
 		fixture.ValidReporterInstanceIdType(),
 		fixture.ValidResourceIdType(),
 		fixture.ValidApiHrefType(),
-		consoleHrefPtr(fixture.ValidConsoleHrefType()),
+		fixture.ValidConsoleHrefType(),
 	)
 
 	if err != nil {
@@ -367,7 +365,7 @@ func TestReporterResource_CreatedAtStaysConstantOnUpdate(t *testing.T) {
 		fixture.ValidReporterInstanceIdType(),
 		fixture.ValidResourceIdType(),
 		fixture.ValidApiHrefType(),
-		consoleHrefPtr(fixture.ValidConsoleHrefType()),
+		fixture.ValidConsoleHrefType(),
 	)
 
 	originalCreatedAt := rr.CreatedAt()
@@ -398,7 +396,7 @@ func TestReporterResource_CreatedAtStaysConstantOnDelete(t *testing.T) {
 		fixture.ValidReporterInstanceIdType(),
 		fixture.ValidResourceIdType(),
 		fixture.ValidApiHrefType(),
-		consoleHrefPtr(fixture.ValidConsoleHrefType()),
+		fixture.ValidConsoleHrefType(),
 	)
 
 	originalCreatedAt := rr.CreatedAt()

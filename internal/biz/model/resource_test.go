@@ -31,7 +31,7 @@ func TestResource_Initialization(t *testing.T) {
 
 		// Note: The new signature creates only one ReporterResource
 		// This test now validates that we can create another resource with different values
-		resource, err := NewResource(fixture.ValidResourceIdType(), fixture.AnotherLocalResourceIdType(), fixture.AnotherResourceTypeType(), fixture.AnotherReporterTypeType(), fixture.AnotherReporterInstanceIdType(), fixture.AnotherReporterResourceIdType(), fixture.AnotherApiHrefType(), fixture.EmptyConsoleHrefType(), fixture.AnotherReporterRepresentationType(), fixture.AnotherCommonRepresentationType(), nil)
+		resource, err := NewResource(fixture.ValidResourceIdType(), fixture.AnotherLocalResourceIdType(), fixture.AnotherResourceTypeType(), fixture.AnotherReporterTypeType(), fixture.AnotherReporterInstanceIdType(), fixture.AnotherReporterResourceIdType(), fixture.AnotherApiHrefType(), fixture.NilConsoleHrefType(), fixture.AnotherReporterRepresentationType(), fixture.AnotherCommonRepresentationType(), nil)
 
 		assertValidResource(t, resource, err, "different reporter resource")
 		assertInitialResourceState(t, resource)
@@ -44,7 +44,7 @@ func TestResource_Initialization(t *testing.T) {
 	t.Run("should create resource with different resource type", func(t *testing.T) {
 		t.Parallel()
 
-		resource, err := NewResource(fixture.ValidResourceIdType(), fixture.AnotherLocalResourceIdType(), fixture.AnotherResourceTypeType(), fixture.AnotherReporterTypeType(), fixture.AnotherReporterInstanceIdType(), fixture.AnotherReporterResourceIdType(), fixture.AnotherApiHrefType(), fixture.EmptyConsoleHrefType(), fixture.AnotherReporterRepresentationType(), fixture.AnotherCommonRepresentationType(), nil)
+		resource, err := NewResource(fixture.ValidResourceIdType(), fixture.AnotherLocalResourceIdType(), fixture.AnotherResourceTypeType(), fixture.AnotherReporterTypeType(), fixture.AnotherReporterInstanceIdType(), fixture.AnotherReporterResourceIdType(), fixture.AnotherApiHrefType(), fixture.NilConsoleHrefType(), fixture.AnotherReporterRepresentationType(), fixture.AnotherCommonRepresentationType(), nil)
 
 		assertValidResource(t, resource, err, "different resource type")
 		assertInitialResourceState(t, resource)

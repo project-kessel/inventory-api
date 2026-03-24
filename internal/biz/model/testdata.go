@@ -453,13 +453,13 @@ func (f ReporterResourceTestFixture) ValidApiHrefType() ApiHref {
 	return ah
 }
 
-func (f ReporterResourceTestFixture) ValidConsoleHrefType() ConsoleHref {
+func (f ReporterResourceTestFixture) ValidConsoleHrefType() *ConsoleHref {
 	ch, _ := NewConsoleHref(f.ValidConsoleHref)
-	return ch
+	return &ch
 }
 
-func (f ReporterResourceTestFixture) EmptyConsoleHrefType() ConsoleHref {
-	return ConsoleHref("")
+func (f ReporterResourceTestFixture) NilConsoleHrefType() *ConsoleHref {
+	return nil
 }
 
 // Helper methods for invalid values (using deserialize to bypass validation)
@@ -564,7 +564,6 @@ func NewResourceFixture(localResourceId, resourceType, reporterType, reporterIns
 	resourceId := fixture.ValidResourceIdType()
 
 	apiHref := fixture.ValidApiHrefType()
-	consoleHref := fixture.ValidConsoleHrefType()
 
 	if workspace == "" {
 		workspace = "test-workspace"
@@ -594,7 +593,7 @@ func NewResourceFixture(localResourceId, resourceType, reporterType, reporterIns
 		transactionId,
 		reporterResourceId,
 		apiHref,
-		&consoleHref,
+		fixture.ValidConsoleHrefType(),
 		&reporterRepresentationData,
 		&commonRepresentationData,
 		nil,
@@ -614,7 +613,7 @@ func NewResourceFixture(localResourceId, resourceType, reporterType, reporterIns
 		Resource:               &resourceCopy,
 		Key:                    key,
 		ApiHref:                apiHref,
-		ConsoleHref:            consoleHref,
+		ConsoleHref:            *fixture.ValidConsoleHrefType(),
 		ReporterRepresentation: reporterRepresentationData,
 		CommonRepresentation:   commonRepresentationData,
 		ReporterResourceId:     reporterResourceId,
@@ -789,7 +788,7 @@ func NewResourceTestFixture() ResourceTestFixture {
 		reporterInstanceId1,
 		resourceId1,
 		apiHref1,
-		&consoleHref1,
+		&consoleHref1, // inline construction, not from fixture
 	)
 
 	reporterResourceId2, _ := NewReporterResourceId(uuid.MustParse("550e8400-e29b-41d4-a716-446655440500"))
@@ -894,9 +893,9 @@ func (f ResourceTestFixture) ValidApiHrefType() ApiHref {
 	return ah
 }
 
-func (f ResourceTestFixture) ValidConsoleHrefType() ConsoleHref {
+func (f ResourceTestFixture) ValidConsoleHrefType() *ConsoleHref {
 	ch, _ := NewConsoleHref(f.ValidConsoleHref)
-	return ch
+	return &ch
 }
 
 // Helper methods for "another" values
@@ -930,8 +929,8 @@ func (f ResourceTestFixture) AnotherApiHrefType() ApiHref {
 	return ah
 }
 
-func (f ResourceTestFixture) EmptyConsoleHrefType() ConsoleHref {
-	return ConsoleHref("")
+func (f ResourceTestFixture) NilConsoleHrefType() *ConsoleHref {
+	return nil
 }
 
 func (f ResourceTestFixture) ValidReporterRepresentationType() Representation {

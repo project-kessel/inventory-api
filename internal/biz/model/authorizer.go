@@ -16,6 +16,7 @@ type Authorizer interface {
 	Check(ctx context.Context, namespace string, permission string, consistencyToken string, resourceType string, localResourceId string, sub *kessel.SubjectReference) (kessel.CheckResponse_Allowed, *kessel.ConsistencyToken, error)
 	CheckForUpdate(ctx context.Context, namespace string, permission string, resourceType string, localResourceId string, sub *kessel.SubjectReference) (kessel.CheckForUpdateResponse_Allowed, *kessel.ConsistencyToken, error)
 	CheckBulk(context.Context, *kessel.CheckBulkRequest) (*kessel.CheckBulkResponse, error)
+	CheckForUpdateBulk(context.Context, *kessel.CheckForUpdateBulkRequest) (*kessel.CheckForUpdateBulkResponse, error)
 	LookupResources(ctx context.Context, in *kessel.LookupResourcesRequest) (grpc.ServerStreamingClient[kessel.LookupResourcesResponse], error)
 	CreateTuples(context.Context, *kessel.CreateTuplesRequest) (*kessel.CreateTuplesResponse, error)
 	DeleteTuples(context.Context, *kessel.DeleteTuplesRequest) (*kessel.DeleteTuplesResponse, error)

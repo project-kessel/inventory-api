@@ -220,8 +220,8 @@ func TestResource_Update(t *testing.T) {
 		if updatedReporterResource.apiHref.String() != newApiHref {
 			t.Errorf("Expected apiHref %s, got %s", newApiHref, updatedReporterResource.apiHref.String())
 		}
-		if updatedReporterResource.ConsoleHref().String() != newConsoleHref {
-			t.Errorf("Expected consoleHref %s, got %s", newConsoleHref, updatedReporterResource.ConsoleHref().String())
+		if updatedReporterResource.consoleHref.String() != newConsoleHref {
+			t.Errorf("Expected consoleHref %s, got %s", newConsoleHref, updatedReporterResource.consoleHref.String())
 		}
 
 		// Verify resource event was created
@@ -351,8 +351,8 @@ func TestResource_Update(t *testing.T) {
 		}
 
 		updatedReporterResource := original.ReporterResources()[0]
-		if updatedReporterResource.ConsoleHref() != nil {
-			t.Errorf("expected nil consoleHref when omitted in Update, got %v", updatedReporterResource.ConsoleHref())
+		if updatedReporterResource.consoleHref != nil {
+			t.Errorf("expected nil consoleHref when omitted in Update, got %v", updatedReporterResource.consoleHref)
 		}
 		if snap := updatedReporterResource.Serialize(); snap.ConsoleHref != nil {
 			t.Errorf("expected Serialize to omit console_href, got %v", *snap.ConsoleHref)

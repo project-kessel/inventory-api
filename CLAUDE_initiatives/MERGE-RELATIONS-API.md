@@ -71,11 +71,10 @@ When reading this file:
 When instructed to update Jira issue status or transitions:
 
 1. Perform the requested Jira update via the jira-mcp-server tools
-2. Update the "Work In Progress" section of this file to reflect the change:
-   - Update the status/description of the affected Jira issue
-   - Move completed issues to a "Completed" subsection
-   - Add any new issues to the appropriate section
-3. Keep the "Work In Progress" section current and accurate as the source of truth for active work
+2. Update the "Currently Active Work" section of this file:
+   - Add issues that are moved to "In Progress" status
+   - Remove issues that are moved to completed or blocked status
+   - Keep this section as a simple list of what's currently being worked on
 
 ## Next Phases (Future Work)
 
@@ -83,18 +82,11 @@ When instructed to update Jira issue status or transitions:
 - **Phase 4**: Operationalize (dashboards, alerts, SOPs, documentation)
 - **Phase 5**: Offboard relations-api (switch to embedded repository, scale down, clean up)
 
-## Work In Progress
+## Currently Active Work
 
-### Active Issues
+- **RHCLOUD-46115** - Phase 2: Evaluate LookupResources endpoint requirements for inventory-api
 
-- **RHCLOUD-45308** - Embed SpiceDB repository and tests in inventory-api
-- **RHCLOUD-46118** - Migrate relations config and implement feature toggle
-- **RHCLOUD-46119** - Install updated inventory-api client SDK for new endpoints (RBAC team)
-
-### Completed Issues
-
-- **RHCLOUD-45309** - Create a plan for merging and deploying a combined inventory-api and relations-api service
-- **RHCLOUD-46120** - Propose and discuss new endpoints for inventory-api
+**Note**: For all issues related to this initiative, query Jira using parent epic [RHCLOUD-44628](https://issues.redhat.com/browse/RHCLOUD-44628).
 
 ### Customer Endpoint Analysis
 

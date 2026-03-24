@@ -663,9 +663,6 @@ func (uc *Usecase) validateReportResourceCommand(ctx context.Context, cmd Report
 	if cmd.ReporterRepresentation == nil {
 		return &RepresentationRequiredError{Kind: "reporter"}
 	}
-	if cmd.CommonRepresentation == nil {
-		return &RepresentationRequiredError{Kind: "common"}
-	}
 
 	sanitizedReporterRepresentation := removeNulls(map[string]interface{}(*cmd.ReporterRepresentation))
 
@@ -674,8 +671,14 @@ func (uc *Usecase) validateReportResourceCommand(ctx context.Context, cmd Report
 		return err
 	}
 
-	// Get common representation (no sanitization needed based on original code)
-	commonRepresentation := map[string]interface{}(*cmd.CommonRepresentation)
+	// Allow nil/empty common representation — CommonShallowValidate will reject it
+	// only if the schema for this resource type declares required fields.
+	var commonRepresentation map[string]interface{}
+	if cmd.CommonRepresentation != nil {
+		commonRepresentation = map[string]interface{}(*cmd.CommonRepresentation)
+	} else {
+		commonRepresentation = map[string]interface{}{}
+	}
 
 	// Validate common data
 	if err := uc.schemaService.CommonShallowValidate(ctx, resourceType, commonRepresentation); err != nil {

@@ -70,7 +70,7 @@ type EventResourceMetadata struct {
 	CreatedAt    *time.Time           `json:"created_at,omitempty"`
 	UpdatedAt    *time.Time           `json:"updated_at,omitempty"`
 	DeletedAt    *time.Time           `json:"deleted_at,omitempty"`
-	WorkspaceId  string               `json:"workspace_id"`
+	WorkspaceId  *string              `json:"workspace_id,omitempty"`
 	Labels       []EventResourceLabel `json:"labels,omitempty"`
 }
 

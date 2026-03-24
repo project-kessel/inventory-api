@@ -37,7 +37,7 @@ func TestReporterResource_Initialization(t *testing.T) {
 		assertValidReporterResource(t, reporterResource, err, "valid inputs")
 	})
 
-	t.Run("should create reporter resource with empty console href", func(t *testing.T) {
+	t.Run("should create reporter resource with nil console href", func(t *testing.T) {
 		t.Parallel()
 
 		reporterResource, err := NewReporterResource(
@@ -48,10 +48,10 @@ func TestReporterResource_Initialization(t *testing.T) {
 			fixture.ValidReporterInstanceIdType(),
 			fixture.ValidResourceIdType(),
 			fixture.ValidApiHrefType(),
-			nil, // empty console href
+			fixture.NilConsoleHrefType(),
 		)
 
-		assertValidReporterResource(t, reporterResource, err, "empty console href")
+		assertValidReporterResource(t, reporterResource, err, "nil console href")
 	})
 
 	t.Run("should accept local resource ID in UUID format", func(t *testing.T) {
@@ -192,8 +192,8 @@ func TestReporterResource_Update(t *testing.T) {
 		if original.apiHref.String() != newApiHref.String() {
 			t.Errorf("Expected updated apiHref %s, got %s", newApiHref.String(), original.apiHref.String())
 		}
-		if original.ConsoleHref().String() != newConsoleHref.String() {
-			t.Errorf("Expected updated consoleHref %s, got %s", newConsoleHref.String(), original.ConsoleHref().String())
+		if original.consoleHref.String() != newConsoleHref.String() {
+			t.Errorf("Expected updated consoleHref %s, got %s", newConsoleHref.String(), original.consoleHref.String())
 		}
 	})
 

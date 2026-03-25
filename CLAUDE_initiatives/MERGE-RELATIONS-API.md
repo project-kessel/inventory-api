@@ -72,9 +72,18 @@ When instructed to update Jira issue status or transitions:
 
 1. Perform the requested Jira update via the jira-mcp-server tools
 2. Update the "Currently Active Work" section of this file:
-   - Add issues that are moved to "In Progress" status
+   - Add issues that are moved to active statuses ("In Progress", "Code Review", etc.)
    - Remove issues that are moved to completed or blocked status
+   - Include the current status in parentheses for clarity (e.g., "(Code Review)")
    - Keep this section as a simple list of what's currently being worked on
+
+### Proto Creation and Editing
+
+When creating or modifying protocol buffer definitions:
+
+1. **Follow official protobuf best practices**: https://protobuf.dev/best-practices/dos-donts/
+2. **Scan existing protos** in `api/kessel/inventory/v1beta2/` to understand and align with established patterns
+3. **Reuse existing types** before creating new ones - maintain consistency across the API
 
 ## Next Phases (Future Work)
 
@@ -84,7 +93,8 @@ When instructed to update Jira issue status or transitions:
 
 ## Currently Active Work
 
-- **RHCLOUD-46115** - Phase 2: Evaluate LookupResources endpoint requirements for inventory-api
+- **RHCLOUD-46115** - Phase 2: Evaluate LookupResources endpoint requirements for inventory-api (Code Review)
+- **RHCLOUD-39498** - Phase 2: Add Lookup Subjects to v1beta2 (In Progress)
 
 **Note**: For all issues related to this initiative, query Jira using parent epic [RHCLOUD-44628](https://issues.redhat.com/browse/RHCLOUD-44628).
 

@@ -314,6 +314,136 @@ func TestCheckForUpdateBulk_UsesCheckForUpdateBulkRelation(t *testing.T) {
 	assert.Equal(t, []metaauthorizer.Relation{metaauthorizer.RelationCheckForUpdateBulk}, meta.relations)
 }
 
+// stubCheckForUpdateBulkAuthz embeds AllowAllAuthz and overrides CheckForUpdateBulk
+// so individual tests can inject any response they need.
+type stubCheckForUpdateBulkAuthz struct {
+	allow.AllowAllAuthz
+	resp *kessel.CheckForUpdateBulkResponse
+	err  error
+}
+
+func (s *stubCheckForUpdateBulkAuthz) CheckForUpdateBulk(_ context.Context, _ *kessel.CheckForUpdateBulkRequest) (*kessel.CheckForUpdateBulkResponse, error) {
+	return s.resp, s.err
+}
+
+func newCheckForUpdateBulkUsecase(t *testing.T, meta *recordingMetaAuthorizer, authz model.Authorizer) *Usecase {
+	t.Helper()
+	return New(
+		data.NewFakeResourceRepository(),
+		newFakeSchemaRepository(t),
+		authz,
+		"rbac",
+		log.DefaultLogger,
+		nil,
+		nil,
+		&UsecaseConfig{},
+		metricscollector.NewFakeMetricsCollector(),
+		meta,
+		newTestSelfSubjectStrategy(),
+	)
+}
+
+func TestCheckForUpdateBulk_MetaAuthzDenied(t *testing.T) {
+	ctx := testAuthzContext()
+	meta := &recordingMetaAuthorizer{allowed: false}
+	uc := newCheckForUpdateBulkUsecase(t, meta, &allow.AllowAllAuthz{})
+
+	subject, err := buildTestSubjectReference("user-1")
+	require.NoError(t, err)
+	key := createReporterResourceKey(t, "host-1", "host", "hbi", "instance-1")
+	relation, err := model.NewRelation("update")
+	require.NoError(t, err)
+
+	_, err = uc.CheckForUpdateBulk(ctx, CheckForUpdateBulkCommand{
+		Items: []CheckBulkItem{
+			{Resource: key, Relation: relation, Subject: subject},
+		},
+	})
+	assert.ErrorIs(t, err, ErrMetaAuthorizationDenied)
+	assert.Equal(t, 1, meta.calls)
+}
+
+func TestCheckForUpdateBulk_MixedResults(t *testing.T) {
+	ctx := testAuthzContext()
+	meta := &recordingMetaAuthorizer{allowed: true}
+
+	stubAuthz := &stubCheckForUpdateBulkAuthz{
+		resp: &kessel.CheckForUpdateBulkResponse{
+			Pairs: []*kessel.CheckBulkResponsePair{
+				{
+					Response: &kessel.CheckBulkResponsePair_Item{
+						Item: &kessel.CheckBulkResponseItem{Allowed: kessel.CheckBulkResponseItem_ALLOWED_TRUE},
+					},
+				},
+				{
+					Response: &kessel.CheckBulkResponsePair_Item{
+						Item: &kessel.CheckBulkResponseItem{Allowed: kessel.CheckBulkResponseItem_ALLOWED_FALSE},
+					},
+				},
+			},
+		},
+	}
+	uc := newCheckForUpdateBulkUsecase(t, meta, stubAuthz)
+
+	subject, err := buildTestSubjectReference("user-1")
+	require.NoError(t, err)
+	key1 := createReporterResourceKey(t, "host-1", "host", "hbi", "instance-1")
+	key2 := createReporterResourceKey(t, "host-2", "host", "hbi", "instance-1")
+	relation, err := model.NewRelation("update")
+	require.NoError(t, err)
+
+	result, err := uc.CheckForUpdateBulk(ctx, CheckForUpdateBulkCommand{
+		Items: []CheckBulkItem{
+			{Resource: key1, Relation: relation, Subject: subject},
+			{Resource: key2, Relation: relation, Subject: subject},
+		},
+	})
+	require.NoError(t, err)
+	require.Len(t, result.Pairs, 2)
+	assert.True(t, result.Pairs[0].Result.Allowed)
+	assert.Nil(t, result.Pairs[0].Result.Error)
+	assert.False(t, result.Pairs[1].Result.Allowed)
+	assert.Nil(t, result.Pairs[1].Result.Error)
+	assert.Equal(t, 2, meta.calls)
+}
+
+func TestCheckForUpdateBulk_MismatchedPairCount(t *testing.T) {
+	ctx := testAuthzContext()
+	meta := &recordingMetaAuthorizer{allowed: true}
+
+	stubAuthz := &stubCheckForUpdateBulkAuthz{
+		resp: &kessel.CheckForUpdateBulkResponse{
+			Pairs: []*kessel.CheckBulkResponsePair{
+				{
+					Response: &kessel.CheckBulkResponsePair_Item{
+						Item: &kessel.CheckBulkResponseItem{Allowed: kessel.CheckBulkResponseItem_ALLOWED_TRUE},
+					},
+				},
+				{
+					Response: &kessel.CheckBulkResponsePair_Item{
+						Item: &kessel.CheckBulkResponseItem{Allowed: kessel.CheckBulkResponseItem_ALLOWED_TRUE},
+					},
+				},
+			},
+		},
+	}
+	uc := newCheckForUpdateBulkUsecase(t, meta, stubAuthz)
+
+	subject, err := buildTestSubjectReference("user-1")
+	require.NoError(t, err)
+	key := createReporterResourceKey(t, "host-1", "host", "hbi", "instance-1")
+	relation, err := model.NewRelation("update")
+	require.NoError(t, err)
+
+	_, err = uc.CheckForUpdateBulk(ctx, CheckForUpdateBulkCommand{
+		Items: []CheckBulkItem{
+			{Resource: key, Relation: relation, Subject: subject},
+		},
+	})
+	require.Error(t, err)
+	assert.Equal(t, codes.Internal, status.Code(err))
+}
+
 func TestCheckSelfBulk_UsesCheckSelfRelationForEachItem(t *testing.T) {
 	ctx := testAuthzContext()
 	meta := &recordingMetaAuthorizer{allowed: true}

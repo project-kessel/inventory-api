@@ -1,6 +1,7 @@
 package model
 
 import (
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -236,6 +237,20 @@ func TestSnapshotSerialization(t *testing.T) {
 		}
 		if snapshotWithNil.Type != "test-resource" {
 			t.Error("Snapshot Type should match even when CommonVersion is nil")
+		}
+
+		// Verify that json:"common_version,omitempty" causes the field to be absent
+		// in the marshaled output and remains nil after a round-trip unmarshal.
+		data, err := json.Marshal(snapshotWithNil)
+		if err != nil {
+			t.Fatalf("json.Marshal failed: %v", err)
+		}
+		var unmarshaled ResourceSnapshot
+		if err := json.Unmarshal(data, &unmarshaled); err != nil {
+			t.Fatalf("json.Unmarshal failed: %v", err)
+		}
+		if unmarshaled.CommonVersion != nil {
+			t.Errorf("expected unmarshaled CommonVersion to be nil, got: %v", *unmarshaled.CommonVersion)
 		}
 	})
 }

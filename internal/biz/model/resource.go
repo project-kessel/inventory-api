@@ -113,8 +113,12 @@ func (r *Resource) Update(
 			commonVersion = &cv
 		}
 		r.commonVersion = commonVersion
+	} else {
+		// No common representation in this update; clear the stored version so
+		// Serialize() does not emit a common_version that no longer matches any
+		// CommonRepresentation in the persisted event.
+		r.commonVersion = nil
 	}
-	// If no common representation provided, keep commonVersion as nil (or unchanged if it was set before)
 
 	reporterResource, err := r.findReporterResourceToUpdateByKey(key)
 	if err != nil {

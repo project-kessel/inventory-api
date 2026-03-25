@@ -60,6 +60,15 @@ func NewReporterRepresentation(
 }
 
 func validateReporterRepresentation(rr *ReporterRepresentation) error {
+	// A tombstone row represents a deletion and must not carry common representation
+	// version metadata, which belongs exclusively to live reporter representations.
+	if rr.Tombstone && rr.CommonVersion != nil {
+		return bizmodel.ValidationError{
+			Field:   "CommonVersion",
+			Message: "must be nil when Tombstone is true",
+		}
+	}
+
 	// Validate common version only if it's provided
 	var commonVersionErr error
 	if rr.CommonVersion != nil {

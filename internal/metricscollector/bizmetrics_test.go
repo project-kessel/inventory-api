@@ -2,6 +2,7 @@ package metricscollector
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"testing"
 	"time"
@@ -66,45 +67,48 @@ func findMetric(t *testing.T, reader *sdkmetric.ManualReader, name string) *metr
 	return nil
 }
 
-func TestCollectResourcesPerWorkspace(t *testing.T) {
-	t.Run("records histogram with query results", func(t *testing.T) {
+func mockSummaryRow(t *testing.T, mock sqlmock.Sqlmock, metrics map[string]any) {
+	t.Helper()
+	metricsJSON, err := json.Marshal(metrics)
+	require.NoError(t, err)
+
+	rows := sqlmock.NewRows([]string{"id", "collected_at", "metrics"}).
+		AddRow("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee", time.Now().UTC(), metricsJSON)
+	mock.ExpectQuery("SELECT").WillReturnRows(rows)
+}
+
+func TestRecordResourcesPerWorkspace(t *testing.T) {
+	t.Run("records histogram from summary data", func(t *testing.T) {
 		mc, reader := setupTestMeterAndCollector(t)
-		db, mock := setupTestDB(t)
 
-		rows := sqlmock.NewRows([]string{"resource_type", "count"}).
-			AddRow("host", 3.0).
-			AddRow("host", 15.0).
-			AddRow("k8s_cluster", 7.0)
-		mock.ExpectQuery("SELECT").WillReturnRows(rows)
+		metrics := map[string]any{
+			"resources_per_workspace": []map[string]any{
+				{"resource_type": "host", "count": 3.0},
+				{"resource_type": "host", "count": 15.0},
+				{"resource_type": "k8s_cluster", "count": 7.0},
+			},
+		}
 
-		collectResourcesPerWorkspace(context.Background(), db, mc, testLogger())
-
-		require.NoError(t, mock.ExpectationsWereMet())
+		recordResourcesPerWorkspace(context.Background(), mc, metrics, testLogger())
 
 		m := findMetric(t, reader, prefix+"resources_per_workspace")
 		require.NotNil(t, m, "expected resources_per_workspace metric to exist")
 
 		hist, ok := m.Data.(metricdata.Histogram[float64])
 		require.True(t, ok, "expected histogram data type")
-		assert.NotEmpty(t, hist.DataPoints)
 
 		var totalCount uint64
 		for _, dp := range hist.DataPoints {
 			totalCount += dp.Count
 		}
-		assert.Equal(t, uint64(3), totalCount, "expected 3 histogram observations (one per workspace/resource_type group)")
+		assert.Equal(t, uint64(3), totalCount)
 	})
 
-	t.Run("handles empty results", func(t *testing.T) {
+	t.Run("handles missing key gracefully", func(t *testing.T) {
 		mc, reader := setupTestMeterAndCollector(t)
-		db, mock := setupTestDB(t)
+		metrics := map[string]any{}
 
-		rows := sqlmock.NewRows([]string{"resource_type", "count"})
-		mock.ExpectQuery("SELECT").WillReturnRows(rows)
-
-		collectResourcesPerWorkspace(context.Background(), db, mc, testLogger())
-
-		require.NoError(t, mock.ExpectationsWereMet())
+		recordResourcesPerWorkspace(context.Background(), mc, metrics, testLogger())
 
 		m := findMetric(t, reader, prefix+"resources_per_workspace")
 		if m != nil {
@@ -119,42 +123,18 @@ func TestCollectResourcesPerWorkspace(t *testing.T) {
 		}
 	})
 
-	t.Run("handles query error gracefully", func(t *testing.T) {
-		mc, reader := setupTestMeterAndCollector(t)
-		db, mock := setupTestDB(t)
-
-		mock.ExpectQuery("SELECT").WillReturnError(fmt.Errorf("connection refused"))
-
-		collectResourcesPerWorkspace(context.Background(), db, mc, testLogger())
-
-		require.NoError(t, mock.ExpectationsWereMet())
-
-		m := findMetric(t, reader, prefix+"resources_per_workspace")
-		if m != nil {
-			hist, ok := m.Data.(metricdata.Histogram[float64])
-			if ok {
-				var totalCount uint64
-				for _, dp := range hist.DataPoints {
-					totalCount += dp.Count
-				}
-				assert.Equal(t, uint64(0), totalCount, "no observations should be recorded on error")
-			}
-		}
-	})
-
 	t.Run("records correct bucket boundaries", func(t *testing.T) {
 		mc, reader := setupTestMeterAndCollector(t)
-		db, mock := setupTestDB(t)
 
-		rows := sqlmock.NewRows([]string{"resource_type", "count"}).
-			AddRow("host", 1.0).
-			AddRow("host", 50.0).
-			AddRow("host", 999.0)
-		mock.ExpectQuery("SELECT").WillReturnRows(rows)
+		metrics := map[string]any{
+			"resources_per_workspace": []map[string]any{
+				{"resource_type": "host", "count": 1.0},
+				{"resource_type": "host", "count": 50.0},
+				{"resource_type": "host", "count": 999.0},
+			},
+		}
 
-		collectResourcesPerWorkspace(context.Background(), db, mc, testLogger())
-
-		require.NoError(t, mock.ExpectationsWereMet())
+		recordResourcesPerWorkspace(context.Background(), mc, metrics, testLogger())
 
 		m := findMetric(t, reader, prefix+"resources_per_workspace")
 		require.NotNil(t, m)
@@ -170,19 +150,18 @@ func TestCollectResourcesPerWorkspace(t *testing.T) {
 	})
 }
 
-func TestCollectResourceCount(t *testing.T) {
-	t.Run("records gauge with query results", func(t *testing.T) {
+func TestRecordResourceCount(t *testing.T) {
+	t.Run("records gauge from summary data", func(t *testing.T) {
 		mc, reader := setupTestMeterAndCollector(t)
-		db, mock := setupTestDB(t)
 
-		rows := sqlmock.NewRows([]string{"resource_type", "reporter_type", "reporter_instance_id", "count"}).
-			AddRow("host", "hbi", "instance-1", 42).
-			AddRow("k8s_cluster", "ocm", "instance-2", 10)
-		mock.ExpectQuery("SELECT").WillReturnRows(rows)
+		metrics := map[string]any{
+			"resource_count": []map[string]any{
+				{"resource_type": "host", "reporter_type": "hbi", "reporter_instance_id": "instance-1", "count": 42.0},
+				{"resource_type": "k8s_cluster", "reporter_type": "ocm", "reporter_instance_id": "instance-2", "count": 10.0},
+			},
+		}
 
-		collectResourceCount(context.Background(), db, mc, testLogger())
-
-		require.NoError(t, mock.ExpectationsWereMet())
+		recordResourceCount(context.Background(), mc, metrics, testLogger())
 
 		m := findMetric(t, reader, prefix+"resource_count")
 		require.NotNil(t, m, "expected resource_count metric to exist")
@@ -204,16 +183,11 @@ func TestCollectResourceCount(t *testing.T) {
 		assert.Equal(t, int64(10), values["k8s_cluster/ocm/instance-2"])
 	})
 
-	t.Run("handles empty results", func(t *testing.T) {
+	t.Run("handles missing key gracefully", func(t *testing.T) {
 		mc, reader := setupTestMeterAndCollector(t)
-		db, mock := setupTestDB(t)
+		metrics := map[string]any{}
 
-		rows := sqlmock.NewRows([]string{"resource_type", "reporter_type", "reporter_instance_id", "count"})
-		mock.ExpectQuery("SELECT").WillReturnRows(rows)
-
-		collectResourceCount(context.Background(), db, mc, testLogger())
-
-		require.NoError(t, mock.ExpectationsWereMet())
+		recordResourceCount(context.Background(), mc, metrics, testLogger())
 
 		m := findMetric(t, reader, prefix+"resource_count")
 		if m != nil {
@@ -223,39 +197,21 @@ func TestCollectResourceCount(t *testing.T) {
 			}
 		}
 	})
-
-	t.Run("handles query error gracefully", func(t *testing.T) {
-		mc, reader := setupTestMeterAndCollector(t)
-		db, mock := setupTestDB(t)
-
-		mock.ExpectQuery("SELECT").WillReturnError(fmt.Errorf("connection refused"))
-
-		collectResourceCount(context.Background(), db, mc, testLogger())
-
-		require.NoError(t, mock.ExpectationsWereMet())
-
-		m := findMetric(t, reader, prefix+"resource_count")
-		if m != nil {
-			gauge, ok := m.Data.(metricdata.Gauge[int64])
-			if ok {
-				assert.Empty(t, gauge.DataPoints, "no data points should be recorded on error")
-			}
-		}
-	})
 }
 
 func TestCollectBusinessMetrics(t *testing.T) {
-	t.Run("collects both metrics", func(t *testing.T) {
+	t.Run("reads summary and records both metrics", func(t *testing.T) {
 		mc, reader := setupTestMeterAndCollector(t)
 		db, mock := setupTestDB(t)
 
-		workspaceRows := sqlmock.NewRows([]string{"resource_type", "count"}).
-			AddRow("host", 5.0)
-		mock.ExpectQuery("SELECT").WillReturnRows(workspaceRows)
-
-		reporterRows := sqlmock.NewRows([]string{"resource_type", "reporter_type", "reporter_instance_id", "count"}).
-			AddRow("host", "hbi", "instance-1", 5)
-		mock.ExpectQuery("SELECT").WillReturnRows(reporterRows)
+		mockSummaryRow(t, mock, map[string]any{
+			"resources_per_workspace": []map[string]any{
+				{"resource_type": "host", "count": 5.0},
+			},
+			"resource_count": []map[string]any{
+				{"resource_type": "host", "reporter_type": "hbi", "reporter_instance_id": "instance-1", "count": 5.0},
+			},
+		})
 
 		collectBusinessMetrics(context.Background(), db, mc, testLogger())
 
@@ -267,6 +223,17 @@ func TestCollectBusinessMetrics(t *testing.T) {
 		gaugeMetric := findMetric(t, reader, prefix+"resource_count")
 		require.NotNil(t, gaugeMetric, "expected resource_count metric")
 	})
+
+	t.Run("handles missing summary table gracefully", func(t *testing.T) {
+		mc, _ := setupTestMeterAndCollector(t)
+		db, mock := setupTestDB(t)
+
+		mock.ExpectQuery("SELECT").WillReturnError(fmt.Errorf("relation \"metrics_summaries\" does not exist"))
+
+		collectBusinessMetrics(context.Background(), db, mc, testLogger())
+
+		require.NoError(t, mock.ExpectationsWereMet())
+	})
 }
 
 func TestStartBusinessMetricsCollector(t *testing.T) {
@@ -274,21 +241,53 @@ func TestStartBusinessMetricsCollector(t *testing.T) {
 		mc, _ := setupTestMeterAndCollector(t)
 		db, mock := setupTestDB(t)
 
-		workspaceRows := sqlmock.NewRows([]string{"resource_type", "count"})
-		mock.ExpectQuery("SELECT").WillReturnRows(workspaceRows)
-
-		reporterRows := sqlmock.NewRows([]string{"resource_type", "reporter_type", "reporter_instance_id", "count"})
-		mock.ExpectQuery("SELECT").WillReturnRows(reporterRows)
+		// The initial collection will query the summary table
+		mock.ExpectQuery("SELECT").WillReturnError(fmt.Errorf("no rows"))
 
 		ctx, cancel := context.WithCancel(context.Background())
 		StartBusinessMetricsCollector(ctx, db, mc, testLogger())
 
-		// Give the goroutine time to run the initial collection
 		time.Sleep(100 * time.Millisecond)
 		cancel()
-		// Give the goroutine time to exit
 		time.Sleep(100 * time.Millisecond)
 
 		require.NoError(t, mock.ExpectationsWereMet())
+	})
+}
+
+func TestParseMetricEntries(t *testing.T) {
+	t.Run("parses []any from GORM JSONB", func(t *testing.T) {
+		input := []any{
+			map[string]any{"resource_type": "host", "count": 5.0},
+			map[string]any{"resource_type": "k8s_cluster", "count": 3.0},
+		}
+
+		result, err := parseMetricEntries(input)
+		require.NoError(t, err)
+		assert.Len(t, result, 2)
+		assert.Equal(t, "host", result[0]["resource_type"])
+		assert.Equal(t, 5.0, result[0]["count"])
+	})
+
+	t.Run("handles JSON round-trip for unexpected types", func(t *testing.T) {
+		// Simulate a type that needs JSON round-trip
+		input := json.RawMessage(`[{"resource_type":"host","count":5}]`)
+
+		result, err := parseMetricEntries(input)
+		require.NoError(t, err)
+		assert.Len(t, result, 1)
+		assert.Equal(t, "host", result[0]["resource_type"])
+	})
+
+	t.Run("skips non-map entries", func(t *testing.T) {
+		input := []any{
+			map[string]any{"resource_type": "host", "count": 5.0},
+			"invalid",
+			42,
+		}
+
+		result, err := parseMetricEntries(input)
+		require.NoError(t, err)
+		assert.Len(t, result, 1)
 	})
 }

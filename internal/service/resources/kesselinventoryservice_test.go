@@ -2861,7 +2861,7 @@ func TestInventoryService_ReportResource_NilOrEmptyRepresentationStructs(t *test
 		localResourceId string
 		common          *structpb.Struct
 		reporter        *structpb.Struct
-		expectMsg       string
+		expectMsg       string // empty string means the request is expected to succeed
 	}{
 		{
 			name:            "both nil",
@@ -2887,6 +2887,19 @@ func TestInventoryService_ReportResource_NilOrEmptyRepresentationStructs(t *test
 			common:          &structpb.Struct{},
 			reporter:        &structpb.Struct{},
 			expectMsg:       "invalid data structure",
+		},
+		{
+			// Reporter is required and non-empty; empty common struct is treated as
+			// absent (no CommonRepresentation is created), so the request succeeds.
+			name:            "reporter non-empty, common empty struct",
+			localResourceId: "host-common-empty-reporter-nonempty",
+			common:          &structpb.Struct{},
+			reporter: &structpb.Struct{
+				Fields: map[string]*structpb.Value{
+					"reporter_field": structpb.NewStringValue("reporter-value"),
+				},
+			},
+			expectMsg: "", // success
 		},
 	}
 
@@ -2915,7 +2928,11 @@ func TestInventoryService_ReportResource_NilOrEmptyRepresentationStructs(t *test
 					}, func(t *testing.T, tr *Transport) {
 						ctx := context.Background()
 						res := tr.Invoke(ctx, withBody(req, ReportResource, httpEndpoint("POST /api/kessel/v1beta2/resources")))
-						Assert(t, res, requireErrorContaining(codes.InvalidArgument, tc.expectMsg))
+						if tc.expectMsg == "" {
+							Assert(t, res, requireSuccess())
+						} else {
+							Assert(t, res, requireErrorContaining(codes.InvalidArgument, tc.expectMsg))
+						}
 					}
 			})
 		})

@@ -2496,84 +2496,82 @@ func testTransactionIDUniqueConstraint(t *testing.T, repo bizmodel.ResourceRepos
 		require.NoError(t, err, "Second CommonRepresentation with empty TransactionID should save successfully")
 	})
 
-	t.Run("should persist and read resources with NULL common_version", func(t *testing.T) {
-		// Create a resource without a common representation (common_version should be NULL)
-		localResourceID := "resource-without-common-rep"
-		resourceId := uuid.New()
-		reporterResourceId := uuid.New()
+}
 
-		reporterData := internal.JsonObject{"cluster_id": "test-cluster-123"}
+func TestNullCommonVersionPersistence(t *testing.T) {
+	db := setupInMemoryDB(t)
+	mc := metricscollector.NewFakeMetricsCollector()
+	tm := NewGormTransactionManager(mc, 3)
+	repo := NewResourceRepository(db, tm, noopOutboxPublisher)
 
-		localResourceIdType, err := bizmodel.NewLocalResourceId(localResourceID)
-		require.NoError(t, err)
+	localResourceID := "resource-without-common-rep"
+	resourceId := uuid.New()
+	reporterResourceId := uuid.New()
 
-		resourceType, err := bizmodel.NewResourceType("k8s_cluster")
-		require.NoError(t, err)
+	reporterData := internal.JsonObject{"cluster_id": "test-cluster-123"}
 
-		reporterType, err := bizmodel.NewReporterType("ocm")
-		require.NoError(t, err)
+	localResourceIdType, err := bizmodel.NewLocalResourceId(localResourceID)
+	require.NoError(t, err)
 
-		reporterInstanceId, err := bizmodel.NewReporterInstanceId("test-instance")
-		require.NoError(t, err)
+	resourceType, err := bizmodel.NewResourceType("k8s_cluster")
+	require.NoError(t, err)
 
-		apiHref, err := bizmodel.NewApiHref("/api/resources/test-cluster-123")
-		require.NoError(t, err)
+	reporterType, err := bizmodel.NewReporterType("ocm")
+	require.NoError(t, err)
 
-		consoleHref, err := bizmodel.NewConsoleHref("/console/resources/test-cluster-123")
-		require.NoError(t, err)
+	reporterInstanceId, err := bizmodel.NewReporterInstanceId("test-instance")
+	require.NoError(t, err)
 
-		reporterRepresentation := bizmodel.Representation(reporterData)
-		emptyCommonRepresentation := bizmodel.Representation(internal.JsonObject{}) // empty common representation
+	apiHref, err := bizmodel.NewApiHref("/api/resources/test-cluster-123")
+	require.NoError(t, err)
 
-		resourceIdType, err := bizmodel.NewResourceId(resourceId)
-		require.NoError(t, err)
+	consoleHref, err := bizmodel.NewConsoleHref("/console/resources/test-cluster-123")
+	require.NoError(t, err)
 
-		reporterResourceIdType, err := bizmodel.NewReporterResourceId(reporterResourceId)
-		require.NoError(t, err)
+	reporterRepresentation := bizmodel.Representation(reporterData)
+	emptyCommonRepresentation := bizmodel.Representation(internal.JsonObject{})
 
-		txID := newUniqueTxID("null-common-version-test")
+	resourceIdType, err := bizmodel.NewResourceId(resourceId)
+	require.NoError(t, err)
 
-		// Create a resource without common representation data (empty map)
-		resource, err := bizmodel.NewResource(
-			resourceIdType,
-			localResourceIdType,
-			resourceType,
-			reporterType,
-			reporterInstanceId,
-			txID,
-			reporterResourceIdType,
-			apiHref,
-			consoleHref,
-			reporterRepresentation,
-			emptyCommonRepresentation, // empty common representation data
-			nil,
-		)
-		require.NoError(t, err)
+	reporterResourceIdType, err := bizmodel.NewReporterResourceId(reporterResourceId)
+	require.NoError(t, err)
 
-		// Save the resource
-		err = repo.Save(db, resource, bizmodel.OperationTypeCreated, "")
-		require.NoError(t, err, "Should save resource without common representation")
+	txID := newUniqueTxID("null-common-version-test")
 
-		// Read the resource back
-		key, err := bizmodel.NewReporterResourceKey(
-			localResourceIdType,
-			resourceType,
-			reporterType,
-			reporterInstanceId,
-		)
-		require.NoError(t, err)
+	resource, err := bizmodel.NewResource(
+		resourceIdType,
+		localResourceIdType,
+		resourceType,
+		reporterType,
+		reporterInstanceId,
+		txID,
+		reporterResourceIdType,
+		apiHref,
+		consoleHref,
+		reporterRepresentation,
+		emptyCommonRepresentation,
+		nil,
+	)
+	require.NoError(t, err)
 
-		retrievedResource, err := repo.FindResourceByKeys(db, key)
-		require.NoError(t, err, "Should find resource by keys")
-		require.NotNil(t, retrievedResource, "Retrieved resource should not be nil")
+	err = repo.Save(db, resource, bizmodel.OperationTypeCreated, "")
+	require.NoError(t, err, "Should save resource without common representation")
 
-		// Serialize to check the CommonVersion
-		resourceSnapshot, _, _, _, err := retrievedResource.Serialize()
-		require.NoError(t, err, "Should serialize resource")
+	key, err := bizmodel.NewReporterResourceKey(
+		localResourceIdType,
+		resourceType,
+		reporterType,
+		reporterInstanceId,
+	)
+	require.NoError(t, err)
 
-		// Assert that CommonVersion is nil (not an implicit default)
-		if resourceSnapshot.CommonVersion != nil {
-			t.Errorf("Expected CommonVersion to be nil for resource without common representation, got: %v", *resourceSnapshot.CommonVersion)
-		}
-	})
+	retrievedResource, err := repo.FindResourceByKeys(db, key)
+	require.NoError(t, err, "Should find resource by keys")
+	require.NotNil(t, retrievedResource, "Retrieved resource should not be nil")
+
+	resourceSnapshot, _, _, _, err := retrievedResource.Serialize()
+	require.NoError(t, err, "Should serialize resource")
+
+	require.Nil(t, resourceSnapshot.CommonVersion, "CommonVersion should be nil for resource without common representation")
 }

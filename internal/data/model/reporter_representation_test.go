@@ -431,24 +431,27 @@ func TestReporterRepresentation_EdgeCases(t *testing.T) {
 	t.Run("should handle tombstone flag variations", func(t *testing.T) {
 		t.Parallel()
 
+		commonVersion := uint(1)
 		testCases := []struct {
-			name      string
-			tombstone bool
+			name          string
+			tombstone     bool
+			commonVersion *uint
 		}{
-			{"tombstone_true", true},
-			{"tombstone_false", false},
+			// Tombstone rows represent deletions and must not carry a CommonVersion.
+			{"tombstone_true", true, nil},
+			// Live rows may carry a CommonVersion.
+			{"tombstone_false", false, &commonVersion},
 		}
 
 		for _, tc := range testCases {
 			t.Run(tc.name, func(t *testing.T) {
 				t.Parallel()
-				commonVersion := uint(1)
 				rr, err := NewReporterRepresentation(
 					internal.JsonObject{"test": "data"},
 					uuid.MustParse("550e8400-e29b-41d4-a716-446655440012"),
 					1,
 					1,
-					&commonVersion,
+					tc.commonVersion,
 					"test-transaction-id-tombstone-flag",
 					tc.tombstone,
 					nil,

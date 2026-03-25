@@ -712,6 +712,25 @@ func TestReporterRepresentation_Serialization(t *testing.T) {
 		}
 	})
 
+	t.Run("should preserve nil CommonVersion through JSON round-trip", func(t *testing.T) {
+		t.Parallel()
+
+		fixture := NewTestFixture(t)
+		rr := fixture.ValidReporterRepresentation()
+		rr.CommonVersion = nil
+
+		jsonData, err := json.Marshal(rr)
+		AssertNoError(t, err, "Should be able to marshal ReporterRepresentation with nil CommonVersion to JSON")
+
+		var unmarshaled ReporterRepresentation
+		err = json.Unmarshal(jsonData, &unmarshaled)
+		AssertNoError(t, err, "Should be able to unmarshal ReporterRepresentation with nil CommonVersion from JSON")
+
+		if unmarshaled.CommonVersion != nil {
+			t.Errorf("expected CommonVersion to be nil after JSON round-trip, got: %v", *unmarshaled.CommonVersion)
+		}
+	})
+
 	t.Run("should handle empty data object in JSON serialization", func(t *testing.T) {
 		t.Parallel()
 

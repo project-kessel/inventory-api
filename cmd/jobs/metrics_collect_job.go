@@ -45,6 +45,12 @@ func collectMetrics(storageOptions *storage.Options, loggerOptions common.Logger
 		return err
 	}
 
+	sqlDB, err := db.DB()
+	if err != nil {
+		return err
+	}
+	defer sqlDB.Close() //nolint:errcheck
+
 	logHelper.Info("Starting metrics collection job")
 
 	metrics := internal.JsonObject{}
@@ -69,6 +75,11 @@ func collectMetrics(storageOptions *storage.Options, loggerOptions common.Logger
 	}
 
 	logHelper.Infof("Metrics summary written successfully (id=%s)", summary.ID)
+
+	if retentionDays <= 0 {
+		logHelper.Warnf("invalid retention-days value %d, using default %d", retentionDays, DefaultRetentionDays)
+		retentionDays = DefaultRetentionDays
+	}
 
 	cutoff := time.Now().UTC().AddDate(0, 0, -retentionDays)
 	result := db.Where("collected_at < ?", cutoff).Delete(&model.MetricsSummary{})

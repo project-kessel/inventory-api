@@ -233,7 +233,9 @@ func NewCommand(
 				return err
 			}
 
-			metricscollector.StartBusinessMetricsCollector(ctx, db, mc, log.NewHelper(log.With(logger, "subsystem", "business_metrics")))
+			bizMetricsCtx, bizMetricsCancel := context.WithCancel(ctx)
+			defer bizMetricsCancel()
+			metricscollector.StartBusinessMetricsCollector(bizMetricsCtx, db, mc, log.NewHelper(log.With(logger, "subsystem", "business_metrics")))
 
 			// construct pprof server
 			pprofServer, err := pprof.New(serverConfig.Options.PprofOptions, logger)

@@ -109,7 +109,7 @@ type fakeHistogram struct {
 }
 
 func (fh *fakeHistogram) Record(ctx context.Context, value float64, options ...metric.RecordOption) {}
-func (fh *fakeHistogram) Enabled(context.Context) bool                                             { return true }
+func (fh *fakeHistogram) Enabled(context.Context) bool                                              { return true }
 
 var _ metric.Float64Histogram = (*fakeHistogram)(nil)
 
@@ -118,6 +118,6 @@ type fakeGauge struct {
 }
 
 func (fg *fakeGauge) Record(ctx context.Context, value int64, options ...metric.RecordOption) {}
-func (fg *fakeGauge) Enabled(context.Context) bool                                           { return true }
+func (fg *fakeGauge) Enabled(context.Context) bool                                            { return true }
 
 var _ metric.Int64Gauge = (*fakeGauge)(nil)

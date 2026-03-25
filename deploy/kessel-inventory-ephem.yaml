@@ -439,10 +439,10 @@ objects:
                     - inventory-api
                     - run-job
                     - metrics-collect-job
-                    - --retention-days=${RETENTION_DAYS}
+                    - --retention-days=30
                   env:
                     - name: CLOWDER_ENABLED
-                      value: ${CLOWDER_ENABLED}
+                      value: "true"
                     - name: INVENTORY_API_CONFIG
                       value: "/inventory/inventory-api-config.yaml"
                     - name: PGDATA
@@ -491,8 +491,8 @@ objects:
                       cpu: ${JOB_LIMITS_CPU}
               volumes:
                 - name: config-volume
-                  secret:
-                    secretName: ${INVENTORY_API_CONFIG_NAME}
+                  configMap:
+                    name: ${INVENTORY_API_CONFIG_NAME}
 parameters:
   - description: ClowdEnvironment name (ephemeral, stage, prod)
     name: ENV_NAME

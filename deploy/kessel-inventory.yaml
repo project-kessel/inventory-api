@@ -142,7 +142,7 @@ objects:
                     - --retention-days=${RETENTION_DAYS}
                   env:
                     - name: CLOWDER_ENABLED
-                      value: ${CLOWDER_ENABLED}
+                      value: "true"
                     - name: INVENTORY_API_CONFIG
                       value: "/inventory/inventory-api-config.yaml"
                     - name: PGDATA
@@ -247,3 +247,6 @@ parameters:
   - description: CPU limit for job
     name: JOB_LIMITS_CPU
     value: '200m'
+  - description: Number of days to retain metrics summary data
+    name: RETENTION_DAYS
+    value: "30"

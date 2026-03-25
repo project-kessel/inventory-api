@@ -47,12 +47,10 @@ fi
 LIVEZ_URL="localhost:${PORT_NUM} kessel.inventory.v1.KesselInventoryHealthService/GetLivez"
 INVENTORY_URL="localhost:${PORT_NUM} kessel.inventory.v1beta2.KesselInventoryService"
 
-WORKSPACES=(3a233bd9-3e5b-49ae-8565-3c82e8e70d97 73b5bfce-9c61-4087-bb0c-481f09644939 fe2eead7-1d42-4bad-bcf3-764d762d0cf2 a8c552aa-2591-4d41-8292-ee6a7139fae8)
-
 for ((i = 0 ; i < ${NUM_RUNS} ; i++)); do
   livez_check
-  REPORTER_INSTANCE_ID="redhat"
-  WORKSPACE_ID="${WORKSPACES[RANDOM % ${#WORKSPACES[@]}]}"
+  REPORTER_INSTANCE_ID=$(uuidgen)
+  WORKSPACE_ID=$(uuidgen)
   LOCAL_RESOURCE_ID=$(uuidgen)
   SATELLITE_ID=$(uuidgen)
   SUB_MANAGER_ID=$(uuidgen)

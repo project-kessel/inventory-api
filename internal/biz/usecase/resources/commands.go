@@ -114,12 +114,12 @@ type LookupResourcesResultItem struct {
 
 // LookupSubjectsCommand contains the request for looking up subjects.
 type LookupSubjectsCommand struct {
-	Resource         model.ReporterResourceKey
-	Relation         model.Relation
-	SubjectType      model.ResourceType
-	SubjectReporter  model.ReporterType
-	SubjectRelation  *model.Relation
-	Limit            uint32
-	Continuation     string
-	Consistency      model.Consistency
+	Resource        model.ReporterResourceKey
+	Relation        model.Relation
+	SubjectType     model.ResourceType
+	SubjectReporter model.ReporterType
+	SubjectRelation *model.Relation
+	Limit           uint32
+	Continuation    string
+	Consistency     model.Consistency
 }

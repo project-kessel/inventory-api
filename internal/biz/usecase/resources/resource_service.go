@@ -542,6 +542,23 @@ func (uc *Usecase) LookupResources(ctx context.Context, cmd LookupResourcesComma
 	return uc.Authz.LookupResources(ctx, v1beta1Req)
 }
 
+// LookupSubjects delegates subject lookup to the authorization service.
+// Returns a streaming client for receiving lookup results.
+// TODO: remove v1beta1 response type
+func (uc *Usecase) LookupSubjects(ctx context.Context, cmd LookupSubjectsCommand) (grpc.ServerStreamingClient[kessel.LookupSubjectsResponse], error) {
+	if model.ConsistencyTypeOf(cmd.Consistency) == model.ConsistencyAtLeastAsAcknowledged {
+		return nil, status.Errorf(codes.InvalidArgument, "inventory-managed consistency tokens aren't available")
+	}
+	// Meta-authorize against the specific resource instance
+	if err := uc.enforceMetaAuthzObject(ctx, metaauthorizer.RelationLookupSubjects, metaauthorizer.NewInventoryResourceFromKey(cmd.Resource)); err != nil {
+		return nil, err
+	}
+
+	// Convert to v1beta1 for the Authz interface
+	v1beta1Req := lookupSubjectsCommandToV1beta1(cmd)
+	return uc.Authz.LookupSubjects(ctx, v1beta1Req)
+}
+
 // lookupConsistencyTokenFromDB looks up the consistency token from the inventory database.
 // Returns the token if found, empty string if resource not found, or error for other failures.
 func (uc *Usecase) lookupConsistencyTokenFromDB(ctx context.Context, reporterResourceKey model.ReporterResourceKey) (string, error) {
@@ -900,6 +917,57 @@ func lookupResourcesCommandToV1beta1(cmd LookupResourcesCommand) *kessel.LookupR
 		},
 		Consistency: consistency,
 	}
+}
+
+// lookupSubjectsCommandToV1beta1 converts a LookupSubjectsCommand to v1beta1.
+func lookupSubjectsCommandToV1beta1(cmd LookupSubjectsCommand) *kessel.LookupSubjectsRequest {
+	var continuationToken *string
+	if cmd.Continuation != "" {
+		continuationToken = &cmd.Continuation
+	}
+	var consistency *kessel.Consistency
+	if token := model.ConsistencyAtLeastAsFreshToken(cmd.Consistency); token != nil {
+		consistency = &kessel.Consistency{
+			Requirement: &kessel.Consistency_AtLeastAsFresh{
+				AtLeastAsFresh: &kessel.ConsistencyToken{
+					Token: token.Serialize(),
+				},
+			},
+		}
+	} else {
+		consistency = &kessel.Consistency{
+			Requirement: &kessel.Consistency_MinimizeLatency{
+				MinimizeLatency: true,
+			},
+		}
+	}
+
+	req := &kessel.LookupSubjectsRequest{
+		Resource: &kessel.ObjectReference{
+			Type: &kessel.ObjectType{
+				Namespace: cmd.Resource.ReporterType().Serialize(),
+				Name:      cmd.Resource.ResourceType().Serialize(),
+			},
+			Id: cmd.Resource.LocalResourceId().Serialize(),
+		},
+		Relation: cmd.Relation.Serialize(),
+		SubjectType: &kessel.ObjectType{
+			Namespace: cmd.SubjectReporter.Serialize(),
+			Name:      cmd.SubjectType.Serialize(),
+		},
+		Pagination: &kessel.RequestPagination{
+			Limit:             cmd.Limit,
+			ContinuationToken: continuationToken,
+		},
+		Consistency: consistency,
+	}
+
+	if cmd.SubjectRelation != nil {
+		relation := cmd.SubjectRelation.Serialize()
+		req.SubjectRelation = &relation
+	}
+
+	return req
 }
 
 // isSPInAllowlist checks if the caller subject is in the allowlist.

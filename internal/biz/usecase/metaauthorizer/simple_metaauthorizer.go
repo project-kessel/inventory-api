@@ -10,6 +10,7 @@ type Relation string
 
 const RelationCheckSelf Relation = "check_self"
 const RelationLookupResources Relation = "lookup_resources"
+const RelationLookupSubjects Relation = "lookup_subjects"
 const RelationReportResource Relation = "report_resource"
 const RelationCheckForUpdate Relation = "check_for_update"
 const RelationDeleteResource Relation = "delete_resource"

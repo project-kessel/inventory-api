@@ -4,12 +4,15 @@ import (
 	"testing"
 	"time"
 
+	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/google/uuid"
 	"github.com/project-kessel/inventory-api/cmd/common"
 	"github.com/project-kessel/inventory-api/internal"
 	"github.com/project-kessel/inventory-api/internal/data/model"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
 )
 
 func TestNewMetricsCollectJobCommand(t *testing.T) {
@@ -195,4 +198,156 @@ func TestMetricsSummaryLatestRead(t *testing.T) {
 	require.NoError(t, db.Order("collected_at DESC").First(&result).Error)
 
 	assert.Equal(t, latest.ID, result.ID)
+}
+
+func setupMockDB(t *testing.T) (*gorm.DB, sqlmock.Sqlmock) {
+	t.Helper()
+	sqlDB, mock, err := sqlmock.New()
+	require.NoError(t, err)
+
+	db, err := gorm.Open(postgres.New(postgres.Config{
+		Conn: sqlDB,
+	}), &gorm.Config{})
+	require.NoError(t, err)
+
+	t.Cleanup(func() {
+		_ = sqlDB.Close()
+	})
+
+	return db, mock
+}
+
+func TestCollectResourcesPerWorkspaceJob(t *testing.T) {
+	db, mock := setupMockDB(t)
+	logger := testLogger()
+
+	rows := sqlmock.NewRows([]string{"resource_type", "count"}).
+		AddRow("host", 15.0).
+		AddRow("k8s-cluster", 3.0)
+	mock.ExpectQuery(`SELECT`).WillReturnRows(rows)
+
+	metrics := internal.JsonObject{}
+	err := collectResourcesPerWorkspaceJob(db, logger, metrics)
+	require.NoError(t, err)
+
+	raw, ok := metrics["resources_per_workspace"]
+	require.True(t, ok)
+
+	entries, ok := raw.([]map[string]any)
+	require.True(t, ok)
+	assert.Len(t, entries, 2)
+
+	assert.Equal(t, "host", entries[0]["resource_type"])
+	assert.Equal(t, 15.0, entries[0]["count"])
+	assert.Equal(t, "k8s-cluster", entries[1]["resource_type"])
+	assert.Equal(t, 3.0, entries[1]["count"])
+
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestCollectResourcesPerWorkspaceJob_EmptyResult(t *testing.T) {
+	db, mock := setupMockDB(t)
+	logger := testLogger()
+
+	rows := sqlmock.NewRows([]string{"resource_type", "count"})
+	mock.ExpectQuery(`SELECT`).WillReturnRows(rows)
+
+	metrics := internal.JsonObject{}
+	err := collectResourcesPerWorkspaceJob(db, logger, metrics)
+	require.NoError(t, err)
+
+	entries := metrics["resources_per_workspace"].([]map[string]any)
+	assert.Empty(t, entries)
+
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestCollectMetricsWithDB(t *testing.T) {
+	db := setupTestDB(t)
+	logger := testLogger()
+
+	require.NoError(t, db.AutoMigrate(&model.MetricsSummary{}))
+
+	// Seed reporter_resources for collectResourceCountJob
+	createTestReporterResource(t, db, "host", "hbi")
+
+	// Seed common_representations for collectResourcesPerWorkspaceJob
+	// Note: SQLite doesn't support LATERAL joins, so this will fail on that query.
+	// We test the full flow by verifying collectMetricsWithDB handles errors gracefully.
+	err := collectMetricsWithDB(db, logger, DefaultRetentionDays)
+
+	// SQLite doesn't support PostgreSQL-specific syntax (LATERAL, ::float),
+	// so the resources_per_workspace query will fail. This validates error handling.
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "resources_per_workspace query failed")
+}
+
+func TestCollectMetricsWithDB_WritesAndCleansUp(t *testing.T) {
+	db, mock := setupMockDB(t)
+	logger := testLogger()
+
+	// Mock resources_per_workspace query
+	mock.ExpectQuery(`SELECT`).WillReturnRows(
+		sqlmock.NewRows([]string{"resource_type", "count"}).
+			AddRow("host", 5.0),
+	)
+
+	// Mock resource_count query
+	mock.ExpectQuery(`SELECT`).WillReturnRows(
+		sqlmock.NewRows([]string{"resource_type", "reporter_type", "reporter_instance_id", "count"}).
+			AddRow("host", "hbi", "inst-1", 10),
+	)
+
+	// Mock summary insert
+	mock.ExpectBegin()
+	mock.ExpectExec(`INSERT`).
+		WithArgs(sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg()).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectCommit()
+
+	// Mock cleanup delete
+	mock.ExpectBegin()
+	mock.ExpectExec(`DELETE`).
+		WithArgs(sqlmock.AnyArg()).
+		WillReturnResult(sqlmock.NewResult(0, 2))
+	mock.ExpectCommit()
+
+	err := collectMetricsWithDB(db, logger, DefaultRetentionDays)
+	require.NoError(t, err)
+
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestCollectMetricsWithDB_InvalidRetentionDays(t *testing.T) {
+	db, mock := setupMockDB(t)
+	logger := testLogger()
+
+	// Mock resources_per_workspace query
+	mock.ExpectQuery(`SELECT`).WillReturnRows(
+		sqlmock.NewRows([]string{"resource_type", "count"}),
+	)
+
+	// Mock resource_count query
+	mock.ExpectQuery(`SELECT`).WillReturnRows(
+		sqlmock.NewRows([]string{"resource_type", "reporter_type", "reporter_instance_id", "count"}),
+	)
+
+	// Mock summary insert
+	mock.ExpectBegin()
+	mock.ExpectExec(`INSERT`).
+		WithArgs(sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg()).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectCommit()
+
+	// Mock cleanup delete (should use DefaultRetentionDays since 0 is invalid)
+	mock.ExpectBegin()
+	mock.ExpectExec(`DELETE`).
+		WithArgs(sqlmock.AnyArg()).
+		WillReturnResult(sqlmock.NewResult(0, 0))
+	mock.ExpectCommit()
+
+	err := collectMetricsWithDB(db, logger, 0)
+	require.NoError(t, err)
+
+	require.NoError(t, mock.ExpectationsWereMet())
 }

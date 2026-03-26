@@ -505,6 +505,83 @@ func TestSimpleAuthorizer_LookupResources_Empty(t *testing.T) {
 	assert.Error(t, err) // io.EOF
 }
 
+func TestSimpleAuthorizer_LookupSubjects(t *testing.T) {
+	authz := NewSimpleAuthorizer()
+
+	// Create tuples for resource-1 with two subjects
+	_, _ = authz.CreateTuples(context.Background(), &kessel.CreateTuplesRequest{
+		Tuples: []*kessel.Relationship{
+			{
+				Resource: &kessel.ObjectReference{
+					Type: &kessel.ObjectType{Namespace: "hbi", Name: "host"},
+					Id:   "resource-1",
+				},
+				Relation: "view",
+				Subject: &kessel.SubjectReference{
+					Subject: &kessel.ObjectReference{
+						Type: &kessel.ObjectType{Namespace: "rbac", Name: "principal"},
+						Id:   "user-a",
+					},
+				},
+			},
+			{
+				Resource: &kessel.ObjectReference{
+					Type: &kessel.ObjectType{Namespace: "hbi", Name: "host"},
+					Id:   "resource-1",
+				},
+				Relation: "view",
+				Subject: &kessel.SubjectReference{
+					Subject: &kessel.ObjectReference{
+						Type: &kessel.ObjectType{Namespace: "rbac", Name: "principal"},
+						Id:   "user-b",
+					},
+				},
+			},
+			// This one is for a different resource
+			{
+				Resource: &kessel.ObjectReference{
+					Type: &kessel.ObjectType{Namespace: "hbi", Name: "host"},
+					Id:   "resource-2",
+				},
+				Relation: "view",
+				Subject: &kessel.SubjectReference{
+					Subject: &kessel.ObjectReference{
+						Type: &kessel.ObjectType{Namespace: "rbac", Name: "principal"},
+						Id:   "user-c",
+					},
+				},
+			},
+		},
+	})
+
+	// Lookup subjects for resource-1 with "view" relation
+	stream, err := authz.LookupSubjects(context.Background(), &kessel.LookupSubjectsRequest{
+		Resource: &kessel.ObjectReference{
+			Type: &kessel.ObjectType{Namespace: "hbi", Name: "host"},
+			Id:   "resource-1",
+		},
+		Relation:    "view",
+		SubjectType: &kessel.ObjectType{Namespace: "rbac", Name: "principal"},
+	})
+	require.NoError(t, err)
+
+	// Collect all results
+	var subjectIDs []string
+	for {
+		resp, err := stream.Recv()
+		if err != nil {
+			break
+		}
+		subjectIDs = append(subjectIDs, resp.Subject.Subject.Id)
+	}
+
+	// Should find 2 subjects for resource-1 (not resource-2's subject)
+	assert.Len(t, subjectIDs, 2)
+	assert.Contains(t, subjectIDs, "user-a")
+	assert.Contains(t, subjectIDs, "user-b")
+	assert.NotContains(t, subjectIDs, "user-c")
+}
+
 // Tests for versioning and snapshot support
 
 func TestSimpleAuthorizer_Version_AdvancesOnMutations(t *testing.T) {

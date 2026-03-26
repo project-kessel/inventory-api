@@ -51,6 +51,10 @@ func collectMetrics(storageOptions *storage.Options, loggerOptions common.Logger
 	}
 	defer sqlDB.Close() //nolint:errcheck
 
+	return collectMetricsWithDB(db, logHelper, retentionDays)
+}
+
+func collectMetricsWithDB(db *gorm.DB, logHelper *log.Helper, retentionDays int) error {
 	logHelper.Info("Starting metrics collection job")
 
 	metrics := internal.JsonObject{}

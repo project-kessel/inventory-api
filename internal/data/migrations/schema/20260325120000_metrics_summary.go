@@ -21,7 +21,10 @@ func MetricsSummaryMigration() *gormigrate.Migration {
 			return tx.AutoMigrate(&MetricsSummary{})
 		},
 		Rollback: func(tx *gorm.DB) error {
-			return nil
+			if err := tx.Migrator().DropConstraint(&MetricsSummary{}, "idx_metrics_summary_collected_at"); err != nil {
+				return err
+			}
+			return tx.Migrator().DropTable(&MetricsSummary{})
 		},
 	}
 }

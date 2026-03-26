@@ -12,9 +12,9 @@ option go_package = "github.com/project-kessel/inventory-api/api/kessel/inventor
 option java_multiple_files = true;
 option java_package = "org.project_kessel.api.inventory.v1beta2";
 
-// LookupSubjectsRequest finds subjects that have a specific relation to a resource.
+// StreamedListSubjectsRequest finds subjects that have a specific relation to a resource.
 // This answers the question: "Which subjects of type X have relation Y to resource Z?"
-message LookupSubjectsRequest {
+message StreamedListSubjectsRequest {
   ResourceReference resource = 1 [(buf.validate.field).required = true];
   string relation = 2 [(buf.validate.field).string.min_len = 1];
   RepresentationType subject_type = 3 [(buf.validate.field).required = true];

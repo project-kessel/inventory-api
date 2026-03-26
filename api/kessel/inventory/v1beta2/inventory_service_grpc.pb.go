@@ -19,16 +19,16 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	KesselInventoryService_Check_FullMethodName               = "/kessel.inventory.v1beta2.KesselInventoryService/Check"
-	KesselInventoryService_CheckSelf_FullMethodName           = "/kessel.inventory.v1beta2.KesselInventoryService/CheckSelf"
-	KesselInventoryService_CheckForUpdate_FullMethodName      = "/kessel.inventory.v1beta2.KesselInventoryService/CheckForUpdate"
-	KesselInventoryService_CheckForUpdateBulk_FullMethodName  = "/kessel.inventory.v1beta2.KesselInventoryService/CheckForUpdateBulk"
-	KesselInventoryService_CheckBulk_FullMethodName           = "/kessel.inventory.v1beta2.KesselInventoryService/CheckBulk"
-	KesselInventoryService_CheckSelfBulk_FullMethodName       = "/kessel.inventory.v1beta2.KesselInventoryService/CheckSelfBulk"
-	KesselInventoryService_ReportResource_FullMethodName      = "/kessel.inventory.v1beta2.KesselInventoryService/ReportResource"
-	KesselInventoryService_DeleteResource_FullMethodName      = "/kessel.inventory.v1beta2.KesselInventoryService/DeleteResource"
-	KesselInventoryService_StreamedListObjects_FullMethodName = "/kessel.inventory.v1beta2.KesselInventoryService/StreamedListObjects"
-	KesselInventoryService_LookupSubjects_FullMethodName      = "/kessel.inventory.v1beta2.KesselInventoryService/LookupSubjects"
+	KesselInventoryService_Check_FullMethodName                = "/kessel.inventory.v1beta2.KesselInventoryService/Check"
+	KesselInventoryService_CheckSelf_FullMethodName            = "/kessel.inventory.v1beta2.KesselInventoryService/CheckSelf"
+	KesselInventoryService_CheckForUpdate_FullMethodName       = "/kessel.inventory.v1beta2.KesselInventoryService/CheckForUpdate"
+	KesselInventoryService_CheckForUpdateBulk_FullMethodName   = "/kessel.inventory.v1beta2.KesselInventoryService/CheckForUpdateBulk"
+	KesselInventoryService_CheckBulk_FullMethodName            = "/kessel.inventory.v1beta2.KesselInventoryService/CheckBulk"
+	KesselInventoryService_CheckSelfBulk_FullMethodName        = "/kessel.inventory.v1beta2.KesselInventoryService/CheckSelfBulk"
+	KesselInventoryService_ReportResource_FullMethodName       = "/kessel.inventory.v1beta2.KesselInventoryService/ReportResource"
+	KesselInventoryService_DeleteResource_FullMethodName       = "/kessel.inventory.v1beta2.KesselInventoryService/DeleteResource"
+	KesselInventoryService_StreamedListObjects_FullMethodName  = "/kessel.inventory.v1beta2.KesselInventoryService/StreamedListObjects"
+	KesselInventoryService_StreamedListSubjects_FullMethodName = "/kessel.inventory.v1beta2.KesselInventoryService/StreamedListSubjects"
 )
 
 // KesselInventoryServiceClient is the client API for KesselInventoryService service.
@@ -162,7 +162,7 @@ type KesselInventoryServiceClient interface {
 	// The result is streamed incrementally to support large datasets.
 	//
 	// Pagination and consistency controls allow fine-tuned performance and data freshness.
-	LookupSubjects(ctx context.Context, in *LookupSubjectsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[LookupSubjectsResponse], error)
+	StreamedListSubjects(ctx context.Context, in *StreamedListSubjectsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[StreamedListSubjectsResponse], error)
 }
 
 type kesselInventoryServiceClient struct {
@@ -272,13 +272,13 @@ func (c *kesselInventoryServiceClient) StreamedListObjects(ctx context.Context, 
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type KesselInventoryService_StreamedListObjectsClient = grpc.ServerStreamingClient[StreamedListObjectsResponse]
 
-func (c *kesselInventoryServiceClient) LookupSubjects(ctx context.Context, in *LookupSubjectsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[LookupSubjectsResponse], error) {
+func (c *kesselInventoryServiceClient) StreamedListSubjects(ctx context.Context, in *StreamedListSubjectsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[StreamedListSubjectsResponse], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &KesselInventoryService_ServiceDesc.Streams[1], KesselInventoryService_LookupSubjects_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &KesselInventoryService_ServiceDesc.Streams[1], KesselInventoryService_StreamedListSubjects_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
-	x := &grpc.GenericClientStream[LookupSubjectsRequest, LookupSubjectsResponse]{ClientStream: stream}
+	x := &grpc.GenericClientStream[StreamedListSubjectsRequest, StreamedListSubjectsResponse]{ClientStream: stream}
 	if err := x.ClientStream.SendMsg(in); err != nil {
 		return nil, err
 	}
@@ -289,7 +289,7 @@ func (c *kesselInventoryServiceClient) LookupSubjects(ctx context.Context, in *L
 }
 
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
-type KesselInventoryService_LookupSubjectsClient = grpc.ServerStreamingClient[LookupSubjectsResponse]
+type KesselInventoryService_StreamedListSubjectsClient = grpc.ServerStreamingClient[StreamedListSubjectsResponse]
 
 // KesselInventoryServiceServer is the server API for KesselInventoryService service.
 // All implementations must embed UnimplementedKesselInventoryServiceServer
@@ -422,7 +422,7 @@ type KesselInventoryServiceServer interface {
 	// The result is streamed incrementally to support large datasets.
 	//
 	// Pagination and consistency controls allow fine-tuned performance and data freshness.
-	LookupSubjects(*LookupSubjectsRequest, grpc.ServerStreamingServer[LookupSubjectsResponse]) error
+	StreamedListSubjects(*StreamedListSubjectsRequest, grpc.ServerStreamingServer[StreamedListSubjectsResponse]) error
 	mustEmbedUnimplementedKesselInventoryServiceServer()
 }
 
@@ -460,8 +460,8 @@ func (UnimplementedKesselInventoryServiceServer) DeleteResource(context.Context,
 func (UnimplementedKesselInventoryServiceServer) StreamedListObjects(*StreamedListObjectsRequest, grpc.ServerStreamingServer[StreamedListObjectsResponse]) error {
 	return status.Errorf(codes.Unimplemented, "method StreamedListObjects not implemented")
 }
-func (UnimplementedKesselInventoryServiceServer) LookupSubjects(*LookupSubjectsRequest, grpc.ServerStreamingServer[LookupSubjectsResponse]) error {
-	return status.Errorf(codes.Unimplemented, "method LookupSubjects not implemented")
+func (UnimplementedKesselInventoryServiceServer) StreamedListSubjects(*StreamedListSubjectsRequest, grpc.ServerStreamingServer[StreamedListSubjectsResponse]) error {
+	return status.Errorf(codes.Unimplemented, "method StreamedListSubjects not implemented")
 }
 func (UnimplementedKesselInventoryServiceServer) mustEmbedUnimplementedKesselInventoryServiceServer() {
 }
@@ -640,16 +640,16 @@ func _KesselInventoryService_StreamedListObjects_Handler(srv interface{}, stream
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type KesselInventoryService_StreamedListObjectsServer = grpc.ServerStreamingServer[StreamedListObjectsResponse]
 
-func _KesselInventoryService_LookupSubjects_Handler(srv interface{}, stream grpc.ServerStream) error {
-	m := new(LookupSubjectsRequest)
+func _KesselInventoryService_StreamedListSubjects_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(StreamedListSubjectsRequest)
 	if err := stream.RecvMsg(m); err != nil {
 		return err
 	}
-	return srv.(KesselInventoryServiceServer).LookupSubjects(m, &grpc.GenericServerStream[LookupSubjectsRequest, LookupSubjectsResponse]{ServerStream: stream})
+	return srv.(KesselInventoryServiceServer).StreamedListSubjects(m, &grpc.GenericServerStream[StreamedListSubjectsRequest, StreamedListSubjectsResponse]{ServerStream: stream})
 }
 
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
-type KesselInventoryService_LookupSubjectsServer = grpc.ServerStreamingServer[LookupSubjectsResponse]
+type KesselInventoryService_StreamedListSubjectsServer = grpc.ServerStreamingServer[StreamedListSubjectsResponse]
 
 // KesselInventoryService_ServiceDesc is the grpc.ServiceDesc for KesselInventoryService service.
 // It's only intended for direct use with grpc.RegisterService,
@@ -698,8 +698,8 @@ var KesselInventoryService_ServiceDesc = grpc.ServiceDesc{
 			ServerStreams: true,
 		},
 		{
-			StreamName:    "LookupSubjects",
-			Handler:       _KesselInventoryService_LookupSubjects_Handler,
+			StreamName:    "StreamedListSubjects",
+			Handler:       _KesselInventoryService_StreamedListSubjects_Handler,
 			ServerStreams: true,
 		},
 	},

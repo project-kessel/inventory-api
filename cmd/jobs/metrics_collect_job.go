@@ -109,13 +109,8 @@ func collectResourcesPerWorkspaceJob(db *gorm.DB, logHelper *log.Helper, metrics
 		SELECT r.type AS resource_type,
 		       COUNT(*)::float AS count
 		FROM resource r
-		JOIN LATERAL (
-			SELECT data
-			FROM common_representations
-			WHERE resource_id = r.id
-			ORDER BY version DESC
-			LIMIT 1
-		) cr ON true
+		JOIN common_representations cr
+			ON cr.resource_id = r.id AND cr.version = r.common_version
 		WHERE cr.data->>'workspace_id' IS NOT NULL
 		GROUP BY r.type, cr.data->>'workspace_id'
 	`).Scan(&results).Error

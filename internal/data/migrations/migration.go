@@ -14,6 +14,7 @@ import (
 var MigrationsList = []*gormigrate.Migration{
 	schema.InitialSchema(),
 	schema.MetricsSummaryMigration(),
+	schema.ReporterResourcesNotTombstoneIdxMigration(),
 }
 
 func init() {

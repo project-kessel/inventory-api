@@ -97,6 +97,11 @@ func (m *MockAuthz) LookupResources(ctx context.Context, request *v1beta1.Lookup
 	return args.Get(0).(grpc.ServerStreamingClient[v1beta1.LookupResourcesResponse]), args.Error(1)
 }
 
+func (m *MockAuthz) LookupSubjects(ctx context.Context, request *v1beta1.LookupSubjectsRequest) (grpc.ServerStreamingClient[v1beta1.LookupSubjectsResponse], error) {
+	args := m.Called(ctx, request)
+	return args.Get(0).(grpc.ServerStreamingClient[v1beta1.LookupSubjectsResponse]), args.Error(1)
+}
+
 type MockConsumer struct {
 	mock.Mock
 }

@@ -426,6 +426,67 @@ func (s *SimpleAuthorizer) LookupResources(_ context.Context, req *kessel.Lookup
 	return &simpleLookupResourcesStream{results: results}, nil
 }
 
+// LookupSubjects implements Authorizer.
+// It returns subjects that have the specified relation to a resource.
+// This is a simple direct-tuple lookup, not a full ReBAC graph traversal.
+func (s *SimpleAuthorizer) LookupSubjects(_ context.Context, req *kessel.LookupSubjectsRequest) (grpc.ServerStreamingClient[kessel.LookupSubjectsResponse], error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	// Extract resource parameters
+	resourceNamespace := ""
+	resourceType := ""
+	resourceID := ""
+	if req.Resource != nil {
+		resourceID = req.Resource.Id
+		if req.Resource.Type != nil {
+			resourceNamespace = req.Resource.Type.Namespace
+			resourceType = req.Resource.Type.Name
+		}
+	}
+	requestedRelation := req.Relation
+
+	// Extract subject type filter
+	subjectNamespace := ""
+	subjectType := ""
+	if req.SubjectType != nil {
+		subjectNamespace = req.SubjectType.Namespace
+		subjectType = req.SubjectType.Name
+	}
+
+	// Find all matching tuples
+	var results []*kessel.LookupSubjectsResponse
+	for key := range s.tuples {
+		// Match tuples where:
+		// - Resource matches exactly
+		// - Relation matches
+		// - Subject type matches (if specified)
+		resourceMatches := key.ResourceNamespace == resourceNamespace &&
+			key.ResourceType == resourceType &&
+			key.ResourceID == resourceID
+		relationMatches := key.Relation == requestedRelation
+		subjectTypeMatches := (subjectNamespace == "" || key.SubjectNamespace == subjectNamespace) &&
+			(subjectType == "" || key.SubjectType == subjectType)
+
+		if resourceMatches && relationMatches && subjectTypeMatches {
+			results = append(results, &kessel.LookupSubjectsResponse{
+				Subject: &kessel.SubjectReference{
+					Subject: &kessel.ObjectReference{
+						Type: &kessel.ObjectType{
+							Namespace: key.SubjectNamespace,
+							Name:      key.SubjectType,
+						},
+						Id: key.SubjectID,
+					},
+				},
+				Pagination: &kessel.ResponsePagination{},
+			})
+		}
+	}
+
+	return &simpleLookupSubjectsStream{results: results}, nil
+}
+
 // CreateTuples implements Authorizer by storing the relationship tuples.
 // This advances the version counter.
 func (s *SimpleAuthorizer) CreateTuples(_ context.Context, req *kessel.CreateTuplesRequest) (*kessel.CreateTuplesResponse, error) {
@@ -546,5 +607,43 @@ func (s *simpleLookupResourcesStream) SendMsg(_ interface{}) error {
 }
 
 func (s *simpleLookupResourcesStream) RecvMsg(_ interface{}) error {
+	return nil
+}
+
+type simpleLookupSubjectsStream struct {
+	results []*kessel.LookupSubjectsResponse
+	index   int
+}
+
+func (s *simpleLookupSubjectsStream) Recv() (*kessel.LookupSubjectsResponse, error) {
+	if s.index >= len(s.results) {
+		return nil, io.EOF
+	}
+	result := s.results[s.index]
+	s.index++
+	return result, nil
+}
+
+func (s *simpleLookupSubjectsStream) Header() (metadata.MD, error) {
+	return nil, nil
+}
+
+func (s *simpleLookupSubjectsStream) Trailer() metadata.MD {
+	return nil
+}
+
+func (s *simpleLookupSubjectsStream) CloseSend() error {
+	return nil
+}
+
+func (s *simpleLookupSubjectsStream) Context() context.Context {
+	return context.Background()
+}
+
+func (s *simpleLookupSubjectsStream) SendMsg(_ interface{}) error {
+	return nil
+}
+
+func (s *simpleLookupSubjectsStream) RecvMsg(_ interface{}) error {
 	return nil
 }

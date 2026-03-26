@@ -13,6 +13,8 @@ import "kessel/inventory/v1beta2/delete_resource_request.proto";
 import "kessel/inventory/v1beta2/delete_resource_response.proto";
 import "kessel/inventory/v1beta2/streamed_list_objects_request.proto";
 import "kessel/inventory/v1beta2/streamed_list_objects_response.proto";
+import "kessel/inventory/v1beta2/lookup_subjects_request.proto";
+import "kessel/inventory/v1beta2/lookup_subjects_response.proto";
 import "kessel/inventory/v1beta2/check_bulk_request.proto";
 import "kessel/inventory/v1beta2/check_bulk_response.proto";
 import "kessel/inventory/v1beta2/check_self_request.proto";
@@ -190,4 +192,16 @@ service KesselInventoryService {
   //
   // Pagination and consistency controls allow fine-tuned performance and data freshness.
   rpc StreamedListObjects(StreamedListObjectsRequest) returns (stream StreamedListObjectsResponse);
+
+  // Streams a list of subjects that have the specified relation to a resource.
+  //
+  // This relationship query answers the question:
+  // "Which subjects of type *X* have relation *Y* to resource *Z*?"
+  //
+  // It is often used for access auditing, troubleshooting permissions, or
+  // displaying lists of users/principals with specific access to a resource.
+  // The result is streamed incrementally to support large datasets.
+  //
+  // Pagination and consistency controls allow fine-tuned performance and data freshness.
+  rpc LookupSubjects(LookupSubjectsRequest) returns (stream LookupSubjectsResponse);
 }

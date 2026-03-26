@@ -386,7 +386,7 @@ func TestToLookupResourcesCommand_NoPagination(t *testing.T) {
 
 func TestToLookupSubjectsCommand_NoPagination(t *testing.T) {
 	reporterType := "hbi"
-	input := &pb.LookupSubjectsRequest{
+	input := &pb.StreamedListSubjectsRequest{
 		Resource: &pb.ResourceReference{
 			ResourceId:   "resource-1",
 			ResourceType: "host",

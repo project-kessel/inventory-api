@@ -463,14 +463,14 @@ func (s *InventoryService) StreamedListObjects(
 	}
 }
 
-func (s *InventoryService) LookupSubjects(
-	req *pb.LookupSubjectsRequest,
-	stream pb.KesselInventoryService_LookupSubjectsServer,
+func (s *InventoryService) StreamedListSubjects(
+	req *pb.StreamedListSubjectsRequest,
+	stream pb.KesselInventoryService_StreamedListSubjectsServer,
 ) error {
 	ctx := stream.Context()
 
 	consistency := consistencyFromProto(req.GetConsistency())
-	log.Debugf("LookupSubjects consistency: %s", model.ConsistencyTypeOf(consistency))
+	log.Debugf("StreamedListSubjects consistency: %s", model.ConsistencyTypeOf(consistency))
 
 	lookupCmd, err := ToLookupSubjectsCommand(req)
 	if err != nil {
@@ -565,7 +565,7 @@ func ToLookupResourceResponse(response *pbv1beta1.LookupResourcesResponse) *pb.S
 }
 
 // ToLookupSubjectsCommand converts a v1beta2 LookupSubjectsRequest to a LookupSubjectsCommand.
-func ToLookupSubjectsCommand(request *pb.LookupSubjectsRequest) (resources.LookupSubjectsCommand, error) {
+func ToLookupSubjectsCommand(request *pb.StreamedListSubjectsRequest) (resources.LookupSubjectsCommand, error) {
 	if request == nil {
 		return resources.LookupSubjectsCommand{}, fmt.Errorf("request is nil")
 	}
@@ -621,7 +621,7 @@ func ToLookupSubjectsCommand(request *pb.LookupSubjectsRequest) (resources.Looku
 	}, nil
 }
 
-func ToLookupSubjectsResponse(response *pbv1beta1.LookupSubjectsResponse) *pb.LookupSubjectsResponse {
+func ToLookupSubjectsResponse(response *pbv1beta1.LookupSubjectsResponse) *pb.StreamedListSubjectsResponse {
 	subjectRef := &pb.SubjectReference{
 		Resource: &pb.ResourceReference{
 			Reporter: &pb.ReporterReference{
@@ -634,7 +634,7 @@ func ToLookupSubjectsResponse(response *pbv1beta1.LookupSubjectsResponse) *pb.Lo
 	if response.Subject.Relation != nil {
 		subjectRef.Relation = response.Subject.Relation
 	}
-	return &pb.LookupSubjectsResponse{
+	return &pb.StreamedListSubjectsResponse{
 		Subject: subjectRef,
 		Pagination: &pb.ResponsePagination{
 			ContinuationToken: response.Pagination.ContinuationToken,

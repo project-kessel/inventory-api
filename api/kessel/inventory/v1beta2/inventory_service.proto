@@ -13,8 +13,8 @@ import "kessel/inventory/v1beta2/delete_resource_request.proto";
 import "kessel/inventory/v1beta2/delete_resource_response.proto";
 import "kessel/inventory/v1beta2/streamed_list_objects_request.proto";
 import "kessel/inventory/v1beta2/streamed_list_objects_response.proto";
-import "kessel/inventory/v1beta2/lookup_subjects_request.proto";
-import "kessel/inventory/v1beta2/lookup_subjects_response.proto";
+import "kessel/inventory/v1beta2/streamed_list_subjects_request.proto";
+import "kessel/inventory/v1beta2/streamed_list_subjects_response.proto";
 import "kessel/inventory/v1beta2/check_bulk_request.proto";
 import "kessel/inventory/v1beta2/check_bulk_response.proto";
 import "kessel/inventory/v1beta2/check_self_request.proto";
@@ -203,5 +203,5 @@ service KesselInventoryService {
   // The result is streamed incrementally to support large datasets.
   //
   // Pagination and consistency controls allow fine-tuned performance and data freshness.
-  rpc LookupSubjects(LookupSubjectsRequest) returns (stream LookupSubjectsResponse);
+  rpc StreamedListSubjects(StreamedListSubjectsRequest) returns (stream StreamedListSubjectsResponse);
 }

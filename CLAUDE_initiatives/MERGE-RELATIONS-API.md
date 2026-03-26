@@ -85,6 +85,38 @@ When creating or modifying protocol buffer definitions:
 2. **Scan existing protos** in `api/kessel/inventory/v1beta2/` to understand and align with established patterns
 3. **Reuse existing types** before creating new ones - maintain consistency across the API
 
+### Verifying Code Changes
+
+Before considering work complete, all code changes must be verified:
+
+1. **Build**: Ensure code compiles
+   ```bash
+   make local-build
+   # CI uses: make build (includes FIPS settings, won't work locally)
+   ```
+
+2. **Lint**: Ensure code passes formatting and linting
+   ```bash
+   goimports -w <changed-files>
+   # CI uses: make lint (requires Docker, may fail locally)
+   ```
+
+3. **Tests**: Run tests
+   ```bash
+   go test ./...
+   # Alternative: make test (may have coverage reporting issues locally but tests run)
+
+   # For targeted testing:
+   go test -run TestSpecificCase ./path/to/package
+   ```
+
+4. **Proto changes**: If proto files were modified, regenerate code
+   ```bash
+   make api
+   ```
+
+**Note**: The CI pipeline runs full `golangci-lint` and `make build` with FIPS. Local verification helps catch issues early but doesn't guarantee CI will pass. Address any CI failures promptly.
+
 ## Next Phases (Future Work)
 
 - **Phase 3**: Functional testing and performance

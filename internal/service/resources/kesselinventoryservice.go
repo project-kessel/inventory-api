@@ -635,7 +635,7 @@ func ToLookupSubjectsResponse(response *pbv1beta1.LookupSubjectsResponse) *pb.Lo
 		subjectRef.Relation = response.Subject.Relation
 	}
 	return &pb.LookupSubjectsResponse{
-		Subject:    subjectRef,
+		Subject: subjectRef,
 		Pagination: &pb.ResponsePagination{
 			ContinuationToken: response.Pagination.ContinuationToken,
 		},

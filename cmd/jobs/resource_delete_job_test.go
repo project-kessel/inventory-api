@@ -50,7 +50,7 @@ func createTestReporterResource(t *testing.T, db *gorm.DB, resourceType, reporte
 		},
 		ResourceID:            resourceID,
 		APIHref:               "https://api.example.com/resource/" + resourceID.String(),
-		ConsoleHref:           "https://console.example.com/resource/" + resourceID.String(),
+		ConsoleHref:           strPtr("https://console.example.com/resource/" + resourceID.String()),
 		RepresentationVersion: 1,
 		Generation:            1,
 		Tombstone:             false,
@@ -59,6 +59,8 @@ func createTestReporterResource(t *testing.T, db *gorm.DB, resourceType, reporte
 
 	return reporterResourceID
 }
+
+func strPtr(s string) *string { return &s }
 
 func createTestCommonRepresentation(t *testing.T, db *gorm.DB, reporterType string) uuid.UUID {
 	t.Helper()

@@ -37,7 +37,7 @@ func TestReporterResource_Initialization(t *testing.T) {
 		assertValidReporterResource(t, reporterResource, err, "valid inputs")
 	})
 
-	t.Run("should create reporter resource with empty console href", func(t *testing.T) {
+	t.Run("should create reporter resource with nil console href", func(t *testing.T) {
 		t.Parallel()
 
 		reporterResource, err := NewReporterResource(
@@ -48,10 +48,10 @@ func TestReporterResource_Initialization(t *testing.T) {
 			fixture.ValidReporterInstanceIdType(),
 			fixture.ValidResourceIdType(),
 			fixture.ValidApiHrefType(),
-			fixture.EmptyConsoleHrefType(),
+			fixture.NilConsoleHrefType(),
 		)
 
-		assertValidReporterResource(t, reporterResource, err, "empty console href")
+		assertValidReporterResource(t, reporterResource, err, "nil console href")
 	})
 
 	t.Run("should accept local resource ID in UUID format", func(t *testing.T) {
@@ -187,7 +187,7 @@ func TestReporterResource_Update(t *testing.T) {
 			t.Fatalf("Failed to create console href: %v", err)
 		}
 
-		original.Update(newApiHref, newConsoleHref)
+		original.Update(newApiHref, &newConsoleHref)
 
 		if original.apiHref.String() != newApiHref.String() {
 			t.Errorf("Expected updated apiHref %s, got %s", newApiHref.String(), original.apiHref.String())
@@ -226,7 +226,7 @@ func TestReporterResource_Update(t *testing.T) {
 			t.Fatalf("Failed to create console href: %v", err)
 		}
 
-		original.Update(newApiHref, newConsoleHref)
+		original.Update(newApiHref, &newConsoleHref)
 
 		expectedVersion := originalVersion + 1
 		if original.representationVersion.Uint() != expectedVersion {
@@ -268,7 +268,7 @@ func TestReporterResource_Update(t *testing.T) {
 			t.Fatalf("Failed to create console href: %v", err)
 		}
 
-		original.Update(newApiHref, newConsoleHref)
+		original.Update(newApiHref, &newConsoleHref)
 
 		if original.id != originalId {
 			t.Errorf("Expected ID to remain unchanged")
@@ -373,7 +373,7 @@ func TestReporterResource_CreatedAtStaysConstantOnUpdate(t *testing.T) {
 
 	newApiHref, _ := NewApiHref("https://api.updated.com")
 	newConsoleHref, _ := NewConsoleHref("https://console.updated.com")
-	rr.Update(newApiHref, newConsoleHref)
+	rr.Update(newApiHref, &newConsoleHref)
 
 	if !rr.CreatedAt().Equal(originalCreatedAt) {
 		t.Error("createdAt should not change on Update")

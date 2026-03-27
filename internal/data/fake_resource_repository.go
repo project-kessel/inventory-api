@@ -81,12 +81,6 @@ func (f *fakeResourceRepository) Save(tx *gorm.DB, resource bizmodel.Resource, o
 		return fmt.Errorf("failed to serialize resource: %w", err)
 	}
 
-	// In fake implementation, we don't actually store representations but we should acknowledge them
-	_ = reporterRepresentationSnapshot
-	_ = commonRepresentationSnapshot
-
-	// Create the composite key that matches the unique constraint:
-	// (LocalResourceID, ReporterType, ResourceType, ReporterInstanceID, RepresentationVersion, Generation)
 	compositeKey := f.makeCompositeKey(
 		reporterResourceSnapshot.ReporterResourceKey.LocalResourceID,
 		reporterResourceSnapshot.ReporterResourceKey.ReporterType,
@@ -96,12 +90,9 @@ func (f *fakeResourceRepository) Save(tx *gorm.DB, resource bizmodel.Resource, o
 		reporterResourceSnapshot.Generation,
 	)
 
-	// Simulate database Save() behavior: upsert by primary key (ReporterResourceID)
 	reporterResourcePrimaryKey := reporterResourceSnapshot.ID
 
-	// Check if this is an update to existing resource (same primary key)
 	if existingResource, exists := f.resourcesByPrimaryKey[reporterResourcePrimaryKey]; exists {
-		// This is an update - remove old composite key mapping
 		oldCompositeKey := f.makeCompositeKey(
 			existingResource.localResourceID,
 			existingResource.reporterType,
@@ -112,17 +103,23 @@ func (f *fakeResourceRepository) Save(tx *gorm.DB, resource bizmodel.Resource, o
 		)
 		delete(f.resourcesByCompositeKey, oldCompositeKey)
 	} else {
-		// This is a new resource - check for unique constraint violation
 		if existingPrimaryKey, exists := f.resourcesByCompositeKey[compositeKey]; exists {
 			return fmt.Errorf("duplicate key violation: reporter_resource_key_idx unique constraint failed for key: %s (conflicts with existing resource: %s)", compositeKey, existingPrimaryKey)
 		}
+	}
+
+	var commonData internal.JsonObject
+	var commonVersion uint
+	if commonRepresentationSnapshot != nil {
+		commonData = commonRepresentationSnapshot.Representation.Data
+		commonVersion = commonRepresentationSnapshot.Version
 	}
 
 	stored := &storedResource{
 		resourceID:            resourceSnapshot.ID,
 		resourceType:          resourceSnapshot.Type,
 		commonVersion:         resourceSnapshot.CommonVersion,
-		commonData:            commonRepresentationSnapshot.Representation.Data,
+		commonData:            commonData,
 		consistencyToken:      resourceSnapshot.ConsistencyToken,
 		reporterResourceID:    reporterResourceSnapshot.ID,
 		localResourceID:       reporterResourceSnapshot.ReporterResourceKey.LocalResourceID,
@@ -135,9 +132,7 @@ func (f *fakeResourceRepository) Save(tx *gorm.DB, resource bizmodel.Resource, o
 		tombstone:             reporterResourceSnapshot.Tombstone,
 	}
 
-	// Store by primary key (simulates database primary storage)
 	f.resourcesByPrimaryKey[reporterResourcePrimaryKey] = stored
-	// Store composite key mapping (simulates unique constraint)
 	f.resourcesByCompositeKey[compositeKey] = reporterResourcePrimaryKey
 
 	historyKey := f.makeHistoryKey(
@@ -149,17 +144,15 @@ func (f *fakeResourceRepository) Save(tx *gorm.DB, resource bizmodel.Resource, o
 	if _, ok := f.representationsByVersion[historyKey]; !ok {
 		f.representationsByVersion[historyKey] = make(map[uint]*storedRepresentation)
 	}
-	commonVersion := commonRepresentationSnapshot.Version
 	f.representationsByVersion[historyKey][stored.representationVersion] = &storedRepresentation{
 		commonData:    cloneJsonObject(stored.commonData),
 		commonVersion: commonVersion,
 	}
 
-	// Mark transaction IDs as processed for idempotency testing
-	if reporterRepresentationSnapshot.TransactionId != "" {
+	if reporterRepresentationSnapshot != nil && reporterRepresentationSnapshot.TransactionId != "" {
 		f.markTransactionIdAsProcessed(reporterRepresentationSnapshot.TransactionId)
 	}
-	if commonRepresentationSnapshot.TransactionId != "" {
+	if commonRepresentationSnapshot != nil && commonRepresentationSnapshot.TransactionId != "" {
 		f.markTransactionIdAsProcessed(commonRepresentationSnapshot.TransactionId)
 	}
 
@@ -220,7 +213,7 @@ func (f *fakeResourceRepository) FindResourceByKeys(tx *gorm.DB, key bizmodel.Re
 			},
 			ResourceID:            latestResource.resourceID,
 			APIHref:               "",
-			ConsoleHref:           "",
+			ConsoleHref:           nil, // optional
 			RepresentationVersion: latestResource.representationVersion,
 			Generation:            latestResource.generation,
 			Tombstone:             latestResource.tombstone,

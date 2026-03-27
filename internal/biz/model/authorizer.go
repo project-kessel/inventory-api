@@ -18,6 +18,7 @@ type Authorizer interface {
 	CheckBulk(context.Context, *kessel.CheckBulkRequest) (*kessel.CheckBulkResponse, error)
 	CheckForUpdateBulk(context.Context, *kessel.CheckForUpdateBulkRequest) (*kessel.CheckForUpdateBulkResponse, error)
 	LookupResources(ctx context.Context, in *kessel.LookupResourcesRequest) (grpc.ServerStreamingClient[kessel.LookupResourcesResponse], error)
+	LookupSubjects(ctx context.Context, in *kessel.LookupSubjectsRequest) (grpc.ServerStreamingClient[kessel.LookupSubjectsResponse], error)
 	CreateTuples(context.Context, *kessel.CreateTuplesRequest) (*kessel.CreateTuplesResponse, error)
 	DeleteTuples(context.Context, *kessel.DeleteTuplesRequest) (*kessel.DeleteTuplesResponse, error)
 	AcquireLock(context.Context, *kessel.AcquireLockRequest) (*kessel.AcquireLockResponse, error)

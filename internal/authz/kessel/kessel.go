@@ -172,6 +172,20 @@ func (a *KesselAuthz) LookupResources(ctx context.Context, in *kessel.LookupReso
 	return resp, nil
 }
 
+func (a *KesselAuthz) LookupSubjects(ctx context.Context, in *kessel.LookupSubjectsRequest) (grpc.ServerStreamingClient[kessel.LookupSubjectsResponse], error) {
+	opts, err := a.getCallOptions()
+	if err != nil {
+		a.incrFailureCounter("LookupSubjects")
+		return nil, err
+	}
+	resp, err := a.LookupService.LookupSubjects(ctx, in, opts...)
+	if err != nil {
+		a.incrFailureCounter("LookupSubjects")
+		return nil, err
+	}
+	return resp, nil
+}
+
 func (a *KesselAuthz) UnsetWorkspace(ctx context.Context, local_resource_id, namespace, name string) (*kessel.DeleteTuplesResponse, error) {
 
 	req := &kessel.RelationTupleFilter{

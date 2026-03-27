@@ -103,6 +103,42 @@ func (a *AllowAllAuthz) LookupResources(ctx context.Context, in *v1beta1.LookupR
 	return &mockLookupResourcesClient{ctx: ctx}, nil
 }
 
+type mockLookupSubjectsClient struct {
+	ctx context.Context
+}
+
+func (m *mockLookupSubjectsClient) Recv() (*v1beta1.LookupSubjectsResponse, error) {
+	return nil, io.EOF
+}
+
+func (m *mockLookupSubjectsClient) Header() (metadata.MD, error) {
+	return nil, nil
+}
+
+func (m *mockLookupSubjectsClient) Trailer() metadata.MD {
+	return nil
+}
+
+func (m *mockLookupSubjectsClient) CloseSend() error {
+	return nil
+}
+
+func (m *mockLookupSubjectsClient) Context() context.Context {
+	return m.ctx
+}
+
+func (m *mockLookupSubjectsClient) SendMsg(msg interface{}) error {
+	return nil
+}
+
+func (m *mockLookupSubjectsClient) RecvMsg(msg interface{}) error {
+	return nil
+}
+
+func (a *AllowAllAuthz) LookupSubjects(ctx context.Context, in *v1beta1.LookupSubjectsRequest) (grpc.ServerStreamingClient[v1beta1.LookupSubjectsResponse], error) {
+	return &mockLookupSubjectsClient{ctx: ctx}, nil
+}
+
 func (a *AllowAllAuthz) AcquireLock(ctx context.Context, r *v1beta1.AcquireLockRequest) (*v1beta1.AcquireLockResponse, error) {
 	return &v1beta1.AcquireLockResponse{}, nil
 }

@@ -385,6 +385,39 @@ func TestToLookupResourcesCommand_NoPagination(t *testing.T) {
 	assert.Equal(t, "", result.Continuation)
 }
 
+func TestToLookupSubjectsCommand_NoPagination(t *testing.T) {
+	reporterType := "hbi"
+	input := &pb.StreamedListSubjectsRequest{
+		Resource: &pb.ResourceReference{
+			ResourceId:   "resource-1",
+			ResourceType: "host",
+			Reporter: &pb.ReporterReference{
+				Type: "hbi",
+			},
+		},
+		Relation: "view",
+		SubjectType: &pb.RepresentationType{
+			ResourceType: "principal",
+			ReporterType: &reporterType,
+		},
+		// Pagination intentionally omitted
+	}
+
+	result, err := svc.ToLookupSubjectsCommand(input)
+	require.NoError(t, err)
+
+	assert.Equal(t, "resource-1", result.Resource.LocalResourceId().Serialize())
+	assert.Equal(t, "host", result.Resource.ResourceType().Serialize())
+	assert.Equal(t, "hbi", result.Resource.ReporterType().Serialize())
+	assert.Equal(t, "view", result.Relation.Serialize())
+	assert.Equal(t, "principal", result.SubjectType.Serialize())
+	assert.Equal(t, "hbi", result.SubjectReporter.Serialize())
+	// Critical: LookupSubjects defaults to 0 (not 1000 like LookupResources)
+	// because SpiceDB does not support limit for LookupSubjects
+	assert.Equal(t, uint32(0), result.Limit)
+	assert.Equal(t, "", result.Continuation)
+}
+
 func TestIsValidatedRepresentationType(t *testing.T) {
 
 	assert.True(t, IsValidType("hbi"))

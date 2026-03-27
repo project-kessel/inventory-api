@@ -103,7 +103,23 @@ type LookupResourcesCommand struct {
 }
 
 // LookupResourcesResultItem represents a single resource from lookup.
+// NOTE: This type is currently unused. Streaming APIs (e.g., LookupResources) return
+// grpc.ServerStreamingClient directly from the usecase layer, bypassing domain-layer result types.
+// This differs from non-streaming APIs (Check, CheckBulk) which return domain types
+// (CheckBulkResult, etc.). This inconsistency should be addressed in future refactoring.
 type LookupResourcesResultItem struct {
 	Resource          model.ReporterResourceKey
 	ContinuationToken string
+}
+
+// LookupSubjectsCommand contains the request for looking up subjects.
+type LookupSubjectsCommand struct {
+	Resource        model.ReporterResourceKey
+	Relation        model.Relation
+	SubjectType     model.ResourceType
+	SubjectReporter model.ReporterType
+	SubjectRelation *model.Relation
+	Limit           uint32
+	Continuation    string
+	Consistency     model.Consistency
 }

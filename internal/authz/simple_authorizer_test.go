@@ -290,6 +290,51 @@ func TestSimpleAuthorizer_CheckBulk(t *testing.T) {
 	assert.Equal(t, kessel.CheckBulkResponseItem_ALLOWED_FALSE, resp.Pairs[1].GetItem().Allowed)
 }
 
+func TestSimpleAuthorizer_CheckForUpdateBulk(t *testing.T) {
+	authz := NewSimpleAuthorizer()
+	authz.Grant("user-a", "update", "hbi", "host", "resource-1")
+	// No grant for user-b on resource-2
+
+	req := &kessel.CheckForUpdateBulkRequest{
+		Items: []*kessel.CheckBulkRequestItem{
+			{
+				Resource: &kessel.ObjectReference{
+					Type: &kessel.ObjectType{Namespace: "hbi", Name: "host"},
+					Id:   "resource-1",
+				},
+				Subject: &kessel.SubjectReference{
+					Subject: &kessel.ObjectReference{
+						Type: &kessel.ObjectType{Namespace: "rbac", Name: "principal"},
+						Id:   "user-a",
+					},
+				},
+				Relation: "update",
+			},
+			{
+				Resource: &kessel.ObjectReference{
+					Type: &kessel.ObjectType{Namespace: "hbi", Name: "host"},
+					Id:   "resource-2",
+				},
+				Subject: &kessel.SubjectReference{
+					Subject: &kessel.ObjectReference{
+						Type: &kessel.ObjectType{Namespace: "rbac", Name: "principal"},
+						Id:   "user-b",
+					},
+				},
+				Relation: "update",
+			},
+		},
+	}
+
+	resp, err := authz.CheckForUpdateBulk(context.Background(), req)
+
+	require.NoError(t, err)
+	require.Len(t, resp.Pairs, 2)
+	assert.Equal(t, kessel.CheckBulkResponseItem_ALLOWED_TRUE, resp.Pairs[0].GetItem().Allowed)
+	assert.Equal(t, kessel.CheckBulkResponseItem_ALLOWED_FALSE, resp.Pairs[1].GetItem().Allowed)
+	assert.NotNil(t, resp.ConsistencyToken)
+}
+
 func TestSimpleAuthorizer_MultipleTuples(t *testing.T) {
 	authz := NewSimpleAuthorizer()
 

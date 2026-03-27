@@ -102,9 +102,97 @@ objects:
             public:
               enabled: true
               apiPath: inventory
-
       testing:
         iqePlugin: kessel-inventory
+
+  - apiVersion: batch/v1
+    kind: CronJob
+    metadata:
+      name: business-metrics-collect
+      labels:
+        app: kessel-inventory-jobs
+        job-type: metrics-collect
+    spec:
+      schedule: "@daily"
+      concurrencyPolicy: Forbid
+      successfulJobsHistoryLimit: 3
+      failedJobsHistoryLimit: 3
+      jobTemplate:
+        metadata:
+          labels:
+            app: kessel-inventory-jobs
+            job-type: metrics-collect
+        spec:
+          backoffLimit: 3
+          template:
+            metadata:
+              labels:
+                app: kessel-inventory-jobs
+                job-type: metrics-collect
+            spec:
+              restartPolicy: OnFailure
+              containers:
+                - name: metrics-collect
+                  image: ${INVENTORY_IMAGE}:${IMAGE_TAG}
+                  imagePullPolicy: Always
+                  command:
+                    - inventory-api
+                    - run-job
+                    - metrics-collect-job
+                    - --retention-days=${RETENTION_DAYS}
+                  env:
+                    - name: CLOWDER_ENABLED
+                      value: "true"
+                    - name: INVENTORY_API_CONFIG
+                      value: "/inventory/inventory-api-config.yaml"
+                    - name: PGDATA
+                      value: /temp/data
+                    - name: INVENTORY_API_STORAGE_POSTGRES_HOST
+                      valueFrom:
+                        secretKeyRef:
+                          name: kessel-inventory-db
+                          key: db.host
+                          optional: true
+                    - name: INVENTORY_API_STORAGE_POSTGRES_PORT
+                      valueFrom:
+                        secretKeyRef:
+                          name: kessel-inventory-db
+                          key: db.port
+                          optional: true
+                    - name: INVENTORY_API_STORAGE_POSTGRES_DBNAME
+                      valueFrom:
+                        secretKeyRef:
+                          name: kessel-inventory-db
+                          key: db.name
+                          optional: true
+                    - name: INVENTORY_API_STORAGE_POSTGRES_USER
+                      valueFrom:
+                        secretKeyRef:
+                          name: kessel-inventory-db
+                          key: db.user
+                          optional: true
+                    - name: INVENTORY_API_STORAGE_POSTGRES_PASSWORD
+                      valueFrom:
+                        secretKeyRef:
+                          name: kessel-inventory-db
+                          key: db.password
+                          optional: true
+                    - name: INVENTORY_API_STORAGE_DATABASE
+                      value: postgres
+                  volumeMounts:
+                    - name: config-volume
+                      mountPath: "/inventory"
+                  resources:
+                    requests:
+                      memory: ${JOB_REQUESTS_MEMORY}
+                      cpu: ${JOB_REQUESTS_CPU}
+                    limits:
+                      memory: ${JOB_LIMITS_MEMORY}
+                      cpu: ${JOB_LIMITS_CPU}
+              volumes:
+                - name: config-volume
+                  secret:
+                    secretName: ${INVENTORY_API_CONFIG_SECRET}
 
   - kind: PodDisruptionBudget
     apiVersion: policy/v1
@@ -147,3 +235,18 @@ parameters:
   - description: CPU limit for Inventory service
     name: INVENTORY_LIMITS_CPU
     value: '500m'
+  - description: Memory request for job
+    name: JOB_REQUESTS_MEMORY
+    value: '256Mi'
+  - description: CPU request for job
+    name: JOB_REQUESTS_CPU
+    value: '100m'
+  - description: Memory limit for job
+    name: JOB_LIMITS_MEMORY
+    value: '384Mi'
+  - description: CPU limit for job
+    name: JOB_LIMITS_CPU
+    value: '200m'
+  - description: Number of days to retain metrics summary data
+    name: RETENTION_DAYS
+    value: "30"

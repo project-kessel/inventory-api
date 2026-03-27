@@ -100,6 +100,10 @@ type MetricsCollector struct {
 	OutboxEventWrites        metric.Int64Counter
 	SerializationFailures    metric.Int64Counter
 	SerializationExhaustions metric.Int64Counter
+
+	// Business Metrics
+	ResourcesPerWorkspace metric.Float64Histogram
+	ResourceCount         metric.Int64Gauge
 }
 
 // New instantiates a new MetricsCollector
@@ -179,6 +183,23 @@ func (m *MetricsCollector) New(meter metric.Meter) error {
 	if m.SerializationExhaustions, err = meter.Int64Counter(prefix + "serialization_exhaustions"); err != nil {
 		return err
 	}
+
+	// create business metrics
+	if m.ResourcesPerWorkspace, err = meter.Float64Histogram(
+		prefix+"resources_per_workspace",
+		metric.WithDescription("Distribution of resource counts per workspace, grouped by resource type"),
+		metric.WithExplicitBucketBoundaries(1, 2, 5, 10, 20, 50, 100, 200, 500, 1000),
+	); err != nil {
+		return err
+	}
+
+	if m.ResourceCount, err = meter.Int64Gauge(
+		prefix+"resource_count",
+		metric.WithDescription("Number of resources grouped by resource type, reporter name, and reporter ID"),
+	); err != nil {
+		return err
+	}
+
 	return nil
 }
 

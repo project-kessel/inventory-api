@@ -3087,6 +3087,28 @@ func TestInventoryService_CheckForUpdateBulk_PairError(t *testing.T) {
 	})
 }
 
+func TestInventoryService_CheckForUpdateBulk_EmptyItems(t *testing.T) {
+	claims := &authnapi.Claims{
+		SubjectId: authnapi.SubjectId("user-123"),
+		AuthType:  authnapi.AuthTypeXRhIdentity,
+	}
+
+	protoReq := &pb.CheckForUpdateBulkRequest{
+		Items: []*pb.CheckBulkRequestItem{},
+	}
+
+	runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
+		return TestServerConfig{
+				Usecase:       newTestUsecase(t, testUsecaseConfig{}),
+				Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+			}, func(t *testing.T, tr *Transport) {
+				ctx := context.Background()
+				res := tr.Invoke(ctx, withBody(protoReq, CheckForUpdateBulk, httpEndpoint("POST /api/kessel/v1beta2/checkforupdatebulk")))
+				Assert(t, res, requireErrorContaining(codes.InvalidArgument, "items"))
+			}
+	})
+}
+
 func TestInventoryService_ReportResource_MetaAuthzProtocolBehavior(t *testing.T) {
 	// SimpleMetaAuthorizer protocol-aware behavior:
 	// - gRPC: allow ALL relations EXCEPT "check_self" -> ReportResource ALLOWED

@@ -79,6 +79,97 @@ func TestResource_Initialization(t *testing.T) {
 		}
 	})
 
+	t.Run("should create resource with only common representation and default reporter to empty", func(t *testing.T) {
+		t.Parallel()
+
+		transactionId := TransactionId("tx-common-only")
+		commonRep := fixture.ValidCommonRepresentationType()
+
+		resource, err := NewResource(
+			fixture.ValidResourceIdType(),
+			fixture.ValidLocalResourceIdType(),
+			fixture.ValidResourceTypeType(),
+			fixture.ValidReporterTypeType(),
+			fixture.ValidReporterInstanceIdType(),
+			transactionId,
+			fixture.ValidReporterResourceIdType(),
+			fixture.ValidApiHrefType(),
+			fixture.ValidConsoleHrefType(),
+			nil,
+			&commonRep,
+			nil,
+		)
+
+		assertValidResource(t, resource, err, "only common representation")
+		assertInitialResourceState(t, resource)
+		assertResourceEvent(t, resource, "only common representation")
+
+		resourceEvents := resource.ResourceReportEvents()
+		require.Len(t, resourceEvents, 1, "Expected 1 resource event")
+
+		event := resourceEvents[0]
+		assert.NotNil(t, event.reporterRepresentation, "Reporter representation should be defaulted, not nil")
+		assert.NotNil(t, event.commonRepresentation, "Common representation should be present")
+		assert.Empty(t, event.reporterRepresentation.Data(), "Defaulted reporter representation should have empty data")
+	})
+
+	t.Run("should create resource with only reporter representation", func(t *testing.T) {
+		t.Parallel()
+
+		transactionId := TransactionId("tx-reporter-only")
+		reporterRep := fixture.ValidReporterRepresentationType()
+
+		resource, err := NewResource(
+			fixture.ValidResourceIdType(),
+			fixture.ValidLocalResourceIdType(),
+			fixture.ValidResourceTypeType(),
+			fixture.ValidReporterTypeType(),
+			fixture.ValidReporterInstanceIdType(),
+			transactionId,
+			fixture.ValidReporterResourceIdType(),
+			fixture.ValidApiHrefType(),
+			fixture.ValidConsoleHrefType(),
+			&reporterRep,
+			nil,
+			nil,
+		)
+
+		assertValidResource(t, resource, err, "only reporter representation")
+		assertInitialResourceState(t, resource)
+		assertResourceEvent(t, resource, "only reporter representation")
+
+		resourceEvents := resource.ResourceReportEvents()
+		require.Len(t, resourceEvents, 1, "Expected 1 resource event")
+
+		event := resourceEvents[0]
+		assert.NotNil(t, event.reporterRepresentation, "Reporter representation should be present")
+		assert.Nil(t, event.commonRepresentation, "Common representation should be nil when not provided")
+	})
+
+	t.Run("should reject resource creation with neither representation", func(t *testing.T) {
+		t.Parallel()
+
+		transactionId := TransactionId("tx-no-rep")
+
+		_, err := NewResource(
+			fixture.ValidResourceIdType(),
+			fixture.ValidLocalResourceIdType(),
+			fixture.ValidResourceTypeType(),
+			fixture.ValidReporterTypeType(),
+			fixture.ValidReporterInstanceIdType(),
+			transactionId,
+			fixture.ValidReporterResourceIdType(),
+			fixture.ValidApiHrefType(),
+			fixture.ValidConsoleHrefType(),
+			nil,
+			nil,
+			nil,
+		)
+
+		assert.Error(t, err, "Should reject when neither representation is provided")
+		assert.ErrorIs(t, err, ErrNoRepresentationProvided)
+	})
+
 	// All tiny type validation tests have been moved to common_test.go where they belong.
 	// Resource aggregate tests should only test business logic with valid tiny types.
 }

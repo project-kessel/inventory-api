@@ -403,6 +403,10 @@ func (lr LocalResourceId) Serialize() string {
 
 type Representation internal.JsonObject
 
+func NewEmptyRepresentation() Representation {
+	return Representation(map[string]interface{}{})
+}
+
 func NewRepresentation(data internal.JsonObject) (Representation, error) {
 	if data == nil {
 		return nil, fmt.Errorf("representation data cannot be nil")

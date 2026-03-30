@@ -23,6 +23,11 @@ type Resource struct {
 
 // Factory methods
 func NewResource(id ResourceId, localResourceId LocalResourceId, resourceType ResourceType, reporterType ReporterType, reporterInstanceId ReporterInstanceId, transactionId TransactionId, reporterResourceId ReporterResourceId, apiHref ApiHref, consoleHref *ConsoleHref, reporterRepresentationData *Representation, commonRepresentationData *Representation, reporterVersion *ReporterVersion) (Resource, error) {
+	if reporterRepresentationData == nil && commonRepresentationData != nil {
+		emptyRep := NewEmptyRepresentation()
+		reporterRepresentationData = &emptyRep
+	}
+
 	commonVersion := NewVersion(initialCommonVersion)
 
 	reporterResource, err := NewReporterResource(

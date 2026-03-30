@@ -15,6 +15,10 @@ type Resource struct {
 	id                   ResourceId
 	resourceType         ResourceType
 	commonVersion        *Version
+	// lastCommonVersion is the highest common_representation version ever persisted for
+	// this resource. Unlike commonVersion it is never reset to nil, so Update() can resume
+	// version numbering correctly after a common-rep-less update has cleared commonVersion.
+	lastCommonVersion    *Version
 	consistencyToken     ConsistencyToken
 	reporterResources    []ReporterResource
 	resourceReportEvents []ResourceReportEvent
@@ -84,6 +88,7 @@ func NewResource(id ResourceId, localResourceId LocalResourceId, resourceType Re
 		id:                   id,
 		resourceType:         resourceType,
 		commonVersion:        commonVersion,
+		lastCommonVersion:    commonVersion,
 		reporterResources:    reporterResources,
 		resourceReportEvents: []ResourceReportEvent{resourceEvent},
 	}
@@ -103,16 +108,21 @@ func (r *Resource) Update(
 	// Only increment commonVersion if common representation data is provided
 	var commonVersion *Version
 	if len(commonRepresentationData) > 0 {
-		// If we have existing commonVersion, increment it
 		if r.commonVersion != nil {
 			cv := r.commonVersion.Increment()
 			commonVersion = &cv
+		} else if r.lastCommonVersion != nil {
+			// common rep was previously dropped (commonVersion reset to nil) but versions
+			// have been used before — resume from the last known version rather than
+			// reinitializing to 0, which would collide with existing DB rows.
+			cv := r.lastCommonVersion.Increment()
+			commonVersion = &cv
 		} else {
-			// If we didn't have commonVersion before but now we have common data, initialize to 0
 			cv := NewVersion(initialCommonVersion)
 			commonVersion = &cv
 		}
 		r.commonVersion = commonVersion
+		r.lastCommonVersion = commonVersion
 	} else {
 		// No common representation in this update; clear the stored version so
 		// Serialize() does not emit a common_version that no longer matches any
@@ -414,10 +424,17 @@ func DeserializeResource(
 		commonVersion = &cv
 	}
 
+	var lastCommonVersion *Version
+	if resourceSnapshot.LastCommonVersion != nil {
+		lcv := DeserializeVersion(*resourceSnapshot.LastCommonVersion)
+		lastCommonVersion = &lcv
+	}
+
 	return &Resource{
 		id:                   DeserializeResourceId(resourceSnapshot.ID),
 		resourceType:         DeserializeResourceType(resourceSnapshot.Type),
 		commonVersion:        commonVersion,
+		lastCommonVersion:    lastCommonVersion,
 		consistencyToken:     DeserializeConsistencyToken(resourceSnapshot.ConsistencyToken),
 		reporterResources:    reporterResources,
 		resourceReportEvents: []ResourceReportEvent{resourceEvent},

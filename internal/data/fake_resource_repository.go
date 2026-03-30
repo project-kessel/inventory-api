@@ -14,12 +14,13 @@ import (
 )
 
 type fakeResourceRepository struct {
-	mu                       sync.RWMutex
-	resourcesByPrimaryKey    map[uuid.UUID]*storedResource // keyed by primary key (ResourceID) - simulates database primary storage
-	resourcesByCompositeKey  map[string]uuid.UUID          // composite key -> primary key mapping for unique constraint
-	resources                map[string]*storedResource    // legacy field for backward compatibility
-	representationsByVersion map[string]map[uint]*storedRepresentation
-	processedTransactionIds  map[string]bool // track processed transaction IDs for idempotency testing
+	mu                          sync.RWMutex
+	resourcesByPrimaryKey       map[uuid.UUID]*storedResource // keyed by primary key (ResourceID) - simulates database primary storage
+	resourcesByCompositeKey     map[string]uuid.UUID          // composite key -> primary key mapping for unique constraint
+	resources                   map[string]*storedResource    // legacy field for backward compatibility
+	representationsByVersion    map[string]map[uint]*storedRepresentation
+	processedTransactionIds     map[string]bool    // track processed transaction IDs for idempotency testing
+	maxCommonVersionByResourceID map[uuid.UUID]*uint // mirrors MAX(version) FROM common_representations WHERE resource_id = ?
 }
 
 type storedResource struct {
@@ -46,11 +47,12 @@ type storedRepresentation struct {
 
 func NewFakeResourceRepository() bizmodel.ResourceRepository {
 	return &fakeResourceRepository{
-		resourcesByPrimaryKey:    make(map[uuid.UUID]*storedResource),
-		resourcesByCompositeKey:  make(map[string]uuid.UUID),
-		resources:                make(map[string]*storedResource),
-		representationsByVersion: make(map[string]map[uint]*storedRepresentation),
-		processedTransactionIds:  make(map[string]bool),
+		resourcesByPrimaryKey:        make(map[uuid.UUID]*storedResource),
+		resourcesByCompositeKey:      make(map[string]uuid.UUID),
+		resources:                    make(map[string]*storedResource),
+		representationsByVersion:     make(map[string]map[uint]*storedRepresentation),
+		processedTransactionIds:      make(map[string]bool),
+		maxCommonVersionByResourceID: make(map[uuid.UUID]*uint),
 	}
 }
 
@@ -135,6 +137,16 @@ func (f *fakeResourceRepository) Save(tx *gorm.DB, resource bizmodel.Resource, o
 		tombstone:             reporterResourceSnapshot.Tombstone,
 	}
 
+	// Mirror the real repo's MAX(version) subquery on common_representations.
+	// Only advance the watermark — never retreat it — scoped to this resource UUID.
+	if resourceSnapshot.CommonVersion != nil {
+		rid := resourceSnapshot.ID
+		if prev, ok := f.maxCommonVersionByResourceID[rid]; !ok || *resourceSnapshot.CommonVersion > *prev {
+			v := *resourceSnapshot.CommonVersion
+			f.maxCommonVersionByResourceID[rid] = &v
+		}
+	}
+
 	// Store by primary key (simulates database primary storage)
 	f.resourcesByPrimaryKey[reporterResourcePrimaryKey] = stored
 	// Store composite key mapping (simulates unique constraint)
@@ -179,19 +191,31 @@ func (f *fakeResourceRepository) FindResourceByKeys(tx *gorm.DB, key bizmodel.Re
 	// find any resource that matches the other key components
 	searchReporterInstanceId := key.ReporterInstanceId().Serialize()
 
-	// Find the latest version for the given natural key
+	// Find the latest version for the given natural key.
+	// Prefer non-tombstoned resources (a live resource from a newer lifecycle always
+	// beats a tombstoned one from an older lifecycle), then break ties by highest
+	// representation version + generation — matching the real repository's behaviour.
 	var latestResource *storedResource
 	for _, stored := range f.resourcesByPrimaryKey {
 		if strings.EqualFold(stored.localResourceID, key.LocalResourceId().Serialize()) &&
 			strings.EqualFold(stored.resourceType, key.ResourceType().Serialize()) &&
 			strings.EqualFold(stored.reporterType, key.ReporterType().Serialize()) {
 
-			// If search key has empty reporterInstanceId, match any stored resource
-			// If search key has reporterInstanceId, it must match exactly
 			if searchReporterInstanceId == "" || strings.EqualFold(stored.reporterInstanceID, searchReporterInstanceId) {
-				// Keep track of the resource with the highest representation version + generation
-				if latestResource == nil ||
-					stored.representationVersion > latestResource.representationVersion ||
+				if latestResource == nil {
+					latestResource = stored
+					continue
+				}
+				// A live resource always wins over a tombstoned one.
+				if !stored.tombstone && latestResource.tombstone {
+					latestResource = stored
+					continue
+				}
+				if stored.tombstone && !latestResource.tombstone {
+					continue
+				}
+				// Both have the same tombstone state — pick highest version/generation.
+				if stored.representationVersion > latestResource.representationVersion ||
 					(stored.representationVersion == latestResource.representationVersion && stored.generation > latestResource.generation) {
 					latestResource = stored
 				}
@@ -200,14 +224,14 @@ func (f *fakeResourceRepository) FindResourceByKeys(tx *gorm.DB, key bizmodel.Re
 	}
 
 	if latestResource != nil {
-		// Create snapshots that reflect the actual stored state
 		resourceSnapshot := bizmodel.ResourceSnapshot{
-			ID:               latestResource.resourceID,
-			Type:             latestResource.resourceType,
-			CommonVersion:    latestResource.commonVersion,
-			ConsistencyToken: latestResource.consistencyToken,
-			CreatedAt:        latestResource.createdAt,
-			UpdatedAt:        latestResource.updatedAt,
+			ID:                latestResource.resourceID,
+			Type:              latestResource.resourceType,
+			CommonVersion:     latestResource.commonVersion,
+			LastCommonVersion: f.maxCommonVersionByResourceID[latestResource.resourceID],
+			ConsistencyToken:  latestResource.consistencyToken,
+			CreatedAt:         latestResource.createdAt,
+			UpdatedAt:         latestResource.updatedAt,
 		}
 
 		reporterResourceSnapshot := bizmodel.ReporterResourceSnapshot{

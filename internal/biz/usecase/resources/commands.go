@@ -121,3 +121,13 @@ type LookupSubjectsCommand struct {
 	Pagination      *model.Pagination
 	Consistency     model.Consistency
 }
+
+// LookupSubjectsResultItem represents a single subject from lookup.
+// NOTE: This type is currently unused. Streaming APIs (e.g., LookupSubjects) return
+// grpc.ServerStreamingClient directly from the usecase layer, bypassing domain-layer result types.
+// This differs from non-streaming APIs (Check, CheckBulk) which return domain types
+// (CheckBulkResult, etc.). This inconsistency should be addressed in future refactoring.
+type LookupSubjectsResultItem struct {
+	Subject           model.SubjectReference
+	ContinuationToken string
+}

@@ -14,12 +14,12 @@ import (
 )
 
 type fakeResourceRepository struct {
-	mu                          sync.RWMutex
-	resourcesByPrimaryKey       map[uuid.UUID]*storedResource // keyed by primary key (ResourceID) - simulates database primary storage
-	resourcesByCompositeKey     map[string]uuid.UUID          // composite key -> primary key mapping for unique constraint
-	resources                   map[string]*storedResource    // legacy field for backward compatibility
-	representationsByVersion    map[string]map[uint]*storedRepresentation
-	processedTransactionIds     map[string]bool    // track processed transaction IDs for idempotency testing
+	mu                           sync.RWMutex
+	resourcesByPrimaryKey        map[uuid.UUID]*storedResource // keyed by primary key (ResourceID) - simulates database primary storage
+	resourcesByCompositeKey      map[string]uuid.UUID          // composite key -> primary key mapping for unique constraint
+	resources                    map[string]*storedResource    // legacy field for backward compatibility
+	representationsByVersion     map[string]map[uint]*storedRepresentation
+	processedTransactionIds      map[string]bool     // track processed transaction IDs for idempotency testing
 	maxCommonVersionByResourceID map[uuid.UUID]*uint // mirrors MAX(version) FROM common_representations WHERE resource_id = ?
 }
 

@@ -12,9 +12,9 @@ const initialCommonVersion = 0
 
 // Create Entities with unexported fields for encapsulation
 type Resource struct {
-	id                   ResourceId
-	resourceType         ResourceType
-	commonVersion        *Version
+	id            ResourceId
+	resourceType  ResourceType
+	commonVersion *Version
 	// lastCommonVersion is the highest common_representation version ever persisted for
 	// this resource. Unlike commonVersion it is never reset to nil, so Update() can resume
 	// version numbering correctly after a common-rep-less update has cleared commonVersion.

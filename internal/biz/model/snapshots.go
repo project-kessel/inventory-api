@@ -14,9 +14,9 @@ type RepresentationSnapshot struct {
 
 // ResourceSnapshot is a DTO that mirrors the GORM Resource model structure
 type ResourceSnapshot struct {
-	ID               uuid.UUID `json:"id"`
-	Type             string    `json:"type"`
-	CommonVersion    *uint     `json:"common_version,omitempty"`
+	ID            uuid.UUID `json:"id"`
+	Type          string    `json:"type"`
+	CommonVersion *uint     `json:"common_version,omitempty"`
 	// LastCommonVersion is the highest common_representation version ever persisted for
 	// this resource, populated via a MAX subquery at read time. It is never written back
 	// to the database and exists solely so Update() can resume version numbering after a

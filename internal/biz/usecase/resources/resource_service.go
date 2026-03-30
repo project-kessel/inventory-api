@@ -881,12 +881,26 @@ func getNextTransactionID() (string, error) {
 	return txid.String(), nil
 }
 
+// paginationToV1beta1 converts model.Pagination to kessel.RequestPagination.
+// Returns nil if no pagination fields are specified.
+func paginationToV1beta1(pagination model.Pagination) *kessel.RequestPagination {
+	// Only create if at least one field is set
+	if pagination.Limit == nil && pagination.Continuation == nil {
+		return nil
+	}
+
+	result := &kessel.RequestPagination{}
+	if pagination.Limit != nil {
+		result.Limit = *pagination.Limit
+	}
+	if pagination.Continuation != nil {
+		result.ContinuationToken = pagination.Continuation
+	}
+	return result
+}
+
 // lookupResourcesCommandToV1beta1 converts a LookupResourcesCommand to v1beta1.
 func lookupResourcesCommandToV1beta1(cmd LookupResourcesCommand) *kessel.LookupResourcesRequest {
-	var continuationToken *string
-	if cmd.Continuation != "" {
-		continuationToken = &cmd.Continuation
-	}
 	var consistency *kessel.Consistency
 	if token := model.ConsistencyAtLeastAsFreshToken(cmd.Consistency); token != nil {
 		consistency = &kessel.Consistency{
@@ -909,22 +923,15 @@ func lookupResourcesCommandToV1beta1(cmd LookupResourcesCommand) *kessel.LookupR
 			Namespace: cmd.ReporterType.Serialize(),
 			Name:      cmd.ResourceType.Serialize(),
 		},
-		Relation: cmd.Relation.Serialize(),
-		Subject:  subjectToV1Beta1(cmd.Subject),
-		Pagination: &kessel.RequestPagination{
-			Limit:             cmd.Limit,
-			ContinuationToken: continuationToken,
-		},
+		Relation:    cmd.Relation.Serialize(),
+		Subject:     subjectToV1Beta1(cmd.Subject),
+		Pagination:  paginationToV1beta1(cmd.Pagination),
 		Consistency: consistency,
 	}
 }
 
 // lookupSubjectsCommandToV1beta1 converts a LookupSubjectsCommand to v1beta1.
 func lookupSubjectsCommandToV1beta1(cmd LookupSubjectsCommand) *kessel.LookupSubjectsRequest {
-	var continuationToken *string
-	if cmd.Continuation != "" {
-		continuationToken = &cmd.Continuation
-	}
 	var consistency *kessel.Consistency
 	if token := model.ConsistencyAtLeastAsFreshToken(cmd.Consistency); token != nil {
 		consistency = &kessel.Consistency{
@@ -955,10 +962,7 @@ func lookupSubjectsCommandToV1beta1(cmd LookupSubjectsCommand) *kessel.LookupSub
 			Namespace: cmd.SubjectReporter.Serialize(),
 			Name:      cmd.SubjectType.Serialize(),
 		},
-		Pagination: &kessel.RequestPagination{
-			Limit:             cmd.Limit,
-			ContinuationToken: continuationToken,
-		},
+		Pagination:  paginationToV1beta1(cmd.Pagination),
 		Consistency: consistency,
 	}
 

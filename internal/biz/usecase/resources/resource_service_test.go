@@ -2478,14 +2478,17 @@ func TestLookupResourcesCommandToV1beta1_UsesMinimizeLatencyForUnspecified(t *te
 	relation, err := model.NewRelation("view")
 	require.NoError(t, err)
 
+	limit := uint32(100)
 	cmd := LookupResourcesCommand{
 		ResourceType: resourceType,
 		ReporterType: reporterType,
 		Relation:     relation,
 		Subject:      subject,
-		Limit:        100,
-		Continuation: "",
-		Consistency:  model.NewConsistencyUnspecified(),
+		Pagination: model.Pagination{
+			Limit:        &limit,
+			Continuation: nil,
+		},
+		Consistency: model.NewConsistencyUnspecified(),
 	}
 
 	req := lookupResourcesCommandToV1beta1(cmd)

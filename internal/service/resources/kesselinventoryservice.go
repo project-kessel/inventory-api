@@ -273,6 +273,20 @@ func consistencyFromProto(c *pb.Consistency) model.Consistency {
 	return model.NewConsistencyUnspecified()
 }
 
+func paginationFromProto(p *pb.RequestPagination) model.Pagination {
+	result := model.Pagination{}
+	if p != nil {
+		if p.Limit > 0 {
+			limit := p.Limit
+			result.Limit = &limit
+		}
+		if p.ContinuationToken != nil && *p.ContinuationToken != "" {
+			result.Continuation = p.ContinuationToken
+		}
+	}
+	return result
+}
+
 // checkBulkResultItemToProtoFields derives the proto Allowed enum and, if the result carries an
 // error, a populated *rpcstatus.Status ready for embedding in a response pair. opName is used
 // only for the error log message. Returns (allowed, nil) when the item succeeded.
@@ -522,25 +536,14 @@ func ToLookupResourcesCommand(request *pb.StreamedListObjectsRequest) (resources
 	if err != nil {
 		return resources.LookupResourcesCommand{}, fmt.Errorf("invalid subject: %w", err)
 	}
-	consistency := consistencyFromProto(request.GetConsistency())
-
-	var limit uint32 = 1000
-	var continuation string
-	if request.Pagination != nil {
-		limit = request.Pagination.Limit
-		if request.Pagination.ContinuationToken != nil {
-			continuation = *request.Pagination.ContinuationToken
-		}
-	}
 
 	return resources.LookupResourcesCommand{
 		ResourceType: resourceType,
 		ReporterType: reporterType,
 		Relation:     relation,
 		Subject:      subjectRef,
-		Limit:        limit,
-		Continuation: continuation,
-		Consistency:  consistency,
+		Pagination:   paginationFromProto(request.Pagination),
+		Consistency:  consistencyFromProto(request.GetConsistency()),
 	}, nil
 }
 
@@ -585,20 +588,6 @@ func ToLookupSubjectsCommand(request *pb.StreamedListSubjectsRequest) (resources
 	if err != nil {
 		return resources.LookupSubjectsCommand{}, fmt.Errorf("invalid subject reporter: %w", err)
 	}
-	consistency := consistencyFromProto(request.GetConsistency())
-
-	// Note: SpiceDB does not currently support limit for LookupSubjects.
-	// We allow users to specify it in the API (for future compatibility),
-	// but SpiceDB will return an error if a limit is provided.
-	// Following relations-api strategy: no default limit, only use what user explicitly provides.
-	var limit uint32 = 0
-	var continuation string
-	if request.Pagination != nil {
-		limit = request.Pagination.Limit
-		if request.Pagination.ContinuationToken != nil {
-			continuation = *request.Pagination.ContinuationToken
-		}
-	}
 
 	var subjectRelation *model.Relation
 	if request.SubjectRelation != nil && *request.SubjectRelation != "" {
@@ -615,9 +604,8 @@ func ToLookupSubjectsCommand(request *pb.StreamedListSubjectsRequest) (resources
 		SubjectType:     subjectType,
 		SubjectReporter: subjectReporter,
 		SubjectRelation: subjectRelation,
-		Limit:           limit,
-		Continuation:    continuation,
-		Consistency:     consistency,
+		Pagination:      paginationFromProto(request.Pagination),
+		Consistency:     consistencyFromProto(request.GetConsistency()),
 	}, nil
 }
 

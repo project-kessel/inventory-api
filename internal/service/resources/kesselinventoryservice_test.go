@@ -12,6 +12,7 @@ import (
 	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2"
 	"github.com/project-kessel/inventory-api/internal/biz/model_legacy"
 	relationsV1beta1 "github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
+	statuspb "google.golang.org/genproto/googleapis/rpc/status"
 	"google.golang.org/protobuf/types/known/structpb"
 
 	"github.com/project-kessel/inventory-api/internal/data"
@@ -2669,6 +2670,441 @@ func TestInventoryService_CheckBulk_MetaAuthzDenied(t *testing.T) {
 				ctx := context.Background()
 				res := tr.Invoke(ctx, withBody(protoReq, CheckBulk, httpEndpoint("POST /api/kessel/v1beta2/checkbulk")))
 				Assert(t, res, requireError(codes.PermissionDenied))
+			}
+	})
+}
+
+func TestInventoryService_CheckForUpdateBulk_AllAllowed(t *testing.T) {
+	claims := &authnapi.Claims{
+		SubjectId: authnapi.SubjectId("user-123"),
+		AuthType:  authnapi.AuthTypeXRhIdentity,
+	}
+
+	protoReq := &pb.CheckForUpdateBulkRequest{
+		Items: []*pb.CheckBulkRequestItem{
+			{
+				Object: &pb.ResourceReference{
+					ResourceId:   "resource-1",
+					ResourceType: "host",
+					Reporter:     &pb.ReporterReference{Type: "hbi"},
+				},
+				Subject: &pb.SubjectReference{
+					Resource: &pb.ResourceReference{
+						ResourceId:   "subject-a",
+						ResourceType: "principal",
+						Reporter:     &pb.ReporterReference{Type: "rbac"},
+					},
+				},
+				Relation: "update",
+			},
+			{
+				Object: &pb.ResourceReference{
+					ResourceId:   "resource-2",
+					ResourceType: "host",
+					Reporter:     &pb.ReporterReference{Type: "hbi"},
+				},
+				Subject: &pb.SubjectReference{
+					Resource: &pb.ResourceReference{
+						ResourceId:   "subject-b",
+						ResourceType: "principal",
+						Reporter:     &pb.ReporterReference{Type: "rbac"},
+					},
+				},
+				Relation: "update",
+			},
+		},
+	}
+
+	runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
+		mockAuthz := &mocks.MockAuthz{}
+		mockAuthz.
+			On("CheckForUpdateBulk",
+				mock.Anything,
+				mock.MatchedBy(func(req *relationsV1beta1.CheckForUpdateBulkRequest) bool {
+					if len(req.Items) != 2 {
+						return false
+					}
+					s1 := req.Items[0].Subject
+					s2 := req.Items[1].Subject
+					return s1.Subject.Id == "subject-a" &&
+						s1.Subject.Type.Name == "principal" &&
+						s1.Subject.Type.Namespace == "rbac" &&
+						s2.Subject.Id == "subject-b" &&
+						s2.Subject.Type.Name == "principal" &&
+						s2.Subject.Type.Namespace == "rbac"
+				}),
+			).
+			Return(&relationsV1beta1.CheckForUpdateBulkResponse{
+				Pairs: []*relationsV1beta1.CheckBulkResponsePair{
+					{
+						Request: &relationsV1beta1.CheckBulkRequestItem{
+							Resource: &relationsV1beta1.ObjectReference{
+								Type: &relationsV1beta1.ObjectType{Namespace: "hbi", Name: "host"},
+								Id:   "resource-1",
+							},
+							Relation: "update",
+						},
+						Response: &relationsV1beta1.CheckBulkResponsePair_Item{
+							Item: &relationsV1beta1.CheckBulkResponseItem{
+								Allowed: relationsV1beta1.CheckBulkResponseItem_ALLOWED_TRUE,
+							},
+						},
+					},
+					{
+						Request: &relationsV1beta1.CheckBulkRequestItem{
+							Resource: &relationsV1beta1.ObjectReference{
+								Type: &relationsV1beta1.ObjectType{Namespace: "hbi", Name: "host"},
+								Id:   "resource-2",
+							},
+							Relation: "update",
+						},
+						Response: &relationsV1beta1.CheckBulkResponsePair_Item{
+							Item: &relationsV1beta1.CheckBulkResponseItem{
+								Allowed: relationsV1beta1.CheckBulkResponseItem_ALLOWED_TRUE,
+							},
+						},
+					},
+				},
+				ConsistencyToken: &relationsV1beta1.ConsistencyToken{Token: "update-bulk-token"},
+			}, nil).
+			Once()
+		return TestServerConfig{
+				Usecase:       newTestUsecase(t, testUsecaseConfig{Authz: mockAuthz}),
+				Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+			}, func(t *testing.T, tr *Transport) {
+				ctx := context.Background()
+				res := tr.Invoke(ctx, withBody(protoReq, CheckForUpdateBulk, httpEndpoint("POST /api/kessel/v1beta2/checkforupdatebulk")))
+				resp := Extract(t, res, expectSuccess(func() *pb.CheckForUpdateBulkResponse { return &pb.CheckForUpdateBulkResponse{} }))
+				require.Len(t, resp.Pairs, 2)
+				assert.Equal(t, pb.Allowed_ALLOWED_TRUE, resp.Pairs[0].GetItem().Allowed)
+				assert.Equal(t, pb.Allowed_ALLOWED_TRUE, resp.Pairs[1].GetItem().Allowed)
+				assert.NotNil(t, resp.ConsistencyToken)
+				assert.Equal(t, "update-bulk-token", resp.ConsistencyToken.GetToken())
+				mockAuthz.AssertExpectations(t)
+			}
+	})
+}
+
+func TestInventoryService_CheckForUpdateBulk_MixedResults(t *testing.T) {
+	claims := &authnapi.Claims{
+		SubjectId: authnapi.SubjectId("user-123"),
+		AuthType:  authnapi.AuthTypeXRhIdentity,
+	}
+
+	protoReq := &pb.CheckForUpdateBulkRequest{
+		Items: []*pb.CheckBulkRequestItem{
+			{
+				Object: &pb.ResourceReference{
+					ResourceId:   "resource-1",
+					ResourceType: "host",
+					Reporter:     &pb.ReporterReference{Type: "hbi"},
+				},
+				Subject: &pb.SubjectReference{
+					Resource: &pb.ResourceReference{
+						ResourceId:   "subject-a",
+						ResourceType: "principal",
+						Reporter:     &pb.ReporterReference{Type: "rbac"},
+					},
+				},
+				Relation: "update",
+			},
+			{
+				Object: &pb.ResourceReference{
+					ResourceId:   "resource-2",
+					ResourceType: "host",
+					Reporter:     &pb.ReporterReference{Type: "hbi"},
+				},
+				Subject: &pb.SubjectReference{
+					Resource: &pb.ResourceReference{
+						ResourceId:   "subject-b",
+						ResourceType: "principal",
+						Reporter:     &pb.ReporterReference{Type: "rbac"},
+					},
+				},
+				Relation: "update",
+			},
+		},
+	}
+
+	runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
+		simpleAuthz := authz.NewSimpleAuthorizer()
+		simpleAuthz.Grant("subject-a", "update", "hbi", "host", "resource-1")
+		return TestServerConfig{
+				Usecase:       newTestUsecase(t, testUsecaseConfig{Authz: simpleAuthz}),
+				Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+			}, func(t *testing.T, tr *Transport) {
+				ctx := context.Background()
+				res := tr.Invoke(ctx, withBody(protoReq, CheckForUpdateBulk, httpEndpoint("POST /api/kessel/v1beta2/checkforupdatebulk")))
+				resp := Extract(t, res, expectSuccess(func() *pb.CheckForUpdateBulkResponse { return &pb.CheckForUpdateBulkResponse{} }))
+				require.Len(t, resp.Pairs, 2)
+				assert.Equal(t, pb.Allowed_ALLOWED_TRUE, resp.Pairs[0].GetItem().Allowed)
+				assert.Equal(t, "resource-1", resp.Pairs[0].Request.Object.ResourceId)
+				assert.Equal(t, "update", resp.Pairs[0].Request.Relation)
+				assert.Equal(t, pb.Allowed_ALLOWED_FALSE, resp.Pairs[1].GetItem().Allowed)
+				assert.Equal(t, "resource-2", resp.Pairs[1].Request.Object.ResourceId)
+				assert.Equal(t, "update", resp.Pairs[1].Request.Relation)
+				assert.NotNil(t, resp.ConsistencyToken)
+			}
+	})
+}
+
+// --- CheckForUpdateBulk with NoIdentity ---
+
+func TestInventoryService_CheckForUpdateBulk_NoIdentity(t *testing.T) {
+	protoReq := &pb.CheckForUpdateBulkRequest{
+		Items: []*pb.CheckBulkRequestItem{
+			{
+				Object: &pb.ResourceReference{
+					ResourceId:   "resource-1",
+					ResourceType: "host",
+					Reporter:     &pb.ReporterReference{Type: "hbi"},
+				},
+				Subject: &pb.SubjectReference{
+					Resource: &pb.ResourceReference{
+						ResourceId:   "subject-a",
+						ResourceType: "principal",
+						Reporter:     &pb.ReporterReference{Type: "rbac"},
+					},
+				},
+				Relation: "update",
+			},
+		},
+	}
+
+	runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
+		return TestServerConfig{
+				Usecase:       newTestUsecase(t, testUsecaseConfig{}),
+				Authenticator: &DenyAuthenticator{},
+			}, func(t *testing.T, tr *Transport) {
+				ctx := context.Background()
+				res := tr.Invoke(ctx, withBody(protoReq, CheckForUpdateBulk, httpEndpoint("POST /api/kessel/v1beta2/checkforupdatebulk")))
+				Assert(t, res, requireError(codes.Unauthenticated))
+			}
+	})
+}
+
+// --- CheckForUpdateBulk Error Scenarios ---
+
+func TestInventoryService_CheckForUpdateBulk_MetaAuthzProtocolBehavior(t *testing.T) {
+	// SimpleMetaAuthorizer protocol-aware behavior:
+	// - gRPC: allow ALL relations EXCEPT "check_self" -> CheckForUpdateBulk ALLOWED
+	// - HTTP + OIDC: deny (only x-rh-identity + check_self is allowed) -> PermissionDenied
+	claims := &authnapi.Claims{
+		SubjectId: authnapi.SubjectId("user-123"),
+		AuthType:  authnapi.AuthTypeOIDC,
+	}
+
+	protoReq := &pb.CheckForUpdateBulkRequest{
+		Items: []*pb.CheckBulkRequestItem{
+			{
+				Object: &pb.ResourceReference{
+					ResourceId:   "resource-1",
+					ResourceType: "host",
+					Reporter:     &pb.ReporterReference{Type: "hbi"},
+				},
+				Subject: &pb.SubjectReference{
+					Resource: &pb.ResourceReference{
+						ResourceId:   "subject-a",
+						ResourceType: "principal",
+						Reporter:     &pb.ReporterReference{Type: "rbac"},
+					},
+				},
+				Relation: "update",
+			},
+		},
+	}
+
+	runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
+		simpleAuthz := authz.NewSimpleAuthorizer()
+		simpleAuthz.Grant("subject-a", "update", "hbi", "host", "resource-1")
+		return TestServerConfig{
+				Usecase: newTestUsecase(t, testUsecaseConfig{
+					Authz:          simpleAuthz,
+					MetaAuthorizer: metaauthorizer.NewSimpleMetaAuthorizer(),
+				}),
+				Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+			}, func(t *testing.T, tr *Transport) {
+				ctx := context.Background()
+				res := tr.Invoke(ctx, withBody(protoReq, CheckForUpdateBulk, httpEndpoint("POST /api/kessel/v1beta2/checkforupdatebulk")))
+				Assert(t, res, Expectation{
+					GRPC: func(t *testing.T, resp proto.Message, err error) {
+						require.NoError(t, err)
+						r := resp.(*pb.CheckForUpdateBulkResponse)
+						assert.Equal(t, pb.Allowed_ALLOWED_TRUE, r.Pairs[0].GetItem().Allowed)
+					},
+					HTTP: func(t *testing.T, statusCode int, _ []byte) {
+						assert.Equal(t, 403, statusCode)
+					},
+				})
+			}
+	})
+}
+
+func TestInventoryService_CheckForUpdateBulk_MetaAuthzDenied(t *testing.T) {
+	claims := &authnapi.Claims{
+		SubjectId: authnapi.SubjectId("user-123"),
+		AuthType:  authnapi.AuthTypeXRhIdentity,
+	}
+
+	protoReq := &pb.CheckForUpdateBulkRequest{
+		Items: []*pb.CheckBulkRequestItem{
+			{
+				Object: &pb.ResourceReference{
+					ResourceId:   "resource-1",
+					ResourceType: "host",
+					Reporter:     &pb.ReporterReference{Type: "hbi"},
+				},
+				Subject: &pb.SubjectReference{
+					Resource: &pb.ResourceReference{
+						ResourceId:   "subject-a",
+						ResourceType: "principal",
+						Reporter:     &pb.ReporterReference{Type: "rbac"},
+					},
+				},
+				Relation: "update",
+			},
+		},
+	}
+
+	runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
+		return TestServerConfig{
+				Usecase:       newTestUsecase(t, testUsecaseConfig{MetaAuthorizer: &DenyingMetaAuthorizer{}}),
+				Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+			}, func(t *testing.T, tr *Transport) {
+				ctx := context.Background()
+				res := tr.Invoke(ctx, withBody(protoReq, CheckForUpdateBulk, httpEndpoint("POST /api/kessel/v1beta2/checkforupdatebulk")))
+				Assert(t, res, requireError(codes.PermissionDenied))
+			}
+	})
+}
+
+func TestInventoryService_CheckForUpdateBulk_InvalidReference_EmptyResourceId(t *testing.T) {
+	claims := &authnapi.Claims{
+		SubjectId: authnapi.SubjectId("user-123"),
+		AuthType:  authnapi.AuthTypeXRhIdentity,
+	}
+
+	protoReq := &pb.CheckForUpdateBulkRequest{
+		Items: []*pb.CheckBulkRequestItem{
+			{
+				Object: &pb.ResourceReference{
+					ResourceId:   "",
+					ResourceType: "host",
+					Reporter:     &pb.ReporterReference{Type: "hbi"},
+				},
+				Subject: &pb.SubjectReference{
+					Resource: &pb.ResourceReference{
+						ResourceId:   "subject-a",
+						ResourceType: "principal",
+						Reporter:     &pb.ReporterReference{Type: "rbac"},
+					},
+				},
+				Relation: "update",
+			},
+		},
+	}
+
+	runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
+		return TestServerConfig{
+				Usecase:       newTestUsecase(t, testUsecaseConfig{}),
+				Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+			}, func(t *testing.T, tr *Transport) {
+				ctx := context.Background()
+				res := tr.Invoke(ctx, withBody(protoReq, CheckForUpdateBulk, httpEndpoint("POST /api/kessel/v1beta2/checkforupdatebulk")))
+				Assert(t, res, requireError(codes.InvalidArgument))
+			}
+	})
+}
+
+func TestInventoryService_CheckForUpdateBulk_PairError(t *testing.T) {
+	claims := &authnapi.Claims{
+		SubjectId: authnapi.SubjectId("user-123"),
+		AuthType:  authnapi.AuthTypeXRhIdentity,
+	}
+
+	protoReq := &pb.CheckForUpdateBulkRequest{
+		Items: []*pb.CheckBulkRequestItem{
+			{
+				Object: &pb.ResourceReference{
+					ResourceId:   "resource-1",
+					ResourceType: "host",
+					Reporter:     &pb.ReporterReference{Type: "hbi"},
+				},
+				Subject: &pb.SubjectReference{
+					Resource: &pb.ResourceReference{
+						ResourceId:   "subject-a",
+						ResourceType: "principal",
+						Reporter:     &pb.ReporterReference{Type: "rbac"},
+					},
+				},
+				Relation: "update",
+			},
+		},
+	}
+
+	runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
+		mockAuthz := &mocks.MockAuthz{}
+		mockAuthz.
+			On("CheckForUpdateBulk", mock.Anything, mock.Anything).
+			Return(&relationsV1beta1.CheckForUpdateBulkResponse{
+				Pairs: []*relationsV1beta1.CheckBulkResponsePair{
+					{
+						Request: &relationsV1beta1.CheckBulkRequestItem{
+							Resource: &relationsV1beta1.ObjectReference{
+								Type: &relationsV1beta1.ObjectType{Namespace: "hbi", Name: "host"},
+								Id:   "resource-1",
+							},
+							Relation: "update",
+						},
+						Response: &relationsV1beta1.CheckBulkResponsePair_Error{
+							Error: &statuspb.Status{
+								Code:    int32(codes.PermissionDenied),
+								Message: "denied by policy",
+							},
+						},
+					},
+				},
+				ConsistencyToken: &relationsV1beta1.ConsistencyToken{Token: "error-token"},
+			}, nil).
+			Once()
+		return TestServerConfig{
+				Usecase:       newTestUsecase(t, testUsecaseConfig{Authz: mockAuthz}),
+				Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+			}, func(t *testing.T, tr *Transport) {
+				ctx := context.Background()
+				res := tr.Invoke(ctx, withBody(protoReq, CheckForUpdateBulk, httpEndpoint("POST /api/kessel/v1beta2/checkforupdatebulk")))
+				resp := Extract(t, res, expectSuccess(func() *pb.CheckForUpdateBulkResponse { return &pb.CheckForUpdateBulkResponse{} }))
+				require.Len(t, resp.Pairs, 1)
+				assert.Nil(t, resp.Pairs[0].GetItem())
+				pairErr := resp.Pairs[0].GetError()
+				require.NotNil(t, pairErr, "expected per-pair error but got nil")
+				assert.Equal(t, int32(codes.PermissionDenied), pairErr.GetCode())
+				assert.Contains(t, pairErr.GetMessage(), "denied by policy")
+				require.NotNil(t, resp.ConsistencyToken)
+				assert.Equal(t, "error-token", resp.ConsistencyToken.GetToken())
+				mockAuthz.AssertExpectations(t)
+			}
+	})
+}
+
+func TestInventoryService_CheckForUpdateBulk_EmptyItems(t *testing.T) {
+	claims := &authnapi.Claims{
+		SubjectId: authnapi.SubjectId("user-123"),
+		AuthType:  authnapi.AuthTypeXRhIdentity,
+	}
+
+	protoReq := &pb.CheckForUpdateBulkRequest{
+		Items: []*pb.CheckBulkRequestItem{},
+	}
+
+	runServerTest(t, func(t *testing.T) (TestServerConfig, func(t *testing.T, tr *Transport)) {
+		return TestServerConfig{
+				Usecase:       newTestUsecase(t, testUsecaseConfig{}),
+				Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+			}, func(t *testing.T, tr *Transport) {
+				ctx := context.Background()
+				res := tr.Invoke(ctx, withBody(protoReq, CheckForUpdateBulk, httpEndpoint("POST /api/kessel/v1beta2/checkforupdatebulk")))
+				Assert(t, res, requireErrorContaining(codes.InvalidArgument, "items"))
 			}
 	})
 }

@@ -13,6 +13,7 @@ import (
 	"gorm.io/gorm"
 
 	authnapi "github.com/project-kessel/inventory-api/internal/authn/api"
+	"github.com/project-kessel/inventory-api/internal/authz"
 	"github.com/project-kessel/inventory-api/internal/authz/allow"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
 	"github.com/project-kessel/inventory-api/internal/biz/usecase/metaauthorizer"
@@ -311,6 +312,82 @@ func TestCheckForUpdateBulk_UsesCheckForUpdateBulkRelation(t *testing.T) {
 	// One meta-authz per item (check_for_update_bulk); Authz.CheckForUpdateBulk called once.
 	assert.Equal(t, 1, meta.calls)
 	assert.Equal(t, []metaauthorizer.Relation{metaauthorizer.RelationCheckForUpdateBulk}, meta.relations)
+}
+
+func TestCheckForUpdateBulk_MetaAuthzDenied(t *testing.T) {
+	ctx := testAuthzContext()
+	meta := &recordingMetaAuthorizer{allowed: false}
+	uc := New(
+		data.NewFakeResourceRepository(),
+		newFakeSchemaRepository(t),
+		&allow.AllowAllAuthz{},
+		"rbac",
+		log.DefaultLogger,
+		nil,
+		nil,
+		&UsecaseConfig{},
+		metricscollector.NewFakeMetricsCollector(),
+		meta,
+		newTestSelfSubjectStrategy(),
+	)
+
+	subject, err := buildTestSubjectReference("user-1")
+	require.NoError(t, err)
+	key := createReporterResourceKey(t, "host-1", "host", "hbi", "instance-1")
+	relation, err := model.NewRelation("update")
+	require.NoError(t, err)
+
+	_, err = uc.CheckForUpdateBulk(ctx, CheckForUpdateBulkCommand{
+		Items: []CheckBulkItem{
+			{Resource: key, Relation: relation, Subject: subject},
+		},
+	})
+	assert.ErrorIs(t, err, ErrMetaAuthorizationDenied)
+	assert.Equal(t, 1, meta.calls)
+}
+
+func TestCheckForUpdateBulk_MixedResults(t *testing.T) {
+	ctx := testAuthzContext()
+	meta := &recordingMetaAuthorizer{allowed: true}
+
+	simpleAuthz := authz.NewSimpleAuthorizer()
+	simpleAuthz.Grant("user-1", "update", "hbi", "host", "host-1")
+	// No grant for host-2
+
+	uc := New(
+		data.NewFakeResourceRepository(),
+		newFakeSchemaRepository(t),
+		simpleAuthz,
+		"rbac",
+		log.DefaultLogger,
+		nil,
+		nil,
+		&UsecaseConfig{},
+		metricscollector.NewFakeMetricsCollector(),
+		meta,
+		newTestSelfSubjectStrategy(),
+	)
+
+	subject, err := buildTestSubjectReference("user-1")
+	require.NoError(t, err)
+	key1 := createReporterResourceKey(t, "host-1", "host", "hbi", "instance-1")
+	key2 := createReporterResourceKey(t, "host-2", "host", "hbi", "instance-1")
+	relation, err := model.NewRelation("update")
+	require.NoError(t, err)
+
+	result, err := uc.CheckForUpdateBulk(ctx, CheckForUpdateBulkCommand{
+		Items: []CheckBulkItem{
+			{Resource: key1, Relation: relation, Subject: subject},
+			{Resource: key2, Relation: relation, Subject: subject},
+		},
+	})
+	require.NoError(t, err)
+	require.Len(t, result.Pairs, 2)
+	assert.True(t, result.Pairs[0].Result.Allowed)
+	assert.Nil(t, result.Pairs[0].Result.Error)
+	assert.False(t, result.Pairs[1].Result.Allowed)
+	assert.Nil(t, result.Pairs[1].Result.Error)
+	assert.Equal(t, 2, meta.calls)
 }
 
 func TestCheckSelfBulk_UsesCheckSelfRelationForEachItem(t *testing.T) {

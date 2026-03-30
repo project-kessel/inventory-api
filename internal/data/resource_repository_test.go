@@ -2498,6 +2498,104 @@ func testTransactionIDUniqueConstraint(t *testing.T, repo bizmodel.ResourceRepos
 
 }
 
+func TestCommonVersionIncrementAndResetCycle(t *testing.T) {
+	db := setupInMemoryDB(t)
+	mc := metricscollector.NewFakeMetricsCollector()
+	tm := NewGormTransactionManager(mc, 3)
+	repo := NewResourceRepository(db, tm, noopOutboxPublisher)
+
+	localResourceID := "resource-common-version-cycle"
+	resourceId := uuid.New()
+	reporterResourceId := uuid.New()
+
+	localResourceIdType, err := bizmodel.NewLocalResourceId(localResourceID)
+	require.NoError(t, err)
+	resourceType, err := bizmodel.NewResourceType("k8s_cluster")
+	require.NoError(t, err)
+	reporterType, err := bizmodel.NewReporterType("ocm")
+	require.NoError(t, err)
+	reporterInstanceId, err := bizmodel.NewReporterInstanceId("test-instance")
+	require.NoError(t, err)
+	apiHref, err := bizmodel.NewApiHref("/api/resources/cycle-test")
+	require.NoError(t, err)
+	consoleHref, err := bizmodel.NewConsoleHref("/console/resources/cycle-test")
+	require.NoError(t, err)
+	resourceIdType, err := bizmodel.NewResourceId(resourceId)
+	require.NoError(t, err)
+	reporterResourceIdType, err := bizmodel.NewReporterResourceId(reporterResourceId)
+	require.NoError(t, err)
+
+	key, err := bizmodel.NewReporterResourceKey(localResourceIdType, resourceType, reporterType, reporterInstanceId)
+	require.NoError(t, err)
+
+	// Step 1: Create with common representation → CommonVersion = 0
+	resource, err := bizmodel.NewResource(
+		resourceIdType,
+		localResourceIdType,
+		resourceType,
+		reporterType,
+		reporterInstanceId,
+		newUniqueTxID("cycle-create"),
+		reporterResourceIdType,
+		apiHref,
+		consoleHref,
+		bizmodel.Representation(internal.JsonObject{"cluster_id": "cycle-cluster"}),
+		bizmodel.Representation(internal.JsonObject{"workspace_id": "cycle-workspace"}),
+		nil,
+	)
+	require.NoError(t, err)
+
+	err = repo.Save(db, resource, bizmodel.OperationTypeCreated, "")
+	require.NoError(t, err)
+
+	found, err := repo.FindResourceByKeys(db, key)
+	require.NoError(t, err)
+	require.NotNil(t, found)
+	snap, _, _, _, err := found.Serialize()
+	require.NoError(t, err)
+	require.NotNil(t, snap.CommonVersion, "CommonVersion should be set after create with common rep")
+	assert.Equal(t, uint(0), *snap.CommonVersion, "CommonVersion should be 0 after initial create")
+
+	// Step 2: Update with common representation → CommonVersion increments to 1
+	err = found.Update(
+		key, apiHref, consoleHref, nil,
+		bizmodel.Representation(internal.JsonObject{"cluster_id": "cycle-cluster-v2"}),
+		bizmodel.Representation(internal.JsonObject{"workspace_id": "cycle-workspace-v2"}),
+		newUniqueTxID("cycle-update-with-common"),
+	)
+	require.NoError(t, err)
+
+	err = repo.Save(db, *found, bizmodel.OperationTypeUpdated, "")
+	require.NoError(t, err)
+
+	found, err = repo.FindResourceByKeys(db, key)
+	require.NoError(t, err)
+	require.NotNil(t, found)
+	snap, _, _, _, err = found.Serialize()
+	require.NoError(t, err)
+	require.NotNil(t, snap.CommonVersion, "CommonVersion should be set after update with common rep")
+	assert.Equal(t, uint(1), *snap.CommonVersion, "CommonVersion should increment to 1 after update with common rep")
+
+	// Step 3: Update without common representation → CommonVersion resets to nil
+	err = found.Update(
+		key, apiHref, consoleHref, nil,
+		bizmodel.Representation(internal.JsonObject{"cluster_id": "cycle-cluster-reporter-only"}),
+		bizmodel.Representation(internal.JsonObject{}),
+		newUniqueTxID("cycle-update-without-common"),
+	)
+	require.NoError(t, err)
+
+	err = repo.Save(db, *found, bizmodel.OperationTypeUpdated, "")
+	require.NoError(t, err)
+
+	found, err = repo.FindResourceByKeys(db, key)
+	require.NoError(t, err)
+	require.NotNil(t, found)
+	snap, _, _, _, err = found.Serialize()
+	require.NoError(t, err)
+	assert.Nil(t, snap.CommonVersion, "CommonVersion should be nil after update without common rep")
+}
+
 func TestNullCommonVersionPersistence(t *testing.T) {
 	db := setupInMemoryDB(t)
 	mc := metricscollector.NewFakeMetricsCollector()
@@ -2574,4 +2672,82 @@ func TestNullCommonVersionPersistence(t *testing.T) {
 	require.NoError(t, err, "Should serialize resource")
 
 	require.Nil(t, resourceSnapshot.CommonVersion, "CommonVersion should be nil for resource without common representation")
+}
+
+func TestCommonVersionFirstAddedOnUpdate(t *testing.T) {
+	db := setupInMemoryDB(t)
+	mc := metricscollector.NewFakeMetricsCollector()
+	tm := NewGormTransactionManager(mc, 3)
+	repo := NewResourceRepository(db, tm, noopOutboxPublisher)
+
+	localResourceID := "resource-no-common-then-update"
+	resourceId := uuid.New()
+	reporterResourceId := uuid.New()
+
+	localResourceIdType, err := bizmodel.NewLocalResourceId(localResourceID)
+	require.NoError(t, err)
+	resourceType, err := bizmodel.NewResourceType("k8s_cluster")
+	require.NoError(t, err)
+	reporterType, err := bizmodel.NewReporterType("ocm")
+	require.NoError(t, err)
+	reporterInstanceId, err := bizmodel.NewReporterInstanceId("test-instance")
+	require.NoError(t, err)
+	apiHref, err := bizmodel.NewApiHref("/api/resources/first-add-test")
+	require.NoError(t, err)
+	consoleHref, err := bizmodel.NewConsoleHref("/console/resources/first-add-test")
+	require.NoError(t, err)
+	resourceIdType, err := bizmodel.NewResourceId(resourceId)
+	require.NoError(t, err)
+	reporterResourceIdType, err := bizmodel.NewReporterResourceId(reporterResourceId)
+	require.NoError(t, err)
+
+	key, err := bizmodel.NewReporterResourceKey(localResourceIdType, resourceType, reporterType, reporterInstanceId)
+	require.NoError(t, err)
+
+	// Step 1: Create without common representation → CommonVersion = nil
+	resource, err := bizmodel.NewResource(
+		resourceIdType,
+		localResourceIdType,
+		resourceType,
+		reporterType,
+		reporterInstanceId,
+		newUniqueTxID("first-add-create"),
+		reporterResourceIdType,
+		apiHref,
+		consoleHref,
+		bizmodel.Representation(internal.JsonObject{"cluster_id": "first-add-cluster"}),
+		bizmodel.Representation(internal.JsonObject{}),
+		nil,
+	)
+	require.NoError(t, err)
+
+	err = repo.Save(db, resource, bizmodel.OperationTypeCreated, "")
+	require.NoError(t, err)
+
+	found, err := repo.FindResourceByKeys(db, key)
+	require.NoError(t, err)
+	require.NotNil(t, found)
+	snap, _, _, _, err := found.Serialize()
+	require.NoError(t, err)
+	assert.Nil(t, snap.CommonVersion, "CommonVersion should be nil before any common rep is provided")
+
+	// Step 2: Update with common representation for the first time → CommonVersion initializes to 0
+	err = found.Update(
+		key, apiHref, consoleHref, nil,
+		bizmodel.Representation(internal.JsonObject{"cluster_id": "first-add-cluster-v2"}),
+		bizmodel.Representation(internal.JsonObject{"workspace_id": "first-add-workspace"}),
+		newUniqueTxID("first-add-update"),
+	)
+	require.NoError(t, err)
+
+	err = repo.Save(db, *found, bizmodel.OperationTypeUpdated, "")
+	require.NoError(t, err)
+
+	found, err = repo.FindResourceByKeys(db, key)
+	require.NoError(t, err)
+	require.NotNil(t, found)
+	snap, _, _, _, err = found.Serialize()
+	require.NoError(t, err)
+	require.NotNil(t, snap.CommonVersion, "CommonVersion should be set after first update with common rep")
+	assert.Equal(t, uint(0), *snap.CommonVersion, "CommonVersion should initialize to 0 on first addition via update")
 }

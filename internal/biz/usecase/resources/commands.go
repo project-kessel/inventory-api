@@ -97,7 +97,7 @@ type LookupResourcesCommand struct {
 	ReporterType model.ReporterType // maps to ObjectType.Namespace in v1beta1
 	Relation     model.Relation
 	Subject      model.SubjectReference
-	Pagination   model.Pagination
+	Pagination   *model.Pagination
 	Consistency  model.Consistency
 }
 
@@ -118,6 +118,6 @@ type LookupSubjectsCommand struct {
 	SubjectType     model.ResourceType
 	SubjectReporter model.ReporterType
 	SubjectRelation *model.Relation
-	Pagination      model.Pagination
+	Pagination      *model.Pagination
 	Consistency     model.Consistency
 }

@@ -3,8 +3,8 @@ package resources_test
 import (
 	"testing"
 
-	svc "github.com/project-kessel/inventory-api/internal/service/resources"
 	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2"
+	svc "github.com/project-kessel/inventory-api/internal/service/resources"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -37,17 +37,16 @@ func TestToLookupResourcesCommand_WithLimitOnly(t *testing.T) {
 	result, err := svc.ToLookupResourcesCommand(input)
 	require.NoError(t, err)
 
-	assert.NotNil(t, result.Pagination.Limit)
-	assert.Equal(t, uint32(50), *result.Pagination.Limit)
+	require.NotNil(t, result.Pagination)
+	assert.Equal(t, uint32(50), result.Pagination.Limit)
 	assert.Nil(t, result.Pagination.Continuation)
 }
 
 func TestToLookupResourcesCommand_WithContinuationOnly(t *testing.T) {
-	// When user sends continuation-only from inventory-api proto (limit defaults to 0),
-	// we treat limit=0 as "not specified" and convert it to nil.
-	// Later when converting back to relations-api proto, this will create
-	// RequestPagination{Limit: 0} which will FAIL proto validation.
-	// Users should not send continuation-only pagination in practice.
+	// This request has continuation but no limit (defaults to 0).
+	// Proto validation should reject this (limit must be > 0), but our converter
+	// just passes it through - validation happens before we reach this code.
+	// This test verifies the pure converter behavior.
 	permission := "view"
 	reporterType := "hbi"
 	token := "continuation-token-123"
@@ -76,7 +75,8 @@ func TestToLookupResourcesCommand_WithContinuationOnly(t *testing.T) {
 	result, err := svc.ToLookupResourcesCommand(input)
 	require.NoError(t, err)
 
-	assert.Nil(t, result.Pagination.Limit, "Limit=0 from proto treated as 'not specified' (nil)")
+	require.NotNil(t, result.Pagination)
+	assert.Equal(t, uint32(0), result.Pagination.Limit, "Pure converter passes through limit=0")
 	assert.NotNil(t, result.Pagination.Continuation)
 	assert.Equal(t, "continuation-token-123", *result.Pagination.Continuation)
 }
@@ -110,8 +110,8 @@ func TestToLookupResourcesCommand_WithBothLimitAndContinuation(t *testing.T) {
 	result, err := svc.ToLookupResourcesCommand(input)
 	require.NoError(t, err)
 
-	assert.NotNil(t, result.Pagination.Limit)
-	assert.Equal(t, uint32(100), *result.Pagination.Limit)
+	require.NotNil(t, result.Pagination)
+	assert.Equal(t, uint32(100), result.Pagination.Limit)
 	assert.NotNil(t, result.Pagination.Continuation)
 	assert.Equal(t, "continuation-token-456", *result.Pagination.Continuation)
 }
@@ -145,9 +145,10 @@ func TestToLookupResourcesCommand_WithEmptyContinuationToken(t *testing.T) {
 	result, err := svc.ToLookupResourcesCommand(input)
 	require.NoError(t, err)
 
-	assert.NotNil(t, result.Pagination.Limit)
-	assert.Equal(t, uint32(50), *result.Pagination.Limit)
-	assert.Nil(t, result.Pagination.Continuation, "Empty continuation token should be treated as not specified")
+	require.NotNil(t, result.Pagination)
+	assert.Equal(t, uint32(50), result.Pagination.Limit)
+	assert.NotNil(t, result.Pagination.Continuation, "Pure converter passes through empty string")
+	assert.Equal(t, "", *result.Pagination.Continuation)
 }
 
 func TestToLookupSubjectsCommand_WithLimitOnly(t *testing.T) {
@@ -174,18 +175,16 @@ func TestToLookupSubjectsCommand_WithLimitOnly(t *testing.T) {
 	result, err := svc.ToLookupSubjectsCommand(input)
 	require.NoError(t, err)
 
-	assert.NotNil(t, result.Pagination.Limit)
-	assert.Equal(t, uint32(75), *result.Pagination.Limit)
+	require.NotNil(t, result.Pagination)
+	assert.Equal(t, uint32(75), result.Pagination.Limit)
 	assert.Nil(t, result.Pagination.Continuation)
 }
 
 func TestToLookupSubjectsCommand_WithContinuationOnly(t *testing.T) {
-	// When user sends continuation-only from inventory-api proto (limit defaults to 0),
-	// we treat limit=0 as "not specified" and convert it to nil.
-	// Later when converting back to relations-api proto, this will create
-	// RequestPagination{Limit: 0} which will FAIL proto validation.
+	// This request has continuation but no limit (defaults to 0).
+	// Proto validation should reject this (limit must be > 0), but our converter
+	// just passes it through - validation happens before we reach this code.
 	// NOTE: Continuation tokens don't work for LookupSubjects in SpiceDB anyway.
-	// Users should not send continuation-only pagination in practice.
 	reporterType := "hbi"
 	token := "subjects-token-789"
 	input := &pb.StreamedListSubjectsRequest{
@@ -210,7 +209,8 @@ func TestToLookupSubjectsCommand_WithContinuationOnly(t *testing.T) {
 	result, err := svc.ToLookupSubjectsCommand(input)
 	require.NoError(t, err)
 
-	assert.Nil(t, result.Pagination.Limit, "Limit=0 from proto treated as 'not specified' (nil)")
+	require.NotNil(t, result.Pagination)
+	assert.Equal(t, uint32(0), result.Pagination.Limit, "Pure converter passes through limit=0")
 	assert.NotNil(t, result.Pagination.Continuation)
 	assert.Equal(t, "subjects-token-789", *result.Pagination.Continuation)
 }
@@ -240,8 +240,8 @@ func TestToLookupSubjectsCommand_WithBothLimitAndContinuation(t *testing.T) {
 	result, err := svc.ToLookupSubjectsCommand(input)
 	require.NoError(t, err)
 
-	assert.NotNil(t, result.Pagination.Limit)
-	assert.Equal(t, uint32(200), *result.Pagination.Limit)
+	require.NotNil(t, result.Pagination)
+	assert.Equal(t, uint32(200), result.Pagination.Limit)
 	assert.NotNil(t, result.Pagination.Continuation)
 	assert.Equal(t, "subjects-token-999", *result.Pagination.Continuation)
 }
@@ -270,7 +270,6 @@ func TestPaginationFromProto_NilInput(t *testing.T) {
 	result, err := svc.ToLookupResourcesCommand(input)
 	require.NoError(t, err)
 
-	// When pagination is nil, we should get an empty Pagination struct with nil fields
-	assert.Nil(t, result.Pagination.Limit)
-	assert.Nil(t, result.Pagination.Continuation)
+	// When pagination is nil from proto, the Pagination pointer should be nil
+	assert.Nil(t, result.Pagination)
 }

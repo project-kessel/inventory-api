@@ -311,8 +311,8 @@ func TestToLookupResourcesCommand(t *testing.T) {
 	assert.Equal(t, "res-id", result.Subject.Subject().LocalResourceId().Serialize())
 	assert.Equal(t, "principal", result.Subject.Subject().ResourceType().Serialize())
 	assert.Equal(t, "rbac", result.Subject.Subject().ReporterType().Serialize())
-	assert.NotNil(t, result.Pagination.Limit)
-	assert.Equal(t, uint32(50), *result.Pagination.Limit)
+	require.NotNil(t, result.Pagination)
+	assert.Equal(t, uint32(50), result.Pagination.Limit)
 }
 
 func TestToLookupResourcesCommand_WithConsistencyToken(t *testing.T) {
@@ -383,8 +383,7 @@ func TestToLookupResourcesCommand_NoPagination(t *testing.T) {
 	assert.Equal(t, "principal", result.Subject.Subject().ResourceType().Serialize())
 	assert.Equal(t, "rbac", result.Subject.Subject().ReporterType().Serialize())
 	// When pagination is not specified, both fields should be nil
-	assert.Nil(t, result.Pagination.Limit)
-	assert.Nil(t, result.Pagination.Continuation)
+	assert.Nil(t, result.Pagination)
 }
 
 func TestToLookupSubjectsCommand_NoPagination(t *testing.T) {
@@ -415,8 +414,7 @@ func TestToLookupSubjectsCommand_NoPagination(t *testing.T) {
 	assert.Equal(t, "principal", result.SubjectType.Serialize())
 	assert.Equal(t, "hbi", result.SubjectReporter.Serialize())
 	// When pagination is not specified, both fields should be nil
-	assert.Nil(t, result.Pagination.Limit)
-	assert.Nil(t, result.Pagination.Continuation)
+	assert.Nil(t, result.Pagination)
 }
 
 func TestIsValidatedRepresentationType(t *testing.T) {

@@ -273,18 +273,14 @@ func consistencyFromProto(c *pb.Consistency) model.Consistency {
 	return model.NewConsistencyUnspecified()
 }
 
-func paginationFromProto(p *pb.RequestPagination) model.Pagination {
-	result := model.Pagination{}
-	if p != nil {
-		if p.Limit > 0 {
-			limit := p.Limit
-			result.Limit = &limit
-		}
-		if p.ContinuationToken != nil && *p.ContinuationToken != "" {
-			result.Continuation = p.ContinuationToken
-		}
+func paginationFromProto(p *pb.RequestPagination) *model.Pagination {
+	if p == nil {
+		return nil
 	}
-	return result
+	return &model.Pagination{
+		Limit:        p.Limit,
+		Continuation: p.ContinuationToken,
+	}
 }
 
 // checkBulkResultItemToProtoFields derives the proto Allowed enum and, if the result carries an

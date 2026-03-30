@@ -2484,8 +2484,8 @@ func TestLookupResourcesCommandToV1beta1_UsesMinimizeLatencyForUnspecified(t *te
 		ReporterType: reporterType,
 		Relation:     relation,
 		Subject:      subject,
-		Pagination: model.Pagination{
-			Limit:        &limit,
+		Pagination: &model.Pagination{
+			Limit:        limit,
 			Continuation: nil,
 		},
 		Consistency: model.NewConsistencyUnspecified(),

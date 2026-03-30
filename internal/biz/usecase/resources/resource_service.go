@@ -882,16 +882,13 @@ func getNextTransactionID() (string, error) {
 }
 
 // paginationToV1beta1 converts model.Pagination to kessel.RequestPagination.
-// Returns nil if no pagination fields are specified.
-func paginationToV1beta1(pagination model.Pagination) *kessel.RequestPagination {
-	// Only create if at least one field is set
-	if pagination.Limit == nil && pagination.Continuation == nil {
+// Returns nil if pagination is not specified.
+func paginationToV1beta1(pagination *model.Pagination) *kessel.RequestPagination {
+	if pagination == nil {
 		return nil
 	}
-
-	result := &kessel.RequestPagination{}
-	if pagination.Limit != nil {
-		result.Limit = *pagination.Limit
+	result := &kessel.RequestPagination{
+		Limit: pagination.Limit,
 	}
 	if pagination.Continuation != nil {
 		result.ContinuationToken = pagination.Continuation

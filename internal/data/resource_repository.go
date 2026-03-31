@@ -257,7 +257,14 @@ func (r *resourceRepository) FindResourceByKeys(tx *gorm.DB, key bizmodel.Report
 		JOIN resource AS res ON res.id = rr2.resource_id
 	`)
 
-	err := r.buildReporterResourceKeyQuery(query, key).Find(&results).Error // Use Find since it returns multiple rows
+	// ORDER BY aligns with the fake repository's deterministic tie-breaking:
+	// non-tombstoned rows first, then highest representation_version, then generation.
+	// This ensures results[0] (used as the primary resource snapshot) is the same
+	// "latest" row the fake selects. We do not LIMIT 1 here because all rr2 rows
+	// are intentionally collected as reporter resource snapshots.
+	err := r.buildReporterResourceKeyQuery(query, key).
+		Order("rr2.tombstone ASC, rr2.representation_version DESC, rr2.generation DESC").
+		Find(&results).Error
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to find resource by keys: %w", err)

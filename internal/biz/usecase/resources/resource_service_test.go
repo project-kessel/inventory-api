@@ -2478,14 +2478,17 @@ func TestLookupResourcesCommandToV1beta1_UsesMinimizeLatencyForUnspecified(t *te
 	relation, err := model.NewRelation("view")
 	require.NoError(t, err)
 
+	limit := uint32(100)
 	cmd := LookupResourcesCommand{
 		ResourceType: resourceType,
 		ReporterType: reporterType,
 		Relation:     relation,
 		Subject:      subject,
-		Limit:        100,
-		Continuation: "",
-		Consistency:  model.NewConsistencyUnspecified(),
+		Pagination: &model.Pagination{
+			Limit:        limit,
+			Continuation: nil,
+		},
+		Consistency: model.NewConsistencyUnspecified(),
 	}
 
 	req := lookupResourcesCommandToV1beta1(cmd)
@@ -2493,4 +2496,100 @@ func TestLookupResourcesCommandToV1beta1_UsesMinimizeLatencyForUnspecified(t *te
 	require.NotNil(t, req.Consistency)
 	_, ok := req.Consistency.Requirement.(*kessel.Consistency_MinimizeLatency)
 	assert.True(t, ok, "unspecified consistency should map to minimize_latency for lookup authz requests")
+}
+
+func TestLookupSubjectsCommandToV1beta1_UsesMinimizeLatencyForUnspecified(t *testing.T) {
+	resourceType, err := model.NewResourceType("host")
+	require.NoError(t, err)
+	reporterType, err := model.NewReporterType("hbi")
+	require.NoError(t, err)
+	localResourceId, err := model.NewLocalResourceId("resource-123")
+	require.NoError(t, err)
+	reporterResourceKey, err := model.NewReporterResourceKey(localResourceId, resourceType, reporterType, model.ReporterInstanceId(""))
+	require.NoError(t, err)
+	relation, err := model.NewRelation("member")
+	require.NoError(t, err)
+	subjectType, err := model.NewResourceType("principal")
+	require.NoError(t, err)
+	subjectReporter, err := model.NewReporterType("rbac")
+	require.NoError(t, err)
+
+	cmd := LookupSubjectsCommand{
+		Resource:        reporterResourceKey,
+		Relation:        relation,
+		SubjectType:     subjectType,
+		SubjectReporter: subjectReporter,
+		SubjectRelation: nil,
+		Pagination:      nil,
+		Consistency:     model.NewConsistencyUnspecified(),
+	}
+
+	req := lookupSubjectsCommandToV1beta1(cmd)
+	require.NotNil(t, req)
+	require.NotNil(t, req.Consistency)
+	_, ok := req.Consistency.Requirement.(*kessel.Consistency_MinimizeLatency)
+	assert.True(t, ok, "unspecified consistency should map to minimize_latency for lookup authz requests")
+}
+
+func TestLookupResourcesCommandToV1beta1_UsesAtLeastAsFreshWhenSpecified(t *testing.T) {
+	subject, err := buildTestSubjectReference("user-1")
+	require.NoError(t, err)
+	resourceType, err := model.NewResourceType("host")
+	require.NoError(t, err)
+	reporterType, err := model.NewReporterType("hbi")
+	require.NoError(t, err)
+	relation, err := model.NewRelation("view")
+	require.NoError(t, err)
+
+	token := model.ConsistencyToken("test-consistency-token")
+	cmd := LookupResourcesCommand{
+		ResourceType: resourceType,
+		ReporterType: reporterType,
+		Relation:     relation,
+		Subject:      subject,
+		Pagination:   nil,
+		Consistency:  model.NewConsistencyAtLeastAsFresh(token),
+	}
+
+	req := lookupResourcesCommandToV1beta1(cmd)
+	require.NotNil(t, req)
+	require.NotNil(t, req.Consistency)
+	atLeastAsFresh, ok := req.Consistency.Requirement.(*kessel.Consistency_AtLeastAsFresh)
+	assert.True(t, ok, "at_least_as_fresh consistency should be preserved")
+	assert.Equal(t, "test-consistency-token", atLeastAsFresh.AtLeastAsFresh.Token)
+}
+
+func TestLookupSubjectsCommandToV1beta1_UsesAtLeastAsFreshWhenSpecified(t *testing.T) {
+	resourceType, err := model.NewResourceType("host")
+	require.NoError(t, err)
+	reporterType, err := model.NewReporterType("hbi")
+	require.NoError(t, err)
+	localResourceId, err := model.NewLocalResourceId("resource-456")
+	require.NoError(t, err)
+	reporterResourceKey, err := model.NewReporterResourceKey(localResourceId, resourceType, reporterType, model.ReporterInstanceId(""))
+	require.NoError(t, err)
+	relation, err := model.NewRelation("member")
+	require.NoError(t, err)
+	subjectType, err := model.NewResourceType("principal")
+	require.NoError(t, err)
+	subjectReporter, err := model.NewReporterType("rbac")
+	require.NoError(t, err)
+
+	token := model.ConsistencyToken("test-subjects-token")
+	cmd := LookupSubjectsCommand{
+		Resource:        reporterResourceKey,
+		Relation:        relation,
+		SubjectType:     subjectType,
+		SubjectReporter: subjectReporter,
+		SubjectRelation: nil,
+		Pagination:      nil,
+		Consistency:     model.NewConsistencyAtLeastAsFresh(token),
+	}
+
+	req := lookupSubjectsCommandToV1beta1(cmd)
+	require.NotNil(t, req)
+	require.NotNil(t, req.Consistency)
+	atLeastAsFresh, ok := req.Consistency.Requirement.(*kessel.Consistency_AtLeastAsFresh)
+	assert.True(t, ok, "at_least_as_fresh consistency should be preserved")
+	assert.Equal(t, "test-subjects-token", atLeastAsFresh.AtLeastAsFresh.Token)
 }

@@ -311,7 +311,8 @@ func TestToLookupResourcesCommand(t *testing.T) {
 	assert.Equal(t, "res-id", result.Subject.Subject().LocalResourceId().Serialize())
 	assert.Equal(t, "principal", result.Subject.Subject().ResourceType().Serialize())
 	assert.Equal(t, "rbac", result.Subject.Subject().ReporterType().Serialize())
-	assert.Equal(t, uint32(50), result.Limit)
+	require.NotNil(t, result.Pagination)
+	assert.Equal(t, uint32(50), result.Pagination.Limit)
 }
 
 func TestToLookupResourcesCommand_WithConsistencyToken(t *testing.T) {
@@ -381,8 +382,39 @@ func TestToLookupResourcesCommand_NoPagination(t *testing.T) {
 	assert.Equal(t, "res-id", result.Subject.Subject().LocalResourceId().Serialize())
 	assert.Equal(t, "principal", result.Subject.Subject().ResourceType().Serialize())
 	assert.Equal(t, "rbac", result.Subject.Subject().ReporterType().Serialize())
-	assert.Equal(t, uint32(1000), result.Limit)
-	assert.Equal(t, "", result.Continuation)
+	// When pagination is not specified, both fields should be nil
+	assert.Nil(t, result.Pagination)
+}
+
+func TestToLookupSubjectsCommand_NoPagination(t *testing.T) {
+	reporterType := "hbi"
+	input := &pb.StreamedListSubjectsRequest{
+		Resource: &pb.ResourceReference{
+			ResourceId:   "resource-1",
+			ResourceType: "host",
+			Reporter: &pb.ReporterReference{
+				Type: "hbi",
+			},
+		},
+		Relation: "view",
+		SubjectType: &pb.RepresentationType{
+			ResourceType: "principal",
+			ReporterType: &reporterType,
+		},
+		// Pagination intentionally omitted
+	}
+
+	result, err := svc.ToLookupSubjectsCommand(input)
+	require.NoError(t, err)
+
+	assert.Equal(t, "resource-1", result.Resource.LocalResourceId().Serialize())
+	assert.Equal(t, "host", result.Resource.ResourceType().Serialize())
+	assert.Equal(t, "hbi", result.Resource.ReporterType().Serialize())
+	assert.Equal(t, "view", result.Relation.Serialize())
+	assert.Equal(t, "principal", result.SubjectType.Serialize())
+	assert.Equal(t, "hbi", result.SubjectReporter.Serialize())
+	// When pagination is not specified, both fields should be nil
+	assert.Nil(t, result.Pagination)
 }
 
 func TestIsValidatedRepresentationType(t *testing.T) {

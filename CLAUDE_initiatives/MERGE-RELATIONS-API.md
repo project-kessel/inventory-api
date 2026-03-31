@@ -46,6 +46,13 @@ When creating Jira issues for this initiative, use the following invariants:
 - **Work Type**: Product / Portfolio Work (ID: 10610)
 - **Summary Prefix**: "Phase <phase number>: "
 
+### Technical Debt and Improvements
+
+For issues that are technical debt, code quality improvements, refactoring, or general infrastructure enhancements (not directly part of the merge initiative), use:
+
+- **Parent Issue**: RHCLOUD-39792 - Kessel Quality of Life Improvements
+- Covers: code refactoring, technical debt reduction, test coverage improvements, linting, developer tooling, infrastructure modernization
+
 ### Implementation Notes
 
 - Work Type "Product / Portfolio Work" maps to ID `10610` in the Jira API
@@ -57,7 +64,7 @@ When creating Jira issues for this initiative, use the following invariants:
 
 ### Keeping Context Fresh
 
-**Last initiative plan read**: 2026-03-25
+**Last initiative plan read**: 2026-03-31
 
 When reading this file:
 1. Check the "Last initiative plan read" date above
@@ -125,8 +132,7 @@ Before considering work complete, all code changes must be verified:
 
 ## Currently Active Work
 
-- **RHCLOUD-46115** - Phase 2: Evaluate LookupResources endpoint requirements for inventory-api (Code Review)
-- **RHCLOUD-39498** - Phase 2: Add Lookup Subjects to v1beta2 (In Progress)
+- **RHCLOUD-39498** - Phase 2: Add Lookup Subjects to v1beta2 (Code Review)
 
 **Note**: For all issues related to this initiative, query Jira using parent epic [RHCLOUD-44628](https://issues.redhat.com/browse/RHCLOUD-44628).
 

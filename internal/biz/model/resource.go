@@ -368,13 +368,20 @@ func (r Resource) Serialize() (ResourceSnapshot, ReporterResourceSnapshot, Repor
 		commonVersionUint = &cv
 	}
 
+	var lastCommonVersionUint *uint
+	if r.lastCommonVersion != nil {
+		lcv := r.lastCommonVersion.Serialize()
+		lastCommonVersionUint = &lcv
+	}
+
 	resourceSnapshot := ResourceSnapshot{
-		ID:               r.id.Serialize(),
-		Type:             r.resourceType.Serialize(),
-		CommonVersion:    commonVersionUint,
-		ConsistencyToken: r.consistencyToken.Serialize(),
-		CreatedAt:        createdAt,
-		UpdatedAt:        updatedAt,
+		ID:                r.id.Serialize(),
+		Type:              r.resourceType.Serialize(),
+		CommonVersion:     commonVersionUint,
+		LastCommonVersion: lastCommonVersionUint,
+		ConsistencyToken:  r.consistencyToken.Serialize(),
+		CreatedAt:         createdAt,
+		UpdatedAt:         updatedAt,
 	}
 
 	var reporterResourceSnapshot ReporterResourceSnapshot

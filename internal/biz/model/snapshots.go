@@ -14,12 +14,17 @@ type RepresentationSnapshot struct {
 
 // ResourceSnapshot is a DTO that mirrors the GORM Resource model structure
 type ResourceSnapshot struct {
-	ID               uuid.UUID `json:"id"`
-	Type             string    `json:"type"`
-	CommonVersion    uint      `json:"common_version"`
-	ConsistencyToken string    `json:"consistency_token"`
-	CreatedAt        time.Time `json:"created_at"`
-	UpdatedAt        time.Time `json:"updated_at"`
+	ID            uuid.UUID `json:"id"`
+	Type          string    `json:"type"`
+	CommonVersion *uint     `json:"common_version,omitempty"`
+	// LastCommonVersion is the highest common_representation version ever persisted for
+	// this resource, populated via a MAX subquery at read time. It is never written back
+	// to the database and exists solely so Update() can resume version numbering after a
+	// common-rep-less update has reset CommonVersion to nil.
+	LastCommonVersion *uint     `json:"-"`
+	ConsistencyToken  string    `json:"consistency_token"`
+	CreatedAt         time.Time `json:"created_at"`
+	UpdatedAt         time.Time `json:"updated_at"`
 }
 
 // ReporterResourceKeySnapshot is a DTO that mirrors the GORM ReporterResourceKey structure
@@ -62,7 +67,7 @@ type ReporterRepresentationSnapshot struct {
 	Version            uint                   `json:"version"`
 	Generation         uint                   `json:"generation"`
 	ReporterVersion    *string                `json:"reporter_version"`
-	CommonVersion      uint                   `json:"common_version"`
+	CommonVersion      *uint                  `json:"common_version,omitempty"`
 	TransactionId      string                 `json:"transaction_id"`
 	Tombstone          bool                   `json:"tombstone"`
 	CreatedAt          time.Time              `json:"created_at"`

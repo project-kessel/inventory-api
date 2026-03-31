@@ -113,8 +113,16 @@ kubectl apply -f deploy/kind/relations/spicedb-kind-setup/postgres/postgresql.ya
 kubectl apply -f deploy/kind/relations/spicedb-kind-setup/postgres/storage.yaml
 
 # Install SpiceDB operator if not already installed
+# Dynamically resolve the synced operator version from the upstream SYNC.md
+SPICEDB_OPERATOR_VERSION=$(curl -fsSL https://raw.githubusercontent.com/project-kessel/spicedb-operator/main/SYNC.md \
+  | grep '^TAG:' | awk '{print $2}')
+if [[ -z "${SPICEDB_OPERATOR_VERSION}" ]]; then
+  echo "ERROR: Failed to resolve SpiceDB operator version from SYNC.md" >&2
+  exit 1
+fi
+echo "Using SpiceDB operator version: ${SPICEDB_OPERATOR_VERSION}"
 kubectl get crd spicedbclusters.authzed.com > /dev/null 2>&1 || \
-  kubectl apply --server-side -f https://github.com/authzed/spicedb-operator/releases/download/v1.21.0/bundle.yaml
+  kubectl apply --server-side -f "https://github.com/authzed/spicedb-operator/releases/download/${SPICEDB_OPERATOR_VERSION}/bundle.yaml"
 
 kubectl apply -f deploy/kind/relations/spicedb-kind-setup/spicedb-cr.yaml
 kubectl apply -f deploy/kind/relations/spicedb-kind-setup/svc-ingress.yaml

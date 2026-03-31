@@ -67,7 +67,6 @@ func (cr CommonRepresentation) SerializeToSnapshot() bizmodel.CommonRepresentati
 	representationSnapshot := bizmodel.RepresentationSnapshot{
 		Data: cr.Data,
 	}
-
 	return bizmodel.CommonRepresentationSnapshot{
 		Representation:             representationSnapshot,
 		ResourceId:                 cr.ResourceId,

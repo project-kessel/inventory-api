@@ -31,7 +31,7 @@ func TestResource_Initialization(t *testing.T) {
 
 		// Note: The new signature creates only one ReporterResource
 		// This test now validates that we can create another resource with different values
-		resource, err := NewResource(fixture.ValidResourceIdType(), fixture.AnotherLocalResourceIdType(), fixture.AnotherResourceTypeType(), fixture.AnotherReporterTypeType(), fixture.AnotherReporterInstanceIdType(), fixture.AnotherReporterResourceIdType(), fixture.AnotherApiHrefType(), fixture.EmptyConsoleHrefType(), fixture.AnotherReporterRepresentationType(), fixture.AnotherCommonRepresentationType(), nil)
+		resource, err := NewResource(fixture.ValidResourceIdType(), fixture.AnotherLocalResourceIdType(), fixture.AnotherResourceTypeType(), fixture.AnotherReporterTypeType(), fixture.AnotherReporterInstanceIdType(), fixture.AnotherReporterResourceIdType(), fixture.AnotherApiHrefType(), fixture.NilConsoleHrefType(), fixture.AnotherReporterRepresentationType(), fixture.AnotherCommonRepresentationType(), nil)
 
 		assertValidResource(t, resource, err, "different reporter resource")
 		assertInitialResourceState(t, resource)
@@ -44,7 +44,7 @@ func TestResource_Initialization(t *testing.T) {
 	t.Run("should create resource with different resource type", func(t *testing.T) {
 		t.Parallel()
 
-		resource, err := NewResource(fixture.ValidResourceIdType(), fixture.AnotherLocalResourceIdType(), fixture.AnotherResourceTypeType(), fixture.AnotherReporterTypeType(), fixture.AnotherReporterInstanceIdType(), fixture.AnotherReporterResourceIdType(), fixture.AnotherApiHrefType(), fixture.EmptyConsoleHrefType(), fixture.AnotherReporterRepresentationType(), fixture.AnotherCommonRepresentationType(), nil)
+		resource, err := NewResource(fixture.ValidResourceIdType(), fixture.AnotherLocalResourceIdType(), fixture.AnotherResourceTypeType(), fixture.AnotherReporterTypeType(), fixture.AnotherReporterInstanceIdType(), fixture.AnotherReporterResourceIdType(), fixture.AnotherApiHrefType(), fixture.NilConsoleHrefType(), fixture.AnotherReporterRepresentationType(), fixture.AnotherCommonRepresentationType(), nil)
 
 		assertValidResource(t, resource, err, "different resource type")
 		assertInitialResourceState(t, resource)
@@ -77,6 +77,97 @@ func TestResource_Initialization(t *testing.T) {
 		if event.commonRepresentation.transactionId.String() == "" {
 			t.Error("Expected generated transaction ID to be non-empty in common representation")
 		}
+	})
+
+	t.Run("should create resource with only common representation and default reporter to empty", func(t *testing.T) {
+		t.Parallel()
+
+		transactionId := TransactionId("tx-common-only")
+		commonRep := fixture.ValidCommonRepresentationType()
+
+		resource, err := NewResource(
+			fixture.ValidResourceIdType(),
+			fixture.ValidLocalResourceIdType(),
+			fixture.ValidResourceTypeType(),
+			fixture.ValidReporterTypeType(),
+			fixture.ValidReporterInstanceIdType(),
+			transactionId,
+			fixture.ValidReporterResourceIdType(),
+			fixture.ValidApiHrefType(),
+			fixture.ValidConsoleHrefType(),
+			nil,
+			&commonRep,
+			nil,
+		)
+
+		assertValidResource(t, resource, err, "only common representation")
+		assertInitialResourceState(t, resource)
+		assertResourceEvent(t, resource, "only common representation")
+
+		resourceEvents := resource.ResourceReportEvents()
+		require.Len(t, resourceEvents, 1, "Expected 1 resource event")
+
+		event := resourceEvents[0]
+		assert.NotNil(t, event.reporterRepresentation, "Reporter representation should be defaulted, not nil")
+		assert.NotNil(t, event.commonRepresentation, "Common representation should be present")
+		assert.Empty(t, event.reporterRepresentation.Data(), "Defaulted reporter representation should have empty data")
+	})
+
+	t.Run("should create resource with only reporter representation", func(t *testing.T) {
+		t.Parallel()
+
+		transactionId := TransactionId("tx-reporter-only")
+		reporterRep := fixture.ValidReporterRepresentationType()
+
+		resource, err := NewResource(
+			fixture.ValidResourceIdType(),
+			fixture.ValidLocalResourceIdType(),
+			fixture.ValidResourceTypeType(),
+			fixture.ValidReporterTypeType(),
+			fixture.ValidReporterInstanceIdType(),
+			transactionId,
+			fixture.ValidReporterResourceIdType(),
+			fixture.ValidApiHrefType(),
+			fixture.ValidConsoleHrefType(),
+			&reporterRep,
+			nil,
+			nil,
+		)
+
+		assertValidResource(t, resource, err, "only reporter representation")
+		assertInitialResourceState(t, resource)
+		assertResourceEvent(t, resource, "only reporter representation")
+
+		resourceEvents := resource.ResourceReportEvents()
+		require.Len(t, resourceEvents, 1, "Expected 1 resource event")
+
+		event := resourceEvents[0]
+		assert.NotNil(t, event.reporterRepresentation, "Reporter representation should be present")
+		assert.Nil(t, event.commonRepresentation, "Common representation should be nil when not provided")
+	})
+
+	t.Run("should reject resource creation with neither representation", func(t *testing.T) {
+		t.Parallel()
+
+		transactionId := TransactionId("tx-no-rep")
+
+		_, err := NewResource(
+			fixture.ValidResourceIdType(),
+			fixture.ValidLocalResourceIdType(),
+			fixture.ValidResourceTypeType(),
+			fixture.ValidReporterTypeType(),
+			fixture.ValidReporterInstanceIdType(),
+			transactionId,
+			fixture.ValidReporterResourceIdType(),
+			fixture.ValidApiHrefType(),
+			fixture.ValidConsoleHrefType(),
+			nil,
+			nil,
+			nil,
+		)
+
+		assert.Error(t, err, "Should reject when neither representation is provided")
+		assert.ErrorIs(t, err, ErrNoRepresentationProvided)
 	})
 
 	// All tiny type validation tests have been moved to common_test.go where they belong.
@@ -188,14 +279,16 @@ func TestResource_Update(t *testing.T) {
 		reporterVersionDomain, _ := NewReporterVersion(reporterVersion)
 		commonRepresentation, _ := NewRepresentation(newCommonData)
 		reporterRepresentation, _ := NewRepresentation(newReporterData)
+		txID := TransactionId("tx-update-with-version")
 
 		err = original.Update(
 			reporterResourceKey,
 			apiHref,
-			consoleHref,
+			&consoleHref,
 			&reporterVersionDomain,
-			commonRepresentation,
-			reporterRepresentation,
+			&reporterRepresentation,
+			&commonRepresentation,
+			&txID,
 		)
 
 		if err != nil {
@@ -254,13 +347,15 @@ func TestResource_Update(t *testing.T) {
 		commonData, _ := NewRepresentation(internal.JsonObject{"test": "data"})
 		reporterData, _ := NewRepresentation(internal.JsonObject{"test": "data"})
 
+		txID := TransactionId("tx-nonexistent")
 		err = original.Update(
 			nonExistentKey,
 			apiHref,
-			consoleHref,
+			&consoleHref,
 			nil,
-			commonData,
-			reporterData,
+			&reporterData,
+			&commonData,
+			&txID,
 		)
 
 		if err == nil {
@@ -288,13 +383,15 @@ func TestResource_Update(t *testing.T) {
 		commonData, _ := NewRepresentation(internal.JsonObject{"test": "data"})
 		reporterData, _ := NewRepresentation(internal.JsonObject{"test": "data"})
 
+		txID := TransactionId("tx-preserve-fields")
 		err = original.Update(
 			reporterResourceKey,
 			apiHref,
-			consoleHref,
+			&consoleHref,
 			nil,
-			commonData,
-			reporterData,
+			&reporterData,
+			&commonData,
+			&txID,
 		)
 
 		if err != nil {
@@ -326,17 +423,18 @@ func TestResource_Update(t *testing.T) {
 
 		// Convert primitives to domain types
 		apiHref, _ := NewApiHref("https://api.example.com/updated")
-		consoleHref, _ := NewConsoleHref("") // Empty console href
 		commonData, _ := NewRepresentation(internal.JsonObject{"test": "data"})
 		reporterData, _ := NewRepresentation(internal.JsonObject{"test": "data"})
 
+		txID := TransactionId("tx-empty-console-href")
 		err = original.Update(
 			reporterResourceKey,
 			apiHref,
-			consoleHref,
 			nil,
-			commonData,
-			reporterData,
+			nil,
+			&reporterData,
+			&commonData,
+			&txID,
 		)
 
 		if err != nil {
@@ -344,8 +442,11 @@ func TestResource_Update(t *testing.T) {
 		}
 
 		updatedReporterResource := original.ReporterResources()[0]
-		if updatedReporterResource.consoleHref.String() != "" {
-			t.Errorf("Expected empty consoleHref, got %s", updatedReporterResource.consoleHref.String())
+		if updatedReporterResource.consoleHref != nil {
+			t.Errorf("expected nil consoleHref when omitted in Update, got %v", updatedReporterResource.consoleHref)
+		}
+		if snap := updatedReporterResource.Serialize(); snap.ConsoleHref != nil {
+			t.Errorf("expected Serialize to omit console_href, got %v", *snap.ConsoleHref)
 		}
 	})
 
@@ -387,13 +488,15 @@ func TestResource_Update(t *testing.T) {
 		commonData, _ := NewRepresentation(internal.JsonObject{"test": "data"})
 		reporterData, _ := NewRepresentation(internal.JsonObject{"test": "data"})
 
+		txID := TransactionId("tx-nil-reporter-version")
 		err = original.Update(
 			reporterResourceKey,
 			apiHref,
-			consoleHref,
+			&consoleHref,
 			nil, // nil reporter version
-			commonData,
-			reporterData,
+			&reporterData,
+			&commonData,
+			&txID,
 		)
 
 		if err != nil {
@@ -427,14 +530,17 @@ func TestResource_Update(t *testing.T) {
 		consoleHref, _ := NewConsoleHref("https://console.example.com/updated")
 		commonData, _ := NewRepresentation(internal.JsonObject{"workspace_id": "updated-workspace"})
 		reporterData, _ := NewRepresentation(internal.JsonObject{"updated": true})
+		emptyTxID := NewTransactionId("")
 
-		err = resource.Update(resource.ReporterResources()[0].Key(), apiHref, consoleHref, nil, commonData, reporterData, NewTransactionId(""))
+		err = resource.Update(resource.ReporterResources()[0].Key(), apiHref, &consoleHref, nil, &reporterData, &commonData, &emptyTxID)
 		require.NoError(t, err)
 
 		updatedSnapshot, _, _, _, err := resource.Serialize()
 		require.NoError(t, err)
 
-		assert.Equal(t, initialCreatedAt, updatedSnapshot.CreatedAt, "created_at should be preserved")
+		require.False(t, updatedSnapshot.CreatedAt.IsZero(), "created_at should be preserved")
+		assert.True(t, updatedSnapshot.CreatedAt.Equal(initialCreatedAt), "created_at should be preserved")
+		require.False(t, updatedSnapshot.UpdatedAt.IsZero(), "updated_at should be updated")
 		assert.True(t, updatedSnapshot.UpdatedAt.After(initialUpdatedAt), "updated_at should be updated")
 	})
 
@@ -461,11 +567,11 @@ func TestResource_Update(t *testing.T) {
 		err = original.Update(
 			reporterResourceKey,
 			apiHref,
-			consoleHref,
+			&consoleHref,
 			nil,
-			commonData,
-			reporterData,
-			emptyTransactionId,
+			&reporterData,
+			&commonData,
+			&emptyTransactionId,
 		)
 
 		if err != nil {
@@ -538,14 +644,15 @@ func TestResource_Update(t *testing.T) {
 		reporterData, _ := NewRepresentation(internal.JsonObject{"updated": true})
 
 		beforeUpdate := time.Now()
+		emptyTxID := NewTransactionId("")
 		err := resource.Update(
 			resource.ReporterResources()[0].Key(),
 			apiHref,
-			consoleHref,
+			&consoleHref,
 			nil,
-			commonData,
-			reporterData,
-			NewTransactionId(""),
+			&reporterData,
+			&commonData,
+			&emptyTxID,
 		)
 		afterUpdate := time.Now()
 
@@ -607,15 +714,16 @@ func TestResource_Update(t *testing.T) {
 		consoleHref, _ := NewConsoleHref("https://console.example.com/updated")
 		commonData, _ := NewRepresentation(internal.JsonObject{"workspace_id": "updated-workspace"})
 		reporterData, _ := NewRepresentation(internal.JsonObject{"updated": true})
+		emptyTxID := NewTransactionId("")
 
 		err := resource.Update(
 			resource.ReporterResources()[0].Key(),
 			apiHref,
-			consoleHref,
+			&consoleHref,
 			nil,
-			commonData,
-			reporterData,
-			NewTransactionId(""),
+			&reporterData,
+			&commonData,
+			&emptyTxID,
 		)
 		require.NoError(t, err)
 
@@ -624,9 +732,11 @@ func TestResource_Update(t *testing.T) {
 		require.NoError(t, err)
 
 		// created_at should be preserved (not changed)
+		require.False(t, updatedSnapshot.CreatedAt.IsZero())
 		assert.Equal(t, originalCreatedAt.Unix(), updatedSnapshot.CreatedAt.Unix(), "created_at should be preserved from original")
 
 		// updated_at should be updated to now (newer than original)
+		require.False(t, updatedSnapshot.UpdatedAt.IsZero())
 		assert.True(t, updatedSnapshot.UpdatedAt.After(originalUpdatedAt), "updated_at should be updated to a newer time")
 	})
 
@@ -667,15 +777,16 @@ func TestResource_Update(t *testing.T) {
 		consoleHref, _ := NewConsoleHref("https://console.example.com/updated")
 		commonData, _ := NewRepresentation(internal.JsonObject{"workspace_id": "test"})
 		reporterData, _ := NewRepresentation(internal.JsonObject{"test": true})
+		emptyTxID := NewTransactionId("")
 
 		err := resource.Update(
 			resource.ReporterResources()[0].Key(),
 			apiHref,
-			consoleHref,
+			&consoleHref,
 			nil,
-			commonData,
-			reporterData,
-			NewTransactionId(""),
+			&reporterData,
+			&commonData,
+			&emptyTxID,
 		)
 		require.NoError(t, err)
 
@@ -728,15 +839,16 @@ func TestResource_Update(t *testing.T) {
 		consoleHref, _ := NewConsoleHref("https://console.example.com/v1")
 		commonData, _ := NewRepresentation(internal.JsonObject{"workspace_id": "test"})
 		reporterData, _ := NewRepresentation(internal.JsonObject{"version": 1})
+		emptyTxID := NewTransactionId("")
 
 		err := resource.Update(
 			resource.ReporterResources()[0].Key(),
 			apiHref,
-			consoleHref,
+			&consoleHref,
 			nil,
-			commonData,
-			reporterData,
-			NewTransactionId(""),
+			&reporterData,
+			&commonData,
+			&emptyTxID,
 		)
 		require.NoError(t, err)
 
@@ -758,11 +870,11 @@ func TestResource_Update(t *testing.T) {
 		err = resource.Update(
 			resource.ReporterResources()[0].Key(),
 			apiHref2,
-			consoleHref2,
+			&consoleHref2,
 			nil,
-			commonData2,
-			reporterData2,
-			NewTransactionId(""),
+			&reporterData2,
+			&commonData2,
+			&emptyTxID,
 		)
 		require.NoError(t, err)
 
@@ -774,6 +886,8 @@ func TestResource_Update(t *testing.T) {
 			"created_at should remain zero after second update")
 
 		// updated_at should be newer than the first update
+		require.False(t, secondSnapshot.UpdatedAt.IsZero())
+		require.False(t, firstSnapshot.UpdatedAt.IsZero())
 		assert.True(t, secondSnapshot.UpdatedAt.After(firstSnapshot.UpdatedAt),
 			"updated_at should be updated on second update")
 	})
@@ -822,15 +936,16 @@ func TestResource_Update(t *testing.T) {
 		consoleHref, _ := NewConsoleHref("https://console.example.com/updated")
 		commonData, _ := NewRepresentation(internal.JsonObject{"workspace_id": "test"})
 		reporterData, _ := NewRepresentation(internal.JsonObject{"test": true})
+		emptyTxID := NewTransactionId("")
 
 		err := resource.Update(
 			resource.ReporterResources()[0].Key(),
 			apiHref,
-			consoleHref,
+			&consoleHref,
 			nil,
-			commonData,
-			reporterData,
-			NewTransactionId(""),
+			&reporterData,
+			&commonData,
+			&emptyTxID,
 		)
 		require.NoError(t, err, "Update should succeed even with zero created_at")
 
@@ -842,6 +957,7 @@ func TestResource_Update(t *testing.T) {
 			"created_at should remain zero for legacy resources")
 
 		// updated_at should be set to 'now'
+		require.False(t, updatedSnapshot.UpdatedAt.IsZero())
 		assert.True(t, updatedSnapshot.UpdatedAt.After(pastUpdatedAt),
 			"updated_at should be newer than the previous value")
 	})

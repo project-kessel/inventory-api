@@ -330,7 +330,8 @@ func TestInventoryConsumer_ProcessMessage(t *testing.T) {
 
 				updatedCommon, err := model.NewRepresentation(map[string]interface{}{"workspace_id": "test-workspace-v1"})
 				require.NoError(t, err)
-				err = testData.Resource.Update(testData.Key, testData.ApiHref, testData.ConsoleHref, nil, testData.ReporterRepresentation, updatedCommon, "tx-v1")
+				txId := model.TransactionId("tx-v1")
+				err = testData.Resource.Update(testData.Key, testData.ApiHref, &testData.ConsoleHref, nil, &testData.ReporterRepresentation, &updatedCommon, txId)
 				require.NoError(t, err)
 				err = repo.Save(db, *testData.Resource, model.OperationTypeUpdated, "tx-v1")
 				require.NoError(t, err)
@@ -353,7 +354,8 @@ func TestInventoryConsumer_ProcessMessage(t *testing.T) {
 
 				updatedCommon, err := model.NewRepresentation(map[string]interface{}{"workspace_id": "test-workspace-v1"})
 				require.NoError(t, err)
-				err = testData.Resource.Update(testData.Key, testData.ApiHref, testData.ConsoleHref, nil, testData.ReporterRepresentation, updatedCommon, "tx-v1")
+				txId := model.TransactionId("tx-v1")
+				err = testData.Resource.Update(testData.Key, testData.ApiHref, &testData.ConsoleHref, nil, &testData.ReporterRepresentation, &updatedCommon, txId)
 				require.NoError(t, err)
 				err = repo.Save(db, *testData.Resource, model.OperationTypeUpdated, "tx-v1")
 				require.NoError(t, err)
@@ -981,14 +983,15 @@ func TestInventoryConsumer_UpdateWithSameWorkspace_NoOp(t *testing.T) {
 	fakeRepo := data.NewFakeResourceRepository()
 	require.NoError(t, fakeRepo.Save(nil, *testData.Resource, model.OperationTypeCreated, string(testData.InitialTransactionId)))
 
+	txId := model.TransactionId("tx-update")
 	err = testData.Resource.Update(
 		testData.Key,
 		testData.ApiHref,
-		testData.ConsoleHref,
+		&testData.ConsoleHref,
 		nil,
-		testData.ReporterRepresentation,
-		testData.CommonRepresentation,
-		"tx-update",
+		&testData.ReporterRepresentation,
+		&testData.CommonRepresentation,
+		txId,
 	)
 	require.NoError(t, err)
 

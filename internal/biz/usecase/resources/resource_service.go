@@ -48,17 +48,6 @@ var (
 	ErrSelfSubjectMissing = errors.New("self subject missing")
 )
 
-// RepresentationRequiredError indicates a required representation was not provided.
-// Kind identifies which representation is missing (e.g. "reporter", "common").
-// TODO: the logic is not correct around this currently, but this can be fixed later
-type RepresentationRequiredError struct {
-	Kind string
-}
-
-func (e *RepresentationRequiredError) Error() string {
-	return fmt.Sprintf("invalid %s representation: representation required", e.Kind)
-}
-
 const listenTimeout = 10 * time.Second
 
 // UsecaseConfig contains configuration flags that control the behavior of usecase operations.
@@ -135,23 +124,24 @@ func (uc *Usecase) ReportResource(ctx context.Context, cmd ReportResourceCommand
 	}
 
 	var subscription pubsub.Subscription
-	txidStr, err := getNextTransactionID()
+
+	txid, err := getNextTransactionID()
 	if err != nil {
 		return err
 	}
 
+	if cmd.TransactionId == nil || *cmd.TransactionId == "" {
+		cmd.TransactionId = &txid
+	}
+
 	// Validate command against schemas
 	if err := uc.validateReportResourceCommand(ctx, cmd); err != nil {
-		var repReqErr *RepresentationRequiredError
-		if errors.As(err, &repReqErr) {
-			return err
-		}
 		return status.Errorf(codes.InvalidArgument, "failed validation for report resource: %v", err)
 	}
 
 	readAfterWriteEnabled := computeReadAfterWrite(uc, cmd.WriteVisibility, authzCtx.Subject.SubjectId)
 	if readAfterWriteEnabled && uc.Config.ConsumerEnabled {
-		subscription = uc.ListenManager.Subscribe(txidStr)
+		subscription = uc.ListenManager.Subscribe(txid.String())
 		defer subscription.Unsubscribe()
 	}
 
@@ -183,12 +173,12 @@ func (uc *Usecase) ReportResource(ctx context.Context, cmd ReportResourceCommand
 			if err == nil && res != nil {
 				log.Info("Resource already exists, updating: ")
 				operationType = model.OperationTypeUpdated
-				return uc.updateResource(tx, cmd, res, txidStr)
+				return uc.updateResource(tx, cmd, res, txid.String())
 			}
 
 			log.Info("Creating new resource")
 			operationType = model.OperationTypeCreated
-			return uc.createResource(tx, cmd, txidStr)
+			return uc.createResource(tx, cmd, txid.String())
 		},
 	)
 
@@ -234,29 +224,6 @@ func (uc *Usecase) ReportResource(ctx context.Context, cmd ReportResourceCommand
 	return nil
 }
 
-// resolveOptionalFields dereferences optional pointer fields from the command.
-// TODO: Remove this helper when model optional fields explicitly (RHCLOUD-41760)
-func resolveOptionalFields(cmd ReportResourceCommand) (
-	consoleHref model.ConsoleHref,
-	transactionId model.TransactionId,
-	reporterRepresentation model.Representation,
-	commonRepresentation model.Representation,
-) {
-	if cmd.ConsoleHref != nil {
-		consoleHref = *cmd.ConsoleHref
-	}
-	if cmd.TransactionId != nil {
-		transactionId = *cmd.TransactionId
-	}
-	if cmd.ReporterRepresentation != nil {
-		reporterRepresentation = *cmd.ReporterRepresentation
-	}
-	if cmd.CommonRepresentation != nil {
-		commonRepresentation = *cmd.CommonRepresentation
-	}
-	return
-}
-
 func (uc *Usecase) createResource(tx *gorm.DB, cmd ReportResourceCommand, txidStr string) error {
 	resourceId, err := uc.resourceRepository.NextResourceId()
 	if err != nil {
@@ -268,21 +235,18 @@ func (uc *Usecase) createResource(tx *gorm.DB, cmd ReportResourceCommand, txidSt
 		return err
 	}
 
-	consoleHref, transactionId, reporterRepresentation, commonRepresentation := resolveOptionalFields(cmd)
-
-	// TODO: need to model explicitly optional fields, see RHCLOUD-41760
 	resource, err := model.NewResource(
 		resourceId,
 		cmd.LocalResourceId,
 		cmd.ResourceType,
 		cmd.ReporterType,
 		cmd.ReporterInstanceId,
-		transactionId,
+		*cmd.TransactionId,
 		reporterResourceId,
 		cmd.ApiHref,
-		consoleHref,
-		reporterRepresentation,
-		commonRepresentation,
+		cmd.ConsoleHref,
+		cmd.ReporterRepresentation,
+		cmd.CommonRepresentation,
 		cmd.ReporterVersion,
 	)
 	if err != nil {
@@ -303,17 +267,14 @@ func (uc *Usecase) updateResource(tx *gorm.DB, cmd ReportResourceCommand, existi
 		return err
 	}
 
-	consoleHref, transactionId, reporterRepresentation, commonRepresentation := resolveOptionalFields(cmd)
-
-	// TODO: need to model explicitly optional fields, see RHCLOUD-41760
 	err = existingResource.Update(
 		reporterResourceKey,
 		cmd.ApiHref,
-		consoleHref,
+		cmd.ConsoleHref,
 		cmd.ReporterVersion,
-		reporterRepresentation,
-		commonRepresentation,
-		transactionId,
+		cmd.ReporterRepresentation,
+		cmd.CommonRepresentation,
+		*cmd.TransactionId,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to update resource: %w", err)
@@ -327,7 +288,7 @@ func (uc *Usecase) Delete(ctx context.Context, reporterResourceKey model.Reporte
 		return err
 	}
 
-	txidStr, err := getNextTransactionID()
+	txid, err := getNextTransactionID()
 	if err != nil {
 		return err
 	}
@@ -348,7 +309,7 @@ func (uc *Usecase) Delete(ctx context.Context, reporterResourceKey model.Reporte
 				if err != nil {
 					return fmt.Errorf("failed to delete resource: %w", err)
 				}
-				return uc.resourceRepository.Save(tx, *res, model.OperationTypeDeleted, txidStr)
+				return uc.resourceRepository.Save(tx, *res, model.OperationTypeDeleted, txid.String())
 			} else {
 				if errors.Is(err, gorm.ErrRecordNotFound) {
 					return ErrResourceNotFound
@@ -677,26 +638,18 @@ func (uc *Usecase) validateReportResourceCommand(ctx context.Context, cmd Report
 		return fmt.Errorf("reporter %s does not report resource types: %s", reporterType, resourceType)
 	}
 
-	if cmd.ReporterRepresentation == nil {
-		return &RepresentationRequiredError{Kind: "reporter"}
-	}
-	if cmd.CommonRepresentation == nil {
-		return &RepresentationRequiredError{Kind: "common"}
-	}
-
-	sanitizedReporterRepresentation := removeNulls(map[string]interface{}(*cmd.ReporterRepresentation))
-
-	// Validate reporter-specific data using the sanitized map
-	if err := uc.schemaService.ReporterShallowValidate(ctx, resourceType, reporterType, sanitizedReporterRepresentation); err != nil {
-		return err
+	if cmd.ReporterRepresentation != nil {
+		sanitizedReporterRepresentation := removeNulls(map[string]interface{}(*cmd.ReporterRepresentation))
+		if err := uc.schemaService.ReporterShallowValidate(ctx, resourceType, reporterType, sanitizedReporterRepresentation); err != nil {
+			return err
+		}
 	}
 
-	// Get common representation (no sanitization needed based on original code)
-	commonRepresentation := map[string]interface{}(*cmd.CommonRepresentation)
-
-	// Validate common data
-	if err := uc.schemaService.CommonShallowValidate(ctx, resourceType, commonRepresentation); err != nil {
-		return err
+	if cmd.CommonRepresentation != nil {
+		commonRepresentation := map[string]interface{}(*cmd.CommonRepresentation)
+		if err := uc.schemaService.CommonShallowValidate(ctx, resourceType, commonRepresentation); err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -873,12 +826,12 @@ func checkForUpdateBulkResultFromV1beta1(resp *kessel.CheckForUpdateBulkResponse
 	}, nil
 }
 
-func getNextTransactionID() (string, error) {
+func getNextTransactionID() (model.TransactionId, error) {
 	txid, err := uuid.NewV7()
 	if err != nil {
 		return "", err
 	}
-	return txid.String(), nil
+	return model.NewTransactionId(txid.String()), nil
 }
 
 // paginationToV1beta1 converts model.Pagination to kessel.RequestPagination.

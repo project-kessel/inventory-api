@@ -1,4 +1,4 @@
-# Common Inventory
+# Inventory API
 
 This repository implements a common inventory system.
 

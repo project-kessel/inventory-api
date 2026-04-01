@@ -16,6 +16,10 @@ type RelationsRepository interface {
 	CheckForUpdate(ctx context.Context, resource ReporterResourceKey, relation Relation,
 		subject SubjectReference) (bool, ConsistencyToken, error)
 
+	// CheckForUpdateBulk performs strongly consistent bulk check-for-update against the relations backend.
+	// Item shape matches CheckBulk; there is no per-request consistency selector (unlike CheckBulk).
+	CheckForUpdateBulk(ctx context.Context, items []CheckItem) ([]CheckBulkResultItem, ConsistencyToken, error)
+
 	CheckBulk(ctx context.Context, items []CheckItem,
 		consistency Consistency) ([]CheckBulkResultItem, ConsistencyToken, error)
 

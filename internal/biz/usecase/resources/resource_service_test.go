@@ -278,7 +278,7 @@ func TestCheckForUpdate_UsesCheckForUpdateRelation(t *testing.T) {
 	relation, err := model.NewRelation("view")
 	require.NoError(t, err)
 
-	allowed, err := usecase.CheckForUpdate(ctx, relation, subject, key)
+	allowed, _, err := usecase.CheckForUpdate(ctx, relation, subject, key)
 	require.NoError(t, err)
 	assert.True(t, allowed)
 	assert.Equal(t, 1, meta.calls)
@@ -2039,7 +2039,7 @@ func TestCheckForUpdate_WithFakeRelations_Allowed(t *testing.T) {
 
 	fakeRepo.Grant("test-user", "edit", "hbi", "host", "host-1")
 
-	allowed, err := uc.CheckForUpdate(ctx, rel, sub, key)
+	allowed, _, err := uc.CheckForUpdate(ctx, rel, sub, key)
 	require.NoError(t, err)
 	assert.True(t, allowed)
 }

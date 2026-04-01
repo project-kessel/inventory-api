@@ -60,6 +60,11 @@ func (m *MockRelationsRepository) CheckBulk(ctx context.Context, items []model.C
 	return args.Get(0).([]model.CheckBulkResultItem), args.Get(1).(model.ConsistencyToken), args.Error(2)
 }
 
+func (m *MockRelationsRepository) CheckForUpdateBulk(ctx context.Context, items []model.CheckItem) ([]model.CheckBulkResultItem, model.ConsistencyToken, error) {
+	args := m.Called(ctx, items)
+	return args.Get(0).([]model.CheckBulkResultItem), args.Get(1).(model.ConsistencyToken), args.Error(2)
+}
+
 func (m *MockRelationsRepository) LookupResources(ctx context.Context, query model.LookupResourcesQuery) (model.LookupResourcesIterator, error) {
 	args := m.Called(ctx, query)
 	return args.Get(0).(model.LookupResourcesIterator), args.Error(1)

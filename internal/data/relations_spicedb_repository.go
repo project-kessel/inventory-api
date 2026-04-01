@@ -196,6 +196,50 @@ func (r *spicedbRelationsRepository) CheckBulk(ctx context.Context, items []mode
 	return results, token, nil
 }
 
+func (r *spicedbRelationsRepository) CheckForUpdateBulk(ctx context.Context, items []model.CheckItem) ([]model.CheckBulkResultItem, model.ConsistencyToken, error) {
+	v1Items := make([]*kessel.CheckBulkRequestItem, len(items))
+	for i, item := range items {
+		v1Items[i] = &kessel.CheckBulkRequestItem{
+			Resource: reporterResourceKeyToObjectRef(item.Resource),
+			Relation: item.Relation.Serialize(),
+			Subject:  subjectRefToV1Beta1(item.Subject),
+		}
+	}
+
+	opts, err := r.getCallOptions()
+	if err != nil {
+		r.incrFailureCounter("CheckForUpdateBulk")
+		return nil, "", err
+	}
+
+	resp, err := r.checkService.CheckForUpdateBulk(ctx, &kessel.CheckForUpdateBulkRequest{
+		Items: v1Items,
+	}, opts...)
+	if err != nil {
+		r.incrFailureCounter("CheckForUpdateBulk")
+		return nil, "", err
+	}
+
+	pairs := resp.GetPairs()
+	results := make([]model.CheckBulkResultItem, len(pairs))
+	for i, pair := range pairs {
+		if pair.GetError() != nil {
+			results[i] = model.CheckBulkResultItem{
+				Allowed: false,
+				Error:   fmt.Errorf("check for update failed: %s", pair.GetError().GetMessage()),
+			}
+		} else if pair.GetItem() != nil {
+			results[i] = model.CheckBulkResultItem{
+				Allowed: pair.GetItem().GetAllowed() == kessel.CheckBulkResponseItem_ALLOWED_TRUE,
+			}
+		}
+	}
+
+	r.incrSuccessCounter("CheckForUpdateBulk")
+	token := tokenFromV1Beta1(resp.GetConsistencyToken())
+	return results, token, nil
+}
+
 func (r *spicedbRelationsRepository) LookupResources(ctx context.Context, query model.LookupResourcesQuery) (model.LookupResourcesIterator, error) {
 	var continuationToken *string
 	if query.Continuation != "" {

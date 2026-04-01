@@ -94,11 +94,28 @@ func (s *InventoryService) CheckForUpdate(ctx context.Context, req *pb.CheckForU
 		log.Error("Failed to build relation: ", err)
 		return nil, err
 	}
-	resp, err := s.Ctl.CheckForUpdate(ctx, relation, subjectRef, reporterResourceKey)
+	allowed, consistencyToken, err := s.Ctl.CheckForUpdate(ctx, relation, subjectRef, reporterResourceKey)
 	if err != nil {
 		return nil, err
 	}
-	return updateResponseFromAuthzRequestV1beta2(resp), nil
+	return updateResponseFromAuthzRequestV1beta2(allowed, consistencyToken), nil
+}
+
+func (s *InventoryService) CheckForUpdateBulk(ctx context.Context, req *pb.CheckForUpdateBulkRequest) (*pb.CheckForUpdateBulkResponse, error) {
+	log.Info("CheckForUpdateBulk using v1beta2 db")
+	if len(req.GetItems()) == 0 {
+		return nil, status.Errorf(codes.InvalidArgument, "items array cannot be empty")
+	}
+
+	cmd, err := toCheckForUpdateBulkCommand(req)
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "%v", err)
+	}
+	resp, err := s.Ctl.CheckForUpdateBulk(ctx, cmd)
+	if err != nil {
+		return nil, err
+	}
+	return fromCheckForUpdateBulkResult(resp, req), nil
 }
 
 func (s *InventoryService) CheckBulk(ctx context.Context, req *pb.CheckBulkRequest) (*pb.CheckBulkResponse, error) {
@@ -188,27 +205,37 @@ func subjectReferenceFromProto(subject *pb.SubjectReference) (model.SubjectRefer
 	return model.NewSubjectReferenceWithoutRelation(key), nil
 }
 
+// protoToCheckBulkItem converts a single *pb.CheckBulkRequestItem to a resources.CheckBulkItem.
+// Both CheckBulkRequest and CheckForUpdateBulkRequest share the same item type.
+func protoToCheckBulkItem(item *pb.CheckBulkRequestItem, idx int) (resources.CheckBulkItem, error) {
+	resourceKey, err := reporterKeyFromResourceReference(item.GetObject())
+	if err != nil {
+		return resources.CheckBulkItem{}, fmt.Errorf("invalid resource at index %d: %w", idx, err)
+	}
+	subjectRef, err := subjectReferenceFromProto(item.GetSubject())
+	if err != nil {
+		return resources.CheckBulkItem{}, fmt.Errorf("invalid subject at index %d: %w", idx, err)
+	}
+	relation, err := model.NewRelation(item.GetRelation())
+	if err != nil {
+		return resources.CheckBulkItem{}, fmt.Errorf("invalid relation at index %d: %w", idx, err)
+	}
+	return resources.CheckBulkItem{
+		Resource: resourceKey,
+		Relation: relation,
+		Subject:  subjectRef,
+	}, nil
+}
+
 // toCheckBulkCommand converts a v1beta2 CheckBulkRequest to a usecase CheckBulkCommand.
 func toCheckBulkCommand(req *pb.CheckBulkRequest) (resources.CheckBulkCommand, error) {
 	items := make([]resources.CheckBulkItem, len(req.GetItems()))
 	for i, item := range req.GetItems() {
-		resourceKey, err := reporterKeyFromResourceReference(item.GetObject())
+		bulkItem, err := protoToCheckBulkItem(item, i)
 		if err != nil {
-			return resources.CheckBulkCommand{}, fmt.Errorf("invalid resource at index %d: %w", i, err)
+			return resources.CheckBulkCommand{}, err
 		}
-		subjectRef, err := subjectReferenceFromProto(item.GetSubject())
-		if err != nil {
-			return resources.CheckBulkCommand{}, fmt.Errorf("invalid subject at index %d: %w", i, err)
-		}
-		relation, err := model.NewRelation(item.GetRelation())
-		if err != nil {
-			return resources.CheckBulkCommand{}, fmt.Errorf("invalid relation at index %d: %w", i, err)
-		}
-		items[i] = resources.CheckBulkItem{
-			Resource: resourceKey,
-			Relation: relation,
-			Subject:  subjectRef,
-		}
+		items[i] = bulkItem
 	}
 
 	consistency := consistencyFromProto(req.GetConsistency())
@@ -216,6 +243,19 @@ func toCheckBulkCommand(req *pb.CheckBulkRequest) (resources.CheckBulkCommand, e
 		Items:       items,
 		Consistency: consistency,
 	}, nil
+}
+
+// toCheckForUpdateBulkCommand converts a v1beta2 CheckForUpdateBulkRequest to a usecase CheckForUpdateBulkCommand.
+func toCheckForUpdateBulkCommand(req *pb.CheckForUpdateBulkRequest) (resources.CheckForUpdateBulkCommand, error) {
+	items := make([]resources.CheckBulkItem, len(req.GetItems()))
+	for i, item := range req.GetItems() {
+		bulkItem, err := protoToCheckBulkItem(item, i)
+		if err != nil {
+			return resources.CheckForUpdateBulkCommand{}, err
+		}
+		items[i] = bulkItem
+	}
+	return resources.CheckForUpdateBulkCommand{Items: items}, nil
 }
 
 // ConsistencyFromProto converts v1beta2 Consistency to model.Consistency.
@@ -232,6 +272,16 @@ func consistencyFromProto(c *pb.Consistency) model.Consistency {
 		return model.NewConsistencyAtLeastAsFresh(token)
 	}
 	return model.NewConsistencyUnspecified()
+}
+
+func paginationFromProto(p *pb.RequestPagination) *model.Pagination {
+	if p == nil {
+		return nil
+	}
+	return &model.Pagination{
+		Limit:        p.Limit,
+		Continuation: p.ContinuationToken,
+	}
 }
 
 // fromCheckBulkResult converts a usecase CheckBulkResult to v1beta2 CheckBulkResponse.
@@ -278,6 +328,57 @@ func fromCheckBulkResult(result *resources.CheckBulkResult, req *pb.CheckBulkReq
 	}
 
 	resp := &pb.CheckBulkResponse{
+		Pairs: pairs,
+	}
+	if result.ConsistencyToken != "" {
+		resp.ConsistencyToken = &pb.ConsistencyToken{Token: result.ConsistencyToken.Serialize()}
+	}
+	return resp
+}
+
+// fromCheckForUpdateBulkResult converts a usecase CheckBulkResult to v1beta2 CheckForUpdateBulkResponse.
+func fromCheckForUpdateBulkResult(result *resources.CheckBulkResult, req *pb.CheckForUpdateBulkRequest) *pb.CheckForUpdateBulkResponse {
+	pairs := make([]*pb.CheckForUpdateBulkResponsePair, len(result.Pairs))
+	for i, pair := range result.Pairs {
+		errResponse := &pb.CheckForUpdateBulkResponsePair_Error{}
+		itemResponse := &pb.CheckForUpdateBulkResponsePair_Item{}
+
+		if pair.Result.Error != nil {
+			errorCode := pair.Result.ErrorCode
+			if errorCode == 0 {
+				errorCode = int32(codes.Internal)
+			}
+			log.Errorf("Error in checkforupdatebulk for item %d, code %d: %v", i, errorCode, pair.Result.Error)
+			errResponse.Error = &rpcstatus.Status{
+				Code:    errorCode,
+				Message: pair.Result.Error.Error(),
+			}
+		}
+
+		allowedResponse := pb.Allowed_ALLOWED_FALSE
+		if pair.Result.Allowed {
+			allowedResponse = pb.Allowed_ALLOWED_TRUE
+		}
+		itemResponse.Item = &pb.CheckForUpdateBulkResponseItem{
+			Allowed: allowedResponse,
+		}
+
+		var requestItem *pb.CheckBulkRequestItem
+		if i < len(req.GetItems()) {
+			requestItem = req.GetItems()[i]
+		}
+
+		pairs[i] = &pb.CheckForUpdateBulkResponsePair{
+			Request: requestItem,
+		}
+		if pair.Result.Error != nil {
+			pairs[i].Response = errResponse
+		} else {
+			pairs[i].Response = itemResponse
+		}
+	}
+
+	resp := &pb.CheckForUpdateBulkResponse{
 		Pairs: pairs,
 	}
 	if result.ConsistencyToken != "" {
@@ -419,25 +520,56 @@ func ToLookupResourcesCommand(request *pb.StreamedListObjectsRequest) (resources
 	if err != nil {
 		return resources.LookupResourcesCommand{}, fmt.Errorf("invalid subject: %w", err)
 	}
-	consistency := consistencyFromProto(request.GetConsistency())
-
-	var limit uint32 = 1000
-	var continuation *string
-	if request.Pagination != nil {
-		limit = request.Pagination.Limit
-		continuation = request.Pagination.ContinuationToken
-	}
 
 	return resources.LookupResourcesCommand{
 		ResourceType: resourceType,
 		ReporterType: reporterType,
 		Relation:     relation,
 		Subject:      subjectRef,
-		Pagination: &model.Pagination{
-			Limit:        limit,
-			Continuation: continuation,
-		},
-		Consistency: consistency,
+		Pagination:   paginationFromProto(request.Pagination),
+		Consistency:  consistencyFromProto(request.GetConsistency()),
+	}, nil
+}
+
+// ToLookupSubjectsCommand converts a v1beta2 StreamedListSubjectsRequest to a LookupSubjectsCommand.
+func ToLookupSubjectsCommand(request *pb.StreamedListSubjectsRequest) (resources.LookupSubjectsCommand, error) {
+	if request == nil {
+		return resources.LookupSubjectsCommand{}, fmt.Errorf("request is nil")
+	}
+	reporterResourceKey, err := reporterKeyFromResourceReference(request.Resource)
+	if err != nil {
+		return resources.LookupSubjectsCommand{}, fmt.Errorf("invalid resource: %w", err)
+	}
+	relation, err := model.NewRelation(request.Relation)
+	if err != nil {
+		return resources.LookupSubjectsCommand{}, fmt.Errorf("invalid relation: %w", err)
+	}
+	subjectType, err := model.NewResourceType(NormalizeType(request.SubjectType.GetResourceType()))
+	if err != nil {
+		return resources.LookupSubjectsCommand{}, fmt.Errorf("invalid subject type: %w", err)
+	}
+	subjectReporter, err := model.NewReporterType(NormalizeType(request.SubjectType.GetReporterType()))
+	if err != nil {
+		return resources.LookupSubjectsCommand{}, fmt.Errorf("invalid subject reporter: %w", err)
+	}
+
+	var subjectRelation *model.Relation
+	if request.SubjectRelation != nil && *request.SubjectRelation != "" {
+		rel, err := model.NewRelation(*request.SubjectRelation)
+		if err != nil {
+			return resources.LookupSubjectsCommand{}, fmt.Errorf("invalid subject relation: %w", err)
+		}
+		subjectRelation = &rel
+	}
+
+	return resources.LookupSubjectsCommand{
+		Resource:        reporterResourceKey,
+		Relation:        relation,
+		SubjectType:     subjectType,
+		SubjectReporter: subjectReporter,
+		SubjectRelation: subjectRelation,
+		Pagination:      paginationFromProto(request.Pagination),
+		Consistency:     consistencyFromProto(request.GetConsistency()),
 	}, nil
 }
 
@@ -503,12 +635,17 @@ func viewResponseFromAuthzRequestV1beta2(allowed bool, consistencyToken model.Co
 	return response
 }
 
-func updateResponseFromAuthzRequestV1beta2(allowed bool) *pb.CheckForUpdateResponse {
+func updateResponseFromAuthzRequestV1beta2(allowed bool, consistencyToken model.ConsistencyToken) *pb.CheckForUpdateResponse {
+	response := &pb.CheckForUpdateResponse{}
 	if allowed {
-		return &pb.CheckForUpdateResponse{Allowed: pb.Allowed_ALLOWED_TRUE}
+		response.Allowed = pb.Allowed_ALLOWED_TRUE
 	} else {
-		return &pb.CheckForUpdateResponse{Allowed: pb.Allowed_ALLOWED_FALSE}
+		response.Allowed = pb.Allowed_ALLOWED_FALSE
 	}
+	if consistencyToken != "" {
+		response.ConsistencyToken = &pb.ConsistencyToken{Token: consistencyToken.Serialize()}
+	}
+	return response
 }
 
 func ResponseFromResource() *pb.ReportResourceResponse {

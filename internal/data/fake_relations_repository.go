@@ -232,6 +232,29 @@ func (f *FakeRelationsRepository) CheckBulk(_ context.Context, items []model.Che
 	return results, resultToken, nil
 }
 
+func (f *FakeRelationsRepository) CheckForUpdateBulk(_ context.Context, items []model.CheckItem) ([]model.CheckBulkResultItem, model.ConsistencyToken, error) {
+	f.mu.RLock()
+	defer f.mu.RUnlock()
+
+	resultToken := f.formatToken()
+	results := make([]model.CheckBulkResultItem, len(items))
+	for i, item := range items {
+		subKey := item.Subject.Subject()
+		key := relationsTupleKey{
+			ResourceNamespace: item.Resource.ReporterType().Serialize(),
+			ResourceType:      item.Resource.ResourceType().Serialize(),
+			ResourceID:        item.Resource.LocalResourceId().Serialize(),
+			Relation:          item.Relation.Serialize(),
+			SubjectNamespace:  subKey.ReporterType().Serialize(),
+			SubjectType:       subKey.ResourceType().Serialize(),
+			SubjectID:         subKey.LocalResourceId().Serialize(),
+		}
+		results[i] = model.CheckBulkResultItem{Allowed: hasTupleInMap(f.tuples, key)}
+	}
+
+	return results, resultToken, nil
+}
+
 func (f *FakeRelationsRepository) LookupResources(_ context.Context, query model.LookupResourcesQuery) (model.LookupResourcesIterator, error) {
 	f.mu.RLock()
 	defer f.mu.RUnlock()

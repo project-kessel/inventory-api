@@ -132,7 +132,7 @@ Before considering work complete, all code changes must be verified:
 
 ## Currently Active Work
 
-- **RHCLOUD-39498** - Phase 2: Add Lookup Subjects to v1beta2 (Code Review)
+- **RHCLOUD-46010** - Phase 2: Bring Create/Delete/ReadTuples and AcquireLock endpoints over to inventory-api from relations-api (In Progress)
 
 **Note**: For all issues related to this initiative, query Jira using parent epic [RHCLOUD-44628](https://issues.redhat.com/browse/RHCLOUD-44628).
 

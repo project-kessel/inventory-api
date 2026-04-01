@@ -274,6 +274,47 @@ func (r *spicedbRelationsRepository) LookupResources(ctx context.Context, query 
 	return &relationsLookupResourcesIterator{stream: stream}, nil
 }
 
+func (r *spicedbRelationsRepository) LookupSubjects(ctx context.Context, query model.LookupSubjectsQuery) (model.LookupSubjectsIterator, error) {
+	opts, err := r.getCallOptions()
+	if err != nil {
+		r.incrFailureCounter("LookupSubjects")
+		return nil, err
+	}
+
+	var pagination *kessel.RequestPagination
+	if query.Limit != 0 || query.Continuation != "" {
+		pagination = &kessel.RequestPagination{Limit: query.Limit}
+		if query.Continuation != "" {
+			c := query.Continuation
+			pagination.ContinuationToken = &c
+		}
+	}
+
+	req := &kessel.LookupSubjectsRequest{
+		Resource: reporterResourceKeyToObjectRef(query.Resource),
+		Relation: query.Relation.Serialize(),
+		SubjectType: &kessel.ObjectType{
+			Namespace: query.SubjectReporter.Serialize(),
+			Name:      query.SubjectType.Serialize(),
+		},
+		Pagination:  pagination,
+		Consistency: consistencyToV1Beta1(query.Consistency),
+	}
+	if query.SubjectRelation != nil {
+		sr := query.SubjectRelation.Serialize()
+		req.SubjectRelation = &sr
+	}
+
+	stream, err := r.lookupService.LookupSubjects(ctx, req, opts...)
+	if err != nil {
+		r.incrFailureCounter("LookupSubjects")
+		return nil, err
+	}
+
+	r.incrSuccessCounter("LookupSubjects")
+	return &relationsLookupSubjectsIterator{stream: stream}, nil
+}
+
 func (r *spicedbRelationsRepository) CreateTuples(ctx context.Context, tuples []model.RelationsTuple, upsert bool,
 	lockId, lockToken string) (model.ConsistencyToken, error) {
 
@@ -367,6 +408,36 @@ func reporterResourceKeyToObjectRef(key model.ReporterResourceKey) *kessel.Objec
 		},
 		Id: key.LocalResourceId().Serialize(),
 	}
+}
+
+func subjectReferenceFromV1Beta1(sub *kessel.SubjectReference) (model.SubjectReference, error) {
+	if sub == nil || sub.Subject == nil || sub.Subject.Type == nil {
+		return model.SubjectReference{}, fmt.Errorf("invalid v1beta1 subject reference")
+	}
+	localID, err := model.NewLocalResourceId(sub.Subject.GetId())
+	if err != nil {
+		return model.SubjectReference{}, fmt.Errorf("local resource id: %w", err)
+	}
+	resType, err := model.NewResourceType(sub.Subject.Type.GetName())
+	if err != nil {
+		return model.SubjectReference{}, err
+	}
+	repType, err := model.NewReporterType(sub.Subject.Type.GetNamespace())
+	if err != nil {
+		return model.SubjectReference{}, err
+	}
+	key, err := model.NewReporterResourceKey(localID, resType, repType, model.ReporterInstanceId(""))
+	if err != nil {
+		return model.SubjectReference{}, err
+	}
+	if relStr := sub.GetRelation(); relStr != "" {
+		rel, err := model.NewRelation(relStr)
+		if err != nil {
+			return model.SubjectReference{}, err
+		}
+		return model.NewSubjectReference(key, &rel), nil
+	}
+	return model.NewSubjectReferenceWithoutRelation(key), nil
 }
 
 func subjectRefToV1Beta1(sub model.SubjectReference) *kessel.SubjectReference {
@@ -488,6 +559,36 @@ func (it *relationsLookupResourcesIterator) Next() (*model.LookupResourceResult,
 		ResourceId:        resourceId,
 		ResourceType:      resType,
 		Namespace:         namespace,
+		ContinuationToken: contToken,
+	}, nil
+}
+
+// relationsLookupSubjectsIterator wraps a gRPC streaming client as a LookupSubjectsIterator.
+type relationsLookupSubjectsIterator struct {
+	stream grpc.ServerStreamingClient[kessel.LookupSubjectsResponse]
+}
+
+func (it *relationsLookupSubjectsIterator) Next() (*model.LookupSubjectResult, error) {
+	resp, err := it.stream.Recv()
+	if err == io.EOF {
+		return nil, io.EOF
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	subj, err := subjectReferenceFromV1Beta1(resp.GetSubject())
+	if err != nil {
+		return nil, err
+	}
+
+	var contToken string
+	if resp.Pagination != nil {
+		contToken = strings.TrimSpace(resp.Pagination.ContinuationToken)
+	}
+
+	return &model.LookupSubjectResult{
+		Subject:           subj,
 		ContinuationToken: contToken,
 	}, nil
 }

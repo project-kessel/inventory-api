@@ -292,6 +292,45 @@ func (f *FakeRelationsRepository) LookupResources(_ context.Context, query model
 	return &fakeLookupIterator{results: results}, nil
 }
 
+func (f *FakeRelationsRepository) LookupSubjects(_ context.Context, query model.LookupSubjectsQuery) (model.LookupSubjectsIterator, error) {
+	f.mu.RLock()
+	defer f.mu.RUnlock()
+
+	resourceNamespace := query.Resource.ReporterType().Serialize()
+	resourceType := query.Resource.ResourceType().Serialize()
+	resourceID := query.Resource.LocalResourceId().Serialize()
+	requestedRelation := query.Relation.Serialize()
+
+	subjectNamespace := query.SubjectReporter.Serialize()
+	subjectType := query.SubjectType.Serialize()
+
+	var results []*model.LookupSubjectResult
+	for key := range f.tuples {
+		resourceMatches := key.ResourceNamespace == resourceNamespace &&
+			key.ResourceType == resourceType &&
+			key.ResourceID == resourceID
+		relationMatches := key.Relation == requestedRelation
+		subjectTypeMatches := (subjectNamespace == "" || key.SubjectNamespace == subjectNamespace) &&
+			(subjectType == "" || key.SubjectType == subjectType)
+
+		if resourceMatches && relationMatches && subjectTypeMatches {
+			lid, _ := model.NewLocalResourceId(key.SubjectID)
+			st, _ := model.NewResourceType(key.SubjectType)
+			ns, _ := model.NewReporterType(key.SubjectNamespace)
+			subKey, err := model.NewReporterResourceKey(lid, st, ns, model.ReporterInstanceId(""))
+			if err != nil {
+				continue
+			}
+			results = append(results, &model.LookupSubjectResult{
+				Subject:           model.NewSubjectReferenceWithoutRelation(subKey),
+				ContinuationToken: "",
+			})
+		}
+	}
+
+	return &fakeLookupSubjectsIterator{results: results}, nil
+}
+
 func (f *FakeRelationsRepository) CreateTuples(_ context.Context, tuples []model.RelationsTuple, _ bool,
 	_, _ string) (model.ConsistencyToken, error) {
 	f.mu.Lock()
@@ -340,6 +379,20 @@ type fakeLookupIterator struct {
 }
 
 func (it *fakeLookupIterator) Next() (*model.LookupResourceResult, error) {
+	if it.index >= len(it.results) {
+		return nil, io.EOF
+	}
+	result := it.results[it.index]
+	it.index++
+	return result, nil
+}
+
+type fakeLookupSubjectsIterator struct {
+	results []*model.LookupSubjectResult
+	index   int
+}
+
+func (it *fakeLookupSubjectsIterator) Next() (*model.LookupSubjectResult, error) {
 	if it.index >= len(it.results) {
 		return nil, io.EOF
 	}

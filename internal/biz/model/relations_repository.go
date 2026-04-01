@@ -25,6 +25,9 @@ type RelationsRepository interface {
 
 	LookupResources(ctx context.Context, query LookupResourcesQuery) (LookupResourcesIterator, error)
 
+	// LookupSubjects streams subjects that have the given relation to a resource (relations-backend semantics).
+	LookupSubjects(ctx context.Context, query LookupSubjectsQuery) (LookupSubjectsIterator, error)
+
 	CreateTuples(ctx context.Context, tuples []RelationsTuple, upsert bool,
 		lockId, lockToken string) (ConsistencyToken, error)
 
@@ -71,5 +74,28 @@ type LookupResourceResult struct {
 	ResourceId        LocalResourceId
 	ResourceType      ResourceType
 	Namespace         ReporterType
+	ContinuationToken string
+}
+
+// LookupSubjectsQuery contains parameters for a subject lookup (object → subjects with relation).
+type LookupSubjectsQuery struct {
+	Resource        ReporterResourceKey
+	Relation        Relation
+	SubjectType     ResourceType
+	SubjectReporter ReporterType
+	SubjectRelation *Relation
+	Limit           uint32
+	Continuation    string
+	Consistency     Consistency
+}
+
+// LookupSubjectsIterator provides streaming access to lookup-subjects results.
+type LookupSubjectsIterator interface {
+	Next() (*LookupSubjectResult, error)
+}
+
+// LookupSubjectResult is one subject row from LookupSubjects.
+type LookupSubjectResult struct {
+	Subject           SubjectReference
 	ContinuationToken string
 }

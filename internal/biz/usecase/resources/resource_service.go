@@ -48,17 +48,6 @@ var (
 	ErrSelfSubjectMissing = errors.New("self subject missing")
 )
 
-// RepresentationRequiredError indicates a required representation was not provided.
-// Kind identifies which representation is missing (e.g. "reporter", "common").
-// TODO: the logic is not correct around this currently, but this can be fixed later
-type RepresentationRequiredError struct {
-	Kind string
-}
-
-func (e *RepresentationRequiredError) Error() string {
-	return fmt.Sprintf("invalid %s representation: representation required", e.Kind)
-}
-
 const listenTimeout = 10 * time.Second
 
 // UsecaseConfig contains configuration flags that control the behavior of usecase operations.
@@ -135,23 +124,24 @@ func (uc *Usecase) ReportResource(ctx context.Context, cmd ReportResourceCommand
 	}
 
 	var subscription pubsub.Subscription
-	txidStr, err := getNextTransactionID()
+
+	txid, err := getNextTransactionID()
 	if err != nil {
 		return err
 	}
 
+	if cmd.TransactionId == nil || *cmd.TransactionId == "" {
+		cmd.TransactionId = &txid
+	}
+
 	// Validate command against schemas
 	if err := uc.validateReportResourceCommand(ctx, cmd); err != nil {
-		var repReqErr *RepresentationRequiredError
-		if errors.As(err, &repReqErr) {
-			return err
-		}
 		return status.Errorf(codes.InvalidArgument, "failed validation for report resource: %v", err)
 	}
 
 	readAfterWriteEnabled := computeReadAfterWrite(uc, cmd.WriteVisibility, authzCtx.Subject.SubjectId)
 	if readAfterWriteEnabled && uc.Config.ConsumerEnabled {
-		subscription = uc.ListenManager.Subscribe(txidStr)
+		subscription = uc.ListenManager.Subscribe(txid.String())
 		defer subscription.Unsubscribe()
 	}
 
@@ -183,12 +173,12 @@ func (uc *Usecase) ReportResource(ctx context.Context, cmd ReportResourceCommand
 			if err == nil && res != nil {
 				log.Info("Resource already exists, updating: ")
 				operationType = model.OperationTypeUpdated
-				return uc.updateResource(tx, cmd, res, txidStr)
+				return uc.updateResource(tx, cmd, res, txid.String())
 			}
 
 			log.Info("Creating new resource")
 			operationType = model.OperationTypeCreated
-			return uc.createResource(tx, cmd, txidStr)
+			return uc.createResource(tx, cmd, txid.String())
 		},
 	)
 
@@ -234,29 +224,6 @@ func (uc *Usecase) ReportResource(ctx context.Context, cmd ReportResourceCommand
 	return nil
 }
 
-// resolveOptionalFields dereferences optional pointer fields from the command.
-// TODO: Remove this helper when model optional fields explicitly (RHCLOUD-41760)
-func resolveOptionalFields(cmd ReportResourceCommand) (
-	consoleHref model.ConsoleHref,
-	transactionId model.TransactionId,
-	reporterRepresentation model.Representation,
-	commonRepresentation model.Representation,
-) {
-	if cmd.ConsoleHref != nil {
-		consoleHref = *cmd.ConsoleHref
-	}
-	if cmd.TransactionId != nil {
-		transactionId = *cmd.TransactionId
-	}
-	if cmd.ReporterRepresentation != nil {
-		reporterRepresentation = *cmd.ReporterRepresentation
-	}
-	if cmd.CommonRepresentation != nil {
-		commonRepresentation = *cmd.CommonRepresentation
-	}
-	return
-}
-
 func (uc *Usecase) createResource(tx *gorm.DB, cmd ReportResourceCommand, txidStr string) error {
 	resourceId, err := uc.resourceRepository.NextResourceId()
 	if err != nil {
@@ -268,21 +235,18 @@ func (uc *Usecase) createResource(tx *gorm.DB, cmd ReportResourceCommand, txidSt
 		return err
 	}
 
-	consoleHref, transactionId, reporterRepresentation, commonRepresentation := resolveOptionalFields(cmd)
-
-	// TODO: need to model explicitly optional fields, see RHCLOUD-41760
 	resource, err := model.NewResource(
 		resourceId,
 		cmd.LocalResourceId,
 		cmd.ResourceType,
 		cmd.ReporterType,
 		cmd.ReporterInstanceId,
-		transactionId,
+		*cmd.TransactionId,
 		reporterResourceId,
 		cmd.ApiHref,
-		consoleHref,
-		reporterRepresentation,
-		commonRepresentation,
+		cmd.ConsoleHref,
+		cmd.ReporterRepresentation,
+		cmd.CommonRepresentation,
 		cmd.ReporterVersion,
 	)
 	if err != nil {
@@ -303,17 +267,14 @@ func (uc *Usecase) updateResource(tx *gorm.DB, cmd ReportResourceCommand, existi
 		return err
 	}
 
-	consoleHref, transactionId, reporterRepresentation, commonRepresentation := resolveOptionalFields(cmd)
-
-	// TODO: need to model explicitly optional fields, see RHCLOUD-41760
 	err = existingResource.Update(
 		reporterResourceKey,
 		cmd.ApiHref,
-		consoleHref,
+		cmd.ConsoleHref,
 		cmd.ReporterVersion,
-		reporterRepresentation,
-		commonRepresentation,
-		transactionId,
+		cmd.ReporterRepresentation,
+		cmd.CommonRepresentation,
+		*cmd.TransactionId,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to update resource: %w", err)
@@ -327,7 +288,7 @@ func (uc *Usecase) Delete(ctx context.Context, reporterResourceKey model.Reporte
 		return err
 	}
 
-	txidStr, err := getNextTransactionID()
+	txid, err := getNextTransactionID()
 	if err != nil {
 		return err
 	}
@@ -348,7 +309,7 @@ func (uc *Usecase) Delete(ctx context.Context, reporterResourceKey model.Reporte
 				if err != nil {
 					return fmt.Errorf("failed to delete resource: %w", err)
 				}
-				return uc.resourceRepository.Save(tx, *res, model.OperationTypeDeleted, txidStr)
+				return uc.resourceRepository.Save(tx, *res, model.OperationTypeDeleted, txid.String())
 			} else {
 				if errors.Is(err, gorm.ErrRecordNotFound) {
 					return ErrResourceNotFound
@@ -542,6 +503,23 @@ func (uc *Usecase) LookupResources(ctx context.Context, cmd LookupResourcesComma
 	return uc.Authz.LookupResources(ctx, v1beta1Req)
 }
 
+// LookupSubjects delegates subject lookup to the authorization service.
+// Returns a streaming client for receiving lookup results.
+// TODO: remove v1beta1 response type
+func (uc *Usecase) LookupSubjects(ctx context.Context, cmd LookupSubjectsCommand) (grpc.ServerStreamingClient[kessel.LookupSubjectsResponse], error) {
+	if model.ConsistencyTypeOf(cmd.Consistency) == model.ConsistencyAtLeastAsAcknowledged {
+		return nil, status.Errorf(codes.InvalidArgument, "inventory-managed consistency tokens aren't available")
+	}
+	// Meta-authorize against the specific resource instance
+	if err := uc.enforceMetaAuthzObject(ctx, metaauthorizer.RelationLookupSubjects, metaauthorizer.NewInventoryResourceFromKey(cmd.Resource)); err != nil {
+		return nil, err
+	}
+
+	// Convert to v1beta1 for the Authz interface
+	v1beta1Req := lookupSubjectsCommandToV1beta1(cmd)
+	return uc.Authz.LookupSubjects(ctx, v1beta1Req)
+}
+
 // lookupConsistencyTokenFromDB looks up the consistency token from the inventory database.
 // Returns the token if found, empty string if resource not found, or error for other failures.
 func (uc *Usecase) lookupConsistencyTokenFromDB(ctx context.Context, reporterResourceKey model.ReporterResourceKey) (string, error) {
@@ -660,26 +638,18 @@ func (uc *Usecase) validateReportResourceCommand(ctx context.Context, cmd Report
 		return fmt.Errorf("reporter %s does not report resource types: %s", reporterType, resourceType)
 	}
 
-	if cmd.ReporterRepresentation == nil {
-		return &RepresentationRequiredError{Kind: "reporter"}
-	}
-	if cmd.CommonRepresentation == nil {
-		return &RepresentationRequiredError{Kind: "common"}
-	}
-
-	sanitizedReporterRepresentation := removeNulls(map[string]interface{}(*cmd.ReporterRepresentation))
-
-	// Validate reporter-specific data using the sanitized map
-	if err := uc.schemaService.ReporterShallowValidate(ctx, resourceType, reporterType, sanitizedReporterRepresentation); err != nil {
-		return err
+	if cmd.ReporterRepresentation != nil {
+		sanitizedReporterRepresentation := removeNulls(map[string]interface{}(*cmd.ReporterRepresentation))
+		if err := uc.schemaService.ReporterShallowValidate(ctx, resourceType, reporterType, sanitizedReporterRepresentation); err != nil {
+			return err
+		}
 	}
 
-	// Get common representation (no sanitization needed based on original code)
-	commonRepresentation := map[string]interface{}(*cmd.CommonRepresentation)
-
-	// Validate common data
-	if err := uc.schemaService.CommonShallowValidate(ctx, resourceType, commonRepresentation); err != nil {
-		return err
+	if cmd.CommonRepresentation != nil {
+		commonRepresentation := map[string]interface{}(*cmd.CommonRepresentation)
+		if err := uc.schemaService.CommonShallowValidate(ctx, resourceType, commonRepresentation); err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -856,20 +826,31 @@ func checkForUpdateBulkResultFromV1beta1(resp *kessel.CheckForUpdateBulkResponse
 	}, nil
 }
 
-func getNextTransactionID() (string, error) {
+func getNextTransactionID() (model.TransactionId, error) {
 	txid, err := uuid.NewV7()
 	if err != nil {
 		return "", err
 	}
-	return txid.String(), nil
+	return model.NewTransactionId(txid.String()), nil
+}
+
+// paginationToV1beta1 converts model.Pagination to kessel.RequestPagination.
+// Returns nil if pagination is not specified.
+func paginationToV1beta1(pagination *model.Pagination) *kessel.RequestPagination {
+	if pagination == nil {
+		return nil
+	}
+	result := &kessel.RequestPagination{
+		Limit: pagination.Limit,
+	}
+	if pagination.Continuation != nil {
+		result.ContinuationToken = pagination.Continuation
+	}
+	return result
 }
 
 // lookupResourcesCommandToV1beta1 converts a LookupResourcesCommand to v1beta1.
 func lookupResourcesCommandToV1beta1(cmd LookupResourcesCommand) *kessel.LookupResourcesRequest {
-	var continuationToken *string
-	if cmd.Continuation != "" {
-		continuationToken = &cmd.Continuation
-	}
 	var consistency *kessel.Consistency
 	if token := model.ConsistencyAtLeastAsFreshToken(cmd.Consistency); token != nil {
 		consistency = &kessel.Consistency{
@@ -892,14 +873,55 @@ func lookupResourcesCommandToV1beta1(cmd LookupResourcesCommand) *kessel.LookupR
 			Namespace: cmd.ReporterType.Serialize(),
 			Name:      cmd.ResourceType.Serialize(),
 		},
-		Relation: cmd.Relation.Serialize(),
-		Subject:  subjectToV1Beta1(cmd.Subject),
-		Pagination: &kessel.RequestPagination{
-			Limit:             cmd.Limit,
-			ContinuationToken: continuationToken,
-		},
+		Relation:    cmd.Relation.Serialize(),
+		Subject:     subjectToV1Beta1(cmd.Subject),
+		Pagination:  paginationToV1beta1(cmd.Pagination),
 		Consistency: consistency,
 	}
+}
+
+// lookupSubjectsCommandToV1beta1 converts a LookupSubjectsCommand to v1beta1.
+func lookupSubjectsCommandToV1beta1(cmd LookupSubjectsCommand) *kessel.LookupSubjectsRequest {
+	var consistency *kessel.Consistency
+	if token := model.ConsistencyAtLeastAsFreshToken(cmd.Consistency); token != nil {
+		consistency = &kessel.Consistency{
+			Requirement: &kessel.Consistency_AtLeastAsFresh{
+				AtLeastAsFresh: &kessel.ConsistencyToken{
+					Token: token.Serialize(),
+				},
+			},
+		}
+	} else {
+		consistency = &kessel.Consistency{
+			Requirement: &kessel.Consistency_MinimizeLatency{
+				MinimizeLatency: true,
+			},
+		}
+	}
+
+	req := &kessel.LookupSubjectsRequest{
+		Resource: &kessel.ObjectReference{
+			Type: &kessel.ObjectType{
+				Namespace: cmd.Resource.ReporterType().Serialize(),
+				Name:      cmd.Resource.ResourceType().Serialize(),
+			},
+			Id: cmd.Resource.LocalResourceId().Serialize(),
+		},
+		Relation: cmd.Relation.Serialize(),
+		SubjectType: &kessel.ObjectType{
+			Namespace: cmd.SubjectReporter.Serialize(),
+			Name:      cmd.SubjectType.Serialize(),
+		},
+		Pagination:  paginationToV1beta1(cmd.Pagination),
+		Consistency: consistency,
+	}
+
+	if cmd.SubjectRelation != nil {
+		relation := cmd.SubjectRelation.Serialize()
+		req.SubjectRelation = &relation
+	}
+
+	return req
 }
 
 // isSPInAllowlist checks if the caller subject is in the allowlist.

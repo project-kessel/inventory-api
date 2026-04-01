@@ -36,7 +36,7 @@ type ReporterResourceSnapshot struct {
 	ReporterResourceKey   ReporterResourceKeySnapshot `json:"reporter_resource_key"`
 	ResourceID            uuid.UUID                   `json:"resource_id"`
 	APIHref               string                      `json:"api_href"`
-	ConsoleHref           string                      `json:"console_href"`
+	ConsoleHref           *string                     `json:"console_href,omitempty"`
 	RepresentationVersion uint                        `json:"representation_version"`
 	Generation            uint                        `json:"generation"`
 	Tombstone             bool                        `json:"tombstone"`

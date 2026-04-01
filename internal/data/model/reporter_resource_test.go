@@ -38,7 +38,7 @@ func TestReporterResource_Infrastructure_Structure(t *testing.T) {
 		AssertFieldType(t, rr, "ReporterInstanceID", reflect.TypeOf(""))
 		AssertFieldType(t, rr, "ResourceID", reflect.TypeOf(uuid.UUID{}))
 		AssertFieldType(t, rr, "APIHref", reflect.TypeOf(""))
-		AssertFieldType(t, rr, "ConsoleHref", reflect.TypeOf(""))
+		AssertFieldType(t, rr, "ConsoleHref", reflect.TypeOf((*string)(nil)))
 		AssertFieldType(t, rr, "RepresentationVersion", reflect.TypeOf(uint(0)))
 		AssertFieldType(t, rr, "Generation", reflect.TypeOf(uint(0)))
 		AssertFieldType(t, rr, "Tombstone", reflect.TypeOf(false))
@@ -158,7 +158,7 @@ func TestReporterResource_Infrastructure_EdgeCases(t *testing.T) {
 		// Zero values should be acceptable for optional fields
 		AssertEqual(t, uuid.Nil, rr.ID, "ID should default to nil UUID")
 		AssertEqual(t, "", rr.LocalResourceID, "LocalResourceID should default to empty string")
-		AssertEqual(t, "", rr.ConsoleHref, "ConsoleHref should default to empty string")
+		AssertEqual(t, (*string)(nil), rr.ConsoleHref, "ConsoleHref should default to nil")
 		AssertEqual(t, uint(0), rr.RepresentationVersion, "RepresentationVersion should default to 0")
 		AssertEqual(t, uint(0), rr.Generation, "Generation should default to 0")
 		AssertEqual(t, false, rr.Tombstone, "Tombstone should default to false")
@@ -177,7 +177,7 @@ func TestReporterResource_Infrastructure_EdgeCases(t *testing.T) {
 			},
 			ResourceID:            uuid.New(),
 			APIHref:               "https://api.example.com/资源",
-			ConsoleHref:           "https://console.example.com/资源",
+			ConsoleHref:           stringPtr("https://console.example.com/资源"),
 			RepresentationVersion: 1,
 			Generation:            0,
 			Tombstone:             false,
@@ -232,7 +232,7 @@ func TestReporterResource_Infrastructure_EdgeCases(t *testing.T) {
 			},
 			ResourceID:            uuid.New(),
 			APIHref:               string(maxAPIHref),
-			ConsoleHref:           string(maxConsoleHref),
+			ConsoleHref:           stringPtr(string(maxConsoleHref)),
 			RepresentationVersion: 999999,
 			Generation:            999999,
 			Tombstone:             true,
@@ -430,6 +430,7 @@ func TestReporterResource_Infrastructure_Constructor(t *testing.T) {
 		id := uuid.New()
 		resourceID := uuid.New()
 
+		consoleHref := "https://console.example.com/resource"
 		rr, err := NewReporterResource(
 			id,
 			"resource-123",
@@ -438,7 +439,7 @@ func TestReporterResource_Infrastructure_Constructor(t *testing.T) {
 			"instance-abc",
 			resourceID,
 			"https://api.example.com/resource",
-			"https://console.example.com/resource",
+			&consoleHref,
 			1,
 			0,
 			false,
@@ -452,7 +453,7 @@ func TestReporterResource_Infrastructure_Constructor(t *testing.T) {
 		AssertEqual(t, "instance-abc", rr.ReporterInstanceID, "ReporterInstanceID should be set correctly")
 		AssertEqual(t, resourceID, rr.ResourceID, "ResourceID should be set correctly")
 		AssertEqual(t, "https://api.example.com/resource", rr.APIHref, "APIHref should be set correctly")
-		AssertEqual(t, "https://console.example.com/resource", rr.ConsoleHref, "ConsoleHref should be set correctly")
+		AssertEqual(t, &consoleHref, rr.ConsoleHref, "ConsoleHref should be set correctly")
 		AssertEqual(t, uint(1), rr.RepresentationVersion, "RepresentationVersion should be set correctly")
 		AssertEqual(t, uint(0), rr.Generation, "Generation should be set correctly")
 		AssertEqual(t, false, rr.Tombstone, "Tombstone should be set correctly")
@@ -462,6 +463,7 @@ func TestReporterResource_Infrastructure_Constructor(t *testing.T) {
 		t.Parallel()
 
 		// Test with invalid inputs
+		ch := "https://console.example.com/resource"
 		_, err := NewReporterResource(
 			uuid.Nil, // Invalid ID
 			"resource-123",
@@ -470,7 +472,7 @@ func TestReporterResource_Infrastructure_Constructor(t *testing.T) {
 			"instance-abc",
 			uuid.New(),
 			"https://api.example.com/resource",
-			"https://console.example.com/resource",
+			&ch,
 			1,
 			0,
 			false,
@@ -487,7 +489,7 @@ func TestReporterResource_Infrastructure_Constructor(t *testing.T) {
 			"instance-abc",
 			uuid.New(),
 			"https://api.example.com/resource",
-			"https://console.example.com/resource",
+			&ch,
 			1,
 			0,
 			false,

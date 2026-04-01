@@ -26,6 +26,14 @@ func SerializeString[U ~string](tinyType U) string {
 	return string(tinyType)
 }
 
+func SerializeStringPtr[U ~string](v *U) *string {
+	if v == nil {
+		return nil
+	}
+	s := string(*v)
+	return &s
+}
+
 func SerializeUint[U ~uint](tinyType U) uint {
 	return uint(tinyType)
 }
@@ -95,8 +103,12 @@ func DeserializeGeneration(value uint) Generation {
 	return DeserializeUint[Generation](value)
 }
 
-func DeserializeReporterVersion(value string) ReporterVersion {
-	return Deserialize[ReporterVersion](value)
+func DeserializeReporterVersion(value *string) *ReporterVersion {
+	if value == nil {
+		return nil
+	}
+	rv := Deserialize[ReporterVersion](*value)
+	return &rv
 }
 
 func DeserializeTombstone(value bool) Tombstone {
@@ -111,8 +123,12 @@ func DeserializeApiHref(value string) ApiHref {
 	return ApiHref(DeserializeURI(value))
 }
 
-func DeserializeConsoleHref(value string) ConsoleHref {
-	return ConsoleHref(DeserializeURI(value))
+func DeserializeConsoleHref(value *string) *ConsoleHref {
+	if value == nil {
+		return nil
+	}
+	ch := ConsoleHref(DeserializeURI(*value))
+	return &ch
 }
 
 func DeserializeLocalResourceId(value string) LocalResourceId {
@@ -387,6 +403,10 @@ func (lr LocalResourceId) Serialize() string {
 
 type Representation internal.JsonObject
 
+func NewEmptyRepresentation() Representation {
+	return Representation(map[string]interface{}{})
+}
+
 func NewRepresentation(data internal.JsonObject) (Representation, error) {
 	if data == nil {
 		return nil, fmt.Errorf("representation data cannot be nil")
@@ -423,13 +443,4 @@ func (t TransactionId) Serialize() string {
 // This will break a bunch of tests.
 func NewTransactionId(transactionId string) TransactionId {
 	return TransactionId(transactionId)
-}
-
-func GenerateTransactionId() (TransactionId, error) {
-	id, err := uuid.NewV7()
-	if err != nil {
-		return "", err
-	}
-
-	return NewTransactionId(id.String()), nil
 }

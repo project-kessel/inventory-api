@@ -311,7 +311,8 @@ func TestToLookupResourcesCommand(t *testing.T) {
 	assert.Equal(t, "res-id", result.Subject.Subject().LocalResourceId().Serialize())
 	assert.Equal(t, "principal", result.Subject.Subject().ResourceType().Serialize())
 	assert.Equal(t, "rbac", result.Subject.Subject().ReporterType().Serialize())
-	assert.Equal(t, uint32(50), result.Limit)
+	require.NotNil(t, result.Pagination)
+	assert.Equal(t, uint32(50), result.Pagination.Limit)
 }
 
 func TestToLookupResourcesCommand_WithConsistencyToken(t *testing.T) {
@@ -381,8 +382,39 @@ func TestToLookupResourcesCommand_NoPagination(t *testing.T) {
 	assert.Equal(t, "res-id", result.Subject.Subject().LocalResourceId().Serialize())
 	assert.Equal(t, "principal", result.Subject.Subject().ResourceType().Serialize())
 	assert.Equal(t, "rbac", result.Subject.Subject().ReporterType().Serialize())
-	assert.Equal(t, uint32(1000), result.Limit)
-	assert.Equal(t, "", result.Continuation)
+	// When pagination is not specified, both fields should be nil
+	assert.Nil(t, result.Pagination)
+}
+
+func TestToLookupSubjectsCommand_NoPagination(t *testing.T) {
+	reporterType := "hbi"
+	input := &pb.StreamedListSubjectsRequest{
+		Resource: &pb.ResourceReference{
+			ResourceId:   "resource-1",
+			ResourceType: "host",
+			Reporter: &pb.ReporterReference{
+				Type: "hbi",
+			},
+		},
+		Relation: "view",
+		SubjectType: &pb.RepresentationType{
+			ResourceType: "principal",
+			ReporterType: &reporterType,
+		},
+		// Pagination intentionally omitted
+	}
+
+	result, err := svc.ToLookupSubjectsCommand(input)
+	require.NoError(t, err)
+
+	assert.Equal(t, "resource-1", result.Resource.LocalResourceId().Serialize())
+	assert.Equal(t, "host", result.Resource.ResourceType().Serialize())
+	assert.Equal(t, "hbi", result.Resource.ReporterType().Serialize())
+	assert.Equal(t, "view", result.Relation.Serialize())
+	assert.Equal(t, "principal", result.SubjectType.Serialize())
+	assert.Equal(t, "hbi", result.SubjectReporter.Serialize())
+	// When pagination is not specified, both fields should be nil
+	assert.Nil(t, result.Pagination)
 }
 
 func TestIsValidatedRepresentationType(t *testing.T) {
@@ -3280,12 +3312,8 @@ func TestInventoryService_ReportResource_AllOptionalMetadataFields(t *testing.T)
 
 // --- ReportResource: Nil/Empty Optional Struct Combinations ---
 
-// The model layer requires both common and reporter representation data to be
-// non-empty. Sending nil or empty structs produces an error. These tests verify
-// the error paths.
-
-// TODO: This is actually not correct behavior.
-// These should be optional, and it depends on schema.
+// Representation validation: both common and reporter must be non-nil and non-empty.
+// Both nil, reporter-only, common-only, or both-empty return an error.
 func TestInventoryService_ReportResource_NilOrEmptyRepresentationStructs(t *testing.T) {
 	claims := &authnapi.Claims{
 		SubjectId: authnapi.SubjectId("reporter-service"),
@@ -3304,36 +3332,14 @@ func TestInventoryService_ReportResource_NilOrEmptyRepresentationStructs(t *test
 			localResourceId: "host-both-nil",
 			common:          nil,
 			reporter:        nil,
-			expectMsg:       "invalid reporter representation: representation required",
-		},
-		{
-			name:            "common set, reporter nil",
-			localResourceId: "host-common-only",
-			common: &structpb.Struct{
-				Fields: map[string]*structpb.Value{
-					"workspace_id": structpb.NewStringValue("ws-common-only"),
-				},
-			},
-			reporter:  nil,
-			expectMsg: "invalid reporter representation: representation required",
-		},
-		{
-			name:            "common nil, reporter set",
-			localResourceId: "host-reporter-only",
-			common:          nil,
-			reporter: &structpb.Struct{
-				Fields: map[string]*structpb.Value{
-					"reporter_field": structpb.NewStringValue("val"),
-				},
-			},
-			expectMsg: "invalid common representation: representation required",
+			expectMsg:       "at least one of reporterRepresentation or commonRepresentation must be provided",
 		},
 		{
 			name:            "both empty structs",
 			localResourceId: "host-both-empty",
 			common:          &structpb.Struct{},
 			reporter:        &structpb.Struct{},
-			expectMsg:       "invalid reporter representation: representation data cannot be empty",
+			expectMsg:       "representation data cannot be empty",
 		},
 	}
 
@@ -3356,13 +3362,14 @@ func TestInventoryService_ReportResource_NilOrEmptyRepresentationStructs(t *test
 						Reporter: tc.reporter,
 					},
 				}
+				expectation := requireErrorContaining(codes.InvalidArgument, tc.expectMsg)
 				return TestServerConfig{
 						Usecase:       uc,
 						Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
 					}, func(t *testing.T, tr *Transport) {
 						ctx := context.Background()
 						res := tr.Invoke(ctx, withBody(req, ReportResource, httpEndpoint("POST /api/kessel/v1beta2/resources")))
-						Assert(t, res, requireErrorContaining(codes.InvalidArgument, tc.expectMsg))
+						Assert(t, res, expectation)
 					}
 			})
 		})
@@ -3508,32 +3515,6 @@ func TestInventoryService_ReportResource_ValidationErrorFormats(t *testing.T) {
 			expectCode:        codes.InvalidArgument,
 			expectMsgContains: "failed validation for report resource",
 		},
-		{
-			name:         "nil reporter representation",
-			resourceType: "host",
-			reporterType: "hbi",
-			common: &structpb.Struct{
-				Fields: map[string]*structpb.Value{
-					"workspace_id": structpb.NewStringValue("ws-123"),
-				},
-			},
-			reporter:          nil,
-			expectCode:        codes.InvalidArgument,
-			expectMsgContains: "invalid reporter representation: representation required",
-		},
-		{
-			name:         "nil common representation",
-			resourceType: "host",
-			reporterType: "hbi",
-			common:       nil,
-			reporter: &structpb.Struct{
-				Fields: map[string]*structpb.Value{
-					"satellite_id": structpb.NewStringValue("sat-123"),
-				},
-			},
-			expectCode:        codes.InvalidArgument,
-			expectMsgContains: "invalid common representation: representation required",
-		},
 	}
 
 	for _, tc := range cases {
@@ -3555,13 +3536,14 @@ func TestInventoryService_ReportResource_ValidationErrorFormats(t *testing.T) {
 						Reporter: tc.reporter,
 					},
 				}
+				expectation := requireErrorContaining(tc.expectCode, tc.expectMsgContains)
 				return TestServerConfig{
 						Usecase:       uc,
 						Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
 					}, func(t *testing.T, tr *Transport) {
 						ctx := context.Background()
 						res := tr.Invoke(ctx, withBody(req, ReportResource, httpEndpoint("POST /api/kessel/v1beta2/resources")))
-						Assert(t, res, requireErrorContaining(tc.expectCode, tc.expectMsgContains))
+						Assert(t, res, expectation)
 					}
 			})
 		})

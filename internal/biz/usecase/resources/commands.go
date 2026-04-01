@@ -97,13 +97,37 @@ type LookupResourcesCommand struct {
 	ReporterType model.ReporterType // maps to ObjectType.Namespace in v1beta1
 	Relation     model.Relation
 	Subject      model.SubjectReference
-	Limit        uint32
-	Continuation string
+	Pagination   *model.Pagination
 	Consistency  model.Consistency
 }
 
 // LookupResourcesResultItem represents a single resource from lookup.
+// NOTE: This type is currently unused. Streaming APIs (e.g., LookupResources) return
+// grpc.ServerStreamingClient directly from the usecase layer, bypassing domain-layer result types.
+// This differs from non-streaming APIs (Check, CheckBulk) which return domain types
+// (CheckBulkResult, etc.). This inconsistency should be addressed in future refactoring.
 type LookupResourcesResultItem struct {
 	Resource          model.ReporterResourceKey
+	ContinuationToken string
+}
+
+// LookupSubjectsCommand contains the request for looking up subjects.
+type LookupSubjectsCommand struct {
+	Resource        model.ReporterResourceKey
+	Relation        model.Relation
+	SubjectType     model.ResourceType
+	SubjectReporter model.ReporterType
+	SubjectRelation *model.Relation
+	Pagination      *model.Pagination
+	Consistency     model.Consistency
+}
+
+// LookupSubjectsResultItem represents a single subject from lookup.
+// NOTE: This type is currently unused. Streaming APIs (e.g., LookupSubjects) return
+// grpc.ServerStreamingClient directly from the usecase layer, bypassing domain-layer result types.
+// This differs from non-streaming APIs (Check, CheckBulk) which return domain types
+// (CheckBulkResult, etc.). This inconsistency should be addressed in future refactoring.
+type LookupSubjectsResultItem struct {
+	Subject           model.SubjectReference
 	ContinuationToken string
 }

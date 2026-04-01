@@ -273,6 +273,16 @@ func consistencyFromProto(c *pb.Consistency) model.Consistency {
 	return model.NewConsistencyUnspecified()
 }
 
+func paginationFromProto(p *pb.RequestPagination) *model.Pagination {
+	if p == nil {
+		return nil
+	}
+	return &model.Pagination{
+		Limit:        p.Limit,
+		Continuation: p.ContinuationToken,
+	}
+}
+
 // checkBulkResultItemToProtoFields derives the proto Allowed enum and, if the result carries an
 // error, a populated *rpcstatus.Status ready for embedding in a response pair. opName is used
 // only for the error log message. Returns (allowed, nil) when the item succeeded.
@@ -463,6 +473,43 @@ func (s *InventoryService) StreamedListObjects(
 	}
 }
 
+func (s *InventoryService) StreamedListSubjects(
+	req *pb.StreamedListSubjectsRequest,
+	stream pb.KesselInventoryService_StreamedListSubjectsServer,
+) error {
+	ctx := stream.Context()
+
+	consistency := consistencyFromProto(req.GetConsistency())
+	log.Debugf("StreamedListSubjects consistency: %s", model.ConsistencyTypeOf(consistency))
+
+	lookupCmd, err := ToLookupSubjectsCommand(req)
+	if err != nil {
+		return err
+	}
+
+	clientStream, err := s.Ctl.LookupSubjects(ctx, lookupCmd)
+	if err != nil {
+		return err
+	}
+
+	for {
+		// Receive next message from the server stream
+		resp, err := clientStream.Recv()
+		if err == io.EOF {
+			// Stream ended successfully
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+
+		// Convert and send the response to the client
+		if err := stream.Send(ToLookupSubjectsResponse(resp)); err != nil {
+			return err
+		}
+	}
+}
+
 // ToLookupResourcesCommand converts a v1beta2 StreamedListObjectsRequest to a LookupResourcesCommand.
 func ToLookupResourcesCommand(request *pb.StreamedListObjectsRequest) (resources.LookupResourcesCommand, error) {
 	if request == nil {
@@ -485,25 +532,14 @@ func ToLookupResourcesCommand(request *pb.StreamedListObjectsRequest) (resources
 	if err != nil {
 		return resources.LookupResourcesCommand{}, fmt.Errorf("invalid subject: %w", err)
 	}
-	consistency := consistencyFromProto(request.GetConsistency())
-
-	var limit uint32 = 1000
-	var continuation string
-	if request.Pagination != nil {
-		limit = request.Pagination.Limit
-		if request.Pagination.ContinuationToken != nil {
-			continuation = *request.Pagination.ContinuationToken
-		}
-	}
 
 	return resources.LookupResourcesCommand{
 		ResourceType: resourceType,
 		ReporterType: reporterType,
 		Relation:     relation,
 		Subject:      subjectRef,
-		Limit:        limit,
-		Continuation: continuation,
-		Consistency:  consistency,
+		Pagination:   paginationFromProto(request.Pagination),
+		Consistency:  consistencyFromProto(request.GetConsistency()),
 	}, nil
 }
 
@@ -521,6 +557,69 @@ func ToLookupResourceResponse(response *pbv1beta1.LookupResourcesResponse) *pb.S
 			ResourceId:   response.Resource.Id,
 			ResourceType: response.Resource.Type.Name,
 		},
+		Pagination: &pb.ResponsePagination{
+			ContinuationToken: response.Pagination.ContinuationToken,
+		},
+	}
+}
+
+// ToLookupSubjectsCommand converts a v1beta2 LookupSubjectsRequest to a LookupSubjectsCommand.
+func ToLookupSubjectsCommand(request *pb.StreamedListSubjectsRequest) (resources.LookupSubjectsCommand, error) {
+	if request == nil {
+		return resources.LookupSubjectsCommand{}, fmt.Errorf("request is nil")
+	}
+	reporterResourceKey, err := reporterKeyFromResourceReference(request.Resource)
+	if err != nil {
+		return resources.LookupSubjectsCommand{}, fmt.Errorf("invalid resource: %w", err)
+	}
+	relation, err := model.NewRelation(request.Relation)
+	if err != nil {
+		return resources.LookupSubjectsCommand{}, fmt.Errorf("invalid relation: %w", err)
+	}
+	subjectType, err := model.NewResourceType(NormalizeType(request.SubjectType.GetResourceType()))
+	if err != nil {
+		return resources.LookupSubjectsCommand{}, fmt.Errorf("invalid subject type: %w", err)
+	}
+	subjectReporter, err := model.NewReporterType(NormalizeType(request.SubjectType.GetReporterType()))
+	if err != nil {
+		return resources.LookupSubjectsCommand{}, fmt.Errorf("invalid subject reporter: %w", err)
+	}
+
+	var subjectRelation *model.Relation
+	if request.SubjectRelation != nil && *request.SubjectRelation != "" {
+		rel, err := model.NewRelation(*request.SubjectRelation)
+		if err != nil {
+			return resources.LookupSubjectsCommand{}, fmt.Errorf("invalid subject relation: %w", err)
+		}
+		subjectRelation = &rel
+	}
+
+	return resources.LookupSubjectsCommand{
+		Resource:        reporterResourceKey,
+		Relation:        relation,
+		SubjectType:     subjectType,
+		SubjectReporter: subjectReporter,
+		SubjectRelation: subjectRelation,
+		Pagination:      paginationFromProto(request.Pagination),
+		Consistency:     consistencyFromProto(request.GetConsistency()),
+	}, nil
+}
+
+func ToLookupSubjectsResponse(response *pbv1beta1.LookupSubjectsResponse) *pb.StreamedListSubjectsResponse {
+	subjectRef := &pb.SubjectReference{
+		Resource: &pb.ResourceReference{
+			Reporter: &pb.ReporterReference{
+				Type: response.Subject.Subject.Type.Namespace,
+			},
+			ResourceId:   response.Subject.Subject.Id,
+			ResourceType: response.Subject.Subject.Type.Name,
+		},
+	}
+	if response.Subject.Relation != nil {
+		subjectRef.Relation = response.Subject.Relation
+	}
+	return &pb.StreamedListSubjectsResponse{
+		Subject: subjectRef,
 		Pagination: &pb.ResponsePagination{
 			ContinuationToken: response.Pagination.ContinuationToken,
 		},

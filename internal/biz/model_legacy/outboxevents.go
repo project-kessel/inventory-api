@@ -70,7 +70,7 @@ type EventResourceMetadata struct {
 	CreatedAt    *time.Time           `json:"created_at,omitempty"`
 	UpdatedAt    *time.Time           `json:"updated_at,omitempty"`
 	DeletedAt    *time.Time           `json:"deleted_at,omitempty"`
-	WorkspaceId  string               `json:"workspace_id"`
+	WorkspaceId  *string              `json:"workspace_id,omitempty"`
 	Labels       []EventResourceLabel `json:"labels,omitempty"`
 }
 
@@ -82,10 +82,10 @@ type EventResourceLabel struct {
 type EventResourceReporter struct {
 	ReporterInstanceId string  `json:"reporter_instance_id"`
 	ReporterType       string  `json:"reporter_type"`
-	ConsoleHref        string  `json:"console_href"`
+	ConsoleHref        *string `json:"console_href,omitempty"`
 	ApiHref            string  `json:"api_href"`
 	LocalResourceId    string  `json:"local_resource_id"`
-	ReporterVersion    *string `json:"reporter_version"`
+	ReporterVersion    *string `json:"reporter_version,omitempty"`
 }
 
 type EventRelationshipMetadata struct {
@@ -97,11 +97,11 @@ type EventRelationshipMetadata struct {
 }
 
 type EventRelationshipReporter struct {
-	ReporterType           string `json:"reporter_type"`
-	SubjectLocalResourceId string `json:"subject_local_resource_id"`
-	ObjectLocalResourceId  string `json:"object_local_resource_id"`
-	ReporterVersion        string `json:"reporter_version"`
-	ReporterInstanceId     string `json:"reporter_instance_id"`
+	ReporterType           string  `json:"reporter_type"`
+	SubjectLocalResourceId string  `json:"subject_local_resource_id"`
+	ObjectLocalResourceId  string  `json:"object_local_resource_id"`
+	ReporterVersion        *string `json:"reporter_version,omitempty"`
+	ReporterInstanceId     string  `json:"reporter_instance_id"`
 }
 
 func newResourceEvent(operationType bizmodel.EventOperationType, resourceEvent *bizmodel.ResourceReportEvent) (*ResourceEvent, error) {
@@ -150,10 +150,10 @@ func newResourceEvent(operationType bizmodel.EventOperationType, resourceEvent *
 			ReporterData: EventResourceReporter{
 				ReporterInstanceId: resourceEvent.ReporterInstanceId(),
 				ReporterType:       resourceEvent.ReporterType(),
-				ConsoleHref:        resourceEvent.ConsoleHref(),
+				ConsoleHref:        bizmodel.SerializeStringPtr(resourceEvent.ConsoleHref()),
 				ApiHref:            resourceEvent.ApiHref(),
 				LocalResourceId:    resourceEvent.LocalResourceId(),
-				ReporterVersion:    resourceEvent.ReporterVersion(), //nolint:staticcheck
+				ReporterVersion:    bizmodel.SerializeStringPtr(resourceEvent.ReporterVersion()),
 			},
 			ResourceData: resourceEvent.Data(),
 		},

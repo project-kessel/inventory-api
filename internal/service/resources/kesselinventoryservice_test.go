@@ -2231,6 +2231,118 @@ func TestInventoryService_StreamedListObjects_MetaAuthzDenied(t *testing.T) {
 	assert.Equal(t, codes.PermissionDenied, grpcStatus.Code())
 }
 
+func TestInventoryService_StreamedListObjects_ValidationRejectsInvalidRequest(t *testing.T) {
+	claims := &authnapi.Claims{
+		SubjectId: authnapi.SubjectId("user-abc"),
+		AuthType:  authnapi.AuthTypeXRhIdentity,
+	}
+
+	uc := newTestUsecase(t, testUsecaseConfig{})
+	client := newTestServer(t, TestServerConfig{
+		Usecase:       uc,
+		Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+	})
+
+	stream, err := client.StreamedListObjects(context.Background(), &pb.StreamedListObjectsRequest{})
+	require.NoError(t, err)
+
+	_, err = stream.Recv()
+	assert.Error(t, err)
+	grpcStatus, ok := status.FromError(err)
+	assert.True(t, ok)
+	assert.Equal(t, codes.InvalidArgument, grpcStatus.Code())
+	assert.Contains(t, grpcStatus.Message(), "object_type")
+	assert.Contains(t, grpcStatus.Message(), "subject")
+}
+
+func TestInventoryService_StreamedListObjects_ValidationRejectsMissingRelation(t *testing.T) {
+	claims := &authnapi.Claims{
+		SubjectId: authnapi.SubjectId("user-abc"),
+		AuthType:  authnapi.AuthTypeXRhIdentity,
+	}
+
+	uc := newTestUsecase(t, testUsecaseConfig{})
+	client := newTestServer(t, TestServerConfig{
+		Usecase:       uc,
+		Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+	})
+
+	req := &pb.StreamedListObjectsRequest{
+		ObjectType: &pb.RepresentationType{ResourceType: "host"},
+		Subject: &pb.SubjectReference{
+			Resource: &pb.ResourceReference{
+				ResourceType: "principal",
+				ResourceId:   "subject-xyz",
+			},
+		},
+	}
+
+	stream, err := client.StreamedListObjects(context.Background(), req)
+	require.NoError(t, err)
+
+	_, err = stream.Recv()
+	assert.Error(t, err)
+	grpcStatus, ok := status.FromError(err)
+	assert.True(t, ok)
+	assert.Equal(t, codes.InvalidArgument, grpcStatus.Code())
+	assert.Contains(t, grpcStatus.Message(), "relation")
+}
+
+func TestInventoryService_StreamedListSubjects_ValidationRejectsInvalidRequest(t *testing.T) {
+	claims := &authnapi.Claims{
+		SubjectId: authnapi.SubjectId("user-abc"),
+		AuthType:  authnapi.AuthTypeXRhIdentity,
+	}
+
+	uc := newTestUsecase(t, testUsecaseConfig{})
+	client := newTestServer(t, TestServerConfig{
+		Usecase:       uc,
+		Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+	})
+
+	stream, err := client.StreamedListSubjects(context.Background(), &pb.StreamedListSubjectsRequest{})
+	require.NoError(t, err)
+
+	_, err = stream.Recv()
+	assert.Error(t, err)
+	grpcStatus, ok := status.FromError(err)
+	assert.True(t, ok)
+	assert.Equal(t, codes.InvalidArgument, grpcStatus.Code())
+	assert.Contains(t, grpcStatus.Message(), "resource")
+	assert.Contains(t, grpcStatus.Message(), "subject_type")
+}
+
+func TestInventoryService_StreamedListSubjects_ValidationRejectsMissingRelation(t *testing.T) {
+	claims := &authnapi.Claims{
+		SubjectId: authnapi.SubjectId("user-abc"),
+		AuthType:  authnapi.AuthTypeXRhIdentity,
+	}
+
+	uc := newTestUsecase(t, testUsecaseConfig{})
+	client := newTestServer(t, TestServerConfig{
+		Usecase:       uc,
+		Authenticator: &StubAuthenticator{Claims: claims, Decision: authnapi.Allow},
+	})
+
+	req := &pb.StreamedListSubjectsRequest{
+		Resource: &pb.ResourceReference{
+			ResourceType: "host",
+			ResourceId:   "host-1",
+		},
+		SubjectType: &pb.RepresentationType{ResourceType: "principal"},
+	}
+
+	stream, err := client.StreamedListSubjects(context.Background(), req)
+	require.NoError(t, err)
+
+	_, err = stream.Recv()
+	assert.Error(t, err)
+	grpcStatus, ok := status.FromError(err)
+	assert.True(t, ok)
+	assert.Equal(t, codes.InvalidArgument, grpcStatus.Code())
+	assert.Contains(t, grpcStatus.Message(), "relation")
+}
+
 // --- CheckForUpdate with NoIdentity ---
 
 func TestInventoryService_CheckForUpdate_NoIdentity(t *testing.T) {

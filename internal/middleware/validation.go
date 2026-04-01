@@ -6,6 +6,7 @@ import (
 	"buf.build/go/protovalidate"
 	"github.com/go-kratos/kratos/v2/errors"
 	"github.com/go-kratos/kratos/v2/middleware"
+	"google.golang.org/grpc"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -20,4 +21,35 @@ func Validation(validator protovalidate.Validator) middleware.Middleware {
 			return handler(ctx, req)
 		}
 	}
+}
+
+func StreamValidationInterceptor(validator protovalidate.Validator) grpc.StreamServerInterceptor {
+	return func(srv any, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
+		wrapper := &requestValidatingWrapper{ServerStream: ss, Validator: validator}
+		return handler(srv, wrapper)
+	}
+}
+
+type requestValidatingWrapper struct {
+	grpc.ServerStream
+	protovalidate.Validator
+}
+
+func (w *requestValidatingWrapper) RecvMsg(m interface{}) error {
+	err := w.ServerStream.RecvMsg(m)
+	if err != nil {
+		return err
+	}
+
+	if v, ok := m.(proto.Message); ok {
+		if err = w.Validate(v); err != nil {
+			return errors.BadRequest("VALIDATOR", err.Error()).WithCause(err)
+		}
+	}
+
+	return nil
+}
+
+func (w *requestValidatingWrapper) SendMsg(m interface{}) error {
+	return w.ServerStream.SendMsg(m)
 }

@@ -10,7 +10,6 @@ import (
 	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
 	"github.com/project-kessel/inventory-api/internal/biz/usecase/resources"
-	pbv1beta1 "github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
 	rpcstatus "google.golang.org/genproto/googleapis/rpc/status"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -104,7 +103,6 @@ func (s *InventoryService) CheckForUpdate(ctx context.Context, req *pb.CheckForU
 
 func (s *InventoryService) CheckForUpdateBulk(ctx context.Context, req *pb.CheckForUpdateBulkRequest) (*pb.CheckForUpdateBulkResponse, error) {
 	log.Info("CheckForUpdateBulk using v1beta2 db")
-
 	cmd, err := toCheckForUpdateBulkCommand(req)
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "%v", err)
@@ -450,24 +448,21 @@ func (s *InventoryService) StreamedListObjects(
 		return err
 	}
 
-	clientStream, err := s.Ctl.LookupResources(ctx, lookupCmd)
+	iter, err := s.Ctl.LookupResources(ctx, lookupCmd)
 	if err != nil {
 		return err
 	}
 
 	for {
-		// Receive next message from the server stream
-		resp, err := clientStream.Recv()
+		result, err := iter.Next()
 		if err == io.EOF {
-			// Stream ended successfully
 			return nil
 		}
 		if err != nil {
 			return err
 		}
 
-		// Convert and send the response to the client
-		if err := stream.Send(ToLookupResourceResponse(resp)); err != nil {
+		if err := stream.Send(ToLookupResourceResponse(result)); err != nil {
 			return err
 		}
 	}
@@ -487,24 +482,21 @@ func (s *InventoryService) StreamedListSubjects(
 		return err
 	}
 
-	clientStream, err := s.Ctl.LookupSubjects(ctx, lookupCmd)
+	iter, err := s.Ctl.LookupSubjects(ctx, lookupCmd)
 	if err != nil {
 		return err
 	}
 
 	for {
-		// Receive next message from the server stream
-		resp, err := clientStream.Recv()
+		result, err := iter.Next()
 		if err == io.EOF {
-			// Stream ended successfully
 			return nil
 		}
 		if err != nil {
 			return err
 		}
 
-		// Convert and send the response to the client
-		if err := stream.Send(ToLookupSubjectsResponse(resp)); err != nil {
+		if err := stream.Send(ToStreamedListSubjectsResponse(result)); err != nil {
 			return err
 		}
 	}
@@ -543,27 +535,7 @@ func ToLookupResourcesCommand(request *pb.StreamedListObjectsRequest) (resources
 	}, nil
 }
 
-func NormalizeType(val string) string {
-	normalized := strings.ToLower(val)
-	return normalized
-}
-
-func ToLookupResourceResponse(response *pbv1beta1.LookupResourcesResponse) *pb.StreamedListObjectsResponse {
-	return &pb.StreamedListObjectsResponse{
-		Object: &pb.ResourceReference{
-			Reporter: &pb.ReporterReference{
-				Type: response.Resource.Type.Namespace,
-			},
-			ResourceId:   response.Resource.Id,
-			ResourceType: response.Resource.Type.Name,
-		},
-		Pagination: &pb.ResponsePagination{
-			ContinuationToken: response.Pagination.ContinuationToken,
-		},
-	}
-}
-
-// ToLookupSubjectsCommand converts a v1beta2 LookupSubjectsRequest to a LookupSubjectsCommand.
+// ToLookupSubjectsCommand converts a v1beta2 StreamedListSubjectsRequest to a LookupSubjectsCommand.
 func ToLookupSubjectsCommand(request *pb.StreamedListSubjectsRequest) (resources.LookupSubjectsCommand, error) {
 	if request == nil {
 		return resources.LookupSubjectsCommand{}, fmt.Errorf("request is nil")
@@ -605,23 +577,48 @@ func ToLookupSubjectsCommand(request *pb.StreamedListSubjectsRequest) (resources
 	}, nil
 }
 
-func ToLookupSubjectsResponse(response *pbv1beta1.LookupSubjectsResponse) *pb.StreamedListSubjectsResponse {
-	subjectRef := &pb.SubjectReference{
-		Resource: &pb.ResourceReference{
+func NormalizeType(val string) string {
+	normalized := strings.ToLower(val)
+	return normalized
+}
+
+func ToLookupResourceResponse(result *model.LookupResourceResult) *pb.StreamedListObjectsResponse {
+	return &pb.StreamedListObjectsResponse{
+		Object: &pb.ResourceReference{
 			Reporter: &pb.ReporterReference{
-				Type: response.Subject.Subject.Type.Namespace,
+				Type: result.Namespace.Serialize(),
 			},
-			ResourceId:   response.Subject.Subject.Id,
-			ResourceType: response.Subject.Subject.Type.Name,
+			ResourceId:   result.ResourceId.Serialize(),
+			ResourceType: result.ResourceType.Serialize(),
+		},
+		Pagination: &pb.ResponsePagination{
+			ContinuationToken: result.ContinuationToken,
 		},
 	}
-	if response.Subject.Relation != nil {
-		subjectRef.Relation = response.Subject.Relation
+}
+
+// ToStreamedListSubjectsResponse maps a domain lookup-subjects row to v1beta2.
+func ToStreamedListSubjectsResponse(result *model.LookupSubjectResult) *pb.StreamedListSubjectsResponse {
+	sk := result.Subject.Subject()
+	repRef := &pb.ReporterReference{Type: sk.ReporterType().Serialize()}
+	if inst := sk.ReporterInstanceId().Serialize(); inst != "" {
+		repRef.InstanceId = &inst
+	}
+	ref := &pb.SubjectReference{
+		Resource: &pb.ResourceReference{
+			Reporter:     repRef,
+			ResourceId:   sk.LocalResourceId().Serialize(),
+			ResourceType: sk.ResourceType().Serialize(),
+		},
+	}
+	if result.Subject.HasRelation() {
+		rel := result.Subject.Relation().Serialize()
+		ref.Relation = &rel
 	}
 	return &pb.StreamedListSubjectsResponse{
-		Subject: subjectRef,
+		Subject: ref,
 		Pagination: &pb.ResponsePagination{
-			ContinuationToken: response.Pagination.ContinuationToken,
+			ContinuationToken: result.ContinuationToken,
 		},
 	}
 }

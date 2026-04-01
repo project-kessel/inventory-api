@@ -72,7 +72,7 @@ type CheckBulkResult struct {
 }
 
 // CheckForUpdateBulkCommand contains the request for a bulk check-for-update (strongly consistent).
-// Reuses CheckBulkItem; no consistency token since each check is strongly consistent.
+// Reuses CheckBulkItem. The relations backend may still return a response-level consistency token.
 type CheckForUpdateBulkCommand struct {
 	Items []CheckBulkItem
 }

@@ -10,10 +10,10 @@ import (
 
 	"github.com/project-kessel/inventory-api/internal/authn"
 	authnFactory "github.com/project-kessel/inventory-api/internal/authn/factory"
-	"github.com/project-kessel/inventory-api/internal/authz"
 	"github.com/project-kessel/inventory-api/internal/config/schema"
 	"github.com/project-kessel/inventory-api/internal/consistency"
 	"github.com/project-kessel/inventory-api/internal/consumer"
+	"github.com/project-kessel/inventory-api/internal/data"
 	"github.com/project-kessel/inventory-api/internal/server"
 	"github.com/project-kessel/inventory-api/internal/service"
 	"github.com/project-kessel/inventory-api/internal/storage"
@@ -23,7 +23,7 @@ import (
 // OptionsConfig contains the settings for each configuration option
 type OptionsConfig struct {
 	Authn               *authn.Options
-	Authz               *authz.Options
+	Authz               *data.RelationsOptionsRoot
 	Storage             *storage.Options
 	Consumer            *consumer.Options
 	Server              *server.Options
@@ -37,7 +37,7 @@ type OptionsConfig struct {
 func NewOptionsConfig() *OptionsConfig {
 	return &OptionsConfig{
 		Authn:               authn.NewOptions(),
-		Authz:               authz.NewOptions(),
+		Authz:               data.NewRelationsOptionsRoot(),
 		Storage:             storage.NewOptions(),
 		Consumer:            consumer.NewOptions(),
 		Server:              server.NewOptions(),
@@ -81,11 +81,11 @@ func LogConfigurationInfo(options *OptionsConfig) {
 		)
 	}
 
-	if options.Authz.Authz == authz.Kessel {
+	if options.Authz.Impl == data.RelationsImplSpiceDB {
 		log.Debugf("Authz Configuration: URL: %s, Insecure?: %t, OIDC?: %t",
-			options.Authz.Kessel.URL,
-			options.Authz.Kessel.Insecure,
-			options.Authz.Kessel.EnableOidcAuth,
+			options.Authz.SpiceDB.URL,
+			options.Authz.SpiceDB.Insecure,
+			options.Authz.SpiceDB.EnableOidcAuth,
 		)
 	}
 
@@ -116,7 +116,7 @@ func (o *OptionsConfig) InjectClowdAppConfig(appconfig *clowder.AppConfig) error
 	// check for authz config
 	if len(appconfig.Endpoints) > 0 {
 		for _, endpoint := range appconfig.Endpoints {
-			if endpoint.App == authz.RelationsAPI {
+			if endpoint.App == "kessel-relations" {
 				o.ConfigureAuthz(endpoint)
 			}
 		}
@@ -137,8 +137,8 @@ func (o *OptionsConfig) InjectClowdAppConfig(appconfig *clowder.AppConfig) error
 
 // ConfigureAuthz updates Authz settings based on ClowdApp AppConfig
 func (o *OptionsConfig) ConfigureAuthz(endpoint clowder.DependencyEndpoint) {
-	o.Authz.Authz = authz.Kessel
-	o.Authz.Kessel.URL = fmt.Sprintf("%s:%d", endpoint.Hostname, 9000)
+	o.Authz.Impl = data.RelationsImplSpiceDB
+	o.Authz.SpiceDB.URL = fmt.Sprintf("%s:%d", endpoint.Hostname, 9000)
 }
 
 // ConfigureStorage updates Storage settings based on ClowdApp AppConfig

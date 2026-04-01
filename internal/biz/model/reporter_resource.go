@@ -3,7 +3,6 @@ package model
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"time"
 )
 
@@ -186,15 +185,13 @@ func (rr ReporterResource) Serialize() ReporterResourceSnapshot {
 }
 
 func DeserializeReporterResource(snapshot ReporterResourceSnapshot) ReporterResource {
-	log.Printf("----------------------------------")
-	log.Printf("ReporterResourceSnapshot : %+v, ", snapshot)
-
+	consoleHref := DeserializeConsoleHref(snapshot.ConsoleHref)
 	return ReporterResource{
 		id:                    DeserializeReporterResourceId(snapshot.ID),
 		ReporterResourceKey:   DeserializeReporterResourceKey(snapshot.ReporterResourceKey.LocalResourceID, snapshot.ReporterResourceKey.ResourceType, snapshot.ReporterResourceKey.ReporterType, snapshot.ReporterResourceKey.ReporterInstanceID),
 		resourceID:            DeserializeResourceId(snapshot.ResourceID),
 		apiHref:               DeserializeApiHref(snapshot.APIHref),
-		consoleHref:           DeserializeConsoleHref(snapshot.ConsoleHref),
+		consoleHref:           consoleHref,
 		representationVersion: DeserializeVersion(snapshot.RepresentationVersion),
 		generation:            DeserializeGeneration(snapshot.Generation),
 		tombstone:             DeserializeTombstone(snapshot.Tombstone),

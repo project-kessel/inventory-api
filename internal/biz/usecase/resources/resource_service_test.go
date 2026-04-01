@@ -4,23 +4,22 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"strings"
 	"testing"
 
 	"github.com/go-kratos/kratos/v2/log"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gorm.io/gorm"
 
 	authnapi "github.com/project-kessel/inventory-api/internal/authn/api"
-	"github.com/project-kessel/inventory-api/internal/authz"
-	"github.com/project-kessel/inventory-api/internal/authz/allow"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
 	"github.com/project-kessel/inventory-api/internal/biz/usecase/metaauthorizer"
 	"github.com/project-kessel/inventory-api/internal/data"
 	"github.com/project-kessel/inventory-api/internal/metricscollector"
 	"github.com/project-kessel/inventory-api/internal/subject/selfsubject"
-	kessel "github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -87,10 +86,11 @@ func (r *recordingMetaAuthorizer) Check(_ context.Context, _ metaauthorizer.Meta
 func TestCheckSelf_UsesCheckSelfRelation(t *testing.T) {
 	ctx := testAuthzContext()
 	meta := &recordingMetaAuthorizer{allowed: true}
+	fakeRepo := data.NewFakeRelationsRepository()
 	usecase := New(
 		data.NewFakeResourceRepository(),
 		newFakeSchemaRepository(t),
-		&allow.AllowAllAuthz{},
+		fakeRepo,
 		"rbac",
 		log.DefaultLogger,
 		nil,
@@ -100,6 +100,8 @@ func TestCheckSelf_UsesCheckSelfRelation(t *testing.T) {
 		meta,
 		newTestSelfSubjectStrategy(),
 	)
+
+	fakeRepo.Grant("test-user", "view", "hbi", "host", "host-1")
 
 	key := createReporterResourceKey(t, "host-1", "host", "hbi", "instance-1")
 	relation, err := model.NewRelation("view")
@@ -118,7 +120,7 @@ func TestCheckSelf_DeniedByMetaAuthz(t *testing.T) {
 	usecase := New(
 		data.NewFakeResourceRepository(),
 		newFakeSchemaRepository(t),
-		&allow.AllowAllAuthz{},
+		data.NewFakeRelationsRepository(),
 		"rbac",
 		log.DefaultLogger,
 		nil,
@@ -142,7 +144,7 @@ func TestCheckSelf_MissingAuthzContext(t *testing.T) {
 	usecase := New(
 		data.NewFakeResourceRepository(),
 		newFakeSchemaRepository(t),
-		&allow.AllowAllAuthz{},
+		data.NewFakeRelationsRepository(),
 		"rbac",
 		log.DefaultLogger,
 		nil,
@@ -168,7 +170,7 @@ func TestReportResource_UsesReportRelation(t *testing.T) {
 	usecase := New(
 		data.NewFakeResourceRepository(),
 		newFakeSchemaRepository(t),
-		&allow.AllowAllAuthz{},
+		data.NewFakeRelationsRepository(),
 		"rbac",
 		log.DefaultLogger,
 		nil,
@@ -192,7 +194,7 @@ func TestDelete_UsesDeleteRelation(t *testing.T) {
 	usecase := New(
 		data.NewFakeResourceRepository(),
 		newFakeSchemaRepository(t),
-		&allow.AllowAllAuthz{},
+		data.NewFakeRelationsRepository(),
 		"rbac",
 		log.DefaultLogger,
 		nil,
@@ -220,10 +222,11 @@ func TestDelete_UsesDeleteRelation(t *testing.T) {
 func TestCheck_UsesCheckRelation(t *testing.T) {
 	ctx := testAuthzContext()
 	meta := &recordingMetaAuthorizer{allowed: true}
+	fakeRepo := data.NewFakeRelationsRepository()
 	usecase := New(
 		data.NewFakeResourceRepository(),
 		newFakeSchemaRepository(t),
-		&allow.AllowAllAuthz{},
+		fakeRepo,
 		"rbac",
 		log.DefaultLogger,
 		nil,
@@ -233,6 +236,8 @@ func TestCheck_UsesCheckRelation(t *testing.T) {
 		meta,
 		newTestSelfSubjectStrategy(),
 	)
+
+	fakeRepo.Grant("user-1", "view", "hbi", "host", "host-1")
 
 	subject, err := buildTestSubjectReference("user-1")
 	require.NoError(t, err)
@@ -250,10 +255,11 @@ func TestCheck_UsesCheckRelation(t *testing.T) {
 func TestCheckForUpdate_UsesCheckForUpdateRelation(t *testing.T) {
 	ctx := testAuthzContext()
 	meta := &recordingMetaAuthorizer{allowed: true}
+	fakeRepo := data.NewFakeRelationsRepository()
 	usecase := New(
 		data.NewFakeResourceRepository(),
 		newFakeSchemaRepository(t),
-		&allow.AllowAllAuthz{},
+		fakeRepo,
 		"rbac",
 		log.DefaultLogger,
 		nil,
@@ -263,6 +269,8 @@ func TestCheckForUpdate_UsesCheckForUpdateRelation(t *testing.T) {
 		meta,
 		newTestSelfSubjectStrategy(),
 	)
+
+	fakeRepo.Grant("user-1", "view", "hbi", "host", "host-1")
 
 	subject, err := buildTestSubjectReference("user-1")
 	require.NoError(t, err)
@@ -277,126 +285,14 @@ func TestCheckForUpdate_UsesCheckForUpdateRelation(t *testing.T) {
 	assert.Equal(t, []metaauthorizer.Relation{metaauthorizer.RelationCheckForUpdate}, meta.relations)
 }
 
-func TestCheckForUpdateBulk_UsesCheckForUpdateBulkRelation(t *testing.T) {
-	ctx := testAuthzContext()
-	meta := &recordingMetaAuthorizer{allowed: true}
-	usecase := New(
-		data.NewFakeResourceRepository(),
-		newFakeSchemaRepository(t),
-		&allow.AllowAllAuthz{},
-		"rbac",
-		log.DefaultLogger,
-		nil,
-		nil,
-		&UsecaseConfig{},
-		metricscollector.NewFakeMetricsCollector(),
-		meta,
-		newTestSelfSubjectStrategy(),
-	)
-
-	subject, err := buildTestSubjectReference("user-1")
-	require.NoError(t, err)
-	key := createReporterResourceKey(t, "host-1", "host", "hbi", "instance-1")
-	relation, err := model.NewRelation("edit")
-	require.NoError(t, err)
-
-	cmd := CheckForUpdateBulkCommand{
-		Items: []CheckBulkItem{
-			{Resource: key, Relation: relation, Subject: subject},
-		},
-	}
-	result, err := usecase.CheckForUpdateBulk(ctx, cmd)
-	require.NoError(t, err)
-	require.Len(t, result.Pairs, 1)
-	assert.True(t, result.Pairs[0].Result.Allowed)
-	// One meta-authz per item (check_for_update_bulk); Authz.CheckForUpdateBulk called once.
-	assert.Equal(t, 1, meta.calls)
-	assert.Equal(t, []metaauthorizer.Relation{metaauthorizer.RelationCheckForUpdateBulk}, meta.relations)
-}
-
-func TestCheckForUpdateBulk_MetaAuthzDenied(t *testing.T) {
-	ctx := testAuthzContext()
-	meta := &recordingMetaAuthorizer{allowed: false}
-	uc := New(
-		data.NewFakeResourceRepository(),
-		newFakeSchemaRepository(t),
-		&allow.AllowAllAuthz{},
-		"rbac",
-		log.DefaultLogger,
-		nil,
-		nil,
-		&UsecaseConfig{},
-		metricscollector.NewFakeMetricsCollector(),
-		meta,
-		newTestSelfSubjectStrategy(),
-	)
-
-	subject, err := buildTestSubjectReference("user-1")
-	require.NoError(t, err)
-	key := createReporterResourceKey(t, "host-1", "host", "hbi", "instance-1")
-	relation, err := model.NewRelation("update")
-	require.NoError(t, err)
-
-	_, err = uc.CheckForUpdateBulk(ctx, CheckForUpdateBulkCommand{
-		Items: []CheckBulkItem{
-			{Resource: key, Relation: relation, Subject: subject},
-		},
-	})
-	assert.ErrorIs(t, err, ErrMetaAuthorizationDenied)
-	assert.Equal(t, 1, meta.calls)
-}
-
-func TestCheckForUpdateBulk_MixedResults(t *testing.T) {
-	ctx := testAuthzContext()
-	meta := &recordingMetaAuthorizer{allowed: true}
-
-	simpleAuthz := authz.NewSimpleAuthorizer()
-	simpleAuthz.Grant("user-1", "update", "hbi", "host", "host-1")
-	// No grant for host-2
-
-	uc := New(
-		data.NewFakeResourceRepository(),
-		newFakeSchemaRepository(t),
-		simpleAuthz,
-		"rbac",
-		log.DefaultLogger,
-		nil,
-		nil,
-		&UsecaseConfig{},
-		metricscollector.NewFakeMetricsCollector(),
-		meta,
-		newTestSelfSubjectStrategy(),
-	)
-
-	subject, err := buildTestSubjectReference("user-1")
-	require.NoError(t, err)
-	key1 := createReporterResourceKey(t, "host-1", "host", "hbi", "instance-1")
-	key2 := createReporterResourceKey(t, "host-2", "host", "hbi", "instance-1")
-	relation, err := model.NewRelation("update")
-	require.NoError(t, err)
-
-	result, err := uc.CheckForUpdateBulk(ctx, CheckForUpdateBulkCommand{
-		Items: []CheckBulkItem{
-			{Resource: key1, Relation: relation, Subject: subject},
-			{Resource: key2, Relation: relation, Subject: subject},
-		},
-	})
-	require.NoError(t, err)
-	require.Len(t, result.Pairs, 2)
-	assert.True(t, result.Pairs[0].Result.Allowed)
-	assert.Nil(t, result.Pairs[0].Result.Error)
-	assert.False(t, result.Pairs[1].Result.Allowed)
-	assert.Nil(t, result.Pairs[1].Result.Error)
-	assert.Equal(t, 2, meta.calls)
-}
-
 func TestCheckSelfBulk_UsesCheckSelfRelationForEachItem(t *testing.T) {
 	ctx := testAuthzContext()
 	meta := &recordingMetaAuthorizer{allowed: true}
+	fakeRepo := data.NewFakeRelationsRepository()
 	usecase := New(
 		data.NewFakeResourceRepository(),
 		newFakeSchemaRepository(t),
-		&allow.AllowAllAuthz{},
+		fakeRepo,
 		"rbac",
 		log.DefaultLogger,
 		nil,
@@ -406,6 +302,9 @@ func TestCheckSelfBulk_UsesCheckSelfRelationForEachItem(t *testing.T) {
 		meta,
 		newTestSelfSubjectStrategy(),
 	)
+
+	fakeRepo.Grant("test-user", "view", "hbi", "host", "host-1")
+	fakeRepo.Grant("test-user", "edit", "hbi", "host", "host-2")
 
 	key1 := createReporterResourceKey(t, "host-1", "host", "hbi", "instance-1")
 	key2 := createReporterResourceKey(t, "host-2", "host", "hbi", "instance-1")
@@ -425,7 +324,10 @@ func TestCheckSelfBulk_UsesCheckSelfRelationForEachItem(t *testing.T) {
 	resp, err := usecase.CheckSelfBulk(ctx, cmd)
 	require.NoError(t, err)
 	require.Len(t, resp.Pairs, 2)
-	assert.Equal(t, []metaauthorizer.Relation{metaauthorizer.RelationCheckSelf, metaauthorizer.RelationCheckSelf}, meta.relations)
+	assert.Equal(t, []metaauthorizer.Relation{
+		metaauthorizer.RelationCheckSelf, metaauthorizer.RelationCheckSelf,
+		metaauthorizer.RelationCheckBulk, metaauthorizer.RelationCheckBulk,
+	}, meta.relations)
 }
 
 func TestCheckSelfBulk_MissingAuthzContext(t *testing.T) {
@@ -433,7 +335,7 @@ func TestCheckSelfBulk_MissingAuthzContext(t *testing.T) {
 	usecase := New(
 		data.NewFakeResourceRepository(),
 		newFakeSchemaRepository(t),
-		&allow.AllowAllAuthz{},
+		data.NewFakeRelationsRepository(),
 		"rbac",
 		log.DefaultLogger,
 		nil,
@@ -466,7 +368,7 @@ func TestCheckBulk_RejectsInventoryManagedConsistency(t *testing.T) {
 	usecase := New(
 		data.NewFakeResourceRepository(),
 		newFakeSchemaRepository(t),
-		&allow.AllowAllAuthz{},
+		data.NewFakeRelationsRepository(),
 		"rbac",
 		log.DefaultLogger,
 		nil,
@@ -505,7 +407,7 @@ func TestCheckSelfBulk_RejectsInventoryManagedConsistency(t *testing.T) {
 	usecase := New(
 		data.NewFakeResourceRepository(),
 		newFakeSchemaRepository(t),
-		&allow.AllowAllAuthz{},
+		data.NewFakeRelationsRepository(),
 		"rbac",
 		log.DefaultLogger,
 		nil,
@@ -621,7 +523,7 @@ func TestReportResource(t *testing.T) {
 
 			resourceRepo := data.NewFakeResourceRepository()
 			schemaRepo := newFakeSchemaRepository(t)
-			authorizer := &allow.AllowAllAuthz{}
+			authorizer := data.NewFakeRelationsRepository()
 			usecaseConfig := &UsecaseConfig{
 				ReadAfterWriteEnabled: false,
 				ConsumerEnabled:       false,
@@ -701,7 +603,7 @@ func TestReportResourceThenDelete(t *testing.T) {
 
 			resourceRepo := data.NewFakeResourceRepository()
 			schemaRepo := newFakeSchemaRepository(t)
-			authorizer := &allow.AllowAllAuthz{}
+			authorizer := data.NewFakeRelationsRepository()
 			usecaseConfig := &UsecaseConfig{
 				ReadAfterWriteEnabled: false,
 				ConsumerEnabled:       false,
@@ -761,7 +663,7 @@ func TestDelete_ResourceNotFound(t *testing.T) {
 
 	resourceRepo := data.NewFakeResourceRepository()
 	schemaRepo := newFakeSchemaRepository(t)
-	authorizer := &allow.AllowAllAuthz{}
+	authorizer := data.NewFakeRelationsRepository()
 	usecaseConfig := &UsecaseConfig{
 		ReadAfterWriteEnabled: false,
 		ConsumerEnabled:       false,
@@ -792,7 +694,7 @@ func TestReportFindDeleteFind_TombstoneLifecycle(t *testing.T) {
 
 	resourceRepo := data.NewFakeResourceRepository()
 	schemaRepo := newFakeSchemaRepository(t)
-	authorizer := &allow.AllowAllAuthz{}
+	authorizer := data.NewFakeRelationsRepository()
 	usecaseConfig := &UsecaseConfig{
 		ReadAfterWriteEnabled: false,
 		ConsumerEnabled:       false,
@@ -837,7 +739,7 @@ func TestMultipleHostsLifecycle(t *testing.T) {
 
 	resourceRepo := data.NewFakeResourceRepository()
 	schemaRepo := newFakeSchemaRepository(t)
-	authorizer := &allow.AllowAllAuthz{}
+	authorizer := data.NewFakeRelationsRepository()
 	usecaseConfig := &UsecaseConfig{
 		ReadAfterWriteEnabled: false,
 		ConsumerEnabled:       false,
@@ -912,7 +814,7 @@ func TestPartialDataScenarios(t *testing.T) {
 
 	resourceRepo := data.NewFakeResourceRepository()
 	schemaRepo := newFakeSchemaRepository(t)
-	authorizer := &allow.AllowAllAuthz{}
+	authorizer := data.NewFakeRelationsRepository()
 	usecaseConfig := &UsecaseConfig{
 		ReadAfterWriteEnabled: false,
 		ConsumerEnabled:       false,
@@ -987,7 +889,7 @@ func TestResourceLifecycle_ReportUpdateDeleteReport(t *testing.T) {
 
 		resourceRepo := data.NewFakeResourceRepository()
 		schemaRepo := newFakeSchemaRepository(t)
-		authorizer := &allow.AllowAllAuthz{}
+		authorizer := data.NewFakeRelationsRepository()
 		usecaseConfig := &UsecaseConfig{
 			ReadAfterWriteEnabled: false,
 			ConsumerEnabled:       false,
@@ -1084,7 +986,7 @@ func TestResourceLifecycle_ReportUpdateDeleteReportDelete(t *testing.T) {
 
 		resourceRepo := data.NewFakeResourceRepository()
 		schemaRepo := newFakeSchemaRepository(t)
-		authorizer := &allow.AllowAllAuthz{}
+		authorizer := data.NewFakeRelationsRepository()
 		usecaseConfig := &UsecaseConfig{
 			ReadAfterWriteEnabled: false,
 			ConsumerEnabled:       false,
@@ -1158,7 +1060,7 @@ func TestResourceLifecycle_ReportDeleteResubmitDelete(t *testing.T) {
 
 		resourceRepo := data.NewFakeResourceRepository()
 		schemaRepo := newFakeSchemaRepository(t)
-		authorizer := &allow.AllowAllAuthz{}
+		authorizer := data.NewFakeRelationsRepository()
 		usecaseConfig := &UsecaseConfig{
 			ReadAfterWriteEnabled: false,
 			ConsumerEnabled:       false,
@@ -1228,7 +1130,7 @@ func TestResourceLifecycle_ReportResubmitDeleteResubmit(t *testing.T) {
 
 		resourceRepo := data.NewFakeResourceRepository()
 		schemaRepo := newFakeSchemaRepository(t)
-		authorizer := &allow.AllowAllAuthz{}
+		authorizer := data.NewFakeRelationsRepository()
 		usecaseConfig := &UsecaseConfig{
 			ReadAfterWriteEnabled: false,
 			ConsumerEnabled:       false,
@@ -1311,7 +1213,7 @@ func TestResourceLifecycle_ComplexIdempotency(t *testing.T) {
 
 		resourceRepo := data.NewFakeResourceRepository()
 		schemaRepo := newFakeSchemaRepository(t)
-		authorizer := &allow.AllowAllAuthz{}
+		authorizer := data.NewFakeRelationsRepository()
 		usecaseConfig := &UsecaseConfig{
 			ReadAfterWriteEnabled: false,
 			ConsumerEnabled:       false,
@@ -1472,7 +1374,7 @@ func TestTransactionIdIdempotency(t *testing.T) {
 
 	resourceRepo := data.NewFakeResourceRepository()
 	schemaRepo := newFakeSchemaRepository(t)
-	authorizer := &allow.AllowAllAuthz{}
+	authorizer := data.NewFakeRelationsRepository()
 	usecaseConfig := &UsecaseConfig{
 		ReadAfterWriteEnabled: false,
 		ConsumerEnabled:       false,
@@ -1692,7 +1594,7 @@ func TestReportResource_ValidationSuccess(t *testing.T) {
 	usecase := New(
 		data.NewFakeResourceRepository(),
 		schemaRepo,
-		&allow.AllowAllAuthz{},
+		data.NewFakeRelationsRepository(),
 		"test-topic",
 		log.DefaultLogger,
 		nil, nil,
@@ -1723,7 +1625,7 @@ func TestReportResource_ValidationErrors(t *testing.T) {
 	usecase := New(
 		data.NewFakeResourceRepository(),
 		schemaRepo,
-		&allow.AllowAllAuthz{},
+		data.NewFakeRelationsRepository(),
 		"test-topic",
 		log.DefaultLogger,
 		nil, nil,
@@ -1942,7 +1844,7 @@ func TestReportResource_SchemaValidation(t *testing.T) {
 			usecase := New(
 				data.NewFakeResourceRepository(),
 				schemaRepository,
-				&allow.AllowAllAuthz{},
+				data.NewFakeRelationsRepository(),
 				"test-topic",
 				log.DefaultLogger,
 				nil, nil,
@@ -1983,7 +1885,7 @@ func TestReportResource_BothRepresentationsNil(t *testing.T) {
 	usecase := New(
 		data.NewFakeResourceRepository(),
 		schemaRepo,
-		&allow.AllowAllAuthz{},
+		data.NewFakeRelationsRepository(),
 		"test-topic",
 		log.DefaultLogger,
 		nil, nil,
@@ -2023,7 +1925,7 @@ func TestReportResource_ValidationErrorFormat(t *testing.T) {
 	usecase := New(
 		data.NewFakeResourceRepository(),
 		schemaRepo,
-		&allow.AllowAllAuthz{},
+		data.NewFakeRelationsRepository(),
 		"test-topic",
 		log.DefaultLogger,
 		nil, nil,
@@ -2072,6 +1974,144 @@ func TestReportResource_ValidationErrorFormat(t *testing.T) {
 	}
 }
 
+// --- Usecase authorization integration tests with FakeRelationsRepository ---
+
+func newUsecaseWithFakeRelations(t *testing.T) (*Usecase, *data.FakeRelationsRepository) {
+	t.Helper()
+	fakeRepo := data.NewFakeRelationsRepository()
+	uc := New(
+		data.NewFakeResourceRepository(),
+		newFakeSchemaRepository(t),
+		fakeRepo,
+		"rbac",
+		log.DefaultLogger,
+		nil,
+		nil,
+		&UsecaseConfig{},
+		metricscollector.NewFakeMetricsCollector(),
+		metaauthorizer.NewSimpleMetaAuthorizer(),
+		newTestSelfSubjectStrategy(),
+	)
+	return uc, fakeRepo
+}
+
+func TestCheck_WithFakeRelations_Allowed(t *testing.T) {
+	uc, fakeRepo := newUsecaseWithFakeRelations(t)
+	ctx := testAuthzContext()
+
+	key := createReporterResourceKey(t, "host-1", "host", "hbi", "instance-1")
+	rel, err := model.NewRelation("view")
+	require.NoError(t, err)
+	sub, err := buildTestSubjectReference("test-user")
+	require.NoError(t, err)
+
+	fakeRepo.Grant("test-user", "view", "hbi", "host", "host-1")
+
+	allowed, _, err := uc.Check(ctx, rel, sub, key, model.NewConsistencyMinimizeLatency())
+	require.NoError(t, err)
+	assert.True(t, allowed)
+}
+
+func TestCheck_WithFakeRelations_Denied(t *testing.T) {
+	uc, _ := newUsecaseWithFakeRelations(t)
+	ctx := testAuthzContext()
+
+	key := createReporterResourceKey(t, "host-1", "host", "hbi", "instance-1")
+	rel, err := model.NewRelation("view")
+	require.NoError(t, err)
+	sub, err := buildTestSubjectReference("test-user")
+	require.NoError(t, err)
+
+	allowed, _, err := uc.Check(ctx, rel, sub, key, model.NewConsistencyMinimizeLatency())
+	require.NoError(t, err)
+	assert.False(t, allowed)
+}
+
+func TestCheckForUpdate_WithFakeRelations_Allowed(t *testing.T) {
+	uc, fakeRepo := newUsecaseWithFakeRelations(t)
+	ctx := testAuthzContext()
+
+	key := createReporterResourceKey(t, "host-1", "host", "hbi", "instance-1")
+	rel, err := model.NewRelation("edit")
+	require.NoError(t, err)
+	sub, err := buildTestSubjectReference("test-user")
+	require.NoError(t, err)
+
+	fakeRepo.Grant("test-user", "edit", "hbi", "host", "host-1")
+
+	allowed, _, err := uc.CheckForUpdate(ctx, rel, sub, key)
+	require.NoError(t, err)
+	assert.True(t, allowed)
+}
+
+func TestCheckBulk_WithFakeRelations_MixedResults(t *testing.T) {
+	uc, fakeRepo := newUsecaseWithFakeRelations(t)
+	ctx := testAuthzContext()
+
+	key1 := createReporterResourceKey(t, "host-1", "host", "hbi", "inst-1")
+	key2 := createReporterResourceKey(t, "host-2", "host", "hbi", "inst-1")
+	rel, err := model.NewRelation("view")
+	require.NoError(t, err)
+	sub, err := buildTestSubjectReference("test-user")
+	require.NoError(t, err)
+
+	fakeRepo.Grant("test-user", "view", "hbi", "host", "host-1")
+
+	cmd := CheckBulkCommand{
+		Items: []CheckBulkItem{
+			{Resource: key1, Relation: rel, Subject: sub},
+			{Resource: key2, Relation: rel, Subject: sub},
+		},
+		Consistency: model.NewConsistencyMinimizeLatency(),
+	}
+
+	result, err := uc.CheckBulk(ctx, cmd)
+	require.NoError(t, err)
+	require.Len(t, result.Pairs, 2)
+	assert.True(t, result.Pairs[0].Result.Allowed, "host-1 should be allowed")
+	assert.False(t, result.Pairs[1].Result.Allowed, "host-2 should be denied")
+}
+
+func TestLookupResources_WithFakeRelations(t *testing.T) {
+	uc, fakeRepo := newUsecaseWithFakeRelations(t)
+	ctx := testAuthzContext()
+
+	fakeRepo.Grant("test-user", "view", "hbi", "host", "host-1")
+	fakeRepo.Grant("test-user", "view", "hbi", "host", "host-2")
+
+	resType, _ := model.NewResourceType("host")
+	repType, _ := model.NewReporterType("hbi")
+	rel, _ := model.NewRelation("view")
+	sub, err := buildTestSubjectReference("test-user")
+	require.NoError(t, err)
+
+	cmd := LookupResourcesCommand{
+		ResourceType: resType,
+		ReporterType: repType,
+		Relation:     rel,
+		Subject:      sub,
+		Pagination: &model.Pagination{
+			Limit: 100,
+		},
+		Consistency: model.NewConsistencyMinimizeLatency(),
+	}
+
+	iter, err := uc.LookupResources(ctx, cmd)
+	require.NoError(t, err)
+
+	var resourceIDs []string
+	for {
+		result, err := iter.Next()
+		if err == io.EOF {
+			break
+		}
+		require.NoError(t, err)
+		resourceIDs = append(resourceIDs, string(result.ResourceId))
+	}
+
+	assert.Len(t, resourceIDs, 2)
+	assert.ElementsMatch(t, []string{"host-1", "host-2"}, resourceIDs)
+}
 func TestResolveConsistencyToken(t *testing.T) {
 	tests := []struct {
 		name               string
@@ -2081,7 +2121,6 @@ func TestResolveConsistencyToken(t *testing.T) {
 		expectedToken      string
 		expectedError      bool
 	}{
-		// Feature flag only affects DEFAULT/UNSPECIFIED behavior - explicit preferences are always honored
 		{
 			name:               "feature flag disabled - unspecified defaults to minimize_latency",
 			featureFlagEnabled: false,
@@ -2111,7 +2150,7 @@ func TestResolveConsistencyToken(t *testing.T) {
 			featureFlagEnabled: false,
 			consistency:        model.NewConsistencyAtLeastAsAcknowledged(),
 			resourceExists:     true,
-			expectedToken:      "", // fake repo returns empty consistency token
+			expectedToken:      "",
 			expectedError:      false,
 		},
 		{
@@ -2119,7 +2158,7 @@ func TestResolveConsistencyToken(t *testing.T) {
 			featureFlagEnabled: true,
 			consistency:        model.NewConsistencyUnspecified(),
 			resourceExists:     true,
-			expectedToken:      "", // fake repo returns empty consistency token
+			expectedToken:      "",
 			expectedError:      false,
 		},
 		{
@@ -2159,27 +2198,26 @@ func TestResolveConsistencyToken(t *testing.T) {
 			featureFlagEnabled: true,
 			consistency:        model.NewConsistencyAtLeastAsAcknowledged(),
 			resourceExists:     true,
-			expectedToken:      "", // fake repo returns empty consistency token
+			expectedToken:      "",
 			expectedError:      false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Use testAuthzContext so ReportResource (when resourceExists) can pass meta-authz
 			ctx := testAuthzContext()
 			logger := log.DefaultLogger
 
 			resourceRepo := data.NewFakeResourceRepository()
 			schemaRepo := newFakeSchemaRepository(t)
-			authorizer := &allow.AllowAllAuthz{}
+			relationsRepo := data.NewFakeRelationsRepository()
 			usecaseConfig := &UsecaseConfig{
 				ReadAfterWriteEnabled:          false,
 				ConsumerEnabled:                false,
 				DefaultToAtLeastAsAcknowledged: tt.featureFlagEnabled,
 			}
 			mc := metricscollector.NewFakeMetricsCollector()
-			uc := New(resourceRepo, schemaRepo, authorizer, "test-topic", logger, nil, nil, usecaseConfig, mc, nil, newTestSelfSubjectStrategy())
+			uc := New(resourceRepo, schemaRepo, relationsRepo, "test-topic", logger, nil, nil, usecaseConfig, mc, nil, newTestSelfSubjectStrategy())
 
 			// Create test reporter resource key
 			localResourceId, err := model.NewLocalResourceId("test-resource-123")
@@ -2264,14 +2302,14 @@ func TestResolveConsistencyToken_OverrideFeatureFlag(t *testing.T) {
 
 			resourceRepo := data.NewFakeResourceRepository()
 			schemaRepo := newFakeSchemaRepository(t)
-			authorizer := &allow.AllowAllAuthz{}
+			relationsRepo := data.NewFakeRelationsRepository()
 			usecaseConfig := &UsecaseConfig{
 				ReadAfterWriteEnabled:          false,
 				ConsumerEnabled:                false,
 				DefaultToAtLeastAsAcknowledged: tt.featureFlagEnabled,
 			}
 			mc := metricscollector.NewFakeMetricsCollector()
-			uc := New(resourceRepo, schemaRepo, authorizer, "test-topic", logger, nil, nil, usecaseConfig, mc, nil, newTestSelfSubjectStrategy())
+			uc := New(resourceRepo, schemaRepo, relationsRepo, "test-topic", logger, nil, nil, usecaseConfig, mc, nil, newTestSelfSubjectStrategy())
 
 			localResourceId, err := model.NewLocalResourceId("test-resource-override")
 			require.NoError(t, err)
@@ -2309,7 +2347,7 @@ func TestResolveConsistencyToken_NilConsistencyDefaultsToUnspecified(t *testing.
 
 	resourceRepo := data.NewFakeResourceRepository()
 	schemaRepo := newFakeSchemaRepository(t)
-	authorizer := &allow.AllowAllAuthz{}
+	relationsRepo := data.NewFakeRelationsRepository()
 	usecaseConfig := &UsecaseConfig{
 		ReadAfterWriteEnabled:          false,
 		ConsumerEnabled:                false,
@@ -2317,7 +2355,7 @@ func TestResolveConsistencyToken_NilConsistencyDefaultsToUnspecified(t *testing.
 	}
 
 	mc := metricscollector.NewFakeMetricsCollector()
-	uc := New(resourceRepo, schemaRepo, authorizer, "test-topic", logger, nil, nil, usecaseConfig, mc, nil, newTestSelfSubjectStrategy())
+	uc := New(resourceRepo, schemaRepo, relationsRepo, "test-topic", logger, nil, nil, usecaseConfig, mc, nil, newTestSelfSubjectStrategy())
 
 	// Create test reporter resource key
 	localResourceId, err := model.NewLocalResourceId("test-resource-456")
@@ -2346,7 +2384,7 @@ func TestResolveConsistencyToken_OverrideFeatureFlag_LogsBypassWhenEnabled(t *te
 
 	resourceRepo := data.NewFakeResourceRepository()
 	schemaRepo := newFakeSchemaRepository(t)
-	authorizer := &allow.AllowAllAuthz{}
+	relationsRepo := data.NewFakeRelationsRepository()
 	usecaseConfig := &UsecaseConfig{
 		ReadAfterWriteEnabled:          false,
 		ConsumerEnabled:                false,
@@ -2354,7 +2392,7 @@ func TestResolveConsistencyToken_OverrideFeatureFlag_LogsBypassWhenEnabled(t *te
 	}
 
 	mc := metricscollector.NewFakeMetricsCollector()
-	uc := New(resourceRepo, schemaRepo, authorizer, "test-topic", logger, nil, nil, usecaseConfig, mc, nil, newTestSelfSubjectStrategy())
+	uc := New(resourceRepo, schemaRepo, relationsRepo, "test-topic", logger, nil, nil, usecaseConfig, mc, nil, newTestSelfSubjectStrategy())
 
 	reporterResourceKey := createReporterResourceKey(t, "host-123", "host", "hbi", "instance-1")
 
@@ -2372,7 +2410,7 @@ func TestResolveConsistencyToken_OverrideFeatureFlag_LogsEnabledWhenNotBypassed(
 
 	resourceRepo := data.NewFakeResourceRepository()
 	schemaRepo := newFakeSchemaRepository(t)
-	authorizer := &allow.AllowAllAuthz{}
+	authorizer := data.NewFakeRelationsRepository()
 	usecaseConfig := &UsecaseConfig{
 		ReadAfterWriteEnabled:          false,
 		ConsumerEnabled:                false,
@@ -2398,7 +2436,7 @@ func TestResolveConsistencyToken_OverrideFeatureFlag_LogsDisabledWhenFeatureOff(
 
 	resourceRepo := data.NewFakeResourceRepository()
 	schemaRepo := newFakeSchemaRepository(t)
-	authorizer := &allow.AllowAllAuthz{}
+	authorizer := data.NewFakeRelationsRepository()
 	usecaseConfig := &UsecaseConfig{
 		ReadAfterWriteEnabled:          false,
 		ConsumerEnabled:                false,
@@ -2414,154 +2452,4 @@ func TestResolveConsistencyToken_OverrideFeatureFlag_LogsDisabledWhenFeatureOff(
 	require.NoError(t, err)
 	assert.Equal(t, "", token)
 	assert.Contains(t, strings.ToLower(logBuf.String()), "feature flag default-to-at-least-as-acknowledged is disabled")
-}
-
-func TestCheckBulkCommandToV1beta1_UsesMinimizeLatencyForUnspecified(t *testing.T) {
-	subject, err := buildTestSubjectReference("user-1")
-	require.NoError(t, err)
-	relation, err := model.NewRelation("view")
-	require.NoError(t, err)
-
-	cmd := CheckBulkCommand{
-		Items: []CheckBulkItem{
-			{
-				Resource: createReporterResourceKey(t, "host-1", "host", "hbi", "instance-1"),
-				Relation: relation,
-				Subject:  subject,
-			},
-		},
-		Consistency: model.NewConsistencyUnspecified(),
-	}
-
-	req := checkBulkCommandToV1beta1(cmd)
-	require.NotNil(t, req)
-	require.NotNil(t, req.Consistency)
-	_, ok := req.Consistency.Requirement.(*kessel.Consistency_MinimizeLatency)
-	assert.True(t, ok, "unspecified consistency should map to minimize_latency for bulk authz requests")
-}
-
-func TestLookupResourcesCommandToV1beta1_UsesMinimizeLatencyForUnspecified(t *testing.T) {
-	subject, err := buildTestSubjectReference("user-1")
-	require.NoError(t, err)
-	resourceType, err := model.NewResourceType("host")
-	require.NoError(t, err)
-	reporterType, err := model.NewReporterType("hbi")
-	require.NoError(t, err)
-	relation, err := model.NewRelation("view")
-	require.NoError(t, err)
-
-	limit := uint32(100)
-	cmd := LookupResourcesCommand{
-		ResourceType: resourceType,
-		ReporterType: reporterType,
-		Relation:     relation,
-		Subject:      subject,
-		Pagination: &model.Pagination{
-			Limit:        limit,
-			Continuation: nil,
-		},
-		Consistency: model.NewConsistencyUnspecified(),
-	}
-
-	req := lookupResourcesCommandToV1beta1(cmd)
-	require.NotNil(t, req)
-	require.NotNil(t, req.Consistency)
-	_, ok := req.Consistency.Requirement.(*kessel.Consistency_MinimizeLatency)
-	assert.True(t, ok, "unspecified consistency should map to minimize_latency for lookup authz requests")
-}
-
-func TestLookupSubjectsCommandToV1beta1_UsesMinimizeLatencyForUnspecified(t *testing.T) {
-	resourceType, err := model.NewResourceType("host")
-	require.NoError(t, err)
-	reporterType, err := model.NewReporterType("hbi")
-	require.NoError(t, err)
-	localResourceId, err := model.NewLocalResourceId("resource-123")
-	require.NoError(t, err)
-	reporterResourceKey, err := model.NewReporterResourceKey(localResourceId, resourceType, reporterType, model.ReporterInstanceId(""))
-	require.NoError(t, err)
-	relation, err := model.NewRelation("member")
-	require.NoError(t, err)
-	subjectType, err := model.NewResourceType("principal")
-	require.NoError(t, err)
-	subjectReporter, err := model.NewReporterType("rbac")
-	require.NoError(t, err)
-
-	cmd := LookupSubjectsCommand{
-		Resource:        reporterResourceKey,
-		Relation:        relation,
-		SubjectType:     subjectType,
-		SubjectReporter: subjectReporter,
-		SubjectRelation: nil,
-		Pagination:      nil,
-		Consistency:     model.NewConsistencyUnspecified(),
-	}
-
-	req := lookupSubjectsCommandToV1beta1(cmd)
-	require.NotNil(t, req)
-	require.NotNil(t, req.Consistency)
-	_, ok := req.Consistency.Requirement.(*kessel.Consistency_MinimizeLatency)
-	assert.True(t, ok, "unspecified consistency should map to minimize_latency for lookup authz requests")
-}
-
-func TestLookupResourcesCommandToV1beta1_UsesAtLeastAsFreshWhenSpecified(t *testing.T) {
-	subject, err := buildTestSubjectReference("user-1")
-	require.NoError(t, err)
-	resourceType, err := model.NewResourceType("host")
-	require.NoError(t, err)
-	reporterType, err := model.NewReporterType("hbi")
-	require.NoError(t, err)
-	relation, err := model.NewRelation("view")
-	require.NoError(t, err)
-
-	token := model.ConsistencyToken("test-consistency-token")
-	cmd := LookupResourcesCommand{
-		ResourceType: resourceType,
-		ReporterType: reporterType,
-		Relation:     relation,
-		Subject:      subject,
-		Pagination:   nil,
-		Consistency:  model.NewConsistencyAtLeastAsFresh(token),
-	}
-
-	req := lookupResourcesCommandToV1beta1(cmd)
-	require.NotNil(t, req)
-	require.NotNil(t, req.Consistency)
-	atLeastAsFresh, ok := req.Consistency.Requirement.(*kessel.Consistency_AtLeastAsFresh)
-	assert.True(t, ok, "at_least_as_fresh consistency should be preserved")
-	assert.Equal(t, "test-consistency-token", atLeastAsFresh.AtLeastAsFresh.Token)
-}
-
-func TestLookupSubjectsCommandToV1beta1_UsesAtLeastAsFreshWhenSpecified(t *testing.T) {
-	resourceType, err := model.NewResourceType("host")
-	require.NoError(t, err)
-	reporterType, err := model.NewReporterType("hbi")
-	require.NoError(t, err)
-	localResourceId, err := model.NewLocalResourceId("resource-456")
-	require.NoError(t, err)
-	reporterResourceKey, err := model.NewReporterResourceKey(localResourceId, resourceType, reporterType, model.ReporterInstanceId(""))
-	require.NoError(t, err)
-	relation, err := model.NewRelation("member")
-	require.NoError(t, err)
-	subjectType, err := model.NewResourceType("principal")
-	require.NoError(t, err)
-	subjectReporter, err := model.NewReporterType("rbac")
-	require.NoError(t, err)
-
-	token := model.ConsistencyToken("test-subjects-token")
-	cmd := LookupSubjectsCommand{
-		Resource:        reporterResourceKey,
-		Relation:        relation,
-		SubjectType:     subjectType,
-		SubjectReporter: subjectReporter,
-		SubjectRelation: nil,
-		Pagination:      nil,
-		Consistency:     model.NewConsistencyAtLeastAsFresh(token),
-	}
-
-	req := lookupSubjectsCommandToV1beta1(cmd)
-	require.NotNil(t, req)
-	require.NotNil(t, req.Consistency)
-	atLeastAsFresh, ok := req.Consistency.Requirement.(*kessel.Consistency_AtLeastAsFresh)
-	assert.True(t, ok, "at_least_as_fresh consistency should be preserved")
-	assert.Equal(t, "test-subjects-token", atLeastAsFresh.AtLeastAsFresh.Token)
 }

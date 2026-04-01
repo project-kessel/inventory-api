@@ -35,7 +35,7 @@ func TestResourceSnapshot_FromDomainEntity(t *testing.T) {
 		transactionId,
 		reporterResourceId,
 		apiHref,
-		&consoleHref,
+		consoleHref,
 		&reporterData,
 		&commonData,
 		nil,
@@ -120,7 +120,6 @@ func TestIndividualSnapshotMethods(t *testing.T) {
 	reporterResourceFixture := NewReporterResourceTestFixture()
 
 	// Test ReporterResource snapshot
-	ch := reporterResourceFixture.ValidConsoleHrefType()
 	reporterResource, err := NewReporterResource(
 		reporterResourceFixture.ValidIdType(),
 		reporterResourceFixture.ValidLocalResourceIdType(),
@@ -129,7 +128,7 @@ func TestIndividualSnapshotMethods(t *testing.T) {
 		reporterResourceFixture.ValidReporterInstanceIdType(),
 		reporterResourceFixture.ValidResourceIdType(),
 		reporterResourceFixture.ValidApiHrefType(),
-		&ch,
+		reporterResourceFixture.ValidConsoleHrefType(),
 	)
 	if err != nil {
 		t.Fatalf("Failed to create ReporterResource: %v", err)
@@ -211,14 +210,11 @@ func TestSnapshotSerialization(t *testing.T) {
 	t.Parallel()
 
 	// Test that snapshots can be used for JSON serialization
-	now := time.Now()
 	snapshot := ResourceSnapshot{
 		ID:               uuid.New(),
 		Type:             "test-resource",
 		CommonVersion:    1,
 		ConsistencyToken: "test-token",
-		CreatedAt:        now,
-		UpdatedAt:        now,
 	}
 
 	// Test that all fields are accessible and properly typed

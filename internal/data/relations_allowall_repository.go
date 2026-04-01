@@ -43,6 +43,14 @@ func (r *allowAllRelationsRepository) CheckBulk(_ context.Context, items []model
 	return results, "", nil
 }
 
+func (r *allowAllRelationsRepository) CheckForUpdateBulk(_ context.Context, items []model.CheckItem) ([]model.CheckBulkResultItem, model.ConsistencyToken, error) {
+	results := make([]model.CheckBulkResultItem, len(items))
+	for i := range items {
+		results[i] = model.CheckBulkResultItem{Allowed: true}
+	}
+	return results, "", nil
+}
+
 func (r *allowAllRelationsRepository) LookupResources(_ context.Context, _ model.LookupResourcesQuery) (model.LookupResourcesIterator, error) {
 	return &emptyLookupIterator{}, nil
 }

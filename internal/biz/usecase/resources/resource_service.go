@@ -359,16 +359,60 @@ func (uc *Usecase) CheckSelf(ctx context.Context, relation model.Relation, repor
 }
 
 // CheckForUpdate verifies if a subject can update the resource.
-func (uc *Usecase) CheckForUpdate(ctx context.Context, relation model.Relation, sub model.SubjectReference, reporterResourceKey model.ReporterResourceKey) (bool, error) {
+func (uc *Usecase) CheckForUpdate(ctx context.Context, relation model.Relation, sub model.SubjectReference, reporterResourceKey model.ReporterResourceKey) (bool, model.ConsistencyToken, error) {
 	if err := uc.enforceMetaAuthzObject(ctx, metaauthorizer.RelationCheckForUpdate, metaauthorizer.NewInventoryResourceFromKey(reporterResourceKey)); err != nil {
-		return false, err
+		return false, "", err
 	}
 
-	allowed, _, err := uc.RelationsRepo.CheckForUpdate(ctx, reporterResourceKey, relation, sub)
+	allowed, token, err := uc.RelationsRepo.CheckForUpdate(ctx, reporterResourceKey, relation, sub)
 	if err != nil {
-		return false, err
+		return false, "", err
 	}
-	return allowed, nil
+	return allowed, token, nil
+}
+
+// CheckForUpdateBulk performs bulk strongly consistent check-for-update permission checks via RelationsRepo.
+func (uc *Usecase) CheckForUpdateBulk(ctx context.Context, cmd CheckForUpdateBulkCommand) (*CheckBulkResult, error) {
+	for _, item := range cmd.Items {
+		if err := uc.enforceMetaAuthzObject(ctx, metaauthorizer.RelationCheckForUpdateBulk, metaauthorizer.NewInventoryResourceFromKey(item.Resource)); err != nil {
+			uc.Log.WithContext(ctx).Errorf("meta authz failed for check for update bulk item: %v error: %v", item.Resource, err)
+			return nil, err
+		}
+	}
+
+	checkItems := make([]model.CheckItem, len(cmd.Items))
+	for i, item := range cmd.Items {
+		checkItems[i] = model.CheckItem{
+			Resource: item.Resource,
+			Relation: item.Relation,
+			Subject:  item.Subject,
+		}
+	}
+
+	results, token, err := uc.RelationsRepo.CheckForUpdateBulk(ctx, checkItems)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(results) != len(cmd.Items) {
+		return nil, status.Errorf(codes.Internal, "internal error: mismatched backend check-for-update results: expected %d pairs, got %d", len(cmd.Items), len(results))
+	}
+
+	pairs := make([]CheckBulkResultPair, len(results))
+	for i, result := range results {
+		pairs[i] = CheckBulkResultPair{
+			Request: cmd.Items[i],
+			Result: CheckBulkResultItem{
+				Allowed: result.Allowed,
+				Error:   result.Error,
+			},
+		}
+	}
+
+	return &CheckBulkResult{
+		Pairs:            pairs,
+		ConsistencyToken: token,
+	}, nil
 }
 
 // CheckBulk performs bulk permission checks.

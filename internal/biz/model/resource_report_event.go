@@ -120,16 +120,16 @@ func (re ResourceReportEvent) Data() internal.JsonObject {
 	return re.reporterRepresentation.Data()
 }
 
-func (re ResourceReportEvent) WorkspaceId() string {
+func (re ResourceReportEvent) WorkspaceId() *string {
 	if re.commonRepresentation == nil {
-		return ""
+		return nil
 	}
 	if workspaceId, ok := re.commonRepresentation.Data()["workspace_id"]; ok {
 		if workspaceIdStr, ok := workspaceId.(string); ok {
-			return workspaceIdStr
+			return &workspaceIdStr
 		}
 	}
-	return ""
+	return nil
 }
 
 // ReporterResourceKey constructs and returns the ReporterResourceKey from the event fields
@@ -161,9 +161,7 @@ func DeserializeResourceEvent(
 		event.commonRepresentation = &cr
 	}
 
-	if reporterRepresentationSnapshot != nil {
-		event.reporterRepresentation = DeserializeReporterDataRepresentation(reporterRepresentationSnapshot)
-	}
+	event.reporterRepresentation = DeserializeReporterDataRepresentation(reporterRepresentationSnapshot)
 
 	event.createdAt = createdAt
 	event.updatedAt = updatedAt

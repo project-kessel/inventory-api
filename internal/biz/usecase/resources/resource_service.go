@@ -8,7 +8,6 @@ import (
 
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/google/uuid"
-	kessel "github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
 	"github.com/project-kessel/inventory-api/cmd/common"
 	authnapi "github.com/project-kessel/inventory-api/internal/authn/api"
 	"github.com/project-kessel/inventory-api/internal/biz/model"
@@ -16,6 +15,7 @@ import (
 	"github.com/project-kessel/inventory-api/internal/metricscollector"
 	"github.com/project-kessel/inventory-api/internal/pubsub"
 	"github.com/project-kessel/inventory-api/internal/subject/selfsubject"
+	kessel "github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
 	"github.com/sony/gobreaker"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"

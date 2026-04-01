@@ -70,6 +70,11 @@ func (m *MockRelationsRepository) LookupResources(ctx context.Context, query mod
 	return args.Get(0).(model.LookupResourcesIterator), args.Error(1)
 }
 
+func (m *MockRelationsRepository) LookupSubjects(ctx context.Context, query model.LookupSubjectsQuery) (model.LookupSubjectsIterator, error) {
+	args := m.Called(ctx, query)
+	return args.Get(0).(model.LookupSubjectsIterator), args.Error(1)
+}
+
 func (m *MockRelationsRepository) CreateTuples(ctx context.Context, tuples []model.RelationsTuple, upsert bool,
 	lockId, lockToken string) (model.ConsistencyToken, error) {
 	args := m.Called(ctx, tuples, upsert, lockId, lockToken)

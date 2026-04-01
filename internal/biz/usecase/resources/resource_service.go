@@ -544,6 +544,35 @@ func (uc *Usecase) LookupResources(ctx context.Context, cmd LookupResourcesComma
 	})
 }
 
+// LookupSubjects delegates subject lookup to RelationsRepo (streaming via iterator).
+func (uc *Usecase) LookupSubjects(ctx context.Context, cmd LookupSubjectsCommand) (model.LookupSubjectsIterator, error) {
+	if model.ConsistencyTypeOf(cmd.Consistency) == model.ConsistencyAtLeastAsAcknowledged {
+		return nil, status.Errorf(codes.InvalidArgument, "inventory-managed consistency tokens aren't available")
+	}
+	if err := uc.enforceMetaAuthzObject(ctx, metaauthorizer.RelationLookupSubjects, metaauthorizer.NewInventoryResourceFromKey(cmd.Resource)); err != nil {
+		return nil, err
+	}
+
+	var limit uint32
+	var continuation string
+	if cmd.Pagination != nil {
+		limit = cmd.Pagination.Limit
+		if cmd.Pagination.Continuation != nil {
+			continuation = *cmd.Pagination.Continuation
+		}
+	}
+	return uc.RelationsRepo.LookupSubjects(ctx, model.LookupSubjectsQuery{
+		Resource:        cmd.Resource,
+		Relation:        cmd.Relation,
+		SubjectType:     cmd.SubjectType,
+		SubjectReporter: cmd.SubjectReporter,
+		SubjectRelation: cmd.SubjectRelation,
+		Limit:           limit,
+		Continuation:    continuation,
+		Consistency:     cmd.Consistency,
+	})
+}
+
 // lookupConsistencyTokenFromDB looks up the consistency token from the inventory database.
 // Returns the token if found, empty string if resource not found, or error for other failures.
 func (uc *Usecase) lookupConsistencyTokenFromDB(ctx context.Context, reporterResourceKey model.ReporterResourceKey) (string, error) {

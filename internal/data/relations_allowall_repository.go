@@ -55,6 +55,10 @@ func (r *allowAllRelationsRepository) LookupResources(_ context.Context, _ model
 	return &emptyLookupIterator{}, nil
 }
 
+func (r *allowAllRelationsRepository) LookupSubjects(_ context.Context, _ model.LookupSubjectsQuery) (model.LookupSubjectsIterator, error) {
+	return &emptyLookupSubjectsIterator{}, nil
+}
+
 func (r *allowAllRelationsRepository) CreateTuples(_ context.Context, _ []model.RelationsTuple, _ bool,
 	_, _ string) (model.ConsistencyToken, error) {
 	return "", nil
@@ -72,5 +76,11 @@ func (r *allowAllRelationsRepository) AcquireLock(_ context.Context, _ string) (
 type emptyLookupIterator struct{}
 
 func (e *emptyLookupIterator) Next() (*model.LookupResourceResult, error) {
+	return nil, io.EOF
+}
+
+type emptyLookupSubjectsIterator struct{}
+
+func (e *emptyLookupSubjectsIterator) Next() (*model.LookupSubjectResult, error) {
 	return nil, io.EOF
 }

@@ -92,6 +92,7 @@ func NewWithDeps(deps ServerConfig) (*kgrpc.Server, error) {
 		streamingInterceptor = append(streamingInterceptor, streamAuth.Interceptor())
 	}
 
+	streamingInterceptor = append(streamingInterceptor, m.StreamValidationInterceptor(deps.Validator))
 	streamingInterceptor = append(streamingInterceptor, m.ErrorMappingStreamInterceptor())
 
 	var authnMiddleware middleware.Middleware

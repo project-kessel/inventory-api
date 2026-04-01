@@ -2,6 +2,7 @@ package data
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/spf13/pflag"
 )
@@ -82,8 +83,19 @@ func (o *RelationsOptionsRoot) Validate() []error {
 // Validate checks the SpiceDB-specific options.
 func (o *RelationsOptions) Validate() []error {
 	var errs []error
-	if len(o.URL) == 0 {
-		errs = append(errs, fmt.Errorf("spicedb url may not be empty"))
+	if strings.TrimSpace(o.URL) == "" {
+		errs = append(errs, fmt.Errorf("relations gRPC url (authz.kessel.url) may not be empty"))
+	}
+	if o.EnableOidcAuth {
+		if strings.TrimSpace(o.ClientId) == "" {
+			errs = append(errs, fmt.Errorf("authz.kessel.sa-client-id must be non-empty when enable-oidc-auth is true"))
+		}
+		if strings.TrimSpace(o.ClientSecret) == "" {
+			errs = append(errs, fmt.Errorf("authz.kessel.sa-client-secret must be non-empty when enable-oidc-auth is true"))
+		}
+		if strings.TrimSpace(o.TokenEndpoint) == "" {
+			errs = append(errs, fmt.Errorf("authz.kessel.sso-token-endpoint must be non-empty when enable-oidc-auth is true"))
+		}
 	}
 	return errs
 }

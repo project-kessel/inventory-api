@@ -356,6 +356,7 @@ func (r *spicedbRelationsRepository) DeleteTuples(ctx context.Context, tuples []
 		return "", err
 	}
 
+	var consistencyToken model.ConsistencyToken
 	for _, tuple := range tuples {
 		filter := tupleToV1Beta1Filter(tuple)
 		req := &kessel.DeleteTuplesRequest{
@@ -368,15 +369,18 @@ func (r *spicedbRelationsRepository) DeleteTuples(ctx context.Context, tuples []
 			}
 		}
 
-		_, err := r.tupleService.DeleteTuples(ctx, req, opts...)
+		resp, err := r.tupleService.DeleteTuples(ctx, req, opts...)
 		if err != nil {
 			r.incrFailureCounter("DeleteTuples")
 			return "", err
 		}
+		if t := tokenFromV1Beta1(resp.GetConsistencyToken()); t != "" {
+			consistencyToken = t
+		}
 	}
 
 	r.incrSuccessCounter("DeleteTuples")
-	return "", nil
+	return consistencyToken, nil
 }
 
 func (r *spicedbRelationsRepository) AcquireLock(ctx context.Context, lockId string) (string, error) {

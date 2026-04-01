@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"buf.build/go/protovalidate"
+	"github.com/go-kratos/kratos/v2/errors"
 	pb "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/grpc"
@@ -84,4 +85,7 @@ func TestStreamValidationInterceptor_InvalidRequest(t *testing.T) {
 
 	err = interceptor(nil, dummyStream, nil, handler)
 	assert.Error(t, err)
+	assert.True(t, errors.IsBadRequest(err))
+	se := errors.FromError(err)
+	assert.Equal(t, "VALIDATOR", se.Reason)
 }

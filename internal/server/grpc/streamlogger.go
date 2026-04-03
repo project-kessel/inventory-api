@@ -21,6 +21,14 @@ func newStreamLoggingInterceptor(logger log.Logger) grpc.StreamServerInterceptor
 		streamID := uuid.New().String()
 		helper := log.NewHelper(logger)
 
+		helper.Infow(
+			"kind", "server",
+			"component", "grpc",
+			"operation", info.FullMethod,
+			"stream.id", streamID,
+			"msg", "stream opened",
+		)
+
 		wrapped := &loggingStream{
 			ServerStream: ss,
 			logger:       helper,
@@ -43,10 +51,7 @@ func newStreamLoggingInterceptor(logger log.Logger) grpc.StreamServerInterceptor
 			stack = fmt.Sprintf("%+v", err)
 		}
 
-		level := log.LevelInfo
-		if err != nil {
-			level = log.LevelError
-		}
+		level := levelForCode(code)
 
 		helper.Log(level,
 			"kind", "server",
@@ -66,6 +71,26 @@ func newStreamLoggingInterceptor(logger log.Logger) grpc.StreamServerInterceptor
 	}
 }
 
+func levelForCode(code codes.Code) log.Level {
+	switch code {
+	case codes.OK:
+		return log.LevelInfo
+	case codes.Canceled, codes.DeadlineExceeded:
+		return log.LevelInfo
+	case codes.InvalidArgument, codes.NotFound, codes.AlreadyExists,
+		codes.PermissionDenied, codes.Unauthenticated, codes.FailedPrecondition,
+		codes.OutOfRange:
+		return log.LevelWarn
+	case codes.Unknown, codes.Internal, codes.Unimplemented,
+		codes.Unavailable, codes.DataLoss:
+		return log.LevelError
+	case codes.ResourceExhausted, codes.Aborted:
+		return log.LevelWarn
+	default:
+		return log.LevelError
+	}
+}
+
 func extractArgs(msg interface{}) string {
 	if stringer, ok := msg.(fmt.Stringer); ok {
 		return stringer.String()
@@ -80,7 +105,7 @@ type loggingStream struct {
 	streamID    string
 	sent        atomic.Int64
 	received    atomic.Int64
-	logOpenOnce sync.Once
+	logArgsOnce sync.Once
 }
 
 func (s *loggingStream) SendMsg(m interface{}) error {
@@ -94,17 +119,17 @@ func (s *loggingStream) SendMsg(m interface{}) error {
 func (s *loggingStream) RecvMsg(m interface{}) error {
 	err := s.ServerStream.RecvMsg(m)
 	if err == nil {
-		s.logOpenOnce.Do(func() {
+		s.received.Add(1)
+		s.logArgsOnce.Do(func() {
 			s.logger.Infow(
 				"kind", "server",
 				"component", "grpc",
 				"operation", s.operation,
 				"stream.id", s.streamID,
-				"msg", "stream opened",
+				"msg", "stream request",
 				"args", extractArgs(m),
 			)
 		})
-		s.received.Add(1)
 	}
 	return err
 }

@@ -112,7 +112,7 @@ func TestStreamLoggingInterceptor_LogsOpenAndClose(t *testing.T) {
 	err := interceptor(nil, stream, info, handler)
 	require.NoError(t, err)
 
-	require.Len(t, mockLog.entries, 2, "Should log open and close")
+	require.Len(t, mockLog.entries, 3, "Should log open, request args, and close")
 
 	openEntry := mockLog.findEntry("stream opened")
 	require.NotNil(t, openEntry)
@@ -122,7 +122,13 @@ func TestStreamLoggingInterceptor_LogsOpenAndClose(t *testing.T) {
 	assert.Equal(t, "/test.Service/StreamMethod", mockLog.getValue(openEntry, "operation"))
 	streamID := mockLog.getValue(openEntry, "stream.id")
 	assert.NotEmpty(t, streamID)
-	assert.Equal(t, "msg:request", mockLog.getValue(openEntry, "args"))
+
+	requestEntry := mockLog.findEntry("stream request")
+	require.NotNil(t, requestEntry)
+	assert.Equal(t, log.LevelInfo, requestEntry.level)
+	assert.Equal(t, "/test.Service/StreamMethod", mockLog.getValue(requestEntry, "operation"))
+	assert.Equal(t, streamID, mockLog.getValue(requestEntry, "stream.id"))
+	assert.Equal(t, "msg:request", mockLog.getValue(requestEntry, "args"))
 
 	closeEntry := mockLog.findEntry("stream closed")
 	require.NotNil(t, closeEntry)
@@ -163,10 +169,18 @@ func TestStreamLoggingInterceptor_LogsOpenOnlyOnFirstRecvMsg(t *testing.T) {
 	err := interceptor(nil, stream, info, handler)
 	require.NoError(t, err)
 
-	require.Len(t, mockLog.entries, 2, "Should log only one open and one close")
+	require.Len(t, mockLog.entries, 3, "Should log open, one request args, and close")
 	openEntry := mockLog.findEntry("stream opened")
 	require.NotNil(t, openEntry)
-	assert.Equal(t, "msg:request0", mockLog.getValue(openEntry, "args"), "Should log args from first message only")
+	requestEntries := 0
+	for i := range mockLog.entries {
+		for j := 0; j < len(mockLog.entries[i].keyval); j += 2 {
+			if mockLog.entries[i].keyval[j] == "msg" && mockLog.entries[i].keyval[j+1] == "stream request" {
+				requestEntries++
+			}
+		}
+	}
+	assert.Equal(t, 1, requestEntries, "Should log args only once even with multiple RecvMsg calls")
 }
 
 func TestStreamLoggingInterceptor_ErrorLogsAtErrorLevel(t *testing.T) {
@@ -190,7 +204,7 @@ func TestStreamLoggingInterceptor_ErrorLogsAtErrorLevel(t *testing.T) {
 
 	closeEntry := mockLog.findEntry("stream closed")
 	require.NotNil(t, closeEntry)
-	assert.Equal(t, log.LevelError, closeEntry.level, "Error should be logged at ERROR level")
+	assert.Equal(t, log.LevelWarn, closeEntry.level, "NotFound should be logged at WARN level")
 	assert.Equal(t, int32(404), mockLog.getValue(closeEntry, "code"))
 	assert.Equal(t, "resource not found", mockLog.getValue(closeEntry, "reason"))
 	stack := mockLog.getValue(closeEntry, "stack")
@@ -309,7 +323,7 @@ func TestStreamLoggingInterceptor_RecvMsgError_DoesNotIncrement(t *testing.T) {
 	assert.Equal(t, int64(0), mockLog.getValue(closeEntry, "received"), "Should not increment on RecvMsg error")
 }
 
-func TestStreamLoggingInterceptor_NoRecvMsg_NoOpenLog(t *testing.T) {
+func TestStreamLoggingInterceptor_NoRecvMsg_LogsOpenAndClose(t *testing.T) {
 	mockLog := &mockLogger{}
 	interceptor := newStreamLoggingInterceptor(mockLog)
 
@@ -323,9 +337,9 @@ func TestStreamLoggingInterceptor_NoRecvMsg_NoOpenLog(t *testing.T) {
 	err := interceptor(nil, stream, info, handler)
 	require.NoError(t, err)
 
-	require.Len(t, mockLog.entries, 1, "Should only log close if no RecvMsg")
+	require.Len(t, mockLog.entries, 2, "Should log both open and close even if no RecvMsg")
 	openEntry := mockLog.findEntry("stream opened")
-	assert.Nil(t, openEntry, "Should not log open if no successful RecvMsg")
+	require.NotNil(t, openEntry, "Should log open even if no successful RecvMsg")
 
 	closeEntry := mockLog.findEntry("stream closed")
 	require.NotNil(t, closeEntry)
@@ -396,26 +410,27 @@ func TestLoggingStream_ConcurrentSendRecv(t *testing.T) {
 
 func TestStreamLoggingInterceptor_DifferentGRPCCodes(t *testing.T) {
 	testCases := []struct {
-		name         string
-		grpcCode     codes.Code
-		expectedHTTP int32
-		message      string
+		name          string
+		grpcCode      codes.Code
+		expectedHTTP  int32
+		expectedLevel log.Level
+		message       string
 	}{
-		{"OK", codes.OK, 200, ""},
-		{"Canceled", codes.Canceled, 499, "request canceled"},
-		{"InvalidArgument", codes.InvalidArgument, 400, "invalid argument"},
-		{"NotFound", codes.NotFound, 404, "not found"},
-		{"AlreadyExists", codes.AlreadyExists, 409, "already exists"},
-		{"PermissionDenied", codes.PermissionDenied, 403, "permission denied"},
-		{"Unauthenticated", codes.Unauthenticated, 401, "unauthenticated"},
-		{"ResourceExhausted", codes.ResourceExhausted, 429, "resource exhausted"},
-		{"FailedPrecondition", codes.FailedPrecondition, 400, "failed precondition"},
-		{"Aborted", codes.Aborted, 409, "aborted"},
-		{"OutOfRange", codes.OutOfRange, 400, "out of range"},
-		{"Unimplemented", codes.Unimplemented, 501, "unimplemented"},
-		{"Internal", codes.Internal, 500, "internal error"},
-		{"Unavailable", codes.Unavailable, 503, "unavailable"},
-		{"DataLoss", codes.DataLoss, 500, "data loss"},
+		{"OK", codes.OK, 200, log.LevelInfo, ""},
+		{"Canceled", codes.Canceled, 499, log.LevelInfo, "request canceled"},
+		{"InvalidArgument", codes.InvalidArgument, 400, log.LevelWarn, "invalid argument"},
+		{"NotFound", codes.NotFound, 404, log.LevelWarn, "not found"},
+		{"AlreadyExists", codes.AlreadyExists, 409, log.LevelWarn, "already exists"},
+		{"PermissionDenied", codes.PermissionDenied, 403, log.LevelWarn, "permission denied"},
+		{"Unauthenticated", codes.Unauthenticated, 401, log.LevelWarn, "unauthenticated"},
+		{"ResourceExhausted", codes.ResourceExhausted, 429, log.LevelWarn, "resource exhausted"},
+		{"FailedPrecondition", codes.FailedPrecondition, 400, log.LevelWarn, "failed precondition"},
+		{"Aborted", codes.Aborted, 409, log.LevelWarn, "aborted"},
+		{"OutOfRange", codes.OutOfRange, 400, log.LevelWarn, "out of range"},
+		{"Unimplemented", codes.Unimplemented, 501, log.LevelError, "unimplemented"},
+		{"Internal", codes.Internal, 500, log.LevelError, "internal error"},
+		{"Unavailable", codes.Unavailable, 503, log.LevelError, "unavailable"},
+		{"DataLoss", codes.DataLoss, 500, log.LevelError, "data loss"},
 	}
 
 	for _, tc := range testCases {
@@ -451,12 +466,7 @@ func TestStreamLoggingInterceptor_DifferentGRPCCodes(t *testing.T) {
 			require.NotNil(t, closeEntry)
 			assert.Equal(t, tc.expectedHTTP, mockLog.getValue(closeEntry, "code"))
 			assert.Equal(t, tc.message, mockLog.getValue(closeEntry, "reason"))
-
-			if tc.grpcCode != codes.OK {
-				assert.Equal(t, log.LevelError, closeEntry.level)
-			} else {
-				assert.Equal(t, log.LevelInfo, closeEntry.level)
-			}
+			assert.Equal(t, tc.expectedLevel, closeEntry.level)
 		})
 	}
 }

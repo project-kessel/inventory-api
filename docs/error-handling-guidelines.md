@@ -37,7 +37,7 @@ Use `middleware.MapError()` for consistent error-to-status mapping:
 - **Parse errors**: Drop message and increment failure metrics
 
 ### Retry Strategy
-Implement exponential backoff with circuit breaker pattern:
+Implement linear backoff with circuit breaker pattern:
 ```go
 backoff := min(time.Duration(retryOptions.BackoffFactor*attempts*300)*time.Millisecond, 
               time.Duration(retryOptions.MaxBackoffSeconds)*time.Second)

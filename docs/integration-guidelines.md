@@ -24,6 +24,7 @@
 ### Client Authentication
 - Use **OIDC token client** when `EnableOIDCAuth` is true
 - Apply **Bearer token** auth via `WithBearerToken()` or `WithInsecureBearerToken()`
+  - ⚠️ **Security Warning**: `WithInsecureBearerToken()` bypasses TLS verification and should never be used in production
 - Handle **authentication failures** with proper error metrics
 
 ### Tuple Operations

@@ -118,7 +118,7 @@ Every RPC method must include:
 ### Error Handling Patterns
 - Use `google.rpc.Status` for error responses
 - Return `codes.InvalidArgument` for validation failures
-- Include detailed error messages for debugging
+- Include client-safe error details only (no secrets/PII/internal stack traces)
 - Preserve error context through service layers
 
 ### Resource Type Validation

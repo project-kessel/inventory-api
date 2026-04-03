@@ -151,6 +151,8 @@ func Validation(validator protovalidate.Validator) middleware.Middleware {
 - Optional audience claim enforcement (`enforce-aud-check`)
 - Configurable issuer validation (`skip-issuer-check`)
 - Default principal domain to prevent empty principals
+- Default security posture: client ID check ON, issuer check ON, audience check ON.
+- Any skip/disable option is allowed only in non-production environments and must be explicitly documented in deployment config.
 
 ## Development and Testing Security
 

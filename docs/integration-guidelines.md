@@ -140,10 +140,16 @@ func (o *OptionsConfig) InjectClowdAppConfig(appconfig *clowder.AppConfig) error
 ### Multi-Strategy Authentication
 - **Authenticator chains** support multiple auth methods via factory pattern
 - **OIDC integration** with configurable auth server URL and client credentials
-- **Unauthenticated fallback** for development scenarios
+- **Unauthenticated fallback** for development scenarios only
+  - ⚠️ **Security Warning**: `allow-unauthenticated` bypasses all authentication
+  - Should never be used in production environments
+  - Requires explicit configuration and awareness of security implications
 - **Bearer token extraction** from request context for downstream calls
 
 ### Authorization Patterns
 - **Kessel authz** for production with Relations API integration
-- **Allow-all authz** for testing and development scenarios
+- **Allow-all authz** for testing and development scenarios only
+  - ⚠️ **Security Warning**: `allow-all` bypasses all authorization checks
+  - Should never be used in production environments  
+  - Requires explicit configuration and awareness of security implications
 - **Subject reference construction** from authenticated identity context

@@ -42,10 +42,17 @@ authn:
 - Use consistency tokens to maintain read-after-write semantics
 - Implement workspace-scoped authorization with RBAC namespace
 
-### Metrics and Monitoring
+### Authorization Logging
 - Track authorization success/failure counters per method
 - Use OpenTelemetry meter: `inventory_relations_api_success/failure`
 - Log authorization decisions at Info level with resource details
+
+### Sensitive Data Redaction
+- **Never log**: Bearer tokens, refresh tokens, API keys, passwords, JWT claims
+- **Never log**: Raw identity payloads or authentication headers
+- **Never log**: Resource IDs that may contain PII or sensitive identifiers
+- **Redact in logs**: Use `[REDACTED]` placeholder for sensitive fields
+- **Log safe data only**: Request IDs, timestamps, operation types, error codes, resource types
 
 ## TLS and Transport Security
 

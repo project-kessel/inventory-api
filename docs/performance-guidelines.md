@@ -140,7 +140,7 @@ backoff := min(
 ```
 
 **Rules:**
-- Use bounded exponential backoff: `BackoffFactor * attempts * 300ms`
+- Use bounded linear backoff: `BackoffFactor * attempts * 300ms`
 - Cap maximum backoff at configurable `MaxBackoffSeconds`
 - Support unlimited retries with `OperationMaxRetries: -1` for critical operations
 - Always increment attempt counters before backoff calculation
@@ -163,7 +163,7 @@ backoff := min(
 
 ### PProf Integration
 - Disabled by default, explicit enablement required
-- Bound to configurable address (default: `0.0.0.0:5000`)
+- Bound to configurable address (default: `127.0.0.1:5000` for security)
 - Full endpoint coverage: heap, goroutine, CPU, trace, mutex, block profiles
 - Security warning: never expose in production environments
 

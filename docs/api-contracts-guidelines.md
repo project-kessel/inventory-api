@@ -2,6 +2,10 @@
 
 ## Repository-Specific Patterns
 
+### Threshold Constants
+- `BULK_OPERATION_THRESHOLD = 5` - Use bulk operations for >5 individual operations  
+- `STREAMING_THRESHOLD = 100` - Use server streaming for list operations returning >100 items
+
 ### Package Structure and Naming
 - All protobuf definitions use package `kessel.inventory.{version}`
 - Go package: `github.com/project-kessel/inventory-api/api/kessel/inventory/{version}`
@@ -67,7 +71,7 @@ message ResourceReference {
 
 ### Bulk Operation Guidelines
 - Bulk endpoints maintain request/response order
-- Use bulk operations for >5 individual operations
+- Use bulk operations for >BULK_OPERATION_THRESHOLD individual operations
 - Bulk responses include per-item status
 - All bulk operations require min_items = 1 validation
 
@@ -79,7 +83,7 @@ message RequestPagination {
 }
 ```
 - Use continuation tokens, not offset-based pagination
-- Streaming operations for large result sets (>1000 items)
+- Streaming operations for large result sets (>STREAMING_THRESHOLD items)
 
 ### Test Structure Requirements
 Protobuf test files include:
@@ -133,7 +137,7 @@ Every RPC method must include:
 - All identifiers require min_len = 1
 
 ### Streaming Response Guidelines
-- Use server streaming for list operations returning >100 items
+- Use server streaming for list operations returning >STREAMING_THRESHOLD items
 - Include pagination in streaming requests
 - Maintain consistency guarantees across stream chunks
 - Handle client disconnection gracefully

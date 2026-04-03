@@ -79,6 +79,7 @@ func NewWithDeps(deps ServerConfig) (*kgrpc.Server, error) {
 	// Stream counter is first so it captures all streams including auth failures
 	streamingInterceptor := []grpc.StreamServerInterceptor{
 		newStreamCounterInterceptor(sm),
+		newStreamLoggingInterceptor(deps.Logger),
 	}
 
 	// Create stream interceptor using aggregating authenticator
@@ -115,7 +116,12 @@ func NewWithDeps(deps ServerConfig) (*kgrpc.Server, error) {
 		),
 		kgrpc.StreamMiddleware(
 			recovery.Recovery(),
-			logging.Server(deps.Logger),
+			// Logging intentionally omitted: Kratos StreamMiddleware runs middleware
+			// per-message instead of per-stream, generating ~765 bytes of log per message
+			// (including full proto args with continuation tokens). At 12M+ messages this
+			// overwhelms the node log collector. Stream logging is handled by
+			// newStreamLoggingInterceptor which logs once per stream open/close.
+			//
 			// Metrics intentionally omitted: Kratos StreamMiddleware counts per-message
 			// instead of per-stream. Stream metrics are handled by newStreamCounterInterceptor.
 		),

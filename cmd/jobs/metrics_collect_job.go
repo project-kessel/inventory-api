@@ -57,6 +57,13 @@ func collectMetrics(storageOptions *storage.Options, loggerOptions common.Logger
 func collectMetricsWithDB(db *gorm.DB, logHelper *log.Helper, retentionDays int) error {
 	logHelper.Info("Starting metrics collection job")
 
+	// Increase work_mem for this session to eliminate Parallel Hash Join batching.
+	// default work_mem (4MB) forces PostgreSQL to split into 8 batches with
+	// repeated disk I/O. This is session-scoped and does not affect other connections.
+	if err := db.Exec("SET work_mem = '256MB'").Error; err != nil {
+		logHelper.Warnf("failed to set work_mem: %v (continuing with default)", err)
+	}
+
 	metrics := internal.JsonObject{}
 
 	if err := collectResourcesPerWorkspaceJob(db, logHelper, metrics); err != nil {

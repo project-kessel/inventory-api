@@ -6,6 +6,7 @@ go 1.25.7
 require (
 	buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go v1.36.11-20260209202127-80ab13bee0bf.1
 	buf.build/go/protovalidate v1.1.3
+	github.com/DATA-DOG/go-sqlmock v1.5.2
 	github.com/authzed/grpcutil v0.0.0-20260105210157-e237581949c2
 	github.com/confluentinc/confluent-kafka-go/v2 v2.13.3
 	github.com/coreos/go-oidc/v3 v3.17.0

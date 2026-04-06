@@ -286,6 +286,9 @@ func TestCollectMetricsWithDB_WritesAndCleansUp(t *testing.T) {
 	db, mock := setupMockDB(t)
 	logger := testLogger()
 
+	// Mock SET work_mem
+	mock.ExpectExec(`SET work_mem`).WillReturnResult(sqlmock.NewResult(0, 0))
+
 	// Mock resources_per_workspace query
 	mock.ExpectQuery(`SELECT`).WillReturnRows(
 		sqlmock.NewRows([]string{"resource_type", "count"}).
@@ -321,6 +324,9 @@ func TestCollectMetricsWithDB_WritesAndCleansUp(t *testing.T) {
 func TestCollectMetricsWithDB_InvalidRetentionDays(t *testing.T) {
 	db, mock := setupMockDB(t)
 	logger := testLogger()
+
+	// Mock SET work_mem
+	mock.ExpectExec(`SET work_mem`).WillReturnResult(sqlmock.NewResult(0, 0))
 
 	// Mock resources_per_workspace query
 	mock.ExpectQuery(`SELECT`).WillReturnRows(

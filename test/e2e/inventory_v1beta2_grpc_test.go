@@ -389,14 +389,8 @@ func TestInventoryAPIHTTP_v1beta2_Host_ConsistentWrite(t *testing.T) {
 	}()
 
 	conn.Connect()
-	assert.NoError(t, err, "Failed to connect gRPC client")
 
 	client := pbv1beta2.NewKesselInventoryServiceClient(conn)
-
-	commonData := &structpb.Struct{}
-	commonData.Fields = map[string]*structpb.Value{
-		"workspace_id": structpb.NewStringValue("workspace-v2"),
-	}
 
 	reporterStruct, err := structpb.NewStruct(map[string]interface{}{
 		"disabled": true,
@@ -428,15 +422,30 @@ func TestInventoryAPIHTTP_v1beta2_Host_ConsistentWrite(t *testing.T) {
 	_, err = client.ReportResource(ctx, &req)
 	require.NoError(t, err, "Failed to Report Resource")
 
+	// The consistency token is set asynchronously by the consumer after it
+	// processes the outbox event through Kafka and writes back to the DB.
+	// Poll until the token appears.
 	var host datamodel.Resource
-	err = db.Table("resource r").
-		Select("r.*").
-		Joins("JOIN reporter_resources rr ON r.id = rr.resource_id").
-		Where("rr.local_resource_id = ?", resourceId).
-		First(&host).Error
-	assert.NoError(t, err, "Error fetching host from DB")
-	assert.NotNil(t, host, "Host not found in DB")
-	assert.NotEmpty(t, host.ConsistencyToken, "Consistency token is empty")
+	tokenFound := false
+	for i := 0; i < 30; i++ {
+		err = db.Table("resource r").
+			Select("r.*").
+			Joins("JOIN reporter_resources rr ON r.id = rr.resource_id").
+			Where("rr.local_resource_id = ?", resourceId).
+			First(&host).Error
+		if err != nil {
+			t.Logf("DB query attempt %d: %v", i+1, err)
+		} else if host.ConsistencyToken != "" {
+			t.Logf("Consistency token populated on attempt %d", i+1)
+			tokenFound = true
+			break
+		} else {
+			t.Logf("Consistency token still empty (attempt %d)", i+1)
+		}
+		time.Sleep(1 * time.Second)
+	}
+	require.NoError(t, err, "Error fetching host from DB")
+	require.True(t, tokenFound, "Consistency token was not populated within 30s")
 
 	delReq := pbv1beta2.DeleteResourceRequest{
 		Reference: &pbv1beta2.ResourceReference{

@@ -60,9 +60,10 @@ implementations := []struct {
 ### Fixture Pattern (Usecase Layer)
 ```go
 // Fluent test data builders
-cmd := fixture(t).Basic("host", "hbi", "instance-1", "host-1", "workspace-1")
-cmd := fixture(t).Updated(resourceType, reporterType, instance, id, workspace)  
-cmd := fixture(t).WithTransactionId(params..., "tx-123")
+// Fluent test data builders (independent examples)
+basicCmd := fixture(t).Basic("host", "hbi", "instance-1", "host-1", "workspace-1")
+updatedCmd := fixture(t).Updated(resourceType, reporterType, instance, id, workspace)  
+txCmd := fixture(t).WithTransactionId(params..., "tx-123")
 ```
 
 ### E2E Test Data

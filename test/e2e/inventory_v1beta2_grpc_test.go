@@ -6,8 +6,11 @@ import (
 	"testing"
 	"time"
 
+	"strings"
+
 	datamodel "github.com/project-kessel/inventory-api/internal/data/model"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 	grpcinsecure "google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/protobuf/proto"
@@ -42,7 +45,7 @@ func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_Host(t *testing.T) {
 		grpc.WithTransportCredentials(grpcinsecure.NewCredentials()),
 		grpc.WithPerRPCCredentials(&bearerAuth{token: "1234"}),
 	)
-	assert.NoError(t, err, "Failed to create gRPC client")
+	require.NoError(t, err, "Failed to create gRPC client")
 	defer func() {
 		if connErr := conn.Close(); connErr != nil {
 			t.Logf("Failed to close gRPC connection: %v", connErr)
@@ -60,7 +63,7 @@ func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_Host(t *testing.T) {
 		"insights_id":             "550e8400-e29b-41d4-a716-446655440000",
 		"ansible_host":            "abc",
 	})
-	assert.NoError(t, err, "Failed to create structpb for host reporter")
+	require.NoError(t, err, "Failed to create structpb for host reporter")
 
 	req := &pbv1beta2.ReportResourceRequest{
 		WriteVisibility:    pbv1beta2.WriteVisibility_MINIMIZE_LATENCY,
@@ -84,7 +87,7 @@ func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_Host(t *testing.T) {
 	}
 
 	_, err = client.ReportResource(ctx, req)
-	assert.NoError(t, err, "Failed to Report Resource")
+	require.NoError(t, err, "Failed to Report Resource")
 
 	delReq := &pbv1beta2.DeleteResourceRequest{
 		Reference: &pbv1beta2.ResourceReference{
@@ -110,7 +113,7 @@ func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_Notifications(t *testing.T) 
 		grpc.WithTransportCredentials(grpcinsecure.NewCredentials()),
 		grpc.WithPerRPCCredentials(&bearerAuth{token: "1234"}),
 	)
-	assert.NoError(t, err, "Failed to create gRPC client")
+	require.NoError(t, err, "Failed to create gRPC client")
 	defer func() {
 		if connErr := conn.Close(); connErr != nil {
 			t.Logf("Failed to close gRPC connection: %v", connErr)
@@ -128,7 +131,7 @@ func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_Notifications(t *testing.T) 
 		"reporter_instance_id": "testuser-example-com",
 		"local_resource_id":    "notification-abc-123",
 	})
-	assert.NoError(t, err, "Failed to create structpb for reporter")
+	require.NoError(t, err, "Failed to create structpb for reporter")
 
 	req := pbv1beta2.ReportResourceRequest{
 
@@ -152,7 +155,7 @@ func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_Notifications(t *testing.T) 
 	}
 
 	_, err = client.ReportResource(ctx, &req)
-	assert.NoError(t, err, "Failed to Report Resource")
+	require.NoError(t, err, "Failed to Report Resource")
 
 	delReq := pbv1beta2.DeleteResourceRequest{
 		Reference: &pbv1beta2.ResourceReference{
@@ -180,7 +183,7 @@ func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_K8S_Cluster(t *testing.T) {
 		grpc.WithTransportCredentials(grpcinsecure.NewCredentials()),
 		grpc.WithPerRPCCredentials(&bearerAuth{token: "1234"}),
 	)
-	assert.NoError(t, err, "Failed to create gRPC client")
+	require.NoError(t, err, "Failed to create gRPC client")
 	defer func() {
 		if connErr := conn.Close(); connErr != nil {
 			t.Logf("Failed to close gRPC connection: %v", connErr)
@@ -201,7 +204,7 @@ func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_K8S_Cluster(t *testing.T) {
 		"vendor_version":      "4.16",
 		"cloud_platform":      "AWS_UPI",
 	})
-	assert.NoError(t, err, "Failed to create structpb for cluster reporter")
+	require.NoError(t, err, "Failed to create structpb for cluster reporter")
 
 	req := pbv1beta2.ReportResourceRequest{
 
@@ -225,7 +228,7 @@ func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_K8S_Cluster(t *testing.T) {
 	}
 
 	_, err = client.ReportResource(ctx, &req)
-	assert.NoError(t, err, "Failed to Report Resource")
+	require.NoError(t, err, "Failed to Report Resource")
 
 	delReq := pbv1beta2.DeleteResourceRequest{
 		Reference: &pbv1beta2.ResourceReference{
@@ -253,7 +256,7 @@ func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_K8S_Policy(t *testing.T) {
 		grpc.WithTransportCredentials(grpcinsecure.NewCredentials()),
 		grpc.WithPerRPCCredentials(&bearerAuth{token: "1234"}),
 	)
-	assert.NoError(t, err, "Failed to create gRPC client")
+	require.NoError(t, err, "Failed to create gRPC client")
 	defer func() {
 		if connErr := conn.Close(); connErr != nil {
 			t.Logf("Failed to close gRPC connection: %v", connErr)
@@ -269,7 +272,7 @@ func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_K8S_Policy(t *testing.T) {
 		"disabled": true,
 		"severity": "MEDIUM",
 	})
-	assert.NoError(t, err, "Failed to create structpb for reporter")
+	require.NoError(t, err, "Failed to create structpb for reporter")
 
 	req := pbv1beta2.ReportResourceRequest{
 
@@ -293,7 +296,7 @@ func TestInventoryAPIHTTP_v1beta2_ResourceLifecycle_K8S_Policy(t *testing.T) {
 	}
 
 	_, err = client.ReportResource(ctx, &req)
-	assert.NoError(t, err, "Failed to Report Resource")
+	require.NoError(t, err, "Failed to Report Resource")
 
 	delReq := pbv1beta2.DeleteResourceRequest{
 		Reference: &pbv1beta2.ResourceReference{
@@ -378,7 +381,7 @@ func TestInventoryAPIHTTP_v1beta2_Host_ConsistentWrite(t *testing.T) {
 		grpc.WithTransportCredentials(grpcinsecure.NewCredentials()),
 		grpc.WithPerRPCCredentials(&bearerAuth{token: "1234"}),
 	)
-	assert.NoError(t, err, "Failed to create gRPC client")
+	require.NoError(t, err, "Failed to create gRPC client")
 	defer func() {
 		if connErr := conn.Close(); connErr != nil {
 			t.Logf("Failed to close gRPC connection: %v", connErr)
@@ -399,7 +402,7 @@ func TestInventoryAPIHTTP_v1beta2_Host_ConsistentWrite(t *testing.T) {
 		"disabled": true,
 		"severity": "MEDIUM",
 	})
-	assert.NoError(t, err, "Failed to create structpb for reporter")
+	require.NoError(t, err, "Failed to create structpb for reporter")
 
 	req := pbv1beta2.ReportResourceRequest{
 		WriteVisibility:    pbv1beta2.WriteVisibility_IMMEDIATE,
@@ -423,7 +426,7 @@ func TestInventoryAPIHTTP_v1beta2_Host_ConsistentWrite(t *testing.T) {
 	}
 
 	_, err = client.ReportResource(ctx, &req)
-	assert.NoError(t, err, "Failed to Report Resource")
+	require.NoError(t, err, "Failed to Report Resource")
 
 	var host datamodel.Resource
 	err = db.Table("resource r").
@@ -468,7 +471,7 @@ func TestInventoryAPIHTTP_v1beta2_workspace_movement_tests(t *testing.T) {
 		grpc.WithTransportCredentials(grpcinsecure.NewCredentials()),
 		grpc.WithPerRPCCredentials(&bearerAuth{token: "1234"}),
 	)
-	assert.NoError(t, err, "Failed to create gRPC client")
+	require.NoError(t, err, "Failed to create gRPC client")
 	defer func() {
 		if connErr := conn.Close(); connErr != nil {
 			t.Logf("Failed to close gRPC connection: %v", connErr)
@@ -485,7 +488,7 @@ func TestInventoryAPIHTTP_v1beta2_workspace_movement_tests(t *testing.T) {
 	reporterStruct, err := structpb.NewStruct(map[string]interface{}{
 		"ansible_host": "test-host.example.com",
 	})
-	assert.NoError(t, err, "Failed to create structpb for host reporter")
+	require.NoError(t, err, "Failed to create structpb for host reporter")
 
 	req := &pbv1beta2.ReportResourceRequest{
 		WriteVisibility:    pbv1beta2.WriteVisibility_MINIMIZE_LATENCY,
@@ -562,6 +565,7 @@ func TestInventoryAPIHTTP_v1beta2_workspace_movement_tests(t *testing.T) {
 
 	// Poll for up to 30 seconds
 	oldWorkspaceAllowed := false
+	connErrors := 0
 	for i := 0; i < 30; i++ {
 		checkResp, err := client.Check(ctx, checkOldWorkspace)
 		if err == nil && checkResp.GetAllowed() == pbv1beta2.Allowed_ALLOWED_FALSE {
@@ -571,7 +575,14 @@ func TestInventoryAPIHTTP_v1beta2_workspace_movement_tests(t *testing.T) {
 		}
 		if err != nil {
 			t.Logf("Check request failed (attempt %d): %v", i+1, err)
+			if isConnectionError(err) {
+				connErrors++
+				if connErrors >= maxConsecutiveConnErrors {
+					t.Fatalf("Service unreachable after %d consecutive connection errors, aborting", connErrors)
+				}
+			}
 		} else {
+			connErrors = 0
 			t.Logf("Old workspace check returned %v (attempt %d), expected ALLOWED_FALSE", checkResp.GetAllowed(), i+1)
 		}
 		if i < 29 {
@@ -608,6 +619,7 @@ func TestInventoryAPIHTTP_v1beta2_workspace_movement_tests(t *testing.T) {
 
 	// Poll for up to 30 seconds
 	newWorkspaceAllowed := false
+	connErrors = 0
 	for i := 0; i < 30; i++ {
 		checkResp, err := client.Check(ctx, checkNewWorkspace)
 		if err == nil && checkResp.GetAllowed() == pbv1beta2.Allowed_ALLOWED_TRUE {
@@ -617,7 +629,14 @@ func TestInventoryAPIHTTP_v1beta2_workspace_movement_tests(t *testing.T) {
 		}
 		if err != nil {
 			t.Logf("Check request failed (attempt %d): %v", i+1, err)
+			if isConnectionError(err) {
+				connErrors++
+				if connErrors >= maxConsecutiveConnErrors {
+					t.Fatalf("Service unreachable after %d consecutive connection errors, aborting", connErrors)
+				}
+			}
 		} else {
+			connErrors = 0
 			t.Logf("New workspace check returned %v (attempt %d), expected ALLOWED_TRUE", checkResp.GetAllowed(), i+1)
 		}
 		if i < 29 {
@@ -654,7 +673,7 @@ func TestInventoryAPIHTTP_v1beta2_CheckBulk_WithErrorPair(t *testing.T) {
 		grpc.WithTransportCredentials(grpcinsecure.NewCredentials()),
 		grpc.WithPerRPCCredentials(&bearerAuth{token: "1234"}),
 	)
-	assert.NoError(t, err, "Failed to create gRPC client")
+	require.NoError(t, err, "Failed to create gRPC client")
 	defer func() {
 		if connErr := conn.Close(); connErr != nil {
 			t.Logf("Failed to close gRPC connection: %v", connErr)
@@ -695,7 +714,7 @@ func TestInventoryAPIHTTP_v1beta2_CheckBulk_WithErrorPair(t *testing.T) {
 	reporterStruct, err := structpb.NewStruct(map[string]interface{}{
 		"ansible_host": "checkbulk-errorpair-host.example.com",
 	})
-	assert.NoError(t, err, "Failed to create structpb for reporter")
+	require.NoError(t, err, "Failed to create structpb for reporter")
 
 	req := &pbv1beta2.ReportResourceRequest{
 		WriteVisibility:    pbv1beta2.WriteVisibility_MINIMIZE_LATENCY,
@@ -717,7 +736,7 @@ func TestInventoryAPIHTTP_v1beta2_CheckBulk_WithErrorPair(t *testing.T) {
 		},
 	}
 	_, err = client.ReportResource(ctx, req)
-	assert.NoError(t, err, "Failed to Report Resource")
+	require.NoError(t, err, "Failed to Report Resource")
 	resourceCreated = true
 
 	// Build CheckBulk with:
@@ -792,9 +811,11 @@ func TestInventoryAPIHTTP_v1beta2_CheckBulk_WithErrorPair(t *testing.T) {
 
 	// Poll up to 30 seconds to allow eventual consistency and error mapping
 	observed := false
+	connErrors := 0
 	for i := 0; i < 30; i++ {
 		resp, err := client.CheckBulk(ctx, checkReq)
 		if err == nil && resp != nil && len(resp.GetPairs()) == 3 {
+			connErrors = 0
 			results := map[string]pbv1beta2.Allowed{}
 			errorSubjects := []string{}
 			for _, p := range resp.GetPairs() {
@@ -822,6 +843,12 @@ func TestInventoryAPIHTTP_v1beta2_CheckBulk_WithErrorPair(t *testing.T) {
 			t.Logf("CheckBulk attempt %d: true=%v false=%v errorPresent=%v", i+1, gotTrue, gotFalse, gotError)
 		} else if err != nil {
 			t.Logf("CheckBulk request failed (attempt %d): %v", i+1, err)
+			if isConnectionError(err) {
+				connErrors++
+				if connErrors >= maxConsecutiveConnErrors {
+					t.Fatalf("Service unreachable after %d consecutive connection errors, aborting", connErrors)
+				}
+			}
 		}
 		if i < 29 {
 			time.Sleep(1 * time.Second)
@@ -846,7 +873,7 @@ func TestInventoryAPIHTTP_v1beta2_create_check_delete_check_resource(t *testing.
 		grpc.WithTransportCredentials(grpcinsecure.NewCredentials()),
 		grpc.WithPerRPCCredentials(&bearerAuth{token: "1234"}),
 	)
-	assert.NoError(t, err, "Failed to create gRPC client")
+	require.NoError(t, err, "Failed to create gRPC client")
 	defer func() {
 		if connErr := conn.Close(); connErr != nil {
 			t.Logf("Failed to close gRPC connection: %v", connErr)
@@ -862,7 +889,7 @@ func TestInventoryAPIHTTP_v1beta2_create_check_delete_check_resource(t *testing.
 	reporterStruct, err := structpb.NewStruct(map[string]interface{}{
 		"ansible_host": "test-host.example.com",
 	})
-	assert.NoError(t, err, "Failed to create structpb for reporter")
+	require.NoError(t, err, "Failed to create structpb for reporter")
 
 	req := &pbv1beta2.ReportResourceRequest{
 		WriteVisibility:    pbv1beta2.WriteVisibility_MINIMIZE_LATENCY,
@@ -884,7 +911,7 @@ func TestInventoryAPIHTTP_v1beta2_create_check_delete_check_resource(t *testing.
 		},
 	}
 	_, err = client.ReportResource(ctx, req)
-	assert.NoError(t, err, "Failed to Report Resource")
+	require.NoError(t, err, "Failed to Report Resource")
 
 	// ------- Check (expect TRUE) -------
 	checkAfterCreate := &pbv1beta2.CheckRequest{
@@ -909,6 +936,7 @@ func TestInventoryAPIHTTP_v1beta2_create_check_delete_check_resource(t *testing.
 	}
 
 	allowedTrueObserved := false
+	connErrors := 0
 	for i := 0; i < 30; i++ {
 		checkResp, err := client.Check(ctx, checkAfterCreate)
 		if err == nil && checkResp.GetAllowed() == pbv1beta2.Allowed_ALLOWED_TRUE {
@@ -918,7 +946,14 @@ func TestInventoryAPIHTTP_v1beta2_create_check_delete_check_resource(t *testing.
 		}
 		if err != nil {
 			t.Logf("Check request failed (attempt %d): %v", i+1, err)
+			if isConnectionError(err) {
+				connErrors++
+				if connErrors >= maxConsecutiveConnErrors {
+					t.Fatalf("Service unreachable after %d consecutive connection errors, aborting", connErrors)
+				}
+			}
 		} else {
+			connErrors = 0
 			t.Logf("Create-check returned %v (attempt %d), expected ALLOWED_TRUE", checkResp.GetAllowed(), i+1)
 		}
 		if i < 29 {
@@ -965,6 +1000,7 @@ func TestInventoryAPIHTTP_v1beta2_create_check_delete_check_resource(t *testing.
 	}
 
 	allowedFalseObserved := false
+	connErrors = 0
 	for i := 0; i < 30; i++ {
 		checkResp, err := client.Check(ctx, checkAfterDelete)
 		if err == nil && checkResp.GetAllowed() == pbv1beta2.Allowed_ALLOWED_FALSE {
@@ -974,7 +1010,14 @@ func TestInventoryAPIHTTP_v1beta2_create_check_delete_check_resource(t *testing.
 		}
 		if err != nil {
 			t.Logf("Check request failed (attempt %d): %v", i+1, err)
+			if isConnectionError(err) {
+				connErrors++
+				if connErrors >= maxConsecutiveConnErrors {
+					t.Fatalf("Service unreachable after %d consecutive connection errors, aborting", connErrors)
+				}
+			}
 		} else {
+			connErrors = 0
 			t.Logf("Delete-check returned %v (attempt %d), expected ALLOWED_FALSE", checkResp.GetAllowed(), i+1)
 		}
 		if i < 29 {
@@ -991,6 +1034,19 @@ func enableShortMode(t *testing.T) {
 	}
 }
 
+const maxConsecutiveConnErrors = 5
+
+// isConnectionError returns true if the error indicates the service is unreachable.
+func isConnectionError(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := err.Error()
+	return strings.Contains(msg, "connection refused") ||
+		strings.Contains(msg, "connection reset") ||
+		strings.Contains(msg, "transport is closing")
+}
+
 func TestInventoryAPIHTTP_v1beta2_CheckBulk_SingleTrueAndFalse(t *testing.T) {
 	enableShortMode(t)
 
@@ -1001,7 +1057,7 @@ func TestInventoryAPIHTTP_v1beta2_CheckBulk_SingleTrueAndFalse(t *testing.T) {
 		grpc.WithTransportCredentials(grpcinsecure.NewCredentials()),
 		grpc.WithPerRPCCredentials(&bearerAuth{token: "1234"}),
 	)
-	assert.NoError(t, err, "Failed to create gRPC client")
+	require.NoError(t, err, "Failed to create gRPC client")
 	defer func() {
 		if connErr := conn.Close(); connErr != nil {
 			t.Logf("Failed to close gRPC connection: %v", connErr)
@@ -1042,7 +1098,7 @@ func TestInventoryAPIHTTP_v1beta2_CheckBulk_SingleTrueAndFalse(t *testing.T) {
 	reporterStruct, err := structpb.NewStruct(map[string]interface{}{
 		"ansible_host": "checkbulk-host.example.com",
 	})
-	assert.NoError(t, err, "Failed to create structpb for reporter")
+	require.NoError(t, err, "Failed to create structpb for reporter")
 
 	req := &pbv1beta2.ReportResourceRequest{
 		WriteVisibility:    pbv1beta2.WriteVisibility_MINIMIZE_LATENCY,
@@ -1064,7 +1120,7 @@ func TestInventoryAPIHTTP_v1beta2_CheckBulk_SingleTrueAndFalse(t *testing.T) {
 		},
 	}
 	_, err = client.ReportResource(ctx, req)
-	assert.NoError(t, err, "Failed to Report Resource")
+	require.NoError(t, err, "Failed to Report Resource")
 	resourceCreated = true
 
 	// Build CheckBulk with one expected TRUE and one expected FALSE
@@ -1115,9 +1171,11 @@ func TestInventoryAPIHTTP_v1beta2_CheckBulk_SingleTrueAndFalse(t *testing.T) {
 
 	// Poll up to 30 seconds to account for eventual consistency
 	observed := false
+	connErrors := 0
 	for i := 0; i < 30; i++ {
 		resp, err := client.CheckBulk(ctx, checkBulkReq)
 		if err == nil && resp != nil && len(resp.GetPairs()) == 2 {
+			connErrors = 0
 			pairs := resp.GetPairs()
 			gotTrue := pairs[0].GetItem() != nil && pairs[0].GetItem().GetAllowed() == pbv1beta2.Allowed_ALLOWED_TRUE
 			gotFalse := pairs[1].GetItem() != nil && pairs[1].GetItem().GetAllowed() == pbv1beta2.Allowed_ALLOWED_FALSE
@@ -1128,6 +1186,12 @@ func TestInventoryAPIHTTP_v1beta2_CheckBulk_SingleTrueAndFalse(t *testing.T) {
 			t.Logf("CheckBulk attempt %d: got allowed = [%v, %v], expected [TRUE, FALSE]", i+1, pairs[0].GetItem().GetAllowed(), pairs[1].GetItem().GetAllowed())
 		} else if err != nil {
 			t.Logf("CheckBulk request failed (attempt %d): %v", i+1, err)
+			if isConnectionError(err) {
+				connErrors++
+				if connErrors >= maxConsecutiveConnErrors {
+					t.Fatalf("Service unreachable after %d consecutive connection errors, aborting", connErrors)
+				}
+			}
 		}
 		if i < 29 {
 			time.Sleep(1 * time.Second)
@@ -1151,7 +1215,7 @@ func TestInventoryAPIHTTP_v1beta2_CheckForUpdate_AllowedTrue(t *testing.T) {
 		grpc.WithTransportCredentials(grpcinsecure.NewCredentials()),
 		grpc.WithPerRPCCredentials(&bearerAuth{token: "1234"}),
 	)
-	assert.NoError(t, err, "Failed to create gRPC client")
+	require.NoError(t, err, "Failed to create gRPC client")
 	defer func() {
 		if connErr := conn.Close(); connErr != nil {
 			t.Logf("Failed to close gRPC connection: %v", connErr)
@@ -1182,7 +1246,7 @@ func TestInventoryAPIHTTP_v1beta2_CheckForUpdate_AllowedTrue(t *testing.T) {
 	reporterStruct, err := structpb.NewStruct(map[string]interface{}{
 		"ansible_host": "checkforupdate-host.example.com",
 	})
-	assert.NoError(t, err, "Failed to create structpb for reporter")
+	require.NoError(t, err, "Failed to create structpb for reporter")
 
 	_, err = client.ReportResource(ctx, &pbv1beta2.ReportResourceRequest{
 		WriteVisibility:    pbv1beta2.WriteVisibility_IMMEDIATE,
@@ -1203,7 +1267,7 @@ func TestInventoryAPIHTTP_v1beta2_CheckForUpdate_AllowedTrue(t *testing.T) {
 			Reporter: reporterStruct,
 		},
 	})
-	assert.NoError(t, err, "Failed to Report Resource")
+	require.NoError(t, err, "Failed to Report Resource")
 	resourceCreated = true
 
 	resp, err := client.CheckForUpdate(ctx, &pbv1beta2.CheckForUpdateRequest{
@@ -1248,7 +1312,7 @@ func TestInventoryAPIHTTP_v1beta2_CheckForUpdate_AllowedFalse(t *testing.T) {
 		grpc.WithTransportCredentials(grpcinsecure.NewCredentials()),
 		grpc.WithPerRPCCredentials(&bearerAuth{token: "1234"}),
 	)
-	assert.NoError(t, err, "Failed to create gRPC client")
+	require.NoError(t, err, "Failed to create gRPC client")
 	defer func() {
 		if connErr := conn.Close(); connErr != nil {
 			t.Logf("Failed to close gRPC connection: %v", connErr)
@@ -1279,7 +1343,7 @@ func TestInventoryAPIHTTP_v1beta2_CheckForUpdate_AllowedFalse(t *testing.T) {
 	reporterStruct, err := structpb.NewStruct(map[string]interface{}{
 		"ansible_host": "checkforupdate-host2.example.com",
 	})
-	assert.NoError(t, err, "Failed to create structpb for reporter")
+	require.NoError(t, err, "Failed to create structpb for reporter")
 
 	_, err = client.ReportResource(ctx, &pbv1beta2.ReportResourceRequest{
 		WriteVisibility:    pbv1beta2.WriteVisibility_IMMEDIATE,
@@ -1300,7 +1364,7 @@ func TestInventoryAPIHTTP_v1beta2_CheckForUpdate_AllowedFalse(t *testing.T) {
 			Reporter: reporterStruct,
 		},
 	})
-	assert.NoError(t, err, "Failed to Report Resource")
+	require.NoError(t, err, "Failed to Report Resource")
 	resourceCreated = true
 
 	resp, err := client.CheckForUpdate(ctx, &pbv1beta2.CheckForUpdateRequest{
@@ -1338,7 +1402,7 @@ func TestInventoryAPIHTTP_v1beta2_CheckBulk_OrderAndEcho(t *testing.T) {
 		grpc.WithTransportCredentials(grpcinsecure.NewCredentials()),
 		grpc.WithPerRPCCredentials(&bearerAuth{token: "1234"}),
 	)
-	assert.NoError(t, err, "Failed to create gRPC client")
+	require.NoError(t, err, "Failed to create gRPC client")
 	defer func() {
 		if connErr := conn.Close(); connErr != nil {
 			t.Logf("Failed to close gRPC connection: %v", connErr)
@@ -1378,7 +1442,7 @@ func TestInventoryAPIHTTP_v1beta2_CheckBulk_OrderAndEcho(t *testing.T) {
 	reporterStruct, err := structpb.NewStruct(map[string]interface{}{
 		"ansible_host": "checkbulk2-host.example.com",
 	})
-	assert.NoError(t, err, "Failed to create structpb for reporter")
+	require.NoError(t, err, "Failed to create structpb for reporter")
 
 	req := &pbv1beta2.ReportResourceRequest{
 		WriteVisibility:    pbv1beta2.WriteVisibility_MINIMIZE_LATENCY,
@@ -1400,7 +1464,7 @@ func TestInventoryAPIHTTP_v1beta2_CheckBulk_OrderAndEcho(t *testing.T) {
 		},
 	}
 	_, err = client.ReportResource(ctx, req)
-	assert.NoError(t, err, "Failed to Report Resource")
+	require.NoError(t, err, "Failed to Report Resource")
 	resourceCreated = true
 
 	item1 := &pbv1beta2.CheckBulkRequestItem{
@@ -1446,11 +1510,13 @@ func TestInventoryAPIHTTP_v1beta2_CheckBulk_OrderAndEcho(t *testing.T) {
 
 	// Poll up to 30 seconds; verify order is preserved and request is echoed
 	observed := false
+	connErrors := 0
 	for i := 0; i < 30; i++ {
 		resp, err := client.CheckBulk(ctx, &pbv1beta2.CheckBulkRequest{
 			Items: []*pbv1beta2.CheckBulkRequestItem{item1, item2},
 		})
 		if err == nil && resp != nil && len(resp.GetPairs()) == 2 {
+			connErrors = 0
 			pairs := resp.GetPairs()
 			// Order preserved
 			firstReq := pairs[0].GetRequest()
@@ -1482,6 +1548,12 @@ func TestInventoryAPIHTTP_v1beta2_CheckBulk_OrderAndEcho(t *testing.T) {
 			t.Logf("CheckBulk attempt %d: orderOK=%v allowed0=%v allowed1=%v", i+1, orderOK, pairs[0].GetItem().GetAllowed(), pairs[1].GetItem().GetAllowed())
 		} else if err != nil {
 			t.Logf("CheckBulk request failed (attempt %d): %v", i+1, err)
+			if isConnectionError(err) {
+				connErrors++
+				if connErrors >= maxConsecutiveConnErrors {
+					t.Fatalf("Service unreachable after %d consecutive connection errors, aborting", connErrors)
+				}
+			}
 		}
 		if i < 29 {
 			time.Sleep(1 * time.Second)

@@ -604,9 +604,21 @@ func (it *relationsLookupResourcesIterator) Next() (*model.LookupResourceResult,
 		return nil, err
 	}
 
-	resType, _ := model.NewResourceType(resp.Resource.Type.Name)
-	namespace, _ := model.NewReporterType(resp.Resource.Type.Namespace)
-	resourceId, _ := model.NewLocalResourceId(resp.Resource.Id)
+	if resp.Resource == nil || resp.Resource.Type == nil {
+		return nil, fmt.Errorf("lookup resources: response contains nil resource or type")
+	}
+	resType, err := model.NewResourceType(resp.Resource.Type.Name)
+	if err != nil {
+		return nil, fmt.Errorf("lookup resources resource type: %w", err)
+	}
+	namespace, err := model.NewReporterType(resp.Resource.Type.Namespace)
+	if err != nil {
+		return nil, fmt.Errorf("lookup resources reporter type: %w", err)
+	}
+	resourceId, err := model.NewLocalResourceId(resp.Resource.Id)
+	if err != nil {
+		return nil, fmt.Errorf("lookup resources resource id: %w", err)
+	}
 
 	var contToken string
 	if resp.Pagination != nil {

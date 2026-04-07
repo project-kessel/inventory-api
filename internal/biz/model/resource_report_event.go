@@ -14,9 +14,9 @@ type ResourceReportEvent struct {
 	reporterId             ReporterId
 	localResourceId        LocalResourceId
 	apiHref                ApiHref
-	consoleHref            ConsoleHref
-	reporterRepresentation ReporterDataRepresentation
-	commonRepresentation   CommonRepresentation
+	consoleHref            *ConsoleHref
+	reporterRepresentation *ReporterDataRepresentation
+	commonRepresentation   *CommonRepresentation
 	createdAt              time.Time
 	updatedAt              time.Time
 }
@@ -28,10 +28,14 @@ func NewResourceReportEvent(
 	reporterInstanceId ReporterInstanceId,
 	localResourceId LocalResourceId,
 	apiHref ApiHref,
-	consoleHref ConsoleHref,
-	reporterDataRepresentation ReporterDataRepresentation,
-	commonRepresentation CommonRepresentation,
+	consoleHref *ConsoleHref,
+	reporterDataRepresentation *ReporterDataRepresentation,
+	commonRepresentation *CommonRepresentation,
 ) (ResourceReportEvent, error) {
+	if reporterDataRepresentation == nil && commonRepresentation == nil {
+		return ResourceReportEvent{}, ErrNoRepresentationProvided
+	}
+
 	reporterId := NewReporterId(reporterType, reporterInstanceId)
 
 	return ResourceReportEvent{
@@ -66,19 +70,18 @@ func (re ResourceReportEvent) ReporterInstanceId() string {
 	return re.reporterId.reporterInstanceId.String()
 }
 
-func (re ResourceReportEvent) ReporterVersion() *string {
-	if re.reporterRepresentation.reporterVersion == nil {
+func (re ResourceReportEvent) ReporterVersion() *ReporterVersion {
+	if re.reporterRepresentation == nil {
 		return nil
 	}
-	versionStr := re.reporterRepresentation.reporterVersion.String()
-	return &versionStr
+	return re.reporterRepresentation.reporterVersion
 }
 
 // CurrentCommonVersion returns the version from the CommonRepresentation, or nil if no common
 // representation data is present. Returning nil signals to the consumer that there is no
 // common representation to look up, preventing a uint underflow when querying version-1.
 func (re ResourceReportEvent) CurrentCommonVersion() *Version {
-	if len(re.commonRepresentation.Representation) == 0 {
+	if re.commonRepresentation == nil {
 		return nil
 	}
 	return &re.commonRepresentation.version
@@ -86,6 +89,9 @@ func (re ResourceReportEvent) CurrentCommonVersion() *Version {
 
 // CurrentReporterRepresentationVersion returns the version from the ReporterRepresentation
 func (re ResourceReportEvent) CurrentReporterRepresentationVersion() *Version {
+	if re.reporterRepresentation == nil {
+		return nil
+	}
 	return &re.reporterRepresentation.version
 }
 
@@ -101,8 +107,8 @@ func (re ResourceReportEvent) ResourceId() uuid.UUID {
 	return uuid.UUID(re.id)
 }
 
-func (re ResourceReportEvent) ConsoleHref() string {
-	return re.consoleHref.String()
+func (re ResourceReportEvent) ConsoleHref() *ConsoleHref {
+	return re.consoleHref
 }
 
 func (re ResourceReportEvent) ApiHref() string {
@@ -110,16 +116,22 @@ func (re ResourceReportEvent) ApiHref() string {
 }
 
 func (re ResourceReportEvent) Data() internal.JsonObject {
+	if re.reporterRepresentation == nil {
+		return nil
+	}
 	return re.reporterRepresentation.Data()
 }
 
-func (re ResourceReportEvent) WorkspaceId() string {
+func (re ResourceReportEvent) WorkspaceId() *string {
+	if re.commonRepresentation == nil {
+		return nil
+	}
 	if workspaceId, ok := re.commonRepresentation.Data()["workspace_id"]; ok {
 		if workspaceIdStr, ok := workspaceId.(string); ok {
-			return workspaceIdStr
+			return &workspaceIdStr
 		}
 	}
-	return ""
+	return nil
 }
 
 // ReporterResourceKey constructs and returns the ReporterResourceKey from the event fields
@@ -147,12 +159,11 @@ func DeserializeResourceEvent(
 	var event ResourceReportEvent
 
 	if commonRepresentationSnapshot != nil {
-		event.commonRepresentation = DeserializeCommonRepresentation(commonRepresentationSnapshot)
+		cr := DeserializeCommonRepresentation(commonRepresentationSnapshot)
+		event.commonRepresentation = &cr
 	}
 
-	if reporterRepresentationSnapshot != nil {
-		event.reporterRepresentation = *DeserializeReporterDataRepresentation(reporterRepresentationSnapshot)
-	}
+	event.reporterRepresentation = DeserializeReporterDataRepresentation(reporterRepresentationSnapshot)
 
 	event.createdAt = createdAt
 	event.updatedAt = updatedAt

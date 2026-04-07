@@ -113,8 +113,26 @@ kubectl apply -f deploy/kind/relations/spicedb-kind-setup/postgres/postgresql.ya
 kubectl apply -f deploy/kind/relations/spicedb-kind-setup/postgres/storage.yaml
 
 # Install SpiceDB operator if not already installed
+# Resolve the operator version from the kessel fork's SYNC.md.
+# To pin a specific version locally, set SPICEDB_OPERATOR_VERSION before running this script
+# (e.g. SPICEDB_OPERATOR_VERSION=v1.2.3 ./scripts/start-inventory-kind.sh).
+if [[ -z "${SPICEDB_OPERATOR_VERSION}" ]]; then
+  SPICEDB_OPERATOR_VERSION=$(curl --fail --silent --location \
+    --connect-timeout 10 --max-time 30 \
+    "https://raw.githubusercontent.com/project-kessel/spicedb-operator/main/SYNC.md" \
+    | grep '^TAG:' | awk '{print $2}')
+else
+  echo "Using pinned SpiceDB operator version: ${SPICEDB_OPERATOR_VERSION}"
+fi
+if [[ ! "${SPICEDB_OPERATOR_VERSION}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+  echo "ERROR: SpiceDB operator TAG '${SPICEDB_OPERATOR_VERSION}' is not a valid semver tag (expected vX.Y.Z)" >&2
+  exit 1
+fi
+echo "Using SpiceDB operator version: ${SPICEDB_OPERATOR_VERSION}"
+
+SPICEDB_OPERATOR_BUNDLE_URL="https://github.com/authzed/spicedb-operator/releases/download/${SPICEDB_OPERATOR_VERSION}/bundle.yaml"
 kubectl get crd spicedbclusters.authzed.com > /dev/null 2>&1 || \
-  kubectl apply --server-side -f https://github.com/authzed/spicedb-operator/releases/download/v1.21.0/bundle.yaml
+  kubectl apply --server-side -f "${SPICEDB_OPERATOR_BUNDLE_URL}"
 
 kubectl apply -f deploy/kind/relations/spicedb-kind-setup/spicedb-cr.yaml
 kubectl apply -f deploy/kind/relations/spicedb-kind-setup/svc-ingress.yaml

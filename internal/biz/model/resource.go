@@ -26,14 +26,10 @@ type Resource struct {
 }
 
 // Factory methods
-func NewResource(id ResourceId, localResourceId LocalResourceId, resourceType ResourceType, reporterType ReporterType, reporterInstanceId ReporterInstanceId, transactionId TransactionId, reporterResourceId ReporterResourceId, apiHref ApiHref, consoleHref ConsoleHref, reporterRepresentationData Representation, commonRepresentationData Representation, reporterVersion *ReporterVersion) (Resource, error) {
-	var err error
-	if transactionId == "" {
-		// generate transaction IDs when not provided
-		transactionId, err = GenerateTransactionId()
-		if err != nil {
-			return Resource{}, err
-		}
+func NewResource(id ResourceId, localResourceId LocalResourceId, resourceType ResourceType, reporterType ReporterType, reporterInstanceId ReporterInstanceId, transactionId TransactionId, reporterResourceId ReporterResourceId, apiHref ApiHref, consoleHref *ConsoleHref, reporterRepresentationData *Representation, commonRepresentationData *Representation, reporterVersion *ReporterVersion) (Resource, error) {
+	if reporterRepresentationData == nil && commonRepresentationData != nil {
+		emptyRep := NewEmptyRepresentation()
+		reporterRepresentationData = &emptyRep
 	}
 
 	// If common representation data is provided, initialize commonVersion to 0
@@ -99,10 +95,10 @@ func NewResource(id ResourceId, localResourceId LocalResourceId, resourceType Re
 func (r *Resource) Update(
 	key ReporterResourceKey,
 	apiHref ApiHref,
-	consoleHref ConsoleHref,
+	consoleHref *ConsoleHref,
 	reporterVersion *ReporterVersion,
-	reporterRepresentationData Representation,
-	commonRepresentationData Representation,
+	reporterRepresentationData *Representation,
+	commonRepresentationData *Representation,
 	transactionId TransactionId,
 ) error {
 	// Only increment commonVersion if common representation data is provided
@@ -136,14 +132,6 @@ func (r *Resource) Update(
 	}
 
 	reporterResource.Update(apiHref, consoleHref)
-
-	if transactionId == "" {
-		// generate transaction IDs when not provided
-		transactionId, err = GenerateTransactionId()
-		if err != nil {
-			return err
-		}
-	}
 
 	resourceEvent, err := resourceEventAndRepresentations(
 		reporterResource.resourceID,
@@ -218,35 +206,42 @@ func resourceEventAndRepresentations(
 	localResourceId LocalResourceId,
 	reporterResourceId ReporterResourceId,
 	apiHref ApiHref,
-	consoleHref ConsoleHref,
-	reporterData Representation,
-	commonData Representation,
+	consoleHref *ConsoleHref,
+	reporterData *Representation,
+	commonData *Representation,
 	reporterVersion *ReporterVersion,
 	representationVersion Version,
 	generation Generation,
 	commonVersion *Version,
 ) (ResourceReportEvent, error) {
 
-	reporterRepresentation, err := NewReporterDataRepresentation(
-		reporterResourceId,
-		representationVersion,
-		generation,
-		reporterData,
-		commonVersion,
-		reporterVersion,
-		transactionId,
-	)
-	if err != nil {
-		return ResourceReportEvent{}, fmt.Errorf("invalid ReporterRepresentation: %w", err)
+	if reporterData == nil && commonData == nil {
+		return ResourceReportEvent{}, ErrNoRepresentationProvided
 	}
 
-	// Only create CommonRepresentation if common data is provided
-	var commonRepresentation CommonRepresentation
-	if len(commonData) > 0 && commonVersion != nil {
-		commonRepresentation, err = NewCommonRepresentation(
+	var reporterRepresentation *ReporterDataRepresentation
+	if reporterData != nil {
+		rr, err := NewReporterDataRepresentation(
+			reporterResourceId,
+			representationVersion,
+			generation,
+			*reporterData,
+			commonVersion,
+			reporterVersion,
+			transactionId,
+		)
+		if err != nil {
+			return ResourceReportEvent{}, fmt.Errorf("invalid ReporterRepresentation: %w", err)
+		}
+		reporterRepresentation = &rr
+	}
+
+	var commonRepresentation *CommonRepresentation
+	if commonData != nil {
+		cr, err := NewCommonRepresentation(
 			resourceId,
-			commonData,
-			*commonVersion,
+			*commonData,
+			commonVersion,
 			reporterType,
 			reporterInstanceId,
 			transactionId,
@@ -254,6 +249,7 @@ func resourceEventAndRepresentations(
 		if err != nil {
 			return ResourceReportEvent{}, fmt.Errorf("invalid CommonRepresentation: %w", err)
 		}
+		commonRepresentation = &cr
 	}
 
 	resourceEvent, err := NewResourceReportEvent(
@@ -355,7 +351,7 @@ func (r Resource) GetTimestamps() (createdAt time.Time, updatedAt time.Time) {
 }
 
 // Serialization + Deserialization functions, direct initialization without validation
-func (r Resource) Serialize() (ResourceSnapshot, ReporterResourceSnapshot, ReporterRepresentationSnapshot, CommonRepresentationSnapshot, error) {
+func (r Resource) Serialize() (ResourceSnapshot, ReporterResourceSnapshot, *ReporterRepresentationSnapshot, *CommonRepresentationSnapshot, error) {
 	var createdAt, updatedAt time.Time
 	if len(r.resourceReportEvents) > 0 {
 		createdAt = r.resourceReportEvents[0].createdAt
@@ -390,16 +386,23 @@ func (r Resource) Serialize() (ResourceSnapshot, ReporterResourceSnapshot, Repor
 		reporterResourceSnapshot = r.reporterResources[0].Serialize()
 	}
 
-	var reporterRepresentationSnapshot ReporterRepresentationSnapshot
-	var commonRepresentationSnapshot CommonRepresentationSnapshot
+	var reporterRepresentationSnapshot *ReporterRepresentationSnapshot
+	var commonRepresentationSnapshot *CommonRepresentationSnapshot
 	if len(r.resourceReportEvents) > 0 {
 		//TODO: Fix this to serialize all ResourceEvents
-		reporterRepresentationSnapshot = r.resourceReportEvents[0].reporterRepresentation.Serialize()
-		commonRepresentationSnapshot = r.resourceReportEvents[0].commonRepresentation.Serialize()
+		if rr := r.resourceReportEvents[0].reporterRepresentation; rr != nil {
+			s := rr.Serialize()
+			reporterRepresentationSnapshot = &s
+		}
+		if cr := r.resourceReportEvents[0].commonRepresentation; cr != nil {
+			s := cr.Serialize()
+			commonRepresentationSnapshot = &s
+		}
 	}
 	if len(r.resourceDeleteEvents) > 0 {
 		//TODO: Fix this to serialize all ResourceEvents
-		reporterRepresentationSnapshot = r.resourceDeleteEvents[0].reporterRepresentation.Serialize()
+		s := r.resourceDeleteEvents[0].reporterRepresentation.Serialize()
+		reporterRepresentationSnapshot = &s
 	}
 
 	return resourceSnapshot, reporterResourceSnapshot, reporterRepresentationSnapshot, commonRepresentationSnapshot, nil

@@ -60,9 +60,9 @@ func createTestResourceReportEvent() bizmodel.ResourceReportEvent {
 		reporterInstanceId,
 		localResourceId,
 		apiHref,
-		consoleHref,
-		reporterRepresentation,
-		commonRepresentation,
+		&consoleHref,
+		&reporterRepresentation,
+		&commonRepresentation,
 	)
 
 	return event
@@ -150,7 +150,64 @@ func assertResourceEventFromDomainEvent(t *testing.T, operation bizmodel.EventOp
 	assert.Equal(t, resourceEvent.WorkspaceId(), data.Metadata.WorkspaceId)
 	assert.Equal(t, resourceEvent.ReporterInstanceId(), data.ReporterData.ReporterInstanceId)
 	assert.Equal(t, resourceEvent.ReporterType(), data.ReporterData.ReporterType)
-	assert.Equal(t, resourceEvent.ConsoleHref(), data.ReporterData.ConsoleHref)
+	assert.Equal(t, bizmodel.SerializeStringPtr(resourceEvent.ConsoleHref()), data.ReporterData.ConsoleHref)
 	assert.Equal(t, resourceEvent.ApiHref(), data.ReporterData.ApiHref)
 	assert.Equal(t, resourceEvent.LocalResourceId(), data.ReporterData.LocalResourceId)
+}
+
+// TestEventResourceReporter_ReporterVersion_Optional documents that EventResourceReporter
+// uses *string for ReporterVersion.
+func TestEventResourceReporter_ReporterVersion_Optional(t *testing.T) {
+	// Nil ReporterVersion round-trips as null in JSON (omitempty omits the field when nil)
+	er := EventResourceReporter{
+		ReporterInstanceId: "inst",
+		ReporterType:       "type",
+		ConsoleHref:        nil,
+		ApiHref:            "",
+		LocalResourceId:    "local",
+		ReporterVersion:    nil,
+	}
+	b, err := json.Marshal(er)
+	assert.NoError(t, err)
+	var decoded EventResourceReporter
+	err = json.Unmarshal(b, &decoded)
+	assert.NoError(t, err)
+	assert.Nil(t, decoded.ReporterVersion)
+
+	// Non-nil ReporterVersion round-trips
+	ver := "1.0"
+	er.ReporterVersion = &ver
+	b, err = json.Marshal(er)
+	assert.NoError(t, err)
+	err = json.Unmarshal(b, &decoded)
+	assert.NoError(t, err)
+	assert.NotNil(t, decoded.ReporterVersion)
+	assert.Equal(t, "1.0", *decoded.ReporterVersion)
+}
+
+// TestEventRelationshipReporter_ReporterVersion_Optional documents that EventRelationshipReporter
+// uses *string for ReporterVersion, aligned with EventResourceReporter.
+func TestEventRelationshipReporter_ReporterVersion_Optional(t *testing.T) {
+	er := EventRelationshipReporter{
+		ReporterType:           "type",
+		SubjectLocalResourceId: "sub",
+		ObjectLocalResourceId:  "obj",
+		ReporterVersion:        nil,
+		ReporterInstanceId:     "inst",
+	}
+	b, err := json.Marshal(er)
+	assert.NoError(t, err)
+	var decoded EventRelationshipReporter
+	err = json.Unmarshal(b, &decoded)
+	assert.NoError(t, err)
+	assert.Nil(t, decoded.ReporterVersion)
+
+	ver := "1.0"
+	er.ReporterVersion = &ver
+	b, err = json.Marshal(er)
+	assert.NoError(t, err)
+	err = json.Unmarshal(b, &decoded)
+	assert.NoError(t, err)
+	assert.NotNil(t, decoded.ReporterVersion)
+	assert.Equal(t, "1.0", *decoded.ReporterVersion)
 }

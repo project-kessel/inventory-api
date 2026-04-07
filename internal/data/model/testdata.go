@@ -622,3 +622,5 @@ func RunTableDrivenTest(t *testing.T, testCases map[string]func(*testing.T)) {
 		})
 	}
 }
+
+func stringPtr(s string) *string { return &s }

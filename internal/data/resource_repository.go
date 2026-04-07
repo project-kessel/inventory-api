@@ -28,7 +28,7 @@ type FindResourceByKeysResult struct {
 	ReporterType          string    `gorm:"column:reporter_type"`
 	ReporterInstanceID    string    `gorm:"column:reporter_instance_id"`
 	APIHref               string    `gorm:"column:api_href"`
-	ConsoleHref           string    `gorm:"column:console_href"`
+	ConsoleHref           *string   `gorm:"column:console_href"`
 	ConsistencyToken      string    `gorm:"column:consistency_token"`
 	CreatedAt             time.Time `gorm:"column:created_at"`
 	UpdatedAt             time.Time `gorm:"column:updated_at"`
@@ -79,7 +79,6 @@ func (result FindResourceByKeysResult) ToSnapshots() (bizmodel.ResourceSnapshot,
 		ReporterInstanceID: result.ReporterInstanceID,
 	}
 
-	// Create ReporterResourceSnapshot
 	reporterResourceSnapshot := bizmodel.ReporterResourceSnapshot{
 		ID:                    result.ReporterResourceID,
 		ReporterResourceKey:   keySnapshot,
@@ -139,8 +138,6 @@ func (r *resourceRepository) Save(tx *gorm.DB, resource bizmodel.Resource, opera
 
 	dataResource := datamodel.DeserializeResourceFromSnapshot(resourceSnapshot)
 	dataReporterResource := datamodel.DeserializeReporterResourceFromSnapshot(reporterResourceSnapshot)
-	dataReporterRepresentation := datamodel.DeserializeReporterRepresentationFromSnapshot(reporterRepresentationSnapshot)
-	dataCommonRepresentation := datamodel.DeserializeCommonRepresentationFromSnapshot(commonRepresentationSnapshot)
 
 	if err := tx.Save(&dataResource).Error; err != nil {
 		return fmt.Errorf("failed to save resource: %w", err)
@@ -150,8 +147,8 @@ func (r *resourceRepository) Save(tx *gorm.DB, resource bizmodel.Resource, opera
 		return fmt.Errorf("failed to save reporter resource: %w", err)
 	}
 
-	//TODO: make these checks better, the zero value checks right now are to avoid saving zero value rows in the representation tables and causing unique constraint failures
-	if dataReporterRepresentation.ReporterResourceID != uuid.Nil {
+	if reporterRepresentationSnapshot != nil {
+		dataReporterRepresentation := datamodel.DeserializeReporterRepresentationFromSnapshot(*reporterRepresentationSnapshot)
 		if err := tx.Create(&dataReporterRepresentation).Error; err != nil {
 			if errors.Is(err, gorm.ErrDuplicatedKey) {
 				return errors.BadRequest("NON-UNIQUE TRANSACTION ID", err.Error()).WithCause(err)
@@ -160,7 +157,8 @@ func (r *resourceRepository) Save(tx *gorm.DB, resource bizmodel.Resource, opera
 		}
 	}
 
-	if dataCommonRepresentation.ResourceId != uuid.Nil {
+	if commonRepresentationSnapshot != nil {
+		dataCommonRepresentation := datamodel.DeserializeCommonRepresentationFromSnapshot(*commonRepresentationSnapshot)
 		if err := tx.Create(&dataCommonRepresentation).Error; err != nil {
 			if errors.Is(err, gorm.ErrDuplicatedKey) {
 				return errors.BadRequest("NON-UNIQUE TRANSACTION ID", err.Error()).WithCause(err)

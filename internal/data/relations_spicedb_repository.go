@@ -318,7 +318,11 @@ func (r *spicedbRelationsRepository) LookupSubjects(ctx context.Context, query m
 func (r *spicedbRelationsRepository) CreateTuples(ctx context.Context, tuples []model.RelationsTuple, upsert bool,
 	lockId, lockToken string) (model.ConsistencyToken, error) {
 
-	rels := tuplesToV1Beta1Relationships(tuples)
+	rels, err := tuplesToV1Beta1Relationships(tuples)
+	if err != nil {
+		r.incrFailureCounter("CreateTuples")
+		return "", err
+	}
 
 	opts, err := r.getCallOptions()
 	if err != nil {
@@ -358,7 +362,11 @@ func (r *spicedbRelationsRepository) DeleteTuples(ctx context.Context, tuples []
 
 	var consistencyToken model.ConsistencyToken
 	for _, tuple := range tuples {
-		filter := tupleToV1Beta1Filter(tuple)
+		filter, err := tupleToV1Beta1Filter(tuple)
+		if err != nil {
+			r.incrFailureCounter("DeleteTuples")
+			return "", err
+		}
 		req := &kessel.DeleteTuplesRequest{
 			Filter: filter,
 		}
@@ -462,6 +470,33 @@ func subjectRefToV1Beta1(sub model.SubjectReference) *kessel.SubjectReference {
 	return ref
 }
 
+// relationsSubjectToSubjectReference maps a tuple subject to the model used by subjectRefToV1Beta1,
+// preserving an optional subject relation (e.g. subject sets such as group#members).
+func relationsSubjectToSubjectReference(rs model.RelationsSubject) (model.SubjectReference, error) {
+	res := rs.Subject()
+	resType, err := model.NewResourceType(res.Type().Name())
+	if err != nil {
+		return model.SubjectReference{}, fmt.Errorf("relations tuple subject resource type: %w", err)
+	}
+	repType, err := model.NewReporterType(res.Type().Namespace())
+	if err != nil {
+		return model.SubjectReference{}, fmt.Errorf("relations tuple subject reporter type: %w", err)
+	}
+	key, err := model.NewReporterResourceKey(res.Id(), resType, repType, model.ReporterInstanceId(""))
+	if err != nil {
+		return model.SubjectReference{}, fmt.Errorf("relations tuple subject key: %w", err)
+	}
+	relStr := strings.TrimSpace(rs.Relation())
+	if relStr == "" {
+		return model.NewSubjectReferenceWithoutRelation(key), nil
+	}
+	rel, err := model.NewRelation(relStr)
+	if err != nil {
+		return model.SubjectReference{}, fmt.Errorf("relations tuple subject relation: %w", err)
+	}
+	return model.NewSubjectReference(key, &rel), nil
+}
+
 func consistencyToV1Beta1(c model.Consistency) *kessel.Consistency {
 	if token := model.ConsistencyAtLeastAsFreshToken(c); token != nil {
 		return &kessel.Consistency{
@@ -484,15 +519,27 @@ func tokenFromV1Beta1(ct *kessel.ConsistencyToken) model.ConsistencyToken {
 	return model.DeserializeConsistencyToken(ct.GetToken())
 }
 
-func tuplesToV1Beta1Relationships(tuples []model.RelationsTuple) []*kessel.Relationship {
+func tuplesToV1Beta1Relationships(tuples []model.RelationsTuple) ([]*kessel.Relationship, error) {
 	rels := make([]*kessel.Relationship, len(tuples))
 	for i, tuple := range tuples {
-		rels[i] = tupleToV1Beta1Relationship(tuple)
+		rel, err := tupleToV1Beta1Relationship(tuple)
+		if err != nil {
+			return nil, err
+		}
+		rels[i] = rel
 	}
-	return rels
+	return rels, nil
 }
 
-func tupleToV1Beta1Relationship(tuple model.RelationsTuple) *kessel.Relationship {
+func tupleToV1Beta1Relationship(tuple model.RelationsTuple) (*kessel.Relationship, error) {
+	subRef, err := relationsSubjectToSubjectReference(tuple.Subject())
+	if err != nil {
+		return nil, err
+	}
+	v1Subject := subjectRefToV1Beta1(subRef)
+	if v1Subject == nil || v1Subject.Subject == nil || v1Subject.Subject.Type == nil {
+		return nil, fmt.Errorf("internal: subject reference conversion produced invalid subject")
+	}
 	return &kessel.Relationship{
 		Resource: &kessel.ObjectReference{
 			Type: &kessel.ObjectType{
@@ -502,38 +549,45 @@ func tupleToV1Beta1Relationship(tuple model.RelationsTuple) *kessel.Relationship
 			Id: tuple.Resource().Id().Serialize(),
 		},
 		Relation: tuple.Relation(),
-		Subject: &kessel.SubjectReference{
-			Subject: &kessel.ObjectReference{
-				Type: &kessel.ObjectType{
-					Name:      tuple.Subject().Subject().Type().Name(),
-					Namespace: tuple.Subject().Subject().Type().Namespace(),
-				},
-				Id: tuple.Subject().Subject().Id().Serialize(),
-			},
-		},
-	}
+		Subject:  v1Subject,
+	}, nil
 }
 
-func tupleToV1Beta1Filter(tuple model.RelationsTuple) *kessel.RelationTupleFilter {
+func tupleToV1Beta1Filter(tuple model.RelationsTuple) (*kessel.RelationTupleFilter, error) {
+	subRef, err := relationsSubjectToSubjectReference(tuple.Subject())
+	if err != nil {
+		return nil, err
+	}
+	v1SubRef := subjectRefToV1Beta1(subRef)
+	if v1SubRef == nil || v1SubRef.Subject == nil || v1SubRef.Subject.Type == nil {
+		return nil, fmt.Errorf("internal: subject reference conversion produced invalid subject")
+	}
+
 	resourceNamespace := tuple.Resource().Type().Namespace()
 	resourceType := tuple.Resource().Type().Name()
 	resourceId := tuple.Resource().Id().Serialize()
 	relation := tuple.Relation()
-	subjectNamespace := tuple.Subject().Subject().Type().Namespace()
-	subjectType := tuple.Subject().Subject().Type().Name()
-	subjectId := tuple.Subject().Subject().Id().Serialize()
+	subjectNamespace := v1SubRef.Subject.Type.Namespace
+	subjectType := v1SubRef.Subject.Type.Name
+	subjectId := v1SubRef.Subject.Id
+
+	subjectFilter := &kessel.SubjectFilter{
+		SubjectNamespace: &subjectNamespace,
+		SubjectType:      &subjectType,
+		SubjectId:        &subjectId,
+	}
+	if v1SubRef.Relation != nil && *v1SubRef.Relation != "" {
+		relCopy := *v1SubRef.Relation
+		subjectFilter.Relation = &relCopy
+	}
 
 	return &kessel.RelationTupleFilter{
 		ResourceNamespace: &resourceNamespace,
 		ResourceType:      &resourceType,
 		ResourceId:        &resourceId,
 		Relation:          &relation,
-		SubjectFilter: &kessel.SubjectFilter{
-			SubjectNamespace: &subjectNamespace,
-			SubjectType:      &subjectType,
-			SubjectId:        &subjectId,
-		},
-	}
+		SubjectFilter:     subjectFilter,
+	}, nil
 }
 
 // relationsLookupResourcesIterator wraps a gRPC streaming client as a LookupResourcesIterator.

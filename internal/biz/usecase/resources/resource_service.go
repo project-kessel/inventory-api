@@ -739,7 +739,6 @@ func getNextTransactionID() (string, error) {
 	return txid.String(), nil
 }
 
-
 // isSPInAllowlist checks if the caller subject is in the allowlist.
 func isSPInAllowlist(callerSubject authnapi.SubjectId, allowlist []string) bool {
 	for _, sp := range allowlist {

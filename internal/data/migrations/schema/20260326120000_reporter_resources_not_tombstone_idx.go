@@ -10,7 +10,7 @@ func ReporterResourcesNotTombstoneIdxMigration() *gormigrate.Migration {
 		ID: "20260326120000",
 		Migrate: func(tx *gorm.DB) error {
 			return tx.Exec(`
-				CREATE INDEX IF NOT EXISTS idx_reporter_resources_not_tombstone
+				CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_reporter_resources_not_tombstone
 				ON reporter_resources (resource_type, reporter_type, reporter_instance_id)
 				WHERE NOT tombstone
 			`).Error

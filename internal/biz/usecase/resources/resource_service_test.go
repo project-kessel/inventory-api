@@ -326,7 +326,6 @@ func TestCheckSelfBulk_UsesCheckSelfRelationForEachItem(t *testing.T) {
 	require.Len(t, resp.Pairs, 2)
 	assert.Equal(t, []metaauthorizer.Relation{
 		metaauthorizer.RelationCheckSelf, metaauthorizer.RelationCheckSelf,
-		metaauthorizer.RelationCheckBulk, metaauthorizer.RelationCheckBulk,
 	}, meta.relations)
 }
 

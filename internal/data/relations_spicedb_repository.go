@@ -241,15 +241,18 @@ func (r *spicedbRelationsRepository) CheckForUpdateBulk(ctx context.Context, ite
 }
 
 func (r *spicedbRelationsRepository) LookupResources(ctx context.Context, query model.LookupResourcesQuery) (model.LookupResourcesIterator, error) {
-	var continuationToken *string
-	if query.Continuation != "" {
-		continuationToken = &query.Continuation
-	}
-
 	opts, err := r.getCallOptions()
 	if err != nil {
 		r.incrFailureCounter("LookupResources")
 		return nil, err
+	}
+
+	var pagination *kessel.RequestPagination
+	if query.Limit != 0 || query.Continuation != "" {
+		pagination = &kessel.RequestPagination{Limit: query.Limit}
+		if query.Continuation != "" {
+			pagination.ContinuationToken = &query.Continuation
+		}
 	}
 
 	stream, err := r.lookupService.LookupResources(ctx, &kessel.LookupResourcesRequest{
@@ -257,12 +260,9 @@ func (r *spicedbRelationsRepository) LookupResources(ctx context.Context, query 
 			Namespace: query.ReporterType.Serialize(),
 			Name:      query.ResourceType.Serialize(),
 		},
-		Relation: query.Relation.Serialize(),
-		Subject:  subjectRefToV1Beta1(query.Subject),
-		Pagination: &kessel.RequestPagination{
-			Limit:             query.Limit,
-			ContinuationToken: continuationToken,
-		},
+		Relation:    query.Relation.Serialize(),
+		Subject:     subjectRefToV1Beta1(query.Subject),
+		Pagination:  pagination,
 		Consistency: consistencyToV1Beta1(query.Consistency),
 	}, opts...)
 	if err != nil {
@@ -285,8 +285,7 @@ func (r *spicedbRelationsRepository) LookupSubjects(ctx context.Context, query m
 	if query.Limit != 0 || query.Continuation != "" {
 		pagination = &kessel.RequestPagination{Limit: query.Limit}
 		if query.Continuation != "" {
-			c := query.Continuation
-			pagination.ContinuationToken = &c
+			pagination.ContinuationToken = &query.Continuation
 		}
 	}
 

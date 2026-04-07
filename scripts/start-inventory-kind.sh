@@ -288,7 +288,8 @@ done
 echo "Waiting for gRPC port 9081 to be ready..."
 GRPC_RETRIES=0
 GRPC_MAX=30
-until kubectl exec "$(kubectl get pods -l app=kessel-inventory -o jsonpath='{.items[0].metadata.name}')" -- sh -c 'echo > /dev/tcp/localhost/9081' 2>/dev/null; do
+until kubectl exec "$(kubectl get pods -l app=kessel-inventory -o jsonpath='{.items[0].metadata.name}')" -- \
+  curl -s --connect-timeout 2 --http2-prior-knowledge -o /dev/null http://localhost:9081/ 2>/dev/null; do
   GRPC_RETRIES=$((GRPC_RETRIES + 1))
   if [ "$GRPC_RETRIES" -ge "$GRPC_MAX" ]; then
     echo "ERROR: gRPC port 9081 not ready after $GRPC_MAX attempts"

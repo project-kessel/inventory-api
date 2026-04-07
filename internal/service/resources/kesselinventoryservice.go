@@ -171,21 +171,7 @@ func (s *InventoryService) CheckSelfBulk(ctx context.Context, req *pb.CheckSelfB
 }
 
 func subjectReferenceFromProto(subject *pb.SubjectReference) (model.SubjectReference, error) {
-	localResourceId, err := model.NewLocalResourceId(subject.Resource.GetResourceId())
-	if err != nil {
-		return model.SubjectReference{}, err
-	}
-	resourceType, err := model.NewResourceType(subject.Resource.GetResourceType())
-	if err != nil {
-		return model.SubjectReference{}, err
-	}
-	// TODO: Reporter is optional and we should also consider instance ID
-	reporterType, err := model.NewReporterType(subject.Resource.GetReporter().GetType())
-	if err != nil {
-		return model.SubjectReference{}, err
-	}
-
-	key, err := model.NewReporterResourceKey(localResourceId, resourceType, reporterType, model.ReporterInstanceId(""))
+	key, err := reporterKeyFromResourceReference(subject.GetResource())
 	if err != nil {
 		return model.SubjectReference{}, err
 	}

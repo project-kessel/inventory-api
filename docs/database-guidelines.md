@@ -61,9 +61,9 @@ func DeserializeResourceFromSnapshot(snapshot bizmodel.ResourceSnapshot) Resourc
 
 ### Core Tables
 - **resource**: Root entity with UUID, type, common_version, consistency_token
-- **reporter_resource**: Links resources to reporters with composite natural key
-- **reporter_representation**: Versioned reporter-specific data
-- **common_representation**: Versioned common representation data
+- **reporter_resources**: Links resources to reporters with composite natural key
+- **reporter_representations**: Versioned reporter-specific data
+- **common_representations**: Versioned common representation data
 - **outbox_events**: Event sourcing for external integrations
 
 ### Composite Key Design

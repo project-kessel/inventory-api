@@ -73,6 +73,38 @@ metricscollector.Incr(counter, operation, attribute.String("extra", value))
 
 ## Configuration Management
 
+### Universal Configuration Pattern
+Every component follows the same configuration lifecycle:
+```go
+// 1. Options struct with mapstructure tags
+type Options struct {
+    Field1 string `mapstructure:"field1"`
+    Field2 bool   `mapstructure:"field2"`
+}
+
+// 2. Constructor with sensible defaults
+func NewOptions() *Options {
+    return &Options{Field1: "default", Field2: true}
+}
+
+// 3. Command-line flags via pflag
+func (o *Options) AddFlags(fs *pflag.FlagSet, prefix string) {
+    fs.StringVar(&o.Field1, prefix+"field1", o.Field1, "description")
+}
+
+// 4. Configuration completion and normalization
+func (o *Options) Complete() []error {
+    // Apply defaults, normalize values
+    return nil
+}
+
+// 5. Configuration validation
+func (o *Options) Validate() []error {
+    // Return all validation errors as slice
+    return errs
+}
+```
+
 ### ClowdApp Integration
 - **Automatic discovery** of dependent services via `InjectClowdAppConfig()`
 - **Database configuration** from ClowdApp database section

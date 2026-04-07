@@ -53,7 +53,7 @@ implementations := []struct {
 - **Fake implementations**: 
   - `NewFakeResourceRepository()` - in-memory resource storage
   - `NewFakeTransactionManager()` - no-op transaction handling
-  - `FakeMetricsCollector` - metrics capture for assertions
+  - `NewFakeMetricsCollector()` - metrics capture for assertions
 
 ## Test Data & Fixtures
 

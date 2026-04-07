@@ -141,8 +141,7 @@ func DeserializeReporterDataRepresentation(snapshot *ReporterRepresentationSnaps
 
 	var reporterVersion *ReporterVersion
 	if snapshot.ReporterVersion != nil {
-		rv := DeserializeReporterVersion(*snapshot.ReporterVersion)
-		reporterVersion = &rv
+		reporterVersion = DeserializeReporterVersion(snapshot.ReporterVersion)
 	}
 
 	return &ReporterDataRepresentation{

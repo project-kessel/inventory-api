@@ -300,7 +300,7 @@ func TestReporterRepresentationSnapshot_TransactionId_EmptyMeansNotSet(t *testin
 		Version:            1,
 		Generation:         0,
 		ReporterVersion:    nil,
-		CommonVersion:      0,
+		CommonVersion:      nil,
 		TransactionId:      "",
 		Tombstone:          false,
 		CreatedAt:          time.Time{},
@@ -318,7 +318,7 @@ func TestResourceSnapshot_CreatedAtUpdatedAt_ZeroMeansNotSet(t *testing.T) {
 	snapshot := ResourceSnapshot{
 		ID:               uuid.New(),
 		Type:             "test",
-		CommonVersion:    0,
+		CommonVersion:    nil,
 		ConsistencyToken: "",
 		CreatedAt:        time.Time{},
 		UpdatedAt:        time.Time{},

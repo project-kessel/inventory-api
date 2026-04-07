@@ -301,13 +301,12 @@ func testRepositoryContract(t *testing.T, repo bizmodel.ResourceRepository, db *
 		api, _ := bizmodel.NewApiHref("https://api.example.com/cv-contract")
 		con, _ := bizmodel.NewConsoleHref("https://console.example.com/cv-contract")
 		rep := bizmodel.Representation(internal.JsonObject{"cluster_id": localID})
-		var common bizmodel.Representation
+		var common *bizmodel.Representation
 		if withCommon {
-			common = bizmodel.Representation(internal.JsonObject{"workspace_id": "ws-" + localID})
-		} else {
-			common = bizmodel.Representation(internal.JsonObject{})
+			commonData := bizmodel.Representation(internal.JsonObject{"workspace_id": "ws-" + localID})
+			common = &commonData
 		}
-		resource, err := bizmodel.NewResource(rID, lid, rt, rpt, rinst, newUniqueTxID(txPrefix+"-create"), rrID, api, con, rep, common, nil)
+		resource, err := bizmodel.NewResource(rID, lid, rt, rpt, rinst, newUniqueTxID(txPrefix+"-create"), rrID, api, &con, &rep, common, nil)
 		require.NoError(t, err)
 		key, err := bizmodel.NewReporterResourceKey(lid, rt, rpt, rinst)
 		require.NoError(t, err)
@@ -319,13 +318,12 @@ func testRepositoryContract(t *testing.T, repo bizmodel.ResourceRepository, db *
 		api, _ := bizmodel.NewApiHref("https://api.example.com/cv-updated")
 		con, _ := bizmodel.NewConsoleHref("https://console.example.com/cv-updated")
 		rep := bizmodel.Representation(internal.JsonObject{"cluster_id": "updated"})
-		var common bizmodel.Representation
+		var common *bizmodel.Representation
 		if withCommon {
-			common = bizmodel.Representation(internal.JsonObject{"workspace_id": "ws-updated"})
-		} else {
-			common = bizmodel.Representation(internal.JsonObject{})
+			commonData := bizmodel.Representation(internal.JsonObject{"workspace_id": "ws-updated"})
+			common = &commonData
 		}
-		require.NoError(t, found.Update(key, api, con, nil, rep, common, newUniqueTxID(txPrefix)))
+		require.NoError(t, found.Update(key, api, &con, nil, &rep, common, newUniqueTxID(txPrefix)))
 	}
 
 	t.Run("CommonVersion lifecycle consistency", func(t *testing.T) {
@@ -2686,6 +2684,8 @@ func TestCommonVersionIncrementAndResetCycle(t *testing.T) {
 	require.NoError(t, err)
 
 	// Step 1: Create with common representation → CommonVersion = 0
+	cycleRep := bizmodel.Representation(internal.JsonObject{"cluster_id": "cycle-cluster"})
+	cycleCommon := bizmodel.Representation(internal.JsonObject{"workspace_id": "cycle-workspace"})
 	resource, err := bizmodel.NewResource(
 		resourceIdType,
 		localResourceIdType,
@@ -2695,9 +2695,9 @@ func TestCommonVersionIncrementAndResetCycle(t *testing.T) {
 		newUniqueTxID("cycle-create"),
 		reporterResourceIdType,
 		apiHref,
-		consoleHref,
-		bizmodel.Representation(internal.JsonObject{"cluster_id": "cycle-cluster"}),
-		bizmodel.Representation(internal.JsonObject{"workspace_id": "cycle-workspace"}),
+		&consoleHref,
+		&cycleRep,
+		&cycleCommon,
 		nil,
 	)
 	require.NoError(t, err)
@@ -2714,10 +2714,12 @@ func TestCommonVersionIncrementAndResetCycle(t *testing.T) {
 	assert.Equal(t, uint(0), *snap.CommonVersion, "CommonVersion should be 0 after initial create")
 
 	// Step 2: Update with common representation → CommonVersion increments to 1
+	cycleRepV2 := bizmodel.Representation(internal.JsonObject{"cluster_id": "cycle-cluster-v2"})
+	cycleCommonV2 := bizmodel.Representation(internal.JsonObject{"workspace_id": "cycle-workspace-v2"})
 	err = found.Update(
-		key, apiHref, consoleHref, nil,
-		bizmodel.Representation(internal.JsonObject{"cluster_id": "cycle-cluster-v2"}),
-		bizmodel.Representation(internal.JsonObject{"workspace_id": "cycle-workspace-v2"}),
+		key, apiHref, &consoleHref, nil,
+		&cycleRepV2,
+		&cycleCommonV2,
 		newUniqueTxID("cycle-update-with-common"),
 	)
 	require.NoError(t, err)
@@ -2734,10 +2736,11 @@ func TestCommonVersionIncrementAndResetCycle(t *testing.T) {
 	assert.Equal(t, uint(1), *snap.CommonVersion, "CommonVersion should increment to 1 after update with common rep")
 
 	// Step 3: Update without common representation → CommonVersion resets to nil
+	cycleRepReporterOnly := bizmodel.Representation(internal.JsonObject{"cluster_id": "cycle-cluster-reporter-only"})
 	err = found.Update(
-		key, apiHref, consoleHref, nil,
-		bizmodel.Representation(internal.JsonObject{"cluster_id": "cycle-cluster-reporter-only"}),
-		bizmodel.Representation(internal.JsonObject{}),
+		key, apiHref, &consoleHref, nil,
+		&cycleRepReporterOnly,
+		nil,
 		newUniqueTxID("cycle-update-without-common"),
 	)
 	require.NoError(t, err)
@@ -2784,12 +2787,14 @@ func TestCommonVersionAfterDeleteAndRecreate(t *testing.T) {
 	resource1ReporterIdType, err := bizmodel.NewReporterResourceId(uuid.New())
 	require.NoError(t, err)
 
+	drRep1 := bizmodel.Representation(internal.JsonObject{"cluster_id": "v1"})
+	drCommon1 := bizmodel.Representation(internal.JsonObject{"workspace_id": "ws-v1"})
 	resource1, err := bizmodel.NewResource(
 		resource1IdType, localResourceIdType, resourceType, reporterType, reporterInstanceId,
 		newUniqueTxID("dr-create-1"),
-		resource1ReporterIdType, apiHref, consoleHref,
-		bizmodel.Representation(internal.JsonObject{"cluster_id": "v1"}),
-		bizmodel.Representation(internal.JsonObject{"workspace_id": "ws-v1"}),
+		resource1ReporterIdType, apiHref, &consoleHref,
+		&drRep1,
+		&drCommon1,
 		nil,
 	)
 	require.NoError(t, err)
@@ -2797,18 +2802,22 @@ func TestCommonVersionAfterDeleteAndRecreate(t *testing.T) {
 
 	found, err := repo.FindResourceByKeys(db, key)
 	require.NoError(t, err)
-	require.NoError(t, found.Update(key, apiHref, consoleHref, nil,
-		bizmodel.Representation(internal.JsonObject{"cluster_id": "v2"}),
-		bizmodel.Representation(internal.JsonObject{"workspace_id": "ws-v2"}),
+	drRep2 := bizmodel.Representation(internal.JsonObject{"cluster_id": "v2"})
+	drCommon2 := bizmodel.Representation(internal.JsonObject{"workspace_id": "ws-v2"})
+	require.NoError(t, found.Update(key, apiHref, &consoleHref, nil,
+		&drRep2,
+		&drCommon2,
 		newUniqueTxID("dr-update-1a"),
 	))
 	require.NoError(t, repo.Save(db, *found, bizmodel.OperationTypeUpdated, ""))
 
 	found, err = repo.FindResourceByKeys(db, key)
 	require.NoError(t, err)
-	require.NoError(t, found.Update(key, apiHref, consoleHref, nil,
-		bizmodel.Representation(internal.JsonObject{"cluster_id": "v3"}),
-		bizmodel.Representation(internal.JsonObject{"workspace_id": "ws-v3"}),
+	drRep3 := bizmodel.Representation(internal.JsonObject{"cluster_id": "v3"})
+	drCommon3 := bizmodel.Representation(internal.JsonObject{"workspace_id": "ws-v3"})
+	require.NoError(t, found.Update(key, apiHref, &consoleHref, nil,
+		&drRep3,
+		&drCommon3,
 		newUniqueTxID("dr-update-1b"),
 	))
 	require.NoError(t, repo.Save(db, *found, bizmodel.OperationTypeUpdated, ""))
@@ -2833,12 +2842,14 @@ func TestCommonVersionAfterDeleteAndRecreate(t *testing.T) {
 	resource2ReporterIdType, err := bizmodel.NewReporterResourceId(uuid.New())
 	require.NoError(t, err)
 
+	drRep1New := bizmodel.Representation(internal.JsonObject{"cluster_id": "v1-new"})
+	drCommon1New := bizmodel.Representation(internal.JsonObject{"workspace_id": "ws-v1-new"})
 	resource2, err := bizmodel.NewResource(
 		resource2IdType, localResourceIdType, resourceType, reporterType, reporterInstanceId,
 		newUniqueTxID("dr-create-2"),
-		resource2ReporterIdType, apiHref, consoleHref,
-		bizmodel.Representation(internal.JsonObject{"cluster_id": "v1-new"}),
-		bizmodel.Representation(internal.JsonObject{"workspace_id": "ws-v1-new"}),
+		resource2ReporterIdType, apiHref, &consoleHref,
+		&drRep1New,
+		&drCommon1New,
 		nil,
 	)
 	require.NoError(t, err)
@@ -2850,9 +2861,11 @@ func TestCommonVersionAfterDeleteAndRecreate(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, uint(0), *snap.CommonVersion, "second lifecycle should start at common_version 0")
 
-	require.NoError(t, found.Update(key, apiHref, consoleHref, nil,
-		bizmodel.Representation(internal.JsonObject{"cluster_id": "v2-new"}),
-		bizmodel.Representation(internal.JsonObject{"workspace_id": "ws-v2-new"}),
+	drRep2New := bizmodel.Representation(internal.JsonObject{"cluster_id": "v2-new"})
+	drCommon2New := bizmodel.Representation(internal.JsonObject{"workspace_id": "ws-v2-new"})
+	require.NoError(t, found.Update(key, apiHref, &consoleHref, nil,
+		&drRep2New,
+		&drCommon2New,
 		newUniqueTxID("dr-update-2a"),
 	))
 	require.NoError(t, repo.Save(db, *found, bizmodel.OperationTypeUpdated, ""))
@@ -2915,11 +2928,12 @@ func TestNullCommonVersionPersistence(t *testing.T) {
 		txID,
 		reporterResourceIdType,
 		apiHref,
-		consoleHref,
-		reporterRepresentation,
-		emptyCommonRepresentation,
+		&consoleHref,
+		&reporterRepresentation,
+		nil,
 		nil,
 	)
+	_ = emptyCommonRepresentation
 	require.NoError(t, err)
 
 	err = repo.Save(db, resource, bizmodel.OperationTypeCreated, "")
@@ -2974,6 +2988,8 @@ func TestCommonVersionDropThenReAdd(t *testing.T) {
 	require.NoError(t, err)
 
 	// Step 1: Create with common representation → CommonVersion = 0
+	daRep := bizmodel.Representation(internal.JsonObject{"cluster_id": "drop-readd-cluster"})
+	daCommon := bizmodel.Representation(internal.JsonObject{"workspace_id": "drop-readd-workspace"})
 	resource, err := bizmodel.NewResource(
 		resourceIdType,
 		localResourceIdType,
@@ -2983,9 +2999,9 @@ func TestCommonVersionDropThenReAdd(t *testing.T) {
 		newUniqueTxID("drop-readd-create"),
 		reporterResourceIdType,
 		apiHref,
-		consoleHref,
-		bizmodel.Representation(internal.JsonObject{"cluster_id": "drop-readd-cluster"}),
-		bizmodel.Representation(internal.JsonObject{"workspace_id": "drop-readd-workspace"}),
+		&consoleHref,
+		&daRep,
+		&daCommon,
 		nil,
 	)
 	require.NoError(t, err)
@@ -3001,10 +3017,11 @@ func TestCommonVersionDropThenReAdd(t *testing.T) {
 	assert.Equal(t, uint(0), *snap.CommonVersion, "CommonVersion should be 0 after initial create")
 
 	// Step 2 (swapped): Update WITHOUT common representation → CommonVersion resets to nil
+	daRepReporterOnly := bizmodel.Representation(internal.JsonObject{"cluster_id": "drop-readd-cluster-reporter-only"})
 	err = found.Update(
-		key, apiHref, consoleHref, nil,
-		bizmodel.Representation(internal.JsonObject{"cluster_id": "drop-readd-cluster-reporter-only"}),
-		bizmodel.Representation(internal.JsonObject{}),
+		key, apiHref, &consoleHref, nil,
+		&daRepReporterOnly,
+		nil,
 		newUniqueTxID("drop-readd-update-without"),
 	)
 	require.NoError(t, err)
@@ -3020,10 +3037,12 @@ func TestCommonVersionDropThenReAdd(t *testing.T) {
 	assert.Nil(t, snap.CommonVersion, "CommonVersion should be nil after update without common rep")
 
 	// Step 3 (swapped): Update WITH common representation → CommonVersion resumes at 1
+	daRepV2 := bizmodel.Representation(internal.JsonObject{"cluster_id": "drop-readd-cluster-v2"})
+	daCommonV2 := bizmodel.Representation(internal.JsonObject{"workspace_id": "drop-readd-workspace-v2"})
 	err = found.Update(
-		key, apiHref, consoleHref, nil,
-		bizmodel.Representation(internal.JsonObject{"cluster_id": "drop-readd-cluster-v2"}),
-		bizmodel.Representation(internal.JsonObject{"workspace_id": "drop-readd-workspace-v2"}),
+		key, apiHref, &consoleHref, nil,
+		&daRepV2,
+		&daCommonV2,
 		newUniqueTxID("drop-readd-update-with"),
 	)
 	require.NoError(t, err)
@@ -3071,6 +3090,7 @@ func TestCommonVersionFirstAddedOnUpdate(t *testing.T) {
 	require.NoError(t, err)
 
 	// Step 1: Create without common representation → CommonVersion = nil
+	faRep := bizmodel.Representation(internal.JsonObject{"cluster_id": "first-add-cluster"})
 	resource, err := bizmodel.NewResource(
 		resourceIdType,
 		localResourceIdType,
@@ -3080,9 +3100,9 @@ func TestCommonVersionFirstAddedOnUpdate(t *testing.T) {
 		newUniqueTxID("first-add-create"),
 		reporterResourceIdType,
 		apiHref,
-		consoleHref,
-		bizmodel.Representation(internal.JsonObject{"cluster_id": "first-add-cluster"}),
-		bizmodel.Representation(internal.JsonObject{}),
+		&consoleHref,
+		&faRep,
+		nil,
 		nil,
 	)
 	require.NoError(t, err)
@@ -3098,10 +3118,12 @@ func TestCommonVersionFirstAddedOnUpdate(t *testing.T) {
 	assert.Nil(t, snap.CommonVersion, "CommonVersion should be nil before any common rep is provided")
 
 	// Step 2: Update with common representation for the first time → CommonVersion initializes to 0
+	faRepV2 := bizmodel.Representation(internal.JsonObject{"cluster_id": "first-add-cluster-v2"})
+	faCommon := bizmodel.Representation(internal.JsonObject{"workspace_id": "first-add-workspace"})
 	err = found.Update(
-		key, apiHref, consoleHref, nil,
-		bizmodel.Representation(internal.JsonObject{"cluster_id": "first-add-cluster-v2"}),
-		bizmodel.Representation(internal.JsonObject{"workspace_id": "first-add-workspace"}),
+		key, apiHref, &consoleHref, nil,
+		&faRepV2,
+		&faCommon,
 		newUniqueTxID("first-add-update"),
 	)
 	require.NoError(t, err)

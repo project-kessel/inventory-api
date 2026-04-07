@@ -115,6 +115,13 @@ func (f *fakeResourceRepository) Save(tx *gorm.DB, resource bizmodel.Resource, o
 	if commonRepresentationSnapshot != nil {
 		commonData = commonRepresentationSnapshot.Representation.Data
 		commonVersion = commonRepresentationSnapshot.Version
+
+		// Track the max common version seen for this resource (mirrors the MAX subquery in the real repo).
+		resourceID := resourceSnapshot.ID
+		if prev := f.maxCommonVersionByResourceID[resourceID]; prev == nil || commonVersion > *prev {
+			v := commonVersion
+			f.maxCommonVersionByResourceID[resourceID] = &v
+		}
 	}
 
 	stored := &storedResource{

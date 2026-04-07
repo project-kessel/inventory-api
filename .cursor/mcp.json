@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "postgres": {
+      "command": "npx",
+      "args": ["-y", "mcp-postgres"],
+      "env": {
+        "DATABASE_URL": "postgresql://postgres:yPsw5e6ab4bvAGe5H@localhost:5433/spicedb",
+        "PATH": "/usr/local/bin:/usr/local/sbin:/usr/bin:/bin"
+      }
+    }
+  }
+}

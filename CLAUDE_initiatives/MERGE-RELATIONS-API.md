@@ -64,7 +64,7 @@ For issues that are technical debt, code quality improvements, refactoring, or g
 
 ### Keeping Context Fresh
 
-**Last initiative plan read**: 2026-03-31
+**Last initiative plan read**: 2026-04-07
 
 When reading this file:
 1. Check the "Last initiative plan read" date above
@@ -72,6 +72,9 @@ When reading this file:
 3. Review for any changes to objectives, phases, or requirements
 4. Prompt the user to update this file and related context if changes are found
 5. Update the "Last initiative plan read" date to today's date
+6. Read Jira comments for all issues listed in "Currently Active Work":
+   - Check for new comments from team members since the last context refresh
+   - Flag to the user any important observations, questions, approach concerns, or discussion points
 
 ### Updating Jira Status
 

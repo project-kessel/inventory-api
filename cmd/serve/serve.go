@@ -59,6 +59,7 @@ func NewCommand(
 	selfSubjectOptions *selfsubject.Options,
 	loggerOptions common.LoggerOptions,
 	schemaOptions *schema.Options,
+	businessMetricsOptions *metricscollector.Options,
 ) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "serve",
@@ -233,6 +234,12 @@ func NewCommand(
 				return err
 			}
 
+			if businessMetricsOptions.Enabled {
+				bizMetricsCtx, bizMetricsCancel := context.WithCancel(ctx)
+				defer bizMetricsCancel()
+				metricscollector.StartBusinessMetricsCollector(bizMetricsCtx, db, mc, log.NewHelper(log.With(logger, "subsystem", "business_metrics")))
+			}
+
 			// construct pprof server
 			pprofServer, err := pprof.New(serverConfig.Options.PprofOptions, logger)
 			if err != nil {
@@ -351,6 +358,7 @@ func NewCommand(
 	serviceOptions.AddFlags()
 	schemaOptions.AddFlags(cmd.Flags(), "schema")
 	selfSubjectOptions.AddFlags(cmd.Flags(), "selfsubjectstrategy")
+	businessMetricsOptions.AddFlags(cmd.Flags(), "business-metrics")
 
 	return cmd
 }

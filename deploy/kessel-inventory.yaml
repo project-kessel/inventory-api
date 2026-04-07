@@ -113,6 +113,7 @@ objects:
         app: kessel-inventory-jobs
         job-type: metrics-collect
     spec:
+      suspend: ${{METRICS_CRONJOB_SUSPEND}}
       schedule: "@daily"
       concurrencyPolicy: Forbid
       successfulJobsHistoryLimit: 3
@@ -250,3 +251,6 @@ parameters:
   - description: Number of days to retain metrics summary data
     name: RETENTION_DAYS
     value: "30"
+  - description: Suspend the metrics collection CronJob (set to true to disable)
+    name: METRICS_CRONJOB_SUSPEND
+    value: "false"

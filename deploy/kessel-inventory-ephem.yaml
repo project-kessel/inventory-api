@@ -413,6 +413,7 @@ objects:
         app: kessel-inventory-jobs
         job-type: metrics-collect
     spec:
+      suspend: ${{METRICS_CRONJOB_SUSPEND}}
       schedule: "@hourly"
       concurrencyPolicy: Forbid
       successfulJobsHistoryLimit: 3
@@ -558,3 +559,6 @@ parameters:
   - description: CPU limit for job
     name: JOB_LIMITS_CPU
     value: '200m'
+  - description: Suspend the metrics collection CronJob (set to true to disable)
+    name: METRICS_CRONJOB_SUSPEND
+    value: "true"

@@ -15,7 +15,6 @@ import (
 	"github.com/project-kessel/inventory-api/internal/metricscollector"
 	"github.com/project-kessel/inventory-api/internal/pubsub"
 	"github.com/project-kessel/inventory-api/internal/subject/selfsubject"
-	kessel "github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
 	"github.com/sony/gobreaker"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -740,113 +739,6 @@ func getNextTransactionID() (string, error) {
 	return txid.String(), nil
 }
 
-func subjectToV1Beta1(sub model.SubjectReference) *kessel.SubjectReference {
-	subKey := sub.Subject()
-	ref := &kessel.SubjectReference{
-		Subject: &kessel.ObjectReference{
-			Type: &kessel.ObjectType{
-				Namespace: subKey.ReporterType().Serialize(),
-				Name:      subKey.ResourceType().Serialize(),
-			},
-			Id: subKey.LocalResourceId().Serialize(),
-		},
-	}
-	if sub.HasRelation() {
-		relation := sub.Relation().Serialize()
-		ref.Relation = &relation
-	}
-	return ref
-}
-
-// paginationToV1beta1 converts model.Pagination to kessel.RequestPagination.
-// Returns nil if pagination is not specified.
-func paginationToV1beta1(pagination *model.Pagination) *kessel.RequestPagination {
-	if pagination == nil {
-		return nil
-	}
-	result := &kessel.RequestPagination{
-		Limit: pagination.Limit,
-	}
-	if pagination.Continuation != nil {
-		result.ContinuationToken = pagination.Continuation
-	}
-	return result
-}
-
-// lookupResourcesCommandToV1beta1 converts a LookupResourcesCommand to v1beta1.
-func lookupResourcesCommandToV1beta1(cmd LookupResourcesCommand) *kessel.LookupResourcesRequest {
-	var consistency *kessel.Consistency
-	if token := model.ConsistencyAtLeastAsFreshToken(cmd.Consistency); token != nil {
-		consistency = &kessel.Consistency{
-			Requirement: &kessel.Consistency_AtLeastAsFresh{
-				AtLeastAsFresh: &kessel.ConsistencyToken{
-					Token: token.Serialize(),
-				},
-			},
-		}
-	} else {
-		consistency = &kessel.Consistency{
-			Requirement: &kessel.Consistency_MinimizeLatency{
-				MinimizeLatency: true,
-			},
-		}
-	}
-
-	return &kessel.LookupResourcesRequest{
-		ResourceType: &kessel.ObjectType{
-			Namespace: cmd.ReporterType.Serialize(),
-			Name:      cmd.ResourceType.Serialize(),
-		},
-		Relation:    cmd.Relation.Serialize(),
-		Subject:     subjectToV1Beta1(cmd.Subject),
-		Pagination:  paginationToV1beta1(cmd.Pagination),
-		Consistency: consistency,
-	}
-}
-
-// lookupSubjectsCommandToV1beta1 converts a LookupSubjectsCommand to v1beta1.
-func lookupSubjectsCommandToV1beta1(cmd LookupSubjectsCommand) *kessel.LookupSubjectsRequest {
-	var consistency *kessel.Consistency
-	if token := model.ConsistencyAtLeastAsFreshToken(cmd.Consistency); token != nil {
-		consistency = &kessel.Consistency{
-			Requirement: &kessel.Consistency_AtLeastAsFresh{
-				AtLeastAsFresh: &kessel.ConsistencyToken{
-					Token: token.Serialize(),
-				},
-			},
-		}
-	} else {
-		consistency = &kessel.Consistency{
-			Requirement: &kessel.Consistency_MinimizeLatency{
-				MinimizeLatency: true,
-			},
-		}
-	}
-
-	req := &kessel.LookupSubjectsRequest{
-		Resource: &kessel.ObjectReference{
-			Type: &kessel.ObjectType{
-				Namespace: cmd.Resource.ReporterType().Serialize(),
-				Name:      cmd.Resource.ResourceType().Serialize(),
-			},
-			Id: cmd.Resource.LocalResourceId().Serialize(),
-		},
-		Relation: cmd.Relation.Serialize(),
-		SubjectType: &kessel.ObjectType{
-			Namespace: cmd.SubjectReporter.Serialize(),
-			Name:      cmd.SubjectType.Serialize(),
-		},
-		Pagination:  paginationToV1beta1(cmd.Pagination),
-		Consistency: consistency,
-	}
-
-	if cmd.SubjectRelation != nil {
-		relation := cmd.SubjectRelation.Serialize()
-		req.SubjectRelation = &relation
-	}
-
-	return req
-}
 
 // isSPInAllowlist checks if the caller subject is in the allowlist.
 func isSPInAllowlist(callerSubject authnapi.SubjectId, allowlist []string) bool {

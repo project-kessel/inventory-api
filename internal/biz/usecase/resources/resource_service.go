@@ -482,19 +482,43 @@ func (uc *Usecase) CheckSelfBulk(ctx context.Context, cmd CheckSelfBulkCommand) 
 		return nil, err
 	}
 
-	bulkCmd := CheckBulkCommand{
-		Items:       make([]CheckBulkItem, len(cmd.Items)),
-		Consistency: cmd.Consistency,
-	}
+	checkItems := make([]model.CheckItem, len(cmd.Items))
 	for i, item := range cmd.Items {
-		bulkCmd.Items[i] = CheckBulkItem{
+		checkItems[i] = model.CheckItem{
 			Resource: item.Resource,
 			Relation: item.Relation,
 			Subject:  subjectRef,
 		}
 	}
 
-	return uc.CheckBulk(ctx, bulkCmd)
+	results, token, err := uc.RelationsRepo.CheckBulk(ctx, checkItems, cmd.Consistency)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(results) != len(cmd.Items) {
+		return nil, status.Errorf(codes.Internal, "internal error: mismatched backend check-self-bulk results: expected %d pairs, got %d", len(cmd.Items), len(results))
+	}
+
+	pairs := make([]CheckBulkResultPair, len(results))
+	for i, result := range results {
+		pairs[i] = CheckBulkResultPair{
+			Request: CheckBulkItem{
+				Resource: cmd.Items[i].Resource,
+				Relation: cmd.Items[i].Relation,
+				Subject:  subjectRef,
+			},
+			Result: CheckBulkResultItem{
+				Allowed: result.Allowed,
+				Error:   result.Error,
+			},
+		}
+	}
+
+	return &CheckBulkResult{
+		Pairs:            pairs,
+		ConsistencyToken: token,
+	}, nil
 }
 
 // checkPermission runs RelationsRepo.Check with the given consistency token.

@@ -87,6 +87,16 @@ When instructed to update Jira issue status or transitions:
    - Include the current status in parentheses for clarity (e.g., "(Code Review)")
    - Keep this section as a simple list of what's currently being worked on
 
+### Adding Jira Comments
+
+When instructed to add a comment to a Jira issue:
+
+1. Draft the comment based on the user's request
+2. Present the candidate comment to the user in human-readable plain text format
+3. Request review and approval from the user before posting
+4. Only post the comment after receiving user approval
+5. Make any requested revisions before posting
+
 ### Proto Creation and Editing
 
 When creating or modifying protocol buffer definitions:

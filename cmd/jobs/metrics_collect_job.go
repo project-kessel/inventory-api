@@ -12,6 +12,7 @@ import (
 	"github.com/project-kessel/inventory-api/internal/storage"
 	"github.com/spf13/cobra"
 	"gorm.io/gorm"
+	gormlogger "gorm.io/gorm/logger"
 )
 
 const DefaultRetentionDays = 30
@@ -80,12 +81,13 @@ func collectMetricsWithDB(db *gorm.DB, logHelper *log.Helper, retentionDays int)
 		Metrics:     metrics,
 	}
 
-	if err := db.Create(&summary).Error; err != nil {
+	insertStart := time.Now()
+	if err := db.Session(&gorm.Session{Logger: db.Logger.LogMode(gormlogger.Silent)}).Create(&summary).Error; err != nil {
 		logHelper.Errorf("failed to write metrics summary: %v", err)
 		return err
 	}
 
-	logHelper.Infof("Metrics summary written successfully (id=%s)", summary.ID)
+	logHelper.Infof("Metrics summary written successfully (id=%s, duration=%s)", summary.ID, time.Since(insertStart))
 
 	if retentionDays <= 0 {
 		logHelper.Warnf("invalid retention-days value %d, using default %d", retentionDays, DefaultRetentionDays)
@@ -119,6 +121,10 @@ func collectResourcesPerWorkspaceJob(db *gorm.DB, logHelper *log.Helper, metrics
 		JOIN common_representations cr
 			ON cr.resource_id = r.id AND cr.version = r.common_version
 		WHERE cr.data->>'workspace_id' IS NOT NULL
+		  AND EXISTS (
+			SELECT 1 FROM reporter_resources rr
+			WHERE rr.resource_id = r.id AND NOT rr.tombstone
+		  )
 		GROUP BY r.type, cr.data->>'workspace_id'
 	`).Scan(&results).Error
 

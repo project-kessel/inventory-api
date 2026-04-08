@@ -199,6 +199,16 @@
           "format": "table",
           "instant": true,
           "refId": "J"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "label_replace(sum by (resource_type) (kessel_inventory_resources_per_workspace_bucket{le=\"+Inf\"})- sum by (resource_type) (kessel_inventory_resources_per_workspace_bucket{le=\"1000.0\"}),\"bucket\", \"1001+\", \"\", \"\")",
+          "format": "table",
+          "instant": true,
+          "refId": "K"
         }
       ],
       "title": "Kessel Inventory: Workspaces Grouped by Resource Count",
@@ -239,7 +249,8 @@
               "Value #G": true,
               "Value #H": true,
               "Value #I": true,
-              "Value #J": true
+              "Value #J": true,
+              "Value #K": true
             }
           }
         },

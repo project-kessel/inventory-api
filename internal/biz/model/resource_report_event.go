@@ -77,7 +77,9 @@ func (re ResourceReportEvent) ReporterVersion() *ReporterVersion {
 	return re.reporterRepresentation.reporterVersion
 }
 
-// CurrentCommonVersion returns the version from the CommonRepresentation
+// CurrentCommonVersion returns the version from the CommonRepresentation, or nil if no common
+// representation data is present. Returning nil signals to the consumer that there is no
+// common representation to look up, preventing a uint underflow when querying version-1.
 func (re ResourceReportEvent) CurrentCommonVersion() *Version {
 	if re.commonRepresentation == nil {
 		return nil

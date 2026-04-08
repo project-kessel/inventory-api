@@ -3437,7 +3437,7 @@ func TestInventoryService_ReportResource_NilOrEmptyRepresentationStructs(t *test
 		localResourceId string
 		common          *structpb.Struct
 		reporter        *structpb.Struct
-		expectMsg       string
+		expectMsg       string // empty string means the request is expected to succeed
 	}{
 		{
 			name:            "both nil",

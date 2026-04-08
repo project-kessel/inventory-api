@@ -411,9 +411,6 @@ func NewRepresentation(data internal.JsonObject) (Representation, error) {
 	if data == nil {
 		return nil, fmt.Errorf("representation data cannot be nil")
 	}
-	if len(data) == 0 {
-		return nil, fmt.Errorf("representation data cannot be empty")
-	}
 	return Representation(data), nil
 }
 

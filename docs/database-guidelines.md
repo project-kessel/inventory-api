@@ -93,6 +93,8 @@ err = tm.HandleSerializableTransaction("operation_name", db, func(tx *gorm.DB) e
 - Metrics collection for failures and exhaustions
 - Isolation level: `sql.LevelSerializable`
 
+**See also:** [Serializable Isolation Level Guide](../dev-guides/serializable-isolation-level.md) for best practices and configuration details.
+
 ### Transaction Manager Interface
 ```go
 type TransactionManager interface {
@@ -197,6 +199,13 @@ func NewSQLiteTestDB(t *testing.T, cfg *gorm.Config) *gorm.DB {
 
 ### Transaction Manager Testing
 Use `fakeTransactionManager` with call tracking for unit tests.
+
+## Migration Management
+
+**See:** [Database Migrations Guide](../dev-guides/migrations.md) for migration creation, execution, and best practices including:
+- Creating new migrations with proper naming and timestamps
+- Using advisory locks for safe concurrent migration execution
+- Rollback procedures and migration validation
 
 ## Performance Considerations
 

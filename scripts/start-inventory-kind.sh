@@ -258,9 +258,17 @@ kubectl create secret generic inventory-api-config \
   --dry-run=client -o yaml | kubectl apply -f -
 rm -f /tmp/inventory-api-config-table.yaml
 
-# Swap connector from WAL to table mode — wait for slot cleanup before recreating
+# Swap connector from WAL to table mode — drop old slot and recreate
 kubectl delete kafkaconnector kessel-inventory-source-connector
 sleep 10
+
+# Drop the WAL replication slot so the table connector starts fresh.
+# The WAL connector's slot captures logical decoding messages, not table changes.
+# Reusing it would cause the table connector to miss outbox_events inserts.
+POSTGRES_POD=$(kubectl get pods -l app=invdatabase -o jsonpath='{.items[0].metadata.name}')
+kubectl exec "$POSTGRES_POD" -- psql -U postgres -d spicedb -c \
+  "SELECT pg_drop_replication_slot('inventory_api_debezium');" 2>/dev/null || true
+
 kubectl apply -f deploy/kind/inventory/strimzi-table-connector.yaml
 
 # Wait for the table-mode connector to reach RUNNING before proceeding
@@ -270,10 +278,26 @@ check_connector_readiness "kessel-inventory-source-connector"
 kubectl rollout restart deployment kessel-inventory
 kubectl rollout status deployment kessel-inventory --timeout=120s
 
-echo "Waiting for inventory service to be ready after restart..."
+echo "Waiting for inventory service HTTP readyz after restart..."
 until kubectl exec "$(kubectl get pods -l app=kessel-inventory -o jsonpath='{.items[0].metadata.name}')" -- curl -sf http://localhost:8081/api/kessel/v1/readyz 2>/dev/null; do
   sleep 5
 done
+
+# Also verify the gRPC port is accepting connections before submitting tests.
+# The HTTP readyz can pass while gRPC is still starting up.
+echo "Waiting for gRPC port 9081 to be ready..."
+GRPC_RETRIES=0
+GRPC_MAX=30
+until kubectl exec "$(kubectl get pods -l app=kessel-inventory -o jsonpath='{.items[0].metadata.name}')" -- \
+  curl -s --connect-timeout 2 --http2-prior-knowledge -o /dev/null http://localhost:9081/ 2>/dev/null; do
+  GRPC_RETRIES=$((GRPC_RETRIES + 1))
+  if [ "$GRPC_RETRIES" -ge "$GRPC_MAX" ]; then
+    echo "ERROR: gRPC port 9081 not ready after $GRPC_MAX attempts"
+    exit 1
+  fi
+  sleep 2
+done
+echo "gRPC port 9081 is ready."
 
 # Submit table-mode e2e tests
 kubectl apply -f deploy/kind/e2e/e2e-batch-outbox-table.yaml

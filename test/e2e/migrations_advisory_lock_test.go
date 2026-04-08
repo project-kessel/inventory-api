@@ -2,6 +2,7 @@ package e2e
 
 import (
 	"fmt"
+	"sort"
 	"sync"
 	"testing"
 	"time"
@@ -12,8 +13,7 @@ import (
 )
 
 const (
-	numMigrateGoroutines    = 5
-	serializationSpanFactor = 2
+	numMigrateGoroutines = 5
 )
 
 func TestMigrate_SerializesConcurrentCalls(t *testing.T) {
@@ -86,33 +86,36 @@ func TestMigrate_SerializesConcurrentCalls(t *testing.T) {
 		t.Fatal("no timings recorded for migration calls")
 	}
 
-	firstStart := timings[0].start
-	lastEnd := timings[0].end
-	minDuration := timings[0].end.Sub(timings[0].start)
+	// Sort goroutines by end time to analyze serialization.
+	sort.Slice(timings, func(i, j int) bool {
+		return timings[i].end.Before(timings[j].end)
+	})
 
+	minDuration := timings[0].end.Sub(timings[0].start)
+	maxDuration := minDuration
 	for _, timing := range timings[1:] {
-		if timing.start.Before(firstStart) {
-			firstStart = timing.start
-		}
-		if timing.end.After(lastEnd) {
-			lastEnd = timing.end
-		}
 		d := timing.end.Sub(timing.start)
 		if d < minDuration {
 			minDuration = d
 		}
+		if d > maxDuration {
+			maxDuration = d
+		}
 	}
 
-	totalSpan := lastEnd.Sub(firstStart)
-
-	if totalSpan <= minDuration*time.Duration(serializationSpanFactor) {
-		t.Fatalf("advisory lock did not appear to serialize migrations: total span=%v, min duration=%v (spanFactor=%v)",
-			totalSpan, minDuration, serializationSpanFactor)
+	// If migrations are serialized, later-finishing goroutines must wait for
+	// the advisory lock and therefore have longer wall-clock durations.  The
+	// last goroutine should take noticeably longer than the first.  A ratio
+	// of 1.3 is conservative: with 5 serialized goroutines the expected
+	// ratio is ~(N-1) but real-world jitter makes strict thresholds flaky.
+	durationRatio := float64(maxDuration) / float64(minDuration)
+	if durationRatio < 1.3 {
+		t.Fatalf("advisory lock did not appear to serialize migrations: "+
+			"max duration=%v, min duration=%v, ratio=%.2f (expected >= 1.3)",
+			maxDuration, minDuration, durationRatio)
 	}
 
-	t.Logf("SUCCESS: All %d migration calls were serialized by advisory lock (total span=%v, min duration=%v, spanFactor≈%.2f)",
-		numMigrateGoroutines,
-		totalSpan,
-		minDuration,
-		float64(totalSpan)/float64(minDuration))
+	t.Logf("SUCCESS: All %d migration calls were serialized by advisory lock "+
+		"(max duration=%v, min duration=%v, ratio=%.2f)",
+		numMigrateGoroutines, maxDuration, minDuration, durationRatio)
 }

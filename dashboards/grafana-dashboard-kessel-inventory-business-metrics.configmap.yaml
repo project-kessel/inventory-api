@@ -1,0 +1,421 @@
+apiVersion: v1
+data:
+  grafana-dashboard-kessel-inventory-business-metrics.json: |-
+    {
+      "annotations": {
+        "list": [
+          {
+            "builtIn": 1,
+            "datasource": {
+              "type": "grafana",
+              "uid": "-- Grafana --"
+            },
+            "enable": true,
+            "hide": true,
+            "iconColor": "rgba(0, 211, 255, 1)",
+            "name": "Annotations & Alerts",
+            "type": "dashboard"
+          }
+        ]
+      },
+      "editable": true,
+      "fiscalYearStartMonth": 0,
+      "graphTooltip": 0,
+      "id": 1102304,
+      "links": [],
+      "panels": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisBorderShow": false,
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "Resource Count",
+                "axisPlacement": "auto",
+                "fillOpacity": 80,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "lineWidth": 1,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  },
+                  {
+                    "color": "red",
+                    "value": 80
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 11,
+            "w": 6,
+            "x": 0,
+            "y": 0
+          },
+          "id": 2,
+          "options": {
+            "barRadius": 0,
+            "barWidth": 0.97,
+            "fullHighlight": false,
+            "groupWidth": 0.7,
+            "legend": {
+              "calcs": [],
+              "displayMode": "table",
+              "placement": "right",
+              "showLegend": true
+            },
+            "orientation": "auto",
+            "showValue": "auto",
+            "stacking": "normal",
+            "tooltip": {
+              "hideZeros": false,
+              "mode": "multi",
+              "sort": "desc"
+            },
+            "xTickLabelRotation": 0,
+            "xTickLabelSpacing": 0
+          },
+          "pluginVersion": "11.6.3",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "expr": "sum by (resource_type, reporter_name) (max by (resource_type, reporter_name, reporter_id) (kessel_inventory_resource_count))",
+              "format": "table",
+              "instant": true,
+              "refId": "A"
+            }
+          ],
+          "title": "Kessel Inventory: Resource Count by Type and Reporter",
+          "transformations": [
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {
+                  "Time": true
+                }
+              }
+            },
+            {
+              "id": "groupingToMatrix",
+              "options": {
+                "columnField": "reporter_name",
+                "emptyValue": "null",
+                "rowField": "resource_type",
+                "valueField": "Value"
+              }
+            }
+          ],
+          "type": "barchart"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisBorderShow": false,
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "Number of Workspaces",
+                "axisPlacement": "auto",
+                "fillOpacity": 80,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "lineWidth": 1,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  },
+                  {
+                    "color": "red",
+                    "value": 80
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 11,
+            "w": 18,
+            "x": 6,
+            "y": 0
+          },
+          "id": 1,
+          "options": {
+            "barRadius": 0,
+            "barWidth": 0.97,
+            "fullHighlight": false,
+            "groupWidth": 0.7,
+            "legend": {
+              "calcs": [],
+              "displayMode": "table",
+              "placement": "right",
+              "showLegend": true
+            },
+            "orientation": "auto",
+            "showValue": "auto",
+            "stacking": "normal",
+            "tooltip": {
+              "hideZeros": false,
+              "mode": "multi",
+              "sort": "desc"
+            },
+            "xTickLabelRotation": 0,
+            "xTickLabelSpacing": 0
+          },
+          "pluginVersion": "11.6.3",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "expr": "label_replace(max by (resource_type) (kessel_inventory_resources_per_workspace_bucket{le=\"1.0\"}),\"bucket\", \"1\", \"\", \"\")",
+              "format": "table",
+              "instant": true,
+              "refId": "A"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "expr": "label_replace(max by (resource_type) (kessel_inventory_resources_per_workspace_bucket{le=\"2.0\"}) - max by (resource_type) (kessel_inventory_resources_per_workspace_bucket{le=\"1.0\"}), \"bucket\", \"2\", \"\", \"\")",
+              "format": "table",
+              "instant": true,
+              "refId": "B"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "expr": "label_replace(max by (resource_type) (kessel_inventory_resources_per_workspace_bucket{le=\"5.0\"})- max by (resource_type) (kessel_inventory_resources_per_workspace_bucket{le=\"2.0\"}),\"bucket\", \"3-5\", \"\", \"\")",
+              "format": "table",
+              "instant": true,
+              "refId": "C"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "expr": "label_replace(max by (resource_type) (kessel_inventory_resources_per_workspace_bucket{le=\"10.0\"})- max by (resource_type) (kessel_inventory_resources_per_workspace_bucket{le=\"5.0\"}),\"bucket\", \"6-10\", \"\", \"\")",
+              "format": "table",
+              "instant": true,
+              "refId": "D"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "expr": "label_replace(max by (resource_type) (kessel_inventory_resources_per_workspace_bucket{le=\"20.0\"})- max by (resource_type) (kessel_inventory_resources_per_workspace_bucket{le=\"10.0\"}),\"bucket\", \"11-20\", \"\", \"\")",
+              "format": "table",
+              "instant": true,
+              "refId": "E"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "expr": "label_replace(max by (resource_type) (kessel_inventory_resources_per_workspace_bucket{le=\"50.0\"})- max by (resource_type) (kessel_inventory_resources_per_workspace_bucket{le=\"20.0\"}),\"bucket\", \"21-50\", \"\", \"\")",
+              "format": "table",
+              "instant": true,
+              "refId": "F"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "expr": "label_replace(max by (resource_type) (kessel_inventory_resources_per_workspace_bucket{le=\"100.0\"})- max by (resource_type) (kessel_inventory_resources_per_workspace_bucket{le=\"50.0\"}),\"bucket\", \"51-100\", \"\", \"\")",
+              "format": "table",
+              "instant": true,
+              "refId": "G"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "expr": "label_replace(max by (resource_type) (kessel_inventory_resources_per_workspace_bucket{le=\"200.0\"})- max by (resource_type) (kessel_inventory_resources_per_workspace_bucket{le=\"100.0\"}),\"bucket\", \"101-200\", \"\", \"\")",
+              "format": "table",
+              "instant": true,
+              "refId": "H"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "expr": "label_replace(max by (resource_type) (kessel_inventory_resources_per_workspace_bucket{le=\"500.0\"})- max by (resource_type) (kessel_inventory_resources_per_workspace_bucket{le=\"200.0\"}),\"bucket\", \"201-500\", \"\", \"\")",
+              "format": "table",
+              "instant": true,
+              "refId": "I"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "expr": "label_replace(max by (resource_type) (kessel_inventory_resources_per_workspace_bucket{le=\"1000.0\"})- max by (resource_type) (kessel_inventory_resources_per_workspace_bucket{le=\"500.0\"}),\"bucket\", \"501-1000\", \"\", \"\")",
+              "format": "table",
+              "instant": true,
+              "refId": "J"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "expr": "label_replace(max by (resource_type) (kessel_inventory_resources_per_workspace_bucket{le=\"+Inf\"})- max by (resource_type) (kessel_inventory_resources_per_workspace_bucket{le=\"1000.0\"}),\"bucket\", \"1001+\", \"\", \"\")",
+              "format": "table",
+              "instant": true,
+              "refId": "K"
+            }
+          ],
+          "title": "Kessel Inventory: Workspaces Grouped by Resource Count",
+          "transformations": [
+            {
+              "id": "merge",
+              "options": {}
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {
+                  "Time": true
+                }
+              }
+            },
+            {
+              "id": "calculateField",
+              "options": {
+                "alias": "Count",
+                "mode": "reduceRow",
+                "reduce": {
+                  "reducer": "sum"
+                },
+                "replaceFields": false
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {
+                  "Value #A": true,
+                  "Value #B": true,
+                  "Value #C": true,
+                  "Value #D": true,
+                  "Value #E": true,
+                  "Value #F": true,
+                  "Value #G": true,
+                  "Value #H": true,
+                  "Value #I": true,
+                  "Value #J": true,
+                  "Value #K": true
+                }
+              }
+            },
+            {
+              "id": "groupingToMatrix",
+              "options": {
+                "columnField": "resource_type",
+                "emptyValue": "null",
+                "rowField": "bucket",
+                "valueField": "Count"
+              }
+            }
+          ],
+          "type": "barchart"
+        }
+      ],
+      "preload": false,
+      "schemaVersion": 41,
+      "tags": [],
+      "templating": {
+        "list": [
+          {
+            "current": {
+              "text": "crcs02ue1-prometheus",
+              "value": "PDD8BE47D10408F45"
+            },
+            "description": "Choose between the production, stage, or Govcloud environments",
+            "label": "Datasource",
+            "name": "datasource",
+            "options": [],
+            "query": "prometheus",
+            "refresh": 1,
+            "regex": "/(crcp01ue1-prometheus)|(crcfrp01ugw1-prometheus)|(crcs02ue1-prometheus)|(crcfrs01ugw1-prometheus)|(hccs01ue1-prometheus)|(hccp01ue1-prometheus)/",
+            "type": "datasource"
+          }
+        ]
+      },
+      "time": {
+        "from": "now-30m",
+        "to": "now"
+      },
+      "timepicker": {},
+      "timezone": "browser",
+      "title": "Kessel Inventory - Business Metrics",
+      "uid": "adx9xqk",
+      "version": 2
+    }
+kind: ConfigMap
+metadata:
+  name: grafana-dashboard-kessel-business-metrics
+  labels:
+    grafana_dashboard: "true"
+  annotations:
+    grafana-folder: /grafana-dashboard-definitions/Kessel

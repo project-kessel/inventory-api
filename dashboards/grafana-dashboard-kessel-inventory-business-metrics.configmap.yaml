@@ -38,6 +38,117 @@ data:
                 "axisBorderShow": false,
                 "axisCenteredZero": false,
                 "axisColorMode": "text",
+                "axisLabel": "Resource Count",
+                "axisPlacement": "auto",
+                "fillOpacity": 80,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "lineWidth": 1,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  },
+                  {
+                    "color": "red",
+                    "value": 80
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 11,
+            "w": 6,
+            "x": 0,
+            "y": 0
+          },
+          "id": 2,
+          "options": {
+            "barRadius": 0,
+            "barWidth": 0.97,
+            "fullHighlight": false,
+            "groupWidth": 0.7,
+            "legend": {
+              "calcs": [],
+              "displayMode": "table",
+              "placement": "right",
+              "showLegend": true
+            },
+            "orientation": "auto",
+            "showValue": "auto",
+            "stacking": "normal",
+            "tooltip": {
+              "hideZeros": false,
+              "mode": "multi",
+              "sort": "desc"
+            },
+            "xTickLabelRotation": 0,
+            "xTickLabelSpacing": 0
+          },
+          "pluginVersion": "11.6.3",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "expr": "sum by (resource_type, reporter_name) (max by (resource_type, reporter_name, reporter_id) (kessel_inventory_resource_count))",
+              "format": "table",
+              "instant": true,
+              "refId": "A"
+            }
+          ],
+          "title": "Kessel Inventory: Resource Count by Type and Reporter",
+          "transformations": [
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {
+                  "Time": true
+                }
+              }
+            },
+            {
+              "id": "groupingToMatrix",
+              "options": {
+                "columnField": "reporter_name",
+                "emptyValue": "null",
+                "rowField": "resource_type",
+                "valueField": "Value"
+              }
+            }
+          ],
+          "type": "barchart"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisBorderShow": false,
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
                 "axisLabel": "Number of Workspaces",
                 "axisPlacement": "auto",
                 "fillOpacity": 80,
@@ -72,9 +183,9 @@ data:
             "overrides": []
           },
           "gridPos": {
-            "h": 12,
-            "w": 24,
-            "x": 0,
+            "h": 11,
+            "w": 18,
+            "x": 6,
             "y": 0
           },
           "id": 1,
@@ -107,7 +218,7 @@ data:
                 "type": "prometheus",
                 "uid": "${datasource}"
               },
-              "expr": "label_replace(sum by (resource_type) (kessel_inventory_resources_per_workspace_bucket{le=\"1.0\"}),\"bucket\", \"1\", \"\", \"\")",
+              "expr": "label_replace(max by (resource_type) (kessel_inventory_resources_per_workspace_bucket{le=\"1.0\"}),\"bucket\", \"1\", \"\", \"\")",
               "format": "table",
               "instant": true,
               "refId": "A"
@@ -118,7 +229,7 @@ data:
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "label_replace(sum by (resource_type) (kessel_inventory_resources_per_workspace_bucket{le=\"2.0\"}) - sum by (resource_type) (kessel_inventory_resources_per_workspace_bucket{le=\"1.0\"}), \"bucket\", \"2\", \"\", \"\")",
+              "expr": "label_replace(max by (resource_type) (kessel_inventory_resources_per_workspace_bucket{le=\"2.0\"}) - max by (resource_type) (kessel_inventory_resources_per_workspace_bucket{le=\"1.0\"}), \"bucket\", \"2\", \"\", \"\")",
               "format": "table",
               "instant": true,
               "refId": "B"
@@ -128,7 +239,7 @@ data:
                 "type": "prometheus",
                 "uid": "${datasource}"
               },
-              "expr": "label_replace(sum by (resource_type) (kessel_inventory_resources_per_workspace_bucket{le=\"5.0\"})- sum by (resource_type) (kessel_inventory_resources_per_workspace_bucket{le=\"2.0\"}),\"bucket\", \"3-5\", \"\", \"\")",
+              "expr": "label_replace(max by (resource_type) (kessel_inventory_resources_per_workspace_bucket{le=\"5.0\"})- max by (resource_type) (kessel_inventory_resources_per_workspace_bucket{le=\"2.0\"}),\"bucket\", \"3-5\", \"\", \"\")",
               "format": "table",
               "instant": true,
               "refId": "C"
@@ -138,7 +249,7 @@ data:
                 "type": "prometheus",
                 "uid": "${datasource}"
               },
-              "expr": "label_replace(sum by (resource_type) (kessel_inventory_resources_per_workspace_bucket{le=\"10.0\"})- sum by (resource_type) (kessel_inventory_resources_per_workspace_bucket{le=\"5.0\"}),\"bucket\", \"6-10\", \"\", \"\")",
+              "expr": "label_replace(max by (resource_type) (kessel_inventory_resources_per_workspace_bucket{le=\"10.0\"})- max by (resource_type) (kessel_inventory_resources_per_workspace_bucket{le=\"5.0\"}),\"bucket\", \"6-10\", \"\", \"\")",
               "format": "table",
               "instant": true,
               "refId": "D"
@@ -148,7 +259,7 @@ data:
                 "type": "prometheus",
                 "uid": "${datasource}"
               },
-              "expr": "label_replace(sum by (resource_type) (kessel_inventory_resources_per_workspace_bucket{le=\"20.0\"})- sum by (resource_type) (kessel_inventory_resources_per_workspace_bucket{le=\"10.0\"}),\"bucket\", \"11-20\", \"\", \"\")",
+              "expr": "label_replace(max by (resource_type) (kessel_inventory_resources_per_workspace_bucket{le=\"20.0\"})- max by (resource_type) (kessel_inventory_resources_per_workspace_bucket{le=\"10.0\"}),\"bucket\", \"11-20\", \"\", \"\")",
               "format": "table",
               "instant": true,
               "refId": "E"
@@ -158,7 +269,7 @@ data:
                 "type": "prometheus",
                 "uid": "${datasource}"
               },
-              "expr": "label_replace(sum by (resource_type) (kessel_inventory_resources_per_workspace_bucket{le=\"50.0\"})- sum by (resource_type) (kessel_inventory_resources_per_workspace_bucket{le=\"20.0\"}),\"bucket\", \"21-50\", \"\", \"\")",
+              "expr": "label_replace(max by (resource_type) (kessel_inventory_resources_per_workspace_bucket{le=\"50.0\"})- max by (resource_type) (kessel_inventory_resources_per_workspace_bucket{le=\"20.0\"}),\"bucket\", \"21-50\", \"\", \"\")",
               "format": "table",
               "instant": true,
               "refId": "F"
@@ -168,7 +279,7 @@ data:
                 "type": "prometheus",
                 "uid": "${datasource}"
               },
-              "expr": "label_replace(sum by (resource_type) (kessel_inventory_resources_per_workspace_bucket{le=\"100.0\"})- sum by (resource_type) (kessel_inventory_resources_per_workspace_bucket{le=\"50.0\"}),\"bucket\", \"51-100\", \"\", \"\")",
+              "expr": "label_replace(max by (resource_type) (kessel_inventory_resources_per_workspace_bucket{le=\"100.0\"})- max by (resource_type) (kessel_inventory_resources_per_workspace_bucket{le=\"50.0\"}),\"bucket\", \"51-100\", \"\", \"\")",
               "format": "table",
               "instant": true,
               "refId": "G"
@@ -178,7 +289,7 @@ data:
                 "type": "prometheus",
                 "uid": "${datasource}"
               },
-              "expr": "label_replace(sum by (resource_type) (kessel_inventory_resources_per_workspace_bucket{le=\"200.0\"})- sum by (resource_type) (kessel_inventory_resources_per_workspace_bucket{le=\"100.0\"}),\"bucket\", \"101-200\", \"\", \"\")",
+              "expr": "label_replace(max by (resource_type) (kessel_inventory_resources_per_workspace_bucket{le=\"200.0\"})- max by (resource_type) (kessel_inventory_resources_per_workspace_bucket{le=\"100.0\"}),\"bucket\", \"101-200\", \"\", \"\")",
               "format": "table",
               "instant": true,
               "refId": "H"
@@ -188,7 +299,7 @@ data:
                 "type": "prometheus",
                 "uid": "${datasource}"
               },
-              "expr": "label_replace(sum by (resource_type) (kessel_inventory_resources_per_workspace_bucket{le=\"500.0\"})- sum by (resource_type) (kessel_inventory_resources_per_workspace_bucket{le=\"200.0\"}),\"bucket\", \"201-500\", \"\", \"\")",
+              "expr": "label_replace(max by (resource_type) (kessel_inventory_resources_per_workspace_bucket{le=\"500.0\"})- max by (resource_type) (kessel_inventory_resources_per_workspace_bucket{le=\"200.0\"}),\"bucket\", \"201-500\", \"\", \"\")",
               "format": "table",
               "instant": true,
               "refId": "I"
@@ -198,7 +309,7 @@ data:
                 "type": "prometheus",
                 "uid": "${datasource}"
               },
-              "expr": "label_replace(sum by (resource_type) (kessel_inventory_resources_per_workspace_bucket{le=\"1000.0\"})- sum by (resource_type) (kessel_inventory_resources_per_workspace_bucket{le=\"500.0\"}),\"bucket\", \"501-1000\", \"\", \"\")",
+              "expr": "label_replace(max by (resource_type) (kessel_inventory_resources_per_workspace_bucket{le=\"1000.0\"})- max by (resource_type) (kessel_inventory_resources_per_workspace_bucket{le=\"500.0\"}),\"bucket\", \"501-1000\", \"\", \"\")",
               "format": "table",
               "instant": true,
               "refId": "J"
@@ -208,7 +319,7 @@ data:
                 "type": "prometheus",
                 "uid": "${datasource}"
               },
-              "expr": "label_replace(sum by (resource_type) (kessel_inventory_resources_per_workspace_bucket{le=\"+Inf\"})- sum by (resource_type) (kessel_inventory_resources_per_workspace_bucket{le=\"1000.0\"}),\"bucket\", \"1001+\", \"\", \"\")",
+              "expr": "label_replace(max by (resource_type) (kessel_inventory_resources_per_workspace_bucket{le=\"+Inf\"})- max by (resource_type) (kessel_inventory_resources_per_workspace_bucket{le=\"1000.0\"}),\"bucket\", \"1001+\", \"\", \"\")",
               "format": "table",
               "instant": true,
               "refId": "K"
@@ -299,7 +410,7 @@ data:
       "timezone": "browser",
       "title": "Kessel Inventory - Business Metrics",
       "uid": "adx9xqk",
-      "version": 1
+      "version": 2
     }
 kind: ConfigMap
 metadata:

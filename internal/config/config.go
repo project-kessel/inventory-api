@@ -14,6 +14,7 @@ import (
 	"github.com/project-kessel/inventory-api/internal/config/schema"
 	"github.com/project-kessel/inventory-api/internal/consistency"
 	"github.com/project-kessel/inventory-api/internal/consumer"
+	"github.com/project-kessel/inventory-api/internal/metricscollector"
 	"github.com/project-kessel/inventory-api/internal/server"
 	"github.com/project-kessel/inventory-api/internal/service"
 	"github.com/project-kessel/inventory-api/internal/storage"
@@ -31,6 +32,7 @@ type OptionsConfig struct {
 	Service             *service.Options
 	Schema              *schema.Options
 	SelfSubjectStrategy *selfsubject.Options
+	BusinessMetrics     *metricscollector.Options `mapstructure:"business-metrics"`
 }
 
 // NewOptionsConfig returns a new OptionsConfig with default options set
@@ -45,6 +47,7 @@ func NewOptionsConfig() *OptionsConfig {
 		Service:             service.NewOptions(),
 		Schema:              schema.NewOptions(),
 		SelfSubjectStrategy: selfsubject.NewOptions(),
+		BusinessMetrics:     metricscollector.NewOptions(),
 	}
 }
 

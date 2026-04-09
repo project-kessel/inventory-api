@@ -13,6 +13,8 @@ import (
 // IDs must be timestamp-based and strictly increasing.
 var MigrationsList = []*gormigrate.Migration{
 	schema.InitialSchema(),
+	schema.MetricsSummaryMigration(),
+	schema.ReporterResourcesNotTombstoneIdxMigration(),
 }
 
 func init() {

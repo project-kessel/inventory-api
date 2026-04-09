@@ -113,8 +113,26 @@ kubectl apply -f deploy/kind/relations/spicedb-kind-setup/postgres/postgresql.ya
 kubectl apply -f deploy/kind/relations/spicedb-kind-setup/postgres/storage.yaml
 
 # Install SpiceDB operator if not already installed
+# Resolve the operator version from the kessel fork's SYNC.md.
+# To pin a specific version locally, set SPICEDB_OPERATOR_VERSION before running this script
+# (e.g. SPICEDB_OPERATOR_VERSION=v1.2.3 ./scripts/start-inventory-kind.sh).
+if [[ -z "${SPICEDB_OPERATOR_VERSION}" ]]; then
+  SPICEDB_OPERATOR_VERSION=$(curl --fail --silent --location \
+    --connect-timeout 10 --max-time 30 \
+    "https://raw.githubusercontent.com/project-kessel/spicedb-operator/main/SYNC.md" \
+    | grep '^TAG:' | awk '{print $2}')
+else
+  echo "Using pinned SpiceDB operator version: ${SPICEDB_OPERATOR_VERSION}"
+fi
+if [[ ! "${SPICEDB_OPERATOR_VERSION}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+  echo "ERROR: SpiceDB operator TAG '${SPICEDB_OPERATOR_VERSION}' is not a valid semver tag (expected vX.Y.Z)" >&2
+  exit 1
+fi
+echo "Using SpiceDB operator version: ${SPICEDB_OPERATOR_VERSION}"
+
+SPICEDB_OPERATOR_BUNDLE_URL="https://github.com/authzed/spicedb-operator/releases/download/${SPICEDB_OPERATOR_VERSION}/bundle.yaml"
 kubectl get crd spicedbclusters.authzed.com > /dev/null 2>&1 || \
-  kubectl apply --server-side -f https://github.com/authzed/spicedb-operator/releases/download/v1.21.0/bundle.yaml
+  kubectl apply --server-side -f "${SPICEDB_OPERATOR_BUNDLE_URL}"
 
 kubectl apply -f deploy/kind/relations/spicedb-kind-setup/spicedb-cr.yaml
 kubectl apply -f deploy/kind/relations/spicedb-kind-setup/svc-ingress.yaml
@@ -240,9 +258,17 @@ kubectl create secret generic inventory-api-config \
   --dry-run=client -o yaml | kubectl apply -f -
 rm -f /tmp/inventory-api-config-table.yaml
 
-# Swap connector from WAL to table mode — wait for slot cleanup before recreating
+# Swap connector from WAL to table mode — drop old slot and recreate
 kubectl delete kafkaconnector kessel-inventory-source-connector
 sleep 10
+
+# Drop the WAL replication slot so the table connector starts fresh.
+# The WAL connector's slot captures logical decoding messages, not table changes.
+# Reusing it would cause the table connector to miss outbox_events inserts.
+POSTGRES_POD=$(kubectl get pods -l app=invdatabase -o jsonpath='{.items[0].metadata.name}')
+kubectl exec "$POSTGRES_POD" -- psql -U postgres -d spicedb -c \
+  "SELECT pg_drop_replication_slot('inventory_api_debezium');" 2>/dev/null || true
+
 kubectl apply -f deploy/kind/inventory/strimzi-table-connector.yaml
 
 # Wait for the table-mode connector to reach RUNNING before proceeding
@@ -252,10 +278,26 @@ check_connector_readiness "kessel-inventory-source-connector"
 kubectl rollout restart deployment kessel-inventory
 kubectl rollout status deployment kessel-inventory --timeout=120s
 
-echo "Waiting for inventory service to be ready after restart..."
+echo "Waiting for inventory service HTTP readyz after restart..."
 until kubectl exec "$(kubectl get pods -l app=kessel-inventory -o jsonpath='{.items[0].metadata.name}')" -- curl -sf http://localhost:8081/api/kessel/v1/readyz 2>/dev/null; do
   sleep 5
 done
+
+# Also verify the gRPC port is accepting connections before submitting tests.
+# The HTTP readyz can pass while gRPC is still starting up.
+echo "Waiting for gRPC port 9081 to be ready..."
+GRPC_RETRIES=0
+GRPC_MAX=30
+until kubectl exec "$(kubectl get pods -l app=kessel-inventory -o jsonpath='{.items[0].metadata.name}')" -- \
+  curl -s --connect-timeout 2 --http2-prior-knowledge -o /dev/null http://localhost:9081/ 2>/dev/null; do
+  GRPC_RETRIES=$((GRPC_RETRIES + 1))
+  if [ "$GRPC_RETRIES" -ge "$GRPC_MAX" ]; then
+    echo "ERROR: gRPC port 9081 not ready after $GRPC_MAX attempts"
+    exit 1
+  fi
+  sleep 2
+done
+echo "gRPC port 9081 is ready."
 
 # Submit table-mode e2e tests
 kubectl apply -f deploy/kind/e2e/e2e-batch-outbox-table.yaml

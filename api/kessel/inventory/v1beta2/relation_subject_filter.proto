@@ -1,0 +1,16 @@
+syntax = "proto3";
+
+package kessel.inventory.v1beta2;
+
+option go_package = "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2";
+option java_multiple_files = true;
+option java_package = "org.project_kessel.api.inventory.v1beta2";
+
+// DEPRECATED: RelationSubjectFilter is part of the legacy tuple-layer API.
+// This type exists only for RBAC backward compatibility and will be removed.
+message RelationSubjectFilter {
+  optional string subject_namespace = 1;
+  optional string subject_type = 2;
+  optional string subject_id = 3;
+  optional string relation = 4;
+}

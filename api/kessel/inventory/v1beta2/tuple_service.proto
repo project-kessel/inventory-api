@@ -1,0 +1,49 @@
+syntax = "proto3";
+
+package kessel.inventory.v1beta2;
+
+import "kessel/inventory/v1beta2/create_tuples_request.proto";
+import "kessel/inventory/v1beta2/create_tuples_response.proto";
+import "kessel/inventory/v1beta2/read_tuples_request.proto";
+import "kessel/inventory/v1beta2/read_tuples_response.proto";
+import "kessel/inventory/v1beta2/delete_tuples_request.proto";
+import "kessel/inventory/v1beta2/delete_tuples_response.proto";
+import "kessel/inventory/v1beta2/acquire_lock_request.proto";
+import "kessel/inventory/v1beta2/acquire_lock_response.proto";
+
+option go_package = "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2";
+option java_multiple_files = true;
+option java_package = "org.project_kessel.api.inventory.v1beta2";
+
+// DEPRECATED: KesselTupleService provides legacy tuple-layer operations.
+// This service exists only for RBAC backward compatibility and will be removed.
+// All endpoints are marked deprecated. Do not add new consumers.
+// Use KesselInventoryService's ReportResource for new integrations.
+service KesselTupleService {
+  // DEPRECATED: CreateTuples creates relationship tuples.
+  // This endpoint exists only for RBAC backward compatibility.
+  // Use ReportResource instead for new code.
+  rpc CreateTuples(CreateTuplesRequest) returns (CreateTuplesResponse) {
+    option deprecated = true;
+  }
+
+  // DEPRECATED: DeleteTuples deletes relationship tuples.
+  // This endpoint exists only for RBAC backward compatibility.
+  // Use DeleteResource instead for new code.
+  rpc DeleteTuples(DeleteTuplesRequest) returns (DeleteTuplesResponse) {
+    option deprecated = true;
+  }
+
+  // DEPRECATED: ReadTuples reads relationship tuples.
+  // This endpoint exists only for RBAC backward compatibility.
+  // Use StreamedListObjects/StreamedListSubjects instead for new code.
+  rpc ReadTuples(ReadTuplesRequest) returns (stream ReadTuplesResponse) {
+    option deprecated = true;
+  }
+
+  // DEPRECATED: AcquireLock acquires a distributed lock.
+  // This endpoint exists only for RBAC backward compatibility.
+  rpc AcquireLock(AcquireLockRequest) returns (AcquireLockResponse) {
+    option deprecated = true;
+  }
+}

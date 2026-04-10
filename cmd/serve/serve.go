@@ -29,6 +29,7 @@ import (
 
 	//v1beta2
 	resourcesvc "github.com/project-kessel/inventory-api/internal/service/resources"
+	tuplesvc "github.com/project-kessel/inventory-api/internal/service/tuples"
 
 	"github.com/project-kessel/inventory-api/internal/authn"
 	"github.com/project-kessel/inventory-api/internal/authz"
@@ -280,6 +281,10 @@ func NewCommand(
 			inventory_service := resourcesvc.NewKesselInventoryServiceV1beta2(inventory_controller)
 			pbv1beta2.RegisterKesselInventoryServiceServer(server.GrpcServer, inventory_service)
 			pbv1beta2.RegisterKesselInventoryServiceHTTPServer(server.HttpServer, inventory_service)
+
+			// DEPRECATED: Legacy tuple service for RBAC-only backward compatibility
+			tuple_service := tuplesvc.New(authorizer)
+			pbv1beta2.RegisterKesselTupleServiceServer(server.GrpcServer, tuple_service)
 
 			health_repo := healthrepo.New(db, authorizer, authzConfig)
 			health_controller := healthctl.New(health_repo, log.With(logger, "subsystem", "health_controller"))

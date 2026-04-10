@@ -158,6 +158,23 @@ func (a *KesselAuthz) DeleteTuples(ctx context.Context, r *kessel.DeleteTuplesRe
 	return resp, nil
 }
 
+func (a *KesselAuthz) ReadTuples(ctx context.Context, r *kessel.ReadTuplesRequest) (grpc.ServerStreamingClient[kessel.ReadTuplesResponse], error) {
+	opts, err := a.getCallOptions()
+	if err != nil {
+		a.incrFailureCounter("ReadTuples")
+		return nil, err
+	}
+
+	stream, err := a.TupleService.ReadTuples(ctx, r, opts...)
+	if err != nil {
+		a.incrFailureCounter("ReadTuples")
+		return nil, err
+	}
+
+	a.incrSuccessCounter("ReadTuples")
+	return stream, nil
+}
+
 func (a *KesselAuthz) LookupResources(ctx context.Context, in *kessel.LookupResourcesRequest) (grpc.ServerStreamingClient[kessel.LookupResourcesResponse], error) {
 	opts, err := a.getCallOptions()
 	if err != nil {

@@ -151,6 +151,42 @@ func (a *AllowAllAuthz) DeleteTuples(ctx context.Context, r *v1beta1.DeleteTuple
 	return &v1beta1.DeleteTuplesResponse{}, nil
 }
 
+type mockReadTuplesClient struct {
+	ctx context.Context
+}
+
+func (m *mockReadTuplesClient) Recv() (*v1beta1.ReadTuplesResponse, error) {
+	return nil, io.EOF
+}
+
+func (m *mockReadTuplesClient) Header() (metadata.MD, error) {
+	return nil, nil
+}
+
+func (m *mockReadTuplesClient) Trailer() metadata.MD {
+	return nil
+}
+
+func (m *mockReadTuplesClient) CloseSend() error {
+	return nil
+}
+
+func (m *mockReadTuplesClient) Context() context.Context {
+	return m.ctx
+}
+
+func (m *mockReadTuplesClient) SendMsg(msg interface{}) error {
+	return nil
+}
+
+func (m *mockReadTuplesClient) RecvMsg(msg interface{}) error {
+	return nil
+}
+
+func (a *AllowAllAuthz) ReadTuples(ctx context.Context, r *v1beta1.ReadTuplesRequest) (grpc.ServerStreamingClient[v1beta1.ReadTuplesResponse], error) {
+	return &mockReadTuplesClient{ctx: ctx}, nil
+}
+
 func (a *AllowAllAuthz) UnsetWorkspace(ctx context.Context, local_resource_id, name, namespace string) (*v1beta1.DeleteTuplesResponse, error) {
 	return &v1beta1.DeleteTuplesResponse{}, nil
 }

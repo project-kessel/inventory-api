@@ -16,7 +16,7 @@ import (
 	"github.com/project-kessel/inventory-api/internal/pubsub"
 	"github.com/project-kessel/inventory-api/internal/subject/selfsubject"
 	kessel "github.com/project-kessel/relations-api/api/kessel/relations/v1beta1"
-	"github.com/sony/gobreaker"
+	"github.com/sony/gobreaker/v2"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -64,7 +64,7 @@ type UsecaseConfig struct {
 type Usecase struct {
 	schemaService       *model.SchemaService
 	resourceRepository  model.ResourceRepository
-	waitForNotifBreaker *gobreaker.CircuitBreaker
+	waitForNotifBreaker *gobreaker.CircuitBreaker[any]
 	Authz               model.Authorizer
 	MetaAuthorizer      metaauthorizer.MetaAuthorizer
 	Namespace           string
@@ -77,7 +77,7 @@ type Usecase struct {
 
 func New(resourceRepository model.ResourceRepository, schemaRepository model.SchemaRepository,
 	authz model.Authorizer, namespace string, logger log.Logger,
-	listenManager pubsub.ListenManagerImpl, waitForNotifBreaker *gobreaker.CircuitBreaker, usecaseConfig *UsecaseConfig, metricsCollector *metricscollector.MetricsCollector, metaAuthorizer metaauthorizer.MetaAuthorizer, selfSubjectStrategy selfsubject.SelfSubjectStrategy) *Usecase {
+	listenManager pubsub.ListenManagerImpl, waitForNotifBreaker *gobreaker.CircuitBreaker[any], usecaseConfig *UsecaseConfig, metricsCollector *metricscollector.MetricsCollector, metaAuthorizer metaauthorizer.MetaAuthorizer, selfSubjectStrategy selfsubject.SelfSubjectStrategy) *Usecase {
 	if metaAuthorizer == nil {
 		metaAuthorizer = metaauthorizer.NewSimpleMetaAuthorizer()
 	}
@@ -195,7 +195,7 @@ func (uc *Usecase) ReportResource(ctx context.Context, cmd ReportResourceCommand
 		timeoutCtx, cancel := context.WithTimeout(ctx, listenTimeout)
 		defer cancel()
 
-		_, err := uc.waitForNotifBreaker.Execute(func() (interface{}, error) {
+		_, err := uc.waitForNotifBreaker.Execute(func() (any, error) {
 			err = subscription.BlockForNotification(timeoutCtx)
 			if err != nil {
 				// Return error for circuit breaker

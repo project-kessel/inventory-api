@@ -20,7 +20,8 @@ type FindResourceByKeysResult struct {
 	RepresentationVersion uint      `gorm:"column:representation_version"`
 	Generation            uint      `gorm:"column:generation"`
 	Tombstone             bool      `gorm:"column:tombstone"`
-	CommonVersion         uint      `gorm:"column:common_version"`
+	CommonVersion         *uint     `gorm:"column:common_version"`
+	LastCommonVersion     *uint     `gorm:"column:last_common_version"`
 	ResourceID            uuid.UUID `gorm:"column:resource_id"`
 	ResourceType          string    `gorm:"column:resource_type"`
 	LocalResourceID       string    `gorm:"column:local_resource_id"`
@@ -61,12 +62,13 @@ func ToSnapshotsFromResults(results []FindResourceByKeysResult) (*bizmodel.Resou
 func (result FindResourceByKeysResult) ToSnapshots() (bizmodel.ResourceSnapshot, bizmodel.ReporterResourceSnapshot) {
 	// Create ResourceSnapshot
 	resourceSnapshot := bizmodel.ResourceSnapshot{
-		ID:               result.ResourceID,
-		Type:             result.ResourceType,
-		CommonVersion:    result.CommonVersion,
-		ConsistencyToken: result.ConsistencyToken,
-		CreatedAt:        result.CreatedAt,
-		UpdatedAt:        result.UpdatedAt,
+		ID:                result.ResourceID,
+		Type:              result.ResourceType,
+		CommonVersion:     result.CommonVersion,
+		LastCommonVersion: result.LastCommonVersion,
+		ConsistencyToken:  result.ConsistencyToken,
+		CreatedAt:         result.CreatedAt,
+		UpdatedAt:         result.UpdatedAt,
 	}
 
 	// Create ReporterResourceKeySnapshot
@@ -236,6 +238,7 @@ func (r *resourceRepository) FindResourceByKeys(tx *gorm.DB, key bizmodel.Report
 		rr2.generation,
 		rr2.tombstone,
 		res.common_version,
+		(SELECT MAX(cr.version) FROM common_representations cr WHERE cr.resource_id = res.id) AS last_common_version,
 		res.id AS resource_id,
 		res.ktn AS consistency_token,
 		res.created_at,
@@ -252,7 +255,14 @@ func (r *resourceRepository) FindResourceByKeys(tx *gorm.DB, key bizmodel.Report
 		JOIN resource AS res ON res.id = rr2.resource_id
 	`)
 
-	err := r.buildReporterResourceKeyQuery(query, key).Find(&results).Error // Use Find since it returns multiple rows
+	// ORDER BY aligns with the fake repository's deterministic tie-breaking:
+	// non-tombstoned rows first, then highest representation_version, then generation.
+	// This ensures results[0] (used as the primary resource snapshot) is the same
+	// "latest" row the fake selects. We do not LIMIT 1 here because all rr2 rows
+	// are intentionally collected as reporter resource snapshots.
+	err := r.buildReporterResourceKeyQuery(query, key).
+		Order("rr2.tombstone ASC, rr2.representation_version DESC, rr2.generation DESC").
+		Find(&results).Error
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to find resource by keys: %w", err)

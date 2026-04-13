@@ -18,6 +18,10 @@ Run read-only SQL queries against the Kessel Inventory database in stage or prod
 
 **Safety**: `gabi` provides read-only database access. DML statements (INSERT, UPDATE, DELETE, etc.) are not permitted.
 
+**Read replica**: In production, gabi connects to a read replica, not the primary. Features that exist only on the primary (replication slots, WAL stats, etc.) will not be available.
+
+**Query timeout**: Queries are subject to a 30-second timeout. Prefer small, targeted queries over large joins or full-table scans. Break complex investigations into sequential steps rather than a single monolithic query.
+
 **Output format**: `gabi exec` returns JSON (array of objects). Prefer selecting specific columns over `SELECT *` on tables with jsonb fields (`data`, `metrics`, `payload`), and always use `LIMIT`. Tokens expire -- if queries fail with auth errors, refresh with `gabi config settoken <new-token>`.
 
 ## Setup (if not configured)
